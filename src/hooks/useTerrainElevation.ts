@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { TERRAIN_ELEVATION_VERSION, applyTerrainElevation, roundTerrainZ, terrainSamplePoints } from '../land/terrainElevation';
+import {
+  TERRAIN_ELEVATION_VERSION, applyTerrainElevation, readTerrainElevation, roundTerrainZ, terrainSamplePoints, type SessionTerrainElevation,
+} from '../land/terrainElevation';
 import type { TrackPoint } from '../core/types';
-import type { SessionTerrainElevation } from '../library/record';
 import { IGN_RESOURCE, fetchIgnElevations } from '../planning/ignAltimetry';
 import { createSessionAssetCache, useSessionAsset } from './sessionAsset';
 import { updateSessionRecord, useLibrarySession } from './useSessionLibrary';
@@ -75,7 +76,7 @@ export const useTerrainElevation = (
   const key = startMs !== null && stepM !== null ? cacheKey(startMs, stepM) : null;
   const wanted = source === 'ign' && key !== null;
   const { value: terrain, error: failed, retry } = useSessionAsset({
-    cache, file, key, active: wanted, field: 'terrainElevation', errorText: 'Altitude de l\'IGN indisponible.',
+    cache, file, key, active: wanted, field: 'terrainElevation', read: readTerrainElevation, errorText: 'Altitude de l\'IGN indisponible.',
     isCurrent: (stored) => isCurrent(stored, startMs, stepM),
     compute: () => search(track, cumDist, stepM ?? 0),
   });

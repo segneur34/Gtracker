@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RESTING_HR_TEST, type RestingSample } from '../recording/restingHrTest';
-import { restingHrResult } from '../running/restingHrResults';
+import { restingHrResult } from './restingHrResults';
 import {
   MAX_STORED_RESTING_RESULTS, mergeRestingResults, parseRestingHrFile, readStoredRestingResults, restingHrFileText,
   sameRestingResults, toStoredRestingResult, type StoredRestingResult,

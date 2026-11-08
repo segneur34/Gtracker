@@ -4,8 +4,8 @@ import { computeKinematics } from '../core/kinematics';
 import type { RawTrackPoint } from '../core/types';
 import type { RouteLeg, RoutePoint } from './route';
 import {
-  PAVED_CATEGORIES, SURFACE_VALUES, buildSurfaceRuns, classifySurface, legSurfaceStretches, parseWayTags, readSurfaceRuns, routeSurfacePaths, routeSurfaces,
-  shiftSurfaceRuns, summarizeSurfaces, surfaceHighlight, surfacePaths, tagsAt, trackSurfaceStretches, wayTagsText,
+  PAVED_CATEGORIES, SURFACE_VALUES, buildSurfaceRuns, classifySurface, legSurfaceStretches, parseWayTags, readSessionSurfaces, readSurfaceRuns, routeSurfacePaths, routeSurfaces,
+  shiftSurfaceRuns, summarizeSurfaces, surfaceHighlight, surfacePaths, tagsAt, trackSurfaceStretches, wayTagsText, type SessionSurfaces,
 } from './surface';
 import { at as geoAt } from '../test/geo.fixture';
 
@@ -285,5 +285,24 @@ describe('revêtement : curseur sur les morceaux (lot 56)', () => {
       expect(legSurfaceStretches(points, surfaces).map((s) => s.category)).toEqual(frozenLeg(points, surfaces));
     }
     expect(legSurfaceStretches(north(5), undefined).map((s) => s.category)).toEqual(frozenLeg(north(5), undefined));
+  });
+});
+
+describe('readSessionSurfaces : voies rangées dans la fiche (lues ici depuis le lot 301)', () => {
+  const surfaces: SessionSurfaces = {
+    source: 'overpass', fetchedAt: '2026-10-04T15:00:00.000Z', matchVersion: 1, startMs: 1_790_000_000_000,
+    tags: ['highway=residential', 'highway=track tracktype=grade2'], runs: [[0, 0], [125_000, 1], [300_000, -1]],
+  };
+
+  it("relit des voies bien formées à l'identique, champs inconnus gardés", () => {
+    expect(readSessionSurfaces(JSON.parse(JSON.stringify(surfaces)))).toEqual(surfaces);
+    expect(readSessionSurfaces({ ...surfaces, futur: 1 })).toEqual({ ...surfaces, futur: 1 });
+  });
+
+  it('rend null pour des voies absentes ou mal formées', () => {
+    expect(readSessionSurfaces(undefined)).toBeNull();
+    expect(readSessionSurfaces({ ...surfaces, runs: [[5, 0]] })).toBeNull();
+    expect(readSessionSurfaces({ ...surfaces, source: 'ailleurs' })).toBeNull();
+    expect(readSessionSurfaces({ ...surfaces, matchVersion: 'un' })).toBeNull();
   });
 });

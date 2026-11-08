@@ -1,12 +1,12 @@
 import { finiteOr, isFiniteNumber, isObject, parseJson, roundTo, stringifyJson } from '../core/basics';
 import type { RestingHrProtocol } from '../recording/restingHrTest';
-import type { RestingHrResult } from '../running/restingHrResults';
+import type { RestingHrResult } from './restingHrResults';
 
 /**
  * Tests de FC repos tels qu'ils sont gardés sur l'appareil (clé
  * `tracker.restingHr`, lue et écrite par `hooks/useRestingHrResults.ts`) :
  * forme gardée, relecture tolérante, au plus `MAX_STORED_RESTING_RESULTS`. Le
- * calcul du résultat est dans `running/restingHrResults.ts`.
+ * calcul du résultat est dans `library/restingHrResults.ts`.
  */
 
 /** Test gardé : le résultat et l'instant du départ, la courbe en entiers. */

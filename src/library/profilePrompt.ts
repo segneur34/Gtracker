@@ -31,8 +31,12 @@ export const runnerRootGoalMin = (profile: Partial<Pick<RunnerProfile, 'rootWeek
   return inRange(raw, lo, hi) ? raw : ROOT_GOAL.defaultMin;
 };
 
-/** Champs que le pop-up de l'accueil demande tant qu'ils manquent ; la FC max et la FC repos viennent des tests. */
-export const PROFILE_PROMPT_FIELDS = ['name', 'birthYear', 'sex', 'weightKg', 'heightCm'] as const;
+/**
+ * Champs que le pop-up de l'accueil demande tant qu'ils manquent : le pseudo et l'année de naissance (lot 301) ;
+ * sexe, poids et taille ne sont plus demandés, ils se règlent dans Réglages › Pratiquant ; la FC max et la FC repos
+ * viennent des tests.
+ */
+export const PROFILE_PROMPT_FIELDS = ['name', 'birthYear'] as const;
 export type ProfilePromptField = (typeof PROFILE_PROMPT_FIELDS)[number];
 
 /** Champs du pop-up qui manquent au profil, dans leur ordre ; vide : le profil est rempli. */
@@ -40,7 +44,6 @@ export const missingProfileFields = (profile: Partial<RunnerProfile>): ProfilePr
   PROFILE_PROMPT_FIELDS.filter((field) => {
     switch (field) {
       case 'name': return runnerName({ name: profile.name ?? null }) === null;
-      case 'sex': return profile.sex !== 'f' && profile.sex !== 'm';
       default: return !validProfileNumber(field, profile[field]);
     }
   });

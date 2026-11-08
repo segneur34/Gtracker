@@ -1,5 +1,4 @@
-import { roundTo } from '../core/basics';
-import { median } from '../core/basics';
+import { isFiniteNumber, isObject, median, roundTo } from '../core/basics';
 import type { TrackPoint } from '../core/types';
 
 /**
@@ -140,3 +139,48 @@ export const applyTerrainElevation = (
 
 /** Altitudes rangées au centimètre. */
 export const roundTerrainZ = (z: number | null): number | null => (z === null ? null : roundTo(z, 2));
+
+/**
+ * Altitude du terrain, demandée à l'IGN (`planning/ignAltimetry.ts`) à la
+ * première ouverture de l'analyse course ou vélo, puis gardée dans sa fiche
+ * (`SessionRecord.terrainElevation`, brute : lue ici depuis le lot 301). Un échantillon
+ * tous les `stepM` mètres, repéré par son instant.
+ */
+export interface SessionTerrainElevation extends TerrainSamples {
+  source: 'ign';
+  /** Modèle demandé (`IGN_RESOURCE`). */
+  resource: string;
+  /** Version de l'échantillonnage (`TERRAIN_ELEVATION_VERSION`) : une plus ancienne est redemandée. */
+  version: number;
+  /** Pas des échantillons, en mètres : un autre pas réglé est redemandé. */
+  stepM: number;
+  /** Date ISO de la demande. */
+  fetchedAt: string;
+}
+
+/**
+ * Altitude du terrain relue, `null` si elle est mal formée : instants entiers,
+ * strictement croissants depuis 0, autant d'altitudes que d'instants.
+ */
+export const readTerrainElevation = (raw: unknown): SessionTerrainElevation | null => {
+  if (!isObject(raw) || raw.source !== 'ign' || typeof raw.resource !== 'string' || typeof raw.fetchedAt !== 'string') return null;
+  if (!isFiniteNumber(raw.version) || !isFiniteNumber(raw.stepM) || raw.stepM <= 0 || !isFiniteNumber(raw.startMs)) return null;
+  const { t, z } = raw;
+  if (!Array.isArray(t) || !Array.isArray(z) || t.length === 0 || t.length !== z.length) return null;
+  for (let i = 0; i < t.length; i++) {
+    const ti: unknown = t[i];
+    if (!Number.isInteger(ti) || (i === 0 ? ti !== 0 : (ti as number) <= (t[i - 1] as number))) return null;
+    if (z[i] !== null && !isFiniteNumber(z[i])) return null;
+  }
+  return {
+    ...raw,
+    source: 'ign',
+    resource: raw.resource,
+    version: raw.version,
+    stepM: raw.stepM,
+    fetchedAt: raw.fetchedAt,
+    startMs: raw.startMs,
+    t: t as number[],
+    z: z as (number | null)[],
+  };
+};

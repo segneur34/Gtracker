@@ -30,7 +30,7 @@ const ALL_SPORTS = Object.keys(SPORT_PROFILES) as SportType[];
  * des onze si le calcul est à deviner.
  */
 export const summarizeGpxOptions = (
-  record: (Partial<Pick<RecordWithoutSummary, 'analysis' | 'terrainElevation' | 'elevationSource' | 'test'>> & { sport: SportType | null | undefined }) | null | undefined,
+  record: (Partial<Pick<RecordWithoutSummary, 'analysis' | 'terrainElevation' | 'elevationSource'>> & { sport: SportType | null | undefined }) | null | undefined,
   activityOf: (sport: SportType) => ActivitySummarySettings
 ): SummarizeGpxOptions => {
   const sport = record ? record.sport : undefined;
@@ -45,7 +45,6 @@ export const summarizeGpxOptions = (
       ? {
         ...(record.terrainElevation !== undefined ? { terrainElevation: record.terrainElevation } : {}),
         ...(record.elevationSource !== undefined ? { elevationSource: record.elevationSource } : {}),
-        ...(record.test !== undefined ? { test: record.test } : {}),
       }
       : undefined,
   };

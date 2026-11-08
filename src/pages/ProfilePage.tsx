@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ActivityChart from '../components/ActivityChart';
 import ActivityArt from '../components/activityArt';
 import MemoryStatus from '../components/MemoryStatus';
@@ -12,7 +12,7 @@ import { activityFamily, type Activity } from '../core/activities';
 import { plural } from '../core/basics';
 import { activityIcon } from '../core/activityIcons';
 import { DISTANCE_UNIT_SYMBOL, formatDuration, toDisplayDistance } from '../core/units';
-import { libraryPath } from '../core/parentPage';
+import { RESTING_HR_PATH, libraryPath } from '../core/parentPage';
 import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useProfileRoot } from '../hooks/useProfileRoot';
@@ -194,7 +194,13 @@ function ProfilePage() {
           <ProfileAvatar avatar={avatar}
             fallback={overallFavorite ? { icon: activityIcon(overallFavorite), color: shown(overallFavorite.color) } : null} />
         </button>
-        <h1 className="profile-head__title">{name ?? 'Profil'}</h1>
+        <div className="profile-head__text">
+          <h1 className="profile-head__title">{name ?? 'Profil'}</h1>
+          {/* Le test de FC repos (lot 301), sous le titre : la hauteur de l'en-tête, et donc la racine, ne bougent pas. */}
+          <Link to={RESTING_HR_PATH} className="profile-head__link">
+            Test de FC repos<IconChevronRight size={14} aria-hidden="true" />
+          </Link>
+        </div>
         <RootSlot growth={root.growth} open={rootOpen} onToggle={() => setRootOpen(!rootOpen)} />
       </header>
       {picking && <AvatarPicker avatar={avatar} onPick={setAvatar} onClose={() => setPicking(false)} />}

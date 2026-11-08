@@ -123,6 +123,39 @@ describe('fiche, compatibilité (e) aller-retour sur une fiche complète', () =>
   });
 });
 
+describe("fiche, compatibilité (f) fiche de l'application complète, champs de la terre gardés bruts (lot 301)", () => {
+  // Fiche telle que l'écrit l'application complète : poids et charge, voies, altitude du terrain, séances (l'une
+  // mal formée), test guidé, cadence et test du résumé. La version voile et surf ne lit plus ces champs-là.
+  const START = 1790000000000;
+  const complete = {
+    ...sessionRecord({ gpx: '2026-09-23_14-00-00_course.gpx', sport: 'running', activityId: 'course', name: 'Footing' },
+      { cadence: { avgSpm: 172.5, steps: 9800 } }),
+    analysis: {
+      windDeg: null, activeThreshold: 1.2, referenceSpeedMs: null, speedRange: null, effortThresholdMs: 4.35, foil: null, pumping: null,
+      waveThreshold: null, bikeWeightKg: 9.8, loadKg: 4.5, savedAt: 4,
+    },
+    surfaces: { source: 'overpass', fetchedAt: '2026-10-04T15:00:00.000Z', matchVersion: 3, startMs: START, tags: ['highway=track'], runs: [[0, 0]] },
+    terrainElevation: { source: 'ign', resource: 'ign_rge_alti_wld', version: 1, stepM: 10, fetchedAt: '2026-10-07T09:00:00.000Z', startMs: START, t: [0, 1800], z: [120.5, null] },
+    elevationSource: 'gps',
+    intervals: [{ workout: { reps: 1, workS: 60, restS: 30 }, laps: [{ kind: 'sprint', rep: 1, startMs: START, endMs: START + 60_000 }] }],
+    test: { protocol: 'fc-max', version: 1, settings: { warmupS: 480 }, startMs: START, steps: [], signals: [] },
+  };
+  const text = serializeRecord(complete as unknown as SessionRecord);
+
+  it('relue, renommée, réécrite : chaque champ revient identique, nom excepté', () => {
+    const rewritten = rewriteAfterRename(text);
+    expect(rewritten.name).toBe('Renommée');
+    expect({ ...rewritten, name: 'Footing' }).toEqual(JSON.parse(text));
+  });
+
+  it('les champs bruts suivent la fiche dans le cache allégé et la fusion avec le disque', () => {
+    const read = parseRecord(text)!;
+    for (const key of ['surfaces', 'terrainElevation', 'intervals', 'test'] as const) expect(read[key]).toEqual(complete[key]);
+    expect((read.summary as unknown as Record<string, unknown>).cadence).toEqual({ avgSpm: 172.5, steps: 9800 });
+    expect(mergeLightRecord(read, lightRecord(read))).toEqual(read);
+  });
+});
+
 describe('fiche, compatibilité : BOM, CRLF, tronqué, vide', () => {
   const text = serializeRecord(sessionRecord({ name: 'Sortie' }));
   it('BOM en tête : retiré, fiche lue', () => {

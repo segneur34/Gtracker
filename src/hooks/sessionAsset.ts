@@ -1,6 +1,6 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { plainError } from '../platform/errorText';
-import type { RecordPatch, SessionRecord } from '../library/record';
+import type { RecordPatch } from '../library/record';
 import { librarySession, updateSessionRecord, useLibrarySession } from './useSessionLibrary';
 
 /**
@@ -64,7 +64,7 @@ export const createSessionAssetCache = <V>(): SessionAssetCache<V> => {
 export type SessionAssetField = 'surfaces' | 'terrainElevation' | 'jumps';
 
 /** Range le résultat dans la fiche, si la session est dans la mémoire et que sa fiche peut être réécrite. */
-const store = <F extends SessionAssetField>(file: string | null, field: F, value: NonNullable<SessionRecord[F]>): void => {
+const store = (file: string | null, field: SessionAssetField, value: unknown): void => {
   const session = file !== null ? librarySession(file) : undefined;
   if (session && !session.readOnly) updateSessionRecord(session.file, { [field]: value } as RecordPatch);
 };
@@ -72,30 +72,34 @@ const store = <F extends SessionAssetField>(file: string | null, field: F, value
 /**
  * Résultat d'une recherche par trace : celui de la fiche s'il est à jour
  * (`isCurrent`), sinon celui trouvé pendant ce lancement, sinon cherché
- * (`compute`) quand `active` et la fiche relue en entier. Un résultat trouvé
+ * (`compute`) quand `active` et la fiche relue en entier. Le champ de la fiche
+ * est lu par `read` (le revêtement et l'altitude y sont bruts depuis le lot 301 :
+ * leur domaine les lit ; une valeur mal formée vaut absente). Un résultat trouvé
  * avant que la bibliothèque connaisse la session y est rangé dès qu'elle la
  * connaît. `error` : message de la dernière recherche échouée pour cette clé,
  * `retry` l'efface et relance.
  */
-export const useSessionAsset = <F extends SessionAssetField>({
-  cache, file, key, isCurrent, active, compute, field, errorText,
+export const useSessionAsset = <V>({
+  cache, file, key, isCurrent, active, compute, field, read, errorText,
 }: {
-  cache: SessionAssetCache<NonNullable<SessionRecord[F]>>;
+  cache: SessionAssetCache<V>;
   file: string | null;
   /** Clé de la trace ; `null` : rien à chercher. */
   key: string | null;
-  isCurrent: (value: NonNullable<SessionRecord[F]> | undefined) => boolean;
+  isCurrent: (value: V | undefined) => boolean;
   active: boolean;
-  compute: () => Promise<NonNullable<SessionRecord[F]>>;
-  field: F;
+  compute: () => Promise<V>;
+  field: SessionAssetField;
+  /** Lecture du champ de la fiche, `null` s'il est mal formé ; une fonction stable (relue quand le champ change). */
+  read: (raw: unknown) => V | null;
   /** Message d'une erreur sans texte. */
   errorText: string;
 }) => {
-  type V = NonNullable<SessionRecord[F]>;
   const session = useLibrarySession(file);
   // Fiche allégée, pas encore relue en entier : son résultat rangé n'est pas encore connu.
   const partial = session?.partial === true;
-  const stored = session?.record[field] as V | undefined;
+  const raw: unknown = session?.record[field];
+  const stored = useMemo(() => (raw === undefined ? undefined : read(raw) ?? undefined), [raw, read]);
   useSyncExternalStore(cache.subscribe, cache.version);
   const [error, setError] = useState<{ key: string; message: string } | null>(null);
 

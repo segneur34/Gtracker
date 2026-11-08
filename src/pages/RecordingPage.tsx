@@ -79,6 +79,7 @@ import { canLockOrientation, isOrientationLocked, keepScreenOn, lockOrientation,
 import { fixesFromRawPoints, recordingDurationMs, isAutoPause, isManualPause } from '../recording/session';
 import { FITNESS_TESTS, FITNESS_TEST_IDS, isFitnessTestId, type FitnessTestId } from '../recording/fitnessTest';
 import { RESTING_HR_TEST, type RestingHrTestId } from '../recording/restingHrTest';
+import { RESTING_HR_PATH } from '../core/parentPage';
 import { NO_BAND_PICKS, ZONE_TARGETS, armableBand, bandLabel, type HeartBand, type HeartBandPicks, type ZoneTarget } from '../recording/zoneAlert';
 import HeartBandPicker from '../components/HeartBandPicker';
 import Dialog from '../components/ui/Dialog';
@@ -1179,7 +1180,7 @@ function RecordingScreen() {
           <p className="rec-lead">
             Test de {RESTING_HR_TEST.durationS / 60} min, assis ou allongé, ceinture cardio portée, sans GPS : il se fait sur sa page.
           </p>
-          <Button variant="record" size="l" block onClick={() => navigate(`/fractionne/tests/${RESTING_HR_TEST.id}`)}>
+          <Button variant="record" size="l" block onClick={() => navigate(RESTING_HR_PATH)}>
             Ouvrir le test
           </Button>
         </Card>

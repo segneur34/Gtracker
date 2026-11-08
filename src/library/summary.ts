@@ -26,14 +26,11 @@ import {
 import type { CumulativeTrack, RawTrackPoint, SportType, TimedTrackPoint, TrackPoint } from '../core/types';
 import type { BikeType } from '../core/domainTypes';
 import { computeCyclingEnergy, cyclingEnergyParams } from '../cycling/energy';
-import { applyTerrainElevation, type TerrainSamples } from '../land/terrainElevation';
+import { applyTerrainElevation, readTerrainElevation } from '../land/terrainElevation';
 import { msToKnots } from '../core/units';
 import { suggestActiveThresholdKn } from '../sailing/sailingConfig';
 import { runSurfSession, surfProfileOf } from '../surfing/surfSession';
-import { FITNESS_TESTS, type SessionTest } from '../recording/fitnessTest';
-import { fitnessTestResults, summaryOfTest } from '../running/fitnessTestResults';
-import { SUMMARY_CALC_VERSION, type SessionSummary, type SummaryBests, type SummaryCadence, type SummaryHeartRate } from './record';
-import { analyzeCadence, sessionCadence, type CadenceDetection } from '../running/cadence';
+import { SUMMARY_CALC_VERSION, type SessionSummary, type SummaryBests, type SummaryHeartRate } from './record';
 
 /**
  * Résumé d'une session pour la bibliothèque : ce que la liste affiche sans
@@ -60,16 +57,15 @@ export interface SummaryOptions {
   /** Réglage du dénivelé. Absent : celui du profil. */
   elevation?: ElevationProfile;
   /**
-   * Altitude du terrain de la fiche, substituée à celle du GPS avant le
-   * dénivelé (course, vélo, source IGN : l'appelant en décide).
+   * Altitude du terrain de la fiche, telle qu'elle y est rangée (brute depuis le lot 301, lue ici par
+   * `readTerrainElevation` : mal formée, elle est ignorée), substituée à celle du GPS avant le dénivelé
+   * (course, vélo, source IGN : l'appelant en décide).
    */
-  terrainElevation?: TerrainSamples;
+  terrainElevation?: unknown;
   /** Support sur foil de la session (surf : il change le seuil par défaut et l'analyse). */
   foil?: boolean;
   /** Seuil de vague en foil de la session, dans l'unité du profil (surf). */
   waveThreshold?: number;
-  /** Test guidé de la fiche, dont le résumé garde la FC max et le dernier palier tenu. */
-  test?: SessionTest;
   /**
    * Vélo (lot 146) : vélo et poids du pratiquant pour la meilleure puissance estimée sur 20 min ; sans poids du
    * pratiquant (`riderKg` `null`), ou absent, elle n'est pas cherchée.
@@ -124,7 +120,7 @@ const analyze = (
   track: TrackPoint[];
   movingTimeS: number | null;
   movingDistanceM: number | null;
-  /** Masque d'activité (hors surf), pour la cadence en mouvement. */
+  /** Masque d'activité (hors surf), pour les meilleurs efforts. */
   mask?: boolean[];
   /** Voile à seuil : temps en mouvement, dénominateur du ratio (`SessionSummary.inMotionS`). */
   inMotionS?: number;
@@ -192,7 +188,8 @@ export const summarizeSession = (
 
   const cum = buildCumulativeTrack(analyzed.track);
   const { cumDist } = cum;
-  const track = options.terrainElevation ? applyTerrainElevation(analyzed.track, cumDist, options.terrainElevation).track : analyzed.track;
+  const terrain = options.terrainElevation === undefined ? null : readTerrainElevation(options.terrainElevation);
+  const track = terrain ? applyTerrainElevation(analyzed.track, cumDist, terrain).track : analyzed.track;
   // Sans calcul connu : le profil neutre (valeurs communes, cardio de référence), le même résumé qu'avec la course.
   const profile = sport === null ? UNCLASSIFIED_PROFILE : getSportProfile(sport);
   const elevationProfile = options.elevation ?? profile.elevation;
@@ -204,9 +201,6 @@ export const summarizeSession = (
     ?? bestWindowSpeedMs(analyzed.track, cum, profile.maxSpeedWindowS)
     ?? maxSmoothedSpeedMs(track);
   const heartRate = summaryHeartRate(track, profile.heartRate);
-  const cadenceParams = sport ? getSportProfile(sport).cadence : null;
-  const cadence = cadenceParams ? summaryCadence(track, analyzed.mask ?? track.map(() => true), cadenceParams) : undefined;
-  const test = options.test ? summaryOfTest(fitnessTestResults(track, options.test, FITNESS_TESTS[options.test.protocol])) : null;
   const tops = summaryTops(analyzed.track, cum, sport);
   const bests = sport !== null ? summaryBests(sport, analyzed.track, cum, track, elevation, analyzed.mask, options.cyclingPower) : undefined;
 
@@ -224,8 +218,6 @@ export const summarizeSession = (
     samplingS: samplingIntervalS(rawPoints),
     ...analyzed.surf,
     ...(heartRate ? { heartRate } : {}),
-    ...(cadence ? { cadence } : {}),
-    ...(test ? { test } : {}),
     ...tops,
     ...(bests ? { bests } : {}),
   };
@@ -326,14 +318,6 @@ export const summarizeHeartRateSession = (timedPoints: readonly TimedTrackPoint[
     samplingS: samplingIntervalS(timedPoints),
     ...(heartRate ? { heartRate } : {}),
   };
-};
-
-/** Cadence du résumé, comme l'onglet « cadence » la mesure ; rien sous `minCoverageS`. */
-const summaryCadence = (track: TrackPoint[], mask: boolean[], params: CadenceDetection): SummaryCadence | undefined => {
-  const cadence = sessionCadence(track, params);
-  if (!cadence.present) return undefined;
-  const analysis = analyzeCadence(track, cadence.spm, mask, null, params);
-  return analysis ? { avgSpm: roundTo(analysis.averageSpm, 1), steps: Math.round(analysis.steps) } : undefined;
 };
 
 /** FC du résumé, comme l'onglet « cardio » la mesure ; rien sous `minCoverageS`. */

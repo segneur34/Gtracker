@@ -9,6 +9,7 @@
 import type { Activity } from '../core/activities';
 import { ZONE_COUNT, edwardsLoad, histogramZoneTimes } from '../core/heartRate';
 import { repsDone } from '../land/heartRateSession';
+import { readIntervalSeries } from '../recording/intervalTimer';
 import { hasPositions, sportFamily, sportTreatment, type SportFamily, type Treatment } from '../core/sportProfiles';
 import { DAY_MS, addDays, addMonths, isoWeek, monthYearLong, monthYearShort, shortDate, stacksByActivity, startOfDay, startOfIsoWeek, startOfMonth } from '../core/calendar';
 import { CHART_PERIODS, chartPeriodBounds, type ChartRange } from './activityChart';
@@ -106,7 +107,7 @@ export const statSessionOf = (file: string, record: SessionRecord, activity: Act
     longestWaveM: summary.longestWaveM ?? null,
     longestFlightS: summary.longestFlightS ?? null,
     flightS: summary.flightS ?? null,
-    reps: repsDone(record.intervals),
+    reps: repsDone(readIntervalSeries(record.intervals)),
     heartRate: summary.heartRate ?? null,
     cadenceSpm: summary.cadence?.avgSpm ?? null,
     gear: record.notes?.gear ?? null,

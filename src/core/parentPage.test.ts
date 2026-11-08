@@ -27,7 +27,9 @@ describe('parentPage', () => {
     expect(parentPage('/fractionne/tests', '')).toBe('/fractionne');
     // Lot I du 25/10 : les tuiles des tests sont sous « Fractionné et tests ».
     expect(parentPage('/fractionne/tests/fc-max', '')).toBe('/fractionne/seances');
-    expect(parentPage('/fractionne/tests/fc-repos', '')).toBe('/fractionne/seances');
+    // Lot 301 : le test de FC repos est sous le Profil.
+    expect(parentPage('/profil/fc-repos', '')).toBe('/profil');
+    expect(parentPage('/profil/fc-repos/', '?vitesse=10')).toBe('/profil');
     expect(parentPage('/fractionne/timer', '')).toBe('/fractionne');
     expect(parentPage('/fractionne/timer/editer', '?id=s1')).toBe('/fractionne/timer');
     expect(parentPage('/course/seances', '')).toBe('/');

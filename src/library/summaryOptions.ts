@@ -69,8 +69,8 @@ export const sessionFoil = (
   deviceFoil: boolean | null
 ): boolean => record?.analysis?.foil ?? sessionActivitySettings(record, { thresholdOverride: undefined, foil: deviceFoil }).foil ?? false;
 
-/** Altitude de la fiche (celle du terrain, et la source choisie) et son test guidé. */
-export type SessionElevation = Pick<SessionRecord, 'terrainElevation' | 'elevationSource' | 'test'>;
+/** Altitude de la fiche (celle du terrain, brute, et la source choisie). */
+export type SessionElevation = Pick<SessionRecord, 'terrainElevation' | 'elevationSource'>;
 
 /**
  * Réglages qui changent le résumé : ceux de l'activité de la session, et ceux
@@ -98,7 +98,6 @@ export const summaryOptions = (
     // Surf : le foil de la session, sinon celui de son activité ; son seuil de vague en foil.
     foil: analysis?.foil ?? activity.foil ?? undefined,
     waveThreshold: analysis?.waveThreshold ?? undefined,
-    test: elevation?.test,
     ...(sportTreatment(sport) === 'velo' && activity.cycling
       ? {
         cyclingPower: {
@@ -115,8 +114,8 @@ export const summaryOptions = (
  * Empreinte des réglages qui changent le résumé, gardée dans le résumé (`SessionSummary.optionsKey`,
  * lot 37) : seuil, allure imposée, foil en surf (ailleurs il ne change pas le résumé) et seuil de
  * vague ; à vélo, depuis le lot 146, le type et le poids du vélo (cinquième place, absente ailleurs :
- * les empreintes des autres calculs ne changent pas). L'altitude du terrain et le test guidé n'y sont pas :
- * ils sont dans la fiche, et leur changement refait déjà le résumé (`applyRecordPatch`).
+ * les empreintes des autres calculs ne changent pas). L'altitude du terrain n'y est pas : elle est dans la
+ * fiche, et son changement refait déjà le résumé (`applyRecordPatch`).
  */
 export const summaryOptionsKey = (sport: SportType, options: SummaryOptions): string =>
   JSON.stringify([
@@ -197,7 +196,7 @@ export interface AnalyzedGpx {
  * Lit un GPX et le résume. `sport` absent : deviné depuis la trace.
  * `analysis` : réglages d'analyse de la fiche (seuil, allure), s'il y en a ;
  * `activityOf` : réglages de l'activité de la session pour le calcul retenu ;
- * `elevation` : son altitude du terrain, la source choisie et son test guidé.
+ * `elevation` : son altitude du terrain et la source choisie.
  * Rend `null` si la trace a moins de deux points, lève une erreur si le XML
  * est illisible.
  */

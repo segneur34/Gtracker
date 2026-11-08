@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import type { TrackPoint } from '../core/types';
-import type { SessionSurfaces } from '../library/record';
 import { fetchWays } from '../planning/overpass';
 import {
-  summarizeSurfaces, surfacePaths, trackSurfaceStretches, type SurfacePath, type SurfaceStretch, type SurfaceTotal,
+  readSessionSurfaces, summarizeSurfaces, surfacePaths, trackSurfaceStretches, type SessionSurfaces, type SurfacePath, type SurfaceStretch,
+  type SurfaceTotal,
 } from '../planning/surface';
 import { WAY_MATCH_DEFAULTS, WAY_MATCH_VERSION, queryLines, trackSurfaceRuns } from '../planning/wayMatch';
 import { createSessionAssetCache, useSessionAsset } from './sessionAsset';
@@ -44,7 +44,7 @@ export const useSessionSurfaces = (track: TrackPoint[], file: string | null, act
   const startMs = track.length > 1 ? track[0].timeMs : null;
   const { value: surfaces, error: failed, retry } = useSessionAsset({
     cache, file, key: startMs !== null ? String(startMs) : null,
-    isCurrent, active, compute: () => search(track), field: 'surfaces', errorText: 'Recherche des voies impossible.',
+    isCurrent, active, compute: () => search(track), field: 'surfaces', read: readSessionSurfaces, errorText: 'Recherche des voies impossible.',
   });
 
   /**

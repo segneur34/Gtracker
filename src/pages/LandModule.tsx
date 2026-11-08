@@ -95,7 +95,8 @@ import { detectIntervals } from '../running/intervalDetection';
 import { analyzeIntervals, type IntervalPhaseSpan } from '../running/intervalStats';
 import type { BaseSessionStats } from '../core/types';
 import { BIKE_TYPES, isValidBikeWeight } from '../cycling/energy';
-import { seriesBlocks, type IntervalSeries, type IntervalWorkout } from '../recording/intervalTimer';
+import { readSessionTest } from '../recording/fitnessTest';
+import { readIntervalSeries, seriesBlocks, type IntervalSeries, type IntervalWorkout } from '../recording/intervalTimer';
 import type { SurfaceCategory } from '../planning/surface';
 import { WAY_MATCH_DEFAULTS } from '../planning/wayMatch';
 import { LAND_PAGES, LAND_TREATMENTS, type LandFamily, type LandTreatment } from './landModules';
@@ -267,9 +268,12 @@ function LandModule({ family }: { family: LandFamily }) {
    * une fiche complétée par un import (« Télécharger la session » du téléphone) s'applique sans rouvrir l'analyse.
    */
   const shownRecord = useLibrarySession(shownFile)?.record;
-  const sessionIntervals = shownRecord?.intervals ?? NO_INTERVALS;
+  // Séances et test guidé bruts dans la fiche depuis le lot 301 : lus ici.
+  const rawIntervals = shownRecord?.intervals;
+  const sessionIntervals = useMemo(() => readIntervalSeries(rawIntervals) ?? NO_INTERVALS, [rawIntervals]);
   /** Test guidé de la fiche (Entraînement › Tests) : l'onglet « test ». */
-  const sessionTest = shownRecord?.test ?? null;
+  const rawTest = shownRecord?.test;
+  const sessionTest = useMemo(() => readSessionTest(rawTest), [rawTest]);
   /** Poids du vélo et des bagages, charge portée : ceux de la session (brouillon, puis fiche), sinon ceux de l'activité. */
   const bikeWeightKg = draft.edits.bikeWeightKg ?? activityBikeKg;
   const loadKg = draft.edits.loadKg ?? carriedLoadKg;

@@ -68,7 +68,6 @@ const EXCEPTIONS: Record<string, string> = {
   'running/energyView → planning/surface': 'idem (type seul)',
   // Les résultats de test et le détecteur d'intervalles lisent des types et des bornes du compteur de l'enregistrement.
   'running/fitnessTestResults → recording/fitnessTest': 'protocole du test de FC max (type)',
-  'running/restingHrResults → recording/restingHrTest': 'protocole du test de FC repos (type)',
   'running/intervalDetection → recording/intervalTimer': 'INTERVAL_LIMITS, bornes du compteur',
   'planning/routeRecord → recording/markGuide': 'réglages de balise rangés avec l\'itinéraire (lot 82)',
   // Le hook de l'axe du temps lit les échelles et le survol des composants de graphe.
@@ -179,9 +178,9 @@ const LAND_TARGETS = ['running', 'cycling', 'land'];
 const LAND_FILES = [
   'components/CadencePanel', 'components/FitnessTestPanel', 'components/IntervalAnalysis', 'components/KilometerSplitsTable',
   'components/StatsLevelPanel', 'components/GradeGradientLegend',
-  'hooks/useRestingHrTest', 'hooks/useTerrainElevation',
-  'library/restingHrStore', 'library/statsLevel',
-  'pages/LandModule', 'pages/landModules', 'pages/MuscuModule', 'pages/RestingHrTestPage',
+  'hooks/useTerrainElevation',
+  'library/statsLevel',
+  'pages/LandModule', 'pages/landModules', 'pages/MuscuModule',
   'planning/duration',
 ];
 
@@ -190,9 +189,8 @@ const SEAM = [
   'hooks/useLiveRecording → running/energy', 'hooks/useLiveRecording → cycling/energy',
   'hooks/useRecorder → running/cadence',
   'hooks/useSportSettings → running/energy', 'hooks/useSportSettings → cycling/energy', 'hooks/useSportSettings → land/grade',
-  'library/record → running/fitnessTestResults', 'library/record → running/energy', 'library/record → cycling/energy', 'library/record → land/terrainElevation',
-  'library/summary → running/fitnessTestResults', 'library/summary → running/cadence', 'library/summary → cycling/energy', 'library/summary → land/grade',
-  'library/summary → land/terrainElevation',
+  'library/record → running/energy', 'library/record → cycling/energy',
+  'library/summary → cycling/energy', 'library/summary → land/grade', 'library/summary → land/terrainElevation',
   'library/summaryOptions → cycling/energy',
   'library/stats → land/heartRateSession',
   'pages/SessionLibrary → land/heartRateSession',

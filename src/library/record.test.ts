@@ -33,9 +33,9 @@ import {
   type SessionAnalysis,
   type SessionJumps,
   type SessionRecord,
-  type SessionSurfaces,
-  type SessionTerrainElevation,
 } from './record';
+import type { SessionTerrainElevation } from '../land/terrainElevation';
+import type { SessionSurfaces } from '../planning/surface';
 import { carriedSettings } from './record';
 import { familyRecords, sessionRecord } from '../test/record.fixture';
 
@@ -99,14 +99,13 @@ describe('parseRecord et serializeRecord', () => {
     expect(parseRecord(JSON.stringify(abimee))?.summary.heartRate).toBeUndefined();
   });
 
-  it('relisent le test du résumé, et écartent un test mal formé', () => {
-    const test = { hrMaxBpm: 189, lastStepSpeedMs: 3.9, steps: 12 };
-    const r = record({ summary: { ...record().summary, test } });
-    expect(parseRecord(serializeRecord(r))?.summary.test).toEqual(test);
-    const sansFc = record({ summary: { ...record().summary, test: { ...test, hrMaxBpm: null } } });
-    expect(parseRecord(serializeRecord(sansFc))?.summary.test?.hrMaxBpm).toBeNull();
-    const abimee = { ...record(), summary: { ...record().summary, test: { hrMaxBpm: 189, steps: 'x' } } };
-    expect(parseRecord(JSON.stringify(abimee))?.summary.test).toBeUndefined();
+  it("gardent brut le test d'un résumé de l'application complète, et le réécrivent tel quel (lot 301)", () => {
+    for (const test of [{ hrMaxBpm: 189, lastStepSpeedMs: 3.9, steps: 12 }, { hrMaxBpm: 189, steps: 'x' }]) {
+      const text = JSON.stringify({ ...record(), summary: { ...record().summary, test } });
+      const read = parseRecord(text)!;
+      expect((read.summary as unknown as Record<string, unknown>).test).toEqual(test);
+      expect(JSON.parse(serializeRecord(read)).summary.test).toEqual(test);
+    }
   });
 
   it('relisent une fiche à l\'identique', () => {
@@ -260,11 +259,12 @@ describe('voies suivies de la fiche', () => {
     expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('surfaces');
   });
 
-  it('sont écartées si elles sont mal formées', () => {
-    const broken = { ...record(), surfaces: { ...surfaces, runs: [[5, 0]] } };
-    expect(parseRecord(JSON.stringify(broken))).not.toHaveProperty('surfaces');
-    const otherSource = { ...record(), surfaces: { ...surfaces, source: 'ailleurs' } };
-    expect(parseRecord(JSON.stringify(otherSource))).not.toHaveProperty('surfaces');
+  it('mal formées, sont gardées brutes et réécrites telles quelles : la fiche ne les lit plus (lot 301)', () => {
+    for (const bad of [{ ...surfaces, runs: [[5, 0]] }, { ...surfaces, source: 'ailleurs' }]) {
+      const read = parseRecord(JSON.stringify({ ...record(), surfaces: bad }))!;
+      expect(read.surfaces).toEqual(bad);
+      expect(JSON.parse(serializeRecord(read)).surfaces).toEqual(bad);
+    }
   });
 
   it('se rangent et se retirent sans recalcul, et restent quand l\'activité change', () => {
@@ -289,9 +289,17 @@ describe('séances du compteur de la fiche', () => {
     expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('intervals');
   });
 
-  it('sont écartées si elles sont mal formées', () => {
-    expect(parseRecord(JSON.stringify({ ...record(), intervals: 'trois fois' }))).not.toHaveProperty('intervals');
-    expect(parseRecord(JSON.stringify({ ...record(), intervals: [{ workout: {}, laps: intervals[0].laps }] }))).not.toHaveProperty('intervals');
+  it('mal formées, sont gardées brutes : la fiche ne les lit plus (lot 301)', () => {
+    expect(parseRecord(JSON.stringify({ ...record(), intervals: 'trois fois' }))?.intervals).toBe('trois fois');
+    const bad = [{ workout: {}, laps: intervals[0].laps }];
+    expect(parseRecord(JSON.stringify({ ...record(), intervals: bad }))?.intervals).toEqual(bad);
+  });
+
+  it("complètent une fiche qui n'en a pas, sans écraser les siennes", () => {
+    expect(completeRecord(record(), record({ intervals })).record.intervals).toEqual(intervals);
+    const own = [{ ...intervals[0], workout: { reps: 3, workS: 30, restS: 30 } }];
+    expect(completeRecord(record({ intervals: own }), record({ intervals })).record.intervals).toEqual(own);
+    expect(completeRecord(record({ intervals: [] }), record({ intervals })).record.intervals).toEqual(intervals);
   });
 
   it('restent quand l\'activité ou le support changent', () => {
@@ -352,18 +360,9 @@ describe('altitude du terrain de la fiche', () => {
     expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('elevationSource');
   });
 
-  it('est écartée si elle est mal formée', () => {
-    const cases = [
-      { ...terrainElevation, t: [0, 3333] },
-      { ...terrainElevation, t: [10, 3333, 6667] },
-      { ...terrainElevation, t: [0, 6667, 3333] },
-      { ...terrainElevation, z: [47.54, 'x', null] },
-      { ...terrainElevation, stepM: 0 },
-      { ...terrainElevation, source: 'gps' },
-    ];
-    for (const broken of cases) {
-      expect(parseRecord(JSON.stringify({ ...record(), terrainElevation: broken }))).not.toHaveProperty('terrainElevation');
-    }
+  it('mal formée, est gardée brute : la fiche ne la lit plus (lot 301) ; une source inconnue est écartée', () => {
+    const broken = { ...terrainElevation, t: [0, 6667, 3333] };
+    expect(parseRecord(JSON.stringify({ ...record(), terrainElevation: broken }))?.terrainElevation).toEqual(broken);
     expect(parseRecord(JSON.stringify({ ...record(), elevationSource: 'ign' }))).not.toHaveProperty('elevationSource');
   });
 
@@ -651,16 +650,17 @@ describe('test guidé de la fiche', () => {
     signals: [{ t: START_MS, s: 'debut' }, { t: START_MS + 480_000, s: 'palier' }],
   };
 
-  it("est relu à l'identique, absent sans test ou mal formé", () => {
+  it("est relu à l'identique, absent sans test, gardé brut s'il est mal formé (lot 301)", () => {
     expect(parseRecord(serializeRecord(record({ test: TEST })))?.test).toEqual(TEST);
     expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('test');
-    expect(parseRecord(JSON.stringify({ ...record(), test: { ...TEST, protocol: 'vma' } }))).not.toHaveProperty('test');
+    const bad = { ...TEST, protocol: 'vma' };
+    expect(parseRecord(JSON.stringify({ ...record(), test: bad }))?.test).toEqual(bad);
   });
 
-  it('complète une fiche sans test et fait refaire son résumé, sans écraser le sien', () => {
+  it("complète une fiche sans test, sans écraser le sien ; le résumé ne le lit plus (lot 301)", () => {
     const done = completeRecord(record(), record({ test: TEST }));
     expect(done.record.test).toEqual(TEST);
-    expect(done.resummarize).toBe(true);
+    expect(done.resummarize).toBe(false);
     const own = { ...TEST, v0Ms: 3 };
     expect(completeRecord(record({ test: own }), record({ test: TEST })).record.test).toEqual(own);
   });
@@ -854,9 +854,11 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
 
   it('relue, renommée, réécrite : chaque champ de forme nouvelle revient identique au caractère près', () => {
     const parsed = parseRecordWithRaw(futureText)!;
-    expect(Object.keys(parsed.unreadable).sort()).toEqual(['analysis.windDeg', 'summary.heartRate', 'surfaces', 'test']);
+    // Voies et test guidé passent bruts (lot 301) : rien d'illisible, la fiche les garde tels quels.
+    expect(Object.keys(parsed.unreadable).sort()).toEqual(['analysis.windDeg', 'summary.heartRate']);
     const read: SessionRecord = { ...parsed.parts, summary: parsed.parts.summary! };
-    expect(read.surfaces).toBeUndefined();
+    expect(read.surfaces).toEqual(future.surfaces);
+    expect(read.test).toEqual(future.test);
     expect(read.analysis?.windDeg).toBeNull();
     const renamed = applyRecordPatch(read, { name: 'Autre nom' }).record;
     const written = serializeRecord(renamed, parsed.unreadable);

@@ -1,5 +1,6 @@
 import { lazy, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useSearchParams } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Routes, Route, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { RESTING_HR_PATH } from './core/parentPage';
 import AppShell from './components/AppShell';
 import { DevThrow } from './components/ErrorBoundary';
 import { hasPositions } from './core/sportProfiles';
@@ -103,6 +104,12 @@ function TrainingAnalysis() {
   return sport !== null && !hasPositions(sport) ? <MuscuModule /> : <LandModule key="fractionne" family="fractionne" />;
 }
 
+/** Ancienne adresse du test de FC repos (sous l'Entraînement jusqu'au lot 301) : la nouvelle, sous le Profil, réglages d'adresse gardés. */
+function RestingHrRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: RESTING_HR_PATH, search }} replace />;
+}
+
 /** Une recharge mène toujours à l'accueil : après une reprise silencieuse (lot 156), retour sur Enregistrer. */
 function LandOnRecording() {
   const land = useRecorderSelector((s) => s.landOnRecording);
@@ -140,7 +147,8 @@ function App() {
           <Route path="/fractionne/timer/editer" element={<TrainingSessionEditPage key="timer" kind="timer" />} />
           <Route path="/fractionne/tests" element={<TestsPage />} />
           <Route path="/fractionne/tests/fc-max" element={<FitnessTestPage />} />
-          <Route path="/fractionne/tests/fc-repos" element={<RestingHrTestPage />} />
+          {/* Ancienne adresse du test de FC repos, passé sous le Profil (lot 301). */}
+          <Route path="/fractionne/tests/fc-repos" element={<RestingHrRedirect />} />
           <Route path="/surf" element={<SessionLibrary key="surf" family="surf" />} />
           <Route path="/surf/analyse" element={<SurfModule />} />
           <Route path="/enregistrer" element={<RecordingPage />} />
@@ -148,6 +156,7 @@ function App() {
           <Route path="/itineraires/liste" element={<RoutesPage />} />
           <Route path="/statistiques" element={<StatisticsPage />} />
           <Route path="/profil" element={<ProfilePage />} />
+          <Route path={RESTING_HR_PATH} element={<RestingHrTestPage />} />
           <Route path="/parametres" element={<SettingsPage />} />
           {/* Tutoriels (lot 147) : la liste, sous Réglages, et chaque leçon. */}
           <Route path="/tutoriels" element={<TutorialsPage />} />

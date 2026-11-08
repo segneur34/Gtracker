@@ -18,6 +18,7 @@ import RefreshLibraryButton from '../components/RefreshLibraryButton';
 import SessionRenameField from '../components/SessionRenameField';
 import RouteList from '../components/RouteList';
 import TrainingHub from '../components/TrainingHub';
+import { readIntervalSeries } from '../recording/intervalTimer';
 import { sessionColorTrack, sessionSpeedRange, type SessionColorTrack } from '../library/sessionTrack';
 import { drawTrackPreview, thinForPreview, trackPreviewView } from '../components/drawTrackPreview';
 import Button from '../components/ui/Button';
@@ -99,7 +100,7 @@ const rowStats = (session: LibrarySession, activity: Activity | null): string[] 
   if (session.record.sport !== null && !hasPositions(session.record.sport)) {
     const stats = [formatDuration(summary.endMs - summary.startMs)];
     if (summary.heartRate) stats.push(`FC moy. ${summary.heartRate.avgBpm}`, `FC max ${summary.heartRate.maxBpm}`);
-    const reps = repsDone(session.record.intervals);
+    const reps = repsDone(readIntervalSeries(session.record.intervals));
     if (reps > 0) stats.push(`${reps} rép.`);
     return stats;
   }
@@ -114,10 +115,6 @@ const rowStats = (session: LibrarySession, activity: Activity | null): string[] 
     if (summary.waveCount !== undefined) stats.push(`${summary.waveCount} vague${summary.waveCount > 1 ? 's' : ''}`);
     if (summary.longestWaveM != null) stats.push(`plus longue ${Math.round(summary.longestWaveM)} m`);
     if (summary.longestFlightS != null) stats.push(`vol ${formatShortDuration(summary.longestFlightS)}`);
-  } else if (summary.test) {
-    // Test guidé : FC max et vitesse du dernier palier tenu.
-    if (summary.test.hrMaxBpm !== null) stats.push(`FC max ${summary.test.hrMaxBpm}`);
-    if (summary.test.lastStepSpeedMs !== null) stats.push(formatLandSpeed(summary.test.lastStepSpeedMs, effectiveSpeedUnit(activity), distanceUnit));
   } else {
     if (summary.movingTimeS && summary.distanceM > 0) {
       stats.push(formatLandSpeed(summary.distanceM / summary.movingTimeS, effectiveSpeedUnit(activity), distanceUnit));
@@ -125,7 +122,7 @@ const rowStats = (session: LibrarySession, activity: Activity | null): string[] 
     if (summary.elevationGainM !== null) stats.push(`D+ ${Math.round(summary.elevationGainM)} m`);
   }
   // Répétitions du compteur, quand la session en a (fractionné).
-  const reps = repsDone(session.record.intervals);
+  const reps = repsDone(readIntervalSeries(session.record.intervals));
   if (reps > 0) stats.push(`${reps} rép.`);
   return stats;
 };

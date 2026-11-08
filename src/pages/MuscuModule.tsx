@@ -36,7 +36,7 @@ import { useAnalysisHeart } from '../hooks/useAnalysisHeart';
 import { useLibrarySession } from '../hooks/useSessionLibrary';
 import { useSessionMarks } from '../hooks/useSessionMarks';
 import { useSportSettings } from '../hooks/useSportSettings';
-import type { IntervalSeries } from '../recording/intervalTimer';
+import { readIntervalSeries, type IntervalSeries } from '../recording/intervalTimer';
 import { SPEED_COLOR } from '../components/chartStyle';
 import AnalysisShell from '../components/AnalysisShell';
 import { shareExtraStats } from '../library/shareStats';
@@ -96,7 +96,9 @@ function MuscuModule() {
   } = useAnalysisSession({ family: FAMILY, activity, setActivity, load, loadedFile: loaded?.file ?? null });
   const points = shownFile ? loaded!.points : NO_POINTS;
   const record = useLibrarySession(shownFile)?.record;
-  const intervals = record?.intervals ?? NO_INTERVALS;
+  // Séances brutes dans la fiche depuis le lot 301 : lues ici.
+  const rawIntervals = record?.intervals;
+  const intervals = useMemo(() => readIntervalSeries(rawIntervals) ?? NO_INTERVALS, [rawIntervals]);
   const sessionKey = shownFile;
 
   const { runner, retainHr, heart, hrZones: zones } = useAnalysisHeart(points, profile.heartRate, hrOffsetBpm);

@@ -7,15 +7,10 @@ import { readSessionMarks, type SessionMark } from '../core/sessionMarks';
 import { isValidSpeedRange, type SpeedRangeMs } from '../core/speedGradient';
 import { getSportProfile, sportTreatment } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
-import type { TerrainSamples } from '../land/terrainElevation';
-import { readSurfaceRuns, type SurfaceRuns } from '../planning/surface';
-import { readSessionTest, type SessionTest } from '../recording/fitnessTest';
-import type { SummaryTest } from '../running/fitnessTestResults';
-import { readIntervalSeries, type IntervalSeries } from '../recording/intervalTimer';
 import { isSportType } from '../core/sportProfiles';
 import { isValidCarriedLoad } from '../running/energy';
 import { EMPTY_NOTES, type GearChoice, type SailingSessionNotes } from './notes';
-import { finiteOr, isFiniteNumber, isObject, parseJson, stringifyJson } from '../core/basics';
+import { isFiniteNumber, isObject, parseJson, stringifyJson } from '../core/basics';
 
 /**
  * Bornes de vraisemblance des meilleurs efforts relus d'une fiche (`SummaryBests`, lot 146), comprises : hors
@@ -161,8 +156,6 @@ export interface SessionSummary {
   heartRate?: SummaryHeartRate;
   /** Cadence à pied, si la session en a assez (`CadenceDetection.minCoverageS`). */
   cadence?: SummaryCadence;
-  /** Test guidé de la fiche (`test`) : FC max et dernier palier tenu ; absent sans test. */
-  test?: SummaryTest;
   /** À pied (traitement course) : temps du meilleur kilomètre, en secondes (tops, `d1km`) ; absent s'il n'est pas couru (version 17). */
   best1kmS?: number;
   /** À vélo : vitesse des meilleures 5 min, en m/s (tops, `t5min`) ; absente si la session est plus courte (version 17). */
@@ -231,11 +224,6 @@ export interface ManeuverResults {
   jibeSuccess: number;
   jibeFail: number;
 }
-
-const readSummaryTest = (raw: unknown): SummaryTest | null => {
-  if (!isObject(raw) || !isFiniteNumber(raw.steps)) return null;
-  return { hrMaxBpm: finiteOr(raw.hrMaxBpm, null), lastStepSpeedMs: finiteOr(raw.lastStepSpeedMs, null), steps: raw.steps };
-};
 
 const readManeuverResults = (raw: unknown): ManeuverResults | null => {
   if (!isObject(raw)) return null;
@@ -344,38 +332,6 @@ export interface SessionAnalysis {
 }
 
 /**
- * Voies suivies par la trace, demandées à OpenStreetMap (`planning/overpass.ts`)
- * à la première ouverture de l'onglet « surface », puis gardées : elles ne se
- * recalculent pas sans réseau. Les débuts des morceaux sont des décalages en
- * millisecondes depuis `startMs`, l'instant du premier point apparié.
- */
-export interface SessionSurfaces extends SurfaceRuns {
-  source: 'overpass';
-  /** Date ISO de la demande. */
-  fetchedAt: string;
-  /** Version de l'appariement (`WAY_MATCH_VERSION`) : une plus ancienne est refaite. */
-  matchVersion: number;
-  startMs: number;
-}
-
-/**
- * Altitude du terrain, demandée à l'IGN (`planning/ignAltimetry.ts`) à la
- * première ouverture de l'analyse course ou vélo, puis gardée. Un échantillon
- * tous les `stepM` mètres, repéré par son instant (`land/terrainElevation.ts`).
- */
-export interface SessionTerrainElevation extends TerrainSamples {
-  source: 'ign';
-  /** Modèle demandé (`IGN_RESOURCE`). */
-  resource: string;
-  /** Version de l'échantillonnage (`TERRAIN_ELEVATION_VERSION`) : une plus ancienne est redemandée. */
-  version: number;
-  /** Pas des échantillons, en mètres : un autre pas réglé est redemandé. */
-  stepM: number;
-  /** Date ISO de la demande. */
-  fetchedAt: string;
-}
-
-/**
  * Sauts d'une session (voile, course, vélo), mesurés par les capteurs du téléphone
  * (`core/jumps.ts`) : calculés depuis le `.imu` rangé à côté du GPX à
  * l'ouverture de l'analyse, puis gardés, puisqu'ils ne se tirent pas du GPX.
@@ -428,20 +384,25 @@ export interface SessionRecord {
   notes: StoredSessionNotes | null;
   /** Absent des fiches écrites avant son introduction : lu comme `null`. */
   analysis: SessionAnalysis | null;
-  /** Absent tant que l'onglet « surface » n'a rien trouvé, ou si la fiche en porte de mal formées. */
-  surfaces?: SessionSurfaces;
-  /** Absent tant que l'IGN n'a pas répondu, ou si la fiche en porte une mal formée. */
-  terrainElevation?: SessionTerrainElevation;
+  /**
+   * Voies suivies (`planning/surface.ts`, `readSessionSurfaces`), absentes tant que l'onglet « surface » n'a rien
+   * trouvé. Comme l'altitude du terrain, les séances du compteur et le test guidé, un champ de la course, du vélo et
+   * de l'Entraînement : la fiche le garde brut, tel que lu sur le disque, et ne le lit plus (lot 301) ; son domaine
+   * le lit à l'emploi, une valeur mal formée y revenant à « absent ».
+   */
+  surfaces?: unknown;
+  /** Altitude du terrain (`land/terrainElevation.ts`, `readTerrainElevation`), absente tant que l'IGN n'a pas répondu ; brute. */
+  terrainElevation?: unknown;
   /** `'gps'` : l'utilisateur garde l'altitude du GPS ; absent : celle de l'IGN (course et vélo). */
   elevationSource?: 'gps';
   /** Fond de carte de cette session (plan ou satellite), changé tout de suite ; absent : celui de la famille (Réglages de l'appareil). */
   mapBase?: MapBase;
   /**
-   * Séances du compteur faites pendant l'enregistrement (fractionné, §10,
-   * point 89), datées par l'horloge du téléphone : elles ne se tirent pas du
-   * GPX. Absent sans compteur, ou si la fiche en porte de mal formées.
+   * Séances du compteur faites pendant l'enregistrement (fractionné, §10, point 89 ;
+   * `recording/intervalTimer.ts`, `readIntervalSeries`), datées par l'horloge du téléphone :
+   * elles ne se tirent pas du GPX. Absent sans compteur ; brut.
    */
-  intervals?: IntervalSeries[];
+  intervals?: unknown;
   /** Sauts mesurés (voile, course, vélo) ; absent sans `.imu`, avant leur calcul, ou si la fiche en porte de mal formés. */
   jumps?: SessionJumps;
   /**
@@ -450,10 +411,10 @@ export interface SessionRecord {
    */
   marks?: SessionMark[];
   /**
-   * Test guidé fait pendant l'enregistrement (Entraînement › Tests) : phases,
-   * paliers et signaux, en heure des positions. Absent sans test, ou mal formé.
+   * Test guidé fait pendant l'enregistrement (Entraînement › Tests ; `recording/fitnessTest.ts`,
+   * `readSessionTest`) : phases, paliers et signaux, en heure des positions. Absent sans test ; brut.
    */
-  test?: SessionTest;
+  test?: unknown;
 }
 
 
@@ -530,9 +491,6 @@ const readSummary = (raw: unknown): SessionSummary | null => {
   const cadence = readSummaryCadence(raw.cadence);
   if (cadence) summary.cadence = cadence;
   else delete summary.cadence;
-  const test = readSummaryTest(raw.test);
-  if (test) summary.test = test;
-  else delete summary.test;
   for (const [field, [min, max]] of Object.entries(SHARE_NUMBER_RANGES) as [keyof typeof SHARE_NUMBER_RANGES, readonly [number, number]][]) {
     const value = raw[field];
     if (!isFiniteNumber(value) || value < min || value > max) delete summary[field];
@@ -665,41 +623,6 @@ export const readAnalysis = (raw: unknown): SessionAnalysis | null => {
   };
 };
 
-/** Voies relues, `null` si elles sont mal formées. */
-export const readSessionSurfaces = (raw: unknown): SessionSurfaces | null => {
-  if (!isObject(raw) || raw.source !== 'overpass' || typeof raw.fetchedAt !== 'string') return null;
-  if (!isFiniteNumber(raw.matchVersion) || !isFiniteNumber(raw.startMs)) return null;
-  const runs = readSurfaceRuns(raw, Number.MAX_SAFE_INTEGER);
-  return runs ? { ...raw, ...runs, source: 'overpass', fetchedAt: raw.fetchedAt, matchVersion: raw.matchVersion, startMs: raw.startMs } : null;
-};
-
-/**
- * Altitude du terrain relue, `null` si elle est mal formée : instants entiers,
- * strictement croissants depuis 0, autant d'altitudes que d'instants.
- */
-export const readTerrainElevation = (raw: unknown): SessionTerrainElevation | null => {
-  if (!isObject(raw) || raw.source !== 'ign' || typeof raw.resource !== 'string' || typeof raw.fetchedAt !== 'string') return null;
-  if (!isFiniteNumber(raw.version) || !isFiniteNumber(raw.stepM) || raw.stepM <= 0 || !isFiniteNumber(raw.startMs)) return null;
-  const { t, z } = raw;
-  if (!Array.isArray(t) || !Array.isArray(z) || t.length === 0 || t.length !== z.length) return null;
-  for (let i = 0; i < t.length; i++) {
-    const ti: unknown = t[i];
-    if (!Number.isInteger(ti) || (i === 0 ? ti !== 0 : (ti as number) <= (t[i - 1] as number))) return null;
-    if (z[i] !== null && !isFiniteNumber(z[i])) return null;
-  }
-  return {
-    ...raw,
-    source: 'ign',
-    resource: raw.resource,
-    version: raw.version,
-    stepM: raw.stepM,
-    fetchedAt: raw.fetchedAt,
-    startMs: raw.startMs,
-    t: t as number[],
-    z: z as (number | null)[],
-  };
-};
-
 const isJumpDoubt = (value: unknown): value is JumpDoubt => (JUMP_DOUBTS as readonly unknown[]).includes(value);
 
 /** Un saut relu, `null` s'il est mal formé. */
@@ -751,7 +674,7 @@ export interface UnreadableField {
 }
 
 /**
- * Champs illisibles d'une fiche, par chemin : `surfaces` au premier niveau,
+ * Champs illisibles d'une fiche, par chemin : `jumps` au premier niveau,
  * `summary.heartRate` ou `analysis.windDeg` dans un objet. Gardés hors de la
  * fiche (le cache allégé la recopie champ à champ), et rendus par
  * `serializeRecord` tant que la valeur n'a pas changé depuis la lecture : une
@@ -760,7 +683,10 @@ export interface UnreadableField {
  */
 export type RecordUnreadable = Readonly<Record<string, UnreadableField>>;
 
-/** Champs de premier niveau dont la lecture peut perdre quelque chose. */
+/**
+ * Champs de premier niveau dont la lecture peut perdre quelque chose. Voies, altitude du terrain, séances et test
+ * guidé passent bruts depuis le lot 301 (rien ne s'y perd) : gardés dans la liste, par sûreté, jusqu'à leur retrait.
+ */
 const GUARDED_FIELDS = [
   'sport', 'activityId', 'source', 'addedAt', 'title', 'name', 'surfaces', 'terrainElevation', 'elevationSource', 'mapBase', 'intervals', 'jumps', 'marks', 'test',
 ] as const;
@@ -833,13 +759,10 @@ const readRecordParts = (raw: unknown): RecordWithoutSummary | null => {
   if (!isObject(raw) || raw.format !== RECORD_FORMAT || !isFiniteNumber(raw.version)) return null;
   if (typeof raw.gpx !== 'string' || raw.gpx === '') return null;
   const summary = readSummary(raw.summary);
-  const { surfaces: rawSurfaces, terrainElevation: rawTerrain, elevationSource: rawSource, mapBase: rawMapBase, intervals: rawIntervals, jumps: rawJumps, marks: rawMarks, test: rawTest, ...rest } = raw;
-  const surfaces = readSessionSurfaces(rawSurfaces);
-  const terrainElevation = readTerrainElevation(rawTerrain);
-  const intervals = readIntervalSeries(rawIntervals);
+  // Voies, altitude du terrain, séances et test guidé (course, vélo, Entraînement) passent bruts par `rest` (lot 301).
+  const { elevationSource: rawSource, mapBase: rawMapBase, jumps: rawJumps, marks: rawMarks, ...rest } = raw;
   const jumps = readSessionJumps(rawJumps);
   const marks = readSessionMarks(rawMarks);
-  const test = readSessionTest(rawTest);
   return {
     ...rest,
     format: RECORD_FORMAT,
@@ -855,14 +778,10 @@ const readRecordParts = (raw: unknown): RecordWithoutSummary | null => {
     summary,
     notes: readNotes(raw.notes),
     analysis: readAnalysis(raw.analysis),
-    ...(surfaces ? { surfaces } : {}),
-    ...(terrainElevation ? { terrainElevation } : {}),
     ...(rawSource === 'gps' ? { elevationSource: 'gps' as const } : {}),
     ...(isMapBase(rawMapBase) ? { mapBase: rawMapBase } : {}),
-    ...(intervals ? { intervals } : {}),
     ...(jumps ? { jumps } : {}),
     ...(marks ? { marks } : {}),
-    ...(test ? { test } : {}),
   };
 };
 
@@ -947,14 +866,17 @@ const withoutCarriedSettings = <T extends SessionRecord>(record: T): T => {
   return { ...record, summary };
 };
 
+/** Liste non vide (champ brut de la fiche). */
+const hasItems = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
+
 /**
  * Fiche de la mémoire complétée par celle d'une copie de la même session
  * (import d'un GPX complet, `library/sessionBundle.ts`, ou d'un GPX et de sa
  * fiche) : support et activité inconnus, séances du compteur, repères, test, nom,
  * notes, réglages, sauts, voies et altitude qu'elle n'a pas encore. Rien de ce
  * qu'elle porte n'est écrasé ; rend la même fiche si rien ne manque.
- * `resummarize` : le résumé est à refaire (support, activité, réglages,
- * altitude ou test reçus).
+ * `resummarize` : le résumé est à refaire (support, activité, réglages ou
+ * altitude reçus ; le test guidé n'y entre plus, lot 301).
  */
 export const completeRecord = (
   existing: SessionRecord,
@@ -965,7 +887,7 @@ export const completeRecord = (
   if (existing.activityId === null && incoming.activityId !== null && (patch.sport ?? existing.sport) === incoming.sport) {
     patch.activityId = incoming.activityId;
   }
-  if (!existing.intervals?.length && incoming.intervals?.length) patch.intervals = incoming.intervals;
+  if (!hasItems(existing.intervals) && hasItems(incoming.intervals)) patch.intervals = incoming.intervals;
   if (!existing.marks?.length && incoming.marks?.length) patch.marks = incoming.marks;
   if (!existing.test && incoming.test) patch.test = incoming.test;
   if (existing.name === null && incoming.name !== null) patch.name = incoming.name;
@@ -977,7 +899,7 @@ export const completeRecord = (
   if (!existing.elevationSource && incoming.elevationSource) patch.elevationSource = incoming.elevationSource;
   if (!existing.mapBase && incoming.mapBase) patch.mapBase = incoming.mapBase;
   if (Object.keys(patch).length === 0) return { record: existing, resummarize: false };
-  const resummarize = ['sport', 'activityId', 'analysis', 'terrainElevation', 'elevationSource', 'test'].some((key) => key in patch);
+  const resummarize = ['sport', 'activityId', 'analysis', 'terrainElevation', 'elevationSource'].some((key) => key in patch);
   // Support ou activité reçus : ce que portait le résumé était à une autre ; réglages reçus : il garde les siens.
   const next = 'sport' in patch || 'activityId' in patch ? withoutCarriedSettings(existing) : 'analysis' in patch ? withCarriedSettingsFixed(existing) : existing;
   return { record: { ...next, ...patch }, resummarize };
@@ -1161,10 +1083,10 @@ export interface RecordPatch {
   windDirDeg?: number | null;
   /** Puissance moyenne en mouvement (vélo), posée par l'analyse ; `null` la retire. */
   avgPowerW?: number | null;
-  /** Voies trouvées pour la trace ; `null` les retire. */
-  surfaces?: SessionSurfaces | null;
-  /** Altitude du terrain ; `null` la retire. */
-  terrainElevation?: SessionTerrainElevation | null;
+  /** Voies trouvées pour la trace (`SessionSurfaces`, `planning/surface.ts`) ; `null` les retire. */
+  surfaces?: unknown;
+  /** Altitude du terrain (`SessionTerrainElevation`, `land/terrainElevation.ts`) ; `null` la retire. */
+  terrainElevation?: unknown;
   /** Source de l'altitude ; `null` : celle de l'IGN. */
   elevationSource?: 'gps' | null;
   /** Fond de carte de la session ; `null` la remet sur celui de la famille. Ne change pas le résumé. */

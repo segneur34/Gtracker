@@ -11,7 +11,7 @@ import {
   type RestingSample,
 } from '../recording/restingHrTest';
 import { useBeltLive } from './useBeltLive';
-import { restingHrResult, type RestingHrResult } from '../running/restingHrResults';
+import { restingHrResult, type RestingHrResult } from '../library/restingHrResults';
 
 /**
  * Déroulé du test de FC repos (`recording/restingHrTest.ts`), tenu par la page

@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { JUMPS_CALC_VERSION, measureJumps, toSessionJump, type JumpDetection } from '../core/jumps';
-import type { SessionJumps } from '../library/record';
+import { readSessionJumps, type SessionJumps } from '../library/record';
 import type { Activity } from '../core/activities';
 import { buildCumulativeTrack } from '../core/sessionStats';
 import { getSportProfile, type SportProfile } from '../core/sportProfiles';
@@ -56,7 +56,7 @@ export const useSessionJumps = (file: string | null, track: TrackPoint[], sport:
   const motion = file !== null && hasSessionMotion(file);
   const eligible = key !== null && detection !== null && session !== undefined && motion;
   const { value, error } = useSessionAsset({
-    cache, file, key, isCurrent, active: eligible, field: 'jumps', errorText: 'Calcul des sauts impossible.',
+    cache, file, key, isCurrent, active: eligible, field: 'jumps', read: readSessionJumps, errorText: 'Calcul des sauts impossible.',
     // Lancé seulement si la session est éligible : fichier et détection connus.
     compute: () => (file !== null && detection !== null ? compute(file, track, detection) : Promise.reject(new Error('Pas de capteurs.'))),
   });

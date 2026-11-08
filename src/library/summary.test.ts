@@ -7,7 +7,6 @@ import { FAMILY_BASE } from '../core/activities';
 import { defaultActiveThresholdOf, getSportProfile } from '../core/sportProfiles';
 import type { RawTrackPoint } from '../core/types';
 import { msToKnots } from '../core/units';
-import type { SessionTest } from '../recording/fitnessTest';
 import { suggestActiveThresholdKn } from '../sailing/sailingConfig';
 import { runSurfSession, surfProfileOf } from '../surfing/surfSession';
 import { SUMMARY_CALC_VERSION } from './record';
@@ -53,33 +52,16 @@ describe('summarizeSession', () => {
     expect(summarizeSession(buildTrack([[600, 3]]), 'running')!.heartRate).toBeUndefined();
   });
 
-  it('range le test guidé de la fiche : FC max et dernier palier tenu, rien sans test', () => {
-    // 3 min à 2 m/s, puis des paliers de 60 s à 2,5 et 3 m/s ; le troisième, à 3,5, lâché tout de suite. FC de 120 à 180.
-    const points = buildTrack([[180, 2], [60, 2.5], [60, 3], [60, 2]]).map((p, i) => ({ ...p, hr: 120 + Math.min(60, i / 5) }));
-    const test: SessionTest = {
-      protocol: 'fc-max', version: 1,
-      settings: { warmupS: 180, age: 35, ageSource: 'defaut', lowBpm: 110, highBpm: 147, zoneMethod: 'max' },
-      startMs: START_MS, rampStartMs: START_MS + 180_000, v0Ms: 2.5,
-      steps: [0, 1, 2].map((k) => ({ startMs: START_MS + (180 + 60 * k) * 1000, targetMs: 2.5 + 0.5 * k })),
-      rampEndMs: START_MS + 330_000, dropMs: START_MS + 305_000, endReason: 'auto', endMs: START_MS + 360_000, signals: [],
-    };
-    const summary = summarizeSession(points, 'run-test', { test })!.test!;
-    expect(summary.steps).toBe(2);
-    expect(summary.lastStepSpeedMs).toBe(3);
-    expect(summary.hrMaxBpm).toBe(180);
-    expect(summarizeSession(points, 'run-test')!.test).toBeUndefined();
+  it("ne range plus ni la cadence ni le test guidé (lot 301 : la version voile et surf n'en a pas)", () => {
+    const points = buildTrack([[600, 3]]).map((p, i) => ({ ...p, cadence: 85, hr: 140 + (i % 20) }));
+    for (const sport of ['running', 'run-test', 'wingfoil'] as const) {
+      const summary = summarizeSession(points, sport)!;
+      expect(summary).not.toHaveProperty('cadence');
+      expect(summary).not.toHaveProperty('test');
+    }
   });
 
-  it('range la cadence à pied (cad du GPX, en foulées), rien sans elle ni à vélo', () => {
-    const points = buildTrack([[600, 3]]).map((p) => ({ ...p, cadence: 85 }));
-    const cad = summarizeSession(points, 'running')!.cadence!;
-    expect(cad.avgSpm).toBeCloseTo(170, 0);
-    expect(cad.steps).toBeCloseTo(1700, -1);
-    expect(summarizeSession(buildTrack([[600, 3]]), 'running')!.cadence).toBeUndefined();
-    expect(summarizeSession(points, 'cycling')!.cadence).toBeUndefined();
-  });
-
-  it('rend la distance intégrée, les bornes et la cadence', () => {
+  it('rend la distance intégrée et les bornes', () => {
     const summary = summarizeSession(buildTrack([[600, 3]]), 'running')!;
     expect(summary.calcVersion).toBe(SUMMARY_CALC_VERSION);
     expect(summary.startMs).toBe(START_MS);
@@ -273,12 +255,18 @@ describe('summarizeSession', () => {
   it("prend le dénivelé sur l'altitude du terrain quand la fiche en porte une", () => {
     // GPS : 100 m de montée ; terrain : 50 m, un échantillon toutes les 10 s, même sans altitude GPS.
     const t = Array.from({ length: 61 }, (_, i) => i * 10_000);
-    const terrainElevation = { startMs: START_MS, t, z: t.map((ms) => 50 + (50 * ms) / 600_000) };
+    const terrainElevation = {
+      source: 'ign', resource: 'ign_rge_alti_wld', version: 1, stepM: 10, fetchedAt: '2026-10-07T09:00:00.000Z',
+      startMs: START_MS, t, z: t.map((ms) => 50 + (50 * ms) / 600_000),
+    };
     for (const raw of [buildTrack([[600, 3]], 1, 100 / 600), buildTrack([[600, 3]])]) {
       const summary = summarizeSession(raw, 'running', { terrainElevation })!;
       expect(summary.elevationGainM).toBeGreaterThan(45);
       expect(summary.elevationGainM).toBeLessThan(52);
     }
+    // Brute dans la fiche depuis le lot 301 : mal formée, elle est ignorée, l'altitude du GPS reste.
+    const gps = summarizeSession(buildTrack([[600, 3]], 1, 100 / 600), 'running', { terrainElevation: { ...terrainElevation, stepM: 0 } })!;
+    expect(gps.elevationGainM).toBeGreaterThan(90);
   });
 
   it('résume une trace sans support, sauf le temps en mouvement', () => {

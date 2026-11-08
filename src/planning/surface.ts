@@ -1,3 +1,4 @@
+import { isFiniteNumber, isObject } from '../core/basics';
 import { haversineDistance, pathLengthM } from '../core/geo';
 import { segmentDistanceM } from '../core/sessionStats';
 import type { TrackPoint } from '../core/types';
@@ -426,3 +427,26 @@ export const routeSurfaces = (legs: ReadonlyArray<RouteLeg>): RouteSurfaces => {
  */
 export const routeSurfacePaths = (legs: ReadonlyArray<RouteLeg>): (SurfacePath[] | null)[] =>
   legs.map((leg) => (leg.status === 'ready' ? surfacePaths(leg.points, legSurfaceStretches(leg.points, knownLegSurfaces(leg))) : null));
+
+/**
+ * Voies suivies par la trace, demandées à OpenStreetMap (`planning/overpass.ts`)
+ * à la première ouverture de l'onglet « surface », puis gardées dans sa fiche (`SessionRecord.surfaces`, brute : lue ici depuis le lot 301) : elles ne se
+ * recalculent pas sans réseau. Les débuts des morceaux sont des décalages en
+ * millisecondes depuis `startMs`, l'instant du premier point apparié.
+ */
+export interface SessionSurfaces extends SurfaceRuns {
+  source: 'overpass';
+  /** Date ISO de la demande. */
+  fetchedAt: string;
+  /** Version de l'appariement (`WAY_MATCH_VERSION`) : une plus ancienne est refaite. */
+  matchVersion: number;
+  startMs: number;
+}
+
+/** Voies relues, `null` si elles sont mal formées. */
+export const readSessionSurfaces = (raw: unknown): SessionSurfaces | null => {
+  if (!isObject(raw) || raw.source !== 'overpass' || typeof raw.fetchedAt !== 'string') return null;
+  if (!isFiniteNumber(raw.matchVersion) || !isFiniteNumber(raw.startMs)) return null;
+  const runs = readSurfaceRuns(raw, Number.MAX_SAFE_INTEGER);
+  return runs ? { ...raw, ...runs, source: 'overpass', fetchedAt: raw.fetchedAt, matchVersion: raw.matchVersion, startMs: raw.startMs } : null;
+};

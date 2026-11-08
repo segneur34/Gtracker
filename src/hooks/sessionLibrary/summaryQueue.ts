@@ -50,7 +50,7 @@ export const setSummaryRunner = (run: SummaryRunner | null): void => {
 const MAX_SUMMARY_RETRIES = 2;
 
 /**
- * Vrai si une donnée de la fiche qui change son résumé a changé (calcul, activité, analyse, altitude, test),
+ * Vrai si une donnée de la fiche qui change son résumé a changé (calcul, activité, analyse, altitude),
  * par identité : une saisie qui n'y touche pas (nom, notes) garde les mêmes objets.
  */
 const summaryInputsChanged = (before: RecordWithoutSummary, after: RecordWithoutSummary): boolean =>
@@ -58,8 +58,7 @@ const summaryInputsChanged = (before: RecordWithoutSummary, after: RecordWithout
   || before.activityId !== after.activityId
   || before.analysis !== after.analysis
   || before.terrainElevation !== after.terrainElevation
-  || before.elevationSource !== after.elevationSource
-  || before.test !== after.test;
+  || before.elevationSource !== after.elevationSource;
 
 /**
  * Crée une fiche, ou refait le résumé d'une fiche existante. Pour celle-ci,

@@ -215,7 +215,7 @@ const addOnce = async (text: string, source: SessionSource, options: AddOptions)
     options.sport !== undefined ? options.sport : from?.sport ?? undefined,
     from?.analysis,
     sessionSummarySettings(from, options.activityId ?? from?.activityId),
-    options.test ? { ...from, test: options.test } : from
+    from
   );
   return { result, disk: sessionFiles(), session: result.file ? library.librarySession(result.file) : undefined, direct };
 };

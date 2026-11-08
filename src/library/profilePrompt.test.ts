@@ -5,8 +5,13 @@ import { PROFILE_PROMPT_FIELDS, missingProfileFields, profilePromptGate, shouldP
 describe('missingProfileFields', () => {
   const full = { ...EMPTY_RUNNER_PROFILE, name: 'Tom', birthYear: 1985, sex: 'm' as const, weightKg: 72, heightCm: 178 };
 
-  it('rend les cinq champs pour un profil vide, dans leur ordre', () => {
+  it('rend les deux champs pour un profil vide, dans leur ordre : pseudo et année de naissance (lot 301)', () => {
     expect(missingProfileFields(EMPTY_RUNNER_PROFILE)).toEqual([...PROFILE_PROMPT_FIELDS]);
+    expect(PROFILE_PROMPT_FIELDS).toEqual(['name', 'birthYear']);
+  });
+
+  it('ne demande plus ni le sexe, ni le poids, ni la taille (lot 301)', () => {
+    expect(missingProfileFields({ ...EMPTY_RUNNER_PROFILE, name: 'Tom', birthYear: 1985 })).toEqual([]);
   });
 
   it('ne rend rien pour un profil rempli, FC comprises ou non', () => {
@@ -19,8 +24,8 @@ describe('missingProfileFields', () => {
   });
 
   it("compte une valeur importée hors plage ou d'un autre type comme manquante", () => {
-    expect(missingProfileFields({ ...full, weightKg: 5, heightCm: '178' as unknown as number })).toEqual(['weightKg', 'heightCm']);
-    expect(missingProfileFields({ ...full, sex: 'x' as unknown as 'f' })).toEqual(['sex']);
+    expect(missingProfileFields({ ...full, birthYear: 1800 })).toEqual(['birthYear']);
+    expect(missingProfileFields({ ...full, birthYear: '1985' as unknown as number })).toEqual(['birthYear']);
   });
 });
 

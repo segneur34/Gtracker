@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildCumulativeTrack } from '../core/sessionStats';
-import { applyTerrainElevation, terrainSamplePoints, type TerrainSamples } from './terrainElevation';
+import { applyTerrainElevation, readTerrainElevation, terrainSamplePoints, type SessionTerrainElevation, type TerrainSamples } from './terrainElevation';
 import type { TrackPoint } from '../core/types';
 import { mPerDegLon } from '../test/geo.fixture';
 
@@ -135,5 +135,29 @@ describe('applyTerrainElevation', () => {
     const track = buildTrack(1, 30).map((p) => ({ ...p, ele: undefined }));
     const out = applyTerrainElevation(track, buildCumulativeTrack(track).cumDist, samplesOf(track, 10, () => 50)).track;
     out.forEach((p) => expect(p.ele).toBe(50));
+  });
+});
+
+describe('readTerrainElevation : altitude rangée dans la fiche (lue ici depuis le lot 301)', () => {
+  const terrain: SessionTerrainElevation = {
+    source: 'ign', resource: 'ign_rge_alti_wld', version: 1, stepM: 10,
+    fetchedAt: '2026-10-07T09:00:00.000Z', startMs: START, t: [0, 3333, 6667], z: [47.54, 46.87, null],
+  };
+
+  it("relit une altitude bien formée à l'identique", () => {
+    expect(readTerrainElevation(JSON.parse(JSON.stringify(terrain)))).toEqual(terrain);
+  });
+
+  it('rend null pour une altitude absente ou mal formée', () => {
+    const cases = [
+      undefined,
+      { ...terrain, t: [0, 3333] },
+      { ...terrain, t: [10, 3333, 6667] },
+      { ...terrain, t: [0, 6667, 3333] },
+      { ...terrain, z: [47.54, 'x', null] },
+      { ...terrain, stepM: 0 },
+      { ...terrain, source: 'gps' },
+    ];
+    for (const broken of cases) expect(readTerrainElevation(broken)).toBeNull();
   });
 });
