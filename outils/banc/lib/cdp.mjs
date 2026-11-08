@@ -273,10 +273,10 @@ export const connect = async ({ port, base = BASE, width, height, shotDir, logEn
     return 'ok';
   };
 
-  /** Fiches JSON du dossier `Tracker/sessions` de la mémoire du navigateur (OPFS). */
+  /** Fiches JSON du dossier `Gtracker/sessions` (nom : `MEMORY_FOLDER_NAME`) de la mémoire du navigateur (OPFS). */
   const records = async () => (await evaluate(`(async () => {
     let dir;
-    try { dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions'); } catch { return []; }
+    try { dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions'); } catch { return []; }
     const list = [];
     for await (const [name, h] of dir.entries()) {
       if (!name.endsWith('.json')) continue;

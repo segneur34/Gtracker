@@ -46,7 +46,7 @@ const settleCalc = async (maxS = 120) => {
 };
 
 /** Fiche d'un itinéraire rangé dans la mémoire du navigateur ? */
-const routeSaved = (name) => evaluate(`(async () => { try { const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('itineraires'); const h = await d.getFileHandle(${JSON.stringify(name + '.json')}); return (await (await h.getFile()).text()).length > 0; } catch { return false; } })()`);
+const routeSaved = (name) => evaluate(`(async () => { try { const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('itineraires'); const h = await d.getFileHandle(${JSON.stringify(name + '.json')}); return (await (await h.getFile()).text()).length > 0; } catch { return false; } })()`);
 
 /** La page se monte après le chargement (modules à la demande, bibliothèque relue) : on attend son premier élément, 3 s au plus comme l'ancien sommeil. */
 const ready = (selector) => waitFor(`document.querySelector(${JSON.stringify(selector)}) !== null`, { timeout: 3000, label: selector });

@@ -38,9 +38,9 @@ const SECOND_NAME = '2026-10-06_10-00-00_cycling.gpx';
 
 // --- Protocole (lib/cdp.mjs) ---
 const { send, evaluate, go, settle, waitFor, wait, importFiles, shoot, close, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
-/** Dossier `Tracker` de la mémoire du navigateur, ou un de ses sous-dossiers. */
+/** Dossier `Gtracker` de la mémoire du navigateur, ou un de ses sous-dossiers. */
 const dirJs = (path) => `(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   for (const p of ${JSON.stringify(path)}.split('/').filter(Boolean)) dir = await dir.getDirectoryHandle(p);
   return dir;
 })()`;
@@ -138,7 +138,7 @@ const snapshot = () => evaluate(`(async () => {
       else { const file = await h.getFile(); out.push(prefix + name + ' ' + file.size + ' ' + file.lastModified); }
     }
   };
-  await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker'), '');
+  await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'), '');
   return JSON.stringify(out.sort());
 })()`);
 const importGreyed = () => evaluate(`(() => { const i = document.querySelector('input[type=file][accept*=".gpx"]'); return i ? i.disabled : '(absent)'; })()`);

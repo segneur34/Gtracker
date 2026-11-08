@@ -61,7 +61,7 @@ const runPath = join(workDir, 'carte-reveil.gpx');
 writeFileSync(runPath, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Course</name><type>running</type><trkseg>\n${run.join('\n')}\n</trkseg></trk></gpx>\n`);
 
 const listSessions = () => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   dir = await dir.getDirectoryHandle('sessions');
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 })()`);

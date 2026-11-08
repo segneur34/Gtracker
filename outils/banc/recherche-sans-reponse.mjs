@@ -44,7 +44,7 @@ const clickButton = (text) => evaluate(`(() => {
   if (!b) return 'absent'; b.click(); return 'ok';
 })()`);
 const listOpfs = async (path) => (await evaluate(`(async () => { try {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   for (const p of ${JSON.stringify(path)}.split('/')) dir = await dir.getDirectoryHandle(p);
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 } catch { return []; } })()`)) ?? [];

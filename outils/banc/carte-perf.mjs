@@ -72,7 +72,7 @@ writeFileSync(runPath, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.
 console.log('trace              :', `${POINTS} points à ${HZ} Hz`);
 
 const listOpfs = (path) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   for (const p of ${JSON.stringify(path)}.split('/')) dir = await dir.getDirectoryHandle(p);
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 })()`);

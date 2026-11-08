@@ -74,7 +74,7 @@ const charts = () => evaluate(`["Évolution des répétitions", "Profil d'une r�
 }).join(' | ')`);
 const card = () => evaluate(`(() => { const c = [...document.querySelectorAll('.ivl')][0]; return c ? c.innerText.replace(/\\n+/g, ' / ') : '(pas de compteur)'; })()`);
 const records = () => evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
   const list = [];
   for await (const [name, h] of dir.entries()) if (name.endsWith('.json')) list.push({ name, record: JSON.parse(await (await h.getFile()).text()) });
   return list;
@@ -472,7 +472,7 @@ console.log('largeur au téléphone :', await evaluate('document.documentElement
   console.log(`${one === '' ? 'ok   ' : 'ÉCHEC'} tout replier : pas de bouton avec une seule séance (« ${one} »)`);
   // Deuxième séance : copie de la première, écrite dans la fiche (OPFS), puis analyse rouverte.
   console.log('seconde séance :', await evaluate(`(async () => {
-    const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+    const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
     const h = await dir.getFileHandle(${JSON.stringify(name)});
     const rec = JSON.parse(await (await h.getFile()).text());
     rec.intervals = [rec.intervals[0], structuredClone(rec.intervals[0])];

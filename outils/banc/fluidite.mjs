@@ -123,7 +123,7 @@ const openTabs = async (labels) => {
   return evaluate(`[...document.querySelectorAll('.an-tabs .ui-tab[aria-pressed="true"]')].map((t) => t.textContent.trim()).join(', ')`);
 };
 const listOpfs = (path) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   for (const p of ${JSON.stringify(path)}.split('/')) dir = await dir.getDirectoryHandle(p);
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 })()`);
@@ -663,7 +663,7 @@ if (MESURES.includes('resumes') || MESURES.includes('demarrage')) {
 }
 /** Les fiches des 30 sessions marquées d'une version de calcul antérieure, cache des fiches effacé. */
 const outdateRecords = () => evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
   let n = 0;
   for await (const [name, h] of dir.entries()) {
     if (!name.endsWith('.json') || !/2026-0[67]-\\d\\d/.test(name)) continue;
@@ -680,7 +680,7 @@ const outdateRecords = () => evaluate(`(async () => {
   return n;
 })()`);
 const upToDate = () => evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
   let n = 0;
   for await (const [name, h] of dir.entries()) {
     if (!name.endsWith('.json') || !/2026-0[67]-\\d\\d/.test(name)) continue;
@@ -910,7 +910,7 @@ if (MESURES.includes('analyser')) {
     const [calcul, ecritures, ouverture] = await Promise.all([longTasks(out.t0, firstWrite), longTasks(firstWrite, push), longTasks(push, tEnd)]);
     const session = pushEvent ? new URLSearchParams(pushEvent.detail.split('?')[1]).get('session') : null;
     const imu = session === null ? null : await evaluate(`(async () => { try {
-      const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+      const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
       return (await (await dir.getFileHandle(${JSON.stringify((session ?? '').replace(/\.gpx$/, '.imu'))})).getFile()).size;
     } catch { return null; } })()`);
     return {

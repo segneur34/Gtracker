@@ -63,13 +63,13 @@ const bodyHas = (text) => evaluate(`document.body.innerText.includes(${JSON.stri
 const waitText = (text, label) => waitFor(() => bodyHas(text), { timeout: 8000, label });
 /** Noms du dossier `sessions` de la mémoire du navigateur (OPFS). */
 const sessionFiles = () => evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
   const names = [];
   for await (const [name] of dir.entries()) names.push(name);
   return names.sort();
 })()`);
 const readSessionText = (name) => evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
   return (await (await dir.getFileHandle(${JSON.stringify(name)})).getFile()).text();
 })()`);
 

@@ -27,7 +27,7 @@ writeFileSync(gpxPath, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.
 // --- Protocole (lib/cdp.mjs) ---
 const { send, evaluate, go, settle, waitFor, wait, importFiles, shoot, close, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
 const readRecord = () => evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
   for await (const [name, h] of dir.entries()) if (name.endsWith('.json')) return JSON.parse(await (await h.getFile()).text());
   return null;
 })()`);

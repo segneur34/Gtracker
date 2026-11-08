@@ -21,13 +21,13 @@ const clickButton = (text) => evaluate(`(() => {
   if (!b) return 'absent'; b.click(); return 'ok';
 })()`);
 const readOpfs = (path) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   const parts = ${JSON.stringify(path)}.split('/');
   for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p);
   return await (await (await dir.getFileHandle(parts[parts.length - 1])).getFile()).text();
 })()`);
 const listOpfs = async (path) => (await evaluate(`(async () => { try {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   for (const p of ${JSON.stringify(path)}.split('/')) dir = await dir.getDirectoryHandle(p);
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 } catch { return []; } })()`)) ?? [];

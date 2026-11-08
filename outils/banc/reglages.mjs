@@ -51,7 +51,7 @@ const reloaded = async (action, max) => {
   await settle({ max });
   return res;
 };
-const opfs = (body) => evaluate(`(async () => { const root = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker'); ${body} })()`);
+const opfs = (body) => evaluate(`(async () => { const root = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'); ${body} })()`);
 const listSettings = () => opfs(`try { const d = await root.getDirectoryHandle('reglages'); const names = []; for await (const [n] of d.entries()) names.push(n); return names.sort().join(', '); } catch { return '(pas de dossier)'; }`);
 const readSettings = (name) => opfs(`const d = await root.getDirectoryHandle('reglages'); return JSON.parse(await (await (await d.getFileHandle(${JSON.stringify(name)})).getFile()).text());`);
 const writeFile = (path, value) => opfs(`let d = root; const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p, { create: true }); const w = await (await d.getFileHandle(name, { create: true })).createWritable(); await w.write(${JSON.stringify(JSON.stringify(value, null, 2))}); await w.close(); return 'ok';`);

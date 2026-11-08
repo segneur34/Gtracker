@@ -43,13 +43,13 @@ const openSettingsTab = async () => {
   return already ? 'déjà ouvert' : clickButton('réglages');
 };
 const readOpfs = (path) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   const parts = ${JSON.stringify(path)}.split('/');
   for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p);
   return await (await (await dir.getFileHandle(parts[parts.length - 1])).getFile()).text();
 })()`);
 const listOpfs = (path) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   for (const p of ${JSON.stringify(path)}.split('/')) dir = await dir.getDirectoryHandle(p);
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 })()`);

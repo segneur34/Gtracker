@@ -30,7 +30,7 @@ const { send, evaluate, go, settle, waitFor, wait, shoot, close, logs } = await 
 
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
-const sessionsDir = `(await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions'))`;
+const sessionsDir = `(await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions'))`;
 const sessionFiles = () => evaluate(`(async () => {
   const names = [];
   for await (const [name] of ${sessionsDir}.entries()) names.push(name);

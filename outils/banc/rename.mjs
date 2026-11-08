@@ -18,8 +18,8 @@ const evaluate = async (expression) => {
 const go = (path, ms = 2500) => lib.go(path, ms);
 const clickText = (text) => evaluate(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === ${JSON.stringify(text)}); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
 const rows = () => evaluate(`JSON.stringify([...document.querySelectorAll('.lib-row__main')].map((r) => r.innerText.replace(/\\n/g, ' / ')))`);
-const record = () => evaluate(`(async () => { const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions'); for await (const [n, h] of d.entries()) if (n.endsWith('.json')) { const r = JSON.parse(await (await h.getFile()).text()); return JSON.stringify({ name: r.name, title: r.title, gpx: r.gpx }); } return 'aucune fiche'; })()`);
-const files = () => evaluate(`(async () => { const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions'); const out = []; for await (const [n] of d.entries()) out.push(n); return out.sort().join(', '); })()`);
+const record = () => evaluate(`(async () => { const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions'); for await (const [n, h] of d.entries()) if (n.endsWith('.json')) { const r = JSON.parse(await (await h.getFile()).text()); return JSON.stringify({ name: r.name, title: r.title, gpx: r.gpx }); } return 'aucune fiche'; })()`);
+const files = () => evaluate(`(async () => { const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions'); const out = []; for await (const [n] of d.entries()) out.push(n); return out.sort().join(', '); })()`);
 const typeName = async (value, key) => {
   await evaluate(`(() => { const i = document.querySelector('.lib-row__rename'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, ${JSON.stringify(value)}); i.dispatchEvent(new Event('input', { bubbles: true })); return 'ok'; })()`);
   await wait(200);

@@ -27,8 +27,8 @@ const clickText = (text, selector = 'button') => evaluate(`(() => { const b = [.
 const setFiles = (selector, paths) => importFiles(paths, selector);
 const lines = (re) => evaluate(`document.body.innerText.split('\\n').filter((l) => ${re}.test(l)).join(' | ')`);
 const rows = () => evaluate(`JSON.stringify([...document.querySelectorAll('.lib-row__main')].map((r) => r.innerText.replace(/\\n/g, ' / ')))`);
-const opfsTree = () => evaluate(`(async () => { const t = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker'); const out = {}; const walk = async (d, p) => { for await (const [n, h] of d.entries()) { if (h.kind === 'directory') await walk(h, p + n + '/'); else out[p + n] = (await h.getFile()).size; } }; await walk(t, ''); return JSON.stringify(out); })()`);
-const readOpfs = (path) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); return await (await (await d.getFileHandle(name)).getFile()).text(); })()`);
+const opfsTree = () => evaluate(`(async () => { const t = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'); const out = {}; const walk = async (d, p) => { for await (const [n, h] of d.entries()) { if (h.kind === 'directory') await walk(h, p + n + '/'); else out[p + n] = (await h.getFile()).size; } }; await walk(t, ''); return JSON.stringify(out); })()`);
+const readOpfs = (path) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); return await (await (await d.getFileHandle(name)).getFile()).text(); })()`);
 const shot = async (name, width, height, mobile) => {
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
   await settle({ max: 800 });

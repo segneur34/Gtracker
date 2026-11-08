@@ -43,7 +43,7 @@ const openSettingsTab = async () => {
   return r;
 };
 const bar = () => evaluate(`document.querySelector('.ui-savebar')?.innerText.replace(/\\n/g, ' ') ?? 'pas de barre'`);
-const readOpfs = (path) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); return await (await (await d.getFileHandle(name)).getFile()).text(); })()`);
+const readOpfs = (path) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); return await (await (await d.getFileHandle(name)).getFile()).text(); })()`);
 const fiche = async (file) => {
   const r = JSON.parse(await readOpfs(`sessions/${file.replace(/\.gpx$/, '.json')}`));
   return JSON.stringify({ sport: r.sport, analysis: r.analysis, movingTimeS: r.summary.movingTimeS === null ? null : Math.round(r.summary.movingTimeS), calcVersion: r.summary.calcVersion });

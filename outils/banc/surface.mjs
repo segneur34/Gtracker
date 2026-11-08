@@ -46,20 +46,20 @@ const tapMap = async (fx, fy) => {
 const surfaceRows = () => evaluate(`[...document.querySelectorAll('.surface-bar__row')].map((r) => r.innerText.replace(/\\n/g, ' ')).join(' · ') || '(aucune)'`);
 const planNotes = (pattern) => evaluate(`[...document.querySelectorAll('.plan-note')].map((x) => x.textContent).filter((t) => ${pattern}.test(t)).join(' | ') || '(aucune)'`);
 const readOpfs = (path) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   const parts = ${JSON.stringify(path)}.split('/');
   for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p);
   return await (await (await dir.getFileHandle(parts[parts.length - 1])).getFile()).text();
 })()`);
 const writeOpfs = (path, text) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   const parts = ${JSON.stringify(path)}.split('/');
   for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p);
   const w = await (await dir.getFileHandle(parts[parts.length - 1])).createWritable();
   await w.write(${JSON.stringify(text)}); await w.close(); return 'ok';
 })()`);
 const listOpfs = (path) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   for (const p of ${JSON.stringify(path)}.split('/')) dir = await dir.getDirectoryHandle(p);
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 })()`);

@@ -206,7 +206,7 @@ console.log('analyser :', await clickText('Analyser'));
 await waitFor(`location.pathname.endsWith('/analyse')`, { timeout: 5000, label: 'analyse' });
 await settle({ max: 5000, label: 'analyse' });
 const recs = await evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
   const list = [];
   for await (const [name, h] of dir.entries()) if (name.endsWith('.json')) list.push(JSON.parse(await (await h.getFile()).text()));
   return list;

@@ -74,7 +74,7 @@ const flagPopup = async (n) => {
   return `${clic} → ${text.replace(/ · .*$/, ' · (heure)')}`;
 };
 const records = () => evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
   const list = [];
   for await (const [name, h] of dir.entries()) if (name.endsWith('.json')) list.push({ name, record: JSON.parse(await (await h.getFile()).text()) });
   return list;

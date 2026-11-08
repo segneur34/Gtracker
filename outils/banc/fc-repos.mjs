@@ -18,7 +18,7 @@ if (!port) {
 }
 
 const { evaluate, go, wait, waitFor, settle, blockNetwork, shoot, close, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
-const dirJs = `(async () => await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker'))()`;
+const dirJs = `(async () => await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'))()`;
 const readRoot = (name) => evaluate(`(async () => {
   try { return await (await (await (await ${dirJs}).getFileHandle(${JSON.stringify(name)})).getFile()).text(); } catch { return null; }
 })()`);

@@ -83,7 +83,7 @@ const sessionBox = (label) => evaluate(`(() => {
   const box = [...document.querySelectorAll('.an-carte-panels label')].find((l) => l.querySelector('strong')?.textContent === ${JSON.stringify(label)})?.querySelector('input[type=checkbox]');
   if (!box) return 'absente'; box.click(); return box.checked ? 'cochée' : 'décochée';
 })()`);
-const sessionsDir = `(await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions'))`;
+const sessionsDir = `(await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions'))`;
 const recordAt = (startMs) => evaluate(`(async () => {
   for await (const [name, h] of ${sessionsDir}.entries()) {
     if (!name.endsWith('.json')) continue;

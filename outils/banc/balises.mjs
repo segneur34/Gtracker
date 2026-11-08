@@ -170,7 +170,7 @@ console.log('Enregistrer :', await clickButton('Enregistrer'));
 await wait(1500);
 console.log('message :', await evaluate(`[...document.querySelectorAll('.plan-note')].map((x) => x.textContent).find((t) => t.startsWith('Enregistré')) ?? null`));
 const ficheBips = await evaluate(`(async () => {
-  const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('itineraires');
+  const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('itineraires');
   return JSON.stringify(JSON.parse(await (await (await d.getFileHandle('Parcours banc.json')).getFile()).text()).markGuide ?? null);
 })()`);
 console.log('bips dans la fiche :', ficheBips);
@@ -179,7 +179,7 @@ const courbeFiche = JSON.parse(ficheBips ?? 'null')?.curve ?? [];
 check('fiche : les bips rangés sont ceux des rangées affichées', courbeFiche.length > 0
   && courbeFiche.map((p) => `${p.distanceM}/${p.intervalMs / 1000}`).join('  ') === rangeesParcours, `${ficheBips} | ${rangeesParcours}`);
 const gpxRange = await evaluate(`(async () => {
-  const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('itineraires');
+  const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('itineraires');
   const text = await (await (await d.getFileHandle('Parcours banc.gpx')).getFile()).text();
   return [...text.matchAll(/<wpt[^>]*><name>([^<]*)<\\/name>/g)].map((m) => m[1]).join(', ');
 })()`);

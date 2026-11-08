@@ -48,9 +48,9 @@ const evaluate = async (expression) => {
   if (res.result?.exceptionDetails) return `ERREUR : ${res.result.exceptionDetails.exception?.description?.split(String.fromCharCode(10))[0] ?? res.result.exceptionDetails.text}`;
   return res.result?.result?.value;
 };
-/** Dossier `Tracker` de la mémoire du navigateur, ou un de ses sous-dossiers. */
+/** Dossier `Gtracker` de la mémoire du navigateur, ou un de ses sous-dossiers. */
 const dirJs = (path) => `(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   for (const p of ${JSON.stringify(path)}.split('/').filter(Boolean)) dir = await dir.getDirectoryHandle(p);
   return dir;
 })()`;

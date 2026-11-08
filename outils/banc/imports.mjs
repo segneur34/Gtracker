@@ -126,7 +126,7 @@ await settle({ max: 3000, label: 'w5' });
 const r5 = await recordOf(t5);
 console.log('fiche : nom', JSON.stringify(r5?.name), '| vitesse max', r5?.summary?.maxSpeedMs?.toFixed(2));
 console.log('fiche abîmée posée dans sessions/ :', await evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
   const put = async (name, text) => { const w = await (await dir.getFileHandle(name, { create: true })).createWritable(); await w.write(text); await w.close(); };
   await put('w6.gpx', ${JSON.stringify(trackGpx('wingfoil', 8, t6))});
   await put('w6.json', ${JSON.stringify(fiche('w6.gpx', t6, { name: 'Dans le dossier', notes: notesWith({ comment: 'gardé', savedAt: t6 }), summary: { ...summaryFor(t6), samplingS: null } }))});
@@ -184,7 +184,7 @@ await waitFor(() => recordOf(t10), { timeout: 3000, label: 'f1' });
 await settle({ max: 3000, label: 'f1' });
 /** Nom du GPX rangé à côté de la fiche au texte exact, relu dans le dossier. */
 const futureFile = await evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
   for await (const [name, h] of dir.entries()) {
     if (name.endsWith('.json') && (await (await h.getFile()).text()) === ${JSON.stringify(futureText)}) return name.replace(/\\.json$/, '.gpx');
   }
@@ -192,7 +192,7 @@ const futureFile = await evaluate(`(async () => {
 })()`);
 console.log('fiche au caractère près :', futureFile !== null);
 console.log('GPX rangé sans le paquet :', futureFile !== null && await evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
   return (await (await (await dir.getFileHandle(${JSON.stringify(futureFile)})).getFile()).text()) === ${JSON.stringify(futureBare)};
 })()`));
 await go(analysisPath('voile', { gpx: futureFile }), 5000);

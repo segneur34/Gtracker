@@ -27,7 +27,7 @@ const DUMP = process.env.DUMP;
 const { send, evaluate, go, settle, waitFor, blockNetwork, importGpx, shoot, close, logs, wait } = await connect({ port, width: 1400, height: 1000, shotDir });
 
 const listOpfs = (path) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
   for (const p of ${JSON.stringify(path)}.split('/')) dir = await dir.getDirectoryHandle(p);
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 })()`);
