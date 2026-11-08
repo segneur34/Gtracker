@@ -485,9 +485,9 @@ Les principes sont dans `docs/DECISIONS.md` (§6, « Enregistrement ») ; ce qui
 
 - **Développement** : `npm run dev` (ou le raccourci « Tracker » du bureau, `outils/lancer-tracker.bat`) et le navigateur du PC ; mise en page mobile au mode appareil de Chrome. `BrowserRouter` fonctionne dans la WebView, chargement direct de chaque route compris.
 - **Outils** :
-  - **JDK 21** (Temurin, `C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot`) : le Java 25 d'Android Studio 2026.1 ne fait pas tourner Gradle 8.14.3 ;
+  - **JDK 21** (Temurin, `C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot`) : le Java 25 d'Android Studio 2026.1 ne fait pas tourner Gradle 8.14.3 ; **Gradle reste en 8.14.3** (`android/gradle/wrapper/gradle-wrapper.properties`) : le 9.6 et au-delà refusent le plugin Android 8.13 (API interne retirée, constaté le 08/11 avec le 9.7.1 posé par Android Studio) ;
   - SDK dans `%LOCALAPPDATA%\Android\Sdk` ;
-  - `android/` est versionné, et `android/app/build.gradle` tire `versionName` et `versionCode` de `package.json`.
+  - `android/` est versionné, et `android/app/build.gradle` tire `versionName` et `versionCode` de `package.json` : majeure × 1 000 000 + mineure × 1 000 + correctif **+ 1**, la série de Gtracker partant de 0.00.00 (code 1) et Android exigeant un code d'au moins 1.
 - **Vers le téléphone** : `npm run build`, `npx cap sync android`, puis `npx cap run android` (2 min 20 à froid).
   - Dans le shell de Claude, qui définit `NoDefaultCurrentDirectoryInExePath=1`, la CLI ne trouve pas `gradlew`.
   - Y passer par `android\gradlew.bat assembleRelease`, avec `JAVA_HOME` et `ANDROID_HOME` posés.
