@@ -1,6 +1,6 @@
 import { roundBearingDeg } from '../core/angles';
 import { bandIndex } from '../core/basics';
-import { sportTreatment, type SportFamily, type Treatment } from '../core/sportProfiles';
+import { sportTreatment, type Treatment } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import {
   J_PER_KCAL, formatClock, formatDistance, formatShortDistance, formatSpeed, formatTimeOfDay, isInverseUnit, type DistanceUnit, type SpeedUnit, formatDecimal
@@ -21,12 +21,11 @@ export type LiveFieldKey =
   | 'speed' | 'average' | 'max' | 'recentDistanceSpeed' | 'lastDistance' | 'distance' | 'duration' | 'clock'
   | 'remaining' | 'remainingTime'
   | 'recentTopShort' | 'recentTopLong' | 'heading' | 'legAverage' | 'markDistance' | 'markBearing'
-  | 'grade' | 'gain' | 'recentDistanceGain' | 'loss' | 'climbRate' | 'power' | 'effort' | 'heartRate' | 'averageHeartRate' | 'heartRateZone'
-  | 'step';
+  | 'grade' | 'gain' | 'recentDistanceGain' | 'loss' | 'climbRate' | 'power' | 'effort' | 'heartRate' | 'averageHeartRate' | 'heartRateZone';
 
 const ALL: Treatment[] = ['voile', 'course', 'velo', 'surf'];
 const LAND: Treatment[] = ['course', 'velo'];
-/** Chiffres sans position : la FC, le temps et l'étape, seuls proposés à la muscu (lot I du 25/10). */
+/** Chiffres sans position : la FC et le temps, seuls proposés à la muscu (lot I du 25/10). */
 const WITH_MUSCU: Treatment[] = [...ALL, 'muscu'];
 
 /** Traitements où chaque chiffre a un sens ; l'ordre est celui des menus de Réglages. */
@@ -57,36 +56,25 @@ const LIVE_FIELD_TREATMENTS: Record<LiveFieldKey, readonly Treatment[]> = {
   clock: WITH_MUSCU,
   remaining: ALL,
   remainingTime: ALL,
-  step: [...LAND, 'muscu'],
 };
 
 /**
- * Chiffres de la notification seulement, pas de la carte réduite : l'étape
- * (26/10), répétition du compteur ou palier d'un test, que la carte du
- * compteur ou du test montre déjà sur la page.
+ * Chiffres de la notification seulement, pas de la carte réduite ; aucun
+ * depuis le retrait de l'étape du compteur et des tests (lot 302).
  */
-const NOTIFICATION_ONLY_FIELDS: readonly LiveFieldKey[] = ['step'];
+const NOTIFICATION_ONLY_FIELDS: readonly LiveFieldKey[] = [];
 
 /** Où un chiffre se lit : la carte réduite de l'enregistrement, ou la notification. */
 export type LiveFieldTarget = 'live' | 'notification';
 
-/** Chiffres réservés à une famille (27/10) : l'étape n'est proposée qu'à l'Entraînement, à pied ou à vélo. */
-const LIVE_FIELD_FAMILIES: Partial<Record<LiveFieldKey, readonly SportFamily[]>> = {
-  step: ['fractionne'],
-};
-
-const allowedFor = (key: LiveFieldKey, treatment: Treatment, target: LiveFieldTarget, family?: SportFamily): boolean => {
-  const families = LIVE_FIELD_FAMILIES[key];
-  return LIVE_FIELD_TREATMENTS[key].includes(treatment)
-    && (target === 'notification' || !NOTIFICATION_ONLY_FIELDS.includes(key))
-    && (!families || (family !== undefined && families.includes(family)));
-};
+const allowedFor = (key: LiveFieldKey, treatment: Treatment, target: LiveFieldTarget): boolean =>
+  LIVE_FIELD_TREATMENTS[key].includes(treatment) && (target === 'notification' || !NOTIFICATION_ONLY_FIELDS.includes(key));
 
 const LIVE_FIELD_KEYS = Object.keys(LIVE_FIELD_TREATMENTS) as LiveFieldKey[];
 
-/** Chiffres proposés pour un traitement (et une famille, pour ceux qui en dépendent), dans l'ordre des menus. */
-export const liveFieldsOfTreatment = (treatment: Treatment, target: LiveFieldTarget = 'live', family?: SportFamily): LiveFieldKey[] =>
-  LIVE_FIELD_KEYS.filter((key) => allowedFor(key, treatment, target, family));
+/** Chiffres proposés pour un traitement, dans l'ordre des menus. */
+export const liveFieldsOfTreatment = (treatment: Treatment, target: LiveFieldTarget = 'live'): LiveFieldKey[] =>
+  LIVE_FIELD_KEYS.filter((key) => allowedFor(key, treatment, target));
 
 /** Nombre de lignes au plus. */
 export const MAX_LIVE_FIELDS = 4;
@@ -121,8 +109,8 @@ export const DEFAULT_NOTIFICATION_FIELDS: Record<Treatment, LiveFieldKey[]> = {
   course: ['speed', 'distance'],
   velo: ['speed', 'distance'],
   surf: ['speed', 'distance'],
-  // L'étape du compteur et la FC : ni vitesse ni distance sans position.
-  muscu: ['step', 'heartRate'],
+  // La FC et la durée : ni vitesse ni distance sans position.
+  muscu: ['heartRate', 'duration'],
 };
 
 /** Chiffres de la notification propres à un calcul, avant ceux de son traitement ; aucun pour l'instant. */
@@ -141,13 +129,13 @@ const isLiveFieldKey = (value: unknown): value is LiveFieldKey =>
  * défaut s'applique).
  */
 export const sanitizeLiveFields = (
-  value: unknown, treatment: Treatment, max = MAX_LIVE_FIELDS, target: LiveFieldTarget = 'live', family?: SportFamily,
+  value: unknown, treatment: Treatment, max = MAX_LIVE_FIELDS, target: LiveFieldTarget = 'live',
 ): LiveFieldKey[] | null => {
   if (!Array.isArray(value)) return null;
   const kept: LiveFieldKey[] = [];
   for (const key of value) {
     if (kept.length === max) break;
-    if (isLiveFieldKey(key) && allowedFor(key, treatment, target, family) && !kept.includes(key)) kept.push(key);
+    if (isLiveFieldKey(key) && allowedFor(key, treatment, target) && !kept.includes(key)) kept.push(key);
   }
   return kept.length > 0 ? kept : null;
 };
@@ -198,7 +186,6 @@ export const liveFieldLabel = (key: LiveFieldKey, { speedUnit, distanceUnit, opt
     case 'heartRate': return 'Fréquence cardiaque';
     case 'averageHeartRate': return 'FC moyenne';
     case 'heartRateZone': return 'Zone cardiaque';
-    case 'step': return 'Étape';
   }
 };
 
@@ -233,7 +220,6 @@ export const liveFieldShortLabel = (key: LiveFieldKey, { speedUnit, distanceUnit
     case 'heartRate': return 'FC';
     case 'averageHeartRate': return 'FC moy.';
     case 'heartRateZone': return 'Zone';
-    case 'step': return 'Étape';
   }
 };
 
@@ -254,12 +240,6 @@ export interface LiveFieldContext extends LiveFieldUnits {
   heartRateBpm: number | null;
   /** Bornes basses des zones cardiaques 1 à 5 du pratiquant, en bpm ; `null` s'il n'en a pas. */
   heartRateZoneBounds: readonly number[] | null;
-  /**
-   * Étape de l'entraînement (26/10) : répétition du compteur sur le total de la
-   * séance, ou palier d'un test, sans total ; absente ou `null` sans compteur
-   * en marche ni rampe de test.
-   */
-  step?: { rep: number; of: number | null } | null;
 }
 
 const NONE = '—';
@@ -318,8 +298,5 @@ export const liveFieldValue = (key: LiveFieldKey, ctx: LiveFieldContext): string
       const zone = bandIndex(bpm, ctx.heartRateZoneBounds);
       return `${zone === 0 ? 'sous Z1' : `Z${zone}`} · ${bpm}`;
     }
-    case 'step':
-      if (!ctx.step) return NONE;
-      return ctx.step.of === null ? String(ctx.step.rep) : `${ctx.step.rep}/${ctx.step.of}`;
   }
 };

@@ -111,6 +111,7 @@ await go('/surf', 4000);
 check('/surf s’ouvre toujours, et dit qu’il est caché', (await evaluate('document.querySelector(".shell-main").innerText')).includes('est caché dans'));
 
 // --- 3. Dernière famille ---
+// L'Entraînement, retiré au lot 302, n'a plus d'œil dans Réglages : son clic ne trouve rien, la famille est déjà cachée.
 await go('/parametres');
 for (const f of ['Voile', 'À pied', 'Entraînement']) await click('.settings-eye', `Cacher ${f}`);
 await wait(300);

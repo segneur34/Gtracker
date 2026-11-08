@@ -10,7 +10,7 @@
 //     en cours affiché, ouvert et retenu après rechargement ; pas de rangée d'activités sur « Tout » ; la flèche
 //     droite du clavier passe à la famille suivante ;
 //  3. la descente : Course (5 sessions, graphique et records), 30 jours (2 sessions), le retour arrière
-//     qui remonte à la vue d'ensemble ; Fractionné puis « Fractionné vélo » (1 session) ; les boutons
+//     qui remonte à la vue d'ensemble ; Fractionné (par l'adresse depuis le lot 302) puis « Fractionné vélo » (1 session) ; les boutons
 //     d'activité de chaque famille (Vélo : ses trois activités ; Voile : « Kite », de base, avec sa session) ;
 //  4. le graphique (lot 2 des demandes du 16/10) : un point cliqué donne sa session, « Ouvrir » mène à son
 //     analyse ; les données proposées par famille (course, voile : % de vol du wingfoil seul, surf), chacune
@@ -207,7 +207,8 @@ await evaluate('history.back()');
 await settle({ max: 1000 });
 check('retour arrière : vue d\'ensemble', (await search()) === '/statistiques' && (await stat('Sessions')) === '12', `${await search()} ; ${await stat('Sessions')}`);
 
-await click('.ui-segmented[aria-label="Famille"] [role=radio]', 'Entraînement');
+// L'Entraînement, retiré de cette version (lot 302), n'a plus de pastille : sa page s'ouvre par l'adresse, ses sessions restent comptées.
+await go('/statistiques?famille=fractionne');
 await settle({ max: 800 });
 check('Fractionné : fond de la famille', (await backdrop()) === 'page-backdrop page-backdrop--fractionne', await backdrop());
 check('activités du fractionné', (await chips('Activité')) === 'Toutes, Fractionné à pied, Fractionné vélo, Tests, Muscu', await chips('Activité'));

@@ -55,3 +55,17 @@ describe('foil des Statistiques', () => {
     expect(valueOf(await convert([wing], [session(record)], { wingfoil: false }))).toBeNull();
   });
 });
+
+describe('famille retirée (lot 302)', () => {
+  it("les sessions de l'Entraînement restent comptées, celles d'une famille cachée non", async () => {
+    vi.resetModules();
+    const { visibleStatSessions } = await import('./useVisibleStatSessions');
+    const piste: Activity = { id: 'run-intervals', name: 'Fractionné à pied', base: 'run-intervals', color: '#000' };
+    const sessions = [
+      session(sessionRecord({ gpx: 'a.gpx', sport: 'run-intervals', activityId: 'run-intervals' })),
+      session(sessionRecord({ gpx: 'b.gpx', sport: 'surf', activityId: 'surf' })),
+    ];
+    const all = visibleStatSessions(sessions, [piste, surf], () => false).all;
+    expect(all.map((s) => s.family)).toEqual(['fractionne']);
+  });
+});

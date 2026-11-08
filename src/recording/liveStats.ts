@@ -178,27 +178,6 @@ export const liveReferenceSpeedMs = (segments: ReadonlyArray<ReadonlyArray<Locat
     maxGapS
   );
 
-/**
- * Direct d'une session sans position (muscu, lot I du 25/10) : la FC moyenne
- * depuis le départ, comme l'analyse, et le temps enregistré hors pauses ; ni
- * distance ni vitesse.
- */
-export const heartOnlyLiveStats = (
-  segments: ReadonlyArray<ReadonlyArray<Pick<LocationFix, 'timeMs' | 'heartRateBpm'>>>, params: HeartRateProfile
-): LiveStats => {
-  let sum = 0;
-  let coveredS = 0;
-  let movingTimeMs = 0;
-  for (const segment of segments) {
-    if (segment.length > 1) movingTimeMs += segment[segment.length - 1].timeMs - segment[0].timeMs;
-    const part = heartPart(segment, params);
-    if (part === null) continue;
-    sum += part.sum;
-    coveredS += part.coveredS;
-  }
-  return { ...EMPTY_LIVE_STATS, movingTimeMs, averageHeartRateBpm: coveredS > 0 ? sum / coveredS : null };
-};
-
 /** Vitesse sur les `targetM` derniers mètres, en remontant les segments ; `null` s'ils ne suffisent pas. */
 const lastDistanceSpeed = (tracks: TrackPoint[][], targetM: number): number | null => {
   let dist = 0;

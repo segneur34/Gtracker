@@ -22,7 +22,7 @@ interface SessionWeightFieldProps {
 
 function SessionWeightField({ label, valueKg, activityKg, isValid, onChange, title }: SessionWeightFieldProps) {
   const shown = (kg: number | null): string => (kg === null ? '' : String(kg));
-  // Texte local, comme `EffortThresholdEditor` : une frappe intermédiaire ne doit
+  // Texte local : une frappe intermédiaire ne doit
   // pas être réécrite par le rendu suivant.
   const [text, setText] = useState(() => shown(valueKg));
   const [prevValue, setPrevValue] = useState(valueKg);

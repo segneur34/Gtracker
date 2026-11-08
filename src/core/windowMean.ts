@@ -1,6 +1,6 @@
 /**
- * Moyenne glissante en temps actif (lot 187, sortie de `recording/fitnessTest.ts`) : une fenêtre de mesures
- * récentes, et sa moyenne pondérée par le temps sur les dernières secondes. Sert au test guidé, à l'alerte de
+ * Moyenne glissante en temps actif (lot 187, sortie du test de FC max, retiré au lot 302) : une fenêtre de mesures
+ * récentes, et sa moyenne pondérée par le temps sur les dernières secondes. Sert à l'alerte de
  * zone cardiaque et au test de FC de repos ; rien n'y dépend d'un sport (règle 2 : tout en secondes).
  */
 

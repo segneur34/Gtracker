@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { BASE_COLOR, baseActivity, type Activity } from '../core/activities';
 import type { LocationFix } from '../platform/location';
 import { buildGpx } from './gpxWriter';
-import type { SessionTest } from './fitnessTest';
-import { runCommand, startRun } from './intervalTimer';
 import {
-  journalActivity, journalActivityLine, journalBreakLine, journalFixLine, journalHeaderLine, journalHeartRateLine, journalIntervalsLine, journalNoteLine, journalTestLine,
-  parseJournal,
+  journalActivity, journalActivityLine, journalBreakLine, journalFixLine, journalHeaderLine, journalNoteLine, parseJournal,
 } from './journal';
 import { roundFix, splitIntoSegments } from './session';
 
@@ -135,18 +132,32 @@ describe('journal', () => {
     expect(parseJournal(good + journalFixLine(fixes[0])).activityChange?.sport).toBe('kite');
   });
 
-  it("relit chaque séance du compteur dans son dernier état, et l'ignore abîmée", () => {
-    const workout = { reps: 2, workS: 60, restS: 30 };
-    const first = startRun(workout, T0);
-    const paused = runCommand(first, 'pause', T0 + 10_000);
-    const second = startRun(workout, T0 + 500_000);
-    const broken = `${JSON.stringify(['intervals', { workout: {}, startedAtMs: T0 }])}\n`;
-    const text = journalOf(fixes) + journalIntervalsLine(first) + journalIntervalsLine(second) + journalIntervalsLine(paused)
-      + broken + journalIntervalsLine(second).slice(0, 30);
+  it("ignore les lignes d'un journal d'avant le lot 302 : séances, test guidé, FC seule (lot 302)", () => {
+    const old = [
+      `${JSON.stringify(['intervals', { workout: { reps: 2, workS: 60, restS: 30 }, startedAtMs: T0, commands: [] }])}\n`,
+      `${JSON.stringify(['test', { protocol: 'fc-max', version: 1, startMs: T0 }])}\n`,
+      `${JSON.stringify(['hr', T0 + 500, 120])}\n`,
+    ];
+    const text = journalHeaderLine('kite', T0 - 5000) + journalFixLine(fixes[0]) + old[0] + journalFixLine(fixes[1]) + old[1] + old[2]
+      + journalBreakLine(fixes[2].timeMs) + journalFixLine(fixes[2]);
     const parsed = parseJournal(text);
-    expect(parsed.intervalRuns).toEqual([paused, second]);
+    const plain = parseJournal(journalHeaderLine('kite', T0 - 5000) + journalFixLine(fixes[0]) + journalFixLine(fixes[1])
+      + journalBreakLine(fixes[2].timeMs) + journalFixLine(fixes[2]));
+    expect(parsed).toEqual(plain);
     expect(parsed.fixes).toHaveLength(3);
-    expect(parseJournal(journalOf(fixes)).intervalRuns).toEqual([]);
+    expect(parsed.breaks).toEqual([2]);
+    expect(Object.keys(parsed)).not.toContain('intervalRuns');
+    expect(Object.keys(parsed)).not.toContain('test');
+    expect(Object.keys(parsed)).not.toContain('heartFixes');
+  });
+
+  it('un journal de muscu (FC seule) se lit sans position', () => {
+    const text = journalHeaderLine('muscu', T0) + `${JSON.stringify(['hr', T0, 90])}\n` + journalBreakLine(T0 + 30_000)
+      + `${JSON.stringify(['hr', T0 + 30_000, 110])}\n`;
+    const parsed = parseJournal(text);
+    expect(parsed.header?.sport).toBe('muscu');
+    expect(parsed.fixes).toEqual([]);
+    expect(parsed.breaks).toEqual([]);
   });
 });
 
@@ -169,66 +180,6 @@ describe('notes du journal', () => {
     expect(parsed.marks).toEqual([]);
     expect(parsed.fixes).toHaveLength(3);
     expect(parseJournal(journalOf(fixes)).marks).toEqual([]);
-  });
-});
-
-describe('test du journal', () => {
-  const TEST: SessionTest = {
-    protocol: 'fc-max',
-    version: 1,
-    settings: { warmupS: 480, age: 35, ageSource: 'profil', lowBpm: 110, highBpm: 147, zoneMethod: 'max' },
-    startMs: T0,
-    rampStartMs: T0 + 480_000,
-    v0Ms: 2.5,
-    steps: [{ startMs: T0 + 480_000, targetMs: 2.5 }],
-    rampEndMs: null,
-    dropMs: null,
-    endReason: null,
-    endMs: null,
-    signals: [{ t: T0, s: 'debut' }, { t: T0 + 480_000, s: 'palier' }],
-  };
-
-  it('relit le dernier état lisible du test, sans gêner les positions', () => {
-    const later: SessionTest = { ...TEST, steps: [...TEST.steps, { startMs: T0 + 540_000, targetMs: 2.67 }] };
-    const text = journalOf(fixes.slice(0, 2)) + journalTestLine(TEST) + journalFixLine(fixes[2]) + journalTestLine(later) + '["test",{"protocol":"fc-max"';
-    const parsed = parseJournal(text);
-    expect(parsed.test).toEqual(later);
-    expect(parsed.fixes).toHaveLength(3);
-  });
-
-  it('rend null sans test, ou si le seul est abîmé', () => {
-    expect(parseJournal(journalOf(fixes)).test).toBeNull();
-    expect(parseJournal(journalOf(fixes) + '["test",{"protocol":"vma"}]\n').test).toBeNull();
-  });
-});
-
-describe('journal d’une session sans position (muscu, lot I du 25/10)', () => {
-  it('relit les mesures de la ceinture et leurs coupures, à part des positions ; une ligne abîmée est ignorée', () => {
-    const text = [
-      journalHeaderLine('muscu', T0),
-      journalHeartRateLine({ timeMs: T0, heartRateBpm: 90 }),
-      journalHeartRateLine({ timeMs: T0 + 1000, heartRateBpm: 92 }),
-      journalHeartRateLine({ timeMs: T0 + 1000, heartRateBpm: 93 }),
-      journalBreakLine(T0 + 30_000),
-      journalHeartRateLine({ timeMs: T0 + 30_000, heartRateBpm: 110 }),
-      journalHeartRateLine({ timeMs: T0 + 31_000 }),
-      '["hr","x",3]',
-      '["hr", 12',
-    ].join('');
-    const parsed = parseJournal(text);
-    expect(parsed.header?.sport).toBe('muscu');
-    expect(parsed.fixes).toEqual([]);
-    expect(parsed.breaks).toEqual([]);
-    expect(parsed.heartFixes).toEqual([
-      { timeMs: T0, heartRateBpm: 90 }, { timeMs: T0 + 1000, heartRateBpm: 92 }, { timeMs: T0 + 30_000, heartRateBpm: 110 }, { timeMs: T0 + 31_000 },
-    ]);
-    expect(parsed.heartBreaks).toEqual([2]);
-  });
-
-  it('un journal à positions n’a aucune mesure à part', () => {
-    const parsed = parseJournal(journalHeaderLine('running', T0) + journalFixLine({ timeMs: T0, lat: 43, lon: 3 }));
-    expect(parsed.heartFixes).toEqual([]);
-    expect(parsed.fixes).toHaveLength(1);
   });
 });
 

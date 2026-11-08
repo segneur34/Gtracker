@@ -3,10 +3,7 @@ import { BASE_COLOR, baseActivity, findActivity, type Activity } from '../core/a
 import { readSessionMark, sortMarks, type SessionMark } from '../core/sessionMarks';
 import type { SportType } from '../core/types';
 import type { LocationFix } from '../platform/location';
-import { readSessionTest, type SessionTest } from './fitnessTest';
-import { readIntervalRun, type IntervalRun } from './intervalTimer';
 import { isSportType } from '../core/sportProfiles';
-import type { HeartRateFix } from './session';
 
 /**
  * Journal d'un enregistrement en cours : une ligne JSON par position, ajoutée
@@ -59,15 +56,6 @@ export const journalFixLine = (fix: LocationFix): string => {
 };
 
 /**
- * Mesure de la ceinture d'une session sans position (muscu, lot I du 25/10) :
- * `['hr', heure, FC]`, la FC à `null` pour le point de l'arrêt. Marquée par
- * `'hr'` en tête : ignorée des versions qui ne la connaissent pas (`toFix`
- * exige un nombre en tête).
- */
-export const journalHeartRateLine = (fix: HeartRateFix): string =>
-  `${JSON.stringify(['hr', fix.timeMs, fix.heartRateBpm ?? null])}\n`;
-
-/**
  * Frontière de segment : une pause, manuelle ou automatique, a repris à cet
  * horodatage. Tableau à deux éléments, marqué par `'break'` en tête : ne
  * collisionne ni avec l'en-tête (un objet), ni avec une position (`toFix`
@@ -91,26 +79,10 @@ export const journalActivityLine = (sport: SportType, activity: { id: string; na
   `${JSON.stringify(['activity', { sport, id: activity.id, name: activity.name }])}\n`;
 
 /**
- * Séance du compteur (`intervalTimer.ts`) telle qu'elle est à cet instant,
- * réécrite à chaque commande : pour une même séance (même `startedAtMs`), la
- * dernière ligne l'emporte. Tableau à deux éléments, marqué par
- * `'intervals'` en tête, ignoré par les versions qui ne le connaissent pas.
- */
-export const journalIntervalsLine = (run: IntervalRun): string => `${JSON.stringify(['intervals', run])}\n`;
-
-/**
  * Repère posé par le bouton « Note ». Tableau à deux éléments, marqué par
  * `'note'` en tête, ignoré par les versions qui ne le connaissent pas.
  */
 export const journalNoteLine = (mark: SessionMark): string => `${JSON.stringify(['note', mark])}\n`;
-
-/**
- * Test guidé (`fitnessTest.ts`) tel qu'il est à cet instant, réécrit à chaque
- * changement de phase et à chaque palier : la dernière ligne l'emporte.
- * Tableau à deux éléments, marqué par `'test'` en tête, ignoré par les
- * versions qui ne le connaissent pas.
- */
-export const journalTestLine = (test: SessionTest): string => `${JSON.stringify(['test', test])}\n`;
 
 /**
  * Pause manuelle à l'heure de l'horloge `atMs`, écrite tout de suite : une reprise après une chute du moteur
@@ -132,10 +104,9 @@ export interface JournalPause {
   autoPartMs: number;
 }
 
-/** Frontière de segment qui clôt une pause manuelle : l'indice du point dans chaque liste, et la part à garder. */
+/** Frontière de segment qui clôt une pause manuelle : l'indice de la position, et la part à garder. */
 export interface ManualBreak {
   fixIndex: number;
-  heartIndex: number;
   autoPartMs: number;
 }
 
@@ -145,18 +116,10 @@ export interface ParsedJournal {
   fixes: LocationFix[];
   /** Indices, dans `fixes`, où reprend un nouveau segment (voir `splitIntoSegments`). */
   breaks: number[];
-  /** Mesures de la ceinture d'une session sans position (muscu), dans l'ordre du temps. */
-  heartFixes: HeartRateFix[];
-  /** Indices, dans `heartFixes`, où reprend un nouveau segment. */
-  heartBreaks: number[];
   /** Dernier changement d'activité, qui prime sur l'en-tête ; `null` s'il n'y en a pas eu. */
   activityChange: JournalActivity | null;
-  /** Séances du compteur, chacune dans son dernier état, dans l'ordre de leur lancement. */
-  intervalRuns: IntervalRun[];
   /** Repères du bouton « Note », dans l'ordre du temps. */
   marks: SessionMark[];
-  /** Test guidé, dans son dernier état lisible ; `null` sans test. */
-  test: SessionTest | null;
   /** Frontières qui closent une pause manuelle : leur écart n'est pas de la durée. */
   manualBreaks: ManualBreak[];
   /** Pause manuelle encore en cours à la fin du journal, `null` sinon. */
@@ -194,32 +157,11 @@ const toActivityMarker = (value: unknown): { marker: boolean; change: JournalAct
   return { marker: true, change: { sport, activity: { id, name } } };
 };
 
-/** Ligne de séance du compteur : `true` si c'en est une (même abîmée), et la séance si elle est lisible. */
-const toIntervalsMarker = (value: unknown): { marker: boolean; run: IntervalRun | null } =>
-  Array.isArray(value) && value.length === 2 && value[0] === 'intervals'
-    ? { marker: true, run: readIntervalRun(value[1]) }
-    : { marker: false, run: null };
-
 /** Ligne de repère : `true` si c'en est une (même abîmée), et le repère s'il est lisible. */
 const toNoteMarker = (value: unknown): { marker: boolean; mark: SessionMark | null } =>
   Array.isArray(value) && value.length === 2 && value[0] === 'note'
     ? { marker: true, mark: readSessionMark(value[1]) }
     : { marker: false, mark: null };
-
-/** Ligne de test : `true` si c'en est une (même abîmée), et le test s'il est lisible. */
-const toTestMarker = (value: unknown): { marker: boolean; test: SessionTest | null } =>
-  Array.isArray(value) && value.length === 2 && value[0] === 'test'
-    ? { marker: true, test: readSessionTest(value[1]) }
-    : { marker: false, test: null };
-
-/** Ligne de mesure de la ceinture : `true` si c'en est une (même abîmée), et la mesure si elle est lisible. */
-const toHeartMarker = (value: unknown): { marker: boolean; fix: HeartRateFix | null } => {
-  if (!Array.isArray(value) || value[0] !== 'hr') return { marker: false, fix: null };
-  const timeMs = finiteOr(value[1], undefined);
-  if (value.length !== 3 || timeMs === undefined) return { marker: true, fix: null };
-  const heartRateBpm = finiteOr(value[2], undefined);
-  return { marker: true, fix: heartRateBpm === undefined ? { timeMs } : { timeMs, heartRateBpm } };
-};
 
 /** Ligne `[marque, heure, ...]` : son heure si `value` en est une et qu'elle est lisible. */
 const timedMarker = (value: unknown, marker: string): number | null =>
@@ -246,19 +188,16 @@ const toFix = (value: unknown): LocationFix | null => {
 /**
  * Relit un journal. Les lignes illisibles sont ignorées, de même qu'une
  * position qui n'est pas plus récente que la précédente, comme à
- * l'enregistrement. Le dernier changement d'activité lisible l'emporte, de
- * même que le dernier état de chaque séance du compteur et du test.
+ * l'enregistrement. Le dernier changement d'activité lisible l'emporte. Les
+ * lignes d'un journal d'avant le lot 302 (FC seule `hr`, séances `intervals`,
+ * test `test`) ne sont pas des positions (`toFix`) : ignorées comme les autres.
  */
 export const parseJournal = (text: string): ParsedJournal => {
   let header: JournalHeader | null = null;
   const fixes: LocationFix[] = [];
   const breaks: number[] = [];
-  const heartFixes: HeartRateFix[] = [];
-  const heartBreaks: number[] = [];
   let activityChange: JournalActivity | null = null;
-  const runs = new Map<number, IntervalRun>();
   const marks: SessionMark[] = [];
-  let test: SessionTest | null = null;
   const manualBreaks: ManualBreak[] = [];
   let openPause: JournalPause | null = null;
   let resumedPause: JournalPause | null = null;
@@ -280,11 +219,10 @@ export const parseJournal = (text: string): ParsedJournal => {
     if (breakAt !== null) {
       lastLineMs = breakAt;
       const pause: JournalPause | null = resumedPause ?? openPause;
-      if (pause) manualBreaks.push({ fixIndex: fixes.length, heartIndex: heartFixes.length, autoPartMs: pause.autoPartMs });
+      if (pause) manualBreaks.push({ fixIndex: fixes.length, autoPartMs: pause.autoPartMs });
       resumedPause = null;
       openPause = null;
       if (fixes.length > 0) breaks.push(fixes.length);
-      if (heartFixes.length > 0) heartBreaks.push(heartFixes.length);
       return;
     }
     const pauseAt = timedMarker(value, 'pause');
@@ -307,26 +245,9 @@ export const parseJournal = (text: string): ParsedJournal => {
       stoppedAtMs = stopAt;
       return;
     }
-    const heart = toHeartMarker(value);
-    if (heart.marker) {
-      const last = heartFixes[heartFixes.length - 1];
-      if (heart.fix && (!last || heart.fix.timeMs > last.timeMs)) {
-        heartFixes.push(heart.fix);
-        lastLineMs = heart.fix.timeMs;
-        // Un point gardé prouve la fin de la pause, même si sa ligne s'est perdue.
-        openPause = null;
-        resumedPause = null;
-      }
-      return;
-    }
     const { marker, change } = toActivityMarker(value);
     if (marker) {
       if (change) activityChange = change;
-      return;
-    }
-    const intervals = toIntervalsMarker(value);
-    if (intervals.marker) {
-      if (intervals.run) runs.set(intervals.run.startedAtMs, intervals.run);
       return;
     }
     const note = toNoteMarker(value);
@@ -335,11 +256,6 @@ export const parseJournal = (text: string): ParsedJournal => {
         marks.push(note.mark);
         lastLineMs = note.mark.timeMs;
       }
-      return;
-    }
-    const tested = toTestMarker(value);
-    if (tested.marker) {
-      if (tested.test) test = tested.test;
       return;
     }
     const fix = toFix(value);
@@ -351,9 +267,8 @@ export const parseJournal = (text: string): ParsedJournal => {
     }
   });
 
-  const intervalRuns = [...runs.values()].sort((a, b) => a.startedAtMs - b.startedAtMs);
   return {
-    header, fixes, breaks, heartFixes, heartBreaks, activityChange, intervalRuns, marks: sortMarks(marks), test,
+    header, fixes, breaks, activityChange, marks: sortMarks(marks),
     manualBreaks, openPause, resumedPause, stoppedAtMs, lastLineMs,
   };
 };

@@ -1,7 +1,7 @@
 /**
  * Durées des sons, en millisecondes : la seule écriture, pour le bip de
- * l'enregistreur (`platform/beeper.ts`) et le calendrier du compteur
- * (`recording/intervalTimer.ts`). `TonePlayer.java` reprend les mêmes valeurs (BRIEF_MS, SHORT_MS, LONG_MS,
+ * l'enregistreur (`platform/beeper.ts`) et des motifs (zone visée, FC repos ; le compteur
+ * d'intervalles est parti au lot 302). `TonePlayer.java` reprend les mêmes valeurs (BRIEF_MS, SHORT_MS, LONG_MS,
  * FINAL_MS, GPS_LOST_* et les vibrations) : les changer des deux côtés.
  */
 

@@ -3,8 +3,6 @@ import { formatLocalDate } from '../core/calendar';
 import { pointTimeMs } from '../core/kinematics';
 import { hasPositions } from '../core/sportProfiles';
 import type { RawTrackPoint, SportType } from '../core/types';
-import type { HeartRateSample } from '../platform/heartRate';
-import { readableBpm } from './heartRate';
 import type { LocationFix } from '../platform/location';
 
 /**
@@ -44,46 +42,6 @@ export const receivedFixRole = (state: RecorderPhase): 'evaluate' | 'show' | 'ig
   state.status === 'starting' || state.status === 'recording' || isAutoPause(state) ? 'evaluate'
     : isManualPause(state) ? 'show'
       : 'ignore';
-
-/**
- * Mesure de la ceinture gardée par l'enregistrement d'une session sans
- * position (muscu, lot I du 25/10) : l'heure et la FC, sans lat ni lon. Sans
- * FC, c'est le point posé à l'heure de l'arrêt, pour que la durée aille
- * jusqu'à lui (`withStopPoint`).
- */
-export interface HeartRateFix {
-  timeMs: number;
-  heartRateBpm?: number;
-}
-
-/**
- * Mesure de la ceinture à garder pour une session sans position, ou `null` :
- * sans contact avec la peau ou sans FC, pas de point (un trou plutôt qu'une
- * valeur figée) ; moins de `minIntervalMs` après la dernière gardée, pas de
- * point non plus (une par seconde au plus, au pas de l'enregistrement).
- */
-export const keepHeartRateSample = (lastKeptMs: number | null, sample: HeartRateSample, minIntervalMs: number): HeartRateFix | null => {
-  const bpm = readableBpm(sample);
-  if (bpm === null || !isFinite(sample.timeMs)) return null;
-  const timeMs = Math.round(sample.timeMs);
-  // Tolérance d'un quart d'intervalle : une ceinture à 1 Hz livre ses mesures
-  // avec quelques ms de gigue, et 998 ms après la dernière reste une mesure
-  // par seconde, pas une de trop (relecture du 28/10).
-  if (lastKeptMs !== null && timeMs - lastKeptMs < minIntervalMs * 0.75) return null;
-  return { timeMs, heartRateBpm: Math.round(bpm) };
-};
-
-/**
- * Segments d'une session sans position, avec un dernier point sans FC à
- * l'heure de l'arrêt au bout du dernier : la durée va jusqu'à l'arrêt, pas
- * jusqu'à la dernière mesure. Rien d'ajouté si l'arrêt n'est pas plus tard
- * que le dernier point, ni sans segment.
- */
-export const withStopPoint = (segments: HeartRateFix[][], stopMs: number): HeartRateFix[][] => {
-  const last = segments[segments.length - 1];
-  if (!last || last.length === 0 || stopMs <= last[last.length - 1].timeMs) return segments;
-  return [...segments.slice(0, -1), [...last, { timeMs: Math.round(stopMs) }]];
-};
 
 /** Vrai si la position est plus récente que la dernière gardée. */
 export const isNewerFix = (lastMs: number | null, fix: LocationFix): boolean =>

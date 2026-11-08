@@ -12,10 +12,10 @@ import android.os.Vibrator;
 import android.os.VibratorManager;
 
 /**
- * Sons et vibrations communs aux bips des balises (BeeperPlugin) et au
- * compteur du fractionné (IntervalTimerService) : un bip bref, un bip court, un bip long,
- * et le long double de la fin d'une séance, chacun avec sa vibration ; et le
- * son « GPS perdu » de l'enregistrement (BeeperPlugin.watchGps, lot 115).
+ * Sons et vibrations des bips (BeeperPlugin : balises, zone visée, test de FC
+ * repos, « Écouter ») : un bip bref, un bip court, un bip long, et le long
+ * double, chacun avec sa vibration ; et les sons « GPS perdu » et « FC perdue »
+ * de l'enregistrement (BeeperPlugin.watchGps, lot 115).
  *
  * Le son passe par le flux des alarmes : audible téléphone en silencieux, au
  * volume des alarmes. Les sons sont synthétisés une fois (sinus, fondus de
@@ -24,10 +24,23 @@ import android.os.VibratorManager;
  *
  * Leur hauteur se choisit dans Réglages (src/recording/beepSound.ts, 24/10) :
  * gardée dans les préférences de l'application, elle vaut pour toutes les
- * instances, celle du service du compteur comprise ; une instance refait ses
- * sons au premier bip qui suit un changement.
+ * instances ; une instance refait ses sons au premier bip qui suit un changement.
  */
 final class TonePlayer {
+
+    /** Genre d'un son d'un motif (`ToneKind` de src/core/beepDurations.ts) : court, long, long double, bref. */
+    static final int TONE_SHORT = 0;
+    static final int TONE_LONG = 1;
+    static final int TONE_FINAL = 2;
+    static final int TONE_BRIEF = 3;
+
+    /** Genre d'un son nommé par la couche web (« court », « long », « final », « bref ») ; court à défaut. */
+    static int toneKind(String tone) {
+        if ("long".equals(tone)) return TONE_LONG;
+        if ("final".equals(tone)) return TONE_FINAL;
+        if ("bref".equals(tone)) return TONE_BRIEF;
+        return TONE_SHORT;
+    }
 
     /** Durées, en millisecondes : bip bref, bip court, bip long, long double (comme src/platform/beeper.ts). */
     static final int BRIEF_MS = 65;

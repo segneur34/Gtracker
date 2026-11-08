@@ -10,7 +10,7 @@ import type { JournalPause, ParsedJournal } from './journal';
  * reprendre seul, proposer « Continuer l'enregistrement », ou remettre la session en attente, comme avant.
  */
 
-export const NO_RECOVERY_SERVICES: RecoveryServices = { gps: false, belt: false };
+export const NO_RECOVERY_SERVICES: RecoveryServices = { gps: false };
 
 /** Ce qu'un journal relu dit de la reprise ; `null` sans journal. */
 export interface RecoveryJournal {
@@ -19,8 +19,6 @@ export interface RecoveryJournal {
   /** Une ligne `stop` : l'utilisateur a arrêté la session. */
   stopped: boolean;
   lastLineMs: number | null;
-  /** Session à positions (service GPS), sinon à la ceinture seule (muscu). */
-  withPositions: boolean;
 }
 
 export interface RecoveryFacts {
@@ -39,9 +37,9 @@ export interface RecoveryFacts {
 export type RecoveryChoice = 'none' | 'stopServices' | 'resume' | 'offer' | 'pending';
 
 export const recoveryDecision = ({ journal, services, nowMs, offerMaxAgeS }: RecoveryFacts): RecoveryChoice => {
-  if (journal === null) return services.gps || services.belt ? 'stopServices' : 'none';
+  if (journal === null) return services.gps ? 'stopServices' : 'none';
   if (journal.stopped || !journal.hasHeader) return 'pending';
-  if (journal.withPositions ? services.gps : services.belt) return 'resume';
+  if (services.gps) return 'resume';
   if (journal.lastLineMs === null) return 'pending';
   const ageMs = nowMs - journal.lastLineMs;
   return ageMs >= 0 && ageMs < offerMaxAgeS * 1000 ? 'offer' : 'pending';

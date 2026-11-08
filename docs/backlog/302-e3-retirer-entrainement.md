@@ -18,3 +18,67 @@ Pas de retrait de la course ni du vélo (303 : `LandModule`, cadence, pente, én
 ## Vérification, banc, essais
 
 `node outils/verif.mjs --rapide` à chaque étape. Banc (orchestrateur) : `general surf balises partage profil cardio sauts` identiques avant/après hors accueil et bibliothèque (entrée Entraînement disparue). Essais au téléphone : enregistrement voile avec ceinture (FC en direct, notification, bip de balise) ; aucun reste d'Entraînement (accueil, bibliothèque, Enregistrer, Réglages).
+
+## Décisions de l'orchestrateur (08/11, sur les questions du plan)
+
+1. Le 301 est commité (8e6520a) : le banc compare à HEAD.
+2. Sessions de muscu déjà rangées : listées sous `/fractionne` avec leur vignette FC, sans analyse (une session sans position renvoie à la bibliothèque).
+3. Course à bornes (bornes de FC guidées) : retirée avec l'Entraînement (`HeartBandPicker`, `heartBands`, `HeartGuideMode`) ; la zone visée et la bande de `recording/zoneAlert.ts` restent.
+4. Statistiques : « Répétitions du compteur » et « n rép. » partent ; les sessions d'Entraînement restent comptées dans le total.
+5. Documents : exception au « pas de `docs/` » pour ce lot, **limitée** à retirer les citations de fichiers supprimés que `npm run verif` (renvois) refuserait : lignes de la carte `docs/INVENTAIRE.md`, mentions dans `docs/ETAT_DU_PROJET.md`, `docs/DECISIONS.md` § 5 et § 6, et dans `CLAUDE.md` (puce « Test guidé », ligne du § 5 de la table). Rien d'autre n'est réécrit ; la passe `doc` vient après validation.
+6. Réglages déjà rangés (séances, tests, bornes) : pas de purge, clés ignorées à la lecture.
+7. Vieilles adresses (`/fractionne/seances`, `?minuterie`, `&test=`) : vers l'accueil, `fc-repos` excepté ; paramètres ignorés.
+8. `HeartRateService.java` : supprimé, d'après l'analyse du plan (seule la muscu le démarrait ; la ceinture en direct passe par `HeartRatePlugin` sous le service GPS). Essai au téléphone obligatoire : ceinture en enregistrement voile, écran éteint 5 minutes.
+
+## Plan du 08/11 (agent Plan, Opus ; à suivre par l'agent lot)
+
+Chemins relatifs à `src/`, sauf mention contraire. À la fin de chaque étape : `npx tsc -b` et `node outils/verif.mjs --rapide` verts, plus `npx vitest run src/architecture.test.ts` (ce test lit le disque et `--changed` ne le prend pas). Avant chaque suppression, chercher ses appelants par Grep.
+Ne changent pas : `SportFamily`, `SportType`, `Treatment`, `library/record.ts` (`intervals?` et `test?: unknown` restent), `core/domainTypes.ts`, ni dans `core/sportProfiles.ts` `isIntervalSport`, `isTestSport`, `trainingKind`, `profile.intervals` (lot 305).
+
+**1. Rendre la famille inerte (aucune suppression)**
+- `core/activities.ts` : ajouter `RETIRED_FAMILIES = ['fractionne']` et `ACTIVE_FAMILIES`. `isFamilyHidden` rend vrai pour une famille retirée : accueil, barre, Statistiques et familles d'Enregistrer suivent d'eux-mêmes par `useVisibility`. `components/ActivitySelect.tsx` : `ActivitySheet` prend `families = ACTIVE_FAMILIES` par défaut. `pages/SettingsPage.tsx` : `familyOrdered` (~793) et le `<select>` d'ajout (~1347) passent sur `ACTIVE_FAMILIES`. Aide du son des bips (~910) : retirer « compteur, tests ».
+- `tutorials/lessons.ts` : la leçon `fractionne` part. La leçon `cardio` prend `target: '/profil'` et sa phrase sur les tests ne garde que la FC repos du Profil.
+
+**2. Pages de l'Entraînement**
+- Supprimés : `pages/MuscuModule.tsx`, `TrainingSessionsPage.tsx`, `TrainingSessionEditPage.tsx`, `TestsPage.tsx`, `FitnessTestPage.tsx`, `components/TrainingHub.tsx`, `FitnessTestPlanChart.tsx`.
+- `pages/TrainingPages.css` devient `pages/RestingHrTestPage.css` et ne garde que les règles lues par `RestingHrTestPage` et `RestingHrChart` : `train-page`, `train-actions`, `train-list`, `train-item*`, `fit-steps`, `rest-*`.
+- `App.tsx` : retirer chargeurs, `lazy`, préchargement et routes séances, timer, tests, fc-max. `TrainingAnalysis` : une session sans position renvoie à `/fractionne` (`Navigate` avec `replace`), les autres vont à `LandModule family="fractionne"`. La redirection fc-repos du 301 reste. Ajouter `/fractionne/*` vers `/`.
+- `pages/SessionLibrary.tsx` : `TrainingHub` et les deux « n rép. » (`repsDone(readIntervalSeries…)`) partent ; la vignette FC reste.
+- `core/parentPage.ts` et son test : les règles `seances|timer|tests` et `?minuterie` partent.
+
+**3. Analyse et Statistiques**
+- `pages/LandModule.tsx`, ce qui part : imports `FitnessTestPanel`, `IntervalAnalysis`, `detectIntervals`, `analyzeIntervals`, `readSessionTest`, `readIntervalSeries`, `seriesBlocks` ; `sessionIntervals`, `sessionTest`, `detectionOn`, `hasIntervals`, `detected`, `intervalSeries`, `cadenceSegments`, `intervalViews`, `intervalEmptyText`, `selectedLap`, `selectedLapPath` et son `HighlightPath` ; le cas `'test'` (`FitnessTestCurves`), les panneaux `open.fractionne` et `open.test`, le titre « Analyse test » ; le champ du seuil d'effort (~1458) ; `effortThresholdMs` reste dans la fiche.
+- `core/analysisTabs.ts` et son test : `'fractionne'` et `'test'` sortent de `LandTab`, de `landTabs` et du filtre d'`analysisTabs`. `MUSCU_TABS` reste (union `Treatment`, lot 305).
+- `library/stats.ts` : `reps` part (session et totaux), avec l'import `repsDone`. `pages/StatisticsPage.tsx` : la tuile « Répétitions du compteur » part.
+- Supprimés, avec leurs tests : `components/IntervalAnalysis.tsx` et `.css`, `FitnessTestPanel.tsx`, `fitnessTestChartParts.tsx`, `running/intervalDetection`, `intervalStats`, `intervalCharts`, `fitnessTestResults`.
+
+**4. Enregistrer (`pages/RecordingPage.tsx`, puis ses hooks)**
+- Part de la page : `TimerScreen` et l'aiguillage `?minuterie` (`RecordingPage` rend directement `RecordingScreen`) ; la rangée Type : `kinds`, `chosenKind`, `rowActivities`, `pickKind` ; la rangée Test : `testId`, `isTest`, `restingChosen`, `guidedTestId`, lien vers le protocole, confirmation sans ceinture, `armFitnessTest` ; la muscu : `heartOnly`, `liveHeartOnly`, `beltMissing`, branche FC seule de `liveStatItems`, `EXAMPLE_BELT` (ici seulement : `useRestingHrTest` s'en sert encore) ; compteur et chrono : `counterOpen`, `stopwatchOpen`, `counterTimer`, `showCounter`, `showTest`, `IntervalCard`, `FitnessTestCard`, `StopButton.inCounter` ; course à bornes : `HeartGuideMode`, `LiveHeartBand`, `guideOffered`, `bandPicks`, `armHeartBand` ; la question « ranger en Fractionné » à « Analyser » (`intervalActivityFor`). L'écran ne reste allumé que pendant l'enregistrement : `useScreenOnWhile(busy)`.
+- Reste : famille et activité, source et rejeu, ceinture (`CaptureOption`, `useBeltWarmup`, `BpmTile`), zone visée (`armZoneAlert`), cadence (303), trace suivie, balises (`MarkGuideCard`, `MarkGuideSlot`), dénivelé, Note, pause et arrêt tenus, carte GPS, session en attente, matériel de fin.
+- Hors de la page : `components/AppShell.tsx` : `IntervalBanner` part ; `main.tsx` : `startIntervalTimer`, `startStopwatchStore`, `startFitnessTestGuide` partent, `installBackButton(() => isRecordingActive(), …)` ; `hooks/recordingNotification.ts` : `getIntervalRun`, `timerStateAt`, `intervalStepAt`, `trainingStep`, `getFitnessTestView`, `subscribeToIntervalCommands` partent ; `recording/liveNotification.ts` : `trainingStep`, entrées `interval` et `timer` de `notificationStateKey` partent ; `recording/liveFields.ts` : la clé `step` part partout, les réglages déjà rangés sont filtrés par `sanitizeLiveFields`.
+- Supprimés : `components/IntervalCard.tsx` et `.css`, `FitnessTestCard.tsx`, `WorkoutBlocksEditor.tsx`, `HeartBandPicker.tsx`, `hooks/useIntervalTimer.ts`, `useStopwatch.ts`, `useFitnessTest.ts` (avec leurs tests), `recording/stopwatch.ts` (avec son test), `recording/workoutLists.ts`.
+
+**5. Le cœur : `hooks/useRecorder.ts`**
+- Part : muscu (`heartOnly`, `heartFixes`, `heartBreaks`, réception de la FC seule ~545, `startHeartRateRecording`, ceinture de `resetSession`, branche muscu de `resumeRecording`, `restoreFromJournal`, `resumeSilently` ~903 et de l'arrêt (`withStopPoint`, `stopBeltKeepAlive`), `getLiveHeartSegments`, `keepBeltAlive`) ; compteur (`intervalRuns`, `noteIntervalRun`, arrêt des séances quand on continue une session ~1239, `seriesWithin`) ; test (`currentTest`, `noteFitnessTest`, `getRecordedTest`, `closeSessionTest`) ; `PendingSession.intervals` et `.test`, et ces paramètres de `buildPendingSession`. `startRecording` et `changeRecordingActivity` refusent désormais un calcul sans position.
+- Reste pour voile et surf : `fixes`, `segmentBreaks` ; pause manuelle et automatique (`pauseClock`, `markManualResume`, `pauseFixes`) ; `marks`, `addRecordingMark` ; ceinture (`takeBelt`, `dropBelt`, `heartRateMaxAgeS`, veille `beltLost`) ; veille GPS ; capture des capteurs ; journal et reprise (`recoverOnce`, `resumeHoldingCommands`, `continuePendingSession`) ; `pending` et `saved`.
+- Fichiers à suivre : `recording/journal.ts` (lignes `hr`, `intervals`, `test` partent, avec `heartFixes`, `heartBreaks`, `intervalRuns`, `test`, `ManualBreak.heartIndex` ; **ajouter un test : un vieux journal qui porte ces lignes se lit, elles sont ignorées**) ; `recording/resume.ts` et `platform/recovery.ts` (`belt` part ; le journal d'une muscu coupée passe par `setJournalAside`) ; `hooks/useLiveRecording.ts` et `recording/liveStats.ts` (`heartOnlyLiveStats` part) ; `recording/session.ts` (`keepHeartRateSample`, `withStopPoint`, `HeartRateFix` partent) ; `recording/gpxWriter.ts` (`buildHeartRateGpx` part) ; `library/newRecord.ts` et `hooks/sessionLibrary/importer.ts` (options `intervals` et `test` partent).
+- Réglages : `settings/activitySettings.ts` : `intervalPresets`, `lastIntervalWorkout`, `timerPresets`, `lastTimerWorkout`, `fitnessTests`, `heartBands` sortent du type ; `settings/activityPresets.ts` : `DEFAULT_INTERVAL_PRESETS` part ; `hooks/useSportSettings.ts` : séances, tests et bornes partent.
+- `core/activities.ts` : `trainingKindsOf`, `kindActivityLabel`, `intervalActivityFor` partent, avec leurs tests. `recording/signalTones.ts` : `TestSignal` se réduit à `debut|bien|trop|accelere|finTest`.
+- En dernier, supprimer `recording/intervalTimer.ts` et `recording/fitnessTest.ts`, avec leurs tests.
+
+**6. Natif (`android/app/src/main/java/io/github/segneur/tracker/`)**
+- `HeartRateService` ne sert qu'à la muscu : supprimé. En direct, le service GPS tient le processus et `HeartRatePlugin` livre la FC sans lui. Avec lui partent `keepAlive` et `stopKeepAlive` (Java et `platform/heartRate.ts`), `keepBeltAlive`, `stopBeltKeepAlive`, et `belt` dans `RecoveryPlugin`.
+- `IntervalTimerService.java` supprimé. `TONE_SHORT`, `TONE_LONG`, `TONE_FINAL`, `TONE_BRIEF` et `toneKind` passent dans `TonePlayer.java` : `BeeperPlugin.pattern` les lit (zone visée, FC repos, « Écouter »). `ToneKind` de `core/beepDurations.ts` ne change pas.
+- `BeeperPlugin` : `scheduleIntervals` et `stopIntervals` partent (pas de `keepAlive` ici : il est dans `HeartRatePlugin`). `platform/beeper.ts` : `IntervalClock`, `ClockPlan`, `ClockCue`, `getIntervalClock`, `scheduleIntervals`, `stopIntervals` partent.
+- `RecordingNotificationPlugin` : l'appel à `IntervalTimerService.recordingNotificationChanged` part, et `isShown`/`setShown` s'ils n'ont plus de lecteur.
+- Manifeste : partent les deux `<service>` (~75-87), `FOREGROUND_SERVICE_SPECIAL_USE`, `FOREGROUND_SERVICE_CONNECTED_DEVICE` (~123) et leurs commentaires. Restent `FOREGROUND_SERVICE`, `WAKE_LOCK`, `POST_NOTIFICATIONS`, commentaire récrit (service GPS, notification).
+- Commentaires de `HeartRatePlugin` (~64) et `BeeperPlugin` (~20, ~82) à jour. Compiler par `gradlew :app:compileDebugJavaWithJavac` depuis `android/` si le JDK 21 est là (`JAVA_HOME`, voir ETAT §12).
+
+**Tests et couture**
+- À adapter (tsc et `vitest --changed` les montrent) : `useRecorder.test`, `useRecorder.resume.test`, `journal.test`, `liveNotification.test`, `liveFields.test`, `liveStats.test`, `gpxWriter.test`, `session.test`, `activities.test`, `analysisTabs.test`, `parentPage.test`, `stats.test`, `shareStats.test`, `newRecord.test`, `record.test`, `addSession.test`, `useSessionLibrary.perte.test`, `activitySettings.test`, `activityPresets.test`, `settingsImport.guard.test` (clé lue brute), `zoneAlert.test` si les bornes partent, `androidManifest.test` (« garde le service » devient « ne le déclare plus »). Les tests du calcul `muscu` (`gpxParser`, `summary`…) restent.
+- `architecture.test.ts` : `LAND_FILES` perd `components/FitnessTestPanel`, `components/IntervalAnalysis`, `pages/MuscuModule` ; `EXCEPTIONS` perd `running/fitnessTestResults → recording/fitnessTest` et `running/intervalDetection → recording/intervalTimer` ; `SEAM` perd `library/stats → land/heartRateSession` ; `pages/SessionLibrary → land/heartRateSession` reste (vignette FC).
+- Pour finir : `node outils/styles-en-ligne.mjs --figer`, sinon `theme/inlineStyles.test.ts` échoue sur les fichiers retirés.
+
+**Banc (`outils/banc/scripts.mjs`, lu par `passe.mjs`)**
+- Retirer du registre et du disque : `chrono`, `compteur-course`, `entrainement`, `fractionne`, `muscu`, `timer`, `test-fcmax`. Dans `passe.mjs`, `/fractionne/tests` sort de `PRECHAUFFE`. `SCRIPTS.md` à jour.
+- À adapter (le même script tourne des deux côtés du passage avant/après) : `fc-repos`, `test-fcrepos` (adresse `/profil/fc-repos`, entrée par le Profil, contrôles `/fractionne/seances|tests` retirés, étiquette `profil`) ; `cardio` (étape 6, le fractionné), `notification` (étape 5, le compteur), `coquille` (cas muscu), `tailles`, `statistiques`, `cacher`, `icones`, `familles`, `lib/onglets.mjs`.

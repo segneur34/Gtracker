@@ -66,9 +66,6 @@ const EXCEPTIONS: Record<string, string> = {
   'cycling/energy → planning/surface': 'catégories de revêtement, lues avant de pouvoir descendre dans le noyau (lot 82)',
   'cycling/energyView → planning/surface': 'idem',
   'running/energyView → planning/surface': 'idem (type seul)',
-  // Les résultats de test et le détecteur d'intervalles lisent des types et des bornes du compteur de l'enregistrement.
-  'running/fitnessTestResults → recording/fitnessTest': 'protocole du test de FC max (type)',
-  'running/intervalDetection → recording/intervalTimer': 'INTERVAL_LIMITS, bornes du compteur',
   'planning/routeRecord → recording/markGuide': 'réglages de balise rangés avec l\'itinéraire (lot 82)',
   // Le hook de l'axe du temps lit les échelles et le survol des composants de graphe.
   'hooks/useTimeChartAxis → components/chartAxes': 'échelles du graphe',
@@ -176,11 +173,11 @@ const LAND_TARGETS = ['running', 'cycling', 'land'];
 
 /** Fichiers de la terre rangés dans le transverse (sans extension) : tout ce qu'ils importent de la terre est admis. */
 const LAND_FILES = [
-  'components/CadencePanel', 'components/FitnessTestPanel', 'components/IntervalAnalysis', 'components/KilometerSplitsTable',
+  'components/CadencePanel', 'components/KilometerSplitsTable',
   'components/StatsLevelPanel', 'components/GradeGradientLegend',
   'hooks/useTerrainElevation',
   'library/statsLevel',
-  'pages/LandModule', 'pages/landModules', 'pages/MuscuModule',
+  'pages/LandModule', 'pages/landModules',
   'planning/duration',
 ];
 
@@ -192,7 +189,6 @@ const SEAM = [
   'library/record → running/energy', 'library/record → cycling/energy',
   'library/summary → cycling/energy', 'library/summary → land/grade', 'library/summary → land/terrainElevation',
   'library/summaryOptions → cycling/energy',
-  'library/stats → land/heartRateSession',
   'pages/SessionLibrary → land/heartRateSession',
   'pages/SettingsPage → running/energy', 'pages/SettingsPage → cycling/energy', 'pages/SettingsPage → land/grade',
   'pages/PlanningPage → land/grade',

@@ -8,8 +8,6 @@
 
 import type { Activity } from '../core/activities';
 import { ZONE_COUNT, edwardsLoad, histogramZoneTimes } from '../core/heartRate';
-import { repsDone } from '../land/heartRateSession';
-import { readIntervalSeries } from '../recording/intervalTimer';
 import { hasPositions, sportFamily, sportTreatment, type SportFamily, type Treatment } from '../core/sportProfiles';
 import { DAY_MS, addDays, addMonths, isoWeek, monthYearLong, monthYearShort, shortDate, stacksByActivity, startOfDay, startOfIsoWeek, startOfMonth } from '../core/calendar';
 import { CHART_PERIODS, chartPeriodBounds, type ChartRange } from './activityChart';
@@ -67,8 +65,6 @@ export interface StatSession {
   longestFlightS: number | null;
   /** Surf sur foil : temps total en vol. */
   flightS: number | null;
-  /** Répétitions du compteur (fractionné). */
-  reps: number;
   /** FC du résumé, `null` pour une session sans FC. */
   heartRate: SummaryHeartRate | null;
   /** Cadence moyenne en mouvement (à pied), en pas par minute, `null` sans cadence. */
@@ -107,7 +103,6 @@ export const statSessionOf = (file: string, record: SessionRecord, activity: Act
     longestWaveM: summary.longestWaveM ?? null,
     longestFlightS: summary.longestFlightS ?? null,
     flightS: summary.flightS ?? null,
-    reps: repsDone(readIntervalSeries(record.intervals)),
     heartRate: summary.heartRate ?? null,
     cadenceSpm: summary.cadence?.avgSpm ?? null,
     gear: record.notes?.gear ?? null,
@@ -262,7 +257,6 @@ export interface StatsTotals {
   waveSessions: number;
   longestWaveM: number | null;
   longestFlightS: number | null;
-  reps: number;
 }
 
 const maxOrNull = (a: number | null, b: number | null): number | null => (a === null ? b : b === null ? a : Math.max(a, b));
@@ -270,7 +264,7 @@ const maxOrNull = (a: number | null, b: number | null): number | null => (a === 
 export const statsTotals = (sessions: readonly StatSession[]): StatsTotals => {
   const t: StatsTotals = {
     sessions: 0, durationS: 0, movingTimeS: 0, movingDistanceM: 0, distanceM: 0, elevationGainM: 0, elevationSessions: 0,
-    maxSpeedMs: null, maneuvers: 0, maneuverSessions: 0, waves: 0, waveSessions: 0, longestWaveM: null, longestFlightS: null, reps: 0,
+    maxSpeedMs: null, maneuvers: 0, maneuverSessions: 0, waves: 0, waveSessions: 0, longestWaveM: null, longestFlightS: null,
   };
   for (const s of sessions) {
     t.sessions++;
@@ -297,7 +291,6 @@ export const statsTotals = (sessions: readonly StatSession[]): StatsTotals => {
     }
     t.longestWaveM = maxOrNull(t.longestWaveM, s.longestWaveM);
     t.longestFlightS = maxOrNull(t.longestFlightS, s.longestFlightS);
-    t.reps += s.reps;
   }
   return t;
 };

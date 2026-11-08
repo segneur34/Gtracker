@@ -4,7 +4,6 @@ import { isFiniteNumber, isObject } from '../core/basics';
 import { isValidSpeedRange } from '../core/speedGradient';
 import { isValidBikeWeight } from '../cycling/energy';
 import { isValidCarriedLoad } from '../running/energy';
-import type { SessionTest } from '../recording/fitnessTest';
 import { EMPTY_NOTES } from './notes';
 import {
   ANALYSIS_KEYS,
@@ -38,6 +37,22 @@ import type { SessionTerrainElevation } from '../land/terrainElevation';
 import type { SessionSurfaces } from '../planning/surface';
 import { carriedSettings } from './record';
 import { familyRecords, sessionRecord } from '../test/record.fixture';
+
+/** Forme du test guidé (FC max) d'avant le lot 302, gardé brut dans la fiche (`record.test`) jusqu'au lot 305. */
+interface SessionTest {
+  protocol: string;
+  version: number;
+  settings: Record<string, unknown>;
+  startMs: number;
+  rampStartMs: number | null;
+  v0Ms: number | null;
+  steps: { startMs: number; targetMs: number }[];
+  rampEndMs: number | null;
+  dropMs: number | null;
+  endReason: string | null;
+  endMs: number | null;
+  signals: { t: number; s: string }[];
+}
 
 const START_MS = Date.UTC(2026, 8, 23, 12, 0, 0);
 

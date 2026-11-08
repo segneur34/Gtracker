@@ -16,7 +16,8 @@ const MODULES = {
   '/voile/analyse': ['sailing-onglets'],
   '/course/analyse': ['running'],
   '/velo/analyse': ['cycling'],
-  '/fractionne/analyse': ['intervals', 'muscu'],
+  // Muscu sans analyse depuis le lot 302 (session sans position renvoyée à la bibliothèque).
+  '/fractionne/analyse': ['intervals'],
   '/surf/analyse': ['surf'],
 };
 

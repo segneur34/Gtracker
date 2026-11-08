@@ -11,16 +11,13 @@ import CadencePanel from '../components/CadencePanel';
 import ChartFold, { GraphFoldHead } from '../components/ChartFold';
 import { HoverReadout, type Readout, type ReadoutValue } from '../components/ChartReadout';
 import { ANALYSIS_MAP_ANCHOR } from '../components/AnalysisMap';
-import EffortThresholdEditor from '../components/EffortThresholdEditor';
 import GradeGradientLegend from '../components/GradeGradientLegend';
 import HeartRateChart from '../components/HeartRateChart';
-import FitnessTestPanel, { FitnessTestCurves } from '../components/FitnessTestPanel';
 import { CardioCompanion, type HeartRateEfficiency } from '../components/HeartRatePanel';
 import { heartRateValue } from '../components/chartReadouts';
 import { distanceX, elapsedX } from '../components/chartAxes';
 import TrackChart, { type TrackSeries, type TrackYAxis } from '../components/TrackChart';
 import { useTimeChartAxis } from '../hooks/useTimeChartAxis';
-import IntervalAnalysis, { type IntervalSeriesView } from '../components/IntervalAnalysis';
 import HighlightPath from '../components/HighlightPath';
 import { useExclusiveToggles } from '../hooks/useExclusiveToggles';
 import JumpMapLayer from '../components/JumpMapLayer';
@@ -60,8 +57,7 @@ import { CHART_MAX_POINTS, trackBounds } from '../core/displayConfig';
 import { computeElevationStats } from '../core/elevation';
 import { buildBaseSessionStats, thresholdActivityMask } from '../core/sessionStats';
 import { nearestIndexAtTime } from '../core/search';
-import { timeSpanHeartRate } from '../core/heartRate';
-import { ELEVATION_PRESETS, defaultActiveThresholdOf, getActiveThresholds, isTestSport, sportTreatment } from '../core/sportProfiles';
+import { ELEVATION_PRESETS, defaultActiveThresholdOf, getActiveThresholds, sportTreatment } from '../core/sportProfiles';
 import { computeAllTopSegments } from '../core/topSegments';
 import { meanFilterByTime } from '../core/speedFilter';
 import { effectiveSpeedRange, trackColorSegments } from '../core/trackColor';
@@ -80,7 +76,7 @@ import { useAnalysisTabs } from '../hooks/useAnalysisTabs';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useZoomOnMap } from '../hooks/useZoomOnMap';
 import { useAnalysisHeart, useHeartRateZoneHighlight } from '../hooks/useAnalysisHeart';
-import { updateSessionRecord, useLibrarySession } from '../hooks/useSessionLibrary';
+import { updateSessionRecord } from '../hooks/useSessionLibrary';
 import { shareExtraStats } from '../library/shareStats';
 import { useShownJumps } from '../hooks/useSessionJumps';
 import { useSessionMarks } from '../hooks/useSessionMarks';
@@ -89,14 +85,10 @@ import { useTerrainElevation, type TerrainElevationStatus } from '../hooks/useTe
 import { useSportSettings } from '../hooks/useSportSettings';
 import { computeGrades, gradeColorPaths, gradeGradientStops, type GradeZoneKey } from '../land/grade';
 import { computeZoneStats, gradeZonePaths, ungradedMovingS } from '../running/runningAnalytics';
-import { analyzeCadence, cadenceBandPaths, measuredCadenceSegments, sessionCadence, timeSpanCadence } from '../running/cadence';
+import { analyzeCadence, cadenceBandPaths, sessionCadence } from '../running/cadence';
 import { isValidCarriedLoad, smoothMovingPower } from '../running/energy';
-import { detectIntervals } from '../running/intervalDetection';
-import { analyzeIntervals, type IntervalPhaseSpan } from '../running/intervalStats';
 import type { BaseSessionStats } from '../core/types';
 import { BIKE_TYPES, isValidBikeWeight } from '../cycling/energy';
-import { readSessionTest } from '../recording/fitnessTest';
-import { readIntervalSeries, seriesBlocks, type IntervalSeries, type IntervalWorkout } from '../recording/intervalTimer';
 import type { SurfaceCategory } from '../planning/surface';
 import { WAY_MATCH_DEFAULTS } from '../planning/wayMatch';
 import { LAND_PAGES, LAND_TREATMENTS, type LandFamily, type LandTreatment } from './landModules';
@@ -192,7 +184,6 @@ interface GraphView {
 const ZONES_FOLDS_DEFAULT = { tableau: true, graphe: true };
 
 /** Session sans séances du compteur : un tableau constant, pour ne pas relancer les calculs qui en dépendent. */
-const NO_INTERVALS: IntervalSeries[] = [];
 
 
 /** Vitesse moyenne montrée : `null` (« — ») sans distance ni temps. */
@@ -263,17 +254,6 @@ function LandModule({ family }: { family: LandFamily }) {
   const activeThreshold = draft.edits.activeThreshold
     ?? sessionActivitySettings(draftRecord, { thresholdOverride: thresholdOverride ?? undefined, foil: null }).thresholdOverride
     ?? defaultActiveThresholdOf(profile, false);
-  /**
-   * Répétitions du compteur rangées dans la fiche de la session affichée, s'il y en a, suivies en direct :
-   * une fiche complétée par un import (« Télécharger la session » du téléphone) s'applique sans rouvrir l'analyse.
-   */
-  const shownRecord = useLibrarySession(shownFile)?.record;
-  // Séances et test guidé bruts dans la fiche depuis le lot 301 : lus ici.
-  const rawIntervals = shownRecord?.intervals;
-  const sessionIntervals = useMemo(() => readIntervalSeries(rawIntervals) ?? NO_INTERVALS, [rawIntervals]);
-  /** Test guidé de la fiche (Entraînement › Tests) : l'onglet « test ». */
-  const rawTest = shownRecord?.test;
-  const sessionTest = useMemo(() => readSessionTest(rawTest), [rawTest]);
   /** Poids du vélo et des bagages, charge portée : ceux de la session (brouillon, puis fiche), sinon ceux de l'activité. */
   const bikeWeightKg = draft.edits.bikeWeightKg ?? activityBikeKg;
   const loadKg = draft.edits.loadKg ?? carriedLoadKg;
@@ -286,26 +266,19 @@ function LandModule({ family }: { family: LandFamily }) {
   const { open, toggle, toggleOf, closeAll, advanced, shown, highlight } = useAnalysisTabs<LandTab, LandHighlightKeys>({
     tabs: LAND_TABS[model.treatment], defaults: LAND_SECTION_DEFAULTS, activity, sessionKey: gpx.sessionKey,
   });
-  /** Répétitions retrouvées dans la vitesse : en famille Fractionné, pour une session faite sans le compteur. */
-  const detectionOn = family === 'fractionne' && sessionIntervals.length === 0 && profile.intervals !== null;
-  // Onglet « fractionné » en famille Fractionné seulement (19/10) : une sortie à pied ou à vélo faite avec le compteur
-  // garde ses répétitions dans sa fiche, et les retrouve si elle passe en Fractionné.
-  const hasIntervals = family === 'fractionne' && (sessionIntervals.length > 0 || detectionOn);
   // Sauts mesurés par les capteurs du téléphone : ceux de la fiche, sinon calculés depuis le `.imu`.
   const thresholdMs = fromDisplaySpeed(activeThreshold, profile.thresholdUnit);
   const jumps = useShownJumps({ file: shownFile, track: gpx.track, profile, activity, thresholdMs, highlight });
   const jumpsVisible = jumps.visible;
   const sections = useMemo(
-    () => shown((s) => (s.key !== 'tops' || profile.topTargets.length > 0) && (s.key !== 'fractionne' || hasIntervals) && (s.key !== 'test' || isTestSport(profile.id))
+    () => shown((s) => (s.key !== 'tops' || profile.topTargets.length > 0)
       && (s.key !== 'sauts' || jumpsVisible) && (s.key !== 'cardio' || heart.present) && (s.key !== 'cadence' || cadencePresent)),
-    [shown, profile.topTargets, profile.id, hasIntervals, jumpsVisible, heart.present, cadencePresent]
+    [shown, profile.topTargets, jumpsVisible, heart.present, cadencePresent]
   );
   const selectedTop = highlight.shownIn('tops');
   const selectedZone = highlight.shownIn('zones');
-  const selectedLap = highlight.shownIn('fractionne');
   const setSelectedTop = (key: string | null) => highlight.show('tops', key);
   const setSelectedZone = (key: GradeZoneKey | null) => highlight.show('zones', key);
-  const setSelectedLap = (key: string | null) => highlight.show('fractionne', key);
   const selectedSurface = highlight.shownIn('surface');
   const setSelectedSurface = (key: SurfaceCategory | null) => highlight.show('surface', key);
   const shownCadenceBand = highlight.shownIn('cadence');
@@ -452,7 +425,7 @@ function LandModule({ family }: { family: LandFamily }) {
   /** Chiffres du panneau Énergie repliés ou dépliés, choix gardé sur l'appareil. */
   const energyFold = useOpenSections(`${page.storageId}.energie`, ENERGY_FIGURES_DEFAULT);
   /** Temps écoulé de chaque point, en minutes : l'axe du graphe d'énergie (`energyZoom`), de la courbe « cardio » (`cardioZoom`) et des courbes du test. */
-  const { minutes: trackMinutes, fullRange: timeRange, zoom: energyZoom, cardioZoom } = useTimeChartAxis(gpx.track, gpx.sessionKey);
+  const { minutes: trackMinutes, zoom: energyZoom, cardioZoom } = useTimeChartAxis(gpx.track, gpx.sessionKey);
   /** Puissance lissée, une fois pour toute la trace : zoomer ne la recalcule pas. */
   const smoothedPower = useMemo(
     () => (energy && open.energie ? smoothMovingPower(energy.power, gpx.track, ENERGY_POWER_SMOOTHING_S) : []),
@@ -513,74 +486,6 @@ function LandModule({ family }: { family: LandFamily }) {
     [overviewTargets, gpx.track, cumulative]
   );
 
-  /**
-   * Répétitions retrouvées dans la vitesse (famille Fractionné, sans
-   * compteur), au seuil d'effort de la session s'il est imposé (brouillon,
-   * puis fiche), sinon à celui tiré de la session.
-   */
-  const effortOverrideMs = draft.edits.effortThresholdMs;
-  const detected = useMemo(
-    () => (detectionOn && profile.intervals && gpx.track.length > 1
-      ? detectIntervals(gpx.track, cumulative, activityMask, profile.intervals.detection, effortOverrideMs)
-      : null),
-    [detectionOn, profile.intervals, gpx.track, cumulative, activityMask, effortOverrideMs]
-  );
-  /** Séances de la session : celles du compteur, sinon celles retrouvées dans la vitesse. */
-  const intervalSeries = useMemo((): { workout: IntervalWorkout; laps: IntervalPhaseSpan[]; detected: boolean; name?: string }[] => {
-    // Une séance à plusieurs blocs de séries : chaque bloc à part, comme une séance d'un seul bloc ; les blocs libres sont hors des répétitions.
-    if (sessionIntervals.length > 0) {
-      return sessionIntervals.flatMap((s) => seriesBlocks(s).map((b) => (
-        { workout: b.workout, laps: b.laps, detected: false, ...(b.seriesCount > 1 ? { name: `Série ${b.series}` } : {}) }
-      )));
-    }
-    return (detected?.series ?? []).map((s) => ({ workout: s.workout, laps: s.phases, detected: true }));
-  }, [sessionIntervals, detected]);
-  /** Segments où la cadence est mesurée, une fois pour toutes les répétitions de la session (lot 56). */
-  const cadenceSegments = useMemo(
-    () => (open.fractionne && cadencePresent && cadence && cadenceParams
-      ? measuredCadenceSegments(gpx.track, cadence.spm, cadenceParams.gapS)
-      : null),
-    [open.fractionne, cadencePresent, cadence, cadenceParams, gpx.track]
-  );
-  /**
-   * Séances mesurées sur la trace : chaque répétition avec le repos qui la
-   * suit, son profil, et la synthèse. Clé d'une répétition : `séance-répétition`.
-   */
-  const intervalViews = useMemo(
-    (): IntervalSeriesView[] => (open.fractionne && profile.intervals && gpx.track.length > 1
-      ? intervalSeries.map((s) => {
-        const analyzed = analyzeIntervals(gpx.track, cumulative, s.laps, profile.intervals!);
-        // FC de chaque effort, si la session en a (ceinture, montre).
-        const heartRates = heart.present
-          ? analyzed.reps.map((r) => timeSpanHeartRate(gpx.track, heart.smoothed, r.work.startMs, r.work.endMs, profile.heartRate.gapS, profile.heartRate.recoveryS))
-          : undefined;
-        // Cadence et longueur de pas de chaque effort, à pied, si la session a de la cadence.
-        const cadences = cadenceSegments
-          ? analyzed.reps.map((r) => timeSpanCadence(cadenceSegments, gpx.track, r.work.startMs, r.work.endMs))
-          : undefined;
-        return { workout: s.workout, detected: s.detected, name: s.name, ...analyzed, heartRates, cadences };
-      })
-      : []),
-    [open.fractionne, profile.intervals, intervalSeries, gpx.track, cumulative, heart, profile.heartRate, cadenceSegments]
-  );
-  /** Ce que dit l'onglet quand la vitesse ne livre aucune répétition. */
-  const intervalEmptyText = (() => {
-    if (intervalSeries.length > 0 || !detected) return null;
-    switch (detected.miss) {
-      case 'sans-contraste':
-        return "Pas de fractionné reconnu : la vitesse ne se partage pas nettement entre efforts et récupérations. Un seuil d'effort imposé dans l'onglet réglages force la recherche.";
-      case 'aucun-effort':
-        return `Aucun effort au-dessus du seuil d'effort (${formatLandSpeed(detected.thresholdMs, editSpeedUnit(speedUnit), distanceUnit)}) : il se baisse dans l'onglet réglages.`;
-      default:
-        return 'Trop peu de mouvement pour y chercher des répétitions.';
-    }
-  })();
-  const selectedLapPath = useMemo(() => {
-    if (selectedLap === null || !open.fractionne) return [];
-    const [series, rep] = selectedLap.split('-').map(Number);
-    return intervalViews[series]?.reps.find((r) => r.rep === rep)?.work.path ?? [];
-  }, [selectedLap, open.fractionne, intervalViews]);
-
   /** Bornes du dégradé de couleur, en m/s : celles de la session, sinon de Réglages, sinon le défaut de l'activité. */
   const range = effectiveSpeedRange({ sessionRange: draft.edits.speedRange, activityRange: speedRange, suggested: null, fallback: defaultSpeedRange });
 
@@ -598,8 +503,6 @@ function LandModule({ family }: { family: LandFamily }) {
   const zoom = useChartZoomSource(trackDist.length > 1 ? { min: trackDist[0], max: trackDist[trackDist.length - 1] } : null, gpx.sessionKey);
   /** Zoom du profil de « général », à part : zoomer « général » ne zoome pas « graphiques ». */
   const profileZoom = useChartZoomSource(trackDist.length > 1 ? { min: trackDist[0], max: trackDist[trackDist.length - 1] } : null, gpx.sessionKey);
-  /** Zoom des courbes de l'onglet « test », sur le temps. */
-  const testZoom = useChartZoomSource(timeRange, gpx.sessionKey);
   /** Carte en plein écran (téléphone), seule ou avec les graphes d'un onglet. */
   const [mapExpanded, setMapExpanded] = useState(false);
   /** « +carte » des graphes zoomés : tronçon en violet, cadrage, plein écran carte + graphes au téléphone. */
@@ -612,7 +515,6 @@ function LandModule({ family }: { family: LandFamily }) {
       zones: { zoom, axis: trackDist },
       energie: { zoom: energyZoom, axis: trackMinutes },
       cardio: { zoom: cardioZoom, axis: trackMinutes },
-      test: { zoom: testZoom, axis: trackMinutes },
     },
     narrow,
     mapAnchorId: ANALYSIS_MAP_ANCHOR,
@@ -1051,12 +953,6 @@ function LandModule({ family }: { family: LandFamily }) {
         return energyChart;
       case 'cardio':
         return <CardioCompanion minutes={trackMinutes} heart={heart} zoom={cardioZoom} zones={hrZones} zoneLines={hrZoneLines} onShowOnMap={() => zoomOnMap.show('cardio')} style={chartBox(CHART_HEIGHT_PX)} />;
-      case 'test':
-        return sessionTest ? (
-          <FitnessTestCurves track={gpx.track} test={sessionTest} minutes={trackMinutes} speedsMs={chartSpeed} hrSmoothed={heart.smoothed}
-            speedUnit={speedUnit} zoom={testZoom} 
-            onShowOnMap={() => zoomOnMap.show('test')} />
-        ) : null;
       default:
         return null;
     }
@@ -1077,16 +973,13 @@ function LandModule({ family }: { family: LandFamily }) {
         <HighlightPath key={`cadence-${selectedCadenceBand}-${idx}`} positions={path} color={HIGHLIGHT_SHOWN_COLOR} />
       ))}
       {selectedSurface && surfaces.paths && <SurfaceHighlight paths={surfaces.paths} category={selectedSurface} />}
-      {selectedLapPath.length > 1 && (
-        <HighlightPath key={`fractionne-${selectedLap}`} positions={selectedLapPath} color={HIGHLIGHT_SHOWN_COLOR} />
-      )}
       <TopsHighlight tops={tops} selected={selectedTop} />
       {jumpsVisible && <JumpMapLayer track={gpx.track} jumps={jumps.jumps} shownJump={jumps.shownJump} podiumShown={jumps.podiumShown} />}
     </AnalysisBaseLayers>
   );
 
   return (
-    <AnalysisShell title={isTestSport(profile.id) ? 'Analyse test' : page.title} family={family} backLabel={page.backLabel} file={gpx.fileName}
+    <AnalysisShell title={page.title} family={family} backLabel={page.backLabel} file={gpx.fileName}
       share={{ segments: mapSegments, stats: generalStats }} error={sessionError} draft={draft} loadError={gpx.error}
       empty={!stats && !gpx.error && requestedFile === null}
       reading={reading}
@@ -1123,37 +1016,6 @@ function LandModule({ family }: { family: LandFamily }) {
                   onShow={(ms) => highlight.show('general', ms === null ? null : String(ms))} />
               </ResizablePanel>
             )}
-
-            {open.fractionne && hasIntervals && profile.intervals && (intervalViews.length > 0 || intervalEmptyText !== null) && (
-              <IntervalAnalysis
-                series={intervalViews}
-                stepS={profile.intervals.profileStepS}
-                launchFraction={profile.intervals.launchFraction}
-                samplingS={gpx.samplingS}
-                speedUnit={speedUnit}
-                distanceUnit={distanceUnit}
-                panelId={panelId}
-                open={open.fractionne}
-                onToggle={toggleOf('fractionne')}
-                selectedLap={selectedLap}
-                onSelectLap={setSelectedLap}
-                emptyText={intervalEmptyText}
-                recoveryS={profile.heartRate.recoveryS}
-                sessionKey={gpx.sessionKey} />
-            )}
-
-            {open.test && isTestSport(profile.id) && (sessionTest ? (
-              <ResizablePanel id={panelId('test')} style={ANALYSIS_PANEL_STYLE}>
-                <FitnessTestPanel track={gpx.track} test={sessionTest} minutes={trackMinutes} speedsMs={chartSpeed} hrSmoothed={heart.smoothed}
-                  speedUnit={speedUnit} profileHrMax={runner.hrMax} onRetainHrMax={(bpm) => retainHr('hrMax', bpm, { kind: 'test', atMs: sessionTest.startMs })}
-                  zoom={testZoom} 
-                  onShowOnMap={() => zoomOnMap.show('test')} open={open.test} onToggle={toggleOf('test')} />
-              </ResizablePanel>
-            ) : (
-              <EmptyTabPanel id={panelId('test.vide')} label="Test" open={open.test} onToggle={toggleOf('test')}>
-                Cette session n'a pas de test guidé dans sa fiche : un test se lance depuis Entraînement › Tests, et ses résultats arrivent ici.
-              </EmptyTabPanel>
-            ))}
 
             {open.tops && tops && (
               <ResizablePanel id={panelId('tops')} style={ANALYSIS_PANEL_STYLE}>
@@ -1447,16 +1309,6 @@ function LandModule({ family }: { family: LandFamily }) {
                   <div className="ui-mt-12 ui-text-s">
                     <SessionColorRangeField unit={speedUnit} range={range} isOverridden={draft.edits.speedRange !== null}
                       onChange={(next) => draft.update({ speedRange: next })} />
-                  </div>
-                )}
-                {detected && (
-                  <div className="ui-mt-12 ui-text-s">
-                    <EffortThresholdEditor
-                      unit={editSpeedUnit(speedUnit)}
-                      valueMs={detected.thresholdMs}
-                      suggestedMs={detected.suggestedThresholdMs}
-                      isOverridden={draft.edits.effortThresholdMs !== null}
-                      onChange={(next) => draft.update({ effortThresholdMs: next })} />
                   </div>
                 )}
                 {runner.weightKg === null && (

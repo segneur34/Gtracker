@@ -2,15 +2,13 @@ import { BRIEF_SPACING_MS } from '../core/beepDurations';
 import type { ClockTone } from '../platform/beeper';
 
 /**
- * Signaux sonores d'un guidage (lot 187, sortis de `recording/fitnessTest.ts`) : les sons que jouent le test guidé,
- * l'alerte de zone cardiaque et le test de FC de repos, les mêmes partout pour que l'oreille les reconnaisse.
+ * Signaux sonores d'un guidage (lot 187) : les sons que jouent l'alerte de zone cardiaque et le test de FC de repos,
+ * les mêmes partout pour que l'oreille les reconnaisse. Ceux du test de FC max (palier, fin de rampe) sont partis
+ * avec lui (lot 302).
  */
 
-/** Un signal du guidage : départ, allure bonne, trop vite, accélérer, palier, fin de rampe, fin du test. */
-export type TestSignal = 'debut' | 'bien' | 'trop' | 'accelere' | 'palier' | 'finRampe' | 'finTest';
-
-/** Écart entre les débuts des sons de la fin de rampe, comme la fin de séance du compteur. */
-export const END_SPACING_MS = 1000;
+/** Un signal du guidage : départ, dans la zone, trop haut, trop bas (accélérer), fin du test. */
+export type TestSignal = 'debut' | 'bien' | 'trop' | 'accelere' | 'finTest';
 
 /** Un bip court seul, ou n bips brefs rapprochés (« bip-bip ») pour trop vite et trop lent. */
 const briefs = (n: number): ClockTone[] => Array.from({ length: n }, (_, i) => ({ delayMs: i * BRIEF_SPACING_MS, tone: 'bref' as const }));
@@ -20,7 +18,5 @@ export const TEST_SIGNAL_TONES: Record<TestSignal, ClockTone[]> = {
   bien: [{ delayMs: 0, tone: 'court' }],
   trop: briefs(2),
   accelere: briefs(3),
-  palier: [{ delayMs: 0, tone: 'long' }],
-  finRampe: [{ delayMs: 0, tone: 'court' }, { delayMs: END_SPACING_MS, tone: 'long' }, { delayMs: 2 * END_SPACING_MS, tone: 'final' }],
   finTest: [{ delayMs: 0, tone: 'long' }],
 };

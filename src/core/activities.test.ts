@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BIKE_INTERVALS_ACTIVITY, DEFAULT_ACTIVITIES, FAMILY_SHADES, GRAVEL_ACTIVITY, MARCHE_ACTIVITY, RUN_INTERVALS_ACTIVITY, SURF_ACTIVITY, SURF_FOIL_ACTIVITY, TESTS_ACTIVITY,
+  ACTIVE_FAMILIES, BIKE_INTERVALS_ACTIVITY, RETIRED_FAMILIES, DEFAULT_ACTIVITIES, FAMILY_SHADES, GRAVEL_ACTIVITY, MARCHE_ACTIVITY, RUN_INTERVALS_ACTIVITY, SURF_ACTIVITY, SURF_FOIL_ACTIVITY, TESTS_ACTIVITY,
   MUSCU_ACTIVITY,
   VTT_ACTIVITY, activitiesOfFamily,
-  activityCounts, activityFamily, activityTreatment, baseActivity, findActivity, insertActivity, intervalActivityFor, isActivityShown, isFamilyHidden,
-  kindActivityLabel, trainingKindsOf,
+  activityCounts, activityFamily, activityTreatment, baseActivity, findActivity, insertActivity, isActivityShown, isFamilyHidden,
   newActivityId, nextActivityColor, readActivities, recolorActivities, sessionActivity, upgradeActivities,
   visibleActivities, visibleFamilies, withHidden, type Activity,
 } from './activities';
@@ -338,8 +337,15 @@ describe('familles et activités cachées (point 100)', () => {
     expect(isFamilyHidden([voile], [], 'voile')).toBe(false);
   });
 
+  it("l'Entraînement, retiré de cette version, est toujours caché (lot 302)", () => {
+    expect(RETIRED_FAMILIES).toEqual(['fractionne']);
+    expect(ACTIVE_FAMILIES).toEqual(['voile', 'course', 'velo', 'surf']);
+    expect(isFamilyHidden(DEFAULT_ACTIVITIES, [], 'fractionne')).toBe(true);
+    expect(isActivityShown(RUN_INTERVALS_ACTIVITY, DEFAULT_ACTIVITIES, [])).toBe(false);
+  });
+
   it('visibleFamilies et visibleActivities', () => {
-    expect(visibleFamilies(withVtt, ['surf'])).toEqual(['voile', 'course', 'velo', 'fractionne']);
+    expect(visibleFamilies(withVtt, ['surf'])).toEqual(['voile', 'course', 'velo']);
     expect(visibleActivities(withVtt, [], 'velo').map((a) => a.name)).toEqual(['Route', 'Gravel']);
     expect(visibleActivities(withVtt, ['surf']).map((a) => a.name)).not.toContain('Surf foil');
     expect(visibleActivities(withVtt, ['surf']).map((a) => a.name)).not.toContain('VTT');
@@ -362,16 +368,7 @@ describe('usesMarkCourse', () => {
 });
 
 describe('types d’entraînement (24/10)', () => {
-  it('rangent le fractionné à pied et à vélo sous « Fractionné »', () => {
-    expect(trainingKindsOf([RUN_INTERVALS_ACTIVITY, BIKE_INTERVALS_ACTIVITY])).toEqual(['fractionne']);
-    expect(trainingKindsOf([trail, voile])).toEqual([]);
-    expect(trainingKindsOf([TESTS_ACTIVITY, RUN_INTERVALS_ACTIVITY])).toEqual(['fractionne', 'tests']);
-    expect(kindActivityLabel(TESTS_ACTIVITY, 'tests')).toBe('Tests');
-  });
-
   it('rangent la muscu sous « Muscu », dans l’Entraînement, sans position (lot I du 25/10)', () => {
-    expect(trainingKindsOf(DEFAULT_ACTIVITIES)).toEqual(['fractionne', 'tests', 'muscu']);
-    expect(kindActivityLabel(MUSCU_ACTIVITY, 'muscu')).toBe('Muscu');
     expect(trainingKind('muscu')).toBe('muscu');
     expect(sportFamily('muscu')).toBe('fractionne');
     expect(sportTreatment('muscu')).toBe('muscu');
@@ -382,29 +379,5 @@ describe('types d’entraînement (24/10)', () => {
     expect([muscu.jumps, muscu.intervals, muscu.cadence, muscu.loopReturnMaxRatio, muscu.terrainElevationStepM]).toEqual([null, null, null, null, null]);
     expect(muscu.topTargets).toEqual([]);
     expect(muscu.heartRate.thresholdOffsetBpm).toBe(0);
-  });
-
-  it('nomment une activité sous son type sans le nom du type', () => {
-    expect(kindActivityLabel(RUN_INTERVALS_ACTIVITY, 'fractionne')).toBe('à pied');
-    expect(kindActivityLabel(BIKE_INTERVALS_ACTIVITY, 'fractionne')).toBe('vélo');
-    expect(kindActivityLabel({ ...RUN_INTERVALS_ACTIVITY, name: 'Piste du stade' }, 'fractionne')).toBe('Piste du stade');
-    expect(kindActivityLabel({ ...RUN_INTERVALS_ACTIVITY, name: 'Fractionné' }, 'fractionne')).toBe('Fractionné');
-  });
-});
-
-describe('intervalActivityFor (19/10)', () => {
-  const fractionne = [RUN_INTERVALS_ACTIVITY, BIKE_INTERVALS_ACTIVITY];
-
-  it('à pied : Fractionné à pied ; à vélo : Fractionné vélo', () => {
-    expect(intervalActivityFor(trail, fractionne)).toBe(RUN_INTERVALS_ACTIVITY);
-    expect(intervalActivityFor(GRAVEL_ACTIVITY, fractionne)).toBe(BIKE_INTERVALS_ACTIVITY);
-  });
-
-  it('rien à demander en Fractionné, en voile, en surf, ni sans activité qui convienne', () => {
-    expect(intervalActivityFor(RUN_INTERVALS_ACTIVITY, fractionne)).toBeNull();
-    expect(intervalActivityFor(voile, fractionne)).toBeNull();
-    expect(intervalActivityFor(SURF_ACTIVITY, fractionne)).toBeNull();
-    expect(intervalActivityFor(trail, [BIKE_INTERVALS_ACTIVITY])).toBeNull();
-    expect(intervalActivityFor(trail, [])).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 /**
  * Pièces des graphes de la voile, communes aux onglets « graphiques », « vent » et « vmg » et à la carte
  * en plein écran : couleurs, axes, séries, points des manœuvres, lectures du point survolé. Aucun composant ici,
- * des constantes et des fonctions (même forme que `fitnessTestChartParts.tsx`).
+ * des constantes et des fonctions.
  */
 import type { CSSProperties, ReactNode } from 'react';
 import type { DotItemDotProps } from 'recharts';

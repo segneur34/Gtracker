@@ -122,7 +122,7 @@ export const restingRemainingS = (state: RestingHrState, nowMs: number): number 
 
 // --- Sons ---
 
-/** Départ : un court. Fin : un long. Les mêmes sons que les tests guidés (`fitnessTest.ts`). */
+/** Départ : un court. Fin : un long. Les mêmes sons que l'alerte de zone (`signalTones.ts`). */
 export const RESTING_SIGNAL_TONES: Record<RestingSignal, ClockTone[]> = {
   debut: TEST_SIGNAL_TONES.debut,
   fin: TEST_SIGNAL_TONES.finTest,

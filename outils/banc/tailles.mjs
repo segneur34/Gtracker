@@ -2,7 +2,7 @@
 // Usage : node tailles.mjs <port> <dossier de travail> [<dossier des captures>]
 // Sur un profil neuf, sans réseau (IGN, Overpass, tuiles bloqués), environ 8 à 12 min. Le script ne corrige rien : il relève.
 //  1. importe une session de chaque famille (voile, course, vélo, surf) par la page ;
-//  2. pour chaque page (accueil, bibliothèques, analyses onglets tous ouverts, Entraînement et ses tests, Enregistrer,
+//  2. pour chaque page (accueil, bibliothèques, analyses onglets tous ouverts, test de FC repos, Enregistrer,
 //     Planifier, Itinéraires, Statistiques, Profil, Réglages tout ouvert), la charge une fois puis la fait passer par
 //     chaque taille d'écran (changement de la taille émulée, sans recharger) et chaque taille de texte ;
 //  3. à chaque combinaison, relève les défauts : page plus large que l'écran, élément qui en sort, texte coupé,
@@ -264,11 +264,7 @@ const PAGES = [
   { name: 'analyse course', path: paths.course, open: true, ms: 6000 },
   { name: 'analyse vélo', path: paths.velo, open: true, ms: 6000 },
   { name: 'analyse surf', path: paths.surf, open: true, ms: 6000 },
-  { name: 'Entraînement', path: '/fractionne' },
-  { name: 'séances', path: '/fractionne/seances' },
-  { name: 'tests', path: '/fractionne/tests' },
-  { name: 'test FC max', path: '/fractionne/tests/fc-max' },
-  { name: 'test FC repos', path: '/fractionne/tests/fc-repos' },
+  { name: 'test FC repos', path: '/profil/fc-repos' },
   { name: 'enregistrer', path: '/enregistrer' },
   { name: 'planifier', path: '/itineraires', ms: 3500 },
   { name: 'itinéraires', path: '/itineraires/liste' },

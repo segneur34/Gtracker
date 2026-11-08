@@ -16,9 +16,9 @@
 //  5. Réglages : « Seuils cardio » (S1 et S2, zones, Personnaliser, Revenir au calcul), la ligne « Seuils cardio »
 //     de la carte d'une activité (−8 en voile), la case « Ceinture cardio » en voile et en surf, les chiffres
 //     « FC moyenne » et « Zone cardiaque » proposés en voile ;
-//  6. une séance de fractionné sans compteur, avec la FC : colonnes « FC » et « Récup. » des répétitions ;
+//  6. (retirée au lot 302 avec l'Entraînement : la FC par répétition de l'onglet « fractionné ») ;
 //  7. la FC dans le résumé des fiches, et l'onglet « cardio » des statistiques ;
-//  8. à 390×844 : l'analyse de course, onglet cardio ouvert, et le fractionné, sans débordement.
+//  8. à 390×844 : l'analyse de course, onglet cardio ouvert, sans débordement.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -126,23 +126,6 @@ const T_RUN = Date.UTC(2026, 9, 1, 8, 0, 0);
 const T_PLAIN = Date.UTC(2026, 9, 4, 8, 0, 0);
 const T_SURF = Date.UTC(2026, 9, 3, 7, 0, 0);
 const T_VOILE = Date.UTC(2026, 8, 20, 13, 0, 0);
-const T_IVL = Date.UTC(2026, 9, 5, 8, 0, 0);
-// Fractionné sans compteur (celui de `fractionne.mjs`) : 10 min d'échauffement, 8 × (1 min d'effort, 1 min de repos).
-const effortAt = (s) => {
-  if (s < 600) return 2.8 + 0.1 * Math.sin(s / 13);
-  const u = s - 600;
-  if (u >= 8 * 120 - 60) return 2.5;
-  const k = u % 120;
-  return k < 60 ? Math.min(1.5 + (k + 1) * 1.2, 5.2 - 0.05 * Math.floor(u / 120) - 0.004 * k) : 1.5;
-};
-// FC qui monte pendant l'effort et redescend pendant le repos, en retard sur la vitesse.
-const ivlHr = (s) => {
-  if (s < 600) return 135;
-  const u = s - 600;
-  if (u >= 8 * 120 - 60) return 140;
-  const k = u % 120;
-  return k < 60 ? 145 + 0.5 * k : 175 - 0.6 * (k - 60);
-};
 // Course de 40 min à 3 m/s, FC de 130 à 172 : dérive nette, montée jusqu'en Z4 et Z5 (réserve 50-190).
 const runHr = (k) => 130 + (k / 2400) * 42;
 const SESSIONS = [
@@ -150,7 +133,6 @@ const SESSIONS = [
   { key: 'sansfc', page: 'course', start: T_PLAIN, gpx: lineGpx('running', 1200, () => 3, T_PLAIN) },
   { key: 'surf', page: 'surf', start: T_SURF, gpx: withHr(surfGpx(T_SURF, MORNING), (k) => 110 + 20 * Math.sin(k / 120)) },
   { key: 'voile', page: 'voile', start: T_VOILE, gpx: withHr(readFileSync(voilePath, 'utf8'), (k) => 120 + 25 * Math.sin(k / 300)) },
-  { key: 'fractionne', page: 'fractionne', start: T_IVL, gpx: withHr(lineGpx('run-intervals', 600 + 8 * 120 - 60 + 300, effortAt, T_IVL), ivlHr) },
 ];
 
 // --- 1. Import ---
@@ -352,20 +334,6 @@ for (const name of ['Voile', 'Surf']) {
 const voileOptions = await evaluate(`[...(${card('Voile')}?.querySelectorAll('select[aria-label="Ligne 1"] option') ?? [])].map((o) => o.textContent.trim())`);
 check('Réglages, Voile : « Fréquence cardiaque », « FC moyenne » et « Zone cardiaque » proposés', ['Fréquence cardiaque', 'FC moyenne', 'Zone cardiaque'].every((o) => voileOptions?.includes(o)));
 
-// --- 6. FC par répétition ---
-await go(paths.fractionne, 6000);
-console.log('  fractionné, onglets :', await tabLabels());
-await clickTab('fractionné');
-await settle({ max: 2000 });
-const ivlText = await evaluate('document.body.innerText');
-const ivlCells = await evaluate(`[...document.querySelectorAll('.an-ivl-hr')].map((c) => c.textContent.trim())`);
-const recCells = await evaluate(`[...document.querySelectorAll('.an-ivl-rec')].map((c) => c.textContent.trim())`);
-console.log('  FC :', ivlCells?.join(' | '), '\n  récup :', recCells?.join(' | '));
-check('fractionné : colonnes « FC » et « Récup. »', ivlText.includes('Récup.') && ivlCells?.length >= 6);
-check('fractionné : FC moyenne / max de chaque effort', ivlCells?.every((c) => /^\d{3} \/ \d{3}$/.test(c)));
-check('fractionné : récupération mesurée', recCells?.filter((c) => /^−\d+ bpm$/.test(c)).length >= 6);
-await shoot('cardio-fractionne');
-
 // --- 7. Résumé et statistiques ---
 const recs = await records();
 const courseRec = recs.find((r) => Math.abs((r.summary?.startMs ?? 0) - T_RUN) < 2000);
@@ -383,7 +351,7 @@ const statsText = await evaluate(`(() => {
 })()`);
 console.log('  cardio :', statsText.slice(0, 400));
 // La voile de `make-gpx.mjs` n'a pas de `<type>` : à classer, elle n'entre pas dans les statistiques.
-check('statistiques : 3 sessions avec FC sur 4 (la voile est à classer)', statsText.includes('Sessions avec FC / 3 / 4'));
+check('statistiques : 2 sessions avec FC sur 3 (la voile est à classer)', statsText.includes('Sessions avec FC / 2 / 3'));
 check('statistiques : charge, temps par zone, charge par semaine, FC par session',
   statsText.includes('Charge') && statsText.includes('Temps par zone') && statsText.includes('Charge par') && statsText.includes('FC moyenne par session'));
 check('statistiques : deux graphes', (await evaluate(`(() => {
@@ -399,10 +367,6 @@ await clickTab('cardio');
 await settle({ max: 1500 });
 check(`à 390 px, course onglet cardio : débordement ${await overflow()}`, (await overflow()) === 0);
 await shoot('cardio-telephone');
-await go(paths.fractionne, 6000);
-await settle({ max: 1500 });
-check(`à 390 px, fractionné : débordement ${await overflow()}`, (await overflow()) === 0);
-await shoot('cardio-fractionne-telephone');
 
 console.log('\n--- console (erreurs, avertissements) ---');
 logs.forEach((l) => console.log(l));

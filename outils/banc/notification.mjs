@@ -8,7 +8,7 @@
 //     envois sans changement d'état ;
 //  3. pause manuelle : envoi immédiat, « en pause », durée figée, posé seul ; reprise : envoi immédiat sans « en pause » ;
 //  4. arrêt : notification effacée ;
-//  5. compteur du fractionné pendant un enregistrement (rejeu ×1 daté de maintenant) : phase au titre et décompte ; « Étape » d'office (26/10) ;
+//  5. (retirée au lot 302 avec l'Entraînement : le compteur du fractionné au titre de la notification) ;
 //  6. la moyenne en voile (lot 150) : « Moyenne active » dans les menus de Réglages, « Moy. act. » dans un rejeu.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -37,7 +37,7 @@ const check = (label, ok, detail = '') => {
   console.log(`${ok ? 'ok  ' : 'ÉCHEC'} ${label}${detail ? ` — ${detail}` : ''}`);
 };
 const holdStop = async () => {
-  const down = await evaluate(`(() => { const b = [...document.querySelectorAll('button.ui-btn--danger')].find((x) => x.textContent.includes('Arrêter') && !x.disabled && !x.closest('.ivl')); if (!b) return 'absent'; window.__stopButton = b; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
+  const down = await evaluate(`(() => { const b = [...document.querySelectorAll('button.ui-btn--danger')].find((x) => x.textContent.includes('Arrêter') && !x.disabled); if (!b) return 'absent'; window.__stopButton = b; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
   if (down !== 'ok') return down;
   await wait(2300);
   return evaluate(`(() => { const b = window.__stopButton; b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); b.click(); return 'ok'; })()`);
@@ -45,13 +45,6 @@ const holdStop = async () => {
 const clickText = (text, selector = 'button') => evaluate(`(() => {
   const b = [...document.querySelectorAll(${JSON.stringify(selector)})].find((x) => x.textContent.trim() === ${JSON.stringify(text)} || x.textContent.includes(${JSON.stringify(text)}));
   if (!b) return 'absent'; if (b.disabled) return 'désactivé'; b.click(); return 'ok';
-})()`);
-const setSelect = (label, value) => evaluate(`(() => {
-  const s = document.querySelector('select[aria-label=${JSON.stringify(label)}]');
-  if (!s) return 'absent';
-  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, ${JSON.stringify(String(value))});
-  s.dispatchEvent(new Event('change', { bubbles: true }));
-  return s.value;
 })()`);
 const setFile = (selector, file) => importFiles(file, selector);
 /** Rejeu d'un GPX à la vitesse donnée, depuis la page Enregistrer, la famille choisie. */
@@ -176,7 +169,7 @@ check('arrêt : notification effacée', sent.slice(mark).some((s) => s.text === 
 console.log('Jeter :', await evaluate(`(() => { window.confirm = () => true; return 'ok'; })()`), await clickText('Jeter'));
 await wait(800);
 
-// 6, joué ici : la moyenne active dans un rejeu de voile, avant le compteur.
+// 6, joué ici : la moyenne active dans un rejeu de voile.
 const fieldsWith = (from, to) => evaluate(`(() => {
   const s = JSON.parse(localStorage.getItem('tracker.sportSettings'));
   for (const id of Object.keys(s.notificationFields ?? {})) s.notificationFields[id] = s.notificationFields[id].map((f) => (f === ${JSON.stringify(from)} ? ${JSON.stringify(to)} : f));
@@ -194,31 +187,6 @@ console.log('Arrêter :', await holdStop());
 await wait(1500);
 console.log('Jeter :', await evaluate(`(() => { window.confirm = () => true; return 'ok'; })()`), await clickText('Jeter'));
 await wait(800);
-
-// 5. Compteur pendant un enregistrement de fractionné.
-const runPath = join(workDir, 'notification-fractionne.gpx');
-nowTrace(runPath, 60, 'run-intervals');
-console.log('Démarrer (fractionné, ×1) :', await startReplay('Entraînement', runPath, 1));
-await wait(2500);
-console.log('séance :', await setSelect('Répétitions', 2), await setSelect('Travail, minutes', 0), await setSelect('Travail, secondes', 10),
-  await setSelect('Repos, minutes', 0), await setSelect('Repos, secondes', 5));
-mark = sent.length;
-console.log('Lancer :', await clickText('Lancer le compteur'));
-await wait(6000);
-const counter = sent.slice(mark).map((s) => s.text);
-console.log('envois :', counter.join('\n        '));
-check('phase au titre, au changement de phase', counter.some((t) => t.includes('· Départ |')) && counter.some((t) => t.includes('· Travail 1/2 |')));
-check('décompte de la phase', counter.some((t) => t.includes('· Travail 1/2 |') && t.includes('[rebours ')));
-// Entraînement (26/10) : l'étape d'office, avec la vitesse ; 0/2 au départ, 1/2 au premier travail.
-check('étape d\'office : 0/2 au départ, 1/2 au premier travail', counter.some((t) => t.includes('· Départ |') && t.includes('Étape 0/2'))
-  && counter.some((t) => t.includes('· Travail 1/2 |') && t.includes('Étape 1/2')), counter.filter((t) => /Travail|Départ/.test(t)).join(' // ').slice(0, 300));
-console.log('Arrêter :', await holdStop());
-await wait(1500);
-await evaluate(`(() => { window.confirm = () => true; return 'ok'; })()`);
-await clickText('Jeter');
-await wait(500);
-// « Arrêter » du compteur se tient 1 s (25/10).
-await evaluate(`(async () => { const b = document.querySelector('.ivl button.ui-btn--danger'); if (!b) return 'absent'; const ev = (t) => b.dispatchEvent(new PointerEvent(t, { bubbles: true, button: 0, pointerType: 'mouse' })); ev('pointerdown'); await new Promise((r) => setTimeout(r, 1200)); ev('pointerup'); b.click(); return 'ok'; })()`);
 
 console.log(logs.length ? `console :\n  ${logs.join('\n  ')}` : 'console : rien');
 console.log(failures ? `${failures} échec(s)` : 'tout est bon');

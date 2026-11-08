@@ -39,8 +39,8 @@ vi.mock('../platform/files', async (importOriginal) => ({
 }));
 
 /** Services vivants vus par `Recovery.state()`. */
-const services = vi.hoisted(() => ({ gps: false, belt: false }));
-vi.mock('../platform/recovery', () => ({ readRecoveryServices: async () => ({ gps: services.gps, belt: services.belt }) }));
+const services = vi.hoisted(() => ({ gps: false }));
+vi.mock('../platform/recovery', () => ({ readRecoveryServices: async () => ({ gps: services.gps }) }));
 
 /** Service GPS : le raccord sans relance, et les arrêts. */
 const gpsService = vi.hoisted(() => ({
@@ -113,7 +113,6 @@ const belt = vi.hoisted(() => {
     adoptable: false,
     holds: 0,
     adoptions: 0,
-    keepAlive: 0,
     saved: null as { address: string; name: string } | null,
     emit: (timeMs: number, bpm: number) => listeners.forEach((l) => l({ bpm, timeMs, contact: true })),
   };
@@ -134,10 +133,6 @@ vi.mock('../platform/heartRate', async (importOriginal) => ({
     belt.listeners.add(listener);
     return () => belt.listeners.delete(listener);
   },
-  keepBeltAlive: async () => {
-    belt.keepAlive += 1;
-  },
-  stopBeltKeepAlive: async () => undefined,
   releaseOrphanedBelt: async () => undefined,
 }));
 
@@ -182,7 +177,6 @@ vi.stubGlobal('localStorage', {
 
 const T0 = Date.UTC(2026, 10, 4, 9, 0, 0);
 const activity = baseActivity('running');
-const muscu = baseActivity('muscu');
 const round = (ms: number) => Math.round(ms);
 
 let recorder: typeof import('./useRecorder');
@@ -240,7 +234,6 @@ beforeEach(async () => {
   journal.writes = 0;
   journal.readFails = false;
   services.gps = false;
-  services.belt = false;
   gpsService.onFix = null;
   gpsService.adoptions = 0;
   gpsService.adoptFails = false;
@@ -257,7 +250,6 @@ beforeEach(async () => {
   belt.adoptable = false;
   belt.holds = 0;
   belt.adoptions = 0;
-  belt.keepAlive = 0;
   belt.saved = null;
   gpsTimer.arms = [];
   gpsTimer.disarms = 0;
@@ -562,35 +554,6 @@ describe('reprise silencieuse, cas limites', () => {
     expect(belt.adoptions).toBe(1);
     expect(belt.holds).toBe(holds);
     expect(fresh.getRecorderState().heartRate).not.toBeNull();
-  });
-
-  it('muscu : le service de la ceinture vaut preuve, ses mesures reprennent, aucun GPS', async () => {
-    belt.saved = { address: 'a', name: 'b' };
-    await recorder.startRecording(muscu, null, { heartRate: belt.saved });
-    for (let s = 0; s <= 10; s++) {
-      vi.setSystemTime(T0 + s * 1000);
-      belt.emit(T0 + s * 1000, 100 + s);
-    }
-    await settle();
-    expect(belt.keepAlive).toBe(1);
-    belt.listeners.clear();
-    belt.adoptable = true;
-    services.belt = true;
-    const fresh = await reload();
-    await fresh.recoverInterruptedRecording();
-    const state = fresh.getRecorderState();
-    expect(state.status).toBe('recording');
-    expect(state.stats.pointCount).toBe(11);
-    expect(gpsService.adoptions).toBe(0);
-    expect(belt.keepAlive).toBe(1);
-    for (let s = 11; s <= 15; s++) {
-      vi.setSystemTime(T0 + s * 1000);
-      belt.emit(T0 + s * 1000, 120);
-    }
-    await settle();
-    expect(fresh.getRecorderState().stats.pointCount).toBe(16);
-    expect(headerCount()).toBe(1);
-    expect(lineCount('break')).toBe(1);
   });
 
   it('le repère et l\'activité changée en route suivent la session', async () => {
@@ -948,32 +911,5 @@ describe('guidages rejoués en silence', () => {
     run((s) => gpsService.onFix!(along(s)), 71, 125, 1);
     expect(freshGuide.getMarkGuideView().finished).toBe(true);
     expect(sounds.finished).toBe(1);
-  });
-
-  it('test de FC max : phase et chiffres retrouvés, aucun signal rejoué, rien de neuf au journal hors la suite', async () => {
-    const test = baseActivity('run-test');
-    const guide = await import('./useFitnessTest');
-    guide.startFitnessTestGuide();
-    const live = fakeSource();
-    await recorder.startRecording(test, live);
-    run(live.emit, 0, 30, 1);
-    await settle();
-    const before = guide.getFitnessTestView();
-    expect(before.phase).toBe('echauffement');
-    const played = sounds.patterns;
-    expect(played).toBeGreaterThan(0);
-
-    services.gps = true;
-    const fresh = await reload();
-    const freshGuide = await import('./useFitnessTest');
-    freshGuide.startFitnessTestGuide();
-    await fresh.recoverInterruptedRecording();
-    const after = freshGuide.getFitnessTestView();
-    expect(after.active).toBe(true);
-    expect(after.phase).toBe('echauffement');
-    expect(after.remainingS).toBe(before.remainingS);
-    expect(sounds.patterns).toBe(played);
-    expect(fresh.getRecordedTest()?.startMs).toBe(T0);
-    expect(parseJournal(journal.text!).test?.startMs).toBe(T0);
   });
 });

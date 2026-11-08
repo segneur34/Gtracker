@@ -26,10 +26,6 @@ import org.json.JSONException;
  * service est affichée, pour ne jamais laisser de notification orpheline
  * après l'arrêt du service. En pause manuelle (service arrêté), il la pose
  * seul ; la reprise rend la main au service, l'arrêt l'efface.
- *
- * Tant qu'elle est affichée, la notification du compteur du fractionné
- * (IntervalTimerService) se cache de l'écran verrouillé : celle-ci porte déjà
- * la phase et son décompte.
  */
 @CapacitorPlugin(name = "RecordingNotification")
 public class RecordingNotificationPlugin extends Plugin {
@@ -37,19 +33,6 @@ public class RecordingNotificationPlugin extends Plugin {
     /** Numéro et canal de la notification du service GPS (BackgroundGeolocationService, constantes non publiques). */
     static final int NOTIFICATION_ID = 28351;
     static final String CHANNEL_ID = "com.capgo.capacitor_background_geolocation";
-
-    private static volatile boolean shown = false;
-
-    /** Vrai tant que la notification de l'enregistrement, récrite ici, est affichée. */
-    static boolean isShown() {
-        return shown;
-    }
-
-    private static void setShown(boolean next) {
-        if (shown == next) return;
-        shown = next;
-        IntervalTimerService.recordingNotificationChanged();
-    }
 
     @PluginMethod
     public void show(PluginCall call) {
@@ -62,7 +45,6 @@ public class RecordingNotificationPlugin extends Plugin {
         boolean standalone = Boolean.TRUE.equals(call.getBoolean("standalone", false));
         if (!standalone && !serviceNotificationActive(manager)) {
             // Service GPS arrêté, ou pas encore au premier plan : rien à récrire.
-            setShown(false);
             call.resolve();
             return;
         }
@@ -103,7 +85,6 @@ public class RecordingNotificationPlugin extends Plugin {
             builder.setShowWhen(false);
         }
         manager.notify(NOTIFICATION_ID, builder.build());
-        setShown(true);
         call.resolve();
     }
 
@@ -112,7 +93,6 @@ public class RecordingNotificationPlugin extends Plugin {
         NotificationManager manager = getContext().getSystemService(NotificationManager.class);
         // Sans effet sur celle du service GPS tant qu'il tourne : Android ne laisse pas l'effacer.
         if (manager != null) manager.cancel(NOTIFICATION_ID);
-        setShown(false);
         call.resolve();
     }
 

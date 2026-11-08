@@ -3,7 +3,7 @@
 // Sur un profil neuf, sans réseau. Dure environ 30 s. Le script :
 //  1. avec `DUMP=x.txt`, ouvre toutes les familles, toutes les activités et toutes leurs parties, et relève le texte
 //     de la liste des activités ; avec `RELEVE_SEUL=1`, il s'arrête là (pour la version d'avant le lot) ;
-//  2. vérifie, sur un profil neuf : les cinq en-têtes de famille, aucune carte d'activité ;
+//  2. vérifie, sur un profil neuf : les en-têtes de famille (quatre depuis le retrait de l'Entraînement, lot 302 ; cinq avant), aucune carte d'activité ;
 //  3. « Voile » ouverte : ses activités, l'œil qui cache la famille sans la replier, puis la rend ;
 //  4. après rechargement : Voile toujours ouverte, les autres fermées ;
 //  5. une activité ajoutée en surf : la famille Surf s'ouvre, la carte de l'activité aussi ;
@@ -84,7 +84,8 @@ await seedSections({});
 await openSettings();
 const labels = await evaluate(`${familyToggles}.map((b) => b.querySelector('.settings-activities__family-name')?.textContent.trim()).join(' | ')`);
 console.log('Familles :', labels);
-check('cinq en-têtes de famille', (await evaluate(`${familyToggles}.length`)) === 5);
+const familyCount = await evaluate(`${familyToggles}.length`);
+check(`en-têtes de famille : ${familyCount}`, familyCount === 4 || familyCount === 5);
 check('toutes fermées', (await evaluate(`${familyToggles}.every((b) => b.getAttribute('aria-expanded') === 'false')`)) === true);
 check('aucune carte d\'activité', (await cardCount()) === 0);
 console.log('Résumé de Voile fermée :', await evaluate(`${familyToggle('Voile')}?.querySelector('.settings-activities__family-summary')?.textContent`));

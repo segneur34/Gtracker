@@ -6,18 +6,18 @@ import {
 import { isNativeApp } from './runtime';
 
 /**
- * Bips et vibrations : seul accès au son et au vibreur (règle 12). Cinq
- * usages : le guidage vers les balises (`getBeeper`), le compteur du
- * fractionné (`getIntervalClock`), un motif joué une fois (`playPattern` :
- * « Écouter » de Réglages), le retour du bouton « Note » (`buzz`) et la
- * veille du GPS de l'enregistrement (`armGpsWatch`, lot 115). La
- * hauteur de tous les sons se règle d'un coup (`setBeepPitch`, 24/10).
+ * Bips et vibrations : seul accès au son et au vibreur (règle 12). Quatre
+ * usages : le guidage vers les balises (`getBeeper`), un motif joué une fois
+ * (`playPattern` : zone visée, test de FC repos, « Écouter » de Réglages), le
+ * retour du bouton « Note » (`buzz`) et la veille du GPS et de la ceinture de
+ * l'enregistrement (`armGpsWatch`, lot 115). La hauteur de tous les sons se
+ * règle d'un coup (`setBeepPitch`, 24/10). Le compteur du fractionné et son
+ * service sont partis avec l'Entraînement (lot 302).
  *
  * Sur le téléphone, un greffon Android tient le rythme sur un fil à lui :
  * écran éteint, les minuteries de la WebView sont bridées (point 40), pas
  * celles d'Android. Pour les balises, le service GPS de l'enregistrement
- * garde le processeur éveillé ; le compteur a son propre service au premier
- * plan, qui tourne sans GPS. Le son passe par le flux des alarmes : audible
+ * garde le processeur éveillé. Le son passe par le flux des alarmes : audible
  * téléphone en silencieux, au volume des alarmes. Dans le navigateur, Web
  * Audio et `navigator.vibrate` le remplacent, pour éprouver l'un et l'autre
  * au banc ; chaque son y est consigné en `console.debug` (« [bips] … »).
@@ -38,35 +38,10 @@ export interface Beeper {
   stop(): Promise<void>;
 }
 
-/** Un son du compteur, après `delayMs` : court, long, ou le long double de la fin de séance. */
+/** Un son d'un motif, après `delayMs` : bref, court, long, ou le long double. */
 export interface ClockTone {
   delayMs: number;
   tone: ToneKind;
-}
-
-/** Un changement de phase du compteur, pour sa notification : son nom, et le temps qu'elle durera (0 : sans décompte). */
-export interface ClockCue {
-  delayMs: number;
-  title: string;
-  phaseMs: number;
-}
-
-/** Programme du compteur, à partir de maintenant. */
-export interface ClockPlan {
-  tones: ClockTone[];
-  cues: ClockCue[];
-  /** Fin d'elle-même après ce délai, en millisecondes (fin de séance) ; 0 : jamais (pause). */
-  stopAfterMs: number;
-}
-
-export interface IntervalClock {
-  /**
-   * Remplace le programme en cours. Sur le téléphone, un service au premier
-   * plan le joue, écran éteint, et le dit dans sa notification.
-   */
-  schedule(plan: ClockPlan, vibrate: boolean): Promise<void>;
-  /** Silence, plus de notification. */
-  stop(): Promise<void>;
 }
 
 /** Greffon maison, `android/app/src/main/java/io/github/segneur/tracker/BeeperPlugin.java`. */
@@ -75,8 +50,6 @@ interface BeeperPlugin {
   validated(options: { vibrate: boolean }): Promise<void>;
   finished(options: { vibrate: boolean }): Promise<void>;
   stop(): Promise<void>;
-  scheduleIntervals(options: ClockPlan & { vibrate: boolean }): Promise<void>;
-  stopIntervals(): Promise<void>;
   buzz(options: { durationMs: number }): Promise<void>;
   pattern(options: { tones: ClockTone[]; vibrate: boolean }): Promise<void>;
   setPitch(options: { hz: number }): Promise<void>;
@@ -221,45 +194,6 @@ let beeper: Beeper | null = null;
 export const getBeeper = (): Beeper => {
   beeper ??= isNativeApp() ? nativeBeeper : createBrowserBeeper();
   return beeper;
-};
-
-const nativeIntervalClock: IntervalClock = {
-  schedule: (plan, vibrate) => nativePlugin.scheduleIntervals({ ...plan, vibrate }),
-  stop: () => nativePlugin.stopIntervals(),
-};
-
-/**
- * Compteur du navigateur : des minuteries, bridées écran éteint, mais le
- * banc les suit. Un son dû tout de suite part dans l'appel même, donc dans
- * le geste qui l'a lancé, sans quoi le navigateur peut le taire.
- */
-const createBrowserIntervalClock = (): IntervalClock => {
-  let timers: ReturnType<typeof setTimeout>[] = [];
-  const clear = () => {
-    timers.forEach(clearTimeout);
-    timers = [];
-  };
-  return {
-    schedule: async (plan, vibrate) => {
-      clear();
-      const play = (tone: ToneKind) => browserTone(TONE_MS[tone], vibrate, tone);
-      // Les minuteries d'abord : le premier son ouvre le contexte audio, ce qui prend un moment.
-      for (const t of plan.tones) if (t.delayMs > 0) timers.push(setTimeout(() => play(t.tone), t.delayMs));
-      for (const c of plan.cues) {
-        timers.push(setTimeout(() => console.debug(`[compteur] ${c.title} à ${Date.now()}`), Math.max(0, c.delayMs)));
-      }
-      for (const t of plan.tones) if (t.delayMs <= 0) play(t.tone);
-    },
-    stop: async () => clear(),
-  };
-};
-
-let intervalClock: IntervalClock | null = null;
-
-/** Compteur du fractionné, sur le téléphone ou dans le navigateur. */
-export const getIntervalClock = (): IntervalClock => {
-  intervalClock ??= isNativeApp() ? nativeIntervalClock : createBrowserIntervalClock();
-  return intervalClock;
 };
 
 // --- Veille du GPS de l'enregistrement (lot 115) ---

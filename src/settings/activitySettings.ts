@@ -13,9 +13,6 @@ import type { SportType } from '../core/types';
 import { DISTANCE_UNIT_LABEL, SPEED_UNIT_LABEL, type DistanceUnit, type SpeedUnit } from '../core/units';
 import { finiteOr, inRange } from '../core/basics';
 import type { BeepSound } from '../recording/beepSound';
-import type { FitnessTestId, FitnessTestSettings } from '../recording/fitnessTest';
-import type { IntervalPreset, IntervalWorkout } from '../recording/intervalTimer';
-import type { HeartBandPicks } from '../recording/zoneAlert';
 import {
   MAX_NOTIFICATION_FIELDS, defaultLiveFieldsOf, defaultNotificationFieldsOf, sanitizeLiveFields, type LiveFieldKey,
 } from '../recording/liveFields';
@@ -230,20 +227,11 @@ export interface StoredSettings {
   longPressMs?: number;
   /** Durée de l'appui long sur « Arrêter » qui termine l'enregistrement, en millisecondes ; 0 : un simple appui. */
   stopHoldMs?: number;
-  /** Séances du compteur gardées pour être reprises toutes faites (fractionné), communes aux activités. */
-  intervalPresets?: IntervalPreset[];
-  /** Dernière séance lancée au compteur, proposée la fois suivante (choix retenu). */
-  lastIntervalWorkout?: IntervalWorkout;
-  /** Dernières bornes de la course à bornes (Entraînement, 05/11), proposées pré-remplies la fois suivante (choix retenu). */
-  heartBands?: ByActivity<HeartBandPicks>;
-  /** Séances du Timer (25/10), à part de celles du fractionné : hors de toute activité, sans GPS ni session. */
-  timerPresets?: IntervalPreset[];
-  /** Dernière séance lancée au Timer (choix retenu). */
-  lastTimerWorkout?: IntervalWorkout;
   /** Son de tous les bips, plus ou moins grave (24/10) ; absent : `DEFAULT_BEEP_SOUND`. */
   beepSound?: BeepSound;
-  /** Réglages des tests guidés (durée d'échauffement, pourcentage de la cible), communs aux activités ; absents : ceux du protocole. */
-  fitnessTests?: Partial<Record<FitnessTestId, Partial<FitnessTestSettings>>>;
+  // Séances du compteur et du Timer, dernières séances lancées, bornes de la course à bornes et réglages des tests
+  // guidés (`intervalPresets`, `lastIntervalWorkout`, `timerPresets`, `lastTimerWorkout`, `heartBands`, `fitnessTests`) :
+  // partis avec l'Entraînement (lot 302). Déjà rangés, ils restent dans le fichier et ne sont plus lus.
 }
 
 /** Appui long par défaut : 2 s, assez pour ne pas partir d'un geste involontaire. */
@@ -495,7 +483,7 @@ export const resolveBikeKg = (stored: StoredSettings, activity: Activity, bikeTy
 };
 
 export const sanitizeNotificationFields = (value: unknown, activity: Activity): LiveFieldKey[] | null =>
-  sanitizeLiveFields(value, activityTreatment(activity), MAX_NOTIFICATION_FIELDS, 'notification', activityFamily(activity));
+  sanitizeLiveFields(value, activityTreatment(activity), MAX_NOTIFICATION_FIELDS, 'notification');
 
 /** Foil d'une activité sans réglage : coché pour « Surf foil » (point 97), sinon le défaut du calcul. */
 export const defaultFoil = (activity: Activity): boolean =>

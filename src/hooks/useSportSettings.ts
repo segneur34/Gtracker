@@ -4,22 +4,15 @@ import {
   readActivities, upgradeActivities, visibleActivities, visibleFamilies, withHidden, type Activity,
 } from '../core/activities';
 import type { ActivityIconId } from '../core/activityIcons';
-import { DEFAULT_INTERVAL_PRESETS } from '../settings/activityPresets';
 import { defaultActiveThresholdOf, getSportProfile, type RecordingProfile, type SportFamily } from '../core/sportProfiles';
 import type { TabChoices } from '../core/analysisTabs';
 import type { SportType } from '../core/types';
 import type { DistanceUnit, SpeedUnit } from '../core/units';
 import { jsonStore } from '../platform/storage';
-import { createJsonSelector, sameJson, type JsonSelector } from './createStore';
+import { createJsonSelector, sameJson } from './createStore';
 import { setBeepPitch } from '../platform/beeper';
 import { DEFAULT_BEEP_SOUND, beepSoundHz, isBeepSound, type BeepSound } from '../recording/beepSound';
-import { FITNESS_TESTS, sanitizeFitnessTestSettings, type FitnessTestId, type FitnessTestSettings } from '../recording/fitnessTest';
-import {
-  DEFAULT_INTERVAL_WORKOUT, DEFAULT_TIMER_WORKOUT, addPreset, replacePreset, sameWorkout, sanitizePresets, sanitizeWorkout, withoutPreset,
-  type IntervalPreset, type IntervalWorkout, type WorkoutKind,
-} from '../recording/intervalTimer';
 import type { LiveFieldKey } from '../recording/liveFields';
-import { sanitizeBandPicks, type HeartBandPicks } from '../recording/zoneAlert';
 import type { MarkGuideSettings } from '../recording/markGuide';
 import type { JumpSettings } from '../recording/jumpSettings';
 import type { BikeType } from '../cycling/energy';
@@ -50,14 +43,6 @@ import {
  */
 
 const STORAGE_KEY = 'tracker.sportSettings';
-
-
-/** Dernières bornes de la course à bornes de l'activité (choix retenu), `null` sans elles. */
-export const readHeartBandPicks = (activityId: string): HeartBandPicks | null => sanitizeBandPicks(readStoredSettings().heartBands?.[activityId]);
-
-/** Retient les bornes de la course à bornes de l'activité, proposées pré-remplies la fois suivante. */
-export const rememberHeartBandPicks = (activityId: string, picks: HeartBandPicks): void =>
-  updateStoredSettings((stored) => ({ ...stored, heartBands: { ...stored.heartBands, [activityId]: picks } }));
 
 /** Seuil fixé pour une activité, hors composant (résumés de la bibliothèque) ; `undefined` sans réglage ni pré-réglage. */
 export const effectiveThresholdOverride = (activity: Activity): number | undefined =>
@@ -285,91 +270,6 @@ const visibility = createJsonSelector<Visibility>(
 
 /** Ce qui est visible, suivi en direct : la barre change dès que Réglages cache ou ré-affiche. */
 export const useVisibility = (): Visibility => useSyncExternalStore(visibility.subscribe, visibility.get);
-
-/** Séances du compteur : celles gardées, et celle à proposer (la dernière lancée, sinon la séance par défaut). */
-export interface IntervalSettings {
-  presets: IntervalPreset[];
-  last: IntervalWorkout;
-}
-
-/** Où chaque genre range ses séances : sa liste, sa dernière lancée, et ce qu'il a avant tout choix. */
-const WORKOUT_STORE = {
-  fractionne: { presets: 'intervalPresets', last: 'lastIntervalWorkout', defaults: DEFAULT_INTERVAL_PRESETS, defaultLast: DEFAULT_INTERVAL_WORKOUT },
-  timer: { presets: 'timerPresets', last: 'lastTimerWorkout', defaults: [] as IntervalPreset[], defaultLast: DEFAULT_TIMER_WORKOUT },
-} as const satisfies Record<WorkoutKind, {
-  presets: keyof StoredSettings; last: keyof StoredSettings; defaults: IntervalPreset[]; defaultLast: IntervalWorkout;
-}>;
-
-const storedPresets = (stored: StoredSettings, kind: WorkoutKind): IntervalPreset[] =>
-  sanitizePresets(stored[WORKOUT_STORE[kind].presets] ?? WORKOUT_STORE[kind].defaults);
-
-const writePresets = (kind: WorkoutKind, change: (presets: IntervalPreset[]) => IntervalPreset[]): void => {
-  const stored = readStoredSettings();
-  const presets = storedPresets(stored, kind);
-  const next = change(presets);
-  if (next !== presets) writeStored({ ...stored, [WORKOUT_STORE[kind].presets]: next });
-};
-
-/** Séances de chaque genre, rendues telles quelles tant que leur texte ne change pas (`useSyncExternalStore` compare les références). */
-const intervalSettings: Record<WorkoutKind, JsonSelector<IntervalSettings>> = {
-  fractionne: createJsonSelector(STORAGE_KEY, () => readIntervalSettings('fractionne')),
-  timer: createJsonSelector(STORAGE_KEY, () => readIntervalSettings('timer')),
-};
-
-const readIntervalSettings = (kind: WorkoutKind): IntervalSettings => {
-  const stored = readStoredSettings();
-  return { presets: storedPresets(stored, kind), last: sanitizeWorkout(stored[WORKOUT_STORE[kind].last]) ?? WORKOUT_STORE[kind].defaultLast };
-};
-
-/** Séances du compteur d'un genre (Fractionné ou Timer), suivies en direct. */
-export const useIntervalSettings = (kind: WorkoutKind): IntervalSettings =>
-  useSyncExternalStore(intervalSettings[kind].subscribe, intervalSettings[kind].get);
-
-/** Retient la séance lancée, proposée au prochain lancement de son genre. */
-export const rememberIntervalWorkout = (kind: WorkoutKind, workout: IntervalWorkout): void => {
-  const stored = readStoredSettings();
-  const field = WORKOUT_STORE[kind].last;
-  const last = sanitizeWorkout(stored[field]);
-  if (!last || !sameWorkout(last, workout)) writeStored({ ...stored, [field]: workout });
-};
-
-/** Garde une séance, sous le nom donné (vide : son libellé) ; sans effet au-delà de `MAX_INTERVAL_PRESETS`. */
-export const saveIntervalPreset = (kind: WorkoutKind, name: string, workout: IntervalWorkout): void =>
-  writePresets(kind, (presets) => addPreset(presets, name, workout));
-
-/** Modifie une séance gardée : son nom (vide : son libellé) et ses blocs ; sans effet si elle n'existe plus ou n'est pas valable. */
-export const updateIntervalPreset = (kind: WorkoutKind, id: string, name: string, workout: IntervalWorkout): void =>
-  writePresets(kind, (presets) => replacePreset(presets, id, name, workout));
-
-/** Retire une séance gardée. */
-export const removeIntervalPreset = (kind: WorkoutKind, id: string): void => writePresets(kind, (presets) => withoutPreset(presets, id));
-
-/** Réglages des tests, rendus tels quels tant que leur texte ne change pas (`useSyncExternalStore` compare les références). */
-const fitnessTestSettings = createJsonSelector<Record<FitnessTestId, FitnessTestSettings>>(STORAGE_KEY, () => {
-  const stored = readStoredSettings().fitnessTests ?? null;
-  return { 'fc-max': sanitizeFitnessTestSettings(stored?.['fc-max'], FITNESS_TESTS['fc-max']) };
-});
-
-/** Réglages d'un test, hors composant (guidage du direct). */
-export const readFitnessTestSettings = (id: FitnessTestId): FitnessTestSettings => fitnessTestSettings.get()[id];
-
-/** Réglages d'un test, suivis en direct. */
-export const useFitnessTestSettings = (id: FitnessTestId): FitnessTestSettings =>
-  useSyncExternalStore(fitnessTestSettings.subscribe, () => fitnessTestSettings.get()[id]);
-
-/** Change les réglages d'un test ; une valeur égale à celle du protocole n'est pas écrite. */
-export const saveFitnessTestSettings = (id: FitnessTestId, patch: Partial<FitnessTestSettings>): void => {
-  const stored = readStoredSettings();
-  const protocol = FITNESS_TESTS[id];
-  const next = sanitizeFitnessTestSettings({ ...readFitnessTestSettings(id), ...patch }, protocol);
-  const own: Partial<FitnessTestSettings> = {};
-  if (next.warmupS !== protocol.warmupS) own.warmupS = next.warmupS;
-  if (next.warmupCeilingBpm !== protocol.warmupCeilingBpm) own.warmupCeilingBpm = next.warmupCeilingBpm;
-  const tests = { ...stored.fitnessTests };
-  if (Object.keys(own).length > 0) tests[id] = own;
-  else delete tests[id];
-  writeStored({ ...stored, fitnessTests: tests });
-};
 
 /** Réglage d'enregistrement effectif d'une activité (`resolveRecordingProfile`). Utilisable hors composant. */
 export const effectiveRecordingProfile = (activity: Activity): RecordingProfile => resolveRecordingProfile(readStoredSettings(), activity);

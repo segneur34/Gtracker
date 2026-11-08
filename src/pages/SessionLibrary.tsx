@@ -17,8 +17,6 @@ import MemoryStatus from '../components/MemoryStatus';
 import RefreshLibraryButton from '../components/RefreshLibraryButton';
 import SessionRenameField from '../components/SessionRenameField';
 import RouteList from '../components/RouteList';
-import TrainingHub from '../components/TrainingHub';
-import { readIntervalSeries } from '../recording/intervalTimer';
 import { sessionColorTrack, sessionSpeedRange, type SessionColorTrack } from '../library/sessionTrack';
 import { drawTrackPreview, thinForPreview, trackPreviewView } from '../components/drawTrackPreview';
 import Button from '../components/ui/Button';
@@ -31,7 +29,7 @@ import { createHeldCache } from '../core/heldCache';
 import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityCounts, sessionActivity, type Activity } from '../core/activities';
 import { smoothHeartRate } from '../core/heartRate';
 import { heartRatePointsFrom } from '../core/heartRateSession';
-import { heartRatePreviewPath, repsDone } from '../land/heartRateSession';
+import { heartRatePreviewPath } from '../land/heartRateSession';
 import { parseGpx } from '../core/gpxParser';
 import { getSportProfile, hasPositions, sportFamily, sportTreatment, type SportFamily } from '../core/sportProfiles';
 import { HEART_RATE_COLOR } from '../components/heartRateColors';
@@ -96,12 +94,10 @@ const formatTime = (ms: number): string =>
 /** Chiffres d'une ligne, selon le traitement de son calcul. */
 const rowStats = (session: LibrarySession, activity: Activity | null): string[] => {
   const { summary } = session.record;
-  // Sans trace (muscu, lot I du 25/10) : durée, FC moyenne et max, répétitions ; ni distance ni vitesse.
+  // Sans trace (muscu, lot I du 25/10) : durée, FC moyenne et max ; ni distance ni vitesse.
   if (session.record.sport !== null && !hasPositions(session.record.sport)) {
     const stats = [formatDuration(summary.endMs - summary.startMs)];
     if (summary.heartRate) stats.push(`FC moy. ${summary.heartRate.avgBpm}`, `FC max ${summary.heartRate.maxBpm}`);
-    const reps = repsDone(readIntervalSeries(session.record.intervals));
-    if (reps > 0) stats.push(`${reps} rép.`);
     return stats;
   }
   const distanceUnit = activity ? effectiveDistanceUnit(activity) : 'km';
@@ -121,9 +117,6 @@ const rowStats = (session: LibrarySession, activity: Activity | null): string[] 
     }
     if (summary.elevationGainM !== null) stats.push(`D+ ${Math.round(summary.elevationGainM)} m`);
   }
-  // Répétitions du compteur, quand la session en a (fractionné).
-  const reps = repsDone(readIntervalSeries(session.record.intervals));
-  if (reps > 0) stats.push(`${reps} rép.`);
   return stats;
 };
 
@@ -697,8 +690,6 @@ function SessionLibrary({ family }: { family: SportFamily }) {
 
       <MemoryStatus compact />
       <OutdatedSummaries />
-      {/* Entraînement : les types d'entraînement en tuiles, avant les sessions (24/10). */}
-      {family === 'fractionne' && <TrainingHub />}
       {helpOpen && (
         <p className="ui-hint ui-hint--m">
           {native

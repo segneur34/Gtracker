@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ACTIVITIES, GRAVEL_ACTIVITY, MARCHE_ACTIVITY, SURF_ACTIVITY, SURF_FOIL_ACTIVITY, VTT_ACTIVITY, baseActivity } from '../core/activities';
-import { DEFAULT_INTERVAL_PRESETS, PRESET_BASES, presetOf } from './activityPresets';
+import { PRESET_BASES, presetOf } from './activityPresets';
 import { kmhToMs, knotsToMs } from '../core/units';
 
 describe('presetOf', () => {
@@ -70,20 +70,20 @@ describe('presetOf', () => {
 });
 
 describe("notification de l'Entraînement (26/10)", () => {
-  it("fractionné à pied, à vélo et tests : l'étape d'office, avec la FC, deux chiffres au plus", () => {
+  it("fractionné à pied, à vélo et tests : la vitesse et la FC (l'étape est partie au lot 302), deux chiffres au plus", () => {
     for (const base of ['run-intervals', 'bike-intervals', 'run-test'] as const) {
-      expect(presetOf(baseActivity(base)).notificationFields).toEqual(['step', 'heartRate']);
+      expect(presetOf(baseActivity(base)).notificationFields).toEqual(['speed', 'heartRate']);
       // Une activité créée sur ces calculs les reprend.
-      expect(presetOf({ id: `a-${base}-2`, base }).notificationFields).toEqual(['step', 'heartRate']);
+      expect(presetOf({ id: `a-${base}-2`, base }).notificationFields).toEqual(['speed', 'heartRate']);
     }
     expect(presetOf(baseActivity('running')).notificationFields).toBeUndefined();
   });
 
-  it('muscu : ceinture d’office, FC et durée en direct, étape et FC dans la notification (lot I du 25/10)', () => {
+  it('muscu : ceinture d’office, FC et durée en direct comme dans la notification (lot I du 25/10)', () => {
     const muscu = presetOf(baseActivity('muscu'));
     expect(muscu.heartRate).toBe(true);
     expect(muscu.liveFields).toEqual(['heartRate', 'heartRateZone', 'averageHeartRate', 'duration']);
-    expect(muscu.notificationFields).toEqual(['step', 'heartRate']);
+    expect(muscu.notificationFields).toEqual(['heartRate', 'duration']);
     expect(muscu.speedRangeMs).toBeUndefined();
     expect(PRESET_BASES).toContain('muscu');
   });
@@ -93,11 +93,5 @@ describe('PRESET_BASES', () => {
   it('liste les calculs qui ont un pré-réglage, voile à la planche comprise, le kite pour ses sauts (05/11)', () => {
     expect(PRESET_BASES).toEqual(expect.arrayContaining(['wingfoil', 'windsurf', 'kite', 'running', 'cycling', 'run-intervals', 'run-test', 'bike-intervals']));
     expect(PRESET_BASES).not.toContain('bateau');
-  });
-});
-
-describe('DEFAULT_INTERVAL_PRESETS', () => {
-  it('trois séances aux identifiants distincts', () => {
-    expect(new Set(DEFAULT_INTERVAL_PRESETS.map((s) => s.id)).size).toBe(3);
   });
 });

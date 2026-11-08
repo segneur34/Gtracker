@@ -28,12 +28,12 @@ import { jsonStore } from './storage';
  * un trou dans la FC, jamais une valeur figée ; la première mesure revenue
  * rend l'état `connected`.
  *
- * Une muscu (lot I du 25/10) n'a pas de service GPS pour tenir l'application
- * écran éteint : `keepBeltAlive` démarre un service au premier plan du greffon
- * (`HeartRateService.java`), avec la notification de l'enregistrement.
+ * Écran éteint, le service au premier plan du GPS de l'enregistrement tient
+ * l'application ; le service de la ceinture seule (muscu sans GPS) est parti
+ * avec l'Entraînement (lot 302).
  *
  * Dans le navigateur, la ceinture d'exemple (`EXAMPLE_BELT`) joue une FC
- * chaque seconde, pour éprouver la muscu au banc ; aucune autre ne s'y connecte.
+ * chaque seconde, pour éprouver au banc le test de FC repos ; aucune autre ne s'y connecte.
  */
 
 export interface HeartRateBelt {
@@ -87,8 +87,6 @@ interface HeartRatePlugin {
   connect(options: { address: string; name: string; random?: boolean }): Promise<void>;
   disconnect(): Promise<void>;
   openBluetoothSettings(): Promise<void>;
-  keepAlive(options: { title: string; text: string }): Promise<void>;
-  stopKeepAlive(): Promise<void>;
   connection(): Promise<{ wanted: boolean; state: BeltState; address?: string }>;
   addListener(event: 'heartRate', listener: (data: { bpm: number; timeMs: number; contact?: boolean }) => void): Promise<PluginListenerHandle>;
   addListener(event: 'status', listener: (data: { state: BeltState; address?: string; random?: boolean }) => void): Promise<PluginListenerHandle>;
@@ -343,29 +341,12 @@ export const releaseBelt = (holder: string): void => {
 };
 
 /**
- * Garde l'application en vie écran éteint pendant une session sans GPS
- * (muscu) : service au premier plan qui pose la notification de
- * l'enregistrement (`title`, `text`), récrite ensuite par
- * `platform/notification.ts`, et tient le processeur éveillé. Dans le
- * navigateur, rien.
- */
-export const keepBeltAlive = async (title: string, text: string): Promise<void> => {
-  if (isNativeApp()) await plugin.keepAlive({ title, text });
-};
-
-/** Arrête le service de `keepBeltAlive`, et sa notification ; sans effet s'il ne tourne pas. */
-export const stopBeltKeepAlive = async (): Promise<void> => {
-  if (isNativeApp()) await plugin.stopKeepAlive().catch(() => undefined);
-};
-
-/**
  * Coupe une connexion que personne ne tient plus : celle d'un enregistrement
  * dont la page a été rechargée (le greffon, lui, est resté connecté).
  */
 export const releaseOrphanedBelt = async (): Promise<void> => {
   if (isNativeApp() && holders.size === 0) {
     await plugin.disconnect().catch(() => undefined);
-    await stopBeltKeepAlive();
   }
 };
 

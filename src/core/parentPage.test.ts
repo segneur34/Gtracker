@@ -21,17 +21,11 @@ describe('parentPage', () => {
     expect(analysisPath('course', null, 'a-marche')).toBe('/course/analyse');
   });
 
-  it("une page de l'Entraînement remonte d'un cran, jusqu'à sa bibliothèque", () => {
-    expect(parentPage('/fractionne/seances', '')).toBe('/fractionne');
-    expect(parentPage('/fractionne/seances/editer', '?id=a')).toBe('/fractionne/seances');
-    expect(parentPage('/fractionne/tests', '')).toBe('/fractionne');
-    // Lot I du 25/10 : les tuiles des tests sont sous « Fractionné et tests ».
-    expect(parentPage('/fractionne/tests/fc-max', '')).toBe('/fractionne/seances');
-    // Lot 301 : le test de FC repos est sous le Profil.
+  it('le test de FC repos remonte au Profil (lot 301) ; les pages retirées de l\'Entraînement, à l\'accueil (lot 302)', () => {
     expect(parentPage('/profil/fc-repos', '')).toBe('/profil');
     expect(parentPage('/profil/fc-repos/', '?vitesse=10')).toBe('/profil');
-    expect(parentPage('/fractionne/timer', '')).toBe('/fractionne');
-    expect(parentPage('/fractionne/timer/editer', '?id=s1')).toBe('/fractionne/timer');
+    expect(parentPage('/fractionne/seances', '')).toBe('/');
+    expect(parentPage('/fractionne/tests/fc-max', '')).toBe('/');
     expect(parentPage('/course/seances', '')).toBe('/');
   });
 
@@ -41,8 +35,8 @@ describe('parentPage', () => {
     expect(parentPage('/tutoriels', '')).toBe('/parametres');
   });
 
-  it('Enregistrer en mode Timer renvoie à la liste du Timer', () => {
-    expect(parentPage('/enregistrer', '?minuterie=1')).toBe('/fractionne/timer');
+  it("Enregistrer renvoie à l'accueil, ancien mode Timer compris (lot 302)", () => {
+    expect(parentPage('/enregistrer', '?minuterie=1')).toBe('/');
     expect(parentPage('/enregistrer', '?activite=a-course')).toBe('/');
   });
 

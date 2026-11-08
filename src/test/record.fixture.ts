@@ -59,7 +59,6 @@ export const statSession = (startMs: number, over: Partial<StatSession> = {}): S
   longestWaveM: null,
   longestFlightS: null,
   flightS: null,
-  reps: 0,
   heartRate: null,
   cadenceSpm: null,
   gear: null,

@@ -10,7 +10,7 @@ import { DEFAULT_ENERGY_PARAMS, runningCostJkgM } from '../running/energy';
 import { sameData } from '../test/sameData';
 import { runSurfSession, surfProfileOf } from '../surfing/surfSession';
 import {
-  EMPTY_LIVE_STATS, LIVE_STATS_DEFAULTS, computeLiveStats, createLiveStatsMemory, heartOnlyLiveStats, liveReferenceSpeedMs, usesActiveAverage, type LiveEnergySetup,
+  EMPTY_LIVE_STATS, LIVE_STATS_DEFAULTS, computeLiveStats, createLiveStatsMemory, liveReferenceSpeedMs, usesActiveAverage, type LiveEnergySetup,
 } from './liveStats';
 import { M_PER_DEG_LAT } from '../test/geo.fixture';
 
@@ -457,22 +457,5 @@ describe("computeLiveStats : moyenne active, comme l'analyse (voile, surf)", () 
     const b = leg(1200, 600, () => 5, 3000 + 50_000).fixes;
     expect(liveReferenceSpeedMs([a, b], wing.maxGapS)).toBeCloseTo(liveReferenceSpeedMs([a], wing.maxGapS), 1);
     expect(liveReferenceSpeedMs([], wing.maxGapS)).toBe(0);
-  });
-});
-
-describe('heartOnlyLiveStats (muscu, lot I du 25/10)', () => {
-  it('FC moyenne pondérée par le temps et temps hors pauses, à 1 Hz comme à 5 Hz ; ni distance ni vitesse', () => {
-    const T = Date.UTC(2026, 9, 28, 18, 0, 0);
-    const seg = (fromS: number, toS: number, stepS: number, bpm: number) =>
-      Array.from({ length: Math.round((toS - fromS) / stepS) + 1 }, (_, k) => ({ timeMs: T + (fromS + k * stepS) * 1000, heartRateBpm: bpm }));
-    const params = SPORT_PROFILES.muscu.heartRate;
-    const at1Hz = heartOnlyLiveStats([seg(0, 60, 1, 100), seg(120, 180, 1, 140)], params);
-    const at5Hz = heartOnlyLiveStats([seg(0, 60, 0.2, 100), seg(120, 180, 0.2, 140)], params);
-    expect(at1Hz.averageHeartRateBpm).toBeCloseTo(120, 6);
-    expect(at5Hz.averageHeartRateBpm).toBeCloseTo(120, 6);
-    expect(at1Hz.movingTimeMs).toBe(120_000);
-    expect(at1Hz.distanceM).toBe(0);
-    expect(at1Hz.averageSpeedMs).toBeNull();
-    expect(heartOnlyLiveStats([], params).averageHeartRateBpm).toBeNull();
   });
 });

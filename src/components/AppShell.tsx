@@ -4,12 +4,9 @@ import { FAMILY_ACCENT, FAMILY_LABEL } from '../core/activities';
 import { parentPage } from '../core/parentPage';
 import type { SportFamily } from '../core/sportProfiles';
 import { formatClock } from '../core/units';
-import { useIntervalTimer } from '../hooks/useIntervalTimer';
 import { useLongPress } from '../hooks/useLongPress';
 import { togglePauseRecording, useRecorderStatus, useRecordingClock, type RecorderStatus } from '../hooks/useRecorder';
 import { effectiveLongPressMs, useVisibility } from '../hooks/useSportSettings';
-import { formatIntervalClock, phaseName } from '../recording/intervalTimer';
-import { TIMER_RECORD_PATH } from '../recording/workoutLists';
 import { setBackNavigator } from '../platform/backButton';
 import { lockOrientation } from '../platform/screen';
 import { IconChart, IconHome, IconPause, IconPlay, IconRoute, IconSettings, IconUser } from './icons';
@@ -65,24 +62,6 @@ const RECORD_PATH = '/enregistrer';
 const PLAN_PATH = '/itineraires';
 const STATISTIQUES: Destination = { to: '/statistiques', label: 'Statistiques', Icon: IconChart, accent: 'var(--ink-2)' };
 const PROFIL: Destination = { to: '/profil', label: 'Profil', Icon: IconUser, accent: 'var(--ink-2)' };
-
-/**
- * Bandeau du compteur sur les autres pages : phase et temps restant, un
- * toucher ramène à Enregistrer (en mode Timer pour une séance du Timer). À
- * part, pour que le rafraîchissement du compteur ne redessine que lui.
- */
-function IntervalBanner() {
-  const { run, state } = useIntervalTimer();
-  if (!run || !state?.phase) return null;
-  const paused = state.status === 'paused';
-  const name = run.kind === 'timer' ? 'Timer' : 'Fractionné';
-  return (
-    <Link to={run.kind === 'timer' ? TIMER_RECORD_PATH : RECORD_PATH} className="shell-banner shell-banner--intervals">
-      <span className="shell-banner__text">{paused ? `${name} en pause` : name} · {phaseName(state.phase)}</span>
-      <span className="num">{formatIntervalClock(state.remainingMs / 1000)}</span>
-    </Link>
-  );
-}
 
 /**
  * Durée de l'enregistrement, seule abonnée à l'horloge : chaque position la
@@ -236,7 +215,6 @@ function AppShell() {
             <RecordingClock />
           </Link>
         )}
-        {pathname !== RECORD_PATH && <IntervalBanner />}
         <IncomingFileNotice />
       </div>
 

@@ -1,7 +1,6 @@
 import { isObject } from './basics';
 import {
-  SPORT_FAMILIES, SPORT_PROFILES, TRAINING_KINDS, TRAINING_KIND_LABEL, isIntervalSport, isSportType, sportFamily, sportTreatment, trainingKind,
-  type SportFamily, type TrainingKind, type Treatment,
+  SPORT_FAMILIES, SPORT_PROFILES, isSportType, sportFamily, sportTreatment, type SportFamily, type Treatment,
 } from './sportProfiles';
 import type { SportType } from './types';
 import { isActivityIconId, type ActivityIconId } from './activityIcons';
@@ -221,28 +220,25 @@ export const activityTreatment = (activity: Activity): Treatment => sportTreatme
 export const activitiesOfFamily = (activities: Activity[], family: SportFamily): Activity[] =>
   activities.filter((a) => activityFamily(a) === family);
 
-/** Types d'entraînement présents parmi ces activités, dans l'ordre de `TRAINING_KINDS`. */
-export const trainingKindsOf = (activities: readonly Activity[]): TrainingKind[] =>
-  TRAINING_KINDS.filter((kind) => activities.some((a) => trainingKind(a.base) === kind));
-
 /**
- * Nom d'une activité sous son type d'entraînement : sans le nom du type en
- * tête (« Fractionné à pied » → « à pied » sous « Fractionné »), ou entier
- * s'il ne commence pas par lui.
+ * Familles retirées de cette version voile et surf (lot 302) : l'Entraînement
+ * n'a plus de pages ; l'identifiant reste dans les types (lot 305), mais la
+ * famille est toujours cachée : accueil, barre, Statistiques, Enregistrer et
+ * Réglages ne la proposent plus. Ses sessions déjà rangées restent lisibles.
  */
-export const kindActivityLabel = (activity: Activity, kind: TrainingKind): string => {
-  const prefix = TRAINING_KIND_LABEL[kind];
-  const rest = activity.name.slice(prefix.length).trim();
-  return activity.name.toLowerCase().startsWith(prefix.toLowerCase()) && rest !== '' ? rest : activity.name;
-};
+export const RETIRED_FAMILIES: readonly SportFamily[] = ['fractionne'];
+
+/** Familles proposées dans cette version, dans l'ordre de `SPORT_FAMILIES`. */
+export const ACTIVE_FAMILIES: SportFamily[] = SPORT_FAMILIES.filter((f) => !RETIRED_FAMILIES.includes(f));
 
 /**
- * Famille cachée (§10, point 100) : cachée dans Réglages, ou sans activité
- * visible, qu'elles soient toutes cachées ou qu'elle n'en ait aucune (choix de
- * l'utilisateur). Une activité ajoutée dans Réglages la fait revenir.
+ * Famille cachée (§10, point 100) : retirée de cette version, cachée dans
+ * Réglages, ou sans activité visible, qu'elles soient toutes cachées ou
+ * qu'elle n'en ait aucune (choix de l'utilisateur). Une activité ajoutée dans
+ * Réglages la fait revenir.
  */
 export const isFamilyHidden = (activities: Activity[], hiddenFamilies: readonly SportFamily[], family: SportFamily): boolean =>
-  hiddenFamilies.includes(family) || activitiesOfFamily(activities, family).every((a) => a.hidden);
+  RETIRED_FAMILIES.includes(family) || hiddenFamilies.includes(family) || activitiesOfFamily(activities, family).every((a) => a.hidden);
 
 /** Familles visibles, dans l'ordre de `families` (toutes par défaut). */
 export const visibleFamilies = (
@@ -255,20 +251,6 @@ export const visibleFamilies = (
  */
 export const isActivityShown = (activity: Activity, activities: Activity[], hiddenFamilies: readonly SportFamily[]): boolean =>
   !activity.hidden && !isFamilyHidden(activities, hiddenFamilies, activityFamily(activity));
-
-/**
- * Activité de fractionné proposée pour une sortie à pied ou à vélo faite avec
- * le compteur d'intervalles (19/10) : la première de `candidates` (les
- * activités visibles de l'Entraînement) sur un calcul de fractionné, au même
- * traitement, à pied ou à vélo. `null` pour une session déjà en Entraînement,
- * en voile ou en surf, ou sans activité qui convienne : rien à demander.
- */
-export const intervalActivityFor = (activity: Activity, candidates: readonly Activity[]): Activity | null => {
-  if (activityFamily(activity) === 'fractionne') return null;
-  const treatment = activityTreatment(activity);
-  if (treatment !== 'course' && treatment !== 'velo') return null;
-  return candidates.find((a) => isIntervalSport(a.base) && activityTreatment(a) === treatment) ?? null;
-};
 
 /** Activité cachée ou ré-affichée ; une activité visible ne porte pas le champ. */
 export const withHidden = (activity: Activity, hidden: boolean): Activity => {

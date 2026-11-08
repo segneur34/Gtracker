@@ -1,5 +1,5 @@
 import { isObject } from './basics';
-import { isIntervalSport, isTestSport, sportTreatment, type SportProfile, type Treatment } from './sportProfiles';
+import { sportTreatment, type SportProfile, type Treatment } from './sportProfiles';
 
 /**
  * Onglets des analyses, par module, dans l'ordre de leur barre. Chaque
@@ -47,7 +47,7 @@ export const SAILING_TABS: AnalysisTab<SailingTab>[] = [
   { key: 'reglages', label: 'réglages' },
 ];
 
-export type LandTab = 'general' | 'fractionne' | 'test' | 'tops' | 'zones' | 'surface' | 'energie' | 'graphiques' | 'cardio' | 'cadence' | 'sauts' | 'notes' | 'reglages';
+export type LandTab = 'general' | 'tops' | 'zones' | 'surface' | 'energie' | 'graphiques' | 'cardio' | 'cadence' | 'sauts' | 'notes' | 'reglages';
 
 /**
  * Course et vélo : « tops » est natif à vélo, générique à pied (course, marche).
@@ -56,9 +56,6 @@ export type LandTab = 'general' | 'fractionne' | 'test' | 'tops' | 'zones' | 'su
  */
 const landTabs = (topsGeneric: boolean, cadence: boolean): AnalysisTab<LandTab>[] => [
   { key: 'general', label: 'général', primary: true },
-  { key: 'fractionne', label: 'fractionné', primary: true },
-  // Seulement pour une session qui a son test guidé (`record.test`).
-  { key: 'test', label: 'test', primary: true },
   topsGeneric ? { key: 'tops', label: 'tops', generic: true } : { key: 'tops', label: 'tops' },
   { key: 'graphiques', label: 'graphiques' },
   { key: 'cardio', label: 'cardio' },
@@ -117,13 +114,12 @@ const TREATMENT_TABS: Record<Treatment, readonly AnalysisTab[]> = {
 
 /**
  * Onglets d'un calcul, proposés dans Réglages : « sauts » seulement s'il les mesure (ni bateau ni fractionné),
- * « cadence » de même, « pumping » de même (voile sur foil, pas le bateau), « fractionné » aux seuls calculs
- * de fractionné (19/10), « test » aux seuls calculs de test (24/10).
+ * « cadence » de même, « pumping » de même (voile sur foil, pas le bateau). Les onglets « fractionné » et
+ * « test » sont partis avec l'Entraînement (lot 302).
  */
 export const analysisTabs = (profile: SportProfile): readonly AnalysisTab[] =>
   TREATMENT_TABS[sportTreatment(profile.id)].filter((tab) => (tab.key !== 'sauts' || profile.jumps !== null) && (tab.key !== 'cadence' || profile.cadence !== null)
-    && (tab.key !== 'pumping' || profile.pump !== null)
-    && (tab.key !== 'fractionne' || isIntervalSport(profile.id)) && (tab.key !== 'test' || isTestSport(profile.id)));
+    && (tab.key !== 'pumping' || profile.pump !== null));
 
 /**
  * Onglets d'une activité proposés dans Réglages › Onglets : ceux de son calcul

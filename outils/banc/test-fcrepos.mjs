@@ -1,8 +1,8 @@
-// Banc de test : test de FC repos de l'Entraînement (24/10).
+// Banc de test : test de FC repos (24/10), sous le Profil depuis le lot 301.
 // Usage : node test-fcrepos.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Pas de ceinture dans le navigateur : la page joue une FC d'exemple
 // (`exampleRestingHr`), à ×1 pour le décompte et la mesure, à ×30 (`?vitesse=30`) pour le test entier. Le script vérifie :
-//  1. la tuile « FC repos » dans Tests, la page (déroulé, aucun GPS demandé) ;
+//  1. le lien « Test de FC repos » du Profil, la page (déroulé, aucun GPS demandé) ;
 //  2. à ×1 : le décompte de préparation, la mesure (courbe qui se remplit, FC lue), « Annuler » qui ne garde rien ;
 //  3. à ×30 : les bips (un court, un long), le résultat (moyenne de 30 s la plus basse après la première minute, comparée à un calcul
 //     refait ici sur la même FC d'exemple), la fenêtre surlignée, la courbe de 180 secondes, le test gardé ;
@@ -60,13 +60,11 @@ const openHelp = async (label) => {
 
 await blockNetwork(['https://*']);
 
-// --- 1. Tuile et page ---
-await go('/fractionne/seances');
-const tiles = await evaluate(`[...document.querySelectorAll('.train-hub[aria-label="Tests"] .ui-subtitle')].map((n) => n.textContent).join(', ')`);
-check('liste des tests : FC max, FC repos', tiles === 'FC max, FC repos', tiles);
-console.log('tuile :', await clickText('FC repos', '.train-tile'));
+// --- 1. Lien du Profil et page ---
+await go('/profil');
+console.log('lien :', await clickText('Test de FC repos', '.profile-head__link'));
 await wait(1000);
-check('page du test', (await evaluate('location.pathname')) === '/fractionne/tests/fc-repos', await evaluate('location.pathname'));
+check('page du test', (await evaluate('location.pathname')) === '/profil/fc-repos', await evaluate('location.pathname'));
 check('« ? » du déroulé', await openHelp('Déroulé'), '');
 const text = await pageText();
 check('déroulé : 10 s, 3 min, bip court puis long, moyenne de 30 s après 60 s', /10 s pour vous poser, puis un bip court/.test(text) && /3 min/.test(text) && /bip long à la fin/.test(text) && /moyenne de 30 s la plus basse après les 60 premières secondes/.test(text), '');
@@ -92,7 +90,7 @@ check('annulé : retour au début, rien de gardé', /Essayer avec une FC d'exemp
 
 // --- 3. À ×30 : le test entier ---
 sounds = [];
-await go('/fractionne/tests/fc-repos?vitesse=30');
+await go('/profil/fc-repos?vitesse=30');
 console.log('exemple ×30 :', await clickText("Essayer avec une FC d'exemple"));
 await wait(9500);
 check('« ? » du résultat', await openHelp('Résultat'), '');
@@ -133,9 +131,9 @@ check('test retiré', (await stored()).length === 0 && !/Vos tests/i.test(await 
 // --- 5. Téléphone ---
 for (const [w, h] of [[390, 844], [320, 640]]) {
   await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 2, mobile: true });
-  await go('/fractionne/tests', 1500);
-  check(`${w} px : /fractionne/tests sans débordement`, (await overflow()) <= 0, `${await overflow()} px`);
-  await go('/fractionne/tests/fc-repos?vitesse=30', 1800);
+  await go('/profil', 1500);
+  check(`${w} px : /profil sans débordement`, (await overflow()) <= 0, `${await overflow()} px`);
+  await go('/profil/fc-repos?vitesse=30', 1800);
   check(`${w} px : page du test sans débordement`, (await overflow()) <= 0, `${await overflow()} px`);
   await clickText("Essayer avec une FC d'exemple");
   await wait(9500);

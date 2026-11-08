@@ -72,22 +72,6 @@
 
         </activity>
 
-        <!-- Compteur du fractionné : bips à l'heure dite, écran éteint, avec ou sans enregistrement (IntervalTimerService). -->
-        <service
-            android:name=".IntervalTimerService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Compteur de fractionné : bips à heure fixe, écran éteint" />
-        </service>
-
-        <!-- Muscu : session sans GPS tenue écran éteint par la ceinture cardio (HeartRateService). -->
-        <service
-            android:name=".HeartRateService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
-
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -109,9 +93,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Vibrations du guidage vers les balises (BeeperPlugin) : permission normale, sans demande. -->
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- Compteur du fractionné : service au premier plan, processeur éveillé, notification de la phase. -->
+    <!-- Enregistrement : service GPS au premier plan (déclaré par son greffon), processeur éveillé, notification lisible
+         écran verrouillé (RecordingNotificationPlugin). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Ceinture cardio (HeartRatePlugin) : recherche et connexion Bluetooth, sans en tirer de position. -->
@@ -120,8 +104,6 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
-    <!-- Muscu : service au premier plan de la ceinture (HeartRateService), type « appareil connecté ». -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <!-- Carte « Autorisations » (PermissionsPlugin) : l'écran système qui lève l'optimisation de la batterie. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Déclarée par le greffon GPS et par androidx.work, sans usage ici (récepteur retiré plus haut). -->

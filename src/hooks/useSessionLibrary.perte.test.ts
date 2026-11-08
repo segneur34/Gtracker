@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RECORD_FORMAT, RECORD_READER_VERSION, SUMMARY_CALC_VERSION, serializeRecord, type SessionRecord } from '../library/record';
 import { bundleSessionGpx } from '../library/sessionBundle';
 import type { MemoryFolder } from '../platform/memoryFolder';
-import type { SessionTest } from '../recording/fitnessTest';
 import { sessionFileName } from '../recording/session';
 import { gpxAt, settle, tick, trackTestTimers, underFakeClock } from '../test/library.fixture';
 import { createFakeFolder } from '../test/memoryFolder.fixture';
@@ -182,38 +181,17 @@ afterEach(() => {
 
 /** Ce que l'enregistrement apporte à la fiche et que le GPX ne dit pas. */
 const START = startOf(0);
-const INTERVALS = [{
-  workout: { reps: 1, workS: 10, restS: 5 },
-  laps: [{ kind: 'travail' as const, rep: 1, startMs: START, endMs: START + 10_000 }],
-}];
 const MARKS = [{ timeMs: START + 10_000, lat: 43.6003, lon: 3.8, label: 'Bouée' }];
-const TEST: SessionTest = {
-  protocol: 'fc-max',
-  version: 1,
-  settings: { warmupS: 480, age: 35, ageSource: 'profil', lowBpm: 110, highBpm: 147, zoneMethod: 'max' },
-  startMs: START,
-  rampStartMs: START + 5_000,
-  v0Ms: 2.5,
-  steps: [{ startMs: START + 5_000, targetMs: 2.5 }],
-  rampEndMs: null,
-  dropMs: null,
-  endReason: null,
-  endMs: null,
-  signals: [{ t: START, s: 'debut' }],
-};
-
 const expectRecordingFields = (record: Record<string, unknown> | undefined): void => {
   expect(record?.activityId).toBe('a-marche');
   expect(record?.marks).toEqual(MARKS);
-  expect(record?.intervals).toEqual(INTERVALS);
-  expect(record?.test).toEqual(TEST);
   expect((record?.analysis as { foil?: boolean } | null)?.foil).toBe(true);
 };
 
 const saveOffline = async (): Promise<string> => {
   opened = 'none';
   const offline = await openFresh();
-  await offline.saveRecordedSession(gpxAt(0), 'running', 'a-marche', INTERVALS, new Uint8Array([1]), MARKS, true, TEST);
+  await offline.saveRecordedSession(gpxAt(0), 'running', 'a-marche', new Uint8Array([1]), MARKS, true);
   return sessionFileName(START, 'running');
 };
 
@@ -258,7 +236,7 @@ describe('session enregistrée sans dossier accessible (1)', () => {
 });
 
 describe('application tuée entre le GPX et sa fiche (3)', () => {
-  it('« Analyser » repris complète la fiche que le balayage a créée : activité, repères, séances, test, foil', async () => {
+  it('« Analyser » repris complète la fiche que le balayage a créée : activité, repères, foil', async () => {
     files.set('sessions/sortie.gpx', gpxAt(0));
     const library = await openFresh();
     await settle(library);
@@ -266,7 +244,7 @@ describe('application tuée entre le GPX et sa fiche (3)', () => {
 
     let location = '';
     await afterWrites(async () => {
-      location = (await library.saveRecordedSession(gpxAt(0), 'running', 'a-marche', INTERVALS, null, MARKS, true, TEST)).location;
+      location = (await library.saveRecordedSession(gpxAt(0), 'running', 'a-marche', null, MARKS, true)).location;
       expectRecordingFields(library.librarySession('sortie.gpx')?.record as unknown as Record<string, unknown>);
     });
     expect(location).toBe('déjà dans la mémoire');
@@ -365,7 +343,7 @@ describe('session déjà présente dont la fiche ne se relit pas (5c)', () => {
 
   it("garde le journal de l'enregistreur, et une session en attente, pour un autre essai", async () => {
     const library = await openPartial();
-    await expect(library.saveRecordedSession(gpxAt(0), 'running', 'a-marche', [], null, MARKS)).rejects.toThrow('fiche');
+    await expect(library.saveRecordedSession(gpxAt(0), 'running', 'a-marche', null, MARKS)).rejects.toThrow('fiche');
 
     const name = await saveOffline();
     opened = 'folder';

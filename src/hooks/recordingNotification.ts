@@ -1,12 +1,8 @@
-import { hasPositions } from '../core/sportProfiles';
 import { clearRecordingNotification, updateRecordingNotification } from '../platform/notification';
-import { intervalStepAt, timerStateAt } from '../recording/intervalTimer';
 import { travelHeading } from '../recording/heading';
 import type { LiveFieldContext } from '../recording/liveFields';
-import { liveNotification, liveNotificationKey, notificationStateKey, trainingStep } from '../recording/liveNotification';
+import { liveNotification, liveNotificationKey, notificationStateKey } from '../recording/liveNotification';
 import { displayedDurationMs } from '../recording/session';
-import { getFitnessTestView } from './useFitnessTest';
-import { getIntervalRun, subscribeToIntervalCommands } from './useIntervalTimer';
 import { getLiveRecording, liveStatsOptionsFor, subscribeToLiveRecording } from './useLiveRecording';
 import { getMarkGuideView } from './useMarkGuide';
 import { getLiveFixes, getRecorderState, subscribeToFixes, subscribeToRecorder } from './useRecorder';
@@ -22,19 +18,14 @@ import { effectiveDistanceUnit, effectiveNotificationFields, effectiveSpeedUnit 
  *
  * Rythme : à l'arrivée des positions et des recalculs du direct, au plus
  * toutes les `MIN_UPDATE_MS`, et seulement si le texte change ; tout de suite
- * à un changement d'état (pause, reprise, pause automatique, GPS perdu ou revenu, FC perdue ou revenue, activité), de
- * phase du compteur du fractionné, et au premier calcul du direct. Le chronomètre d'Android fait tourner la
- * durée, ou le décompte de la phase, entre deux envois.
+ * à un changement d'état (pause, reprise, pause automatique, GPS perdu ou revenu, FC perdue ou revenue, activité),
+ * et au premier calcul du direct. Le chronomètre d'Android fait tourner la durée entre deux envois.
  *
  * Le service GPS pose sa propre notification à son démarrage, au départ : la
  * première position qui suit la fait récrire. En pause manuelle, le service tourne encore (la carte du
  * direct suit le coureur, lot 104) mais ses positions ne viennent pas ici : la
  * notification « en pause » est posée seule, figée ; elle est effacée à
  * l'arrêt de l'enregistrement.
- *
- * Sans position (muscu, lot I du 25/10), c'est le service de la ceinture
- * (`keepBeltAlive`) qui la pose au départ, sur le même numéro : la première
- * mesure gardée qui suit la fait récrire, comme la première position.
  */
 
 /** Intervalle minimal entre deux envois sans changement d'état, en millisecondes. */
@@ -43,7 +34,7 @@ const MIN_UPDATE_MS = 5000;
 /** Dernier envoi : sa clé et son instant. */
 let sentKey: string | null = null;
 let sentAtMs = 0;
-/** État du dernier envoi (pause, activité, phase du compteur) : un changement part tout de suite. */
+/** État du dernier envoi (pause, activité) : un changement part tout de suite. */
 let sentStateKey: string | null = null;
 /** Une notification de l'application est peut-être affichée. */
 let shown = false;
@@ -68,18 +59,15 @@ const update = (force: boolean) => {
     return;
   }
   const nowMs = Date.now();
-  const run = getIntervalRun();
-  const timer = run ? timerStateAt(run, nowMs) : null;
   const live = getLiveRecording();
   // État qui commande un envoi immédiat ; les premiers chiffres du direct aussi.
   const stateKey = notificationStateKey({
-    status, pausedReason: recorder.pausedReason, gpsLost: recorder.gpsLost, beltLost: recorder.beltLost, activityId: activity.id, timer, computed: live.updatedMs !== null,
+    status, pausedReason: recorder.pausedReason, gpsLost: recorder.gpsLost, beltLost: recorder.beltLost, activityId: activity.id, computed: live.updatedMs !== null,
   });
   if (!force && stateKey === sentStateKey && nowMs - sentAtMs < MIN_UPDATE_MS) return;
 
   const fields = effectiveNotificationFields(activity);
   const mark = getMarkGuideView();
-  const counterActive = timer !== null && (timer.status === 'running' || timer.status === 'paused');
   const context: LiveFieldContext = {
     speedUnit: effectiveSpeedUnit(activity),
     distanceUnit: effectiveDistanceUnit(activity),
@@ -95,7 +83,6 @@ const update = (force: boolean) => {
     markBearingDeg: mark.active ? mark.bearingDeg : null,
     heartRateBpm: recorder.heartRate?.bpm ?? null,
     heartRateZoneBounds: fields.includes('heartRateZone') ? readHeartRateZoneBounds(activity) : null,
-    step: fields.includes('step') ? trainingStep(run && counterActive ? intervalStepAt(run, nowMs) : null, getFitnessTestView()) : null,
   };
   const paused = status === 'paused' ? recorder.pausedReason ?? 'auto' : null;
   const content = liveNotification({
@@ -106,8 +93,6 @@ const update = (force: boolean) => {
     gpsLost: recorder.gpsLost,
     beltLost: recorder.beltLost,
     startedAtMs: recorder.stats.firstMs,
-    interval: timer?.phase && run && counterActive ? { state: timer } : null,
-    nowMs,
   });
   const standalone = paused === 'manual';
   const key = liveNotificationKey(content, standalone);
@@ -120,14 +105,11 @@ const update = (force: boolean) => {
 };
 
 const onRecorder = () => {
-  const { status, pausedReason, activity, stats } = getRecorderState();
+  const { status, pausedReason, stats } = getRecorderState();
   // Départ : le service GPS va poser sa notification (il reste allumé pendant une pause manuelle, lot 104).
   if (status === 'recording' && previous.status === 'starting') rewriteOnFix = true;
-  // Sans position, une mesure de la ceinture gardée tient lieu de position.
-  const measured = activity !== null && !hasPositions(activity.base) && stats.pointCount > previous.pointCount;
   previous = { status, pausedReason, pointCount: stats.pointCount };
-  if (measured) onFix();
-  else update(false);
+  update(false);
 };
 
 const onFix = () => {
@@ -149,7 +131,6 @@ export const startRecordingNotification = (): void => {
   subscribeToRecorder(onRecorder);
   subscribeToFixes(onFix);
   subscribeToLiveRecording(() => update(false));
-  subscribeToIntervalCommands(() => update(false));
   if (getRecorderState().status === 'idle') {
     shown = true;
     clear();

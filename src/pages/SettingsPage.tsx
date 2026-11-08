@@ -1,6 +1,6 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type ReactNode } from 'react';
 import {
-  FAMILY_ACCENT, FAMILY_LABEL, FAMILY_SHADES, activitiesOfFamily, activityFamily, isFamilyHidden, nextActivityColor, visibleActivities, visibleFamilies,
+  ACTIVE_FAMILIES, FAMILY_ACCENT, FAMILY_LABEL, FAMILY_SHADES, activitiesOfFamily, activityFamily, isFamilyHidden, nextActivityColor, visibleActivities, visibleFamilies,
   type Activity,
 } from '../core/activities';
 import {
@@ -676,7 +676,7 @@ const ActivityCard = memo(function ActivityCard({
             </SettingRow>}
             {positions && <FieldsSetting label="Carte réduite à l'enregistrement" helpKey={`${id}:carte-reduite`}
               help="Les chiffres en grand quand la carte est réduite, de haut en bas."
-              treatment={treatment} family={family} units={fieldUnits} fields={s.liveFields} overridden={s.isLiveFieldsOverridden}
+              treatment={treatment} units={fieldUnits} fields={s.liveFields} overridden={s.isLiveFieldsOverridden}
               defaults={defaultLiveFieldsFor(activity)} max={MAX_LIVE_FIELDS}
               onChange={(fields) => setFor(id, 'liveFields', fields)} />}
             {s.jumps !== null && (
@@ -712,8 +712,8 @@ const ActivityCard = memo(function ActivityCard({
             <div className="settings-part__sub">
               <h4 className="settings-part__subtitle">Notification</h4>
               <FieldsSetting label="Chiffres de la notification" helpKey={`${id}:notification`}
-                help="Deux chiffres au plus, lisibles écran verrouillé avec le nom de l'activité et la durée. « Étape » : la répétition du compteur en cours sur toutes celles de la séance (5/20), ou le palier d'un test. Le téléphone doit montrer le contenu des notifications sur l'écran verrouillé."
-                target="notification" treatment={treatment} family={family} units={fieldUnits} fields={s.notificationFields} overridden={s.isNotificationFieldsOverridden}
+                help="Deux chiffres au plus, lisibles écran verrouillé avec le nom de l'activité et la durée. Le téléphone doit montrer le contenu des notifications sur l'écran verrouillé."
+                target="notification" treatment={treatment} units={fieldUnits} fields={s.notificationFields} overridden={s.isNotificationFieldsOverridden}
                 defaults={defaultNotificationFieldsFor(activity)} max={MAX_NOTIFICATION_FIELDS}
                 onChange={(fields) => setFor(id, 'notificationFields', fields)} />
             </div>
@@ -787,10 +787,10 @@ function SettingsPage() {
     setRenaming(null);
   };
   /**
-   * Activités rangées par famille (Voile, À pied, Vélo, Fractionné, Surf), chacune dans l'ordre de
+   * Activités rangées par famille (Voile, À pied, Vélo, Surf ; l'Entraînement est retiré), chacune dans l'ordre de
    * la liste, les cachées en bas de leur famille (§10, point 100).
    */
-  const familyOrdered = SPORT_FAMILIES.flatMap((f) => {
+  const familyOrdered = ACTIVE_FAMILIES.flatMap((f) => {
     const own = activitiesOfFamily(activities, f);
     return [...own.filter((a) => !a.hidden), ...own.filter((a) => a.hidden)];
   });
@@ -907,7 +907,7 @@ function SettingsPage() {
               value={stopHoldMs / 1000}
               onCommit={(v) => setStopHoldMs(v === null ? null : Math.round(v * 1000))} />
             <SettingRow label="Son des bips" helpKey="son-bips"
-              help="Pour tous les bips : compteur d'intervalles, balises, tests. Un haut-parleur de téléphone porte le mieux vers l'aigu ; plus grave, le bip s'entend moins fort. « Écouter » joue le signal d'un changement de phase.">
+              help="Pour tous les bips : balises, zone visée, FC repos. Un haut-parleur de téléphone porte le mieux vers l'aigu ; plus grave, le bip s'entend moins fort. « Écouter » joue le signal d'un changement de phase.">
               <div className="settings-inline">
                 <SegmentedControl label="Son des bips" items={BEEP_SOUNDS.map((s) => ({ key: s.key, label: s.label }))} value={beepSound}
                   onChange={(next) => { setBeepSound(next); void setBeepPitch(beepSoundHz(next)).then(() => playPattern(LISTEN_PATTERN, false)); }} />
@@ -1073,14 +1073,13 @@ const thresholdHelp = (treatment: Treatment, foil: boolean): string => {
  * premier toujours rempli ; un chiffre déjà placé n'est pas proposé ailleurs.
  * La liste est rangée sans trou ; revenue au défaut, elle est effacée.
  */
-function FieldsSetting({ label, help, helpKey, target = 'live', treatment, family, units, fields, overridden, defaults, max, onChange }: {
+function FieldsSetting({ label, help, helpKey, target = 'live', treatment, units, fields, overridden, defaults, max, onChange }: {
   label: string;
   help: string;
   helpKey: string;
   /** Carte réduite (par défaut) ou notification, qui a ses chiffres à elle. */
   target?: LiveFieldTarget;
   treatment: Treatment;
-  family: SportFamily;
   units: LiveFieldUnits;
   fields: LiveFieldKey[];
   overridden: boolean;
@@ -1088,7 +1087,7 @@ function FieldsSetting({ label, help, helpKey, target = 'live', treatment, famil
   max: number;
   onChange: (fields: LiveFieldKey[] | null) => void;
 }) {
-  const options = liveFieldsOfTreatment(treatment, target, family);
+  const options = liveFieldsOfTreatment(treatment, target);
   const slots = Array.from({ length: max }, (_, i) => fields[i] ?? null);
   const pick = (slot: number, key: LiveFieldKey | null) => {
     const next = slots.map((k, i) => (i === slot ? key : k)).filter((k): k is LiveFieldKey => k !== null);
@@ -1344,7 +1343,7 @@ function AddActivityForm({
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
       <select value={family} onChange={(e) => pickFamily(e.target.value as SportFamily)} aria-label="Famille" className="ui-field ui-field--s">
-        {SPORT_FAMILIES.map((f) => <option key={f} value={f}>{FAMILY_LABEL[f]}</option>)}
+        {ACTIVE_FAMILIES.map((f) => <option key={f} value={f}>{FAMILY_LABEL[f]}</option>)}
       </select>
       {familySports(family).length > 1 && (
         <label className="ui-inline-row-6 ui-center">

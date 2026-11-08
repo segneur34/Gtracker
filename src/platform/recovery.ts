@@ -8,25 +8,24 @@ import { isNativeApp } from './runtime';
  * échoue, aucun : la reprise silencieuse n'a jamais lieu sur un doute.
  */
 
-/** Services au premier plan vus vivants : GPS, et ceinture sans position (muscu). */
+/** Services au premier plan vus vivants : le GPS (le service de la ceinture seule est parti avec la muscu, lot 302). */
 export interface RecoveryServices {
   gps: boolean;
-  belt: boolean;
 }
 
 interface RecoveryPlugin {
-  state(): Promise<RecoveryServices>;
+  state(): Promise<{ gps?: boolean }>;
 }
 
 const plugin = registerPlugin<RecoveryPlugin>('Recovery');
 
 export const readRecoveryServices = async (): Promise<RecoveryServices> => {
-  if (!isNativeApp()) return { gps: false, belt: false };
+  if (!isNativeApp()) return { gps: false };
   try {
-    const { gps, belt } = await plugin.state();
-    return { gps: gps === true, belt: belt === true };
+    const { gps } = await plugin.state();
+    return { gps: gps === true };
   } catch (err) {
     console.warn('Services de l\'enregistrement illisibles', err);
-    return { gps: false, belt: false };
+    return { gps: false };
   }
 };

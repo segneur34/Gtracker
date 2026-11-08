@@ -161,6 +161,7 @@ describe('import d\'un fichier de réglages complet avec une famille inconnue (g
     const stored = importFile(fullSportSettings());
     // Ce que l'application entière range à terre est encore là : rien n'est filtré à l'import, seulement à la lecture.
     expect(stored.bikeTypes).toEqual({ cycling: 'gravel' });
-    expect(stored.intervalPresets).toHaveLength(1);
+    // Les séances du compteur (parti au lot 302) restent dans le fichier, lues brutes : plus rien ne les lit.
+    expect((stored as Record<string, unknown>).intervalPresets).toHaveLength(1);
   });
 });

@@ -19,7 +19,7 @@
 //  - `releve` : fichiers du dossier de travail ajoutés au relevé ;
 //  - `delaiMin` : délai maximal en minutes (10 par défaut) ;
 //  - `accelerable` : le script lit `TEMPS` (attentes raccourcies, sortie inchangée sous horloge accélérée) :
-//    `compteur-course`, `notes`, `test-fcmax` (29/10), `carte-direct` (31/10) ; les autres scripts `solo` restent à temps réel (LISEZMOI) ;
+//    `notes`, `carte-direct` (31/10) ; les autres scripts `solo` restent à temps réel (LISEZMOI) ;
 //  - `manuel` : raison pour laquelle le lanceur ne sait pas le lancer seul (lancé seulement si nommé, sauf
 //    `{dossierGpx}` : lancé avec `--gpx`).
 
@@ -48,21 +48,17 @@ export const SCRIPTS = [
   { nom: 'carte-perf', args: ['{port}', '{travail}', '{captures?}'], pages: ['course', 'bibliotheque'], sansCache: true, delaiMin: 15 },
   // Le fond de carte revient seul après une veille : tuiles coupées, cases en échec, page cachée puis gelée ; relevés détaillés sur la sortie d'erreur.
   { nom: 'carte-reveil', args: ['{port}', '{travail}'], pages: ['course'], solo: true },
-  { nom: 'cardio', args: ['{port}', '{captures?}'], pages: ['course', 'surf', 'fractionne', 'voile', 'reglages', 'statistiques'] },
+  { nom: 'cardio', args: ['{port}', '{captures?}'], pages: ['course', 'surf', 'voile', 'reglages', 'statistiques'] },
   // Sans `Network.enable`, rien n'est bloqué : l'altitude de l'IGN remplace la côte (SCRIPTS.md, « Scripts à revoir »).
   { nom: 'charge', args: ['{port}', '{captures?}'], pages: ['course', 'velo', 'reglages'], reseau: true },
-  { nom: 'chrono', args: ['{port}', '{captures?}'], pages: ['enregistrer'], solo: true },
   { nom: 'classer', args: ['{port}', '{travail}', '{captures?}'], pages: ['bibliotheque', 'course', 'velo'] },
-  { nom: 'compteur-course', args: ['{port}', '{travail}', '{captures?}'], pages: ['enregistrer', 'fractionne', 'course'], solo: true, accelerable: true },
   { nom: 'coquille', args: ['{port}', '{captures?}'], pages: ['voile', 'course', 'velo', 'surf', 'fractionne'] },
   { nom: 'denivele-direct', args: ['{port}', '{travail}', '{captures?}'], pages: ['enregistrer'], solo: true },
   { nom: 'depense', args: ['{port}', '{captures?}'], pages: ['course', 'reglages'] },
   { nom: 'donnees', args: ['{port}', '{travail}', '{captures?}'], pages: ['bibliotheque', 'velo', 'accueil', 'profil'], dev: true },
-  { nom: 'entrainement', args: ['{port}', '{captures?}'], pages: ['fractionne', 'enregistrer', 'reglages', 'accueil'] },
   { nom: 'familles', args: ['{port}', '{captures?}'], pages: ['reglages'] },
   // Mesure (lot 114) : fluidité, ouverture d'une longue voile, seuil changé, zoom d'un graphe, résumés refaits, démarrage ; ×1 puis processeur ralenti ×6, en s ; seul (tâches longues et images par seconde), environ 12 min.
   { nom: 'fluidite', args: ['{port}', '{travail}', '{captures?}'], pages: ['voile', 'course', 'accueil', 'bibliotheque'], solo: true, sansCache: true, delaiMin: 45 },
-  { nom: 'fractionne', args: ['{port}', '{travail}', '{captures?}'], pages: ['fractionne', 'enregistrer', 'reglages', 'accueil'], solo: true },
   { nom: 'general', args: ['{port}', '{captures?}'], pages: ['voile', 'course', 'velo', 'surf'] },
   { nom: 'glisser', args: ['{port}', '{captures?}'], pages: ['profil', 'statistiques'] },
   // GPS perdu (lot 115) : rejeu ×1 avec un trou de 90 s ; alerte, son unique et notification, puis tout effacé au retour.
@@ -84,7 +80,6 @@ export const SCRIPTS = [
   { nom: 'materiel', args: ['{port}', '{captures?}'], pages: ['course', 'velo', 'surf', 'reglages'] },
   { nom: 'materiel-fin', args: ['{port}', '{travail}', '{captures?}'], pages: ['enregistrer', 'course'], solo: true, accelerable: true },
   { nom: 'miseajour', args: ['{port}', '{travail}', '{captures?}'], pages: ['bibliotheque', 'reglages'] },
-  { nom: 'muscu', args: ['{port}', '{captures?}'], pages: ['fractionne'] },
   { nom: 'notes', args: ['{port}', '{travail}', '{captures?}'], pages: ['enregistrer', 'course', 'voile', 'surf'], solo: true, accelerable: true, masques: [heure] },
   { nom: 'notification', args: ['{port}', '{travail}'], pages: ['reglages', 'enregistrer', 'fractionne'], solo: true },
   { nom: 'onglets', args: ['{port}', '{captures?}'], pages: ['course', 'velo', 'surf', 'voile', 'reglages'] },
@@ -119,10 +114,8 @@ export const SCRIPTS = [
   { nom: 'tailles', args: ['{port}', '{travail}', '{captures?}'],
     pages: ['voile', 'course', 'velo', 'surf', 'fractionne', 'enregistrer', 'bibliotheque', 'planification', 'statistiques', 'profil', 'reglages', 'accueil'],
     sansCache: true, releve: ['rapport.md'], delaiMin: 20 },
-  { nom: 'fc-repos', args: ['{port}', '{captures?}'], pages: ['fractionne'], solo: true },
-  { nom: 'test-fcmax', args: ['{port}', '{captures?}'], pages: ['fractionne', 'enregistrer'], solo: true, dev: true, accelerable: true },
-  { nom: 'test-fcrepos', args: ['{port}', '{captures?}'], pages: ['fractionne'], solo: true },
-  { nom: 'timer', args: ['{port}', '{captures?}'], pages: ['fractionne', 'enregistrer'], solo: true },
+  { nom: 'fc-repos', args: ['{port}', '{captures?}'], pages: ['profil'], solo: true },
+  { nom: 'test-fcrepos', args: ['{port}', '{captures?}'], pages: ['profil'], solo: true },
   // Carte du direct sur un itinéraire suivi : hors-piste sans saut, attributs SVG des tracés en plan et en satellite.
   { nom: 'trace-suivie', args: ['{port}', '{travail}', '{captures?}'], pages: ['enregistrer', 'course', 'planification'], solo: true },
   // Tutoriels (lot 147) : carte du jour de l'accueil, leçon, liste, bloc de Réglages ; jours changés par l'heure de la page.

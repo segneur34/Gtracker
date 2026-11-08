@@ -44,7 +44,7 @@ const check = (name, ok, detail = '') => {
 await blockNetwork(['https://*']);
 
 // --- 1. Un test mené à son terme est écrit dans le dossier ---
-await go('/fractionne/tests/fc-repos?vitesse=30');
+await go('/profil/fc-repos?vitesse=30');
 await settle({ max: 3000, label: 'ouverture' });
 console.log('exemple ×30 :', await clickText("Essayer avec une FC d'exemple"));
 await waitFor(`document.querySelector('.rest-result__bpm')`, { timeout: 20000, label: 'résultat' });
@@ -58,7 +58,7 @@ const fileText1 = await readRoot('fc-repos.json');
 // --- 2. Clé de l'appareil vidée, dossier rouvert ---
 await evaluate(`localStorage.removeItem('tracker.restingHr')`);
 check('clé vidée', (await stored()).length === 0, '');
-await go('/fractionne/tests/fc-repos');
+await go('/profil/fc-repos');
 await waitFor(async () => (await stored()).length === 1, { timeout: 8000, label: 'résultats revenus' });
 const back = (await stored())[0];
 check('résultats revenus dans la clé de l\'appareil', back.startedAtMs === first.startedAtMs && back.series.length === first.series.length, '');
@@ -70,7 +70,7 @@ await shoot('fc-repos-revenus');
 // --- 3. Un test d'un autre appareil, posé dans le fichier seulement ---
 const other = { ...first, startedAtMs: first.startedAtMs - 86_400_000, lowestBpm: first.lowestBpm + 3 };
 await writeRoot('fc-repos.json', JSON.stringify({ format: 'tracker-fc-repos', version: 1, results: [first, other] }));
-await go('/fractionne/tests/fc-repos');
+await go('/profil/fc-repos');
 await waitFor(async () => (await stored()).length === 2, { timeout: 8000, label: 'fusion' });
 check('test de l\'autre appareil repris', (await stored()).some((r) => r.startedAtMs === other.startedAtMs), '');
 check('fichier à deux tests', (await fileResults()).length === 2, '');
@@ -83,7 +83,7 @@ check('un test retiré, le fichier n\'en garde qu\'un', (await stored()).length 
 
 // --- 5. Fichier abîmé ---
 await writeRoot('fc-repos.json', '{ cassé');
-await go('/fractionne/tests/fc-repos?vitesse=30');
+await go('/profil/fc-repos?vitesse=30');
 await settle({ max: 3000, label: 'ouverture, fichier abîmé' });
 check('fichier abîmé : liste de l\'appareil gardée', (await stored()).length === 1, '');
 check('fichier abîmé : jamais écrasé', (await readRoot('fc-repos.json')) === '{ cassé', '');

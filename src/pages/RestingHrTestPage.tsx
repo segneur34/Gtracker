@@ -17,7 +17,7 @@ import { BELT_STATE_LABEL } from '../platform/heartRate';
 import { RESTING_HR_TEST, restingRemainingS } from '../recording/restingHrTest';
 import { toStoredRestingResult, type StoredRestingResult } from '../library/restingHrStore';
 import { restingHrSeries } from '../library/restingHrResults';
-import './TrainingPages.css';
+import './RestingHrTestPage.css';
 
 const PROTOCOL = RESTING_HR_TEST;
 /** Plage de la FC repos de Pratiquant (`useRunnerProfile`), pour proposer de la retenir. */

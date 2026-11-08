@@ -7,8 +7,6 @@ import { isBlankGpxText, isFitFileName, isGpxFileName } from '../../library/reco
 import { unbundleSessionGpx } from '../../library/sessionBundle';
 import { readPickedBytes, readPickedFile } from '../../platform/files';
 import { pickFolderToImport, type ImportEntry } from '../../platform/memoryFolder';
-import type { IntervalSeries } from '../../recording/intervalTimer';
-import type { SessionTest } from '../../recording/fitnessTest';
 import { errorMessage } from '../../core/basics';
 import { libraryState, reportError, setState, type LibraryState } from './store';
 import { hasSessionMotion, lib } from './memory';
@@ -21,12 +19,11 @@ import { addGpx, type AddResult } from './addSession';
  */
 
 /**
- * Range une session qui vient d'être enregistrée, avec les séances du
- * compteur faites pendant elle, ses repères (`marks`), ses capteurs (`motion`, le contenu du
- * `.imu`), le foil de son activité (`foil`, `null` hors voile et surf) et son test guidé (`test`). Rend son nom dans la mémoire et, en clair, l'endroit où elle se
+ * Range une session qui vient d'être enregistrée, avec ses repères (`marks`), ses capteurs (`motion`, le contenu du
+ * `.imu`) et le foil de son activité (`foil`, `null` hors voile et surf). Rend son nom dans la mémoire et, en clair, l'endroit où elle se
  * trouve. Ne lève d'erreur que si l'écriture échoue : l'enregistreur garde
  * alors son journal. Une session mise en attente faute de dossier y attend
- * avec ses capteurs et sa fiche (activité, foil, séances, repères, test),
+ * avec ses capteurs et sa fiche (activité, foil, repères),
  * rangées avec elle dès qu'un dossier est là (`flushPending`). Une session
  * déjà dans la mémoire (fiche coupée par un arrêt de l'application) reçoit
  * de l'enregistrement ce qui manque à sa fiche (`completeRecord`).
@@ -35,16 +32,14 @@ export const saveRecordedSession = async (
   text: string,
   sport: SportType | null,
   activityId: string | null,
-  intervals: IntervalSeries[] = [],
   motion: Uint8Array | null = null,
   marks: SessionMark[] = [],
-  foil: boolean | null = null,
-  test: SessionTest | null = null
+  foil: boolean | null = null
 ): Promise<{ file: string | null; location: string }> => {
   await lib.opening;
   const result = await addGpx(text, 'enregistrement', {
     // Calcul inconnu (journal sans en-tête) : rien de deviné, la session est rangée « à classer ».
-    sport, activityId: activityId ?? undefined, intervals, marks, motion: motion ?? undefined, foil: foil ?? undefined, test: test ?? undefined,
+    sport, activityId: activityId ?? undefined, marks, motion: motion ?? undefined, foil: foil ?? undefined,
   });
   switch (result.status) {
     case 'added':

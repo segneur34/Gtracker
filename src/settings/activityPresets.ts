@@ -5,7 +5,6 @@ import { kmhToMs, knotsToMs, type SpeedUnit } from '../core/units';
 import type { BikeType } from '../core/domainTypes';
 import type { PaceLevel } from '../planning/duration';
 import type { WayType } from '../planning/brouterProfile';
-import type { IntervalPreset } from '../recording/intervalTimer';
 import type { JumpSettings } from '../recording/jumpSettings';
 import type { LiveFieldKey } from '../recording/liveFields';
 import type { MarkGuideSettings } from '../recording/markGuide';
@@ -48,10 +47,10 @@ export interface ActivityPreset {
 }
 
 /**
- * Notification de l'Entraînement (26/10) : l'étape (répétition du compteur,
- * palier d'un test) d'office, avec la FC (Q9, 28/10), dans la limite des deux chiffres.
+ * Notification de l'Entraînement : la vitesse et la FC (Q9, 28/10 ; l'étape du compteur et des tests
+ * est partie avec eux au lot 302), dans la limite des deux chiffres.
  */
-const TRAINING_NOTIFICATION: LiveFieldKey[] = ['step', 'heartRate'];
+const TRAINING_NOTIFICATION: LiveFieldKey[] = ['speed', 'heartRate'];
 
 /** Pause automatique à la vitesse du calcul (`DEFAULT_RECORDING`), au bout de ce temps. */
 const pauseAfter = (delayS: number) => ({ speedMs: DEFAULT_RECORDING.autoPauseSpeedMs, delayS });
@@ -119,11 +118,11 @@ const BASE_PRESETS: Partial<Record<SportType, ActivityPreset>> = {
     liveFields: ['speed', 'average', 'heartRate', 'heartRateZone'],
     notificationFields: TRAINING_NOTIFICATION,
   },
-  // Muscu (lot I du 25/10) : la ceinture d'office (obligatoire), la FC et la durée en direct,
-  // l'étape du compteur et la FC dans la notification (ni vitesse ni distance sans position).
+  // Muscu (lot I du 25/10) : la ceinture d'office (obligatoire), la FC et la durée en direct comme
+  // dans la notification (ni vitesse ni distance sans position).
   muscu: {
     liveFields: ['heartRate', 'heartRateZone', 'averageHeartRate', 'duration'],
-    notificationFields: ['step', 'heartRate'],
+    notificationFields: ['heartRate', 'duration'],
     heartRate: true,
   },
 };
@@ -182,10 +181,3 @@ export const presetOf = (activity: { id: string; base: SportType }): ActivityPre
 
 /** Calculs dont les activités ont un pré-réglage (effacement une fois à la mise à jour, `PRESET_RESETS`). */
 export const PRESET_BASES = Object.keys(BASE_PRESETS) as SportType[];
-
-/** Séances du compteur gardées au départ, communes aux activités. */
-export const DEFAULT_INTERVAL_PRESETS: IntervalPreset[] = [
-  { id: 's1', name: '20 × 10-10', workout: { reps: 20, workS: 10, restS: 10 } },
-  { id: 's2', name: '20 × 20-20', workout: { reps: 20, workS: 20, restS: 20 } },
-  { id: 's3', name: '20 × 30-30', workout: { reps: 20, workS: 30, restS: 30 } },
-];

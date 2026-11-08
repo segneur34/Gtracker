@@ -17,7 +17,7 @@ import { readHeartRateZoneBounds } from './useRunnerProfile';
 
 /**
  * Bips de sortie de zone cardiaque pendant l'enregistrement (lot 28), hors des
- * composants comme le guidage des tests (`useFitnessTest`) : ils tournent
+ * composants comme le guidage des balises (`useMarkGuide`) : ils tournent
  * écran éteint, page fermée.
  *
  * La zone visée est armée au départ (`armZoneAlert`, choix d'Enregistrer) ;

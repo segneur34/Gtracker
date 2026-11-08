@@ -42,10 +42,6 @@
   text-decoration: none;
 }
 
-.shell-banner--intervals {
-  background: var(--fractionne);
-}
-
 .shell-banner__dot {
   width: 10px;
   height: 10px;

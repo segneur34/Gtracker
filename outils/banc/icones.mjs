@@ -85,7 +85,8 @@ await settle({ max: 2500, label: 'import' });
 await go('/');
 await ready('.home-family__name');
 const homeLabels = await evaluate(`[...document.querySelectorAll('.home-family__name')].map((s) => s.textContent)`);
-check('accueil : noms des familles', JSON.stringify(homeLabels) === JSON.stringify(['Voile', 'À pied', 'Vélo', 'Surf', 'Entraînement']), JSON.stringify(homeLabels));
+// L'Entraînement, retiré au lot 302, n'est plus sur l'accueil : seule sa présence change d'un côté à l'autre du passage.
+check('accueil : noms des familles', JSON.stringify(homeLabels.filter((l) => l !== 'Entraînement')) === JSON.stringify(['Voile', 'À pied', 'Vélo', 'Surf']), JSON.stringify(homeLabels));
 check('accueil : pas de petites icônes', (await evaluate(`document.querySelectorAll('.home-family__acts').length`)) === 0);
 await shoot('icones-accueil');
 

@@ -1,0 +1,125 @@
+/* Page du test de FC repos (sous le Profil depuis le lot 301) : règles reprises des pages de l'Entraînement, retirées au lot 302. */
+
+/* Boutons d'action en orange de la famille Entraînement (27/10), gardé tel quel. */
+.train-page {
+  --btn-accent: var(--fractionne);
+}
+
+/* Boutons d'action sous le déroulé. */
+.train-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Mesures précédentes : une liste de cartes. */
+.train-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.train-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.train-item__text {
+  display: flex;
+  flex: 1 1 14rem;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.train-item__name {
+  font-weight: 700;
+  overflow-wrap: normal;
+}
+
+.train-item__detail {
+  color: var(--muted);
+  font-size: var(--text-s);
+  overflow-wrap: anywhere;
+}
+
+.train-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Déroulé du protocole. */
+.fit-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding-left: 1.4em;
+}
+
+/* Page du test de FC repos : le décompte, la FC en direct, le résultat. */
+.rest-belt {
+  margin: 0 0 var(--space-3);
+}
+
+.rest-belt__bpm {
+  font-variant-numeric: tabular-nums;
+}
+
+.rest-live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.rest-count {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rest-live__bpm {
+  margin: 0;
+  font-size: var(--text-l);
+  font-variant-numeric: tabular-nums;
+}
+
+.rest-result {
+  margin: 0;
+  font-size: var(--text-l);
+}
+
+.rest-result__bpm {
+  font-size: var(--text-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.rest-actions {
+  margin-top: var(--space-3);
+}
+
+.rest-chart {
+  margin: var(--space-2) 0;
+  min-width: 0;
+}
+
+.rest-history__item {
+  align-items: flex-start;
+}
+
+.rest-history__chart {
+  /* Colonne flex avec align-items: flex-start : sans cela, largeur nulle. */
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+}

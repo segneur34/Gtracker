@@ -4,7 +4,7 @@ import {
   liveFieldLabel, liveFieldShortLabel, liveFieldValue, liveFieldsOfTreatment, recentWindowLabel, sanitizeLiveFields, type LiveFieldContext,
   type LiveFieldKey, type LiveFieldUnits,
 } from './liveFields';
-import { SPORT_PROFILES, sportFamily, sportTreatment } from '../core/sportProfiles';
+import { SPORT_PROFILES, sportTreatment } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import { EMPTY_LIVE_STATS, LIVE_STATS_DEFAULTS } from './liveStats';
 import { isInverseUnit, type DistanceUnit, type SpeedUnit } from '../core/units';
@@ -52,7 +52,7 @@ describe('liveFieldsOfTreatment', () => {
     for (const sport of Object.keys(SPORT_PROFILES) as SportType[]) {
       const treatment = sportTreatment(sport);
       expect(sanitizeLiveFields(defaultLiveFieldsOf(sport), treatment)).toEqual(defaultLiveFieldsOf(sport));
-      expect(sanitizeLiveFields(defaultNotificationFieldsOf(sport), treatment, MAX_NOTIFICATION_FIELDS, 'notification', sportFamily(sport)))
+      expect(sanitizeLiveFields(defaultNotificationFieldsOf(sport), treatment, MAX_NOTIFICATION_FIELDS, 'notification'))
         .toEqual(defaultNotificationFieldsOf(sport));
     }
   });
@@ -172,39 +172,20 @@ describe('liveFieldValue', () => {
 });
 
 describe('muscu (lot I du 25/10)', () => {
-  it('ne propose que la FC, le temps et l’étape : ni vitesse, ni distance, ni pente', () => {
-    expect(liveFieldsOfTreatment('muscu', 'live', 'fractionne')).toEqual(['heartRate', 'averageHeartRate', 'heartRateZone', 'duration', 'clock']);
-    expect(liveFieldsOfTreatment('muscu', 'notification', 'fractionne')).toEqual(['heartRate', 'averageHeartRate', 'heartRateZone', 'duration', 'clock', 'step']);
+  it('ne propose que la FC et le temps : ni vitesse, ni distance, ni pente', () => {
+    expect(liveFieldsOfTreatment('muscu', 'live')).toEqual(['heartRate', 'averageHeartRate', 'heartRateZone', 'duration', 'clock']);
+    expect(liveFieldsOfTreatment('muscu', 'notification')).toEqual(['heartRate', 'averageHeartRate', 'heartRateZone', 'duration', 'clock']);
     expect(sanitizeLiveFields(['speed', 'distance', 'heartRate'], 'muscu')).toEqual(['heartRate']);
-    expect(defaultNotificationFieldsOf('muscu')).toEqual(['step', 'heartRate']);
+    expect(defaultNotificationFieldsOf('muscu')).toEqual(['heartRate', 'duration']);
   });
 });
 
-describe('étape (26/10)', () => {
-  it("ne se propose que dans la notification, et seulement à la famille Entraînement (27/10)", () => {
-    expect(liveFieldsOfTreatment('course', 'notification', 'fractionne')).toContain('step');
-    expect(liveFieldsOfTreatment('velo', 'notification', 'fractionne')).toContain('step');
-    expect(liveFieldsOfTreatment('course', 'notification', 'course')).not.toContain('step');
-    expect(liveFieldsOfTreatment('velo', 'notification', 'velo')).not.toContain('step');
+describe('étape du compteur, retirée (lot 302)', () => {
+  it("un « Étape » déjà rangé est écarté à la lecture, partout", () => {
     expect(liveFieldsOfTreatment('course', 'notification')).not.toContain('step');
-    expect(liveFieldsOfTreatment('voile', 'notification', 'voile')).not.toContain('step');
-    expect(liveFieldsOfTreatment('course', 'live', 'fractionne')).not.toContain('step');
-    expect(sanitizeLiveFields(['step', 'speed'], 'course', MAX_NOTIFICATION_FIELDS, 'notification', 'fractionne')).toEqual(['step', 'speed']);
-    expect(sanitizeLiveFields(['step', 'speed'], 'velo', MAX_NOTIFICATION_FIELDS, 'notification', 'fractionne')).toEqual(['step', 'speed']);
-    // Un « Étape » mémorisé sur une course ou un vélo est nettoyé.
-    expect(sanitizeLiveFields(['step', 'speed'], 'course', MAX_NOTIFICATION_FIELDS, 'notification', 'course')).toEqual(['speed']);
-    expect(sanitizeLiveFields(['step'], 'velo', MAX_NOTIFICATION_FIELDS, 'notification', 'velo')).toBeNull();
-    // Dans la carte réduite, elle est écartée partout.
-    expect(sanitizeLiveFields(['step', 'speed'], 'course', MAX_LIVE_FIELDS, 'live', 'fractionne')).toEqual(['speed']);
-  });
-
-  it("se lit n/N au compteur, le palier seul pendant un test, « — » sans l'un ni l'autre", () => {
-    expect(liveFieldLabel('step', context())).toBe('Étape');
-    expect(liveFieldShortLabel('step', context())).toBe('Étape');
-    expect(liveFieldValue('step', context({ step: { rep: 5, of: 20 } }))).toBe('5/20');
-    expect(liveFieldValue('step', context({ step: { rep: 4, of: null } }))).toBe('4');
-    expect(liveFieldValue('step', context({ step: null }))).toBe('—');
-    expect(liveFieldValue('step', context())).toBe('—');
+    expect(sanitizeLiveFields(['step', 'speed'], 'course', MAX_NOTIFICATION_FIELDS, 'notification')).toEqual(['speed']);
+    expect(sanitizeLiveFields(['step'], 'velo', MAX_NOTIFICATION_FIELDS, 'notification')).toBeNull();
+    expect(sanitizeLiveFields(['step', 'speed'], 'course', MAX_LIVE_FIELDS, 'live')).toEqual(['speed']);
   });
 });
 
@@ -242,7 +223,6 @@ describe('libellés sur les options du direct (lot 67)', () => {
       case 'heartRate': return 'Fréquence cardiaque';
       case 'averageHeartRate': return 'FC moyenne';
       case 'heartRateZone': return 'Zone cardiaque';
-      case 'step': return 'Étape';
     }
   };
 
@@ -275,12 +255,11 @@ describe('libellés sur les options du direct (lot 67)', () => {
       case 'heartRate': return 'FC';
       case 'averageHeartRate': return 'FC moy.';
       case 'heartRateZone': return 'Zone';
-      case 'step': return 'Étape';
     }
   };
 
 
-  const KEYS = Object.keys(DEFAULT_LIVE_FIELDS).flatMap((t) => liveFieldsOfTreatment(t as Treatment, 'notification', 'fractionne'));
+  const KEYS = Object.keys(DEFAULT_LIVE_FIELDS).flatMap((t) => liveFieldsOfTreatment(t as Treatment, 'notification'));
   const UNITS: { speedUnit: SpeedUnit; distanceUnit: DistanceUnit }[] = [
     { speedUnit: 'kmh', distanceUnit: 'km' }, { speedUnit: 'minkm', distanceUnit: 'km' }, { speedUnit: 'kn', distanceUnit: 'nm' },
   ];

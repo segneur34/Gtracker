@@ -1,8 +1,6 @@
 import { decodeImuHeader } from '../core/imuFile';
 import { JUMPS_CALC_VERSION } from '../core/jumps';
 import type { SessionMark } from '../core/sessionMarks';
-import type { SessionTest } from '../recording/fitnessTest';
-import type { IntervalSeries } from '../recording/intervalTimer';
 import {
   RECORD_FORMAT, RECORD_VERSION, findLegacyNotes, readAnalysis, type RecordWithoutSummary, type SessionRecord, type SessionSource,
 } from './record';
@@ -28,12 +26,8 @@ export interface NewRecordOptions {
   activityId?: string;
   /** Fiche qui accompagne le GPX, lors de l'import d'un dossier ; son résumé est refait. */
   record?: RecordWithoutSummary | null;
-  /** Séances du compteur faites pendant l'enregistrement, rangées dans la fiche. */
-  intervals?: IntervalSeries[];
   /** Repères du bouton « Note », rangés dans la fiche. */
   marks?: SessionMark[];
-  /** Test guidé fait pendant l'enregistrement, rangé dans la fiche. */
-  test?: SessionTest;
   /** Capteurs de l'enregistrement (`.imu`), rangés à côté du GPX. */
   motion?: Uint8Array;
   /** Foil de l'activité à l'enregistrement, rangé dans les réglages de la session. */
@@ -62,7 +56,7 @@ export const newRecord = (
 /**
  * Fiche d'une session qui entre dans la mémoire sous le nom `gpx` : celle qui l'accompagne (import d'un
  * dossier, session en attente), son résumé refait, sinon une neuve, à l'activité et au foil choisis à
- * l'enregistrement ; avec les séances du compteur, les repères et le test guidé de l'enregistrement.
+ * l'enregistrement ; avec les repères de l'enregistrement. Une fiche qui accompagne le GPX garde ses séances et son test.
  */
 export const recordFor = (
   gpx: string, analyzed: AnalyzedGpx, source: SessionSource, options: NewRecordOptions, context: NewRecordContext
@@ -77,9 +71,7 @@ export const recordFor = (
   const jumpsUnmeasured = options.motion && decodeImuHeader(options.motion)?.setup.jumps === false;
   return {
     ...made,
-    ...(options.intervals && options.intervals.length > 0 ? { intervals: options.intervals } : {}),
     ...(options.marks && options.marks.length > 0 ? { marks: options.marks } : {}),
-    ...(options.test ? { test: options.test } : {}),
     ...(jumpsUnmeasured && !made.jumps
       ? { jumps: { version: JUMPS_CALC_VERSION, computedAt: new Date(context.now()).toISOString(), jumps: [], measured: false as const } }
       : {}),

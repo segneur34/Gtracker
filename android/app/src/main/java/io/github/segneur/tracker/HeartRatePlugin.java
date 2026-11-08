@@ -60,8 +60,8 @@ import java.util.UUID;
  * Chaque mesure (caractéristique 0x2A37) part vers la page par l'événement
  * `heartRate` ; l'enregistreur la joint à la position suivante. Écran éteint,
  * le service au premier plan du GPS garde le processus en vie, et la pile
- * Bluetooth livre les mesures comme les positions ; sans GPS (muscu), c'est
- * HeartRateService, démarré par `keepAlive`.
+ * Bluetooth livre les mesures comme les positions (le service de la ceinture
+ * seule, pour la muscu sans GPS, est parti avec l'Entraînement au lot 302).
  *
  * Une ceinture jointe puis perdue (hors de portée, retirée, liaison muette
  * `STALL_MS`, découverte en échec, Bluetooth éteint puis rallumé) est
@@ -435,30 +435,6 @@ public class HeartRatePlugin extends Plugin {
     }
 
     /**
-     * Muscu (lot I du 25/10) : démarre le service au premier plan qui tient
-     * l'application écran éteint pendant une session sans GPS, avec la
-     * notification de l'enregistrement (`title`, `text`). Refusé sans la
-     * permission Bluetooth, qu'Android 14 exige pour ce type de service.
-     */
-    @PluginMethod
-    public void keepAlive(PluginCall call) {
-        if (!permitted()) {
-            call.reject("permission Bluetooth refusée");
-            return;
-        }
-        Intent intent = new Intent(getContext(), HeartRateService.class)
-            .putExtra(HeartRateService.EXTRA_TITLE, call.getString("title", "Tracker enregistre"))
-            .putExtra(HeartRateService.EXTRA_TEXT, call.getString("text", ""));
-        try {
-            ContextCompat.startForegroundService(getContext(), intent);
-            call.resolve();
-        } catch (RuntimeException e) {
-            Log.w(TAG, "service impossible à lancer : " + e.getMessage());
-            call.reject("service impossible à lancer");
-        }
-    }
-
-    /**
      * Connexion en cours, sans y toucher : la page reprise après une chute du moteur de rendu
      * la reprend telle quelle, sans `connect`, qui couperait une ceinture qui mesure.
      */
@@ -472,13 +448,6 @@ public class HeartRatePlugin extends Plugin {
             if (wanted && address != null) ret.put("address", address);
             call.resolve(ret);
         });
-    }
-
-    /** Arrête le service de `keepAlive`, et sa notification. */
-    @PluginMethod
-    public void stopKeepAlive(PluginCall call) {
-        getContext().stopService(new Intent(getContext(), HeartRateService.class));
-        call.resolve();
     }
 
     /** Ouvre les réglages Bluetooth d'Android : le secours quand la ceinture reste introuvable. */

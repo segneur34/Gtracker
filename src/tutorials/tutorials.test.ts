@@ -8,9 +8,9 @@ import {
 const lesson = (id: string, families?: Lesson['families']): Lesson => ({ id, title: id, hook: id, families, icon: 'analyse', target: '/', body: [id] });
 
 describe('programme des tutoriels', () => {
-  it('quatorze leçons, identifiants uniques, chacune avec un titre, une accroche et 3 à 6 paragraphes', () => {
-    expect(LESSONS).toHaveLength(14);
-    expect(new Set(LESSONS.map((l) => l.id)).size).toBe(14);
+  it('treize leçons, identifiants uniques, chacune avec un titre, une accroche et 3 à 6 paragraphes', () => {
+    expect(LESSONS).toHaveLength(13);
+    expect(new Set(LESSONS.map((l) => l.id)).size).toBe(13);
     for (const l of LESSONS) {
       expect(l.title.length).toBeGreaterThan(0);
       expect(l.hook.length).toBeGreaterThan(0);
@@ -28,9 +28,9 @@ describe('programme des tutoriels', () => {
     const lessons = [lesson('a'), lesson('b'), lesson('voile', ['voile']), lesson('d')];
     expect(lessonOfDay(3, [], lessons)?.id).toBe('voile');
     expect(lessonOfDay(3, ['voile'], lessons)?.id).toBe('d');
-    // Le vrai programme : la leçon de la voile (12e) cède la place aux sauts.
-    expect(lessonOfDay(12, [])?.id).toBe('voile');
-    expect(lessonOfDay(12, ['voile'])?.id).toBe('capteurs');
+    // Le vrai programme : la leçon de la voile (11e) cède la place aux sauts.
+    expect(lessonOfDay(11, [])?.id).toBe('voile');
+    expect(lessonOfDay(11, ['voile'])?.id).toBe('capteurs');
   });
 
   it("une leçon de deux familles n'est sautée que si les deux sont cachées", () => {
@@ -39,9 +39,9 @@ describe('programme des tutoriels', () => {
   });
 
   it('au-delà du programme : plus de leçon', () => {
-    expect(lessonOfDay(14, [])?.id).toBe('partage');
-    expect(lessonOfDay(15, [])).toBeNull();
-    expect(lessonOfDay(14, ['voile'])).toBeNull();
+    expect(lessonOfDay(13, [])?.id).toBe('partage');
+    expect(lessonOfDay(14, [])).toBeNull();
+    expect(lessonOfDay(13, ['voile'])).toBeNull();
     expect(lessonOfDay(0, [])).toBeNull();
   });
 });

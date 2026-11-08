@@ -233,7 +233,7 @@ describe('enregistrement en attente d\'un dossier (A2)', () => {
   it('pose les capteurs, puis la fiche, avant le GPX : un GPX en attente a toujours les siens complets', async () => {
     access = 'unavailable';
     const library = await openFresh();
-    await library.saveRecordedSession(gpxAt(0), 'running', null, [], new Uint8Array([1]));
+    await library.saveRecordedSession(gpxAt(0), 'running', null, new Uint8Array([1]));
     expect(pendingWrites.map((p) => p.replace(/^.*\./, ''))).toEqual(['imu', 'json', 'gpx']);
   });
 });

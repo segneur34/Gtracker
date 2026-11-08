@@ -2,9 +2,9 @@
 // Usage : node coquille.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau (IGN, Overpass, tuiles bloqués). Dure environ 1 min (lib/cdp.mjs). Le script ne vérifie
 // presque rien : il relève, pour comparer la sortie avant et après.
-//  1. importe une wing, une course, une sortie à vélo, une session de surf (traces de `general.mjs`), une séance de
-//     muscu avec la FC (`muscu.mjs`) et une sans FC ;
-//  2. pour chaque analyse (les cinq sessions, la muscu sans FC, `/voile/analyse`, `/course/analyse`, `/surf/analyse` et
+//  1. importe une wing, une course, une sortie à vélo, une session de surf (traces de `general.mjs`) ; la muscu est
+//     partie avec l'Entraînement (lot 302 : une session sans position n'a plus d'analyse) ;
+//  2. pour chaque analyse (les quatre sessions, `/voile/analyse`, `/course/analyse`, `/surf/analyse` et
 //     `/fractionne/analyse` sans session, une session introuvable en voile et en course), à 1400×1000, 390×844 et
 //     834×375 (carte en plein écran refermée) : le texte de `.an-page`, la classe de chacun de ses enfants, et les
 //     rectangles arrondis de `.an-page`, `.an-sheet`, `.an-map-row`, `.an-map-panel`, `.ui-savebar`, `.ui-alert`,
@@ -40,7 +40,7 @@ const setSize = async (s) => {
   await send('Emulation.setTouchEmulationEnabled', { enabled: s.mobile, maxTouchPoints: 5 });
 };
 
-// --- Sessions synthétiques (celles de `general.mjs` et de `muscu.mjs`) ---
+// --- Sessions synthétiques (celles de `general.mjs`) ---
 const gpxOf = (type, pts) => `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Banc</name><type>${type}</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
 /** Wing : bords de près et de portant, virements et empannages, vent du nord. */
 const wingGpx = (t0) => {
@@ -101,31 +101,15 @@ const MORNING = [
   [5, 1.5, 180], [6, 6, 160], [2, 6, 250], [2, 6, 120], [10, 6, 160], [40, 1],
   [5, 1.6, 180], [8, 4.5, 190], [80, 1], [30, 0.1],
 ];
-/** Muscu : points sans position, à l'heure ; la FC si `hrAt` est donné. */
-const muscuGpx = (t0, seconds, hrAt) => {
-  const pts = [];
-  for (let k = 0; k <= seconds; k += 2) {
-    const hr = hrAt ? `<extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>${Math.round(hrAt(k))}</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions>` : '';
-    pts.push(`<trkpt><time>${new Date(t0 + k * 1000).toISOString()}</time>${hr}</trkpt>`);
-  }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1" `
-    + `xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"><trk><name>Séance</name><type>muscu</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
-};
-const seriesHr = (k) => (k < 300 ? 90 + k / 10 : (k - 300) % 120 < 40 ? 150 + ((k - 300) % 120) / 2 : 165 - Math.min(60, ((k - 300) % 120) - 40) * 1);
-
 const T_VOILE = Date.UTC(2026, 9, 5, 13, 0, 0);
 const T_RUN = Date.UTC(2026, 9, 6, 8, 0, 0);
 const T_BIKE = Date.UTC(2026, 9, 6, 14, 0, 0);
 const T_SURF = Date.UTC(2026, 9, 7, 7, 0, 0);
-const T_MUSCU = Date.UTC(2026, 9, 6, 17, 0, 0);
-const T_MUSCU_SANS = Date.UTC(2026, 9, 8, 17, 0, 0);
 const SESSIONS = [
   { key: 'voile', page: 'voile', start: T_VOILE, gpx: wingGpx(T_VOILE) },
   { key: 'course', page: 'course', start: T_RUN, gpx: hillGpx('running', 2400, 3, 0.03, T_RUN) },
   { key: 'velo', page: 'velo', start: T_BIKE, gpx: hillGpx('cycling', 3000, 7, 0.02, T_BIKE) },
   { key: 'surf', page: 'surf', start: T_SURF, gpx: surfGpx(T_SURF, MORNING) },
-  { key: 'muscu', page: 'fractionne', start: T_MUSCU, gpx: muscuGpx(T_MUSCU, 1800, seriesHr) },
-  { key: 'muscu-sans-fc', page: 'fractionne', start: T_MUSCU_SANS, gpx: muscuGpx(T_MUSCU_SANS, 1200, null) },
 ];
 
 // --- 1. Import ---

@@ -15,7 +15,7 @@ const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h)
 const session = statSession;
 
 describe('statSessionOf', () => {
-  it('reprend le résumé, la famille du calcul et compte les répétitions du compteur', () => {
+  it('reprend le résumé et la famille du calcul ; les séances de la fiche ne comptent plus (lot 302)', () => {
     const record = {
       name: 'Piste',
       summary: { calcVersion: 2, startMs: 1000, endMs: 61_000, distanceM: 400, movingTimeS: 50, elevationGainM: 2, maxSpeedMs: 7, pointCount: 60, samplingS: 1 },
@@ -29,7 +29,8 @@ describe('statSessionOf', () => {
     } as unknown as SessionRecord;
     const activity: Activity = { id: 'frac', name: 'Fractionné à pied', base: 'run-intervals', color: '#c25700' };
     const s = statSessionOf('a.json', record, activity);
-    expect(s).toMatchObject({ file: 'a.json', name: 'Piste', family: 'fractionne', treatment: 'course', reps: 2, maneuverCount: null });
+    expect(s).toMatchObject({ file: 'a.json', name: 'Piste', family: 'fractionne', treatment: 'course', maneuverCount: null });
+    expect(s).not.toHaveProperty('reps');
     // Fiche d'avant la version 5 : ni distance en action, ni temps de vol, ni réussite.
     expect(s).toMatchObject({ movingDistanceM: null, flightS: null, maneuverResults: null, foil: false });
     expect(statSessionOf('a.json', record, activity, true).foil).toBe(true);

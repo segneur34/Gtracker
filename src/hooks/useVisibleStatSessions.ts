@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { activityFamily, sessionActivity, type Activity } from '../core/activities';
+import { RETIRED_FAMILIES, activityFamily, sessionActivity, type Activity } from '../core/activities';
 import type { SportFamily } from '../core/sportProfiles';
 import type { LibrarySession } from '../library/record';
 import { statSessionOf, type StatSession } from '../library/stats';
@@ -13,6 +13,8 @@ import { effectiveFoil, useVisibility } from './useSportSettings';
  * activité de base, hors de la liste (son calcul sans activité créée, activité
  * supprimée) : elle est gardée, et son activité ajoutée à `activityById` pour
  * son nom et sa couleur. `foil` : celui de la session, sinon de son activité (`sessionFoil`).
+ * Les sessions d'une famille retirée de cette version (l'Entraînement, lot 302)
+ * restent comptées, bien que la famille soit toujours cachée.
  */
 export interface VisibleStatSessions {
   all: StatSession[];
@@ -35,7 +37,8 @@ export const visibleStatSessions = (
   for (const s of sessions) {
     const a = sessionActivity(activities, s.record.activityId, s.record.sport);
     if (!a) continue;
-    if (!isShown(a) && !(openFamily !== null && activityFamily(a) === openFamily)) continue;
+    const family = activityFamily(a);
+    if (!isShown(a) && !RETIRED_FAMILIES.includes(family) && !(openFamily !== null && family === openFamily)) continue;
     if (!activityById.has(a.id)) activityById.set(a.id, a);
     all.push(statSessionOf(s.file, s.record, a, sessionFoil(s.record, effectiveFoil(a))));
   }

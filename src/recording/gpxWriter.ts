@@ -1,7 +1,6 @@
 import { GARMIN_TRACKPOINT_NAMESPACE, escapeXmlAttr, gpxDocument } from '../core/xml';
 import type { LocationFix } from '../platform/location';
 import { gpxStrideCadence } from '../running/cadence';
-import type { HeartRateFix } from './session';
 
 /**
  * Écriture d'une session en GPX 1.1, le format pivot de l'application : ce
@@ -55,22 +54,6 @@ const trackSegment = (fixes: LocationFix[]): string => ['    <trkseg>', ...fixes
 
 /** `segments` : la trace, découpée en continus (`splitIntoSegments`) — un `<trkseg>` par pause. */
 export const buildGpx = (segments: LocationFix[][], meta: GpxMeta): string => renderGpx(segments, meta, trackSegment);
-
-/** Point d'une session sans position : l'heure, et la FC si la ceinture l'a donnée ; ni `lat` ni `lon`. */
-const heartRatePoint = (fix: HeartRateFix): string => {
-  const hr = fix.heartRateBpm === undefined ? ''
-    : `<extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>${fix.heartRateBpm}</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions>`;
-  return `      <trkpt><time>${isoTime(fix.timeMs)}</time>${hr}</trkpt>`;
-};
-
-/**
- * GPX d'une session sans position (muscu, lot I du 25/10, décision 5) : des
- * `<trkpt>` sans `lat` ni `lon`, l'heure et la FC seules, un `<trkseg>` par
- * pause. Ce n'est pas un GPX 1.1 valide pour les autres applications, qui
- * exigent la position : seul `parseGpx` le relit (`timedPoints`).
- */
-export const buildHeartRateGpx = (segments: HeartRateFix[][], meta: GpxMeta): string =>
-  renderGpx(segments, meta, (fixes) => ['    <trkseg>', ...fixes.map(heartRatePoint), '    </trkseg>'].join('\n'));
 
 const renderGpx = <F extends { timeMs: number }>(segments: F[][], meta: GpxMeta, segment: (fixes: F[]) => string): string => {
   const name = escapeXmlAttr(meta.name);

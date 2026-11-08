@@ -1,17 +1,15 @@
 import { roundBearingDeg } from '../core/angles';
 import { errorMessage } from '../core/basics';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type RefObject } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import ActivitySelect from '../components/ActivitySelect';
 import BeltStatus from '../components/BeltStatus';
 import { zoneLabel } from '../components/heartRateColors';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import HoldButton from '../components/ui/HoldButton';
-import FitnessTestCard from '../components/FitnessTestCard';
 import FollowedElevation from '../components/FollowedElevation';
 import FollowTracePicker from '../components/FollowTracePicker';
-import IntervalCard from '../components/IntervalCard';
 import PageHeader from '../components/ui/PageHeader';
 import SegmentedControl from '../components/ui/SegmentedControl';
 import { ChoiceOption, ChoiceSheet } from '../components/ui/ChoiceSheet';
@@ -20,20 +18,16 @@ import SessionEndGear from '../components/SessionEndGear';
 import { IconFlag, IconLock, IconPause, IconPlay, IconRoute } from '../components/icons';
 import { parseGpx } from '../core/gpxParser';
 import {
-  FAMILY_ACCENT, FAMILY_LABEL, FAMILY_SHADES, activitiesOfFamily, activityFamily, intervalActivityFor, kindActivityLabel, trainingKindsOf, type Activity,
+  FAMILY_ACCENT, FAMILY_LABEL, FAMILY_SHADES, activitiesOfFamily, activityFamily, type Activity,
 } from '../core/activities';
 import {
-  TRAINING_KIND_LABEL, hasPositions, isIntervalSport, isLandTreatment, isTestSport, sportFamily, sportTreatment, trainingKind, usesMarkCourse, type SportFamily,
-  type TrainingKind,
+  hasPositions, isLandTreatment, sportFamily, sportTreatment, usesMarkCourse, type SportFamily,
 } from '../core/sportProfiles';
 import { formatClock, formatDistance, formatShortDistance, formatSpeed, formatMeters, formatDecimal } from '../core/units';
 import LiveMap from '../components/LiveMap';
 import { clearFollowedTrace, useFollowedTrace } from '../hooks/useFollowedTrace';
-import { armFitnessTest, useFitnessTest } from '../hooks/useFitnessTest';
-import { armHeartBand, armZoneAlert, setLiveBand, useZoneAlert } from '../hooks/useZoneAlert';
-import { useIntervalTimerOpen, useIntervalTimerRunning } from '../hooks/useIntervalTimer';
+import { armZoneAlert, useZoneAlert } from '../hooks/useZoneAlert';
 import { useTransientValue } from '../hooks/useTransientValue';
-import { useStopwatchOpen, useStopwatchRunning } from '../hooks/useStopwatch';
 import { liveStatsOptionsFor, useLiveRecording } from '../hooks/useLiveRecording';
 import { useBeltLive } from '../hooks/useBeltLive';
 import { useBeltWarmup } from '../hooks/useBeltWarmup';
@@ -43,13 +37,13 @@ import { setBeepsMuted, skipMark, useMarkGuide } from '../hooks/useMarkGuide';
 import { usePerActivityChoice } from '../hooks/usePerActivityChoice';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useNarrowScreen, usePhoneLandscape } from '../hooks/useNarrowScreen';
-import { readHeartRateZoneBounds, readHeartRateZones } from '../hooks/useRunnerProfile';
+import { readHeartRateZoneBounds } from '../hooks/useRunnerProfile';
 import {
-  effectiveCadence, effectiveDistanceUnit, effectiveFoil, effectiveHeartRate, effectiveJumpSettings, effectiveLiveFields, effectivePumping, effectiveSpeedUnit, effectiveStopHoldMs, effectiveTurns, lastRecordActivity, lastRecordedOrFirst, readHeartBandPicks, rememberHeartBandPicks, rememberRecordActivity, useVisibility,
+  effectiveCadence, effectiveDistanceUnit, effectiveFoil, effectiveHeartRate, effectiveJumpSettings, effectiveLiveFields, effectivePumping, effectiveSpeedUnit, effectiveStopHoldMs, effectiveTurns, lastRecordActivity, rememberRecordActivity, useVisibility,
 } from '../hooks/useSportSettings';
 import { getMotionCapabilities, type MotionCapabilities } from '../platform/motion';
 import { beltLabels } from '../platform/beltList';
-import { BELT_STATE_LABEL, EXAMPLE_BELT, chooseSavedBelt, savedBelt, savedBelts, type BeltState, type HeartRateBelt } from '../platform/heartRate';
+import { BELT_STATE_LABEL, chooseSavedBelt, savedBelt, savedBelts, type BeltState, type HeartRateBelt } from '../platform/heartRate';
 import { JUMP_PLACEMENT_LABEL } from '../recording/jumpSettings';
 import { PERMISSION_LABEL } from '../recording/permissionsPrompt';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
@@ -59,7 +53,7 @@ import {
   addRecordingMark, analyzePendingSession, changeRecordingActivity, continuePendingSession, discardPendingSession, dismissRecorderResult, getLastFix, getLiveFixes,
   getLiveHeadingFixes, getLiveSegmentCount, pauseRecording,
   resumeRecording, startRecording, stopRecording, stopRecordingBeltSearch, type RecorderState,
-  useLivePosition, useRecordingClock, useRecorderSelector, useRecorderStatus,
+  useLivePosition, useRecordingClock, useRecorderSelector,
 } from '../hooks/useRecorder';
 import { followedProfile, hasFollowedElevation } from '../recording/followedProfile';
 import { followedTraceLengthM, splitFollowedTrace, type FollowProgress, type FollowedTrace } from '../recording/followedTrace';
@@ -77,13 +71,7 @@ import { buzz } from '../platform/beeper';
 import { isNativeApp } from '../platform/runtime';
 import { canLockOrientation, isOrientationLocked, keepScreenOn, lockOrientation, subscribeOrientationLock } from '../platform/screen';
 import { fixesFromRawPoints, recordingDurationMs, isAutoPause, isManualPause } from '../recording/session';
-import { FITNESS_TESTS, FITNESS_TEST_IDS, isFitnessTestId, type FitnessTestId } from '../recording/fitnessTest';
-import { RESTING_HR_TEST, type RestingHrTestId } from '../recording/restingHrTest';
-import { RESTING_HR_PATH } from '../core/parentPage';
-import { NO_BAND_PICKS, ZONE_TARGETS, armableBand, bandLabel, type HeartBand, type HeartBandPicks, type ZoneTarget } from '../recording/zoneAlert';
-import HeartBandPicker from '../components/HeartBandPicker';
-import Dialog from '../components/ui/Dialog';
-import { WORKOUT_LISTS } from '../recording/workoutLists';
+import { ZONE_TARGETS, type ZoneTarget } from '../recording/zoneAlert';
 import './RecordingPage.css';
 
 /**
@@ -101,17 +89,9 @@ import './RecordingPage.css';
  * une à une, avec des bips d'approche (`useMarkGuide`), et l'avancement se
  * compte par balises.
  *
- * En fractionné, le compteur (`IntervalCard`) vit à côté de l'enregistrement,
- * sans en dépendre : lancé avant, pendant ou sans lui.
- *
- * En muscu (lot I du 25/10), une session sans GPS : la ceinture est exigée
- * (« Démarrer » attend qu'elle soit connectée), ni source, ni trace à suivre,
- * ni carte ; la carte du compteur porte les séances du Timer. Dans le
- * navigateur, la FC d'exemple (`EXAMPLE_BELT`) en tient lieu.
- *
- * En mode Timer (`?minuterie`, « Lancer » d'une séance du Timer, 25/10), hors
- * d'un enregistrement, la page n'est que le compteur : ni activité, ni carte,
- * ni « Démarrer », donc ni GPS ni session.
+ * L'Entraînement (compteur d'intervalles, chrono, tests guidés, muscu, course
+ * à bornes) est retiré de cette version voile et surf (lot 302) : toute
+ * session a des positions ; la ceinture, la zone visée et les balises restent.
  *
  * Dans le navigateur, une source « rejeu » relit un GPX en accéléré : toute la
  * chaîne s'éprouve sur le PC, jusqu'à l'analyse de la session obtenue.
@@ -148,48 +128,7 @@ const BpmTile = ({ belt, target }: { belt: { state: BeltState; bpm: number | nul
   );
 };
 
-/**
- * Course à bornes en cours (05/11), sous la tuile BPM : la bande, et « Modifier »,
- * qui ouvre les mêmes bornes qu'avant le départ ; les bips suivent la nouvelle
- * bande dès la mesure suivante, le compte repart de zéro (`setLiveBand`).
- */
-function LiveHeartBand({ activity, band }: { activity: Activity; band: HeartBand }) {
-  const [editing, setEditing] = useState<HeartBandPicks | null>(null);
-  const zones = readHeartRateZones(activity);
-  const open = () => setEditing(readHeartBandPicks(activity.id) ?? {
-    min: { choice: band.minBpm === null ? 'aucune' : 'bpm', bpm: band.minBpm },
-    max: { choice: band.maxBpm === null ? 'aucune' : 'bpm', bpm: band.maxBpm },
-  });
-  const next = editing ? armableBand(editing, zones) : null;
-  const apply = () => {
-    if (!editing || next === null) return;
-    rememberHeartBandPicks(activity.id, editing);
-    setLiveBand(next);
-    setEditing(null);
-  };
-  return (
-    <div className="rec-band">
-      <span>Bornes {bandLabel(band)}</span>
-      <Button size="s" onClick={open}>Modifier</Button>
-      {editing && (
-        <Dialog title="Bornes cardio" onClose={() => setEditing(null)}>
-          <HeartBandPicker picks={editing} onChange={setEditing} zones={zones} />
-          <div className="rec-band__actions">
-            <Button size="s" onClick={() => setEditing(null)}>Annuler</Button>
-            <Button size="s" variant="primary" disabled={next === null} onClick={apply}>Appliquer</Button>
-          </div>
-        </Dialog>
-      )}
-    </div>
-  );
-}
-
 const STAT_GRID = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 'var(--space-2)' } as const;
-
-/** Guidage cardio de l'Entraînement : aucun, zone visée, ou bornes de BPM (course à bornes, 05/11). */
-type HeartGuideMode = 'aucun' | 'zone' | 'bornes';
-const HEART_GUIDE_MODES: readonly HeartGuideMode[] = ['aucun', 'zone', 'bornes'];
-const HEART_GUIDE_LABEL: Record<HeartGuideMode, string> = { aucun: 'aucun', zone: 'zone', bornes: 'bornes' };
 
 /** Nom d'une famille dans « Aucune activité … ». */
 const FAMILY_NOUN: Record<SportFamily, string> = { voile: 'voile', course: 'à pied', velo: 'vélo', fractionne: "d'entraînement", surf: 'de surf' };
@@ -247,22 +186,12 @@ const MarkGuideCard = ({ view, activity }: { view: MarkGuideView; activity: Acti
 };
 
 /**
- * Statistiques en direct propres au traitement du calcul de l'activité ; sans position (muscu), la FC moyenne et la zone.
+ * Statistiques en direct propres au traitement du calcul de l'activité.
  * Libellés tirés des options du calcul (`options`).
  */
-const liveStatItems = (
-  activity: Activity, live: LiveStats, heartRateBpm: number | null, options: LiveStatsOptions,
-): { label: string; value: string }[] => {
+const liveStatItems = (activity: Activity, live: LiveStats, options: LiveStatsOptions): { label: string; value: string }[] => {
   const unit = effectiveSpeedUnit(activity);
   const distanceUnit = effectiveDistanceUnit(activity);
-  if (!hasPositions(activity.base)) {
-    const units: LiveFieldUnits = { speedUnit: unit, distanceUnit, options };
-    const context: LiveFieldContext = {
-      ...units, stats: live, durationMs: 0, nowMs: null, remainingM: null, headingDeg: null, markDistanceM: null, markBearingDeg: null,
-      heartRateBpm, heartRateZoneBounds: readHeartRateZoneBounds(activity),
-    };
-    return (['averageHeartRate', 'heartRateZone'] as const).map((key) => ({ label: liveFieldLabel(key, units), value: liveFieldValue(key, context) }));
-  }
   if (sportTreatment(activity.base) === 'voile') {
     return [
       ...options.topDurationsS.map((d, i) => ({
@@ -392,15 +321,14 @@ const useRecMapFit = (page: RefObject<HTMLDivElement | null>, active: boolean): 
  * « Arrêter » : tenu le temps réglé dans Réglages (2 s par défaut), pour qu'un
  * geste involontaire ne coupe pas la session ; un appui court le rappelle. À 0,
  * un simple appui arrête. Le grand cadran montre l'appui sous le doigt (`HoldButton`).
- * `inCounter` : le même arrêt, proposé par l'écran « Séance terminée » du compteur (lot 103).
  */
-function StopButton({ status, inCounter = false }: { status: RecorderState['status']; inCounter?: boolean }) {
+function StopButton({ status }: { status: RecorderState['status'] }) {
   const stop = useCallback(() => void stopRecording(), []);
   return (
     <HoldButton onHold={stop} getHoldMs={effectiveStopHoldMs} disabled={status === 'starting' || status === 'stopping'}
-      size={inCounter ? undefined : 'l'} style={inCounter ? undefined : { flex: 1 }} lead={<span className="ui-record-dot ui-record-dot--stop" />}
-      dialTitle={inCounter ? "Arrêter l'enregistrement" : 'Arrêter'}
-      label={status === 'stopping' ? 'Enregistrement du fichier…' : inCounter ? "Arrêter l'enregistrement" : 'Arrêter'} />
+      size="l" style={{ flex: 1 }} lead={<span className="ui-record-dot ui-record-dot--stop" />}
+      dialTitle="Arrêter"
+      label={status === 'stopping' ? 'Enregistrement du fichier…' : 'Arrêter'} />
   );
 }
 
@@ -591,7 +519,7 @@ function RecordingFigures({ summaryShown, clockShown, liveActivity, followed, co
 
       <Card heading="En cours">
         {heartRate && <BpmTile belt={heartRate} target={zoneAlert.active ? zoneAlert.target : 0} />}
-        {heartRate && (heartRate.state === 'searching' || heartRate.state === 'lost') && liveActivity && hasPositions(liveActivity.base) && (
+        {heartRate && (heartRate.state === 'searching' || heartRate.state === 'lost') && liveActivity && (
           // Ceinture perdue ou jamais trouvée (lot 198) : on peut renoncer à elle, l'enregistrement continue sans cardio.
           <div className="rec-belt-stop">
             <span className="ui-muted">Sans elle, l'enregistrement continue, sans cardio.</span>
@@ -601,14 +529,13 @@ function RecordingFigures({ summaryShown, clockShown, liveActivity, followed, co
             }}>Arrêter de chercher</Button>
           </div>
         )}
-        {zoneAlert.active && zoneAlert.band && liveActivity && <LiveHeartBand activity={liveActivity} band={zoneAlert.band} />}
         <div style={STAT_GRID}>
           <Stat label="Durée" value={formatClock(durationMs)} />
           {liveActivity && followed && (courseMarksOf && markGuide.active
             ? courseStatItems(liveActivity, markGuide)
             : followStatItems(liveActivity, progress, followedLengthM)
           ).map((item) => <Stat key={item.label} {...item} />)}
-          {liveActivity && liveStatItems(liveActivity, live.stats, heartRate?.bpm ?? null, options).map((item) => <Stat key={item.label} {...item} />)}
+          {liveActivity && liveStatItems(liveActivity, live.stats, options).map((item) => <Stat key={item.label} {...item} />)}
         </div>
         {liveActivity && sportFamily(liveActivity.base) === 'voile' && (
           <div className="rec-grid-fit">
@@ -628,16 +555,15 @@ function RecordingFigures({ summaryShown, clockShown, liveActivity, followed, co
  * satellites sont suivis sur le téléphone tant que le GPS tourne (coupé en
  * pause manuelle), que la partie soit affichée ou non.
  */
-function RecordingGpsCard({ busy, liveHeartOnly, deviceGps }: {
+function RecordingGpsCard({ busy, deviceGps }: {
   busy: boolean;
-  liveHeartOnly: boolean;
   /** GPS du téléphone (pas le navigateur, pas un rejeu) : le nombre de satellites a un sens. */
   deviceGps: boolean;
 }) {
   const stats = useRecorderSelector((s) => s.stats);
   const recording = useRecorderSelector((s) => s.status === 'recording');
   const satellites = useSatellites(deviceGps && recording);
-  if (!((busy || stats.pointCount > 0) && !liveHeartOnly)) return null;
+  if (!(busy || stats.pointCount > 0)) return null;
   // Durée couverte par les positions : celle du GPS ; la durée affichée de la session suit l'horloge (`useRecordingClock`).
   const pointsDurationMs = recordingDurationMs(stats);
   const meanIntervalS = stats.pointCount > 1 ? pointsDurationMs / 1000 / (stats.pointCount - 1) : null;
@@ -695,8 +621,8 @@ function RecordingScreen() {
   const native = isNativeApp();
   const { open: shown, toggle: toggleShown } = useOpenSections<'carte' | 'denivele'>('recording', RECORDING_SECTION_DEFAULTS);
 
-  // Famille puis activité : celle demandée par l'adresse (« Lancer » d'une page de l'Entraînement, `?activite=`),
-  // sinon celle de la trace suivie, sinon la dernière enregistrée.
+  // Famille puis activité : celle demandée par l'adresse (`?activite=`), sinon celle de la trace suivie, sinon la dernière
+  // enregistrée.
   // Seules les visibles sont proposées : une activité cachée dans Réglages n'est pas reprise (§10, point 100).
   const [params] = useSearchParams();
   const { activities, families, isShown } = useVisibility();
@@ -717,26 +643,6 @@ function RecordingScreen() {
     setFamily(sportFamily(activity.base));
     setChosenId(activity.id);
   };
-  // Entraînement : le type d'abord (Fractionné, Tests, Muscu), puis ses activités (à pied, vélo), 24/10.
-  const kinds = family === 'fractionne' ? trainingKindsOf(familyActivities) : [];
-  const chosenKind = kinds.length > 0 && chosen ? trainingKind(chosen.base) : null;
-  const rowActivities = chosenKind ? familyActivities.filter((a) => trainingKind(a.base) === chosenKind) : familyActivities;
-  /** Un type choisi : la dernière activité enregistrée de ce type, sinon la première. */
-  const pickKind = (kind: TrainingKind) => {
-    setChosenId(lastRecordedOrFirst(familyActivities.filter((a) => trainingKind(a.base) === kind))?.id ?? null);
-  };
-  // Tests : le test choisi sous « Tests » (rangée « Test »), celui de l'adresse (`&test=`, « Lancer » d'un protocole), sinon la FC max.
-  // La FC repos s'y choisit aussi, mais se fait sur sa page, sans enregistreur ni GPS (les sessions sans GPS viendront avec la muscu).
-  const [testId, setTestId] = useState<FitnessTestId | RestingHrTestId>(() => {
-    const asked = params.get('test');
-    return isFitnessTestId(asked) || asked === RESTING_HR_TEST.id ? asked : 'fc-max';
-  });
-  const isTest = chosen !== null && isTestSport(chosen.base);
-  // Muscu : sans position, la ceinture seule (obligatoire), ni source ni trace à suivre.
-  const heartOnly = chosen !== null && !hasPositions(chosen.base);
-  const restingChosen = isTest && testId === RESTING_HR_TEST.id;
-  const guidedTestId: FitnessTestId = isFitnessTestId(testId) ? testId : 'fc-max';
-  const navigate = useNavigate();
   /** Une trace choisie propose son activité (celle de l'itinéraire, ou de la session). */
   const proposeActivityOf = (trace: FollowedTrace) => {
     const activity = shownActivities.find((a) => a.id === trace.activityId);
@@ -767,10 +673,8 @@ function RecordingScreen() {
   const cadenceSetting = chosen ? effectiveCadence(chosen) : null;
   const [cadencePicked, setCadencePicked] = usePerActivityChoice(chosenActivityId, cadenceSetting ?? false);
   const measureCadence = chosen !== null && cadenceSetting !== null && cadencePicked;
-  // Ceinture cardio : proposée par l'activité (course, vélo, fractionné), cochée d'office si Réglages le dit, et toujours pour un test ;
-  // la case vaut pour cet enregistrement.
-  const heartRateOffered = chosen ? effectiveHeartRate(chosen) : null;
-  const heartRateSetting = heartRateOffered === null ? null : heartRateOffered || isTest;
+  // Ceinture cardio : proposée par l'activité, cochée d'office si Réglages le dit ; la case vaut pour cet enregistrement.
+  const heartRateSetting = chosen ? effectiveHeartRate(chosen) : null;
   // Appareil actif, changé d'un geste par « Changer » s'il y en a plusieurs de retenus (lot 198) ; jamais une fois parti.
   const [retainedBelt, setRetainedBelt] = useState<HeartRateBelt | null>(savedBelt);
   const retainedBelts = useMemo(() => savedBelts(), []);
@@ -780,13 +684,12 @@ function RecordingScreen() {
     setRetainedBelt(savedBelt());
     setChoosingBelt(false);
   };
-  // Dans le navigateur, la muscu prend la FC d'exemple.
-  const belt = heartOnly && !native ? EXAMPLE_BELT : retainedBelt;
+  const belt = retainedBelt;
   // Noms montrés : un nom porté par deux appareils prend la fin de leur adresse.
   const retainedLabels = useMemo(() => beltLabels(retainedBelts), [retainedBelts]);
   const beltLabel = belt === null ? '' : retainedLabels[retainedBelts.findIndex((b) => b.address === belt.address)] ?? belt.name;
   const [heartRatePicked, setHeartRatePicked] = usePerActivityChoice(chosenActivityId, heartRateSetting ?? false);
-  const measureHeartRate = chosen !== null && heartRateSetting !== null && belt !== null && !restingChosen && (heartOnly || heartRatePicked);
+  const measureHeartRate = chosen !== null && heartRateSetting !== null && belt !== null && heartRatePicked;
   const [motionCaps, setMotionCaps] = useState<MotionCapabilities | null>(null);
   useEffect(() => {
     let alive = true;
@@ -800,7 +703,7 @@ function RecordingScreen() {
 
   const busy = status !== 'idle';
   // Ceinture cochée : connectée dès maintenant, avant le départ, pour voir qu'elle répond.
-  const beltWarmup = useBeltWarmup(belt, (heartOnly || (native && sourceChoice === 'device')) && measureHeartRate && !busy && pending === null);
+  const beltWarmup = useBeltWarmup(belt, native && sourceChoice === 'device' && measureHeartRate && !busy && pending === null);
   const beltLive = useBeltLive();
   const missingPermissions = useMissingPermissions();
   const analyzing = useRecorderSelector((s) => s.analyzing);
@@ -813,66 +716,20 @@ function RecordingScreen() {
   }
   // Matériel choisi qui n'a pas pu être écrit dans la fiche de la session rangée.
   const [gearNotWritten, setGearNotWritten] = useState(false);
-  // Muscu : pas de départ sans la ceinture connectée (décision du 25/10).
-  const beltMissing = heartOnly && (belt === null || beltLive.state !== 'connected');
-  const canStart = !busy && pending === null && chosen !== null && !restingChosen
-    && (heartOnly ? !beltMissing : sourceChoice === 'device' || replay !== null);
-  // Zone visée : bips de sortie de zone, proposés avec la ceinture connectée et les zones de Pratiquant, jamais pour un test ;
-  // « aucune » à chaque ouverture de la page.
+  const canStart = !busy && pending === null && chosen !== null && hasPositions(chosen.base) && (sourceChoice === 'device' || replay !== null);
+  // Zone visée : bips de sortie de zone, proposés avec la ceinture connectée et les zones de Pratiquant ; « aucune » à chaque
+  // ouverture de la page.
   const zoneBounds = chosen ? readHeartRateZoneBounds(chosen) : null;
   const [zonePicked, setZonePicked] = usePerActivityChoice<ZoneTarget>(chosenActivityId, 0);
-  const zoneOffered = !isTest && measureHeartRate && beltLive.state === 'connected'
-    && (heartOnly || (native && sourceChoice === 'device')) && zoneBounds !== null;
-  // Course à bornes (05/11) : en Entraînement seulement, aux conditions de la zone visée ; « aucun » à chaque ouverture
-  // de la page, les dernières bornes de l'activité pré-remplies.
-  const guideOffered = zoneOffered && chosen !== null && activityFamily(chosen) === 'fractionne';
-  const [guidePicked, setGuidePicked] = usePerActivityChoice<HeartGuideMode>(chosenActivityId, 'aucun');
-  const guideMode: HeartGuideMode = guideOffered ? guidePicked : 'zone';
-  const [bandPicked, setBandPicked] = usePerActivityChoice<HeartBandPicks | null>(chosenActivityId, null);
-  const bandPicks = bandPicked ?? (chosen ? readHeartBandPicks(chosen.id) : null) ?? NO_BAND_PICKS;
-  const guideZones = chosen && guideOffered ? readHeartRateZones(chosen) : null;
-  /** Arme le guidage cardio choisi au départ : zone visée, bornes (retenues pour l'activité) ou rien. */
-  const armHeartGuide = () => {
-    if (!zoneOffered || guideMode === 'aucun') {
-      armZoneAlert(0);
-      return;
-    }
-    if (guideMode === 'bornes' && chosen) {
-      const band = armableBand(bandPicks, guideZones);
-      if (band !== null) {
-        rememberHeartBandPicks(chosen.id, bandPicks);
-        armHeartBand(band);
-      } else {
-        armZoneAlert(0);
-      }
-      return;
-    }
-    armZoneAlert(zonePicked);
-  };
+  const zoneOffered = measureHeartRate && beltLive.state === 'connected' && native && sourceChoice === 'device' && zoneBounds !== null;
   const liveActivity = recordedActivity ?? chosen;
-  // Session sans position, en cours ou choisie : ni carte, ni GPS, ni trace suivie.
-  const liveHeartOnly = liveActivity !== null && !hasPositions(liveActivity.base);
-  const mapReduced = busy && !shown.carte && !liveHeartOnly;
+  const mapReduced = busy && !shown.carte;
   // Téléphone tourné : les grands chiffres à gauche de la carte, sans avoir à la réduire.
   const landscape = usePhoneLandscape();
-  const summaryShown = (mapReduced || (busy && landscape)) && liveActivity !== null && !liveHeartOnly;
+  const summaryShown = (mapReduced || (busy && landscape)) && liveActivity !== null;
   const clockShown = summaryShown && effectiveLiveFields(liveActivity).includes('clock');
-  // Compteur : pour le fractionné choisi (au repos) ou enregistré, pas pour un test, et tant qu'une séance ou le chrono est lancé.
-  const counterOpen = useIntervalTimerOpen();
-  const stopwatchOpen = useStopwatchOpen();
-  const counterActivity = busy ? liveActivity : pending ? null : chosen;
-  const counterFamily = busy ? (liveActivity ? activityFamily(liveActivity) : null) : pending ? null : family;
-  // Muscu : le compteur sur les séances du Timer, lançable avant ou pendant l'enregistrement.
-  const counterTimer = counterActivity !== null && !hasPositions(counterActivity.base);
-  const showCounter = counterOpen || stopwatchOpen
-    || (counterFamily === 'fractionne' && (counterActivity === null || isIntervalSport(counterActivity.base) || counterTimer));
-  // Carte du test : à la place du compteur, pour un test choisi au repos ou guidé pendant l'enregistrement.
-  const fitnessTest = useFitnessTest();
-  const showTest = busy ? fitnessTest.active : pending === null && isTest && !restingChosen;
-  // Écran allumé tant qu'un enregistrement (pause comprise), une séance du compteur (pause comprise) ou le chrono en marche, sur cette page seulement.
-  const counterRunning = useIntervalTimerRunning();
-  const stopwatchRunning = useStopwatchRunning();
-  useScreenOnWhile(busy || counterRunning || stopwatchRunning);
+  // Écran allumé tant qu'un enregistrement tourne (pause comprise), sur cette page seulement.
+  useScreenOnWhile(busy);
 
   // Parcours de balises : la trace suivie a des balises et l'activité navigue sur un parcours (voile, surf). L'avancement se compte par balises.
   const courseMarksOf = followed?.marks && liveActivity && usesMarkCourse(sportFamily(liveActivity.base)) ? followed.marks : null;
@@ -883,7 +740,7 @@ function RecordingScreen() {
   const elevationShown = elevationOffered && shown.denivele;
   const pageRef = useRef<HTMLDivElement>(null);
   const phoneUpright = useNarrowScreen() && !landscape;
-  const mapFit = phoneUpright && elevationShown && busy && !mapReduced && !liveHeartOnly;
+  const mapFit = phoneUpright && elevationShown && busy && !mapReduced;
   useRecMapFit(pageRef, mapFit);
 
   const handleReplayFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -901,19 +758,10 @@ function RecordingScreen() {
   };
 
   /**
-   * « Analyser » : range la session, puis l'ouvre si elle est entrée dans la mémoire. Une sortie à pied
-   * ou à vélo faite avec le compteur d'intervalles : on demande d'abord si elle passe en Fractionné, seule
-   * famille à avoir l'onglet « fractionné » (19/10) ; sinon elle reste dans la sienne, sans cet onglet.
+   * « Analyser » : range la session, puis l'ouvre si elle est entrée dans la mémoire.
    * `withoutMotion` : « Analyser sans les capteurs », proposé après une capture illisible.
    */
   const handleAnalyze = async (withoutMotion = false) => {
-    const intervalActivity = pending?.activity && pending.intervals.length > 0
-      ? intervalActivityFor(pending.activity, activitiesOfFamily(shownActivities, 'fractionne'))
-      : null;
-    const toIntervals = intervalActivity !== null && pending?.activity && window.confirm(
-      `Le compteur d'intervalles a servi pendant cette session. La ranger en « ${intervalActivity.name} » ? `
-      + `Elle aura l'onglet fractionné ; sinon elle reste en « ${pending.activity.name} », sans cet onglet.`
-    );
     const gear = endGear;
     const result = await analyzePendingSession(withoutMotion);
     // Le matériel choisi va dans la fiche, comme le reste ; s'il n'y entre pas, il se refait dans l'onglet de l'analyse.
@@ -922,13 +770,7 @@ function RecordingScreen() {
     if (!gearWritten && result?.libraryFile) window.alert(GEAR_NOT_WRITTEN);
     if (result?.libraryFile) {
       dismissRecorderResult();
-      if (toIntervals && intervalActivity) {
-        const listed = activities.some((a) => a.id === intervalActivity.id);
-        updateSessionRecord(result.libraryFile, { sport: intervalActivity.base, activityId: listed ? intervalActivity.id : null });
-        openSession(result.libraryFile, 'fractionne');
-      } else if (result.sport !== null) {
-        openSession(result.libraryFile, sportFamily(result.sport));
-      }
+      if (result.sport !== null) openSession(result.libraryFile, sportFamily(result.sport));
       // Session à classer (journal sans en-tête) : rangée sans activité, elle se classe depuis la bibliothèque.
     }
   };
@@ -954,23 +796,8 @@ function RecordingScreen() {
 
   const handleStart = () => {
     if (!chosen) return;
-    if (heartOnly) {
-      if (!belt) return;
-      rememberRecordActivity(chosen.id);
-      armHeartGuide();
-      void beltWarmup.handOver(() => startRecording(chosen, null, { heartRate: belt }));
-      return;
-    }
-    // Test sans ceinture connectée (ni FC dans le fichier rejoué) : on demande, sans bloquer.
-    const replayHasHr = sourceChoice === 'replay' && replay !== null && replay.fixes.some((f) => f.heartRateBpm !== undefined);
-    const beltReady = native && sourceChoice === 'device' && measureHeartRate && beltLive.state === 'connected';
-    if (isTest && !beltReady && !replayHasHr && !window.confirm(
-      `Aucune ceinture cardio connectée. Le test ${FITNESS_TESTS[guidedTestId].label} guide l'échauffement sur la FC et en mesure le maximum : `
-      + "sans elle, ni l'un ni l'autre. Démarrer quand même ?"
-    )) return;
     rememberRecordActivity(chosen.id);
-    if (isTest) armFitnessTest(guidedTestId);
-    armHeartGuide();
+    armZoneAlert(zoneOffered ? zonePicked : 0);
     const source = sourceChoice === 'replay' && replay
       ? createReplaySource(replay.fixes, replaySpeed)
       : deviceLocationSource();
@@ -994,28 +821,13 @@ function RecordingScreen() {
 
       {!busy && !pending && <Card className="rec-options">
         <div className="rec-test-form">
-          {/* Boutons glissants en cascade : la famille, puis ses activités ; en Entraînement, le type d'entraînement entre les deux,
-              et ses activités seulement s'il en a plusieurs ; sous Tests, le test et son protocole. */}
+          {/* Boutons glissants en cascade : la famille, puis ses activités. */}
           <div className="ui-stack-2">
             <SegmentedControl fit label="Famille" items={families.map((f) => ({ key: f, label: FAMILY_LABEL[f] }))} value={family}
               accent={FAMILY_ACCENT[family]} onChange={pickFamily} />
-            {kinds.length > 0 && (
-              <SegmentedControl label="Type" items={kinds.map((k) => ({ key: k, label: TRAINING_KIND_LABEL[k] }))} value={chosenKind ?? kinds[0]}
-                accent={FAMILY_ACCENT[family]} onChange={pickKind} />
-            )}
-            {rowActivities.length > (chosenKind ? 1 : 0) && (
+            {familyActivities.length > 0 && (
               <SegmentedControl label="Activité" value={chosenId ?? ''} accent={FAMILY_ACCENT[family]} onChange={setChosenId}
-                items={rowActivities.map((a) => ({ key: a.id, label: chosenKind ? kindActivityLabel(a, chosenKind) : a.name, title: a.name }))} />
-            )}
-            {isTest && (
-              <>
-                <SegmentedControl label="Test" value={testId} accent={FAMILY_ACCENT[family]} onChange={setTestId}
-                  items={[
-                    ...FITNESS_TEST_IDS.map((id) => ({ key: id, label: FITNESS_TESTS[id].label })),
-                    { key: RESTING_HR_TEST.id, label: RESTING_HR_TEST.label },
-                  ]} />
-                <Link to={`/fractionne/tests/${testId}`} className="ui-text-s">Voir le protocole</Link>
-              </>
+                items={familyActivities.map((a) => ({ key: a.id, label: a.name, title: a.name }))} />
             )}
           </div>
           {familyActivities.length === 0 && (
@@ -1024,7 +836,7 @@ function RecordingScreen() {
             </div>
           )}
 
-          {chosen && jumpSettings && native && !restingChosen && (
+          {chosen && jumpSettings && native && (
             <CaptureOption label="Mesurer les sauts" checked={measureJumps && motionCaps?.available === true} disabled={!motionCaps?.available}
               onChange={setJumpPicked}
               note={<>
@@ -1036,7 +848,7 @@ function RecordingScreen() {
               </>} />
           )}
 
-          {chosen && cadenceSetting !== null && native && !restingChosen && (
+          {chosen && cadenceSetting !== null && native && (
             <CaptureOption label="Mesurer la cadence" checked={measureCadence && motionCaps?.available === true} disabled={!motionCaps?.available}
               onChange={setCadencePicked}
               note={motionCaps && !motionCaps.available
@@ -1044,31 +856,26 @@ function RecordingScreen() {
                 : 'Téléphone porté sur soi, où vous voulez : poche, main, brassard, ceinture.'} />
           )}
 
-          {chosen && heartRateSetting !== null && (native || heartOnly) && !restingChosen && (
-            // Muscu : la ceinture d'office, la case ne se décoche pas.
-            <CaptureOption label="Ceinture cardio" checked={measureHeartRate} disabled={belt === null || heartOnly}
+          {chosen && heartRateSetting !== null && native && (
+            <CaptureOption label="Ceinture cardio" checked={measureHeartRate} disabled={belt === null}
               onChange={setHeartRatePicked}
               note={belt === null
-                ? <>Aucune ceinture choisie : <Link to="/parametres">Réglages</Link>, bloc « Capteurs ».{heartOnly && ' La muscu se fait avec elle.'}</>
-                : belt === EXAMPLE_BELT
-                  ? "FC d'exemple du navigateur, pour éprouver la muscu : la vraie ceinture est sur le téléphone."
-                  : <>
-                    {heartOnly
-                      ? `${beltLabel}, portée et humidifiée : la muscu se fait avec elle, sans GPS.`
-                      : `${beltLabel}, portée et humidifiée : elle n'émet qu'au contact de la peau.`}
-                    {retainedBelts.length >= 2 && (
-                      <>{' '}<Button size="s" onClick={() => setChoosingBelt(true)}>Changer</Button></>
-                    )}
-                  </>}>
-              {measureHeartRate && (sourceChoice === 'device' || heartOnly) && (
+                ? <>Aucune ceinture choisie : <Link to="/parametres">Réglages</Link>, bloc « Capteurs ».</>
+                : <>
+                  {`${beltLabel}, portée et humidifiée : elle n'émet qu'au contact de la peau.`}
+                  {retainedBelts.length >= 2 && (
+                    <>{' '}<Button size="s" onClick={() => setChoosingBelt(true)}>Changer</Button></>
+                  )}
+                </>}>
+              {measureHeartRate && sourceChoice === 'device' && (
                 <span className="ui-text-s rec-indent">
                   <BeltStatus state={beltLive.state} bpm={beltLive.bpm}
                     offText={beltWarmup.error ? `connexion impossible : ${beltWarmup.error}` : null}>
                     {beltWarmup.error && (
                       <Button size="s" onClick={beltWarmup.retry}>Réessayer</Button>
                     )}
-                    {/* Ceinture encore cherchée (lot 198) : on peut y renoncer, comme en décochant la case (pas en muscu, qui se fait avec elle). */}
-                    {!heartOnly && (beltLive.state === 'connecting' || beltLive.state === 'searching' || beltLive.state === 'lost') && (
+                    {/* Ceinture encore cherchée (lot 198) : on peut y renoncer, comme en décochant la case. */}
+                    {(beltLive.state === 'connecting' || beltLive.state === 'searching' || beltLive.state === 'lost') && (
                       <Button size="s" onClick={() => setHeartRatePicked(false)}>Annuler la recherche</Button>
                     )}
                   </BeltStatus>
@@ -1086,28 +893,12 @@ function RecordingScreen() {
             </ChoiceSheet>
           )}
 
-          {chosen && guideOffered && (
-            // Entraînement : zone visée ou bornes de BPM (course à bornes, 05/11).
-            <div className="ui-stack-1 rec-indent">
-              <span className="ui-muted ui-text-s">Guidage cardio</span>
-              <SegmentedControl label="Guidage cardio" value={guidePicked} onChange={setGuidePicked}
-                items={HEART_GUIDE_MODES.map((mode) => ({ key: mode, label: HEART_GUIDE_LABEL[mode] }))} />
-            </div>
-          )}
-
-          {chosen && zoneOffered && guideMode === 'zone' && (
+          {chosen && zoneOffered && (
             // Bips de sortie de zone : deux bips trop haut, trois trop bas, un au retour.
             <div className="ui-stack-1 rec-indent">
               <span className="ui-muted ui-text-s">Zone visée</span>
               <SegmentedControl label="Zone visée" value={String(zonePicked)} onChange={(key) => setZonePicked(Number(key) as ZoneTarget)}
                 items={ZONE_TARGETS.map((zone) => ({ key: String(zone), label: zone === 0 ? 'aucune' : zoneLabel(zone) }))} />
-            </div>
-          )}
-
-          {chosen && guideOffered && guideMode === 'bornes' && (
-            // Mêmes bips que la zone visée, hors des bornes.
-            <div className="rec-indent">
-              <HeartBandPicker picks={bandPicks} onChange={setBandPicked} zones={guideZones} />
             </div>
           )}
 
@@ -1127,7 +918,7 @@ function RecordingScreen() {
                 : 'Téléphone fixé sur la poitrine : virages de chaque vague, plus fins que ceux du GPS (Réglages).'} />
           )}
 
-          {restingChosen || heartOnly ? null : native ? (
+          {native ? (
             <div><span className="ui-eyebrow">Source</span> <span className="ui-ml-8">GPS du téléphone</span></div>
           ) : (
             <div className="ui-stack-8">
@@ -1174,16 +965,6 @@ function RecordingScreen() {
           )}
           <StopButton status={status} />
         </div>
-      ) : !pending && restingChosen ? (
-        // FC repos : pas d'enregistrement, le test se fait sur sa page.
-        <Card>
-          <p className="rec-lead">
-            Test de {RESTING_HR_TEST.durationS / 60} min, assis ou allongé, ceinture cardio portée, sans GPS : il se fait sur sa page.
-          </p>
-          <Button variant="record" size="l" block onClick={() => navigate(RESTING_HR_PATH)}>
-            Ouvrir le test
-          </Button>
-        </Card>
       ) : !pending && (
         // Au repos, la moitié du bouton choisit une trace à suivre ; l'un sous l'autre quand la place manque (écran
         // étroit, texte d'Android agrandi).
@@ -1192,19 +973,10 @@ function RecordingScreen() {
             <span className="ui-record-dot" />
             Démarrer
           </Button>
-          {!heartOnly && (
-            <Button variant="secondary" size="l" className="rec-action-btn" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
-              <IconRoute size={20} />
-              Suivre une trace
-            </Button>
-          )}
-          {beltMissing && (
-            <p className="rec-actions-note">
-              {belt === null
-                ? 'La muscu se fait avec la ceinture cardio : choisissez-la dans Réglages, bloc « Capteurs ».'
-                : "La muscu se fait avec la ceinture cardio : « Démarrer » attend qu'elle soit connectée. Portez-la, électrodes humidifiées."}
-            </p>
-          )}
+          <Button variant="secondary" size="l" className="rec-action-btn" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
+            <IconRoute size={20} />
+            Suivre une trace
+          </Button>
         </div>
       )}
 
@@ -1224,7 +996,7 @@ function RecordingScreen() {
             <label className="rec-status__activity">
               <span className="ui-eyebrow">Activité</span>
               <ActivitySelect
-                activities={activities.filter((a) => hasPositions(a.base) === !liveHeartOnly)}
+                activities={activities.filter((a) => hasPositions(a.base))}
                 value={liveActivity.id}
                 extra={liveActivity}
                 className="ui-field"
@@ -1235,9 +1007,9 @@ function RecordingScreen() {
         </div>
       )}
 
-      {picking && !busy && !pending && !heartOnly && <FollowTracePicker onClose={() => setPicking(false)} onPicked={proposeActivityOf} />}
+      {picking && !busy && !pending && <FollowTracePicker onClose={() => setPicking(false)} onPicked={proposeActivityOf} />}
 
-      {followed && !liveHeartOnly && (
+      {followed && (
         <div className="ui-alert ui-row-10 ui-center ui-wrap rec-follow">
           <IconRoute size={18} />
           <span className="ui-grow">
@@ -1253,9 +1025,7 @@ function RecordingScreen() {
 
       {manualPause && (
         <div className="ui-alert ui-alert--warning">
-          {liveHeartOnly
-            ? 'En pause : les mesures de la ceinture ne sont pas gardées.'
-            : `En pause : rien n'est compté ; le GPS reste allumé pour la carte${measuringMotion ? ', la mesure des capteurs est suspendue' : ''}.`}
+          {`En pause : rien n'est compté ; le GPS reste allumé pour la carte${measuringMotion ? ', la mesure des capteurs est suspendue' : ''}.`}
         </div>
       )}
       {busy && measuringMotion && status !== 'paused' && (
@@ -1267,27 +1037,22 @@ function RecordingScreen() {
 
       {error && <div className="ui-alert ui-alert--danger">{error}</div>}
 
-      {showCounter && <IntervalCard kind={counterTimer ? 'timer' : 'fractionne'} recording={busy} muscu={counterTimer}
-        stopRecording={<StopButton status={status} inCounter />} />}
-
-      {showTest && <FitnessTestCard testId={guidedTestId} activity={liveActivity} />}
-
       {liveActivity && <MarkGuideSlot activity={liveActivity} />}
 
-      {(busy || (followed && !pending)) && !mapReduced && !liveHeartOnly && (
+      {(busy || (followed && !pending)) && !mapReduced && (
         <RecordingMap busy={busy} followed={followed} courseMarksOf={courseMarksOf} liveActivity={liveActivity} family={family}
           onReduce={() => toggleShown('carte')} hoverPoints={elevationShown && followed ? followedProfile(followed).rows : undefined} />
       )}
 
       {/* Carte réduite : elle n'est plus dessinée, les vitesses prennent sa place ; tourné, elles sont à côté d'elle. */}
-      {mapReduced && !liveHeartOnly && <Button variant="secondary" block onClick={() => toggleShown('carte')}>Afficher la carte</Button>}
+      {mapReduced && <Button variant="secondary" block onClick={() => toggleShown('carte')}>Afficher la carte</Button>}
       {elevationShown && followed && liveActivity && <FollowedElevation trace={followed} activity={liveActivity} busy={busy} />}
       {busy && (
         <RecordingFigures summaryShown={summaryShown} clockShown={clockShown} liveActivity={liveActivity} followed={followed}
           courseMarksOf={courseMarksOf} followedLengthM={followedLengthM} />
       )}
 
-      <RecordingGpsCard busy={busy} liveHeartOnly={liveHeartOnly} deviceGps={native && sourceChoice === 'device'} />
+      <RecordingGpsCard busy={busy} deviceGps={native && sourceChoice === 'device'} />
 
       {pending && (
         <Card heading={(
@@ -1392,30 +1157,4 @@ function RecordingScreen() {
   );
 }
 
-/**
- * Enregistrer en mode Timer : la carte du compteur seule, sur les séances du
- * Timer, écran allumé tant qu'une séance ou le chrono tourne. Rien n'y
- * démarre le GPS ; « Enregistrer une session » rend la page ordinaire.
- */
-function TimerScreen() {
-  const counterRunning = useIntervalTimerRunning();
-  const stopwatchRunning = useStopwatchRunning();
-  useScreenOnWhile(counterRunning || stopwatchRunning);
-  return (
-    <div className="ui-page rec-page" style={{ '--help-accent': FAMILY_ACCENT.fractionne } as React.CSSProperties}>
-      <PageHeader title="Timer" back={{ to: WORKOUT_LISTS.timer.listPath, label: 'Séances' }}
-        subtitle="Le compteur seul : sans GPS, aucune session n'est enregistrée." />
-      <IntervalCard kind="timer" recording={false} />
-      <Link to="/enregistrer" replace className="rec-link-start">Enregistrer une session</Link>
-    </div>
-  );
-}
-
-/** Enregistrer : en mode Timer (`?minuterie`) tant que rien n'enregistre, sinon la page ordinaire. */
-function RecordingPage() {
-  const [params] = useSearchParams();
-  const idle = useRecorderStatus() === 'idle';
-  return params.has('minuterie') && idle ? <TimerScreen /> : <RecordingScreen />;
-}
-
-export default RecordingPage;
+export default RecordingScreen;

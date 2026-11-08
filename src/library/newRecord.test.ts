@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { IMU_FORMAT, IMU_VERSION, PHONE_STREAMS, encodeImu } from '../core/imuFile';
 import { JUMPS_CALC_VERSION } from '../core/jumps';
-import type { SessionTest } from '../recording/fitnessTest';
 import { sessionRecord } from '../test/record.fixture';
 import { newRecord, recordFor, type NewRecordContext } from './newRecord';
 import { RECORD_FORMAT, RECORD_VERSION } from './record';
@@ -25,7 +24,6 @@ const context = (legacy: Record<string, unknown> | null = null): NewRecordContex
 };
 
 // Le contenu du test guidé n'est pas lu ici : seul compte qu'il soit rangé tel quel.
-const TEST = { protocol: 'fcmax' } as unknown as SessionTest;
 
 const motionWithJumps = (jumps: boolean) => encodeImu({
   format: IMU_FORMAT, version: IMU_VERSION, startedAtMs: NOW, clock: { elapsedUs: 0, wallMs: NOW },
@@ -57,16 +55,16 @@ describe('fiche d’une session qui entre dans la mémoire (lot 113)', () => {
     expect(ctx.reads).toBe(0);
   });
 
-  it('range dans une fiche neuve le foil, les séances, les repères et le test de l’enregistrement', () => {
+  it('range dans une fiche neuve le foil et les repères de l’enregistrement ; ni séances ni test (lot 302)', () => {
     const record = recordFor('c.gpx', analyzed, 'enregistrement', {
-      activityId: 'wing', foil: true, intervals: [], marks: [{ timeMs: NOW, lat: null, lon: null, label: 'bouée' }], test: TEST,
+      activityId: 'wing', foil: true, marks: [{ timeMs: NOW, lat: null, lon: null, label: 'bouée' }],
     }, context());
     expect(record.activityId).toBe('wing');
     expect(record.analysis?.foil).toBe(true);
     expect(record.analysis?.savedAt).toBe(NOW);
     expect(record.intervals).toBeUndefined();
     expect(record.marks).toHaveLength(1);
-    expect(record.test).toBe(TEST);
+    expect(record.test).toBeUndefined();
   });
 
   it('dit tout de suite « pas de sauts à chercher » pour une capture de la seule cadence', async () => {

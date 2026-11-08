@@ -1,11 +1,9 @@
 package io.github.segneur.tracker;
 
-import android.content.Intent;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
 import android.util.Log;
-import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -17,8 +15,9 @@ import org.json.JSONObject;
 
 /**
  * Bips et vibrations : le guidage vers les balises d'un parcours de voile
- * (src/recording/markGuide.ts, src/platform/beeper.ts), et le compteur du
- * fractionné (src/platform/intervalClock.ts), confié à IntervalTimerService.
+ * (src/recording/markGuide.ts, src/platform/beeper.ts), et les motifs joués une
+ * fois (zone visée, test de FC repos, « Écouter » de Réglages). Le compteur du
+ * fractionné et son service sont partis avec l'Entraînement (lot 302).
  *
  * Le rythme des balises est tenu ici, sur un fil à lui : écran éteint, les
  * minuteries de la WebView sont bridées, pas celles d'Android, et le service
@@ -79,7 +78,7 @@ public class BeeperPlugin extends Plugin {
 
     /**
      * Échéance de la veille de la ceinture (lot 177), sur le fil des bips : les bips d'approche continuent.
-     * Écran éteint, le verrou partiel est celui du service GPS, ou de HeartRateService en muscu.
+     * Écran éteint, le verrou partiel est celui du service GPS.
      */
     private final Runnable beltLost = new Runnable() {
         @Override
@@ -159,8 +158,8 @@ public class BeeperPlugin extends Plugin {
 
     /**
      * Un motif joué une fois, chaque son (court, long, final) à son délai en
-     * millisecondes : « Écouter » de Réglages, signaux des tests. Il ne touche
-     * ni au rythme des balises ni au service du compteur.
+     * millisecondes : « Écouter » de Réglages, zone visée, test de FC repos. Il
+     * ne touche pas au rythme des balises.
      */
     @PluginMethod
     public void pattern(PluginCall call) {
@@ -172,15 +171,15 @@ public class BeeperPlugin extends Plugin {
             for (int i = 0; i < list.length(); i++) {
                 JSONObject tone = list.getJSONObject(i);
                 delays[i] = Math.max(0, tone.getLong("delayMs"));
-                kinds[i] = IntervalTimerService.toneKind(tone.optString("tone", "court"));
+                kinds[i] = TonePlayer.toneKind(tone.optString("tone", "court"));
             }
             Handler h = handler();
             for (int i = 0; i < delays.length; i++) {
                 int kind = kinds[i];
                 h.postDelayed(() -> {
-                    if (kind == IntervalTimerService.TONE_FINAL) tones().playFinal(vibrateRequested);
-                    else if (kind == IntervalTimerService.TONE_LONG) tones().playLong(vibrateRequested);
-                    else if (kind == IntervalTimerService.TONE_BRIEF) tones().playBrief(vibrateRequested);
+                    if (kind == TonePlayer.TONE_FINAL) tones().playFinal(vibrateRequested);
+                    else if (kind == TonePlayer.TONE_LONG) tones().playLong(vibrateRequested);
+                    else if (kind == TonePlayer.TONE_BRIEF) tones().playBrief(vibrateRequested);
                     else tones().playShort(vibrateRequested);
                 }, delays[i]);
             }
@@ -191,7 +190,7 @@ public class BeeperPlugin extends Plugin {
         }
     }
 
-    /** Hauteur de tous les bips, en hertz (Réglages) : ceux d'ici et ceux du compteur. */
+    /** Hauteur de tous les bips, en hertz (Réglages). */
     @PluginMethod
     public void setPitch(PluginCall call) {
         Integer hz = call.getInt("hz");
@@ -260,61 +259,6 @@ public class BeeperPlugin extends Plugin {
             if (tones != null) tones.release();
             tones = null;
         });
-        call.resolve();
-    }
-
-    /**
-     * Compteur du fractionné : remplace le programme en cours par celui-ci
-     * (sons et changements de phase, chacun à un délai en millisecondes) et
-     * lance le service qui le joue, écran éteint compris ; `stopAfterMs` : le
-     * service s'arrête de lui-même après ce délai (fin de séance), 0 jamais.
-     */
-    @PluginMethod
-    public void scheduleIntervals(PluginCall call) {
-        JSArray toneList = call.getArray("tones", new JSArray());
-        JSArray cueList = call.getArray("cues", new JSArray());
-        try {
-            long[] toneDelays = new long[toneList.length()];
-            int[] toneKinds = new int[toneList.length()];
-            for (int i = 0; i < toneList.length(); i++) {
-                JSONObject tone = toneList.getJSONObject(i);
-                toneDelays[i] = tone.getLong("delayMs");
-                toneKinds[i] = IntervalTimerService.toneKind(tone.optString("tone", "court"));
-            }
-            long[] cueDelays = new long[cueList.length()];
-            long[] cuePhaseMs = new long[cueList.length()];
-            String[] cueTitles = new String[cueList.length()];
-            for (int i = 0; i < cueList.length(); i++) {
-                JSONObject cue = cueList.getJSONObject(i);
-                cueDelays[i] = cue.getLong("delayMs");
-                cuePhaseMs[i] = cue.optLong("phaseMs", 0);
-                cueTitles[i] = cue.optString("title", "");
-            }
-            Intent intent = new Intent(getContext(), IntervalTimerService.class)
-                .setAction(IntervalTimerService.ACTION_SCHEDULE)
-                .putExtra(IntervalTimerService.EXTRA_TONE_DELAYS, toneDelays)
-                .putExtra(IntervalTimerService.EXTRA_TONE_KINDS, toneKinds)
-                .putExtra(IntervalTimerService.EXTRA_CUE_DELAYS, cueDelays)
-                .putExtra(IntervalTimerService.EXTRA_CUE_PHASE_MS, cuePhaseMs)
-                .putExtra(IntervalTimerService.EXTRA_CUE_TITLES, cueTitles)
-                .putExtra(IntervalTimerService.EXTRA_VIBRATE, Boolean.TRUE.equals(call.getBoolean("vibrate", false)))
-                .putExtra(IntervalTimerService.EXTRA_STOP_AFTER_MS, (long) call.getInt("stopAfterMs", 0));
-            ContextCompat.startForegroundService(getContext(), intent);
-            call.resolve();
-        } catch (JSONException | RuntimeException e) {
-            Log.w(TAG, "Compteur impossible à lancer", e);
-            call.reject("Compteur impossible à lancer.");
-        }
-    }
-
-    /**
-     * Arrête le compteur du fractionné : silence, plus de notification, même
-     * restée seule d'un service déjà arrêté (lot 143).
-     */
-    @PluginMethod
-    public void stopIntervals(PluginCall call) {
-        getContext().stopService(new Intent(getContext(), IntervalTimerService.class));
-        IntervalTimerService.cancelNotification(getContext());
         call.resolve();
     }
 

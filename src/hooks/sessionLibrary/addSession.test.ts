@@ -4,7 +4,6 @@ import type { RecordWithoutSummary, SessionAnalysis, SessionSource } from '../..
 import { analyzeGpx } from '../../library/summaryOptions';
 import { handleTrackRequest, type TrackRequest, type TrackResponse } from '../../library/trackWorkerProtocol';
 import type { MemoryFolder } from '../../platform/memoryFolder';
-import type { SessionTest } from '../../recording/fitnessTest';
 import { settle, trackTestTimers } from '../../test/library.fixture';
 import { createFakeFolder } from '../../test/memoryFolder.fixture';
 import { sessionRecord } from '../../test/record.fixture';
@@ -134,22 +133,6 @@ const analysis = (patch: Partial<SessionAnalysis>): SessionAnalysis => ({
   windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, effortThresholdMs: null, foil: null, waveThreshold: null, ...patch,
 } as SessionAnalysis);
 
-const TEST_START = Date.UTC(2026, 10, 4, 8);
-const TEST: SessionTest = {
-  protocol: 'fc-max',
-  version: 1,
-  settings: { warmupS: 480, age: 35, ageSource: 'profil', lowBpm: 110, highBpm: 147, zoneMethod: 'max' },
-  startMs: TEST_START,
-  rampStartMs: TEST_START + 5_000,
-  v0Ms: 2.5,
-  steps: [{ startMs: TEST_START + 5_000, targetMs: 2.5 }],
-  rampEndMs: null,
-  dropMs: null,
-  endReason: null,
-  endMs: null,
-  signals: [{ t: TEST_START, s: 'debut' }],
-};
-
 const sail = (hz: number, meta?: { name: string; type: string }): string => gpxOf(sailRaw({ windDeg: 20, legs: upDownLegs(2, 60), hz }), 'simple', meta);
 const run = (hz: number, meta?: { name: string; type: string }): string => gpxOf(sailRaw({ windDeg: 0, legs: upDownLegs(2, 60), hz, polar: slowPolar }), 'simple', meta);
 
@@ -164,10 +147,10 @@ interface Case {
 
 const CASES: Case[] = [
   {
-    name: 'sport imposé, activité et test d’un enregistrement',
+    name: 'sport imposé et activité d’un enregistrement',
     text: (hz) => run(hz),
     source: 'enregistrement',
-    options: { sport: 'running', activityId: 'a-marche', test: TEST, intervals: [], marks: [] },
+    options: { sport: 'running', activityId: 'a-marche', marks: [] },
     sport: 'running',
   },
   {

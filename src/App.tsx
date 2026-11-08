@@ -20,7 +20,6 @@ const loaders = {
   SessionLibrary: () => import('./pages/SessionLibrary'),
   RecordingPage: () => import('./pages/RecordingPage'),
   LandModule: () => import('./pages/LandModule'),
-  MuscuModule: () => import('./pages/MuscuModule'),
   SailingModule: () => import('./pages/SailingModule'),
   SurfModule: () => import('./pages/SurfModule'),
   SettingsPage: () => import('./pages/SettingsPage'),
@@ -28,10 +27,6 @@ const loaders = {
   RoutesPage: () => import('./pages/RoutesPage'),
   StatisticsPage: () => import('./pages/StatisticsPage'),
   ProfilePage: () => import('./pages/ProfilePage'),
-  TrainingSessionsPage: () => import('./pages/TrainingSessionsPage'),
-  TrainingSessionEditPage: () => import('./pages/TrainingSessionEditPage'),
-  TestsPage: () => import('./pages/TestsPage'),
-  FitnessTestPage: () => import('./pages/FitnessTestPage'),
   RestingHrTestPage: () => import('./pages/RestingHrTestPage'),
   TutorialsPage: () => import('./pages/TutorialsPage'),
   TutorialPage: () => import('./pages/TutorialPage'),
@@ -40,7 +35,6 @@ const loaders = {
 const SessionLibrary = lazy(loaders.SessionLibrary);
 const RecordingPage = lazy(loaders.RecordingPage);
 const LandModule = lazy(loaders.LandModule);
-const MuscuModule = lazy(loaders.MuscuModule);
 const SailingModule = lazy(loaders.SailingModule);
 const SurfModule = lazy(loaders.SurfModule);
 const SettingsPage = lazy(loaders.SettingsPage);
@@ -48,10 +42,6 @@ const PlanningPage = lazy(loaders.PlanningPage);
 const RoutesPage = lazy(loaders.RoutesPage);
 const StatisticsPage = lazy(loaders.StatisticsPage);
 const ProfilePage = lazy(loaders.ProfilePage);
-const TrainingSessionsPage = lazy(loaders.TrainingSessionsPage);
-const TrainingSessionEditPage = lazy(loaders.TrainingSessionEditPage);
-const TestsPage = lazy(loaders.TestsPage);
-const FitnessTestPage = lazy(loaders.FitnessTestPage);
 const RestingHrTestPage = lazy(loaders.RestingHrTestPage);
 const TutorialsPage = lazy(loaders.TutorialsPage);
 const TutorialPage = lazy(loaders.TutorialPage);
@@ -68,9 +58,8 @@ const PRELOAD_FALLBACK_MS = 1500;
  */
 const preloadPages = (): (() => void) => {
   const order: (keyof typeof loaders)[] = [
-    'RecordingPage', 'SessionLibrary', 'LandModule', 'SailingModule', 'SurfModule', 'MuscuModule', 'StatisticsPage', 'ProfilePage',
-    'SettingsPage', 'PlanningPage', 'RoutesPage', 'TrainingSessionsPage', 'TrainingSessionEditPage', 'TestsPage',
-    'FitnessTestPage', 'RestingHrTestPage', 'TutorialPage', 'TutorialsPage',
+    'RecordingPage', 'SessionLibrary', 'LandModule', 'SailingModule', 'SurfModule', 'StatisticsPage', 'ProfilePage',
+    'SettingsPage', 'PlanningPage', 'RoutesPage', 'RestingHrTestPage', 'TutorialPage', 'TutorialsPage',
   ];
   let cancelled = false;
   let handle: number | null = null;
@@ -93,15 +82,19 @@ const preloadPages = (): (() => void) => {
 };
 
 /**
- * Analyse de l'Entraînement : `LandModule`, sauf pour une session sans trace
- * (muscu, lot I du 25/10), analysée par `MuscuModule`, sans carte. Le calcul
- * se lit dans la fiche de la session demandée (`?session=`) ; tant que la
- * bibliothèque ne la connaît pas, rien n'est chargé (`useSessionFromUrl`).
+ * Analyse d'une session de l'Entraînement, famille retirée de cette version
+ * (lot 302) mais dont les sessions déjà rangées restent lisibles :
+ * `LandModule` ; une session sans trace (muscu) n'a plus d'analyse et renvoie
+ * à la bibliothèque de la famille. Le calcul se lit dans la fiche de la
+ * session demandée (`?session=`) ; tant que la bibliothèque ne la connaît pas,
+ * rien n'est chargé (`useSessionFromUrl`).
  */
 function TrainingAnalysis() {
   const [params] = useSearchParams();
   const sport = useLibrarySession(params.get('session'))?.record.sport ?? null;
-  return sport !== null && !hasPositions(sport) ? <MuscuModule /> : <LandModule key="fractionne" family="fractionne" />;
+  return sport !== null && !hasPositions(sport)
+    ? <Navigate to="/fractionne" replace />
+    : <LandModule key="fractionne" family="fractionne" />;
 }
 
 /** Ancienne adresse du test de FC repos (sous l'Entraînement jusqu'au lot 301) : la nouvelle, sous le Profil, réglages d'adresse gardés. */
@@ -140,15 +133,10 @@ function App() {
           <Route path="/velo/analyse" element={<LandModule key="velo" family="velo" />} />
           <Route path="/fractionne" element={<SessionLibrary key="fractionne" family="fractionne" />} />
           <Route path="/fractionne/analyse" element={<TrainingAnalysis />} />
-          {/* Entraînement : ses pages à lui, sous sa bibliothèque (24/10). */}
-          <Route path="/fractionne/seances" element={<TrainingSessionsPage key="fractionne" kind="fractionne" />} />
-          <Route path="/fractionne/seances/editer" element={<TrainingSessionEditPage key="fractionne" kind="fractionne" />} />
-          <Route path="/fractionne/timer" element={<TrainingSessionsPage key="timer" kind="timer" />} />
-          <Route path="/fractionne/timer/editer" element={<TrainingSessionEditPage key="timer" kind="timer" />} />
-          <Route path="/fractionne/tests" element={<TestsPage />} />
-          <Route path="/fractionne/tests/fc-max" element={<FitnessTestPage />} />
           {/* Ancienne adresse du test de FC repos, passé sous le Profil (lot 301). */}
           <Route path="/fractionne/tests/fc-repos" element={<RestingHrRedirect />} />
+          {/* Pages de l'Entraînement retirées (lot 302 : séances, timer, tests) : vers l'accueil. */}
+          <Route path="/fractionne/*" element={<Navigate to="/" replace />} />
           <Route path="/surf" element={<SessionLibrary key="surf" family="surf" />} />
           <Route path="/surf/analyse" element={<SurfModule />} />
           <Route path="/enregistrer" element={<RecordingPage />} />

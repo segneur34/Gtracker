@@ -154,29 +154,14 @@ export const LESSONS: readonly Lesson[] = [
   {
     id: 'cardio',
     title: 'Ceinture cardio et zones',
-    hook: 'La ceinture, vos fréquences cardiaques et les tests guidés.',
+    hook: 'La ceinture, vos fréquences cardiaques et le test de FC repos.',
     icon: 'cardio',
-    target: '/fractionne/seances',
+    target: '/profil',
     body: [
       "Une ceinture cardio Bluetooth se relie dans Réglages › Capteurs ; une fois retenue, l'enregistrement la reprend.",
       'Dans Réglages › Pratiquant, la FC max et la FC de repos fixent vos zones cardiaques, et leurs seuils se règlent au même endroit. Sans FC max, elle est estimée par l\'âge.',
-      'Deux tests guidés les mesurent : la FC max, une course de plus en plus rapide annoncée par des bips, et la FC de repos, trois minutes immobile. Ils sont dans Entraînement, sous « Fractionné et tests ».',
+      'Un test guidé mesure la FC de repos, trois minutes immobile : il est dans le Profil.',
       "L'onglet « cardio » des analyses montre le temps passé dans chaque zone.",
-    ],
-  },
-  {
-    id: 'fractionne',
-    title: 'Le fractionné',
-    hook: 'Des séances à répétitions, et un compteur qui vous guide.',
-    families: ['fractionne'],
-    icon: 'fractionne',
-    target: '/fractionne',
-    body: [
-      "Dans Entraînement, « Fractionné et tests » range vos séances : échauffement, répétitions d'effort et de récupération, retour au calme.",
-      'Chaque phase se règle en durée ou en distance, avec la zone à tenir.',
-      "À l'enregistrement, choisissez la séance : le compteur annonce chaque phase par des bips, écran éteint compris.",
-      "L'onglet « fractionné » de l'analyse détaille chaque répétition.",
-      "À côté, le Timer enchaîne des temps d'effort et de repos sans GPS, pour la musculation.",
     ],
   },
   {

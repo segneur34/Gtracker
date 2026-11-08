@@ -5,10 +5,10 @@ import { EMPTY_RECORDING_STATS, addFixAfterManualPause, addFixToStats, recording
 
 const T0 = Date.UTC(2026, 10, 4, 9, 0, 0);
 const OFFER_S = 600;
-const GPS_ALIVE = { gps: true, belt: false };
+const GPS_ALIVE = { gps: true };
 
 const facts = (patch: Partial<NonNullable<RecoveryFacts['journal']>> = {}, rest: Partial<RecoveryFacts> = {}): RecoveryFacts => ({
-  journal: { hasHeader: true, stopped: false, lastLineMs: T0, withPositions: true, ...patch },
+  journal: { hasHeader: true, stopped: false, lastLineMs: T0, ...patch },
   services: NO_RECOVERY_SERVICES,
   nowMs: T0,
   offerMaxAgeS: OFFER_S,
@@ -19,12 +19,6 @@ describe('recoveryDecision', () => {
   it('service vivant et journal : reprise, quel que soit son âge', () => {
     expect(recoveryDecision(facts({}, { services: GPS_ALIVE }))).toBe('resume');
     expect(recoveryDecision(facts({}, { services: GPS_ALIVE, nowMs: T0 + 5 * 3600_000 }))).toBe('resume');
-  });
-
-  it('sans position, c\'est le service de la ceinture qui vaut preuve, pas celui du GPS', () => {
-    expect(recoveryDecision(facts({ withPositions: false }, { services: { gps: false, belt: true } }))).toBe('resume');
-    expect(recoveryDecision(facts({ withPositions: false }, { services: GPS_ALIVE }))).toBe('offer');
-    expect(recoveryDecision(facts({ withPositions: true }, { services: { gps: false, belt: true } }))).toBe('offer');
   });
 
   it('application tuée : « Continuer » proposé à 9 min 59, plus à 10 min ni à 10 min 01', () => {
@@ -51,7 +45,6 @@ describe('recoveryDecision', () => {
   it('sans journal : rien, sauf un service qui tourne pour personne', () => {
     expect(recoveryDecision({ journal: null, services: NO_RECOVERY_SERVICES, nowMs: T0, offerMaxAgeS: OFFER_S })).toBe('none');
     expect(recoveryDecision({ journal: null, services: GPS_ALIVE, nowMs: T0, offerMaxAgeS: OFFER_S })).toBe('stopServices');
-    expect(recoveryDecision({ journal: null, services: { gps: false, belt: true }, nowMs: T0, offerMaxAgeS: OFFER_S })).toBe('stopServices');
   });
 });
 
@@ -177,7 +170,7 @@ describe('journal rouvert', () => {
     expect(lifted.resumedPause).toEqual({ atMs: T0 + 2000, autoPartMs: 0 });
     const closed = parseJournal(`${header}${fix(1)}${journalPauseLine(T0 + 2000)}${journalResumeLine(T0 + 5000)}${journalBreakLine(T0 + 6000)}${fix(6)}`);
     expect(closed.resumedPause).toBeNull();
-    expect(closed.manualBreaks).toEqual([{ fixIndex: 1, heartIndex: 0, autoPartMs: 0 }]);
+    expect(closed.manualBreaks).toEqual([{ fixIndex: 1, autoPartMs: 0 }]);
   });
 
   it('une frontière d\'une pause automatique n\'est pas une pause manuelle', () => {

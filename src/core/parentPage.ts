@@ -9,11 +9,8 @@ export const RESTING_HR_PATH = '/profil/fc-repos';
 /**
  * Page au-dessus d'une adresse, où renvoie la touche retour d'Android (et le
  * geste du bord de l'écran) : l'analyse d'une session renvoie à la
- * bibliothèque de sa famille, comme le lien « ← » de son en-tête, et une page
- * de l'Entraînement (séances du fractionné ou du Timer et leur édition, tests) à la page au-dessus d'elle,
- * un test à « Fractionné et tests » (`/fractionne/seances`, où sont ses tuiles depuis le lot I), celui de
- * FC repos au Profil, où est son entrée depuis le lot 301 ;
- * Enregistrer en mode Timer (`?minuterie`) renvoie à la liste du Timer ; une
+ * bibliothèque de sa famille, comme le lien « ← » de son en-tête, et le test
+ * de FC repos au Profil, où est son entrée depuis le lot 301 ; une
  * leçon des tutoriels à leur liste, et celle-ci à Réglages ; les
  * Statistiques remontent d'un cran (activité, famille, vue d'ensemble), la
  * période gardée ; toute autre page renvoie à l'accueil. `null` à l'accueil :
@@ -28,11 +25,6 @@ export const parentPage = (pathname: string, search: string): string | null => {
   }
   // Le test de FC repos : le Profil, où est son entrée.
   if (path === RESTING_HR_PATH) return '/profil';
-  // Un test : « Fractionné et tests », où sont ses tuiles.
-  if (parts[0] === 'fractionne' && parts[1] === 'tests' && parts.length > 2) return '/fractionne/seances';
-  // Pages de l'Entraînement (séances du fractionné, Timer) : un cran plus haut, jusqu'à sa bibliothèque.
-  if (parts[0] === 'fractionne' && ['seances', 'timer', 'tests'].includes(parts[1])) return `/${parts.slice(0, -1).join('/')}`;
-  if (path === '/enregistrer' && new URLSearchParams(search).has('minuterie')) return '/fractionne/timer';
   // Tutoriels (lot 147) : une leçon remonte à la liste, d'où qu'on l'ait ouverte (carte de l'accueil comprise), la liste à Réglages.
   if (parts[0] === 'tutoriels') return parts.length > 1 ? '/tutoriels' : '/parametres';
   if (path === '/statistiques') {

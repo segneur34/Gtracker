@@ -630,7 +630,6 @@ function StatisticsPage() {
                       )}
                       {family === 'surf' && totals.longestWaveM !== null && <StatTile label="Plus longue vague" value={`${Math.round(totals.longestWaveM)} m`} />}
                       {family === 'surf' && totals.longestFlightS !== null && <StatTile label="Plus long vol" value={formatShortDuration(totals.longestFlightS)} />}
-                      {totals.reps > 0 && <StatTile label="Répétitions du compteur" value={totals.reps} />}
                     </div>
                     {family === null && (
                       <ul className="stats-rows">

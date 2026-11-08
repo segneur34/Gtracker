@@ -82,7 +82,6 @@ Vérifications et banc se lancent depuis la conversation par `npm run verif`, `n
 - Surbrillance sur la carte d'une analyse (top, podium, zone de pente, répétition, saut) : par `useMapHighlight`, rattachée à son onglet, couleurs de `components/highlightColors.ts`.
 - Métrique de manœuvre : `ManeuverLocation` (`sailing/maneuvers.ts`), puis `MANEUVER_METRICS` et `summarizeManeuvers` (`sailing/sailingAnalytics.ts`).
 - Donnée propre à une session (notes, vent saisi, seuil d'activité, allure imposée, foil, pumping, poids du vélo, charge portée, repères du bouton « Note », support et activité) : dans sa fiche (`library/record.ts`), écrite par `updateSessionRecord` ; dans le module, par le brouillon (`useSessionDraft`, `library/sessionEdits.ts`) et « Enregistrer la session » ; jamais dans une clé de l'appareil. Une donnée recalculable depuis le GPX va dans `summary`, avec `SUMMARY_CALC_VERSION` augmenté si son calcul change.
-- Test guidé (FC max, plus tard VMA) : un protocole dans `FITNESS_TESTS` (`recording/fitnessTest.ts`), ses résultats dans `running/fitnessTestResults.ts`, sa case dans la rangée « Test » d'Enregistrer et sa tuile dans `TestsPage`.
 - Calcul pur : dans `core/`, `sailing/`, `running/`, `cycling/`, `surfing/`, `planning/`, `recording/` ou `library/`, avec son `*.test.ts` sur trace synthétique.
 - Couleur, police, rayon, espacement : une variable de `src/theme/tokens.css`, jamais une valeur en dur dans un écran neuf. Composants communs dans `components/ui`, icônes dans `components/icons.tsx` (pas d'emoji). Les couleurs de données des graphes et de la carte restent en dur (attributs SVG).
 
@@ -96,7 +95,7 @@ Celles d'un domaine sont dans `docs/DECISIONS.md`, celles de la disposition des 
 | `running/`, `cycling/`, `LandModule`, graphes et leur zoom, pente, énergie, altitude (`useTerrainElevation`), revêtement (`planning/surface.ts`, `useSessionSurfaces`) | 2. Course et vélo |
 | sauts (`core/jumps.ts`, `platform/motion.ts`, `useSessionJumps`, `JumpsPanel`) | 3. Sauts |
 | `surfing/`, `SurfModule` | 4. Surf |
-| compteur d'intervalles et répétitions (`recording/intervalTimer.ts`, `useIntervalTimer`, onglet « fractionné »), page Entraînement, tests (`fitnessTest`, `restingHrTest`, onglet « test ») | 5. Fractionné |
+| test de FC repos (`restingHrTest`, sous le Profil) ; compteur d'intervalles, page Entraînement et tests guidés retirés au lot 302 | 5. Fractionné |
 | `recording/`, `useRecorder`, `RecordingPage`, pause, journal | 6. Enregistrement |
 | `planning/`, `PlanningPage`, `RoutesPage`, `usePlannedRoute`, profil BRouter (coûts des types de voie fixés avec l'utilisateur : ne pas les retoucher sans lui) | 7. Planification et itinéraires |
 | `library/`, `useSessionLibrary`, `SessionLibrary`, `platform/memoryFolder.ts`, `platform/tileCache.ts`, fond des cartes (`BaseTileLayer`), réglages par appareil, GPX téléchargé | 8. Mémoire et fichiers |
