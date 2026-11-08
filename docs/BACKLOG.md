@@ -1,6 +1,6 @@
 # Reste à faire
 
-Tenu par Claude ; l'utilisateur n'a jamais à l'ouvrir. `node outils/backlog.mjs` vérifie la forme et imprime le tableau de bord : aucun résumé fait à la main ne le remplace. Prochains numéros : élément 310, essai 201, question Q101 (numéros à part de ceux de Tracker complet : une correction commune se note dans les deux).
+Tenu par Claude ; l'utilisateur n'a jamais à l'ouvrir. `node outils/backlog.mjs` vérifie la forme et imprime le tableau de bord : aucun résumé fait à la main ne le remplace. Prochains numéros : élément 311, essai 201, question Q101 (numéros à part de ceux de Tracker complet : une correction commune se note dans les deux).
 - Une ligne par élément : `- N · [type] Titre · noté jj/mm · petit|gros · Modèle/effort · état · dépend de : … · détail : chemin` (champs sans objet omis, ordre gardé). N unique, dans la suite des lots, jamais réutilisé ; type `[bogue]`, `[idée]`, `[dette]` ou `[outil]` ; petit = un lot Sonnet ou Opus, une session ; gros = plusieurs lots, Fable, ou des données réelles ; détail dans `docs/backlog/N-titre.md` quand la ligne ne suffit pas.
 - Quatre zones, un élément dans une seule : **Maintenant** (en cours ou à valider ; 3 lots avec essais au téléphone au plus, un lot validé sur lecture ne compte pas ; première ligne : l'APK installée) ; **Ensuite** (prêts, liste numérotée, l'ordre est la priorité, 7 au plus) ; **Ça attend une occasion** (sous une condition écrite en gras, hors de toute limite) ; **Plus tard** (daté, une phrase avec le résultat attendu ; proposé à l'abandon à la revue après 90 jours).
 - Rangement à la mise au propre, posé en clair à l'utilisateur : un chiffre faux ou un usage cassé → tête d'Ensuite ; « vous en servirez-vous à votre prochaine sortie ? » oui → Ensuite, non → Plus tard ; petit et utile passe avant gros et utile.
@@ -12,7 +12,7 @@ Tenu par Claude ; l'utilisateur n'a jamais à l'ouvrir. `node outils/backlog.mjs
 
 ## Maintenant
 
-APK 0.6.00 construite le 08/11 (`Gtracker-0.6.00.apk`, versionCode 6000, identifiant `io.github.segneur.tracker.voile`, installable à côté de Tracker), pas encore installée ; copie dans `D:\gong tracker\`.
+APK 0.6.00 construite le 08/11 (`Gtracker-0.6.00.apk`, versionCode 6000, identifiant `io.github.segneur.tracker.voile`, installable à côté de Tracker) ; copie dans `D:\gong tracker\` ; **pas installée : l'utilisateur veut d'abord un nouveau logo** (08/11), voir « Ça attend une occasion ».
 
 ## Ensuite
 
@@ -25,6 +25,9 @@ APK 0.6.00 construite le 08/11 (`Gtracker-0.6.00.apk`, versionCode 6000, identif
 7. 307 · [dette] Renvois d'atelier dans `src/` (« lot N », « Qnn », « l'utilisateur » → « l'auteur ») : « HISTORIQUE, point N » seule forme, ou la raison en clair ; test léger qui refuse « lot N » et « Qnn » hors tests ; glossaire d'une page, docs/GLOSSAIRE.md (« course », « mark », noms du calcul d'une session, noms de la FC) ; par groupes de dossiers, après E4 pour ne pas nettoyer ce qui part ; résultat attendu : rien de visible, un code lisible par l'acheteur · noté 08/11 · gros · Sonnet/medium · dépend de : 303 · détail : docs/backlog/160-dette-audit-vente.md
 
 ## Ça attend une occasion
+
+**Un nouveau logo pour Gtracker (décision de l'utilisateur du 08/11, avant toute installation ; DA GONG dans `D:\gong tracker\gong-galaxy-da\`)**
+- 310 · [idée] Logo et icône de Gtracker : icône de lanceur Android (toutes densités, adaptative), favicon et icônes web, logo de l'accueil (aujourd'hui « Tracker » en Shrikhand), image de partage ; puis APK 0.6.01 installée à côté de Tracker ; résultat attendu : deux applications reconnaissables d'un coup d'œil sur le téléphone · noté 08/11 · petit · Sonnet/medium
 
 **La livraison, une fois E2 à E7 et le n° 307 faits**
 - 308 · [dette] E8, identité et livrable : identifiant d'application et espace de noms des GPX (ancien lu, nouveau écrit, fiche 153), crédits des images (relevé par l'utilisateur), politique de confidentialité, écran « À propos », brouillons des formulaires Play, manifeste (services et permission batterie, fiches 151 et 171), fonds de carte sous contrat ou tuiles de l'acheteur (Q5, fiche 152) ; docs réécrites (README, CLAUDE.md → ARCHITECTURE et CONTRIBUER, DECISIONS §2 et §5 retirées, ETAT refait, INVENTAIRE régénéré, HISTORIQUE nettoyé des liens claude.ai, des chemins du poste et de « ex. Tom ») ; atelier retiré (`.claude/`, BACKLOG, MODELES, `DOCUMENTS` de `outils/docs-cites.mjs` réduit) ; banc rebranché sur voile et surf ; puis dépôt réécrit en un seul commit (`git checkout --orphan`) ; résultat attendu : un dépôt livrable, sans identité du vendeur ni atelier · noté 08/11 · gros · Opus/high · dépend de : 306, 307 · détail : docs/backlog/153-vente-identite-images.md
