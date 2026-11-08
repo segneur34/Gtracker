@@ -1,6 +1,6 @@
 import type { LessonIcon as LessonIconId } from '../tutorials/lessons';
 import {
-  IconChart, IconFile, IconLayers, IconMap, IconNote, IconPlay, IconPulse, IconRoute, IconRunIntervals, IconSail,
+  IconChart, IconFile, IconLayers, IconMap, IconNote, IconPlay, IconPulse, IconRoute, IconSail,
   IconSettings, IconShare, IconUser, IconWingfoil,
 } from './icons';
 
@@ -15,7 +15,6 @@ const ICONS: Record<LessonIconId, typeof IconChart> = {
   statistiques: IconChart,
   itineraires: IconRoute,
   cardio: IconPulse,
-  fractionne: IconRunIntervals,
   voile: IconSail,
   capteurs: IconWingfoil,
   partage: IconShare,

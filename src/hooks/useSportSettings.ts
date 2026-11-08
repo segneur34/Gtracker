@@ -15,19 +15,18 @@ import { DEFAULT_BEEP_SOUND, beepSoundHz, isBeepSound, type BeepSound } from '..
 import type { LiveFieldKey } from '../recording/liveFields';
 import type { MarkGuideSettings } from '../recording/markGuide';
 import type { JumpSettings } from '../recording/jumpSettings';
-import type { BikeType } from '../core/domainTypes';
 import type { GearGroup, GearItem } from '../library/notes';
 import type { ActivitySpeedRanges } from '../library/sessionTrack';
 import type { DurationSettings, PaceLevel } from '../planning/duration';
 import type { WayType } from '../planning/brouterProfile';
-import type { GradeRange } from '../planning/grade';
+import { DEFAULT_GRADE_RANGE, type GradeRange } from '../planning/grade';
 import { resolveGearGroups, resolveGearLabels, sanitizeGearGroups, withGearItem } from '../settings/gear';
 import {
-  DEFAULT_LONG_PRESS_MS, DEFAULT_STOP_HOLD_MS, PRESETS_VERSION, defaultSpeedRangeOf, durationSettingsOf, isValidLongPress, isValidStopHold,
-  moduleActivity, readHiddenFamilies, resetOverrides, resetStoredPresets, resolveActivityPace, resolveBikeKg, resolveBikeType,
-  resolveDistanceUnit, resolveFoil, resolveGradeRange, resolveHeartRate, resolveHrOffset, resolveJumps, resolveLiveFields,
-  resolveLoopReturnRatio, resolveMarkGuide, resolveNotificationFields, resolvePumping, resolveRecordingProfile, resolveTurns, resolveSpeedRange, resolveSpeedUnit,
-  resolveTabChoices, resolveThresholdOverride, resolveWayTypes, settingsView, withSetting, withVisibility, withoutOverrides,
+  DEFAULT_LONG_PRESS_MS, DEFAULT_STOP_HOLD_MS, PRESETS_VERSION, defaultSpeedRangeOf, isValidLongPress, isValidStopHold,
+  moduleActivity, readHiddenFamilies, resetOverrides, resetStoredPresets,
+  resolveDistanceUnit, resolveFoil, resolveHeartRate, resolveHrOffset, resolveJumps, resolveLiveFields,
+  resolveMarkGuide, resolveNotificationFields, resolvePumping, resolveRecordingProfile, resolveTurns, resolveSpeedRange, resolveSpeedUnit,
+  resolveTabChoices, resolveThresholdOverride, settingsView, withSetting, withVisibility, withoutOverrides,
   type SettingField, type SportSettingsView, type StoredSettings,
 } from '../settings/activitySettings';
 
@@ -234,7 +233,8 @@ export const effectiveStopHoldMs = (): number => {
 export interface Visibility {
   /** Toutes les activités, cachées comprises : elles nomment les sessions (`sessionActivity`). */
   activities: Activity[];
-  hiddenFamilies: SportFamily[];
+  /** Familles cachées, celles de l'application complète comprises (`readHiddenFamilies`). */
+  hiddenFamilies: string[];
   /** Familles visibles, dans l'ordre de `SPORT_FAMILIES`. */
   families: SportFamily[];
   /** Activité visible : ni cachée, ni dans une famille cachée ; une activité de base suit sa famille. */
@@ -303,29 +303,23 @@ export const effectiveSpeedUnit = (activity: Activity): SpeedUnit => resolveSpee
 /** Unité de distance effective d'une activité : celle choisie dans Réglages, sinon le kilomètre. */
 export const effectiveDistanceUnit = (activity: Activity): DistanceUnit => resolveDistanceUnit(readStoredSettings(), activity);
 
-/** Retour de boucle d'une activité en planification, en fois l'aller ; `null` en voile. Utilisable hors composant. */
-export const effectiveLoopReturnRatio = (activity: Activity): number | null => resolveLoopReturnRatio(readStoredSettings(), activity);
+// Planification, valeurs neutres jusqu'au lot 304 (planificateur routier) : la voile et le surf ne règlent ni
+// boucle, ni pente, ni voies, ni niveau, ni temps estimé ; les fonctions restent pour la planification qui les lit.
 
-/** Bornes de la couleur de pente d'une activité : celles de Réglages, sinon le défaut. Utilisable hors composant. */
-export const effectiveGradeRange = (activity: Activity): GradeRange => resolveGradeRange(readStoredSettings(), activity);
+/** Retour de boucle d'une activité en planification : aucun en voile et en surf (lot 304). */
+export const effectiveLoopReturnRatio = (_activity: Activity): number | null => null;
 
-/** Type et poids du vélo d'une activité : ceux de Réglages, sinon le type par défaut et son poids. Utilisable hors composant. */
-export const effectiveBikeSetup = (activity: Activity): { bikeType: BikeType; bikeKg: number } => {
-  const stored = readStoredSettings();
-  const bikeType = resolveBikeType(stored, activity);
-  return { bikeType, bikeKg: resolveBikeKg(stored, activity, bikeType) };
-};
+/** Bornes de la couleur de pente d'une activité : celles par défaut, sans réglage en voile et en surf (lot 304). */
+export const effectiveGradeRange = (_activity: Activity): GradeRange => DEFAULT_GRADE_RANGE;
 
-/** Types de voie cochés d'office en planification ; aucun en voile. Utilisable hors composant. */
-export const effectiveWayTypes = (activity: Activity): WayType[] => resolveWayTypes(readStoredSettings(), activity).wayTypes;
+/** Types de voie cochés d'office en planification : aucun en voile et en surf (lot 304). */
+export const effectiveWayTypes = (_activity: Activity): WayType[] => [];
 
-/** Niveau effectif d'une activité de course ou de vélo, `null` en voile. Utilisable hors composant. */
-export const effectivePace = (activity: Activity): { level: PaceLevel; flatSpeedMs: number } | null =>
-  resolveActivityPace(readStoredSettings(), activity);
+/** Niveau du temps estimé : aucun en voile et en surf (lot 304). */
+export const effectivePace = (_activity: Activity): { level: PaceLevel; flatSpeedMs: number } | null => null;
 
-/** Réglage du temps estimé d'un itinéraire pour une activité (`durationSettingsOf`), `null` en voile. */
-export const effectiveDurationSettings = (activity: Activity, riderKg: number | null): DurationSettings | null =>
-  durationSettingsOf(readStoredSettings(), activity, riderKg);
+/** Réglage du temps estimé d'un itinéraire : aucun en voile et en surf (lot 304). */
+export const effectiveDurationSettings = (_activity: Activity, _riderKg: number | null): DurationSettings | null => null;
 
 /**
  * Accès à toutes les activités à la fois, pour la page Réglages : leurs

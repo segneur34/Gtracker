@@ -7,7 +7,7 @@ import './IconPicker.css';
 import Button from './ui/Button';
 
 /**
- * Icône d'une activité : les seize dessins, à la couleur de l'activité. Celle
+ * Icône d'une activité : les neuf dessins, à la couleur de l'activité. Celle
  * cochée est la choisie, ou à défaut celle devinée du nom (`activityIcon`).
  * Repliée au départ (19/10) : l'icône en cours et « Changer », qui déplie la
  * grille ; un choix la replie, « Tout réduire » de Réglages aussi.

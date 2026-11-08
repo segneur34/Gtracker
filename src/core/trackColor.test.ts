@@ -44,25 +44,19 @@ describe('trackColorSpeedsMs', () => {
     expect(trackColorSpeedsMs(track, 'voile')).toEqual(track.map((p) => p.smoothedSpeedMs));
   });
 
-  it('lisse à pied et à vélo sur 15 s : une pointe de 3 s s\'efface', () => {
+  it('garde en surf la vitesse lissée du noyau : une vague de quelques secondes ne s\'efface pas', () => {
     const track = buildTrack([[30, 2], [3, 10], [30, 2]]);
-    for (const treatment of ['course', 'velo'] as const) {
-      const speeds = trackColorSpeedsMs(track, treatment);
-      const peak = colorAt(track, speeds, 31.5);
-      expect(peak).toBeLessThan(5);
-      expect(peak).toBeGreaterThan(2);
-      // Loin de la pointe, la vitesse reste celle de la phase.
-      expect(colorAt(track, speeds, 10)).toBeCloseTo(2, 6);
-    }
+    expect(TRACK_COLOR_SMOOTHING_S.surf).toBe(0);
+    expect(trackColorSpeedsMs(track, 'surf')).toEqual(track.map((p) => p.smoothedSpeedMs));
   });
 
-  it('donne la même couleur à 1 Hz et à 5 Hz (fenêtre en secondes)', () => {
+  it('donne la même couleur à 1 Hz et à 5 Hz', () => {
     const phases: [number, number][] = [[60, 2], [20, 6], [60, 3]];
     const slow = buildTrack(phases, 1);
     const fast = buildTrack(phases, 5);
-    const slowSpeeds = trackColorSpeedsMs(slow, 'course');
-    const fastSpeeds = trackColorSpeedsMs(fast, 'course');
-    for (const s of [5, 55, 62, 70, 85, 120]) {
+    const slowSpeeds = trackColorSpeedsMs(slow, 'surf');
+    const fastSpeeds = trackColorSpeedsMs(fast, 'surf');
+    for (const s of [5, 55, 70, 85, 120]) {
       expect(colorAt(fast, fastSpeeds, s)).toBeCloseTo(colorAt(slow, slowSpeeds, s), 0);
     }
   });
@@ -82,7 +76,7 @@ describe('trackColorSegments', () => {
   });
 
   it('ne trace rien sous deux points', () => {
-    expect(trackColorSegments(buildTrack([[0, 2]]), 'course', { minMs: 1, maxMs: 4 })).toEqual([]);
+    expect(trackColorSegments(buildTrack([[0, 2]]), 'surf', { minMs: 1, maxMs: 4 })).toEqual([]);
   });
 });
 
@@ -137,7 +131,7 @@ describe('pathsByColor', () => {
   it('ne perd aucun trait d\'une trace, à 1 Hz comme à 5 Hz', () => {
     const range = { minMs: 1, maxMs: 9 };
     for (const hz of [1, 5]) {
-      const segments = trackColorSegments(buildTrack([[60, 2], [20, 6], [60, 8]], hz), 'course', range);
+      const segments = trackColorSegments(buildTrack([[60, 2], [20, 6], [60, 8]], hz), 'surf', range);
       for (const tranches of [1, 8]) {
         const groups = pathsByColor(segments, tranches);
         const chunk = Math.ceil(segments.length / tranches);

@@ -8,7 +8,7 @@
 
 import type { Activity } from '../core/activities';
 import { ZONE_COUNT, edwardsLoad, histogramZoneTimes } from '../core/heartRate';
-import { hasPositions, sportFamily, sportTreatment, type SportFamily, type Treatment } from '../core/sportProfiles';
+import { sportFamily, sportTreatment, type SportFamily, type Treatment } from '../core/sportProfiles';
 import { DAY_MS, addDays, addMonths, isoWeek, monthYearLong, monthYearShort, shortDate, stacksByActivity, startOfDay, startOfIsoWeek, startOfMonth } from '../core/calendar';
 import { CHART_PERIODS, chartPeriodBounds, type ChartRange } from './activityChart';
 import type { GearChoice, GearGroup } from './notes';
@@ -52,8 +52,6 @@ export interface StatSession {
   activityId: string;
   family: SportFamily;
   treatment: Treatment;
-  /** Session à positions ; faux sans trace (muscu) : ni distance ni vitesse, sa durée et sa FC comptent. */
-  positions: boolean;
   /** Voile : manœuvres classées à la dernière analyse, `null` si la session n'a jamais été ouverte. */
   maneuverCount: number | null;
   /** Voile : leur réussite, `null` si la session n'a pas été ouverte depuis qu'elle est retenue. */
@@ -91,7 +89,6 @@ export const statSessionOf = (file: string, record: SessionRecord, activity: Act
     activityId: activity.id,
     family: sportFamily(activity.base),
     treatment: sportTreatment(activity.base),
-    positions: hasPositions(activity.base),
     maneuverCount: summary.maneuverCount ?? null,
     maneuverResults: summary.maneuverResults ?? null,
     foil,
@@ -264,8 +261,7 @@ export const statsTotals = (sessions: readonly StatSession[]): StatsTotals => {
     t.sessions++;
     t.durationS += Math.max(0, (s.endMs - s.startMs) / 1000);
     t.distanceM += s.distanceM;
-    // Sans trace (muscu) : ni temps ni distance en action, qui feraient la vitesse moyenne.
-    if (s.positions && s.movingTimeS !== null && s.movingTimeS > 0) {
+    if (s.movingTimeS !== null && s.movingTimeS > 0) {
       t.movingTimeS += s.movingTimeS;
       // La distance entière, le temps que la fiche soit recalculée (version 5 du résumé).
       t.movingDistanceM += s.movingDistanceM ?? s.distanceM;
@@ -611,8 +607,6 @@ export const recordKindsOf = (family: SportFamily | null): StatsRecordKind[] => 
   const common: StatsRecordKind[] = ['vitesse', 'distance', 'duree'];
   if (family === 'voile') return [...common, 'manoeuvres'];
   if (family === 'surf') return [...common, 'vague', 'vol'];
-  // Course, vélo et Entraînement, retirés (lots 302 et 303) : les records communs.
-  if (family !== null) return common;
   return ['distance', 'duree'];
 };
 

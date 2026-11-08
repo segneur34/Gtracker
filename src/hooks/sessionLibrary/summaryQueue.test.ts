@@ -23,7 +23,7 @@ const NAMES = ['a.gpx', 'b.gpx', 'c.gpx'];
 
 /** Résumé du faux calcul : parti d'autant de minutes que `index`. */
 const analyzedAt = (index: number): AnalyzedGpx => ({
-  summary: { ...sessionRecord().summary, startMs: START_MS + index * 60_000 }, sport: 'running', title: `Trace ${index}`,
+  summary: { ...sessionRecord().summary, startMs: START_MS + index * 60_000 }, sport: 'surf', title: `Trace ${index}`,
 });
 
 /** Faux calcul, asynchrone comme celui du worker : un résumé par GPX, parti d'autant de minutes que son rang. */
@@ -87,13 +87,13 @@ describe('calcul des résumés de la file (setSummaryRunner)', () => {
     // Ce que le calcul rend est rangé : fiche écrite, session publiée.
     expect(library.readLibraryState().sessions.map((s) => s.record.title).sort()).toEqual(['Trace 0', 'Trace 1', 'Trace 2']);
     expect(parseRecordWithRaw(files.get('sessions/b.json') ?? '')?.parts.summary?.startMs).toBe(START_MS + 60_000);
-    // Le calcul reçoit le texte du GPX, le calcul à deviner, et les réglages de l'activité résolus pour les onze calculs.
+    // Le calcul reçoit le texte du GPX, le calcul à deviner, et les réglages de l'activité résolus pour les cinq calculs.
     const [text, options] = fakeRunner.mock.calls[0];
     expect(text).toBe('<gpx rang="0"></gpx>');
     expect(options.sport).toBeUndefined();
     expect(options.analysis).toBeUndefined();
     expect(options.elevation).toBeUndefined();
-    expect(Object.keys(options.activitySettings)).toHaveLength(11);
+    expect(Object.keys(options.activitySettings)).toHaveLength(5);
     // Des données seulement : elles traversent un message vers le worker.
     expect(structuredClone(options)).toStrictEqual(options);
   });
@@ -125,7 +125,7 @@ describe('calcul asynchrone (lot 126 B) : la session relue quand le résumé rev
   const putOutdated = (): void => {
     files.clear();
     files.set('sessions/a.gpx', '<gpx rang="0"></gpx>');
-    files.set('sessions/a.json', serializeRecord(sessionRecord({ gpx: 'a.gpx', sport: 'running', activityId: 'running', title: null })));
+    files.set('sessions/a.json', serializeRecord(sessionRecord({ gpx: 'a.gpx', sport: 'surf', activityId: 'surf', title: null })));
   };
 
   const waitFor = async (what: string, done: () => boolean): Promise<void> => {

@@ -25,18 +25,20 @@ describe('guessSport', () => {
   it('reconnaît nos supports tels que notre GPX les écrit', () => {
     expect(guessSport('wingfoil')).toBe('wingfoil');
     expect(guessSport('bateau')).toBe('bateau');
-    expect(guessSport('cycling')).toBe('cycling');
+    expect(guessSport('surf')).toBe('surf');
+  });
+
+  it("une trace de course ou de vélo, de l'application complète ou d'ailleurs, est à classer (lot 305)", () => {
+    for (const type of ['running', 'cycling', 'run-intervals', 'muscu', 'Trail Running', 'trail_running', 'Road Cycling', 'mountain_biking', 'Ride']) {
+      expect(guessSport(type), type).toBeNull();
+    }
   });
 
   it('reconnaît les types des autres applications, quelle que soit leur graphie', () => {
-    expect(guessSport('running')).toBe('running');
-    expect(guessSport('Trail Running')).toBe('running');
-    expect(guessSport('trail_running')).toBe('running');
     expect(guessSport('Windsurfing')).toBe('windsurf');
+    expect(guessSport('wind_surf')).toBe('windsurf');
     expect(guessSport('kitesurfing')).toBe('kite');
-    expect(guessSport('Road Cycling')).toBe('cycling');
-    expect(guessSport('mountain_biking')).toBe('cycling');
-    expect(guessSport('Ride')).toBe('cycling');
+    expect(guessSport('Wing Foiling')).toBe('wingfoil');
     expect(guessSport('Surfing')).toBe('surf');
     expect(guessSport('surf')).toBe('surf');
     // Le kitesurf reste du kite.

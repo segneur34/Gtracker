@@ -108,7 +108,7 @@ describe('settingsSignature', () => {
 
   it('ignore les choix retenus : activité du module, ancienne clé du support, activité à enregistrer, dernière séance du compteur', () => {
     const reopened = {
-      ...settings, moduleActivity: { voile: 'kite', course: 'course' }, recordActivity: 'course', sport: 'kite',
+      ...settings, moduleActivity: { voile: 'kite', surf: 'a-surf-foil' }, recordActivity: 'a-surf-foil', sport: 'kite',
       lastIntervalWorkout: { reps: 8, workS: 30, restS: 30 },
     };
     expect(settingsSignature({ 'tracker.sportSettings': reopened, 'tracker.runnerProfile': { me: { weightKg: 70 } } })).toBe(signature);

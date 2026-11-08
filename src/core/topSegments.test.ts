@@ -13,7 +13,7 @@ import { msToKnots } from './units';
 import { sameData } from '../test/sameData';
 import { mPerDegLon } from '../test/geo.fixture';
 import { eastwardTrack } from '../test/track.fixture';
-import { RUNNING_TOP_TARGETS, SPORT_PROFILES, SURF_TOP_TARGETS } from './sportProfiles';
+import { SAILING_TOP_TARGETS, SPORT_PROFILES, SURF_TOP_TARGETS } from './sportProfiles';
 
 const TIME_5S: TopTarget = { key: 't5s', label: '5 s', value: 5, kind: 'time' };
 const DIST_100M: TopTarget = { key: 'd100m', label: '100 m', value: 100, kind: 'distance' };
@@ -251,12 +251,12 @@ describe('cibles des tops à pied et en surf (onglet générique)', () => {
 
   // Surf : 20 min de rame à 1,2 m/s, une vague de 12 s à 5 m/s, dont 2 s à 7 m/s.
   const surfSeconds = Array.from({ length: 1200 }, (_, t) => (t >= 305 && t < 307 ? 7 : t >= 300 && t < 312 ? 5 : 1.2));
-  // Course : 40 min à 3 m/s, dont 80 s à 5 m/s (400 m).
-  const runSeconds = Array.from({ length: 2400 }, (_, t) => (t >= 600 && t < 680 ? 5 : 3));
+  // Planche : 40 min à 6 m/s, dont 100 s à 10 m/s (1 000 m).
+  const sailSeconds = Array.from({ length: 2400 }, (_, t) => (t >= 600 && t < 700 ? 10 : 6));
 
   for (const [name, seconds, targets] of [
     ['surf', surfSeconds, SURF_TOP_TARGETS],
-    ['course', runSeconds, RUNNING_TOP_TARGETS],
+    ['planche', sailSeconds, SAILING_TOP_TARGETS],
   ] as const) {
     // Le meilleur passage est le même ; les suivants, sans chevauchement, se
     // placent à la fraction de seconde près au bord d'une vague : seule leur présence est comparée.
@@ -281,13 +281,12 @@ describe('cibles des tops à pied et en surf (onglet générique)', () => {
     expect(tops.d5km[0].val).toBe('-');
   });
 
-  it('course : les 400 m rapides, ni semi ni marathon', () => {
-    const track = atRate(runSeconds, 1);
-    const tops = computeAllTopSegments(track, buildCumulativeTrack(track), RUNNING_TOP_TARGETS, kmh);
-    expect(parseFloat(tops.d400m[0].val)).toBeCloseTo(kmh(5), 0);
-    expect(parseFloat(tops.t12min[0].val)).toBeGreaterThan(kmh(3));
-    expect(tops.dsemi[0].val).toBe('-');
-    expect(tops.dmarathon[0].val).toBe('-');
+  it('planche : les 1 000 m rapides, et le mille plus lent', () => {
+    const track = atRate(sailSeconds, 1);
+    const tops = computeAllTopSegments(track, buildCumulativeTrack(track), SAILING_TOP_TARGETS, kmh);
+    expect(parseFloat(tops.d1000m[0].val)).toBeCloseTo(kmh(10), 0);
+    expect(parseFloat(tops.d1NM[0].val)).toBeGreaterThan(kmh(6));
+    expect(parseFloat(tops.d1NM[0].val)).toBeLessThan(kmh(10));
   });
 });
 

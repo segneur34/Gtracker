@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  LAND_TABS, MUSCU_TABS, SAILING_TABS, SURF_TABS, activityTabs, analysisTabs, closeAllTabs, generalOpenAfterAdvanced, initialTabsState, isTabShown, maskAdvancedTabs, maskHiddenTabs, sanitizeTabChoices, shownTabs, tabDefaults, tabsStateFor, toggleTabChoice,
+  SAILING_TABS, SURF_TABS, activityTabs, analysisTabs, closeAllTabs, generalOpenAfterAdvanced, initialTabsState, isTabShown, maskAdvancedTabs, maskHiddenTabs, sanitizeTabChoices, shownTabs, tabDefaults, tabsStateFor, toggleTabChoice,
   type TabChoices,
 } from './analysisTabs';
 import { SPORT_PROFILES } from './sportProfiles';
@@ -22,31 +22,10 @@ describe('analysisTabs : onglets proposés par calcul', () => {
     expect(keys(analysisTabs(SPORT_PROFILES.kite))).toContain('pumping');
   });
 
-  it('course et vélo : la même barre, sans « sauts » en fractionné', () => {
-    expect(keys(analysisTabs(SPORT_PROFILES.running))).toEqual(keys(LAND_TABS.course));
-    expect(keys(analysisTabs(SPORT_PROFILES.cycling))).toEqual(keys(LAND_TABS.velo));
-    expect(keys(analysisTabs(SPORT_PROFILES['run-intervals']))).not.toContain('sauts');
-    expect(keys(analysisTabs(SPORT_PROFILES['bike-intervals']))).not.toContain('sauts');
-  });
-
-  it('ni « fractionné » ni « test » : partis avec l\'Entraînement (lot 302)', () => {
-    for (const sport of ['running', 'cycling', 'run-intervals', 'bike-intervals', 'run-test'] as const) {
-      expect(keys(analysisTabs(SPORT_PROFILES[sport]))).not.toContain('fractionne');
-      expect(keys(analysisTabs(SPORT_PROFILES[sport]))).not.toContain('test');
+  it('ni « fractionné », ni « test », ni « cadence » : partis avec la terre (lots 302 et 303)', () => {
+    for (const profile of Object.values(SPORT_PROFILES)) {
+      for (const key of ['fractionne', 'test', 'cadence', 'zones', 'surface', 'energie']) expect(keys(analysisTabs(profile)), profile.id).not.toContain(key);
     }
-  });
-
-  it('course et vélo : « graphiques » à la place des zones de pente, « cardio » derrière lui (16/10)', () => {
-    expect(keys(LAND_TABS.course)).toEqual(['general', 'tops', 'graphiques', 'cardio', 'cadence', 'surface', 'energie', 'zones', 'sauts', 'notes', 'reglages']);
-    expect(keys(LAND_TABS.velo)).toEqual(['general', 'tops', 'graphiques', 'cardio', 'surface', 'energie', 'zones', 'sauts', 'notes', 'reglages']);
-    expect(tab(LAND_TABS.course, 'graphiques').label).toBe('graphiques');
-  });
-
-  it('« cadence » à pied seulement : course, marche, fractionné à pied', () => {
-    expect(keys(analysisTabs(SPORT_PROFILES.running))).toContain('cadence');
-    expect(keys(analysisTabs(SPORT_PROFILES['run-intervals']))).toContain('cadence');
-    expect(keys(analysisTabs(SPORT_PROFILES.cycling))).not.toContain('cadence');
-    expect(keys(analysisTabs(SPORT_PROFILES['bike-intervals']))).not.toContain('cadence');
   });
 
   it('surf : « pumping » juste après « vols », puis « tops » avant « graphiques »', () => {
@@ -55,12 +34,6 @@ describe('analysisTabs : onglets proposés par calcul', () => {
     expect(surf.indexOf('pumping')).toBe(surf.indexOf('vols') + 1);
     expect(surf.indexOf('tops')).toBe(surf.indexOf('pumping') + 1);
     expect(surf.indexOf('graphiques')).toBe(surf.indexOf('tops') + 1);
-  });
-
-  it('muscu : général, cardio, matériel et notes, réglages, sans carte (lot I du 25/10)', () => {
-    expect(keys(analysisTabs(SPORT_PROFILES.muscu))).toEqual(['general', 'cardio', 'notes', 'reglages']);
-    expect(keys(MUSCU_TABS)).toEqual(['general', 'cardio', 'notes', 'reglages']);
-    expect(MUSCU_TABS[0].primary).toBe(true);
   });
 
   it('chaque calcul qui propose « tops » a des cibles', () => {
@@ -75,8 +48,8 @@ describe("activityTabs : onglets de Réglages selon les options de l'activité (
     const wing = SPORT_PROFILES.wingfoil;
     expect(keys(activityTabs(wing, { foil: true, jumps: true }))).toContain('sauts');
     expect(keys(activityTabs(wing, { foil: true, jumps: false }))).not.toContain('sauts');
-    expect(keys(activityTabs(SPORT_PROFILES.cycling, { foil: false, jumps: true }))).toContain('sauts');
-    expect(keys(activityTabs(SPORT_PROFILES.running, { foil: false, jumps: false }))).not.toContain('sauts');
+    expect(keys(activityTabs(SPORT_PROFILES.kite, { foil: false, jumps: true }))).toContain('sauts');
+    expect(keys(activityTabs(SPORT_PROFILES.windsurf, { foil: false, jumps: false }))).not.toContain('sauts');
   });
 
   it('un calcul sans sauts ne les propose pas, même coché ; « vols » et « pumping » suivent le foil', () => {
@@ -88,10 +61,9 @@ describe("activityTabs : onglets de Réglages selon les options de l'activité (
 });
 
 describe('isTabShown : défauts et choix', () => {
-  it('sans choix, les onglets du module sont montrés, « tops » caché à pied et en surf', () => {
+  it('sans choix, les onglets du module sont montrés, « tops » caché en surf', () => {
     expect(keys(shownTabs(SAILING_TABS, null))).toEqual(keys(SAILING_TABS));
-    expect(keys(shownTabs(LAND_TABS.velo, null))).toContain('tops');
-    expect(keys(shownTabs(LAND_TABS.course, null))).not.toContain('tops');
+    expect(keys(shownTabs(SAILING_TABS, null))).toContain('tops');
     expect(keys(shownTabs(SURF_TABS, null))).not.toContain('tops');
   });
 
@@ -152,59 +124,60 @@ describe('toggleTabChoice', () => {
 describe('toggleTabChoice : activité à pré-réglage (n° 174)', () => {
   /** Ce que lit l'application (`resolveTabChoices`) : le choix rangé, sinon le pré-réglage tout entier. */
   const resolved = (choices: TabChoices | null, preset: TabChoices | null) => sanitizeTabChoices(choices) ?? preset;
-  const sauts = tab(LAND_TABS.course, 'sauts');
-  const cardio = tab(LAND_TABS.course, 'cardio');
-  const topsCourse = tab(LAND_TABS.course, 'tops');
-  const topsVelo = tab(LAND_TABS.velo, 'tops');
-  const COURSE = { sauts: false };
-  const VTT = { tops: false };
+  // Pré-réglages d'essai (ceux de la course et du VTT avant le lot 305) : un onglet natif caché, un générique montré.
+  const sauts = tab(SAILING_TABS, 'sauts');
+  const cardio = tab(SAILING_TABS, 'cardio');
+  const topsVoile = tab(SAILING_TABS, 'tops');
+  const topsSurf = tab(SURF_TABS, 'tops');
+  const HIDDEN = { sauts: false };
+  const SHOWN = { tops: true };
 
-  it('Course : un toucher montre « sauts », un second revient au pré-réglage', () => {
-    const once = toggleTabChoice(COURSE, sauts, COURSE);
-    expect(isTabShown(sauts, resolved(once, COURSE))).toBe(true);
+  it('un onglet caché par le pré-réglage : un toucher le montre, un second revient au pré-réglage', () => {
+    const once = toggleTabChoice(HIDDEN, sauts, HIDDEN);
+    expect(isTabShown(sauts, resolved(once, HIDDEN))).toBe(true);
     expect(once).toEqual({ sauts: true });
-    expect(toggleTabChoice(once, sauts, COURSE)).toBeNull();
+    expect(toggleTabChoice(once, sauts, HIDDEN)).toBeNull();
   });
 
-  it('VTT : un toucher montre « tops », un second revient au pré-réglage', () => {
-    const once = toggleTabChoice(VTT, topsVelo, VTT);
-    expect(isTabShown(topsVelo, resolved(once, VTT))).toBe(true);
-    expect(once).toEqual({ tops: true });
-    expect(toggleTabChoice(once, topsVelo, VTT)).toBeNull();
+  it('un onglet générique montré par le pré-réglage : un toucher le cache, un second revient au pré-réglage', () => {
+    const once = toggleTabChoice(SHOWN, topsSurf, SHOWN);
+    expect(isTabShown(topsSurf, resolved(once, SHOWN))).toBe(false);
+    expect(once).toEqual({ tops: false });
+    expect(toggleTabChoice(once, topsSurf, SHOWN)).toBeNull();
   });
 
   it('chaque toucher change le bouton, dix fois de suite', () => {
     let stored: TabChoices | null = null;
     let shown = false;
     for (let i = 0; i < 10; i++) {
-      stored = toggleTabChoice(resolved(stored, COURSE), sauts, COURSE);
+      stored = toggleTabChoice(resolved(stored, HIDDEN), sauts, HIDDEN);
       shown = !shown;
-      expect(isTabShown(sauts, resolved(stored, COURSE)), `toucher ${i + 1}`).toBe(shown);
+      expect(isTabShown(sauts, resolved(stored, HIDDEN)), `toucher ${i + 1}`).toBe(shown);
     }
   });
 
   it("un autre onglet changé puis remis ne change pas « sauts » et rend la marque « défaut »", () => {
-    const changed = toggleTabChoice(COURSE, cardio, COURSE);
+    const changed = toggleTabChoice(HIDDEN, cardio, HIDDEN);
     expect(changed).toEqual({ sauts: false, cardio: false });
-    expect(toggleTabChoice(changed, cardio, COURSE)).toBeNull();
+    expect(toggleTabChoice(changed, cardio, HIDDEN)).toBeNull();
   });
 
   it("« sauts » montré reste montré quand un autre onglet revient à son défaut", () => {
-    const withTops = toggleTabChoice(toggleTabChoice(COURSE, topsCourse, COURSE), sauts, COURSE);
-    expect(withTops).toEqual({ sauts: true, tops: true });
-    const back = toggleTabChoice(withTops, topsCourse, COURSE);
+    const withTops = toggleTabChoice(toggleTabChoice(HIDDEN, topsVoile, HIDDEN), sauts, HIDDEN);
+    expect(withTops).toEqual({ sauts: true, tops: false });
+    const back = toggleTabChoice(withTops, topsVoile, HIDDEN);
     expect(back).toEqual({ sauts: true });
-    expect(isTabShown(sauts, resolved(back, COURSE))).toBe(true);
+    expect(isTabShown(sauts, resolved(back, HIDDEN))).toBe(true);
   });
 
   it("un choix ancien, sans la clé du pré-réglage, ne retombe pas sur lui en se vidant", () => {
     // Rangé avant le n° 174 : « sauts » y est montré parce qu'absent.
     const old = { cardio: false };
     expect(isTabShown(sauts, old)).toBe(true);
-    const back = toggleTabChoice(old, cardio, COURSE);
+    const back = toggleTabChoice(old, cardio, HIDDEN);
     expect(back).toEqual({ sauts: true });
-    expect(isTabShown(sauts, resolved(back, COURSE))).toBe(true);
-    expect(isTabShown(cardio, resolved(back, COURSE))).toBe(true);
+    expect(isTabShown(sauts, resolved(back, HIDDEN))).toBe(true);
+    expect(isTabShown(cardio, resolved(back, HIDDEN))).toBe(true);
   });
 
   it("un choix égal au pré-réglage s'efface, quel que soit l'ordre de ses clés", () => {
@@ -214,7 +187,7 @@ describe('toggleTabChoice : activité à pré-réglage (n° 174)', () => {
 
   it('sans pré-réglage, un choix revenu au défaut du module s\'efface', () => {
     expect(toggleTabChoice({ sauts: false }, sauts, null)).toBeNull();
-    expect(toggleTabChoice(null, topsCourse, null)).toEqual({ tops: true });
+    expect(toggleTabChoice(null, topsSurf, null)).toEqual({ tops: true });
   });
 });
 
@@ -250,8 +223,8 @@ describe('maskAdvancedTabs', () => {
   });
 
   it('« général » est de la première rangée, « avancé » fermé masque les autres', () => {
-    const land = { general: true, tops: false, zones: false, surface: false, energie: false, graphiques: true, cardio: false, cadence: false, sauts: false, notes: false, reglages: false };
-    const masked = maskAdvancedTabs(land, LAND_TABS.course, false);
+    const sail = { ...tabDefaults(SAILING_TABS), graphiques: true };
+    const masked = maskAdvancedTabs(sail, SAILING_TABS, false);
     expect(masked.general).toBe(true);
     expect(masked.graphiques).toBe(false);
   });
@@ -299,7 +272,7 @@ describe('état des onglets : « général » seul à chaque ouverture (05/11)',
 
 describe('closeAllTabs : « tout fermer »', () => {
   it('ferme chaque onglet, « général » compris', () => {
-    const open = { ...tabDefaults(LAND_TABS.course), tops: true, cardio: true };
+    const open = { ...tabDefaults(SAILING_TABS), tops: true, cardio: true };
     const closed = closeAllTabs(open);
     expect(Object.keys(closed)).toEqual(Object.keys(open));
     expect(Object.values(closed).every((v) => v === false)).toBe(true);
@@ -307,28 +280,24 @@ describe('closeAllTabs : « tout fermer »', () => {
 });
 
 describe('tabDefaults : onglets ouverts à la première visite', () => {
-  // Copies gelées des constantes écrites à la main avant le lot 62 (SailingModule, LandModule, SurfModule, MuscuModule).
+  // Copies gelées des constantes écrites à la main avant le lot 62 (SailingModule, SurfModule ; celles de LandModule et MuscuModule
+  // sont parties avec la course, le vélo et l'Entraînement).
   const SAILING_PANEL_DEFAULTS = {
     general: true, tops: false, manoeuvres: false, graphiques: false, cardio: false, vmg: false, sauts: false, vols: false, pumping: false, vent: false, matos: false, reglages: false,
-  };
-  const LAND_SECTION_DEFAULTS = {
-    general: true, tops: false, zones: false, surface: false, energie: false, graphiques: false, cardio: false, cadence: false,
-    sauts: false, notes: false, reglages: false,
   };
   const SURF_SECTION_DEFAULTS = {
     general: true, vagues: false, rame: false, vols: false, pumping: false, tops: false, graphiques: false, cardio: false, notes: false, reglages: false,
   };
-  const MUSCU_SECTION_DEFAULTS = { general: true, cardio: false, notes: false, reglages: false };
 
   it('rend les défauts de chaque module, tels qu\'ils étaient écrits', () => {
     expect(tabDefaults(SAILING_TABS)).toEqual(SAILING_PANEL_DEFAULTS);
-    expect(tabDefaults(LAND_TABS.course, LAND_TABS.velo)).toEqual(LAND_SECTION_DEFAULTS);
     expect(tabDefaults(SURF_TABS)).toEqual(SURF_SECTION_DEFAULTS);
-    expect(tabDefaults(MUSCU_TABS)).toEqual(MUSCU_SECTION_DEFAULTS);
   });
 
-  it('course et vélo : l\'union des deux listes, « cadence » comprise', () => {
-    expect(Object.hasOwn(tabDefaults(LAND_TABS.velo), 'cadence')).toBe(false);
-    expect(tabDefaults(LAND_TABS.course, LAND_TABS.velo).cadence).toBe(false);
+  it("plusieurs listes : l'union de leurs onglets", () => {
+    const both = tabDefaults(SAILING_TABS, SURF_TABS);
+    expect(both.vagues).toBe(false);
+    expect(both.manoeuvres).toBe(false);
+    expect(both.general).toBe(true);
   });
 });

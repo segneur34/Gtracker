@@ -47,8 +47,8 @@ const trackerEntry = (): CorpusEntry => {
   }));
   return {
     nom: 'Tracker (buildGpx), deux segments',
-    texte: buildGpx(segmentsOf(fixes, 2), { name: 'Course, 01/10/2026 10:00', sport: 'running' }),
-    attendu: { points: BASE_POINT_COUNT, segments: 2, hasDeviceSpeed: true, avecFc: true, trackName: 'Course, 01/10/2026 10:00', trackType: 'running' },
+    texte: buildGpx(segmentsOf(fixes, 2), { name: 'Surf, 01/10/2026 10:00', sport: 'surf' }),
+    attendu: { points: BASE_POINT_COUNT, segments: 2, hasDeviceSpeed: true, avecFc: true, trackName: 'Surf, 01/10/2026 10:00', trackType: 'surf' },
   };
 };
 

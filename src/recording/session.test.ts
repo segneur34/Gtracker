@@ -289,8 +289,6 @@ describe('états de l’enregistreur', () => {
 
 describe('nothingToKeep (lot 67, sorti de useRecorder)', () => {
   it('parle des positions, ou sans position (muscu) des mesures de la ceinture', () => {
-    expect(nothingToKeep('running')).toBe('Moins de deux positions reçues : rien à enregistrer.');
-    expect(nothingToKeep(null)).toBe('Moins de deux positions reçues : rien à enregistrer.');
-    expect(nothingToKeep('muscu')).toBe('Moins de deux mesures de la ceinture : rien à enregistrer.');
+    expect(nothingToKeep()).toBe('Moins de deux positions reçues : rien à enregistrer.');
   });
 });

@@ -10,10 +10,11 @@
 
 /**
  * Support / activité analysée. Le seuil d'activité et l'unité d'affichage en dépendent.
- * L'identifiant va dans le `<type>` du GPX enregistré et dans le nom de son fichier.
+ * L'identifiant va dans le `<type>` du GPX enregistré et dans le nom de son fichier. Les calculs de l'application
+ * complète (course, vélo, Entraînement, retirés aux lots 302, 303 et 305) ne sont plus des calculs : une fiche ou un
+ * GPX qui les porte se relit sans calcul, « à classer » (`library/record.ts`, `library/naming.ts`).
  */
-export type SportType =
-  | 'wingfoil' | 'windsurf' | 'kite' | 'bateau' | 'running' | 'cycling' | 'run-intervals' | 'bike-intervals' | 'run-test' | 'surf' | 'muscu';
+export type SportType = 'wingfoil' | 'windsurf' | 'kite' | 'bateau' | 'surf';
 
 /** Position, en degrés décimaux. */
 export interface LatLon {

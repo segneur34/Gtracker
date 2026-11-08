@@ -1,8 +1,10 @@
 /* Page du test de FC repos (sous le Profil depuis le lot 301) : règles reprises des pages de l'Entraînement, retirées au lot 302. */
 
-/* Boutons d'action en orange de la famille Entraînement (27/10), gardé tel quel. */
+/* Boutons d'action et aides en orange, celui de l'ancienne famille Entraînement (27/10), gardé tel quel dans les deux
+   thèmes depuis le retrait de cette famille (lot 305). */
 .train-page {
-  --btn-accent: var(--fractionne);
+  --test-accent: #c25700;
+  --btn-accent: var(--test-accent);
 }
 
 /* Boutons d'action sous le déroulé. */

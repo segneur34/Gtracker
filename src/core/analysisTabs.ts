@@ -18,7 +18,7 @@ export interface AnalysisTab<K extends string = string> {
   label: string;
   /** Onglet générique : caché tant que l'activité ne le coche pas. */
   generic?: true;
-  /** Onglet de la première rangée, hors d'« avancé » : « général », « fractionné » (22/10) et « test » (24/10). */
+  /** Onglet de la première rangée, hors d'« avancé » : « général ». */
   primary?: true;
 }
 
@@ -47,33 +47,6 @@ export const SAILING_TABS: AnalysisTab<SailingTab>[] = [
   { key: 'reglages', label: 'réglages' },
 ];
 
-export type LandTab = 'general' | 'tops' | 'zones' | 'surface' | 'energie' | 'graphiques' | 'cardio' | 'cadence' | 'sauts' | 'notes' | 'reglages';
-
-/**
- * Course et vélo : « tops » est natif à vélo, générique à pied (course, marche).
- * « graphiques » à la place des zones de pente, « cardio » juste derrière lui
- * (choix de l'utilisateur, 16/10), puis « cadence », à pied seulement.
- */
-const landTabs = (topsGeneric: boolean, cadence: boolean): AnalysisTab<LandTab>[] => [
-  { key: 'general', label: 'général', primary: true },
-  topsGeneric ? { key: 'tops', label: 'tops', generic: true } : { key: 'tops', label: 'tops' },
-  { key: 'graphiques', label: 'graphiques' },
-  { key: 'cardio', label: 'cardio' },
-  // Seulement pour une session qui a de la cadence (capteurs du téléphone, montre).
-  ...(cadence ? [{ key: 'cadence' as const, label: 'cadence' }] : []),
-  { key: 'surface', label: 'surface' },
-  { key: 'energie', label: 'énergie' },
-  { key: 'zones', label: 'zones de pente' },
-  { key: 'sauts', label: 'sauts' },
-  { key: 'notes', label: 'matériel et notes' },
-  { key: 'reglages', label: 'réglages' },
-];
-
-export const LAND_TABS: Record<'course' | 'velo', AnalysisTab<LandTab>[]> = {
-  course: landTabs(true, true),
-  velo: landTabs(false, false),
-};
-
 export type SurfTab = 'general' | 'vagues' | 'rame' | 'vols' | 'pumping' | 'tops' | 'graphiques' | 'cardio' | 'notes' | 'reglages';
 
 /** Surf (surf, paddle, SUP foil, kayak, downwind) : « tops » est générique. */
@@ -91,34 +64,15 @@ export const SURF_TABS: AnalysisTab<SurfTab>[] = [
   { key: 'reglages', label: 'réglages' },
 ];
 
-export type MuscuTab = 'general' | 'cardio' | 'notes' | 'reglages';
+const TREATMENT_TABS: Record<Treatment, readonly AnalysisTab[]> = { voile: SAILING_TABS, surf: SURF_TABS };
 
 /**
- * Muscu (lot I du 25/10), sans carte : « général » porte la FC et les phases
- * du compteur, « cardio » le panneau commun (charge, zones, FC max à retenir).
- */
-export const MUSCU_TABS: AnalysisTab<MuscuTab>[] = [
-  { key: 'general', label: 'général', primary: true },
-  { key: 'cardio', label: 'cardio' },
-  { key: 'notes', label: 'matériel et notes' },
-  { key: 'reglages', label: 'réglages' },
-];
-
-const TREATMENT_TABS: Record<Treatment, readonly AnalysisTab[]> = {
-  voile: SAILING_TABS,
-  course: LAND_TABS.course,
-  velo: LAND_TABS.velo,
-  surf: SURF_TABS,
-  muscu: MUSCU_TABS,
-};
-
-/**
- * Onglets d'un calcul, proposés dans Réglages : « sauts » seulement s'il les mesure (ni bateau ni fractionné),
- * « cadence » de même, « pumping » de même (voile sur foil, pas le bateau). Les onglets « fractionné » et
+ * Onglets d'un calcul, proposés dans Réglages : « sauts » seulement s'il les mesure (ni bateau ni surf),
+ * « pumping » de même (voile sur foil, pas le bateau). Les onglets « fractionné » et
  * « test » sont partis avec l'Entraînement (lot 302).
  */
 export const analysisTabs = (profile: SportProfile): readonly AnalysisTab[] =>
-  TREATMENT_TABS[sportTreatment(profile.id)].filter((tab) => (tab.key !== 'sauts' || profile.jumps !== null) && (tab.key !== 'cadence' || profile.cadence !== null)
+  TREATMENT_TABS[sportTreatment(profile.id)].filter((tab) => (tab.key !== 'sauts' || profile.jumps !== null)
     && (tab.key !== 'pumping' || profile.pump !== null));
 
 /**

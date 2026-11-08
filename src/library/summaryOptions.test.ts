@@ -33,21 +33,13 @@ describe('réglages du résumé (lot 72)', () => {
 
   it("l'allure imposée en voile seulement", () => {
     expect(summaryOptions('kite', analysis({ referenceSpeedMs: 7 }), activity).referenceSpeedOverrideMs).toBe(7);
-    expect(summaryOptions('running', analysis({ referenceSpeedMs: 7 }), activity).referenceSpeedOverrideMs).toBeUndefined();
+    expect(summaryOptions('surf', analysis({ referenceSpeedMs: 7 }), activity).referenceSpeedOverrideMs).toBeUndefined();
   });
 
   it("le foil de la session, sinon celui de l'activité", () => {
     expect(summaryOptions('surf', analysis({ foil: false }), activity).foil).toBe(false);
     expect(summaryOptions('surf', null, activity).foil).toBe(true);
-    expect(summaryOptions('running', null, { thresholdOverride: undefined, foil: null }).foil).toBeUndefined();
-  });
-
-  it("l'altitude du terrain à pied et à vélo, sauf si le GPS est gardé", () => {
-    const terrainElevation = { stepM: 10, startMs: 0, samples: [] } as never;
-    expect(summaryOptions('running', null, activity, { terrainElevation, elevationSource: 'terrain', test: undefined } as never).terrainElevation)
-      .toBe(terrainElevation);
-    expect(summaryOptions('running', null, activity, { terrainElevation, elevationSource: 'gps' } as never).terrainElevation).toBeUndefined();
-    expect(summaryOptions('wingfoil', null, activity, { terrainElevation } as never).terrainElevation).toBeUndefined();
+    expect(summaryOptions('kite', null, { thresholdOverride: undefined, foil: null }).foil).toBeUndefined();
   });
 });
 
@@ -78,7 +70,7 @@ describe('résumé à refaire quand les réglages changent (lot 37)', () => {
   };
 
   it("autres réglages sur cet appareil : rien, la session garde les siens (Q57) ; un geste : périmée", () => {
-    const record = keyed('running', course);
+    const record = keyed('kite', course);
     expect(isSummaryOutdated(record, of(course))).toBe(false);
     expect(isSummaryOutdated(record, of({ ...course, thresholdOverride: 7 }))).toBe(false);
     expect(isSummaryOutdated(record, of({ ...course, thresholdOverride: undefined }))).toBe(false);
@@ -91,7 +83,7 @@ describe('résumé à refaire quand les réglages changent (lot 37)', () => {
   });
 
   it("session à seuil propre : rien quand les réglages de l'appareil diffèrent ; un geste la réécrit, pour que son porté suive", () => {
-    const record = keyed('running', course, { analysis: analysis({ activeThreshold: 8 }) });
+    const record = keyed('kite', course, { analysis: analysis({ activeThreshold: 8 }) });
     expect(isSummaryOutdated(record, of({ ...course, thresholdOverride: 7 }))).toBe(false);
     expect(isSummaryOutdated(record, of({ ...course, thresholdOverride: undefined }))).toBe(false);
     expect(isSummaryOutdated(record, of(course), () => ({ threshold: 7 }))).toBe(true);
@@ -113,7 +105,7 @@ describe('résumé à refaire quand les réglages changent (lot 37)', () => {
     expect(isSummaryOutdated(keyed('surf', foil), of(noFoil))).toBe(false);
     expect(isSummaryOutdated(keyed('surf', foil), of(noFoil), () => ({ foil: false }))).toBe(true);
     expect(isSummaryOutdated(keyed('wingfoil', foil), of(noFoil))).toBe(false);
-    expect(isSummaryOutdated(keyed('running', foil), of(noFoil))).toBe(false);
+    expect(isSummaryOutdated(keyed('kite', foil), of(noFoil))).toBe(false);
     // Foil de la session : celui de l'activité n'y change rien.
     expect(isSummaryOutdated(keyed('surf', foil, { analysis: analysis({ foil: true }) }), of(noFoil))).toBe(false);
   });
@@ -126,11 +118,12 @@ describe('résumé à refaire quand les réglages changent (lot 37)', () => {
   });
 
   it("fiche d'avant l'empreinte : périmée une fois", () => {
-    expect(isSummaryOutdated(sessionRecord({ sport: 'running' }), of(course))).toBe(true);
+    expect(isSummaryOutdated(sessionRecord({ sport: 'kite' }), of(course))).toBe(true);
   });
 
-  it('muscu, sport inconnu ou absent : jamais, sauf version du calcul dépassée', () => {
-    for (const sport of ['muscu', 'moth', null] as (SportType | null)[]) {
+  it("calcul de l'application complète, inconnu ou absent : jamais, sauf version du calcul dépassée", () => {
+    // Calculs de l'application complète (lot 305) ou inconnus : la fiche n'est jamais réécrite d'office.
+    for (const sport of ['running', 'cycling', 'muscu', 'moth', null] as (SportType | null)[]) {
       const record = sessionRecord({ sport });
       expect(isSummaryOutdated(record, of(course))).toBe(false);
       expect(isSummaryOutdated({ ...record, summary: { ...record.summary, calcVersion: SUMMARY_CALC_VERSION - 1 } }, of(course))).toBe(true);
@@ -138,15 +131,15 @@ describe('résumé à refaire quand les réglages changent (lot 37)', () => {
   });
 
   it('version du calcul dépassée : périmée, empreinte juste ou non', () => {
-    const record = keyed('running', course);
+    const record = keyed('kite', course);
     expect(isSummaryOutdated({ ...record, summary: { ...record.summary, calcVersion: SUMMARY_CALC_VERSION - 1 } }, of(course))).toBe(true);
   });
 
   describe("un résumé tout juste calculé n'est pas périmé, à 1 Hz comme à 5 Hz", () => {
     const cases: [SportType, ActivitySummarySettings, Partial<SessionAnalysis> | null, [number, number][]][] = [
-      ['running', course, null, [[60, 0.3], [600, 3], [60, 0], [600, 3.5]]],
-      ['running', { thresholdOverride: undefined, foil: null }, { activeThreshold: 4 }, [[60, 0.3], [600, 3]]],
-      ['cycling', { thresholdOverride: 0, foil: null }, null, [[60, 0], [900, 8]]],
+      ['kite', course, null, [[60, 0.3], [600, 3], [60, 0], [600, 3.5]]],
+      ['kite', { thresholdOverride: undefined, foil: null }, { activeThreshold: 4 }, [[60, 0.3], [600, 3]]],
+      ['windsurf', { thresholdOverride: 0, foil: null }, null, [[60, 0], [900, 8]]],
       ['wingfoil', { thresholdOverride: undefined, foil: true }, { referenceSpeedMs: 7 }, [[120, 1], [600, 9], [60, 2], [600, 10]]],
       ['kite', { thresholdOverride: 12, foil: false }, null, [[120, 1], [600, 9]]],
       ['surf', { thresholdOverride: undefined, foil: true }, { waveThreshold: 9 }, [[300, 0.8], [20, 6], [300, 0.8], [25, 7], [300, 0.5]]],
@@ -211,7 +204,7 @@ describe('réglages portés par la session (Q57)', () => {
     for (const hz of [1, 5]) {
       const track = JSON.stringify(phasesTrack([[300, 0.8], [20, 6], [300, 0.8]], hz));
       expect(analyzeGpx(track, 'surf', null, () => ({ thresholdOverride: 4, foil: true }))!.summary.activitySettings).toEqual({ threshold: 4, foil: true });
-      expect(analyzeGpx(track, 'running', null, () => ({ thresholdOverride: undefined, foil: null }))!.summary.activitySettings).toEqual({ threshold: null });
+      expect(analyzeGpx(track, 'kite', null, () => ({ thresholdOverride: undefined, foil: null }))!.summary.activitySettings).toEqual({ threshold: null });
     }
   });
 
@@ -245,43 +238,5 @@ describe("sessions à refaire, dans l'ordre de la liste (lot 37)", () => {
     const sessions = [session('a', 1), session('b', 0), session('c', 1, true), session('d', 1), session('e', 1)];
     expect(outdatedRefreshFiles(sessions, (record) => record.summary.distanceM === 1, new Set(['d']))).toEqual(['a', 'e']);
     expect(outdatedRefreshFiles(sessions, () => false, new Set())).toEqual([]);
-  });
-});
-
-/**
- * Restes du vélo dans le résumé (lot 146, vélo retiré au lot 303) : la fiche garde ses meilleurs efforts déjà rangés
- * et l'empreinte de ses réglages, inchangée jusqu'au lot 305, pour qu'aucune fiche de vélo ne soit refaite.
- */
-describe('restes du vélo dans le résumé (lot 303)', () => {
-  const POWER: { bikeType: 'route' | 'gravel'; bikeKg: number; riderKg: number | null } = { bikeType: 'route', bikeKg: 8.5, riderKg: 70 };
-
-  it('les réglages du résumé : le vélo de l’activité, le poids du vélo de la session, le pratiquant même sans poids', () => {
-    const cycling = { bikeType: 'gravel' as const, bikeKg: 12, riderKg: 70 };
-    expect(summaryOptions('cycling', null, { thresholdOverride: undefined, foil: null, cycling }).cyclingPower).toEqual(cycling);
-    const analysis = { bikeWeightKg: 15 } as Parameters<typeof summaryOptions>[1];
-    expect(summaryOptions('cycling', analysis, { thresholdOverride: undefined, foil: null, cycling }).cyclingPower).toEqual({ ...cycling, bikeKg: 15 });
-    expect(summaryOptions('running', null, { thresholdOverride: undefined, foil: null, cycling }).cyclingPower).toBeUndefined();
-  });
-
-  it('empreinte : le type et le poids du vélo à vélo seulement, pas le poids du pratiquant', () => {
-    const key = (cycling: typeof POWER, sport: 'cycling' | 'running' = 'cycling') =>
-      summaryOptionsKey(sport, summaryOptions(sport, null, { thresholdOverride: undefined, foil: null, cycling }));
-    expect(key(POWER)).toBe(JSON.stringify([null, null, null, null, ['route', 8.5]]));
-    expect(key({ ...POWER, riderKg: 90 })).toBe(key(POWER));
-    expect(key({ ...POWER, bikeKg: 10 })).not.toBe(key(POWER));
-    expect(key(POWER, 'running')).toBe(JSON.stringify([null, null, null, null]));
-  });
-
-  it('fiche de vélo : refaite seulement si le vélo de l’activité change, plus pour le poids du pratiquant', () => {
-    const device = (over: Partial<typeof POWER> = {}) => () => ({ thresholdOverride: undefined, foil: null, cycling: { ...POWER, ...over } });
-    const made = device({ riderKg: null });
-    const record = {
-      ...sessionRecord(), sport: 'cycling', activityId: null, analysis: null,
-      summary: { ...sessionRecord().summary, calcVersion: SUMMARY_CALC_VERSION, optionsKey: summaryOptionsKey('cycling', summaryOptions('cycling', null, made())) },
-    } as unknown as SessionRecord;
-    expect(isSummaryOutdated(record, made)).toBe(false);
-    // Le poids du pratiquant connu ne relance plus la puissance des 20 min (partie au lot 303).
-    expect(isSummaryOutdated(record, device())).toBe(false);
-    expect(isSummaryOutdated(record, device({ bikeKg: 10 }))).toBe(true);
   });
 });

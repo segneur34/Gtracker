@@ -359,7 +359,7 @@ function SailingModule() {
       windDeg: currentWindValue,
       windLevel: edits.notes.windLevel,
       rating: edits.notes.rating,
-    }, { foil, units: { speed: speedUnit, distance: distanceUnit } }),
+    }, { foil }),
   ] : [];
   /** Virements ou empannages réussis sur le total, et leur part ; « — » sans vent connu. */
   const maneuverRate = (summary: { success: number; fail: number } | null): string => {

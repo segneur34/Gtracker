@@ -2,7 +2,6 @@ import type { JumpDetection } from './jumps';
 import type { HeartRateZoneModel } from './heartRate';
 import type { AttitudeParams } from './imuVertical';
 import type { PumpDetection } from './pumping';
-import type { CadenceDetection } from './domainTypes';
 import type { SpeedRangeMs } from './speedGradient';
 import type { SportType, TopTarget } from './types';
 import { DEFAULT_MAX_DETOUR_RATIO } from './kinematics';
@@ -31,21 +30,10 @@ export interface ElevationProfile {
 }
 
 /**
- * Retour d'une boucle qui évite l'aller : au plus 1,5 fois l'aller, choix de
- * l'utilisateur (06/10/2026, §10, point 87).
- */
-export const DEFAULT_LOOP_RETURN_MAX_RATIO = 1.5;
-/** Bornes du réglage du retour de boucle, en fois l'aller. */
-export const LOOP_RETURN_RATIO_RANGE = { min: 1, max: 3 } as const;
-
-/**
  * Pas plus long que cette durée : trou de la trace (arrêt sans point, GPS
  * perdu), en secondes, commun à tous les supports (décision du 27/10).
  */
 export const MAX_GAP_S = 10;
-
-/** Pas proposés pour l'altitude du terrain, en mètres. */
-export const TERRAIN_STEP_CHOICES_M = [5, 10, 20] as const;
 
 /**
  * Lissage de l'altitude et plus petit dénivelé compté. Le réglage « route »
@@ -57,26 +45,6 @@ export const ELEVATION_PRESETS: Record<'route' | 'trail', ElevationProfile> = {
   route: { smoothingSeconds: 20, minGainM: 3 },
   trail: { smoothingSeconds: 30, minGainM: 5 },
 };
-
-/** Pente locale (`planning/grade.ts`) et zones de pente (analyse de la course, retirée au lot 303). */
-export interface GradeProfile {
-  /**
-   * Demi-largeur, en mètres, de la fenêtre sur laquelle la pente est mesurée :
-   * entre deux points voisins, quelques dizaines de centimètres d'erreur
-   * d'altitude font dix pour cent ; sur cinquante mètres, elles s'effacent.
-   */
-  halfWindowM: number;
-  /** Pente, en fraction, au-dessous de laquelle le terrain est considéré plat. */
-  flatMaxGrade: number;
-  /** Pente, en fraction, à partir de laquelle une montée ou une descente est raide. */
-  steepMinGrade: number;
-}
-
-/**
- * Pente et zones de pente, communes à tous les supports : course, vélo,
- * énergie, cadence selon la pente, profil d'altitude de la planification.
- */
-export const GRADE_ANALYSIS: GradeProfile = { halfWindowM: 25, flatMaxGrade: 0.03, steepMinGrade: 0.1 };
 
 /**
  * Réglage de l'enregistrement GPS sur téléphone. L'enregistreur ne filtre
@@ -146,60 +114,16 @@ export const DEFAULT_RECORDING: RecordingProfile = {
 };
 
 /**
- * Fractionné : pause automatique coupée, un repos immobile de plus de 60 s
- * couperait la trace (§10, point 89). Le délai reste, pour qui la rallume.
- * Le surf la reprend : l'attente au pic est immobile.
+ * Surf : pause automatique coupée, l'attente au pic est immobile (reprise du
+ * fractionné, retiré au lot 302). Le délai reste, pour qui la rallume.
  */
-const INTERVAL_RECORDING: RecordingProfile = { ...DEFAULT_RECORDING, autoPauseSpeedMs: 0 };
+const SURF_RECORDING: RecordingProfile = { ...DEFAULT_RECORDING, autoPauseSpeedMs: 0 };
 
 /**
  * Bateau (21/10) : pause automatique sous 0,2 km/h pendant 60 s, plus bas que
  * le défaut : un bord lent, sous 1 km/h, ne doit pas mettre la trace en pause.
  */
 const BOAT_RECORDING: RecordingProfile = { ...DEFAULT_RECORDING, autoPauseSpeedMs: kmhToMs(0.2) };
-
-/**
- * Répétitions retrouvées dans la vitesse d'une session faite sans le compteur
- * (détection de l'Entraînement, retirée au lot 302). Le seuil d'effort, lui, est tiré de la
- * session, et se surcharge par session (`SessionAnalysis.effortThresholdMs`).
- */
-export interface IntervalDetectionProfile {
-  /** Pas de lecture de la vitesse sur la distance cumulée, en secondes. */
-  stepS: number;
-  /** Lissage de la vitesse avant la recherche des efforts, en secondes. */
-  smoothingS: number;
-  /** On sort d'un effort sous le seuil diminué de cette fraction (hystérésis). */
-  exitFraction: number;
-  /** Effort plus court écarté, en secondes. */
-  minWorkS: number;
-  /** Effort plus court que cette part de la durée médiane de sa séance écarté (accélération d'échauffement). */
-  minWorkFraction: number;
-  /** Creux plus court fondu dans l'effort qui l'entoure, en secondes. */
-  minDipS: number;
-  /** Recherche du creux de vitesse qui précède un effort, d'où il part, en secondes. */
-  launchSearchS: number;
-  /**
-   * Rapport minimal entre la vitesse moyenne des efforts et celle du reste ;
-   * en dessous, la session n'a pas l'allure d'un fractionné.
-   */
-  minContrast: number;
-  /**
-   * Rapport à partir duquel les rapides se séparent encore en deux (footing
-   * d'approche et efforts) : le seuil monte alors entre eux. Plus haut que
-   * `minContrast`, pour ne pas couper entre deux allures d'effort.
-   */
-  upperContrast: number;
-  /** Repos minimal qui ouvre une nouvelle séance (10/10 puis 20/20), en secondes. */
-  blockMinGapS: number;
-  /** …et en fois le repos médian de la session. */
-  blockGapFactor: number;
-  /**
-   * Rapport de durée qui ouvre aussi une séance sans long repos (10/10 enchaîné
-   * sur un 20/20) : deux efforts de suite aussi éloignés de la durée médiane de
-   * la séance en cours, plus longs ou plus courts.
-   */
-  blockWorkFactor: number;
-}
 
 /**
  * Ceinture cardio Bluetooth à l'enregistrement (`platform/heartRate.ts`) et
@@ -399,52 +323,8 @@ const SAILING_PUMP_DETECTION: PumpDetection = {
   minFlightS: 10,
 };
 
-/**
- * Cadence à pied (calcul retiré avec la course au lot 303, demande du 16/10) : provisoire, à
- * régler sur de vraies sorties, téléphone porté comme d'habitude. De 70 pas
- * par minute (marche lente) à 240 (sprint).
- */
-const CADENCE: CadenceDetection = {
-  gridStepS: 0.02, maxGapS: 0.2, gravityWindowS: 2, windowS: 6, stepS: 1,
-  // Foulée de course au-dessus de 5 m/s² (06/11, n° 26, six courses et une marche sur la poitrine) : à 10, une
-  // foulée de course à 8 m/s² passait pour un pas (76 pas/min sur 30 % de la course du 25/10, 64 % de celle du
-  // 29/10) ; les fenêtres de marche qui ont la période d'un pas restent à 2,6 m/s².
-  minSpm: 70, maxSpm: 240, minCorrelation: 0.3, peakFraction: 0.85, halfPeriodFraction: 0.5, strideRmsMs2: 5,
-  minRmsMs2: 0.5, minCoverage: 0.8, chartSmoothingS: 5, minCoverageS: 60, gapS: 10,
-  walkBands: [90, 100, 110, 120, 130], runBands: [150, 160, 170, 180, 190], runAboveSpm: 140,
-  maxWindowS: 30, speedBinKmh: 1, minBinS: 30, driftMinS: 10 * 60,
-  // Unité de `cad` d'un GPX (décision du 27/10) : longueur de pas ÷ fréquence des pas vraisemblable,
-  // marche 0,3 à 0,45, course 0,35 à 0,65 ; un facteur 2 faux la multiplie ou la divise par 4.
-  stepLengthPerHz: { min: 0.2, max: 0.8 }, spmAbove: 130,
-  keepCapture: true,
-};
-
 /** Libellé du ratio de temps actif d'une session sur foil, quel que soit le calcul. */
 export const FOIL_RATIO_LABEL = 'Ratio de vol';
-
-/** Analyse des répétitions (fractionné, §10, point 89). */
-export interface IntervalProfile {
-  /** Pas du profil de vitesse d'une répétition, en secondes. */
-  profileStepS: number;
-  /** Fin de la mise en vitesse : la répétition atteint cette part de sa vitesse. */
-  launchFraction: number;
-  detection: IntervalDetectionProfile;
-}
-
-/**
- * Commun à pied et à vélo : seuils relatifs et durées, aucun en vitesse
- * absolue. Efforts de 3 s au moins : sur une trace Komoot, un 10/10 ne montre
- * que 3 à 6 s de points rapides, le reste tombant dans le long segment de la
- * récupération (essai du 08/10).
- */
-const INTERVAL_ANALYSIS: IntervalProfile = {
-  profileStepS: 1,
-  launchFraction: 0.9,
-  detection: {
-    stepS: 1, smoothingS: 3, exitFraction: 0.05, minWorkS: 3, minWorkFraction: 0.4, minDipS: 5, launchSearchS: 8,
-    minContrast: 1.25, upperContrast: 1.4, blockMinGapS: 60, blockGapFactor: 3, blockWorkFactor: 1.6,
-  },
-};
 
 /**
  * Analyse d'une session de surf (`surfing/`, §10, point 97) : vagues, rame,
@@ -571,19 +451,6 @@ export interface SportProfile {
   foilDefault: boolean;
   /** Réglage du dénivelé. */
   elevation: ElevationProfile;
-  /** Pente locale et zones de pente. */
-  grade: GradeProfile;
-  /**
-   * Pas des échantillons d'altitude du terrain (IGN), en mètres, surchargeable
-   * par activité ; `null` : pas d'altitude du terrain (voile).
-   */
-  terrainElevationStepM: number | null;
-  /**
-   * Mode « Boucle » de la planification : longueur maximale du retour qui
-   * évite l'aller, en fois l'aller ; au-delà, le retour le plus court.
-   * Surchargeable par activité ; `null` : pas de boucle (voile, fractionné, qui ne planifie pas).
-   */
-  loopReturnMaxRatio: number | null;
   /**
    * Cibles de recherche des meilleurs segments. L'onglet « tops » est natif en
    * voile et à vélo, générique à pied et en surf (`core/analysisTabs.ts`).
@@ -591,11 +458,6 @@ export interface SportProfile {
   topTargets: readonly TopTarget[];
   /** Réglage de l'enregistrement GPS. */
   recording: RecordingProfile;
-  /**
-   * Analyse des répétitions du compteur, et leur détection en famille
-   * Fractionné ; `null` en voile, où le compteur ne sert pas.
-   */
-  intervals: IntervalProfile | null;
   /** Sauts mesurés par les capteurs du téléphone ; `null` en bateau, en fractionné et en surf. */
   jumps: JumpProfile | null;
   /** Ceinture cardio proposée à l'enregistrement et analyse de la FC, dans tous les sports. */
@@ -605,8 +467,6 @@ export interface SportProfile {
    * `null` à pied, à vélo et en Entraînement, où l'énergie mécanique reste seule.
    */
   hrEnergy: HrEnergyProfile | null;
-  /** Cadence à pied mesurée par les capteurs du téléphone ; `null` hors course, marche et fractionné à pied. */
-  cadence: CadenceDetection | null;
   /** Analyse des vagues ; `null` hors surf. */
   surf: SurfProfile | null;
   /**
@@ -629,38 +489,6 @@ export const SAILING_TOP_TARGETS = [
 
 /** Clé d'une cible de tops de la voile (`t2s` … `d1NM`). */
 export type SailingTopKey = (typeof SAILING_TOP_TARGETS)[number]['key'];
-
-/** Cibles de tops du vélo : les durées des tests d'effort, les distances des segments usuels. */
-export const CYCLING_TOP_TARGETS: TopTarget[] = [
-  { key: 't1min', label: '1 min', value: 60, kind: 'time' },
-  { key: 't5min', label: '5 min', value: 300, kind: 'time' },
-  { key: 't20min', label: '20 min', value: 1200, kind: 'time' },
-  { key: 't60min', label: '1 h', value: 3600, kind: 'time' },
-  { key: 'd1km', label: '1 km', value: 1000, kind: 'distance' },
-  { key: 'd5km', label: '5 km', value: 5000, kind: 'distance' },
-  { key: 'd10km', label: '10 km', value: 10000, kind: 'distance' },
-  { key: 'd20km', label: '20 km', value: 20000, kind: 'distance' },
-  { key: 'd40km', label: '40 km', value: 40000, kind: 'distance' },
-];
-
-/**
- * Cibles de tops à pied, course et marche : les durées des tests (Cooper sur
- * 12 min) et les distances des courses usuelles. Onglet caché tant que
- * l'activité ne le coche pas dans Réglages.
- */
-export const RUNNING_TOP_TARGETS: TopTarget[] = [
-  { key: 't1min', label: '1 min', value: 60, kind: 'time' },
-  { key: 't5min', label: '5 min', value: 300, kind: 'time' },
-  { key: 't12min', label: '12 min', value: 720, kind: 'time' },
-  { key: 't30min', label: '30 min', value: 1800, kind: 'time' },
-  { key: 't60min', label: '1 h', value: 3600, kind: 'time' },
-  { key: 'd400m', label: '400 m', value: 400, kind: 'distance' },
-  { key: 'd1km', label: '1 km', value: 1000, kind: 'distance' },
-  { key: 'd5km', label: '5 km', value: 5000, kind: 'distance' },
-  { key: 'd10km', label: '10 km', value: 10000, kind: 'distance' },
-  { key: 'dsemi', label: 'semi', value: 21097.5, kind: 'distance' },
-  { key: 'dmarathon', label: 'marathon', value: 42195, kind: 'distance' },
-];
 
 /**
  * Cibles de tops de la famille surf (surf, paddle, SUP foil, kayak,
@@ -689,7 +517,6 @@ const COMMON_DEFAULTS = {
   withoutActiveThreshold: null,
   speedRangeFollowsPace: false,
   elevation: ELEVATION_PRESETS.route,
-  grade: GRADE_ANALYSIS,
   foilDefault: false,
   recording: DEFAULT_RECORDING,
 };
@@ -720,81 +547,15 @@ const SAILING_DEFAULTS = {
   // 30 m/s font 58 nœuds : hors de portée en session ordinaire.
   maxPlausibleSpeedMs: 30,
   defaultPolarMinSpeed: 5,
-  terrainElevationStepM: null,
-  loopReturnMaxRatio: null,
   topTargets: SAILING_TOP_TARGETS,
-  intervals: null,
   heartRate: HEART_RATE,
   hrEnergy: HR_ENERGY,
-  cadence: null,
   surf: null,
   pump: SAILING_PUMP_DETECTION,
 };
 
 /** Seuils cardio d'un calcul décalés de `offsetBpm` par rapport à la course. */
 const heartRateOffset = (offsetBpm: number): HeartRateProfile => ({ ...HEART_RATE, thresholdOffsetBpm: offsetBpm });
-
-const RUNNING_PROFILE: SportProfile = {
-  ...COMMON_DEFAULTS,
-  id: 'running',
-  label: 'À pied',
-  // 4 km/h, la marche, et 15 km/h.
-  speedRange: { minMs: kmhToMs(4), maxMs: kmhToMs(15) },
-  speedUnit: 'minkm',
-  thresholdUnit: 'kmh',
-  // Reprise au-dessus de 4 km/h, pause en dessous de 2 km/h, confirmée sur 3 s.
-  defaultActiveThreshold: 3,
-  activeHysteresis: { enterOffset: 1, exitOffset: -1 },
-  // Sans seuil réglé : arrêt complet sous 0,5 km/h, reprise au-dessus de 2 km/h.
-  stillThreshold: 1,
-  minStateDurationS: 3,
-  medianWindowSeconds: 5,
-  // 12 m/s font 43 km/h, au-delà du sprint humain.
-  maxPlausibleSpeedMs: 12,
-  defaultPolarMinSpeed: 0,
-  activeRatioLabel: 'Ratio en mouvement',
-  terrainElevationStepM: 10,
-  loopReturnMaxRatio: DEFAULT_LOOP_RETURN_MAX_RATIO,
-  topTargets: RUNNING_TOP_TARGETS,
-  intervals: INTERVAL_ANALYSIS,
-  jumps: { defaultMinHeightM: 0.3, detection: JUMP_DETECTION },
-  heartRate: HEART_RATE,
-  hrEnergy: null,
-  cadence: CADENCE,
-  surf: null,
-  pump: null,
-};
-
-const CYCLING_PROFILE: SportProfile = {
-  ...COMMON_DEFAULTS,
-  id: 'cycling',
-  label: 'Vélo',
-  // 10 km/h, l'allure de balade, et 40 km/h.
-  speedRange: { minMs: kmhToMs(10), maxMs: kmhToMs(40) },
-  speedUnit: 'kmh',
-  thresholdUnit: 'kmh',
-  // Reprise au-dessus de 6 km/h, pause en dessous de 3 km/h, confirmée sur 3 s.
-  defaultActiveThreshold: 5,
-  activeHysteresis: { enterOffset: 1, exitOffset: -2 },
-  // Sans seuil réglé : arrêt complet sous 1 km/h, reprise au-dessus de 3 km/h.
-  stillThreshold: 2,
-  minStateDurationS: 3,
-  medianWindowSeconds: 3,
-  // 25 m/s font 90 km/h, au-delà d'une descente de col ordinaire.
-  maxPlausibleSpeedMs: 25,
-  defaultPolarMinSpeed: 0,
-  activeRatioLabel: 'Ratio en mouvement',
-  terrainElevationStepM: 10,
-  loopReturnMaxRatio: DEFAULT_LOOP_RETURN_MAX_RATIO,
-  topTargets: CYCLING_TOP_TARGETS,
-  intervals: INTERVAL_ANALYSIS,
-  jumps: { defaultMinHeightM: 0.3, detection: JUMP_DETECTION },
-  heartRate: heartRateOffset(-7),
-  hrEnergy: null,
-  cadence: null,
-  surf: null,
-  pump: null,
-};
 
 /**
  * Surf : pause automatique coupée, l'attente au pic est immobile. Seuil de
@@ -820,15 +581,11 @@ const SURF_PROFILE: SportProfile = {
   maxPlausibleSpeedMs: 20,
   defaultPolarMinSpeed: 0,
   activeRatioLabel: 'Ratio sur la vague',
-  terrainElevationStepM: null,
-  loopReturnMaxRatio: null,
   topTargets: SURF_TOP_TARGETS,
-  recording: INTERVAL_RECORDING,
-  intervals: null,
+  recording: SURF_RECORDING,
   jumps: null,
   heartRate: heartRateOffset(-10),
   hrEnergy: HR_ENERGY,
-  cadence: null,
   surf: {
     minWaitS: 10, minWaveS: 3, minWaveM: 15, takeoffSearchS: 15,
     foilActiveThreshold: 10, foilWaveThreshold: 18, turnMinDeg: 60,
@@ -887,27 +644,7 @@ export const SPORT_PROFILES: Record<SportType, SportProfile> = {
     // Ni foil pompé ni capteurs du pumping.
     pump: null,
   },
-  running: RUNNING_PROFILE,
-  cycling: CYCLING_PROFILE,
-  // Fractionné : les calculs de la course et du vélo, sans pause automatique, planification ni sauts.
-  'run-intervals': {
-    ...RUNNING_PROFILE, id: 'run-intervals', label: 'Fractionné à pied', loopReturnMaxRatio: null, recording: INTERVAL_RECORDING, jumps: null,
-  },
-  'bike-intervals': {
-    ...CYCLING_PROFILE, id: 'bike-intervals', label: 'Fractionné vélo', loopReturnMaxRatio: null, recording: INTERVAL_RECORDING, jumps: null,
-  },
-  // Tests guidés à pied (FC max, 24/10) : la course sans pause automatique, ni planification, ni sauts, ni répétitions.
-  'run-test': {
-    ...RUNNING_PROFILE, id: 'run-test', label: 'Test à pied', loopReturnMaxRatio: null, recording: INTERVAL_RECORDING, jumps: null, intervals: null,
-  },
   surf: SURF_PROFILE,
-  // Muscu (lot I du 25/10) : la ceinture cardio seule, sans position ni GPS ; la course pour le
-  // reste (FC, zones), sans pause automatique, planification, sauts, cadence ni répétitions
-  // retrouvées. Décalage de S1 et S2 à 0, faute de référence, surchargeable par activité.
-  muscu: {
-    ...RUNNING_PROFILE, id: 'muscu', label: 'Muscu', loopReturnMaxRatio: null, recording: INTERVAL_RECORDING,
-    jumps: null, intervals: null, cadence: null, terrainElevationStepM: null, topTargets: [], heartRate: heartRateOffset(0),
-  },
 };
 
 /** Supports dont l'analyse repose sur le vent. */
@@ -939,37 +676,29 @@ export const activeRatioLabel = (profile: SportProfile, foil: boolean): string =
 
 /**
  * Traitement d'un calcul : la façon dont ses sessions se calculent et
- * s'affichent (unités, énergie, vélo, altitude du terrain, chiffres du direct,
- * module d'analyse). À ne pas confondre avec la famille, qui les range.
+ * s'affichent (unités, chiffres du direct, onglets, module d'analyse). À ne
+ * pas confondre avec la famille, qui les range ; les deux portent les mêmes
+ * noms depuis le retrait de la terre (lot 305).
  */
-export type Treatment = 'voile' | 'course' | 'velo' | 'surf' | 'muscu';
-
-/** Traitement à pied ou à vélo : dénivelé, altitude du terrain, pente, énergie. */
-export const isLandTreatment = (treatment: Treatment): boolean => treatment === 'course' || treatment === 'velo';
+export type Treatment = 'voile' | 'surf';
 
 /**
  * Famille d'un calcul : où ses sessions se rangent (bibliothèque, accueil,
- * barre de navigation, listes d'activités, Réglages). Une famille de
- * traitement porte son nom ; `fractionne`, nommée « Entraînement » depuis le
- * 24/10, range des calculs traités à pied ou à vélo (§10, point 89).
+ * barre de navigation, listes d'activités, Réglages). Celles de l'application
+ * complète (`course`, `velo`, `fractionne`) ne sont plus des familles : une
+ * famille cachée de ce nom est gardée brute (`FULL_APP_FAMILY_IDS`).
  */
-export type SportFamily = 'voile' | 'course' | 'velo' | 'surf' | 'fractionne';
+export type SportFamily = 'voile' | 'surf';
 
 /** Les familles, dans l'ordre de l'interface. */
-export const SPORT_FAMILIES: SportFamily[] = ['voile', 'course', 'velo', 'surf', 'fractionne'];
+export const SPORT_FAMILIES: SportFamily[] = ['voile', 'surf'];
 
 const SPORT_TREATMENT: Record<SportType, Treatment> = {
   wingfoil: 'voile',
   windsurf: 'voile',
   kite: 'voile',
   bateau: 'voile',
-  running: 'course',
-  cycling: 'velo',
-  'run-intervals': 'course',
-  'bike-intervals': 'velo',
-  'run-test': 'course',
   surf: 'surf',
-  muscu: 'muscu',
 };
 
 const SPORT_FAMILY: Record<SportType, SportFamily> = {
@@ -977,51 +706,12 @@ const SPORT_FAMILY: Record<SportType, SportFamily> = {
   windsurf: 'voile',
   kite: 'voile',
   bateau: 'voile',
-  running: 'course',
-  cycling: 'velo',
-  'run-intervals': 'fractionne',
-  'bike-intervals': 'fractionne',
-  'run-test': 'fractionne',
   surf: 'surf',
-  muscu: 'fractionne',
 };
 
 export const sportTreatment = (sport: SportType): Treatment => SPORT_TREATMENT[sport];
 
 export const sportFamily = (sport: SportType): SportFamily => SPORT_FAMILY[sport];
-
-/**
- * Calcul du fractionné, à pied ou à vélo : le seul de la famille Entraînement
- * à avoir l'onglet « fractionné », la détection des répétitions et le compteur
- * proposé d'office (24/10).
- */
-export const isIntervalSport = (sport: SportType): boolean => sport === 'run-intervals' || sport === 'bike-intervals';
-
-/**
- * Type d'entraînement d'un calcul de la famille Entraînement (24/10) : la
- * rangée « Fractionné · Tests · Muscu » d'Enregistrer, au-dessus des
- * activités du type (à pied, vélo). `null` hors de la famille.
- */
-export type TrainingKind = 'fractionne' | 'tests' | 'muscu';
-
-export const TRAINING_KINDS: readonly TrainingKind[] = ['fractionne', 'tests', 'muscu'];
-
-export const TRAINING_KIND_LABEL: Record<TrainingKind, string> = { fractionne: 'Fractionné', tests: 'Tests', muscu: 'Muscu' };
-
-export const trainingKind = (sport: SportType): TrainingKind | null =>
-  isIntervalSport(sport) ? 'fractionne' : sport === 'run-test' ? 'tests' : sport === 'muscu' ? 'muscu' : null;
-
-/**
- * Calcul enregistré avec des positions (GPS) : tous sauf la muscu, faite de
- * la ceinture cardio seule (lot I du 25/10). Une session sans position n'a ni
- * trace, ni carte, ni cinématique : son GPX ne porte que l'heure et la FC
- * (`ParsedGpx.timedPoints`). C'est ce prédicat qu'on teste, pas le nom du
- * calcul, pour qu'un autre calcul sans trace (test de FC repos) s'y range.
- */
-export const hasPositions = (sport: SportType): boolean => sport !== 'muscu';
-
-/** Calcul d'un test guidé (`recording/fitnessTest.ts`) : la rangée « Test » d'Enregistrer, l'onglet « test » de l'analyse. */
-export const isTestSport = (sport: SportType): boolean => trainingKind(sport) === 'tests';
 
 /**
  * Famille qui navigue sur un parcours de balises (voile, surf) : itinéraire

@@ -111,7 +111,7 @@ const mockPlatform = (): void => {
       return {
         rawPoints: [...text.matchAll(/<trkpt lat="([\d.]+)" lon="([\d.]+)"><time>([^<]+)<\/time>/g)]
           .map((m) => ({ lat: Number(m[1]), lon: Number(m[2]), time: m[3] })),
-        trackType: 'running',
+        trackType: 'surf',
         hasDeviceSpeed: false,
       };
     },
@@ -183,7 +183,7 @@ afterEach(() => {
 const START = startOf(0);
 const MARKS = [{ timeMs: START + 10_000, lat: 43.6003, lon: 3.8, label: 'Bouée' }];
 const expectRecordingFields = (record: Record<string, unknown> | undefined): void => {
-  expect(record?.activityId).toBe('a-marche');
+  expect(record?.activityId).toBe('a-surf-foil');
   expect(record?.marks).toEqual(MARKS);
   expect((record?.analysis as { foil?: boolean } | null)?.foil).toBe(true);
 };
@@ -191,8 +191,8 @@ const expectRecordingFields = (record: Record<string, unknown> | undefined): voi
 const saveOffline = async (): Promise<string> => {
   opened = 'none';
   const offline = await openFresh();
-  await offline.saveRecordedSession(gpxAt(0), 'running', 'a-marche', new Uint8Array([1]), MARKS, true);
-  return sessionFileName(START, 'running');
+  await offline.saveRecordedSession(gpxAt(0), 'surf', 'a-surf-foil', new Uint8Array([1]), MARKS, true);
+  return sessionFileName(START, 'surf');
 };
 
 describe('session enregistrée sans dossier accessible (1)', () => {
@@ -244,7 +244,7 @@ describe('application tuée entre le GPX et sa fiche (3)', () => {
 
     let location = '';
     await afterWrites(async () => {
-      location = (await library.saveRecordedSession(gpxAt(0), 'running', 'a-marche', null, MARKS, true)).location;
+      location = (await library.saveRecordedSession(gpxAt(0), 'surf', 'a-surf-foil', null, MARKS, true)).location;
       expectRecordingFields(library.librarySession('sortie.gpx')?.record as unknown as Record<string, unknown>);
     });
     expect(location).toBe('déjà dans la mémoire');
@@ -275,7 +275,7 @@ const entry = (name: string, text: string) => ({
 
 /** Fiche d'une version future de Tracker, avec un champ que cette version ne connaît pas. */
 const FUTURE_RECORD = JSON.stringify({
-  format: RECORD_FORMAT, version: 99, gpx: 'a.gpx', sport: 'running', activityId: null, source: 'import',
+  format: RECORD_FORMAT, version: 99, gpx: 'a.gpx', sport: 'surf', activityId: null, source: 'import',
   addedAt: '2026-10-27T11:00:00.000Z', title: null, name: 'Futur',
   summary: { calcVersion: SUMMARY_CALC_VERSION, startMs: START, endMs: START + 20_000, distanceM: 66, movingTimeS: 20, elevationGainM: null, maxSpeedMs: 3.3, pointCount: 3, samplingS: 10 },
   notes: null, analysis: null, nouveau: { forme: [1, 2] },
@@ -343,7 +343,7 @@ describe('session déjà présente dont la fiche ne se relit pas (5c)', () => {
 
   it("garde le journal de l'enregistreur, et une session en attente, pour un autre essai", async () => {
     const library = await openPartial();
-    await expect(library.saveRecordedSession(gpxAt(0), 'running', 'a-marche', null, MARKS)).rejects.toThrow('fiche');
+    await expect(library.saveRecordedSession(gpxAt(0), 'surf', 'a-surf-foil', null, MARKS)).rejects.toThrow('fiche');
 
     const name = await saveOffline();
     opened = 'folder';
@@ -469,13 +469,13 @@ describe('changement de dossier avec une fiche pas encore écrite (2, décision 
     const library = await openFresh();
     await settle(library);
     refused.add('sessions/sortie.json');
-    await afterWrites(() => library.updateSessionRecord('sortie.gpx', { name: 'Matin', activityId: 'a-marche' }));
+    await afterWrites(() => library.updateSessionRecord('sortie.gpx', { name: 'Matin', activityId: 'a-surf-foil' }));
 
     chosen = otherFolder;
     await afterWrites(() => library.chooseFolder());
     const copy = library.librarySession('copie.gpx');
     expect(copy?.record.name).toBe('Matin');
-    expect(copy?.record.activityId).toBe('a-marche');
+    expect(copy?.record.activityId).toBe('a-surf-foil');
     expect(recordOf(otherFiles, 'copie.gpx').name).toBe('Matin');
     expect(library.readLibraryState().error).toBeNull();
   });
@@ -697,16 +697,16 @@ describe('cache des fiches d\'une autre version du lecteur (lot 148, C5-7)', () 
     expect(JSON.parse(stored.get(CACHE_KEY)!).reader).toBe(RECORD_READER_VERSION);
   });
 
-  it('un cache sans numéro vaut la version 1 : pas de relecture complète au premier lancement', async () => {
-    expect(RECORD_READER_VERSION).toBe(1);
+  it('un cache sans numéro vaut la version 1 : ignoré par le lecteur de la version 2 (lot 305), les fiches sont relues', async () => {
+    expect(RECORD_READER_VERSION).toBe(2);
     const cache = await cacheMade();
     delete cache.reader;
     cache.entries['sortie.json'].record.name = 'Du cache';
     stored.set(CACHE_KEY, JSON.stringify(cache));
     const library = await openFresh();
     await settle(library);
-    expect(library.librarySession('sortie.gpx')?.record.name).toBe('Du cache');
-    expect(library.librarySession('sortie.gpx')?.partial).toBe(true);
+    expect(library.librarySession('sortie.gpx')?.record.name).not.toBe('Du cache');
+    expect(JSON.parse(stored.get(CACHE_KEY)!).reader).toBe(2);
   });
 });
 
@@ -763,9 +763,9 @@ describe('marqueur d\'une version plus récente (lot 148, C5-9)', () => {
     expect(report.added).toEqual([]);
     expect(report.unsaved).toBe(1);
 
-    const saved = await library.saveRecordedSession(gpxAt(55), 'running', 'a-marche');
+    const saved = await library.saveRecordedSession(gpxAt(55), 'surf', 'a-surf-foil');
     expect(saved.file).toBeNull();
-    const name = sessionFileName(startOf(55), 'running');
+    const name = sessionFileName(startOf(55), 'surf');
     expect(pendingFiles.has(name)).toBe(true);
     expect(library.readLibraryState().pendingCount).toBe(1);
     expect(files).toEqual(before);

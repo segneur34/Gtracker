@@ -8,6 +8,23 @@ import type { CumulativeTrack } from '../core/types';
  * transition, gardé jusqu'au retrait du planificateur routier (lot 304).
  */
 
+/** Pente locale et zones de pente (déménagées de `core/sportProfiles.ts` au lot 305). */
+export interface GradeProfile {
+  /**
+   * Demi-largeur, en mètres, de la fenêtre sur laquelle la pente est mesurée :
+   * entre deux points voisins, quelques dizaines de centimètres d'erreur
+   * d'altitude font dix pour cent ; sur cinquante mètres, elles s'effacent.
+   */
+  halfWindowM: number;
+  /** Pente, en fraction, au-dessous de laquelle le terrain est considéré plat. */
+  flatMaxGrade: number;
+  /** Pente, en fraction, à partir de laquelle une montée ou une descente est raide. */
+  steepMinGrade: number;
+}
+
+/** Pente et zones de pente du profil d'altitude de la planification (`planning/route.ts`). */
+export const GRADE_ANALYSIS: GradeProfile = { halfWindowM: 25, flatMaxGrade: 0.03, steepMinGrade: 0.1 };
+
 /**
  * Pente locale en chaque point, en fraction (0,05 = 5 %), mesurée entre
  * l'altitude à `halfWindowM` avant et après lui le long de la trace.

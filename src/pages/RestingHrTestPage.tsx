@@ -8,7 +8,6 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import { IconPlay } from '../components/icons';
-import { FAMILY_ACCENT } from '../core/activities';
 import { formatMinSec } from '../core/units';
 import { useRestingHrResults } from '../hooks/useRestingHrResults';
 import { useRestingHrTest } from '../hooks/useRestingHrTest';
@@ -90,7 +89,7 @@ function RestingHrTestPage() {
   const remainingS = run ? Math.ceil(restingRemainingS(run.state, run.nowMs)) : 0;
 
   return (
-    <div className="ui-page train-page" style={{ '--help-accent': FAMILY_ACCENT.fractionne } as React.CSSProperties}>
+    <div className="ui-page train-page" style={{ '--help-accent': 'var(--test-accent)' } as React.CSSProperties}>
       <PageHeader title="FC repos" back={{ to: '/profil', label: 'Profil' }}
         subtitle={`Trois minutes immobile, la FC lue sur la ceinture, sans GPS : la moyenne de ${PROTOCOL.windowS} s la plus basse, après la première minute, est votre FC de repos.`} />
 

@@ -2,7 +2,7 @@ import { errorMessage } from '../core/basics';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { Activity } from '../core/activities';
 import { marksWithin, type SessionMark } from '../core/sessionMarks';
-import { DEFAULT_RECORDING, getSportProfile, hasPositions, type RecordingProfile } from '../core/sportProfiles';
+import { DEFAULT_RECORDING, getSportProfile, type RecordingProfile } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import { effectiveFoil, effectiveHeartRate, effectiveRecordingProfile, readStoredActivities, rememberRecordActivity } from './useSportSettings';
 import { recordingJournal } from '../platform/files';
@@ -843,11 +843,6 @@ const recoverOnce = async (): Promise<JournalRecovery> => {
   }
   const parsed = parseJournal(text);
   const session = journalSession(parsed);
-  // Muscu coupée par une version d'avant (session à la ceinture seule) : cette version ne la reprend ni ne la range.
-  if (session && !hasPositions(session.sport)) {
-    await stopOrphans();
-    return setJournalAside('Session de muscu interrompue, que cette version ne lit plus');
-  }
   const facts = recoveryFactsOf(parsed);
   if (recoveryDecision({ ...facts, services, nowMs }) === 'resume' && session && await resumeHoldingCommands(parsed, session.activity)) return 'free';
   await stopOrphans();
@@ -979,7 +974,7 @@ export const startRecording = exclusive(async (
 ): Promise<void> => {
   if (isBusy()) return;
   const sport = activity.base;
-  if (!hasPositions(sport) || source === null) return;
+  if (source === null) return;
   const recovery = await recoverInterruptedRecording();
   // La session d'un journal a repris seule : pas de second départ.
   if (isBusy()) return;
@@ -1038,7 +1033,7 @@ export const continuePendingSession = exclusive(async (source: LocationSource | 
   const before = state.pending;
   if (isBusy() || !before?.canContinue || before.activity === null) return;
   const activity = before.activity;
-  if (!hasPositions(activity.base) || source === null) return;
+  if (source === null) return;
   const backToPending = async (why: unknown): Promise<void> => {
     await abandonResume();
     setState({ pending: before, error: `Reprise impossible : ${errorMessage(why, 'erreur inconnue')}. La session reste en attente.` });
@@ -1158,7 +1153,6 @@ export const resumeRecording = exclusive(async (): Promise<void> => {
 export const changeRecordingActivity = (activity: Activity): void => {
   // Pas pendant le démarrage : l'en-tête du journal n'est peut-être pas encore écrit.
   if ((state.status !== 'recording' && state.status !== 'paused') || state.activity?.id === activity.id) return;
-  if (!hasPositions(activity.base)) return;
   const profile = effectiveRecordingProfile(activity);
   currentProfile = profile;
   belowSinceMs = null;
@@ -1265,7 +1259,7 @@ export const stopRecording = afterCurrent(async (): Promise<void> => {
       heartRate: null,
       marks: [],
       pending,
-      error: pending ? joinMessages(state.error, motionWarning) : nothingToKeep(activity.base),
+      error: pending ? joinMessages(state.error, motionWarning) : nothingToKeep(),
     });
   } catch (err) {
     setState({

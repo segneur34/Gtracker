@@ -9,15 +9,11 @@ import type { SessionSummary } from './record';
  * Lignes ajoutées à l'image de partage le 05/11 (lot 145), à la fin de la liste,
  * les mêmes clés dans l'analyse ouverte et dans le résumé d'une fiche : le choix
  * retenu pour l'activité vaut aux deux endroits. Voile : manœuvres réussies, part
- * du vol pompée (sur foil), vent ; à pied : meilleur kilomètre (temps) ; à vélo :
- * puissance moyenne et meilleures 5 min ; partout : l'appréciation.
+ * du vol pompée (sur foil), vent ; partout : l'appréciation.
  */
 export const SHARE_EXTRA_KEYS: Record<Treatment, readonly string[]> = {
   voile: ['maneuverSuccess', 'pumpingShare', 'wind', 'rating'],
-  course: ['top-d1km', 'rating'],
-  velo: ['puissance', 'top-t5min', 'rating'],
   surf: ['rating'],
-  muscu: ['rating'],
 };
 
 /** Ce qui donne les lignes ajoutées : l'analyse ouverte (ses calculs) ou la fiche (son résumé, ses notes) ; absent ou `null` : « — ». */
@@ -29,12 +25,6 @@ export interface ShareExtras {
   /** Voile : direction du vent retenue, en degrés, et sa force notée dans « matos et conditions ». */
   windDeg?: number | null;
   windLevel?: WindLevel | null;
-  /** À pied : temps du meilleur kilomètre, en secondes. */
-  best1kmS?: number | null;
-  /** À vélo : vitesse des meilleures 5 min, en m/s. */
-  best5minMs?: number | null;
-  /** À vélo : puissance moyenne en mouvement, en watts. */
-  avgPowerW?: number | null;
   /** Appréciation de la séance. */
   rating?: Rating | null;
 }
@@ -63,18 +53,15 @@ export const maneuverSuccessValue = (m: { success: number; total: number } | nul
 export const shareExtraStats = (
   treatment: Treatment,
   extras: ShareExtras,
-  options: { foil?: boolean; units?: { speed: SpeedUnit; distance: DistanceUnit } } = {}
+  options: { foil?: boolean } = {}
 ): ShareStat[] => {
-  const { foil = false, units = { speed: 'kmh', distance: 'km' } } = options;
+  const { foil = false } = options;
   const value = (v: number | null | undefined, format: (n: number) => string): string =>
     v === null || v === undefined || !Number.isFinite(v) ? DASH : format(v);
   const rows: Record<string, ShareStat> = {
     maneuverSuccess: { key: 'maneuverSuccess', label: 'Manœuvres réussies', value: maneuverSuccessValue(extras.maneuvers) },
     pumpingShare: { key: 'pumpingShare', label: 'Pumping', value: value(extras.pumpingShare, (s) => `${Math.round(s * 100)} % du vol`) },
     wind: { key: 'wind', label: 'Vent', value: windShareValue(extras.windDeg, extras.windLevel) },
-    'top-d1km': { key: 'top-d1km', label: 'Meilleur 1 km', value: value(extras.best1kmS, formatShortDuration) },
-    puissance: { key: 'puissance', label: 'Puissance moyenne', value: value(extras.avgPowerW, (w) => `${Math.round(w)} W`) },
-    'top-t5min': { key: 'top-t5min', label: 'Meilleures 5 min', value: value(extras.best5minMs, (ms) => formatLandSpeed(ms, units.speed, units.distance)) },
     rating: { key: 'rating', label: 'Appréciation', value: ratingLabel(extras.rating) ?? DASH },
   };
   return SHARE_EXTRA_KEYS[treatment].filter((key) => key !== 'pumpingShare' || foil).map((key) => rows[key]);
@@ -111,11 +98,8 @@ export const summaryShareStats = (
     // Le vent saisi dans la fiche, sinon celui que l'analyse a retenu.
     windDeg: notes.windDeg ?? summary.windDirDeg,
     windLevel: notes.windLevel,
-    best1kmS: summary.best1kmS,
-    best5minMs: summary.best5minMs,
-    avgPowerW: summary.avgPowerW,
     rating: notes.rating,
-  }, { foil, units });
+  }, { foil });
   return [...summaryBaseStats(summary, treatment, units, withActiveThreshold, foil), ...extras];
 };
 
@@ -148,38 +132,15 @@ const summaryBaseStats = (
       { key: 'maneuvers', label: 'Manœuvres', value: summary.maneuverCount === undefined ? '—' : String(summary.maneuverCount) },
     ].filter((stat) => withActiveThreshold || !active.has(stat.key));
   }
-  if (treatment === 'muscu') {
-    // Sans trace (lot I du 25/10) : la durée et la FC, comme l'onglet « général » de son analyse.
-    const hr = summary.heartRate;
-    return [
-      { key: 'totalTime', label: 'Durée', value: formatDuration(totalS * 1000) },
-      { key: 'activeTime', label: 'Hors pauses', value: movingS === null ? '—' : formatDuration(movingS * 1000) },
-      { key: 'heartRate', label: 'FC moyenne', value: hr ? `${Math.round(hr.avgBpm)} bpm` : '—' },
-      { key: 'heartRateMax', label: 'FC max', value: hr ? `${hr.maxBpm} bpm` : '—' },
-    ];
-  }
-  if (treatment === 'surf') {
-    return [
-      { key: 'totalTime', label: 'Durée de la session', value: formatDuration(totalS * 1000) },
-      { key: 'waves', label: 'Vagues', value: summary.waveCount === undefined ? '—' : String(summary.waveCount) },
-      { key: 'longestWave', label: 'Plus longue vague', value: summary.longestWaveM == null ? '—' : `${Math.round(summary.longestWaveM)} m` },
-      // Sans vague, pas de vitesse max (Q34) : « — », comme sa page.
-      { key: 'maxSpeed', label: 'Vitesse max', value: summary.maxSpeedMs > 0 ? speed(summary.maxSpeedMs) : '—' },
-      { key: 'longestFlight', label: 'Plus long vol', value: summary.longestFlightS == null ? '—' : formatShortDuration(summary.longestFlightS) },
-      { key: 'distance', label: 'Distance totale', value: distance },
-    ];
-  }
+  // Surf.
   return [
-    { key: 'distance', label: 'Distance', value: distance },
-    { key: 'activeDistance', label: 'Distance en mouvement', value: movingM === null ? '—' : formatDistance(movingM, units.distance) },
-    { key: 'totalTime', label: 'Temps de parcours', value: formatDuration(totalS * 1000) },
-    { key: 'activeTime', label: 'Temps en mouvement', value: movingS === null ? '—' : formatDuration(movingS * 1000) },
-    { key: 'movingAverage', label: 'Moyenne en mouvement', value: speed(per(movingM ?? summary.distanceM, movingS)) },
-    { key: 'overallAverage', label: 'Moyenne sur le temps total', value: speed(per(summary.distanceM, totalS)) },
-    { key: 'elevationGain', label: 'Dénivelé', value: summary.elevationGainM === null ? '—' : `+${Math.round(summary.elevationGainM)} m` },
-    { key: 'maxSpeed', label: 'Vitesse max', value: speed(summary.maxSpeedMs) },
-    { key: 'heartRate', label: 'FC moyenne', value: summary.heartRate ? `${Math.round(summary.heartRate.avgBpm)} bpm` : '—' },
-    { key: 'cadence', label: 'Cadence', value: summary.cadence ? `${Math.round(summary.cadence.avgSpm)} pas/min` : '—' },
+    { key: 'totalTime', label: 'Durée de la session', value: formatDuration(totalS * 1000) },
+    { key: 'waves', label: 'Vagues', value: summary.waveCount === undefined ? '—' : String(summary.waveCount) },
+    { key: 'longestWave', label: 'Plus longue vague', value: summary.longestWaveM == null ? '—' : `${Math.round(summary.longestWaveM)} m` },
+    // Sans vague, pas de vitesse max (Q34) : « — », comme sa page.
+    { key: 'maxSpeed', label: 'Vitesse max', value: summary.maxSpeedMs > 0 ? speed(summary.maxSpeedMs) : '—' },
+    { key: 'longestFlight', label: 'Plus long vol', value: summary.longestFlightS == null ? '—' : formatShortDuration(summary.longestFlightS) },
+    { key: 'distance', label: 'Distance totale', value: distance },
   ];
 };
 

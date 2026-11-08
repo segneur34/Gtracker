@@ -64,8 +64,10 @@ describe('du FIT au GPX, relu par parseGpx', () => {
   });
 
   it('nomme la session comme un enregistrement', () => {
-    const { trackName } = parseGpx(gpxOf(buildFitActivity({ points: seconds(2), sessionSports: [2] })));
-    expect(trackName).toMatch(/^Vélo.*, 10\/10\/2026 \d\d:00$/);
+    const { trackName } = parseGpx(gpxOf(buildFitActivity({ points: seconds(2), sessionSports: [38] })));
+    expect(trackName).toMatch(/^Surf, 10\/10\/2026 \d\d:00$/);
+    // Une course de la montre, sans calcul ici (lot 305) : nommée comme une session à classer.
+    expect(parseGpx(gpxOf(buildFitActivity({ points: seconds(2), sessionSports: [1] }))).trackName).toMatch(/^Session, /);
     const unknown = parseGpx(gpxOf(buildFitActivity({ points: seconds(2), sessionSports: [0] })));
     expect(unknown.trackName).toMatch(/^Session, 10\/10\/2026 \d\d:00$/);
   });
@@ -138,8 +140,13 @@ describe('sport écrit dans le GPX', () => {
     parseGpx(gpxOf(buildFitActivity({ points: seconds(2), sessionSports, sportMessage }))).trackType;
 
   it('le numéro du profil FIT devient un nom lu par `guessSport`', () => {
-    const cases: [number, string][] = [[1, 'running'], [2, 'cycling'], [21, 'cycling'], [32, 'bateau'], [38, 'surf'], [43, 'windsurf'], [44, 'kite']];
+    const cases: [number, string][] = [[32, 'bateau'], [38, 'surf'], [43, 'windsurf'], [44, 'kite']];
     for (const [code, sport] of cases) expect(guessSport(typeOf([code]))).toBe(sport);
+    // Course et vélo : leur nom reste écrit, la session est à classer (lot 305).
+    for (const [code, name] of [[1, 'running'], [2, 'cycling'], [21, 'e_biking']] as const) {
+      expect(typeOf([code])).toBe(name);
+      expect(guessSport(typeOf([code]))).toBeNull();
+    }
   });
 
   it('un sport connu du FIT mais pas d\'ici garde son nom et reste à classer', () => {

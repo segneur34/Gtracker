@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { heartRateZones } from '../core/heartRate';
-import { SPORT_PROFILES } from '../core/sportProfiles';
+import { REFERENCE_HEART_RATE } from '../core/sportProfiles';
 import { EMPTY_RUNNER_PROFILE, type RunnerProfile } from '../library/athleteProfile';
 import { formatOffsetBpm, hrSourceLabel, zonesOriginText } from './heartRateOrigin';
 
-const MODEL = SPORT_PROFILES.running.heartRate.zoneModel;
+const MODEL = REFERENCE_HEART_RATE.zoneModel;
 const atDay = (day: number, month: number) => new Date(2026, month - 1, day, 9).getTime();
 
 describe('hrSourceLabel', () => {

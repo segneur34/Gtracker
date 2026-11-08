@@ -15,7 +15,7 @@ const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h)
 const session = statSession;
 
 describe('statSessionOf', () => {
-  it('reprend le résumé et la famille du calcul ; les séances de la fiche ne comptent plus (lot 302)', () => {
+  it('reprend le résumé et la famille du calcul ; les séances d\'une fiche complète ne comptent pas (lot 302)', () => {
     const record = {
       name: 'Piste',
       summary: { calcVersion: 2, startMs: 1000, endMs: 61_000, distanceM: 400, movingTimeS: 50, elevationGainM: 2, maxSpeedMs: 7, pointCount: 60, samplingS: 1 },
@@ -27,9 +27,9 @@ describe('statSessionOf', () => {
         ],
       }],
     } as unknown as SessionRecord;
-    const activity: Activity = { id: 'frac', name: 'Fractionné à pied', base: 'run-intervals', color: '#c25700' };
+    const activity: Activity = { id: 'a-paddle', name: 'Paddle', base: 'surf', color: '#847c6e' };
     const s = statSessionOf('a.json', record, activity);
-    expect(s).toMatchObject({ file: 'a.json', name: 'Piste', family: 'fractionne', treatment: 'course', maneuverCount: null });
+    expect(s).toMatchObject({ file: 'a.json', name: 'Piste', family: 'surf', treatment: 'surf', maneuverCount: null });
     expect(s).not.toHaveProperty('reps');
     // Fiche d'avant la version 5 : ni distance en action, ni temps de vol, ni réussite.
     expect(s).toMatchObject({ movingDistanceM: null, flightS: null, maneuverResults: null, foil: false });
@@ -149,9 +149,9 @@ describe('metricsOf', () => {
   const keys = (family: Parameters<typeof metricsOf>[0], list: StatSession[]) => metricsOf(family, list).map((m) => m.key);
 
   it('propose les données de la famille qui ont une valeur', () => {
-    // Le dénivelé et la cadence sont partis avec la course et le vélo (lot 303).
-    expect(keys('course', [session(at(2026, 3, 1), { elevationGainM: 80 })])).toEqual(['vmax', 'moyenne', 'duree', 'distance']);
-    expect(keys('course', [session(at(2026, 3, 1))])).toEqual(['vmax', 'moyenne', 'duree', 'distance']);
+    // Le dénivelé et la cadence sont partis avec la course et le vélo (lot 303) ; un paddle sans vague n'a que les communes.
+    expect(keys('surf', [session(at(2026, 3, 1), { elevationGainM: 80 })])).toEqual(['vmax', 'moyenne', 'duree', 'distance']);
+    expect(keys('surf', [session(at(2026, 3, 1))])).toEqual(['vmax', 'moyenne', 'duree', 'distance']);
     expect(keys('voile', [sailStatSession(at(2026, 3, 1))])).toEqual(['vmax', 'moyenne', 'duree', 'distance']);
     expect(keys('voile', [sailStatSession(at(2026, 3, 1), { foil: true, maneuverResults: { tackSuccess: 1, tackFail: 0, jibeSuccess: 0, jibeFail: 0 } })]))
       .toEqual(['vmax', 'moyenne', 'duree', 'distance', 'vol', 'reussite']);
@@ -162,7 +162,7 @@ describe('metricsOf', () => {
 
   it('vue d\'ensemble : la durée seule ; rien sans session', () => {
     expect(keys(null, [session(at(2026, 3, 1))])).toEqual(['duree']);
-    expect(keys('course', [])).toEqual([]);
+    expect(keys('surf', [])).toEqual([]);
   });
 });
 
@@ -172,7 +172,7 @@ describe('regularity', () => {
   it('compte les semaines actives, la plus longue suite et la suite en cours', () => {
     // Semaines 30, 31, 32 actives, 33 vide, 34 active, puis rien jusqu'à la 38, active, et la 39 vide.
     const sessions = [at(2026, 7, 21), at(2026, 7, 28), at(2026, 7, 29), at(2026, 8, 4), at(2026, 8, 18), at(2026, 9, 15)].map((t) => session(t));
-    const r = regularity(sessions, statsPeriodBounds('sixmois', now), now, ['course']);
+    const r = regularity(sessions, statsPeriodBounds('sixmois', now), now, ['a-paddle']);
     // De la semaine 30, celle de la plus vieille session, à la 39 : pas les six mois.
     expect(r.weeks).toBe(10);
     expect(r.activeWeeks).toBe(5);
@@ -189,7 +189,7 @@ describe('regularity', () => {
 
   it('compte toute la période quand une session la précède', () => {
     const sessions = [at(2025, 1, 6), at(2026, 7, 21), at(2026, 9, 15)].map((t) => session(t));
-    const r = regularity(sessions, statsPeriodBounds('sixmois', now), now, ['course']);
+    const r = regularity(sessions, statsPeriodBounds('sixmois', now), now, ['a-paddle']);
     expect(r.weeks).toBe(26);
     expect(r.perWeek).toBeCloseTo(2 / 26);
     expect(r.bars).toHaveLength(26);
@@ -198,7 +198,7 @@ describe('regularity', () => {
   it('part de la plus vieille session sur une année', () => {
     // Première session le lundi de la semaine 32 : 8 semaines comptées jusqu'à la 39, pas 52.
     const sessions = [at(2026, 8, 3), at(2026, 9, 21)].map((t) => session(t));
-    const r = regularity(sessions, statsPeriodBounds('annee', now), now, ['course']);
+    const r = regularity(sessions, statsPeriodBounds('annee', now), now, ['a-paddle']);
     expect(r.weeks).toBe(8);
     expect(r.perWeek).toBeCloseTo(2 / 8);
   });
@@ -222,13 +222,13 @@ describe('regularity', () => {
   });
 
   it('passe aux barres par mois au-delà d’un an, depuis la première session', () => {
-    const sessions = [at(2024, 6, 10), at(2025, 2, 3), at(2026, 9, 21)].map((t) => session(t, { activityId: 'velo' }));
-    const r = regularity(sessions, statsPeriodBounds('tout', now), now, ['course', 'velo']);
+    const sessions = [at(2024, 6, 10), at(2025, 2, 3), at(2026, 9, 21)].map((t) => session(t, { activityId: 'kite', family: 'voile', treatment: 'voile' }));
+    const r = regularity(sessions, statsPeriodBounds('tout', now), now, ['a-paddle', 'kite']);
     expect(r.barUnit).toBe('mois');
     // De juin 2024 à septembre 2026.
     expect(r.bars).toHaveLength(28);
     expect(r.bars.reduce((n, b) => n + b.count, 0)).toBe(3);
-    expect(r.bars[0].stacks).toEqual([{ activityId: 'velo', count: 1 }]);
+    expect(r.bars[0].stacks).toEqual([{ activityId: 'kite', count: 1 }]);
     expect(r.weeksSinceLast).toBe(0);
   });
 
@@ -251,7 +251,6 @@ describe('records', () => {
   it('propose les records de chaque famille', () => {
     expect(recordKindsOf('voile')).toContain('manoeuvres');
     expect(recordKindsOf('surf')).toEqual(expect.arrayContaining(['vague', 'vol']));
-    expect(recordKindsOf('fractionne')).toEqual(['vitesse', 'distance', 'duree']);
     expect(recordKindsOf(null)).not.toContain('vitesse');
   });
 });
@@ -338,35 +337,21 @@ describe('cardio', () => {
   });
 
   it("prend les zones de chaque session, décalées pour son activité", () => {
-    const list = [session(at(2026, 10, 5), { heartRate: hr(150) }), session(at(2026, 10, 6), { heartRate: hr(150), activityId: 'velo' })];
+    const list = [session(at(2026, 10, 5), { heartRate: hr(150) }), session(at(2026, 10, 6), { heartRate: hr(150), activityId: 'kite', family: 'voile', treatment: 'voile' })];
     // Zones du vélo plus hautes : ses 130 tombent en Z1, ses 170 restent en Z4.
-    const t = cardioTotals(list, (s) => (s.activityId === 'velo' ? [125, 140, 160, 165, 185] : bounds), weights);
+    const t = cardioTotals(list, (s) => (s.activityId === 'kite' ? [125, 140, 160, 165, 185] : bounds), weights);
     expect(t.zoneTimesS).toEqual([0, 600, 600, 0, 1200, 0]);
   });
 
   it('range la charge par semaine et la FC par session', () => {
     const list = [session(at(2026, 10, 5), { heartRate: hr(150) }), session(at(2026, 10, 14), { heartRate: hr(130) })];
-    const reg = regularity(list, { fromMs: at(2026, 10, 5, 0), toMs: at(2026, 10, 19, 0) }, at(2026, 10, 18), ['course']);
+    const reg = regularity(list, { fromMs: at(2026, 10, 5, 0), toMs: at(2026, 10, 19, 0) }, at(2026, 10, 18), ['a-paddle']);
     const bars = cardioLoadBars(reg.bars, list, () => bounds, weights);
     expect(bars.map((b) => Math.round(b.load))).toEqual([60, 60]);
     expect(heartRatePoints([...list].reverse()).map((p) => p.avgBpm)).toEqual([150, 130]);
   });
 });
 
-describe('muscu dans les statistiques (lot I du 25/10)', () => {
-  it('compte en sessions et en durée, ni en temps ni en vitesse en action, ni en distance', () => {
-    const run = session(at(2026, 3, 1));
-    const muscu = session(at(2026, 3, 2), {
-      family: 'fractionne', treatment: 'muscu', positions: false, distanceM: 0, movingDistanceM: null, maxSpeedMs: 0, movingTimeS: 1800,
-    });
-    const t = statsTotals([run, muscu]);
-    expect(t.sessions).toBe(2);
-    expect(t.durationS).toBe(7200);
-    expect(t.movingTimeS).toBe(3000);
-    expect(averageMovingSpeedMs(t)).toBeCloseTo(3, 6);
-    expect(metricsOf('fractionne', [muscu]).map((m) => m.key)).toEqual(['duree']);
-  });
-});
 
 describe('weeklyDurations', () => {
   it('somme les durées par semaine du lundi, zéros compris, dans l ordre', () => {

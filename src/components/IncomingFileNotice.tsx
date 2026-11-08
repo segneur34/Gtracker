@@ -18,7 +18,7 @@ import Button from './ui/Button';
  */
 
 /** Module d'une session à classer en lecture seule, qui ne peut pas garder d'activité : aucun n'est plus juste qu'un autre. */
-const UNCLASSIFIED_FAMILY: SportFamily = 'course';
+const UNCLASSIFIED_FAMILY: SportFamily = 'voile';
 
 function NoticeRow({ id, text, file, route, trouble }: { id: string; text: string; file: string | null; route?: string; trouble: boolean }) {
   const openSession = useOpenSession();

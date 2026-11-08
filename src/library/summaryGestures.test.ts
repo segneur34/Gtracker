@@ -10,7 +10,7 @@ describe('réglages suivis par activité (Q57)', () => {
   it('le seuil réglé ou pré-réglé ; le foil en surf seulement', () => {
     const thresholds: Record<string, number> = { 'a-moth': 7, surf: 4 };
     const values = activityValues(
-      [activity('a-moth', 'wingfoil'), activity('surf', 'surf'), activity('a-trail', 'cycling')],
+      [activity('a-moth', 'wingfoil'), activity('surf', 'surf'), activity('a-trail', 'kite')],
       (a) => ({ thresholdOverride: thresholds[a.id], foil: true }),
     );
     expect(values['a-moth']).toEqual({ threshold: 7 });
@@ -20,27 +20,27 @@ describe('réglages suivis par activité (Q57)', () => {
 });
 
 describe('gestes', () => {
-  const start: SummaryGestures = { baseline: { course: { threshold: 6 }, surf: { threshold: null, foil: false } }, pending: {} };
+  const start: SummaryGestures = { baseline: { kite: { threshold: 6 }, surf: { threshold: null, foil: false } }, pending: {} };
 
   it('sans comparaison passée : référence posée, rien à refaire', () => {
-    expect(noteGestures(null, { course: { threshold: 6 } })).toEqual({ baseline: { course: { threshold: 6 } }, pending: {} });
+    expect(noteGestures(null, { kite: { threshold: 6 } })).toEqual({ baseline: { kite: { threshold: 6 } }, pending: {} });
   });
 
   it('un seuil changé : ce composant seul', () => {
-    const next = noteGestures(start, { course: { threshold: 7 }, surf: { threshold: null, foil: false } });
-    expect(next.pending).toEqual({ course: { threshold: 7 } });
-    expect(next.baseline.course).toEqual({ threshold: 7 });
+    const next = noteGestures(start, { kite: { threshold: 7 }, surf: { threshold: null, foil: false } });
+    expect(next.pending).toEqual({ kite: { threshold: 7 } });
+    expect(next.baseline.kite).toEqual({ threshold: 7 });
   });
 
   it('un seuil retiré vaut un geste ; un foil changé en surf aussi', () => {
-    const next = noteGestures(start, { course: { threshold: null }, surf: { threshold: null, foil: true } });
-    expect(next.pending).toEqual({ course: { threshold: null }, surf: { foil: true } });
+    const next = noteGestures(start, { kite: { threshold: null }, surf: { threshold: null, foil: true } });
+    expect(next.pending).toEqual({ kite: { threshold: null }, surf: { foil: true } });
   });
 
   it('rien de changé : rien à refaire, et ce qui attendait reste', () => {
     expect(noteGestures(start, start.baseline).pending).toEqual({});
-    const waiting = { ...start, pending: { course: { threshold: 6 } } };
-    expect(noteGestures(waiting, start.baseline).pending).toEqual({ course: { threshold: 6 } });
+    const waiting = { ...start, pending: { kite: { threshold: 6 } } };
+    expect(noteGestures(waiting, start.baseline).pending).toEqual({ kite: { threshold: 6 } });
   });
 
   it('un second geste remplace le premier sur son composant, et le complète sur l\'autre', () => {
@@ -50,27 +50,27 @@ describe('gestes', () => {
   });
 
   it('réglages repris d\'eux-mêmes : référence à jour, pas de geste', () => {
-    const next = noteGestures(start, { course: { threshold: 9 }, surf: { threshold: null, foil: true } }, true);
+    const next = noteGestures(start, { kite: { threshold: 9 }, surf: { threshold: null, foil: true } }, true);
     expect(next.pending).toEqual({});
-    expect(next.baseline.course).toEqual({ threshold: 9 });
+    expect(next.baseline.kite).toEqual({ threshold: 9 });
   });
 
   it("réglages repris d'eux-mêmes : un geste en attente d'un lancement précédent reste", () => {
-    const waiting = { ...start, pending: { course: { threshold: 7 } } };
-    const next = noteGestures(waiting, { course: { threshold: 9 }, surf: { threshold: null, foil: true } }, true);
-    expect(next.pending).toEqual({ course: { threshold: 7 } });
-    expect(next.baseline.course).toEqual({ threshold: 9 });
+    const waiting = { ...start, pending: { kite: { threshold: 7 } } };
+    const next = noteGestures(waiting, { kite: { threshold: 9 }, surf: { threshold: null, foil: true } }, true);
+    expect(next.pending).toEqual({ kite: { threshold: 7 } });
+    expect(next.baseline.kite).toEqual({ threshold: 9 });
   });
 
   it('activité nouvelle : pas de geste ; activité supprimée : elle sort de la référence et de l\'attente', () => {
     const waiting = { ...start, pending: { surf: { foil: true } } };
-    const next = noteGestures(waiting, { course: { threshold: 6 }, neuve: { threshold: 3 } });
+    const next = noteGestures(waiting, { kite: { threshold: 6 }, neuve: { threshold: 3 } });
     expect(next.pending).toEqual({});
-    expect(Object.keys(next.baseline).sort()).toEqual(['course', 'neuve']);
+    expect(Object.keys(next.baseline).sort()).toEqual(['kite', 'neuve']);
   });
 
   it('gestes faits retirés, les autres gardés', () => {
-    const waiting = { ...start, pending: { course: { threshold: 7 }, surf: { foil: true } } };
+    const waiting = { ...start, pending: { kite: { threshold: 7 }, surf: { foil: true } } };
     expect(settleGestures(waiting, (id) => id === 'surf').pending).toEqual({ surf: { foil: true } });
   });
 

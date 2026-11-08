@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { BackdropVariant } from '../core/backdropPattern';
-import { favoriteFamily, withoutRetiredFamilies } from '../library/profile';
+import { favoriteFamily } from '../library/profile';
 import { useVisibility } from './useSportSettings';
 import { useVisibleStatSessions } from './useVisibleStatSessions';
 
@@ -14,5 +14,5 @@ import { useVisibleStatSessions } from './useVisibleStatSessions';
 export function useFavoriteBackdrop(): BackdropVariant {
   const { all } = useVisibleStatSessions();
   const { activities } = useVisibility();
-  return useMemo(() => favoriteFamily(withoutRetiredFamilies(all), activities.map((a) => a.id)) ?? 'contours', [all, activities]);
+  return useMemo(() => favoriteFamily(all, activities.map((a) => a.id)) ?? 'contours', [all, activities]);
 }

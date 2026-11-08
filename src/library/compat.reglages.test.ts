@@ -51,11 +51,11 @@ describe('réglages, compatibilité : BOM, CRLF', () => {
 describe('réglages : deux écritures de suite (n° 174, case « Sauts » puis onglet)', () => {
   it('la seconde relit la première au lieu de l\'écraser', () => {
     jsonStore.write('tracker.sportSettings', {});
-    const jumps = { enabled: true, placement: 'poitrine' as const, minHeightM: 0.3 };
-    updateStoredSettings((s) => withSetting(s, 'running', 'jumps', jumps));
-    updateStoredSettings((s) => withSetting(s, 'running', 'tabs', { sauts: true }));
-    expect(readStoredSettings().jumps).toEqual({ running: jumps });
-    expect(readStoredSettings().tabs).toEqual({ running: { sauts: true } });
+    const jumps = { enabled: true, placement: 'poitrine' as const, minHeightM: 1.5 };
+    updateStoredSettings((s) => withSetting(s, 'kite', 'jumps', jumps));
+    updateStoredSettings((s) => withSetting(s, 'kite', 'tabs', { sauts: true }));
+    expect(readStoredSettings().jumps).toEqual({ kite: jumps });
+    expect(readStoredSettings().tabs).toEqual({ kite: { sauts: true } });
   });
 });
 
@@ -89,9 +89,9 @@ describe('réglages, compatibilité : numéros de version jamais rabaissés (lot
     expect(withVisibility({ activitiesVersion: ACTIVITIES_VERSION - 1 }, activities, [])?.activitiesVersion).toBe(ACTIVITIES_VERSION);
   });
   it('une version de pré-réglages plus basse fait effacer de nouveau les réglages couverts', () => {
-    const stored = { presetsVersion: 2, activities: undefined, thresholds: { 'a-marche': 1.2, wingfoil: 9 } };
+    const stored = { presetsVersion: 1, activities: undefined, thresholds: { wingfoil: 1.2, kite: 9 } };
     const next = resetStoredPresets(stored as never);
-    expect((next.thresholds as Record<string, number>)['a-marche']).toBeUndefined();
-    expect((next.thresholds as Record<string, number>).wingfoil).toBe(9);
+    expect((next.thresholds as Record<string, number>).wingfoil).toBeUndefined();
+    expect((next.thresholds as Record<string, number>).kite).toBe(9);
   });
 });

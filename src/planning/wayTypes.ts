@@ -1,4 +1,3 @@
-import type { BikeType } from '../core/domainTypes';
 import type { Treatment } from '../core/sportProfiles';
 import { WAY_TYPES, type WayType } from './brouterProfile';
 
@@ -43,24 +42,11 @@ export const wayTypesOf = (mode: WaysMode): WayType[] => {
 
 export const isWayType = (value: string): value is WayType => (WAY_TYPES as readonly string[]).includes(value);
 
-/** À vélo, types de voie cochés d'office selon le type de vélo (§10, point 81). */
-export const BIKE_WAY_TYPES: Record<BikeType, WayType[]> = {
-  route: ['route'],
-  ville: ['route'],
-  gravel: ['piste'],
-  vtt: ['sentier', 'piste'],
-};
-
 /**
- * Types de voie cochés d'office en planification pour une activité qui n'en
- * a pas de réglés ni de pré-réglés (`settings/activityPresets.ts`) : selon son
- * type de vélo, la route à pied ; aucun en voile, où les balises sont
- * reliées en ligne droite.
+ * Types de voie cochés d'office en planification pour une activité : aucun en voile et en surf, où les balises
+ * sont reliées en ligne droite (ceux du vélo et de la course sont partis au lot 305 ; planificateur : lot 304).
  */
-export const presetWayTypes = (treatment: Treatment, bikeType: BikeType): WayType[] => {
-  if (treatment === 'velo') return BIKE_WAY_TYPES[bikeType];
-  return treatment === 'course' ? ['route'] : [];
-};
+export const presetWayTypes = (_treatment: Treatment): WayType[] => [];
 
 /** Types de voie d'un réglage : connus, dans l'ordre, sans doublon ; `null` si la valeur n'en est pas une liste non vide. */
 export const sanitizeWayTypes = (value: unknown): WayType[] | null => {

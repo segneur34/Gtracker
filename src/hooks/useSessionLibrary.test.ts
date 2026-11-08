@@ -3,8 +3,8 @@ import { RECORD_FORMAT, RECORD_VERSION, SUMMARY_CALC_VERSION, serializeRecord, t
 import type { MemoryFolder } from '../platform/memoryFolder';
 import { createFakeFolder } from '../test/memoryFolder.fixture';
 
-const GPX = '2026-10-27_10-00-00_running.gpx';
-const RECORD = '2026-10-27_10-00-00_running.json';
+const GPX = '2026-10-27_10-00-00_kite.gpx';
+const RECORD = '2026-10-27_10-00-00_kite.json';
 const START_MS = Date.parse('2026-10-27T10:00:00Z');
 
 /** Fichiers du faux dossier, par chemin ; écritures et suppressions relevées dans l'ordre. */
@@ -34,11 +34,11 @@ const record: SessionRecord = {
   format: RECORD_FORMAT,
   version: RECORD_VERSION,
   gpx: GPX,
-  sport: 'running',
+  sport: 'kite',
   activityId: null,
   source: 'enregistrement',
   addedAt: '2026-10-27T11:00:00.000Z',
-  title: 'Course, 27/10/2026 10:00',
+  title: 'Kitesurf, 27/10/2026 10:00',
   name: null,
   summary: {
     calcVersion: SUMMARY_CALC_VERSION,

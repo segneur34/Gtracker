@@ -62,13 +62,13 @@
   padding: var(--space-2) var(--space-4);
   background: var(--surface);
   border-bottom: 1px solid var(--line-strong);
-  border-left: 4px solid var(--velo);
+  border-left: 4px solid var(--success);
   color: var(--ink);
   font-size: var(--text-s);
 }
 
 .shell-notice--trouble {
-  border-left-color: var(--course);
+  border-left-color: var(--danger);
 }
 
 .shell-notice__text {

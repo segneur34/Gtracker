@@ -11,6 +11,7 @@ import {
   EMPTY_LIVE_STATS, LIVE_STATS_DEFAULTS, computeLiveStats, createLiveStatsMemory, liveReferenceSpeedMs, usesActiveAverage,
 } from './liveStats';
 import { M_PER_DEG_LAT } from '../test/geo.fixture';
+import { WALK_PROFILE } from '../test/walkProfile.fixture';
 
 const T0 = Date.UTC(2026, 8, 23, 12, 0, 0);
 
@@ -37,7 +38,8 @@ const trace = (
   return fixes;
 };
 
-const running = SPORT_PROFILES.running;
+/** Profil à pied gelé (`WALK_PROFILE`), sans moyenne active ni bords. */
+const running = WALK_PROFILE;
 const wing = SPORT_PROFILES.wingfoil;
 
 describe('computeLiveStats', () => {
@@ -234,52 +236,12 @@ describe('computeLiveStats : mémoire du direct', () => {
   });
 });
 
-describe('computeLiveStats : derniers mètres, vitesse ascensionnelle', () => {
+describe('computeLiveStats : derniers mètres', () => {
   it('donne la vitesse des 300 derniers mètres', () => {
     // 800 s à 2 m/s puis 100 s à 4 m/s : les 300 derniers mètres tiennent dans la partie à 4 m/s.
     const stats = computeLiveStats([trace(0, 900, 1, (t) => (t <= 800 ? 2 : 4))], running);
     expect(stats.recentDistanceSpeedMs).toBeCloseTo(4, 1);
     expect(computeLiveStats([trace(0, 60, 1, () => 3)], running).recentDistanceSpeedMs).toBeNull();
-  });
-
-  it('donne le D+ des 300 derniers mètres ; plus de pente du moment (lot 303)', () => {
-    // Plat 10 min, puis rampe à 5 % (0,15 m/s à 3 m/s) pendant 5 min : 45 m, dont 15 sur les 300 derniers mètres.
-    const ele = (t: number) => (t <= 600 ? 100 : 100 + 0.15 * (t - 600));
-    const stats = computeLiveStats([trace(0, 900, 1, () => 3, ele)], running);
-    expect(stats.recentDistanceGainM!).toBeGreaterThan(13);
-    expect(stats.recentDistanceGainM!).toBeLessThan(16);
-    expect(stats.currentGrade).toBeNull();
-  });
-
-  it('donne la vitesse ascensionnelle sur le temps enregistré, pause exclue', () => {
-    const ele = (t: number) => 0.15 * t;
-    const straight = computeLiveStats([trace(0, 600, 1, () => 3, ele)], running);
-    expect(straight.climbRateMh!).toBeGreaterThan(500);
-    expect(straight.climbRateMh!).toBeLessThan(560);
-    // Pause de 100 s dans la fenêtre de 5 min : la vitesse ascensionnelle reste celle de la marche.
-    const before = trace(0, 300, 1, () => 3, ele);
-    const after = trace(400, 600, 1, () => 3, ele, before[before.length - 1].lat);
-    const paused = computeLiveStats([before, after], running);
-    expect(paused.climbRateMh!).toBeGreaterThan(500);
-    expect(paused.climbRateMh!).toBeLessThan(560);
-    // Trop tôt : rien.
-    expect(computeLiveStats([trace(0, 30, 1, () => 3, ele)], running).climbRateMh).toBeNull();
-  });
-
-  it("laisse pente, D+ récent et vitesse ascensionnelle vides sans altitude", () => {
-    const stats = computeLiveStats([trace(0, 600, 1, () => 3)], running);
-    expect(stats.recentDistanceGainM).toBeNull();
-    expect(stats.currentGrade).toBeNull();
-    expect(stats.climbRateMh).toBeNull();
-  });
-});
-
-describe('computeLiveStats : puissance et énergie, retirées avec la course et le vélo (lot 303)', () => {
-  it('ne donne plus ni puissance ni énergie, même avec altitude', () => {
-    const stats = computeLiveStats([trace(0, 600, 1, () => 4, (t) => 0.3 * t)], running);
-    expect(stats.recentPowerW).toBeNull();
-    expect(stats.effortJ).toBeNull();
-    expect(stats.energyPerKg).toBe(false);
   });
 });
 
@@ -406,8 +368,6 @@ describe("computeLiveStats : moyenne active, comme l'analyse (voile, surf)", () 
     expect(usesActiveAverage(wing)).toBe(true);
     expect(usesActiveAverage(SPORT_PROFILES.surf)).toBe(true);
     expect(usesActiveAverage(SPORT_PROFILES.bateau)).toBe(false);
-    expect(usesActiveAverage(running)).toBe(false);
-    expect(usesActiveAverage(SPORT_PROFILES.cycling)).toBe(false);
   });
 
   it("allure de la session : le pas de reprise d'une pause n'y compte pas", () => {

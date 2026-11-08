@@ -68,7 +68,7 @@ export default function SailingSettingsPanel({
         Vitesse : {hasDeviceSpeed ? "Doppler de l'appareil" : 'dérivée des positions, filtrée'}.
       </SessionSettingsHeader>
       <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <SessionActivityField activities={activities} activity={activity} withPositions families={sessionFile ? undefined : ['voile']}
+        <SessionActivityField activities={activities} activity={activity} families={sessionFile ? undefined : ['voile']}
           onChange={onChangeActivity} />
 
         {hasActiveThreshold && (

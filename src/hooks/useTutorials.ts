@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { libraryPath } from '../core/parentPage';
 import { SPORT_FAMILIES, type SportFamily } from '../core/sportProfiles';
-import { favoriteFamily, withoutRetiredFamilies } from '../library/profile';
+import { favoriteFamily } from '../library/profile';
 import type { Lesson } from '../tutorials/lessons';
 import {
   EMPTY_TUTORIAL_STATE, dismissToday, markOpened, markRead, readTutorialState, shownLessons, type TutorialState,
@@ -46,7 +46,7 @@ export function useLessonPath(lesson: Lesson | null): string | null {
   return useMemo(() => {
     if (!lesson) return null;
     if (lesson.target !== 'bibliotheque') return lesson.target;
-    const family = favoriteFamily(withoutRetiredFamilies(all), activities.map((a) => a.id)) ?? families[0] ?? 'voile';
+    const family = favoriteFamily(all, activities.map((a) => a.id)) ?? families[0] ?? 'voile';
     return libraryPath(family);
   }, [lesson, all, activities, families]);
 }

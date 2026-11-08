@@ -1,17 +1,17 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type ReactNode } from 'react';
 import {
-  ACTIVE_FAMILIES, FAMILY_ACCENT, FAMILY_LABEL, FAMILY_SHADES, activitiesOfFamily, activityFamily, isFamilyHidden, nextActivityColor, visibleActivities, visibleFamilies,
+  FAMILY_ACCENT, FAMILY_LABEL, FAMILY_SHADES, activitiesOfFamily, activityFamily, isFamilyHidden, nextActivityColor, visibleActivities, visibleFamilies,
   type Activity,
 } from '../core/activities';
 import {
-  LOOP_RETURN_RATIO_RANGE, REFERENCE_HEART_RATE, SPORT_FAMILIES, SPORT_PROFILES, familySports, hasActiveThreshold, hasPositions,
+  REFERENCE_HEART_RATE, SPORT_FAMILIES, SPORT_PROFILES, familySports, hasActiveThreshold,
   sportFamily, sportTreatment, usesMarkCourse,
   type SportFamily, type SportProfile, type Treatment,
 } from '../core/sportProfiles';
 import { activityTabs, isTabShown, toggleTabChoice, type TabChoices } from '../core/analysisTabs';
 import type { SportType } from '../core/types';
 import {
-  DISTANCE_UNIT_LABEL, DISTANCE_UNIT_SYMBOL, SPEED_UNIT_LABEL, speedUnitLabel, speedUnitSymbol, editSpeedUnit, formatPace, formatSpeedValue, fromDisplaySpeed, kmhToMs, msToKmh, toDisplaySpeed,
+  DISTANCE_UNIT_LABEL, DISTANCE_UNIT_SYMBOL, SPEED_UNIT_LABEL, speedUnitLabel, editSpeedUnit, formatSpeedValue, fromDisplaySpeed, kmhToMs, msToKmh, toDisplaySpeed,
   type DistanceUnit, type SpeedUnit, commaDecimal, parseDecimal
 } from '../core/units';
 import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
@@ -34,7 +34,7 @@ import { playPattern, setBeepPitch, type ClockTone } from '../platform/beeper';
 import { BEEP_SOUNDS, beepSoundHz } from '../recording/beepSound';
 import { DEFAULT_GEAR_LABELS, MAX_GEAR_LABEL_LENGTH, sanitizeGearLabels } from '../settings/gear';
 import {
-  HR_OFFSET_RANGE, TREATMENT_UNITS, defaultAutoPauseOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultTabsOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, defaultSpeedRangeOf, defaultFoil, defaultHrOffsetOf, planningFamily, rangeFollowsPace, tabsAfterJumpsChange, thresholdFollowsPace, type SportSettingsView,
+  HR_OFFSET_RANGE, TREATMENT_UNITS, defaultAutoPauseOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultTabsOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, defaultSpeedRangeOf, defaultFoil, defaultHrOffsetOf, rangeFollowsPace, tabsAfterJumpsChange, thresholdFollowsPace, type SportSettingsView,
 } from '../settings/activitySettings';
 import { useAllSportSettings } from '../hooks/useSportSettings';
 import { sameJson } from '../hooks/createStore';
@@ -47,12 +47,6 @@ import {
 } from '../recording/liveFields';
 import { LIVE_STATS_DEFAULTS, usesActiveAverage } from '../recording/liveStats';
 import { simulatedApproachMs } from '../recording/markGuide';
-import {
-  CUSTOM_FLAT_SPEED_BOUNDS_MS, LEVEL_FLAT_SPEED_MS, PACE_LEVELS, PACE_LEVEL_LABEL,
-  isPaceLevel, type PaceLevel, type PlanningFamily,
-} from '../planning/duration';
-import type { WayType } from '../planning/brouterProfile';
-import { WAY_TYPE_LABEL } from '../planning/route';
 import BeepCurveEditor from '../components/BeepCurveEditor';
 import HeartRateBeltSettings from '../components/HeartRateBeltSettings';
 import { CARD_STYLE } from '../components/styles';
@@ -68,7 +62,6 @@ import ShadePicker from '../components/ShadePicker';
 import ActivityIcon from '../components/ActivityIcon';
 import IconPicker from '../components/IconPicker';
 import { activityIcon, guessActivityIcon, type ActivityIconId } from '../core/activityIcons';
-import WayTypeTabs from '../components/WayTypeTabs';
 import {
   JUMP_MIN_HEIGHT_RANGE, JUMP_PLACEMENTS, JUMP_PLACEMENT_LABEL, type JumpPlacement, type JumpSettings,
 } from '../recording/jumpSettings';
@@ -117,30 +110,6 @@ function JumpsSetting({ id, jumps, overridden, onChange }: {
         </>
       )}
     </>
-  );
-}
-
-/**
- * Types de voie cochés d'office quand on choisit l'activité en planification
- * (course, vélo) : proposés selon le vélo ou le terrain, tant qu'on ne les
- * change pas. Le dernier coché ne se décoche pas.
- */
-function WayTypesSetting({ view, treatment, onChange }: { view: SportSettingsView; treatment: Treatment; onChange: (ways: WayType[]) => void }) {
-  const toggle = (type: WayType) => {
-    const next = view.wayTypes.includes(type) ? view.wayTypes.filter((w) => w !== type) : [...view.wayTypes, type];
-    if (next.length > 0) onChange(next);
-  };
-  return (
-    <SettingRow label="Types de voie" helpKey={`${view.activity.id}:voies`}
-      help="Cochés d'office quand on planifie avec cette activité ; ils se changent ensuite pour chaque itinéraire.">
-      <div className="settings-sports__pair">
-        <WayTypeTabs compact checked={view.wayTypes} onToggle={toggle} label={`Types de voie de ${view.activity.name}`}
-          style={{ '--tab-accent': FAMILY_ACCENT[activityFamily(view.activity)] } as CSSProperties} />
-        {!view.isWayTypesOverridden && (
-          <span className="settings-sports__mark">{treatment === 'velo' ? 'selon le vélo' : 'selon le terrain'}</span>
-        )}
-      </div>
-    </SettingRow>
   );
 }
 
@@ -376,14 +345,11 @@ const ActivityCard = memo(function ActivityCard({
   const family = sportFamily(activity.base);
   const treatment = sportTreatment(activity.base);
   const sailing = treatment === 'voile';
-  /** Sans position (muscu) : ni unités, ni seuil, ni couleurs de trace, ni pause automatique ; la ceinture d'office. */
-  const positions = hasPositions(activity.base);
   /** Seuil d'activité réglable : pas en bateau, où toute la session compte en navigation. */
-  const withThreshold = hasActiveThreshold(p) && positions;
+  const withThreshold = hasActiveThreshold(p);
   /** Nom du seuil, sous son titre : de vague ou de vol en surf. */
   const thresholdLabel = treatment === 'surf' ? (s.foil ? 'Seuil de vol' : 'Seuil de vague') : "Seuil d'activité";
   /** Famille du temps estimé des itinéraires, `null` en voile et en fractionné. */
-  const paceFamily = planningFamily(activity);
   const units = TREATMENT_UNITS[treatment];
   const renamingThis = renaming;
   /** Grisée : cachée elle-même, ou par sa famille. */
@@ -422,7 +388,7 @@ const ActivityCard = memo(function ActivityCard({
   const pauseKmh = parseFloat(msToKmh(s.autoPause.speedMs).toFixed(1));
   // Les menus des chiffres du direct les nomment comme le direct : « Moyenne active » en voile et en surf.
   const fieldUnits: LiveFieldUnits = { ...s, options: { ...LIVE_STATS_DEFAULTS, activeAverage: usesActiveAverage(p) } };
-  const summary = !positions ? 'sans GPS, ceinture cardio' : [
+  const summary = [
     speedUnitLabel(s.speedUnit, s.distanceUnit),
     DISTANCE_UNIT_SYMBOL[s.distanceUnit],
     ...(!withThreshold ? [] : [
@@ -433,8 +399,6 @@ const ActivityCard = memo(function ActivityCard({
     ...(s.foil && s.pumping ? ['pumping'] : []),
     ...(s.turns ? ['virages'] : []),
     ...(s.jumps?.enabled ? ['sauts'] : []),
-    ...(paceFamily ? [`voies : ${s.wayTypes.map((w) => WAY_TYPE_LABEL[w].toLowerCase()).join(' + ')}`] : []),
-    ...(paceFamily ? [`niveau ${PACE_LEVEL_LABEL[s.paceLevel].toLowerCase()}`] : []),
   ].join(' · ');
   return (
     <div className={`settings-activity${shownHidden ? ' settings-activity--hidden' : ''}`}>
@@ -485,7 +449,7 @@ const ActivityCard = memo(function ActivityCard({
             <IconPicker value={activityIcon(activity)} color={activity.color} onChange={(icon) => updateActivity(id, { icon })}
               label={`Icône de ${activity.name}`} />
           </SettingRow>
-          {positions && <SettingsPart label="Affichage" open={openPart.affichage} onToggle={() => togglePart('affichage')}>
+          <SettingsPart label="Affichage" open={openPart.affichage} onToggle={() => togglePart('affichage')}>
             <SettingRow label="Unité de vitesse" helpKey={`${id}:unite-vitesse`} help={UNIT_HELP}>
               <select value={s.speedUnit} onChange={(e) => setFor(id, 'speedUnit', e.target.value as SpeedUnit)} className="ui-field ui-field--s">
                 {units.map((u) => <option key={u} value={u}>{speedUnitLabel(u, s.distanceUnit)}</option>)}
@@ -511,7 +475,7 @@ const ActivityCard = memo(function ActivityCard({
                 {s.speedRange === null && <span className="settings-sports__mark">{followsPace ? "selon l'allure" : 'défaut'}</span>}
               </div>
             </SettingRow>
-          </SettingsPart>}
+          </SettingsPart>
           <SettingsPart label="Onglet analyse" open={openPart.analyse} onToggle={() => togglePart('analyse')}>
             {withThreshold && (
             <SettingRow label={thresholdLabel} helpKey={`${id}:seuil`} help={thresholdHelp(treatment, s.foil === true)}>
@@ -594,7 +558,7 @@ const ActivityCard = memo(function ActivityCard({
             )}
           </SettingsPart>
           <SettingsPart label="Enregistrement" open={openPart.enregistrement} onToggle={() => togglePart('enregistrement')}>
-            {positions && <SettingRow label="Pause automatique" helpKey={`${id}:pause`}
+            <SettingRow label="Pause automatique" helpKey={`${id}:pause`}
               help="La trace se met en pause seule sous cette vitesse, au bout de ce temps. 0 km/h la désactive.">
               <div className="settings-sports__pair">
                 <span className="settings-sports__mark">sous</span>
@@ -607,12 +571,12 @@ const ActivityCard = memo(function ActivityCard({
                   onCommit={(v) => setAutoPauseField('delayS', v)} />
                 {!s.isAutoPauseOverridden && <span className="settings-sports__mark">défaut</span>}
               </div>
-            </SettingRow>}
-            {positions && <FieldsSetting label="Carte réduite à l'enregistrement" helpKey={`${id}:carte-reduite`}
+            </SettingRow>
+            <FieldsSetting label="Carte réduite à l'enregistrement" helpKey={`${id}:carte-reduite`}
               help="Les chiffres en grand quand la carte est réduite, de haut en bas."
               treatment={treatment} units={fieldUnits} fields={s.liveFields} overridden={s.isLiveFieldsOverridden}
               defaults={defaultLiveFieldsFor(activity)} max={MAX_LIVE_FIELDS}
-              onChange={(fields) => setFor(id, 'liveFields', fields)} />}
+              onChange={(fields) => setFor(id, 'liveFields', fields)} />
             {s.jumps !== null && (
               <JumpsSetting id={id} jumps={s.jumps} overridden={s.isJumpsOverridden} onChange={(next) => {
                 const tabs = tabsAfterJumpsChange(s, next);
@@ -620,20 +584,13 @@ const ActivityCard = memo(function ActivityCard({
                 if (tabs !== undefined) setFor(id, 'tabs', tabs);
               }} />
             )}
-            {positions ? (
-              <SettingRow label="Ceinture cardio" helpKey={`${id}:ceinture`}
+            <SettingRow label="Ceinture cardio" helpKey={`${id}:ceinture`}
                 help="La ceinture du bloc « Capteurs » (celle « utilisée au prochain départ » s'il y en a plusieurs) est proposée, cochée, à chaque enregistrement ; la fréquence cardiaque est écrite dans la trace.">
                 <label className="settings-sports__pair">
                   <input type="checkbox" checked={s.heartRate} onChange={(e) => setFor(id, 'heartRate', e.target.checked)} />
                   <span>Proposer la ceinture cardio</span>
                 </label>
               </SettingRow>
-            ) : (
-              <SettingRow label="Ceinture cardio" helpKey={`${id}:ceinture`}
-                help="Une session sans GPS se fait avec la ceinture du bloc « Capteurs » (celle « utilisée au prochain départ » s'il y en a plusieurs) : « Démarrer » attend qu'elle soit connectée.">
-                <span className="settings-sports__mark">obligatoire</span>
-              </SettingRow>
-            )}
             <div className="settings-part__sub">
               <h4 className="settings-part__subtitle">Notification</h4>
               <FieldsSetting label="Chiffres de la notification" helpKey={`${id}:notification`}
@@ -643,29 +600,6 @@ const ActivityCard = memo(function ActivityCard({
                 onChange={(fields) => setFor(id, 'notificationFields', fields)} />
             </div>
           </SettingsPart>
-          {(paceFamily !== null || s.loopReturnRatio !== null) && (
-            <SettingsPart label="Planification" open={openPart.itineraires} onToggle={() => togglePart('itineraires')}>
-              {paceFamily && (
-                <WayTypesSetting view={s} treatment={treatment} onChange={(ways) => setFor(id, 'wayTypes', ways)} />
-              )}
-              {s.loopReturnRatio !== null && (
-                <SettingRow label="Retour de boucle" helpKey={`${id}:boucle`}
-                  help="En boucle, le retour évite les voies de l'aller tant qu'il n'est pas plus long que tant de fois l'aller ; au-delà, il prend le plus court.">
-                  <div className="settings-sports__pair">
-                    <span className="settings-sports__mark">au plus</span>
-                    <NumberField unit="× l'aller" step={0.1} min={LOOP_RETURN_RATIO_RANGE.min} max={LOOP_RETURN_RATIO_RANGE.max}
-                      value={s.loopReturnRatio} onCommit={(v) => setFor(id, 'loopReturnRatio', v)} />
-                    {s.loopReturnRatio === p.loopReturnMaxRatio && <span className="settings-sports__mark">défaut</span>}
-                  </div>
-                </SettingRow>
-              )}
-              {paceFamily && (
-                <PaceSettings family={paceFamily} view={s}
-                  onLevel={(level) => setFor(id, 'paceLevel', level)}
-                  onCustomSpeed={(ms) => setFor(id, 'customFlatSpeedMs', ms)} />
-              )}
-            </SettingsPart>
-          )}
           {usesMarkCourse(family) && (
             <SettingsPart label="Planification : balise sonore" open={openPart.balises} onToggle={() => togglePart('balises')}>
                 <SettingRow label="Bips d'approche des balises" helpKey={`${id}:bips`} helpFirst
@@ -710,7 +644,7 @@ function SettingsPage() {
    * Activités rangées par famille (Voile, À pied, Vélo, Surf ; l'Entraînement est retiré), chacune dans l'ordre de
    * la liste, les cachées en bas de leur famille (§10, point 100).
    */
-  const familyOrdered = ACTIVE_FAMILIES.flatMap((f) => {
+  const familyOrdered = SPORT_FAMILIES.flatMap((f) => {
     const own = activitiesOfFamily(activities, f);
     return [...own.filter((a) => !a.hidden), ...own.filter((a) => a.hidden)];
   });
@@ -1030,60 +964,6 @@ function FieldsSetting({ label, help, helpKey, target = 'live', treatment, units
   );
 }
 
-/** Vitesse en km/h, sans décimale inutile. */
-const kmhLabel = (ms: number): string => `${commaDecimal(parseFloat(msToKmh(ms).toFixed(1)))} km/h`;
-
-/** Ce que donne une vitesse sur le plat : l'allure en course, la vitesse seule à vélo (puissance de montée partie au lot 303). */
-const paceDetail = (family: PlanningFamily, speedMs: number, distanceUnit: DistanceUnit): string =>
-  family === 'course'
-    ? `${kmhLabel(speedMs)}, ${formatPace(speedMs, distanceUnit)} ${speedUnitSymbol('minkm', distanceUnit)}`
-    : kmhLabel(speedMs);
-
-/**
- * Niveau du temps estimé des itinéraires d'une activité, dans sa carte : un
- * des niveaux, chacun avec sa vitesse, ou « Personnalisé » et une vitesse
- * saisie en km/h.
- */
-function PaceSettings({ family, view, onLevel, onCustomSpeed }: {
-  family: PlanningFamily;
-  view: SportSettingsView;
-  onLevel: (level: PaceLevel) => void;
-  onCustomSpeed: (speedMs: number | null) => void;
-}) {
-  const [lo, hi] = CUSTOM_FLAT_SPEED_BOUNDS_MS[family];
-  const custom = view.customFlatSpeedMs;
-  return (
-    <>
-      <SettingRow label="Niveau (temps estimé)" helpKey={`${view.activity.id}:niveau`} help={family === 'course'
-        ? 'Vitesse sur le plat du temps estimé ; chaque 100 m de D+ compte comme 1 km de plus.'
-        : 'Vitesse sur le plat des itinéraires.'}>
-        <select value={view.paceLevel} onChange={(e) => isPaceLevel(e.target.value) && onLevel(e.target.value)} className="ui-field ui-field--s">
-          {PACE_LEVELS.map((level) => (
-            <option key={level} value={level}>
-              {level === 'perso'
-                ? PACE_LEVEL_LABEL.perso
-                : `${PACE_LEVEL_LABEL[level]} · ${paceDetail(family, LEVEL_FLAT_SPEED_MS[family][level], view.distanceUnit)}`}
-            </option>
-          ))}
-        </select>
-      </SettingRow>
-      {view.paceLevel === 'perso' && (
-        <SettingRow label="Vitesse sur le plat" helpKey={`${view.activity.id}:vitesse-plat`} help="Votre vitesse sur le plat, pour le temps estimé.">
-          <div className="settings-sports__pair">
-            <NumberField unit="km/h" step={0.5}
-              min={parseFloat(msToKmh(lo).toFixed(1))} max={parseFloat(msToKmh(hi).toFixed(1))}
-              value={custom === null ? null : parseFloat(msToKmh(custom).toFixed(1))}
-              onCommit={(kmh) => onCustomSpeed(kmh === null ? null : kmhToMs(kmh))} />
-            <span className="settings-sports__mark">
-              {custom === null ? 'sans vitesse saisie, le niveau moyen' : `soit ${paceDetail(family, custom, view.distanceUnit)}`}
-            </span>
-          </div>
-        </SettingRow>
-      )}
-    </>
-  );
-}
-
 /**
  * En-tête d'une famille dans la liste des activités, comme dans le choix d'une activité, avec son œil :
  * cachée, elle est grisée, ses activités aussi. Le bandeau replie la famille ; repliée, il nomme ses
@@ -1231,7 +1111,7 @@ function AddActivityForm({
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
       <select value={family} onChange={(e) => pickFamily(e.target.value as SportFamily)} aria-label="Famille" className="ui-field ui-field--s">
-        {ACTIVE_FAMILIES.map((f) => <option key={f} value={f}>{FAMILY_LABEL[f]}</option>)}
+        {SPORT_FAMILIES.map((f) => <option key={f} value={f}>{FAMILY_LABEL[f]}</option>)}
       </select>
       {familySports(family).length > 1 && (
         <label className="ui-inline-row-6 ui-center">

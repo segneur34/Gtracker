@@ -45,7 +45,7 @@ describe('direct de l’enregistrement, écran éteint', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(T0);
-    recorder.state.activity = baseActivity('running');
+    recorder.state.activity = baseActivity('kite');
   });
   afterEach(() => vi.useRealTimers());
 

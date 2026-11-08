@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { RETIRED_FAMILIES, activityFamily, sessionActivity, type Activity } from '../core/activities';
+import { activityFamily, sessionActivity, type Activity } from '../core/activities';
 import type { SportFamily } from '../core/sportProfiles';
 import type { LibrarySession } from '../library/record';
 import { statSessionOf, type StatSession } from '../library/stats';
@@ -38,7 +38,7 @@ export const visibleStatSessions = (
     const a = sessionActivity(activities, s.record.activityId, s.record.sport);
     if (!a) continue;
     const family = activityFamily(a);
-    if (!isShown(a) && !RETIRED_FAMILIES.includes(family) && !(openFamily !== null && family === openFamily)) continue;
+    if (!isShown(a) && !(openFamily !== null && family === openFamily)) continue;
     if (!activityById.has(a.id)) activityById.set(a.id, a);
     all.push(statSessionOf(s.file, s.record, a, sessionFoil(s.record, effectiveFoil(a))));
   }

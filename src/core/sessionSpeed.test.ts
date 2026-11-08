@@ -276,7 +276,7 @@ describe('options de la cinématique tirées du profil (lot 72)', () => {
   });
 
   it("ailleurs, le plafond du support seul, quelle que soit l'allure", () => {
-    const run = SPORT_PROFILES.running;
+    const run = SPORT_PROFILES.surf;
     const options = kinematicsOptionsOf(run, { scaleToSession: false, referenceMs: 3 });
     expect(options).toEqual({
       medianWindowSeconds: run.medianWindowSeconds,

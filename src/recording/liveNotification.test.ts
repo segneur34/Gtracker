@@ -57,8 +57,8 @@ describe('liveNotification', () => {
   });
 
   it('marque les valeurs absentes', () => {
-    const n = liveNotification(input({ fields: ['grade', 'heading'] }));
-    expect(n.text).toBe('Pente — · Cap —');
+    const n = liveNotification(input({ fields: ['markDistance', 'heading'] }));
+    expect(n.text).toBe('Balise — · Cap —');
   });
 
   it('en pause manuelle : durée figée dans le titre, deux chiffres sur la ligne, pas de chronomètre', () => {
@@ -81,7 +81,7 @@ describe('liveNotification', () => {
     expect(liveNotification(input({ gpsLost: true, paused: 'auto' })).title).toBe('Wingfoil · GPS perdu · pause auto');
     expect(liveNotification(input({ beltLost: true })).title).toBe('Wingfoil · FC perdue');
     expect(liveNotification(input({ gpsLost: true, beltLost: true })).title).toBe('Wingfoil · GPS perdu · FC perdue');
-    expect(notificationStateKey({ status: 'recording', pausedReason: null, gpsLost: false, beltLost: true, activityId: 'running', computed: true })).toContain('fc-perdue');
+    expect(notificationStateKey({ status: 'recording', pausedReason: null, gpsLost: false, beltLost: true, activityId: 'kite', computed: true })).toContain('fc-perdue');
   });
 
   it('sans premier point, pas de chronomètre', () => {
@@ -107,10 +107,10 @@ describe('notificationStateKey (lot 67, sortie de recordingNotification)', () =>
   const oldKey = (status: string, pausedReason: 'manual' | 'auto' | null, activity: { id: string } | null, computed: boolean): string =>
     `${status}|${pausedReason ?? ''}|${activity?.id ?? ''}||${computed}`;
   const cases: [string, 'manual' | 'auto' | null, string | null, boolean][] = [
-    ['recording', null, 'running', true],
-    ['paused', 'auto', 'running', true],
+    ['recording', null, 'kite', true],
+    ['paused', 'auto', 'kite', true],
     ['paused', 'manual', 'wingfoil', true],
-    ['recording', null, 'running', false],
+    ['recording', null, 'kite', false],
     ['starting', null, null, false],
   ];
 
@@ -121,16 +121,16 @@ describe('notificationStateKey (lot 67, sortie de recordingNotification)', () =>
 
   it('change avec la pause et le premier calcul', () => {
     const key = (patch: Partial<Parameters<typeof notificationStateKey>[0]>) =>
-      notificationStateKey({ status: 'recording', pausedReason: null, gpsLost: false, beltLost: false, activityId: 'running', computed: true, ...patch });
-    expect(key({})).toBe('recording||running||true');
+      notificationStateKey({ status: 'recording', pausedReason: null, gpsLost: false, beltLost: false, activityId: 'kite', computed: true, ...patch });
+    expect(key({})).toBe('recording||kite||true');
     expect(key({ status: 'paused', pausedReason: 'auto' })).not.toBe(key({ status: 'paused', pausedReason: 'manual' }));
     expect(key({ computed: false })).not.toBe(key({}));
   });
 
   it('change quand le GPS est perdu, puis revient (lot 115)', () => {
     const key = (gpsLost: boolean) =>
-      notificationStateKey({ status: 'recording', pausedReason: null, gpsLost, beltLost: false, activityId: 'running', computed: true });
+      notificationStateKey({ status: 'recording', pausedReason: null, gpsLost, beltLost: false, activityId: 'kite', computed: true });
     expect(key(true)).not.toBe(key(false));
-    expect(key(false)).toBe('recording||running||true');
+    expect(key(false)).toBe('recording||kite||true');
   });
 });

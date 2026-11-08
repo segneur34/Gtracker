@@ -128,8 +128,10 @@ describe("fiche, compatibilité (f) fiche de l'application complète, champs de 
   // mal formée), test guidé, cadence et test du résumé. La version voile et surf ne lit plus ces champs-là.
   const START = 1790000000000;
   const complete = {
-    ...sessionRecord({ gpx: '2026-09-23_14-00-00_course.gpx', sport: 'running', activityId: 'course', name: 'Footing' },
+    ...sessionRecord({ gpx: '2026-09-23_14-00-00_course.gpx', activityId: 'course', name: 'Footing' },
       { cadence: { avgSpm: 172.5, steps: 9800 } }),
+    // Calcul de l'application complète, inconnu ici depuis le lot 305 : relu sans calcul, réécrit tel quel.
+    sport: 'running',
     analysis: {
       windDeg: null, activeThreshold: 1.2, referenceSpeedMs: null, speedRange: null, effortThresholdMs: 4.35, foil: null, pumping: null,
       waveThreshold: null, bikeWeightKg: 9.8, loadKg: 4.5, savedAt: 4,
@@ -150,6 +152,7 @@ describe("fiche, compatibilité (f) fiche de l'application complète, champs de 
 
   it('les champs bruts suivent la fiche dans le cache allégé et la fusion avec le disque', () => {
     const read = parseRecord(text)!;
+    expect(read.sport).toBeNull();
     for (const key of ['surfaces', 'terrainElevation', 'intervals', 'test'] as const) expect(read[key]).toEqual(complete[key]);
     expect((read.summary as unknown as Record<string, unknown>).cadence).toEqual({ avgSpm: 172.5, steps: 9800 });
     expect(mergeLightRecord(read, lightRecord(read))).toEqual(read);

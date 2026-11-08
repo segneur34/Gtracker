@@ -20,8 +20,10 @@ describe('cache des fiches (lot 113)', () => {
     expect(storedCacheFor({ ...cache, fields: 'autre' }, 'f:1').entries).toEqual({});
     expect(storedCacheFor({ ...cache, reader: RECORD_READER_VERSION + 1 }, 'f:1').entries).toEqual({});
     expect(storedCacheFor(null, 'f:1')).toEqual({ entries: {}, light: false });
-    // Lecteur absent : la version 1.
-    expect(storedCacheFor({ ...cache, reader: undefined }, 'f:1').light).toBe(RECORD_READER_VERSION === 1);
+    // Lecteur absent : la version 1, ignorée par le lecteur de la version 2 (lot 305 : une fiche de course n'a plus de calcul).
+    expect(RECORD_READER_VERSION).toBe(2);
+    expect(storedCacheFor({ ...cache, reader: undefined }, 'f:1')).toEqual({ entries: {}, light: false });
+    expect(storedCacheFor({ ...cache, reader: 1 }, 'f:1')).toEqual({ entries: {}, light: false });
     expect(storedCacheFor({ ...cache, light: undefined }, 'f:1').light).toBe(false);
   });
 

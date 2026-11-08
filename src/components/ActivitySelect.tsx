@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ACTIVE_FAMILIES, FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, type Activity } from '../core/activities';
-import type { SportFamily } from '../core/sportProfiles';
+import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, type Activity } from '../core/activities';
+import { SPORT_FAMILIES, type SportFamily } from '../core/sportProfiles';
 import { useVisibility } from '../hooks/useSportSettings';
 import { useThemedShade } from '../hooks/useTheme';
 import { ChoiceOption, ChoiceSheet } from './ui/ChoiceSheet';
@@ -33,7 +33,7 @@ interface ActivitySheetProps {
   /** Identifiant de l'activité choisie, `null` si aucune. */
   value: string | null;
   /** Familles proposées ; toutes par défaut. */
-  families?: SportFamily[];
+  families?: readonly SportFamily[];
   label?: string;
   /** Question posée en tête de la liste, et sa précision. */
   heading?: { title: string; hint?: string };
@@ -44,7 +44,7 @@ interface ActivitySheetProps {
 }
 
 /** Liste des activités par famille, par-dessus la page ; Échap, un appui à côté ou le retour d'Android la ferme. */
-export function ActivitySheet({ activities, value, families = ACTIVE_FAMILIES, label, heading, reset, onChoose, onClose }: ActivitySheetProps) {
+export function ActivitySheet({ activities, value, families = SPORT_FAMILIES, label, heading, reset, onChoose, onClose }: ActivitySheetProps) {
   const selectedRef = useRef<HTMLButtonElement>(null);
   const { isShown } = useVisibility();
   const shown = useThemedShade();
@@ -100,7 +100,7 @@ interface ActivitySelectProps {
   /** Activité hors de la liste à proposer quand même (l'activité de base d'un calcul). */
   extra?: Activity | null;
   /** Familles proposées ; toutes par défaut. */
-  families?: SportFamily[];
+  families?: readonly SportFamily[];
   /** Ligne « sans choix » en tête de la liste (filtre) ; `onChange` n'est pas appelé pour elle. */
   reset?: { label: string; onChoose: () => void };
   placeholder?: string;

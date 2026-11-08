@@ -145,7 +145,6 @@ describe('pumping en voile sur foil', () => {
     expect(SPORT_PROFILES.windsurf.pump).toBe(S);
     expect(SPORT_PROFILES.kite.pump).toBe(S);
     expect(SPORT_PROFILES.bateau.pump).toBeNull();
-    expect(SPORT_PROFILES.running.pump).toBeNull();
     expect(S.minFlightS).toBeGreaterThan(0);
   });
 

@@ -15,8 +15,7 @@ import { EMPTY_LIVE_LEGS, combineLiveLegs, splitLiveLegs, type LiveLegSplit, typ
  * Statistiques affichées pendant l'enregistrement, calculées sur la trace en
  * cours avec la même chaîne que l'analyse (`computeKinematics`, dénivelé,
  * tops). La pente, la puissance et l'énergie de la course et du vélo sont
- * parties au lot 303 (leurs chiffres restent à `null`, lus par `liveFields.ts`
- * jusqu'au lot 305). Chaque segment est traité à part : rien ne
+ * parties aux lots 303 et 305. Chaque segment est traité à part : rien ne
  * franchit une pause. Tout en unités SI ; la page convertit.
  *
  * Avec une mémoire (`LiveStatsMemory`, tenue par `useLiveRecording`), un
@@ -28,20 +27,16 @@ import { EMPTY_LIVE_LEGS, combineLiveLegs, splitLiveLegs, type LiveLegSplit, typ
  */
 
 export interface LiveStatsOptions {
-  /** Fenêtre glissante des tops de voile, du D+ récent et de la vitesse ascensionnelle, en secondes. */
+  /** Fenêtre glissante des tops de voile et du D+ récent, en secondes. */
   recentWindowS: number;
   /** Durées des tops de voile sur la fenêtre récente, en secondes. */
   topDurationsS: number[];
   /** Distance de l'allure « dernier kilomètre », en mètres. */
   lastDistanceM: number;
-  /** Distance de la vitesse et du D+ des « derniers mètres », en mètres. */
+  /** Distance de la vitesse des « derniers mètres », en mètres. */
   recentDistanceM: number;
   /** Durée de la vitesse max de la session, en secondes : une meilleure vitesse tenue, pas un point isolé. */
   maxDurationS: number;
-  /** Fenêtre de l'ancienne puissance en direct, en secondes : plus calculée (lot 303), son libellé reste lu par `liveFields.ts` jusqu'au lot 305. */
-  powerWindowS: number;
-  /** Temps enregistré dans la fenêtre récente au-dessous duquel la vitesse ascensionnelle n'est pas donnée, en secondes. */
-  minClimbWindowS: number;
   /** Le chiffre « moyenne » du direct est la moyenne active (`usesActiveAverage`) : libellés et valeur la disent. */
   activeAverage?: boolean;
   /**
@@ -58,8 +53,6 @@ export const LIVE_STATS_DEFAULTS: LiveStatsOptions = {
   lastDistanceM: 1000,
   recentDistanceM: 300,
   maxDurationS: 2,
-  powerWindowS: 15,
-  minClimbWindowS: 60,
 };
 
 export interface LiveStats {
@@ -89,18 +82,6 @@ export interface LiveStats {
   elevationLossM: number | null;
   /** D+ sur la fenêtre récente, `null` si l'altitude manque. */
   recentGainM: number | null;
-  /** D+ des `recentDistanceM` derniers mètres, `null` si l'altitude manque. */
-  recentDistanceGainM: number | null;
-  /** Pente des derniers mètres : retirée avec la course et le vélo (lot 303), toujours `null` ; le champ part au lot 305. */
-  currentGrade: number | null;
-  /** D+ récent par heure de temps enregistré dans la fenêtre récente, en m/h ; `null` sans altitude ou trop tôt. */
-  climbRateMh: number | null;
-  /** Puissance mécanique de la course et du vélo : retirée au lot 303, toujours `null` ; le champ part au lot 305. */
-  recentPowerW: number | null;
-  /** Énergie de l'effort de la course et du vélo : retirée au lot 303, toujours `null` ; le champ part au lot 305. */
-  effortJ: number | null;
-  /** Puissance et énergie par kilo : retirées au lot 303, toujours faux ; le champ part au lot 305. */
-  energyPerKg: boolean;
   /** Bord en cours et bord précédent, en voile seulement. */
   legs: LiveLegs;
   /** FC moyenne depuis le départ, pondérée par le temps, en bpm ; `null` sans ceinture. */
@@ -120,12 +101,6 @@ export const EMPTY_LIVE_STATS: LiveStats = {
   elevationGainM: null,
   elevationLossM: null,
   recentGainM: null,
-  recentDistanceGainM: null,
-  currentGrade: null,
-  climbRateMh: null,
-  recentPowerW: null,
-  effortJ: null,
-  energyPerKg: false,
   legs: EMPTY_LIVE_LEGS,
   averageHeartRateBpm: null,
 };
@@ -180,25 +155,6 @@ const lastDistanceSpeed = (tracks: TrackPoint[][], targetM: number): number | nu
     }
   }
   return null;
-};
-
-/**
- * D+ des `targetM` derniers mètres, sur l'altitude lissée de chaque segment
- * (`smoothed`, dans l'ordre des segments) ; chaque segment est cumulé à part.
- */
-const lastDistanceGain = (tracks: TrackPoint[][], smoothed: number[][], targetM: number, minGainM: number): number => {
-  let dist = 0;
-  let gainM = 0;
-  for (let s = tracks.length - 1; s >= 0 && dist < targetM; s--) {
-    const track = tracks[s];
-    let start = track.length - 1;
-    while (start > 0 && dist < targetM) {
-      dist += segmentDistanceM(track, start);
-      start--;
-    }
-    gainM += accumulateElevation(smoothed[s].slice(start), minGainM).gainM;
-  }
-  return gainM;
 };
 
 /**
@@ -350,9 +306,6 @@ export const computeLiveStats = (
   let gainM = 0;
   let lossM = 0;
   let recentGainM = 0;
-  // Temps enregistré dans la fenêtre récente, pauses exclues, en secondes.
-  let recentTimeS = 0;
-  const smoothed: number[][] = [];
   if (hasElevation) {
     active.forEach((p) => {
       const { track } = p;
@@ -364,10 +317,7 @@ export const computeLiveStats = (
       if (track[track.length - 1].timeMs >= sinceMs) {
         const recent = elevation.smoothed.filter((_, i) => track[i].timeMs >= sinceMs);
         recentGainM += accumulateElevation(recent, profile.elevation.minGainM).gainM;
-        const firstRecent = track.find((q) => q.timeMs >= sinceMs);
-        if (firstRecent) recentTimeS += (track[track.length - 1].timeMs - firstRecent.timeMs) / 1000;
       }
-      smoothed.push(elevation.smoothed);
     });
   }
 
@@ -396,15 +346,6 @@ export const computeLiveStats = (
     elevationGainM: hasElevation ? gainM : null,
     elevationLossM: hasElevation ? lossM : null,
     recentGainM: hasElevation ? recentGainM : null,
-    recentDistanceGainM: hasElevation
-      ? lastDistanceGain(tracks, smoothed, options.recentDistanceM, profile.elevation.minGainM)
-      : null,
-    // Retirés avec la course et le vélo (lot 303) ; les champs partent au lot 305.
-    currentGrade: null,
-    climbRateMh: hasElevation && recentTimeS >= options.minClimbWindowS ? (recentGainM / recentTimeS) * 3600 : null,
-    recentPowerW: null,
-    effortJ: null,
-    energyPerKg: false,
     legs: sailing ? combineLiveLegs(active.map((p) => p.legs!)) : EMPTY_LIVE_LEGS,
     averageHeartRateBpm: heartCoveredS > 0 ? heartSum / heartCoveredS : null,
   };

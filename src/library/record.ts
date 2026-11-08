@@ -7,7 +7,7 @@ import { isValidSpeedRange, type SpeedRangeMs } from '../core/speedGradient';
 import { getSportProfile, sportTreatment } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import { isSportType } from '../core/sportProfiles';
-import { isValidBikeWeight, isValidCarriedLoad } from '../core/retiredLand';
+
 import { EMPTY_NOTES, type GearChoice, type SailingSessionNotes } from './notes';
 import { isFiniteNumber, isObject, parseJson, stringifyJson } from '../core/basics';
 
@@ -598,6 +598,19 @@ export const ANALYSIS_FIELDS: { readonly [K in AnalysisKey]: AnalysisField<K> } 
   loadKg: { part: 'charge', read: (raw) => (isValidCarriedLoad(raw) ? raw : null) },
 };
 
+/**
+ * Poids du vélo et charge portée d'une session de l'application complète (vélo, course, retirés aux lots 303 et
+ * 305) : lus et réécrits à l'identique, jusqu'au lot 306. Poids de vélo plausible, bagages compris, en kg.
+ */
+function isValidBikeWeight(value: unknown): value is number {
+  return typeof value === 'number' && isFinite(value) && value >= 3 && value <= 60;
+}
+
+/** Charge portée plausible (sac, affaires), en kg ; 0 : aucune. */
+function isValidCarriedLoad(value: unknown): value is number {
+  return typeof value === 'number' && isFinite(value) && value >= 0 && value <= 50;
+}
+
 /** Les clés de `ANALYSIS_FIELDS`, dans leur ordre. */
 export const ANALYSIS_KEYS = Object.keys(ANALYSIS_FIELDS) as AnalysisKey[];
 
@@ -998,9 +1011,11 @@ export const RECORD_LIGHT_FIELDS_KEY = RECORD_LIGHT_FIELDS.join(',');
  * fiches du cache sont ce qu'a rendu le lecteur de la version qui l'a fait, et n'y repassent pas. À
  * augmenter dès qu'une fiche ne se lit plus pareil (nouveau défaut, champ normalisé autrement, borne) :
  * le cache d'avant est alors ignoré, toutes les fiches sont relues, puis il est refait. Un cache sans
- * ce numéro est de la version 1.
+ * ce numéro est de la version 1. Version 2 (lot 305) : une fiche de course, de vélo ou de l'Entraînement
+ * se relit sans calcul (`sport` nul, le brut gardé pour l'écriture) ; un cache de la version 1 la
+ * resservirait avec son calcul, que cette version ne connaît plus.
  */
-export const RECORD_READER_VERSION = 1;
+export const RECORD_READER_VERSION = 2;
 
 const LIGHT_FIELDS: ReadonlySet<string> = new Set(RECORD_LIGHT_FIELDS);
 

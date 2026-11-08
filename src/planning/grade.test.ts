@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildCumulativeTrack } from '../core/sessionStats';
 import { SLOW_COLOR, gradientColor } from '../core/speedGradient';
-import { GRADE_ANALYSIS as G } from '../core/sportProfiles';
 import type { TrackPoint } from '../core/types';
 import { eastwardTrack } from '../test/track.fixture';
 import {
-  DEFAULT_CYCLING_GRADE_RANGE, DEFAULT_GRADE_RANGE, computeGrades, gradeColorPaths, gradeGradientColor, gradeGradientStops, gradeStepColor,
+  DEFAULT_CYCLING_GRADE_RANGE, DEFAULT_GRADE_RANGE, GRADE_ANALYSIS as G, computeGrades, gradeColorPaths, gradeGradientColor, gradeGradientStops, gradeStepColor,
   isValidGradeRange,
 } from './grade';
 

@@ -20,14 +20,15 @@ const summary = (patch: Partial<SessionSummary> = {}): SessionSummary => ({
 const values = (stats: ReturnType<typeof summaryShareStats>) => Object.fromEntries(stats.map((s) => [s.key, s.value]));
 
 describe('summaryShareStats', () => {
-  it('donne à pied les chiffres de l\'onglet « général », sous les mêmes clés', () => {
-    const v = values(summaryShareStats(summary(), 'course', { speed: 'kmh', distance: 'km' }));
+  it('donne en voile les chiffres de l\'onglet « général », sous les mêmes clés', () => {
+    const v = values(summaryShareStats(summary(), 'voile', { speed: 'kmh', distance: 'km' }));
     expect(v.distance).toBe('10,00 km');
     expect(v.totalTime).toBe('1 h 00');
     expect(v.activeTime).toBe('50 min');
-    expect(v.movingAverage).toBe('10,8 km/h');
-    expect(v.overallAverage).toBe('10,0 km/h');
-    expect(v.elevationGain).toBe('+120 m');
+    expect(v.activeAverage).toBe('10,8 km/h');
+    expect(v.averageSpeed).toBe('10,0 km/h');
+    // Ni dénivelé ni cadence, partis avec la course et le vélo.
+    expect(v.elevationGain).toBeUndefined();
   });
 
   it("surf sans vague : vitesse max « — », jamais 0 ; écartée de l'image", () => {
@@ -36,23 +37,6 @@ describe('summaryShareStats', () => {
     expect(values(none).maxSpeed).toBe('—');
     expect(shareableStats(none).map((s) => s.key)).not.toContain('maxSpeed');
     expect(values(summaryShareStats(summary({ maxSpeedMs: 5 }), 'surf', units)).maxSpeed).toBe('18,0 km/h');
-  });
-
-  it('écarte, une fois filtrés, les chiffres que la session n\'a pas', () => {
-    const stats = shareableStats(summaryShareStats(summary({ elevationGainM: null }), 'velo', { speed: 'kmh', distance: 'km' }));
-    const keys = stats.map((s) => s.key);
-    expect(keys).not.toContain('elevationGain');
-    expect(keys).not.toContain('heartRate');
-    expect(keys).not.toContain('cadence');
-  });
-
-  it('ajoute la FC et la cadence quand la session en a', () => {
-    const v = values(summaryShareStats(summary({
-      heartRate: { avgBpm: 151.6, maxBpm: 180, coveredS: 3000, histogram: { fromBpm: 150, seconds: [3000] } },
-      cadence: { avgSpm: 171.2, steps: 8000 },
-    }), 'course', { speed: 'minkm', distance: 'km' }));
-    expect(v.heartRate).toBe('152 bpm');
-    expect(v.cadence).toBe('171 pas/min');
   });
 
   it('donne en voile la moyenne active et les manœuvres, dans l\'unité de l\'activité', () => {
@@ -77,7 +61,7 @@ describe('lignes ajoutées du partage (lot 145)', () => {
   const tail = (stats: ReturnType<typeof summaryShareStats>, n: number) => stats.slice(-n).map((s) => s.key);
 
   it('mêmes clés, à la fin, dans le résumé et dans l’analyse ouverte (`shareExtraStats`)', () => {
-    for (const treatment of ['course', 'velo', 'surf', 'muscu'] as const) {
+    for (const treatment of ['surf'] as const) {
       const keys = SHARE_EXTRA_KEYS[treatment];
       expect(tail(summaryShareStats(summary(), treatment, km), keys.length)).toEqual([...keys]);
       expect(shareExtraStats(treatment, {}).map((s) => s.key)).toEqual([...keys]);
@@ -88,10 +72,9 @@ describe('lignes ajoutées du partage (lot 145)', () => {
   });
 
   it('une valeur absente vaut « — »', () => {
-    const v = values(summaryShareStats(summary(), 'velo', km));
-    expect(v.puissance).toBe('—');
-    expect(v['top-t5min']).toBe('—');
+    const v = values(summaryShareStats(summary(), 'surf', km));
     expect(v.rating).toBe('—');
+    expect(values(summaryShareStats(summary(), 'voile', kn)).maneuverSuccess).toBe('—');
   });
 
   it('voile : manœuvres réussies, vent, appréciation, sans emoji', () => {
@@ -114,10 +97,4 @@ describe('lignes ajoutées du partage (lot 145)', () => {
     expect(notFoil.pumpingShare).toBeUndefined();
   });
 
-  it('à pied, meilleur kilomètre en temps ; à vélo, meilleures 5 min et puissance', () => {
-    expect(values(summaryShareStats(summary({ best1kmS: 272 }), 'course', km))['top-d1km']).toBe('4 min 32');
-    const ride = values(summaryShareStats(summary({ best5minMs: 10, avgPowerW: 181.6 }), 'velo', km));
-    expect(ride['top-t5min']).toBe('36,0 km/h');
-    expect(ride.puissance).toBe('182 W');
-  });
 });

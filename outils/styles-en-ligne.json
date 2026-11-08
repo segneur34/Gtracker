@@ -63,8 +63,8 @@
   "src/pages/RestingHrTestPage.tsx": 1,
   "src/pages/RoutesPage.tsx": 1,
   "src/pages/SailingModule.tsx": 7,
-  "src/pages/SessionLibrary.tsx": 4,
-  "src/pages/SettingsPage.tsx": 9,
+  "src/pages/SessionLibrary.tsx": 3,
+  "src/pages/SettingsPage.tsx": 8,
   "src/pages/StatisticsPage.tsx": 10,
   "src/pages/SurfModule.tsx": 3
 }

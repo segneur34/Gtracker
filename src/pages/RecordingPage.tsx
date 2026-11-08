@@ -21,9 +21,9 @@ import {
   FAMILY_ACCENT, FAMILY_LABEL, FAMILY_SHADES, activitiesOfFamily, activityFamily, type Activity,
 } from '../core/activities';
 import {
-  hasPositions, isLandTreatment, sportFamily, sportTreatment, usesMarkCourse, type SportFamily,
+  sportFamily, sportTreatment, usesMarkCourse, type SportFamily,
 } from '../core/sportProfiles';
-import { formatClock, formatDistance, formatShortDistance, formatSpeed, formatMeters, formatDecimal } from '../core/units';
+import { formatClock, formatDistance, formatShortDistance, formatSpeed, formatDecimal } from '../core/units';
 import LiveMap from '../components/LiveMap';
 import { clearFollowedTrace, useFollowedTrace } from '../hooks/useFollowedTrace';
 import { armZoneAlert, useZoneAlert } from '../hooks/useZoneAlert';
@@ -55,7 +55,7 @@ import {
   resumeRecording, startRecording, stopRecording, stopRecordingBeltSearch, type RecorderState,
   useLivePosition, useRecordingClock, useRecorderSelector,
 } from '../hooks/useRecorder';
-import { followedProfile, hasFollowedElevation } from '../recording/followedProfile';
+import { followedProfile } from '../recording/followedProfile';
 import { followedTraceLengthM, splitFollowedTrace, type FollowProgress, type FollowedTrace } from '../recording/followedTrace';
 import { travelHeading } from '../recording/heading';
 import {
@@ -131,7 +131,7 @@ const BpmTile = ({ belt, target }: { belt: { state: BeltState; bpm: number | nul
 const STAT_GRID = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 'var(--space-2)' } as const;
 
 /** Nom d'une famille dans « Aucune activité … ». */
-const FAMILY_NOUN: Record<SportFamily, string> = { voile: 'voile', course: 'à pied', velo: 'vélo', fractionne: "d'entraînement", surf: 'de surf' };
+const FAMILY_NOUN: Record<SportFamily, string> = { voile: 'voile', surf: 'de surf' };
 
 
 /** Distance restante et part faite de la trace suivie ; « à rejoindre » tant qu'on ne l'a pas rejointe. */
@@ -201,24 +201,12 @@ const liveStatItems = (activity: Activity, live: LiveStats, options: LiveStatsOp
       { label: 'Distance', value: formatDistance(live.distanceM, distanceUnit) },
     ];
   }
-  if (sportTreatment(activity.base) === 'surf') {
-    return [
-      { label: 'Vitesse', value: formatSpeed(live.currentSpeedMs, unit, distanceUnit) },
-      // Sur toute la trace : pas la « Vitesse max » de l'analyse, celle d'une vague, que le direct ne détecte pas.
-      { label: liveFieldLabel('max', { speedUnit: unit, distanceUnit, options }), value: formatSpeed(live.maxSpeedMs, unit, distanceUnit) },
-      { label: 'Distance', value: formatDistance(live.distanceM, distanceUnit) },
-    ];
-  }
-  // Course : l'allure ; vélo : la vitesse.
-  const speedWord = sportTreatment(activity.base) === 'velo' ? 'Vitesse' : 'Allure';
+  // Surf.
   return [
-    { label: speedWord, value: formatSpeed(live.currentSpeedMs, unit, distanceUnit) },
+    { label: 'Vitesse', value: formatSpeed(live.currentSpeedMs, unit, distanceUnit) },
+    // Sur toute la trace : pas la « Vitesse max » de l'analyse, celle d'une vague, que le direct ne détecte pas.
+    { label: liveFieldLabel('max', { speedUnit: unit, distanceUnit, options }), value: formatSpeed(live.maxSpeedMs, unit, distanceUnit) },
     { label: 'Distance', value: formatDistance(live.distanceM, distanceUnit) },
-    { label: distanceUnit === 'nm' ? 'Dernier mille' : 'Dernier km', value: formatSpeed(live.lastDistanceSpeedMs, unit, distanceUnit) },
-    { label: `${speedWord} moyenne`, value: formatSpeed(live.averageSpeedMs, unit, distanceUnit) },
-    { label: 'D+', value: formatMeters(live.elevationGainM) },
-    { label: 'D−', value: formatMeters(live.elevationLossM) },
-    { label: `D+ ${recentWindowLabel(options)}`, value: formatMeters(live.recentGainM) },
   ];
 };
 
@@ -712,7 +700,7 @@ function RecordingScreen() {
   }
   // Matériel choisi qui n'a pas pu être écrit dans la fiche de la session rangée.
   const [gearNotWritten, setGearNotWritten] = useState(false);
-  const canStart = !busy && pending === null && chosen !== null && hasPositions(chosen.base) && (sourceChoice === 'device' || replay !== null);
+  const canStart = !busy && pending === null && chosen !== null && (sourceChoice === 'device' || replay !== null);
   // Zone visée : bips de sortie de zone, proposés avec la ceinture connectée et les zones de Pratiquant ; « aucune » à chaque
   // ouverture de la page.
   const zoneBounds = chosen ? readHeartRateZoneBounds(chosen) : null;
@@ -730,9 +718,9 @@ function RecordingScreen() {
   // Parcours de balises : la trace suivie a des balises et l'activité navigue sur un parcours (voile, surf). L'avancement se compte par balises.
   const courseMarksOf = followed?.marks && liveActivity && usesMarkCourse(sportFamily(liveActivity.base)) ? followed.marks : null;
   const followedLengthM = useMemo(() => (followed ? followedTraceLengthM(followed) : 0), [followed]);
-  // Dénivelé de la trace suivie : à terre, hors parcours de balises, si elle a une altitude.
-  const followedHasElevation = useMemo(() => followed !== null && hasFollowedElevation(followed), [followed]);
-  const elevationOffered = followedHasElevation && !pending && !courseMarksOf && liveActivity !== null && isLandTreatment(sportTreatment(liveActivity.base));
+  // Dénivelé de la trace suivie : à terre seulement (course, vélo), jamais proposé en voile ni en surf depuis le lot 305 ;
+  // l'affichage reste, jusqu'au retrait de la terre de l'enregistrement.
+  const elevationOffered: boolean = false;
   const elevationShown = elevationOffered && shown.denivele;
   const pageRef = useRef<HTMLDivElement>(null);
   const phoneUpright = useNarrowScreen() && !landscape;
@@ -980,7 +968,7 @@ function RecordingScreen() {
             <label className="rec-status__activity">
               <span className="ui-eyebrow">Activité</span>
               <ActivitySelect
-                activities={activities.filter((a) => hasPositions(a.base))}
+                activities={activities}
                 value={liveActivity.id}
                 extra={liveActivity}
                 className="ui-field"
@@ -1048,7 +1036,7 @@ function RecordingScreen() {
           </span>
         )}>
           <p className="rec-saved-text">
-            {pending.activity?.name ?? 'À classer'}, {pending.pointCount} {pending.sport === null || hasPositions(pending.sport) ? 'points' : 'mesures de la ceinture'}.<br />
+            {pending.activity?.name ?? 'À classer'}, {pending.pointCount} points.<br />
             <span className="ui-muted ui-text-s">
               Pas encore rangée : « Analyser » la range dans la mémoire et l'ouvre, « Jeter » l'abandonne.
               Aucun nouvel enregistrement avant ce choix.
@@ -1091,7 +1079,7 @@ function RecordingScreen() {
           </span>
         )}>
           <p className="rec-saved-text">
-            {saved.activity?.name ?? 'À classer'}, {saved.pointCount} {saved.sport === null || hasPositions(saved.sport) ? 'points' : 'mesures de la ceinture'}.<br />
+            {saved.activity?.name ?? 'À classer'}, {saved.pointCount} points.<br />
             <span className="ui-muted ui-text-s rec-break-all">Rangée dans : {saved.location}</span>
             {gearNotWritten && (
               <>

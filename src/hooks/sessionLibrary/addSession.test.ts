@@ -150,15 +150,22 @@ const CASES: Case[] = [
     name: 'sport imposé et activité d’un enregistrement',
     text: (hz) => run(hz),
     source: 'enregistrement',
-    options: { sport: 'running', activityId: 'a-marche', marks: [] },
-    sport: 'running',
+    options: { sport: 'surf', activityId: 'a-surf-foil', marks: [] },
+    sport: 'surf',
   },
   {
     name: 'sport deviné de la trace, sans fiche',
+    text: (hz) => run(hz, { name: 'Vagues', type: 'surf' }),
+    source: 'import',
+    options: {},
+    sport: 'surf',
+  },
+  {
+    name: 'trace de course (application complète) : à classer (lot 305)',
     text: (hz) => run(hz, { name: 'Footing', type: 'running' }),
     source: 'import',
     options: {},
-    sport: 'running',
+    sport: null,
   },
   {
     name: 'sport null : session à classer',
@@ -197,8 +204,7 @@ const addOnce = async (text: string, source: SessionSource, options: AddOptions)
     text,
     options.sport !== undefined ? options.sport : from?.sport ?? undefined,
     from?.analysis,
-    sessionSummarySettings(from, options.activityId ?? from?.activityId),
-    from
+    sessionSummarySettings(from, options.activityId ?? from?.activityId)
   );
   return { result, disk: sessionFiles(), session: result.file ? library.librarySession(result.file) : undefined, direct };
 };
@@ -230,7 +236,7 @@ describe('addGpx : résumé par le worker', () => {
     FakeWorker.hold = true;
     const { addGpx } = await openFresh();
     let finished = false;
-    const adding = addGpx(run(1), 'enregistrement', { sport: 'running' }).then((r) => {
+    const adding = addGpx(run(1), 'enregistrement', { sport: 'surf' }).then((r) => {
       finished = true;
       return r;
     });
@@ -249,7 +255,7 @@ describe('addGpx : résumé par le worker', () => {
     const { addGpx } = await openFresh();
     const motion = new Uint8Array([1, 2, 3, 4]);
     const buffer = motion.buffer;
-    const result = await addGpx(run(1), 'enregistrement', { sport: 'running', activityId: 'a-marche', motion });
+    const result = await addGpx(run(1), 'enregistrement', { sport: 'surf', activityId: 'a-surf-foil', motion });
     expect(result.status).toBe('added');
     expect(FakeWorker.posts).toHaveLength(1);
     const [request, ...transfer] = FakeWorker.posts[0] as [TrackRequest, ...unknown[]];
@@ -257,8 +263,8 @@ describe('addGpx : résumé par le worker', () => {
     expect(Object.keys(request).sort()).toEqual(['gpxText', 'id', 'kind', 'options']);
     expect(request.kind).toBe('summarize');
     const { activitySummarySettings } = await import('./summarySettings');
-    expect(request.options).toMatchObject({ sport: 'running', activitySettings: { running: activitySummarySettings('a-marche')('running') } });
-    expect(Object.keys((request.options as { activitySettings: object }).activitySettings)).toEqual(['running']);
+    expect(request.options).toMatchObject({ sport: 'surf', activitySettings: { surf: activitySummarySettings('a-surf-foil')('surf') } });
+    expect(Object.keys((request.options as { activitySettings: object }).activitySettings)).toEqual(['surf']);
     // Rien n'est détaché : `analyzePendingSession` réutilise ces octets à chaque essai.
     expect(motion.buffer).toBe(buffer);
     expect(motion.byteLength).toBe(4);
@@ -269,7 +275,7 @@ describe('addGpx : résumé par le worker', () => {
     const one = gpxOf(sailRaw({ windDeg: 0, legs: [{ twa: 90, durationS: 0 }] }));
     const refusals = async () => {
       const { addGpx } = await openFresh();
-      return [await addGpx('<gpx><trk>', 'import', {}), await addGpx(one, 'enregistrement', { sport: 'running' })];
+      return [await addGpx('<gpx><trk>', 'import', {}), await addGpx(one, 'enregistrement', { sport: 'surf' })];
     };
     const inline = await refusals();
     useWorker();
@@ -286,12 +292,12 @@ describe('addGpx : résumé par le worker', () => {
     const { library, addGpx } = await openFresh();
     const text = run(1);
     refuseRecords = true;
-    await expect(addGpx(text, 'enregistrement', { sport: 'running' })).rejects.toThrow('écriture refusée');
+    await expect(addGpx(text, 'enregistrement', { sport: 'surf' })).rejects.toThrow('écriture refusée');
     refuseRecords = false;
     expect(log.some((l) => l.startsWith('write sessions/') && l.endsWith('.gpx'))).toBe(true);
     expect(sessionFiles()).toEqual([]);
     expect(library.readLibraryState().sessions).toEqual([]);
-    const again = await addGpx(text, 'enregistrement', { sport: 'running' });
+    const again = await addGpx(text, 'enregistrement', { sport: 'surf' });
     expect(again.status).toBe('added');
     expect(again.file).not.toMatch(/-2\.gpx$/);
     expect(files.has(`sessions/${again.file}`)).toBe(true);
@@ -324,12 +330,12 @@ describe('addGpx : résumé par le worker', () => {
 
   it('worker mort pendant le calcul : refait en ligne, la session est rangée pareil', async () => {
     const text = run(1);
-    const inline = await addOnce(text, 'enregistrement', { sport: 'running' });
+    const inline = await addOnce(text, 'enregistrement', { sport: 'surf' });
     reset();
     useWorker();
     FakeWorker.hold = true;
     const { addGpx } = await openFresh();
-    const adding = addGpx(text, 'enregistrement', { sport: 'running' });
+    const adding = addGpx(text, 'enregistrement', { sport: 'surf' });
     await turn();
     FakeWorker.instances[0].onerror?.();
     expect((await adding).status).toBe('added');
@@ -342,11 +348,11 @@ describe('imports, par le même chemin', () => {
     name, key: name.replace(/\.gpx$/, ''), readText: async () => text, readBytes: async () => null,
   });
   const entries = () => [
-    entry('a.gpx', run(1, { name: 'A', type: 'running' })),
+    entry('a.gpx', run(1, { name: 'A', type: 'surf' })),
     entry('illisible.gpx', '<gpx><trk>'),
     entry('vide.gpx', '  '),
     entry('b.gpx', gpxOf(sailRaw({ windDeg: 20, legs: upDownLegs(2, 60), startMs: Date.UTC(2026, 9, 3, 10) }), 'simple', { name: 'B', type: 'wingfoil' })),
-    entry('a-encore.gpx', run(1, { name: 'A', type: 'running' })),
+    entry('a-encore.gpx', run(1, { name: 'A', type: 'surf' })),
   ];
 
   it('même rapport et mêmes écritures, dans le même ordre, en ligne et par le worker, une session à la fois', async () => {

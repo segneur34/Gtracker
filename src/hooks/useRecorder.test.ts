@@ -166,7 +166,7 @@ const recorder = await import('./useRecorder');
 const live = await import('./useLiveRecording');
 
 const T0 = Date.UTC(2026, 9, 27, 9, 0, 0);
-const activity = baseActivity('running');
+const activity = baseActivity('bateau');
 
 /** Source simulée : compte ses démarrages et ses arrêts, dit si elle tourne, émet à la demande tant qu'elle tourne. */
 const fakeSource = () => {
@@ -412,36 +412,6 @@ describe('repère « Note » (D11)', () => {
   });
 });
 
-describe('muscu retirée (lot 302)', () => {
-  const muscu = baseActivity('muscu');
-  const ceinture = { address: '00:11:22:33:44:55', name: 'Ceinture' };
-
-  it('refuse le départ d’une muscu, ceinture comprise : rien ne démarre, aucun journal', async () => {
-    await recorder.startRecording(muscu, null, { heartRate: ceinture });
-    await recorder.startRecording(muscu, fakeSource(), { heartRate: ceinture });
-    expect(recorder.getRecorderState().status).toBe('idle');
-    expect(journal.headers).toBe(0);
-  });
-
-  it('le journal d’une muscu coupée par une version d’avant est mis de côté, et c’est dit', async () => {
-    journal.text = [
-      JSON.stringify({ format: 'tracker-journal', version: 1, sport: 'muscu', startedAtMs: T0, activity: { id: 'muscu', name: 'Muscu' } }),
-      JSON.stringify(['hr', T0, 95]),
-      JSON.stringify(['hr', T0 + 1000, 97]),
-    ].join('\n');
-    expect(await recorder.recoverInterruptedRecording()).toBe('setAside');
-    expect(journal.aside).toHaveLength(1);
-    expect(recorder.getRecorderState().pending).toBeNull();
-    expect(recorder.getRecorderState().error).toMatch(/muscu .*gardé de côté/);
-  });
-
-  it('ne passe pas d’une activité à positions à la muscu en cours de route', async () => {
-    await recorder.startRecording(activity, fakeSource());
-    recorder.changeRecordingActivity(muscu);
-    expect(recorder.getRecorderState().activity?.id).toBe(activity.id);
-  });
-});
-
 describe('prévenir quand ça rate (lot 115)', () => {
   it("GPS perdu après 1 min sans position : alerte posée une fois, effacée à la position suivante ; muet en pause manuelle", async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -632,7 +602,7 @@ describe('prévenir quand ça rate (lot 115)', () => {
 });
 
 describe('journal illisible (lot 143, 123a)', () => {
-  const header = JSON.stringify({ format: 'tracker-journal', version: 1, sport: 'running', startedAtMs: T0, activity: { id: 'running', name: 'Course' } });
+  const header = JSON.stringify({ format: 'tracker-journal', version: 1, sport: 'kite', startedAtMs: T0, activity: { id: 'a-kite', name: 'Kite' } });
 
   it('au lancement : mis de côté et dit, jamais pris pour absent ; le départ suivant écrit un journal neuf', async () => {
     journal.text = 'session perdue';

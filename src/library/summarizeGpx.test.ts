@@ -18,23 +18,15 @@ const analysis = (patch: Partial<SessionAnalysis>): SessionAnalysis => ({
 
 /** Réglages de l'activité par calcul, différents d'un calcul à l'autre : une table mal résolue se verrait. */
 const activityOf = (sport: SportType): ActivitySummarySettings => ({
-  thresholdOverride: sport === 'running' ? 1.5 : sport === 'wingfoil' ? 9 : sport === 'surf' ? 4 : undefined,
+  thresholdOverride: sport === 'kite' ? 1.5 : sport === 'wingfoil' ? 9 : sport === 'surf' ? 4 : undefined,
   foil: sport === 'surf' || sport === 'wingfoil' ? true : null,
 });
 
 /** Le même résumé par les deux chemins, options passées par un clonage structuré comme vers le worker. */
 const both = (text: string, record: SessionRecord | undefined) => {
   const options = summarizeGpxOptions(record, activityOf);
-  const direct = analyzeGpx(text, record ? record.sport : undefined, record?.analysis, activityOf, record);
+  const direct = analyzeGpx(text, record ? record.sport : undefined, record?.analysis, activityOf);
   return { direct, viaTable: summarizeGpx(text, structuredClone(options)), options };
-};
-
-const muscuGpx = (seconds: number): string => {
-  const points = Array.from({ length: seconds }, (_, s) => {
-    const time = new Date(Date.UTC(2026, 10, 4, 18, 0, s)).toISOString();
-    return `<trkpt><time>${time}</time><extensions><hr>${100 + (s % 30)}</hr></extensions></trkpt>`;
-  }).join('');
-  return `<?xml version="1.0"?><gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><type>muscu</type><trkseg>${points}</trkseg></trk></gpx>`;
 };
 
 describe('summarizeGpx : le résumé d’analyzeGpx, réglages en table', () => {
@@ -48,7 +40,7 @@ describe('summarizeGpx : le résumé d’analyzeGpx, réglages en table', () => 
       expect(Object.keys(options.activitySettings)).toEqual(['wingfoil']);
     });
 
-    it(`course avec l'altitude du terrain, ignorée depuis le lot 303, à ${hz} Hz`, () => {
+    it(`kite et l'altitude du terrain d'une fiche, ignorée depuis le lot 303, à ${hz} Hz`, () => {
       const raw = sailRaw({ windDeg: 0, legs: upDownLegs(2, 120), hz, polar: slowPolar });
       const text = gpxOf(raw);
       const startMs = Date.parse(String(raw[0].time));
@@ -56,7 +48,7 @@ describe('summarizeGpx : le résumé d’analyzeGpx, réglages en table', () => 
         source: 'ign' as const, resource: 'test', version: 1, stepM: 20, fetchedAt: '2026-11-04T08:00:00Z', startMs,
         t: Array.from({ length: 24 }, (_, i) => i * 10_000), z: Array.from({ length: 24 }, (_, i) => 50 + (i % 6) * 3),
       };
-      const record = sessionRecord({ sport: 'running', terrainElevation });
+      const record = sessionRecord({ sport: 'kite', terrainElevation });
       const { direct, viaTable } = both(text, record);
       expect(direct).not.toBeNull();
       expect(viaTable).toStrictEqual(direct);
@@ -75,20 +67,13 @@ describe('summarizeGpx : le résumé d’analyzeGpx, réglages en table', () => 
     });
   }
 
-  it('muscu : points sans position, résumé de la FC', () => {
-    const record = sessionRecord({ sport: 'muscu' });
-    const { direct, viaTable } = both(muscuGpx(300), record);
-    expect(direct).not.toBeNull();
-    expect(viaTable).toStrictEqual(direct);
-  });
-
-  it('GPX neuf, calcul deviné du type de la trace : les onze calculs en table', () => {
-    const text = gpxOf(sailRaw({ windDeg: 0, legs: upDownLegs(2, 60), polar: slowPolar }), 'simple', { name: 'Footing', type: 'running' });
+  it('GPX neuf, calcul deviné du type de la trace : les cinq calculs en table', () => {
+    const text = gpxOf(sailRaw({ windDeg: 0, legs: upDownLegs(2, 60), polar: slowPolar }), 'simple', { name: 'Vagues', type: 'surfing' });
     const { direct, viaTable, options } = both(text, undefined);
-    expect(direct?.sport).toBe('running');
+    expect(direct?.sport).toBe('surf');
     expect(viaTable).toStrictEqual(direct);
     expect(options.sport).toBeUndefined();
-    expect(Object.keys(options.activitySettings)).toHaveLength(11);
+    expect(Object.keys(options.activitySettings)).toHaveLength(5);
     // Le calcul à deviner reste à deviner de l'autre côté du clonage.
     expect('sport' in structuredClone(options) && structuredClone(options).sport === undefined).toBe(true);
   });
@@ -102,7 +87,7 @@ describe('summarizeGpx : le résumé d’analyzeGpx, réglages en table', () => 
 
   it('moins de deux points : null ; XML illisible : la même erreur', () => {
     const one = gpxOf(sailRaw({ windDeg: 0, legs: [{ twa: 90, durationS: 0 }] }));
-    expect(summarizeGpx(one, summarizeGpxOptions(sessionRecord({ sport: 'running' }), activityOf))).toBeNull();
+    expect(summarizeGpx(one, summarizeGpxOptions(sessionRecord({ sport: 'kite' }), activityOf))).toBeNull();
     expect(() => summarizeGpx('<gpx>', summarizeGpxOptions(undefined, activityOf))).toThrow(/illisible/);
   });
 

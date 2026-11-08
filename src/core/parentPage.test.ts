@@ -8,17 +8,14 @@ describe('parentPage', () => {
 
   it("l'analyse renvoie à la bibliothèque de sa famille", () => {
     expect(parentPage('/voile/analyse', '?session=a.gpx')).toBe('/voile');
-    expect(parentPage('/course/analyse', '?session=b.gpx')).toBe('/course');
-    expect(parentPage('/velo/analyse', '')).toBe('/velo');
-    expect(parentPage('/fractionne/analyse', '?session=c.gpx')).toBe('/fractionne');
     expect(parentPage('/surf/analyse', '?session=d.gpx')).toBe('/surf');
   });
 
   it("l'analyse rend le filtre d'activité de la bibliothèque d'où l'on vient (lot 158)", () => {
-    expect(parentPage('/course/analyse', '?session=b.gpx&activite=a-marche')).toBe('/course?activite=a-marche');
-    expect(analysisPath('course', 'b.gpx', 'a-marche')).toBe('/course/analyse?session=b.gpx&activite=a-marche');
-    expect(analysisPath('course', 'b.gpx', null)).toBe('/course/analyse?session=b.gpx');
-    expect(analysisPath('course', null, 'a-marche')).toBe('/course/analyse');
+    expect(parentPage('/surf/analyse', '?session=b.gpx&activite=a-surf-foil')).toBe('/surf?activite=a-surf-foil');
+    expect(analysisPath('surf', 'b.gpx', 'a-surf-foil')).toBe('/surf/analyse?session=b.gpx&activite=a-surf-foil');
+    expect(analysisPath('surf', 'b.gpx', null)).toBe('/surf/analyse?session=b.gpx');
+    expect(analysisPath('surf', null, 'a-surf-foil')).toBe('/surf/analyse');
   });
 
   it('le test de FC repos remonte au Profil (lot 301) ; les pages retirées de l\'Entraînement, à l\'accueil (lot 302)', () => {
@@ -46,8 +43,8 @@ describe('parentPage', () => {
     expect(parentPage('/velo', '?vue=planifiees')).toBe('/');
   });
 
-  it("les autres pages renvoient à l'accueil", () => {
-    for (const p of ['/enregistrer', '/profil', '/parametres', '/itineraires', '/itineraires/liste', '/inconnue', '/voile/autre']) {
+  it("les autres pages renvoient à l'accueil, anciennes analyses de la terre comprises (lot 305)", () => {
+    for (const p of ['/course/analyse', '/velo/analyse', '/fractionne/analyse', '/enregistrer', '/profil', '/parametres', '/itineraires', '/itineraires/liste', '/inconnue', '/voile/autre']) {
       expect(parentPage(p, '')).toBe('/');
     }
     expect(parentPage('/itineraires', '?itineraire=x')).toBe('/');
@@ -71,18 +68,18 @@ describe('parentPage', () => {
 describe('chemins de la bibliothèque et des analyses (lot 72)', () => {
   it("ouvre la bibliothèque d'une famille, filtrée sur une activité", () => {
     expect(libraryPath('voile')).toBe('/voile');
-    expect(libraryPath('course', 'a-trail é')).toBe('/course?activite=a-trail%20%C3%A9');
+    expect(libraryPath('surf', 'a-paddle é')).toBe('/surf?activite=a-paddle%20%C3%A9');
   });
 
   it("ouvre l'analyse d'une famille, sur une session si elle est donnée", () => {
-    expect(analysisPath('velo')).toBe('/velo/analyse');
+    expect(analysisPath('voile')).toBe('/voile/analyse');
     expect(analysisPath('surf', '2026-09-23 surf.gpx')).toBe('/surf/analyse?session=2026-09-23%20surf.gpx');
     expect(parentPage('/surf/analyse', '?session=x')).toBe('/surf');
   });
 
   it('range une session dans la famille de son calcul, une session à classer dans celle donnée', () => {
-    expect(sessionFamily({ record: { sport: 'run-intervals' } }, 'course')).toBe('fractionne');
+    expect(sessionFamily({ record: { sport: 'kite' } }, 'surf')).toBe('voile');
     expect(sessionFamily({ record: { sport: null } }, 'voile')).toBe('voile');
-    expect(sessionFamily(undefined, 'velo')).toBe('velo');
+    expect(sessionFamily(undefined, 'surf')).toBe('surf');
   });
 });

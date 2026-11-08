@@ -24,30 +24,29 @@ describe("bornes de couleur hors de l'analyse (vignettes, partage)", () => {
     const bare = sessionRecord();
     expect(sessionSpeedRange(bare, activity, 'voile', suggested)).toEqual(activity.fixed);
     expect(sessionSpeedRange(bare, { ...activity, fixed: null }, 'voile', suggested)).toEqual(suggested);
-    expect(sessionSpeedRange(bare, { ...activity, fixed: null }, 'course', null)).toEqual(activity.fallback);
+    expect(sessionSpeedRange(bare, { ...activity, fixed: null }, 'surf', null)).toEqual(activity.fallback);
   });
 
   it('une session à classer, sans activité : la suggestion en voile, sinon le calcul de la famille', () => {
     expect(sessionSpeedRange({ analysis: null, sport: 'wingfoil' }, null, 'voile', suggested)).toEqual(suggested);
     expect(sessionSpeedRange({ analysis: null, sport: null }, null, 'voile', null)).toEqual(getSportProfile('wingfoil').speedRange);
-    expect(sessionSpeedRange({ analysis: null, sport: null }, null, 'velo', null)).toEqual(getSportProfile('cycling').speedRange);
     expect(sessionSpeedRange({ analysis: null, sport: 'surf' }, null, 'surf', null)).toEqual(getSportProfile('surf').speedRange);
   });
 });
 
 describe('trace colorée tirée du GPX', () => {
-  it('suggère des bornes en voile, pas à pied ; bateau aux siennes', () => {
+  it('suggère des bornes en voile, pas en surf ; bateau aux siennes', () => {
     const gpx = straightGpx(knotsToMs(15), 120);
     const wing = sessionColorTrack(gpx, 'wingfoil', null, 'voile');
     expect(wing?.points.length).toBeGreaterThan(100);
     expect(wing?.suggested?.maxMs).toBeGreaterThan(knotsToMs(15));
     expect(sessionColorTrack(gpx, 'bateau', null, 'voile')?.suggested).toEqual(getSportProfile('bateau').speedRange);
-    expect(sessionColorTrack(straightGpx(3, 120), 'running', null, 'course')?.suggested).toBeNull();
+    expect(sessionColorTrack(straightGpx(3, 120), 'surf', null, 'surf')?.suggested).toBeNull();
   });
 
   it('même vitesse de couleur à 1 Hz et à 5 Hz', () => {
-    const at1 = sessionColorTrack(straightGpx(3, 120, 1), 'running', null, 'course')!;
-    const at5 = sessionColorTrack(straightGpx(3, 120, 5), 'running', null, 'course')!;
+    const at1 = sessionColorTrack(straightGpx(3, 120, 1), 'surf', null, 'surf')!;
+    const at5 = sessionColorTrack(straightGpx(3, 120, 5), 'surf', null, 'surf')!;
     const mid = (t: typeof at1) => t.points[Math.floor(t.points.length / 2)].colorMs;
     expect(mid(at5)).toBeCloseTo(mid(at1), 1);
   });
@@ -55,6 +54,6 @@ describe('trace colorée tirée du GPX', () => {
   it('rien sous deux points', () => {
     const one = straightGpx(3, 10).replace(/(<\/trkpt>)<trkpt.*<\/trkpt>/, '$1');
     expect(one.match(/<trkpt/g)).toHaveLength(1);
-    expect(sessionColorTrack(one, 'running', null, 'course')).toBeNull();
+    expect(sessionColorTrack(one, 'surf', null, 'surf')).toBeNull();
   });
 });

@@ -516,19 +516,14 @@ describe('trace importée', () => {
     expect(setLegMode(route, 0, 'grandeRoute').legs[0]).toMatchObject({ mode: 'grandeRoute', status: 'pending' });
   });
 
-  it('prend les règles du vélo pour la famille vélo, celles du piéton sinon', () => {
-    expect(routeVehicle('velo')).toBe('velo');
-    expect(routeVehicle('course')).toBe('pieton');
+  it('prend les règles du piéton en voile et en surf (le vélo est parti au lot 305)', () => {
     expect(routeVehicle('voile')).toBe('pieton');
+    expect(routeVehicle('surf')).toBe('pieton');
   });
 
-  it('propose des types de voie selon le type de vélo, la route à pied ; aucun en voile', () => {
-    expect(presetWayTypes('velo', 'route')).toEqual(['route']);
-    expect(presetWayTypes('velo', 'ville')).toEqual(['route']);
-    expect(presetWayTypes('velo', 'gravel')).toEqual(['piste']);
-    expect(presetWayTypes('velo', 'vtt')).toEqual(['sentier', 'piste']);
-    expect(presetWayTypes('course', 'vtt')).toEqual(['route']);
-    expect(presetWayTypes('voile', 'route')).toEqual([]);
+  it("ne coche aucun type de voie d'office en voile ni en surf", () => {
+    expect(presetWayTypes('voile')).toEqual([]);
+    expect(presetWayTypes('surf')).toEqual([]);
   });
 
   it('lit les types de voie d\'un réglage : remis dans l\'ordre, sans doublon, jamais vides', () => {

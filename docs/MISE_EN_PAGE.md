@@ -1,6 +1,6 @@
 # Mise en page d'une page d'analyse
 
-Patron commun aux modules d'analyse (voile ; course, vélo et fractionné, qui partagent `LandModule` ; surf) et à tout sport à venir. La page des statistiques (`StatisticsPage`) en reprend les onglets, les panneaux et leurs règles de téléphone (`an-page`, `an-carte-panels`, `an-sheet__stats`), sans carte ni en-tête de session. Ce qui est commun passe par des pièces partagées, pour qu'une règle ne s'écrive qu'une fois ; ce document dit lesquelles et dans quel ordre les poser. Ses règles sont des décisions de l'utilisateur, de même autorité que `CLAUDE.md` : rien ne s'y change sans lui. Les signatures se lisent dans le code.
+Patron commun aux modules d'analyse (voile ; surf ; course, vélo et fractionné, qui partageaient LandModule, retirés aux lots 302 et 303) et à tout sport à venir. La page des statistiques (`StatisticsPage`) en reprend les onglets, les panneaux et leurs règles de téléphone (`an-page`, `an-carte-panels`, `an-sheet__stats`), sans carte ni en-tête de session. Ce qui est commun passe par des pièces partagées, pour qu'une règle ne s'écrive qu'une fois ; ce document dit lesquelles et dans quel ordre les poser. Ses règles sont des décisions de l'utilisateur, de même autorité que `CLAUDE.md` : rien ne s'y change sans lui. Les signatures se lisent dans le code.
 
 ## Structure, de haut en bas
 

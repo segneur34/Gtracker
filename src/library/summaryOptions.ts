@@ -1,14 +1,12 @@
-import type { BikeType } from '../core/domainTypes';
 import { parseGpx } from '../core/gpxParser';
-import { SAILING_SPORTS, getSportProfile, hasPositions, isLandTreatment, isSportType, sportTreatment } from '../core/sportProfiles';
+import { SAILING_SPORTS, getSportProfile, isSportType } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
-import { isValidBikeWeight } from '../core/retiredLand';
 import { guessSport } from './naming';
 import {
   ANALYSIS_SUMMARY_FIELDS, carriedSettings, isSummaryStale, type LibrarySession, type RecordWithoutSummary, type SessionAnalysis, type SessionRecord, type SessionSummary,
   type SummaryActivitySettings,
 } from './record';
-import { summarizeHeartRateSession, summarizeSession, type SummaryOptions } from './summary';
+import { summarizeSession, type SummaryOptions } from './summary';
 
 /**
  * Préparation du résumé d'une fiche (lot 72) : les réglages qui le changent,
@@ -23,20 +21,6 @@ export interface ActivitySummarySettings {
   thresholdOverride: number | undefined;
   /** Foil de l'activité (voile, surf) ; `null` ailleurs. */
   foil: boolean | null;
-  /**
-   * Vélo (lot 146) : type et poids du vélo de l'activité, poids du pratiquant (`null` s'il n'est pas renseigné),
-   * pour la meilleure puissance estimée sur 20 min du résumé ; absent hors vélo. Le type et le poids du vélo
-   * entrent dans l'empreinte, comme le seuil (§8 : les changer dans Réglages refait les sessions de l'activité) ;
-   * le poids du pratiquant n'y entre pas : un résumé fait sans lui est refait une fois, dès qu'il est connu.
-   */
-  cycling?: CyclingSummarySettings;
-}
-
-/** Vélo et pratiquant d'une activité à vélo, pour la puissance du résumé (`ActivitySummarySettings.cycling`). */
-export interface CyclingSummarySettings {
-  bikeType: BikeType;
-  bikeKg: number;
-  riderKg: number | null;
 }
 
 /**
@@ -56,7 +40,6 @@ export const sessionActivitySettings = (
   return {
     thresholdOverride: threshold === undefined ? device.thresholdOverride : threshold ?? undefined,
     foil: foil === undefined ? device.foil : foil,
-    ...(device.cycling !== undefined ? { cycling: device.cycling } : {}),
   };
 };
 
@@ -69,53 +52,40 @@ export const sessionFoil = (
   deviceFoil: boolean | null
 ): boolean => record?.analysis?.foil ?? sessionActivitySettings(record, { thresholdOverride: undefined, foil: deviceFoil }).foil ?? false;
 
-/** Altitude de la fiche (celle du terrain, brute, et la source choisie). */
+/**
+ * Altitude de la fiche (celle du terrain, brute, et la source choisie) : portée par les options du résumé
+ * (`summarizeGpx`) mais plus lue depuis le retrait de la course et du vélo (lots 303 et 305), le résumé de la
+ * voile et du surf ne prenant que l'altitude du GPS.
+ */
 export type SessionElevation = Pick<SessionRecord, 'terrainElevation' | 'elevationSource'>;
 
 /**
  * Réglages qui changent le résumé : ceux de l'activité de la session, et ceux
  * de la session (`analysis`, dans sa fiche). Le seuil de la session prime sur
  * celui de l'activité ; l'allure imposée n'existe que pour une session, et
- * qu'en voile. L'altitude du terrain de la fiche remplace celle du GPS en
- * course et à vélo, sauf si l'utilisateur a gardé le GPS. En surf, le foil
- * de la session (sinon de son activité) et son seuil de vague en foil. À vélo,
- * le vélo de l'activité et le poids du pratiquant (le poids du vélo de la
- * session s'il est saisi), pour la puissance des meilleurs 20 min (lot 146).
+ * qu'en voile. En surf, le foil de la session (sinon de son activité) et son
+ * seuil de vague en foil.
  */
 export const summaryOptions = (
   sport: SportType | null,
   analysis: SessionAnalysis | null | undefined,
-  activity: ActivitySummarySettings,
-  elevation?: SessionElevation | null
+  activity: ActivitySummarySettings
 ): SummaryOptions => {
   if (sport === null) return {};
   return {
     // Le seuil de la session, sinon celui réglé ou pré-réglé pour son activité (0 : aucun seuil réglé, arrêts complets ôtés d'office).
     activeThreshold: analysis?.activeThreshold ?? activity.thresholdOverride,
     referenceSpeedOverrideMs: SAILING_SPORTS.includes(sport) ? analysis?.referenceSpeedMs ?? undefined : undefined,
-    terrainElevation:
-      isLandTreatment(sportTreatment(sport)) && elevation?.elevationSource !== 'gps' ? elevation?.terrainElevation : undefined,
     // Surf : le foil de la session, sinon celui de son activité ; son seuil de vague en foil.
     foil: analysis?.foil ?? activity.foil ?? undefined,
     waveThreshold: analysis?.waveThreshold ?? undefined,
-    ...(sportTreatment(sport) === 'velo' && activity.cycling
-      ? {
-        cyclingPower: {
-          bikeType: activity.cycling.bikeType,
-          bikeKg: isValidBikeWeight(analysis?.bikeWeightKg) ? analysis.bikeWeightKg : activity.cycling.bikeKg,
-          riderKg: activity.cycling.riderKg,
-        },
-      }
-      : {}),
   };
 };
 
 /**
  * Empreinte des réglages qui changent le résumé, gardée dans le résumé (`SessionSummary.optionsKey`,
  * lot 37) : seuil, allure imposée, foil en surf (ailleurs il ne change pas le résumé) et seuil de
- * vague ; à vélo, depuis le lot 146, le type et le poids du vélo (cinquième place, absente ailleurs :
- * les empreintes des autres calculs ne changent pas). L'altitude du terrain n'y est pas : elle est dans la
- * fiche, et son changement refait déjà le résumé (`applyRecordPatch`).
+ * vague. Le vélo y avait une cinquième place (lot 146), partie avec lui sans changer les autres empreintes.
  */
 export const summaryOptionsKey = (sport: SportType, options: SummaryOptions): string =>
   JSON.stringify([
@@ -123,7 +93,6 @@ export const summaryOptionsKey = (sport: SportType, options: SummaryOptions): st
     options.referenceSpeedOverrideMs ?? null,
     getSportProfile(sport).surf ? options.foil ?? false : null,
     options.waveThreshold ?? null,
-    ...(options.cyclingPower ? [[options.cyclingPower.bikeType, options.cyclingPower.bikeKg]] : []),
   ]);
 
 /**
@@ -142,7 +111,7 @@ export const isSummaryOutdated = (
 ): boolean => {
   if (isSummaryStale(record)) return true;
   const { sport } = record;
-  if (sport === null || !isSportType(sport) || !hasPositions(sport)) return false;
+  if (sport === null || !isSportType(sport)) return false;
   const expected = summaryOptionsKey(sport, summaryOptions(sport, record.analysis, sessionActivitySettings(record, activityOf(sport))));
   if (record.summary.optionsKey !== expected) return true;
   const pending = pendingOf?.(sport);
@@ -193,8 +162,7 @@ export interface AnalyzedGpx {
 /**
  * Lit un GPX et le résume. `sport` absent : deviné depuis la trace.
  * `analysis` : réglages d'analyse de la fiche (seuil, allure), s'il y en a ;
- * `activityOf` : réglages de l'activité de la session pour le calcul retenu ;
- * `elevation` : son altitude du terrain et la source choisie.
+ * `activityOf` : réglages de l'activité de la session pour le calcul retenu.
  * Rend `null` si la trace a moins de deux points, lève une erreur si le XML
  * est illisible.
  */
@@ -202,18 +170,12 @@ export const analyzeGpx = (
   text: string,
   sport: SportType | null | undefined,
   analysis: SessionAnalysis | null | undefined,
-  activityOf: (sport: SportType) => ActivitySummarySettings,
-  elevation?: SessionElevation | null
+  activityOf: (sport: SportType) => ActivitySummarySettings
 ): AnalyzedGpx | null => {
   const parsed = parseGpx(text);
   const resolved = sport === undefined ? guessSport(parsed.trackType) : sport;
-  // Session sans trace (muscu) : ses points n'ont que l'heure et la FC.
-  if (resolved !== null && !hasPositions(resolved)) {
-    const summary = summarizeHeartRateSession(parsed.timedPoints, resolved);
-    return summary ? { summary, sport: resolved, title: parsed.trackName ?? null } : null;
-  }
   const activity = resolved === null ? null : activityOf(resolved);
-  const options = resolved === null || activity === null ? {} : summaryOptions(resolved, analysis, activity, elevation);
+  const options = resolved === null || activity === null ? {} : summaryOptions(resolved, analysis, activity);
   const summary = summarizeSession(parsed.rawPoints, resolved, options);
   if (!summary) return null;
   // Empreinte des réglages du calcul : un réglage changé plus tard rendra ce résumé à refaire ;

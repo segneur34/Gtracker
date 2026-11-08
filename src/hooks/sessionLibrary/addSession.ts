@@ -88,9 +88,6 @@ export interface AddOptions extends NewRecordOptions {
  * si son profil le demande (`pump.pruneCapture`), sinon gardés entiers. En
  * voile sur foil, Pumping coché (fiche, sinon activité), gardés entiers aussi :
  * le pumping se mesure sur tout le vol (décision du 28/10).
- * Une capture qui mesurait la cadence (déjà écrite dans le GPX) est gardée
- * entière tant que la mesure se règle (`cadence.keepCapture`) ; ensuite, sans
- * sauts mesurés, elle n'est pas rangée (`null`).
  * En cas d'échec, la capture complète : on ne perd jamais de mesure par erreur.
  */
 const prunedMotion = async (
@@ -100,10 +97,6 @@ const prunedMotion = async (
   const profile = getSportProfile(sport);
   try {
     const setup = decodeImuHeader(motion)?.setup;
-    if (setup?.cadence && profile.cadence) {
-      if (profile.cadence.keepCapture) return motion;
-      if (setup.jumps === false) return null;
-    }
     if (profile.surf) {
       if (!profile.pump?.pruneCapture) return motion;
       const rides = surfRides(parseGpx(text).rawPoints, sport, summaryOptions(sport, analysis, activitySummarySettings(activityId)(sport)));

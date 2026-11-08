@@ -116,13 +116,6 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('guidage actif ou non', () => {
-  it('hors voile, rien n’est actif et rien ne sonne, même avec des balises', async () => {
-    const { guide } = await recording(baseActivity('running'));
-    emit(-50);
-    expect(guide.getMarkGuideView().active).toBe(false);
-    expect(beeps).toEqual([]);
-  });
-
   it('sans balise, rien n’est actif', async () => {
     const { guide } = await recording(wing, course(COURSE_GUIDE, []));
     emit(-50);
@@ -286,11 +279,4 @@ describe('changement d’activité', () => {
     expect(beeps).toEqual(['rythme 600', 'rythme 600']);
   });
 
-  it('passer à une activité hors voile arrête le guidage', async () => {
-    const { guide } = await recording();
-    emit(-60);
-    setRecorder({ activity: baseActivity('running') });
-    expect(guide.getMarkGuideView().active).toBe(false);
-    expect(beeps.at(-1)).toBe('arrêt');
-  });
 });

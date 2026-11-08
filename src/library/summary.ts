@@ -1,6 +1,5 @@
 import { computeElevationStats } from '../core/elevation';
 import { heartRateHistogram, heartRateStats, smoothHeartRate, type HeartRatePoint } from '../core/heartRate';
-import { activeDurationS, heartRatePointsFrom } from '../core/heartRateSession';
 import { computeKinematics } from '../core/kinematics';
 import { kinematicsOptionsOf, referenceSpeedMs, samplingIntervalS, scalesFiltersToSession } from '../core/sessionSpeed';
 import {
@@ -20,8 +19,7 @@ import {
   type ElevationProfile,
   type HeartRateProfile,
 } from '../core/sportProfiles';
-import type { RawTrackPoint, SportType, TimedTrackPoint, TrackPoint } from '../core/types';
-import type { BikeType } from '../core/domainTypes';
+import type { RawTrackPoint, SportType, TrackPoint } from '../core/types';
 import { msToKnots } from '../core/units';
 import { suggestActiveThresholdKn } from '../sailing/sailingConfig';
 import { runSurfSession, surfProfileOf } from '../surfing/surfSession';
@@ -51,20 +49,10 @@ export interface SummaryOptions {
   referenceSpeedOverrideMs?: number;
   /** Réglage du dénivelé. Absent : celui du profil. */
   elevation?: ElevationProfile;
-  /**
-   * Altitude du terrain de la fiche (course et vélo) : n'est plus substituée à celle du GPS depuis le retrait de la
-   * course et du vélo (lot 303) ; gardée dans le type, ignorée, jusqu'au lot 305.
-   */
-  terrainElevation?: unknown;
   /** Support sur foil de la session (surf : il change le seuil par défaut et l'analyse). */
   foil?: boolean;
   /** Seuil de vague en foil de la session, dans l'unité du profil (surf). */
   waveThreshold?: number;
-  /**
-   * Vélo (lot 146) : vélo et poids du pratiquant de l'ancienne meilleure puissance sur 20 min, plus cherchée depuis
-   * le retrait du vélo (lot 303) ; gardé dans le type, ignoré (il compte encore dans `summaryOptionsKey`), jusqu'au lot 305.
-   */
-  cyclingPower?: { bikeType: BikeType; bikeKg: number; riderKg: number | null };
 }
 
 /**
@@ -208,30 +196,6 @@ export const summarizeSession = (
     pointCount: track.length,
     samplingS: samplingIntervalS(rawPoints),
     ...analyzed.surf,
-    ...(heartRate ? { heartRate } : {}),
-  };
-};
-
-/**
- * Résumé d'une session sans trace (muscu, lot I du 25/10), ou `null` à moins
- * de deux points horodatés : ni distance, ni vitesse, ni dénivelé ; la durée
- * hors pauses en temps en action, et la FC comme l'onglet « cardio » la mesure.
- */
-export const summarizeHeartRateSession = (timedPoints: readonly TimedTrackPoint[], sport: SportType): SessionSummary | null => {
-  const points = heartRatePointsFrom(timedPoints);
-  if (points.length < 2) return null;
-  const heartRate = summaryHeartRate(points, getSportProfile(sport).heartRate);
-  return {
-    calcVersion: SUMMARY_CALC_VERSION,
-    startMs: points[0].timeMs,
-    endMs: points[points.length - 1].timeMs,
-    distanceM: 0,
-    movingTimeS: activeDurationS(points),
-    movingDistanceM: null,
-    elevationGainM: null,
-    maxSpeedMs: 0,
-    pointCount: points.length,
-    samplingS: samplingIntervalS(timedPoints),
     ...(heartRate ? { heartRate } : {}),
   };
 };

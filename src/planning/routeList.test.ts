@@ -6,7 +6,7 @@ import { routeToRecord } from './routeRecord';
 
 const activities: Activity[] = [
   { id: 'wingfoil', name: 'Voile', base: 'wingfoil', color: '#1565c0' },
-  { id: 'running', name: 'Course', base: 'running', color: '#bf360c' },
+  { id: 'a-paddle', name: 'Paddle', base: 'surf', color: '#847c6e' },
   { id: 'moth', name: 'Moth', base: 'windsurf', color: '#00897b' },
 ];
 
@@ -14,7 +14,7 @@ const route = (name: string, activityId: string | null) => ({ name, record: { ac
 
 const routes = [
   route('tour du lac', 'wingfoil'),
-  route('footing', 'running'),
+  route('downwind', 'a-paddle'),
   route('régate', 'moth'),
   route('sans activité', null),
   route('activité supprimée', 'a-disparu'),
@@ -24,7 +24,7 @@ const routes = [
 describe('routesOfFamily', () => {
   it('garde les itinéraires dont l’activité est de la famille', () => {
     expect(routesOfFamily(routes, activities, 'voile').map((r) => r.name)).toEqual(['tour du lac', 'régate', 'calcul de base']);
-    expect(routesOfFamily(routes, activities, 'course').map((r) => r.name)).toEqual(['footing']);
+    expect(routesOfFamily(routes, activities, 'surf').map((r) => r.name)).toEqual(['downwind']);
   });
 });
 
@@ -54,7 +54,7 @@ describe('sortRoutes', () => {
 describe('distance et temps d\'une fiche', () => {
   const planned = [{ lat: 43.6, lon: 3.8 }, { lat: 43.61, lon: 3.8 }, { lat: 43.61, lon: 3.81 }]
     .reduce((r, w) => addWaypoint(r, w, 'straight'), EMPTY_ROUTE);
-  const meta = { name: 'boucle', activityId: 'running', createdAt: '2026-10-27T10:00:00Z', updatedAt: '2026-10-27T10:00:00Z' };
+  const meta = { name: 'boucle', activityId: 'kite', createdAt: '2026-10-27T10:00:00Z', updatedAt: '2026-10-27T10:00:00Z' };
 
   it('calculés une fois par fiche : la même valeur, sans refaire le tracé', () => {
     const record = routeToRecord(planned, meta);

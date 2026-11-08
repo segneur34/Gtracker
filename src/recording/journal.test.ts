@@ -110,10 +110,10 @@ describe('journal', () => {
       + journalActivityLine('kite', { id: 'a-kite', name: 'Kite' })
       + journalBreakLine(fixes[1].timeMs)
       + journalFixLine(fixes[1])
-      + journalActivityLine('running', { id: 'running', name: 'Course' })
+      + journalActivityLine('surf', { id: 'surf', name: 'Surf' })
       + journalFixLine(fixes[2]);
     const parsed = parseJournal(text);
-    expect(parsed.activityChange).toEqual({ sport: 'running', activity: { id: 'running', name: 'Course' } });
+    expect(parsed.activityChange).toEqual({ sport: 'surf', activity: { id: 'surf', name: 'Surf' } });
     // L'en-tête reste celui du départ : c'est au lecteur de faire primer le changement.
     expect(parsed.header?.sport).toBe('wingfoil');
     expect(parsed.fixes).toHaveLength(3);
@@ -124,8 +124,10 @@ describe('journal', () => {
   it('ignore un changement d\'activité abîmé ou tronqué, le précédent reste', () => {
     const good = journalActivityLine('kite', { id: 'a-kite', name: 'Kite' });
     const broken = `${JSON.stringify(['activity', { sport: 'moth', id: 'x', name: 'Moth' }])}\n`;
-    const truncated = journalActivityLine('running', { id: 'running', name: 'Course' }).slice(0, 20);
-    const parsed = parseJournal(journalOf(fixes) + good + broken + truncated);
+    const truncated = journalActivityLine('surf', { id: 'surf', name: 'Surf' }).slice(0, 20);
+    // Le calcul d'une course de l'application complète n'en est plus un : changement ignoré, comme abîmé.
+    const land = `${JSON.stringify(['activity', { sport: 'running', id: 'running', name: 'Course' }])}\n`;
+    const parsed = parseJournal(journalOf(fixes) + good + broken + land + truncated);
     expect(parsed.activityChange).toEqual({ sport: 'kite', activity: { id: 'a-kite', name: 'Kite' } });
     expect(parsed.fixes).toHaveLength(3);
     // Sans en-tête lisible, le changement vaut quand même.
@@ -151,13 +153,15 @@ describe('journal', () => {
     expect(Object.keys(parsed)).not.toContain('heartFixes');
   });
 
-  it('un journal de muscu (FC seule) se lit sans position', () => {
-    const text = journalHeaderLine('muscu', T0) + `${JSON.stringify(['hr', T0, 90])}\n` + journalBreakLine(T0 + 30_000)
-      + `${JSON.stringify(['hr', T0 + 30_000, 110])}\n`;
-    const parsed = parseJournal(text);
-    expect(parsed.header?.sport).toBe('muscu');
-    expect(parsed.fixes).toEqual([]);
-    expect(parsed.breaks).toEqual([]);
+  it("un journal de muscu ou de course de l'application complète : sans en-tête lisible, positions gardées, à classer (lot 305)", () => {
+    const header = (sport: string) => `${JSON.stringify({ format: 'tracker-journal', version: 1, sport, startedAtMs: T0 })}\n`;
+    const muscu = parseJournal(header('muscu') + `${JSON.stringify(['hr', T0, 90])}\n` + journalBreakLine(T0 + 30_000)
+      + `${JSON.stringify(['hr', T0 + 30_000, 110])}\n`);
+    expect(muscu.header).toBeNull();
+    expect(muscu.fixes).toEqual([]);
+    const run = parseJournal(header('running') + journalFixLine(fixes[0]) + journalFixLine(fixes[1]));
+    expect(run.header).toBeNull();
+    expect(run.fixes).toHaveLength(2);
   });
 });
 
@@ -185,20 +189,20 @@ describe('notes du journal', () => {
 
 describe('journalActivity (lot 67, sortie de useRecorder)', () => {
   const list: Activity[] = [
-    { id: 'running', name: 'Course', base: 'running', color: '#d11a1a' },
-    { id: 'trail-1', name: 'Trail', base: 'running', color: '#a01010' },
+    { id: 'surf', name: 'Surf', base: 'surf', color: '#5b6670' },
+    { id: 'paddle-1', name: 'Paddle', base: 'surf', color: '#8292a6' },
     { id: 'moth-1', name: 'Moth', base: 'wingfoil', color: '#004aad' },
   ];
 
   it("reprend l'activité de la liste, du même calcul", () => {
-    expect(journalActivity('running', { id: 'trail-1', name: 'Ancien nom' }, list)).toBe(list[1]);
+    expect(journalActivity('surf', { id: 'paddle-1', name: 'Ancien nom' }, list)).toBe(list[1]);
   });
 
   it("d'un autre calcul ou absente de la liste : reconstruite sous le nom gardé, couleur du calcul", () => {
-    expect(journalActivity('running', { id: 'moth-1', name: 'Moth' }, list))
-      .toEqual({ id: 'moth-1', name: 'Moth', base: 'running', color: BASE_COLOR.running });
-    expect(journalActivity('cycling', { id: 'gravel-2', name: 'Gravel' }, list))
-      .toEqual({ id: 'gravel-2', name: 'Gravel', base: 'cycling', color: BASE_COLOR.cycling });
+    expect(journalActivity('surf', { id: 'moth-1', name: 'Moth' }, list))
+      .toEqual({ id: 'moth-1', name: 'Moth', base: 'surf', color: BASE_COLOR.surf });
+    expect(journalActivity('kite', { id: 'kite-2', name: 'Kite' }, list))
+      .toEqual({ id: 'kite-2', name: 'Kite', base: 'kite', color: BASE_COLOR.kite });
   });
 
   it("sans activité dans l'en-tête : l'activité de base du calcul", () => {

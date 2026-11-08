@@ -12,9 +12,10 @@
 //  4. une ligne de la légende ouvre la bibliothèque filtrée sur son activité ;
 //  5. à 390×844 : rien ne déborde, chiffres en une bande de deux sur deux, détail par activité retenu déplié ; la case « Profil » de la barre du bas ouvre la page, allumée ;
 //     à 320 px, aucune case de la bande ne sort de l'écran (la bande « qui dépasse » de la maquette du 22/10) ;
-//  6. cinq activités de plus (huit en tout) : « Autres (3) » dans l'anneau ; le toucher ouvre le détail replié et y
-//     déplie ses trois activités, en retrait, dont une ouvre sa bibliothèque ; la ligne « Autres » les replie ;
-//  7. la photo (22/10) : au départ le dessin du sport préféré ; toucher la photo ouvre le choix des seize dessins ;
+//  6. deux activités de plus (kite et bateau, cinq en tout, autant que de calculs de voile et de surf) : cinq parts
+//     dans l'anneau, sans « Autres » (une sixième activité ne vient plus d'un simple GPX depuis le lot 305) ; une ligne
+//     de la légende ouvre sa bibliothèque ;
+//  7. la photo (22/10) : au départ le dessin du sport préféré ; toucher la photo ouvre le choix des neuf dessins ;
 //     un dessin choisi, puis une image importée (réduite à 256 px, en JPEG), tous deux retenus au rechargement ;
 //     « Retirer » rend le dessin du sport préféré.
 import { connect } from './lib/cdp.mjs';
@@ -225,13 +226,13 @@ await settle({ max: 1000 });
 check('la case Profil ouvre la page, allumée', (await search()) === '/profil' && (await evaluate(`${tab}.classList.contains('active')`)), await search());
 check('390 px : barre du bas sans débordement', !(await overflow()));
 
-// 6. « Autres » : cinq activités de plus, 20 min chacune, cette semaine.
+// 6. Deux activités de plus, 20 min chacune, cette semaine : cinq en tout, cinq parts, sans « Autres » (lot 305 : course,
+// vélo et Entraînement retirés, une sixième activité ne vient plus d'un simple GPX).
 await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
-// Le fractionné et les tests (familles retirées, lots 302 et 303) comptent encore dans l'anneau ; « Autres » garde les trois dernières.
-const EXTRA = [['kite', 3, 8], ['bateau', 4, 4], ['run-intervals', 5, 3.5], ['bike-intervals', 6, 6], ['run-test', 7, 3]];
+const EXTRA = [['kite', 3, 8], ['bateau', 4, 4]];
 await go('/voile', 4000);
 await waitFor(`Boolean(document.querySelector('input[type=file][accept*=".gpx"]'))`, { timeout: 3000, every: 50 });
-console.log('import des cinq de plus :', await evaluate(`(() => {
+console.log('import des deux de plus :', await evaluate(`(() => {
   const input = document.querySelector('input[type=file][accept*=".gpx"]');
   if (!input) return 'absent';
   const dt = new DataTransfer();
@@ -245,26 +246,16 @@ console.log('import des cinq de plus :', await evaluate(`(() => {
 await waitFor(async () => (await records())?.length === SESSIONS.length + EXTRA.length, { timeout: 12000, label: 'fiches' });
 await settle({ max: 2000, label: 'import' });
 await go('/profil');
-// Détail replié d'abord, pour voir le toucher sur « Autres » l'ouvrir.
-if ((await evaluate(`document.querySelector('.profile-fold')?.getAttribute('aria-expanded')`)) === 'true') await evaluate(`document.querySelector('.profile-fold').click()`);
 await wait(300);
-check('anneau : six parts, la dernière grise', (await evaluate(`document.querySelectorAll('.profile-donut circle').length`)) === 6
-  && (await evaluate(`[...document.querySelectorAll('.profile-donut circle')].at(-1).getAttribute('stroke')`)) === '#9aa0a6');
-await evaluate(`[...document.querySelectorAll('.profile-donut circle')].at(-1).dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
-await wait(400);
-check('toucher « Autres » : centre sur son total', (await text('.profile-donut__center')) === 'Autres (3)1 h 0033 %', await text('.profile-donut__center'));
-check('toucher « Autres » : le détail s\'ouvre', (await evaluate(`document.querySelector('.profile-fold')?.getAttribute('aria-expanded')`)) === 'true');
-const subs = () => evaluate(`[...document.querySelectorAll('.profile-legend__sub')].map((li) => li.textContent)`);
-check('… et ses trois activités dépliées, en retrait', (await subs())?.length === 3 && (await subs()).every((r) => r.includes('20 min')), JSON.stringify(await subs()));
-await shoot('profil-autres');
-await evaluate(`[...document.querySelectorAll('.profile-legend li')].find((li) => li.textContent.startsWith('Autres')).querySelector('button').click()`);
+check('anneau : cinq parts, sans « Autres »', (await evaluate(`document.querySelectorAll('.profile-donut circle').length`)) === 5
+  && !(await legend())?.some((row) => row.startsWith('Autres')), JSON.stringify(await legend()));
+await shoot('profil-cinq');
+// Détail déplié, pour toucher une ligne de la légende.
+if ((await evaluate(`document.querySelector('.profile-fold')?.getAttribute('aria-expanded')`)) !== 'true') await evaluate(`document.querySelector('.profile-fold')?.click()`);
 await wait(300);
-check('la ligne « Autres » les replie', (await subs())?.length === 0);
-await evaluate(`[...document.querySelectorAll('.profile-legend li')].find((li) => li.textContent.startsWith('Autres')).querySelector('button').click()`);
-await wait(300);
-await evaluate(`document.querySelector('.profile-legend__sub button').click()`);
+await evaluate(`[...document.querySelectorAll('.profile-legend__row')].at(-1).click()`);
 await settle({ max: 1500 });
-check('une activité d\'« Autres » ouvre sa bibliothèque', /^\/(voile|fractionne|surf)\?activite=/.test((await search()) ?? ''), await search());
+check('une activité de la légende ouvre sa bibliothèque', /^\/(voile|surf)\?activite=/.test((await search()) ?? ''), await search());
 
 // 7. La photo.
 await go('/profil');
@@ -279,7 +270,7 @@ const before = await avatarState();
 check('photo au départ : le dessin du sport préféré, à sa couleur', /^dessin .+ tracé$/.test(before ?? ''), before);
 await evaluate(`document.querySelector('.profile-head__avatar').click()`);
 await wait(300);
-check('toucher la photo ouvre le choix des seize dessins', (await evaluate(`document.querySelectorAll('.avatar-picker__choice').length`)) === 16);
+check('toucher la photo ouvre le choix des neuf dessins', (await evaluate(`document.querySelectorAll('.avatar-picker__choice').length`)) === 9);
 await evaluate(`document.querySelector('.avatar-picker__choice[aria-label="Kitesurf"]').click()`);
 await wait(300);
 check('un dessin choisi : le choix se ferme, la photo suit', !(await evaluate(`!!document.querySelector('.avatar-picker')`)) && (await avatarState()) === 'dessin var(--voile) tracé', await avatarState());

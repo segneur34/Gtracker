@@ -19,13 +19,13 @@ const sample = (): PlannedRoute => {
   return route;
 };
 
-const META = { name: 'Tour du Pic', activityId: 'course', createdAt: '2026-09-25T10:00:00.000Z', updatedAt: '2026-09-25T11:00:00.000Z' };
+const META = { name: 'Tour du Pic', activityId: 'a-kite', createdAt: '2026-09-25T10:00:00.000Z', updatedAt: '2026-09-25T11:00:00.000Z' };
 
 describe('fiche d\'itinéraire', () => {
   it('fait l\'aller-retour : tronçons calculés gardés, tronçons en attente recalculés', () => {
     const route = sample();
     const record = parseRouteRecord(serializeRouteRecord(routeToRecord(route, META)))!;
-    expect(record).toMatchObject({ name: 'Tour du Pic', activityId: 'course', version: ROUTE_VERSION });
+    expect(record).toMatchObject({ name: 'Tour du Pic', activityId: 'a-kite', version: ROUTE_VERSION });
     const back = recordToRoute(record);
     expect(back.waypoints).toEqual([A, B, C]);
     expect(back.legs[0].status).toBe('ready');

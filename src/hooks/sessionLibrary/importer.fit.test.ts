@@ -66,15 +66,15 @@ afterEach(() => {
 describe('import de FIT', () => {
   it('range un FIT sous un GPX, jamais le .fit : FC et sport repris, fiche créée', async () => {
     const library = await openFresh();
-    const report = await library.importEntries([entry('montre.fit', fitAt(1, { sessionSports: [1] }))]);
+    const report = await library.importEntries([entry('montre.fit', fitAt(1, { sessionSports: [38] }))]);
     expect(report.added).toHaveLength(1);
     expect(sessionGpx()).toEqual([`sessions/${report.added[0]}`]);
     expect([...files.keys()].some((path) => /\.fit$/i.test(path))).toBe(false);
     const gpx = files.get(`sessions/${report.added[0]}`)!;
     expect(gpx).toContain('<gpxtpx:hr>141</gpxtpx:hr>');
-    expect(gpx).toContain('<type>running</type>');
+    expect(gpx).toContain('<type>surfing</type>');
     const session = library.readLibraryState().sessions[0];
-    expect(session.record.sport).toBe('running');
+    expect(session.record.sport).toBe('surf');
     expect(session.record.source).toBe('import');
     expect(session.record.summary.startMs).toBe(startOf(1));
     expect(library.readLibraryState().message).toBe('1 session ajoutée.');

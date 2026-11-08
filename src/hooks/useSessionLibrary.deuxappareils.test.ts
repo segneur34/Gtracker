@@ -9,7 +9,7 @@ import { createFakeFolder } from '../test/memoryFolder.fixture';
  * lecture et son écriture. Faux dossier où chaque écriture change la date, comme un vrai fichier.
  */
 
-const GPX = '2026-10-27_10-00-00_running.gpx';
+const GPX = '2026-10-27_10-00-00_kite.gpx';
 const JSON_NAME = GPX.replace(/\.gpx$/, '.json');
 const JSON_PATH = `sessions/${JSON_NAME}`;
 const START_MS = Date.parse('2026-10-27T10:00:00Z');
@@ -61,7 +61,7 @@ const mockPlatform = (): void => {
       rawPoints: [...text.matchAll(/<trkpt lat="([\d.]+)" lon="([\d.]+)"><time>([^<]+)<\/time>/g)]
         .map((m) => ({ lat: Number(m[1]), lon: Number(m[2]), time: m[3] })),
       timedPoints: [],
-      trackType: 'running',
+      trackType: 'kite',
       hasDeviceSpeed: false,
     }),
   }));
@@ -79,7 +79,7 @@ const notes = (patch: Partial<StoredSessionNotes>): StoredSessionNotes => ({
 });
 
 const baseRecord = (patch: Partial<SessionRecord> = {}): SessionRecord => ({
-  format: RECORD_FORMAT, version: RECORD_VERSION, gpx: GPX, sport: 'running', activityId: 'running', source: 'enregistrement',
+  format: RECORD_FORMAT, version: RECORD_VERSION, gpx: GPX, sport: 'kite', activityId: 'kite', source: 'enregistrement',
   addedAt: '2026-10-27T12:00:00.000Z', title: null, name: null,
   summary: {
     calcVersion: SUMMARY_CALC_VERSION, startMs: START_MS, endMs: START_MS + 20_000, distanceM: 66, movingTimeS: 20, elevationGainM: null, maxSpeedMs: 3.3,

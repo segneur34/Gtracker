@@ -1,4 +1,5 @@
-// Vectorise la planche des 16 dessins d'activité en src/components/activityArt.tsx.
+// Vectorise la planche des 16 dessins d'activité en src/components/activityArt.tsx, qui n'en garde que 9 :
+// ceux de la course, du vélo et du fractionné (`SKIPPED`) sont sautés depuis le lot 305.
 //
 // La planche (image de 2400 × 1792, 4 × 4 dessins légendés, fournie par l'utilisateur
 // le 17/10/2026) n'est pas versionnée : le fichier produit fait foi. Pour la refaire :
@@ -27,6 +28,9 @@ const IDS = [
   ['gravel', 'surf', 'surf-foil', 'kayak'],
   ['paddle', 'paddle-foil', 'fractionne-velo', 'fractionne-pied'],
 ];
+
+/** Dessins de la planche retirés avec la course, le vélo et l'Entraînement (lot 305) : ni tracés ni écrits. */
+const SKIPPED = new Set(['course', 'marche', 'route', 'vtt', 'gravel', 'fractionne-velo', 'fractionne-pied']);
 
 const luminance = (d, i) => 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
 const trace = (img) => new Promise((res, rej) =>
@@ -60,6 +64,7 @@ const compact = (d) => {
   const { width, data } = sheet.bitmap;
   const entries = [];
   for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+    if (SKIPPED.has(IDS[r][c])) continue;
     const [x0, x1] = COLS[c];
     const [y0, y1] = BANDS[c][r];
     let minX = x1, maxX = x0;

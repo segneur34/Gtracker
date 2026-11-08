@@ -12,7 +12,7 @@ const GPX = '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator=
 const record = (patch: Partial<SessionRecord> = {}): SessionRecord =>
   sessionRecord({
     gpx: '2026-10-10_09-00-00_fractionne-course.gpx',
-    sport: 'running',
+    sport: null,
     addedAt: '2026-10-10T08:00:00.000Z',
     title: 'Fractionné',
     ...patch,

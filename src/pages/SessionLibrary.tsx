@@ -22,16 +22,11 @@ import { drawTrackPreview, thinForPreview, trackPreviewView } from '../component
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import MoreMenu from '../components/ui/MoreMenu';
-import { PREVIEW_MAX_POINTS } from '../core/displayConfig';
 import { MAP_BASES } from '../core/mapBase';
 import { coloredSegments } from '../core/trackColor';
 import { createHeldCache } from '../core/heldCache';
 import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityCounts, sessionActivity, type Activity } from '../core/activities';
-import { smoothHeartRate } from '../core/heartRate';
-import { heartRatePointsFrom, heartRatePreviewPath } from '../core/heartRateSession';
-import { parseGpx } from '../core/gpxParser';
-import { getSportProfile, hasPositions, sportFamily, sportTreatment, type SportFamily } from '../core/sportProfiles';
-import { HEART_RATE_COLOR } from '../components/heartRateColors';
+import { sportFamily, sportTreatment, type SportFamily } from '../core/sportProfiles';
 import { formatDuration, formatShortDuration, formatLandSpeed, formatSpeed, formatDistanceAuto } from '../core/units';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
 import { useElementSize } from '../hooks/useElementSize';
@@ -49,7 +44,6 @@ import { previewStore } from '../library/previewStore';
 import { previewFingerprint, previewKey, roundPreviewPoints, type PreviewTrack } from '../library/previewTracks';
 import { previewImageStore } from '../library/previewImageStore';
 import { previewImageKey } from '../library/previewImages';
-import bannerFractionne from '../assets/bandeaux/fractionne.webp';
 import bannerSurf from '../assets/bandeaux/surf.webp';
 import bannerVoile from '../assets/bandeaux/voile.webp';
 import './SessionLibrary.css';
@@ -73,13 +67,10 @@ const PREVIEW_CREDIT_NAME = previewCreditName.join(' ');
 
 /**
  * Tournure de chaque famille dans « Aucune session … » et photo de son bandeau (refonte du 22/10) ; nom et couleur :
- * `FAMILY_LABEL`, `FAMILY_ACCENT`. La course et le vélo, retirés (lot 303), n'ont plus de bibliothèque ni de photo.
+ * `FAMILY_LABEL`, `FAMILY_ACCENT`.
  */
 const FAMILY: Record<SportFamily, { title: string; accent: string; of: string; banner?: string }> = {
   voile: { title: FAMILY_LABEL.voile, accent: FAMILY_ACCENT.voile, of: 'de voile', banner: bannerVoile },
-  course: { title: FAMILY_LABEL.course, accent: FAMILY_ACCENT.course, of: 'à pied' },
-  velo: { title: FAMILY_LABEL.velo, accent: FAMILY_ACCENT.velo, of: 'de vélo' },
-  fractionne: { title: FAMILY_LABEL.fractionne, accent: FAMILY_ACCENT.fractionne, of: "d'entraînement", banner: bannerFractionne },
   surf: { title: FAMILY_LABEL.surf, accent: FAMILY_ACCENT.surf, of: 'de surf', banner: bannerSurf },
 };
 
@@ -94,12 +85,6 @@ const formatTime = (ms: number): string =>
 /** Chiffres d'une ligne, selon le traitement de son calcul. */
 const rowStats = (session: LibrarySession, activity: Activity | null): string[] => {
   const { summary } = session.record;
-  // Sans trace (muscu, lot I du 25/10) : durée, FC moyenne et max ; ni distance ni vitesse.
-  if (session.record.sport !== null && !hasPositions(session.record.sport)) {
-    const stats = [formatDuration(summary.endMs - summary.startMs)];
-    if (summary.heartRate) stats.push(`FC moy. ${summary.heartRate.avgBpm}`, `FC max ${summary.heartRate.maxBpm}`);
-    return stats;
-  }
   const distanceUnit = activity ? effectiveDistanceUnit(activity) : 'km';
   const stats = [formatDuration(summary.endMs - summary.startMs), formatDistanceAuto(summary.distanceM, distanceUnit)];
   if (activity === null) return stats;
@@ -119,61 +104,6 @@ const rowStats = (session: LibrarySession, activity: Activity | null): string[] 
   }
   return stats;
 };
-
-/** Courbes de FC des vignettes sans trace (muscu), déjà calculées : comme `previewCache`. */
-const heartPreviewCache = new Map<string, string | null>();
-
-/** Cadre de la courbe de FC d'une vignette, en unités du dessin (étiré à la vignette). */
-const HEART_PREVIEW_VIEW = { width: 200, height: 100 } as const;
-
-/**
- * Vignette d'une session sans trace (muscu, lot I du 25/10, question 1 : la
- * courbe de FC à la place de la carte), lue quand la ligne approche de
- * l'écran, une fois ; un toucher ouvre l'analyse, comme la carte.
- */
-function SessionHeartRatePreview({ session, folderLabel, onOpen }: { session: LibrarySession; folderLabel: string | null; onOpen: () => void }) {
-  const frame = useRef<HTMLDivElement>(null);
-  const { file } = session;
-  const sport = session.record.sport;
-  const cacheKey = `${folderLabel}|${file}|${sport}`;
-  const near = useNearViewport(frame, heartPreviewCache.has(cacheKey), PREVIEW_PRELOAD_MARGIN);
-  const [path, setPath] = useState<string | null | undefined>(() => heartPreviewCache.get(cacheKey));
-
-  useEffect(() => {
-    if (!near || heartPreviewCache.has(cacheKey) || sport === null) return;
-    let cancelled = false;
-    void (async () => {
-      const gpx = await readSessionGpx(file);
-      if (cancelled) return;
-      let drawn: string | null = null;
-      try {
-        if (gpx !== null) {
-          const points = heartRatePointsFrom(parseGpx(gpx).timedPoints);
-          const { smoothS, gapS } = getSportProfile(sport).heartRate;
-          drawn = heartRatePreviewPath(points, smoothHeartRate(points, smoothS, gapS), HEART_PREVIEW_VIEW.width, HEART_PREVIEW_VIEW.height, PREVIEW_MAX_POINTS);
-        }
-      } catch {
-        drawn = null;
-      }
-      heartPreviewCache.set(cacheKey, drawn);
-      setPath(drawn);
-    })();
-    return () => { cancelled = true; };
-  }, [near, file, sport, cacheKey]);
-
-  return (
-    <div ref={frame} className="lib-row__preview" role="link" aria-label="Ouvrir l'analyse" onClick={onOpen}>
-      {path ? (
-        <svg viewBox={`0 0 ${HEART_PREVIEW_VIEW.width} ${HEART_PREVIEW_VIEW.height}`} preserveAspectRatio="none" aria-hidden="true"
-          style={{ position: 'absolute', inset: '12% 6%', width: '88%', height: '76%', overflow: 'visible' }}>
-          <path d={path} fill="none" stroke={HEART_RATE_COLOR} strokeWidth={2} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-        </svg>
-      ) : (
-        <span className="lib-row__preview-status">{path === null ? 'Courbe indisponible' : 'FC…'}</span>
-      )}
-    </div>
-  );
-}
 
 /** Marge sous l'écran où une vignette se charge déjà, pour être prête quand on y arrive. */
 const PREVIEW_PRELOAD_MARGIN = '200px';
@@ -479,9 +409,7 @@ const SessionRow = memo(function SessionRow({
           {record.notes?.comment && <span className="lib-row__note">{record.notes.comment}</span>}
           {session.warning && <span className="lib-row__warning">{session.warning}</span>}
         </button>
-        {record.sport !== null && !hasPositions(record.sport)
-          ? <SessionHeartRatePreview session={session} folderLabel={folderLabel} onOpen={open} />
-          : <SessionPreviewMap session={session} activity={activity} family={family} folderLabel={folderLabel} onOpen={open} />}
+        <SessionPreviewMap session={session} activity={activity} family={family} folderLabel={folderLabel} onOpen={open} />
       </div>
       {asking && (
         <ActivitySheet
@@ -658,7 +586,7 @@ function SessionLibrary({ family }: { family: SportFamily }) {
   );
 
   return (
-    <div className="ui-page ui-page--backdrop lib-page" style={{ '--lib-accent': accent, '--help-accent': accent, ...(family === 'fractionne' ? { '--btn-accent': accent } : {}) } as React.CSSProperties}>
+    <div className="ui-page ui-page--backdrop lib-page" style={{ '--lib-accent': accent, '--help-accent': accent } as React.CSSProperties}>
       <PageBackdrop variant={family} />
       {/* Bandeau photo de la famille : son icône, son nom, ses activités et le nombre de sessions ; « … » en haut à droite. */}
       <header className="ui-photo-banner lib-banner" style={(banner ? { '--banner': `url(${banner})` } : {}) as React.CSSProperties}>

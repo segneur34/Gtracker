@@ -10,20 +10,13 @@ import type { TrackPoint } from './types';
  */
 
 /**
- * Lissage de la vitesse de couleur, en secondes, par traitement. À pied et à
- * vélo, le GPS tremble à basse vitesse et la trace se bariolerait : une
- * moyenne de 15 s la rend lisible. En voile, la vitesse lissée du noyau
- * suffit, et une moyenne effacerait les accélérations courtes ; en surf
- * aussi, où une vague ne dure que quelques secondes.
+ * Lissage de la vitesse de couleur, en secondes, par traitement. En voile, la
+ * vitesse lissée du noyau suffit, et une moyenne effacerait les accélérations
+ * courtes ; en surf aussi, où une vague ne dure que quelques secondes. (À pied
+ * et à vélo, retirés au lot 305, une moyenne de 15 s rendait lisible une trace
+ * que le GPS fait trembler à basse vitesse.)
  */
-export const TRACK_COLOR_SMOOTHING_S: Record<Treatment, number> = {
-  voile: 0,
-  course: 15,
-  velo: 15,
-  surf: 0,
-  // Sans trace : sans objet.
-  muscu: 0,
-};
+export const TRACK_COLOR_SMOOTHING_S: Record<Treatment, number> = { voile: 0, surf: 0 };
 
 /** Vitesse de couleur de chaque point, en m/s. */
 export const trackColorSpeedsMs = (track: readonly TrackPoint[], treatment: Treatment): number[] => {

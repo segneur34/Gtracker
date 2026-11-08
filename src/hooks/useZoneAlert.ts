@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { Activity } from '../core/activities';
-import { getSportProfile, isTestSport } from '../core/sportProfiles';
+import { getSportProfile } from '../core/sportProfiles';
 import { playPattern } from '../platform/beeper';
 import { subscribeHeartRate, type HeartRateSample } from '../platform/heartRate';
 import { jsonStore } from '../platform/storage';
@@ -119,7 +119,7 @@ const sync = () => {
   }
   recordingBefore = true;
   const activity = recorder.activity;
-  if (armed === 0 || activity === null || isTestSport(activity.base)) {
+  if (armed === 0 || activity === null) {
     session = null;
     publish();
     return;

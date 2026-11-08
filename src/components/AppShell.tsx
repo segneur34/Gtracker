@@ -52,11 +52,10 @@ const HOME: Destination = { to: '/', label: 'Accueil', Icon: IconHome, accent: '
 const familyDestination = (family: SportFamily, to: string): Destination =>
   ({ to, label: FAMILY_LABEL[family], Icon: FAMILY_ICON[family], accent: FAMILY_ACCENT[family] });
 const VOILE = familyDestination('voile', '/voile');
-const FRACTIONNE = familyDestination('fractionne', '/fractionne');
 const SURF = familyDestination('surf', '/surf');
 const SETTINGS: Destination = { to: '/parametres', label: 'Réglages', Icon: IconSettings, accent: 'var(--ink)' };
-/** Onglets des familles ; la course et le vélo, retirés de cette version (lot 303), n'en ont plus. */
-const FAMILY_TABS: Partial<Record<SportFamily, Destination>> = { voile: VOILE, fractionne: FRACTIONNE, surf: SURF };
+/** Onglets des familles. */
+const FAMILY_TABS: Record<SportFamily, Destination> = { voile: VOILE, surf: SURF };
 const RECORD_PATH = '/enregistrer';
 const PLAN_PATH = '/itineraires';
 const STATISTIQUES: Destination = { to: '/statistiques', label: 'Statistiques', Icon: IconChart, accent: 'var(--ink-2)' };
@@ -189,7 +188,7 @@ function AppShell() {
           <span className="shell-brand__name" aria-hidden="true">Gtracker</span>
         </Link>
         <nav aria-label="Navigation principale" className="shell-toplinks">
-          {families.map((f) => FAMILY_TABS[f]).filter((d) => d !== undefined).map(topLink)}
+          {families.map((f) => FAMILY_TABS[f]).map(topLink)}
           {topLink(STATISTIQUES)}
           {topLink(PROFIL)}
           {topLink(SETTINGS)}

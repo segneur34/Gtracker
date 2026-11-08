@@ -36,7 +36,7 @@ export const sessionRecord = (patch: Partial<SessionRecord> = {}, summary: Parti
   ...patch,
 });
 
-/** Session des statistiques d'essai : une course d'une heure, 10 km, qui commence à `startMs`. */
+/** Session des statistiques d'essai : un paddle d'une heure (calcul du surf, sans vague), 10 km, qui commence à `startMs`. */
 export const statSession = (startMs: number, over: Partial<StatSession> = {}): StatSession => ({
   file: `s-${startMs}.json`,
   name: null,
@@ -48,10 +48,9 @@ export const statSession = (startMs: number, over: Partial<StatSession> = {}): S
   movingDistanceM: 9000,
   elevationGainM: null,
   maxSpeedMs: 5,
-  activityId: 'course',
-  family: 'course',
-  treatment: 'course',
-  positions: true,
+  activityId: 'a-paddle',
+  family: 'surf',
+  treatment: 'surf',
   maneuverCount: null,
   maneuverResults: null,
   foil: false,
@@ -109,13 +108,15 @@ export const familyRecords = (): Record<string, SessionRecord> => {
       notes: { ...notes, foil: 'Foil 1200', mast: '85', wing: '5 m²', windLevel: 'moyen', waterState: 'clapot', gear },
       analysis: analysis({ windDeg: 312.5, activeThreshold: 8, referenceSpeedMs: 6.2, speedRange: { minMs: 3, maxMs: 14.5 }, foil: true, pumping: false }),
     }, { maneuverCount: 24, maneuverResults: { tackSuccess: 5, tackFail: 2, jibeSuccess: 12, jibeFail: 5 }, inMotionS: 3100, movingDistanceM: 23_500.5 }),
+    // Fiches de l'application complète (course, vélo, fractionné), telles que cette version les relit : sans calcul,
+    // leur `sport` brut gardé à part pour l'écriture (`library/record.ts`, lot 305).
     course: sessionRecord({
-      gpx: '2026-09-23_14-00-00_course.gpx', sport: 'running', activityId: 'course', name: 'Footing',
+      gpx: '2026-09-23_14-00-00_course.gpx', sport: null, activityId: 'course', name: 'Footing',
       notes: { ...notes, gear }, analysis: analysis({ activeThreshold: 1.2, loadKg: 4.5, speedRange: { minMs: 2, maxMs: 5 } }),
       terrainElevation, marks,
     }, { elevationGainM: 412.4, heartRate, cadence: { avgSpm: 172.5, steps: 9800 }, movingDistanceM: 11_000 }),
     velo: sessionRecord({
-      gpx: '2026-09-23_14-00-00_route.gpx', sport: 'cycling', activityId: 'route', analysis: analysis({ bikeWeightKg: 9.8, speedRange: { minMs: 4, maxMs: 16 } }),
+      gpx: '2026-09-23_14-00-00_route.gpx', sport: null, activityId: 'route', analysis: analysis({ bikeWeightKg: 9.8, speedRange: { minMs: 4, maxMs: 16 } }),
       surfaces: {
         source: 'overpass', fetchedAt: '2026-10-04T15:00:00.000Z', matchVersion: 3, startMs: START_MS,
         tags: ['highway=residential', 'highway=track|surface=gravel'], runs: Array.from({ length: 300 }, (_, i): [number, number] => [i * 12_000, (i % 3) - 1]),
@@ -127,7 +128,7 @@ export const familyRecords = (): Record<string, SessionRecord> => {
       analysis: analysis({ foil: true, pumping: true, waveThreshold: 9.5, activeThreshold: 0 }), notes: { ...notes, conditions: '' },
     }, { waveCount: 14, longestWaveM: 182.25, longestFlightS: null, flightS: 640.5 }),
     fractionne: sessionRecord({
-      gpx: '2026-09-23_14-00-00_fractionne.gpx', sport: 'run-intervals', activityId: 'fractionne',
+      gpx: '2026-09-23_14-00-00_fractionne.gpx', sport: null, activityId: 'fractionne',
       analysis: analysis({ effortThresholdMs: 4.35 }),
       intervals: [{
         workout: { reps: 3, workS: 60, restS: 30 },

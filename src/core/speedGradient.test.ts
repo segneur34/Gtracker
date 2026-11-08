@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { SLOW_COLOR, gradientColor, speedGradientColor } from './speedGradient';
-import { SPORT_PROFILES } from './sportProfiles';
 
 // Repris de l'ancien test des analyses de course (lot 303) : le dégradé de vitesse est commun à tous les supports.
 describe('dégradé de vitesse', () => {
-  const { minMs, maxMs } = SPORT_PROFILES.running.speedRange;
   const kmh = (v: number) => v / 3.6;
+  // Bornes de l'ancienne course : 4 et 15 km/h.
+  const { minMs, maxMs } = { minMs: kmh(4), maxMs: kmh(15) };
 
   it('met la marche en gris', () => {
     expect(speedGradientColor(kmh(3), minMs, maxMs)).toBe(SLOW_COLOR);

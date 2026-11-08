@@ -1,4 +1,3 @@
-import { hasPositions } from '../core/sportProfiles';
 import type { LibrarySession } from './record';
 
 /**
@@ -27,15 +26,11 @@ type Sortable = Pick<LibrarySession, 'record'>;
 
 /** Valeur de tri d'une session, `null` si elle n'en a pas pour ce tri. */
 const sortValue = (session: Sortable, sort: SessionSort): number | null => {
-  const { summary, sport } = session.record;
+  const { summary } = session.record;
   let value: number;
   if (sort === 'recent') value = summary.startMs;
   else if (sort === 'duration') value = summary.endMs - summary.startMs;
-  else {
-    // Sans trace (muscu), ni distance ni vitesse.
-    if (sport !== null && !hasPositions(sport)) return null;
-    value = sort === 'distance' ? summary.distanceM : summary.maxSpeedMs;
-  }
+  else value = sort === 'distance' ? summary.distanceM : summary.maxSpeedMs;
   return Number.isFinite(value) ? value : null;
 };
 

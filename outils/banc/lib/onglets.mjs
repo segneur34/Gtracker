@@ -14,10 +14,7 @@
 /** Analyse → clés de `tracker.sections` où ses onglets étaient retenus. */
 const MODULES = {
   '/voile/analyse': ['sailing-onglets'],
-  '/course/analyse': ['running'],
-  '/velo/analyse': ['cycling'],
-  // Muscu sans analyse depuis le lot 302 (session sans position renvoyée à la bibliothèque).
-  '/fractionne/analyse': ['intervals'],
+  // Course, vélo et Entraînement sans analyse depuis les lots 302, 303 et 305.
   '/surf/analyse': ['surf'],
 };
 

@@ -48,7 +48,7 @@ const mockPlatform = (): void => {
         rawPoints: [...text.matchAll(/<trkpt lat="([\d.]+)" lon="([\d.]+)"><time>([^<]+)<\/time>/g)]
           .map((m) => ({ lat: Number(m[1]), lon: Number(m[2]), time: m[3] })),
         timedPoints: [],
-        trackType: 'running',
+        trackType: 'surf',
         hasDeviceSpeed: false,
       };
     },
@@ -72,10 +72,13 @@ const analysis = (patch: Partial<SessionAnalysis>): SessionAnalysis => ({
   pumping: null, waveThreshold: null, bikeWeightKg: null, loadKg: null, savedAt: 1, ...patch,
 });
 
-/** Course sans seuil propre, course au seuil propre, sortie à vélo. */
-const COURSE = '2026-10-27_10-00-00_running.gpx';
-const COURSE_SEUIL = '2026-10-27_10-30-00_running.gpx';
-const VELO = '2026-10-27_11-00-00_cycling.gpx';
+/**
+ * Surf sans seuil propre, surf au seuil propre, sortie en wing (une course, une course au seuil propre et une
+ * sortie à vélo avant le retrait de la terre, lot 305 : les noms des constantes sont restés).
+ */
+const COURSE = '2026-10-27_10-00-00_surf.gpx';
+const COURSE_SEUIL = '2026-10-27_10-30-00_surf.gpx';
+const VELO = '2026-10-27_11-00-00_wingfoil.gpx';
 
 const jsonOf = (gpx: string): string => gpx.replace(/\.gpx$/, '.json');
 
@@ -83,7 +86,7 @@ const jsonOf = (gpx: string): string => gpx.replace(/\.gpx$/, '.json');
 const oldRecord = (gpx: string, hhmm: string, patch: Partial<SessionRecord>): SessionRecord => {
   const startMs = Date.parse(`2026-10-27T${hhmm}:00Z`);
   return {
-    format: RECORD_FORMAT, version: RECORD_VERSION, gpx, sport: 'running', activityId: 'running', source: 'enregistrement',
+    format: RECORD_FORMAT, version: RECORD_VERSION, gpx, sport: 'surf', activityId: 'surf', source: 'enregistrement',
     addedAt: '2026-10-27T12:00:00.000Z', title: null, name: null,
     summary: {
       calcVersion: SUMMARY_CALC_VERSION, startMs, endMs: startMs + 20_000, distanceM: 66, movingTimeS: 20,
@@ -97,7 +100,7 @@ const putSessions = (): void => {
   for (const [gpx, hhmm, patch] of [
     [COURSE, '10:00', {}],
     [COURSE_SEUIL, '10:30', { analysis: analysis({ activeThreshold: 5 }) }],
-    [VELO, '11:00', { sport: 'cycling', activityId: 'cycling' }],
+    [VELO, '11:00', { sport: 'wingfoil', activityId: 'wingfoil' }],
   ] as [string, string, Partial<SessionRecord>][]) {
     files.set(`sessions/${gpx}`, gpxAt(hhmm));
     files.set(`sessions/${jsonOf(gpx)}`, serializeRecord(oldRecord(gpx, hhmm, patch)));
@@ -153,7 +156,7 @@ describe('la session garde ses réglages (Q57)', () => {
   /** L'autre appareil : mêmes fichiers, autre stockage, ses réglages datés (ce n'est pas un appareil neuf, qui reprendrait ceux du dossier). */
   const otherDevice = (threshold: number): void => {
     stored.clear();
-    stored.set('tracker.sportSettings', JSON.stringify({ thresholds: { running: threshold } }));
+    stored.set('tracker.sportSettings', JSON.stringify({ thresholds: { surf: threshold } }));
     stored.set('tracker.settingsSavedAt', JSON.stringify(Date.now()));
   };
 
@@ -161,7 +164,7 @@ describe('la session garde ses réglages (Q57)', () => {
     putSessions();
     const first = await openFresh();
     await settle(first.library);
-    setThreshold(first.settings, 'running', 4);
+    setThreshold(first.settings, 'surf', 4);
     await first.library.queueOutdatedRefresh();
     const carried = diskRecord(COURSE).summary;
     expect(carried.activitySettings?.threshold).toBe(4);
@@ -171,7 +174,7 @@ describe('la session garde ses réglages (Q57)', () => {
     log.length = 0;
     const second = await openFresh();
     await settle(second.library);
-    expect(second.settings.readStoredSettings().thresholds?.running).toBe(7);
+    expect(second.settings.readStoredSettings().thresholds?.surf).toBe(7);
     expect(recordWrites()).toEqual([]);
     expect(gpxReads()).toEqual([]);
     expect(second.library.librarySession(COURSE)!.record.summary.activitySettings?.threshold).toBe(4);
@@ -183,7 +186,7 @@ describe('la session garde ses réglages (Q57)', () => {
     expect(recordWrites()).toEqual([]);
 
     // Le geste sur le second appareil : ses courses, une fois.
-    setThreshold(third.settings, 'running', 8);
+    setThreshold(third.settings, 'surf', 8);
     await third.library.queueOutdatedRefresh();
     expect(recordWrites().sort()).toEqual([COURSE, COURSE_SEUIL].map(jsonOf).sort());
     expect(diskRecord(COURSE).summary.activitySettings?.threshold).toBe(8);
@@ -197,10 +200,10 @@ describe('la session garde ses réglages (Q57)', () => {
     putSessions();
     const first = await openFresh();
     await settle(first.library);
-    setThreshold(first.settings, 'running', 4);
+    setThreshold(first.settings, 'surf', 4);
     // Fermée avant que rien ne soit refait, mais après que le geste a été vu : la référence a déjà suivi.
     stored.set('tracker.summaryGestures', JSON.stringify({
-      baseline: { ...gestures().baseline, running: { threshold: 4 } }, pending: { running: { threshold: 4 } },
+      baseline: { ...gestures().baseline, surf: { threshold: 4 } }, pending: { surf: { threshold: 4 } },
     }));
 
     log.length = 0;
@@ -221,9 +224,9 @@ describe('la session garde ses réglages (Q57)', () => {
     await settle(first.library);
     const good = files.get(`sessions/${COURSE}`)!;
     files.set(`sessions/${COURSE}`, 'illisible');
-    setThreshold(first.settings, 'running', 4);
+    setThreshold(first.settings, 'surf', 4);
     await first.library.queueOutdatedRefresh();
-    expect(gestures().pending).toEqual({ running: { threshold: 4 } });
+    expect(gestures().pending).toEqual({ surf: { threshold: 4 } });
 
     files.set(`sessions/${COURSE}`, good);
     log.length = 0;
@@ -237,20 +240,20 @@ describe('la session garde ses réglages (Q57)', () => {
     putSessions();
     const first = await openFresh();
     await settle(first.library);
-    setThreshold(first.settings, 'running', 4);
+    setThreshold(first.settings, 'surf', 4);
     await first.library.queueOutdatedRefresh();
     // Le fichier de réglages du premier appareil reste dans le dossier, avec le seuil 9.
     const settingsPath = [...files.keys()].find((path) => path.startsWith('reglages/'))!;
     const file = JSON.parse(files.get(settingsPath)!);
     file.savedAt = Date.now();
-    file.values['tracker.sportSettings'] = { thresholds: { running: 9 } };
+    file.values['tracker.sportSettings'] = { thresholds: { surf: 9 } };
     files.set(settingsPath, JSON.stringify(file));
 
     stored.clear();
     log.length = 0;
     const second = await openFresh();
     await settle(second.library);
-    expect(second.settings.readStoredSettings().thresholds?.running).toBe(9);
+    expect(second.settings.readStoredSettings().thresholds?.surf).toBe(9);
     expect(recordWrites()).toEqual([]);
     expect(gestures().pending).toEqual({});
     expect(diskRecord(COURSE).summary.activitySettings?.threshold).toBe(4);
@@ -262,10 +265,10 @@ describe('la session garde ses réglages (Q57)', () => {
     await settle(first.library);
     // Le fichier de réglages de l'appareil part 2 s après un changement : on n'en dépend pas, on le récrit à la main sous un autre appareil.
     const own = JSON.parse(files.get([...files.keys()].find((path) => path.startsWith('reglages/'))!)!);
-    const other = { ...own, device: { id: 'autre-appareil', name: 'Autre' }, values: { ...own.values, 'tracker.sportSettings': { thresholds: { running: 9 } } } };
+    const other = { ...own, device: { id: 'autre-appareil', name: 'Autre' }, values: { ...own.values, 'tracker.sportSettings': { thresholds: { surf: 9 } } } };
     files.set('reglages/autre.json', JSON.stringify(other));
     await first.library.adoptSettingsFile('autre.json');
-    expect(first.settings.readStoredSettings().thresholds?.running).toBe(9);
+    expect(first.settings.readStoredSettings().thresholds?.surf).toBe(9);
 
     log.length = 0;
     const second = await openFresh();
@@ -277,24 +280,24 @@ describe('la session garde ses réglages (Q57)', () => {
 
   it('pré-réglages mis à jour avant la fin d\'une ouverture lente, à la toute première comparaison : un geste quand même', async () => {
     putSessions();
-    const keyed = oldRecord(COURSE, '10:00', {});
-    files.set(`sessions/${jsonOf(COURSE)}`, serializeRecord({ ...keyed, summary: { ...keyed.summary, optionsKey: JSON.stringify([7, null, null, null]) } }));
-    // Réglages d'une version d'avant : le seuil de Course sera effacé par la mise à jour des pré-réglages.
-    stored.set('tracker.sportSettings', JSON.stringify({ thresholds: { running: 7 }, presetsVersion: 0 }));
+    const keyed = oldRecord(VELO, '11:00', { sport: 'wingfoil', activityId: 'wingfoil' });
+    files.set(`sessions/${jsonOf(VELO)}`, serializeRecord({ ...keyed, summary: { ...keyed.summary, optionsKey: JSON.stringify([7, null, null, null]) } }));
+    // Réglages d'une version d'avant : le seuil de la wing sera effacé par la mise à jour des pré-réglages.
+    stored.set('tracker.sportSettings', JSON.stringify({ thresholds: { wingfoil: 7 }, presetsVersion: 0 }));
     vi.resetModules();
     mockPlatform();
     const library = await import('./useSessionLibrary');
     const settings = await import('./useSportSettings');
     const opening = library.openLibrary();
     expect(settings.upgradeStoredPresets()).toBe(true);
-    expect(settings.readStoredSettings().thresholds?.running).toBeUndefined();
+    expect(settings.readStoredSettings().thresholds?.wingfoil).toBeUndefined();
     await opening;
     await settle(library);
     await library.settingsUpgraded();
     await settle(library);
-    for (let i = 0; i < 500 && diskRecord(COURSE).summary.activitySettings === undefined; i++) await tick();
-    expect(diskRecord(COURSE).summary.activitySettings?.threshold).not.toBe(7);
-    expect(diskRecord(COURSE).summary.activitySettings).toBeDefined();
+    for (let i = 0; i < 500 && diskRecord(VELO).summary.activitySettings === undefined; i++) await tick();
+    expect(diskRecord(VELO).summary.activitySettings?.threshold).not.toBe(7);
+    expect(diskRecord(VELO).summary.activitySettings).toBeDefined();
     expect(gestures().pending).toEqual({});
   });
 
@@ -302,7 +305,7 @@ describe('la session garde ses réglages (Q57)', () => {
     putSessions();
     const first = await openFresh();
     await settle(first.library);
-    setThreshold(first.settings, 'running', 4);
+    setThreshold(first.settings, 'surf', 4);
     await first.library.queueOutdatedRefresh();
     const kept = stored.get('tracker.summaryGestures');
     const settings = stored.get('tracker.sportSettings')!;
@@ -327,12 +330,12 @@ describe('la session garde ses réglages (Q57)', () => {
     putSessions();
     const first = await openFresh();
     await settle(first.library);
-    setThreshold(first.settings, 'running', 4);
+    setThreshold(first.settings, 'surf', 4);
     await first.library.queueOutdatedRefresh();
     log.length = 0;
     first.settings.updateStoredSettings((settings) => ({
       ...settings,
-      activities: first.settings.readStoredActivities().filter((a) => a.id !== 'running'),
+      activities: first.settings.readStoredActivities().filter((a) => a.id !== 'surf'),
     }));
     await first.library.queueOutdatedRefresh();
     expect(recordWrites()).toEqual([]);
@@ -343,11 +346,11 @@ describe('la session garde ses réglages (Q57)', () => {
     putSessions();
     const gpx = COURSE_SEUIL;
     const old = oldRecord(gpx, '10:30', { analysis: analysis({ activeThreshold: 12 }) });
-    const key = JSON.stringify([12, null, null, null]);
+    const key = JSON.stringify([12, null, false, null]);
     files.set(`sessions/${jsonOf(gpx)}`, serializeRecord({ ...old, summary: { ...old.summary, optionsKey: key } }));
     const { library, settings } = await openFresh();
     await settle(library);
-    setThreshold(settings, 'running', 6);
+    setThreshold(settings, 'surf', 6);
     await library.queueOutdatedRefresh();
     log.length = 0;
     library.updateSessionRecord(gpx, { analysis: analysis({ activeThreshold: null, savedAt: 2 }) });
@@ -362,10 +365,10 @@ describe('la session garde ses réglages (Q57)', () => {
     putSessions();
     const { library, settings } = await openFresh();
     await settle(library);
-    setThreshold(settings, 'running', 4);
+    setThreshold(settings, 'surf', 4);
     await library.queueOutdatedRefresh();
     log.length = 0;
-    const walking = settings.readStoredActivities().find((a) => a.id !== 'running' && a.base === 'running');
+    const walking = settings.readStoredActivities().find((a) => a.id !== 'surf' && a.base === 'surf');
     expect(walking).toBeDefined();
     setThreshold(settings, walking!.id, 2);
     library.updateSessionRecord(COURSE, { activityId: walking!.id });
@@ -397,7 +400,7 @@ describe('résumés refaits quand les réglages changent (lot 37)', () => {
     putSessions();
     const first = await openFresh();
     await settle(first.library);
-    setThreshold(first.settings, 'running', 4);
+    setThreshold(first.settings, 'surf', 4);
 
     const ownBefore = diskRecord(COURSE_SEUIL).summary;
     log.length = 0;
@@ -423,7 +426,7 @@ describe('résumés refaits quand les réglages changent (lot 37)', () => {
     await library.queueOutdatedRefresh();
     expect(log.filter((l) => l.startsWith('read ') || l.startsWith('write '))).toEqual([]);
 
-    setThreshold(settings, 'running', 4);
+    setThreshold(settings, 'surf', 4);
     await library.queueOutdatedRefresh();
     expect(gpxReads().sort()).toEqual([COURSE, COURSE_SEUIL].sort());
     expect(recordWrites().sort()).toEqual([COURSE, COURSE_SEUIL].map(jsonOf).sort());
@@ -431,13 +434,13 @@ describe('résumés refaits quand les réglages changent (lot 37)', () => {
     // Le GPX du vélo devient illisible : tenté une fois, signalé, puis laissé jusqu'à la prochaine ouverture.
     files.set(`sessions/${VELO}`, 'illisible');
     log.length = 0;
-    setThreshold(settings, 'cycling', 15);
+    setThreshold(settings, 'wingfoil', 15);
     await library.queueOutdatedRefresh();
     expect(gpxReads()).toEqual([VELO]);
     expect(recordWrites()).toEqual([]);
     expect(library.readLibraryState().unreadable).toEqual([VELO]);
     log.length = 0;
-    setThreshold(settings, 'cycling', 16);
+    setThreshold(settings, 'wingfoil', 16);
     await library.queueOutdatedRefresh();
     expect(gpxReads()).toEqual([]);
     expect(library.readLibraryState().unreadable).toEqual([VELO]);
@@ -454,8 +457,8 @@ describe('résumés refaits quand les réglages changent (lot 37)', () => {
 
     log.length = 0;
     // Saisie touche à touche : un seul recalcul, avec le dernier seuil.
-    setThreshold(settings, 'running', 3);
-    setThreshold(settings, 'running', 4);
+    setThreshold(settings, 'surf', 3);
+    setThreshold(settings, 'surf', 4);
     await new Promise((r) => setTimeout(r, 1000));
     expect(gpxReads()).toEqual([]);
     let seen = 0;

@@ -124,8 +124,8 @@ describe('bords du direct', () => {
     expect(current?.headingDeg).toBeNull();
   });
 
-  it('ne calcule pas de bords en course à pied', () => {
-    const stats = computeLiveStats([tack()], SPORT_PROFILES.running);
+  it('ne calcule pas de bords en surf', () => {
+    const stats = computeLiveStats([tack()], SPORT_PROFILES.surf);
     expect(stats.legs).toEqual({ current: null, previous: null });
   });
 });

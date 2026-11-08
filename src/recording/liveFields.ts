@@ -3,14 +3,15 @@ import { bandIndex } from '../core/basics';
 import { sportTreatment, type Treatment } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import {
-  J_PER_KCAL, formatClock, formatDistance, formatShortDistance, formatSpeed, formatTimeOfDay, isInverseUnit, type DistanceUnit, type SpeedUnit, formatDecimal
+  formatClock, formatDistance, formatShortDistance, formatSpeed, formatTimeOfDay, isInverseUnit, type DistanceUnit, type SpeedUnit,
 } from '../core/units';
 import { LIVE_STATS_DEFAULTS, type LiveStats, type LiveStatsOptions } from './liveStats';
 
 /**
  * Chiffres en grand de l'enregistrement quand la carte est réduite, choisis
  * par activité dans Réglages : jusqu'à `MAX_LIVE_FIELDS`, parmi ceux qui ont
- * un sens pour son traitement (le fractionné à pied a ceux de la course).
+ * un sens pour son traitement. Un chiffre de la terre (pente, D+, puissance,
+ * énergie) rangé par l'application complète est écarté à la lecture.
  * Ceux de la notification de l'enregistrement viennent du même catalogue,
  * choisis à part, `MAX_NOTIFICATION_FIELDS` au plus, avec en plus ceux qui
  * ne vont qu'à elle (`NOTIFICATION_ONLY_FIELDS`). Libellés et valeurs sont
@@ -21,12 +22,9 @@ export type LiveFieldKey =
   | 'speed' | 'average' | 'max' | 'recentDistanceSpeed' | 'lastDistance' | 'distance' | 'duration' | 'clock'
   | 'remaining' | 'remainingTime'
   | 'recentTopShort' | 'recentTopLong' | 'heading' | 'legAverage' | 'markDistance' | 'markBearing'
-  | 'grade' | 'gain' | 'recentDistanceGain' | 'loss' | 'climbRate' | 'power' | 'effort' | 'heartRate' | 'averageHeartRate' | 'heartRateZone';
+  | 'heartRate' | 'averageHeartRate' | 'heartRateZone';
 
-const ALL: Treatment[] = ['voile', 'course', 'velo', 'surf'];
-const LAND: Treatment[] = ['course', 'velo'];
-/** Chiffres sans position : la FC et le temps, seuls proposés à la muscu (lot I du 25/10). */
-const WITH_MUSCU: Treatment[] = [...ALL, 'muscu'];
+const ALL: Treatment[] = ['voile', 'surf'];
 
 /** Traitements où chaque chiffre a un sens ; l'ordre est celui des menus de Réglages. */
 const LIVE_FIELD_TREATMENTS: Record<LiveFieldKey, readonly Treatment[]> = {
@@ -41,19 +39,12 @@ const LIVE_FIELD_TREATMENTS: Record<LiveFieldKey, readonly Treatment[]> = {
   heading: ['voile'],
   markDistance: ['voile', 'surf'],
   markBearing: ['voile', 'surf'],
-  grade: LAND,
-  gain: LAND,
-  recentDistanceGain: LAND,
-  loss: LAND,
-  climbRate: LAND,
-  power: LAND,
-  effort: LAND,
-  heartRate: WITH_MUSCU,
-  averageHeartRate: WITH_MUSCU,
-  heartRateZone: WITH_MUSCU,
+  heartRate: ALL,
+  averageHeartRate: ALL,
+  heartRateZone: ALL,
   distance: ALL,
-  duration: WITH_MUSCU,
-  clock: WITH_MUSCU,
+  duration: ALL,
+  clock: ALL,
   remaining: ALL,
   remainingTime: ALL,
 };
@@ -79,13 +70,10 @@ export const liveFieldsOfTreatment = (treatment: Treatment, target: LiveFieldTar
 /** Nombre de lignes au plus. */
 export const MAX_LIVE_FIELDS = 4;
 
-/** Lignes à défaut de choix : en course, les 300 derniers mètres plutôt que la pointe de 2 s. */
+/** Lignes à défaut de choix. */
 export const DEFAULT_LIVE_FIELDS: Record<Treatment, LiveFieldKey[]> = {
   voile: ['speed', 'average', 'max'],
-  course: ['speed', 'average', 'recentDistanceSpeed'],
-  velo: ['speed', 'average', 'max'],
   surf: ['speed', 'max', 'duration'],
-  muscu: ['heartRate', 'heartRateZone', 'averageHeartRate', 'duration'],
 };
 
 /**
@@ -103,14 +91,10 @@ export const defaultLiveFieldsOf = (sport: SportType): LiveFieldKey[] =>
 /** Chiffres de la notification de l'enregistrement au plus : écran verrouillé, Android coupe la ligne au-delà de deux. */
 export const MAX_NOTIFICATION_FIELDS = 2;
 
-/** Chiffres de la notification à défaut de choix, les mêmes pour tous les traitements à positions. */
+/** Chiffres de la notification à défaut de choix, les mêmes pour tous les traitements. */
 export const DEFAULT_NOTIFICATION_FIELDS: Record<Treatment, LiveFieldKey[]> = {
   voile: ['speed', 'distance'],
-  course: ['speed', 'distance'],
-  velo: ['speed', 'distance'],
   surf: ['speed', 'distance'],
-  // La FC et la durée : ni vitesse ni distance sans position.
-  muscu: ['heartRate', 'duration'],
 };
 
 /** Chiffres de la notification propres à un calcul, avant ceux de son traitement ; aucun pour l'instant. */
@@ -176,13 +160,6 @@ export const liveFieldLabel = (key: LiveFieldKey, { speedUnit, distanceUnit, opt
     case 'legAverage': return 'Moyenne du bord';
     case 'markDistance': return 'Balise';
     case 'markBearing': return 'Cap balise';
-    case 'grade': return 'Pente';
-    case 'gain': return 'D+';
-    case 'recentDistanceGain': return `D+ ${options.recentDistanceM} derniers m`;
-    case 'loss': return 'D−';
-    case 'climbRate': return 'Vitesse ascensionnelle';
-    case 'power': return `Puissance (${options.powerWindowS} s)`;
-    case 'effort': return 'Énergie';
     case 'heartRate': return 'Fréquence cardiaque';
     case 'averageHeartRate': return 'FC moyenne';
     case 'heartRateZone': return 'Zone cardiaque';
@@ -210,13 +187,6 @@ export const liveFieldShortLabel = (key: LiveFieldKey, { speedUnit, distanceUnit
     case 'legAverage': return 'Bord';
     case 'markDistance': return 'Balise';
     case 'markBearing': return 'Cap bal.';
-    case 'grade': return 'Pente';
-    case 'gain': return 'D+';
-    case 'recentDistanceGain': return `D+ ${options.recentDistanceM} m`;
-    case 'loss': return 'D−';
-    case 'climbRate': return 'Asc.';
-    case 'power': return 'Puiss.';
-    case 'effort': return 'Énergie';
     case 'heartRate': return 'FC';
     case 'averageHeartRate': return 'FC moy.';
     case 'heartRateZone': return 'Zone';
@@ -244,15 +214,6 @@ export interface LiveFieldContext extends LiveFieldUnits {
 
 const NONE = '—';
 
-const formatMeters = (m: number | null): string => (m === null ? NONE : `${Math.round(m)} m`);
-
-/** Pente en pour cent, signée. */
-const formatGrade = (grade: number | null): string => {
-  if (grade === null) return NONE;
-  const percent = Math.round(grade * 100);
-  return percent > 0 ? `+${percent} %` : percent < 0 ? `−${-percent} %` : '0 %';
-};
-
 /** Valeur d'un chiffre, formatée dans les unités de l'activité ; « — » quand elle manque. */
 export const liveFieldValue = (key: LiveFieldKey, ctx: LiveFieldContext): string => {
   const { stats, speedUnit, distanceUnit } = ctx;
@@ -277,19 +238,6 @@ export const liveFieldValue = (key: LiveFieldKey, ctx: LiveFieldContext): string
     case 'legAverage': return stats.legs.current ? formatSpeed(stats.legs.current.averageSpeedMs, speedUnit, distanceUnit) : NONE;
     case 'markDistance': return ctx.markDistanceM === null ? NONE : formatShortDistance(ctx.markDistanceM, distanceUnit);
     case 'markBearing': return ctx.markBearingDeg === null ? NONE : `${roundBearingDeg(ctx.markBearingDeg)}°`;
-    case 'grade': return formatGrade(stats.currentGrade);
-    case 'gain': return formatMeters(stats.elevationGainM);
-    case 'recentDistanceGain': return formatMeters(stats.recentDistanceGainM);
-    case 'loss': return formatMeters(stats.elevationLossM);
-    case 'climbRate': return stats.climbRateMh === null ? NONE : `${Math.round(stats.climbRateMh)} m/h`;
-    case 'power':
-      if (stats.recentPowerW === null) return NONE;
-      return stats.energyPerKg ? `${formatDecimal(stats.recentPowerW, 1)} W/kg` : `${Math.round(stats.recentPowerW)} W`;
-    case 'effort': {
-      if (stats.effortJ === null) return NONE;
-      const kcal = stats.effortJ / J_PER_KCAL;
-      return stats.energyPerKg ? `${formatDecimal(kcal, 1)} kcal/kg` : `${Math.round(kcal)} kcal`;
-    }
     case 'heartRate': return ctx.heartRateBpm === null ? NONE : `${Math.round(ctx.heartRateBpm)} bpm`;
     case 'averageHeartRate': return stats.averageHeartRateBpm === null ? NONE : `${Math.round(stats.averageHeartRateBpm)} bpm`;
     case 'heartRateZone': {

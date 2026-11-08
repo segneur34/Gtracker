@@ -1,28 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_ACTIVITIES, GRAVEL_ACTIVITY, MARCHE_ACTIVITY, SURF_ACTIVITY, SURF_FOIL_ACTIVITY, VTT_ACTIVITY, baseActivity } from '../core/activities';
+import { DEFAULT_ACTIVITIES, SURF_ACTIVITY, SURF_FOIL_ACTIVITY } from '../core/activities';
 import { PRESET_BASES, presetOf } from './activityPresets';
-import { kmhToMs, knotsToMs } from '../core/units';
+import { knotsToMs } from '../core/units';
 
 describe('presetOf', () => {
-  it('une activité de départ qui a son pré-réglage le garde en entier, sans reprendre celui du calcul', () => {
-    const marche = presetOf(MARCHE_ACTIVITY);
-    expect(marche.threshold).toBe(0);
-    expect(marche.energyModel).toBe('marche');
-    expect(presetOf(baseActivity('running')).energyModel).toBeUndefined();
-    expect(marche.heartRate).toBeUndefined(); // la course, elle, le porte
-    expect(presetOf(baseActivity('running')).heartRate).toBe(true);
-    expect(presetOf(GRAVEL_ACTIVITY).bikeType).toBe('gravel');
-    expect(presetOf(VTT_ACTIVITY).tabs).toEqual({ tops: false });
-  });
-
-  it('une activité créée par l\'utilisateur prend le pré-réglage de son calcul', () => {
-    const trail = { id: 'a-trail', name: 'Trail', base: 'running' as const };
-    expect(presetOf(trail)).toBe(presetOf(baseActivity('running')));
-    expect(presetOf(trail).wayTypes).toEqual(['sentier', 'piste']);
-    const fixie = { id: 'a-fixie', name: 'Fixie', base: 'cycling' as const };
-    expect(presetOf(fixie).bikeKg).toBe(12);
-  });
-
   it('une activité créée sur le wingfoil ou la planche reprend les 8 nœuds', () => {
     for (const base of ['wingfoil', 'windsurf'] as const) {
       const p = presetOf({ id: `a-${base}-2`, base });
@@ -41,57 +22,34 @@ describe('presetOf', () => {
     const a = presetOf({ id: 'a-surf-2', base: 'surf' });
     expect(a).toEqual({});
     expect(presetOf({ id: 'autre', base: 'surf' })).toBe(a);
+    expect(presetOf({ id: 'a-bateau', base: 'bateau' })).toBe(a);
   });
 
-  it("sauts mesurés d'office en voile (wing, planche, kite) et au VTT, pas ailleurs (05/11)", () => {
+  it("sauts mesurés d'office en voile (wing, planche, kite), pas ailleurs (05/11)", () => {
     for (const base of ['wingfoil', 'windsurf', 'kite'] as const) {
       expect(presetOf({ id: `a-${base}-2`, base }).jumps?.enabled).toBe(true);
     }
     expect(presetOf({ id: 'a-kite', base: 'kite' }).jumps).toEqual({ enabled: true, placement: 'poitrine', minHeightM: 1 });
-    expect(presetOf(VTT_ACTIVITY).jumps).toEqual({ enabled: true, placement: 'poitrine', minHeightM: 0.3 });
-    for (const activity of DEFAULT_ACTIVITIES.filter((a) => a.id !== VTT_ACTIVITY.id && a.base !== 'wingfoil')) {
+    for (const activity of DEFAULT_ACTIVITIES.filter((a) => a.base !== 'wingfoil')) {
       expect(presetOf(activity).jumps?.enabled ?? false).toBe(false);
     }
   });
 
-  it('chaque pré-réglage de calcul porte des bornes de couleur croissantes et des unités connues', () => {
+  it('chaque pré-réglage de calcul porte des bornes de couleur croissantes', () => {
     for (const base of PRESET_BASES) {
       const p = presetOf({ id: `test-${base}`, base });
       if (p.speedRangeMs) expect(p.speedRangeMs.minMs).toBeLessThan(p.speedRangeMs.maxMs);
-      if (p.gradeRange) expect(p.gradeRange.min).toBeLessThan(p.gradeRange.max);
       if (p.autoPause) expect(p.autoPause.delayS).toBeGreaterThan(0);
     }
   });
 
   it('toutes les activités de départ rendent un pré-réglage sans surprise', () => {
     for (const activity of DEFAULT_ACTIVITIES) expect(() => presetOf(activity)).not.toThrow();
-    expect(presetOf(MARCHE_ACTIVITY).pace?.customFlatSpeedMs).toBeCloseTo(kmhToMs(5), 9);
-  });
-});
-
-describe("notification de l'Entraînement (26/10)", () => {
-  it("fractionné à pied, à vélo et tests : la vitesse et la FC (l'étape est partie au lot 302), deux chiffres au plus", () => {
-    for (const base of ['run-intervals', 'bike-intervals', 'run-test'] as const) {
-      expect(presetOf(baseActivity(base)).notificationFields).toEqual(['speed', 'heartRate']);
-      // Une activité créée sur ces calculs les reprend.
-      expect(presetOf({ id: `a-${base}-2`, base }).notificationFields).toEqual(['speed', 'heartRate']);
-    }
-    expect(presetOf(baseActivity('running')).notificationFields).toBeUndefined();
-  });
-
-  it('muscu : ceinture d’office, FC et durée en direct comme dans la notification (lot I du 25/10)', () => {
-    const muscu = presetOf(baseActivity('muscu'));
-    expect(muscu.heartRate).toBe(true);
-    expect(muscu.liveFields).toEqual(['heartRate', 'heartRateZone', 'averageHeartRate', 'duration']);
-    expect(muscu.notificationFields).toEqual(['heartRate', 'duration']);
-    expect(muscu.speedRangeMs).toBeUndefined();
-    expect(PRESET_BASES).toContain('muscu');
   });
 });
 
 describe('PRESET_BASES', () => {
-  it('liste les calculs qui ont un pré-réglage, voile à la planche comprise, le kite pour ses sauts (05/11)', () => {
-    expect(PRESET_BASES).toEqual(expect.arrayContaining(['wingfoil', 'windsurf', 'kite', 'running', 'cycling', 'run-intervals', 'run-test', 'bike-intervals']));
-    expect(PRESET_BASES).not.toContain('bateau');
+  it('liste les calculs qui ont un pré-réglage : wing, planche, et le kite pour ses sauts (05/11)', () => {
+    expect(PRESET_BASES).toEqual(['wingfoil', 'windsurf', 'kite']);
   });
 });

@@ -110,9 +110,9 @@ function App() {
           {/* Course et vélo retirés de cette version (lot 303) : bibliothèques et analyses mènent à l'accueil. */}
           <Route path="/course/*" element={<Navigate to="/" replace />} />
           <Route path="/velo/*" element={<Navigate to="/" replace />} />
-          {/* Entraînement retiré (lot 302) : sa bibliothèque reste lisible, ses sessions n'ont plus d'analyse (lot 303). */}
-          <Route path="/fractionne" element={<SessionLibrary key="fractionne" family="fractionne" />} />
-          <Route path="/fractionne/analyse" element={<Navigate to="/fractionne" replace />} />
+          {/* Entraînement retiré (lot 302), sa bibliothèque aussi (lot 305) : vers l'accueil, comme la course. */}
+          <Route path="/fractionne" element={<Navigate to="/" replace />} />
+          <Route path="/fractionne/analyse" element={<Navigate to="/" replace />} />
           {/* Ancienne adresse du test de FC repos, passé sous le Profil (lot 301). */}
           <Route path="/fractionne/tests/fc-repos" element={<RestingHrRedirect />} />
           {/* Pages de l'Entraînement retirées (lot 302 : séances, timer, tests) : vers l'accueil. */}

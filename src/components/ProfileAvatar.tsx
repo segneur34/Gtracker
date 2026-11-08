@@ -19,10 +19,7 @@ import './ProfileAvatar.css';
 /** Famille de chaque dessin : sa couleur de fond. */
 const ICON_FAMILY: Record<ActivityIconId, SportFamily> = {
   bateau: 'voile', planche: 'voile', wingfoil: 'voile', kite: 'voile',
-  course: 'course', marche: 'course',
-  route: 'velo', vtt: 'velo', gravel: 'velo',
   surf: 'surf', 'surf-foil': 'surf', kayak: 'surf', paddle: 'surf', 'paddle-foil': 'surf',
-  'fractionne-velo': 'fractionne', 'fractionne-pied': 'fractionne',
 };
 
 interface AvatarFallback {

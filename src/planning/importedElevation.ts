@@ -23,6 +23,12 @@ import { routePoints, type PlannedRoute, type RouteLeg, type RoutePoint } from '
  */
 export const IMPORT_MAX_OFFSET_M = 30;
 
+/**
+ * Pas des échantillons de l'IGN demandés pour un GPX chargé sans activité, en mètres : celui de l'ancien calcul de
+ * la course (lot 305) ; une activité de voile ou de surf n'en demande aucun (planificateur routier : lot 304).
+ */
+export const PLANNING_TERRAIN_STEP_M = 10;
+
 /** Écart sous lequel la recherche près du dernier point trouvé suffit, sinon elle repart de tout le tracé. Dix mètres : trois fois l'écart d'une trace bien suivie, un point perdu (demi-tour, saut) le dépasse. */
 const NEAR_M = 10;
 

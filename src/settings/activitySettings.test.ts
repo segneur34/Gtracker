@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ACTIVITIES, type Activity } from '../core/activities';
 import { analysisTabs, isTabShown, toggleTabChoice } from '../core/analysisTabs';
-import { getSportProfile, hasActiveThreshold, TERRAIN_STEP_CHOICES_M } from '../core/sportProfiles';
+import { getSportProfile, hasActiveThreshold } from '../core/sportProfiles';
 import { isValidGradeRange } from '../planning/grade';
 import { knotsToMs } from '../core/units';
-import { DEFAULT_PACE_LEVEL } from '../planning/duration';
-import { WAY_TYPES } from '../planning/brouterProfile';
-import { BIKE_DEFAULT_KG } from '../core/retiredLand';
 import {
-  PER_ACTIVITY_KEYS, PRESETS_VERSION, TREATMENT_UNITS, defaultAutoPauseOf, defaultBikeKg, defaultBikeType, defaultGradeRange, defaultHeartRateOf,
-  defaultHrOffsetOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultPaceOf, defaultSpeedRangeOf, defaultSpeedUnitOf,
-  defaultTerrainStepOf, defaultThresholdOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, rangeFollowsPace, resetOverrides, resetStoredPresets, resolveJumps, resolveRecordingProfile, resolveThresholdOverride, resolveTurns, defaultTurnsOf,
+  FULL_APP_FAMILY_IDS, PER_ACTIVITY_KEYS, PRESETS_VERSION, TREATMENT_UNITS, defaultAutoPauseOf, defaultHeartRateOf,
+  defaultHrOffsetOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultSpeedRangeOf, defaultSpeedUnitOf,
+  defaultThresholdOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, rangeFollowsPace, readHiddenFamilies, resetOverrides,
+  resetStoredPresets, resolveJumps, resolveRecordingProfile, resolveThresholdOverride, resolveTurns, defaultTurnsOf, withVisibility,
   SETTING_FIELDS, defaultTabsOf, effectiveHrZoneLines, settingsView, tabsAfterJumpsChange, thresholdFollowsPace, withSetting, type StoredSettings,
 } from './activitySettings';
+
+const byId = (id: string) => DEFAULT_ACTIVITIES.find((a) => a.id === id)!;
+const kiteCree: Activity = { id: 'a-kite', name: 'Kite', base: 'kite', color: '#5b87f2' };
 
 describe('pré-réglages du bateau (21/10)', () => {
   const boat = { id: 'a-voilier', name: 'Voilier', base: 'bateau' as const, color: '#014e86' };
@@ -56,11 +57,11 @@ describe('pré-réglages du bateau (21/10)', () => {
 });
 
 describe('pré-réglages des activités (21/10)', () => {
-  const [voile, course, marche, route, gravel, vtt, surf, , runIntervals, bikeIntervals] = DEFAULT_ACTIVITIES;
+  const voile = byId('wingfoil');
+  const surf = byId('surf');
   const pav = { id: 'a-pav', name: 'Pav', base: 'windsurf' as const, color: '#5b87f2' };
-  const trail = { id: 'a-trail', name: 'Trail', base: 'running' as const, color: '#d42a3c' };
-  const kmh = (ms: number) => Math.round(ms * 3.6 * 10) / 10;
   const kn = (ms: number) => Math.round((ms / knotsToMs(1)) * 10) / 10;
+  const kmh = (ms: number) => Math.round(ms * 3.6 * 10) / 10;
 
   it('wing et planche : 8 nœuds partout, seuil et couleurs fixes', () => {
     for (const activity of [voile, pav]) {
@@ -74,129 +75,100 @@ describe('pré-réglages des activités (21/10)', () => {
       expect(defaultMarkGuideOf(activity).curve.map((p) => p.distanceM)).toEqual([5, 25, 34]);
     }
     // Le kite suit toujours l'allure.
-    const kite = { id: 'a-kite', name: 'Kite', base: 'kite' as const, color: '#1976d2' };
-    expect(thresholdFollowsPace(kite)).toBe(true);
-    expect(rangeFollowsPace(kite)).toBe(true);
+    expect(thresholdFollowsPace(kiteCree)).toBe(true);
+    expect(rangeFollowsPace(kiteCree)).toBe(true);
   });
 
-  it("sans seuil d'activité à pied, à vélo et en fractionné, marche comprise (28/10)", () => {
-    for (const activity of [course, marche, route, gravel, vtt, runIntervals, bikeIntervals, trail]) {
-      expect(defaultThresholdOf(activity, false)).toBe(0);
-    }
-    // Le surf garde ses défauts.
+  it('le surf garde les défauts de son calcul', () => {
     expect(defaultThresholdOf(surf, false)).toBe(getSportProfile('surf').defaultActiveThreshold);
+    expect(defaultHeartRateOf(surf)).toBe(false);
   });
 
-  it('course : km/h, couleurs de 1 à 13, pause sous 0,5 km/h pendant 20 s, ceinture, sentier et piste', () => {
-    expect(defaultSpeedUnitOf(course)).toBe('kmh');
-    const range = defaultSpeedRangeOf(course);
-    expect([kmh(range.minMs), kmh(range.maxMs)]).toEqual([1, 13]);
-    expect(defaultAutoPauseOf(course)).toEqual({ speedMs: 0.5 / 3.6, delayS: 20 });
-    expect(defaultGradeRange(course)).toEqual({ min: 0, max: 0.17 });
-    expect(defaultHeartRateOf(course)).toBe(true);
-    expect(defaultTerrainStepOf(course)).toBe(5);
-    // Une activité créée sur la course prend son pré-réglage.
-    expect(defaultSpeedRangeOf(trail)).toEqual(range);
-  });
-
-  it("la marche a le sien en entier, sans rien reprendre de la course", () => {
-    const range = defaultSpeedRangeOf(marche);
-    expect([kmh(range.minMs), kmh(range.maxMs)]).toEqual([1, 8]);
-    expect(defaultHeartRateOf(marche)).toBe(false);
-    expect(defaultNotificationFieldsFor(marche)).toEqual(['speed', 'heartRate']);
-    const walk = defaultPaceOf(marche);
-    expect(walk.level).toBe('perso');
-    expect(walk.customFlatSpeedMs! * 3.6).toBeCloseTo(5);
-    expect(defaultPaceOf(course)).toEqual({ level: DEFAULT_PACE_LEVEL, customFlatSpeedMs: null });
-  });
-
-  it('vélo : type et poids pré-réglés, le poids du type dès que le type change', () => {
-    expect(defaultBikeType(route)).toBe('route');
-    expect(defaultBikeKg(route, 'route')).toBe(12);
-    expect(defaultBikeKg(route, 'gravel')).toBe(BIKE_DEFAULT_KG.gravel);
-    expect(defaultBikeType(gravel)).toBe('gravel');
-    expect(defaultBikeKg(gravel, 'gravel')).toBe(13);
-    expect(defaultBikeType(vtt)).toBe('vtt');
-    expect(defaultBikeKg(vtt, 'vtt')).toBe(BIKE_DEFAULT_KG.vtt);
-    expect(defaultHeartRateOf(route)).toBe(true);
-    expect(defaultHeartRateOf(gravel)).toBe(false);
-  });
-
-  it('fractionné : chiffres cardio, pause coupée', () => {
-    for (const activity of [runIntervals, bikeIntervals]) {
-      expect(defaultLiveFieldsFor(activity)).toEqual(['speed', 'average', 'heartRate', 'heartRateZone']);
-      expect(defaultAutoPauseOf(activity).speedMs).toBe(0);
-    }
-  });
-
-  it('efface une fois les anciens réglages des sports pré-réglés, pas ceux du kite ni du surf', () => {
+  it('efface une fois les anciens réglages de la wing et de la planche (version 1 → 2), pas ceux du kite ni du surf', () => {
     const stored: StoredSettings = {
       activities: [...DEFAULT_ACTIVITIES, pav],
       presetsVersion: 1,
-      thresholds: { running: 2, 'a-gravel': 2, [pav.id]: 9, kite: 12, surf: 9 },
-      speedRanges: { 'a-route': { minMs: 2, maxMs: 12 }, cycling: { minMs: 2, maxMs: 12 } },
+      thresholds: { wingfoil: 2, [pav.id]: 9, kite: 12, surf: 9 },
       tabs: { [pav.id]: { vent: false } },
-      gearLabels: { running: ['Chaussures', ''] },
+      gearLabels: { surf: ['Planche', ''] },
     };
     const next = resetStoredPresets(stored);
     expect(next.thresholds).toEqual({ kite: 12, surf: 9 });
-    expect(next.speedRanges).toEqual({ 'a-route': { minMs: 2, maxMs: 12 } });
     expect(next.tabs).toEqual({});
     expect(next.gearLabels).toEqual(stored.gearLabels);
   });
 
-  it('efface une fois le seuil rangé de la Marche (version 2 → 3), garde celui de la Course', () => {
+  it('la version 3 (Marche, retirée au lot 305) est sans effet ; la version reste à 5', () => {
     const stored: StoredSettings = {
       activities: [...DEFAULT_ACTIVITIES],
       presetsVersion: 2,
-      thresholds: { [marche.id]: 0.5, running: 2, kite: 12 },
-      speedRanges: { [marche.id]: { minMs: 0.3, maxMs: 2 } },
+      thresholds: { 'a-marche': 0.5, running: 2, kite: 12 },
+      speedRanges: { 'a-marche': { minMs: 0.3, maxMs: 2 } },
     };
     const next = resetStoredPresets(stored);
-    expect(next.thresholds).toEqual({ running: 2, kite: 12 });
+    expect(next.thresholds).toBe(stored.thresholds);
     expect(next.speedRanges).toBe(stored.speedRanges);
     expect(PRESETS_VERSION).toBe(5);
   });
 
-  it('efface une fois la case des sauts du kite et du VTT (version 3 → 4), garde celle des autres', () => {
-    const kiteCree = { id: 'a-kite', name: 'Kite', base: 'kite' as const, color: '#5b87f2' };
+  it("efface une fois la case des sauts du kite (version 3 → 4), garde celle des autres, même au VTT d'un réglage complet", () => {
     const off = { enabled: false, placement: 'poitrine' as const, minHeightM: 1 };
     const stored: StoredSettings = {
       activities: [...DEFAULT_ACTIVITIES, kiteCree],
       presetsVersion: 3,
-      jumps: { kite: off, [kiteCree.id]: off, 'a-vtt': off, cycling: off, wingfoil: off },
+      jumps: { kite: off, [kiteCree.id]: off, 'a-vtt': off, wingfoil: off },
       thresholds: { kite: 12 },
     };
     const next = resetStoredPresets(stored);
-    expect(next.jumps).toEqual({ cycling: off, wingfoil: off });
+    expect(next.jumps).toEqual({ 'a-vtt': off, wingfoil: off });
     expect(next.thresholds).toBe(stored.thresholds);
+  });
+
+  it("la version 5 (onglet « sauts » décoché à terre) est sans effet : rien d'écrit dans les onglets", () => {
+    const stored: StoredSettings = {
+      presetsVersion: 4,
+      tabs: { 'a-marche': { tops: true }, wingfoil: { vent: false }, surf: { rame: false } },
+    };
+    expect(resetStoredPresets(stored)).toBe(stored);
+  });
+});
+
+describe('familles cachées (lecteur à type fermé, lot 305)', () => {
+  it("garde les familles de cette version et celles de l'application complète, écarte les autres", () => {
+    expect(readHiddenFamilies({ hiddenFamilies: ['fractionne', 'ski', 'surf', 'course', 'velo', 3 as never] })).toEqual(['fractionne', 'surf', 'course', 'velo']);
+    expect(readHiddenFamilies({})).toEqual([]);
+    expect(FULL_APP_FAMILY_IDS).toEqual(['course', 'velo', 'fractionne']);
+  });
+
+  it("les réécrit telles quelles en cachant une famille d'ici", () => {
+    const stored: StoredSettings = { activities: [...DEFAULT_ACTIVITIES], hiddenFamilies: ['course', 'velo', 'fractionne'] };
+    const next = withVisibility(stored, [...DEFAULT_ACTIVITIES], [...readHiddenFamilies(stored), 'surf']);
+    expect(next?.hiddenFamilies).toEqual(['course', 'velo', 'fractionne', 'surf']);
+    // Cacher aussi la voile ne laisserait rien : refusé.
+    expect(withVisibility(stored, [...DEFAULT_ACTIVITIES], ['voile', 'surf'])).toBeNull();
   });
 });
 
 describe('sauts mesurés par défaut (05/11)', () => {
-  it('cochés en voile et au VTT, décochés ailleurs ; ni bateau ni surf', () => {
-    const byId = (id: string) => DEFAULT_ACTIVITIES.find((a) => a.id === id)!;
-    const kiteCree = { id: 'a-kite', name: 'Kite', base: 'kite' as const, color: '#5b87f2' };
+  it('cochés en voile ; ni bateau ni surf', () => {
     expect(resolveJumps({}, byId('wingfoil'))?.enabled).toBe(true);
     expect(resolveJumps({}, kiteCree)).toEqual({ enabled: true, placement: 'poitrine', minHeightM: 1 });
-    expect(resolveJumps({}, byId('a-vtt'))?.enabled).toBe(true);
-    for (const id of ['running', 'a-marche', 'cycling', 'a-gravel']) expect(resolveJumps({}, byId(id))?.enabled).toBe(false);
     expect(resolveJumps({}, { id: 'a-voilier', name: 'Voilier', base: 'bateau', color: '#014e86' })).toBeNull();
     expect(resolveJumps({}, byId('surf'))).toBeNull();
     // Le réglage enregistré prime.
-    expect(resolveJumps({ jumps: { 'a-vtt': { enabled: false, placement: 'taille', minHeightM: 0.5 } } }, byId('a-vtt'))?.enabled).toBe(false);
+    expect(resolveJumps({ jumps: { wingfoil: { enabled: false, placement: 'taille', minHeightM: 0.5 } } }, byId('wingfoil'))?.enabled).toBe(false);
   });
 });
 
 describe('virages mesurés par le gyroscope (lot 40)', () => {
-  const byId = (id: string) => DEFAULT_ACTIVITIES.find((a) => a.id === id)!;
   const paddle = { id: 'a-paddle', name: 'Paddle', base: 'surf' as const, color: '#8292a6' };
 
   it('cochés pour Surf et Surf foil, décochés pour une activité créée en surf, absents hors surf', () => {
     expect(resolveTurns({}, byId('surf'))).toBe(true);
     expect(resolveTurns({}, byId('a-surf-foil'))).toBe(true);
     expect(resolveTurns({}, paddle)).toBe(false);
-    for (const id of ['wingfoil', 'running', 'cycling', 'a-vtt']) expect(resolveTurns({}, byId(id))).toBeNull();
+    expect(resolveTurns({}, byId('wingfoil'))).toBeNull();
+    expect(resolveTurns({}, kiteCree)).toBeNull();
     expect(settingsView({}, byId('wingfoil')).turns).toBeNull();
   });
 
@@ -215,11 +187,8 @@ describe('virages mesurés par le gyroscope (lot 40)', () => {
   });
 });
 
-describe('onglets à pré-réglage et case « Sauts » (n° 174)', () => {
-  const byId = (id: string) => DEFAULT_ACTIVITIES.find((a) => a.id === id)!;
-  const run = byId('running');
-  const vtt = byId('a-vtt');
-  const route = byId('cycling');
+describe('onglets et case « Sauts » (n° 174)', () => {
+  const wing = byId('wingfoil');
   const tabOf = (activity: Activity, key: string) => analysisTabs(getSportProfile(activity.base)).find((t) => t.key === key)!;
   /** Un toucher sur le bouton d'un onglet, tel que le fait Réglages : relit la vue, écrit le choix. */
   const touch = (stored: StoredSettings, activity: Activity, key: string): StoredSettings =>
@@ -234,124 +203,52 @@ describe('onglets à pré-réglage et case « Sauts » (n° 174)', () => {
     return tabs === undefined ? written : withSetting(written, activity.id, 'tabs', tabs)!;
   };
 
-  it('Course et VTT : un onglet caché par le pré-réglage répond au premier toucher, aller-retour, et la marque « défaut » suit', () => {
-    for (const [activity, key] of [[run, 'sauts'], [vtt, 'tops']] as const) {
-      expect(shown({}, activity, key)).toBe(false);
-      expect(settingsView({}, activity).isTabsOverridden).toBe(false);
-      const once = touch({}, activity, key);
-      expect(shown(once, activity, key)).toBe(true);
-      expect(settingsView(once, activity).isTabsOverridden).toBe(true);
-      expect(isActivityOverridden(settingsView(once, activity))).toBe(true);
-      const twice = touch(once, activity, key);
-      expect(shown(twice, activity, key)).toBe(false);
-      expect(settingsView(twice, activity).isTabsOverridden).toBe(false);
-      expect(isActivityOverridden(settingsView(twice, activity))).toBe(false);
-    }
+  it("un onglet caché d'un toucher revient au second, et la marque « défaut » suit", () => {
+    expect(shown({}, wing, 'sauts')).toBe(true);
+    const once = touch({}, wing, 'sauts');
+    expect(shown(once, wing, 'sauts')).toBe(false);
+    expect(settingsView(once, wing).isTabsOverridden).toBe(true);
+    expect(isActivityOverridden(settingsView(once, wing))).toBe(true);
+    const twice = touch(once, wing, 'sauts');
+    expect(shown(twice, wing, 'sauts')).toBe(true);
+    expect(settingsView(twice, wing).isTabsOverridden).toBe(false);
+    expect(isActivityOverridden(settingsView(twice, wing))).toBe(false);
   });
 
-  it('un autre onglet changé puis remis rend la marque « défaut » et laisse l\'onglet du pré-réglage caché', () => {
-    const back = touch(touch({}, run, 'cardio'), run, 'cardio');
-    expect(settingsView(back, run).isTabsOverridden).toBe(false);
-    expect(shown(back, run, 'sauts')).toBe(false);
+  it("aucune activité de départ n'a de pré-réglage d'onglets", () => {
+    for (const activity of DEFAULT_ACTIVITIES) expect(defaultTabsOf(activity), activity.id).toBeNull();
   });
 
-  it('un pré-réglage d\'onglets s\'écarte toujours du défaut du module (`toggleTabChoice`)', () => {
-    for (const activity of DEFAULT_ACTIVITIES) {
-      for (const [key, value] of Object.entries(defaultTabsOf(activity) ?? {})) {
-        expect(isTabShown(tabOf(activity, key), null), `${activity.id} ${key}`).toBe(!value);
-      }
-    }
-    expect(defaultTabsOf(run)).toEqual({ sauts: false });
-    expect(defaultTabsOf(vtt)).toEqual({ tops: false });
-    // Q61, 06/11 : décoché de base partout à terre, sauf au VTT, qui mesure les sauts d\'office.
-    for (const activity of [byId('a-marche'), byId('a-gravel'), route]) expect(defaultTabsOf(activity), activity.id).toEqual({ sauts: false });
+  it("rien à écrire si l'onglet est déjà montré", () => {
+    const view = settingsView({ jumps: { [wing.id]: { enabled: false, placement: 'poitrine', minHeightM: 0.5 } } }, wing);
+    expect(tabsAfterJumpsChange(view, { ...view.jumps!, enabled: true })).toBeUndefined();
   });
 
-  it('Course : cocher la case montre l\'onglet, en écrivant le choix en clair', () => {
-    const view = settingsView({}, run);
-    expect(view.jumps?.enabled).toBe(false);
-    expect(tabsAfterJumpsChange(view, { ...view.jumps!, enabled: true })).toEqual({ sauts: true });
-    const checked = setCase({}, run, true);
-    expect(shown(checked, run, 'sauts')).toBe(true);
-    expect(settingsView(checked, run).jumps?.enabled).toBe(true);
-    expect(settingsView(checked, run).isTabsOverridden).toBe(true);
-  });
-
-  it('Marche, Route, Gravel : cocher la case montre l\'onglet', () => {
-    for (const activity of [byId('a-marche'), route, byId('a-gravel')]) {
-      const view = settingsView({ jumps: { [activity.id]: { enabled: false, placement: 'poitrine', minHeightM: 0.5 } } }, activity);
-      expect(shown({}, activity, 'sauts'), activity.id).toBe(false);
-      expect(tabsAfterJumpsChange(view, { ...view.jumps!, enabled: true }), activity.id).toEqual({ sauts: true });
-    }
-  });
-
-  it('une mise à jour décoche « sauts » dans les choix rangés, sans rien effacer d\'autre', () => {
-    const marche = byId('a-marche');
-    const gravel = byId('a-gravel');
-    const stored: StoredSettings = {
-      presetsVersion: 4,
-      tabs: { [marche.id]: { tops: true }, [route.id]: { sauts: true }, [vtt.id]: { cardio: false }, [gravel.id]: { tops: true } },
-      jumps: { [gravel.id]: { enabled: true, placement: 'poitrine', minHeightM: 0.5 } },
-    };
-    expect(resetStoredPresets(stored).tabs).toEqual({
-      // Sans choix sur « sauts » : décoché ; choix déjà fait, VTT et case cochée : gardés.
-      [marche.id]: { tops: true, sauts: false }, [route.id]: { sauts: true }, [vtt.id]: { cardio: false }, [gravel.id]: { tops: true },
-    });
-    const written = { ...stored, presetsVersion: PRESETS_VERSION };
-    expect(resetStoredPresets(written)).toBe(written);
-  });
-
-  it('rien à écrire si l\'onglet est déjà montré : VTT, Voile', () => {
-    for (const activity of [vtt, byId('wingfoil')]) {
-      const view = settingsView({ jumps: { [activity.id]: { enabled: false, placement: 'poitrine', minHeightM: 0.5 } } }, activity);
-      expect(tabsAfterJumpsChange(view, { ...view.jumps!, enabled: true }), activity.id).toBeUndefined();
-    }
-  });
-
-  it('seul le passage de décochée à cochée compte : décocher et changer une sous-option n\'écrivent rien', () => {
-    const checked = settingsView(setCase({}, run, true), run);
-    expect(tabsAfterJumpsChange(checked, { ...checked.jumps!, enabled: false })).toBeUndefined();
-    expect(tabsAfterJumpsChange(checked, { ...checked.jumps!, placement: 'bras' })).toBeUndefined();
-    const unchecked = settingsView({}, run);
-    expect(tabsAfterJumpsChange(unchecked, { ...unchecked.jumps!, placement: 'bras' })).toBeUndefined();
-  });
-
-  it('un calcul sans sauts n\'écrit rien', () => {
+  it("un calcul sans sauts n'écrit rien", () => {
     const view = settingsView({}, byId('surf'));
     expect(view.jumps).toBeNull();
     expect(tabsAfterJumpsChange(view, { enabled: true, placement: 'poitrine', minHeightM: 0.5 })).toBeUndefined();
   });
 
-  it('décocher garde le choix ; l\'onglet se décoche seul, la case cochée ; recocher la case le remontre', () => {
-    const on = setCase({}, run, true);
-    const off = setCase(on, run, false);
-    expect(settingsView(off, run).tabs).toEqual({ sauts: true });
-    expect(settingsView(off, run).jumps?.enabled).toBe(false);
-    const alone = touch(on, run, 'sauts');
-    expect(shown(alone, run, 'sauts')).toBe(false);
-    expect(settingsView(alone, run).jumps?.enabled).toBe(true);
-    expect(shown(setCase(setCase(alone, run, false), run, true), run, 'sauts')).toBe(true);
-  });
-
-  it('un choix rangé sans pré-réglage qui cache l\'onglet s\'efface en le montrant', () => {
-    const wing = byId('wingfoil');
+  it("un choix rangé qui cache l'onglet s'efface en cochant la case", () => {
     const stored: StoredSettings = { tabs: { [wing.id]: { sauts: false } }, jumps: { [wing.id]: { enabled: false, placement: 'poitrine', minHeightM: 0.5 } } };
     const next = setCase(stored, wing, true);
     expect(shown(next, wing, 'sauts')).toBe(true);
     expect(settingsView(next, wing).isTabsOverridden).toBe(false);
   });
+
+  it("seul le passage de décochée à cochée compte : décocher et changer une sous-option n'écrivent rien", () => {
+    const checked = settingsView({ tabs: { [wing.id]: { sauts: false } } }, wing);
+    expect(tabsAfterJumpsChange(checked, { ...checked.jumps!, enabled: false })).toBeUndefined();
+    expect(tabsAfterJumpsChange(checked, { ...checked.jumps!, placement: 'bras' })).toBeUndefined();
+  });
 });
 
 describe('décalage des seuils cardio (25/10)', () => {
-  const [voile, course, marche, route, , , surf, , runIntervals, bikeIntervals] = DEFAULT_ACTIVITIES;
-  const kite = { id: 'a-kite', name: 'Kite', base: 'kite' as const, color: '#5b87f2' };
   const pav = { id: 'a-pav', name: 'Pav', base: 'windsurf' as const, color: '#5b87f2' };
 
-  it("prend celui du calcul, la Marche le sien", () => {
-    expect([course, runIntervals].map(defaultHrOffsetOf)).toEqual([0, 0]);
-    expect(defaultHrOffsetOf(marche)).toBe(-4);
-    expect([route, bikeIntervals].map(defaultHrOffsetOf)).toEqual([-7, -7]);
-    expect([voile, kite, pav, surf].map(defaultHrOffsetOf)).toEqual([-8, -8, -5, -10]);
+  it('prend celui du calcul', () => {
+    expect([byId('wingfoil'), kiteCree, pav, byId('surf')].map(defaultHrOffsetOf)).toEqual([-8, -8, -5, -10]);
   });
 });
 
@@ -364,74 +261,51 @@ describe('unités proposées par traitement', () => {
 });
 
 describe('isActivityOverridden', () => {
-  const find = (id: string) => DEFAULT_ACTIVITIES.find((a) => a.id === id)!;
-  const wing = find('wingfoil');
-  const run = find('running');
-  const bike = find('cycling');
-  const surf = find('surf');
-  const otherBike = (Object.keys(BIKE_DEFAULT_KG) as (keyof typeof BIKE_DEFAULT_KG)[]).find((k) => k !== defaultBikeType(bike))!;
+  const wing = byId('wingfoil');
+  const surf = byId('surf');
 
   /** Une valeur réglée, autre que le défaut, pour chaque table rangée par activité. */
-  const SAMPLES: Record<string, { activity: typeof wing; value: unknown }> = {
+  const SAMPLES: Record<string, { activity: Activity; value: unknown }> = {
     thresholds: { activity: wing, value: 12 },
-    speedUnits: { activity: run, value: TREATMENT_UNITS.course.find((u) => u !== defaultSpeedUnitOf(run)) },
-    distanceUnits: { activity: run, value: 'nm' },
-    speedRanges: { activity: run, value: { minMs: 1, maxMs: 5 } },
-    gradeRanges: { activity: run, value: defaultGradeRange(run) },
-    autoPause: { activity: run, value: { speedMs: 0.5, delayS: 10 } },
-    bikeTypes: { activity: bike, value: otherBike },
-    bikeWeights: { activity: bike, value: 9 },
-    carriedLoads: { activity: run, value: 5 },
-    energyModels: { activity: run, value: 'marche' },
-    hrOffsets: { activity: run, value: 5 },
-    gearLabels: { activity: run, value: ['Chaussures', 'Montre'] },
-    tabs: { activity: run, value: { general: false } },
-    paceLevels: { activity: run, value: DEFAULT_PACE_LEVEL === 'expert' ? 'bon' : 'expert' },
-    customFlatSpeeds: { activity: run, value: 3.3 },
-    liveFields: { activity: run, value: defaultLiveFieldsFor(run) },
-    notificationFields: { activity: run, value: defaultNotificationFieldsFor(run) },
+    speedUnits: { activity: wing, value: TREATMENT_UNITS.voile.find((u) => u !== defaultSpeedUnitOf(wing)) },
+    distanceUnits: { activity: wing, value: 'nm' },
+    speedRanges: { activity: surf, value: { minMs: 1, maxMs: 5 } },
+    autoPause: { activity: surf, value: { speedMs: 0.5, delayS: 10 } },
+    hrOffsets: { activity: surf, value: 5 },
+    gearLabels: { activity: surf, value: ['Planche', 'Combinaison'] },
+    tabs: { activity: surf, value: { general: false } },
+    liveFields: { activity: surf, value: defaultLiveFieldsFor(surf) },
+    notificationFields: { activity: surf, value: defaultNotificationFieldsFor(surf) },
     markGuide: { activity: wing, value: defaultMarkGuideOf(wing) },
-    wayTypes: { activity: run, value: [WAY_TYPES[0]] },
-    terrainSteps: { activity: run, value: TERRAIN_STEP_CHOICES_M.find((v) => v !== defaultTerrainStepOf(run)) },
-    loopReturnRatios: { activity: run, value: getSportProfile('running').loopReturnMaxRatio === 2 ? 2.5 : 2 },
     foils: { activity: wing, value: true },
     pumping: { activity: wing, value: true },
     turns: { activity: surf, value: false },
     jumps: { activity: wing, value: getSportProfile('wingfoil').jumps },
-    heartRate: { activity: run, value: !defaultHeartRateOf(run) },
-    cadence: { activity: run, value: false },
-    hrZoneLines: { activity: run, value: true },
+    heartRate: { activity: surf, value: !defaultHeartRateOf(surf) },
+    hrZoneLines: { activity: surf, value: true },
   };
-
-  /**
-   * Tables de la course et du vélo que Réglages ne montre plus (lot 303) : gardées dans les réglages (lot 305),
-   * effacées par « Par défaut », mais plus comptées dans « · modifié ».
-   */
-  const RETIRED = ['gradeRanges', 'bikeWeights', 'carriedLoads', 'energyModels', 'terrainSteps', 'cadence'];
 
   it('couvre chaque table rangée par activité, le matériel enregistré excepté', () => {
     expect([...PER_ACTIVITY_KEYS].filter((k) => k !== 'gearGroups').sort()).toEqual(Object.keys(SAMPLES).sort());
   });
 
   it('est faux sans aucun réglage', () => {
-    for (const activity of [wing, run, bike, surf]) expect(isActivityOverridden(settingsView({}, activity))).toBe(false);
+    for (const activity of [wing, kiteCree, surf]) expect(isActivityOverridden(settingsView({}, activity))).toBe(false);
   });
 
   for (const [key, { activity, value }] of Object.entries(SAMPLES)) {
-    if (RETIRED.includes(key)) {
-      it(`ne montre plus « ${key} » (lot 303), mais « Par défaut » l'efface`, () => {
-        const stored = { [key]: { [activity.id]: value } } as StoredSettings;
-        expect(isActivityOverridden(settingsView(stored, activity))).toBe(false);
-        expect((resetOverrides(stored, activity.id) as Record<string, Record<string, unknown>>)[key]).toEqual({});
-      });
-      continue;
-    }
     it(`voit « ${key} » réglé, et plus rien après « Par défaut »`, () => {
       const stored = { [key]: { [activity.id]: value } } as StoredSettings;
       expect(isActivityOverridden(settingsView(stored, activity))).toBe(true);
       expect(isActivityOverridden(settingsView(resetOverrides(stored, activity.id), activity))).toBe(false);
     });
   }
+
+  it("ignore les tables de la course et du vélo d'un réglage complet, que « Par défaut » laisse", () => {
+    const stored = { gradeRanges: { [wing.id]: { min: 0, max: 0.1 } }, bikeTypes: { [wing.id]: 'gravel' } } as StoredSettings;
+    expect(isActivityOverridden(settingsView(stored, wing))).toBe(false);
+    expect(resetOverrides(stored, wing.id)).toEqual(stored);
+  });
 
   it('ne compte pas le matériel enregistré, que « Par défaut » garde', () => {
     const groups = [{ id: 'g-mat', name: 'Aile', items: [{ id: 'i1', name: '5 m' }] }];
@@ -447,8 +321,7 @@ describe('bornes de couleur par défaut, tenues par le profil du calcul (lot 72)
   /** Valeurs d'avant le lot 72, gelées : les constantes de sport et la table du traitement qu'elles remplacent. */
   const expected = {
     wingfoil: [knotsToMs(8), knotsToMs(28)], windsurf: [knotsToMs(8), knotsToMs(28)], kite: [knotsToMs(8), knotsToMs(28)],
-    bateau: [knotsToMs(1), knotsToMs(15)], running: [kmh(4), kmh(15)], 'run-intervals': [kmh(4), kmh(15)], 'run-test': [kmh(4), kmh(15)],
-    muscu: [kmh(4), kmh(15)], cycling: [kmh(10), kmh(40)], 'bike-intervals': [kmh(10), kmh(40)], surf: [kmh(5), kmh(30)],
+    bateau: [knotsToMs(1), knotsToMs(15)], surf: [kmh(5), kmh(30)],
   } as const;
 
   it('chaque calcul a les siennes, celles du traitement de jadis', () => {
@@ -461,7 +334,7 @@ describe('bornes de couleur par défaut, tenues par le profil du calcul (lot 72)
 
   it("une activité sans pré-réglage prend celles de son calcul, une pré-réglée les siennes", () => {
     expect(defaultSpeedRangeOf(custom('kite'))).toEqual(getSportProfile('kite').speedRange);
-    expect(defaultSpeedRangeOf(custom('muscu'))).toEqual(getSportProfile('muscu').speedRange);
+    expect(defaultSpeedRangeOf(custom('surf'))).toEqual(getSportProfile('surf').speedRange);
     const wing = DEFAULT_ACTIVITIES.find((a) => a.id === 'wingfoil')!;
     expect(defaultSpeedRangeOf(wing).maxMs).toBeCloseTo(knotsToMs(24), 9);
   });
@@ -470,21 +343,18 @@ describe('bornes de couleur par défaut, tenues par le profil du calcul (lot 72)
     expect(rangeFollowsPace(custom('kite'))).toBe(true);
     expect(rangeFollowsPace(custom('windsurf'))).toBe(false);
     expect(rangeFollowsPace(custom('bateau'))).toBe(false);
-    expect(rangeFollowsPace(custom('running'))).toBe(false);
     expect(rangeFollowsPace(custom('surf'))).toBe(false);
   });
 });
 
 describe("écriture d'un réglage par la table des champs (lot 72)", () => {
-  const find = (id: string) => DEFAULT_ACTIVITIES.find((a) => a.id === id)!;
-  const run = find('running');
-  const wing = find('wingfoil');
+  const run = byId('surf');
+  const wing = byId('wingfoil');
   const base: StoredSettings = { thresholds: { kite: 9 } };
 
-  it('chaque champ se range dans une table par activité, et chaque table a son champ, sauf celles de la course et du vélo (lot 303)', () => {
+  it('chaque champ se range dans une table par activité, et chaque table a son champ', () => {
     const keys = Object.values(SETTING_FIELDS).map((rule) => rule.key);
-    const retired = ['gradeRanges', 'bikeWeights', 'carriedLoads', 'energyModels', 'terrainSteps', 'cadence'];
-    expect([...keys].sort()).toEqual([...PER_ACTIVITY_KEYS].filter((k) => !retired.includes(k)).sort());
+    expect([...keys].sort()).toEqual([...PER_ACTIVITY_KEYS].sort());
   });
 
   it("range la valeur sous l'activité seule, sans toucher aux autres", () => {
@@ -506,16 +376,17 @@ describe("écriture d'un réglage par la table des champs (lot 72)", () => {
   });
 
   it("refuse un réglage que le calcul n'a pas, ou une activité inconnue", () => {
-    expect(withSetting(base, run.id, 'foil', true)).toBeNull();
-    expect(withSetting(base, run.id, 'pumping', true)).toBeNull();
+    const boat = { id: 'a-voilier', name: 'Voilier', base: 'bateau' as const, color: '#014e86' };
+    const withBoat: StoredSettings = { ...base, activities: [...DEFAULT_ACTIVITIES, boat] };
+    expect(withSetting(withBoat, boat.id, 'pumping', true)).toBeNull();
     expect(withSetting(base, wing.id, 'pumping', true)?.pumping).toEqual({ [wing.id]: true });
     expect(withSetting(base, 'a-inconnue', 'liveFields', null)).toBeNull();
-    expect(withSetting(base, 'a-inconnue', 'customFlatSpeedMs', 3)).toBeNull();
+    expect(withSetting(base, 'a-inconnue', 'jumps', null)).toBeNull();
   });
 });
 
 describe('réglages abîmés relus avec contrôle (lot 117)', () => {
-  const run = DEFAULT_ACTIVITIES.find((a) => a.id === 'running')!;
+  const run = byId('surf');
   const wrong = (v: unknown) => v as never;
 
   it("un seuil abîmé retombe sur le pré-réglage, un seuil sain est gardé", () => {
@@ -607,15 +478,15 @@ describe("paire de bornes de Réglages : un champ vidé n'efface que sa borne", 
   });
 
   it("une paire rendue est toujours acceptée par le rangement et par la lecture, jamais à une seule borne", () => {
-    const run = DEFAULT_ACTIVITIES.find((a) => a.base === 'running')!;
+    const run = byId('surf');
     const stored = withSetting({}, run.id, 'speedRange', nextSpeedRange(null, 'minMs', 1, defaultSpeedRangeOf(run)));
     expect(settingsView(stored!, run).speedRange).toEqual({ minMs: 1, maxMs: defaultSpeedRangeOf(run).maxMs });
   });
 });
 
 describe('limites des zones sur la courbe de FC (case « Zones », 05/11)', () => {
-  const run = DEFAULT_ACTIVITIES.find((a) => a.id === 'running')!;
-  const bike = DEFAULT_ACTIVITIES.find((a) => a.id === 'cycling')!;
+  const run = byId('surf');
+  const bike = byId('wingfoil');
 
   it('décochées par défaut', () => {
     expect(effectiveHrZoneLines({}, run)).toBe(false);

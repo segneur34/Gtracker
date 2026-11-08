@@ -220,7 +220,7 @@ export const resummarize = async (file: string): Promise<void> => {
     await hydrateSession(f, file);
     const session = findSession(file);
     if (text === null || !session || session.readOnly || session.partial || lib.folder !== f) return;
-    const analyzed = analyzeGpx(text, session.record.sport, session.record.analysis, sessionSummarySettings(session.record), session.record);
+    const analyzed = analyzeGpx(text, session.record.sport, session.record.analysis, sessionSummarySettings(session.record));
     if (!analyzed) return;
     const record = withSummary(session.record, analyzed.summary);
     noteRecordEdits(file, session.record, record);

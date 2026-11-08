@@ -45,40 +45,6 @@ export const IconSurf = ({ size = 24, ...props }: IconProps) => (
   </svg>
 );
 
-/** Coureur stylisé, en pleine foulée vers la droite. */
-export const IconRun = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <circle cx="16" cy="4" r="1.6" fill="currentColor" />
-    <path d="M14.5 8l-2.5 6" />
-    <path d="M14 9.5l3 2.5h2.5" />
-    <path d="M14 9.5l-3.5.5-2 2.5" />
-    <path d="M12 14l3 2v4.5" />
-    <path d="M12 14l-2.5 4H5" />
-  </svg>
-);
-
-export const IconBike = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <circle cx="5.5" cy="16" r="3.5" />
-    <circle cx="18.5" cy="16" r="3.5" />
-    <path d="M5.5 16l4-7h6l3 7" />
-    <path d="M9.5 9l3 7h6" />
-    <path d="M8 6h3" />
-    <path d="M15.5 9l-1-3h2" />
-  </svg>
-);
-
-/** Chronomètre : le fractionné et son compteur. */
-export const IconStopwatch = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <circle cx="12" cy="13.5" r="7.5" />
-    <path d="M12 13.5V9.5" />
-    <path d="M10 2.5h4" />
-    <path d="M12 2.5V6" />
-    <path d="M18.5 6.5l1.5-1.5" />
-  </svg>
-);
-
 /** Cœur traversé d'un pouls : les tests de l'Entraînement (FC max). */
 export const IconPulse = ({ size = 24, ...props }: IconProps) => (
   <svg {...strokeProps(size)} {...props}>
@@ -323,57 +289,6 @@ export const IconKite = ({ size = 24, ...props }: IconProps) => (
   </svg>
 );
 
-/** Marcheur au bâton, sac au dos. */
-export const IconWalk = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <circle cx="11" cy="3.8" r="1.6" fill="currentColor" stroke="none" />
-    <path d="M10.5 7.5l-1 6" />
-    <path d="M9.5 13.5l2.5 3v4" />
-    <path d="M9.5 13.5l-2 3.5-1.5 3.5" />
-    <path d="M10.5 8.5l3.5 2.5" />
-    <path d="M15 9l1.5 12" />
-    <path d="M10 8H8v4.5h1.5" />
-  </svg>
-);
-
-/** Vélo de route, cintre recourbé. */
-export const IconRoadBike = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <circle cx="5.5" cy="16" r="3.5" />
-    <circle cx="18.5" cy="16" r="3.5" />
-    <path d="M5.5 16l4-7h6l3 7" />
-    <path d="M9.5 9l3 7h6" />
-    <path d="M8 6h3" />
-    <path d="M15.5 9l-1-3h2.5a1.5 1.5 0 0 1 0 3" />
-  </svg>
-);
-
-/** VTT sur un sol accidenté. */
-export const IconMtb = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <circle cx="5.5" cy="15" r="3.5" />
-    <circle cx="18.5" cy="15" r="3.5" />
-    <path d="M5.5 15l4-7h6l3 7" />
-    <path d="M9.5 8l3 7h6" />
-    <path d="M8 5h3" />
-    <path d="M15.5 8l-1-3h3" />
-    <path d="M2 21.5l3-1 3 .5 3-1.5 3 .5 3-1 4-.5" />
-  </svg>
-);
-
-/** Gravel : vélo et sacoche de selle. */
-export const IconGravel = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <circle cx="5.5" cy="16" r="3.5" />
-    <circle cx="18.5" cy="16" r="3.5" />
-    <path d="M5.5 16l4-7h6l3 7" />
-    <path d="M9.5 9l3 7h6" />
-    <path d="M8 6h3" />
-    <path d="M15.5 9l-1-3h2" />
-    <rect x="2.5" y="8" width="4.5" height="3.5" rx="1" />
-  </svg>
-);
-
 /** Surf : vague qui déferle et planche. */
 export const IconSurfer = ({ size = 24, ...props }: IconProps) => (
   <svg {...strokeProps(size)} {...props}>
@@ -433,40 +348,6 @@ export const IconPaddleFoil = ({ size = 24, ...props }: IconProps) => (
     <path d="M4 14h16" />
     <path d="M12.5 14v6" />
     <path d="M9 20h7" />
-  </svg>
-);
-
-/** Fractionné vélo : vélo et chronomètre. */
-export const IconBikeIntervals = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <g transform="translate(0 4.5) scale(.78)" strokeWidth="2.5">
-      <circle cx="5.5" cy="16" r="3.5" />
-      <circle cx="18.5" cy="16" r="3.5" />
-      <path d="M5.5 16l4-7h6l3 7" />
-      <path d="M9.5 9l3 7h6" />
-      <path d="M8 6h3" />
-      <path d="M15.5 9l-1-3h2" />
-    </g>
-    <circle cx="18.5" cy="6.5" r="4" />
-    <path d="M18.5 6.5V4.5" />
-    <path d="M17.5 1.5h2" />
-  </svg>
-);
-
-/** Fractionné à pied : coureur et chronomètre. */
-export const IconRunIntervals = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <g transform="translate(4.8 4.8) scale(.8)" strokeWidth="2.5">
-      <circle cx="16" cy="4" r="1.6" fill="currentColor" stroke="none" />
-      <path d="M14.5 8l-2.5 6" />
-      <path d="M14 9.5l3 2.5h2.5" />
-      <path d="M14 9.5l-3.5.5-2 2.5" />
-      <path d="M12 14l3 2v4.5" />
-      <path d="M12 14l-2.5 4H5" />
-    </g>
-    <circle cx="6" cy="7" r="4" />
-    <path d="M6 7V5" />
-    <path d="M5 2h2" />
   </svg>
 );
 

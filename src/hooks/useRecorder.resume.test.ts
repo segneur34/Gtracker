@@ -176,7 +176,7 @@ vi.stubGlobal('localStorage', {
 });
 
 const T0 = Date.UTC(2026, 10, 4, 9, 0, 0);
-const activity = baseActivity('running');
+const activity = baseActivity('bateau');
 const round = (ms: number) => Math.round(ms);
 
 let recorder: typeof import('./useRecorder');
@@ -561,13 +561,13 @@ describe('reprise silencieuse, cas limites', () => {
     await recorder.startRecording(activity, live);
     run(live.emit, 0, 5, 1);
     expect(recorder.addRecordingMark()).not.toBeNull();
-    recorder.changeRecordingActivity(baseActivity('cycling'));
+    recorder.changeRecordingActivity(baseActivity('kite'));
     await settle();
     services.gps = true;
     const fresh = await reload();
     await fresh.recoverInterruptedRecording();
     const state = fresh.getRecorderState();
-    expect(state.activity?.base).toBe('cycling');
+    expect(state.activity?.base).toBe('kite');
     expect(state.marks).toHaveLength(1);
   });
 

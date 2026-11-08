@@ -12,7 +12,7 @@ import { runSurfSession, surfProfileOf } from '../surfing/surfSession';
 import { SUMMARY_CALC_VERSION } from './record';
 import { ORIGIN, at, mPerDegLon } from '../test/geo.fixture';
 import { phasesTrack } from '../test/track.fixture';
-import { analysisTrack, summarizeHeartRateSession, summarizeSession } from './summary';
+import { analysisTrack, summarizeSession } from './summary';
 
 const START_MS = Date.parse('2026-09-20T10:00:00Z');
 
@@ -25,8 +25,8 @@ const buildTrack = (phases: [number, number][], hz = 1, climbPerS?: number): Raw
 
 describe('summarizeSession', () => {
   it('ne range plus ni le meilleur kilomètre ni les meilleures 5 min, ni les meilleurs efforts (course et vélo retirés, lot 303)', () => {
-    const run = summarizeSession(buildTrack([[200, 3], [200, 4], [200, 3]]), 'running')!;
-    const ride = summarizeSession(buildTrack([[150, 7], [300, 9], [150, 7]]), 'cycling')!;
+    const run = summarizeSession(buildTrack([[200, 3], [200, 4], [200, 3]]), 'kite')!;
+    const ride = summarizeSession(buildTrack([[150, 7], [300, 9], [150, 7]]), 'wingfoil')!;
     for (const summary of [run, ride]) {
       expect(summary.best1kmS).toBeUndefined();
       expect(summary.best5minMs).toBeUndefined();
@@ -36,17 +36,17 @@ describe('summarizeSession', () => {
 
   it('range la FC de la session, rien sans FC', () => {
     const points = buildTrack([[600, 3]]).map((p, i) => ({ ...p, hr: 140 + (i % 20) }));
-    const hr = summarizeSession(points, 'running')!.heartRate!;
+    const hr = summarizeSession(points, 'wingfoil')!.heartRate!;
     expect(hr.avgBpm).toBeGreaterThan(140);
     expect(hr.avgBpm).toBeLessThan(160);
     expect(hr.coveredS).toBe(600);
     expect(hr.histogram.seconds.reduce((a, b) => a + b, 0)).toBeCloseTo(600, -1);
-    expect(summarizeSession(buildTrack([[600, 3]]), 'running')!.heartRate).toBeUndefined();
+    expect(summarizeSession(buildTrack([[600, 3]]), 'wingfoil')!.heartRate).toBeUndefined();
   });
 
   it("ne range plus ni la cadence ni le test guidé (lot 301 : la version voile et surf n'en a pas)", () => {
     const points = buildTrack([[600, 3]]).map((p, i) => ({ ...p, cadence: 85, hr: 140 + (i % 20) }));
-    for (const sport of ['running', 'run-test', 'wingfoil'] as const) {
+    for (const sport of ['kite', 'surf', 'wingfoil'] as const) {
       const summary = summarizeSession(points, sport)!;
       expect(summary).not.toHaveProperty('cadence');
       expect(summary).not.toHaveProperty('test');
@@ -54,7 +54,7 @@ describe('summarizeSession', () => {
   });
 
   it('rend la distance intégrée et les bornes', () => {
-    const summary = summarizeSession(buildTrack([[600, 3]]), 'running')!;
+    const summary = summarizeSession(buildTrack([[600, 3]]), 'wingfoil')!;
     expect(summary.calcVersion).toBe(SUMMARY_CALC_VERSION);
     expect(summary.startMs).toBe(START_MS);
     expect(summary.endMs).toBe(START_MS + 600_000);
@@ -65,21 +65,21 @@ describe('summarizeSession', () => {
   });
 
   it('trace clairsemée (un point toutes les 15 s, chaque pas est un trou) : vitesse max lissée, pas 0 (lot 81)', () => {
-    const summary = summarizeSession(buildTrack([[1200, 4]], 1 / 15), 'running')!;
+    const summary = summarizeSession(buildTrack([[1200, 4]], 1 / 15), 'wingfoil')!;
     expect(summary.maxSpeedMs).toBeCloseTo(4, 1);
   });
 
   it('part de la trace d\'analyse, celle que la vignette colore', () => {
-    // Pic de 1 s à 60 m/s : au-delà de la vitesse plausible d'une course, il est écrêté.
+    // Pic de 1 s à 60 m/s : au-delà de la vitesse plausible d'une voile, il est écrêté.
     const raw = buildTrack([[300, 3], [1, 60], [300, 3]]);
-    for (const sport of ['running', 'wingfoil'] as const) {
+    for (const sport of ['kite', 'wingfoil'] as const) {
       const track = analysisTrack(raw, sport);
       const summary = summarizeSession(raw, sport)!;
       expect(summary.pointCount).toBe(track.length);
       // Vitesse max : la meilleure moyenne sur 2 s de la trace d'analyse (Q34, lot 81).
       expect(summary.maxSpeedMs).toBe(bestWindowSpeedMs(track, buildCumulativeTrack(track), 2));
     }
-    expect(Math.max(...analysisTrack(raw, 'running').map((p) => p.smoothedSpeedMs))).toBeLessThan(20);
+    expect(Math.max(...analysisTrack(raw, 'wingfoil').map((p) => p.smoothedSpeedMs))).toBeLessThan(20);
     // Sans support, aucun filtre : la trace brute enrichie.
     expect(analysisTrack(raw, null)).toEqual(computeKinematics(raw));
   });
@@ -137,13 +137,6 @@ describe('summarizeSession', () => {
     }
   });
 
-  it('ne compte en mouvement que le temps passé au-dessus du seuil du support', () => {
-    // Course : 10 min à 10,8 km/h, puis 5 min à l'arrêt.
-    const summary = summarizeSession(buildTrack([[600, 3], [300, 0]]), 'running')!;
-    expect(summary.movingTimeS).toBeGreaterThan(590);
-    expect(summary.movingTimeS).toBeLessThan(610);
-  });
-
   it('accorde le seuil de la voile à l\'allure de la session, comme le module', () => {
     // Wingfoil à 20 nœuds pendant 10 min, puis 5 min à 2 nœuds : seul le vol compte.
     const summary = summarizeSession(buildTrack([[600, 10.3], [300, 1]]), 'wingfoil')!;
@@ -152,14 +145,14 @@ describe('summarizeSession', () => {
   });
 
   it('mesure la distance parcourue en action, avec le même masque que le temps', () => {
-    // 10 min à 3 m/s, 5 min à 0,5 m/s (sous le seuil de la course) : seuls les 1 800 m courus comptent.
-    const summary = summarizeSession(buildTrack([[600, 3], [300, 0.5]]), 'running')!;
+    // 10 min à 3 m/s, 5 min à 0,5 m/s (sous un seuil de 3 nœuds) : seuls les 1 800 m en action comptent.
+    const summary = summarizeSession(buildTrack([[600, 3], [300, 0.5]]), 'wingfoil', { activeThreshold: 3 })!;
     expect(summary.distanceM).toBeCloseTo(1950, -1);
     expect(summary.movingDistanceM!).toBeGreaterThan(1750);
     expect(summary.movingDistanceM!).toBeLessThan(1850);
     expect(summary.movingDistanceM! / summary.movingTimeS!).toBeCloseTo(3, 1);
     // Toute en action : la distance entière.
-    const all = summarizeSession(buildTrack([[600, 3]]), 'running')!;
+    const all = summarizeSession(buildTrack([[600, 3]]), 'wingfoil', { activeThreshold: 3 })!;
     expect(all.movingDistanceM!).toBeGreaterThan(all.distanceM - 20);
     // Voile : seul le vol.
     const wing = summarizeSession(buildTrack([[600, 10.3], [300, 1]]), 'wingfoil')!;
@@ -175,8 +168,8 @@ describe('summarizeSession', () => {
       expect(summary.inMotionS!).toBeLessThan(910);
       expect(summary.movingTimeS! / summary.inMotionS!).toBeCloseTo(2 / 3, 1);
     }
-    // Ni la course ni le bateau, sans ratio de vol.
-    expect('inMotionS' in summarizeSession(buildTrack([[600, 3]]), 'running')!).toBe(false);
+    // Ni le surf ni le bateau, sans ratio de vol.
+    expect('inMotionS' in summarizeSession(buildTrack([[600, 3]]), 'surf')!).toBe(false);
     expect('inMotionS' in summarizeSession(buildTrack([[600, 2.06]]), 'bateau')!).toBe(false);
   });
 
@@ -190,14 +183,14 @@ describe('summarizeSession', () => {
   });
 
   it('suit un seuil imposé', () => {
-    // À 10,8 km/h, un seuil de 12 km/h ne voit jamais la session en mouvement.
-    const summary = summarizeSession(buildTrack([[600, 3]]), 'running', { activeThreshold: 12 })!;
+    // À 5,8 nœuds, un seuil de 12 nœuds ne voit jamais la session en mouvement.
+    const summary = summarizeSession(buildTrack([[600, 3]]), 'wingfoil', { activeThreshold: 12 })!;
     expect(summary.movingTimeS).toBe(0);
   });
 
   it('sans seuil (réglé à 0), ôte tout de même un arrêt complet du temps en mouvement (plancher, 27/10)', () => {
-    // 10 min à 3 m/s, 5 min immobile : l'arrêt sort au plancher d'arrêt de la course.
-    const summary = summarizeSession(buildTrack([[600, 3], [300, 0]]), 'running', { activeThreshold: 0 })!;
+    // 10 min à 3 m/s, 5 min immobile : l'arrêt sort au plancher d'arrêt de la voile.
+    const summary = summarizeSession(buildTrack([[600, 3], [300, 0]]), 'wingfoil', { activeThreshold: 0 })!;
     expect(summary.movingTimeS!).toBeGreaterThan(595);
     expect(summary.movingTimeS!).toBeLessThan(605);
     // Seuls manquent les mètres des premières secondes, le temps de confirmer le départ.
@@ -216,8 +209,8 @@ describe('summarizeSession', () => {
         .map((p) => ({ ...p, speedMs: 3, ...(Date.parse(p.time as string) === pauseEnd ? { segmentStart: true as const } : {}) }));
     };
     for (const hz of [1, 5]) {
-      for (const activeThreshold of [0, undefined]) {
-        const summary = summarizeSession(paused(hz), 'running', { activeThreshold })!;
+      for (const activeThreshold of [0, 3]) {
+        const summary = summarizeSession(paused(hz), 'wingfoil', { activeThreshold })!;
         expect(summary.distanceM).toBeCloseTo(1800, -1);
         expect(summary.movingTimeS!).toBeGreaterThan(590);
         expect(summary.movingTimeS!).toBeLessThan(601);
@@ -228,8 +221,8 @@ describe('summarizeSession', () => {
 
   it('donne le même résumé à 1 Hz et à 5 Hz', () => {
     const phases: [number, number][] = [[300, 3], [120, 0], [300, 3.5]];
-    const at1 = summarizeSession(buildTrack(phases, 1), 'running')!;
-    const at5 = summarizeSession(buildTrack(phases, 5), 'running')!;
+    const at1 = summarizeSession(buildTrack(phases, 1), 'wingfoil', { activeThreshold: 3 })!;
+    const at5 = summarizeSession(buildTrack(phases, 5), 'wingfoil', { activeThreshold: 3 })!;
     expect(at5.distanceM).toBeCloseTo(at1.distanceM, -1);
     expect(Math.abs(at5.movingTimeS! - at1.movingTimeS!)).toBeLessThan(3);
     expect(Math.abs(at5.movingDistanceM! - at1.movingDistanceM!)).toBeLessThan(10);
@@ -238,20 +231,10 @@ describe('summarizeSession', () => {
 
   it('rend le dénivelé positif si la trace a des altitudes, `null` sinon', () => {
     // 100 m de montée régulière en 10 min.
-    const withEle = summarizeSession(buildTrack([[600, 3]], 1, 100 / 600), 'running')!;
+    const withEle = summarizeSession(buildTrack([[600, 3]], 1, 100 / 600), 'wingfoil')!;
     expect(withEle.elevationGainM).toBeGreaterThan(90);
     expect(withEle.elevationGainM).toBeLessThan(105);
-    expect(summarizeSession(buildTrack([[600, 3]]), 'running')!.elevationGainM).toBeNull();
-  });
-
-  it("garde l'altitude du GPS même quand la fiche porte celle du terrain (course et vélo retirés, lot 303)", () => {
-    const t = Array.from({ length: 61 }, (_, i) => i * 10_000);
-    const terrainElevation = {
-      source: 'ign', resource: 'ign_rge_alti_wld', version: 1, stepM: 10, fetchedAt: '2026-10-07T09:00:00.000Z',
-      startMs: START_MS, t, z: t.map((ms) => 50 + (50 * ms) / 600_000),
-    };
-    const raw = buildTrack([[600, 3]], 1, 100 / 600);
-    expect(summarizeSession(raw, 'running', { terrainElevation })).toEqual(summarizeSession(raw, 'running'));
+    expect(summarizeSession(buildTrack([[600, 3]]), 'wingfoil')!.elevationGainM).toBeNull();
   });
 
   it('résume une trace sans support, sauf le temps en mouvement', () => {
@@ -262,8 +245,8 @@ describe('summarizeSession', () => {
   });
 
   it('rend `null` pour une trace de moins de deux points', () => {
-    expect(summarizeSession([], 'running')).toBeNull();
-    expect(summarizeSession(buildTrack([]), 'running')).toBeNull();
+    expect(summarizeSession([], 'wingfoil')).toBeNull();
+    expect(summarizeSession(buildTrack([]), 'wingfoil')).toBeNull();
   });
 });
 
@@ -311,9 +294,9 @@ describe('vitesse max du surf : celle de la page, une vague (Q34)', () => {
     });
   }
 
-  it('voile et course gardent la meilleure moyenne de 2 s de toute la trace', () => {
+  it('la voile garde la meilleure moyenne de 2 s de toute la trace', () => {
     const raw = buildTrack([[300, 3], [20, 6], [300, 3]]);
-    for (const sport of ['wingfoil', 'running', 'cycling'] as const) {
+    for (const sport of ['wingfoil', 'kite', 'bateau'] as const) {
       const summary = summarizeSession(raw, sport)!;
       const track = analysisTrack(raw, sport);
       expect(summary.maxSpeedMs).toBe(bestWindowSpeedMs(track, buildCumulativeTrack(track), getSportProfile(sport).maxSpeedWindowS));
@@ -321,25 +304,3 @@ describe('vitesse max du surf : celle de la page, une vague (Q34)', () => {
   });
 });
 
-describe('summarizeHeartRateSession (muscu, lot I du 25/10)', () => {
-  const T0 = Date.UTC(2026, 9, 28, 18, 0, 0);
-  const timed = Array.from({ length: 181 }, (_, k) => ({ time: new Date(T0 + k * 1000).toISOString(), hr: 100 + (k % 20) }));
-
-  it('donne un résumé non nul : distance 0, durée hors pauses, FC présente', () => {
-    const resumed = [...timed.slice(0, 91), ...timed.slice(91).map((p, k) => ({ ...p, time: new Date(T0 + (k + 120) * 1000).toISOString(), ...(k === 0 ? { segmentStart: true as const } : {}) }))];
-    const s = summarizeHeartRateSession(resumed, 'muscu')!;
-    expect(s.distanceM).toBe(0);
-    expect(s.maxSpeedMs).toBe(0);
-    expect(s.elevationGainM).toBeNull();
-    expect(s.movingDistanceM).toBeNull();
-    expect(s.movingTimeS).toBe(90 + 89);
-    expect(s.startMs).toBe(T0);
-    expect(s.heartRate?.maxBpm).toBeGreaterThan(110);
-    expect(s.samplingS).toBe(1);
-    expect(s.calcVersion).toBe(SUMMARY_CALC_VERSION);
-  });
-
-  it('moins de deux points : null', () => {
-    expect(summarizeHeartRateSession(timed.slice(0, 1), 'muscu')).toBeNull();
-  });
-});

@@ -417,8 +417,8 @@ describe('altitude de la trace suivie', () => {
   });
 
   it('une session à terre porte son altitude lissée, le même D+ à 1 Hz et à 5 Hz', () => {
-    const at1Hz = followedTraceFromSession(session(1, 3), 'Sortie', 'course', { land: true })!;
-    const at5Hz = followedTraceFromSession(session(5, 3), 'Sortie', 'course', { land: true })!;
+    const at1Hz = followedTraceFromSession(session(1, 3), 'Sortie', 'surf', { land: true })!;
+    const at5Hz = followedTraceFromSession(session(5, 3), 'Sortie', 'surf', { land: true })!;
     // Sans lissage, le bruit gonfle le D+ ; lissé, il reste celui des deux bosses (100 m).
     const rough = accumulateElevation(session(1, 3).map((p) => p.ele), MIN_GAIN).gainM;
     expect(gainOf(at1Hz)).toBeLessThan(rough);
@@ -436,11 +436,11 @@ describe('altitude de la trace suivie', () => {
 
   it('une session à terre sans altitude reste sans altitude', () => {
     const flat = session(1, 0).map(({ lat, lon }) => ({ lat, lon }));
-    expect(followedTraceFromSession(flat, 'Sortie', 'course', { land: true })!.points.every((p) => !('eleM' in p))).toBe(true);
+    expect(followedTraceFromSession(flat, 'Sortie', 'surf', { land: true })!.points.every((p) => !('eleM' in p))).toBe(true);
   });
 
   it('amincir garde les sommets, et deux fois garde le D+ à 1 m près', () => {
-    const full = followedTraceFromSession(session(1, 0), 'Sortie', 'course', { land: true })!;
+    const full = followedTraceFromSession(session(1, 0), 'Sortie', 'surf', { land: true })!;
     const once = thinFollowedTrace(full, FOLLOWED_TRACE_TOLERANCE_M);
     const twice = thinFollowedTrace(once, FOLLOWED_TRACE_TOLERANCE_M);
     // La route est droite : seul le relief garde des points.

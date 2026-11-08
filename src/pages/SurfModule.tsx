@@ -784,7 +784,7 @@ function SurfModule() {
                   {' · '}Cap : {track.some((p) => p.courseDeg !== undefined) ? "fourni par l'appareil" : 'tiré des positions'}.
                 </SessionSettingsHeader>
                 <div className="ui-row-18 ui-center ui-wrap">
-                  <SessionActivityField activities={allActivities} activity={activity} withPositions families={sessionFile ? undefined : ['surf']}
+                  <SessionActivityField activities={allActivities} activity={activity} families={sessionFile ? undefined : ['surf']}
                     onChange={(next) => changeSessionActivity(sessionFile, next)} />
                   <FoilPumpingFields
                     foilTitle="Surf foil pour cette session, enregistré avec elle. Celui de l'activité se règle dans Réglages."

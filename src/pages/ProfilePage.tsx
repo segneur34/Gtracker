@@ -25,7 +25,7 @@ import { useNow } from '../hooks/useNow';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
 import { CHART_PERIODS, type ChartRange } from '../library/activityChart';
-import { activityShares, favoriteActivity, withoutRetiredFamilies } from '../library/profile';
+import { activityShares, favoriteActivity } from '../library/profile';
 import { inBounds, isStatsPeriod, statsPeriodBounds, statsTotals } from '../library/stats';
 import { OTHERS_COLOR } from '../components/chartStyle';
 import './ProfilePage.css';
@@ -153,10 +153,10 @@ function ProfilePage() {
       others: rest.map(ofShare),
     };
   }, [inPeriod, activityOrder, activityById, shown]);
-  const favoriteId = useMemo(() => favoriteActivity(withoutRetiredFamilies(inPeriod), activityOrder), [inPeriod, activityOrder]);
+  const favoriteId = useMemo(() => favoriteActivity(inPeriod, activityOrder), [inPeriod, activityOrder]);
   const favorite = favoriteId ? activityById.get(favoriteId) ?? null : null;
   // Photo par défaut : le sport préféré de toutes les sessions, qui ne change pas avec la période (voile et surf seuls, lot 303).
-  const overallFavoriteId = useMemo(() => favoriteActivity(withoutRetiredFamilies(all), activityOrder), [all, activityOrder]);
+  const overallFavoriteId = useMemo(() => favoriteActivity(all, activityOrder), [all, activityOrder]);
   const overallFavorite = overallFavoriteId ? activityById.get(overallFavoriteId) ?? null : null;
   const openLibrary = (a: Activity) => navigate(libraryPath(activityFamily(a), a.id));
 

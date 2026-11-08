@@ -37,7 +37,7 @@ import PageHeader from '../components/ui/PageHeader';
 import { activityFamily, activityTreatment, findActivity, type Activity } from '../core/activities';
 import { DEFAULT_MAP_CENTER, trackBounds } from '../core/displayConfig';
 import { parseGpxPath } from '../core/gpxParser';
-import { ELEVATION_PRESETS, getSportProfile, usesMarkCourse } from '../core/sportProfiles';
+import { ELEVATION_PRESETS, usesMarkCourse } from '../core/sportProfiles';
 import { useExclusiveToggles } from '../hooks/useExclusiveToggles';
 import { DISTANCE_UNIT_SYMBOL, formatDistance, formatDuration, formatLandSpeed, toDisplayDistance, formatMeters, commaDecimal } from '../core/units';
 import { useLeaveWarning } from '../hooks/leaveGuard';
@@ -49,9 +49,9 @@ import { getLastFix, useRecorderStatus } from '../hooks/useRecorder';
 import { useRouteLibrary, type SavedRoute } from '../hooks/useRouteLibrary';
 import { useRunnerProfile } from '../hooks/useRunnerProfile';
 import {
-  effectiveDistanceUnit, effectiveDurationSettings, effectiveGradeRange, effectiveLoopReturnRatio, effectiveMarkGuide, effectivePace, effectiveSpeedUnit, effectiveWayTypes, lastRecordActivity, readStoredSettings, useVisibility,
+  effectiveDistanceUnit, effectiveDurationSettings, effectiveGradeRange, effectiveLoopReturnRatio, effectiveMarkGuide, effectivePace, effectiveSpeedUnit, effectiveWayTypes, lastRecordActivity, useVisibility,
 } from '../hooks/useSportSettings';
-import { PLANNING_FAMILIES, resolveTerrainStepM } from '../settings/activitySettings';
+import { PLANNING_FAMILIES } from '../settings/activitySettings';
 import { ROUTES_DIR } from '../library/folderLayout';
 import { guessSport } from '../library/naming';
 import { PACE_LEVEL_LABEL, estimateDurationFromProfile } from '../planning/duration';
@@ -66,6 +66,7 @@ import {
   type PlannedRoute, type RouteMode, type RoutePoint, type Waypoint,
 } from '../planning/route';
 import { wayTypesOf, waysMode } from '../planning/wayTypes';
+import { PLANNING_TERRAIN_STEP_M } from '../planning/importedElevation';
 import { buildRouteGpx, markLabel, waypointLabel } from '../planning/routeGpx';
 import { recordToRoute, routeMarkGuide } from '../planning/routeRecord';
 import { routeSurfacePaths, routeSurfaces, type SurfaceCategory } from '../planning/surface';
@@ -347,14 +348,15 @@ function PlanningPage() {
   const gradeRange = useMemo(() => (activity ? effectiveGradeRange(activity) : null), [activity]);
   const color = safeColor(activity?.color ?? FALLBACK_COLOR);
   /** Famille de l'activité planifiée : son fond de carte, celui de ses analyses. */
-  const mapFamily = activity ? activityFamily(activity) : 'course';
+  // Sans activité, le fond de la voile (lot 305).
+  const mapFamily = activity ? activityFamily(activity) : 'voile';
   const satellite = useMapBase(mapFamily)[0] === 'satellite';
   const riderKg = useRunnerProfile().profile.weightKg;
   /** Réglage du temps estimé : niveau de l'activité dans Réglages ; `null` en voile. */
   const durationSettings = useMemo(() => (activity ? effectiveDurationSettings(activity, riderKg) : null), [activity, riderKg]);
   const pace = useMemo(() => (activity ? effectivePace(activity) : null), [activity]);
 
-  const vehicle = routeVehicle(activity ? activityTreatment(activity) : 'course');
+  const vehicle = routeVehicle(activity ? activityTreatment(activity) : 'voile');
   /** Retour d'une boucle : au plus tant de fois l'aller (Réglages) ; `null` en voile. */
   const loopRatio = useMemo(() => (activity ? effectiveLoopReturnRatio(activity) : null), [activity]);
   // Types de voie de l'activité à l'ouverture et à chaque changement d'activité, puis ceux que l'on coche ; mode « Boucle »
@@ -389,9 +391,9 @@ function PlanningPage() {
     setActivityId(id);
     const next = findActivity(activities, id);
     const nextMode = activityMode(next);
-    const nextFamily = next ? activityFamily(next) : 'course';
+    const nextFamily = next ? activityFamily(next) : 'voile';
     const nextEdit = usesMarkCourse(nextFamily) ? 'straight' : nextMode;
-    const nextVehicle = routeVehicle(next ? activityTreatment(next) : 'course');
+    const nextVehicle = routeVehicle(next ? activityTreatment(next) : 'voile');
     planner.chooseMode(nextMode, (r) => setRouteMode(r, nextEdit, editMode, nextVehicle !== vehicle),
       usesMarkCourse(nextFamily) ? false : undefined);
   };
@@ -741,9 +743,9 @@ function PlanningPage() {
       const sport = guessSport(parsed.trackType);
       const guessed = sport ? activities.find((a) => a.base === sport && plannable(a)) : undefined;
       // La trace reste telle quelle : pas de mode « Boucle ».
-      // Son altitude est demandée à l'IGN, au pas des analyses de l'activité (rien en voile ni en surf) ; sans activité, celui de la course.
+      // Son altitude est demandée à l'IGN sans activité seulement (rien en voile ni en surf), au pas de `PLANNING_TERRAIN_STEP_M`.
       const target = guessed ?? activity;
-      const terrainStepM = target ? resolveTerrainStepM(readStoredSettings(), target) : getSportProfile('running').terrainElevationStepM;
+      const terrainStepM = target ? null : PLANNING_TERRAIN_STEP_M;
       planner.loadImported(loaded, terrainStepM, guessed ? activityMode(guessed) : undefined, false);
       setLocked(false);
       setCurrent(null);

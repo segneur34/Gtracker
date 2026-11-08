@@ -4,6 +4,7 @@ import { activeRuns, buildBaseSessionStats, buildCumulativeTrack, computeActiveT
 import { getActiveThresholds, SPORT_PROFILES, type SportProfile } from './sportProfiles';
 import type { RawTrackPoint, TrackPoint } from './types';
 import { mPerDegLon } from '../test/geo.fixture';
+import { WALK_PROFILE } from '../test/walkProfile.fixture';
 
 const START_MS = Date.parse('2026-10-27T10:00:00Z');
 const LAT = 43.6;
@@ -68,7 +69,8 @@ const totalDistanceM = (track: TrackPoint[]): number => {
   return cumDist[cumDist.length - 1];
 };
 
-const RUNNING = SPORT_PROFILES.running;
+/** Profil à pied gelé (`WALK_PROFILE`) : seuil en km/h, confirmation sur 3 s. */
+const RUNNING = WALK_PROFILE;
 
 describe('buildBaseSessionStats, dénominateur du ratio', () => {
   // 10 min à 10 m/s, 10 min à 2 m/s, 10 min à l'arrêt.
@@ -144,7 +146,7 @@ describe('getActiveThresholds', () => {
 
   it('garde seuil + écart quand il reste positif', () => {
     expect(getActiveThresholds(RUNNING, 3)).toEqual({ enter: 4, exit: 2 });
-    expect(getActiveThresholds(SPORT_PROFILES.cycling, 5)).toEqual({ enter: 6, exit: 3 });
+    expect(getActiveThresholds(SPORT_PROFILES.surf, 5)).toEqual({ enter: 6, exit: 3 });
   });
 
   it('donne au plancher d’arrêt du bateau une sortie à 0,5 nœud, et rend 0 pour un seuil nul', () => {

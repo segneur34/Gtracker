@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeDeg } from '../core/angles';
 import { isFiniteNumber, isObject } from '../core/basics';
 import { isValidSpeedRange } from '../core/speedGradient';
-import { isValidBikeWeight, isValidCarriedLoad } from '../core/retiredLand';
+
 import { EMPTY_NOTES } from './notes';
 import {
   ANALYSIS_KEYS,
@@ -316,8 +316,8 @@ describe('séances du compteur de la fiche', () => {
     expect(completeRecord(record({ intervals: [] }), record({ intervals })).record.intervals).toEqual(intervals);
   });
 
-  it('restent quand l\'activité ou le support changent', () => {
-    const changed = applyRecordPatch(record({ sport: 'run-intervals', intervals }), { sport: 'running', activityId: 'running' });
+  it('restent quand l\'activité ou le support changent, même une fiche de fractionné classée en surf (lot 305)', () => {
+    const changed = applyRecordPatch(record({ sport: null, intervals }), { sport: 'surf', activityId: 'surf' });
     expect(changed.record.intervals).toEqual(intervals);
   });
 });
@@ -564,8 +564,8 @@ describe('applyRecordPatch', () => {
   });
 
   it("d'une famille à l'autre, seuil et bornes de couleur effacés, le reste gardé", () => {
-    const { record: next, resummarize } = applyRecordPatch(withAnalysis, { sport: 'running', activityId: 'running' });
-    expect(next.sport).toBe('running');
+    const { record: next, resummarize } = applyRecordPatch(withAnalysis, { sport: 'surf', activityId: 'surf' });
+    expect(next.sport).toBe('surf');
     expect(next.analysis).toEqual({ ...analysis, activeThreshold: null, speedRange: null });
     expect(next.notes).toBe(withAnalysis.notes);
     expect(next.name).toBe(withAnalysis.name);
@@ -575,17 +575,9 @@ describe('applyRecordPatch', () => {
     expect(applyRecordPatch(next, { sport: 'wingfoil' }).record.analysis?.windDeg).toBe(20);
   });
 
-  it('de la course au fractionné à pied, même traitement : les bornes de couleur restent', () => {
-    const running = record({ sport: 'running', analysis });
-    const { record: next } = applyRecordPatch(running, { sport: 'run-intervals', activityId: 'run-intervals' });
-    expect(next.analysis).toEqual({ ...analysis, activeThreshold: null });
-    // Vers le fractionné vélo, l'échelle change.
-    expect(applyRecordPatch(running, { sport: 'bike-intervals' }).record.analysis?.speedRange).toBeNull();
-  });
-
   it('classer une session sans support ne touche pas à ses réglages', () => {
     const unclassified = record({ sport: null, analysis });
-    const { record: next, resummarize } = applyRecordPatch(unclassified, { sport: 'running', activityId: 'running' });
+    const { record: next, resummarize } = applyRecordPatch(unclassified, { sport: 'surf', activityId: 'surf' });
     expect(next.analysis).toEqual({ ...analysis, activeThreshold: null });
     expect(resummarize).toBe(true);
   });
@@ -911,6 +903,10 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
   });
 });
 
+/** Bornes de l'ancien `core/retiredLand.ts` (supprimé au lot 305), gelées ici. */
+const isValidBikeWeight = (value: unknown): value is number => typeof value === 'number' && isFinite(value) && value >= 3 && value <= 60;
+const isValidCarriedLoad = (value: unknown): value is number => typeof value === 'number' && isFinite(value) && value >= 0 && value <= 50;
+
 /** Copie gelée de la lecture des réglages d'avant la table `ANALYSIS_FIELDS` (lot 80). */
 const oldReadAnalysis = (raw: unknown): SessionAnalysis | null => {
   if (!isObject(raw)) return null;
@@ -1071,5 +1067,34 @@ describe('meilleurs efforts déjà rangés (lot 146 ; plus calculés depuis le l
     expect(parseRecord(JSON.stringify({ ...raw, summary: { ...summary, bests: { d5kmS: 299, d10kmS: 599 } } }))!.summary.bests).toBeUndefined();
     const edges = { d5kmS: SUMMARY_BESTS_BOUNDS.d5kmS.max, d10kmS: SUMMARY_BESTS_BOUNDS.d10kmS.min, p20minW: 2000, powerRiderKg: 20 };
     expect(parseRecord(JSON.stringify({ ...raw, summary: { ...summary, bests: edges } }))!.summary.bests).toEqual(edges);
+  });
+});
+
+describe("fiche de l'application complète : course, vélo, fractionné (lot 305)", () => {
+  /** Fiche de course telle que l'écrit l'application complète, résumé à jour. */
+  const raw = (sport: string) => JSON.stringify({ ...sessionRecord({ gpx: `2026-09-23_14-00-00_${sport}.gpx`, activityId: sport, name: 'Sortie' }), sport }, null, 2);
+
+  it('se relit sans calcul, son calcul gardé brut et rendu à chaque écriture', () => {
+    for (const sport of ['running', 'cycling', 'run-intervals', 'bike-intervals', 'run-test', 'muscu']) {
+      const parsed = parseRecordWithRaw(raw(sport))!;
+      expect(parsed.parts.sport, sport).toBeNull();
+      expect(parsed.unreadable.sport, sport).toEqual({ raw: sport, read: null });
+      const record = { ...parsed.parts, summary: parsed.parts.summary! };
+      // Renommée, puis réécrite : le calcul d'origine revient tel quel.
+      const renamed = applyRecordPatch(record, { name: 'Renommée' }).record;
+      const written = JSON.parse(serializeRecord(renamed, parsed.unreadable));
+      expect(written.sport, sport).toBe(sport);
+      expect(written.name).toBe('Renommée');
+      // Son résumé n'est jamais à refaire : rien ne la réécrit d'office.
+      expect(isSummaryStale(record), sport).toBe(false);
+    }
+  });
+
+  it("classée en voile ou en surf par l'utilisateur, elle prend le calcul choisi : un geste explicite", () => {
+    const parsed = parseRecordWithRaw(raw('running'))!;
+    const record = { ...parsed.parts, summary: parsed.parts.summary! };
+    const { record: classed, resummarize } = applyRecordPatch(record, { sport: 'surf', activityId: 'surf' });
+    expect(resummarize).toBe(true);
+    expect(JSON.parse(serializeRecord(classed, parsed.unreadable)).sport).toBe('surf');
   });
 });

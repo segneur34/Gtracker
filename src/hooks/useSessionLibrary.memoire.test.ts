@@ -70,7 +70,7 @@ const mockPlatform = (): void => {
       return {
         rawPoints: [...text.matchAll(/<trkpt lat="([\d.]+)" lon="([\d.]+)"><time>([^<]+)<\/time>/g)]
           .map((m) => ({ lat: Number(m[1]), lon: Number(m[2]), time: m[3] })),
-        trackType: 'running',
+        trackType: 'surf',
         hasDeviceSpeed: false,
       };
     },
@@ -212,7 +212,7 @@ describe("fiche d'une version future renommée (A1)", () => {
     const surfaces = { source: 'overpass', format: 2, segments: [{ from: 0, kind: 'asphalte' }] };
     files.set('sessions/sortie.gpx', gpxAt(0));
     files.set('sessions/sortie.json', JSON.stringify({
-      format: RECORD_FORMAT, version: RECORD_VERSION, gpx: 'sortie.gpx', sport: 'running', activityId: null, source: 'import',
+      format: RECORD_FORMAT, version: RECORD_VERSION, gpx: 'sortie.gpx', sport: 'surf', activityId: null, source: 'import',
       addedAt: '2026-10-27T11:00:00.000Z', title: null, name: null,
       summary: { calcVersion: SUMMARY_CALC_VERSION, startMs, endMs: startMs + 20_000, distanceM: 66, movingTimeS: 20, elevationGainM: null, maxSpeedMs: 3.3, pointCount: 3, samplingS: 10 },
       notes: null, analysis: null, surfaces,
@@ -233,7 +233,7 @@ describe('enregistrement en attente d\'un dossier (A2)', () => {
   it('pose les capteurs, puis la fiche, avant le GPX : un GPX en attente a toujours les siens complets', async () => {
     access = 'unavailable';
     const library = await openFresh();
-    await library.saveRecordedSession(gpxAt(0), 'running', null, new Uint8Array([1]));
+    await library.saveRecordedSession(gpxAt(0), 'surf', null, new Uint8Array([1]));
     expect(pendingWrites.map((p) => p.replace(/^.*\./, ''))).toEqual(['imu', 'json', 'gpx']);
   });
 });
@@ -286,7 +286,7 @@ describe('GPX vide dans le dossier (lot 84, C)', () => {
     files.set('sessions/vide.gpx', '');
     // Fiche lisible au résumé illisible, puis fiche d'une version plus récente.
     files.set('sessions/vide.json', JSON.stringify({
-      format: RECORD_FORMAT, version: RECORD_VERSION, gpx: 'vide.gpx', sport: 'running', activityId: null, source: 'import',
+      format: RECORD_FORMAT, version: RECORD_VERSION, gpx: 'vide.gpx', sport: 'surf', activityId: null, source: 'import',
       addedAt: '2026-10-27T11:00:00.000Z', title: null, name: 'Matin', summary: null, notes: null, analysis: null,
     }));
     files.set('sessions/futur.gpx', '');

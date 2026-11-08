@@ -139,12 +139,6 @@
   /* Familles et actions */
   --voile: #004aad;
   --voile-soft: #e5eefb;
-  --course: #d11a1a;
-  --course-soft: #fdeaea;
-  --velo: #2c7231;
-  --velo-soft: #e4f2e5;
-  --fractionne: #c25700;
-  --fractionne-soft: #feece3;
   --surf: #5b6670;
   --surf-soft: #eceff2;
   /* Boutons de planification de l'accueil (ardoise de la maquette). */
@@ -233,12 +227,6 @@
 
   --voile: #2f6fd6;
   --voile-soft: #1a2a44;
-  --course: #d93636;
-  --course-soft: #3d1c1c;
-  --velo: #34823c;
-  --velo-soft: #1b2f1d;
-  --fractionne: #c25700;
-  --fractionne-soft: #3a2414;
   --surf: #627386;
   --surf-soft: #262c33;
   --home-action: #4b64a0;
@@ -292,9 +280,6 @@
   --line-strong: #2f353b;
 
   --voile-soft: #121c2e;
-  --course-soft: #2a1313;
-  --velo-soft: #112014;
-  --fractionne-soft: #28180d;
   --surf-soft: #16191d;
   --contour: transparent;
 

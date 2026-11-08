@@ -28,13 +28,11 @@ describe('matériel enregistré (lot 20) : écrit dans les réglages', () => {
     expect(addGearItem('wing', 'g-inconnu', 'Axis')).toBeNull();
   });
 
-  it('propose le pumping en voile sur foil comme en surf, pas en bateau ni à pied (lot 22)', () => {
+  it('propose le pumping en voile sur foil comme en surf, pas en bateau (lot 22)', () => {
     const wing = DEFAULT_ACTIVITIES.find((a) => a.base === 'wingfoil')!;
     const boat = { id: 'a-voilier', name: 'Voilier', base: 'bateau' as const, color: '#014e86' };
-    const run = DEFAULT_ACTIVITIES.find((a) => a.base === 'running')!;
     expect(effectivePumping(wing)).toBe(false);
     expect(effectivePumping(boat)).toBeNull();
-    expect(effectivePumping(run)).toBeNull();
     jsonStore.write('tracker.sportSettings', { pumping: { [wing.id]: true, [boat.id]: true } });
     expect(effectivePumping(wing)).toBe(true);
     expect(effectivePumping(boat)).toBeNull();

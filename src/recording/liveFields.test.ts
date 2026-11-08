@@ -28,20 +28,17 @@ const context = (patch: Partial<LiveFieldContext> = {}): LiveFieldContext => ({
 describe('liveFieldsOfTreatment', () => {
   it('ne propose que les chiffres qui ont un sens pour le traitement', () => {
     expect(liveFieldsOfTreatment('voile')).toContain('recentTopShort');
-    expect(liveFieldsOfTreatment('voile')).not.toContain('power');
-    for (const treatment of ['voile', 'course', 'velo', 'surf'] as const) {
+    for (const treatment of ['voile', 'surf'] as const) {
       expect(liveFieldsOfTreatment(treatment)).toEqual(expect.arrayContaining(['heartRate', 'averageHeartRate', 'heartRateZone']));
     }
-    expect(liveFieldsOfTreatment('course')).toContain('power');
     expect(liveFieldsOfTreatment('voile')).toContain('markDistance');
     expect(liveFieldsOfTreatment('surf')).toEqual(expect.arrayContaining(['markDistance', 'markBearing']));
-    expect(liveFieldsOfTreatment('course')).not.toContain('markBearing');
-    expect(liveFieldsOfTreatment('course')).not.toContain('heading');
-    expect(liveFieldsOfTreatment('velo')).toContain('grade');
+    expect(liveFieldsOfTreatment('surf')).not.toContain('heading');
+    expect(liveFieldsOfTreatment('surf')).not.toContain('recentTopShort');
   });
 
   it('propose les défauts de chaque traitement', () => {
-    for (const treatment of ['voile', 'course', 'velo', 'surf'] as const) {
+    for (const treatment of ['voile', 'surf'] as const) {
       for (const key of DEFAULT_LIVE_FIELDS[treatment]) expect(liveFieldsOfTreatment(treatment)).toContain(key);
       for (const key of DEFAULT_NOTIFICATION_FIELDS[treatment]) expect(liveFieldsOfTreatment(treatment)).toContain(key);
       expect(DEFAULT_NOTIFICATION_FIELDS[treatment].length).toBeLessThanOrEqual(MAX_NOTIFICATION_FIELDS);
@@ -66,20 +63,25 @@ describe('liveFieldsOfTreatment', () => {
 
 describe('sanitizeLiveFields', () => {
   it('garde les clés connues et permises, sans doublon, dans la limite', () => {
-    expect(sanitizeLiveFields(['speed', 'power', 'speed', 'inconnu', 'heading'], 'course')).toEqual(['speed', 'power']);
+    expect(sanitizeLiveFields(['speed', 'heading', 'speed', 'inconnu', 'recentTopShort'], 'surf')).toEqual(['speed']);
     expect(sanitizeLiveFields(['speed', 'average', 'max', 'distance', 'duration'], 'voile')).toHaveLength(MAX_LIVE_FIELDS);
+  });
+
+  it('écarte les chiffres de la terre (pente, D+, puissance, énergie) rangés par l\'application complète (lot 305)', () => {
+    expect(sanitizeLiveFields(['speed', 'power', 'gain', 'grade', 'effort', 'climbRate', 'loss', 'recentDistanceGain', 'heading'], 'voile')).toEqual(['speed', 'heading']);
+    expect(sanitizeLiveFields(['gain', 'power'], 'surf')).toBeNull();
   });
 
   it('borne au maximum demandé, celui de la notification', () => {
     expect(sanitizeLiveFields(['speed', 'average', 'max', 'distance'], 'voile', MAX_NOTIFICATION_FIELDS)).toEqual(['speed', 'average']);
-    expect(sanitizeLiveFields(['heading', 'speed', 'power', 'average', 'max'], 'course', 3)).toEqual(['speed', 'power', 'average']);
+    expect(sanitizeLiveFields(['heading', 'speed', 'max', 'average', 'distance'], 'surf', 3)).toEqual(['speed', 'max', 'average']);
   });
 
   it("rend null quand rien ne reste, pour retomber sur le défaut", () => {
-    expect(sanitizeLiveFields([], 'course')).toBeNull();
-    expect(sanitizeLiveFields(['heading'], 'course')).toBeNull();
-    expect(sanitizeLiveFields('speed', 'course')).toBeNull();
-    expect(sanitizeLiveFields(undefined, 'course')).toBeNull();
+    expect(sanitizeLiveFields([], 'surf')).toBeNull();
+    expect(sanitizeLiveFields(['heading'], 'surf')).toBeNull();
+    expect(sanitizeLiveFields('speed', 'surf')).toBeNull();
+    expect(sanitizeLiveFields(undefined, 'surf')).toBeNull();
   });
 });
 
@@ -97,7 +99,7 @@ describe('moyenne du direct : « Moyenne active » en voile et en surf (04/11)',
     expect(liveFieldValue('average', context({ stats: { ...stats, activeAverageSpeedMs: null }, options: active }))).toBe(liveFieldValue('average', context()));
   });
 
-  it('course, vélo, fractionné et bateau gardent leur chiffre et leur nom', () => {
+  it('le bateau, sans seuil, garde son chiffre et son nom', () => {
     expect(liveFieldLabel('average', { speedUnit: 'kmh', distanceUnit: 'km' })).toBe('Moyenne');
     expect(liveFieldLabel('average', { speedUnit: 'minkm', distanceUnit: 'km' })).toBe('Allure moyenne');
     expect(liveFieldShortLabel('average', { speedUnit: 'kmh', distanceUnit: 'km' })).toBe('Moy.');
@@ -115,7 +117,6 @@ describe('liveFieldLabel', () => {
     expect(liveFieldLabel('average', { speedUnit: 'kn', distanceUnit: 'nm' })).toBe('Moyenne');
     expect(liveFieldLabel('lastDistance', { speedUnit: 'kn', distanceUnit: 'nm' })).toBe('Dernier mille');
     expect(liveFieldLabel('recentDistanceSpeed', { speedUnit: 'kmh', distanceUnit: 'km' })).toBe('300 derniers m');
-    expect(liveFieldLabel('power', { speedUnit: 'kmh', distanceUnit: 'km' })).toBe('Puissance (15 s)');
   });
 });
 
@@ -128,24 +129,6 @@ describe('liveFieldShortLabel', () => {
 });
 
 describe('liveFieldValue', () => {
-  it('formate pente, dénivelé et vitesse ascensionnelle', () => {
-    const stats = { ...EMPTY_LIVE_STATS, currentGrade: 0.062, recentDistanceGainM: 14.6, climbRateMh: 851.2 };
-    expect(liveFieldValue('grade', context({ stats }))).toBe('+6 %');
-    expect(liveFieldValue('grade', context({ stats: { ...stats, currentGrade: -0.08 } }))).toBe('−8 %');
-    expect(liveFieldValue('grade', context({ stats: { ...stats, currentGrade: 0.004 } }))).toBe('0 %');
-    expect(liveFieldValue('recentDistanceGain', context({ stats }))).toBe('15 m');
-    expect(liveFieldValue('climbRate', context({ stats }))).toBe('851 m/h');
-  });
-
-  it('formate puissance et énergie, par kilo sans poids', () => {
-    const stats = { ...EMPTY_LIVE_STATS, recentPowerW: 312.4, effortJ: 640 * 4184 };
-    expect(liveFieldValue('power', context({ stats }))).toBe('312 W');
-    expect(liveFieldValue('effort', context({ stats }))).toBe('640 kcal');
-    const perKg = { ...stats, recentPowerW: 4.18, effortJ: 8.5 * 4184, energyPerKg: true };
-    expect(liveFieldValue('power', context({ stats: perKg }))).toBe('4,2 W/kg');
-    expect(liveFieldValue('effort', context({ stats: perKg }))).toBe('8,5 kcal/kg');
-  });
-
   it('donne le temps restant à la moyenne actuelle, et rien sans trace', () => {
     const stats = { ...EMPTY_LIVE_STATS, averageSpeedMs: 3 };
     expect(liveFieldValue('remainingTime', context({ stats, remainingM: 5400 }))).toBe('0:30:00');
@@ -154,7 +137,7 @@ describe('liveFieldValue', () => {
   });
 
   it('marque les valeurs manquantes', () => {
-    for (const key of ['grade', 'gain', 'climbRate', 'power', 'effort', 'heading', 'legAverage', 'markDistance', 'markBearing'] as const) {
+    for (const key of ['heading', 'legAverage', 'markDistance', 'markBearing'] as const) {
       expect(liveFieldValue(key, context())).toBe('—');
     }
     expect(liveFieldValue('heading', context({ headingDeg: 359.7 }))).toBe('0°');
@@ -171,21 +154,12 @@ describe('liveFieldValue', () => {
   });
 });
 
-describe('muscu (lot I du 25/10)', () => {
-  it('ne propose que la FC et le temps : ni vitesse, ni distance, ni pente', () => {
-    expect(liveFieldsOfTreatment('muscu', 'live')).toEqual(['heartRate', 'averageHeartRate', 'heartRateZone', 'duration', 'clock']);
-    expect(liveFieldsOfTreatment('muscu', 'notification')).toEqual(['heartRate', 'averageHeartRate', 'heartRateZone', 'duration', 'clock']);
-    expect(sanitizeLiveFields(['speed', 'distance', 'heartRate'], 'muscu')).toEqual(['heartRate']);
-    expect(defaultNotificationFieldsOf('muscu')).toEqual(['heartRate', 'duration']);
-  });
-});
-
 describe('étape du compteur, retirée (lot 302)', () => {
   it("un « Étape » déjà rangé est écarté à la lecture, partout", () => {
-    expect(liveFieldsOfTreatment('course', 'notification')).not.toContain('step');
-    expect(sanitizeLiveFields(['step', 'speed'], 'course', MAX_NOTIFICATION_FIELDS, 'notification')).toEqual(['speed']);
-    expect(sanitizeLiveFields(['step'], 'velo', MAX_NOTIFICATION_FIELDS, 'notification')).toBeNull();
-    expect(sanitizeLiveFields(['step', 'speed'], 'course', MAX_LIVE_FIELDS, 'live')).toEqual(['speed']);
+    expect(liveFieldsOfTreatment('voile', 'notification')).not.toContain('step');
+    expect(sanitizeLiveFields(['step', 'speed'], 'voile', MAX_NOTIFICATION_FIELDS, 'notification')).toEqual(['speed']);
+    expect(sanitizeLiveFields(['step'], 'surf', MAX_NOTIFICATION_FIELDS, 'notification')).toBeNull();
+    expect(sanitizeLiveFields(['step', 'speed'], 'surf', MAX_LIVE_FIELDS, 'live')).toEqual(['speed']);
   });
 });
 
@@ -213,13 +187,6 @@ describe('libellés sur les options du direct (lot 67)', () => {
       case 'legAverage': return 'Moyenne du bord';
       case 'markDistance': return 'Balise';
       case 'markBearing': return 'Cap balise';
-      case 'grade': return 'Pente';
-      case 'gain': return 'D+';
-      case 'recentDistanceGain': return `D+ ${LIVE_STATS_DEFAULTS.recentDistanceM} derniers m`;
-      case 'loss': return 'D−';
-      case 'climbRate': return 'Vitesse ascensionnelle';
-      case 'power': return `Puissance (${LIVE_STATS_DEFAULTS.powerWindowS} s)`;
-      case 'effort': return 'Énergie';
       case 'heartRate': return 'Fréquence cardiaque';
       case 'averageHeartRate': return 'FC moyenne';
       case 'heartRateZone': return 'Zone cardiaque';
@@ -245,13 +212,6 @@ describe('libellés sur les options du direct (lot 67)', () => {
       case 'legAverage': return 'Bord';
       case 'markDistance': return 'Balise';
       case 'markBearing': return 'Cap bal.';
-      case 'grade': return 'Pente';
-      case 'gain': return 'D+';
-      case 'recentDistanceGain': return `D+ ${LIVE_STATS_DEFAULTS.recentDistanceM} m`;
-      case 'loss': return 'D−';
-      case 'climbRate': return 'Asc.';
-      case 'power': return 'Puiss.';
-      case 'effort': return 'Énergie';
       case 'heartRate': return 'FC';
       case 'averageHeartRate': return 'FC moy.';
       case 'heartRateZone': return 'Zone';
@@ -280,17 +240,14 @@ describe('libellés sur les options du direct (lot 67)', () => {
   it('suivent des options changées', () => {
     const units: LiveFieldUnits = {
       speedUnit: 'kmh', distanceUnit: 'km',
-      options: { ...LIVE_STATS_DEFAULTS, recentWindowS: 600, topDurationsS: [3, 20], recentDistanceM: 500, maxDurationS: 5, powerWindowS: 30 },
+      options: { ...LIVE_STATS_DEFAULTS, recentWindowS: 600, topDurationsS: [3, 20], recentDistanceM: 500, maxDurationS: 5 },
     };
     expect(liveFieldLabel('recentTopShort', units)).toBe('Top 3 s (10 min)');
     expect(liveFieldLabel('recentTopLong', units)).toBe('Top 20 s (10 min)');
     expect(liveFieldLabel('recentDistanceSpeed', units)).toBe('500 derniers m');
-    expect(liveFieldLabel('recentDistanceGain', units)).toBe('D+ 500 derniers m');
     expect(liveFieldLabel('max', units)).toBe('Max (5 s)');
-    expect(liveFieldLabel('power', units)).toBe('Puissance (30 s)');
     expect(liveFieldShortLabel('recentTopShort', units)).toBe('Top 3 s');
     expect(liveFieldShortLabel('recentDistanceSpeed', units)).toBe('500 m');
-    expect(liveFieldShortLabel('recentDistanceGain', units)).toBe('D+ 500 m');
     expect(recentWindowLabel(units.options)).toBe('10 min');
   });
 });

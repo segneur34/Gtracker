@@ -4,9 +4,9 @@ import {
   edwardsLoad, estimateHrMax, heartRateHistogram, heartRateStats, heartRateThresholds, heartRateZonePaths, heartRateZones,
   histogramZoneTimes, isValidThresholds, isValidZoneBounds, smoothHeartRate, spanHeartRate, timeInZones, timeSpanHeartRate, type HeartRatePoint,
 } from './heartRate';
-import { SPORT_PROFILES } from './sportProfiles';
+import { REFERENCE_HEART_RATE } from './sportProfiles';
 
-const P = SPORT_PROFILES.running.heartRate;
+const P = REFERENCE_HEART_RATE;
 const T0 = Date.UTC(2026, 9, 15, 10, 0, 0);
 
 /** Points à `hz` par seconde, de `startS` à `endS` exclu, FC `hrAt(t)` (`undefined` : sans mesure). */

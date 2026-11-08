@@ -14,8 +14,8 @@ import type { SportFamily } from './sportProfiles';
  * copies d'une tuile à côté, ce qui dépasse d'un bord reprenant à l'autre.
  *
  * Dessins choisis par l'utilisateur sur maquette le 23/10 : voile et surf
- * d'après ses images (souffle de vent, vague), fractionné celui du 22/10 ;
- * ceux de la course et du vélo sont partis avec eux (lot 303). Chaque fond a sa taille de tuile et son
+ * d'après ses images (souffle de vent, vague) ; ceux de la course, du vélo et
+ * du fractionné sont partis avec eux (lots 303 et 305). Chaque fond a sa taille de tuile et son
  * espacement (`scale`, qui agrandit la tuile sans épaissir le trait) ; l'encre
  * et l'épaisseur sont dans le CSS (`ui.css`, `.page-backdrop--<fond>`).
  */
@@ -187,14 +187,6 @@ const neighbours = (width: number, height: number): Point[] =>
   [[0, 0], [-width, 0], [width, 0], [0, -height], [0, height], [-width, -height]];
 
 /**
- * Dessin isolé posé en `(x, y)` (tracé relatif après son point de départ), répété une tuile plus à gauche
- * et plus haut : ce qui dépasse à droite ou en bas reprend à gauche ou en haut.
- */
-const wrappedShape = (x: number, y: number, relative: string): string =>
-  [[0, 0], [-TILE_W, 0], [0, -TILE_H], [-TILE_W, -TILE_H]]
-    .map(([dx, dy]) => `M${roundTo(x + dx, 1)} ${roundTo(y + dy, 1)}${relative}`).join('');
-
-/**
  * Souffle de vent, d'après l'image de l'utilisateur (23/10) : quatre longs traits, dont l'un finit en
  * spirale. Tracés absolus dans un cadre de 1080 × 370, posés à l'échelle voulue par `placeSouffle`.
  */
@@ -265,35 +257,13 @@ const surfTile = (): TilePath[] => {
   }));
 };
 
-/** Fractionné : rafales de trois traits de vitesse en diagonale, en quinconce. */
-const fractionneTile = (): TilePath[] => {
-  const paths: string[] = [];
-  const [ux, uy] = [0.83, -0.55];
-  const cols = 3;
-  const rows = 5;
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const x0 = (col * TILE_W) / cols + (row % 2) * 50 + jitter(row * cols + col) * 20;
-      const y0 = (row * TILE_H) / rows + 80;
-      [[0, 0, 54], [16, 11, 84], [42, 16, 38]].forEach(([dx, dy, len]) => {
-        paths.push(wrappedShape(x0 + dx, y0 + dy, `l${roundTo(ux * len, 1)} ${roundTo(uy * len, 1)}`));
-      });
-    }
-  }
-  return [{ d: paths.join('') }];
-};
-
 export type BackdropVariant = 'contours' | SportFamily;
 
 /** Dessin, taille de tuile et espacement de chaque fond, réglés à l'œil par l'utilisateur sur la maquette du 23/10. */
 const BACKDROPS: Record<BackdropVariant, { draw: () => TilePath[]; width: number; height: number; scale: number }> = {
   contours: { draw: contourTile, width: TILE_W, height: TILE_H, scale: 1 },
   voile: { draw: voileTile, width: TILE_W, height: TILE_H, scale: 0.9 },
-  // Course et vélo, retirés de cette version (lot 303) : leurs clés restent (types, lot 305), au dessin des courbes de niveau.
-  course: { draw: contourTile, width: TILE_W, height: TILE_H, scale: 1 },
-  velo: { draw: contourTile, width: TILE_W, height: TILE_H, scale: 1 },
   surf: { draw: surfTile, width: SURF_W, height: SURF_H, scale: 0.9 },
-  fractionne: { draw: fractionneTile, width: TILE_W, height: TILE_H, scale: 1 },
 };
 
 /** Tuile d'un fond ; ses tracés sont calculés une fois, à la première demande. */

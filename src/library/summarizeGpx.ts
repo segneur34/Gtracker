@@ -14,20 +14,20 @@ export interface SummarizeGpxOptions {
   sport: SportType | null | undefined;
   /** Réglages d'analyse de la fiche (seuil, allure), s'il y en a. */
   analysis: SessionAnalysis | null | undefined;
-  /** Réglages de l'activité de la session par calcul : celui de la session, ou les onze quand il est à deviner. */
+  /** Réglages de l'activité de la session par calcul : celui de la session, ou les cinq quand il est à deviner. */
   activitySettings: Partial<Record<SportType, ActivitySummarySettings>>;
-  /** Altitude du terrain de la fiche, la source choisie et son test guidé. */
+  /** Altitude du terrain de la fiche et la source choisie : portée, plus lue (`SessionElevation`). */
   elevation: SessionElevation | null | undefined;
 }
 
-/** Les onze calculs, pour une session dont le calcul est à deviner. */
+/** Les cinq calculs, pour une session dont le calcul est à deviner. */
 const ALL_SPORTS = Object.keys(SPORT_PROFILES) as SportType[];
 
 /**
  * Options du résumé d'une session (`summarizeGpx`) : le calcul, l'analyse et l'altitude de sa fiche
  * (`record`, absente pour un GPX neuf : calcul deviné ; `addGpx` y passe le calcul qu'il impose, `undefined` s'il
  * est à deviner) ; les réglages de son activité lus par `activityOf` pour le calcul de la fiche, ou pour chacun
- * des onze si le calcul est à deviner.
+ * des cinq si le calcul est à deviner.
  */
 export const summarizeGpxOptions = (
   record: (Partial<Pick<RecordWithoutSummary, 'analysis' | 'terrainElevation' | 'elevationSource'>> & { sport: SportType | null | undefined }) | null | undefined,
@@ -54,9 +54,9 @@ export const summarizeGpxOptions = (
  * Lit un GPX et le résume, comme `analyzeGpx` avec les mêmes réglages. Rend `null` si la trace a moins de deux
  * points, lève si le XML est illisible, ou si la table ne porte pas le calcul retenu (options mal formées).
  */
-export const summarizeGpx = (gpxText: string, { sport, analysis, activitySettings, elevation }: SummarizeGpxOptions): AnalyzedGpx | null =>
+export const summarizeGpx = (gpxText: string, { sport, analysis, activitySettings }: SummarizeGpxOptions): AnalyzedGpx | null =>
   analyzeGpx(gpxText, sport, analysis, (s) => {
     const settings = activitySettings[s];
     if (!settings) throw new Error(`Réglages de l'activité absents pour le calcul ${s}.`);
     return settings;
-  }, elevation);
+  });

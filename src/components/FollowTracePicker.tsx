@@ -3,7 +3,6 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sessionActivity } from '../core/activities';
 import { parseGpx } from '../core/gpxParser';
-import { hasPositions, isLandTreatment, sportTreatment } from '../core/sportProfiles';
 import { useRouteLibrary, type SavedRoute } from '../hooks/useRouteLibrary';
 import { followTrace } from '../hooks/useFollowedTrace';
 import { readSessionGpx, useLibraryFields } from '../hooks/useSessionLibrary';
@@ -66,8 +65,7 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
     () => [...sessions]
       .sort((a, b) => b.record.summary.startMs - a.record.summary.startMs)
       .map((session) => ({ ...session, activity: sessionActivity(activities, session.record.activityId, session.record.sport) }))
-      // Une session sans trace (muscu) n'est pas une trace à suivre.
-      .filter((s) => (s.record.sport === null || hasPositions(s.record.sport)) && (s.activity === null || isShown(s.activity))),
+      .filter((s) => s.activity === null || isShown(s.activity)),
     [sessions, activities, isShown]
   );
   /** Activités présentes parmi les sessions, dans l'ordre des Réglages. */
@@ -90,13 +88,13 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
     onClose();
   };
 
-  const pickSession = async (file: string, name: string, activityId: string | null, land: boolean) => {
+  const pickSession = async (file: string, name: string, activityId: string | null) => {
     setLoading(file);
     setError(null);
     try {
       const text = await readSessionGpx(file);
       if (text === null) throw new Error('Session introuvable dans la mémoire.');
-      const trace = followedTraceFromSession(parseGpx(text).rawPoints, name, activityId, { land });
+      const trace = followedTraceFromSession(parseGpx(text).rawPoints, name, activityId, { land: false });
       if (!trace) throw new Error('Cette session n\'a pas assez de points.');
       followTrace(trace);
       onPicked?.(trace);
@@ -157,7 +155,7 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
                 return (
                   <li key={file}>
                     <button type="button" style={ROW_STYLE} disabled={loading !== null}
-                      onClick={() => void pickSession(file, name, activity?.id ?? null, record.sport !== null && isLandTreatment(sportTreatment(record.sport)))}>
+                      onClick={() => void pickSession(file, name, activity?.id ?? null)}>
                       <strong>{name}</strong>
                       <span style={DETAIL_STYLE}>
                         {loading === file ? 'Lecture…' : [activity?.name, formatDate(record.summary.startMs)].filter(Boolean).join(' · ')}

@@ -1,9 +1,9 @@
 import { accumulateElevation, smoothElevationAlong } from '../core/elevation';
 import { projectOnSegment } from '../core/geoPlane';
 import { cumulativeDistancesM, haversineDistance, initialBearing } from '../core/geo';
-import { GRADE_ANALYSIS, type Treatment } from '../core/sportProfiles';
+import type { Treatment } from '../core/sportProfiles';
 import type { GradientStop } from '../core/speedGradient';
-import { computeGrades, gradeGradientStops, type GradeRange } from './grade';
+import { GRADE_ANALYSIS, computeGrades, gradeGradientStops, type GradeRange } from './grade';
 import type { WayType } from './brouterProfile';
 import { isWayType, waysMode, wayTypesOf, WAYS_SEPARATOR, type WaysMode } from './wayTypes';
 import { isWaysMode, joinLegs, samePlace } from './legJoin';
@@ -104,12 +104,12 @@ export const readRouteMode = (value: unknown): RouteMode | null => {
 /**
  * Règles d'accès du calcul : celles du piéton (escaliers permis, sens
  * interdits ignorés) ou du vélo (sens interdits respectés, passages à pied
- * pénalisés). Elles suivent le traitement de l'activité ; la voile prend
- * celles du piéton.
+ * pénalisés). La voile et le surf prennent celles du piéton ; celles du vélo
+ * restent pour le planificateur routier (lot 304).
  */
 export type RouteVehicle = 'pieton' | 'velo';
 
-export const routeVehicle = (treatment: Treatment): RouteVehicle => (treatment === 'velo' ? 'velo' : 'pieton');
+export const routeVehicle = (_treatment: Treatment): RouteVehicle => 'pieton';
 
 /** Tronçon qui ne se calcule pas : ligne droite, ou trace importée. */
 const isFixedMode = (mode: RouteMode): boolean => !isWaysMode(mode);

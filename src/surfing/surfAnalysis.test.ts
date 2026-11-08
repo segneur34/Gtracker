@@ -289,7 +289,7 @@ describe('runSurfSession et résumé de la bibliothèque', () => {
     expect(foil.flightS).not.toBeNull();
     expect(foil.flightS!).toBeGreaterThanOrEqual(foil.longestFlightS ?? 0);
     // Sur une autre famille, pas de champ du surf.
-    expect(summarizeSession(raw, 'running')!.waveCount).toBeUndefined();
+    expect(summarizeSession(raw, 'kite')!.waveCount).toBeUndefined();
   });
 });
 
@@ -346,6 +346,6 @@ describe('vitesse max des vagues, plancher d’arrêt unique, pause manuelle (lo
       { lat: 43.4, lon: 3.6, time: new Date(T0).toISOString(), speedMs: 3 },
       { lat: 43.40001, lon: 3.6, time: new Date(T0 + 1000).toISOString(), speedMs: 3 },
     ];
-    expect(summarizeSession(two, 'running')!.maxSpeedMs).toBeCloseTo(3, 6);
+    expect(summarizeSession(two, 'bateau')!.maxSpeedMs).toBeCloseTo(3, 6);
   });
 });

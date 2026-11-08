@@ -82,9 +82,9 @@ describe('fiche d\'un itinéraire importé', () => {
   });
 
   it('autre GPX : la trace gardée telle quelle, nommée par le fichier, activité devinée', () => {
-    const record = importedRouteRecord(ROUTE_ONLY, 'komoot.gpx', { ...options(), activityFor: (type) => (type === undefined ? 'course' : null) });
+    const record = importedRouteRecord(ROUTE_ONLY, 'komoot.gpx', { ...options(), activityFor: (type) => (type === undefined ? 'surf' : null) });
     expect(record?.name).toBe('Tour du lac');
-    expect(record?.activityId).toBe('course');
+    expect(record?.activityId).toBe('surf');
     expect(record?.createdAt).toBe(NOW);
     expect(record?.legs.map((leg) => leg.mode)).toEqual(['imported']);
     expect(record?.waypoints).toEqual([{ lat: 43.6, lon: 3.8 }, { lat: 43.61, lon: 3.8 }]);

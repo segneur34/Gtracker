@@ -11,7 +11,7 @@ import type { SportFamily } from '../core/sportProfiles';
 /** Icône d'une leçon, dessinée par `components/LessonIcon.tsx`. */
 export type LessonIcon =
   | 'enregistrer' | 'analyse' | 'carte' | 'activites' | 'memoire' | 'profil' | 'notes'
-  | 'statistiques' | 'itineraires' | 'cardio' | 'fractionne' | 'voile' | 'capteurs' | 'partage';
+  | 'statistiques' | 'itineraires' | 'cardio' | 'voile' | 'capteurs' | 'partage';
 
 /** Page ouverte par « Essayer » : une adresse, ou la bibliothèque de la famille préférée (`'bibliotheque'`). */
 export type LessonTarget = `/${string}` | 'bibliotheque';

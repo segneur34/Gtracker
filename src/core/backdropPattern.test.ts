@@ -12,7 +12,7 @@ const lineEnds = (d: string): [number, number][] =>
 const onEdge = (ends: [number, number][], axis: 0 | 1, at: number): number[] =>
   ends.filter((p) => p[axis] === at).map((p) => p[1 - axis]).sort((a, b) => a - b);
 
-const VARIANTS: BackdropVariant[] = ['contours', 'voile', 'course', 'velo', 'surf', 'fractionne'];
+const VARIANTS: BackdropVariant[] = ['contours', 'voile', 'surf'];
 
 describe('tuiles des fonds de page', () => {
   it('les reliefs se raccordent d\'un bord à l\'autre, dans les deux sens', () => {
@@ -31,11 +31,6 @@ describe('tuiles des fonds de page', () => {
       expect(onEdge(ends, 0, tile.width), variant).toEqual(left);
       expect(onEdge(ends, 1, tile.height), variant).toEqual(onEdge(ends, 1, 0));
     }
-  });
-
-  it('course et vélo, retirés (lot 303), reprennent les courbes de niveau', () => {
-    expect(backdropTile('course')).toEqual(backdropTile('contours'));
-    expect(backdropTile('velo')).toEqual(backdropTile('contours'));
   });
 
   it('chaque fond a ses tracés, sans valeur manquante, une taille et un espacement', () => {

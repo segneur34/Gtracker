@@ -46,14 +46,16 @@ export const downloadBaseName = (sessionName: string, activityName: string | nul
 /**
  * Types d'activité des autres applications, ramenés à nos supports. Les clés
  * sont en minuscules, sans espace ni tiret ni souligné : `Trail Running`,
- * `trail_running` et `trail-running` se lisent `trailrunning`.
+ * `trail_running` et `trail-running` se lisent `trailrunning`. Course et vélo,
+ * ceux de l'application complète compris (`running`, `cycling`), n'ont plus de
+ * calcul ici (lot 305) : `null`, la session est « à classer ».
  */
-const FOREIGN_TYPES: Record<string, SportType> = {
-  running: 'running',
-  run: 'running',
-  trailrunning: 'running',
-  treadmillrunning: 'running',
-  course: 'running',
+const FOREIGN_TYPES: Record<string, SportType | null> = {
+  running: null,
+  run: null,
+  trailrunning: null,
+  treadmillrunning: null,
+  course: null,
   windsurfing: 'windsurf',
   windsurf: 'windsurf',
   kitesurfing: 'kite',
@@ -64,17 +66,17 @@ const FOREIGN_TYPES: Record<string, SportType> = {
   voile: 'bateau',
   wingfoiling: 'wingfoil',
   wingfoil: 'wingfoil',
-  cycling: 'cycling',
-  biking: 'cycling',
-  bike: 'cycling',
-  ride: 'cycling',
-  roadcycling: 'cycling',
-  roadbiking: 'cycling',
-  mountainbiking: 'cycling',
-  gravelcycling: 'cycling',
-  ebikeride: 'cycling',
-  ebiking: 'cycling',
-  velo: 'cycling',
+  cycling: null,
+  biking: null,
+  bike: null,
+  ride: null,
+  roadcycling: null,
+  roadbiking: null,
+  mountainbiking: null,
+  gravelcycling: null,
+  ebikeride: null,
+  ebiking: null,
+  velo: null,
   surfing: 'surf',
   surf: 'surf',
   surffoiling: 'surf',

@@ -83,7 +83,7 @@ describe.each([[1], [5]])('statistiques refaites depuis le journal, à %i Hz', (
   it('relues d\'un vrai journal : le même résultat', () => {
     const { stats, first, second, third } = lived();
     const fix = (timeMs: number) => journalFixLine({ timeMs, lat: 43, lon: 3, accuracyM: 4 });
-    const text = journalHeaderLine('running', T0)
+    const text = journalHeaderLine('kite', T0)
       + first.map(fix).join('')
       + journalPauseLine(T0 + 60_000) + journalResumeLine(T0 + 120_000) + journalBreakLine(second[0])
       + second.map(fix).join('')
@@ -134,7 +134,7 @@ describe('continuedPause', () => {
 
 describe('journal rouvert', () => {
   const fix = (s: number) => journalFixLine({ timeMs: T0 + s * 1000, lat: 43, lon: 3 });
-  const header = journalHeaderLine('running', T0);
+  const header = journalHeaderLine('kite', T0);
 
   it('dernière ligne tronquée : ignorée, âge lu sur la précédente lisible, un saut de ligne protège la suite', () => {
     const text = `${header}${fix(1)}${fix(2)}[${T0 + 3000},43.1`;

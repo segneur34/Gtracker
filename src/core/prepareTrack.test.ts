@@ -56,7 +56,7 @@ describe('prepareTrack : mêmes sorties que l’enchaînement de useGpxSession',
       const raw = holeRaw(sailRaw({ windDeg: 0, legs: upDownLegs(2, 90), hz }), 60, 75);
       const paused: RawTrackPoint[] = raw.map((p, i) => (i === Math.floor(raw.length * 0.7) ? { ...p, segmentStart: true as const } : p));
       const text = gpxOf(paused);
-      for (const options of [{ profile: profileOf('running') }, {}, { profile: profileOf('cycling'), fileName: 'v.gpx' }]) {
+      for (const options of [{ profile: profileOf('surf') }, {}, { profile: profileOf('bateau'), fileName: 'v.gpx' }]) {
         expect(prepareTrack(text, options)).toStrictEqual(frozenHookChain(text, options));
       }
     });
@@ -64,7 +64,7 @@ describe('prepareTrack : mêmes sorties que l’enchaînement de useGpxSession',
 
   it('sur chaque GPX lisible du corpus, au format de chaque éditeur', () => {
     for (const entry of GPX_CORPUS) {
-      for (const options of [{ profile: profileOf('running'), fileName: 'c.gpx' }, { profile: profileOf('kite') }]) {
+      for (const options of [{ profile: profileOf('surf'), fileName: 'c.gpx' }, { profile: profileOf('kite') }]) {
         expect(prepareTrack(entry.texte, options), entry.nom).toStrictEqual(frozenHookChain(entry.texte, options));
       }
     }
