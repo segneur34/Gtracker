@@ -1,0 +1,108 @@
+import { useCallback, useMemo } from 'react';
+import { JUMPS_CALC_VERSION, measureJumps, toSessionJump, type JumpDetection } from '../core/jumps';
+import type { SessionJumps } from '../library/record';
+import type { Activity } from '../core/activities';
+import { buildCumulativeTrack } from '../core/sessionStats';
+import { getSportProfile, type SportProfile } from '../core/sportProfiles';
+import type { SportType, TrackPoint } from '../core/types';
+import { effectiveJumpSettings } from './useSportSettings';
+import { createSessionAssetCache, useSessionAsset } from './sessionAsset';
+import { loadSessionMotion } from './sessionMotion';
+import { hasSessionMotion, useLibrarySession } from './useSessionLibrary';
+
+/**
+ * Sauts d'une session (voile, course, vélo ; `core/jumps.ts`) : ceux de sa fiche s'ils sont
+ * à jour, sinon calculés depuis son `.imu` à l'ouverture de l'analyse, puis
+ * rangés dans la fiche (hors brouillon : ce n'est pas une saisie). Une session
+ * sans `.imu` ni sauts rangés n'en a pas : l'onglet « sauts » ne paraît pas.
+ */
+
+/**
+ * Sauts calculés pendant ce lancement, par session et instant du premier point (fiche en lecture seule comprise) ;
+ * `measured: false` : la capture ne mesurait pas les sauts (cadence seule).
+ */
+const cache = createSessionAssetCache<SessionJumps>();
+
+/**
+ * `none` : pas de mesure des sauts pour cette session ; `computing` : calcul
+ * en cours ; `ready` : sauts connus (liste éventuellement vide) ; `error` :
+ * calcul impossible (`error` en dit la raison).
+ */
+export type JumpsStatus = 'none' | 'computing' | 'ready' | 'error';
+
+/** Laisse la page se dessiner avant un calcul de quelques dixièmes de seconde. */
+const nextFrame = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+const compute = async (file: string, track: TrackPoint[], detection: JumpDetection): Promise<SessionJumps> => {
+  await nextFrame();
+  const recording = await loadSessionMotion(file);
+  // Capture de la seule cadence : pas de sauts à chercher, et la fiche le retient.
+  const measured = recording.header.setup.jumps !== false;
+  const jumps = measured ? measureJumps(recording, detection, track, buildCumulativeTrack(track).cumDist).jumps.map(toSessionJump) : [];
+  return { version: JUMPS_CALC_VERSION, computedAt: new Date().toISOString(), jumps, ...(measured ? {} : { measured: false as const }) };
+};
+
+/** Sauts rangés à jour, ou capture qui ne les mesurait pas (quelle que soit la version). */
+const isCurrent = (stored: SessionJumps | undefined): boolean =>
+  stored !== undefined && (stored.measured === false || stored.version >= JUMPS_CALC_VERSION);
+
+/** Aucun saut : la même liste d'un rendu à l'autre (le pumping se recalcule quand elle change). */
+const NO_JUMPS: SessionJumps['jumps'] = [];
+
+export const useSessionJumps = (file: string | null, track: TrackPoint[], sport: SportType) => {
+  const session = useLibrarySession(file);
+  const detection = getSportProfile(sport).jumps?.detection ?? null;
+  const key = file !== null && track.length > 1 ? `${file}|${track[0].timeMs}` : null;
+  const motion = file !== null && hasSessionMotion(file);
+  const eligible = key !== null && detection !== null && session !== undefined && motion;
+  const { value, error } = useSessionAsset({
+    cache, file, key, isCurrent, active: eligible, field: 'jumps', errorText: 'Calcul des sauts impossible.',
+    // Lancé seulement si la session est éligible : fichier et détection connus.
+    compute: () => (file !== null && detection !== null ? compute(file, track, detection) : Promise.reject(new Error('Pas de capteurs.'))),
+  });
+  const notMeasured = value?.measured === false;
+  const jumps = value !== undefined && !notMeasured ? value.jumps : null;
+  const status: JumpsStatus = jumps !== null ? 'ready' : error !== null ? 'error' : eligible && !notMeasured ? 'computing' : 'none';
+  return { status, jumps: jumps ?? NO_JUMPS, error };
+};
+
+/** Surbrillance de l'onglet « sauts » : un saut par l'heure de son décollage, ou le podium (`podium`). */
+export interface JumpsHighlight {
+  shownIn: (panel: 'sauts') => string | null;
+  show: (panel: 'sauts', key: string | null) => void;
+}
+
+/**
+ * Sauts d'une analyse (voile, course, vélo) : ceux de la session (`useSessionJumps`)
+ * montrés à la hauteur minimale de l'activité, pris au seuil d'activité ou plus,
+ * et leur surbrillance sur la carte. L'onglet « sauts » ne paraît que si la
+ * session en a (`visible`).
+ */
+export const useShownJumps = ({ file, track, profile, activity, thresholdMs, highlight }: {
+  file: string | null;
+  track: TrackPoint[];
+  profile: Pick<SportProfile, 'id' | 'jumps'>;
+  activity: Activity;
+  /** Seuil d'activité de la session, en m/s. */
+  thresholdMs: number;
+  highlight: JumpsHighlight;
+}) => {
+  const state = useSessionJumps(file, track, profile.id);
+  const minHeightM = effectiveJumpSettings(activity)?.minHeightM ?? profile.jumps?.defaultMinHeightM ?? 0;
+  /** Sauts montrés : la hauteur minimale de l'activité atteinte, pris au seuil d'activité ou plus. */
+  const jumps = useMemo(
+    () => state.jumps.filter((j) => j.heightM >= minHeightM && (j.speedMs === null || j.speedMs >= thresholdMs)),
+    [state.jumps, minHeightM, thresholdMs]
+  );
+  const shownKey = highlight.shownIn('sauts');
+  const podiumShown = shownKey === 'podium';
+  /** Saut montré, par l'heure de son décollage. */
+  const shownJump = shownKey !== null && !podiumShown ? Number(shownKey) : null;
+  const { show } = highlight;
+  const showJump = useCallback((takeoffMs: number | null) => show('sauts', takeoffMs === null ? null : String(takeoffMs)), [show]);
+  const togglePodium = useCallback(() => show('sauts', podiumShown ? null : 'podium'), [show, podiumShown]);
+  return {
+    status: state.status, error: state.error, jumps, allJumps: state.jumps, hiddenCount: state.jumps.length - jumps.length, minHeightM,
+    visible: state.status !== 'none', shownJump, podiumShown, showJump, togglePodium,
+  };
+};

@@ -1,0 +1,121 @@
+// Banc de l'allure imposée propre à chaque session (lot D de l'audit, 24/09/2026). Deux sessions
+// enregistrées par rejeu ; l'allure imposée à la première passe par le brouillon, s'écrit dans sa
+// fiche, recalcule son résumé, et ne touche pas la seconde. Une ancienne allure par support, posée
+// d'avance dans les réglages de l'appareil, doit être ignorée puis effacée à la première écriture.
+// Profil Chrome neuf. Usage : node allure-session.mjs <port> <GPX 1> <GPX 2>, chemins Windows ;
+// les deux GPX : make-gpx.mjs sans décalage, puis avec un décalage d'une heure.
+// Depuis le 28/10, le champ « Allure de la session » est dans l'onglet « réglages » de l'analyse voile
+// (panneau « Réglages de la session ») : le script ouvre cet onglet avant de le lire.
+import { connect } from './lib/cdp.mjs';
+import { ONGLETS } from './lib/onglets.mjs';
+
+const [port, gpx1, gpx2] = process.argv.slice(2);
+
+const dialogs = [];
+const { send, go: libGo, settle, waitFor, wait, importFiles, onMessage, close, logs } = await connect({ port });
+onMessage((msg) => { if (msg.method === 'Page.javascriptDialogOpening') dialogs.push(msg.params.message); });
+// Ici une exception de la page rend un texte « ERREUR: … » au lieu de `undefined`.
+const evaluate = async (expression) => {
+  const res = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+  if (res.result?.exceptionDetails) return `ERREUR: ${res.result.exceptionDetails.exception?.description?.split('\n')[0]}`;
+  return res.result?.result?.value;
+};
+const go = (path, ms = 2500) => libGo(path, ms);
+
+// « Arrêter » se tient (appui long réglable, 2 s par défaut) : appui, attente, puis relâcher.
+const holdStop = async () => {
+  const down = await evaluate(`(() => { const b = [...document.querySelectorAll('button.ui-btn--danger')].find((x) => x.textContent.includes('Arrêter') && !x.disabled && !x.closest('.ivl')); if (!b) return 'absent'; window.__stopButton = b; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
+  if (down !== 'ok') return down;
+  await wait(2300);
+  return evaluate(`(() => { const b = window.__stopButton; b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); b.click(); return 'ok'; })()`);
+};
+const clickText = (text) => evaluate(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim().startsWith(${JSON.stringify(text)})); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
+// Saisie dans un champ contrôlé par React : setter natif, événement `input`, puis Entrée. Depuis le lot 157,
+// l'allure n'est écrite dans le brouillon qu'à Entrée ou en quittant le champ.
+const typeInto = (selector, value) => evaluate(`(() => { const el = ${selector}; if (!el) return 'absent'; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); return 'ok'; })()`);
+const ALLURE_LABEL = `[...document.querySelectorAll('label')].find((l) => l.textContent.includes('Allure de la session'))`;
+const ALLURE_INPUT = `${ALLURE_LABEL}?.querySelector('input')`;
+const allure = () => evaluate(`(() => { const l = ${ALLURE_LABEL}; if (!l) return 'pas de champ'; return l.querySelector('input').value + ' nds, ' + (l.textContent.includes('déduite') ? 'déduite' : l.textContent.includes('Défaut') ? 'imposée (bouton Défaut)' : '?'); })()`);
+/** Ouvre l'onglet « réglages » de l'analyse s'il est fermé (les onglets ouverts sont mémorisés). */
+const openSettingsTab = async () => {
+  const r = await evaluate(`(() => { const b = [...document.querySelectorAll('.an-tabs .ui-tab')].find((x) => x.textContent.trim() === 'réglages'); if (!b) return 'onglet absent'; if (b.getAttribute('aria-pressed') === 'true') return 'déjà ouvert'; b.click(); return 'ouvert'; })()`);
+  await settle({ max: 1200 });
+  return r;
+};
+const bar = () => evaluate(`document.querySelector('.ui-savebar')?.innerText.replace(/\\n/g, ' ') ?? 'pas de barre'`);
+const readOpfs = (path) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); return await (await (await d.getFileHandle(name)).getFile()).text(); })()`);
+const fiche = async (file) => {
+  const r = JSON.parse(await readOpfs(`sessions/${file.replace(/\.gpx$/, '.json')}`));
+  return JSON.stringify({ sport: r.sport, analysis: r.analysis, movingTimeS: r.summary.movingTimeS === null ? null : Math.round(r.summary.movingTimeS), calcVersion: r.summary.calcVersion });
+};
+const sportSettings = () => evaluate(`localStorage.getItem('tracker.sportSettings')`);
+const step = (title) => console.log(`\n== ${title}`);
+
+/** Enregistre une session par rejeu à ×600, puis l'ouvre dans l'analyse ; rend son nom de fichier. */
+const recordAndAnalyse = async (gpx) => {
+  await go('/enregistrer');
+  await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click(); 'ok'`);
+  await wait(300);
+  await importFiles(gpx, 'input[type=file]');
+  await settle({ max: 800 });
+  await evaluate(`(() => { const s = [...document.querySelectorAll('select')].pop(); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '600'); s.dispatchEvent(new Event('change', { bubbles: true })); return 'ok'; })()`);
+  await clickText('Démarrer');
+  await wait(8000);
+  await holdStop();
+  await waitFor("[...document.querySelectorAll('button')].some((x) => x.textContent.trim().startsWith('Analyser'))", { timeout: 2500, label: 'bouton Analyser' });
+  console.log('Analyser :', await clickText('Analyser'));
+  await waitFor("location.pathname.includes('/analyse')", { timeout: 6000, label: 'analyse ouverte' });
+  await settle({ max: 6000, label: 'analyse' });
+  const url = await evaluate('location.pathname + location.search');
+  return { url, file: decodeURIComponent(url.split('session=')[1] ?? '') };
+};
+
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
+
+step('0. Ancienne allure par support posée dans les réglages de l\'appareil (1 m/s en wingfoil)');
+await go('/');
+await evaluate(`localStorage.setItem('tracker.sportSettings', JSON.stringify({ referenceSpeeds: { wingfoil: 1 } })); 'ok'`);
+console.log('réglages :', await sportSettings());
+
+step('1. Session 1 : allure déduite, l\'ancienne allure par support ignorée');
+const s1 = await recordAndAnalyse(gpx1);
+console.log('url :', s1.url);
+console.log('onglet réglages :', await openSettingsTab());
+console.log('allure :', await allure(), '| barre :', await bar());
+console.log('fiche :', await fiche(s1.file));
+
+step('2. Allure imposée à 6 nds : brouillon, fiche intacte');
+console.log('saisie :', await typeInto(ALLURE_INPUT, '6'));
+await settle({ max: 3000 });
+console.log('allure :', await allure(), '| barre :', await bar());
+console.log('fiche :', await fiche(s1.file));
+
+step('3. Enregistrer la session : allure dans la fiche, résumé recalculé');
+console.log('clic :', await clickText('Enregistrer la session'));
+await wait(4000);
+console.log('barre :', await bar());
+console.log('fiche :', await fiche(s1.file));
+
+step('4. Rechargement : allure relue depuis la fiche');
+await go(s1.url, 7000);
+console.log('onglet réglages :', await openSettingsTab());
+console.log('allure :', await allure(), '| barre :', await bar());
+
+step('5. Session 2 : allure déduite de sa trace, pas celle de la session 1');
+const s2 = await recordAndAnalyse(gpx2);
+console.log('url :', s2.url);
+console.log('onglet réglages :', await openSettingsTab());
+console.log('allure :', await allure(), '| barre :', await bar());
+console.log('fiche :', await fiche(s2.file));
+
+step("6. L'ancienne allure par support est effacée des réglages de l'appareil (dès la première écriture, au lancement)");
+const finalSettings = await sportSettings();
+console.log('réglages :', finalSettings);
+console.log('referenceSpeeds absent (oui attendu) :', !/referenceSpeeds/.test(finalSettings ?? ''));
+
+step('Console');
+console.log('dialogues :', dialogs.length ? dialogs.join(' / ') : 'aucun');
+console.log(logs.length ? logs.join('\n') : 'aucune erreur');
+await close();
+process.exit(0);

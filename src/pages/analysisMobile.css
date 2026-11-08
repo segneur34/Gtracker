@@ -1,0 +1,735 @@
+/* Disposition des modules d'analyse, sur les variables de `theme/tokens.css` (`docs/MISE_EN_PAGE.md`). La
+   structure des `div` (`.an-page`, `.an-sheet`, `.an-map-row`, `.an-carte-col`, `.an-carte-panels`) est posée par
+   `components/AnalysisShell.tsx`, commune à la voile, à pied et à vélo, au surf et au muscu. Sur ordinateur : la
+   carte en haut, plus étroite que la page, puis la colonne des onglets (`.an-carte-col`) et ses panneaux, deux
+   par ligne (`HALF_PANEL_STYLE`). Sur téléphone (sous 768 px, ou tourné : `NARROW_QUERY`) : la carte en tête,
+   en pleine largeur, puis les panneaux un par ligne ; tourné, la carte à gauche (fin du fichier). Les chiffres
+   de la session sont dans l'onglet « général » de chaque module (`an-sheet__stats--always`). */
+
+/* Dans les analyses, 2 px sous la taille des autres pages (demande du 24/10) : titres des panneaux
+   (`PanelTitle`) et noms des graphes (`ChartFold`, `ChartReadout`). La carte en plein écran est dans la page ;
+   Statistiques, qui reprend la disposition, garde les siennes. */
+.an-page:not(.stats-page) {
+  --panel-title-size: var(--text-s);
+  --chart-name-size: var(--text-2xs);
+}
+
+.an-sheet__stats {
+  display: none;
+}
+
+.an-sheet__stats--always {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+/* Deux tuiles gardées côte à côte : occupe deux colonnes de la grille et passe à la ligne si elles ne tiennent pas. */
+.an-sheet__stat-pair {
+  grid-column: span 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3) var(--space-4);
+}
+
+.an-sheet__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.an-sheet__stat-label {
+  color: var(--muted);
+  font-size: var(--text-s);
+}
+
+.an-sheet__stat-value {
+  font-size: var(--text-l);
+}
+
+.an-map-overlay {
+  display: none;
+}
+
+/* Coin bas droit d'une carte d'analyse (`AnalysisMap`) : la légende de couleur, puis la mention OSM,
+   côte à côte sur une ligne plutôt qu'empilées ; si les deux ne tiennent pas, la mention passe sous la légende
+   (jamais écrasée : la mention d'OSM ne doit pas être coupée, `flex-shrink: 0`). */
+.an-map-corner .leaflet-bottom.leaflet-right {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: flex-end;
+}
+
+.an-map-corner .leaflet-bottom.leaflet-right > .leaflet-control {
+  float: none;
+  clear: none;
+}
+
+.an-map-corner .leaflet-bottom.leaflet-right > .leaflet-control-attribution {
+  flex: 0 0 auto;
+}
+
+.an-map-corner .leaflet-control.an-map-legend {
+  margin: 0 2px 0 0;
+}
+
+/* Onglets sous la carte, puis leurs panneaux : en ligne, qui passent à la ligne ; un panneau haut
+   n'étire pas son voisin. */
+.an-carte-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Flèche qui cache la barre d'onglets, en fin de rangée, et bouton fin qui la ramène
+   (`CollapsibleSectionTabs`). */
+.an-tabs-hide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* Barre d'onglets en deux rangées : « général » et « avancé », puis les onglets avancés. */
+.an-tabs {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Une rangée avancée dépliée : le trait passe sous elle, la première rangée se resserre. */
+.an-tabs > .ui-tabs:has(+ .an-tabs-advanced) {
+  padding-bottom: var(--space-2);
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+/* « avancé » : une pastille au contour en tirets, qui ne se remplit pas une fois dépliée. */
+.an-tabs-advanced-toggle {
+  border-style: dashed;
+}
+
+/* Bloc en ligne, pas flex : la majuscule de `.ui-tab::first-letter` s'y applique. */
+.an-tabs-advanced-toggle svg {
+  margin-left: var(--space-1);
+  vertical-align: -2px;
+}
+
+.an-tabs-advanced-toggle[aria-expanded='true'] {
+  border-style: solid;
+  border-color: var(--tab-accent, var(--voile));
+  color: var(--tab-accent, var(--voile));
+}
+
+/* « tout fermer », après la flèche : sobre comme elle, ce n'est pas un onglet. Bloc en ligne, pas flex :
+   la majuscule de `::first-letter` s'y applique. */
+.an-tabs-close-all {
+  display: inline-block;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.an-tabs-close-all::first-letter {
+  text-transform: uppercase;
+}
+
+.an-tabs-reveal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 22px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Case « Zones » de l'onglet cardio, au-dessus de la courbe (05/11). */
+.an-cardio__zone-lines {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  font-size: var(--text-s);
+}
+
+.an-carte-panels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+/* Outil posé sur la carte d'une analyse (`AnalysisMap`, prop `overlay`) : transparent aux gestes,
+   sauf ses pièces, pour que la carte reste maniable autour. */
+.an-map-tools {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-map-tools);
+  pointer-events: none;
+}
+
+/* Réglage du vent sur la carte (`WindAdjustOverlay`) : bandeau en haut, boussole au centre,
+   polaire en bas à gauche. */
+.an-wind {
+  position: absolute;
+  inset: 0;
+}
+
+.an-wind__bar {
+  position: absolute;
+  top: var(--space-3);
+  left: 56px;
+  right: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  font-size: var(--text-s);
+  pointer-events: auto;
+}
+
+.an-wind__value {
+  font-size: var(--text-m);
+}
+
+.an-wind__source {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  margin-right: auto;
+}
+
+.an-wind__field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.an-wind__field input {
+  width: 64px;
+}
+
+.an-wind .ui-btn[aria-pressed='true'] {
+  border-color: var(--voile);
+  color: var(--voile);
+}
+
+.an-wind__dial {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(260px, 70%, 62vh);
+  aspect-ratio: 1;
+  transform: translate(-50%, -40%);
+  touch-action: none;
+  cursor: grab;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.an-wind__dial:active {
+  cursor: grabbing;
+}
+
+.an-wind__polar {
+  position: absolute;
+  left: var(--space-3);
+  bottom: var(--space-6);
+  width: 210px;
+  height: 210px;
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  pointer-events: auto;
+}
+
+/* Onglet « vmg » (voile) : première colonne du tableau, puis les deux podiums côte à côte. */
+.an-vmg-allure {
+  text-align: left;
+  padding: 4px;
+}
+
+.an-vmg-tops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+  margin-top: 15px;
+}
+
+.an-vmg-top {
+  margin-bottom: 10px;
+}
+
+.an-vmg-top__head {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.an-vmg-top__ranks {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: var(--text-s);
+  font-weight: 700;
+}
+
+/* Synthèse des manœuvres (voile) : la marge des cellules, dont la version du téléphone (plus bas, `!important`) reste prioritaire. */
+.an-man-summary th,
+.an-man-summary td {
+  padding: 7px 14px;
+}
+
+@media (min-width: 768px) and (min-height: 500px), (min-width: 768px) and (pointer: fine), (min-width: 768px) and (pointer: none) {
+  /* Carte en haut, centrée, plus étroite que la page : la souris trouve de la place de chaque côté
+     pour faire défiler la page sans zoomer la carte. */
+  .an-map-row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--space-4);
+  }
+
+  .an-map-panel {
+    width: var(--analysis-map-width);
+    /* Ramenée à l'écran (« +carte »), elle s'arrête sous la barre du haut, qui colle. */
+    scroll-margin-top: calc(var(--topbar-h) + var(--space-2));
+  }
+}
+
+/* En-tête de la feuille : retour, titre, nom de la session. */
+.an-sheet__head {
+  margin-bottom: var(--space-4);
+}
+
+@media (max-width: 767.98px), (max-height: 499.98px) and (pointer: coarse) {
+  .an-page {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Rangée de la carte : sur téléphone, elle s'efface (`display: contents`) et ses enfants se rangent
+     dans la page. En tête, la ligne d'en-tête (`.an-sheet`), puis la carte, puis la barre de session,
+     les alertes et les onglets ; en voile, la colonne d'onglets de la carte vient en dernier. */
+  .an-map-row {
+    display: contents !important;
+  }
+
+  .an-carte-col {
+    order: 1;
+    flex: none !important;
+  }
+
+  /* Bloc carte (`AnalysisMap`, légende posée dessus) : pleine largeur, carte à hauteur fixe. */
+  .an-map-panel {
+    order: -1;
+    flex: none !important;
+    width: 100% !important;
+    height: auto !important;
+    resize: none !important;
+    margin-bottom: var(--space-2);
+  }
+
+  .an-map-frame {
+    flex: none !important;
+    height: 30vh;
+    cursor: pointer;
+  }
+
+  /* Feuille réduite à l'en-tête, sur une ligne au-dessus de la carte : la flèche de retour, le nom
+     de la session et Renommer. Le titre de la page reste lu par un lecteur d'écran, comme le texte du
+     lien de retour ; les chiffres sont dans l'onglet « général ». */
+  .an-sheet {
+    order: -2;
+    margin-bottom: var(--space-2);
+  }
+
+  .an-sheet__head {
+    margin-bottom: 0;
+  }
+
+  .an-sheet .ui-page-header {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .an-sheet .ui-back {
+    font-size: 0;
+    min-width: 44px;
+  }
+
+  .an-sheet .ui-page-header__row {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .an-sheet .ui-page-header__subtitle {
+    min-width: 0;
+  }
+
+  /* Onglets en petites pastilles serrées, sans trait dessous : ils tiennent sur deux lignes. */
+  .an-page .ui-tabs {
+    gap: var(--space-1);
+    padding-bottom: 0;
+    margin-bottom: 0;
+    border-bottom: none;
+  }
+
+  .an-page .ui-tab {
+    min-height: 32px;
+    padding: 0 var(--space-3);
+    font-size: var(--text-xs);
+  }
+
+  .an-sheet__stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+
+  /* Sous les bandeaux d'un enregistrement en cours (`--shell-top`), qui cacheraient le × et le zoom. */
+  .an-map-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    top: var(--shell-top);
+    z-index: var(--z-map-overlay);
+    background: var(--surface);
+  }
+
+  .an-map-overlay__close {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+    z-index: calc(var(--z-map-overlay) + 1);
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: var(--text-xl);
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .an-map-overlay__map {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Plein écran carte + graphes (« +carte », 23/10) : la carte en haut, les graphes de l'onglet dessous, qui défilent. */
+  .an-map-overlay--charts {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .an-map-overlay--charts .an-map-overlay__map {
+    flex: 0 0 55%;
+    height: auto;
+  }
+
+  .an-map-overlay__charts {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    /* La barre d'onglets du bas passe au-dessus (`AppShell.css`) : le dernier graphe défile jusqu'au-dessus d'elle. */
+    padding: var(--space-2) var(--space-4) calc(var(--space-4) + var(--tabbar-h) + var(--inset-bottom));
+    border-top: 1px solid var(--line-strong);
+  }
+
+  /* Réglage du vent en plein écran : le bandeau laisse la place au zoom à gauche, au × de fermeture à droite. */
+  .an-wind__bar {
+    right: 60px;
+    justify-content: flex-start;
+    gap: var(--space-1) var(--space-2);
+    padding: var(--space-2);
+  }
+
+  .an-wind__polar {
+    width: 160px;
+    height: 160px;
+  }
+
+  /* Colonne d'onglets de la carte (voile) : jamais plus large que l'écran, même quand un panneau
+     porte un contenu de largeur fixe (graphes) ; ce contenu défile dans son panneau. */
+  .an-carte-col,
+  .an-carte-panels,
+  .an-carte-panels > * {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .an-carte-panels > * {
+    overflow-x: auto;
+  }
+
+  /* Panneau Manœuvres (voile) : synthèse pleine largeur et resserrée ; détails sur toute la
+     largeur ; podiums en grille, le libellé de la métrique sur sa propre ligne, les valeurs dessous.
+     Le conteneur défile plutôt que d'élargir la page si un texte agrandi ne tient pas. */
+  .an-man-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .an-man-summary {
+    width: 100%;
+    font-size: var(--text-xs) !important;
+  }
+
+  .an-man-summary th,
+  .an-man-summary td {
+    padding: var(--space-1) 3px !important;
+    font-size: inherit !important;
+  }
+
+  .an-man-summary th:first-child,
+  .an-man-summary td:first-child {
+    padding-left: var(--space-2) !important;
+  }
+
+  .an-man-summary button {
+    padding: 2px 6px !important;
+    font-size: inherit !important;
+  }
+
+  .an-man-detail {
+    flex: 1 1 100% !important;
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .an-man-podium thead tr,
+  .an-man-podium tbody tr {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+    align-items: center;
+  }
+
+  .an-man-podium thead th:first-child {
+    display: none;
+  }
+
+  .an-man-podium tbody td:first-child {
+    grid-column: 1 / -1;
+    padding-bottom: 0 !important;
+    font-weight: 600;
+  }
+}
+
+/* Téléphone tourné (lot 5 b des demandes du 23/10) : la carte s'ouvre en plein écran en tournant (`AnalysisMap`) ;
+   fermée, elle tient le côté gauche, fixe, sur toute la hauteur, et l'en-tête, les onglets et les panneaux
+   défilent à sa droite. Le plein écran laisse le rail de navigation à gauche ; avec des graphes, ils passent à
+   droite de la carte. */
+@media (orientation: landscape) and (max-height: 499.98px) and (pointer: coarse) {
+  .an-page:has(.an-map-panel) {
+    /* 55 / 45 (demandé le 24/10) ; un petit téléphone garde `--an-side-min` aux panneaux. */
+    --an-map-w: clamp(calc(var(--land-w) * 0.4), calc(var(--land-w) - var(--an-side-min)), calc(var(--land-w) * 0.55));
+    padding-left: calc(var(--an-map-w) + var(--space-3)) !important;
+  }
+
+  .an-map-panel {
+    position: fixed !important;
+    top: calc(var(--shell-top) + var(--space-3));
+    bottom: calc(var(--space-3) + var(--inset-bottom));
+    left: calc(var(--shell-left) + var(--space-3));
+    width: calc(var(--an-map-w) - var(--space-3)) !important;
+    margin-bottom: 0;
+  }
+
+  .an-map-frame {
+    flex: 1 1 auto !important;
+    height: auto;
+  }
+
+  .an-map-overlay {
+    left: var(--shell-left);
+  }
+
+  .an-map-overlay--charts {
+    flex-direction: row;
+  }
+
+  .an-map-overlay--charts .an-map-overlay__map {
+    flex: 0 0 55%;
+    height: 100%;
+  }
+
+  .an-map-overlay--charts .an-map-overlay__close {
+    right: auto;
+    left: calc(55% - 36px - var(--space-3));
+  }
+
+  .an-map-overlay__charts {
+    padding-bottom: calc(var(--space-4) + var(--inset-bottom));
+    border-top: none;
+    border-left: 1px solid var(--line-strong);
+  }
+}
+
+/* Styles sortis du JSX (élément 160), à valeur égale ; les utilitaires communs sont dans `ui.css`. */
+
+.an-cad-title {
+  font-size: var(--text-s);
+  margin: 4px 0 2px;
+}
+
+.an-chip-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.an-ivl-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: inherit;
+  text-align: left;
+}
+
+.an-land-hint {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.an-land-opts {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: var(--text-s);
+}
+
+.an-mark-label {
+  flex: 1 1 8em;
+  min-width: 0;
+}
+
+.an-mark-n {
+  min-width: 1.5em;
+}
+
+.an-muscu-legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.an-name-input {
+  flex: 1 1 180px;
+  min-width: 0;
+  max-width: 360px;
+}
+
+.an-name-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.an-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
+}
+
+.an-notes-col {
+  flex: 1 1 260px;
+}
+
+.an-notes-input {
+  flex: 1;
+  padding: 4px 6px;
+}
+
+.an-notes-label {
+  width: 90px;
+}
+
+.an-notes-text {
+  width: 100%;
+  padding: 6px;
+  font-family: inherit;
+  font-size: var(--text-s);
+  box-sizing: border-box;
+}
+
+.an-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  padding-right: 28px;
+}
+
+.an-panel-head--mb10 {
+  margin-bottom: 10px;
+}
+
+.an-surf-bar {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.an-surf-legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+

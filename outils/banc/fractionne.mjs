@@ -1,0 +1,515 @@
+// Banc de test : groupe Fractionné et compteur d'intervalles (§10, point 89).
+// Usage : node fractionne.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
+// Sur un profil neuf, sans réseau. Dure environ 2 min. Le script vérifie :
+//  1. Enregistrer : l'onglet Fractionné, ses deux activités, la carte « Compteur » ;
+//  2. une séance de 2 × 0:05 / 0:05 gardée sous un nom, retrouvée après rechargement ;
+//  3. le compteur seul : phases à l'écran, et les sons (« [bips] ») à l'heure, chaque signal fini à l'instant du
+//     changement (court, court, long ; à la fin de la séance, court, long, long double) ;
+//  4. pause, reprise, « Passer », puis un rechargement en pleine séance : séance reprise, bandeau sur une autre page, arrêt ;
+//  5. le compteur lancé pendant un enregistrement (rejeu ×1 d'une trace datée de maintenant) : répétitions rangées dans
+//     la fiche, onglet « fractionné » de l'analyse (synthèse, tableau, évolution, profil), « 2 rép. » dans la
+//     bibliothèque Fractionné ;
+//  6. une séance sans compteur importée (8 efforts d'une minute) : répétitions retrouvées dans la vitesse, seuil
+//     d'effort imposé dans l'onglet réglages (trop haut : aucun effort ; plus bas : enregistré dans la fiche), puis
+//     retour au seuil tiré de la session ;
+//  7. le groupe dans Réglages et sur l'accueil, et son absence en planification.
+//  Au passage (lot 61), sur deux autres séances sans compteur de même forme : un clic sur l'évolution hors du tracé ne
+//  choisit aucune répétition (un clic sur le tracé, si) ; le profil zoomé revient à tout voir quand l'autre séance
+//  s'ouvre sans rechargement (avant le lot 61, « Tout voir » restait : échec attendu sur l'ancienne version).
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { connect } from './lib/cdp.mjs';
+import { ONGLETS } from './lib/onglets.mjs';
+
+const [port, workDir, shotDir] = process.argv.slice(2);
+if (!port || !workDir) {
+  console.error('Usage : node fractionne.mjs <port> <dossier de travail> [<dossier des captures>]');
+  process.exit(1);
+}
+
+// --- Protocole ---
+// --- Protocole (lib/cdp.mjs) ---
+const { send, evaluate, go, wait, blockNetwork, importFiles, shoot, close, logs, onMessage } = await connect({ port, width: 1400, height: 1000, shotDir });
+const sounds = [];
+onMessage((msg) => {
+  if (msg.method !== 'Runtime.consoleAPICalled') return;
+  const text = msg.params.args.map((a) => a.value ?? a.description).join(' ');
+  if (msg.params.type === 'debug' && /^\[(bips|compteur)\]/.test(text)) sounds.push(text);
+});
+// « Arrêter » se tient (appui long réglable, 2 s par défaut) : appui, attente, puis relâcher.
+const holdStop = async () => {
+  const down = await evaluate(`(() => { const b = [...document.querySelectorAll('button.ui-btn--danger')].find((x) => x.textContent.includes('Arrêter') && !x.disabled && !x.closest('.ivl')); if (!b) return 'absent'; window.__stopButton = b; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
+  if (down !== 'ok') return down;
+  await wait(2300);
+  return evaluate(`(() => { const b = window.__stopButton; b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); b.click(); return 'ok'; })()`);
+};
+const clickText = (text, selector = 'button') => evaluate(`(() => {
+  const b = [...document.querySelectorAll(${JSON.stringify(selector)})].find((x) => x.textContent.trim() === ${JSON.stringify(text)} || x.textContent.includes(${JSON.stringify(text)}));
+  if (!b) return 'absent'; if (b.disabled) return 'désactivé'; b.click(); return 'ok';
+})()`);
+const setSelect = (label, value) => evaluate(`(() => {
+  const s = document.querySelector('select[aria-label=${JSON.stringify(label)}]');
+  if (!s) return 'absent';
+  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, ${JSON.stringify(String(value))});
+  s.dispatchEvent(new Event('change', { bubbles: true }));
+  return s.value;
+})()`);
+const typeInto = (label, value) => evaluate(`(() => {
+  const i = document.querySelector('input[aria-label=${JSON.stringify(label)}]');
+  if (!i) return 'absent';
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ${JSON.stringify(value)});
+  i.dispatchEvent(new Event('input', { bubbles: true }));
+  return i.value;
+})()`);
+const setFile = (selector, file) => importFiles(file, selector);
+/** Texte du panneau d'analyse qui porte ce titre. */
+const panel = (title) => evaluate(`(() => {
+  const t = [...document.querySelectorAll('.an-carte-panels [role=button]')].find((h) => h.textContent.trim() === ${JSON.stringify(title)});
+  return t ? t.closest('.an-carte-panels > *').innerText.replace(/\\n+/g, ' / ').slice(0, 700) : '(absent)';
+})()`);
+/** Graphes dessinés dans les panneaux Évolution et Profil. */
+const charts = () => evaluate(`["Évolution des répétitions", "Profil d'une répétition"].map((title) => {
+  const t = [...document.querySelectorAll('.an-carte-panels [role=button]')].find((h) => h.textContent.trim() === title);
+  return title + ' : ' + (t ? t.closest('.an-carte-panels > *').querySelectorAll('.recharts-surface').length : 'absent');
+}).join(' | ')`);
+const card = () => evaluate(`(() => { const c = [...document.querySelectorAll('.ivl')][0]; return c ? c.innerText.replace(/\\n+/g, ' / ') : '(pas de compteur)'; })()`);
+const records = () => evaluate(`(async () => {
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+  const list = [];
+  for await (const [name, h] of dir.entries()) if (name.endsWith('.json')) list.push({ name, record: JSON.parse(await (await h.getFile()).text()) });
+  return list;
+})()`);
+/** Sons consignés depuis `fromIndex`, en millisecondes depuis le premier, arrondies au dixième de seconde. */
+const timeline = (fromIndex) => {
+  const list = sounds.slice(fromIndex).filter((s) => s.startsWith('[bips]'));
+  const at = list.map((s) => Number(/à (\d+)/.exec(s)?.[1]));
+  return list.map((s, i) => `${/\[bips\] (\w+)/.exec(s)[1]}@${Math.round((at[i] - at[0]) / 100) / 10}`).join(' ');
+};
+
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
+await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
+
+// 1. Enregistrer, onglet Fractionné.
+await go('/enregistrer');
+console.log('famille Entraînement :', await clickText('Entraînement'));
+await wait(400);
+console.log('activités :', await evaluate(`[...document.querySelectorAll('[aria-label=Activité] button')].map((o) => o.textContent).join(', ')`));
+console.log('compteur :', await evaluate(`(document.querySelector('.ivl .ivl-switch__pick[aria-pressed=true]')?.textContent ?? '(absent)') + ' / ' + (document.querySelector('.ivl-summary')?.textContent ?? '')`));
+
+// 2. Séance 2 × 0:05 / 0:05, gardée.
+console.log('réglage :', await setSelect('Répétitions', 2), await setSelect('Travail, minutes', 0), await setSelect('Travail, secondes', 5),
+  await setSelect('Repos, minutes', 0), await setSelect('Repos, secondes', 5));
+await wait(200);
+console.log('résumé :', await evaluate(`document.querySelector('.ivl-summary')?.textContent`));
+console.log('Garder :', await clickText('Garder cette séance'));
+await wait(200);
+console.log('nom :', await typeInto('Nom de la séance', 'Essai court'), '| Garder :', await clickText('Garder'));
+await wait(300);
+await go('/enregistrer');
+await clickText('Entraînement');
+await wait(400);
+console.log('après rechargement, séances gardées :', await evaluate(`[...document.querySelectorAll('.ivl-preset__pick')].map((b) => b.innerText.replace(/\\n/g, ' ') + (b.getAttribute('aria-pressed') === 'true' ? ' (choisie)' : '')).join(' ; ')`));
+console.log('choisir « Essai court » :', await clickText('Essai court', '.ivl-preset__pick'));
+await wait(200);
+await shoot('fractionne-compteur');
+
+// 3. Compteur seul : 3 s de départ, puis 15 s de séance.
+const first = sounds.length;
+console.log('Lancer :', await clickText('Lancer le compteur'));
+await wait(1200);
+console.log('à 1 s :', await card());
+await shoot('fractionne-travail');
+await wait(5000);
+console.log('à 6 s :', await card());
+await wait(14500);
+console.log('à 21 s :', await card());
+console.log('sons :', timeline(first));
+console.log('attendu : court@0 court@1 long@2 court@5 court@6 long@7 court@10 court@11 long@12 court@14.2 long@15.2 final@16.2');
+console.log('notification :', sounds.slice(first).filter((s) => s.startsWith('[compteur]')).map((s) => s.replace(/ à \d+/, '').replace('[compteur] ', '')).join(' → '));
+console.log('Tout clore :', await clickText('Tout clore'));
+await wait(300);
+
+// 4. Pause, reprise, Passer, rechargement en pleine séance, bandeau, arrêt.
+console.log('Lancer :', await clickText('Lancer le compteur'));
+await wait(1500);
+console.log('Pause :', await clickText('Pause'));
+await wait(300);
+const pausedCard = await card();
+await wait(2000);
+console.log('en pause :', pausedCard, '| 2 s plus tard, inchangé :', (await card()) === pausedCard);
+console.log('Reprendre :', await clickText('Reprendre'), '| Passer :', await clickText('Passer'));
+await wait(500);
+console.log('après Passer :', await card());
+await go('/course');
+console.log('rechargé sur /course, bandeau :', await evaluate(`document.querySelector('.shell-banner--intervals')?.innerText.replace(/\\n/g, ' ') ?? '(aucun)'`));
+await go('/enregistrer');
+console.log('de retour :', await card());
+// « Arrêter » du compteur se tient 1 s (25/10).
+console.log('Arrêter :', await evaluate(`(async () => { const b = document.querySelector('.ivl button.ui-btn--danger'); if (!b) return 'absent'; const ev = (t) => b.dispatchEvent(new PointerEvent(t, { bubbles: true, button: 0, pointerType: 'mouse' })); ev('pointerdown'); await new Promise((r) => setTimeout(r, 1200)); ev('pointerup'); b.click(); return 'ok'; })()`));
+await wait(300);
+console.log('arrêté :', await card(), '| gardée :', await evaluate(`JSON.parse(localStorage.getItem('tracker.intervalRun'))?.commands.map((c) => c.kind).join(',')`));
+console.log('Tout clore :', await clickText('Tout clore'), '| oubliée :', await evaluate(`localStorage.getItem('tracker.intervalRun')`));
+
+// 5. Pendant un enregistrement : rejeu ×1 d'une trace datée de maintenant, 5 s à 5 m/s puis 5 s à 1 m/s.
+const t0 = Date.now();
+const lat = 43.7;
+const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
+let meters = 0;
+const pts = [];
+for (let k = 0; k <= 45; k++) {
+  const v = Math.floor(k / 5) % 2 === 0 ? 5 : 1;
+  if (k > 0) meters += v;
+  pts.push(`<trkpt lat="${lat}" lon="${(3.85 + meters / mPerDegLon).toFixed(7)}"><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${v}</speed></extensions></trkpt>`);
+}
+const replayPath = join(workDir, 'fractionne-rejeu.gpx');
+writeFileSync(replayPath, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Rejeu</name><type>run-intervals</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`);
+console.log('famille Entraînement :', await clickText('Entraînement'));
+await wait(300);
+await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click(); 'ok'`);
+await wait(300);
+await setFile('input[type=file][accept*=".gpx"]', replayPath);
+await wait(500);
+await evaluate(`(() => { const s = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => o.value === '600')); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '1'); s.dispatchEvent(new Event('change', { bubbles: true })); return s.value; })()`);
+console.log('Démarrer :', await clickText('Démarrer'));
+await wait(2000);
+console.log('Lancer :', await clickText('Lancer le compteur'));
+await wait(21000);
+console.log('pendant :', await card());
+await shoot('fractionne-enregistrement');
+console.log('Arrêter (enregistrement) :', await holdStop());
+await wait(2500);
+console.log('Analyser :', await clickText('Analyser'));
+await wait(6000);
+console.log('page :', await evaluate('location.pathname'), '| onglets :', await evaluate(`[...document.querySelectorAll('.an-carte-col .ui-tab')].map((t) => t.textContent).join(', ')`));
+console.log('panneau :', await panel('Répétitions'));
+console.log('graphes :', await charts());
+console.log('Voir :', await clickText('Voir'), '| tracé violet :', await evaluate(`[...document.querySelectorAll('path.leaflet-interactive')].filter((p) => p.getAttribute('stroke') === '#7b1fa2').length`));
+await shoot('fractionne-analyse');
+// Profil d'une répétition zoomable et lu au-dessus (lot 2 des demandes du 24/10) : survol, puis double-clic.
+const profileScope = `[...document.querySelectorAll('.an-carte-panels [role=button]')].find((h) => h.textContent.trim() === "Profil d'une répétition")?.closest('.an-carte-panels > *')`;
+const profilePoint = await evaluate(`(async () => {
+  const c = ${profileScope}?.querySelector('.zoom-chart');
+  if (!c) return null;
+  c.scrollIntoView({ block: 'center' });
+  await new Promise((r) => setTimeout(r, 300));
+  const r = (c.querySelector('.recharts-cartesian-grid') ?? c).getBoundingClientRect();
+  return { x: r.left + r.width * 0.5, y: r.top + r.height / 2 };
+})()`);
+if (profilePoint) {
+  const m = (type, clickCount = 1) => send('Input.dispatchMouseEvent', { type, x: profilePoint.x, y: profilePoint.y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount });
+  await m('mouseMoved');
+  await wait(300);
+  const read = await evaluate(`${profileScope}?.querySelector('[data-chart-readout]')?.textContent.trim()`);
+  const bubble = await evaluate(`[...(${profileScope}?.querySelectorAll('.recharts-tooltip-wrapper') ?? [])].map((w) => w.textContent.trim()).join('')`);
+  console.log(`${/^Moyenne [\d.,]+ km\/h · \d+:\d\d après le départ$/.test(read ?? '') && bubble === '' ? 'ok   ' : 'ÉCHEC'} profil : lecture au-dessus, sans bulle (${read} | « ${bubble} »)`);
+  for (const n of [1, 2]) { await m('mousePressed', n); await m('mouseReleased', n); }
+  await wait(600);
+  const buttons = await evaluate(`[...(${profileScope}?.querySelectorAll('.zoom-chart__actions button') ?? [])].map((b) => b.textContent.trim()).join(' | ')`);
+  console.log(`${buttons === 'Tout voir' ? 'ok   ' : 'ÉCHEC'} profil : double-clic qui zoome, « Tout voir » sans « Sur la carte » (${buttons})`);
+  await shoot('fractionne-profil-zoom');
+} else console.log('ÉCHEC profil zoomable absent');
+const recs = await records();
+const rec = recs.find((r) => r.record.sport === 'run-intervals')?.record;
+console.log('fiche :', rec ? `${rec.sport}, activité ${rec.activityId}, séances ${rec.intervals?.length ?? 0}, phases ${rec.intervals?.[0]?.laps.map((l) => `${l.kind}${l.rep} ${Math.round((l.endMs - l.startMs) / 1000)} s`).join(', ')}` : '(aucune)');
+await go('/fractionne');
+console.log('bibliothèque :', await evaluate(`document.querySelector('.lib-list')?.innerText.replace(/\\n+/g, ' / ').slice(0, 300) ?? '(vide)'`), '| vue planifiées :', await evaluate(`[...document.querySelectorAll('.ui-tab')].some((t) => /planifi/.test(t.textContent))`));
+
+// 6. Séance sans compteur : 10 min d'échauffement, 8 × (1 min d'effort qui faiblit, 1 min à 1,5 m/s), 5 min de retour
+// au calme. Le GPX passe par la page, dans un `File` : Chrome peut refuser de lire le dossier de travail.
+const tf = Date.UTC(2026, 9, 3, 7, 0, 0);
+const effortAt = (s) => {
+  if (s < 600) return 2.8 + 0.1 * Math.sin(s / 13);
+  const t = s - 600;
+  if (t >= 8 * 120 - 60) return 2.5;
+  const k = t % 120;
+  return k < 60 ? Math.min(1.5 + (k + 1) * 1.2, 5.2 - 0.05 * Math.floor(t / 120) - 0.004 * k) : 1.5;
+};
+let fm = 0;
+const fpts = [];
+for (let k = 0; k <= 600 + 8 * 120 - 60 + 300; k++) {
+  const v = effortAt(k);
+  if (k > 0) fm += v;
+  fpts.push(`<trkpt lat="${lat}" lon="${(3.85 + fm / mPerDegLon).toFixed(7)}"><ele>60</ele><time>${new Date(tf + k * 1000).toISOString()}</time><extensions><speed>${v.toFixed(3)}</speed></extensions></trkpt>`);
+}
+const freeGpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Sans compteur</name><type>run-intervals</type><trkseg>\n${fpts.join('\n')}\n</trkseg></trk></gpx>\n`;
+await go('/fractionne');
+console.log('import sans compteur :', await evaluate(`(() => {
+  const input = document.querySelector('input[type=file][accept*=".gpx"]');
+  if (!input) return 'absent';
+  const dt = new DataTransfer();
+  dt.items.add(new File([${JSON.stringify(freeGpx)}], 'sans-compteur.gpx', { type: 'application/gpx+xml' }));
+  input.files = dt.files;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  return 'ok';
+})()`));
+await wait(4000);
+const freeRecord = async () => (await records()).find((r) => r.record.summary?.startMs === tf)?.record;
+const free = await freeRecord();
+console.log('fiche sans compteur :', free ? `${free.gpx}, séances du compteur : ${free.intervals?.length ?? 0}` : '(absente)');
+const freePath = `/fractionne/analyse?session=${encodeURIComponent(free?.gpx ?? '')}`;
+await go(freePath, 6000);
+console.log('panneau :', await panel('Répétitions'));
+console.log('graphes :', await charts());
+const effortField = () => evaluate(`document.querySelector('input[aria-label="Seuil d\\'effort"]')?.value ?? '(absent)'`);
+// `typeInto` met le libellé entre apostrophes : celle de « Seuil d'effort » le casserait.
+const setEffort = (value) => evaluate(`(() => {
+  const i = document.querySelector('input[aria-label="Seuil d\\'effort"]');
+  if (!i) return 'absent';
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ${JSON.stringify(value)});
+  i.dispatchEvent(new Event('input', { bubbles: true }));
+  return i.value;
+})()`);
+console.log('onglet réglages :', await clickText('réglages', '.an-carte-col .ui-tab'));
+await wait(500);
+console.log('seuil tiré de la session :', await effortField());
+console.log('seuil 25 km/h :', await setEffort('25'));
+await wait(800);
+console.log('panneau :', await panel('Fractionné'), '| barre :', await evaluate(`document.querySelector('.ui-savebar, .an-savebar')?.innerText.replace(/\\n+/g, ' / ') ?? document.body.innerText.match(/Non enregistr[^\\n]*/)?.[0] ?? '(aucune)'`));
+console.log('seuil 14 km/h :', await setEffort('14'));
+await wait(800);
+console.log('panneau :', (await panel('Répétitions')).slice(0, 160));
+console.log('Enregistrer la session :', await clickText('Enregistrer la session'));
+await wait(2500);
+const saved = await freeRecord();
+console.log("fiche : seuil d'effort", saved?.analysis?.effortThresholdMs?.toFixed(3) ?? '(absent)', 'm/s (attendu 3.889)');
+await go(freePath, 6000);
+console.log('après rechargement, seuil :', await effortField(), '| Revenir à la session :', await clickText('Revenir à la session'));
+await wait(800);
+console.log('seuil :', await effortField(), '| panneau :', (await panel('Répétitions')).slice(0, 120));
+await shoot('fractionne-detection');
+console.log('Annuler :', await clickText('Annuler'));
+
+// 6 bis (lot 61). Deux séances de même forme, sans compteur : clic sur l'évolution, puis zoom du profil d'une séance à l'autre.
+const freeGpxAt = (start, name) => {
+  let m = 0;
+  const list = [];
+  for (let k = 0; k <= 600 + 8 * 120 - 60 + 300; k++) {
+    const v = effortAt(k);
+    if (k > 0) m += v;
+    list.push(`<trkpt lat="${lat}" lon="${(3.85 + m / mPerDegLon).toFixed(7)}"><ele>60</ele><time>${new Date(start + k * 1000).toISOString()}</time><extensions><speed>${v.toFixed(3)}</speed></extensions></trkpt>`);
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>${name}</name><type>run-intervals</type><trkseg>\n${list.join('\n')}\n</trkseg></trk></gpx>\n`;
+};
+const twins = [tf + 86_400_000, tf + 2 * 86_400_000];
+const twinPaths = [];
+for (const [k, start] of twins.entries()) {
+  await go('/fractionne');
+  const gpx = freeGpxAt(start, `Jumelle ${k + 1}`);
+  console.log(`import jumelle ${k + 1} :`, await evaluate(`(() => {
+  const input = document.querySelector('input[type=file][accept*=".gpx"]');
+  if (!input) return 'absent';
+  const dt = new DataTransfer();
+  dt.items.add(new File([${JSON.stringify(gpx)}], 'jumelle-${k + 1}.gpx', { type: 'application/gpx+xml' }));
+  input.files = dt.files;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  return 'ok';
+})()`));
+  await wait(4000);
+  const twin = (await records()).find((r) => r.record.summary?.startMs === start)?.record;
+  twinPaths.push(`/fractionne/analyse?session=${encodeURIComponent(twin?.gpx ?? '')}`);
+}
+await go(twinPaths[0], 6000);
+const panelScope = (title) => `[...document.querySelectorAll('.an-carte-panels [role=button]')].find((h) => h.textContent.trim() === ${JSON.stringify(title)})?.closest('.an-carte-panels > *')`;
+const violet = () => evaluate(`[...document.querySelectorAll('path.leaflet-interactive')].filter((p) => p.getAttribute('stroke') === '#7b1fa2').length`);
+/** Points de l'évolution : milieu de la zone de tracé, et dans la marge de l'axe vertical, hors du tracé. */
+const evolutionPoints = await evaluate(`(async () => {
+  const w = ${panelScope('Évolution des répétitions')}?.querySelector('.recharts-wrapper');
+  if (!w) return null;
+  w.scrollIntoView({ block: 'center' });
+  await new Promise((r) => setTimeout(r, 300));
+  const g = (w.querySelector('.recharts-cartesian-grid') ?? w).getBoundingClientRect();
+  const r = w.getBoundingClientRect();
+  return { inX: g.left + g.width * 0.5, outX: r.left + 6, y: g.top + g.height / 2 };
+})()`);
+if (evolutionPoints) {
+  const at = (x) => async (type) => send('Input.dispatchMouseEvent', { type, x, y: evolutionPoints.y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
+  const inside = at(evolutionPoints.inX);
+  const outside = at(evolutionPoints.outX);
+  await inside('mouseMoved');
+  await wait(200);
+  await outside('mouseMoved');
+  await wait(200);
+  await outside('mousePressed');
+  await outside('mouseReleased');
+  await wait(600);
+  const afterOutside = await violet();
+  console.log(`${afterOutside === 0 ? 'ok   ' : 'ÉCHEC'} évolution : un clic hors du tracé ne choisit aucune répétition (${afterOutside} tracé violet)`);
+  await inside('mouseMoved');
+  await wait(200);
+  await inside('mousePressed');
+  await inside('mouseReleased');
+  await wait(600);
+  const afterInside = await violet();
+  console.log(`${afterInside === 1 ? 'ok   ' : 'ÉCHEC'} évolution : un clic sur le tracé montre sa répétition (${afterInside} tracé violet)`);
+  await inside('mousePressed');
+  await inside('mouseReleased');
+  await wait(600);
+} else console.log('ÉCHEC évolution absente');
+const profileButtons = () => evaluate(`[...(${panelScope("Profil d'une répétition")}?.querySelectorAll('.zoom-chart__actions button') ?? [])].map((b) => b.textContent.trim()).join(' | ')`);
+const twinProfile = await evaluate(`(async () => {
+  const c = ${panelScope("Profil d'une répétition")}?.querySelector('.zoom-chart');
+  if (!c) return null;
+  c.scrollIntoView({ block: 'center' });
+  await new Promise((r) => setTimeout(r, 300));
+  const r = (c.querySelector('.recharts-cartesian-grid') ?? c).getBoundingClientRect();
+  return { x: r.left + r.width * 0.5, y: r.top + r.height / 2 };
+})()`);
+if (twinProfile) {
+  const m = (type, clickCount = 1) => send('Input.dispatchMouseEvent', { type, x: twinProfile.x, y: twinProfile.y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount });
+  await m('mouseMoved');
+  await wait(300);
+  // Lecture sur une séance importée, à l'heure fixe : comparable d'un passage à l'autre, au contraire du rejeu.
+  console.log('jumelle 1, profil lu au milieu :', await evaluate(`${panelScope("Profil d'une répétition")}?.querySelector('[data-chart-readout]')?.textContent.trim()`));
+  for (const n of [1, 2]) { await m('mousePressed', n); await m('mouseReleased', n); }
+  await wait(600);
+  const zoomed = await profileButtons();
+  console.log(`${zoomed === 'Tout voir' ? 'ok   ' : 'ÉCHEC'} jumelle 1 : profil zoomé (${zoomed})`);
+  // Autre séance sans rechargement : le routeur suit l'adresse (comme un lien de la bibliothèque).
+  await evaluate(`(() => { history.pushState({}, '', ${JSON.stringify(twinPaths[1])}); dispatchEvent(new PopStateEvent('popstate')); return 'ok'; })()`);
+  await wait(3000);
+  const opened = await evaluate(`decodeURIComponent(location.search).includes(${JSON.stringify(new Date(twins[1]).toISOString().slice(0, 10))}) || location.search === ${JSON.stringify(twinPaths[1].slice(twinPaths[1].indexOf('?')))}`);
+  const after = await profileButtons();
+  console.log(`${opened && after === '' ? 'ok   ' : 'ÉCHEC'} jumelle 2 ouverte sans rechargement : profil revenu à tout voir (${opened ? 'ouverte' : 'pas ouverte'}, boutons « ${after} »)`);
+} else console.log('ÉCHEC profil de la jumelle absent');
+
+// 7. Réglages, accueil, planification.
+await go('/parametres');
+await clickText('Activités', '[role=button]');
+await wait(400);
+// Familles repliées depuis le lot 2 des demandes du 15/10 : toutes ouvertes.
+await evaluate(`document.querySelectorAll('.settings-activities__family-toggle[aria-expanded="false"]').forEach((b) => b.click()); 'ok'`);
+await wait(300);
+console.log('Réglages, familles :', await evaluate(`[...document.querySelectorAll('.settings-activities__family')].map((f) => f.textContent).join(', ')`));
+console.log('Réglages, activités :', await evaluate(`[...document.querySelectorAll('.settings-activity__name')].map((f) => f.textContent).join(', ')`));
+await setSelect('Famille', 'fractionne');
+await wait(200);
+console.log('ajout, calculs du fractionné :', await evaluate(`[...document.querySelectorAll('.settings-add select')].map((s) => [...s.options].map((o) => o.textContent).join('/')).join(' | ')`));
+await go('/');
+console.log('accueil :', await evaluate(`[...document.querySelectorAll('.home-family__name')].map((n) => n.textContent).join(', ')`),
+  '| barre :', await evaluate(`[...document.querySelectorAll('.shell-toplink')].map((a) => a.textContent).join(', ')`));
+await go('/itineraires', 4000);
+await evaluate(`document.querySelector('.plan-toolbar button.ui-field, .plan-toolbar .activity-select button')?.click(); 'ok'`);
+await wait(400);
+console.log('planification, familles proposées :', await evaluate(`[...document.querySelectorAll('.activity-select__family')].map((f) => f.textContent).join(', ') || '(liste non ouverte)'`),
+  '| activité :', await evaluate(`document.querySelector('.plan-toolbar')?.innerText.split('\\n')[0]`));
+
+// Téléphone : la carte du compteur et l'analyse à 390 × 844.
+await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+await go('/enregistrer');
+await clickText('Entraînement');
+await wait(400);
+await shoot('fractionne-telephone-compteur');
+console.log('largeur au téléphone :', await evaluate('document.documentElement.scrollWidth'));
+
+// 8 (lot 181). Séance avec FC et cadence : les cellules d'une carte de répétition ne se chevauchent pas, à 320, 360 et 390 px.
+{
+  const start = tf + 3 * 86_400_000;
+  let m = 0;
+  const list = [];
+  for (let k = 0; k <= 600 + 8 * 120 - 60 + 300; k++) {
+    const v = effortAt(k);
+    if (k > 0) m += v;
+    const hr = Math.round(110 + 8 * Math.min(1, v / 5));
+    const cad = Math.round(80 + 6 * Math.min(1, v / 5));
+    list.push(`<trkpt lat="${lat}" lon="${(3.85 + m / mPerDegLon).toFixed(7)}"><ele>60</ele><time>${new Date(start + k * 1000).toISOString()}</time><extensions><speed>${v.toFixed(3)}</speed><hr>${hr + 40}</hr><cad>${cad}</cad></extensions></trkpt>`);
+  }
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>FC et cadence</name><type>run-intervals</type><trkseg>\n${list.join('\n')}\n</trkseg></trk></gpx>\n`;
+  await go('/fractionne');
+  await evaluate(`(() => {
+    const input = document.querySelector('input[type=file][accept*=".gpx"]');
+    const dt = new DataTransfer();
+    dt.items.add(new File([${JSON.stringify(gpx)}], 'fc-cadence.gpx', { type: 'application/gpx+xml' }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    return 'ok';
+  })()`);
+  await wait(4000);
+  const rec = (await records()).find((r) => r.record.summary?.startMs === start)?.record;
+  for (const width of [320, 360, 390]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 2, mobile: true });
+    await go(`/fractionne/analyse?session=${encodeURIComponent(rec?.gpx ?? '')}`, 6000);
+    const res = await evaluate(`(async () => {
+      const row = document.querySelector('.an-ivl-table tbody tr');
+      if (!row) return { error: 'aucune carte de répétition' };
+      row.scrollIntoView({ block: 'center' });
+      await new Promise((r) => setTimeout(r, 300));
+      const cells = [...row.querySelectorAll('td')].filter((c) => getComputedStyle(c).display !== 'none');
+      const named = cells.map((c) => {
+        const range = document.createRange();
+        range.selectNodeContents(c);
+        const r = range.getBoundingClientRect();
+        const before = getComputedStyle(c, '::before').content;
+        return { name: c.className.replace(/\\bnum\\b/, '').trim(), l: r.left, r: r.right, t: r.top, b: r.bottom, over: c.scrollWidth - c.clientWidth, w: r.width, before };
+      }).filter((c) => c.w > 0);
+      const bad = [];
+      for (let i = 0; i < named.length; i++) {
+        if (named[i].over > 1) bad.push(named[i].name + ' déborde de ' + named[i].over + ' px');
+        for (let j = i + 1; j < named.length; j++) {
+          const a = named[i], b = named[j];
+          if (a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5) bad.push(a.name + ' recouvre ' + b.name);
+        }
+      }
+      return { cells: named.length, hasCad: !!row.querySelector('.an-ivl-cad'), hasHr: !!row.querySelector('.an-ivl-hr'), bad, cad: row.querySelector('.an-ivl-cad')?.innerText, page: document.documentElement.scrollWidth };
+    })()`);
+    const ok = !res.error && res.hasCad && res.hasHr && res.bad.length === 0;
+    console.log(`${ok ? 'ok   ' : 'ÉCHEC'} carte de répétition à ${width} px : ${res.error ?? `${res.cells} cellules, FC ${res.hasHr}, cadence ${res.hasCad} (« ${(res.cad ?? '').replace(/\n/g, ' ')} »), page ${res.page} px, ${res.bad.length ? res.bad.join(' ; ') : 'aucun chevauchement'}`}`);
+    if (width === 320) await shoot('fractionne-carte-320');
+  }
+}
+
+// 9 (lot 182). « Tout replier » : le rejeu du compteur (section 5) reçoit une seconde séance, copie de la première.
+{
+  const name = (await records()).find((r) => r.record.sport === 'run-intervals' && r.record.intervals?.length)?.name;
+  const gpxName = (await records()).find((r) => r.name === name)?.record.gpx;
+  const path = `/fractionne/analyse?session=${encodeURIComponent(gpxName ?? '')}`;
+  const foldBtn = () => evaluate(`[...document.querySelectorAll('.an-carte-panels button')].filter((b) => /^Tout (re|dé)plier$/.test(b.textContent.trim())).map((b) => b.textContent.trim()).join('|')`);
+  /** Titres de séance (boutons à chevron) : [ouverts, repliés] sur les trois panneaux. */
+  const titles = () => evaluate(`(() => { const b = [...document.querySelectorAll('.an-carte-panels button[aria-expanded]')].filter((x) => /cette séance$/.test(x.title)); return [b.filter((x) => x.title.startsWith('Replier')).length, b.filter((x) => x.title.startsWith('Déplier')).length]; })()`);
+  await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 844, deviceScaleFactor: 2, mobile: true });
+  await go(path, 6000);
+  const one = await foldBtn();
+  console.log(`${one === '' ? 'ok   ' : 'ÉCHEC'} tout replier : pas de bouton avec une seule séance (« ${one} »)`);
+  // Deuxième séance : copie de la première, écrite dans la fiche (OPFS), puis analyse rouverte.
+  console.log('seconde séance :', await evaluate(`(async () => {
+    const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Tracker')).getDirectoryHandle('sessions');
+    const h = await dir.getFileHandle(${JSON.stringify(name)});
+    const rec = JSON.parse(await (await h.getFile()).text());
+    rec.intervals = [rec.intervals[0], structuredClone(rec.intervals[0])];
+    const w = await h.createWritable();
+    await w.write(JSON.stringify(rec));
+    await w.close();
+    return rec.intervals.length;
+  })()`));
+  await go(path, 6000);
+  await wait(500);
+  const both = await foldBtn();
+  const [open0, fold0] = await titles();
+  console.log(`${both === 'Tout replier' && open0 === 6 && fold0 === 0 ? 'ok   ' : 'ÉCHEC'} tout replier : bouton unique avec 2 séances, 6 titres ouverts (« ${both} », ${open0} ouverts, ${fold0} repliés)`);
+  const geom = await evaluate(`(() => { const b = [...document.querySelectorAll('.an-carte-panels button')].find((x) => x.textContent.trim() === 'Tout replier'); const r = b.getBoundingClientRect(); return { h: Math.round(r.height), right: Math.round(r.right), page: document.documentElement.scrollWidth }; })()`);
+  console.log(`${geom.h >= 40 && geom.right <= 320 && geom.page <= 320 ? 'ok   ' : 'ÉCHEC'} tout replier : bouton de ${geom.h} px de haut, contenu dans 320 px (bord droit ${geom.right}, page ${geom.page})`);
+  await shoot('fractionne-tout-replier');
+  const press = () => evaluate(`(() => { const b = [...document.querySelectorAll('.an-carte-panels button')].find((x) => /^Tout (re|dé)plier$/.test(x.textContent.trim())); b?.click(); return b ? 'ok' : 'absent'; })()`);
+  await press();
+  await wait(400);
+  const [open1, fold1] = await titles();
+  const label1 = await foldBtn();
+  console.log(`${open1 === 0 && fold1 === 6 && label1 === 'Tout déplier' ? 'ok   ' : 'ÉCHEC'} tout replier : un appui replie les 2 séances dans les 3 panneaux (${fold1} repliés, « ${label1} »)`);
+  await press();
+  await wait(400);
+  const [open2, fold2] = await titles();
+  const label2 = await foldBtn();
+  console.log(`${open2 === 6 && fold2 === 0 && label2 === 'Tout replier' ? 'ok   ' : 'ÉCHEC'} tout replier : un second appui rouvre tout (${open2} ouverts, « ${label2} »)`);
+  // Une à une : la dernière repliée change aussi le libellé.
+  const foldOne = () => evaluate(`(() => { const b = [...document.querySelectorAll('.an-carte-panels button[aria-expanded=true]')].find((x) => x.title === 'Replier cette séance'); b?.click(); return b ? 'ok' : 'absent'; })()`);
+  await foldOne();
+  await wait(300);
+  const mid = await foldBtn();
+  await foldOne();
+  await wait(300);
+  const last = await foldBtn();
+  console.log(`${mid === 'Tout replier' && last === 'Tout déplier' ? 'ok   ' : 'ÉCHEC'} tout replier : une séance repliée, « ${mid} » ; les deux, « ${last} »`);
+}
+
+console.log(logs.length ? `console :\n${[...new Set(logs)].join('\n')}` : 'console : aucune erreur');
+await close();

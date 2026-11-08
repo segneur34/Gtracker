@@ -1,0 +1,91 @@
+/**
+ * Notes de session : matériel utilisé, conditions rencontrées, appréciation.
+ * Saisies par l'utilisateur, jamais déduites de la trace. En voile : foil, mât,
+ * aile, vent et plan d'eau ; ailleurs : deux champs de matériel nommés par
+ * activité dans Réglages, et des conditions en texte libre. L'appréciation et
+ * le commentaire sont communs à toutes les activités.
+ */
+
+export type WindLevel = 'tres-faible' | 'faible' | 'moyen' | 'fort' | 'tres-fort';
+export type WaterState = 'plat' | 'clapot' | 'vagues';
+export type Rating = 1 | 2 | 3 | 4 | 5;
+
+/** Pièce du matériel enregistré d'une activité (Réglages, `gearGroups`). */
+export interface GearItem {
+  id: string;
+  name: string;
+}
+
+/** Groupe du matériel enregistré (« Voile », « Aile avant », « Mât »…), avec ses pièces ; une liste par activité. */
+export interface GearGroup {
+  id: string;
+  name: string;
+  items: GearItem[];
+}
+
+/**
+ * Pièce choisie dans un groupe du matériel enregistré de l'activité (Réglages),
+ * ou ajoutée pour la session seule (identifiant hors de la liste). Le nom et
+ * le groupe sont recopiés : la pièce se retrouve renommée (par l'identifiant)
+ * ou retirée de la liste (par le nom).
+ */
+export interface GearChoice {
+  groupId: string;
+  groupName: string;
+  itemId: string;
+  itemName: string;
+}
+
+export interface SailingSessionNotes {
+  foil: string;
+  mast: string;
+  wing: string;
+  /** Matériel hors voile, sous les intitulés de l'activité (`gearLabels` des Réglages). */
+  gear1: string;
+  gear2: string;
+  /** Conditions hors voile, en texte libre. */
+  conditions: string;
+  /** Matériel enregistré choisi, une pièce par groupe au plus ; `null` : rien de choisi. */
+  gear: GearChoice[] | null;
+  windLevel: WindLevel | null;
+  waterState: WaterState | null;
+  rating: Rating | null;
+  comment: string;
+}
+
+export const EMPTY_NOTES: SailingSessionNotes = {
+  foil: '',
+  mast: '',
+  wing: '',
+  gear1: '',
+  gear2: '',
+  conditions: '',
+  gear: null,
+  windLevel: null,
+  waterState: null,
+  rating: null,
+  comment: '',
+};
+
+export const WIND_LEVELS: { value: WindLevel; label: string }[] = [
+  { value: 'tres-faible', label: 'Très faible' },
+  { value: 'faible', label: 'Faible' },
+  { value: 'moyen', label: 'Moyen' },
+  { value: 'fort', label: 'Fort' },
+  { value: 'tres-fort', label: 'Très fort' },
+];
+
+export const WATER_STATES: { value: WaterState; label: string }[] = [
+  { value: 'plat', label: 'Plat' },
+  { value: 'clapot', label: 'Clapot' },
+  { value: 'vagues', label: 'Vagues' },
+];
+
+/** Appréciation, du plus triste au plus content : son visage (`IconFace` de `components/icons.tsx`), sans emoji. */
+export const RATINGS: { value: Rating; label: string; face: 'triste' | 'decu' | 'neutre' | 'content' | 'ravi' }[] = [
+  { value: 1, label: 'Nul', face: 'triste' },
+  { value: 2, label: 'Bof', face: 'decu' },
+  { value: 3, label: 'Moyen', face: 'neutre' },
+  { value: 4, label: 'Bien', face: 'content' },
+  { value: 5, label: 'Très bien', face: 'ravi' },
+];

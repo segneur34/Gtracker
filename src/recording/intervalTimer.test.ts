@@ -1,0 +1,396 @@
+import { describe, expect, it } from 'vitest';
+import {
+  handsOverToRecording, INTERVAL_TONE_MS, MAX_INTERVAL_PRESETS, addPreset, intervalStepAt, isRunClosed, lapsWithin, newPresetId, phaseName, readIntervalRun, readIntervalSeries, replacePreset,
+  readStoredIntervalRun, runCommand, runLaps, runToResume, sameWorkout, sanitizePresets, sanitizeWorkout, seriesBlocks, seriesWithin, startRun, storedIntervalRun,
+  timerStateAt, upcomingSchedule,
+  withoutPreset, workoutBlocks, workoutDurationS, workoutFromBlocks, workoutLabel, workoutPhases,
+  type IntervalBlock, type IntervalRun, type IntervalTone, type IntervalWorkout,
+} from './intervalTimer';
+
+const T0 = 1_700_000_000_000;
+const at = (s: number) => T0 + s * 1000;
+/** 3 × 1:00, 0:30 de repos : départ 0-3, travail 3-63, repos 63-93, travail 93-153, repos 153-183, travail 183-243. */
+const workout: IntervalWorkout = { reps: 3, workS: 60, restS: 30 };
+const run = startRun(workout, T0);
+
+/** La séance après une suite de commandes, chacune à son instant (en secondes). */
+const withCommands = (base: IntervalRun, ...commands: [IntervalRun['commands'][number]['kind'], number][]): IntervalRun =>
+  commands.reduce((r, [kind, s]) => runCommand(r, kind, at(s)), base);
+
+describe('séance', () => {
+  it('découpe la séance en phases, compte à rebours du départ en tête, sans repos après la dernière répétition', () => {
+    expect(workoutPhases(workout).map((p) => [p.kind, p.rep, p.startS, p.endS])).toEqual([
+      ['pret', 1, 0, 3], ['travail', 1, 3, 63], ['repos', 1, 63, 93], ['travail', 2, 93, 153], ['repos', 2, 153, 183], ['travail', 3, 183, 243],
+    ]);
+    expect(workoutDurationS(workout)).toBe(240);
+    expect(workoutPhases({ reps: 2, workS: 30, restS: 0 }).map((p) => p.kind)).toEqual(['pret', 'travail', 'travail']);
+  });
+
+  it('nomme une séance', () => {
+    expect(workoutLabel({ reps: 10, workS: 60, restS: 30 })).toBe('10 × 1:00 / 0:30');
+    expect(workoutLabel({ reps: 5, workS: 3600, restS: 0 })).toBe('5 × 1:00:00');
+  });
+
+  it('écarte une séance hors bornes ou en secondes non entières', () => {
+    expect(sanitizeWorkout({ reps: 8, workS: 45, restS: 15 })).toEqual({ reps: 8, workS: 45, restS: 15 });
+    expect(sanitizeWorkout({ reps: 0, workS: 45, restS: 15 })).toBeNull();
+    expect(sanitizeWorkout({ reps: 8, workS: 2, restS: 15 })).toBeNull();
+    expect(sanitizeWorkout({ reps: 8, workS: 45.5, restS: 15 })).toBeNull();
+    expect(sanitizeWorkout('8 × 45')).toBeNull();
+  });
+});
+
+describe('timerStateAt', () => {
+  it('suit les phases à l’horloge, puis se termine', () => {
+    expect(timerStateAt(run, at(1))).toMatchObject({ status: 'running', phase: { kind: 'pret' }, remainingMs: 2000 });
+    expect(timerStateAt(run, at(13))).toMatchObject({ status: 'running', phase: { kind: 'travail', rep: 1 }, remainingMs: 50_000 });
+    expect(timerStateAt(run, at(68))).toMatchObject({ status: 'running', phase: { kind: 'repos', rep: 1 }, remainingMs: 25_000 });
+    expect(timerStateAt(run, at(242))).toMatchObject({ phase: { kind: 'travail', rep: 3 }, remainingMs: 1000 });
+    expect(timerStateAt(run, at(243))).toMatchObject({ status: 'finished', phase: null });
+    expect(timerStateAt(run, at(5000)).status).toBe('finished');
+  });
+
+  it('gèle pendant une pause, et reprend où elle en était', () => {
+    const paused = withCommands(run, ['pause', 30], ['resume', 100]);
+    expect(timerStateAt(paused, at(80))).toMatchObject({ status: 'paused', remainingMs: 33_000 });
+    expect(timerStateAt(paused, at(120))).toMatchObject({ status: 'running', phase: { kind: 'travail', rep: 1 }, remainingMs: 13_000 });
+  });
+
+  it('« Passer » termine la phase en cours tout de suite', () => {
+    const skipped = withCommands(run, ['skip', 10]);
+    expect(timerStateAt(skipped, at(10))).toMatchObject({ phase: { kind: 'repos', rep: 1 }, remainingMs: 30_000 });
+    expect(timerStateAt(skipped, at(40))).toMatchObject({ phase: { kind: 'travail', rep: 2 }, remainingMs: 60_000 });
+    // Passer la dernière phase clôt la séance.
+    expect(timerStateAt(withCommands(run, ['skip', 200]), at(200)).status).toBe('finished');
+  });
+
+  it('« Passer » en pause : la phase suivante attend la reprise', () => {
+    const r = withCommands(run, ['pause', 20], ['skip', 25], ['resume', 50]);
+    expect(timerStateAt(r, at(40))).toMatchObject({ status: 'paused', phase: { kind: 'repos' }, remainingMs: 30_000 });
+    expect(timerStateAt(r, at(60))).toMatchObject({ status: 'running', phase: { kind: 'repos' }, remainingMs: 20_000 });
+  });
+
+  it('l’arrêt clôt la séance', () => {
+    expect(timerStateAt(withCommands(run, ['stop', 70]), at(80))).toMatchObject({ status: 'stopped', phase: null });
+  });
+});
+
+describe('runCommand', () => {
+  it('ignore une commande sans objet', () => {
+    expect(runCommand(run, 'resume', at(5))).toBe(run);
+    const paused = runCommand(run, 'pause', at(5));
+    expect(runCommand(paused, 'pause', at(6))).toBe(paused);
+    const done = runCommand(run, 'stop', at(5));
+    expect(runCommand(done, 'skip', at(6))).toBe(done);
+    expect(runCommand(run, 'pause', at(300))).toBe(run);
+  });
+});
+
+describe('upcomingSchedule', () => {
+  it('finit chaque signal à l’instant du changement : court, court, long, le même vers un travail et vers un repos', () => {
+    const { tones, cues } = upcomingSchedule(run, T0, false);
+    const signal = (t: IntervalTone) => `${t.tone === 'court' ? 'c' : t.tone === 'long' ? 'L' : 'F'}${t.delayMs / 1000}`;
+    expect(tones.map(signal)).toEqual([
+      'c0.2', 'c1.2', 'L2.2', // départ : le travail commence à 3 s, à la fin du bip long
+      'c60.2', 'c61.2', 'L62.2', // vers le repos, à 63 s
+      'c90.2', 'c91.2', 'L92.2',
+      'c150.2', 'c151.2', 'L152.2',
+      'c180.2', 'c181.2', 'L182.2',
+      'c239.4', 'L240.4', 'F241.4', // fin de séance : court, long, long double, fini à 243 s
+    ]);
+    expect(cues.map((c) => [c.delayMs, c.title, c.phaseMs])).toEqual([
+      [0, 'Départ', 3000], [3000, 'Travail 1/3', 60_000], [63_000, 'Repos 1/3', 30_000], [93_000, 'Travail 2/3', 60_000],
+      [153_000, 'Repos 2/3', 30_000], [183_000, 'Travail 3/3', 60_000], [243_000, 'Terminé', 0],
+    ]);
+  });
+
+  it('joue encore le premier bip du départ quand le programme est calculé un instant après le lancement', () => {
+    expect(upcomingSchedule(run, T0 + 300, false).tones[0]).toEqual({ delayMs: 0, tone: 'court' });
+  });
+
+  it('ne prend rien à la phase suivante : chaque bip commence et finit dans la phase qui finit (essai sur 10 s / 10 s)', () => {
+    const tenTen = startRun({ reps: 3, workS: 10, restS: 10 }, T0);
+    const phases = workoutPhases(tenTen.workout);
+    const { tones } = upcomingSchedule(tenTen, T0, false);
+    expect(tones).toHaveLength(phases.length * 3);
+    for (const tone of tones) {
+      const atS = tone.delayMs / 1000;
+      const phase = phases.find((ph) => atS >= ph.startS && atS < ph.endS)!;
+      expect(atS + INTERVAL_TONE_MS[tone.tone] / 1000).toBeLessThanOrEqual(phase.endS + 1e-9);
+      expect(phase.endS - atS).toBeLessThanOrEqual(3.6 + 1e-9);
+    }
+    // Le dernier bip de chaque signal finit pile au changement.
+    for (const ph of phases) {
+      const last = tones.filter((t) => t.delayMs / 1000 < ph.endS).pop()!;
+      expect(last.delayMs / 1000 + INTERVAL_TONE_MS[last.tone] / 1000).toBeCloseTo(ph.endS, 9);
+    }
+  });
+
+  it('en cours de phase, ne programme que ce qui reste ; après « Passer », un bip long annonce la phase', () => {
+    const { tones, cues } = upcomingSchedule(run, at(61.5), false);
+    expect(tones[0]).toEqual({ delayMs: 700, tone: 'long' });
+    expect(cues[0]).toEqual({ delayMs: 0, title: 'Travail 1/3', phaseMs: 1500 });
+    const skipped = withCommands(run, ['skip', 10]);
+    expect(upcomingSchedule(skipped, at(10), true).tones.slice(0, 2)).toEqual([{ delayMs: 0, tone: 'long' }, { delayMs: 27_200, tone: 'court' }]);
+  });
+
+  it('ne joue pas avant le début d’une phase trop courte pour tout son signal', () => {
+    const short = startRun({ reps: 2, workS: 5, restS: 2 }, T0);
+    const shorts = upcomingSchedule(short, T0, false).tones.filter((t) => t.tone === 'court').map((t) => t.delayMs);
+    expect(shorts).toEqual([200, 1200, 5200, 6200, 8200, 11_400]);
+  });
+
+  it('ne programme rien en pause ni après la fin', () => {
+    expect(upcomingSchedule(withCommands(run, ['pause', 10]), at(20), false)).toEqual({ tones: [], cues: [] });
+    expect(upcomingSchedule(run, at(300), false)).toEqual({ tones: [], cues: [] });
+  });
+});
+
+describe('runLaps', () => {
+  it('rend les phases faites avec leurs instants réels : la pause allonge, « Passer » écourte', () => {
+    const r = withCommands(run, ['pause', 30], ['resume', 50], ['skip', 100]);
+    expect(runLaps(r, at(130)).map((l) => [l.kind, l.rep, (l.startMs - T0) / 1000, (l.endMs - T0) / 1000])).toEqual([
+      ['travail', 1, 3, 83], ['repos', 1, 83, 100], ['travail', 2, 100, 130],
+    ]);
+  });
+
+  it('termine la phase en cours à l’arrêt, et rend toute la séance une fois finie', () => {
+    expect(runLaps(withCommands(run, ['stop', 70]), at(500)).map((l) => (l.endMs - T0) / 1000)).toEqual([63, 70]);
+    // Arrêtée pendant le compte à rebours : aucune répétition.
+    expect(runLaps(withCommands(run, ['stop', 2]), at(500))).toEqual([]);
+    expect(runLaps(run, at(500))).toHaveLength(5);
+  });
+
+  it('ramène les phases à la fenêtre d’un enregistrement', () => {
+    const laps = runLaps(run, at(500));
+    const kept = lapsWithin(laps, at(70), at(160));
+    expect(kept.map((l) => [l.kind, l.rep, (l.startMs - T0) / 1000, (l.endMs - T0) / 1000])).toEqual([
+      ['repos', 1, 70, 93], ['travail', 2, 93, 153], ['repos', 2, 153, 160],
+    ]);
+    const before = startRun(workout, at(-1000));
+    expect(seriesWithin([run, before], at(0), at(100)).map((s) => s.laps.length)).toEqual([3]);
+  });
+});
+
+describe('séances gardées et relecture', () => {
+  it('garde les séances valables, sans doublon', () => {
+    const presets = sanitizePresets([
+      { id: 's1', name: ' Pyramide ', workout },
+      { id: 's1', name: 'Doublon', workout },
+      { id: 's2', name: '', workout: { reps: 4, workS: 120, restS: 60 } },
+      { id: 's3', name: 'Abîmée', workout: { reps: 0 } },
+      'texte',
+    ]);
+    expect(presets).toEqual([
+      { id: 's1', name: 'Pyramide', workout },
+      { id: 's2', name: '4 × 2:00 / 1:00', workout: { reps: 4, workS: 120, restS: 60 } },
+    ]);
+    expect(newPresetId(presets)).toBe('s3');
+    expect(newPresetId([{ id: 's2', name: 'x', workout }])).toBe('s3');
+  });
+
+  it('relit les séances d’une fiche et une séance du journal', () => {
+    const series = [{ workout, laps: runLaps(run, at(500)) }];
+    expect(readIntervalSeries(JSON.parse(JSON.stringify(series)))).toEqual(series);
+    expect(readIntervalSeries([{ workout, laps: [{ kind: 'sprint', rep: 1, startMs: 0, endMs: 1 }] }])).toBeNull();
+    expect(readIntervalSeries(undefined)).toBeNull();
+    const r = withCommands(run, ['pause', 30], ['resume', 50]);
+    expect(readIntervalRun(JSON.parse(JSON.stringify(r)))).toEqual(r);
+    expect(readIntervalRun({ workout, startedAtMs: 'hier', commands: [] })).toBeNull();
+  });
+
+  it('ajoute, modifie et retire une séance gardée, plafond compris', () => {
+    const one = addPreset([], ' Gainage ', workout);
+    expect(one).toEqual([{ id: 's1', name: 'Gainage', workout }]);
+    const two = addPreset(one, '', { reps: 4, workS: 120, restS: 60 });
+    expect(two[1]).toEqual({ id: 's2', name: '4 × 2:00 / 1:00', workout: { reps: 4, workS: 120, restS: 60 } });
+    // Séance non valable : la liste rendue telle quelle, même référence.
+    expect(addPreset(two, 'x', { reps: 0, workS: 60, restS: 0 })).toBe(two);
+    const full = Array.from({ length: MAX_INTERVAL_PRESETS }, (_, i) => ({ id: `s${i + 1}`, name: `n${i}`, workout }));
+    expect(addPreset(full, 'de trop', workout)).toBe(full);
+
+    const renamed = replacePreset(two, 's1', '', { reps: 5, workS: 30, restS: 15 });
+    expect(renamed[0]).toEqual({ id: 's1', name: '5 × 0:30 / 0:15', workout: { reps: 5, workS: 30, restS: 15 } });
+    expect(renamed[1]).toBe(two[1]);
+    expect(replacePreset(two, 's9', 'x', workout)).toBe(two);
+
+    expect(withoutPreset(two, 's1')).toEqual([two[1]]);
+    // Un identifiant libre, pas celui d'une séance restante.
+    expect(addPreset(withoutPreset(two, 's1'), 'neuve', workout)[1].id).toBe('s3');
+  });
+
+  it('une séance du Timer garde son genre, une séance d’avant reste du fractionné', () => {
+    const timerRun = startRun(workout, T0, 'timer');
+    expect(timerRun.kind).toBe('timer');
+    expect(startRun(workout, T0, 'fractionne')).toEqual(run);
+    const paused = runCommand(timerRun, 'pause', at(10));
+    expect(paused.kind).toBe('timer');
+    expect(readIntervalRun(JSON.parse(JSON.stringify(paused)))).toEqual(paused);
+    expect(readIntervalRun({ workout, startedAtMs: T0, commands: [] })).toEqual(run);
+    expect(readIntervalRun({ workout, startedAtMs: T0, commands: [], kind: 'muscu' })).toEqual(run);
+  });
+});
+
+describe('séance à blocs', () => {
+  /** Échauffement 1:00, 2 × 0:30 / 0:15, récupération 0:20, 2 × 0:10 sans repos. */
+  const blocks: IntervalBlock[] = [
+    { kind: 'libre', label: 'Échauffement', durationS: 60 },
+    { kind: 'series', reps: 2, workS: 30, restS: 15 },
+    { kind: 'libre', label: 'Récupération', durationS: 20 },
+    { kind: 'series', reps: 2, workS: 10, restS: 0 },
+  ];
+  const multi = workoutFromBlocks(blocks)!;
+  const multiRun = startRun(multi, T0);
+
+  it('tient le premier bloc de séries en tête, pour les versions d’avant ; un seul bloc reste une séance simple', () => {
+    expect(multi).toEqual({ reps: 2, workS: 30, restS: 15, blocks });
+    expect(workoutFromBlocks([{ kind: 'series', reps: 3, workS: 60, restS: 30 }])).toEqual(workout);
+    expect(workoutBlocks(workout)).toEqual([{ kind: 'series', reps: 3, workS: 60, restS: 30 }]);
+  });
+
+  it('écarte une séance sans bloc de séries, trop longue ou au bloc abîmé', () => {
+    expect(workoutFromBlocks([{ kind: 'libre', label: 'Échauffement', durationS: 600 }])).toBeNull();
+    expect(workoutFromBlocks([])).toBeNull();
+    expect(workoutFromBlocks(Array.from({ length: 21 }, () => blocks[1]))).toBeNull();
+    expect(workoutFromBlocks([blocks[1], { kind: 'libre', label: 'Sieste' as 'Récupération', durationS: 60 }])).toBeNull();
+    expect(workoutFromBlocks([blocks[1], { kind: 'libre', label: 'Récupération', durationS: 2 }])).toBeNull();
+  });
+
+  it('relit les blocs gardés ; des blocs abîmés laissent le premier bloc de séries', () => {
+    expect(sanitizeWorkout(JSON.parse(JSON.stringify(multi)))).toEqual(multi);
+    expect(sanitizeWorkout({ reps: 2, workS: 30, restS: 15, blocks: [{ kind: 'allure', speed: 4 }] })).toEqual({ reps: 2, workS: 30, restS: 15 });
+    expect(sameWorkout(multi, sanitizeWorkout(JSON.parse(JSON.stringify(multi)))!)).toBe(true);
+    expect(sameWorkout(multi, { reps: 2, workS: 30, restS: 15 })).toBe(false);
+  });
+
+  it('enchaîne les blocs : un bloc libre en une phase, chaque bloc de séries sans repos après sa dernière répétition', () => {
+    expect(workoutPhases(multi).map((p) => [p.kind, p.block, p.rep, p.startS, p.endS])).toEqual([
+      ['pret', 0, 1, 0, 3],
+      ['libre', 0, 1, 3, 63],
+      ['travail', 1, 1, 63, 93], ['repos', 1, 1, 93, 108], ['travail', 1, 2, 108, 138],
+      ['libre', 2, 1, 138, 158],
+      ['travail', 3, 1, 158, 168], ['travail', 3, 2, 168, 178],
+    ]);
+    expect(workoutDurationS(multi)).toBe(175);
+    expect(workoutLabel(multi)).toBe('Échauffement 1:00 + 2 × 0:30 / 0:15 + Récupération 0:20 + 2 × 0:10');
+    expect(workoutPhases(multi).map(phaseName)).toEqual([
+      'Départ', 'Échauffement', 'Série 1 · Travail 1/2', 'Série 1 · Repos 1/2', 'Série 1 · Travail 2/2', 'Récupération', 'Série 2 · Travail 1/2', 'Série 2 · Travail 2/2',
+    ]);
+    expect(phaseName(workoutPhases(workout)[1])).toBe('Travail 1/3');
+  });
+
+  it('signale la fin de chaque phase, bloc libre compris, par le même signal', () => {
+    const { tones, cues } = upcomingSchedule(multiRun, T0, false);
+    const ends = (fromS: number, toS: number) => tones.filter((t) => t.delayMs > fromS * 1000 && t.delayMs < toS * 1000).map((t) => t.tone);
+    expect(ends(60, 63)).toEqual(['court', 'court', 'long']);
+    expect(ends(135, 138)).toEqual(['court', 'court', 'long']);
+    expect(ends(173, 178)).toEqual(['court', 'long', 'final']);
+    expect(cues.map((c) => c.title)).toEqual([
+      'Départ', 'Échauffement', 'Série 1 · Travail 1/2', 'Série 1 · Repos 1/2', 'Série 1 · Travail 2/2', 'Récupération', 'Série 2 · Travail 1/2', 'Série 2 · Travail 2/2', 'Terminé',
+    ]);
+  });
+
+  it('garde les blocs libres dans la fiche, hors des répétitions de chaque bloc', () => {
+    const laps = runLaps(multiRun, at(500));
+    expect(laps.map((l) => [l.kind, l.block, l.rep])).toEqual([
+      ['libre', 0, 1], ['travail', 1, 1], ['repos', 1, 1], ['travail', 1, 2], ['libre', 2, 1], ['travail', 3, 1], ['travail', 3, 2],
+    ]);
+    const series = { workout: multi, laps };
+    expect(readIntervalSeries(JSON.parse(JSON.stringify([series])))).toEqual([series]);
+    const split = seriesBlocks(series);
+    expect(split.map((b) => [b.series, b.seriesCount, b.workout.reps, b.laps.map((l) => `${l.kind} ${l.rep}`).join(', ')])).toEqual([
+      [1, 2, 2, 'travail 1, repos 1, travail 2'],
+      [2, 2, 2, 'travail 1, travail 2'],
+    ]);
+  });
+
+  it('une fiche d’avant les blocs reste une seule séance', () => {
+    const old = { workout, laps: runLaps(run, at(500)).map(({ kind, rep, startMs, endMs }) => ({ kind, rep, startMs, endMs })) };
+    const split = seriesBlocks(old);
+    expect(split).toHaveLength(1);
+    expect(split[0].laps).toHaveLength(5);
+    expect(split[0].seriesCount).toBe(1);
+  });
+});
+
+describe('fin de séance et étape (26/10)', () => {
+  it('une séance est close une fois finie ou arrêtée, pas en cours ni en pause', () => {
+    expect(isRunClosed(run, at(10))).toBe(false);
+    expect(isRunClosed(withCommands(run, ['pause', 10]), at(500))).toBe(false);
+    expect(isRunClosed(run, at(243))).toBe(true);
+    expect(isRunClosed(withCommands(run, ['stop', 20]), at(21))).toBe(true);
+    // « Modifier » du Timer : arrêtée, la séance est close tout de suite.
+    expect(isRunClosed(withCommands(run, ['pause', 10], ['stop', 15]), at(15))).toBe(true);
+  });
+
+  it('compte la répétition en cours sur toute la séance, repos et blocs libres gardant la précédente', () => {
+    expect(intervalStepAt(run, at(1))).toEqual({ rep: 0, of: 3 });
+    expect(intervalStepAt(run, at(10))).toEqual({ rep: 1, of: 3 });
+    expect(intervalStepAt(run, at(70))).toEqual({ rep: 1, of: 3 });
+    expect(intervalStepAt(run, at(100))).toEqual({ rep: 2, of: 3 });
+    expect(intervalStepAt(run, at(200))).toEqual({ rep: 3, of: 3 });
+    expect(intervalStepAt(run, at(243))).toBeNull();
+    expect(intervalStepAt(withCommands(run, ['stop', 20]), at(30))).toBeNull();
+    // En pause : l'étape de la phase gelée.
+    expect(intervalStepAt(withCommands(run, ['pause', 100]), at(400))).toEqual({ rep: 2, of: 3 });
+  });
+
+  it('additionne les blocs de séries : échauffement à 0, retour de la récupération sur la dernière faite', () => {
+    const multi = workoutFromBlocks([
+      { kind: 'libre', label: 'Échauffement', durationS: 60 },
+      { kind: 'series', reps: 2, workS: 30, restS: 15 },
+      { kind: 'libre', label: 'Récupération', durationS: 20 },
+      { kind: 'series', reps: 2, workS: 10, restS: 0 },
+    ])!;
+    const multiRun = startRun(multi, T0);
+    // Échauffement 3-63, travail 63-93, repos 93-108, travail 108-138, récupération 138-158, travail 158-168, travail 168-178.
+    expect([10, 70, 100, 120, 150, 160, 170].map((s) => intervalStepAt(multiRun, at(s))?.rep)).toEqual([0, 1, 1, 2, 2, 3, 4]);
+    expect(intervalStepAt(multiRun, at(70))?.of).toBe(4);
+  });
+});
+
+describe('handsOverToRecording (muscu, lot I du 25/10)', () => {
+  it('le Fractionné va à tout enregistrement, le Timer seulement à une session sans position', () => {
+    expect(handsOverToRecording({}, true)).toBe(true);
+    expect(handsOverToRecording({}, false)).toBe(true);
+    expect(handsOverToRecording({ kind: 'timer' }, true)).toBe(false);
+    expect(handsOverToRecording({ kind: 'timer' }, false)).toBe(true);
+    expect(handsOverToRecording({ kind: 'timer' }, null)).toBe(false);
+    expect(handsOverToRecording({}, null)).toBe(false);
+  });
+});
+
+describe('séance reprise au lancement (lot 143, 124)', () => {
+  /** La séance gardée telle que l'appareil la relit. */
+  const reread = (r: IntervalRun | null, confided: boolean) => readStoredIntervalRun(JSON.parse(JSON.stringify(storedIntervalRun(r, confided))));
+
+  it('garde la marque « confiée » avec la séance, et relit une séance gardée sans elle comme non confiée', () => {
+    expect(reread(run, true)).toEqual({ run, confided: true });
+    expect(reread(run, false)).toEqual({ run, confided: false });
+    expect(storedIntervalRun(run, false)).toBe(run);
+    expect(storedIntervalRun(null, true)).toBeNull();
+    expect(readStoredIntervalRun(null)).toEqual({ run: null, confided: false });
+    expect(readStoredIntervalRun({ confided: true })).toEqual({ run: null, confided: true });
+  });
+
+  it("reprend une séance qui court ou attend en pause, pas une séance close", () => {
+    expect(runToResume(reread(run, false), at(30))).toEqual(run);
+    const paused = withCommands(run, ['pause', 10]);
+    expect(runToResume(reread(paused, false), at(5000))).toEqual(paused);
+    expect(runToResume(reread(run, false), at(400))).toBeNull();
+    expect(runToResume(reread(withCommands(run, ['stop', 10]), false), at(30))).toBeNull();
+    expect(runToResume(reread(null, false), at(30))).toBeNull();
+  });
+
+  it("ne reprend jamais une séance confiée à un enregistrement : coupé avec la page, elle s'arrête avec lui, rien ne sonne seul", () => {
+    expect(runToResume(reread(run, true), at(30))).toBeNull();
+    // L'enregistrement a repris seul après une chute de la page : sa séance continue avec lui (lot 156).
+    expect(runToResume(reread(run, true), at(30), true)).toEqual(run);
+    expect(runToResume(reread(withCommands(run, ['pause', 10]), true), at(30), true)).toEqual(withCommands(run, ['pause', 10]));
+    expect(runToResume(reread(run, true), at(400), true)).toBeNull();
+    expect(runToResume(reread(null, true), at(30), true)).toBeNull();
+    expect(runToResume(reread(withCommands(run, ['pause', 10]), true), at(30))).toBeNull();
+    // Une séance du Timer confiée à une muscu, de même.
+    expect(runToResume(reread(startRun(workout, T0, 'timer'), true), at(30))).toBeNull();
+  });
+});

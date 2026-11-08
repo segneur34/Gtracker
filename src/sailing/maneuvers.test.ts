@@ -1,0 +1,2375 @@
+import { describe, expect, it } from 'vitest';
+import { computeKinematics } from '../core/kinematics';
+import type { RawTrackPoint } from '../core/types';
+import { knotsToMs } from '../core/units';
+import { sampledIndices } from '../core/chartZoom';
+import { CHART_MAX_POINTS } from '../core/displayConfig';
+import { trackToPointData, type PointData } from './pointData';
+import {
+  WIND_LOCAL_MAX_GAP_MIN,
+  analyzeManeuvers,
+  classifyManeuvers,
+  estimateWind,
+  maneuverAgreement,
+  measureManeuver,
+  prepareManeuverDetection,
+  selectWindCandidate,
+  stableSegment,
+  tackOf,
+  windSamplesFrom,
+  type ManeuverLocation,
+  type ManeuverOptions,
+  type ManeuverStats,
+  type WindEstimationOptions,
+  type WindowReading,
+} from './maneuvers';
+import { sessionManeuverThresholds } from './sailingConfig';
+import { calculateWindStats, summarizeManeuvers, windChartRows } from './sailingAnalytics';
+import { buildWindTimeline, describeWindCandidate, estimateWindFromPolar, estimateWindPolar, observeTurns, polarSampling, prepareWindPolar, type TurnObservation } from './wind';
+import { angleDiff, circularMean, normalizeDeg, toRad } from '../core/angles';
+import { M_PER_DEG_LAT, at as geoAt } from '../test/geo.fixture';
+import { TRACK_START_MS, buildLegSession, polarSpeed, slowPolar, upwindDownwindLegs, type Leg } from '../test/sailing.fixture';
+
+/**
+ * Trace synthétique décrite par une fonction cap(t) et une vitesse. Le cap est
+ * imposé directement : ce sont les analyses, pas la kinématique, qui sont
+ * testées ici.
+ */
+const buildTrack = (
+  durationS: number,
+  stepS: number,
+  bearingAt: (t: number) => number,
+  speedAt: number | ((t: number, bearing: number) => number) = 10
+): PointData[] => {
+  const points: PointData[] = [];
+  for (let t = 0; t <= durationS; t += stepS) {
+    const timeMs = TRACK_START_MS + Math.round(t * 1000);
+    const bearing = ((bearingAt(t) % 360) + 360) % 360;
+    const speed = typeof speedAt === 'function' ? speedAt(t, bearing) : speedAt;
+    points.push({
+      lat: 43.6,
+      lon: 3.8 + t * 0.0001,
+      timeMs,
+      smoothedSpeed: speed,
+      bearing,
+    });
+  }
+  return points;
+};
+
+/** Session qui balaie tous les caps, lentement, en dix minutes. */
+const fullSweep = (t: number): number => (t * 0.6) % 360;
+
+const distanceTo = (angle: number, target: number) => Math.abs(angleDiff(angle, target));
+
+/** Cap 90° pendant 30 s, puis virage de 180° par le nord en 6 s, puis cap 270°. */
+const singleTackThroughNorth = (t: number): number => {
+  if (t < 30) return 90;
+  if (t > 36) return 270;
+  return 90 - ((t - 30) / 6) * 180;
+};
+
+/**
+ * Trace d'enregistreur économique, calquée sur une trace Komoot réelle : des
+ * bords échantillonnés toutes les 6 s, et un virage entier compressé dans un
+ * unique intervalle, parce que l'appareil cesse de poser des points quand la
+ * planche ralentit. Les caps et les vitesses reproduisent le relevé de 13:07.
+ */
+const buildSparseTurnTrack = (turnGapS: number, resumeAfterGap = false): PointData[] => {
+  const points: PointData[] = [];
+  let t = 0;
+  const push = (bearing: number, speed: number, segmentStart = false) => {
+    const timeMs = TRACK_START_MS + Math.round(t * 1000);
+    points.push({
+      lat: 43.553 + t * 0.00001,
+      lon: 4.071 + t * 0.00001,
+      timeMs,
+      smoothedSpeed: speed,
+      bearing,
+      ...(segmentStart ? { segmentStart: true as const } : {}),
+    });
+  };
+
+  // Bord au nord-ouest, puis le virage en un seul pas, puis bord au sud-est.
+  for (let k = 0; k < 10; k++, t += 6) push(324, 4.7);
+  t += turnGapS;
+  for (let k = 0; k < 10; k++, t += 6) push(109, 3.3, resumeAfterGap && k === 0);
+  return points;
+};
+
+/**
+ * Bords de 60 s échantillonnés tous les `legStepS`, cap 40° puis 215°, trois
+ * fois de suite, chaque demi-tour de 175° tenant dans un unique silence de
+ * 20 s de l'enregistreur : on connaît le cap avant et le cap après, pas le
+ * côté par lequel la planche est passée (lot 44).
+ */
+const buildSilentUTurns = (legStepS: number, speedKn = 10): PointData[] => {
+  const points: PointData[] = [];
+  let t = 0;
+  for (let leg = 0; leg < 4; leg++) {
+    const bearing = leg % 2 === 0 ? 40 : 215;
+    const legStart = t;
+    for (; t <= legStart + 60 + 1e-9; t += legStepS) {
+      points.push({ lat: 43.553 + t * 0.00001, lon: 4.071 + t * 0.00001, timeMs: TRACK_START_MS + Math.round(t * 1000), smoothedSpeed: speedKn, bearing });
+    }
+    t = legStart + 60 + 20;
+  }
+  return points;
+};
+
+/**
+ * Deux bords séparés par un unique pas, avec positions réelles : c'est le
+ * virage de 12:50 de la trace Komoot, entamé à 2 nœuds et long de 12 m.
+ * `speedKn` pilote la vitesse d'entrée, `stepM` la distance du virage.
+ */
+const buildSlowTurnTrack = (speedKn: number, stepM: number): PointData[] => {
+  const points: PointData[] = [];
+  let lat = 43.5553;
+  let t = 0;
+
+  const push = (bearing: number, speed: number, advanceM: number) => {
+    const timeMs = TRACK_START_MS + Math.round(t * 1000);
+    points.push({
+      lat,
+      lon: 4.0720,
+      timeMs,
+      smoothedSpeed: speed,
+      bearing,
+    });
+    lat += advanceM / M_PER_DEG_LAT;
+  };
+
+  // Bord vers l'ouest, le virage en un pas, puis bord vers l'est-sud-est.
+  for (let k = 0; k < 6; k++, t += 10) push(282, speedKn, speedKn * 0.514444 * 10);
+  t += 11;
+  push(123, speedKn, stepM);
+  for (let k = 0; k < 6; k++, t += 10) push(123, speedKn, speedKn * 0.514444 * 10);
+  return points;
+};
+
+/**
+ * Trace de la chaîne réelle (positions, vitesse appareil, `computeKinematics`
+ * avec le trou de 10 s du profil) : un bord, un silence de l'enregistreur
+ * pendant lequel la planche a viré, un bord. La corde du silence se donne à
+ * part de la vitesse : un enregistreur économique se tait quand la planche
+ * ralentit, et la vitesse lue à la reprise ne dit rien de ce qui s'est passé.
+ */
+const buildTurnThroughHole = (
+  before: { heading: number; kn: number },
+  hole: { s: number; chordM: number; chordBearing: number },
+  after: { heading: number; kn: number },
+  legS = 60,
+  stepS = 1
+): PointData[] => {
+  const raw: RawTrackPoint[] = [];
+  let east = 0;
+  let north = 0;
+  let t = 0;
+  const push = (kn: number) =>
+    raw.push({ ...geoAt(east, north, { lat: 43.5, lon: 3.8 }), time: new Date(TRACK_START_MS + t * 1000).toISOString(), speedMs: knotsToMs(kn) });
+  const advance = (bearing: number, meters: number) => {
+    east += meters * Math.sin(toRad(bearing));
+    north += meters * Math.cos(toRad(bearing));
+  };
+  push(before.kn);
+  for (let k = 1; k < legS / stepS; k++) { advance(before.heading, knotsToMs(before.kn) * stepS); t += stepS; push(before.kn); }
+  advance(hole.chordBearing, hole.chordM); t += hole.s; push(after.kn);
+  for (let k = 1; k < legS / stepS; k++) { advance(after.heading, knotsToMs(after.kn) * stepS); t += stepS; push(after.kn); }
+  return trackToPointData(computeKinematics(raw, { medianWindowSeconds: 3, maxGapS: 10 }));
+};
+
+/**
+ * Manœuvre d'une session scriptée : la vitesse tombe linéairement jusqu'à
+ * `conservation` × la vitesse de bord au milieu de la rotation (décalé de
+ * `minLagS`), puis remonte en `recoveryS`. `slowdown` fait ralentir le rider
+ * sur les secondes qui précèdent le virage, comme avant un empannage prudent.
+ */
+interface ScriptedManeuver {
+  conservation: number;
+  turnS: number;
+  recoveryS: number;
+  minLagS?: number;
+  slowdown?: { toKn: number; overS: number };
+}
+
+/** Bruit d'une trace : erreur de position GPS corrélée, oscillation du cap, bruit Doppler. */
+interface NoiseLevel {
+  positionM: number;
+  headingDeg: number;
+  dopplerMs: number;
+}
+
+/**
+ * Bruit calibré sur les traces réelles : il redonne la part de manœuvres à
+ * caps stabilisés des deux côtés qu'on y observe, environ une sur cinq.
+ */
+const REALISTIC_NOISE: NoiseLevel = { positionM: 0.5, headingDeg: 1.5, dopplerMs: 0.15 };
+/** Bruit faible, que la détection supporte aussi à 5 Hz. */
+const LOW_NOISE: NoiseLevel = { positionM: 0.1, headingDeg: 0.5, dopplerMs: 0.05 };
+
+/** Générateur pseudo-aléatoire à graine (mulberry32) : un test bruité doit rester reproductible. */
+const seededRandom = (seed: number) => () => {
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+/**
+ * Session bruitée par bords, vent du nord : empannages entre largues à 135°,
+ * ou virements entre bords de près à 45°. La position est intégrée depuis le
+ * cap et la vitesse, bruitée, puis passée par `computeKinematics` comme un
+ * vrai fichier : caps et vitesses retenues sortent de la chaîne réelle, filtre
+ * médian compris. Rend aussi les instants vrais de chaque rotation.
+ */
+const buildNoisySession = (
+  maneuvers: ScriptedManeuver[],
+  options: { tack?: boolean; hz?: number; legKn?: number; noise?: NoiseLevel; seed?: number } = {}
+): { points: PointData[]; truth: { startMs: number; endMs: number }[] } => {
+  const tack = options.tack ?? false;
+  const hz = options.hz ?? 1;
+  const legKn = options.legKn ?? 18;
+  const noise = options.noise ?? REALISTIC_NOISE;
+  const legS = 40;
+  const random = seededRandom(options.seed ?? 1);
+  const gauss = () => {
+    let u = 0;
+    while (u === 0) u = random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());
+  };
+
+  // Le cap passe par le lit du vent au virement (45 → −45), par le vent
+  // arrière à l'empannage (135 → 225).
+  const twa = tack ? 45 : 135;
+  const legHeading = (k: number) => (k % 2 === 0 ? twa : tack ? -twa : 360 - twa);
+  const events = maneuvers.map((m, k) => {
+    const startS = legS * (k + 1) + maneuvers.slice(0, k).reduce((a, p) => a + p.turnS, 0);
+    return { ...m, k, startS, endS: startS + m.turnS, apexS: startS + m.turnS / 2 + (m.minLagS ?? 0) };
+  });
+  const totalS = legS * (maneuvers.length + 1) + maneuvers.reduce((a, m) => a + m.turnS, 0);
+
+  const dt = 0.02;
+  const decay = (value: number, tauS: number, sigma: number) =>
+    value - (value / tauS) * dt + sigma * Math.sqrt((2 * dt) / tauS) * gauss();
+  let north = 0;
+  let east = 0;
+  let errorNorth = 0;
+  let errorEast = 0;
+  let wobble = 0;
+  let nextSampleS = 0;
+  const raw: RawTrackPoint[] = [];
+  for (let s = 0; s <= totalS + 1e-9; s += dt) {
+    let heading = legHeading(0);
+    let speedKn = legKn;
+    for (const e of events) {
+      const from = legHeading(e.k);
+      const to = legHeading(e.k + 1);
+      if (s >= e.endS) heading = to;
+      if (s >= e.startS && s < e.endS) heading = from + (to - from) * ((s - e.startS) / e.turnS);
+      const minKn = legKn * e.conservation;
+      const entryKn = e.slowdown ? e.slowdown.toKn : legKn;
+      if (e.slowdown && s >= e.startS - e.slowdown.overS && s < e.startS) {
+        speedKn = Math.min(speedKn, legKn + (entryKn - legKn) * ((s - e.startS + e.slowdown.overS) / e.slowdown.overS));
+      }
+      if (s >= e.startS && s < e.apexS) {
+        speedKn = Math.min(speedKn, entryKn + (minKn - entryKn) * ((s - e.startS) / (e.apexS - e.startS)));
+      } else if (s >= e.apexS && s < e.apexS + e.recoveryS) {
+        speedKn = Math.min(speedKn, minKn + (legKn - minKn) * ((s - e.apexS) / e.recoveryS));
+      }
+    }
+    // Erreur GPS lente (10 s), oscillation du cap plus vive (3 s).
+    errorNorth = decay(errorNorth, 10, noise.positionM);
+    errorEast = decay(errorEast, 10, noise.positionM);
+    wobble = decay(wobble, 3, noise.headingDeg);
+    const rad = ((heading + wobble) * Math.PI) / 180;
+    const speedMs = speedKn * 0.514444;
+    north += speedMs * Math.cos(rad) * dt;
+    east += speedMs * Math.sin(rad) * dt;
+    if (s >= nextSampleS - 1e-9) {
+      raw.push({
+        ...geoAt(east + errorEast, north + errorNorth, { lat: 43.5, lon: 3.8 }),
+        time: new Date(TRACK_START_MS + Math.round(s * 1000)).toISOString(),
+        speedMs: Math.max(0, speedMs + noise.dopplerMs * gauss()),
+      });
+      nextSampleS += 1 / hz;
+    }
+  }
+  return {
+    points: trackToPointData(computeKinematics(raw, { medianWindowSeconds: 3 })),
+    truth: events.map((e) => ({ startMs: TRACK_START_MS + e.startS * 1000, endMs: TRACK_START_MS + e.endS * 1000 })),
+  };
+};
+
+/** Qualités d'empannage et de virement, de la meilleure à la moins bonne. */
+const GOOD_JIBES: ScriptedManeuver[] = [
+  { conservation: 0.85, turnS: 5, recoveryS: 3 },
+  { conservation: 0.65, turnS: 5, recoveryS: 6 },
+  { conservation: 0.5, turnS: 6, recoveryS: 9 },
+];
+const GOOD_TACKS: ScriptedManeuver[] = [
+  { conservation: 0.6, turnS: 4, recoveryS: 3 },
+  { conservation: 0.4, turnS: 5, recoveryS: 6 },
+  { conservation: 0.25, turnS: 6, recoveryS: 10 },
+];
+
+/**
+ * Un virement sans bruit, cap et vitesse imposés (donc sans filtre médian) :
+ * près à 45° jusqu'à 40 s, rotation jusqu'à −45° en 4 s, et une vitesse qui
+ * touche le fond, 4,5 nœuds, `minLagS` secondes après le milieu de la
+ * rotation. Rend aussi l'instant de ce creux.
+ */
+const scriptedTack = (minLagS: number) => {
+  const apexS = 42 + minLagS;
+  const track = buildTrack(
+    100,
+    1,
+    (t) => (t < 40 ? 45 : t < 44 ? 45 - ((t - 40) / 4) * 90 : -45),
+    (t) => {
+      const dip = t < apexS ? 15 - (10.5 * Math.max(0, t - 38)) / (apexS - 38) : 4.5 + (10.5 * (t - apexS)) / 6;
+      return Math.min(15, dip);
+    }
+  );
+  return { track, apexMs: TRACK_START_MS + apexS * 1000 };
+};
+
+/**
+ * Virement sans bruit de la chaîne réelle (positions, vitesse appareil,
+ * `computeKinematics`) : près à 45° à 15 nœuds, rotation jusqu'à −45° de 40 à
+ * 44 s, et un creux plat à 11,5 nœuds sur ]41,5 ; 42,5] s, une seule seconde :
+ * un point à 1 Hz, cinq à 5 Hz. L'écrêtage par l'accélération (10 m/s²)
+ * laisse passer ces 3,5 nœuds en 0,2 s ; la médiane de 3 s les efface.
+ */
+const DIP_LEG_KN = 15;
+const DIP_KN = 11.5;
+const buildDipTack = (hz: number): PointData[] => {
+  const dtS = 0.01;
+  const stepsPerSample = Math.round(1 / (hz * dtS));
+  const speedAt = (s: number) => (s > 41.5 && s <= 42.5 ? DIP_KN : DIP_LEG_KN);
+  const headingAt = (s: number) => (s < 40 ? 45 : s < 44 ? 45 - ((s - 40) / 4) * 90 : -45);
+  const raw: RawTrackPoint[] = [];
+  let east = 0;
+  let north = 0;
+  for (let n = 0; n <= 100 / dtS; n++) {
+    const s = n * dtS;
+    if (n % stepsPerSample === 0) {
+      const sampleS = n / stepsPerSample / hz;
+      raw.push({
+        ...geoAt(east, north, { lat: 43.5, lon: 3.8 }),
+        time: new Date(TRACK_START_MS + Math.round(sampleS * 1000)).toISOString(),
+        speedMs: knotsToMs(speedAt(sampleS)),
+      });
+    }
+    const meters = knotsToMs(speedAt(s)) * dtS;
+    east += meters * Math.sin(toRad(headingAt(s)));
+    north += meters * Math.cos(toRad(headingAt(s)));
+  }
+  return trackToPointData(computeKinematics(raw, { medianWindowSeconds: 3 }));
+};
+
+/** Manœuvre factice, pour éprouver le résumé sans passer par la détection. */
+const fakeManeuver = (overrides: Partial<ManeuverLocation>): ManeuverLocation => ({
+  lat: 43.6,
+  lon: 3.8,
+  type: 'jibe',
+  success: true,
+  lostFlightS: 0,
+  tack: 'starboard',
+  takeoff: false,
+  vmin: 12,
+  localWind: 0,
+  timeMs: TRACK_START_MS,
+  trackIndex: 0,
+  stableHeadings: false,
+  windCriteria: { conservation: 0.7, success: true },
+  entrySpeed: 18,
+  conservation: 0.7,
+  relaunchS: 3,
+  headingChange: 90,
+  distanceM: 60,
+  windwardGainM: 20,
+  apexIndex: 0,
+  entryIndex: 0,
+  exitIndex: 0,
+  rotationEndIndex: 0,
+  entryHeading: 135,
+  exitHeading: 225,
+  path: [],
+  ...overrides,
+});
+
+describe('analyzeManeuvers, seuils accordés à la session', () => {
+  it('écarte un virage lent avec le seuil du wingfoil, le retient avec celui de la session', () => {
+    const track = buildSlowTurnTrack(2, 12);
+
+    // 4 nœuds à l'entrée : la valeur d'un wingfoil, que cette session
+    // n'atteint jamais. Le virage est vu, mais écarté.
+    const auSeuilWingfoil = analyzeManeuvers(track, 200, { successThresholdKn: 1 });
+    expect(auSeuilWingfoil.locations).toHaveLength(0);
+    expect(auSeuilWingfoil.rejected.slowEntry).toBeGreaterThan(0);
+
+    // 0,7 nœud, soit la part correspondante d'une allure de 4,4 nœuds.
+    const auSeuilDeLaSession = analyzeManeuvers(track, 200, {
+      successThresholdKn: 1,
+      minEntrySpeedKn: 0.7,
+    });
+    expect(auSeuilDeLaSession.locations).toHaveLength(1);
+  });
+
+  it('n\'invente pas de virage sur place, où le cap n\'est que du bruit', () => {
+    // Même virage, mais trois mètres parcourus : à cette distance l'écart de
+    // cap ne mesure que l'incertitude de position.
+    const track = buildSlowTurnTrack(0.2, 3);
+    const stats = analyzeManeuvers(track, 200, {
+      successThresholdKn: 1,
+      minEntrySpeedKn: 0.05,
+    });
+
+    expect(stats.locations).toHaveLength(0);
+    expect(stats.rejected.tooShort).toBeGreaterThan(0);
+  });
+});
+
+describe('sessionManeuverThresholds', () => {
+  it('redonne les valeurs du profil sur une session rapide', () => {
+    const seuils = sessionManeuverThresholds('wingfoil', 25);
+    expect(seuils.minEntrySpeedKn).toBeCloseTo(4, 2);
+    expect(seuils.polarMinSpeedKn).toBeCloseTo(5, 2);
+  });
+
+  it('les abaisse sur une session lente', () => {
+    const seuils = sessionManeuverThresholds('windsurf', 4.4);
+    expect(seuils.minEntrySpeedKn).toBeLessThan(1);
+    expect(seuils.polarMinSpeedKn).toBeLessThan(1);
+  });
+
+  it('ne dépasse jamais les valeurs du profil, si rapide que soit la session', () => {
+    const seuils = sessionManeuverThresholds('kite', 40);
+    expect(seuils.minEntrySpeedKn).toBeCloseTo(4, 2);
+    expect(seuils.polarMinSpeedKn).toBeCloseTo(5, 2);
+  });
+
+  it('s\'en remet au profil quand l\'allure est inconnue', () => {
+    expect(sessionManeuverThresholds('bateau', 0)).toEqual({
+      minEntrySpeedKn: 4,
+      polarMinSpeedKn: 2,
+    });
+  });
+});
+
+describe('analyzeManeuvers, enregistrement économique', () => {
+  it('lit le virage compressé dans un seul intervalle', () => {
+    // Le cas réel : 22 s entre les deux bords, aucun point pendant le virement
+    // puisque la planche s'était arrêtée. Vent à 23°, comme sur la trace.
+    const stats = analyzeManeuvers(buildSparseTurnTrack(22), 23, { successThresholdKn: 8 });
+
+    expect(stats.locations).toHaveLength(1);
+    expect(stats.locations[0].type).toBe('tack');
+  });
+
+  it('compte un demi-tour de 175° vu en un pas de 20 s, sens incertain, hors du vent (lot 44)', () => {
+    for (const legStepS of [1, 0.2, 6]) {
+      const points = buildSilentUTurns(legStepS);
+      const stats = analyzeManeuvers(points, 0, { successThresholdKn: 8 });
+      expect(stats.locations.map((m) => m.type)).toEqual(['undecided', 'undecided', 'undecided']);
+      expect(stats.undecided).toBe(3);
+      expect(stats.tackSuccess + stats.tackFail + stats.jibeSuccess + stats.jibeFail).toBe(0);
+      // Réussie ou ratée sur sa vitesse minimale ; sans direction, ni gain au vent ni cap stabilisé.
+      for (const m of stats.locations) {
+        expect(m.success).toBe(true);
+        expect(m.windwardGainM).toBeNull();
+        expect(m.stableHeadings).toBe(false);
+      }
+      // Aucune n'alimente le vent : ni sa mesure, ni son orientation, ni sa courbe.
+      expect(windSamplesFrom(stats)).toHaveLength(0);
+      expect(maneuverAgreement(stats).count).toBe(0);
+      expect(calculateWindStats(points, stats, 0)).toBeNull();
+      // Le vent n'y change rien : le sens incertain ne le lit pas.
+      expect(analyzeManeuvers(points, 120, { successThresholdKn: 8 })).toEqual(stats);
+    }
+  });
+
+  it('met le sens incertain entamé sous le seuil de vol avec les demi-tours hors vol (lot 44)', () => {
+    const stats = analyzeManeuvers(buildSilentUTurns(1, 6), 0, { successThresholdKn: 8, flightThresholdKn: 8 });
+    expect(stats.locations).toHaveLength(0);
+    expect(stats.undecided).toBe(0);
+    expect(stats.rejected.noFlight).toBe(3);
+    expect(stats.rejectedTurns.every((r) => r.motif === 'noFlight' && r.type === undefined)).toBe(true);
+  });
+
+  it('classe toujours le même demi-tour observé point à point, à 1 Hz comme à 5 Hz (lot 44)', () => {
+    // La branche ne s'arme que sur une fenêtre vide : un virage de 180° vu
+    // sur plusieurs points garde son sens.
+    for (const stepS of [1, 0.2]) {
+      const stats = analyzeManeuvers(buildTrack(70, stepS, singleTackThroughNorth), 0, { successThresholdKn: 8 });
+      expect(stats.tackSuccess + stats.tackFail).toBe(1);
+      expect(stats.undecided).toBe(0);
+    }
+  });
+
+  it('n\'invente pas de virage à travers une vraie coupure', () => {
+    // Une minute sans un point : les deux bords n'ont plus de rapport entre
+    // eux, et les lire comme un virage fabriquerait une manœuvre imaginaire.
+    const stats = analyzeManeuvers(buildSparseTurnTrack(60), 23, { successThresholdKn: 8 });
+
+    expect(stats.locations).toHaveLength(0);
+  });
+
+  it('reste sans effet sur une trace dense', () => {
+    // La branche ne s'arme que si la fenêtre est vide : à 1 Hz elle contient
+    // douze points, et rien ne change pour les traces qui fonctionnent.
+    const track = buildTrack(70, 1, singleTackThroughNorth);
+    const stats = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+
+    expect(stats.tackSuccess + stats.tackFail).toBe(1);
+  });
+
+  it('ne lit jamais un virage à travers une reprise de pause', () => {
+    // Le même pas de 20 s, mais c'est une reprise après une pause de
+    // l'enregistrement : rien n'y a été parcouru, ce n'est pas un virage.
+    expect(analyzeManeuvers(buildSparseTurnTrack(20), 23, { successThresholdKn: 8 }).locations).toHaveLength(1);
+    expect(analyzeManeuvers(buildSparseTurnTrack(20, true), 23, { successThresholdKn: 8 }).locations).toHaveLength(0);
+  });
+
+  it('n\'invente plus de virage sur un pas unique de 25 s dont la corde fait 3 m (règle 6, lot 79)', () => {
+    // Bord à 5 nœuds, 25 s de silence (admis jusqu'à 30 s), reprise 3 m plus
+    // loin à 5 nœuds sur l'autre bord. La vitesse lissée à la reprise donnait
+    // 64 m au garde-fou des 10 m, et un « virage » sur place était compté. La
+    // distance du noyau borne ce pas par sa corde × 1,5, soit 4,5 m.
+    const track = buildTurnThroughHole({ heading: 282, kn: 5 }, { s: 25, chordM: 3, chordBearing: 123 }, { heading: 123, kn: 5 });
+    const stats = analyzeManeuvers(track, 200, { successThresholdKn: 1 });
+    expect(stats.locations).toHaveLength(0);
+    expect(stats.rejected.tooShort).toBeGreaterThan(0);
+  });
+
+  it('lit toujours le virage compressé en un pas quand la planche a vraiment avancé (cadence Komoot, chaîne réelle)', () => {
+    // Le cas réel de 13:07, avec de vraies positions : un point toutes les 6 s, 22 s de silence, 40 m de corde.
+    const track = buildTurnThroughHole({ heading: 324, kn: 4.7 }, { s: 22, chordM: 40, chordBearing: 110 }, { heading: 109, kn: 3.3 }, 60, 6);
+    const stats = analyzeManeuvers(track, 23, { successThresholdKn: 8 });
+    expect(stats.locations).toHaveLength(1);
+    expect(stats.locations[0].type).toBe('tack');
+  });
+
+  it('borne la distance et le gain d\'une manœuvre traversée par un trou à la corde × 1,5 (règle 6, lot 79)', () => {
+    // Virement par le nord pendant 15 s de silence, reprise 10 m plus loin sur
+    // le nouveau bord : 38,6 m à 5 nœuds, 15 m par la corde.
+    const track = buildTurnThroughHole({ heading: 45, kn: 5 }, { s: 15, chordM: 10, chordBearing: 315 }, { heading: 315, kn: 5 });
+    const [m] = analyzeManeuvers(track, 0, { successThresholdKn: 2 }).locations;
+    expect(m.type).toBe('tack');
+    expect(m.distanceM!).toBeGreaterThan(10);
+    expect(m.distanceM!).toBeLessThanOrEqual(10 * 1.5 + 0.1);
+    expect(m.windwardGainM!).toBeGreaterThan(0);
+    expect(m.windwardGainM!).toBeLessThanOrEqual(m.distanceM!);
+  });
+
+  it('ne compte pas le pas de reprise dans la distance de manœuvre', () => {
+    // Virement dense par le nord, relance lente coupée par une pause (dernier
+    // point à 39 s, reprise à 60 s) : la distance mesurée jusqu'à la relance,
+    // à 66 s, ne compte pas le pas de reprise, qui valait 32 m à 3 nœuds sur 21 s.
+    const withPause = (resume: boolean): PointData[] =>
+      buildTrack(90, 1, singleTackThroughNorth, (t) => (t >= 31 && t <= 65 ? 3 : 12))
+        .filter((p) => { const t = (p.timeMs - TRACK_START_MS) / 1000; return t < 40 || t >= 60; })
+        .map((p) => ((p.timeMs - TRACK_START_MS) / 1000 === 60 && resume ? { ...p, segmentStart: true as const } : p));
+    const plain = analyzeManeuvers(withPause(false), 0, { successThresholdKn: 8 }).locations[0];
+    const resumed = analyzeManeuvers(withPause(true), 0, { successThresholdKn: 8 }).locations[0];
+    expect(plain.relaunchS).not.toBeNull();
+    expect(resumed.relaunchS).toBe(plain.relaunchS);
+    expect(plain.distanceM! - resumed.distanceM!).toBeCloseTo(knotsToMs(3) * 21, 0);
+  });
+});
+
+describe('analyzeManeuvers', () => {
+  it('compte un seul virement pour un seul virage, grâce au temps mort', () => {
+    const track = buildTrack(70, 1, singleTackThroughNorth);
+    const stats = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+
+    expect(stats.tackSuccess + stats.tackFail).toBe(1);
+    expect(stats.jibeSuccess + stats.jibeFail).toBe(0);
+  });
+
+  it('classe le virage en virement quand il traverse l\'axe du vent', () => {
+    const track = buildTrack(70, 1, singleTackThroughNorth);
+    const stats = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+
+    expect(stats.tackSuccess).toBe(1);
+    expect(stats.locations[0].type).toBe('tack');
+  });
+
+  it('classe le même virage en empannage si le vent vient du sud', () => {
+    const track = buildTrack(70, 1, singleTackThroughNorth);
+    const stats = analyzeManeuvers(track, 180, { successThresholdKn: 8 });
+
+    expect(stats.jibeSuccess + stats.jibeFail).toBe(1);
+    expect(stats.tackSuccess + stats.tackFail).toBe(0);
+  });
+
+  it('mesure le vent local sur les caps stabilisés, à 0° pour un virage 90° → 270°', () => {
+    const track = buildTrack(70, 1, singleTackThroughNorth);
+    const stats = analyzeManeuvers(track, 0);
+
+    expect(stats.locations[0].stableHeadings).toBe(true);
+    expect(distanceTo(stats.locations[0].localWind, 0)).toBeLessThanOrEqual(3);
+  });
+
+  it('donne le même décompte à 1 Hz et à 5 Hz', () => {
+    const at1Hz = analyzeManeuvers(buildTrack(70, 1, singleTackThroughNorth), 0);
+    const at5Hz = analyzeManeuvers(buildTrack(70, 0.2, singleTackThroughNorth), 0);
+
+    expect(at5Hz.tackSuccess + at5Hz.tackFail).toBe(at1Hz.tackSuccess + at1Hz.tackFail);
+  });
+
+  it('juge la réussite sur le seuil injecté', () => {
+    const track = buildTrack(70, 1, singleTackThroughNorth, 10);
+
+    expect(analyzeManeuvers(track, 0, { successThresholdKn: 8 }).tackSuccess).toBe(1);
+    expect(analyzeManeuvers(track, 0, { successThresholdKn: 12 }).tackFail).toBe(1);
+  });
+
+  it('ne détecte rien sur un cap constant', () => {
+    const stats = analyzeManeuvers(buildTrack(60, 1, () => 90), 0);
+    expect(stats.locations).toHaveLength(0);
+  });
+
+  it('compte tous les virements et empannages d\'une session par bords', () => {
+    const track = buildLegSession(upwindDownwindLegs(6), () => 0);
+    const stats = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+
+    // 5 virements entre les 6 bords de près, puis une abattée (aucun axe
+    // franchi), un empannage, une remontée (aucun axe franchi).
+    expect(stats.tackSuccess + stats.tackFail).toBe(5);
+    expect(stats.jibeSuccess + stats.jibeFail).toBe(1);
+  });
+
+  it('mesure la qualité d\'un virement : conservation, relance, cap, distance', () => {
+    const track = buildLegSession(upwindDownwindLegs(2), () => 0);
+    const stats = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const tack = stats.locations.find((m) => m.type === 'tack');
+
+    expect(tack).toBeDefined();
+    // Entrée à 12 nœuds, minimum à 3 : un quart de la vitesse conservée.
+    expect(tack!.entrySpeed).toBeCloseTo(12, 1);
+    expect(tack!.conservation).toBeCloseTo(0.25, 2);
+    // La vitesse revient à 12 nœuds dès la sortie du cône : relance courte.
+    expect(tack!.relaunchS).not.toBeNull();
+    expect(tack!.relaunchS!).toBeLessThanOrEqual(6);
+    // De +45° à -45° : 90° de changement de cap.
+    expect(Math.abs(tack!.headingChange - 90)).toBeLessThanOrEqual(5);
+    expect(tack!.distanceM).toBeGreaterThan(10);
+    expect(tack!.path.length).toBeGreaterThan(2);
+    // Virement tombé à 3 nœuds, raté au seuil de 8 : pas de gain au vent.
+    expect(tack!.success).toBe(false);
+    expect(tack!.windwardGainM).toBeNull();
+  });
+
+  it('mesure le gain au vent des manœuvres réussies dans leur sens : vers le vent en virement, sous le vent en empannage, indépendant de la cadence', () => {
+    const at1Hz = analyzeManeuvers(buildLegSession(upwindDownwindLegs(2), () => 0), 0, { successThresholdKn: 2 }).locations;
+    const at5Hz = analyzeManeuvers(buildLegSession(upwindDownwindLegs(2), () => 0, { stepS: 0.2 }), 0, { successThresholdKn: 2 }).locations;
+
+    for (const type of ['tack', 'jibe'] as const) {
+      const at1 = at1Hz.find((m) => m.type === type)!;
+      const at5 = at5Hz.find((m) => m.type === type)!;
+      // Face au vent pendant le virement, dos au vent pendant l'empannage :
+      // chacun avance dans son sens, sur une part du chemin parcouru.
+      expect(at1.success).toBe(true);
+      expect(at1.windwardGainM!).toBeGreaterThan(0);
+      expect(at1.windwardGainM!).toBeLessThan(at1.distanceM!);
+      expect(Math.abs(at5.windwardGainM! - at1.windwardGainM!)).toBeLessThanOrEqual(0.2 * at1.windwardGainM!);
+    }
+  });
+
+  it('laisse la relance indéfinie quand la vitesse ne revient pas', () => {
+    // Après le virage, le rider reste à 3 nœuds : jamais relancé.
+    const track = buildTrack(90, 1, singleTackThroughNorth, (t) => (t < 30 ? 10 : 3));
+    const stats = analyzeManeuvers(track, 0);
+    expect(stats.locations).toHaveLength(1);
+    expect(stats.locations[0].relaunchS).toBeNull();
+  });
+
+  it('résume les manœuvres avec moyennes et podiums', () => {
+    const track = buildLegSession(upwindDownwindLegs(6), () => 0);
+    const summary = summarizeManeuvers(analyzeManeuvers(track, 0, { successThresholdKn: 8 }));
+
+    expect(summary.tack).not.toBeNull();
+    expect(summary.tack!.count).toBe(5);
+    expect(summary.tack!.averages.conservation).toBe('25 %');
+    expect(summary.tack!.tops.conservation).toHaveLength(3);
+    // Podium trié : la conservation la plus haute d'abord, la distance la plus courte d'abord.
+    const cons = summary.tack!.tops.conservation.map((t) => t.value);
+    expect(cons[0]).toBeGreaterThanOrEqual(cons[1]);
+    const dist = summary.tack!.tops.distance.map((t) => t.value);
+    expect(dist[0]).toBeLessThanOrEqual(dist[1]);
+    // Gain au vent : réussies seulement (ici, aucun virement), puis le plus grand d'abord, affiché signé.
+    expect(summary.tack!.tops.windwardGain).toHaveLength(0);
+    expect(summary.tack!.averages.windwardGain).toBe('-');
+    const reussies = summarizeManeuvers(analyzeManeuvers(track, 0, { successThresholdKn: 2 }));
+    const gain = reussies.tack!.tops.windwardGain.map((t) => t.value);
+    expect(gain).toHaveLength(3);
+    expect(gain[0]).toBeGreaterThanOrEqual(gain[1]);
+    expect(reussies.tack!.averages.windwardGain).toMatch(/^\+\d+ m$/);
+    // Un empannage avance sous le vent : son gain est positif lui aussi.
+    expect(reussies.jibe!.averages.windwardGain).toMatch(/^\+\d+ m$/);
+    // Le cap de sortie d'un empannage est un choix d'allure : moyenne, pas de podium.
+    expect(summary.tack!.tops.headingChange.length).toBeGreaterThan(0);
+    expect(summary.jibe!.tops.headingChange).toHaveLength(0);
+    expect(summary.jibe!.averages.headingChange).not.toBe('-');
+
+    expect(summary.jibe).not.toBeNull();
+    expect(summary.jibe!.count).toBe(1);
+    expect(summary.jibe!.tops.relaunch.length).toBeLessThanOrEqual(1);
+  });
+
+  it('mesure le vent local d\'un empannage sur ses caps stabilisés', () => {
+    const track = buildLegSession(upwindDownwindLegs(2), () => 0);
+    const stats = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const jibe = stats.locations.find((m) => m.type === 'jibe');
+
+    expect(jibe).toBeDefined();
+    expect(distanceTo(jibe!.localWind, 0)).toBeLessThanOrEqual(5);
+  });
+});
+
+describe('measureManeuver', () => {
+  const at = (points: PointData[], index: number) => points[index].timeMs;
+  const nearestTruth = (truth: { startMs: number; endMs: number }[], timeMs: number) =>
+    truth.reduce((best, t) => (Math.abs(t.startMs - timeMs) < Math.abs(best.startMs - timeMs) ? t : best));
+
+  it('borne la manœuvre au virage lui-même, malgré le bruit de la trace', () => {
+    // La détection se déclenche plusieurs secondes avant le virage : ses
+    // bornes faisaient commencer la manœuvre 5 s trop tôt en médiane.
+    for (const tack of [false, true]) {
+      for (const seed of [1, 2, 3]) {
+        const { points, truth } = buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { tack, legKn: tack ? 15 : 18, seed });
+        const found = analyzeManeuvers(points, 0, { successThresholdKn: 2 }).locations;
+        expect(found).toHaveLength(3);
+        for (const m of found) {
+          expect(m.type).toBe(tack ? 'tack' : 'jibe');
+          const t = nearestTruth(truth, at(points, m.entryIndex));
+          expect(Math.abs(at(points, m.entryIndex) - t.startMs)).toBeLessThanOrEqual(2000);
+          // La sortie ne tombe jamais avant la fin de la rotation.
+          expect(at(points, m.exitIndex)).toBeGreaterThanOrEqual(t.endMs - 2000);
+        }
+      }
+    }
+  });
+
+  it('garde les mêmes bornes où que la détection se soit déclenchée', () => {
+    const { track } = scriptedTack(0);
+    const bounds = new Set<string>();
+    for (const triggerS of [30, 34, 38]) {
+      for (const endS of [43, 44, 45]) {
+        const m = measureManeuver(track, { triggerIndex: triggerS, endIndex: endS, turnSign: -1, type: 'tack' }, 0);
+        bounds.add(`${m.rotationStartIndex}-${m.rotationEndIndex}`);
+      }
+    }
+    expect(bounds.size).toBe(1);
+  });
+
+  it('classe les manœuvres comme leur qualité, en conservation comme en relance', () => {
+    for (const tack of [false, true]) {
+      for (const seed of [1, 2, 3]) {
+        const { points } = buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { tack, legKn: tack ? 15 : 18, seed });
+        const stats = analyzeManeuvers(points, 0, { successThresholdKn: 2 });
+        // Dans l'ordre du temps : la meilleure, la moyenne, la moins bonne.
+        const [good, medium, poor] = stats.locations;
+        expect(good.conservation).toBeGreaterThan(medium.conservation);
+        expect(medium.conservation).toBeGreaterThan(poor.conservation);
+        expect(good.relaunchS!).toBeLessThan(medium.relaunchS!);
+        expect(medium.relaunchS!).toBeLessThan(poor.relaunchS!);
+
+        const summary = summarizeManeuvers(stats)[tack ? 'tack' : 'jibe']!;
+        expect(summary.tops.conservation.map((t) => t.index)).toEqual([0, 1, 2]);
+        expect(summary.tops.relaunch.map((t) => t.index)).toEqual([0, 1, 2]);
+      }
+    }
+  });
+
+  it('lit la vitesse d\'approche avant la rotation : ralentir avant d\'empanner n\'en fait pas un sans-faute', () => {
+    // Le cas relevé sur une séance réelle : 21 nœuds au largue, 12 au début
+    // du virage. Lue au premier point de la rotation, la vitesse d'entrée
+    // donnait 100 % de conservation, une relance de 0 s et une distance nulle.
+    const { points } = buildNoisySession(
+      [{ conservation: 12 / 18, turnS: 6, recoveryS: 8, slowdown: { toKn: 12, overS: 6 } }],
+      { seed: 3 }
+    );
+    const jibe = analyzeManeuvers(points, 0, { successThresholdKn: 2 }).locations.find((m) => m.type === 'jibe')!;
+
+    expect(Math.abs(jibe.entrySpeed - 18)).toBeLessThanOrEqual(1);
+    expect(jibe.conservation).toBeLessThan(0.75);
+    expect(jibe.relaunchS!).toBeGreaterThan(3);
+    expect(jibe.distanceM!).toBeGreaterThan(20);
+  });
+
+  it('trouve le creux de vitesse où qu\'il tombe, jusqu\'après la rotation', () => {
+    // Pendant la rotation, à sa fin, ou quelques secondes après : le creux
+    // d'un virement vient souvent une fois le nouveau cap pris. La détection
+    // ne le cherchait pas après la rotation et sautait le dernier point de sa
+    // fenêtre initiale.
+    for (const minLagS of [-1, 0, 2, 4, 8]) {
+      const { track, apexMs } = scriptedTack(minLagS);
+      const tack = analyzeManeuvers(track, 0, { successThresholdKn: 2 }).locations.find((m) => m.type === 'tack')!;
+
+      expect(tack.vmin).toBeCloseTo(4.5, 6);
+      expect(track[tack.apexIndex].timeMs).toBe(apexMs);
+      expect(tack.conservation).toBeCloseTo(0.3, 6);
+      expect(tack.relaunchS!).toBeGreaterThan(0);
+    }
+  });
+
+  it('lit le creux en V sur la vitesse brute, sous la médiane, identique à 1 Hz et à 5 Hz (lot 44)', () => {
+    const conservations = [1, 5].map((hz) => {
+      const points = buildDipTack(hz);
+      const [tack] = analyzeManeuvers(points, 0, { successThresholdKn: 2 }).locations;
+      // La même trace sans la vitesse non filtrée : la mesure lissée d'avant.
+      const smoothedOnly = points.map(({ speedKn: _raw, ...p }) => p);
+      const [smoothed] = analyzeManeuvers(smoothedOnly, 0, { successThresholdKn: 2 }).locations;
+      expect(tack.type).toBe('tack');
+      expect(smoothed.conservation).toBeCloseTo(1, 6);
+      expect(tack.conservation).toBeLessThan(smoothed.conservation);
+      expect(tack.conservation).toBeCloseTo(DIP_KN / DIP_LEG_KN, 3);
+      // Le creux de la vitesse lissée borne toujours la relance : elle ne bouge pas.
+      expect(tack.relaunchS).toBe(smoothed.relaunchS);
+      expect(tack.exitIndex).toBe(smoothed.exitIndex);
+      return tack.conservation;
+    });
+    expect(conservations[1]).toBeCloseTo(conservations[0], 6);
+  });
+
+  it('mesure le gain au vent dans le sens de la manœuvre, plus grand pour la plus rapide', () => {
+    // Même durée de rotation : seule la vitesse conservée les distingue.
+    for (const tack of [false, true]) {
+      const fast = { conservation: tack ? 0.6 : 0.85, turnS: 5, recoveryS: 3 };
+      const slow = { conservation: tack ? 0.3 : 0.5, turnS: 5, recoveryS: 8 };
+      const { points } = buildNoisySession([fast, slow], { tack, legKn: tack ? 15 : 18, noise: LOW_NOISE });
+      const [first, second] = analyzeManeuvers(points, 0, { successThresholdKn: 2 }).locations;
+
+      expect(second.windwardGainM!).toBeGreaterThan(0);
+      expect(first.windwardGainM!).toBeGreaterThan(second.windwardGainM!);
+    }
+  });
+
+  /**
+   * Mêmes manœuvres, mêmes types, mêmes réussites, mesures proches, à 1 Hz et
+   * à 5 Hz. La conservation se lit depuis le lot 44 sur la vitesse non
+   * filtrée : le point seul à 1 Hz, la moyenne de sa seconde (±0,45 s) à
+   * 5 Hz, qui remonte le fond d'un V aigu d'environ 0,6 nœud (+0,04 sur un
+   * virement à 15 nœuds), quand le point seul garde à 1 Hz son bruit Doppler.
+   */
+  const expectSameMeasures = (noise: NoiseLevel, tolerance: { conservation: number; relaunchS: number; headingDeg: number; gainM: number }) => {
+    for (const tack of [false, true]) {
+      for (const seed of [1, 2, 3]) {
+        const options = { tack, legKn: tack ? 15 : 18, noise, seed };
+        const at1Hz = analyzeManeuvers(buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, options).points, 0, { successThresholdKn: 2 }).locations;
+        const at5Hz = analyzeManeuvers(buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { ...options, hz: 5 }).points, 0, { successThresholdKn: 2 }).locations;
+
+        expect(at5Hz).toHaveLength(at1Hz.length);
+        at1Hz.forEach((a, k) => {
+          const b = at5Hz[k];
+          expect(b.type).toBe(a.type);
+          expect(b.success).toBe(a.success);
+          expect(Math.abs(a.conservation - b.conservation)).toBeLessThanOrEqual(tolerance.conservation);
+          expect(Math.abs(a.relaunchS! - b.relaunchS!)).toBeLessThanOrEqual(tolerance.relaunchS);
+          expect(Math.abs(a.headingChange - b.headingChange)).toBeLessThanOrEqual(tolerance.headingDeg);
+          expect(Math.abs(a.windwardGainM! - b.windwardGainM!)).toBeLessThanOrEqual(tolerance.gainM);
+        });
+      }
+    }
+  };
+
+  it('donne les mêmes mesures à 1 Hz et à 5 Hz', () => {
+    // Relevé du lot 44 : conservation à 0,052 près (0,020 sur la vitesse lissée).
+    expectSameMeasures(LOW_NOISE, { conservation: 0.06, relaunchS: 1.5, headingDeg: 3, gainM: 3 });
+  });
+
+  it('donne les mêmes mesures à 1 Hz et à 5 Hz sous un bruit indépendant d\'un point à l\'autre', () => {
+    // Bruit réaliste, positions et Doppler compris : lue point à point, la
+    // somme des rotations cumulait à 5 Hz cinq fois le bruit d'un pas de 1 s,
+    // et la cohérence écartait presque tous les virages (lot 30). Nombre,
+    // types et réussites sont ceux du 1 Hz, la conservation proche ; cap et gain gardent
+    // le bruit des bornes de la mesure au creux du virement le plus lent
+    // (3,75 nœuds, un pas de 0,4 m pour 0,5 m d'erreur de position), qui frappe
+    // une cadence comme l'autre : 67° à 1 Hz pour un virage de 90°, 69° à 5 Hz
+    // sur une autre graine. Relevé du lot 44 : 18,5° et 13,2 m au plus, que la
+    // lecture des caps stabilisés par pas ne change pas ; conservation à
+    // 0,075 près (0,030 sur la vitesse lissée), le point seul gardant à 1 Hz
+    // son bruit Doppler.
+    expectSameMeasures(REALISTIC_NOISE, { conservation: 0.08, relaunchS: 2, headingDeg: 20, gainM: 15 });
+  });
+
+  it('observeTurns relève les mêmes virages, vol perdu ou non, à 1 Hz et à 5 Hz', () => {
+    for (const tack of [false, true]) {
+      for (const seed of [1, 2, 3]) {
+        const options = { tack, legKn: tack ? 15 : 18, noise: REALISTIC_NOISE, seed };
+        const at1Hz = observeTurns(buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, options).points, 5);
+        const at5Hz = observeTurns(buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { ...options, hz: 5 }).points, 5);
+
+        expect(at1Hz).toHaveLength(3);
+        expect(at5Hz.map((t) => t.slow)).toEqual(at1Hz.map((t) => t.slow));
+        // La bissectrice sommée pas à pas garde le bruit du cap au point le plus lent.
+        at1Hz.forEach((a, k) => expect(Math.abs(angleDiff(a.midHeading, at5Hz[k].midHeading))).toBeLessThanOrEqual(20));
+      }
+    }
+  });
+
+  it('lit un cap stabilisé à 5 Hz sous 1° de bruit de cap, comme à 1 Hz (règle 2, lot 79)', () => {
+    // Cap qui oscille de ±1° d'un point à l'autre : 2°/s à 1 Hz, mais 10°/s
+    // d'un point au suivant à 5 Hz, au-dessus des 3°/s admis. Lu par pas
+    // d'au moins 0,9 s, le segment existe aux deux cadences, avec le même cap.
+    const wobble = (t: number, stepS: number) => 90 + (Math.round(t / stepS) % 2 === 0 ? 1 : -1);
+    const at1Hz = stableSegment(buildTrack(60, 1, (t) => wobble(t, 1)), 0, 1);
+    const at5Hz = stableSegment(buildTrack(60, 0.2, (t) => wobble(t, 0.2)), 0, 1);
+    expect(at1Hz).not.toBeNull();
+    expect(at5Hz).not.toBeNull();
+    expect(Math.abs(angleDiff(at5Hz!.heading, at1Hz!.heading))).toBeLessThanOrEqual(1);
+    // Un vrai changement de cap arrête toujours le segment, à 5 Hz comme à 1 Hz.
+    const turning = (stepS: number) => buildTrack(60, stepS, (t) => 90 + t * 6);
+    expect(stableSegment(turning(1), 0, 1)).toBeNull();
+    expect(stableSegment(turning(0.2), 0, 1)).toBeNull();
+  });
+
+  it('lit autant de caps stabilisés, donc autant d\'échantillons de vent, à 5 Hz qu\'à 1 Hz sous bruit réaliste (lot 44)', () => {
+    // Relevé du lot 79 : les empannages faisaient 3/3 aux deux cadences et
+    // les virements 3 à 1 Hz, 2 à 5 Hz (graines 1 à 3). Le dernier virement,
+    // le plus lent, tient son cap stabilisé du repli sur la fenêtre médiane,
+    // dont l'écart maximal, lu point à point, tombait à 21° à 1 Hz et 29° à
+    // 5 Hz autour des 25° admis. Lu par pas d'au moins 0,9 s (lot 44), il est
+    // le même aux deux cadences : 3/3 partout.
+    const counts = (hz: number): [number, number, number][] => {
+      const rows: [number, number, number][] = [];
+      for (const tack of [false, true]) {
+        for (const seed of [1, 2, 3]) {
+          const { points } = buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { tack, legKn: tack ? 15 : 18, noise: REALISTIC_NOISE, seed, hz });
+          const stats = analyzeManeuvers(points, 0, { successThresholdKn: 2 });
+          rows.push([stats.locations.length, stats.locations.filter((m) => m.stableHeadings).length, windSamplesFrom(stats).length]);
+        }
+      }
+      return rows;
+    };
+    const at1Hz = counts(1);
+    const at5Hz = counts(5);
+    expect(at5Hz).toEqual(at1Hz);
+    for (const [count, stable, samples] of at1Hz) {
+      expect(stable).toBe(count);
+      expect(samples).toBe(count);
+    }
+  });
+});
+
+describe('summarizeManeuvers', () => {
+  it('départage les égalités par la conservation, puis la conservation par la relance', () => {
+    const stats = {
+      tackSuccess: 0,
+      tackFail: 0,
+      jibeSuccess: 4,
+      jibeFail: 0,
+      undecided: 0,
+      rejected: { slowEntry: 0, incoherent: 0, still: 0, unclassified: 0, tooShort: 0, fullTurn: 0, noFlight: 0 },
+      rejectedTurns: [],
+      locations: [
+        fakeManeuver({ timeMs: TRACK_START_MS, relaunchS: 2, conservation: 0.6 }),
+        fakeManeuver({ timeMs: TRACK_START_MS + 60000, relaunchS: 2, conservation: 0.8 }),
+        fakeManeuver({ timeMs: TRACK_START_MS + 120000, relaunchS: 4, conservation: 0.8 }),
+        fakeManeuver({ timeMs: TRACK_START_MS + 180000, relaunchS: null, conservation: 0.8 }),
+      ],
+    };
+    const jibe = summarizeManeuvers(stats).jibe!;
+
+    // Même relance de 2 s : la meilleure conservation passe devant la plus ancienne.
+    expect(jibe.tops.relaunch.map((t) => t.index)).toEqual([1, 0, 2]);
+    // Même conservation de 80 % : la relance la plus courte d'abord, sans relance en dernier.
+    expect(jibe.tops.conservation.map((t) => t.index)).toEqual([1, 2, 3]);
+  });
+
+  it('résume le sens incertain à part, avec ses moyennes, sans podium (lot 44)', () => {
+    const stats: ManeuverStats = {
+      tackSuccess: 1,
+      tackFail: 0,
+      jibeSuccess: 0,
+      jibeFail: 0,
+      undecided: 2,
+      rejected: { slowEntry: 0, incoherent: 0, still: 0, unclassified: 0, tooShort: 0, fullTurn: 0, noFlight: 0 },
+      rejectedTurns: [],
+      locations: [
+        fakeManeuver({ type: 'undecided', success: true, conservation: 0.6, windwardGainM: null }),
+        fakeManeuver({ type: 'tack', conservation: 0.5 }),
+        fakeManeuver({ type: 'undecided', success: false, conservation: 0.4, windwardGainM: null }),
+      ],
+    };
+    const summary = summarizeManeuvers(stats);
+    expect(summary.tack!.count).toBe(1);
+    expect(summary.jibe).toBeNull();
+    const undecided = summary.undecided!;
+    expect(undecided.count).toBe(2);
+    expect(undecided.success).toBe(1);
+    expect(undecided.fail).toBe(1);
+    expect(undecided.averages.conservation).toBe('50 %');
+    for (const tops of Object.values(undecided.tops)) expect(tops).toHaveLength(0);
+  });
+
+  it('compte à part les manœuvres sans relance, absentes de la moyenne', () => {
+    const stats = {
+      tackSuccess: 0,
+      tackFail: 0,
+      jibeSuccess: 3,
+      jibeFail: 0,
+      undecided: 0,
+      rejected: { slowEntry: 0, incoherent: 0, still: 0, unclassified: 0, tooShort: 0, fullTurn: 0, noFlight: 0 },
+      rejectedTurns: [],
+      locations: [
+        fakeManeuver({ relaunchS: 2 }),
+        fakeManeuver({ relaunchS: 4 }),
+        fakeManeuver({ relaunchS: null, distanceM: null }),
+      ],
+    };
+    const jibe = summarizeManeuvers(stats).jibe!;
+
+    expect(jibe.withoutRelaunch).toBe(1);
+    expect(jibe.averages.relaunch).toBe('3,0 s');
+    // Sans relance, pas de distance de manœuvre : elle ne gagne pas le podium des plus courtes.
+    expect(jibe.tops.distance).toHaveLength(2);
+  });
+});
+
+describe('estimateWind', () => {
+  it('signale une faible confiance sur un aller simple', () => {
+    const estimate = estimateWind(buildTrack(600, 1, () => 135));
+    expect(estimate.reliable).toBe(false);
+    expect(estimate.confidence).toBeLessThan(0.4);
+  });
+
+  it('retrouve le vent et son sens sur une session par bords', () => {
+    const estimate = estimateWind(buildLegSession(upwindDownwindLegs(6), () => 0));
+
+    expect(distanceTo(estimate.direction, 0)).toBeLessThanOrEqual(8);
+    expect(estimate.reliable).toBe(true);
+    expect(estimate.maneuverCount).toBeGreaterThan(0);
+  });
+
+  it('n\'est pas pollué par une chute au milieu de la session', () => {
+    const track = buildLegSession(upwindDownwindLegs(6), () => 0);
+    // Trente secondes à l'eau au tiers de la session : vitesse quasi nulle, cap aléatoire.
+    const fallStart = Math.floor(track.length / 3);
+    const noise = [130, 20, 250, 80, 300, 10, 200, 90, 330, 160, 40, 270, 120, 350, 60, 210, 30, 280, 150, 100, 320, 70, 240, 180, 50, 290, 140, 20, 260, 110];
+    noise.forEach((b, k) => {
+      track[fallStart + k] = { ...track[fallStart + k], bearing: b, smoothedSpeed: 0.5 };
+    });
+
+    const estimate = estimateWind(track);
+    expect(distanceTo(estimate.direction, 0)).toBeLessThanOrEqual(8);
+
+    // La chute peut être comptée comme manœuvre ratée, mais elle n'a pas de
+    // caps stabilisés de part et d'autre : elle ne sert jamais au vent.
+    const maneuvers = analyzeManeuvers(track, estimate.direction);
+    const duringFall = maneuvers.locations.filter(
+      (m) => m.trackIndex >= fallStart - 15 && m.trackIndex <= fallStart + noise.length + 15
+    );
+    expect(duringFall.filter((m) => m.stableHeadings)).toHaveLength(0);
+  });
+
+  it('retrouve un vent d\'ouest sur une session par bords', () => {
+    const estimate = estimateWind(buildLegSession(upwindDownwindLegs(6), () => 270));
+    expect(distanceTo(estimate.direction, 270)).toBeLessThanOrEqual(8);
+  });
+
+  it('ne confond pas le vent et son opposé', () => {
+    // C'est l'aberration observée sur une vraie session : 38° contre 176°.
+    const estimate = estimateWind(buildLegSession(upwindDownwindLegs(8), () => 38));
+    expect(distanceTo(estimate.direction, 38)).toBeLessThanOrEqual(8);
+    expect(distanceTo(estimate.direction, 218)).toBeGreaterThan(90);
+  });
+
+  it('retrouve un vent de nord à partir de la seule polaire, sans virement', () => {
+    const estimate = estimateWind(buildTrack(600, 1, fullSweep, polarSpeed(0)));
+    expect(distanceTo(estimate.direction, 0)).toBeLessThanOrEqual(10);
+    expect(estimate.orientedBy).toBe('polaire');
+  });
+
+  // Protocole 1 : asymétrie du rider.
+  it('reste proche du vent réel quand le rider remonte mieux sur un bord', () => {
+    const legs: Leg[] = [];
+    for (let i = 0; i < 8; i++) legs.push({ twa: i % 2 === 0 ? 45 : -55, durationS: 180 });
+    const track = buildLegSession(legs, () => 0);
+
+    const estimate = estimateWind(track);
+    const maneuvers = analyzeManeuvers(track, estimate.direction);
+    const localWinds = maneuvers.locations.map((m) => m.localWind);
+
+    // Biais théorique de la bissectrice : 5°. On tolère le double.
+    expect(distanceTo(estimate.direction, 0)).toBeLessThanOrEqual(10);
+    expect(localWinds.length).toBeGreaterThan(0);
+    for (const w of localWinds) expect(distanceTo(w, 0)).toBeLessThanOrEqual(10);
+  });
+
+  // Protocole 2 : session tronquée, que du près.
+  it('résiste à l\'absence totale de bords de largue', () => {
+    const legs: Leg[] = [];
+    for (let i = 0; i < 8; i++) legs.push({ twa: i % 2 === 0 ? 45 : -45, durationS: 150 });
+    const estimate = estimateWind(buildLegSession(legs, () => 120));
+
+    expect(distanceTo(estimate.direction, 120)).toBeLessThanOrEqual(10);
+    expect(estimate.reliable).toBe(true);
+  });
+
+  it('ne dépend pas de la mesure affichée des manœuvres', () => {
+    // La trace du banc de test (outils/banc/make-gpx.mjs) : bords de près et
+    // de portant, virements qui tombent de 7 à 3 m/s. La détection lit leur
+    // conservation à 49 %, la mesure affichée à 51 %, de l'autre côté du
+    // seuil de 50 % qui oriente le vent. Lue sur la mesure affichée, elle
+    // faisait tourner l'estimation de 90° et ne laissait qu'une manœuvre.
+    const start = Date.UTC(2026, 8, 20, 13, 0, 0);
+    const raw: RawTrackPoint[] = [];
+    let lat = 43.5;
+    let lon = 3.95;
+    const step = (heading: number, speedMs: number) => {
+      const rad = (heading * Math.PI) / 180;
+      lat += (speedMs * Math.cos(rad)) / 6371000 * (180 / Math.PI);
+      lon += (speedMs * Math.sin(rad)) / (6371000 * Math.cos((lat * Math.PI) / 180)) * (180 / Math.PI);
+      raw.push({ lat, lon, time: new Date(start + raw.length * 1000).toISOString(), speedMs });
+    };
+    const leg = (heading: number, speedMs: number, count: number) => {
+      for (let i = 0; i < count; i++) step(heading + Math.sin(i / 7) * 3, speedMs + Math.sin(i / 5) * 0.5);
+    };
+    const turn = (from: number, to: number, minMs: number, maxMs: number, count: number) => {
+      const diff = ((to - from + 540) % 360) - 180;
+      for (let i = 1; i <= count; i++) {
+        step((from + (diff * i) / count + 360) % 360, maxMs - (maxMs - minMs) * Math.sin((Math.PI * i) / count));
+      }
+    };
+    for (let k = 0; k < 6; k++) { leg(45, 7, 150); turn(45, 315, 3, 7, 6); leg(315, 7, 150); turn(315, 45, 3, 7, 6); }
+    turn(45, 135, 6, 9, 5);
+    for (let k = 0; k < 6; k++) { leg(135, 9, 150); turn(135, 225, 6, 9, 6); leg(225, 9, 150); turn(225, 135, 6, 9, 6); }
+    const track = trackToPointData(computeKinematics(raw, { medianWindowSeconds: 3 }));
+    // La mesure affichée lit depuis le lot 44 la vitesse non filtrée (43 %
+    // ici) : la même trace sans elle garde la mesure lissée de l'époque, à 51 %.
+    const smoothedOnly = track.map(({ speedKn: _raw, ...p }) => p);
+
+    const tacks = analyzeManeuvers(smoothedOnly, 0).locations.filter((m) => m.type === 'tack');
+    expect(tacks.length).toBeGreaterThan(0);
+    for (const m of tacks) {
+      expect(m.windCriteria.conservation).toBeLessThan(0.5);
+      expect(m.conservation).toBeGreaterThan(0.5);
+    }
+    expect(distanceTo(estimateWind(smoothedOnly).direction, 0)).toBeLessThanOrEqual(8);
+    // Ni la détection ni le vent ne lisent la vitesse non filtrée.
+    const withRaw = analyzeManeuvers(track, 0).locations.filter((m) => m.type === 'tack');
+    expect(withRaw.map((m) => m.windCriteria)).toEqual(tacks.map((m) => m.windCriteria));
+    expect(estimateWind(track)).toEqual(estimateWind(smoothedOnly));
+  });
+
+  it('rabat la confiance d\'une trace clairsemée sous le seuil de fiabilité', () => {
+    // Session dense par bords, puis la même telle qu'un enregistreur économique
+    // la rend (un point toutes les 17 s, caps relus en cordes par la chaîne
+    // réelle) : la polaire n'a presque rien à dire, le vent est demandé à
+    // l'utilisateur au lieu d'être affiché avec aplomb (§10, point 27).
+    const dense = buildLegSession(upwindDownwindLegs(6), () => 0, { integratePosition: true });
+    const raw: RawTrackPoint[] = dense
+      .filter((_, k) => k % 17 === 0)
+      .map((p) => ({ lat: p.lat, lon: p.lon, time: new Date(p.timeMs).toISOString(), speedMs: knotsToMs(p.smoothedSpeed) }));
+    const sparse = trackToPointData(computeKinematics(raw, { medianWindowSeconds: 3 }));
+
+    expect(polarSampling(dense)).toBe(1);
+    expect(polarSampling(sparse)).toBeCloseTo(5 / 17, 6);
+    const denseEstimate = estimateWind(dense);
+    const sparseEstimate = estimateWind(sparse);
+    expect(denseEstimate.reliable).toBe(true);
+    expect(sparseEstimate.confidence).toBeLessThanOrEqual(denseEstimate.confidence / 2);
+    expect(sparseEstimate.reliable).toBe(false);
+  });
+
+  // Protocole 3 : courant traversier constant.
+  it('reste borné, sans diverger, sous un courant traversier de 2 nœuds', () => {
+    const estimate = estimateWind(
+      buildLegSession(upwindDownwindLegs(8), () => 0, { currentKn: 2, currentDir: 90 })
+    );
+
+    // Sans capteur de cap, le biais est inévitable : il doit rester modéré.
+    expect(Number.isFinite(estimate.direction)).toBe(true);
+    expect(distanceTo(estimate.direction, 0)).toBeLessThanOrEqual(20);
+  });
+});
+
+/** Bords de portant alternés : que des empannages, aucun virement. */
+const downwindLegs = (count: number, legDurationS = 180): Leg[] => {
+  const legs: Leg[] = [];
+  for (let i = 0; i < count; i++) legs.push({ twa: i % 2 === 0 ? 135 : -135, durationS: legDurationS });
+  return legs;
+};
+
+/** Les réglages du profil d'un support lent, un bateau : polaire à 2 nœuds, réussite à 3. */
+const SLOW_SPORT: WindEstimationOptions = { minSpeedKn: 2, successThresholdKn: 3 };
+
+describe('estimateWind, réglages du support', () => {
+  it('la polaire d\'un support lent se trompe de bord au seuil du wingfoil', () => {
+    const track = buildLegSession(upwindDownwindLegs(6), () => 0, { polar: slowPolar });
+
+    // À 5 nœuds, seuls le largue et le portant dépassent le seuil : l'angle
+    // mort trouvé est celui du vent arrière, à 180° du vrai vent.
+    expect(distanceTo(estimateWindFromPolar(track, 5).direction, 0)).toBeGreaterThan(90);
+
+    // À 2 nœuds, le seuil du profil bateau, seul le cône reste sous la barre
+    // et la polaire retrouve le vent d'elle-même.
+    expect(distanceTo(estimateWindFromPolar(track, 2).direction, 0)).toBeLessThanOrEqual(15);
+  });
+
+  it('compte les virages écartés, une fois chacun', () => {
+    // Vent faux de 90° : chaque demi-tour devient une abattée pour le
+    // classement, et disparaît sans laisser de trace au compteur près. C'est
+    // le cas qui n'affichait « aucune manœuvre » sans dire pourquoi.
+    const track = buildLegSession(upwindDownwindLegs(6), () => 0);
+    const justes = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const fausses = analyzeManeuvers(track, 90, { successThresholdKn: 8 });
+
+    // Quelques virages très ouverts restent classables — la tolérance vaut la
+    // moitié du virage — mais l'essentiel s'évapore, et c'est cette évaporation
+    // que le compteur rend enfin visible.
+    expect(fausses.locations.length).toBeLessThan(justes.locations.length / 2);
+    expect(fausses.rejected.unclassified).toBeGreaterThan(0);
+
+    // Un virage écarté ne pose pas de temps mort : il est rencontré à chaque
+    // point suivant. Sans déduplication, le compteur annoncerait des
+    // centaines de rejets pour une poignée de demi-tours.
+    expect(fausses.rejected.unclassified).toBeLessThanOrEqual(justes.locations.length + 2);
+  });
+
+  it('les virages redressent le bord que la polaire a manqué', () => {
+    const track = buildLegSession(upwindDownwindLegs(6), () => 0, { polar: slowPolar });
+
+    // Même au seuil du wingfoil, où la polaire seule part à l'opposé (test
+    // précédent), l'orientation par les virages rattrape le bon bord : le vol
+    // perdu se juge sur la part de vitesse conservée et non sur des nœuds, si
+    // bien qu'un empannage de support lent n'est plus pris pour un virement.
+    const estimate = estimateWindPolar(track, { minSpeedKn: 5 });
+    expect(distanceTo(estimate.direction, 0)).toBeLessThanOrEqual(15);
+    expect(estimate.orientedBy).toBe('virages');
+  });
+
+  it('un empannage lent n\'alimente le vent qu\'au seuil de son support', () => {
+    const track = buildLegSession(downwindLegs(6), () => 0, { polar: slowPolar });
+
+    // Les empannages sont détectés dans les deux cas : c'est leur réussite,
+    // donc leur droit à mesurer le vent, qui dépend du seuil.
+    expect(analyzeManeuvers(track, 0, { successThresholdKn: 8 }).locations).not.toHaveLength(0);
+
+    expect(windSamplesFrom(analyzeManeuvers(track, 0, { successThresholdKn: 8 }))).toHaveLength(0);
+    expect(windSamplesFrom(analyzeManeuvers(track, 0, { successThresholdKn: 3 })).length).toBeGreaterThan(0);
+  });
+
+  it('retrouve le vent d\'un support lent avec les seuils de son profil', () => {
+    const track = buildLegSession(upwindDownwindLegs(6), () => 0, { polar: slowPolar });
+    const estimate = estimateWind(track, SLOW_SPORT);
+
+    expect(distanceTo(estimate.direction, 0)).toBeLessThanOrEqual(15);
+    expect(estimate.reliable).toBe(true);
+    // L'empannage, raté au seuil du wingfoil, compte désormais parmi les mesures.
+    expect(estimate.maneuverCount).toBeGreaterThan(estimateWind(track).maneuverCount);
+  });
+
+  it('sans options, reproduit exactement les valeurs du wingfoil', () => {
+    const track = buildLegSession(upwindDownwindLegs(6), () => 0);
+    expect(estimateWind(track)).toEqual(estimateWind(track, { minSpeedKn: 5, successThresholdKn: 8 }));
+  });
+});
+
+describe('selectWindCandidate', () => {
+  const protocoles: [string, PointData[]][] = [
+    ['wingfoil par bords', buildLegSession(upwindDownwindLegs(6), () => 0)],
+    ['wingfoil vent 38', buildLegSession(upwindDownwindLegs(8), () => 38)],
+    ['support lent par bords', buildLegSession(upwindDownwindLegs(6), () => 0, { polar: slowPolar })],
+    ['support lent au portant', buildLegSession(downwindLegs(6), () => 0, { polar: slowPolar })],
+  ];
+
+  // Le jumeau au vent arrière est testé comme candidat sans être un maximum du
+  // score polaire : il n'avait donc pas de descripteur, et la confiance
+  // annoncée retombait sur celle d'une direction qui n'avait pas été retenue.
+  it.each(protocoles)('annonce la confiance de la direction qu\'elle retient (%s)', (_nom, track) => {
+    for (const options of [{}, SLOW_SPORT] as WindEstimationOptions[]) {
+      const minSpeedKn = options.minSpeedKn ?? 5;
+      const polar = estimateWindPolar(track, { minSpeedKn });
+      const selection = selectWindCandidate(track, polar, options);
+
+      if (selection.direction === polar.direction) {
+        expect(selection.polarConfidence).toBe(polar.confidence);
+        expect(selection.orientedBy).toBe(polar.orientedBy);
+        continue;
+      }
+
+      const retenu = describeWindCandidate(track, selection.direction, minSpeedKn);
+      expect(selection.orientedBy).toBe('virages');
+      expect(selection.polarConfidence).toBeCloseTo(
+        retenu.symmetry * retenu.coverage * retenu.clarity,
+        10
+      );
+    }
+  });
+
+  it('retient le candidat de meilleur accord, même quand tous sont mauvais', () => {
+    // Session au portant pur : aucun virement pour ancrer l'orientation, et
+    // une vitesse partout sous les 5 nœuds du critère de vol perdu. Aucun
+    // candidat ne peut convaincre, mais une direction doit tout de même sortir,
+    // accompagnée de la confiance qui lui correspond.
+    const track = buildLegSession(downwindLegs(6), () => 0, { polar: slowPolar });
+    const polar = estimateWindPolar(track, { minSpeedKn: 2 });
+    const selection = selectWindCandidate(track, polar, SLOW_SPORT);
+
+    expect(Number.isFinite(selection.direction)).toBe(true);
+    expect(selection.polarConfidence).toBeGreaterThanOrEqual(0);
+    expect(selection.polarConfidence).toBeLessThanOrEqual(1);
+  });
+
+  it('rabat la confiance polaire de moitié quand aucun candidat ne classe une manœuvre alors que la trace a des virages (lot 149, C1-2)', () => {
+    // Balayage lent de tous les caps : la polaire a une direction et une confiance, aucun virage n'est détecté.
+    const track = buildTrack(600, 1, fullSweep, polarSpeed(0));
+    const stage = prepareWindPolar(track);
+    const polar = stage.polar;
+    expect(polar.confidence).toBeGreaterThan(0);
+    expect(selectWindCandidate(track, polar, { polarStage: stage }).polarConfidence).toBe(polar.confidence);
+    // Les mêmes candidats, mais la trace a un virage que personne ne classe : la confiance est rabattue.
+    const turn: TurnObservation = { headingAtMin: 0, midHeading: 0, minSpeed: 3, speedLoss: 9, cumulativeTurn: 90, slow: true };
+    const withTurns = { ...stage, turns: [turn], turnsDirection: null };
+    expect(selectWindCandidate(track, polar, { polarStage: withTurns }).polarConfidence).toBeCloseTo(polar.confidence * 0.5, 12);
+  });
+
+  it('ajoute aux candidats la direction votée par les virages et le jumeau de chacun, dédoublonnés à 45°', () => {
+    // Session au près seul (vent 0°) : les candidats polaires ne portent pas forcément le vrai vent ; la direction
+    // votée par les virements à vol perdu, face au vent, y est ajoutée et les manœuvres la retiennent.
+    const legs = Array.from({ length: 7 }, (_, i) => ({ twa: i % 2 === 0 ? 45 : -45, durationS: 150 }));
+    const track = buildLegSession(legs, () => 0);
+    const stage = prepareWindPolar(track);
+    expect(stage.turnsDirection).not.toBeNull();
+    expect(Math.abs(angleDiff(stage.turnsDirection!, 0))).toBeLessThanOrEqual(10);
+    const selection = selectWindCandidate(track, stage.polar, { polarStage: stage });
+    expect(Math.abs(angleDiff(selection.direction, 0))).toBeLessThanOrEqual(10);
+  });
+});
+
+describe('calculateWindStats', () => {
+  it('renvoie null avec moins de deux manœuvres', () => {
+    const track = buildTrack(120, 1, fullSweep, polarSpeed(0));
+    expect(calculateWindStats(track, null)).toBeNull();
+    expect(calculateWindStats(track, analyzeManeuvers(track, 0))).toBeNull();
+  });
+
+  it('retient toutes les manœuvres, pas seulement celles à caps stabilisés', () => {
+    // Bords de 18 s, transitions comprises : trop courts pour que `stableSegment`
+    // trouve un cap stabilisé des deux côtés de chaque virage. C'est le cas qui
+    // vidait la courbe, et sur lequel les tentatives d'assouplissement du §10-21
+    // avaient échoué. Depuis le repli sur les caps médians (28/10), ces bords
+    // en donnent un : une manœuvre sur deux est marquée sans cap stabilisé,
+    // pour garder le cas.
+    const track = buildLegSession(upwindDownwindLegs(10, 18), () => 0);
+    const detected = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const maneuvers: ManeuverStats = {
+      ...detected,
+      locations: detected.locations.map((m, k) => (k % 2 === 0 ? m : { ...m, stableHeadings: false })),
+    };
+    const stats = calculateWindStats(track, maneuvers, 0);
+
+    expect(stats).not.toBeNull();
+    expect(windSamplesFrom(maneuvers).length).toBeLessThan(maneuvers.locations.length);
+    expect(stats!.count).toBe(maneuvers.locations.length);
+    expect(stats!.stableShare).toBeLessThan(1);
+  });
+
+  it('fait davantage confiance aux manœuvres symétriques', () => {
+    // Trois virements symétriques, puis quatre virages où l'on entre au largue
+    // pour ressortir au près. Ces derniers sont classés virements mais leur
+    // milieu est décalé de près de 40° : c'est exactement le défaut décrit sur
+    // trace réelle, et à la majorité ils tirent la moyenne brute avec eux.
+    const legs: Leg[] = [
+      { twa: 45, durationS: 120 }, { twa: -45, durationS: 120 },
+      { twa: 45, durationS: 120 }, { twa: -45, durationS: 120 },
+      { twa: 120, durationS: 120 }, { twa: -45, durationS: 120 },
+      { twa: 120, durationS: 120 }, { twa: -45, durationS: 120 },
+    ];
+    const track = buildLegSession(legs, () => 0);
+    const maneuvers = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const stats = calculateWindStats(track, maneuvers, 0);
+
+    const brute = circularMean(maneuvers.locations.map((m) => m.localWind)).mean;
+    expect(distanceTo(brute, 0)).toBeGreaterThan(20);
+    expect(distanceTo(stats!.avgWind, 0)).toBeLessThan(12);
+  });
+
+  it('se rabat sur la moyenne des mesures sans vent de référence', () => {
+    const track = buildLegSession(upwindDownwindLegs(6), () => 0);
+    const maneuvers = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+
+    // Sur une session propre, l'amorce importe peu : les deux voies concordent.
+    const avecReference = calculateWindStats(track, maneuvers, 0);
+    const sansReference = calculateWindStats(track, maneuvers);
+    expect(sansReference).not.toBeNull();
+    expect(distanceTo(sansReference!.avgWind, avecReference!.avgWind)).toBeLessThanOrEqual(5);
+  });
+
+  it('ne diverge pas quand la série traverse le nord', () => {
+    // Vent oscillant de ±20° autour de 0 : moyenne 0, plage 40, pas de dérive.
+    const wind = (t: number) => 20 * Math.sin(t / 300);
+    const track = buildLegSession(upwindDownwindLegs(14, 120), wind);
+    const stats = calculateWindStats(track, analyzeManeuvers(track, 0));
+
+    expect(stats).not.toBeNull();
+    expect(distanceTo(stats!.avgWind, 0)).toBeLessThanOrEqual(10);
+    expect(stats!.range).toBeLessThan(90);
+    expect(stats!.range).toBeGreaterThan(20);
+  });
+
+  it('interrompt la courbe au-delà d\'un long trou sans manœuvre', () => {
+    // Deux séries de bords séparées par 45 minutes de cap constant.
+    const legs: Leg[] = [
+      { twa: 45, durationS: 180 }, { twa: -45, durationS: 180 }, { twa: 45, durationS: 180 },
+      { twa: 100, durationS: 2700 },
+      { twa: 45, durationS: 180 }, { twa: -45, durationS: 180 }, { twa: 45, durationS: 180 },
+    ];
+    const track = buildLegSession(legs, () => 0);
+    const stats = calculateWindStats(track, analyzeManeuvers(track, 0));
+
+    expect(stats).not.toBeNull();
+    expect(stats!.windAt(TRACK_START_MS + 1800 * 1000)).toBeNull();
+    expect(windChartRows(track, stats!, sampledIndices(0, track.length - 1, CHART_MAX_POINTS)).some((p) => p.angle === null)).toBe(true);
+  });
+
+  it('marque chaque manœuvre sur la courbe, là où se trouve la mesure', () => {
+    const track = buildLegSession(upwindDownwindLegs(6), () => 0);
+    const maneuvers = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const stats = calculateWindStats(track, maneuvers, 0);
+
+    expect(stats).not.toBeNull();
+
+    // Un point marqué par manœuvre, et chacun près de la manœuvre qu'il marque.
+    const rows = windChartRows(track, stats!, sampledIndices(0, track.length - 1, CHART_MAX_POINTS));
+    expect(rows.filter((p) => p.isManeuver).length).toBe(maneuvers.locations.length);
+    for (const m of maneuvers.locations) {
+      const marked = rows.some((p) => p.isManeuver && Math.abs(track[p.index].timeMs - m.timeMs) <= 10000);
+      expect(marked).toBe(true);
+    }
+  });
+
+  it('ne marque, zoomé, que les manœuvres de la plage visible', () => {
+    const track = buildLegSession(upwindDownwindLegs(6), () => 0);
+    const maneuvers = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const stats = calculateWindStats(track, maneuvers, 0);
+    expect(stats).not.toBeNull();
+
+    // Première moitié de la trace, à 50 lignes : seules ses manœuvres sont marquées.
+    const last = Math.floor(track.length / 2);
+    const rows = windChartRows(track, stats!, sampledIndices(0, last, 50));
+    const inside = maneuvers.locations.filter((m) => m.trackIndex <= last).length;
+    expect(inside).toBeGreaterThan(0);
+    expect(inside).toBeLessThan(maneuvers.locations.length);
+    expect(rows.filter((p) => p.isManeuver).length).toBe(inside);
+    expect(rows[0].minutes).toBe(0);
+    // Angle tracé autour de la référence : jamais déroulé de plus d'un demi-tour.
+    for (const row of rows) if (row.angle !== null) expect(Math.abs(row.angle - stats!.referenceDeg)).toBeLessThanOrEqual(180);
+  });
+
+  // Protocole 4 : bascule de vent. De 50° : au-delà, le vent global est tiré
+  // vers l'un des deux vents, et le changement d'amures exigé (28/10) écarte
+  // les virements de l'autre, à plus de 45° de lui (bords de près à 45°).
+  it('voit une bascule de 50° sur les manœuvres', () => {
+    const SHIFT = 50;
+    const wind = (t: number) => (t < 1200 ? 0 : t < 1380 ? ((t - 1200) / 180) * SHIFT : SHIFT);
+    const track = buildLegSession(upwindDownwindLegs(16, 150), wind);
+    const global = estimateWind(track);
+    const maneuvers = analyzeManeuvers(track, global.direction);
+    const stats = calculateWindStats(track, maneuvers);
+
+    expect(stats).not.toBeNull();
+
+    // Les vents locaux des dernières manœuvres doivent lire le nouveau vent.
+    const late = maneuvers.locations.filter((m) => m.timeMs - TRACK_START_MS > 1600 * 1000);
+    expect(late.length).toBeGreaterThan(0);
+    for (const m of late) expect(distanceTo(m.localWind, SHIFT)).toBeLessThanOrEqual(12);
+    // Les premières, au vent d'avant la bascule, sont toujours comptées.
+    expect(maneuvers.locations.filter((m) => m.timeMs - TRACK_START_MS < 1100 * 1000).length).toBeGreaterThan(0);
+
+    // La courbe finit près du nouveau vent et a couvert la bascule.
+    const end = stats!.windAt(TRACK_START_MS + 2200 * 1000);
+    expect(end).not.toBeNull();
+    expect(distanceTo(end!, SHIFT)).toBeLessThanOrEqual(12);
+    expect(stats!.range).toBeGreaterThanOrEqual(SHIFT * 0.75);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Détection robuste au bruit de cap (session réelle du 26/10, lot 10)
+// ---------------------------------------------------------------------------
+
+/** Interpolation linéaire entre des repères `[t, valeur]`, constante au-delà. */
+const keyframes = (frames: [number, number][]) => (t: number): number => {
+  if (t <= frames[0][0]) return frames[0][1];
+  for (let k = 1; k < frames.length; k++) {
+    const [t1, v1] = frames[k];
+    if (t <= t1) {
+      const [t0, v0] = frames[k - 1];
+      return v0 + ((v1 - v0) * (t - t0)) / (t1 - t0);
+    }
+  }
+  return frames[frames.length - 1][1];
+};
+
+/**
+ * Bruit de cap d'un wing à 1 Hz, jusqu'à ±8° : lisse et fonction du seul
+ * temps, il est le même à toute cadence. Il suffit à priver la trace de tout
+ * segment sous 3°/s : comme sur la vraie session, seuls les caps médians
+ * jugent le virage.
+ */
+const headingNoise = (t: number): number => 5 * Math.sin(0.7 * t) + 3 * Math.sin(1.7 * t + 1);
+
+/**
+ * Session scriptée par repères de cap et de vitesse (nœuds), vent du nord.
+ * Planche arrêtée (vitesse nulle), le cap n'est que du bruit de position : il
+ * prend n'importe quelle valeur.
+ */
+const scriptedSession = (
+  durationS: number,
+  headings: [number, number][],
+  speeds: [number, number][],
+  stepS: number
+): PointData[] => {
+  const headingAt = keyframes(headings);
+  const speedAt = keyframes(speeds);
+  return buildTrack(
+    durationS,
+    stepS,
+    (t) => (speedAt(t) < 0.5 ? (t * 137.5) % 360 : headingAt(t) + headingNoise(t)),
+    (t) => speedAt(t)
+  );
+};
+
+/** Seuils d'une session de wing : réussite et vol à 8 nœuds, entrée dès 2 nœuds. */
+const FLIGHT_OPTIONS: ManeuverOptions = { successThresholdKn: 8, minEntrySpeedKn: 2, flightThresholdKn: 8 };
+
+const SCENARIOS: Record<string, { durationS: number; headings: [number, number][]; speeds: [number, number][] }> = {
+  // Deux virements à 15 s d'intervalle, comme à 21:12 le 26/10 : le premier
+  // finit en abattant un peu, le second en remontant ; le temps mort compté
+  // depuis la fin de la fenêtre mangeait le début du second.
+  deuxVirements: {
+    durationS: 160,
+    headings: [[0, -60], [60, -60], [64, 60], [67, 66], [75, 30], [80, -127], [87, -70]],
+    speeds: [[0, 12], [60, 12], [62, 9], [65, 12], [75, 12], [78, 9], [81, 12]],
+  },
+  // Un virement symétrique, de 45° à −45° au vent.
+  virementSymetrique: {
+    durationS: 130,
+    headings: [[0, 45], [60, 45], [65, -45]],
+    speeds: [[0, 18], [60, 18], [63, 10], [66, 18]],
+  },
+  // Un empannage lent, puis un virement tourné dans le même sens dès 6 s
+  // après, comme à 26:05 le 26/10.
+  empannageVirement: {
+    durationS: 170,
+    headings: [[0, 87], [60, 87], [76, 314], [78, 304], [82, 285], [88, 465]],
+    speeds: [[0, 12], [60, 12], [70, 11], [76, 12], [84, 12], [86, 9], [90, 12]],
+  },
+  // Un virement raté, un frétillement, puis la chute : planche arrêtée 30 s.
+  viramentRateChute: {
+    durationS: 180,
+    headings: [[0, 45], [60, 45], [66, -45], [73, -45], [75, -5], [77, -80], [79, -45]],
+    speeds: [[0, 18], [60, 18], [63, 4], [68, 12], [78, 12], [79, 0], [110, 0], [115, 18]],
+  },
+  // Un 360 étalé sur 16 s, sans perdre le vol.
+  tourComplet: {
+    durationS: 150,
+    headings: [[0, 45], [60, 45], [76, 405]],
+    speeds: [[0, 15], [60, 15], [68, 13], [76, 15]],
+  },
+  // Un empannage en vol, puis un demi-tour en archimédien à 3 nœuds avant de revoler.
+  empannageEtDemiTour: {
+    durationS: 240,
+    headings: [[0, 135], [60, 135], [65, 225], [160, 225], [168, 135]],
+    speeds: [[0, 16], [60, 16], [62, 12], [65, 16], [100, 16], [120, 3], [168, 3], [175, 16]],
+  },
+  // Approche à 5 nœuds, sous le seuil : le rider décolle pendant l'empannage.
+  decollagePendantLeVirage: {
+    durationS: 150,
+    headings: [[0, 120], [60, 120], [68, 240]],
+    speeds: [[0, 5], [60, 5], [68, 16]],
+  },
+};
+
+const scenarioStats = (name: string, stepS = 1, options: ManeuverOptions = FLIGHT_OPTIONS): ManeuverStats => {
+  const s = SCENARIOS[name];
+  return analyzeManeuvers(scriptedSession(s.durationS, s.headings, s.speeds, stepS), 0, options);
+};
+
+/** Ce qui doit être identique à 1 Hz et à 5 Hz : manœuvres comptées et mises de côté. */
+const signature = (stats: ManeuverStats) => ({
+  counted: stats.locations.map((m) => `${m.type}:${m.success ? 'ok' : 'raté'}`),
+  fullTurn: stats.rejected.fullTurn,
+  noFlight: stats.rejected.noFlight,
+});
+
+describe('analyzeManeuvers, détection robuste au bruit de cap', () => {
+  it('compte deux virements à 15 s d\'intervalle', () => {
+    const stats = scenarioStats('deuxVirements');
+    expect(signature(stats).counted).toEqual(['tack:ok', 'tack:ok']);
+  });
+
+  it('compte un virement 10 s après un empannage tourné dans le même sens', () => {
+    const stats = scenarioStats('empannageVirement');
+    expect(signature(stats).counted).toEqual(['jibe:ok', 'tack:ok']);
+  });
+
+  it('ne compte que le virement raté, pas la chute qui le suit', () => {
+    const stats = scenarioStats('viramentRateChute');
+    expect(signature(stats).counted).toEqual(['tack:raté']);
+  });
+
+  it('écarte un tour complet, ni virement ni empannage', () => {
+    const stats = scenarioStats('tourComplet');
+    expect(stats.locations).toHaveLength(0);
+    expect(stats.rejected.fullTurn).toBe(1);
+    expect(stats.rejectedTurns.find((r) => r.motif === 'fullTurn')!.turnDeg).toBeGreaterThanOrEqual(270);
+  });
+
+  it('met à part le demi-tour entamé hors vol, hors des comptes et du % de réussite', () => {
+    const stats = scenarioStats('empannageEtDemiTour');
+    expect(signature(stats)).toEqual({ counted: ['jibe:ok'], fullTurn: 0, noFlight: 1 });
+    expect(stats.jibeFail).toBe(0);
+    const summary = summarizeManeuvers(stats);
+    expect(summary.jibe!.count).toBe(1);
+    expect(summary.jibe!.success).toBe(1);
+    const aside = stats.rejectedTurns.find((r) => r.motif === 'noFlight')!;
+    expect(aside.type).toBe('jibe');
+    expect(aside.speedKn).toBeLessThan(8);
+  });
+
+  it('sans seuil de vol (bateau), compte le demi-tour lent comme une manœuvre ratée', () => {
+    const { flightThresholdKn: _ignored, ...withoutFlight } = FLIGHT_OPTIONS;
+    const stats = scenarioStats('empannageEtDemiTour', 1, withoutFlight);
+    expect(signature(stats)).toEqual({ counted: ['jibe:ok', 'jibe:raté'], fullTurn: 0, noFlight: 0 });
+  });
+
+  it('compte l\'empannage où le rider décolle pendant le virage, lu à partir du décollage (04/11, option 1)', () => {
+    // Approche à 5 nœuds, sous le seuil de vol de 8 : jusqu'au 04/11, un
+    // demi-tour hors vol. En vol au franchissement du vent arrière et en
+    // sortie, il compte, l'entrée lue au décollage, entre 8 et 10 nœuds.
+    const s = SCENARIOS.decollagePendantLeVirage;
+    for (const stepS of [1, 0.2]) {
+      const points = scriptedSession(s.durationS, s.headings, s.speeds, stepS);
+      const stats = analyzeManeuvers(points, 0, FLIGHT_OPTIONS);
+      expect(signature(stats), `${stepS}`).toEqual({ counted: ['jibe:ok'], fullTurn: 0, noFlight: 0 });
+      const [jibe] = stats.locations;
+      expect(jibe.takeoff).toBe(true);
+      expect(jibe.entrySpeed).toBeGreaterThanOrEqual(8);
+      expect(jibe.entrySpeed).toBeLessThan(10);
+      expect(jibe.lostFlightS).toBe(0);
+      // La manœuvre se lit depuis le décollage : premier point en vol du vol qui porte le franchissement.
+      expect(points[jibe.entryIndex].smoothedSpeed).toBeGreaterThanOrEqual(8);
+      expect(points[jibe.entryIndex - 1].smoothedSpeed).toBeLessThan(8);
+      expect(jibe.path[0]).toEqual([points[jibe.entryIndex].lat, points[jibe.entryIndex].lon]);
+    }
+    // Sous le seuil au franchissement de l'axe : toujours un demi-tour hors vol.
+    const aside = scenarioStats('decollagePendantLeVirage', 1, { ...FLIGHT_OPTIONS, flightThresholdKn: 14 });
+    expect(signature(aside)).toEqual({ counted: [], fullTurn: 0, noFlight: 1 });
+  });
+
+  it('donne le même résultat à 1 Hz et à 5 Hz', () => {
+    for (const name of Object.keys(SCENARIOS)) {
+      expect(signature(scenarioStats(name, 0.2)), name).toEqual(signature(scenarioStats(name, 1)));
+    }
+  });
+
+  it('gigue d\'horloge de 998 et 1002 ms : mêmes manœuvres et mêmes bornes qu\'à 1 Hz exacte (lot 79)', () => {
+    // Une vraie trace à 1 Hz a quelques millisecondes de gigue. Le départ du
+    // cœur du virage se lisait par pas de 1 s stricts : un pas de 998 ms en
+    // avalait deux, et le début de la rotation pouvait se déplacer d'un point.
+    const jitter = (points: PointData[]): PointData[] => points.map((p, k) => ({ ...p, timeMs: p.timeMs + (k % 2 === 0 ? -2 : 2) }));
+    const bounds = (stats: ManeuverStats) =>
+      stats.locations.map((m) => `${m.type}:${m.success ? 'ok' : 'raté'}:${m.entryIndex}-${m.apexIndex}-${m.exitIndex}:${m.localWind}:${m.headingChange.toFixed(2)}`);
+    for (const name of Object.keys(SCENARIOS)) {
+      const s = SCENARIOS[name];
+      const exact = scriptedSession(s.durationS, s.headings, s.speeds, 1);
+      expect(bounds(analyzeManeuvers(jitter(exact), 0, FLIGHT_OPTIONS)), name).toEqual(bounds(analyzeManeuvers(exact, 0, FLIGHT_OPTIONS)));
+    }
+    for (const tack of [false, true]) {
+      const { points } = buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { tack, legKn: tack ? 15 : 18, seed: 2 });
+      expect(bounds(analyzeManeuvers(jitter(points), 0, { successThresholdKn: 2 }))).toEqual(bounds(analyzeManeuvers(points, 0, { successThresholdKn: 2 })));
+    }
+  });
+
+  it('lit des caps stabilisés sur les fenêtres médianes quand aucun segment ne tient 3°/s', () => {
+    const stats = scenarioStats('virementSymetrique');
+    expect(stats.locations).toHaveLength(1);
+    expect(stats.locations[0].stableHeadings).toBe(true);
+    expect(distanceTo(stats.locations[0].localWind, 0)).toBeLessThanOrEqual(10);
+    // Les manœuvres nourrissent donc de nouveau l'estimation du vent.
+    expect(windSamplesFrom(stats)).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ratée = vol perdu au moins 2 s, entrée au départ de la rotation, fin de
+// trace, amures (lot 144, 04/11)
+// ---------------------------------------------------------------------------
+
+describe('réussite : vol perdu au moins 2 s d\'affilée (04/11)', () => {
+  /**
+   * Virement par le nord à 12 nœuds, et un creux en V jusqu'à `dipKn` au
+   * milieu du virage (t = 33 s), dont les pentes passent `underS` secondes
+   * sous le seuil de 8 nœuds : linéaires, elles s'interpolent exactement à
+   * toute cadence.
+   */
+  const dippedTack = (stepS: number, underS: number, dipKn: number): PointData[] => {
+    // Chaque pente passe sous 8 nœuds sur la part (8 − creux) / (12 − creux) de sa durée ; un creux au seuil même n'y passe jamais.
+    const halfS = dipKn < 8 ? (underS * (12 - dipKn)) / (8 - dipKn) / 2 : underS / 2;
+    return buildTrack(80, stepS, singleTackThroughNorth, (t) => (Math.abs(t - 33) < halfS ? 12 - (12 - dipKn) * (1 - Math.abs(t - 33) / halfS) : 12));
+  };
+  const OPTIONS: ManeuverOptions = { successThresholdKn: 8, minEntrySpeedKn: 2 };
+  const only = (points: PointData[], options: ManeuverOptions = OPTIONS): ManeuverLocation => {
+    const stats = analyzeManeuvers(points, 0, options);
+    expect(stats.locations).toHaveLength(1);
+    return stats.locations[0];
+  };
+
+  it('un creux d\'une seconde sous le seuil ne rate pas la manœuvre, trois secondes la ratent, à 1 Hz comme à 5 Hz', () => {
+    for (const stepS of [1, 0.2]) {
+      const brief = only(dippedTack(stepS, 1, 5));
+      expect(brief.success, `creux bref ${stepS}`).toBe(true);
+      expect(brief.lostFlightS).toBeGreaterThan(0.8);
+      expect(brief.lostFlightS).toBeLessThan(1.2);
+      // La vitesse minimale reste la mesure : le creux s'y lit tel quel.
+      expect(brief.vmin).toBeCloseTo(5, 6);
+      expect(brief.conservation).toBeCloseTo(5 / 12, 6);
+
+      const long = only(dippedTack(stepS, 3, 5));
+      expect(long.success, `creux long ${stepS}`).toBe(false);
+      expect(long.lostFlightS).toBeGreaterThan(2.8);
+      expect(long.lostFlightS).toBeLessThan(3.2);
+      expect(long.vmin).toBeCloseTo(5, 6);
+      expect(long.windwardGainM).toBeNull();
+
+      // Quasi-arrêt dès le départ de la rotation, 3 nœuds pendant 20 s (à
+      // l'arrêt même, le cap n'est que du bruit : `still`) : la fenêtre, close
+      // 10 s après la rotation faute de relance, borne la durée lue.
+      const stopped = only(buildTrack(80, stepS, singleTackThroughNorth, (t) => (t >= 31 && t < 51 ? 3 : 12)));
+      expect(stopped.success, `quasi-arrêt ${stepS}`).toBe(false);
+      expect(stopped.lostFlightS).toBeGreaterThanOrEqual(10);
+    }
+    // Les durées lues aux deux cadences se rejoignent à un pas de 5 Hz près : bornes interpolées en temps.
+    expect(Math.abs(only(dippedTack(1, 1, 5)).lostFlightS - only(dippedTack(0.2, 1, 5)).lostFlightS)).toBeLessThan(0.2);
+    expect(Math.abs(only(dippedTack(1, 3, 5)).lostFlightS - only(dippedTack(0.2, 3, 5)).lostFlightS)).toBeLessThan(0.2);
+  });
+
+  it('un creux qui se referme en un pas après la rotation se clôt au franchissement interpolé, pas au dernier point lent', () => {
+    // 3 nœuds pendant les 2 dernières secondes de la rotation, puis 12 nœuds
+    // d'un coup : le point qui relance clôt la fenêtre, et il doit entrer dans
+    // la série, sinon le creux finissait au dernier point sous le seuil
+    // (1,99 s à 5 Hz, « réussi », pour 2,1 s et raté à 1 Hz).
+    const results = [1, 0.2].map((stepS) => only(buildTrack(80, stepS, singleTackThroughNorth, (t) => (t >= 34 && t < 36 ? 3 : 12))));
+    for (const tack of results) {
+      expect(tack.success).toBe(false);
+      expect(tack.lostFlightS).toBeGreaterThanOrEqual(2);
+      expect(tack.lostFlightS).toBeLessThan(2.3);
+      expect(tack.vmin).toBeCloseTo(3, 6);
+    }
+    expect(Math.abs(results[0].lostFlightS - results[1].lostFlightS)).toBeLessThan(0.2);
+  });
+
+  it('jamais sous le seuil : vol perdu 0 s ; au seuil exactement, pas en dessous', () => {
+    const clean = only(buildTrack(80, 1, singleTackThroughNorth, 12));
+    expect(clean.success).toBe(true);
+    expect(clean.lostFlightS).toBe(0);
+    const atThreshold = only(dippedTack(1, 3, 8));
+    expect(atThreshold.success).toBe(true);
+    expect(atThreshold.lostFlightS).toBe(0);
+  });
+
+  it('la durée exigée se surcharge (lostFlightSeconds)', () => {
+    expect(only(dippedTack(1, 1, 5), { ...OPTIONS, lostFlightSeconds: 0.5 }).success).toBe(false);
+    expect(only(dippedTack(1, 3, 5), { ...OPTIONS, lostFlightSeconds: 5 }).success).toBe(true);
+  });
+
+  it('un demi-tour vu en un seul pas interpole sur ce pas : entré et ressorti sous le seuil, il est raté', () => {
+    const [turn] = analyzeManeuvers(buildSparseTurnTrack(22), 23, { successThresholdKn: 8 }).locations;
+    expect(turn.success).toBe(false);
+    expect(turn.lostFlightS).toBeGreaterThanOrEqual(2);
+  });
+
+  it('un virage entamé dans la dernière demi-fenêtre de la trace est compté « trop court » plutôt que perdu', () => {
+    // Le cap s'ouvre de 50° à gauche puis repart de 90° à droite jusqu'au
+    // dernier point, 5 s après : les fenêtres d'au moins 6 s ne voient que
+    // 40° net, celles de la fin voient 90°, inobservables.
+    const bearing = (t: number): number => (t < 27 ? 90 : t < 28 ? 90 - 50 * (t - 27) : 40 + 18 * (t - 28));
+    for (const stepS of [1, 0.2]) {
+      const stats = analyzeManeuvers(buildTrack(33, stepS, bearing, 12), 0, OPTIONS);
+      expect(stats.locations, `${stepS}`).toHaveLength(0);
+      expect(stats.rejected.tooShort, `${stepS}`).toBe(1);
+      expect(stats.rejectedTurns.map((r) => r.motif)).toEqual(['tooShort']);
+    }
+    // Planche presque arrêtée en fin de trace : le cap n'est que du bruit, rien n'est compté.
+    const stopped = analyzeManeuvers(buildTrack(33, 1, bearing, (t) => (t < 26 ? 12 : 1)), 0, OPTIONS);
+    expect(stopped.rejected.tooShort).toBe(0);
+    expect(stopped.locations).toHaveLength(0);
+  });
+});
+
+describe('vitesse d\'approche au départ de la rotation (04/11)', () => {
+  it('un décollage juste avant le virage ne fait plus un demi-tour hors vol : l\'entrée est la vitesse au départ de la rotation', () => {
+    // 6 nœuds en archimédien, puis 12 nœuds atteints en 4 s juste avant que
+    // le cap parte : la médiane de 12 à 2 s avant la rotation lit encore 6.
+    const speed = (t: number): number => (t < 26 ? 6 : t < 30 ? 6 + 1.5 * (t - 26) : 12);
+    for (const stepS of [1, 0.2]) {
+      const stats = analyzeManeuvers(buildTrack(80, stepS, singleTackThroughNorth, speed), 0, { successThresholdKn: 8, minEntrySpeedKn: 2, flightThresholdKn: 8 });
+      expect(stats.rejected.noFlight, `${stepS}`).toBe(0);
+      expect(stats.locations).toHaveLength(1);
+      const [tack] = stats.locations;
+      expect(tack.entrySpeed).toBeGreaterThanOrEqual(11);
+      expect(tack.takeoff).toBe(false);
+      expect(tack.success).toBe(true);
+      // Repère sur la carte dans la rotation, pas au point lent d'avant le décollage (lecture de l'utilisateur, 04/11).
+      expect(tack.trackIndex, `${stepS}`).toBeGreaterThanOrEqual(tack.entryIndex);
+    }
+  });
+
+  it('garde la médiane quand le rider a ralenti avant de virer : la vitesse au départ ne la remplace pas', () => {
+    const speed = (t: number): number => (t < 24 ? 18 : t < 30 ? 18 - (t - 24) : 12);
+    const [tack] = analyzeManeuvers(buildTrack(80, 1, singleTackThroughNorth, speed), 0, { successThresholdKn: 2 }).locations;
+    expect(tack.entrySpeed).toBeGreaterThan(14);
+  });
+});
+
+describe('amures (note 135, 04/11)', () => {
+  it('tribord amure quand le vent vient de tribord : cap à gauche du vent', () => {
+    expect(tackOf(315, 0)).toBe('starboard');
+    expect(tackOf(45, 0)).toBe('port');
+    expect(tackOf(45, 90)).toBe('starboard');
+    expect(tackOf(135, 90)).toBe('port');
+  });
+
+  it('pose l\'amure d\'avant la manœuvre sur chaque virement et empannage, jamais sur un sens incertain', () => {
+    // Près bâbord amure (cap 45°, vent du nord), virement, près tribord amure,
+    // abattée, empannage depuis le cap 225°, tribord amure.
+    const stats = analyzeManeuvers(buildLegSession(upwindDownwindLegs(2), () => 0), 0, { successThresholdKn: 2 });
+    const tack = stats.locations.find((m) => m.type === 'tack')!;
+    const jibe = stats.locations.find((m) => m.type === 'jibe')!;
+    expect(tack.tack).toBe('port');
+    expect(jibe.tack).toBe('starboard');
+    for (const m of analyzeManeuvers(buildSilentUTurns(6), 0, { successThresholdKn: 8 }).locations) {
+      expect(m.type).toBe('undecided');
+      expect(m.tack).toBeNull();
+    }
+  });
+
+  it('résume virements et empannages par amure : comptés, réussis, vitesse minimale et conservation médianes', () => {
+    const stats: ManeuverStats = {
+      tackSuccess: 2, tackFail: 1, jibeSuccess: 1, jibeFail: 0, undecided: 1,
+      rejected: { slowEntry: 0, incoherent: 0, still: 0, unclassified: 0, tooShort: 0, fullTurn: 0, noFlight: 0 },
+      rejectedTurns: [],
+      locations: [
+        fakeManeuver({ type: 'tack', tack: 'starboard', success: true, vmin: 7, conservation: 0.5 }),
+        fakeManeuver({ type: 'tack', tack: 'starboard', success: false, vmin: 4, conservation: 0.3 }),
+        fakeManeuver({ type: 'tack', tack: 'port', success: true, vmin: 6, conservation: 0.4 }),
+        fakeManeuver({ type: 'jibe', tack: 'port', success: true, vmin: 9, conservation: 0.9 }),
+        fakeManeuver({ type: 'undecided', tack: null, success: true, vmin: 5, conservation: 0.45 }),
+      ],
+    };
+    const { byTack } = summarizeManeuvers(stats);
+    expect(byTack.tack.starboard).toEqual({ count: 2, success: 1, vminMedian: 5.5, conservationMedian: 0.4 });
+    expect(byTack.tack.port).toEqual({ count: 1, success: 1, vminMedian: 6, conservationMedian: 0.4 });
+    expect(byTack.jibe.starboard).toBeNull();
+    expect(byTack.jibe.port).toEqual({ count: 1, success: 1, vminMedian: 9, conservationMedian: 0.9 });
+    expect(summarizeManeuvers(null).byTack).toEqual({ tack: { starboard: null, port: null }, jibe: { starboard: null, port: null } });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Détection préparée une fois, classée par vent (lot 30)
+// ---------------------------------------------------------------------------
+
+/**
+ * Sessions de toutes natures : bruitées à 1 et 5 Hz (trois graines), scriptées
+ * à 1 et 5 Hz, par bords, clairsemée (pas unique, puis reprise de pause),
+ * demi-tours silencieux. Construites une fois pour les tests de neutralité
+ * (lots 30, 58, 79 et 112).
+ */
+let built: [string, PointData[], ManeuverOptions][] | undefined;
+const sessions = (): [string, PointData[], ManeuverOptions][] => {
+  if (built) return built;
+  const all: [string, PointData[], ManeuverOptions][] = [];
+  for (const tack of [false, true]) {
+    for (const hz of [1, 5]) {
+      for (const seed of [1, 2, 3]) {
+        all.push([`bruitée ${tack ? 'virements' : 'empannages'} ${hz} Hz graine ${seed}`, buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { tack, legKn: tack ? 15 : 18, seed, hz }).points, { successThresholdKn: 2 }]);
+      }
+    }
+  }
+  for (const name of Object.keys(SCENARIOS)) {
+    const s = SCENARIOS[name];
+    all.push([`${name} 1 Hz`, scriptedSession(s.durationS, s.headings, s.speeds, 1), FLIGHT_OPTIONS]);
+    all.push([`${name} 5 Hz`, scriptedSession(s.durationS, s.headings, s.speeds, 0.2), FLIGHT_OPTIONS]);
+  }
+  all.push(['par bords', buildLegSession(upwindDownwindLegs(6), () => 0), { successThresholdKn: 8 }]);
+  all.push(['bords courts', buildLegSession(upwindDownwindLegs(10, 18), () => 0), { successThresholdKn: 8 }]);
+  all.push(['clairsemée', buildSparseTurnTrack(22), { successThresholdKn: 8 }]);
+  all.push(['clairsemée reprise de pause', buildSparseTurnTrack(22, true), { successThresholdKn: 8 }]);
+  all.push(['demi-tours silencieux', buildSilentUTurns(6), { successThresholdKn: 8 }]);
+  built = all;
+  return all;
+};
+
+describe('prepareManeuverDetection et classifyManeuvers', () => {
+  it('donne, vent après vent sur une même détection, exactement ce qu\'une analyse neuve donne', () => {
+    // Les vents se suivent dans un ordre varié : la borne basse de la recherche
+    // du cœur d'un virage dépend de la manœuvre précédente, donc du vent, et
+    // chaque lecture mémorisée doit valoir pour le vent qui la relit.
+    for (const [name, points, options] of sessions()) {
+      const detection = prepareManeuverDetection(points, options);
+      const timeline = buildWindTimeline(
+        windSamplesFrom(analyzeManeuvers(points, 0, options)).map((m) => ({ timeMs: m.timeMs, direction: m.localWind })),
+        0,
+        WIND_LOCAL_MAX_GAP_MIN * 60 * 1000
+      );
+      for (const wind of [0, 90, 180, 270, 23, timeline, 0]) {
+        expect(classifyManeuvers(detection, wind, options), name).toEqual(analyzeManeuvers(points, wind, options));
+      }
+    }
+  });
+
+  it('estime le même vent avec et sans détection préparée', () => {
+    for (const [name, points] of sessions()) {
+      const options: WindEstimationOptions = { minSpeedKn: 3, successThresholdKn: 8, minEntrySpeedKn: 2, flightThresholdKn: 8, stillSpeedKn: 1 };
+      const detection = prepareManeuverDetection(points, { minEntrySpeedKn: 2, stillSpeedKn: 1 });
+      expect(estimateWind(points, { ...options, detection }), name).toEqual(estimateWind(points, options));
+      expect(estimateWind(points, { detection: prepareManeuverDetection(points) }), name).toEqual(estimateWind(points));
+    }
+  });
+
+  it('refuse une détection préparée sur une autre trace ou avec d\'autres réglages', () => {
+    const points = buildLegSession(upwindDownwindLegs(6), () => 0);
+    const other = buildLegSession(upwindDownwindLegs(6), () => 0);
+    expect(() => estimateWind(points, { detection: prepareManeuverDetection(other) })).toThrow();
+    expect(() => estimateWind(points, { minEntrySpeedKn: 2, detection: prepareManeuverDetection(points) })).toThrow();
+    expect(() => estimateWind(points, { stillSpeedKn: 1, detection: prepareManeuverDetection(points, { stillSpeedKn: 2 }) })).toThrow();
+    expect(() => estimateWind(points, { minEntrySpeedKn: 2, detection: prepareManeuverDetection(points, { minEntrySpeedKn: 2 }) })).not.toThrow();
+    // Le virage minimal est un réglage de détection comme les autres (lot 79) : l'estimation ne le surcharge pas, elle lit le défaut.
+    expect(() => estimateWind(points, { detection: prepareManeuverDetection(points, { minTurnDeg: 70 }) })).toThrow();
+    expect(() => estimateWind(points, { detection: prepareManeuverDetection(points, { minTurnDeg: 60 }) })).not.toThrow();
+    // De même la part minimale de fenêtre (lot 112).
+    expect(() => estimateWind(points, { detection: prepareManeuverDetection(points, { minWindowShare: 0.4 }) })).toThrow();
+    expect(() => estimateWind(points, { detection: prepareManeuverDetection(points, { minWindowShare: 0.5 }) })).not.toThrow();
+  });
+
+  it('donne, avec le virage minimal passé en réglage à sa valeur par défaut, exactement ce que donnait la constante (lot 79)', () => {
+    for (const [name, points, options] of sessions()) {
+      const plain = JSON.stringify(analyzeManeuvers(points, 0, options));
+      expect(JSON.stringify(analyzeManeuvers(points, 0, { ...options, minTurnDeg: 60 })), name).toBe(plain);
+    }
+  });
+
+  it('donne, avec la part minimale de fenêtre passée en réglage à sa valeur par défaut, exactement ce que donnait le seuil écrit dans le calcul (lot 112)', () => {
+    for (const [name, points, options] of sessions()) {
+      const plain = JSON.stringify(analyzeManeuvers(points, 0, options));
+      expect(JSON.stringify(analyzeManeuvers(points, 0, { ...options, minWindowShare: 0.5 })), name).toBe(plain);
+    }
+  });
+
+  it('estime le même vent avec et sans étage polaire préparé, à tous les seuils (lot 58)', () => {
+    // Le hook prépare la polaire une fois par trace et la garde quand le seuil
+    // bouge : chaque seuil doit rendre exactement l'estimation d'une passe neuve.
+    for (const [name, points] of sessions()) {
+      for (const minSpeedKn of [2, 5]) {
+        // L'étage porte aussi la vitesse d'entrée des virages (Q53) : celle de l'estimation.
+        const polarStage = prepareWindPolar(points, minSpeedKn, 2);
+        const detection = prepareManeuverDetection(points, { minEntrySpeedKn: 2, stillSpeedKn: 1 });
+        for (const successThresholdKn of [2, 6.5, 8, 12, 6.5]) {
+          const options: WindEstimationOptions = { minSpeedKn, successThresholdKn, minEntrySpeedKn: 2, flightThresholdKn: successThresholdKn, stillSpeedKn: 1 };
+          const fresh = estimateWind(points, options);
+          const staged = estimateWind(points, { ...options, detection, polarStage });
+          expect(staged, `${name} ${minSpeedKn} ${successThresholdKn}`).toEqual(fresh);
+          expect(JSON.stringify(staged)).toBe(JSON.stringify(fresh));
+        }
+      }
+      expect(estimateWind(points, { polarStage: prepareWindPolar(points) }), name).toEqual(estimateWind(points));
+    }
+  });
+
+  it('refuse un étage polaire préparé sur une autre trace ou à une autre vitesse plancher', () => {
+    const points = buildLegSession(upwindDownwindLegs(6), () => 0);
+    const other = buildLegSession(upwindDownwindLegs(6), () => 0);
+    expect(() => estimateWind(points, { polarStage: prepareWindPolar(other) })).toThrow();
+    expect(() => estimateWind(points, { minSpeedKn: 2, polarStage: prepareWindPolar(points, 5) })).toThrow();
+    expect(() => estimateWind(points, { minSpeedKn: 2, polarStage: prepareWindPolar(points, 2) })).not.toThrow();
+    // Et à une autre vitesse d'entrée des virages (Q53) : l'orientation en dépend.
+    expect(() => estimateWind(points, { minEntrySpeedKn: 2, polarStage: prepareWindPolar(points) })).toThrow();
+    expect(() => estimateWind(points, { minEntrySpeedKn: 2, polarStage: prepareWindPolar(points, undefined, 2) })).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Virages vus des deux côtés (lot 112)
+// ---------------------------------------------------------------------------
+
+/**
+ * Copies gelées, au 01/11, de ce que chaque côté faisait de la fenêtre d'un
+ * virage avant la mise en commun du lot 112 : `observeTurns` (`wind.ts`) et
+ * `readWindow` de `prepareManeuverDetection` (`maneuvers.ts`), avec leurs
+ * aides (`strideEnd`, `isTurningStep`, `scanTurnWindow`, `distanceBetween`)
+ * et leurs seuils en littéral, aux valeurs par défaut. Elles ne suivent pas le
+ * code : elles prouvent que la mise en commun n'a rien changé. Deux règles y
+ * ont été alignées le 04/11 (Q53, lot 144), des deux côtés : une seule
+ * cohérence, 0,5, et la même vitesse d'entrée, 4 nd en `>` strict ; le reste
+ * de la copie du vent est celui du 01/11, et c'est ce que le test prouve.
+ */
+const FROZEN = {
+  strideMs: 900,
+  turningRateDegS: 2,
+  windowMs: 12000,
+  maxStepMs: 30000,
+  minTurnDeg: 60,
+  /** Cohérence minimale, la même côté vent et côté manœuvres (`MANEUVER_MIN_COHERENCE`, Q53 ; le vent lisait 0,6). */
+  coherence: 0.5,
+  exitStabilityMs: 5000,
+  exitMaxStepDeg: 45,
+  maxConservation: 0.5,
+  /** Vitesse d'entrée, en `>` strict des deux côtés (`MANEUVER_MIN_ENTRY_SPEED_KN`, Q53 ; le vent lisait 5 nd en `>=`). */
+  entryKn: 4,
+  minDistanceM: 10,
+} as const;
+
+const frozenStrideEnd = (points: readonly PointData[], k: number, last: number): number => {
+  const untilMs = points[k].timeMs + FROZEN.strideMs;
+  let next = k + 1;
+  while (next < last && points[next].timeMs < untilMs) next++;
+  return next;
+};
+
+const frozenIsTurningStep = (points: readonly PointData[], from: number, to: number, turnSign: number): boolean => {
+  const step = angleDiff(points[to].bearing, points[from].bearing);
+  const dtS = (points[to].timeMs - points[from].timeMs) / 1000;
+  return Math.sign(step) === turnSign && Math.abs(step) >= FROZEN.turningRateDegS * Math.max(dtS, 0);
+};
+
+const frozenScanTurnWindow = (points: readonly PointData[], i: number): { j: number; cumulativeTurn: number; totalRotation: number } => {
+  let cumulativeTurn = 0;
+  let totalRotation = 0;
+  let strideStart = i;
+  let j = i;
+  while (
+    j + 1 < points.length &&
+    (points[j + 1].timeMs - points[i].timeMs <= FROZEN.windowMs ||
+      (j === i && !points[j + 1].segmentStart && points[j + 1].timeMs - points[i].timeMs <= FROZEN.maxStepMs))
+  ) {
+    cumulativeTurn += angleDiff(points[j + 1].bearing, points[j].bearing);
+    j++;
+    if (points[j].timeMs - points[strideStart].timeMs >= FROZEN.strideMs) {
+      totalRotation += Math.abs(angleDiff(points[j].bearing, points[strideStart].bearing));
+      strideStart = j;
+    }
+  }
+  if (strideStart < j) totalRotation += Math.abs(angleDiff(points[j].bearing, points[strideStart].bearing));
+  return { j, cumulativeTurn, totalRotation };
+};
+
+/** Virage d'`observeTurns`, avec les bornes de sa fenêtre et son point le plus lent. */
+type FrozenTurn = TurnObservation & { i: number; j: number; minIndex: number };
+
+/** Ce qu'`observeTurns` d'avant le lot 112 faisait de la fenêtre ouverte au point `i`. */
+type FrozenObservation =
+  | { verdict: 'small' | 'incoherent' | 'slowEntry' }
+  | { verdict: 'exitUnstable'; j: number }
+  | { verdict: 'turn'; turn: FrozenTurn };
+
+const frozenObserveWindow = (points: PointData[], i: number, minEntrySpeedKn: number): FrozenObservation => {
+  const windowMs = FROZEN.windowMs;
+  const scan = frozenScanTurnWindow(points, i);
+  let { j, cumulativeTurn } = scan;
+  let minSpd = points[i].smoothedSpeed;
+  let minIndex = i;
+  for (let k = i + 1; k <= j; k++) {
+    if (points[k].smoothedSpeed < minSpd) {
+      minSpd = points[k].smoothedSpeed;
+      minIndex = k;
+    }
+  }
+  const coherent = scan.totalRotation > 0 && Math.abs(cumulativeTurn) / scan.totalRotation >= FROZEN.coherence;
+  const entrySpeed = points[i].smoothedSpeed;
+  const startsFlying = entrySpeed > minEntrySpeedKn;
+  if (!(Math.abs(cumulativeTurn) > FROZEN.minTurnDeg)) return { verdict: 'small' };
+  if (!coherent) return { verdict: 'incoherent' };
+  if (!startsFlying) return { verdict: 'slowEntry' };
+
+  const turnSign = Math.sign(cumulativeTurn);
+  while (j + 1 < points.length) {
+    const next = frozenStrideEnd(points, j, points.length - 1);
+    if (points[next].timeMs - points[i].timeMs > 2 * windowMs) break;
+    if (!frozenIsTurningStep(points, j, next, turnSign)) break;
+    for (let k = j + 1; k <= next; k++) {
+      cumulativeTurn += angleDiff(points[k].bearing, points[k - 1].bearing);
+      if (points[k].smoothedSpeed < minSpd) {
+        minSpd = points[k].smoothedSpeed;
+        minIndex = k;
+      }
+    }
+    j = next;
+  }
+
+  let exitStable = true;
+  for (let k = j; k + 1 < points.length; ) {
+    const next = frozenStrideEnd(points, k, points.length - 1);
+    if (points[next].timeMs - points[j].timeMs > FROZEN.exitStabilityMs) break;
+    if (Math.abs(angleDiff(points[next].bearing, points[k].bearing)) > FROZEN.exitMaxStepDeg) {
+      exitStable = false;
+      break;
+    }
+    k = next;
+  }
+  if (!exitStable) return { verdict: 'exitUnstable', j };
+  return {
+    verdict: 'turn',
+    turn: {
+      i,
+      j,
+      minIndex,
+      headingAtMin: points[minIndex].bearing,
+      midHeading: normalizeDeg(points[i].bearing + cumulativeTurn / 2),
+      minSpeed: minSpd,
+      speedLoss: Math.max(0, entrySpeed - minSpd),
+      cumulativeTurn,
+      slow: minSpd < FROZEN.maxConservation * entrySpeed,
+    },
+  };
+};
+
+/** Copie gelée d'`observeTurns` : ses virages, et les fenêtres lues qui ont fait sauter le balayage à `j + 1`. */
+const frozenObserveTurns = (points: PointData[], minEntrySpeedKn: number = FROZEN.entryKn): { turns: FrozenTurn[]; jumps: { i: number; j: number }[] } => {
+  const turns: FrozenTurn[] = [];
+  const jumps: { i: number; j: number }[] = [];
+  let i = 0;
+  while (i < points.length - 1) {
+    const seen = frozenObserveWindow(points, i, minEntrySpeedKn);
+    if (seen.verdict === 'turn') {
+      turns.push(seen.turn);
+      jumps.push({ i, j: seen.turn.j });
+      i = seen.turn.j + 1;
+    } else if (seen.verdict === 'exitUnstable') {
+      jumps.push({ i, j: seen.j });
+      i = seen.j + 1;
+    } else {
+      i++;
+    }
+  }
+  return { turns, jumps };
+};
+
+const frozenStepDistanceM = (points: PointData[], k: number): number => {
+  if (k <= 0 || points[k].segmentStart) return 0;
+  const given = points[k].stepDistanceM;
+  if (given !== undefined) return given;
+  const dt = (points[k].timeMs - points[k - 1].timeMs) / 1000;
+  return dt > 0 ? knotsToMs(points[k].smoothedSpeed) * dt : 0;
+};
+
+const frozenDistanceBetween = (points: PointData[], from: number, to: number): number => {
+  let meters = 0;
+  for (let k = from + 1; k <= to; k++) meters += frozenStepDistanceM(points, k);
+  return meters;
+};
+
+/** Copie gelée de `readWindow` de `prepareManeuverDetection`, aux réglages par défaut. */
+const frozenReadWindow = (points: PointData[], i: number): WindowReading => {
+  const n = points.length;
+  const windowMs = FROZEN.windowMs;
+  const scan = frozenScanTurnWindow(points, i);
+  let { j, cumulativeTurn } = scan;
+  let anchorSpeed = Infinity;
+  let anchorIndex = i;
+  for (let k = i; k < j; k++) {
+    if (points[k].smoothedSpeed < anchorSpeed) {
+      anchorSpeed = points[k].smoothedSpeed;
+      anchorIndex = k;
+    }
+  }
+  if (points[j].timeMs - points[i].timeMs < windowMs * 0.5) return { kind: 'nothing' };
+  if (!(Math.abs(cumulativeTurn) > FROZEN.minTurnDeg)) return { kind: 'nothing' };
+  const endMs = points[j].timeMs;
+  const coherent = scan.totalRotation > 0 && Math.abs(cumulativeTurn) / scan.totalRotation >= FROZEN.coherence;
+  if (!coherent) return { kind: 'rejected', motif: 'incoherent', endMs, turnDeg: cumulativeTurn };
+  if (!(points[i].smoothedSpeed > FROZEN.entryKn)) return { kind: 'rejected', motif: 'slowEntry', endMs, turnDeg: cumulativeTurn };
+  if (!(frozenDistanceBetween(points, i, j) >= FROZEN.minDistanceM)) return { kind: 'rejected', motif: 'tooShort', endMs, turnDeg: cumulativeTurn };
+
+  const turnSign = Math.sign(cumulativeTurn);
+  while (j + 1 < n) {
+    const next = frozenStrideEnd(points, j, n - 1);
+    if (points[next].timeMs - points[i].timeMs > 2 * windowMs) break;
+    if (!frozenIsTurningStep(points, j, next, turnSign)) break;
+    for (let k = j + 1; k <= next; k++) {
+      cumulativeTurn += angleDiff(points[k].bearing, points[k - 1].bearing);
+      if (points[k].smoothedSpeed < anchorSpeed) {
+        anchorSpeed = points[k].smoothedSpeed;
+        anchorIndex = k;
+      }
+    }
+    j = next;
+  }
+
+  let lowestFree = i;
+  while (lowestFree > 0 && points[lowestFree - 1].timeMs >= points[i].timeMs - windowMs) lowestFree--;
+  return { kind: 'turn', j, cumulativeTurn, turnSign, anchorIndex, anchorSpeed, lowestFree };
+};
+
+/**
+ * Règles du tableau du lot 112 qui expliquent un virage vu d'un seul côté.
+ * Côté vent seul : ce que la détection a fait de la même fenêtre. Côté
+ * manœuvres seul : ce que le vent a fait de la fenêtre, ou le saut à `j + 1`
+ * qui l'a enjambée.
+ */
+const RULE = {
+  /** Depuis Q53 (04/11), même seuil et même comparaison des deux côtés : ne devrait plus se voir. */
+  entry: 'entrée sous le seuil d\'un seul côté',
+  /** Depuis Q53, même cohérence des deux côtés : ne devrait plus se voir. */
+  coherence: 'cohérence insuffisante d\'un seul côté',
+  shortWindow: 'fenêtre trop courte (moins d\'une demi-fenêtre, fin de trace)',
+  distance: 'moins de 10 m parcourus',
+  exit: 'sortie instable (5 s, pas de plus de 45°)',
+  skipped: 'enjambé par le saut à j + 1 d\'une fenêtre lue avant',
+  duplicate: 'même virage du vent, déjà apparié à une fenêtre déclenchée plus tôt (la détection n\'a pas de saut, le temps mort vient au classement)',
+  anchor: 'point le plus lent à plus d\'une fenêtre',
+} as const;
+
+interface TurnsAgreement {
+  /** Virages retenus par `observeTurns`. */
+  vent: number;
+  /** Fenêtres `turn` de la détection, regroupées par point le plus lent. */
+  manoeuvres: number;
+  /** Paires appariées par l'instant du point le plus lent, à une fenêtre près. */
+  communs: number;
+  ventSeul: Partial<Record<string, number>>;
+  manoeuvresSeules: Partial<Record<string, number>>;
+}
+
+const count = (rules: string[]): Partial<Record<string, number>> => {
+  const out: Partial<Record<string, number>> = {};
+  for (const rule of rules) out[rule] = (out[rule] ?? 0) + 1;
+  return out;
+};
+
+/** Accord des virages vus par le vent (`observeTurns` à `windEntryKn`) et par la détection aux réglages par défaut. */
+const turnsAgreement = (points: PointData[], windEntryKn: number): TurnsAgreement => {
+  const detection = prepareManeuverDetection(points);
+  const { turns, jumps } = frozenObserveTurns(points, windEntryKn);
+  const groups = new Map<number, number[]>();
+  for (let i = 0; i < points.length; i++) {
+    const w = detection.windowAt(i);
+    if (w.kind === 'turn') groups.set(w.anchorIndex, [...(groups.get(w.anchorIndex) ?? []), i]);
+  }
+  const anchors = [...groups.keys()].sort((a, b) => a - b);
+
+  const pairs: { dt: number; k: number; a: number }[] = [];
+  turns.forEach((t, k) => {
+    for (const a of anchors) {
+      const dt = Math.abs(points[t.minIndex].timeMs - points[a].timeMs);
+      if (dt <= FROZEN.windowMs) pairs.push({ dt, k, a });
+    }
+  });
+  pairs.sort((p, q) => p.dt - q.dt);
+  const pairedTurns = new Set<number>();
+  const pairedAnchors = new Set<number>();
+  for (const { k, a } of pairs) {
+    if (pairedTurns.has(k) || pairedAnchors.has(a)) continue;
+    pairedTurns.add(k);
+    pairedAnchors.add(a);
+  }
+
+  const ventSeul = turns
+    .filter((_, k) => !pairedTurns.has(k))
+    .map((t) => {
+      const w = detection.windowAt(t.i);
+      if (w.kind === 'nothing') return RULE.shortWindow;
+      if (w.kind === 'rejected') return w.motif === 'incoherent' ? RULE.coherence : w.motif === 'slowEntry' ? RULE.entry : RULE.distance;
+      return RULE.anchor;
+    });
+  const manoeuvresSeules = anchors
+    .filter((a) => !pairedAnchors.has(a))
+    .map((a) => {
+      const windows = groups.get(a) ?? [];
+      const seen = windows.map((i) => frozenObserveWindow(points, i, windEntryKn));
+      if (seen.some((s) => s.verdict === 'turn')) {
+        if (windows.some((i) => jumps.some((jump) => jump.i < i && i <= jump.j))) return RULE.skipped;
+        if (turns.some((t, k) => pairedTurns.has(k) && windows.includes(t.i))) return RULE.duplicate;
+        return RULE.anchor;
+      }
+      const first = seen[0];
+      return first.verdict === 'slowEntry' ? RULE.entry : first.verdict === 'incoherent' ? RULE.coherence : first.verdict === 'exitUnstable' ? RULE.exit : RULE.anchor;
+    });
+  return { vent: turns.length, manoeuvres: anchors.length, communs: pairedTurns.size, ventSeul: count(ventSeul), manoeuvresSeules: count(manoeuvresSeules) };
+};
+
+/**
+ * Accord relevé le 01/11, figé, relevé de nouveau le 04/11 (Q53, lot 144) :
+ * le test ne l'exige pas, il le mesure, et un écart entre les deux côtés y
+ * est nommé par la règle qui l'explique. Un changement de cette table est un
+ * changement de chiffre d'un côté ou de l'autre : il se discute avant d'être
+ * accepté. « manoeuvres » compte des groupes de fenêtres par point le plus
+ * lent, pas des manœuvres classées : la détection, sans saut à `j + 1`,
+ * redéclenche une fenêtre à chaque point du virage, et c'est le temps mort du
+ * classement qui n'en garde qu'une.
+ *
+ * Lignes changées le 04/11, mêmes seuils d'entrée et de cohérence des deux
+ * côtés : `bruitée virements 5 Hz graine 3` (la fenêtre que le vent écartait à
+ * l'entrée est maintenant vue, mais enjambée par un saut : rien de plus
+ * commun) ; `clairsemée` (le vent voit enfin le virage en un pas, entré à
+ * 4,7 nd ; l'appariement par le point le plus lent échoue à travers le pas de
+ * 22 s, le vent le lisant dernier point compris et la détection non) ;
+ * `viramentRateChute` (la chute n'est plus écartée par la cohérence côté vent,
+ * mais par sa sortie instable : le vent ne la prend toujours pas pour un virage).
+ */
+const TURNS_AGREEMENT: Record<string, TurnsAgreement> = {
+  'bruitée empannages 1 Hz graine 1': { vent: 3, manoeuvres: 3, communs: 3, ventSeul: {}, manoeuvresSeules: {} },
+  'bruitée empannages 1 Hz graine 2': { vent: 3, manoeuvres: 3, communs: 3, ventSeul: {}, manoeuvresSeules: {} },
+  'bruitée empannages 1 Hz graine 3': { vent: 3, manoeuvres: 3, communs: 3, ventSeul: {}, manoeuvresSeules: {} },
+  'bruitée empannages 5 Hz graine 1': { vent: 3, manoeuvres: 3, communs: 3, ventSeul: {}, manoeuvresSeules: {} },
+  'bruitée empannages 5 Hz graine 2': { vent: 3, manoeuvres: 3, communs: 3, ventSeul: {}, manoeuvresSeules: {} },
+  'bruitée empannages 5 Hz graine 3': { vent: 3, manoeuvres: 3, communs: 3, ventSeul: {}, manoeuvresSeules: {} },
+  'bruitée virements 1 Hz graine 1': { vent: 3, manoeuvres: 3, communs: 3, ventSeul: {}, manoeuvresSeules: {} },
+  'bruitée virements 1 Hz graine 2': { vent: 3, manoeuvres: 3, communs: 3, ventSeul: {}, manoeuvresSeules: {} },
+  'bruitée virements 1 Hz graine 3': { vent: 3, manoeuvres: 3, communs: 3, ventSeul: {}, manoeuvresSeules: {} },
+  'bruitée virements 5 Hz graine 1': { vent: 3, manoeuvres: 4, communs: 3, ventSeul: {}, manoeuvresSeules: { [RULE.duplicate]: 1 } },
+  'bruitée virements 5 Hz graine 2': { vent: 3, manoeuvres: 3, communs: 3, ventSeul: {}, manoeuvresSeules: {} },
+  'bruitée virements 5 Hz graine 3': { vent: 3, manoeuvres: 4, communs: 3, ventSeul: {}, manoeuvresSeules: { [RULE.skipped]: 1 } },
+  'deuxVirements 1 Hz': { vent: 2, manoeuvres: 5, communs: 2, ventSeul: {}, manoeuvresSeules: { [RULE.duplicate]: 1, [RULE.skipped]: 2 } },
+  'deuxVirements 5 Hz': { vent: 3, manoeuvres: 9, communs: 3, ventSeul: {}, manoeuvresSeules: { [RULE.duplicate]: 1, [RULE.skipped]: 5 } },
+  'virementSymetrique 1 Hz': { vent: 1, manoeuvres: 1, communs: 1, ventSeul: {}, manoeuvresSeules: {} },
+  'virementSymetrique 5 Hz': { vent: 1, manoeuvres: 1, communs: 1, ventSeul: {}, manoeuvresSeules: {} },
+  'empannageVirement 1 Hz': { vent: 2, manoeuvres: 4, communs: 2, ventSeul: {}, manoeuvresSeules: { [RULE.skipped]: 2 } },
+  'empannageVirement 5 Hz': { vent: 2, manoeuvres: 4, communs: 2, ventSeul: {}, manoeuvresSeules: { [RULE.skipped]: 2 } },
+  'viramentRateChute 1 Hz': { vent: 1, manoeuvres: 2, communs: 1, ventSeul: {}, manoeuvresSeules: { [RULE.exit]: 1 } },
+  'viramentRateChute 5 Hz': { vent: 1, manoeuvres: 2, communs: 1, ventSeul: {}, manoeuvresSeules: { [RULE.exit]: 1 } },
+  'tourComplet 1 Hz': { vent: 1, manoeuvres: 7, communs: 1, ventSeul: {}, manoeuvresSeules: { [RULE.skipped]: 6 } },
+  'tourComplet 5 Hz': { vent: 1, manoeuvres: 28, communs: 1, ventSeul: {}, manoeuvresSeules: { [RULE.skipped]: 27 } },
+  'empannageEtDemiTour 1 Hz': { vent: 1, manoeuvres: 1, communs: 1, ventSeul: {}, manoeuvresSeules: {} },
+  'empannageEtDemiTour 5 Hz': { vent: 1, manoeuvres: 2, communs: 1, ventSeul: {}, manoeuvresSeules: { [RULE.skipped]: 1 } },
+  'decollagePendantLeVirage 1 Hz': { vent: 1, manoeuvres: 12, communs: 1, ventSeul: {}, manoeuvresSeules: { [RULE.skipped]: 11 } },
+  'decollagePendantLeVirage 5 Hz': { vent: 1, manoeuvres: 61, communs: 1, ventSeul: {}, manoeuvresSeules: { [RULE.skipped]: 60 } },
+  'par bords': { vent: 8, manoeuvres: 17, communs: 8, ventSeul: {}, manoeuvresSeules: { [RULE.skipped]: 9 } },
+  'bords courts': { vent: 12, manoeuvres: 21, communs: 12, ventSeul: {}, manoeuvresSeules: { [RULE.skipped]: 9 } },
+  'clairsemée': { vent: 1, manoeuvres: 1, communs: 0, ventSeul: { [RULE.anchor]: 1 }, manoeuvresSeules: { [RULE.anchor]: 1 } },
+  'clairsemée reprise de pause': { vent: 0, manoeuvres: 0, communs: 0, ventSeul: {}, manoeuvresSeules: {} },
+  'demi-tours silencieux': { vent: 3, manoeuvres: 3, communs: 3, ventSeul: {}, manoeuvresSeules: {} },
+};
+
+describe('virages vus des deux côtés, lot 112', () => {
+  it('observeTurns donne exactement ce que donnait sa copie gelée, à 2 et 5 nd et par défaut', () => {
+    const plain = ({ i: _i, j: _j, minIndex: _m, ...turn }: FrozenTurn): TurnObservation => turn;
+    for (const [name, points] of sessions()) {
+      for (const minEntrySpeedKn of [2, 5]) {
+        expect(observeTurns(points, minEntrySpeedKn), `${name} ${minEntrySpeedKn}`).toEqual(frozenObserveTurns(points, minEntrySpeedKn).turns.map(plain));
+      }
+      expect(observeTurns(points), name).toEqual(frozenObserveTurns(points).turns.map(plain));
+    }
+  });
+
+  it('la fenêtre de la détection donne exactement ce que donnait sa copie gelée, pour tout point', () => {
+    for (const [name, points] of sessions()) {
+      const detection = prepareManeuverDetection(points);
+      for (let i = 0; i < points.length; i++) {
+        expect(detection.windowAt(i), `${name} ${i}`).toEqual(frozenReadWindow(points, i));
+      }
+    }
+  });
+
+  it('mesure, sans l\'exiger, l\'accord des virages vus par le vent et par les manœuvres', () => {
+    // Les deux côtés lisent la même vitesse d'entrée depuis Q53 : celle de la détection, 4 nd.
+    const measured: Record<string, TurnsAgreement> = {};
+    for (const [name, points] of sessions()) measured[name] = turnsAgreement(points, FROZEN.entryKn);
+    expect(measured).toEqual(TURNS_AGREEMENT);
+  });
+});

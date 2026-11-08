@@ -1,0 +1,1126 @@
+/*
+ * Composants d'interface communs (`components/ui`), sur les variables de
+ * `theme/tokens.css`. Préfixe `ui-` : aucune collision avec Leaflet ou Recharts.
+ */
+
+/* --- Page --- */
+
+.ui-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-5) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.ui-page--wide {
+  max-width: none;
+}
+
+/* Page à fond dessiné (`PageBackdrop`) : le dessin couvre au moins l'écran et passe sous le contenu.
+   `:where` ne pèse rien : la position propre d'un enfant (collant, absolu) l'emporte. */
+.ui-page--backdrop {
+  position: relative;
+  min-height: calc(100dvh - var(--tabbar-h) - var(--inset-bottom));
+}
+
+:where(.ui-page--backdrop > :not(.page-backdrop)) {
+  position: relative;
+}
+
+.page-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Économe : pas de fond dessiné, ni courbes de niveau ni motif de famille. */
+:root[data-eco] .page-backdrop {
+  display: none;
+}
+
+.page-backdrop path {
+  fill: none;
+  stroke: var(--backdrop-ink);
+  /* Épaisseur à l'écran : la tuile agrandie de son espacement (`--backdrop-scale`) n'épaissit pas le trait. */
+  stroke-width: calc(var(--backdrop-stroke) / var(--backdrop-scale, 1));
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Encre et épaisseur de chaque fond, réglées à l'œil sur la maquette du 23/10 : la couleur de la famille,
+   celle de l'image donnée par l'utilisateur (surf, vélo), le gris bleuté des courbes de niveau. */
+.page-backdrop--contours {
+  --backdrop-ink: var(--contour);
+  --backdrop-stroke: 1.3;
+}
+
+.page-backdrop--contours .page-backdrop__major {
+  --backdrop-stroke: 2.4;
+}
+
+.page-backdrop--voile {
+  --backdrop-ink: color-mix(in srgb, var(--voile) 41%, transparent);
+  --backdrop-stroke: 1.65;
+}
+
+.page-backdrop--course {
+  --backdrop-ink: color-mix(in srgb, var(--course) 36%, transparent);
+  --backdrop-stroke: 4.2;
+}
+
+.page-backdrop--velo {
+  --backdrop-ink: color-mix(in srgb, var(--backdrop-velo) 47%, transparent);
+  --backdrop-stroke: 2.4;
+}
+
+.page-backdrop--surf {
+  --backdrop-ink: color-mix(in srgb, var(--backdrop-surf) 59%, transparent);
+  --backdrop-stroke: 2.85;
+}
+
+.page-backdrop--fractionne {
+  --backdrop-ink: color-mix(in srgb, var(--fractionne) 34%, transparent);
+  --backdrop-stroke: 3;
+}
+
+.page-backdrop .page-backdrop__dots {
+  --backdrop-stroke: 4;
+  stroke-dasharray: 0.1 12;
+}
+
+.page-backdrop .page-backdrop__thin {
+  --backdrop-stroke: 1.3;
+}
+
+/* À pied (« Relief et sentier », 28/10) : traits de la maquette × 1,4. Après les règles globales, à poids égal. */
+.page-backdrop--course .page-backdrop__dots {
+  --backdrop-stroke: 5.6;
+}
+
+.page-backdrop--course .page-backdrop__thin {
+  --backdrop-stroke: 1.8;
+}
+
+.page-backdrop .page-backdrop__fill {
+  fill: var(--backdrop-ink);
+  stroke: none;
+}
+
+.ui-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ui-page-header__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.ui-page-header h1 {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: var(--text-title);
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-spacing);
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.ui-page-header__subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-m);
+}
+
+.ui-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  color: var(--voile);
+  font-size: var(--text-m);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* --- Carte --- */
+
+.ui-card {
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  padding: var(--space-4) 18px;
+}
+
+.ui-card__title {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-title);
+  font-size: var(--text-l);
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-spacing);
+  text-transform: uppercase;
+}
+
+/* Intertitre dans un panneau ou une carte (« Tops distance », « Conditions ») : le style des titres, en plus petit. */
+.ui-subtitle {
+  font-family: var(--font-title);
+  font-size: var(--text-m);
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-spacing);
+  text-transform: uppercase;
+}
+
+.ui-eyebrow {
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: var(--title-spacing);
+}
+
+/* Aide grise sous un titre ou à la place d'une liste vide ; `--m` pour la bibliothèque, un cran plus grand. */
+.ui-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-s);
+}
+
+.ui-hint--m {
+  font-size: var(--text-m);
+  line-height: 1.5;
+}
+
+/* Carte blanche en colonne (graphe d'activités et répartition du Profil). */
+.ui-card-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+/* Pastille de couleur 10 × 10 devant un nom (légendes, lignes de statistiques). */
+.ui-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* Bandeau photo qui déborde des marges de la page (accueil, bibliothèque) ; hauteur, marges intérieures et ombre du texte restent à la page. */
+.ui-photo-banner {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) 0;
+  background-size: cover;
+  background-position: center;
+  color: var(--on-accent);
+}
+
+/* Fond d'une fenêtre modale (`Dialog`, `ActivitySelect`, `GearPicker`) : au-dessus de tout (`--z-dialog`). */
+.ui-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  background: color-mix(in srgb, var(--ink) 40%, transparent);
+}
+
+/* --- Boutons --- */
+
+.ui-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-pill);
+  /* Comme les boutons de l'accueil : capitales grasses, en petit. */
+  font-size: var(--text-s);
+  font-weight: var(--action-weight);
+  letter-spacing: var(--action-spacing);
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: filter 0.15s ease, background-color 0.15s ease;
+}
+
+/* Bouton tenu (appui long) : ni sélection du texte, ni menu du système, ni défilement, qui l'annuleraient (pointercancel). */
+.ui-btn--hold {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.ui-btn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+/* Bouton grisé qui n'est pas un `button` (un `label` porteur d'un sélecteur de fichiers). */
+.ui-btn--off {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Survol réservé aux pointeurs qui survolent : au toucher, il resterait collé jusqu'au toucher suivant (lot 143). */
+@media (hover: hover) {
+  .ui-btn:not(:disabled):hover {
+    filter: brightness(0.95);
+  }
+}
+
+.ui-btn--l {
+  min-height: 56px;
+  /* En capitales, un cran sous --text-l, et plus petit sur un écran étroit : « Suivre une trace » tient à côté de
+     « Démarrer ». */
+  font-size: clamp(var(--text-s), 4vw, var(--text-m));
+  padding: 0 clamp(var(--space-3), 4vw, var(--space-5));
+}
+
+.ui-btn--s {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-s);
+}
+
+.ui-btn--block {
+  display: flex;
+  width: 100%;
+}
+
+/* La couleur d'action vient du conteneur (`--btn-accent`, comme `--tab-accent`) : l'orange de l'Entraînement, sinon le bleu. */
+.ui-btn--primary {
+  background: var(--btn-accent, var(--voile));
+  color: var(--on-accent);
+}
+
+.ui-btn--record {
+  background: var(--record);
+  color: var(--on-accent);
+}
+
+.ui-btn--danger {
+  background: var(--recording);
+  color: var(--on-accent);
+}
+
+.ui-btn--secondary {
+  background: var(--surface);
+  border-color: var(--line-strong);
+  color: var(--ink-2);
+}
+
+.ui-btn--ghost {
+  background: transparent;
+  color: var(--voile);
+}
+
+/* Pictogramme d'enregistrement : disque blanc, rond rouge au centre (45 % du diamètre) ;
+   carré plein de la couleur du texte pendant l'enregistrement. */
+.ui-record-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle closest-side, var(--recording) 0 82%, var(--on-accent) 85%);
+}
+
+.ui-record-dot--stop {
+  border-radius: 3px;
+  background: currentColor;
+}
+
+/* --- Onglets de section des modules d'analyse --- */
+
+.ui-tabs {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.ui-tab {
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--text-s);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ui-tab::first-letter {
+  text-transform: uppercase;
+}
+
+/* Petite icône devant le libellé d'un onglet (activité). */
+.ui-tab__icon {
+  margin-right: var(--space-1);
+  vertical-align: -3px;
+}
+
+.ui-tab[aria-pressed='true'] {
+  background: var(--tab-accent, var(--voile));
+  border-color: var(--tab-accent, var(--voile));
+  color: var(--on-accent);
+}
+
+/* Rangée resserrée, sans trait dessous : dans une ligne de réglage ou un encart sur la carte. */
+.ui-tabs--compact {
+  gap: var(--space-1);
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+.ui-tabs--compact .ui-tab {
+  min-height: 28px;
+  padding: 0 var(--space-2);
+}
+
+/* --- Bouton glissant (`SegmentedControl`) : gouttière creuse, case blanche sous le choix --- */
+
+.ui-segmented {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-m);
+  background: var(--surface-sunken);
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* La case s'attrape au doigt ou à la souris : pas de sélection du texte en glissant. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ui-segmented::-webkit-scrollbar {
+  display: none;
+}
+
+.ui-segmented__thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  pointer-events: none;
+}
+
+.ui-segmented.is-ready .ui-segmented__thumb {
+  transition: transform 0.18s ease, width 0.18s ease;
+}
+
+/* Case tenue : elle suit le doigt sans retard ; elle glisse à sa place au lâcher. */
+.ui-segmented.is-ready.is-dragging .ui-segmented__thumb {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-segmented.is-ready .ui-segmented__thumb {
+    transition: none;
+  }
+}
+
+/* Marges et texte qui se resserrent sur un écran étroit (cinq familles tiennent dès 320 px) ; au-delà de la place,
+   la rangée défile. */
+.ui-segmented button {
+  position: relative;
+  flex: 1 0 auto;
+  min-height: 30px;
+  padding: 0 clamp(var(--space-1), 1.6vw, var(--space-2));
+  border: none;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: clamp(10px, 3.2vw, var(--text-xs));
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.18s;
+}
+
+/* Liste courte et fixe (`fit`) : les choix rétrécissent avec la place (texte d'Android agrandi) ; un mot long se coupe
+   à une césure, sur deux lignes, plutôt que de faire défiler la rangée. */
+.ui-segmented--fit button {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
+  hyphens: auto;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767.98px), (max-height: 499.98px) and (pointer: coarse) {
+  .ui-segmented--fit button {
+    line-height: 1.15;
+  }
+}
+
+/* Choix en couleur : le choix en cours, ou celui sous la case pendant qu'on la glisse. */
+.ui-segmented button.is-lit {
+  color: var(--seg-accent, var(--ink));
+}
+
+/* La case se prend sur le choix en cours : le geste horizontal est à elle, pas au défilement de la page. */
+.ui-segmented button[aria-checked='true'] {
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.ui-segmented.is-dragging,
+.ui-segmented.is-dragging button {
+  cursor: grabbing;
+}
+
+.ui-segmented button:focus-visible {
+  outline: 2px solid var(--seg-accent, var(--ink-2));
+  outline-offset: -2px;
+}
+
+/* --- Point d'interrogation qui déplie une explication (`HelpButton`) --- */
+
+.ui-help {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.ui-help--s {
+  width: 32px;
+  height: 32px;
+}
+
+.ui-help--xs {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+}
+
+@media (hover: hover) {
+  .ui-help:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.ui-help[aria-expanded='true'] {
+  color: var(--help-accent, var(--voile));
+}
+
+/* --- Menu « … » des actions de moindre usage (`MoreMenu`) --- */
+
+.ui-more {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.ui-more__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.ui-more__button[aria-expanded='true'] {
+  background: var(--surface-hover);
+}
+
+@media (hover: hover) {
+  .ui-more__button:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* Au-dessus des cartes Leaflet, comme le menu des sports de la barre du bas. */
+.ui-more__panel {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 240px;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--shadow-color) 18%, transparent);
+  font-size: var(--text-m);
+  font-weight: 400;
+  color: var(--ink);
+  text-align: left;
+  white-space: normal;
+}
+
+.ui-more__panel[hidden] {
+  display: none;
+}
+
+/* Les boutons posés dans le menu y deviennent des lignes à plat. */
+.ui-more__panel .ui-btn {
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.ui-more__panel .ui-btn svg {
+  flex-shrink: 0;
+}
+
+@media (hover: hover) {
+  .ui-more__panel .ui-btn:not(:disabled):not(.ui-btn--off):hover {
+    filter: none;
+    background: var(--surface-hover);
+  }
+}
+
+/* Ligne d'information en tête du menu (nombre de sessions, emplacement). */
+.ui-more__note {
+  display: block;
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-s);
+  line-height: 1.4;
+}
+
+/* --- Messages --- */
+
+.ui-alert {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-m);
+  font-size: var(--text-m);
+  line-height: 1.45;
+}
+
+.ui-alert--danger {
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
+  color: var(--danger-ink);
+}
+
+.ui-alert--warning {
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-line);
+}
+
+.ui-alert--success {
+  background: var(--success-soft);
+  border: 1px solid var(--success);
+}
+
+/* --- Barre d'enregistrement d'une session --- */
+
+.ui-savebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  color: var(--muted);
+  font-size: var(--text-s);
+}
+
+/* Modifications en attente : la barre reste visible en faisant défiler la page. */
+.ui-savebar--dirty {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-savebar);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--warning-line);
+  border-radius: var(--radius-m);
+  background: var(--warning-soft);
+  color: var(--ink);
+  font-size: var(--text-m);
+}
+
+.ui-savebar__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+@media (min-width: 768px) and (min-height: 500px), (min-width: 768px) and (pointer: fine), (min-width: 768px) and (pointer: none) {
+  .ui-savebar--dirty {
+    top: var(--topbar-h);
+  }
+}
+
+/* --- Champs --- */
+
+.ui-field {
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-m);
+}
+
+.ui-field--s {
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-s);
+}
+
+/* --- Graphes (Recharts) --- */
+
+/* Ce que Recharts peint de lui-même (trait des axes, graduations sans couleur donnée, bulle) suit le thème :
+   en clair, les mêmes valeurs que Recharts. Une graduation colorée par sa donnée garde sa couleur. */
+.recharts-cartesian-axis-line,
+.recharts-cartesian-axis-tick-line {
+  stroke: var(--chart-tick);
+}
+
+.recharts-cartesian-axis-tick-value[fill='#666'] {
+  fill: var(--chart-tick);
+}
+
+/* La bulle pose son fond blanc en ligne : seul `!important` passe devant. */
+.recharts-default-tooltip {
+  background-color: var(--surface) !important;
+  border-color: var(--line-strong) !important;
+  color: var(--ink);
+}
+
+/* --- Tableaux des panneaux d'analyse --- */
+
+/* Le tableau : pleine largeur, bordé, en petit. Les marges propres à sa place restent en ligne. */
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-s);
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+}
+
+/* Une ligne du corps : un trait fin au-dessus ; grisée quand sa valeur est nulle. */
+.ui-table__row {
+  border-top: 1px solid var(--line-soft);
+}
+
+.ui-table__row--empty {
+  opacity: 0.45;
+}
+
+/* Sur téléphone, un tableau `ui-table--cards` n'a plus d'en-tête : chaque ligne devient une carte en grille
+   (numéro à gauche, puis trois colonnes), dont la page donne les zones (`grid-template-areas`) par ses cellules. */
+@media (max-width: 767.98px), (max-height: 499.98px) and (pointer: coarse) {
+  .ui-table--cards thead {
+    display: none;
+  }
+
+  .ui-table--cards tbody tr {
+    display: grid;
+    grid-template-columns: 2em minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: center;
+    padding: 4px 0;
+  }
+
+  .ui-table--cards td {
+    padding: 2px 4px !important;
+    text-align: left !important;
+  }
+}
+
+/* --- Utilitaires ---
+   Les styles qui étaient recopiés en ligne dans le JSX (élément 160), à valeur égale : une propriété ou un petit motif
+   par classe, à poser à côté de celles de l'élément. En fin de feuille, ils passent devant une règle de même poids ;
+   un style qui dépend d'une valeur calculée (couleur d'une activité, largeur en %) reste en ligne. */
+
+/* Texte et couleur */
+.ui-bold {
+  font-weight: 700;
+}
+
+.ui-danger-text {
+  color: var(--danger);
+}
+
+.ui-muted {
+  color: var(--muted);
+}
+
+.ui-nowrap {
+  white-space: nowrap;
+}
+
+.ui-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--panel-title-size, var(--text-m));
+  cursor: pointer;
+  user-select: none;
+}
+
+.ui-panel-title__text {
+  font-family: var(--font-title);
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-spacing);
+  text-transform: uppercase;
+}
+
+.ui-pointer {
+  cursor: pointer;
+}
+
+.ui-semibold {
+  font-weight: 600;
+}
+
+.ui-session-date {
+  margin-left: 6px;
+  font-size: var(--text-s);
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.ui-sunken {
+  background-color: var(--surface-sunken);
+}
+
+.ui-text-m {
+  font-size: var(--text-m);
+}
+
+.ui-text-s {
+  font-size: var(--text-s);
+}
+
+.ui-text-xs {
+  font-size: var(--text-xs);
+}
+
+.ui-weight-normal {
+  font-weight: normal;
+}
+
+/* Marges et espacements */
+.ui-m-0 {
+  margin: 0;
+}
+
+.ui-mb-4 {
+  margin-bottom: 4px;
+}
+
+.ui-mb-6 {
+  margin-bottom: 6px;
+}
+
+.ui-mb-8 {
+  margin-bottom: 8px;
+}
+
+.ui-mb-10 {
+  margin-bottom: 10px;
+}
+
+.ui-mb-14 {
+  margin-bottom: 14px;
+}
+
+.ui-mb-15 {
+  margin-bottom: 15px;
+}
+
+.ui-ml-8 {
+  margin-left: 8px;
+}
+
+.ui-ml-auto {
+  margin-left: auto;
+}
+
+.ui-mt-4 {
+  margin-top: 4px;
+}
+
+.ui-mt-6 {
+  margin-top: 6px;
+}
+
+.ui-mt-8 {
+  margin-top: 8px;
+}
+
+.ui-mt-8-only {
+  margin: 8px 0 0;
+}
+
+.ui-mt-10 {
+  margin-top: 10px;
+}
+
+.ui-mt-12 {
+  margin-top: 12px;
+}
+
+.ui-my-8 {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.ui-my-10 {
+  margin: 10px 0;
+}
+
+.ui-p-20 {
+  padding: 20px;
+}
+
+.ui-pr-28 {
+  padding-right: 28px;
+}
+
+/* Rangées et colonnes */
+.ui-block {
+  display: block;
+}
+
+.ui-center {
+  align-items: center;
+}
+
+.ui-flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.ui-grow {
+  flex: 1;
+}
+
+.ui-inline-row-4 {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.ui-inline-row-6 {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.ui-min-w-0 {
+  min-width: 0;
+}
+
+.ui-no-shrink {
+  flex-shrink: 0;
+}
+
+.ui-row-4 {
+  display: flex;
+  gap: 4px;
+}
+
+.ui-row-6 {
+  display: flex;
+  gap: 6px;
+}
+
+.ui-row-8 {
+  display: flex;
+  gap: 8px;
+}
+
+.ui-row-10 {
+  display: flex;
+  gap: 10px;
+}
+
+.ui-row-15 {
+  display: flex;
+  gap: 15px;
+}
+
+.ui-row-18 {
+  display: flex;
+  gap: 18px;
+}
+
+.ui-row-s2 {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.ui-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-stack-1 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ui-stack-2 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ui-stack-3 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ui-stack-6 {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ui-stack-8 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ui-stack-10 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ui-wrap {
+  flex-wrap: wrap;
+}
+
+/* Tailles et défilement */
+.ui-chart-200 {
+  width: 100%;
+  height: 200px;
+}
+
+.ui-fill {
+  height: 100%;
+  width: 100%;
+}
+
+.ui-h-160 {
+  height: 160px;
+}
+
+.ui-max-520 {
+  max-width: 520px;
+}
+
+.ui-overflow-hidden {
+  overflow: hidden;
+}
+
+.ui-overflow-x {
+  overflow-x: auto;
+}
+
+.ui-scroll-x {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.ui-w-180 {
+  width: 180px;
+}
+
+/* Champs */
+.ui-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: var(--text-s);
+}
+
+.ui-field-row__label {
+  width: 190px;
+}
+
+.ui-input-num {
+  width: 68px;
+  text-align: right;
+}
+
+/* Cellules de tableau */
+.ui-cell {
+  padding: 0.4em 0.6em;
+}
+
+.ui-cell--bold {
+  font-weight: 700;
+}
+
+.ui-cell--center {
+  text-align: center;
+}
+
+.ui-cell--left {
+  text-align: left;
+}
+
+.ui-cell-tight {
+  padding: 0.35em 0.5em;
+  text-align: center;
+  white-space: nowrap;
+}
+

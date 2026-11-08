@@ -1,0 +1,365 @@
+/* Enregistrer sur un téléphone tourné (lot 5 b des demandes du 23/10). En cours : la carte fixe à droite, sur toute
+   la hauteur ; à sa gauche, Pause, Arrêter, Note et le cadenas, les grands chiffres, puis la carte « En cours » qui
+   défilent. Au repos : le choix à gauche, Démarrer et Suivre une trace à droite. Rien ne change droit. */
+@media (orientation: landscape) and (max-height: 499.98px) and (pointer: coarse) {
+  .rec-page .ui-page-header__subtitle {
+    display: none;
+  }
+
+  .ui-page.rec-page:has(.rec-map) {
+    /* Les chiffres demandent moins de place que des panneaux : la carte garde de quoi loger zoom et « Réduire la carte ». */
+    --rec-map-w: clamp(calc(var(--land-w) * 0.45), calc(var(--land-w) - var(--land-side-min)), calc(var(--land-w) * 0.5));
+    max-width: none;
+    margin: 0;
+    padding-right: calc(var(--rec-map-w) + var(--space-3));
+  }
+
+  .rec-map {
+    position: fixed;
+    z-index: 0;
+    top: calc(var(--shell-top) + var(--space-3));
+    bottom: calc(var(--space-3) + var(--inset-bottom));
+    right: calc(var(--inset-right) + var(--space-3));
+    width: calc(var(--rec-map-w) - var(--space-3));
+  }
+
+  .rec-map > div {
+    height: 100% !important;
+  }
+
+  /* Dénivelé de la trace suivie : fixé en bas de la colonne de droite, la carte raccourcie d'autant. Carte réduite, il
+     reste dans le flux. */
+  .ui-page.rec-page:has(.rec-map):has(.rec-elevation) {
+    /* Le graphe (96 px, `FollowedElevation`), sa ligne de lecture et la ligne du reste à monter, en tailles de texte. */
+    --rec-elevation-h: calc(96px + 3em + 2 * var(--space-2));
+  }
+
+  .rec-page:has(.rec-map) .rec-elevation {
+    position: fixed;
+    z-index: 0;
+    bottom: calc(var(--space-3) + var(--inset-bottom));
+    right: calc(var(--inset-right) + var(--space-3));
+    width: calc(var(--rec-map-w) - var(--space-3));
+    height: var(--rec-elevation-h);
+    padding: var(--space-2) var(--space-3);
+    overflow: hidden;
+  }
+
+  .rec-page:has(.rec-map) .rec-elevation > .ui-mt-10 {
+    margin-top: 0;
+  }
+
+  .rec-page:has(.rec-elevation) .rec-map {
+    bottom: calc(var(--space-3) + var(--inset-bottom) + var(--rec-elevation-h) + var(--space-2));
+  }
+
+  .ui-page.rec-page:not(:has(.rec-map)) {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
+  }
+
+  .rec-page:not(:has(.rec-map)) > * {
+    grid-column: 1 / -1;
+  }
+
+  .rec-page:not(:has(.rec-map)) > .ui-page-header {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .rec-page:not(:has(.rec-map)) > .rec-options {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .rec-page:not(:has(.rec-map)) > .rec-actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    flex-direction: column;
+  }
+
+  .rec-page:not(:has(.rec-map)) > .rec-actions > * {
+    flex: none !important;
+    min-height: 56px;
+  }
+
+  /* Petit téléphone tourné : pas la place de deux colonnes, la page s'empile comme droite. */
+  @media (max-width: 699.98px) {
+    .ui-page.rec-page:not(:has(.rec-map)) {
+      display: flex;
+    }
+  }
+}
+
+/* Téléphone debout, dénivelé ouvert pendant un enregistrement : carte et graphe tiennent à l'écran, les chiffres
+   passent dessous. La carte prend ce qui reste au-dessus de la barre du bas (`useRecMapFit` donne son haut et la hauteur
+   du graphe), sans dépasser sa hauteur ordinaire. Le reste de la page se resserre comme sur le téléphone tourné. */
+.ui-page.rec-page--fit {
+  /* Zoom et choix du fond finissent à 120 px du haut de la carte : ils restent dedans, avec la position sous les yeux. */
+  --rec-map-min-h: 140px;
+}
+
+.rec-page--fit .ui-page-header__subtitle {
+  display: none;
+}
+
+/* Le nom de la trace sur sa ligne, les boutons dessous, plutôt que le nom étroit sur quatre lignes. */
+.rec-page--fit .rec-follow > .ui-grow {
+  flex-basis: calc(100% - 28px);
+}
+
+.rec-page--fit .rec-map > div {
+  box-sizing: border-box;
+  height: min(45vh, max(var(--rec-map-min-h), calc(100dvh - var(--tabbar-h) - var(--inset-bottom) - var(--space-3)
+    - var(--rec-fit-elevation, 0px) - var(--space-5) - var(--rec-fit-top, 0px)))) !important;
+}
+
+.rec-page--fit .rec-elevation {
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+.rec-page--fit .rec-elevation > .ui-mt-10 {
+  margin-top: 0;
+}
+
+/* Ce qui reste à monter, sous le graphe de dénivelé de la trace suivie. */
+.rec-elevation__gain {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-s);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Ligne d'état de l'enregistrement (source du GPS, activité), sous « Note » et au-dessus de la carte : visible carte
+   ouverte. */
+.rec-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.rec-status__source {
+  color: var(--muted);
+  font-size: var(--text-s);
+}
+
+.rec-status__activity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* Tuile « BPM » de la carte « En cours » : allongée, sur une ligne, au-dessus de Durée et Vitesse, dans le style des
+   tuiles. */
+.rec-bpm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  padding: 14px 16px;
+  border-radius: var(--radius-m);
+  background: var(--bg);
+}
+
+.rec-bpm__label {
+  color: var(--muted);
+  font-size: var(--text-s);
+}
+
+.rec-bpm__value {
+  font-size: var(--text-display);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rec-bpm__state {
+  min-width: 0;
+  font-size: var(--text-s);
+  text-align: right;
+}
+
+/* Course à bornes en cours, sous la tuile BPM (05/11) : la bande et « Modifier » ; boutons de sa fenêtre.
+   Même ligne pour « Arrêter de chercher » une ceinture perdue (lot 198). */
+.rec-band,
+.rec-belt-stop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-s);
+}
+
+.rec-band__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* Matériel choisi à la fin de la session, avant « Analyser » (lot 143, 131). */
+.rec-end-gear {
+  margin-bottom: var(--space-3);
+}
+
+.rec-end-gear__title {
+  display: block;
+  margin-bottom: var(--space-2);
+}
+
+/* Styles sortis du JSX (élément 160), à valeur égale ; les utilitaires communs sont dans `ui.css`. */
+
+.rec-action-btn {
+  flex: 1 1 130px;
+}
+
+.rec-actions-note {
+  margin: 0;
+  flex-basis: 100%;
+  font-size: var(--text-s);
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.rec-break-all {
+  word-break: break-all;
+}
+
+.rec-footnote {
+  margin: 0;
+  font-size: var(--text-s);
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.rec-grid-fit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.rec-indent {
+  margin-left: 26px;
+}
+
+.rec-lead {
+  margin: 0 0 var(--space-3);
+  line-height: 1.5;
+}
+
+.rec-leg-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.rec-leg-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.rec-link-start {
+  font-size: var(--text-s);
+  align-self: flex-start;
+}
+
+.rec-live-label {
+  font-size: var(--text-m);
+  color: var(--muted);
+  min-width: 0;
+}
+
+.rec-live-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.rec-live-value {
+  font-size: var(--text-display);
+  font-weight: 700;
+  line-height: 1.15;
+  min-width: 0;
+  text-align: right;
+}
+
+.rec-mark-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.rec-mark-aim {
+  font-size: var(--text-display);
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.rec-mark-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  flex-wrap: wrap;
+}
+
+.rec-mark-text {
+  flex: 1 1 12em;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rec-replay-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-left: 24px;
+}
+
+.rec-saved-text {
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.rec-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  background: var(--bg);
+}
+
+.rec-stat__value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.rec-summary {
+  cursor: pointer;
+  margin-bottom: var(--space-2);
+}
+
+.rec-test-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: var(--text-m);
+}
+
+.rec-tool-shadow {
+  box-shadow: var(--shadow-tool);
+}
+

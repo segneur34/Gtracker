@@ -1,0 +1,461 @@
+// Banc de test : graphes repliables un par un et graphe d'altitude de l'onglet « zones de pente »
+// (demandes du 16/10, 16:32 et 16:37).
+// Usage : node graphes.mjs <port> [<dossier des captures>]
+// Sur un profil neuf, sans réseau. Dure environ 1 min 30. Le script :
+//  1. importe une course (FC et altitude qui monte puis descend), une session de surf avec la FC et une session de
+//     voile (`make-gpx.mjs`) avec la FC ;
+//  2. course : onglets dans l'ordre voulu (« graphiques » à la place des zones, « cardio » derrière lui), trois
+//     replis (Vitesse, Altitude, FC) ; replier l'altitude retire son graphe, sa légende et « Voir sur la carte »,
+//     rapetisse le panneau, et reste replié après rechargement ;
+//  3. mode superposé : la même rangée de replis ; une série repliée n'est pas tracée ; tout replié, plus de graphe ;
+//  4. onglet « zones de pente » : le tableau puis le graphe d'altitude, son repli ; le survol pose le repère sur la
+//     carte ; « Voir sur la carte » colore la trace par la pente (légende de pente sur la carte), qui revient à la
+//     vitesse quand aucun graphe d'altitude n'est plus montré ;
+//  5. surf : replis Vitesse et FC ; voile : replis des trois graphes, titre gardé, état retenu ;
+//  6. à 390×844 : la course, graphes et zones ouverts, sans débordement.
+//  Au passage (lot 60) : le graphe de vitesse de la course zoomé par un double-clic, graduations relevées
+//  (abscisse des trois graphes, ordonnée de la vitesse), capture `graphes-zoom`, puis « Tout voir ».
+//  Lot 61 : noms des graphes de la voile (texte sans tenir compte de la casse, couleur et taille relevées), nom du
+//  vent ; survol de la vitesse en voile et en surf, curseur sur la FC (échec attendu avant le lot 61) ; une sortie à
+//  sprints de 2 h à 1 Hz, pic de FC et creux de cadence de 6 s entre deux points du pas régulier : le haut de l'axe
+//  de FC atteint le pic, le bas de celui de la cadence le creux (échecs attendus avant le lot 61), capture
+//  `graphes-sprints`.
+//  Lot 93 : clic sur le graphe de vitesse de la course puis sortie de la souris : le repère de la carte s'efface.
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { connect } from './lib/cdp.mjs';
+import { ONGLETS } from './lib/onglets.mjs';
+
+const [port, shotDir] = process.argv.slice(2);
+if (!port) {
+  console.error('Usage : node graphes.mjs <port> [<dossier des captures>]');
+  process.exit(1);
+}
+const { send, evaluate, go, settle, waitFor, wait, blockNetwork, importGpx, records, shoot, check, finish, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
+const overflow = () => evaluate(`document.documentElement.scrollWidth - document.documentElement.clientWidth`);
+
+const tabLabels = () => evaluate(`[...document.querySelectorAll('.an-carte-col .ui-tab')].map((t) => t.textContent.trim()).join(' | ')`);
+const clickTab = (label, close = false) => evaluate(`(() => {
+  const t = [...document.querySelectorAll('.an-carte-col .ui-tab')].find((x) => x.textContent.trim() === ${JSON.stringify(label)});
+  if (!t) return 'absent';
+  const isOpen = t.getAttribute('aria-pressed') === 'true';
+  if (isOpen !== ${close}) return isOpen ? 'déjà ouvert' : 'déjà fermé';
+  t.click(); return 'ok';
+})()`);
+/** Le panneau dont le titre commence ainsi. */
+const SCOPE = (title) => `([...document.querySelectorAll('.an-carte-panels [role=button]')].find((h) => h.textContent.trim().startsWith(${JSON.stringify(title)}))?.closest('.an-carte-panels > *') ?? null)`;
+const chartsIn = (title) => evaluate(`(() => { const s = ${SCOPE(title)}; return s ? s.querySelectorAll('.recharts-surface').length : -1; })()`);
+const areasIn = (title) => evaluate(`(() => { const s = ${SCOPE(title)}; return s ? s.querySelectorAll('.recharts-area').length : -1; })()`);
+const linesIn = (title) => evaluate(`(() => { const s = ${SCOPE(title)}; return s ? s.querySelectorAll('.recharts-line').length : -1; })()`);
+/** Texte du panneau tel qu'écrit : `innerText` rendrait les capitales de la refonte (boutons, noms des graphes). */
+const textIn = (title) => evaluate(`(() => { const s = ${SCOPE(title)}; return s ? s.textContent : ''; })()`);
+const heightOf = (title) => evaluate(`(() => { const s = ${SCOPE(title)}; return s ? Math.round(s.getBoundingClientRect().height) : -1; })()`);
+/** Boutons de repli du panneau : nom et état. */
+const folds = (title) => evaluate(`(() => { const s = ${SCOPE(title)}; return s ? [...s.querySelectorAll('[data-chart-fold]')].map((b) => b.textContent.trim() + (b.getAttribute('aria-expanded') === 'true' ? '+' : '-')).join(' ') : '(absent)'; })()`);
+const fold = (title, label) => evaluate(`(() => {
+  const s = ${SCOPE(title)};
+  const b = s ? [...s.querySelectorAll('[data-chart-fold]')].find((x) => x.textContent.trim() === ${JSON.stringify(label)}) : null;
+  if (!b) return 'absent'; b.click(); return 'ok';
+})()`);
+const clickButton = (title, label) => evaluate(`(() => {
+  const s = ${SCOPE(title)};
+  const b = s ? [...s.querySelectorAll('button')].find((x) => x.textContent.trim() === ${JSON.stringify(label)}) : null;
+  if (!b) return 'absent'; b.click(); return 'ok';
+})()`);
+/** Légende de pente posée sur la carte (« … % pente »). */
+const gradeLegendOnMap = () => evaluate(`[...document.querySelectorAll('.an-map-row .speed-legend')].some((l) => l.textContent.includes('% pente'))`);
+const hoverMarkers = () => evaluate(`document.querySelectorAll('.an-map-row path[stroke="#1b1f24"]').length`);
+const hoverChart = (title, nth) => evaluate(`(async () => {
+  const s = ${SCOPE(title)};
+  const el = s ? s.querySelectorAll('.recharts-wrapper')[${nth}] : null;
+  if (!el) return 'absent';
+  el.scrollIntoView({ block: 'center' });
+  await new Promise((r) => requestAnimationFrame(() => r()));
+  const r = el.getBoundingClientRect();
+  for (let k = 0; k < 5; k++) {
+    el.querySelector('.recharts-surface').dispatchEvent(new MouseEvent('mousemove', { clientX: r.left + 80 + k * 20, clientY: r.top + r.height / 2, bubbles: true }));
+    await new Promise((res) => requestAnimationFrame(() => res()));
+  }
+  return 'ok';
+})()`);
+/** Le n-ième graphe zoomable du panneau. */
+const CHART = (title, nth) => `(${SCOPE(title)}?.querySelectorAll('.zoom-chart')[${nth}] ?? null)`;
+/** Graduations d'un axe (`xAxis` ou `yAxis`) du n-ième graphe. */
+const ticks = (title, nth, axis = 'xAxis') => evaluate(`(() => { const c = ${CHART(title, nth)}; return c ? [...c.querySelectorAll('.recharts-${axis}-tick-labels .recharts-cartesian-axis-tick-value')].map((t) => t.textContent.trim()).join(' | ') : '(absent)'; })()`);
+const zoomButtons = (title, nth) => evaluate(`(() => { const c = ${CHART(title, nth)}; return c ? [...c.querySelectorAll('.zoom-chart__map, .zoom-chart__actions button')].map((b) => b.textContent.trim()).join(' | ') : '(absent)'; })()`);
+const clickZoomButton = (title, nth, label) => evaluate(`(() => {
+  const c = ${CHART(title, nth)};
+  const b = c ? [...c.querySelectorAll('.zoom-chart__map, .zoom-chart__actions button')].find((x) => x.textContent.trim() === ${JSON.stringify(label)}) : null;
+  if (!b) return 'absent'; b.click(); return 'ok';
+})()`);
+/** Double-clic au milieu de la zone de tracé du n-ième graphe, graphe ramené au milieu de l'écran (comme `zoom-carte.mjs`). */
+const doubleClick = async (title, nth, fx) => {
+  const p = await evaluate(`(async () => {
+    const c = ${CHART(title, nth)};
+    if (!c) return null;
+    c.scrollIntoView({ block: 'center' });
+    await new Promise((r) => setTimeout(r, 300));
+    const r = (c.querySelector('.recharts-cartesian-grid') ?? c).getBoundingClientRect();
+    return { x: r.left + r.width * ${fx}, y: r.top + r.height / 2 };
+  })()`);
+  if (!p) return 'absent';
+  const mouse = (type, clickCount = 1) => send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount });
+  await mouse('mouseMoved');
+  await mouse('mousePressed', 1);
+  await mouse('mouseReleased', 1);
+  await mouse('mousePressed', 2);
+  await mouse('mouseReleased', 2);
+  await settle({ max: 800 });
+  return 'ok';
+};
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
+await blockNetwork();
+
+// --- Sessions synthétiques ---
+/** Course en ligne droite, altitude qui monte de 0 à 40 % du temps à 8 %, puis redescend. */
+const runGpx = (seconds, speed, t0, hrAt) => {
+  const lat = 43.7;
+  const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
+  const pts = [];
+  let m = 0;
+  let ele = 50;
+  for (let k = 0; k <= seconds; k++) {
+    if (k > 0) { m += speed; ele += (k < seconds * 0.4 ? 0.08 : -0.05) * speed; }
+    const hr = hrAt ? `<gpxtpx:TrackPointExtension><gpxtpx:hr>${Math.round(hrAt(k))}</gpxtpx:hr></gpxtpx:TrackPointExtension>` : '';
+    pts.push(`<trkpt lat="${lat}" lon="${(3.85 + m / mPerDegLon).toFixed(7)}"><ele>${ele.toFixed(1)}</ele><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${speed}</speed>${hr}</extensions></trkpt>`);
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"><trk><name>Côte</name><type>running</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
+};
+const M_PER_DEG_LAT = 111_195;
+const surfGpx = (startMs, phases, hrAt) => {
+  let lat = 43.4;
+  let lon = 3.6;
+  let t = 0;
+  const pts = [];
+  const push = (speed, heading) => pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><time>${new Date(startMs + t * 1000).toISOString()}</time>`
+    + `<extensions><speed>${speed}</speed>${speed > 0 ? `<course>${heading}</course>` : ''}<gpxtpx:TrackPointExtension><gpxtpx:hr>${Math.round(hrAt(t))}</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions></trkpt>`);
+  push(0, 0);
+  for (const [s, speed, heading = 0] of phases) {
+    for (let k = 0; k < s; k++) {
+      lat += (speed * Math.cos((heading * Math.PI) / 180)) / M_PER_DEG_LAT;
+      lon += (speed * Math.sin((heading * Math.PI) / 180)) / (M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
+      t += 1;
+      push(speed, heading);
+    }
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"><trk><name>Matinée</name><type>surf</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
+};
+const MORNING = [
+  [60, 0], [60, 1.2], [50, 1], [4, 0.1], [40, 1], [4, 0.1], [26, 1], [90, 0.1],
+  [6, 1.6, 180], [12, 5, 200], [100, 1], [60, 0.1],
+  [5, 1.5, 180], [6, 6, 160], [2, 6, 250], [2, 6, 120], [10, 6, 160], [40, 1],
+];
+const withHr = (gpx, hrAt) => {
+  let k = 0;
+  return gpx
+    .replace('xmlns="http://www.topografix.com/GPX/1/1"', 'xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"')
+    .replace(/<\/extensions><\/trkpt>/g, () => `<gpxtpx:TrackPointExtension><gpxtpx:hr>${Math.round(hrAt(k++))}</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions></trkpt>`);
+};
+const voilePath = join(tmpdir(), 'graphes-voile.gpx');
+execFileSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'make-gpx.mjs'), voilePath]);
+
+/**
+ * Sortie à sprints de `seconds` s à 1 Hz (60 s à 5 m/s toutes les 5 min, sinon 2,5 m/s), FC de 140 ± 10 et cadence de
+ * 85 foulées par minute ; un pic de FC à 200 et un creux de cadence à 60, de 6 s chacun, posés à 3 s après un point
+ * du pas régulier des graphes (15 s pour 7 201 points), hors des sprints : tracés seulement si chaque série garde ses
+ * extrêmes.
+ */
+const sprintGpx = (seconds, t0) => {
+  const lat = 43.6;
+  const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
+  const peak = 15 * 210 + 3;
+  const dip = 15 * 390 + 3;
+  const pts = [];
+  let m = 0;
+  for (let k = 0; k <= seconds; k++) {
+    const speed = k % 300 < 60 ? 5 : 2.5;
+    if (k > 0) m += speed;
+    const hr = k >= peak && k < peak + 6 ? 200 : 140 + 10 * Math.sin(k / 300);
+    const cad = k >= dip && k < dip + 6 ? 60 : 85;
+    pts.push(`<trkpt lat="${lat}" lon="${(3.8 + m / mPerDegLon).toFixed(7)}"><ele>40</ele><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${speed}</speed><gpxtpx:TrackPointExtension><gpxtpx:hr>${Math.round(hr)}</gpxtpx:hr><gpxtpx:cad>${cad}</gpxtpx:cad></gpxtpx:TrackPointExtension></extensions></trkpt>`);
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"><trk><name>Sprints</name><type>running</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
+};
+
+const T_RUN = Date.UTC(2026, 9, 1, 8, 0, 0);
+const T_SURF = Date.UTC(2026, 9, 3, 7, 0, 0);
+const T_VOILE = Date.UTC(2026, 8, 20, 13, 0, 0);
+const T_SPRINTS = Date.UTC(2026, 9, 2, 17, 0, 0);
+const SESSIONS = [
+  { key: 'course', page: 'course', start: T_RUN, gpx: runGpx(1800, 3, T_RUN, (k) => 130 + k / 60) },
+  { key: 'surf', page: 'surf', start: T_SURF, gpx: surfGpx(T_SURF, MORNING, (k) => 110 + 20 * Math.sin(k / 120)) },
+  { key: 'voile', page: 'voile', start: T_VOILE, gpx: withHr(readFileSync(voilePath, 'utf8'), (k) => 120 + 25 * Math.sin(k / 300)) },
+  { key: 'sprints', page: 'course', start: T_SPRINTS, gpx: sprintGpx(7200, T_SPRINTS) },
+];
+
+// --- 1. Import ---
+const paths = {};
+for (const s of SESSIONS) {
+  await go(`/${s.page}`, 3000);
+  console.log(`import ${s.key} :`, await importGpx(s.gpx, `${s.key}.gpx`));
+  // L'écriture en mémoire ne touche ni au DOM ni au réseau : la fiche est attendue, puis sa réécriture différée.
+  const rec = await waitFor(async () => (await records())?.find((r) => Math.abs((r.summary?.startMs ?? 0) - s.start) < 2000), { timeout: 6000, label: `fiche ${s.key}` });
+  await settle({ max: 2000, label: `import ${s.key}` });
+  paths[s.key] = `/${s.page}/analyse?session=${encodeURIComponent(rec?.gpx ?? '')}`;
+  check(`${s.key} rangée`, Boolean(rec));
+}
+
+// --- 2. Course : ordre, replis en mode séparé ---
+await go(paths.course, 6000);
+const labels = await tabLabels();
+check(`course : ordre des onglets (${labels})`, labels.startsWith('général | avancé | graphiques | cardio | surface | énergie | zones de pente'));
+console.log('  graphiques :', await clickTab('graphiques'));
+await settle({ max: 1500 });
+check(`course : trois replis ouverts (${await folds('Graphiques')})`, (await folds('Graphiques')) === 'Vitesse+ Altitude+ FC+');
+check(`course : trois graphes (${await chartsIn('Graphiques')})`, (await chartsIn('Graphiques')) === 3);
+check('course : « Voir sur la carte » sous l\'altitude', (await textIn('Graphiques')).includes('Voir sur la carte'));
+const tall = await heightOf('Graphiques');
+console.log('  replier Altitude :', await fold('Graphiques', 'Altitude'));
+await settle({ max: 1000 });
+check(`course : altitude repliée, deux graphes (${await chartsIn('Graphiques')})`, (await chartsIn('Graphiques')) === 2);
+check('course : légende de pente et « Voir sur la carte » repliées avec elle', !(await textIn('Graphiques')).includes('Voir sur la carte'));
+const short = await heightOf('Graphiques');
+check(`course : le panneau rapetisse (${tall} → ${short} px)`, short < tall - 100);
+await shoot('graphes-course-replie');
+await go(paths.course, 6000);
+check(`course : repli retenu après rechargement (${await folds('Graphiques')})`, (await folds('Graphiques')) === 'Vitesse+ Altitude- FC+');
+
+// --- 3. Mode superposé ---
+console.log('  Superposés :', await clickButton('Graphiques', 'Superposés'));
+await settle({ max: 1200 });
+check(`superposé : un graphe, rangée de replis (${await chartsIn('Graphiques')}, ${await folds('Graphiques')})`, (await chartsIn('Graphiques')) === 1 && (await folds('Graphiques')) === 'Vitesse+ Altitude- FC+');
+check(`superposé : altitude repliée, pas d'aire (${await areasIn('Graphiques')}), deux courbes (${await linesIn('Graphiques')})`, (await areasIn('Graphiques')) === 0 && (await linesIn('Graphiques')) === 2);
+await fold('Graphiques', 'Altitude');
+await settle({ max: 800 });
+check(`superposé : altitude rendue (${await areasIn('Graphiques')} aire)`, (await areasIn('Graphiques')) === 1);
+await fold('Graphiques', 'FC');
+await settle({ max: 800 });
+check(`superposé : FC repliée, une courbe (${await linesIn('Graphiques')})`, (await linesIn('Graphiques')) === 1);
+await fold('Graphiques', 'Vitesse');
+await fold('Graphiques', 'Altitude');
+await settle({ max: 800 });
+check(`superposé : tout replié, plus de graphe (${await chartsIn('Graphiques')})`, (await chartsIn('Graphiques')) === 0);
+await fold('Graphiques', 'Vitesse');
+await fold('Graphiques', 'Altitude');
+await fold('Graphiques', 'FC');
+console.log('  Séparés :', await clickButton('Graphiques', 'Séparés'));
+await settle({ max: 800 });
+check(`séparé : tout rouvert (${await folds('Graphiques')}, ${await chartsIn('Graphiques')} graphes)`, (await folds('Graphiques')) === 'Vitesse+ Altitude+ FC+' && (await chartsIn('Graphiques')) === 3);
+
+// Graphe de vitesse zoomé (lot 60) : graduations relevées, à comparer avant et après un changement des graphes.
+const ticksBefore = await ticks('Graphiques', 0);
+console.log(`  graduations avant le zoom : ${ticksBefore}`);
+console.log('  double-clic sur la vitesse :', await doubleClick('Graphiques', 0, 0.5));
+for (const k of [0, 1, 2]) console.log(`  graphe ${k + 1} zoomé : abscisse ${await ticks('Graphiques', k)} ; ordonnée ${await ticks('Graphiques', k, 'yAxis')}`);
+check(`zoomé : graduations changées, « Tout voir » paru (${await zoomButtons('Graphiques', 0)})`,
+  (await ticks('Graphiques', 0)) !== ticksBefore && (await zoomButtons('Graphiques', 0)).includes('Tout voir'));
+await shoot('graphes-zoom');
+console.log('  Tout voir :', await clickZoomButton('Graphiques', 0, 'Tout voir'));
+await settle({ max: 800 });
+check(`« Tout voir » : graduations rendues (${await ticks('Graphiques', 0)})`, (await ticks('Graphiques', 0)) === ticksBefore);
+
+// Lot 93 : un clic sur un graphe lui donne le focus, et la couche clavier de Recharts (accessibilityLayer) active alors
+// le premier point (curseur et point actif posés dessus) ; si la souris est hors du tracé (graduations, marges), le
+// moindre mouvement ramène le repère de la carte au premier point affiché. Le repère doit rester où le survol l'a
+// laissé, et le graphe ne doit ni prendre le focus ni afficher de curseur à l'insu de la souris.
+{
+  // Page rechargée : le double-clic du zoom, plus haut, a déjà donné le focus au graphe.
+  await go(paths.course, 6000);
+  await clickTab('graphiques');
+  await settle({ max: 1500 });
+  const p = await evaluate(`(async () => {
+    const c = ${CHART('Graphiques', 0)};
+    if (!c) return null;
+    c.scrollIntoView({ block: 'center' });
+    await new Promise((r) => setTimeout(r, 300));
+    const r = (c.querySelector('.recharts-cartesian-grid') ?? c).getBoundingClientRect();
+    return { trace: { x: r.left + r.width * 0.6, y: r.top + r.height / 2 }, graduations: { x: r.left - 12, y: r.top + r.height / 2 } };
+  })()`);
+  const mouse = (type, pt, clickCount = 0) => send('Input.dispatchMouseEvent', { type, x: pt.x, y: pt.y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount });
+  /** Le repère de la carte tel que dessiné (sa position suit le point survolé). */
+  const marker = () => evaluate(`[...document.querySelectorAll('.an-map-row path[stroke="#1b1f24"]')].map((m) => m.getAttribute('d') + '|' + JSON.stringify(m.getBoundingClientRect())).join(';')`);
+  /** Curseurs de survol et points actifs dessinés dans les graphes de la page. */
+  const cursors = () => evaluate(`document.querySelectorAll('.recharts-tooltip-cursor').length + document.querySelectorAll('.recharts-active-dot').length`);
+  check('premier point : graphe de vitesse trouvé', Boolean(p));
+  if (p) {
+    // Le survol pose le repère, puis la souris passe sur les graduations, où le repère reste.
+    for (const dx of [-30, -10, 0]) await mouse('mouseMoved', { x: p.trace.x + dx, y: p.trace.y });
+    await wait(300);
+    check(`premier point : le survol pose le repère sur la carte (${await hoverMarkers()})`, (await hoverMarkers()) === 1);
+    for (const dx of [0, 3]) await mouse('mouseMoved', { x: p.graduations.x + dx, y: p.graduations.y });
+    await wait(300);
+    const laisse = await marker();
+    // Clic sur une graduation, puis quelques mouvements de la souris sur elles.
+    await mouse('mousePressed', p.graduations, 1);
+    await mouse('mouseReleased', p.graduations, 1);
+    for (const dy of [0, 3, 6]) await mouse('mouseMoved', { x: p.graduations.x, y: p.graduations.y + dy });
+    await wait(500);
+    const focus = await evaluate(`(() => { const a = document.activeElement; return a ? a.tagName + ' tabindex=' + a.getAttribute('tabindex') : ''; })()`);
+    const apres = await marker();
+    console.log(`  après le clic sur une graduation : focus ${focus}, ${await cursors()} curseur(s) et point(s) actif(s), repère ${apres === laisse ? 'resté où il était' : 'déplacé'}`);
+    check('premier point : un clic sur une graduation ne ramène pas le repère au premier point', apres === laisse);
+    check(`premier point : le graphe ne prend pas le focus au clavier (${focus})`, !focus.includes('tabindex=0'));
+    check(`premier point : aucun curseur ni point actif hors du tracé (${await cursors()})`, (await cursors()) === 0);
+    await mouse('mouseMoved', { x: 5, y: 5 });
+  }
+}
+
+// --- 4. Zones de pente ---
+console.log('  graphiques fermé :', await clickTab('graphiques', true));
+console.log('  zones de pente :', await clickTab('zones de pente'));
+await settle({ max: 1500 });
+const zonesText = await textIn('Allure par zone de pente');
+check('zones : le tableau puis le graphe d\'altitude', zonesText.indexOf('Montée raide') >= 0 && zonesText.indexOf('Montée raide') < zonesText.indexOf('Voir sur la carte'));
+check(`zones : un graphe, son repli (${await chartsIn('Allure par zone de pente')}, ${await folds('Allure par zone de pente')})`, (await chartsIn('Allure par zone de pente')) === 1 && (await folds('Allure par zone de pente')) === 'Tableau+ Altitude+');
+check(`zones : pas de repère avant le survol (${await hoverMarkers()})`, (await hoverMarkers()) === 0);
+console.log('  survol :', await hoverChart('Allure par zone de pente', 0));
+await wait(500);
+check(`zones : le survol pose le repère sur la carte (${await hoverMarkers()})`, (await hoverMarkers()) === 1);
+check('zones : la carte a la légende de vitesse', !(await gradeLegendOnMap()));
+console.log('  Voir sur la carte :', await clickButton('Allure par zone de pente', 'Voir sur la carte'));
+await settle({ max: 1000 });
+check('zones : « Voir sur la carte » colore la trace par la pente', await gradeLegendOnMap());
+await shoot('graphes-zones-pente');
+await fold('Allure par zone de pente', 'Tableau');
+await wait(500);
+check('zones : tableau replié, graphe gardé', !(await textIn('Allure par zone de pente')).includes('Montée raide') && (await chartsIn('Allure par zone de pente')) === 1);
+await fold('Allure par zone de pente', 'Tableau');
+await wait(500);
+check('zones : tableau rendu', (await textIn('Allure par zone de pente')).includes('Montée raide'));
+await fold('Allure par zone de pente', 'Altitude');
+await settle({ max: 800 });
+check(`zones : graphe replié (${await chartsIn('Allure par zone de pente')}), la carte revient à la vitesse`, (await chartsIn('Allure par zone de pente')) === 0 && !(await gradeLegendOnMap()));
+await fold('Allure par zone de pente', 'Altitude');
+await settle({ max: 800 });
+check('zones : déplié, la pente revient sur la carte (bouton resté enfoncé)', await gradeLegendOnMap());
+console.log('  zones fermé :', await clickTab('zones de pente', true));
+await settle({ max: 800 });
+check('zones fermé : la carte revient à la vitesse', !(await gradeLegendOnMap()));
+console.log('  graphiques :', await clickTab('graphiques'));
+await settle({ max: 1200 });
+check('graphiques ouvert : la pente revient (même bouton, « Masquer de la carte »)', (await gradeLegendOnMap()) && (await textIn('Graphiques')).includes('Masquer de la carte'));
+await clickButton('Graphiques', 'Masquer de la carte');
+await wait(500);
+
+// --- 5. Surf et voile ---
+await go(paths.surf, 6000);
+await clickTab('graphiques');
+await settle({ max: 1500 });
+check(`surf : replis Vitesse et FC (${await folds('Vitesse')})`, (await folds('Vitesse')) === 'Vitesse+ FC+');
+await fold('Vitesse', 'FC');
+await settle({ max: 800 });
+check(`surf : FC repliée, un graphe (${await chartsIn('Vitesse')})`, (await chartsIn('Vitesse')) === 1);
+await go(paths.surf, 6000);
+check(`surf : repli retenu (${await folds('Vitesse')})`, (await folds('Vitesse')) === 'Vitesse+ FC-');
+await fold('Vitesse', 'Vitesse');
+await settle({ max: 800 });
+check(`surf : tout replié, plus de graphe (${await chartsIn('Vitesse')})`, (await chartsIn('Vitesse')) === 0);
+await fold('Vitesse', 'Vitesse');
+await fold('Vitesse', 'FC');
+
+await go(paths.voile, 8000);
+await clickTab('graphiques');
+await settle({ max: 2000 });
+check(`voile : trois replis (${await folds('Graphiques')})`, (await folds('Graphiques')) === 'Historique de Vitesse+ Fréquence cardiaque+ Polaire de Vitesse (TWA)+');
+const voileCharts = await chartsIn('Graphiques');
+await fold('Graphiques', 'Historique de Vitesse');
+await settle({ max: 800 });
+check(`voile : vitesse repliée, un graphe de moins (${voileCharts} → ${await chartsIn('Graphiques')}), titre gardé`,
+  (await chartsIn('Graphiques')) === voileCharts - 1 && (await textIn('Graphiques')).includes('Historique de Vitesse'));
+await go(paths.voile, 8000);
+check(`voile : repli retenu (${await folds('Graphiques')})`, (await folds('Graphiques')) === 'Historique de Vitesse- Fréquence cardiaque+ Polaire de Vitesse (TWA)+');
+await fold('Graphiques', 'Historique de Vitesse');
+await settle({ max: 800 });
+check(`voile : rouvert (${await chartsIn('Graphiques')})`, (await chartsIn('Graphiques')) === voileCharts);
+
+// --- 5 bis. Lot 61 : noms de la voile, curseur commun, pics gardés ---
+/** Boutons de repli du panneau tels qu'affichés, en minuscules (les noms suivent la règle commune : capitales), avec leur couleur et leur taille. */
+const foldLooks = (title) => evaluate(`(() => { const s = ${SCOPE(title)}; return s ? [...s.querySelectorAll('[data-chart-fold]')].map((b) => { const c = getComputedStyle(b); return b.innerText.trim().toLowerCase() + ' (' + c.color + ', ' + c.fontSize + ')'; }).join(' ; ') : '(absent)'; })()`);
+/** Curseurs de survol dessinés dans le n-ième graphe du panneau. */
+const cursorsIn = (title, nth) => evaluate(`(() => { const s = ${SCOPE(title)}; const w = s ? s.querySelectorAll('.recharts-wrapper')[${nth}] : null; return w ? w.querySelectorAll('.recharts-tooltip-cursor').length : -1; })()`);
+/** Graduations de l'axe vertical du graphe dont l'axe porte cette unité. */
+const unitTicks = (unit) => evaluate(`(() => {
+  const c = [...document.querySelectorAll('.zoom-chart')].find((z) => [...z.querySelectorAll('.recharts-label')].some((l) => l.textContent.trim() === ${JSON.stringify(unit)}));
+  return c ? [...c.querySelectorAll('.recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value')].map((t) => Number(t.textContent.trim())).filter((v) => Number.isFinite(v)) : [];
+})()`);
+
+await go(paths.voile, 8000);
+await clickTab('graphiques');
+await settle({ max: 2000 });
+const voileTitles = await foldLooks('Graphiques');
+console.log(`  voile, noms des graphes : ${voileTitles}`);
+check('voile : noms des graphes, casse non comptée', ['historique de vitesse', 'fréquence cardiaque', 'polaire de vitesse (twa)'].every((t) => voileTitles.includes(`${t} (`)));
+console.log('  survol de la vitesse :', await hoverChart('Graphiques', 0));
+await wait(500);
+check(`voile : survol de la vitesse, curseur sur la FC (${await cursorsIn('Graphiques', 1)})`, (await cursorsIn('Graphiques', 1)) >= 1);
+console.log('  vent :', await clickTab('vent'));
+await settle({ max: 1500 });
+const windTitle = await evaluate(`(() => { const e = [...document.querySelectorAll('.an-carte-panels *')].find((x) => x.children.length === 0 && x.textContent.trim() === 'Évolution du Vent'); return e ? e.innerText.trim().toLowerCase() + ' (' + getComputedStyle(e).color + ', ' + getComputedStyle(e).fontSize + ')' : '(absent)'; })()`);
+console.log(`  voile, nom du vent : ${windTitle}`);
+check('voile : nom du vent, casse non comptée', windTitle.startsWith('évolution du vent ('));
+await clickTab('vent', true);
+// Lot 167 : courbe de la VMG dans son onglet, sous le tableau et les podiums, tracée, avec zéro dans son axe.
+console.log('  vmg :', await clickTab('vmg'));
+await settle({ max: 1500 });
+const vmgDrawn = await evaluate(`(() => { const s = ${SCOPE('Analyse VMG')}; const d = s?.querySelector('.recharts-line-curve')?.getAttribute('d') ?? ''; return { lines: s ? s.querySelectorAll('.recharts-line').length : -1, drawn: d.length > 0 }; })()`);
+check(`voile : courbe de la VMG tracée (${vmgDrawn.lines} ligne, tracé ${vmgDrawn.drawn})`, vmgDrawn.lines === 1 && vmgDrawn.drawn);
+const vmgOrder = await evaluate(`(() => { const s = ${SCOPE('Analyse VMG')}; const t = s?.querySelector('table'); const c = s?.querySelector('.zoom-chart'); return !!t && !!c && t.getBoundingClientRect().bottom <= c.getBoundingClientRect().top; })()`);
+check('voile : la courbe de la VMG vient sous le tableau', vmgOrder === true);
+const vmgTicks = await ticks('Analyse VMG', 0, 'yAxis');
+check(`voile : zéro dans l'axe de la VMG (${vmgTicks})`, vmgTicks.split(' | ').includes('0'));
+const vmgShot = async (name) => {
+  await evaluate(`${SCOPE('Analyse VMG')}?.scrollIntoView({ block: 'start' })`);
+  await settle({ max: 800 });
+  await shoot(name);
+};
+await vmgShot('vmg');
+await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+await settle({ max: 1500 });
+await vmgShot('vmg-tel');
+await send('Emulation.clearDeviceMetricsOverride');
+await settle({ max: 800 });
+await clickTab('vmg', true);
+
+await go(paths.surf, 6000);
+await clickTab('graphiques');
+await settle({ max: 1500 });
+console.log('  surf, survol de la vitesse :', await hoverChart('Vitesse', 0));
+await wait(500);
+check(`surf : survol de la vitesse, curseur sur la FC (${await cursorsIn('Vitesse', 1)})`, (await cursorsIn('Vitesse', 1)) >= 1);
+
+await go(paths.sprints, 8000);
+await clickTab('graphiques');
+await settle({ max: 2000 });
+console.log(`  sprints, replis : ${await folds('Graphiques')}`);
+const hrTicks = await unitTicks('bpm');
+const cadTicks = await unitTicks('pas/min');
+console.log(`  sprints, graduations de la FC : ${hrTicks.join(' | ')} ; de la cadence : ${cadTicks.join(' | ')}`);
+check(`sprints : le haut de l'axe de FC atteint le pic de 200 (${Math.max(...hrTicks)})`, hrTicks.length > 0 && Math.max(...hrTicks) >= 200);
+check(`sprints : le bas de l'axe de cadence descend au creux (${Math.min(...cadTicks)} pour ${Math.max(...cadTicks)} en haut)`,
+  cadTicks.length > 0 && Math.min(...cadTicks) <= 0.8 * Math.max(...cadTicks));
+await shoot('graphes-sprints');
+
+// --- 6. Téléphone ---
+await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+await go(paths.course, 6000);
+await clickTab('zones de pente');
+await settle({ max: 1500 });
+check(`390 px : course, graphes et zones ouverts, sans débordement (${await overflow()} px)`, (await overflow()) <= 0);
+check(`390 px : graphes et zone montrés (${await chartsIn('Graphiques')}, ${await chartsIn('Allure par zone de pente')})`,
+  (await chartsIn('Graphiques')) === 3 && (await chartsIn('Allure par zone de pente')) === 1);
+await shoot('graphes-390');
+await go(paths.voile, 8000);
+check(`390 px : voile sans débordement (${await overflow()} px)`, (await overflow()) <= 0);
+
+console.log('\n--- console (erreurs, avertissements) ---');
+for (const l of logs) console.log(l);
+await finish('\nTout passe.', { ko: (n) => `\n${n} échec(s).` });

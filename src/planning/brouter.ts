@@ -1,0 +1,227 @@
+import { fetchWithin, readErrorBody, readJson, type FetchMessages } from './fetchJson';
+import { BROUTER_PROFILE_TEXT, profileCombination, type WayType } from './brouterProfile';
+import type { RoutePoint, RouteVehicle, Waypoint } from './route';
+import { buildSurfaceRuns, parseWayTags, wayTagsText, type SurfaceRuns } from './surface';
+import { isObject } from '../core/basics';
+
+/**
+ * Calcul d'un tronçon sur les chemins de la carte, par le serveur public de
+ * BRouter (moteur libre sur les données OpenStreetMap, `brouter.de`). Sans
+ * clé ; le serveur autorise l'appel depuis n'importe quelle page
+ * (`Access-Control-Allow-Origin: *`), donc depuis la WebView du téléphone.
+ *
+ * Le calcul suit le profil de l'application (`brouterProfile.ts`), envoyé au
+ * serveur une fois par lancement, même quand plusieurs tronçons le demandent
+ * ensemble : le serveur le garde sous un id, que l'appareil retient
+ * (`ProfileIdStore`, lu et écrit par `usePlannedRoute`) pour réécrire le même
+ * fichier au lancement suivant plutôt que d'en créer un autre.
+ *
+ * La réponse GeoJSON donne l'altitude de chaque point, d'où le dénivelé de
+ * l'itinéraire, et les étiquettes des voies suivies, d'où son revêtement
+ * (`surface.ts`). Seuls `fetchLeg` et l'envoi du profil touchent au réseau ;
+ * le reste est pur.
+ */
+
+export const BROUTER_URL = 'https://brouter.de/brouter';
+/** Envoi d'un profil : `POST` du texte, suivi de `/<id>` pour réécrire un profil déjà envoyé. */
+export const BROUTER_PROFILE_URL = `${BROUTER_URL}/profile`;
+
+/** Où l'appareil retient l'id du profil envoyé : fourni par l'appelant, ce fichier ne touche pas au stockage. */
+export interface ProfileIdStore {
+  /** Id retenu au lancement précédent, tel que rangé (vérifié ici) ; `null` si aucun. */
+  read(): unknown;
+  write(id: string): void;
+}
+
+/**
+ * Réponse du serveur quand le profil demandé n'existe plus (effacé de son
+ * côté) : 500, corps vide. On renvoie alors le profil, une fois. Un 500 avec
+ * un message (« target island »…) est une vraie erreur : pas de renvoi.
+ */
+const PROFILE_MISSING_STATUS = 500;
+
+/**
+ * Délai accordé au serveur pour un calcul ou l'envoi du profil, en
+ * millisecondes : au-delà, le tronçon passe en échec, et « Réessayer » paraît.
+ */
+export const BROUTER_TIMEOUT_MS = 60_000;
+
+const NO_NETWORK = 'Pas de réseau : le tronçon reste en ligne droite.';
+const UNREADABLE = 'Réponse du serveur de calcul illisible.';
+const CALL: FetchMessages = { noNetwork: NO_NETWORK, timeout: 'Le serveur de calcul ne répond pas : réessayez.', timeoutMs: BROUTER_TIMEOUT_MS };
+
+/** Six décimales : une dizaine de centimètres, bien assez pour un point posé au doigt. */
+const coord = (w: Waypoint): string => `${w.lon.toFixed(6)},${w.lat.toFixed(6)}`;
+
+/**
+ * Options d'un calcul : zones pondérées à éviter (paramètre `polygons`,
+ * `loopReturn.ts`) et variante demandée (`alternativeidx`, 0 par défaut).
+ */
+export interface LegOptions {
+  polygons?: string;
+  alternative?: number;
+}
+
+/** Types de voie cochés et règles d'accès, en une seule variable du profil (`profileCombination`). */
+export const brouterUrl = (
+  from: Waypoint,
+  to: Waypoint,
+  ways: ReadonlyArray<WayType>,
+  vehicle: RouteVehicle,
+  profileId: string,
+  { polygons, alternative = 0 }: LegOptions = {}
+): string =>
+  `${BROUTER_URL}?lonlats=${coord(from)}|${coord(to)}&profile=${profileId}` +
+  `&profile:calcul=${profileCombination(ways, vehicle === 'velo')}&alternativeidx=${alternative}&format=geojson` +
+  (polygons ? `&polygons=${polygons}` : '');
+
+/** Id de profil envoyé : `custom_` suivi de lettres, chiffres ou soulignés. */
+const isProfileId = (value: unknown): value is string => typeof value === 'string' && /^custom_\w+$/.test(value);
+
+/**
+ * Id rendu par le serveur après l'envoi du profil (`{"profileid": "custom_…"}`).
+ * Lève une erreur s'il refuse le profil (`error`) ou si la réponse n'a pas
+ * cette forme.
+ */
+export const parseProfileUpload = (json: unknown): string => {
+  if (isObject(json) && typeof json.error === 'string' && json.error !== '') {
+    throw new Error(`Le serveur de calcul refuse le profil : ${json.error}`);
+  }
+  const id = isObject(json) ? json.profileid : null;
+  if (!isProfileId(id)) throw new Error(UNREADABLE);
+  return id;
+};
+
+/** Une coordonnée en micro-degrés, comme le serveur l'écrit dans `messages`. */
+const micro = (deg: number): number => Math.round(deg * 1e6);
+
+/**
+ * Voies suivies, tirées de `messages` : une ligne d'en-tête, puis une ligne
+ * par morceau de voie, qui finit au point du tracé dont elle porte les
+ * coordonnées (en micro-degrés) et commence où finit la précédente. Seules les
+ * étiquettes du revêtement sont gardées (`wayTagsText`). `undefined` si le
+ * tableau manque ou ne colle pas au tracé : le revêtement reste inconnu.
+ */
+export const parseBrouterMessages = (messages: unknown, points: ReadonlyArray<RoutePoint>): SurfaceRuns | undefined => {
+  if (!Array.isArray(messages) || messages.length < 2 || !Array.isArray(messages[0]) || points.length < 2) return undefined;
+  const header = messages[0] as unknown[];
+  const lonCol = header.indexOf('Longitude');
+  const latCol = header.indexOf('Latitude');
+  const tagsCol = header.indexOf('WayTags');
+  if (lonCol < 0 || latCol < 0 || tagsCol < 0) return undefined;
+
+  const entries: { start: number; tags: string }[] = [];
+  let start = 0;
+  for (const row of messages.slice(1)) {
+    if (!Array.isArray(row)) return undefined;
+    const lon = Number(row[lonCol]);
+    const lat = Number(row[latCol]);
+    let end = start;
+    while (end < points.length && (micro(points[end].lon) !== lon || micro(points[end].lat) !== lat)) end++;
+    if (end === points.length) return undefined;
+    if (end > start) {
+      entries.push({ start, tags: wayTagsText(parseWayTags(typeof row[tagsCol] === 'string' ? row[tagsCol] : '')) });
+      start = end;
+    }
+  }
+  return entries.length > 0 ? buildSurfaceRuns(entries) : undefined;
+};
+
+/**
+ * Géométrie de la réponse : les coordonnées `[lon, lat, altitude]` de la
+ * première ligne, et les voies suivies (`parseBrouterMessages`). Elle part du
+ * chemin le plus proche du premier point, pas du point lui-même
+ * (`snapToWaypoints`), et peut être vide pour deux points confondus. Lève une
+ * erreur si la réponse n'a pas cette forme.
+ */
+export const parseBrouterGeojson = (json: unknown): { points: RoutePoint[]; surfaces?: SurfaceRuns } => {
+  const feature = isObject(json) && Array.isArray(json.features) ? json.features[0] : null;
+  const geometry = isObject(feature) ? feature.geometry : null;
+  const coordinates = isObject(geometry) && geometry.type === 'LineString' ? geometry.coordinates : null;
+  if (!Array.isArray(coordinates)) throw new Error(UNREADABLE);
+
+  const points: RoutePoint[] = [];
+  for (const c of coordinates) {
+    if (!Array.isArray(c)) continue;
+    const [lon, lat, ele] = c as unknown[];
+    if (typeof lat !== 'number' || typeof lon !== 'number' || !isFinite(lat) || !isFinite(lon)) continue;
+    points.push(typeof ele === 'number' && isFinite(ele) ? { lat, lon, eleM: ele } : { lat, lon });
+  }
+  const properties = isObject(feature) ? feature.properties : null;
+  const surfaces = parseBrouterMessages(isObject(properties) ? properties.messages : undefined, points);
+  return surfaces ? { points, surfaces } : { points };
+};
+
+/**
+ * Point loin de tout chemin connu, zone sans données (en mer : « datafile
+ * … not found »), ou deux points qu'aucun chemin ne relie.
+ */
+const NO_PATH = /not mapped|no track found|target island|datafile .* not found/i;
+
+/** Message en clair pour une réponse en erreur du serveur. */
+export const brouterErrorMessage = (status: number, body: string): string =>
+  NO_PATH.test(body)
+    ? 'Aucun chemin trouvé entre ces deux points : rapprochez un point d\'un chemin, ou passez ce tronçon en ligne droite.'
+    : `Le serveur de calcul n'a pas répondu (erreur ${status}). Réessayez dans un moment.`;
+
+/** Envoie le profil, sur l'id retenu s'il y en a un, et retient l'id rendu. */
+const uploadProfile = async (store: ProfileIdStore): Promise<string> => {
+  const stored = store.read();
+  const url = isProfileId(stored) ? `${BROUTER_PROFILE_URL}/${stored}` : BROUTER_PROFILE_URL;
+  const id = await fetchWithin(url, { method: 'POST', body: BROUTER_PROFILE_TEXT }, CALL, async (response) => {
+    if (!response.ok) throw new Error(brouterErrorMessage(response.status, await readErrorBody(response)));
+    return parseProfileUpload(await readJson(response, UNREADABLE));
+  });
+  store.write(id);
+  return id;
+};
+
+/** Envoi en cours ou fait pendant ce lancement ; oublié après un échec, pour que l'essai suivant le refasse. */
+let profileUpload: Promise<string> | null = null;
+
+const ensureProfile = (store: ProfileIdStore): Promise<string> => {
+  const upload: Promise<string> = (profileUpload ??= uploadProfile(store).catch((err: unknown) => {
+    if (profileUpload === upload) profileUpload = null;
+    throw err;
+  }));
+  return upload;
+};
+
+/** Le serveur ne connaît plus le profil demandé (`PROFILE_MISSING_STATUS`, corps vide). */
+const PROFILE_MISSING = Symbol('profil absent');
+
+/**
+ * Calcule un tronçon, selon les types de voie cochés et les règles d'accès de
+ * l'activité, et les options (`LegOptions`). `profile` : où retenir l'id du
+ * profil. Si le serveur a perdu le profil, un seul renvoi sert tous les
+ * tronçons qui l'ont constaté ensemble. `signal` annule la requête quand
+ * le tronçon a changé entre-temps (l'envoi du profil, partagé, va à son
+ * terme). Sans réponse en `BROUTER_TIMEOUT_MS`, échec. Lève une erreur au
+ * message lisible.
+ */
+export const fetchLeg = async (
+  from: Waypoint,
+  to: Waypoint,
+  ways: ReadonlyArray<WayType>,
+  vehicle: RouteVehicle,
+  profile: ProfileIdStore,
+  signal?: AbortSignal,
+  options?: LegOptions
+): Promise<{ points: RoutePoint[]; surfaces?: SurfaceRuns }> => {
+  const request = (profileId: string) =>
+    fetchWithin(brouterUrl(from, to, ways, vehicle, profileId, options), { signal }, CALL, async (response) => {
+      if (response.ok) return parseBrouterGeojson(await readJson(response, UNREADABLE));
+      const body = await readErrorBody(response);
+      if (response.status === PROFILE_MISSING_STATUS && body.trim() === '') return PROFILE_MISSING;
+      throw new Error(brouterErrorMessage(response.status, body));
+    });
+  const sent = ensureProfile(profile);
+  let result = await request(await sent);
+  if (result === PROFILE_MISSING) {
+    // Plusieurs tronçons peuvent l'avoir constaté : seul le premier efface l'envoi périmé, les autres reprennent le nouveau.
+    if (profileUpload === sent) profileUpload = null;
+    result = await request(await ensureProfile(profile));
+  }
+  if (result === PROFILE_MISSING) throw new Error(brouterErrorMessage(PROFILE_MISSING_STATUS, ''));
+  return result;
+};

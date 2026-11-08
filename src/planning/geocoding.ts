@@ -1,0 +1,70 @@
+import { fetchJson } from './fetchJson';
+import type { Waypoint } from './route';
+import { isObject } from '../core/basics';
+
+/**
+ * Recherche d'un lieu par son nom (commune, sommet, refuge, adresse), par le
+ * service public Photon de komoot, bâti sur les données OpenStreetMap. Sans
+ * clé ; il autorise l'appel depuis n'importe quelle page. Seul `searchPlaces`
+ * touche au réseau.
+ */
+
+export const PHOTON_URL = 'https://photon.komoot.io/api/';
+
+/** Délai accordé à la recherche, en millisecondes : au-delà, elle échoue, et l'on peut relancer. */
+export const PHOTON_TIMEOUT_MS = 20_000;
+
+export interface Place extends Waypoint {
+  /** Nom du lieu. */
+  label: string;
+  /** Où il se trouve : commune, département, pays, ce qui est connu. */
+  detail: string;
+}
+
+/**
+ * Adresse de la recherche. `near` : le centre de la carte, pour que les
+ * lieux proches passent devant leurs homonymes lointains.
+ */
+export const photonUrl = (query: string, near?: Waypoint, limit = 6): string => {
+  const params = new URLSearchParams({ q: query, limit: String(limit), lang: 'fr' });
+  if (near) {
+    params.set('lat', near.lat.toFixed(4));
+    params.set('lon', near.lon.toFixed(4));
+  }
+  return `${PHOTON_URL}?${params.toString()}`;
+};
+
+const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null);
+
+/** Lieux de la réponse ; les entrées mal formées sont écartées. */
+export const parsePhoton = (json: unknown): Place[] => {
+  if (!isObject(json) || !Array.isArray(json.features)) return [];
+  const places: Place[] = [];
+  for (const feature of json.features) {
+    if (!isObject(feature) || !isObject(feature.properties) || !isObject(feature.geometry)) continue;
+    const coordinates = feature.geometry.coordinates;
+    if (!Array.isArray(coordinates)) continue;
+    const [lon, lat] = coordinates as unknown[];
+    if (typeof lat !== 'number' || typeof lon !== 'number' || !isFinite(lat) || !isFinite(lon)) continue;
+
+    const p = feature.properties;
+    const street = text(p.street);
+    const label = text(p.name) ?? (street ? [text(p.housenumber), street].filter(Boolean).join(' ') : null) ?? text(p.city);
+    if (!label) continue;
+    const detail = [text(p.city), text(p.county), text(p.country)]
+      .filter((part, i, all): part is string => part !== null && part !== label && all.indexOf(part) === i)
+      .join(', ');
+    places.push({ label, detail, lat, lon });
+  }
+  return places;
+};
+
+/** Lieux qui répondent à `query`. Lève une erreur au message lisible. */
+export const searchPlaces = async (query: string, near?: Waypoint, signal?: AbortSignal): Promise<Place[]> =>
+  parsePhoton(await fetchJson(photonUrl(query, near), { signal }, {
+    noNetwork: 'Pas de réseau : la recherche de lieux est impossible.',
+    timeout: 'La recherche de lieux ne répond pas : réessayez.',
+    timeoutMs: PHOTON_TIMEOUT_MS,
+    unreadable: 'Réponse de la recherche de lieux illisible.',
+    httpError: (status) => `La recherche de lieux n'a pas répondu (erreur ${status}).`,
+  }));

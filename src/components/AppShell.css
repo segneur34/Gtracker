@@ -1,0 +1,411 @@
+/*
+ * Cadre de l'application (`AppShell.tsx`) : barre d'onglets en bas sur
+ * téléphone, rail à gauche sur téléphone tourné, barre en haut sur
+ * ordinateur, bandeau d'enregistrement. Téléphone et ordinateur : les
+ * requêtes de `hooks/useNarrowScreen.ts`, recopiées.
+ *
+ * Les barres passent au-dessus de la carte : Leaflet pose ses calques et
+ * contrôles jusqu'à z-index 1000 dans le contexte de la page.
+ */
+
+.shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.shell-main {
+  flex: 1 0 auto;
+  min-width: 0;
+}
+
+/* --- Bandeaux d'enregistrement et du compteur, l'un sous l'autre --- */
+
+.shell-banners {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-bars);
+}
+
+.shell-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  background: var(--recording);
+  color: var(--on-accent);
+  font-size: var(--text-m);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.shell-banner--intervals {
+  background: var(--fractionne);
+}
+
+.shell-banner__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--on-accent);
+}
+
+.shell-banner__text {
+  flex: 1;
+}
+
+/* Résultat d'un fichier reçu d'une autre application : du texte à lire, pas un état en cours, donc sur fond de carte. */
+.shell-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-strong);
+  border-left: 4px solid var(--velo);
+  color: var(--ink);
+  font-size: var(--text-s);
+}
+
+.shell-notice--trouble {
+  border-left-color: var(--course);
+}
+
+.shell-notice__text {
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.shell-notice__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* --- Barre d'onglets, téléphone --- */
+
+.shell-tabbar {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-bars);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  height: calc(var(--tabbar-h) + var(--inset-bottom));
+  padding-bottom: var(--inset-bottom);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+/* Libellé qui rétrécit avec l'écran (« Statistiques » tient dans sa case dès 340 px), coupé par « … » en dernier
+   recours (taille du texte d'Android agrandie) ; sous 340 px, les icônes seules, libellé gardé pour le lecteur d'écran. */
+.shell-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: clamp(10px, 3.1vw, var(--text-xs));
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.shell-tab span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 339.98px) {
+  .shell-tab span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.shell-tab.active {
+  color: var(--tab-color, var(--ink));
+  font-weight: 700;
+}
+
+.shell-tabbar__record {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shell-record {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  margin-top: -22px;
+  border-radius: 50%;
+  background: var(--record);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 5px var(--bg);
+}
+
+.shell-record .ui-record-dot {
+  width: 20px;
+  height: 20px;
+}
+
+.shell-record--busy {
+  background: var(--recording);
+}
+
+.shell-record--paused {
+  background: var(--muted);
+}
+
+/* Anneau qui se remplit pendant l'appui long (`--press-ms`, posé par AppShell.tsx).
+   Pendant un enregistrement, le rond est un <button> : sans le style natif. */
+.shell-record {
+  position: relative;
+  padding: 0;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.shell-record__ring {
+  position: absolute;
+  inset: -5px;
+  width: calc(100% + 10px);
+  height: calc(100% + 10px);
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+
+.shell-record__ring circle {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 4;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: shell-record-fill var(--press-ms) linear forwards;
+}
+
+@keyframes shell-record-fill {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.shell-record--busy .ui-record-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+/* --- Barre du haut, ordinateur --- */
+
+.shell-topbar {
+  display: none;
+}
+
+@media (min-width: 768px) and (min-height: 500px), (min-width: 768px) and (pointer: fine), (min-width: 768px) and (pointer: none) {
+  .shell-tabbar {
+    display: none;
+  }
+
+  .shell-topbar {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-bars);
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+    height: var(--topbar-h);
+    padding: 0 var(--space-5);
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* Sous la barre du haut, les bandeaux restent visibles au défilement. */
+  .shell-banners {
+    top: var(--topbar-h);
+  }
+}
+
+/* --- Rail, téléphone tourné --- */
+
+/* Les cinq cases de la barre du bas, à la verticale, à gauche ; icônes seules (libellés gardés pour le lecteur
+   d'écran). La page commence à sa droite (`--shell-left`, `tokens.css`). */
+@media (orientation: landscape) and (max-height: 499.98px) and (pointer: coarse) {
+  .shell {
+    padding-left: var(--shell-left);
+    padding-right: var(--inset-right);
+  }
+
+  .shell-tabbar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--shell-left);
+    height: auto;
+    padding: 0 0 var(--inset-bottom) var(--inset-left);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(5, minmax(0, 1fr));
+    border-top: none;
+    border-right: 1px solid var(--line);
+  }
+
+  .shell-tab span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .shell-record {
+    width: 46px;
+    height: 46px;
+    margin-top: 0;
+    box-shadow: none;
+  }
+}
+
+/* Logo, comme celui de l'accueil, à la taille de la barre. */
+.shell-brand {
+  color: var(--ink);
+  font-family: var(--font-logo);
+  font-size: var(--text-xl);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.shell-toplinks {
+  display: flex;
+  gap: var(--space-1);
+  flex: 1;
+}
+
+.shell-toplink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: var(--text-m);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .shell-toplink:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.shell-toplink.active {
+  color: var(--tab-color, var(--ink));
+  background: var(--surface-sunken);
+}
+
+/* Itinéraires et Enregistrer, côte à côte à droite de la barre du haut. */
+.shell-topactions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+/* Ordinateur étroit (768 à 1200 px) : tout tient sur une ligne, liens et boutons resserrés. */
+@media (max-width: 1199.98px) {
+  .shell-topbar {
+    gap: var(--space-3);
+    padding: 0 var(--space-3);
+  }
+
+  .shell-toplinks {
+    gap: 0;
+  }
+
+  .shell-toplink {
+    padding: 0 var(--space-2);
+    font-size: var(--text-s);
+  }
+
+  .shell-topplan,
+  .shell-toprecord {
+    padding: 0 var(--space-3);
+    font-size: var(--text-s);
+  }
+}
+
+.shell-topplan {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--text-m);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .shell-topplan:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.shell-topplan.active {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
+.shell-toprecord {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--record);
+  color: var(--on-accent);
+  font-size: var(--text-m);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.shell-toprecord .ui-record-dot {
+  width: 12px;
+  height: 12px;
+}
+
+.shell-toprecord--busy {
+  background: var(--recording);
+}

@@ -1,0 +1,150 @@
+import { useEffect, useRef, useState } from 'react';
+import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, type Activity } from '../core/activities';
+import { SPORT_FAMILIES, type SportFamily } from '../core/sportProfiles';
+import { useVisibility } from '../hooks/useSportSettings';
+import { useThemedShade } from '../hooks/useTheme';
+import { ChoiceOption, ChoiceSheet } from './ui/ChoiceSheet';
+import ActivityIcon from './ActivityIcon';
+import { FAMILY_ICON } from './familyIcons';
+import { IconChevronRight } from './icons';
+import './ActivitySelect.css';
+
+/**
+ * Choix d'une activité, groupées par famille (Voile, À pied, Vélo, Fractionné) :
+ * planifier un itinéraire, classer une session, changer l'activité d'un
+ * enregistrement en cours ou d'une session analysée. Passer d'une famille à
+ * l'autre change le module qui analyse la session : c'est à l'appelant d'en
+ * tirer les conséquences.
+ *
+ * Une liste dessinée par l'application plutôt qu'un menu natif : celui
+ * d'Android range mal les groupes (traits entre les activités d'une même
+ * famille, aucun entre les familles). Ici, la famille à gauche, ses activités
+ * décalées dessous, un trait entre deux familles. La liste seule
+ * (`ActivitySheet`) s'ouvre aussi sans bouton : demander l'activité d'une
+ * session à classer avant de l'analyser.
+ *
+ * Une activité cachée dans Réglages, ou d'une famille cachée, n'y est pas
+ * proposée, sauf si c'est celle choisie : l'analyse d'une session cachée
+ * garde son activité (§10, point 100).
+ */
+
+interface ActivitySheetProps {
+  activities: Activity[];
+  /** Identifiant de l'activité choisie, `null` si aucune. */
+  value: string | null;
+  /** Familles proposées ; toutes par défaut. */
+  families?: SportFamily[];
+  label?: string;
+  /** Question posée en tête de la liste, et sa précision. */
+  heading?: { title: string; hint?: string };
+  /** Première ligne « sans choix » (un filtre : « Toutes ») ; elle est cochée tant que `value` est `null`. */
+  reset?: { label: string; onChoose: () => void };
+  onChoose: (activity: Activity) => void;
+  onClose: () => void;
+}
+
+/** Liste des activités par famille, par-dessus la page ; Échap, un appui à côté ou le retour d'Android la ferme. */
+export function ActivitySheet({ activities, value, families = SPORT_FAMILIES, label, heading, reset, onChoose, onClose }: ActivitySheetProps) {
+  const selectedRef = useRef<HTMLButtonElement>(null);
+  const { isShown } = useVisibility();
+  const shown = useThemedShade();
+  const groups = families
+    .map((family) => ({ family, items: activitiesOfFamily(activities, family).filter((a) => a.id === value || isShown(a)) }))
+    .filter((g) => g.items.length > 0);
+
+  useEffect(() => {
+    selectedRef.current?.focus();
+  }, []);
+
+  return (
+    <ChoiceSheet label={heading?.title ?? label ?? 'Activité'} onClose={onClose}>
+      {heading && (
+        <div className="activity-select__heading">
+          <strong>{heading.title}</strong>
+          {heading.hint && <span>{heading.hint}</span>}
+        </div>
+      )}
+      {reset && (
+        <div className="activity-select__group">
+          <ChoiceOption label={reset.label} selected={value === null} onClick={reset.onChoose} />
+        </div>
+      )}
+      {groups.map(({ family, items }) => {
+        const Icon = FAMILY_ICON[family];
+        return (
+          <div key={family} className="activity-select__group" role="group" aria-label={FAMILY_LABEL[family]}>
+            <div className="activity-select__family" style={{ color: FAMILY_ACCENT[family] }}>
+              <Icon size={20} />
+              {FAMILY_LABEL[family]}
+            </div>
+            {items.map((a) => {
+              const selected = a.id === value;
+              return (
+                <ChoiceOption key={a.id} buttonRef={selected ? selectedRef : undefined} label={a.name} selected={selected}
+                  onClick={() => onChoose(a)}
+                  icon={<ActivityIcon activity={a} size={20} className="activity-select__icon" style={{ color: shown(a.color) }} />} />
+              );
+            })}
+          </div>
+        );
+      })}
+    </ChoiceSheet>
+  );
+}
+
+interface ActivitySelectProps {
+  activities: Activity[];
+  /** Identifiant de l'activité choisie ; `null` : `placeholder`. */
+  value: string | null;
+  onChange: (activity: Activity) => void;
+  /** Activité hors de la liste à proposer quand même (l'activité de base d'un calcul). */
+  extra?: Activity | null;
+  /** Familles proposées ; toutes par défaut. */
+  families?: SportFamily[];
+  /** Ligne « sans choix » en tête de la liste (filtre) ; `onChange` n'est pas appelé pour elle. */
+  reset?: { label: string; onChoose: () => void };
+  placeholder?: string;
+  disabled?: boolean;
+  /** Classe du bouton, celle d'un champ (`ui-field`, petit par défaut). */
+  className?: string;
+  label?: string;
+}
+
+function ActivitySelect({
+  activities, value, onChange, extra, families, reset, placeholder, disabled, className = 'ui-field ui-field--s', label,
+}: ActivitySelectProps) {
+  const [open, setOpen] = useState(false);
+  const list = extra && !activities.some((a) => a.id === extra.id) ? [...activities, extra] : activities;
+  const current = list.find((a) => a.id === value) ?? null;
+
+  const choose = (activity: Activity) => {
+    setOpen(false);
+    if (activity.id !== value) onChange(activity);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className={`${className} activity-select`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={label ? `${label} : ${current?.name ?? placeholder ?? 'à choisir'}` : undefined}
+        disabled={disabled}
+        onClick={() => setOpen(true)}>
+        {current && <ActivityIcon activity={current} size={18} className="activity-select__icon" style={{ color: current.color }} />}
+        <span className={current ? 'activity-select__name' : 'activity-select__name activity-select__name--empty'}>
+          {current?.name ?? placeholder ?? 'Choisir…'}
+        </span>
+        <IconChevronRight size={14} className="activity-select__chevron" />
+      </button>
+
+      {open && (
+        <ActivitySheet activities={list} value={value} families={families} label={label}
+          reset={reset && { label: reset.label, onChoose: () => { setOpen(false); reset.onChoose(); } }} onChoose={choose} onClose={() => setOpen(false)} />
+      )}
+    </>
+  );
+}
+
+export default ActivitySelect;

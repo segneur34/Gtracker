@@ -1,0 +1,131 @@
+import ChartFold from './ChartFold';
+import { HelpText } from './Help';
+import { PanelHeading } from './PanelTitle';
+import BandShareTable from './BandShareTable';
+import { CADENCE_BAND_COLORS } from './cadenceColors';
+import { bandRangeLabel } from '../core/bands';
+import { speedUnitLabel, formatShortDuration, formatSpeedValue, toDisplaySpeed, signedPercent, type DistanceUnit, type SpeedUnit, formatDecimal } from '../core/units';
+import { useOpenSections } from '../hooks/useOpenSections';
+import type { CadenceAnalysis, CadenceShare } from '../running/cadence';
+import StatTile from './ui/StatTile';
+
+interface Props {
+  analysis: CadenceAnalysis;
+  speedUnit: SpeedUnit;
+  /** Unité de distance de l'activité : une allure est par kilomètre ou par mille nautique. */
+  distanceUnit?: DistanceUnit;
+  /** Tranche montrée sur la carte (0 sous la première borne), ou `null`. */
+  selectedBand: number | null;
+  onSelectBand: (band: number | null) => void;
+  /** Préfixe des replis gardés sur l'appareil (celui du module). */
+  storagePrefix: string;
+  open: boolean;
+  onToggle: () => void;
+}
+
+/** Tableaux de l'onglet, dépliés tant qu'on ne les replie pas. */
+const FOLDS_DEFAULT = { tranches: true, vitesse: true, pente: true };
+
+const cell = { padding: '0.4em 0.6em', textAlign: 'center' } as const;
+
+const spmText = (spm: number) => `${Math.round(spm)} pas/min`;
+const stepText = (m: number | null) => (m === null ? '—' : `${formatDecimal(m, 2)} m`);
+/** Écart de `to` à `from`, signé en pourcentage, « +0.0 % » à zéro. */
+const signedChange = (from: number, to: number) => signedPercent(from > 0 ? (to - from) / from : 0, { zeroSign: true });
+
+/**
+ * Onglet « cadence » des analyses à pied (course, marche, fractionné à pied) :
+ * chiffres, temps par tranche de cadence avec ses passages sur la carte,
+ * cadence et longueur de pas selon la vitesse et selon la pente, dérive.
+ * Posé dans le `ResizablePanel` du module ; la courbe est dans « graphiques ».
+ */
+export default function CadencePanel({ analysis, speedUnit, distanceUnit = 'km', selectedBand, onSelectBand, storagePrefix, open, onToggle }: Props) {
+  const folds = useOpenSections(`${storagePrefix}.cadence`, FOLDS_DEFAULT);
+  const { bands, bySpeed, byGrade, drift } = analysis;
+  const unit = speedUnitLabel(speedUnit, distanceUnit);
+  const speedText = (ms: number) => formatSpeedValue(toDisplaySpeed(ms, speedUnit, distanceUnit), speedUnit);
+  // La tranche la plus lente part de l'arrêt : « moins de » sa borne haute.
+  const speedRange = (fromMs: number, toMs: number) => (fromMs < 0.5 ? `< ${speedText(toMs)}` : `${speedText(fromMs)} – ${speedText(toMs)}`);
+  const shareRow = (key: string, label: string, s: CadenceShare, extra?: string) => (
+    <tr key={key} className={s.timeS > 0 ? 'ui-table__row' : 'ui-table__row ui-table__row--empty'}>
+      <td className="ui-cell ui-cell--bold ui-nowrap">
+        {label}{extra && <span className="ui-muted ui-weight-normal ui-text-xs"> {extra}</span>}
+      </td>
+      <td style={cell}>{formatShortDuration(s.timeS)}</td>
+      <td style={{ ...cell, fontWeight: 700 }}>{s.timeS > 0 ? spmText(s.spm) : '—'}</td>
+      <td style={cell}>{s.timeS > 0 ? stepText(s.stepLengthM) : '—'}</td>
+    </tr>
+  );
+  const shareHead = (first: string) => (
+    <thead>
+      <tr className="ui-sunken">
+        <th className="ui-cell ui-cell--left">{first}</th>
+        <th style={cell}>Temps</th>
+        <th style={cell}>Cadence</th>
+        <th style={cell}>Pas</th>
+      </tr>
+    </thead>
+  );
+
+  return (
+    <>
+      <PanelHeading label="Cadence" extra={<span className="ui-muted ui-weight-normal ui-text-xs">(en mouvement)</span>} open={open} onToggle={onToggle} helpKey="analyse:cadence" />
+      <HelpText helpKey="analyse:cadence" note>
+        Cadence comptée par l'accéléromètre du téléphone (ou la montre), en pas par minute ; la courbe est dans l'onglet « graphiques ».
+        {bands && ` Tranches de la ${bands.running ? 'course' : 'marche'}, choisies par la cadence moyenne ; « Voir » montre leurs passages sur la carte, en violet.`}
+        {bySpeed.length > 0 && " Pour aller plus vite, on presse le pas (cadence) ou on l'allonge (longueur) : la longueur de pas est la distance divisée par les pas."}
+      </HelpText>
+      <div className="an-sheet__stats an-sheet__stats--always">
+        <StatTile label="Cadence moyenne" value={spmText(analysis.averageSpm)} />
+        {analysis.maxSpm !== null && (
+          <StatTile label={<>Cadence max ({analysis.maxWindowS} s)</>} value={spmText(analysis.maxSpm)} />
+        )}
+        <StatTile label="Longueur de pas" value={stepText(analysis.stepLengthM)} />
+        <StatTile label="Pas" value={Math.round(analysis.steps).toLocaleString('fr-FR')} />
+        <StatTile label="Temps mesuré" value={<>{Math.round(analysis.measuredShare * 100)} %</>} />
+      </div>
+      {drift && (
+        <div className="an-cad-title">
+          <span className="ui-muted">Dérive, du premier au dernier tiers : </span>
+          cadence {Math.round(drift.first.spm)} → {Math.round(drift.last.spm)} pas/min ({signedChange(drift.first.spm, drift.last.spm)})
+          {drift.first.stepLengthM !== null && drift.last.stepLengthM !== null && (
+            <>, pas {formatDecimal(drift.first.stepLengthM, 2)} → {formatDecimal(drift.last.stepLengthM, 2)} m ({signedChange(drift.first.stepLengthM, drift.last.stepLengthM)})</>
+          )}
+        </div>
+      )}
+
+      <ChartFold label={bands.running ? 'Tranches (course)' : 'Tranches (marche)'} open={folds.open.tranches} onToggle={() => folds.toggle('tranches')} className="ui-mt-12" />
+      {folds.open.tranches && (
+        <BandShareTable head="Pas/min" shareWidth="35%" marginTop="6px" nowrapLabel
+          rows={bands.timesS.map((timeS, band) => ({ color: CADENCE_BAND_COLORS[band], label: bandRangeLabel(bands.bounds, band), timeS }))}
+          selected={selectedBand} onSelect={onSelectBand} />
+      )}
+
+      {bySpeed.length > 0 && (
+        <>
+          <ChartFold label="Selon la vitesse" open={folds.open.vitesse} onToggle={() => folds.toggle('vitesse')} className="ui-mt-12" />
+          {folds.open.vitesse && (
+            <table className="ui-table ui-mt-6">
+              {shareHead(unit)}
+              <tbody>{bySpeed.map((b) => shareRow(String(b.fromMs), speedRange(b.fromMs, b.toMs), b))}</tbody>
+            </table>
+          )}
+        </>
+      )}
+
+      {byGrade && (
+        <>
+          <ChartFold label="Selon la pente" open={folds.open.pente} onToggle={() => folds.toggle('pente')} className="ui-mt-12" />
+          {folds.open.pente && (
+            <table className="ui-table ui-mt-6">
+              {shareHead('Zone')}
+              <tbody>
+                {byGrade.map((z) => shareRow(z.zone.key, z.zone.label, z, z.zone.range))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
+    </>
+  );
+}

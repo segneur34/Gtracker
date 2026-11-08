@@ -1,0 +1,254 @@
+import { toRad } from './angles';
+import type { TileCoord } from './tiles';
+
+/**
+ * Image de partage d'une session : calculs purs (cadrage de la trace en
+ * Mercator, tuiles de fond à poser, chiffres retenus). Le dessin est dans
+ * `components/drawShareImage.ts`, l'envoi dans `platform/share.ts`.
+ */
+
+/** Un chiffre de la synthèse d'une session, tel que l'affiche son onglet « général ». */
+export interface ShareStat {
+  /** Identifiant stable, clé du choix retenu sur l'appareil ; jamais affiché. */
+  key: string;
+  label: string;
+  value: string;
+  /** Explication au survol, dans l'analyse seulement. */
+  title?: string;
+}
+
+export const SHARE_IMAGE = {
+  /** Image en hauteur, au format d'un écran de téléphone (9:16). */
+  widthPx: 1080,
+  heightPx: 1920,
+  /** Marge gauche du titre et du pied, et droite du pseudo. */
+  marginPx: 60,
+  /** Voile blanc dégradé du haut, sous le titre. */
+  veilPx: 300,
+  /** Liseré à la couleur de la famille, sur le bord gauche du voile. */
+  edgePx: 14,
+  /** Lignes de base du titre et du sous-titre. */
+  titleBaselinePx: 96,
+  subtitleBaselinePx: 146,
+  /** Haut de la zone où se cadre la trace, sous le sous-titre ; elle descend jusqu'au cartouche. */
+  frameTopPx: 180,
+  /** Cartouche des chiffres : marges à gauche et à droite, puis sous lui. */
+  cardMarginXPx: 40,
+  cardMarginBottomPx: 60,
+  /** Hauteur du cartouche au-dessus et au-dessous des rangées de chiffres. */
+  cardPaddingPx: 70,
+  cardRadiusPx: 28,
+  /** Barre à la couleur de la famille en haut du cartouche. */
+  cardBarPx: 12,
+  /** Haut de la grille des chiffres sous celui du cartouche, et ses marges à gauche et à droite. */
+  statsTopPx: 44,
+  statsMarginXPx: 90,
+  /** Hauteur d'une rangée de chiffres. */
+  statRowPx: 130,
+  /** Lignes de base du libellé et de la valeur dans une rangée. */
+  statLabelBaselinePx: 36,
+  statValueBaselinePx: 94,
+  /** Trait au-dessus du pied, depuis le bas du cartouche. */
+  ruleFromBottomPx: 64,
+  /** Ligne de base du pied, depuis le bas du cartouche. */
+  footerFromBottomPx: 24,
+  /** Sans aucun chiffre : voile blanc du bas, sous le pied seul. */
+  footerVeilPx: 160,
+  /** Chiffres au plus sur l'image : deux rangées de trois. */
+  maxStats: 6,
+  tileSizePx: 256,
+  /** Zoom le plus fort du fond : au-delà, une trace minuscule n'est pas plus lisible. */
+  maxZoom: 17,
+  /** Marge entre la trace et le bord de sa zone de cadrage. */
+  paddingPx: 70,
+  /** Chiffres retenus d'office, à la première ouverture : les premiers de la synthèse. */
+  defaultStatCount: 6,
+} as const;
+
+/** Colonnes de la grille des chiffres : une rangée jusqu'à trois, deux sur deux pour quatre, trois au-delà. */
+export const statColumns = (count: number): number => (count <= 3 ? Math.max(count, 1) : count === 4 ? 2 : 3);
+
+/** Rangées de la grille des chiffres. */
+export const statRows = (count: number): number => (count <= 0 ? 0 : Math.ceil(count / statColumns(count)));
+
+/** Hauteur du cartouche des chiffres pour `count` chiffres ; 0 sans chiffre (pas de cartouche). */
+export const cardHeight = (count: number): number => {
+  const rows = statRows(Math.min(count, SHARE_IMAGE.maxStats));
+  return rows === 0 ? 0 : 2 * SHARE_IMAGE.cardPaddingPx + rows * SHARE_IMAGE.statRowPx;
+};
+
+/** Haut du cartouche des chiffres, posé à `cardMarginBottomPx` du bas de l'image. */
+export const cardTop = (count: number): number => SHARE_IMAGE.heightPx - SHARE_IMAGE.cardMarginBottomPx - cardHeight(count);
+
+/**
+ * Hauteur de la zone où se cadre la trace pour `count` chiffres : de
+ * `frameTopPx`, sous le titre, jusqu'au haut du cartouche, ou, sans chiffre,
+ * jusqu'au voile du pied. La carte, elle, remplit toute l'image (`fullView`).
+ */
+export const mapHeight = (count: number): number =>
+  (cardHeight(count) === 0 ? SHARE_IMAGE.heightPx - SHARE_IMAGE.footerVeilPx : cardTop(count)) - SHARE_IMAGE.frameTopPx;
+
+/** Point du monde en pixels de tuile au zoom `zoom` (Mercator sphérique, comme les tuiles d'OSM). */
+export const worldPx = (lat: number, lon: number, zoom: number): { x: number; y: number } => {
+  const size = SHARE_IMAGE.tileSizePx * 2 ** zoom;
+  const sin = Math.min(Math.max(Math.sin(toRad(lat)), -0.9999), 0.9999);
+  return {
+    x: ((lon + 180) / 360) * size,
+    y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * size,
+  };
+};
+
+/**
+ * Cadrage de la carte : un zoom entier pour les tuiles, agrandies `scale` fois
+ * (de 1 à 2) pour que la trace remplisse le cadre, et le coin haut gauche du
+ * cadre en pixels du monde à ce zoom.
+ */
+export interface ShareView {
+  zoom: number;
+  scale: number;
+  originX: number;
+  originY: number;
+  widthPx: number;
+  heightPx: number;
+}
+
+/** Cadre qui contient tous les points, marge comprise ; `null` sans point. */
+export const fitView = (
+  points: ReadonlyArray<readonly [number, number]>,
+  widthPx: number,
+  heightPx: number,
+  paddingPx: number = SHARE_IMAGE.paddingPx,
+  maxZoom: number = SHARE_IMAGE.maxZoom
+): ShareView | null => {
+  if (points.length === 0) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const [lat, lon] of points) {
+    const p = worldPx(lat, lon, 0);
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  }
+  const room = (span: number, px: number) => (span > 0 ? Math.max(px - 2 * paddingPx, 1) / span : Infinity);
+  const zoomF = Math.min(Math.log2(Math.min(room(maxX - minX, widthPx), room(maxY - minY, heightPx))), maxZoom);
+  const zoom = Math.max(Math.floor(zoomF), 0);
+  const scale = 2 ** (Math.max(zoomF, 0) - zoom);
+  const factor = 2 ** zoom;
+  return {
+    zoom,
+    scale,
+    originX: ((minX + maxX) / 2) * factor - widthPx / 2 / scale,
+    originY: ((minY + maxY) / 2) * factor - heightPx / 2 / scale,
+    widthPx,
+    heightPx,
+  };
+};
+
+/**
+ * Cadre d'une carte de `widthPx` × `heightPx` posée sur les points comme le
+ * fait `fitBounds` de Leaflet (vignette de la bibliothèque, dessinée en image
+ * fixe au cadrage de la carte qu'elle remplace) : zoom entier, le plus fort où
+ * l'emprise tient avec `paddingPx` de chaque côté (à 1 % de zoom près, l'écart
+ * que Leaflet tolère avant de descendre d'un cran), plafonné à `maxZoom` ; le
+ * centre de l'emprise au centre du cadre, coin haut gauche arrondi au pixel ;
+ * tuiles à leur taille (`scale` 1). `null` sans point.
+ */
+export const fitBoundsView = (
+  points: ReadonlyArray<readonly [number, number]>,
+  widthPx: number,
+  heightPx: number,
+  { paddingPx, maxZoom }: { paddingPx: number; maxZoom: number }
+): ShareView | null => {
+  if (points.length === 0) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const [lat, lon] of points) {
+    const p = worldPx(lat, lon, 0);
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  }
+  // Rapport entre la place offerte et l'emprise au zoom 0, comme `getBoundsZoom` ; sans résultat (emprise nulle,
+  // cadre plus petit que ses marges), sans limite, comme Leaflet.
+  const ratio = Math.min((widthPx - 2 * paddingPx) / (maxX - minX), (heightPx - 2 * paddingPx) / (maxY - minY));
+  const log = Math.log2(ratio);
+  const raw = Number.isNaN(log) ? Infinity : log;
+  const zoom = Math.min(Math.max(Math.floor(Math.round(raw * 100) / 100), 0), maxZoom);
+  const factor = 2 ** zoom;
+  return {
+    zoom,
+    scale: 1,
+    originX: Math.round(((minX + maxX) / 2) * factor - widthPx / 2),
+    originY: Math.round(((minY + maxY) / 2) * factor - heightPx / 2),
+    widthPx,
+    heightPx,
+  };
+};
+
+/** Point de la trace en pixels du cadre. */
+export const projectPoint = (view: ShareView, lat: number, lon: number): { x: number; y: number } => {
+  const p = worldPx(lat, lon, view.zoom);
+  return { x: (p.x - view.originX) * view.scale, y: (p.y - view.originY) * view.scale };
+};
+
+/**
+ * Cadre étendu à toute l'image : `view` cadre la trace dans une zone de
+ * `view.heightPx` qui commence à `topPx` du haut de l'image ; le cadre rendu
+ * commence en haut de l'image et descend sur `heightPx`, au même zoom. Les
+ * tuiles (`viewTiles`) couvrent alors toute l'image et `projectPoint` donne
+ * les coordonnées de l'image.
+ */
+export const fullView = (view: ShareView, topPx: number, heightPx: number = SHARE_IMAGE.heightPx): ShareView => ({
+  ...view,
+  originY: view.originY - topPx / view.scale,
+  heightPx,
+});
+
+/** Tuile de fond et sa place dans le cadre. */
+export interface PlacedTile {
+  tile: TileCoord;
+  x: number;
+  y: number;
+  sizePx: number;
+}
+
+/** Tuiles qui couvrent le cadre ; la longitude fait le tour du monde, la latitude s'arrête aux bords. */
+export const viewTiles = (view: ShareView): PlacedTile[] => {
+  const size = SHARE_IMAGE.tileSizePx;
+  const count = 2 ** view.zoom;
+  const first = { x: Math.floor(view.originX / size), y: Math.floor(view.originY / size) };
+  const last = {
+    x: Math.floor((view.originX + view.widthPx / view.scale) / size),
+    y: Math.floor((view.originY + view.heightPx / view.scale) / size),
+  };
+  const tiles: PlacedTile[] = [];
+  for (let ty = Math.max(first.y, 0); ty <= Math.min(last.y, count - 1); ty++) {
+    for (let tx = first.x; tx <= last.x; tx++) {
+      tiles.push({
+        tile: { z: view.zoom, x: ((tx % count) + count) % count, y: ty },
+        x: (tx * size - view.originX) * view.scale,
+        y: (ty * size - view.originY) * view.scale,
+        sizePx: size * view.scale,
+      });
+    }
+  }
+  return tiles;
+};
+
+/**
+ * Chiffres de l'image, dans l'ordre de la synthèse : ceux que l'utilisateur
+ * a retenus, ou, sans choix retenu, les premiers ; six au plus. Un chiffre
+ * retenu que la session n'a pas (autre support, pas de foil) est ignoré.
+ */
+export const pickShareStats = (available: readonly ShareStat[], chosen: readonly string[] | null): ShareStat[] =>
+  (chosen === null ? available.slice(0, SHARE_IMAGE.defaultStatCount) : available.filter((stat) => chosen.includes(stat.key)))
+    .slice(0, SHARE_IMAGE.maxStats);
+
+/** Chiffres à proposer pour l'image : ceux que la session n'a pas (« — ») n'y apporteraient rien. */
+export const shareableStats = (stats: readonly ShareStat[]): ShareStat[] => stats.filter((stat) => stat.value !== '—');

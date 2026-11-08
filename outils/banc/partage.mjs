@@ -1,0 +1,250 @@
+// Banc de test : « Partager » du menu « … » des analyses, image de la trace et des chiffres choisis (18/10).
+// Usage : node partage.mjs <port> <dossier de travail> [<dossier des captures>]
+// Sur un profil neuf. Réseau : les tuiles d'OpenStreetMap seulement (fond de l'image) ; IGN, Overpass et BRouter
+// bloqués. Dure environ 1 min 30. Le script :
+//  1. importe une boucle de course et la voile de `make-gpx.mjs` ;
+//  2. pour chacune : « Partager » en tête du menu « … », la fenêtre, l'aperçu (1080 × 1920, en hauteur), les pastilles
+//     égales aux chiffres de l'onglet « général » (sans les « — »), les six premières enfoncées ; l'image est
+//     gardée dans le dossier des captures (`partage-<page>.png`) ;
+//  3. en course : deux pastilles seulement (image toujours en 1080 × 1920), fond de carte décoché, choix rangés sous
+//     l'activité de la session (`tracker.partage`) et retrouvés à la réouverture ; « Partager » par le partage du
+//     navigateur (simulé : fichier PNG nommé d'après la session), puis sans partage (téléchargement et message) ;
+//     Échap ferme ;
+//     lignes ajoutées le 05/11 : « Meilleur 1 km » en course, « Manœuvres réussies » et « Vent » en voile, rien de
+//     « — » (pas d'appréciation donnée) ;
+//  4. à 390×844 : la fenêtre tient dans l'écran, sans débordement de la page ;
+//  5. fin d'enregistrement, à 390×844 : rejeu ×600 de la boucle en À pied, Arrêter, puis « … » › « Partager » de la
+//     carte « Session terminée » : aperçu en 1080 × 1920, chiffres du résumé, choix de la course repris (même activité).
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { connect } from './lib/cdp.mjs';
+import { ONGLETS } from './lib/onglets.mjs';
+
+const [port, workDir, shotDir] = process.argv.slice(2);
+if (!port || !workDir) {
+  console.error('Usage : node partage.mjs <port> <dossier de travail> [<dossier des captures>]');
+  process.exit(1);
+}
+
+// --- Protocole (lib/cdp.mjs) ---
+const { send, evaluate, go, settle, waitFor, wait, blockNetwork, importGpx, importFiles, records, clickText, shoot, close, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
+
+let failures = 0;
+const check = (what, ok, detail = '') => { console.log(`${ok ? 'ok   ' : 'ÉCHEC'} ${what}${detail ? ` (${detail})` : ''}`); if (!ok) failures++; };
+
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
+await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://brouter.de/*']);
+
+// --- Sessions ---
+/** Boucle de course de 30 min au nord de Montpellier, à 3 m/s. */
+const loopGpx = (t0) => {
+  const pts = [];
+  const seconds = 1800;
+  for (let k = 0; k <= seconds; k++) {
+    const a = (k / seconds) * 2 * Math.PI;
+    const lat = 43.65 + 0.012 * Math.sin(a) + 0.002 * Math.sin(3 * a);
+    const lon = 3.86 + 0.016 * Math.cos(a);
+    pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><ele>${(60 + 20 * Math.sin(a)).toFixed(1)}</ele><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${k % 600 < 120 ? 4.2 : 3}</speed></extensions></trkpt>`);
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Boucle</name><type>running</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
+};
+const voilePath = join(tmpdir(), 'partage-voile.gpx');
+execFileSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'make-gpx.mjs'), voilePath]);
+const T_RUN = Date.UTC(2026, 9, 1, 8, 0, 0);
+const T_VOILE = Date.UTC(2026, 8, 20, 13, 0, 0);
+const SESSIONS = [
+  // `share` : chiffres de l'image (22/10 : la liste entière d'avant, l'onglet « général » n'en montrant plus que l'essentiel).
+  { page: 'course', start: T_RUN, gpx: loopGpx(T_RUN), share: ['Distance', 'Distance en mouvement', 'Temps de parcours', /^Temps en mouvement/, 'Moyenne en mouvement', 'Moyenne sur le temps total', 'Dénivelé', 'Altitude', 'Meilleur 1 km'] },
+  { page: 'voile', start: T_VOILE, gpx: readFileSync(voilePath, 'utf8'), share: ['Distance', 'Distance active', 'Temps total', /^Temps en vol/, 'Ratio de vol', 'Vitesse moyenne', /^Moyenne active/, 'Manœuvres réussies', 'Vent'] },
+];
+
+const paths = {};
+/** Activité de chaque session rangée : clé de son choix dans `tracker.partage`. */
+const activityIds = {};
+for (const s of SESSIONS) {
+  await go(`/${s.page}`, 3000);
+  console.log(`import ${s.page} :`, await importGpx(s.gpx, `${s.page}.gpx`));
+  const rec = await waitFor(async () => (await records())?.find((r) => Math.abs((r.summary?.startMs ?? 0) - s.start) < 2000), { timeout: 6000, label: `fiche ${s.page}` });
+  await settle({ max: 2000, label: `import ${s.page}` });
+  paths[s.page] = `/${s.page}/analyse?session=${encodeURIComponent(rec?.gpx ?? '')}`;
+  activityIds[s.page] = rec?.activityId ?? rec?.sport;
+  check(`${s.page} rangée`, Boolean(rec));
+}
+
+// --- Outils de la fenêtre ---
+const menuItems = () => evaluate(`(() => {
+  const b = document.querySelector('.an-sheet__head .ui-more__button');
+  if (!b) return null;
+  b.click();
+  return [...document.querySelectorAll('.an-sheet__head .ui-more__panel button')].map((x) => x.textContent.trim());
+})()`);
+const openShare = async () => {
+  const items = await menuItems();
+  await evaluate(`[...document.querySelectorAll('.an-sheet__head .ui-more__panel button')].find((x) => x.textContent.trim() === 'Partager')?.click()`);
+  return items;
+};
+/** Attend l'image à jour : bouton « Partager » de la fenêtre actif. */
+const waitImage = async (ms = 20000) => {
+  for (let t = 0; t < ms; t += 250) {
+    const ready = await evaluate(`(() => {
+      const img = document.querySelector('.share-dialog__preview img');
+      const btn = [...document.querySelectorAll('.share-dialog__actions button')].find((b) => b.textContent.trim() === 'Partager');
+      return Boolean(img && img.complete && img.naturalWidth > 0 && btn && !btn.disabled);
+    })()`);
+    if (ready) return true;
+    await wait(250);
+  }
+  return false;
+};
+const imageSize = () => evaluate(`(() => { const i = document.querySelector('.share-dialog__preview img'); return i ? [i.naturalWidth, i.naturalHeight] : null; })()`);
+const chips = () => evaluate(`[...document.querySelectorAll('.share-dialog .ui-tab')].map((b) => ({ label: b.textContent.trim(), on: b.getAttribute('aria-pressed') === 'true' }))`);
+const pressChip = (label) => evaluate(`[...document.querySelectorAll('.share-dialog .ui-tab')].find((b) => b.textContent.trim() === ${JSON.stringify(label)})?.click() ?? 'absent'`);
+const saveImage = async (name) => {
+  const data = await evaluate(`(async () => {
+    const i = document.querySelector('.share-dialog__preview img');
+    const blob = await (await fetch(i.src)).blob();
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let s = ''; for (let k = 0; k < bytes.length; k += 0x8000) s += String.fromCharCode(...bytes.subarray(k, k + 0x8000));
+    return btoa(s);
+  })()`);
+  if (shotDir && data) writeFileSync(`${shotDir}/${name}.png`, Buffer.from(data, 'base64'));
+};
+const generalStats = () => evaluate(`[...document.querySelectorAll('.an-sheet__stats--always .an-sheet__stat')]
+  .map((s) => ({ label: s.querySelector('.an-sheet__stat-label').textContent.trim(), value: s.querySelector('.an-sheet__stat-value').textContent.trim() }))`);
+/** L'image est en hauteur, 1080 × 1920, quel que soit le nombre de chiffres (`SHARE_IMAGE.widthPx`, `heightPx`). */
+const isPortrait = (size) => size?.[0] === 1080 && size?.[1] === 1920;
+
+// --- 2. Chaque analyse ---
+for (const s of SESSIONS) {
+  await go(paths[s.page], 7000);
+  const items = await openShare();
+  check(`${s.page} : « Partager » en tête du menu « … »`, items?.[0] === 'Partager', JSON.stringify(items));
+  check(`${s.page} : fenêtre ouverte`, Boolean(await evaluate(`document.querySelector('.share-dialog[role=dialog]') !== null`)));
+  check(`${s.page} : aperçu dessiné`, await waitImage());
+  // Relu une fois l'image prête : l'altitude (IGN bloqué, repli sur le GPS) arrive après l'ouverture.
+  const general = await generalStats();
+  const c = await chips();
+  const sameLabels = c.length === s.share.length && s.share.every((l, k) => (typeof l === 'string' ? c[k].label === l : l.test(c[k].label)));
+  check(`${s.page} : pastilles = chiffres de l'image`, sameLabels, c.map((x) => x.label).join(' | '));
+  // L'essentiel de « général » se retrouve dans l'image (distance, temps, moyenne).
+  const shared = general.filter((g) => g.value !== '—' && c.some((x) => x.label === g.label));
+  check(`${s.page} : chiffres communs avec « général »`, shared.length >= 3, shared.map((g) => g.label).join(' | '));
+  // Lignes ajoutées le 05/11 (lot 145) : sans appréciation donnée, pas de pastille « Appréciation » (« — » écarté).
+  check(`${s.page} : pas d'« Appréciation » sans appréciation`, !c.some((x) => x.label === 'Appréciation'));
+  check(`${s.page} : les six premières enfoncées`, c.filter((x) => x.on).length === Math.min(6, c.length) && c.slice(0, 6).every((x) => x.on));
+  const size = await imageSize();
+  check(`${s.page} : image en hauteur de 1080 × 1920`, isPortrait(size), JSON.stringify(size));
+  await saveImage(`partage-${s.page}`);
+  await shoot(`partage-fenetre-${s.page}`);
+  await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+  await wait(300);
+  check(`${s.page} : Échap ferme la fenêtre`, await evaluate(`document.querySelector('.share-dialog') === null`));
+}
+
+// --- 3. Choix en course ---
+await go(paths.course, 7000);
+await openShare();
+await waitImage();
+let c = await chips();
+for (const label of c.filter((x) => x.on).slice(2).map((x) => x.label)) await pressChip(label);
+await waitImage();
+c = await chips();
+check('course : deux pastilles enfoncées', c.filter((x) => x.on).length === 2, c.filter((x) => x.on).map((x) => x.label).join(' | '));
+check('course : deux chiffres, image toujours en 1080 × 1920', isPortrait(await imageSize()), JSON.stringify(await imageSize()));
+await evaluate(`document.querySelector('.share-dialog__check input').click()`);
+await waitImage();
+await saveImage('partage-course-sans-carte');
+const stored = await evaluate(`localStorage.getItem('tracker.partage')`);
+console.log('tracker.partage :', stored);
+const course = JSON.parse(stored ?? '{}')[activityIds.course] ?? {};
+check(`course : choix rangés sous l'activité (${activityIds.course})`, course.stats?.length === 2 && course.map === false);
+
+// Partage du navigateur, simulé : le fichier transmis.
+await evaluate(`(() => {
+  window.__partage = null;
+  navigator.canShare = () => true;
+  navigator.share = async (data) => { window.__partage = { name: data.files[0].name, type: data.files[0].type, size: data.files[0].size, title: data.title }; };
+})()`);
+await evaluate(`[...document.querySelectorAll('.share-dialog__actions button')].find((b) => b.textContent.trim() === 'Partager').click()`);
+await wait(500);
+const shared = await evaluate('window.__partage');
+console.log('partagé :', JSON.stringify(shared));
+check('course : PNG transmis au partage, nommé d\'après la session', shared?.type === 'image/png' && /^2026-10-01 .+\.png$/.test(shared?.name ?? '') && shared.size > 10_000);
+
+// Sans partage : téléchargement et message.
+await evaluate(`navigator.canShare = () => false`);
+await evaluate(`[...document.querySelectorAll('.share-dialog__actions button')].find((b) => b.textContent.trim() === 'Partager').click()`);
+await wait(500);
+const note = await evaluate(`document.querySelector('.share-dialog [role=status]')?.textContent ?? ''`);
+check('course : sans partage, l\'image est téléchargée', note.includes('téléchargée'), note);
+
+// Réouverture : choix retrouvés.
+await go(paths.course, 7000);
+await openShare();
+await waitImage();
+c = await chips();
+check('course : choix retrouvés à la réouverture', c.filter((x) => x.on).length === 2
+  && !(await evaluate(`document.querySelector('.share-dialog__check input').checked`)));
+
+// --- 4. Téléphone ---
+await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+await go(paths.voile, 7000);
+await openShare();
+check('390×844 : aperçu dessiné', await waitImage());
+const fit = await evaluate(`(() => {
+  const r = document.querySelector('.share-dialog').getBoundingClientRect();
+  return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, w: innerWidth, h: innerHeight, over: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+})()`);
+check('390×844 : la fenêtre tient dans l\'écran', fit.left >= 0 && fit.right <= fit.w && fit.top >= 0 && fit.bottom <= fit.h && fit.over === 0, JSON.stringify(fit));
+await shoot('partage-telephone');
+await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+
+// --- 5. Fin d'enregistrement ---
+const holdStop = async () => {
+  const down = await evaluate(`(() => { const b = [...document.querySelectorAll('button.ui-btn--danger')].find((x) => x.textContent.includes('Arrêter') && !x.disabled); if (!b) return 'absent'; window.__stopButton = b; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
+  if (down !== 'ok') return down;
+  await wait(2300);
+  return evaluate(`(() => { const b = window.__stopButton; b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); b.click(); return 'ok'; })()`);
+};
+const replayPath = join(workDir, 'partage-rejeu.gpx');
+writeFileSync(replayPath, loopGpx(Date.now() - 1800 * 1000));
+await go('/enregistrer', 4000);
+console.log('famille :', await clickText('À pied', '[aria-label=Famille] button'));
+await wait(300);
+await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click()`);
+await wait(300);
+await importFiles(replayPath, 'input[type=file][accept*=".gpx"]');
+await wait(800);
+await evaluate(`(() => { const s = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => o.value === '600')); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '600'); s.dispatchEvent(new Event('change', { bubbles: true })); return s.value; })()`);
+console.log('Démarrer :', await clickText('Démarrer'));
+await wait(6000);
+console.log('Arrêter :', await holdStop());
+await waitFor("[...document.querySelectorAll('.ui-card')].some((c) => c.textContent.includes('Session terminée') && c.querySelector('.ui-more__button'))", { timeout: 2500, label: 'session terminée' });
+const cardMenu = await evaluate(`(() => {
+  const card = [...document.querySelectorAll('.ui-card')].find((c) => c.textContent.includes('Session terminée'));
+  const b = card?.querySelector('.ui-more__button');
+  if (!b) return null;
+  b.click();
+  return [...card.querySelectorAll('.ui-more__panel button')].map((x) => x.textContent.trim());
+})()`);
+check('fin d\'enregistrement : « Partager » dans le « … » de « Session terminée »', Boolean(cardMenu?.includes('Partager')), JSON.stringify(cardMenu));
+await evaluate(`[...document.querySelectorAll('.ui-card .ui-more__panel button')].find((x) => x.textContent.trim() === 'Partager')?.click()`);
+check('fin d\'enregistrement : aperçu dessiné', await waitImage());
+check('fin d\'enregistrement : image en hauteur de 1080 × 1920', isPortrait(await imageSize()), JSON.stringify(await imageSize()));
+c = await chips();
+console.log('pastilles :', c.map((x) => `${x.label}${x.on ? ' *' : ''}`).join(' | '));
+check('fin d\'enregistrement : chiffres du résumé', c.some((x) => x.label === 'Distance') && c.length >= 6, String(c.length));
+check('fin d\'enregistrement : choix de la course repris (même activité)', c.filter((x) => x.on).length === course.stats?.length
+  && !(await evaluate(`document.querySelector('.share-dialog__check input').checked`)));
+await saveImage('partage-enregistrement');
+await shoot('partage-enregistrement-fenetre');
+
+console.log('\n--- console (erreurs, avertissements) ---');
+logs.forEach((l) => console.log(l));
+console.log(failures === 0 ? '\nTout passe.' : `\n${failures} échec(s).`);
+await close();
+process.exit(failures === 0 ? 0 : 1);

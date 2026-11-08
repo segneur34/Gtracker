@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Ni sauvegarde Google ni transfert d'appareil : le dossier mémoire est la seule sauvegarde. allowBackup="false"
+         n'arrête pas le transfert d'appareil sous Android 12 ou plus, d'où les règles, qui excluent tout des deux. -->
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme"
+        tools:targetApi="31">
+
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- « Ouvrir avec Tracker » d'un GPX ou d'un FIT (IncomingFilePlugin). Tracker apparaît dans le choix d'Android, sans en
+                 devenir l'application par défaut ; la signature du fichier est vérifiée à la réception, un type ne prouve rien. Pas de
+                 BROWSABLE : une page web ne peut pas pousser de fichier. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:mimeType="application/gpx+xml" />
+                <data android:mimeType="application/gpx" />
+                <data android:mimeType="application/vnd.ant.fit" />
+                <data android:mimeType="application/fit" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="text/xml" />
+                <data android:mimeType="application/xml" />
+            </intent-filter>
+
+            <!-- « Ouvrir avec » d'un .gpx dont le gestionnaire de fichiers donne un type inattendu (text/plain, application/gpx,
+                 type vide ou générique selon l'application) : Tracker est proposé d'après l'extension du nom. Forme connue d'Android
+                 (type générique, hôte joker, motifs de chemin), limitée au GPX ; le JSON n'est jamais proposé. Seul content:// : la
+                 réception refuse file://. Le FIT passe par ses types, plus fiables. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.gpx" />
+                <data android:pathPattern=".*\\.GPX" />
+            </intent-filter>
+
+            <!-- « Partager vers Tracker » : le fichier est dans EXTRA_STREAM, l'intention n'a pas d'adresse. Déclarer un schéma ici
+                 l'empêcherait d'entrer (règle des filtres d'Android). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/gpx+xml" />
+                <data android:mimeType="application/vnd.ant.fit" />
+                <data android:mimeType="application/fit" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="text/xml" />
+                <data android:mimeType="application/xml" />
+            </intent-filter>
+
+        </activity>
+
+        <!-- Compteur du fractionné : bips à l'heure dite, écran éteint, avec ou sans enregistrement (IntervalTimerService). -->
+        <service
+            android:name=".IntervalTimerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Compteur de fractionné : bips à heure fixe, écran éteint" />
+        </service>
+
+        <!-- Muscu : session sans GPS tenue écran éteint par la ceinture cardio (HeartRateService). -->
+        <service
+            android:name=".HeartRateService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"></meta-data>
+        </provider>
+
+        <!-- Récepteur du greffon GPS, retiré : il ne restaure au démarrage que des zones de géorepérage, jamais créées ici. -->
+        <receiver
+            android:name="com.capgo.capacitor_background_geolocation.GeofenceBootReceiver"
+            tools:node="remove" />
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Vibrations du guidage vers les balises (BeeperPlugin) : permission normale, sans demande. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Compteur du fractionné : service au premier plan, processeur éveillé, notification de la phase. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Ceinture cardio (HeartRatePlugin) : recherche et connexion Bluetooth, sans en tirer de position. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <!-- Muscu : service au premier plan de la ceinture (HeartRateService), type « appareil connecté ». -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- Carte « Autorisations » (PermissionsPlugin) : l'écran système qui lève l'optimisation de la batterie. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Déclarée par le greffon GPS et par androidx.work, sans usage ici (récepteur retiré plus haut). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
+</manifest>

@@ -1,0 +1,292 @@
+import { useEffect, useState } from 'react';
+import {
+  canChooseMemoryFolder,
+  canImportSessions,
+  chooseFolder,
+  dismissLibraryMessage,
+  reconnectFolder,
+  switchToBrowserMemory,
+  useLibraryFields,
+} from '../hooks/useSessionLibrary';
+import { READ_ONLY_MEMORY_MESSAGE, browserMemoryIsGuaranteed } from '../platform/memoryFolder';
+import { isNativeApp } from '../platform/runtime';
+import ImportButtons from './ImportButtons';
+import PanelTitle from './PanelTitle';
+import RefreshLibraryButton from './RefreshLibraryButton';
+import SettingsFiles, { SettingsOfferBanner } from './SettingsFiles';
+import { HelpText, HelpToggle } from './Help';
+import { useInSettings } from './helpContext';
+import Button from './ui/Button';
+import Card from './ui/Card';
+import { plural } from '../core/basics';
+import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
+
+/**
+ * État de la mémoire : où elle est, combien de sessions, ce qu'il faut faire
+ * si elle est inaccessible. En tête des bibliothèques en version `compact`,
+ * qui ne montre rien quand tout va bien (le nombre de sessions et
+ * l'emplacement sont dans leur menu « … »), seulement ce qui demande
+ * attention : mémoire fermée, lecture en cours, sessions en attente,
+ * doublons, GPX illisibles, messages et fichier de réglages proposé. Dans
+ * Réglages en version détaillée (changer de dossier, fichiers de réglages
+ * par appareil par `SettingsFiles`, mode d'emploi du copier-coller). Avec `collapse`, la carte se replie par son titre et ne
+ * garde, fermée, que sa ligne d'état et ses alertes, dont la proposition d'un
+ * nouveau fichier de réglages (`SettingsOfferBanner`). Dans Réglages, les
+ * explications passent sous des « ? » (`Help.tsx`) ; ailleurs, elles restent à découvert.
+ *
+ * Dans Réglages, « Mettre à jour » (`RefreshLibraryButton`) et « Ajouter les
+ * sessions d'un dossier » (`ImportButtons`) suivent la ligne d'état, carte
+ * repliée comprise ; dans les bibliothèques, ils sont dans le menu « … ».
+ */
+
+
+const mutedStyle = { margin: 0, color: 'var(--muted)', fontSize: 'var(--text-s)', lineHeight: 1.5 } as const;
+const rowStyle = { display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' } as const;
+
+function MemoryStatus({
+  detailed = false, compact = false, collapse,
+}: {
+  detailed?: boolean;
+  /** Bibliothèques : rien quand tout va bien. */
+  compact?: boolean;
+  collapse?: { open: boolean; onToggle: () => void };
+}) {
+  const library = useLibraryFields(
+    'status', 'folderKind', 'folderLabel', 'memoryReadOnly', 'reason', 'sessions', 'scanning', 'pendingCount', 'duplicates', 'unreadable', 'tooLarge', 'message', 'error'
+  );
+  const { status, folderKind, folderLabel } = library;
+  const canChoose = canChooseMemoryFolder();
+  const native = isNativeApp();
+  /** Dans Réglages : explications sous des « ? ». */
+  const inSettings = useInSettings();
+  /** Le navigateur a-t-il promis de garder sa mémoire ? Seul le refus se dit (Réglages, mémoire du navigateur). */
+  const [guaranteed, setGuaranteed] = useState(true);
+  useEffect(() => {
+    if (status !== 'ready' || folderKind !== 'browser') return;
+    let alive = true;
+    void browserMemoryIsGuaranteed().then((ok) => { if (alive) setGuaranteed(ok); });
+    return () => { alive = false; };
+  }, [status, folderKind]);
+
+  const headline = (() => {
+    switch (status) {
+      case 'opening':
+        return 'Ouverture de la mémoire…';
+      case 'ready':
+        return `${plural(library.sessions.length, 'session')} · ${folderLabel ?? 'mémoire'}`;
+      case 'needs-permission':
+        return native
+          ? `Android a retiré l'accès au ${folderLabel ?? 'dossier choisi'}.`
+          : `Le ${folderLabel ?? 'dossier choisi'} attend votre autorisation.`;
+      default:
+        return library.reason ?? 'Aucune mémoire accessible.';
+    }
+  })();
+
+  /** Ligne d'état ; dans Réglages, « Mettre à jour » et l'import d'un dossier dessous. */
+  const statusLine = (
+    <>
+      <p style={{ margin: 0, fontSize: 'var(--text-m)', fontWeight: 600 }}>{headline}</p>
+      {status === 'ready' && library.memoryReadOnly && <p style={mutedStyle}>{READ_ONLY_MEMORY_MESSAGE}</p>}
+      {detailed && (canImportSessions(library) || (status === 'ready' && library.memoryReadOnly)) && (
+        <div style={rowStyle}>
+          <RefreshLibraryButton />
+          <ImportButtons gpx={false} />
+        </div>
+      )}
+    </>
+  );
+
+  const alert = (library.message || library.error) && (
+    <div className={`ui-alert ${library.error ? 'ui-alert--danger' : 'ui-alert--success'}`}>
+      {library.error ?? library.message}{' '}
+      <Button size="s" variant="ghost" onClick={dismissLibraryMessage}>Fermer</Button>
+    </div>
+  );
+
+  // Seule la lecture des GPX sans fiche demande attention ; les résumés refaits ont leur ligne dans la liste.
+  const creating = library.scanning && library.scanning.creating.done < library.scanning.creating.total
+    ? library.scanning.creating : null;
+  const attention = status !== 'ready' || library.memoryReadOnly || creating !== null || library.pendingCount > 0
+    || library.duplicates.length > 0 || library.unreadable.length > 0 || library.tooLarge.length > 0;
+  if (compact && !attention) {
+    return (
+      <>
+        <SettingsOfferBanner />
+        {alert}
+      </>
+    );
+  }
+
+  const heading = collapse
+    ? <PanelTitle label="Mémoire" open={collapse.open} onToggle={collapse.onToggle}
+      extra={collapse.open ? <HelpToggle helpKey="memoire" label="Mémoire" size="s" /> : undefined} />
+    : detailed ? 'Mémoire' : undefined;
+
+  if (collapse && !collapse.open) {
+    return (
+      <Card heading={heading}>
+        <div className="ui-stack-3">
+          {statusLine}
+          <SettingsOfferBanner />
+          {alert}
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card heading={heading}>
+      <div className="ui-stack-3">
+        <HelpText helpKey="memoire">
+          Le dossier garde chaque session (sa trace GPX et sa fiche) et un fichier de réglages par appareil. Pour
+          sauvegarder ou changer d'appareil, copiez le dossier Gtracker entier : sur le téléphone, Stockage interne ›
+          Documents › Gtracker.
+        </HelpText>
+        {statusLine}
+
+        {creating && (
+          <p style={mutedStyle}>
+            Lecture des traces sans fiche : {creating.done} / {creating.total}
+          </p>
+        )}
+
+        {library.pendingCount > 0 && (
+          <p style={mutedStyle}>
+            {plural(library.pendingCount, 'session enregistrée')} en attente d'un dossier mémoire, gardée
+            {library.pendingCount > 1 ? 's' : ''} dans le dossier privé de l'application.
+          </p>
+        )}
+
+        {status === 'unavailable' && native && (
+          <>
+            {inSettings ? (
+              <>
+                <p style={mutedStyle}>
+                  Choisissez où garder vos sessions.
+                  <HelpToggle helpKey="memoire:choisir" label="Choisir le dossier" />
+                </p>
+                <HelpText helpKey="memoire:choisir">
+                  Dans le sélecteur : Documents, puis le dossier Gtracker (créez-le s'il n'existe pas), « Utiliser ce
+                  dossier », « Autoriser ».
+                </HelpText>
+              </>
+            ) : <p style={mutedStyle}>
+              Tracker garde vos sessions dans un dossier du téléphone, que vous pouvez copier sur le PC pour les
+              sauvegarder ou les retrouver. Dans le sélecteur qui va s'ouvrir : Documents, puis le dossier Gtracker
+              (créez-le s'il n'existe pas), « Utiliser ce dossier », et « Autoriser ».
+            </p>}
+            <div style={rowStyle}>
+              <Button variant="primary" onClick={() => void chooseFolder()}>Choisir le dossier</Button>
+            </div>
+          </>
+        )}
+
+        {status === 'needs-permission' && (
+          <div style={rowStyle}>
+            <Button variant="primary" onClick={() => void reconnectFolder()}>
+              {native ? 'Choisir à nouveau le dossier' : 'Reconnecter le dossier'}
+            </Button>
+            {detailed && !native && <Button onClick={() => void switchToBrowserMemory()}>Revenir à la mémoire du navigateur</Button>}
+          </div>
+        )}
+
+        {status === 'ready' && folderKind === 'browser' && !compact && inSettings && (
+          <>
+            <p style={mutedStyle}>
+              Emplacement : la mémoire de ce navigateur.
+              <HelpToggle helpKey="memoire:emplacement" label="Emplacement" />
+            </p>
+            <HelpText helpKey="memoire:emplacement">
+              {canChoose
+                ? "Invisible dans l'explorateur de fichiers. Choisissez un dossier (conseil : Documents › Gtracker) pour sauvegarder les sessions ou les passer au téléphone."
+                : "Invisible dans l'explorateur de fichiers. Pour un dossier du PC, ouvrez Tracker dans Chrome ou Edge."}
+            </HelpText>
+            {!guaranteed && (
+              <p style={mutedStyle}>
+                Ce navigateur ne garantit pas de garder cette mémoire : il peut la vider s'il manque de place.
+                {canChoose
+                  ? " Choisissez un dossier pour que vos sessions restent à l'abri."
+                  : " Pour les garder à l'abri, ouvrez Tracker dans Chrome ou Edge et choisissez un dossier."}
+              </p>
+            )}
+            {canChoose && (
+              <div style={rowStyle}>
+                <Button variant="primary" onClick={() => void chooseFolder()}>Choisir un dossier</Button>
+              </div>
+            )}
+          </>
+        )}
+
+        {status === 'ready' && folderKind === 'browser' && !compact && !inSettings && (
+          <>
+            <p style={mutedStyle}>
+              {detailed ? 'Emplacement : la mémoire interne de ce navigateur. ' : ''}
+              Les sessions sont gardées dans ce navigateur : aucun dossier sur le PC, l'explorateur de fichiers ne
+              les voit pas.
+              {canChoose
+                ? ' Choisissez un dossier pour les sauvegarder, les copier ou les passer au téléphone : elles y seront recopiées. Conseil : créez-le dans Documents, sous le nom Tracker, dans la fenêtre qui va s\'ouvrir.'
+                : ' Pour les garder dans un dossier du PC, ouvrez Tracker dans Chrome ou Edge.'}
+            </p>
+            {canChoose && (
+              <div style={rowStyle}>
+                <Button variant="primary" onClick={() => void chooseFolder()}>Choisir un dossier</Button>
+              </div>
+            )}
+          </>
+        )}
+
+        {detailed && status === 'ready' && folderKind === 'picked' && (
+          <>
+            <p style={mutedStyle}>
+              Emplacement : {folderLabel}, sur ce PC.
+              <HelpToggle helpKey="memoire:emplacement" label="Emplacement" />
+            </p>
+            <HelpText helpKey="memoire:emplacement">
+              Le navigateur ne donne que le nom du dossier : son chemin s'affiche dans la fenêtre de « Voir ou changer
+              le dossier ». Annuler n'y change rien.
+            </HelpText>
+            <div style={rowStyle}>
+              <Button onClick={() => void chooseFolder()}>Voir ou changer le dossier</Button>
+              <Button onClick={() => void switchToBrowserMemory()}>Revenir à la mémoire du navigateur</Button>
+            </div>
+          </>
+        )}
+
+        {detailed && status === 'ready' && folderKind === 'device' && (
+          <>
+            <p style={mutedStyle}>Emplacement : {folderLabel}, dans le stockage interne du téléphone.</p>
+            <div style={rowStyle}>
+              <Button onClick={() => void chooseFolder()}>Changer de dossier</Button>
+            </div>
+          </>
+        )}
+
+        {library.duplicates.length > 0 && (
+          <p style={mutedStyle}>
+            {plural(library.duplicates.length, 'fichier')} en double ignoré{library.duplicates.length > 1 ? 's' : ''} : même
+            trace sous un autre nom ({library.duplicates.join(', ')}).
+          </p>
+        )}
+        {library.unreadable.length > 0 && (
+          <p style={mutedStyle}>
+            {plural(library.unreadable.length, 'GPX illisible')} dans le dossier : {library.unreadable.join(', ')}.
+          </p>
+        )}
+        {library.tooLarge.length > 0 && (
+          <p style={mutedStyle}>
+            {plural(library.tooLarge.length, 'fichier')} de plus de {MAX_LISTED_FILE_BYTES / (1024 * 1024)} Mo laissé
+            {library.tooLarge.length > 1 ? 's' : ''} de côté, trop gros pour être lu{library.tooLarge.length > 1 ? 's' : ''} : {library.tooLarge.join(', ')}.
+          </p>
+        )}
+
+        <SettingsOfferBanner />
+        {detailed && status === 'ready' && <SettingsFiles />}
+
+        {alert}
+      </div>
+    </Card>
+  );
+}
+
+export default MemoryStatus;

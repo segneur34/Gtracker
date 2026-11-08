@@ -1,0 +1,69 @@
+import type { ReactNode } from 'react';
+import { formatSessionDate } from '../core/units';
+import { HelpToggle } from './Help';
+import { IconChevronRight } from './icons';
+
+/**
+ * Titre d'un panneau d'analyse, cliquable pour le refermer sans remonter à la
+ * rangée d'onglets : utile quand le panneau ouvert dépasse l'écran, surtout
+ * sur téléphone. Le nom en capitales espacées, comme les titres de l'accueil ;
+ * `extra` (date, mention) garde sa casse. Plus petit dans les analyses
+ * (`--panel-title-size`, `analysisMobile.css`). `helpKey` pose le « ? » de
+ * l'aide du panneau à droite du titre, une fois ouvert ; son texte (`HelpText`
+ * en `note`) se place juste sous le titre.
+ */
+function PanelTitle({ label, extra, open, onToggle, helpKey }: {
+  label: ReactNode;
+  extra?: ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  helpKey?: string;
+}) {
+  return (
+    <strong
+      role="button"
+      tabIndex={0}
+      onClick={onToggle}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+      className="ui-panel-title">
+      <IconChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined, transition: 'transform 0.15s', flexShrink: 0 }} />
+      <span className="ui-panel-title__text">
+        {label}
+      </span>
+      {extra}
+      {helpKey && open && <HelpToggle helpKey={helpKey} label={typeof label === 'string' ? label : 'ce panneau'} size="s" />}
+    </strong>
+  );
+}
+
+export default PanelTitle;
+
+/** Date et heure de départ d'une session, en petit à droite du titre « Général ». */
+export function SessionDate({ track }: { track: readonly { timeMs: number }[] }) {
+  if (track.length === 0) return null;
+  return (
+    <span className="ui-session-date">
+      {formatSessionDate(track[0].timeMs)}
+    </span>
+  );
+}
+
+/**
+ * Titre d'un panneau dans sa ligne, avec la marge qui le sépare du contenu :
+ * l'en-tête de presque tous les onglets. `padRight` réserve 28 px à droite
+ * (coin du panneau des sauts et du fractionné).
+ */
+export function PanelHeading({ label, extra, open, onToggle, helpKey, padRight = false }: {
+  label: ReactNode;
+  extra?: ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  helpKey?: string;
+  padRight?: boolean;
+}) {
+  return (
+    <div style={padRight ? { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', paddingRight: '28px' } : { marginBottom: '10px' }}>
+      <PanelTitle label={label} extra={extra} open={open} onToggle={onToggle} helpKey={helpKey} />
+    </div>
+  );
+}

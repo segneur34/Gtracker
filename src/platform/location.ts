@@ -1,0 +1,434 @@
+import { finiteOr } from '../core/basics';
+import { LOCATION_DENIED_TEXT, plainError } from './errorText';
+import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
+import type { Location as PluginLocation } from '@capgo/background-geolocation';
+import { isNativeApp } from './runtime';
+
+/**
+ * Sources de position : seul point d'accès autorisé au GPS.
+ *
+ * Trois sources, une même forme : le plugin de géolocalisation en arrière-plan
+ * dans l'application Android, `watchPosition` dans le navigateur, et un
+ * « rejeu » qui relit une trace en accéléré pour éprouver tout l'enregistrement
+ * sur le PC. Aucune ne filtre quoi que ce soit : l'intelligence reste dans le
+ * pipeline d'analyse (`docs/ETAT_DU_PROJET.md` §12).
+ */
+
+/** Position reçue d'une source, en unités SI. */
+export interface LocationFix {
+  /** Instant de la mesure, en millisecondes depuis l'époque Unix. */
+  timeMs: number;
+  lat: number;
+  lon: number;
+  /** Rayon d'incertitude horizontale, en mètres, à 68 %. */
+  accuracyM?: number;
+  /** Altitude, en mètres. */
+  altitudeM?: number;
+  /** Vitesse fournie par le système (Doppler sur la plupart des puces), en m/s. */
+  speedMs?: number;
+  /** Cap fourni par le système, en degrés, 0 = nord, sens horaire. */
+  bearingDeg?: number;
+  /** Fréquence cardiaque de la ceinture, en battements par minute, jointe par l'enregistreur. */
+  heartRateBpm?: number;
+  /** Cadence à pied, en pas par minute, mesurée à l'arrêt sur la capture des capteurs (`running/cadence.ts`). */
+  cadenceSpm?: number;
+}
+
+export interface LocationWatchOptions {
+  /** Intervalle demandé entre deux positions, en millisecondes. */
+  intervalMs: number;
+  /** Déplacement minimal avant une nouvelle position, en mètres. */
+  distanceFilterM: number;
+  /** Titre et texte de la notification permanente qu'Android exige pendant l'enregistrement. */
+  notificationTitle: string;
+  notificationText: string;
+}
+
+/** Arrête la réception des positions. */
+export type StopLocation = () => Promise<void>;
+
+export interface LocationSource {
+  /** Libellé affiché à l'utilisateur. */
+  label: string;
+  /**
+   * Démarre la réception : `onFix` à chaque position, `onError` quand la
+   * source échoue (permission refusée, localisation coupée). Rend la fonction
+   * d'arrêt.
+   */
+  start(
+    options: LocationWatchOptions,
+    onFix: (fix: LocationFix) => void,
+    onError: (message: string) => void
+  ): Promise<StopLocation>;
+}
+
+const fromPlugin = (location: PluginLocation): LocationFix => ({
+  timeMs: location.time ?? Date.now(),
+  lat: location.latitude,
+  lon: location.longitude,
+  accuracyM: finiteOr(location.accuracy, undefined),
+  altitudeM: finiteOr(location.altitude, undefined),
+  speedMs: finiteOr(location.speed, undefined),
+  bearingDeg: finiteOr(location.bearing, undefined),
+});
+
+/** Attente entre deux essais de démarrage du GPS, quand la localisation du téléphone est coupée. */
+const LOCATION_RETRY_MS = 2_000;
+
+/** Refus du plugin quand la localisation du téléphone est coupée, l'autorisation étant donnée (« Location services disabled. »). */
+const isLocationDisabled = (error: { message?: string }): boolean => /disabled/i.test(error.message ?? '');
+
+/**
+ * Refus du plugin rendu en clair (lot 158) : `NOT_AUTHORIZED` (« User denied
+ * location permission ») dit où réactiver la localisation ; toute autre
+ * erreur passe par le traducteur, son texte brut n'allant qu'en console.
+ */
+export const locationErrorText = (error: { message?: string; code?: string }): string => {
+  if (error.code === 'NOT_AUTHORIZED' || /denied/i.test(error.message ?? '')) return LOCATION_DENIED_TEXT;
+  const err = Object.assign(new Error(error.message ?? ''), error.code ? { code: error.code } : {});
+  return plainError(err, 'Localisation indisponible.');
+};
+
+/** Rôle de qui tient le service GPS du téléphone. */
+type NativeRole = 'ponctuelle' | 'enregistrement';
+
+/**
+ * Détenteur du service GPS du téléphone, `null` s'il est libre. Le greffon
+ * n'a qu'un service et qu'un destinataire : un second `start` est refusé
+ * (`ALREADY_STARTED`) et `stop` l'arrête pour tout le monde. Un enregistrement
+ * clôt donc d'abord une localisation ponctuelle en cours ; une localisation
+ * ponctuelle pendant un enregistrement est refusée.
+ */
+let nativeHolder: { role: NativeRole; interrupt: () => Promise<void> } | null = null;
+
+const INTERRUPTED_BY_RECORDING = "Recherche interrompue par l'enregistrement.";
+const HELD_BY_RECORDING = "Position suivie par l'enregistrement : prendre sa dernière position.";
+const SERVICE_BUSY = 'GPS déjà occupé : mettez en pause, puis reprenez.';
+const LOCATION_DISABLED_TEXT = "Localisation du téléphone coupée : activez-la, l'enregistrement démarre à la première position.";
+
+/**
+ * GPS du téléphone, par `@capgo/background-geolocation` : un service de
+ * premier plan, avec sa notification, qui continue écran éteint. Le plugin est
+ * chargé à la demande, pour ne rien coûter au navigateur.
+ *
+ * Localisation coupée au démarrage : le plugin refuse sans rien lancer. Le
+ * démarrage est alors réessayé jusqu'à ce qu'elle revienne, pour que les
+ * positions arrivent dès qu'elle est activée, sans pause ni reprise. Service
+ * déjà lancé sans détenteur connu (relancé seul par Android) : il est arrêté,
+ * puis relancé une fois.
+ */
+const startNative = async (
+  role: NativeRole,
+  options: LocationWatchOptions,
+  onFix: (fix: LocationFix) => void,
+  onError: (message: string) => void
+): Promise<StopLocation> => {
+  if (role === 'ponctuelle' && nativeHolder?.role === 'enregistrement') throw new Error(HELD_BY_RECORDING);
+  let stopped = false;
+  let retry: ReturnType<typeof setTimeout> | null = null;
+  let toldDisabled = false;
+  let relaunched = false;
+  let stopping: Promise<void> | null = null;
+  // Un seul arrêt, attendu par tous ceux qui le demandent.
+  const stop: StopLocation = () => (stopping ??= (async () => {
+    stopped = true;
+    if (retry !== null) clearTimeout(retry);
+    retry = null;
+    if (nativeHolder === holder) nativeHolder = null;
+    const { BackgroundGeolocation } = await import('@capgo/background-geolocation');
+    await BackgroundGeolocation.stop();
+  })());
+  const holder = {
+    role,
+    interrupt: async () => {
+      if (role === 'ponctuelle') onError(INTERRUPTED_BY_RECORDING);
+      await stop();
+    },
+  };
+  // Pris avant toute attente : un démarrage qui suit voit déjà ce détenteur.
+  const previous = nativeHolder;
+  nativeHolder = holder;
+  if (previous) await previous.interrupt().catch(() => undefined);
+
+  const { BackgroundGeolocation } = await import('@capgo/background-geolocation');
+  const launch = async (): Promise<void> => {
+    if (stopped) return;
+    await BackgroundGeolocation.start(
+      {
+        backgroundTitle: options.notificationTitle,
+        backgroundMessage: options.notificationText,
+        requestPermissions: true,
+        // Jamais de position périmée : une position ancienne fausserait le premier intervalle.
+        stale: false,
+        distanceFilter: options.distanceFilterM,
+        minIntervalMs: options.intervalMs,
+      },
+      (location, error) => {
+        if (stopped) return;
+        if (error) {
+          if (isLocationDisabled(error)) {
+            if (!toldDisabled) onError(LOCATION_DISABLED_TEXT);
+            toldDisabled = true;
+            retry = setTimeout(() => {
+              retry = null;
+              if (!stopped) launch().catch((err: unknown) => onError(plainError(err, 'Localisation indisponible.')));
+            }, LOCATION_RETRY_MS);
+            return;
+          }
+          if (error.code === 'ALREADY_STARTED') {
+            if (relaunched) {
+              onError(SERVICE_BUSY);
+              return;
+            }
+            relaunched = true;
+            BackgroundGeolocation.stop()
+              .then(launch)
+              .catch((err: unknown) => onError(plainError(err, 'Localisation indisponible.')));
+            return;
+          }
+          onError(locationErrorText(error));
+          return;
+        }
+        if (location) onFix(fromPlugin(location));
+      }
+    );
+  };
+  await launch();
+  return stop;
+};
+
+const nativeSource: LocationSource = {
+  label: 'GPS du téléphone',
+  start: (options, onFix, onError) => startNative('enregistrement', options, onFix, onError),
+};
+
+/**
+ * GPS du navigateur. Suffit pour éprouver la page sur le PC ; inutilisable
+ * pour une vraie session, le navigateur coupant la localisation écran éteint.
+ */
+const browserSource: LocationSource = {
+  label: 'GPS du navigateur',
+  start: async (_options, onFix, onError) => {
+    if (!('geolocation' in navigator)) {
+      onError('Ce navigateur ne donne pas accès à la position.');
+      return async () => {};
+    }
+    const id = navigator.geolocation.watchPosition(
+      (p) =>
+        onFix({
+          timeMs: p.timestamp,
+          lat: p.coords.latitude,
+          lon: p.coords.longitude,
+          accuracyM: finiteOr(p.coords.accuracy, undefined),
+          altitudeM: finiteOr(p.coords.altitude, undefined),
+          speedMs: finiteOr(p.coords.speed, undefined),
+          bearingDeg: finiteOr(p.coords.heading, undefined),
+        }),
+      (e) => onError(e.code === e.PERMISSION_DENIED ? LOCATION_DENIED_TEXT : 'Localisation indisponible.'),
+      { enableHighAccuracy: true, maximumAge: 0 }
+    );
+    return async () => navigator.geolocation.clearWatch(id);
+  },
+};
+
+/** Source de position de l'appareil : le plugin sur le téléphone, le navigateur ailleurs. */
+export const deviceLocationSource = (): LocationSource => (isNativeApp() ? nativeSource : browserSource);
+
+/**
+ * Rejeu d'une trace : chaque position est émise quand le temps écoulé depuis
+ * le départ, multiplié par `speedFactor`, atteint son écart au premier point.
+ * Les heures d'origine sont conservées, si bien qu'une trace rejouée puis
+ * enregistrée redonne la même analyse que le fichier de départ. Une minuterie
+ * en retard émet d'un coup tout ce qui est échu.
+ */
+export const createReplaySource = (fixes: LocationFix[], speedFactor: number): LocationSource => ({
+  label: `Rejeu ×${speedFactor}`,
+  start: async (_options, onFix) => {
+    let next = 0;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const firstMs = fixes[0]?.timeMs ?? 0;
+    const startedAt = Date.now();
+
+    const tick = () => {
+      if (stopped) return;
+      const elapsedTrackMs = (Date.now() - startedAt) * speedFactor;
+      while (next < fixes.length && fixes[next].timeMs - firstMs <= elapsedTrackMs) {
+        onFix(fixes[next]);
+        next++;
+      }
+      if (next < fixes.length) {
+        const waitMs = (fixes[next].timeMs - firstMs - elapsedTrackMs) / speedFactor;
+        timer = setTimeout(tick, Math.max(0, waitMs));
+      }
+    };
+    tick();
+
+    return async () => {
+      stopped = true;
+      if (timer !== null) clearTimeout(timer);
+    };
+  },
+});
+
+/**
+ * Arrête le service GPS natif, s'il tourne encore sans personne pour
+ * l'écouter : après un arrêt brutal de l'application, Android peut le
+ * relancer seul. Sans effet dans le navigateur.
+ */
+export const stopOrphanedDeviceLocation = async (): Promise<void> => {
+  if (!isNativeApp() || nativeHolder !== null) return;
+  try {
+    const { BackgroundGeolocation } = await import('@capgo/background-geolocation');
+    await BackgroundGeolocation.stop();
+  } catch {
+    // Rien à arrêter.
+  }
+};
+
+/** Message d'un greffon vers la page, tel que `MessageHandler.java` l'envoie à `window.Capacitor.fromNative`. */
+interface NativeMessage {
+  pluginId?: string;
+  methodName?: string;
+  save?: boolean;
+  success?: boolean;
+  data?: PluginLocation;
+  error?: { message?: string; code?: string };
+}
+
+type CapacitorBridge = { fromNative?: (message: NativeMessage) => void };
+
+/**
+ * Rebranche la page rechargée sur le service GPS resté vivant après une chute du moteur de rendu (lot 156), sans
+ * jamais le relancer : écran éteint, le système le laisserait sans position. L'appel gardé par le greffon
+ * (`watchCall`) envoie déjà dans la page neuve, sous un numéro que celle-ci ne connaît plus : ses positions sont lues
+ * au passage dans `window.Capacitor.fromNative`, puis laissées à leur chemin ; ses refus vont à `onError`, comme ceux
+ * d'une source démarrée, sans relance. Lève si le pont manque ou si le service a déjà un détenteur : la reprise retombe
+ * alors sur l'arrêt. Rend l'arrêt, qui rend aussi le pont.
+ */
+export const adoptRunningService = (onFix: (fix: LocationFix) => void, onError: (message: string) => void): StopLocation => {
+  const bridge = (window as unknown as { Capacitor?: CapacitorBridge }).Capacitor;
+  const original = bridge?.fromNative;
+  if (!bridge || !original) throw new Error('Pont du téléphone introuvable.');
+  if (nativeHolder !== null) throw new Error(SERVICE_BUSY);
+  let stopping: Promise<void> | null = null;
+  const stop: StopLocation = () => (stopping ??= (async () => {
+    if (bridge.fromNative === listen) bridge.fromNative = original;
+    if (nativeHolder === holder) nativeHolder = null;
+    const { BackgroundGeolocation } = await import('@capgo/background-geolocation');
+    await BackgroundGeolocation.stop();
+  })());
+  const holder = { role: 'enregistrement' as const, interrupt: stop };
+  const listen = (message: NativeMessage): void => {
+    // Lu avant de passer la main : le pont efface `data` et `error` en fin de traitement.
+    const { pluginId, methodName, save, success, data, error } = message;
+    if (stopping === null && pluginId === 'BackgroundGeolocation' && methodName === 'start') {
+      try {
+        if (success === true && save === true && data) onFix(fromPlugin(data));
+        else if (success === false && error) onError(isLocationDisabled(error) ? LOCATION_DISABLED_TEXT : locationErrorText(error));
+      } catch (err) {
+        console.warn('Message du service GPS repris illisible', err);
+      }
+    }
+    original.call(bridge, message);
+  };
+  nativeHolder = holder;
+  bridge.fromNative = listen;
+  return stop;
+};
+
+/**
+ * Vrai si l'accès à la position est déjà accordé, sans jamais le demander :
+ * une page peut alors s'en servir d'elle-même (Itinéraires centrée sur soi).
+ * Dans le doute, faux.
+ */
+export const locationPermissionGranted = async (): Promise<boolean> => {
+  try {
+    if (isNativeApp()) {
+      const { BackgroundGeolocation } = await import('@capgo/background-geolocation');
+      return (await BackgroundGeolocation.checkPermissions()).location === 'granted';
+    }
+    if (!('permissions' in navigator) || !('geolocation' in navigator)) return false;
+    return (await navigator.permissions.query({ name: 'geolocation' })).state === 'granted';
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Une seule position, pour centrer une carte (page Itinéraires). Sur le
+ * téléphone, le service GPS démarre le temps de la trouver, avec sa
+ * notification, puis s'arrête. Un enregistrement qui démarre entre-temps
+ * l'interrompt (rejet). Refusée pendant un enregistrement, qui partage ce
+ * service : prendre alors sa dernière position.
+ */
+export const currentPosition = (timeoutMs = 30_000): Promise<LocationFix> =>
+  new Promise((resolve, reject) => {
+    let settled = false;
+    let stop: StopLocation | null = null;
+    const finish = (settle: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      settle();
+      void stop?.();
+    };
+    const timer = setTimeout(
+      () => finish(() => reject(new Error('Position introuvable : vérifiez que la localisation est activée.'))),
+      timeoutMs
+    );
+    const source: LocationSource = isNativeApp()
+      ? { label: nativeSource.label, start: (options, onFix, onError) => startNative('ponctuelle', options, onFix, onError) }
+      : browserSource;
+    source
+      .start(
+        { intervalMs: 1000, distanceFilterM: 0, notificationTitle: 'Tracker', notificationText: 'Recherche de votre position' },
+        (fix) => finish(() => resolve(fix)),
+        (message) => finish(() => reject(new Error(message)))
+      )
+      .then(
+        (stopFn) => {
+          stop = stopFn;
+          // Position trouvée avant que le démarrage ne rende la main : on arrête tout de suite.
+          if (settled) void stopFn();
+        },
+        (err) => finish(() => reject(err instanceof Error ? err : new Error('Localisation indisponible.')))
+      );
+  });
+
+/** Satellites du GPS : servant à la position, et en vue. */
+export interface SatelliteCount {
+  used: number;
+  visible: number;
+}
+
+interface GnssPlugin {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  addListener(event: 'satellites', listener: (data: SatelliteCount) => void): Promise<PluginListenerHandle>;
+}
+
+const gnss = registerPlugin<GnssPlugin>('Gnss');
+
+/**
+ * Suit les satellites du GPS sur le téléphone (`GnssPlugin.java`), une fois
+ * par seconde environ, tant que le GPS tourne ; rend l'arrêt. Sans effet dans
+ * le navigateur, qui n'en dit rien.
+ */
+export const watchSatellites = (listener: (count: SatelliteCount) => void): (() => void) => {
+  if (!isNativeApp()) return () => undefined;
+  let stopped = false;
+  let handle: PluginListenerHandle | null = null;
+  void gnss.addListener('satellites', (data) => {
+    if (!stopped) listener({ used: data.used, visible: data.visible });
+  }).then((h) => {
+    handle = h;
+    if (stopped) void h.remove();
+    else void gnss.start().catch(() => undefined);
+  }).catch(() => undefined);
+  return () => {
+    stopped = true;
+    void handle?.remove();
+    void gnss.stop().catch(() => undefined);
+  };
+};

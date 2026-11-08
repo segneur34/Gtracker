@@ -1,0 +1,119 @@
+/* Graphe zoomable (`ZoomableChart.tsx`) : planification, statistiques et analyses (voile, course, vélo, surf, fractionné, test, sauts). */
+
+.zoom-chart {
+  position: relative;
+  /* Un doigt fait défiler la page ; deux doigts zooment le graphe, pas la page. */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/*
+ * Les doigts visent toujours la surface du graphe, jamais un de ses traits :
+ * zoomer redessine grille et graduations, et un toucher dont la cible
+ * disparaît ne reçoit plus ses mouvements. Le survol de Recharts se fonde sur
+ * la position, pas sur la cible.
+ */
+.zoom-chart .recharts-surface * {
+  pointer-events: none;
+}
+
+/* Recharts rend le graphe focalisable (clavier) : pas de contour après un clic ou une zone tirée à la souris. */
+.zoom-chart .recharts-surface:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Zone tirée à la souris : la couleur vient de chartStyle.ts (variable posée par ZoomableChart). */
+.zoom-chart__selection {
+  position: absolute;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--zoom-selection) 15%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--zoom-selection) 60%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--zoom-selection) 60%, transparent);
+}
+
+/* « Tout voir », en haut à droite du graphe zoomé. */
+.zoom-chart__actions {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-3);
+  z-index: 1;
+  display: flex;
+  gap: var(--space-1);
+}
+
+/*
+ * « Afficher » ou « +carte » (25/10) : hors du tracé, sur la ligne du nom du graphe juste
+ * au-dessus, collé à droite ; la lecture de cette ligne lui laisse la place.
+ */
+.zoom-chart__map.ui-btn {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  z-index: 1;
+  min-height: 20px;
+  padding: 0 calc(var(--space-3) * 0.8);
+  font-size: calc(var(--text-s) * 0.8);
+  box-shadow: var(--shadow-chip);
+}
+
+.chart-head:has(+ .zoom-chart > .zoom-chart__map),
+.chart-readout--line:has(+ .zoom-chart > .zoom-chart__map) {
+  padding-right: 84px;
+}
+
+/* 20 % sous `.ui-btn--s` (demande du 24/10) : ils couvraient trop du graphe. */
+.zoom-chart__actions .ui-btn {
+  min-height: 24px;
+  padding: 0 calc(var(--space-3) * 0.8);
+  font-size: calc(var(--text-s) * 0.8);
+  box-shadow: var(--shadow-chip);
+}
+
+/*
+ * Nom d'un graphe et sa lecture (`ChartReadout`), au-dessus de lui : une
+ * seule ligne, qui ne passe jamais à la ligne, pour que le graphe ne bouge
+ * pas sous le doigt quand la valeur change.
+ */
+.chart-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.chart-readout {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+}
+
+/* Ligne de lecture seule (graphe sans nom au-dessus de lui, Superposés) : la hauteur d'une ligne, même vide. */
+.chart-readout--line {
+  flex: none;
+  display: block;
+  min-height: 1.6em;
+}
+
+.chart-readout__value {
+  font-weight: 600;
+}
+
+.chart-readout__at {
+  color: var(--muted);
+}
+
+/* Étiquette d'un graphe sans bouton de repli, à la manière de `ChartFold`. */
+.chart-readout__label {
+  font-size: var(--chart-name-size, var(--text-xs));
+  font-weight: 600;
+  letter-spacing: var(--title-spacing);
+  text-transform: uppercase;
+  margin-right: var(--space-2);
+}

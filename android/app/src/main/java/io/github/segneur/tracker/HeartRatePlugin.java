@@ -1,0 +1,909 @@
+package io.github.segneur.tracker;
+
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
+import android.bluetooth.BluetoothGattService;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanRecord;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.ParcelUuid;
+import android.os.SystemClock;
+import android.provider.Settings;
+import android.util.Log;
+import androidx.core.content.ContextCompat;
+import com.getcapacitor.JSArray;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Ceinture cardio Bluetooth (src/platform/heartRate.ts) : recherche, connexion
+ * et fréquence cardiaque, par le service standard Heart Rate (0x180D) que
+ * toute ceinture « Bluetooth Smart » expose. Aucun appairage : une ceinture
+ * ne le demande pas, la connexion se fait directement.
+ *
+ * Avant d'ouvrir la connexion, une recherche courte filtrée sur l'adresse
+ * retrouve la ceinture : l'appareil rendu porte le bon type d'adresse. Une
+ * ceinture à adresse aléatoire (la Decathlon) ouverte par la seule adresse
+ * passe pour publique, et la pile ne la joint que si elle en garde une fiche
+ * (après un passage par les réglages Bluetooth d'Android, par exemple).
+ *
+ * Chaque mesure (caractéristique 0x2A37) part vers la page par l'événement
+ * `heartRate` ; l'enregistreur la joint à la position suivante. Écran éteint,
+ * le service au premier plan du GPS garde le processus en vie, et la pile
+ * Bluetooth livre les mesures comme les positions ; sans GPS (muscu), c'est
+ * HeartRateService, démarré par `keepAlive`.
+ *
+ * Une ceinture jointe puis perdue (hors de portée, retirée, liaison muette
+ * `STALL_MS`, découverte en échec, Bluetooth éteint puis rallumé) est
+ * cherchée de nouveau, sans fin jusqu'à `disconnect` : recherche filtrée,
+ * puis ouverture directe si elle est vue ; toutes les `LOST_AUTOCONNECT_EVERY`
+ * recherches vaines, une ouverture en attente (`autoConnect`), pour une
+ * ceinture restée liée au téléphone qui ne s'annonce plus. Une tentative
+ * toutes les `LOST_RETRY_MS`, puis `LOST_RETRY_SLOW_MS` passé
+ * `LOST_FAST_MS` de perte. Chaque tentative laisse une ligne au journal.
+ * Une ceinture jamais jointe depuis `connect` (laissée à la maison) est
+ * recherchée au même rythme, compté depuis `connect` (lot 115).
+ */
+@CapacitorPlugin(
+    name = "HeartRate",
+    permissions = {
+        @Permission(alias = "bluetooth", strings = { Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT }),
+    }
+)
+public class HeartRatePlugin extends Plugin {
+
+    private static final UUID HEART_RATE_SERVICE = UUID.fromString("0000180d-0000-1000-8000-00805f9b34fb");
+    private static final UUID HEART_RATE_MEASUREMENT = UUID.fromString("00002a37-0000-1000-8000-00805f9b34fb");
+    private static final UUID CLIENT_CONFIG = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+    /** Durée de recherche par défaut, en millisecondes. */
+    private static final long DEFAULT_SCAN_MS = 6000;
+    /** Recherche de la ceinture avant d'ouvrir la connexion, au plus, en millisecondes. */
+    private static final long LOCATE_MS = 5000;
+    /**
+     * Ceinture perdue après jonction : pause entre deux tentatives pendant les
+     * `LOST_FAST_MS` premières millisecondes de perte. Une recherche de
+     * `LOCATE_MS` toutes les 15 s environ reste sous la limite d'Android.
+     */
+    private static final long LOST_RETRY_MS = 10000;
+    /** Pause entre deux tentatives passé `LOST_FAST_MS` de perte : la batterie d'abord. */
+    private static final long LOST_RETRY_SLOW_MS = 30000;
+    /** Durée de perte pendant laquelle les tentatives restent rapprochées (`LOST_RETRY_MS`), en millisecondes. */
+    private static final long LOST_FAST_MS = 5 * 60_000;
+    /** Une recherche vaine sur ce nombre est suivie d'une ouverture en attente (`autoConnect`) plutôt que d'une simple pause. */
+    private static final int LOST_AUTOCONNECT_EVERY = 3;
+    /**
+     * Ouverture directe sans réponse abandonnée après ce délai, en
+     * millisecondes : Android l'expire d'ordinaire à 30 s ; au-delà, elle est
+     * bloquée.
+     */
+    private static final long OPEN_GUARD_MS = 35000;
+    /**
+     * Liaison établie sans aucune trame pendant ce délai, en millisecondes :
+     * bloquée (découverte sans réponse, abonnement raté), traitée comme une
+     * perte. Une trame « sans contact » compte : une ceinture retirée mais
+     * liée n'est pas relancée en boucle.
+     */
+    private static final long STALL_MS = 20000;
+    /** Étiquette du journal (`adb logcat -s TrackerHR`). */
+    private static final String TAG = "TrackerHR";
+
+    private final Handler main = new Handler(Looper.getMainLooper());
+
+    // État de la connexion, lu et écrit sur le fil principal (les rappels Bluetooth y sont renvoyés).
+    private BluetoothGatt gatt;
+    private String address;
+    private String name;
+    /** L'appareil à ouvrir ; celui rendu par la recherche porte le bon type d'adresse. */
+    private BluetoothDevice device;
+    /** Vrai si `device` vient d'une recherche : son type d'adresse est alors sûr. */
+    private boolean located = false;
+    /** Vrai entre `connect` et `disconnect` : une coupure est alors relancée. */
+    private boolean wanted = false;
+    /** Dernier état annoncé à la page, rendu par `connection` à une page rechargée. */
+    private String lastStatus = "off";
+    /** Vrai dès que la ceinture a été jointe (abonnement posé) depuis `connect` : une coupure est alors une perte. */
+    private boolean joined = false;
+    /** Vrai entre l'état « connecté » de la liaison et sa fermeture. */
+    private boolean linked = false;
+    /** Dernier `connect` (`SystemClock.elapsedRealtime`) : les recherches d'une ceinture jamais jointe s'espacent passé `LOST_FAST_MS`. */
+    private long connectedAt = 0;
+    /** Début de la perte en cours (`SystemClock.elapsedRealtime`), ou -1 hors perte. */
+    private long lostSince = -1;
+    /** Recherches vaines depuis le début de la perte en cours. */
+    private int vainSearches = 0;
+    /** Recherche en cours avant l'ouverture, ou `null`. */
+    private ScanCallback locating;
+    private final Runnable locateTimeout = () -> locatedBy(locating, null);
+    private final Runnable relocate = this::locate;
+    private final Runnable lostRetry = this::retryLost;
+    private final Runnable stall = this::stalled;
+    /** Bluetooth éteint ou rallumé : la ceinture voulue est lâchée, puis reprise. */
+    private final BroadcastReceiver bluetoothState = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
+            main.post(() -> bluetoothChanged(state));
+        }
+    };
+    private boolean receiving = false;
+
+    // Recherche lancée par `scan`, lue et écrite sur le fil principal ; `null` hors recherche.
+    /** Appel à résoudre à la fin de la recherche (son terme, ou `stopScan`). */
+    private PluginCall scanCall;
+    private ScanCallback scanCallback;
+    /** Appareils trouvés par la recherche en cours, par adresse. */
+    private Map<String, JSObject> scanFound;
+    private final Runnable scanEnd = this::finishScan;
+
+    @Override
+    public void load() {
+        super.load();
+        try {
+            // Annonce protégée, envoyée par le seul Bluetooth du système : exportée sans risque, et sûre d'arriver.
+            ContextCompat.registerReceiver(getContext(), bluetoothState,
+                new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED), ContextCompat.RECEIVER_EXPORTED);
+            receiving = true;
+        } catch (RuntimeException e) {
+            Log.d(TAG, "état du Bluetooth non suivi : " + e.getMessage());
+        }
+    }
+
+    // --- Permissions ---
+
+    /** Android 12 et plus : recherche et connexion demandent une permission ; avant, celle de la position suffit. */
+    private boolean needsRuntimePermission() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+    }
+
+    private boolean permitted() {
+        return !needsRuntimePermission() || getPermissionState("bluetooth") == PermissionState.GRANTED;
+    }
+
+    /** Demande la permission si besoin, puis appelle `then` ; rejette l'appel si elle est refusée. */
+    private void withPermission(PluginCall call, String callback) {
+        if (permitted()) {
+            if ("scanAfterPermission".equals(callback)) scanAfterPermission(call);
+            else connectAfterPermission(call);
+            return;
+        }
+        requestPermissionForAlias("bluetooth", call, callback);
+    }
+
+    private BluetoothAdapter adapter() {
+        BluetoothManager manager = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+        return manager == null ? null : manager.getAdapter();
+    }
+
+    // --- Méthodes ---
+
+    /** État de la permission : granted, denied ou prompt ; avant Android 12, toujours accordée. */
+    private String permissionText() {
+        return needsRuntimePermission() ? getPermissionState("bluetooth").toString() : "granted";
+    }
+
+    /** Bluetooth présent et allumé, permission accordée (et son état en clair, pour la carte « Autorisations »). */
+    @PluginMethod
+    public void availability(PluginCall call) {
+        BluetoothAdapter adapter = adapter();
+        JSObject ret = new JSObject();
+        ret.put("bluetooth", adapter != null);
+        ret.put("enabled", adapter != null && adapter.isEnabled());
+        ret.put("permitted", permitted());
+        ret.put("permission", permissionText());
+        call.resolve(ret);
+    }
+
+    /** Demande la permission Bluetooth (carte « Autorisations ») ; rend son état. */
+    @PluginMethod
+    public void requestPermission(PluginCall call) {
+        if (permitted()) {
+            permissionAnswered(call);
+            return;
+        }
+        requestPermissionForAlias("bluetooth", call, "permissionAnswered");
+    }
+
+    @PermissionCallback
+    private void permissionAnswered(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("permission", permissionText());
+        call.resolve(ret);
+    }
+
+    /** Cherche les ceintures pendant `durationMs`, ou jusqu'à `stopScan` ; rend leur adresse, leur nom et la force du signal. */
+    @PluginMethod
+    public void scan(PluginCall call) {
+        withPermission(call, "scanAfterPermission");
+    }
+
+    @PermissionCallback
+    @SuppressLint("MissingPermission")
+    private void scanAfterPermission(PluginCall call) {
+        if (!permitted()) {
+            call.reject("permission Bluetooth refusée");
+            return;
+        }
+        BluetoothAdapter adapter = adapter();
+        if (adapter == null || !adapter.isEnabled()) {
+            call.reject("Bluetooth éteint");
+            return;
+        }
+        BluetoothLeScanner scanner = adapter.getBluetoothLeScanner();
+        if (scanner == null) {
+            call.reject("recherche Bluetooth impossible");
+            return;
+        }
+        // Un nombre JSON arrive en Integer ou en Long selon sa taille : lu comme Number.
+        Object rawDuration = call.getData().opt("durationMs");
+        long durationMs = Math.max(1000, rawDuration instanceof Number ? ((Number) rawDuration).longValue() : DEFAULT_SCAN_MS);
+        // Sur le fil principal, comme `stopScan` : la recherche en cours n'est lue et écrite que là.
+        main.post(() -> {
+            // Une recherche encore en cours rend d'abord ce qu'elle a trouvé.
+            finishScan();
+            Map<String, JSObject> found = new LinkedHashMap<>();
+            // Sans filtre : certaines ceintures n'annoncent pas leur service, on les reconnaît alors à leur nom.
+            ScanCallback callback = new ScanCallback() {
+                @Override
+                public void onScanResult(int callbackType, ScanResult result) {
+                    BluetoothDevice device = result.getDevice();
+                    ScanRecord record = result.getScanRecord();
+                    String deviceName = record != null && record.getDeviceName() != null ? record.getDeviceName() : device.getName();
+                    if (!isHeartRateDevice(record, deviceName)) return;
+                    JSObject belt = new JSObject();
+                    belt.put("address", device.getAddress());
+                    belt.put("name", deviceName != null ? deviceName : device.getAddress());
+                    belt.put("rssi", result.getRssi());
+                    Boolean random = randomAddress(device);
+                    if (random != null) belt.put("random", random);
+                    main.post(() -> found.put(device.getAddress(), belt));
+                }
+            };
+            try {
+                scanner.startScan(callback);
+            } catch (Exception e) {
+                Log.w(TAG, "recherche impossible : " + e.getMessage());
+                call.reject("recherche impossible");
+                return;
+            }
+            scanCall = call;
+            scanCallback = callback;
+            scanFound = found;
+            main.postDelayed(scanEnd, durationMs);
+        });
+    }
+
+    /**
+     * Arrête la recherche de `scan` avant son terme (« Annuler » de Réglages) :
+     * sa promesse est résolue aussitôt avec les appareils déjà trouvés, jamais
+     * rejetée. Sans recherche en cours, sans effet.
+     */
+    @PluginMethod
+    public void stopScan(PluginCall call) {
+        main.post(() -> {
+            finishScan();
+            call.resolve();
+        });
+    }
+
+    /**
+     * Fin de la recherche en cours, à son terme ou arrêtée par `stopScan` :
+     * recherche Bluetooth arrêtée, appareils trouvés rendus à son appel. Sur le
+     * fil principal ; sans recherche en cours, rien.
+     */
+    @SuppressLint("MissingPermission")
+    private void finishScan() {
+        main.removeCallbacks(scanEnd);
+        if (scanCall == null) return;
+        PluginCall call = scanCall;
+        ScanCallback callback = scanCallback;
+        Map<String, JSObject> found = scanFound;
+        scanCall = null;
+        scanCallback = null;
+        scanFound = null;
+        try {
+            BluetoothAdapter adapter = adapter();
+            BluetoothLeScanner scanner = adapter == null ? null : adapter.getBluetoothLeScanner();
+            if (scanner != null && callback != null) scanner.stopScan(callback);
+        } catch (Exception ignored) {
+            // Bluetooth coupé pendant la recherche : les ceintures déjà vues sont rendues.
+        }
+        JSArray devices = new JSArray();
+        if (found != null) for (JSObject belt : found.values()) devices.put(belt);
+        JSObject ret = new JSObject();
+        ret.put("devices", devices);
+        call.resolve(ret);
+    }
+
+    private static boolean isHeartRateDevice(ScanRecord record, String deviceName) {
+        if (record != null) {
+            List<ParcelUuid> uuids = record.getServiceUuids();
+            if (uuids != null && uuids.contains(new ParcelUuid(HEART_RATE_SERVICE))) return true;
+        }
+        if (deviceName == null) return false;
+        String lower = deviceName.toLowerCase(Locale.ROOT);
+        return lower.contains("hrm") || lower.contains("heart") || lower.contains("cardio") || lower.startsWith("hr ");
+    }
+
+    /** Adresse aléatoire (vrai) ou publique (faux) d'un appareil rendu par une recherche ; `null` avant Android 15, qui ne le dit pas. */
+    private static Boolean randomAddress(BluetoothDevice device) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return null;
+        return device.getAddressType() == BluetoothDevice.ADDRESS_TYPE_RANDOM;
+    }
+
+    /** L'appareil d'adresse `target`, du type `random` s'il est connu (Android 13 et plus) ; sinon tel que la pile le connaît. */
+    private static BluetoothDevice remoteDevice(BluetoothAdapter adapter, String target, Boolean random) {
+        if (random != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return adapter.getRemoteLeDevice(target, random ? BluetoothDevice.ADDRESS_TYPE_RANDOM : BluetoothDevice.ADDRESS_TYPE_PUBLIC);
+        }
+        return adapter.getRemoteDevice(target);
+    }
+
+    private static String addressTypeText(BluetoothDevice device) {
+        Boolean random = randomAddress(device);
+        return random == null ? "type inconnu" : random ? "aléatoire" : "publique";
+    }
+
+    /** Se connecte à la ceinture `address` et s'abonne à sa fréquence ; une connexion en cours est d'abord close. */
+    @PluginMethod
+    public void connect(PluginCall call) {
+        withPermission(call, "connectAfterPermission");
+    }
+
+    @PermissionCallback
+    private void connectAfterPermission(PluginCall call) {
+        if (!permitted()) {
+            call.reject("permission Bluetooth refusée");
+            return;
+        }
+        String target = call.getString("address");
+        BluetoothAdapter adapter = adapter();
+        if (target == null || !BluetoothAdapter.checkBluetoothAddress(target)) {
+            call.reject("adresse de ceinture invalide");
+            return;
+        }
+        if (adapter == null || !adapter.isEnabled()) {
+            call.reject("Bluetooth éteint");
+            return;
+        }
+        String targetName = call.getString("name", target);
+        // Type d'adresse retenu par l'application (vrai : aléatoire), absent s'il n'est pas connu.
+        Object rawRandom = call.getData().opt("random");
+        Boolean random = rawRandom instanceof Boolean ? (Boolean) rawRandom : null;
+        main.post(() -> {
+            disarm();
+            address = target;
+            name = targetName;
+            device = remoteDevice(adapter, target, random);
+            located = false;
+            wanted = true;
+            joined = false;
+            connectedAt = SystemClock.elapsedRealtime();
+            lostSince = -1;
+            vainSearches = 0;
+            sendStatus("connecting");
+            locate();
+            call.resolve();
+        });
+    }
+
+    /** Coupe la connexion et n'essaie plus de la relancer. */
+    @PluginMethod
+    public void disconnect(PluginCall call) {
+        main.post(() -> {
+            wanted = false;
+            disarm();
+            sendStatus("off");
+            call.resolve();
+        });
+    }
+
+    /** Arrête recherche, relances, garde-fous et connexion : plus aucune minuterie armée. */
+    private void disarm() {
+        stopLocating();
+        main.removeCallbacks(lostRetry);
+        closeGatt();
+    }
+
+    /**
+     * Muscu (lot I du 25/10) : démarre le service au premier plan qui tient
+     * l'application écran éteint pendant une session sans GPS, avec la
+     * notification de l'enregistrement (`title`, `text`). Refusé sans la
+     * permission Bluetooth, qu'Android 14 exige pour ce type de service.
+     */
+    @PluginMethod
+    public void keepAlive(PluginCall call) {
+        if (!permitted()) {
+            call.reject("permission Bluetooth refusée");
+            return;
+        }
+        Intent intent = new Intent(getContext(), HeartRateService.class)
+            .putExtra(HeartRateService.EXTRA_TITLE, call.getString("title", "Tracker enregistre"))
+            .putExtra(HeartRateService.EXTRA_TEXT, call.getString("text", ""));
+        try {
+            ContextCompat.startForegroundService(getContext(), intent);
+            call.resolve();
+        } catch (RuntimeException e) {
+            Log.w(TAG, "service impossible à lancer : " + e.getMessage());
+            call.reject("service impossible à lancer");
+        }
+    }
+
+    /**
+     * Connexion en cours, sans y toucher : la page reprise après une chute du moteur de rendu
+     * la reprend telle quelle, sans `connect`, qui couperait une ceinture qui mesure.
+     */
+    @PluginMethod
+    public void connection(PluginCall call) {
+        main.post(() -> {
+            JSObject ret = new JSObject();
+            ret.put("wanted", wanted);
+            ret.put("state", lastStatus);
+            // L'appareil tenu : la page n'en laisse pas prendre un autre par-dessus.
+            if (wanted && address != null) ret.put("address", address);
+            call.resolve(ret);
+        });
+    }
+
+    /** Arrête le service de `keepAlive`, et sa notification. */
+    @PluginMethod
+    public void stopKeepAlive(PluginCall call) {
+        getContext().stopService(new Intent(getContext(), HeartRateService.class));
+        call.resolve();
+    }
+
+    /** Ouvre les réglages Bluetooth d'Android : le secours quand la ceinture reste introuvable. */
+    @PluginMethod
+    public void openBluetoothSettings(PluginCall call) {
+        Intent intent = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            getContext().startActivity(intent);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Réglages Bluetooth introuvables");
+        }
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        if (receiving) {
+            receiving = false;
+            try {
+                getContext().unregisterReceiver(bluetoothState);
+            } catch (IllegalArgumentException ignored) {
+                // Déjà retiré.
+            }
+        }
+        main.post(() -> {
+            wanted = false;
+            disarm();
+            finishScan();
+        });
+        super.handleOnDestroy();
+    }
+
+    // --- Connexion ---
+
+    /** Vrai pendant la perte d'une ceinture déjà jointe : les relances suivent alors `LOST_RETRY_MS`. */
+    private boolean lostMode() {
+        return wanted && joined;
+    }
+
+    /** Pause avant la prochaine tentative d'une ceinture perdue : rapprochée au début de la perte, espacée ensuite. */
+    private long lostDelay() {
+        long lostMs = lostSince < 0 ? 0 : SystemClock.elapsedRealtime() - lostSince;
+        return lostMs < LOST_FAST_MS ? LOST_RETRY_MS : LOST_RETRY_SLOW_MS;
+    }
+
+    /** Arme la prochaine tentative d'une ceinture perdue dans `delayMs`, à la place de celle déjà armée. */
+    private void retryLostIn(long delayMs) {
+        main.removeCallbacks(lostRetry);
+        main.postDelayed(lostRetry, delayMs);
+    }
+
+    /** Durée de la perte en cours, en secondes, pour le journal. */
+    private long lostSeconds() {
+        return lostSince < 0 ? 0 : (SystemClock.elapsedRealtime() - lostSince) / 1000;
+    }
+
+    /**
+     * Tentative suivante d'une ceinture perdue : une ouverture restée sans
+     * réponse (en attente, ou directe bloquée) est close, puis la ceinture est
+     * recherchée. Une liaison établie est laissée à son garde-fou (`STALL_MS`).
+     */
+    private void retryLost() {
+        if (!lostMode()) return;
+        if (gatt != null) {
+            if (linked) return;
+            Log.d(TAG, "perdue depuis " + lostSeconds() + " s : ouverture sans réponse, abandonnée");
+            closeGatt();
+        }
+        locate();
+    }
+
+    /**
+     * Cherche la ceinture (`LOCATE_MS` au plus), puis ouvre la connexion
+     * (`afterSearch`). Bluetooth éteint : rien, son retour relance
+     * (`bluetoothChanged`).
+     */
+    @SuppressLint("MissingPermission")
+    private void locate() {
+        stopLocating();
+        main.removeCallbacks(lostRetry);
+        if (!wanted || device == null) return;
+        BluetoothAdapter adapter = adapter();
+        if (adapter == null || !adapter.isEnabled()) {
+            Log.d(TAG, "Bluetooth éteint : reprise à son retour");
+            return;
+        }
+        BluetoothLeScanner scanner = adapter.getBluetoothLeScanner();
+        if (scanner == null) {
+            afterSearch(null);
+            return;
+        }
+        ScanCallback cb = new ScanCallback() {
+            @Override
+            public void onScanResult(int callbackType, ScanResult result) {
+                BluetoothDevice found = result.getDevice();
+                if (found.getAddress().equalsIgnoreCase(address)) main.post(() -> locatedBy(this, found));
+            }
+
+            @Override
+            public void onScanFailed(int errorCode) {
+                Log.d(TAG, "recherche refusée, code " + errorCode);
+                main.post(() -> locatedBy(this, null));
+            }
+        };
+        // Des filtres, pour que la recherche tienne écran éteint ; ils s'ajoutent (l'un ou l'autre) :
+        // l'adresse, et le service cardio au cas où le filtre d'adresse, posé en publique, manquerait
+        // une adresse aléatoire. L'adresse est vérifiée à chaque résultat.
+        List<ScanFilter> filters = new ArrayList<>();
+        filters.add(new ScanFilter.Builder().setDeviceAddress(address).build());
+        filters.add(new ScanFilter.Builder().setServiceUuid(new ParcelUuid(HEART_RATE_SERVICE)).build());
+        ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
+        try {
+            scanner.startScan(filters, settings, cb);
+        } catch (Exception e) {
+            Log.d(TAG, "recherche impossible : " + e.getMessage());
+            afterSearch(null);
+            return;
+        }
+        if (lostMode()) Log.d(TAG, "perdue depuis " + lostSeconds() + " s : recherche");
+        locating = cb;
+        main.postDelayed(locateTimeout, LOCATE_MS);
+    }
+
+    /** Fin de la recherche `cb` : `found` est la ceinture, ou `null` si elle n'a pas été vue. */
+    private void locatedBy(ScanCallback cb, BluetoothDevice found) {
+        if (cb == null || cb != locating) return;
+        stopLocating();
+        afterSearch(found);
+    }
+
+    /**
+     * Après une recherche (`found` : la ceinture, ou `null`). Pas encore
+     * jointe : ouverture directe dans tous les cas, sur l'appareil déjà connu
+     * si elle n'a pas été vue (une ceinture déjà connectée au téléphone ne
+     * s'annonce plus). Perdue : ouverture directe si elle est vue ; sinon une
+     * pause, ou, toutes les `LOST_AUTOCONNECT_EVERY` recherches vaines, une
+     * ouverture en attente.
+     */
+    private void afterSearch(BluetoothDevice found) {
+        if (!wanted) return;
+        if (found != null) {
+            // L'appareil rendu par la recherche porte le bon type d'adresse (ceinture à adresse aléatoire).
+            device = found;
+            located = true;
+        }
+        if (!lostMode()) {
+            Log.d(TAG, found != null ? "trouvée par la recherche, adresse " + addressTypeText(found) : "pas vue par la recherche");
+            open(false);
+            return;
+        }
+        if (found != null) {
+            Log.d(TAG, "perdue depuis " + lostSeconds() + " s : revue, adresse " + addressTypeText(found));
+            open(false);
+            return;
+        }
+        vainSearches++;
+        if (vainSearches % LOST_AUTOCONNECT_EVERY == 0) {
+            Log.d(TAG, "perdue depuis " + lostSeconds() + " s : pas vue (" + vainSearches + " recherches vaines)");
+            open(true);
+        } else {
+            long delayMs = lostDelay();
+            Log.d(TAG, "perdue depuis " + lostSeconds() + " s : pas vue (" + vainSearches
+                + " recherches vaines), prochaine dans " + delayMs / 1000 + " s");
+            retryLostIn(delayMs);
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void stopLocating() {
+        main.removeCallbacks(locateTimeout);
+        main.removeCallbacks(relocate);
+        if (locating == null) return;
+        ScanCallback cb = locating;
+        locating = null;
+        try {
+            BluetoothAdapter adapter = adapter();
+            BluetoothLeScanner scanner = adapter == null ? null : adapter.getBluetoothLeScanner();
+            if (scanner != null) scanner.stopScan(cb);
+        } catch (Exception ignored) {
+            // Bluetooth coupé entre-temps : la recherche s'est arrêtée d'elle-même.
+        }
+    }
+
+    /**
+     * Ouvre la connexion sur `device`. `autoConnect` faux, pour qu'elle soit
+     * rapide ; vrai pour une ceinture perdue que la recherche ne voit pas,
+     * restée liée au téléphone. Pendant une perte, la tentative suivante est
+     * armée (`retryLost`) : elle clôt une ouverture restée sans réponse.
+     */
+    @SuppressLint("MissingPermission")
+    private void open(boolean autoConnect) {
+        closeGatt();
+        Log.d(TAG, "ouverture " + (autoConnect ? "en attente" : "directe") + ", adresse "
+            + (located ? addressTypeText(device) : "non vérifiée"));
+        if (lostMode()) retryLostIn(autoConnect ? lostDelay() : OPEN_GUARD_MS);
+        try {
+            gatt = device.connectGatt(getContext(), autoConnect, callback, BluetoothDevice.TRANSPORT_LE);
+        } catch (SecurityException e) {
+            wanted = false;
+            disarm();
+            sendStatus("off");
+            return;
+        }
+        if (gatt == null) {
+            Log.d(TAG, "ouverture refusée par la pile");
+            dropped();
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void closeGatt() {
+        linked = false;
+        main.removeCallbacks(stall);
+        if (gatt == null) return;
+        try {
+            gatt.disconnect();
+            gatt.close();
+        } catch (SecurityException ignored) {
+            // Permission retirée entre-temps : la connexion tombe d'elle-même.
+        }
+        gatt = null;
+    }
+
+    /**
+     * La connexion est tombée, ou n'a pas abouti (coupure, découverte en
+     * échec, liaison muette) : jointe, la ceinture est perdue et cherchée de
+     * nouveau, aussitôt au début de la perte puis après `lostDelay` ; jamais
+     * jointe, elle est recherchée de nouveau au même rythme, compté depuis
+     * `connect` : `LOST_RETRY_MS` les `LOST_FAST_MS` premières millisecondes,
+     * puis `LOST_RETRY_SLOW_MS` (Android refuse plus de 5 recherches par 30 s).
+     */
+    private void dropped() {
+        closeGatt();
+        main.removeCallbacks(lostRetry);
+        main.removeCallbacks(relocate);
+        if (!wanted || device == null) {
+            sendStatus(wanted ? "lost" : "off");
+            return;
+        }
+        boolean fresh = joined && lostSince < 0;
+        if (fresh) {
+            lostSince = SystemClock.elapsedRealtime();
+            vainSearches = 0;
+        }
+        BluetoothAdapter adapter = adapter();
+        if (adapter == null || !adapter.isEnabled()) {
+            // Reprise au retour du Bluetooth (`bluetoothChanged`).
+            sendStatus("lost");
+            return;
+        }
+        if (joined) {
+            // Perdue (hors de portée, retirée) : cherchée de nouveau, écran éteint compris.
+            sendStatus("lost");
+            if (fresh) locate();
+            else retryLostIn(lostDelay());
+        } else {
+            // Jamais jointe depuis `connect` (laissée à la maison ?) : recherchée de nouveau, de plus en plus rarement.
+            sendStatus("searching");
+            long sinceConnectMs = SystemClock.elapsedRealtime() - connectedAt;
+            main.postDelayed(relocate, sinceConnectMs < LOST_FAST_MS ? LOST_RETRY_MS : LOST_RETRY_SLOW_MS);
+        }
+    }
+
+    /** Liaison établie restée sans trame `STALL_MS` : bloquée, close et relancée. */
+    private void stalled() {
+        if (gatt == null || !linked) return;
+        Log.d(TAG, "liaison muette depuis " + STALL_MS / 1000 + " s : close");
+        dropped();
+    }
+
+    /** Une trame vient d'arriver : la liaison vit, le garde-fou repart, la perte en cours est finie. */
+    private void framed() {
+        if (gatt == null || !linked) return;
+        main.removeCallbacks(stall);
+        main.postDelayed(stall, STALL_MS);
+        if (lostSince >= 0) {
+            Log.d(TAG, "reprise après " + lostSeconds() + " s de perte, " + vainSearches + " recherches vaines");
+            lostSince = -1;
+            vainSearches = 0;
+        }
+    }
+
+    /** Bluetooth éteint : connexion et recherche lâchées ; rallumé : la ceinture voulue est reprise. */
+    private void bluetoothChanged(int state) {
+        if (!wanted) return;
+        if (state == BluetoothAdapter.STATE_TURNING_OFF || state == BluetoothAdapter.STATE_OFF) {
+            Log.d(TAG, "Bluetooth éteint (état " + state + ")");
+            stopLocating();
+            main.removeCallbacks(lostRetry);
+            closeGatt();
+            if (joined && lostSince < 0) lostSince = SystemClock.elapsedRealtime();
+            sendStatus("lost");
+        } else if (state == BluetoothAdapter.STATE_ON) {
+            if (gatt != null || locating != null) return;
+            Log.d(TAG, "Bluetooth rallumé : reprise");
+            if (joined) {
+                // Une nouvelle perte : tentatives rapprochées de nouveau.
+                lostSince = SystemClock.elapsedRealtime();
+                vainSearches = 0;
+            }
+            locate();
+        }
+    }
+
+    private final BluetoothGattCallback callback = new BluetoothGattCallback() {
+        @Override
+        @SuppressLint("MissingPermission")
+        public void onConnectionStateChange(BluetoothGatt g, int status, int newState) {
+            main.post(() -> {
+                if (g != gatt) return;
+                Log.d(TAG, "connexion : état " + newState + ", statut " + status + (joined ? ", déjà jointe" : ", pas encore jointe"));
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    linked = true;
+                    main.removeCallbacks(lostRetry);
+                    // Garde-fou : sans trame d'ici `STALL_MS`, la liaison est tenue pour bloquée.
+                    main.removeCallbacks(stall);
+                    main.postDelayed(stall, STALL_MS);
+                    try {
+                        g.discoverServices();
+                    } catch (SecurityException ignored) {
+                        // Traité par la coupure qui suit, ou par le garde-fou.
+                    }
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    dropped();
+                }
+            });
+        }
+
+        @Override
+        @SuppressLint("MissingPermission")
+        public void onServicesDiscovered(BluetoothGatt g, int status) {
+            main.post(() -> {
+                if (g != gatt) return;
+                if (status != BluetoothGatt.GATT_SUCCESS) {
+                    // Découverte en échec : une perte, jamais un appareil sans cardio.
+                    Log.d(TAG, "découverte en échec, statut " + status);
+                    dropped();
+                    return;
+                }
+                BluetoothGattService service = g.getService(HEART_RATE_SERVICE);
+                BluetoothGattCharacteristic measurement = service == null ? null : service.getCharacteristic(HEART_RATE_MEASUREMENT);
+                if (measurement == null) {
+                    if (joined) {
+                        // Déjà jointe : son service n'a pas disparu, la découverte est incomplète.
+                        Log.d(TAG, "découverte sans service cardio, ceinture déjà jointe : perte");
+                        dropped();
+                        return;
+                    }
+                    // Première jonction réussie sans service cardio : pas une ceinture, inutile d'insister.
+                    wanted = false;
+                    disarm();
+                    sendStatus("unsupported");
+                    return;
+                }
+                try {
+                    g.setCharacteristicNotification(measurement, true);
+                    BluetoothGattDescriptor config = measurement.getDescriptor(CLIENT_CONFIG);
+                    if (config != null) writeConfig(g, config);
+                    joined = true;
+                    sendStatus("connected");
+                } catch (SecurityException ignored) {
+                    dropped();
+                }
+            });
+        }
+
+        // Android 13 et plus.
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt g, BluetoothGattCharacteristic characteristic, byte[] value) {
+            if (!HEART_RATE_MEASUREMENT.equals(characteristic.getUuid())) return;
+            sendMeasurement(value);
+            main.post(() -> { if (g == gatt) framed(); });
+        }
+
+        // Avant Android 13.
+        @Override
+        @SuppressWarnings("deprecation")
+        public void onCharacteristicChanged(BluetoothGatt g, BluetoothGattCharacteristic characteristic) {
+            if (!HEART_RATE_MEASUREMENT.equals(characteristic.getUuid())) return;
+            sendMeasurement(characteristic.getValue());
+            main.post(() -> { if (g == gatt) framed(); });
+        }
+    };
+
+    @SuppressLint("MissingPermission")
+    @SuppressWarnings("deprecation")
+    private static void writeConfig(BluetoothGatt g, BluetoothGattDescriptor config) {
+        byte[] enable = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            g.writeDescriptor(config, enable);
+        } else {
+            config.setValue(enable);
+            g.writeDescriptor(config);
+        }
+    }
+
+    // --- Événements ---
+
+    /**
+     * Mesure 0x2A37 : drapeaux, puis la fréquence sur 8 ou 16 bits. Le contact
+     * avec la peau n'est connu que si la ceinture sait le détecter.
+     */
+    private void sendMeasurement(byte[] value) {
+        if (value == null || value.length < 2) return;
+        int flags = value[0] & 0xff;
+        boolean wide = (flags & 0x01) != 0;
+        if (wide && value.length < 3) return;
+        int bpm = wide ? (value[1] & 0xff) | ((value[2] & 0xff) << 8) : value[1] & 0xff;
+        JSObject data = new JSObject();
+        data.put("bpm", bpm);
+        data.put("timeMs", System.currentTimeMillis());
+        if ((flags & 0x04) != 0) data.put("contact", (flags & 0x02) != 0);
+        notifyListeners("heartRate", data);
+    }
+
+    private void sendStatus(String state) {
+        lastStatus = state;
+        JSObject data = new JSObject();
+        data.put("state", state);
+        if (address != null) data.put("address", address);
+        if (name != null) data.put("name", name);
+        // Type d'adresse sûr seulement pour un appareil trouvé par la recherche : l'application le retient.
+        Boolean random = located && device != null ? randomAddress(device) : null;
+        if (random != null) data.put("random", random);
+        notifyListeners("status", data);
+    }
+}

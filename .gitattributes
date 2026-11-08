@@ -1,0 +1,13 @@
+# Fins de ligne : LF partout, CRLF pour les scripts de commandes Windows.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaires déclarés, plutôt que devinés par git.
+*.webp binary
+*.png binary
+*.woff2 binary
+*.woff binary
+*.jks binary
+*.ico binary
+*.imu binary

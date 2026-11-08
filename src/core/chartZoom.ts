@@ -1,0 +1,311 @@
+import { bracketIndex, firstIndexAfter, firstIndexAtOrAfter } from './search';
+
+/**
+ * Zoom horizontal d'un graphe : plage visible de l'axe des abscisses, dans
+ * l'unité de l'axe (distance affichée). Les positions à l'écran sont en
+ * pixels depuis le bord gauche de la zone de tracé, de largeur `widthPx`.
+ * `null` vaut « tout voir ».
+ */
+
+export interface XRange {
+  min: number;
+  max: number;
+}
+
+/**
+ * Plage ramenée dans `full`, d'une largeur d'au moins `minSpan` (centrée sur
+ * la plage demandée si elle est élargie) ; `null` si elle couvre tout.
+ */
+export const clampRange = (range: XRange, full: XRange, minSpan: number): XRange | null => {
+  const fullSpan = full.max - full.min;
+  if (!(fullSpan > 0)) return null;
+  const span = Math.max(minSpan, range.max - range.min);
+  if (!(span < fullSpan)) return null;
+  const center = (range.min + range.max) / 2;
+  const atEnd = full.max - span;
+  const min = Math.max(full.min, Math.min(center - span / 2, atEnd));
+  // Fin atteinte : `max` exactement `full.max` (min + span peut arrondir un ulp dessous).
+  return { min, max: min >= atEnd ? full.max : min + span };
+};
+
+/** Deux plages égales (mêmes bornes), `null` compris : « tout voir » égale « tout voir ». */
+export const sameRange = (a: XRange | null, b: XRange | null): boolean => (
+  a === b || (a !== null && b !== null && a.min === b.min && a.max === b.max)
+);
+
+/**
+ * Plage zoomée affichée, à partir de celle qui est rangée : ramenée dans
+ * l'étendue `full` du moment (elle peut avoir changé depuis : point ajouté à
+ * un itinéraire), `null` pour tout voir ou sans étendue.
+ */
+export const zoomViewOf = (raw: XRange | null, full: XRange | null, minSpan: number): XRange | null => (
+  raw && full ? clampRange(raw, full, minSpan) : null
+);
+
+/**
+ * Plage du tronçon montré en violet sur la carte (« Afficher », « +carte ») :
+ * la plage zoomée ; sans zoom, toute l'étendue si le graphe a été montré
+ * entier (`whole`), rien sinon (montré zoomé puis revenu à tout voir).
+ */
+export const zoomPathRange = (view: XRange | null, full: XRange | null, whole: boolean): XRange | null => (
+  view ?? (whole ? full : null)
+);
+
+/**
+ * Calcul d'une plage gardé pour la dernière plage demandée (égalité des
+ * bornes, `sameRange`) : deux graphes au zoom commun, ou un panneau et la
+ * carte en plein écran, lisent les mêmes lignes sans les refaire, et une
+ * image de zoom qui ne bouge pas la plage ne refait rien.
+ */
+export const lastByRange = <T>(compute: (view: XRange | null) => T): ((view: XRange | null) => T) => {
+  let last: { view: XRange | null; value: T } | null = null;
+  return (view) => {
+    if (last && sameRange(last.view, view)) return last.value;
+    const value = compute(view);
+    last = { view, value };
+    return value;
+  };
+};
+
+/**
+ * Plage après un geste à deux doigts : les valeurs qui étaient sous chaque
+ * doigt au début du geste (`startPx`, plage `start`) restent sous lui
+ * (`nowPx`). Écarter zoome, pincer dézoome, glisser déplace. Doigts croisés
+ * ou confondus : la plage de départ.
+ */
+export const pinchRange = (
+  start: XRange,
+  startPx: readonly [number, number],
+  nowPx: readonly [number, number],
+  widthPx: number,
+  full: XRange,
+  minSpan: number
+): XRange | null => {
+  const startGap = startPx[1] - startPx[0];
+  const nowGap = nowPx[1] - nowPx[0];
+  if (!(widthPx > 0) || Math.abs(startGap) < 1 || Math.abs(nowGap) < 1) return clampRange(start, full, minSpan);
+  const perPx = (start.max - start.min) / widthPx;
+  const v0 = start.min + startPx[0] * perPx;
+  const v1 = start.min + startPx[1] * perPx;
+  const scale = (v1 - v0) / nowGap;
+  if (!(scale > 0)) return clampRange(start, full, minSpan);
+  const min = v0 - nowPx[0] * scale;
+  return clampRange({ min, max: min + widthPx * scale }, full, minSpan);
+};
+
+/**
+ * Plage après un double-clic ou un double toucher à `px` : divisée par
+ * `factor`, la valeur sous le doigt ou la souris restant sous lui (deux
+ * doubles touchers au même endroit zooment sur le même point).
+ */
+export const zoomAtRange = (
+  view: XRange,
+  px: number,
+  widthPx: number,
+  factor: number,
+  full: XRange,
+  minSpan: number
+): XRange | null => {
+  if (!(widthPx > 0) || !(factor > 0)) return clampRange(view, full, minSpan);
+  const at = Math.max(0, Math.min(1, px / widthPx));
+  const value = view.min + at * (view.max - view.min);
+  const span = (view.max - view.min) / factor;
+  const min = value - at * span;
+  return clampRange({ min, max: min + span }, full, minSpan);
+};
+
+/**
+ * Tronçon de la trace que montre une plage de l'axe d'un graphe : `axis`
+ * donne la valeur croissante de chaque point (distance affichée, minutes).
+ * Les points dans la plage, et à chaque bout le point de la borne, placé sur
+ * le segment qui la coupe. Un seul intervalle peut couvrir toute la plage
+ * (règle 10) : deux points sur ce segment, jamais aucun. Vide sans trace.
+ */
+export const axisRangePath = (
+  points: ReadonlyArray<{ lat: number; lon: number }>,
+  axis: ArrayLike<number>,
+  range: XRange
+): [number, number][] => {
+  const n = Math.min(points.length, axis.length);
+  if (n === 0) return [];
+  // Position du point de la trace à la valeur `v` de l'axe, interpolée sur son segment.
+  const at = (v: number): [number, number] => {
+    if (v <= axis[0]) return [points[0].lat, points[0].lon];
+    if (v >= axis[n - 1]) return [points[n - 1].lat, points[n - 1].lon];
+    const lo = bracketIndex(n, (i) => axis[i] <= v);
+    const hi = Math.min(lo + 1, n - 1);
+    const span = axis[hi] - axis[lo];
+    const t = span > 0 ? (v - axis[lo]) / span : 0;
+    return [points[lo].lat + t * (points[hi].lat - points[lo].lat), points[lo].lon + t * (points[hi].lon - points[lo].lon)];
+  };
+  const path: [number, number][] = [at(range.min)];
+  for (let i = 0; i < n; i++) {
+    if (axis[i] > range.min && axis[i] < range.max) path.push([points[i].lat, points[i].lon]);
+  }
+  path.push(at(range.max));
+  return path;
+};
+
+/** Plage désignée par une sélection à la souris entre deux positions, bornée à la zone de tracé. */
+export const pxSelectionRange = (aPx: number, bPx: number, view: XRange, widthPx: number): XRange => {
+  const clampPx = (px: number) => Math.max(0, Math.min(widthPx, px));
+  const perPx = widthPx > 0 ? (view.max - view.min) / widthPx : 0;
+  const lo = clampPx(Math.min(aPx, bPx));
+  const hi = clampPx(Math.max(aPx, bPx));
+  return { min: view.min + lo * perPx, max: view.min + hi * perPx };
+};
+
+/**
+ * Indices extrêmes, bornes comprises, des valeurs croissantes `values` à
+ * tracer pour la plage : celles qu'elle contient et un voisin de chaque côté,
+ * pour que la courbe touche les bords. Toute la série sans plage.
+ */
+export const visibleIndexRange = (values: ArrayLike<number>, range: XRange | null): [number, number] => {
+  const n = values.length;
+  if (n === 0) return [0, -1];
+  if (!range) return [0, n - 1];
+  return [Math.max(0, firstIndexAtOrAfter(values, range.min) - 1), Math.min(n - 1, firstIndexAfter(values, range.max))];
+};
+
+/**
+ * Écart minimal d'un extrême à la corde de ses deux voisins tracés pour
+ * qu'il soit ajouté au tracé, en part de l'étendue de la série sur la plage.
+ * À 5 %, un pic de 2 s à plus d'un nœud au-dessus du bord reste tracé, et le
+ * bruit du GPS n'ajoute que 10 à 25 % de points à la vitesse brute de la
+ * voile, presque rien à la vitesse lissée de la course (mesuré sur 22 traces
+ * réelles le 27/10 ; à 2 %, jusqu'à +75 % en voile).
+ */
+export const CHART_EXTREME_TOLERANCE = 0.05;
+
+/** Indices de `first` à `last` à pas régulier, au plus `maxPoints` environ, le dernier compris ; et ce pas. */
+const regularIndices = (first: number, last: number, maxPoints: number): { out: number[]; step: number } => {
+  const step = Math.max(1, Math.ceil((last - first + 1) / Math.max(1, maxPoints)));
+  const out: number[] = [];
+  for (let i = first; i <= last; i += step) out.push(i);
+  if (out[out.length - 1] !== last) out.push(last);
+  return { out, step };
+};
+
+/**
+ * Indices du pas régulier `out` (de `first` à `last`), avec les extrêmes de
+ * `values` qu'il sauterait : entre deux indices tracés, le maximum et le
+ * minimum qui s'écartent de la corde entre ces deux voisins de plus de
+ * `CHART_EXTREME_TOLERANCE` de l'étendue de la série sur la plage. Croissants.
+ */
+const keepExtremes = (out: number[], first: number, last: number, values: ArrayLike<number | null | undefined>): number[] => {
+  const at = (i: number): number => {
+    const v = values[i];
+    return typeof v === 'number' && isFinite(v) ? v : NaN;
+  };
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let i = first; i <= last; i++) {
+    const v = at(i);
+    if (Number.isNaN(v)) continue;
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
+  }
+  const tolerance = (hi - lo) * CHART_EXTREME_TOLERANCE;
+  if (!(tolerance > 0)) return out;
+
+  const kept: number[] = [];
+  for (let k = 0; k < out.length - 1; k++) {
+    const a = out[k];
+    const b = out[k + 1];
+    kept.push(a);
+    let maxI = -1;
+    let minI = -1;
+    let maxV = -Infinity;
+    let minV = Infinity;
+    for (let i = a + 1; i < b; i++) {
+      const v = at(i);
+      if (Number.isNaN(v)) continue;
+      if (v > maxV) {
+        maxV = v;
+        maxI = i;
+      }
+      if (v < minV) {
+        minV = v;
+        minI = i;
+      }
+    }
+    if (maxI < 0) continue;
+    const va = at(a);
+    const vb = at(b);
+    // Corde entre les deux voisins tracés, à l'indice de l'extrême ; un seul voisin tracé : sa valeur ; aucun : rien à voir.
+    const chordAt = (i: number): number => {
+      if (Number.isNaN(va)) return vb;
+      if (Number.isNaN(vb)) return va;
+      return va + ((vb - va) * (i - a)) / (b - a);
+    };
+    const addMax = maxV - chordAt(maxI) > tolerance;
+    const addMin = chordAt(minI) - minV > tolerance;
+    if (addMax && addMin) kept.push(Math.min(maxI, minI), Math.max(maxI, minI));
+    else if (addMax) kept.push(maxI);
+    else if (addMin) kept.push(minI);
+  }
+  kept.push(out[out.length - 1]);
+  return kept;
+};
+
+/**
+ * Indices de `first` à `last` à tracer, au plus `maxPoints` environ, à pas
+ * régulier ; le dernier est toujours compris, pour que la courbe aille au
+ * bout de la plage. Les extrêmes de chaque série de `series` (les courbes
+ * que le graphe trace de ces lignes : vitesse, altitude, FC, cadence) que le
+ * pas régulier sauterait sont ajoutés, chacun jugé sur l'étendue de sa
+ * série (27/10, et 29/10 pour plusieurs séries) : un pic bref de FC ou un
+ * creux de cadence reste tracé même quand la vitesse ne bouge pas. La
+ * tolérance (`CHART_EXTREME_TOLERANCE`) borne d'elle-même les points d'une
+ * trace bruitée, sans autre plafond. Les indices, croissants et sans
+ * doublon, restent ceux de la trace complète : le survol et le repère de la
+ * carte ne changent pas.
+ */
+export const sampledIndicesKeeping = (
+  first: number,
+  last: number,
+  maxPoints: number,
+  series: ReadonlyArray<ArrayLike<number | null | undefined>>
+): number[] => {
+  if (last < first) return [];
+  const { out, step } = regularIndices(first, last, maxPoints);
+  if (series.length === 0 || step <= 1) return out;
+  if (series.length === 1) return keepExtremes(out, first, last, series[0]);
+  const all = series.flatMap((values) => keepExtremes(out, first, last, values)).sort((a, b) => a - b);
+  const merged: number[] = [];
+  for (const i of all) if (merged[merged.length - 1] !== i) merged.push(i);
+  return merged;
+};
+
+/**
+ * Indices de `first` à `last` à tracer, au plus `maxPoints` environ, à pas
+ * régulier ; avec `values` (la série principale du graphe), ses extrêmes que
+ * le pas régulier sauterait sont ajoutés (`sampledIndicesKeeping`).
+ */
+export const sampledIndices = (
+  first: number,
+  last: number,
+  maxPoints: number,
+  values?: ArrayLike<number | null | undefined>
+): number[] => sampledIndicesKeeping(first, last, maxPoints, values ? [values] : []);
+
+/** Multiples d'une puissance de dix retenus comme pas de graduation. */
+const NICE_STEPS = [1, 2, 2.5, 5, 10];
+
+/**
+ * Graduations rondes de la plage (pas de 1, 2, 2,5 ou 5 × 10ⁿ), environ
+ * `count` : une plage zoomée a des bornes quelconques, que le graphe
+ * graduerait telles quelles (2,02, 4,05…).
+ */
+export const niceTicks = (range: XRange, count = 5): number[] => {
+  const span = range.max - range.min;
+  if (!(span > 0) || count < 2) return [];
+  const raw = span / (count - 1);
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  const step = (NICE_STEPS.find((m) => m * pow >= raw * (1 - 1e-9)) ?? 10) * pow;
+  const out: number[] = [];
+  for (let k = Math.ceil(range.min / step - 1e-9); k * step <= range.max + step * 1e-9; k++) {
+    out.push(parseFloat((k * step).toFixed(12)));
+  }
+  return out;
+};

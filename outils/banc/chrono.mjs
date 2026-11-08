@@ -1,0 +1,92 @@
+// Banc de test : chronomètre de la carte du compteur (lot 2 des demandes du 10-14/10).
+// Usage : node chrono.mjs <port> [<dossier des captures>]
+// Sur un profil neuf, sans réseau, à 390×844 puis à 1400×1000. Dure environ 30 s. Le script vérifie :
+//  1. Enregistrer, onglet Fractionné : la bascule « Compteur | Chrono », le chrono à zéro ;
+//  2. Départ, deux tours, Arrêt : temps, tours (le dernier en haut), Reprendre et Remise à zéro ;
+//  3. la vue Compteur : la pastille du chrono sur son bouton ;
+//  4. un rechargement chrono lancé : il reprend juste, la carte s'ouvre sur lui ;
+//  5. en Course, chrono lancé : la carte reste visible ; Remise à zéro : elle disparaît ;
+//  6. la page sans débordement à 390 px, puis à 1400 px.
+import { connect } from './lib/cdp.mjs';
+import { ONGLETS } from './lib/onglets.mjs';
+
+const [port, shotDir] = process.argv.slice(2);
+if (!port) {
+  console.error('Usage : node chrono.mjs <port> [<dossier des captures>]');
+  process.exit(1);
+}
+
+// --- Protocole ---
+// --- Protocole (lib/cdp.mjs) ---
+const { send, evaluate, go, wait, blockNetwork, shoot, close, logs } = await connect({ port, shotDir });
+const clickText = (text, selector = 'button') => evaluate(`(() => {
+  const b = [...document.querySelectorAll(${JSON.stringify(selector)})].find((x) => x.textContent.trim() === ${JSON.stringify(text)} || x.textContent.trim().startsWith(${JSON.stringify(text)}));
+  if (!b) return 'absent'; if (b.disabled) return 'désactivé'; b.click(); return 'ok';
+})()`);
+const card = () => evaluate(`(() => { const c = document.querySelector('.ivl'); return c ? c.innerText.replace(/\\n+/g, ' / ') : '(pas de carte)'; })()`);
+const overflow = () => evaluate(`document.documentElement.scrollWidth - document.documentElement.clientWidth`);
+const stored = () => evaluate(`localStorage.getItem('tracker.stopwatch')`);
+
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
+await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
+
+for (const [width, height, mobile] of [[390, 844, true], [1400, 1000, false]]) {
+  console.log(`\n=== ${width}×${height} ===`);
+  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
+
+  // 1. Enregistrer, Fractionné : la bascule.
+  await go('/enregistrer');
+  console.log('famille Entraînement :', await clickText('Entraînement'));
+  await wait(300);
+  console.log('bascule :', await evaluate(`[...document.querySelectorAll('.ivl-switch__pick')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? ' (choisi)' : '')).join(' | ')`));
+  console.log('Chrono :', await clickText('Chrono', '.ivl-switch__pick'));
+  await wait(200);
+  console.log('carte :', await card());
+
+  // 2. Départ, deux tours, Arrêt.
+  console.log('Départ :', await clickText('Départ'));
+  await wait(1200);
+  console.log('Tour :', await clickText('Tour'));
+  await wait(700);
+  console.log('Tour :', await clickText('Tour'));
+  await wait(400);
+  console.log('carte en marche :', await card());
+  await shoot(`chrono-${width}-marche`);
+  console.log('Arrêt :', await clickText('Arrêt'));
+  await wait(300);
+  const pausedText = await card();
+  console.log('carte à l\'arrêt :', pausedText);
+  await wait(1000);
+  console.log('figé à l\'arrêt :', (await card()) === pausedText);
+  console.log('Reprendre :', await clickText('Reprendre'));
+  await wait(200);
+
+  // 3. Vue Compteur : pastille du chrono.
+  console.log('Compteur :', await clickText('Compteur', '.ivl-switch__pick'));
+  await wait(300);
+  console.log('pastille :', await evaluate(`document.querySelector('.ivl-switch__badge')?.textContent ?? '(aucune)'`));
+  await shoot(`chrono-${width}-pastille`);
+
+  // 4. Rechargement, chrono lancé.
+  console.log('gardé :', await stored());
+  await go('/enregistrer');
+  console.log('après rechargement :', await card());
+
+  // 5. À pied (Course) : la carte reste tant que le chrono est lancé.
+  console.log('famille À pied :', await clickText('À pied', '[aria-label=Famille] button'));
+  await wait(300);
+  console.log('carte en Course :', await card());
+  console.log('Arrêt :', await clickText('Arrêt'));
+  await wait(200);
+  console.log('Remise à zéro :', await clickText('Remise à zéro'));
+  await wait(300);
+  console.log('carte après remise à zéro :', await card(), '; gardé :', await stored());
+
+  // 6. Débordement.
+  console.log('débordement horizontal (px) :', await overflow());
+}
+
+console.log('\nconsole :', logs.length ? logs.join('\n  ') : 'rien');
+await close();
+process.exit(0);
