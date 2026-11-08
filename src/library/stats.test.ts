@@ -149,7 +149,8 @@ describe('metricsOf', () => {
   const keys = (family: Parameters<typeof metricsOf>[0], list: StatSession[]) => metricsOf(family, list).map((m) => m.key);
 
   it('propose les données de la famille qui ont une valeur', () => {
-    expect(keys('course', [session(at(2026, 3, 1), { elevationGainM: 80 })])).toEqual(['vmax', 'moyenne', 'duree', 'distance', 'denivele']);
+    // Le dénivelé et la cadence sont partis avec la course et le vélo (lot 303).
+    expect(keys('course', [session(at(2026, 3, 1), { elevationGainM: 80 })])).toEqual(['vmax', 'moyenne', 'duree', 'distance']);
     expect(keys('course', [session(at(2026, 3, 1))])).toEqual(['vmax', 'moyenne', 'duree', 'distance']);
     expect(keys('voile', [sailStatSession(at(2026, 3, 1))])).toEqual(['vmax', 'moyenne', 'duree', 'distance']);
     expect(keys('voile', [sailStatSession(at(2026, 3, 1), { foil: true, maneuverResults: { tackSuccess: 1, tackFail: 0, jibeSuccess: 0, jibeFail: 0 } })]))
@@ -157,13 +158,6 @@ describe('metricsOf', () => {
     expect(keys('surf', [surfStatSession(at(2026, 3, 1))])).toEqual(['vmax', 'moyenne', 'duree', 'distance', 'vagues', 'vague']);
     expect(keys('surf', [surfStatSession(at(2026, 3, 1), { flightS: 600, longestFlightS: 120 })]))
       .toEqual(['vmax', 'moyenne', 'duree', 'distance', 'vol', 'vagues', 'vague', 'volMax']);
-  });
-
-  it('cadence moyenne : à pied, quand une session en a', () => {
-    expect(keys('course', [session(at(2026, 3, 1), { cadenceSpm: 168 })])).toEqual(['vmax', 'moyenne', 'duree', 'distance', 'cadence']);
-    expect(keys('fractionne', [session(at(2026, 3, 1), { family: 'fractionne', cadenceSpm: 176 })])).toContain('cadence');
-    expect(keys('velo', [session(at(2026, 3, 1), { family: 'velo', treatment: 'velo', cadenceSpm: 80 })])).not.toContain('cadence');
-    expect(metricSeries([session(at(2026, 3, 1), { cadenceSpm: 168 }), session(at(2026, 3, 2))], statsMetric('cadence'))[0].points).toHaveLength(1);
   });
 
   it('vue d\'ensemble : la durée seule ; rien sans session', () => {
@@ -246,18 +240,18 @@ describe('regularity', () => {
 
 describe('records', () => {
   it('classe les meilleures sessions, la plus ancienne d’abord à égalité, sans celles qui n’ont pas la valeur', () => {
-    const a = session(at(2026, 3, 1), { elevationGainM: 300 });
-    const b = session(at(2026, 3, 2), { elevationGainM: 500 });
-    const c = session(at(2026, 3, 3), { elevationGainM: 300 });
+    const a = session(at(2026, 3, 1), { maneuverCount: 30 });
+    const b = session(at(2026, 3, 2), { maneuverCount: 50 });
+    const c = session(at(2026, 3, 3), { maneuverCount: 30 });
     const d = session(at(2026, 3, 4));
-    expect(topSessions([d, c, b, a], 'denivele').map((e) => e.session)).toEqual([b, a, c]);
-    expect(topSessions([a, b], 'denivele', 1).map((e) => e.value)).toEqual([500]);
+    expect(topSessions([d, c, b, a], 'manoeuvres').map((e) => e.session)).toEqual([b, a, c]);
+    expect(topSessions([a, b], 'manoeuvres', 1).map((e) => e.value)).toEqual([50]);
   });
 
   it('propose les records de chaque famille', () => {
     expect(recordKindsOf('voile')).toContain('manoeuvres');
     expect(recordKindsOf('surf')).toEqual(expect.arrayContaining(['vague', 'vol']));
-    expect(recordKindsOf('fractionne')).toContain('denivele');
+    expect(recordKindsOf('fractionne')).toEqual(['vitesse', 'distance', 'duree']);
     expect(recordKindsOf(null)).not.toContain('vitesse');
   });
 });

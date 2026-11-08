@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { cumulativeDistancesM } from '../core/geo';
-import { IMPORT_MAX_OFFSET_M, applyImportedElevation, importedSamplePoints } from './importedElevation';
+import { buildCumulativeTrack } from '../core/sessionStats';
+import type { TrackPoint } from '../core/types';
+import { mPerDegLon } from '../test/geo.fixture';
+import { IMPORT_MAX_OFFSET_M, applyImportedElevation, importedSamplePoints, terrainSamplePoints } from './importedElevation';
 import { insertWaypoint, reverseRoute, routeFromTrack, routePoints, routeTotals, type PlannedRoute, type RoutePoint } from './route';
 
 /** Altitude du terrain d'essai : monte d'un mètre tous les 11 m vers le nord (400 m sur les 0,04° de la trace). */
@@ -133,5 +136,77 @@ describe('altitude de l\'IGN posée sur une trace chargée', () => {
     const samples = importedSamplePoints(route, 20);
     const { route: out } = applyImportedElevation(route, samples, zOf(samples));
     expect(routeTotals(out, 3).gainM!).toBeCloseTo(400, 0);
+  });
+});
+
+// Échantillons de l'altitude du terrain, repris de celle des sessions de course et de vélo (lot 303).
+const START = Date.parse('2026-10-03T08:00:00Z');
+
+/**
+ * Trace vers l'est à vitesse constante, `hz` points par seconde, pendant
+ * `seconds` secondes ; `stopAt` : un arrêt de `stopS` secondes à cet instant.
+ */
+const buildTrack = (hz: number, seconds: number, speedMs = 3, ele?: (s: number) => number, stop?: { atS: number; durationS: number }): TrackPoint[] => {
+  const points: TrackPoint[] = [];
+  const metersPerDegLon = mPerDegLon(43.6);
+  let x = 0;
+  for (let i = 0; i <= seconds * hz; i++) {
+    const s = i / hz;
+    const stopped = stop !== undefined && s > stop.atS && s <= stop.atS + stop.durationS;
+    const v = stopped ? 0 : speedMs;
+    if (i > 0) x += v / hz;
+    points.push({
+      lat: 43.6,
+      lon: 3.8 + x / metersPerDegLon,
+      time: new Date(START + s * 1000).toISOString(),
+      timeMs: START + s * 1000,
+      ele: ele ? ele(s) : 100,
+      speedMs: v,
+      smoothedSpeedMs: v,
+      bearing: 90,
+      speedSource: 'doppler',
+    });
+  }
+  return points;
+};
+
+describe('terrainSamplePoints', () => {
+  it('prend un point tous les pas, premier et dernier compris', () => {
+    const track = buildTrack(1, 100); // 300 m
+    const cumDist = buildCumulativeTrack(track).cumDist;
+    for (const stepM of [5, 10, 20]) {
+      const points = terrainSamplePoints(track, cumDist, stepM);
+      expect(points.length).toBe(300 / stepM + 1);
+      expect(points[0].t).toBe(0);
+      expect(points[points.length - 1].t).toBe(100_000);
+      // 10 m à 3 m/s : un échantillon toutes les 3,33 s.
+      expect(points[1].t).toBe(Math.round((stepM / 3) * 1000));
+    }
+  });
+
+  it('donne les mêmes échantillons à 1 Hz et à 5 Hz', () => {
+    const slow = buildTrack(1, 120);
+    const fast = buildTrack(5, 120);
+    const a = terrainSamplePoints(slow, buildCumulativeTrack(slow).cumDist, 10);
+    const b = terrainSamplePoints(fast, buildCumulativeTrack(fast).cumDist, 10);
+    expect(b.length).toBe(a.length);
+    b.forEach((p, i) => {
+      expect(p.t).toBe(a[i].t);
+      expect(p.lon).toBeCloseTo(a[i].lon, 8);
+    });
+  });
+
+  it("ne prend rien pendant un arrêt", () => {
+    const track = buildTrack(1, 100, 3, undefined, { atS: 30, durationS: 40 });
+    const points = terrainSamplePoints(track, buildCumulativeTrack(track).cumDist, 10);
+    // 60 s en mouvement : 180 m, soit 18 pas, plus le premier point.
+    expect(points.length).toBe(19);
+    expect(points.some((p) => p.t > 30_000 && p.t < 70_000)).toBe(false);
+  });
+
+  it("rend une liste vide pour un pas nul ou une trace vide", () => {
+    expect(terrainSamplePoints([], [], 10)).toEqual([]);
+    const track = buildTrack(1, 10);
+    expect(terrainSamplePoints(track, buildCumulativeTrack(track).cumDist, 0)).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from 'react';
+import { Fragment } from 'react';
 import { HelpText } from './Help';
 import { PanelHeading } from './PanelTitle';
 import HighlightPath from './HighlightPath';
@@ -20,16 +20,14 @@ interface Props {
   accent: string;
   open: boolean;
   onToggle: () => void;
-  /** Sous le tableau : les tranches par kilomètre, à pied et à vélo (`KilometerSplitsTable`). */
-  children?: ReactNode;
 }
 
 /**
  * Onglet « tops » : les trois meilleurs passages sur chaque durée ou distance
  * du calcul, et le podium sur la carte (`TopsHighlight`). Partagé par la
- * voile, la course, le vélo et le surf ; posé dans le `ResizablePanel` du module.
+ * voile et le surf ; posé dans le `ResizablePanel` du module.
  */
-export default function TopsPanel({ targets, tops, unit, selected, onSelect, accent, open, onToggle, children }: Props) {
+export default function TopsPanel({ targets, tops, unit, selected, onSelect, accent, open, onToggle }: Props) {
   return (
     <>
       <PanelHeading label="Meilleurs segments" open={open} onToggle={onToggle} helpKey="analyse:tops" />
@@ -69,7 +67,6 @@ export default function TopsPanel({ targets, tops, unit, selected, onSelect, acc
           ))}
         </tbody>
       </table>
-      {children}
     </>
   );
 }

@@ -2,19 +2,19 @@
 // Usage : node partage.mjs <port> <dossier de travail> [<dossier des captures>]
 // Sur un profil neuf. Réseau : les tuiles d'OpenStreetMap seulement (fond de l'image) ; IGN, Overpass et BRouter
 // bloqués. Dure environ 1 min 30. Le script :
-//  1. importe une boucle de course et la voile de `make-gpx.mjs` ;
-//  2. pour chacune : « Partager » en tête du menu « … », la fenêtre, l'aperçu (1080 × 1920, en hauteur), les pastilles
+//  1. importe la voile de `make-gpx.mjs` (course et vélo retirés au lot 303) ;
+//  2. pour la session : « Partager » en tête du menu « … », la fenêtre, l'aperçu (1080 × 1920, en hauteur), les pastilles
 //     égales aux chiffres de l'onglet « général » (sans les « — »), les six premières enfoncées ; l'image est
 //     gardée dans le dossier des captures (`partage-<page>.png`) ;
-//  3. en course : deux pastilles seulement (image toujours en 1080 × 1920), fond de carte décoché, choix rangés sous
+//  3. en voile : deux pastilles seulement (image toujours en 1080 × 1920), fond de carte décoché, choix rangés sous
 //     l'activité de la session (`tracker.partage`) et retrouvés à la réouverture ; « Partager » par le partage du
 //     navigateur (simulé : fichier PNG nommé d'après la session), puis sans partage (téléchargement et message) ;
 //     Échap ferme ;
-//     lignes ajoutées le 05/11 : « Meilleur 1 km » en course, « Manœuvres réussies » et « Vent » en voile, rien de
+//     lignes ajoutées le 05/11 : « Manœuvres réussies » et « Vent » en voile, rien de
 //     « — » (pas d'appréciation donnée) ;
 //  4. à 390×844 : la fenêtre tient dans l'écran, sans débordement de la page ;
-//  5. fin d'enregistrement, à 390×844 : rejeu ×600 de la boucle en À pied, Arrêter, puis « … » › « Partager » de la
-//     carte « Session terminée » : aperçu en 1080 × 1920, chiffres du résumé, choix de la course repris (même activité).
+//  5. fin d'enregistrement, à 390×844 : rejeu ×600 d'une boucle en Voile, Arrêter, puis « … » › « Partager » de la
+//     carte « Session terminée » : aperçu en 1080 × 1920, chiffres du résumé, choix de la voile repris (clé de l'activité enregistrée).
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -40,7 +40,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://brouter.de/*']);
 
 // --- Sessions ---
-/** Boucle de course de 30 min au nord de Montpellier, à 3 m/s. */
+/** Boucle de 30 min au nord de Montpellier, à 3 m/s. */
 const loopGpx = (t0) => {
   const pts = [];
   const seconds = 1800;
@@ -50,15 +50,13 @@ const loopGpx = (t0) => {
     const lon = 3.86 + 0.016 * Math.cos(a);
     pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><ele>${(60 + 20 * Math.sin(a)).toFixed(1)}</ele><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${k % 600 < 120 ? 4.2 : 3}</speed></extensions></trkpt>`);
   }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Boucle</name><type>running</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Boucle</name><type>wingfoil</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
 };
 const voilePath = join(tmpdir(), 'partage-voile.gpx');
 execFileSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'make-gpx.mjs'), voilePath]);
-const T_RUN = Date.UTC(2026, 9, 1, 8, 0, 0);
 const T_VOILE = Date.UTC(2026, 8, 20, 13, 0, 0);
 const SESSIONS = [
   // `share` : chiffres de l'image (22/10 : la liste entière d'avant, l'onglet « général » n'en montrant plus que l'essentiel).
-  { page: 'course', start: T_RUN, gpx: loopGpx(T_RUN), share: ['Distance', 'Distance en mouvement', 'Temps de parcours', /^Temps en mouvement/, 'Moyenne en mouvement', 'Moyenne sur le temps total', 'Dénivelé', 'Altitude', 'Meilleur 1 km'] },
   { page: 'voile', start: T_VOILE, gpx: readFileSync(voilePath, 'utf8'), share: ['Distance', 'Distance active', 'Temps total', /^Temps en vol/, 'Ratio de vol', 'Vitesse moyenne', /^Moyenne active/, 'Manœuvres réussies', 'Vent'] },
 ];
 
@@ -71,7 +69,7 @@ for (const s of SESSIONS) {
   const rec = await waitFor(async () => (await records())?.find((r) => Math.abs((r.summary?.startMs ?? 0) - s.start) < 2000), { timeout: 6000, label: `fiche ${s.page}` });
   await settle({ max: 2000, label: `import ${s.page}` });
   paths[s.page] = `/${s.page}/analyse?session=${encodeURIComponent(rec?.gpx ?? '')}`;
-  activityIds[s.page] = rec?.activityId ?? rec?.sport;
+  activityIds[s.page] = rec?.activityId ?? rec?.sport ?? s.page; // la voile est rangée sous « voile »
   check(`${s.page} rangée`, Boolean(rec));
 }
 
@@ -145,23 +143,23 @@ for (const s of SESSIONS) {
   check(`${s.page} : Échap ferme la fenêtre`, await evaluate(`document.querySelector('.share-dialog') === null`));
 }
 
-// --- 3. Choix en course ---
-await go(paths.course, 7000);
+// --- 3. Choix en voile ---
+await go(paths.voile, 7000);
 await openShare();
 await waitImage();
 let c = await chips();
 for (const label of c.filter((x) => x.on).slice(2).map((x) => x.label)) await pressChip(label);
 await waitImage();
 c = await chips();
-check('course : deux pastilles enfoncées', c.filter((x) => x.on).length === 2, c.filter((x) => x.on).map((x) => x.label).join(' | '));
-check('course : deux chiffres, image toujours en 1080 × 1920', isPortrait(await imageSize()), JSON.stringify(await imageSize()));
+check('voile : deux pastilles enfoncées', c.filter((x) => x.on).length === 2, c.filter((x) => x.on).map((x) => x.label).join(' | '));
+check('voile : deux chiffres, image toujours en 1080 × 1920', isPortrait(await imageSize()), JSON.stringify(await imageSize()));
 await evaluate(`document.querySelector('.share-dialog__check input').click()`);
 await waitImage();
-await saveImage('partage-course-sans-carte');
+await saveImage('partage-voile-sans-carte');
 const stored = await evaluate(`localStorage.getItem('tracker.partage')`);
 console.log('tracker.partage :', stored);
-const course = JSON.parse(stored ?? '{}')[activityIds.course] ?? {};
-check(`course : choix rangés sous l'activité (${activityIds.course})`, course.stats?.length === 2 && course.map === false);
+const choix = JSON.parse(stored ?? '{}')[activityIds.voile] ?? {};
+check(`voile : choix rangés sous l'activité (${activityIds.voile})`, choix.stats?.length === 2 && choix.map === false);
 
 // Partage du navigateur, simulé : le fichier transmis.
 await evaluate(`(() => {
@@ -173,21 +171,21 @@ await evaluate(`[...document.querySelectorAll('.share-dialog__actions button')].
 await wait(500);
 const shared = await evaluate('window.__partage');
 console.log('partagé :', JSON.stringify(shared));
-check('course : PNG transmis au partage, nommé d\'après la session', shared?.type === 'image/png' && /^2026-10-01 .+\.png$/.test(shared?.name ?? '') && shared.size > 10_000);
+check('voile : PNG transmis au partage, nommé d\'après la session', shared?.type === 'image/png' && /^2026-09-20 .+\.png$/.test(shared?.name ?? '') && shared.size > 10_000);
 
 // Sans partage : téléchargement et message.
 await evaluate(`navigator.canShare = () => false`);
 await evaluate(`[...document.querySelectorAll('.share-dialog__actions button')].find((b) => b.textContent.trim() === 'Partager').click()`);
 await wait(500);
 const note = await evaluate(`document.querySelector('.share-dialog [role=status]')?.textContent ?? ''`);
-check('course : sans partage, l\'image est téléchargée', note.includes('téléchargée'), note);
+check('voile : sans partage, l\'image est téléchargée', note.includes('téléchargée'), note);
 
 // Réouverture : choix retrouvés.
-await go(paths.course, 7000);
+await go(paths.voile, 7000);
 await openShare();
 await waitImage();
 c = await chips();
-check('course : choix retrouvés à la réouverture', c.filter((x) => x.on).length === 2
+check('voile : choix retrouvés à la réouverture', c.filter((x) => x.on).length === 2
   && !(await evaluate(`document.querySelector('.share-dialog__check input').checked`)));
 
 // --- 4. Téléphone ---
@@ -212,8 +210,10 @@ const holdStop = async () => {
 };
 const replayPath = join(workDir, 'partage-rejeu.gpx');
 writeFileSync(replayPath, loopGpx(Date.now() - 1800 * 1000));
+// L'activité enregistrée n'est pas celle de la session importée (autre clé) : le choix de la voile est posé pour toute la famille.
+await evaluate(`localStorage.setItem('tracker.partage', JSON.stringify(Object.fromEntries(['voile', 'wingfoil', 'windsurf', 'kite', 'bateau'].map((k) => [k, ${JSON.stringify(choix)}]))))`);
 await go('/enregistrer', 4000);
-console.log('famille :', await clickText('À pied', '[aria-label=Famille] button'));
+console.log('famille :', await clickText('Voile', '[aria-label=Famille] button'));
 await wait(300);
 await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click()`);
 await wait(300);
@@ -238,7 +238,7 @@ check('fin d\'enregistrement : image en hauteur de 1080 × 1920', isPortrait(awa
 c = await chips();
 console.log('pastilles :', c.map((x) => `${x.label}${x.on ? ' *' : ''}`).join(' | '));
 check('fin d\'enregistrement : chiffres du résumé', c.some((x) => x.label === 'Distance') && c.length >= 6, String(c.length));
-check('fin d\'enregistrement : choix de la course repris (même activité)', c.filter((x) => x.on).length === course.stats?.length
+check('fin d\'enregistrement : choix de la voile repris (même activité)', c.filter((x) => x.on).length === choix.stats?.length
   && !(await evaluate(`document.querySelector('.share-dialog__check input').checked`)));
 await saveImage('partage-enregistrement');
 await shoot('partage-enregistrement-fenetre');

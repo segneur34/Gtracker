@@ -1,9 +1,9 @@
-// Banc de test : la carte du direct pendant un enregistrement à pied (lot 104, carte figée en pause manuelle).
+// Banc de test : la carte du direct pendant un enregistrement de voile (lot 104, carte figée en pause manuelle ; à pied jusqu'au lot 303).
 // Usage : node carte-direct.mjs <port> <dossier de travail, chemin Windows>
 // Sur un profil neuf, sans réseau, environ 8 min en temps réel, 1 min avec `TEMPS=10` (horloge de la page accélérée).
-// Deux passages en rejeu ×1 d'une course à 3 m/s vers l'est, 1 Hz, vitesse du capteur sur chaque point, chacun fini
+// Deux passages en rejeu ×1 d'une wing à 3 m/s vers l'est, 1 Hz, vitesse du capteur sur chaque point, chacun fini
 // par l'arrêt tenu puis « Jeter » :
-//  1. pause manuelle (« Pause » de la page) de 60 à 90 s pendant laquelle le rejeu avance (le coureur continue, le
+//  1. pause manuelle (« Pause » de la page) de 60 à 90 s pendant laquelle le rejeu avance (la planche continue, le
 //     GPS reste allumé), puis « Reprendre » : la flèche suit pendant la pause, sans trace dessinée ni distance qui
 //     monte, et après la reprise aucun trait entre le point de la pause et celui de la reprise, ni passager (relevés
 //     serrés juste après la reprise) ni durable ;
@@ -11,8 +11,8 @@
 //     `visibilityState` forcé et `visibilitychange`, le second cachée et son JavaScript suspendu par le débogueur,
 //     comme un écran éteint : au réveil, le rejeu rend d'un coup ce qui est échu ; `Page.setWebLifecycleState`
 //     ne convient pas, le Chrome sans fenêtre jette la page gelée et en recharge une autre), et une immobilité de
-//     150 à 195 s (pause automatique du pré-réglage de la course, 0,5 km/h sur 20 s).
-// La course n'a pas de « Moyenne active » (lot 150 : voile et surf seulement).
+//     150 à 225 s (pause automatique du pré-réglage de la Voile, 1,5 km/h sur 60 s ; second trou de 280 à 295 s).
+// La « Moyenne active » (lot 150, voile et surf) est relevée sans verdict.
 // Toutes les 2 s de page, un relevé : « Points » de la partie GPS (les positions arrivent), distance de la carte « En
 // cours », déplacement de la carte (`.leaflet-map-pane`), place de la flèche dans la carte, longueur des tracés de la
 // trace (leur `d` : Leaflet réduit une ligne droite à ses deux bouts), « Recentrer », bandeau de pause automatique. Une phase dit « figée » sur trois relevés de suite où les points
@@ -37,7 +37,7 @@ const SPEED_MS = 3;
 const t0 = Date.parse('2026-01-15T09:00:00Z');
 const lat = 43.7;
 const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
-/** Course de `endS` s : immobile sur `still` (secondes, bornes [a, b]), sans point dans les trous `holes`. */
+/** Wing en ligne droite de `endS` s : immobile sur `still` (secondes, bornes [a, b]), sans point dans les trous `holes`. */
 const writeTrack = (name, endS, { still = null, holes = [] } = {}) => {
   const pts = [];
   let meters = 0;
@@ -49,21 +49,22 @@ const writeTrack = (name, endS, { still = null, holes = [] } = {}) => {
       + `<extensions><speed>${isStill ? 0 : SPEED_MS}</speed></extensions></trkpt>`);
   }
   const path = join(workDir, name);
-  writeFileSync(path, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Rejeu</name><type>running</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`);
+  writeFileSync(path, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Rejeu</name><type>wingfoil</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`);
   return { path, count: pts.length };
 };
 const PAUSE = [60, 90];
 const PAUSE_END_S = 150;
 const pauseTrack = writeTrack('carte-direct-pause.gpx', PAUSE_END_S);
 const HOLE_1 = [60, 86];
-const STILL = [150, 195];
-const HOLE_2 = [250, 265];
-const HOLES_END_S = 300;
+const STILL = [150, 225];
+const HOLE_2 = [280, 295];
+const HOLES_END_S = 330;
 const holesTrack = writeTrack('carte-direct-trous.gpx', HOLES_END_S, { still: STILL, holes: [HOLE_1, HOLE_2] });
 console.log(`traces : ${pauseTrack.count} points sans trou ; ${holesTrack.count} points, trous de ${HOLE_1[1] - HOLE_1[0]} s et ${HOLE_2[1] - HOLE_2[0]} s`);
 
 // --- Relevés ---
-const COLOR = '#d11a1a';
+// Trace du direct à la première nuance de la famille (Voile, thème clair).
+const COLOR = '#004aad';
 /**
  * Relevé de la page ; avec `gap` ({ from, to } : places de la flèche, en points du calque de la carte, au point de
  * la pause et à celui de la reprise), le nombre d'endroits des tracés de la trace tombés dans le trou entre les deux.
@@ -206,7 +207,7 @@ const holdStop = async () => {
 
 const startReplay = async (track) => {
   await go('/enregistrer', 6000);
-  await clickText('À pied');
+  await clickText('Voile');
   await vwait(300);
   await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click(); 'ok'`);
   await vwait(300);
@@ -228,11 +229,11 @@ const endReplay = async (pass) => {
   check(`${pass} : arrêt tenu puis « Jeter »`, stop === 'ok' && thrown === 'ok', `${stop} / ${thrown}`);
 };
 
-// 1. Pause manuelle pendant laquelle le coureur avance.
+// 1. Pause manuelle pendant laquelle la planche avance.
 {
   const pass = '1. pause manuelle';
   check(`${pass} : rejeu lancé`, await startReplay(pauseTrack));
-  check(`${pass} : course, pas de « Moyenne active »`, !(await evaluate(`document.body.innerText.includes('Moyenne active')`)));
+  diag(`${pass} : « Moyenne active » ${(await evaluate(`document.body.innerText.includes('Moyenne active')`)) ? 'affichée' : 'absente'}`);
   await sampleUntil('avant pause', PAUSE[0]);
   check(`${pass} : « Pause »`, (await clickText('Pause')) === 'ok');
   // Le dernier calcul du direct, différé, peut suivre la pause de 2 s.

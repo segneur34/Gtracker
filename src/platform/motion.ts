@@ -6,7 +6,7 @@ import { isNativeApp } from './runtime';
 
 /**
  * Capteurs du téléphone pendant un enregistrement, pour la mesure des sauts,
- * du pumping et de la cadence à pied : seul passage autorisé vers eux (règle 12). Sur le téléphone, le
+ * du pumping et des virages : seul passage autorisé vers eux (règle 12). Sur le téléphone, le
  * greffon maison `Motion` (`android/…/MotionPlugin.java`) écrit accéléromètre
  * et gyroscope bruts dans un fichier privé, `capteurs/<startedAtMs>.imu`
  * (format : `core/imuFile.ts`) ; l'enregistreur le range ensuite à côté du
@@ -26,10 +26,8 @@ export interface MotionCapabilities {
 export interface MotionSetup {
   placement: JumpPlacement;
   foil: boolean;
-  /** La capture sert aux sauts (ou au pumping) : sans eux, elle ne sert qu'à la cadence. */
+  /** La capture sert aux sauts ; faux : au pumping seul. La cadence à pied est partie avec la course (lot 303). */
   jumps: boolean;
-  /** Cadence à pied mesurée (`running/cadence.ts`). */
-  cadence: boolean;
 }
 
 /** Capture arrêtée : son fichier privé et ce qu'il faut savoir pour la juger. */
@@ -55,11 +53,11 @@ export const motionCapturePath = (startedAtMs: number): string => `${MOTION_DIR}
 /** Plugin maison, `android/app/src/main/java/io/github/segneur/tracker/MotionPlugin.java`. */
 interface MotionPlugin {
   capabilities(): Promise<{ accelerometer: boolean; gyroscope: boolean; barometer: boolean; accelMaxRange?: number }>;
-  start(options: { startedAtMs: number; placement: JumpPlacement; foil: boolean; jumps: boolean; cadence: boolean }): Promise<{ path: string }>;
+  start(options: { startedAtMs: number; placement: JumpPlacement; foil: boolean; jumps: boolean }): Promise<{ path: string }>;
   pause(): Promise<void>;
   resume(): Promise<void>;
   stop(): Promise<{ path: string | null; bytes?: number; durationS?: number; samples?: number; longestGapS?: number; error?: string }>;
-  status(): Promise<{ path: string | null; listening?: boolean; placement?: JumpPlacement; foil?: boolean; jumps?: boolean; cadence?: boolean }>;
+  status(): Promise<{ path: string | null; listening?: boolean; placement?: JumpPlacement; foil?: boolean; jumps?: boolean }>;
 }
 
 const plugin = registerPlugin<MotionPlugin>('Motion');
@@ -91,7 +89,7 @@ export const getMotionCapabilities = (): Promise<MotionCapabilities> => {
 /** Démarre la capture d'un enregistrement ; lève une erreur si le téléphone ne le permet pas. */
 export const startMotionCapture = async (startedAtMs: number, setup: MotionSetup): Promise<void> => {
   if (!isNativeApp()) throw new Error(UNAVAILABLE.reason ?? 'Capteurs indisponibles.');
-  await plugin.start({ startedAtMs, placement: setup.placement, foil: setup.foil, jumps: setup.jumps, cadence: setup.cadence });
+  await plugin.start({ startedAtMs, placement: setup.placement, foil: setup.foil, jumps: setup.jumps });
 };
 
 export const pauseMotionCapture = async (): Promise<void> => {
@@ -139,7 +137,7 @@ export const runningMotionCapture = async (): Promise<RunningMotionCapture | nul
   return {
     path: r.path,
     listening: r.listening === true,
-    setup: { placement: r.placement ?? 'poitrine', foil: r.foil === true, jumps: r.jumps !== false, cadence: r.cadence === true },
+    setup: { placement: r.placement ?? 'poitrine', foil: r.foil === true, jumps: r.jumps !== false },
   };
 };
 

@@ -30,8 +30,6 @@ export interface LocationFix {
   bearingDeg?: number;
   /** Fréquence cardiaque de la ceinture, en battements par minute, jointe par l'enregistreur. */
   heartRateBpm?: number;
-  /** Cadence à pied, en pas par minute, mesurée à l'arrêt sur la capture des capteurs (`running/cadence.ts`). */
-  cadenceSpm?: number;
 }
 
 export interface LocationWatchOptions {

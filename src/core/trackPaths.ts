@@ -1,5 +1,5 @@
 /**
- * Tracés sur la carte des passages d'une zone (pente, cadence, FC) : une même
+ * Tracés sur la carte des passages d'une zone (FC) : une même
  * mesure, posée sur des pas différents.
  */
 

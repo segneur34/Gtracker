@@ -4,12 +4,11 @@ import {
   type Activity,
 } from '../core/activities';
 import {
-  LOOP_RETURN_RATIO_RANGE, REFERENCE_HEART_RATE, SPORT_FAMILIES, SPORT_PROFILES, TERRAIN_STEP_CHOICES_M, familySports, hasActiveThreshold, hasPositions,
-  isLandTreatment, sportFamily, sportTreatment, usesMarkCourse,
+  LOOP_RETURN_RATIO_RANGE, REFERENCE_HEART_RATE, SPORT_FAMILIES, SPORT_PROFILES, familySports, hasActiveThreshold, hasPositions,
+  sportFamily, sportTreatment, usesMarkCourse,
   type SportFamily, type SportProfile, type Treatment,
 } from '../core/sportProfiles';
 import { activityTabs, isTabShown, toggleTabChoice, type TabChoices } from '../core/analysisTabs';
-import { isValidGradeRange } from '../land/grade';
 import type { SportType } from '../core/types';
 import {
   DISTANCE_UNIT_LABEL, DISTANCE_UNIT_SYMBOL, SPEED_UNIT_LABEL, speedUnitLabel, speedUnitSymbol, editSpeedUnit, formatPace, formatSpeedValue, fromDisplaySpeed, kmhToMs, msToKmh, toDisplaySpeed,
@@ -35,15 +34,13 @@ import { playPattern, setBeepPitch, type ClockTone } from '../platform/beeper';
 import { BEEP_SOUNDS, beepSoundHz } from '../recording/beepSound';
 import { DEFAULT_GEAR_LABELS, MAX_GEAR_LABEL_LENGTH, sanitizeGearLabels } from '../settings/gear';
 import {
-  HR_OFFSET_RANGE, TREATMENT_UNITS, defaultAutoPauseOf, defaultBikeKg, defaultEnergyModelOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultTabsOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, defaultSpeedRangeOf, defaultFoil, defaultGradeRange, defaultHrOffsetOf, defaultTerrainStepOf, planningFamily, rangeFollowsPace, tabsAfterJumpsChange, thresholdFollowsPace, type SportSettingsView,
+  HR_OFFSET_RANGE, TREATMENT_UNITS, defaultAutoPauseOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultTabsOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, defaultSpeedRangeOf, defaultFoil, defaultHrOffsetOf, planningFamily, rangeFollowsPace, tabsAfterJumpsChange, thresholdFollowsPace, type SportSettingsView,
 } from '../settings/activitySettings';
 import { useAllSportSettings } from '../hooks/useSportSettings';
 import { sameJson } from '../hooks/createStore';
 import type { GearGroup } from '../library/notes';
 import GearGroupsEditor from '../components/GearGroupsEditor';
 import { plural } from '../core/basics';
-import { BIKE_TYPES, formatCrr, type BikeType } from '../cycling/energy';
-import type { EnergyModel } from '../running/energy';
 import {
   MAX_LIVE_FIELDS, MAX_NOTIFICATION_FIELDS, liveFieldLabel, liveFieldsOfTreatment,
   type LiveFieldKey, type LiveFieldTarget, type LiveFieldUnits,
@@ -51,8 +48,8 @@ import {
 import { LIVE_STATS_DEFAULTS, usesActiveAverage } from '../recording/liveStats';
 import { simulatedApproachMs } from '../recording/markGuide';
 import {
-  CUSTOM_FLAT_SPEED_BOUNDS_MS, LEVEL_CLIMB_POWER_WKG, LEVEL_FLAT_SPEED_MS, PACE_LEVELS, PACE_LEVEL_LABEL,
-  climbPowerWkgForFlatSpeed, isPaceLevel, type PaceLevel, type PlanningFamily,
+  CUSTOM_FLAT_SPEED_BOUNDS_MS, LEVEL_FLAT_SPEED_MS, PACE_LEVELS, PACE_LEVEL_LABEL,
+  isPaceLevel, type PaceLevel, type PlanningFamily,
 } from '../planning/duration';
 import type { WayType } from '../planning/brouterProfile';
 import { WAY_TYPE_LABEL } from '../planning/route';
@@ -192,8 +189,6 @@ const TILE_CAP_CHOICES_MB = [100, 250, 500, 1000, 2000, 5000];
 /** « Écouter » le son des bips : le signal d'un changement de phase du compteur, court, court, long, une seconde entre deux. */
 const LISTEN_PATTERN: ClockTone[] = [{ delayMs: 0, tone: 'court' }, { delayMs: 1000, tone: 'court' }, { delayMs: 2000, tone: 'long' }];
 const DISTANCE_UNITS = Object.keys(DISTANCE_UNIT_LABEL) as DistanceUnit[];
-/** Modèles de dépense à pied (réglage « Dépense »). */
-const ENERGY_MODEL_CHOICES: { key: EnergyModel; label: string }[] = [{ key: 'course', label: 'Course' }, { key: 'marche', label: 'Marche' }];
 /** Activités ouvertes, par identifiant ; absente : fermée. */
 const NO_ACTIVITY_OPEN: Record<string, boolean> = {};
 /** Parties d'une carte d'activité, toutes fermées au départ ; l'état, mémorisé, vaut pour toutes les activités. */
@@ -381,8 +376,6 @@ const ActivityCard = memo(function ActivityCard({
   const family = sportFamily(activity.base);
   const treatment = sportTreatment(activity.base);
   const sailing = treatment === 'voile';
-  /** À pied ou à vélo : pente, terrain, dénivelé. */
-  const land = isLandTreatment(treatment);
   /** Sans position (muscu) : ni unités, ni seuil, ni couleurs de trace, ni pause automatique ; la ceinture d'office. */
   const positions = hasPositions(activity.base);
   /** Seuil d'activité réglable : pas en bateau, où toute la session compte en navigation. */
@@ -419,14 +412,6 @@ const ActivityCard = memo(function ActivityCard({
     const range = nextSpeedRange(s.speedRange, bound, next === null ? null : fromDisplaySpeed(next, rangeUnit), fallbackRange);
     if (range !== s.speedRange) setFor(id, 'speedRange', range);
   };
-  // Couleur de pente de la courbe d'altitude (course, vélo), saisie en %, rangée en fraction.
-  const fallbackGrades = defaultGradeRange(activity);
-  const shownGrades = s.gradeRange ?? fallbackGrades;
-  const percent = (fraction: number) => parseFloat((fraction * 100).toFixed(1));
-  const setGradeBound = (bound: 'min' | 'max', next: number | null) => {
-    const grades = nextBoundPair(s.gradeRange, bound, next === null ? null : next / 100, fallbackGrades, isValidGradeRange);
-    if (grades !== s.gradeRange) setFor(id, 'gradeRange', grades);
-  };
   const setAutoPauseField = (field: 'speedKmh' | 'delayS', next: number | null) => {
     const current = s.isAutoPauseOverridden ? s.autoPause : null;
     const pause = field === 'speedKmh'
@@ -448,8 +433,6 @@ const ActivityCard = memo(function ActivityCard({
     ...(s.foil && s.pumping ? ['pumping'] : []),
     ...(s.turns ? ['virages'] : []),
     ...(s.jumps?.enabled ? ['sauts'] : []),
-    ...(s.cadence ? ['cadence'] : []),
-    ...(treatment === 'velo' ? [BIKE_TYPES[s.bikeType].noun] : []),
     ...(paceFamily ? [`voies : ${s.wayTypes.map((w) => WAY_TYPE_LABEL[w].toLowerCase()).join(' + ')}`] : []),
     ...(paceFamily ? [`niveau ${PACE_LEVEL_LABEL[s.paceLevel].toLowerCase()}`] : []),
   ].join(' · ');
@@ -528,23 +511,6 @@ const ActivityCard = memo(function ActivityCard({
                 {s.speedRange === null && <span className="settings-sports__mark">{followsPace ? "selon l'allure" : 'défaut'}</span>}
               </div>
             </SettingRow>
-            {land && (
-              <SettingRow label="Colorisation pente" helpKey={`${id}:couleurs-pente`}
-                help="Couleur de la courbe d'altitude selon la pente, montée ou descente : grise sous la première valeur, la plus vive à la seconde.">
-                <div className="settings-sports__pair">
-                  <NumberField step={1} min={0}
-                    value={s.gradeRange === null ? null : percent(shownGrades.min)}
-                    placeholder={String(percent(fallbackGrades.min))}
-                    onCommit={(v) => setGradeBound('min', v)} />
-                  <span>à</span>
-                  <NumberField unit="%" step={1} min={0}
-                    value={s.gradeRange === null ? null : percent(shownGrades.max)}
-                    placeholder={String(percent(fallbackGrades.max))}
-                    onCommit={(v) => setGradeBound('max', v)} />
-                  {s.gradeRange === null && <span className="settings-sports__mark">défaut</span>}
-                </div>
-              </SettingRow>
-            )}
           </SettingsPart>}
           <SettingsPart label="Onglet analyse" open={openPart.analyse} onToggle={() => togglePart('analyse')}>
             {withThreshold && (
@@ -592,26 +558,6 @@ const ActivityCard = memo(function ActivityCard({
                 </label>
               </SettingRow>
             )}
-            {treatment === 'course' && (
-              <SettingRow label="Dépense" helpKey={`${id}:depense`}
-                help="Modèle de l'énergie des sessions : la course (Minetti, selon l'économie de course) ou la marche (Pandolf, descentes corrigées par Santee), qui coûte environ moitié moins sur le plat.">
-                <div className="settings-sports__pair">
-                  <SegmentedControl label="Dépense" items={ENERGY_MODEL_CHOICES} value={s.energyModel}
-                    onChange={(model) => setFor(id, 'energyModel', model === defaultEnergyModelOf(activity) ? null : model)} />
-                  {!s.isEnergyModelOverridden && <span className="settings-sports__mark">défaut</span>}
-                </div>
-              </SettingRow>
-            )}
-            {treatment === 'course' && (
-              <SettingRow label="Charge portée" helpKey={`${id}:charge`}
-                help="Sac, eau, affaires : ils augmentent l'énergie des sessions. Chaque session peut avoir la sienne.">
-                <div className="settings-sports__pair">
-                  <NumberField unit="kg" step={0.5} min={0} max={50}
-                    value={s.carriedLoad} placeholder="0" onCommit={(kg) => setFor(id, 'carriedLoad', kg)} />
-                  {s.carriedLoad === null && <span className="settings-sports__mark">aucune</span>}
-                </div>
-              </SettingRow>
-            )}
             <SettingRow label="Seuils cardio" helpKey={`${id}:seuils-cardio`}
               help="S1, S2 et les zones cardio de cette activité, décalés par rapport à ceux de la course (Réglages › Pratiquant) : la FC y monte moins haut pour un même effort (vélo −7, marche −4, planche −5, wing et kite −8, surf −10 par défaut).">
               <div className="settings-sports__pair">
@@ -621,18 +567,6 @@ const ActivityCard = memo(function ActivityCard({
                 {!s.isHrOffsetOverridden && <span className="settings-sports__mark">défaut</span>}
               </div>
             </SettingRow>
-            {s.terrainStepM !== null && (
-              <SettingRow label="Altitude IGN" helpKey={`${id}:altitude-ign`}
-                help="L'altitude du terrain est demandée à l'IGN, un point tous les tant de mètres le long de la trace.">
-                <div className="settings-sports__pair">
-                  <span className="settings-sports__mark">un point tous les</span>
-                  <select value={s.terrainStepM} onChange={(e) => setFor(id, 'terrainStepM', Number(e.target.value))} className="ui-field ui-field--s">
-                    {TERRAIN_STEP_CHOICES_M.map((m) => <option key={m} value={m}>{m} m</option>)}
-                  </select>
-                  {s.terrainStepM === defaultTerrainStepOf(activity) && <span className="settings-sports__mark">défaut</span>}
-                </div>
-              </SettingRow>
-            )}
             <AnalysisTabsSetting view={s} profile={p} onChange={(choices) => setFor(id, 'tabs', choices)} />
           </SettingsPart>
           <SettingsPart label="Matériel" open={openPart.materiel} onToggle={() => togglePart('materiel')}>
@@ -700,15 +634,6 @@ const ActivityCard = memo(function ActivityCard({
                 <span className="settings-sports__mark">obligatoire</span>
               </SettingRow>
             )}
-            {s.cadence !== null && (
-              <SettingRow label="Cadence" helpKey={`${id}:cadence`}
-                help="Le téléphone, porté sur soi, compte les pas (Android) ; la cadence est écrite dans la trace.">
-                <label className="settings-sports__pair">
-                  <input type="checkbox" checked={s.cadence} onChange={(e) => setFor(id, 'cadence', e.target.checked ? null : false)} />
-                  <span>Mesurer la cadence</span>
-                </label>
-              </SettingRow>
-            )}
             <div className="settings-part__sub">
               <h4 className="settings-part__subtitle">Notification</h4>
               <FieldsSetting label="Chiffres de la notification" helpKey={`${id}:notification`}
@@ -718,13 +643,8 @@ const ActivityCard = memo(function ActivityCard({
                 onChange={(fields) => setFor(id, 'notificationFields', fields)} />
             </div>
           </SettingsPart>
-          {(treatment === 'velo' || paceFamily !== null || s.loopReturnRatio !== null) && (
-            <SettingsPart label={treatment === 'velo' ? (paceFamily ? 'Vélo et planification' : 'Vélo') : 'Planification'} open={openPart.itineraires} onToggle={() => togglePart('itineraires')}>
-              {treatment === 'velo' && (
-                <BikeSettings view={s}
-                  onBikeType={(t) => setFor(id, 'bikeType', t)}
-                  onBikeWeight={(kg) => setFor(id, 'bikeWeight', kg)} />
-              )}
+          {(paceFamily !== null || s.loopReturnRatio !== null) && (
+            <SettingsPart label="Planification" open={openPart.itineraires} onToggle={() => togglePart('itineraires')}>
               {paceFamily && (
                 <WayTypesSetting view={s} treatment={treatment} onChange={(ways) => setFor(id, 'wayTypes', ways)} />
               )}
@@ -966,8 +886,6 @@ function SettingsPage() {
             <NumberField label="Fréquence cardiaque de repos" unit={hrUnit('hrRest')} min={25} max={120} value={profile.hrRest} onCommit={profileField('hrRest')} placeholder="ex. 55"
               helpKey="pratiquant:fc-repos" help="Avec la FC max, les seuils se calculent sur la réserve cardiaque, plus juste. Le test de FC repos (page Profil) la mesure." />
             <HeartRateThresholdsField profile={profile} onChange={setThresholds} />
-            <NumberField label="Économie de course" unit="ml O₂/kg/km" min={120} max={320} value={profile.economyMlKgKm} onCommit={profileField('economyMlKgKm')} placeholder="200"
-              helpKey="pratiquant:economie" help="Oxygène pour courir 1 km sur le plat, donné par un test en laboratoire. Sans valeur, 200 : environ 1 kcal par kilo et par kilomètre." />
             <p className="ui-eyebrow set-subhead">Racine du Profil</p>
             <NumberField label="Objectif par semaine" unit="min" min={ROOT_GOAL.min} max={ROOT_GOAL.max} value={profile.rootWeeklyGoalMin} onCommit={profileField('rootWeeklyGoalMin')}
               placeholder={String(ROOT_GOAL.defaultMin)} helpKey="pratiquant:racine-objectif"
@@ -1115,11 +1033,11 @@ function FieldsSetting({ label, help, helpKey, target = 'live', treatment, units
 /** Vitesse en km/h, sans décimale inutile. */
 const kmhLabel = (ms: number): string => `${commaDecimal(parseFloat(msToKmh(ms).toFixed(1)))} km/h`;
 
-/** Ce que donne une vitesse sur le plat : l'allure en course, la puissance de montée à vélo. */
-const paceDetail = (family: PlanningFamily, speedMs: number, distanceUnit: DistanceUnit, climbWkg?: number): string =>
+/** Ce que donne une vitesse sur le plat : l'allure en course, la vitesse seule à vélo (puissance de montée partie au lot 303). */
+const paceDetail = (family: PlanningFamily, speedMs: number, distanceUnit: DistanceUnit): string =>
   family === 'course'
     ? `${kmhLabel(speedMs)}, ${formatPace(speedMs, distanceUnit)} ${speedUnitSymbol('minkm', distanceUnit)}`
-    : `${kmhLabel(speedMs)}, ${commaDecimal(parseFloat((climbWkg ?? climbPowerWkgForFlatSpeed(speedMs)).toFixed(1)))} W/kg en montée`;
+    : kmhLabel(speedMs);
 
 /**
  * Niveau du temps estimé des itinéraires d'une activité, dans sa carte : un
@@ -1138,13 +1056,13 @@ function PaceSettings({ family, view, onLevel, onCustomSpeed }: {
     <>
       <SettingRow label="Niveau (temps estimé)" helpKey={`${view.activity.id}:niveau`} help={family === 'course'
         ? 'Vitesse sur le plat du temps estimé ; chaque 100 m de D+ compte comme 1 km de plus.'
-        : 'Vitesse sur le plat du temps estimé, et puissance tenue en montée, par kilo de votre poids ; en descente, roue libre.'}>
+        : 'Vitesse sur le plat des itinéraires.'}>
         <select value={view.paceLevel} onChange={(e) => isPaceLevel(e.target.value) && onLevel(e.target.value)} className="ui-field ui-field--s">
           {PACE_LEVELS.map((level) => (
             <option key={level} value={level}>
               {level === 'perso'
                 ? PACE_LEVEL_LABEL.perso
-                : `${PACE_LEVEL_LABEL[level]} · ${paceDetail(family, LEVEL_FLAT_SPEED_MS[family][level], view.distanceUnit, family === 'velo' ? LEVEL_CLIMB_POWER_WKG[level] : undefined)}`}
+                : `${PACE_LEVEL_LABEL[level]} · ${paceDetail(family, LEVEL_FLAT_SPEED_MS[family][level], view.distanceUnit)}`}
             </option>
           ))}
         </select>
@@ -1205,36 +1123,6 @@ function EyeButton({ name, hidden, disabled, onToggle }: { name: string; hidden:
     <button type="button" className="settings-eye" aria-pressed={hidden} aria-label={label} title={label} disabled={disabled} onClick={onToggle}>
       {hidden ? <IconEyeOff size={18} /> : <IconEye size={18} />}
     </button>
-  );
-}
-
-/** Type et poids du vélo d'une activité de vélo, dans sa carte. */
-function BikeSettings({ view, onBikeType, onBikeWeight }: {
-  view: SportSettingsView;
-  onBikeType: (type: BikeType) => void;
-  onBikeWeight: (kg: number | null) => void;
-}) {
-  const spec = BIKE_TYPES[view.bikeType];
-  return (
-    <>
-      <SettingRow label="Type de vélo" helpKey={`${view.activity.id}:type-velo`}
-        help="Pneus et position : ils fixent le roulement sur chaque revêtement et la prise au vent, pour la puissance, l'énergie et le temps estimé.">
-        <div className="settings-sports__pair">
-          <select value={view.bikeType} onChange={(e) => onBikeType(e.target.value as BikeType)} className="ui-field ui-field--s">
-            {(Object.keys(BIKE_TYPES) as BikeType[]).map((t) => <option key={t} value={t}>{BIKE_TYPES[t].label}</option>)}
-          </select>
-          <span className="settings-sports__mark">
-            roulement {formatCrr(spec.crrBySurface.asphalte ?? spec.crr)} sur asphalte, {formatCrr(spec.crrBySurface.terre ?? spec.crr)} sur terre
-            (moyen {formatCrr(spec.crr)}), traînée {formatCrr(spec.cdaM2)} m²
-          </span>
-        </div>
-      </SettingRow>
-      <SettingRow label="Poids du vélo" helpKey={`${view.activity.id}:poids-velo`}
-        help="Avec le vôtre (Pratiquant), pour la puissance et l'énergie. Vide : celui de l'activité, ou du type de vélo s'il a changé.">
-        <NumberField unit="kg" step={0.5} min={3} max={60}
-          value={view.bikeWeight} placeholder={String(defaultBikeKg(view.activity, view.bikeType))} onCommit={onBikeWeight} />
-      </SettingRow>
-    </>
   );
 }
 

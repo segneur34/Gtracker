@@ -15,20 +15,19 @@ import { DEFAULT_BEEP_SOUND, beepSoundHz, isBeepSound, type BeepSound } from '..
 import type { LiveFieldKey } from '../recording/liveFields';
 import type { MarkGuideSettings } from '../recording/markGuide';
 import type { JumpSettings } from '../recording/jumpSettings';
-import type { BikeType } from '../cycling/energy';
-import { isValidCarriedLoad, type EnergyModel } from '../running/energy';
+import type { BikeType } from '../core/domainTypes';
 import type { GearGroup, GearItem } from '../library/notes';
 import type { ActivitySpeedRanges } from '../library/sessionTrack';
 import type { DurationSettings, PaceLevel } from '../planning/duration';
 import type { WayType } from '../planning/brouterProfile';
-import type { GradeRange } from '../land/grade';
+import type { GradeRange } from '../planning/grade';
 import { resolveGearGroups, resolveGearLabels, sanitizeGearGroups, withGearItem } from '../settings/gear';
 import {
-  DEFAULT_LONG_PRESS_MS, DEFAULT_STOP_HOLD_MS, PRESETS_VERSION, defaultSpeedRangeOf, durationSettingsOf, effectiveHrZoneLines, isValidLongPress, isValidStopHold,
-  moduleActivity, readHiddenFamilies, resetOverrides, resetStoredPresets, resolveActivityPace, resolveBikeKg, resolveBikeType, resolveCadence,
-  resolveDistanceUnit, resolveEnergyModel, resolveFoil, resolveGradeRange, resolveHeartRate, resolveHrOffset, resolveJumps, resolveLiveFields,
+  DEFAULT_LONG_PRESS_MS, DEFAULT_STOP_HOLD_MS, PRESETS_VERSION, defaultSpeedRangeOf, durationSettingsOf, isValidLongPress, isValidStopHold,
+  moduleActivity, readHiddenFamilies, resetOverrides, resetStoredPresets, resolveActivityPace, resolveBikeKg, resolveBikeType,
+  resolveDistanceUnit, resolveFoil, resolveGradeRange, resolveHeartRate, resolveHrOffset, resolveJumps, resolveLiveFields,
   resolveLoopReturnRatio, resolveMarkGuide, resolveNotificationFields, resolvePumping, resolveRecordingProfile, resolveTurns, resolveSpeedRange, resolveSpeedUnit,
-  resolveTabChoices, resolveTerrainStepM, resolveThresholdOverride, resolveWayTypes, settingsView, withSetting, withVisibility, withoutOverrides,
+  resolveTabChoices, resolveThresholdOverride, resolveWayTypes, settingsView, withSetting, withVisibility, withoutOverrides,
   type SettingField, type SportSettingsView, type StoredSettings,
 } from '../settings/activitySettings';
 
@@ -177,9 +176,6 @@ export const upgradeStoredPresets = (): boolean => {
   return true;
 };
 
-/** Modèle de dépense d'une activité, réglé ou par défaut. Utilisable hors composant (direct). */
-export const effectiveEnergyModel = (activity: Activity): EnergyModel => resolveEnergyModel(readStoredSettings(), activity);
-
 export const readStoredActivities = (): Activity[] => readActivities(readStoredSettings().activities);
 
 /** Dernière activité enregistrée, si elle existe encore. */
@@ -294,9 +290,6 @@ export const effectiveTurns = (activity: Activity): boolean | null => resolveTur
 
 /** Ceinture cardio d'une activité. Utilisable hors composant. */
 export const effectiveHeartRate = (activity: Activity): boolean => resolveHeartRate(readStoredSettings(), activity);
-
-/** Cadence d'une activité à pied, `null` ailleurs. Utilisable hors composant. */
-export const effectiveCadence = (activity: Activity): boolean | null => resolveCadence(readStoredSettings(), activity);
 
 /** Réglages des sauts d'une activité, `null` si son calcul ne les mesure pas. Utilisable hors composant. */
 export const effectiveJumpSettings = (activity: Activity): JumpSettings | null => resolveJumps(readStoredSettings(), activity);
@@ -556,9 +549,6 @@ export const useSportSettings = (family: SportFamily) => {
   const activeThreshold = thresholdOverride ?? defaultActiveThresholdOf(profile, foil);
   const isThresholdOverridden = thresholdOverride !== null;
 
-  /** Pas des échantillons d'altitude du terrain, réglé dans Réglages ; `null` en voile. */
-  const terrainStepM = resolveTerrainStepM(stored, activity);
-
   // Lecture seule : les unités se choisissent dans Réglages, par activité.
   const speedUnit = resolveSpeedUnit(stored, activity);
   const distanceUnit = resolveDistanceUnit(stored, activity);
@@ -566,23 +556,10 @@ export const useSportSettings = (family: SportFamily) => {
   // Lecture seule ici : les bornes de l'activité se règlent dans Réglages, celles
   // d'une trace dans sa fiche (brouillon du module).
   const speedRange = useStableByText(resolveSpeedRange(stored, activity));
-  const gradeRange = useStableByText(resolveGradeRange(stored, activity));
-
-  // Vélo : type et poids, réglés dans Réglages.
-  const bikeType = resolveBikeType(stored, activity);
-  const bikeWeightKg = resolveBikeKg(stored, activity, bikeType);
-  // Course : charge portée, réglée dans Réglages.
-  const storedLoad = stored.carriedLoads?.[id];
-  const carriedLoadKg = isValidCarriedLoad(storedLoad) ? storedLoad : 0;
-  // À pied : modèle de dépense, réglé dans Réglages.
-  const energyModel = resolveEnergyModel(stored, activity);
   const gearLabels = useStableByText(resolveGearLabels(stored, id));
   const gearGroups = useStableByText(resolveGearGroups(stored, id));
   // Cardio : décalage des seuils S1 et S2, réglé dans Réglages.
   const hrOffsetBpm = resolveHrOffset(stored, activity);
-  // Cardio : limites des zones sur la courbe de FC, case « Zones » de l'onglet cardio (05/11).
-  const hrZoneLines = effectiveHrZoneLines(stored, activity);
-  const setHrZoneLines = useCallback((on: boolean) => updateStoredSettings((current) => withSetting(current, id, 'hrZoneLines', on)), [id]);
 
   return {
     activity,
@@ -592,31 +569,18 @@ export const useSportSettings = (family: SportFamily) => {
     activeThreshold,
     thresholdOverride,
     isThresholdOverridden,
-    terrainStepM,
     speedUnit,
     distanceUnit,
     /** Bornes du dégradé réglées pour l'activité dans Réglages ou pré-réglées, ou `null` pour le défaut du module. */
     speedRange,
-    /** Bornes de la couleur de pente de la courbe d'altitude, réglées dans Réglages ou par défaut. */
-    gradeRange,
     /** Bornes du dégradé à défaut de réglage, propres au traitement du calcul. */
     defaultSpeedRange: defaultSpeedRangeOf(activity),
-    bikeType,
-    /** Poids du vélo effectif, en kg (celui du type à défaut de réglage). */
-    bikeWeightKg,
-    /** Charge portée de l'activité, en kg (0 sans réglage) ; une session peut avoir la sienne. */
-    carriedLoadKg,
-    /** Modèle de dépense à pied de l'activité : course (Minetti) ou marche (Pandolf). */
-    energyModel,
     /** Intitulés des deux champs de matériel des notes (hors voile), réglés dans Réglages ou par défaut. */
     gearLabels,
     /** Matériel enregistré de l'activité, choisi par groupe dans l'onglet du matériel ; `null` : option coupée ou aucun groupe. */
     gearGroups,
     /** Décalage des seuils cardio de l'activité, en bpm. */
     hrOffsetBpm,
-    /** Limites des zones Z1 à Z5 sur la courbe de FC, et leur case (rangée pour l'activité). */
-    hrZoneLines,
-    setHrZoneLines,
     foil,
     pumping,
   };

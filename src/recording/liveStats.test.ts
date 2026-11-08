@@ -4,13 +4,11 @@ import { kinematicsOptionsOf, referenceSpeedMs, scalesFiltersToSession } from '.
 import { buildCumulativeTrack, computeActiveDistanceM, computeActiveTimeMs, thresholdActivityMask } from '../core/sessionStats';
 import { SPORT_PROFILES, type SportProfile } from '../core/sportProfiles';
 import { knotsToMs } from '../core/units';
-import { cyclingEnergyParams } from '../cycling/energy';
 import type { LocationFix } from '../platform/location';
-import { DEFAULT_ENERGY_PARAMS, runningCostJkgM } from '../running/energy';
 import { sameData } from '../test/sameData';
 import { runSurfSession, surfProfileOf } from '../surfing/surfSession';
 import {
-  EMPTY_LIVE_STATS, LIVE_STATS_DEFAULTS, computeLiveStats, createLiveStatsMemory, liveReferenceSpeedMs, usesActiveAverage, type LiveEnergySetup,
+  EMPTY_LIVE_STATS, LIVE_STATS_DEFAULTS, computeLiveStats, createLiveStatsMemory, liveReferenceSpeedMs, usesActiveAverage,
 } from './liveStats';
 import { M_PER_DEG_LAT } from '../test/geo.fixture';
 
@@ -188,11 +186,11 @@ describe('computeLiveStats : mémoire du direct', () => {
   };
 
   for (const hz of [1, 5]) {
-    it(`donne à chaque position le résultat du calcul sans mémoire, pauses, énergie et bords compris, à ${hz} Hz`, () => {
+    it(`donne à chaque position le résultat du calcul sans mémoire, pauses et bords compris, à ${hz} Hz`, () => {
       const segments = replay(hz);
       const total = segments.reduce((n, s) => n + s.length, 0);
       const cases = [
-        { profile: running, options: { ...LIVE_STATS_DEFAULTS, energy: { family: 'course' as const, params: DEFAULT_ENERGY_PARAMS, massKg: 70 } } },
+        { profile: running, options: LIVE_STATS_DEFAULTS },
         { profile: wing, options: LIVE_STATS_DEFAULTS },
       ];
       const checked = checkedPositions(segments, hz);
@@ -236,7 +234,7 @@ describe('computeLiveStats : mémoire du direct', () => {
   });
 });
 
-describe('computeLiveStats : derniers mètres, pente, vitesse ascensionnelle', () => {
+describe('computeLiveStats : derniers mètres, vitesse ascensionnelle', () => {
   it('donne la vitesse des 300 derniers mètres', () => {
     // 800 s à 2 m/s puis 100 s à 4 m/s : les 300 derniers mètres tiennent dans la partie à 4 m/s.
     const stats = computeLiveStats([trace(0, 900, 1, (t) => (t <= 800 ? 2 : 4))], running);
@@ -244,13 +242,13 @@ describe('computeLiveStats : derniers mètres, pente, vitesse ascensionnelle', (
     expect(computeLiveStats([trace(0, 60, 1, () => 3)], running).recentDistanceSpeedMs).toBeNull();
   });
 
-  it('donne le D+ des 300 derniers mètres et la pente du moment', () => {
+  it('donne le D+ des 300 derniers mètres ; plus de pente du moment (lot 303)', () => {
     // Plat 10 min, puis rampe à 5 % (0,15 m/s à 3 m/s) pendant 5 min : 45 m, dont 15 sur les 300 derniers mètres.
     const ele = (t: number) => (t <= 600 ? 100 : 100 + 0.15 * (t - 600));
     const stats = computeLiveStats([trace(0, 900, 1, () => 3, ele)], running);
     expect(stats.recentDistanceGainM!).toBeGreaterThan(13);
     expect(stats.recentDistanceGainM!).toBeLessThan(16);
-    expect(stats.currentGrade!).toBeCloseTo(0.05, 2);
+    expect(stats.currentGrade).toBeNull();
   });
 
   it('donne la vitesse ascensionnelle sur le temps enregistré, pause exclue', () => {
@@ -276,52 +274,12 @@ describe('computeLiveStats : derniers mètres, pente, vitesse ascensionnelle', (
   });
 });
 
-describe('computeLiveStats : puissance et énergie', () => {
-  const noAir = { ...DEFAULT_ENERGY_PARAMS, airDragJs2M3Kg: 0 };
-  const withEnergy = (energy: LiveEnergySetup) => ({ ...LIVE_STATS_DEFAULTS, energy });
-
-  it('donne en course la puissance mécanique sur 15 s et l\'énergie de course', () => {
-    const stats = computeLiveStats([trace(0, 600, 1, () => 4)], running, withEnergy({ family: 'course', params: noAir, massKg: 75 }));
-    expect(stats.recentPowerW!).toBeCloseTo(4.18 * 0.25 * 4 * 75, 0);
-    expect(stats.effortJ! / (4.18 * 75 * 2400)).toBeCloseTo(1, 3);
-    expect(stats.energyPerKg).toBe(false);
-  });
-
-  it("compte la pente jusqu'au dernier point, sans plat fictif en bout de trace", () => {
-    // Rampe à 10 % à 3 m/s : toute la fenêtre de 15 s est en montée.
-    const ele = (t: number) => 0.3 * t;
-    const stats = computeLiveStats([trace(0, 600, 1, () => 3, ele)], running, withEnergy({ family: 'course', params: noAir, massKg: 70 }));
-    const expected = runningCostJkgM(0.1, noAir) * 0.25 * 3 * 70;
-    expect(stats.recentPowerW! / expected).toBeCloseTo(1, 2);
-  });
-
-  it('donne des valeurs par kilo sans poids', () => {
-    const stats = computeLiveStats([trace(0, 600, 1, () => 4)], running, withEnergy({ family: 'course', params: noAir, massKg: null }));
-    expect(stats.recentPowerW!).toBeCloseTo(4.18 * 0.25 * 4, 2);
-    expect(stats.energyPerKg).toBe(true);
-  });
-
-  it('donne la même puissance à 1 Hz et à 5 Hz', () => {
-    const speed = (t: number) => 3 + Math.sin(t / 30);
-    const ele = (t: number) => 50 + 20 * Math.sin(t / 120);
-    const options = withEnergy({ family: 'course', params: DEFAULT_ENERGY_PARAMS, massKg: 70 });
-    const a = computeLiveStats([trace(0, 600, 1, speed, ele)], running, options);
-    const b = computeLiveStats([trace(0, 600, 5, speed, ele)], running, options);
-    expect(b.recentPowerW! / a.recentPowerW!).toBeCloseTo(1, 1);
-    expect(b.effortJ! / a.effortJ!).toBeCloseTo(1, 2);
-  });
-
-  it('ne donne aucune puissance à vélo dans une descente raide', () => {
-    const ele = (t: number) => 500 - 0.8 * t;
-    const options = withEnergy({ family: 'velo', params: cyclingEnergyParams('route', 8.5, 75) });
-    const stats = computeLiveStats([trace(0, 300, 1, () => 8, ele)], SPORT_PROFILES.cycling, options);
-    expect(stats.recentPowerW).toBe(0);
-  });
-
-  it("ne calcule ni puissance ni énergie sans modèle d'énergie", () => {
-    const stats = computeLiveStats([trace(0, 600, 1, () => 4)], running);
+describe('computeLiveStats : puissance et énergie, retirées avec la course et le vélo (lot 303)', () => {
+  it('ne donne plus ni puissance ni énergie, même avec altitude', () => {
+    const stats = computeLiveStats([trace(0, 600, 1, () => 4, (t) => 0.3 * t)], running);
     expect(stats.recentPowerW).toBeNull();
     expect(stats.effortJ).toBeNull();
+    expect(stats.energyPerKg).toBe(false);
   });
 });
 

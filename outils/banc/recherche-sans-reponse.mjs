@@ -1,7 +1,7 @@
 // Banc des recherches réseau sans réponse (lot 54, étape 6 ; ex-essai 69) : Overpass (revêtement, 120 s) et IGN
 // (altitude, 30 s par paquet) qui ne répondent jamais. Les requêtes sont interceptées par le domaine `Fetch` du
 // protocole et laissées pendantes (ni réponse, ni blocage). Le script :
-//  1. écrit une course synthétique au nord de Montpellier (celle de `altitude.mjs`) et l'importe ;
+//  1. écrit une course synthétique au nord de Montpellier (celle de l'ancien `altitude`, retiré au lot 303) et l'importe ;
 //  2. l'ouvre (l'altitude de l'IGN est demandée) et déplie l'onglet « surface » (Overpass est interrogé) ;
 //  3. relève, seconde par seconde, le texte d'erreur et le « Réessayer » qui apparaissent, et le temps écoulé
 //     depuis la première requête interceptée du même service ;
@@ -59,7 +59,7 @@ const sourceLine = () => evaluate(`[...document.querySelectorAll('span')].map((x
 await send('Fetch.enable', { patterns: [{ urlPattern: 'https://*overpass*' }, { urlPattern: 'https://*geopf*' }, { urlPattern: 'https://*ign.fr*' }] });
 // Rangée « avancé » des analyses ouverte d'office : tous les onglets restent dans la barre.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
-// 1. Course synthétique vers le nord (celle d'altitude.mjs), importée.
+// 1. Course synthétique vers le nord (celle de l'ancien script de l'altitude), importée.
 const t0 = Date.UTC(2026, 9, 7, 8, 0, 0);
 const fixes = [];
 // Sans altitude dans le fichier : c'est ce qui fait demander celle de l'IGN.

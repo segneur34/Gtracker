@@ -1,7 +1,7 @@
 /**
- * Période d'un signal régulier par autocorrélation, commune à la cadence à
- * pied (`running/cadence.ts`, `stepPeriod`) et à la validation du pumping sur
- * foil (`core/pumping.ts`, `pumpCadence`). Les décalages sont en cases de la
+ * Période d'un signal régulier par autocorrélation, pour la validation du
+ * pumping sur foil (`core/pumping.ts`, `pumpCadence`) ; elle servait aussi à la
+ * cadence à pied, partie avec la course (lot 303). Les décalages sont en cases de la
  * grille de l'appelant : à lui de les tirer de secondes (règle 2).
  */
 

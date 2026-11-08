@@ -306,8 +306,8 @@ describe('activityCounts', () => {
 });
 
 describe('familles et activités cachées (point 100)', () => {
-  const hiddenVtt = withHidden(VTT_ACTIVITY, true);
-  const withVtt = DEFAULT_ACTIVITIES.map((a) => (a.id === VTT_ACTIVITY.id ? hiddenVtt : a));
+  const hiddenFoil = withHidden(SURF_FOIL_ACTIVITY, true);
+  const withFoilHidden = DEFAULT_ACTIVITIES.map((a) => (a.id === SURF_FOIL_ACTIVITY.id ? hiddenFoil : a));
 
   it('readActivities garde « hidden: true » et ignore toute autre valeur', () => {
     const [kept, ignored] = readActivities([{ ...moth, hidden: true }, { ...trail, hidden: 'oui' }]);
@@ -329,32 +329,35 @@ describe('familles et activités cachées (point 100)', () => {
 
   it('une famille est cachée par Réglages, ou quand toutes ses activités le sont', () => {
     expect(isFamilyHidden(DEFAULT_ACTIVITIES, ['surf'], 'surf')).toBe(true);
-    expect(isFamilyHidden(withVtt, [], 'velo')).toBe(false);
-    const allBikes = DEFAULT_ACTIVITIES.map((a) => (activityFamily(a) === 'velo' ? withHidden(a, true) : a));
-    expect(isFamilyHidden(allBikes, [], 'velo')).toBe(true);
+    expect(isFamilyHidden(withFoilHidden, [], 'surf')).toBe(false);
+    const allSurfs = DEFAULT_ACTIVITIES.map((a) => (activityFamily(a) === 'surf' ? withHidden(a, true) : a));
+    expect(isFamilyHidden(allSurfs, [], 'surf')).toBe(true);
     // Sans activité, une famille est cachée aussi.
     expect(isFamilyHidden([voile], [], 'surf')).toBe(true);
     expect(isFamilyHidden([voile], [], 'voile')).toBe(false);
   });
 
-  it("l'Entraînement, retiré de cette version, est toujours caché (lot 302)", () => {
-    expect(RETIRED_FAMILIES).toEqual(['fractionne']);
-    expect(ACTIVE_FAMILIES).toEqual(['voile', 'course', 'velo', 'surf']);
-    expect(isFamilyHidden(DEFAULT_ACTIVITIES, [], 'fractionne')).toBe(true);
+  it("l'Entraînement (lot 302), la course et le vélo (lot 303), retirés de cette version, sont toujours cachés", () => {
+    expect(RETIRED_FAMILIES).toEqual(['course', 'velo', 'fractionne']);
+    expect(ACTIVE_FAMILIES).toEqual(['voile', 'surf']);
+    for (const family of RETIRED_FAMILIES) expect(isFamilyHidden(DEFAULT_ACTIVITIES, [], family)).toBe(true);
     expect(isActivityShown(RUN_INTERVALS_ACTIVITY, DEFAULT_ACTIVITIES, [])).toBe(false);
+    expect(isActivityShown(VTT_ACTIVITY, DEFAULT_ACTIVITIES, [])).toBe(false);
+    expect(isActivityShown(trail, [...DEFAULT_ACTIVITIES, trail], [])).toBe(false);
   });
 
   it('visibleFamilies et visibleActivities', () => {
-    expect(visibleFamilies(withVtt, ['surf'])).toEqual(['voile', 'course', 'velo']);
-    expect(visibleActivities(withVtt, [], 'velo').map((a) => a.name)).toEqual(['Route', 'Gravel']);
-    expect(visibleActivities(withVtt, ['surf']).map((a) => a.name)).not.toContain('Surf foil');
-    expect(visibleActivities(withVtt, ['surf']).map((a) => a.name)).not.toContain('VTT');
+    expect(visibleFamilies(withFoilHidden, ['surf'])).toEqual(['voile']);
+    expect(visibleFamilies(withFoilHidden, [])).toEqual(['voile', 'surf']);
+    expect(visibleActivities(withFoilHidden, [], 'surf').map((a) => a.name)).toEqual(['Surf']);
+    expect(visibleActivities(withFoilHidden, []).map((a) => a.name)).not.toContain('Surf foil');
+    expect(visibleActivities(DEFAULT_ACTIVITIES, []).map((a) => a.name)).not.toContain('VTT');
   });
 
   it("l'activité de base d'un calcul suit sa famille", () => {
     expect(isActivityShown(baseActivity('kite'), DEFAULT_ACTIVITIES, [])).toBe(true);
     expect(isActivityShown(baseActivity('kite'), DEFAULT_ACTIVITIES, ['voile'])).toBe(false);
-    expect(isActivityShown(hiddenVtt, withVtt, [])).toBe(false);
+    expect(isActivityShown(hiddenFoil, withFoilHidden, [])).toBe(false);
   });
 
 });

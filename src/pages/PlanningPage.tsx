@@ -70,7 +70,7 @@ import { buildRouteGpx, markLabel, waypointLabel } from '../planning/routeGpx';
 import { recordToRoute, routeMarkGuide } from '../planning/routeRecord';
 import { routeSurfacePaths, routeSurfaces, type SurfaceCategory } from '../planning/surface';
 import { beepStartM, simulatedApproachMs, validationRadiusM, type MarkGuideSettings } from '../recording/markGuide';
-import { gradeColorPaths } from '../land/grade';
+import { gradeColorPaths } from '../planning/grade';
 import { canDownloadFiles, downloadTextFile, readPickedFile, safeFileName } from '../platform/files';
 import { currentPosition, locationPermissionGranted } from '../platform/location';
 import { isNativeApp } from '../platform/runtime';

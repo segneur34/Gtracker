@@ -87,7 +87,7 @@ const frozenNearest = (t: number[], ms: number): number => {
   const [lo, hi] = frozenBracket(t, t.length, ms);
   return Math.abs(t[hi] - ms) < Math.abs(t[lo] - ms) ? hi : lo;
 };
-/** `firstFrom` de `running/energy.ts`. */
+/** `firstFrom` de l'ancien calcul d'énergie de la course (retiré au lot 303). */
 const frozenFirstFrom = (t: number[], x: number, lo: number, hi: number, strict: boolean): number => {
   let a = lo;
   let b = hi + 1;

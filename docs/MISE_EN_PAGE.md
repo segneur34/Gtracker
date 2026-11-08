@@ -55,7 +55,7 @@ Patron commun aux modules d'analyse (voile ; course, vélo et fractionné, qui p
 | `components/ChartFold.tsx` | Repli d'une partie d'un panneau (un graphe parmi plusieurs, un tableau), état retenu par `useOpenSections` ; pas de bouton quand le panneau n'a qu'une partie |
 | `components/SessionNameEditor.tsx` | Nom de la session, « Renommer », et « … » (`ui/MoreMenu.tsx`) pour partager la session en image (`ShareDialog`) ou télécharger le GPX |
 | `components/SectionTabs.tsx`, `components/CollapsibleSectionTabs.tsx`, `components/ResizablePanel.tsx` | Onglets, barre d'onglets repliable des analyses, panneaux redimensionnables |
-| `components/SpeedGradientLegend.tsx`, `components/GradeGradientLegend.tsx` | Les légendes de la vitesse et de la pente, en lecture seule, passées à `AnalysisMap` |
+| `components/SpeedGradientLegend.tsx` | La légende de la vitesse, en lecture seule, passée à `AnalysisMap` (celle de la pente est partie avec la course et le vélo, lot 303) |
 | `components/styles.ts` | `CARD_STYLE` des panneaux, `HALF_PANEL_STYLE` pour deux panneaux par ligne |
 | `components/SpeedRangeEditor.tsx` | Saisie des bornes de couleur de la trace, dans l'onglet réglages |
 | `components/SessionSaveBar.tsx` | Barre du brouillon de la session |

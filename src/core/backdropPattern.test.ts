@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TILE_H, TILE_W, backdropTile, reliefHeight, trailX, veloHeight, type BackdropVariant } from './backdropPattern';
+import { TILE_H, TILE_W, backdropTile, reliefHeight, type BackdropVariant } from './backdropPattern';
 
 /** Points de départ et d'arrivée des lignes brisées d'un tracé (`M` et dernier `L` de chaque ligne). */
 const lineEnds = (d: string): [number, number][] =>
@@ -16,17 +16,14 @@ const VARIANTS: BackdropVariant[] = ['contours', 'voile', 'course', 'velo', 'sur
 
 describe('tuiles des fonds de page', () => {
   it('les reliefs se raccordent d\'un bord à l\'autre, dans les deux sens', () => {
-    const velo = backdropTile('velo');
     for (const [x, y] of [[0, 0], [37, 210], [180, 600]]) {
       expect(reliefHeight(x + TILE_W, y)).toBeCloseTo(reliefHeight(x, y), 9);
       expect(reliefHeight(x, y + TILE_H)).toBeCloseTo(reliefHeight(x, y), 9);
-      expect(veloHeight(x + velo.width, y)).toBeCloseTo(veloHeight(x, y), 9);
-      expect(veloHeight(x, y + velo.height)).toBeCloseTo(veloHeight(x, y), 9);
     }
   });
 
   it('chaque fin de courbe de niveau sur un bord reprend au bord opposé, au même endroit', () => {
-    for (const variant of ['contours', 'velo'] as const) {
+    for (const variant of ['contours'] as const) {
       const tile = backdropTile(variant);
       const ends = tile.paths.flatMap((p) => lineEnds(p.d));
       const left = onEdge(ends, 0, 0);
@@ -36,15 +33,9 @@ describe('tuiles des fonds de page', () => {
     }
   });
 
-  it('à pied, le sentier se raccorde en hauteur et les courbes du relief doux aux bords', () => {
-    expect(Math.abs(trailX(0) - trailX(TILE_H))).toBeLessThan(0.1);
-    const tile = backdropTile('course');
-    expect(tile.paths.map((p) => p.kind)).toEqual(['thin', 'dots', 'fill', undefined]);
-    const ends = lineEnds(tile.paths[0].d);
-    const left = onEdge(ends, 0, 0);
-    expect(left.length).toBeGreaterThan(0);
-    expect(onEdge(ends, 0, tile.width)).toEqual(left);
-    expect(onEdge(ends, 1, tile.height)).toEqual(onEdge(ends, 1, 0));
+  it('course et vélo, retirés (lot 303), reprennent les courbes de niveau', () => {
+    expect(backdropTile('course')).toEqual(backdropTile('contours'));
+    expect(backdropTile('velo')).toEqual(backdropTile('contours'));
   });
 
   it('chaque fond a ses tracés, sans valeur manquante, une taille et un espacement', () => {

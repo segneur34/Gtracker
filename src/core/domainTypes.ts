@@ -6,7 +6,7 @@
  * même nom.
  */
 
-// --- Cadence à pied (`running/cadence.ts`) ---
+// --- Cadence à pied (calcul retiré avec la course au lot 303 ; le profil la garde jusqu'au lot 305) ---
 
 /** Constantes de la mesure (`SPORT_PROFILES.running.cadence`). */
 export interface CadenceDetection {
@@ -157,7 +157,7 @@ export type PermissionsStatus = Record<PermissionKey, PermissionState>;
 /** Où le téléphone est fixé : règle les seuils de détection et dit la précision à attendre. */
 export type JumpPlacement = 'poitrine' | 'taille' | 'bras' | 'dos';
 
-// --- Type de vélo (`cycling/energy.ts`) ---
+// --- Type de vélo (calcul retiré avec le vélo au lot 303 ; réglages et planification le lisent encore) ---
 
 /** Type de vélo, c'est-à-dire surtout ses pneus : il fixe le roulement, la traînée et le poids du vélo par défaut. */
 export type BikeType = 'route' | 'gravel' | 'vtt' | 'ville';

@@ -2,19 +2,16 @@ import { useSyncExternalStore } from 'react';
 import type { Activity } from '../core/activities';
 import { defaultActiveThresholdOf, getSportProfile, sportFamily, sportTreatment, usesMarkCourse } from '../core/sportProfiles';
 import { METERS_PER_DISTANCE_UNIT, msToKnots } from '../core/units';
-import { REFERENCE_RIDER_KG, cyclingEnergyParams } from '../cycling/energy';
 import type { LocationFix } from '../platform/location';
 import { createFollowCursor, type FollowCursor, type FollowProgress, type FollowedTrace } from '../recording/followedTrace';
 import {
   EMPTY_LIVE_STATS, LIVE_STATS_DEFAULTS, computeLiveStats, createLiveStatsMemory, liveReferenceSpeedMs, usesActiveAverage,
-  type LiveEnergySetup, type LiveStats, type LiveStatsMemory, type LiveStatsOptions,
+  type LiveStats, type LiveStatsMemory, type LiveStatsOptions,
 } from '../recording/liveStats';
-import { runningEnergyParams, walkingEnergyParams } from '../running/energy';
 import { resolveSailingThresholds } from '../sailing/sailingConfig';
 import { getFollowedTrace, subscribeToFollowedTrace } from './useFollowedTrace';
 import { getLiveSegments, getRecorderState, subscribeToRecorder } from './useRecorder';
-import { readRunnerProfile } from './useRunnerProfile';
-import { effectiveBikeSetup, effectiveDistanceUnit, effectiveEnergyModel, effectiveFoil, effectiveThresholdOverride } from './useSportSettings';
+import { effectiveDistanceUnit, effectiveFoil, effectiveThresholdOverride } from './useSportSettings';
 import { createListeners } from './createStore';
 
 /**
@@ -31,8 +28,7 @@ import { createListeners } from './createStore';
  * secondes quand les positions s'arrêtent (pause manuelle, fin d'un rejeu).
  *
  * Le « dernier kilomètre » (ou mille) suit l'unité de distance de l'activité ;
- * la puissance et l'énergie (course, vélo), le modèle de l'analyse ; la moyenne
- * active (voile, surf), le seuil de l'analyse. En dehors d'un parcours de voile,
+ * la moyenne active (voile, surf), le seuil de l'analyse. En dehors d'un parcours de voile,
  * l'avancement sur la trace suivie est calculé ici.
  */
 
@@ -57,32 +53,14 @@ export interface LiveRecording {
 
 const EMPTY: LiveRecording = { segments: [], stats: EMPTY_LIVE_STATS, updatedMs: null, progress: null };
 
-/** Modèle de la puissance et de l'énergie en direct, celui de l'analyse ; aucun en voile ni en surf. */
-const liveEnergySetup = (activity: Activity): LiveEnergySetup | undefined => {
-  const treatment = sportTreatment(activity.base);
-  const runner = readRunnerProfile();
-  if (treatment === 'course') {
-    const params = effectiveEnergyModel(activity) === 'marche'
-      ? walkingEnergyParams(runner.economyMlKgKm, runner.weightKg)
-      : runningEnergyParams(runner.economyMlKgKm);
-    return { family: treatment, params, massKg: runner.weightKg };
-  }
-  if (treatment === 'velo') {
-    const { bikeType, bikeKg } = effectiveBikeSetup(activity);
-    return { family: treatment, params: cyclingEnergyParams(bikeType, bikeKg, runner.weightKg ?? REFERENCE_RIDER_KG) };
-  }
-  return undefined;
-};
-
 /**
  * Options du calcul du direct pour une activité : celles par défaut, le
- * « dernier kilomètre » (ou mille) dans son unité de distance, et le modèle
- * d'énergie de l'analyse. Les libellés du direct les reprennent.
+ * « dernier kilomètre » (ou mille) dans son unité de distance, et la moyenne
+ * active. Les libellés du direct les reprennent.
  */
 export const liveStatsOptionsFor = (activity: Activity): LiveStatsOptions => ({
   ...LIVE_STATS_DEFAULTS,
   lastDistanceM: METERS_PER_DISTANCE_UNIT[effectiveDistanceUnit(activity)],
-  energy: liveEnergySetup(activity),
   activeAverage: usesActiveAverage(getSportProfile(activity.base)),
 });
 

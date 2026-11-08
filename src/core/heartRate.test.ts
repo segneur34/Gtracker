@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bandIndex } from './basics';
 import {
-  edwardsLoad, efficiencyBlocks, estimateHrMax, heartRateDrift, heartRateHistogram, heartRateStats, heartRateThresholds, heartRateZonePaths, heartRateZones,
+  edwardsLoad, estimateHrMax, heartRateHistogram, heartRateStats, heartRateThresholds, heartRateZonePaths, heartRateZones,
   histogramZoneTimes, isValidThresholds, isValidZoneBounds, smoothHeartRate, spanHeartRate, timeInZones, timeSpanHeartRate, type HeartRatePoint,
 } from './heartRate';
 import { SPORT_PROFILES } from './sportProfiles';
@@ -196,39 +196,6 @@ describe('zones et charge', () => {
     const histogram = heartRateHistogram(points, smoothed, P.gapS)!;
     expect(histogram.fromBpm).toBe(100);
     expect(histogram.seconds).toHaveLength(100);
-  });
-});
-
-describe('heartRateDrift', () => {
-  it('mesure la montée de la FC à vitesse égale', () => {
-    // 40 min à 3 m/s, FC de 140 à 160 : la seconde moitié coûte plus de battements.
-    const points = series(0, 2400, 1, (t) => 140 + (t / 2400) * 20);
-    const speeds = points.map(() => 3);
-    const active = points.map(() => true);
-    const drift = heartRateDrift(points, analyze(points), speeds, active, P.gapS, P.driftMinS)!;
-    expect(drift.driftPct).toBeGreaterThan(4);
-    expect(drift.driftPct).toBeLessThan(10);
-  });
-
-  it('ne dit rien sous la durée minimale', () => {
-    const points = series(0, 600, 1, () => 150);
-    expect(heartRateDrift(points, analyze(points), points.map(() => 3), points.map(() => true), P.gapS, P.driftMinS)).toBeNull();
-  });
-});
-
-describe('efficiencyBlocks', () => {
-  it('fait des blocs de durée fixe, rangés par moitié', () => {
-    const points = series(0, 300, 1, () => 150);
-    const blocks = efficiencyBlocks(points, analyze(points), points.map(() => 3), points.map(() => true), P.gapS, P.scatterBlockS);
-    expect(blocks.length).toBe(9);
-    expect(blocks[0]).toMatchObject({ speedMs: 3, bpm: 150, half: 0 });
-    expect(blocks[blocks.length - 1].half).toBe(1);
-  });
-
-  it('abandonne un bloc coupé par une pause', () => {
-    const points = series(0, 100, 1, () => 150);
-    const active = points.map((_, i) => i % 20 !== 0);
-    expect(efficiencyBlocks(points, analyze(points), points.map(() => 3), active, P.gapS, P.scatterBlockS)).toHaveLength(0);
   });
 });
 

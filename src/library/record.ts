@@ -1,14 +1,13 @@
 import { normalizeDeg } from '../core/angles';
 import type { HeartRateHistogram } from '../core/heartRate';
 import { isMapBase, type MapBase } from '../core/mapBase';
-import { isValidBikeWeight } from '../cycling/energy';
 import { JUMP_DOUBTS, type JumpDoubt, type SessionJump } from '../core/jumps';
 import { readSessionMarks, type SessionMark } from '../core/sessionMarks';
 import { isValidSpeedRange, type SpeedRangeMs } from '../core/speedGradient';
 import { getSportProfile, sportTreatment } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import { isSportType } from '../core/sportProfiles';
-import { isValidCarriedLoad } from '../running/energy';
+import { isValidBikeWeight, isValidCarriedLoad } from '../core/retiredLand';
 import { EMPTY_NOTES, type GearChoice, type SailingSessionNotes } from './notes';
 import { isFiniteNumber, isObject, parseJson, stringifyJson } from '../core/basics';
 
@@ -391,7 +390,7 @@ export interface SessionRecord {
    * le lit à l'emploi, une valeur mal formée y revenant à « absent ».
    */
   surfaces?: unknown;
-  /** Altitude du terrain (`land/terrainElevation.ts`, `readTerrainElevation`), absente tant que l'IGN n'a pas répondu ; brute. */
+  /** Altitude du terrain de l'IGN (course et vélo, retirés au lot 303), absente tant que l'IGN n'a pas répondu ; brute. */
   terrainElevation?: unknown;
   /** `'gps'` : l'utilisateur garde l'altitude du GPS ; absent : celle de l'IGN (course et vélo). */
   elevationSource?: 'gps';
@@ -429,7 +428,7 @@ export interface SummaryBests {
   d5kmS?: number;
   /** Meilleur 10 km, en secondes. */
   d10kmS?: number;
-  /** Vélo : meilleure puissance mécanique moyenne estimée sur 20 min, en W (modèle du vélo, `cycling/energy.ts`). */
+  /** Vélo : meilleure puissance mécanique moyenne estimée sur 20 min, en W (modèle du vélo, retiré au lot 303). */
   p20minW?: number;
   /**
    * Vélo : poids du pratiquant avec lequel la puissance a été cherchée, en kg ; absent si le poids n'était pas
@@ -1085,7 +1084,7 @@ export interface RecordPatch {
   avgPowerW?: number | null;
   /** Voies trouvées pour la trace (`SessionSurfaces`, `planning/surface.ts`) ; `null` les retire. */
   surfaces?: unknown;
-  /** Altitude du terrain (`SessionTerrainElevation`, `land/terrainElevation.ts`) ; `null` la retire. */
+  /** Altitude du terrain (course et vélo, retirés au lot 303), gardée brute ; `null` la retire. */
   terrainElevation?: unknown;
   /** Source de l'altitude ; `null` : celle de l'IGN. */
   elevationSource?: 'gps' | null;

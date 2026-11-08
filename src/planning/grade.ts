@@ -1,43 +1,12 @@
 import { SLOW_COLOR, gradientColor, type GradientStop } from '../core/speedGradient';
-import type { GradeProfile } from '../core/sportProfiles';
 import type { CumulativeTrack } from '../core/types';
 
 /**
- * Pente locale, zones de pente et couleurs de pente, communes à la course, au
- * vélo, à la planification et au direct. La fenêtre et les seuils des zones
- * viennent du profil (`SportProfile.grade`).
+ * Pente locale et couleurs de pente de la planification et des graphes
+ * d'altitude gardés (itinéraire, trace suivie) : copie minimale de l'ancien
+ * module commun à la course et au vélo, retirés au lot 303. Module de
+ * transition, gardé jusqu'au retrait du planificateur routier (lot 304).
  */
-
-export type GradeZoneKey = 'steepDown' | 'down' | 'flat' | 'up' | 'steepUp';
-
-export interface GradeZone {
-  key: GradeZoneKey;
-  label: string;
-  /** Description de la plage de pente, pour l'affichage. */
-  range: string;
-}
-
-/** Les zones de pente, de la montée raide à la descente raide, avec leurs plages. */
-export const gradeZones = (p: GradeProfile): GradeZone[] => {
-  const flat = p.flatMaxGrade * 100;
-  const steep = p.steepMinGrade * 100;
-  return [
-    { key: 'steepUp', label: 'Montée raide', range: `≥ ${steep} %` },
-    { key: 'up', label: 'Montée', range: `${flat} à ${steep} %` },
-    { key: 'flat', label: 'À peu près plat', range: `± ${flat} %` },
-    { key: 'down', label: 'Descente', range: `-${flat} à -${steep} %` },
-    { key: 'steepDown', label: 'Descente raide', range: `≤ -${steep} %` },
-  ];
-};
-
-export const classifyGrade = (grade: number, p: GradeProfile): GradeZoneKey | null => {
-  if (!isFinite(grade)) return null;
-  if (grade >= p.steepMinGrade) return 'steepUp';
-  if (grade >= p.flatMaxGrade) return 'up';
-  if (grade > -p.flatMaxGrade) return 'flat';
-  if (grade > -p.steepMinGrade) return 'down';
-  return 'steepDown';
-};
 
 /**
  * Pente locale en chaque point, en fraction (0,05 = 5 %), mesurée entre
@@ -115,6 +84,9 @@ export interface GradeRange {
  */
 export const DEFAULT_GRADE_RANGE: GradeRange = { min: 0, max: 0.25 };
 
+/** Bornes de la couleur de pente à vélo : 15 % y est déjà un mur. */
+export const DEFAULT_CYCLING_GRADE_RANGE: GradeRange = { min: 0, max: 0.15 };
+
 /** Vrai pour des bornes utilisables : finies, basse positive ou nulle, haute au-dessus. */
 export const isValidGradeRange = (range: { min?: unknown; max?: unknown }): range is GradeRange =>
   typeof range.min === 'number' && typeof range.max === 'number' &&
@@ -157,7 +129,7 @@ export interface ColoredPath {
 
 /**
  * Trace colorée par la pente, pour la carte : le segment qui arrive au point
- * `i` porte la pente de `i` (comme `gradeZonePaths`), à la couleur de son
+ * `i` porte la pente de `i`, à la couleur de son
  * palier (`gradeStepColor`). Les segments voisins de même couleur forment un
  * seul trait, qui reprend la dernière position du précédent.
  */

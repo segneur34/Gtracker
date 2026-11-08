@@ -24,22 +24,14 @@ const START_MS = Date.parse('2026-09-20T10:00:00Z');
 const buildTrack = (phases: [number, number][], hz = 1, climbPerS?: number): RawTrackPoint[] => phasesTrack(phases, hz, { startMs: START_MS, climbPerS });
 
 describe('summarizeSession', () => {
-  it('range le meilleur kilomètre à pied et les meilleures 5 min à vélo (version 17), à 1 Hz comme à 5 Hz', () => {
-    for (const hz of [1, 5]) {
-      // Course : 10 min à 3 m/s, dont 200 s à 4 m/s (800 m) ; le meilleur kilomètre : 800 m à 4 m/s et 200 m à 3 m/s.
-      const run = summarizeSession(buildTrack([[200, 3], [200, 4], [200, 3]], hz), 'running')!;
-      expect(run.best1kmS).toBeCloseTo(200 + 200 / 3, 0);
-      expect(run.best5minMs).toBeUndefined();
-      // Vélo : 10 min à 7 m/s, dont 5 min à 9 m/s.
-      const ride = summarizeSession(buildTrack([[150, 7], [300, 9], [150, 7]], hz), 'cycling')!;
-      expect(ride.best5minMs).toBeCloseTo(9, 1);
-      expect(ride.best1kmS).toBeUndefined();
+  it('ne range plus ni le meilleur kilomètre ni les meilleures 5 min, ni les meilleurs efforts (course et vélo retirés, lot 303)', () => {
+    const run = summarizeSession(buildTrack([[200, 3], [200, 4], [200, 3]]), 'running')!;
+    const ride = summarizeSession(buildTrack([[150, 7], [300, 9], [150, 7]]), 'cycling')!;
+    for (const summary of [run, ride]) {
+      expect(summary.best1kmS).toBeUndefined();
+      expect(summary.best5minMs).toBeUndefined();
+      expect(summary.bests).toBeUndefined();
     }
-    // Moins d'un kilomètre, moins de 5 min : rien.
-    expect(summarizeSession(buildTrack([[200, 3]]), 'running')!.best1kmS).toBeUndefined();
-    expect(summarizeSession(buildTrack([[200, 7]]), 'cycling')!.best5minMs).toBeUndefined();
-    // Ni en voile ni en surf.
-    expect(summarizeSession(buildTrack([[600, 6]]), 'wingfoil')!.best1kmS).toBeUndefined();
   });
 
   it('range la FC de la session, rien sans FC', () => {
@@ -252,21 +244,14 @@ describe('summarizeSession', () => {
     expect(summarizeSession(buildTrack([[600, 3]]), 'running')!.elevationGainM).toBeNull();
   });
 
-  it("prend le dénivelé sur l'altitude du terrain quand la fiche en porte une", () => {
-    // GPS : 100 m de montée ; terrain : 50 m, un échantillon toutes les 10 s, même sans altitude GPS.
+  it("garde l'altitude du GPS même quand la fiche porte celle du terrain (course et vélo retirés, lot 303)", () => {
     const t = Array.from({ length: 61 }, (_, i) => i * 10_000);
     const terrainElevation = {
       source: 'ign', resource: 'ign_rge_alti_wld', version: 1, stepM: 10, fetchedAt: '2026-10-07T09:00:00.000Z',
       startMs: START_MS, t, z: t.map((ms) => 50 + (50 * ms) / 600_000),
     };
-    for (const raw of [buildTrack([[600, 3]], 1, 100 / 600), buildTrack([[600, 3]])]) {
-      const summary = summarizeSession(raw, 'running', { terrainElevation })!;
-      expect(summary.elevationGainM).toBeGreaterThan(45);
-      expect(summary.elevationGainM).toBeLessThan(52);
-    }
-    // Brute dans la fiche depuis le lot 301 : mal formée, elle est ignorée, l'altitude du GPS reste.
-    const gps = summarizeSession(buildTrack([[600, 3]], 1, 100 / 600), 'running', { terrainElevation: { ...terrainElevation, stepM: 0 } })!;
-    expect(gps.elevationGainM).toBeGreaterThan(90);
+    const raw = buildTrack([[600, 3]], 1, 100 / 600);
+    expect(summarizeSession(raw, 'running', { terrainElevation })).toEqual(summarizeSession(raw, 'running'));
   });
 
   it('résume une trace sans support, sauf le temps en mouvement', () => {

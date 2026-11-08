@@ -1,24 +1,23 @@
 // Banc de test : onglet « cardio » et FC dans toutes les analyses (lot 7 des demandes du 10-13/10, étape analyse).
 // Usage : node cardio.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 2 min. Le script :
-//  1. importe une course, une session de voile (`make-gpx.mjs`) et une session de surf, toutes avec la FC
-//     (`gpxtpx:hr`), et une course sans FC ;
+//  1. importe une wing en ligne droite avec une FC qui monte, une session de voile (`make-gpx.mjs`) et une session de
+//     surf, toutes avec la FC (`gpxtpx:hr`), et une wing sans FC (la course de ces étapes est retirée au lot 303) ;
 //  2. sans FC max ni âge : l'onglet « cardio » juste après celui des graphes, FC moyenne et max, pas de zones,
-//     « La retenir » qui range la FC max de la sortie ; la course sans FC n'a pas l'onglet ;
+//     « La retenir » qui range la FC max de la sortie ; la wing sans FC n'a pas l'onglet ;
 //  3. FC max et FC de repos saisies : le tableau des zones calées sur S1 et S2 (réserve cardiaque), « Voir » qui trace les passages
-//     d'une zone sur la carte, effacés à la fermeture de l'onglet ; dérive et nuage FC / vitesse en course ;
+//     d'une zone sur la carte, effacés à la fermeture de l'onglet ;
 //     un profil repris d'ailleurs, FC de repos écrite en texte (lot 150) : écartée, des zones plausibles ;
-//     case « Zones » du panneau (05/11) : décochée par défaut, cochée des limites de plus (au plus cinq), retenue au rechargement ;
-//     énergie estimée par la FC (lot 96) : sans poids ni âge, l'invite en voile et en surf, rien en course ; avec poids,
-//     année de naissance et sexe, la tuile « Énergie estimée » (« env. … kcal », « dont env. … kcal au repos ») et son
-//     « ? » en voile et en surf, toujours rien en course ;
+//     énergie estimée par la FC (lot 96) : sans poids ni âge, l'invite ; avec poids, année de naissance et sexe, la
+//     tuile « Énergie estimée » (« env. … kcal », « dont env. … kcal au repos ») et son « ? » en voile et en surf ;
+//     (dérive, nuage FC / vitesse et case « Zones », propres à la course, retirés au lot 303) ;
 //  4. la courbe de FC dans l'onglet des graphes des trois modules ;
 //  5. Réglages : « Seuils cardio » (S1 et S2, zones, Personnaliser, Revenir au calcul), la ligne « Seuils cardio »
 //     de la carte d'une activité (−8 en voile), la case « Ceinture cardio » en voile et en surf, les chiffres
 //     « FC moyenne » et « Zone cardiaque » proposés en voile ;
 //  6. (retirée au lot 302 avec l'Entraînement : la FC par répétition de l'onglet « fractionné ») ;
 //  7. la FC dans le résumé des fiches, et l'onglet « cardio » des statistiques ;
-//  8. à 390×844 : l'analyse de course, onglet cardio ouvert, sans débordement.
+//  8. à 390×844 : l'analyse de la wing en ligne, onglet cardio ouvert, sans débordement.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -122,15 +121,15 @@ const withHr = (gpx, hrAt) => {
 const voilePath = join(tmpdir(), 'cardio-voile.gpx');
 execFileSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'make-gpx.mjs'), voilePath]);
 
-const T_RUN = Date.UTC(2026, 9, 1, 8, 0, 0);
+const T_WING = Date.UTC(2026, 9, 1, 8, 0, 0);
 const T_PLAIN = Date.UTC(2026, 9, 4, 8, 0, 0);
 const T_SURF = Date.UTC(2026, 9, 3, 7, 0, 0);
 const T_VOILE = Date.UTC(2026, 8, 20, 13, 0, 0);
-// Course de 40 min à 3 m/s, FC de 130 à 172 : dérive nette, montée jusqu'en Z4 et Z5 (réserve 50-190).
-const runHr = (k) => 130 + (k / 2400) * 42;
+// Wing de 40 min en ligne droite à 6 m/s, FC de 130 à 172 : montée jusqu'en Z4 et Z5 (réserve 50-190).
+const wingHr = (k) => 130 + (k / 2400) * 42;
 const SESSIONS = [
-  { key: 'course', page: 'course', start: T_RUN, gpx: withHr(lineGpx('running', 2400, () => 3, T_RUN), runHr) },
-  { key: 'sansfc', page: 'course', start: T_PLAIN, gpx: lineGpx('running', 1200, () => 3, T_PLAIN) },
+  { key: 'wing', page: 'voile', start: T_WING, gpx: withHr(lineGpx('wingfoil', 2400, () => 6, T_WING), wingHr) },
+  { key: 'sansfc', page: 'voile', start: T_PLAIN, gpx: lineGpx('wingfoil', 1200, () => 6, T_PLAIN) },
   { key: 'surf', page: 'surf', start: T_SURF, gpx: withHr(surfGpx(T_SURF, MORNING), (k) => 110 + 20 * Math.sin(k / 120)) },
   { key: 'voile', page: 'voile', start: T_VOILE, gpx: withHr(readFileSync(voilePath, 'utf8'), (k) => 120 + 25 * Math.sin(k / 300)) },
 ];
@@ -148,8 +147,8 @@ for (const s of SESSIONS) {
 }
 
 // --- 2. Sans FC max ni âge ---
-const GRAPH_TAB = { course: 'graphiques', surf: 'graphiques', voile: 'graphiques' };
-for (const key of ['course', 'surf', 'voile']) {
+const GRAPH_TAB = { wing: 'graphiques', surf: 'graphiques', voile: 'graphiques' };
+for (const key of ['wing', 'surf', 'voile']) {
   await go(paths[key], 6000);
   const labels = (await tabLabels()).split(' | ');
   const at = labels.indexOf('cardio');
@@ -159,88 +158,63 @@ for (const key of ['course', 'surf', 'voile']) {
   const text = await panel('Cardio');
   check(`${key} : FC moyenne et max`, /FC moyenne \/ \d+ bpm/.test(text) && /FC max \/ \d+ bpm/.test(text));
   check(`${key} : pas de zones, et la raison`, text.includes('Pour les zones d\'effort'));
-  // Énergie estimée par la FC (lot 96) : voile et surf seulement ; profil vide, l'invite à la place de la tuile.
-  const withEnergy = key !== 'course';
-  check(`${key} : ${withEnergy ? "invite au poids et à l'année de naissance" : 'ni énergie estimée ni invite'}`,
-    text.includes('renseignez votre poids et votre année de naissance') === withEnergy && !text.includes('Énergie estimée'), text.slice(0, 400));
+  // Énergie estimée par la FC (lot 96) : profil vide, l'invite à la place de la tuile.
+  check(`${key} : invite au poids et à l'année de naissance`,
+    text.includes('renseignez votre poids et votre année de naissance') && !text.includes('Énergie estimée'), text.slice(0, 400));
   check(`${key} : courbe de FC`, (await chartsIn('Cardio')) >= 1);
 }
-await go(paths.course, 6000);
+await go(paths.wing, 6000);
 const before = await panel('Cardio');
-check('course : FC max de la sortie proposée', before.includes('Aucune FC max') && before.toLowerCase().includes('la retenir'));
+check('wing : FC max de la sortie proposée', before.includes('Aucune FC max') && before.toLowerCase().includes('la retenir'));
 console.log('  La retenir :', await clickButton('Cardio', 'La retenir'));
 await settle({ max: 800 });
 const kept = await runner();
 console.log('  pratiquant :', JSON.stringify(kept));
 check('FC max rangée dans le profil (170 environ)', kept?.hrMax >= 165 && kept?.hrMax <= 175);
-await go(paths.course, 6000);
-check('course : la proposition disparaît', !(await panel('Cardio')).includes('La retenir'));
+await go(paths.wing, 6000);
+check('wing : la proposition disparaît', !(await panel('Cardio')).includes('La retenir'));
 await go(paths.sansfc, 6000);
-check(`course sans FC : pas d'onglet cardio (${await tabLabels()})`, !(await tabLabels()).split(' | ').includes('cardio'));
+check(`wing sans FC : pas d'onglet cardio (${await tabLabels()})`, !(await tabLabels()).split(' | ').includes('cardio'));
 
 // --- 3. Zones ---
 await setRunner({ hrMax: 190, hrRest: 50 });
-await go(paths.course, 6000);
+await go(paths.wing, 6000);
 const zones = await panel('Cardio');
-console.log('  cardio :', zones.slice(0, 600));
-check('course : tableau des zones, calées sur S1 et S2', ['sous Z1', 'Z1', 'Z2', 'Z3', 'Z4', 'Z5'].every((z) => zones.includes(z))
-  && zones.includes('Zones calées sur S1 148 et S2 169 bpm, tirés de la FC repos 50 (saisie) et de la FC max 190 (saisie).'));
-check('course : charge', /Charge\s*\/ \d+/.test(zones));
+console.log('  cardio :', zones.slice(0, 1200));
+// Seuils de la voile décalés de −8 (Réglages) : les chiffres viennent de la phrase, la source est vérifiée.
+check('wing : tableau des zones, calées sur S1 et S2', ['sous Z1', 'Z1', 'Z2', 'Z3', 'Z4', 'Z5'].every((z) => zones.includes(z))
+  && /Zones calées sur S1 \d+ et S2 \d+ bpm(?: \([^)]*pour cette activité\))?, tirés de la FC repos 50 \(saisie\) et de la FC max 190 \(saisie\)/.test(zones));
+check('wing : charge', /Charge\s*\/ \d+/.test(zones));
 await evaluate(`document.querySelector('button.ui-help--xs')?.click()`);
 await wait(300);
 const loadHelp = await panel('Cardio');
-check('course : « ? » de la charge, sous Z1 compté', loadHelp.includes("méthode d'Edwards") && loadHelp.includes('sous Z1 (moins de 114 bpm) × 0,5'));
+check('wing : « ? » de la charge, sous Z1 compté', loadHelp.includes("méthode d'Edwards") && /sous Z1 \(moins de \d+ bpm\) × 0,5/.test(loadHelp));
 await evaluate(`document.querySelector('button.ui-help--xs')?.click()`);
-check('course : dérive mesurée', /Dérive cardiaque de \d+[.,]\d %/.test(zones));
-check('course : nuage FC / vitesse', (await chartsIn('Cardio')) >= 2);
 const violetBefore = await violetPaths();
 console.log('  Voir Z3 :', await clickButton('Cardio', 'Voir', 3));
 await settle({ max: 1000 });
 const violetShown = await violetPaths();
-check(`course : passages de Z3 sur la carte (${violetBefore} → ${violetShown})`, violetShown > violetBefore);
-await shoot('cardio-course');
+check(`wing : passages de Z3 sur la carte (${violetBefore} → ${violetShown})`, violetShown > violetBefore);
+await shoot('cardio-wing');
 console.log('  ferme cardio :', await clickTab('cardio', true));
 await settle({ max: 800 });
-check('course : surbrillance effacée à la fermeture', (await violetPaths()) === violetBefore);
+check('wing : surbrillance effacée à la fermeture', (await violetPaths()) === violetBefore);
 console.log('  rouvre cardio :', await clickTab('cardio'));
 await settle({ max: 800 });
-check('course : surbrillance pas ramenée', (await violetPaths()) === violetBefore);
-
-// --- 3 bis. Limites des zones sur la courbe (case « Zones », 05/11) ---
-const CARDIO_SCOPE = `[...document.querySelectorAll('.an-carte-panels [role=button]')].find((h) => h.textContent.trim().startsWith('Cardio'))?.closest('.an-carte-panels > *')`;
-const zoneBox = () => evaluate(`(() => { const b = ${CARDIO_SCOPE}?.querySelector('.an-cardio__zone-lines input'); return b ? b.checked : null; })()`);
-const refLines = () => evaluate(`${CARDIO_SCOPE}?.querySelectorAll('.recharts-reference-line').length ?? -1`);
-const linesOff = await refLines();
-check(`course : case « Zones » décochée par défaut (${await zoneBox()})`, (await zoneBox()) === false);
-await evaluate(`(() => { ${CARDIO_SCOPE}?.querySelector('.an-cardio__zone-lines input')?.click(); return 'ok'; })()`);
-await settle({ max: 800 });
-const linesOn = await refLines();
-// Une limite hors de la plage de la courbe n'est pas tracée : au plus cinq de plus.
-check(`course : « Zones » cochée, des limites de plus (${linesOff} → ${linesOn})`, linesOn > linesOff && linesOn <= linesOff + 5);
-await go(paths.course, 6000);
-await clickTab('cardio');
-await settle({ max: 1000 });
-check(`course : « Zones » retenue au rechargement (${await zoneBox()}, ${await refLines()} traits)`, (await zoneBox()) === true && (await refLines()) === linesOn);
-await evaluate(`(() => { ${CARDIO_SCOPE}?.querySelector('.an-cardio__zone-lines input')?.click(); return 'ok'; })()`);
-await settle({ max: 800 });
-check('course : « Zones » décochée de nouveau', (await zoneBox()) === false && (await refLines()) === linesOff);
+check('wing : surbrillance pas ramenée', (await violetPaths()) === violetBefore);
 
 // --- 3 ter. Énergie estimée par la FC (lot 96) : poids, année de naissance et sexe saisis ---
 const beforeEnergy = await runner();
 await setRunner({ ...beforeEnergy, weightKg: 75, birthYear: 1986, sex: 'm' });
 const ENERGY_TILE = /Énergie estimée\s*\/ env\. \d+ kcal dont env\. \d+ kcal au repos/;
 const ENERGY_HELP = 'button.ui-help[aria-label="Aide : Énergie estimée"]';
-for (const key of ['voile', 'surf', 'course']) {
+for (const key of ['voile', 'surf']) {
   await go(paths[key], 8000);
   await clickTab('cardio');
   await settle({ max: 1500 });
   const text = await panel('Cardio');
   const tile = text.match(/Énergie estimée[^/]*\/ [^/]*/)?.[0] ?? '(sans tuile)';
   console.log(`  ${key}, énergie :`, tile);
-  if (key === 'course') {
-    check("course : pas d'énergie estimée par la FC (énergie mécanique seule)", !text.includes('Énergie estimée') && !text.includes('renseignez votre poids'), text.slice(0, 400));
-    continue;
-  }
   check(`${key} : tuile « Énergie estimée » (${tile})`, ENERGY_TILE.test(text) && !text.includes('renseignez votre poids'), text.slice(0, 400));
   if (key === 'voile') {
     // 1 h 02 de FC autour de 120 bpm, homme de 75 kg, 40 ans : env. 650 kcal (diagnostic du lot 96).
@@ -255,14 +229,14 @@ for (const key of ['voile', 'surf', 'course']) {
 await setRunner(beforeEnergy);
 
 // --- 4. Courbe dans les graphes ---
-await go(paths.course, 6000);
+await go(paths.wing, 6000);
 console.log('  graphiques :', await clickTab('graphiques'));
 await settle({ max: 1500 });
-check(`course : trois graphes, vitesse, altitude et FC (${await chartsIn('Graphiques')})`, (await chartsIn('Graphiques')) === 3);
+check('wing : « Fréquence cardiaque » dans graphiques', (await panel('Graphiques')).toLowerCase().includes('fréquence cardiaque'));
 await go(paths.sansfc, 6000);
 await clickTab('graphiques');
 await settle({ max: 1500 });
-check(`course sans FC : deux graphes (${await chartsIn('Graphiques')})`, (await chartsIn('Graphiques')) === 2);
+check('wing sans FC : pas de « Fréquence cardiaque » dans graphiques', !(await panel('Graphiques')).toLowerCase().includes('fréquence cardiaque'));
 await go(paths.surf, 6000);
 await clickTab('graphiques');
 await settle({ max: 1500 });
@@ -276,7 +250,7 @@ await shoot('cardio-voile');
 // --- Profil repris d'un autre appareil, FC de repos écrite en texte : écartée, jamais concaténée (lot 150) ---
 const cleanRunner = await runner();
 await setRunner({ ...cleanRunner, hrRest: '50' });
-await go(paths.course, 6000);
+await go(paths.wing, 6000);
 await clickTab('cardio');
 await settle({ max: 1500 });
 const textRest = await panel('Cardio');
@@ -336,11 +310,11 @@ check('Réglages, Voile : « Fréquence cardiaque », « FC moyenne » et « Zon
 
 // --- 7. Résumé et statistiques ---
 const recs = await records();
-const courseRec = recs.find((r) => Math.abs((r.summary?.startMs ?? 0) - T_RUN) < 2000);
+const wingRec = recs.find((r) => Math.abs((r.summary?.startMs ?? 0) - T_WING) < 2000);
 const plainRec = recs.find((r) => Math.abs((r.summary?.startMs ?? 0) - T_PLAIN) < 2000);
-console.log('  résumé de la course :', JSON.stringify({ ...courseRec?.summary?.heartRate, histogram: undefined }));
-check('résumé : FC de la course (calcVersion 4 ou plus)', courseRec?.summary?.calcVersion >= 4 && courseRec?.summary?.heartRate?.avgBpm > 140);
-check('résumé : rien pour la course sans FC', plainRec && plainRec.summary.heartRate === undefined);
+console.log('  résumé de la wing :', JSON.stringify({ ...wingRec?.summary?.heartRate, histogram: undefined }));
+check('résumé : FC de la wing (calcVersion 4 ou plus)', wingRec?.summary?.calcVersion >= 4 && wingRec?.summary?.heartRate?.avgBpm > 140);
+check('résumé : rien pour la wing sans FC', plainRec && plainRec.summary.heartRate === undefined);
 await go('/statistiques', 5000);
 console.log('  statistiques, onglets :', await evaluate(`[...document.querySelectorAll('.stats-col .ui-tab')].map((t) => t.textContent.trim()).join(' | ')`));
 console.log('  ouvre cardio :', await evaluate(`(() => { const t = [...document.querySelectorAll('.stats-col .ui-tab')].find((x) => x.textContent.trim() === 'cardio'); if (!t) return 'absent'; if (t.getAttribute('aria-pressed') !== 'true') t.click(); return 'ok'; })()`));
@@ -362,10 +336,10 @@ await shoot('cardio-statistiques');
 
 // --- 8. Téléphone ---
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-await go(paths.course, 6000);
+await go(paths.wing, 6000);
 await clickTab('cardio');
 await settle({ max: 1500 });
-check(`à 390 px, course onglet cardio : débordement ${await overflow()}`, (await overflow()) === 0);
+check(`à 390 px, wing onglet cardio : débordement ${await overflow()}`, (await overflow()) === 0);
 await shoot('cardio-telephone');
 
 console.log('\n--- console (erreurs, avertissements) ---');

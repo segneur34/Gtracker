@@ -8,35 +8,24 @@ import {
 import { SAILING_SPORTS, hasActiveThreshold, sportTreatment, type HeartRateProfile, type SportProfile } from '../core/sportProfiles';
 import { bestWindowSpeedMs } from '../core/topSegments';
 import type { CumulativeTrack, RawTrackPoint, TrackPoint } from '../core/types';
-import { computeCyclingEnergy, type CyclingEnergyParams } from '../cycling/energy';
 import type { LocationFix } from '../platform/location';
-import { computeEnergy, type EnergyParams } from '../running/energy';
-import { computeGrades } from '../land/grade';
 import { EMPTY_LIVE_LEGS, combineLiveLegs, splitLiveLegs, type LiveLegSplit, type LiveLegs } from './liveLegs';
 
 /**
  * Statistiques affichées pendant l'enregistrement, calculées sur la trace en
  * cours avec la même chaîne que l'analyse (`computeKinematics`, dénivelé,
- * pente, tops, modèles d'énergie). Chaque segment est traité à part : rien ne
+ * tops). La pente, la puissance et l'énergie de la course et du vélo sont
+ * parties au lot 303 (leurs chiffres restent à `null`, lus par `liveFields.ts`
+ * jusqu'au lot 305). Chaque segment est traité à part : rien ne
  * franchit une pause. Tout en unités SI ; la page convertit.
  *
  * Avec une mémoire (`LiveStatsMemory`, tenue par `useLiveRecording`), un
  * segment fermé n'est calculé qu'une fois et le segment en cours reprend sa
  * cinématique là où elle en était (`resumeKinematics`) : le coût de chaque
  * recalcul ne croît plus avec la durée que par le reste du segment en cours
- * (dénivelé, FC, énergie, tops), bien plus léger (27/10). Le résultat est
+ * (dénivelé, FC, tops), bien plus léger (27/10). Le résultat est
  * celui du calcul sans mémoire (`liveStats.test.ts`).
  */
-
-/** Modèle de la puissance et de l'énergie en direct : celui de l'analyse de la famille. */
-export type LiveEnergySetup =
-  | {
-    family: 'course';
-    params: EnergyParams;
-    /** Poids du pratiquant ; `null` : puissance et énergie par kilo. */
-    massKg: number | null;
-  }
-  | { family: 'velo'; params: CyclingEnergyParams };
 
 export interface LiveStatsOptions {
   /** Fenêtre glissante des tops de voile, du D+ récent et de la vitesse ascensionnelle, en secondes. */
@@ -49,12 +38,10 @@ export interface LiveStatsOptions {
   recentDistanceM: number;
   /** Durée de la vitesse max de la session, en secondes : une meilleure vitesse tenue, pas un point isolé. */
   maxDurationS: number;
-  /** Fenêtre de la puissance en direct, en secondes. */
+  /** Fenêtre de l'ancienne puissance en direct, en secondes : plus calculée (lot 303), son libellé reste lu par `liveFields.ts` jusqu'au lot 305. */
   powerWindowS: number;
   /** Temps enregistré dans la fenêtre récente au-dessous duquel la vitesse ascensionnelle n'est pas donnée, en secondes. */
   minClimbWindowS: number;
-  /** Modèle d'énergie (course, vélo) ; absent : ni puissance ni énergie. */
-  energy?: LiveEnergySetup;
   /** Le chiffre « moyenne » du direct est la moyenne active (`usesActiveAverage`) : libellés et valeur la disent. */
   activeAverage?: boolean;
   /**
@@ -104,18 +91,15 @@ export interface LiveStats {
   recentGainM: number | null;
   /** D+ des `recentDistanceM` derniers mètres, `null` si l'altitude manque. */
   recentDistanceGainM: number | null;
-  /**
-   * Pente des derniers mètres, en fraction, sur la fenêtre de l'analyse
-   * (`computeGrades`) ; `null` sans altitude ou avant qu'elle soit établie.
-   */
+  /** Pente des derniers mètres : retirée avec la course et le vélo (lot 303), toujours `null` ; le champ part au lot 305. */
   currentGrade: number | null;
   /** D+ récent par heure de temps enregistré dans la fenêtre récente, en m/h ; `null` sans altitude ou trop tôt. */
   climbRateMh: number | null;
-  /** Puissance mécanique moyenne sur `powerWindowS`, en W (W/kg si `energyPerKg`) ; `null` sans modèle d'énergie. */
+  /** Puissance mécanique de la course et du vélo : retirée au lot 303, toujours `null` ; le champ part au lot 305. */
   recentPowerW: number | null;
-  /** Énergie de l'effort depuis le départ, repos non compris, en J (J/kg si `energyPerKg`) ; `null` sans modèle d'énergie. */
+  /** Énergie de l'effort de la course et du vélo : retirée au lot 303, toujours `null` ; le champ part au lot 305. */
   effortJ: number | null;
-  /** Course sans poids renseigné : puissance et énergie par kilo. */
+  /** Puissance et énergie par kilo : retirées au lot 303, toujours faux ; le champ part au lot 305. */
   energyPerKg: boolean;
   /** Bord en cours et bord précédent, en voile seulement. */
   legs: LiveLegs;
@@ -217,61 +201,6 @@ const lastDistanceGain = (tracks: TrackPoint[][], smoothed: number[][], targetM:
   return gainM;
 };
 
-/** Dernière valeur finie d'un tableau, `null` s'il n'y en a pas. */
-const lastFinite = (values: number[]): number | null => {
-  for (let i = values.length - 1; i >= 0; i--) if (isFinite(values[i])) return values[i];
-  return null;
-};
-
-/**
- * Pentes d'un segment en cours : `computeGrades` n'en donne pas sur la
- * demi-fenêtre finale, faute de points devant ; la dernière connue y est
- * reprise, sans quoi la puissance des dernières secondes compterait plat.
- */
-const gradesUpToNow = (grades: number[]): number[] => {
-  const last = lastFinite(grades);
-  if (last === null) return grades;
-  const out = [...grades];
-  for (let i = out.length - 1; i >= 0 && !isFinite(out[i]); i--) out[i] = last;
-  return out;
-};
-
-/**
- * Puissance moyenne des segments qui finissent dans les `windowS` dernières
- * secondes, pondérée par leur durée. Le dernier compte toujours : une cadence
- * lâche peut le laisser seul (règle 10). `null` si aucun n'a de puissance.
- */
-const trailingMeanPower = (power: number[], track: TrackPoint[], windowS: number): number | null => {
-  const lastMs = track[track.length - 1].timeMs;
-  let energy = 0;
-  let timeS = 0;
-  for (let i = track.length - 1; i >= 1; i--) {
-    if (i < track.length - 1 && lastMs - track[i].timeMs >= windowS * 1000) break;
-    const dt = (track[i].timeMs - track[i - 1].timeMs) / 1000;
-    if (dt > 0 && isFinite(power[i])) {
-      energy += power[i] * dt;
-      timeS += dt;
-    }
-  }
-  return timeS > 0 ? energy / timeS : null;
-};
-
-/**
- * Puissance et énergie d'un segment, avec le modèle de l'analyse ; toute
- * position compte comme en mouvement (la pause coupe déjà la trace), le repos
- * est laissé de côté.
- */
-const segmentEnergy = (track: TrackPoint[], grades: number[], setup: LiveEnergySetup): { effortJ: number; power: number[] } => {
-  const moving = track.map(() => true);
-  if (setup.family === 'course') {
-    const mass = setup.massKg ?? 1;
-    const result = computeEnergy(track, grades, moving, setup.params, 0);
-    return { effortJ: result.netJkg * mass, power: result.mechanicalPowerWkg.map((p) => p * mass) };
-  }
-  const result = computeCyclingEnergy(track, grades, moving, setup.params, 0);
-  return { effortJ: result.netJ, power: result.mechanicalPowerW };
-};
-
 /**
  * Meilleure vitesse sur `durationS`, parmi les points postérieurs à `sinceMs`.
  * Segment par segment : rien ne franchit une pause ; un segment fini avant
@@ -304,10 +233,8 @@ interface SegmentParts {
   maxSpeedMs: number | null;
   /** Bords, en voile seulement. */
   legs: LiveLegSplit | null;
-  /** Dénivelé et pentes, demandés quand l'altitude est établie. */
-  elevation: { stats: ElevationStats; grades: number[] } | null;
-  /** Énergie, demandée avec un modèle, selon que les pentes étaient connues. */
-  energy: { graded: boolean; effortJ: number; power: number[] } | null;
+  /** Dénivelé, demandé quand l'altitude est établie. */
+  elevation: { stats: ElevationStats } | null;
 }
 
 /** Un segment de l'enregistrement, tel que vu la dernière fois, et ce qui en a été calculé. */
@@ -386,7 +313,6 @@ export const computeLiveStats = (
       maxSpeedMs: bestWindowSpeedMs(track, cum, options.maxDurationS),
       legs: sailing && track.length >= 2 ? splitLiveLegs(track) : null,
       elevation: null,
-      energy: null,
     };
   }
   // Un segment fermé ne reprend jamais : ses étapes intermédiaires et ses points bruts ne servent plus.
@@ -427,15 +353,10 @@ export const computeLiveStats = (
   // Temps enregistré dans la fenêtre récente, pauses exclues, en secondes.
   let recentTimeS = 0;
   const smoothed: number[][] = [];
-  // Pente en chaque point, par segment ; sans altitude, vide : le modèle d'énergie compte alors plat.
-  const grades: number[][] = active.map(() => []);
   if (hasElevation) {
-    active.forEach((p, s) => {
+    active.forEach((p) => {
       const { track } = p;
-      p.elevation ??= (() => {
-        const stats = computeElevationStats(track, profile.elevation);
-        return { stats, grades: gradesUpToNow(computeGrades(stats.smoothed, p.cum, profile.grade.halfWindowM)) };
-      })();
+      p.elevation ??= { stats: computeElevationStats(track, profile.elevation) };
       const elevation = p.elevation.stats;
       gainM += elevation.gainM;
       lossM += elevation.lossM;
@@ -447,19 +368,7 @@ export const computeLiveStats = (
         if (firstRecent) recentTimeS += (track[track.length - 1].timeMs - firstRecent.timeMs) / 1000;
       }
       smoothed.push(elevation.smoothed);
-      grades[s] = p.elevation.grades;
     });
-  }
-
-  let effortJ: number | null = null;
-  let recentPowerW: number | null = null;
-  if (options.energy) {
-    effortJ = 0;
-    active.forEach((p, s) => {
-      if (!p.energy || p.energy.graded !== hasElevation) p.energy = { graded: hasElevation, ...segmentEnergy(p.track, grades[s], options.energy!) };
-      effortJ! += p.energy.effortJ;
-    });
-    recentPowerW = trailingMeanPower(active[active.length - 1].energy!.power, lastTrack, options.powerWindowS);
   }
 
   let maxSpeedMs: number | null = null;
@@ -490,11 +399,12 @@ export const computeLiveStats = (
     recentDistanceGainM: hasElevation
       ? lastDistanceGain(tracks, smoothed, options.recentDistanceM, profile.elevation.minGainM)
       : null,
-    currentGrade: hasElevation ? lastFinite(grades[grades.length - 1]) : null,
+    // Retirés avec la course et le vélo (lot 303) ; les champs partent au lot 305.
+    currentGrade: null,
     climbRateMh: hasElevation && recentTimeS >= options.minClimbWindowS ? (recentGainM / recentTimeS) * 3600 : null,
-    recentPowerW,
-    effortJ,
-    energyPerKg: options.energy?.family === 'course' && options.energy.massKg === null,
+    recentPowerW: null,
+    effortJ: null,
+    energyPerKg: false,
     legs: sailing ? combineLiveLegs(active.map((p) => p.legs!)) : EMPTY_LIVE_LEGS,
     averageHeartRateBpm: heartCoveredS > 0 ? heartSum / heartCoveredS : null,
   };

@@ -1,16 +1,14 @@
 import { median } from '../core/basics';
 import { cumulativeDistancesM } from '../core/geo';
-import { terrainSamplePoints } from '../land/terrainElevation';
 import type { LatLon } from '../core/types';
 import { routePoints, type PlannedRoute, type RouteLeg, type RoutePoint } from './route';
 
 /**
  * Altitude du terrain (IGN, `ignAltimetry.ts`) posée sur la trace d'un GPX
  * chargé dans la planification, à la place de l'altitude lissée du GPS
- * (`routeFromTrack`). Mêmes échantillons que pour une session
- * (`terrainSamplePoints`, un point tous les `stepM` mètres), mais la trace n'a
- * pas d'heure : leur « instant » est la distance depuis le départ, en
- * millimètres.
+ * (`routeFromTrack`). Échantillons pris par `terrainSamplePoints`, un point
+ * tous les `stepM` mètres ; la trace n'a pas d'heure : leur « instant » est la
+ * distance depuis le départ, en millimètres.
  *
  * L'altitude se pose par la position, pas par le rang des points : un
  * tronçon coupé ou recollé par un point déplacé (`insertWaypoint`,
@@ -30,6 +28,52 @@ const NEAR_M = 10;
 
 /** Segments cherchés de part et d'autre du dernier trouvé. Soixante : de quoi suivre un GPX espacé de plusieurs dizaines de mètres au pas de 5 m, sans balayer toute la trace. */
 const NEAR_SEGMENTS = 60;
+
+/** Position à demander au service, avec son instant en ms depuis le premier point. */
+interface TerrainSamplePoint {
+  lat: number;
+  lon: number;
+  t: number;
+}
+
+/**
+ * Une position tous les `stepM` mètres de `cumDist` (distance cumulée de la
+ * trace, `buildCumulativeTrack`), interpolée entre les deux points qui
+ * l'encadrent, plus le premier et le dernier point. Un arrêt (distance qui
+ * n'avance pas) ne donne pas d'échantillon. Seuls la position et l'instant
+ * comptent : la trace de la planification, sans heure, y met sa distance.
+ * Repris de l'altitude du terrain des sessions de course et de vélo (lot 303).
+ */
+export const terrainSamplePoints = (
+  track: ReadonlyArray<{ lat: number; lon: number; timeMs: number }>,
+  cumDist: ReadonlyArray<number>,
+  stepM: number
+): TerrainSamplePoint[] => {
+  if (track.length === 0 || !(stepM > 0)) return [];
+  const startMs = track[0].timeMs;
+  const points: TerrainSamplePoint[] = [];
+  const push = (lat: number, lon: number, timeMs: number) => {
+    const t = Math.round(timeMs - startMs);
+    if (points.length > 0 && t <= points[points.length - 1].t) return;
+    points.push({ lat, lon, t });
+  };
+  push(track[0].lat, track[0].lon, startMs);
+  let next = stepM;
+  for (let i = 1; i < track.length; i++) {
+    const d0 = cumDist[i - 1];
+    const d1 = cumDist[i];
+    while (d1 > d0 && next <= d1) {
+      const f = (next - d0) / (d1 - d0);
+      const a = track[i - 1];
+      const b = track[i];
+      push(a.lat + f * (b.lat - a.lat), a.lon + f * (b.lon - a.lon), a.timeMs + f * (b.timeMs - a.timeMs));
+      next += stepM;
+    }
+  }
+  const last = track[track.length - 1];
+  push(last.lat, last.lon, last.timeMs);
+  return points;
+};
 
 const EARTH_RADIUS_M = 6_371_000;
 

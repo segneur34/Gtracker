@@ -74,7 +74,7 @@ const sensors = vi.hoisted(() => ({
   stops: 0,
   pauses: 0,
   resumes: 0,
-  running: null as null | { path: string; listening: boolean; setup: { placement: 'poitrine'; foil: boolean; jumps: boolean; cadence: boolean } },
+  running: null as null | { path: string; listening: boolean; setup: { placement: 'poitrine'; foil: boolean; jumps: boolean } },
   found: null as null | { path: string; bytes: number; durationS: number; samples: number; longestGapS: number; error: null },
   /** La lecture de la capture attend ceci : la reprise reste en `starting` le temps d'une commande. */
   gate: null as Promise<void> | null,
@@ -507,12 +507,12 @@ describe('reprise silencieuse, cas limites', () => {
 
   it('capture ouverte : suivie, jamais redémarrée ; rendue à l\'arrêt', async () => {
     const live = source();
-    await recorder.startRecording(activity, live, { motion: { placement: 'poitrine', foil: false, jumps: true, cadence: false } });
+    await recorder.startRecording(activity, live, { motion: { placement: 'poitrine', foil: false, jumps: true } });
     run(live.emit, 0, 10, 1);
     await settle();
     expect(sensors.starts).toBe(1);
     const startedAtMs = parseJournal(journal.text!).header!.startedAtMs;
-    sensors.running = { path: `capteurs/${startedAtMs}.imu`, listening: true, setup: { placement: 'poitrine', foil: false, jumps: true, cadence: false } };
+    sensors.running = { path: `capteurs/${startedAtMs}.imu`, listening: true, setup: { placement: 'poitrine', foil: false, jumps: true } };
     services.gps = true;
     const fresh = await reload();
     await fresh.recoverInterruptedRecording();
@@ -528,12 +528,12 @@ describe('reprise silencieuse, cas limites', () => {
 
   it('capture et pause manuelle : un ordre perdu avec la page est rattrapé', async () => {
     const live = source();
-    await recorder.startRecording(activity, live, { motion: { placement: 'poitrine', foil: false, jumps: true, cadence: false } });
+    await recorder.startRecording(activity, live, { motion: { placement: 'poitrine', foil: false, jumps: true } });
     run(live.emit, 0, 10, 1);
     await recorder.pauseRecording();
     const startedAtMs = parseJournal(journal.text!).header!.startedAtMs;
     const pausesBefore = sensors.pauses;
-    sensors.running = { path: `capteurs/${startedAtMs}.imu`, listening: true, setup: { placement: 'poitrine', foil: false, jumps: true, cadence: false } };
+    sensors.running = { path: `capteurs/${startedAtMs}.imu`, listening: true, setup: { placement: 'poitrine', foil: false, jumps: true } };
     services.gps = true;
     const fresh = await reload();
     await fresh.recoverInterruptedRecording();

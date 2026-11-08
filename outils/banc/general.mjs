@@ -1,14 +1,14 @@
 // Banc de test : onglet « général » complet et rangée « avancé » (demande du 22/10).
 // Usage : node general.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau (IGN, Overpass, tuiles bloqués). Dure environ 40 s (lib/cdp.mjs). Le script :
-//  1. importe une wing (bords et manœuvres, vent du nord), une course et une sortie à vélo en côte, une session de surf ;
+//  1. importe une wing (bords et manœuvres, vent du nord) et une session de surf (course et vélo retirés au lot 303) ;
 //  2. voile, à 1400×1000 : la première rangée « général · avancé », les chiffres du nouveau général (distance en vol,
 //     virements et empannages réussis, top 2 s et 100 m), la mini-boussole et « Régler » ; « avancé » déplie les
 //     onglets, « tops » ouvert, « avancé » refermé replie rangée et panneau, rouvert les rend ; la flèche qui cache
 //     la barre ne touche à aucun panneau ;
 //  3. réglage du vent sur la carte : la flèche tirée à l'est donne 90°, écrit dans le brouillon ; « Inverser »,
 //     « Polaire » (dessinée), « Terminé » ;
-//  4. course et vélo : chiffres du général, meilleurs segments, profil d'altitude compact ; surf : chiffres réduits ;
+//  4. surf : chiffres réduits ; une session neuve ou rouverte s'ouvre sur « général » seul ;
 //  5. à 390×844 : voile sans débordement, « Régler » ouvre la carte en plein écran avec la boussole, « Terminé » la ferme.
 import { BLOCKED_URLS, connect } from './lib/cdp.mjs';
 
@@ -75,17 +75,6 @@ const wingGpx = (t0) => {
   return gpxOf('wingfoil', pts);
 };
 /** Aller et retour vers l'est, en côte de `grade` à l'aller, à vitesse constante, avec altitude. */
-const hillGpx = (type, seconds, speed, grade, t0) => {
-  const lat = 43.7;
-  const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
-  const pts = [];
-  const half = seconds / 2;
-  for (let k = 0; k <= seconds; k++) {
-    const m = (k <= half ? k : seconds - k) * speed;
-    pts.push(`<trkpt lat="${(lat + (k > half ? 0.0002 : 0)).toFixed(7)}" lon="${(3.85 + m / mPerDegLon).toFixed(7)}"><ele>${(50 + grade * m).toFixed(1)}</ele><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${speed}</speed></extensions></trkpt>`);
-  }
-  return gpxOf(type, pts);
-};
 // Surf : la matinée de `surf.mjs`, phases [durée en s, vitesse en m/s, cap].
 const M_PER_DEG_LAT = 111_195;
 const surfGpx = (startMs, phases) => {
@@ -113,15 +102,9 @@ const MORNING = [
   [5, 1.6, 180], [8, 4.5, 190], [80, 1], [30, 0.1],
 ];
 const T_VOILE = Date.UTC(2026, 9, 5, 13, 0, 0);
-const T_RUN = Date.UTC(2026, 9, 6, 8, 0, 0);
-const T_BIKE = Date.UTC(2026, 9, 6, 14, 0, 0);
 const T_SURF = Date.UTC(2026, 9, 7, 7, 0, 0);
 const SESSIONS = [
   { key: 'voile', page: 'voile', start: T_VOILE, gpx: wingGpx(T_VOILE) },
-  // Course : 40 min à 3 m/s, 3 % à l'aller.
-  { key: 'course', page: 'course', start: T_RUN, gpx: hillGpx('running', 2400, 3, 0.03, T_RUN) },
-  // Vélo : 50 min à 7 m/s, 2 % à l'aller.
-  { key: 'velo', page: 'velo', start: T_BIKE, gpx: hillGpx('cycling', 3000, 7, 0.02, T_BIKE) },
   { key: 'surf', page: 'surf', start: T_SURF, gpx: surfGpx(T_SURF, MORNING) },
 ];
 
@@ -202,35 +185,9 @@ await clickButton(`document.querySelector('.an-map-panel .an-wind')`, 'Terminé'
 await wait(500);
 check('« Terminé » ferme la boussole', !(await evaluate(`Boolean(document.querySelector('.an-wind'))`)));
 
-// --- 4. Course, vélo, surf ---
-const profileShown = () => evaluate(`Boolean((${panelOf('Général')})?.querySelector('.recharts-area'))`);
+// --- 4. Surf (course et vélo retirés au lot 303) ---
 // Une session neuve s'ouvre sur « général », « avancé » fermé, quel que soit l'état laissé (23/10).
 await setAdvanced(true);
-await go(paths.course, 8000);
-check('session neuve : « général » ouvert, « avancé » fermé', !(await advancedOpen()) && (await panel('Général')) !== '(absent)');
-general = await panel('Général');
-console.log('général course :', general);
-for (const label of ['Distance', 'Temps de parcours', 'Temps en mouvement', 'Moyenne en mouvement', 'Dénivelé', 'Meilleur 1 km']) {
-  check(`course, général : « ${label} »`, general.includes(label), general.slice(0, 200));
-}
-check('course, général : ni moyenne sur le temps total ni altitude min–max', !general.includes('Moyenne sur le temps total') && !general.includes('Altitude /'), general);
-check('course : profil d\'altitude compact', await profileShown());
-check('course : première rangée « général · avancé »', (await row(0)) === 'général | avancé', await row(0));
-await shoot('general-course');
-// La même session rouverte après une autre page s'ouvre aussi sur « général » seul, « avancé » fermé (lot 145, 05/11).
-await setAdvanced(true);
-await go('/statistiques', 2000);
-await go(paths.course, 8000);
-check('même session rouverte : « général » seul, « avancé » fermé', !(await advancedOpen()) && (await panel('Général')) !== '(absent)');
-
-await go(paths.velo, 8000);
-general = await panel('Général');
-console.log('général vélo :', general);
-for (const label of ['Moyenne en mouvement', 'Dénivelé', 'Meilleures 5 min', 'Meilleur 10 km']) {
-  check(`vélo, général : « ${label} »`, general.includes(label), general.slice(0, 200));
-}
-check('vélo : profil d\'altitude compact', await profileShown());
-
 await go(paths.surf, 6000);
 general = await panel('Général');
 console.log('général surf :', general);
@@ -238,6 +195,13 @@ for (const label of ['Durée de la session', 'Vagues', 'Sur la vague', 'Plus lon
   check(`surf, général : « ${label} »`, general.includes(label), general.slice(0, 200));
 }
 check('surf, général : sans rame, retour au pic ni distance totale', !/Vitesse de rame|Retour au pic|Distance totale/.test(general), general);
+check('session neuve : « général » ouvert, « avancé » fermé', !(await advancedOpen()) && general !== '(absent)');
+check('surf : première rangée « général · avancé »', (await row(0)) === 'général | avancé', await row(0));
+// La même session rouverte après une autre page s'ouvre aussi sur « général » seul, « avancé » fermé (lot 145, 05/11).
+await setAdvanced(true);
+await go('/statistiques', 2000);
+await go(paths.surf, 6000);
+check('même session rouverte : « général » seul, « avancé » fermé', !(await advancedOpen()) && (await panel('Général')) !== '(absent)');
 
 // --- 5. Téléphone ---
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });

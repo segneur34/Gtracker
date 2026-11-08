@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { energyCases } from '../land/energyTestTracks';
-import { classifyGrade, type GradeZoneKey } from '../land/grade';
-import { GRADE_ANALYSIS } from './sportProfiles';
 import type { TrackPoint } from './types';
 import { consecutiveSteps, pathsWhere } from './trackPaths';
-import { gradeZonePaths } from '../running/runningAnalytics';
+import { sailTrack, upDownLegs } from '../test/sailing.fixture';
 
-/** Copie gelée de `gradeZonePaths` avant le lot 70. */
-const frozenGradeZonePaths = (track: TrackPoint[], grades: number[], activityMask: boolean[], zone: GradeZoneKey): [number, number][][] => {
+/**
+ * Copie gelée d'un tracé conditionnel à la main (la boucle de `gradeZonePaths` avant le lot 70, sur un prédicat
+ * quelconque) : `pathsWhere` doit la redonner. Fixture de voile depuis le retrait de la course (lot 303).
+ */
+const frozenPathsWhere = (track: TrackPoint[], keep: (i: number) => boolean): [number, number][][] => {
   const paths: [number, number][][] = [];
   let current: [number, number][] | null = null;
   for (let i = 1; i < track.length; i++) {
-    if (!activityMask[i] || classifyGrade(grades[i], GRADE_ANALYSIS) !== zone) {
+    if (!keep(i)) {
       current = null;
       continue;
     }
@@ -36,11 +36,14 @@ describe('pathsWhere', () => {
     expect(pathsWhere(pts, consecutiveSteps(pts.length), () => false)).toEqual([]);
   });
 
-  it('redonne gradeZonePaths à l’identique, 1 Hz et 5 Hz, pauses et pente manquante', () => {
-    for (const c of energyCases()) {
-      for (const zone of ['steepDown', 'down', 'flat', 'up', 'steepUp'] as GradeZoneKey[]) {
-        expect(gradeZonePaths(c.track, c.grades, c.mask, zone, GRADE_ANALYSIS))
-          .toEqual(frozenGradeZonePaths(c.track, c.grades, c.mask, zone));
+  it('redonne la copie gelée à l’identique, 1 Hz et 5 Hz, sur une session de wing et un seuil de vitesse', () => {
+    for (const hz of [1, 5]) {
+      const { track } = sailTrack({ windDeg: 0, legs: upDownLegs(4), hz, seed: 3 });
+      for (const thresholdMs of [3, 5, 7]) {
+        const fast = (i: number) => (track[i].smoothedSpeedMs ?? 0) >= thresholdMs;
+        const expected = frozenPathsWhere(track, fast);
+        expect(expected.length).toBeGreaterThan(0);
+        expect(pathsWhere(track, consecutiveSteps(track.length), (s) => fast(s.to))).toEqual(expected);
       }
     }
   });

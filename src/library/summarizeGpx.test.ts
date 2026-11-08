@@ -48,7 +48,7 @@ describe('summarizeGpx : le résumé d’analyzeGpx, réglages en table', () => 
       expect(Object.keys(options.activitySettings)).toEqual(['wingfoil']);
     });
 
-    it(`course avec l'altitude du terrain, à ${hz} Hz`, () => {
+    it(`course avec l'altitude du terrain, ignorée depuis le lot 303, à ${hz} Hz`, () => {
       const raw = sailRaw({ windDeg: 0, legs: upDownLegs(2, 120), hz, polar: slowPolar });
       const text = gpxOf(raw);
       const startMs = Date.parse(String(raw[0].time));
@@ -60,10 +60,10 @@ describe('summarizeGpx : le résumé d’analyzeGpx, réglages en table', () => 
       const { direct, viaTable } = both(text, record);
       expect(direct).not.toBeNull();
       expect(viaTable).toStrictEqual(direct);
-      // L'altitude gardée par le GPS : un autre résumé, le même par les deux chemins.
+      // L'altitude du terrain n'est plus substituée (lot 303) : l'altitude du GPS donne le même résumé.
       const gps = both(text, { ...record, elevationSource: 'gps' });
       expect(gps.viaTable).toStrictEqual(gps.direct);
-      expect(gps.direct).not.toStrictEqual(direct);
+      expect(gps.direct?.summary).toStrictEqual(direct?.summary);
     });
 
     it(`surf sur foil, à ${hz} Hz`, () => {

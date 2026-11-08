@@ -22,7 +22,7 @@ const gpxOf = (bytes: Uint8Array): string => {
 };
 
 describe('du FIT au GPX, relu par parseGpx', () => {
-  it('positions, heure, altitude, vitesse, FC et cadence font l\'aller-retour', () => {
+  it('positions, heure, altitude, vitesse et FC font l\'aller-retour', () => {
     const parsed = parseGpx(gpxOf(buildFitActivity({ points: seconds(3) })));
     expect(parsed.rawPoints).toHaveLength(3);
     expect(parsed.hasDeviceSpeed).toBe(true);
@@ -36,9 +36,9 @@ describe('du FIT au GPX, relu par parseGpx', () => {
     expect(p.hr).toBe(150);
   });
 
-  it('cadence : le FIT donne des foulées, `buildGpx` divise des pas par 2, le GPX porte les foulées du FIT', () => {
+  it('la cadence du FIT n\'est plus écrite (course et vélo retirés, lot 303)', () => {
     const parsed = parseGpx(gpxOf(buildFitActivity({ points: [point(0), { ...point(1), cadence: 171 }, { ...point(2), cadence: 85, fractionalCadence: 64 }] })));
-    expect(parsed.rawPoints.map((p) => p.cadence)).toEqual([85, 171, 86]);
+    expect(parsed.rawPoints.map((p) => p.cadence)).toEqual([undefined, undefined, undefined]);
   });
 
   it('un point sans mesure n\'écrit pas sa mesure', () => {

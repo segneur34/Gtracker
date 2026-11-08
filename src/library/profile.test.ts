@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activityShares, favoriteActivity, favoriteFamily } from './profile';
+import { activityShares, favoriteActivity, favoriteFamily, withoutRetiredFamilies } from './profile';
 import { statSession } from '../test/record.fixture';
 
 // Dates construites à l'heure locale : les tests ne dépendent pas du fuseau de la machine.
@@ -65,5 +65,19 @@ describe('favoriteFamily', () => {
 
   it('sans session, aucune', () => {
     expect(favoriteFamily([], ['course'])).toBeNull();
+  });
+});
+
+describe('withoutRetiredFamilies', () => {
+  it('écarte la course, le vélo et l’Entraînement, retirés de cette version (lots 302 et 303)', () => {
+    const kept = withoutRetiredFamilies([
+      session(at(2026, 3, 1), { endMs: at(2026, 3, 1) + 5 * 3_600_000 }),
+      session(at(2026, 3, 2), { activityId: 'route', family: 'velo', endMs: at(2026, 3, 2) + 4 * 3_600_000 }),
+      session(at(2026, 3, 3), { activityId: 'voile', family: 'voile' }),
+      session(at(2026, 3, 4), { activityId: 'surf', family: 'surf' }),
+      session(at(2026, 3, 5), { activityId: 'fractionne-pied', family: 'fractionne' }),
+    ]);
+    expect(kept.map((s) => s.family)).toEqual(['voile', 'surf']);
+    expect(favoriteFamily(kept, ['voile', 'surf'])).toBe('surf');
   });
 });

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # Tracker : analyse de sessions sportives à partir de traces GPX
 
-Application 100 % client (React 19, TypeScript, Vite 8, Recharts, Leaflet), sans backend. Modules voile (`/voile` : wingfoil, planche, kite, bateau), course (`/course`), vélo (`/velo`) et fractionné (`/fractionne`), ces trois derniers sur un module d'analyse commun (`LandModule`), surf (`/surf`), pages `/enregistrer`, `/itineraires`, `/statistiques` et `/parametres`. Interface et commentaires en français. Application Android via Capacitor, avec enregistrement GPS natif et mémoire en dossier portable.
+Application 100 % client (React 19, TypeScript, Vite 8, Recharts, Leaflet), sans backend. Modules voile (`/voile` : wingfoil, planche, kite, bateau) et surf (`/surf`), la course, le vélo et l'Entraînement retirés aux lots 302 et 303 (bibliothèque `/fractionne` gardée en lecture), pages `/enregistrer`, `/itineraires`, `/statistiques` et `/parametres`. Interface et commentaires en français. Application Android via Capacitor, avec enregistrement GPS natif et mémoire en dossier portable.
 
 Chaque information a une seule place :
 - `docs/ETAT_DU_PROJET.md` : pipeline, persistance, dette et limites connues, et **l'avancement du plan mobile (§12), tenu là seulement**. Le lire avant de toucher au noyau ou aux analyses voile.
@@ -69,7 +69,7 @@ Vérifications et banc se lancent depuis la conversation par `npm run verif`, `n
 10. Cadence variable : une application économique peut compresser un virage entier dans un seul intervalle. Ne jamais supposer plusieurs points dans une fenêtre de quelques secondes.
 11. Cartes : composants maison sur `leaflet` (`components/map/`), jamais `react-leaflet` ; le style d'un trait ou d'un rond passe par `pathOptions`, réappliqué (`setStyle`) quand l'objet change : le garder stable (constante ou `useMemo`).
 12. Stockage, fichiers (reçus d'une autre application compris), position, son, vibreur, capteurs, ceinture cardio, autorisations, notification, écran allumé et orientation figée : uniquement via `src/platform/` (`storage.ts`, `files.ts`, `incomingFile.ts`, `memoryFolder.ts`, `location.ts`, `beeper.ts`, `motion.ts`, `notification.ts`, `screen.ts`, `heartRate.ts`, `permissions.ts` ; jamais `localStorage`, `Filesystem`, `showDirectoryPicker`, `navigator.geolocation`, Web Audio, `navigator.vibrate`, `navigator.wakeLock`, `screen.orientation` ni `DeviceMotionEvent` en direct). Chaque module y choisit sa version navigateur ou téléphone par `isNativeApp()`.
-13. Le code commun n'importe ni `running/`, ni `cycling/`, ni `land/` (ce qui part de la version voile et surf) ; les exceptions sont nommées dans `src/architecture.test.ts` (`LAND_FILES`, `SEAM`) et ne font que diminuer : on retire un fil, on n'en ajoute pas.
+13. Le code commun n'importe rien de la terre (course, vélo, Entraînement), retirée aux lots 302 et 303 ; `src/architecture.test.ts` garde `LAND_FILES` et `SEAM` vides, et aucun dossier `running`, `cycling` ou `land` ne revient.
 
 ## Où ajouter quoi
 
@@ -82,7 +82,7 @@ Vérifications et banc se lancent depuis la conversation par `npm run verif`, `n
 - Surbrillance sur la carte d'une analyse (top, podium, zone de pente, répétition, saut) : par `useMapHighlight`, rattachée à son onglet, couleurs de `components/highlightColors.ts`.
 - Métrique de manœuvre : `ManeuverLocation` (`sailing/maneuvers.ts`), puis `MANEUVER_METRICS` et `summarizeManeuvers` (`sailing/sailingAnalytics.ts`).
 - Donnée propre à une session (notes, vent saisi, seuil d'activité, allure imposée, foil, pumping, poids du vélo, charge portée, repères du bouton « Note », support et activité) : dans sa fiche (`library/record.ts`), écrite par `updateSessionRecord` ; dans le module, par le brouillon (`useSessionDraft`, `library/sessionEdits.ts`) et « Enregistrer la session » ; jamais dans une clé de l'appareil. Une donnée recalculable depuis le GPX va dans `summary`, avec `SUMMARY_CALC_VERSION` augmenté si son calcul change.
-- Calcul pur : dans `core/`, `sailing/`, `running/`, `cycling/`, `surfing/`, `planning/`, `recording/` ou `library/`, avec son `*.test.ts` sur trace synthétique.
+- Calcul pur : dans `core/`, `sailing/`, `surfing/`, `planning/`, `recording/` ou `library/`, avec son `*.test.ts` sur trace synthétique.
 - Couleur, police, rayon, espacement : une variable de `src/theme/tokens.css`, jamais une valeur en dur dans un écran neuf. Composants communs dans `components/ui`, icônes dans `components/icons.tsx` (pas d'emoji). Les couleurs de données des graphes et de la carte restent en dur (attributs SVG).
 
 ## Décisions de l'utilisateur
@@ -92,7 +92,7 @@ Celles d'un domaine sont dans `docs/DECISIONS.md`, celles de la disposition des 
 | Avant de toucher à | Section de `DECISIONS.md` |
 |---|---|
 | `sailing/`, `SailingModule`, vent, manœuvres, foil, balises (`markGuide`, `useMarkGuide`) | 1. Voile |
-| `running/`, `cycling/`, `LandModule`, graphes et leur zoom, pente, énergie, altitude (`useTerrainElevation`), revêtement (`planning/surface.ts`, `useSessionSurfaces`) | 2. Course et vélo |
+| graphes et leur zoom, pente (`planning/grade.ts`), revêtement (`planning/surface.ts`) ; course et vélo retirés au lot 303 | 2. Course et vélo |
 | sauts (`core/jumps.ts`, `platform/motion.ts`, `useSessionJumps`, `JumpsPanel`) | 3. Sauts |
 | `surfing/`, `SurfModule` | 4. Surf |
 | test de FC repos (`restingHrTest`, sous le Profil) ; compteur d'intervalles, page Entraînement et tests guidés retirés au lot 302 | 5. Fractionné |

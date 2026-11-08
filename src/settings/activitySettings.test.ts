@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_ACTIVITIES, type Activity } from '../core/activities';
 import { analysisTabs, isTabShown, toggleTabChoice } from '../core/analysisTabs';
 import { getSportProfile, hasActiveThreshold, TERRAIN_STEP_CHOICES_M } from '../core/sportProfiles';
-import { isValidGradeRange } from '../land/grade';
+import { isValidGradeRange } from '../planning/grade';
 import { knotsToMs } from '../core/units';
 import { DEFAULT_PACE_LEVEL } from '../planning/duration';
 import { WAY_TYPES } from '../planning/brouterProfile';
-import { BIKE_TYPES } from '../cycling/energy';
+import { BIKE_DEFAULT_KG } from '../core/retiredLand';
 import {
   PER_ACTIVITY_KEYS, PRESETS_VERSION, TREATMENT_UNITS, defaultAutoPauseOf, defaultBikeKg, defaultBikeType, defaultGradeRange, defaultHeartRateOf,
   defaultHrOffsetOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultPaceOf, defaultSpeedRangeOf, defaultSpeedUnitOf,
-  defaultEnergyModelOf, defaultTerrainStepOf, defaultThresholdOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, rangeFollowsPace, resetOverrides, resetStoredPresets, resolveJumps, resolveRecordingProfile, resolveThresholdOverride, resolveTurns, defaultTurnsOf,
+  defaultTerrainStepOf, defaultThresholdOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, rangeFollowsPace, resetOverrides, resetStoredPresets, resolveJumps, resolveRecordingProfile, resolveThresholdOverride, resolveTurns, defaultTurnsOf,
   SETTING_FIELDS, defaultTabsOf, effectiveHrZoneLines, settingsView, tabsAfterJumpsChange, thresholdFollowsPace, withSetting, type StoredSettings,
 } from './activitySettings';
 
@@ -113,11 +113,11 @@ describe('pré-réglages des activités (21/10)', () => {
   it('vélo : type et poids pré-réglés, le poids du type dès que le type change', () => {
     expect(defaultBikeType(route)).toBe('route');
     expect(defaultBikeKg(route, 'route')).toBe(12);
-    expect(defaultBikeKg(route, 'gravel')).toBe(BIKE_TYPES.gravel.bikeKg);
+    expect(defaultBikeKg(route, 'gravel')).toBe(BIKE_DEFAULT_KG.gravel);
     expect(defaultBikeType(gravel)).toBe('gravel');
     expect(defaultBikeKg(gravel, 'gravel')).toBe(13);
     expect(defaultBikeType(vtt)).toBe('vtt');
-    expect(defaultBikeKg(vtt, 'vtt')).toBe(BIKE_TYPES.vtt.bikeKg);
+    expect(defaultBikeKg(vtt, 'vtt')).toBe(BIKE_DEFAULT_KG.vtt);
     expect(defaultHeartRateOf(route)).toBe(true);
     expect(defaultHeartRateOf(gravel)).toBe(false);
   });
@@ -143,11 +143,6 @@ describe('pré-réglages des activités (21/10)', () => {
     expect(next.speedRanges).toEqual({ 'a-route': { minMs: 2, maxMs: 12 } });
     expect(next.tabs).toEqual({});
     expect(next.gearLabels).toEqual(stored.gearLabels);
-  });
-
-  it('dépense : la Marche sur Pandolf, les autres sur la course', () => {
-    expect(defaultEnergyModelOf(marche)).toBe('marche');
-    for (const activity of [course, trail, runIntervals, route]) expect(defaultEnergyModelOf(activity)).toBe('course');
   });
 
   it('efface une fois le seuil rangé de la Marche (version 2 → 3), garde celui de la Course', () => {
@@ -374,7 +369,7 @@ describe('isActivityOverridden', () => {
   const run = find('running');
   const bike = find('cycling');
   const surf = find('surf');
-  const otherBike = (Object.keys(BIKE_TYPES) as (keyof typeof BIKE_TYPES)[]).find((k) => k !== defaultBikeType(bike))!;
+  const otherBike = (Object.keys(BIKE_DEFAULT_KG) as (keyof typeof BIKE_DEFAULT_KG)[]).find((k) => k !== defaultBikeType(bike))!;
 
   /** Une valeur réglée, autre que le défaut, pour chaque table rangée par activité. */
   const SAMPLES: Record<string, { activity: typeof wing; value: unknown }> = {
@@ -408,6 +403,12 @@ describe('isActivityOverridden', () => {
     hrZoneLines: { activity: run, value: true },
   };
 
+  /**
+   * Tables de la course et du vélo que Réglages ne montre plus (lot 303) : gardées dans les réglages (lot 305),
+   * effacées par « Par défaut », mais plus comptées dans « · modifié ».
+   */
+  const RETIRED = ['gradeRanges', 'bikeWeights', 'carriedLoads', 'energyModels', 'terrainSteps', 'cadence'];
+
   it('couvre chaque table rangée par activité, le matériel enregistré excepté', () => {
     expect([...PER_ACTIVITY_KEYS].filter((k) => k !== 'gearGroups').sort()).toEqual(Object.keys(SAMPLES).sort());
   });
@@ -417,6 +418,14 @@ describe('isActivityOverridden', () => {
   });
 
   for (const [key, { activity, value }] of Object.entries(SAMPLES)) {
+    if (RETIRED.includes(key)) {
+      it(`ne montre plus « ${key} » (lot 303), mais « Par défaut » l'efface`, () => {
+        const stored = { [key]: { [activity.id]: value } } as StoredSettings;
+        expect(isActivityOverridden(settingsView(stored, activity))).toBe(false);
+        expect((resetOverrides(stored, activity.id) as Record<string, Record<string, unknown>>)[key]).toEqual({});
+      });
+      continue;
+    }
     it(`voit « ${key} » réglé, et plus rien après « Par défaut »`, () => {
       const stored = { [key]: { [activity.id]: value } } as StoredSettings;
       expect(isActivityOverridden(settingsView(stored, activity))).toBe(true);
@@ -472,9 +481,10 @@ describe("écriture d'un réglage par la table des champs (lot 72)", () => {
   const wing = find('wingfoil');
   const base: StoredSettings = { thresholds: { kite: 9 } };
 
-  it('chaque champ se range dans une table par activité, et chaque table a son champ', () => {
+  it('chaque champ se range dans une table par activité, et chaque table a son champ, sauf celles de la course et du vélo (lot 303)', () => {
     const keys = Object.values(SETTING_FIELDS).map((rule) => rule.key);
-    expect([...keys].sort()).toEqual([...PER_ACTIVITY_KEYS].sort());
+    const retired = ['gradeRanges', 'bikeWeights', 'carriedLoads', 'energyModels', 'terrainSteps', 'cadence'];
+    expect([...keys].sort()).toEqual([...PER_ACTIVITY_KEYS].filter((k) => !retired.includes(k)).sort());
   });
 
   it("range la valeur sous l'activité seule, sans toucher aux autres", () => {
@@ -490,12 +500,9 @@ describe("écriture d'un réglage par la table des champs (lot 72)", () => {
     expect(withSetting(base, run.id, 'hrOffset', 2.5)).toBeNull();
   });
 
-  it("ne range que l'écart au défaut : aucune charge, ceinture par défaut, cadence mesurée", () => {
-    expect(withSetting({ carriedLoads: { [run.id]: 5 } }, run.id, 'carriedLoad', 0)?.carriedLoads).toEqual({});
+  it("ne range que l'écart au défaut : ceinture par défaut", () => {
     expect(withSetting(base, run.id, 'heartRate', defaultHeartRateOf(run))?.heartRate).toEqual({});
     expect(withSetting(base, run.id, 'heartRate', !defaultHeartRateOf(run))?.heartRate).toEqual({ [run.id]: !defaultHeartRateOf(run) });
-    expect(withSetting(base, run.id, 'cadence', true)?.cadence).toEqual({});
-    expect(withSetting(base, run.id, 'cadence', false)?.cadence).toEqual({ [run.id]: false });
   });
 
   it("refuse un réglage que le calcul n'a pas, ou une activité inconnue", () => {

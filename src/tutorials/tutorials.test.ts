@@ -35,7 +35,7 @@ describe('programme des tutoriels', () => {
 
   it("une leçon de deux familles n'est sautée que si les deux sont cachées", () => {
     expect(shownLessons(['voile']).some((l) => l.id === 'capteurs')).toBe(true);
-    expect(shownLessons(['voile', 'velo']).some((l) => l.id === 'capteurs')).toBe(false);
+    expect(shownLessons(['voile', 'surf']).some((l) => l.id === 'capteurs')).toBe(false);
   });
 
   it('au-delà du programme : plus de leçon', () => {

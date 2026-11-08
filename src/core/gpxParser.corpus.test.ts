@@ -34,7 +34,7 @@ const outcome = <T,>(read: () => T): { value: T } | { error: string } => {
   }
 };
 
-/** Sortie de l'enregistreur de Tracker (`buildGpx`) : la trace de base en deux segments, vitesse, cap, FC et cadence. */
+/** Sortie de l'enregistreur de Tracker (`buildGpx`) : la trace de base en deux segments, vitesse, cap et FC. */
 const trackerEntry = (): CorpusEntry => {
   const fixes: LocationFix[] = basePoints().map((p) => ({
     lat: p.lat,
@@ -44,7 +44,6 @@ const trackerEntry = (): CorpusEntry => {
     speedMs: p.speedMs,
     bearingDeg: p.courseDeg,
     heartRateBpm: p.hr,
-    cadenceSpm: p.cad === undefined ? undefined : p.cad * 2,
   }));
   return {
     nom: 'Tracker (buildGpx), deux segments',

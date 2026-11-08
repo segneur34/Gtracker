@@ -2,7 +2,7 @@ import type { BikeType } from '../core/domainTypes';
 import { parseGpx } from '../core/gpxParser';
 import { SAILING_SPORTS, getSportProfile, hasPositions, isLandTreatment, isSportType, sportTreatment } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
-import { isValidBikeWeight } from '../cycling/energy';
+import { isValidBikeWeight } from '../core/retiredLand';
 import { guessSport } from './naming';
 import {
   ANALYSIS_SUMMARY_FIELDS, carriedSettings, isSummaryStale, type LibrarySession, type RecordWithoutSummary, type SessionAnalysis, type SessionRecord, type SessionSummary,
@@ -145,8 +145,6 @@ export const isSummaryOutdated = (
   if (sport === null || !isSportType(sport) || !hasPositions(sport)) return false;
   const expected = summaryOptionsKey(sport, summaryOptions(sport, record.analysis, sessionActivitySettings(record, activityOf(sport))));
   if (record.summary.optionsKey !== expected) return true;
-  // Vélo : puissance des meilleurs 20 min cherchée sans poids du pratiquant, qui est connu maintenant (lot 146).
-  if (sportTreatment(sport) === 'velo' && (activityOf(sport).cycling?.riderKg ?? null) !== null && record.summary.bests?.powerRiderKg === undefined) return true;
   const pending = pendingOf?.(sport);
   if (!pending) return false;
   const carried = carriedSettings(record);

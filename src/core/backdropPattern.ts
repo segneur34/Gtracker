@@ -9,14 +9,13 @@ import type { SportFamily } from './sportProfiles';
  * sur une longue liste).
  *
  * Chaque tracé se raccorde à lui-même d'un bord à l'autre : les courbes de
- * niveau sont celles d'un relief périodique dans les deux sens, le sentier
- * à pied une fonction périodique de la hauteur, et les dessins
+ * niveau sont celles d'un relief périodique dans les deux sens, et les dessins
  * isolés (souffles, vague, repères, traits de vitesse) sont posés avec leurs
  * copies d'une tuile à côté, ce qui dépasse d'un bord reprenant à l'autre.
  *
- * Dessins choisis par l'utilisateur sur maquette le 23/10 : voile, surf et
- * vélo d'après ses images (souffle de vent, vague, dénivelé), fractionné
- * celui du 22/10 ; à pied « Relief et sentier », choisi le 28/10. Chaque fond a sa taille de tuile et son
+ * Dessins choisis par l'utilisateur sur maquette le 23/10 : voile et surf
+ * d'après ses images (souffle de vent, vague), fractionné celui du 22/10 ;
+ * ceux de la course et du vélo sont partis avec eux (lot 303). Chaque fond a sa taille de tuile et son
  * espacement (`scale`, qui agrandit la tuile sans épaissir le trait) ; l'encre
  * et l'épaisseur sont dans le CSS (`ui.css`, `.page-backdrop--<fond>`).
  */
@@ -46,15 +45,6 @@ type Point = [number, number];
 /** Ligne brisée fine d'une suite de points, en tracé SVG. */
 const polyline = (points: readonly (readonly [number, number])[]): string =>
   points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${roundTo(x, 1)} ${roundTo(y, 1)}`).join('');
-
-/** Points d'une fonction `x(y)` de `from` à `to`, tous les `step` pixels. */
-const sampleY = (from: number, to: number, x: (y: number) => number, step = 6): Point[] => {
-  const n = Math.max(1, Math.ceil((to - from) / step));
-  return Array.from({ length: n + 1 }, (_, i) => {
-    const y = from + ((to - from) * i) / n;
-    return [x(y), y];
-  });
-};
 
 /** Suite pseudo-aléatoire fixe dans [0, 1[ : le motif est le même à chaque ouverture. */
 const jitter = (n: number): number => {
@@ -226,53 +216,6 @@ const placeSouffle = (ox: number, oy: number, s: number): string =>
 /** Voile : trois souffles de tailles différentes par tuile, beaucoup de vide autour. */
 const voileTile = (): TilePath[] => [{ d: placeSouffle(24, 70, 0.3) + placeSouffle(150, 360, 0.24) + placeSouffle(-60, 540, 0.2) }];
 
-/** Relief doux de l'à pied : peu d'ondes, donc de larges courbes ; périodique sur la tuile comme `RELIEF`. */
-const RELIEF_SOFT = [
-  { k: 1, l: 1, a: 1, phase: 1.1 }, { k: 1, l: -1, a: 0.8, phase: 2.6 },
-  { k: 0, l: 1, a: 0.5, phase: 0.2 }, { k: 2, l: 1, a: 0.25, phase: 4.4 },
-];
-
-/** Abscisse du sentier à la hauteur `y` : périodique en hauteur, il se raccorde à lui-même d'une tuile à l'autre. */
-export const trailX = (y: number): number =>
-  TILE_W * 0.52 + 96 * Math.sin((TAU * y) / TILE_H + 0.6) + 34 * Math.sin((2 * TAU * y) / TILE_H + 2.4);
-
-/**
- * À pied, « Relief et sentier » (choisi sur maquette le 28/10) : un seul sentier pointillé qui descend la tuile
- * en serpentant, avec un départ (rond plein) et une arrivée (fanion), posé dans sept larges courbes de niveau fines.
- */
-const courseTile = (): TilePath[] => {
-  const heights = heightGrid(reliefOf(RELIEF_SOFT, TILE_W, TILE_H), TILE_W, TILE_H);
-  const flat = heights.flat();
-  const lo = Math.min(...flat);
-  const hi = Math.max(...flat);
-  const contours = Array.from({ length: 7 }, (_, n) => isoline(heights, lo + ((hi - lo) * (n + 1)) / 8)).join('');
-  return [
-    { d: contours, kind: 'thin' },
-    { d: polyline(sampleY(0, TILE_H, trailX, 4)), kind: 'dots' },
-    { d: wrappedShape(trailX(58) + 6, 58, 'a6 6 0 1 0 -12 0a6 6 0 1 0 12 0'), kind: 'fill' },
-    { d: wrappedShape(trailX(470), 470, 'l0 -26l18 7l-18 7') },
-  ];
-};
-
-/** Tuile du vélo : grande, pour que ses courbes restent peu nombreuses à l'écran. */
-const VELO_W = 780;
-const VELO_H = 1280;
-const VELO_LEVELS = 11;
-
-/**
- * Relief du vélo, d'après l'image de l'utilisateur (23/10) : un sinus en largeur que deux ondes en hauteur
- * déforment, d'où des courbes de niveau ouvertes en grands lacets ; périodique sur la tuile, dans les deux sens.
- */
-export const veloHeight = (x: number, y: number): number =>
-  Math.sin(TAU * x / VELO_W + 3 * Math.sin(TAU * y / VELO_H + 1) + 1.2 * Math.sin(TAU * (x / VELO_W + 2 * y / VELO_H) + 2.5));
-
-/** Vélo : courbes de dénivelé, à niveaux égaux entre −1 et 1. */
-const veloTile = (): TilePath[] => {
-  const heights = heightGrid(veloHeight, VELO_W, VELO_H);
-  const lines = Array.from({ length: VELO_LEVELS }, (_, n) => isoline(heights, -1 + (2 * (n + 0.5)) / VELO_LEVELS));
-  return [{ d: lines.join('') }];
-};
-
 /** Tuile du surf : une seule vague par tuile, donc à peu près une par écran. */
 const SURF_W = 600;
 const SURF_H = 520;
@@ -346,8 +289,9 @@ export type BackdropVariant = 'contours' | SportFamily;
 const BACKDROPS: Record<BackdropVariant, { draw: () => TilePath[]; width: number; height: number; scale: number }> = {
   contours: { draw: contourTile, width: TILE_W, height: TILE_H, scale: 1 },
   voile: { draw: voileTile, width: TILE_W, height: TILE_H, scale: 0.9 },
-  course: { draw: courseTile, width: TILE_W, height: TILE_H, scale: 1.65 },
-  velo: { draw: veloTile, width: VELO_W, height: VELO_H, scale: 1.8 },
+  // Course et vélo, retirés de cette version (lot 303) : leurs clés restent (types, lot 305), au dessin des courbes de niveau.
+  course: { draw: contourTile, width: TILE_W, height: TILE_H, scale: 1 },
+  velo: { draw: contourTile, width: TILE_W, height: TILE_H, scale: 1 },
   surf: { draw: surfTile, width: SURF_W, height: SURF_H, scale: 0.9 },
   fractionne: { draw: fractionneTile, width: TILE_W, height: TILE_H, scale: 1 },
 };

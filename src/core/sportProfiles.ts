@@ -58,7 +58,7 @@ export const ELEVATION_PRESETS: Record<'route' | 'trail', ElevationProfile> = {
   trail: { smoothingSeconds: 30, minGainM: 5 },
 };
 
-/** Pente locale et zones de pente (`running/runningAnalytics.ts`). */
+/** Pente locale (`planning/grade.ts`) et zones de pente (analyse de la course, retirée au lot 303). */
 export interface GradeProfile {
   /**
    * Demi-largeur, en mètres, de la fenêtre sur laquelle la pente est mesurée :
@@ -160,7 +160,7 @@ const BOAT_RECORDING: RecordingProfile = { ...DEFAULT_RECORDING, autoPauseSpeedM
 
 /**
  * Répétitions retrouvées dans la vitesse d'une session faite sans le compteur
- * (`running/intervalDetection.ts`). Le seuil d'effort, lui, est tiré de la
+ * (détection de l'Entraînement, retirée au lot 302). Le seuil d'effort, lui, est tiré de la
  * session, et se surcharge par session (`SessionAnalysis.effortThresholdMs`).
  */
 export interface IntervalDetectionProfile {
@@ -400,7 +400,7 @@ const SAILING_PUMP_DETECTION: PumpDetection = {
 };
 
 /**
- * Cadence à pied (`running/cadence.ts`, demande du 16/10) : provisoire, à
+ * Cadence à pied (calcul retiré avec la course au lot 303, demande du 16/10) : provisoire, à
  * régler sur de vraies sorties, téléphone porté comme d'habitude. De 70 pas
  * par minute (marche lente) à 240 (sprint).
  */

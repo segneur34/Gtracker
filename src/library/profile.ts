@@ -5,6 +5,7 @@
  * d'activités et les statistiques.
  */
 
+import { RETIRED_FAMILIES } from '../core/activities';
 import type { SportFamily } from '../core/sportProfiles';
 import { groupTotals, type StatSession, type StatsTotals } from './stats';
 
@@ -41,6 +42,14 @@ export const favoriteActivity = (sessions: readonly StatSession[], activityOrder
     .filter((s) => s.totals.durationS === top.totals.durationS)
     .reduce((best, s) => (lastStart(s.activityId) > lastStart(best.activityId) ? s : best)).activityId;
 };
+
+/**
+ * Sessions des familles proposées dans cette version (voile et surf) : le sport
+ * préféré du Profil et le fond des pages ne comptent pas celles des familles
+ * retirées (course, vélo, Entraînement, lots 302 et 303), gardées ailleurs.
+ */
+export const withoutRetiredFamilies = (sessions: readonly StatSession[]): StatSession[] =>
+  sessions.filter((s) => !RETIRED_FAMILIES.includes(s.family));
 
 /** Famille du sport préféré, qui choisit le fond des pages (`useFavoriteBackdrop`) ; `null` sans temps. */
 export const favoriteFamily = (sessions: readonly StatSession[], activityOrder: readonly string[]): SportFamily | null => {

@@ -221,12 +221,13 @@ export const activitiesOfFamily = (activities: Activity[], family: SportFamily):
   activities.filter((a) => activityFamily(a) === family);
 
 /**
- * Familles retirées de cette version voile et surf (lot 302) : l'Entraînement
- * n'a plus de pages ; l'identifiant reste dans les types (lot 305), mais la
- * famille est toujours cachée : accueil, barre, Statistiques, Enregistrer et
- * Réglages ne la proposent plus. Ses sessions déjà rangées restent lisibles.
+ * Familles retirées de cette version voile et surf : l'Entraînement (lot 302),
+ * la course et le vélo (lot 303) n'ont plus de pages ; les identifiants restent
+ * dans les types (lot 305), mais ces familles sont toujours cachées : accueil,
+ * barre, Statistiques, Enregistrer, Réglages et Planifier ne les proposent plus.
+ * Leurs sessions déjà rangées restent dans les fiches, jamais réécrites.
  */
-export const RETIRED_FAMILIES: readonly SportFamily[] = ['fractionne'];
+export const RETIRED_FAMILIES: readonly SportFamily[] = ['course', 'velo', 'fractionne'];
 
 /** Familles proposées dans cette version, dans l'ordre de `SPORT_FAMILIES`. */
 export const ACTIVE_FAMILIES: SportFamily[] = SPORT_FAMILIES.filter((f) => !RETIRED_FAMILIES.includes(f));

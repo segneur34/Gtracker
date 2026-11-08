@@ -12,7 +12,7 @@ import { hasPositions, sportFamily, sportTreatment, type SportFamily, type Treat
 import { DAY_MS, addDays, addMonths, isoWeek, monthYearLong, monthYearShort, shortDate, stacksByActivity, startOfDay, startOfIsoWeek, startOfMonth } from '../core/calendar';
 import { CHART_PERIODS, chartPeriodBounds, type ChartRange } from './activityChart';
 import type { GearChoice, GearGroup } from './notes';
-import type { ManeuverResults, SessionRecord, SummaryBests, SummaryHeartRate } from './record';
+import type { ManeuverResults, SessionRecord, SummaryHeartRate } from './record';
 
 export type StatsPeriod = ChartRange;
 
@@ -67,12 +67,8 @@ export interface StatSession {
   flightS: number | null;
   /** FC du résumé, `null` pour une session sans FC. */
   heartRate: SummaryHeartRate | null;
-  /** Cadence moyenne en mouvement (à pied), en pas par minute, `null` sans cadence. */
-  cadenceSpm: number | null;
   /** Matériel enregistré choisi dans les notes (saisi, pas calculé : hors du résumé), `null` sans choix. */
   gear: readonly GearChoice[] | null;
-  /** Meilleurs 5 km, 10 km et 20 min à vélo du résumé (version 17, lot 146), `null` sans eux. */
-  bests: SummaryBests | null;
 }
 
 /**
@@ -104,9 +100,7 @@ export const statSessionOf = (file: string, record: SessionRecord, activity: Act
     longestFlightS: summary.longestFlightS ?? null,
     flightS: summary.flightS ?? null,
     heartRate: summary.heartRate ?? null,
-    cadenceSpm: summary.cadence?.avgSpm ?? null,
     gear: record.notes?.gear ?? null,
-    bests: summary.bests ?? null,
   };
 };
 
@@ -320,10 +314,10 @@ export const groupTotals = <K extends string>(
 // --- Graphique : une donnée par session ---
 
 /** Données du graphique. */
-export type StatsMetricKey = 'vmax' | 'moyenne' | 'duree' | 'distance' | 'denivele' | 'cadence' | 'vol' | 'reussite' | 'vagues' | 'vague' | 'volMax';
+export type StatsMetricKey = 'vmax' | 'moyenne' | 'duree' | 'distance' | 'vol' | 'reussite' | 'vagues' | 'vague' | 'volMax';
 
 /** Sorte de valeur, qui donne l'axe et le format ; toutes en SI (m/s, s, m), le pourcentage de 0 à 100. */
-export type StatsMetricUnit = 'vitesse' | 'duree' | 'distance' | 'pourcent' | 'nombre' | 'metres' | 'secondes' | 'cadence';
+export type StatsMetricUnit = 'vitesse' | 'duree' | 'distance' | 'pourcent' | 'nombre' | 'metres' | 'secondes';
 
 export interface StatsMetricSeries {
   key: string;
@@ -356,8 +350,6 @@ const percent = (part: number, whole: number | null): number | null =>
 /** Réussite d'une sorte de manœuvre, en %, `null` sans manœuvre de cette sorte. */
 const successRate = (success: number, fail: number): number | null => percent(success, success + fail);
 
-const LAND_FAMILIES: readonly SportFamily[] = ['course', 'velo', 'fractionne'];
-
 const single = (key: string, label: string, value: StatsMetricSeries['value']): StatsMetricSeries[] => [{ key, label, value }];
 
 /** Les données du graphique, dans l'ordre des pastilles. */
@@ -373,15 +365,6 @@ export const STATS_METRICS: readonly StatsMetric[] = [
   },
   { key: 'duree', label: 'Durée', unit: 'duree', families: null, overview: true, record: false, series: single('duree', 'Durée', durationOf) },
   { key: 'distance', label: 'Distance', unit: 'distance', families: null, overview: false, record: false, series: single('distance', 'Distance', (s) => positive(s.distanceM)) },
-  {
-    key: 'denivele', label: 'Dénivelé positif', unit: 'metres', families: LAND_FAMILIES, overview: false, record: false,
-    series: single('denivele', 'Dénivelé positif', (s) => (s.elevationGainM !== null && Number.isFinite(s.elevationGainM) ? Math.max(0, s.elevationGainM) : null)),
-  },
-  {
-    // À pied (course, marche, fractionné à pied) : la cadence mesurée par le téléphone ou la montre.
-    key: 'cadence', label: 'Cadence moyenne', unit: 'cadence', families: ['course', 'fractionne'], overview: false, record: false,
-    series: single('cadence', 'Cadence moyenne', (s) => positive(s.cadenceSpm)),
-  },
   {
     // Voile : le « Ratio de vol » de l'analyse, temps en action sur le temps en mouvement (sur la durée pour
     // une fiche d'avant la version 12), sur foil seulement ; surf : le temps des vols.
@@ -611,14 +594,13 @@ export const regularity = (
 };
 
 /** Records qu'on peut classer. */
-export type StatsRecordKind = 'vitesse' | 'distance' | 'duree' | 'denivele' | 'manoeuvres' | 'vague' | 'vol';
+export type StatsRecordKind = 'vitesse' | 'distance' | 'duree' | 'manoeuvres' | 'vague' | 'vol';
 
 /** Valeur d'une session pour un record, `null` si elle n'en a pas. */
 export const RECORD_VALUE: Record<StatsRecordKind, (s: StatSession) => number | null> = {
   vitesse: (s) => (s.maxSpeedMs > 0 ? s.maxSpeedMs : null),
   distance: (s) => (s.distanceM > 0 ? s.distanceM : null),
   duree: (s) => (s.endMs > s.startMs ? (s.endMs - s.startMs) / 1000 : null),
-  denivele: (s) => (s.elevationGainM !== null && s.elevationGainM > 0 ? s.elevationGainM : null),
   manoeuvres: (s) => (s.maneuverCount !== null && s.maneuverCount > 0 ? s.maneuverCount : null),
   vague: (s) => (s.longestWaveM !== null && s.longestWaveM > 0 ? s.longestWaveM : null),
   vol: (s) => (s.longestFlightS !== null && s.longestFlightS > 0 ? s.longestFlightS : null),
@@ -629,7 +611,8 @@ export const recordKindsOf = (family: SportFamily | null): StatsRecordKind[] => 
   const common: StatsRecordKind[] = ['vitesse', 'distance', 'duree'];
   if (family === 'voile') return [...common, 'manoeuvres'];
   if (family === 'surf') return [...common, 'vague', 'vol'];
-  if (family === 'course' || family === 'velo' || family === 'fractionne') return [...common, 'denivele'];
+  // Course, vélo et Entraînement, retirés (lots 302 et 303) : les records communs.
+  if (family !== null) return common;
   return ['distance', 'duree'];
 };
 

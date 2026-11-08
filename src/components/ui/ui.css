@@ -54,29 +54,24 @@
 }
 
 /* Encre et épaisseur de chaque fond, réglées à l'œil sur la maquette du 23/10 : la couleur de la famille,
-   celle de l'image donnée par l'utilisateur (surf, vélo), le gris bleuté des courbes de niveau. */
-.page-backdrop--contours {
+   celle de l'image donnée par l'utilisateur (surf), le gris bleuté des courbes de niveau ; la course et le
+   vélo, retirés (lot 303), prennent les courbes de niveau. */
+.page-backdrop--contours,
+.page-backdrop--course,
+.page-backdrop--velo {
   --backdrop-ink: var(--contour);
   --backdrop-stroke: 1.3;
 }
 
-.page-backdrop--contours .page-backdrop__major {
+.page-backdrop--contours .page-backdrop__major,
+.page-backdrop--course .page-backdrop__major,
+.page-backdrop--velo .page-backdrop__major {
   --backdrop-stroke: 2.4;
 }
 
 .page-backdrop--voile {
   --backdrop-ink: color-mix(in srgb, var(--voile) 41%, transparent);
   --backdrop-stroke: 1.65;
-}
-
-.page-backdrop--course {
-  --backdrop-ink: color-mix(in srgb, var(--course) 36%, transparent);
-  --backdrop-stroke: 4.2;
-}
-
-.page-backdrop--velo {
-  --backdrop-ink: color-mix(in srgb, var(--backdrop-velo) 47%, transparent);
-  --backdrop-stroke: 2.4;
 }
 
 .page-backdrop--surf {
@@ -96,15 +91,6 @@
 
 .page-backdrop .page-backdrop__thin {
   --backdrop-stroke: 1.3;
-}
-
-/* À pied (« Relief et sentier », 28/10) : traits de la maquette × 1,4. Après les règles globales, à poids égal. */
-.page-backdrop--course .page-backdrop__dots {
-  --backdrop-stroke: 5.6;
-}
-
-.page-backdrop--course .page-backdrop__thin {
-  --backdrop-stroke: 1.8;
 }
 
 .page-backdrop .page-backdrop__fill {

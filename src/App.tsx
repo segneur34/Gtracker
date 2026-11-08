@@ -1,11 +1,9 @@
 import { lazy, useEffect } from 'react';
-import { BrowserRouter as Router, Navigate, Routes, Route, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { RESTING_HR_PATH } from './core/parentPage';
 import AppShell from './components/AppShell';
 import { DevThrow } from './components/ErrorBoundary';
-import { hasPositions } from './core/sportProfiles';
 import { acknowledgeRecordingLanding, useRecorderSelector } from './hooks/useRecorder';
-import { useLibrarySession } from './hooks/useSessionLibrary';
 import Home from './pages/Home';
 
 /**
@@ -19,7 +17,6 @@ import Home from './pages/Home';
 const loaders = {
   SessionLibrary: () => import('./pages/SessionLibrary'),
   RecordingPage: () => import('./pages/RecordingPage'),
-  LandModule: () => import('./pages/LandModule'),
   SailingModule: () => import('./pages/SailingModule'),
   SurfModule: () => import('./pages/SurfModule'),
   SettingsPage: () => import('./pages/SettingsPage'),
@@ -34,7 +31,6 @@ const loaders = {
 
 const SessionLibrary = lazy(loaders.SessionLibrary);
 const RecordingPage = lazy(loaders.RecordingPage);
-const LandModule = lazy(loaders.LandModule);
 const SailingModule = lazy(loaders.SailingModule);
 const SurfModule = lazy(loaders.SurfModule);
 const SettingsPage = lazy(loaders.SettingsPage);
@@ -58,7 +54,7 @@ const PRELOAD_FALLBACK_MS = 1500;
  */
 const preloadPages = (): (() => void) => {
   const order: (keyof typeof loaders)[] = [
-    'RecordingPage', 'SessionLibrary', 'LandModule', 'SailingModule', 'SurfModule', 'StatisticsPage', 'ProfilePage',
+    'RecordingPage', 'SessionLibrary', 'SailingModule', 'SurfModule', 'StatisticsPage', 'ProfilePage',
     'SettingsPage', 'PlanningPage', 'RoutesPage', 'RestingHrTestPage', 'TutorialPage', 'TutorialsPage',
   ];
   let cancelled = false;
@@ -80,22 +76,6 @@ const preloadPages = (): (() => void) => {
     }
   };
 };
-
-/**
- * Analyse d'une session de l'Entraînement, famille retirée de cette version
- * (lot 302) mais dont les sessions déjà rangées restent lisibles :
- * `LandModule` ; une session sans trace (muscu) n'a plus d'analyse et renvoie
- * à la bibliothèque de la famille. Le calcul se lit dans la fiche de la
- * session demandée (`?session=`) ; tant que la bibliothèque ne la connaît pas,
- * rien n'est chargé (`useSessionFromUrl`).
- */
-function TrainingAnalysis() {
-  const [params] = useSearchParams();
-  const sport = useLibrarySession(params.get('session'))?.record.sport ?? null;
-  return sport !== null && !hasPositions(sport)
-    ? <Navigate to="/fractionne" replace />
-    : <LandModule key="fractionne" family="fractionne" />;
-}
 
 /** Ancienne adresse du test de FC repos (sous l'Entraînement jusqu'au lot 301) : la nouvelle, sous le Profil, réglages d'adresse gardés. */
 function RestingHrRedirect() {
@@ -127,12 +107,12 @@ function App() {
           {/* Chaque famille : sa bibliothèque, et son module d'analyse ouvert sur une session (`?session=`). */}
           <Route path="/voile" element={<SessionLibrary key="voile" family="voile" />} />
           <Route path="/voile/analyse" element={<SailingModule />} />
-          <Route path="/course" element={<SessionLibrary key="course" family="course" />} />
-          <Route path="/course/analyse" element={<LandModule key="course" family="course" />} />
-          <Route path="/velo" element={<SessionLibrary key="velo" family="velo" />} />
-          <Route path="/velo/analyse" element={<LandModule key="velo" family="velo" />} />
+          {/* Course et vélo retirés de cette version (lot 303) : bibliothèques et analyses mènent à l'accueil. */}
+          <Route path="/course/*" element={<Navigate to="/" replace />} />
+          <Route path="/velo/*" element={<Navigate to="/" replace />} />
+          {/* Entraînement retiré (lot 302) : sa bibliothèque reste lisible, ses sessions n'ont plus d'analyse (lot 303). */}
           <Route path="/fractionne" element={<SessionLibrary key="fractionne" family="fractionne" />} />
-          <Route path="/fractionne/analyse" element={<TrainingAnalysis />} />
+          <Route path="/fractionne/analyse" element={<Navigate to="/fractionne" replace />} />
           {/* Ancienne adresse du test de FC repos, passé sous le Profil (lot 301). */}
           <Route path="/fractionne/tests/fc-repos" element={<RestingHrRedirect />} />
           {/* Pages de l'Entraînement retirées (lot 302 : séances, timer, tests) : vers l'accueil. */}

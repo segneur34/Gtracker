@@ -1,10 +1,7 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import headerPhoto from '../assets/accueil/entete-accueil.webp';
-import vignetteAPied from '../assets/accueil/vignette-a-pied.webp';
-import vignetteFractionne from '../assets/accueil/vignette-fractionne.webp';
 import vignetteSurf from '../assets/accueil/vignette-surf.webp';
-import vignetteVelo from '../assets/accueil/vignette-velo.webp';
 import vignetteVoile from '../assets/accueil/vignette-voile.webp';
 import MemoryStatus from '../components/MemoryStatus';
 import PageBackdrop from '../components/PageBackdrop';
@@ -40,12 +37,10 @@ import './Home.css';
  * cachée ni son nom ni ses itinéraires (§10, point 100).
  */
 
-const FAMILY_PHOTO: Record<SportFamily, string> = {
+/** Photo de la carte de chaque famille proposée ; les familles retirées (lots 302 et 303) n'ont plus de carte ni de photo. */
+const FAMILY_PHOTO: Partial<Record<SportFamily, string>> = {
   voile: vignetteVoile,
-  course: vignetteAPied,
-  velo: vignetteVelo,
   surf: vignetteSurf,
-  fractionne: vignetteFractionne,
 };
 
 function Home() {
@@ -98,7 +93,7 @@ function Home() {
                 <span className="home-family__name">{FAMILY_LABEL[family]}</span>
                 {names && <span className="home-family__activities">{names}</span>}
               </span>
-              <img className="home-family__photo" src={FAMILY_PHOTO[family]} alt="" />
+              {FAMILY_PHOTO[family] && <img className="home-family__photo" src={FAMILY_PHOTO[family]} alt="" />}
             </Link>
           );
         })}

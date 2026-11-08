@@ -155,9 +155,8 @@
   --neutral-accent: #3d444d;
   /* Courbes de niveau du fond des pages (accueil, Profil, Statistiques, Réglages). */
   --contour: #b6c4d1;
-  /* Encre des fonds surf et vélo : couleurs des images données par l'utilisateur le 23/10. */
+  /* Encre du fond surf : couleur de l'image donnée par l'utilisateur le 23/10. */
   --backdrop-surf: #1ba1e2;
-  --backdrop-velo: #7f9f7c;
   /* Racine du Profil (`components/drawRoot.ts`, lues par le canevas) : racine vivante, radicelles
      de la période, radicelle flétrie, partie sèche, pousse, sol, graine, fleur. */
   --root-live: #4c8a43;

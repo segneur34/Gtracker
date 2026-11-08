@@ -616,14 +616,14 @@ describe('prévenir quand ça rate (lot 115)', () => {
     sensors.resumeFails = true;
     try {
       const source = fakeSource();
-      await recorder.startRecording(activity, source, { motion: { placement: 'poitrine', foil: false, jumps: false, cadence: true } });
+      await recorder.startRecording(activity, source, { motion: { placement: 'poitrine', foil: true, jumps: false } });
       source.emit(0);
       source.emit(1);
       await recorder.pauseRecording();
       await recorder.resumeRecording();
       const state = recorder.getRecorderState();
       expect(state.status).toBe('recording');
-      expect(state.error).toBe('Capteurs : reprise impossible, sauts et cadence arrêtés');
+      expect(state.error).toBe('Capteurs : reprise impossible, sauts arrêtés');
       expect(state.measuringMotion).toBe(true);
     } finally {
       sensors.resumeFails = false;
@@ -688,7 +688,7 @@ describe('journal illisible (lot 143, 123a)', () => {
 
 describe('capteurs à l’arrêt (lot 143, 123c)', () => {
   const capture: MotionCapture = { path: `capteurs/${T0}.imu`, bytes: 4096, durationS: 2, samples: 200, longestGapS: 0.01, error: null };
-  const setup = { placement: 'poitrine' as const, foil: false, jumps: true, cadence: true };
+  const setup = { placement: 'poitrine' as const, foil: false, jumps: true };
 
   /** Enregistre deux positions avec les capteurs, puis arrête : l'alerte de l'arrêt. */
   const stopWith = async (stop: () => Promise<MotionCapture | null>): Promise<string | null> => {
@@ -723,7 +723,7 @@ describe('capteurs à l’arrêt (lot 143, 123c)', () => {
 
 describe('capture à « Analyser » (lot 148, T2-1)', () => {
   const capture: MotionCapture = { path: `capteurs/${T0}.imu`, bytes: 4096, durationS: 2, samples: 200, longestGapS: 0.01, error: null };
-  const setup = { placement: 'poitrine' as const, foil: true, jumps: true, cadence: false };
+  const setup = { placement: 'poitrine' as const, foil: true, jumps: true };
 
   /** Session de voile arrêtée, en attente : la capture n'a pas été lue à l'arrêt (chemin normal). */
   const stopped = async (): Promise<void> => {
@@ -734,7 +734,6 @@ describe('capture à « Analyser » (lot 148, T2-1)', () => {
     source.emit(1);
     await recorder.stopRecording();
     expect(recorder.getRecorderState().pending?.motion?.path).toBe(capture.path);
-    expect(recorder.getRecorderState().pending?.motionBytes).toBeNull();
   };
   const unreadable = async (): Promise<Uint8Array | null> => {
     throw new Error('mémoire du pont');

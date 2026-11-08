@@ -2,9 +2,7 @@ import { errorMessage } from '../core/basics';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { Activity } from '../core/activities';
 import { marksWithin, type SessionMark } from '../core/sessionMarks';
-import { decodeImu } from '../core/imuFile';
 import { DEFAULT_RECORDING, getSportProfile, hasPositions, type RecordingProfile } from '../core/sportProfiles';
-import { cadenceSeries, joinCadence } from '../running/cadence';
 import type { SportType } from '../core/types';
 import { effectiveFoil, effectiveHeartRate, effectiveRecordingProfile, readStoredActivities, rememberRecordActivity } from './useSportSettings';
 import { recordingJournal } from '../platform/files';
@@ -131,8 +129,6 @@ export interface PendingSession {
   marks: SessionMark[];
   /** Capture des capteurs (sauts), dans le dossier privé, rangée avec la session ; `null` sans mesure. */
   motion: MotionCapture | null;
-  /** Octets de la capture déjà lus à l'arrêt (cadence), pour ne pas les relire à « Analyser » ; `null` sinon. */
-  motionBytes: Uint8Array | null;
 }
 
 /** Session rangée par « Analyser ». */
@@ -162,7 +158,7 @@ export interface RecorderState {
   pausedReason: 'manual' | 'auto' | null;
   /** Horloge de la pause en cours, pour la durée affichée (`displayedDurationMs`) ; `null` hors pause. */
   pauseClock: PauseClock | null;
-  /** Vrai tant que les capteurs du téléphone mesurent (sauts, pumping, cadence). */
+  /** Vrai tant que les capteurs du téléphone mesurent (sauts, pumping). */
   measuringMotion: boolean;
   /** Ce que la capture en cours mesure, `null` sans capture. */
   motionSetup: MotionSetup | null;
@@ -312,7 +308,7 @@ export const GPS_LOST_ERROR = "GPS perdu : plus aucune position. L'enregistremen
 /** Échec de la pause de la capture des capteurs. */
 const SENSORS_PAUSE_ERROR = 'Capteurs : pause impossible, la mesure continue pendant la pause';
 /** Échec de la reprise de la capture des capteurs. */
-const SENSORS_RESUME_ERROR = 'Capteurs : reprise impossible, sauts et cadence arrêtés';
+const SENSORS_RESUME_ERROR = 'Capteurs : reprise impossible, sauts arrêtés';
 /** « Continuer » après une capture des capteurs : elle ne reprend pas, ce qu'elle a mesuré reste. */
 const CAPTURE_NOT_RESUMED = 'Capteurs : la mesure ne reprend pas ; ce qu\'ils ont mesuré avant la coupure est gardé.';
 /** Notifications refusées au départ d'un enregistrement : ajouté une fois à l'alerte. */
@@ -515,32 +511,6 @@ const receiveFix = (received: LocationFix): void => {
 };
 
 /**
- * Cadence à pied mesurée sur la capture, si elle la mesurait, jointe à chaque
- * position (`gpxtpx:cad` du GPX). Sans elle, ou si le calcul échoue, les
- * positions telles quelles : la session n'est jamais bloquée par la cadence.
- * Seul l'accéléromètre est décodé ; les octets lus sont rendus aussi, gardés
- * pour « Analyser ». Pas de `loadSessionMotion` ici : c'est la capture entière
- * du dossier privé, décodée en partie, que personne d'autre ne lit à l'arrêt
- * (l'analyse lit le `.imu` élagué, rangé avec la session).
- */
-const withMeasuredCadence = async (
-  segments: LocationFix[][], sport: SportType | null, motion: MotionCapture | null
-): Promise<{ segments: LocationFix[][]; bytes: Uint8Array | null }> => {
-  const params = sport !== null ? getSportProfile(sport).cadence : undefined;
-  if (!params || !motion) return { segments, bytes: null };
-  let bytes: Uint8Array | null = null;
-  try {
-    bytes = await readMotionCapture(motion.path);
-    const recording = bytes ? await decodeImu(bytes, { streams: ['accel'] }) : null;
-    if (!recording || !recording.header.setup.cadence) return { segments, bytes };
-    const series = cadenceSeries(recording, params);
-    return { segments: series ? segments.map((segment) => joinCadence(segment, series)) : segments, bytes };
-  } catch {
-    return { segments, bytes };
-  }
-};
-
-/**
  * Construit le GPX de segments, sans le ranger : le journal reste jusqu'à la
  * décision de l'utilisateur. Rend `null`, journal effacé, s'il y a moins de
  * deux positions au total : aucune trace ne s'en tire, il n'y a rien à garder.
@@ -562,9 +532,8 @@ const buildPendingSession = async (
   }
   const startMs = segments.find((s) => s.length > 0)![0].timeMs;
   const fileName = sessionFileName(startMs, sport);
-  const measured = await withMeasuredCadence(segments, sport, motion);
-  const content = buildGpx(measured.segments, { name: sessionTitle(startMs, titleName), sport });
-  return { fileName, content, sport, activity, pointCount, recovered, canContinue: false, marks, motion, motionBytes: measured.bytes };
+  const content = buildGpx(segments, { name: sessionTitle(startMs, titleName), sport });
+  return { fileName, content, sport, activity, pointCount, recovered, canContinue: false, marks, motion };
 };
 
 /**
@@ -587,7 +556,7 @@ const rangePendingSession = async (pending: PendingSession, withoutMotion: boole
   let motion: Uint8Array | null = null;
   if (pending.motion && !withoutMotion) {
     try {
-      motion = pending.motionBytes ?? await readMotionCapture(pending.motion.path);
+      motion = await readMotionCapture(pending.motion.path);
     } catch (err) {
       console.warn(`Capture illisible : ${errorMessage(err, 'erreur inconnue')}`);
       setState({ motionUnreadable: true, error: MOTION_UNREADABLE_MESSAGE });
@@ -1237,11 +1206,11 @@ export const togglePauseRecording = (): Promise<void> =>
  * même a échoué ; `capture` à `null` sans échec : plus rien ne tournait.
  */
 export const motionCaptureWarning = (capture: MotionCapture | null, failure: string | null): string | null => {
-  const lost = 'la session sera rangée sans les mesures des capteurs (sauts, pumping ou cadence).';
+  const lost = 'la session sera rangée sans les mesures des capteurs (sauts ou pumping).';
   if (failure !== null) return `Capteurs : arrêt impossible (${failure}), ${lost}`;
   if (capture === null) return `Capteurs : la mesure s'était arrêtée, ${lost}`;
   if (capture.error !== null) {
-    return `Capteurs : écriture interrompue (${capture.error}), leurs mesures sont incomplètes : sauts, pumping ou cadence peuvent manquer.`;
+    return `Capteurs : écriture interrompue (${capture.error}), leurs mesures sont incomplètes : sauts ou pumping peuvent manquer.`;
   }
   if (capture.samples === 0) return `Capteurs : aucune mesure reçue, ${lost}`;
   return null;

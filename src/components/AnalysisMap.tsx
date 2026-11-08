@@ -24,8 +24,8 @@ export interface AnalysisMapProps {
   layers: ReactNode;
   /**
    * Légende de la couleur de la trace, posée sur la carte : celle de la
-   * vitesse (`SpeedGradientLegend`) ou de la pente (`GradeGradientLegend`) ;
-   * `null` sans trace, ou quand la trace a d'autres couleurs (revêtement).
+   * vitesse (`SpeedGradientLegend`) ; `null` sans trace, ou quand la trace a
+   * d'autres couleurs.
    */
   legend: ReactNode | null;
   /** Hauteur par défaut du bloc. */

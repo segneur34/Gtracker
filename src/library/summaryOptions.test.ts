@@ -247,3 +247,41 @@ describe("sessions à refaire, dans l'ordre de la liste (lot 37)", () => {
     expect(outdatedRefreshFiles(sessions, () => false, new Set())).toEqual([]);
   });
 });
+
+/**
+ * Restes du vélo dans le résumé (lot 146, vélo retiré au lot 303) : la fiche garde ses meilleurs efforts déjà rangés
+ * et l'empreinte de ses réglages, inchangée jusqu'au lot 305, pour qu'aucune fiche de vélo ne soit refaite.
+ */
+describe('restes du vélo dans le résumé (lot 303)', () => {
+  const POWER: { bikeType: 'route' | 'gravel'; bikeKg: number; riderKg: number | null } = { bikeType: 'route', bikeKg: 8.5, riderKg: 70 };
+
+  it('les réglages du résumé : le vélo de l’activité, le poids du vélo de la session, le pratiquant même sans poids', () => {
+    const cycling = { bikeType: 'gravel' as const, bikeKg: 12, riderKg: 70 };
+    expect(summaryOptions('cycling', null, { thresholdOverride: undefined, foil: null, cycling }).cyclingPower).toEqual(cycling);
+    const analysis = { bikeWeightKg: 15 } as Parameters<typeof summaryOptions>[1];
+    expect(summaryOptions('cycling', analysis, { thresholdOverride: undefined, foil: null, cycling }).cyclingPower).toEqual({ ...cycling, bikeKg: 15 });
+    expect(summaryOptions('running', null, { thresholdOverride: undefined, foil: null, cycling }).cyclingPower).toBeUndefined();
+  });
+
+  it('empreinte : le type et le poids du vélo à vélo seulement, pas le poids du pratiquant', () => {
+    const key = (cycling: typeof POWER, sport: 'cycling' | 'running' = 'cycling') =>
+      summaryOptionsKey(sport, summaryOptions(sport, null, { thresholdOverride: undefined, foil: null, cycling }));
+    expect(key(POWER)).toBe(JSON.stringify([null, null, null, null, ['route', 8.5]]));
+    expect(key({ ...POWER, riderKg: 90 })).toBe(key(POWER));
+    expect(key({ ...POWER, bikeKg: 10 })).not.toBe(key(POWER));
+    expect(key(POWER, 'running')).toBe(JSON.stringify([null, null, null, null]));
+  });
+
+  it('fiche de vélo : refaite seulement si le vélo de l’activité change, plus pour le poids du pratiquant', () => {
+    const device = (over: Partial<typeof POWER> = {}) => () => ({ thresholdOverride: undefined, foil: null, cycling: { ...POWER, ...over } });
+    const made = device({ riderKg: null });
+    const record = {
+      ...sessionRecord(), sport: 'cycling', activityId: null, analysis: null,
+      summary: { ...sessionRecord().summary, calcVersion: SUMMARY_CALC_VERSION, optionsKey: summaryOptionsKey('cycling', summaryOptions('cycling', null, made())) },
+    } as unknown as SessionRecord;
+    expect(isSummaryOutdated(record, made)).toBe(false);
+    // Le poids du pratiquant connu ne relance plus la puissance des 20 min (partie au lot 303).
+    expect(isSummaryOutdated(record, device())).toBe(false);
+    expect(isSummaryOutdated(record, device({ bikeKg: 10 }))).toBe(true);
+  });
+});

@@ -28,8 +28,7 @@ import { coloredSegments } from '../core/trackColor';
 import { createHeldCache } from '../core/heldCache';
 import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityCounts, sessionActivity, type Activity } from '../core/activities';
 import { smoothHeartRate } from '../core/heartRate';
-import { heartRatePointsFrom } from '../core/heartRateSession';
-import { heartRatePreviewPath } from '../land/heartRateSession';
+import { heartRatePointsFrom, heartRatePreviewPath } from '../core/heartRateSession';
 import { parseGpx } from '../core/gpxParser';
 import { getSportProfile, hasPositions, sportFamily, sportTreatment, type SportFamily } from '../core/sportProfiles';
 import { HEART_RATE_COLOR } from '../components/heartRateColors';
@@ -50,10 +49,8 @@ import { previewStore } from '../library/previewStore';
 import { previewFingerprint, previewKey, roundPreviewPoints, type PreviewTrack } from '../library/previewTracks';
 import { previewImageStore } from '../library/previewImageStore';
 import { previewImageKey } from '../library/previewImages';
-import bannerCourse from '../assets/bandeaux/course.webp';
 import bannerFractionne from '../assets/bandeaux/fractionne.webp';
 import bannerSurf from '../assets/bandeaux/surf.webp';
-import bannerVelo from '../assets/bandeaux/velo.webp';
 import bannerVoile from '../assets/bandeaux/voile.webp';
 import './SessionLibrary.css';
 
@@ -74,11 +71,14 @@ const PREVIEW_CREDIT_NAME = previewCreditName.join(' ');
  * adresse, montre tout et le rappelle (§10, point 100).
  */
 
-/** Tournure de chaque famille dans « Aucune session … » et photo de son bandeau (refonte du 22/10) ; nom et couleur : `FAMILY_LABEL`, `FAMILY_ACCENT`. */
-const FAMILY: Record<SportFamily, { title: string; accent: string; of: string; banner: string }> = {
+/**
+ * Tournure de chaque famille dans « Aucune session … » et photo de son bandeau (refonte du 22/10) ; nom et couleur :
+ * `FAMILY_LABEL`, `FAMILY_ACCENT`. La course et le vélo, retirés (lot 303), n'ont plus de bibliothèque ni de photo.
+ */
+const FAMILY: Record<SportFamily, { title: string; accent: string; of: string; banner?: string }> = {
   voile: { title: FAMILY_LABEL.voile, accent: FAMILY_ACCENT.voile, of: 'de voile', banner: bannerVoile },
-  course: { title: FAMILY_LABEL.course, accent: FAMILY_ACCENT.course, of: 'à pied', banner: bannerCourse },
-  velo: { title: FAMILY_LABEL.velo, accent: FAMILY_ACCENT.velo, of: 'de vélo', banner: bannerVelo },
+  course: { title: FAMILY_LABEL.course, accent: FAMILY_ACCENT.course, of: 'à pied' },
+  velo: { title: FAMILY_LABEL.velo, accent: FAMILY_ACCENT.velo, of: 'de vélo' },
   fractionne: { title: FAMILY_LABEL.fractionne, accent: FAMILY_ACCENT.fractionne, of: "d'entraînement", banner: bannerFractionne },
   surf: { title: FAMILY_LABEL.surf, accent: FAMILY_ACCENT.surf, of: 'de surf', banner: bannerSurf },
 };
@@ -661,7 +661,7 @@ function SessionLibrary({ family }: { family: SportFamily }) {
     <div className="ui-page ui-page--backdrop lib-page" style={{ '--lib-accent': accent, '--help-accent': accent, ...(family === 'fractionne' ? { '--btn-accent': accent } : {}) } as React.CSSProperties}>
       <PageBackdrop variant={family} />
       {/* Bandeau photo de la famille : son icône, son nom, ses activités et le nombre de sessions ; « … » en haut à droite. */}
-      <header className="ui-photo-banner lib-banner" style={{ '--banner': `url(${banner})` } as React.CSSProperties}>
+      <header className="ui-photo-banner lib-banner" style={(banner ? { '--banner': `url(${banner})` } : {}) as React.CSSProperties}>
         <div className="lib-banner__more">
           {/* Imports et mise à jour, de moindre usage : derrière « … », pour que la liste vienne tout de suite. */}
           <MoreMenu label="Importer, mettre à jour">

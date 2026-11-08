@@ -38,9 +38,7 @@ const fixOf = (record: FitRecord): LocationFix => ({
   altitudeM: record.altitudeM,
   speedMs: record.speedMs,
   heartRateBpm: record.heartRateBpm,
-  // Le FIT donne des foulées par minute (des tours à vélo) et `buildGpx` attend des pas, qu'il divise par 2 : le double
-  // ressort tel quel dans `gpxtpx:cad`.
-  cadenceSpm: record.cadence === undefined ? undefined : record.cadence * 2,
+  // La cadence du FIT n'est plus écrite : elle est partie avec la course et le vélo (lot 303).
 });
 
 /**

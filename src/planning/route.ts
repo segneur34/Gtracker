@@ -3,7 +3,7 @@ import { projectOnSegment } from '../core/geoPlane';
 import { cumulativeDistancesM, haversineDistance, initialBearing } from '../core/geo';
 import { GRADE_ANALYSIS, type Treatment } from '../core/sportProfiles';
 import type { GradientStop } from '../core/speedGradient';
-import { computeGrades, gradeGradientStops, type GradeRange } from '../land/grade';
+import { computeGrades, gradeGradientStops, type GradeRange } from './grade';
 import type { WayType } from './brouterProfile';
 import { isWayType, waysMode, wayTypesOf, WAYS_SEPARATOR, type WaysMode } from './wayTypes';
 import { isWaysMode, joinLegs, samePlace } from './legJoin';

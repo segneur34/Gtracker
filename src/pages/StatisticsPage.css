@@ -146,26 +146,6 @@
   color: var(--faint);
 }
 
-/* Ligne sans session à ouvrir (onglet « niveau ») ; texte d'une ligne du niveau, qui passe à la ligne. */
-.stats-row--static {
-  cursor: default;
-}
-
-.stats-level__text {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-/* Phrase d'invite de l'onglet « niveau » (profil incomplet). */
-.stats-level__hint {
-  color: var(--muted);
-  font-size: var(--text-s);
-}
-
-.stats-level__text strong {
-  font-weight: 600;
-}
-
 .stats-metric-chips {
   flex-shrink: 0;
   margin-bottom: var(--space-2);

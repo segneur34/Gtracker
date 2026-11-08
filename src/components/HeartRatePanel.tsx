@@ -1,7 +1,6 @@
 import { toFixedNumber } from '../core/basics';
 import { memo, useMemo, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { CartesianGrid, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
 import BandShareTable from './BandShareTable';
 import CardioLoadHelp from './CardioLoadHelp';
 import { HoverReadout, type Readout } from './ChartReadout';
@@ -16,26 +15,18 @@ import { bandRangeLabel } from '../core/bands';
 import { sampledIndices, visibleIndexRange } from '../core/chartZoom';
 import { CHART_MAX_POINTS } from '../core/displayConfig';
 import {
-  edwardsLoad, efficiencyBlocks, heartRateDrift, timeInZones, type HeartRatePoint, type HeartRateZones,
+  edwardsLoad, timeInZones, type HeartRatePoint, type HeartRateZones,
 } from '../core/heartRate';
 import { estimateHrEnergy, hrEnergyKcal } from '../core/hrEnergy';
 import type { HeartRateProfile, HrEnergyProfile } from '../core/sportProfiles';
-import { SPEED_UNIT_LABEL, formatClock, formatShortDuration, toDisplaySpeed, editSpeedUnit, type SpeedUnit, formatDecimal, commaDecimal } from '../core/units';
+import { formatClock, formatShortDuration } from '../core/units';
 import { useZoomState, type ChartZoomSource } from '../hooks/useChartZoom';
 import { runnerAge, type RunnerProfile } from '../library/athleteProfile';
 import type { SessionHeartRate } from '../hooks/useSessionHeartRate';
 import { zonesOriginText } from './heartRateOrigin';
 import StatTile from './ui/StatTile';
-import { CHART_GRID_PROPS, CHART_TICK, SPEED_COLOR, chartTick, yAxisLabel } from './chartStyle';
 import { elapsedX } from './chartAxes';
 import { heartRateReadout } from './chartReadouts';
-
-/** Vitesse et activité de la trace, pour la dérive et le nuage FC / vitesse (course et vélo). */
-export interface HeartRateEfficiency {
-  speedsMs: readonly number[];
-  active: readonly boolean[];
-  speedUnit: SpeedUnit;
-}
 
 interface Props {
   track: readonly HeartRatePoint[];
@@ -56,22 +47,15 @@ interface Props {
   /** Zone montrée sur la carte (1 à 5, 0 sous Z1), ou `null`. */
   selectedZone: number | null;
   onSelectZone: (zone: number | null) => void;
-  /** Course et vélo seulement. */
-  efficiency?: HeartRateEfficiency;
   /** Zoom de la courbe, tenu par le module (« +carte », plein écran carte + graphes) ; « tout voir » à chaque session. Lu par la courbe seule. */
   zoom: ChartZoomSource;
   /** « +carte » de la courbe zoomée. */
   onShowOnMap?: () => void;
-  /** Session sans trace (muscu) : ni colonne « Carte » des zones, ni mention de la carte. */
-  mapless?: boolean;
-  /** Case « Zones » (course, vélo, fractionné, 05/11) : limites des zones tracées sur la courbe, rangée pour l'activité ; absente : pas de case. */
-  zoneLines?: { on: boolean; onChange: (on: boolean) => void };
   open: boolean;
   onToggle: () => void;
 }
 
 const minutesLabel = (v: unknown) => formatClock(Number(v) * 60_000);
-const scatterTooltipStyle = { fontSize: 'var(--text-xs)' } as const;
 
 /**
  * Courbe de FC de l'onglet « cardio », sur le temps écoulé, avec sa lecture
@@ -142,14 +126,14 @@ export function CardioCompanion({ minutes, heart, zoom, zones, zoneLines = false
 }
 
 /**
- * Onglet « cardio » des trois modules : FC moyenne, max et charge, courbe
+ * Onglet « cardio » de la voile et du surf : FC moyenne, max et charge, courbe
  * reliée à la carte, temps par zone avec ses passages sur la carte, FC max
- * observée à retenir ; en course et à vélo, dérive et nuage FC / vitesse.
+ * observée à retenir.
  * Posé dans le `ResizablePanel` du module.
  */
 function HeartRatePanel({
-  track, minutes, heart, params, hrEnergy, zones, profileHrMax, runner, onRetainHrMax, selectedZone, onSelectZone, efficiency,
-  zoom, onShowOnMap, mapless = false, zoneLines, open, onToggle,
+  track, minutes, heart, params, hrEnergy, zones, profileHrMax, runner, onRetainHrMax, selectedZone, onSelectZone,
+  zoom, onShowOnMap, open, onToggle,
 }: Props) {
   const { smoothed, stats } = heart;
 
@@ -161,18 +145,6 @@ function HeartRatePanel({
     const athlete = { weightKg: runner.weightKg, age: runnerAge(runner, track[0].timeMs), sex: runner.sex, hrMax: runner.hrMax };
     return estimateHrEnergy(track, smoothed, athlete, params, hrEnergy);
   }, [hrEnergy, track, smoothed, runner, params]);
-  const drift = useMemo(
-    () => (efficiency ? heartRateDrift(track, smoothed, efficiency.speedsMs, efficiency.active, params.gapS, params.driftMinS) : null),
-    [efficiency, track, smoothed, params.gapS, params.driftMinS]
-  );
-  /** Vitesse du nuage : km/h quand l'unité est une allure, qui ferait un axe inversé. */
-  const scatterUnit: SpeedUnit | null = efficiency ? editSpeedUnit(efficiency.speedUnit) : null;
-  const blocks = useMemo(() => {
-    if (!efficiency || scatterUnit === null) return null;
-    const all = efficiencyBlocks(track, smoothed, efficiency.speedsMs, efficiency.active, params.gapS, params.scatterBlockS)
-      .map((b) => ({ speed: toFixedNumber(toDisplaySpeed(b.speedMs, scatterUnit), 1), bpm: Math.round(b.bpm), half: b.half }));
-    return [all.filter((b) => b.half === 0), all.filter((b) => b.half === 1)];
-  }, [efficiency, scatterUnit, track, smoothed, params.gapS, params.scatterBlockS]);
 
   if (!stats) return null;
   const aboveProfile = profileHrMax === null || stats.maxBpm > profileHrMax;
@@ -182,10 +154,9 @@ function HeartRatePanel({
       <PanelHeading label="Cardio" open={open} onToggle={onToggle} helpKey="analyse:cardio" />
       <HelpText helpKey="analyse:cardio" note>
         FC lissée sur {params.smoothS} s ; un trou de plus de {params.gapS} s (ceinture retirée, pause) n'est pas compté.
-        {!mapless && ' Le survol de la courbe déplace le repère sur la carte.'}
+        {' Le survol de la courbe déplace le repère sur la carte.'}
         {zones && " Les traits noirs S1 et S2 de la courbe sont vos seuils aérobie et anaérobie."}
-        {zones && !mapless && " « Voir » montre les passages d'une zone sur la carte, en violet."}
-        {efficiency && scatterUnit !== null && " D'une sortie à l'autre, le nuage qui glisse vers la droite à FC égale dit le progrès."}
+        {zones && " « Voir » montre les passages d'une zone sur la carte, en violet."}
       </HelpText>
       <div className="an-sheet__stats an-sheet__stats--always">
         <StatTile label="FC moyenne" value={<>{Math.round(stats.avgBpm)} bpm</>} />
@@ -231,22 +202,16 @@ function HeartRatePanel({
         </div>
       )}
 
-      {zones && zoneLines && (
-        <label className="an-cardio__zone-lines" title="Limites des zones Z1 à Z5 sur la courbe, en traits fins ; retenu pour l'activité.">
-          <input type="checkbox" checked={zoneLines.on} onChange={(e) => zoneLines.onChange(e.target.checked)} />
-          Zones
-        </label>
-      )}
       <div className="ui-mt-6">
         <CardioCurve minutes={minutes} smoothed={smoothed} zoom={zoom} zones={zones?.bounds ?? null} thresholds={zones ? { s1: zones.s1, s2: zones.s2 } : null}
-          zoneLines={zones !== null && zoneLines?.on === true} onShowOnMap={onShowOnMap} style={{ width: '100%', height: '200px' }} />
+          onShowOnMap={onShowOnMap} style={{ width: '100%', height: '200px' }} />
       </div>
 
       {zones && zoneTimes ? (
         <>
           <BandShareTable head="Zone" detailHead="FC" shareWidth="30%" marginTop="10px"
             rows={zoneTimes.map((timeS, zone) => ({ color: HEART_ZONE_COLORS[zone], label: zoneLabel(zone), detail: bandRangeLabel(zones.bounds, zone), timeS }))}
-            selected={selectedZone} onSelect={mapless ? undefined : onSelectZone} />
+            selected={selectedZone} onSelect={onSelectZone} />
           <div className="ui-muted ui-text-xs ui-mt-6">
             Zones calées sur {zonesOriginText(zones, runner)}
           </div>
@@ -257,39 +222,6 @@ function HeartRatePanel({
         </p>
       )}
 
-      {efficiency && scatterUnit !== null && (
-        <div className="ui-mt-12">
-          <div className="ui-bold ui-mb-4">Dérive et efficacité</div>
-          <div className="ui-text-s ui-mb-6">
-            {drift === null
-              ? `Dérive cardiaque : il faut au moins ${Math.round(params.driftMinS / 60)} min en mouvement avec la FC.`
-              : Math.abs(drift.driftPct) < params.driftStablePct
-                ? `Dérive cardiaque de ${formatDecimal(drift.driftPct, 1)} % : FC stable à vitesse égale d'une moitié à l'autre.`
-                : drift.driftPct > 0
-                  ? `Dérive cardiaque de ${formatDecimal(drift.driftPct, 1)} % : à vitesse égale, le cœur bat plus vite en seconde moitié (fatigue, chaleur, déshydratation).`
-                  : `Dérive cardiaque de ${formatDecimal(drift.driftPct, 1)} % : la seconde moitié est plus efficace que la première (échauffement, descente).`}
-          </div>
-          {blocks && blocks[0].length + blocks[1].length > 1 && (
-            <div className="ui-chart-200">
-              <ResponsiveContainer>
-                <ScatterChart accessibilityLayer={false} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid {...CHART_GRID_PROPS} />
-                  <XAxis dataKey="speed" type="number" name="Vitesse" domain={['auto', 'auto']} tick={CHART_TICK}
-                    label={{ value: SPEED_UNIT_LABEL[scatterUnit], position: 'insideBottomRight', offset: -2, fill: 'var(--chart-axis)', fontSize: 11 }} />
-                  <YAxis dataKey="bpm" type="number" name="FC" domain={['auto', 'auto']} width={46} tick={chartTick(HEART_RATE_COLOR)}
-                    label={yAxisLabel('bpm', HEART_RATE_COLOR)} />
-                  <Tooltip contentStyle={scatterTooltipStyle} formatter={(value, name) => [name === 'FC' ? `${value} bpm` : `${commaDecimal(String(value))} ${SPEED_UNIT_LABEL[scatterUnit]}`, name]} />
-                  <Scatter name="Première moitié" data={blocks[0]} fill={SPEED_COLOR} isAnimationActive={false} />
-                  <Scatter name="Seconde moitié" data={blocks[1]} fill="#fb8c00" isAnimationActive={false} />
-                </ScatterChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-          <div className="ui-muted ui-text-xs ui-mt-4">
-            Un point par bloc de {params.scatterBlockS} s en mouvement : <span style={{ color: SPEED_COLOR }}>première moitié</span>, <span style={{ color: '#fb8c00' }}>seconde moitié</span>.
-          </div>
-        </div>
-      )}
     </>
   );
 }

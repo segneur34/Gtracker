@@ -15,7 +15,6 @@ import SectionTabs, { type SectionDefinition } from '../components/SectionTabs';
 import ZoomableChart, { ChartZoomProbe } from '../components/ZoomableChart';
 import { IconChevronRight } from '../components/icons';
 import CardioLoadHelp from '../components/CardioLoadHelp';
-import StatsLevelPanel from '../components/StatsLevelPanel';
 import { HEART_RATE_COLOR, HEART_ZONE_COLORS, zoneLabel } from '../components/heartRateColors';
 import { ANALYSIS_PANEL_STYLE, CARD_STYLE, HALF_PANEL_STYLE } from '../components/styles';
 import PageHeader from '../components/ui/PageHeader';
@@ -39,9 +38,9 @@ import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { readStoredRecord, useStoredRecord } from '../hooks/useStoredRecord';
 import { useVisibleStatSessions, visibleStatSessions } from '../hooks/useVisibleStatSessions';
-import { effectiveDistanceUnit, effectiveEnergyModel, effectiveHrOffset, effectiveSpeedUnit, useGearGroups, useVisibility } from '../hooks/useSportSettings';
+import { effectiveDistanceUnit, effectiveHrOffset, effectiveSpeedUnit, useGearGroups, useVisibility } from '../hooks/useSportSettings';
 import {
-  STATS_PERIODS, TREND_SESSIONS, averageMovingSpeedMs, cardioLoadBars, cardioTotals, dateTicks, defaultMetricKey, heartRatePoints, formatDateTick,
+  STATS_PERIODS, TREND_SESSIONS, cardioLoadBars, cardioTotals, dateTicks, defaultMetricKey, heartRatePoints, formatDateTick,
   gearFilterItems, gearFilterRows, gearParamOf, gearPickLabel, groupTotals, inBounds, isStatsMetricKey, matchesGearSelection, isStatsPeriod, readGearParam, withGearPick, metricSeries, metricsOf, recordKindsOf, regularity, statsMetric,
   statsPeriodBounds, statsTotals, topSessions, weeklyDurations, type MetricPoint, type StatSession, type StatsMetricKey, type StatsPeriod, type StatsRecordKind,
   type StatsTotals, type ZoneBoundsOf,
@@ -67,16 +66,13 @@ import { CHART_GRID_PROPS, CHART_TICK, OTHERS_COLOR, chartTick, yAxisLabel } fro
  * Les sessions d'une activité ou d'une famille cachée n'y sont pas, ni celles
  * à classer ; une famille cachée ouverte par son adresse montre tout.
  *
- * L'onglet « niveau » (lot 146), à pied et à vélo, situe les meilleurs efforts
- * de la période par rapport à des références publiées (`StatsLevelPanel`).
- *
  * Onglets et panneaux comme les pages d'analyse (`docs/MISE_EN_PAGE.md`),
  * sans carte. Le graphique trace une donnée au choix par session ; dans la vue
  * d'ensemble, la durée seule, et pas de records : mêlées, les unités ne se
  * comparent pas.
  */
 
-type StatsSection = 'general' | 'vitesse' | 'regularite' | 'records' | 'niveau' | 'cardio';
+type StatsSection = 'general' | 'vitesse' | 'regularite' | 'records' | 'cardio';
 
 const STATS_SECTIONS: SectionDefinition<StatsSection>[] = [
   { key: 'general', label: 'général' },
@@ -84,13 +80,11 @@ const STATS_SECTIONS: SectionDefinition<StatsSection>[] = [
   { key: 'vitesse', label: 'graphique' },
   { key: 'regularite', label: 'régularité' },
   { key: 'records', label: 'records' },
-  // À pied (sans la marche) et à vélo seulement, d'une famille ou d'une de ses activités (lot 146).
-  { key: 'niveau', label: 'niveau' },
   // Seulement quand une session de la période a de la FC ; les bpm se comparent d'une famille à l'autre.
   { key: 'cardio', label: 'cardio' },
 ];
 
-const STATS_SECTION_DEFAULTS: Record<StatsSection, boolean> = { general: true, vitesse: true, regularite: true, records: false, niveau: false, cardio: false };
+const STATS_SECTION_DEFAULTS: Record<StatsSection, boolean> = { general: true, vitesse: true, regularite: true, records: false, cardio: false };
 
 /** Coefficients de la charge : les mêmes dans tous les calculs (`HeartRateProfile`). */
 const LOAD_WEIGHTS = REFERENCE_HEART_RATE.loadWeights;
@@ -126,21 +120,12 @@ const RECORD_LABEL: Record<StatsRecordKind, string> = {
   vitesse: 'Vitesse max',
   distance: 'Distance',
   duree: 'Durée',
-  denivele: 'Dénivelé positif',
   manoeuvres: 'Manœuvres',
   vague: 'Plus longue vague',
   vol: 'Plus long vol',
 };
 
 const isFamily = (value: unknown): value is SportFamily => SPORT_FAMILIES.some((f) => f === value);
-
-/** Familles qui comptent le dénivelé et la vitesse moyenne en action. */
-const isLandFamily = (family: SportFamily | null): boolean => family === 'course' || family === 'velo' || family === 'fractionne';
-
-/** Activité de marche (son modèle d'énergie) : écartée de l'onglet « niveau », dont les tables sont celles de la course. */
-const isWalking = (activity: Activity | undefined | null): boolean => !!activity && effectiveEnergyModel(activity) === 'marche';
-
-
 
 /** Rangée de pastilles : la donnée du graphique. */
 function Chips<K extends string>({ label, items, value, onChoose, accent, className }: {
@@ -400,14 +385,7 @@ function StatisticsPage() {
     [hrPoints, narrow]
   );
 
-  // Niveau : à pied et à vélo, pas sur une activité de marche ; à pied, les sessions de marche écartées.
-  const levelFamily = (family === 'course' || family === 'velo') && !isWalking(activity) ? family : null;
-  const levelSessions = useMemo(
-    () => (levelFamily === 'course' ? inPeriod.filter((s) => !isWalking(activityById.get(s.activityId))) : inPeriod),
-    [levelFamily, inPeriod, activityById]
-  );
-  const sections = STATS_SECTIONS.filter((s) => (family !== null || s.key !== 'records') && (s.key !== 'cardio' || hasCardio)
-    && (s.key !== 'niveau' || levelFamily !== null));
+  const sections = STATS_SECTIONS.filter((s) => (family !== null || s.key !== 'records') && (s.key !== 'cardio' || hasCardio));
 
   // Graphique : une donnée au choix, un point par session de la sélection (période comprise) et par série ; en
   // pointillé, le record en escalier (vitesse max) ou la tendance. Le choix retenu, s'il n'existe pas ici, cède
@@ -437,7 +415,6 @@ function StatisticsPage() {
     : metric.unit === 'pourcent' ? '%'
     : metric.unit === 'metres' ? 'm'
     : metric.unit === 'secondes' ? 's'
-    : metric.unit === 'cadence' ? 'pas/min'
     : '';
   const axisTick = (v: number): string =>
     metric.unit === 'vitesse' ? formatSpeedValue(v, speedUnit) : v.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
@@ -451,7 +428,6 @@ function StatisticsPage() {
       case 'nombre': return String(value);
       case 'metres': return `${Math.round(value)} m`;
       case 'secondes': return formatShortDuration(value);
-      case 'cadence': return `${Math.round(value)} pas/min`;
     }
   };
   const chartSeries = useMemo(
@@ -514,7 +490,6 @@ function StatisticsPage() {
       case 'vitesse': return formatLandSpeed(value, a ? effectiveSpeedUnit(a) : speedUnit, a ? effectiveDistanceUnit(a) : distanceUnit);
       case 'distance': return formatDistanceAuto(value, a ? effectiveDistanceUnit(a) : distanceUnit);
       case 'duree': return formatDuration(value * 1000);
-      case 'denivele': return `${Math.round(value)} m`;
       case 'manoeuvres': return String(value);
       case 'vague': return `${Math.round(value)} m`;
       case 'vol': return formatShortDuration(value);
@@ -611,10 +586,6 @@ function StatisticsPage() {
                       <StatTile label="Durée totale" value={formatDuration(totals.durationS * 1000)} title="Du premier au dernier point de chaque session" />
                       {totals.movingTimeS > 0 && <StatTile label="Temps en action" value={formatDuration(totals.movingTimeS * 1000)} />}
                       {family !== null && <StatTile label="Distance" value={formatDistanceAuto(totals.distanceM, distanceUnit)} />}
-                      {isLandFamily(family) && averageMovingSpeedMs(totals) !== null && (
-                        <StatTile label="Vitesse moyenne en action" value={formatLandSpeed(averageMovingSpeedMs(totals), speedUnit, distanceUnit)} />
-                      )}
-                      {isLandFamily(family) && totals.elevationSessions > 0 && <StatTile label="Dénivelé positif" value={`${Math.round(totals.elevationGainM)} m`} />}
                       {family !== null && totals.maxSpeedMs !== null && <StatTile label="Vitesse max" value={formatLandSpeed(totals.maxSpeedMs, speedUnit, distanceUnit)} />}
                       {family === 'voile' && totals.maneuverSessions > 0 && (
                         <>
@@ -925,13 +896,6 @@ function StatisticsPage() {
                     })}
                   </div>
                 )}
-              </ResizablePanel>
-            )}
-
-            {open.niveau && levelFamily !== null && (
-              <ResizablePanel id={panelId('niveau')} style={ANALYSIS_PANEL_STYLE}>
-                <StatsLevelPanel family={levelFamily} sessions={levelSessions} runner={runner} open={open.niveau}
-                  onToggle={() => toggle('niveau')} onOpen={(s) => openSession(s.file, s.family)} />
               </ResizablePanel>
             )}
           </div>

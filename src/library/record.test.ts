@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeDeg } from '../core/angles';
 import { isFiniteNumber, isObject } from '../core/basics';
 import { isValidSpeedRange } from '../core/speedGradient';
-import { isValidBikeWeight } from '../cycling/energy';
-import { isValidCarriedLoad } from '../running/energy';
+import { isValidBikeWeight, isValidCarriedLoad } from '../core/retiredLand';
 import { EMPTY_NOTES } from './notes';
 import {
   ANALYSIS_KEYS,
@@ -11,6 +10,7 @@ import {
   RECORD_LIGHT_FIELDS,
   RECORD_LIGHT_FIELDS_KEY,
   RECORD_VERSION,
+  SUMMARY_BESTS_BOUNDS,
   SUMMARY_CALC_VERSION,
   applyRecordPatch,
   carryRecordEdits,
@@ -33,7 +33,6 @@ import {
   type SessionJumps,
   type SessionRecord,
 } from './record';
-import type { SessionTerrainElevation } from '../land/terrainElevation';
 import type { SessionSurfaces } from '../planning/surface';
 import { carriedSettings } from './record';
 import { familyRecords, sessionRecord } from '../test/record.fixture';
@@ -356,7 +355,7 @@ describe('sauts de la fiche', () => {
 });
 
 describe('altitude du terrain de la fiche', () => {
-  const terrainElevation: SessionTerrainElevation = {
+  const terrainElevation = {
     source: 'ign',
     resource: 'ign_rge_alti_wld',
     version: 1,
@@ -407,7 +406,7 @@ describe('altitude du terrain de la fiche', () => {
 });
 
 describe('fiche allégée du cache', () => {
-  const terrainElevation: SessionTerrainElevation = {
+  const terrainElevation = {
     source: 'ign', resource: 'ign_rge_alti_wld', version: 1, stepM: 10,
     fetchedAt: '2026-10-07T09:00:00.000Z', startMs: START_MS, t: [0, 3333], z: [47.5, 46.9],
   };
@@ -731,7 +730,7 @@ describe('fiches anciennes et abîmées', () => {
 });
 
 describe('completeRecord', () => {
-  const terrainElevation: SessionTerrainElevation = {
+  const terrainElevation = {
     source: 'ign', resource: 'ign_rge_alti_wld', version: 1, stepM: 10,
     fetchedAt: '2026-10-07T09:00:00.000Z', startMs: START_MS, t: [0, 3333], z: [47.5, 46.9],
   };
@@ -816,7 +815,7 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
     source: 'overpass', fetchedAt: '2026-10-04T15:00:00.000Z', matchVersion: 1, startMs: START_MS,
     tags: ['highway=residential'], runs: [[0, 0], [125_000, -1]],
   };
-  const terrainElevation: SessionTerrainElevation = {
+  const terrainElevation = {
     source: 'ign', resource: 'ign_rge_alti_wld', version: 1, stepM: 10,
     fetchedAt: '2026-10-07T09:00:00.000Z', startMs: START_MS, t: [0, 3333], z: [47.5, null],
   };
@@ -1057,5 +1056,20 @@ describe('réglages portés par le résumé (Q57)', () => {
       expect(summary.optionsKey).toBeUndefined();
       expect(summary.activitySettings).toBeUndefined();
     }
+  });
+});
+
+describe('meilleurs efforts déjà rangés (lot 146 ; plus calculés depuis le lot 303)', () => {
+  it('fiche relue : gardés, une valeur abîmée ou invraisemblable oubliée', () => {
+    const { summary } = sessionRecord();
+    const raw = { ...sessionRecord(), summary: { ...summary, bests: { d5kmS: 'abîmé', d10kmS: 2500, p20minW: -3, powerRiderKg: 70 } } };
+    expect(parseRecord(JSON.stringify(raw))!.summary.bests).toEqual({ d10kmS: 2500, powerRiderKg: 70 });
+    expect(parseRecord(JSON.stringify({ ...raw, summary: { ...summary, bests: { d5kmS: null } } }))!.summary.bests).toBeUndefined();
+    // Hors des bornes (`SUMMARY_BESTS_BOUNDS`) : 1 s au 5 km, 1e9 W, 0,001 kg.
+    const absurd = parseRecord(JSON.stringify({ ...raw, summary: { ...summary, bests: { d5kmS: 1, d10kmS: 2500, p20minW: 1e9, powerRiderKg: 0.001 } } }))!;
+    expect(absurd.summary.bests).toEqual({ d10kmS: 2500 });
+    expect(parseRecord(JSON.stringify({ ...raw, summary: { ...summary, bests: { d5kmS: 299, d10kmS: 599 } } }))!.summary.bests).toBeUndefined();
+    const edges = { d5kmS: SUMMARY_BESTS_BOUNDS.d5kmS.max, d10kmS: SUMMARY_BESTS_BOUNDS.d10kmS.min, p20minW: 2000, powerRiderKg: 20 };
+    expect(parseRecord(JSON.stringify({ ...raw, summary: { ...summary, bests: edges } }))!.summary.bests).toEqual(edges);
   });
 });

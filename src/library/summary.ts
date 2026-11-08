@@ -1,4 +1,3 @@
-import { roundTo } from '../core/basics';
 import { computeElevationStats } from '../core/elevation';
 import { heartRateHistogram, heartRateStats, smoothHeartRate, type HeartRatePoint } from '../core/heartRate';
 import { activeDurationS, heartRatePointsFrom } from '../core/heartRateSession';
@@ -11,26 +10,22 @@ import {
   computeActiveTimeMs,
   thresholdActivityMask,
 } from '../core/sessionStats';
-import { computeGrades } from '../land/grade';
-import { bestWindowSpeedMs, computeAllTopSegments, computeTopSegments } from '../core/topSegments';
+import { bestWindowSpeedMs } from '../core/topSegments';
 import {
   SAILING_SPORTS,
   UNCLASSIFIED_PROFILE,
   defaultActiveThresholdOf,
   getSportProfile,
   hasActiveThreshold,
-  sportTreatment,
   type ElevationProfile,
   type HeartRateProfile,
 } from '../core/sportProfiles';
-import type { CumulativeTrack, RawTrackPoint, SportType, TimedTrackPoint, TrackPoint } from '../core/types';
+import type { RawTrackPoint, SportType, TimedTrackPoint, TrackPoint } from '../core/types';
 import type { BikeType } from '../core/domainTypes';
-import { computeCyclingEnergy, cyclingEnergyParams } from '../cycling/energy';
-import { applyTerrainElevation, readTerrainElevation } from '../land/terrainElevation';
 import { msToKnots } from '../core/units';
 import { suggestActiveThresholdKn } from '../sailing/sailingConfig';
 import { runSurfSession, surfProfileOf } from '../surfing/surfSession';
-import { SUMMARY_CALC_VERSION, type SessionSummary, type SummaryBests, type SummaryHeartRate } from './record';
+import { SUMMARY_CALC_VERSION, type SessionSummary, type SummaryHeartRate } from './record';
 
 /**
  * Résumé d'une session pour la bibliothèque : ce que la liste affiche sans
@@ -57,9 +52,8 @@ export interface SummaryOptions {
   /** Réglage du dénivelé. Absent : celui du profil. */
   elevation?: ElevationProfile;
   /**
-   * Altitude du terrain de la fiche, telle qu'elle y est rangée (brute depuis le lot 301, lue ici par
-   * `readTerrainElevation` : mal formée, elle est ignorée), substituée à celle du GPS avant le dénivelé
-   * (course, vélo, source IGN : l'appelant en décide).
+   * Altitude du terrain de la fiche (course et vélo) : n'est plus substituée à celle du GPS depuis le retrait de la
+   * course et du vélo (lot 303) ; gardée dans le type, ignorée, jusqu'au lot 305.
    */
   terrainElevation?: unknown;
   /** Support sur foil de la session (surf : il change le seuil par défaut et l'analyse). */
@@ -67,8 +61,8 @@ export interface SummaryOptions {
   /** Seuil de vague en foil de la session, dans l'unité du profil (surf). */
   waveThreshold?: number;
   /**
-   * Vélo (lot 146) : vélo et poids du pratiquant pour la meilleure puissance estimée sur 20 min ; sans poids du
-   * pratiquant (`riderKg` `null`), ou absent, elle n'est pas cherchée.
+   * Vélo (lot 146) : vélo et poids du pratiquant de l'ancienne meilleure puissance sur 20 min, plus cherchée depuis
+   * le retrait du vélo (lot 303) ; gardé dans le type, ignoré (il compte encore dans `summaryOptionsKey`), jusqu'au lot 305.
    */
   cyclingPower?: { bikeType: BikeType; bikeKg: number; riderKg: number | null };
 }
@@ -188,8 +182,7 @@ export const summarizeSession = (
 
   const cum = buildCumulativeTrack(analyzed.track);
   const { cumDist } = cum;
-  const terrain = options.terrainElevation === undefined ? null : readTerrainElevation(options.terrainElevation);
-  const track = terrain ? applyTerrainElevation(analyzed.track, cumDist, terrain).track : analyzed.track;
+  const track = analyzed.track;
   // Sans calcul connu : le profil neutre (valeurs communes, cardio de référence), le même résumé qu'avec la course.
   const profile = sport === null ? UNCLASSIFIED_PROFILE : getSportProfile(sport);
   const elevationProfile = options.elevation ?? profile.elevation;
@@ -201,8 +194,6 @@ export const summarizeSession = (
     ?? bestWindowSpeedMs(analyzed.track, cum, profile.maxSpeedWindowS)
     ?? maxSmoothedSpeedMs(track);
   const heartRate = summaryHeartRate(track, profile.heartRate);
-  const tops = summaryTops(analyzed.track, cum, sport);
-  const bests = sport !== null ? summaryBests(sport, analyzed.track, cum, track, elevation, analyzed.mask, options.cyclingPower) : undefined;
 
   return {
     calcVersion: SUMMARY_CALC_VERSION,
@@ -218,82 +209,7 @@ export const summarizeSession = (
     samplingS: samplingIntervalS(rawPoints),
     ...analyzed.surf,
     ...(heartRate ? { heartRate } : {}),
-    ...tops,
-    ...(bests ? { bests } : {}),
   };
-};
-
-/** Cibles des meilleurs efforts, par la clé de leur top (`SportProfile.topTargets`). */
-const BEST_DISTANCE_KEYS = { d5kmS: 'd5km', d10kmS: 'd10km' } as const;
-const BEST_POWER_KEY = 't20min';
-
-/** Meilleure moyenne d'une cible de tops, dans l'unité de `cum` (m/s sur la distance, W sur le travail) ; `null` si aucune fenêtre ne tient. */
-const bestOfTarget = (sport: SportType, key: string, track: TrackPoint[], cum: CumulativeTrack): { value: number; rate: number } | null => {
-  const target = getSportProfile(sport).topTargets.find((t) => t.key === key);
-  if (!target) return null;
-  const [top] = computeTopSegments(track, cum, target, (v) => v, { count: 1, decimals: 6 });
-  return top?.speed ? { value: target.value, rate: top.speed } : null;
-};
-
-/**
- * Meilleurs efforts d'une session à pied ou à vélo (lot 146) : 5 km et 10 km par les tops sur la distance retenue
- * (règle 6, trous de trace écartés) ; à vélo, la meilleure puissance mécanique moyenne sur 20 min, par les mêmes
- * tops sur le travail cumulé du modèle du vélo (`computeCyclingEnergy`, roulement moyen, sans revêtement, pente de
- * l'altitude retenue comme l'analyse, roue libre et arrêts à 0 W). `undefined` hors de ces traitements ou sans rien.
- */
-const summaryBests = (
-  sport: SportType,
-  analysisTrack: TrackPoint[],
-  cum: CumulativeTrack,
-  track: TrackPoint[],
-  elevation: ReturnType<typeof computeElevationStats>,
-  mask: boolean[] | undefined,
-  power: SummaryOptions['cyclingPower']
-): SummaryBests | undefined => {
-  const treatment = sportTreatment(sport);
-  if (treatment !== 'course' && treatment !== 'velo') return undefined;
-  const bests: SummaryBests = {};
-  for (const [field, key] of Object.entries(BEST_DISTANCE_KEYS) as [keyof typeof BEST_DISTANCE_KEYS, string][]) {
-    const best = bestOfTarget(sport, key, analysisTrack, cum);
-    if (best) bests[field] = roundTo(best.value / best.rate, 1);
-  }
-  if (treatment === 'velo' && power && power.riderKg !== null) {
-    bests.powerRiderKg = power.riderKg;
-    const profile = getSportProfile(sport);
-    const grades = elevation.coverage >= MIN_ELEVATION_COVERAGE ? computeGrades(elevation.smoothed, cum, profile.grade.halfWindowM, track) : [];
-    const params = { ...cyclingEnergyParams(power.bikeType, power.bikeKg, power.riderKg), gradeZones: profile.grade };
-    const { mechanicalPowerW } = computeCyclingEnergy(track, grades, mask ?? track.map(() => true), params, 0);
-    // Travail cumulé : ses meilleures 20 min, sur le temps, sont la meilleure puissance moyenne.
-    const cumWork = [0];
-    for (let i = 1; i < track.length; i++) {
-      const dt = (track[i].timeMs - track[i - 1].timeMs) / 1000;
-      const w = mechanicalPowerW[i];
-      cumWork.push(cumWork[i - 1] + (Number.isFinite(w) && dt > 0 ? w * dt : 0));
-    }
-    const best = bestOfTarget(sport, BEST_POWER_KEY, track, { cumDist: cumWork, cumTime: cum.cumTime });
-    if (best) bests.p20minW = Math.round(best.rate);
-  }
-  return Object.keys(bests).length > 0 ? bests : undefined;
-};
-
-/**
- * Meilleur kilomètre en temps (à pied) et meilleures 5 min en vitesse (à vélo)
- * du résumé, les tops de « général » de l'analyse (`computeAllTopSegments`, sur
- * la distance retenue, règle 6), pour l'image de partage (version 17) ; rien
- * ailleurs, ni s'ils ne sont pas atteints.
- */
-const summaryTops = (
-  track: TrackPoint[],
-  cum: ReturnType<typeof buildCumulativeTrack>,
-  sport: SportType | null
-): Pick<SessionSummary, 'best1kmS' | 'best5minMs'> => {
-  const treatment = sport ? sportTreatment(sport) : null;
-  const key = treatment === 'course' ? 'd1km' : treatment === 'velo' ? 't5min' : null;
-  const target = key && sport ? getSportProfile(sport).topTargets.find((t) => t.key === key) : undefined;
-  if (!key || !target) return {};
-  const speed = computeAllTopSegments(track, cum, [target], (ms) => ms, { count: 1, decimals: 3 })[key]?.[0]?.speed ?? null;
-  if (speed === null || !(speed > 0)) return {};
-  return key === 'd1km' ? { best1kmS: target.value / speed } : { best5minMs: speed };
 };
 
 /**

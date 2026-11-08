@@ -1,11 +1,11 @@
 // Banc de test : la page « Profil » (demandes du 18/10, du 19/10 et du 20/10), une période en un coup d'œil.
 // Usage : node profil.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Le script écrit lui-même six sessions synthétiques de 20 min, datées en jours
-// avant aujourd'hui (deux courses, une sortie à vélo en côte et une de wingfoil récentes, une course et une sortie à
-// vélo de l'an passé), les importe par la page Course, et vérifie :
+// avant aujourd'hui (deux wings, une session de surf en côte et une de planche récentes, une wing et une session de
+// surf de l'an passé ; course et vélo retirés au lot 303), les importe par la page Voile, et vérifie :
 //  1. l'accueil : plus de graphe d'activités, une ligne « Profil » qui ouvre la page ; « Profil » dans la barre du haut ;
 //  2. la période en tête (bouton glissant), « Année » au départ : distance (somme des vitesses × durées, à 5 % près),
-//     sport préféré (la course, avec son dessin, qui ouvre sa bibliothèque), D+ de la côte seule, nombre de sessions du graphe ; l'anneau et sa légende (une part par activité, la course à 50 %) ;
+//     sport préféré (la Voile, avec son dessin, qui ouvre sa bibliothèque), D+ de la côte seule, nombre de sessions du graphe ; l'anneau et sa légende (une part par activité, la Voile à 50 %) ;
 //     le graphe d'activités en bas, sans barre de période à lui ;
 //  3. les autres périodes règlent toute la page : « 30 jours » (trois sessions), « Depuis le début » (les six, une
 //     barre par mois), choix retenu au rechargement ;
@@ -62,8 +62,8 @@ const gpxOf = (type, daysAgo, speedMs, climbM = 0) => {
 // Les quatre premières dans l'année en cours, les deux dernières l'an passé : le script n'a de sens qu'après le
 // 30 mars (une sortie à 92 jours) et avant que 345 jours ne repassent dans l'année (toujours vrai).
 const SESSIONS = [
-  ['running', 2, 3.4], ['running', 16, 3.0], ['cycling', 9, 6, 200], ['wingfoil', 92, 9],
-  ['running', 400, 3.0], ['cycling', 430, 6],
+  ['wingfoil', 2, 3.4], ['wingfoil', 16, 3.0], ['surf', 9, 6, 200], ['windsurf', 92, 9],
+  ['wingfoil', 400, 3.0], ['surf', 430, 6],
 ];
 const yearOf = (daysAgo) => new Date(day(daysAgo)).getFullYear();
 const thisYear = new Date().getFullYear();
@@ -93,7 +93,7 @@ const chartCount = () => text('.actchart__head span');
 const parseFr = (s) => Number((s ?? '').replace(/[^\d,]/g, '').replace(',', '.'));
 
 // --- Mise en place ---
-await go('/course', 5000);
+await go('/voile', 5000);
 await waitFor(`Boolean(document.querySelector('input[type=file][accept*=".gpx"]'))`, { timeout: 3000, every: 50 });
 console.log('import :', await evaluate(`(() => {
   const input = document.querySelector('input[type=file][accept*=".gpx"]');
@@ -113,8 +113,8 @@ await settle({ max: 2000, label: 'import' });
 await go('/');
 check('accueil : plus de graphe d\'activités', (await evaluate(`!!document.querySelector('.actchart')`)) === false);
 const backdrop = () => evaluate(`document.querySelector('.page-backdrop')?.getAttribute('class')`);
-// Fond des pages hors sport (lot 3 du 23/10) : le motif de la famille du sport préféré de toutes les sessions, la course.
-check('accueil : fond de la famille du sport préféré', (await backdrop()) === 'page-backdrop page-backdrop--course', await backdrop());
+// Fond des pages hors sport (lot 3 du 23/10) : le motif de la famille du sport préféré de toutes les sessions, la voile.
+check('accueil : fond de la famille du sport préféré', (await backdrop()) === 'page-backdrop page-backdrop--voile', await backdrop());
 check('accueil : plus de ligne « Profil » (demande du 19/10)', !(await evaluate(`[...document.querySelectorAll('.home-link')].some((el) => el.textContent.trim() === 'Profil')`)));
 const opened = await evaluate(`(() => {
   const a = [...document.querySelectorAll('.shell-toplink')].find((el) => el.textContent.trim() === 'Profil');
@@ -138,20 +138,20 @@ check('nombre d\'activités de l\'année, en tête de la bande', count === '4', 
 const km = parseFr(distance);
 check('distance de l\'année, en km', distance?.endsWith('km') && Math.abs(km - kmOf(current)) / kmOf(current) < 0.05, `${distance} pour ${kmOf(current).toFixed(1)} attendus`);
 check('plus de case « Temps »', !(await evaluate(`[...document.querySelectorAll('.profile-figure .ui-eyebrow')].some((e) => e.textContent === 'Temps')`)));
-check('sport préféré : la course, avec son dessin', (await favorite()) === 'Course'
+check('sport préféré : la Voile, avec son dessin', (await favorite()) === 'Voile'
   && (await evaluate(`!!document.querySelector('.profile-figure--link svg.profile-figure__art path')`)), await favorite());
 const gainM = parseFr(gain);
 check('D+ de l\'année : la côte', gain?.endsWith('m') && gainM > 150 && gainM < 230, gain);
 check('nombre de sessions (graphe)', (await chartCount()) === '4 sessions', await chartCount());
 const ordre = await evaluate(`[...document.querySelectorAll('.profile > *')].map((el) => (el.getAttribute('class') ?? '').split(' ')[0] || el.tagName).join(' > ')`);
 check('ordre : fond, en-tête, période, chiffres, répartition, graphe', /^page-backdrop > profile-head > ui-segmented.*profile-figures.*profile-split.*actchart/.test(ordre ?? ''), ordre);
-check('Profil : fond de la famille du sport préféré', (await backdrop()) === 'page-backdrop page-backdrop--course', await backdrop());
+check('Profil : fond de la famille du sport préféré', (await backdrop()) === 'page-backdrop page-backdrop--voile', await backdrop());
 check('détail par activité replié au départ', (await evaluate(`document.querySelector('.profile-fold')?.getAttribute('aria-expanded')`)) === 'false'
   && (await legend()).length === 0);
 await evaluate(`document.querySelector('.profile-fold').click()`);
 await wait(300);
 let rows = await legend();
-check('légende : une ligne par activité, la course en tête à 50 %', rows?.length === 3 && rows[0].endsWith('50 %') && rows[0].includes('40 min')
+check('légende : une ligne par activité, la Voile en tête à 50 %', rows?.length === 3 && rows[0].endsWith('50 %') && rows[0].includes('40 min')
   && rows.slice(1).every((r) => r.endsWith('25 %')), JSON.stringify(rows));
 check('anneau : trois parts', (await evaluate(`document.querySelectorAll('.profile-donut circle').length`)) === 3);
 check('centre de l\'anneau : le total', (await text('.profile-donut__center')) === 'Total1 h 20', await text('.profile-donut__center'));
@@ -166,10 +166,10 @@ const recent = SESSIONS.filter(([, d]) => d <= 29);
 check('« 30 jours »', await pick('30 jours'));
 await wait(500);
 [, distance] = await figures();
-check('30 jours : chiffres', Math.abs(parseFr(distance) - kmOf(recent)) / kmOf(recent) < 0.05 && (await favorite()) === 'Course' && (await chartCount()) === '3 sessions',
+check('30 jours : chiffres', Math.abs(parseFr(distance) - kmOf(recent)) / kmOf(recent) < 0.05 && (await favorite()) === 'Voile' && (await chartCount()) === '3 sessions',
   `${distance} ; ${await favorite()} ; ${await chartCount()}`);
 rows = await legend();
-check('30 jours : légende sans le wingfoil', rows?.length === 2, JSON.stringify(rows));
+check('30 jours : légende sans la planche', rows?.length === 2, JSON.stringify(rows));
 check('30 jours : une barre par jour', (await evaluate(`document.querySelectorAll('.actchart__bar').length`)) === 30);
 check('« Depuis le début »', await pick('Depuis le début'));
 await wait(500);
@@ -188,11 +188,11 @@ check("retour à l'année", (await chartCount()) === '4 sessions', await chartCo
 // 4. Le sport préféré, puis une ligne de la légende, ouvrent la bibliothèque de leur activité.
 await evaluate(`document.querySelector('.profile-figure--link').click()`);
 await settle({ max: 1500 });
-check('le sport préféré ouvre sa bibliothèque', (await search())?.startsWith('/course?activite=running'), await search());
+check('le sport préféré ouvre sa bibliothèque', (await search())?.startsWith('/voile?activite=wingfoil'), await search());
 await go('/profil');
 await evaluate(`document.querySelector('.profile-legend__row').click()`);
 await settle({ max: 1500 });
-check('la ligne ouvre la bibliothèque filtrée', (await search())?.startsWith('/course?activite='), await search());
+check('la ligne ouvre la bibliothèque filtrée', (await search())?.startsWith('/voile?activite='), await search());
 
 // 5. Téléphone.
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
@@ -227,8 +227,9 @@ check('390 px : barre du bas sans débordement', !(await overflow()));
 
 // 6. « Autres » : cinq activités de plus, 20 min chacune, cette semaine.
 await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
-const EXTRA = [['windsurf', 3, 8], ['kite', 4, 9], ['bateau', 5, 4], ['run-intervals', 6, 3.5], ['surf', 7, 3]];
-await go('/course', 4000);
+// Le fractionné et les tests (familles retirées, lots 302 et 303) comptent encore dans l'anneau ; « Autres » garde les trois dernières.
+const EXTRA = [['kite', 3, 8], ['bateau', 4, 4], ['run-intervals', 5, 3.5], ['bike-intervals', 6, 6], ['run-test', 7, 3]];
+await go('/voile', 4000);
 await waitFor(`Boolean(document.querySelector('input[type=file][accept*=".gpx"]'))`, { timeout: 3000, every: 50 });
 console.log('import des cinq de plus :', await evaluate(`(() => {
   const input = document.querySelector('input[type=file][accept*=".gpx"]');
@@ -263,7 +264,7 @@ await evaluate(`[...document.querySelectorAll('.profile-legend li')].find((li) =
 await wait(300);
 await evaluate(`document.querySelector('.profile-legend__sub button').click()`);
 await settle({ max: 1500 });
-check('une activité d\'« Autres » ouvre sa bibliothèque', /^\/(voile|course|fractionne|surf|velo)\?activite=/.test((await search()) ?? ''), await search());
+check('une activité d\'« Autres » ouvre sa bibliothèque', /^\/(voile|fractionne|surf)\?activite=/.test((await search()) ?? ''), await search());
 
 // 7. La photo.
 await go('/profil');

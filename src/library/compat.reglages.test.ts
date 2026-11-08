@@ -84,7 +84,7 @@ describe('réglages, compatibilité : numéros de version jamais rabaissés (lot
     const next = withVisibility({ activitiesVersion: ACTIVITIES_VERSION + 1 }, [], []);
     // Aucune famille visible : refusé ; avec les familles par défaut, le numéro lu reste.
     expect(next).toBeNull();
-    const activities = [{ id: 'a', name: 'A', base: 'running' as const, color: '#000' }];
+    const activities = [{ id: 'a', name: 'A', base: 'wingfoil' as const, color: '#000' }];
     expect(withVisibility({ activitiesVersion: ACTIVITIES_VERSION + 1 }, activities, [])?.activitiesVersion).toBe(ACTIVITIES_VERSION + 1);
     expect(withVisibility({ activitiesVersion: ACTIVITIES_VERSION - 1 }, activities, [])?.activitiesVersion).toBe(ACTIVITIES_VERSION);
   });
