@@ -1,6 +1,6 @@
 # 160 · Dette relevée par l'audit du 01 au 03/11, à solder au fil des lots qui touchent les fichiers
 
-Noté le 03/11 (audit avant vente, synthèse `~/.claude/plans/audit-vente-0111/RAPPORT.md`, lignes D6, D7, D8, D12, D15, D16, D17 et section E). Pas un lot : une liste à piocher quand un lot touche déjà le fichier ; les gros morceaux (pages, styles en ligne) deviendront des lots à part si l'acheteur le demande.
+Noté le 03/11 (audit avant vente, synthèse `D:\gong tracker\atelier\audit-vente-0111\RAPPORT.md`, lignes D6, D7, D8, D12, D15, D16, D17 et section E). Pas un lot : une liste à piocher quand un lot touche déjà le fichier ; les gros morceaux (pages, styles en ligne) deviendront des lots à part si l'acheteur le demande.
 
 ## Gros, à faire au fil de l'eau
 

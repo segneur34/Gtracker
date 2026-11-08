@@ -1,6 +1,6 @@
 # 154 · Vente : extraction de la version voile + surf (retrait des familles à pied, vélo et fractionné)
 
-Noté le 03/11 (audit avant vente, synthèse `~/.claude/plans/audit-vente-0111/RAPPORT.md` § 3 « Carte d'extraction » ; détail fichier par fichier dans `angle-X1.md` (tables par dossier, script `X1-graphe.mjs`) et `angle-X2.md` (cardio et Profil, Enregistrer, Planifier, Statistiques, natif, outils, docs)). Modèle | Réflexion : Fable | high pour E1 et E6, Opus | high ensuite. Contexte donné le 01/11 : voile et surf seulement, tout le transverse gardé (Enregistrer, Planifier, Statistiques, Profil, Bibliothèque, Réglages, mémoire), acheteur francophone.
+Noté le 03/11 (audit avant vente, synthèse `D:\gong tracker\atelier\audit-vente-0111\RAPPORT.md` § 3 « Carte d'extraction » ; détail fichier par fichier dans `angle-X1.md` (tables par dossier, script `X1-graphe.mjs`) et `angle-X2.md` (cardio et Profil, Enregistrer, Planifier, Statistiques, natif, outils, docs)). Modèle | Réflexion : Fable | high pour E1 et E6, Opus | high ensuite. Contexte donné le 01/11 : voile et surf seulement, tout le transverse gardé (Enregistrer, Planifier, Statistiques, Profil, Bibliothèque, Réglages, mémoire), acheteur francophone.
 
 ## Chiffres
 

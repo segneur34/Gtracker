@@ -1,6 +1,6 @@
 # 151 · Vente : mentions légales, politique de confidentialité, manifeste Android, sauvegarde
 
-Noté le 03/11 (audit avant vente, synthèse `~/.claude/plans/audit-vente-0111/RAPPORT.md`, lignes A3, A4, A7, C15 ; détail dans `angle-V1.md` (V1-3, V1-4), `angle-T4.md` (T4-1, T4-3, T4-4, T4-5), `angle-C6.md` (C6-3, C6-6)). Modèle | Réflexion : Opus | high.
+Noté le 03/11 (audit avant vente, synthèse `D:\gong tracker\atelier\audit-vente-0111\RAPPORT.md`, lignes A3, A4, A7, C15 ; détail dans `angle-V1.md` (V1-3, V1-4), `angle-T4.md` (T4-1, T4-3, T4-4, T4-5), `angle-C6.md` (C6-3, C6-6)). Modèle | Réflexion : Opus | high.
 
 ## Tel que noté
 

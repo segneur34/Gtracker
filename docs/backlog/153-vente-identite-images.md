@@ -1,6 +1,6 @@
 # 153 · Vente : identité du vendeur dans l'appli et les formats, provenance des images
 
-Noté le 03/11 (audit avant vente, synthèse `~/.claude/plans/audit-vente-0111/RAPPORT.md`, lignes A5, A6 ; détail dans `angle-V1.md` (V1-5, V1-6, V1-9, V1-10, V1-11), `angle-X2.md` (X2-7, X2-9), `angle-T3.md` (T3-4), `angle-C6.md` (C6-11)). Modèle | Réflexion : Sonnet | medium (code) ; le relevé des images est à faire par l'utilisateur.
+Noté le 03/11 (audit avant vente, synthèse `D:\gong tracker\atelier\audit-vente-0111\RAPPORT.md`, lignes A5, A6 ; détail dans `angle-V1.md` (V1-5, V1-6, V1-9, V1-10, V1-11), `angle-X2.md` (X2-7, X2-9), `angle-T3.md` (T3-4), `angle-C6.md` (C6-11)). Modèle | Réflexion : Sonnet | medium (code) ; le relevé des images est à faire par l'utilisateur.
 
 ## Tel que noté
 

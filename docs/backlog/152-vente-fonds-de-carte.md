@@ -1,6 +1,6 @@
 # 152 · Vente : fonds de carte sous licence (tuiles OSM hors ligne, satellite Esri sans clé)
 
-Noté le 03/11 (audit avant vente, synthèse `~/.claude/plans/audit-vente-0111/RAPPORT.md`, lignes A1, A2 ; détail dans `angle-V1.md` (V1-1, V1-2, table « Services tiers »)). Modèle | Réflexion : Fable | high (décision d'architecture et de produit).
+Noté le 03/11 (audit avant vente, synthèse `D:\gong tracker\atelier\audit-vente-0111\RAPPORT.md`, lignes A1, A2 ; détail dans `angle-V1.md` (V1-1, V1-2, table « Services tiers »)). Modèle | Réflexion : Fable | high (décision d'architecture et de produit).
 
 ## Tel que noté
 
