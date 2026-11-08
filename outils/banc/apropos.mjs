@@ -3,7 +3,7 @@
 // Sur un profil neuf, sans réseau, environ 30 s. `fetch` est remplacé avant le chargement par une liste synthétique,
 // sauf au point 7. Il vérifie :
 //  1. le bloc, dernier de la page, replié au départ : aucune liste demandée au chargement ni à son ouverture ;
-//  2. ouvert : logo centré en police du logo à 34 px, version, paragraphe, filet, ligne « Licences… » repliée ;
+//  2. ouvert : logo GONG complet suivi de « Gtracker », centré, version, paragraphe, filet, ligne « Licences… » repliée ;
 //  3. dépliée : les deux listes demandées, la phrase, les deux groupes, trois composants puis « Voir les N autres »,
 //     lignes de 44 px au moins sur le fond de page, rayon `--radius-s`, le doublon JS et complément une seule fois ;
 //  4. un composant : son texte complet dans une zone qui défile (320 px au plus), un seul ouvert à la fois, notice et
@@ -93,9 +93,9 @@ check('aucune liste demandée au chargement', (await fetches()) === 0, await fet
 // --- 2. Ouvert ---
 check('« À propos » s\'ouvre', (await openBlock()) === 'ok');
 await settle({ max: 500 });
-const logo = await evaluate(`(() => { const l = document.querySelector('.about__logo'); const s = getComputedStyle(l); return { text: l.textContent, font: s.fontFamily, size: s.fontSize, align: s.textAlign }; })()`);
-check('logo « Tracker » en police du logo', logo.text === 'Tracker' && logo.font.includes('Shrikhand'), JSON.stringify(logo));
-check('logo à 34 px, centré', logo.size === '34px' && logo.align === 'center', JSON.stringify(logo));
+const logo = await evaluate(`(() => { const l = document.querySelector('.about__logo'); const s = getComputedStyle(l); return { text: l.textContent, mark: l.querySelector('svg path') !== null, align: s.textAlign }; })()`);
+check('logo GONG puis « Gtracker »', logo.text === 'Gtracker' && logo.mark === true, JSON.stringify(logo));
+check('logo centré', logo.align === 'center', JSON.stringify(logo));
 const version = await evaluate(`document.querySelector('.about__version').textContent`);
 check('version', /^Version \d+\.\d+\.\d+$/.test(version), version);
 const paragraph = await evaluate(`document.querySelector('.about__text').textContent.trim()`);
@@ -195,7 +195,7 @@ await waitFor(`document.querySelectorAll('.about-license__row').length > 0`, { t
 const devIntro = await evaluate(`[...document.querySelectorAll('.about-licenses__intro')].map((p) => p.textContent)`);
 check('sans licences.json : la mention', devIntro.includes('Liste complète dans la version construite.'), devIntro.join(' | '));
 const devRows = await rows();
-check('… et le complément réel', ['@fontsource/shrikhand', '@capgo/background-geolocation', 'AndroidX', 'Services Google Play'].every((n) => devRows.some((r) => r.name.startsWith(n))), devRows.map((r) => r.name).join(', '));
+check('… et le complément réel', ['Logo GONG', '@capgo/background-geolocation', 'AndroidX', 'Services Google Play'].every((n) => devRows.some((r) => r.name.startsWith(n))), devRows.map((r) => r.name).join(', '));
 await shoot('apropos-sans-liste');
 
 await setStub(stubSource('échec', 'échec'));

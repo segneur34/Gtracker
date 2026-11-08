@@ -25,6 +25,7 @@ import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { useVisibility } from '../hooks/useSportSettings';
 import { shownRoutes } from '../planning/routeShown';
 import { tutorialCardGate } from '../tutorials/tutorials';
+import GongLogo from '../components/GongLogo';
 import './Home.css';
 
 /**
@@ -69,7 +70,11 @@ function Home() {
     <div className="ui-page ui-page--backdrop home">
       <PageBackdrop variant={backdrop} />
       <header className="ui-photo-banner home-header" style={{ backgroundImage: `url(${headerPhoto})` }}>
-        <h1 className="home-logo">Tracker<span className="home-version">v{__APP_VERSION__}</span></h1>
+        <h1 className="home-logo" aria-label="GONG Gtracker">
+          <GongLogo className="home-logo__mark" />
+          <span className="home-logo__name" aria-hidden="true">Gtracker</span>
+          <span className="home-version">v{__APP_VERSION__}</span>
+        </h1>
         <p className="home-welcome">{name ? `Bienvenue ${name}` : 'Bienvenue'}</p>
       </header>
 

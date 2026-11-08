@@ -292,14 +292,27 @@
 }
 
 /* Bloc « À propos » (`AboutSettings`) : logo centré, version, paragraphe, puis les licences en partie repliable. */
-/* Logo, comme celui de l'accueil (`.home-logo`). */
+/* Logo GONG complet puis « Gtracker », comme à l'accueil (`.home-logo`). */
 .about__logo {
-  font-family: var(--font-logo);
-  font-size: var(--logo-size);
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 1.1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1) var(--space-3);
   text-align: center;
+}
+
+.about__logo-mark {
+  height: var(--logo-height);
+  width: auto;
+}
+
+.about__logo-name {
+  font-family: var(--font);
+  font-size: var(--text-xl);
+  font-weight: var(--action-weight);
+  letter-spacing: var(--title-spacing);
+  line-height: 1.1;
   text-transform: uppercase;
 }
 

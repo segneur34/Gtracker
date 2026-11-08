@@ -41,6 +41,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.`
 
+/** Logo GONG (src/assets/logo/) : une marque, pas une licence libre. */
+const LOGO_GONG = {
+  name: 'Logo GONG',
+  version: '',
+  identifier: 'Marque de GONG SUP',
+  text: "Le logo GONG (symbole et mot) est une marque de GONG SUP, reproduit ici pour la version de Tracker proposée à GONG. Ce n'est pas une licence libre : il ne se réutilise pas ailleurs sans l'accord de GONG SUP.",
+}
+
 /** Table groupe → famille. Sans `texte` : la licence Apache 2.0 (voir `principal`). */
 const FAMILLES = [
   { nom: 'AndroidX', groupe: (g) => g.startsWith('androidx.'), identifiant: 'Apache-2.0' },
@@ -130,9 +138,9 @@ const principal = () => {
   if (composants.length === 0) throw new Error(`Aucun composant dans ${fichier} : est-ce bien la sortie de gradlew ?`)
   const lignes = [
     lignePaquet('@fontsource/montserrat'),
-    lignePaquet('@fontsource/shrikhand'),
     lignePaquet('@capacitor/android'),
     lignePaquet('@capgo/background-geolocation', { notice: 'Utilisé sans modification. Sources :', url: GREFFON_GPS }),
+    LOGO_GONG,
     ...lignesNatives(composants, apache),
   ]
   writeFileSync(join(RACINE, 'public', 'licences-hors-js.json'), `${JSON.stringify(lignes, null, 2)}\n`)

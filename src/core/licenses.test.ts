@@ -160,7 +160,7 @@ describe('complément hors JS (public/licences-hors-js.json)', () => {
 
   it('paquets npm : versions du package-lock', () => {
     const npm = rows.filter((r) => r.name.startsWith('@'));
-    expect(npm.map((r) => r.name)).toEqual(['@fontsource/montserrat', '@fontsource/shrikhand', '@capacitor/android', '@capgo/background-geolocation']);
+    expect(npm.map((r) => r.name)).toEqual(['@fontsource/montserrat', '@capacitor/android', '@capgo/background-geolocation']);
     for (const row of npm) expect(row.version, row.name).toBe(lockVersion(row.name));
   });
 

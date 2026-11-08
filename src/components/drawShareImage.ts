@@ -1,6 +1,7 @@
 import { cardHeight, cardTop, fitView, fullView, mapHeight, projectPoint, SHARE_IMAGE, statColumns, viewTiles, type ShareStat } from '../core/shareImage';
 import { MAP_BASES, type MapBase } from '../core/mapBase';
 import { tileKey, type TileCoord } from '../core/tiles';
+import { GONG_LOGO_HEIGHT, GONG_LOGO_PATH, GONG_LOGO_WIDTH } from './gongLogoPath';
 import { lightToken } from '../theme/lightToken';
 import { loadMapTile, tileImage } from '../platform/mapTiles';
 import { strokeColoredTrack } from './drawTrackPreview';
@@ -58,19 +59,19 @@ const token = (name: string, fallback: string): string => lightToken(name, fallb
 /** Police de l'interface (`--font`), chargée avant de dessiner : sans elle, le canevas prend celle du système. */
 const fontFamily = (): string => token('--font', 'system-ui, sans-serif');
 
-/** Police du logo (`--font-logo`), pour « Tracker » au pied de l'image, comme sur l'accueil. */
-const logoFamily = (): string => token('--font-logo', 'Georgia, serif');
-
-const ensureFonts = async (family: string, logo: string): Promise<void> => {
+const ensureFonts = async (family: string): Promise<void> => {
   try {
     await Promise.all([
       document.fonts.load(`700 40px ${family}`), document.fonts.load(`600 40px ${family}`), document.fonts.load(`400 40px ${family}`),
-      document.fonts.load(`400 40px ${logo}`),
     ]);
   } catch {
     // Police indisponible : celle du système fait l'affaire.
   }
 };
+
+/** Pied de l'image : hauteur du logo GONG et écart avec « Gtracker », en pixels de l'image. */
+const FOOTER_LOGO_HEIGHT_PX = 26;
+const FOOTER_LOGO_GAP_PX = 14;
 
 /** Texte tronqué d'une ellipse pour tenir dans `maxWidth`. */
 const fitText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string => {
@@ -146,8 +147,7 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Dessin impossible sur cet appareil.');
   const family = fontFamily();
-  const logo = logoFamily();
-  await ensureFonts(family, logo);
+  await ensureFonts(family);
   const ink = token('--ink', '#1b1f24');
   const muted = token('--muted', '#5b6470');
   ctx.textBaseline = 'alphabetic';
@@ -234,9 +234,15 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
   // Pied, à la même hauteur avec ou sans cartouche.
   const footerY = cardY + cardH - footerFromBottomPx;
   ctx.fillStyle = token('--faint', '#8a9099');
-  ctx.font = `400 26px ${logo}`;
-  ctx.fillText('TRACKER', margin, footerY);
+  // Logo GONG complet (tracé du SVG mis à l'échelle), base sur la ligne du pied, puis « Gtracker » à sa droite.
+  const logoScale = FOOTER_LOGO_HEIGHT_PX / GONG_LOGO_HEIGHT;
+  ctx.save();
+  ctx.translate(margin, footerY - FOOTER_LOGO_HEIGHT_PX);
+  ctx.scale(logoScale, logoScale);
+  ctx.fill(new Path2D(GONG_LOGO_PATH));
+  ctx.restore();
   ctx.font = `600 26px ${family}`;
+  ctx.fillText('Gtracker', margin + GONG_LOGO_WIDTH * logoScale + FOOTER_LOGO_GAP_PX, footerY);
   if (content.author !== null) {
     ctx.textAlign = 'right';
     ctx.fillText(fitText(ctx, content.author, widthPx / 2 - margin), widthPx - margin, footerY);

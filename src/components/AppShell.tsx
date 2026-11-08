@@ -17,6 +17,7 @@ import { FAMILY_ICON } from './familyIcons';
 import ErrorBoundary from './ErrorBoundary';
 import { HelpProvider } from './Help';
 import HoldDial from './ui/HoldDial';
+import GongLogo from './GongLogo';
 import ImportQuestion from './ImportQuestion';
 import IncomingFileNotice from './IncomingFileNotice';
 
@@ -205,7 +206,10 @@ function AppShell() {
   return (
     <div className="shell">
       <header className="shell-topbar">
-        <Link to="/" className="shell-brand">Tracker</Link>
+        <Link to="/" className="shell-brand" aria-label="GONG Gtracker">
+          <GongLogo className="shell-brand__mark" />
+          <span className="shell-brand__name" aria-hidden="true">Gtracker</span>
+        </Link>
         <nav aria-label="Navigation principale" className="shell-toplinks">
           {families.map((f) => topLink(FAMILY_TABS[f]))}
           {topLink(STATISTIQUES)}

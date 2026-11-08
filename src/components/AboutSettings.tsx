@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { licenseGroup, mergeLicenseLists, parseLicenseList, type LicenseEntry } from '../core/licenses';
 import { fetchWithin } from '../planning/fetchJson';
+import GongLogo from './GongLogo';
 import Button from './ui/Button';
 import SettingsPart from './SettingsPart';
 
@@ -105,7 +106,10 @@ function AboutSettings() {
   const [licensesOpen, setLicensesOpen] = useState(false);
   return (
     <div className="about">
-      <div className="about__logo">Tracker</div>
+      <div className="about__logo">
+        <GongLogo className="about__logo-mark" />
+        <span className="about__logo-name">Gtracker</span>
+      </div>
       <p className="about__version">Version {__APP_VERSION__}</p>
       <p className="about__text">
         Vos sessions restent sur cet appareil et dans votre dossier mémoire, sans compte. Les fonds de carte, la recherche de lieux, les itinéraires, ainsi que l'altitude et le revêtement des parcours à pied et à vélo, passent par des services en ligne.
