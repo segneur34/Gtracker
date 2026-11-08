@@ -12,7 +12,7 @@ Tenu par Claude ; l'utilisateur n'a jamais à l'ouvrir. `node outils/backlog.mjs
 
 ## Maintenant
 
-APK 0.6.00 pas encore construite : aucune APK « Gtracker » construite encore (identifiant `io.github.segneur.tracker.voile`, installable à côté de Tracker) ; version de départ 0.6.00.
+APK 0.6.00 construite le 08/11 (`Gtracker-0.6.00.apk`, versionCode 6000, identifiant `io.github.segneur.tracker.voile`, installable à côté de Tracker), pas encore installée ; copie dans `D:\gong tracker\`.
 
 ## Ensuite
 
