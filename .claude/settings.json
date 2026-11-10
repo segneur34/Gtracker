@@ -6,6 +6,15 @@
       "Bash(npm run lint)",
       "mcp__claude_ai_Claude_Docs__read",
       "mcp__claude_ai_Claude_Docs__guide"
+    ],
+    "deny": [
+      "Edit(//c/Users/segne/tracker/**)",
+      "Write(//c/Users/segne/tracker/**)",
+      "NotebookEdit(//c/Users/segne/tracker/**)",
+      "Edit(~/.claude/plans/**)",
+      "Write(~/.claude/plans/**)",
+      "Edit(~/.claude/projects/c--Users-segne-tracker/**)",
+      "Write(~/.claude/projects/c--Users-segne-tracker/**)"
     ]
   }
 }
