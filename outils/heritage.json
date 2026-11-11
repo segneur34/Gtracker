@@ -1,0 +1,85 @@
+{
+  "'running'": {
+    "src/core/sportProfiles.test.ts": 1,
+    "src/hooks/sessionLibrary/addSession.test.ts": 1,
+    "src/library/fitToGpx.ts": 1,
+    "src/library/legacyImport.test.ts": 5,
+    "src/library/naming.test.ts": 1,
+    "src/library/naming.ts": 1
+  },
+  "'cycling'": {
+    "src/library/fitToGpx.ts": 1,
+    "src/library/legacyImport.test.ts": 3,
+    "src/library/naming.test.ts": 1,
+    "src/library/naming.ts": 1,
+    "src/test/gpx/corpus.ts": 1
+  },
+  "land[A-Z]…": {
+    "src/App.tsx": 3,
+    "src/core/analysisTabs.test.ts": 1,
+    "src/hooks/useRecorder.resume.test.ts": 5,
+    "src/hooks/useRecorder.ts": 6
+  },
+  "fractionné, musculation, Entraînement": {
+    "src/architecture.test.ts": 2,
+    "src/components/drawRoot.ts": 1,
+    "src/components/gearFields.test.ts": 3,
+    "src/core/analysisTabs.test.ts": 4,
+    "src/core/gpxParser.corpus.test.ts": 2,
+    "src/core/periodicity.ts": 1,
+    "src/core/sportProfiles.test.ts": 2,
+    "src/core/sportProfiles.ts": 1,
+    "src/library/legacyImport.test.ts": 4,
+    "src/library/naming.test.ts": 1,
+    "src/library/naming.ts": 2,
+    "src/library/sessionBundle.test.ts": 6,
+    "src/pages/PlanningPage.tsx": 1,
+    "src/recording/session.test.ts": 1,
+    "src/settings/activitySettings.test.ts": 1,
+    "src/test/gpxParser.legacy.ts": 1
+  },
+  "à pied": {
+    "src/core/trackColor.test.ts": 1,
+    "src/library/legacyImport.ts": 1,
+    "src/recording/markGuide.test.ts": 1,
+    "src/recording/markGuide.ts": 1
+  },
+  "vélo": {
+    "src/architecture.test.ts": 1,
+    "src/components/gearFields.test.ts": 1,
+    "src/core/analysisTabs.test.ts": 1,
+    "src/core/trackColor.test.ts": 1,
+    "src/core/types.ts": 1,
+    "src/hooks/sessionLibrary/addSession.ts": 1,
+    "src/hooks/sessionLibrary/importer.ts": 1,
+    "src/hooks/sessionLibrary/incoming.test.ts": 2,
+    "src/hooks/sessionLibrary/incoming.ts": 1,
+    "src/library/fitToGpx.test.ts": 1,
+    "src/library/fitToGpx.ts": 3,
+    "src/library/importEntry.ts": 1,
+    "src/library/importReport.test.ts": 4,
+    "src/library/importReport.ts": 2,
+    "src/library/legacyImport.test.ts": 3,
+    "src/library/legacyImport.ts": 2,
+    "src/library/naming.test.ts": 1,
+    "src/library/naming.ts": 1,
+    "src/library/record.ts": 2,
+    "src/library/shareStats.test.ts": 1,
+    "src/library/stats.test.ts": 1,
+    "src/library/summary.test.ts": 1,
+    "src/library/summaryOptions.ts": 1,
+    "src/settings/gear.test.ts": 3
+  },
+  "Gravel, VTT": {
+    "src/core/analysisTabs.test.ts": 1
+  },
+  "runner": {
+    "src/hooks/sessionLibrary/summaryQueue.test.ts": 23,
+    "src/hooks/sessionLibrary/summaryQueue.ts": 13
+  },
+  "segneur34": {
+    "src/library/legacyImport.test.ts": 1,
+    "src/platform/capacitorConfig.test.ts": 2,
+    "src/test/legacyImport.fixture.ts": 2
+  }
+}

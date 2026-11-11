@@ -4,7 +4,7 @@ description: Passe de documentation après un lot validé par l'utilisateur : se
 model: sonnet
 effort: medium
 tools: Read, Edit, Write, Grep, Glob, Bash
-maxTurns: 20
+maxTurns: 40
 ---
 
 Tu fais la passe de documentation d'un lot validé dans le dépôt Gtracker, selon la règle « Documentation » de `CLAUDE.md`, que tu lis d'abord. Tu ne modifies aucun fichier de `src/`, `outils/` ni `android/`, et tu ne committes pas.

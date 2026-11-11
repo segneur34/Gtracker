@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SPORT_FAMILIES } from './core/sportProfiles';
 
 /**
  * Sens des dépendances entre dossiers de `src/` (lot 71, fiche
@@ -10,8 +11,7 @@ import { describe, expect, it } from 'vitest';
  *   platform → core seulement ; theme → core seulement
  *
  * Les domaines se lisent du bas vers le haut : sailing et surfing (feuilles),
- * planning, recording, library ; land, running et cycling (course, vélo,
- * Entraînement) sont partis aux lots 302 et 303. Un domaine importe `core/` et les
+ * planning, recording, library. Un domaine importe `core/` et les
  * domaines plus bas que lui, jamais l'inverse ; seuls `recording/` et
  * `library/` lisent `platform/` (position, capteurs, dossier mémoire).
  *
@@ -153,47 +153,18 @@ describe("sens des dépendances entre dossiers de src/", () => {
 });
 
 /**
- * Couture de la version voile et surf (lot 187, fiche `docs/backlog/154-vente-extraction-voile-surf.md`) : le
- * transverse (`core/`, `platform/`, `theme/`, `tutorials/`, `library/`, `settings/`, `hooks/`, `components/`, `pages/`,
- * `recording/`, `planning/`) n'importe rien des dossiers `running`, `cycling` et `land`, ce qui part de la version vendue,
- * et ces dossiers ne reviennent pas : la terre est retirée (lots 302 et 303). Les deux listes nommées d'exceptions,
- * les fichiers de la terre rangés dans le transverse (`LAND_FILES`) et la couture des fichiers gardés (`SEAM`), ont
- * fini vides au lot 303 et le restent.
+ * Règle 9 de `CLAUDE.md` : chaque famille a sa bibliothèque et son module d'analyse, à une adresse ; il n'y a que deux
+ * familles. Un dossier de la terre recréé (`running`, `cycling`, `land`) n'aurait pas de ligne dans `ALLOWED` et ferait
+ * déjà échouer « chaque dossier de src/ a une règle » ; son vocabulaire est gardé par le cliquet de `outils/heritage.mjs`.
  */
-const TRANSVERSE = ['core', 'platform', 'theme', 'tutorials', 'library', 'settings', 'hooks', 'components', 'pages', 'recording', 'planning'];
-const LAND_TARGETS = ['running', 'cycling', 'land'];
-
-/** Fichiers de la terre rangés dans le transverse (sans extension) : tous partis aux lots 302 et 303, la liste reste vide. */
-const LAND_FILES: string[] = [];
-
-/** La couture : imports « fichier → cible » des fichiers gardés vers la terre ; toute découdue au lot 303, la liste reste vide. */
-const SEAM: string[] = [];
-
-describe('couture de la version voile et surf : le transverse n’importe rien de la course, du vélo ni de l’Entraînement (lots 187 à 303)', () => {
-  const seams = edges().filter((e) => TRANSVERSE.includes(groupOf(e.from)) && LAND_TARGETS.includes(groupOf(e.to)));
-  const names = seams.map(edgeName);
-
-  it('la couture est découdue : aucun import de la terre, plus aucun dossier de la terre (lot 303)', () => {
-    expect(names).toEqual([]);
-    expect(LAND_FILES).toEqual([]);
-    expect(SEAM).toEqual([]);
-    const folders = fs.readdirSync(SRC, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
-    expect(folders.filter((f) => LAND_TARGETS.includes(f))).toEqual([]);
-  });
-
-  it('aucun import de la terre hors des fichiers de la terre et de la couture nommée', () => {
-    const unexpected = seams.filter((e) => !LAND_FILES.includes(e.from)).map(edgeName).filter((name) => !SEAM.includes(name));
-    expect(unexpected).toEqual([]);
-  });
-
-  it('chaque fichier de la terre listé importe encore la terre (la liste ne fait que diminuer)', () => {
-    const importing = new Set(seams.map((e) => e.from));
-    expect(LAND_FILES.filter((f) => !importing.has(f))).toEqual([]);
-  });
-
-  it('chaque fil de la couture existe encore (la liste ne fait que diminuer)', () => {
-    const present = new Set(names);
-    expect(SEAM.filter((name) => !present.has(name))).toEqual([]);
+describe('familles et adresses (règle 9)', () => {
+  it('chaque famille a sa bibliothèque et son module', () => {
+    const app = fs.readFileSync(new URL('App.tsx', SRC), 'utf8');
+    for (const f of SPORT_FAMILIES) {
+      expect(app).toContain(`path="/${f}"`);
+      expect(app).toContain(`path="/${f}/analyse"`);
+    }
+    expect([...SPORT_FAMILIES]).toEqual(['voile', 'surf']);
   });
 
   it("App.tsx n'a plus de route de la course, du vélo ni du fractionné, et mène toute autre adresse à l'accueil", () => {

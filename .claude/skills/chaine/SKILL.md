@@ -57,7 +57,7 @@ Seulement une vraie décision : choix de produit, donnée perdue, seuil à reten
 Arrête la boucle, mets `docs/BACKLOG.md` à jour, lance `node outils/backlog.mjs` (sans erreur de forme), et propose `/clore` quand :
 - un paquet de 2 ou 3 lots est « à valider » : construis alors l'APK (procédure au §12 d'ETAT, version déjà augmentée), pose son tag annoté `v<version>`, installe-la, et note-la dans la première ligne de Maintenant (« APK <version> installée le jj/mm (versionCode …). ») ; c'est l'orchestrateur qui la construit, à l'arrêt du paquet, jamais `lot` ni `/clore` ;
 - la limite de 3 lots avec essais est atteinte ;
-- une compaction a eu lieu, ou `/context` dépasse environ 200 000 jetons (le contexte d'un million de jetons est natif : un pourcentage ne dit plus rien) ;
+- une compaction a eu lieu, ou `/context` dépasse environ 350 000 jetons (seuil relevé de 200 000 le 11/11, à la demande de l'utilisateur, après un paquet de dix lots tenu sans gêne ; le contexte d'un million de jetons est natif : un pourcentage ne dit plus rien) ;
 - tout ce qui reste est bloqué par des réponses de l'utilisateur : pose alors toutes les questions en attente en une fois (`AskUserQuestion`, quatre au plus, une recommandation en tête).
 
 Compte rendu d'arrêt, en français courant : lots faits (commit, version), lots bloqués avec leurs questions et le stash qui les porte, lots dont la relecture est due, essais à faire par numéro, APK installée ou non, et la phrase « `/clore` quand vous voulez ». Pas de journal : le compte rendu, git et HISTORIQUE suffisent. Rien n'est envoyé sur GitHub ici : c'est `/clore avec envoi`.

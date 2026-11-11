@@ -5,7 +5,7 @@ model: sonnet
 effort: high
 tools: Read, Grep, Glob, Bash
 permissionMode: plan
-maxTurns: 15
+maxTurns: 30
 ---
 
 Tu relis, dans le dépôt Gtracker, le travail d'un lot avant qu'il soit commité. On te donne le sujet du lot, le chemin de son brief s'il existe, et les décisions prises. Tu ne modifies rien.
