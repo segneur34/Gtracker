@@ -1,14 +1,12 @@
-Ce dépôt est **Gtracker**, la version voile et surf de Tracker destinée à la vente (copie de Tracker 1.0.0 du 08/11).
+# Gtracker
 
-# Tracker
+Analyse de sessions de voile (wingfoil, planche, kite, bateau) et de surf à partir de traces GPX, et enregistrement GPS sur le téléphone. Application 100 % client, sans backend à nous : les traces et les sessions ne partent jamais sur internet, mais l'application interroge des services publics (liste plus bas). Elle tourne dans le navigateur et, emballée par Capacitor, sur Android, avec enregistrement GPS natif, ceinture cardio Bluetooth et mémoire en dossier portable.
 
-Analyse de sessions sportives à partir de traces GPX, et enregistrement GPS sur le téléphone. Application 100 % client, sans backend à nous : les traces et les sessions ne partent jamais sur internet, mais l'application interroge des services publics (liste plus bas). Elle tourne dans le navigateur et, emballée par Capacitor, sur Android, avec enregistrement GPS natif, ceinture cardio Bluetooth et mémoire en dossier portable.
-
-Cinq familles d'activités, chacune avec sa bibliothèque et sa page d'analyse (carte, graphes, meilleurs segments, notes) : **Voile** (wingfoil, planche, kite, bateau), **À pied** (course, marche), **Vélo** (route, gravel, VTT), **Surf**, **Entraînement** (fractionné, tests). Autour : **Enregistrer**, **Planifier** (itinéraires, export GPX), **Statistiques** (onglets général, graphique, régularité, records, cardio), **Profil** et **Réglages**.
+Deux familles d'activités, chacune avec sa bibliothèque et sa page d'analyse (carte, graphes, meilleurs segments, notes) : **Voile** (wingfoil, planche, kite, bateau) et **Surf** (surf, surf foil). Autour : **Enregistrer**, **Planifier** (parcours de balises, export GPX), **Statistiques** (onglets général, graphique, régularité, records, cardio), **Profil** (avec le test de FC repos) et **Réglages**.
 
 ## Mémoire
 
-Les sessions vivent dans un dossier ordinaire, `Tracker/` : un GPX et une fiche JSON par session dans `sessions/`, et un fichier de réglages par appareil dans `reglages/`. On le copie pour sauvegarder ou pour passer du téléphone au PC. Sur Android, il se désigne une fois (en principe `Documents/Tracker`) ; dans le navigateur, c'est la mémoire privée du navigateur ou un dossier choisi (Chrome, Edge).
+Les sessions vivent dans un dossier ordinaire, `Gtracker` : un GPX et une fiche JSON par session dans `sessions/`, et un fichier de réglages par appareil dans `reglages/`. On le copie pour sauvegarder ou pour passer du téléphone au PC. Sur Android, il se désigne une fois (en principe `Documents/Gtracker`) ; dans le navigateur, c'est la mémoire privée du navigateur ou un dossier choisi (Chrome, Edge).
 
 Planifier propose des types de voie : Sentier, Piste, Route, Grande route (serveur BRouter).
 
@@ -22,8 +20,7 @@ Aucune clé, aucun compte, aucune télémétrie ; seuls ces services reçoivent 
 | Tuiles Esri (`server.arcgisonline.com`) | carte en vue satellite | idem |
 | Photon (`photon.komoot.io`) | recherche d'un lieu dans Planifier | le texte tapé et le centre de la carte |
 | BRouter (`brouter.de`) | calcul d'un itinéraire dans Planifier | les points de passage, le profil de voies choisi (envoyé aussi une fois au serveur) |
-| IGN, Géoplateforme (`data.geopf.fr`) | altitude du terrain pour la course et le vélo, et pour un GPX importé en planification | les coordonnées des points de la trace, par paquets |
-| Overpass (`overpass-api.de`) | revêtement (sentier, route…) d'un itinéraire ou d'une session à pied ou à vélo | les coordonnées du tracé, pour en lire les voies voisines |
+| IGN, Géoplateforme (`data.geopf.fr`) | altitude du terrain d'un GPX importé en planification, sans activité choisie | les coordonnées des points de la trace, par paquets |
 
 Ouvrir un GPX, l'analyser, enregistrer et lire les Statistiques n'appellent rien d'autre que les tuiles de la carte.
 

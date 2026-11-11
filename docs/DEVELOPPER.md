@@ -1,4 +1,4 @@
-# Construire Tracker
+# Construire Gtracker
 
 Une page pour qui reprend le dépôt : de quoi on a besoin, comment on vérifie, comment on sort une application web ou un APK. Le détail de l'architecture est dans `CLAUDE.md` et `docs/ETAT_DU_PROJET.md`.
 
@@ -31,7 +31,7 @@ node outils/verif.mjs --rapide    typecheck, lint, tests des fichiers modifiés
    npm run build
    npx cap sync android
    cd android
-   ./gradlew assembleRelease      (Windows : gradlew.bat)   APK : app/build/outputs/apk/release/Tracker-<version>.apk
+   ./gradlew assembleRelease      (Windows : gradlew.bat)   APK : app/build/outputs/apk/release/Gtracker-<version>.apk
    ./gradlew bundleRelease        AAB pour Google Play
    ```
    La version de l'APK vient de `package.json` (`versionName`) et en tire `versionCode` ; elle se monte avant chaque APK diffusé.
