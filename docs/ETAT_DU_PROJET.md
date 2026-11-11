@@ -338,7 +338,7 @@ Pas de `any` dans `src/` (nettoyages des points 15, 44 et 168) ; le code mort la
 
 ## 10. Historique des décisions et pièges rencontrés
 
-Déplacé dans `docs/HISTORIQUE.md` le 23 septembre 2026, numérotation inchangée : les renvois « §10, point N » y mènent. À consulter sur le sujet qu'on touche, avant de retenter ce qui a déjà été essayé.
+Tenu dans `docs/HISTORIQUE.md`, numérotation inchangée : les renvois « §10, point N » y mènent. Le journal commence au point 323 ; les points 1 à 322, d'avant la version voile et surf, sont hors dépôt (son en-tête dit où les lire). À consulter sur le sujet qu'on touche, avant de retenter ce qui a déjà été essayé.
 
 ## 11. Limites connues
 
@@ -384,7 +384,7 @@ Décidée le 23 septembre 2026 ; le choix de Capacitor et les options écartées
 
 C'est le seul endroit où il est tenu : les phases et le reste à faire. Le détail de chaque lot est dans HISTORIQUE.
 
-- **Phases 0 à 3 et plan en six lots** : faits du 23/09 au 08/11, avant la version voile et surf ; détail aux points 36 à 322 de `docs/HISTORIQUE.md`. Le test de 2 h écran éteint, reporté par l'utilisateur à la phase 1, reste à faire. Dépendances à jour depuis le 28/10 (TypeScript 7.0.2, `@types/node` 26, Capacitor 8.6.0, `npm audit` à 0, point 192).
+- **Phases 0 à 3 et plan en six lots** : faits du 23/09 au 08/11, avant la version voile et surf ; détail aux points 36 à 322 de l'historique d'avant, hors dépôt (en-tête de `docs/HISTORIQUE.md`). Le test de 2 h écran éteint, reporté par l'utilisateur à la phase 1, reste à faire. Dépendances à jour depuis le 28/10 (TypeScript 7.0.2, `@types/node` 26, Capacitor 8.6.0, `npm audit` à 0, point 192).
 - **Phase 2, interface mobile** : trois passes faites (points 47 à 49, 52, 56 à 58, 69 ; patron dans `docs/MISE_EN_PAGE.md`), puis les petites largeurs, la taille du texte d'Android jusqu'à 130 % et le téléphone tourné (point 139, relevé `tailles.mjs`). Restent :
   - toucher au lieu du survol : fait pour les graphes de vitesse, d'altitude et du vent (points 73, 94) ; reste la courbe d'un saut ;
   - `accept=".gpx"` de la bibliothèque, qui grise parfois les GPX sous Android.

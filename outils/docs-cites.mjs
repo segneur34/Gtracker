@@ -4,7 +4,8 @@
 //
 // Un chemin (« core/units.ts », « outils/banc/ ») doit désigner un fichier ou un dossier du dépôt ; un nom seul
 // (« formatDecimal ») doit apparaître dans le code. `docs/HISTORIQUE.md` et `docs/backlog/` ne sont pas vérifiés :
-// ils citent légitimement des fichiers disparus. Tout trouvé : une ligne ; sinon les renvois faux, code 1.
+// ils citent légitimement des fichiers disparus. Un « point N » cité doit exister dans `docs/HISTORIQUE.md` dès que N
+// atteint le premier point du journal. Tout trouvé : une ligne ; sinon les renvois faux, code 1.
 // Sans dépendance.
 
 import fs from 'node:fs'
@@ -60,6 +61,12 @@ const vuDansLeCode = (nom) => {
   return code.some((s) => re.test(s))
 }
 
+// Points d'HISTORIQUE : le journal commence à son premier point (les précédents sont hors dépôt, voir son en-tête) ;
+// tout « point N » cité à partir de celui-là doit y exister.
+const JOURNAL = path.join(racine, 'docs/HISTORIQUE.md')
+const points = new Set(fs.existsSync(JOURNAL) ? [...fs.readFileSync(JOURNAL, 'utf8').matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1])) : [])
+const premierPoint = points.size > 0 ? Math.min(...points) : Infinity
+
 const documents = process.argv.length > 2 ? process.argv.slice(2) : DOCUMENTS
 const problemes = []
 for (const doc of documents) {
@@ -73,6 +80,11 @@ for (const doc of documents) {
     for (const m of ligne.matchAll(/`([^`]+)`/g)) {
       const t = m[1].trim()
       if (!vus.has(t)) vus.set(t, i + 1)
+    }
+    for (const m of ligne.matchAll(/\bpoints? (\d+(?:(?:, | et | à )\d+)*)/g)) {
+      for (const n of m[1].match(/\d+/g).map(Number)) {
+        if (n >= premierPoint && !points.has(n)) problemes.push(`${doc}:${i + 1}  point absent d'HISTORIQUE : ${n}`)
+      }
     }
   })
   for (const [brut, ligne] of vus) {
