@@ -199,7 +199,7 @@ export const LESSONS: readonly Lesson[] = [
     icon: 'partage',
     target: 'bibliotheque',
     body: [
-      'Dans une analyse, le « … » à côté du nom de la session propose « Partager » : une image carrée de la trace et des chiffres que vous choisissez, avec ou sans fond de carte.',
+      "Dans une analyse, le « … » à côté du nom de la session propose « Partager l'image » : une image carrée de la trace et des chiffres que vous choisissez, avec ou sans fond de carte.",
       'Vos choix de chiffres sont retenus par activité.',
       "« Télécharger la session » range son fichier GPX dans Téléchargements : il s'ouvre dans les autres applications, et Gtracker le relit tout entier, notes comprises.",
     ],

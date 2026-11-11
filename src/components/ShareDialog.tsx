@@ -51,7 +51,7 @@ interface ShareDialogProps {
 }
 
 /**
- * Fenêtre « Partager la session » : l'aperçu de l'image (trace, fond de
+ * Fenêtre « Partager l'image » : l'aperçu de l'image (trace, fond de
  * carte, chiffres), les chiffres à y mettre et le fond, retenus par activité
  * sur l'appareil (six chiffres au plus), et le bouton qui ouvre le menu de partage du téléphone
  * (`platform/share.ts`). Ouverte depuis le « … » de l'analyse et des cartes de fin d'enregistrement.
@@ -118,7 +118,7 @@ function ShareDialog({ family, file, activityId, title, subtitle, fileName, segm
     if (!image) return;
     setNote(null);
     try {
-      const outcome = await shareFile(image.blob, `${fileName}.png`, 'Partager la session');
+      const outcome = await shareFile(image.blob, `${fileName}.png`, "Partager l'image");
       if (outcome === 'downloaded') setNote({ text: 'Ce navigateur ne partage pas d\'image : elle est téléchargée.', error: false });
     } catch (err) {
       setNote({ text: `Partage impossible : ${plainError(err, 'erreur inconnue')}`, error: true });
@@ -126,7 +126,7 @@ function ShareDialog({ family, file, activityId, title, subtitle, fileName, segm
   };
 
   return (
-    <Dialog title="Partager la session" onClose={onClose} className="share-dialog">
+    <Dialog title="Partager l'image" onClose={onClose} className="share-dialog">
 
       <div className="share-dialog__preview" aria-busy={drawing}>
         {image

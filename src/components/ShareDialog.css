@@ -1,4 +1,4 @@
-/* Fenêtre « Partager la session » (`ShareDialog.tsx`), dans une `Dialog` : ce qui lui est propre. */
+/* Fenêtre « Partager l'image » (`ShareDialog.tsx`), dans une `Dialog` : ce qui lui est propre. */
 
 .share-dialog__preview {
   display: flex;

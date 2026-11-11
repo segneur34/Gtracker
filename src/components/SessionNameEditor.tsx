@@ -42,7 +42,7 @@ const discardQuestion = (drafted: boolean): string =>
 
 /**
  * Nom d'une session de la mémoire, en tête de son analyse, son bouton
- * « Renommer » et son menu « … » (« Partager », qui ouvre `ShareDialog` avec
+ * « Renommer » et son menu « … » (« Partager l'image », qui ouvre `ShareDialog` avec
  * ce que l'analyse passe dans `share` ; « Télécharger la session », dans
  * Téléchargements : un GPX complet, fiche et capteurs compris, que « Importer
  * des GPX » range tout entier sur un autre appareil ; « Jeter », en dernier,
@@ -146,7 +146,7 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
             {share && (
               <Button onClick={() => setSharing(true)}>
                 <IconShare size={18} />
-                Partager
+                Partager l'image
               </Button>
             )}
             <Button onClick={() => void shareTrace()}>
