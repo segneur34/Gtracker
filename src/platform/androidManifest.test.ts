@@ -64,14 +64,6 @@ describe('manifeste Android : retraits', () => {
 });
 
 describe('manifeste Android : ce qui reste', () => {
-  it.each(['.IntervalTimerService', '.HeartRateService'])("ne déclare plus le service %s, parti avec l'Entraînement (lot 302)", (name) => {
-    expect(tagWithName(MANIFEST, 'service', name)).toBeUndefined();
-  });
-
-  it.each(['FOREGROUND_SERVICE_SPECIAL_USE', 'FOREGROUND_SERVICE_CONNECTED_DEVICE'])('ne demande plus %s (lot 302)', (name) => {
-    expect(tagWithName(MANIFEST, 'uses-permission', `android.permission.${name}`)).toBeUndefined();
-  });
-
   it.each(['FOREGROUND_SERVICE', 'WAKE_LOCK', 'POST_NOTIFICATIONS'])("garde %s : service GPS et notification de l'enregistrement", (name) => {
     expect(tagWithName(MANIFEST, 'uses-permission', `android.permission.${name}`)).toBeDefined();
   });

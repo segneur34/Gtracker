@@ -4,7 +4,7 @@ import { SLOW_COLOR, gradientColor } from '../core/speedGradient';
 import type { TrackPoint } from '../core/types';
 import { eastwardTrack } from '../test/track.fixture';
 import {
-  DEFAULT_CYCLING_GRADE_RANGE, DEFAULT_GRADE_RANGE, GRADE_ANALYSIS as G, computeGrades, gradeColorPaths, gradeGradientColor, gradeGradientStops, gradeStepColor,
+  DEFAULT_GRADE_RANGE, GRADE_ANALYSIS as G, computeGrades, gradeColorPaths, gradeGradientColor, gradeGradientStops, gradeStepColor,
   isValidGradeRange,
 } from './grade';
 
@@ -109,7 +109,7 @@ describe('gradeGradientColor', () => {
 
   it('refuse des bornes inversées ou négatives', () => {
     expect(isValidGradeRange({ min: 0, max: 0.25 })).toBe(true);
-    expect(isValidGradeRange(DEFAULT_CYCLING_GRADE_RANGE)).toBe(true);
+    expect(isValidGradeRange(DEFAULT_GRADE_RANGE)).toBe(true);
     expect(isValidGradeRange({ min: 0.3, max: 0.2 })).toBe(false);
     expect(isValidGradeRange({ min: -0.1, max: 0.2 })).toBe(false);
   });

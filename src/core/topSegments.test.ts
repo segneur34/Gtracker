@@ -244,7 +244,7 @@ describe('buildBaseSessionStats, vitesses moyennes', () => {
   });
 });
 
-describe('cibles des tops à pied et en surf (onglet générique)', () => {
+describe('cibles des tops en surf et en planche (onglet générique)', () => {
   /** Vitesse par seconde, répétée `hz` fois : la même session à 1 Hz et à 5 Hz. */
   const atRate = (perSecond: number[], hz: number) => eastwardTrack(perSecond.flatMap((v) => new Array(hz).fill(v)), 1 / hz);
   const kmh = (ms: number) => ms * 3.6;

@@ -101,9 +101,6 @@ export interface GradeRange {
  */
 export const DEFAULT_GRADE_RANGE: GradeRange = { min: 0, max: 0.25 };
 
-/** Bornes de la couleur de pente à vélo : 15 % y est déjà un mur. */
-export const DEFAULT_CYCLING_GRADE_RANGE: GradeRange = { min: 0, max: 0.15 };
-
 /** Vrai pour des bornes utilisables : finies, basse positive ou nulle, haute au-dessus. */
 export const isValidGradeRange = (range: { min?: unknown; max?: unknown }): range is GradeRange =>
   typeof range.min === 'number' && typeof range.max === 'number' &&

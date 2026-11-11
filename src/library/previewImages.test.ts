@@ -4,8 +4,8 @@ import {
 } from './previewImages';
 
 const PARTS: PreviewImageParts = {
-  cacheKey: 'T|a.gpx|running|null|running',
-  fingerprint: 'running|null|running|1|2|1200|1.9',
+  cacheKey: 'T|a.gpx|wingfoil|null|wingfoil',
+  fingerprint: 'wingfoil|null|wingfoil|1|2|1200|1.9',
   width: 120,
   height: 90,
   pixelRatio: 2,
@@ -18,8 +18,8 @@ describe('clé de l’image d’une vignette', () => {
   it('change avec chacun de ce dont l’image dépend', () => {
     const base = previewImageKey(PARTS);
     const variants: Partial<PreviewImageParts>[] = [
-      { cacheKey: 'T|b.gpx|running|null|running' },
-      { fingerprint: 'running|null|running|1|2|1201|1.9' },
+      { cacheKey: 'T|b.gpx|wingfoil|null|wingfoil' },
+      { fingerprint: 'wingfoil|null|wingfoil|1|2|1201|1.9' },
       { width: 121 },
       { height: 91 },
       { pixelRatio: 3 },

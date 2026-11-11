@@ -12,7 +12,7 @@ import { createFakeFolder } from '../test/memoryFolder.fixture';
  * ceux d'un autre appareil ne réécrivent rien, seul un geste le fait, repris s'il est interrompu.
  */
 
-/** Course de trois points, à 10 s d'écart, partie à `hhmm` le 27/10/2026. */
+/** Trace de trois points, à 10 s d'écart, partie à `hhmm` le 27/10/2026. */
 const gpxAt = gpxAtTime;
 
 /** Fichiers du faux dossier, par chemin ; lectures, écritures et suppressions relevées dans l'ordre. */
@@ -73,12 +73,11 @@ const analysis = (patch: Partial<SessionAnalysis>): SessionAnalysis => ({
 });
 
 /**
- * Surf sans seuil propre, surf au seuil propre, sortie en wing (une course, une course au seuil propre et une
- * sortie à vélo avant le retrait de la terre, lot 305 : les noms des constantes sont restés).
+ * Surf sans seuil propre, surf au seuil propre, sortie en wing.
  */
-const COURSE = '2026-10-27_10-00-00_surf.gpx';
-const COURSE_SEUIL = '2026-10-27_10-30-00_surf.gpx';
-const VELO = '2026-10-27_11-00-00_wingfoil.gpx';
+const SURF = '2026-10-27_10-00-00_surf.gpx';
+const SURF_SEUIL = '2026-10-27_10-30-00_surf.gpx';
+const WING = '2026-10-27_11-00-00_wingfoil.gpx';
 
 const jsonOf = (gpx: string): string => gpx.replace(/\.gpx$/, '.json');
 
@@ -98,9 +97,9 @@ const oldRecord = (gpx: string, hhmm: string, patch: Partial<SessionRecord>): Se
 
 const putSessions = (): void => {
   for (const [gpx, hhmm, patch] of [
-    [COURSE, '10:00', {}],
-    [COURSE_SEUIL, '10:30', { analysis: analysis({ activeThreshold: 5 }) }],
-    [VELO, '11:00', { sport: 'wingfoil', activityId: 'wingfoil' }],
+    [SURF, '10:00', {}],
+    [SURF_SEUIL, '10:30', { analysis: analysis({ activeThreshold: 5 }) }],
+    [WING, '11:00', { sport: 'wingfoil', activityId: 'wingfoil' }],
   ] as [string, string, Partial<SessionRecord>][]) {
     files.set(`sessions/${gpx}`, gpxAt(hhmm));
     files.set(`sessions/${jsonOf(gpx)}`, serializeRecord(oldRecord(gpx, hhmm, patch)));
@@ -166,7 +165,7 @@ describe('la session garde ses réglages (Q57)', () => {
     await settle(first.library);
     setThreshold(first.settings, 'surf', 4);
     await first.library.queueOutdatedRefresh();
-    const carried = diskRecord(COURSE).summary;
+    const carried = diskRecord(SURF).summary;
     expect(carried.activitySettings?.threshold).toBe(4);
 
     // Le second appareil a 7 dans ses réglages, et un stockage neuf.
@@ -177,7 +176,7 @@ describe('la session garde ses réglages (Q57)', () => {
     expect(second.settings.readStoredSettings().thresholds?.surf).toBe(7);
     expect(recordWrites()).toEqual([]);
     expect(gpxReads()).toEqual([]);
-    expect(second.library.librarySession(COURSE)!.record.summary.activitySettings?.threshold).toBe(4);
+    expect(second.library.librarySession(SURF)!.record.summary.activitySettings?.threshold).toBe(4);
     await second.library.queueOutdatedRefresh();
     expect(recordWrites()).toEqual([]);
 
@@ -185,11 +184,11 @@ describe('la session garde ses réglages (Q57)', () => {
     await settle(third.library);
     expect(recordWrites()).toEqual([]);
 
-    // Le geste sur le second appareil : ses courses, une fois.
+    // Le geste sur le second appareil : ses sessions, une fois.
     setThreshold(third.settings, 'surf', 8);
     await third.library.queueOutdatedRefresh();
-    expect(recordWrites().sort()).toEqual([COURSE, COURSE_SEUIL].map(jsonOf).sort());
-    expect(diskRecord(COURSE).summary.activitySettings?.threshold).toBe(8);
+    expect(recordWrites().sort()).toEqual([SURF, SURF_SEUIL].map(jsonOf).sort());
+    expect(diskRecord(SURF).summary.activitySettings?.threshold).toBe(8);
     expect(gestures().pending).toEqual({});
     log.length = 0;
     await third.library.queueOutdatedRefresh();
@@ -209,7 +208,7 @@ describe('la session garde ses réglages (Q57)', () => {
     log.length = 0;
     const second = await openFresh();
     await settle(second.library);
-    expect(recordWrites().sort()).toEqual([COURSE, COURSE_SEUIL].map(jsonOf).sort());
+    expect(recordWrites().sort()).toEqual([SURF, SURF_SEUIL].map(jsonOf).sort());
     expect(gestures().pending).toEqual({});
 
     log.length = 0;
@@ -222,17 +221,17 @@ describe('la session garde ses réglages (Q57)', () => {
     putSessions();
     const first = await openFresh();
     await settle(first.library);
-    const good = files.get(`sessions/${COURSE}`)!;
-    files.set(`sessions/${COURSE}`, 'illisible');
+    const good = files.get(`sessions/${SURF}`)!;
+    files.set(`sessions/${SURF}`, 'illisible');
     setThreshold(first.settings, 'surf', 4);
     await first.library.queueOutdatedRefresh();
     expect(gestures().pending).toEqual({ surf: { threshold: 4 } });
 
-    files.set(`sessions/${COURSE}`, good);
+    files.set(`sessions/${SURF}`, good);
     log.length = 0;
     const second = await openFresh();
     await settle(second.library);
-    expect(recordWrites()).toEqual([jsonOf(COURSE)]);
+    expect(recordWrites()).toEqual([jsonOf(SURF)]);
     expect(gestures().pending).toEqual({});
   });
 
@@ -256,7 +255,7 @@ describe('la session garde ses réglages (Q57)', () => {
     expect(second.settings.readStoredSettings().thresholds?.surf).toBe(9);
     expect(recordWrites()).toEqual([]);
     expect(gestures().pending).toEqual({});
-    expect(diskRecord(COURSE).summary.activitySettings?.threshold).toBe(4);
+    expect(diskRecord(SURF).summary.activitySettings?.threshold).toBe(4);
   });
 
   it("« Reprendre » le fichier d'un autre appareil compte comme un geste : ses sessions suivent à la réouverture", async () => {
@@ -273,15 +272,15 @@ describe('la session garde ses réglages (Q57)', () => {
     log.length = 0;
     const second = await openFresh();
     await settle(second.library);
-    expect(recordWrites().sort()).toEqual([COURSE, COURSE_SEUIL].map(jsonOf).sort());
-    expect(diskRecord(COURSE).summary.activitySettings?.threshold).toBe(9);
+    expect(recordWrites().sort()).toEqual([SURF, SURF_SEUIL].map(jsonOf).sort());
+    expect(diskRecord(SURF).summary.activitySettings?.threshold).toBe(9);
     expect(gestures().pending).toEqual({});
   });
 
   it('pré-réglages mis à jour avant la fin d\'une ouverture lente, à la toute première comparaison : un geste quand même', async () => {
     putSessions();
-    const keyed = oldRecord(VELO, '11:00', { sport: 'wingfoil', activityId: 'wingfoil' });
-    files.set(`sessions/${jsonOf(VELO)}`, serializeRecord({ ...keyed, summary: { ...keyed.summary, optionsKey: JSON.stringify([7, null, null, null]) } }));
+    const keyed = oldRecord(WING, '11:00', { sport: 'wingfoil', activityId: 'wingfoil' });
+    files.set(`sessions/${jsonOf(WING)}`, serializeRecord({ ...keyed, summary: { ...keyed.summary, optionsKey: JSON.stringify([7, null, null, null]) } }));
     // Réglages d'une version d'avant : le seuil de la wing sera effacé par la mise à jour des pré-réglages.
     stored.set('tracker.sportSettings', JSON.stringify({ thresholds: { wingfoil: 7 }, presetsVersion: 0 }));
     vi.resetModules();
@@ -295,9 +294,9 @@ describe('la session garde ses réglages (Q57)', () => {
     await settle(library);
     await library.settingsUpgraded();
     await settle(library);
-    for (let i = 0; i < 500 && diskRecord(VELO).summary.activitySettings === undefined; i++) await tick();
-    expect(diskRecord(VELO).summary.activitySettings?.threshold).not.toBe(7);
-    expect(diskRecord(VELO).summary.activitySettings).toBeDefined();
+    for (let i = 0; i < 500 && diskRecord(WING).summary.activitySettings === undefined; i++) await tick();
+    expect(diskRecord(WING).summary.activitySettings?.threshold).not.toBe(7);
+    expect(diskRecord(WING).summary.activitySettings).toBeDefined();
     expect(gestures().pending).toEqual({});
   });
 
@@ -339,12 +338,12 @@ describe('la session garde ses réglages (Q57)', () => {
     }));
     await first.library.queueOutdatedRefresh();
     expect(recordWrites()).toEqual([]);
-    expect(diskRecord(COURSE).summary.activitySettings?.threshold).toBe(4);
+    expect(diskRecord(SURF).summary.activitySettings?.threshold).toBe(4);
   });
 
   it('seuil propre retiré sur une ancienne fiche : retour au réglage de l\'appareil, pas au seuil retiré', async () => {
     putSessions();
-    const gpx = COURSE_SEUIL;
+    const gpx = SURF_SEUIL;
     const old = oldRecord(gpx, '10:30', { analysis: analysis({ activeThreshold: 12 }) });
     const key = JSON.stringify([12, null, false, null]);
     files.set(`sessions/${jsonOf(gpx)}`, serializeRecord({ ...old, summary: { ...old.summary, optionsKey: key } }));
@@ -368,13 +367,13 @@ describe('la session garde ses réglages (Q57)', () => {
     setThreshold(settings, 'surf', 4);
     await library.queueOutdatedRefresh();
     log.length = 0;
-    const walking = settings.readStoredActivities().find((a) => a.id !== 'surf' && a.base === 'surf');
-    expect(walking).toBeDefined();
-    setThreshold(settings, walking!.id, 2);
-    library.updateSessionRecord(COURSE, { activityId: walking!.id });
+    const other = settings.readStoredActivities().find((a) => a.id !== 'surf' && a.base === 'surf');
+    expect(other).toBeDefined();
+    setThreshold(settings, other!.id, 2);
+    library.updateSessionRecord(SURF, { activityId: other!.id });
     for (let i = 0; i < 200 && recordWrites().length === 0; i++) await new Promise((r) => setTimeout(r, 10));
     await tick();
-    expect(diskRecord(COURSE).summary.activitySettings?.threshold).toBe(2);
+    expect(diskRecord(SURF).summary.activitySettings?.threshold).toBe(2);
   });
 });
 
@@ -383,9 +382,9 @@ describe('résumés refaits quand les réglages changent (lot 37)', () => {
     putSessions();
     const { library } = await openFresh();
     await settle(library);
-    expect(gpxReads().sort()).toEqual([COURSE, COURSE_SEUIL, VELO].sort());
-    expect(recordWrites().sort()).toEqual([COURSE, COURSE_SEUIL, VELO].map(jsonOf).sort());
-    for (const gpx of [COURSE, COURSE_SEUIL, VELO]) expect(diskRecord(gpx).summary.optionsKey).toBeTypeOf('string');
+    expect(gpxReads().sort()).toEqual([SURF, SURF_SEUIL, WING].sort());
+    expect(recordWrites().sort()).toEqual([SURF, SURF_SEUIL, WING].map(jsonOf).sort());
+    for (const gpx of [SURF, SURF_SEUIL, WING]) expect(diskRecord(gpx).summary.optionsKey).toBeTypeOf('string');
     expect(library.readLibraryState().toUpdate).toBe(0);
 
     log.length = 0;
@@ -396,24 +395,24 @@ describe('résumés refaits quand les réglages changent (lot 37)', () => {
     expect(second.library.readLibraryState().sessions).toHaveLength(3);
   });
 
-  it("seuil de Course changé application fermée : à l'ouverture, les courses sont refaites, seuil propre compris, chiffres de celle-ci identiques", async () => {
+  it("seuil du surf changé application fermée : à l'ouverture, les sessions de surf sont refaites, seuil propre compris, chiffres de celle-ci identiques", async () => {
     putSessions();
     const first = await openFresh();
     await settle(first.library);
     setThreshold(first.settings, 'surf', 4);
 
-    const ownBefore = diskRecord(COURSE_SEUIL).summary;
+    const ownBefore = diskRecord(SURF_SEUIL).summary;
     log.length = 0;
     const { library } = await openFresh();
     await settle(library);
-    expect(gpxReads().sort()).toEqual([COURSE, COURSE_SEUIL].sort());
-    expect(recordWrites().sort()).toEqual([COURSE, COURSE_SEUIL].map(jsonOf).sort());
-    const ownAfter = diskRecord(COURSE_SEUIL).summary;
+    expect(gpxReads().sort()).toEqual([SURF, SURF_SEUIL].sort());
+    expect(recordWrites().sort()).toEqual([SURF, SURF_SEUIL].map(jsonOf).sort());
+    const ownAfter = diskRecord(SURF_SEUIL).summary;
     expect(ownAfter.activitySettings?.threshold).toBe(4);
     expect({ ...ownAfter, activitySettings: null }).toEqual({ ...ownBefore, activitySettings: null });
-    const course = library.librarySession(COURSE)!;
-    expect(course.record.summary.optionsKey).toBe(diskRecord(COURSE).summary.optionsKey);
-    expect(course.record.summary.optionsKey).not.toBe(library.librarySession(COURSE_SEUIL)!.record.summary.optionsKey);
+    const surf = library.librarySession(SURF)!;
+    expect(surf.record.summary.optionsKey).toBe(diskRecord(SURF).summary.optionsKey);
+    expect(surf.record.summary.optionsKey).not.toBe(library.librarySession(SURF_SEUIL)!.record.summary.optionsKey);
   });
 
   it("seuil changé en cours d'utilisation : seules les sessions de l'activité sont refaites ; une trace illisible n'est tentée qu'une fois", async () => {
@@ -428,22 +427,22 @@ describe('résumés refaits quand les réglages changent (lot 37)', () => {
 
     setThreshold(settings, 'surf', 4);
     await library.queueOutdatedRefresh();
-    expect(gpxReads().sort()).toEqual([COURSE, COURSE_SEUIL].sort());
-    expect(recordWrites().sort()).toEqual([COURSE, COURSE_SEUIL].map(jsonOf).sort());
+    expect(gpxReads().sort()).toEqual([SURF, SURF_SEUIL].sort());
+    expect(recordWrites().sort()).toEqual([SURF, SURF_SEUIL].map(jsonOf).sort());
 
-    // Le GPX du vélo devient illisible : tenté une fois, signalé, puis laissé jusqu'à la prochaine ouverture.
-    files.set(`sessions/${VELO}`, 'illisible');
+    // Le GPX du wing devient illisible : tenté une fois, signalé, puis laissé jusqu'à la prochaine ouverture.
+    files.set(`sessions/${WING}`, 'illisible');
     log.length = 0;
     setThreshold(settings, 'wingfoil', 15);
     await library.queueOutdatedRefresh();
-    expect(gpxReads()).toEqual([VELO]);
+    expect(gpxReads()).toEqual([WING]);
     expect(recordWrites()).toEqual([]);
-    expect(library.readLibraryState().unreadable).toEqual([VELO]);
+    expect(library.readLibraryState().unreadable).toEqual([WING]);
     log.length = 0;
     setThreshold(settings, 'wingfoil', 16);
     await library.queueOutdatedRefresh();
     expect(gpxReads()).toEqual([]);
-    expect(library.readLibraryState().unreadable).toEqual([VELO]);
+    expect(library.readLibraryState().unreadable).toEqual([WING]);
     expect(library.readLibraryState().toUpdate).toBe(0);
   });
 
@@ -469,9 +468,9 @@ describe('résumés refaits quand les réglages changent (lot 37)', () => {
     }
     await settle(library);
     expect(seen).toBe(2);
-    expect(gpxReads().sort()).toEqual([COURSE, COURSE_SEUIL].sort());
-    expect(recordWrites().sort()).toEqual([COURSE, COURSE_SEUIL].map(jsonOf).sort());
-    expect(diskRecord(COURSE).summary.activitySettings?.threshold).toBe(4);
+    expect(gpxReads().sort()).toEqual([SURF, SURF_SEUIL].sort());
+    expect(recordWrites().sort()).toEqual([SURF, SURF_SEUIL].map(jsonOf).sort());
+    expect(diskRecord(SURF).summary.activitySettings?.threshold).toBe(4);
     expect(library.readLibraryState().toUpdate).toBe(0);
     // Le fichier de réglages de l'appareil part 2 s après la saisie : attendu ici, pour ne rien laisser derrière le test.
     await new Promise((r) => setTimeout(r, 1200));

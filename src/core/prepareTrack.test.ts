@@ -17,7 +17,7 @@ import type { RawTrackPoint, SportType } from './types';
 /**
  * `prepareTrack` (lot 126 B) rend ce que `useGpxSession` dérivait en `useMemo` avant d'aller dans le worker : la
  * copie gelée ci-dessous est l'enchaînement du hook tel qu'il était (version 0.4.77), recopié tel quel. Égalité
- * stricte, à 1 Hz et à 5 Hz, en voile avec et sans allure imposée, à pied, sans profil, avec trou et pause.
+ * stricte, à 1 Hz et à 5 Hz, en voile avec et sans allure imposée, avec ou sans profil, avec trou et pause.
  */
 
 /** Copie gelée de l'enchaînement de `useGpxSession` avant le lot 126 B : ne pas la faire évoluer avec le code. */
@@ -52,7 +52,7 @@ describe('prepareTrack : mêmes sorties que l’enchaînement de useGpxSession',
       }
     });
 
-    it(`à pied, sans profil, avec trou et pause, à ${hz} Hz`, () => {
+    it(`avec ou sans profil, avec trou et pause, à ${hz} Hz`, () => {
       const raw = holeRaw(sailRaw({ windDeg: 0, legs: upDownLegs(2, 90), hz }), 60, 75);
       const paused: RawTrackPoint[] = raw.map((p, i) => (i === Math.floor(raw.length * 0.7) ? { ...p, segmentStart: true as const } : p));
       const text = gpxOf(paused);

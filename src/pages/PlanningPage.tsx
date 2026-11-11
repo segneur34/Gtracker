@@ -39,7 +39,7 @@ import { DEFAULT_MAP_CENTER, trackBounds } from '../core/displayConfig';
 import { parseGpxPath } from '../core/gpxParser';
 import { ELEVATION_PRESETS, usesMarkCourse } from '../core/sportProfiles';
 import { useExclusiveToggles } from '../hooks/useExclusiveToggles';
-import { DISTANCE_UNIT_SYMBOL, formatDistance, formatDuration, formatLandSpeed, toDisplayDistance, formatMeters, commaDecimal } from '../core/units';
+import { DISTANCE_UNIT_SYMBOL, formatDistance, toDisplayDistance, formatMeters, commaDecimal } from '../core/units';
 import { useLeaveWarning } from '../hooks/leaveGuard';
 import { useGoOnRoute } from '../hooks/useGoOnRoute';
 import { useMapBase } from '../hooks/useMapBase';
@@ -47,14 +47,12 @@ import { useOpenSections } from '../hooks/useOpenSections';
 import { usePlannedRoute, type ImportedElevationStatus } from '../hooks/usePlannedRoute';
 import { getLastFix, useRecorderStatus } from '../hooks/useRecorder';
 import { useRouteLibrary, type SavedRoute } from '../hooks/useRouteLibrary';
-import { useRunnerProfile } from '../hooks/useRunnerProfile';
 import {
-  effectiveDistanceUnit, effectiveDurationSettings, effectiveGradeRange, effectiveLoopReturnRatio, effectiveMarkGuide, effectivePace, effectiveSpeedUnit, effectiveWayTypes, lastRecordActivity, useVisibility,
+  effectiveDistanceUnit, effectiveGradeRange, effectiveLoopReturnRatio, effectiveMarkGuide, effectiveSpeedUnit, effectiveWayTypes, lastRecordActivity, useVisibility,
 } from '../hooks/useSportSettings';
 import { PLANNING_FAMILIES } from '../settings/activitySettings';
 import { ROUTES_DIR } from '../library/folderLayout';
 import { guessSport } from '../library/naming';
-import { PACE_LEVEL_LABEL, estimateDurationFromProfile } from '../planning/duration';
 import { shownRoutes } from '../planning/routeShown';
 import { isAbortError } from '../planning/fetchJson';
 import { searchPlaces, type Place } from '../planning/geocoding';
@@ -86,8 +84,7 @@ import { jsonStore } from '../platform/storage';
  * changer, directement ou par l'activité, recalcule tout l'itinéraire
  * (`setRouteMode`) ; dessous, des onglets ouvrent les blocs (général, surface, tracé,
  * points, enregistrer, mes itinéraires), comme dans les analyses. Distance, dénivelés et profil d'altitude se mettent à jour
- * à chaque calcul, avec le temps estimé en course et à vélo (niveau choisi
- * dans Réglages) et le revêtement des voies suivies (`planning/surface.ts`). L'itinéraire s'enregistre dans `itineraires/` du dossier
+ * à chaque calcul, avec le revêtement des voies suivies (`planning/surface.ts`). L'itinéraire s'enregistre dans `itineraires/` du dossier
  * mémoire, avec son GPX.
  *
  * En voile et en surf, c'est un parcours : des balises numérotées, reliées en ligne
@@ -341,9 +338,6 @@ function PlanningPage() {
   /** Parcours de balises (voile, surf) : balises numérotées, tronçons en ligne droite, bloc « Parcours » au lieu du dénivelé. */
   const markCourse = activity !== null && usesMarkCourse(activityFamily(activity));
   const distanceUnit = activity ? effectiveDistanceUnit(activity) : 'km';
-  const speedUnit = activity ? effectiveSpeedUnit(activity) : 'kmh';
-  /** Le kilomètre-effort (100 m de D+ comptent 1 km), dit dans l'unité de distance de l'activité. */
-  const effortDistance = `${commaDecimal(toFixedNumber(toDisplayDistance(1000, distanceUnit), 2))} ${DISTANCE_UNIT_SYMBOL[distanceUnit]}`;
   const minGainM = ELEVATION_PRESETS.route.minGainM;
   const gradeRange = useMemo(() => (activity ? effectiveGradeRange(activity) : null), [activity]);
   const color = safeColor(activity?.color ?? FALLBACK_COLOR);
@@ -351,10 +345,6 @@ function PlanningPage() {
   // Sans activité, le fond de la voile (lot 305).
   const mapFamily = activity ? activityFamily(activity) : 'voile';
   const satellite = useMapBase(mapFamily)[0] === 'satellite';
-  const riderKg = useRunnerProfile().profile.weightKg;
-  /** Réglage du temps estimé : niveau de l'activité dans Réglages ; `null` en voile. */
-  const durationSettings = useMemo(() => (activity ? effectiveDurationSettings(activity, riderKg) : null), [activity, riderKg]);
-  const pace = useMemo(() => (activity ? effectivePace(activity) : null), [activity]);
 
   const vehicle = routeVehicle(activity ? activityTreatment(activity) : 'voile');
   /** Retour d'une boucle : au plus tant de fois l'aller (Réglages) ; `null` en voile. */
@@ -520,8 +510,6 @@ function PlanningPage() {
 
   /** Profil à pas régulier ; ses lignes portent la position du repère de survol sur la carte. */
   const profile = useMemo(() => routeProfileRows(points), [points]);
-  /** Temps estimé, sur les totaux et le profil déjà calculés. */
-  const durationS = useMemo(() => estimateDurationFromProfile(totals, profile, durationSettings), [totals, profile, durationSettings]);
   const { zoom, chartRows, gradeStops, gradientId, readProfile } = useRouteProfileChart(profile, distanceUnit, gradeRange);
   const hasElevation = totals.gainM !== null && chartRows.some((r) => r.altitude !== null);
   /** Tracé coloré par la pente, sur les lignes du profil (tous les 10 m), tant que le bloc Général est ouvert. */
@@ -1061,27 +1049,15 @@ function PlanningPage() {
             </PlanBlock>
           ) : (
             <PlanBlock id="planning.profil" label="Général" open={open.profil} onToggle={() => toggle('profil')}
-              helpKey={(hasElevation && gradeRange) || (durationSettings && pace) ? 'plan:general' : undefined}>
+              helpKey={hasElevation && gradeRange ? 'plan:general' : undefined}>
               <HelpText helpKey="plan:general" note>
                 {hasElevation && gradeRange && 'Pour zoomer : écartez deux doigts ou touchez deux fois la courbe ; à la souris, tirez une zone ou double-cliquez. '}
-                {durationSettings && pace && (
-                  <>
-                    Temps estimé au niveau {PACE_LEVEL_LABEL[pace.level].toLowerCase()}, {formatLandSpeed(pace.flatSpeedMs, speedUnit, distanceUnit)} sur le plat
-                    {durationSettings.family === 'course' ? `, chaque 100 m de D+ comptant ${effortDistance}` : ''} : à régler dans <Link to="/parametres">Réglages</Link>.
-                  </>
-                )}
               </HelpText>
-              <div className={durationSettings ? 'plan-stats plan-stats--four' : 'plan-stats'}>
+              <div className="plan-stats">
                 {/* Au-delà de 100 km, une décimale : le chiffre tient dans sa case sur téléphone. */}
                 <div className="plan-stat"><span>Distance</span><strong className="num">{formatDistance(totals.distanceM, distanceUnit, toDisplayDistance(totals.distanceM, distanceUnit) >= 100 ? 1 : 2)}</strong></div>
                 <div className="plan-stat"><span>D+</span><strong className="num">{formatMeters(totals.gainM)}</strong></div>
                 <div className="plan-stat"><span>D−</span><strong className="num">{formatMeters(totals.lossM)}</strong></div>
-                {durationSettings && (
-                  <div className="plan-stat">
-                    <span>Temps</span>
-                    <strong className="num">{durationS !== null ? `≈ ${formatDuration(durationS * 1000)}` : '—'}</strong>
-                  </div>
-                )}
               </div>
 
               {importedElevationText && <p className="plan-note">{importedElevationText}</p>}

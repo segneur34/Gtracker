@@ -1,6 +1,6 @@
 import { roundBearingDeg } from '../core/angles';
 import { errorMessage } from '../core/basics';
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type RefObject } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ChangeEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import ActivitySelect from '../components/ActivitySelect';
 import BeltStatus from '../components/BeltStatus';
@@ -8,7 +8,6 @@ import { zoneLabel } from '../components/heartRateColors';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import HoldButton from '../components/ui/HoldButton';
-import FollowedElevation from '../components/FollowedElevation';
 import FollowTracePicker from '../components/FollowTracePicker';
 import PageHeader from '../components/ui/PageHeader';
 import SegmentedControl from '../components/ui/SegmentedControl';
@@ -36,7 +35,7 @@ import { useMissingPermissions } from '../hooks/usePermissions';
 import { setBeepsMuted, skipMark, useMarkGuide } from '../hooks/useMarkGuide';
 import { usePerActivityChoice } from '../hooks/usePerActivityChoice';
 import { useOpenSections } from '../hooks/useOpenSections';
-import { useNarrowScreen, usePhoneLandscape } from '../hooks/useNarrowScreen';
+import { usePhoneLandscape } from '../hooks/useNarrowScreen';
 import { readHeartRateZoneBounds } from '../hooks/useRunnerProfile';
 import {
   effectiveDistanceUnit, effectiveFoil, effectiveHeartRate, effectiveJumpSettings, effectiveLiveFields, effectivePumping, effectiveSpeedUnit, effectiveStopHoldMs, effectiveTurns, lastRecordActivity, rememberRecordActivity, useVisibility,
@@ -55,7 +54,6 @@ import {
   resumeRecording, startRecording, stopRecording, stopRecordingBeltSearch, type RecorderState,
   useLivePosition, useRecordingClock, useRecorderSelector,
 } from '../hooks/useRecorder';
-import { followedProfile } from '../recording/followedProfile';
 import { followedTraceLengthM, splitFollowedTrace, type FollowProgress, type FollowedTrace } from '../recording/followedTrace';
 import { travelHeading } from '../recording/heading';
 import {
@@ -84,8 +82,7 @@ import './RecordingPage.css';
  * « Suivre une trace » choisit un itinéraire rangé ou une session déjà
  * enregistrée, dessiné sous la trace en cours, la partie faite en gris, avec
  * la distance restante le long de la trace ; au repos, la carte le montre en
- * aperçu. À terre, « Dénivelé » ouvre son profil sous la carte, avec la position
- * (`FollowedElevation`). En voile, un itinéraire est un parcours : ses balises se valident
+ * aperçu. En voile, un itinéraire est un parcours : ses balises se valident
  * une à une, avec des bips d'approche (`useMarkGuide`), et l'avancement se
  * compte par balises.
  *
@@ -273,37 +270,8 @@ const liveSummaryItems = (
   }));
 };
 
-/** Carte de l'enregistrement en cours, réduite ou non, et dénivelé de la trace suivie, ouvert ou non ; mémorisé sur l'appareil. */
-const RECORDING_SECTION_DEFAULTS = { carte: true, denivele: false };
-
-/**
- * Téléphone debout, dénivelé ouvert pendant un enregistrement : la feuille de
- * style raccourcit la carte pour que carte et graphe tiennent à l'écran
- * (`rec-page--fit`). Il lui manque deux mesures, que seule la page connaît : le
- * haut de la carte, qui dépend de ce qui la précède (nom de la trace, alertes), et
- * la hauteur du graphe. Ce qui les change change aussi la hauteur de la page.
- */
-const useRecMapFit = (page: RefObject<HTMLDivElement | null>, active: boolean): void => {
-  useLayoutEffect(() => {
-    const element = page.current;
-    if (!active || !element) return;
-    const measure = () => {
-      const map = element.querySelector('.rec-map');
-      const elevation = element.querySelector('.rec-elevation');
-      if (!map || !elevation) return;
-      element.style.setProperty('--rec-fit-top', `${map.getBoundingClientRect().top + window.scrollY}px`);
-      element.style.setProperty('--rec-fit-elevation', `${elevation.getBoundingClientRect().height}px`);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => {
-      observer.disconnect();
-      element.style.removeProperty('--rec-fit-top');
-      element.style.removeProperty('--rec-fit-elevation');
-    };
-  }, [page, active]);
-};
+/** Carte de l'enregistrement en cours, réduite ou non ; mémorisé sur l'appareil. */
+const RECORDING_SECTION_DEFAULTS = { carte: true };
 
 /**
  * « Arrêter » : tenu le temps réglé dans Réglages (2 s par défaut), pour qu'un
@@ -407,13 +375,11 @@ interface FollowedProps {
  * position (position et cap), à chaque calcul du direct (trace, avancement) et
  * à chaque pas du guidage, sans le reste de la page.
  */
-function RecordingMap({ busy, followed, courseMarksOf, liveActivity, family, onReduce, hoverPoints }: FollowedProps & {
+function RecordingMap({ busy, followed, courseMarksOf, liveActivity, family, onReduce }: FollowedProps & {
   busy: boolean;
   liveActivity: Activity | null;
   family: SportFamily;
   onReduce: () => void;
-  /** Lignes du graphe de dénivelé ouvert : son survol pose un repère sur la carte. */
-  hoverPoints?: ReadonlyArray<{ lat: number; lon: number }>;
 }) {
   // La carte suit chaque position gardée, et en pause manuelle chaque position reçue (le GPS reste allumé), avec son cap.
   const livePosition = useLivePosition();
@@ -448,7 +414,6 @@ function RecordingMap({ busy, followed, courseMarksOf, liveActivity, family, onR
         guide={guide.remaining} guideDone={guide.done} travel={travel}
         marks={mapMarks} validationRadiusM={markGuide.active ? markGuide.validationRadiusM : undefined}
         notes={busy ? notes : undefined}
-        hoverPoints={hoverPoints}
         color={FAMILY_SHADES[liveActivity ? sportFamily(liveActivity.base) : 'voile'][0]}
         family={liveActivity ? activityFamily(liveActivity) : family}
         overlay={busy ? (
@@ -607,7 +572,7 @@ function RecordingScreen() {
   const followed = useFollowedTrace();
   const [picking, setPicking] = useState(false);
   const native = isNativeApp();
-  const { open: shown, toggle: toggleShown } = useOpenSections<'carte' | 'denivele'>('recording', RECORDING_SECTION_DEFAULTS);
+  const { open: shown, toggle: toggleShown } = useOpenSections<'carte'>('recording', RECORDING_SECTION_DEFAULTS);
 
   // Famille puis activité : celle demandée par l'adresse (`?activite=`), sinon celle de la trace suivie, sinon la dernière
   // enregistrée.
@@ -718,14 +683,6 @@ function RecordingScreen() {
   // Parcours de balises : la trace suivie a des balises et l'activité navigue sur un parcours (voile, surf). L'avancement se compte par balises.
   const courseMarksOf = followed?.marks && liveActivity && usesMarkCourse(sportFamily(liveActivity.base)) ? followed.marks : null;
   const followedLengthM = useMemo(() => (followed ? followedTraceLengthM(followed) : 0), [followed]);
-  // Dénivelé de la trace suivie : à terre seulement (course, vélo), jamais proposé en voile ni en surf depuis le lot 305 ;
-  // l'affichage reste, jusqu'au retrait de la terre de l'enregistrement.
-  const elevationOffered: boolean = false;
-  const elevationShown = elevationOffered && shown.denivele;
-  const pageRef = useRef<HTMLDivElement>(null);
-  const phoneUpright = useNarrowScreen() && !landscape;
-  const mapFit = phoneUpright && elevationShown && busy && !mapReduced;
-  useRecMapFit(pageRef, mapFit);
 
   const handleReplayFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -796,7 +753,7 @@ function RecordingScreen() {
   };
 
   return (
-    <div ref={pageRef} className={mapFit ? 'ui-page rec-page rec-page--fit' : 'ui-page rec-page'}>
+    <div className="ui-page rec-page">
       <PageHeader title="Enregistrer" subtitle="Une position par seconde, gardée brute : l'analyse se fait ensuite." />
 
       {!busy && !pending && <Card className="rec-options">
@@ -988,9 +945,6 @@ function RecordingScreen() {
             Trace suivie : <strong>{followed.name}</strong>{followed.source === 'session' ? ' (session)' : ''}
             {liveActivity && <> · {formatDistance(followedLengthM, effectiveDistanceUnit(liveActivity), 1)}</>}
           </span>
-          {elevationOffered && (
-            <Button size="s" variant={shown.denivele ? 'secondary' : 'ghost'} aria-pressed={shown.denivele} onClick={() => toggleShown('denivele')}>Dénivelé</Button>
-          )}
           <Button size="s" variant="ghost" onClick={clearFollowedTrace}>Retirer</Button>
         </div>
       )}
@@ -1013,12 +967,11 @@ function RecordingScreen() {
 
       {(busy || (followed && !pending)) && !mapReduced && (
         <RecordingMap busy={busy} followed={followed} courseMarksOf={courseMarksOf} liveActivity={liveActivity} family={family}
-          onReduce={() => toggleShown('carte')} hoverPoints={elevationShown && followed ? followedProfile(followed).rows : undefined} />
+          onReduce={() => toggleShown('carte')} />
       )}
 
       {/* Carte réduite : elle n'est plus dessinée, les vitesses prennent sa place ; tourné, elles sont à côté d'elle. */}
       {mapReduced && <Button variant="secondary" block onClick={() => toggleShown('carte')}>Afficher la carte</Button>}
-      {elevationShown && followed && liveActivity && <FollowedElevation trace={followed} activity={liveActivity} busy={busy} />}
       {busy && (
         <RecordingFigures summaryShown={summaryShown} clockShown={clockShown} liveActivity={liveActivity} followed={followed}
           courseMarksOf={courseMarksOf} followedLengthM={followedLengthM} />

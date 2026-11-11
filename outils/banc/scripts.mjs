@@ -57,7 +57,6 @@ export const SCRIPTS = [
     manuel: 'course et vélo retirés (303), à revoir' },
   { nom: 'coquille', args: ['{port}', '{captures?}'], pages: ['voile', 'course', 'velo', 'surf', 'fractionne'],
     manuel: 'course et vélo retirés (303), à revoir' },
-  { nom: 'denivele-direct', args: ['{port}', '{travail}', '{captures?}'], pages: ['enregistrer'], solo: true },
   { nom: 'donnees', args: ['{port}', '{travail}', '{captures?}'], pages: ['bibliotheque', 'velo', 'accueil', 'profil'], dev: true,
     manuel: 'course et vélo retirés (303), à revoir' },
   { nom: 'familles', args: ['{port}', '{captures?}'], pages: ['reglages'] },

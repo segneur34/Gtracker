@@ -1,21 +1,19 @@
 import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Activity } from '../core/activities';
-import { ELEVATION_PRESETS } from '../core/sportProfiles';
-import { formatDistance, formatDuration } from '../core/units';
+import { formatDistance } from '../core/units';
 import { useGoOnRoute } from '../hooks/useGoOnRoute';
 import type { SavedRoute } from '../hooks/useRouteLibrary';
-import { useRunnerProfile } from '../hooks/useRunnerProfile';
-import { effectiveDistanceUnit, effectiveDurationSettings } from '../hooks/useSportSettings';
+import { effectiveDistanceUnit } from '../hooks/useSportSettings';
 import { useThemedShade } from '../hooks/useTheme';
-import { routeActivity, routeDistanceM, routeDurationS } from '../planning/routeList';
+import { routeActivity, routeDistanceM } from '../planning/routeList';
 import ActivityIcon from './ActivityIcon';
 import Button from './ui/Button';
 import './RouteList.css';
 
 /**
  * Liste d'itinéraires rangés : nom, activité, distance dans l'unité de son
- * activité, temps estimé en course et à vélo (niveau de Réglages), date. Commune à l'accueil, aux bibliothèques Voile et Course
+ * activité, date. Commune à l'accueil, aux bibliothèques Voile et Surf
  * (vue « Planifiées ») et à la page Itinéraires (« Mes itinéraires »).
  *
  * Toucher un itinéraire l'ouvre dans la page Itinéraires
@@ -41,20 +39,13 @@ const routePath = (saved: SavedRoute): string => `/itineraires?itineraire=${enco
 
 function RouteList({ routes, activities, onOpen, currentBase = null, actions, go: withGo = true }: RouteListProps) {
   const distances = useMemo(() => new Map(routes.map((s) => [s.base, routeDistanceM(s.record)])), [routes]);
-  const riderKg = useRunnerProfile().profile.weightKg;
   const shown = useThemedShade();
-  const durations = useMemo(() => new Map(routes.map((s) => {
-    const activity = routeActivity(s, activities);
-    const settings = activity ? effectiveDurationSettings(activity, riderKg) : null;
-    return [s.base, activity && settings ? routeDurationS(s.record, ELEVATION_PRESETS.route.minGainM, settings) : null];
-  })), [routes, activities, riderKg]);
   const { go, canGo } = useGoOnRoute();
 
   return (
     <ul className="route-list">
       {routes.map((saved) => {
         const activity = routeActivity(saved, activities);
-        const duration = durations.get(saved.base) ?? null;
         const body = (
           <>
             <strong>{saved.record.name}</strong>
@@ -66,7 +57,6 @@ function RouteList({ routes, activities, onOpen, currentBase = null, actions, go
               <span className="num">
                 {' · '}
                 {formatDistance(distances.get(saved.base) ?? 0, activity ? effectiveDistanceUnit(activity) : 'km')}
-                {duration !== null && ` · ≈ ${formatDuration(duration * 1000)}`}
                 {' · '}
                 {new Date(saved.record.updatedAt).toLocaleDateString('fr-FR')}
               </span>

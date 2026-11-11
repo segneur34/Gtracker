@@ -47,9 +47,8 @@ describe('icônes des activités', () => {
   it('le choix de Réglages prime, et se relit', () => {
     const chosen = { ...moth, icon: 'planche' as const };
     expect(activityIcon(chosen)).toBe('planche');
-    // Une icône inconnue, ou de l'application complète (course, vélo, fractionné, lot 305), est ignorée.
-    const [kept, ignored, land] = readActivities([chosen, { ...moth, id: 'a-autre', icon: 'pétanque' }, { ...moth, id: 'a-velo', icon: 'gravel' }]);
-    expect('icon' in land).toBe(false);
+    // Une icône inconnue est ignorée.
+    const [kept, ignored] = readActivities([chosen, { ...moth, id: 'a-autre', icon: 'pétanque' }]);
     expect(kept).toEqual(chosen);
     expect('icon' in ignored).toBe(false);
   });

@@ -33,8 +33,6 @@ export const SCREEN_BREAKPOINTS = {
   recordingNarrow: '(max-width: 699.98px)',
   /** Barre du haut resserrée sur un ordinateur étroit (`AppShell.css`). */
   topbarTight: '(max-width: 1199.98px)',
-  /** Planification, grand écran (`PlanningPage.css`). */
-  planningWide: '(min-width: 1200px)',
   /** Mouvement réduit demandé au système (case du bouton glissant, `ui.css` ; animation de la racine du Profil). */
   reducedMotion: '(prefers-reduced-motion: reduce)',
   /** Survol réservé aux pointeurs qui survolent : au toucher, un `:hover` reste collé au bouton (lot 143). */

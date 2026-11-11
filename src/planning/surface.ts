@@ -10,8 +10,7 @@ import type { RouteLeg, RoutePoint } from './route';
  * Revêtement d'un itinéraire ou d'une session, en catégories à la Komoot
  * (Asphalte, Gravillon, Non pavé…), d'après les étiquettes OpenStreetMap des
  * voies suivies : celles que rend BRouter pour un tronçon calculé
- * (`brouter.ts`), ou celles des voies au plus près d'une trace enregistrée
- * (`overpass.ts`, `wayMatch.ts`).
+ * (`brouter.ts`), ou celles d'une fiche de session qui les a gardées.
  *
  * Seules les étiquettes qui décident du revêtement sont gardées
  * (`SURFACE_TAG_KEYS`), en texte `clé=valeur` séparé d'espaces, la forme de
@@ -429,16 +428,15 @@ export const routeSurfacePaths = (legs: ReadonlyArray<RouteLeg>): (SurfacePath[]
   legs.map((leg) => (leg.status === 'ready' ? surfacePaths(leg.points, legSurfaceStretches(leg.points, knownLegSurfaces(leg))) : null));
 
 /**
- * Voies suivies par la trace, demandées à OpenStreetMap (`planning/overpass.ts`)
- * à la première ouverture de l'onglet « surface », puis gardées dans sa fiche (`SessionRecord.surfaces`, brute : lue ici depuis le lot 301) : elles ne se
- * recalculent pas sans réseau. Les débuts des morceaux sont des décalages en
+ * Voies suivies par la trace, demandées jadis à OpenStreetMap et gardées dans
+ * sa fiche (`SessionRecord.surfaces`, brute : lue ici depuis le lot 301). Les débuts des morceaux sont des décalages en
  * millisecondes depuis `startMs`, l'instant du premier point apparié.
  */
 export interface SessionSurfaces extends SurfaceRuns {
   source: 'overpass';
   /** Date ISO de la demande. */
   fetchedAt: string;
-  /** Version de l'appariement (`WAY_MATCH_VERSION`) : une plus ancienne est refaite. */
+  /** Version de l'appariement qui a écrit ces voies. */
   matchVersion: number;
   startMs: number;
 }

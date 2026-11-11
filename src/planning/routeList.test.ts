@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Activity } from '../core/activities';
 import { EMPTY_ROUTE, addWaypoint } from './route';
-import { routeDistanceM, routeDurationS, routesOfFamily, sortRoutes } from './routeList';
+import { routeDistanceM, routesOfFamily, sortRoutes } from './routeList';
 import { routeToRecord } from './routeRecord';
 
 const activities: Activity[] = [
@@ -51,7 +51,7 @@ describe('sortRoutes', () => {
   });
 });
 
-describe('distance et temps d\'une fiche', () => {
+describe('distance d\'une fiche', () => {
   const planned = [{ lat: 43.6, lon: 3.8 }, { lat: 43.61, lon: 3.8 }, { lat: 43.61, lon: 3.81 }]
     .reduce((r, w) => addWaypoint(r, w, 'straight'), EMPTY_ROUTE);
   const meta = { name: 'boucle', activityId: 'kite', createdAt: '2026-10-27T10:00:00Z', updatedAt: '2026-10-27T10:00:00Z' };
@@ -65,14 +65,5 @@ describe('distance et temps d\'une fiche', () => {
     expect(routeDistanceM(record)).toBe(first);
     // Une autre fiche, même identique, se calcule à part.
     expect(routeDistanceM(routeToRecord(planned, meta))).toBe(first);
-  });
-
-  it('le temps est gardé par réglage', () => {
-    const record = routeToRecord(planned, meta);
-    const slow = routeDurationS(record, 3, { family: 'course', flatSpeedMs: 2, climbFactor: 10 });
-    const fast = routeDurationS(record, 3, { family: 'course', flatSpeedMs: 4, climbFactor: 10 });
-    expect(slow).not.toBeNull();
-    expect(fast! * 2).toBeCloseTo(slow!, 6);
-    expect(routeDurationS(record, 3, null)).toBeNull();
   });
 });

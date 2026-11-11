@@ -20,9 +20,8 @@ import { windowMean, type WindowSample } from '../core/windowMean';
  * compte repart de zéro à la reprise. Un changement de côté (trop haut puis
  * trop bas) repart aussi de zéro.
  *
- * « Course à bornes » (Entraînement, 05/11) : la même machine, sur une bande de
- * FC donnée par ses bornes, mini et/ou maxi (`HeartBand`), au lieu d'une zone ;
- * une zone visée n'est qu'une bande, de son bas à son haut (`zoneBand`).
+ * La machine travaille sur une bande de FC, mini et/ou maxi (`HeartBand`) ;
+ * une zone visée est la bande de son bas à son haut (`zoneBand`).
  */
 
 /** Zone visée : 1 à 5, 0 pour aucune. */
@@ -51,44 +50,12 @@ export const zoneBand = (target: ZoneTarget, bounds: readonly number[]): HeartBa
   return { minBpm: Math.ceil(bounds[target - 1]), maxBpm: upper === undefined ? null : Math.ceil(upper) - 1 };
 };
 
-/** Choix d'une borne : aucune, le bord d'une zone (1 à 5), un seuil du pratiquant (S1, S2), ou un BPM saisi. */
-export type BoundChoice = 'aucune' | '1' | '2' | '3' | '4' | '5' | 's1' | 's2' | 'bpm';
+/** Bpm plausibles d'une borne : ceux d'une mesure de la ceinture. */
+const BAND_BPM_RANGE = { min: MIN_PLAUSIBLE_BPM, max: MAX_PLAUSIBLE_BPM } as const;
 
-/** Choix d'une borne, mini ou maxi, de la course à bornes. */
-export const BOUND_CHOICES: Record<'min' | 'max', readonly BoundChoice[]> = {
-  min: ['aucune', '1', '2', '3', '4', '5', 's1', 's2', 'bpm'],
-  // Z5 n'a pas de haut : pas de maxi « Z5 ».
-  max: ['aucune', '1', '2', '3', '4', 's1', 's2', 'bpm'],
-};
-
-/** Bpm plausibles d'une borne saisie : ceux d'une mesure de la ceinture. */
-export const BAND_BPM_RANGE = { min: MIN_PLAUSIBLE_BPM, max: MAX_PLAUSIBLE_BPM } as const;
-
-/** Bpm saisi admis comme borne : un nombre fini dans `range`, arrondi au bpm ; `null` sinon. */
-export const typedBoundBpm = (value: unknown, range: { min: number; max: number } = BAND_BPM_RANGE): number | null =>
+/** Bpm admis comme borne : un nombre fini dans `range`, arrondi au bpm ; `null` sinon. */
+const typedBoundBpm = (value: unknown, range: { min: number; max: number } = BAND_BPM_RANGE): number | null =>
   typeof value === 'number' && Number.isFinite(value) && value >= range.min && value <= range.max ? Math.round(value) : null;
-
-/**
- * BPM d'une borne choisie : une zone donne son bord (mini : son bas ; maxi :
- * son haut, la borne de la suivante moins un, `zoneBand`), S1 ou S2 le seuil du
- * pratiquant pour l'activité, « BPM » la valeur saisie, arrondie, même hors de
- * `BAND_BPM_RANGE` (la bande est alors refusée par `validBand`, jamais armée sur
- * une autre borne) ; `null` pour « aucune », un BPM non saisi, ou sans zones
- * pour un choix qui en a besoin.
- */
-export const boundBpm = (
-  choice: BoundChoice,
-  side: 'min' | 'max',
-  zones: { bounds: readonly number[]; s1: number; s2: number } | null,
-  typed: number | null = null
-): number | null => {
-  if (choice === 'aucune') return null;
-  if (choice === 'bpm') return typed !== null && Number.isFinite(typed) ? Math.round(typed) : null;
-  if (zones === null) return null;
-  if (choice === 's1' || choice === 's2') return typedBoundBpm(zones[choice]);
-  const band = zoneBand(Number(choice) as ZoneTarget, zones.bounds);
-  return band === null ? null : side === 'min' ? band.minBpm : band.maxBpm;
-};
 
 /** Bande utilisable : au moins une borne, chacune plausible (`typedBoundBpm`), mini au plus égal au maxi. */
 export const validBand = (band: HeartBand | null | undefined): band is HeartBand => {
@@ -97,71 +64,6 @@ export const validBand = (band: HeartBand | null | undefined): band is HeartBand
   if (!ok(band.minBpm) || !ok(band.maxBpm)) return false;
   return band.minBpm === null || band.maxBpm === null || band.minBpm <= band.maxBpm;
 };
-
-/** Bande relue (fichier, mémoire de l'appareil) : celle reçue si elle est utilisable, `null` sinon. */
-export const sanitizeBand = (value: unknown): HeartBand | null => {
-  if (typeof value !== 'object' || value === null) return null;
-  const { minBpm = null, maxBpm = null } = value as Record<string, unknown>;
-  const band = { minBpm, maxBpm } as HeartBand;
-  return validBand(band) ? { minBpm: band.minBpm, maxBpm: band.maxBpm } : null;
-};
-
-/** Choix d'une borne : le choix, et le BPM saisi (lu pour « BPM » seulement ; les autres le recalculent). */
-export interface BoundPick {
-  choice: BoundChoice;
-  bpm: number | null;
-}
-
-/** Choix des deux bornes de la course à bornes, retenus pour l'activité (dernières bornes proposées). */
-export interface HeartBandPicks {
-  min: BoundPick;
-  max: BoundPick;
-}
-
-export const NO_BAND_PICKS: HeartBandPicks = { min: { choice: 'aucune', bpm: null }, max: { choice: 'aucune', bpm: null } };
-
-const sanitizePick = (value: unknown, side: 'min' | 'max'): BoundPick | null => {
-  if (typeof value !== 'object' || value === null) return null;
-  const { choice, bpm } = value as Record<string, unknown>;
-  if (!(BOUND_CHOICES[side] as readonly unknown[]).includes(choice)) return null;
-  return { choice: choice as BoundChoice, bpm: typedBoundBpm(bpm) };
-};
-
-/** Choix relus (fichier de réglages) : chaque borne contrôlée, une borne illisible vaut « aucune » ; `null` sans rien de lisible. */
-export const sanitizeBandPicks = (value: unknown): HeartBandPicks | null => {
-  if (typeof value !== 'object' || value === null) return null;
-  const { min, max } = value as Record<string, unknown>;
-  const picks = { min: sanitizePick(min, 'min'), max: sanitizePick(max, 'max') };
-  if (picks.min === null && picks.max === null) return null;
-  return { min: picks.min ?? NO_BAND_PICKS.min, max: picks.max ?? NO_BAND_PICKS.max };
-};
-
-/** Bande des choix, sur les zones et seuils du moment (`boundBpm`) : une zone ou un seuil suit le pratiquant. */
-export const picksBand = (picks: HeartBandPicks, zones: { bounds: readonly number[]; s1: number; s2: number } | null): HeartBand => ({
-  minBpm: boundBpm(picks.min.choice, 'min', zones, picks.min.bpm),
-  maxBpm: boundBpm(picks.max.choice, 'max', zones, picks.max.bpm),
-});
-
-/** BPM saisi hors de `BAND_BPM_RANGE` : à signaler sous son champ (« entre 25 et 250 »). */
-export const outOfRangePick = (pick: BoundPick): boolean =>
-  pick.choice === 'bpm' && pick.bpm !== null && Number.isFinite(pick.bpm) && typedBoundBpm(pick.bpm) === null;
-
-/**
- * Bande à armer des choix : chaque borne choisie a son BPM (un « BPM » laissé
- * vide ou hors plage n'est pas effacé sans un mot : la bande est refusée), et la
- * bande est utilisable (`validBand`) ; `null` sinon.
- */
-export const armableBand = (picks: HeartBandPicks, zones: { bounds: readonly number[]; s1: number; s2: number } | null): HeartBand | null => {
-  const band = picksBand(picks, zones);
-  if ((picks.min.choice !== 'aucune' && band.minBpm === null) || (picks.max.choice !== 'aucune' && band.maxBpm === null)) return null;
-  return validBand(band) ? band : null;
-};
-
-/** « 140–160 bpm », « 140 bpm et plus », « 160 bpm au plus » : la bande dite en clair. */
-export const bandLabel = (band: HeartBand): string =>
-  band.minBpm !== null && band.maxBpm !== null
-    ? `${band.minBpm}–${band.maxBpm} bpm`
-    : band.minBpm !== null ? `${band.minBpm} bpm et plus` : `${band.maxBpm} bpm au plus`;
 
 /** Signal de zone : les sons du test guidé (`TEST_SIGNAL_TONES`). */
 export type ZoneSignal = 'trop' | 'accelere' | 'bien';
@@ -230,15 +132,16 @@ export interface ZoneAlertSample {
   active: boolean;
 }
 
-/** Ce que les bips visent : une zone sur les bornes des zones 1 à 5 (`readHeartRateZoneBounds`), ou une bande (course à bornes). */
-export type ZoneAlertSetup = { params: ZoneAlertParams } & (
-  | { bounds: readonly number[]; target: ZoneTarget }
-  | { band: HeartBand }
-);
+/** Ce que les bips visent : une zone sur les bornes des zones 1 à 5 (`readHeartRateZoneBounds`). */
+export interface ZoneAlertSetup {
+  params: ZoneAlertParams;
+  bounds: readonly number[];
+  target: ZoneTarget;
+}
 
 /** Bande visée d'un réglage des bips ; `null` : rien à viser. */
 const setupBand = (setup: ZoneAlertSetup): HeartBand | null => {
-  const band = 'band' in setup ? setup.band : zoneBand(setup.target, setup.bounds);
+  const band = zoneBand(setup.target, setup.bounds);
   return validBand(band) ? band : null;
 };
 

@@ -14,7 +14,7 @@ const pt = (lat: number, lon: number, time: string | null, inner = '') =>
 describe('parseGpx', () => {
   it('lit position, altitude, heure, FC et cadence des extensions Garmin préfixées', () => {
     const xml = gpx(
-      `<trk><name>Sortie</name><type>running</type><trkseg>${pt(
+      `<trk><name>Sortie</name><type>sailing</type><trkseg>${pt(
         45, 5, '2026-10-01T10:00:00Z', '<ele>120.5</ele><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>152</gpxtpx:hr><gpxtpx:cad>84</gpxtpx:cad></gpxtpx:TrackPointExtension></extensions>'
       )}</trkseg></trk>`
     );
@@ -22,7 +22,7 @@ describe('parseGpx', () => {
     expect(r.rawPoints).toHaveLength(1);
     expect(r.rawPoints[0]).toMatchObject({ lat: 45, lon: 5, time: '2026-10-01T10:00:00Z', ele: 120.5, hr: 152, cadence: 84 });
     expect(r.trackName).toBe('Sortie');
-    expect(r.trackType).toBe('running');
+    expect(r.trackType).toBe('sailing');
     expect(r.hasDeviceSpeed).toBe(false);
   });
 

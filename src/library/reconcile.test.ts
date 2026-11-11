@@ -67,10 +67,10 @@ describe('planReconcile', () => {
   it('repère les GPX posés à la racine, et rien d\'autre', () => {
     const plan = planReconcile(
       [],
-      [file(MARKER_FILE), file('reglages.json'), file('LISEZMOI.txt'), file('2026-09-23_18-00-00_running.GPX')],
+      [file(MARKER_FILE), file('reglages.json'), file('LISEZMOI.txt'), file('2026-09-23_18-00-00_surf.GPX')],
       {}
     );
-    expect(plan.rootGpx).toEqual(['2026-09-23_18-00-00_running.GPX']);
+    expect(plan.rootGpx).toEqual(['2026-09-23_18-00-00_surf.GPX']);
     expect(plan.rootRecords).toEqual({});
   });
 

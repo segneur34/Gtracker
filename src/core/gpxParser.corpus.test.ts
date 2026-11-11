@@ -106,7 +106,7 @@ const EDGE_CASES: [string, string][] = [
   ['point dans un point, champs pris par les deux', doc(seg(`<trkpt lat="45" lon="5"><trkpt lat="46" lon="6"><time>${T(1)}</time><hr>99</hr></trkpt><time>${T(2)}</time><ele>3</ele></trkpt>`))],
   ['point racine', `<trkpt lat="45" lon="5"><time>${T(0)}</time><trkpt lat="46" lon="6"><time>${T(1)}</time></trkpt></trkpt>`],
   ['champ préfixé avant le même sans préfixe, champ vide en premier', doc(seg(`<trkpt lat="45" lon="5"><time>${T(0)}</time><e:hr xmlns:e="urn:e">150</e:hr><extensions><hr>151</hr></extensions><cad></cad><cad>80</cad></trkpt>`))],
-  ['nom préfixé en premier enfant, nom vide en premier', doc(`<trk><e:name xmlns:e="urn:e">Préfixé</e:name><name>Second</name><type/><type>running</type><trkseg><trkpt lat="45" lon="5"><time>${T(0)}</time></trkpt></trkseg></trk>`)],
+  ['nom préfixé en premier enfant, nom vide en premier', doc(`<trk><e:name xmlns:e="urn:e">Préfixé</e:name><name>Second</name><type/><type>sailing</type><trkseg><trkpt lat="45" lon="5"><time>${T(0)}</time></trkpt></trkseg></trk>`)],
   ['trk imbriqué ailleurs, avant la vraie trace', doc(`<extensions><trk><name>Dans les extensions</name></trk></extensions>${seg(`<trkpt lat="45" lon="5"><time>${T(0)}</time></trkpt>`)}`)],
   ['nom de la route, puis des métadonnées', doc(`<metadata><name>Méta</name></metadata><rte><rtept lat="45" lon="5"><ele>10</ele></rtept><rtept lat="45" lon="5.01"/></rte>`)],
   ['nom des métadonnées seul, une trace d’un point et une route', doc(`<metadata><name> Méta </name></metadata><trk><trkseg><trkpt lat="45" lon="5"/></trkseg></trk><rte><name/><rtept lat="45" lon="5"/><rtept lat="45" lon="5.01"/></rte>`)],

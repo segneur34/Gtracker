@@ -36,13 +36,11 @@ describe('readActivities', () => {
     expect(list).toEqual([moth, { id: 'z', name: 'Kite', base: 'kite', color: baseActivity('kite').color }]);
   });
 
-  it("écarte, comme le ski, les activités de l'application complète posées sur un calcul à terre (lot 305)", () => {
+  it("écarte les activités posées sur un calcul inconnu", () => {
     const list = readActivities([
       voile,
-      { id: 'running', name: 'Course', base: 'running', color: '#d11a1a' },
-      { id: 'a-vtt', name: 'VTT', base: 'cycling', color: '#0a9469' },
-      { id: 'run-intervals', name: 'Fractionné à pied', base: 'run-intervals', color: '#c25700' },
-      { id: 'muscu', name: 'Muscu', base: 'muscu', color: '#9f6c00' },
+      { id: 'a-parapente', name: 'Parapente', base: 'parapente', color: '#d11a1a' },
+      { id: 'a-planeur', name: 'Planeur', base: 'planeur', color: '#0a9469' },
       { id: 'a-ski', name: 'Ski', base: 'ski', color: '#123456' },
       SURF_ACTIVITY,
     ]);
@@ -149,8 +147,8 @@ describe('findActivity et activitiesOfFamily', () => {
     expect(findActivity([moth], 'bateau')).toEqual(baseActivity('bateau'));
     expect(findActivity([moth], 'a-inconnue')).toBeNull();
     expect(findActivity([moth], null)).toBeNull();
-    // L'identifiant d'un calcul de l'application complète n'en est plus un.
-    expect(findActivity([moth], 'running')).toBeNull();
+    // L'identifiant d'un calcul inconnu n'en est pas un.
+    expect(findActivity([moth], 'parapente')).toBeNull();
   });
 
   it('range par famille', () => {
@@ -250,8 +248,8 @@ describe('familles et activités cachées (point 100)', () => {
     expect(isFamilyHidden([voile], [], 'voile')).toBe(false);
   });
 
-  it("les familles de l'application complète cachées dans un réglage repris ne cachent rien d'ici", () => {
-    const hidden = ['course', 'velo', 'fractionne'];
+  it("les familles inconnues cachées dans un réglage repris ne cachent rien d'ici", () => {
+    const hidden = ['ski', 'parapente'];
     expect(visibleFamilies(DEFAULT_ACTIVITIES, hidden)).toEqual(['voile', 'surf']);
     expect(isActivityShown(voile, DEFAULT_ACTIVITIES, hidden)).toBe(true);
   });

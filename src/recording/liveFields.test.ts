@@ -67,9 +67,9 @@ describe('sanitizeLiveFields', () => {
     expect(sanitizeLiveFields(['speed', 'average', 'max', 'distance', 'duration'], 'voile')).toHaveLength(MAX_LIVE_FIELDS);
   });
 
-  it('écarte les chiffres de la terre (pente, D+, puissance, énergie) rangés par l\'application complète (lot 305)', () => {
-    expect(sanitizeLiveFields(['speed', 'power', 'gain', 'grade', 'effort', 'climbRate', 'loss', 'recentDistanceGain', 'heading'], 'voile')).toEqual(['speed', 'heading']);
-    expect(sanitizeLiveFields(['gain', 'power'], 'surf')).toBeNull();
+  it('écarte une clé qui n\'est plus un chiffre du direct, dans une liste rangée plus tôt', () => {
+    expect(sanitizeLiveFields(['speed', 'ancienne', 'heading', 'autre'], 'voile')).toEqual(['speed', 'heading']);
+    expect(sanitizeLiveFields(['ancienne', 'autre'], 'surf')).toBeNull();
   });
 
   it('borne au maximum demandé, celui de la notification', () => {
@@ -151,15 +151,6 @@ describe('liveFieldValue', () => {
     expect(liveFieldValue('heartRateZone', context({ heartRateBpm: 92, heartRateZoneBounds: bounds }))).toBe('sous Z1 · 92');
     expect(liveFieldValue('heartRateZone', context({ heartRateBpm: 152 }))).toBe('—');
     expect(liveFieldValue('markDistance', context({ markDistanceM: 143 }))).toBe('143 m');
-  });
-});
-
-describe('étape du compteur, retirée (lot 302)', () => {
-  it("un « Étape » déjà rangé est écarté à la lecture, partout", () => {
-    expect(liveFieldsOfTreatment('voile', 'notification')).not.toContain('step');
-    expect(sanitizeLiveFields(['step', 'speed'], 'voile', MAX_NOTIFICATION_FIELDS, 'notification')).toEqual(['speed']);
-    expect(sanitizeLiveFields(['step'], 'surf', MAX_NOTIFICATION_FIELDS, 'notification')).toBeNull();
-    expect(sanitizeLiveFields(['step', 'speed'], 'surf', MAX_LIVE_FIELDS, 'live')).toEqual(['speed']);
   });
 });
 

@@ -18,12 +18,9 @@ describe('parentPage', () => {
     expect(analysisPath('surf', null, 'a-surf-foil')).toBe('/surf/analyse');
   });
 
-  it('le test de FC repos remonte au Profil (lot 301) ; les pages retirées de l\'Entraînement, à l\'accueil (lot 302)', () => {
+  it('le test de FC repos remonte au Profil (lot 301)', () => {
     expect(parentPage('/profil/fc-repos', '')).toBe('/profil');
     expect(parentPage('/profil/fc-repos/', '?vitesse=10')).toBe('/profil');
-    expect(parentPage('/fractionne/seances', '')).toBe('/');
-    expect(parentPage('/fractionne/tests/fc-max', '')).toBe('/');
-    expect(parentPage('/course/seances', '')).toBe('/');
   });
 
   it('une leçon des tutoriels remonte à leur liste, la liste à Réglages (lot 147)', () => {
@@ -32,19 +29,19 @@ describe('parentPage', () => {
     expect(parentPage('/tutoriels', '')).toBe('/parametres');
   });
 
-  it("Enregistrer renvoie à l'accueil, ancien mode Timer compris (lot 302)", () => {
-    expect(parentPage('/enregistrer', '?minuterie=1')).toBe('/');
-    expect(parentPage('/enregistrer', '?activite=a-course')).toBe('/');
+  it("Enregistrer renvoie à l'accueil, filtre d'activité compris", () => {
+    expect(parentPage('/enregistrer', '')).toBe('/');
+    expect(parentPage('/enregistrer', '?activite=a-surf-foil')).toBe('/');
   });
 
   it("une bibliothèque renvoie à l'accueil, filtre compris", () => {
     expect(parentPage('/voile', '')).toBe('/');
-    expect(parentPage('/course', '?activite=a-marche')).toBe('/');
-    expect(parentPage('/velo', '?vue=planifiees')).toBe('/');
+    expect(parentPage('/surf', '?activite=a-surf-foil')).toBe('/');
+    expect(parentPage('/voile', '?vue=planifiees')).toBe('/');
   });
 
-  it("les autres pages renvoient à l'accueil, anciennes analyses de la terre comprises (lot 305)", () => {
-    for (const p of ['/course/analyse', '/velo/analyse', '/fractionne/analyse', '/enregistrer', '/profil', '/parametres', '/itineraires', '/itineraires/liste', '/inconnue', '/voile/autre']) {
+  it("les autres pages, connues ou non, renvoient à l'accueil", () => {
+    for (const p of ['/ski/analyse', '/parapente/seances', '/enregistrer', '/profil', '/parametres', '/itineraires', '/itineraires/liste', '/inconnue', '/voile/autre']) {
       expect(parentPage(p, '')).toBe('/');
     }
     expect(parentPage('/itineraires', '?itineraire=x')).toBe('/');
@@ -54,7 +51,7 @@ describe('parentPage', () => {
     expect(parentPage('/statistiques', '?famille=voile&activite=kite&periode=annee')).toBe('/statistiques?famille=voile&periode=annee');
     expect(parentPage('/statistiques', '?famille=voile&activite=kite')).toBe('/statistiques?famille=voile');
     expect(parentPage('/statistiques', '?famille=voile&periode=annee')).toBe('/statistiques?periode=annee');
-    expect(parentPage('/statistiques', '?famille=velo')).toBe('/statistiques');
+    expect(parentPage('/statistiques', '?famille=surf')).toBe('/statistiques');
     expect(parentPage('/statistiques', '?periode=annee')).toBe('/');
     expect(parentPage('/statistiques', '')).toBe('/');
   });

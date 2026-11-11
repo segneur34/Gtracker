@@ -292,7 +292,7 @@ export const corpusSegmentsOf = (raw: RawTrackPoint[]): CorpusPoint[][] => {
 // Corpus
 // ---------------------------------------------------------------------------
 
-const RUN = { name: 'Course à pied du matin', type: 'running' };
+const FOREIGN = { name: 'Session du matin', type: 'sailing' };
 const SAIL = { name: 'Wing du soir', type: 'wingfoil' };
 const N = BASE_POINT_COUNT;
 
@@ -322,7 +322,7 @@ const extensionsWithoutSpeed = (): string => {
   const point = (p: CorpusPoint): string =>
     `<trkpt lat="${p.lat}" lon="${p.lon}"><ele>${p.ele}</ele><time>${p.time}</time><extensions><power>210</power>`
     + `<gpxtpx:TrackPointExtension><gpxtpx:atemp>19.5</gpxtpx:atemp><gpxtpx:depth>0</gpxtpx:depth></gpxtpx:TrackPointExtension></extensions></trkpt>`;
-  return `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Wahoo ELEMNT" xmlns="${GPX11}" xmlns:gpxtpx="${TPX1}"><trk><name>Sortie vélo</name><type>cycling</type><trkseg>${basePoints().map(point).join('')}</trkseg></trk></gpx>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Wahoo ELEMNT" xmlns="${GPX11}" xmlns:gpxtpx="${TPX1}"><trk><name>Session du soir</name><type>cycling</type><trkseg>${basePoints().map(point).join('')}</trkseg></trk></gpx>`;
 };
 
 /** Commentaires entre les points, dans un point, et autour d'un point entier mis en commentaire. */
@@ -349,23 +349,23 @@ const crlfTabs = (text: string): string => text.split('\n').map((line) => line.r
 export const GPX_CORPUS: CorpusEntry[] = [
   {
     nom: 'Garmin Connect (ns3:, FC et cadence)',
-    texte: garminConnectGpx(segmentsOf(basePoints().map(withMillis)), RUN),
-    attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: true, trackName: RUN.name, trackType: 'running' },
+    texte: garminConnectGpx(segmentsOf(basePoints().map(withMillis)), FOREIGN),
+    attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: true, trackName: FOREIGN.name, trackType: 'sailing' },
   },
   {
     nom: 'Garmin gpxtpx: v2 (vitesse et cap)',
-    texte: garminV2Gpx(segmentsOf(basePoints()), { name: 'Sortie vélo', type: 'cycling' }),
-    attendu: { points: N, segments: 1, hasDeviceSpeed: true, avecFc: true, trackType: 'cycling' },
+    texte: garminV2Gpx(segmentsOf(basePoints()), { name: 'Session du soir', type: 'kitesurfing' }),
+    attendu: { points: N, segments: 1, hasDeviceSpeed: true, avecFc: true, trackType: 'kitesurfing' },
   },
   {
     nom: 'Strava (sans vitesse)',
-    texte: stravaGpx(segmentsOf(basePoints()), { name: 'Morning Run', type: 'running' }),
-    attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: true, trackName: 'Morning Run', trackType: 'running' },
+    texte: stravaGpx(segmentsOf(basePoints()), { name: 'Session du matin', type: 'windsurfing' }),
+    attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: true, trackName: 'Session du matin', trackType: 'windsurfing' },
   },
   {
     nom: 'Komoot, sortie enregistrée (sans extensions)',
-    texte: komootGpx(segmentsOf(basePoints().map(withMillis)), { name: 'Tour à vélo' }),
-    attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: false, trackName: 'Tour à vélo' },
+    texte: komootGpx(segmentsOf(basePoints().map(withMillis)), { name: 'Tour du lac' }),
+    attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: false, trackName: 'Tour du lac' },
   },
   {
     nom: 'Komoot, itinéraire (<rte> seule)',
@@ -384,24 +384,24 @@ export const GPX_CORPUS: CorpusEntry[] = [
   },
   {
     nom: 'BOM en tête (Strava)',
-    texte: '﻿' + stravaGpx(segmentsOf(basePoints()), RUN),
+    texte: '﻿' + stravaGpx(segmentsOf(basePoints()), FOREIGN),
     // BOM ignoré (lot 126, décision 1 du 04/11), comme le navigateur et `Blob.text()` : xmldom refusait la déclaration
     // qui le suit, et le test du corpus compare donc ce texte, BOM retiré, à la copie gelée.
-    attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: true, trackName: RUN.name, trackType: 'running' },
+    attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: true, trackName: FOREIGN.name, trackType: 'sailing' },
   },
   {
     nom: 'CDATA dans le nom',
-    texte: stravaGpx(segmentsOf(basePoints()), { name: '<![CDATA[Sortie & retour <matin>]]>', type: 'running' }),
+    texte: stravaGpx(segmentsOf(basePoints()), { name: '<![CDATA[Sortie & retour <matin>]]>', type: 'sailing' }),
     attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: true, trackName: 'Sortie & retour <matin>' },
   },
   {
     nom: 'sans déclaration XML',
-    texte: stravaGpx(segmentsOf(basePoints()), RUN).replace(/^<\?xml[^>]*\?>\n/, ''),
+    texte: stravaGpx(segmentsOf(basePoints()), FOREIGN).replace(/^<\?xml[^>]*\?>\n/, ''),
     attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: true },
   },
   {
     nom: 'trois <trkseg> (pauses)',
-    texte: garminV2Gpx(segmentsOf(basePoints(), 3), RUN),
+    texte: garminV2Gpx(segmentsOf(basePoints(), 3), FOREIGN),
     attendu: { points: N, segments: 3, hasDeviceSpeed: true, avecFc: true },
   },
   {
@@ -416,17 +416,17 @@ export const GPX_CORPUS: CorpusEntry[] = [
   },
   {
     nom: 'CRLF et tabulations (Garmin Connect)',
-    texte: crlfTabs(garminConnectGpx(segmentsOf(basePoints().map(withMillis)), RUN)),
-    attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: true, trackName: RUN.name },
+    texte: crlfTabs(garminConnectGpx(segmentsOf(basePoints().map(withMillis)), FOREIGN)),
+    attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: true, trackName: FOREIGN.name },
   },
   {
     nom: 'heures décimales et décalage horaire',
-    texte: garminV2Gpx(segmentsOf(offsetDecimalTimes(basePoints())), RUN),
+    texte: garminV2Gpx(segmentsOf(offsetDecimalTimes(basePoints())), FOREIGN),
     attendu: { points: N, segments: 1, hasDeviceSpeed: true, avecFc: true },
   },
   {
     nom: 'points sans heure',
-    texte: stravaGpx(segmentsOf(someWithoutTime(basePoints())), RUN),
+    texte: stravaGpx(segmentsOf(someWithoutTime(basePoints())), FOREIGN),
     attendu: { points: N - WITHOUT_TIME, segments: 1, hasDeviceSpeed: false, avecFc: true, chemin: N },
   },
   {
@@ -455,5 +455,5 @@ export const UNREADABLE_GPX: { nom: string; texte: string }[] = [
   { nom: 'balise non fermée', texte: '<gpx><trk><trkseg></gpx>' },
   { nom: 'point non fermé', texte: `<?xml version="1.0"?><gpx xmlns="${GPX11}"><trk><trkseg><trkpt lat="1" lon="2"><time>2026-10-01T08:00:00Z</time></trkseg></trk></gpx>` },
   { nom: 'entité inconnue', texte: `<?xml version="1.0"?><gpx xmlns="${GPX11}"><trk><name>&inconnue;</name></trk></gpx>` },
-  { nom: 'tronqué au milieu', texte: garminConnectGpx(segmentsOf(basePoints()), RUN).slice(0, 1500) },
+  { nom: 'tronqué au milieu', texte: garminConnectGpx(segmentsOf(basePoints()), FOREIGN).slice(0, 1500) },
 ];

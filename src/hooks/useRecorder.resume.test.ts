@@ -820,52 +820,27 @@ describe('zone visée', () => {
     await recorder.startRecording(activity, live);
     run(live.emit, 0, 5, 1);
     await settle();
-    expect(zone.getZoneAlertTarget()).toBe(3);
+    // La zone visée est gardée sur l'appareil pendant l'enregistrement.
+    const stored = async () => (await import('../platform/storage')).jsonStore.read<unknown>('tracker.zoneAlertTarget');
+    expect(await stored()).toBe(3);
 
     services.gps = true;
     const fresh = await reload();
     const freshZone = await import('./useZoneAlert');
     freshZone.startZoneAlertGuide();
-    expect(freshZone.getZoneAlertTarget()).toBe(0);
+    // Reprise : la zone relue est armée de nouveau (sinon la reprise effacerait la clé).
     await fresh.recoverInterruptedRecording();
-    expect(freshZone.getZoneAlertTarget()).toBe(3);
+    expect(await stored()).toBe(3);
 
-    // Tuée pendant la session, rouverte, puis nouvelle sortie sans zone : pas de bip surprise.
+    // Tuée pendant la session, rouverte, puis nouvelle sortie sans zone : la zone restée est effacée, pas de bip surprise.
     services.gps = false;
     journal.text = null;
     const again = await reload();
     const againZone = await import('./useZoneAlert');
     againZone.startZoneAlertGuide();
     await again.startRecording(activity, fakeSource());
-    expect(againZone.getZoneAlertTarget()).toBe(0);
+    expect(await stored()).toBeNull();
     await again.stopRecording();
-  });
-
-  it('course à bornes : la bande, changée en direct, est reprise après une chute (05/11)', async () => {
-    const zone = await import('./useZoneAlert');
-    zone.startZoneAlertGuide();
-    zone.armHeartBand({ minBpm: 140, maxBpm: 160 });
-    const live = fakeSource();
-    await recorder.startRecording(activity, live);
-    run(live.emit, 0, 5, 1);
-    await settle();
-    expect(zone.getHeartGuide()).toEqual({ minBpm: 140, maxBpm: 160 });
-    zone.setLiveBand({ minBpm: null, maxBpm: 150 });
-    expect(zone.getHeartGuide()).toEqual({ minBpm: null, maxBpm: 150 });
-    // Mini au-dessus du maxi : ignorée.
-    zone.setLiveBand({ minBpm: 170, maxBpm: 150 });
-    expect(zone.getHeartGuide()).toEqual({ minBpm: null, maxBpm: 150 });
-
-    services.gps = true;
-    const fresh = await reload();
-    const freshZone = await import('./useZoneAlert');
-    freshZone.startZoneAlertGuide();
-    expect(freshZone.getHeartGuide()).toBe(0);
-    await fresh.recoverInterruptedRecording();
-    expect(freshZone.getHeartGuide()).toEqual({ minBpm: null, maxBpm: 150 });
-    expect(freshZone.getZoneAlertTarget()).toBe(0);
-    await fresh.stopRecording();
-    expect(freshZone.getHeartGuide()).toBe(0);
   });
 });
 

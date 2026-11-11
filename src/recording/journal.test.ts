@@ -125,44 +125,13 @@ describe('journal', () => {
     const good = journalActivityLine('kite', { id: 'a-kite', name: 'Kite' });
     const broken = `${JSON.stringify(['activity', { sport: 'moth', id: 'x', name: 'Moth' }])}\n`;
     const truncated = journalActivityLine('surf', { id: 'surf', name: 'Surf' }).slice(0, 20);
-    // Le calcul d'une course de l'application complète n'en est plus un : changement ignoré, comme abîmé.
-    const land = `${JSON.stringify(['activity', { sport: 'running', id: 'running', name: 'Course' }])}\n`;
-    const parsed = parseJournal(journalOf(fixes) + good + broken + land + truncated);
+    const parsed = parseJournal(journalOf(fixes) + good + broken + truncated);
     expect(parsed.activityChange).toEqual({ sport: 'kite', activity: { id: 'a-kite', name: 'Kite' } });
     expect(parsed.fixes).toHaveLength(3);
     // Sans en-tête lisible, le changement vaut quand même.
     expect(parseJournal(good + journalFixLine(fixes[0])).activityChange?.sport).toBe('kite');
   });
 
-  it("ignore les lignes d'un journal d'avant le lot 302 : séances, test guidé, FC seule (lot 302)", () => {
-    const old = [
-      `${JSON.stringify(['intervals', { workout: { reps: 2, workS: 60, restS: 30 }, startedAtMs: T0, commands: [] }])}\n`,
-      `${JSON.stringify(['test', { protocol: 'fc-max', version: 1, startMs: T0 }])}\n`,
-      `${JSON.stringify(['hr', T0 + 500, 120])}\n`,
-    ];
-    const text = journalHeaderLine('kite', T0 - 5000) + journalFixLine(fixes[0]) + old[0] + journalFixLine(fixes[1]) + old[1] + old[2]
-      + journalBreakLine(fixes[2].timeMs) + journalFixLine(fixes[2]);
-    const parsed = parseJournal(text);
-    const plain = parseJournal(journalHeaderLine('kite', T0 - 5000) + journalFixLine(fixes[0]) + journalFixLine(fixes[1])
-      + journalBreakLine(fixes[2].timeMs) + journalFixLine(fixes[2]));
-    expect(parsed).toEqual(plain);
-    expect(parsed.fixes).toHaveLength(3);
-    expect(parsed.breaks).toEqual([2]);
-    expect(Object.keys(parsed)).not.toContain('intervalRuns');
-    expect(Object.keys(parsed)).not.toContain('test');
-    expect(Object.keys(parsed)).not.toContain('heartFixes');
-  });
-
-  it("un journal de muscu ou de course de l'application complète : sans en-tête lisible, positions gardées, à classer (lot 305)", () => {
-    const header = (sport: string) => `${JSON.stringify({ format: 'tracker-journal', version: 1, sport, startedAtMs: T0 })}\n`;
-    const muscu = parseJournal(header('muscu') + `${JSON.stringify(['hr', T0, 90])}\n` + journalBreakLine(T0 + 30_000)
-      + `${JSON.stringify(['hr', T0 + 30_000, 110])}\n`);
-    expect(muscu.header).toBeNull();
-    expect(muscu.fixes).toEqual([]);
-    const run = parseJournal(header('running') + journalFixLine(fixes[0]) + journalFixLine(fixes[1]));
-    expect(run.header).toBeNull();
-    expect(run.fixes).toHaveLength(2);
-  });
 });
 
 describe('notes du journal', () => {
