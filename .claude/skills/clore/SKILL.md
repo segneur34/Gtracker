@@ -1,20 +1,20 @@
 ---
 name: clore
-description: Clôture d'une session de travail sur Tracker : vérification et commit du travail en cours, résultats d'essais et passe doc des lots validés, reste à faire (docs/BACKLOG.md), point de reprise, envoi sur GitHub, compte rendu et prompt de reprise.
-argument-hint: "[ok partout | ok sauf N : … | ok sauf lot L : … ] [sans envoi]"
+description: Clôture d'une session de travail sur Gtracker : vérification et commit du travail en cours, résultats d'essais et passe doc des lots validés, reste à faire (docs/BACKLOG.md), point de reprise, envoi sur GitHub seulement avec « avec envoi », compte rendu et prompt de reprise.
+argument-hint: "[ok partout | ok sauf N : … | ok sauf lot L : … ] [avec envoi]"
 disable-model-invocation: true
 ---
 
 # /clore : finir la session
 
-Tu clos la session de travail sur Tracker (`D:\gong tracker\Gtracker`). Tu suis les règles de `CLAUDE.md` (Environnement, Documentation) et de `docs/MODELES.md` (Mode chaîne), et l'en-tête de `docs/BACKLOG.md`. La doc passe par le sous-agent `doc`, jamais par toi ; les vérifications se lancent depuis la conversation (`npm run verif`). Tu ne réécris jamais l'historique git (pas d'amend, pas de rebase, pas de force).
+Tu clos la session de travail sur Gtracker (le dépôt courant). Tu suis les règles de `CLAUDE.md` (Environnement, Documentation) et de `docs/MODELES.md`, la boucle du mode chaîne étant dans `/chaine`, et l'en-tête de `docs/BACKLOG.md`. La doc passe par le sous-agent `doc`, jamais par toi ; les vérifications se lancent depuis la conversation (`npm run verif`). Tu ne réécris jamais l'historique git (pas d'amend, pas de rebase, pas de force).
 
 Argument reçu : `$ARGUMENTS`
-- Vide : pas de résultats d'essais, envoi sur GitHub à la fin.
+- Vide : pas de résultats d'essais, et rien n'est envoyé sur GitHub.
 - `ok partout` : tous les lots de Maintenant sont validés, ceux qui ont des essais au téléphone comme ceux « à valider sur lecture ».
 - `ok sauf N : remarque, M : remarque` : les essais N et M (sous-lignes `essai N` de Maintenant) sont ratés ; tout le reste est validé, lots sur lecture compris.
 - `ok sauf lot L : remarque` : retient un lot sans essai (sur lecture) ; se combine avec la forme précédente.
-- `sans envoi` (seul ou en plus) : tout faire sauf l'envoi sur GitHub.
+- `avec envoi` (seul ou en plus) : envoyer aussi sur GitHub à la fin (étape 6). Sans ces mots, jamais d'envoi.
 
 ## 1. État des lieux (lecture seule)
 
@@ -27,8 +27,8 @@ Relève, sans rien modifier :
 ## 2. Travail non commité
 
 Classe les fichiers modifiés :
-- **Code** (`src/`, `outils/`, `android/`, `package.json`, configuration) : lance `npm run verif` (vérification complète : lint, tous les tests, build). Si elle échoue : arrête-toi, donne la sortie à l'utilisateur, ne committe rien. Pour un lot Opus ou Fable, lance ensuite l'agent `relecture` sur le diff ; un défaut confirmé se corrige avant le commit, ou se note dans l'état de la ligne du lot si la session ne peut pas le corriger.
-  - Si le travail est un lot entier (sujet fini, vérifié, banc joué si le brief le demandait) : augmente la version dans `package.json` si `src/` a changé et qu'elle n'a pas déjà bougé depuis le dernier commit ; commit « à valider » dans le style des commits récents (`git log -5` : sujet du lot, décisions, tests, verif, banc, version) ; mets à jour la ligne du lot dans Maintenant (état « à valider (commit, version) »).
+- **Code** (`src/`, `outils/`, `android/`, `package.json`, configuration) : lance `npm run verif` (vérification complète : lint, tous les tests, build). Si elle échoue : arrête-toi, donne la sortie à l'utilisateur, ne committe rien. Pour un lot Opus ou Fable, lance ensuite l'agent `relecture` sur le diff ; un défaut confirmé se corrige avant le commit, ou se note dans l'état de la ligne du lot si la session ne peut pas le corriger. Si la relecture ne peut pas se faire (quota épuisé, agent en échec), elle n'est jamais sautée en silence : le lot est commité avec l'état « à valider, relecture due » (`outils/backlog.mjs` l'affiche dans les alertes) et le compte rendu le dit.
+  - Si le travail est un lot entier (sujet fini, vérifié, banc joué si le brief le demandait) : augmente la version dans `package.json` si `src/` ou `android/` a changé et qu'elle n'a pas déjà bougé depuis le dernier commit ; commit « à valider » dans le style des commits récents (`git log -5` : sujet du lot, décisions, tests, verif, banc, version) ; mets à jour la ligne du lot dans Maintenant (état « à valider (commit, version) »).
   - Si ce n'est pas un lot entier : ne committe pas. Note le lot « en cours » dans sa ligne, avec ce qui est fait et ce qui reste, et dis-le dans le compte rendu.
 - **Doc et outillage seuls** (`docs/`, `CLAUDE.md`, `.claude/`, mémoire) : commit direct, sans vérification, message court en français.
 
@@ -53,23 +53,23 @@ Sans résultats dans l'argument : aucune passe doc (règle : doc après validati
 - Idées lancées en passant dans la session : une ligne en Plus tard, datée, une phrase avec le résultat attendu ; rien d'autre.
 - Questions de la session restées sans réponse : dans « Questions », chacune avec ta réponse par défaut et la date (cinq au plus).
 - Pas de journal : le compte rendu, git et HISTORIQUE suffisent. `node outils/backlog.mjs` doit finir sans erreur de forme.
-- Mémoire `point-de-reprise-cible-mobile.md` (`~/.claude/projects/D--gong-tracker-Gtracker/memory/`) : rien à écrire, l'état est dans `docs/BACKLOG.md` ; seulement si le rythme de travail a changé dans la session, corriger son paragraphe « Rythme », sans journal.
+- Mémoire `point-de-reprise-gtracker.md` (dossier mémoire du projet de Claude) : rien à écrire, l'état est dans `docs/BACKLOG.md` ; seulement si le rythme de travail a changé dans la session, corriger son paragraphe « Rythme », sans journal.
 
 ## 5. APK, si le téléphone est branché
 
 Tu ne construis pas d'APK ici (procédure au §12 d'ETAT, à demander à part), mais tu installes celle qui existe déjà :
-- lis la version de `package.json` ; si `android/app/build/outputs/apk/release/Gtracker-<version>.apk` existe, vérifie le téléphone : `"C:/Users/segne/AppData/Local/Android/Sdk/platform-tools/adb.exe" devices` doit lister `45LZ6LRSHIDIEUX8` avec l'état `device` ;
-- branché : `adb install -r <cette APK>`, puis `adb shell dumpsys package io.github.segneur.tracker.voile | grep -m1 versionName` doit donner la version ; note « APK <version> installée le jj/mm (versionCode …). » dans la première ligne de Maintenant (un commit de doc si `docs/BACKLOG.md` change) ;
+- lis la version de `package.json` ; si `android/app/build/outputs/apk/release/Gtracker-<version>.apk` existe, vérifie le téléphone : `"$ANDROID_HOME/platform-tools/adb.exe" devices` doit lister le téléphone habituel (son numéro de série est dans la mémoire de Claude, pas dans le dépôt) avec l'état `device` ;
+- branché : `adb install -r <cette APK>`, puis `adb shell dumpsys package <applicationId> | grep -m1 versionName` doit donner la version (`applicationId` de `android/app/build.gradle`) ; note « APK <version> installée le jj/mm (versionCode …). » dans la première ligne de Maintenant (un commit de doc si `docs/BACKLOG.md` change) ;
 - débranché, ou pas d'APK de cette version : ne fais rien, dis-le dans le compte rendu (« APK <version> construite, à installer » ou « à construire »).
 
 ## 6. Envoi sur GitHub
 
-Sauf `sans envoi` : `git push origin main --follow-tags` (les tags annotés des APK partent avec), puis `git log --oneline origin/main..main` doit être vide ; cite ce résultat. Si le push échoue, donne l'erreur et ne retente pas autrement.
+Seulement avec `avec envoi` dans l'argument (sinon saute cette étape et dis « rien envoyé » dans le compte rendu) : `git push origin main --follow-tags` (les tags annotés des APK partent avec), puis `git log --oneline origin/main..main` doit être vide ; cite ce résultat. Si le push échoue, donne l'erreur et ne retente pas autrement.
 
 ## 7. Compte rendu
 
 Un message qui tient seul, pour quelqu'un qui n'a pas vu la session, en français courant :
-- les commits de la session (hash court, sujet, version) et s'ils sont envoyés ;
+- les commits de la session (hash court, sujet, version) et s'ils sont envoyés ou non (jamais sans `avec envoi`) ;
 - ce qui est validé, ce qui attend l'utilisateur : essais par numéro, questions ouvertes (Q n) avec ce que Claude fera sans réponse ;
 - ce qui a été laissé de côté et pourquoi (lot en cours non commité, vérification en échec, doc non faite faute de résultats) ;
 - la version de `package.json`, et l'APK : installée à l'étape 5, construite mais à installer (téléphone débranché), ou à construire (version plus haute que celle de la première ligne de Maintenant) ;
@@ -81,6 +81,6 @@ Pas de construction d'APK (procédure au §12 d'ETAT, à demander à part) : seu
 
 ## Pièges du poste
 
-- `npx vitest` depuis Git Bash avec un `cwd` en `c:\…` minuscule échoue : `cmd //c "cd /d \"D:\gong tracker\Gtracker\" && npx vitest run …"` ; `outils/verif.mjs` le fait seul (racine en capitale).
+- `npx vitest` depuis Git Bash avec un `cwd` en `c:\…` minuscule échoue : `cmd //c "cd /d \"<racine du dépôt>\" && npx vitest run …"` ; `outils/verif.mjs` le fait seul (racine en capitale).
 - Ne jamais éditer un fichier source par PowerShell (double encodage UTF-8).
 - Fins de ligne par `.gitattributes` : ne pas convertir.

@@ -1,6 +1,6 @@
 ---
 name: lot
-description: Exécute un lot de Tracker d'après son brief (code, tests, vérifications courtes) et rend un rapport FAIT / BLOQUÉ / ÉCHEC. Ne committe pas, n'augmente pas la version, ne tranche aucune décision de l'utilisateur. Modèle et effort donnés à chaque appel d'après la colonne « Modèle | Réflexion » du brief.
+description: Exécute un lot de Gtracker d'après son brief (code, tests, vérifications courtes) et rend un rapport FAIT / BLOQUÉ / ÉCHEC. Ne committe pas, n'augmente pas la version, ne tranche aucune décision de l'utilisateur. Modèle et effort donnés à chaque appel d'après la colonne « Modèle | Réflexion » du brief.
 model: opus
 effort: high
 tools: Read, Edit, Write, Grep, Glob, Bash
@@ -17,18 +17,17 @@ hooks:
           command: "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/garde-lot.mjs\""
 ---
 
-Tu exécutes un lot dans le dépôt Tracker (`D:\gong tracker\Gtracker`), sous la conduite d'un orchestrateur qui ne lit que ton rapport. On te donne le brief du lot (un fichier, ou un paragraphe du §9 de `D:\gong tracker\atelier\revue-2710\RAPPORT.md` avec les rapports de domaine `revue-X.md` à côté), les décisions déjà prises, et le cas échéant le dossier de brouillon à employer.
+Tu exécutes un lot dans le dépôt Gtracker, sous la conduite d'un orchestrateur qui ne lit que ton rapport. On te donne le brief du lot (un fichier de `docs/backlog/`), les décisions déjà prises, et le cas échéant le dossier de brouillon à employer.
 
 ## Avant de coder
 
-1. Lis `CLAUDE.md` (règles d'architecture 1 à 12, « Où ajouter quoi »), puis la ou les sections de `docs/DECISIONS.md` que le brief cite ou que la table de `CLAUDE.md` associe aux fichiers touchés ; `docs/MISE_EN_PAGE.md` si une page d'analyse est concernée.
-2. Lis le brief en entier et, pour un lot de la revue, chaque constat cité (B-n, O-n) dans son rapport de domaine : fichier, ligne, scénario, correction suggérée. Vérifie dans le code que le constat tient encore (des lots précédents ont pu le corriger).
-3. Si le brief n'est qu'un paragraphe du §9, écris d'abord `D:\gong tracker\atelier\revue-2710\lotN-brief.md` sur le modèle de `lot4-brief.md` (décisions tranchées par toi, ordre d'exécution, tests, vérifications et banc, ce que l'utilisateur doit essayer), puis exécute-le. C'est ce fichier qui permettra une reprise.
-4. Si on te relance après un ÉCHEC, lis d'abord la section « Échec » du rapport précédent jointe à la demande : ce qui a cassé et ce qui a été essayé ; ne refais pas le même chemin. Si on te dit que l'arbre porte déjà un travail commencé (lot repris après une question), pars de `git diff`, ne le refais pas.
+1. Lis `CLAUDE.md` (règles d'architecture 1 à 13, « Où ajouter quoi »), puis la ou les sections de `docs/DECISIONS.md` que le brief cite ou que la table de `CLAUDE.md` associe aux fichiers touchés ; `docs/MISE_EN_PAGE.md` si une page d'analyse est concernée.
+2. Lis le brief en entier et vérifie dans le code que chaque constat qu'il cite tient encore (des lots précédents ont pu le corriger).
+3. Si on te relance après un ÉCHEC, lis d'abord la section « Échec » du rapport précédent jointe à la demande : ce qui a cassé et ce qui a été essayé ; ne refais pas le même chemin. Si on te dit que l'arbre porte déjà un travail commencé (lot repris après une question), pars de `git diff`, ne le refais pas.
 
 ## Pendant
 
-- Code en français (interface, commentaires), dans le style du dépôt ; réutilise ce qui existe avant d'écrire du neuf : Grep dans `docs/INVENTAIRE.md` (70 Ko, jamais lu en entier), puis dans le code.
+- Code en français (interface, commentaires), dans le style du dépôt ; réutilise ce qui existe avant d'écrire du neuf : Grep dans `docs/INVENTAIRE.md` (gros fichier, jamais lu en entier), puis dans le code.
 - Un calcul pur reçoit son test synthétique (`*.test.ts`, 1 Hz et 5 Hz quand une fenêtre en secondes est en jeu).
 - Après chaque étape : `node outils/verif.mjs --rapide 2>&1` (typecheck, lint, tests touchés ; sortie de quelques lignes). Tout doit passer avant de rendre la main.
 - Tu ne lances ni la vérification complète (`npm run verif`) ni le banc (l'orchestrateur s'en charge après toi), mais tu peux lancer un script du banc toi-même si le brief te demande de mesurer.

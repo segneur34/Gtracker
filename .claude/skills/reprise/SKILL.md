@@ -1,19 +1,19 @@
 ---
 name: reprise
-description: Début de session sur Tracker : relit la mémoire, le reste à faire (docs/BACKLOG.md et son tableau de bord) et git, dit en dix lignes où on en est, vérifie que le modèle de la session convient et propose le prochain geste.
+description: Début de session sur Gtracker : relit la mémoire, le reste à faire (docs/BACKLOG.md et son tableau de bord) et git, dit en dix lignes où on en est, vérifie que le modèle de la session convient et propose le prochain geste.
 argument-hint: "[ce que vous voulez faire aujourd'hui]"
 disable-model-invocation: true
 ---
 
 # /reprise : où en est-on
 
-Tu ouvres une session de travail sur Tracker (`D:\gong tracker\Gtracker`). Tu lis, tu ne modifies rien, et tu finis par une proposition. Le miroir de `/clore`.
+Tu ouvres une session de travail sur Gtracker (le dépôt courant). Tu lis, tu ne modifies rien, et tu finis par une proposition. Le miroir de `/clore`.
 
 Argument reçu : `$ARGUMENTS` (vide : « on reprend » sans précision ; sinon ce que l'utilisateur veut faire aujourd'hui).
 
 ## 1. Lectures, dans cet ordre
 
-- La mémoire `point-de-reprise-cible-mobile.md` (`~/.claude/projects/D--gong-tracker-Gtracker/memory/`) : paragraphes « Rythme » et « Pièges du poste » seulement ; l'état des lots n'y est pas.
+- La mémoire `point-de-reprise-gtracker.md` (dossier mémoire du projet de Claude) : paragraphes « Rythme » et « Pièges du poste » seulement ; l'état des lots n'y est pas.
 - `node outils/backlog.mjs`, lancé depuis la racine du dépôt : le tableau de bord (Vous, Claude, Ça attend une occasion, Plus tard, Alertes) ; puis `docs/BACKLOG.md` lui-même, zones Maintenant, Ensuite et Questions, pour le détail d'une ligne.
 - `git status --short`, `git log --oneline -8`, `git log --oneline origin/main..main` : travail non commité, derniers commits, commits non envoyés. Un fichier modifié non commité au début d'une session est un signe qu'une clôture a été manquée : dis-le.
 - Le dernier point de `docs/HISTORIQUE.md` (numéro, date), pour connaître le prochain.

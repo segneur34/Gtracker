@@ -264,12 +264,21 @@ export function rangerMaintenant(r) {
   return s
 }
 
+/** Les lots de Maintenant commités sans relecture (état « à valider, relecture due »). */
+export function relecturesDues(r) {
+  return r.maintenant.filter((e) => /relecture due/i.test(e.etat ?? ''))
+}
+
 /** Les alertes de limite (pas des erreurs de forme). */
 export function alertes(r, aujourdhui = new Date()) {
   const a = []
   const lotsAvecEssais = rangerMaintenant(r).avecEssais
   if (lotsAvecEssais.length > LIMITES.lotsAvecEssais) {
     a.push(`Maintenant : ${lotsAvecEssais.length} lots attendent des essais au téléphone (${LIMITES.lotsAvecEssais} au plus) : valider avant d'en lancer un autre.`)
+  }
+  const relectureDue = relecturesDues(r)
+  if (relectureDue.length) {
+    a.push(`Relecture due : lot ${numeros(relectureDue)} commité sans relecture : la faire avant la validation.`)
   }
   if (r.ensuite.length > LIMITES.ensuite) {
     a.push(`Ensuite : ${r.ensuite.length} éléments (${LIMITES.ensuite} au plus) : en renvoyer en Plus tard.`)
@@ -319,6 +328,8 @@ export function tableauDeBord(r, aujourdhui = new Date(), chemin = 'docs/BACKLOG
     const b = /bogue n° ?(\d+)/.exec(e.etat)
     out.push(`- À revoir après le bogue ${b ? b[1] : '?'} : lot ${e.numero}.`)
   }
+  const dues = relecturesDues(r)
+  if (dues.length) out.push(`- Relecture due : lot ${numeros(dues)}.`)
   if (lotsAvecEssais.length >= LIMITES.lotsAvecEssais) {
     out.push(`- Rien avant validation : ${lotsAvecEssais.length} lots attendent leurs essais.`)
   } else if (r.ensuite.length) {

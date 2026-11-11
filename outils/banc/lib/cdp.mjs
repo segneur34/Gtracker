@@ -7,7 +7,7 @@ import { writeFileSync } from 'node:fs';
 import { TEMPS, horlogeScript } from './horloge.mjs';
 
 /** Adresse de l'application ; `BASE` la remplace (par exemple `http://127.0.0.1:4191`). */
-export const BASE = process.env.BASE ?? 'http://localhost:5173';
+export const BASE = process.env.BASE ?? 'http://localhost:5174';
 export { TEMPS };
 
 /** Domaines bloqués d'ordinaire : relief de l'IGN, Overpass, tuiles, BRouter, imagerie satellite. */

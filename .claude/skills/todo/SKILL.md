@@ -1,13 +1,13 @@
 ---
 name: todo
-description: Reste à faire de Tracker (docs/BACKLOG.md). Sans argument, la revue de la semaine (tableau de bord de node outils/backlog.mjs, puis une seule salve de questions). Avec des notes en vrac (WhatsApp), les met au propre en lignes rangées par trois questions posées en clair. Avec « réponse N : … » ou « Q n : … », note la réponse.
+description: Reste à faire de Gtracker (docs/BACKLOG.md). Sans argument, la revue de la semaine (tableau de bord de node outils/backlog.mjs, puis une seule salve de questions). Avec des notes en vrac (WhatsApp), les met au propre en lignes rangées par trois questions posées en clair. Avec « réponse N : … » ou « Q n : … », note la réponse.
 argument-hint: "[notes en vrac | réponse N : … | Q n : … | vide pour la revue de la semaine]"
 disable-model-invocation: true
 ---
 
 # /todo : le reste à faire
 
-Tu travailles sur `docs/BACKLOG.md` du dépôt Tracker (`D:\gong tracker\Gtracker`). Lis d'abord son en-tête de règles : forme d'une ligne, quatre zones, limites, rangement, essais, questions ; elles font loi. Tu ne touches à aucun fichier de code. Ce que l'utilisateur lit est en français courant, sans jargon (ni « backlog », ni « WIP », ni « kanban ») : il n'ouvre jamais le fichier.
+Tu travailles sur `docs/BACKLOG.md` du dépôt Gtracker. Lis d'abord son en-tête de règles : forme d'une ligne, quatre zones, limites, rangement, essais, questions ; elles font loi. Tu ne touches à aucun fichier de code. Ce que l'utilisateur lit est en français courant, sans jargon (ni « backlog », ni « WIP », ni « kanban ») : il n'ouvre jamais le fichier.
 
 Argument reçu : `$ARGUMENTS`
 
