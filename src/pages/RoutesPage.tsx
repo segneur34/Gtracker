@@ -7,6 +7,7 @@ import RouteList from '../components/RouteList';
 import { IconFile, IconRoute, IconShare } from '../components/icons';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import MoreMenu from '../components/ui/MoreMenu';
 import PageHeader from '../components/ui/PageHeader';
 import { activityCounts } from '../core/activities';
 import { useRouteLibrary, type SavedRoute } from '../hooks/useRouteLibrary';
@@ -41,7 +42,8 @@ const readSort = (): RouteSort => {
 };
 
 function RoutesPage() {
-  const { routes: allRoutes, loaded, error, canSave, importGpx, shareFileOf } = useRouteLibrary();
+  const { routes: allRoutes, loaded, error, canSave, importGpx, shareFileOf, remove } = useRouteLibrary();
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
   const [imported, setImported] = useState<string | null>(null);
   const { activities, isShown } = useVisibility();
@@ -90,7 +92,19 @@ function RoutesPage() {
     }
   };
 
-  const tabCount = counts.length + (withoutActivity > 0 ? 1 : 0);
+  /** Supprime l'itinéraire confirmé ; un échec est dit. */
+  const deleteRoute = async (saved: SavedRoute) => {
+    setConfirmingDelete(null);
+    setNote(null);
+    try {
+      await remove(saved);
+      setNote({ text: `« ${saved.record.name} » est supprimé.`, error: false });
+    } catch (err) {
+      setNote({ text: `Suppression impossible : ${plainError(err, 'erreur inconnue')}`, error: true });
+    }
+  };
+
+  const tabCount =counts.length + (withoutActivity > 0 ? 1 : 0);
 
   return (
     <div className="ui-page" style={{ '--tab-accent': 'var(--neutral-accent)' } as React.CSSProperties}>
@@ -136,11 +150,20 @@ function RoutesPage() {
       <Card>
         {shown.length > 0 ? (
           <RouteList routes={shown} activities={activities} currentBase={imported}
-            actions={(saved) => (
-              <Button size="s" variant="ghost" className="route-list__icon-btn" title="Partager"
-                onClick={() => void share(saved)} aria-label={`Partager ${saved.record.name}`}>
-                <IconShare size={24} />
-              </Button>
+            actions={(saved) => confirmingDelete === saved.base ? (
+              <span className="ui-row-s2 ui-wrap">
+                <Button size="s" variant="danger" onClick={() => void deleteRoute(saved)}>Supprimer définitivement</Button>
+                <Button size="s" variant="ghost" onClick={() => setConfirmingDelete(null)}>Garder</Button>
+              </span>
+            ) : (
+              <MoreMenu label="Plus d'actions sur l'itinéraire">
+                <Button size="s" variant="ghost" onClick={() => void share(saved)} aria-label={`Partager ${saved.record.name}`}>
+                  <IconShare size={18} /> Partager
+                </Button>
+                <Button size="s" variant="ghost" onClick={() => setConfirmingDelete(saved.base)} aria-label={`Supprimer ${saved.record.name}`}>
+                  Supprimer
+                </Button>
+              </MoreMenu>
             )} />
         ) : (
           <p className="ui-hint ui-hint--m">
