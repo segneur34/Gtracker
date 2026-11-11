@@ -49,6 +49,8 @@ export const incomingVerdict = (report: ImportReport, name: string): IncomingVer
   if (report.failed.length > 0) return { kind: 'refused', text: `${quoted(name)} n'a pas été rangé : ${sentence(reasonOf(name, report.failed[0]))}` };
   if (report.invalid.length > 0) return { kind: 'refused', text: `${quoted(name)} n'a pas été rangé : fichier illisible.` };
   if (report.notActivities.length > 0) return { kind: 'refused', text: describeImport(report) };
+  // Course, vélo, entraînement : refusé pour de bon, la copie est retirée (lot 321).
+  if (report.otherSports.length > 0) return { kind: 'refused', text: describeImport(report) };
   if (report.ignored.length > 0) return { kind: 'refused', text: `${quoted(name)} n'a pas été rangé : fichier vide.` };
   if (report.unsaved > 0) return { kind: 'refused', text: refusedForMemory(name, false) };
   return { kind: 'retry', reason: null };

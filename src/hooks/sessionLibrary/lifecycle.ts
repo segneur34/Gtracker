@@ -2,6 +2,7 @@ import {
   MARKER_FILE, MEMORY_VERSION, README_FILE, markerText, readMarkerVersion, readmeText, sessionPath,
 } from '../../library/folderLayout';
 import { describeRefresh } from '../../library/importReport';
+import { LEGACY_MARKER_FILE } from '../../library/legacyImport';
 import { folderId } from '../../library/libraryCache';
 import { imuFileName } from '../../library/record';
 import {
@@ -37,6 +38,20 @@ const guardedFolder = async (f: MemoryFolder): Promise<MemoryFolder> => {
   const marker = await f.readText(MARKER_FILE).catch(() => null);
   return readMarkerVersion(marker) > MEMORY_VERSION ? readOnlyFolder(f) : f;
 };
+
+/** Refus du dossier mémoire de l'ancienne application choisi comme mémoire : ses sessions entrent par l'import. */
+export const LEGACY_FOLDER_REFUSAL = 'Ce dossier est celui de l\'autre application : ajoutez ses sessions par « Ajouter les sessions d\'un dossier ».';
+
+/**
+ * Vrai pour le dossier mémoire de l'ancienne application : son marqueur, sans celui de Gtracker. Il n'est pas ouvert
+ * comme mémoire, et rien n'y est écrit (ni marqueur, ni mode d'emploi). Marqueur non lu : dossier ordinaire. La mémoire
+ * du navigateur n'est jamais refusée : seul un dossier choisi l'est.
+ */
+const isLegacyMemory = async (f: MemoryFolder): Promise<boolean> =>
+  (await f.readText(LEGACY_MARKER_FILE).catch(() => null)) !== null && (await f.readText(MARKER_FILE).catch(() => null)) === null;
+
+/** Contrôle d'un dossier désigné (`FolderCheck`) : fait avant que le choix ne soit gardé, le dossier gardé reste celui d'avant. */
+const legacyFolderCheck = async (f: MemoryFolder): Promise<string | null> => ((await isLegacyMemory(f)) ? LEGACY_FOLDER_REFUSAL : null);
 
 /** Marqueur écrit s'il manque ; mode d'emploi récrit s'il manque ou a changé. Rien en lecture seule. */
 const ensureLayout = async (f: MemoryFolder): Promise<void> => {
@@ -209,7 +224,8 @@ export const canChooseMemoryFolder = canChooseFolder;
 export const chooseFolder = async (): Promise<void> => {
   let picked: MemoryFolder | null;
   try {
-    picked = await chooseMemoryFolder();
+    // Dossier de l'ancienne application : refusé avant d'être gardé ni écrit, la mémoire en service reste en place.
+    picked = await chooseMemoryFolder(legacyFolderCheck);
   } catch (err) {
     setState({ error: err instanceof FolderRefusedError ? err.message : `Dossier inaccessible : ${errorMessage(err, 'erreur inconnue')}` });
     return;
@@ -257,10 +273,13 @@ export const chooseFolder = async (): Promise<void> => {
 export const reconnectFolder = async (): Promise<void> => {
   let f: MemoryFolder | null;
   try {
-    f = await reconnectMemoryFolder();
+    // Sur le téléphone, désigner de nouveau, c'est choisir : le dossier de l'ancienne application y est refusé de même.
+    f = await reconnectMemoryFolder(legacyFolderCheck);
   } catch (err) {
     if (err instanceof FolderRefusedError) {
-      // Dossier retenu écarté (un sous-dossier d'une mémoire) : retour à la mémoire du navigateur.
+      // Dossier écarté (sous-dossier d'une mémoire, dossier de l'ancienne application) : la mémoire gardée est rouverte.
+      // Dans le navigateur, le dossier retenu écarté a été oublié : c'est celle du navigateur. Sur le téléphone, le
+      // dossier désigné n'a pas été gardé : c'est celui d'avant, qui attend encore sa permission, ou aucun.
       const carried = takeUnwritten();
       await openLibrary();
       setState({ error: err.message });

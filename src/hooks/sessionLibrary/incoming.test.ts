@@ -59,9 +59,10 @@ const receive = (name: string, content: Uint8Array | string | null, refusal: Inc
 };
 
 const startOf = (minute: number): number => Date.parse(`2026-10-27T10:${String(minute).padStart(2, '0')}:00Z`);
-const fitAt = (minute: number, fileType?: number): Uint8Array => buildFitActivity({
+/** Activité de montre partie à la minute `minute` : du surf (38), ou le sport `sport` du profil FIT. */
+const fitAt = (minute: number, fileType?: number, sport = 38): Uint8Array => buildFitActivity({
   points: [0, 10, 20].map((s, i) => ({ timeMs: startOf(minute) + s * 1000, lat: 43.6 + i * 0.0003, lon: 3.8, speedMs: 3, hr: 140 + i })),
-  sessionSports: [1],
+  sessionSports: [sport],
   ...(fileType === undefined ? {} : { fileType }),
 });
 
@@ -160,6 +161,19 @@ describe('fichiers reçus d\'une autre application', () => {
     const { notices } = await launch();
     expect(removed).toEqual([id]);
     expect(notices()[0].text).toBe('« vide.gpx » n\'a pas été rangé : fichier illisible.');
+  });
+
+  it('FIT ou GPX de course ou de vélo : refus dit, copie retirée, rien de rangé (lot 321)', async () => {
+    const sentence = "1 session de course, de vélo ou d'entraînement laissée de côté : Gtracker ne range que la voile et le surf.";
+    const fit = receive('footing.fit', fitAt(1, undefined, 1));
+    const gpx = receive('velo.gpx', gpxAt(2).replace('<trk>', '<trk><type>cycling</type>'));
+    const { notices } = await launch();
+    expect(sessionGpx()).toEqual([]);
+    expect(removed).toEqual([fit, gpx]);
+    expect(notices()).toEqual([
+      { id: fit, text: sentence, file: null, trouble: true },
+      { id: gpx, text: sentence, file: null, trouble: true },
+    ]);
   });
 
   it('FIT qui n\'est pas une activité : phrase claire, copie retirée', async () => {

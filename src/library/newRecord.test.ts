@@ -27,7 +27,7 @@ const context = (legacy: Record<string, unknown> | null = null): NewRecordContex
 
 const motionWithJumps = (jumps: boolean) => encodeImu({
   format: IMU_FORMAT, version: IMU_VERSION, startedAtMs: NOW, clock: { elapsedUs: 0, wallMs: NOW },
-  setup: { placement: 'poitrine', foil: false, jumps, cadence: true }, streams: [...PHONE_STREAMS],
+  setup: { placement: 'poitrine', foil: false, jumps }, streams: [...PHONE_STREAMS],
 }, []);
 
 describe('fiche neuve d’une session (lot 113)', () => {

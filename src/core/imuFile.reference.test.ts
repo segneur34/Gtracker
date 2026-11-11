@@ -43,7 +43,7 @@ describe('référence du format des capteurs, écrite par le téléphone', () =>
     const view = new DataView(REFERENCE.buffer, REFERENCE.byteOffset, REFERENCE.byteLength);
     const length = view.getUint32(8, true);
     const text = new TextDecoder().decode(REFERENCE.subarray(12, 12 + length));
-    expect(text.startsWith('{"format":"tracker-capteurs",')).toBe(true);
+    expect(text.startsWith('{"format":"gtracker-capteurs",')).toBe(true);
     expect(text.endsWith(']}')).toBe(true);
     // Texte en UTF-8 : les accents et l'euro comptent pour plus d'un octet dans la longueur.
     expect(length).toBeGreaterThan(text.length);
@@ -53,12 +53,12 @@ describe('référence du format des capteurs, écrite par le téléphone', () =>
   it('relit l\'en-tête, tel que le plugin l\'écrit', async () => {
     const { recording } = await decoded();
     expect(recording.header).toEqual({
-      format: 'tracker-capteurs',
+      format: 'gtracker-capteurs',
       version: 1,
       startedAtMs: 1_790_000_000_000,
       clock: { elapsedUs: 123_456_789_000, wallMs: 1_790_000_000_150 },
       device: { manufacturer: 'Société d\'essai', model: 'Téléphone €', android: 36 },
-      setup: { placement: 'poitrine', foil: true, jumps: true, cadence: false },
+      setup: { placement: 'poitrine', foil: true, jumps: true },
       streams: [
         {
           id: 0, kind: 'accel', axes: 3, unit: 0.01, offset: 0,

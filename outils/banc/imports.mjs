@@ -67,7 +67,7 @@ const summaryFor = (t0) => ({ calcVersion: 2, startMs: t0, endMs: t0 + 600_000, 
 const notesWith = (patch) => ({ foil: '', mast: '', wing: '', comment: '', windLevel: null, waterState: null, rating: null, savedAt: 1, ...patch });
 /** Fiche du jour, réduite à ce qui compte ici. */
 const fiche = (gpx, t0, patch = {}) => JSON.stringify({
-  format: 'tracker-session', version: 1, gpx, sport: 'wingfoil', activityId: null, source: 'import',
+  format: 'gtracker-session', version: 1, gpx, sport: 'wingfoil', activityId: null, source: 'import',
   addedAt: new Date(t0).toISOString(), title: 'Trace', name: null, summary: summaryFor(t0), notes: null, analysis: null, ...patch,
 });
 const at = (day) => Date.parse(`2026-09-${String(day).padStart(2, '0')}T10:00:00Z`);
@@ -173,11 +173,12 @@ console.log('graphe :', await evaluate(`document.querySelectorAll('.recharts-sur
 await shoot('imports-velo');
 
 // --- 7. GPX complet portant une fiche d'une version plus récente (lot 148), avant le surf pour rester sur grand écran ---
+// Paquet et fiche au format de Gtracker (lot 321) : une fiche plus récente de l'autre application n'est plus rangée.
 const t10 = at(19);
 const futureText = `${JSON.stringify({ ...JSON.parse(fiche('f1.gpx', t10, { name: 'Du futur', notes: notesWith({ comment: 'venu <du> futur', savedAt: t10 }) })), version: 99, nouveau: { forme: [1, 2] } }, null, 1)}\n`;
 const xmlText = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const futureBare = trackGpx('wingfoil', 8, t10);
-const futureBundle = futureBare.replace('</gpx>', `<extensions><tracker:session xmlns:tracker="https://github.com/segneur34/Tracker/session" version="1"><tracker:record>${xmlText(futureText)}</tracker:record></tracker:session></extensions></gpx>`);
+const futureBundle = futureBare.replace('</gpx>', `<extensions><gtracker:session xmlns:gtracker="urn:gtracker:session" version="1"><gtracker:record>${xmlText(futureText)}</gtracker:record></gtracker:session></extensions></gpx>`);
 await go('/voile', 3000);
 console.log('\nGPX complet à fiche v99 :', await importFiles([['f1.gpx', futureBundle]]));
 await waitFor(() => recordOf(t10), { timeout: 3000, label: 'f1' });

@@ -161,8 +161,8 @@ const CASES: Case[] = [
     sport: 'surf',
   },
   {
-    name: 'trace de course (application complète) : à classer (lot 305)',
-    text: (hz) => run(hz, { name: 'Footing', type: 'running' }),
+    name: 'trace d’un type inconnu : à classer',
+    text: (hz) => run(hz, { name: 'Balade', type: 'hiking' }),
     source: 'import',
     options: {},
     sport: null,
@@ -340,6 +340,34 @@ describe('addGpx : résumé par le worker', () => {
     FakeWorker.instances[0].onerror?.();
     expect((await adding).status).toBe('added');
     expect(sessionFiles()).toStrictEqual(inline.disk);
+  });
+});
+
+describe('addGpx : sport que Gtracker ne range pas (lot 321)', () => {
+  const footing = (hz: number) => run(hz, { name: 'Footing', type: 'running' });
+
+  for (const hz of [1, 5]) {
+    it(`une trace de course importée sans fiche est refusée, rien n'est écrit, en ligne et par le worker, à ${hz} Hz`, async () => {
+      const inline = await addOnce(footing(hz), 'import', {});
+      useWorker();
+      const worker = await addOnce(footing(hz), 'import', {});
+      vi.unstubAllGlobals();
+      for (const got of [inline, worker]) {
+        expect(got.result).toStrictEqual({ status: 'other-sport', file: null });
+        expect(got.disk).toEqual([]);
+      }
+    });
+  }
+
+  it('jamais pour une session qui a sa fiche, ni pour un enregistrement ou un calcul imposé : à classer ou rangée', async () => {
+    const withRecord = await addOnce(footing(1), 'import', { record: sessionRecord({ sport: null }) });
+    expect(withRecord.result.status).toBe('added');
+    expect(withRecord.session?.record.sport).toBeNull();
+    const recorded = await addOnce(footing(1), 'enregistrement', { sport: null });
+    expect(recorded.result.status).toBe('added');
+    const imposed = await addOnce(footing(1), 'import', { sport: 'surf' });
+    expect(imposed.result.status).toBe('added');
+    expect(imposed.session?.record.sport).toBe('surf');
   });
 });
 

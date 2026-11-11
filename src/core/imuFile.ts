@@ -1,3 +1,4 @@
+import { FILE_FORMATS } from './appIdentity';
 import { isObject, upperMedianOfSorted } from './basics';
 /**
  * Fichier des capteurs d'une session (`.imu`), rangé à côté de son GPX :
@@ -34,7 +35,8 @@ import { isObject, upperMedianOfSorted } from './basics';
  */
 
 export const IMU_MAGIC = 'TRKIMU1\n';
-export const IMU_FORMAT = 'tracker-capteurs';
+/** Format de l'en-tête (`core/appIdentity.ts`) ; celui de l'ancienne application n'est lu qu'à la porte d'import. */
+export const IMU_FORMAT = FILE_FORMATS.capteurs;
 export const IMU_VERSION = 1;
 
 /** Pas des instants dans un bloc, en microsecondes. */
@@ -65,10 +67,10 @@ export interface ImuHeader {
   device?: { manufacturer?: string; model?: string; android?: number };
   /**
    * Réglages au départ : emplacement du téléphone et foil (sauts), et ce que
-   * la capture mesure : `jumps` (sauts ou pumping ; absent des fichiers
-   * d'avant la cadence, donc vrai) et `cadence` (cadence à pied).
+   * la capture mesure : `jumps` (sauts ; faux : pumping seul ; absent des
+   * plus anciens fichiers, donc vrai).
    */
-  setup: { placement: string; foil: boolean; jumps?: boolean; cadence?: boolean };
+  setup: { placement: string; foil: boolean; jumps?: boolean };
   streams: ImuStreamInfo[];
   /**
    * Fenêtres gardées, en µs comme les instants, quand le fichier a été élagué ;
@@ -176,22 +178,45 @@ const readHeader = (json: unknown): ImuHeader | null => {
       placement: typeof setup.placement === 'string' ? setup.placement : 'poitrine',
       foil: setup.foil === true,
       jumps: setup.jumps !== false,
-      cadence: setup.cadence === true,
     },
     streams,
   } as ImuHeader;
 };
 
-/** En-tête seul d'un fichier, sans en lire les mesures ; `null` s'il est illisible. */
-export const decodeImuHeader = (bytes: Uint8Array): ImuHeader | null => {
+/**
+ * Découpe d'un fichier : le texte de son en-tête (JSON, non lu) et ses paquets de mesures, sans recopie ; `null` sans
+ * la marque ou si l'en-tête dépasse le fichier. Sert aussi à la porte d'import, qui récrit l'en-tête seul.
+ */
+export const splitImu = (bytes: Uint8Array): { headerText: string; body: Uint8Array } | null => {
   const magic = asciiBytes(IMU_MAGIC);
   if (bytes.length < magic.length + 4 || magic.some((b, i) => bytes[i] !== b)) return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const headerLength = view.getUint32(magic.length, true);
   const headerStart = magic.length + 4;
   if (headerStart + headerLength > bytes.length) return null;
+  return {
+    headerText: new TextDecoder().decode(bytes.subarray(headerStart, headerStart + headerLength)),
+    body: bytes.subarray(headerStart + headerLength),
+  };
+};
+
+/** Fichier écrit d'un en-tête (`header`, déjà en JSON ou objet) et de paquets déjà compressés (`body`). */
+export const joinImu = (header: string | object, body: Uint8Array): Uint8Array => {
+  const headerBytes = new TextEncoder().encode(typeof header === 'string' ? header : JSON.stringify(header));
+  const file = new Uint8Array(IMU_MAGIC.length + 4 + headerBytes.length + body.length);
+  file.set(asciiBytes(IMU_MAGIC));
+  new DataView(file.buffer).setUint32(IMU_MAGIC.length, headerBytes.length, true);
+  file.set(headerBytes, IMU_MAGIC.length + 4);
+  file.set(body, IMU_MAGIC.length + 4 + headerBytes.length);
+  return file;
+};
+
+/** En-tête seul d'un fichier, sans en lire les mesures ; `null` s'il est illisible. */
+export const decodeImuHeader = (bytes: Uint8Array): ImuHeader | null => {
+  const split = splitImu(bytes);
+  if (!split) return null;
   try {
-    return readHeader(JSON.parse(new TextDecoder().decode(bytes.subarray(headerStart, headerStart + headerLength))));
+    return readHeader(JSON.parse(split.headerText));
   } catch {
     return null;
   }
@@ -270,21 +295,19 @@ const readBlocks = (payload: Uint8Array, blocks: BlockSpan[], streams: Accumulat
  */
 export const decodeImu = async (bytes: Uint8Array, options: ImuDecodeOptions = {}): Promise<ImuRecording | null> => {
   const header = decodeImuHeader(bytes);
-  if (!header) return null;
-  const magic = asciiBytes(IMU_MAGIC);
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const headerLength = view.getUint32(magic.length, true);
-  const headerStart = magic.length + 4;
+  const body = header ? splitImu(bytes)?.body : undefined;
+  if (!header || !body) return null;
+  const view = new DataView(body.buffer, body.byteOffset, body.byteLength);
 
   // Paquets complets, sans les recopier ; un dernier incomplet est ignoré.
   const packets: Uint8Array[] = [];
   let truncated = false;
-  let offset = headerStart + headerLength;
-  while (offset < bytes.length) {
-    if (offset + 4 > bytes.length) { truncated = true; break; }
+  let offset = 0;
+  while (offset < body.length) {
+    if (offset + 4 > body.length) { truncated = true; break; }
     const length = view.getUint32(offset, true);
-    if (offset + 4 + length > bytes.length) { truncated = true; break; }
-    packets.push(bytes.subarray(offset + 4, offset + 4 + length));
+    if (offset + 4 + length > body.length) { truncated = true; break; }
+    packets.push(body.subarray(offset + 4, offset + 4 + length));
     offset += 4 + length;
   }
   const totalBytes = packets.reduce((sum, packet) => sum + packet.length, 0);

@@ -3,7 +3,7 @@ import { getSportProfile } from '../core/sportProfiles';
 import type { LocationFix } from '../platform/location';
 import { buildGpx } from '../recording/gpxWriter';
 import { sessionTitle } from '../recording/session';
-import { guessSport } from './naming';
+import { guessSport, isOtherSportType } from './naming';
 
 /**
  * D'un fichier FIT à une session : le FIT est converti une seule fois, à l'entrée, en GPX, le seul format de la
@@ -79,7 +79,9 @@ export type FitConversion =
   /** Un FIT lisible qui n'est pas une activité (réglages, parcours, données du jour…). */
   | { kind: 'not-activity' }
   /** Une activité qu'on ne peut pas ranger, avec la raison en clair. */
-  | { kind: 'refused'; reason: string };
+  | { kind: 'refused'; reason: string }
+  /** Une activité d'un sport que Gtracker ne range pas (course, vélo) : comptée à part, sans être nommée (lot 321). */
+  | { kind: 'other-sport' };
 
 /** Vrai si le FIT est une activité, sans en lire la suite : `false` pour un autre type ou un fichier qui n'est pas un FIT. */
 export const isFitActivity = (bytes: Uint8Array): boolean => {
@@ -95,6 +97,9 @@ export const isFitActivity = (bytes: Uint8Array): boolean => {
 export const fitToGpx = (bytes: Uint8Array): FitConversion => {
   const fit = parseFit(bytes);
   if (fit.fileType !== null && fit.fileType !== FIT_FILE_ACTIVITY) return { kind: 'not-activity' };
+  const type = fitSportName(fit.sportCodes);
+  // Course ou vélo, avec ou sans positions (tapis, home-trainer) : laissé de côté, sans écrire de GPX.
+  if (isOtherSportType(type)) return { kind: 'other-sport' };
   const segments = fitSegments(fit.records, fit.timerEvents);
   if (segments.length === 0) {
     return {
@@ -104,7 +109,6 @@ export const fitToGpx = (bytes: Uint8Array): FitConversion => {
         : 'aucune position dans ce fichier (tapis, salle) : pas de trace à ranger',
     };
   }
-  const type = fitSportName(fit.sportCodes);
   const sport = guessSport(type ?? undefined);
   const name = sessionTitle(segments[0][0].timeMs, sport ? getSportProfile(sport).label : 'Session');
   return { kind: 'session', gpx: buildGpx(segments, { name, sport: type }) };

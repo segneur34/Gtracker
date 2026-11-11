@@ -66,8 +66,6 @@ describe('du FIT au GPX, relu par parseGpx', () => {
   it('nomme la session comme un enregistrement', () => {
     const { trackName } = parseGpx(gpxOf(buildFitActivity({ points: seconds(2), sessionSports: [38] })));
     expect(trackName).toMatch(/^Surf, 10\/10\/2026 \d\d:00$/);
-    // Une course de la montre, sans calcul ici (lot 305) : nommée comme une session à classer.
-    expect(parseGpx(gpxOf(buildFitActivity({ points: seconds(2), sessionSports: [1] }))).trackName).toMatch(/^Session, /);
     const unknown = parseGpx(gpxOf(buildFitActivity({ points: seconds(2), sessionSports: [0] })));
     expect(unknown.trackName).toMatch(/^Session, 10\/10\/2026 \d\d:00$/);
   });
@@ -142,11 +140,18 @@ describe('sport écrit dans le GPX', () => {
   it('le numéro du profil FIT devient un nom lu par `guessSport`', () => {
     const cases: [number, string][] = [[32, 'bateau'], [38, 'surf'], [43, 'windsurf'], [44, 'kite']];
     for (const [code, sport] of cases) expect(guessSport(typeOf([code]))).toBe(sport);
-    // Course et vélo : leur nom reste écrit, la session est à classer (lot 305).
-    for (const [code, name] of [[1, 'running'], [2, 'cycling'], [21, 'e_biking']] as const) {
-      expect(typeOf([code])).toBe(name);
-      expect(guessSport(typeOf([code]))).toBeNull();
+  });
+
+  it('course et vélo : laissés de côté, sans GPX ni raison à nommer (lot 321)', () => {
+    for (const code of [1, 2, 21]) {
+      expect(fitToGpx(buildFitActivity({ points: seconds(2), sessionSports: [code] }))).toStrictEqual({ kind: 'other-sport' });
     }
+    // Sans positions (tapis, home-trainer) : de même, et non « aucune position ».
+    expect(fitToGpx(buildFitActivity({ points: [{ timeMs: T0, hr: 120 }, { timeMs: T0 + 1000, hr: 121 }], sessionSports: [1] })))
+      .toStrictEqual({ kind: 'other-sport' });
+    // Le sport du message `sport`, sans session ; une course en plusieurs sessions avec transitions.
+    expect(fitToGpx(buildFitActivity({ points: seconds(2), sessionSports: [], sportMessage: 1 }))).toStrictEqual({ kind: 'other-sport' });
+    expect(fitToGpx(buildFitActivity({ points: seconds(2), sessionSports: [1, 3, 1] }))).toStrictEqual({ kind: 'other-sport' });
   });
 
   it('un sport connu du FIT mais pas d\'ici garde son nom et reste à classer', () => {
@@ -162,11 +167,11 @@ describe('sport écrit dans le GPX', () => {
   });
 
   it('sans session, le sport du message `sport`', () => {
-    expect(typeOf([], 1)).toBe('running');
+    expect(typeOf([], 38)).toBe('surfing');
   });
 
   it('multisport : une seule session, typée si un seul sport hors transitions, à classer sinon', () => {
-    expect(typeOf([1, 3, 1])).toBe('running');
+    expect(typeOf([38, 3, 38])).toBe('surfing');
     expect(typeOf([5, 3, 2, 3, 1])).toBeUndefined();
   });
 });

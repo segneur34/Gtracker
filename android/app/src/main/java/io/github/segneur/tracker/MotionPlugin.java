@@ -370,7 +370,7 @@ public class MotionPlugin extends Plugin implements SensorEventListener {
         Sensor accel, Sensor gyro, Sensor pressure
     ) throws JSONException {
         JSONObject header = new JSONObject();
-        header.put("format", "tracker-capteurs");
+        header.put("format", "gtracker-capteurs");
         header.put("version", 1);
         header.put("startedAtMs", startedAtMs);
         JSONObject clock = new JSONObject();

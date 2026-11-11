@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { describeImport, describeRefresh, type ImportReport } from './importReport';
 
 const report = (patch: Partial<ImportReport> = {}): ImportReport => ({
-  added: [], existing: [], duplicates: 0, invalid: [], ignored: [], notActivities: [], unsaved: 0, failed: [], retryable: [], motionAdded: 0, motionFailed: [], recordCompleted: 0, recordNotRead: 0, ...patch,
+  added: [], existing: [], duplicates: 0, invalid: [], ignored: [], notActivities: [], otherSports: [], unsaved: 0, failed: [], retryable: [], motionAdded: 0,
+  motionFailed: [], recordCompleted: 0, recordNotRead: 0, legacyRecordsIgnored: [], ...patch,
 });
 
 describe("compte rendu d'un import (lot 72)", () => {
@@ -41,6 +42,27 @@ describe("compte rendu d'un import (lot 72)", () => {
     );
     expect(describeImport(report({ duplicates: 2, recordNotRead: 2 }))).toBe(
       '0 sessions ajoutées, 2 déjà présentes, fiche non relue pour 2 sessions déjà présentes : non complétées.',
+    );
+  });
+
+  it('compte les sessions de course, de vélo ou d’entraînement laissées de côté, sans les nommer (lot 321)', () => {
+    expect(describeImport(report({ otherSports: ['course.fit'] }))).toBe(
+      "1 session de course, de vélo ou d'entraînement laissée de côté : Gtracker ne range que la voile et le surf.",
+    );
+    expect(describeImport(report({ added: ['a.gpx'], otherSports: ['c.fit', 'v.gpx', 'r.gpx'] }))).toBe(
+      "1 session ajoutée. 3 sessions de course, de vélo ou d'entraînement laissées de côté : Gtracker ne range que la voile et le surf.",
+    );
+    // Avec un FIT qui n'est pas une activité : il y a autre chose à dire que lui.
+    expect(describeImport(report({ otherSports: ['c.fit'], notActivities: ['r.fit'] }))).toBe(
+      "1 session de course, de vélo ou d'entraînement laissée de côté : Gtracker ne range que la voile et le surf.",
+    );
+    expect(describeImport(report({ otherSports: ['c.fit'] }))).not.toContain('c.fit');
+  });
+
+  it('dit la fiche de l’autre application non reprise, la trace rangée seule (lot 321)', () => {
+    expect(describeImport(report({ added: ['a.gpx'], legacyRecordsIgnored: ['a.gpx'] }))).toBe(
+      "1 session ajoutée, fiche de l'autre application d'une version plus récente ou illisible pour 1 session (a.gpx) : "
+      + 'trace seule rangée, sans nom, notes ni repères.',
     );
   });
 });

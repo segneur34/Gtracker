@@ -7,8 +7,8 @@ import { FUTURE_RECORD_WARNING, UNREADABLE_RECORD_WARNING } from './recordText';
 const sidecarText = serializeRecord(sessionRecord({ name: 'À côté' }));
 const bundleText = serializeRecord(sessionRecord({ name: 'Du paquet' }));
 const futureText = serializeRecord({ ...sessionRecord({ name: 'Future' }), version: RECORD_VERSION + 1 });
-const bundle = { record: parseRecordWithRaw(bundleText)?.parts ?? null, recordText: bundleText, unreadable: {} };
-const noBundle = { record: null, recordText: null, unreadable: {} };
+const bundle = { record: parseRecordWithRaw(bundleText)?.parts ?? null, recordText: bundleText, unreadable: {}, otherSport: null };
+const noBundle = { record: null, recordText: null, unreadable: {}, otherSport: null };
 
 describe('fiche d’un GPX importé (lot 113)', () => {
   it('prend la fiche posée à côté avant celle du paquet', () => {
@@ -21,12 +21,15 @@ describe('fiche d’un GPX importé (lot 113)', () => {
   it('prend celle du paquet sans fiche à côté, ou à côté d’une fiche vide', () => {
     expect(importRecordChoice(undefined, bundle).record?.name).toBe('Du paquet');
     expect(importRecordChoice('  ', bundle).record?.name).toBe('Du paquet');
-    expect(importRecordChoice(null, noBundle)).toEqual({ record: null, unreadable: {}, keepRecordText: undefined });
+    expect(importRecordChoice(null, noBundle)).toEqual({
+      record: null, unreadable: {}, keepRecordText: undefined, otherSport: null, legacyRecordIgnored: false,
+    });
   });
 
   it('range telle quelle une fiche à côté illisible ou plus récente, sans fondre celle du paquet', () => {
     expect(importRecordChoice('{ abîmée', bundle)).toEqual({
       record: null, unreadable: undefined, keepRecordText: { text: '{ abîmée', warning: UNREADABLE_RECORD_WARNING, parts: null },
+      otherSport: null, legacyRecordIgnored: false,
     });
     const future = importRecordChoice(futureText, bundle);
     expect(future.record).toBeNull();
@@ -35,9 +38,9 @@ describe('fiche d’un GPX importé (lot 113)', () => {
   });
 
   it('range telle quelle la fiche du paquet qu’il n’a pas su lire, pas une fiche de paquet blanche', () => {
-    const choice = importRecordChoice(undefined, { record: null, recordText: futureText, unreadable: {} });
+    const choice = importRecordChoice(undefined, { record: null, recordText: futureText, unreadable: {}, otherSport: null });
     expect(choice.record).toBeNull();
     expect(choice.keepRecordText?.text).toBe(futureText);
-    expect(importRecordChoice(undefined, { record: null, recordText: ' ', unreadable: {} }).keepRecordText).toBeUndefined();
+    expect(importRecordChoice(undefined, { record: null, recordText: ' ', unreadable: {}, otherSport: null }).keepRecordText).toBeUndefined();
   });
 });

@@ -18,6 +18,11 @@ export interface ImportReport {
   ignored: string[];
   /** FIT lisibles qui ne sont pas des activités (réglages, parcours…) : ignorés, dits seulement si rien d'autre n'est à dire. */
   notActivities: string[];
+  /**
+   * Sessions de course, de vélo ou d'entraînement (fiche, `<type>` d'un GPX sans fiche, sport d'un FIT), laissées de
+   * côté : comptées dans la phrase, jamais nommées une à une (montre prêtée, dossier entier).
+   */
+  otherSports: string[];
   unsaved: number;
   /** Fichiers qu'on n'a pas pu lire ou ranger, avec la raison. */
   failed: string[];
@@ -34,11 +39,23 @@ export interface ImportReport {
   recordCompleted: number;
   /** Sessions déjà présentes à compléter dont la fiche n'a pas pu être relue : rien n'y a été ajouté. */
   recordNotRead: number;
+  /**
+   * GPX rangés ou déjà présents dont la fiche, de l'autre application, est d'une version plus récente ou illisible :
+   * elle n'est pas reprise (nom, notes, repères), la trace seule entre (`library/legacyImport.ts`).
+   */
+  legacyRecordsIgnored: string[];
 }
 
-/** Phrase du compte rendu : sessions ajoutées, déjà présentes, complétées ou non, illisibles, non rangées. */
+/** Phrase des sessions d'un sport que Gtracker ne range pas. */
+const otherSportsSentence = (n: number): string => {
+  const s = n > 1 ? 's' : '';
+  return `${n} session${s} de course, de vélo ou d'entraînement laissée${s} de côté : Gtracker ne range que la voile et le surf.`;
+};
+
+/** Phrase du compte rendu : sessions ajoutées, déjà présentes, complétées ou non, illisibles, non rangées, d'un autre sport. */
 export const describeImport = (report: ImportReport): string => {
-  const nothingElse = report.added.length === 0 && report.duplicates === 0 && report.invalid.length === 0 && report.unsaved === 0 && report.failed.length === 0;
+  const nothingElse = report.added.length === 0 && report.duplicates === 0 && report.invalid.length === 0 && report.unsaved === 0
+    && report.failed.length === 0 && report.otherSports.length === 0;
   if (report.notActivities.length > 0 && nothingElse) {
     return report.notActivities.length > 1
       ? `Ces ${report.notActivities.length} fichiers de montre ne sont pas des activités (réglages, parcours…) : rien n'a été importé.`
@@ -65,7 +82,17 @@ export const describeImport = (report: ImportReport): string => {
   if (report.unsaved > 0) {
     parts.push(`${report.unsaved} non rangée${report.unsaved > 1 ? 's' : ''} : désignez d'abord le dossier mémoire (Réglages › Mémoire)`);
   }
-  return `${parts.join(', ')}.`;
+  if (report.legacyRecordsIgnored.length > 0) {
+    const n = report.legacyRecordsIgnored.length;
+    const s = n > 1 ? 's' : '';
+    parts.push(`fiche de l'autre application d'une version plus récente ou illisible pour ${n} session${s} (${report.legacyRecordsIgnored.join(', ')}) : `
+      + `trace seule rangée, sans nom, notes ni repères`);
+  }
+  const others = report.otherSports.length;
+  if (others === 0) return `${parts.join(', ')}.`;
+  // Rien d'autre que des sessions d'un autre sport : leur phrase seule.
+  const onlyOthers = parts.length === 1 && report.added.length === 0 && report.failed.length === 0;
+  return onlyOthers ? otherSportsSentence(others) : `${parts.join(', ')}. ${otherSportsSentence(others)}`;
 };
 
 /**

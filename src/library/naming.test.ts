@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { downloadBaseName, guessSport, uniqueSessionFileName } from './naming';
+import { downloadBaseName, guessSport, isOtherSportType, uniqueSessionFileName } from './naming';
 
 describe('uniqueSessionFileName', () => {
   it("garde le nom s'il est libre, sinon ajoute un numéro", () => {
@@ -28,10 +28,23 @@ describe('guessSport', () => {
     expect(guessSport('surf')).toBe('surf');
   });
 
-  it("une trace de course ou de vélo, de l'application complète ou d'ailleurs, est à classer (lot 305)", () => {
-    for (const type of ['running', 'cycling', 'run-intervals', 'muscu', 'Trail Running', 'trail_running', 'Road Cycling', 'mountain_biking', 'Ride']) {
+  it("une trace de course, de vélo ou d'entraînement, de l'ancienne application ou d'ailleurs, n'a pas de calcul et se reconnaît (lot 321)", () => {
+    const others = [
+      'running', 'cycling', 'run-intervals', 'bike-intervals', 'run-test', 'muscu', 'Trail Running', 'trail_running', 'Road Cycling',
+      'mountain_biking', 'Ride', 'e_biking', 'Velo',
+    ];
+    for (const type of others) {
       expect(guessSport(type), type).toBeNull();
+      expect(isOtherSportType(type), type).toBe(true);
     }
+  });
+
+  it('un type inconnu ou d’un sport rangé n’est pas refusé : à classer, ou son calcul', () => {
+    for (const type of ['hiking', 'walking', 'paddling', 'Randonnée', '', 'surf', 'Windsurfing', 'wingfoil']) {
+      expect(isOtherSportType(type), type).toBe(false);
+    }
+    expect(isOtherSportType(undefined)).toBe(false);
+    expect(isOtherSportType(null)).toBe(false);
   });
 
   it('reconnaît les types des autres applications, quelle que soit leur graphie', () => {

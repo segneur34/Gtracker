@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { MARKER_FILE } from '../core/appIdentity';
 import {
   MISSING_FOLDER_MESSAGE, READ_ONLY_MEMORY_MESSAGE, fileErrorCode, folderImportPaths, isMemorySubfolder, readOnlyFolder, readableFolderError, shouldDescendIntoMemory,
 } from './memoryFolder';
@@ -15,7 +16,8 @@ describe('shouldDescendIntoMemory', () => {
   });
 
   it('garde un dossier mémoire renommé, reconnu à son contenu', () => {
-    expect(shouldDescendIntoMemory('Sauvegarde', new Set(['tracker.json', 'sessions', 'Tracker']))).toBe(false);
+    expect(shouldDescendIntoMemory('Sauvegarde', new Set([MARKER_FILE, 'Gtracker']))).toBe(false);
+    expect(shouldDescendIntoMemory('Sauvegarde', new Set([MARKER_FILE, 'sessions', 'Tracker']))).toBe(false);
     expect(shouldDescendIntoMemory('Sauvegarde', new Set(['sessions']))).toBe(false);
   });
 
@@ -32,7 +34,7 @@ describe('isMemorySubfolder', () => {
   });
 
   it('accepte un dossier marqué comme mémoire, quel que soit son nom, et tout autre dossier', () => {
-    expect(isMemorySubfolder('sessions', new Set(['tracker.json', 'sessions']))).toBe(false);
+    expect(isMemorySubfolder('sessions', new Set([MARKER_FILE, 'sessions']))).toBe(false);
     expect(isMemorySubfolder('Tracker', new Set(['sessions']))).toBe(false);
     expect(isMemorySubfolder('Mes sessions', new Set())).toBe(false);
   });
@@ -44,9 +46,9 @@ describe('folderImportPaths', () => {
 
   it("reprend les GPX, les fiches et les capteurs de la racine et de sessions/", () => {
     expect(folderImportPaths(
-      [file('tracker.json'), file('a.GPX'), dir('sessions')],
+      [file(MARKER_FILE), file('a.GPX'), dir('sessions')],
       [file('b.gpx'), file('b.json'), file('b.imu')]
-    )).toEqual(['tracker.json', 'a.GPX', 'sessions/b.gpx', 'sessions/b.json', 'sessions/b.imu']);
+    )).toEqual([MARKER_FILE, 'a.GPX', 'sessions/b.gpx', 'sessions/b.json', 'sessions/b.imu']);
   });
 
   it('reprend aussi les fichiers de montre, à la racine comme dans sessions/', () => {

@@ -1,7 +1,7 @@
 import { parseGpx } from '../core/gpxParser';
 import { SAILING_SPORTS, getSportProfile, isSportType } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
-import { guessSport } from './naming';
+import { guessSport, isOtherSportType } from './naming';
 import {
   ANALYSIS_SUMMARY_FIELDS, carriedSettings, isSummaryStale, type LibrarySession, type RecordWithoutSummary, type SessionAnalysis, type SessionRecord, type SessionSummary,
   type SummaryActivitySettings,
@@ -157,6 +157,12 @@ export interface AnalyzedGpx {
   summary: SessionSummary;
   sport: SportType | null;
   title: string | null;
+  /**
+   * Vrai si le calcul a été deviné et que le `<type>` du GPX dit un sport que Gtracker ne range pas (course, vélo,
+   * entraînement, `isOtherSportType`) : la porte d'import refuse la session. Absent sinon, jamais `false` (le résumé
+   * figé de `summaryFrozen.test.ts` compare toute la sortie).
+   */
+  otherSport?: true;
 }
 
 /**
@@ -186,6 +192,7 @@ export const analyzeGpx = (
       : { ...summary, optionsKey: summaryOptionsKey(resolved, options), activitySettings: portedSettings(resolved, activity) },
     sport: resolved,
     title: parsed.trackName ?? null,
+    ...(sport === undefined && isOtherSportType(parsed.trackType) ? { otherSport: true as const } : {}),
   };
 };
 

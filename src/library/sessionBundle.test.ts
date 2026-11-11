@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { XML } from '../core/appIdentity';
 import { escapeXmlText } from '../core/xml';
 import { RECORD_VERSION, completeRecord, parseRecordWithRaw, serializeRecord, type SessionRecord } from './record';
 import { bundleSessionGpx, unbundleSessionGpx } from './sessionBundle';
@@ -48,7 +49,7 @@ describe('GPX complet', () => {
   });
 
   it('laisse tel quel un GPX sans paquet', () => {
-    expect(unbundleSessionGpx(GPX)).toEqual({ gpx: GPX, record: null, unreadable: {}, recordText: null, motion: null });
+    expect(unbundleSessionGpx(GPX)).toEqual({ gpx: GPX, record: null, unreadable: {}, recordText: null, motion: null, otherSport: null });
   });
 
   it('retire puis ignore un paquet abîmé', () => {
@@ -91,7 +92,9 @@ describe('GPX complet', () => {
     const fine = record({ name: 'Carnon' });
     const bundled = bundleSessionGpx(GPX, fine, null);
     expect(unbundleSessionGpx(bundled).recordText).toBe(serializeRecord(fine));
-    const broken = bundled.replace(/<tracker:record>[\s\S]*<\/tracker:record>/, '<tracker:record>{ cassé</tracker:record>');
+    const element = `${XML.session.prefix}:record`;
+    const broken = bundled.replace(new RegExp(`<${element}>[\\s\\S]*<\\/${element}>`), `<${element}>{ cassé</${element}>`);
+    expect(broken).not.toBe(bundled);
     const back = unbundleSessionGpx(broken);
     expect(back.record).toBeNull();
     expect(back.recordText).toBe('{ cassé');
@@ -99,11 +102,6 @@ describe('GPX complet', () => {
 });
 
 describe('nom de la session dans le GPX complet', () => {
-  /** Paquet de la 0.2.82 : la fiche et les capteurs, sans retouche du nom. */
-  const OLD_BUNDLE = GPX.replace('</gpx>', '<extensions><tracker:session xmlns:tracker="https://github.com/segneur34/Tracker/session" version="1">'
-    + '<tracker:record>' + JSON.stringify(record({ name: 'Ancien' })).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    + '</tracker:record></tracker:session></extensions></gpx>');
-
   it('écrit le nom dans les métadonnées, créées, et dans la trace, puis rend le GPX d’origine', () => {
     const bundled = bundleSessionGpx(GPX, record({ name: 'Carnon' }), null);
     expect(bundled).toContain('<metadata><name>Carnon</name></metadata>');
@@ -135,12 +133,6 @@ describe('nom de la session dans le GPX complet', () => {
     expect(bundled).toContain('<trk><name>Fractionné</name>');
     expect(bundled).not.toContain('<metadata>');
     expect(unbundleSessionGpx(bundled).gpx).toBe(GPX);
-  });
-
-  it('relit un paquet de la 0.2.82', () => {
-    const back = unbundleSessionGpx(OLD_BUNDLE);
-    expect(back.gpx).toBe(GPX);
-    expect(back.record?.name).toBe('Ancien');
   });
 });
 
@@ -176,7 +168,7 @@ describe('repères de la session dans le GPX complet', () => {
     expect(back.gpx).toContain('<trk><name>Carnon</name>');
     // Les deux points de trace, entiers.
     expect(back.gpx.match(/<trkpt lat="[\d.]+" lon="[\d.]+"><time>[^<]+<\/time><\/trkpt>/g)).toHaveLength(2);
-    expect(back.gpx).not.toContain('tracker:');
+    expect(back.gpx).not.toContain(`${XML.session.prefix}:`);
   });
 
   it('sans repère, n’écrit pas de <wpt>', () => {

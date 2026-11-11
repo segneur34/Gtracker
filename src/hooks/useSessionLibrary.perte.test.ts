@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FILE_FORMATS, MARKER_FILE, XML } from '../core/appIdentity';
 import { RECORD_FORMAT, RECORD_READER_VERSION, SUMMARY_CALC_VERSION, serializeRecord, type SessionRecord } from '../library/record';
+import { LEGACY_MARKER_FILE } from '../library/legacyImport';
 import { bundleSessionGpx } from '../library/sessionBundle';
-import type { MemoryFolder } from '../platform/memoryFolder';
+import { LEGACY_FOLDER_REFUSAL } from './sessionLibrary/lifecycle';
+import type { FolderCheck, MemoryFolder } from '../platform/memoryFolder';
 import { sessionFileName } from '../recording/session';
 import { gpxAt, settle, tick, trackTestTimers, underFakeClock } from '../test/library.fixture';
 import { createFakeFolder } from '../test/memoryFolder.fixture';
@@ -36,7 +39,7 @@ const memoryFolder = (store: Map<string, string>, label: string, kind: MemoryFol
     label,
     readText: async (path) => {
       if (store === files && readRefused.has(path)) throw new Error('accès refusé');
-      if (store === files && path === 'tracker.json' && markerGate) {
+      if (store === files && path === MARKER_FILE && markerGate) {
         markerAsked = true;
         await markerGate;
       }
@@ -95,11 +98,18 @@ const fakePending: MemoryFolder = createFakeFolder(pendingFiles, log, {
   },
 });
 
-/** Mémoire ouverte par `openLibrary` : le dossier, celle du navigateur, aucune, ou le dossier dont l'accès est à redonner. */
-let opened: 'folder' | 'browser' | 'none' | 'permission' = 'folder';
+/**
+ * Mémoire ouverte par `openLibrary` : le dossier, celle du navigateur, aucune, le dossier dont l'accès est à redonner,
+ * ou le dossier gardé (`saved`, aucun s'il n'y en a pas : un lancement suivant).
+ */
+let opened: 'folder' | 'browser' | 'none' | 'permission' | 'saved' = 'folder';
 /** Dossier rendu par « Choisir un dossier » (`chosen`) et par « Choisir à nouveau le dossier » (`reconnected`). */
 let chosen: MemoryFolder | null = null;
 let reconnected: MemoryFolder | null = null;
+/** Dossier gardé d'un lancement à l'autre (poignée du navigateur, choix du téléphone) : écrit par un choix accepté. */
+let saved: MemoryFolder | null = null;
+/** Appels à `forgetChosenFolder` : le dossier retenu est oublié. */
+let forgotten = 0;
 
 /** Modules simulés, refaits après chaque `vi.resetModules()` : un `vi.mock` posé une fois survivrait à `resetModules`. */
 const mockPlatform = (): void => {
@@ -116,19 +126,33 @@ const mockPlatform = (): void => {
       };
     },
   }));
-  vi.doMock('../platform/memoryFolder', async (importOriginal) => ({
-    ...(await importOriginal<typeof import('../platform/memoryFolder')>()),
-    openMemoryFolder: async () => (
-      opened === 'folder' ? { state: 'ready', folder: fakeFolder }
-        : opened === 'browser' ? { state: 'ready', folder: browserFolder }
-          : opened === 'permission' ? { state: 'needs-permission', label: 'Tracker' }
-            : { state: 'unavailable', reason: 'aucun dossier' }
-    ),
-    chooseMemoryFolder: async () => chosen,
-    reconnectMemoryFolder: async () => reconnected,
-    forgetChosenFolder: async () => undefined,
-    pendingFolder: () => fakePending,
-  }));
+  vi.doMock('../platform/memoryFolder', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../platform/memoryFolder')>();
+    /** Comme le vrai sélecteur : le contrôle de l'appelant, puis le dossier gardé (`saved`) s'il est accepté. */
+    const pick = async (folder: MemoryFolder | null, check?: FolderCheck): Promise<MemoryFolder | null> => {
+      const message = folder && check ? await check(folder) : null;
+      if (message !== null) throw new actual.FolderRefusedError(message);
+      if (folder) saved = folder;
+      return folder;
+    };
+    return {
+      ...actual,
+      openMemoryFolder: async () => (
+        opened === 'folder' ? { state: 'ready', folder: fakeFolder }
+          : opened === 'browser' ? { state: 'ready', folder: browserFolder }
+            : opened === 'permission' ? { state: 'needs-permission', label: 'Tracker' }
+              : opened === 'saved' ? (saved ? { state: 'ready', folder: saved } : { state: 'unavailable', reason: 'aucun dossier' })
+                : { state: 'unavailable', reason: 'aucun dossier' }
+      ),
+      chooseMemoryFolder: (check?: FolderCheck) => pick(chosen, check),
+      reconnectMemoryFolder: (check?: FolderCheck) => pick(reconnected, check),
+      forgetChosenFolder: async () => {
+        forgotten += 1;
+        saved = null;
+      },
+      pendingFolder: () => fakePending,
+    };
+  });
 };
 
 type Library = typeof import('./useSessionLibrary');
@@ -168,6 +192,8 @@ beforeEach(() => {
   opened = 'folder';
   chosen = null;
   reconnected = null;
+  saved = null;
+  forgotten = 0;
   writeGate = null;
   markerGate = null;
   markerAsked = false;
@@ -280,7 +306,7 @@ const FUTURE_RECORD = JSON.stringify({
   summary: { calcVersion: SUMMARY_CALC_VERSION, startMs: START, endMs: START + 20_000, distanceM: 66, movingTimeS: 20, elevationGainM: null, maxSpeedMs: 3.3, pointCount: 3, samplingS: 10 },
   notes: null, analysis: null, nouveau: { forme: [1, 2] },
 }, null, 1);
-const BROKEN_RECORD = '{ "format": "tracker-session", cassé';
+const BROKEN_RECORD = `{ "format": "${RECORD_FORMAT}", cassé`;
 
 describe("fiche qu'on ne sait pas réécrire, importée ou recopiée (5b)", () => {
   it('importée à côté de son GPX : rangée au caractère près, la session en lecture seule', async () => {
@@ -653,7 +679,10 @@ describe('fiche qu\'on ne sait pas réécrire, portée par un GPX complet (lot 1
   it('illisible : de même, au caractère près', async () => {
     const library = await openFresh();
     await settle(library);
-    const broken = bundleSessionGpx(gpxAt(0), { ...future, version: 1 }, null).replace(/<tracker:record>[\s\S]*<\/tracker:record>/, '<tracker:record>{ cassé</tracker:record>');
+    const element = `${XML.session.prefix}:record`;
+    const bundled = bundleSessionGpx(gpxAt(0), { ...future, version: 1 }, null);
+    const broken = bundled.replace(new RegExp(`<${element}>[\\s\\S]*<\\/${element}>`), `<${element}>{ cassé</${element}>`);
+    expect(broken).not.toBe(bundled);
     const report = await library.importEntries([entry('a.gpx', broken)]);
     const file = report.added[0];
     expect(files.get(`sessions/${file.replace(/\.gpx$/, '.json')}`)).toBe('{ cassé');
@@ -711,11 +740,11 @@ describe('cache des fiches d\'une autre version du lecteur (lot 148, C5-7)', () 
 });
 
 describe('marqueur d\'une version plus récente (lot 148, C5-9)', () => {
-  const MARKER_V2 = JSON.stringify({ format: 'tracker-memoire', version: 2 });
+  const MARKER_V2 = JSON.stringify({ format: FILE_FORMATS.memoire, version: 2 });
 
   /** Un dossier où une ouverture ordinaire écrirait partout : GPX à la racine, sans fiche, fiche à refaire, extension à ranger, ancien fichier de réglages. */
   const folderToWrite = (): void => {
-    files.set('tracker.json', MARKER_V2);
+    files.set(MARKER_FILE, MARKER_V2);
     files.set('racine.gpx', gpxAt(40));
     files.set('reglages.json', JSON.stringify({ format: 'tracker-reglages', version: 1, savedAt: 1, values: {} }));
     files.set('sessions/seul.gpx', gpxAt(0));
@@ -777,13 +806,13 @@ describe('marqueur d\'une version plus récente (lot 148, C5-9)', () => {
   });
 
   it('marqueur illisible ou de la version connue : dossier ordinaire, marqueur illisible non réécrit', async () => {
-    files.set('tracker.json', '{ cassé');
+    files.set(MARKER_FILE, '{ cassé');
     files.set('sessions/seul.gpx', gpxAt(0));
     const library = await openFresh();
     await settle(library);
     expect(library.readLibraryState().memoryReadOnly).toBe(false);
     expect(library.librarySession('seul.gpx')?.readOnly).toBe(false);
-    expect(files.get('tracker.json')).toBe('{ cassé');
+    expect(files.get(MARKER_FILE)).toBe('{ cassé');
     expect(log).toContain('write sessions/seul.json');
   });
 });
@@ -825,7 +854,7 @@ describe('dossier fermé ou remplacé pendant la lecture de son marqueur (lot 14
     expect(library.readLibraryState().sessions).toEqual([]);
     expect(await library.currentMemoryFolder()).toBeNull();
     expect(log).toEqual([]);
-    expect(files.has('tracker.json')).toBe(false);
+    expect(files.has(MARKER_FILE)).toBe(false);
   });
 
   it('remplacé par un autre dossier : celui-ci reste en service, le premier n\'est pas touché', async () => {
@@ -845,7 +874,90 @@ describe('dossier fermé ou remplacé pendant la lecture de son marqueur (lot 14
     expect(library.readLibraryState().folderLabel).toBe('Autre');
     expect((await library.currentMemoryFolder())?.label).toBe('Autre');
     expect(library.readLibraryState().sessions.map((s) => s.file)).toEqual(['autre.gpx']);
-    expect(files.has('tracker.json')).toBe(false);
-    expect(otherFiles.has('tracker.json')).toBe(true);
+    expect(files.has(MARKER_FILE)).toBe(false);
+    expect(otherFiles.has(MARKER_FILE)).toBe(true);
+  });
+});
+
+describe('dossier de l\'ancienne application choisi comme mémoire (lot 321)', () => {
+  /** Dossier mémoire de l'ancienne application : son marqueur, une session, son mode d'emploi. */
+  const legacyFolder = (): void => {
+    otherFiles.set(LEGACY_MARKER_FILE, '{"format":"x-memoire","version":1}\n');
+    otherFiles.set('sessions/autre.gpx', gpxAt(10));
+    otherFiles.set('LISEZMOI.txt', 'Mode d\'emploi de l\'autre application');
+  };
+
+  it('refusé avant toute écriture : la mémoire en service reste, et reste gardée pour le lancement suivant', async () => {
+    files.set('sessions/seul.gpx', gpxAt(0));
+    legacyFolder();
+    const before = new Map(otherFiles);
+    // Le dossier A, gardé et en service.
+    saved = fakeFolder;
+    opened = 'saved';
+    const library = await openFresh();
+    await settle(library);
+    chosen = otherFolder;
+    await library.chooseFolder();
+    await settle(library);
+    const state = library.readLibraryState();
+    expect(state.error).toBe(LEGACY_FOLDER_REFUSAL);
+    expect((await library.currentMemoryFolder())?.label).toBe('Tracker');
+    expect(state.sessions.map((s) => s.file)).toEqual(['seul.gpx']);
+    expect(otherFiles).toEqual(before);
+    expect(saved).toBe(fakeFolder);
+    expect(forgotten).toBe(0);
+    // Lancement suivant : A est rouvert.
+    const next = await openFresh();
+    await settle(next);
+    expect((await next.currentMemoryFolder())?.label).toBe('Tracker');
+    expect(next.readLibraryState().sessions.map((s) => s.file)).toEqual(['seul.gpx']);
+  });
+
+  it('aucun dossier gardé avant le refus : aucun après', async () => {
+    legacyFolder();
+    const before = new Map(otherFiles);
+    opened = 'saved';
+    const library = await openFresh();
+    expect(library.readLibraryState().status).toBe('unavailable');
+    chosen = otherFolder;
+    await library.chooseFolder();
+    expect(library.readLibraryState().error).toBe(LEGACY_FOLDER_REFUSAL);
+    expect(saved).toBeNull();
+    expect(otherFiles).toEqual(before);
+    const next = await openFresh();
+    expect(next.readLibraryState().status).toBe('unavailable');
+    expect(await next.currentMemoryFolder()).toBeNull();
+  });
+
+  it('désigné de nouveau (téléphone) : refusé de même, le dossier d\'avant attend toujours sa permission', async () => {
+    opened = 'permission';
+    saved = fakeFolder;
+    legacyFolder();
+    const before = new Map(otherFiles);
+    const library = await openFresh();
+    expect(library.readLibraryState().status).toBe('needs-permission');
+    reconnected = otherFolder;
+    await library.reconnectFolder();
+    await settle(library);
+    expect(library.readLibraryState().error).toBe(LEGACY_FOLDER_REFUSAL);
+    expect(library.readLibraryState().status).toBe('needs-permission');
+    expect(library.readLibraryState().folderLabel).toBe('Tracker');
+    expect(saved).toBe(fakeFolder);
+    expect(forgotten).toBe(0);
+    expect(otherFiles).toEqual(before);
+  });
+
+  it('un dossier qui porte aussi le marqueur de Gtracker est une mémoire ordinaire', async () => {
+    legacyFolder();
+    otherFiles.set(MARKER_FILE, `${JSON.stringify({ format: FILE_FORMATS.memoire, version: 1 })}\n`);
+    const library = await openFresh();
+    chosen = otherFolder;
+    await library.chooseFolder();
+    await settle(library);
+    expect(library.readLibraryState().error).toBeNull();
+    expect((await library.currentMemoryFolder())?.label).toBe('Autre');
+    expect(library.readLibraryState().sessions.map((s) => s.file)).toEqual(['autre.gpx']);
+    expect(saved).toBe(otherFolder);
+    expect(forgotten).toBe(0);
   });
 });

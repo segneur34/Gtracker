@@ -142,7 +142,7 @@ const snapshot = () => evaluate(`(async () => {
   return JSON.stringify(out.sort());
 })()`);
 const importGreyed = () => evaluate(`(() => { const i = document.querySelector('input[type=file][accept*=".gpx"]'); return i ? i.disabled : '(absent)'; })()`);
-await writeOpfs('', 'tracker.json', JSON.stringify({ format: 'tracker-memoire', version: 2 }));
+await writeOpfs('', 'gtracker.json', JSON.stringify({ format: 'gtracker-memoire', version: 2 }));
 await writeOpfs('', '2026-10-07_10-00-00_cycling.gpx', rideGpx('Racine', Date.UTC(2026, 9, 7, 8, 0, 0)));
 await writeOpfs('sessions', '2026-10-08_10-00-00_cycling.gpx', rideGpx('Sans fiche', Date.UTC(2026, 9, 8, 8, 0, 0)));
 const beforeOpening = await snapshot();

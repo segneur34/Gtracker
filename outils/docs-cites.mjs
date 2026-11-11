@@ -31,7 +31,7 @@ const IGNORES = new Set(['node_modules', '.git', 'build', 'dist', '.gradle', 'wo
 // Ce que l'application crée à l'exécution ou qui vient d'ailleurs que du dépôt : jamais vérifié sur le disque.
 const HORS_DEPOT = new Set([
   'Tracker/', 'sessions/', 'reglages/', 'en-attente/', 'tuiles/', 'z_x_y.png', 'sat_z_x_y.png', '_index.json',
-  'vignettes.json', 'tracker.json', 'reglages.json', 'dist/', 'leaflet.css', 'local.properties', 'keystore.properties',
+  'vignettes.json', 'gtracker.json', 'tracker.json', 'reglages.json', 'dist/', 'leaflet.css', 'local.properties', 'keystore.properties',
   'node_modules/', 'gradlew', 'JAVA_HOME', 'ANDROID_HOME', 'MEMORY.md', '/', 'itineraires/', 'N-titre.md', 'docs/backlog/N-titre.md', 'Explore',
   'licences.json', 'fc-repos.json',
 ])

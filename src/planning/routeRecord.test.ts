@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FILE_FORMATS } from '../core/appIdentity';
 import { EMPTY_ROUTE, addWaypoint, legKey, routeFromTrack, setLegMode, withLegResult, type PlannedRoute } from './route';
 import { buildRouteGpx, waypointLabel } from './routeGpx';
 import { MARK_GUIDE_DEFAULTS } from '../recording/markGuide';
@@ -71,7 +72,7 @@ describe('fiche d\'itinéraire', () => {
 
   it('refuse ce qui n\'est pas une fiche d\'itinéraire', () => {
     expect(parseRouteRecord('pas du json')).toBeNull();
-    expect(parseRouteRecord(JSON.stringify({ format: 'tracker-session', version: 1 }))).toBeNull();
+    expect(parseRouteRecord(JSON.stringify({ format: FILE_FORMATS.session, version: 1 }))).toBeNull();
     expect(parseRouteRecord(JSON.stringify({ format: 'tracker-itineraire', version: 1, waypoints: [{ lat: 'x' }] }))).toBeNull();
   });
 

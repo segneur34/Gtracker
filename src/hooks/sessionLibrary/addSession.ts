@@ -51,7 +51,8 @@ export const countPending = async (): Promise<void> => {
   }
 };
 
-export type AddStatus = 'added' | 'duplicate' | 'pending' | 'unsaved' | 'invalid';
+/** `other-sport` : GPX importé sans fiche dont le `<type>` dit un sport que Gtracker ne range pas, refusé. */
+export type AddStatus = 'added' | 'duplicate' | 'pending' | 'unsaved' | 'invalid' | 'other-sport';
 
 export interface AddResult {
   status: AddStatus;
@@ -130,6 +131,9 @@ export const addGpx = async (text: string, source: SessionSource, options: AddOp
     return { status: 'invalid', file: null, message: errorMessage(err, 'GPX illisible.') };
   }
   if (!analyzed) return { status: 'invalid', file: null, message: 'Pas assez de points horodatés.' };
+  // Import d'un GPX sans fiche ni calcul imposé, dont le `<type>` dit la course, le vélo ou l'entraînement : refusé (lot 321).
+  // Jamais pour une session qui a sa fiche : la recopie de la mémoire du navigateur garde ses sessions « à classer ».
+  if (source === 'import' && !from && options.sport === undefined && analyzed.otherSport) return { status: 'other-sport', file: null };
 
   const startMs = analyzed.summary.startMs;
   let existing = findSessionAt(startMs);

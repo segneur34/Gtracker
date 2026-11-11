@@ -1,4 +1,5 @@
 import { errorMessage } from '../core/basics';
+import { MARKER_FILE } from '../core/appIdentity';
 import { registerPlugin } from '@capacitor/core';
 import { base64ToBytes, bytesToBase64 } from '../core/base64';
 import { fileErrorCode, plainError } from './errorText';
@@ -12,8 +13,8 @@ import { jsonStore } from './storage';
  * La mémoire de l'application est un dossier ordinaire, qu'on copie pour la
  * sauvegarder ou la déplacer d'un appareil à l'autre :
  *
- *     Tracker/
- *       tracker.json, reglages.json, LISEZMOI.txt
+ *     Gtracker/
+ *       gtracker.json, reglages.json, LISEZMOI.txt
  *       sessions/   un GPX et sa fiche JSON par session
  *
  * Ce module ne sait rien de ce contenu : il lit, écrit et liste des fichiers
@@ -242,7 +243,7 @@ const READ_WRITE: FileSystemHandlePermissionDescriptor = { mode: 'readwrite' };
  */
 export const shouldDescendIntoMemory = (pickedName: string, names: ReadonlySet<string>): boolean =>
   pickedName.split('/').pop() !== MEMORY_FOLDER_NAME &&
-  !names.has('tracker.json') &&
+  !names.has(MARKER_FILE) &&
   !names.has('sessions') &&
   names.has(MEMORY_FOLDER_NAME);
 
@@ -254,13 +255,25 @@ const MEMORY_SUBFOLDERS = ['sessions', 'itineraires'];
  * `itineraires`) plutôt que la mémoire ? Le prendre pour la mémoire y
  * créerait une mémoire neuve, un niveau trop bas : les sessions copiées dans
  * `sessions/` n'apparaîtraient plus. Un dossier qui porte le marqueur
- * (`tracker.json`) est une mémoire, quel que soit son nom.
+ * (`MARKER_FILE`) est une mémoire, quel que soit son nom.
  */
 export const isMemorySubfolder = (pickedName: string, names: ReadonlySet<string>): boolean =>
-  MEMORY_SUBFOLDERS.includes((pickedName.split('/').pop() ?? '').toLowerCase()) && !names.has('tracker.json');
+  MEMORY_SUBFOLDERS.includes((pickedName.split('/').pop() ?? '').toLowerCase()) && !names.has(MARKER_FILE);
 
 /** Dossier désigné refusé ; le message dit quoi choisir à la place. */
 export class FolderRefusedError extends Error {}
+
+/**
+ * Contrôle d'un dossier désigné d'après son contenu, décidé par l'appelant (la bibliothèque : dossier de l'ancienne
+ * application) : le message du refus, `null` s'il convient. Fait avant que le choix ne soit gardé, si bien qu'un
+ * refus laisse gardé le dossier d'avant, comme celui d'un sous-dossier.
+ */
+export type FolderCheck = (folder: MemoryFolder) => Promise<string | null>;
+
+const checkRefusal = async (folder: MemoryFolder, check: FolderCheck | undefined): Promise<FolderRefusedError | null> => {
+  const message = check ? await check(folder) : null;
+  return message === null ? null : new FolderRefusedError(message);
+};
 
 const subfolderRefusal = (pickedName: string): FolderRefusedError =>
   new FolderRefusedError(
@@ -402,7 +415,7 @@ const createDeviceFolder = ({ uri, base, label }: DeviceFolderChoice): MemoryFol
   };
 };
 
-const pickDeviceFolder = async (): Promise<MemoryFolder | null> => {
+const pickDeviceFolder = async (check?: FolderCheck): Promise<MemoryFolder | null> => {
   const { uri, name } = await nativeFolder.pickFolder();
   if (!uri) return null;
   const pickedName = name ?? 'dossier choisi';
@@ -415,8 +428,12 @@ const pickDeviceFolder = async (): Promise<MemoryFolder | null> => {
     base: descend ? MEMORY_FOLDER_NAME : '',
     label: `dossier « ${descend ? `${pickedName}/${MEMORY_FOLDER_NAME}` : pickedName} »`,
   };
+  const folder = createDeviceFolder(choice);
+  // Refusé par l'appelant : le choix d'avant reste gardé.
+  const refusal = await checkRefusal(folder, check);
+  if (refusal) throw refusal;
   jsonStore.write(DEVICE_FOLDER_KEY, choice);
-  return createDeviceFolder(choice);
+  return folder;
 };
 
 const readDeviceChoice = (): DeviceFolderChoice | null => {
@@ -502,11 +519,12 @@ export const canChooseFolder = (): boolean =>
 /**
  * Ouvre le sélecteur de dossier, à appeler depuis un clic. Rend `null` si
  * l'utilisateur renonce. Le dossier choisi devient la mémoire ; un
- * sous-dossier d'une mémoire est refusé (`FolderRefusedError`), et la mémoire
- * en service reste en place.
+ * sous-dossier d'une mémoire, ou un dossier que `check` refuse, est refusé
+ * (`FolderRefusedError`) avant d'être gardé : la mémoire en service reste en
+ * place, et le dossier gardé est celui d'avant.
  */
-export const chooseMemoryFolder = async (): Promise<MemoryFolder | null> => {
-  if (isNativeApp()) return pickDeviceFolder();
+export const chooseMemoryFolder = async (check?: FolderCheck): Promise<MemoryFolder | null> => {
+  if (isNativeApp()) return pickDeviceFolder(check);
   if (!canChooseFolder()) return null;
   // La fenêtre s'ouvre sur le dossier en service, s'il y en a un : c'est le seul moyen d'en
   // voir le chemin complet, que le navigateur ne donne pas. Sinon, sur Documents.
@@ -521,23 +539,34 @@ export const chooseMemoryFolder = async (): Promise<MemoryFolder | null> => {
     throw err;
   }
   if (isMemorySubfolder(handle.name, await entryNames(handle))) throw subfolderRefusal(handle.name);
+  const folder = await pickedFolder(handle);
+  const refusal = await checkRefusal(folder, check);
+  if (refusal) throw refusal;
   await withHandleStore('readwrite', (store) => store.put(handle, HANDLE_KEY));
-  return pickedFolder(handle);
+  return folder;
 };
 
 /**
  * Redonne l'autorisation au dossier choisi, à appeler depuis un clic. Sur le
- * téléphone, Android ne sait que le faire désigner à nouveau.
+ * téléphone, Android ne sait que le faire désigner à nouveau : `check` y vaut
+ * comme pour un choix. Dans le navigateur, le dossier gardé lui-même refusé
+ * par `check` est oublié, comme un sous-dossier.
  */
-export const reconnectMemoryFolder = async (): Promise<MemoryFolder | null> => {
-  if (isNativeApp()) return pickDeviceFolder();
+export const reconnectMemoryFolder = async (check?: FolderCheck): Promise<MemoryFolder | null> => {
+  if (isNativeApp()) return pickDeviceFolder(check);
   const handle = await readSavedHandle();
   if (!handle) return null;
   const state = (await handle.requestPermission?.(READ_WRITE)) ?? 'granted';
   if (state !== 'granted') return null;
-  const refusal = await dropSubfolderHandle(handle);
-  if (refusal) throw refusal;
-  return pickedFolder(handle);
+  const subfolder = await dropSubfolderHandle(handle);
+  if (subfolder) throw subfolder;
+  const folder = await pickedFolder(handle);
+  const refusal = await checkRefusal(folder, check);
+  if (refusal) {
+    await forgetChosenFolder();
+    throw refusal;
+  }
+  return folder;
 };
 
 /** Oublie le dossier choisi : la mémoire revient à celle du navigateur. */

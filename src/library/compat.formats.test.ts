@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { XML } from '../core/appIdentity';
 import { isWritableRouteRecord, parseRouteRecord, routeToRecord } from '../planning/routeRecord';
 import { parseJournal } from '../recording/journal';
 import { PREVIEW_FORMAT_VERSION, parsePreviewDocument } from './previewTracks';
@@ -100,7 +101,10 @@ describe('GPX complet, compatibilité (sessionBundle)', () => {
     expect(b.gpx).toBe(gpx);
   });
   it('bloc réindenté (guillemets simples) : non reconnu, fiche perdue', () => {
-    const b = unbundleSessionGpx(bundleSessionGpx(gpx, rec, null).replace(/xmlns:tracker="([^"]*)"/, "xmlns:tracker='$1'"));
+    const bundled = bundleSessionGpx(gpx, rec, null);
+    const reindented = bundled.replace(new RegExp(`xmlns:${XML.session.prefix}="([^"]*)"`), `xmlns:${XML.session.prefix}='$1'`);
+    expect(reindented).not.toBe(bundled);
+    const b = unbundleSessionGpx(reindented);
     expect(b.record).toBeNull();
   });
 });

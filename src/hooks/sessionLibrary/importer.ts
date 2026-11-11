@@ -2,6 +2,7 @@ import type { SessionMark } from '../../core/sessionMarks';
 import type { SportType } from '../../core/types';
 import { describeImport, type ImportReport } from '../../library/importReport';
 import { importRecordChoice } from '../../library/importEntry';
+import { upgradeImportedImu } from '../../library/legacyImport';
 import { fitToGpx, isFitActivity, type FitConversion } from '../../library/fitToGpx';
 import { isBlankGpxText, isFitFileName, isGpxFileName } from '../../library/record';
 import { unbundleSessionGpx } from '../../library/sessionBundle';
@@ -107,6 +108,7 @@ const noteAddResult = (report: ImportReport, result: AddResult, name: string): v
     if (result.recordNotRead) report.recordNotRead += 1;
   }
   else if (result.status === 'invalid') report.invalid.push(name);
+  else if (result.status === 'other-sport') report.otherSports.push(name);
   else report.unsaved += 1;
 };
 
@@ -135,7 +137,8 @@ export const importEntries = async (
 ): Promise<ImportReport> => {
   setState({ importing: true });
   const report: ImportReport = {
-    added: [], existing: [], duplicates: 0, invalid: [], ignored: [], notActivities: [], unsaved: 0, failed: [], retryable: [], motionAdded: 0, motionFailed: [], recordCompleted: 0, recordNotRead: 0,
+    added: [], existing: [], duplicates: 0, invalid: [], ignored: [], notActivities: [], otherSports: [], unsaved: 0, failed: [], retryable: [],
+    motionAdded: 0, motionFailed: [], recordCompleted: 0, recordNotRead: 0, legacyRecordsIgnored: [],
   };
   try {
     await lib.opening;
@@ -168,16 +171,25 @@ export const importEntries = async (
         const bundle = unbundleSessionGpx(text);
         const recordText = await records.get(entry.key)?.readText();
         // Fiche posée à côté, sinon celle du paquet ; gardée telle quelle si on ne sait pas la réécrire.
-        const { record, unreadable, keepRecordText } = importRecordChoice(recordText, bundle);
+        const { record, unreadable, keepRecordText, otherSport, legacyRecordIgnored } = importRecordChoice(recordText, bundle);
+        // Fiche d'une session de course, de vélo ou d'entraînement : refusée, comptée sans être nommée (lot 321).
+        if (otherSport !== null) {
+          report.otherSports.push(entry.name);
+          continue;
+        }
         // Capteurs illisibles : la session est rangée sans eux, et comptée à part ; ceux du paquet les remplacent s'il en porte.
         let motionFailed = false;
         const sideMotion = await motions.get(entry.key)?.readBytes().catch(() => {
           motionFailed = true;
           return null;
         });
-        const motion = sideMotion ?? bundle.motion ?? undefined;
+        // Capteurs de l'ancienne application : convertis en entrant, chaque source à part (ceux du paquet servent si ceux
+        // posés à côté ne se convertissent pas) ; s'il n'en reste aucun, comptés comme illisibles.
+        const motion = (sideMotion ? upgradeImportedImu(sideMotion) : null) ?? (bundle.motion ? upgradeImportedImu(bundle.motion) : null) ?? undefined;
+        if ((sideMotion || bundle.motion) && !motion) motionFailed = true;
         const result = await addGpx(bundle.gpx, 'import', { record, motion, unreadable, keepRecordText });
         noteAddResult(report, result, entry.name);
+        if (legacyRecordIgnored && (result.status === 'added' || result.status === 'duplicate')) report.legacyRecordsIgnored.push(entry.name);
         // Une session qui a déjà ses capteurs n'a rien perdu.
         if (motionFailed && !motion && result.file && !hasSessionMotion(result.file)) report.motionFailed.push(entry.name);
       } catch (err) {
@@ -202,6 +214,7 @@ export const importEntries = async (
           continue;
         }
         if (fit.kind === 'not-activity') report.notActivities.push(entry.name);
+        else if (fit.kind === 'other-sport') report.otherSports.push(entry.name);
         else if (fit.kind === 'refused') report.failed.push(`${entry.name} : ${fit.reason}`);
         else noteAddResult(report, await addGpx(fit.gpx, 'import', {}), entry.name);
       } catch (err) {

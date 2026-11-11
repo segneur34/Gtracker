@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { FolderEntry } from '../platform/memoryFolder';
+import { MARKER_FILE } from './folderLayout';
 import type { SessionRecord } from './record';
 import { MAX_LISTED_FILE_BYTES, indexByRecordName, oddRecordExtensions, planReconcile, type LibraryCache } from './reconcile';
 import { sessionRecord } from '../test/record.fixture';
 
 const file = (name: string, size = 100, mtimeMs = 1000): FolderEntry => ({ name, kind: 'file', size, mtimeMs });
+/** GPX nommé comme le marqueur : il ne reçoit pas le marqueur pour fiche. */
+const MARKER_GPX = MARKER_FILE.replace(/\.json$/, '.gpx');
 
 const record = (gpx: string): SessionRecord =>
   sessionRecord({ gpx, source: 'import', title: null }, { startMs: 1, endMs: 2, distanceM: 3, movingTimeS: 1, maxSpeedMs: 3, pointCount: 2 });
@@ -64,7 +67,7 @@ describe('planReconcile', () => {
   it('repère les GPX posés à la racine, et rien d\'autre', () => {
     const plan = planReconcile(
       [],
-      [file('tracker.json'), file('reglages.json'), file('LISEZMOI.txt'), file('2026-09-23_18-00-00_running.GPX')],
+      [file(MARKER_FILE), file('reglages.json'), file('LISEZMOI.txt'), file('2026-09-23_18-00-00_running.GPX')],
       {}
     );
     expect(plan.rootGpx).toEqual(['2026-09-23_18-00-00_running.GPX']);
@@ -74,10 +77,10 @@ describe('planReconcile', () => {
   it('fait suivre à un GPX de la racine la fiche posée à côté de lui, jamais le marqueur ni les réglages', () => {
     const plan = planReconcile(
       [],
-      [file('a.gpx'), file('a.json'), file('b.gpx'), file('c.json'), file('tracker.gpx'), file('tracker.json'), file('reglages.gpx'), file('reglages.json')],
+      [file('a.gpx'), file('a.json'), file('b.gpx'), file('c.json'), file(MARKER_GPX), file(MARKER_FILE), file('reglages.gpx'), file('reglages.json')],
       {}
     );
-    expect(plan.rootGpx).toEqual(['a.gpx', 'b.gpx', 'reglages.gpx', 'tracker.gpx']);
+    expect(plan.rootGpx).toEqual(['a.gpx', 'b.gpx', MARKER_GPX, 'reglages.gpx']);
     expect(plan.rootRecords).toEqual({ 'a.gpx': 'a.json' });
   });
 });

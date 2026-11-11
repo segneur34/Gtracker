@@ -136,7 +136,7 @@ export interface FitActivitySpec {
   points: FitPointSpec[];
   /** Type de fichier (4 : activité). */
   fileType?: number;
-  /** Sport de chaque `session` ; vide : aucune session. */
+  /** Sport de chaque `session` ; vide : aucune session ; absent : une session de sport générique (0). */
   sessionSports?: number[];
   /** Sport du message `sport`. */
   sportMessage?: number;
@@ -192,6 +192,7 @@ export const buildFitActivity = (spec: FitActivitySpec): Uint8Array => {
   for (const step of steps) step.write();
 
   const last = spec.points[spec.points.length - 1]?.timeMs ?? Date.UTC(2026, 0, 1);
-  for (const sport of spec.sessionSports ?? [1]) writer.message(3, [fitTime(last), sport]);
+  // Par défaut, une session de sport générique (0) : à classer. La course (1) est refusée à l'import depuis le lot 321.
+  for (const sport of spec.sessionSports ?? [0]) writer.message(3, [fitTime(last), sport]);
   return writer.bytes();
 };

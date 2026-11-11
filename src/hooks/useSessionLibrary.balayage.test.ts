@@ -88,7 +88,8 @@ const mockPlatform = (): void => {
       return {
         rawPoints: [...text.matchAll(/<trkpt lat="([\d.]+)" lon="([\d.]+)"><time>([^<]+)<\/time>/g)]
           .map((m) => ({ lat: Number(m[1]), lon: Number(m[2]), time: m[3] })),
-        trackType: 'running',
+        // Sans `<type>` : sessions à classer (une course serait refusée à l'import, lot 321).
+        trackType: undefined,
         hasDeviceSpeed: false,
       };
     },

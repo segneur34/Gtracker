@@ -1,4 +1,5 @@
 import { normalizeDeg } from '../core/angles';
+import { FILE_FORMATS } from '../core/appIdentity';
 import type { HeartRateHistogram } from '../core/heartRate';
 import { isMapBase, type MapBase } from '../core/mapBase';
 import { JUMP_DOUBTS, type JumpDoubt, type SessionJump } from '../core/jumps';
@@ -42,7 +43,8 @@ export const SUMMARY_BESTS_BOUNDS = {
  * - une fiche d'une version future est lue, mais jamais réécrite.
  */
 
-export const RECORD_FORMAT = 'tracker-session';
+/** Format de la fiche (`core/appIdentity.ts`) ; celui de l'ancienne application n'est lu qu'à la porte d'import. */
+export const RECORD_FORMAT = FILE_FORMATS.session;
 export const RECORD_VERSION = 1;
 
 /**
@@ -758,17 +760,23 @@ export interface ParsedRecord {
  * champs inconnus sont gardés tels quels ; les champs connus illisibles sont
  * rendus à part, bruts (`unreadable`).
  */
-export const parseRecordWithRaw = (text: string): ParsedRecord | null => {
-  const raw = parseJson(text);
-  const parts = readRecordParts(raw);
+export const parseRecordWithRaw = (text: string): ParsedRecord | null => parseRecordValue(parseJson(text));
+
+/**
+ * Lit une fiche déjà relue en JSON (`parseRecordWithRaw`). `formats` : ceux qu'on accepte, le seul de cette version
+ * par défaut ; la porte d'import y ajoute celui de l'ancienne application (`library/legacyImport.ts`). La fiche lue
+ * porte toujours `RECORD_FORMAT` : elle s'écrit sous le nom de cette version.
+ */
+export const parseRecordValue = (raw: unknown, formats: readonly string[] = [RECORD_FORMAT]): ParsedRecord | null => {
+  const parts = readRecordParts(raw, formats);
   return parts && isObject(raw) ? { parts, unreadable: unreadableFields(raw, parts) } : null;
 };
 
 /** Lit une fiche, résumé compris s'il est lisible (`parseRecordWithRaw`, sans les champs illisibles). */
 export const parseRecordParts = (text: string): RecordWithoutSummary | null => parseRecordWithRaw(text)?.parts ?? null;
 
-const readRecordParts = (raw: unknown): RecordWithoutSummary | null => {
-  if (!isObject(raw) || raw.format !== RECORD_FORMAT || !isFiniteNumber(raw.version)) return null;
+const readRecordParts = (raw: unknown, formats: readonly string[]): RecordWithoutSummary | null => {
+  if (!isObject(raw) || typeof raw.format !== 'string' || !formats.includes(raw.format) || !isFiniteNumber(raw.version)) return null;
   if (typeof raw.gpx !== 'string' || raw.gpx === '') return null;
   const summary = readSummary(raw.summary);
   // Voies, altitude du terrain, séances et test guidé (course, vélo, Entraînement) passent bruts par `rest` (lot 301).

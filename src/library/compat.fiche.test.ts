@@ -71,7 +71,8 @@ describe('fiche, compatibilité (b) champs mal typés', () => {
 
 describe('fiche, compatibilité (c) __proto__', () => {
   it('pas de pollution, clé gardée telle quelle à la réécriture', () => {
-    const text = '{"format":"tracker-session","version":1,"gpx":"a.gpx","sport":"wingfoil","source":"import","addedAt":"2026-09-24T10:00:00.000Z","title":null,'
+    const text = `{"format":"${RECORD_FORMAT}","version":1,"gpx":"a.gpx",`
+      + '"sport":"wingfoil","source":"import","addedAt":"2026-09-24T10:00:00.000Z","title":null,'
       + `"summary":${JSON.stringify(sessionRecord().summary)},"notes":{"comment":"c","savedAt":1,"__proto__":{"pollue":true}},"analysis":null,"__proto__":{"pollue":true}}`;
     const out = rewriteAfterRename(text);
     expect(({} as Record<string, unknown>).pollue).toBeUndefined();
@@ -80,25 +81,7 @@ describe('fiche, compatibilité (c) __proto__', () => {
   });
 });
 
-describe('fiche, compatibilité (d) fiche de septembre (58aa8bb)', () => {
-  /** Forme de la fiche au 24/09 : pas d'activité, de nom, de gear1/2, conditions, gear ; analysis à trois champs ; un ancien `terrain`. */
-  const september = {
-    format: RECORD_FORMAT, version: 1, gpx: '2026-09-23_14-00-00_wingfoil.gpx', sport: 'wingfoil', source: 'enregistrement',
-    addedAt: '2026-09-24T10:00:00.000Z', title: 'Wingfoil',
-    summary: { calcVersion: 2, startMs: 1790000000000, endMs: 1790003600000, distanceM: 20000, movingTimeS: 2500, elevationGainM: null, maxSpeedMs: 11, pointCount: 3601, samplingS: 1, maneuverCount: 12 },
-    notes: { foil: 'Axis 900', mast: '75', wing: '5 m', windLevel: 'moyen', waterState: 'clapot', rating: 4, comment: 'Bien', savedAt: 1790004000000 },
-    analysis: { windDeg: 270, activeThreshold: 9, referenceSpeedMs: null, terrain: 'route', savedAt: 1790004000000 },
-  };
-  it('lue sans perte, réécrite sans perte', () => {
-    const parsed = parseRecordWithRaw(JSON.stringify(september))!;
-    expect(parsed.unreadable).toEqual({});
-    expect(parsed.parts.summary?.calcVersion).toBe(2);
-    const out = rewriteAfterRename(JSON.stringify(september));
-    expect(out.notes).toMatchObject(september.notes);
-    expect(out.analysis).toMatchObject(september.analysis);
-    expect((out.summary as Record<string, unknown>).maneuverCount).toBe(12);
-  });
-});
+// (d) fiche de septembre de l'ancienne application : lue par la porte d'import, `legacyImport.test.ts` (lot 321).
 
 describe('fiche, compatibilité (e) aller-retour sur une fiche complète', () => {
   const full = sessionRecord({

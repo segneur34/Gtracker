@@ -44,18 +44,28 @@ export const downloadBaseName = (sessionName: string, activityName: string | nul
 };
 
 /**
- * Types d'activité des autres applications, ramenés à nos supports. Les clés
- * sont en minuscules, sans espace ni tiret ni souligné : `Trail Running`,
- * `trail_running` et `trail-running` se lisent `trailrunning`. Course et vélo,
- * ceux de l'application complète compris (`running`, `cycling`), n'ont plus de
- * calcul ici (lot 305) : `null`, la session est « à classer ».
+ * Type d'activité ramené à sa clé : en minuscules, sans espace ni tiret ni souligné. `Trail Running`,
+ * `trail_running` et `trail-running` se lisent `trailrunning`.
  */
-const FOREIGN_TYPES: Record<string, SportType | null> = {
-  running: null,
-  run: null,
-  trailrunning: null,
-  treadmillrunning: null,
-  course: null,
+const typeKey = (type: string): string => type.trim().toLowerCase().replace(/[\s_-]/g, '');
+
+/**
+ * Sports que Gtracker ne range pas : course, vélo et entraînement, tels que les autres applications les écrivent dans
+ * le `<type>` d'un GPX, et tels que l'ancienne application les écrivait dans ses GPX et ses fiches (`running`,
+ * `cycling`, `run-intervals`, `bike-intervals`, `run-test`, `muscu`). Par leur clé (`typeKey`). La seule liste : la
+ * porte d'import refuse une session de l'un d'eux (`library/legacyImport.ts`, bibliothèque, FIT).
+ */
+const OTHER_SPORT_TYPES: ReadonlySet<string> = new Set([
+  'running', 'run', 'trailrunning', 'treadmillrunning', 'course',
+  'cycling', 'biking', 'bike', 'ride', 'roadcycling', 'roadbiking', 'mountainbiking', 'gravelcycling', 'ebikeride', 'ebiking', 'velo',
+  'runintervals', 'bikeintervals', 'runtest', 'muscu',
+]);
+
+/** Vrai pour un sport que Gtracker ne range pas (`OTHER_SPORT_TYPES`) ; faux pour un type inconnu, qui reste « à classer ». */
+export const isOtherSportType = (type: string | null | undefined): boolean => typeof type === 'string' && OTHER_SPORT_TYPES.has(typeKey(type));
+
+/** Types d'activité des autres applications, ramenés à nos supports, par leur clé (`typeKey`). */
+const FOREIGN_TYPES: Record<string, SportType> = {
   windsurfing: 'windsurf',
   windsurf: 'windsurf',
   kitesurfing: 'kite',
@@ -66,27 +76,16 @@ const FOREIGN_TYPES: Record<string, SportType | null> = {
   voile: 'bateau',
   wingfoiling: 'wingfoil',
   wingfoil: 'wingfoil',
-  cycling: null,
-  biking: null,
-  bike: null,
-  ride: null,
-  roadcycling: null,
-  roadbiking: null,
-  mountainbiking: null,
-  gravelcycling: null,
-  ebikeride: null,
-  ebiking: null,
-  velo: null,
   surfing: 'surf',
   surf: 'surf',
   surffoiling: 'surf',
   foilsurfing: 'surf',
 };
 
-/** Support deviné depuis la balise `<type>` d'un GPX, ou `null`. */
+/** Support deviné depuis la balise `<type>` d'un GPX, ou `null` (type inconnu, ou sport que Gtracker ne range pas). */
 export const guessSport = (gpxType: string | undefined): SportType | null => {
   if (!gpxType) return null;
   const raw = gpxType.trim();
   if (isSportType(raw)) return raw;
-  return FOREIGN_TYPES[raw.toLowerCase().replace(/[\s_-]/g, '')] ?? null;
+  return FOREIGN_TYPES[typeKey(raw)] ?? null;
 };

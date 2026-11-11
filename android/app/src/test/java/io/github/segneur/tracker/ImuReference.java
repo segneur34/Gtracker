@@ -25,10 +25,10 @@ final class ImuReference {
      * `JSONObject` n'existe pas hors d'Android). Les accents et l'euro font
      * différer les octets des caractères : la longueur écrite est en octets.
      */
-    static final String HEADER_JSON = "{\"format\":\"tracker-capteurs\",\"version\":1,\"startedAtMs\":1790000000000,"
+    static final String HEADER_JSON = "{\"format\":\"gtracker-capteurs\",\"version\":1,\"startedAtMs\":1790000000000,"
         + "\"clock\":{\"elapsedUs\":123456789000,\"wallMs\":1790000000150},"
         + "\"device\":{\"manufacturer\":\"Société d'essai\",\"model\":\"Téléphone €\",\"android\":36},"
-        + "\"setup\":{\"placement\":\"poitrine\",\"foil\":true,\"jumps\":true,\"cadence\":false},"
+        + "\"setup\":{\"placement\":\"poitrine\",\"foil\":true,\"jumps\":true},"
         + "\"streams\":["
         + "{\"id\":0,\"kind\":\"accel\",\"axes\":3,\"unit\":0.01,\"offset\":0,"
         + "\"sensor\":{\"name\":\"Accéléromètre\",\"vendor\":\"Société d'essai\",\"maxRange\":78.5,\"resolution\":0.0025,\"minDelayUs\":2500}},"

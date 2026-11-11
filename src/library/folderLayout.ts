@@ -1,10 +1,13 @@
+import { FILE_FORMATS, MARKER_FILE } from '../core/appIdentity';
 import { isFiniteNumber, isObject, parseJson, stringifyJson } from '../core/basics';
+
+export { MARKER_FILE };
 
 /**
  * Disposition du dossier mémoire (`docs/ETAT_DU_PROJET.md` §6) :
  *
- *     Tracker/
- *       tracker.json     marqueur, pour reconnaître le dossier et dire sa version
+ *     Gtracker/
+ *       gtracker.json    marqueur, pour reconnaître le dossier et dire sa version
  *                        (`readMarkerVersion` : au-delà de `MEMORY_VERSION`, lecture seule)
  *       reglages/        un fichier de réglages par appareil, `<appareil>.json`
  *                        (`settingsFile.ts`) ; avant le point 90, un seul
@@ -21,7 +24,6 @@ import { isFiniteNumber, isObject, parseJson, stringifyJson } from '../core/basi
 
 export const SESSIONS_DIR = 'sessions';
 export const ROUTES_DIR = 'itineraires';
-export const MARKER_FILE = 'tracker.json';
 export const SETTINGS_DIR = 'reglages';
 /** Ancien fichier unique des réglages, à la racine : relu une fois, puis retiré. */
 export const SETTINGS_FILE = 'reglages.json';
@@ -29,7 +31,7 @@ export const README_FILE = 'LISEZMOI.txt';
 /** Tests de FC repos, à la racine (`restingHrStore.ts`) : pas dans `reglages/`, dont chaque fichier est lu comme un réglage. */
 export const RESTING_HR_FILE = 'fc-repos.json';
 
-export const MEMORY_FORMAT = 'tracker-memoire';
+export const MEMORY_FORMAT = FILE_FORMATS.memoire;
 export const MEMORY_VERSION = 1;
 
 export const sessionPath = (fileName: string): string => `${SESSIONS_DIR}/${fileName}`;
@@ -71,7 +73,7 @@ export const readmeText = (): string =>
     '  Réglages > Mémoire, « Mettre à jour » et « Reprendre ».',
     '- fc-repos.json : vos tests de FC repos. Chaque appareil y ajoute les siens et',
     '  reprend ceux des autres à l\'ouverture du dossier.',
-    '- tracker.json : permet à l\'application de reconnaître ce dossier.',
+    `- ${MARKER_FILE} : permet à l'application de reconnaître ce dossier.`,
     '',
     'Sauvegarder ou changer d\'appareil : copiez le dossier Gtracker entier.',
     'Sur le téléphone, il se trouve dans Stockage interne > Documents > Tracker',
