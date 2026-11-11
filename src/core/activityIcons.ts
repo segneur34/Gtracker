@@ -1,4 +1,5 @@
 import type { Activity } from './activities';
+import { familySports, type SportFamily } from './sportProfiles';
 import type { SportType } from './types';
 
 /**
@@ -61,6 +62,27 @@ export const guessActivityIcon = (name: string, base: SportType, id = ''): Activ
   const lower = name.toLowerCase();
   const match = NAME_ICON.find((rule) => (!rule.bases || rule.bases.includes(base)) && rule.pattern.test(lower));
   return match?.icon ?? BASE_ICON[base];
+};
+
+/** Mots du nom qui disent le calcul d'une activité de voile, du plus précis au plus large (même ordre que `NAME_ICON`). */
+const NAME_BASE: { pattern: RegExp; base: SportType }[] = [
+  { pattern: /\bkite/, base: 'kite' },
+  { pattern: /\bwing/, base: 'wingfoil' },
+  { pattern: /\b(planche|windsurf|windfoil)/, base: 'windsurf' },
+  { pattern: /\b(bateau|voilier|dériveur|deriveur|catamaran)/, base: 'bateau' },
+];
+
+/**
+ * Calcul deviné du nom d'une activité qu'on ajoute (« Bateau » → bateau, « Kite » → kite, « Planche » →
+ * windsurf, « Wing » → wingfoil), pour que le formulaire ne parte pas sur le premier calcul de la famille en
+ * silence ; le sélecteur reste modifiable. Le calcul rendu est toujours de `family` (un nom de voile en surf
+ * rend le premier calcul du surf) ; un nom qui ne dit rien rend le premier calcul de la famille.
+ */
+export const guessActivityBase = (name: string, family: SportFamily): SportType => {
+  const allowed = familySports(family);
+  const lower = name.toLowerCase();
+  const match = NAME_BASE.find((rule) => allowed.includes(rule.base) && rule.pattern.test(lower));
+  return match?.base ?? allowed[0];
 };
 
 /** Icône d'une activité : celle choisie, sinon la devinée. */

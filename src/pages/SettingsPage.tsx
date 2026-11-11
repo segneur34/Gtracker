@@ -61,7 +61,7 @@ import SettingsPart from '../components/SettingsPart';
 import ShadePicker from '../components/ShadePicker';
 import ActivityIcon from '../components/ActivityIcon';
 import IconPicker from '../components/IconPicker';
-import { activityIcon, guessActivityIcon, type ActivityIconId } from '../core/activityIcons';
+import { activityIcon, guessActivityBase, guessActivityIcon, type ActivityIconId } from '../core/activityIcons';
 import {
   JUMP_MIN_HEIGHT_RANGE, JUMP_PLACEMENTS, JUMP_PLACEMENT_LABEL, type JumpPlacement, type JumpSettings,
 } from '../recording/jumpSettings';
@@ -1080,12 +1080,14 @@ function AddActivityForm({
 }) {
   const [name, setName] = useState('');
   const [family, setFamily] = useState<SportFamily>('voile');
-  const [base, setBase] = useState<SportType>(familySports('voile')[0]);
+  // Le calcul se devine du nom (« Bateau » → bateau) tant qu'on n'en choisit pas un soi-même.
+  const [chosenBase, setChosenBase] = useState<SportType | null>(null);
+  const base = chosenBase ?? guessActivityBase(name, family);
   const [color, setColor] = useState(() => nextActivityColor(activities, 'voile'));
   const [icon, setIcon] = useState<ActivityIconId | null>(null);
   const pickFamily = (next: SportFamily) => {
     setFamily(next);
-    setBase(familySports(next)[0]);
+    setChosenBase(null);
     setColor(nextActivityColor(activities, next));
     setIcon(null);
   };
@@ -1093,6 +1095,7 @@ function AddActivityForm({
     if (onAdd(name, base, color, icon ?? undefined) === null) return;
     setName('');
     setIcon(null);
+    setChosenBase(null);
     setColor(nextActivityColor([...activities, { id: '', name, base, color }], family));
   };
   return (
@@ -1108,7 +1111,7 @@ function AddActivityForm({
       {familySports(family).length > 1 && (
         <label className="ui-inline-row-6 ui-center">
           <span className="ui-muted ui-text-xs">calcul</span>
-          <select value={base} onChange={(e) => setBase(e.target.value as SportType)} className="ui-field ui-field--s">
+          <select value={base} onChange={(e) => setChosenBase(e.target.value as SportType)} className="ui-field ui-field--s">
             {familySports(family).map((b) => <option key={b} value={b}>{SPORT_PROFILES[b].label}</option>)}
           </select>
         </label>

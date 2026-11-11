@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ACTIVITIES, readActivities, type Activity } from './activities';
-import { ACTIVITY_ICON_IDS, ACTIVITY_ICON_LABEL, activityIcon, guessActivityIcon, isActivityIconId } from './activityIcons';
+import { ACTIVITY_ICON_IDS, ACTIVITY_ICON_LABEL, activityIcon, guessActivityBase, guessActivityIcon, isActivityIconId } from './activityIcons';
 
 const moth: Activity = { id: 'a-moth', name: 'Moth à foil', base: 'wingfoil', color: '#2e7d32' };
 
@@ -42,6 +42,25 @@ describe('icônes des activités', () => {
     expect(guessActivityIcon('Foil', 'wingfoil')).toBe('wingfoil');
     expect(guessActivityIcon('Régate', 'bateau')).toBe('bateau');
     expect(guessActivityIcon('Matin', 'surf')).toBe('surf');
+  });
+
+  it("devine le calcul d'une activité qu'on ajoute d'après son nom, dans sa famille (lot 314)", () => {
+    expect(guessActivityBase('Bateau', 'voile')).toBe('bateau');
+    expect(guessActivityBase('Mon voilier', 'voile')).toBe('bateau');
+    expect(guessActivityBase('Dériveur', 'voile')).toBe('bateau');
+    expect(guessActivityBase('Catamaran', 'voile')).toBe('bateau');
+    expect(guessActivityBase('Kite', 'voile')).toBe('kite');
+    expect(guessActivityBase('Kitefoil', 'voile')).toBe('kite');
+    expect(guessActivityBase('Planche', 'voile')).toBe('windsurf');
+    expect(guessActivityBase('Windfoil', 'voile')).toBe('windsurf');
+    expect(guessActivityBase('Wing', 'voile')).toBe('wingfoil');
+    // Un nom qui ne dit rien : le premier calcul de la famille.
+    expect(guessActivityBase('Sortie', 'voile')).toBe('wingfoil');
+    expect(guessActivityBase('', 'voile')).toBe('wingfoil');
+    // Famille respectée : un nom de voile en surf rend le premier calcul du surf.
+    expect(guessActivityBase('Bateau', 'surf')).toBe('surf');
+    expect(guessActivityBase('Kite', 'surf')).toBe('surf');
+    expect(guessActivityBase('Paddle', 'surf')).toBe('surf');
   });
 
   it('le choix de Réglages prime, et se relit', () => {

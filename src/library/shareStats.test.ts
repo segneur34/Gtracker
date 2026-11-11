@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { shareableStats } from '../core/shareImage';
+import { SAILING_SPORTS, getSportProfile, hasActiveThreshold } from '../core/sportProfiles';
 import type { SessionSummary } from './record';
 import { SHARE_EXTRA_KEYS, shareExtraStats, summaryShareStats } from './shareStats';
 
@@ -29,6 +30,27 @@ describe('summaryShareStats', () => {
     expect(v.averageSpeed).toBe('10,0 km/h');
     // Ni dénivelé ni cadence, partis avec la course et le vélo.
     expect(v.elevationGain).toBeUndefined();
+  });
+
+  it('un calcul sans seuil (bateau) montre « Temps en mouvement », jamais de temps actif ni en vol, foil ou non (lot 314)', () => {
+    const units = { speed: 'kmh', distance: 'km' } as const;
+    for (const sport of SAILING_SPORTS) {
+      const withThreshold = hasActiveThreshold(getSportProfile(sport));
+      for (const foil of [false, true]) {
+        const stats = summaryShareStats(summary(), 'voile', units, withThreshold, foil);
+        const keys = stats.map((s) => s.key);
+        if (withThreshold) {
+          expect(keys).toContain('activeTime');
+          expect(keys).not.toContain('movingTime');
+        } else {
+          expect(keys).not.toContain('activeTime');
+          expect(keys).not.toContain('activeRatio');
+          expect(stats.find((s) => s.key === 'movingTime')).toEqual({ key: 'movingTime', label: 'Temps en mouvement', value: '50 min' });
+          expect(stats.map((s) => s.label)).not.toContain('Temps en vol');
+        }
+      }
+    }
+    expect(SAILING_SPORTS.some((sport) => !hasActiveThreshold(getSportProfile(sport)))).toBe(true);
   });
 
   it("surf sans vague : vitesse max « — », jamais 0 ; écartée de l'image", () => {

@@ -329,6 +329,8 @@ function SailingModule() {
   );
   /** « Temps en vol » sur foil, « Temps actif » sinon : le libellé dit ce qu'il mesure. */
   const activeTimeWord = foil ? 'Temps en vol' : 'Temps actif';
+  /** Sans seuil (bateau) : « Temps en mouvement », le temps de navigation déjà calculé (`stats.activeTime`, masque sans seuil). */
+  const movingTimeStat: ShareStat = { key: 'movingTime', label: 'Temps en mouvement', value: stats?.activeTime ?? '—' };
   /**
    * Chiffres de l'onglet « général », proposés aussi pour l'image de partage. Sans seuil (bateau),
    * toute la session compte en navigation : ni distance, temps, ratio ni moyenne actifs.
@@ -344,7 +346,7 @@ function SailingModule() {
     ...(hasActiveThreshold ? [
       { key: 'activeTime', label: `${activeTimeWord} (≥${showThreshold(activeThresholdKn)} ${speedSymbol})`, value: stats.activeTime },
       { key: 'activeRatio', label: activeRatioLabel(profile, foil), value: `${commaDecimal(stats.activeRatio)}%` },
-    ] : []),
+    ] : [movingTimeStat]),
     { key: 'averageSpeed', label: 'Vitesse moyenne', value: formatSpeed(stats.avgSpeedMs, speedUnit) },
     ...(hasActiveThreshold ? [
       { key: 'activeAverage', label: `Moyenne active (≥${showThreshold(activeThresholdKn)} ${speedSymbol})`, value: formatSpeed(stats.activeAvgSpeedMs, speedUnit) },
@@ -384,6 +386,7 @@ function SailingModule() {
     ] : [
       { key: 'distance', label: 'Distance', value: formatDistance(stats.distanceM, distanceUnit) },
       { key: 'totalTime', label: 'Temps total', value: stats.totalTime },
+      movingTimeStat,
       { key: 'averageSpeed', label: 'Vitesse moyenne', value: formatSpeed(stats.avgSpeedMs, speedUnit) },
     ]),
     // Top 2 s en face de la moyenne ; le top 100 m reste dans « avancé › tops » (31/10).

@@ -77,7 +77,8 @@ const flightRatioValue = (movingS: number | null, inMotionS: number | undefined)
  * onglets « général » des analyses : le choix retenu pour l'activité vaut
  * aux deux endroits ; un chiffre que la session n'a pas vaut « — ». Sans
  * seuil d'activité (`withActiveThreshold` faux, bateau), la voile n'a ni
- * distance, temps ni moyenne actifs, comme son onglet « général ». Sur foil
+ * distance, temps ni moyenne actifs, comme son onglet « général », mais un
+ * « Temps en mouvement » (lot 314). Sur foil
  * (`foil`), le temps actif est le temps en vol, et le dit, suivi du ratio de
  * vol. Les lignes ajoutées le 05/11 (`shareExtraStats`) suivent, l'appréciation
  * et la force du vent lues dans les notes de la fiche (`notes`).
@@ -119,10 +120,13 @@ const summaryBaseStats = (
 
   if (treatment === 'voile') {
     const active = new Set(['activeDistance', 'activeTime', 'activeRatio', 'activeAverage']);
+    // Sans seuil (bateau), `movingTimeS` est le temps en mouvement (toute la navigation, pauses et trous immobiles ôtés).
+    const movingTime = { key: 'movingTime', label: 'Temps en mouvement', value: movingS === null ? '—' : formatDuration(movingS * 1000) };
     return [
       { key: 'distance', label: 'Distance', value: distance },
       { key: 'activeDistance', label: 'Distance active', value: movingM === null ? '—' : formatDistance(movingM, units.distance) },
       { key: 'totalTime', label: 'Temps total', value: formatDuration(totalS * 1000) },
+      ...(withActiveThreshold ? [] : [movingTime]),
       { key: 'activeTime', label: foil ? 'Temps en vol' : 'Temps actif', value: movingS === null ? '—' : formatDuration(movingS * 1000) },
       // Sur foil : la part du temps en mouvement passée en vol (05/11), comme « général ».
       ...(foil ? [{ key: 'activeRatio', label: FOIL_RATIO_LABEL, value: flightRatioValue(movingS, summary.inMotionS) }] : []),

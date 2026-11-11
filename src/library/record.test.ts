@@ -496,6 +496,31 @@ describe('applyRecordPatch', () => {
     expect(applyRecordPatch(scored.record, { maneuverCount: 12, maneuverResults: { ...results } }).record).toBe(scored.record);
   });
 
+  describe("foil et pumping de la fiche (lot 314)", () => {
+    const withFoil = (over: Partial<SessionRecord> = {}) =>
+      record({ analysis: { ...analysis, foil: true, pumping: true }, ...over });
+
+    it("repassent à null quand le calcul change (voile foil → bateau), le reste est gardé", () => {
+      const { record: next, resummarize } = applyRecordPatch(withFoil({ sport: 'wingfoil' }), { sport: 'bateau', activityId: null });
+      expect(next.analysis).toMatchObject({ foil: null, pumping: null, windDeg: 20, activeThreshold: null });
+      expect(resummarize).toBe(true);
+    });
+
+    it("repassent à null quand l'activité change au même calcul (Surf foil → Surf)", () => {
+      const surfFoil = withFoil({ sport: 'surf', activityId: 'a-surf-foil' });
+      const { record: next, resummarize } = applyRecordPatch(surfFoil, { activityId: 'surf' });
+      expect(next.analysis?.foil).toBeNull();
+      expect(next.analysis?.pumping).toBeNull();
+      expect(resummarize).toBe(true);
+    });
+
+    it("sont gardés si ni l'activité ni le calcul ne changent", () => {
+      const r = withFoil({ sport: 'wingfoil', activityId: 'wingfoil' });
+      expect(applyRecordPatch(r, { sport: 'wingfoil', activityId: 'wingfoil', name: 'Sortie' }).record.analysis).toMatchObject({ foil: true, pumping: true });
+      expect(applyRecordPatch(r, { notes: r.notes }).record.analysis).toMatchObject({ foil: true, pumping: true });
+    });
+  });
+
   it('pose et retire les chiffres du partage écrits par l’analyse, sans refaire le résumé', () => {
     const posed = applyRecordPatch(record(), { pumpingShare: 0.4, windDirDeg: 230 });
     expect(posed.record.summary).toMatchObject({ pumpingShare: 0.4, windDirDeg: 230 });

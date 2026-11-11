@@ -13,6 +13,16 @@ import { summarizeSession, type SummaryOptions } from './summary';
  * la lecture du GPX et le nouveau résumé gardé avec ses manœuvres. Pur : les
  * réglages de l'activité sont lus par l'appelant (`useSessionLibrary`) et
  * passés en paramètre.
+ *
+ * Qui l'emporte pour le foil, du plus fort au plus faible : le foil de la fiche
+ * (`analysis.foil`, case de l'onglet réglages de la session) ; sinon celui que
+ * le résumé porte (`summary.activitySettings`, ou l'empreinte `optionsKey` d'une
+ * ancienne fiche), relu par `carriedSettings` ; sinon celui de l'activité dans
+ * Réglages. `sessionFoil`, `sessionActivitySettings` et `summaryOptions` font
+ * cette lecture. Quand l'activité ou le calcul de la session change
+ * (`applyRecordPatch`), le foil et le pumping de la fiche repassent à `null` et
+ * le résumé porté est oublié : la session prend ceux de sa nouvelle activité
+ * (lot 314), pas ceux du matériel de l'ancienne.
  */
 
 /** Réglages de l'activité d'une session qui changent son résumé, lus dans Réglages par l'appelant. */

@@ -243,13 +243,13 @@ export interface SessionAnalysis {
   speedRange: SpeedRangeMs | null;
   /**
    * Support sur foil pour cette session ; `null` : celui de son activité
-   * (Réglages). Il décrit le matériel du jour : un changement d'activité le
-   * garde. Absent des fiches plus anciennes.
+   * (Réglages). Un changement d'activité ou de calcul le remet à `null` : la
+   * session prend le foil de sa nouvelle activité (lot 314). Absent des fiches plus anciennes.
    */
   foil: boolean | null;
   /**
    * Pumping foil pour cette session (surf, point 104 ; voile sur foil, lot 22) ; `null` : celui de son
-   * activité (Réglages). Absent des fiches plus anciennes.
+   * activité (Réglages). Remis à `null` avec le foil au changement d'activité ou de calcul. Absent des fiches plus anciennes.
    */
   pumping: boolean | null;
   /**
@@ -959,7 +959,9 @@ export interface RecordPatch {
  * `resummarize` : le résumé est à recalculer (support, activité, seuil, allure
  * imposée, altitude ou source de l'altitude changés).
  *
- * Un changement de support efface le seuil propre à la session, exprimé dans
+ * Un changement d'activité ou de support efface le foil et le pumping de la
+ * session (elle prend ceux de sa nouvelle activité). Un changement de support
+ * efface le seuil propre à la session, exprimé dans
  * l'unité de l'ancien support ; un changement de traitement (voile ↔ surf)
  * efface aussi ses bornes de couleur, pensées pour les vitesses de l'autre
  * sport. Le vent saisi, l'allure imposée (elle décrit la trace) et les notes
@@ -1046,6 +1048,10 @@ export const applyRecordPatch = (record: SessionRecord, patch: RecordPatch): { r
         next = { ...next, analysis: cleared };
       }
     }
+  }
+  // Le foil et le pumping de la fiche décrivent le matériel de l'ancienne activité : la nouvelle prend les siens (lot 314).
+  if ((activityChanged || sportChanged) && next.analysis && (next.analysis.foil != null || next.analysis.pumping != null)) {
+    next = { ...next, analysis: { ...next.analysis, foil: null, pumping: null } };
   }
   if (next === original) return { record: original, resummarize: false };
   // Activité ou calcul changé : ce que le résumé portait était à l'ancienne ; la nouvelle prend ceux de l'appareil.
