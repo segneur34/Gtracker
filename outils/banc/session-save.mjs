@@ -1,30 +1,25 @@
 // Banc du bouton « Enregistrer la session » (24/09/2026, refait le 29/10 sur la page d'aujourd'hui, n° 84) :
 // brouillon du vent, du seuil et des notes, avertissement en quittant, écriture dans la fiche, relecture après
 // rechargement, Annuler. Profil Chrome neuf : OPFS vide au départ.
-// Usage : node session-save.mjs <port> <GPX de voile, chemin Windows>
+// Usage : node session-save.mjs <port>
+// La session est la trace de voile de `lib/traces.mjs` (wingfoil, le calcul par défaut de la voile : « Wingfoil »).
 // Ce que la page d'aujourd'hui change par rapport à la première version : l'analyse s'ouvre par son adresse (la
 // ligne de la bibliothèque n'y mène plus), le vent se saisit par « Régler » (boussole sur la carte), le seuil
 // d'activité est dans l'onglet « réglages », les notes dans « matos et conditions », et la barre est
 // `.ui-savebar` (« Non enregistré : … », « Annuler », « Enregistrer la session »).
 // Chaque étape dit « ok » ou « ÉCHEC » ; le script rend 1 au premier échec compté.
-import { readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { traceVoile } from './lib/traces.mjs';
 
-const [port, rawGpxPath] = process.argv.slice(2);
-if (!port || !rawGpxPath) {
-  console.error('Usage : node session-save.mjs <port> <GPX de voile, chemin Windows>');
+const [port] = process.argv.slice(2);
+if (!port) {
+  console.error('Usage : node session-save.mjs <port>');
   process.exit(1);
 }
-// La trace de `make-gpx.mjs` n'a pas de type : sans lui la session est « à classer » et son brouillon ne s'enregistre
-// pas. On en pose un (wingfoil), dans une copie.
-const gpxPath = join(tmpdir(), 'banc-session-save.gpx');
-writeFileSync(gpxPath, readFileSync(rawGpxPath, 'utf8').replace('<name>Synthétique</name>', '<name>Synthétique</name><type>wingfoil</type>'));
 
 // --- Protocole (lib/cdp.mjs) ---
-const { send, evaluate, go, settle, waitFor, blockNetwork, importFiles, records, clickText, check, finish, logs, onMessage } = await connect({ port, width: 1400, height: 1000 });
+const { send, evaluate, go, settle, waitFor, blockNetwork, importGpx, records, clickText, check, finish, logs, onMessage } = await connect({ port, width: 1400, height: 1000 });
 await blockNetwork();
 // Rangée « avancé » des analyses ouverte d'office, avec « général » : tous les onglets restent dans la barre.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
@@ -68,7 +63,7 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 step('1. Import du GPX, ouverture de la session');
 await go('/voile', 3000);
-console.log('import :', await importFiles(gpxPath, 'input[type=file][accept*=".gpx"]'));
+console.log('import :', await importGpx(traceVoile({ nom: 'Synthétique', virageMin: 3 }), 'synthetique.gpx'));
 await waitFor(async () => (await records())?.some((r) => r.summary?.movingTimeS !== undefined), { timeout: 8000, label: 'fiche' });
 await settle({ max: 2000, label: 'import' });
 const file = (await records())?.[0]?.gpx ?? '';

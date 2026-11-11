@@ -1,16 +1,17 @@
 // Banc de test : rendus de React pendant un enregistrement (lot 67, « ne redessiner que les chiffres »).
 // Usage : node rendus.mjs <port> <dossier de travail, chemin Windows>
 // Sur un profil neuf, sans réseau, environ 3 min 30 en temps réel (`TEMPS=10` : 25 s, mêmes ordres de grandeur).
-// Au registre en `manuel` (lancé seulement si nommé) : une mesure, pas une preuve de neutralité (les comptes varient de quelques unités d'un passage à
-// l'autre). Un faux crochet des outils de React (`__REACT_DEVTOOLS_GLOBAL_HOOK__`), posé avant tout script de la page,
+// Une mesure, pas une preuve de neutralité (les comptes varient de quelques unités d'un passage à l'autre) : le script
+// ne compare pas deux relevés, il contrôle des plafonds (`check`, voir PLAFONDS). Un faux crochet des outils de React (`__REACT_DEVTOOLS_GLOBAL_HOOK__`), posé avant tout script de la page,
 // reçoit chaque commit ; l'arbre des fibres y est parcouru, et une fibre de composant compte un rendu quand elle est
 // neuve dans l'arbre (clonée pour ce rendu, ou montée) et porte le drapeau « travail fait » (`PerformedWork`, 1).
-// Rejeu ×1 d'une course de 400 s à 1 Hz : 60 s carte ouverte, 60 s carte réduite, 60 s sur l'accueil ; une ligne
+// Rejeu ×1 d'une session de voile (wingfoil) de 400 s à 1 Hz : 60 s carte ouverte, 60 s carte réduite, 60 s sur l'accueil ; une ligne
 // par phase et par composant suivi, puis les autres composants les plus rendus.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect } from './lib/cdp.mjs';
 import { analyseOuvertePuisJetee } from './lib/fin-enregistrement.mjs';
+import { traceVoile } from './lib/traces.mjs';
 
 const [port, workDir] = process.argv.slice(2);
 if (!port || !workDir) {
@@ -21,7 +22,7 @@ if (!port || !workDir) {
 /** Composants suivis, dans l'ordre du relevé ; ceux qui n'existent pas d'un côté comptent 0. */
 const TRACKED = [
   'AppShell', 'RecordingClock', 'RecordButton', 'RecordingPage', 'RecordingScreen', 'RecordingMap', 'LiveMap',
-  'RecordingFigures', 'RecordingGpsCard', 'MarkGuideSlot', 'IntervalBanner',
+  'RecordingFigures', 'RecordingGpsCard', 'MarkGuideSlot',
 ];
 const PHASE_MS = 60000;
 
@@ -68,24 +69,17 @@ const HOOK = `(() => {
   };
 })()`;
 
-const { send, evaluate, go, settle, waitFor, wait, vwait, blockNetwork, importFiles, click, clickText, logs, close } =
+const { send, evaluate, go, settle, waitFor, wait, vwait, blockNetwork, importFiles, click, clickText, check, finish, logs } =
   await connect({ port, width: 1400, height: 1000 });
 await send('Page.addScriptToEvaluateOnNewDocument', { source: HOOK });
 await blockNetwork();
 
-// Course de 400 s à 3 m/s, 1 Hz.
-const t0 = Date.parse('2026-01-15T09:00:00Z');
-const lat = 43.7;
-const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
-const pts = [];
-for (let k = 0; k <= 400; k++) {
-  pts.push(`<trkpt lat="${lat}" lon="${(3.85 + (3 * k) / mPerDegLon).toFixed(7)}"><ele>50</ele><time>${new Date(t0 + k * 1000).toISOString()}</time></trkpt>`);
-}
-const path = join(workDir, 'rendus-course.gpx');
-writeFileSync(path, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Rejeu</name><type>running</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`);
+// Voile de 401 points à 1 Hz (t = 0 à 400 s).
+const path = join(workDir, 'rendus-voile.gpx');
+writeFileSync(path, traceVoile({ debutMs: Date.parse('2026-01-15T09:00:00Z'), nom: 'Rejeu', bords: 1, secondes: 401 }));
 
 await go('/enregistrer', 6000);
-console.log('famille À pied :', await clickText('À pied'));
+console.log('famille Voile :', await clickText('Voile', '[aria-label=Famille] button'));
 await wait(300);
 console.log('activité :', await evaluate(`[...document.querySelectorAll('[aria-pressed="true"], [aria-checked="true"], [aria-selected="true"]')].map((b) => b.textContent.trim()).filter(Boolean).join(' | ')`));
 await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click(); 'ok'`);
@@ -104,15 +98,16 @@ const phase = async (label) => {
   for (const name of TRACKED) console.log(`${name.padEnd(22)} ${counts[name] ?? 0}`);
   const others = Object.entries(counts).filter(([n]) => !TRACKED.includes(n)).sort((a, b) => b[1] - a[1]).slice(0, 8);
   console.log(`autres : ${others.map(([n, c]) => `${n} ${c}`).join(', ')}`);
+  return { commits, counts };
 };
 
-await phase('carte ouverte');
+const ouverte = await phase('carte ouverte');
 console.log('Réduire la carte :', await clickText('Réduire la carte'));
 await vwait(1000);
-await phase('carte réduite');
+const reduite = await phase('carte réduite');
 console.log('Accueil :', await click('.shell-brand'));
 await vwait(1000);
-await phase('accueil');
+const accueil = await phase('accueil');
 
 // Retour à Enregistrer par le lien du haut (sans recharger), arrêt tenu, session jetée.
 console.log('Enregistrer :', await click('.shell-toprecord'));
@@ -123,10 +118,26 @@ if (down === 'ok') {
   await evaluate(`(() => { const b = window.__stopButton; b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); b.click(); return 'ok'; })()`);
 }
 console.log('Arrêter :', down);
-// Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
-console.log('Jeter :', await analyseOuvertePuisJetee(evaluate));
+// L'analyse s'ouvre seule, la session se jette depuis son menu « … ».
+{ const fin = await analyseOuvertePuisJetee(evaluate); check('arrêt tenu : analyse ouverte seule, puis session jetée', fin === 'ok', fin); }
 await settle({ max: 2000 });
+
+// Plafonds, larges (les comptes varient de quelques unités d'un passage à l'autre) : avant le lot 67, la page entière
+// (`RecordingScreen` 90, `AppShell` 60 par minute) se redessinait à chaque position ; aujourd'hui seuls les chiffres,
+// la carte et l'horloge le font.
+const n = (phase, name) => phase.counts[name] ?? 0;
+/** Le détail (les comptes) n'est écrit qu'en cas d'échec : le relevé d'un passage reste comparable à l'autre. */
+const plafond = (label, ok, detail = '') => check(label, ok, ok ? '' : detail);
+for (const [label, phase] of [['carte ouverte', ouverte], ['carte réduite', reduite], ['accueil', accueil]]) {
+  const page = n(phase, 'AppShell') + n(phase, 'RecordingPage') + n(phase, 'RecordingScreen');
+  plafond(`${label} : la page entière ne se redessine pas (AppShell, RecordingPage, RecordingScreen)`, page <= 10, `${page} rendus en 60 s`);
+  plafond(`${label} : pas plus de 2 commits par seconde`, phase.commits <= 120, `${phase.commits} commits`);
+  plafond(`${label} : l'horloge de l'enregistrement avance (au moins 40 rendus en 60 s)`, n(phase, 'RecordingClock') >= 40, String(n(phase, 'RecordingClock')));
+}
+plafond('carte ouverte : la carte du direct se redessine à chaque position, au plus 2 fois par seconde', n(ouverte, 'LiveMap') >= 30 && n(ouverte, 'LiveMap') <= 120, String(n(ouverte, 'LiveMap')));
+plafond("carte réduite : la carte du direct n'est plus dessinée", n(reduite, 'RecordingMap') === 0 && n(reduite, 'LiveMap') === 0, `${n(reduite, 'RecordingMap')} / ${n(reduite, 'LiveMap')}`);
+plafond('accueil : ni chiffres ni carte du direct redessinés', n(accueil, 'RecordingFigures') === 0 && n(accueil, 'RecordingMap') === 0 && n(accueil, 'LiveMap') === 0);
 
 console.log('--- console ---');
 for (const l of logs) console.log(l);
-await close();
+await finish('Tout passe.');

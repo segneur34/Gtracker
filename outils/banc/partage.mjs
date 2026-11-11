@@ -1,8 +1,7 @@
 // Banc de test : « Partager » du menu « … » des analyses, image de la trace et des chiffres choisis (18/10).
 // Usage : node partage.mjs <port> <dossier de travail> [<dossier des captures>]
-// Sur un profil neuf. Réseau : les tuiles d'OpenStreetMap seulement (fond de l'image) ; IGN, Overpass et BRouter
-// bloqués. Dure environ 1 min 30. Le script :
-//  1. importe la voile de `make-gpx.mjs` (course et vélo retirés au lot 303) ;
+// Sur un profil neuf. Réseau : les tuiles d'OpenStreetMap seulement (fond de l'image) ; le reste bloqué. Dure environ 1 min 30. Le script :
+//  1. importe la voile de `lib/traces.mjs` (wingfoil) ;
 //  2. pour la session : « Partager » en tête du menu « … », la fenêtre, l'aperçu (1080 × 1920, en hauteur), les pastilles
 //     égales aux chiffres de l'onglet « général » (sans les « — »), les six premières enfoncées ; l'image est
 //     gardée dans le dossier des captures (`partage-<page>.png`) ;
@@ -13,15 +12,18 @@
 //     lignes ajoutées le 05/11 : « Manœuvres réussies » et « Vent » en voile, rien de
 //     « — » (pas d'appréciation donnée) ;
 //  4. à 390×844 : la fenêtre tient dans l'écran, sans débordement de la page ;
-//  5. fin d'enregistrement, à 390×844 : rejeu ×600 d'une boucle en Voile, Arrêter, puis « … » › « Partager » de la
-//     carte « Session terminée » : aperçu en 1080 × 1920, chiffres du résumé, choix de la voile repris (clé de l'activité enregistrée).
-import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { CLES, connect } from './lib/cdp.mjs';
+//  5. fin d'enregistrement, à 390×844 : rejeu ×600 d'une trace de voile, Arrêter ; l'analyse s'ouvre seule, puis « … » ›
+//     « Partager l'image » de l'analyse : aperçu en 1080 × 1920, chiffres du résumé, choix de la voile repris (clé de
+//     l'activité enregistrée, la même que celle de la session importée : Wingfoil).
+// La taille du PNG transmis au partage n'est pas relevée : le fond de l'image est fait des tuiles d'OpenStreetMap, lues
+// en direct, et sa taille change d'un passage à l'autre (tuiles plus ou moins nettes ou toutes arrivées) ; le script ne
+// contrôle que « plus de 10 000 octets ».
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { BLOCKED_URLS, CLES, connect } from './lib/cdp.mjs';
+import { attendreAnalyse } from './lib/fin-enregistrement.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { DEBUT_PAR_DEFAUT, traceVoile } from './lib/traces.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
 if (!port || !workDir) {
@@ -37,27 +39,14 @@ const check = (what, ok, detail = '') => { console.log(`${ok ? 'ok   ' : 'ÉCHEC
 
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
-await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://brouter.de/*']);
+// Tout est bloqué sauf les tuiles d'OpenStreetMap, fond de l'image.
+await blockNetwork(BLOCKED_URLS.filter((u) => !u.includes('openstreetmap')));
 
 // --- Sessions ---
-/** Boucle de 30 min au nord de Montpellier, à 3 m/s. */
-const loopGpx = (t0) => {
-  const pts = [];
-  const seconds = 1800;
-  for (let k = 0; k <= seconds; k++) {
-    const a = (k / seconds) * 2 * Math.PI;
-    const lat = 43.65 + 0.012 * Math.sin(a) + 0.002 * Math.sin(3 * a);
-    const lon = 3.86 + 0.016 * Math.cos(a);
-    pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><ele>${(60 + 20 * Math.sin(a)).toFixed(1)}</ele><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${k % 600 < 120 ? 4.2 : 3}</speed></extensions></trkpt>`);
-  }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Boucle</name><type>wingfoil</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
-};
-const voilePath = join(tmpdir(), 'partage-voile.gpx');
-execFileSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'make-gpx.mjs'), voilePath]);
-const T_VOILE = Date.UTC(2026, 8, 20, 13, 0, 0);
+const T_VOILE = DEBUT_PAR_DEFAUT;
 const SESSIONS = [
   // `share` : chiffres de l'image (22/10 : la liste entière d'avant, l'onglet « général » n'en montrant plus que l'essentiel).
-  { page: 'voile', start: T_VOILE, gpx: readFileSync(voilePath, 'utf8'), share: ['Distance', 'Distance active', 'Temps total', /^Temps en vol/, 'Ratio de vol', 'Vitesse moyenne', /^Moyenne active/, 'Manœuvres réussies', 'Vent'] },
+  { page: 'voile', start: T_VOILE, gpx: traceVoile({ nom: 'Synthétique', virageMin: 3 }), share: ['Distance', 'Distance active', 'Temps total', /^Temps en vol/, 'Ratio de vol', 'Vitesse moyenne', /^Moyenne active/, 'Manœuvres réussies', 'Vent'] },
 ];
 
 const paths = {};
@@ -123,7 +112,7 @@ for (const s of SESSIONS) {
   check(`${s.page} : « Partager » en tête du menu « … »`, items?.[0] === "Partager l'image", JSON.stringify(items));
   check(`${s.page} : fenêtre ouverte`, Boolean(await evaluate(`document.querySelector('.share-dialog[role=dialog]') !== null`)));
   check(`${s.page} : aperçu dessiné`, await waitImage());
-  // Relu une fois l'image prête : l'altitude (IGN bloqué, repli sur le GPS) arrive après l'ouverture.
+  // Relu une fois l'image prête.
   const general = await generalStats();
   const c = await chips();
   const sameLabels = c.length === s.share.length && s.share.every((l, k) => (typeof l === 'string' ? c[k].label === l : l.test(c[k].label)));
@@ -170,7 +159,7 @@ await evaluate(`(() => {
 await evaluate(`[...document.querySelectorAll('.share-dialog__actions button')].find((b) => b.textContent.trim() === 'Partager').click()`);
 await wait(500);
 const shared = await evaluate('window.__partage');
-console.log('partagé :', JSON.stringify(shared));
+console.log('partagé :', JSON.stringify({ name: shared?.name, type: shared?.type, title: shared?.title }));
 check('voile : PNG transmis au partage, nommé d\'après la session', shared?.type === 'image/png' && /^2026-09-20 .+\.png$/.test(shared?.name ?? '') && shared.size > 10_000);
 
 // Sans partage : téléchargement et message.
@@ -209,36 +198,31 @@ const holdStop = async () => {
   return evaluate(`(() => { const b = window.__stopButton; b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); b.click(); return 'ok'; })()`);
 };
 const replayPath = join(workDir, 'partage-rejeu.gpx');
-writeFileSync(replayPath, loopGpx(Date.now() - 1800 * 1000));
-// L'activité enregistrée n'est pas celle de la session importée (autre clé) : le choix de la voile est posé pour toute la famille.
-await evaluate(`localStorage.setItem('${CLES.partage}', JSON.stringify(Object.fromEntries(['voile', 'wingfoil', 'windsurf', 'kite', 'bateau'].map((k) => [k, ${JSON.stringify(choix)}]))))`);
+writeFileSync(replayPath, traceVoile({ debutMs: Date.now() - 1800 * 1000, nom: 'Rejeu', bords: 1 }));
+// Le choix de la voile posé à l'étape 3 est rangé sous « wingfoil », activité de la session importée et de l'enregistrement.
 await go('/enregistrer', 4000);
 console.log('famille :', await clickText('Voile', '[aria-label=Famille] button'));
 await wait(300);
 await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click()`);
-await wait(300);
+await waitFor(`[...document.querySelectorAll('input[type=file]')].length > 0`, { timeout: 3000 });
 await importFiles(replayPath, 'input[type=file][accept*=".gpx"]');
-await wait(800);
+await waitFor(`[...document.querySelectorAll('select')].some((x) => [...x.options].some((o) => o.value === '600'))`, { timeout: 8000, label: 'menu de la vitesse' });
 await evaluate(`(() => { const s = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => o.value === '600')); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '600'); s.dispatchEvent(new Event('change', { bubbles: true })); return s.value; })()`);
 console.log('Démarrer :', await clickText('Démarrer'));
 await wait(6000);
 console.log('Arrêter :', await holdStop());
-await waitFor("[...document.querySelectorAll('.ui-card')].some((c) => c.textContent.includes('Session terminée') && c.querySelector('.ui-more__button'))", { timeout: 2500, label: 'session terminée' });
-const cardMenu = await evaluate(`(() => {
-  const card = [...document.querySelectorAll('.ui-card')].find((c) => c.textContent.includes('Session terminée'));
-  const b = card?.querySelector('.ui-more__button');
-  if (!b) return null;
-  b.click();
-  return [...card.querySelectorAll('.ui-more__panel button')].map((x) => x.textContent.trim());
-})()`);
-check('fin d\'enregistrement : « Partager » dans le « … » de « Session terminée »', Boolean(cardMenu?.includes("Partager l'image")), JSON.stringify(cardMenu));
-await evaluate(`[...document.querySelectorAll('.ui-card .ui-more__panel button')].find((x) => x.textContent.trim() === "Partager l'image")?.click()`);
-check('fin d\'enregistrement : aperçu dessiné', await waitImage());
-check('fin d\'enregistrement : image en hauteur de 1080 × 1920', isPortrait(await imageSize()), JSON.stringify(await imageSize()));
+// La fin de l'enregistrement range la session et ouvre son analyse ; « Partager l'image » est dans le « … » de l'analyse.
+const opened = await attendreAnalyse(evaluate);
+check("fin d'enregistrement : l'analyse s'ouvre seule", opened === 'ok', opened);
+await settle({ max: 3000, label: 'analyse' });
+const endMenu = await openShare();
+check("fin d'enregistrement : « Partager l'image » en tête du « … » de l'analyse", endMenu?.[0] === "Partager l'image", JSON.stringify(endMenu));
+check("fin d'enregistrement : aperçu dessiné", await waitImage());
+check("fin d'enregistrement : image en hauteur de 1080 × 1920", isPortrait(await imageSize()), JSON.stringify(await imageSize()));
 c = await chips();
 console.log('pastilles :', c.map((x) => `${x.label}${x.on ? ' *' : ''}`).join(' | '));
-check('fin d\'enregistrement : chiffres du résumé', c.some((x) => x.label === 'Distance') && c.length >= 6, String(c.length));
-check('fin d\'enregistrement : choix de la voile repris (même activité)', c.filter((x) => x.on).length === choix.stats?.length
+check("fin d'enregistrement : chiffres du résumé", c.some((x) => x.label === 'Distance') && c.length >= 6, String(c.length));
+check("fin d'enregistrement : choix de la voile repris (même activité)", c.filter((x) => x.on).length === choix.stats?.length
   && !(await evaluate(`document.querySelector('.share-dialog__check input').checked`)));
 await saveImage('partage-enregistrement');
 await shoot('partage-enregistrement-fenetre');

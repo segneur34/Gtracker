@@ -13,7 +13,6 @@
 //     « Voir », sauts rangés dans la fiche ; captures sur ordinateur et à 390×844 ;
 //  4. Enregistrer, dans le navigateur : pas de case « Mesurer les sauts » (téléphone seulement) ;
 //  5. la suppression de la session : GPX, fiche et `.imu` effacés ;
-//  6. (à pied et au VTT, n° 174 : retirée au lot 303 avec la course et le vélo).
 import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
@@ -325,7 +324,6 @@ await waitFor(async () => !(await sessionFiles()).some((f) => f.startsWith((gpxN
 files = await sessionFiles();
 check('GPX, fiche et .imu effacés', !files.some((f) => f.startsWith((gpxName ?? '').replace(/\.gpx$/, ''))), files.join(', ') || '(vide)');
 
-// --- 6. À pied et VTT : retirée au lot 303 avec la course et le vélo ---
 
 console.log('--- console (erreurs, avertissements) ---');
 for (const line of logs) console.log(line);

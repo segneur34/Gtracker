@@ -1,20 +1,20 @@
 // Banc de test : notification de l'enregistrement (§10, point 101).
 // Usage : node notification.mjs <port> <dossier de travail, chemin Windows>
-// Sur un profil neuf, sans réseau. Dure environ 1 min 30. La version navigateur de `platform/notification.ts`
+// Sur un profil neuf, sans réseau. Dure environ 1 min 30. L'activité de voile par défaut est « Wingfoil » (famille « Voile »). La version navigateur de `platform/notification.ts`
 // consigne chaque envoi en `console.debug` (« [notification] titre | texte [chronomètre] (seule) »). Le script vérifie :
-//  1. Réglages : la notification, dans la partie Enregistrement de la carte Voile, deux menus, « défaut » ; la seconde ligne passée à
+//  1. Réglages : la notification, dans la partie Enregistrement de la carte Wingfoil, deux menus, « défaut » ; la seconde ligne passée à
 //     « Max (2 s) », rangée dans les réglages ;
-//  2. un rejeu ×10 de voile : titre « Voile », chiffres choisis, chronomètre de durée, et au moins 5 s entre deux
+//  2. un rejeu ×10 de voile : titre « Wingfoil », chiffres choisis, chronomètre de durée, et au moins 5 s entre deux
 //     envois sans changement d'état ;
 //  3. pause manuelle : envoi immédiat, « en pause », durée figée, posé seul ; reprise : envoi immédiat sans « en pause » ;
-//  4. arrêt : notification effacée ;
-//  5. (retirée au lot 302 avec l'Entraînement : le compteur du fractionné au titre de la notification) ;
-//  6. la moyenne en voile (lot 150) : « Moyenne active » dans les menus de Réglages, « Moy. act. » dans un rejeu.
+//  4. arrêt : notification effacée ; l'analyse s'ouvre seule, la session est jetée depuis son menu « … » ;
+//  5. la moyenne en voile (lot 150) : « Moyenne active » dans les menus de Réglages, « Moy. act. » dans un rejeu.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CLES, connect } from './lib/cdp.mjs';
 import { analyseOuvertePuisJetee } from './lib/fin-enregistrement.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { traceVoile } from './lib/traces.mjs';
 
 const [port, workDir] = process.argv.slice(2);
 if (!port || !workDir) {
@@ -22,9 +22,8 @@ if (!port || !workDir) {
   process.exit(1);
 }
 
-// --- Protocole ---
 // --- Protocole (lib/cdp.mjs) ---
-const { send, evaluate, go, wait, blockNetwork, importFiles, close, logs, onMessage } = await connect({ port, width: 1400, height: 1000 });
+const { send, evaluate, go, wait, waitFor, blockNetwork, importFiles, close, logs, onMessage } = await connect({ port, width: 1400, height: 1000 });
 /** Envois de la notification, avec l'instant de réception. */
 const sent = [];
 onMessage((msg) => {
@@ -56,37 +55,27 @@ const startReplay = async (family, file, speed) => {
   await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click(); 'ok'`);
   await wait(300);
   await setFile('input[type=file][accept*=".gpx"]', file);
-  await wait(500);
+  check('rejeu : fichier lu, menu de la vitesse présent', Boolean(await waitFor(`[...document.querySelectorAll('select')].some((x) => [...x.options].some((o) => o.value === '600'))`, { timeout: 8000 })));
   await evaluate(`(() => { const s = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => o.value === '600')); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, ${JSON.stringify(String(speed))}); s.dispatchEvent(new Event('change', { bubbles: true })); return s.value; })()`);
-  return clickText('Démarrer');
+  const demarre = await clickText('Démarrer');
+  check('enregistrement en cours (bouton Arrêter)', Boolean(await waitFor(`[...document.querySelectorAll('button.ui-btn--danger')].some((x) => x.textContent.includes('Arrêter'))`, { timeout: 10000 })));
+  return demarre;
 };
-/** Trace à 1 Hz datée de maintenant : `n` points vers l'est, entre 1,5 et 4,5 m/s, pour que les chiffres changent. */
-const nowTrace = (path, n, type) => {
-  const t0 = Date.now();
-  const lat = 43.7;
-  const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
-  const pts = [];
-  let meters = 0;
-  for (let k = 0; k < n; k++) {
-    const v = 3 + 1.5 * Math.sin(k / 7);
-    if (k > 0) meters += v;
-    pts.push(`<trkpt lat="${lat}" lon="${(3.85 + meters / mPerDegLon).toFixed(7)}"><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${v.toFixed(2)}</speed></extensions></trkpt>`);
-  }
-  writeFileSync(path, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Rejeu</name><type>${type}</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`);
-};
+/** Trace de voile à 1 Hz datée de maintenant (un bord de près et un de portant, environ 630 points), vitesses qui changent pour que les chiffres changent. */
+const nowTrace = (path, type) => writeFileSync(path, traceVoile({ debutMs: Date.now(), type, nom: 'Rejeu', bords: 1 }));
 
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
 
-// 1. Réglages : notification, dans la partie Enregistrement de la carte Voile.
+// 1. Réglages : notification, dans la partie Enregistrement de la carte Wingfoil.
 await go('/parametres', 4000);
 await evaluate(`(() => { const b = [...document.querySelectorAll('[role=button]')].find((el) => el.textContent.trim() === 'Activités'); if (b && !document.querySelector('.settings-activities')) b.click(); return 'ok'; })()`);
 await wait(300);
 // Familles repliées depuis le lot 2 des demandes du 15/10 : toutes ouvertes.
 await evaluate(`document.querySelectorAll('.settings-activities__family-toggle[aria-expanded="false"]').forEach((b) => b.click()); 'ok'`);
 await wait(300);
-await evaluate(`(() => { const b = [...document.querySelectorAll('.settings-activity__toggle')].find((x) => x.textContent.trim().startsWith('Voile')); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); return 'ok'; })()`);
+await evaluate(`(() => { const b = [...document.querySelectorAll('.settings-activity__toggle')].find((x) => x.textContent.trim().startsWith('Wingfoil')); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); return 'ok'; })()`);
 // La carte ouverte monte ses parties : 300 ms ne suffisent pas toujours.
 await wait(800);
 // Depuis le 19/10, la notification est une sous-partie d'Enregistrement.
@@ -103,12 +92,12 @@ const before = await notifRow();
 check('deux menus, défaut vitesse, distance', before?.menus === 2 && before.values.join(',') === 'Vitesse,Distance' && before.text.includes('défaut'),
   JSON.stringify(before?.values));
 const menuChoices = await evaluate(`[...[...document.querySelectorAll('.settings-part__sub')].find((p) => p.querySelector('.settings-part__subtitle')?.textContent.trim() === 'Notification').querySelector('select').options].map((o) => o.textContent)`);
-check('Voile : le menu propose « Moyenne active », plus « Moyenne »', menuChoices.includes('Moyenne active') && !menuChoices.includes('Moyenne'), menuChoices.join(', '));
+check('Wingfoil : le menu propose « Moyenne active », plus « Moyenne »', menuChoices.includes('Moyenne active') && !menuChoices.includes('Moyenne'), menuChoices.join(', '));
 // Depuis le 27/10, « Par défaut » est une entrée du menu « … » de la carte : grisée, non absente, quand rien n'est modifié.
 const parDefaut = (card) => `(${card})?.querySelector('.settings-activity__head > .ui-more .ui-more__panel')?.querySelectorAll('button')`;
 const parDefautState = (card) => evaluate(`(() => { const b = [...(${parDefaut(card)} ?? [])].find((x) => x.textContent.trim() === 'Par défaut'); return b ? (b.disabled ? 'grisé' : 'actif') : 'absent'; })()`);
-const voileCardSel = `[...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__toggle')?.textContent.trim().startsWith('Voile'))`;
-check('rien de changé : « Par défaut » grisé dans la carte Voile', (await parDefautState(voileCardSel)) === 'grisé');
+const voileCardSel = `[...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__toggle')?.textContent.trim().startsWith('Wingfoil'))`;
+check('rien de changé : « Par défaut » grisé dans la carte Wingfoil', (await parDefautState(voileCardSel)) === 'grisé');
 await evaluate(`(() => {
   const part = [...document.querySelectorAll('.settings-part__sub')].find((p) => p.querySelector('.settings-part__subtitle')?.textContent.trim() === 'Notification');
   const s = part.querySelectorAll('select')[1];
@@ -121,8 +110,8 @@ const after = await notifRow();
 const stored = await evaluate(`JSON.stringify(JSON.parse(localStorage.getItem('${CLES.sportSettings}'))?.notificationFields)`);
 check('seconde ligne « Max », rangée, plus « défaut »', after?.values[1]?.startsWith('Max') && !after.text.includes('défaut') && /"max"/.test(stored ?? ''), stored);
 // Seuls les chiffres de la notification changés : la carte a son « Défaut », et repliée, « · modifié » (demande du 19/10).
-const voileCard = `[...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__toggle')?.textContent.trim().startsWith('Voile'))`;
-check('« Par défaut » de la carte Voile actif', (await parDefautState(voileCard)) === 'actif');
+const voileCard = `[...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__toggle')?.textContent.trim().startsWith('Wingfoil'))`;
+check('« Par défaut » de la carte Wingfoil actif', (await parDefautState(voileCard)) === 'actif');
 await evaluate(`${voileCard}.querySelector('.settings-activity__toggle').click(); 'ok'`);
 await wait(300);
 const voileSummary = await evaluate(`${voileCard}?.querySelector('.settings-activity__summary')?.textContent ?? ''`);
@@ -130,14 +119,14 @@ check('carte repliée : « · modifié »', voileSummary.includes('· modifié')
 
 // 2. Rejeu ×10 de voile.
 const sailPath = join(workDir, 'notification-voile.gpx');
-nowTrace(sailPath, 600, 'wingfoil');
+nowTrace(sailPath, 'wingfoil');
 const s0 = sent.length;
 console.log('Démarrer :', await startReplay('Voile', sailPath, 10));
 await wait(16000);
 // Le chargement de la page efface une notification restée d'un arrêt brutal : hors du compte.
 const run = sent.slice(s0).filter((s) => s.text !== 'effacée');
 console.log('envois :', run.map((s) => s.text).slice(0, 4).join('\n        '));
-check('titre et chiffres choisis', run.length > 0 && run.every((s) => s.text.startsWith('Voile | Vit. ') && s.text.includes(' · Max ')),
+check('titre et chiffres choisis', run.length > 0 && run.every((s) => s.text.startsWith('Wingfoil | Vit. ') && s.text.includes(' · Max ')),
   run[run.length - 1]?.text);
 check('chronomètre de durée', run.length > 0 && run.every((s) => s.text.includes('[durée ')));
 // Les premiers envois partent tout de suite : départ, récriture à la première position (le service GPS vient de
@@ -151,7 +140,7 @@ let mark = sent.length;
 console.log('Pause :', await clickText('Pause'));
 await wait(800);
 const paused = sent.slice(mark);
-check('pause : envoi immédiat, « en pause », durée figée, posé seul', paused.length === 1 && /^Voile · en pause 0:\d\d:\d\d \| /.test(paused[0].text)
+check('pause : envoi immédiat, « en pause », durée figée, posé seul', paused.length === 1 && /^Wingfoil · en pause 0:\d\d:\d\d \| /.test(paused[0].text)
   && paused[0].text.endsWith('(seule)') && !paused[0].text.includes('[durée'), paused[0]?.text);
 await wait(3000);
 check('rien pendant la pause', sent.length === mark + 1);
@@ -159,7 +148,7 @@ mark = sent.length;
 console.log('Reprendre :', await clickText('Reprendre'));
 await wait(1500);
 const resumed = sent.slice(mark);
-check('reprise : envoi immédiat, sans « en pause »', resumed.length >= 1 && resumed[0].text.startsWith('Voile | Vit. ') && !resumed[0].text.includes('(seule)'),
+check('reprise : envoi immédiat, sans « en pause »', resumed.length >= 1 && resumed[0].text.startsWith('Wingfoil | Vit. ') && !resumed[0].text.includes('(seule)'),
   resumed.map((s) => s.text).join(' // '));
 
 // 4. Arrêt.
@@ -167,11 +156,11 @@ mark = sent.length;
 console.log('Arrêter :', await holdStop());
 await wait(1500);
 check('arrêt : notification effacée', sent.slice(mark).some((s) => s.text === 'effacée'), sent.slice(mark).map((s) => s.text).join(' // '));
-// Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
-console.log('Jeter :', await analyseOuvertePuisJetee(evaluate));
+// L'analyse s'ouvre seule, la session se jette depuis son menu « … ».
+{ const fin = await analyseOuvertePuisJetee(evaluate); check('arrêt tenu : analyse ouverte seule, puis session jetée', fin === 'ok', fin); }
 await wait(800);
 
-// 6, joué ici : la moyenne active dans un rejeu de voile.
+// 5, joué ici : la moyenne active dans un rejeu de voile.
 const fieldsWith = (from, to) => evaluate(`(() => {
   const s = JSON.parse(localStorage.getItem('${CLES.sportSettings}'));
   for (const id of Object.keys(s.notificationFields ?? {})) s.notificationFields[id] = s.notificationFields[id].map((f) => (f === ${JSON.stringify(from)} ? ${JSON.stringify(to)} : f));
@@ -187,8 +176,8 @@ check('voile : « Moy. act. » dans la notification, jamais « Moy. » seul', av
   averages.slice(-3).join(' // '));
 console.log('Arrêter :', await holdStop());
 await wait(1500);
-// Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
-console.log('Jeter :', await analyseOuvertePuisJetee(evaluate));
+// L'analyse s'ouvre seule, la session se jette depuis son menu « … ».
+{ const fin = await analyseOuvertePuisJetee(evaluate); check('arrêt tenu : analyse ouverte seule, puis session jetée', fin === 'ok', fin); }
 await wait(800);
 
 console.log(logs.length ? `console :\n  ${logs.join('\n  ')}` : 'console : rien');

@@ -1,4 +1,4 @@
-// Banc du brouillon de voile entre deux sessions (lot 54, étape 9 ; remplace `session-save.mjs`, périmé) :
+// Banc du brouillon de voile entre deux sessions (lot 54, étape 9) :
 // le vent saisi dans A n'apparaît pas dans B, y compris juste après le changement de session, et revient en A
 // une fois « Enregistrer la session » cliqué. La fiche de A porte le vent, celle de B non.
 // Usage : node brouillon-voile.mjs <port> <dossier de travail, chemin Windows>

@@ -1,14 +1,14 @@
-// Suite de session-save.mjs (24/09/2026, reprise sur la bibliothèque et la page d'aujourd'hui le 29/10, n° 84),
-// sur le même profil Chrome : la session déjà importée est classée en Voile (l'activité de la session change par
-// le choix d'activité de l'onglet réglages), puis son seuil est enregistré à 4 et 12 nœuds ; le résumé de la fiche
-// doit suivre. Pour finir (lot 313), un brouillon ouvert, la session est jetée depuis le menu « … » de son analyse
-// (« Jeter » tenu une seconde, confirmé) : retour à la bibliothèque, session absente de la mémoire.
+// Suite de session-save.mjs (24/09/2026, reprise sur la bibliothèque et la page d'aujourd'hui le 29/10, n° 84), mais
+// autonome : le lanceur donne un profil Chrome neuf à chaque script. Il importe lui-même la session de voile de
+// `lib/traces.mjs` (wingfoil), y enregistre un seuil de 15 nœuds, puis change l'activité de la session dans l'onglet
+// réglages (Wingfoil vers Kite : recalcul complet) ; ensuite son seuil est enregistré à 4 et 12 nœuds, et le résumé de
+// la fiche doit suivre. Pour finir (lot 313), un brouillon ouvert, la session est jetée depuis le menu « … » de son
+// analyse (« Jeter » tenu une seconde, confirmé) : retour à la bibliothèque, session absente de la mémoire.
 // Usage : node session-save-resume.mjs <port>
-// Se branche sur le Chrome du profil de `session-save.mjs` (`BANC_WS` : l'onglet de ce profil), sinon ouvre un
-// onglet du Chrome du port : alors la bibliothèque doit déjà contenir la session.
 import { connect } from './lib/cdp.mjs';
 import { jeterDepuisAnalyse } from './lib/fin-enregistrement.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { traceVoile } from './lib/traces.mjs';
 
 const [port] = process.argv.slice(2);
 if (!port) {
@@ -17,7 +17,7 @@ if (!port) {
 }
 
 // --- Protocole (lib/cdp.mjs) ---
-const { send, evaluate, go, settle, waitFor, clickText, records, check, finish, logs } = await connect({ port, width: 1400, height: 1000 });
+const { send, evaluate, go, settle, waitFor, blockNetwork, importGpx, clickText, records, check, finish, logs } = await connect({ port, width: 1400, height: 1000 });
 
 const step = (title) => console.log(`\n== ${title}`);
 const typeInto = (selector, value) => evaluate(`(() => {
@@ -52,20 +52,43 @@ const fiche = async (file) => {
 };
 const activeTime = () => evaluate(`document.body.innerText.match(/Temps (actif|en vol)[^\\n]*\\n[^\\n]*/)?.[0].replace(/\\n/g, ' ') ?? '(absent)'`);
 
+// Rangée « avancé » des analyses ouverte d'office (`lib/onglets.mjs`) : tous les onglets restent dans la barre.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
+await blockNetwork();
+
+step('Import de la session de voile (wingfoil), ouverture de son analyse');
 await go('/voile', 3000);
+console.log('import :', await importGpx(traceVoile({ nom: 'Synthétique', virageMin: 3 }), 'synthetique.gpx'));
+await waitFor(async () => (await records())?.some((r) => r.summary?.movingTimeS !== undefined), { timeout: 8000, label: 'fiche' });
+await settle({ max: 2000, label: 'import' });
 const file = (await records())?.[0]?.gpx ?? '';
-check('la session de session-save.mjs est là', file !== '', file);
+check('une fiche rangée, en wingfoil', file !== '' && (await records())[0].sport === 'wingfoil', file);
 const url = `/voile/analyse?session=${encodeURIComponent(file)}`;
 await go(url, 6000);
 await waitFor(`document.querySelectorAll('.an-carte-col .ui-tab').length > 0`, { timeout: 30000, every: 200, label: 'onglets' });
 await settle({ max: 1000, label: 'analyse' });
 
-step('Activité Voile : le seuil de la session est effacé, résumé recalculé');
+step('Seuil de 15 nœuds enregistré sur la session');
 console.log('onglet réglages :', await openTab('réglages'));
 await settle({ max: 800, label: 'onglet réglages' });
-console.log('Voile :', await chooseActivity('Voile'));
-await settle({ max: 4000, label: 'changement d\'activité' });
-console.log('fiche :', await fiche(file), '| seuil affiché :', await evaluate(`${THRESHOLD_INPUT}?.value`));
+const movingFree = JSON.parse(await fiche(file)).movingTimeS;
+console.log('saisie :', await typeInto(THRESHOLD_INPUT, '15'));
+await settle({ max: 1500, label: 'seuil saisi' });
+console.log('clic :', await clickText('Enregistrer la session'));
+await waitFor(async () => JSON.parse(await fiche(file)).analysis?.activeThreshold === 15, { timeout: 4000, label: 'fiche écrite' });
+await settle({ max: 3000, label: 'enregistrement' });
+const withThreshold = JSON.parse(await fiche(file));
+check('seuil de la session dans la fiche, résumé recalculé', withThreshold.analysis?.activeThreshold === 15 && withThreshold.movingTimeS !== movingFree, `${movingFree} → ${withThreshold.movingTimeS}`);
+
+step('Activité Kite : le seuil de la session est effacé, résumé recalculé');
+console.log('onglet réglages :', await openTab('réglages'));
+await settle({ max: 800, label: 'onglet réglages' });
+console.log('Kite :', await chooseActivity('Kite'));
+await settle({ max: 4000, label: 'changement d’activité' });
+const kite = JSON.parse(await fiche(file));
+console.log('fiche :', JSON.stringify(kite), '| seuil affiché :', await evaluate(`${THRESHOLD_INPUT}?.value`));
+check('la session est passée en kite', kite.sport === 'kite', String(kite.sport));
+check('le seuil de la session est effacé', (kite.analysis?.activeThreshold ?? null) === null, JSON.stringify(kite.analysis));
 
 for (const seuil of ['4', '12']) {
   step(`Seuil ${seuil} nds enregistré`);
@@ -79,12 +102,16 @@ for (const seuil of ['4', '12']) {
   await settle({ max: 4000, label: 'enregistrement' });
   await openTab('général');
   await settle({ max: 800, label: 'onglet général' });
-  console.log('page :', await activeTime(), '| fiche :', await fiche(file));
+  const page = await activeTime();
+  const now = JSON.parse(await fiche(file));
+  console.log('page :', page, '| fiche :', JSON.stringify(now));
+  check(`seuil de ${seuil} nds dans la fiche`, Math.abs((now.analysis?.activeThreshold ?? -1) - Number(seuil)) < 1e-6, JSON.stringify(now.analysis?.activeThreshold));
+  check(`la page dit « ≥${seuil} nds »`, page.includes(`≥${seuil} nds`), page);
+  check(`le résumé de la fiche suit le seuil de ${seuil} nds`, now.movingTimeS !== JSON.parse(before).movingTimeS, `${JSON.parse(before).movingTimeS} → ${now.movingTimeS}`);
 }
 
 step('« Jeter » depuis l\'analyse, un brouillon ouvert (lot 313) : bibliothèque, session absente');
-// Rangée « avancé » ouverte d'office (`lib/onglets.mjs`), pour atteindre « matos et conditions » ; l'analyse est rouverte.
-await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
+// L'analyse est rouverte.
 // Bibliothèque, puis l'analyse : l'entrée sous l'analyse est la bibliothèque, comme sur le téléphone.
 await go('/voile', 3000);
 await go(url, 6000);

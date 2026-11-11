@@ -31,8 +31,8 @@ const PORT_APRES = 4195;
 const PORT_AVANT = 4196;
 // Préchauffage : chaque page chargée une fois (Vite compile à la demande, un premier chargement dépasse les attentes
 // des scripts) ; les analyses sans session chargent tout de même leur module.
-const PRECHAUFFE = ['/', '/voile', '/voile/analyse', '/surf/analyse',
-  '/enregistrer', '/itineraires', '/statistiques', '/profil', '/parametres'];
+const PRECHAUFFE = ['/', '/voile', '/voile/analyse', '/surf', '/surf/analyse',
+  '/enregistrer', '/itineraires', '/itineraires/liste', '/statistiques', '/profil', '/parametres'];
 const debut = Date.now();
 
 // --- Options ---

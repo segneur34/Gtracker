@@ -5,7 +5,7 @@
 //  1. pendant le trou, rien avant 1 min sans position ;
 //  2. vers 1 min 01 : l'alerte rouge de la page Enregistrer (`ui-alert--danger`) dit « GPS perdu », le son est joué une
 //     seule fois (« [bips] gps perdu », version navigateur de `platform/beeper.ts`), la notification le dit au titre
-//     (« [notification] Voile · GPS perdu | … », version navigateur de `platform/notification.ts`) ;
+//     (« [notification] Wingfoil · GPS perdu | … », version navigateur de `platform/notification.ts`) ;
 //  3. aucun rappel pendant le reste du trou ;
 //  4. au retour des positions : alerte effacée, notification sans « GPS perdu », toujours un seul son.
 // La sortie standard ne porte aucune durée : elle sert à comparer deux passages.
@@ -13,6 +13,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect } from './lib/cdp.mjs';
 import { analyseOuvertePuisJetee } from './lib/fin-enregistrement.mjs';
+import { traceVoile } from './lib/traces.mjs';
 
 const [port, workDir] = process.argv.slice(2);
 if (!port || !workDir) {
@@ -58,18 +59,8 @@ const waitFor = async (test, maxMs) => {
   return null;
 };
 
-/** Trace de voile à 1 Hz datée de maintenant : 20 s, un trou de 90 s, 30 s. */
-const gapTrace = (path) => {
-  const t0 = Date.now();
-  const lat = 43.7;
-  const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
-  const seconds = [...Array.from({ length: 21 }, (_, k) => k), ...Array.from({ length: 31 }, (_, k) => 110 + k)];
-  const pts = seconds.map((s) => {
-    const meters = s * 4;
-    return `<trkpt lat="${lat}" lon="${(3.85 + meters / mPerDegLon).toFixed(7)}"><time>${new Date(t0 + s * 1000).toISOString()}</time><extensions><speed>4.00</speed></extensions></trkpt>`;
-  });
-  writeFileSync(path, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Rejeu</name><type>wingfoil</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`);
-};
+/** Trace de voile à 1 Hz datée de maintenant : 21 points (0 à 20 s), un trou de 90 s, 31 points (110 à 140 s). */
+const gapTrace = (path) => writeFileSync(path, traceVoile({ debutMs: Date.now(), nom: 'Rejeu', bords: 1, secondes: 141, sauter: (t) => t > 20 && t < 110 }));
 
 await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
 
@@ -81,11 +72,13 @@ await wait(300);
 await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click(); 'ok'`);
 await wait(300);
 await importFiles(path, 'input[type=file][accept*=".gpx"]');
-await wait(500);
+// Le menu de la vitesse du rejeu n'existe qu'une fois le fichier lu.
+check('rejeu : fichier lu, menu de la vitesse présent', (await waitFor(() => evaluate(`[...document.querySelectorAll('select')].some((x) => [...x.options].some((o) => o.value === '600'))`), 8000)) !== null);
 // Rejeu ×1 : le trou dure vraiment 90 s.
 await evaluate(`(() => { const s = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => o.value === '600')); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '1'); s.dispatchEvent(new Event('change', { bubbles: true })); return s.value; })()`);
 const startedAt = Date.now();
 console.log('Démarrer :', await clickText('Démarrer'));
+check('enregistrement en cours (bouton Arrêter)', (await waitFor(() => evaluate(`[...document.querySelectorAll('button.ui-btn--danger')].some((x) => x.textContent.includes('Arrêter'))`), 10_000)) !== null);
 
 // 1. Pendant le trou, rien avant 1 min sans position (dernière position du premier morceau vers 20 s).
 await wait(Math.max(0, startedAt + 77_000 - Date.now()));
@@ -100,7 +93,7 @@ check('alerte vers 1 min après la dernière position', sinceStartS !== null && 
 check('son « GPS perdu » joué une fois', lostTones.length === 1, `${lostTones.length} son(s)`);
 await wait(1000);
 const lostNotice = sent.filter((s) => s.text.includes('GPS perdu'));
-check('notification « GPS perdu » au titre', lostNotice.length >= 1 && lostNotice.every((s) => s.text.startsWith('Voile · GPS perdu | ')), lostNotice[0]?.text);
+check('notification « GPS perdu » au titre', lostNotice.length >= 1 && lostNotice.every((s) => s.text.startsWith('Wingfoil · GPS perdu | ')), lostNotice[0]?.text);
 
 // 3. Aucun rappel pendant le reste du trou (retour des positions vers 110 s).
 await wait(Math.max(0, startedAt + 108_000 - Date.now()));
@@ -118,7 +111,7 @@ check('toujours un seul son', lostTones.length === 1, `${lostTones.length} son(s
 
 console.log('Arrêter :', await holdStop());
 // Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
-console.log('Jeter :', await analyseOuvertePuisJetee(evaluate));
+{ const fin = await analyseOuvertePuisJetee(evaluate); check('arrêt tenu : analyse ouverte seule, puis session jetée', fin === 'ok', fin); }
 await wait(500);
 
 console.log(logs.length ? `console :\n  ${logs.join('\n  ')}` : 'console : rien');

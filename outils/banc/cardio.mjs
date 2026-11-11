@@ -15,7 +15,6 @@
 //  5. Réglages : « Seuils cardio » (S1 et S2, zones, Personnaliser, Revenir au calcul), la ligne « Seuils cardio »
 //     de la carte d'une activité (−8 en voile), la case « Ceinture cardio » en voile et en surf, les chiffres
 //     « FC moyenne » et « Zone cardiaque » proposés en voile ;
-//  6. (retirée au lot 302 avec l'Entraînement : la FC par répétition de l'onglet « fractionné ») ;
 //  7. la FC dans le résumé des fiches, et l'onglet « cardio » des statistiques ;
 //  8. à 390×844 : l'analyse de la wing en ligne, onglet cardio ouvert, sans débordement.
 import { execFileSync } from 'node:child_process';

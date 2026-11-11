@@ -1,7 +1,7 @@
 // Captures d'écran de pages de l'application dans un Chrome sans fenêtre.
 // Usage : node shots.mjs <port> <dossier> <largeur>x<hauteur>[m] <chemin> [chemin...]
 //   « m » après la taille : émulation téléphone (écran tactile, densité 2).
-// Variables : BASE (serveur, défaut http://localhost:5173), FULL=1 (page entière),
+// Variables : BASE (serveur, défaut http://localhost:5174), FULL=1 (page entière),
 // SETUP (code exécuté dans la page avant les captures, ex. remplir localStorage),
 // WAIT (ms d'attente après chargement, défaut 2500).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, outDir, size, ...paths] = process.argv.slice(2);
-const BASE = process.env.BASE ?? 'http://localhost:5173';
+const BASE = process.env.BASE ?? 'http://localhost:5174';
 const WAIT = Number(process.env.WAIT ?? 2500);
 const mobile = size.endsWith('m');
 const [width, height] = size.replace('m', '').split('x').map(Number);
