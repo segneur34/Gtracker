@@ -131,13 +131,8 @@ export const settleSettingsGestures = (f: MemoryFolder): void => {
   if (!sameJson(next, gestures)) jsonStore.write(GESTURES_KEY, next);
 };
 
-const LEGACY_NOTES_KEY = 'tracker.sailingNotes';
-
-/** Horloge et notes anciennes d'une fiche neuve (`library/newRecord.ts`). */
-const recordContext: NewRecordContext = {
-  now: () => Date.now(),
-  legacyNotes: () => jsonStore.read<Record<string, unknown>>(LEGACY_NOTES_KEY),
-};
+/** Horloge d'une fiche neuve (`library/newRecord.ts`). */
+const recordContext: NewRecordContext = { now: () => Date.now() };
 
 export const newRecord = (gpx: string, analyzed: AnalyzedGpx, source: SessionSource, activityId: string | null = null): SessionRecord =>
   buildNewRecord(gpx, analyzed, source, activityId, recordContext);

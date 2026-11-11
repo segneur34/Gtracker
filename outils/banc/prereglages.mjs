@@ -1,9 +1,7 @@
 // Banc de test : pré-réglages du bateau, puis de tous les sports hors surf (demandes du 21/10).
 // Usage : node prereglages.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 1 min. Vérifie :
-//  1. mise à jour : les réglages d'avant d'une activité sur Bateau (couleurs, pause, seuil, chiffres) et de la Voile
-//     (wingfoil) sont effacés une fois, l'unité du bateau et ceux du kite restent, `presetsVersion` rangée ; rechargée,
-//     rien ne bouge ;
+//  1. une liste d'activités avec une activité sur Bateau, sans aucun réglage ;
 //  2. Réglages : le bateau colore de 1 à 15 nd (« défaut »), pause sous 0,2 km/h pendant 60 s, chiffres vitesse,
 //     moyenne, distance et cap, notification vitesse et distance, pas de ligne « Seuil d'activité », sans « · modifié » ;
 //     la Voile à 8 nd (seuil, couleurs de 8 à 24) ; Course, Marche, Route, Gravel, VTT et fractionnés sans seuil
@@ -14,11 +12,7 @@
 //     seuil ; une session Voile les garde ;
 //  4. une course de deux `<trkseg>` séparés par 10 min de pause, vitesse Doppler comprise : ni la distance ni le temps
 //     en mouvement de la pause ne sont comptés (bug du 17/10), dans le résumé comme dans l'analyse ;
-//  5. un réglage du bateau fait après la mise à jour reste au rechargement ;
-//  6. mise à jour des pré-réglages 2 → 3 (28/10) : le seuil de 0,5 km/h rangé pour la Marche est effacé, celui
-//     de la Course gardé ; version rangée 4 (05/11) ;
-//  7. mise à jour 3 → 4 (05/11) : la case des sauts du kite et du VTT s'efface (cochée d'office), celle de la Route
-//     et les autres réglages restent.
+//  5. un réglage du bateau reste au rechargement.
 import { connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
@@ -52,38 +46,11 @@ const OTHERS = [
   { id: 'bike-intervals', name: 'Fractionné vélo', base: 'bike-intervals', color: '#873e04' },
 ];
 
-// 1. Réglages d'avant les pré-réglages, puis rechargement : la mise à jour se fait au démarrage.
+// 1. Une liste d'activités avec une activité sur Bateau, sans aucun réglage.
 await go('/');
 await evaluate(`(() => {
   localStorage.clear();
-  localStorage.setItem('tracker.sportSettings', JSON.stringify({
-    activities: ${JSON.stringify([SAIL, RUN, ...OTHERS, BOAT])}, activitiesVersion: 6,
-    speedRanges: { 'a-voilier': { minMs: 1.5, maxMs: 6 }, wingfoil: { minMs: 3, maxMs: 12 }, kite: { minMs: 3, maxMs: 12 } },
-    thresholds: { 'a-voilier': 3, wingfoil: 9, running: 2, kite: 9 },
-    terrains: { running: 'trail' },
-    autoPause: { 'a-voilier': { speedMs: 0.3, delayS: 60 } },
-    liveFields: { 'a-voilier': ['speed', 'max'] },
-    notificationFields: { 'a-voilier': ['speed', 'max'] },
-    speedUnits: { 'a-voilier': 'kmh' },
-  }));
-  return 'ok';
-})()`);
-await go('/');
-const after = await stored();
-check('bateau : couleurs, seuil, pause et chiffres d\'avant effacés',
-  !after?.speedRanges?.['a-voilier'] && !after?.thresholds?.['a-voilier'] && !after?.autoPause?.['a-voilier']
-  && !after?.liveFields?.['a-voilier'] && !after?.notificationFields?.['a-voilier'], JSON.stringify(after));
-check('Voile et Course : couleurs et seuil d\'avant effacés', !after?.speedRanges?.wingfoil && !after?.thresholds?.wingfoil && !after?.thresholds?.running);
-check('kite : couleurs et seuil gardés', after?.speedRanges?.kite?.maxMs === 12 && after?.thresholds?.kite === 9);
-check('bateau : unité gardée', after?.speedUnits?.['a-voilier'] === 'kmh');
-check('presetsVersion rangée', after?.presetsVersion === 4, String(after?.presetsVersion));
-await go('/');
-check('rechargée : rien ne bouge', JSON.stringify(await stored()) === JSON.stringify(after));
-// L'unité remise aux nœuds pour lire les bornes en nœuds.
-await evaluate(`(() => {
-  const s = JSON.parse(localStorage.getItem('tracker.sportSettings'));
-  delete s.speedUnits['a-voilier'];
-  localStorage.setItem('tracker.sportSettings', JSON.stringify(s));
+  localStorage.setItem('tracker.sportSettings', JSON.stringify({ activities: ${JSON.stringify([SAIL, RUN, ...OTHERS, BOAT])} }));
   return 'ok';
 })()`);
 
@@ -250,7 +217,7 @@ check('analyse de la course : 1,80 km, 10 min en mouvement sur 20', /Distance\n1
   (runText ?? '').split('\n').filter((l) => /km|min/.test(l)).slice(0, 12).join(' | '));
 await shoot('prereglages-course-pause');
 
-// 5. Un réglage du bateau fait après la mise à jour reste.
+// 5. Un réglage du bateau reste au rechargement.
 await go('/parametres');
 // La carte du Voilier et sa ligne doivent être montées avant d'y écrire (une écriture dans le vide laissait le réglage à 0,3).
 await waitFor(`Boolean(${rowOf('Voilier', 'Pause automatique')}?.querySelector('input'))`, { timeout: 4000, label: 'ligne Pause automatique' });
@@ -272,35 +239,6 @@ check('bateau : pause réglée à 0,5 km/h rangée', set && Math.abs(set.speedMs
 await go('/');
 const kept = (await stored())?.autoPause?.['a-voilier'];
 check('rechargée : réglage gardé', kept && Math.abs(kept.speedMs * 3.6 - 0.5) < 1e-6, JSON.stringify(kept));
-
-// 6. Réglages écrits avec les pré-réglages de la version 2 : la Marche à 0,5 km/h rangée, la Course à 3 km/h.
-await evaluate(`(() => {
-  const s = JSON.parse(localStorage.getItem('tracker.sportSettings'));
-  s.presetsVersion = 2;
-  s.thresholds = { ...s.thresholds, 'a-marche': 0.5, running: 3 };
-  localStorage.setItem('tracker.sportSettings', JSON.stringify(s));
-  return 'ok';
-})()`);
-await go('/');
-const v3 = await stored();
-check('mise à jour 2 → 3 : seuil de la Marche effacé, celui de la Course gardé',
-  v3?.thresholds?.['a-marche'] === undefined && v3?.thresholds?.running === 3 && v3?.presetsVersion === 4, JSON.stringify(v3?.thresholds));
-
-// 7. Réglages de la version 3 (05/11) : la case des sauts du kite et du VTT décochée s'efface (retour au défaut,
-// cochée), celle de la Route reste, comme le seuil du kite.
-await evaluate(`(() => {
-  const s = JSON.parse(localStorage.getItem('tracker.sportSettings'));
-  const off = { enabled: false, placement: 'poitrine', minHeightM: 0.5 };
-  s.presetsVersion = 3;
-  s.jumps = { ...s.jumps, kite: off, 'a-vtt': off, cycling: off };
-  localStorage.setItem('tracker.sportSettings', JSON.stringify(s));
-  return 'ok';
-})()`);
-await go('/');
-const v4 = await stored();
-check('mise à jour 3 → 4 : sauts du kite et du VTT revenus au défaut, ceux de la Route et le seuil du kite gardés',
-  v4?.jumps?.kite === undefined && v4?.jumps?.['a-vtt'] === undefined && v4?.jumps?.cycling?.enabled === false
-    && v4?.thresholds?.kite === 9 && v4?.thresholds?.running === 3 && v4?.presetsVersion === 4, JSON.stringify(v4?.jumps));
 
 const errors = logs.filter((l) => !l.startsWith('warning'));
 console.log(errors.length ? `--- console ---\n${errors.join('\n')}` : 'console : rien');

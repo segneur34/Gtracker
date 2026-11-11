@@ -1,4 +1,3 @@
-import { plainError } from './platform/errorText';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -13,11 +12,10 @@ import { startMarkGuide } from './hooks/useMarkGuide';
 import { startZoneAlertGuide } from './hooks/useZoneAlert';
 import { startRecordingNotification } from './hooks/recordingNotification';
 import { isRecordingActive, recoverInterruptedRecording, subscribeToRecorder } from './hooks/useRecorder';
-import { openLibrary, reportStartupError, settingsUpgraded, startIncomingFiles, startLibraryUi } from './hooks/useSessionLibrary';
+import { openLibrary, startIncomingFiles, startLibraryUi } from './hooks/useSessionLibrary';
 import { importRouteGpx } from './hooks/routeFiles';
 import { incomingFiles } from './platform/incomingFile';
-import { startBeepSound, upgradeStoredActivities, upgradeStoredPresets } from './hooks/useSportSettings';
-import { forgetFormerAnalysisTabs } from './hooks/useOpenSections';
+import { startBeepSound } from './hooks/useSportSettings';
 import { startTheme } from './hooks/useTheme';
 import { installBackButton } from './platform/backButton';
 import { clearStaleScreenOn, resetOrientationLock } from './platform/screen';
@@ -43,26 +41,6 @@ void initStorage()
     return Promise.race([openLibrary(), new Promise((resolve) => setTimeout(resolve, LIBRARY_OPEN_WAIT_MS))]);
   })
   .then(() => {
-    // Liste d'activités et pré-réglages d'une version d'avant mis à jour, une fois les réglages du dossier repris ;
-    // le fichier de l'appareil suit. Les deux mises à jour se font, d'où les deux appels avant le test. Une mise à
-    // jour qui lève (réglages d'une forme inattendue) est dite, et l'interface s'affiche quand même.
-    let upgradeError: unknown = null;
-    const upgrade = (run: () => boolean): boolean => {
-      try {
-        return run();
-      } catch (err) {
-        upgradeError ??= err;
-        return false;
-      }
-    };
-    const activitiesUpgraded = upgrade(upgradeStoredActivities);
-    const presetsUpgraded = upgrade(upgradeStoredPresets);
-    if (activitiesUpgraded || presetsUpgraded) void settingsUpgraded();
-    // Onglets ouverts que les analyses retenaient avant le 05/11 : effacés une fois.
-    upgrade(() => {
-      forgetFormerAnalysisTabs();
-      return false;
-    });
     ReactDOM.createRoot(document.getElementById('root')!).render(
       <React.StrictMode>
         <ErrorBoundary>
@@ -71,10 +49,6 @@ void initStorage()
       </React.StrictMode>
     );
     startLibraryUi(isRecordingActive);
-    if (upgradeError !== null) {
-      const detail = plainError(upgradeError, 'erreur inconnue');
-      reportStartupError(`Réglages de l'appareil non mis à jour pour cette version : ${detail}`);
-    }
     installLeaveGuard();
     // Pendant un enregistrement, la touche retour met l'application en arrière-plan.
     void installBackButton(() => isRecordingActive(), confirmLeave);

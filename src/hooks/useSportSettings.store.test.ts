@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { patchedDraft, type SessionEdits } from '../library/sessionEdits';
 import { jsonStore } from '../platform/storage';
+import { withSetting } from '../settings/activitySettings';
 import { readStoredSettings, subscribeStoredSettings, updateStoredSettings } from './useSportSettings';
 
 const KEY = 'tracker.sportSettings';
@@ -40,6 +41,25 @@ describe('lecture des réglages par useSyncExternalStore (A4)', () => {
     unsubscribe();
   });
 
+  it('premier lancement, rien de rangé : le même objet vide à chaque lecture (sinon le rendu boucle)', () => {
+    jsonStore.write(KEY, { thresholds: { wingfoil: 10 } });
+    readStoredSettings();
+    memory.clear();
+    const first = readStoredSettings();
+    expect(first).toEqual({});
+    expect(readStoredSettings()).toBe(first);
+    jsonStore.write('tracker.autreCle', { x: 1 });
+    expect(readStoredSettings()).toBe(first);
+  });
+
+  it('rend les réglages tels que rangés, sans rien écarter ni ajouter', () => {
+    const stored = { thresholds: { wingfoil: 10 }, cleInconnue: { x: 1 } };
+    jsonStore.write(KEY, stored);
+    expect(readStoredSettings()).toEqual(stored);
+    updateStoredSettings((s) => ({ ...s, longPressMs: 900 }));
+    expect(readStoredSettings()).toEqual({ ...stored, longPressMs: 900 });
+  });
+
   it("n'est réveillé que par les écritures des réglages", () => {
     const listener = vi.fn();
     const unsubscribe = subscribeStoredSettings(listener);
@@ -62,6 +82,15 @@ describe('deux écritures dans un même geste (A5)', () => {
     expect(stored.speedUnits?.wingfoil).toBe('kmh');
     expect(stored.distanceUnits?.wingfoil).toBe('nm');
     expect(stored.thresholds?.wingfoil).toBe(10);
+  });
+
+  it('case « Sauts » puis onglet (n° 174) : la seconde relit la première au lieu de l’écraser', () => {
+    jsonStore.write(KEY, {});
+    const jumps = { enabled: true, placement: 'poitrine' as const, minHeightM: 1.5 };
+    updateStoredSettings((s) => withSetting(s, 'kite', 'jumps', jumps));
+    updateStoredSettings((s) => withSetting(s, 'kite', 'tabs', { sauts: true }));
+    expect(readStoredSettings().jumps).toEqual({ kite: jumps });
+    expect(readStoredSettings().tabs).toEqual({ kite: { sauts: true } });
   });
 
   it("n'écrit rien quand le changement rend null", () => {

@@ -95,28 +95,6 @@ export const DEFAULT_ACTIVITIES: Activity[] = [
   SURF_FOIL_ACTIVITY,
 ];
 
-/**
- * Version de la liste des activités rangée dans les réglages. 2 : Route,
- * Gravel et VTT dans la famille Vélo (point 81) ; 3 : les deux activités du
- * fractionné (point 89) ; 4 : couleurs prises dans les nuances de la famille
- * (point 90) ; 5 : Surf et Surf foil (point 97) ; 6 : Marche (20/10) ; 7 : couleurs de la
- * refonte (22/10) ; 8 : Tests (24/10) ; 9 : Muscu (lot I du 25/10). Une liste d'avant est mise à jour une fois
- * (`upgradeActivities`) ; toute liste écrite ensuite porte ce numéro, pour
- * qu'une activité supprimée ne revienne pas. Le numéro ne recule jamais, même
- * si les versions 2, 3, 6, 8 et 9 n'apportaient que des activités à terre,
- * retirées au lot 305.
- */
-export const ACTIVITIES_VERSION = 9;
-
-/**
- * Activités ajoutées à une liste d'avant, avec la version de la liste qui les a apportées. Versions 2, 3, 6, 8,
- * 9 : graines à terre (Gravel et VTT, les deux du fractionné, Marche, Tests, Muscu), sans effet ici (lot 305).
- */
-const ACTIVITY_SEEDS: { version: number; activity: Activity }[] = [
-  { version: 5, activity: SURF_ACTIVITY },
-  { version: 5, activity: SURF_FOIL_ACTIVITY },
-];
-
 /** Calcul par défaut d'une famille, pour un module sans activité. */
 export const FAMILY_BASE: Record<SportFamily, SportType> = { voile: 'wingfoil', surf: 'surf' };
 
@@ -131,9 +109,8 @@ const isColor = (value: unknown): value is string => typeof value === 'string' &
 /**
  * Liste des activités telle que les réglages la gardent. Absente : celles du
  * premier lancement. Une entrée abîmée est écartée, un doublon d'identifiant
- * aussi, comme une activité posée sur un calcul inconnu (« ski », ou ceux de
- * la course, du vélo et de l'Entraînement, lot 305) ; une liste vide reste
- * vide (l'utilisateur a tout supprimé).
+ * aussi, comme une activité posée sur un calcul inconnu (« ski ») ; une liste
+ * vide reste vide (l'utilisateur a tout supprimé).
  */
 export const readActivities = (raw: unknown): Activity[] => {
   // Une copie : l'appelant peut trier ou compléter la liste sans toucher la constante.
@@ -229,65 +206,6 @@ export const sessionActivity = (
     return chosen && chosen.base === sport ? chosen : baseActivity(sport);
   }
   return activities.find((a) => a.id === sport) ?? activities.find((a) => a.base === sport) ?? baseActivity(sport);
-};
-
-/** Nom sans casse, accents ni espaces autour, pour reconnaître une activité déjà créée. */
-const foldName = (name: string): string =>
-  name.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr');
-
-/**
- * Liste de la version `fromVersion` mise à jour (`ACTIVITIES_VERSION`) : seul
- * ce qu'ont apporté les versions suivantes s'ajoute, pour qu'une activité
- * supprimée depuis ne revienne pas.
- * - Version 4 : chaque activité dont la couleur n'est pas une nuance de sa
- *   famille, ou en porte une déjà prise plus haut dans la liste, reçoit la
- *   première nuance libre de sa famille (`recolorActivities`).
- * - Version 5 : les deux activités du surf.
- * - Version 7 (refonte du 22/10) : nouvelle première nuance de la voile ; la
- *   couleur de chaque activité repasse par `recolorActivities`, comme en version 4.
- * - Versions 2, 3, 6, 8 et 9 : des activités à terre (et le renommage de
- *   « Vélo » en « Route »), retirées au lot 305 : sans effet ici.
- *
- * Une activité ajoutée se range avec sa famille, sauf si une autre porte déjà
- * son identifiant, ou son nom dans la même famille (casse et accents ignorés :
- * un « surf » créé avant reste seul) ; sa couleur, si une autre la porte déjà,
- * est la première nuance libre.
- */
-export const upgradeActivities = (activities: Activity[], fromVersion: number): Activity[] => {
-  const sameName = (a: string, b: string) => foldName(a) === foldName(b);
-  let list = activities;
-  for (const { version, activity: seed } of ACTIVITY_SEEDS) {
-    if (version <= fromVersion) continue;
-    const family = activityFamily(seed);
-    if (list.some((a) => a.id === seed.id || (activityFamily(a) === family && sameName(a.name, seed.name)))) continue;
-    const color = list.some((a) => a.color.toLowerCase() === seed.color) ? nextActivityColor(list, family) : seed.color;
-    list = insertActivity(list, { ...seed, color });
-  }
-  return fromVersion >= 7 ? list : recolorActivities(list);
-};
-
-/**
- * Liste où chaque activité porte une nuance de sa famille, distincte des
- * autres. Une nuance déjà juste est gardée, la première fois qu'elle paraît ;
- * les autres activités reçoivent, dans l'ordre de la liste, la première
- * nuance libre : sur une liste d'avant le point 90, la première activité de
- * chaque famille prend donc la couleur de la famille.
- */
-export const recolorActivities = (activities: Activity[]): Activity[] => {
-  const kept = new Set<string>();
-  const keeps = activities.map((a) => {
-    const color = a.color.toLowerCase();
-    const ok = FAMILY_SHADES[activityFamily(a)].includes(color) && !kept.has(color);
-    if (ok) kept.add(color);
-    return ok;
-  });
-  const list = activities.filter((_, i) => keeps[i]);
-  return activities.map((a, i) => {
-    if (keeps[i]) return a;
-    const recolored = { ...a, color: nextActivityColor(list, activityFamily(a)) };
-    list.push(recolored);
-    return recolored;
-  });
 };
 
 /**

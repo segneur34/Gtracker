@@ -10,8 +10,7 @@ export { MARKER_FILE };
  *       gtracker.json    marqueur, pour reconnaître le dossier et dire sa version
  *                        (`readMarkerVersion` : au-delà de `MEMORY_VERSION`, lecture seule)
  *       reglages/        un fichier de réglages par appareil, `<appareil>.json`
- *                        (`settingsFile.ts`) ; avant le point 90, un seul
- *                        reglages.json à la racine
+ *                        (`settingsFile.ts`)
  *       LISEZMOI.txt     ce qu'est ce dossier, pour qui l'ouvre à la main
  *       fc-repos.json    les tests de FC repos, fusionnés entre appareils
  *                        (`restingHrStore.ts`)
@@ -25,8 +24,6 @@ export { MARKER_FILE };
 export const SESSIONS_DIR = 'sessions';
 export const ROUTES_DIR = 'itineraires';
 export const SETTINGS_DIR = 'reglages';
-/** Ancien fichier unique des réglages, à la racine : relu une fois, puis retiré. */
-export const SETTINGS_FILE = 'reglages.json';
 export const README_FILE = 'LISEZMOI.txt';
 /** Tests de FC repos, à la racine (`restingHrStore.ts`) : pas dans `reglages/`, dont chaque fichier est lu comme un réglage. */
 export const RESTING_HR_FILE = 'fc-repos.json';

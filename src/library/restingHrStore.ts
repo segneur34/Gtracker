@@ -29,10 +29,11 @@ export const MAX_STORED_RESTING_RESULTS = 60;
 export const readStoredRestingResult = (raw: unknown): StoredRestingResult | null => {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
-  if (!isFiniteNumber(r.startedAtMs) || !isFiniteNumber(r.lowestBpm) || !isFiniteNumber(r.fromS) || !isFiniteNumber(r.toS) || !Array.isArray(r.series)) return null;
+  if (!isFiniteNumber(r.startedAtMs) || !isFiniteNumber(r.version) || !isFiniteNumber(r.lowestBpm) || !isFiniteNumber(r.fromS)
+    || !isFiniteNumber(r.toS) || !Array.isArray(r.series)) return null;
   return {
     startedAtMs: r.startedAtMs,
-    version: isFiniteNumber(r.version) ? r.version : 1,
+    version: r.version,
     lowestBpm: r.lowestBpm,
     fromS: r.fromS,
     toS: r.toS,

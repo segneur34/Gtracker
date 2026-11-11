@@ -74,14 +74,15 @@ describe('planReconcile', () => {
     expect(plan.rootRecords).toEqual({});
   });
 
-  it('fait suivre à un GPX de la racine la fiche posée à côté de lui, jamais le marqueur ni les réglages', () => {
+  it('fait suivre à un GPX de la racine la fiche posée à côté de lui, jamais le marqueur', () => {
     const plan = planReconcile(
       [],
       [file('a.gpx'), file('a.json'), file('b.gpx'), file('c.json'), file(MARKER_GPX), file(MARKER_FILE), file('reglages.gpx'), file('reglages.json')],
       {}
     );
     expect(plan.rootGpx).toEqual(['a.gpx', 'b.gpx', MARKER_GPX, 'reglages.gpx']);
-    expect(plan.rootRecords).toEqual({ 'a.gpx': 'a.json' });
+    // Un `reglages.json` à la racine n'est plus un fichier de l'application : la fiche de `reglages.gpx`.
+    expect(plan.rootRecords).toEqual({ 'a.gpx': 'a.json', 'reglages.gpx': 'reglages.json' });
   });
 });
 

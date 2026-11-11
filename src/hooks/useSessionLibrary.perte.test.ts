@@ -742,11 +742,10 @@ describe('cache des fiches d\'une autre version du lecteur (lot 148, C5-7)', () 
 describe('marqueur d\'une version plus récente (lot 148, C5-9)', () => {
   const MARKER_V2 = JSON.stringify({ format: FILE_FORMATS.memoire, version: 2 });
 
-  /** Un dossier où une ouverture ordinaire écrirait partout : GPX à la racine, sans fiche, fiche à refaire, extension à ranger, ancien fichier de réglages. */
+  /** Un dossier où une ouverture ordinaire écrirait partout : GPX à la racine, sans fiche, fiche à refaire, extension à ranger. */
   const folderToWrite = (): void => {
     files.set(MARKER_FILE, MARKER_V2);
     files.set('racine.gpx', gpxAt(40));
-    files.set('reglages.json', JSON.stringify({ format: 'tracker-reglages', version: 1, savedAt: 1, values: {} }));
     files.set('sessions/seul.gpx', gpxAt(0));
     files.set('sessions/majuscules.gpx', gpxAt(10));
     files.set('sessions/majuscules.JSON', FUTURE_RECORD.replace('"version": 99', '"version": 1'));

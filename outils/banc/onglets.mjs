@@ -258,15 +258,11 @@ await settle({ max: 1000 });
 check('« tout fermer » : plus aucun onglet ouvert', (await pressedTabs()) === '', await pressedTabs());
 check('« tout fermer » : aucun panneau', (await evaluate(`document.querySelectorAll('.an-carte-panels > *').length`)) === 0);
 check(`« tout fermer » : « avancé » inchangé (${advancedBefore})`, (await advancedState()) === advancedBefore);
-// Réouverture de la même session sans le banc qui rejoue les onglets : « général » seul, « avancé » fermé (05/11),
-// et plus rien des onglets d'avant dans `tracker.sections` (effacés au démarrage).
+// Réouverture de la même session sans le banc qui rejoue les onglets : « général » seul, « avancé » fermé (05/11).
 await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: ongletsId });
-await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}'); s.running = { tops: true, cardio: true }; s['analyses-avance'] = { ouvert: true }; localStorage.setItem('tracker.sections', JSON.stringify(s)); return 'ok'; })()`);
 await go(paths.course, 6000);
 check('réouverture : « général » seul', (await pressedTabs()) === 'général', await pressedTabs());
 check('réouverture : « avancé » fermé', (await advancedState()) === 'false', await advancedState());
-const former = await evaluate(`Object.keys(JSON.parse(localStorage.getItem('tracker.sections') ?? '{}')).filter((k) => k === 'running' || k === 'analyses-avance').join(', ')`);
-check('anciens onglets retenus effacés au démarrage', former === '', former);
 await evaluate(`(() => { document.querySelector('.an-tabs-advanced-toggle')?.click(); return 'ok'; })()`);
 await settle({ max: 500 });
 console.log('tops (avancé ouvert) :', await clickTab('tops'));

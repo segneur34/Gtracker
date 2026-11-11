@@ -13,8 +13,8 @@ import { findSession, sessionOfFile } from './sessionLibrary/memory';
  * Au lancement (`openLibrary`) :
  * 1. le dossier mémoire est ouvert, et reçoit son marqueur et son
  *    `LISEZMOI.txt` s'ils manquent ;
- * 2. les réglages sont rapprochés de `reglages.json`, le plus récent
- *    l'emporte ;
+ * 2. les réglages sont rapprochés des fichiers de `reglages/` : un appareil
+ *    neuf reprend le plus récent ;
  * 3. `sessions/` est lu en une fois et rapproché du cache des fiches :
  *    seules les fiches qui ont changé sont relues, et la liste s'affiche. Le
  *    cache ne garde que des fiches allégées (`lightRecord`) : une session qui
@@ -44,7 +44,7 @@ export { dismissIncomingNotice, dismissLibraryMessage, dismissSettingsOffer, rea
 export { hasSessionMotion } from './sessionLibrary/memory';
 export { summarizeGpxText } from './sessionLibrary/summarySettings';
 export { queueOutdatedRefresh } from './sessionLibrary/summaryQueue';
-export { adoptSettingsFile, importSettingsFile, renameDevice, settingsUpgraded } from './sessionLibrary/deviceSettings';
+export { adoptSettingsFile, importSettingsFile, renameDevice } from './sessionLibrary/deviceSettings';
 export type { AddResult, AddStatus } from './sessionLibrary/addSession';
 export { answerImportQuestion, canImportSessions, importEntries, importFiles, importFromFolder, saveRecordedSession } from './sessionLibrary/importer';
 export { startIncomingFiles } from './sessionLibrary/incoming';

@@ -10,18 +10,8 @@ const NOW = Date.UTC(2026, 10, 4, 9, 30, 0);
 const base = sessionRecord();
 const analyzed: AnalyzedGpx = { summary: base.summary, sport: 'wingfoil', title: 'Wing du matin' };
 
-/** Horloge fixe ; les notes anciennes lues sont comptées. */
-const context = (legacy: Record<string, unknown> | null = null): NewRecordContext & { reads: number } => {
-  const ctx = {
-    reads: 0,
-    now: () => NOW,
-    legacyNotes: () => {
-      ctx.reads += 1;
-      return legacy;
-    },
-  };
-  return ctx;
-};
+/** Horloge fixe. */
+const context = (): NewRecordContext => ({ now: () => NOW });
 
 // Le contenu du test guidé n'est pas lu ici : seul compte qu'il soit rangé tel quel.
 
@@ -38,21 +28,18 @@ describe('fiche neuve d’une session (lot 113)', () => {
     });
   });
 
-  it('reprend les notes saisies avant le dossier pour le même début de trace', () => {
-    const notes = { comment: 'Belle sortie', rating: 4 };
-    const record = newRecord('a.gpx', analyzed, 'enregistrement', 'wing', context({ [`ancienne|${base.summary.startMs}`]: notes, [`autre|1`]: { comment: 'x' } }));
+  it('range l’activité choisie, sans notes', () => {
+    const record = newRecord('a.gpx', analyzed, 'enregistrement', 'wing', context());
     expect(record.activityId).toBe('wing');
-    expect(record.notes?.comment).toBe('Belle sortie');
+    expect(record.notes).toBeNull();
   });
 });
 
 describe('fiche d’une session qui entre dans la mémoire (lot 113)', () => {
-  it('garde la fiche apportée, résumé refait et calcul du GPX, sans lire les notes anciennes', () => {
-    const ctx = context();
+  it('garde la fiche apportée, résumé refait et calcul du GPX', () => {
     const apportee = { ...base, name: 'Sortie', sport: 'kite' as const };
-    const record = recordFor('b.gpx', analyzed, 'import', { record: apportee }, ctx);
+    const record = recordFor('b.gpx', analyzed, 'import', { record: apportee }, context());
     expect(record).toMatchObject({ gpx: 'b.gpx', name: 'Sortie', sport: 'wingfoil', summary: base.summary });
-    expect(ctx.reads).toBe(0);
   });
 
   it('range dans une fiche neuve le foil et les repères de l’enregistrement ; ni séances ni test (lot 302)', () => {

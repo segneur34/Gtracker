@@ -2,22 +2,20 @@ import { decodeImuHeader } from '../core/imuFile';
 import { JUMPS_CALC_VERSION } from '../core/jumps';
 import type { SessionMark } from '../core/sessionMarks';
 import {
-  RECORD_FORMAT, RECORD_VERSION, findLegacyNotes, readAnalysis, type RecordWithoutSummary, type SessionRecord, type SessionSource,
+  RECORD_FORMAT, RECORD_VERSION, readAnalysis, type RecordWithoutSummary, type SessionRecord, type SessionSource,
 } from './record';
 import { withSummary, type AnalyzedGpx } from './summaryOptions';
 
 /**
  * Fiche d'une session qui entre dans la mémoire (lot 113, sortie de la bibliothèque) : neuve, ou celle qui
- * l'accompagne, avec ce que l'enregistrement y range. L'horloge et les notes anciennes sont passées en
- * paramètres : la bibliothèque donne `Date.now` et la lecture du stockage de l'appareil.
+ * l'accompagne, avec ce que l'enregistrement y range. L'horloge est passée en paramètre : la bibliothèque
+ * donne `Date.now`.
  */
 
 /** Ce que la fiche neuve prend hors du GPX. */
 export interface NewRecordContext {
   /** Instant présent, en ms. */
   now: () => number;
-  /** Notes saisies avant l'existence du dossier (`tracker.sailingNotes`), lues seulement pour une fiche neuve. */
-  legacyNotes: () => Record<string, unknown> | null;
 }
 
 /** Ce qu'une session apporte à sa fiche en entrant dans la mémoire (`addGpx` de la bibliothèque). */
@@ -48,15 +46,14 @@ export const newRecord = (
   title: analyzed.title,
   name: null,
   summary: analyzed.summary,
-  // Notes saisies avant l'existence du dossier, pour la même trace.
-  notes: findLegacyNotes(context.legacyNotes(), analyzed.summary.startMs),
+  notes: null,
   analysis: null,
 });
 
 /**
  * Fiche d'une session qui entre dans la mémoire sous le nom `gpx` : celle qui l'accompagne (import d'un
  * dossier, session en attente), son résumé refait, sinon une neuve, à l'activité et au foil choisis à
- * l'enregistrement ; avec les repères de l'enregistrement. Une fiche qui accompagne le GPX garde ses séances et son test.
+ * l'enregistrement ; avec les repères de l'enregistrement.
  */
 export const recordFor = (
   gpx: string, analyzed: AnalyzedGpx, source: SessionSource, options: NewRecordOptions, context: NewRecordContext

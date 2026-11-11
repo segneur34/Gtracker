@@ -42,6 +42,11 @@ describe('résultats gardés', () => {
     expect(read[0].startedAtMs).toBe(START + MAX_STORED_RESTING_RESULTS + 4);
     expect(readStoredRestingResults('pas une liste')).toEqual([]);
   });
+
+  it('écarte un test sans version de protocole, toujours écrite', () => {
+    const { version: _sans, ...withoutVersion } = toStoredRestingResult(result, START, P)!;
+    expect(readStoredRestingResults([withoutVersion])).toEqual([]);
+  });
 });
 
 describe('fichier fc-repos.json et fusion entre appareils', () => {

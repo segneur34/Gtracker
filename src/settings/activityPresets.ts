@@ -64,6 +64,3 @@ const NO_PRESET: ActivityPreset = {};
 /** Pré-réglage d'une activité : le sien si c'est une activité de départ qui en a un, sinon celui de son calcul. */
 export const presetOf = (activity: { id: string; base: SportType }): ActivityPreset =>
   ACTIVITY_PRESETS[activity.id] ?? BASE_PRESETS[activity.base] ?? NO_PRESET;
-
-/** Calculs dont les activités ont un pré-réglage (effacement une fois à la mise à jour, `PRESET_RESETS`). */
-export const PRESET_BASES = Object.keys(BASE_PRESETS) as SportType[];

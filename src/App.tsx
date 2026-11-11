@@ -1,5 +1,5 @@
 import { lazy, useEffect } from 'react';
-import { BrowserRouter as Router, Navigate, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Routes, Route, useNavigate } from 'react-router-dom';
 import { RESTING_HR_PATH } from './core/parentPage';
 import AppShell from './components/AppShell';
 import { DevThrow } from './components/ErrorBoundary';
@@ -77,12 +77,6 @@ const preloadPages = (): (() => void) => {
   };
 };
 
-/** Ancienne adresse du test de FC repos (sous l'Entraînement jusqu'au lot 301) : la nouvelle, sous le Profil, réglages d'adresse gardés. */
-function RestingHrRedirect() {
-  const { search } = useLocation();
-  return <Navigate to={{ pathname: RESTING_HR_PATH, search }} replace />;
-}
-
 /** Une recharge mène toujours à l'accueil : après une reprise silencieuse (lot 156), retour sur Enregistrer. */
 function LandOnRecording() {
   const land = useRecorderSelector((s) => s.landOnRecording);
@@ -107,16 +101,6 @@ function App() {
           {/* Chaque famille : sa bibliothèque, et son module d'analyse ouvert sur une session (`?session=`). */}
           <Route path="/voile" element={<SessionLibrary key="voile" family="voile" />} />
           <Route path="/voile/analyse" element={<SailingModule />} />
-          {/* Course et vélo retirés de cette version (lot 303) : bibliothèques et analyses mènent à l'accueil. */}
-          <Route path="/course/*" element={<Navigate to="/" replace />} />
-          <Route path="/velo/*" element={<Navigate to="/" replace />} />
-          {/* Entraînement retiré (lot 302), sa bibliothèque aussi (lot 305) : vers l'accueil, comme la course. */}
-          <Route path="/fractionne" element={<Navigate to="/" replace />} />
-          <Route path="/fractionne/analyse" element={<Navigate to="/" replace />} />
-          {/* Ancienne adresse du test de FC repos, passé sous le Profil (lot 301). */}
-          <Route path="/fractionne/tests/fc-repos" element={<RestingHrRedirect />} />
-          {/* Pages de l'Entraînement retirées (lot 302 : séances, timer, tests) : vers l'accueil. */}
-          <Route path="/fractionne/*" element={<Navigate to="/" replace />} />
           <Route path="/surf" element={<SessionLibrary key="surf" family="surf" />} />
           <Route path="/surf/analyse" element={<SurfModule />} />
           <Route path="/enregistrer" element={<RecordingPage />} />
@@ -131,6 +115,8 @@ function App() {
           <Route path="/tutoriels/:id" element={<TutorialPage />} />
           {/* Développement seulement : une page qui lève au rendu, pour essayer la limite d'erreur au banc. */}
           {import.meta.env.DEV && <Route path="/essai/erreur" element={<DevThrow />} />}
+          {/* Toute autre adresse mène à l'accueil, au lieu d'une page vide. */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </Router>

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bandIndex } from './basics';
 import {
   edwardsLoad, estimateHrMax, heartRateHistogram, heartRateStats, heartRateThresholds, heartRateZonePaths, heartRateZones,
-  histogramZoneTimes, isValidThresholds, isValidZoneBounds, smoothHeartRate, spanHeartRate, timeInZones, timeSpanHeartRate, type HeartRatePoint,
+  histogramZoneTimes, isValidThresholds, smoothHeartRate, spanHeartRate, timeInZones, timeSpanHeartRate, type HeartRatePoint,
 } from './heartRate';
 import { REFERENCE_HEART_RATE } from './sportProfiles';
 
@@ -102,13 +102,6 @@ describe('heartRateThresholds', () => {
     expect(heartRateThresholds({ hrMax: 190, hrRest: 50, hrThresholds: [150, 172] }, null, model)).toMatchObject({ s1: 150, s2: 172, method: 'saisis' });
     expect(heartRateThresholds({ hrMax: 190, hrRest: 50, hrThresholds: [172, 150] }, null, model)!.method).toBe('reserve');
     expect(isValidThresholds([150])).toBe(false);
-  });
-
-  it("reprend des zones saisies avant les seuils : S1 au début de Z3, S2 d'après Z4", () => {
-    const t = heartRateThresholds({ hrMax: 190, hrRest: 50, hrZones: [110, 130, 145, 160, 172] }, null, model)!;
-    expect(t).toMatchObject({ method: 'saisis', s1: 145, s2: Math.round(145 + 15 / 0.68) });
-    expect(heartRateThresholds({ hrMax: 190, hrRest: 50, hrZones: [110, 100, 145, 160, 172] }, null, model)!.method).toBe('reserve');
-    expect(isValidZoneBounds([110, 130, 145, 160])).toBe(false);
   });
 
   it('rend null sans seuils saisis, FC max ni âge', () => {

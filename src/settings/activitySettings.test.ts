@@ -5,10 +5,10 @@ import { getSportProfile, hasActiveThreshold } from '../core/sportProfiles';
 import { isValidGradeRange } from '../planning/grade';
 import { knotsToMs } from '../core/units';
 import {
-  FULL_APP_FAMILY_IDS, PER_ACTIVITY_KEYS, PRESETS_VERSION, TREATMENT_UNITS, defaultAutoPauseOf, defaultHeartRateOf,
+  PER_ACTIVITY_KEYS, TREATMENT_UNITS, defaultAutoPauseOf, defaultHeartRateOf,
   defaultHrOffsetOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultSpeedRangeOf, defaultSpeedUnitOf,
-  defaultThresholdOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, rangeFollowsPace, readHiddenFamilies, resetOverrides,
-  resetStoredPresets, resolveJumps, resolveRecordingProfile, resolveThresholdOverride, resolveTurns, defaultTurnsOf, withVisibility,
+  defaultThresholdOf, hiddenFamiliesOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, rangeFollowsPace, resetOverrides,
+  resolveJumps, resolveRecordingProfile, resolveThresholdOverride, resolveTurns, defaultTurnsOf, withVisibility,
   SETTING_FIELDS, defaultTabsOf, effectiveHrZoneLines, settingsView, tabsAfterJumpsChange, thresholdFollowsPace, withSetting, type StoredSettings,
 } from './activitySettings';
 
@@ -28,31 +28,6 @@ describe('pré-réglages du bateau (21/10)', () => {
     expect(profile.recording.autoPauseSpeedMs * 3.6).toBeCloseTo(0.2, 6);
     expect(profile.recording.autoPauseDelayS).toBe(60);
     expect(hasActiveThreshold(getSportProfile('wingfoil'))).toBe(true);
-  });
-
-  it("efface une fois les anciens réglages du bateau, rien d'autre", () => {
-    const stored: StoredSettings = {
-      activities: [...DEFAULT_ACTIVITIES, boat],
-      speedRanges: { [boat.id]: { minMs: 1, maxMs: 9 }, bateau: { minMs: 1, maxMs: 8 }, kite: { minMs: 3, maxMs: 12 } },
-      thresholds: { [boat.id]: 3, kite: 9 },
-      autoPause: { [boat.id]: { speedMs: 0.3, delayS: 60 } },
-      liveFields: { [boat.id]: ['speed'] },
-      notificationFields: { [boat.id]: ['speed', 'max'] },
-      speedUnits: { [boat.id]: 'kmh' },
-    };
-    const next = resetStoredPresets(stored);
-    expect(next.speedRanges).toEqual({ kite: { minMs: 3, maxMs: 12 } });
-    expect(next.thresholds).toEqual({ kite: 9 });
-    expect(next.autoPause).toEqual({});
-    expect(next.liveFields).toEqual({});
-    expect(next.notificationFields).toEqual({});
-    expect(next.speedUnits).toEqual({ [boat.id]: 'kmh' });
-    // Réglages écrits après la mise à jour : gardés.
-    const written = { ...stored, presetsVersion: PRESETS_VERSION };
-    expect(resetStoredPresets(written)).toBe(written);
-    // Rien à effacer : les réglages eux-mêmes.
-    const clean: StoredSettings = { speedUnits: { kite: 'kmh' } };
-    expect(resetStoredPresets(clean)).toBe(clean);
   });
 });
 
@@ -83,67 +58,20 @@ describe('pré-réglages des activités (21/10)', () => {
     expect(defaultThresholdOf(surf, false)).toBe(getSportProfile('surf').defaultActiveThreshold);
     expect(defaultHeartRateOf(surf)).toBe(false);
   });
-
-  it('efface une fois les anciens réglages de la wing et de la planche (version 1 → 2), pas ceux du kite ni du surf', () => {
-    const stored: StoredSettings = {
-      activities: [...DEFAULT_ACTIVITIES, pav],
-      presetsVersion: 1,
-      thresholds: { wingfoil: 2, [pav.id]: 9, kite: 12, surf: 9 },
-      tabs: { [pav.id]: { vent: false } },
-      gearLabels: { surf: ['Planche', ''] },
-    };
-    const next = resetStoredPresets(stored);
-    expect(next.thresholds).toEqual({ kite: 12, surf: 9 });
-    expect(next.tabs).toEqual({});
-    expect(next.gearLabels).toEqual(stored.gearLabels);
-  });
-
-  it('la version 3 (Marche, retirée au lot 305) est sans effet ; la version reste à 5', () => {
-    const stored: StoredSettings = {
-      activities: [...DEFAULT_ACTIVITIES],
-      presetsVersion: 2,
-      thresholds: { 'a-marche': 0.5, running: 2, kite: 12 },
-      speedRanges: { 'a-marche': { minMs: 0.3, maxMs: 2 } },
-    };
-    const next = resetStoredPresets(stored);
-    expect(next.thresholds).toBe(stored.thresholds);
-    expect(next.speedRanges).toBe(stored.speedRanges);
-    expect(PRESETS_VERSION).toBe(5);
-  });
-
-  it("efface une fois la case des sauts du kite (version 3 → 4), garde celle des autres, même au VTT d'un réglage complet", () => {
-    const off = { enabled: false, placement: 'poitrine' as const, minHeightM: 1 };
-    const stored: StoredSettings = {
-      activities: [...DEFAULT_ACTIVITIES, kiteCree],
-      presetsVersion: 3,
-      jumps: { kite: off, [kiteCree.id]: off, 'a-vtt': off, wingfoil: off },
-      thresholds: { kite: 12 },
-    };
-    const next = resetStoredPresets(stored);
-    expect(next.jumps).toEqual({ 'a-vtt': off, wingfoil: off });
-    expect(next.thresholds).toBe(stored.thresholds);
-  });
-
-  it("la version 5 (onglet « sauts » décoché à terre) est sans effet : rien d'écrit dans les onglets", () => {
-    const stored: StoredSettings = {
-      presetsVersion: 4,
-      tabs: { 'a-marche': { tops: true }, wingfoil: { vent: false }, surf: { rame: false } },
-    };
-    expect(resetStoredPresets(stored)).toBe(stored);
-  });
 });
 
-describe('familles cachées (lecteur à type fermé, lot 305)', () => {
-  it("garde les familles de cette version et celles de l'application complète, écarte les autres", () => {
-    expect(readHiddenFamilies({ hiddenFamilies: ['fractionne', 'ski', 'surf', 'course', 'velo', 3 as never] })).toEqual(['fractionne', 'surf', 'course', 'velo']);
-    expect(readHiddenFamilies({})).toEqual([]);
-    expect(FULL_APP_FAMILY_IDS).toEqual(['course', 'velo', 'fractionne']);
+describe('familles cachées', () => {
+  it('ne garde que la voile et le surf, écarte toute autre valeur', () => {
+    const raw = { hiddenFamilies: ['fractionne', 'ski', 'surf', 'course', 3] } as unknown as StoredSettings;
+    expect(hiddenFamiliesOf(raw)).toEqual(['surf']);
+    expect(hiddenFamiliesOf({})).toEqual([]);
+    expect(hiddenFamiliesOf({ hiddenFamilies: 'surf' } as unknown as StoredSettings)).toEqual([]);
   });
 
-  it("les réécrit telles quelles en cachant une famille d'ici", () => {
-    const stored: StoredSettings = { activities: [...DEFAULT_ACTIVITIES], hiddenFamilies: ['course', 'velo', 'fractionne'] };
-    const next = withVisibility(stored, [...DEFAULT_ACTIVITIES], [...readHiddenFamilies(stored), 'surf']);
-    expect(next?.hiddenFamilies).toEqual(['course', 'velo', 'fractionne', 'surf']);
+  it('cache une famille, et refuse de cacher la dernière visible', () => {
+    const stored: StoredSettings = { activities: [...DEFAULT_ACTIVITIES] };
+    const next = withVisibility(stored, [...DEFAULT_ACTIVITIES], [...hiddenFamiliesOf(stored), 'surf']);
+    expect(next).toEqual({ activities: DEFAULT_ACTIVITIES, hiddenFamilies: ['surf'] });
     // Cacher aussi la voile ne laisserait rien : refusé.
     expect(withVisibility(stored, [...DEFAULT_ACTIVITIES], ['voile', 'surf'])).toBeNull();
   });
@@ -301,8 +229,8 @@ describe('isActivityOverridden', () => {
     });
   }
 
-  it("ignore les tables de la course et du vélo d'un réglage complet, que « Par défaut » laisse", () => {
-    const stored = { gradeRanges: { [wing.id]: { min: 0, max: 0.1 } }, bikeTypes: { [wing.id]: 'gravel' } } as StoredSettings;
+  it('ignore une table inconnue rangée par activité, que « Par défaut » laisse', () => {
+    const stored = { tableInconnue: { [wing.id]: 'x' } } as unknown as StoredSettings;
     expect(isActivityOverridden(settingsView(stored, wing))).toBe(false);
     expect(resetOverrides(stored, wing.id)).toEqual(stored);
   });

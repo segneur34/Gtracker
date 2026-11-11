@@ -277,29 +277,6 @@ describe('la session garde ses réglages (Q57)', () => {
     expect(gestures().pending).toEqual({});
   });
 
-  it('pré-réglages mis à jour avant la fin d\'une ouverture lente, à la toute première comparaison : un geste quand même', async () => {
-    putSessions();
-    const keyed = oldRecord(WING, '11:00', { sport: 'wingfoil', activityId: 'wingfoil' });
-    files.set(`sessions/${jsonOf(WING)}`, serializeRecord({ ...keyed, summary: { ...keyed.summary, optionsKey: JSON.stringify([7, null, null, null]) } }));
-    // Réglages d'une version d'avant : le seuil de la wing sera effacé par la mise à jour des pré-réglages.
-    stored.set('tracker.sportSettings', JSON.stringify({ thresholds: { wingfoil: 7 }, presetsVersion: 0 }));
-    vi.resetModules();
-    mockPlatform();
-    const library = await import('./useSessionLibrary');
-    const settings = await import('./useSportSettings');
-    const opening = library.openLibrary();
-    expect(settings.upgradeStoredPresets()).toBe(true);
-    expect(settings.readStoredSettings().thresholds?.wingfoil).toBeUndefined();
-    await opening;
-    await settle(library);
-    await library.settingsUpgraded();
-    await settle(library);
-    for (let i = 0; i < 500 && diskRecord(WING).summary.activitySettings === undefined; i++) await tick();
-    expect(diskRecord(WING).summary.activitySettings?.threshold).not.toBe(7);
-    expect(diskRecord(WING).summary.activitySettings).toBeDefined();
-    expect(gestures().pending).toEqual({});
-  });
-
   it('stockage illisible au démarrage : aucune comparaison, des défauts ne passent pas pour un geste', async () => {
     putSessions();
     const first = await openFresh();

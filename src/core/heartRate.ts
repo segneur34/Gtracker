@@ -105,8 +105,6 @@ export interface HeartRateAthlete {
   hrRest: number | null;
   /** S1 et S2 saisis à la main (test en laboratoire), à pied, en bpm. */
   hrThresholds?: readonly number[] | null;
-  /** Bornes basses des zones 1 à 5 saisies avant les seuils (avant le 25/10), relues pour en tirer S1 et S2. */
-  hrZones?: readonly number[] | null;
 }
 
 /**
@@ -158,24 +156,13 @@ export const estimateHrMax = (age: number): number => Math.round(208 - 0.7 * age
 
 const plausible = (b: unknown): b is number => typeof b === 'number' && isFinite(b) && b >= MIN_PLAUSIBLE_BPM && b <= MAX_PLAUSIBLE_BPM;
 
-/** Bornes personnalisées valides : 5 valeurs croissantes. */
-export const isValidZoneBounds = (bounds: readonly number[] | null | undefined): bounds is readonly number[] =>
-  Array.isArray(bounds) && bounds.length === ZONE_COUNT && bounds.every((b, k) => plausible(b) && (k === 0 || b > bounds[k - 1]));
-
 /** Seuils saisis valides : S1 puis S2, plus haut. */
 export const isValidThresholds = (thresholds: readonly number[] | null | undefined): thresholds is readonly [number, number] =>
   Array.isArray(thresholds) && thresholds.length === 2 && plausible(thresholds[0]) && plausible(thresholds[1]) && thresholds[1] > thresholds[0];
 
-/**
- * Seuils saisis : ceux de `hrThresholds`, sinon tirés des zones saisies avant
- * eux (S1 au début de Z3, S2 là où Z4 le placerait).
- */
-const enteredThresholds = (athlete: HeartRateAthlete, model: HeartRateZoneModel): [number, number] | null => {
-  if (isValidThresholds(athlete.hrThresholds)) return [Math.round(athlete.hrThresholds[0]), Math.round(athlete.hrThresholds[1])];
-  if (!isValidZoneBounds(athlete.hrZones)) return null;
-  const [, , z3, z4] = athlete.hrZones;
-  return [Math.round(z3), Math.round(z3 + (z4 - z3) / model.z4)];
-};
+/** Seuils saisis (`hrThresholds`), arrondis ; `null` s'ils manquent ou ne sont pas valides. */
+const enteredThresholds = (athlete: HeartRateAthlete): [number, number] | null =>
+  isValidThresholds(athlete.hrThresholds) ? [Math.round(athlete.hrThresholds[0]), Math.round(athlete.hrThresholds[1])] : null;
 
 /**
  * S1 et S2 à pied : saisis d'abord ; sinon en part de la réserve cardiaque
@@ -186,7 +173,7 @@ export const heartRateThresholds = (athlete: HeartRateAthlete, age: number | nul
   const given = athlete.hrMax;
   const hrMax = given ?? (age !== null && age > 0 ? estimateHrMax(age) : null);
   const estimated = given === null && hrMax !== null;
-  const entered = enteredThresholds(athlete, model);
+  const entered = enteredThresholds(athlete);
   if (entered) return { s1: entered[0], s2: entered[1], method: 'saisis', hrMax, estimated };
   if (hrMax === null) return null;
   const rest = athlete.hrRest;

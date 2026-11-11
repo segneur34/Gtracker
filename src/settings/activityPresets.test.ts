@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ACTIVITIES, SURF_ACTIVITY, SURF_FOIL_ACTIVITY } from '../core/activities';
-import { PRESET_BASES, presetOf } from './activityPresets';
+import { presetOf } from './activityPresets';
+import { SPORT_PROFILES } from '../core/sportProfiles';
+import type { SportType } from '../core/types';
 import { knotsToMs } from '../core/units';
 
 describe('presetOf', () => {
@@ -36,7 +38,7 @@ describe('presetOf', () => {
   });
 
   it('chaque pré-réglage de calcul porte des bornes de couleur croissantes', () => {
-    for (const base of PRESET_BASES) {
+    for (const base of Object.keys(SPORT_PROFILES) as SportType[]) {
       const p = presetOf({ id: `test-${base}`, base });
       if (p.speedRangeMs) expect(p.speedRangeMs.minMs).toBeLessThan(p.speedRangeMs.maxMs);
       if (p.autoPause) expect(p.autoPause.delayS).toBeGreaterThan(0);
@@ -45,11 +47,5 @@ describe('presetOf', () => {
 
   it('toutes les activités de départ rendent un pré-réglage sans surprise', () => {
     for (const activity of DEFAULT_ACTIVITIES) expect(() => presetOf(activity)).not.toThrow();
-  });
-});
-
-describe('PRESET_BASES', () => {
-  it('liste les calculs qui ont un pré-réglage : wing, planche, et le kite pour ses sauts (05/11)', () => {
-    expect(PRESET_BASES).toEqual(['wingfoil', 'windsurf', 'kite']);
   });
 });

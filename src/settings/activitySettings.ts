@@ -1,15 +1,14 @@
 import {
-  ACTIVITIES_VERSION, FAMILY_BASE, SURF_FOIL_ACTIVITY, activitiesOfFamily, activityFamily, activityTreatment, baseActivity, findActivity,
+  FAMILY_BASE, SURF_FOIL_ACTIVITY, activitiesOfFamily, activityFamily, activityTreatment, baseActivity, findActivity,
   readActivities, visibleFamilies, type Activity,
 } from '../core/activities';
-import { PRESET_BASES, presetOf } from './activityPresets';
+import { presetOf } from './activityPresets';
 import {
   SPORT_FAMILIES, defaultActiveThresholdOf, getSportProfile, hasActiveThreshold,
   type RecordingProfile, type SportFamily, type Treatment,
 } from '../core/sportProfiles';
 import { analysisTabs, isTabShown, sanitizeTabChoices, toggleTabChoice, type TabChoices } from '../core/analysisTabs';
 import { isValidSpeedRange, type SpeedRangeMs } from '../core/speedGradient';
-import type { SportType } from '../core/types';
 import { DISTANCE_UNIT_LABEL, SPEED_UNIT_LABEL, type DistanceUnit, type SpeedUnit } from '../core/units';
 import { inRange } from '../core/basics';
 import type { BeepSound } from '../recording/beepSound';
@@ -24,7 +23,7 @@ import { sanitizeGearGroups, sanitizeGearLabels } from './gear';
 /**
  * Réglages d'une activité, purs (lot 72) : défauts tirés du pré-réglage et du
  * calcul, valeurs effectives (`resolve*`) lues sur un `StoredSettings` passé en
- * argument, vue de Réglages, « Par défaut », mise à jour des pré-réglages.
+ * argument, vue de Réglages, « Par défaut ».
  * Le magasin (`tracker.sportSettings`), sa lecture et ses écritures restent
  * dans `hooks/useSportSettings.ts`.
  */
@@ -118,23 +117,17 @@ export const tabsAfterJumpsChange = (
 export type ByActivity<T> = Partial<Record<string, T>>;
 
 export interface StoredSettings {
-  /** Ancienne clé : le support choisi dans le module voile, lu faute de `moduleActivity.voile`. */
-  sport?: string;
   /** Activité retenue par chaque module tant qu'aucune session ne l'impose. */
   moduleActivity?: Partial<Record<SportFamily, string>>;
   /** Dernière activité enregistrée, proposée au prochain enregistrement. */
   recordActivity?: string;
   /** Activités de l'utilisateur ; absentes : celles du premier lancement. */
   activities?: Activity[];
-  /** Version de la liste des activités (`ACTIVITIES_VERSION`) ; absente : 1. */
-  activitiesVersion?: number;
-  /** Version des pré-réglages (`PRESETS_VERSION`) des réglages écrits ; absente : 0. */
-  presetsVersion?: number;
   /**
-   * Familles cachées dans Réglages (§10, point 100) : ni proposées, ni listées ; rien n'est effacé. Chaînes brutes :
-   * celles de l'application complète (`FULL_APP_FAMILY_IDS`) sont gardées telles quelles (`readHiddenFamilies`).
+   * Familles cachées dans Réglages (§10, point 100) : ni proposées, ni listées ; rien n'est effacé. Lues par
+   * `hiddenFamiliesOf`, qui écarte toute valeur hors de `SPORT_FAMILIES`.
    */
-  hiddenFamilies?: string[];
+  hiddenFamilies?: SportFamily[];
   /** Surcharges du seuil d'activité, dans l'unité du profil du calcul ; 0 : aucun seuil réglé, arrêts complets ôtés d'office. */
   thresholds?: ByActivity<number>;
   /** Unité d'affichage des vitesses. */
@@ -162,13 +155,6 @@ export interface StoredSettings {
   jumps?: ByActivity<JumpSettings>;
   /** Ceinture cardio proposée à l'enregistrement ; absente : non. */
   heartRate?: ByActivity<boolean>;
-  /**
-   * Relique de l'application complète (type de vélo), lue brute : plus rien ne l'interprète, elle reste dans le
-   * fichier et se réécrit telle quelle. De même, sans champ ici, `terrainSteps`, `gradeRanges`, `cadence`,
-   * `bikeWeights`, `carriedLoads`, `energyModels`, `paceLevels`, `customFlatSpeeds`, `wayTypes` et
-   * `loopReturnRatios` (course et vélo, retirés aux lots 303 et 305) : `readStoredSettings` ne filtre rien.
-   */
-  bikeTypes?: ByActivity<unknown>;
   /** Décalage des seuils cardio S1 et S2 par rapport à la référence, en bpm ; absent : `defaultHrOffsetOf`. */
   hrOffsets?: ByActivity<number>;
   /** Limites des zones Z1 à Z5 tracées sur la courbe de FC des analyses (case « Zones » de l'onglet cardio, 05/11) ; absent : non. */
@@ -191,9 +177,6 @@ export interface StoredSettings {
   stopHoldMs?: number;
   /** Son de tous les bips, plus ou moins grave (24/10) ; absent : `DEFAULT_BEEP_SOUND`. */
   beepSound?: BeepSound;
-  // Séances du compteur et du Timer, dernières séances lancées, bornes de la course à bornes et réglages des tests
-  // guidés (`intervalPresets`, `lastIntervalWorkout`, `timerPresets`, `lastTimerWorkout`, `heartBands`, `fitnessTests`) :
-  // partis avec l'Entraînement (lot 302). Déjà rangés, ils restent dans le fichier et ne sont plus lus.
 }
 
 /** Appui long par défaut : 2 s, assez pour ne pas partir d'un geste involontaire. */
@@ -290,83 +273,16 @@ export const isKnownDistanceUnit = (value: unknown): value is DistanceUnit =>
   typeof value === 'string' && value in DISTANCE_UNIT_LABEL;
 
 
-/**
- * Familles de l'application complète (à pied, vélo, Entraînement), absentes de cette version : cachées dans un
- * fichier de réglages repris, elles sont gardées telles quelles par `readHiddenFamilies` (rien ne les affiche) et
- * réécrites ainsi par `withVisibility`, pour que ce fichier, relu par l'application complète, les garde cachées.
- */
-export const FULL_APP_FAMILY_IDS: readonly string[] = ['course', 'velo', 'fractionne'];
+const isKnownFamily = (value: unknown): value is SportFamily =>
+  typeof value === 'string' && (SPORT_FAMILIES as readonly string[]).includes(value);
 
-const isKnownFamily = (value: unknown): value is string =>
-  typeof value === 'string' && ((SPORT_FAMILIES as readonly string[]).includes(value) || FULL_APP_FAMILY_IDS.includes(value));
-
-/** Familles cachées : celles de cette version et de l'application complète, les autres valeurs écartées. */
-export const readHiddenFamilies = (stored: StoredSettings): string[] =>
+/** Familles cachées, les valeurs hors de `SPORT_FAMILIES` écartées. */
+export const hiddenFamiliesOf = (stored: StoredSettings): SportFamily[] =>
   Array.isArray(stored.hiddenFamilies) ? stored.hiddenFamilies.filter(isKnownFamily) : [];
 
 /** Réglages avec ces activités et ces familles cachées ; `null` s'il ne resterait aucune famille visible. */
-export const withVisibility = (stored: StoredSettings, activities: Activity[], hiddenFamilies: string[]): StoredSettings | null =>
-  visibleFamilies(activities, hiddenFamilies).length === 0
-    ? null
-    : { ...stored, activities, activitiesVersion: Math.max(stored.activitiesVersion ?? 0, ACTIVITIES_VERSION), hiddenFamilies };
-
-/**
- * Version des pré-réglages. 1 (21/10) : bateau (couleurs de 1 à 15 nœuds,
- * sans seuil d'activité, pause sous 0,2 km/h, chiffres du direct). 2 (21/10) :
- * wing, planche, à pied, vélo et fractionné (`settings/activityPresets.ts`).
- * 3 (28/10) : la Marche sans seuil d'activité. 4 (05/11) : sauts mesurés
- * d'office au kite et au VTT. 5 (06/11) : onglet « sauts » décoché à terre.
- * Les versions 3 et 5 ne visaient que la terre, retirée au lot 305 : elles
- * restent comptées, sans effet ici ; le numéro ne recule jamais.
- */
-export const PRESETS_VERSION = 5;
-
-/**
- * Réglages effacés une fois, à la mise à jour, pour que les pré-réglages
- * repris s'appliquent (choix de l'utilisateur, 21/10) : ces clés, pour toute
- * activité dont le calcul est listé, activité de base comprise, et pour les
- * activités de `ids`. Les réglages écrits ensuite portent `PRESETS_VERSION`
- * et restent.
- */
-const PRESET_RESETS: { version: number; bases: SportType[]; ids?: string[]; keys: PerActivityKey[] }[] = [
-  { version: 1, bases: ['bateau'], keys: ['speedRanges', 'autoPause', 'liveFields', 'notificationFields', 'thresholds'] },
-  {
-    version: 2,
-    // Calculs pré-réglés au 21/10 : le kite, pré-réglé au 05/11 pour ses sauts seulement, n'y entre pas. Les calculs
-    // et les clés de la terre (pente, vélo, voies, terrain, niveau), retirés au lot 305, n'y sont plus.
-    bases: PRESET_BASES.filter((base) => base !== 'kite'),
-    keys: ['thresholds', 'speedUnits', 'speedRanges', 'autoPause', 'liveFields', 'notificationFields', 'markGuide', 'jumps', 'heartRate', 'tabs'],
-  },
-  // Le seuil de la Marche (28/10), retirée au lot 305 : sans effet.
-  { version: 3, bases: [], keys: [] },
-  // Sauts d'office au kite (le VTT, retiré au lot 305, n'y est plus) : leur ancienne case (décochée par défaut) s'efface une fois.
-  { version: 4, bases: ['kite'], keys: ['jumps'] },
-  // Version 5 (onglet « sauts » décoché à terre, 06/11) : la terre retirée au lot 305, sans effet ; rien ne s'y efface.
-];
-
-/**
- * Réglages d'une version de pré-réglages d'avant mis à jour (`PRESET_RESETS`) :
- * les réglages des calculs repris depuis sont effacés. Rend `stored` lui-même
- * s'il n'y a rien à changer.
- */
-export const resetStoredPresets = (stored: StoredSettings): StoredSettings => {
-  const from = stored.presetsVersion ?? 0;
-  if (from >= PRESETS_VERSION) return stored;
-  const activities = readActivities(stored.activities);
-  let next = stored;
-  for (const { version, bases, ids: own = [], keys } of PRESET_RESETS) {
-    if (version <= from) continue;
-    const ids = new Set<string>([...bases, ...own, ...activities.filter((a) => bases.includes(a.base)).map((a) => a.id)]);
-    for (const key of keys) {
-      const map = next[key];
-      if (!map || !Object.keys(map).some((id) => ids.has(id))) continue;
-      const copy: Record<string, unknown> = { ...map };
-      for (const id of ids) delete copy[id];
-      next = { ...next, [key]: copy };
-    }
-  }
-  return next;
-};
+export const withVisibility = (stored: StoredSettings, activities: Activity[], hiddenFamilies: SportFamily[]): StoredSettings | null =>
+  visibleFamilies(activities, hiddenFamilies).length === 0 ? null : { ...stored, activities, hiddenFamilies };
 
 /** Unité de distance d'une activité : celle choisie, sinon le kilomètre. */
 export const resolveDistanceUnit = (stored: StoredSettings, activity: Activity): DistanceUnit => {
@@ -735,7 +651,7 @@ export const isActivityOverridden = (s: SportSettingsView): boolean => {
  * calcul par défaut de la famille.
  */
 export const moduleActivity = (stored: StoredSettings, activities: Activity[], family: SportFamily): Activity => {
-  const remembered = stored.moduleActivity?.[family] ?? (family === 'voile' ? stored.sport : undefined);
+  const remembered = stored.moduleActivity?.[family];
   const found = findActivity(activities, remembered);
   if (found && activityFamily(found) === family && !found.hidden) return found;
   // Cachée : la première visible de la famille, sinon celle retenue tout de même (§10, point 100).

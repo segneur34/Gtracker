@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import {
-  ACTIVITIES_VERSION, activitiesOfFamily, activityFamily, findActivity, isActivityShown, newActivityId, insertActivity,
-  readActivities, upgradeActivities, visibleActivities, visibleFamilies, withHidden, type Activity,
+  activitiesOfFamily, activityFamily, findActivity, isActivityShown, newActivityId, insertActivity,
+  readActivities, visibleActivities, visibleFamilies, withHidden, type Activity,
 } from '../core/activities';
 import type { ActivityIconId } from '../core/activityIcons';
 import { defaultActiveThresholdOf, getSportProfile, type RecordingProfile, type SportFamily } from '../core/sportProfiles';
@@ -21,8 +21,8 @@ import type { WayType } from '../planning/brouterProfile';
 import { DEFAULT_GRADE_RANGE, type GradeRange } from '../planning/grade';
 import { resolveGearGroups, resolveGearLabels, sanitizeGearGroups, withGearItem } from '../settings/gear';
 import {
-  DEFAULT_LONG_PRESS_MS, DEFAULT_STOP_HOLD_MS, PRESETS_VERSION, defaultSpeedRangeOf, isValidLongPress, isValidStopHold,
-  moduleActivity, readHiddenFamilies, resetOverrides, resetStoredPresets,
+  DEFAULT_LONG_PRESS_MS, DEFAULT_STOP_HOLD_MS, defaultSpeedRangeOf, hiddenFamiliesOf, isValidLongPress, isValidStopHold,
+  moduleActivity, resetOverrides,
   resolveDistanceUnit, resolveFoil, resolveHeartRate, resolveHrOffset, resolveJumps, resolveLiveFields,
   resolveMarkGuide, resolveNotificationFields, resolvePumping, resolveRecordingProfile, resolveTurns, resolveSpeedRange, resolveSpeedUnit,
   resolveTabChoices, resolveThresholdOverride, settingsView, withSetting, withVisibility, withoutOverrides,
@@ -81,21 +81,18 @@ export const addGearItem = (activityId: string, groupId: string, name: string): 
 /** Décalage des seuils cardio d'une activité, hors composant (direct, test guidé). */
 export const effectiveHrOffset = (activity: Activity): number => resolveHrOffset(readStoredSettings(), activity);
 
-/**
- * Réglages enregistrés, pour qui calcule hors d'un composant : les résumés de
- * la bibliothèque. L'ancienne allure imposée par support (`referenceSpeeds`)
- * est écartée : depuis le 24 septembre 2026, elle vit dans la fiche de chaque
- * session (§10, point 46), et la prochaine écriture la retire de l'appareil
- * et de `reglages.json`.
- */
+/** Réglages enregistrés, pour qui calcule hors d'un composant : les résumés de la bibliothèque. */
 export const readStoredSettings = (): StoredSettings => {
-  const raw = jsonStore.read<StoredSettings & { referenceSpeeds?: unknown }>(STORAGE_KEY);
+  const raw = jsonStore.read<StoredSettings>(STORAGE_KEY);
   // Même objet tant que la valeur enregistrée ne change pas : c'est l'instantané de `useSyncExternalStore`.
+  // Rien de rangé (premier lancement) : le même objet vide à chaque appel, sinon le rendu boucle.
   if (storedCache && storedCache.raw === raw) return storedCache.value;
-  const { referenceSpeeds: _abandoned, ...settings } = raw ?? {};
-  storedCache = { raw, value: settings };
-  return settings;
+  const value = raw ?? NO_SETTINGS;
+  storedCache = { raw, value };
+  return value;
 };
+
+const NO_SETTINGS: StoredSettings = {};
 
 let storedCache: { raw: unknown; value: StoredSettings } | null = null;
 
@@ -120,13 +117,7 @@ const storedActivities = (stored: StoredSettings): Activity[] => {
   return activitiesCache.value;
 };
 
-/**
- * Toute écriture porte la version des pré-réglages : ce qu'elle contient est choisi avec eux. Jamais
- * rabaissée : réglages repris d'une version plus récente de l'application, un numéro plus bas ferait
- * effacer de nouveau, chez elle, des réglages saisis depuis (`resetStoredPresets`).
- */
-const writeStored = (settings: StoredSettings): void =>
-  jsonStore.write(STORAGE_KEY, { ...settings, presetsVersion: Math.max(settings.presetsVersion ?? 0, PRESETS_VERSION) });
+const writeStored = (settings: StoredSettings): void => jsonStore.write(STORAGE_KEY, settings);
 
 /**
  * Réécrit les réglages à partir de ceux du moment, relus à l'instant et non
@@ -137,41 +128,6 @@ const writeStored = (settings: StoredSettings): void =>
 export const updateStoredSettings = (change: (stored: StoredSettings) => StoredSettings | null | undefined): void => {
   const next = change(readStoredSettings());
   if (next) writeStored(next);
-};
-
-/**
- * Met à jour, une fois, une liste d'activités d'une version d'avant
- * (`upgradeActivities`). À appeler au démarrage, une fois les réglages du
- * dossier mémoire repris, et avant que la bibliothèque ne guette les
- * changements de réglages : ce n'est pas un changement de l'utilisateur, et
- * la date des réglages de l'appareil ne bouge pas. Rend vrai si la liste a
- * été récrite : le fichier de réglages de l'appareil est alors à récrire, à
- * la même date (`settingsUpgraded`). Sans liste rangée, rien à faire : celle
- * du premier lancement est déjà à jour.
- */
-export const upgradeStoredActivities = (): boolean => {
-  const stored = readStoredSettings();
-  if (stored.activities === undefined || (stored.activitiesVersion ?? 1) >= ACTIVITIES_VERSION) return false;
-  // Version des pré-réglages laissée telle quelle : `upgradeStoredPresets`, qui suit, a encore à effacer.
-  jsonStore.write(STORAGE_KEY, {
-    ...stored,
-    activities: upgradeActivities(readActivities(stored.activities), stored.activitiesVersion ?? 1),
-    activitiesVersion: ACTIVITIES_VERSION,
-  });
-  return true;
-};
-
-/**
- * Efface, une fois, les réglages des calculs dont les pré-réglages ont été
- * repris (`resetStoredPresets`). À appeler au démarrage, comme
- * `upgradeStoredActivities` ; rend vrai si les réglages ont été récrits.
- */
-export const upgradeStoredPresets = (): boolean => {
-  const stored = readStoredSettings();
-  const next = resetStoredPresets(stored);
-  if (next === stored) return false;
-  writeStored(next);
-  return true;
 };
 
 export const readStoredActivities = (): Activity[] => readActivities(readStoredSettings().activities);
@@ -232,8 +188,8 @@ export const effectiveStopHoldMs = (): number => {
 export interface Visibility {
   /** Toutes les activités, cachées comprises : elles nomment les sessions (`sessionActivity`). */
   activities: Activity[];
-  /** Familles cachées, celles de l'application complète comprises (`readHiddenFamilies`). */
-  hiddenFamilies: string[];
+  /** Familles cachées dans Réglages (`hiddenFamiliesOf`). */
+  hiddenFamilies: SportFamily[];
   /** Familles visibles, dans l'ordre de `SPORT_FAMILIES`. */
   families: SportFamily[];
   /** Activité visible : ni cachée, ni dans une famille cachée ; une activité de base suit sa famille. */
@@ -251,7 +207,7 @@ const visibility = createJsonSelector<Visibility>(
   () => {
     const stored = readStoredSettings();
     const activities = readActivities(stored.activities);
-    const hiddenFamilies = readHiddenFamilies(stored);
+    const hiddenFamilies = hiddenFamiliesOf(stored);
     return {
       activities,
       hiddenFamilies,
@@ -321,8 +277,8 @@ export const effectiveWayTypes = (_activity: Activity): WayType[] => [];
  * prochain affichage.
  */
 export const useAllSportSettings = () => {
-  // Lus par `useSyncExternalStore` : une écriture d'ailleurs (compteur du fractionné, `reglages.json`
-  // repris du dossier), même faite entre le rendu et l'abonnement, est vue.
+  // Lus par `useSyncExternalStore` : une écriture d'ailleurs (réglages repris du dossier), même faite
+  // entre le rendu et l'abonnement, est vue.
   const stored = useSyncExternalStore(subscribeStoredSettings, readStoredSettings);
   const activities = storedActivities(stored);
 
@@ -348,7 +304,7 @@ export const useAllSportSettings = () => {
         const activities = storedActivities(stored);
         id = newActivityId(trimmed, activities);
         const activity: Activity = { id, name: trimmed, base, color, ...(icon ? { icon } : {}) };
-        return { ...stored, activities: insertActivity(activities, activity), activitiesVersion: Math.max(stored.activitiesVersion ?? 0, ACTIVITIES_VERSION) };
+        return { ...stored, activities: insertActivity(activities, activity) };
       });
       return id;
     },
@@ -361,7 +317,6 @@ export const useAllSportSettings = () => {
       const name = patch.name?.trim();
       updateStoredSettings((stored) => ({
         ...stored,
-        activitiesVersion: Math.max(stored.activitiesVersion ?? 0, ACTIVITIES_VERSION),
         activities: storedActivities(stored).map((a) =>
           a.id === id
             ? { ...a, ...(name ? { name } : {}), ...(patch.color ? { color: patch.color } : {}), ...(patch.icon ? { icon: patch.icon } : {}) }
@@ -381,7 +336,6 @@ export const useAllSportSettings = () => {
       updateStoredSettings((stored) => ({
         ...withoutOverrides(stored, id),
         activities: storedActivities(stored).filter((a) => a.id !== id),
-        activitiesVersion: Math.max(stored.activitiesVersion ?? 0, ACTIVITIES_VERSION),
       })),
     []
   );
@@ -395,7 +349,7 @@ export const useAllSportSettings = () => {
     (id: string, hidden: boolean) =>
       updateStoredSettings((stored) => {
         const activities = storedActivities(stored);
-        const hiddenFamilies = readHiddenFamilies(stored);
+        const hiddenFamilies = hiddenFamiliesOf(stored);
         const target = activities.find((a) => a.id === id);
         if (!target) return null;
         const nextActivities = activities.map((a) => (a.id === id ? withHidden(a, hidden) : a));
@@ -414,7 +368,7 @@ export const useAllSportSettings = () => {
     (family: SportFamily, hidden: boolean) =>
       updateStoredSettings((stored) => {
         const activities = storedActivities(stored);
-        const hiddenFamilies = readHiddenFamilies(stored);
+        const hiddenFamilies = hiddenFamiliesOf(stored);
         if (hidden) return withVisibility(stored, activities, hiddenFamilies.includes(family) ? hiddenFamilies : [...hiddenFamilies, family]);
         const own = activitiesOfFamily(activities, family);
         const allHidden = own.length > 0 && own.every((a) => a.hidden);
@@ -468,7 +422,7 @@ export const useAllSportSettings = () => {
 
   return {
     activities, view, setFor, resetActivity, addActivity, updateActivity, removeActivity, longPressMs, setLongPressMs,
-    stopHoldMs, setStopHoldMs, beepSound, setBeepSound, hiddenFamilies: readHiddenFamilies(stored), setActivityHidden, setFamilyHidden,
+    stopHoldMs, setStopHoldMs, beepSound, setBeepSound, hiddenFamilies: hiddenFamiliesOf(stored), setActivityHidden, setFamilyHidden,
   };
 };
 
@@ -500,10 +454,9 @@ export const useSportSettings = (family: SportFamily) => {
   const activities = storedActivities(stored);
   // Refaite seulement si l'activité retenue ou la liste change, pas à chaque écriture d'un autre réglage.
   const remembered = stored.moduleActivity?.[family];
-  const legacySport = stored.sport;
   const activity = useMemo(
-    () => moduleActivity({ moduleActivity: { [family]: remembered }, sport: legacySport }, activities, family),
-    [remembered, legacySport, activities, family]
+    () => moduleActivity({ moduleActivity: { [family]: remembered } }, activities, family),
+    [remembered, activities, family]
   );
   const sport = activity.base;
   const profile = useMemo(() => getSportProfile(sport), [sport]);

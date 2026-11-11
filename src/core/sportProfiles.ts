@@ -684,9 +684,7 @@ export type Treatment = 'voile' | 'surf';
 
 /**
  * Famille d'un calcul : où ses sessions se rangent (bibliothèque, accueil,
- * barre de navigation, listes d'activités, Réglages). Celles de l'application
- * complète (`course`, `velo`, `fractionne`) ne sont plus des familles : une
- * famille cachée de ce nom est gardée brute (`FULL_APP_FAMILY_IDS`).
+ * barre de navigation, listes d'activités, Réglages).
  */
 export type SportFamily = 'voile' | 'surf';
 

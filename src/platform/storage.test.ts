@@ -105,8 +105,8 @@ describe('createJsonStore', () => {
 
   it('ne lève aucune erreur quand le stockage refuse de lire ou d\'écrire', () => {
     const store = createJsonStore(() => failingBackend);
-    expect(store.read('tracker.sailingNotes')).toBeNull();
-    expect(() => store.write('tracker.sailingNotes', { a: 1 })).not.toThrow();
+    expect(store.read('tracker.uneCle')).toBeNull();
+    expect(() => store.write('tracker.uneCle', { a: 1 })).not.toThrow();
   });
 
   it('absorbe aussi l\'erreur levée dès l\'accès au stockage', () => {

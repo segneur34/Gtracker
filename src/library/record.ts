@@ -978,25 +978,6 @@ export const isFitFileName = (name: string): boolean => /\.fit$/i.test(name);
 export const isBlankGpxText = (text: string): boolean => text.trim() === '';
 
 /**
- * Notes saisies avant l'existence du dossier mémoire (`tracker.sailingNotes`),
- * rangées sous `nom de trace ou de fichier|instant du premier point`. Le nom a
- * pu changer depuis, l'instant non : c'est lui qui les retrouve.
- */
-export const findLegacyNotes = (
-  legacy: Record<string, unknown> | null,
-  startMs: number
-): StoredSessionNotes | null => {
-  if (!legacy) return null;
-  const suffix = `|${startMs}`;
-  for (const [key, value] of Object.entries(legacy)) {
-    if (!key.endsWith(suffix)) continue;
-    const notes = readNotes(value);
-    if (notes) return notes;
-  }
-  return null;
-};
-
-/**
  * Champs d'une fiche gardés dans le cache de la bibliothèque : ce que la liste
  * montre et ce que l'utilisateur saisit. Le reste (altitude du terrain, voies,
  * sauts, champs d'une version future) pèse lourd et ne sert qu'à l'analyse :

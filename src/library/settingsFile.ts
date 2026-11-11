@@ -16,10 +16,6 @@ import { ROOT_GOAL } from './rootGrowth';
  * reprend tout seul le plus récent. L'appareil reconnaît son fichier à son
  * identifiant, tiré au hasard, et non à son nom : deux téléphones nommés
  * « Téléphone » ne s'écrasent pas.
- *
- * Avant le point 90, un seul `reglages.json` à la racine, sans appareil
- * (version 1), et le plus récent l'emportait (`chooseSettings`) : cette règle
- * ne joue plus qu'une fois, au passage vers `reglages/`.
  */
 
 export const SETTINGS_FORMAT = 'tracker-reglages';
@@ -214,13 +210,10 @@ export const settingsActivityCount = (file: SettingsFile): number => {
 // --- Choix retenus ---
 
 /**
- * Choix retenus d'une fois sur l'autre, qui ne sont pas des réglages : le
- * support ou l'activité du module (`sport`, l'ancienne clé, et
- * `moduleActivity`), l'activité proposée à l'enregistrement, la dernière
- * séance lancée au compteur, du fractionné comme du Timer, et les dernières
- * bornes de la course à bornes.
+ * Choix retenus d'une fois sur l'autre, qui ne sont pas des réglages :
+ * l'activité de chaque module et celle proposée à l'enregistrement.
  */
-const REMEMBERED_CHOICES = ['sport', 'moduleActivity', 'recordActivity', 'lastIntervalWorkout', 'lastTimerWorkout', 'heartBands'];
+const REMEMBERED_CHOICES = ['moduleActivity', 'recordActivity'];
 
 /**
  * Empreinte des réglages qui voyagent, sans les choix retenus : ouvrir une
@@ -260,16 +253,4 @@ export const adoptedValues = (raw: Record<string, unknown>, mine: Record<string,
   const settings: Record<string, unknown> = Object.fromEntries(Object.entries(theirSport).filter(([key]) => !REMEMBERED_CHOICES.includes(key)));
   if (isObject(mySport)) for (const key of REMEMBERED_CHOICES) if (key in mySport) settings[key] = mySport[key];
   return { ...theirs, 'tracker.sportSettings': settings };
-};
-
-// --- Ancien `reglages.json` ---
-
-/** `folder` : reprendre le fichier ; `local` : l'écrire ; `same` : rien à faire. */
-export type SettingsChoice = 'folder' | 'local' | 'same';
-
-/** Règle d'avant le point 90, entre l'ancien `reglages.json` et l'appareil : le plus récent l'emporte. */
-export const chooseSettings = (localSavedAt: number | null, folder: SettingsFile | null): SettingsChoice => {
-  if (folder === null) return 'local';
-  if (localSavedAt === null || folder.savedAt > localSavedAt) return 'folder';
-  return folder.savedAt < localSavedAt ? 'local' : 'same';
 };

@@ -1,6 +1,6 @@
-import { SETTINGS_DIR, SETTINGS_FILE, settingsPath } from '../../library/folderLayout';
+import { SETTINGS_DIR, settingsPath } from '../../library/folderLayout';
 import {
-  TRAVELLING_KEYS, adoptedValues, buildSettingsFile, checkedValues, chooseSettings, cleanDeviceName, deviceFileName,
+  TRAVELLING_KEYS, adoptedValues, buildSettingsFile, cleanDeviceName, deviceFileName,
   freeDeviceName, importedSettingsFileName, newestSettingsEntry, ownSettingsEntry, parseSettingsFile,
   serializeSettingsFile, settingsEntryKey, settingsEntryName, settingsFileInfo, settingsSignature,
   sortedSettingsFiles, unseenSettingsEntries, type SettingsEntry, type SettingsFileInfo,
@@ -186,20 +186,6 @@ const flushSettings = async (): Promise<void> => {
   }
 };
 
-/**
- * Après la mise à jour des activités au démarrage (`upgradeStoredActivities`),
- * qui n'est pas un changement de l'utilisateur : le fichier de l'appareil est
- * récrit à la même date, et l'empreinte recalée, pour que le premier choix
- * retenu écrit ensuite ne date pas les réglages.
- */
-export const settingsUpgraded = async (): Promise<void> => {
-  await lib.opening;
-  lastSignature = settingsSignature(localTravellingValues());
-  await flushSettings();
-  // Pré-réglages changés par la mise à jour : un geste comme un autre, pris en compte après l'ouverture.
-  void queueOutdatedRefresh();
-};
-
 /** Fichiers de réglages déjà vus (`settingsEntryKey`) ; `null` avant le premier rapprochement qui les retient. */
 const readSeenSettings = (): Set<string> | null => {
   const raw = jsonStore.read<unknown>(SEEN_SETTINGS_KEY);
@@ -249,37 +235,28 @@ const applySettingsValues = (values: Record<string, unknown>): boolean => {
  * l'appareil : les pages déjà affichées ne les voient qu'après un
  * rechargement.
  * - Appareil neuf, sans réglage daté : il reprend le fichier le plus récent
- *   du dossier (l'ancien `reglages.json` à défaut), et le dit.
- * - Appareil sans fichier à lui, avec un ancien `reglages.json` : la règle
- *   d'avant le point 90 joue une dernière fois (le plus récent l'emporte).
+ *   du dossier, et le dit.
  * - Sinon, les réglages de l'appareil sont les siens, quoi que contiennent
  *   les autres fichiers.
- * L'appareil écrit ensuite son fichier s'il manque ou diffère, et l'ancien
- * `reglages.json` est retiré. Le fichier d'un autre appareil qu'il n'avait
- * jamais vu lui est proposé (`offerNewSettings`).
+ * L'appareil écrit ensuite son fichier s'il manque ou diffère. Le fichier
+ * d'un autre appareil qu'il n'avait jamais vu lui est proposé (`offerNewSettings`).
  */
 const syncSettings = async (f: MemoryFolder): Promise<boolean> => {
   const id = deviceId();
   await readSettingsEntries(f);
   const own = ownSettingsEntry(settingsEntries, id);
-  const legacy = parseSettingsFile(await f.readText(SETTINGS_FILE));
   let savedAt = readLocalSavedAt();
   let changed = false;
   let autoAdopted = false;
   // Stockage illisible au démarrage : l'appareil peut se croire neuf sans l'être, rien n'est repris de lui-même.
-  const startupFailed = storageStartupFailure() !== null;
-  if (savedAt === null && !startupFailed) {
+  if (savedAt === null && storageStartupFailure() === null) {
     const newest = own ?? newestSettingsEntry(settingsEntries);
-    const source = newest?.file ?? legacy;
-    if (source) {
+    if (newest) {
       autoAdopted = true;
-      changed = applySettingsValues(adoptedValues(source.values, localTravellingValues()));
-      savedAt = source.savedAt;
-      if (newest && newest !== own) setState({ message: `Réglages repris de « ${settingsEntryName(newest)} », le fichier le plus récent du dossier.` });
+      changed = applySettingsValues(adoptedValues(newest.file.values, localTravellingValues()));
+      savedAt = newest.file.savedAt;
+      if (newest !== own) setState({ message: `Réglages repris de « ${settingsEntryName(newest)} », le fichier le plus récent du dossier.` });
     }
-  } else if (!own && legacy && chooseSettings(savedAt, legacy) === 'folder') {
-    changed = applySettingsValues(checkedValues(legacy.values));
-    savedAt = legacy.savedAt;
   }
   if (savedAt === null) savedAt = Date.now();
   jsonStore.write(SETTINGS_SAVED_AT_KEY, savedAt);
@@ -288,7 +265,6 @@ const syncSettings = async (f: MemoryFolder): Promise<boolean> => {
     && settingsSignature(own.file.values) === lastSignature;
   if (upToDate) publishSettingsFiles();
   else await writeOwnSettings(f, savedAt);
-  if (legacy && !startupFailed && !f.readOnly) await f.remove(SETTINGS_FILE);
   offerNewSettings(autoAdopted);
   return changed;
 };

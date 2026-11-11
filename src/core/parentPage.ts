@@ -3,14 +3,14 @@ import type { SportType } from './types';
 
 const isFamily = (s: string): s is SportFamily => (SPORT_FAMILIES as string[]).includes(s);
 
-/** Page du test de FC repos, ouverte depuis le Profil (lot 301 ; sous l'Entraînement avant). */
+/** Page du test de FC repos, ouverte depuis le Profil. */
 export const RESTING_HR_PATH = '/profil/fc-repos';
 
 /**
  * Page au-dessus d'une adresse, où renvoie la touche retour d'Android (et le
  * geste du bord de l'écran) : l'analyse d'une session renvoie à la
  * bibliothèque de sa famille, comme le lien « ← » de son en-tête, et le test
- * de FC repos au Profil, où est son entrée depuis le lot 301 ; une
+ * de FC repos au Profil, où est son entrée ; une
  * leçon des tutoriels à leur liste, et celle-ci à Réglages ; les
  * Statistiques remontent d'un cran (activité, famille, vue d'ensemble), la
  * période gardée ; toute autre page renvoie à l'accueil. `null` à l'accueil :

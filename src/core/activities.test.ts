@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ACTIVITIES_VERSION, DEFAULT_ACTIVITIES, FAMILY_SHADES, SURF_ACTIVITY, SURF_FOIL_ACTIVITY, activitiesOfFamily,
+  DEFAULT_ACTIVITIES, FAMILY_SHADES, SURF_ACTIVITY, SURF_FOIL_ACTIVITY, activitiesOfFamily,
   activityCounts, activityFamily, activityTreatment, baseActivity, findActivity, insertActivity, isActivityShown, isFamilyHidden,
-  newActivityId, nextActivityColor, readActivities, recolorActivities, sessionActivity, upgradeActivities,
+  newActivityId, nextActivityColor, readActivities, sessionActivity,
   visibleActivities, visibleFamilies, withHidden, type Activity,
 } from './activities';
 import { SPORT_FAMILIES, usesMarkCourse } from './sportProfiles';
@@ -47,43 +47,9 @@ describe('readActivities', () => {
     expect(list.map((a) => a.id)).toEqual(['wingfoil', 'surf']);
   });
 
-  it("ignore une icône de l'application complète : elle redevient devinée", () => {
+  it('ignore une icône inconnue : elle redevient devinée', () => {
     const [kite] = readActivities([{ id: 'a-kite', name: 'Kite', base: 'kite', color: '#4458c2', icon: 'course' }]);
     expect(kite).toEqual({ id: 'a-kite', name: 'Kite', base: 'kite', color: '#4458c2' });
-  });
-});
-
-describe('upgradeActivities', () => {
-  it('la version reste à 9 : les graines à terre des versions 2, 3, 6, 8 et 9 ne reviennent jamais', () => {
-    expect(ACTIVITIES_VERSION).toBe(9);
-    // Une liste de la version 1 ne reçoit que le surf, et ses couleurs.
-    expect(upgradeActivities([voile], 1).map((a) => a.name)).toEqual(['Voile', ...surfs]);
-    for (const version of [5, 6, 7, 8]) expect(upgradeActivities([voile], version)).toEqual([voile]);
-    // Une activité à terre déjà là (relue plus tôt, puis écartée par `readActivities`) n'est jamais renommée.
-    const vieux: Activity = { id: 'a-velo', name: 'Vélo', base: 'wingfoil', color: '#014e86' };
-    expect(upgradeActivities([voile, vieux], 1).find((a) => a.id === 'a-velo')?.name).toBe('Vélo');
-  });
-
-  it('une liste de la version 4 reçoit le surf, dans ses nuances', () => {
-    const upgraded = upgradeActivities([voile], 4);
-    expect(upgraded.map((a) => a.name)).toEqual(['Voile', ...surfs]);
-    expect(upgraded.slice(1).map((a) => a.color)).toEqual([FAMILY_SHADES.surf[0], FAMILY_SHADES.surf[1]]);
-    // Un « Surf » déjà créé par l'utilisateur, sur ce calcul, n'est pas doublé.
-    const mine: Activity = { id: 'a-surf', name: 'surf', base: 'surf', color: FAMILY_SHADES.surf[2] };
-    expect(upgradeActivities([voile, mine], 4).map((a) => a.id)).toEqual(['wingfoil', 'a-surf', SURF_FOIL_ACTIVITY.id]);
-    // Supprimés ensuite, ils ne reviennent pas.
-    expect(upgradeActivities([voile], 5)).toEqual([voile]);
-  });
-
-  it('prend une couleur libre si la sienne est déjà portée', () => {
-    const grey: Activity = { ...paddle, color: SURF_ACTIVITY.color };
-    const surf = upgradeActivities([voile, grey], 4).find((a) => a.id === SURF_ACTIVITY.id)!;
-    expect(surf.color).not.toBe(SURF_ACTIVITY.color);
-  });
-
-  it('ne change plus rien une fois faite', () => {
-    const once = upgradeActivities([voile, moth], 1);
-    expect(upgradeActivities(once, 9)).toEqual(once);
   });
 });
 
@@ -175,39 +141,6 @@ describe('newActivityId et nextActivityColor', () => {
   });
 });
 
-describe('recolorActivities (version 4)', () => {
-  const old = (a: Activity, color: string): Activity => ({ ...a, color });
-
-  it('donne à une liste d\'avant les nuances de chaque famille, dans l\'ordre de la liste', () => {
-    const before = [old(voile, '#1565c0'), old(moth, '#2e7d32'), old(SURF_ACTIVITY, '#bf360c'), old(paddle, '#00695c')];
-    expect(recolorActivities(before).map((a) => a.color)).toEqual([
-      FAMILY_SHADES.voile[0], FAMILY_SHADES.voile[1], FAMILY_SHADES.surf[0], FAMILY_SHADES.surf[1],
-    ]);
-  });
-
-  it('garde une nuance déjà juste, et recolore un doublon ou la nuance d\'une autre famille', () => {
-    const kept = old(moth, FAMILY_SHADES.voile[0]);
-    const twin = old(voile, FAMILY_SHADES.voile[0]);
-    const foreign = old(paddle, FAMILY_SHADES.voile[2]);
-    expect(recolorActivities([twin, kept, foreign]).map((a) => a.color)).toEqual([
-      FAMILY_SHADES.voile[0], FAMILY_SHADES.voile[1], FAMILY_SHADES.surf[0],
-    ]);
-    // Une nuance juste plus bas dans la liste reste à son activité.
-    const later = old(moth, FAMILY_SHADES.voile[0]);
-    expect(recolorActivities([old(voile, '#123456'), later]).map((a) => a.color)).toEqual([FAMILY_SHADES.voile[1], FAMILY_SHADES.voile[0]]);
-  });
-
-  it('ne change rien à une liste déjà juste', () => {
-    expect(recolorActivities(DEFAULT_ACTIVITIES)).toEqual(DEFAULT_ACTIVITIES);
-  });
-
-  it('passe par upgradeActivities pour une liste de la version 3', () => {
-    expect(upgradeActivities([old(voile, '#1565c0'), old(paddle, '#bf360c')], 3).map((a) => a.color)).toEqual([
-      FAMILY_SHADES.voile[0], FAMILY_SHADES.surf[2], FAMILY_SHADES.surf[0], FAMILY_SHADES.surf[1],
-    ]);
-  });
-});
-
 describe('activityCounts', () => {
   it('compte dans l’ordre donné, puis dans l’ordre d’apparition, sans les activités absentes', () => {
     const kite = baseActivity('kite');
@@ -231,11 +164,6 @@ describe('familles et activités cachées (point 100)', () => {
     expect(withHidden(moth, true)).toEqual({ ...moth, hidden: true });
     expect(withHidden(withHidden(moth, true), false)).toEqual(moth);
     expect('hidden' in withHidden(withHidden(moth, true), false)).toBe(false);
-  });
-
-  it("une liste mise à jour garde l'activité cachée", () => {
-    const old = [voile, withHidden(paddle, true)];
-    expect(upgradeActivities(old, 4).find((a) => a.id === paddle.id)?.hidden).toBe(true);
   });
 
   it('une famille est cachée par Réglages, ou quand toutes ses activités le sont', () => {

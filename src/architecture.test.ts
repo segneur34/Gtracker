@@ -195,6 +195,13 @@ describe('couture de la version voile et surf : le transverse n’importe rien d
     const present = new Set(names);
     expect(SEAM.filter((name) => !present.has(name))).toEqual([]);
   });
+
+  it("App.tsx n'a plus de route de la course, du vélo ni du fractionné, et mène toute autre adresse à l'accueil", () => {
+    const app = withoutComments(fs.readFileSync(new URL('App.tsx', SRC), 'utf8'));
+    const paths = [...app.matchAll(/<Route\s[^>]*?path=["{]['"]?([^'"}]+)/g)].map((m) => m[1]);
+    expect(paths.filter((p) => /^\/(?:course|velo|fractionne)\b/.test(p))).toEqual([]);
+    expect(paths).toContain('*');
+  });
 });
 
 /**

@@ -7,7 +7,6 @@ import {
   adoptedValues,
   buildSettingsFile,
   checkedValues,
-  chooseSettings,
   cleanDeviceName,
   deviceFileName,
   freeDeviceName,
@@ -48,7 +47,7 @@ describe('parseSettingsFile', () => {
     expect(serializeSettingsFile(parseSettingsFile(old)!)).toBe(text);
   });
 
-  it("relit l'ancien reglages.json (version 1), sans appareil", () => {
+  it('relit un fichier de la version 1, sans appareil', () => {
     const old = JSON.stringify({ format: SETTINGS_FORMAT, version: 1, savedAt: 5, values });
     expect(parseSettingsFile(old)).toEqual({ format: SETTINGS_FORMAT, version: 1, savedAt: 5, device: null, values });
   });
@@ -67,6 +66,41 @@ describe('parseSettingsFile', () => {
     expect(parseSettingsFile(JSON.stringify({ format: 'autre', version: 1, savedAt: 1, values: {} }))).toBeNull();
     expect(parseSettingsFile(JSON.stringify({ format: SETTINGS_FORMAT, version: 1, values: {} }))).toBeNull();
   });
+
+  const file = (over: Record<string, unknown> = {}) => JSON.stringify({
+    format: SETTINGS_FORMAT, version: 2, savedAt: 1790000000000, device: { id: 'abc', name: 'Téléphone' }, values, ...over,
+  });
+
+  it('lit une version future comme une autre, et sa réécriture garde son numéro et ses clés', () => {
+    const read = parseSettingsFile(file({ version: 7, values: { 'tracker.sportSettings': {}, 'tracker.futur': { x: 1 } } }));
+    expect(read?.version).toBe(7);
+    const written = buildSettingsFile({ 'tracker.sportSettings': { ancien: true } }, 1, read, { id: 'abc', name: 'T' });
+    expect(written.version).toBe(7);
+    expect(written.values['tracker.futur']).toEqual({ x: 1 });
+  });
+
+  it('champs mal typés : savedAt en texte ou values en tableau, fichier ignoré ; appareil mal formé, null', () => {
+    expect(parseSettingsFile(file({ savedAt: '1790000000000' }))).toBeNull();
+    expect(parseSettingsFile(file({ values: [] }))).toBeNull();
+    expect(parseSettingsFile(file({ device: { id: 3, name: 'x' } }))?.device).toBeNull();
+  });
+
+  it("accepte sans contrôle une valeur de tracker.sportSettings d'une autre forme", () => {
+    expect(parseSettingsFile(file({ values: { 'tracker.sportSettings': 'texte' } }))?.values['tracker.sportSettings']).toBe('texte');
+  });
+
+  it('une clé __proto__ ne pollue rien et se réécrit telle quelle', () => {
+    const text = `{"format":"${SETTINGS_FORMAT}","version":2,"savedAt":1,"device":null,"values":{"__proto__":{"pollue":true},"tracker.sportSettings":{}}}`;
+    const read = parseSettingsFile(text)!;
+    expect(({} as Record<string, unknown>).pollue).toBeUndefined();
+    const again = parseSettingsFile(serializeSettingsFile(buildSettingsFile({}, 2, read, null)))!;
+    expect(Object.prototype.hasOwnProperty.call(again.values, '__proto__')).toBe(true);
+  });
+
+  it('lit un fichier précédé d’un BOM ou aux fins de ligne CRLF', () => {
+    expect(parseSettingsFile('﻿' + file())).not.toBeNull();
+    expect(parseSettingsFile(serializeSettingsFile(parseSettingsFile(file())!).replace(/\n/g, '\r\n'))).not.toBeNull();
+  });
 });
 
 describe('buildSettingsFile', () => {
@@ -75,25 +109,6 @@ describe('buildSettingsFile', () => {
     const file = buildSettingsFile(values, 2, previous);
     expect(file.values).toEqual({ 'tracker.futur': 1, ...values });
     expect(file.version).toBe(SETTINGS_VERSION + 1);
-  });
-});
-
-describe('chooseSettings', () => {
-  const folder = buildSettingsFile(values, 1000);
-
-  it('reprend le dossier sur un appareil sans réglage daté', () => {
-    expect(chooseSettings(null, folder)).toBe('folder');
-  });
-
-  it('retient le plus récent des deux', () => {
-    expect(chooseSettings(500, folder)).toBe('folder');
-    expect(chooseSettings(2000, folder)).toBe('local');
-    expect(chooseSettings(1000, folder)).toBe('same');
-  });
-
-  it('écrit les réglages de l\'appareil dans un dossier qui n\'en a pas', () => {
-    expect(chooseSettings(null, null)).toBe('local');
-    expect(chooseSettings(1000, null)).toBe('local');
   });
 });
 
@@ -106,19 +121,14 @@ describe('settingsSignature', () => {
   };
   const signature = settingsSignature({ 'tracker.sportSettings': settings, 'tracker.runnerProfile': { me: { weightKg: 70 } } });
 
-  it('ignore les choix retenus : activité du module, ancienne clé du support, activité à enregistrer, dernière séance du compteur', () => {
-    const reopened = {
-      ...settings, moduleActivity: { voile: 'kite', surf: 'a-surf-foil' }, recordActivity: 'a-surf-foil', sport: 'kite',
-      lastIntervalWorkout: { reps: 8, workS: 30, restS: 30 },
-    };
+  it('ignore les choix retenus : activité du module, activité à enregistrer', () => {
+    const reopened = { ...settings, moduleActivity: { voile: 'kite', surf: 'a-surf-foil' }, recordActivity: 'a-surf-foil' };
     expect(settingsSignature({ 'tracker.sportSettings': reopened, 'tracker.runnerProfile': { me: { weightKg: 70 } } })).toBe(signature);
   });
 
-  it('change avec un vrai réglage, de support, de coureur ou une séance gardée', () => {
+  it('change avec un vrai réglage, de support ou de pratiquant', () => {
     const changed = { ...settings, thresholds: { wingfoil: 10 } };
     expect(settingsSignature({ 'tracker.sportSettings': changed, 'tracker.runnerProfile': { me: { weightKg: 70 } } })).not.toBe(signature);
-    const preset = { ...settings, intervalPresets: [{ id: 's1', name: 'Pyramide', workout: { reps: 8, workS: 30, restS: 30 } }] };
-    expect(settingsSignature({ 'tracker.sportSettings': preset, 'tracker.runnerProfile': { me: { weightKg: 70 } } })).not.toBe(signature);
     expect(settingsSignature({ 'tracker.sportSettings': settings, 'tracker.runnerProfile': { me: { weightKg: 71 } } })).not.toBe(signature);
   });
 
@@ -230,21 +240,16 @@ describe('adoptedValues', () => {
   it("prend les réglages de l'autre appareil, mais garde les choix retenus de celui-ci", () => {
     const theirs = {
       'tracker.sportSettings': {
-        thresholds: { wingfoil: 12 }, recordActivity: 'a-trail', moduleActivity: { voile: 'a-kite' }, intervalPresets: [1], timerPresets: [2],
-        lastTimerWorkout: { reps: 9, workS: 20, restS: 10 },
+        thresholds: { wingfoil: 12 }, recordActivity: 'a-kite', moduleActivity: { voile: 'a-kite' }, gearLabels: { surf: ['Planche', 'Combi'] },
       },
       'tracker.runnerProfile': { me: { weightKg: 80 } },
     };
     const mine = {
-      'tracker.sportSettings': {
-        thresholds: { wingfoil: 9 }, recordActivity: 'wingfoil', lastIntervalWorkout: { reps: 4, workS: 60, restS: 60 },
-        lastTimerWorkout: { reps: 8, workS: 40, restS: 20 },
-      },
+      'tracker.sportSettings': { thresholds: { wingfoil: 9 }, recordActivity: 'wingfoil', moduleActivity: { surf: 'a-surf-foil' } },
     };
     expect(adoptedValues(theirs, mine)).toEqual({
       'tracker.sportSettings': {
-        thresholds: { wingfoil: 12 }, intervalPresets: [1], timerPresets: [2], recordActivity: 'wingfoil',
-        lastIntervalWorkout: { reps: 4, workS: 60, restS: 60 }, lastTimerWorkout: { reps: 8, workS: 40, restS: 20 },
+        thresholds: { wingfoil: 12 }, gearLabels: { surf: ['Planche', 'Combi'] }, moduleActivity: { surf: 'a-surf-foil' }, recordActivity: 'wingfoil',
       },
       'tracker.runnerProfile': { me: { ...EMPTY_RUNNER_PROFILE, weightKg: 80 } },
     });

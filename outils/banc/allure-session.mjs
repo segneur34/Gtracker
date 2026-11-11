@@ -1,7 +1,6 @@
 // Banc de l'allure imposée propre à chaque session (lot D de l'audit, 24/09/2026). Deux sessions
 // enregistrées par rejeu ; l'allure imposée à la première passe par le brouillon, s'écrit dans sa
-// fiche, recalcule son résumé, et ne touche pas la seconde. Une ancienne allure par support, posée
-// d'avance dans les réglages de l'appareil, doit être ignorée puis effacée à la première écriture.
+// fiche, recalcule son résumé, et ne touche pas la seconde.
 // Profil Chrome neuf. Usage : node allure-session.mjs <port> <GPX 1> <GPX 2>, chemins Windows ;
 // les deux GPX : make-gpx.mjs sans décalage, puis avec un décalage d'une heure.
 // Depuis le 28/10, le champ « Allure de la session » est dans l'onglet « réglages » de l'analyse voile
@@ -48,7 +47,6 @@ const fiche = async (file) => {
   const r = JSON.parse(await readOpfs(`sessions/${file.replace(/\.gpx$/, '.json')}`));
   return JSON.stringify({ sport: r.sport, analysis: r.analysis, movingTimeS: r.summary.movingTimeS === null ? null : Math.round(r.summary.movingTimeS), calcVersion: r.summary.calcVersion });
 };
-const sportSettings = () => evaluate(`localStorage.getItem('tracker.sportSettings')`);
 const step = (title) => console.log(`\n== ${title}`);
 
 /** Enregistre une session par rejeu à ×600, puis l'ouvre dans l'analyse ; rend son nom de fichier. */
@@ -73,12 +71,7 @@ const recordAndAnalyse = async (gpx) => {
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
-step('0. Ancienne allure par support posée dans les réglages de l\'appareil (1 m/s en wingfoil)');
-await go('/');
-await evaluate(`localStorage.setItem('tracker.sportSettings', JSON.stringify({ referenceSpeeds: { wingfoil: 1 } })); 'ok'`);
-console.log('réglages :', await sportSettings());
-
-step('1. Session 1 : allure déduite, l\'ancienne allure par support ignorée');
+step('1. Session 1 : allure déduite');
 const s1 = await recordAndAnalyse(gpx1);
 console.log('url :', s1.url);
 console.log('onglet réglages :', await openSettingsTab());
@@ -108,11 +101,6 @@ console.log('url :', s2.url);
 console.log('onglet réglages :', await openSettingsTab());
 console.log('allure :', await allure(), '| barre :', await bar());
 console.log('fiche :', await fiche(s2.file));
-
-step("6. L'ancienne allure par support est effacée des réglages de l'appareil (dès la première écriture, au lancement)");
-const finalSettings = await sportSettings();
-console.log('réglages :', finalSettings);
-console.log('referenceSpeeds absent (oui attendu) :', !/referenceSpeeds/.test(finalSettings ?? ''));
 
 step('Console');
 console.log('dialogues :', dialogs.length ? dialogs.join(' / ') : 'aucun');

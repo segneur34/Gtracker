@@ -16,7 +16,6 @@ import {
   carryRecordEdits,
   completeRecord,
   dedupeSessions,
-  findLegacyNotes,
   isSummaryStale,
   isWritableRecord,
   lightRecord,
@@ -469,22 +468,6 @@ describe('recordFileName', () => {
   it('remplace l\'extension du GPX, quelle que soit sa casse', () => {
     expect(recordFileName('2026-09-23_14-00-00_wingfoil.gpx')).toBe('2026-09-23_14-00-00_wingfoil.json');
     expect(recordFileName('Sortie.GPX')).toBe('Sortie.json');
-  });
-});
-
-describe('findLegacyNotes', () => {
-  it('retrouve les notes d\'avant le dossier par l\'instant du premier point, quel que soit le nom', () => {
-    const legacy = {
-      [`ancien-nom.gpx|${START_MS}`]: { foil: 'Axis', savedAt: 5 },
-      [`autre|${START_MS + 1000}`]: { foil: 'Autre' },
-    };
-    expect(findLegacyNotes(legacy, START_MS)?.foil).toBe('Axis');
-    expect(findLegacyNotes(legacy, START_MS + 2000)).toBeNull();
-    expect(findLegacyNotes(null, START_MS)).toBeNull();
-  });
-
-  it('ne confond pas un instant avec un autre qui finit par les mêmes chiffres', () => {
-    expect(findLegacyNotes({ [`x|1${START_MS}`]: { foil: 'Non' } }, START_MS)).toBeNull();
   });
 });
 

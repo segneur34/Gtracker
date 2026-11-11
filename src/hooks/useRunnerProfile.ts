@@ -79,11 +79,11 @@ export const useRunnerProfile = () => {
     [update]
   );
 
-  /** S1 et S2 saisis à la main, `null` pour revenir au calcul ; S2 sous S1 : ignorés. Les zones d'avant les seuils s'effacent. */
+  /** S1 et S2 saisis à la main, `null` pour revenir au calcul ; S2 sous S1 : ignorés. */
   const setThresholds = useCallback(
     (thresholds: number[] | null) => {
       if (thresholds !== null && !isValidThresholds(thresholds)) return;
-      update({ hrThresholds: thresholds === null ? null : thresholds.map(Math.round), hrZones: null });
+      update({ hrThresholds: thresholds === null ? null : thresholds.map(Math.round) });
     },
     [update]
   );

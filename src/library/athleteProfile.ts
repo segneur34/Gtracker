@@ -1,6 +1,6 @@
 import { finiteOr, inRange } from '../core/basics';
 import { isActivityIconId, type ActivityIconId } from '../core/activityIcons';
-import { heartRateZones, isValidThresholds, isValidZoneBounds, type HeartRateZones } from '../core/heartRate';
+import { heartRateZones, isValidThresholds, type HeartRateZones } from '../core/heartRate';
 import type { HeartRateProfile } from '../core/sportProfiles';
 
 /**
@@ -55,8 +55,6 @@ export interface RunnerProfile {
   hrRestSource: HrSource | null;
   /** Seuils S1 et S2 saisis à la main (test en laboratoire), à pied, en bpm ; `null` : calculés. */
   hrThresholds: number[] | null;
-  /** Bornes des zones saisies avant les seuils (avant le 25/10), relues seulement pour en tirer S1 et S2 ; effacées à la saisie des seuils. */
-  hrZones: number[] | null;
   /** Économie de course sur le plat, en ml d'O₂ par kg et par km (test en laboratoire). */
   economyMlKgKm: number | null;
   /** Racine du Profil (`library/rootGrowth.ts`) : objectif par semaine, en minutes ; `null` : `ROOT_GOAL.defaultMin`. */
@@ -75,13 +73,12 @@ export const EMPTY_RUNNER_PROFILE: RunnerProfile = {
   hrRest: null,
   hrRestSource: null,
   hrThresholds: null,
-  hrZones: null,
   economyMlKgKm: null,
   rootWeeklyGoalMin: null,
 };
 
 /** Plages plausibles de chaque champ numérique. */
-export type RunnerNumberField = Exclude<keyof RunnerProfile, 'name' | 'avatar' | 'sex' | 'hrZones' | 'hrThresholds' | 'hrMaxSource' | 'hrRestSource'>;
+export type RunnerNumberField = Exclude<keyof RunnerProfile, 'name' | 'avatar' | 'sex' | 'hrThresholds' | 'hrMaxSource' | 'hrRestSource'>;
 
 /** Longueur maximale du nom ou pseudo. */
 export const RUNNER_NAME_MAX = 40;
@@ -162,7 +159,6 @@ export const sanitizeRunnerProfile = (raw: unknown, rootGoal: { min: number; max
   };
   const numbers = (value: unknown): number[] | null => (Array.isArray(value) ? value.slice() as number[] : null);
   const thresholds = numbers(p.hrThresholds);
-  const zones = numbers(p.hrZones);
   const hrMax = bounded('hrMax');
   const hrRest = bounded('hrRest');
   const forSource = { hrMax, hrRest, hrMaxSource: p.hrMaxSource, hrRestSource: p.hrRestSource } as Partial<RunnerProfile>;
@@ -178,7 +174,6 @@ export const sanitizeRunnerProfile = (raw: unknown, rootGoal: { min: number; max
     hrRest,
     hrRestSource: runnerHrSource(forSource, 'hrRest'),
     hrThresholds: isValidThresholds(thresholds) ? thresholds : null,
-    hrZones: isValidZoneBounds(zones) ? zones : null,
     economyMlKgKm: bounded('economyMlKgKm'),
     rootWeeklyGoalMin: inRange(p.rootWeeklyGoalMin, rootGoal.min, rootGoal.max) ? p.rootWeeklyGoalMin : null,
   };
