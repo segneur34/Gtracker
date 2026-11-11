@@ -31,10 +31,6 @@ export const firstIndexAfter = (values: ArrayLike<number>, target: number): numb
 export const firstIndexAtOrAfterTime = (points: ArrayLike<{ timeMs: number }>, ms: number): number =>
   partitionPoint(points.length, (i) => points[i].timeMs < ms);
 
-/** Dernier point daté de `ms` ou avant, `-1` avant le premier. */
-export const lastIndexAtOrBeforeTime = (points: ArrayLike<{ timeMs: number }>, ms: number): number =>
-  partitionPoint(points.length, (i) => points[i].timeMs <= ms) - 1;
-
 /**
  * Segment `[lo, lo + 1]` qui encadre une valeur, `atOrBefore` étant vrai puis
  * faux le long de la suite : rend `lo`, dans `[0, length − 2]` (0 si la suite

@@ -1,13 +1,13 @@
 import { useState } from 'react';
 
 /** Choix fait sur la page pour une activité (case cochée ou décochée). */
-export interface PerActivityChoice<T = boolean> {
+export interface PerActivityChoice {
   activityId: string;
-  measure: T;
+  measure: boolean;
 }
 
 /** Valeur d'un choix : celui fait sur la page pour cette activité, sinon `fallback` (Réglages). */
-export const choiceFor = <T,>(choice: PerActivityChoice<T> | null, activityId: string | null, fallback: T): T =>
+export const choiceFor = (choice: PerActivityChoice | null, activityId: string | null, fallback: boolean): boolean =>
   choice !== null && activityId !== null && choice.activityId === activityId ? choice.measure : fallback;
 
 /**
@@ -16,9 +16,9 @@ export const choiceFor = <T,>(choice: PerActivityChoice<T> | null, activityId: s
  * (`fallback`), jusqu'à ce que l'utilisateur le change ; son choix ne suit pas
  * une autre activité choisie ensuite. Rend la valeur et de quoi la changer.
  */
-export const usePerActivityChoice = <T = boolean,>(activityId: string | null, fallback: T): [T, (measure: T) => void] => {
-  const [choice, setChoice] = useState<PerActivityChoice<T> | null>(null);
-  const set = (measure: T) => {
+export const usePerActivityChoice = (activityId: string | null, fallback: boolean): [boolean, (measure: boolean) => void] => {
+  const [choice, setChoice] = useState<PerActivityChoice | null>(null);
+  const set = (measure: boolean) => {
     if (activityId !== null) setChoice({ activityId, measure });
   };
   return [choiceFor(choice, activityId, fallback), set];

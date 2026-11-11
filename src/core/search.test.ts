@@ -5,7 +5,6 @@ import {
   firstIndexAfter,
   firstIndexAtOrAfter,
   firstIndexAtOrAfterTime,
-  lastIndexAtOrBeforeTime,
   nearestIndexAtTime,
   partitionPoint,
   valueAtTime,
@@ -40,11 +39,6 @@ describe('recherches dichotomiques', () => {
   it('cherche par l\'instant d\'une trace', () => {
     expect(firstIndexAtOrAfterTime(points, 3)).toBe(1);
     expect(firstIndexAtOrAfterTime(points, 10)).toBe(6);
-    expect(lastIndexAtOrBeforeTime(points, 0)).toBe(-1);
-    expect(lastIndexAtOrBeforeTime(points, 3)).toBe(3);
-    expect(lastIndexAtOrBeforeTime(points, 8)).toBe(4);
-    expect(lastIndexAtOrBeforeTime(points, 100)).toBe(5);
-    expect(lastIndexAtOrBeforeTime([], 1)).toBe(-1);
   });
 
   it('marche sur un tableau typé, comme les instants d\'un fichier de capteurs', () => {
