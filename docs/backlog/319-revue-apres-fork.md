@@ -75,6 +75,16 @@ Chacune a sa réponse par défaut ; les sections de lot donnent le détail. Seul
 15. **Planificateur (lot 304)** : la recherche d'adresse (Photon) reste-t-elle ? Les conditions d'usage des fonds de carte OSM et Esri sont à faire valider avant la vente (fiche 152).
 16. **Q102 du BACKLOG** change de sens : la décision 3 impose d'inclure `docs/DECISIONS.md` dès maintenant dans la remise à jour des documents. *Par défaut : inclus.*
 
+### Réponses de l'utilisateur (11/11/2026)
+
+**« Défaut partout », sauf trois points.** Les défauts des questions 2 à 12, 14 et 16 sont donc des décisions : porte par fichiers seulement ; session de course, de vélo ou d'entraînement refusée avec un message ; mesures des capteurs reprises ; itinéraires et réglages de Tracker coupés ; préfixe `gtracker` et identifiant `io.github.segneur.gtracker` jusqu'à la livraison ; clé de signature neuve ; dénivelé retiré sur l'eau ; le foil suit la nouvelle activité ; journal d'historique neuf, non livré ; archives d'`atelier\` sorties sans être supprimées ; mémoires de Claude réécrites et refus d'écriture passé dans les réglages personnels ; import FIT gardé ; `docs/DECISIONS.md` inclus dès maintenant (Q102). Q103 : `/clore` n'envoie plus, `/clore avec envoi` pour envoyer. Q104 : orchestrateur à `medium`, `high` s'il reste une question ou un lot du noyau.
+
+- **Question 1** : version d'essai jetable (voir plus haut).
+- **Q101 du BACKLOG (lot 316)** : le GPX **et** l'image se partagent tous les deux, ce sont deux partages distincts. « Partager la trace » envoie le GPX ; le partage en image existant reste.
+- **Question 13, réponse qui change le lot 326** : l'utilisateur veut « décompacter » les deux groupes pour avoir directement sur l'accueil les activités (wing, kite, paddle, pumping, surf…), avec toujours la possibilité de les cacher et d'en créer. C'est une idée de produit neuve, rangée en **332** (maquette d'abord, questions à lui poser : bibliothèque, barre, Réglages, calcul de « paddle » et de « pumping »). **Le lot 326 ne part pas avant que le 332 soit décidé** : la famille reste peut-être le rangement interne du calcul, mais plus celui de l'accueil.
+- **Question 15** (recherche de lieu dans Planifier) : pas comprise, réexpliquée le 11/11 ; à reposer avant le lot 304. Défaut de la section du 304 en attendant : on la garde, avec une phrase dans la politique de confidentialité.
+- **Question 9, première moitié** (l'activité « Bateau » est-elle sur le calcul bateau ?) : réponse lue dans les fichiers du téléphone le 11/11 (copie hors dépôt : `D:\gong tracker\atelier\session-bateau-1111\`). La session en cause est « Régate j24 » du 08/11 (`sessions\2026-11-08_11-28-30_wingfoil.json`) : `sport: "wingfoil"`, `activityId: "wingfoil"` (l'activité de départ « Voile »), `analysis.foil: true`. Il n'y a **aucune activité « Bateau »** sur ce téléphone (`reglages\telephone.json` ne porte que le profil) : la régate a été enregistrée sous « Voile », qui repose sur le calcul wingfoil, d'où « Temps en vol ». Le lot 315 (« Bateau » activité de départ) est donc le vrai remède ; le 314 (le foil suit l'activité quand on en change) reste nécessaire pour que cette session, une fois passée en « Bateau », perde son foil.
+
 ## Ce que la revue n'a pas fait
 
 - Ni banc, ni build, ni essai au téléphone : tout vient de la lecture du code et des tests.
