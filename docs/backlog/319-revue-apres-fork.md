@@ -27,7 +27,7 @@ Revue demandée par l'utilisateur le 11/11/2026, faite dans la nuit par une conv
   5. un banc dont le passage courant est cassé et dont le port par défaut est celui de l'ancien Tracker (lot 330) ;
   6. des documents qui décrivent encore l'ancienne application, alors que leurs deux contrôleurs automatiques sont verts (lots 318 et 331).
 - **Bogue 314, cause trouvée** : le foil et le pumping restent dans la fiche quand on change l'activité d'une session (`src/library/record.ts:1188-1207`). Voir le lot 314 + 315.
-- **Fenêtre à ne pas manquer** : aucune APK de Gtracker n'est installée. Tout renommage (clés, formats, identifiant, clé de signature) est gratuit aujourd'hui ; après l'installation d'une version que l'on garde, chacun devient une migration.
+- **Fenêtre à ne pas manquer** : la seule APK de Gtracker installée est la 0.00.05, version d'essai jetable (corrigé le 11/11 : la revue la croyait non installée). Tout renommage (clés, formats, identifiant, clé de signature) est gratuit aujourd'hui ; après l'installation d'une version que l'on garde, chacun devient une migration.
 - **Contre-vérification** : 184 suppressions contrôlées une à une, 130 confirmées, 41 nuancées, 13 infirmées (section « Suppressions écartées par la contre-vérification »).
 
 ## Ordre conseillé
@@ -58,7 +58,7 @@ Les rangs 3 à 7 se font **avant toute APK que l'on garde** (voir la première q
 
 Chacune a sa réponse par défaut ; les sections de lot donnent le détail. Seule la première est aussi dans `docs/BACKLOG.md` (Q105), la limite y étant de cinq questions.
 
-1. **Installer la 0.00.05 ?** Comme l'identifiant de l'application changera (lot 323), la 0.00.06 sera une application neuve. La 0.00.05 peut donc servir de version d'essai jetable pour valider les lots 301 à 305, à condition de la désinstaller et de supprimer son dossier `Documents/Gtracker` avant la 0.00.06 : rien de ce qu'elle enregistre ne sera repris. *Par défaut : version d'essai jetable.* L'autre choix : ne rien installer avant la fin des lots 320 à 323.
+1. **Installer la 0.00.05 ?** Comme l'identifiant de l'application changera (lot 323), la 0.00.06 sera une application neuve. La 0.00.05 peut donc servir de version d'essai jetable pour valider les lots 301 à 305, à condition de la désinstaller et de supprimer son dossier `Documents/Gtracker` avant la 0.00.06 : rien de ce qu'elle enregistre ne sera repris. *Par défaut : version d'essai jetable.* L'autre choix : ne rien installer avant la fin des lots 320 à 323. **Réponse (11/11) : version d'essai jetable.** Elle était en fait déjà sur le téléphone depuis le 08/11 à 22 h 06 (relevé adb du 11/11), et l'utilisateur y a fait ses essais le 11/11.
 2. **La porte d'import passe-t-elle par des fichiers seulement** (un GPX, un paquet de session, ou « Ajouter les sessions d'un dossier »), sans jamais ouvrir le dossier de Tracker comme mémoire ? *Par défaut : oui.*
 3. **Une session de course, de vélo ou d'entraînement qui se présente à l'import** : refusée avec un message, ou rangée « à classer » ? *Par défaut : refusée.*
 4. **Reprend-on les mesures des capteurs (sauts, pumping) d'une session de Tracker ?** *Par défaut : oui*, sans quoi une session de wing importée perd ses sauts.
