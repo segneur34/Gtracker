@@ -1,24 +1,20 @@
 /**
  * Durées des sons, en millisecondes : la seule écriture, pour le bip de
- * l'enregistreur (`platform/beeper.ts`) et des motifs (zone visée, FC repos). `TonePlayer.java` reprend les mêmes
- * valeurs (BRIEF_MS, SHORT_MS, LONG_MS, GPS_LOST_* et les vibrations) : les changer des deux côtés.
+ * l'enregistreur (`platform/beeper.ts`) et des motifs (FC repos, « Écouter » de Réglages). `TonePlayer.java` reprend les mêmes
+ * valeurs (SHORT_MS, LONG_MS, GPS_LOST_* et les vibrations) : les changer des deux côtés.
  */
 
-/** Bip bref des doubles et triples : plus court que le bip court, pour un « bip-bip » net. */
-const BEEP_BRIEF_MS = 65;
-/** Écart entre les débuts de deux bips brefs d'un même double ou triple. */
-export const BRIEF_SPACING_MS = 165;
 /** Bip d'approche et bip de validation d'une balise. */
 export const BEEP_SHORT_MS = 120;
 export const BEEP_LONG_MS = 800;
 /** Pause entre les trois bips de fin d'un parcours. */
 export const BEEP_FINISH_GAP_MS = 250;
 
-/** Sons du test de FC repos et de l'alerte de zone : bip bref, bip court, bip long. */
-export type ToneKind = 'bref' | 'court' | 'long';
+/** Sons des motifs (test de FC repos, « Écouter » de Réglages) : bip court, bip long. */
+export type ToneKind = 'court' | 'long';
 
 /** Durée de chaque son, en millisecondes. */
-export const TONE_MS: Record<ToneKind, number> = { bref: BEEP_BRIEF_MS, court: BEEP_SHORT_MS, long: BEEP_LONG_MS };
+export const TONE_MS: Record<ToneKind, number> = { court: BEEP_SHORT_MS, long: BEEP_LONG_MS };
 
 /**
  * « GPS perdu » (lot 115) : deux notes descendantes, la hauteur réglée puis

@@ -12,8 +12,8 @@ import android.os.Vibrator;
 import android.os.VibratorManager;
 
 /**
- * Sons et vibrations des bips (BeeperPlugin : balises, zone visée, test de FC
- * repos, « Écouter ») : un bip bref, un bip court et un bip long, chacun avec
+ * Sons et vibrations des bips (BeeperPlugin : balises, test de FC
+ * repos, « Écouter ») : un bip court et un bip long, chacun avec
  * sa vibration ; et les sons « GPS perdu » et « FC perdue »
  * de l'enregistrement (BeeperPlugin.watchGps, lot 115).
  *
@@ -28,24 +28,20 @@ import android.os.VibratorManager;
  */
 final class TonePlayer {
 
-    /** Genre d'un son d'un motif (`ToneKind` de src/core/beepDurations.ts) : court, long, bref. */
+    /** Genre d'un son d'un motif (`ToneKind` de src/core/beepDurations.ts) : court, long. */
     static final int TONE_SHORT = 0;
     static final int TONE_LONG = 1;
-    static final int TONE_BRIEF = 3;
 
-    /** Genre d'un son nommé par la couche web (« court », « long », « bref ») ; court à défaut. */
+    /** Genre d'un son nommé par la couche web (« court », « long ») ; court à défaut. */
     static int toneKind(String tone) {
         if ("long".equals(tone)) return TONE_LONG;
-        if ("bref".equals(tone)) return TONE_BRIEF;
         return TONE_SHORT;
     }
 
-    /** Durées, en millisecondes : bip bref, bip court, bip long (comme src/platform/beeper.ts). */
-    static final int BRIEF_MS = 65;
+    /** Durées, en millisecondes : bip court, bip long (comme src/platform/beeper.ts). */
     static final int SHORT_MS = 120;
     static final int LONG_MS = 800;
-    /** Vibrations, en millisecondes : avec un bip bref, avec un bip court, avec un bip long. */
-    static final int BRIEF_VIBRATION_MS = 40;
+    /** Vibrations, en millisecondes : avec un bip court, avec un bip long. */
     static final int SHORT_VIBRATION_MS = 80;
     static final int LONG_VIBRATION_MS = 600;
     /**
@@ -76,7 +72,6 @@ final class TonePlayer {
     private static volatile int pitchHz = -1;
 
     private final Context context;
-    private AudioTrack briefTone;
     private AudioTrack shortTone;
     private AudioTrack longTone;
     private AudioTrack gpsLostTone;
@@ -116,12 +111,6 @@ final class TonePlayer {
         builtHz = hz;
     }
 
-    void playBrief(boolean vibrate) {
-        ensurePitch();
-        if (briefTone == null) briefTone = buildTone(BRIEF_MS, builtHz);
-        play(briefTone, vibrate ? BRIEF_VIBRATION_MS : 0);
-    }
-
     void playShort(boolean vibrate) {
         ensurePitch();
         if (shortTone == null) shortTone = buildTone(SHORT_MS, builtHz);
@@ -151,12 +140,10 @@ final class TonePlayer {
     }
 
     void release() {
-        if (briefTone != null) briefTone.release();
         if (shortTone != null) shortTone.release();
         if (longTone != null) longTone.release();
         if (gpsLostTone != null) gpsLostTone.release();
         if (beltLostTone != null) beltLostTone.release();
-        briefTone = null;
         shortTone = null;
         longTone = null;
         gpsLostTone = null;

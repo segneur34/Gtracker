@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-/** Choix fait sur la page pour une activité (case cochée ou décochée, zone visée). */
+/** Choix fait sur la page pour une activité (case cochée ou décochée). */
 export interface PerActivityChoice<T = boolean> {
   activityId: string;
   measure: T;
@@ -12,7 +12,7 @@ export const choiceFor = <T,>(choice: PerActivityChoice<T> | null, activityId: s
 
 /**
  * Choix d'Enregistrer qui vaut pour cet enregistrement (sauts, pumping,
- * cadence, ceinture, zone visée) : celui de l'activité dans Réglages
+ * cadence, ceinture) : celui de l'activité dans Réglages
  * (`fallback`), jusqu'à ce que l'utilisateur le change ; son choix ne suit pas
  * une autre activité choisie ensuite. Rend la valeur et de quoi la changer.
  */

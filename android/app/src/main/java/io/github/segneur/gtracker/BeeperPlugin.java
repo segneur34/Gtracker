@@ -16,7 +16,7 @@ import org.json.JSONObject;
 /**
  * Bips et vibrations : le guidage vers les balises d'un parcours de voile
  * (src/recording/markGuide.ts, src/platform/beeper.ts), et les motifs joués une
- * fois (zone visée, test de FC repos, « Écouter » de Réglages).
+ * fois (test de FC repos, « Écouter » de Réglages).
  *
  * Le rythme des balises est tenu ici, sur un fil à lui : écran éteint, les
  * minuteries de la WebView sont bridées, pas celles d'Android, et le service
@@ -156,8 +156,8 @@ public class BeeperPlugin extends Plugin {
     }
 
     /**
-     * Un motif joué une fois, chaque son (court, long, final) à son délai en
-     * millisecondes : « Écouter » de Réglages, zone visée, test de FC repos. Il
+     * Un motif joué une fois, chaque son (court, long) à son délai en
+     * millisecondes : « Écouter » de Réglages, test de FC repos. Il
      * ne touche pas au rythme des balises.
      */
     @PluginMethod
@@ -177,7 +177,6 @@ public class BeeperPlugin extends Plugin {
                 int kind = kinds[i];
                 h.postDelayed(() -> {
                     if (kind == TonePlayer.TONE_LONG) tones().playLong(vibrateRequested);
-                    else if (kind == TonePlayer.TONE_BRIEF) tones().playBrief(vibrateRequested);
                     else tones().playShort(vibrateRequested);
                 }, delays[i]);
             }

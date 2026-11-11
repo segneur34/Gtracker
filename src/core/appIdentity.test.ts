@@ -46,7 +46,6 @@ describe('noms techniques de l\'application', () => {
       followedTrace: 'gtracker.followedTrace',
       fondCarte: 'gtracker.fondCarte',
       brouterProfile: 'gtracker.brouterProfile',
-      zoneAlertTarget: 'gtracker.zoneAlertTarget',
       restingHr: 'gtracker.restingHr',
       planning: 'gtracker.planning',
       routeList: 'gtracker.routeList',

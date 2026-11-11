@@ -9,7 +9,6 @@ import './components/AppShell.css';
 import { confirmLeave, installLeaveGuard } from './hooks/leaveGuard';
 import { startLiveRecording } from './hooks/useLiveRecording';
 import { startMarkGuide } from './hooks/useMarkGuide';
-import { startZoneAlertGuide } from './hooks/useZoneAlert';
 import { startRecordingNotification } from './hooks/recordingNotification';
 import { isRecordingActive, recoverInterruptedRecording, subscribeToRecorder } from './hooks/useRecorder';
 import { openLibrary, startIncomingFiles, startLibraryUi } from './hooks/useSessionLibrary';
@@ -56,8 +55,6 @@ void initStorage()
     const recovered = recoverInterruptedRecording();
     // Bips d'approche des balises, pendant un enregistrement de voile qui suit un parcours.
     startMarkGuide();
-    // Bips de sortie de la zone cardiaque visée, pendant un enregistrement avec la ceinture.
-    startZoneAlertGuide();
     // Une fois l'enregistrement tranché : l'écran allumé d'une session close est rendu.
     const afterRecovery = () => {
       if (!isRecordingActive()) clearStaleScreenOn();

@@ -4,7 +4,6 @@ import { Fragment, useCallback, useEffect, useMemo, useState, useSyncExternalSto
 import { Link, useSearchParams } from 'react-router-dom';
 import ActivitySelect from '../components/ActivitySelect';
 import BeltStatus from '../components/BeltStatus';
-import { zoneLabel } from '../components/heartRateColors';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import HoldButton from '../components/ui/HoldButton';
@@ -25,7 +24,6 @@ import {
 import { formatClock, formatDistance, formatShortDistance, formatSpeed, formatDecimal } from '../core/units';
 import LiveMap from '../components/LiveMap';
 import { clearFollowedTrace, useFollowedTrace } from '../hooks/useFollowedTrace';
-import { armZoneAlert, useZoneAlert } from '../hooks/useZoneAlert';
 import { useTransientValue } from '../hooks/useTransientValue';
 import { liveStatsOptionsFor, useLiveRecording } from '../hooks/useLiveRecording';
 import { useBeltLive } from '../hooks/useBeltLive';
@@ -69,7 +67,6 @@ import { buzz } from '../platform/beeper';
 import { isNativeApp } from '../platform/runtime';
 import { canLockOrientation, isOrientationLocked, keepScreenOn, lockOrientation, subscribeOrientationLock } from '../platform/screen';
 import { fixesFromRawPoints, recordingDurationMs, isAutoPause, isManualPause } from '../recording/session';
-import { ZONE_TARGETS, type ZoneTarget } from '../recording/zoneAlert';
 import './RecordingPage.css';
 
 /**
@@ -107,15 +104,15 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
 );
 
 /** Fréquence cardiaque du direct : tuile allongée sur une ligne, plus grosse que les autres. Seulement avec une ceinture ;
- *  hors mesure, l'état de la ceinture tient la place du chiffre. Avec des bips de zone, la zone visée suit le libellé. */
-const BpmTile = ({ belt, target }: { belt: { state: BeltState; bpm: number | null }; target: ZoneTarget }) => {
+ *  hors mesure, l'état de la ceinture tient la place du chiffre. */
+const BpmTile = ({ belt }: { belt: { state: BeltState; bpm: number | null } }) => {
   const measured = belt.state === 'connected' && belt.bpm !== null;
   const text = measured
     ? String(Math.round(belt.bpm as number))
     : belt.state === 'connected' ? 'connectée, sans contact avec la peau' : BELT_STATE_LABEL[belt.state];
   return (
     <div className="rec-bpm">
-      <span className="rec-bpm__label">{target > 0 ? `BPM · visée ${zoneLabel(target)}` : 'BPM'}</span>
+      <span className="rec-bpm__label">BPM</span>
       <span className={measured ? 'num rec-bpm__value' : 'rec-bpm__state'}>{text}</span>
     </div>
   );
@@ -436,7 +433,6 @@ function RecordingFigures({ summaryShown, clockShown, liveActivity, followed, co
   followedLengthM: number;
 }) {
   const heartRate = useRecorderSelector((s) => s.heartRate);
-  const zoneAlert = useZoneAlert();
   // Horloge : la durée tourne en pause automatique ; l'heure, si la carte réduite l'affiche, bat chaque seconde.
   const { nowMs, durationMs } = useRecordingClock(clockShown);
   // Calculé hors de la page, repris par la notification de l'enregistrement.
@@ -462,7 +458,7 @@ function RecordingFigures({ summaryShown, clockShown, liveActivity, followed, co
       )}
 
       <Card heading="En cours">
-        {heartRate && <BpmTile belt={heartRate} target={zoneAlert.active ? zoneAlert.target : 0} />}
+        {heartRate && <BpmTile belt={heartRate} />}
         {heartRate && (heartRate.state === 'searching' || heartRate.state === 'lost') && liveActivity && (
           // Ceinture perdue ou jamais trouvée (lot 198) : on peut renoncer à elle, l'enregistrement continue sans cardio.
           <div className="rec-belt-stop">
@@ -657,11 +653,6 @@ function RecordingScreen() {
   // Matériel choisi qui n'a pas pu être écrit dans la fiche de la session rangée.
   const [gearNotWritten, setGearNotWritten] = useState(false);
   const canStart = !busy && pending === null && chosen !== null && (sourceChoice === 'device' || replay !== null);
-  // Zone visée : bips de sortie de zone, proposés avec la ceinture connectée et les zones de Pratiquant ; « aucune » à chaque
-  // ouverture de la page.
-  const zoneBounds = chosen ? readHeartRateZoneBounds(chosen) : null;
-  const [zonePicked, setZonePicked] = usePerActivityChoice<ZoneTarget>(chosenActivityId, 0);
-  const zoneOffered = measureHeartRate && beltLive.state === 'connected' && native && sourceChoice === 'device' && zoneBounds !== null;
   const liveActivity = recordedActivity ?? chosen;
   const mapReduced = busy && !shown.carte;
   // Téléphone tourné : les grands chiffres à gauche de la carte, sans avoir à la réduire.
@@ -726,7 +717,6 @@ function RecordingScreen() {
   const handleStart = () => {
     if (!chosen) return;
     rememberRecordActivity(chosen.id);
-    armZoneAlert(zoneOffered ? zonePicked : 0);
     const source = sourceChoice === 'replay' && replay
       ? createReplaySource(replay.fixes, replaySpeed)
       : deviceLocationSource();
@@ -809,15 +799,6 @@ function RecordingScreen() {
                 <ChoiceOption key={b.address} label={retainedLabels[i]} selected={b.address === retainedBelt?.address} onClick={() => pickBelt(b)} />
               ))}
             </ChoiceSheet>
-          )}
-
-          {chosen && zoneOffered && (
-            // Bips de sortie de zone : deux bips trop haut, trois trop bas, un au retour.
-            <div className="ui-stack-1 rec-indent">
-              <span className="ui-muted ui-text-s">Zone visée</span>
-              <SegmentedControl label="Zone visée" value={String(zonePicked)} onChange={(key) => setZonePicked(Number(key) as ZoneTarget)}
-                items={ZONE_TARGETS.map((zone) => ({ key: String(zone), label: zone === 0 ? 'aucune' : zoneLabel(zone) }))} />
-            </div>
           )}
 
           {chosen && pumpingOffered && native && (

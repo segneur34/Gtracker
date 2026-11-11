@@ -25,7 +25,7 @@ export const CLES = Object.freeze({
   partage: cle('partage'), libraryCache: cle('libraryCache'), settingsSavedAt: cle('settingsSavedAt'), deviceId: cle('deviceId'),
   deviceName: cle('deviceName'), seenSettingsFiles: cle('seenSettingsFiles'), summaryGestures: cle('summaryGestures'),
   followedTrace: cle('followedTrace'), fondCarte: cle('fondCarte'), brouterProfile: cle('brouterProfile'),
-  zoneAlertTarget: cle('zoneAlertTarget'), restingHr: cle('restingHr'), planning: cle('planning'), routeList: cle('routeList'),
+  restingHr: cle('restingHr'), planning: cle('planning'), routeList: cle('routeList'),
   triBibliotheque: cle('triBibliotheque'), heartRateBelts: cle('heartRateBelts'), memoryFolder: cle('memoryFolder'),
   permissionsSeenVersion: cle('permissionsSeenVersion'), tileCache: cle('tileCache'), tileUrls: cle('tileUrls'),
 });

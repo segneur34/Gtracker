@@ -3,7 +3,6 @@ import { baseActivity } from '../core/activities';
 import type { LocationFix, LocationSource, StopLocation } from '../platform/location';
 import { parseJournal } from '../recording/journal';
 import { EMPTY_RECORDING_STATS, addFixAfterManualPause, addFixToStats, displayedDurationMs, type RecordingStats } from '../recording/session';
-import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Reprise d'un enregistrement après une chute du moteur de la page (lot 156). Une chute est simulée par des modules
@@ -809,39 +808,6 @@ describe('« Continuer l\'enregistrement », application tuée puis rouverte', (
     await fresh.continuePendingSession(next);
     expect(next.starts).toBe(0);
     expect(fresh.getRecorderState().pending).not.toBeNull();
-  });
-});
-
-describe('zone visée', () => {
-  it('reprise après une chute ; un départ ordinaire ne relit jamais une zone restée', async () => {
-    const zone = await import('./useZoneAlert');
-    zone.startZoneAlertGuide();
-    zone.armZoneAlert(3);
-    const live = fakeSource();
-    await recorder.startRecording(activity, live);
-    run(live.emit, 0, 5, 1);
-    await settle();
-    // La zone visée est gardée sur l'appareil pendant l'enregistrement.
-    const stored = async () => (await import('../platform/storage')).jsonStore.read<unknown>(STORAGE_KEYS.zoneAlertTarget);
-    expect(await stored()).toBe(3);
-
-    services.gps = true;
-    const fresh = await reload();
-    const freshZone = await import('./useZoneAlert');
-    freshZone.startZoneAlertGuide();
-    // Reprise : la zone relue est armée de nouveau (sinon la reprise effacerait la clé).
-    await fresh.recoverInterruptedRecording();
-    expect(await stored()).toBe(3);
-
-    // Tuée pendant la session, rouverte, puis nouvelle sortie sans zone : la zone restée est effacée, pas de bip surprise.
-    services.gps = false;
-    journal.text = null;
-    const again = await reload();
-    const againZone = await import('./useZoneAlert');
-    againZone.startZoneAlertGuide();
-    await again.startRecording(activity, fakeSource());
-    expect(await stored()).toBeNull();
-    await again.stopRecording();
   });
 });
 

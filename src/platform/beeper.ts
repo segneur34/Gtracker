@@ -8,7 +8,7 @@ import { isNativeApp } from './runtime';
 /**
  * Bips et vibrations : seul accès au son et au vibreur (règle 12). Quatre
  * usages : le guidage vers les balises (`getBeeper`), un motif joué une fois
- * (`playPattern` : zone visée, test de FC repos, « Écouter » de Réglages), le
+ * (`playPattern` : test de FC repos, « Écouter » de Réglages), le
  * retour du bouton « Note » (`buzz`) et la veille du GPS et de la ceinture de
  * l'enregistrement (`armGpsWatch`, lot 115). La hauteur de tous les sons se
  * règle d'un coup (`setBeepPitch`, 24/10).

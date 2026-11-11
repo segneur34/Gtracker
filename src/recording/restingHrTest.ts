@@ -120,7 +120,7 @@ export const restingRemainingS = (state: RestingHrState, nowMs: number): number 
 
 // --- Sons ---
 
-/** Départ : un court. Fin : un long. Les mêmes sons que l'alerte de zone (`signalTones.ts`). */
+/** Départ : un court. Fin : un long. Les sons du guidage (`signalTones.ts`). */
 export const RESTING_SIGNAL_TONES: Record<RestingSignal, PatternTone[]> = {
   debut: GUIDE_SIGNAL_TONES.debut,
   fin: GUIDE_SIGNAL_TONES.finGuide,

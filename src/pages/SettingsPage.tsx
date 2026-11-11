@@ -753,7 +753,7 @@ function SettingsPage() {
               value={stopHoldMs / 1000}
               onCommit={(v) => setStopHoldMs(v === null ? null : Math.round(v * 1000))} />
             <SettingRow label="Son des bips" helpKey="son-bips"
-              help="Pour tous les bips : balises, zone visée, FC repos. Un haut-parleur de téléphone porte le mieux vers l'aigu ; plus grave, le bip s'entend moins fort. « Écouter » joue le signal d'un changement de phase.">
+              help="Pour tous les bips : balises, FC repos. Un haut-parleur de téléphone porte le mieux vers l'aigu ; plus grave, le bip s'entend moins fort. « Écouter » joue le signal d'un changement de phase.">
               <div className="settings-inline">
                 <SegmentedControl label="Son des bips" items={BEEP_SOUNDS.map((s) => ({ key: s.key, label: s.label }))} value={beepSound}
                   onChange={(next) => { setBeepSound(next); void setBeepPitch(beepSoundHz(next)).then(() => playPattern(LISTEN_PATTERN, false)); }} />
