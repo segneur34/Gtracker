@@ -13,9 +13,12 @@ Brief d'origine : `docs/backlog/319-revue-apres-fork.md`, section « Lot 331 · 
 - `src/` cite 77 fois un ancien point (26 numéros). Le journal n'étant pas livré, le lot 307 remplace chaque renvoi par la raison en clair (elle se lit dans la copie figée) ; son test refuse « lot N », « Qnn » et « point N ».
 - `docs/ETAT_DU_PROJET.md` (≈ 217 renvois) et `docs/INVENTAIRE.md` (≈ 206) gardent leurs renvois aux anciens points jusqu'à la livraison (lot 308), où ils sont refaits.
 
-## Reste dans ETAT et INVENTAIRE
+## Relecture d'ETAT et d'INVENTAIRE (faite le 11/11 au soir)
 
-- ETAT : le §12 (notification, HyperOS) cite encore « Tracker » seul vers la ligne 410 ; les parties planification des §4 et §6 n'ont pas été revérifiées après le lot 304 ; le mot « cadence » n'a pas été passé au crible ; la limite « Distance » (point 300, mesurée sur des courses) a été retirée sans être réécrite pour la voile : à reposer si on veut la garder.
-- INVENTAIRE : les lignes 14, 57, 195, 264 et 268 sortent encore à la recherche de contrôle (peut-être des faux amis) ; l'entrée de `PlanningPage.tsx` (vers la ligne 254) n'a pas été relue.
-- Les lignes qui dépendent des lots 322 à 324 (clés, marqueur, agent envoyé aux serveurs de cartes, alias de signature) : à vérifier contre le code d'aujourd'hui.
-- Second temps prévu par le brief : après les lots 326 et 339 (lignes « famille et traitement » de CLAUDE.md et d'ETAT).
+- Corrigé : plus de « Tracker » seul (notification du §12), cadence de pas retirée partout où elle n'est plus lue ni écrite, planification remise d'accord avec le lot 304 (entrée de `PlanningPage.tsx`, fiches d'itinéraire en version 4), noms `gtrackerBack` et `<gtracker:itineraire>`, chemin du poste retiré, deux clés de stockage ajoutées au tableau du §6 ; clés, marqueur, alias et identifiant vérifiés contre le code.
+- Laissé, faux amis : « cadence » du GPS et du pumping, « course » au sens du parcours de balises ou du cap, `landWords.test.ts`, `segneur` dans l'identifiant.
+- Non relu : les très longues lignes des §4 et §6 d'ETAT hors recherches ciblées ; la limite « Distance » n'est pas reposée.
+
+## Reste
+
+- Second temps prévu par le brief, après les lots 326 et 339 : lignes « famille et traitement » de CLAUDE.md et d'ETAT.
