@@ -10,7 +10,7 @@ import { LESSONS } from '../tutorials/lessons';
 import '../components/Tutorials.css';
 
 /**
- * Une leçon des tutoriels (`/tutoriels/:id`, lot 147) : titre, quelques
+ * Une leçon des tutoriels (`/tutoriels/:id`) : titre, quelques
  * paragraphes, « Essayer » vers la page dont elle parle, la précédente et la
  * suivante du programme. L'ouvrir la marque lue. Son adresse s'ouvre toujours,
  * même d'une famille cachée ; le retour mène à la liste (`/tutoriels`), d'où

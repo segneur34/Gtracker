@@ -224,7 +224,7 @@ describe('prepareWindPolar', () => {
     for (let b = 0; b < 360; b += 2) symmetric.push({ bearing: b, speed: 12 });
     for (const points of [buildPoints(realisticPolar(0)), buildPoints(realisticPolar(137)), buildPoints(symmetric), []]) {
       for (const minSpeedKn of [2, 5]) {
-        // La vitesse d'entrée des virages fait partie de l'étage (Q53) : par défaut, celle de la détection des manœuvres.
+        // La vitesse d'entrée des virages fait partie de l'étage : par défaut, celle de la détection des manœuvres.
         for (const minEntrySpeedKn of [undefined, 2, 4]) {
           const stage = prepareWindPolar(points, minSpeedKn, minEntrySpeedKn);
           expect(stage.points).toBe(points);
@@ -280,10 +280,10 @@ describe('observeTurns', () => {
     expect(turns.filter((t) => t.slow)).toHaveLength(0);
   });
 
-  it('lit l\'entrée comme la détection des manœuvres : plus de 4 nœuds, strictement (Q53, 04/11)', () => {
-    // Jusqu'au 04/11, l'orientation exigeait la vitesse plancher de la
-    // polaire, 5 nœuds, atteinte ou dépassée : un virage entré à 4,5 nœuds
-    // était compté par les manœuvres et ignoré par le vent. Même seuil, même
+  it('lit l\'entrée comme la détection des manœuvres : plus de 4 nœuds, strictement', () => {
+    // Si l'orientation exigeait la vitesse plancher de la polaire (5 nœuds,
+    // atteinte ou dépassée), un virage entré à 4,5 nœuds serait compté par les
+    // manœuvres et ignoré par le vent. Même seuil, même
     // comparaison des deux côtés : à 4 nœuds justes, aucun des deux ne le voit.
     const turnAt = (entryKn: number): { bearing: number; speed: number }[] => {
       const samples: { bearing: number; speed: number }[] = [];
@@ -298,7 +298,7 @@ describe('observeTurns', () => {
   });
 });
 
-describe('turnsDirectionOf et WindPolarStage.turnsDirection (lot 149, C1-2)', () => {
+describe('turnsDirectionOf et WindPolarStage.turnsDirection', () => {
   /** Deux virements 45° ↔ 315° dont le point le plus lent est face au nord, entre deux bords tenus. */
   const tacking = (): PointData[] => {
     const samples: { bearing: number; speed: number }[] = [];

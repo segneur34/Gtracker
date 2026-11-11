@@ -74,7 +74,7 @@ import './RecordingPage.css';
  * Enregistrement d'une session : support, démarrer, arrêter, et ce qu'il faut
  * pour juger en direct que l'enregistrement tient (points, durée, plus long
  * trou, précision). À l'arrêt, la session se range seule dans la mémoire et
- * son analyse s'ouvre (`FinishRecording`, `App.tsx`, lot 313) ; on la jette
+ * son analyse s'ouvre (`FinishRecording`, `App.tsx`) ; on la jette
  * depuis l'analyse. La carte de la session en attente ne reste que comme
  * filet : rangement en échec (« Analyser » réessaie, « Jeter » l'abandonne),
  * ou session reprise après une coupure qui peut encore continuer. La carte
@@ -465,7 +465,7 @@ function RecordingFigures({ summaryShown, clockShown, liveActivity, followed, co
       <Card heading="En cours">
         {heartRate && <BpmTile belt={heartRate} />}
         {heartRate && (heartRate.state === 'searching' || heartRate.state === 'lost') && liveActivity && (
-          // Ceinture perdue ou jamais trouvée (lot 198) : on peut renoncer à elle, l'enregistrement continue sans cardio.
+          // Ceinture perdue ou jamais trouvée : on peut renoncer à elle, l'enregistrement continue sans cardio.
           <div className="rec-belt-stop">
             <span className="ui-muted">Sans elle, l'enregistrement continue, sans cardio.</span>
             <Button size="s" onClick={() => {
@@ -568,7 +568,7 @@ function RecordingScreen() {
 
   // Famille puis activité : celle demandée par l'adresse (`?activite=`), sinon celle de la trace suivie, sinon la dernière
   // enregistrée.
-  // Seules les visibles sont proposées : une activité cachée dans Réglages n'est pas reprise (§10, point 100).
+  // Seules les visibles sont proposées : une activité cachée dans Réglages n'est pas reprise.
   const [params] = useSearchParams();
   const { activities, families, isShown } = useVisibility();
   const shownActivities = useMemo(() => activities.filter(isShown), [activities, isShown]);
@@ -598,7 +598,7 @@ function RecordingScreen() {
     changeRecordingActivity(activity);
     pickActivity(activity);
   };
-  // Sauts : proposés seulement si l'activité les mesure (case de Réglages, 05/11), cochés d'office alors, sur le
+  // Sauts : proposés seulement si l'activité les mesure (case de Réglages), cochés d'office alors, sur le
   // téléphone seulement ; la case vaut pour cet enregistrement.
   const activityJumps = chosen ? effectiveJumpSettings(chosen) : null;
   const jumpSettings = activityJumps?.enabled === true ? activityJumps : null;
@@ -609,14 +609,14 @@ function RecordingScreen() {
   const pumpingOffered = chosen !== null && effectiveFoil(chosen) === true && effectivePumping(chosen) === true;
   const [pumpPicked, setPumpPicked] = usePerActivityChoice(chosenActivityId, true);
   const measurePumping = pumpingOffered && pumpPicked;
-  // Virages du surf (lot 40) : proposés par l'activité (case « Mesurer les virages » de Réglages), cochés d'office ; la case vaut
+  // Virages du surf : proposés par l'activité (case « Mesurer les virages » de Réglages), cochés d'office ; la case vaut
   // pour cet enregistrement. Avec le pumping, une seule capture.
   const turnsOffered = chosen !== null && effectiveTurns(chosen) === true;
   const [turnsPicked, setTurnsPicked] = usePerActivityChoice(chosenActivityId, true);
   const measureTurns = turnsOffered && turnsPicked;
   // Ceinture cardio : proposée par l'activité, cochée d'office si Réglages le dit ; la case vaut pour cet enregistrement.
   const heartRateSetting = chosen ? effectiveHeartRate(chosen) : null;
-  // Appareil actif, changé d'un geste par « Changer » s'il y en a plusieurs de retenus (lot 198) ; jamais une fois parti.
+  // Appareil actif, changé d'un geste par « Changer » s'il y en a plusieurs de retenus ; jamais une fois parti.
   const [retainedBelt, setRetainedBelt] = useState<HeartRateBelt | null>(savedBelt);
   const retainedBelts = useMemo(() => savedBelts(), []);
   const [choosingBelt, setChoosingBelt] = useState(false);
@@ -660,7 +660,7 @@ function RecordingScreen() {
     else markRecorderResultOpened();
     openSession(file, sportFamily(sport));
   };
-  // Matériel choisi à la fin de la session, vide d'office : remis à zéro pour chaque session en attente (lot 143, 131).
+  // Matériel choisi à la fin de la session, vide d'office : remis à zéro pour chaque session en attente.
   const [endGear, setEndGear] = useState<GearChoice[] | null>(null);
   const [endGearOf, setEndGearOf] = useState(pending);
   if (endGearOf !== pending) {
@@ -802,7 +802,7 @@ function RecordingScreen() {
                     {beltWarmup.error && (
                       <Button size="s" onClick={beltWarmup.retry}>Réessayer</Button>
                     )}
-                    {/* Ceinture encore cherchée (lot 198) : on peut y renoncer, comme en décochant la case. */}
+                    {/* Ceinture encore cherchée : on peut y renoncer, comme en décochant la case. */}
                     {(beltLive.state === 'connecting' || beltLive.state === 'searching' || beltLive.state === 'lost') && (
                       <Button size="s" onClick={() => setHeartRatePicked(false)}>Annuler la recherche</Button>
                     )}

@@ -325,7 +325,7 @@ interface ActivityCardProps {
 }
 
 /**
- * Carte d'une activité dans Réglages (lot 72) : sortie de la page et
+ * Carte d'une activité dans Réglages : sortie de la page et
  * mémoïsée, pour qu'une frappe (nom du pratiquant, champ d'une autre activité)
  * ne redessine plus toutes les cartes ouvertes. Ses réglages se comparent par
  * leur texte : relus à chaque écriture, ils sont un objet neuf même inchangés.
@@ -396,7 +396,7 @@ const ActivityCard = memo(function ActivityCard({
     <div className={`settings-activity${shownHidden ? ' settings-activity--hidden' : ''}`}>
       <div className="settings-activity__head">
         {/* Le nom fait partie du bouton qui déplie et replie, ouvert comme fermé : seul « Renommer » (menu « … ») le met
-            dans un champ, pour ne pas le changer par mégarde en voulant replier la carte (demande du 20/10). */}
+            dans un champ, pour ne pas le changer par mégarde en voulant replier la carte. */}
         <button type="button" className="settings-activity__toggle" aria-expanded={isOpen}
           onClick={() => {
             toggleActivity(id);
@@ -634,7 +634,7 @@ function SettingsPage() {
   };
   /**
    * Activités rangées par famille (Voile, Surf), chacune dans l'ordre de
-   * la liste, les cachées en bas de leur famille (§10, point 100).
+   * la liste, les cachées en bas de leur famille.
    */
   const familyOrdered = SPORT_FAMILIES.flatMap((f) => {
     const own = activitiesOfFamily(activities, f);
@@ -867,7 +867,7 @@ function CollapseAllButton({ onCollapse }: { onCollapse: () => void }) {
 }
 
 /** Titre d'un bloc de la page, avec son « ? » une fois le bloc ouvert, et l'aide dépliée dessous. */
-/** Bloc « Tutoriels » (lot 147) : le compte des leçons lues et le lien vers toutes les leçons. */
+/** Bloc « Tutoriels » : le compte des leçons lues et le lien vers toutes les leçons. */
 function TutorialsSettings() {
   const { state, lessons } = useTutorials();
   const readCount = lessons.filter((l) => state.read.includes(l.id)).length;
@@ -986,7 +986,7 @@ function FamilyHeading({ family, hidden, disabled, open, names, onOpen, onToggle
 }
 
 /**
- * Œil qui cache ou ré-affiche une famille ou une activité (§10, point 100). Fermé (désactivé) sur la
+ * Œil qui cache ou ré-affiche une famille ou une activité. Fermé (désactivé) sur la
  * dernière visible : il en reste toujours une.
  */
 function EyeButton({ name, hidden, disabled, onToggle }: { name: string; hidden: boolean; disabled: boolean; onToggle: () => void }) {

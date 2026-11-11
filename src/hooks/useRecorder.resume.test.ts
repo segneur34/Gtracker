@@ -5,7 +5,7 @@ import { parseJournal } from '../recording/journal';
 import { EMPTY_RECORDING_STATS, addFixAfterManualPause, addFixToStats, displayedDurationMs, type RecordingStats } from '../recording/session';
 
 /**
- * Reprise d'un enregistrement après une chute du moteur de la page (lot 156). Une chute est simulée par des modules
+ * Reprise d'un enregistrement après une chute du moteur de la page. Une chute est simulée par des modules
  * neufs (`reload`) : la mémoire de la page est perdue, le journal et les services du téléphone restent.
  */
 
@@ -799,7 +799,7 @@ describe('« Continuer l\'enregistrement », application tuée puis rouverte', (
     expect(fresh.getRecorderState().pending?.motion?.path).toBe(path);
   });
 
-  it('rangement seul à la réouverture (lot 313) : la session reprise trop vieille pour continuer est rangée, la fraîche attend', async () => {
+  it('rangement seul à la réouverture : la session reprise trop vieille pour continuer est rangée, la fraîche attend', async () => {
     await killedAt20(1);
     vi.setSystemTime(T0 + 60_000);
     let fresh = await reload();

@@ -19,7 +19,7 @@ export interface AnalysisSessionInput {
   /**
    * Fichier du brouillon : `shown` (défaut), la session affichée ; `requested`,
    * la session demandée par l'adresse dès que sa trace est lue, même sortie
-   * de la mémoire depuis (la voile, comme avant le lot 62).
+   * de la mémoire depuis (la voile).
    */
   draftFor?: 'shown' | 'requested';
   /** Trace remise au module encore en préparation (`useGpxSession`, `reading`) : la lecture continue. */

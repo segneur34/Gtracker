@@ -21,11 +21,11 @@ import { jsonStore } from '../platform/storage';
 import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
- * Tous les itinéraires planifiés (point 68), ouverts depuis la carte de
+ * Tous les itinéraires planifiés, ouverts depuis la carte de
  * l'accueil, qui n'en montre que les derniers : tri au choix, retenu sur
  * l'appareil (`gtracker.routeList`), et onglets par activité. Chaque ligne
  * ouvre l'itinéraire, ou part dessus (« Partir »). Ceux d'une activité
- * cachée dans Réglages n'y sont pas (§10, point 100).
+ * cachée dans Réglages n'y sont pas.
  *
  * Lot 194 : « Partager » envoie le GPX d'un itinéraire, sa fiche en extension,
  * vers une autre application ; « Importer un itinéraire » range celui d'un GPX

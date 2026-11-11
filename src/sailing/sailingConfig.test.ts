@@ -83,12 +83,12 @@ describe('suggestSpeedRangeMs', () => {
   });
 });
 
-describe('seuils de la détection des manœuvres (28/10)', () => {
-  it('un seul garde-fou de cohérence, pour les manœuvres comme pour l\'orientation du vent (Q53, 04/11)', () => {
+describe('seuils de la détection des manœuvres', () => {
+  it('un seul garde-fou de cohérence, pour les manœuvres comme pour l\'orientation du vent', () => {
     expect(MANEUVER_MIN_COHERENCE).toBe(0.5);
   });
 
-  it('une manœuvre n\'est ratée que si la vitesse reste sous le seuil au moins 2 s (04/11)', () => {
+  it('une manœuvre n\'est ratée que si la vitesse reste sous le seuil au moins 2 s', () => {
     expect(MANEUVER_LOST_FLIGHT_S).toBe(2);
   });
 
@@ -102,7 +102,7 @@ describe('seuils de la détection des manœuvres (28/10)', () => {
   });
 });
 
-describe('seuils de la session de voile : quatre priorités (lot 72)', () => {
+describe('seuils de la session de voile : quatre priorités', () => {
   const wing = SPORT_PROFILES.wingfoil;
   const fast = 20;
   const slow = 5;

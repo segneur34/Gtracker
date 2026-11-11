@@ -6,7 +6,7 @@ import { sailingActivityThresholds } from './useSailingSession';
 
 /**
  * Le calcul pur de `useSailingSession` qui reste au hook : le seuil de
- * l'appareil et celui de l'activité que la fiche porte (Q57), avant
+ * l'appareil et celui de l'activité que la fiche porte, avant
  * `resolveSailingThresholds`. Le reste de la chaîne est testé hors React,
  * dans `sailing/sailingSession.test.ts`.
  */

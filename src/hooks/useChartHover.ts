@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { createListeners } from './createStore';
 
 /**
- * Point de trace survolé sur un graphe, hors de l'état des modules (27/10) :
+ * Point de trace survolé sur un graphe, hors de l'état des modules :
  * le survol ne redessine que ce qui le lit, le repère de la carte
  * (`HoveredTrackMarker`) et les lectures au-dessus des graphes
  * (`HoverReadout`), et non toute la page d'analyse, ses panneaux, ses graphes

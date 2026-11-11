@@ -77,7 +77,7 @@ import { createListeners } from './createStore';
  * un `<trkseg>` par segment continu (`splitIntoSegments`), et la session
  * passe en attente (`pending`), puis se range seule dans la bibliothèque
  * (`finishPendingSession`, appelé par l'application, qui ouvre ensuite son
- * analyse, lot 313) ; on la jette depuis l'analyse. Si le rangement échoue,
+ * analyse) ; on la jette depuis l'analyse. Si le rangement échoue,
  * elle reste en attente : « Analyser » réessaie, « Jeter » l'abandonne. Tant
  * qu'elle attend, le journal est gardé : après un arrêt brutal ou une
  * fermeture, la session est reconstruite depuis lui au démarrage suivant, et
@@ -85,21 +85,21 @@ import { createListeners } from './createStore';
  * session jetée.
  *
  * Deux pauses : manuelle (rien n'est gardé, la source GPS reste allumée pour
- * la carte du direct, reprise explicite, lot 104) et automatique (immobilité
+ * la carte du direct, reprise explicite) et automatique (immobilité
  * prolongée, détectée par `evaluateAutoPause` — la source reste active pour
  * détecter la reprise du mouvement). Les deux ouvrent un nouveau segment à la
  * reprise.
  *
- * Veille du GPS (lot 115) : passé `gpsLostDelayS` sans position, hors pause
+ * Veille du GPS : passé `gpsLostDelayS` sans position, hors pause
  * manuelle, le GPS est dit perdu (`gpsLost`, alerte `GPS_LOST_ERROR`, son et
  * notification), une fois par perte ; tout s'efface à la position suivante.
  * La machine est `recording/gpsWatch.ts`, le minuteur natif (`armGpsWatch`).
  *
- * Veille de la ceinture (lot 177) : la même machine, passé `beltLostDelayS` sans
+ * Veille de la ceinture : la même machine, passé `beltLostDelayS` sans
  * mesure lisible d'une ceinture qui en donnait, hors pause manuelle (`beltLost`,
  * alerte `BELT_LOST_ERROR`, son et notification), une fois par perte.
  *
- * Reprise (lot 156, `recording/resume.ts`) : si le moteur de la page tombe, seule la page repart (`MainActivity.java`).
+ * Reprise : si le moteur de la page tombe, seule la page repart (`MainActivity.java`).
  * Le service GPS encore vivant, la session reprend seule (`resumeSilently`) : mémoire refaite depuis le journal, jamais
  * d'en-tête de plus, service jamais relancé, un segment neuf à la position suivante. Application tuée et rouverte peu
  * après : « Continuer l'enregistrement » dans la carte de la session en attente (`continuePendingSession`).
@@ -184,9 +184,9 @@ export interface RecorderState {
    */
   resultOpened: boolean;
   error: string | null;
-  /** GPS perdu : plus de position depuis le délai du profil (lot 115) ; effacé à la position suivante. */
+  /** GPS perdu : plus de position depuis le délai du profil ; effacé à la position suivante. */
   gpsLost: boolean;
-  /** FC perdue : plus de mesure lisible d'une ceinture qui en donnait (lot 177) ; effacé à la mesure suivante. */
+  /** FC perdue : plus de mesure lisible d'une ceinture qui en donnait ; effacé à la mesure suivante. */
   beltLost: boolean;
   /**
    * Vrai pendant le `starting` d'une session relue du journal, positions déjà en mémoire : les guidages se rejouent
@@ -275,7 +275,7 @@ let belowSinceMs: number | null = null;
 /** Une pause vient de se terminer : le prochain point gardé ouvre un nouveau segment. */
 let pendingBreak = false;
 /**
- * Le saut vient d'une pause manuelle (lot 158) : la part de l'écart passée en pause automatique avant
+ * Le saut vient d'une pause manuelle : la part de l'écart passée en pause automatique avant
  * l'appui sur Pause (qui reste comptée), `null` sinon. Le premier point gardé retranche le reste de la durée.
  */
 let manualBreakAutoPartMs: number | null = null;
@@ -313,7 +313,7 @@ const onSourceError = (message: string): void => {
   setState({ error: message });
 };
 
-/** Alerte de la page Enregistrer quand le GPS se tait (lot 115). */
+/** Alerte de la page Enregistrer quand le GPS se tait. */
 export const GPS_LOST_ERROR = "GPS perdu : plus aucune position. L'enregistrement continue, la trace reprendra au retour du GPS.";
 /** Échec de la pause de la capture des capteurs. */
 const SENSORS_PAUSE_ERROR = 'Capteurs : pause impossible, la mesure continue pendant la pause';
@@ -413,7 +413,7 @@ const stopBeltWatch = (): void => {
   beltWatch = START_GPS_WATCH;
 };
 
-/** Au départ : des notifications refusées sont dites une fois, dans l'alerte de la page (lot 115). */
+/** Au départ : des notifications refusées sont dites une fois, dans l'alerte de la page. */
 const warnIfNotificationsOff = async (): Promise<void> => {
   const permissions = await readPermissions().catch(() => null);
   const refused = permissions?.notifications === 'denied' || permissions?.notifications === 'prompt';
@@ -558,7 +558,7 @@ const MOTION_UNREADABLE_MESSAGE = 'Les mesures des capteurs de cette session n\'
  * la capture. Rend la session rangée, ou `null` si l'écriture du GPX échoue :
  * la session reste alors en attente, journal compris. Le GPX écrit, la session
  * est rangée même si le ménage qui suit échoue (journal ou capture restés sur
- * l'appareil) : c'est dit, sans la remettre en attente (lot 329). Une capture
+ * l'appareil) : c'est dit, sans la remettre en attente. Une capture
  * absente : la session est rangée sans elle. Une capture qui existe mais ne se
  * lit pas : la session reste en attente, rien n'est effacé (`motionUnreadable`).
  * `withoutMotion` (« Analyser sans les capteurs », après cet échec) : la
@@ -579,7 +579,7 @@ const rangePendingSession = async (pending: PendingSession, withoutMotion: boole
   }
   let stored: { file: string | null; location: string };
   try {
-    // Le foil de l'activité au moment du rangement, qui suit l'arrêt (lot 313) : celui de la sortie, sauf pour une
+    // Le foil de l'activité au moment du rangement, qui suit l'arrêt : celui de la sortie, sauf pour une
     // session reprise d'un journal après une coupure, rangée à la réouverture avec le réglage de ce moment.
     const foil = pending.activity ? effectiveFoil(pending.activity) : null;
     stored = await saveRecordedSession(pending.content, pending.sport, pending.activity?.id ?? null, motion, pending.marks, foil);
@@ -620,7 +620,7 @@ const startRanging = (withoutMotion: boolean, kept: string | null): Promise<Save
 
 /**
  * « Analyser » de la carte de la session en attente : lance son rangement (`rangePendingSession`). Il appartient au
- * module, pas à la page, qu'on peut quitter et rouvrir pendant le calcul (lot 161) : un second appel pendant qu'il
+ * module, pas à la page, qu'on peut quitter et rouvrir pendant le calcul : un second appel pendant qu'il
  * tourne rend la même promesse, sans en lancer un autre, même avec un autre `withoutMotion`. `analyzing` retombe à
  * sa fin, réussie ou non. Rangée, la session n'a plus de message, hors ménage en échec.
  */
@@ -638,7 +638,7 @@ export const finishingPendingSession = (s: RecorderState): boolean =>
   s.analyzing || (s.pending !== null && !s.pending.canContinue && finishTried !== s.pending);
 
 /**
- * Fin d'un enregistrement (lot 313) : range seule la session en attente, sans attendre « Analyser », une seule fois
+ * Fin d'un enregistrement : range seule la session en attente, sans attendre « Analyser », une seule fois
  * par session ; en échec, elle reste en attente avec son message, et la carte de la page Enregistrer sert de filet
  * (« Analyser » pour réessayer, « Jeter »). Rien pendant un rangement déjà lancé, ni pour une session reprise après
  * une coupure qui peut encore continuer (`canContinue` : la carte garde « Continuer l'enregistrement »). Les
@@ -653,7 +653,7 @@ export const finishPendingSession = (): Promise<SavedSession | null> => {
 
 /**
  * « Jeter » de la carte de la session en attente : l'abandonne et efface son journal et sa capture ; sans effet
- * pendant son rangement. Un effacement en échec garde la session en attente, et le dit (lot 329).
+ * pendant son rangement. Un effacement en échec garde la session en attente, et le dit.
  */
 export const discardPendingSession = async (): Promise<void> => {
   const pending = state.pending;
@@ -987,7 +987,7 @@ const releaseRecordingBelt = (): void => {
 };
 
 /**
- * « Arrêter de chercher » (lot 198), ceinture perdue ou jamais trouvée en route : l'enregistrement la rend et continue
+ * « Arrêter de chercher », ceinture perdue ou jamais trouvée en route : l'enregistrement la rend et continue
  * sans cardio, tuile BPM et alerte de FC perdue retirées. Plus rien ne la recherche jusqu'à la fin de la sortie : le
  * greffon n'est plus demandé (fin de sa reprise seule), la pause ne la reprend pas, et une reprise après une chute de
  * la page la trouve lâchée (`adoptBelt` rend `null`). Seul « Continuer l'enregistrement », après une application
@@ -1142,7 +1142,7 @@ export const continuePendingSession = exclusive(async (source: LocationSource | 
 
 /**
  * Pause manuelle : plus rien n'est gardé ni compté, durée figée. Le GPS reste
- * allumé (lot 104, décision du 31/10) : la carte du direct suit le coureur
+ * allumé : la carte du direct suit le coureur
  * qui continue d'avancer, et la reprise ne relance rien (pas de première
  * position périmée). Depuis une pause automatique, la reprise devient manuelle.
  */
@@ -1365,7 +1365,7 @@ const subscribeToLivePosition = (listener: () => void): (() => void) => {
 };
 
 /**
- * Position de la carte du direct, pour la carte seule (point 210) : redessine à chaque position gardée, et en pause
+ * Position de la carte du direct, pour la carte seule : redessine à chaque position gardée, et en pause
  * manuelle à chaque position reçue ; `null` au repos.
  */
 export const useLivePosition = (): LocationFix | null => useSyncExternalStore(subscribeToLivePosition, getLivePosition);

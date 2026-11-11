@@ -16,7 +16,7 @@ const NAMESPACE = STORAGE_KEYS.tutoriels;
 const KEY = 'etat';
 
 /**
- * Tutoriels (lot 147) : l'état de l'appareil (jours d'ouverture, leçons lues,
+ * Tutoriels : l'état de l'appareil (jours d'ouverture, leçons lues,
  * carte du jour fermée) et les leçons montrées, celles des familles cachées
  * retirées. Une écriture qui ne change rien n'est pas faite.
  */

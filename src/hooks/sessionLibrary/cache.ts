@@ -7,7 +7,7 @@ import { recordTimers, writing } from './recordWrites';
 import { STORAGE_KEYS } from '../../core/appIdentity';
 
 /**
- * Cache des fiches, gardé sur l'appareil hors du dossier (lot 113) : lu au balayage, mis à jour un instant après
+ * Cache des fiches, gardé sur l'appareil hors du dossier : lu au balayage, mis à jour un instant après
  * un import ou une suppression, refait en entier à la fin d'un balayage (`library/libraryCache.ts`).
  */
 

@@ -80,7 +80,7 @@ const SAILING_GEAR_FIELDS_FOIL: GearField[] = [
 
 /**
  * Onglets du module, tous sous la carte, dans l'ordre
- * voulu par l'utilisateur. Le premier, « général », porte les chiffres globaux
+ * voulu. Le premier, « général », porte les chiffres globaux
  * et le vent : seul ouvert par défaut, il se replie pour comparer tableaux et
  * carte. Les réglages de la session sont dans le dernier. Leur liste est `SAILING_TABS`
  * (`core/analysisTabs.ts`), où chaque activité choisit dans Réglages ceux qu'elle montre. Pour en ajouter un :
@@ -110,7 +110,7 @@ function SailingModule() {
   }, []);
   // Session de la mémoire désignée par l'URL : son activité devient celle du module. Son brouillon (vent saisi,
   // seuil d'activité, allure imposée, couleurs et notes, écrits dans sa fiche par « Enregistrer la session »)
-  // reste rattaché à la session demandée, comme avant le lot 62. Toutes les activités sont proposées pour une
+  // reste rattaché à la session demandée. Toutes les activités sont proposées pour une
   // session de la mémoire, celles de la voile seules sinon ; vers une activité de surf, la session part
   // dans le module surf (`useChangeSessionActivity`).
   const {
@@ -186,7 +186,7 @@ function SailingModule() {
   // Les manœuvres de sens incertain comptent dans le total, pas dans la réussite des virements et empannages.
   const undecided = maneuverStats?.undecided ?? null;
   // Pas pendant un brouillon : la liste doit refléter l'état enregistré ; ni avant que les
-  // manœuvres n'aient rejoint le seuil (Q40), qui les classe.
+  // manœuvres n'aient rejoint le seuil, qui les classe.
   const loadedFromMemory = sessionFile !== null && fileName === sessionFile && trackData.length > 0;
   const { dirty } = draft;
   useEffect(() => {
@@ -208,7 +208,7 @@ function SailingModule() {
     if (loc.takeoff) notes.push('au décollage');
     return notes;
   }, [foil]);
-  /** Pumping de la session (brouillon, puis fiche), sinon celui de l'activité ; sur foil seulement (lot 22). */
+  /** Pumping de la session (brouillon, puis fiche), sinon celui de l'activité ; sur foil seulement. */
   const pumping = foil && profile.pump !== null && (edits.pumping ?? activityPumping);
   /** FC de la session (ceinture, montre) et zones du pratiquant : l'onglet « cardio » et sa courbe dans « graphiques ». */
   const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(track, profile.heartRate, effectiveHrOffset(activity));
@@ -225,7 +225,7 @@ function SailingModule() {
 
   /**
    * Graphes de l'onglet « graphiques » dépliés, chacun replié à part par son
-   * titre pour ne comparer que ceux qui restent ouverts (16/10). Replié, un
+   * titre pour ne comparer que ceux qui restent ouverts. Replié, un
    * graphe se réduit à son titre ; sa taille mémorisée l'attend.
    */
   const graphFolds = useOpenSections('sailing-graphes', SAILING_GRAPH_FOLDS_DEFAULT);
@@ -251,7 +251,7 @@ function SailingModule() {
   const {
     byFlight: flightPumping, summary: pumpSummary, podium: podiumFlights, series: pumpSeriesList, seriesPodium,
   } = useFlightPumping(pumpSensors.recording, pumpDetection, track, cumulative, flights, jumps.allJumps);
-  /** Part du vol pompée (capteurs du `.imu`), sur foil avec le pumping mesuré : image de partage et résumé de la fiche (lot 145). */
+  /** Part du vol pompée (capteurs du `.imu`), sur foil avec le pumping mesuré : image de partage et résumé de la fiche. */
   const sharedPumpingShare = foil && pumpSummary ? pumpSummary.pumpShare : null;
   // Part du vol pompée et vent retenu recopiés dans le résumé, pour le partage d'une session dont l'analyse n'est pas
   // ouverte ; mêmes conditions que les manœuvres (fiche de ce fichier, pas de brouillon, seuil rejoint).
@@ -285,9 +285,9 @@ function SailingModule() {
   const [showJibesOnMap, setShowJibesOnMap] = useState<boolean>(false);
   const [showUndecidedOnMap, setShowUndecidedOnMap] = useState<boolean>(false);
   const [showManeuverDetails, setShowManeuverDetails] = useState<boolean>(false);
-  /** Liste de toutes les manœuvres d'un type, sous « Détails » : repliée d'office, non mémorisée (05/11). */
+  /** Liste de toutes les manœuvres d'un type, sous « Détails » : repliée d'office, non mémorisée. */
   const [allManeuversOpen, setAllManeuversOpen] = useState<Record<'tack' | 'jibe', boolean>>({ tack: false, jibe: false });
-  /** Genre montré dans le tableau par amure (note 135) : virements ou empannages. */
+  /** Genre montré dans le tableau par amure : virements ou empannages. */
   const [tackTableType, setTackTableType] = useState<'tack' | 'jibe'>('tack');
   /** Vues et cases de la carte de l'onglet « manœuvres », tenues ici : la carte les lit, et l'onglet rouvert les retrouve. */
   const maneuversView: ManeuversView = {
@@ -306,7 +306,7 @@ function SailingModule() {
   const [windAdjust, setWindAdjust] = useState(false);
   const [mapExpanded, setMapExpanded] = useState(false);
 
-  /** Vent saisi loin du vent calculé fiable, qui écarte les manœuvres (C1-3) : une phrase sous le tableau. */
+  /** Vent saisi loin du vent calculé fiable, qui écarte les manœuvres : une phrase sous le tableau. */
   const windWarning = useMemo(
     () => windInputWarning({ manualDeg: edits.windDeg === null ? null : normalizeDeg(edits.windDeg), autoWind: windEstimate, stats: maneuverStats }),
     [edits.windDeg, windEstimate, maneuverStats]
@@ -352,7 +352,7 @@ function SailingModule() {
       { key: 'activeAverage', label: `Moyenne active (≥${showThreshold(activeThresholdKn)} ${speedSymbol})`, value: formatSpeed(stats.activeAvgSpeedMs, speedUnit) },
     ] : []),
     ...heartRateStat,
-    // Lignes ajoutées le 05/11 (lot 145), les mêmes que celles du résumé d'une fiche (`summaryShareStats`).
+    // Lignes ajoutées au partage, les mêmes que celles du résumé d'une fiche (`summaryShareStats`).
     ...shareExtraStats('voile', {
       maneuvers: maneuverStats
         ? { success: maneuverStats.tackSuccess + maneuverStats.jibeSuccess, total: maneuverStats.tackSuccess + maneuverStats.tackFail + maneuverStats.jibeSuccess + maneuverStats.jibeFail }
@@ -371,7 +371,7 @@ function SailingModule() {
   };
   const topValue = (top: TopSegment | undefined): string => (top && top.val !== '-' ? `${showKn(top.val)} ${speedSymbol}` : '—');
   /**
-   * Chiffres de l'onglet « général » (22/10) : l'essentiel de la session, le détail restant dans
+   * Chiffres de l'onglet « général » : l'essentiel de la session, le détail restant dans
    * « avancé ». Sur foil, la distance, le ratio et la moyenne sont ceux du vol ; sans seuil (bateau),
    * toute la session compte. L'image de partage garde la liste entière (`generalStats`).
    */
@@ -389,7 +389,7 @@ function SailingModule() {
       movingTimeStat,
       { key: 'averageSpeed', label: 'Vitesse moyenne', value: formatSpeed(stats.avgSpeedMs, speedUnit) },
     ]),
-    // Top 2 s en face de la moyenne ; le top 100 m reste dans « avancé › tops » (31/10).
+    // Top 2 s en face de la moyenne ; le top 100 m reste dans « avancé › tops ».
     { key: 'top2s', label: 'Top 2 s', value: topValue(stats.tops.t2s[0]) },
     { key: 'tacks', label: 'Virements réussis', value: maneuverRate(maneuverSummary.tack) },
     { key: 'jibes', label: 'Empannages réussis', value: maneuverRate(maneuverSummary.jibe) },
@@ -513,7 +513,7 @@ function SailingModule() {
 
   /**
    * Onglet ouvert sans rien à montrer : sans vent, les manœuvres, la VMG et le vent ne se calculent pas ;
-   * l'onglet le dit, avec de quoi ouvrir « général » où on le saisit (demande du 19/10).
+   * l'onglet le dit, avec de quoi ouvrir « général » où on le saisit.
    */
   const renderEmptyPanel = (key: 'manoeuvres' | 'vmg' | 'vent', label: string, what: string, otherwise: string) => (
     <EmptyTabPanel id={`sailing.carte.${key}.vide`} label={label} open={open[key]} onToggle={toggleOf(key)}
@@ -606,7 +606,7 @@ function SailingModule() {
               <ResizablePanel id="sailing.general" style={PANEL_BLOCK_STYLE}>
                 <PanelHeading label="Général" extra={<SessionDate track={trackData} />} open={open.general} onToggle={toggleOf('general')} />
                 <GeneralStats stats={overviewStats} pairs={[['tacks', 'jibes']]} />
-                {/* Mini-boussole du vent ; « Régler » ouvre la grande sur la carte (22/10). */}
+                {/* Mini-boussole du vent ; « Régler » ouvre la grande sur la carte. */}
                 <div className="an-sheet__wind" style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
                   <WindCompass windAngle={currentWindValue ?? autoWind ?? 0} size={64} />
                   <div style={{ flex: '1 1 0', minWidth: 0 }}>

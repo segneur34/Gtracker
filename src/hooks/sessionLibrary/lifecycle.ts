@@ -26,7 +26,7 @@ import { flushPending } from './pending';
 import { recordToCopy } from './sessionRecords';
 
 /**
- * Ouverture de la mémoire (lot 113) : le dossier mis en service ou quitté, le lancement, le choix d'un autre
+ * Ouverture de la mémoire : le dossier mis en service ou quitté, le lancement, le choix d'un autre
  * dossier, le retour à la mémoire du navigateur et la relecture (« Mettre à jour »).
  */
 

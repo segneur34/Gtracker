@@ -197,7 +197,7 @@ export const interpolateDirection = (
  * entre deux mesures, valeur de la plus proche à moins de `maxGapMs` des
  * bornes, et repli fourni partout ailleurs : dans un trou trop large, au-delà
  * de `maxGapMs` avant la première mesure ou après la dernière (même règle aux
- * bords qu'au milieu, décision du 27/10), et sans aucune mesure.
+ * bords qu'au milieu), et sans aucune mesure.
  */
 export const buildWindTimeline = (
   samples: TimedDirection[],
@@ -283,8 +283,7 @@ export const CANDIDATE_MIN_SEPARATION = 45;
 /**
  * Intervalle moyen entre deux points, en secondes, au-delà duquel la trace
  * soutient de moins en moins la polaire : la durée d'un virage. Un enregistreur
- * économique pose un point quand on avance et se tait dès qu'on ralentit (§10,
- * point 27) : un virement entier tient dans un seul pas, dont la corde pointe
+ * économique pose un point quand on avance et se tait dès qu'on ralentit : un virement entier tient dans un seul pas, dont la corde pointe
  * face au vent, là où la polaire attend l'angle mort, et le point le plus lent
  * n'est jamais enregistré, si bien que les manœuvres ne peuvent plus orienter
  * le vent. Une telle trace (517 points en 2 h, un toutes les 14 s en moyenne)
@@ -494,7 +493,7 @@ export interface SlowestPoint {
  * Point le plus lent de `from` à `to`, le dernier point compris ou non ; à
  * vitesses égales, le premier l'emporte. Commun aux deux lectures d'un
  * virage, qui gardent chacune leur règle : la détection des manœuvres omet
- * le dernier point de la fenêtre initiale (§10, points 21 et 70 : le
+ * le dernier point de la fenêtre initiale (le
  * déplacer changerait le classement et le vent), l'orientation du vent le
  * comprend.
  */
@@ -571,9 +570,9 @@ export interface TurnObservation {
  * `minEntrySpeedKn` écarte les sorties de chute, où l'on repart d'un cap
  * quelconque. C'est la vitesse d'entrée de la détection des manœuvres,
  * accordée à l'allure de la session (`sessionManeuverThresholds`), lue avec la
- * même comparaison stricte, et la cohérence est la sienne aussi (Q53, 04/11) :
- * un virage est vu des deux côtés ou d'aucun. Jusque-là, l'orientation lisait
- * la vitesse plancher de la polaire (5 nd) et une cohérence de 0,6.
+ * même comparaison stricte, et la cohérence est la sienne aussi :
+ * un virage est vu des deux côtés ou d'aucun (lire la vitesse plancher de la
+ * polaire, 5 nd, et une cohérence de 0,6 ferait diverger les deux lectures).
  */
 export const observeTurns = (
   points: PointData[],
@@ -690,7 +689,7 @@ const POLAR_CONTRAST_MIN = 0.15;
  * sinon les virages tranchent, sinon la polaire garde son orientation avec une
  * confiance réduite d'autant. Les virages qui tranchent (`turnsOf`, lus
  * seulement si le contraste polaire ne suffit pas) sont ceux d'`observeTurns`
- * à la vitesse d'entrée de la détection des manœuvres (Q53).
+ * à la vitesse d'entrée de la détection des manœuvres.
  */
 const orientPolar = (polar: PolarWindEstimate, turnsOf: () => readonly TurnObservation[]): WindEstimate => {
   const candidateA = polar.direction;
@@ -732,7 +731,7 @@ const orientPolar = (polar: PolarWindEstimate, turnsOf: () => readonly TurnObser
 export interface WindPolarStage {
   readonly points: PointData[];
   readonly minSpeedKn: number;
-  /** Vitesse d'entrée des virages lus par l'orientation : celle de la détection des manœuvres (Q53). */
+  /** Vitesse d'entrée des virages lus par l'orientation : celle de la détection des manœuvres. */
   readonly minEntrySpeedKn: number;
   /** Candidats de la polaire, par score décroissant, séparés d'au moins 45°, trois au plus. */
   readonly candidates: readonly PolarWindEstimate[];
@@ -752,9 +751,8 @@ export interface WindPolarStage {
  * Direction d'où vient le vent selon les virages à vol perdu seuls : moyenne
  * circulaire de leur cap au point le plus lent, qui est face au vent quand le
  * vol est perdu (virement). Au degré près, comme les candidats de la polaire ;
- * `null` sans virage à vol perdu. C'est le filet de `selectWindCandidate`
- * (lot 149, C1-2) : sur une session de wing réaliste, la décélération d'un
- * virement laisse des points rapides dans le cône, et la polaire seule désigne
+ * `null` sans virage à vol perdu. C'est le filet de `selectWindCandidate` :
+ * sur une session de wing réaliste, la décélération d'un virement laisse des points rapides dans le cône, et la polaire seule désigne
  * le trou de couverture entre près et largue, à 90° du vrai vent, qui peut ne
  * figurer parmi aucun de ses candidats ; les virages eux-mêmes le proposent.
  */

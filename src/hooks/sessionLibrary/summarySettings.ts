@@ -20,7 +20,7 @@ import { lib } from './memory';
 import { STORAGE_KEYS } from '../../core/appIdentity';
 
 /**
- * Réglages des résumés (lot 113) : ceux de l'activité d'une session, les gestes dans Réglages qui les changent
+ * Réglages des résumés : ceux de l'activité d'une session, les gestes dans Réglages qui les changent
  * (`library/summaryGestures.ts`), le test « résumé à refaire » et la fiche neuve d'une session.
  */
 

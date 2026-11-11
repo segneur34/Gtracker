@@ -5,7 +5,7 @@ import { settle, threePointGpx, tick, trackTestTimers, underFakeClock } from '..
 import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
- * Balayage de la bibliothèque sur un faux dossier de 300 sessions (lot 68) :
+ * Balayage de la bibliothèque sur un faux dossier de 300 sessions :
  * publications groupées au rythme du compteur, aucune session perdue ni
  * doublée pendant le balayage, saisies et suppressions gardées, cache des
  * fiches mis à jour une seconde après un import ou une suppression.
@@ -89,7 +89,7 @@ const mockPlatform = (): void => {
       return {
         rawPoints: [...text.matchAll(/<trkpt lat="([\d.]+)" lon="([\d.]+)"><time>([^<]+)<\/time>/g)]
           .map((m) => ({ lat: Number(m[1]), lon: Number(m[2]), time: m[3] })),
-        // Sans `<type>` : sessions à classer (une course serait refusée à l'import, lot 321).
+        // Sans `<type>` : sessions à classer (une course serait refusée à l'import).
         trackType: undefined,
         hasDeviceSpeed: false,
       };

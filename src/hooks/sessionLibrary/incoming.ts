@@ -10,7 +10,7 @@ import { isGpxFileName } from '../../library/record';
 import { isRouteGpx } from '../../planning/routeImport';
 
 /**
- * Fichiers reçus d'une autre application (« Ouvrir avec Gtracker », « Partager vers Gtracker », lot 35), côté page : la
+ * Fichiers reçus d'une autre application (« Ouvrir avec Gtracker », « Partager vers Gtracker »), côté page : la
  * copie privée faite par le greffon (`platform/incomingFile.ts`) passe par la même chaîne que l'import (`importEntries` :
  * doublon « déjà présente », refus, FIT illisible avec sa raison), un fichier à la fois, et le résultat se lit dans un
  * bandeau (`IncomingFileNotice`), car un brouillon peut être ouvert : aucune navigation automatique.
@@ -22,7 +22,7 @@ import { isRouteGpx } from '../../planning/routeImport';
  *
  * Pendant un enregistrement, la copie native se fait, et la page ne touche à rien : la file reprend à l'arrêt.
  *
- * Un GPX qui est un itinéraire (lot 194 : fiche d'un itinéraire de Gtracker, ou tracé sans aucun point daté,
+ * Un GPX qui est un itinéraire (fiche d'un itinéraire de Gtracker, ou tracé sans aucun point daté,
  * `isRouteGpx`) est rangé dans `itineraires/` au lieu des sessions (`routeArrival`) ; tout autre fichier suit l'import.
  */
 
@@ -49,7 +49,7 @@ const incomingVerdict = (report: ImportReport, name: string): IncomingVerdict =>
   if (report.failed.length > 0) return { kind: 'refused', text: `${quoted(name)} n'a pas été rangé : ${sentence(reasonOf(name, report.failed[0]))}` };
   if (report.invalid.length > 0) return { kind: 'refused', text: `${quoted(name)} n'a pas été rangé : fichier illisible.` };
   if (report.notActivities.length > 0) return { kind: 'refused', text: describeImport(report) };
-  // Course, vélo, entraînement : refusé pour de bon, la copie est retirée (lot 321).
+  // Course, vélo, entraînement : refusé pour de bon, la copie est retirée.
   if (report.otherSports.length > 0) return { kind: 'refused', text: describeImport(report) };
   if (report.ignored.length > 0) return { kind: 'refused', text: `${quoted(name)} n'a pas été rangé : fichier vide.` };
   if (report.unsaved > 0) return { kind: 'refused', text: refusedForMemory(name, false) };
@@ -72,7 +72,7 @@ const refusalText = (name: string, refusal: IncomingRefusal): string => {
 export type IncomingRouteImporter = (text: string, fileName: string) => Promise<{ base: string; record: { name: string } }>;
 
 let port: IncomingFilesPort = incomingFiles;
-/** Absent : un GPX d'itinéraire suit l'import des sessions, comme avant le lot 194. */
+/** Absent : un GPX d'itinéraire suit l'import des sessions. */
 let importRoute: IncomingRouteImporter | null = null;
 let isRecording: () => boolean = () => false;
 /** Fichiers déjà passés pendant ce lancement : gardés pour le suivant, ou dont le retrait a échoué. */
@@ -219,7 +219,7 @@ export const drainIncomingFiles = (): Promise<void> => {
 /**
  * Lance la file, une fois l'enregistrement interrompu tranché (`main.tsx`). `isRecordingActive` et
  * `subscribeRecording` viennent de l'enregistreur, injectés comme pour `startLibraryUi` ; `routeImporter` range les
- * itinéraires reçus (lot 194), injecté pour que la bibliothèque n'importe pas celle des itinéraires, qui l'importe. Une ouverture normale, file vide,
+ * itinéraires reçus, injecté pour que la bibliothèque n'importe pas celle des itinéraires, qui l'importe. Une ouverture normale, file vide,
  * ne fait que lire une liste vide.
  */
 export const startIncomingFiles = (

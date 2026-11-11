@@ -32,7 +32,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * Magasin des réglages par activité (`gtracker.sportSettings`) : sa lecture
  * (`useSyncExternalStore`), ses écritures, relues au moment d'écrire, et les
  * hooks qui les suivent. Le calcul pur d'un réglage (défauts, valeurs
- * effectives, vue de Réglages) est dans `settings/activitySettings.ts` (lot 72).
+ * effectives, vue de Réglages) est dans `settings/activitySettings.ts`.
  *
  * Le seuil est volontairement modifiable : 8 nœuds ne vaut qu'en wingfoil, et
  * le réglage fin dépend du matériel et du pratiquant.
@@ -177,7 +177,7 @@ export const effectiveStopHoldMs = (): number => {
   return isValidStopHold(value) ? value : DEFAULT_STOP_HOLD_MS;
 };
 
-/** Ce qui est visible (§10, point 100) : la liste complète, les familles cachées, et de quoi filtrer. */
+/** Ce qui est visible : la liste complète, les familles cachées, et de quoi filtrer. */
 interface Visibility {
   /** Toutes les activités, cachées comprises : elles nomment les sessions (`sessionActivity`). */
   activities: Activity[];
@@ -322,7 +322,7 @@ export const useAllSportSettings = () => {
   );
 
   /**
-   * Cache ou ré-affiche une activité (§10, point 100) ; rien n'est effacé.
+   * Cache ou ré-affiche une activité ; rien n'est effacé.
    * Ré-afficher une activité d'une famille cachée ré-affiche la famille.
    * Cacher la dernière activité visible de la dernière famille visible est refusé.
    */
@@ -391,7 +391,7 @@ export const useAllSportSettings = () => {
 
   const beepSound = isBeepSound(stored.beepSound) ? stored.beepSound : DEFAULT_BEEP_SOUND;
   /**
-   * Son de tous les bips ; le choix est toujours écrit (26/10), pour qu'un
+   * Son de tous les bips ; le choix est toujours écrit, pour qu'un
    * changement du défaut ne touche pas un son choisi.
    */
   const setBeepSound = useCallback(
@@ -430,7 +430,7 @@ const useStableByText = <T,>(value: T): T => {
  */
 export const useSportSettings = (family: SportFamily) => {
   // Lus par `useSyncExternalStore`, abonnés aux seuls réglages : une écriture d'ailleurs (Réglages,
-  // réglages repris du dossier), même faite entre le rendu et l'abonnement, est vue (E-B6, A4).
+  // réglages repris du dossier), même faite entre le rendu et l'abonnement, est vue.
   const stored = useSyncExternalStore(subscribeStoredSettings, readStoredSettings);
   const activities = storedActivities(stored);
   // Refaite seulement si l'activité retenue ou la liste change, pas à chaque écriture d'un autre réglage.

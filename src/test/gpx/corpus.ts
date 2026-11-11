@@ -1,8 +1,8 @@
 import type { RawTrackPoint } from '../../core/types';
 
 /**
- * Corpus de GPX synthétiques, au format de chaque éditeur (lot 159) : le filet du lecteur GPX avant sa réécriture
- * (lot 126). Une trace de base (60 points à 1 Hz, altitude, vitesse, cap, FC et cadence connus) est rendue par une
+ * Corpus de GPX synthétiques, au format de chaque éditeur : le filet du lecteur GPX avant sa réécriture.
+ * Une trace de base (60 points à 1 Hz, altitude, vitesse, cap, FC et cadence connus) est rendue par une
  * fonction par éditeur ; chaque entrée dit ce que le lecteur doit en tirer, par construction.
  *
  * Des chaînes et non des fichiers `.gpx` : `.gitattributes` normaliserait les fins de ligne d'un vrai fichier, et le
@@ -384,7 +384,7 @@ export const GPX_CORPUS: CorpusEntry[] = [
   {
     nom: 'BOM en tête (Strava)',
     texte: '﻿' + stravaGpx(segmentsOf(basePoints()), FOREIGN),
-    // BOM ignoré (lot 126, décision 1 du 04/11), comme le navigateur et `Blob.text()` : xmldom refusait la déclaration
+    // BOM ignoré, comme le navigateur et `Blob.text()` : xmldom refusait la déclaration
     // qui le suit, et le test du corpus compare donc ce texte, BOM retiré, à la copie gelée.
     attendu: { points: N, segments: 1, hasDeviceSpeed: false, avecFc: true, trackName: FOREIGN.name, trackType: 'sailing' },
   },

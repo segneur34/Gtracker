@@ -31,7 +31,7 @@ export const MANEUVER_MIN_TURN_DEG = 60;
 /**
  * Virage, en degrés, du cap d'approche au cap de sortie, à partir duquel un
  * demi-tour est un tour complet (un 360) : ni virement ni empannage, il n'est
- * jamais compté (décision du 28/10).
+ * jamais compté.
  */
 export const MANEUVER_FULL_TURN_DEG = 270;
 
@@ -41,14 +41,14 @@ export const MANEUVER_FULL_TURN_DEG = 270;
  * le changement d'amures exigé écarte déjà loffs, abattées et chutes. À 1 Hz,
  * le bruit de cap d'un wing suffisait à écarter un vrai virement à 0,6 (0,57).
  * La même pour la détection des manœuvres et pour l'orientation du vent
- * (`observeTurns`), qui lisait 0,6 jusqu'au 04/11 (Q53 : mêmes règles des deux
- * côtés, pour qu'un virage ne soit pas vu par l'un et pas par l'autre).
+ * (`observeTurns`) : mêmes règles des deux côtés, pour qu'un virage ne soit pas
+ * vu par l'un et pas par l'autre.
  */
 export const MANEUVER_MIN_COHERENCE = 0.5;
 
 /**
  * Durée minimale, en secondes, pendant laquelle la vitesse doit rester sous
- * le seuil de réussite pour qu'une manœuvre soit ratée (04/11). Un rebond sur
+ * le seuil de réussite pour qu'une manœuvre soit ratée. Un rebond sur
  * l'eau ou un ralentissement d'un instant en restant en vol passait pour un
  * vol perdu, parce que la vitesse minimale seule décidait ; elle reste la
  * mesure affichée, les 2 s ne changent que le verdict. Lue sur la même série
@@ -180,9 +180,9 @@ const SPEED_RANGE_MAX_MARGIN_KN = 1;
  *
  * Au-dessus de `FAST_SESSION_REFERENCE_KN`, la session a globalement volé ou
  * plané : le seuil du profil du support reste pertinent. En dessous, exiger
- * ce même seuil écarterait la session presque entière (§10, point 27) : le
- * seuil retombe à `SLOW_SESSION_ACTIVE_THRESHOLD_KN`. Le bateau, sans seuil
- * depuis le 21/10, n'en a pas l'usage (`withoutActiveThreshold`).
+ * ce même seuil écarterait la session presque entière (une trace de planche lente ne donnait aucune manœuvre) : le
+ * seuil retombe à `SLOW_SESSION_ACTIVE_THRESHOLD_KN`. Le bateau, sans seuil,
+ * n'en a pas l'usage (`withoutActiveThreshold`).
  */
 export const suggestActiveThresholdKn = (sport: SportType, referenceSpeedKn: number): number => {
   const profile = SPORT_PROFILES[sport];
@@ -206,16 +206,16 @@ export interface SailingThresholds {
 }
 
 /**
- * Seuils d'une session de voile, dans cet ordre de priorité (§10, point 29) :
- * 1. sans seuil (bateau, 21/10), le seuil fixe de réussite des manœuvres du
+ * Seuils d'une session de voile, dans cet ordre de priorité :
+ * 1. sans seuil (bateau), le seuil fixe de réussite des manœuvres du
  *    calcul (`withoutActiveThreshold`), qui ne se règle nulle part ;
  * 2. le seuil de la session (`sessionKn`, sa fiche ou son brouillon) ;
  * 3. celui de l'activité, réglé dans Réglages ou pré-réglé (`activityKn`) ;
  * 4. la suggestion selon l'allure de la session (`referenceKn`), jamais le
  *    défaut fixe du profil (une trace lente au seuil wingfoil n'affichait
- *    aucune manœuvre, point 27).
+ *    aucune manœuvre).
  * Le seuil de vol des manœuvres est le seuil d'activité : un demi-tour entamé
- * en dessous n'est ni réussi ni raté (28/10) ; le bateau compte tout.
+ * en dessous n'est ni réussi ni raté ; le bateau compte tout.
  */
 export const resolveSailingThresholds = (
   profile: SportProfile,
@@ -259,8 +259,7 @@ export const suggestSpeedRangeMs = (
  * Polaire affichée : un virement qui passe moins de `POLAR_TACK_FACE_WIND_MAX_S`
  * à moins de `POLAR_TACK_FACE_WIND_DEG` du vent en est écarté : sa vitesse près
  * du vent n'est que l'élan du virage. Plus long, c'est une vraie remontée, en
- * pumping par exemple (décidé le 05/11 ; sur 80 virements réels en wing : 2 s en
- * médiane, 4 s au plus).
+ * pumping par exemple (sur 80 virements réels en wing : 2 s en médiane, 4 s au plus).
  */
 export const POLAR_TACK_FACE_WIND_DEG = 30;
 export const POLAR_TACK_FACE_WIND_MAX_S = 3;
@@ -298,7 +297,7 @@ export const WIND_CONFIDENCE_MIN = 0.4;
 
 /**
  * Facteur appliqué à la confiance polaire quand aucun candidat de vent ne
- * classe une seule manœuvre alors que la trace a des virages (lot 149, C1-2) :
+ * classe une seule manœuvre alors que la trace a des virages :
  * la polaire a le dernier mot, mais rien ne l'a contrôlée, et sur une session
  * de wing réaliste son meilleur score désigne souvent le trou de couverture
  * entre près et largue, à 90° du vrai vent. Sous `WIND_CONFIDENCE_MIN` dans

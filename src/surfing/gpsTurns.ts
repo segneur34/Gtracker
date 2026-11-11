@@ -2,7 +2,7 @@ import { signedDeltaHalfOpen } from '../core/angles';
 import type { TrackPoint } from '../core/types';
 
 /**
- * Grands changements de direction d'une vague, vus par le GPS (§10, point 97).
+ * Grands changements de direction d'une vague, vus par le GPS.
  *
  * À une position par seconde, un bottom turn ou un top turn, qui dure à peu
  * près une seconde, ne laisse qu'un point : seuls les grands virages (cutback,

@@ -8,7 +8,7 @@ import type { CumulativeTrack, TrackPoint } from '../core/types';
 import { countDirectionChanges } from './gpsTurns';
 
 /**
- * Analyse d'une session de surf (§10, point 97), en SI, sur la trace du noyau.
+ * Analyse d'une session de surf, en SI, sur la trace du noyau.
  *
  * La session se découpe pas à pas (le pas `i` va du point `i − 1` au point `i`) :
  * - **glisse** : dans une vague, ou dans un vol sur foil. C'est une suite du
@@ -37,7 +37,7 @@ import { countDirectionChanges } from './gpsTurns';
 /**
  * Réglages de l'analyse : ceux du surf, le trou de la trace et la fenêtre de la
  * vitesse max du calcul, et `stillMs`, le plancher d'arrêt du profil
- * (`stillThreshold`) en m/s : un seul plancher pour le masque et l'attente (Q43).
+ * (`stillThreshold`) en m/s : un seul plancher pour le masque et l'attente.
  */
 export type SurfParams = Pick<
   SurfProfile, 'minWaitS' | 'minWaveS' | 'minWaveM' | 'takeoffSearchS' | 'turnMinDeg'
@@ -48,7 +48,7 @@ export type SurfPhase = 'glisse' | 'rame' | 'attente' | 'trou';
 
 /** Un passage de la trace, entre deux points. */
 export interface SurfSpan extends FlightSpan {
-  /** Vitesse max : la meilleure moyenne sur `maxSpeedWindowS` (Q34) ; la moyenne du passage s'il est plus court. */
+  /** Vitesse max : la meilleure moyenne sur `maxSpeedWindowS` ; la moyenne du passage s'il est plus court. */
   maxSpeedMs: number;
   avgSpeedMs: number;
 }
@@ -211,7 +211,7 @@ const returnOf = (
  * Analyse d'une session. `rideMask` : le masque d'activité au seuil de la
  * session (vague, ou vol sur foil) ; `waveMask` : sur foil, le masque au seuil
  * de vague en foil, `null` sans foil. Une glisse qui traverse un trou de la
- * trace parcouru en mouvement reste une glisse (Q56, `activeRuns`) ; le pas du
+ * trace parcouru en mouvement reste une glisse (`activeRuns`) ; le pas du
  * trou garde sa phase « trou » dans la frise (`stepPhases`).
  */
 export const analyzeSurf = (
@@ -232,7 +232,7 @@ export const analyzeSurf = (
     });
   } else {
     rides.forEach((r, k) => {
-      // Vagues du vol : les suites du masque de vague entre ses bornes, sans reparcourir la trace (27/10).
+      // Vagues du vol : les suites du masque de vague entre ses bornes, sans reparcourir la trace.
       const flightWaves = keptRuns(track, cum, activeRuns(track, waveMask, r.start + 1, r.end), p);
       let waveS = 0;
       let waveDistanceM = 0;

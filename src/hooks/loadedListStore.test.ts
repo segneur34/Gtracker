@@ -3,7 +3,7 @@ import { createLoadedListStore } from './loadedListStore';
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-describe('createLoadedListStore (lot 158)', () => {
+describe('createLoadedListStore', () => {
   it('ne lit qu\'une fois pour plusieurs pages montées sous la même clé', async () => {
     const list = vi.fn(async () => ['a', 'b']);
     const { store, ensure } = createLoadedListStore(list, String);

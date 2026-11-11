@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 const positions = new Map<string, number>();
 
 /**
- * Défilement d'une liste retenu entre deux visites (lot 158) : la bibliothèque
+ * Défilement d'une liste retenu entre deux visites : la bibliothèque
  * d'une famille se rouvre là où on l'a laissée en revenant d'une analyse.
  * La position est rendue une fois, quand `ready` devient vrai (la liste est
  * dessinée), puis suivie jusqu'à la sortie de la page. `key` : une clé par

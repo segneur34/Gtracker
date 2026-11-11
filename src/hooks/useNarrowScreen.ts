@@ -14,7 +14,7 @@ export const NARROW_QUERY = '(max-width: 767.98px), (max-height: 499.98px) and (
  */
 export const WIDE_QUERY = '(min-width: 768px) and (min-height: 500px), (min-width: 768px) and (pointer: fine), (min-width: 768px) and (pointer: none)';
 
-/** Téléphone tourné : rail de navigation à gauche, carte sur un côté (lot 5 b des demandes du 23/10). */
+/** Téléphone tourné : rail de navigation à gauche, carte sur un côté. */
 export const PHONE_LANDSCAPE_QUERY = '(orientation: landscape) and (max-height: 499.98px) and (pointer: coarse)';
 
 /**
@@ -35,7 +35,7 @@ export const SCREEN_BREAKPOINTS = {
   topbarTight: '(max-width: 1199.98px)',
   /** Mouvement réduit demandé au système (case du bouton glissant, `ui.css` ; animation de la racine du Profil). */
   reducedMotion: '(prefers-reduced-motion: reduce)',
-  /** Survol réservé aux pointeurs qui survolent : au toucher, un `:hover` reste collé au bouton (lot 143). */
+  /** Survol réservé aux pointeurs qui survolent : au toucher, un `:hover` reste collé au bouton. */
   hover: '(hover: hover)',
 } as const;
 

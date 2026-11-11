@@ -11,7 +11,7 @@ import { gpxOf, sailRaw, slowPolar, upDownLegs } from '../../test/sailing.fixtur
 import type { AddOptions } from './addSession';
 
 /**
- * Entrée d'une session dans la mémoire avec son résumé calculé par le worker des traces (lot 161) : la fiche et le
+ * Entrée d'une session dans la mémoire avec son résumé calculé par le worker des traces : la fiche et le
  * résumé sont les mêmes par le worker et en ligne, et ceux du calcul direct ; le fil de l'affichage rend la main
  * pendant le calcul ; GPX illisible, écriture en échec, élagage en échec, worker mort : rien ne change. Les capteurs
  * ne partent jamais au worker. Les imports, qui passent par le même chemin, gardent leur ordre et leur rapport.
@@ -199,7 +199,7 @@ const addOnce = async (text: string, source: SessionSource, options: AddOptions)
   const { library, addGpx, sessionSummarySettings } = await openFresh();
   const result = await addGpx(text, source, options);
   const from = (options.record ?? null) as RecordWithoutSummary | null;
-  // La formule d'avant le lot 161, gardée ici comme référence.
+  // La formule d'avant le calcul dans le worker, gardée ici comme référence.
   const direct = analyzeGpx(
     text,
     options.sport !== undefined ? options.sport : from?.sport ?? undefined,
@@ -343,7 +343,7 @@ describe('addGpx : résumé par le worker', () => {
   });
 });
 
-describe('addGpx : sport que Gtracker ne range pas (lot 321)', () => {
+describe('addGpx : sport que Gtracker ne range pas', () => {
   const footing = (hz: number) => run(hz, { name: 'Footing', type: 'running' });
 
   for (const hz of [1, 5]) {

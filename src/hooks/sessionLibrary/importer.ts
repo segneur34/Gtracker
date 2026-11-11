@@ -15,7 +15,7 @@ import { scheduleCacheUpdate } from './cache';
 import { addGpx, type AddResult } from './addSession';
 
 /**
- * Import de sessions et rangement d'un enregistrement (lot 113) : GPX ou FIT choisis, dossier mémoire entier, session
+ * Import de sessions et rangement d'un enregistrement : GPX ou FIT choisis, dossier mémoire entier, session
  * qui vient d'être enregistrée.
  */
 
@@ -116,13 +116,13 @@ const noteAddResult = (report: ImportReport, result: AddResult, name: string): v
  * Importe des fichiers : des GPX, des FIT, ou un dossier mémoire entier, dont chaque
  * fiche accompagne son GPX (notes et support compris). Chaque session est lue
  * juste avant d'être rangée, GPX, fiche et capteurs, puis relâchée : un
- * dossier entier n'est jamais chargé d'un coup (E-B1). Une session déjà
+ * dossier entier n'est jamais chargé d'un coup. Une session déjà
  * présente n'est pas dupliquée ; si elle n'avait pas ses capteurs, elle reçoit
  * ceux du dossier (`.imu`). Un fichier qu'on ne peut lire ou ranger n'arrête
  * pas les autres : il est nommé, avec la raison, dans une erreur. Des capteurs
  * illisibles ne retiennent ni le GPX ni la fiche : comptés à part
  * (`motionFailed`), un nouvel import les ajoute (`motionAdded`). Sans
- * dossier mémoire, rien n'est rangé ni mis en attente (décision du 27/10).
+ * dossier mémoire, rien n'est rangé ni mis en attente.
  *
  * Les GPX passent d'abord, les FIT ensuite : le GPX d'une session garde sa fiche, et le FIT
  * de la même sortie compte alors « déjà présente », rien n'est écrasé. Un FIT est converti
@@ -172,7 +172,7 @@ export const importEntries = async (
         const recordText = await records.get(entry.key)?.readText();
         // Fiche posée à côté, sinon celle du paquet ; gardée telle quelle si on ne sait pas la réécrire.
         const { record, unreadable, keepRecordText, otherSport, legacyRecordIgnored } = importRecordChoice(recordText, bundle);
-        // Fiche d'une session de course, de vélo ou d'entraînement : refusée, comptée sans être nommée (lot 321).
+        // Fiche d'une session de course, de vélo ou d'entraînement : refusée, comptée sans être nommée.
         if (otherSport !== null) {
           report.otherSports.push(entry.name);
           continue;
@@ -267,7 +267,7 @@ export const importFromFolder = async (): Promise<ImportReport | null> => {
 
 /**
  * Peut-on importer : seulement dans une mémoire ouverte, où l'on peut écrire.
- * Sans dossier, un import est refusé plutôt que mis en attente (décision du
- * 27/10) : seuls les enregistrements attendent un dossier.
+ * Sans dossier, un import est refusé plutôt que mis en attente (choix du produit) :
+ * seuls les enregistrements attendent un dossier.
  */
 export const canImportSessions = (s: Pick<LibraryState, 'status' | 'memoryReadOnly'>): boolean => s.status === 'ready' && !s.memoryReadOnly;

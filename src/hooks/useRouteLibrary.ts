@@ -49,9 +49,9 @@ export const useRouteLibrary = () => {
     error,
     save,
     remove,
-    /** Range l'itinéraire d'un GPX choisi dans les fichiers (lot 194) ; lève, message en clair. */
+    /** Range l'itinéraire d'un GPX choisi dans les fichiers ; lève, message en clair. */
     importGpx: importRouteGpx,
-    /** GPX à partager d'un itinéraire rangé, avec sa fiche en extension (lot 194). */
+    /** GPX à partager d'un itinéraire rangé, avec sa fiche en extension. */
     shareFileOf: routeShareFile,
   };
 };

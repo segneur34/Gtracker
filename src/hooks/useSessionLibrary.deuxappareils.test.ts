@@ -5,7 +5,7 @@ import { gpxAt, settle, tick, trackTestTimers, underFakeClock } from '../test/li
 import { createFakeFolder } from '../test/memoryFolder.fixture';
 
 /**
- * Deux appareils sur un même dossier (lot 148, sujet 3) : la fiche change sur le disque entre sa
+ * Deux appareils sur un même dossier : la fiche change sur le disque entre sa
  * lecture et son écriture. Faux dossier où chaque écriture change la date, comme un vrai fichier.
  */
 

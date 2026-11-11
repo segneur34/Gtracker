@@ -6,7 +6,7 @@
    en pleine largeur, puis les panneaux un par ligne ; tourné, la carte à gauche (fin du fichier). Les chiffres
    de la session sont dans l'onglet « général » de chaque module (`an-sheet__stats--always`). */
 
-/* Dans les analyses, 2 px sous la taille des autres pages (demande du 24/10) : titres des panneaux
+/* Dans les analyses, 2 px sous la taille des autres pages : titres des panneaux
    (`PanelTitle`) et noms des graphes (`ChartFold`, `ChartReadout`). La carte en plein écran est dans la page ;
    Statistiques, qui reprend la disposition, garde les siennes. */
 .an-page:not(.stats-page) {
@@ -165,7 +165,7 @@
   cursor: pointer;
 }
 
-/* Case « Zones » de l'onglet cardio, au-dessus de la courbe (05/11). */
+/* Case « Zones » de l'onglet cardio, au-dessus de la courbe. */
 .an-carte-panels {
   display: flex;
   flex-wrap: wrap;
@@ -441,7 +441,7 @@
     height: 100%;
   }
 
-  /* Plein écran carte + graphes (« +carte », 23/10) : la carte en haut, les graphes de l'onglet dessous, qui défilent. */
+  /* Plein écran carte + graphes (« +carte ») : la carte en haut, les graphes de l'onglet dessous, qui défilent. */
   .an-map-overlay--charts {
     display: flex;
     flex-direction: column;
@@ -543,13 +543,13 @@
   }
 }
 
-/* Téléphone tourné (lot 5 b des demandes du 23/10) : la carte s'ouvre en plein écran en tournant (`AnalysisMap`) ;
+/* Téléphone tourné : la carte s'ouvre en plein écran en tournant (`AnalysisMap`) ;
    fermée, elle tient le côté gauche, fixe, sur toute la hauteur, et l'en-tête, les onglets et les panneaux
    défilent à sa droite. Le plein écran laisse le rail de navigation à gauche ; avec des graphes, ils passent à
    droite de la carte. */
 @media (orientation: landscape) and (max-height: 499.98px) and (pointer: coarse) {
   .an-page:has(.an-map-panel) {
-    /* 55 / 45 (demandé le 24/10) ; un petit téléphone garde `--an-side-min` aux panneaux. */
+    /* 55 / 45 ; un petit téléphone garde `--an-side-min` aux panneaux. */
     --an-map-w: clamp(calc(var(--land-w) * 0.4), calc(var(--land-w) - var(--an-side-min)), calc(var(--land-w) * 0.55));
     padding-left: calc(var(--an-map-w) + var(--space-3)) !important;
   }

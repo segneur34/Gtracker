@@ -73,7 +73,7 @@ let live: LiveRecording = EMPTY;
 let computedFor: { pointCount: number; activity: Activity; trace: FollowedTrace | null } | null = null;
 /**
  * Mémoire du direct de la session en cours (segments fermés calculés une fois, cinématique reprise) et curseur
- * sur la trace suivie, qui ne relit que les positions nouvelles (27/10) ; jetés au retour au repos.
+ * sur la trace suivie, qui ne relit que les positions nouvelles ; jetés au retour au repos.
  */
 let memory: LiveStatsMemory = createLiveStatsMemory();
 let follow: { trace: FollowedTrace; cursor: FollowCursor } | null = null;

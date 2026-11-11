@@ -76,9 +76,9 @@ vi.mock('../platform/heartRate', async (importOriginal) => ({
   },
 }));
 
-/** Veille du GPS simulée (lot 115) : minuteurs armés et désarmés relevés, échéance déclenchée à la demande. */
+/** Veille du GPS simulée : minuteurs armés et désarmés relevés, échéance déclenchée à la demande. */
 const gps = vi.hoisted(() => ({ arms: [] as number[], disarms: 0, expire: null as (() => void) | null }));
-/** Veille de la ceinture simulée (lot 177), de même. */
+/** Veille de la ceinture simulée, de même. */
 const beltWatch = vi.hoisted(() => ({ arms: [] as number[], disarms: 0, expire: null as (() => void) | null }));
 vi.mock('../platform/beeper', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../platform/beeper')>()),
@@ -233,7 +233,7 @@ afterEach(async () => {
 });
 
 describe('enregistreur', () => {
-  it('deux « Démarrer » sans attendre : un seul démarrage de la source et un seul en-tête (D-B3)', async () => {
+  it('deux « Démarrer » sans attendre : un seul démarrage de la source et un seul en-tête', async () => {
     const source = fakeSource();
     await Promise.all([recorder.startRecording(activity, source), recorder.startRecording(activity, source)]);
     expect(source.starts).toBe(1);
@@ -241,7 +241,7 @@ describe('enregistreur', () => {
     expect(recorder.getRecorderState().status).toBe('recording');
   });
 
-  it("deux « Reprendre » sans attendre : la source, restée allumée pendant la pause, n'est ni arrêtée ni relancée (D-B3, lot 104)", async () => {
+  it("deux « Reprendre » sans attendre : la source, restée allumée pendant la pause, n'est ni arrêtée ni relancée", async () => {
     const source = fakeSource();
     await recorder.startRecording(activity, source);
     source.emit(0);
@@ -254,7 +254,7 @@ describe('enregistreur', () => {
     expect(recorder.getRecorderState().status).toBe('recording');
   });
 
-  it("pause manuelle : le GPS reste allumé, la carte suit le coureur, rien n'est gardé ni compté, la trace repart à la reprise (lot 104)", async () => {
+  it("pause manuelle : le GPS reste allumé, la carte suit le coureur, rien n'est gardé ni compté, la trace repart à la reprise", async () => {
     const source = fakeSource();
     await recorder.startRecording(activity, source);
     for (let s = 0; s < 10; s++) source.emit(s);
@@ -285,7 +285,7 @@ describe('enregistreur', () => {
     expect(recorder.getLiveHeadingFixes()).toHaveLength(11);
     for (let s = 141; s < 150; s++) source.emit(s);
     expect(recorder.getLiveSegmentCount()).toBe(2);
-    // Durée (lot 158) : 9 s avant la pause, 9 s après ; les 131 s de pause manuelle ne sont pas rattrapées à la reprise.
+    // Durée : 9 s avant la pause, 9 s après ; les 131 s de pause manuelle ne sont pas rattrapées à la reprise.
     expect(recordingDurationMs(recorder.getRecorderState().stats)).toBe(18_000);
     await recorder.stopRecording();
     const content = recorder.getRecorderState().pending!.content;
@@ -295,7 +295,7 @@ describe('enregistreur', () => {
     expect(content.split('<trkseg>')[2]).toContain(new Date(T0 + 140_000).toISOString().slice(0, 19));
   });
 
-  it('le direct couvre la position qui vient d\'arriver (D-B4)', async () => {
+  it('le direct couvre la position qui vient d\'arriver', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(T0);
     live.startLiveRecording();
@@ -417,7 +417,7 @@ describe('repère « Note » (D11)', () => {
   });
 });
 
-describe('prévenir quand ça rate (lot 115)', () => {
+describe('prévenir quand ça rate', () => {
   it("GPS perdu après 1 min sans position : alerte posée une fois, effacée à la position suivante ; muet en pause manuelle", async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(T0);
@@ -490,7 +490,7 @@ describe('prévenir quand ça rate (lot 115)', () => {
     expect(recorder.getRecorderState().beltLost).toBe(false);
   });
 
-  it("« Arrêter de chercher » (lot 198) : la ceinture est rendue, alerte et tuile retirées, plus rien ne la suit jusqu'à l'arrêt", async () => {
+  it("« Arrêter de chercher » : la ceinture est rendue, alerte et tuile retirées, plus rien ne la suit jusqu'à l'arrêt", async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(T0);
     const source = fakeSource();
@@ -606,7 +606,7 @@ describe('prévenir quand ça rate (lot 115)', () => {
   });
 });
 
-describe('journal illisible (lot 143, 123a)', () => {
+describe('journal illisible', () => {
   const header = JSON.stringify({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0, activity: { id: 'a-kite', name: 'Kite' } });
 
   it('au lancement : mis de côté et dit, jamais pris pour absent ; le départ suivant écrit un journal neuf', async () => {
@@ -661,7 +661,7 @@ describe('journal illisible (lot 143, 123a)', () => {
   });
 });
 
-describe('capteurs à l’arrêt (lot 143, 123c)', () => {
+describe('capteurs à l’arrêt', () => {
   const capture: MotionCapture = { path: `capteurs/${T0}.imu`, bytes: 4096, durationS: 2, samples: 200, longestGapS: 0.01, error: null };
   const setup = { placement: 'poitrine' as const, foil: false };
 
@@ -696,7 +696,7 @@ describe('capteurs à l’arrêt (lot 143, 123c)', () => {
   });
 });
 
-describe('capture à « Analyser » (lot 148, T2-1)', () => {
+describe('capture à « Analyser »', () => {
   const capture: MotionCapture = { path: `capteurs/${T0}.imu`, bytes: 4096, durationS: 2, samples: 200, longestGapS: 0.01, error: null };
   const setup = { placement: 'poitrine' as const, foil: true };
 
@@ -813,7 +813,7 @@ describe('capture à « Analyser » (lot 148, T2-1)', () => {
   });
 });
 
-describe('rangement en cours, état du module (lot 161)', () => {
+describe('rangement en cours, état du module', () => {
   /** Session arrêtée, en attente, dont le rangement attend `open()`. */
   const held = async (): Promise<() => void> => {
     const source = fakeSource();
@@ -904,7 +904,7 @@ describe('rangement en cours, état du module (lot 161)', () => {
   });
 });
 
-describe('fin d\'enregistrement : rangement seul, ménage et « Jeter » en échec (lots 313 et 329)', () => {
+describe('fin d\'enregistrement : rangement seul, ménage et « Jeter » en échec', () => {
   /** Session arrêtée, en attente, sans capteurs. */
   const stopped = async (): Promise<void> => {
     const source = fakeSource();
@@ -1024,7 +1024,7 @@ describe('fin d\'enregistrement : rangement seul, ménage et « Jeter » en éch
   });
 });
 
-describe('aller-retour du journal (audit du 03/11, C4)', () => {
+describe('aller-retour du journal', () => {
   it("le GPX refait depuis le journal est celui de l'arrêt, à l'octet : pauses automatique et manuelle, note, activité changée", async () => {
     const source = fakeSource();
     await recorder.startRecording(baseActivity('wingfoil'), source);

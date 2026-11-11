@@ -57,7 +57,7 @@ const record: SessionRecord = {
 
 afterEach(() => vi.useRealTimers());
 
-describe('removeSession (E-B4)', () => {
+describe('removeSession', () => {
   it('ne laisse pas de session fantôme ni de fiche réécrite quand la session change pendant sa suppression', async () => {
     files.set(`sessions/${GPX}`, '<gpx/>');
     files.set(`sessions/${RECORD}`, serializeRecord(record));

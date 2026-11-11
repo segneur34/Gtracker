@@ -10,7 +10,7 @@ import { scheduleCacheUpdate } from './cache';
 import { addGpx, countPending, pendingWriting, type AddOptions, type AddResult } from './addSession';
 
 /**
- * Sessions enregistrées en attente d'un dossier mémoire (téléphone ; lot 113), rangées dès qu'il y en a un, avec
+ * Sessions enregistrées en attente d'un dossier mémoire (téléphone), rangées dès qu'il y en a un, avec
  * leur fiche et leurs capteurs ; reprise des temporaires d'une écriture interrompue.
  */
 
@@ -35,7 +35,7 @@ const readPendingImuTemp = async (pending: MemoryFolder, name: string | null): P
 
 /** Fiche d'une session en attente, lue à côté de son GPX pour être rangée avec lui. */
 interface PendingRecord {
-  /** Son nom dans le dossier en attente, `null` si la session n'en a pas (attente d'avant le lot 116). */
+  /** Son nom dans le dossier en attente, `null` si la session n'en a pas (attente d'une ancienne version). */
   name: string | null;
   /** Ce qu'elle apporte à `addGpx` : rien si elle est illisible. */
   options: Pick<AddOptions, 'record' | 'unreadable'>;

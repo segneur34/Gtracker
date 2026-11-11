@@ -9,8 +9,8 @@ import { runInWorker } from '../library/trackWorkerClient';
  * lit le fichier, calcule la kinématique et s'arrête là. Chaque module de
  * support construit ensuite ses propres statistiques par-dessus.
  *
- * Lecture et kinématique se font hors du fil de l'affichage (lot 126 B,
- * `core/prepareTrack.ts` dans `library/trackWorker.ts`) : le résultat arrive
+ * Lecture et kinématique se font hors du fil de l'affichage (`core/prepareTrack.ts`
+ * dans `library/trackWorker.ts`) : le résultat arrive
  * d'un coup, avec les mêmes chiffres qu'en ligne.
  */
 

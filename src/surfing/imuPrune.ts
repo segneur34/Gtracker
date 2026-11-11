@@ -4,7 +4,7 @@ import { captureBounds, fileUsOf, mergeWindows, type ImuWindow } from '../core/i
 import type { SurfSpan } from './surfAnalysis';
 
 /**
- * Élagage du `.imu` d'une session de surf autour de ses glisses (point 104),
+ * Élagage du `.imu` d'une session de surf autour de ses glisses,
  * propre au surf (l'enveloppe commune est `pruneImu`) ; la mesure du pumping,
  * commune au surf et à la voile, est dans `core/pumping.ts`. Instants du
  * fichier en µs, heures en ms.

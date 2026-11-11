@@ -31,7 +31,7 @@ describe('createStore', () => {
   });
 });
 
-describe('createListeners : arguments et abonnés en échec (lot 72)', () => {
+describe('createListeners : arguments et abonnés en échec', () => {
   it('passe ses arguments à chaque abonné', () => {
     const listeners = createListeners<[number, string]>();
     const a = vi.fn();
@@ -60,7 +60,7 @@ describe('createListeners : arguments et abonnés en échec (lot 72)', () => {
   });
 });
 
-describe('createJsonSelector (lot 72)', () => {
+describe('createJsonSelector', () => {
   const memory = new Map<string, string>();
   beforeEach(() => {
     memory.clear();

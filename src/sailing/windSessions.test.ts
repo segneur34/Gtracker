@@ -7,10 +7,9 @@ import { windInputWarning } from './sailingAnalytics';
 import { prepareWindPolar } from './wind';
 
 /**
- * Sessions réalistes passées par la chaîne réelle (sondes C1 de l'audit du
- * 03/11, reprises au lot 149) : filet du vent, avertissement du vent saisi,
- * virage en un seul pas, dates qui reculent. Les chiffres attendus sont ceux
- * relevés le 04/11, avant et après le lot, notés à chaque cas.
+ * Sessions réalistes passées par la chaîne réelle (sondes d'audit) : filet du
+ * vent, avertissement du vent saisi, virage en un seul pas, dates qui
+ * reculent. Les chiffres attendus sont des relevés, notés à chaque cas.
  */
 
 beforeAll(() => {
@@ -19,7 +18,7 @@ beforeAll(() => {
 
 const WIND = 20;
 
-describe('vent : polaire seule, sans manœuvre qui départage (C1-2)', () => {
+describe('vent : polaire seule, sans manœuvre qui départage', () => {
   const run = (legs: { twa: number; durationS: number }[]) => analyzeSailing(sailRaw({ windDeg: WIND, legs, hz: 1, seed: 5 }));
 
   it('un bord de près, une abattée, un bord de largue : rien ne départage, le vent est demandé', () => {
@@ -62,7 +61,7 @@ describe('vent : polaire seule, sans manœuvre qui départage (C1-2)', () => {
   });
 });
 
-describe('vent : longue session (C1-2)', () => {
+describe('vent : longue session', () => {
   // Les sept sessions retrouvent 19° à 20° par les virages, avant comme après le lot ; le meilleur candidat
   // polaire est le trou de couverture (111° à 116°), le vrai vent son troisième candidat.
   const cases: { name: string; legs: number; legS: number; hz: number; seed: number }[] = [
@@ -89,15 +88,15 @@ describe('vent : longue session (C1-2)', () => {
   }
 
   it('décélération brutale (sans inertie, 5 Hz) : jamais « fiable » loin du vrai vent', () => {
-    // Audit du 03/11 (avant le lot 144) : 106° fiable à 0,68, 254 virages écartés. Avant le lot 149 : 26° ;
-    // après : 20° par les virages.
+    // Relevés : 106° fiable à 0,68 avec 254 virages écartés (ancien comportement), puis 26° ;
+    // aujourd'hui : 20° par les virages.
     const a = analyzeSailing(sailRaw({ windDeg: WIND, legs: upDownLegs(60, 90), hz: 5, seed: 11, speedTauS: 0 }));
     expect(!a.windEstimate.reliable || degApart(a.windEstimate.direction, WIND) <= 10).toBe(true);
     expect(degApart(a.windEstimate.direction, WIND)).toBeLessThanOrEqual(10);
   }, 120_000);
 });
 
-describe('vent saisi loin du vent calculé (C1-3)', () => {
+describe('vent saisi loin du vent calculé', () => {
   const base = sailRaw({ windDeg: WIND, legs: upDownLegs(12, 95), hz: 1, seed: 3 });
   const warningAt = (off: number) => {
     const a = analyzeSailing(base, { windDeg: WIND + off });
@@ -117,7 +116,7 @@ describe('vent saisi loin du vent calculé (C1-3)', () => {
   });
 });
 
-describe('virage entier dans un seul pas, enregistreur économique (C1-1)', () => {
+describe('virage entier dans un seul pas, enregistreur économique', () => {
   const legsAt = (twa: number) => [{ twa, durationS: 120 }, { twa: -twa, durationS: 120 }, { twa, durationS: 120 }, { twa: -twa, durationS: 120 }];
 
   it('virement de 90° dans un silence de 20 s : les trois virements sont lus, le point de reprise porte le cap du nouveau bord', () => {
@@ -146,7 +145,7 @@ describe('virage entier dans un seul pas, enregistreur économique (C1-1)', () =
   });
 });
 
-describe('dates qui reculent dans le fichier (C1-4, C2-1)', () => {
+describe('dates qui reculent dans le fichier', () => {
   const base = sailRaw({ windDeg: WIND, legs: upDownLegs(12, 95), hz: 1, seed: 3 });
 
   it('deux points permutés : le point daté en arrière est écarté, mêmes manœuvres, mêmes tops, même vent', () => {

@@ -44,7 +44,7 @@ export function useCloseOnOutsideOrEscape(
     };
     document.addEventListener('pointerdown', onPointer);
     document.addEventListener('keydown', onKey);
-    // Le retour d'Android ferme le menu avant de quitter la page (lot 158).
+    // Le retour d'Android ferme le menu avant de quitter la page.
     const removeLayer = pushBackLayer(() => closeRef.current());
     return () => {
       document.removeEventListener('pointerdown', onPointer);

@@ -114,7 +114,7 @@ describe('analyzeSailingSession : ordre du seuil d’activité', () => {
   });
 });
 
-describe('analyzeSailingSession : seuil différé (Q40)', () => {
+describe('analyzeSailingSession : seuil différé', () => {
   it('les calculs suivent `computeThresholdKn`, les seuils affichés restent ceux de la session', () => {
     const deferred = analyze(fast, 'wingfoil', { sessionThresholdKn: 6, computeThresholdKn: 11, windDeg: WIND });
     const at11 = analyze(fast, 'wingfoil', { sessionThresholdKn: 11, windDeg: WIND });
@@ -229,7 +229,7 @@ describe('analyzeSailingSession : les trois étapes', () => {
     expect(sailingPolarGraph(prepared, b.currentWindValue)).not.toEqual(sailingPolarGraph(prepared, a.currentWindValue));
   });
 
-  it('VMG : les manœuvres sont écartées des chiffres et font un trou dans la courbe (lot 167)', () => {
+  it('VMG : les manœuvres sont écartées des chiffres et font un trou dans la courbe', () => {
     const a = analyze(fast);
     const locations = a.maneuverStats!.locations;
     expect(locations.length).toBeGreaterThan(0);

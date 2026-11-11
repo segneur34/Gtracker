@@ -10,7 +10,7 @@ import { gpxAt, settle, tick, trackTestTimers, underFakeClock } from '../test/li
 import { createFakeFolder } from '../test/memoryFolder.fixture';
 
 /**
- * Bibliothèque sur une mémoire simulée (lot 116, « ne plus perdre de données ») : session
+ * Bibliothèque sur une mémoire simulée (« ne plus perdre de données ») : session
  * enregistrée sans dossier, fiche dont l'écriture échoue, coupure entre le GPX et sa fiche,
  * fiche illisible sur le disque, cache d'une autre liste de champs, fiche d'une version plus
  * récente importée ou recopiée, relecture en échec dite au compte rendu.
@@ -488,7 +488,7 @@ describe("fiche dont l'écriture a échoué (2)", () => {
   });
 });
 
-describe('changement de dossier avec une fiche pas encore écrite (2, décision du 01/11)', () => {
+describe('changement de dossier avec une fiche pas encore écrite', () => {
   it('reporte ses changements sur la même session du nouveau dossier, retrouvée par le début de trace', async () => {
     files.set('sessions/sortie.gpx', gpxAt(0));
     otherFiles.set('sessions/copie.gpx', gpxAt(0));
@@ -599,7 +599,7 @@ describe('session en attente déjà rangée, en lecture seule (1, relecture)', (
   });
 });
 
-describe('capteurs là mais illisibles (lot 148, C5-6)', () => {
+describe('capteurs là mais illisibles', () => {
   it('en attente : les trois fichiers restent, c’est dit, puis la session se range quand ils se lisent', async () => {
     const name = await saveOffline();
     const imu = name.replace(/\.gpx$/, '.imu');
@@ -658,7 +658,7 @@ describe('capteurs là mais illisibles (lot 148, C5-6)', () => {
   });
 });
 
-describe('fiche qu\'on ne sait pas réécrire, portée par un GPX complet (lot 148, C5-4)', () => {
+describe('fiche qu\'on ne sait pas réécrire, portée par un GPX complet', () => {
   const future = JSON.parse(FUTURE_RECORD) as SessionRecord;
 
   it('version plus récente : rangée au caractère près, GPX rendu, capteurs gardés, session en lecture seule', async () => {
@@ -701,7 +701,7 @@ describe('fiche qu\'on ne sait pas réécrire, portée par un GPX complet (lot 1
   });
 });
 
-describe('cache des fiches d\'une autre version du lecteur (lot 148, C5-7)', () => {
+describe('cache des fiches d\'une autre version du lecteur', () => {
   /** Ouvre le dossier une fois, pour que le cache soit écrit, et rend ce cache à retoucher. */
   const cacheMade = async () => {
     files.set('sessions/sortie.gpx', gpxAt(0));
@@ -727,7 +727,7 @@ describe('cache des fiches d\'une autre version du lecteur (lot 148, C5-7)', () 
   });
 });
 
-describe('marqueur d\'une version plus récente (lot 148, C5-9)', () => {
+describe('marqueur d\'une version plus récente', () => {
   const MARKER_V2 = JSON.stringify({ format: FILE_FORMATS.memoire, version: 2 });
 
   /** Un dossier où une ouverture ordinaire écrirait partout : GPX à la racine, sans fiche, fiche à refaire, extension à ranger. */
@@ -804,7 +804,7 @@ describe('marqueur d\'une version plus récente (lot 148, C5-9)', () => {
   });
 });
 
-describe('dossier fermé ou remplacé pendant la lecture de son marqueur (lot 148)', () => {
+describe('dossier fermé ou remplacé pendant la lecture de son marqueur', () => {
   /** « Choisir un dossier » sur le dossier suivi, retenu à la lecture de son marqueur ; rend la fin du choix et de quoi libérer la lecture. */
   const choosingHeld = async (library: Library): Promise<{ choosing: Promise<void>; release: () => void }> => {
     let open!: () => void;
@@ -866,7 +866,7 @@ describe('dossier fermé ou remplacé pendant la lecture de son marqueur (lot 14
   });
 });
 
-describe('dossier de l\'ancienne application choisi comme mémoire (lot 321)', () => {
+describe('dossier de l\'ancienne application choisi comme mémoire', () => {
   /** Dossier mémoire de l'ancienne application : son marqueur, une session, son mode d'emploi. */
   const legacyFolder = (): void => {
     otherFiles.set(LEGACY_MARKER_FILE, '{"format":"x-memoire","version":1}\n');

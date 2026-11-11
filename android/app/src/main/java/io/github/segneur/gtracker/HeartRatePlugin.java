@@ -71,7 +71,7 @@ import java.util.UUID;
  * toutes les `LOST_RETRY_MS`, puis `LOST_RETRY_SLOW_MS` passé
  * `LOST_FAST_MS` de perte. Chaque tentative laisse une ligne au journal.
  * Une ceinture jamais jointe depuis `connect` (laissée à la maison) est
- * recherchée au même rythme, compté depuis `connect` (lot 115).
+ * recherchée au même rythme, compté depuis `connect`.
  */
 @CapacitorPlugin(
     name = "HeartRate",

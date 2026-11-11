@@ -25,7 +25,7 @@ import { createStore } from './createStore';
  * (`stepMarkGuide`) et le rythme des bips est réglé (`platform/beeper.ts`) ;
  * le greffon Android tient ce rythme entre deux positions. Pendant une pause
  * manuelle, les positions ne lui parviennent plus (le GPS reste allumé pour la
- * carte seule, lot 104) : silence. GPS perdu (`RecorderState.gpsLost`, lot
+ * carte seule) : silence. GPS perdu (`RecorderState.gpsLost`, lot
  * 115) : silence aussi, la distance n'étant plus à jour ; la position suivante
  * relance le rythme. Session reprise après une chute du moteur de la page (lot
  * 156) : l'état se refait en silence sur les positions relues (`replayMarkGuide`),

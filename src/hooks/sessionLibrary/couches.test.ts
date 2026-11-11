@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Découpage de la bibliothèque (lot 113) : chaque partie de `hooks/sessionLibrary/` n'importe que les parties
+ * Découpage de la bibliothèque : chaque partie de `hooks/sessionLibrary/` n'importe que les parties
  * avant elle (aucun cycle, aucun import à rebours) ; le point d'entrée `hooks/useSessionLibrary.ts` garde ses
  * exports, et le code de l'application ne passe que par lui.
  */
@@ -47,7 +47,7 @@ const codeFiles = (dir: URL, prefix = ''): string[] =>
     return isCode(e.name) ? [`${prefix}${e.name}`] : [];
   });
 
-describe('couches de la bibliothèque (lot 113)', () => {
+describe('couches de la bibliothèque', () => {
   it('chaque partie est rangée dans une couche, et seules elles sont dans le dossier', () => {
     const parts = fs.readdirSync(HERE, { withFileTypes: true }).map((e) => e.name).filter(isCode).map((n) => n.replace(/\.ts$/, ''));
     expect([...parts].sort()).toEqual([...LAYERS].sort());

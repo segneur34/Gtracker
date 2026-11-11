@@ -26,7 +26,7 @@ import GongLogo from '../components/GongLogo';
 import './Home.css';
 
 /**
- * Accueil, sur la maquette du 22/10 : en-tête photo avec le logo, la version
+ * Accueil, sur la maquette : en-tête photo avec le logo, la version
  * et le salut au pseudo ; une carte par famille visible, ses activités visibles
  * en sous-titre et sa photo fondue dans sa couleur (après les cartes de la
  * mémoire, des autorisations, le pop-up du profil et la leçon du jour des
@@ -34,10 +34,10 @@ import './Home.css';
  * la liste des itinéraires planifiés (leur nombre dès que la mémoire est prête),
  * sur un fond de courbes de niveau. Enregistrer est le bouton rond de la barre
  * du bas. Une famille cachée dans Réglages n'y a pas sa carte, une activité
- * cachée ni son nom ni ses itinéraires (§10, point 100).
+ * cachée ni son nom ni ses itinéraires.
  */
 
-/** Photo de la carte de chaque famille proposée ; les familles retirées (lots 302 et 303) n'ont plus de carte ni de photo. */
+/** Photo de la carte de chaque famille proposée ; les familles retirées n'ont plus de carte ni de photo. */
 const FAMILY_PHOTO: Partial<Record<SportFamily, string>> = {
   voile: vignetteVoile,
   surf: vignetteSurf,

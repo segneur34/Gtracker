@@ -8,7 +8,7 @@ import type { RecorderState } from './useRecorder';
 import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
- * Guidage vers les balises, sans DOM (lot 159) : l'enregistreur est un faux magasin (état, abonnés, positions), les
+ * Guidage vers les balises, sans DOM : l'enregistreur est un faux magasin (état, abonnés, positions), les
  * bips un faux greffon qui note ce qu'on lui demande, la trace suivie la vraie (`followTrace`). Le module est
  * réimporté neuf à chaque test. Deux balises sur une ligne vers l'est : A à l'origine, B 500 m plus loin.
  */
@@ -228,7 +228,7 @@ describe('« Passer »', () => {
   });
 });
 
-describe('reprise après une chute de la page (lot 156)', () => {
+describe('reprise après une chute de la page', () => {
   it('l’état se refait en silence sur les positions déjà gardées : la balise validée le reste', async () => {
     const { guide, trace } = await load();
     trace.followTrace(course());

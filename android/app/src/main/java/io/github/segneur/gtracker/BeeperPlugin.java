@@ -24,7 +24,7 @@ import org.json.JSONObject;
  * que régler l'intervalle à chaque position reçue. Sons et vibrations :
  * TonePlayer.
  *
- * Veille du GPS de l'enregistrement (lot 115, src/recording/gpsWatch.ts) : la
+ * Veille du GPS de l'enregistrement (src/recording/gpsWatch.ts) : la
  * couche web repousse un minuteur à chaque position (`watchGps`) ; s'il
  * échoit, le son « GPS perdu » est joué, les bips d'approche se taisent, puis
  * l'événement `gpsLost` prévient la page, qui pose l'alerte et récrit la
@@ -76,7 +76,7 @@ public class BeeperPlugin extends Plugin {
     };
 
     /**
-     * Échéance de la veille de la ceinture (lot 177), sur le fil des bips : les bips d'approche continuent.
+     * Échéance de la veille de la ceinture, sur le fil des bips : les bips d'approche continuent.
      * Écran éteint, le verrou partiel est celui du service GPS.
      */
     private final Runnable beltLost = new Runnable() {

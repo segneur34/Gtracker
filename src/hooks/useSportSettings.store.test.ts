@@ -85,7 +85,7 @@ describe('deux écritures dans un même geste (A5)', () => {
     expect(stored.thresholds?.wingfoil).toBe(10);
   });
 
-  it('case « Sauts » puis onglet (n° 174) : la seconde relit la première au lieu de l’écraser', () => {
+  it('case « Sauts » puis onglet : la seconde relit la première au lieu de l’écraser', () => {
     jsonStore.write(KEY, {});
     const jumps = { enabled: true, placement: 'poitrine' as const, minHeightM: 1.5 };
     updateStoredSettings((s) => withSetting(s, 'kite', 'jumps', jumps));

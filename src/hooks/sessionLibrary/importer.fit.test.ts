@@ -5,7 +5,7 @@ import { gpxAt, settle, tick, trackTestTimers } from '../../test/library.fixture
 import { createFakeFolder } from '../../test/memoryFolder.fixture';
 
 /**
- * Import de fichiers FIT par la bibliothèque (lot 35) : un FIT devient une session comme un GPX, un doublon compte
+ * Import de fichiers FIT par la bibliothèque : un FIT devient une session comme un GPX, un doublon compte
  * « déjà présente », un illisible n'arrête pas les autres, un dossier de plusieurs activités demande confirmation.
  */
 

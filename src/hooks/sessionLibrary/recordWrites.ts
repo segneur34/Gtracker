@@ -16,7 +16,7 @@ import {
 import { refreshFailed, sessionSummarySettings, summaryOutdatedTest } from './summarySettings';
 
 /**
- * Écritures des fiches (lot 113) : différées et regroupées, une à la fois par fiche, fondues avec le disque si le
+ * Écritures des fiches : différées et regroupées, une à la fois par fiche, fondues avec le disque si le
  * fichier a changé depuis sa lecture (`library/recordMerge.ts`) ; résumé refait après un changement de réglage
  * de la session, et saisies reportées dans un nouveau dossier.
  */
@@ -232,7 +232,7 @@ export const resummarize = async (file: string): Promise<void> => {
 };
 
 /**
- * Au changement de dossier (décision du 01/11) : les saisies des fiches qu'on n'avait pas pu écrire
+ * Au changement de dossier (choix du produit) : les saisies des fiches qu'on n'avait pas pu écrire
  * dans l'ancien (`carried`) sont reportées sur la même session du nouveau, retrouvée par le début de
  * trace (`carryRecordEdits`), puis écrites. Une session absente du nouveau dossier, ou dont la fiche ne
  * s'y écrit pas (lecture seule), est dite. Sans dossier ouvert (accès refusé, dossier inutilisable),

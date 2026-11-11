@@ -21,8 +21,8 @@ export interface AnalysisTabsInput<K extends string> {
 /**
  * Onglets d'un module d'analyse, les mêmes pour les quatre : sections ouvertes
  * en mémoire vive, rendues aux défauts (« général » seul, « avancé » fermé) à
- * chaque ouverture d'une analyse et à chaque autre session (05/11,
- * `tabsStateFor`) ; celles cachées par l'activité dans Réglages fermées
+ * chaque ouverture d'une analyse et à chaque autre session
+ * (`tabsStateFor`) ; celles cachées par l'activité dans Réglages fermées
  * (`maskHiddenTabs`), celles de la rangée « avancé » repliées tant qu'elle est
  * fermée (`maskAdvancedTabs`) ; la surbrillance unique de la carte, rattachée
  * aux onglets ouverts (`useMapHighlight`) ; le point survolé des graphes effacé

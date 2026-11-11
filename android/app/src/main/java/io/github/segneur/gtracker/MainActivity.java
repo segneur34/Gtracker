@@ -85,7 +85,7 @@ public class MainActivity extends BridgeActivity {
 
     /**
      * Recharge la page, sur la même WebView : une activité recréée arrêterait le service GPS
-     * (`BackgroundGeolocation.handleOnDestroy`). La sonde du 04/11 a montré qu'elle repart, écran
+     * (`BackgroundGeolocation.handleOnDestroy`). Une sonde a montré qu'elle repart, écran
      * éteint compris, et que le service et ses positions survivent. Au-delà de la garde, ou sans
      * pont : faux, Android tue le processus, et la réouverture propose de continuer. Compté ici
      * seulement, une seule fois par chute.

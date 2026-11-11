@@ -74,7 +74,7 @@ describe('gyroWaveTurns', () => {
   });
 
   it('une dérive secouée par le buste (rame, pumping) n\'est pas un virage, malgré ses pointes de vitesse', () => {
-    // 90° en 9 s, et le buste qui oscille de ±15° une fois par seconde (pointes près de 100°/s) : séance témoin du 14/10.
+    // 90° en 9 s, et le buste qui oscille de ±15° une fois par seconde (pointes près de 100°/s) : séance témoin.
     const shaken = (t: number) => yawOf([[30.5, 90, 10]])(t) + 15 * RAD * Math.sin(2 * Math.PI * t);
     expect(gyroWaveTurns(capture({ yaw: shaken }), D, session(1))).toEqual([0]);
   });

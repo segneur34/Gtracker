@@ -1,4 +1,4 @@
-/* Enregistrer sur un téléphone tourné (lot 5 b des demandes du 23/10). En cours : la carte fixe à droite, sur toute
+/* Enregistrer sur un téléphone tourné. En cours : la carte fixe à droite, sur toute
    la hauteur ; à sa gauche, Pause, Arrêter, Note et le cadenas, les grands chiffres, puis la carte « En cours » qui
    défilent. Au repos : le choix à gauche, Démarrer et Suivre une trace à droite. Rien ne change droit. */
 @media (orientation: landscape) and (max-height: 499.98px) and (pointer: coarse) {
@@ -118,7 +118,7 @@
   text-align: right;
 }
 
-/* « Arrêter de chercher » une ceinture perdue, sous la tuile BPM (lot 198). */
+/* « Arrêter de chercher » une ceinture perdue, sous la tuile BPM. */
 .rec-belt-stop {
   display: flex;
   align-items: center;
@@ -128,7 +128,7 @@
   font-size: var(--text-s);
 }
 
-/* Matériel choisi à la fin de la session, avant « Analyser » (lot 143, 131). */
+/* Matériel choisi à la fin de la session, avant « Analyser ». */
 .rec-end-gear {
   margin-bottom: var(--space-3);
 }

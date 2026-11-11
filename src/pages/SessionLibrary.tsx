@@ -63,7 +63,7 @@ const PREVIEW_CREDIT_NAME = previewCreditName.join(' ');
  *
  * Les sessions et itinéraires d'une activité cachée dans Réglages n'y sont
  * pas, une ligne dit combien ; la page d'une famille cachée, ouverte par son
- * adresse, montre tout et le rappelle (§10, point 100).
+ * adresse, montre tout et le rappelle.
  */
 
 /**
@@ -119,13 +119,13 @@ const previewMeta = new Map<string, PreviewMeta>();
 const PREVIEW_META_MAX = 400;
 
 /**
- * Points des vignettes déjà calculées (E-O7) : revenir sur la bibliothèque, ou
+ * Points des vignettes déjà calculées : revenir sur la bibliothèque, ou
  * changer de bornes ou de taille, ne relit ni ne réanalyse le GPX. Chaque
  * trace est gardée réduite au zoom de sa vignette (`zoom`, `Infinity` pour les
  * points entiers tirés du GPX) ; une vignette d'un zoom plus fort relit le
  * GPX. Au plus `PREVIEW_POINTS_MAX` points en tout, les moins récents oubliés
  * d'abord. D'un lancement à l'autre, les traces réduites sont gardées sur
- * l'appareil (`previewStore`, lot 118) : au lancement suivant, une vignette
+ * l'appareil (`previewStore`) : au lancement suivant, une vignette
  * trouvée là se dessine sans relire le GPX.
  */
 const previewPoints = new Map<string, { points: SessionColorTrack['points']; zoom: number }>();
@@ -156,7 +156,7 @@ const rememberPoints = (key: string, points: SessionColorTrack['points'], zoom: 
  * densité de l'écran, le thème économe et les bornes de couleur ; une
  * vignette affichée n'est jamais libérée. D'un lancement à l'autre, l'image
  * finie (trace sur son fond, toutes tuiles présentes) est gardée sur
- * l'appareil sous la même clé (`previewImageStore`, lot 121), jamais dans la
+ * l'appareil sous la même clé (`previewImageStore`), jamais dans la
  * fiche ; en économe, rien n'est gardé (pas de fond à attendre).
  */
 const previewImages = createHeldCache<string>(200, (url) => URL.revokeObjectURL(url));
@@ -168,7 +168,7 @@ const previewImages = createHeldCache<string>(200, (url) => URL.revokeObjectURL(
  * fond en une image fixe (`drawTrackPreview`), au cadrage et à la coloration
  * de l'analyse ; redessinée seulement si la vignette change de taille ou la
  * trace de bornes. Aucune carte vivante : une longue bibliothèque reste
- * légère. Un toucher ouvre l'analyse. En économe (décision du 28/10), la
+ * légère. Un toucher ouvre l'analyse. En économe (choix du produit), la
  * trace seule, sur le fond noir des cartes de la page, sans le plan d'OSM.
  */
 function SessionPreviewMap({ session, activity, family, folderLabel, onOpen }: {
@@ -345,7 +345,7 @@ function SessionPreviewMap({ session, activity, family, folderLabel, onOpen }: {
 
 /**
  * Ligne d'une session. Mémorisée, rappels stables : un balayage de la
- * bibliothèque ne redessine que les lignes dont la fiche change (E-O1).
+ * bibliothèque ne redessine que les lignes dont la fiche change.
  */
 const SessionRow = memo(function SessionRow({
   session, activity, activities, family, fromActivityId, folderLabel, confirming, onAskDelete, onCancelDelete,
@@ -456,7 +456,7 @@ const SessionRow = memo(function SessionRow({
 });
 
 /**
- * Résumés refaits en tâche de fond (version du calcul, réglage d'activité changé), lot 37 : une
+ * Résumés refaits en tâche de fond (version du calcul, réglage d'activité changé) : une
  * ligne tant qu'il en reste, lue à part pour que le compteur ne redessine pas la liste.
  */
 function OutdatedSummaries() {
@@ -493,7 +493,7 @@ function SessionLibrary({ family }: { family: SportFamily }) {
   /** Famille cachée, ouverte par son adresse : tout y est montré. */
   const familyHidden = !families.includes(family);
   const [params, setParams] = useSearchParams();
-  // Le filtre d'activité vit dans l'adresse (lot 158) : il survit à une analyse ouverte puis fermée.
+  // Le filtre d'activité vit dans l'adresse : il survit à une analyse ouverte puis fermée.
   const filter = params.get('activite') ?? 'all';
   const setFilter = (next: string) => setParams((current) => {
     const updated = new URLSearchParams(current);
@@ -569,7 +569,7 @@ function SessionLibrary({ family }: { family: SportFamily }) {
     [activities, family, listed]
   );
   const FamilyIcon = FAMILY_ICON[family];
-  // La liste se rouvre là où on l'a laissée en revenant d'une analyse (lot 158).
+  // La liste se rouvre là où on l'a laissée en revenant d'une analyse.
   useRetainedScroll(`bibliotheque:${family}`, library.status !== 'opening');
 
   const row = (session: LibrarySession) => (

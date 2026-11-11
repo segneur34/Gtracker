@@ -20,7 +20,7 @@ import { readStoredActivities } from './useSportSettings';
  * sessions : une fiche JSON qui fait foi et son GPX, réécrits ensemble. Le
  * nom de fichier est tiré du nom de l'itinéraire à son premier rangement et
  * ne change plus. Hors de React : la page (`useRouteLibrary`) et la file des
- * fichiers reçus (`sessionLibrary/incoming.ts`, lot 194, qui reçoit
+ * fichiers reçus (`sessionLibrary/incoming.ts`, qui reçoit
  * `importRouteGpx` de `main.tsx`) y rangent l'une et l'autre.
  */
 
@@ -61,7 +61,7 @@ const listRoutes = async (): Promise<SavedRoute[]> => {
   return routes.sort((a, b) => (a.record.updatedAt < b.record.updatedAt ? 1 : a.record.updatedAt > b.record.updatedAt ? -1 : 0));
 };
 
-/** Itinéraires de la mémoire ouverte, lus une fois pour toutes les pages (lot 158) et relus après chaque rangement ou suppression. */
+/** Itinéraires de la mémoire ouverte, lus une fois pour toutes les pages et relus après chaque rangement ou suppression. */
 export const routeStore = createLoadedListStore(listRoutes, (err) => plainError(err, 'Lecture des itinéraires impossible.'));
 
 /** GPX rangé d'une fiche, et partagé : le tracé pour les autres applications, la fiche en extension pour Gtracker. */
@@ -138,7 +138,7 @@ export const importRouteGpx = async (text: string, fileName: string): Promise<Sa
 
 /**
  * Fichier partagé d'un itinéraire : le GPX tel que rangé (`routeGpxOf`), refait
- * de la fiche, qui fait foi (un itinéraire rangé avant le lot 194 gagne ainsi
+ * de la fiche, qui fait foi (un itinéraire rangé avant l'ajout de la fiche gagne ainsi
  * sa fiche en extension) ; celui d'une version plus récente, relu tel quel.
  */
 export const routeShareFile = async (saved: SavedRoute): Promise<{ fileName: string; text: string }> => {

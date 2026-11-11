@@ -17,7 +17,7 @@ describe("lecture du GPX d'une analyse (B2)", () => {
   });
 });
 
-describe('suite donnée à une lecture terminée (lot 157)', () => {
+describe('suite donnée à une lecture terminée', () => {
   const text: GpxLoadOutcome = { text: '<gpx/>' };
   const missing: GpxLoadOutcome = { error: 'GPX introuvable dans la mémoire.', retry: false };
   const thrown: GpxLoadOutcome = { error: 'Accès au dossier refusé.', retry: true };
@@ -38,7 +38,7 @@ describe('suite donnée à une lecture terminée (lot 157)', () => {
   });
 });
 
-describe('session en cours de lecture (lot 157)', () => {
+describe('session en cours de lecture', () => {
   it('aucune session demandée : rien à lire', () => {
     expect(sessionReading({ requested: null, ready: true, known: true, deliveredFor: null, error: null })).toBe(false);
   });

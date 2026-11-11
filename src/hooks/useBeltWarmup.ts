@@ -37,7 +37,7 @@ export function useBeltWarmup(belt: HeartRateBelt | null, active: boolean): {
     holdBelt(HOLDER, belt)
       .then(() => {
         // La page n'en veut plus depuis la demande : la rendre aussitôt, sauf si une prise plus
-        // récente la tient sous le même nom (double passage d'effet de StrictMode, banc du 28/10).
+        // récente la tient sous le même nom (double passage d'effet de StrictMode).
         if (cancelled && !handingOver.current && generation.current === mine) releaseBelt(HOLDER);
       })
       .catch((err: unknown) => {

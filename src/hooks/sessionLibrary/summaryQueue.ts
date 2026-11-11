@@ -20,9 +20,9 @@ import { rebuildCache } from './cache';
 import type { SummaryJob } from './scan';
 
 /**
- * File des résumés (lot 113) : crée ou recalcule les fiches une trace à la fois, en laissant l'interface
+ * File des résumés : crée ou recalcule les fiches une trace à la fois, en laissant l'interface
  * répondre, au lancement, à « Mettre à jour » et après un réglage changé. Le calcul d'un résumé se fait hors du
- * fil de l'affichage (lot 126 B, `library/trackWorker.ts`), et reste remplaçable (`setSummaryRunner`).
+ * fil de l'affichage (`library/trackWorker.ts`), et reste remplaçable (`setSummaryRunner`).
  */
 
 /** `stopped` : le dossier a changé, le balayage s'arrête ; `blank` : GPX vide, qui n'est pas une session (ignoré, pas effacé). */
@@ -222,7 +222,7 @@ let outdatedAgain = false;
 
 /**
  * Refait en tâche de fond les résumés périmés, dont ceux d'un geste dans Réglages (seuil ou foil d'une
- * activité changés, pré-réglage effacé), comparé ici (`noteSettingsGestures`), lot 37 : une trace à la
+ * activité changés, pré-réglage effacé), comparé ici (`noteSettingsGestures`) : une trace à la
  * fois, par le même passage que les fiches du lancement (`completeScan`), la plus récente d'abord.
  * Attend la fin de l'ouverture, d'une relecture ou d'un passage en cours ; s'arrête avec lui si la
  * mémoire change (`generation`). Appelé de nouveau pendant qu'il tourne, il réévalue une fois à la

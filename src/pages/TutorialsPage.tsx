@@ -8,7 +8,7 @@ import { useTutorials } from '../hooks/useTutorials';
 import '../components/Tutorials.css';
 
 /**
- * Tous les tutoriels (`/tutoriels`, lot 147) : les leçons dans l'ordre du
+ * Tous les tutoriels (`/tutoriels`) : les leçons dans l'ordre du
  * programme, celles des familles cachées retirées, une coche sur celles lues ;
  * ouverte depuis Réglages › Tutoriels, où le retour ramène.
  */

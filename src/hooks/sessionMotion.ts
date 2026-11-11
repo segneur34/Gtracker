@@ -5,7 +5,7 @@ import { readSessionMotion } from './useSessionLibrary';
 /**
  * Capteurs d'une session (`.imu`) lus et décodés une seule fois pour les
  * sauts et le pumping. Un seul fichier gardé en mémoire, celui de la session
- * ouverte, et libéré dès que plus aucune analyse ne le lit (27/10) : une
+ * ouverte, et libéré dès que plus aucune analyse ne le lit : une
  * capture décodée pèse des dizaines de Mo.
  */
 

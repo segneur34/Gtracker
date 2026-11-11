@@ -5,7 +5,7 @@ import { createFakeFolder, fakeEntries } from '../test/memoryFolder.fixture';
 import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
- * Bibliothèque sur un faux dossier (lot 3 de la revue du 27/10) : import sans
+ * Bibliothèque sur un faux dossier : import sans
  * dossier, import d'un dossier fichier par fichier, ordre de suppression,
  * fiche non écrite tenue hors du cache.
  */
@@ -112,7 +112,7 @@ beforeEach(() => {
   storageFailed = false;
 });
 
-describe('isolement des tests (lot 159)', () => {
+describe('isolement des tests', () => {
   it('chaque ouverture repart d’un stockage neuf, même simulé : l’ordre des tests ne compte pas', async () => {
     await openFresh();
     const first = (await import('../platform/storage')).jsonStore;
@@ -122,7 +122,7 @@ describe('isolement des tests (lot 159)', () => {
   });
 });
 
-describe('import sans dossier mémoire (E-B2, décision du 27/10 : refusé)', () => {
+describe('import sans dossier mémoire (refusé)', () => {
   it("ne met rien en attente et refuse l'import", async () => {
     access = 'unavailable';
     const library = await openFresh();
@@ -134,7 +134,7 @@ describe('import sans dossier mémoire (E-B2, décision du 27/10 : refusé)', ()
   });
 });
 
-describe("import d'un dossier (E-B1)", () => {
+describe("import d'un dossier", () => {
   it('lit chaque session juste avant de la ranger, jamais tout le dossier d’abord', async () => {
     const library = await openFresh();
     await settle(library);
@@ -161,7 +161,7 @@ describe("import d'un dossier (E-B1)", () => {
   });
 });
 
-describe('suppression (E-B9)', () => {
+describe('suppression', () => {
   it('retire le GPX d’abord : un échec ensuite ne ressuscite pas la session sans ses notes', async () => {
     const library = await openFresh();
     await settle(library);
@@ -173,7 +173,7 @@ describe('suppression (E-B9)', () => {
   });
 });
 
-describe('fiche non écrite (E-B10)', () => {
+describe('fiche non écrite', () => {
   it("n'entre pas dans le cache des fiches", async () => {
     const library = await openFresh();
     await settle(library);
@@ -239,7 +239,7 @@ describe('enregistrement en attente d\'un dossier (A2)', () => {
   });
 });
 
-describe('temporaires laissés en attente par un plantage (lot 84, A)', () => {
+describe('temporaires laissés en attente par un plantage', () => {
   it('range un GPX temporaire complet, efface un tronqué en le disant, et le reste d’une écriture achevée', async () => {
     pendingFiles.set('complet.gpx.tmp', gpxAt(0));
     pendingFiles.set('tronque.gpx.tmp', gpxAt(5).slice(0, 80));
@@ -255,7 +255,7 @@ describe('temporaires laissés en attente par un plantage (lot 84, A)', () => {
   });
 });
 
-describe('capteurs en attente listés mais introuvables (lot 84, A)', () => {
+describe('capteurs en attente listés mais introuvables', () => {
   it('ne les efface pas quand leur lecture ne rend rien, la session étant rangée sans eux', async () => {
     // Le faux dossier en attente rend `null` à toute lecture d'octets : absents ; une lecture qui lève : `useSessionLibrary.perte.test.ts`.
     pendingFiles.set('x.gpx.tmp', gpxAt(0));
@@ -269,7 +269,7 @@ describe('capteurs en attente listés mais introuvables (lot 84, A)', () => {
   });
 });
 
-describe('GPX vide dans le dossier (lot 84, C)', () => {
+describe('GPX vide dans le dossier', () => {
   it('n’est ni une session ni « illisible », et reste en place', async () => {
     files.set('sessions/vide.gpx', '');
     files.set('sessions/blanc.gpx', ' \n  ');
@@ -343,7 +343,7 @@ describe('stockage illisible au démarrage (A3)', () => {
   });
 });
 
-describe('fichiers de réglages illisibles et profil relu (lot 143, 123 b et d)', () => {
+describe('fichiers de réglages illisibles et profil relu', () => {
   beforeEach(() => {
     const data = new Map<string, string>();
     vi.stubGlobal('localStorage', { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => data.set(k, v) });

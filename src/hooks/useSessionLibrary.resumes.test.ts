@@ -6,10 +6,10 @@ import { createFakeFolder } from '../test/memoryFolder.fixture';
 import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
- * Résumés refaits quand les réglages changent (lot 37), sur un faux dossier : fiches d'avant
+ * Résumés refaits quand les réglages changent, sur un faux dossier : fiches d'avant
  * l'empreinte refaites une fois, rien de relu ni d'écrit à l'ouverture suivante, les sessions de
  * l'activité refaites après un seuil changé (à l'ouverture comme en cours d'utilisation), trace
- * illisible tentée une fois, déclenchement par un réglage écrit. La session garde ses réglages (Q57) :
+ * illisible tentée une fois, déclenchement par un réglage écrit. La session garde ses réglages :
  * ceux d'un autre appareil ne réécrivent rien, seul un geste le fait, repris s'il est interrompu.
  */
 
@@ -149,7 +149,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('la session garde ses réglages (Q57)', () => {
+describe('la session garde ses réglages', () => {
   const gestures = (): { baseline: Record<string, unknown>; pending: Record<string, unknown> } => JSON.parse(stored.get(STORAGE_KEYS.summaryGestures)!);
 
   /** L'autre appareil : mêmes fichiers, autre stockage, ses réglages datés (ce n'est pas un appareil neuf, qui reprendrait ceux du dossier). */
@@ -354,7 +354,7 @@ describe('la session garde ses réglages (Q57)', () => {
   });
 });
 
-describe('résumés refaits quand les réglages changent (lot 37)', () => {
+describe('résumés refaits quand les réglages changent', () => {
   it("refait une fois les fiches d'avant l'empreinte, puis ne relit ni n'écrit rien au lancement suivant", async () => {
     putSessions();
     const { library } = await openFresh();

@@ -5,7 +5,7 @@ import { jsonStore } from '../platform/storage';
 import { addGearItem, effectivePumping, readStoredSettings } from './useSportSettings';
 import { STORAGE_KEYS } from '../core/appIdentity';
 
-describe('matériel enregistré (lot 20) : écrit dans les réglages', () => {
+describe('matériel enregistré : écrit dans les réglages', () => {
   const wing: GearGroup = { id: 'g-aile', name: 'Aile', items: [{ id: 'i-5', name: 'Duotone 5' }, { id: 'i-6', name: 'Duotone 6' }] };
   const mast: GearGroup = { id: 'g-mat', name: 'Mât', items: [] };
   const memory = new Map<string, string>();
@@ -29,7 +29,7 @@ describe('matériel enregistré (lot 20) : écrit dans les réglages', () => {
     expect(addGearItem('wing', 'g-inconnu', 'Axis')).toBeNull();
   });
 
-  it('propose le pumping en voile sur foil comme en surf, pas en bateau (lot 22)', () => {
+  it('propose le pumping en voile sur foil comme en surf, pas en bateau', () => {
     const wing = DEFAULT_ACTIVITIES.find((a) => a.base === 'wingfoil')!;
     const boat = { id: 'a-voilier', name: 'Voilier', base: 'bateau' as const, color: '#014e86' };
     expect(effectivePumping(wing)).toBe(false);

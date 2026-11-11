@@ -329,7 +329,7 @@ export interface ManeuverSummary {
   jibe: ManeuverTypeSummary | null;
   /** Sens incertain : moyennes seulement, aucun podium (`MANEUVER_METRICS[].ranked`). */
   undecided: ManeuverTypeSummary | null;
-  /** Virements et empannages par amure avant la manœuvre (HISTORIQUE, point 267). */
+  /** Virements et empannages par amure avant la manœuvre. */
   byTack: Record<'tack' | 'jibe', ManeuversByTack>;
 }
 
@@ -479,7 +479,7 @@ export interface WindInputWarning {
 }
 
 /**
- * Avertissement d'un vent saisi probablement faux (HISTORIQUE, point 268) : avec des
+ * Avertissement d'un vent saisi probablement faux : avec des
  * bords à ±45° du vent, un vent saisi à plus de 45° du vent calculé met
  * l'approche et la sortie d'un virement du même côté de l'axe, et toutes les
  * manœuvres tombent en « sens incertain » sans qu'aucun chiffre ne le relie
@@ -512,7 +512,7 @@ export const summarizeManeuvers = (maneuverStats: ManeuverStats | null): Maneuve
 export type ManeuverSpan = Pick<ManeuverLocation, 'entryIndex' | 'exitIndex'>;
 
 /**
- * Ce que la VMG écarte d'une manœuvre : sa rotation seule (décidé le 05/11), la
+ * Ce que la VMG écarte d'une manœuvre : sa rotation seule, la
  * relance pouvant durer jusqu'à une minute sans être encore la manœuvre. Les
  * mêmes bornes pour les chiffres, la courbe et les trous qu'elle franchit.
  */
@@ -555,7 +555,7 @@ const vmgSums = (trackData: PointData[], wind: WindReference, minSpeedKn: number
     const stepS = (p.timeMs - trackData[k - 1].timeMs) / 1000;
     const dt = p.segmentStart ? 0 : Math.max(0, stepS);
     const diff = angleDiff(p.bearing, windAt(wind, p.timeMs));
-    // Trou de trace (règle 6, comme les manœuvres : HISTORIQUE, point 225) : vitesse moyenne du pas = distance retenue (bornée par
+    // Trou de trace (règle 6, comme les manœuvres) : vitesse moyenne du pas = distance retenue (bornée par
     // la corde, nulle si immobile) / durée. Hors trou, la vitesse lissée du point, inchangée.
     const speed = dt > maxGapS && p.stepDistanceM !== undefined ? msToKnots(p.stepDistanceM / dt) : p.smoothedSpeed;
     const vmg = speed * Math.cos(diff * (Math.PI / 180));
@@ -599,7 +599,7 @@ export const calculateVmgStats = (
   let sumUpStbd = 0, sumUpPort = 0, sumDownStbd = 0, sumDownPort = 0;
   let cUpStbd = 0, cUpPort = 0, cDownStbd = 0, cDownPort = 0;
 
-  // Fenêtres candidates au podium (toutes au-dessus du minimum), au près et au portant, en tableaux typés (HISTORIQUE, point 197).
+  // Fenêtres candidates au podium (toutes au-dessus du minimum), au près et au portant, en tableaux typés (ouverture rapide d'une longue session).
   const up = { starts: new Int32Array(n), ends: new Int32Array(n), vals: new Float64Array(n), size: 0 };
   const down = { starts: new Int32Array(n), ends: new Int32Array(n), vals: new Float64Array(n), size: 0 };
   let j = 0;
@@ -711,9 +711,8 @@ export const vmgSeries = (
 };
 
 /**
- * Points de la courbe de VMG que le trait franchit d'un seul tenant (05/11,
- * demande de l'utilisateur : une courbe coupée à chaque manœuvre devient
- * illisible) : les trous qui contiennent une manœuvre, entre deux valeurs. Un
+ * Points de la courbe de VMG que le trait franchit d'un seul tenant (une
+ * courbe coupée à chaque manœuvre devient illisible) : les trous qui contiennent une manœuvre, entre deux valeurs. Un
  * autre trou (arrêt, passage sous le seuil, trace coupée) reste un trou, il dit
  * que rien de comparable ne s'est passé là. La manœuvre reste écartée : aucune
  * valeur n'y est tracée, le trait va droit d'un bord à l'autre.

@@ -54,13 +54,13 @@ import { CHART_GRID_PROPS, CHART_TICK, OTHERS_COLOR, chartTick, yAxisLabel } fro
 import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
- * Statistiques (lot 5, étape 1) : une vue d'ensemble, puis une famille, puis
+ * Statistiques : une vue d'ensemble, puis une famille, puis
  * une activité, sur une période au choix, tirées du résumé des fiches sans
  * relire un seul GPX (`library/stats.ts`). Le choix est dans l'adresse
  * (`?famille=&activite=&materiel=&periode=`) : le retour arrière remonte d'un niveau.
- * Le filtre « Matériel » (lot 20) garde les sessions d'une activité qui
+ * Le filtre « Matériel » garde les sessions d'une activité qui
  * portent une pièce de son matériel enregistré ; une ligne par groupe depuis
- * le lot 146, croisées : une session compte si elle porte chaque pièce choisie
+ * le filtre par groupe, croisées : une session compte si elle porte chaque pièce choisie
  * (`materiel=groupe:piece,groupe:piece`).
  * Le dernier choix est retenu sur l'appareil : une adresse sans paramètre le
  * reprend à l'ouverture.
@@ -174,7 +174,7 @@ interface ChartRow extends MetricPoint {
 
 /**
  * Forme des points, pointillé de la tendance et mot de la légende de chaque série, par sa clé : l'empannage
- * (jibe) en rond, le virement (tack) en triangle (23/10). Une série sans entrée prend celle d'une série seule.
+ * (jibe) en rond, le virement (tack) en triangle. Une série sans entrée prend celle d'une série seule.
  */
 const SERIE_STYLE: Record<string, { shape: 'circle' | 'triangle'; dash: string; legend: string }> = {
   empannages: { shape: 'circle', dash: '4 3', legend: 'empannage (jibe)' },

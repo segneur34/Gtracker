@@ -32,7 +32,7 @@ import { findSession, sessionOfFile } from './sessionLibrary/memory';
  * arrière-plan.
  *
  * Ce fichier est le point d'entrée : les pages n'importent que lui. Le reste est
- * découpé par sujet sous `hooks/sessionLibrary/` (lot 113), en couches dont
+ * découpé par sujet sous `hooks/sessionLibrary/`, en couches dont
  * chacune n'importe que les précédentes (`couches.test.ts`) : `store`,
  * `memory`, `summarySettings`, `recordWrites`, `cache`, `scan`,
  * `summaryQueue`, `deviceSettings`, `addSession`, `pending`, `importer`, `incoming`,

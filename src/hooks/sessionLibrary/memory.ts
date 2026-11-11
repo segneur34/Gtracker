@@ -9,7 +9,7 @@ import type { FileStat, MemoryFolder } from '../../platform/memoryFolder';
 import { setState, type LibraryState } from './store';
 
 /**
- * Mémoire ouverte (lot 113) : l'état partagé par toutes les parties de la bibliothèque (`lib`), la liste des
+ * Mémoire ouverte : l'état partagé par toutes les parties de la bibliothèque (`lib`), la liste des
  * sessions, ses index et sa publication, les fiches pas encore écrites et la relecture d'une fiche allégée.
  */
 
@@ -127,7 +127,7 @@ export const removing = new Set<string>();
 
 /**
  * Fiches dont la dernière écriture a échoué : le fichier du disque n'est pas
- * la fiche en mémoire, qui n'entre donc pas dans le cache (E-B10). Retentées à
+ * la fiche en mémoire, qui n'entre donc pas dans le cache. Retentées à
  * chaque `flushWrites` (arrière-plan, « Mettre à jour », changement de
  * dossier), gardées en mémoire par une relecture (`keptInMemory`, `scan`),
  * retirées à la première écriture réussie ; au changement de dossier, leurs
@@ -224,7 +224,7 @@ export const hydrateSession = (f: MemoryFolder, file: string, quiet = false): Pr
     const text = isBlankRecordText(read) ? null : read;
     const parsed = text === null ? null : parseRecordWithRaw(text);
     const parts = parsed?.parts ?? null;
-    // Résumé du disque illisible (écriture interrompue) : celui de la mémoire, refait depuis le GPX, le remplace (E-B10).
+    // Résumé du disque illisible (écriture interrompue) : celui de la mémoire, refait depuis le GPX, le remplace.
     const disk = parts ? { ...parts, summary: parts.summary ?? current.record.summary } : null;
     if (text !== null && !disk) {
       replaceSession({ ...current, partial: false, readOnly: true, warning: DAMAGED_RECORD_WARNING }, quiet);

@@ -21,7 +21,7 @@ interface LoadedListStore<T> {
 }
 
 /**
- * Magasin partagé d'une liste lue dans la mémoire (lot 158), au lieu d'une
+ * Magasin partagé d'une liste lue dans la mémoire, au lieu d'une
  * lecture par page montée : les itinéraires étaient relus en entier (un
  * listage et une lecture par fiche) à chaque montage de chaque page.
  * `list` rend la liste ; `describe` met en clair l'erreur d'une lecture.

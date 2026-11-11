@@ -30,7 +30,7 @@ import { activityOfSession, activitySummarySettings, newRecord, recordFor, sessi
 import { noteRecordEdits, resummarize, scheduleRecordWrite, writeRecordFile } from './recordWrites';
 
 /**
- * Entrée d'une session dans la mémoire (lot 113) : son GPX, sa fiche et ses capteurs, ou ce qui manque à une
+ * Entrée d'une session dans la mémoire : son GPX, sa fiche et ses capteurs, ou ce qui manque à une
  * session déjà là ; mise en attente d'un dossier pour un enregistrement.
  */
 
@@ -88,7 +88,7 @@ export interface AddOptions extends NewRecordOptions {
  * surf (vols sur foil, vagues sinon, au seuil de la fiche ou de l'activité)
  * si son profil le demande (`pump.pruneCapture`), sinon gardés entiers. En
  * voile sur foil, Pumping coché (fiche, sinon activité), gardés entiers aussi :
- * le pumping se mesure sur tout le vol (décision du 28/10).
+ * le pumping se mesure sur tout le vol.
  * En cas d'échec, la capture complète : on ne perd jamais de mesure par erreur.
  */
 const prunedMotion = async (
@@ -124,14 +124,14 @@ export const addGpx = async (text: string, source: SessionSource, options: AddOp
   let analyzed: AnalyzedGpx | null;
   try {
     const sport = options.sport !== undefined ? options.sport : from?.sport ?? undefined;
-    // Hors du fil de l'affichage (lot 161) : « Rangement… » se peint et la page répond pendant le calcul. Réglages lus
+    // Hors du fil de l'affichage : « Rangement… » se peint et la page répond pendant le calcul. Réglages lus
     // avant l'envoi ; le GPX seul part, jamais les capteurs ; mêmes chiffres et mêmes erreurs qu'en ligne (`runTrackJob`).
     analyzed = await runInWorker('summarize', text, summarizeGpxOptions({ ...from, sport }, sessionSummarySettings(from, options.activityId ?? from?.activityId)));
   } catch (err) {
     return { status: 'invalid', file: null, message: errorMessage(err, 'GPX illisible.') };
   }
   if (!analyzed) return { status: 'invalid', file: null, message: 'Pas assez de points horodatés.' };
-  // Import d'un GPX sans fiche ni calcul imposé, dont le `<type>` dit la course, le vélo ou l'entraînement : refusé (lot 321).
+  // Import d'un GPX sans fiche ni calcul imposé, dont le `<type>` dit la course, le vélo ou l'entraînement : refusé.
   // Jamais pour une session qui a sa fiche : la recopie de la mémoire du navigateur garde ses sessions « à classer ».
   if (source === 'import' && !from && options.sport === undefined && analyzed.otherSport) return { status: 'other-sport', file: null };
 
@@ -194,7 +194,7 @@ export const addGpx = async (text: string, source: SessionSource, options: AddOp
   const f = writableFolder();
   const name = sessionFileName(startMs, analyzed.sport);
   if (!f) {
-    // Seul un enregistrement attend un dossier ; un import sans dossier est refusé (décision du 27/10).
+    // Seul un enregistrement attend un dossier ; un import sans dossier est refusé.
     const pending = source === 'enregistrement' ? pendingFolder() : null;
     if (!pending) return { status: 'unsaved', file: null };
     // Les capteurs, puis la fiche, avant le GPX : un GPX en attente a toujours les siens complets à côté de lui.

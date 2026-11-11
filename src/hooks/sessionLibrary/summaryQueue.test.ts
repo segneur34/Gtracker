@@ -9,7 +9,7 @@ import { sessionRecord } from '../../test/record.fixture';
 import type { SummaryRunner } from './summaryQueue';
 
 /**
- * Calcul des résumés remplaçable (lot 113), asynchrone depuis le lot 126 B (worker) : la file appelle le calcul
+ * Calcul des résumés remplaçable, asynchrone (worker) : la file appelle le calcul
  * donné, une trace à la fois, dans le même ordre et avec la même pause entre deux, et range ce qu'il rend ; la
  * session est relue au retour du calcul (saisie gardée, résumé refait si ses réglages ont changé).
  */
@@ -112,7 +112,7 @@ describe('calcul des résumés de la file (setSummaryRunner)', () => {
   });
 });
 
-describe('calcul asynchrone (lot 126 B) : la session relue quand le résumé revient', () => {
+describe('calcul asynchrone : la session relue quand le résumé revient', () => {
   /** Calcul qui ne rend son résumé que sur demande (`calls[i].resolve`). */
   const heldRunner = () => {
     const calls: { options: SummarizeGpxOptions; resolve: (analyzed: AnalyzedGpx | null) => void }[] = [];

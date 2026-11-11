@@ -19,7 +19,7 @@ export interface ChartZoom {
 
 /**
  * Zoom d'un ou de plusieurs graphes qui partagent leur axe, hors de l'état du
- * module (lot 127) : une image de pincement ne redessine que ce qui le lit
+ * module : une image de pincement ne redessine que ce qui le lit
  * (`ZoomView`, `useZoomState`), pas toute la page d'analyse, comme le survol
  * (`useChartHover`). Rendue stable tant que l'étendue et la session ne
  * changent pas : elle passe telle quelle à un panneau mémoïsé.
@@ -71,7 +71,7 @@ export const createChartZoomStore = (): ChartZoomStore => {
 /**
  * Source d'un zoom sur un magasin, pour une étendue et une session : une
  * plage posée dans une autre session ne se lit pas (« tout voir » à chaque
- * session, comme avant le lot 127).
+ * session).
  */
 export const chartZoomSource = (store: ChartZoomStore, full: XRange | null, resetKey: unknown): ChartZoomSource => {
   const minSpan = full ? (full.max - full.min) * CHART_ZOOM_MIN_FRACTION : 0;
@@ -102,7 +102,7 @@ export const useChartZoomSource = (fullRange: XRange | null, resetKey?: unknown)
   const fullMin = fullRange?.min;
   const fullMax = fullRange?.max;
   // Un seul objet tant que les bornes ne changent pas : `shown`, les `domain` des axes et le tronçon
-  // d'« Afficher » (`useZoomOnMap`) ne sont pas refaits à chaque rendu (27/10).
+  // d'« Afficher » (`useZoomOnMap`) ne sont pas refaits à chaque rendu.
   const full = useMemo(
     () => (fullMin === undefined || fullMax === undefined ? null : { min: fullMin, max: fullMax }),
     [fullMin, fullMax]

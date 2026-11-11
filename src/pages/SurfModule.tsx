@@ -74,11 +74,11 @@ import type { ChartZoom } from '../hooks/useChartZoom';
 import { shareExtraStats } from '../library/shareStats';
 
 /**
- * Analyse d'une session de surf (§10, point 97), selon le patron commun
+ * Analyse d'une session de surf, selon le patron commun
  * (`docs/MISE_EN_PAGE.md`) : carte colorée par la vitesse, puis les onglets.
  * « général » porte la synthèse ; « vagues » le tableau des vagues ; « rame »
  * les remontées et le retour au pic ; « vols », sur foil seulement, les vols
- * qui relient plusieurs vagues en pompant (point 104), et à part « pumping »,
+ * qui relient plusieurs vagues en pompant, et à part « pumping »,
  * les séries de coups mesurées par les capteurs si la session les a ; « tops », si l'activité le coche
  * dans Réglages (paddle, kayak, downwind), les meilleurs passages sur chaque
  * durée ou distance ; « graphiques » la vitesse au fil
@@ -96,7 +96,7 @@ const panelId = (name: string) => `${STORAGE_ID}.${name}`;
 
 /**
  * Graphes de l'onglet « graphiques » dépliés : avec la FC, chacun se replie à
- * part pour ne comparer que ceux qui restent ouverts (16/10). Choix gardé sur l'appareil.
+ * part pour ne comparer que ceux qui restent ouverts. Choix gardé sur l'appareil.
  */
 const GRAPH_FOLDS_DEFAULT = { vitesse: true, fc: true };
 /** Hauteur de base d'un graphe : le panneau suit le nombre de graphes dépliés. */
@@ -122,7 +122,7 @@ const tdStyle = { padding: '0.35em 0.5em', textAlign: 'center', whiteSpace: 'now
 
 const orDash = (value: number | null, format: (v: number) => string): string => (value === null ? '—' : format(value));
 
-/** Colonnes des vols propres au surf : vagues du vol, temps de vol hors des vagues vu par le GPS (lot 50 : ce n'est pas du pumping). */
+/** Colonnes des vols propres au surf : vagues du vol, temps de vol hors des vagues vu par le GPS (ce n'est pas du pumping). */
 const SURF_FLIGHT_PODIUM_COLUMNS: FlightColumn<SurfFlight>[] = [
   { header: 'Vagues', cell: (f) => f.waveCount },
   { header: 'Hors vague', cell: (f) => formatShortDuration(f.pumpS) },
@@ -135,7 +135,7 @@ const ShowButton = ({ shown, onClick, disabled }: { shown: boolean; onClick: () 
 );
 
 /** Une ligne du graphe : `index` renvoie au point de trace d'origine. */
-/** Curseur commun aux graphes de vitesse et de FC (Q38) : ils lisent les mêmes lignes. */
+/** Curseur commun aux graphes de vitesse et de FC : ils lisent les mêmes lignes. */
 const SURF_SYNC_ID = 'surf';
 /** Graphes mémoïsés : sans changement de leurs props, un clic d'onglet ou un tri ne refait pas le dessin Recharts. */
 const MemoTrackChart = memo(TrackChart) as typeof TrackChart;
@@ -166,7 +166,7 @@ function SurfModule() {
     sessionFile, requested: requestedFile, shownFile, error: sessionError, reading, draft, record: draftRecord, allActivities, changeActivity: changeSessionActivity,
   } = useAnalysisSession({ family: 'surf', activity, setActivity, load: gpx.loadGpxContent, loadedFile: gpx.fileName, preparing: gpx.reading });
 
-  /** Seuil et foil de l'activité : ceux que la fiche de la session porte, sinon ceux de cet appareil (Q57). */
+  /** Seuil et foil de l'activité : ceux que la fiche de la session porte, sinon ceux de cet appareil. */
   const carried = sessionActivitySettings(draftRecord, { thresholdOverride: thresholdOverride ?? undefined, foil: activityFoil });
   /** Foil de la session (brouillon, puis fiche), sinon celui de l'activité. */
   const foil = draft.edits.foil ?? carried.foil ?? false;
@@ -188,7 +188,7 @@ function SurfModule() {
   const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(gpx.track, profile.heartRate, hrOffsetBpm);
   // Pumping des vols, par les capteurs de la session : il suit les vols, donc le seuil du brouillon.
   // Capteurs lus à l'ouverture de l'onglet « vols » ou « pumping », Pumping coché, comme en voile : une capture entière pèse plusieurs Mo ;
-  // et à celle de l'onglet « vagues », pour les virages du gyroscope (lot 40).
+  // et à celle de l'onglet « vagues », pour les virages du gyroscope.
   const sensors = useSessionPumping(shownFile, (pumping && (open.vols || open.pumping)) || open.vagues);
   const pumpDetection = surfProfile?.pump ?? null;
   /** Capteurs vus du pumping : rien tant que Pumping est décoché, même lus pour les virages de l'onglet « vagues ». */
@@ -254,12 +254,12 @@ function SurfModule() {
     ] : []),
     { key: 'distance', label: 'Distance totale', value: formatDistance(totalDistanceM, distanceUnit) },
     ...(heart.present && heart.stats ? [{ key: 'heartRate', label: 'FC moyenne', value: `${Math.round(heart.stats.avgBpm)} bpm` }] : []),
-    // Appréciation (05/11), comme le résumé d'une fiche.
+    // Appréciation, comme le résumé d'une fiche.
     ...shareExtraStats('surf', { rating: draft.edits.notes.rating }),
   ] : [];
 
   /**
-   * Chiffres de l'onglet « général » (22/10) : l'essentiel, le détail restant dans « avancé ».
+   * Chiffres de l'onglet « général » : l'essentiel, le détail restant dans « avancé ».
    * L'image de partage garde la liste entière (`generalStats`).
    */
   const overviewKeys = ['totalTime', 'waves', 'waveTime', 'longestWave', 'maxSpeed', ...(foil ? ['flightTime', 'longestFlight'] : []), 'heartRate'];
@@ -273,7 +273,7 @@ function SurfModule() {
   const waves = useMemo(() => analysis?.waves ?? [], [analysis]);
   const flights = useMemo(() => analysis?.flights ?? [], [analysis]);
   const returns = useMemo(() => analysis?.returns ?? [], [analysis]);
-  /** Virages du gyroscope de chaque vague (lot 40) ; absente : vague sans capture, qui garde ceux du GPS. */
+  /** Virages du gyroscope de chaque vague ; absente : vague sans capture, qui garde ceux du GPS. */
   const gyroTurns = useMemo(() => {
     const byWave = new Map<SurfWave, number>();
     if (!sensors.recording || !surfProfile) return byWave;
@@ -524,7 +524,7 @@ function SurfModule() {
                         if (s <= 0) return null;
                         const label = phase === 'glisse' && foil ? 'en vol' : PHASE_LABELS[phase];
                         // Sans foil, la glisse est faite des vagues : son temps est déjà « Sur la vague » au-dessus,
-                        // la légende ne le redit pas (demande du 19/10). Sur foil, « en vol » est une autre durée.
+                        // la légende ne le redit pas. Sur foil, « en vol » est une autre durée.
                         const repeated = phase === 'glisse' && !foil;
                         return (
                           <span key={phase} className="ui-inline-row-4 ui-center">
@@ -727,7 +727,7 @@ function SurfModule() {
               return (
               <ResizablePanel id={panelId('graphiques')} defaultHeight={folds ? undefined : 360} minHeight={folds ? 120 : 200} direction="vertical"
                 style={{ ...PANEL_BLOCK_STYLE, display: 'flex', flexDirection: 'column', overflow: folds ? 'auto' : 'hidden' }}>
-                {/* Le panneau suit le zoom, pas le module (lot 127). */}
+                {/* Le panneau suit le zoom, pas le module. */}
                 <ZoomView zoom={zoom}>
                   {(z) => {
                     const chartData = chartDataAt(z.view);

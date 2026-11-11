@@ -20,7 +20,7 @@ import { queueOutdatedRefresh } from './summaryQueue';
 import { STORAGE_KEYS } from '../../core/appIdentity';
 
 /**
- * Réglages de l'appareil, un fichier par appareil dans `reglages/` (§10, point 90 ; lot 113) : rapprochement à
+ * Réglages de l'appareil, un fichier par appareil dans `reglages/` : rapprochement à
  * l'ouverture, écriture différée, reprise du fichier d'un autre appareil, renommage, import ; et le vidage de
  * toutes les écritures en attente (`flushWrites`).
  */
@@ -110,7 +110,7 @@ export const forgetSettingsEntries = (): void => {
  * Fichiers de `reglages/` : les lisibles, et les noms de ceux qui ne se
  * lisent pas (abîmés, ou d'un autre format). Ceux-ci ne sont ni proposés ni
  * repris, mais leur nom reste pris : on ne sait pas de quel appareil ils
- * sont, et l'appareil n'écrit jamais par-dessus (lot 143).
+ * sont, et l'appareil n'écrit jamais par-dessus.
  */
 const readSettingsListing = async (f: MemoryFolder): Promise<{ entries: SettingsEntry[]; unreadable: string[] }> => {
   const entries: SettingsEntry[] = [];
@@ -395,7 +395,7 @@ export const libraryUiStarted = (): boolean => uiStarted;
 export const applySettingsChange = async (changed: boolean): Promise<void> => {
   if (!changed || !uiStarted) return;
   if (canReload()) {
-    // Fiches et réglages en attente d'écriture d'abord : le rechargement les perdrait (E-B7).
+    // Fiches et réglages en attente d'écriture d'abord : le rechargement les perdrait.
     await flushWrites();
     window.location.reload();
   } else {

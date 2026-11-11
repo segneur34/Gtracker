@@ -58,7 +58,7 @@ function StoredResultRow({ result, onRemove }: { result: StoredRestingResult; on
 }
 
 /**
- * Test de FC repos (24/10), ouvert depuis le Profil (lot 301) : 3 minutes immobile, la FC lue sur
+ * Test de FC repos, ouvert depuis le Profil : 3 minutes immobile, la FC lue sur
  * la ceinture, sans GPS ni enregistreur (`useRestingHrTest`). Le résultat est
  * la moyenne de 30 s la plus basse après la première minute, avec la courbe des 3 minutes ; on peut la
  * retenir comme FC repos de Pratiquant. Les tests faits restent sur l'appareil.

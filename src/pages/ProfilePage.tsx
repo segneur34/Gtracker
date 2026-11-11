@@ -32,7 +32,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Profil : une période en un coup d'œil (`library/profile.ts`), sur la
- * maquette du 22/10 et un fond de courbes de niveau. En tête, la photo ronde
+ * maquette et un fond de courbes de niveau. En tête, la photo ronde
  * (un dessin d'activité ou une image importée, choisis en la touchant ; sans
  * choix, le dessin du sport préféré de toutes les sessions) et le pseudo. Puis
  * la période, qui règle toute la page : semaine, 30 jours, 6 mois, année (les
@@ -155,7 +155,7 @@ function ProfilePage() {
   }, [inPeriod, activityOrder, activityById, shown]);
   const favoriteId = useMemo(() => favoriteActivity(inPeriod, activityOrder), [inPeriod, activityOrder]);
   const favorite = favoriteId ? activityById.get(favoriteId) ?? null : null;
-  // Photo par défaut : le sport préféré de toutes les sessions, qui ne change pas avec la période (voile et surf seuls, lot 303).
+  // Photo par défaut : le sport préféré de toutes les sessions, qui ne change pas avec la période (voile et surf seuls).
   const overallFavoriteId = useMemo(() => favoriteActivity(all, activityOrder), [all, activityOrder]);
   const overallFavorite = overallFavoriteId ? activityById.get(overallFavoriteId) ?? null : null;
   const openLibrary = (a: Activity) => navigate(libraryPath(activityFamily(a), a.id));
@@ -195,7 +195,7 @@ function ProfilePage() {
         </button>
         <div className="profile-head__text">
           <h1 className="profile-head__title">{name ?? 'Profil'}</h1>
-          {/* Le test de FC repos (lot 301), sous le titre : la hauteur de l'en-tête, et donc la racine, ne bougent pas. */}
+          {/* Le test de FC repos, sous le titre : la hauteur de l'en-tête, et donc la racine, ne bougent pas. */}
           <Link to={RESTING_HR_PATH} className="profile-head__link">
             Test de FC repos<IconChevronRight size={14} aria-hidden="true" />
           </Link>

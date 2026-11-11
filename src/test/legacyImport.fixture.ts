@@ -1,5 +1,5 @@
 /**
- * Jeu d'essai figé de la porte d'import (lot 320) : ce que l'application d'origine (Tracker 1.0.0) écrit pour une
+ * Jeu d'essai figé de la porte d'import : ce que l'application d'origine (Tracker 1.0.0) écrit pour une
  * session de wingfoil et une session de surf, en octets.
  *
  * Produit par le code du commit 2eed9e7 (copie de Tracker 1.0.0), ne pas retoucher à la main.
@@ -17,7 +17,7 @@
  *
  * Ce fichier contient forcément creator="Tracker", tracker-session, tracker-capteurs et l'adresse du dépôt
  * d'origine : c'est l'un des trois fichiers d'exception de la garde des anciens noms. Ne pas les « nettoyer ».
- * Il fige Tracker 1.0.0 au 08/11 : Tracker peut écrire autrement plus tard.
+ * Il fige l'écriture de cette version : l'application d'origine peut écrire autrement plus tard.
  *
  * Contenu : la trace de chaque session (GPX de l'enregistreur), sa fiche (nom, notes, deux repères, réglages
  * d'analyse complets, résumé version 18, sauts en voile), les capteurs de la voile (deux secondes), et le GPX complet

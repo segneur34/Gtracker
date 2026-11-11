@@ -51,7 +51,7 @@ const buildSurfSession = (phases: Phase[], cadenceS = 1): TrackPoint[] => {
 const surf = SPORT_PROFILES.surf.surf!;
 const params: SurfParams = {
   ...surf, maxGapS: SPORT_PROFILES.surf.maxGapS, maxSpeedWindowS: SPORT_PROFILES.surf.maxSpeedWindowS,
-  // Un seul plancher d'arrêt (Q43, lot 81) : celui du profil, 2 km/h.
+  // Un seul plancher d'arrêt : celui du profil, 2 km/h.
   stillMs: fromDisplaySpeed(SPORT_PROFILES.surf.stillThreshold, 'kmh'),
 };
 
@@ -173,7 +173,7 @@ describe('analyzeSurf, cadence', () => {
     expect(analysis.waves[1].distanceM).toBeCloseTo(120, -1);
   });
 
-  it('une glisse qui traverse un trou parcouru en mouvement reste une glisse (Q56), le pas du trou garde sa phase « trou »', () => {
+  it('une glisse qui traverse un trou parcouru en mouvement reste une glisse, le pas du trou garde sa phase « trou »', () => {
     // La deuxième vague (20 s à 6 m/s) perd ses points du milieu pendant 12 s, planche lancée : un seul pas de 13 s.
     const through: Phase[] = [
       ...MORNING.slice(0, 13),
@@ -293,7 +293,7 @@ describe('runSurfSession et résumé de la bibliothèque', () => {
   });
 });
 
-describe('vitesse max des vagues, plancher d’arrêt unique, pause manuelle (lot 81)', () => {
+describe('vitesse max des vagues, plancher d’arrêt unique, pause manuelle', () => {
   const profile = surfProfileOf(SPORT_PROFILES.surf)!;
 
   for (const cadenceS of [1, 0.2]) {

@@ -3,7 +3,7 @@ import type { PointData } from './pointData';
 import type { ManeuverLocation, ManeuverStats, WindReference } from './maneuvers';
 import { calculateVmgStats, calculateWindStats, vmgBridgedHoles, vmgChartRows, vmgManeuverSpans, vmgSeries, windInputWarning, type VmgStats } from './sailingAnalytics';
 
-/** Forme des copies gelées : cases en chaînes `toFixed(1)`, comme avant le lot 79. */
+/** Forme des copies gelées : cases en chaînes `toFixed(1)`, comme à l'origine. */
 type FrozenVmgStats = Omit<VmgStats, 'upStbd' | 'upPort' | 'downStbd' | 'downPort'> & Record<'upStbd' | 'upPort' | 'downStbd' | 'downPort', { max: string; avg: string }>;
 /** Le résultat d'aujourd'hui dans la forme gelée, pour le comparer à l'identique. */
 const asFrozen = (v: VmgStats): FrozenVmgStats => {
@@ -73,7 +73,7 @@ const legSession = (legS = 90, transitionS = 6) => {
 };
 
 /**
- * Version d'avant le 27/10, moyennes par point : la référence que la version
+ * Ancienne version, moyennes par point : la référence que la version
  * en sommes cumulées doit retrouver sur une trace régulière.
  */
 const legacyVmgStats = (trackData: PointData[], wind: WindReference, minSpeedKn: number, windowSeconds = 10): FrozenVmgStats => {
@@ -190,7 +190,7 @@ describe('calculateVmgStats', () => {
     });
   });
 
-  it('moyenne par bord pondérée par la durée : une cadence irrégulière donne la même moyenne que 1 Hz (lot 117)', () => {
+  it('moyenne par bord pondérée par la durée : une cadence irrégulière donne la même moyenne que 1 Hz', () => {
     // Un seul bord au près tribord : 12 nœuds pendant 200 s, puis 8 nœuds pendant 200 s.
     const speedAt = (t: number) => (t < 200 ? 12 : 8);
     const regular = buildTrackAt(regularTimes(400, 1), () => 315, speedAt);
@@ -246,7 +246,7 @@ describe('calculateVmgStats', () => {
     expect(calculateVmgStats(withStep, 0, MIN_KN)).toEqual(calculateVmgStats(plain, 0, MIN_KN));
   });
 
-  it('trou de trace (lot 100) : le pas du trou compte pour sa distance, pas pour la vitesse lissée du point de reprise', () => {
+  it('trou de trace : le pas du trou compte pour sa distance, pas pour la vitesse lissée du point de reprise', () => {
     // Bord au près à 12 nœuds ; trou de 60 s au milieu, bornée par la corde : le bateau n'a fait que 6 nœuds en moyenne.
     const build = (stepS: number): PointData[] => {
       const times = [...regularTimes(30, stepS), ...regularTimes(30, stepS).map((t) => t + 90)];
@@ -258,8 +258,8 @@ describe('calculateVmgStats', () => {
     const at1 = calculateVmgStats(build(1), 0, MIN_KN, 120)!;
     const at5 = calculateVmgStats(build(0.2), 0, MIN_KN, 120)!;
     const full = 12 * Math.cos(Math.PI / 4);
-    // Fenêtre de 120 s (au-delà du trou) : avant le lot 100 la vitesse lissée de 12 nœuds courait sur les 60 s du trou
-    // (8,485 partout) ; maintenant le trou pèse 6 nœuds : 60 s à 12 + 60 s à 6, sur 120 s, soit 9 nœuds de vitesse, 6,364 de VMG.
+    // Fenêtre de 120 s (au-delà du trou) : la vitesse lissée de 12 nœuds ne court pas sur les 60 s du trou
+    // (elle donnerait 8,485 partout) ; le trou pèse 6 nœuds : 60 s à 12 + 60 s à 6, sur 120 s, soit 9 nœuds de vitesse, 6,364 de VMG.
     expect(at1.upStbd.max).toBeLessThan(full - 1);
     expect(at1.upStbd.avg).toBeCloseTo(9 * Math.cos(Math.PI / 4), 0);
     expect(at5.upStbd.avg).toBeCloseTo(at1.upStbd.avg, 1);
@@ -293,7 +293,7 @@ describe('calculateWindStats', () => {
     expect(wind.maxWind).toBe(0);
   });
 
-  it('ne suit pas le vent aux manœuvres de sens incertain (lot 44)', () => {
+  it('ne suit pas le vent aux manœuvres de sens incertain', () => {
     const track = buildTrackAt(regularTimes(600, 1), () => 315, () => 12);
     const stats: ManeuverStats = {
       tackSuccess: 2, tackFail: 0, jibeSuccess: 0, jibeFail: 0, undecided: 2,
@@ -313,7 +313,7 @@ describe('calculateWindStats', () => {
   });
 });
 
-/** Copie gelée de `calculateVmgStats` d'avant le lot 56 (objets par fenêtre, filtre et tri du podium). */
+/** Copie gelée de `calculateVmgStats` d'origine (objets par fenêtre, filtre et tri du podium). */
 const frozenVmgStats = (trackData: PointData[], wind: WindReference, minSpeedKn: number, windowSeconds = 10): FrozenVmgStats | null => {
   if (trackData.length === 0) return null;
   const resolveWind = (w: WindReference, timeMs: number): number => (typeof w === 'function' ? w(timeMs) : w);
@@ -395,7 +395,7 @@ const frozenVmgStats = (trackData: PointData[], wind: WindReference, minSpeedKn:
   };
 };
 
-describe('calculateVmgStats, podium sans tri (lot 56)', () => {
+describe('calculateVmgStats, podium sans tri', () => {
   const session = legSession();
   // Vitesse bruitée et arrondie au dixième : beaucoup de fenêtres égales, l'ordre des égalités compte.
   let seed = 3;
@@ -418,7 +418,7 @@ describe('calculateVmgStats, podium sans tri (lot 56)', () => {
   });
 });
 
-describe('windInputWarning (lot 149, C1-3)', () => {
+describe('windInputWarning', () => {
   const stats = (counted: number, unclassified: number): ManeuverStats => ({
     tackSuccess: counted, tackFail: 0, jibeSuccess: 0, jibeFail: 0, undecided: 0,
     rejected: { slowEntry: 0, incoherent: 0, still: 0, unclassified, tooShort: 0, fullTurn: 0, noFlight: 0 },
@@ -441,7 +441,7 @@ describe('windInputWarning (lot 149, C1-3)', () => {
   });
 });
 
-describe('VMG sans les manœuvres (lot 167)', () => {
+describe('VMG sans les manœuvres', () => {
   /** Vent du nord : près tribord à 315° pendant 120 s, virement de 8 s, près bâbord à 45°, à 12 nœuds ; la vitesse tombe à 6 dans le virement. */
   const TURN_S = 120;
   const tackSession = (stepS: number) => {
@@ -576,7 +576,7 @@ describe('VMG sans les manœuvres (lot 167)', () => {
   });
 });
 
-describe('vmgChartRows (lot 167)', () => {
+describe('vmgChartRows', () => {
   const minutes = Array.from({ length: 100 }, (_, k) => k / 60);
   const toChart = (kn: number) => kn * 2;
 

@@ -43,7 +43,7 @@ export const useStoredRecord = <T extends object>(
     return value;
   };
   // Abonné au stockage : deux composants qui lisent la même clé (l'accueil et le pop-up du profil)
-  // voient chacun les écritures de l'autre, dès le premier rendu (E-B11).
+  // voient chacun les écritures de l'autre, dès le premier rendu.
   const value = useSyncExternalStore(jsonStore.subscribe, getValue);
 
   const update = useCallback(

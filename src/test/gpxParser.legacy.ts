@@ -1,8 +1,8 @@
-// Copie gelée le 04/11/2026 de `src/core/gpxParser.ts` (lot 159, version 0.4.71), ne pas modifier.
-// Elle est la référence du lecteur d'avant le lot 126 : `core/gpxParser.corpus.test.ts` compare le lecteur de
+// Copie gelée de `src/core/gpxParser.ts`, ne pas modifier.
+// Elle est la référence du lecteur d'avant sa réécriture : `core/gpxParser.corpus.test.ts` compare le lecteur de
 // l'application à elle, nombre à nombre, sur le corpus `test/gpx/corpus.ts`. Un écart voulu s'écrit dans ce test,
 // avec sa raison, jamais en retouchant cette copie. Fichier de test seulement : l'application ne l'importe pas.
-// Seule retouche (lot 325e) : la cadence et les points sans position (`timedPoints`, muscu) n'ont plus de lecteur dans
+// Seule retouche : la cadence et les points sans position (`timedPoints`, muscu) n'ont plus de lecteur dans
 // l'application et sont retirés des deux côtés ; la copie n'est plus gelée que sur les champs vivants.
 import type { RawTrackPoint } from '../core/types';
 
@@ -74,7 +74,7 @@ type PointField = (typeof POINT_FIELDS)[number];
 /**
  * Nœud de chacun des champs d'un point, comme `findByLocalName` le trouverait
  * (premier descendant de ce nom qualifié, sinon premier de ce nom local), en
- * un seul parcours des descendants au lieu d'un par champ (lot 56).
+ * un seul parcours des descendants au lieu d'un par champ.
  */
 const pointFieldNodes = (trkpt: Element): Record<PointField, Element | null> => {
   const qualified: Record<PointField, Element | null> = { time: null, ele: null, speed: null, course: null, hr: null };
@@ -155,9 +155,9 @@ export const parseGpx = (gpxContent: string): ParsedGpx => {
     // Un point sans horodatage ne sert à rien : toute la kinématique repose
     // sur la différence de temps entre deux points.
     if (!time) continue;
-    // Date lue une fois (lot 56), comme `pointTimeMs` la relirait. Une date
+    // Date lue une fois, comme `pointTimeMs` la relirait. Une date
     // illisible (`NaN`), ou qui recule sous le dernier point gardé, écarte le
-    // point ici, la seule place (lot 149, C2-1 et C2-2) : en aval, un recul
+    // point ici, la seule place : en aval, un recul
     // allongeait le pas suivant et fabriquait de faux tops, un `NaN` mettait
     // « NaN min » en temps actif et amputait les tops de toute la suite. Une
     // date égale est gardée : `spreadEqualTimes` la répartit.

@@ -6,7 +6,7 @@ import { directionChanges, type DirectionChange } from './gpsTurns';
 
 /**
  * Virages d'une vague mesurés par le gyroscope du téléphone fixé sur la
- * poitrine (lot 40). Un bottom turn ou un top turn dure environ une seconde :
+ * poitrine. Un bottom turn ou un top turn dure environ une seconde :
  * le GPS, à une position par seconde, ne le voit pas (`surfing/gpsTurns.ts`),
  * le gyroscope si.
  *
@@ -20,7 +20,7 @@ import { directionChanges, type DirectionChange } from './gpsTurns';
  * et le suivant : en `minDeg / minRateDegS` secondes au plus. Une dérive
  * lente, même secouée par la rame ou le pumping (le buste oscille vite, mais
  * de peu), n'est pas un virage : la vitesse de pointe ne suffit pas (séance
- * témoin du 14/10, sup foil à plat : 60° en 5 à 20 s, pointes de 40 à 120°/s).
+ * témoin, sup foil à plat : 60° en 5 à 20 s, pointes de 40 à 120°/s).
  * Tout en SI (secondes, radians) sauf les seuils, en degrés comme ceux du GPS.
  */
 

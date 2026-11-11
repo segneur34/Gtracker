@@ -19,7 +19,7 @@ export interface Listeners<A extends unknown[] = []> {
 }
 
 /**
- * Ensemble d'abonnés, le seul de l'application (lot 72). `safe` : un abonné
+ * Ensemble d'abonnés, le seul de l'application. `safe` : un abonné
  * qui lève n'empêche pas les suivants d'être prévenus, ni l'appelant de
  * poursuivre (enregistrement, direct, notification).
  */
@@ -88,7 +88,7 @@ export interface JsonSelector<T> {
 }
 
 /**
- * Lecture d'une partie d'une clé du magasin JSON (lot 72), une seule façon de
+ * Lecture d'une partie d'une clé du magasin JSON, une seule façon de
  * la garder pour tous : `select` n'est refait que si la valeur rangée change,
  * et la sélection précédente est rendue telle quelle tant que `equal` (même
  * texte JSON par défaut) la dit inchangée. Une écriture d'un autre réglage de

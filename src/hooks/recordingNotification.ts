@@ -23,7 +23,7 @@ import { effectiveDistanceUnit, effectiveNotificationFields, effectiveSpeedUnit 
  *
  * Le service GPS pose sa propre notification à son démarrage, au départ : la
  * première position qui suit la fait récrire. En pause manuelle, le service tourne encore (la carte du
- * direct suit le coureur, lot 104) mais ses positions ne viennent pas ici : la
+ * direct suit le coureur) mais ses positions ne viennent pas ici : la
  * notification « en pause » est posée seule, figée ; elle est effacée à
  * l'arrêt de l'enregistrement.
  */
@@ -106,7 +106,7 @@ const update = (force: boolean) => {
 
 const onRecorder = () => {
   const { status, pausedReason, stats } = getRecorderState();
-  // Départ : le service GPS va poser sa notification (il reste allumé pendant une pause manuelle, lot 104).
+  // Départ : le service GPS va poser sa notification (il reste allumé pendant une pause manuelle).
   if (status === 'recording' && previous.status === 'starting') rewriteOnFix = true;
   previous = { status, pausedReason, pointCount: stats.pointCount };
   update(false);

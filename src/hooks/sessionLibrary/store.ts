@@ -4,7 +4,7 @@ import type { MemoryKind } from '../../platform/memoryFolder';
 import { createListeners } from '../createStore';
 
 /**
- * État publié de la bibliothèque des sessions (lot 113) : ce que les pages lisent (`useSessionLibrary`), ses
+ * État publié de la bibliothèque des sessions : ce que les pages lisent (`useSessionLibrary`), ses
  * abonnés et ses messages. Première couche : n'importe aucune autre partie de `hooks/sessionLibrary/`.
  */
 
@@ -16,7 +16,7 @@ export interface IncomingNotice {
   text: string;
   /** Session à ouvrir (« Voir la session »), rangée ou déjà présente. */
   file: string | null;
-  /** Itinéraire rangé (lot 194), à ouvrir dans la planification (« Voir l'itinéraire ») : nom de ses fichiers. */
+  /** Itinéraire rangé, à ouvrir dans la planification (« Voir l'itinéraire ») : nom de ses fichiers. */
   route?: string;
   /** Rien n'a été rangé. */
   trouble: boolean;

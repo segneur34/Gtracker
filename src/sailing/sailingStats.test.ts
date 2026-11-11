@@ -24,12 +24,12 @@ describe('buildSailingSessionStats', () => {
 
   it('wingfoil : le seuil écarte le bord lent', () => {
     // Bord lent à 1,5 nœud : sous le seuil (3 nœuds, sortie à 2), mais en mouvement (au-dessus du
-    // plancher d'arrêt, 1 nœud), donc au dénominateur du ratio depuis le 28/10.
+    // plancher d'arrêt, 1 nœud), donc au dénominateur du ratio.
     const stats = buildSailingSessionStats(buildTrack([[600, 4], [300, 1.5]]), { sport: 'wingfoil', activeThresholdKn: 3 })!;
     expect(parseFloat(stats.activeRatio)).toBeLessThan(80);
   });
 
-  it('wingfoil : ratio de vol sur le temps en mouvement, 10 min d\'arrêt avant et après n\'y changent rien (28/10)', () => {
+  it('wingfoil : ratio de vol sur le temps en mouvement, 10 min d\'arrêt avant et après n\'y changent rien', () => {
     // 10 min de vol à 15 nœuds, 5 min en archimédien à 3 nœuds : 2/3 de vol.
     const sailed = buildSailingSessionStats(buildTrack([[600, 15], [300, 3]]), { sport: 'wingfoil', activeThresholdKn: 7 })!;
     const withStops = buildSailingSessionStats(buildTrack([[600, 0], [600, 15], [300, 3], [600, 0]]), { sport: 'wingfoil', activeThresholdKn: 7 })!;
@@ -43,7 +43,7 @@ describe('buildSailingSessionStats', () => {
     expect(buildSailingSessionStats(track, { sport: 'bateau' })!.inMotionTimeS).toBe(0);
   });
 
-  it.each(['wingfoil', 'windsurf', 'kite', 'bateau'] as const)("masques reçus tout faits : mêmes chiffres qu'à les refaire (%s, lot 58)", (sport) => {
+  it.each(['wingfoil', 'windsurf', 'kite', 'bateau'] as const)("masques reçus tout faits : mêmes chiffres qu'à les refaire (%s)", (sport) => {
     const sailed = buildTrack([[300, 0], [600, 15], [300, 3], [120, 9], [300, 0]], 5);
     const cumulative = buildCumulativeTrack(sailed);
     const ratioMask = sailingRatioMask(sailed, sport);
@@ -75,7 +75,7 @@ describe('sailingFlights', () => {
     expect(sailingFlights(track, buildCumulativeTrack(track), 'bateau', 8, 10)).toEqual([]);
   });
 
-  it.each([1, 5])('un trou de la trace parcouru en vol reste dans le vol (Q56), un trou immobile le coupe (%s Hz)', (hz) => {
+  it.each([1, 5])('un trou de la trace parcouru en vol reste dans le vol, un trou immobile le coupe (%s Hz)', (hz) => {
     // Un vol de 5 min ; les points de la 2e à la 3e minute manquent, la position avance pendant le silence.
     const raw = phasesTrack([[30, knotsToMs(3)], [300, knotsToMs(15)], [30, knotsToMs(3)]], hz, { startMs: START_MS });
     const t = (p: { time: string | Date }) => (new Date(p.time).getTime() - START_MS) / 1000;

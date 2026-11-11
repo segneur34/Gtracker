@@ -35,8 +35,8 @@ import { GPX_EDITORS, corpusSegmentsOf, type CorpusMeta, type GpxEditor } from '
  * l'application (positions intégrées depuis le cap et la vitesse, bruit GPS
  * et Doppler, `computeKinematics` accordé à l'allure, puis
  * `analyzeSailingSession`, la chaîne de `useSailingSession` : estimation du
- * vent et deux passes de détection). Reprise des sondes de l'audit du 03/11
- * (`C1-lib`). Fichier de test seulement : rien de l'application ne l'importe.
+ * vent et deux passes de détection). Reprise des sondes d'un audit de la
+ * chaîne. Fichier de test seulement : rien de l'application ne l'importe.
  */
 
 export const SAIL_ORIGIN = { lat: 43.5, lon: 3.8 };
@@ -399,7 +399,7 @@ export interface SailingSessionSettings extends SailingTrackInput {
   windDeg: number | null;
   /**
    * Seuil des calculs, en nœuds, quand il diffère du seuil effectif : celui du
-   * champ, différé dans le hook (HISTORIQUE, point 220). Par défaut, `thresholds.activeKn`.
+   * champ, différé dans le hook, pour que le curseur reste fluide. Par défaut, `thresholds.activeKn`.
    */
   computeThresholdKn?: number;
 }

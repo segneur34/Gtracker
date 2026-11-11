@@ -16,7 +16,7 @@ import { scheduleCacheUpdate } from './cache';
 import type { AddOptions } from './addSession';
 
 /**
- * Une session de la mémoire (lot 113) : son GPX, sa fiche entière, ses capteurs, le changement de sa fiche et sa
+ * Une session de la mémoire : son GPX, sa fiche entière, ses capteurs, le changement de sa fiche et sa
  * suppression ; sa fiche à recopier dans un autre dossier.
  */
 
@@ -103,7 +103,7 @@ export const updateSessionRecord = (file: string, patch: RecordPatch): void => {
  * Supprime une session : son GPX, sa fiche et ses capteurs, ainsi que les copies de la même
  * trace sous un autre nom, qui sans cela prendraient sa place dans la liste. Elles quittent
  * la liste avant les suppressions sur le disque, et restent dans `removing` jusqu'à la fin :
- * un recalcul de fond qui les traite ne les y remet pas (E-B4, 27/10).
+ * un recalcul de fond qui les traite ne les y remet pas.
  */
 export const removeSession = async (file: string): Promise<void> => {
   const f = lib.folder;

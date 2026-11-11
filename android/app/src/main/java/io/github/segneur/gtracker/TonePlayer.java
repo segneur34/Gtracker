@@ -15,14 +15,14 @@ import android.os.VibratorManager;
  * Sons et vibrations des bips (BeeperPlugin : balises, test de FC
  * repos, « Écouter ») : un bip court et un bip long, chacun avec
  * sa vibration ; et les sons « GPS perdu » et « FC perdue »
- * de l'enregistrement (BeeperPlugin.watchGps, lot 115).
+ * de l'enregistrement (BeeperPlugin.watchGps).
  *
  * Le son passe par le flux des alarmes : audible téléphone en silencieux, au
  * volume des alarmes. Les sons sont synthétisés une fois (sinus, fondus de
  * quelques millisecondes pour éviter les claquements), puis rejoués. Chaque
  * utilisateur a son instance, appelée depuis un seul fil.
  *
- * Leur hauteur se choisit dans Réglages (src/recording/beepSound.ts, 24/10) :
+ * Leur hauteur se choisit dans Réglages (src/recording/beepSound.ts) :
  * gardée dans les préférences de l'application, elle vaut pour toutes les
  * instances ; une instance refait ses sons au premier bip qui suit un changement.
  */
@@ -196,7 +196,7 @@ final class TonePlayer {
     /**
      * Son statique prêt à être rejoué, sur le flux des alarmes ; `null` si
      * Android refuse la piste (sortie audio occupée, trop de pistes ouvertes) :
-     * la vibration reste seule, l'application ne s'arrête pas (lot 143). Une
+     * la vibration reste seule, l'application ne s'arrête pas. Une
      * piste refusée est redemandée au bip suivant.
      */
     private static AudioTrack track(short[] pcm) {

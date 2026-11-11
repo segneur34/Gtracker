@@ -15,7 +15,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
 /**
  * Profil du pratiquant, persistant (`gtracker.athleteProfile`) : sa lecture et
  * ses écritures. Sa forme et ses règles pures sont dans `library/athleteProfile.ts`
- * et `library/profile.ts` (lot 72).
+ * et `library/profile.ts`.
  */
 
 type NumberField = AthleteNumberField;

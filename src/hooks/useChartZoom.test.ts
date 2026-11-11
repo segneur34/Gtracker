@@ -13,7 +13,7 @@ const sourceWithCount = (full = FULL, key: unknown = 'a') => {
   return { store, source, notified: () => notified };
 };
 
-describe('zoom hors du module (lot 127)', () => {
+describe('zoom hors du module', () => {
   it('set : plage bornée à l\'étendue et à la largeur minimale', () => {
     const { source } = sourceWithCount();
     expect(source.minSpan).toBe(100 * CHART_ZOOM_MIN_FRACTION);

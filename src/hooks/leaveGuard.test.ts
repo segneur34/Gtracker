@@ -136,7 +136,7 @@ describe('createHistoryGuard', () => {
     expect(b.asked).toHaveLength(0);
   });
 
-  it('levée avant de remplacer la page (« Jeter », lot 313) : attendue, puis le retour ne ramène pas à la page quittée', async () => {
+  it('levée avant de remplacer la page (« Jeter ») : attendue, puis le retour ne ramène pas à la page quittée', async () => {
     const b = makeBrowser([]);
     b.guard.arm();
     let released = false;

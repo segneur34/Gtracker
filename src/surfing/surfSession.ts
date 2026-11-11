@@ -37,7 +37,7 @@ export const runSurfSession = (
   // un trou de la trace (téléphone sous l'eau) n'est en glisse que s'il avance à la détente basse.
   const rideMask = thresholdActivityMask(track, profile, settings.threshold);
   const waveMask = settings.foil ? thresholdActivityMask(track, profile, effectiveWaveThreshold(profile.surf, settings.waveThreshold)) : null;
-  // Un seul plancher d'arrêt (Q43) : celui du profil, pour l'attente comme pour le masque.
+  // Un seul plancher d'arrêt : celui du profil, pour l'attente comme pour le masque.
   const stillMs = fromDisplaySpeed(profile.stillThreshold, profile.thresholdUnit);
   const analysis = analyzeSurf(track, cum, rideMask, waveMask, {
     ...profile.surf, maxGapS: profile.maxGapS, maxSpeedWindowS: profile.maxSpeedWindowS, stillMs,

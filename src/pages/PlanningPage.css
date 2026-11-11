@@ -407,7 +407,7 @@
   }
 }
 
-/* Téléphone tourné (lot 5 b des demandes du 23/10) : la carte fixe à gauche, sur toute la hauteur ; l'activité,
+/* Téléphone tourné : la carte fixe à gauche, sur toute la hauteur ; l'activité,
    la recherche et les panneaux de l'itinéraire défilent à sa droite. */
 @media (orientation: landscape) and (max-height: 499.98px) and (pointer: coarse) {
   .ui-page.plan-page {

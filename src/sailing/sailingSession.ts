@@ -93,7 +93,8 @@ export interface PreparedSailingTrack {
  * 4 nœuds est une valeur de wingfoil : sur une session de planche qui navigue
  * à 4,4 nœuds, elle écarterait tous les demi-tours, d'où les seuils de
  * manœuvre accordés à l'allure. Les virages qui orientent l'axe du vent sont
- * lus à la vitesse d'entrée de la détection (HISTORIQUE, point 267).
+ * lus à la vitesse d'entrée de la détection, pour qu'un virage ne soit pas
+ * vu par les manœuvres sans l'être par le vent, ou l'inverse.
  */
 export const prepareSailingTrack = (track: TrackPoint[], input: SailingTrackInput): PreparedSailingTrack => {
   const { sport } = input;

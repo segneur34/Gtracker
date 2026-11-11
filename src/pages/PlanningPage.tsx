@@ -82,8 +82,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Préférences de la page sur l'appareil : dernière activité choisie, dernière
- * vue de la carte. Un ancien `mode` ou `loop` (planificateur routier, retiré
- * au lot 304) y reste, ignoré.
+ * vue de la carte. Un ancien `mode` ou `loop` (planificateur routier, retiré) y reste, ignoré.
  */
 const PREFS_KEY = STORAGE_KEYS.planning;
 
@@ -230,7 +229,7 @@ function PlanBlock({ id, label, open, onToggle, aside, helpKey, children }: {
 }
 
 function PlanningPage() {
-  // Une activité cachée dans Réglages n'est ni proposée (`ActivitySheet`) ni reprise (§10, point 100).
+  // Une activité cachée dans Réglages n'est ni proposée (`ActivitySheet`) ni reprise.
   const { activities, isShown } = useVisibility();
   // Le fractionné ne se planifie pas : ses activités ne sont ni proposées ni reprises.
   const plannable = (a: Activity | null): a is Activity => a !== null && PLANNING_FAMILIES.includes(activityFamily(a)) && isShown(a);
@@ -245,7 +244,7 @@ function PlanningPage() {
   const distanceUnit = activity ? effectiveDistanceUnit(activity) : 'km';
   const color = safeColor(activity?.color ?? FALLBACK_COLOR);
   /** Famille de l'activité planifiée : son fond de carte, celui de ses analyses. */
-  // Sans activité, le fond de la voile (lot 305).
+  // Sans activité, le fond de la voile.
   const mapFamily = activity ? activityFamily(activity) : 'voile';
   const satellite = useMapBase(mapFamily)[0] === 'satellite';
 
@@ -279,7 +278,7 @@ function PlanningPage() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<Place | null>(null);
-  // Le retour d'Android ferme la fiche du point ou le lieu proposé avant de quitter la page (lot 158).
+  // Le retour d'Android ferme la fiche du point ou le lieu proposé avant de quitter la page.
   const selectedOpen = selected !== null;
   const candidateOpen = candidate !== null;
   useEffect(() => (selectedOpen ? pushBackLayer(() => setSelected(null)) : undefined), [selectedOpen]);

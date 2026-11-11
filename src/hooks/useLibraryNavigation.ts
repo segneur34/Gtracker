@@ -116,7 +116,7 @@ export const sessionReading = ({ requested, ready, known, deliveredFor, error }:
  * Le chargement ne dépend que du nom du fichier. `onLoad` change d'identité à
  * chaque changement de réglage (`setSport`), et la fiche à chaque écriture
  * (notes, nombre de manœuvres) : s'ils relançaient l'effet, la trace serait
- * rechargée en boucle, comme au §10, point 39. D'où les références à part.
+ * rechargée en boucle. D'où les références à part.
  *
  * Quitter la page, ou demander une autre session, abandonne la lecture en
  * cours (nettoyage de l'effet, `gpxLoadAction`) : son texte n'est pas lu, et

@@ -17,7 +17,7 @@ import { summaryOutdatedTest } from './summarySettings';
 import { readCache } from './cache';
 
 /**
- * Lecture de `sessions/` (lot 113) : rapprochée du cache, elle publie la liste et rend les fiches à créer ou à
+ * Lecture de `sessions/` : rapprochée du cache, elle publie la liste et rend les fiches à créer ou à
  * recalculer, que la file des résumés (`summaryQueue.ts`) traite ensuite.
  */
 
@@ -128,7 +128,7 @@ export const scan = async (f: MemoryFolder, gen: number, editsBefore = lib.editC
   const jobs: SummaryJob[] = [];
   const found: LibrarySession[] = [];
   let publishedCount = 0;
-  // Résumé à refaire : version du calcul dépassée, ou réglages changés depuis (empreinte, lot 37).
+  // Résumé à refaire : version du calcul dépassée, ou réglages changés depuis (empreinte).
   const isOutdated = summaryOutdatedTest();
   const keep = (file: string, record: SessionRecord, partial: boolean) => {
     const future = !isWritableRecord(record);
@@ -154,7 +154,7 @@ export const scan = async (f: MemoryFolder, gen: number, editsBefore = lib.editC
 
   for (const [file, record] of Object.entries(plan.reuse)) if (!held(file)) keep(file, record, cache.light);
   // Fiches à relire, par paquets lus ensemble. Mémoire encore vide (ouverture sans cache, téléphone
-  // neuf) : la liste s'affiche par lots au fil de la lecture, au lieu d'attendre la dernière (E-O5).
+  // neuf) : la liste s'affiche par lots au fil de la lecture, au lieu d'attendre la dernière.
   const progressive = lib.all.length === 0;
   const toRead = plan.read.filter((file) => !held(file));
   for (let from = 0; from < toRead.length; from += RECORD_READ_BATCH) {

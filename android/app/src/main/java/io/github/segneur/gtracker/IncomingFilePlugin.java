@@ -36,8 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.json.JSONObject;
 
 /**
- * « Ouvrir avec Gtracker » et « Partager vers Gtracker » d'un GPX ou d'un FIT (lot 35,
- * src/platform/incomingFile.ts, seul pont vers ce greffon) : une file privée des fichiers reçus,
+ * « Ouvrir avec Gtracker » et « Partager vers Gtracker » d'un GPX ou d'un FIT (src/platform/incomingFile.ts, seul pont vers ce greffon) : une file privée des fichiers reçus,
  * sous `filesDir/recus/`, que la page vide quand elle le peut.
  *
  * Le droit de lire le fichier d'une autre application meurt avec l'activité : la copie part tout de

@@ -38,8 +38,7 @@ export const sailingActivityMask = (track: TrackPoint[], sport: SportType, activ
 
 /**
  * Masque du dénominateur du ratio de vol (ou de navigation, de planing) : le
- * temps en mouvement, arrêts complets ôtés au plancher d'arrêt (décision du
- * 28/10) ; sur toute la session, une demi-heure passée à l'arrêt le divisait
+ * temps en mouvement, arrêts complets ôtés au plancher d'arrêt ; sur toute la session, une demi-heure passée à l'arrêt le divisait
  * par deux. Le bateau, sans seuil, n'a pas de ratio.
  */
 export const sailingRatioMask = (track: TrackPoint[], sport: SportType): boolean[] | undefined => {
@@ -87,10 +86,10 @@ export const buildSailingSessionStats = (
 };
 
 /**
- * Vols d'une session de voile sur foil (pumping, lot 22) : les suites du
+ * Vols d'une session de voile sur foil (pumping) : les suites du
  * masque d'activité au seuil de la session, celui des statistiques (temps et
  * ratio de vol) ; un trou de la trace parcouru en vol reste dans le vol, comme
- * dans le temps de vol (Q56, `activeRuns`) ; celles de moins de `minFlightS`
+ * dans le temps de vol (`activeRuns`) ; celles de moins de `minFlightS`
  * secondes ne sont pas listées. La détection n'est pas retouchée : c'est celle
  * des chiffres « en vol ». Rien en bateau, sans seuil.
  *

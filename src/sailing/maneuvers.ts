@@ -76,7 +76,7 @@ export interface ManeuverOptions {
  * tu pendant le virage) dont l'arc court et l'arc long sont tous deux
  * plausibles (`SHORT_ARC_DOUBT_DEG`). On connaît le cap avant et le cap après,
  * pas le chemin : la manœuvre est comptée sans nom ni direction, et
- * n'alimente pas le vent (`isDirected`). Décision de l'utilisateur du 31/10 :
+ * n'alimente pas le vent (`isDirected`). Choix du produit :
  * aucune hypothèse, ni perte de vitesse ni déport latéral.
  */
 export type ManeuverKind = 'tack' | 'jibe' | 'undecided';
@@ -99,7 +99,7 @@ export interface ManeuverLocation {
   /**
    * Vrai si la vitesse n'est pas restée sous le seuil de réussite pendant
    * `MANEUVER_LOST_FLIGHT_S` d'affilée (`lostFlightS`) : un creux plus bref,
-   * rebond ou ralentissement en vol, ne fait pas une manœuvre ratée (04/11).
+   * rebond ou ralentissement en vol, ne fait pas une manœuvre ratée.
    */
   success: boolean;
   /**
@@ -113,7 +113,7 @@ export interface ManeuverLocation {
   /**
    * Vrai pour une manœuvre entamée sous le seuil de vol mais en vol au
    * franchissement de l'axe du vent et à la sortie : décollage pendant le
-   * virage, chiffres lus à partir du décollage (04/11, option 1).
+   * virage, chiffres lus à partir du décollage.
    */
   takeoff: boolean;
   /**
@@ -133,7 +133,7 @@ export interface ManeuverLocation {
   /**
    * Repère de la manœuvre, près du point le plus lent vu par la détection.
    * Le classement y lit le vent : il reste donc celui de la détection, pour
-   * que ni le classement ni le vent ne dépendent de la mesure (§10, point 21).
+   * que ni le classement ni le vent ne dépendent de la mesure.
    */
   timeMs: number;
   trackIndex: number;
@@ -142,10 +142,10 @@ export interface ManeuverLocation {
   /**
    * Conservation et réussite telles que la détection les lit, pour la seule
    * estimation du vent (`maneuverAgreement`, `windSamplesFrom`), réglée sur
-   * elles (§10, points 23 et 26). Les métriques affichées ne les remplacent
+   * elles. Les métriques affichées ne les remplacent
    * pas : l'orientation du vent tient à un seuil de conservation de 50 %, et
    * des virements de synthèse passés de 49 à 52 % par la mesure corrigée
-   * suffisaient à la faire tourner de 90° (§10, point 70).
+   * suffisaient à la faire tourner de 90°.
    */
   windCriteria: { conservation: number; success: boolean };
 
@@ -153,7 +153,7 @@ export interface ManeuverLocation {
    * Vitesse d'approche, en nœuds : la médiane de la vitesse retenue de 12 s à
    * 2 s avant la rotation, ou la vitesse lissée au départ de la rotation si
    * elle est plus haute (décollage juste avant le virage, silence GPS dans la
-   * fenêtre : 04/11). Lue au décollage pour une manœuvre `takeoff`.
+   * fenêtre). Lue au décollage pour une manœuvre `takeoff`.
    */
   entrySpeed: number;
   /**
@@ -203,7 +203,7 @@ export interface ManeuverLocation {
   exitIndex: number;
   /**
    * Indice de la fin de la rotation (premier point au cap de sortie), avant la
-   * relance : la VMG n'écarte que la rotation (décidé le 05/11), la relance
+   * relance : la VMG n'écarte que la rotation, la relance
    * pouvant durer jusqu'à une minute sans être encore la manœuvre.
    */
   rotationEndIndex: number;
@@ -238,7 +238,7 @@ interface ManeuverRejections {
   /**
    * Cap franc, mais sur une distance trop courte pour qu'il veuille dire
    * quelque chose ; ou virage entamé dans la dernière demi-fenêtre de la trace,
-   * inobservable (04/11 : compté ici plutôt que perdu en silence).
+   * inobservable (compté ici plutôt que perdu en silence).
    */
   tooShort: number;
   /** Tour complet (un 360) : ni virement ni empannage, jamais compté. */
@@ -415,7 +415,7 @@ export interface WindEstimationOptions {
    * à tous les seuils d'activité ; absent, l'estimation le prépare elle-même.
    * Il doit porter sur la même trace, avec la même vitesse plancher de la
    * polaire (`minSpeedKn`) et la même vitesse d'entrée des virages
-   * (`minEntrySpeedKn`, Q53), sans quoi il est refusé.
+   * (`minEntrySpeedKn`), sans quoi il est refusé.
    */
   polarStage?: WindPolarStage;
 }
@@ -508,8 +508,8 @@ export const selectWindCandidate = (
 
   // Candidats, dans cet ordre, qui départage à égalité d'accord : les maxima du
   // score polaire ; la direction votée par les virages à vol perdu, le filet
-  // quand la polaire désigne un trou de couverture à 90° du vrai vent (lot
-  // 149, C1-2) ; puis le jumeau au vent arrière de chacun, que seules les
+  // quand la polaire désigne un trou de couverture à 90° du vrai vent ;
+  // puis le jumeau au vent arrière de chacun, que seules les
   // manœuvres écartent avec certitude. Dédoublonnés à 45°, comme la polaire.
   const stage = polarStageFor(points, options);
   if (stage.candidates.length === 0) return fallback;
@@ -651,8 +651,9 @@ const STABLE_SEARCH_S = 20;
  * même légèrement décalé peut suffire à faire sortir un virage limite de la
  * tolérance de classement (`classifyTurn`), qui le fait alors disparaître
  * entièrement plutôt que de simplement l'exclure de la courbe de vent.
- * Revenu aux valeurs d'origine ; voir `docs/HISTORIQUE.md`, point 21, pour
- * le détail avant de retenter un réglage.
+ * Assouplir ces valeurs (marge à 2 s, durée à 3 s) a fait baisser le nombre
+ * total de manœuvres : elles sont revenues à leur valeur d'origine, ne pas
+ * retenter sans mesurer le nombre de manœuvres avant et après.
  */
 const STABLE_MARGIN_S = 4;
 /** Durée minimale d'un segment stabilisé, en secondes. */
@@ -868,7 +869,7 @@ interface TurnHeadings {
  * soit à peu près celui de sa corde ; moyenne simple sans distance. À 1 Hz,
  * un pas est un point, et son cap celui du point. À 5 Hz, le bruit
  * indépendant d'un point à l'autre faisait monter l'écart d'une fenêtre lue
- * point à point de 21° à 29°, au-delà des 25° admis (n° 49).
+ * point à point de 21° à 29°, au-delà des 25° admis.
  */
 const strideHeadings = (
   points: PointData[],
@@ -1132,7 +1133,7 @@ const longestUnderMs = (samples: readonly SpeedSample[], thresholdKn: number): n
  * parfaite), ou la vitesse lissée à `from` si elle est plus haute : un
  * décollage juste avant le virage, ou un silence GPS dans la fenêtre,
  * faisaient lire une approche sous le seuil de vol à un virement attaqué en
- * vol (04/11).
+ * vol.
  *
  * Point le plus lent : sur toute la rotation, puis au-delà tant que la
  * vitesse n'est pas revenue, le creux d'un virement venant souvent une fois
@@ -1190,7 +1191,7 @@ const measureSpeeds = (points: PointData[], from: number, rotationEnd: number): 
 };
 
 /**
- * Décollage pendant le virage (04/11, option 1) : une manœuvre entamée sous le
+ * Décollage pendant le virage : une manœuvre entamée sous le
  * seuil de vol compte quand même si la planche vole au franchissement de
  * l'axe du vent (`axisDeg` : le vent pour un virement, son opposé pour un
  * empannage) et à la sortie. Le franchissement se lit entre deux points, par
@@ -1471,7 +1472,7 @@ export interface ManeuverDetection {
  * Rien ici ne lit le vent : l'estimation du vent classe cette détection par
  * candidat, puis le module par vent global et par vent local, sans refaire le
  * balayage de la trace (cinq à six fois, 0,5 s par mouvement du seuil sur 3 h
- * à 5 Hz, §10 point 23). Les lectures sont mémorisées par fenêtre, et par
+ * à 5 Hz). Les lectures sont mémorisées par fenêtre, et par
  * borne basse de recherche du cœur du virage, qui seule dépend de la manœuvre
  * précédente, donc du vent.
  */
@@ -1495,7 +1496,7 @@ export const prepareManeuverDetection = (points: PointData[], options: ManeuverD
     // où le classement lit le vent, et nourrit la lecture qu'en fait
     // l'estimation du vent (`windCriteria`). Il omet le dernier point de la
     // fenêtre initiale : il reste tel quel, car le déplacer changerait le
-    // classement et le vent (§10, points 21 et 70). La vitesse minimale
+    // classement et le vent. La vitesse minimale
     // affichée est celle de `measureRotation`, sur toute la rotation.
     const initial = slowestPoint(points, i, scan.j, false);
 
@@ -1504,7 +1505,7 @@ export const prepareManeuverDetection = (points: PointData[], options: ManeuverD
     // ci-dessus dure, lui, plus longtemps que la fenêtre entière. Un virage
     // franc, entamé en mouvement dans cette dernière demi-fenêtre, ne
     // disparaît plus en silence : il est compté avec les virages trop courts,
-    // sans être classé (04/11) ; planche arrêtée, le cap n'est que du bruit.
+    // sans être classé ; planche arrêtée, le cap n'est que du bruit.
     const endMs = points[scan.j].timeMs;
     if (endMs - points[i].timeMs < windowMs * minWindowShare) {
       return Math.abs(scan.cumulativeTurn) > minTurnDeg && points[i].smoothedSpeed > minEntrySpeedKn
@@ -1696,7 +1697,7 @@ export const classifyManeuvers = (
   /**
    * Un virage écarté ne pose pas de temps mort — et ne doit pas en poser : il
    * peut être classé une poignée de points plus loin, et l'écarter pour de bon
-   * est précisément ce qui a fait échouer les deux tentatives du §10 point 21.
+   * est précisément ce qui a fait échouer les deux tentatives d'assouplissement.
    * Il est donc rencontré à nouveau à chaque point suivant, d'où cette borne
    * qui ne sert qu'à ne pas le compter vingt fois.
    */
@@ -1770,7 +1771,7 @@ export const classifyManeuvers = (
     /**
      * Manœuvre comptée, ses métriques de qualité tirées de la mesure. Ratée
      * si la vitesse est restée sous le seuil de réussite au moins
-     * `lostFlightMs` d'affilée ; la vitesse minimale reste la mesure (04/11).
+     * `lostFlightMs` d'affilée ; la vitesse minimale reste la mesure.
      */
     const locationOf = (
       measure: RotationMeasure,
@@ -1779,7 +1780,7 @@ export const classifyManeuvers = (
       const underMs = measure.lostFlightMs(successThresholdKn);
       // Repère sur la carte : le point le plus lent de la fenêtre, sauf s'il
       // précède la rotation (planche qui accélère ou décolle en entrant dans
-      // le virage, 04/11) : alors le creux de la rotation elle-même. `timeMs`
+      // le virage) : alors le creux de la rotation elle-même. `timeMs`
       // reste celui de la détection (courbe du vent).
       const markerIndex = anchorIndex < measure.entryIndex ? measure.apexIndex : anchorIndex;
       return {
@@ -1817,7 +1818,7 @@ export const classifyManeuvers = (
     // Demi-tour vu en un seul pas, assez grand pour que l'arc long soit aussi
     // plausible que l'arc court : un virement passé par le lit du vent peut
     // ressortir en empannage. Compté, mesuré, sans nom ni direction, et sans
-    // lire le vent (décision du 31/10) ; plus petit, il garde l'arc court et
+    // lire le vent ; plus petit, il garde l'arc court et
     // se classe comme les autres. Un virage observé sur plusieurs points n'est
     // jamais concerné.
     if (reading.singleStep && turn >= SHORT_ARC_DOUBT_DEG) {
@@ -1868,8 +1869,8 @@ export const classifyManeuvers = (
     let measure = rotation;
     let takeoff = false;
     // Entamé sous le seuil de vol : un demi-tour en archimédien, qui n'est
-    // ni réussi ni raté (décision du 28/10)… sauf si la planche a décollé
-    // pendant le virage, en vol à l'axe du vent et en sortie (04/11) : la
+    // ni réussi ni raté… sauf si la planche a décollé
+    // pendant le virage, en vol à l'axe du vent et en sortie : la
     // manœuvre compte, lue à partir du décollage.
     if (flightThresholdKn !== undefined && rotation.entrySpeed < flightThresholdKn) {
       const takeoffIndex = takeoffIndexOf(points, rotation, headings, turnSign, type === 'tack' ? windDeg : windDeg + 180, flightThresholdKn);

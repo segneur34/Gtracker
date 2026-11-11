@@ -42,7 +42,7 @@
   min-width: 0;
 }
 
-/* Une ligne du filtre « Matériel » par groupe (lot 146) : le nom du groupe, puis ses pièces ; la rangée défile si elle ne tient pas. */
+/* Une ligne du filtre « Matériel » par groupe : le nom du groupe, puis ses pièces ; la rangée défile si elle ne tient pas. */
 .stats-gear {
   display: flex;
   align-items: center;

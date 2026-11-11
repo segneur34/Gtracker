@@ -7,7 +7,7 @@ import { createFakeFolder } from '../../test/memoryFolder.fixture';
 import { FILE_FORMATS } from '../../core/appIdentity';
 
 /**
- * File des fichiers reçus d'une autre application (lot 35), sur une fausse plateforme : ce que le téléphone a copié, ce que
+ * File des fichiers reçus d'une autre application, sur une fausse plateforme : ce que le téléphone a copié, ce que
  * la mémoire en fait, ce qui reste à retenter. La file de la fausse plateforme survit à un « lancement » (`launch`), comme
  * le dossier privé du téléphone.
  */
@@ -164,7 +164,7 @@ describe('fichiers reçus d\'une autre application', () => {
     expect(notices()[0].text).toBe('« vide.gpx » n\'a pas été rangé : fichier illisible.');
   });
 
-  it('FIT ou GPX de course ou de vélo : refus dit, copie retirée, rien de rangé (lot 321)', async () => {
+  it('FIT ou GPX de course ou de vélo : refus dit, copie retirée, rien de rangé', async () => {
     const sentence = "1 session de course, de vélo ou d'entraînement laissée de côté : Gtracker ne range que la voile et le surf.";
     const fit = receive('footing.fit', fitAt(1, undefined, 1));
     const gpx = receive('velo.gpx', gpxAt(2).replace('<trk>', '<trk><type>cycling</type>'));
@@ -396,7 +396,7 @@ describe('fichiers reçus d\'une autre application', () => {
     }
   });
 
-  it("un GPX d'itinéraire (route seule, sans heure) est rangé dans les itinéraires, pas en session (lot 194)", async () => {
+  it("un GPX d'itinéraire (route seule, sans heure) est rangé dans les itinéraires, pas en session", async () => {
     const id = receive('komoot.gpx', ROUTE_ONLY_GPX);
     const { notices } = await launch();
     expect(sessionGpx()).toEqual([]);
@@ -407,7 +407,7 @@ describe('fichiers reçus d\'une autre application', () => {
     }]);
   });
 
-  it("itinéraire reçu sous un nom déjà pris : ni fichier ni nom doublé (lot 194)", async () => {
+  it("itinéraire reçu sous un nom déjà pris : ni fichier ni nom doublé", async () => {
     files.set('itineraires/Tour du lac.json', JSON.stringify({
       format: FILE_FORMATS.itineraire, version: 3, name: 'Tour du lac', activityId: null,
       createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',

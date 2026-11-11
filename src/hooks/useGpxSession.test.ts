@@ -4,7 +4,7 @@ import { gpxOf, sailRaw, upDownLegs } from '../test/sailing.fixture';
 import { failedState, gpxReading, preparedState, withSource, type GpxSource, type ShownGpx } from './useGpxSession';
 
 /**
- * États de `useGpxSession` devenu asynchrone (lot 126 B) : « Lecture de la session… » tant qu'un autre fichier que
+ * États de `useGpxSession` devenu asynchrone : « Lecture de la session… » tant qu'un autre fichier que
  * celui affiché se prépare ; la même source relue (allure, support) garde la trace affichée jusqu'au résultat ;
  * moins de deux points ou GPX illisible dits en clair, comme avant.
  */
