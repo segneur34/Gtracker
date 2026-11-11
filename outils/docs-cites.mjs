@@ -23,6 +23,7 @@ const DOCUMENTS = [
   'docs/INSTALLATION.md',
   'docs/DEVELOPPER.md',
   'docs/INVENTAIRE.md',
+  'docs/GLOSSAIRE.md',
   'docs/BACKLOG.md',
 ]
 // Fichiers générés par la construction et ignorés par git : jamais parcourus, pour voir ici ce que voit un clone neuf

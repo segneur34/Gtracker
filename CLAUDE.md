@@ -11,6 +11,7 @@ Chaque information a une seule place :
 - `docs/DECISIONS.md` : les décisions de l'utilisateur propres à un domaine, en sections 1 à 11 (voile, analyses communes, sauts, surf, test de FC repos, enregistrement, planification, mémoire, Profil, Statistiques, Réglages et accueil) ; les transverses restent ici. Lire la section du domaine avant d'y toucher (table plus bas).
 - `docs/HISTORIQUE.md` : décisions et pièges, en points numérotés (« §10, point N ») ; le consulter par recherche sur le sujet, pas en entier.
 - `docs/INVENTAIRE.md` : carte des fichiers ; les signatures se lisent dans le code.
+- `docs/GLOSSAIRE.md` : les mots du code qui trompent (« course », « mark », calcul, support et activité, noms de la FC, seuils), en une page.
 - `docs/MISE_EN_PAGE.md` : patron commun des pages d'analyse (structure, règles ordinateur et téléphone, pièces partagées). Le suivre pour toute page d'analyse, existante ou nouvelle.
 - `docs/BACKLOG.md` : le seul reste à faire : lots, idées, dette, essais au téléphone, questions ; `docs/backlog/` pour les détails ; `node outils/backlog.mjs` pour le tableau de bord.
 - `docs/MODELES.md` : quel modèle (Fable, Opus, Sonnet, Haiku) et quel effort pour quelle tâche, et les sous-agents de `.claude/agents/`.

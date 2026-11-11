@@ -726,7 +726,7 @@ function StatisticsPage() {
                         </button>
                       ) : voileWithoutResults > 0 && (
                         <span style={noteStyle}>
-                          Réussite connue des sessions rouvertes dans l'analyse depuis la version 0.3.5 : {plural(voileWithoutResults, 'session')} à rouvrir.
+                          Réussite connue seulement des sessions déjà ouvertes dans l'analyse : {plural(voileWithoutResults, 'session')} à rouvrir.
                         </span>
                       )}
                     </div>
