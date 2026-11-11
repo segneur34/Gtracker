@@ -3,6 +3,7 @@ import { RECORD_FORMAT, RECORD_VERSION, SUMMARY_CALC_VERSION, serializeRecord, t
 import type { MemoryFolder } from '../platform/memoryFolder';
 import { gpxAtTime, settle, tick, trackTestTimers } from '../test/library.fixture';
 import { createFakeFolder } from '../test/memoryFolder.fixture';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Résumés refaits quand les réglages changent (lot 37), sur un faux dossier : fiches d'avant
@@ -149,13 +150,13 @@ afterEach(() => {
 });
 
 describe('la session garde ses réglages (Q57)', () => {
-  const gestures = (): { baseline: Record<string, unknown>; pending: Record<string, unknown> } => JSON.parse(stored.get('tracker.summaryGestures')!);
+  const gestures = (): { baseline: Record<string, unknown>; pending: Record<string, unknown> } => JSON.parse(stored.get(STORAGE_KEYS.summaryGestures)!);
 
   /** L'autre appareil : mêmes fichiers, autre stockage, ses réglages datés (ce n'est pas un appareil neuf, qui reprendrait ceux du dossier). */
   const otherDevice = (threshold: number): void => {
     stored.clear();
-    stored.set('tracker.sportSettings', JSON.stringify({ thresholds: { surf: threshold } }));
-    stored.set('tracker.settingsSavedAt', JSON.stringify(Date.now()));
+    stored.set(STORAGE_KEYS.sportSettings, JSON.stringify({ thresholds: { surf: threshold } }));
+    stored.set(STORAGE_KEYS.settingsSavedAt, JSON.stringify(Date.now()));
   };
 
   it('deux appareils, deux jeux de réglages, une fiche, plusieurs ouvertures : aucune écriture ; puis un geste : réécrite une fois', async () => {
@@ -200,7 +201,7 @@ describe('la session garde ses réglages (Q57)', () => {
     await settle(first.library);
     setThreshold(first.settings, 'surf', 4);
     // Fermée avant que rien ne soit refait, mais après que le geste a été vu : la référence a déjà suivi.
-    stored.set('tracker.summaryGestures', JSON.stringify({
+    stored.set(STORAGE_KEYS.summaryGestures, JSON.stringify({
       baseline: { ...gestures().baseline, surf: { threshold: 4 } }, pending: { surf: { threshold: 4 } },
     }));
 
@@ -244,7 +245,7 @@ describe('la session garde ses réglages (Q57)', () => {
     const settingsPath = [...files.keys()].find((path) => path.startsWith('reglages/'))!;
     const file = JSON.parse(files.get(settingsPath)!);
     file.savedAt = Date.now();
-    file.values['tracker.sportSettings'] = { thresholds: { surf: 9 } };
+    file.values[STORAGE_KEYS.sportSettings] = { thresholds: { surf: 9 } };
     files.set(settingsPath, JSON.stringify(file));
 
     stored.clear();
@@ -263,7 +264,7 @@ describe('la session garde ses réglages (Q57)', () => {
     await settle(first.library);
     // Le fichier de réglages de l'appareil part 2 s après un changement : on n'en dépend pas, on le récrit à la main sous un autre appareil.
     const own = JSON.parse(files.get([...files.keys()].find((path) => path.startsWith('reglages/'))!)!);
-    const other = { ...own, device: { id: 'autre-appareil', name: 'Autre' }, values: { ...own.values, 'tracker.sportSettings': { thresholds: { surf: 9 } } } };
+    const other = { ...own, device: { id: 'autre-appareil', name: 'Autre' }, values: { ...own.values, [STORAGE_KEYS.sportSettings]: { thresholds: { surf: 9 } } } };
     files.set('reglages/autre.json', JSON.stringify(other));
     await first.library.adoptSettingsFile('autre.json');
     expect(first.settings.readStoredSettings().thresholds?.surf).toBe(9);
@@ -282,19 +283,19 @@ describe('la session garde ses réglages (Q57)', () => {
     await settle(first.library);
     setThreshold(first.settings, 'surf', 4);
     await first.library.queueOutdatedRefresh();
-    const kept = stored.get('tracker.summaryGestures');
-    const settings = stored.get('tracker.sportSettings')!;
+    const kept = stored.get(STORAGE_KEYS.summaryGestures);
+    const settings = stored.get(STORAGE_KEYS.sportSettings)!;
 
     storageFailed = true;
-    stored.delete('tracker.sportSettings');
+    stored.delete(STORAGE_KEYS.sportSettings);
     log.length = 0;
     const second = await openFresh();
     await settle(second.library);
     expect(recordWrites()).toEqual([]);
-    expect(stored.get('tracker.summaryGestures')).toBe(kept);
+    expect(stored.get(STORAGE_KEYS.summaryGestures)).toBe(kept);
 
     storageFailed = false;
-    stored.set('tracker.sportSettings', settings);
+    stored.set(STORAGE_KEYS.sportSettings, settings);
     const third = await openFresh();
     await settle(third.library);
     expect(recordWrites()).toEqual([]);

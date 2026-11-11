@@ -15,7 +15,7 @@
 // valeur tirée au glisser, 13 ou 14 m selon le pixel) ; fin par « Tout passe. » ou le nombre d'échecs, code 0 ou 1.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, connect } from './lib/cdp.mjs';
+import { BASE, CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -115,7 +115,7 @@ const guideCard = () => evaluate(`(() => {
 })()`);
 const followedStats = () => evaluate(`document.body.innerText.split('\\n').filter((l, i, all) => /^(Restant|Balises validées)$/.test(all[i - 1] ?? '')).join(' | ')`);
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 
@@ -123,7 +123,7 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, devi
 await send('Page.navigate', { url: `${BASE}/itineraires` });
 await wait(3000);
 // Tous les onglets ouverts (seul le premier l'est par défaut), lus au chargement de la page.
-await evaluate(`localStorage.setItem('tracker.sections', JSON.stringify({ planning: { profil: true, parcours: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
+await evaluate(`localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { profil: true, parcours: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
 await send('Page.navigate', { url: `${BASE}/itineraires` });
 await wait(3000);
 console.log('activité Voile :', await chooseOption('Voile'));
@@ -170,7 +170,7 @@ console.log('Enregistrer :', await clickButton('Enregistrer'));
 await wait(1500);
 console.log('message :', await evaluate(`[...document.querySelectorAll('.plan-note')].map((x) => x.textContent).find((t) => t.startsWith('Enregistré')) ?? null`));
 const ficheBips = await evaluate(`(async () => {
-  const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('itineraires');
+  const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('itineraires');
   return JSON.stringify(JSON.parse(await (await (await d.getFileHandle('Parcours banc.json')).getFile()).text()).markGuide ?? null);
 })()`);
 console.log('bips dans la fiche :', ficheBips);
@@ -179,7 +179,7 @@ const courbeFiche = JSON.parse(ficheBips ?? 'null')?.curve ?? [];
 check('fiche : les bips rangés sont ceux des rangées affichées', courbeFiche.length > 0
   && courbeFiche.map((p) => `${p.distanceM}/${p.intervalMs / 1000}`).join('  ') === rangeesParcours, `${ficheBips} | ${rangeesParcours}`);
 const gpxRange = await evaluate(`(async () => {
-  const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('itineraires');
+  const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('itineraires');
   const text = await (await (await d.getFileHandle('Parcours banc.gpx')).getFile()).text();
   return [...text.matchAll(/<wpt[^>]*><name>([^<]*)<\\/name>/g)].map((m) => m[1]).join(', ');
 })()`);
@@ -187,15 +187,15 @@ console.log('GPX rangé :', gpxRange);
 check('GPX rangé : balises numérotées 1, 2, 3', gpxRange === '1, 2, 3', gpxRange);
 console.log('Partir :', await clickButton('Partir'));
 await wait(2000);
-const suivies = await evaluate(`JSON.parse(localStorage.getItem('tracker.followedTrace')).marks?.length ?? 0`);
-const validationSuivie = await evaluate(`JSON.parse(localStorage.getItem('tracker.followedTrace')).markGuide?.curve[0].distanceM ?? null`);
+const suivies = await evaluate(`JSON.parse(localStorage.getItem('${CLES.followedTrace}')).marks?.length ?? 0`);
+const validationSuivie = await evaluate(`JSON.parse(localStorage.getItem('${CLES.followedTrace}')).markGuide?.curve[0].distanceM ?? null`);
 console.log('page :', await evaluate('location.pathname'), '; balises suivies :', suivies, '; validation suivie :', validationSuivie);
 check('« Partir » : 4 balises suivies', suivies === 4, suivies);
 check('« Partir » : validation suivie au premier point de la courbe du parcours', validationSuivie !== null && validationSuivie === courbeFiche[0]?.distanceM, `${validationSuivie} / ${courbeFiche[0]?.distanceM}`);
 console.log('aperçu, balises sur la carte :', await evaluate(`document.querySelectorAll('.leaflet-marker-icon span').length`));
 
 // 2. Parcours synthétique, rejeu ×1.
-await evaluate(`localStorage.setItem('tracker.followedTrace', JSON.stringify(${JSON.stringify({ name: 'Synthétique', source: 'route', activityId: 'wingfoil', points: marks, marks })})); 'ok'`);
+await evaluate(`localStorage.setItem('${CLES.followedTrace}', JSON.stringify(${JSON.stringify({ name: 'Synthétique', source: 'route', activityId: 'wingfoil', points: marks, marks })})); 'ok'`);
 await send('Page.navigate', { url: `${BASE}/enregistrer` });
 await wait(2500);
 const prepareReplay = async (speed) => {
@@ -262,7 +262,7 @@ await wait(1000);
 
 // 3. Rejeu ×10, bips propres au parcours (validation à 280 m) : « Passer » puis « Bips » coupés.
 const wideGuide = { curve: [{ distanceM: 280, intervalMs: 250 }, { distanceM: 400, intervalMs: 1500 }], vibrate: true };
-await evaluate(`localStorage.setItem('tracker.followedTrace', JSON.stringify(${JSON.stringify({ name: 'Synthétique', source: 'route', activityId: 'wingfoil', points: marks, marks, markGuide: wideGuide })})); 'ok'`);
+await evaluate(`localStorage.setItem('${CLES.followedTrace}', JSON.stringify(${JSON.stringify({ name: 'Synthétique', source: 'route', activityId: 'wingfoil', points: marks, marks, markGuide: wideGuide })})); 'ok'`);
 await send('Page.navigate', { url: `${BASE}/enregistrer` });
 await wait(2500);
 await prepareReplay(10);
@@ -293,12 +293,12 @@ await clickButton('Jeter');
 await wait(1000);
 
 // 4. Réglages : éditeur de la courbe.
-await evaluate(`localStorage.setItem('tracker.sections', JSON.stringify({ settings: { activites: true }, 'settings-families': { voile: true }, 'settings-activity-parts': { balises: true } })); 'ok'`);
+await evaluate(`localStorage.setItem('${CLES.sections}', JSON.stringify({ settings: { activites: true }, 'settings-families': { voile: true }, 'settings-activity-parts': { balises: true } })); 'ok'`);
 await send('Page.navigate', { url: `${BASE}/parametres` });
 await wait(2500);
 await evaluate(`[...document.querySelectorAll('.settings-activity__toggle')].find((b) => b.textContent.includes('Voile')).click(); 'ok'`);
 await wait(500);
-const stored = () => evaluate(`JSON.stringify(JSON.parse(localStorage.getItem('tracker.sportSettings') ?? '{}').markGuide ?? null)`);
+const stored = () => evaluate(`JSON.stringify(JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}').markGuide ?? null)`);
 const editorRows = () => evaluate(`[...document.querySelectorAll('.beep-editor__row')].map((r) => [...r.querySelectorAll('input')].map((i) => i.value).join('/')).join('  ')`);
 await evaluate(`document.querySelector('.beep-editor').scrollIntoView({ block: 'center' }); 'ok'`);
 await wait(300);

@@ -25,7 +25,7 @@
  */
 
 /** GPX d'une session de wingfoil (`<type>wingfoil</type>`), 100 s à 1 Hz avec FC et Doppler, tel que l'enregistreur l'écrit. */
-export const TRACKER_WING_GPX: string = [
+export const LEGACY_WING_GPX: string = [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<gpx version="1.1" creator="Tracker"',
   '  xmlns="http://www.topografix.com/GPX/1/1"',
@@ -143,7 +143,7 @@ export const TRACKER_WING_GPX: string = [
 ].join('\n');
 
 /** GPX d'une session de surf sur foil (`<type>surf</type>`), 226 s à 1 Hz avec Doppler et cap. */
-export const TRACKER_SURF_GPX: string = [
+export const LEGACY_SURF_GPX: string = [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<gpx version="1.1" creator="Tracker"',
   '  xmlns="http://www.topografix.com/GPX/1/1"',
@@ -387,7 +387,7 @@ export const TRACKER_SURF_GPX: string = [
 ].join('\n');
 
 /** Fiche `.json` de la session de wingfoil (nom, notes, repères, analyse, sauts, résumé). */
-export const TRACKER_WING_RECORD: string = [
+export const LEGACY_WING_RECORD: string = [
   '{',
   '  "format": "tracker-session",',
   '  "version": 1,',
@@ -524,7 +524,7 @@ export const TRACKER_WING_RECORD: string = [
 ].join('\n');
 
 /** Fiche `.json` de la session de surf (nom, notes, repères, analyse avec seuil de vague, résumé). */
-export const TRACKER_SURF_RECORD: string = [
+export const LEGACY_SURF_RECORD: string = [
   '{',
   '  "format": "tracker-session",',
   '  "version": 1,',
@@ -602,7 +602,7 @@ export const TRACKER_SURF_RECORD: string = [
 ].join('\n');
 
 /** Fichier des capteurs `.imu` de la session de wingfoil (1557 octets), en base64 : deux secondes de mesures. */
-export const TRACKER_WING_IMU: string = [
+export const LEGACY_WING_IMU: string = [
   'VFJLSU1VMQo3AwAAeyJmb3JtYXQiOiJ0cmFja2VyLWNhcHRldXJzIiwidmVyc2lvbiI6MSwic3RhcnRlZEF0TXMiOjE3ODAzMDgw',
   'MTUwMDAsImNsb2NrIjp7ImVsYXBzZWRVcyI6MTIzNDU2Nzg5MDAwLCJ3YWxsTXMiOjE3ODAzMDgwMTUxNTB9LCJkZXZpY2UiOnsi',
   'bWFudWZhY3R1cmVyIjoiU29jacOpdMOpIGQnZXNzYWkiLCJtb2RlbCI6IlTDqWzDqXBob25lIGQnZXNzYWkiLCJhbmRyb2lkIjoz',
@@ -627,7 +627,7 @@ export const TRACKER_WING_IMU: string = [
 ].join('');
 
 /** GPX complet (paquet de session) de la session de wingfoil : fiche, capteurs et retouches du GPX. */
-export const TRACKER_WING_BUNDLE: string = [
+export const LEGACY_WING_BUNDLE: string = [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<gpx version="1.1" creator="Tracker"',
   '  xmlns="http://www.topografix.com/GPX/1/1"',
@@ -877,7 +877,7 @@ export const TRACKER_WING_BUNDLE: string = [
 ].join('\n');
 
 /** GPX complet (paquet de session) de la session de surf : fiche et retouches du GPX, sans capteurs. */
-export const TRACKER_SURF_BUNDLE: string = [
+export const LEGACY_SURF_BUNDLE: string = [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<gpx version="1.1" creator="Tracker"',
   '  xmlns="http://www.topografix.com/GPX/1/1"',

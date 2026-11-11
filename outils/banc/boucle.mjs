@@ -4,7 +4,7 @@
 // Montpellier ; B déplacé ; « Autre retour » ; un point posé sur le retour ; « Précédent » ; A retiré puis rendu ;
 // rangement, rechargement, réouverture sans calcul ; bouton éteint. Les calculs se suivent, un à la fois, comme
 // dans l'application : le script attend la fin de chacun avant l'étape suivante.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -26,7 +26,7 @@ const clickAt = async (x, y) => { await mouse('mousePressed', x, y); await mouse
 
 /** Position d'un lieu sur la carte, par la projection de Leaflet, d'après la vue retenue dans les préférences de la page. */
 const screenOf = (lat, lon) => evaluate(`(() => {
-  const view = JSON.parse(localStorage.getItem('tracker.planning')).view;
+  const view = JSON.parse(localStorage.getItem('${CLES.planning}')).view;
   const b = document.querySelector('.plan-map .leaflet-container').getBoundingClientRect();
   const scale = 256 * 2 ** view.zoom;
   const px = (lo) => scale * (0.5 + lo / 360);
@@ -46,7 +46,7 @@ const settleCalc = async (maxS = 120) => {
 };
 
 /** Fiche d'un itinéraire rangé dans la mémoire du navigateur ? */
-const routeSaved = (name) => evaluate(`(async () => { try { const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('itineraires'); const h = await d.getFileHandle(${JSON.stringify(name + '.json')}); return (await (await h.getFile()).text()).length > 0; } catch { return false; } })()`);
+const routeSaved = (name) => evaluate(`(async () => { try { const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('itineraires'); const h = await d.getFileHandle(${JSON.stringify(name + '.json')}); return (await (await h.getFile()).text()).length > 0; } catch { return false; } })()`);
 
 /** La page se monte après le chargement (modules à la demande, bibliothèque relue) : on attend son premier élément, 3 s au plus comme l'ancien sommeil. */
 const ready = (selector) => waitFor(`document.querySelector(${JSON.stringify(selector)}) !== null`, { timeout: 3000, label: selector });
@@ -89,7 +89,7 @@ const tapReturn = async () => {
   return 'ok';
 };
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await go('/itineraires', 3000);
 
@@ -100,8 +100,8 @@ const C = [43.6400, 3.9000];
 
 for (const activityId of ['running', 'cycling']) {
   console.log(`=== ${activityId} ===`);
-  await evaluate(`localStorage.setItem('tracker.planning', JSON.stringify({ activityId: '${activityId}', view: { lat: 43.6255, lon: 3.8885, zoom: 14 }, loop: false }));
-    localStorage.setItem('tracker.sections', JSON.stringify({ planning: { profil: true, surface: false, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
+  await evaluate(`localStorage.setItem('${CLES.planning}', JSON.stringify({ activityId: '${activityId}', view: { lat: 43.6255, lon: 3.8885, zoom: 14 }, loop: false }));
+    localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { profil: true, surface: false, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
   await go('/itineraires', 3000);
   await ready('.plan-modes__loop');
 
@@ -150,7 +150,7 @@ for (const activityId of ['running', 'cycling']) {
     set.call(input, ${JSON.stringify(name)}); input.dispatchEvent(new Event('input', { bubbles: true })); return 'ok'; })()`);
   console.log('Enregistrer :', await clickIn('.plan-actions button', 'Enregistrer', true));
   await waitFor(() => routeSaved(name), { timeout: 1500, label: 'itinéraire rangé' });
-  await evaluate(`localStorage.setItem('tracker.planning', JSON.stringify({ ...JSON.parse(localStorage.getItem('tracker.planning')), loop: false })); 'ok'`);
+  await evaluate(`localStorage.setItem('${CLES.planning}', JSON.stringify({ ...JSON.parse(localStorage.getItem('${CLES.planning}')), loop: false })); 'ok'`);
   await go('/itineraires', 3000);
   await ready('.route-list__open');
   const before = await brouterCalls();

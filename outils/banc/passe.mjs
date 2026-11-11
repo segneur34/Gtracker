@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PAGES, PASSAGE_COURANT, SCRIPTS } from './scripts.mjs';
+import { DOSSIER_BANC } from './lib/cdp.mjs';
 
 const BANC = path.dirname(fileURLToPath(import.meta.url));
 const DEPOT = path.resolve(BANC, '..', '..');
@@ -36,7 +37,7 @@ const debut = Date.now();
 
 // --- Options ---
 const opts = { noms: [], pages: null, tous: false, avant: null, parCote: false, j: 4, sansReseau: false, gpx: null,
-  brouillon: path.join(os.tmpdir(), 'tracker-banc'), temps: null, captures: false, garder: false, sansCache: false, nettoyerAvant: false, chrome: 9480, port: PORT_APRES };
+  brouillon: path.join(os.tmpdir(), DOSSIER_BANC), temps: null, captures: false, garder: false, sansCache: false, nettoyerAvant: false, chrome: 9480, port: PORT_APRES };
 {
   const a = process.argv.slice(2);
   const valeur = (i, nom) => { if (a[i + 1] === undefined) sortie(2, `${nom} attend une valeur`); return a[i + 1]; };

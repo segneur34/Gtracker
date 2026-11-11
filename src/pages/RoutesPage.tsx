@@ -17,11 +17,12 @@ import { readPickedFile } from '../platform/files';
 import { isNativeApp } from '../platform/runtime';
 import { shareFile } from '../platform/share';
 import { jsonStore } from '../platform/storage';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Tous les itinéraires planifiés (point 68), ouverts depuis la carte de
  * l'accueil, qui n'en montre que les derniers : tri au choix, retenu sur
- * l'appareil (`tracker.routeList`), et onglets par activité. Chaque ligne
+ * l'appareil (`gtracker.routeList`), et onglets par activité. Chaque ligne
  * ouvre l'itinéraire, ou part dessus (« Partir »). Ceux d'une activité
  * cachée dans Réglages n'y sont pas (§10, point 100).
  *
@@ -30,7 +31,7 @@ import { jsonStore } from '../platform/storage';
  * choisi dans les fichiers, souligné dans la liste.
  */
 
-const PREFS_KEY = 'tracker.routeList';
+const PREFS_KEY = STORAGE_KEYS.routeList;
 /** Onglet des itinéraires rangés sans activité connue. */
 const WITHOUT_ACTIVITY = '';
 

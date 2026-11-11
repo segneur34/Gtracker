@@ -10,7 +10,7 @@
 //     après le crayon ;
 //  5. « Nouvel itinéraire » (après l'avoir verrouillé) : modifiable de nouveau.
 // Verdicts par `check` ; fin par « Tout passe. » ou le nombre d'échecs, code 0 ou 1.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -69,7 +69,7 @@ const movedTogether = (a, b) => {
 // Rangée « avancé » des analyses ouverte d'office (`lib/onglets.mjs`, 05/11).
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await go('/itineraires', 3000);
-await evaluate(`localStorage.setItem('tracker.sections', JSON.stringify({ planning: { profil: true, parcours: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
+await evaluate(`localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { profil: true, parcours: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
 await go('/itineraires', 3000);
 await ready();
 console.log('activité Voile :', await chooseVoile());

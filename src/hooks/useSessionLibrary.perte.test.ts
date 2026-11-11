@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FILE_FORMATS, MARKER_FILE, XML } from '../core/appIdentity';
+import { FILE_FORMATS, MARKER_FILE, XML, STORAGE_KEYS } from '../core/appIdentity';
 import { RECORD_FORMAT, RECORD_READER_VERSION, SUMMARY_CALC_VERSION, serializeRecord, type SessionRecord } from '../library/record';
 import { LEGACY_MARKER_FILE } from '../library/legacyImport';
 import { bundleSessionGpx } from '../library/sessionBundle';
@@ -59,7 +59,7 @@ const memoryFolder = (store: Map<string, string>, label: string, kind: MemoryFol
   (path) => store.get(path)!.length,
 );
 
-const fakeFolder = memoryFolder(files, 'Tracker');
+const fakeFolder = memoryFolder(files, 'Gtracker');
 
 /** Second dossier, désigné par « Choisir un dossier » (`chosen`). */
 const otherFiles = new Map<string, string>();
@@ -140,7 +140,7 @@ const mockPlatform = (): void => {
       openMemoryFolder: async () => (
         opened === 'folder' ? { state: 'ready', folder: fakeFolder }
           : opened === 'browser' ? { state: 'ready', folder: browserFolder }
-            : opened === 'permission' ? { state: 'needs-permission', label: 'Tracker' }
+            : opened === 'permission' ? { state: 'needs-permission', label: 'Gtracker' }
               : opened === 'saved' ? (saved ? { state: 'ready', folder: saved } : { state: 'unavailable', reason: 'aucun dossier' })
                 : { state: 'unavailable', reason: 'aucun dossier' }
       ),
@@ -180,7 +180,7 @@ const recordOf = (store: Map<string, string>, gpx: string): Record<string, unkno
 
 /** Stockage de l'appareil, gardé d'une ouverture à l'autre : le cache des fiches y survit. */
 const stored = new Map<string, string>();
-const CACHE_KEY = 'tracker.libraryCache';
+const CACHE_KEY = STORAGE_KEYS.libraryCache;
 
 beforeEach(() => {
   for (const map of [files, otherFiles, browserFiles, pendingFiles, stored]) map.clear();
@@ -299,7 +299,7 @@ const entry = (name: string, text: string) => ({
   readBytes: async () => null,
 });
 
-/** Fiche d'une version future de Tracker, avec un champ que cette version ne connaît pas. */
+/** Fiche d'une version future de Gtracker, avec un champ que cette version ne connaît pas. */
 const FUTURE_RECORD = JSON.stringify({
   format: RECORD_FORMAT, version: 99, gpx: 'a.gpx', sport: 'surf', activityId: null, source: 'import',
   addedAt: '2026-10-27T11:00:00.000Z', title: null, name: 'Futur',
@@ -533,7 +533,7 @@ describe('changement de dossier avec une fiche pas encore écrite (2, décision 
 
     // « Choisir à nouveau le dossier » : le même dossier, désigné de nouveau.
     refused.clear();
-    reconnected = memoryFolder(files, 'Tracker');
+    reconnected = memoryFolder(files, 'Gtracker');
     await afterWrites(() => library.reconnectFolder());
     expect(library.librarySession('sortie.gpx')?.record.name).toBe('Matin');
     expect(recordOf(files, 'sortie.gpx').name).toBe('Matin');
@@ -888,7 +888,7 @@ describe('dossier de l\'ancienne application choisi comme mémoire (lot 321)', (
     await settle(library);
     const state = library.readLibraryState();
     expect(state.error).toBe(LEGACY_FOLDER_REFUSAL);
-    expect((await library.currentMemoryFolder())?.label).toBe('Tracker');
+    expect((await library.currentMemoryFolder())?.label).toBe('Gtracker');
     expect(state.sessions.map((s) => s.file)).toEqual(['seul.gpx']);
     expect(otherFiles).toEqual(before);
     expect(saved).toBe(fakeFolder);
@@ -896,7 +896,7 @@ describe('dossier de l\'ancienne application choisi comme mémoire (lot 321)', (
     // Lancement suivant : A est rouvert.
     const next = await openFresh();
     await settle(next);
-    expect((await next.currentMemoryFolder())?.label).toBe('Tracker');
+    expect((await next.currentMemoryFolder())?.label).toBe('Gtracker');
     expect(next.readLibraryState().sessions.map((s) => s.file)).toEqual(['seul.gpx']);
   });
 
@@ -928,7 +928,7 @@ describe('dossier de l\'ancienne application choisi comme mémoire (lot 321)', (
     await settle(library);
     expect(library.readLibraryState().error).toBe(LEGACY_FOLDER_REFUSAL);
     expect(library.readLibraryState().status).toBe('needs-permission');
-    expect(library.readLibraryState().folderLabel).toBe('Tracker');
+    expect(library.readLibraryState().folderLabel).toBe('Gtracker');
     expect(saved).toBe(fakeFolder);
     expect(forgotten).toBe(0);
     expect(otherFiles).toEqual(before);

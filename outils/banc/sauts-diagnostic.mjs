@@ -42,7 +42,7 @@ if (!detection) {
 
 const rec = await decodeImu(new Uint8Array(readFileSync(imuPath)));
 if (!rec) {
-  console.error('Fichier illisible : pas un fichier des capteurs de Tracker.');
+  console.error('Fichier illisible : pas un fichier des capteurs de Gtracker.');
   process.exit(1);
 }
 

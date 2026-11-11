@@ -64,7 +64,7 @@ const listRoutes = async (): Promise<SavedRoute[]> => {
 /** Itinéraires de la mémoire ouverte, lus une fois pour toutes les pages (lot 158) et relus après chaque rangement ou suppression. */
 export const routeStore = createLoadedListStore(listRoutes, (err) => plainError(err, 'Lecture des itinéraires impossible.'));
 
-/** GPX rangé d'une fiche, et partagé : le tracé pour les autres applications, la fiche en extension pour Tracker. */
+/** GPX rangé d'une fiche, et partagé : le tracé pour les autres applications, la fiche en extension pour Gtracker. */
 const routeGpxOf = (route: PlannedRoute, record: RouteRecord): string =>
   buildRouteGpx(route, record.name, gpxLabel(record.activityId), record);
 

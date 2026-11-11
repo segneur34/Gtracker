@@ -1,12 +1,13 @@
 import { useCallback } from 'react';
 import { useStoredRecord } from './useStoredRecord';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Sections ouvertes d'un module, mémorisées dans le navigateur : on retrouve
  * la page comme on l'a laissée.
  */
 export const useOpenSections = <K extends string>(moduleId: string, defaults: Record<K, boolean>) => {
-  const { value, update } = useStoredRecord<Record<K, boolean>>('tracker.sections', moduleId, defaults);
+  const { value, update } = useStoredRecord<Record<K, boolean>>(STORAGE_KEYS.sections, moduleId, defaults);
 
   const toggle = useCallback(
     (key: K) => update((current) => ({ [key]: !current[key] }) as Partial<Record<K, boolean>>),

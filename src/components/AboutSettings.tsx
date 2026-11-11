@@ -92,7 +92,7 @@ function LicensesList() {
   const toggle = (key: string) => setOpenKey((current) => (current === key ? null : key));
   return (
     <>
-      <p className="about-licenses__intro">Tracker s'appuie sur ces composants. Touchez-en un pour lire sa licence.</p>
+      <p className="about-licenses__intro">Gtracker s'appuie sur ces composants. Touchez-en un pour lire sa licence.</p>
       {/* Sous `npm run dev` : Vite n'écrit la liste du JS qu'à la construction. */}
       {!lists.built && <p className="about-licenses__intro">Liste complète dans la version construite.</p>}
       <LicenseGroupList title="MIT, ISC, BSD" entries={entries.filter((e) => licenseGroup(e.identifier) === 'permissive')} limit={LICENSES_PREVIEW} openKey={openKey} onToggle={toggle} />

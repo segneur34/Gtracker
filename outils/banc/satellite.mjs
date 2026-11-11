@@ -6,7 +6,7 @@
 //  2. dans chaque analyse, à 1400×1000 : un bouton « Fond de carte » sous le + et le −, mention OSM ; un toucher ouvre
 //     le choix Plan · Satellite sans rien changer, un toucher ailleurs ou Échap le ferme ; « Satellite » passe à la photo
 //     (mention Esri) et ferme le choix ; le texte de la page ne change pas hors mention ; le fond est rangé dans la
-//     fiche de la session (lot 193), pas pour la famille (`tracker.fondCarte`), et retrouvé après rechargement ; la
+//     fiche de la session (lot 193), pas pour la famille (`gtracker.fondCarte`), et retrouvé après rechargement ; la
 //     voile en satellite laisse la course en plan ;
 //  3. bibliothèque (vignettes) : pas de bouton, mention OSM ; planification : le fond de la famille de son activité
 //     (la Voile, en satellite), son bouton qui ne pose pas de point, deux points posés sur la photo ;
@@ -17,7 +17,7 @@
 //  7. mentions sur téléphone (lot 195), à 390×844 puis 320×640 : satellite sur une seule ligne de 12 px, « Powered by Esri »
 //     en tête, un toucher déplie (classe is-open, hauteur qui grandit, aria-expanded) et un second replie ; plan : « © OpenStreetMap »
 //     entier et sur une ligne ; à 1400 px, rien de replié ni d'aria sur la mention.
-import { connect } from './lib/cdp.mjs';
+import { CACHES, CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -60,15 +60,15 @@ const choose = async (label, scope = '', ms = 1000) => {
 };
 const attribution = () => evaluate(`document.querySelector('.leaflet-control-attribution')?.textContent ?? ''`);
 const pageText = () => evaluate(`document.body.innerText.replace(/(Powered by Esri · Imagerie © Esri, Vantor, Earthstar Geographics, GIS User Community|Powered by Esri · Imagerie © Esri, Vantor, Earthstar Geographics|© OpenStreetMap)/g, '<mention>')`);
-const storedBases = () => evaluate(`JSON.parse(localStorage.getItem('tracker.fondCarte') ?? '{}')`);
+const storedBases = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.fondCarte}') ?? '{}')`);
 /** Tuiles de la carte compacte affichées (image chargée). */
 const loadedTiles = () => evaluate(`[...document.querySelectorAll('.leaflet-tile-pane img.leaflet-tile')].filter((i) => i.complete && i.naturalWidth > 0).length`);
 const cachedSatTiles = () => evaluate(`(async () => {
-  const cache = await caches.open('tracker-tuiles');
+  const cache = await caches.open('${CACHES.tuiles}');
   return (await cache.keys()).filter((r) => r.url.includes('/sat_')).length;
 })()`);
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 const BLOCKED = ['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*'];
 await blockNetwork(BLOCKED);
@@ -134,7 +134,7 @@ for (const s of SESSIONS) {
   check(`${s.page} : Satellite coché`, (await current()) === 'Satellite');
   const stored = await storedBases();
   // Lot 193 (07/11) : le choix fait dans une analyse va dans la fiche de la session ; le fond de la famille
-  // (`tracker.fondCarte`) ne bouge pas, il ne se change plus que depuis la planification ou le direct.
+  // (`gtracker.fondCarte`) ne bouge pas, il ne se change plus que depuis la planification ou le direct.
   const fiche = (await records())?.find((r) => r.gpx === gpxs[s.page]);
   check(`${s.page} : fond rangé dans la fiche, pas pour la famille`, fiche?.mapBase === 'satellite' && stored[s.page] !== 'satellite', JSON.stringify({ fiche: fiche?.mapBase ?? null, stored }));
   await shoot(`satellite-${s.page}`);

@@ -3,16 +3,17 @@ import { isMapBase, MAP_BASE_DEFAULT, resolveMapBase, type MapBase } from '../co
 import type { SportFamily } from '../core/sportProfiles';
 import { jsonStore } from '../platform/storage';
 import { updateSessionRecord, useLibrarySession } from './useSessionLibrary';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Fond de carte (plan ou satellite). Celui d'une famille est propre à
- * l'appareil (clé `tracker.fondCarte`) : il sert à la planification, au direct
+ * l'appareil (clé `gtracker.fondCarte`) : il sert à la planification, au direct
  * et de départ aux sessions. Celui d'une analyse est propre à sa session, dans
  * sa fiche (`mapBase`), changé tout de suite par le bouton de la carte, comme
  * le support ; sans fond rangé, la session prend celui de sa famille.
  */
 
-const STORAGE_KEY = 'tracker.fondCarte';
+const STORAGE_KEY = STORAGE_KEYS.fondCarte;
 
 type StoredBases = Partial<Record<SportFamily, unknown>>;
 

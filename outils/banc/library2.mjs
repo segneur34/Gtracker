@@ -5,7 +5,7 @@
 // Usage : node library2.mjs <port> <dossier de travail>
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir] = process.argv.slice(2);
@@ -22,10 +22,10 @@ const go = async (path, max) => {
 const clickText = (text) => evaluate(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim().startsWith(${JSON.stringify(text)})); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
 const setFiles = (selector, paths) => importFiles(paths, selector);
 const rows = () => evaluate(`JSON.stringify([...document.querySelectorAll('.lib-row__main')].map((r) => r.innerText.replace(/\\n/g, ' / ')))`);
-const readOpfs = (path) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); return await (await (await d.getFileHandle(name)).getFile()).text(); })()`);
-const writeOpfs = (path, text) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); const w = await (await d.getFileHandle(name, { create: true })).createWritable(); await w.write(${JSON.stringify(text)}); await w.close(); return 'ok'; })()`);
+const readOpfs = (path) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); return await (await (await d.getFileHandle(name)).getFile()).text(); })()`);
+const writeOpfs = (path, text) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); const w = await (await d.getFileHandle(name, { create: true })).createWritable(); await w.write(${JSON.stringify(text)}); await w.close(); return 'ok'; })()`);
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 const NAME = '2026-09-20_15-00-00_wingfoil';
 
@@ -51,11 +51,11 @@ console.log('\n== 2. fichier d\'un autre appareil, plus récent');
 const settings = JSON.parse(await readOpfs('reglages/pc.json'));
 settings.savedAt = Date.now() + 60_000;
 settings.device = { id: 'autre-appareil', name: 'Téléphone' };
-settings.values['tracker.sportSettings'] = { ...settings.values['tracker.sportSettings'], thresholds: { wingfoil: 11 } };
+settings.values[CLES.sportSettings] = { ...settings.values[CLES.sportSettings], thresholds: { wingfoil: 11 } };
 console.log('écriture :', await writeOpfs('reglages/telephone.json', JSON.stringify(settings)));
 await go('/parametres', 3500);
 console.log('seuil wingfoil affiché (inchangé attendu) :', await evaluate(`document.querySelector('table input[type=number]')?.value`));
-console.log('stockage de l\'appareil :', await evaluate(`localStorage.getItem('tracker.sportSettings')`));
+console.log('stockage de l\'appareil :', await evaluate(`localStorage.getItem('${CLES.sportSettings}')`));
 console.log(await evaluate(`document.body.innerText.split('\\n').filter((l) => /^(Téléphone|PC|cet appareil|Reprendre)$/.test(l)).join(' | ')`));
 
 console.log('\n--- console (erreurs, avertissements) ---');

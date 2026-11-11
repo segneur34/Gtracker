@@ -24,7 +24,7 @@ import { sanitizeGearGroups, sanitizeGearLabels } from './gear';
  * Réglages d'une activité, purs (lot 72) : défauts tirés du pré-réglage et du
  * calcul, valeurs effectives (`resolve*`) lues sur un `StoredSettings` passé en
  * argument, vue de Réglages, « Par défaut ».
- * Le magasin (`tracker.sportSettings`), sa lecture et ses écritures restent
+ * Le magasin (`gtracker.sportSettings`), sa lecture et ses écritures restent
  * dans `hooks/useSportSettings.ts`.
  */
 

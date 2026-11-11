@@ -17,6 +17,7 @@ import type { MemoryFolder } from '../../platform/memoryFolder';
 import { jsonStore, storageStartupFailure } from '../../platform/storage';
 import { effectiveFoil, effectiveThresholdOverride, readStoredActivities } from '../useSportSettings';
 import { lib } from './memory';
+import { STORAGE_KEYS } from '../../core/appIdentity';
 
 /**
  * Réglages des résumés (lot 113) : ceux de l'activité d'une session, les gestes dans Réglages qui les changent
@@ -45,7 +46,7 @@ export const summarizeGpxText = (text: string, sport: SportType, activityId: str
   analyzeGpx(text, sport, null, activitySummarySettings(activityId))?.summary ?? null;
 
 /** Gestes dans Réglages qui changent les résumés (`library/summaryGestures.ts`), rangés sur l'appareil : ils ne voyagent pas. */
-const GESTURES_KEY = 'tracker.summaryGestures';
+const GESTURES_KEY = STORAGE_KEYS.summaryGestures;
 
 export const readGestures = (): SummaryGestures | null => readSummaryGestures(jsonStore.read<unknown>(GESTURES_KEY));
 

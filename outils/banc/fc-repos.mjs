@@ -3,13 +3,13 @@
 // Sur un profil neuf (mémoire du navigateur, OPFS), sans réseau. Pas de ceinture : la page joue la FC d'exemple à ×30
 // (`?vitesse=30`, 9 s pour le test entier). Le script vérifie :
 //  1. un test mené à son terme est écrit dans `fc-repos.json` à la racine du dossier, avec le LISEZMOI qui le cite ;
-//  2. la clé de l'appareil (`tracker.restingHr`) vidée, le dossier rouvert : le test revient, dans la clé, dans le
+//  2. la clé de l'appareil (`gtracker.restingHr`) vidée, le dossier rouvert : le test revient, dans la clé, dans le
 //     fichier (inchangé) et sur la page « Vos tests » ;
 //  3. un test posé seulement dans le fichier (autre appareil) vient s'ajouter à celui de l'appareil, et le fichier
 //     garde les deux ;
 //  4. « Retirer » réécrit le fichier ;
 //  5. fichier abîmé : la liste de l'appareil reste, le fichier n'est pas écrasé, et l'enregistrer un test n'échoue pas.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect, DOSSIER_MEMOIRE, FORMATS } from './lib/cdp.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -18,7 +18,7 @@ if (!port) {
 }
 
 const { evaluate, go, wait, waitFor, settle, blockNetwork, shoot, close, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
-const dirJs = `(async () => await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'))()`;
+const dirJs = `(async () => await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}'))()`;
 const readRoot = (name) => evaluate(`(async () => {
   try { return await (await (await (await ${dirJs}).getFileHandle(${JSON.stringify(name)})).getFile()).text(); } catch { return null; }
 })()`);
@@ -30,7 +30,7 @@ const fileResults = async () => {
   const text = await readRoot('fc-repos.json');
   return text === null ? null : JSON.parse(text).results;
 };
-const stored = () => evaluate(`JSON.parse(localStorage.getItem('tracker.restingHr') ?? '[]')`);
+const stored = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.restingHr}') ?? '[]')`);
 const clickText = (text, selector = 'button') => evaluate(`(() => {
   const b = [...document.querySelectorAll(${JSON.stringify(selector)})].find((x) => x.textContent.trim() === ${JSON.stringify(text)});
   if (!b) return 'absent'; b.click(); return 'ok';
@@ -56,7 +56,7 @@ check('le LISEZMOI cite le fichier', /fc-repos\.json/.test((await readRoot('LISE
 const fileText1 = await readRoot('fc-repos.json');
 
 // --- 2. Clé de l'appareil vidée, dossier rouvert ---
-await evaluate(`localStorage.removeItem('tracker.restingHr')`);
+await evaluate(`localStorage.removeItem('${CLES.restingHr}')`);
 check('clé vidée', (await stored()).length === 0, '');
 await go('/profil/fc-repos');
 await waitFor(async () => (await stored()).length === 1, { timeout: 8000, label: 'résultats revenus' });
@@ -69,7 +69,7 @@ await shoot('fc-repos-revenus');
 
 // --- 3. Un test d'un autre appareil, posé dans le fichier seulement ---
 const other = { ...first, startedAtMs: first.startedAtMs - 86_400_000, lowestBpm: first.lowestBpm + 3 };
-await writeRoot('fc-repos.json', JSON.stringify({ format: 'tracker-fc-repos', version: 1, results: [first, other] }));
+await writeRoot('fc-repos.json', JSON.stringify({ format: FORMATS.fcRepos, version: 1, results: [first, other] }));
 await go('/profil/fc-repos');
 await waitFor(async () => (await stored()).length === 2, { timeout: 8000, label: 'fusion' });
 check('test de l\'autre appareil repris', (await stored()).some((r) => r.startedAtMs === other.startedAtMs), '');

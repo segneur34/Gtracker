@@ -17,7 +17,7 @@
 //  5. à 390 et 320 px : rien ne déborde, le carré et la bulle restent dans l'écran.
 // Avec un dossier, il y écrit les captures et une planche (`planche.html`) qui les rassemble.
 import { writeFileSync } from 'node:fs';
-import { BASE, connect } from './lib/cdp.mjs';
+import { BASE, CLES, connect } from './lib/cdp.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -99,7 +99,7 @@ const setField = (label, value) => evaluate(`(() => {
   input.dispatchEvent(new Event('blur', { bubbles: true }));
   return true;
 })()`);
-const seen = () => evaluate(`JSON.parse(localStorage.getItem('tracker.profil') ?? '{}').racine ?? null`);
+const seen = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.profil}') ?? '{}').racine ?? null`);
 const openBubble = async () => { await evaluate(`document.querySelector('.profile-root-slot')?.click()`); await wait(300); return bubbleText(); };
 
 // --- Heure de la page ---
@@ -112,7 +112,7 @@ const setClock = async (fakeMs, forget = true) => {
     const R = Date;
     class D extends R { constructor(...a) { if (a.length === 0) super(R.now() + off); else super(...a); } static now() { return R.now() + off; } }
     window.Date = D;
-    ${forget ? `try { const all = JSON.parse(localStorage.getItem('tracker.profil') ?? '{}'); delete all.racine; localStorage.setItem('tracker.profil', JSON.stringify(all)); } catch {}` : ''}
+    ${forget ? `try { const all = JSON.parse(localStorage.getItem('${CLES.profil}') ?? '{}'); delete all.racine; localStorage.setItem('${CLES.profil}', JSON.stringify(all)); } catch {}` : ''}
   })();`;
   clockScript = (await send('Page.addScriptToEvaluateOnNewDocument', { source })).result.identifier;
 };
@@ -201,7 +201,7 @@ check('Échap ferme la bulle', (await bubbleText()) === null);
 
 // 3. Réglages.
 await setClock(dayAt(30, 0, 12));
-await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}'); s.settings = { ...s.settings, pratiquant: true }; localStorage.setItem('tracker.sections', JSON.stringify(s)); })()`);
+await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}'); s.settings = { ...s.settings, pratiquant: true }; localStorage.setItem('${CLES.sections}', JSON.stringify(s)); })()`);
 await go('/parametres', 3000);
 const labels = await evaluate(`[...document.querySelectorAll('label')].map((l) => l.textContent)`);
 check('Réglages : la ligne « Objectif par semaine »', labels.some((t) => t.startsWith('Objectif par semaine')));
@@ -230,7 +230,7 @@ const recordDrawn = async (shots) => {
   return drawn;
 };
 await setClock(dayAt(32, 0, 12), false);
-await evaluate(`(() => { const all = JSON.parse(localStorage.getItem('tracker.profil') ?? '{}'); all.racine = { level: 3, period: 1, minutes: 20 }; localStorage.setItem('tracker.profil', JSON.stringify(all)); })()`);
+await evaluate(`(() => { const all = JSON.parse(localStorage.getItem('${CLES.profil}') ?? '{}'); all.racine = { level: 3, period: 1, minutes: 20 }; localStorage.setItem('${CLES.profil}', JSON.stringify(all)); })()`);
 await send('Page.navigate', { url: `${BASE}/profil` });
 let drawn = await recordDrawn(false);
 check('état vu sans version (valeurs d\'essai) ignoré : rien de rejoué', drawn.length > 0 && drawn.every((v) => v === 21), [...new Set(drawn)].join(' → '));

@@ -101,7 +101,7 @@ const roundDeg = (deg: number): number => Math.round(deg * 1e6) / 1e6;
 const roundEle = (eleM: number): number => Math.round(eleM * 10) / 10;
 
 /**
- * Trace suivie amincie pour être gardée sur l'appareil (`tracker.followedTrace`) :
+ * Trace suivie amincie pour être gardée sur l'appareil (`gtracker.followedTrace`) :
  * points simplifiés à `toleranceM` près, bouts compris, relief à
  * `elevationToleranceM` près (`simplifyAlongElevation`), et valeurs arrondies.
  * Trois heures à 1 Hz pèsent plusieurs centaines de Ko sinon, réécrites avec

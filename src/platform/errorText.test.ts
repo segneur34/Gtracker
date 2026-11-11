@@ -27,7 +27,7 @@ describe('plainError (lot 158)', () => {
   });
 
   it('reconnaît les messages techniques d’Android', () => {
-    expect(plainError(new Error('Missing file for primary:Documents/Tracker'))).toMatch(/introuvable/);
+    expect(plainError(new Error('Missing file for primary:Documents/Gtracker'))).toMatch(/introuvable/);
     expect(plainError(new Error('write failed: ENOSPC (No space left on device)'))).toMatch(/place/);
     expect(plainError(new Error('Failed to fetch'))).toMatch(/Réseau/);
   });

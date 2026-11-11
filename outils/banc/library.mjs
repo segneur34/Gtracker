@@ -2,7 +2,7 @@
 // import, doublon, à classer, suppression, relance, fichier de réglages de l'appareil. Profil Chrome neuf : OPFS vide au départ.
 // Usage : node library.mjs <port> <dossier des GPX : voile.gpx, course.gpx, sans-type.gpx> <dossier des captures>
 import { join } from 'node:path';
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, gpxDir, shotDir] = process.argv.slice(2);
@@ -27,8 +27,8 @@ const clickText = (text, selector = 'button') => evaluate(`(() => { const b = [.
 const setFiles = (selector, paths) => importFiles(paths, selector);
 const lines = (re) => evaluate(`document.body.innerText.split('\\n').filter((l) => ${re}.test(l)).join(' | ')`);
 const rows = () => evaluate(`JSON.stringify([...document.querySelectorAll('.lib-row__main')].map((r) => r.innerText.replace(/\\n/g, ' / ')))`);
-const opfsTree = () => evaluate(`(async () => { const t = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'); const out = {}; const walk = async (d, p) => { for await (const [n, h] of d.entries()) { if (h.kind === 'directory') await walk(h, p + n + '/'); else out[p + n] = (await h.getFile()).size; } }; await walk(t, ''); return JSON.stringify(out); })()`);
-const readOpfs = (path) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); return await (await (await d.getFileHandle(name)).getFile()).text(); })()`);
+const opfsTree = () => evaluate(`(async () => { const t = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}'); const out = {}; const walk = async (d, p) => { for await (const [n, h] of d.entries()) { if (h.kind === 'directory') await walk(h, p + n + '/'); else out[p + n] = (await h.getFile()).size; } }; await walk(t, ''); return JSON.stringify(out); })()`);
+const readOpfs = (path) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); return await (await (await d.getFileHandle(name)).getFile()).text(); })()`);
 const shot = async (name, width, height, mobile) => {
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
   await settle({ max: 800 });
@@ -37,7 +37,7 @@ const shot = async (name, width, height, mobile) => {
 };
 const step = (title) => console.log(`\n== ${title}`);
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
 step('1. Bibliothèque vide');
@@ -109,7 +109,7 @@ await go('/parametres');
 await evaluate(`(() => { const i = document.querySelector('table input[type=number]'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, '9.5'); i.dispatchEvent(new Event('input', { bubbles: true })); return i.value; })()`);
 await settle({ max: 3000 });
 const settings = JSON.parse(await readOpfs('reglages/pc.json'));
-console.log('reglages/pc.json :', JSON.stringify(settings.values['tracker.sportSettings']?.thresholds), '| appareil', settings.device?.name, '| savedAt', new Date(settings.savedAt).toISOString());
+console.log('reglages/pc.json :', JSON.stringify(settings.values[CLES.sportSettings]?.thresholds), '| appareil', settings.device?.name, '| savedAt', new Date(settings.savedAt).toISOString());
 console.log(await lines(/cet appareil|Nom de cet appareil/));
 await shot('reglages-desktop', 1400, 1000, false);
 await shot('reglages-mobile', 390, 844, true);

@@ -5,7 +5,7 @@
 // les deux GPX : make-gpx.mjs sans décalage, puis avec un décalage d'une heure.
 // Depuis le 28/10, le champ « Allure de la session » est dans l'onglet « réglages » de l'analyse voile
 // (panneau « Réglages de la session ») : le script ouvre cet onglet avant de le lire.
-import { connect } from './lib/cdp.mjs';
+import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, gpx1, gpx2] = process.argv.slice(2);
@@ -42,7 +42,7 @@ const openSettingsTab = async () => {
   return r;
 };
 const bar = () => evaluate(`document.querySelector('.ui-savebar')?.innerText.replace(/\\n/g, ' ') ?? 'pas de barre'`);
-const readOpfs = (path) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); return await (await (await d.getFileHandle(name)).getFile()).text(); })()`);
+const readOpfs = (path) => evaluate(`(async () => { let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}'); const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p); return await (await (await d.getFileHandle(name)).getFile()).text(); })()`);
 const fiche = async (file) => {
   const r = JSON.parse(await readOpfs(`sessions/${file.replace(/\.gpx$/, '.json')}`));
   return JSON.stringify({ sport: r.sport, analysis: r.analysis, movingTimeS: r.summary.movingTimeS === null ? null : Math.round(r.summary.movingTimeS), calcVersion: r.summary.calcVersion });
@@ -68,7 +68,7 @@ const recordAndAnalyse = async (gpx) => {
   return { url, file: decodeURIComponent(url.split('session=')[1] ?? '') };
 };
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
 step('1. Session 1 : allure déduite');

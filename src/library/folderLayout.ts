@@ -51,8 +51,8 @@ export const readMarkerVersion = (text: string | null): number => {
 /** Texte du `LISEZMOI.txt`, en fins de ligne Windows : il sera surtout ouvert sur un PC. */
 export const readmeText = (): string =>
   [
-    'Dossier mémoire de Tracker',
-    '==========================',
+    'Dossier mémoire de Gtracker',
+    '===========================',
     '',
     'Ce dossier contient toutes vos sessions et vos réglages.',
     '',
@@ -64,7 +64,7 @@ export const readmeText = (): string =>
     '  passage, tracé) ; le GPX du même nom est à emporter dans une autre application',
     '  ou sur une montre.',
     '- reglages/ : un fichier de réglages par appareil (telephone.json, pc.json…) :',
-    '  activités et leurs réglages, séances du compteur, barre du bas, profil du',
+    '  activités et leurs réglages, barre du bas, profil du',
     '  pratiquant. Chaque appareil écrit le sien. Pour reprendre ceux d\'un autre',
     '  appareil, ou de quelqu\'un d\'autre : déposez son fichier ici, puis dans',
     '  Réglages > Mémoire, « Mettre à jour » et « Reprendre ».',
@@ -73,11 +73,8 @@ export const readmeText = (): string =>
     `- ${MARKER_FILE} : permet à l'application de reconnaître ce dossier.`,
     '',
     'Sauvegarder ou changer d\'appareil : copiez le dossier Gtracker entier.',
-    'Sur le téléphone, il se trouve dans Stockage interne > Documents > Tracker',
+    'Sur le téléphone, il se trouve dans Stockage interne > Documents > Gtracker',
     '(par câble USB depuis le PC, ou avec le gestionnaire de fichiers).',
-    '',
-    'Fusionner deux dossiers : copiez le contenu de l\'un dans l\'autre. Une même',
-    'session présente deux fois n\'est comptée qu\'une fois.',
     '',
     'Ajouter une trace d\'une autre application : déposez son GPX dans sessions/.',
     'L\'application lui crée sa fiche au lancement suivant, ou en touchant',

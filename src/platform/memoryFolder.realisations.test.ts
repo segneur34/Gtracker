@@ -55,7 +55,7 @@ vi.mock('@capacitor/core', async (importOriginal) => ({
 }));
 vi.mock('./storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./storage')>()),
-  jsonStore: { read: () => ({ uri: 'content://arbre', base: 'Tracker', label: 'dossier' }), write: () => undefined },
+  jsonStore: { read: () => ({ uri: 'content://arbre', base: 'Gtracker', label: 'dossier' }), write: () => undefined },
 }));
 
 const loaded = () => import('./memoryFolder');
@@ -152,7 +152,7 @@ describe('stat', () => {
     };
     expect(await access.folder.stat('sessions/a.json')).toEqual({ size: 12, mtimeMs: 0 });
     expect(await access.folder.stat('sessions/b.json')).toBeNull();
-    expect(asked).toEqual(['Tracker/sessions/a.json', 'Tracker/sessions/b.json']);
+    expect(asked).toEqual(['Gtracker/sessions/a.json', 'Gtracker/sessions/b.json']);
 
     plugin.stat = async () => {
       throw Object.assign(new Error('Lecture du fichier impossible : EACCES'), { code: 'PERMISSION' });

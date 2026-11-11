@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { THEME_CHOICES, THEME_DEFAULT, THEME_STORAGE_KEY, parseThemeSettings, resolveTheme, sameAppliedTheme } from './theme';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 describe('thème', () => {
   it('départ : Auto, sans Économe, sous la clé de l\'appareil', () => {
     expect(THEME_DEFAULT).toEqual({ choice: 'auto', eco: false });
-    expect(THEME_STORAGE_KEY).toBe('tracker.theme');
+    expect(THEME_STORAGE_KEY).toBe(STORAGE_KEYS.theme);
     expect(parseThemeSettings(null)).toEqual(THEME_DEFAULT);
     expect(THEME_CHOICES.map((c) => c.label)).toEqual(['Clair', 'Sombre', 'Auto']);
   });

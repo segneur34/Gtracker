@@ -17,7 +17,7 @@
 // sortie d'erreur (`diag`). Le saut d'horloge (`Date.now` décalé dans la page) évite une minute d'attente par passage.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { connect, diag, vwait } from './lib/cdp.mjs';
+import { connect, diag, DOSSIER_MEMOIRE, vwait } from './lib/cdp.mjs';
 import { BLOCKED_EXCEPT_TILES, fakeTiles } from './lib/tuiles.mjs';
 
 const [port, workDir] = process.argv.slice(2);
@@ -61,7 +61,7 @@ const runPath = join(workDir, 'carte-reveil.gpx');
 writeFileSync(runPath, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Course</name><type>running</type><trkseg>\n${run.join('\n')}\n</trkseg></trk></gpx>\n`);
 
 const listSessions = () => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}');
   dir = await dir.getDirectoryHandle('sessions');
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 })()`);

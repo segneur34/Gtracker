@@ -9,7 +9,7 @@ import type { ActivitySummarySettings } from './summaryOptions';
  * Gestes dans Réglages qui changent les résumés (Q57, lot 148) : une session garde le seuil et le foil
  * avec lesquels elle a été calculée (`SummaryActivitySettings`), mêmes chiffres sur tous les appareils, et
  * seul un changement fait sur cet appareil (saisi, repris d'un autre fichier, pré-réglage mis à jour) réécrit
- * les sessions de l'activité. Pur : l'état, rangé par appareil (`tracker.summaryGestures`, ne voyage pas), est
+ * les sessions de l'activité. Pur : l'état, rangé par appareil (`gtracker.summaryGestures`, ne voyage pas), est
  * lu et écrit par `useSessionLibrary`, qui le compare aux réglages à chaque écriture et à chaque ouverture.
  */
 

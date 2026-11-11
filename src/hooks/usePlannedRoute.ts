@@ -13,6 +13,7 @@ import {
   withReturnResult,
   type LegRequest, type PlannedRoute, type ReturnRequest, type RouteMode, type RouteVehicle, type Waypoint,
 } from '../planning/route';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Itinéraire en cours de planification : les modifications de l'utilisateur,
@@ -36,7 +37,7 @@ import {
  */
 
 /** Id du profil de calcul envoyé au serveur, retenu sur l'appareil (`planning/brouter.ts`). */
-const PROFILE_KEY = 'tracker.brouterProfile';
+const PROFILE_KEY = STORAGE_KEYS.brouterProfile;
 const profileStore: ProfileIdStore = {
   read: () => jsonStore.read<{ id?: unknown }>(PROFILE_KEY)?.id ?? null,
   write: (id) => jsonStore.write(PROFILE_KEY, { id }),

@@ -12,7 +12,7 @@
 //  6. la moyenne en voile (lot 150) : « Moyenne active » dans les menus de Réglages, « Moy. act. » dans un rejeu.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir] = process.argv.slice(2);
@@ -74,7 +74,7 @@ const nowTrace = (path, n, type) => {
   writeFileSync(path, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Rejeu</name><type>${type}</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`);
 };
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
 
@@ -117,7 +117,7 @@ await evaluate(`(() => {
 })()`);
 await wait(300);
 const after = await notifRow();
-const stored = await evaluate(`JSON.stringify(JSON.parse(localStorage.getItem('tracker.sportSettings'))?.notificationFields)`);
+const stored = await evaluate(`JSON.stringify(JSON.parse(localStorage.getItem('${CLES.sportSettings}'))?.notificationFields)`);
 check('seconde ligne « Max », rangée, plus « défaut »', after?.values[1]?.startsWith('Max') && !after.text.includes('défaut') && /"max"/.test(stored ?? ''), stored);
 // Seuls les chiffres de la notification changés : la carte a son « Défaut », et repliée, « · modifié » (demande du 19/10).
 const voileCard = `[...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__toggle')?.textContent.trim().startsWith('Voile'))`;
@@ -171,9 +171,9 @@ await wait(800);
 
 // 6, joué ici : la moyenne active dans un rejeu de voile.
 const fieldsWith = (from, to) => evaluate(`(() => {
-  const s = JSON.parse(localStorage.getItem('tracker.sportSettings'));
+  const s = JSON.parse(localStorage.getItem('${CLES.sportSettings}'));
   for (const id of Object.keys(s.notificationFields ?? {})) s.notificationFields[id] = s.notificationFields[id].map((f) => (f === ${JSON.stringify(from)} ? ${JSON.stringify(to)} : f));
-  localStorage.setItem('tracker.sportSettings', JSON.stringify(s));
+  localStorage.setItem('${CLES.sportSettings}', JSON.stringify(s));
   return JSON.stringify(s.notificationFields);
 })()`);
 console.log('chiffres :', await fieldsWith('max', 'average'));

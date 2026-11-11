@@ -54,11 +54,11 @@ export const dispatchBack = (canLeave: () => boolean = () => true): BackOutcome 
  * tourner. Tant que `keepAlive` répond vrai, l'application passe en
  * arrière-plan au lieu de se fermer. `canLeave` peut retenir l'utilisateur sur
  * la page (modifications non enregistrées). Dans le navigateur, en
- * développement, `window.trackerBack()` fait le même retour (banc).
+ * développement, `window.gtrackerBack()` fait le même retour (banc).
  */
 export const installBackButton = async (keepAlive: () => boolean, canLeave: () => boolean = () => true): Promise<void> => {
   if (!isNativeApp()) {
-    if (import.meta.env.DEV) (window as Window & { trackerBack?: () => BackOutcome }).trackerBack = () => dispatchBack(canLeave);
+    if (import.meta.env.DEV) (window as Window & { gtrackerBack?: () => BackOutcome }).gtrackerBack = () => dispatchBack(canLeave);
     return;
   }
   const { App } = await import('@capacitor/app');

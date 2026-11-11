@@ -12,7 +12,7 @@
 //     équipées par l'onglet « matériel et notes » ; une ligne par groupe porté (pas celle du groupe jamais porté),
 //     croisement en ET (Trail : 2 sessions, Trail et 5 L : 1), adresse `materiel=groupe:piece,…`, résumé de
 //     « Sélection », retour arrière d'un cran, ancienne adresse à une pièce relue dans son groupe.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -41,7 +41,7 @@ const saveBar = () => evaluate(`document.body.innerText.match(/Non enregistr[^\\
 const gearInput = (label) => `[...document.querySelectorAll('label')].find((l) => l.querySelector('span')?.textContent.trim() === ${JSON.stringify(label)})?.querySelector('input[type=text]')`;
 const gearLabels = () => evaluate(`[...document.querySelectorAll('label')].filter((l) => l.querySelector('input[type=text]') && l.querySelector('span')).map((l) => l.querySelector('span').textContent.trim()).join(', ')`);
 const conditionsArea = `document.querySelector('textarea[aria-label="Conditions"]')`;
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
 
@@ -60,7 +60,7 @@ const lineGpx = (type, speedMs, t0) => {
 // --- 1. Réglages ---
 await go('/parametres', 4000);
 await evaluate(`(() => {
-  localStorage.setItem('tracker.sections', JSON.stringify({
+  localStorage.setItem('${CLES.sections}', JSON.stringify({
     settings: { activites: true },
     'settings-activities': { wingfoil: true, running: true, cycling: true, surf: true },
     'settings-families': { voile: true, course: true, velo: true, fractionne: true, surf: true },
@@ -79,7 +79,7 @@ console.log('intitulé 1 :', await setText(`${courseCard}?.querySelector('input[
 await wait(300);
 console.log('intitulé 2 :', await setText(`${courseCard}?.querySelector('input[aria-label="Intitulé du matériel 2"]')`, 'Sac'));
 await wait(500);
-const stored = await evaluate(`JSON.stringify(JSON.parse(localStorage.getItem('tracker.sportSettings') ?? '{}').gearLabels)`);
+const stored = await evaluate(`JSON.stringify(JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}').gearLabels)`);
 console.log('rangés :', stored);
 check('intitulés de Course rangés, rognés', stored === JSON.stringify({ running: ['Chaussures', 'Sac'] }));
 await shoot('materiel-reglages');
@@ -151,13 +151,13 @@ await shoot('materiel-telephone');
 await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
 await go('/', 3000);
 await evaluate(`(() => {
-  const s = JSON.parse(localStorage.getItem('tracker.sportSettings') ?? '{}');
+  const s = JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}');
   s.gearGroups = { ...s.gearGroups, running: [
     { id: 'g-ch', name: 'Chaussures', items: [{ id: 'c-trail', name: 'Trail' }, { id: 'c-route', name: 'Route' }] },
     { id: 'g-sac', name: 'Sac', items: [{ id: 's-5', name: '5 L' }, { id: 's-10', name: '10 L' }] },
     { id: 'g-montre', name: 'Montre', items: [{ id: 'm-1', name: 'Jamais portée' }] },
   ] };
-  localStorage.setItem('tracker.sportSettings', JSON.stringify(s));
+  localStorage.setItem('${CLES.sportSettings}', JSON.stringify(s));
   return 'ok';
 })()`);
 /** Importe une course, choisit une pièce par groupe dans l'onglet « matériel et notes », enregistre. */

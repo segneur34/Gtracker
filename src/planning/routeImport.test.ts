@@ -47,7 +47,7 @@ describe('GPX d\'un itinéraire avec sa fiche (lot 194)', () => {
 });
 
 describe('aiguillage d\'un GPX reçu : itinéraire ou session', () => {
-  it('itinéraire : fiche de Tracker, route seule, trace sans heure', () => {
+  it('itinéraire : fiche de Gtracker, route seule, trace sans heure', () => {
     expect(isRouteGpx(sharedGpx)).toBe(true);
     expect(isRouteGpx(ROUTE_ONLY)).toBe(true);
     expect(isRouteGpx(trackGpx(false))).toBe(true);
@@ -70,7 +70,7 @@ describe('nom d\'un itinéraire importé', () => {
 });
 
 describe('fiche d\'un itinéraire importé', () => {
-  it('GPX de Tracker : balises, tronçons, activité et bips repris tels quels, nom non doublé', () => {
+  it('GPX de Gtracker : balises, tronçons, activité et bips repris tels quels, nom non doublé', () => {
     const record = importedRouteRecord(sharedGpx, 'x.gpx', options([courseRecord.name]));
     expect(record).not.toBeNull();
     expect(record?.name).toBe('Parcours <Carnon> & co (2)');

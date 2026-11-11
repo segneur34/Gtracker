@@ -14,7 +14,7 @@
 // Les durées sont en secondes (le masque commun `N ms` les effacerait) et changent d'un passage à l'autre.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { connect } from './lib/cdp.mjs';
+import { CACHES, CLES, connect } from './lib/cdp.mjs';
 import { BLOCKED_EXCEPT_TILES, fakeTiles, formatTileStats } from './lib/tuiles.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -135,7 +135,7 @@ const SIZES = [['1400', { width: 1400, height: 1000, deviceScaleFactor: 1, mobil
 for (const [sizeLabel, metrics] of SIZES) {
   await send('Emulation.setDeviceMetricsOverride', metrics);
   for (const [themeLabel, theme] of THEMES) {
-    await evaluate(`localStorage.setItem('tracker.theme', ${JSON.stringify(JSON.stringify(theme))}); true`);
+    await evaluate(`localStorage.setItem('${CLES.theme}', ${JSON.stringify(JSON.stringify(theme))}); true`);
     await go('/course', 8000);
     await waitFor(`[...document.querySelectorAll('.lib-row__preview')].slice(0, 6).every((f) => f.querySelector('img.lib-row__preview-image, .leaflet-tile-loaded, .leaflet-trace-pane canvas'))`, { timeout: 20000, label: `vignettes ${themeLabel} ${sizeLabel}` });
     // Tuiles et dernier dessin.
@@ -146,19 +146,19 @@ for (const [sizeLabel, metrics] of SIZES) {
     await capture(`${themeLabel}-${sizeLabel}`);
   }
 }
-await evaluate(`localStorage.removeItem('tracker.theme'); true`);
+await evaluate(`localStorage.removeItem('${CLES.theme}'); true`);
 await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
 
 // 5. 10 000 tuiles gardées : liste au premier chargement, puis au suivant.
 await go('/', 5000);
 const filled = await evaluate(`(async () => {
-  const cache = await caches.open('tracker-tuiles');
+  const cache = await caches.open('${CACHES.tuiles}');
   const body = new Uint8Array(2000);
   const now = Date.now();
   for (let i = 0; i < 10000; i += 250) {
     await Promise.all(Array.from({ length: 250 }, (_, k) => {
       const key = '16_' + (33000 + i + k) + '_23900';
-      return cache.put('/tuiles-gardees/' + key + '.png', new Response(new Blob([body], { type: 'image/png' }), { headers: { 'content-type': 'image/png', 'content-length': '2000', 'x-tracker-saved-at': String(now) } }));
+      return cache.put('/tuiles-gardees/' + key + '.png', new Response(new Blob([body], { type: 'image/png' }), { headers: { 'content-type': 'image/png', 'content-length': '2000', '${CACHES.entete}': String(now) } }));
     }));
   }
   // Tuiles gardées par une version sans index (ou index perdu) : la première liste le refait.

@@ -47,6 +47,7 @@ import { previewImageKey } from '../library/previewImages';
 import bannerSurf from '../assets/bandeaux/surf.webp';
 import bannerVoile from '../assets/bandeaux/voile.webp';
 import './SessionLibrary.css';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /** Mention des vignettes (toujours sur le plan, `drawTrackPreview`), « © » puis le nom, en couleur de lien comme sur la carte. */
 const [PREVIEW_CREDIT_MARK, ...previewCreditName] = MAP_BASES.plan.credit.split(' ');
@@ -465,7 +466,7 @@ function OutdatedSummaries() {
 }
 
 /** Tri choisi, propre à l'appareil et le même pour toutes les familles. */
-const SORT_KEY = 'tracker.triBibliotheque';
+const SORT_KEY = STORAGE_KEYS.triBibliotheque;
 const readSort = (): SessionSort => {
   const stored = jsonStore.read<{ sort?: unknown }>(SORT_KEY)?.sort;
   return isSessionSort(stored) ? stored : SESSION_SORT_DEFAULT;
@@ -622,7 +623,7 @@ function SessionLibrary({ family }: { family: SportFamily }) {
         <p className="ui-hint ui-hint--m">
           {native
             ? "« Ajouter les sessions d'un dossier » reprend celles d'un dossier Gtracker copié depuis le PC ou un autre téléphone, notes comprises. On peut aussi copier les fichiers directement dans Documents › Gtracker › sessions : ils apparaissent avec « Mettre à jour », ou au lancement suivant. Un dossier qui contient plusieurs activités de montre (fichiers .fit) demande confirmation : si la montre est prêtée, copiez d'abord vos seuls fichiers dans un dossier, ou choisissez-les un par un avec « Importer des GPX ou FIT »."
-            : "« Ajouter les sessions d'un dossier » reprend celles d'un dossier Gtracker copié depuis le téléphone ou un autre PC, notes comprises. Chrome demande alors s'il faut importer les fichiers « sur ce site » : ils restent sur ce PC, Tracker n'envoie rien sur internet. Le dossier mémoire de ce PC, lui, se choisit dans Réglages › Mémoire ; des fichiers copiés dedans pendant que Tracker est ouvert apparaissent avec « Mettre à jour ». Un dossier qui contient plusieurs activités de montre (fichiers .fit) demande confirmation : si la montre est prêtée, copiez d'abord vos seuls fichiers dans un dossier du PC, ou choisissez-les un par un avec « Importer des GPX ou FIT »."}
+            : "« Ajouter les sessions d'un dossier » reprend celles d'un dossier Gtracker copié depuis le téléphone ou un autre PC, notes comprises. Chrome demande alors s'il faut importer les fichiers « sur ce site » : ils restent sur ce PC, Gtracker n'envoie rien sur internet. Le dossier mémoire de ce PC, lui, se choisit dans Réglages › Mémoire ; des fichiers copiés dedans pendant que Gtracker est ouvert apparaissent avec « Mettre à jour ». Un dossier qui contient plusieurs activités de montre (fichiers .fit) demande confirmation : si la montre est prêtée, copiez d'abord vos seuls fichiers dans un dossier du PC, ou choisissez-les un par un avec « Importer des GPX ou FIT »."}
         </p>
       )}
 

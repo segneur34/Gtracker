@@ -20,7 +20,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -61,7 +61,7 @@ const panel = (title) => evaluate(`(() => {
 })()`);
 
 // Le blocage par hôte ne vaut qu'avec `Network.enable` (fait par `connect`) : sans lui, Overpass répond parfois (504), et le relevé change.
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 let ongletsId = (await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS })).result.identifier;
 await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
 
@@ -150,12 +150,12 @@ const CARDS = { Voile: 'wingfoil', Course: 'running', Route: 'cycling', 'Fractio
 const openSettings = async () => {
   await go('/parametres', 3000);
   await evaluate(`(() => {
-    const sections = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}');
+    const sections = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
     sections.settings = { ...sections.settings, activites: true };
     sections['settings-activities'] = ${JSON.stringify(Object.fromEntries(Object.values(CARDS).map((k) => [k, true])))};
     sections['settings-activity-parts'] = { analyse: true };
     sections['settings-families'] = { voile: true, course: true, velo: true, fractionne: true, surf: true };
-    localStorage.setItem('tracker.sections', JSON.stringify(sections));
+    localStorage.setItem('${CLES.sections}', JSON.stringify(sections));
     return 'ok';
   })()`);
   await go('/parametres', 3000);
@@ -174,7 +174,7 @@ const pressPill = (name, label) => evaluate(`(() => {
   if (!b) return 'absent'; b.click(); return 'ok';
 })()`);
 const rowMark = (name) => evaluate(`${tabsRow(name)}?.querySelector('.settings-sports__mark')?.textContent ?? '(aucune)'`);
-const storedTabs = () => evaluate(`JSON.stringify(JSON.parse(localStorage.getItem('tracker.sportSettings') ?? '{}').tabs ?? null)`);
+const storedTabs = () => evaluate(`JSON.stringify(JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}').tabs ?? null)`);
 
 await openSettings();
 const shown = {};

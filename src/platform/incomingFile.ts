@@ -3,7 +3,7 @@ import { base64ToBytes } from '../core/base64';
 import { isNativeApp } from './runtime';
 
 /**
- * « Ouvrir avec Tracker » et « Partager vers Tracker » (lot 35) : seul passage vers
+ * « Ouvrir avec Gtracker » et « Partager vers Gtracker » (lot 35) : seul passage vers
  * `android/…/IncomingFilePlugin.java`, qui copie aussitôt le fichier reçu dans une file privée. Dans le navigateur,
  * sans effet : la file reste vide. La file côté page est dans `hooks/sessionLibrary/incoming.ts`.
  */

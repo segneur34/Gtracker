@@ -13,7 +13,7 @@
 //     choisie, rangée dans la liste des activités, gardée après rechargement, reprise par l'onglet de la bibliothèque ;
 //     une activité « Paddle » ajoutée en surf, son icône devinée cochée pendant la saisie, rangée sans choix ;
 //  6. à 390×844 : bibliothèque et accueil sans débordement.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -26,7 +26,7 @@ if (!port) {
 const { send, evaluate, go, settle, waitFor, wait, records, shoot, close, logs: allLogs } = await connect({ port, width: 1400, height: 1000, shotDir });
 // Ce script ne relevait que les erreurs de console, pas les avertissements.
 const logs = { get length() { return allLogs.filter((l) => !l.startsWith('warning:')).length; }, join: (sep) => allLogs.filter((l) => !l.startsWith('warning:')).join(sep) };
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
 let failures = 0;
@@ -60,7 +60,7 @@ const tabIcon = (label) => evaluate(`[...document.querySelectorAll('.ui-tab')].f
 const h1 = () => evaluate(`document.querySelector('h1')?.textContent ?? null`);
 const tab = (label) => `[...document.querySelectorAll('.ui-tab')].find((b) => b.textContent.trim().startsWith(${JSON.stringify(label)}))`;
 const overflow = () => evaluate('document.documentElement.scrollWidth > window.innerWidth');
-const stored = () => evaluate(`JSON.parse(localStorage.getItem('tracker.sportSettings') ?? '{}').activities ?? null`);
+const stored = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}').activities ?? null`);
 
 /** La page se monte après le chargement (modules à la demande, bibliothèque relue) : on attend son premier élément, 3 s au plus comme l'ancien sommeil. */
 const ready = (selector) => waitFor(`document.querySelector(${JSON.stringify(selector)}) !== null`, { timeout: 3000, label: selector });
@@ -128,10 +128,10 @@ await wait(300);
 
 // 5. Réglages.
 await evaluate(`(() => {
-  const sections = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}');
+  const sections = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
   sections.settings = { ...sections.settings, activites: true };
   sections['settings-families'] = { voile: true };
-  localStorage.setItem('tracker.sections', JSON.stringify(sections));
+  localStorage.setItem('${CLES.sections}', JSON.stringify(sections));
   return 'ok';
 })()`);
 await go('/parametres');

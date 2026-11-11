@@ -1,6 +1,6 @@
 // Banc de test : onglets des analyses ouverts d'office (lot 145, 05/11). Depuis le 05/11, l'application ne retient
 // plus les onglets ouverts : toute ouverture d'une analyse rend « général » seul, « avancé » fermé. Les scripts, qui
-// posaient les onglets voulus dans `tracker.sections` (clés `sailing-onglets`, `running`, `cycling`, `intervals`,
+// posaient les onglets voulus dans `gtracker.sections` (clés `sailing-onglets`, `running`, `cycling`, `intervals`,
 // `muscu`, `surf`) et la rangée « avancé » ouverte, continuent de les y poser : ce script, injecté à chaque page
 // (`Page.addScriptToEvaluateOnNewDocument`), les relit avant l'application (qui les efface au démarrage), les garde
 // sous `banc.onglets` et, à chaque nouvelle analyse montée (`.an-page`), clique une fois sur chaque onglet voulu
@@ -10,8 +10,9 @@
 // éprouve la rangée fermée sans ce script.
 // Usage : `await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });` ; `ongletsSource({ memoire: false })`
 // pour ne rien rejouer ni retenir (seule la rangée « avancé » est ouverte d'office : `onglets.mjs`, réouverture).
+import { CLES } from './cdp.mjs';
 
-/** Analyse → clés de `tracker.sections` où ses onglets étaient retenus. */
+/** Analyse → clés de `gtracker.sections` où ses onglets étaient retenus. */
 const MODULES = {
   '/voile/analyse': ['sailing-onglets'],
   // Course, vélo et Entraînement sans analyse depuis les lots 302, 303 et 305.
@@ -24,10 +25,10 @@ export const ongletsSource = ({ memoire = true } = {}) => `(() => {
   const MEMOIRE = ${memoire};
   const KEYS = [...new Set(Object.values(MODULES).flat())];
   const readJson = (key) => { try { return JSON.parse(localStorage.getItem(key) ?? '{}') ?? {}; } catch { return {}; } };
-  // Onglets posés par le script dans \`tracker.sections\`, relus avant que l'application ne les efface.
+  // Onglets posés par le script dans \`${CLES.sections}\`, relus avant que l'application ne les efface.
   if (MEMOIRE) {
     try {
-      const sections = readJson('tracker.sections');
+      const sections = readJson('${CLES.sections}');
       const wanted = readJson('banc.onglets');
       let moved = false;
       for (const k of KEYS) if (sections[k] && typeof sections[k] === 'object') { wanted[k] = sections[k]; moved = true; }

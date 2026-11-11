@@ -8,7 +8,7 @@
 //  3. Voile, sans liste : pas de rangée.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
 if (!port || !workDir) {
@@ -62,9 +62,9 @@ const allRecords = async () => (await records()).map((r) => r.record ?? r);
 // Liste de matériel de Course, écrite dans les réglages.
 await go('/');
 await evaluate(`(() => {
-  const s = JSON.parse(localStorage.getItem('tracker.sportSettings') ?? '{}');
+  const s = JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}');
   s.gearGroups = { ...s.gearGroups, running: [{ id: 'g1', name: 'Chaussures', items: [{ id: 'i1', name: 'Trail rouge' }, { id: 'i2', name: 'Route blanche' }] }] };
-  localStorage.setItem('tracker.sportSettings', JSON.stringify(s));
+  localStorage.setItem('${CLES.sportSettings}', JSON.stringify(s));
   return 'ok';
 })()`);
 

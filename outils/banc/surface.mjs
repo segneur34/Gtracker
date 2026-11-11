@@ -10,7 +10,7 @@
 //     recharge la page : mêmes chiffres, aucune nouvelle requête.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -46,20 +46,20 @@ const tapMap = async (fx, fy) => {
 const surfaceRows = () => evaluate(`[...document.querySelectorAll('.surface-bar__row')].map((r) => r.innerText.replace(/\\n/g, ' ')).join(' · ') || '(aucune)'`);
 const planNotes = (pattern) => evaluate(`[...document.querySelectorAll('.plan-note')].map((x) => x.textContent).filter((t) => ${pattern}.test(t)).join(' | ') || '(aucune)'`);
 const readOpfs = (path) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}');
   const parts = ${JSON.stringify(path)}.split('/');
   for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p);
   return await (await (await dir.getFileHandle(parts[parts.length - 1])).getFile()).text();
 })()`);
 const writeOpfs = (path, text) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}');
   const parts = ${JSON.stringify(path)}.split('/');
   for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p);
   const w = await (await dir.getFileHandle(parts[parts.length - 1])).createWritable();
   await w.write(${JSON.stringify(text)}); await w.close(); return 'ok';
 })()`);
 const listOpfs = (path) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}');
   for (const p of ${JSON.stringify(path)}.split('/')) dir = await dir.getDirectoryHandle(p);
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 })()`);
@@ -74,8 +74,8 @@ const waitComputed = async () => {
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 // 1. Itinéraire calculé, en Course, au nord de Montpellier (garrigue et routes).
 await go('/itineraires', 2000);
-await evaluate(`localStorage.setItem('tracker.planning', JSON.stringify({ activityId: 'running', mode: 'chemin', view: { lat: 43.7735, lon: 3.811, zoom: 15 } }));
-  localStorage.setItem('tracker.sections', JSON.stringify({ planning: { profil: true, surface: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
+await evaluate(`localStorage.setItem('${CLES.planning}', JSON.stringify({ activityId: 'running', mode: 'chemin', view: { lat: 43.7735, lon: 3.811, zoom: 15 } }));
+  localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { profil: true, surface: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
 await go('/itineraires');
 await ready('.plan-map .leaflet-container');
 console.log('blocs :', await evaluate(`[...document.querySelectorAll('.plan-block__head')].map((x) => x.textContent.trim()).join(' | ')`));

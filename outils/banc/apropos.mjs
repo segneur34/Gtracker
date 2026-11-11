@@ -13,7 +13,7 @@
 //  7. sans `licences.json` (le serveur de développement répond par la page HTML) : le complément réel et « Liste
 //     complète dans la version construite. » ; les deux fichiers en échec : « Liste des licences indisponible. ».
 // Il finit par « Tout passe. » ou le nombre d'échecs.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -111,7 +111,7 @@ await waitFor(`document.querySelectorAll('.about-license__row').length > 0`, { t
 // Mode strict de React, sur le serveur de développement : l'effet part deux fois, le premier chargement annulé.
 check('les deux listes demandées, une fois chacune', (await fetches()) === 4, await fetches());
 const intro = await evaluate(`[...document.querySelectorAll('.about-licenses__intro')].map((p) => p.textContent)`);
-check('la phrase d\'introduction, seule', intro.length === 1 && intro[0] === "Tracker s'appuie sur ces composants. Touchez-en un pour lire sa licence.", intro.join(' | '));
+check('la phrase d\'introduction, seule', intro.length === 1 && intro[0] === "Gtracker s'appuie sur ces composants. Touchez-en un pour lire sa licence.", intro.join(' | '));
 const groups = await evaluate(`[...document.querySelectorAll('.about-licenses__group')].map((p) => p.textContent)`);
 check('deux groupes', groups.join(' | ') === 'MIT, ISC, BSD | Autres licences', groups.join(' | '));
 const before = await rows();
@@ -167,7 +167,7 @@ await shoot('apropos-tourne');
 await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
 
 // --- 6. Thème sombre, puis « Tout réduire » ---
-await evaluate(`localStorage.setItem('tracker.theme', JSON.stringify({ choice: 'sombre', eco: false }))`);
+await evaluate(`localStorage.setItem('${CLES.theme}', JSON.stringify({ choice: 'sombre', eco: false }))`);
 await go('/parametres', 3000);
 check('thème sombre posé', (await evaluate(`document.documentElement.dataset.theme`)) === 'dark');
 await openLicenses();
@@ -178,7 +178,7 @@ const darkRows = await rows();
 const darkBg = await tokenColor('--bg');
 check('sombre : lignes sur le fond de page sombre', darkBg !== pageBg && darkRows.every((r) => r.bg === darkBg), `${darkRows[0].bg} / ${darkBg}`);
 await shoot('apropos-sombre');
-await evaluate(`localStorage.removeItem('tracker.theme')`);
+await evaluate(`localStorage.removeItem('${CLES.theme}')`);
 check('« Tout réduire »', (await clickText('Tout réduire')) === 'ok');
 await settle({ max: 500 });
 check('le bloc est replié', (await evaluate(`document.querySelector('.about') === null`)) === true);

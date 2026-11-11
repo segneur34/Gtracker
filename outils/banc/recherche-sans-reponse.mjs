@@ -11,7 +11,7 @@
 // Le GPX écrit n'a pas d'altitude : l'IGN est donc interrogé d'office. Sur un profil neuf, avec réseau (overpass-api.de et data.geopf.fr) pour la fin. Dure environ 3 à 5 min.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { connect } from './lib/cdp.mjs';
+import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir] = process.argv.slice(2);
@@ -44,7 +44,7 @@ const clickButton = (text) => evaluate(`(() => {
   if (!b) return 'absent'; b.click(); return 'ok';
 })()`);
 const listOpfs = async (path) => (await evaluate(`(async () => { try {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}');
   for (const p of ${JSON.stringify(path)}.split('/')) dir = await dir.getDirectoryHandle(p);
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 } catch { return []; } })()`)) ?? [];

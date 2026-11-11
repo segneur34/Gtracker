@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MemoryFolder } from '../platform/memoryFolder';
 import { gpxAt, settle, trackTestTimers, underFakeClock } from '../test/library.fixture';
 import { createFakeFolder, fakeEntries } from '../test/memoryFolder.fixture';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Bibliothèque sur un faux dossier (lot 3 de la revue du 27/10) : import sans
@@ -187,7 +188,7 @@ describe('fiche non écrite (E-B10)', () => {
     // Un import vide met à jour le cache, une seconde après.
     await underFakeClock(1100, () => library.importFiles([]));
     const { jsonStore } = await import('../platform/storage');
-    const cache = jsonStore.read<{ entries: Record<string, unknown> }>('tracker.libraryCache');
+    const cache = jsonStore.read<{ entries: Record<string, unknown> }>(STORAGE_KEYS.libraryCache);
     expect(cache?.entries[file.replace(/\.gpx$/, '.json')]).toBeUndefined();
   });
 });
@@ -319,7 +320,7 @@ describe('stockage illisible au démarrage (A3)', () => {
   const otherDevice = async () => {
     const { buildSettingsFile, serializeSettingsFile } = await import('../library/settingsFile');
     files.set('reglages/autre.json', serializeSettingsFile(
-      buildSettingsFile({ 'tracker.runnerProfile': { me: { name: 'Autre' } } }, 1000, null, { id: 'autre', name: 'Autre' })
+      buildSettingsFile({ [STORAGE_KEYS.athleteProfile]: { me: { name: 'Autre' } } }, 1000, null, { id: 'autre', name: 'Autre' })
     ));
   };
 
@@ -373,13 +374,13 @@ describe('fichiers de réglages illisibles et profil relu (lot 143, 123 b et d)'
   it('reprend le profil du pratiquant champ par champ : une valeur hors plage ou de travers reste vide', async () => {
     const { buildSettingsFile, serializeSettingsFile } = await import('../library/settingsFile');
     files.set('reglages/autre.json', serializeSettingsFile(buildSettingsFile(
-      { 'tracker.runnerProfile': { me: { name: 'Autre', weightKg: 9999, heightCm: '180', hrMax: 190, sex: 'x', inconnu: 1 } } },
+      { [STORAGE_KEYS.athleteProfile]: { me: { name: 'Autre', weightKg: 9999, heightCm: '180', hrMax: 190, sex: 'x', inconnu: 1 } } },
       1000, null, { id: 'autre', name: 'Autre' },
     )));
     const library = await openFresh();
     await settle(library);
     const { jsonStore } = await import('../platform/storage');
-    const me = jsonStore.read<Record<string, Record<string, unknown>>>('tracker.runnerProfile')?.me;
+    const me = jsonStore.read<Record<string, Record<string, unknown>>>(STORAGE_KEYS.athleteProfile)?.me;
     expect(me).toMatchObject({ name: 'Autre', weightKg: null, heightCm: null, hrMax: 190, sex: null });
     expect(me).not.toHaveProperty('inconnu');
   });

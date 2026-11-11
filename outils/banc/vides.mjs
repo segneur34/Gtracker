@@ -9,7 +9,7 @@
 //  5. à 360×800 : accueil sans lien Profil ni Statistiques, barre du bas Accueil · Profil · rond · Statistiques ·
 //     Réglages ; Réglages, carte Voile ouverte : le nom en texte, qui replie la carte, « Renommer » à droite, sur la
 //     ligne du nom ; Échap n'enregistre rien, Entrée renomme, le nom est relu ; rien ne déborde.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -41,7 +41,7 @@ const clickIn = (title, text) => evaluate(`(() => {
 let failures = 0;
 const check = (what, ok, detail) => { console.log(`${ok ? 'ok   ' : 'ÉCHEC'} ${what}${!ok && detail !== undefined ? ` (${detail})` : ''}`); if (!ok) failures++; };
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork();
 
@@ -148,11 +148,11 @@ check('barre du bas : Accueil, Profil, Statistiques, Réglages', bar === 'Accuei
 
 await go('/parametres', 2000);
 await evaluate(`(() => {
-  const sections = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}');
+  const sections = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
   sections.settings = { ...sections.settings, activites: true };
   sections['settings-activities'] = { wingfoil: true };
   sections['settings-families'] = { voile: true };
-  localStorage.setItem('tracker.sections', JSON.stringify(sections));
+  localStorage.setItem('${CLES.sections}', JSON.stringify(sections));
   return 'ok';
 })()`);
 await go('/parametres', 3000);

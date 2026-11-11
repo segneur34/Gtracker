@@ -13,7 +13,7 @@
 //  4. une course de deux `<trkseg>` séparés par 10 min de pause, vitesse Doppler comprise : ni la distance ni le temps
 //     en mouvement de la pause ne sont comptés (bug du 17/10), dans le résumé comme dans l'analyse ;
 //  5. un réglage du bateau reste au rechargement.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -24,7 +24,7 @@ if (!port) {
 
 // --- Protocole (lib/cdp.mjs) ---
 const { send, evaluate, go, settle, waitFor, blockNetwork, importGpx, records, shoot, close, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork(['*://*.openstreetmap.org/*', '*://server.arcgisonline.com/*', '*://data.geopf.fr/*', '*://overpass-api.de/*']);
 let failures = 0;
@@ -32,7 +32,7 @@ const check = (label, ok, detail = '') => {
   if (!ok) failures++;
   console.log(`${ok ? 'OK ' : 'ÉCHEC'} ${label}${detail ? ` : ${detail}` : ''}`);
 };
-const stored = () => evaluate(`JSON.parse(localStorage.getItem('tracker.sportSettings') ?? 'null')`);
+const stored = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? 'null')`);
 const SAIL = { id: 'wingfoil', name: 'Voile', base: 'wingfoil', color: '#1976d2' };
 const RUN = { id: 'running', name: 'Course', base: 'running', color: '#d42a3c' };
 const BOAT = { id: 'a-voilier', name: 'Voilier', base: 'bateau', color: '#014e86' };
@@ -50,18 +50,18 @@ const OTHERS = [
 await go('/');
 await evaluate(`(() => {
   localStorage.clear();
-  localStorage.setItem('tracker.sportSettings', JSON.stringify({ activities: ${JSON.stringify([SAIL, RUN, ...OTHERS, BOAT])} }));
+  localStorage.setItem('${CLES.sportSettings}', JSON.stringify({ activities: ${JSON.stringify([SAIL, RUN, ...OTHERS, BOAT])} }));
   return 'ok';
 })()`);
 
 // 2. Réglages : familles Voile, À pied, Vélo et Fractionné, leurs cartes ouvertes, toutes leurs parties dépliées.
 await evaluate(`(() => {
-  const sections = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}');
+  const sections = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
   sections.settings = { ...sections.settings, activites: true };
   sections['settings-families'] = { voile: true, course: true, velo: true, fractionne: true };
   sections['settings-activities'] = Object.fromEntries(['wingfoil', 'a-voilier', 'running', 'a-marche', 'cycling', 'a-gravel', 'a-vtt', 'run-intervals', 'bike-intervals'].map((id) => [id, true]));
   sections['settings-activity-parts'] = { affichage: true, analyse: true, enregistrement: true, itineraires: true, balises: true };
-  localStorage.setItem('tracker.sections', JSON.stringify(sections));
+  localStorage.setItem('${CLES.sections}', JSON.stringify(sections));
   return 'ok';
 })()`);
 await go('/parametres');
@@ -165,9 +165,9 @@ for (const s of SESSIONS) {
 }
 // Onglets général et réglages ouverts.
 await evaluate(`(() => {
-  const sections = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}');
+  const sections = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
   sections['sailing-onglets'] = { ...sections['sailing-onglets'], general: true, reglages: true };
-  localStorage.setItem('tracker.sections', JSON.stringify(sections));
+  localStorage.setItem('${CLES.sections}', JSON.stringify(sections));
   return 'ok';
 })()`);
 for (const s of SESSIONS) {

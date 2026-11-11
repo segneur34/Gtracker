@@ -5,6 +5,7 @@ import type { FollowedTrace } from '../recording/followedTrace';
 import type { MarkGuideSettings } from '../recording/markGuide';
 import { T0, at } from '../test/geo.fixture';
 import type { RecorderState } from './useRecorder';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Guidage vers les balises, sans DOM (lot 159) : l'enregistreur est un faux magasin (état, abonnés, positions), les
@@ -251,7 +252,7 @@ describe('changement d’activité', () => {
   const moth: Activity = { id: 'a-moth', name: 'Moth', base: 'wingfoil', color: '#004aad' };
   const kite: Activity = { id: 'a-kite', name: 'Kite', base: 'kite', color: '#004aad' };
   const settingsWith = () =>
-    stored.set('tracker.sportSettings', JSON.stringify({
+    stored.set(STORAGE_KEYS.sportSettings, JSON.stringify({
       markGuide: {
         [moth.id]: { curve: [{ distanceM: 20, intervalMs: 200 }, { distanceM: 100, intervalMs: 1000 }], vibrate: true },
         [kite.id]: { curve: [{ distanceM: 30, intervalMs: 300 }, { distanceM: 200, intervalMs: 2000 }], vibrate: false },

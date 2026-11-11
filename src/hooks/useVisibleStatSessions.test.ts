@@ -3,6 +3,7 @@ import type { Activity } from '../core/activities';
 import type { LibrarySession } from '../library/record';
 import { statsMetric } from '../library/stats';
 import { sessionRecord } from '../test/record.fixture';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /** Foil des Statistiques (et donc « % de vol » en voile) : une seule lecture, `sessionFoil`. */
 
@@ -27,7 +28,7 @@ const surf: Activity = { id: 'surf', name: 'Surf', base: 'surf', color: '#000' }
 const session = (record: LibrarySession['record']): LibrarySession => ({ file: record.gpx, record, readOnly: false, warning: null });
 
 const convert = async (activities: Activity[], sessions: LibrarySession[], foils: Record<string, boolean>) => {
-  stored.set('tracker.sportSettings', JSON.stringify({ foils }));
+  stored.set(STORAGE_KEYS.sportSettings, JSON.stringify({ foils }));
   vi.resetModules();
   const { visibleStatSessions } = await import('./useVisibleStatSessions');
   return visibleStatSessions(sessions, activities, () => true).all;

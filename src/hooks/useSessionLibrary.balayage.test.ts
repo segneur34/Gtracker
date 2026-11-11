@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LibrarySession } from '../library/record';
 import type { FolderEntry, MemoryFolder } from '../platform/memoryFolder';
 import { settle, threePointGpx, tick, trackTestTimers, underFakeClock } from '../test/library.fixture';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Balayage de la bibliothèque sur un faux dossier de 300 sessions (lot 68) :
@@ -32,7 +33,7 @@ const entriesOf = (dir: string): FolderEntry[] =>
 
 const fakeFolder: MemoryFolder = {
   kind: 'picked',
-  label: 'Tracker',
+  label: 'Gtracker',
   list: async (dir) => entriesOf(dir),
   readText: async (path) => files.get(path) ?? null,
   writeText: async (path, text) => {
@@ -103,7 +104,7 @@ const mockPlatform = (): void => {
 
 /** Stockage de l'appareil, gardé d'une ouverture à l'autre : le cache des fiches y survit. */
 const stored = new Map<string, string>();
-const CACHE_KEY = 'tracker.libraryCache';
+const CACHE_KEY = STORAGE_KEYS.libraryCache;
 
 type Library = typeof import('./useSessionLibrary');
 

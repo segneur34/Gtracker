@@ -8,7 +8,7 @@
 // et il vérifie que la longueur de la racine est la même aux cinq périodes, pour chaque taille d'écran.
 // Avec un dossier, il y écrit une capture réduite (échelle 0,35) par période et par taille.
 import { writeFileSync } from 'node:fs';
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -46,7 +46,7 @@ const setClock = async (fakeMs) => {
     const R = Date;
     class D extends R { constructor(...a) { if (a.length === 0) super(R.now() + off); else super(...a); } static now() { return R.now() + off; } }
     window.Date = D;
-    try { const all = JSON.parse(localStorage.getItem('tracker.profil') ?? '{}'); delete all.racine; localStorage.setItem('tracker.profil', JSON.stringify(all)); } catch {}
+    try { const all = JSON.parse(localStorage.getItem('${CLES.profil}') ?? '{}'); delete all.racine; localStorage.setItem('${CLES.profil}', JSON.stringify(all)); } catch {}
   })();`;
   clockScript = (await send('Page.addScriptToEvaluateOnNewDocument', { source })).result.identifier;
 };
@@ -75,7 +75,7 @@ for (const size of sizes) {
   const lengths = [];
   const overflows = [];
   for (const period of PERIODS) {
-    await evaluate(`(() => { const all = JSON.parse(localStorage.getItem('tracker.profil') ?? '{}'); all.affichage = { periode: ${JSON.stringify(period)} }; localStorage.setItem('tracker.profil', JSON.stringify(all)); })()`);
+    await evaluate(`(() => { const all = JSON.parse(localStorage.getItem('${CLES.profil}') ?? '{}'); all.affichage = { periode: ${JSON.stringify(period)} }; localStorage.setItem('${CLES.profil}', JSON.stringify(all)); })()`);
     await go('/profil', 4500);
     // La racine se dessine quand la bibliothèque est lue (OPFS), ce que `settle` ne voit pas.
     await waitFor(`Number(document.querySelector('canvas.profile-root')?.dataset.longueur) > 0`, { timeout: 4500, label: 'racine dessinée' });

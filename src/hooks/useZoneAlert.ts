@@ -14,6 +14,7 @@ import {
 import { createStore } from './createStore';
 import { getRecorderState, subscribeToRecorder } from './useRecorder';
 import { readHeartRateZoneBounds } from './useAthleteProfile';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Bips de sortie de zone cardiaque pendant l'enregistrement (lot 28), hors des
@@ -35,7 +36,7 @@ import { readHeartRateZoneBounds } from './useAthleteProfile';
  */
 
 /** Clé de l'appareil de la zone visée (un numéro) pendant l'enregistrement. */
-const STORAGE_KEY = 'tracker.zoneAlertTarget';
+const STORAGE_KEY = STORAGE_KEYS.zoneAlertTarget;
 
 /** Zone gardée pour une session reprise ; 0 si absente ou illisible. */
 const readStoredTarget = (): ZoneTarget => {

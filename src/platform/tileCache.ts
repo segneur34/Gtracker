@@ -5,6 +5,7 @@ import { shouldCheckCap, TILE_CACHE_DEFAULTS, tilesToEvict, type CachedTileEntry
 import { filesystem } from './files';
 import { isNativeApp } from './runtime';
 import { jsonStore } from './storage';
+import { STORAGE_KEYS, CACHE_NAMES } from '../core/appIdentity';
 
 /**
  * Tuiles de carte gardées sur l'appareil (cartes sans réseau, `core/tiles.ts`) :
@@ -131,8 +132,8 @@ const nativeStore: TileStore = {
   },
 };
 
-const CACHE_NAME = 'tracker-tuiles';
-const SAVED_AT_HEADER = 'x-tracker-saved-at';
+const CACHE_NAME = CACHE_NAMES.tuiles;
+const SAVED_AT_HEADER = CACHE_NAMES.savedAtHeader;
 const TILE_PATH = '/tuiles-gardees/';
 /** Adresse fictive d'une tuile dans le cache, jamais demandée au réseau. */
 const cacheUrl = (key: string): string => `${TILE_PATH}${key}.png`;
@@ -338,7 +339,7 @@ const createBrowserStore = (): TileStore => {
 export const tileStore: TileStore = isNativeApp() ? nativeStore : createBrowserStore();
 
 /** Clé du plafond, propre à l'appareil (hors de `reglages.json`). */
-const CAP_STORAGE_KEY = 'tracker.tileCache';
+const CAP_STORAGE_KEY = STORAGE_KEYS.tileCache;
 
 /** Plafond permis dans Réglages, en mégaoctets. */
 const TILE_CAP_LIMITS_MB = { min: 10, max: 20_000 } as const;
@@ -358,7 +359,7 @@ export const writeTileCapMb = (next: number | null): void => {
 };
 
 /** Clé des adresses de tuiles choisies, propre à l'appareil (hors de `reglages.json`), comme le plafond. */
-const URL_STORAGE_KEY = 'tracker.tileUrls';
+const URL_STORAGE_KEY = STORAGE_KEYS.tileUrls;
 
 /**
  * Adresses de tuiles saisies dans Réglages, par fond, telles quelles ; `core/mapBase.ts` (`tileTemplate`) dit

@@ -1,6 +1,7 @@
 import { escapeXmlAttr, escapeXmlText, gpxDocument } from '../core/xml';
 import { isLooped, routePoints, type PlannedRoute } from './route';
 import { parseRouteRecord, serializeRouteRecord, type RouteRecord } from './routeRecord';
+import { XML } from '../core/appIdentity';
 
 /**
  * GPX d'un itinéraire, pour l'emporter dans une autre application ou sur une
@@ -18,9 +19,9 @@ import { parseRouteRecord, serializeRouteRecord, type RouteRecord } from './rout
  * (`library/sessionBundle.ts`) : relu par `embeddedRouteRecord`.
  */
 
-const NS = 'https://github.com/segneur34/Tracker/itineraire';
-const OPEN = `<extensions><tracker:itineraire xmlns:tracker="${NS}" version="1">`;
-const CLOSE = '</tracker:itineraire></extensions>';
+const PREFIX = XML.itineraire.prefix;
+const OPEN = `<extensions><${PREFIX}:itineraire xmlns:${PREFIX}="${XML.itineraire.ns}" version="1">`;
+const CLOSE = `</${PREFIX}:itineraire></extensions>`;
 
 const unescapeXml = (text: string): string => text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 

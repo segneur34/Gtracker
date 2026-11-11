@@ -14,7 +14,7 @@
 //  4. Enregistrer, dans le navigateur : pas de case « Mesurer les sauts » (téléphone seulement) ;
 //  5. la suppression de la session : GPX, fiche et `.imu` effacés ;
 //  6. (à pied et au VTT, n° 174 : retirée au lot 303 avec la course et le vélo).
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -26,9 +26,9 @@ if (!port) {
 // --- Protocole (lib/cdp.mjs) ---
 const { send, evaluate, go, settle, waitFor, wait, shoot, close, logs } = await connect({ port, shotDir });
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
-const sessionsDir = `(await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions'))`;
+const sessionsDir = `(await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('sessions'))`;
 const sessionFiles = () => evaluate(`(async () => {
   const names = [];
   for await (const [name] of ${sessionsDir}.entries()) names.push(name);
@@ -118,7 +118,7 @@ await wait(500);
 list = await rows();
 check('relu : foil décoché, sauts cochés', list.find((r) => r.label === 'Foil')?.checked === false && list.find((r) => r.label === 'Sauts')?.checked === true);
 check('relu : bras, 1,5 m', list.some((r) => r.sub && r.text.includes('Bras')) && await evaluate(`[...(${voileCard}).querySelectorAll('.settings-row--sub input')].some((i) => i.value === '1.5')`));
-const stored = await evaluate(`JSON.parse(localStorage.getItem('tracker.sportSettings') ?? '{}')`);
+const stored = await evaluate(`JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}')`);
 check('rangé par activité', stored.foils?.wingfoil === false && stored.jumps?.wingfoil?.placement === 'bras', JSON.stringify({ foils: stored.foils, jumps: stored.jumps }));
 // Carte repliée : le résumé dit « sauts », plus « foil ».
 await evaluate(`(${voileCard}).querySelector('.settings-activity__toggle').click()`);

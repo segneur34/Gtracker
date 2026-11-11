@@ -13,7 +13,7 @@
 //     dates), un GPX à la racine et un GPX sans fiche restent tels quels, l'import est grisé et la carte de la mémoire le dit.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { connect } from './lib/cdp.mjs';
+import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -40,7 +40,7 @@ const SECOND_NAME = '2026-10-06_10-00-00_cycling.gpx';
 const { send, evaluate, go, settle, waitFor, wait, importFiles, shoot, close, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
 /** Dossier `Gtracker` de la mémoire du navigateur, ou un de ses sous-dossiers. */
 const dirJs = (path) => `(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}');
   for (const p of ${JSON.stringify(path)}.split('/').filter(Boolean)) dir = await dir.getDirectoryHandle(p);
   return dir;
 })()`;
@@ -70,7 +70,7 @@ const refresh = async () => {
 };
 const sessionNames = () => evaluate(`[...document.querySelectorAll('.lib-row__name')].map((x) => x.textContent.trim()).join(' | ') || '(aucune nommée)'`);
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
 // 1. Une session importée, puis retirée du dossier derrière le dos de l'application.
@@ -138,7 +138,7 @@ const snapshot = () => evaluate(`(async () => {
       else { const file = await h.getFile(); out.push(prefix + name + ' ' + file.size + ' ' + file.lastModified); }
     }
   };
-  await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'), '');
+  await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}'), '');
   return JSON.stringify(out.sort());
 })()`);
 const importGreyed = () => evaluate(`(() => { const i = document.querySelector('input[type=file][accept*=".gpx"]'); return i ? i.disabled : '(absent)'; })()`);
@@ -149,7 +149,7 @@ const beforeOpening = await snapshot();
 await go('/velo');
 await settle({ max: 3000, label: 'ouverture en lecture seule' });
 console.log('marqueur v2, à l\'ouverture :', await memory());
-console.log('carte de la mémoire :', await evaluate(`document.body.innerText.match(/[^\\n]*version plus récente de Tracker[^\\n]*/)?.[0] ?? '(absente)'`));
+console.log('carte de la mémoire :', await evaluate(`document.body.innerText.match(/[^\\n]*version plus récente de Gtracker[^\\n]*/)?.[0] ?? '(absente)'`));
 console.log('marqueur v2, aucun fichier changé :', (await snapshot()) === beforeOpening, '| import grisé :', await importGreyed());
 console.log('Mettre à jour :', await refresh());
 console.log('après :', await memory());

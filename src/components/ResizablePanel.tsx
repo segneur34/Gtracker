@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { jsonStore } from '../platform/storage';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Panneau redimensionnable par sa poignée en bas à droite, en largeur et en
@@ -22,7 +23,7 @@ import { jsonStore } from '../platform/storage';
  * mémorisée sur ordinateur est ignorée sans être effacée.
  */
 
-const STORAGE_KEY = 'tracker.panelSizes';
+const STORAGE_KEY = STORAGE_KEYS.panelSizes;
 
 /** Zone en pixels, depuis le coin bas-droit, où le navigateur dessine la poignée `resize`. */
 const HANDLE_ZONE_PX = 20;

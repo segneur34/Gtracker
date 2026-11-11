@@ -17,6 +17,7 @@ import { lib, unwritten } from './memory';
 import { cancelRecordWrite, recordTimers, writeRecordNow } from './recordWrites';
 import { flushCacheUpdate } from './cache';
 import { queueOutdatedRefresh } from './summaryQueue';
+import { STORAGE_KEYS } from '../../core/appIdentity';
 
 /**
  * Réglages de l'appareil, un fichier par appareil dans `reglages/` (§10, point 90 ; lot 113) : rapprochement à
@@ -40,15 +41,15 @@ export const flushWrites = async (): Promise<void> => {
 };
 
 /** Instant du dernier changement des réglages de l'appareil. */
-const SETTINGS_SAVED_AT_KEY = 'tracker.settingsSavedAt';
+const SETTINGS_SAVED_AT_KEY = STORAGE_KEYS.settingsSavedAt;
 
 /** Identifiant et nom de l'appareil : propres à lui, ils ne voyagent pas. */
-const DEVICE_ID_KEY = 'tracker.deviceId';
+const DEVICE_ID_KEY = STORAGE_KEYS.deviceId;
 
-const DEVICE_NAME_KEY = 'tracker.deviceName';
+const DEVICE_NAME_KEY = STORAGE_KEYS.deviceName;
 
 /** Fichiers de réglages déjà vus par l'appareil (`settingsEntryKey`) : un nouveau n'est proposé qu'une fois. */
-const SEEN_SETTINGS_KEY = 'tracker.seenSettingsFiles';
+const SEEN_SETTINGS_KEY = STORAGE_KEYS.seenSettingsFiles;
 
 const SETTINGS_WRITE_DELAY_MS = 2000;
 
@@ -360,7 +361,7 @@ export const importSettingsFile = async (picked: File): Promise<{ file: Settings
   try {
     const text = await readPickedFile(picked);
     const file = parseSettingsFile(text);
-    if (!file) return { refusal: `${picked.name} n'est pas un fichier de réglages de Tracker.` };
+    if (!file) return { refusal: `${picked.name} n'est pas un fichier de réglages de Gtracker.` };
     const id = deviceId();
     if (file.device?.id === id) return { refusal: `${picked.name} est le fichier de réglages de cet appareil.` };
     await readSettingsEntries(f);

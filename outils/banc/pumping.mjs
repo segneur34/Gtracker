@@ -15,7 +15,7 @@
 //     séries ; « Enregistrer la session » range `analysis.pumping` ;
 //  4. Enregistrer, dans le navigateur : pas de case « Mesurer le pumping » (téléphone seulement) ;
 //  5. la page à 390 × 844, sans débordement.
-import { connect } from './lib/cdp.mjs';
+import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -83,7 +83,7 @@ const sessionBox = (label) => evaluate(`(() => {
   const box = [...document.querySelectorAll('.an-carte-panels label')].find((l) => l.querySelector('strong')?.textContent === ${JSON.stringify(label)})?.querySelector('input[type=checkbox]');
   if (!box) return 'absente'; box.click(); return box.checked ? 'cochée' : 'décochée';
 })()`);
-const sessionsDir = `(await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions'))`;
+const sessionsDir = `(await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('sessions'))`;
 const recordAt = (startMs) => evaluate(`(async () => {
   for await (const [name, h] of ${sessionsDir}.entries()) {
     if (!name.endsWith('.json')) continue;

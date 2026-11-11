@@ -2,6 +2,7 @@ import { readActivities } from '../core/activities';
 import { isObject, parseJson, stringifyJson } from '../core/basics';
 import { sanitizeAthleteProfile } from './athleteProfile';
 import { ROOT_GOAL } from './rootGrowth';
+import { STORAGE_KEYS, FILE_FORMATS } from '../core/appIdentity';
 
 /**
  * Fichiers de réglages du dossier mémoire (§10, point 90) : un par appareil,
@@ -18,12 +19,12 @@ import { ROOT_GOAL } from './rootGrowth';
  * « Téléphone » ne s'écrasent pas.
  */
 
-export const SETTINGS_FORMAT = 'tracker-reglages';
+export const SETTINGS_FORMAT = FILE_FORMATS.reglages;
 /** 2 : appareil qui a écrit le fichier (`device`). */
 export const SETTINGS_VERSION = 2;
 
 /** Clés de `jsonStore` recopiées dans le dossier. */
-export const TRAVELLING_KEYS = ['tracker.sportSettings', 'tracker.runnerProfile'] as const;
+export const TRAVELLING_KEYS = [STORAGE_KEYS.sportSettings, STORAGE_KEYS.athleteProfile] as const;
 
 /** Appareil qui a écrit un fichier : identifiant tiré au hasard, nom choisi par l'utilisateur. */
 export interface SettingsDevice {
@@ -203,7 +204,7 @@ export const importedSettingsFileName = (
 
 /** Nombre d'activités d'un fichier ; sans liste rangée, celles du premier lancement. */
 export const settingsActivityCount = (file: SettingsFile): number => {
-  const sport = file.values['tracker.sportSettings'];
+  const sport = file.values[STORAGE_KEYS.sportSettings];
   return readActivities(isObject(sport) ? sport.activities : undefined).length;
 };
 
@@ -221,20 +222,20 @@ const REMEMBERED_CHOICES = ['moduleActivity', 'recordActivity'];
  * un réglage, et ne doit pas dater les réglages de l'appareil.
  */
 export const settingsSignature = (values: Record<string, unknown>): string => {
-  const sportSettings = values['tracker.sportSettings'];
+  const sportSettings = values[STORAGE_KEYS.sportSettings];
   if (!isObject(sportSettings)) return JSON.stringify(values);
   const settings = Object.fromEntries(Object.entries(sportSettings).filter(([key]) => !REMEMBERED_CHOICES.includes(key)));
-  return JSON.stringify({ ...values, 'tracker.sportSettings': settings });
+  return JSON.stringify({ ...values, [STORAGE_KEYS.sportSettings]: settings });
 };
 
 /**
  * Valeurs d'un fichier relues avec contrôle avant d'être reprises : chaque
- * profil du pratiquant (`tracker.runnerProfile`, rangé par clé) champ par
+ * profil du pratiquant (`gtracker.athleteProfile`, rangé par clé) champ par
  * champ (`sanitizeAthleteProfile`) ; un profil qui n'a pas la forme d'une liste
  * rangée par clé n'est pas repris (celui de l'appareil reste).
  */
 export const checkedValues = (values: Record<string, unknown>): Record<string, unknown> => {
-  const key = 'tracker.runnerProfile';
+  const key = STORAGE_KEYS.athleteProfile;
   if (!(key in values)) return values;
   const { [key]: profiles, ...rest } = values;
   if (!isObject(profiles)) return rest;
@@ -247,10 +248,10 @@ export const checkedValues = (values: Record<string, unknown>): Record<string, u
  */
 export const adoptedValues = (raw: Record<string, unknown>, mine: Record<string, unknown>): Record<string, unknown> => {
   const theirs = checkedValues(raw);
-  const theirSport = theirs['tracker.sportSettings'];
+  const theirSport = theirs[STORAGE_KEYS.sportSettings];
   if (!isObject(theirSport)) return theirs;
-  const mySport = mine['tracker.sportSettings'];
+  const mySport = mine[STORAGE_KEYS.sportSettings];
   const settings: Record<string, unknown> = Object.fromEntries(Object.entries(theirSport).filter(([key]) => !REMEMBERED_CHOICES.includes(key)));
   if (isObject(mySport)) for (const key of REMEMBERED_CHOICES) if (key in mySport) settings[key] = mySport[key];
-  return { ...theirs, 'tracker.sportSettings': settings };
+  return { ...theirs, [STORAGE_KEYS.sportSettings]: settings };
 };

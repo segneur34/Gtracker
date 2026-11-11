@@ -2,6 +2,7 @@ import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { isNativeApp } from './runtime';
 import { addBelt, forgetBelt, learnBeltAddressType, readBeltList, storedBeltList, type BeltList } from './beltList';
 import { jsonStore } from './storage';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Ceinture cardio Bluetooth : seul passage autorisé vers elle (règle 12). Sur
@@ -142,7 +143,7 @@ export const stopBeltScan = async (): Promise<void> => {
 // --- Appareils retenus ---
 
 /** Tous les appareils retenus (lot 198), l'actif, celui du prochain départ, marqué dedans (`storedBeltList`). */
-const BELTS_KEY = 'tracker.heartRateBelts';
+const BELTS_KEY = STORAGE_KEYS.heartRateBelts;
 
 const readBelts = (): BeltList => readBeltList(jsonStore.read<unknown>(BELTS_KEY));
 

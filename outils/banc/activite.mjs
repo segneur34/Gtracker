@@ -4,7 +4,7 @@
 // Le GPX vient de `make-gpx.mjs`. Sur un profil où deux itinéraires sont rangés, l'un en Voile et
 // l'autre en Course (`planning.mjs` deux fois, le second avec un GPX de type course), le script
 // vérifie aussi que suivre un itinéraire propose son activité.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, gpxPath, shotDir] = process.argv.slice(2);
@@ -56,11 +56,11 @@ const recordChoice = () => evaluate(`JSON.stringify({
   activite: document.querySelector('[aria-label=Activité] [aria-checked=true]')?.textContent ?? null,
 })`);
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await go('/', 2500);
 // Onglets réglages ouverts dans les deux modules.
-await evaluate(`localStorage.setItem('tracker.sections', JSON.stringify({ 'sailing-onglets': { reglages: true }, running: { reglages: true } })); 'ok'`);
+await evaluate(`localStorage.setItem('${CLES.sections}', JSON.stringify({ 'sailing-onglets': { reglages: true }, running: { reglages: true } })); 'ok'`);
 
 // 1. Suivre un itinéraire propose son activité.
 await go('/enregistrer', 2500);
@@ -103,7 +103,7 @@ console.log('Réduire la carte :', await clickText('Réduire la carte'));
 await wait(2500);
 console.log('carte montée :', await evaluate(`document.querySelectorAll('.leaflet-container').length`));
 console.log('résumé :', await lines('/^(Allure|Allure moyenne|Meilleure allure)/'));
-console.log('mémorisé :', await evaluate(`localStorage.getItem('tracker.sections')`));
+console.log('mémorisé :', await evaluate(`localStorage.getItem('${CLES.sections}')`));
 await shoot('carte-reduite');
 if (shotDir) {
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });

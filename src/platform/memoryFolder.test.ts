@@ -17,11 +17,11 @@ describe('shouldDescendIntoMemory', () => {
 
   it('garde un dossier mémoire renommé, reconnu à son contenu', () => {
     expect(shouldDescendIntoMemory('Sauvegarde', new Set([MARKER_FILE, 'Gtracker']))).toBe(false);
-    expect(shouldDescendIntoMemory('Sauvegarde', new Set([MARKER_FILE, 'sessions', 'Tracker']))).toBe(false);
+    expect(shouldDescendIntoMemory('Sauvegarde', new Set([MARKER_FILE, 'sessions', 'Gtracker']))).toBe(false);
     expect(shouldDescendIntoMemory('Sauvegarde', new Set(['sessions']))).toBe(false);
   });
 
-  it('garde un dossier quelconque sans Tracker : il deviendra la mémoire', () => {
+  it('garde un dossier quelconque sans Gtracker : il deviendra la mémoire', () => {
     expect(shouldDescendIntoMemory('Traces', new Set(['a.gpx']))).toBe(false);
   });
 });
@@ -29,13 +29,13 @@ describe('shouldDescendIntoMemory', () => {
 describe('isMemorySubfolder', () => {
   it('refuse le dossier sessions ou itineraires d\'une mémoire', () => {
     expect(isMemorySubfolder('sessions', new Set(['a.gpx', 'a.json']))).toBe(true);
-    expect(isMemorySubfolder('Documents/Tracker/Sessions', new Set())).toBe(true);
+    expect(isMemorySubfolder('Documents/Gtracker/Sessions', new Set())).toBe(true);
     expect(isMemorySubfolder('itineraires', new Set(['Boucle.json']))).toBe(true);
   });
 
   it('accepte un dossier marqué comme mémoire, quel que soit son nom, et tout autre dossier', () => {
     expect(isMemorySubfolder('sessions', new Set([MARKER_FILE, 'sessions']))).toBe(false);
-    expect(isMemorySubfolder('Tracker', new Set(['sessions']))).toBe(false);
+    expect(isMemorySubfolder('Gtracker', new Set(['sessions']))).toBe(false);
     expect(isMemorySubfolder('Mes sessions', new Set())).toBe(false);
   });
 });
@@ -66,7 +66,7 @@ describe('folderImportPaths', () => {
 describe('readableFolderError (lot 143, idée 122)', () => {
   it('rend en clair un dossier désigné qui n’existe plus, le détail en console', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const err = readableFolderError(new Error('Écriture impossible : Missing file for primary:Documents/Tracker at /storage/emulated/0/Documents/Tracker'));
+    const err = readableFolderError(new Error('Écriture impossible : Missing file for primary:Documents/Gtracker at /storage/emulated/0/Documents/Gtracker'));
     expect((err as Error).message).toBe(MISSING_FOLDER_MESSAGE);
     expect(fileErrorCode(err)).toBe('NOT_FOUND');
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('Missing file for'));
@@ -89,7 +89,7 @@ describe('readableFolderError (lot 143, idée 122)', () => {
 
   it('un NOT_FOUND du greffon, à ce texte, reste le dossier introuvable', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const err = readableFolderError(Object.assign(new Error('Lecture impossible : Missing file for primary:Tracker'), { code: 'NOT_FOUND' }));
+    const err = readableFolderError(Object.assign(new Error('Lecture impossible : Missing file for primary:Gtracker'), { code: 'NOT_FOUND' }));
     expect((err as Error).message).toBe(MISSING_FOLDER_MESSAGE);
     warn.mockRestore();
   });

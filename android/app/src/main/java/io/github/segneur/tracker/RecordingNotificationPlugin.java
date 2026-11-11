@@ -48,7 +48,7 @@ public class RecordingNotificationPlugin extends Plugin {
             call.resolve();
             return;
         }
-        String title = call.getString("title", "Tracker");
+        String title = call.getString("title", "Gtracker");
         String text = call.getString("text", "");
         List<String> lines = new ArrayList<>();
         JSArray array = call.getArray("lines");

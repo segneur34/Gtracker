@@ -27,7 +27,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- « Ouvrir avec Tracker » d'un GPX ou d'un FIT (IncomingFilePlugin). Tracker apparaît dans le choix d'Android, sans en
+            <!-- « Ouvrir avec Gtracker » d'un GPX ou d'un FIT (IncomingFilePlugin). Gtracker apparaît dans le choix d'Android, sans en
                  devenir l'application par défaut ; la signature du fichier est vérifiée à la réception, un type ne prouve rien. Pas de
                  BROWSABLE : une page web ne peut pas pousser de fichier. -->
             <intent-filter>
@@ -44,7 +44,7 @@
             </intent-filter>
 
             <!-- « Ouvrir avec » d'un .gpx dont le gestionnaire de fichiers donne un type inattendu (text/plain, application/gpx,
-                 type vide ou générique selon l'application) : Tracker est proposé d'après l'extension du nom. Forme connue d'Android
+                 type vide ou générique selon l'application) : Gtracker est proposé d'après l'extension du nom. Forme connue d'Android
                  (type générique, hôte joker, motifs de chemin), limitée au GPX ; le JSON n'est jamais proposé. Seul content:// : la
                  réception refuse file://. Le FIT passe par ses types, plus fiables. -->
             <intent-filter>
@@ -57,7 +57,7 @@
                 <data android:pathPattern=".*\\.GPX" />
             </intent-filter>
 
-            <!-- « Partager vers Tracker » : le fichier est dans EXTRA_STREAM, l'intention n'a pas d'adresse. Déclarer un schéma ici
+            <!-- « Partager vers Gtracker » : le fichier est dans EXTRA_STREAM, l'intention n'a pas d'adresse. Déclarer un schéma ici
                  l'empêcherait d'entrer (règle des filtres d'Android). -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />

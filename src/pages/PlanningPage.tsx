@@ -74,6 +74,7 @@ import { canDownloadFiles, downloadTextFile, readPickedFile, safeFileName } from
 import { currentPosition, locationPermissionGranted } from '../platform/location';
 import { isNativeApp } from '../platform/runtime';
 import { jsonStore } from '../platform/storage';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Planification d'un itinéraire : on pose des points sur la carte, chaque
@@ -110,7 +111,7 @@ import { jsonStore } from '../platform/storage';
  * plus écrit depuis que chaque activité a ses types de voie (§10, point 81) :
  * un ancien `mode` y reste, ignoré.
  */
-const PREFS_KEY = 'tracker.planning';
+const PREFS_KEY = STORAGE_KEYS.planning;
 
 interface PlanningPrefs {
   activityId?: string;

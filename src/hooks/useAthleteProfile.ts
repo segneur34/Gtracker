@@ -10,16 +10,17 @@ import {
 } from '../library/athleteProfile';
 import { effectiveHrOffset } from './useSportSettings';
 import { readStoredRecord, useStoredRecord } from './useStoredRecord';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
- * Profil du pratiquant, persistant (`tracker.runnerProfile`) : sa lecture et
+ * Profil du pratiquant, persistant (`gtracker.athleteProfile`) : sa lecture et
  * ses écritures. Sa forme et ses règles pures sont dans `library/athleteProfile.ts`
  * et `library/profile.ts` (lot 72).
  */
 
 type NumberField = AthleteNumberField;
 
-const NAMESPACE = 'tracker.runnerProfile';
+const NAMESPACE = STORAGE_KEYS.athleteProfile;
 const KEY = 'me';
 
 /** Relecture contrôlée du profil rangé : il voyage par le fichier de réglages, d'où il peut revenir abîmé. */

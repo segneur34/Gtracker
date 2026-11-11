@@ -11,7 +11,7 @@ import { IconClose } from './icons';
 import Button from './ui/Button';
 
 /**
- * Résultat d'un fichier reçu d'une autre application (« Ouvrir avec Tracker », `hooks/sessionLibrary/incoming.ts`), dans le
+ * Résultat d'un fichier reçu d'une autre application (« Ouvrir avec Gtracker », `hooks/sessionLibrary/incoming.ts`), dans le
  * cadre de toutes les pages : la carte de la mémoire n'est pas montée partout. Pas de navigation automatique, un brouillon
  * peut être ouvert : « Voir la session » y passe par `confirmLeave`, comme tout départ. Une session à classer demande son
  * activité avant l'analyse, comme dans une bibliothèque. Un itinéraire reçu (lot 194) s'ouvre de même dans la planification.

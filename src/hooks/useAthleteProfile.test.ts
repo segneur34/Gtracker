@@ -5,6 +5,7 @@ import { ROOT_GOAL } from '../library/rootGrowth';
 import { EMPTY_ATHLETE_PROFILE, ATHLETE_NAME_MAX, athleteHeartRateZones, storedAthleteProfile, type AthleteProfile } from '../library/athleteProfile';
 import { missingProfileFields, shouldPromptProfile } from '../library/profilePrompt';
 import { readAthleteProfile } from './useAthleteProfile';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 describe('profil lu au premier rendu du pop-up', () => {
   const memory = new Map<string, string>();
@@ -23,7 +24,7 @@ describe('profil lu au premier rendu du pop-up', () => {
     shouldPromptProfile({ native: true, missing: missingProfileFields(profile), askedThisLaunch: false, otherCardShown: false });
 
   it("ne s'ouvre pas quand le profil rempli est déjà rangé (régression : il revenait à chaque ouverture)", () => {
-    jsonStore.write('tracker.runnerProfile', { me: full });
+    jsonStore.write(STORAGE_KEYS.athleteProfile, { me: full });
     expect(readAthleteProfile()).toMatchObject({ name: 'Tom', weightKg: 72 });
     expect(open(readAthleteProfile())).toBe(false);
   });
@@ -48,7 +49,7 @@ describe("profil repris d'un autre appareil, contrôlé champ par champ", () => 
   const heartRate = getSportProfile('wingfoil').heartRate;
 
   it('une FC de repos écrite en texte est écartée : zones plausibles, plus de 5 098 bpm', () => {
-    jsonStore.write('tracker.runnerProfile', { me: { hrMax: 190, hrRest: '50' } });
+    jsonStore.write(STORAGE_KEYS.athleteProfile, { me: { hrMax: 190, hrRest: '50' } });
     const profile = readAthleteProfile();
     expect(profile.hrRest).toBeNull();
     expect(profile.hrMax).toBe(190);
@@ -70,7 +71,7 @@ describe("profil repris d'un autre appareil, contrôlé champ par champ", () => 
       hrRest: 50, hrRestSource: { kind: 'saisie', atMs: null }, hrThresholds: [140, 170], rootWeeklyGoalMin: 120,
     };
     expect(storedAthleteProfile(valid, ROOT_GOAL)).toEqual(valid);
-    jsonStore.write('tracker.runnerProfile', { me: valid });
+    jsonStore.write(STORAGE_KEYS.athleteProfile, { me: valid });
     expect(readAthleteProfile()).toEqual(valid);
   });
 

@@ -4,13 +4,14 @@ import type { MemoryFolder } from '../../platform/memoryFolder';
 import { jsonStore } from '../../platform/storage';
 import { cacheDirty, findSession, lib, unwritten } from './memory';
 import { recordTimers, writing } from './recordWrites';
+import { STORAGE_KEYS } from '../../core/appIdentity';
 
 /**
  * Cache des fiches, gardé sur l'appareil hors du dossier (lot 113) : lu au balayage, mis à jour un instant après
  * un import ou une suppression, refait en entier à la fin d'un balayage (`library/libraryCache.ts`).
  */
 
-const CACHE_KEY = 'tracker.libraryCache';
+const CACHE_KEY = STORAGE_KEYS.libraryCache;
 
 export const readCache = (f: MemoryFolder): ReadCache => storedCacheFor(jsonStore.read<StoredCache>(CACHE_KEY), folderId(f));
 

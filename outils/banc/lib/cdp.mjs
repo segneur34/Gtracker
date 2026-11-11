@@ -10,6 +10,41 @@ import { TEMPS, horlogeScript } from './horloge.mjs';
 export const BASE = process.env.BASE ?? 'http://localhost:5174';
 export { TEMPS };
 
+// Noms techniques de l'application, écrits ici une seule fois (lot 322). Un script .mjs ne peut pas importer
+// `src/core/appIdentity.ts` sans le crochet `charge-ts` : les valeurs en sont recopiées. Une clé changée côté application se
+// change ici, jamais dans un script : une clé fausse ne casse rien, le script injecte dans une clé que plus rien ne lit et
+// « passe » à tort.
+/** Préfixe commun des clés de l'appareil (`localStorage`) et des noms de cache (`APP_SLUG`). */
+export const PREFIXE_CLE = 'gtracker';
+/** Clé de l'appareil : `cle('sections')` donne la clé des sections ouvertes. */
+export const cle = (nom) => `${PREFIXE_CLE}.${nom}`;
+/** Clés de l'appareil lues ou écrites par les scripts. Le profil du pratiquant est la seule à changer de suffixe. */
+export const CLES = Object.freeze({
+  sections: cle('sections'), sportSettings: cle('sportSettings'), athleteProfile: cle('athleteProfile'), profil: cle('profil'),
+  theme: cle('theme'), tutoriels: cle('tutoriels'), statistiques: cle('statistiques'), panelSizes: cle('panelSizes'),
+  partage: cle('partage'), libraryCache: cle('libraryCache'), settingsSavedAt: cle('settingsSavedAt'), deviceId: cle('deviceId'),
+  deviceName: cle('deviceName'), seenSettingsFiles: cle('seenSettingsFiles'), summaryGestures: cle('summaryGestures'),
+  followedTrace: cle('followedTrace'), fondCarte: cle('fondCarte'), brouterProfile: cle('brouterProfile'),
+  zoneAlertTarget: cle('zoneAlertTarget'), restingHr: cle('restingHr'), planning: cle('planning'), routeList: cle('routeList'),
+  triBibliotheque: cle('triBibliotheque'), heartRateBelts: cle('heartRateBelts'), memoryFolder: cle('memoryFolder'),
+  permissionsSeenVersion: cle('permissionsSeenVersion'), tileCache: cle('tileCache'), tileUrls: cle('tileUrls'),
+});
+/** Clés qui voyagent dans `values` de chaque `reglages/<appareil>.json` (`TRAVELLING_KEYS`, `library/settingsFile.ts`). */
+export const CLES_VOYAGEUSES = Object.freeze([CLES.sportSettings, CLES.athleteProfile]);
+/** Formats de fichier que les scripts écrivent pour éprouver une lecture (`FILE_FORMATS`, `core/appIdentity.ts`). */
+export const FORMATS = Object.freeze({ reglages: `${PREFIXE_CLE}-reglages`, fcRepos: `${PREFIXE_CLE}-fc-repos` });
+/** Caches de l'application (Cache API), en-tête d'horodatage des tuiles et base IndexedDB du dossier choisi. */
+export const CACHES = Object.freeze({
+  tuiles: `${PREFIXE_CLE}-tuiles`, entete: `x-${PREFIXE_CLE}-saved-at`, vignettes: `${PREFIXE_CLE}-vignettes`,
+  vignettesImages: `${PREFIXE_CLE}-vignettes-images`, baseMemoire: `${PREFIXE_CLE}-memoire`,
+});
+/** Dossier de la mémoire dans le stockage du navigateur (OPFS) : `MEMORY_FOLDER_NAME`. */
+export const DOSSIER_MEMOIRE = 'Gtracker';
+/** Poignée posée sur `window` en développement pour jouer le retour d'Android (`platform/backButton.ts`). */
+export const POIGNEE_RETOUR = 'gtrackerBack';
+/** Dossier de travail du banc dans le dossier temporaire du système. */
+export const DOSSIER_BANC = `${PREFIXE_CLE}-banc`;
+
 /** Domaines bloqués d'ordinaire : relief de l'IGN, Overpass, tuiles, BRouter, imagerie satellite. */
 export const BLOCKED_URLS = ['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*', '*://server.arcgisonline.com/*'];
 
@@ -273,10 +308,10 @@ export const connect = async ({ port, base = BASE, width, height, shotDir, logEn
     return 'ok';
   };
 
-  /** Fiches JSON du dossier `Gtracker/sessions` (nom : `MEMORY_FOLDER_NAME`) de la mémoire du navigateur (OPFS). */
+  /** Fiches JSON du dossier `sessions` du dossier mémoire (`DOSSIER_MEMOIRE`) de la mémoire du navigateur (OPFS). */
   const records = async () => (await evaluate(`(async () => {
     let dir;
-    try { dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions'); } catch { return []; }
+    try { dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('sessions'); } catch { return []; }
     const list = [];
     for await (const [name, h] of dir.entries()) {
       if (!name.endsWith('.json')) continue;

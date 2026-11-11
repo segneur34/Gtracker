@@ -3,9 +3,9 @@
 // Sur un profil neuf, sans réseau ni session, environ 30 s. L'heure de la page est décalée par un script posé avant
 // son chargement (`Date` remplacé, comme `racine.mjs`) pour passer d'un jour au suivant. Il vérifie :
 //  1. jour 1 : la carte « Aujourd'hui : Enregistrer une session » sur l'accueil, avant les familles, son accroche,
-//     « Lire » et la croix ; le jour rangé sur l'appareil (`tracker.tutoriels`) ;
+//     « Lire » et la croix ; le jour rangé sur l'appareil (`gtracker.tutoriels`) ;
 //  2. « Lire » ouvre la leçon (`/tutoriels/enregistrer`) : titre, « Leçon 1 sur 14 », paragraphes, « Essayer » vers
-//     Enregistrer, « Leçon suivante » sans « précédente » ; la leçon marquée lue ; le retour d'Android (`trackerBack`)
+//     Enregistrer, « Leçon suivante » sans « précédente » ; la leçon marquée lue ; le retour d'Android (`gtrackerBack`)
 //     mène à la liste, puis à Réglages ;
 //  3. la liste `/tutoriels` : quatorze leçons dans l'ordre, la première cochée seule, « 1 lue sur 14 » ;
 //  4. l'accueil du même jour, la leçon lue : plus de carte ;
@@ -17,7 +17,7 @@
 //  8. à 390×844 : l'accueil avec la carte, et une leçon d'une famille cachée (son adresse s'ouvre toujours), sans
 //     débordement.
 // Il finit par « Tout passe. » ou le nombre d'échecs.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect, POIGNEE_RETOUR } from './lib/cdp.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -51,7 +51,7 @@ const now = new Date();
 const dayAt = (n) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + n - 1, 12).getTime();
 const keyOf = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-const stored = () => evaluate(`JSON.parse(localStorage.getItem('tracker.tutoriels') ?? '{}').etat ?? null`);
+const stored = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.tutoriels}') ?? '{}').etat ?? null`);
 const path = () => evaluate('location.pathname');
 /** La carte du jour : titre, accroche, bouton, croix ; `null` si elle n'est pas là. */
 const card = () => evaluate(`(() => {
@@ -75,7 +75,7 @@ const homeAt = async (dayMs) => {
 };
 const rows = () => evaluate(`[...document.querySelectorAll('.tutorial-row')].map((r) => ({ title: r.querySelector('.tutorial-row__title')?.textContent, read: !!r.querySelector('.tutorial-row__read') }))`);
 const subtitle = () => evaluate(`document.querySelector('.ui-page-header__subtitle')?.textContent ?? null`);
-const back = () => evaluate(`window.trackerBack ? window.trackerBack() : 'absent'`);
+const back = () => evaluate(`window.${POIGNEE_RETOUR} ? window.${POIGNEE_RETOUR}() : 'absent'`);
 const overflow = () => evaluate('document.documentElement.scrollWidth > window.innerWidth');
 
 // 1. Jour 1.
@@ -153,7 +153,7 @@ await evaluate(`document.querySelector('a[href="/tutoriels"]').click()`);
 check('… qui ouvre la liste', (await waitFor(`location.pathname === '/tutoriels' && document.querySelectorAll('.tutorial-row').length > 0`, { timeout: 3000 })) === true, await path());
 
 // 7. La voile cachée par son œil dans Réglages › Activités : sa leçon retirée de la liste.
-await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}'); s.settings = { ...s.settings, activites: true }; localStorage.setItem('tracker.sections', JSON.stringify(s)); })()`);
+await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}'); s.settings = { ...s.settings, activites: true }; localStorage.setItem('${CLES.sections}', JSON.stringify(s)); })()`);
 await go('/parametres', 3000);
 const eye = `[...document.querySelectorAll('.settings-eye')].find((b) => (b.getAttribute('aria-label') ?? '').startsWith('Cacher Voile'))`;
 await waitFor(`Boolean(${eye})`, { timeout: 3000, label: 'œil' });

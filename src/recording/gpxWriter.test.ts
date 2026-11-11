@@ -26,7 +26,7 @@ describe('buildGpx', () => {
       + '<extensions><gpxtpx:TrackPointExtension><gpxtpx:speed>5.43</gpxtpx:speed><gpxtpx:course>270.1</gpxtpx:course>'
       + '</gpxtpx:TrackPointExtension></extensions></trkpt>'
     );
-    expect(gpx).not.toContain('tracker:accuracy');
+    expect(gpx).not.toContain(':accuracy');
   });
 
   it("n'écrit pas le cap d'une position immobile ou sans vitesse", () => {

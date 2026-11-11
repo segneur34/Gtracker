@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { XML } from '../core/appIdentity';
+import { APP_NAME, XML } from '../core/appIdentity';
 import { base64ToBytes } from '../core/base64';
 import { IMU_FORMAT, decodeImu, decodeImuHeader, joinImu, splitImu } from '../core/imuFile';
+import { gpxDocument } from '../core/xml';
 import type { ImportEntry, MemoryFolder } from '../platform/memoryFolder';
 import { settle, trackTestTimers } from '../test/library.fixture';
 import {
-  TRACKER_SURF_BUNDLE, TRACKER_SURF_GPX, TRACKER_SURF_RECORD, TRACKER_WING_BUNDLE, TRACKER_WING_GPX, TRACKER_WING_IMU, TRACKER_WING_RECORD,
+  LEGACY_SURF_BUNDLE, LEGACY_SURF_GPX, LEGACY_SURF_RECORD, LEGACY_WING_BUNDLE, LEGACY_WING_GPX, LEGACY_WING_IMU, LEGACY_WING_RECORD,
 } from '../test/legacyImport.fixture';
 import { createFakeFolder } from '../test/memoryFolder.fixture';
 import { importRecordChoice } from './importEntry';
@@ -22,15 +23,15 @@ import { bundleSessionGpx, unbundleSessionGpx } from './sessionBundle';
  * rester vert quand ces constantes changent (lot 321).
  */
 
-const WING_IMU = base64ToBytes(TRACKER_WING_IMU);
+const WING_IMU = base64ToBytes(LEGACY_WING_IMU);
 
 /** Ce que chacune des deux sessions du jeu d'essai porte, écrit à la main (les chiffres viennent du code d'origine). */
 const SESSIONS = {
   wing: {
     sport: 'wingfoil',
-    gpx: TRACKER_WING_GPX,
-    record: TRACKER_WING_RECORD,
-    bundle: TRACKER_WING_BUNDLE,
+    gpx: LEGACY_WING_GPX,
+    record: LEGACY_WING_RECORD,
+    bundle: LEGACY_WING_BUNDLE,
     imu: WING_IMU,
     name: 'Wing & foil, après-midi d\'essai',
     comment: 'Vent < 20 nœuds, rafales > 25 & houle courte.',
@@ -43,9 +44,9 @@ const SESSIONS = {
   },
   surf: {
     sport: 'surf',
-    gpx: TRACKER_SURF_GPX,
-    record: TRACKER_SURF_RECORD,
-    bundle: TRACKER_SURF_BUNDLE,
+    gpx: LEGACY_SURF_GPX,
+    record: LEGACY_SURF_RECORD,
+    bundle: LEGACY_SURF_BUNDLE,
     imu: null,
     name: 'Surf du matin',
     comment: 'Une belle vague, l\'eau était froide.',
@@ -70,7 +71,7 @@ const recordOf = (kind: Kind): SessionRecord => {
 
 /** Fiche de l'ancienne application, retouchée par `patch` (champs de premier niveau, analyse, résumé). */
 const legacyRecord = (patch: { top?: Record<string, unknown>; analysis?: Record<string, unknown>; summary?: Record<string, unknown> }): string => {
-  const raw = JSON.parse(TRACKER_WING_RECORD) as Record<string, Record<string, unknown>>;
+  const raw = JSON.parse(LEGACY_WING_RECORD) as Record<string, Record<string, unknown>>;
   return JSON.stringify({
     ...raw, ...patch.top, analysis: { ...raw.analysis, ...patch.analysis }, summary: { ...raw.summary, ...patch.summary },
   });
@@ -104,8 +105,8 @@ describe('jeu d\'essai de la porte d\'import : le paquet de session', () => {
       expect(SESSIONS[kind].record.endsWith('}\n')).toBe(true);
       expect(SESSIONS[kind].bundle.length).toBeGreaterThan(SESSIONS[kind].gpx.length);
     }
-    expect(TRACKER_WING_GPX).toContain('<type>wingfoil</type>');
-    expect(TRACKER_SURF_GPX).toContain('<type>surf</type>');
+    expect(LEGACY_WING_GPX).toContain('<type>wingfoil</type>');
+    expect(LEGACY_SURF_GPX).toContain('<type>surf</type>');
   });
 
   for (const kind of KINDS) {
@@ -178,7 +179,7 @@ describe('jeu d\'essai de la porte d\'import : le paquet de session', () => {
   });
 
   it('wingfoil : les capteurs du paquet sont ceux du .imu, et se lisent entièrement', async () => {
-    const bundle = unbundleSessionGpx(TRACKER_WING_BUNDLE);
+    const bundle = unbundleSessionGpx(LEGACY_WING_BUNDLE);
     expect(bundle.motion).not.toBeNull();
     expect(bundle.motion).toEqual(WING_IMU);
     // Lot 321 : l'en-tête de l'ancienne application, tel qu'écrit, ne se lit qu'une fois converti par la porte d'import.
@@ -197,7 +198,7 @@ describe('jeu d\'essai de la porte d\'import : le paquet de session', () => {
   });
 
   it('surf : un paquet sans capteurs n\'en invente pas', () => {
-    expect(unbundleSessionGpx(TRACKER_SURF_BUNDLE).motion).toBeNull();
+    expect(unbundleSessionGpx(LEGACY_SURF_BUNDLE).motion).toBeNull();
   });
 });
 
@@ -329,9 +330,9 @@ describe('porte d\'import : la bibliothèque range les sessions de l\'ancienne a
 
   it('le même paquet importé deux fois : « déjà présente », rien n\'est écrasé', async () => {
     const library = await openFresh();
-    const first = await library.importEntries([entry('wing-paquet.gpx', TRACKER_WING_BUNDLE)]);
+    const first = await library.importEntries([entry('wing-paquet.gpx', LEGACY_WING_BUNDLE)]);
     const before = files.get(`sessions/${first.added[0]}`);
-    const again = await library.importEntries([entry('wing-paquet.gpx', TRACKER_WING_BUNDLE)]);
+    const again = await library.importEntries([entry('wing-paquet.gpx', LEGACY_WING_BUNDLE)]);
     expect(again.added).toEqual([]);
     expect(again.duplicates).toBe(1);
     expect(files.get(`sessions/${first.added[0]}`)).toBe(before);
@@ -339,9 +340,9 @@ describe('porte d\'import : la bibliothèque range les sessions de l\'ancienne a
 
   it('le GPX seul d\'abord, puis le paquet : la session reçoit sa fiche et ses capteurs', async () => {
     const library = await openFresh();
-    const first = await library.importEntries([entry('wing.gpx', TRACKER_WING_GPX)]);
+    const first = await library.importEntries([entry('wing.gpx', LEGACY_WING_GPX)]);
     expect(first.added).toHaveLength(1);
-    const again = await library.importEntries([entry('wing-paquet.gpx', TRACKER_WING_BUNDLE)]);
+    const again = await library.importEntries([entry('wing-paquet.gpx', LEGACY_WING_BUNDLE)]);
     expect(again.added).toEqual([]);
     expect(again.duplicates).toBe(1);
     expect(again.recordCompleted).toBe(1);
@@ -383,7 +384,7 @@ describe('porte d\'import : lecture de l\'ancien format (fonctions pures)', () =
       expect(read.otherSport).toBe(sport);
       expect(read.parsed?.parts.sport).toBeNull();
     }
-    expect(parseImportedRecord(TRACKER_SURF_RECORD).otherSport).toBeNull();
+    expect(parseImportedRecord(LEGACY_SURF_RECORD).otherSport).toBeNull();
     // Un sport inconnu n'est pas refusé : la session reste « à classer ».
     expect(parseImportedRecord(legacyRecord({ top: { sport: 'hiking' } })).otherSport).toBeNull();
   });
@@ -424,7 +425,7 @@ describe('porte d\'import : lecture de l\'ancien format (fonctions pures)', () =
   });
 
   it('fiche à côté ou du paquet : se fond comme une fiche de Gtracker', () => {
-    const choice = importRecordChoice(TRACKER_WING_RECORD, NO_BUNDLE);
+    const choice = importRecordChoice(LEGACY_WING_RECORD, NO_BUNDLE);
     expect(choice.record?.name).toBe(SESSIONS.wing.name);
     expect(choice.keepRecordText).toBeUndefined();
     expect(choice.legacyRecordIgnored).toBe(false);
@@ -445,35 +446,48 @@ describe('porte d\'import : lecture de l\'ancien format (fonctions pures)', () =
   it('dit le sport que Gtracker ne range pas, de la fiche à côté ou du paquet', () => {
     expect(importRecordChoice(legacyRecord({ top: { sport: 'running' } }), NO_BUNDLE).otherSport).toBe('running');
     expect(importRecordChoice(undefined, { ...NO_BUNDLE, otherSport: 'cycling' }).otherSport).toBe('cycling');
-    const running = TRACKER_WING_BUNDLE.replace('"sport": "wingfoil"', '"sport": "running"');
-    expect(running).not.toBe(TRACKER_WING_BUNDLE);
+    const running = LEGACY_WING_BUNDLE.replace('"sport": "wingfoil"', '"sport": "running"');
+    expect(running).not.toBe(LEGACY_WING_BUNDLE);
     expect(unbundleSessionGpx(running).otherSport).toBe('running');
   });
 
   it('la mémoire ne lit plus l\'ancien format : seule la porte d\'import le lit', () => {
-    expect(parseRecordWithRaw(TRACKER_WING_RECORD)).toBeNull();
-    expect(parseRecord(TRACKER_SURF_RECORD)).toBeNull();
-    expect(parseImportedRecord(TRACKER_WING_RECORD).legacy).toBe(true);
+    expect(parseRecordWithRaw(LEGACY_WING_RECORD)).toBeNull();
+    expect(parseRecord(LEGACY_SURF_RECORD)).toBeNull();
+    expect(parseImportedRecord(LEGACY_WING_RECORD).legacy).toBe(true);
   });
 
   it('un paquet écrit par Gtracker ne porte aucun ancien nom, et se relit sans passer par l\'ancien format', () => {
-    const bundled = bundleSessionGpx(TRACKER_WING_GPX, recordOf('wing'), upgradeImportedImu(WING_IMU));
+    const bundled = bundleSessionGpx(LEGACY_WING_GPX, recordOf('wing'), upgradeImportedImu(WING_IMU));
     expect(bundled).not.toMatch(/(^|[^g])tracker[:-]/);
     expect(bundled).toContain(`<${XML.session.prefix}:session xmlns:${XML.session.prefix}="${XML.session.ns}" version="1">`);
     const back = unbundleSessionGpx(bundled);
-    expect(back.gpx).toBe(TRACKER_WING_GPX);
+    expect(back.gpx).toBe(LEGACY_WING_GPX);
     expect(back.record?.name).toBe(SESSIONS.wing.name);
     expect(back.recordText && parseImportedRecord(back.recordText).legacy).toBe(false);
     expect(back.motion && decodeImuHeader(back.motion)?.format).toBe(IMU_FORMAT);
   });
 
+  it('un GPX de Gtracker empaqueté puis relu : aller-retour exact, aucun ancien nom nulle part', () => {
+    const gpx = gpxDocument(['  <trk><name>Essai</name><trkseg></trkseg></trk>']);
+    const bundled = bundleSessionGpx(gpx, recordOf('wing'), upgradeImportedImu(WING_IMU));
+    expect(bundled).not.toMatch(/(?<![gG])tracker/i);
+    expect(bundled).toContain(`creator="${APP_NAME}"`);
+    const back = unbundleSessionGpx(bundled);
+    expect(back.gpx).toBe(gpx);
+    expect(back.record?.name).toBe(SESSIONS.wing.name);
+    expect(back.recordText && JSON.parse(back.recordText).format).toBe(RECORD_FORMAT);
+    expect(back.motion && decodeImuHeader(back.motion)?.format).toBe(IMU_FORMAT);
+    expect(back.motion && splitImu(back.motion)?.body).toEqual(splitImu(WING_IMU)?.body);
+  });
+
   it('relit un paquet de l\'ancienne application sans retouches ni capteurs (0.2.82)', () => {
     // Déménagé de `sessionBundle.test.ts` (lot 321) : la fiche et rien d'autre, sous l'ancien préfixe.
-    const escaped = TRACKER_WING_RECORD.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const old = TRACKER_WING_GPX.replace('</gpx>', '<extensions><tracker:session xmlns:tracker="https://github.com/segneur34/Tracker/session" version="1">'
+    const escaped = LEGACY_WING_RECORD.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const old = LEGACY_WING_GPX.replace('</gpx>', '<extensions><tracker:session xmlns:tracker="https://github.com/segneur34/Tracker/session" version="1">'
       + `<tracker:record>${escaped}</tracker:record></tracker:session></extensions></gpx>`);
     const back = unbundleSessionGpx(old);
-    expect(back.gpx).toBe(TRACKER_WING_GPX);
+    expect(back.gpx).toBe(LEGACY_WING_GPX);
     expect(back.record?.name).toBe(SESSIONS.wing.name);
     expect(back.record?.format).toBe(RECORD_FORMAT);
     expect(back.motion).toBeNull();
@@ -513,8 +527,8 @@ describe('porte d\'import : ce que la bibliothèque range est au format de Gtrac
 
   it('(b) le paquet, ou les fichiers posés à côté : fiche et capteurs écrits sous les noms neufs', async () => {
     for (const entries of [
-      [entry('wing-paquet.gpx', TRACKER_WING_BUNDLE)],
-      [entry('wing.gpx', TRACKER_WING_GPX), entry('wing.json', TRACKER_WING_RECORD), entry('wing.imu', WING_IMU)],
+      [entry('wing-paquet.gpx', LEGACY_WING_BUNDLE)],
+      [entry('wing.gpx', LEGACY_WING_GPX), entry('wing.json', LEGACY_WING_RECORD), entry('wing.imu', WING_IMU)],
     ]) {
       files.clear();
       bytes.clear();
@@ -534,12 +548,12 @@ describe('porte d\'import : ce que la bibliothèque range est au format de Gtrac
     const library = await openFresh();
     const report = await library.importEntries([
       // GPX et fiche de course posée à côté.
-      entry('course.gpx', TRACKER_WING_GPX.replace('<type>wingfoil</type>', '<type>running</type>')),
+      entry('course.gpx', LEGACY_WING_GPX.replace('<type>wingfoil</type>', '<type>running</type>')),
       entry('course.json', legacyRecord({ top: { sport: 'running' } })),
       // GPX seul, son `<type>` de vélo.
-      entry('velo.gpx', TRACKER_SURF_GPX.replace('<type>surf</type>', '<type>cycling</type>')),
+      entry('velo.gpx', LEGACY_SURF_GPX.replace('<type>surf</type>', '<type>cycling</type>')),
       // Paquet dont la fiche dit un fractionné.
-      entry('fractionne.gpx', TRACKER_WING_BUNDLE.replace('"sport": "wingfoil"', '"sport": "run-intervals"')),
+      entry('fractionne.gpx', LEGACY_WING_BUNDLE.replace('"sport": "wingfoil"', '"sport": "run-intervals"')),
     ], { fromFolder: true });
     expect(report.added).toEqual([]);
     expect(report.failed).toEqual([]);
@@ -552,7 +566,7 @@ describe('porte d\'import : ce que la bibliothèque range est au format de Gtrac
 
   it('fiche de l\'ancienne application plus récente : la trace seule est rangée, le compte rendu le dit', async () => {
     const library = await openFresh();
-    const report = await library.importEntries([entry('wing.gpx', TRACKER_WING_GPX), entry('wing.json', legacyRecord({ top: { version: 2 } }))], { fromFolder: true });
+    const report = await library.importEntries([entry('wing.gpx', LEGACY_WING_GPX), entry('wing.json', legacyRecord({ top: { version: 2 } }))], { fromFolder: true });
     expect(report.added).toHaveLength(1);
     expect(report.legacyRecordsIgnored).toEqual(['wing.gpx']);
     const got = stored(library, report.added);
@@ -570,7 +584,7 @@ describe('porte d\'import : ce que la bibliothèque range est au format de Gtrac
     const newer = joinImu({ ...imuHeaderJson(WING_IMU), version: 2 }, split.body);
     const library = await openFresh();
     const report = await library.importEntries([
-      entry('wing.gpx', TRACKER_WING_GPX), entry('wing.json', TRACKER_WING_RECORD), entry('wing.imu', newer),
+      entry('wing.gpx', LEGACY_WING_GPX), entry('wing.json', LEGACY_WING_RECORD), entry('wing.imu', newer),
     ], { fromFolder: true });
     expect(report.added).toHaveLength(1);
     expect(report.motionFailed).toEqual(['wing.gpx']);
@@ -584,7 +598,7 @@ describe('porte d\'import : ce que la bibliothèque range est au format de Gtrac
     if (!split) throw new Error('.imu illisible');
     const newer = joinImu({ ...imuHeaderJson(WING_IMU), version: 2 }, split.body);
     const library = await openFresh();
-    const report = await library.importEntries([entry('wing.gpx', TRACKER_WING_BUNDLE), entry('wing.imu', newer)], { fromFolder: true });
+    const report = await library.importEntries([entry('wing.gpx', LEGACY_WING_BUNDLE), entry('wing.imu', newer)], { fromFolder: true });
     expect(report.added).toHaveLength(1);
     expect(report.motionFailed).toEqual([]);
     expectSameMeasures(stored(library, report.added).motion, WING_IMU);
@@ -593,13 +607,13 @@ describe('porte d\'import : ce que la bibliothèque range est au format de Gtrac
   it('(d) une fiche de l\'ancienne application posée dans la mémoire reste en lecture seule, jamais réécrite', async () => {
     const file = '2026-06-01_12-00-00_wingfoil.gpx';
     const json = `sessions/${file.replace(/\.gpx$/, '.json')}`;
-    files.set(`sessions/${file}`, TRACKER_WING_GPX);
-    files.set(json, TRACKER_WING_RECORD);
+    files.set(`sessions/${file}`, LEGACY_WING_GPX);
+    files.set(json, LEGACY_WING_RECORD);
     const library = await openFresh();
     const session = library.readLibraryState().sessions.find((s) => s.file === file);
     expect(session).toBeDefined();
     expect(session?.readOnly).toBe(true);
-    expect(files.get(json)).toBe(TRACKER_WING_RECORD);
+    expect(files.get(json)).toBe(LEGACY_WING_RECORD);
     expect(log.filter((line) => line === `write ${json}`)).toEqual([]);
   });
 });

@@ -7,7 +7,7 @@
 // point inséré sur la trace importée, point déplacé, rangement puis réouverture après rechargement.
 // `DUMP=fichier` relève le texte de la page rouverte.
 import { writeFileSync } from 'node:fs';
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, gpxDir, shotDir] = process.argv.slice(2);
@@ -51,12 +51,12 @@ const state = () => evaluate(`(() => {
 })()`);
 const log = async (label) => console.log(label.padEnd(34), await state());
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await go('/itineraires', 3000);
 // En Course (sur un profil neuf, la première activité est la voile, sans chemins), tous les onglets ouverts.
-await evaluate(`localStorage.setItem('tracker.planning', JSON.stringify({ activityId: 'running' }));
-  localStorage.setItem('tracker.sections', JSON.stringify({ planning: { profil: true, surface: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
+await evaluate(`localStorage.setItem('${CLES.planning}', JSON.stringify({ activityId: 'running' }));
+  localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { profil: true, surface: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
 await go('/itineraires', 3000);
 
 // 1. Trois points en ligne droite, « Précédent », boucle en ligne droite depuis un autre mode.

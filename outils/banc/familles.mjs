@@ -9,7 +9,7 @@
 //  5. une activité ajoutée en surf : la famille Surf s'ouvre, la carte de l'activité aussi ;
 //  6. à 390×844 : aucun débordement, familles fermées puis ouvertes.
 import { writeFileSync } from 'node:fs';
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -36,7 +36,7 @@ const report = () => {
 };
 
 // Le blocage par hôte ne vaut qu'avec `Network.enable` (fait par `connect`).
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
 
@@ -44,10 +44,10 @@ const FAMILIES = ['voile', 'course', 'velo', 'fractionne', 'surf'];
 const PARTS = ['affichage', 'analyse', 'enregistrement', 'notification', 'itineraires', 'balises'];
 /** Mémoire des blocs : Activités ouvert, et ce que `extra` y ajoute. */
 const seedSections = (extra) => evaluate(`(() => {
-  const sections = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}');
+  const sections = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
   sections.settings = { ...sections.settings, activites: true };
   Object.assign(sections, ${JSON.stringify(extra)});
-  localStorage.setItem('tracker.sections', JSON.stringify(sections));
+  localStorage.setItem('${CLES.sections}', JSON.stringify(sections));
   return 'ok';
 })()`);
 const familyToggles = `[...document.querySelectorAll('.settings-activities__family-toggle')]`;
@@ -133,7 +133,7 @@ check('après une modification, « Par défaut » actif', (await menuState()) ==
 await openSettings();
 check('Voile toujours ouverte après rechargement', (await evaluate(`${familyToggle('Voile')}?.getAttribute('aria-expanded')`)) === 'true');
 check('les autres toujours fermées', (await evaluate(`${familyToggles}.filter((b) => b.getAttribute('aria-expanded') === 'true').length`)) === 1);
-check('mémorisé dans tracker.sections', (await evaluate(`JSON.parse(localStorage.getItem('tracker.sections') ?? '{}')['settings-families']?.voile`)) === true);
+check(`mémorisé dans ${CLES.sections}`,(await evaluate(`JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}')['settings-families']?.voile`)) === true);
 
 // --- 5. Activité ajoutée en surf ---
 const added = await evaluate(`(() => {

@@ -187,7 +187,7 @@ export const LESSONS: readonly Lesson[] = [
     icon: 'capteurs',
     target: '/parametres',
     body: [
-      'Le téléphone porte des capteurs de mouvement : Tracker s\'en sert pour mesurer la hauteur et la durée de vos sauts, en wing ou en kite.',
+      'Le téléphone porte des capteurs de mouvement : Gtracker s\'en sert pour mesurer la hauteur et la durée de vos sauts, en wing ou en kite.',
       "La case « Mesurer les sauts » se coche par activité, dans Réglages ; elle est alors proposée à l'enregistrement, et l'onglet « sauts » de l'analyse les liste.",
       "Sur foil, le pumping (coups, fréquence, décollage de chaque vol) se mesure téléphone fixé sur la poitrine : cochez « Pumping foil » sur l'activité, puis « Mesurer le pumping » dans Enregistrer.",
     ],
@@ -201,7 +201,7 @@ export const LESSONS: readonly Lesson[] = [
     body: [
       'Dans une analyse, le « … » à côté du nom de la session propose « Partager » : une image carrée de la trace et des chiffres que vous choisissez, avec ou sans fond de carte.',
       "Vos choix de chiffres sont retenus par activité ; « Partager » est aussi proposé à la fin d'un enregistrement.",
-      "« Télécharger la session » range son fichier GPX dans Téléchargements : il s'ouvre dans les autres applications, et Tracker le relit tout entier, notes comprises.",
+      "« Télécharger la session » range son fichier GPX dans Téléchargements : il s'ouvre dans les autres applications, et Gtracker le relit tout entier, notes comprises.",
     ],
   },
 ];

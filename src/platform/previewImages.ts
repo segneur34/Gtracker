@@ -1,6 +1,7 @@
 import { base64ToBlob, blobToBase64 } from '../core/base64';
 import { filesystem } from './files';
 import { isNativeApp } from './runtime';
+import { CACHE_NAMES } from '../core/appIdentity';
 
 /**
  * Images finies des vignettes de la bibliothèque (trace sur son fond), gardées
@@ -11,7 +12,7 @@ import { isNativeApp } from './runtime';
  *
  * - Sur le téléphone, le dossier `vignettes-images/` du dossier privé de
  *   l'application (`Directory.Data`), avec `index.json` dedans.
- * - Dans le navigateur, le Cache API (`tracker-vignettes-images`).
+ * - Dans le navigateur, le Cache API (`gtracker-vignettes-images`).
  *
  * Magasin frère de celui des tuiles (`tileCache.ts`), pas le même : ni le
  * plafond ni les comptes ni « Vider » de Réglages ne le voient. Hors du
@@ -104,7 +105,7 @@ const nativeBackend: PreviewImageBackend = {
   },
 };
 
-const CACHE_NAME = 'tracker-vignettes-images';
+const CACHE_NAME = CACHE_NAMES.vignettesImages;
 const CACHE_PATH = '/vignettes-images/';
 /** Adresses fictives dans le cache, jamais demandées au réseau ; l'index porte un nom qu'aucune image ne porte. */
 const cacheUrl = (name: string): string => `${CACHE_PATH}${name}.png`;

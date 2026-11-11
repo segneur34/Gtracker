@@ -31,7 +31,7 @@ import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -48,7 +48,7 @@ const go = async (path, max) => {
   await waitFor(`Boolean(document.querySelector('.shell-main'))`, { timeout: 5000, every: 50, label: 'premier rendu' });
   return ms;
 };
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 // Sortie propre à ce script (« OK » et « : détail » toujours montrés) : gardée telle quelle pour que le relevé reste comparable.
 let failures = 0;
@@ -294,11 +294,11 @@ await wait(300);
 // 5. Famille cachée : Surf, par les réglages de l'appareil.
 await go('/statistiques');
 await evaluate(`(() => {
-  const s = JSON.parse(localStorage.getItem('tracker.sportSettings') ?? '{}');
+  const s = JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}');
   s.hiddenFamilies = ['surf'];
-  localStorage.setItem('tracker.sportSettings', JSON.stringify(s));
+  localStorage.setItem('${CLES.sportSettings}', JSON.stringify(s));
   // Sans paramètre, la page reprend le dernier affichage (Fractionné vélo) : on repart de la vue d'ensemble.
-  localStorage.removeItem('tracker.statistiques');
+  localStorage.removeItem('${CLES.statistiques}');
 })()`);
 await go('/statistiques');
 check('Surf caché : 11 sessions', (await stat('Sessions')) === '11', await stat('Sessions'));
@@ -307,9 +307,9 @@ await go('/statistiques?famille=surf');
 check('Surf par l\'adresse', (await stat('Sessions')) === '1' && (await evaluate(`document.querySelector('.shell-main').innerText.includes('cachée dans Réglages')`)),
   await stat('Sessions'));
 await evaluate(`(() => {
-  const s = JSON.parse(localStorage.getItem('tracker.sportSettings') ?? '{}');
+  const s = JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}');
   delete s.hiddenFamilies;
-  localStorage.setItem('tracker.sportSettings', JSON.stringify(s));
+  localStorage.setItem('${CLES.sportSettings}', JSON.stringify(s));
 })()`);
 
 // 5b. Réussite des manœuvres : une session de voile ouverte dans son analyse.
@@ -359,7 +359,7 @@ await shoot('stats-reussite');
 // 5c. Onglet « niveau » (lot 146).
 const levelLines = () => evaluate(`[...document.querySelectorAll('.stats-level__text')].map((e) => e.textContent.replace(/\\s+/g, ' ').trim()).join(' | ')`);
 const levelHint = () => evaluate(`[...document.querySelectorAll('.stats-level__hint')].map((e) => e.textContent).join(' | ')`);
-const setRunner = (profile) => evaluate(`(() => { localStorage.setItem('tracker.runnerProfile', ${JSON.stringify(JSON.stringify({ me: profile }))}); return 'ok'; })()`);
+const setRunner = (profile) => evaluate(`(() => { localStorage.setItem('${CLES.athleteProfile}', ${JSON.stringify(JSON.stringify({ me: profile }))}); return 'ok'; })()`);
 await go('/statistiques?famille=course');
 await openTab('niveau');
 await wait(400);

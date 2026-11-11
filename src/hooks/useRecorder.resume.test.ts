@@ -3,6 +3,7 @@ import { baseActivity } from '../core/activities';
 import type { LocationFix, LocationSource, StopLocation } from '../platform/location';
 import { parseJournal } from '../recording/journal';
 import { EMPTY_RECORDING_STATS, addFixAfterManualPause, addFixToStats, displayedDurationMs, type RecordingStats } from '../recording/session';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Reprise d'un enregistrement après une chute du moteur de la page (lot 156). Une chute est simulée par des modules
@@ -821,7 +822,7 @@ describe('zone visée', () => {
     run(live.emit, 0, 5, 1);
     await settle();
     // La zone visée est gardée sur l'appareil pendant l'enregistrement.
-    const stored = async () => (await import('../platform/storage')).jsonStore.read<unknown>('tracker.zoneAlertTarget');
+    const stored = async () => (await import('../platform/storage')).jsonStore.read<unknown>(STORAGE_KEYS.zoneAlertTarget);
     expect(await stored()).toBe(3);
 
     services.gps = true;

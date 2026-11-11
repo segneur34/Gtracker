@@ -3,6 +3,7 @@ import { jsonStore } from '../platform/storage';
 import { FOLLOWED_TRACE_TOLERANCE_M, followedTraceFromPoints, thinFollowedTrace, type FollowedTrace } from '../recording/followedTrace';
 import { sanitizeMarkGuide } from '../recording/markGuide';
 import { createListeners } from './createStore';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Trace suivie pendant l'enregistrement, gardée hors des pages : elle reste
@@ -13,7 +14,7 @@ import { createListeners } from './createStore';
  * suivie et gardée, et elle pèse peu dans le stockage de l'appareil.
  */
 
-const STORAGE_KEY = 'tracker.followedTrace';
+const STORAGE_KEY = STORAGE_KEYS.followedTrace;
 
 /** Trace gardée, relue avec sa forme vérifiée ; `null` si absente ou illisible. */
 const readStored = (): FollowedTrace | null => {

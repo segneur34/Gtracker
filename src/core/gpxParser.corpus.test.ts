@@ -34,8 +34,8 @@ const outcome = <T,>(read: () => T): { value: T } | { error: string } => {
   }
 };
 
-/** Sortie de l'enregistreur de Tracker (`buildGpx`) : la trace de base en deux segments, vitesse, cap et FC. */
-const trackerEntry = (): CorpusEntry => {
+/** Sortie de l'enregistreur (`buildGpx`), un GPX sans fiche : la trace de base en deux segments, vitesse, cap et FC. */
+const recorderEntry = (): CorpusEntry => {
   const fixes: LocationFix[] = basePoints().map((p) => ({
     lat: p.lat,
     lon: p.lon,
@@ -46,13 +46,13 @@ const trackerEntry = (): CorpusEntry => {
     heartRateBpm: p.hr,
   }));
   return {
-    nom: 'Tracker (buildGpx), deux segments',
+    nom: 'Enregistreur de la même famille (buildGpx), deux segments',
     texte: buildGpx(segmentsOf(fixes, 2), { name: 'Surf, 01/10/2026 10:00', sport: 'surf' }),
     attendu: { points: BASE_POINT_COUNT, segments: 2, hasDeviceSpeed: true, avecFc: true, trackName: 'Surf, 01/10/2026 10:00', trackType: 'surf' },
   };
 };
 
-const ENTRIES: CorpusEntry[] = [...GPX_CORPUS, trackerEntry()];
+const ENTRIES: CorpusEntry[] = [...GPX_CORPUS, recorderEntry()];
 
 describe('corpus des éditeurs : même lecture que la copie gelée du 04/11', () => {
   it.each(ENTRIES.map((e) => [e.nom, e] as const))('%s', (_, entry) => {
@@ -141,7 +141,7 @@ describe('fichier tronqué : même issue que la copie gelée, coupé tous les 37
   // Des centaines de lectures par fichier, en double : au-delà des 5 s par défaut quand toute la suite tourne en parallèle.
   const TRUNCATED_TIMEOUT_MS = 30_000;
 
-  it.each(['Garmin Connect (ns3:, FC et cadence)', 'commentaires', 'Tracker (buildGpx), deux segments'])('%s', (nom) => {
+  it.each(['Garmin Connect (ns3:, FC et cadence)', 'commentaires', 'Enregistreur de la même famille (buildGpx), deux segments'])('%s', (nom) => {
     const texte = ENTRIES.find((e) => e.nom === nom)!.texte;
     vi.stubGlobal('DOMParser', QuietXmlDom);
     try {

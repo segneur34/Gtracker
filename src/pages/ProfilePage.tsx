@@ -28,6 +28,7 @@ import { activityShares, favoriteActivity } from '../library/profile';
 import { inBounds, isStatsPeriod, statsPeriodBounds, statsTotals } from '../library/stats';
 import { OTHERS_COLOR } from '../components/chartStyle';
 import './ProfilePage.css';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Profil : une période en un coup d'œil (`library/profile.ts`), sur la
@@ -54,7 +55,7 @@ const PROFILE_PERIODS: { id: ChartRange; label: string }[] = [...CHART_PERIODS, 
 interface ProfileView {
   periode: string;
 }
-const VIEW_NAMESPACE = 'tracker.profil';
+const VIEW_NAMESPACE = STORAGE_KEYS.profil;
 const VIEW_KEY = 'affichage';
 const VIEW_DEFAULTS: ProfileView = { periode: 'annee' };
 

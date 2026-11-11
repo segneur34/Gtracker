@@ -1,5 +1,6 @@
 import { filesystem } from './files';
 import { isNativeApp } from './runtime';
+import { CACHE_NAMES } from '../core/appIdentity';
 
 /**
  * Document des vignettes de la bibliothèque gardées sur l'appareil d'un
@@ -9,7 +10,7 @@ import { isNativeApp } from './runtime';
  *
  * - Sur le téléphone, `vignettes.json` du dossier privé de l'application
  *   (`Directory.Data`), comme les tuiles (`tileCache.ts`).
- * - Dans le navigateur, une entrée du Cache API (`tracker-vignettes`).
+ * - Dans le navigateur, une entrée du Cache API (`gtracker-vignettes`).
  *
  * Hors du stockage clé-valeur (`storage.ts`, quelques Mo en tout) et du
  * dossier mémoire : ce n'est pas une donnée de session. Une lecture manquée
@@ -42,7 +43,7 @@ const nativeBackend: PreviewBackend = {
   },
 };
 
-const CACHE_NAME = 'tracker-vignettes';
+const CACHE_NAME = CACHE_NAMES.vignettes;
 /** Adresse fictive du document dans le cache, jamais demandée au réseau. */
 const CACHE_URL = '/vignettes-gardees/vignettes.json';
 

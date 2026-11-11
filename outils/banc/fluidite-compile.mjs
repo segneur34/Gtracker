@@ -6,10 +6,11 @@ import { existsSync, mkdirSync, rmSync, createWriteStream } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DOSSIER_BANC } from './lib/cdp.mjs';
 
 const label = process.argv[2] ?? 'essai';
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const SP = join(tmpdir(), 'tracker-banc', 'compile');
+const SP = join(tmpdir(), DOSSIER_BANC, 'compile');
 const dist = join(SP, `dist-${label}`);
 const work = join(SP, `prod-${label}`);
 const shots = join(SP, `captures-prod-${label}`);

@@ -1,10 +1,11 @@
 import { finiteOr, isFiniteNumber, isObject, parseJson, roundTo, stringifyJson } from '../core/basics';
 import type { RestingHrProtocol } from '../recording/restingHrTest';
 import type { RestingHrResult } from './restingHrResults';
+import { STORAGE_KEYS, FILE_FORMATS } from '../core/appIdentity';
 
 /**
  * Tests de FC repos tels qu'ils sont gardés sur l'appareil (clé
- * `tracker.restingHr`, lue et écrite par `hooks/useRestingHrResults.ts`) :
+ * `gtracker.restingHr`, lue et écrite par `hooks/useRestingHrResults.ts`) :
  * forme gardée, relecture tolérante, au plus `MAX_STORED_RESTING_RESULTS`. Le
  * calcul du résultat est dans `library/restingHrResults.ts`.
  */
@@ -53,7 +54,7 @@ export const readStoredRestingResults = (raw: unknown): StoredRestingResult[] =>
     .slice(0, MAX_STORED_RESTING_RESULTS);
 
 /** Clé de l'appareil où la liste est gardée. */
-export const RESTING_HR_KEY = 'tracker.restingHr';
+export const RESTING_HR_KEY = STORAGE_KEYS.restingHr;
 
 /**
  * Union de deux listes par `startedAtMs` (un même départ est un même test : celui de `a`, l'appareil, est gardé),
@@ -72,7 +73,7 @@ export const mergeRestingResults = (a: readonly StoredRestingResult[], b: readon
 export const sameRestingResults = (a: readonly StoredRestingResult[], b: readonly StoredRestingResult[]): boolean =>
   JSON.stringify(a) === JSON.stringify(b);
 
-const FILE_FORMAT = 'tracker-fc-repos';
+const FILE_FORMAT = FILE_FORMATS.fcRepos;
 const FILE_VERSION = 1;
 
 /** Texte du fichier `fc-repos.json` du dossier mémoire. */

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Écoute de la ceinture (B5) : un abonnement aux événements du greffon qui
@@ -254,7 +255,7 @@ describe('appareils retenus', () => {
   /** Stockage remis à vide : rien ne reste d'un test à l'autre. */
   beforeEach(async () => {
     const { jsonStore } = await import('./storage');
-    jsonStore.write('tracker.heartRateBelts', null);
+    jsonStore.write(STORAGE_KEYS.heartRateBelts, null);
   });
 
   it("la liste rangée porte l'actif marqué, et se relit telle quelle", async () => {
@@ -262,7 +263,7 @@ describe('appareils retenus', () => {
     const { addSavedBelt, savedBelt, savedBelts } = await import('./heartRate');
     addSavedBelt(belt, true);
     addSavedBelt(other, false);
-    expect(jsonStore.read('tracker.heartRateBelts')).toEqual([{ ...belt, active: true }, other]);
+    expect(jsonStore.read(STORAGE_KEYS.heartRateBelts)).toEqual([{ ...belt, active: true }, other]);
     expect(savedBelts()).toEqual([belt, other]);
     expect(savedBelt()).toEqual(belt);
   });

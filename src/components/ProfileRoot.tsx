@@ -8,6 +8,7 @@ import { levelText, type RootGrowth } from '../library/rootGrowth';
 import { BLOOM_BESIDE, BLOOM_MAX, BLOOM_STEPS, drawRoot, readRootColors, type RootColors, type RootFrame } from './drawRoot';
 import './ProfileRoot.css';
 import { formatDecimal, formatDuration } from '../core/units';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Racine du Profil (maquette validée le 22/10) : elle part du carré à droite
@@ -37,7 +38,7 @@ interface LastSeen {
   period: number | null;
   minutes: number;
 }
-const SEEN_NAMESPACE = 'tracker.profil';
+const SEEN_NAMESPACE = STORAGE_KEYS.profil;
 const SEEN_KEY = 'racine';
 /** 2 : la semaine du 25/10 (1 : valeurs d'essai d'un jour, sans version). */
 const SEEN_RULES = 2;

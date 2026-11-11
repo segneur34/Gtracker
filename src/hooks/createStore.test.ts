@@ -72,7 +72,7 @@ describe('createJsonSelector (lot 72)', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  const KEY = 'tracker.essaiSelecteur';
+  const KEY = 'gtracker.essaiSelecteur';
 
   it("ne refait la sélection qu'à une écriture de la clé, et garde la même valeur si elle n'a pas changé", () => {
     const select = vi.fn((raw: unknown) => ({ a: (raw as { a?: number } | null)?.a ?? 0 }));
@@ -82,7 +82,7 @@ describe('createJsonSelector (lot 72)', () => {
     expect(first).toEqual({ a: 1 });
     expect(selector.get()).toBe(first);
     expect(select).toHaveBeenCalledTimes(1);
-    jsonStore.write('tracker.autre', { a: 9 });
+    jsonStore.write('gtracker.autre', { a: 9 });
     expect(selector.get()).toBe(first);
     jsonStore.write(KEY, { a: 1, b: 2 });
     expect(selector.get()).toBe(first);
@@ -94,7 +94,7 @@ describe('createJsonSelector (lot 72)', () => {
     const listener = vi.fn();
     const selector = createJsonSelector(KEY, (raw) => raw, () => true);
     const unsubscribe = selector.subscribe(listener);
-    jsonStore.write('tracker.autre', 1);
+    jsonStore.write('gtracker.autre', 1);
     expect(listener).not.toHaveBeenCalled();
     jsonStore.write(KEY, 1);
     const kept = selector.get();

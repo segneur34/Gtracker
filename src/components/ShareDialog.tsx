@@ -15,9 +15,10 @@ import type { TrackSegment } from './TrackSegmentsLayer';
 import Button from './ui/Button';
 import Dialog from './ui/Dialog';
 import './ShareDialog.css';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /** Choix retenus sur l'appareil, par activité : les chiffres de l'image et le fond de carte. */
-const STORAGE_KEY = 'tracker.partage';
+const STORAGE_KEY = STORAGE_KEYS.partage;
 
 interface ShareChoice {
   /** Clés des chiffres retenus ; absent, les premiers de la synthèse (`pickShareStats`). */

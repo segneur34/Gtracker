@@ -2,6 +2,7 @@ import { sanitizeMarkGuide, type MarkGuideSettings } from '../recording/markGuid
 import { DEFAULT_ROUTE_MODE, newLeg, readRouteMode, type PlannedRoute, type RouteLeg, type RouteMode, type RoutePoint, type Waypoint } from './route';
 import { readSurfaceRuns, type SurfaceRuns } from './surface';
 import { isFiniteNumber, isObject, parseJson } from '../core/basics';
+import { FILE_FORMATS } from '../core/appIdentity';
 
 /**
  * Fiche d'un itinéraire : le fichier JSON rangé dans `itineraires/` du
@@ -16,7 +17,7 @@ import { isFiniteNumber, isObject, parseJson } from '../core/basics';
  * d'une version future lue mais jamais réécrite.
  */
 
-export const ROUTE_FORMAT = 'tracker-itineraire';
+export const ROUTE_FORMAT = FILE_FORMATS.itineraire;
 /**
  * 2 : tronçons `imported` (trace d'un GPX chargé). Une version d'avant les
  * lit sans les réécrire : elle les recalculerait par les chemins, et la trace

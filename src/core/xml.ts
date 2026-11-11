@@ -1,3 +1,4 @@
+import { APP_NAME } from './appIdentity';
 /**
  * XML et GPX : l'échappement des textes, et l'enveloppe d'un document GPX 1.1
  * (déclaration, ouverture, fermeture) que partagent l'enregistreur
@@ -24,7 +25,7 @@ export const gpxDocument = (lines: readonly string[], extraNamespaces: Readonly<
   const extra = Object.entries(extraNamespaces).map(([prefix, uri]) => `xmlns:${prefix}="${uri}"`);
   const open =
     extra.length === 0
-      ? [`<gpx version="1.1" creator="Tracker" xmlns="${GPX_NAMESPACE}">`]
-      : ['<gpx version="1.1" creator="Tracker"', `  xmlns="${GPX_NAMESPACE}"`, ...extra.map((ns, i) => `  ${ns}${i === extra.length - 1 ? '>' : ''}`)];
+      ? [`<gpx version="1.1" creator="${APP_NAME}" xmlns="${GPX_NAMESPACE}">`]
+      : [`<gpx version="1.1" creator="${APP_NAME}"`, `  xmlns="${GPX_NAMESPACE}"`, ...extra.map((ns, i) => `  ${ns}${i === extra.length - 1 ? '>' : ''}`)];
   return ['<?xml version="1.0" encoding="UTF-8"?>', ...open, ...lines, '</gpx>', ''].join('\n');
 };

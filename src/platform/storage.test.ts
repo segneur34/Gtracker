@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createJsonStore, createMirroredBackend, loadNativeEntries, type PreferencesReader, type StorageBackend } from './storage';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /** Preferences simulées du téléphone, pour `initStorage`. */
 const preferences = {
@@ -71,7 +72,7 @@ const failingBackend: StorageBackend = {
 describe('createJsonStore', () => {
   it('rend null pour une clé jamais écrite', () => {
     const store = createJsonStore(() => memoryBackend());
-    expect(store.read('tracker.sportSettings')).toBeNull();
+    expect(store.read(STORAGE_KEYS.sportSettings)).toBeNull();
   });
 
   it('relit ce qu\'il a écrit', () => {
@@ -79,9 +80,9 @@ describe('createJsonStore', () => {
     const store = createJsonStore(() => backend);
     const settings = { sport: 'windsurf', thresholds: { windsurf: 6.5 } };
 
-    store.write('tracker.sportSettings', settings);
+    store.write(STORAGE_KEYS.sportSettings, settings);
 
-    expect(store.read('tracker.sportSettings')).toEqual(settings);
+    expect(store.read(STORAGE_KEYS.sportSettings)).toEqual(settings);
   });
 
   it('écrit le même JSON que l\'ancien accès direct, pour relire les données déjà enregistrées', () => {
@@ -90,50 +91,50 @@ describe('createJsonStore', () => {
     // format ne doit pas changer d'un octet.
     const value = { 'sailing.carte': { width: 640, height: 600 } };
     const backend = memoryBackend();
-    createJsonStore(() => backend).write('tracker.panelSizes', value);
+    createJsonStore(() => backend).write(STORAGE_KEYS.panelSizes, value);
 
-    expect(backend.data.get('tracker.panelSizes')).toBe(JSON.stringify(value));
+    expect(backend.data.get(STORAGE_KEYS.panelSizes)).toBe(JSON.stringify(value));
 
-    const legacy = memoryBackend({ 'tracker.panelSizes': JSON.stringify(value) });
-    expect(createJsonStore(() => legacy).read('tracker.panelSizes')).toEqual(value);
+    const legacy = memoryBackend({ [STORAGE_KEYS.panelSizes]: JSON.stringify(value) });
+    expect(createJsonStore(() => legacy).read(STORAGE_KEYS.panelSizes)).toEqual(value);
   });
 
   it('rend null sur un JSON illisible au lieu de lever une erreur', () => {
-    const store = createJsonStore(() => memoryBackend({ 'tracker.sections': '{"sailing": ' }));
-    expect(store.read('tracker.sections')).toBeNull();
+    const store = createJsonStore(() => memoryBackend({ [STORAGE_KEYS.sections]: '{"sailing": ' }));
+    expect(store.read(STORAGE_KEYS.sections)).toBeNull();
   });
 
   it('ne lève aucune erreur quand le stockage refuse de lire ou d\'écrire', () => {
     const store = createJsonStore(() => failingBackend);
-    expect(store.read('tracker.uneCle')).toBeNull();
-    expect(() => store.write('tracker.uneCle', { a: 1 })).not.toThrow();
+    expect(store.read('gtracker.uneCle')).toBeNull();
+    expect(() => store.write('gtracker.uneCle', { a: 1 })).not.toThrow();
   });
 
   it('absorbe aussi l\'erreur levée dès l\'accès au stockage', () => {
     const store = createJsonStore(() => {
       throw new Error('localStorage inaccessible');
     });
-    expect(store.read('tracker.runnerProfile')).toBeNull();
-    expect(() => store.write('tracker.runnerProfile', { me: {} })).not.toThrow();
+    expect(store.read(STORAGE_KEYS.athleteProfile)).toBeNull();
+    expect(() => store.write(STORAGE_KEYS.athleteProfile, { me: {} })).not.toThrow();
   });
 
   it('garde pour la session une valeur que le stockage refuse, au lieu de relire l\'ancienne', () => {
     // Quota plein : l'ancienne valeur reste lisible, la nouvelle ne s'écrit pas.
-    const backend = memoryBackend({ 'tracker.sportSettings': '{"sport":"wingfoil"}' });
+    const backend = memoryBackend({ [STORAGE_KEYS.sportSettings]: '{"sport":"wingfoil"}' });
     const full: StorageBackend = { getItem: backend.getItem, setItem: () => { throw new Error('quota dépassé'); } };
     let refuse = true;
     const store = createJsonStore(() => (refuse ? full : backend));
 
-    store.write('tracker.sportSettings', { sport: 'kite' });
-    expect(store.read('tracker.sportSettings')).toEqual({ sport: 'kite' });
-    expect(backend.data.get('tracker.sportSettings')).toBe('{"sport":"wingfoil"}');
+    store.write(STORAGE_KEYS.sportSettings, { sport: 'kite' });
+    expect(store.read(STORAGE_KEYS.sportSettings)).toEqual({ sport: 'kite' });
+    expect(backend.data.get(STORAGE_KEYS.sportSettings)).toBe('{"sport":"wingfoil"}');
 
     // Le stockage accepte de nouveau : la valeur écrite fait foi.
     refuse = false;
-    store.write('tracker.sportSettings', { sport: 'windsurf' });
-    expect(backend.data.get('tracker.sportSettings')).toBe('{"sport":"windsurf"}');
+    store.write(STORAGE_KEYS.sportSettings, { sport: 'windsurf' });
+    expect(backend.data.get(STORAGE_KEYS.sportSettings)).toBe('{"sport":"windsurf"}');
     refuse = true;
-    expect(store.read('tracker.sportSettings')).toEqual({ sport: 'windsurf' });
+    expect(store.read(STORAGE_KEYS.sportSettings)).toEqual({ sport: 'windsurf' });
   });
 
   it("ne prévient l'abonné d'une clé que des écritures de cette clé, refusées comprises", () => {
@@ -141,15 +142,15 @@ describe('createJsonStore', () => {
     const backend = memoryBackend();
     const store = createJsonStore(() => (refuse ? { getItem: backend.getItem, setItem: () => { throw new Error('quota'); } } : backend));
     let calls = 0;
-    const unsubscribe = store.subscribeKey('tracker.sportSettings', () => calls++);
-    store.write('tracker.panelSizes', {});
+    const unsubscribe = store.subscribeKey(STORAGE_KEYS.sportSettings, () => calls++);
+    store.write(STORAGE_KEYS.panelSizes, {});
     expect(calls).toBe(0);
-    store.write('tracker.sportSettings', {});
+    store.write(STORAGE_KEYS.sportSettings, {});
     refuse = true;
-    store.write('tracker.sportSettings', { a: 1 });
+    store.write(STORAGE_KEYS.sportSettings, { a: 1 });
     expect(calls).toBe(2);
     unsubscribe();
-    store.write('tracker.sportSettings', {});
+    store.write(STORAGE_KEYS.sportSettings, {});
     expect(calls).toBe(2);
   });
 
@@ -159,44 +160,44 @@ describe('createJsonStore', () => {
     const store = createJsonStore(() => (refuse ? failingBackend : backend));
     const failures: string[] = [];
     const unsubscribe = store.subscribeFailure((key) => failures.push(key));
-    store.write('tracker.panelSizes', {});
+    store.write(STORAGE_KEYS.panelSizes, {});
     refuse = true;
-    store.write('tracker.libraryCache', {});
-    store.reportFailure('tracker.followedTrace');
+    store.write(STORAGE_KEYS.libraryCache, {});
+    store.reportFailure(STORAGE_KEYS.followedTrace);
     unsubscribe();
-    store.write('tracker.sections', {});
-    expect(failures).toEqual(['tracker.libraryCache', 'tracker.followedTrace']);
+    store.write(STORAGE_KEYS.sections, {});
+    expect(failures).toEqual([STORAGE_KEYS.libraryCache, STORAGE_KEYS.followedTrace]);
   });
 
   it("signale chaque écriture aux abonnés, même refusée, jusqu'au désabonnement", () => {
     const store = createJsonStore(() => failingBackend);
     const keys: string[] = [];
     const unsubscribe = store.subscribe((key) => keys.push(key));
-    store.write('tracker.sportSettings', { sport: 'kite' });
+    store.write(STORAGE_KEYS.sportSettings, { sport: 'kite' });
     unsubscribe();
-    store.write('tracker.runnerProfile', {});
-    expect(keys).toEqual(['tracker.sportSettings']);
+    store.write(STORAGE_KEYS.athleteProfile, {});
+    expect(keys).toEqual([STORAGE_KEYS.sportSettings]);
   });
 });
 
 describe('createJsonStore, lecture mise en cache (E-O3)', () => {
   it('rend le même objet tant que la valeur brute ne change pas, un neuf après une écriture', () => {
-    const backend = memoryBackend({ 'tracker.x': '{"a":{"b":1}}' });
+    const backend = memoryBackend({ 'gtracker.x': '{"a":{"b":1}}' });
     const store = createJsonStore(() => backend);
-    const first = store.read<{ a: { b: number } }>('tracker.x');
-    expect(store.read('tracker.x')).toBe(first);
-    store.write('tracker.x', { a: { b: 2 } });
-    const second = store.read<{ a: { b: number } }>('tracker.x');
+    const first = store.read<{ a: { b: number } }>('gtracker.x');
+    expect(store.read('gtracker.x')).toBe(first);
+    store.write('gtracker.x', { a: { b: 2 } });
+    const second = store.read<{ a: { b: number } }>('gtracker.x');
     expect(second).not.toBe(first);
     expect(second?.a.b).toBe(2);
     // Valeur changée par un autre écrivain (autre onglet) : relue.
-    backend.data.set('tracker.x', '{"a":{"b":3}}');
-    expect(store.read<{ a: { b: number } }>('tracker.x')?.a.b).toBe(3);
+    backend.data.set('gtracker.x', '{"a":{"b":3}}');
+    expect(store.read<{ a: { b: number } }>('gtracker.x')?.a.b).toBe(3);
   });
 
   it("gèle en profondeur l'objet rendu en développement : un appelant ne peut pas le modifier en douce", () => {
-    const store = createJsonStore(() => memoryBackend({ 'tracker.x': '{"a":{"b":1}}' }));
-    const value = store.read<{ a: { b: number } }>('tracker.x')!;
+    const store = createJsonStore(() => memoryBackend({ 'gtracker.x': '{"a":{"b":1}}' }));
+    const value = store.read<{ a: { b: number } }>('gtracker.x')!;
     expect(Object.isFrozen(value)).toBe(true);
     expect(Object.isFrozen(value.a)).toBe(true);
   });
@@ -205,16 +206,16 @@ describe('createJsonStore, lecture mise en cache (E-O3)', () => {
 describe('createMirroredBackend', () => {
   it('lit depuis la mémoire amorcée et recopie chaque écriture', () => {
     const persisted: [string, string][] = [];
-    const backend = createMirroredBackend({ 'tracker.sections': '{"sailing":{"global":true}}' }, (key, value) => {
+    const backend = createMirroredBackend({ [STORAGE_KEYS.sections]: '{"sailing":{"global":true}}' }, (key, value) => {
       persisted.push([key, value]);
     });
     const store = createJsonStore(() => backend);
 
-    expect(store.read('tracker.sections')).toEqual({ sailing: { global: true } });
-    store.write('tracker.panelSizes', { 'sailing.carte': { width: 600 } });
+    expect(store.read(STORAGE_KEYS.sections)).toEqual({ sailing: { global: true } });
+    store.write(STORAGE_KEYS.panelSizes, { 'sailing.carte': { width: 600 } });
 
-    expect(store.read('tracker.panelSizes')).toEqual({ 'sailing.carte': { width: 600 } });
-    expect(persisted).toEqual([['tracker.panelSizes', '{"sailing.carte":{"width":600}}']]);
+    expect(store.read(STORAGE_KEYS.panelSizes)).toEqual({ 'sailing.carte': { width: 600 } });
+    expect(persisted).toEqual([[STORAGE_KEYS.panelSizes, '{"sailing.carte":{"width":600}}']]);
   });
 });
 
@@ -247,36 +248,36 @@ describe('chargement du stockage du téléphone (A3)', () => {
   });
 
   it("au démarrage, garde une clé illisible en mémoire seulement et relève l'échec", async () => {
-    preferences.values = { 'tracker.a': '"un"', 'tracker.b': '"deux"' };
-    preferences.failures = { 'tracker.b': 2 };
+    preferences.values = { 'gtracker.a': '"un"', 'gtracker.b': '"deux"' };
+    preferences.failures = { 'gtracker.b': 2 };
     const storage = await freshStorage();
     await storage.initStorage();
-    expect(storage.storageStartupFailure()).toEqual({ all: false, keys: ['tracker.b'] });
-    expect(storage.jsonStore.read('tracker.a')).toBe('un');
-    expect(storage.jsonStore.read('tracker.b')).toBeNull();
-    storage.jsonStore.write('tracker.b', 'défaut');
-    storage.jsonStore.write('tracker.a', 'autre');
-    expect(storage.jsonStore.read('tracker.b')).toBe('défaut');
+    expect(storage.storageStartupFailure()).toEqual({ all: false, keys: ['gtracker.b'] });
+    expect(storage.jsonStore.read('gtracker.a')).toBe('un');
+    expect(storage.jsonStore.read('gtracker.b')).toBeNull();
+    storage.jsonStore.write('gtracker.b', 'défaut');
+    storage.jsonStore.write('gtracker.a', 'autre');
+    expect(storage.jsonStore.read('gtracker.b')).toBe('défaut');
     // La vraie valeur, peut-être encore sur le téléphone, n'est jamais écrasée.
-    expect(preferences.written).toEqual(['tracker.a']);
+    expect(preferences.written).toEqual(['gtracker.a']);
   });
 
   it('reste en mémoire, sans localStorage, si rien ne peut être lu', async () => {
-    preferences.values = { 'tracker.a': '"un"' };
+    preferences.values = { 'gtracker.a': '"un"' };
     preferences.keysFail = true;
     const storage = await freshStorage();
     await storage.initStorage();
     expect(storage.storageStartupFailure()).toEqual({ all: true, keys: [] });
-    storage.jsonStore.write('tracker.a', 'autre');
-    expect(storage.jsonStore.read('tracker.a')).toBe('autre');
+    storage.jsonStore.write('gtracker.a', 'autre');
+    expect(storage.jsonStore.read('gtracker.a')).toBe('autre');
     expect(preferences.written).toEqual([]);
   });
 
   it('sans échec, ne relève rien', async () => {
-    preferences.values = { 'tracker.a': '"un"' };
+    preferences.values = { 'gtracker.a': '"un"' };
     const storage = await freshStorage();
     await storage.initStorage();
     expect(storage.storageStartupFailure()).toBeNull();
-    expect(storage.jsonStore.read('tracker.a')).toBe('un');
+    expect(storage.jsonStore.read('gtracker.a')).toBe('un');
   });
 });

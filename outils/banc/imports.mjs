@@ -10,7 +10,7 @@
 //  5. une sortie à vélo : énergie non calculée sans poids ;
 //  6. une session de surf : foil supposé dans « Général » et dans l'onglet réglages ; à 390×844, pas de débordement ;
 //  7. un GPX complet portant une fiche d'une version plus récente : fiche rangée au caractère près, GPX sans le paquet, lecture seule (lot 148).
-import { connect } from './lib/cdp.mjs';
+import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -45,7 +45,7 @@ const libraryMessage = () => evaluate(`document.body.innerText.match(/[^\\n]*(im
 const warnings = () => evaluate(`document.body.innerText.match(/[^\\n]*(illisible|lecture seule|abîmée|plus récente)[^\\n]*/g)?.join(' | ') ?? '(aucun)'`);
 const analysisPath = (family, record) => `/${family}/analyse?session=${encodeURIComponent(record?.gpx ?? '')}`;
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
 
@@ -126,7 +126,7 @@ await settle({ max: 3000, label: 'w5' });
 const r5 = await recordOf(t5);
 console.log('fiche : nom', JSON.stringify(r5?.name), '| vitesse max', r5?.summary?.maxSpeedMs?.toFixed(2));
 console.log('fiche abîmée posée dans sessions/ :', await evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('sessions');
   const put = async (name, text) => { const w = await (await dir.getFileHandle(name, { create: true })).createWritable(); await w.write(text); await w.close(); };
   await put('w6.gpx', ${JSON.stringify(trackGpx('wingfoil', 8, t6))});
   await put('w6.json', ${JSON.stringify(fiche('w6.gpx', t6, { name: 'Dans le dossier', notes: notesWith({ comment: 'gardé', savedAt: t6 }), summary: { ...summaryFor(t6), samplingS: null } }))});
@@ -185,7 +185,7 @@ await waitFor(() => recordOf(t10), { timeout: 3000, label: 'f1' });
 await settle({ max: 3000, label: 'f1' });
 /** Nom du GPX rangé à côté de la fiche au texte exact, relu dans le dossier. */
 const futureFile = await evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('sessions');
   for await (const [name, h] of dir.entries()) {
     if (name.endsWith('.json') && (await (await h.getFile()).text()) === ${JSON.stringify(futureText)}) return name.replace(/\\.json$/, '.gpx');
   }
@@ -193,7 +193,7 @@ const futureFile = await evaluate(`(async () => {
 })()`);
 console.log('fiche au caractère près :', futureFile !== null);
 console.log('GPX rangé sans le paquet :', futureFile !== null && await evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('sessions');
   return (await (await (await dir.getFileHandle(${JSON.stringify(futureFile)})).getFile()).text()) === ${JSON.stringify(futureBare)};
 })()`));
 await go(analysisPath('voile', { gpx: futureFile }), 5000);

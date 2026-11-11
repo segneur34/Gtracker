@@ -4,6 +4,7 @@ import type { LocationFix, LocationSource } from '../platform/location';
 import type { MotionCapture } from '../platform/motion';
 import { recordingDurationMs } from '../recording/session';
 import { journalFixLine, parseJournal } from '../recording/journal';
+import { FILE_FORMATS } from '../core/appIdentity';
 
 /**
  * Journal en mémoire ; chaque écriture complète (l'en-tête) est relevée. `unreadable` : présent mais
@@ -602,7 +603,7 @@ describe('prévenir quand ça rate (lot 115)', () => {
 });
 
 describe('journal illisible (lot 143, 123a)', () => {
-  const header = JSON.stringify({ format: 'tracker-journal', version: 1, sport: 'kite', startedAtMs: T0, activity: { id: 'a-kite', name: 'Kite' } });
+  const header = JSON.stringify({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0, activity: { id: 'a-kite', name: 'Kite' } });
 
   it('au lancement : mis de côté et dit, jamais pris pour absent ; le départ suivant écrit un journal neuf', async () => {
     journal.text = 'session perdue';

@@ -6,6 +6,7 @@ import {
   journalActivity, journalActivityLine, journalBreakLine, journalFixLine, journalHeaderLine, journalNoteLine, parseJournal,
 } from './journal';
 import { roundFix, splitIntoSegments } from './session';
+import { FILE_FORMATS } from '../core/appIdentity';
 
 const T0 = Date.UTC(2026, 8, 23, 12, 0, 0);
 
@@ -21,7 +22,7 @@ const journalOf = (list: LocationFix[]): string =>
 describe('journal', () => {
   it('relit l\'en-tête et toutes les positions, valeurs absentes comprises', () => {
     const parsed = parseJournal(journalOf(fixes));
-    expect(parsed.header).toEqual({ format: 'tracker-journal', version: 1, sport: 'kite', startedAtMs: T0 - 5000 });
+    expect(parsed.header).toEqual({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0 - 5000 });
     expect(parsed.fixes).toEqual(fixes.map((f) => ({
       accuracyM: undefined, altitudeM: undefined, speedMs: undefined, bearingDeg: undefined, ...f,
     })));
@@ -44,7 +45,7 @@ describe('journal', () => {
   });
 
   it('récupère les positions même sans en-tête lisible', () => {
-    const text = '{"format":"tracker-jou\n' + fixes.map(journalFixLine).join('');
+    const text = '{"format":"gtracker-jou\n' + fixes.map(journalFixLine).join('');
     const parsed = parseJournal(text);
     expect(parsed.header).toBeNull();
     expect(parsed.fixes).toHaveLength(3);
@@ -56,7 +57,7 @@ describe('journal', () => {
   });
 
   it('rend un en-tête nul pour un support inconnu', () => {
-    const text = '{"format":"tracker-journal","version":1,"sport":"parapente","startedAtMs":0}\n';
+    const text = '{"format":"gtracker-journal","version":1,"sport":"parapente","startedAtMs":0}\n';
     expect(parseJournal(text).header).toBeNull();
   });
 
@@ -100,8 +101,8 @@ describe('journal', () => {
   it("garde l'activité de l'en-tête, et l'ignore abîmée", () => {
     const withActivity = journalHeaderLine('kite', T0, { id: 'a-kite-lac', name: 'Kite au lac' });
     expect(parseJournal(withActivity).header?.activity).toEqual({ id: 'a-kite-lac', name: 'Kite au lac' });
-    const broken = JSON.stringify({ format: 'tracker-journal', version: 1, sport: 'kite', startedAtMs: T0, activity: { id: 3 } }) + '\n';
-    expect(parseJournal(broken).header).toEqual({ format: 'tracker-journal', version: 1, sport: 'kite', startedAtMs: T0 });
+    const broken = JSON.stringify({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0, activity: { id: 3 } }) + '\n';
+    expect(parseJournal(broken).header).toEqual({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0 });
   });
 
   it('retient le dernier changement d\'activité, sans rien perdre des positions ni des coupures', () => {

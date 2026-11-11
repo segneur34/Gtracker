@@ -165,8 +165,8 @@ export function PermissionsPrompt({ onDecided }: { onDecided?: (shown: boolean) 
       <div className="ui-stack-3">
         <p className="permissions__intro">
           {missing.length === 0
-            ? 'Tout est accordé : Tracker peut enregistrer écran éteint.'
-            : "Pour enregistrer écran éteint, sans coupure, Tracker a besoin de ce qui suit. Chacune se règle aussi plus tard, dans Réglages › Autorisations."}
+            ? 'Tout est accordé : Gtracker peut enregistrer écran éteint.'
+            : "Pour enregistrer écran éteint, sans coupure, Gtracker a besoin de ce qui suit. Chacune se règle aussi plus tard, dans Réglages › Autorisations."}
         </p>
         <PermissionRows keys={keys} status={status} refresh={refresh} />
         <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>

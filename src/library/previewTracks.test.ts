@@ -40,8 +40,8 @@ describe('empreinte d’une vignette gardée', () => {
   });
 
   it('clé : dossier et fichier', () => {
-    expect(previewKey('Tracker', 'a.gpx')).toBe('Tracker|a.gpx');
-    expect(previewKey(null, 'a.gpx')).not.toBe(previewKey('Tracker', 'a.gpx'));
+    expect(previewKey('Gtracker', 'a.gpx')).toBe('Gtracker|a.gpx');
+    expect(previewKey(null, 'a.gpx')).not.toBe(previewKey('Gtracker', 'a.gpx'));
   });
 });
 

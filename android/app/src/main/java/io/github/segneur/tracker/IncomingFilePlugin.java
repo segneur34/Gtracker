@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.json.JSONObject;
 
 /**
- * « Ouvrir avec Tracker » et « Partager vers Tracker » d'un GPX ou d'un FIT (lot 35,
+ * « Ouvrir avec Gtracker » et « Partager vers Gtracker » d'un GPX ou d'un FIT (lot 35,
  * src/platform/incomingFile.ts, seul pont vers ce greffon) : une file privée des fichiers reçus,
  * sous `filesDir/recus/`, que la page vide quand elle le peut.
  *
@@ -122,7 +122,7 @@ public class IncomingFilePlugin extends Plugin {
     /**
      * Adresse du fichier ; `null` si l'intention n'en porte aucune qu'on puisse lire. Seul `content://` :
      * le manifeste n'accepte que lui, mais une intention nommant l'activité passe outre, et un `file://` ferait lire à
-     * Tracker ses propres fichiers privés au profit d'une autre application.
+     * Gtracker ses propres fichiers privés au profit d'une autre application.
      */
     private static Uri fileOf(Intent intent) {
         Uri uri = null;
@@ -255,7 +255,7 @@ public class IncomingFilePlugin extends Plugin {
             Log.e(TAG, "Refus non gardé : " + refusal, e);
         }
         new Handler(Looper.getMainLooper()).post(() ->
-            Toast.makeText(context, "Tracker n'a pas pu recevoir ce fichier.", Toast.LENGTH_LONG).show());
+            Toast.makeText(context, "Gtracker n'a pas pu recevoir ce fichier.", Toast.LENGTH_LONG).show());
     }
 
     private static String entryName(String id, String state, String name) {

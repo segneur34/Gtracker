@@ -20,7 +20,7 @@ export const createFakeFolder = (
   sizeOf?: (path: string) => number,
 ): MemoryFolder => ({
   kind: 'picked',
-  label: 'Tracker',
+  label: 'Gtracker',
   list: async (dir) => fakeEntries(files, dir, sizeOf),
   readText: async (path) => files.get(path) ?? null,
   writeText: async (path, text) => {

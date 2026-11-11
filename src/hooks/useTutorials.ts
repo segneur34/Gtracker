@@ -9,9 +9,10 @@ import {
 import { readStoredRecord, useStoredRecord } from './useStoredRecord';
 import { useVisibility } from './useSportSettings';
 import { useVisibleStatSessions } from './useVisibleStatSessions';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /** Rangé sur cet appareil seulement (pas dans le fichier de réglages du dossier mémoire). */
-const NAMESPACE = 'tracker.tutoriels';
+const NAMESPACE = STORAGE_KEYS.tutoriels;
 const KEY = 'etat';
 
 /**

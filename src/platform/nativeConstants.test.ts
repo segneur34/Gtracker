@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { APP_SLUG } from '../core/appIdentity';
 import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
 
 /**
@@ -189,5 +190,21 @@ describe('fichiers reçus d\'une autre application (lot 35)', () => {
     expect(entry).toContain('runOnWorker(() -> {');
     expect(entry.indexOf('receive(context, uri, refusalWithoutFile);')).toBeGreaterThan(entry.indexOf('runOnWorker(() -> {'));
     expect(between(INCOMING_PLUGIN, 'private static void runOnWorker', 'public void load()')).toContain('catch (Exception | OutOfMemoryError e)');
+  });
+});
+
+/**
+ * Noms techniques écrits en dur dans le Java, qui ne peut pas importer `core/appIdentity.ts` : ils portent le nom
+ * technique de l'application comme ceux du TypeScript.
+ */
+describe('noms techniques du Java', () => {
+  it('fichiers temporaires du dossier mémoire', () => {
+    const memory = appJava('MemoryFolderPlugin.java');
+    expect(captured(memory, /\bTEMP_SUFFIX = "([^"]+)";/)).toBe(`.${APP_SLUG}-tmp`);
+    expect(captured(memory, /\bNEW_SUFFIX = "([^"]+)";/)).toBe(`.${APP_SLUG}-new`);
+  });
+
+  it('préférences des bips', () => {
+    expect(captured(appJava('TonePlayer.java'), /\bPREFS = "([^"]+)";/)).toBe(`${APP_SLUG}.sons`);
   });
 });

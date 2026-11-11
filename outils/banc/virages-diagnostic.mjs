@@ -68,7 +68,7 @@ const hhmmss = (ms) => new Date(ms).toLocaleTimeString('fr-FR', { hour12: false 
 // --- Capture ---
 const rec = await decodeImu(new Uint8Array(readFileSync(imuPath)));
 if (!rec) {
-  console.error('Fichier illisible : pas un fichier des capteurs de Tracker.');
+  console.error('Fichier illisible : pas un fichier des capteurs de Gtracker.');
   process.exit(1);
 }
 const stats = imuCaptureStats(rec);

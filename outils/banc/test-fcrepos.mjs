@@ -8,7 +8,7 @@
 //     refait ici sur la même FC d'exemple), la fenêtre surlignée, la courbe de 180 secondes, le test gardé ;
 //  4. « La retenir » (FC repos de Pratiquant), « Refaire », le test dans « Vos tests », « Retirer » ;
 //  5. à 390 et 320 px : les pages sans débordement.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -31,7 +31,7 @@ const clickText = (text, selector = 'button') => evaluate(`(() => {
 })()`);
 const overflow = () => evaluate('document.documentElement.scrollWidth - window.innerWidth');
 const pageText = () => evaluate('document.querySelector(".ui-page").innerText');
-const stored = () => evaluate(`JSON.parse(localStorage.getItem('tracker.restingHr') ?? '[]')`);
+const stored = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.restingHr}') ?? '[]')`);
 let failures = 0;
 const check = (name, ok, detail = '') => {
   if (!ok) failures++;
@@ -111,9 +111,9 @@ await shoot('fcrepos-resultat');
 // --- 4. Retenir, refaire, historique ---
 console.log('retenir :', await clickText('La retenir comme FC repos'));
 await wait(400);
-const runner = await evaluate(`JSON.parse(localStorage.getItem('tracker.runnerProfile') ?? '{}')?.me?.hrRest ?? null`);
+const runner = await evaluate(`JSON.parse(localStorage.getItem('${CLES.athleteProfile}') ?? '{}')?.me?.hrRest ?? null`);
 check(`FC repos de Pratiquant = ${expectedLowest}`, runner === expectedLowest, String(runner));
-const source = await evaluate(`JSON.parse(localStorage.getItem('tracker.runnerProfile') ?? '{}')?.me?.hrRestSource?.kind ?? null`);
+const source = await evaluate(`JSON.parse(localStorage.getItem('${CLES.athleteProfile}') ?? '{}')?.me?.hrRestSource?.kind ?? null`);
 check('origine rangée : test', source === 'test', String(source));
 check('bouton devenu « Retenue comme FC repos »', /Retenue comme FC repos/i.test(await pageText()), '');
 console.log('refaire :', await clickText('Refaire'));

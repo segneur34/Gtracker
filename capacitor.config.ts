@@ -19,7 +19,7 @@ const config: CapacitorConfig = {
     minWebViewVersion: 111,
     // Ajouté à l'agent de la WebView, donc envoyé avec chaque tuile demandée : OpenStreetMap exige qu'une
     // application s'identifie, avec un contact. La page GitHub publique, jamais une adresse e-mail.
-    appendUserAgent: `Tracker/${version} (+https://github.com/segneur34)`,
+    appendUserAgent: `Gtracker/${version} (+https://github.com/segneur34)`,
   },
   plugins: {
     // Icônes sombres dans les barres système au lancement ; le thème les règle

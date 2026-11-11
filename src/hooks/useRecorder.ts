@@ -610,7 +610,7 @@ export const discardPendingSession = async (): Promise<void> => {
 const sourceOptions = (activity: Activity, recording: RecordingProfile): LocationWatchOptions => ({
   intervalMs: recording.intervalMs,
   distanceFilterM: recording.distanceFilterM,
-  notificationTitle: 'Tracker enregistre',
+  notificationTitle: 'Gtracker enregistre',
   notificationText: `Session ${activity.name} en cours`,
 });
 

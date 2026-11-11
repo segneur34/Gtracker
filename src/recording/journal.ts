@@ -4,6 +4,7 @@ import { readSessionMark, sortMarks, type SessionMark } from '../core/sessionMar
 import type { SportType } from '../core/types';
 import type { LocationFix } from '../platform/location';
 import { isSportType } from '../core/sportProfiles';
+import { FILE_FORMATS } from '../core/appIdentity';
 
 /**
  * Journal d'un enregistrement en cours : une ligne JSON par position, ajoutée
@@ -17,7 +18,7 @@ import { isSportType } from '../core/sportProfiles';
  */
 
 interface JournalHeader {
-  format: 'tracker-journal';
+  format: typeof FILE_FORMATS.journal;
   version: 1;
   sport: SportType;
   /** Instant du démarrage, en millisecondes. */
@@ -31,7 +32,7 @@ interface JournalHeader {
 }
 
 export const journalHeaderLine = (sport: SportType, startedAtMs: number, activity?: { id: string; name: string }): string => {
-  const header: JournalHeader = { format: 'tracker-journal', version: 1, sport, startedAtMs };
+  const header: JournalHeader = { format: FILE_FORMATS.journal, version: 1, sport, startedAtMs };
   if (activity) header.activity = { id: activity.id, name: activity.name };
   return `${JSON.stringify(header)}\n`;
 };
@@ -135,8 +136,8 @@ export interface ParsedJournal {
 const toHeader = (value: unknown): JournalHeader | null => {
   if (typeof value !== 'object' || value === null) return null;
   const v = value as Partial<JournalHeader>;
-  if (v.format !== 'tracker-journal' || !isSportType(v.sport) || typeof v.startedAtMs !== 'number') return null;
-  const header: JournalHeader = { format: 'tracker-journal', version: 1, sport: v.sport, startedAtMs: v.startedAtMs };
+  if (v.format !== FILE_FORMATS.journal || !isSportType(v.sport) || typeof v.startedAtMs !== 'number') return null;
+  const header: JournalHeader = { format: FILE_FORMATS.journal, version: 1, sport: v.sport, startedAtMs: v.startedAtMs };
   const a = v.activity;
   if (typeof a === 'object' && a !== null && typeof a.id === 'string' && a.id !== '' && typeof a.name === 'string') {
     header.activity = { id: a.id, name: a.name };

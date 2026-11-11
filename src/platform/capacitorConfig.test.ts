@@ -21,12 +21,12 @@ const config = ((await import(/* @vite-ignore */ repoUrl('capacitor.config.ts').
 describe('configuration Capacitor : agent identifiant', () => {
   const agent = config.android?.appendUserAgent ?? '';
 
-  it('a la forme « Tracker/<version> (+page GitHub) »', () => {
-    expect(agent).toMatch(/^Tracker\/\d+\.\d+\.\d+ \(\+https:\/\/github\.com\/segneur34\)$/);
+  it('a la forme « Gtracker/<version> (+page GitHub) »', () => {
+    expect(agent).toMatch(/^Gtracker\/\d+\.\d+\.\d+ \(\+https:\/\/github\.com\/segneur34\)$/);
   });
 
   it('porte la version de package.json', () => {
-    expect(agent).toBe(`Tracker/${PACKAGE.version} (+https://github.com/segneur34)`);
+    expect(agent).toBe(`Gtracker/${PACKAGE.version} (+https://github.com/segneur34)`);
   });
 
   it('la version n\'est pas recopiée à la main dans le fichier', () => {

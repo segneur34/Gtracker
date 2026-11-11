@@ -4,7 +4,7 @@
 // Aucun réseau n'est attendu : les demandes à l'IGN et à Overpass sont relevées, et il ne doit y en avoir aucune.
 // Le script écrit lui-même ses GPX. Il vérifie :
 //  1. le cache allégé : une sortie à vélo avec son altitude IGN et ses voies rangées dans la fiche ; après deux
-//     lancements, `tracker.libraryCache` ne les contient plus ; un renommage depuis la bibliothèque les laisse
+//     lancements, `gtracker.libraryCache` ne les contient plus ; un renommage depuis la bibliothèque les laisse
 //     intacts dans la fiche ; l'analyse s'ouvre sans demande à l'IGN ni à Overpass, altitude « IGN » ;
 //  2. le recalcul de fond : 30 fiches au résumé périmé (`calcVersion` 1) ; la dernière, renommée pendant le
 //     balayage, garde son nom et reçoit son nouveau résumé ;
@@ -14,7 +14,7 @@
 //  5. le stockage plein : un réglage refusé reste en place pour la session, et le bandeau le dit.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, connect } from './lib/cdp.mjs';
+import { BASE, CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -50,7 +50,7 @@ const evaluate = async (expression) => {
 };
 /** Dossier `Gtracker` de la mémoire du navigateur, ou un de ses sous-dossiers. */
 const dirJs = (path) => `(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}');
   for (const p of ${JSON.stringify(path)}.split('/').filter(Boolean)) dir = await dir.getDirectoryHandle(p);
   return dir;
 })()`;
@@ -71,7 +71,7 @@ const waitScan = async (maxS = 60) => {
 };
 const fiche = async (gpx) => JSON.parse(await readOpfs('sessions', gpx.replace(/\.gpx$/, '.json')));
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
 // 1. Cache allégé.
@@ -94,7 +94,7 @@ await go('/velo');
 await waitScan();
 await go('/velo');
 await waitScan();
-const cache = await evaluate(`localStorage.getItem('tracker.libraryCache') ?? ''`);
+const cache = await evaluate(`localStorage.getItem('${CLES.libraryCache}') ?? ''`);
 console.log(`fiche : ${ficheSize} car. | cache : ${cache.length} car., allégé : ${cache.includes('"light":true')}, altitude dedans : ${cache.includes('terrainElevation')}, voies dedans : ${cache.includes('"surfaces"')}`);
 console.log('session partielle :', await evaluate(`(async () => (${LIB}).librarySession(${JSON.stringify(gpx)})?.partial === true)()`));
 console.log('Renommer :', await evaluate(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Renommer'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
@@ -204,11 +204,11 @@ const filled = await evaluate(`(() => {
   }
   return n;
 })()`);
-const before = await evaluate(`localStorage.getItem('tracker.sections') ?? '(rien)'`);
+const before = await evaluate(`localStorage.getItem('${CLES.sections}') ?? '(rien)'`);
 const toggled = await evaluate(`(() => { const b = document.querySelector('.actchart__fold'); if (!b) return 'bouton absent'; b.click(); return 'totaux du graphe ' + (b.getAttribute('aria-expanded') === 'true' ? 'repliés' : 'dépliés'); })()`);
 await wait(500);
-const stored = await evaluate(`localStorage.getItem('tracker.sections') ?? '(rien)'`);
-const inMemory = await evaluate(`(async () => JSON.stringify((await import('/src/platform/storage.ts')).jsonStore.read('tracker.sections')))()`);
+const stored = await evaluate(`localStorage.getItem('${CLES.sections}') ?? '(rien)'`);
+const inMemory = await evaluate(`(async () => JSON.stringify((await import('/src/platform/storage.ts')).jsonStore.read('${CLES.sections}')))()`);
 console.log(`${filled} clés de remplissage | ${toggled} | stockage inchangé : ${stored === before} | valeur relue nouvelle : ${inMemory !== (stored === '(rien)' ? 'null' : stored)}`);
 console.log('bandeaux :', await alerts());
 await shoot('donnees-stockage-plein');

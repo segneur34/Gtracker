@@ -5,16 +5,16 @@ import { routeToRecord, type RouteRecord } from './routeRecord';
 
 /**
  * Itinéraire reçu en GPX (lot 194) : partagé par un autre téléphone, reçu
- * d'une autre application (« Ouvrir avec », « Partager vers Tracker ») ou
+ * d'une autre application (« Ouvrir avec », « Partager vers Gtracker ») ou
  * choisi dans les fichiers depuis la page Itinéraires. Pur : la page et la
  * file des fichiers reçus rangent la fiche rendue (`hooks/routeFiles.ts`).
  */
 
 /**
  * Vrai si le GPX est un itinéraire plutôt qu'une session : il porte la fiche
- * d'un itinéraire de Tracker, ou un tracé d'au moins deux points sans aucun
+ * d'un itinéraire de Gtracker, ou un tracé d'au moins deux points sans aucun
  * point daté (une `<rte>` seule, ou une trace sans heure, comme le GPX d'un
- * itinéraire de Tracker, de Komoot ou de Visorando). Une session a toujours
+ * itinéraire de Gtracker, de Komoot ou de Visorando). Une session a toujours
  * des points datés : elle reste une session. Un XML illisible n'est pas un
  * itinéraire : l'import des sessions dira pourquoi.
  */
@@ -55,7 +55,7 @@ export interface RouteImportOptions {
 
 /**
  * Fiche d'un itinéraire tirée d'un GPX, `null` s'il n'en contient pas (moins
- * de deux points). Un GPX de Tracker rend sa fiche telle quelle (points de
+ * de deux points). Un GPX de Gtracker rend sa fiche telle quelle (points de
  * passage ou balises, mode de chaque tronçon, activité, bips d'approche),
  * renommée si son nom est déjà pris. Un autre GPX devient une trace gardée
  * telle quelle (`routeFromTrack`), comme « Charger un GPX » de la

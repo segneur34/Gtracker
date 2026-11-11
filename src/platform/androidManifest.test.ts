@@ -120,7 +120,7 @@ describe('manifeste Android : fichiers reçus d\'une autre application (lot 35)'
     expect(withAction('VIEW')).toContain('android:mimeType="application/gpx"');
   });
 
-  it('un seul filtre VIEW à type générique, borné à l’extension .gpx (Tracker ne se propose pas pour tout)', () => {
+  it('un seul filtre VIEW à type générique, borné à l’extension .gpx (Gtracker ne se propose pas pour tout)', () => {
     const generic = allWithAction('VIEW').filter((f) => f.includes('*/*'));
     expect(generic).toHaveLength(1);
     expect(extensionFilter).toContain('android:mimeType="*/*"');

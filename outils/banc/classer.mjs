@@ -7,7 +7,7 @@
 //  3. choisir Gravel range l'activité dans la fiche et ouvre l'analyse vélo, pas celle de la page Course.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { connect } from './lib/cdp.mjs';
+import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -27,7 +27,7 @@ writeFileSync(gpxPath, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.
 // --- Protocole (lib/cdp.mjs) ---
 const { send, evaluate, go, settle, waitFor, wait, importFiles, shoot, close, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
 const readRecord = () => evaluate(`(async () => {
-  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('sessions');
   for await (const [name, h] of dir.entries()) if (name.endsWith('.json')) return JSON.parse(await (await h.getFile()).text());
   return null;
 })()`);
@@ -36,7 +36,7 @@ const sheet = () => evaluate(`(() => {
   return s ? s.querySelector('.activity-select__heading')?.innerText.replace(/\\n/g, ' / ') ?? '(liste sans question)' : '(pas de liste)';
 })()`);
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
 // 1. Import depuis la page Course.

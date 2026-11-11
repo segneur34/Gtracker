@@ -1,3 +1,4 @@
+import { STORAGE_KEYS } from '../core/appIdentity';
 /**
  * Thème de l'interface (lot 12, maquette du 28/10) : Clair, Sombre ou Auto,
  * qui suit le réglage du téléphone ou du navigateur (`prefers-color-scheme`),
@@ -29,7 +30,7 @@ export interface ThemeSettings {
 }
 
 /** Clé de stockage, propre à l'appareil (hors du fichier de réglages qui voyage, `library/settingsFile.ts`). */
-export const THEME_STORAGE_KEY = 'tracker.theme';
+export const THEME_STORAGE_KEY = STORAGE_KEYS.theme;
 
 /** Réglage de départ (décision du 28/10) : Auto, sans Économe. */
 export const THEME_DEFAULT: ThemeSettings = { choice: 'auto', eco: false };

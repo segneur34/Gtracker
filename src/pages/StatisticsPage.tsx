@@ -51,6 +51,7 @@ import './StatisticsPage.css';
 import { plural } from '../core/basics';
 import StatTile from '../components/ui/StatTile';
 import { CHART_GRID_PROPS, CHART_TICK, OTHERS_COLOR, chartTick, yAxisLabel } from '../components/chartStyle';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Statistiques (lot 5, étape 1) : une vue d'ensemble, puis une famille, puis
@@ -96,7 +97,7 @@ const zonesFor = (athlete: AthleteProfile, activity: Activity | null) => activit
 
 const STORAGE_ID = 'statistiques';
 
-/** Dernier affichage, retenu sur l'appareil (`tracker.statistiques`) ; `null` : « Tout », ou la donnée par défaut. */
+/** Dernier affichage, retenu sur l'appareil (`gtracker.statistiques`) ; `null` : « Tout », ou la donnée par défaut. */
 interface StatsView {
   famille: SportFamily | null;
   activite: string | null;
@@ -107,7 +108,7 @@ interface StatsView {
   materiel?: string | null;
 }
 
-const VIEW_NAMESPACE = 'tracker.statistiques';
+const VIEW_NAMESPACE = STORAGE_KEYS.statistiques;
 const VIEW_KEY = 'affichage';
 const VIEW_DEFAULTS: StatsView = { famille: null, activite: null, periode: 'tout', donnee: null, materiel: null };
 const panelId = (name: string) => `${STORAGE_ID}.${name}`;

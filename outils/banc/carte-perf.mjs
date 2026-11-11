@@ -17,7 +17,7 @@
 // est gardée dans `window.__cartes`.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { connect } from './lib/cdp.mjs';
+import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { BLOCKED_EXCEPT_TILES, fakeTiles, formatTileStats } from './lib/tuiles.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -72,7 +72,7 @@ writeFileSync(runPath, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.
 console.log('trace              :', `${POINTS} points à ${HZ} Hz`);
 
 const listOpfs = (path) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}');
   for (const p of ${JSON.stringify(path)}.split('/')) dir = await dir.getDirectoryHandle(p);
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 })()`);

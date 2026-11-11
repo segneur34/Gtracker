@@ -16,7 +16,7 @@
 //  5. à 390×844, au doigt : double toucher qui zoome ; carte hors de vue : « +carte » ouvre le plein écran
 //     carte + graphes, × le ferme ; de même depuis le profil de « général » ; carte entière à l'écran (« général » replié) : « +carte » ouvre quand même le plein écran, tronçon allumé ;
 //  6. à 390×844 (25/10) : « +carte » seul sur un graphe non zoomé ; il ouvre carte + graphes de l'onglet, sans violet ;
-//     le retour d'Android (`window.trackerBack`, en développement) referme le plein écran et rend la page au même
+//     le retour d'Android (`window.gtrackerBack`, en développement) referme le plein écran et rend la page au même
 //     défilement, zoom compris ; de même zoomé, et pour la carte seule ouverte d'un toucher ;
 //  7. (25/10) « Afficher » sur chaque graphe, zoomé ou non, sur ordinateur et dans le plein écran (non zoomé :
 //     toute la trace) ; « +carte » dans la page du téléphone ; un second clic à la même plage retire le violet,
@@ -27,7 +27,7 @@ import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connect } from './lib/cdp.mjs';
+import { connect, POIGNEE_RETOUR } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { CHART, SCOPE, graphGestures } from './lib/graphes.mjs';
 
@@ -367,7 +367,7 @@ await evaluate(`document.querySelector('.an-map-overlay__close')?.click()`);
 await settle({ max: 800 });
 
 // --- 6. Sans zoom, et retour d'Android (25/10) ---
-const back = () => evaluate(`window.trackerBack ? window.trackerBack() : 'absent'`);
+const back = () => evaluate(`window.${POIGNEE_RETOUR} ? window.${POIGNEE_RETOUR}() : 'absent'`);
 const overlayOpen = () => evaluate(`Boolean(document.querySelector('.an-map-overlay'))`);
 await clickZoomButton('Graphiques', 0, 'Tout voir');
 await wait(600);

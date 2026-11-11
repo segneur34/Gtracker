@@ -172,7 +172,7 @@ function MemoryStatus({
                 </HelpText>
               </>
             ) : <p style={mutedStyle}>
-              Tracker garde vos sessions dans un dossier du téléphone, que vous pouvez copier sur le PC pour les
+              Gtracker garde vos sessions dans un dossier du téléphone, que vous pouvez copier sur le PC pour les
               sauvegarder ou les retrouver. Dans le sélecteur qui va s'ouvrir : Documents, puis le dossier Gtracker
               (créez-le s'il n'existe pas), « Utiliser ce dossier », et « Autoriser ».
             </p>}
@@ -200,14 +200,14 @@ function MemoryStatus({
             <HelpText helpKey="memoire:emplacement">
               {canChoose
                 ? "Invisible dans l'explorateur de fichiers. Choisissez un dossier (conseil : Documents › Gtracker) pour sauvegarder les sessions ou les passer au téléphone."
-                : "Invisible dans l'explorateur de fichiers. Pour un dossier du PC, ouvrez Tracker dans Chrome ou Edge."}
+                : "Invisible dans l'explorateur de fichiers. Pour un dossier du PC, ouvrez Gtracker dans Chrome ou Edge."}
             </HelpText>
             {!guaranteed && (
               <p style={mutedStyle}>
                 Ce navigateur ne garantit pas de garder cette mémoire : il peut la vider s'il manque de place.
                 {canChoose
                   ? " Choisissez un dossier pour que vos sessions restent à l'abri."
-                  : " Pour les garder à l'abri, ouvrez Tracker dans Chrome ou Edge et choisissez un dossier."}
+                  : " Pour les garder à l'abri, ouvrez Gtracker dans Chrome ou Edge et choisissez un dossier."}
               </p>
             )}
             {canChoose && (
@@ -225,8 +225,8 @@ function MemoryStatus({
               Les sessions sont gardées dans ce navigateur : aucun dossier sur le PC, l'explorateur de fichiers ne
               les voit pas.
               {canChoose
-                ? ' Choisissez un dossier pour les sauvegarder, les copier ou les passer au téléphone : elles y seront recopiées. Conseil : créez-le dans Documents, sous le nom Tracker, dans la fenêtre qui va s\'ouvrir.'
-                : ' Pour les garder dans un dossier du PC, ouvrez Tracker dans Chrome ou Edge.'}
+                ? ' Choisissez un dossier pour les sauvegarder, les copier ou les passer au téléphone : elles y seront recopiées. Conseil : créez-le dans Documents, sous le nom Gtracker, dans la fenêtre qui va s\'ouvrir.'
+                : ' Pour les garder dans un dossier du PC, ouvrez Gtracker dans Chrome ou Edge.'}
             </p>
             {canChoose && (
               <div style={rowStyle}>

@@ -46,7 +46,7 @@ const LOGO_GONG = {
   name: 'Logo GONG',
   version: '',
   identifier: 'Marque de GONG SUP',
-  text: "Le logo GONG (symbole et mot) est une marque de GONG SUP, reproduit ici pour la version de Tracker proposée à GONG. Ce n'est pas une licence libre : il ne se réutilise pas ailleurs sans l'accord de GONG SUP.",
+  text: "Le logo GONG (symbole et mot) est une marque de GONG SUP, reproduit dans Gtracker avec l'accord de GONG SUP. Ce n'est pas une licence libre : il ne se réutilise pas ailleurs sans l'accord de GONG SUP.",
 }
 
 /** Table groupe → famille. Sans `texte` : la licence Apache 2.0 (voir `principal`). */

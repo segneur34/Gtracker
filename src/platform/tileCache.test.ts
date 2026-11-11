@@ -87,7 +87,7 @@ describe('tuiles gardées dans le navigateur', () => {
     await first.write('14_1_2', tile(20));
     await first.flushIndex();
     // Une tuile gardée par une page fermée avant d'avoir rangé l'index.
-    await storage.cache.put('/tuiles-gardees/14_1_3.png', new Response(tile(30), { headers: { 'content-length': '30', 'x-tracker-saved-at': '5' } }));
+    await storage.cache.put('/tuiles-gardees/14_1_3.png', new Response(tile(30), { headers: { 'content-length': '30', 'x-gtracker-saved-at': '5' } }));
     const next = createBrowserTileStore(storage);
     // L'index rangé sert aussitôt, puis il est refait en arrière-plan.
     expect(await next.list()).toHaveLength(2);

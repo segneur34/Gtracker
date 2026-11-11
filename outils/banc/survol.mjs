@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -27,7 +27,7 @@ const DUMP = process.env.DUMP;
 const { send, evaluate, go, settle, waitFor, blockNetwork, importGpx, shoot, close, logs, wait } = await connect({ port, width: 1400, height: 1000, shotDir });
 
 const listOpfs = (path) => evaluate(`(async () => {
-  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker');
+  let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}');
   for (const p of ${JSON.stringify(path)}.split('/')) dir = await dir.getDirectoryHandle(p);
   const names = []; for await (const [name] of dir.entries()) names.push(name); return names.sort();
 })()`);
@@ -45,7 +45,7 @@ const timing = (list) => {
 /** Attend l'image suivante : le rendu de React et le travail de Leaflet sont faits. */
 const NEXT_FRAME = 'new Promise((res) => requestAnimationFrame(() => setTimeout(res, 0)))';
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork(['https://data.geopf.fr/*', 'https://overpass-api.de/*', 'https://brouter.de/*', 'https://photon.komoot.io/*']);
 
@@ -69,7 +69,7 @@ execFileSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'm
 
 // 2. Course.
 await go('/course');
-await evaluate(`localStorage.setItem('tracker.sections', JSON.stringify({
+await evaluate(`localStorage.setItem('${CLES.sections}', JSON.stringify({
   running: { general: true, tops: false, zones: false, surface: false, energie: false, graphiques: true, reglages: false },
   'sailing-onglets': { general: true, tops: true, manoeuvres: true, graphiques: true, vmg: true, vent: true, matos: true, reglages: true },
 })); 'ok'`);

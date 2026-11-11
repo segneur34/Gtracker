@@ -7,7 +7,7 @@ import { familyRecords, sessionRecord } from '../test/record.fixture';
 
 const START_MS = Date.UTC(2026, 9, 10, 7, 0, 0);
 
-const GPX = '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Tracker" xmlns="http://www.topografix.com/GPX/1/1">\n'
+const GPX = '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Gtracker" xmlns="http://www.topografix.com/GPX/1/1">\n'
   + '<trk><name>Fractionné</name><trkseg><trkpt lat="43.6" lon="3.8"><time>2026-10-10T07:00:00Z</time></trkpt></trkseg></trk>\n</gpx>\n';
 
 const record = (patch: Partial<SessionRecord> = {}): SessionRecord =>

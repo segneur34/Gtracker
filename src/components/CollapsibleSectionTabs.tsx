@@ -1,6 +1,7 @@
 import SectionTabs, { type SectionDefinition } from './SectionTabs';
 import { IconChevronDown, IconChevronUp } from './icons';
 import { useStoredRecord } from '../hooks/useStoredRecord';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Barre d'onglets d'une analyse, sous la carte : la première rangée porte
@@ -31,7 +32,7 @@ interface CollapsibleSectionTabsProps<K extends string> {
 }
 
 function CollapsibleSectionTabs<K extends string>({ sections, open, onToggle, onCloseAll, advancedOpen, onToggleAdvanced, accent }: CollapsibleSectionTabsProps<K>) {
-  const { value, update } = useStoredRecord('tracker.sections', 'analyses-barre', BAR_DEFAULTS);
+  const { value, update } = useStoredRecord(STORAGE_KEYS.sections, 'analyses-barre', BAR_DEFAULTS);
 
   if (value.cachee) {
     return (

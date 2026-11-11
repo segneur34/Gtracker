@@ -7,7 +7,7 @@
 //     égales aux chiffres de l'onglet « général » (sans les « — »), les six premières enfoncées ; l'image est
 //     gardée dans le dossier des captures (`partage-<page>.png`) ;
 //  3. en voile : deux pastilles seulement (image toujours en 1080 × 1920), fond de carte décoché, choix rangés sous
-//     l'activité de la session (`tracker.partage`) et retrouvés à la réouverture ; « Partager » par le partage du
+//     l'activité de la session (`gtracker.partage`) et retrouvés à la réouverture ; « Partager » par le partage du
 //     navigateur (simulé : fichier PNG nommé d'après la session), puis sans partage (téléchargement et message) ;
 //     Échap ferme ;
 //     lignes ajoutées le 05/11 : « Manœuvres réussies » et « Vent » en voile, rien de
@@ -20,7 +20,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -35,7 +35,7 @@ const { send, evaluate, go, settle, waitFor, wait, blockNetwork, importGpx, impo
 let failures = 0;
 const check = (what, ok, detail = '') => { console.log(`${ok ? 'ok   ' : 'ÉCHEC'} ${what}${detail ? ` (${detail})` : ''}`); if (!ok) failures++; };
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://brouter.de/*']);
 
@@ -61,7 +61,7 @@ const SESSIONS = [
 ];
 
 const paths = {};
-/** Activité de chaque session rangée : clé de son choix dans `tracker.partage`. */
+/** Activité de chaque session rangée : clé de son choix dans `gtracker.partage`. */
 const activityIds = {};
 for (const s of SESSIONS) {
   await go(`/${s.page}`, 3000);
@@ -156,8 +156,8 @@ check('voile : deux chiffres, image toujours en 1080 × 1920', isPortrait(await 
 await evaluate(`document.querySelector('.share-dialog__check input').click()`);
 await waitImage();
 await saveImage('partage-voile-sans-carte');
-const stored = await evaluate(`localStorage.getItem('tracker.partage')`);
-console.log('tracker.partage :', stored);
+const stored = await evaluate(`localStorage.getItem('${CLES.partage}')`);
+console.log(`${CLES.partage} :`, stored);
 const choix = JSON.parse(stored ?? '{}')[activityIds.voile] ?? {};
 check(`voile : choix rangés sous l'activité (${activityIds.voile})`, choix.stats?.length === 2 && choix.map === false);
 
@@ -211,7 +211,7 @@ const holdStop = async () => {
 const replayPath = join(workDir, 'partage-rejeu.gpx');
 writeFileSync(replayPath, loopGpx(Date.now() - 1800 * 1000));
 // L'activité enregistrée n'est pas celle de la session importée (autre clé) : le choix de la voile est posé pour toute la famille.
-await evaluate(`localStorage.setItem('tracker.partage', JSON.stringify(Object.fromEntries(['voile', 'wingfoil', 'windsurf', 'kite', 'bateau'].map((k) => [k, ${JSON.stringify(choix)}]))))`);
+await evaluate(`localStorage.setItem('${CLES.partage}', JSON.stringify(Object.fromEntries(['voile', 'wingfoil', 'windsurf', 'kite', 'bateau'].map((k) => [k, ${JSON.stringify(choix)}]))))`);
 await go('/enregistrer', 4000);
 console.log('famille :', await clickText('Voile', '[aria-label=Famille] button'));
 await wait(300);

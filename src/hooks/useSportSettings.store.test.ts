@@ -3,8 +3,9 @@ import { patchedDraft, type SessionEdits } from '../library/sessionEdits';
 import { jsonStore } from '../platform/storage';
 import { withSetting } from '../settings/activitySettings';
 import { readStoredSettings, subscribeStoredSettings, updateStoredSettings } from './useSportSettings';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
-const KEY = 'tracker.sportSettings';
+const KEY = STORAGE_KEYS.sportSettings;
 const memory = new Map<string, string>();
 beforeEach(() => {
   memory.clear();
@@ -21,7 +22,7 @@ describe('lecture des réglages par useSyncExternalStore (A4)', () => {
     jsonStore.write(KEY, { thresholds: { wingfoil: 10 } });
     const first = readStoredSettings();
     expect(readStoredSettings()).toBe(first);
-    jsonStore.write('tracker.autreCle', { x: 1 });
+    jsonStore.write('gtracker.autreCle', { x: 1 });
     expect(readStoredSettings()).toBe(first);
     jsonStore.write(KEY, { thresholds: { wingfoil: 11 } });
     expect(readStoredSettings()).not.toBe(first);
@@ -48,7 +49,7 @@ describe('lecture des réglages par useSyncExternalStore (A4)', () => {
     const first = readStoredSettings();
     expect(first).toEqual({});
     expect(readStoredSettings()).toBe(first);
-    jsonStore.write('tracker.autreCle', { x: 1 });
+    jsonStore.write('gtracker.autreCle', { x: 1 });
     expect(readStoredSettings()).toBe(first);
   });
 
@@ -63,7 +64,7 @@ describe('lecture des réglages par useSyncExternalStore (A4)', () => {
   it("n'est réveillé que par les écritures des réglages", () => {
     const listener = vi.fn();
     const unsubscribe = subscribeStoredSettings(listener);
-    jsonStore.write('tracker.panelSizes', {});
+    jsonStore.write(STORAGE_KEYS.panelSizes, {});
     expect(listener).not.toHaveBeenCalled();
     jsonStore.write(KEY, {});
     expect(listener).toHaveBeenCalledTimes(1);

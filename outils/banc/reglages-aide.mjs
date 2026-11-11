@@ -8,7 +8,7 @@
 //  3. le « ? » d'un bloc (Activités) ne replie pas le bloc, son texte se déplie sous le titre ;
 //  4. à 390×844 : aucun débordement, une aide ouverte comprise ;
 //  5. hors de Réglages, les aides valent aussi : le mode d'emploi des bips d'un parcours (Itinéraires) est sous le « ? » du bloc.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -28,18 +28,18 @@ const finish = async () => {
   await close();
 };
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
 
 /** Tout ouvert : blocs, familles, parties des activités (mémoire des blocs), puis chaque carte d'activité. */
 const openAll = async () => {
   await evaluate(`(() => {
-    const s = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}');
+    const s = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
     s.settings = { memoire: true, autorisations: true, activites: true, enregistrement: true, capteurs: true, cartes: true, pratiquant: true };
     s['settings-families'] = { voile: true, course: true, velo: true, fractionne: true, surf: true };
     s['settings-activity-parts'] = { affichage: true, analyse: true, enregistrement: true, itineraires: true, balises: true };
-    localStorage.setItem('tracker.sections', JSON.stringify(s));
+    localStorage.setItem('${CLES.sections}', JSON.stringify(s));
     return 'ok';
   })()`);
   await go('/parametres', 3000);

@@ -5,6 +5,7 @@ import {
   MAX_STORED_RESTING_RESULTS, mergeRestingResults, parseRestingHrFile, readStoredRestingResults, restingHrFileText,
   sameRestingResults, toStoredRestingResult, type StoredRestingResult,
 } from './restingHrStore';
+import { FILE_FORMATS } from '../core/appIdentity';
 
 const P = RESTING_HR_TEST;
 const START = 1_000_000;
@@ -81,11 +82,11 @@ describe('fichier fc-repos.json et fusion entre appareils', () => {
     expect(parseRestingHrFile(null)).toEqual([]);
     expect(parseRestingHrFile('{ cassé')).toBeNull();
     expect(parseRestingHrFile(JSON.stringify({ format: 'autre', results: [] }))).toBeNull();
-    expect(parseRestingHrFile(JSON.stringify({ format: 'tracker-fc-repos' }))).toBeNull();
+    expect(parseRestingHrFile(JSON.stringify({ format: FILE_FORMATS.fcRepos }))).toBeNull();
   });
 
   it('écarte les tests mal formés du fichier', () => {
-    const text = JSON.stringify({ format: 'tracker-fc-repos', version: 1, results: [at(1), { lowestBpm: 'x' }, null] });
+    const text = JSON.stringify({ format: FILE_FORMATS.fcRepos, version: 1, results: [at(1), { lowestBpm: 'x' }, null] });
     expect(parseRestingHrFile(text)).toEqual([at(1)]);
   });
 });

@@ -5,7 +5,7 @@
 //     « Tout réduire » : plus rien d'ouvert sur la page, et après rechargement non plus ;
 //  2. saisit un pseudo dans Pratiquant : il devient le titre du Profil ; effacé, le titre redevient « Profil » ;
 //  3. à 390×844 : l'en-tête et son bouton sans débordement.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -26,18 +26,18 @@ const finish = async () => {
   await close();
 };
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork();
 
 /** Tout ouvert : blocs, familles, parties des activités (mémoire des blocs), puis chaque carte d'activité. */
 const openAll = async () => {
   await evaluate(`(() => {
-    const s = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}');
+    const s = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
     s.settings = { memoire: true, autorisations: true, activites: true, enregistrement: true, capteurs: true, cartes: true, pratiquant: true };
     s['settings-families'] = { voile: true, course: true, velo: true, fractionne: true, surf: true };
     s['settings-activity-parts'] = { affichage: true, analyse: true, enregistrement: true, itineraires: true, balises: true };
-    localStorage.setItem('tracker.sections', JSON.stringify(s));
+    localStorage.setItem('${CLES.sections}', JSON.stringify(s));
     return 'ok';
   })()`);
   await go('/parametres', 3000);
@@ -64,7 +64,7 @@ check('bouton « Tout réduire » présent', await clickText('Tout réduire'));
 await wait(500);
 check('après : plus rien d ouvert', (await openCount()) === 0, await openCount());
 check('après : ni grille d icônes ni aide', (await evaluate(`document.querySelectorAll('.icon-picker__grid, .settings-help').length`)) === 0);
-const mem = await evaluate(`JSON.parse(localStorage.getItem('tracker.sections') ?? '{}')`);
+const mem = await evaluate(`JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}')`);
 const anyTrue = ['settings', 'settings-families', 'settings-activity-parts', 'settings-activities'].some((k) => Object.values(mem[k] ?? {}).some(Boolean));
 check('mémoire : tout à false', !anyTrue);
 await shoot('reduire-apres');
@@ -79,7 +79,7 @@ await clickText('Tout réduire');
 await wait(300);
 
 // --- 2. Pseudo ---
-await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}'); s.settings = { ...s.settings, pratiquant: true }; localStorage.setItem('tracker.sections', JSON.stringify(s)); return 'ok'; })()`);
+await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}'); s.settings = { ...s.settings, pratiquant: true }; localStorage.setItem('${CLES.sections}', JSON.stringify(s)); return 'ok'; })()`);
 await go('/parametres', 3000);
 const setPseudo = (v) => evaluate(`(() => {
   const input = document.querySelector('input[autocomplete="nickname"]');

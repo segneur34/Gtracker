@@ -207,7 +207,7 @@ describe('dossier de plusieurs activités de montre', () => {
     expect(library.readLibraryState().importQuestion).toBeNull();
   });
 
-  it('un dossier Tracker sans FIT : pas de question', async () => {
+  it('un dossier Gtracker sans FIT : pas de question', async () => {
     const library = await openFresh();
     const report = await library.importEntries([entry('s.gpx', gpxAt(9)), entry('t.gpx', gpxAt(10))], { fromFolder: true });
     expect(library.readLibraryState().importQuestion).toBeNull();

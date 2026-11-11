@@ -73,7 +73,7 @@ describe('fiche d\'itinéraire', () => {
   it('refuse ce qui n\'est pas une fiche d\'itinéraire', () => {
     expect(parseRouteRecord('pas du json')).toBeNull();
     expect(parseRouteRecord(JSON.stringify({ format: FILE_FORMATS.session, version: 1 }))).toBeNull();
-    expect(parseRouteRecord(JSON.stringify({ format: 'tracker-itineraire', version: 1, waypoints: [{ lat: 'x' }] }))).toBeNull();
+    expect(parseRouteRecord(JSON.stringify({ format: FILE_FORMATS.itineraire, version: 1, waypoints: [{ lat: 'x' }] }))).toBeNull();
   });
 
   it('garde une trace importée telle quelle, sans la recalculer', () => {

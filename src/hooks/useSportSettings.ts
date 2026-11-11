@@ -28,9 +28,10 @@ import {
   resolveTabChoices, resolveThresholdOverride, settingsView, withSetting, withVisibility, withoutOverrides,
   type SettingField, type SportSettingsView, type StoredSettings,
 } from '../settings/activitySettings';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
- * Magasin des réglages par activité (`tracker.sportSettings`) : sa lecture
+ * Magasin des réglages par activité (`gtracker.sportSettings`) : sa lecture
  * (`useSyncExternalStore`), ses écritures, relues au moment d'écrire, et les
  * hooks qui les suivent. Le calcul pur d'un réglage (défauts, valeurs
  * effectives, vue de Réglages) est dans `settings/activitySettings.ts` (lot 72).
@@ -39,7 +40,7 @@ import {
  * le réglage fin dépend du matériel et du pratiquant.
  */
 
-const STORAGE_KEY = 'tracker.sportSettings';
+const STORAGE_KEY = STORAGE_KEYS.sportSettings;
 
 /** Seuil fixé pour une activité, hors composant (résumés de la bibliothèque) ; `undefined` sans réglage ni pré-réglage. */
 export const effectiveThresholdOverride = (activity: Activity): number | undefined =>

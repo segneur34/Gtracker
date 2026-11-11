@@ -2,7 +2,7 @@
 // relu après rechargement, affiché en tête de l'analyse, effacé par un nom vide, puis donné depuis
 // l'en-tête de l'analyse et relu dans la bibliothèque. Profil Chrome neuf.
 // Usage : node rename.mjs <port> <gpx de voile, produit par make-gpx.mjs>
-import { connect } from './lib/cdp.mjs';
+import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, gpx] = process.argv.slice(2);
@@ -18,8 +18,8 @@ const evaluate = async (expression) => {
 const go = (path, ms = 2500) => lib.go(path, ms);
 const clickText = (text) => evaluate(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === ${JSON.stringify(text)}); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
 const rows = () => evaluate(`JSON.stringify([...document.querySelectorAll('.lib-row__main')].map((r) => r.innerText.replace(/\\n/g, ' / ')))`);
-const record = () => evaluate(`(async () => { const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions'); for await (const [n, h] of d.entries()) if (n.endsWith('.json')) { const r = JSON.parse(await (await h.getFile()).text()); return JSON.stringify({ name: r.name, title: r.title, gpx: r.gpx }); } return 'aucune fiche'; })()`);
-const files = () => evaluate(`(async () => { const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions'); const out = []; for await (const [n] of d.entries()) out.push(n); return out.sort().join(', '); })()`);
+const record = () => evaluate(`(async () => { const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('sessions'); for await (const [n, h] of d.entries()) if (n.endsWith('.json')) { const r = JSON.parse(await (await h.getFile()).text()); return JSON.stringify({ name: r.name, title: r.title, gpx: r.gpx }); } return 'aucune fiche'; })()`);
+const files = () => evaluate(`(async () => { const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('sessions'); const out = []; for await (const [n] of d.entries()) out.push(n); return out.sort().join(', '); })()`);
 const typeName = async (value, key) => {
   await evaluate(`(() => { const i = document.querySelector('.lib-row__rename'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, ${JSON.stringify(value)}); i.dispatchEvent(new Event('input', { bubbles: true })); return 'ok'; })()`);
   await wait(200);
@@ -29,7 +29,7 @@ const typeName = async (value, key) => {
 const listReady = async () => { await waitFor(async () => (await rows()) !== '[]', { timeout: 4000, label: 'liste' }); await settle({ max: 1000, label: 'liste' }); };
 const step = (title) => console.log(`\n== ${title}`);
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
 step('1. Import du GPX dans la bibliothèque voile');

@@ -1,5 +1,5 @@
 import { errorMessage } from '../core/basics';
-import { MARKER_FILE } from '../core/appIdentity';
+import { MARKER_FILE, STORAGE_KEYS, CACHE_NAMES } from '../core/appIdentity';
 import { registerPlugin } from '@capacitor/core';
 import { base64ToBytes, bytesToBase64 } from '../core/base64';
 import { fileErrorCode, plainError } from './errorText';
@@ -201,7 +201,7 @@ const openBrowserMemory = async (): Promise<MemoryFolder> => {
 
 // Poignée du dossier choisi, gardée dans IndexedDB : on ne peut la mettre ni
 // dans `localStorage` ni en JSON.
-const HANDLE_DB = 'tracker-memoire';
+const HANDLE_DB = CACHE_NAMES.memoire;
 const HANDLE_STORE = 'poignees';
 const HANDLE_KEY = 'dossier';
 
@@ -236,8 +236,8 @@ const readSavedHandle = async (): Promise<FileSystemDirectoryHandle | null> => {
 const READ_WRITE: FileSystemHandlePermissionDescriptor = { mode: 'readwrite' };
 
 /**
- * Faut-il descendre dans `Tracker` ? Si l'utilisateur a désigné le dossier
- * parent (`Documents`) au lieu du dossier `Tracker` lui-même, oui : c'est
+ * Faut-il descendre dans `Gtracker` ? Si l'utilisateur a désigné le dossier
+ * parent (`Documents`) au lieu du dossier `Gtracker` lui-même, oui : c'est
  * l'erreur la plus probable, et elle éparpillerait sinon des fichiers dans
  * `Documents`. `names` : le contenu du dossier désigné.
  */
@@ -343,12 +343,12 @@ interface MemoryFolderPlugin {
 const nativeFolder = registerPlugin<MemoryFolderPlugin>('MemoryFolder');
 
 /** Dossier choisi sur le téléphone, gardé d'un lancement à l'autre. */
-const DEVICE_FOLDER_KEY = 'tracker.memoryFolder';
+const DEVICE_FOLDER_KEY = STORAGE_KEYS.memoryFolder;
 
 interface DeviceFolderChoice {
   /** Adresse du dossier désigné, telle qu'Android la rend. */
   uri: string;
-  /** Sous-dossier `Tracker` si l'on a désigné son parent, sinon `''`. */
+  /** Sous-dossier `Gtracker` si l'on a désigné son parent, sinon `''`. */
   base: string;
   label: string;
 }
@@ -358,7 +358,7 @@ export const MISSING_FOLDER_MESSAGE = 'Le dossier mémoire est introuvable. Dés
 
 /**
  * Erreur du sélecteur d'Android rendue en clair : un dossier désigné qui
- * n'existe plus donne « … Missing file for primary:Documents/Tracker at
+ * n'existe plus donne « … Missing file for primary:Documents/Gtracker at
  * /storage/… » (lot 143, idée 122), remplacé par `MISSING_FOLDER_MESSAGE` ;
  * le détail technique ne va qu'en console. Un code explicite du greffon prime
  * sur le texte (un accès refusé arrive souvent enveloppé dans une
@@ -532,7 +532,7 @@ export const chooseMemoryFolder = async (check?: FolderCheck): Promise<MemoryFol
   let handle: FileSystemDirectoryHandle;
   try {
     handle = await window.showDirectoryPicker!(
-      current ? { mode: 'readwrite', startIn: current } : { id: 'tracker-memoire', mode: 'readwrite', startIn: 'documents' }
+      current ? { mode: 'readwrite', startIn: current } : { id: CACHE_NAMES.memoire, mode: 'readwrite', startIn: 'documents' }
     );
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') return null;
@@ -741,7 +741,7 @@ const createPrivateFolder = (base: string): MemoryFolder => {
 /** Pourquoi un import est refusé : aucun dossier mémoire accessible (décision du 27/10). */
 export const NO_FOLDER_IMPORT_MESSAGE = "Désignez d'abord le dossier mémoire (Réglages › Mémoire) pour importer des sessions.";
 
-export const READ_ONLY_MEMORY_MESSAGE = "Ce dossier vient d'une version plus récente de Tracker : il est lu sans rien y changer. Mettez l'application à jour pour y ranger vos sessions.";
+export const READ_ONLY_MEMORY_MESSAGE = "Ce dossier vient d'une version plus récente de Gtracker : il est lu sans rien y changer. Mettez l'application à jour pour y ranger vos sessions.";
 
 /**
  * Le même dossier, qui lit et refuse toute écriture : à l'ouverture d'une mémoire

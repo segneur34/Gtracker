@@ -80,8 +80,8 @@ function SettingsFiles() {
       </strong>
       <HelpText helpKey="memoire:reglages">
         {folderKind === 'browser'
-          ? "Chaque appareil range ses réglages sous son nom (Tracker › reglages). Pour reprendre ceux d'un autre : « Importer un fichier de réglages », puis choisissez son fichier."
-          : "Chaque appareil range ses réglages sous son nom (Tracker › reglages). Pour reprendre ceux d'un autre : copiez son fichier dans ce dossier, puis « Mettre à jour » et « Reprendre », ou « Importer un fichier de réglages »."}
+          ? "Chaque appareil range ses réglages sous son nom (Gtracker › reglages). Pour reprendre ceux d'un autre : « Importer un fichier de réglages », puis choisissez son fichier."
+          : "Chaque appareil range ses réglages sous son nom (Gtracker › reglages). Pour reprendre ceux d'un autre : copiez son fichier dans ce dossier, puis « Mettre à jour » et « Reprendre », ou « Importer un fichier de réglages »."}
       </HelpText>
       <label className="ui-row-s2 ui-center ui-wrap ui-text-s">
         <span>Nom de cet appareil<HelpToggle helpKey="memoire:appareil" label="Nom de cet appareil" /></span>

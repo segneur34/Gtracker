@@ -63,7 +63,7 @@ await (await icon(192, SYMBOL_SHARE, 'square')).toFile(join(root, 'public/favico
 /** Image de l'icône du bureau (carré arrondi blanc), PNG de `size` px. */
 const disc = async (size) => (await icon(size, SYMBOL_SHARE, 'rounded')).toBuffer();
 
-// Icône du raccourci de bureau (`outils/icone-tracker.ico`) : une image par taille, en BMP 32 bits sous
+// Icône du raccourci de bureau (`outils/icone-gtracker.ico`) : une image par taille, en BMP 32 bits sous
 // 256 px, en PNG à 256. L'explorateur de Windows lit mal le PNG aux petites tailles : un .ico tout en
 // PNG y garde l'ancienne icône, même après redémarrage.
 const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256];
@@ -104,5 +104,5 @@ images.forEach((png, i) => {
   header.writeUInt32LE(offset, at + 12);
   offset += png.length;
 });
-writeFileSync(join(root, 'outils/icone-tracker.ico'), Buffer.concat([header, ...images]));
+writeFileSync(join(root, 'outils/icone-gtracker.ico'), Buffer.concat([header, ...images]));
 console.log('icônes Android, favicon et icône du bureau refaites');

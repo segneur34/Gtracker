@@ -45,11 +45,11 @@ import org.json.JSONObject;
  * l'interface.
  *
  * Un fichier existant n'est jamais réécrit sur place : le nouveau contenu va
- * d'abord à côté (« nom.tracker-tmp »), puis prend sa place (`replace`). Une
+ * d'abord à côté (« nom.gtracker-tmp »), puis prend sa place (`replace`). Une
  * coupure en plein échange est reprise à la lecture suivante du dossier
  * (`list`) : une fiche n'est jamais laissée à moitié écrite. Un fichier neuf
- * est écrit de même sous « nom.tracker-new », puis renommé (`createNew`) ; un
- * « .tracker-new » resté seul, création interrompue, est effacé par `list`.
+ * est écrit de même sous « nom.gtracker-new », puis renommé (`createNew`) ; un
+ * « .gtracker-new » resté seul, création interrompue, est effacé par `list`.
  *
  * Un fichier absent n'est pas une erreur (`text` ou `data` nul, `exists` faux).
  * Une erreur est rejetée avec un code (`rejectCoded`), qui dit à la couche web
@@ -62,12 +62,12 @@ public class MemoryFolderPlugin extends Plugin {
     private static final String FILE_MIME = "application/octet-stream";
 
     /** Suffixe du fichier écrit à côté de celui qu'il remplace, le temps de l'échange. */
-    private static final String TEMP_SUFFIX = ".tracker-tmp";
+    private static final String TEMP_SUFFIX = ".gtracker-tmp";
     /**
      * Suffixe d'un fichier neuf, le temps de l'écrire : distinct de TEMP_SUFFIX, qu'une
      * coupure fait reprendre par `list`, alors qu'un fichier neuf interrompu est seulement effacé.
      */
-    private static final String NEW_SUFFIX = ".tracker-new";
+    private static final String NEW_SUFFIX = ".gtracker-new";
     /** Fournisseur du stockage du téléphone, dont l'identifiant d'un document est son chemin. */
     private static final String EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents";
     private static final String LOG_TAG = "MemoryFolder";
@@ -92,7 +92,7 @@ public class MemoryFolderPlugin extends Plugin {
             Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
         );
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Le sélecteur s'ouvre sur Documents, où le dossier Tracker est attendu.
+            // Le sélecteur s'ouvre sur Documents, où le dossier Gtracker est attendu.
             Uri documents = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Documents");
             intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, documents);
         }
@@ -332,7 +332,7 @@ public class MemoryFolderPlugin extends Plugin {
 
     /**
      * Remplace un fichier existant sans jamais le laisser à moitié écrit : le
-     * contenu va d'abord dans « nom.tracker-tmp », puis l'ancien fichier est
+     * contenu va d'abord dans « nom.gtracker-tmp », puis l'ancien fichier est
      * retiré et le nouveau prend son nom. Si l'application est tuée entre deux
      * étapes, `list` termine l'échange. Un fournisseur qui ne sait pas renommer
      * reçoit l'écriture en place, comme avant.
@@ -363,7 +363,7 @@ public class MemoryFolderPlugin extends Plugin {
 
     /**
      * Crée un fichier sans jamais le laisser à moitié écrit sous son nom : le
-     * contenu va d'abord dans « nom.tracker-new », qui prend ensuite le nom
+     * contenu va d'abord dans « nom.gtracker-new », qui prend ensuite le nom
      * demandé. Si l'application est tuée avant, `list` efface le fichier neuf
      * resté seul. Un fournisseur qui ne sait pas renommer reçoit l'écriture en
      * place, comme `replace`.
@@ -570,7 +570,7 @@ public class MemoryFolderPlugin extends Plugin {
 
     /**
      * Enfant d'un dossier, par son nom. Sur le stockage du téléphone,
-     * l'identifiant d'un document est son chemin (« primary:Documents/Tracker/sessions ») :
+     * l'identifiant d'un document est son chemin (« primary:Documents/Gtracker/sessions ») :
      * on le construit et on vérifie qu'il existe, une requête au lieu de lire
      * tout le dossier. Chez ce fournisseur, un document absent l'est vraiment :
      * pas de relecture du dossier (le temporaire d'une réécriture est presque
@@ -617,8 +617,8 @@ public class MemoryFolderPlugin extends Plugin {
     }
 
     /**
-     * Libellé lisible du dossier choisi : « Documents/Tracker » pour
-     * « primary:Documents/Tracker » ou « home:Tracker » (la racine Documents
+     * Libellé lisible du dossier choisi : « Documents/Gtracker » pour
+     * « primary:Documents/Gtracker » ou « home:Gtracker » (la racine Documents
      * du sélecteur).
      */
     private static String folderLabel(Uri tree) {

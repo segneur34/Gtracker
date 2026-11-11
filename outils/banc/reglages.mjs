@@ -15,7 +15,7 @@
 //     reprend son défaut et garde l'autre ; les deux vidées : plus de réglage, « défaut » ;
 // 10. le seuil suit la session (lot 148, Q57) : seuil de Course changé, sa fiche recalculée ; seconde ouverture, fiche
 //     intacte (lastModified) ; réglages d'un autre appareil (seuil différent, sans geste) : fiche intacte.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect, DOSSIER_MEMOIRE, FORMATS } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -44,11 +44,11 @@ const reloaded = async (action, max) => {
   await settle({ max });
   return res;
 };
-const opfs = (body) => evaluate(`(async () => { const root = await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker'); ${body} })()`);
+const opfs = (body) => evaluate(`(async () => { const root = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}'); ${body} })()`);
 const listSettings = () => opfs(`try { const d = await root.getDirectoryHandle('reglages'); const names = []; for await (const [n] of d.entries()) names.push(n); return names.sort().join(', '); } catch { return '(pas de dossier)'; }`);
 const readSettings = (name) => opfs(`const d = await root.getDirectoryHandle('reglages'); return JSON.parse(await (await (await d.getFileHandle(${JSON.stringify(name)})).getFile()).text());`);
 const writeFile = (path, value) => opfs(`let d = root; const parts = ${JSON.stringify(path)}.split('/'); const name = parts.pop(); for (const p of parts) d = await d.getDirectoryHandle(p, { create: true }); const w = await (await d.getFileHandle(name, { create: true })).createWritable(); await w.write(${JSON.stringify(JSON.stringify(value, null, 2))}); await w.close(); return 'ok';`);
-const stored = () => evaluate(`JSON.parse(localStorage.getItem('tracker.sportSettings') ?? 'null')`);
+const stored = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? 'null')`);
 /** Ouvre la carte Mémoire de Réglages, si elle est repliée. */
 const openMemory = () => evaluate(`(() => { if (document.querySelector('input[maxlength="40"].ui-field')) return 'déjà ouverte'; const b = [...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Mémoire'); if (!b) return 'absente'; b.click(); return 'ouverte'; })()`);
 const fileList = () => evaluate(`(() => { const ul = [...document.querySelectorAll('ul')].find((u) => /cet appareil/.test(u.innerText)); return ul ? [...ul.children].map((li) => li.innerText.replace(/\\n/g, ' / ')).join(' || ') : '(pas de liste)'; })()`);
@@ -64,14 +64,14 @@ const clickInBanner = (text) => evaluate(`(() => { const a = [...document.queryS
 const pageLines = (re) =>evaluate(`document.body.innerText.split('\\n').filter((l) => ${re}.test(l)).join(' | ')`);
 const step = (title) => console.log(`\n== ${title}`);
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `tracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
+// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
 step('1. Premier lancement');
 await go('/parametres', 4000);
 console.log('reglages/ :', await listSettings());
 const first = await readSettings('pc.json');
-console.log('pc.json : version', first.version, '| appareil', JSON.stringify(first.device), '| activités', first.values['tracker.sportSettings']?.activities?.length ?? '(défaut)');
+console.log('pc.json : version', first.version, '| appareil', JSON.stringify(first.device), '| activités', first.values[CLES.sportSettings]?.activities?.length ?? '(défaut)');
 
 step('3. Le fichier de Léa, déposé dans reglages/');
 const leaActivities = [
@@ -82,14 +82,14 @@ const leaActivities = [
   { id: 'cycling', name: 'Route', base: 'cycling', color: '#00695c' },
 ];
 const lea = {
-  format: 'tracker-reglages', version: 2, savedAt: Date.now() - 3_600_000, device: { id: 'appareil-de-lea', name: 'Léa' },
+  format: FORMATS.reglages, version: 2, savedAt: Date.now() - 3_600_000, device: { id: 'appareil-de-lea', name: 'Léa' },
   values: {
-    'tracker.sportSettings': { activities: leaActivities, thresholds: { wingfoil: 13 }, recordActivity: 'a-trail' },
-    'tracker.runnerProfile': { me: { weightKg: 58 } },
+    [CLES.sportSettings]: { activities: leaActivities, thresholds: { wingfoil: 13 }, recordActivity: 'a-trail' },
+    [CLES.athleteProfile]: { me: { weightKg: 58 } },
   },
 };
 // L'appareil retient une activité à l'enregistrement : elle doit survivre à la reprise.
-await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('tracker.sportSettings') ?? '{}'); s.recordActivity = 'running'; localStorage.setItem('tracker.sportSettings', JSON.stringify(s)); return 'ok'; })()`);
+await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}'); s.recordActivity = 'running'; localStorage.setItem('${CLES.sportSettings}', JSON.stringify(s)); return 'ok'; })()`);
 console.log('écrit :', await writeFile('reglages/lea.json', lea));
 console.log('carte Mémoire :', await openMemory());
 await wait(500);
@@ -108,9 +108,9 @@ console.log('confirmation :', dialogs.at(-1) ?? '(aucune)');
 const after = await stored();
 console.log('activités :', after?.activities?.map((a) => `${a.name} ${a.color}`).join(', '));
 console.log('seuil wingfoil :', after?.thresholds?.wingfoil, '(13 attendu) | activité retenue à l\'enregistrement :', after?.recordActivity, '(running attendu)');
-console.log('poids du pratiquant :', await evaluate(`JSON.parse(localStorage.getItem('tracker.runnerProfile') ?? 'null')?.me?.weightKg`));
+console.log('poids du pratiquant :', await evaluate(`JSON.parse(localStorage.getItem('${CLES.athleteProfile}') ?? 'null')?.me?.weightKg`));
 const pc = await readSettings('pc.json');
-console.log('pc.json : seuil', pc.values['tracker.sportSettings']?.thresholds?.wingfoil, '| appareil', pc.device?.name);
+console.log('pc.json : seuil', pc.values[CLES.sportSettings]?.thresholds?.wingfoil, '| appareil', pc.device?.name);
 console.log('carte Mémoire :', await openMemory());
 await wait(500);
 console.log('liste :', await fileList());
@@ -118,7 +118,7 @@ console.log('bandeau après la reprise (aucun attendu) :', await banner());
 
 step('5. Renommer l\'appareil');
 await rename('PC du bureau', async () => /pc-du-bureau/.test(await listSettings()));
-console.log('reglages/ :', await listSettings(), '| nom gardé :', await evaluate(`localStorage.getItem('tracker.deviceName')`));
+console.log('reglages/ :', await listSettings(), '| nom gardé :', await evaluate(`localStorage.getItem('${CLES.deviceName}')`));
 await rename('Léa', async () => Boolean(await pageLines('/choisissez un autre nom/')));
 console.log('refus :', await pageLines('/choisissez un autre nom/'), '| reglages/ :', await listSettings());
 await evaluate(`(() => { const i = document.querySelector('input[maxlength="40"].ui-field'); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return 'ok'; })()`);
@@ -129,7 +129,7 @@ const intrus = { ...lea, device: { id: 'intrus', name: 'PC du bureau' }, savedAt
 console.log('écrit par-dessus :', await writeFile('reglages/pc-du-bureau.json', intrus));
 await go('/parametres', 4000);
 console.log('message :', await pageLines('/s\'appelle désormais/'));
-console.log('reglages/ :', await listSettings(), '| nom :', await evaluate(`localStorage.getItem('tracker.deviceName')`));
+console.log('reglages/ :', await listSettings(), '| nom :', await evaluate(`localStorage.getItem('${CLES.deviceName}')`));
 console.log('pc-du-bureau.json reste à l\'intrus :', (await readSettings('pc-du-bureau.json')).device?.id);
 console.log('bandeau au lancement :', await banner());
 console.log('Fermer :', await clickInBanner('Fermer'));
@@ -155,8 +155,8 @@ await wait(500);
 console.log('un JSON quelconque :', await importJson('notes.json', { bonjour: 1 }), '|', await importNote());
 console.log('le fichier de cet appareil :', await importJson(ownName, await readSettings(ownName)), '|', await importNote());
 const tablet = {
-  format: 'tracker-reglages', version: 2, savedAt: Date.now() - 600_000, device: { id: 'tablette-de-lea', name: 'Tablette' },
-  values: { 'tracker.sportSettings': { ...(await stored()), thresholds: { wingfoil: 15 } } },
+  format: FORMATS.reglages, version: 2, savedAt: Date.now() - 600_000, device: { id: 'tablette-de-lea', name: 'Tablette' },
+  values: { [CLES.sportSettings]: { ...(await stored()), thresholds: { wingfoil: 15 } } },
 };
 await refuseDialogs(true);
 console.log('la Tablette, reprise refusée :', await importJson('reglages-tablette.json', tablet), '|', await importNote());
@@ -174,12 +174,12 @@ await shoot('reglages-import');
 
 // 9. Bornes de couleur : un champ vidé n'efface que sa borne. Course : la liste reprise de la Tablette n'a pas de vélo.
 await evaluate(`(() => {
-  const sections = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}');
+  const sections = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
   sections.settings = { ...sections.settings, activites: true };
   sections['settings-families'] = { ...sections['settings-families'], course: true };
   sections['settings-activities'] = { ...sections['settings-activities'], running: true };
   sections['settings-activity-parts'] = { ...sections['settings-activity-parts'], affichage: true };
-  localStorage.setItem('tracker.sections', JSON.stringify(sections));
+  localStorage.setItem('${CLES.sections}', JSON.stringify(sections));
   return 'ok';
 })()`);
 await go('/parametres', 3000);
@@ -235,7 +235,7 @@ const courseText = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" c
 await opfs(`const d = await root.getDirectoryHandle('sessions', { create: true }); const w = await (await d.getFileHandle(${JSON.stringify(COURSE_GPX)}, { create: true })).createWritable(); await w.write(${JSON.stringify(courseText)}); await w.close(); return 'ok';`);
 /** Fiche de la course : ses réglages portés et la date de son fichier ; `null` tant qu'elle n'existe pas. */
 const courseRecord = () => opfs(`try { const d = await root.getDirectoryHandle('sessions'); const f = await (await d.getFileHandle(${JSON.stringify(COURSE_JSON)})).getFile(); const r = JSON.parse(await f.text()); return { porte: r.summary.activitySettings?.threshold, cle: r.summary.optionsKey, date: f.lastModified }; } catch { return null; }`);
-const setCourseThreshold = (value) => evaluate(`(() => { const s = JSON.parse(localStorage.getItem('tracker.sportSettings') ?? '{}'); s.thresholds = { ...s.thresholds, running: ${value} }; localStorage.setItem('tracker.sportSettings', JSON.stringify(s)); return 'ok'; })()`);
+const setCourseThreshold = (value) => evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}'); s.thresholds = { ...s.thresholds, running: ${value} }; localStorage.setItem('${CLES.sportSettings}', JSON.stringify(s)); return 'ok'; })()`);
 await setCourseThreshold(1);
 await go('/course', 4000);
 await waitFor(async () => (await courseRecord()) !== null, { timeout: 5000, label: 'fiche de la course' });
@@ -253,7 +253,7 @@ await settle({ max: 2000 });
 check('seuil : seconde ouverture, fiche intacte', (await courseRecord()).date === redone.date, JSON.stringify(await courseRecord()));
 // Autre appareil : un autre seuil dans ses réglages, sans geste de sa part.
 await setCourseThreshold(3);
-await evaluate(`(() => { const g = JSON.parse(localStorage.getItem('tracker.summaryGestures')); g.baseline.running = { threshold: 3 }; localStorage.setItem('tracker.summaryGestures', JSON.stringify(g)); return 'ok'; })()`);
+await evaluate(`(() => { const g = JSON.parse(localStorage.getItem('${CLES.summaryGestures}')); g.baseline.running = { threshold: 3 }; localStorage.setItem('${CLES.summaryGestures}', JSON.stringify(g)); return 'ok'; })()`);
 await go('/course', 4000);
 await settle({ max: 2000 });
 check('seuil : autres réglages sans geste, fiche intacte', (await courseRecord()).date === redone.date && (await courseRecord()).porte === 2, JSON.stringify(await courseRecord()));

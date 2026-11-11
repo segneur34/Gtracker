@@ -380,7 +380,7 @@ export const currentPosition = (timeoutMs = 30_000): Promise<LocationFix> =>
       : browserSource;
     source
       .start(
-        { intervalMs: 1000, distanceFilterM: 0, notificationTitle: 'Tracker', notificationText: 'Recherche de votre position' },
+        { intervalMs: 1000, distanceFilterM: 0, notificationTitle: 'Gtracker', notificationText: 'Recherche de votre position' },
         (fix) => finish(() => resolve(fix)),
         (message) => finish(() => reject(new Error(message)))
       )

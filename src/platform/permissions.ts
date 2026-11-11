@@ -3,6 +3,7 @@ import type { PermissionKey, PermissionState, PermissionsStatus } from '../core/
 import { bluetoothPermission, requestBluetoothPermission } from './heartRate';
 import { isNativeApp } from './runtime';
 import { jsonStore } from './storage';
+import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Autorisations du téléphone : seul passage autorisé vers elles (règle 12),
@@ -103,7 +104,7 @@ export const onAppResume = (listener: () => void): (() => void) => {
 
 // --- Version vue en dernier ---
 
-const SEEN_KEY = 'tracker.permissionsSeenVersion';
+const SEEN_KEY = STORAGE_KEYS.permissionsSeenVersion;
 
 /** Version de l'application pour laquelle la carte a été vue (« Plus tard » ou tout accordé), ou `null`. */
 export const permissionsSeenVersion = (): string | null => {

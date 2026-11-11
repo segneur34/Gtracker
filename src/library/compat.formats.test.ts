@@ -7,9 +7,10 @@ import { PREVIEW_IMAGE_INDEX_VERSION, parsePreviewImageIndex } from './previewIm
 import { bundleSessionGpx, unbundleSessionGpx } from './sessionBundle';
 import { serializeRecord } from './record';
 import { sessionRecord } from '../test/record.fixture';
+import { FILE_FORMATS } from '../core/appIdentity';
 
 const route = (over: Record<string, unknown> = {}) => JSON.stringify({
-  format: 'tracker-itineraire', version: 3, name: 'Tour', activityId: null, createdAt: 'a', updatedAt: 'b',
+  format: FILE_FORMATS.itineraire, version: 3, name: 'Tour', activityId: null, createdAt: 'a', updatedAt: 'b',
   waypoints: [{ lat: 43, lon: 3 }, { lat: 43.1, lon: 3.1 }], legs: [{ mode: 'straight', points: [[43, 3], [43.1, 3.1]], futurTroncon: 1 }],
   ...over,
 });
@@ -37,7 +38,7 @@ describe('itinéraire, compatibilité', () => {
 });
 
 describe('journal, compatibilité', () => {
-  const header = '{"format":"tracker-journal","version":1,"sport":"wingfoil","startedAtMs":1000}';
+  const header = '{"format":"gtracker-journal","version":1,"sport":"wingfoil","startedAtMs":1000}';
   it('(a) version future lue comme v1, ligne inconnue ignorée', () => {
     const j = parseJournal(`${header.replace('"version":1', '"version":9')}\n[2000,43,3]\n["futur",1]\n[3000,43.1,3.1]\n`);
     expect(j.header?.version).toBe(1);

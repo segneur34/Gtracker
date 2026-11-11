@@ -4,6 +4,7 @@ import type { MemoryFolder } from '../../platform/memoryFolder';
 import { buildFitActivity } from '../../test/fit.fixture';
 import { gpxAt, settle, trackTestTimers } from '../../test/library.fixture';
 import { createFakeFolder } from '../../test/memoryFolder.fixture';
+import { FILE_FORMATS } from '../../core/appIdentity';
 
 /**
  * File des fichiers reçus d'une autre application (lot 35), sur une fausse plateforme : ce que le téléphone a copié, ce que
@@ -186,7 +187,7 @@ describe('fichiers reçus d\'une autre application', () => {
   it.each([
     ['format', '« photo.jpg » n\'a pas été rangé : ce n\'est ni un GPX ni un FIT.'],
     ['trop-gros', '« gros.gpx » n\'a pas été rangé : il dépasse 30 Mo.'],
-    ['illisible', '« perdu.gpx » n\'a pas été rangé : Tracker n\'a pas pu le lire. Essayez de l\'ouvrir de nouveau.'],
+    ['illisible', '« perdu.gpx » n\'a pas été rangé : Gtracker n\'a pas pu le lire. Essayez de l\'ouvrir de nouveau.'],
   ] as const)('refus du téléphone (%s) : dit, sans rien lire, et retiré', async (refusal, text) => {
     const name = /« (.+) »/.exec(text)![1];
     const id = receive(name, null, refusal);
@@ -213,7 +214,7 @@ describe('fichiers reçus d\'une autre application', () => {
     expect(removed).toEqual([]);
     expect(queue.has(id)).toBe(true);
     expect(sessionGpx()).toEqual([]);
-    expect(first.notices()[0].text).toBe('« montre.fit » n\'a pas pu être rangé (écriture refusée). Tracker le garde et réessaiera au prochain lancement.');
+    expect(first.notices()[0].text).toBe('« montre.fit » n\'a pas pu être rangé (écriture refusée). Gtracker le garde et réessaiera au prochain lancement.');
     expect(first.notices()[0].trouble).toBe(true);
 
     const readsBefore = reads;
@@ -238,7 +239,7 @@ describe('fichiers reçus d\'une autre application', () => {
       const { notices } = await launch();
       expect(queue.has(id)).toBe(true);
       expect(removed).toEqual([]);
-      expect(notices()[0].text).toContain('Tracker le garde et réessaiera au prochain lancement.');
+      expect(notices()[0].text).toContain('Gtracker le garde et réessaiera au prochain lancement.');
     } finally {
       fakePort.read = read;
     }
@@ -408,7 +409,7 @@ describe('fichiers reçus d\'une autre application', () => {
 
   it("itinéraire reçu sous un nom déjà pris : ni fichier ni nom doublé (lot 194)", async () => {
     files.set('itineraires/Tour du lac.json', JSON.stringify({
-      format: 'tracker-itineraire', version: 3, name: 'Tour du lac', activityId: null,
+      format: FILE_FORMATS.itineraire, version: 3, name: 'Tour du lac', activityId: null,
       createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
       waypoints: [{ lat: 43, lon: 3 }, { lat: 43.01, lon: 3 }], legs: [],
     }));

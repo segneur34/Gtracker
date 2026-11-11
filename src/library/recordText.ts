@@ -5,11 +5,11 @@ import { isWritableRecord, type ParsedRecord, type RecordWithoutSummary } from '
  * réécrit pas (lot 113, sortis de la bibliothèque).
  */
 
-export const FUTURE_RECORD_WARNING = 'Fiche écrite par une version plus récente de Tracker : lue sans être modifiée.';
+export const FUTURE_RECORD_WARNING = 'Fiche écrite par une version plus récente de Gtracker : lue sans être modifiée.';
 export const UNREADABLE_RECORD_WARNING = 'Fiche illisible, laissée telle quelle : le résumé affiché est recalculé.';
 export const DAMAGED_RECORD_WARNING = 'Fiche devenue illisible, laissée telle quelle : les changements ne sont plus enregistrés.';
 export const NOT_READ_RECORD_WARNING = 'Fiche non lue (accès refusé) : laissée telle quelle, relue à « Mettre à jour ».';
-export const READ_ONLY_MEMORY_WARNING = 'Dossier écrit par une version plus récente de Tracker : session lue sans être modifiée.';
+export const READ_ONLY_MEMORY_WARNING = 'Dossier écrit par une version plus récente de Gtracker : session lue sans être modifiée.';
 
 /** Fiche de 0 octet (création interrompue, fichier créé vide avant d'être écrit) : tenue pour absente. */
 export const isBlankRecordText = (text: string | null): boolean => text !== null && text.trim() === '';

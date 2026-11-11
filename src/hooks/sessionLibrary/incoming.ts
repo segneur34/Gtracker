@@ -10,7 +10,7 @@ import { isGpxFileName } from '../../library/record';
 import { isRouteGpx } from '../../planning/routeImport';
 
 /**
- * Fichiers reçus d'une autre application (« Ouvrir avec Tracker », « Partager vers Tracker », lot 35), côté page : la
+ * Fichiers reçus d'une autre application (« Ouvrir avec Gtracker », « Partager vers Gtracker », lot 35), côté page : la
  * copie privée faite par le greffon (`platform/incomingFile.ts`) passe par la même chaîne que l'import (`importEntries` :
  * doublon « déjà présente », refus, FIT illisible avec sa raison), un fichier à la fois, et le résultat se lit dans un
  * bandeau (`IncomingFileNotice`), car un brouillon peut être ouvert : aucune navigation automatique.
@@ -22,7 +22,7 @@ import { isRouteGpx } from '../../planning/routeImport';
  *
  * Pendant un enregistrement, la copie native se fait, et la page ne touche à rien : la file reprend à l'arrêt.
  *
- * Un GPX qui est un itinéraire (lot 194 : fiche d'un itinéraire de Tracker, ou tracé sans aucun point daté,
+ * Un GPX qui est un itinéraire (lot 194 : fiche d'un itinéraire de Gtracker, ou tracé sans aucun point daté,
  * `isRouteGpx`) est rangé dans `itineraires/` au lieu des sessions (`routeArrival`) ; tout autre fichier suit l'import.
  */
 
@@ -64,7 +64,7 @@ const refusalText = (name: string, refusal: IncomingRefusal): string => {
     case 'trop-gros':
       return `${quoted(name)} n'a pas été rangé : il dépasse ${MAX_LISTED_FILE_BYTES / (1024 * 1024)} Mo.`;
     default:
-      return `${quoted(name)} n'a pas été rangé : Tracker n'a pas pu le lire. Essayez de l'ouvrir de nouveau.`;
+      return `${quoted(name)} n'a pas été rangé : Gtracker n'a pas pu le lire. Essayez de l'ouvrir de nouveau.`;
   }
 };
 
@@ -131,7 +131,7 @@ const routeArrival = async (file: IncomingFile): Promise<'route' | Uint8Array | 
   } catch (err) {
     notify({
       id,
-      text: `${quoted(name)} n'a pas pu être rangé dans les itinéraires (${errorMessage(err, 'erreur inconnue')}). Tracker le garde et réessaiera au prochain lancement.`,
+      text: `${quoted(name)} n'a pas pu être rangé dans les itinéraires (${errorMessage(err, 'erreur inconnue')}). Gtracker le garde et réessaiera au prochain lancement.`,
       file: null,
       trouble: true,
     });
@@ -169,7 +169,7 @@ const handle = async (file: IncomingFile): Promise<void> => {
     case 'retry':
       notify({
         id,
-        text: `${quoted(name)} n'a pas pu être rangé${verdict.reason ? ` (${verdict.reason})` : ''}. Tracker le garde et réessaiera au prochain lancement.`,
+        text: `${quoted(name)} n'a pas pu être rangé${verdict.reason ? ` (${verdict.reason})` : ''}. Gtracker le garde et réessaiera au prochain lancement.`,
         file: null,
         trouble: true,
       });

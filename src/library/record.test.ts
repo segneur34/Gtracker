@@ -33,7 +33,7 @@ import {
 } from './record';
 import type { SessionSurfaces } from '../planning/surface';
 import { carriedSettings } from './record';
-import { TRACKER_WING_RECORD } from '../test/legacyImport.fixture';
+import { LEGACY_WING_RECORD } from '../test/legacyImport.fixture';
 import { familyRecords, sessionRecord } from '../test/record.fixture';
 
 const START_MS = Date.UTC(2026, 8, 23, 12, 0, 0);
@@ -930,7 +930,7 @@ describe('fiche de Gtracker rangée avant le lot 306', () => {
    * Fiche au format de Gtracker portant les réglages d'analyse que cette version ne connaît plus (trois champs nuls,
    * ceux de la fiche du jeu d'essai de la porte) : ils sont des champs inconnus, gardés tels quels.
    */
-  const raw = JSON.parse(TRACKER_WING_RECORD) as Record<string, unknown>;
+  const raw = JSON.parse(LEGACY_WING_RECORD) as Record<string, unknown>;
   const stored = `${stringifyJson({ ...raw, format: RECORD_FORMAT })}\n`;
   const unclassified = `${stringifyJson({ ...raw, format: RECORD_FORMAT, sport: null })}\n`;
   const retired = (text: string): string[] => {

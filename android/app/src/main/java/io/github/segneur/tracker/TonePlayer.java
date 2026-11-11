@@ -67,7 +67,7 @@ final class TonePlayer {
     static final int DEFAULT_PITCH_HZ = 2000;
     private static final int MIN_PITCH_HZ = 300;
     private static final int MAX_PITCH_HZ = 5000;
-    private static final String PREFS = "tracker.sons";
+    private static final String PREFS = "gtracker.sons";
     private static final String PREF_PITCH = "pitchHz";
     private static final int SAMPLE_RATE = 44100;
     private static final int FADE_MS = 5;

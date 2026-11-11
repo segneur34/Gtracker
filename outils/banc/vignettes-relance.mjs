@@ -2,10 +2,10 @@
 // Usage : node vignettes-relance.mjs <port> <dossier de travail, chemin Windows>
 // Sur un profil neuf ; tuiles fausses (`lib/tuiles.mjs`, servies en 50 ms, sans réseau), le reste bloqué. Le script :
 //  1. écrit 30 courses synthétiques de 20 min à 1 Hz (boucles de tailles et de lieux différents) et les importe ;
-//  2. efface les vignettes gardées (caches `tracker-vignettes` et `tracker-vignettes-images`), puis ouvre la bibliothèque
+//  2. efface les vignettes gardées (caches `gtracker-vignettes` et `gtracker-vignettes-images`), puis ouvre la bibliothèque
 //     à pied à 390 × 844, densité 2 (premier lancement : chaque vignette relit son GPX), attend les vignettes visibles,
 //     laisse 3 s à l'écriture du magasin et relève l'empreinte SHA-1 de chaque image visible (la référence), puis le
-//     nombre et le poids moyen des images finies gardées (cache `tracker-vignettes-images` ; 0 avant le lot 121) ;
+//     nombre et le poids moyen des images finies gardées (cache `gtracker-vignettes-images` ; 0 avant le lot 121) ;
 //  3. relance la page trois fois, processeur ralenti six fois (`Emulation.setCPUThrottlingRate`), et mesure depuis la
 //     navigation : « trace », jusqu'à ce que chaque vignette visible porte une image (la trace seule, d'attente, compte) ;
 //     « fond », jusqu'à ce que chaque vignette visible ait montré son image finie (empreinte égale à la référence),
@@ -14,7 +14,7 @@
 // Les durées sont en secondes (le masque commun `N ms` les effacerait) et changent d'un passage à l'autre.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, connect } from './lib/cdp.mjs';
+import { BASE, CACHES, connect } from './lib/cdp.mjs';
 import { BLOCKED_EXCEPT_TILES, fakeTiles } from './lib/tuiles.mjs';
 
 const [port, workDir] = process.argv.slice(2);
@@ -80,8 +80,8 @@ const HASHES = `(async () => {
 })()`;
 /** Images finies gardées sur l'appareil (lot 121) : nombre et poids total, sans créer le cache s'il manque. */
 const KEPT_IMAGES = `(async () => {
-  if (!(await caches.has('tracker-vignettes-images'))) return { count: 0, bytes: 0 };
-  const cache = await caches.open('tracker-vignettes-images');
+  if (!(await caches.has('${CACHES.vignettesImages}'))) return { count: 0, bytes: 0 };
+  const cache = await caches.open('${CACHES.vignettesImages}');
   let count = 0;
   let bytes = 0;
   for (const request of await cache.keys()) {
@@ -155,7 +155,7 @@ const finalHashes = async (label) => {
 
 // 2. Premier lancement : rien de gardé.
 await go('/', 5000);
-await evaluate(`Promise.all(['tracker-vignettes', 'tracker-vignettes-images'].map((name) => caches.delete(name))).then(() => true, () => true)`);
+await evaluate(`Promise.all(['${CACHES.vignettes}', '${CACHES.vignettesImages}'].map((name) => caches.delete(name))).then(() => true, () => true)`);
 const firstMs = (await launch()).trace;
 console.log('1er lancement         :', firstMs == null ? '(vignettes absentes après 60 s)' : `${seconds(firstMs)}, sans ralenti`);
 const reference = await finalHashes('1er lancement');
