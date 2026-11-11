@@ -98,7 +98,7 @@ Celles d'un domaine sont dans `docs/DECISIONS.md`, celles de la disposition des 
 | `surfing/`, `SurfModule` | 4. Surf |
 | test de FC repos (`restingHrTest`, `RestingHrTestPage`, sous le Profil) | 5. Test de FC repos |
 | `recording/`, `useRecorder`, `RecordingPage`, pause, journal | 6. Enregistrement |
-| `planning/`, `PlanningPage`, `RoutesPage`, `usePlannedRoute`, profil BRouter (coûts des types de voie fixés avec l'utilisateur : ne pas les retoucher sans lui) | 7. Planification et itinéraires |
+| `planning/`, `PlanningPage`, `RoutesPage`, `usePlannedRoute` | 7. Planification et itinéraires |
 | `library/`, `useSessionLibrary`, `SessionLibrary`, `platform/memoryFolder.ts`, `platform/tileCache.ts`, fond des cartes (`BaseTileLayer`), réglages par appareil, GPX téléchargé | 8. Mémoire et fichiers |
 | `pages/ProfilePage`, `library/rootGrowth`, `ProfileRoot`, `ProfileAvatar`, `ProfilePrompt` | 9. Profil |
 | `pages/StatisticsPage` | 10. Statistiques |
