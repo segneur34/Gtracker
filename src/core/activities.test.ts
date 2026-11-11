@@ -10,7 +10,8 @@ import { SPORT_FAMILIES, usesMarkCourse } from './sportProfiles';
 const moth: Activity = { id: 'a-moth', name: 'Moth à foil', base: 'wingfoil', color: '#2e7d32' };
 const paddle: Activity = { id: 'a-paddle', name: 'Paddle', base: 'surf', color: '#847c6e' };
 const voile = DEFAULT_ACTIVITIES[0];
-const surfs = [SURF_ACTIVITY.name, SURF_FOIL_ACTIVITY.name];
+const voiles = DEFAULT_ACTIVITIES.filter((a) => activityFamily(a) === 'voile').map((a) => a.name);
+const surfs = DEFAULT_ACTIVITIES.filter((a) => activityFamily(a) === 'surf').map((a) => a.name);
 
 describe('readActivities', () => {
   it('rend celles du premier lancement quand la liste est absente', () => {
@@ -20,8 +21,26 @@ describe('readActivities', () => {
     expect(copy).not.toBe(DEFAULT_ACTIVITIES);
     copy[0].name = 'Autre';
     copy.pop();
-    expect(DEFAULT_ACTIVITIES[0].name).toBe('Voile');
-    expect(DEFAULT_ACTIVITIES.map((a) => [a.name, a.base])).toEqual([['Voile', 'wingfoil'], ['Surf', 'surf'], ['Surf foil', 'surf']]);
+    expect(DEFAULT_ACTIVITIES[0].name).toBe('Wingfoil');
+  });
+
+  it('la liste de départ (lot 335) : onze activités, leur calcul, quatre visibles', () => {
+    expect(DEFAULT_ACTIVITIES.map((a) => [a.id, a.name, a.base, a.hidden === true])).toEqual([
+      ['wingfoil', 'Wingfoil', 'wingfoil', false],
+      ['a-parawing', 'Parawing', 'wingfoil', true],
+      ['windsurf', 'Windsurf', 'windsurf', true],
+      ['a-windfoil', 'Windfoil', 'windsurf', true],
+      ['kite', 'Kite', 'kite', false],
+      ['a-kitefoil', 'Kitefoil', 'kite', true],
+      ['bateau', 'Bateau', 'bateau', true],
+      ['surf', 'Surf', 'surf', false],
+      ['a-paddle', 'Paddle', 'surf', true],
+      ['a-surf-foil', 'Surf foil', 'surf', true],
+      ['a-pumping', 'Pumping', 'surf', false],
+    ]);
+    expect(visibleActivities(DEFAULT_ACTIVITIES, []).map((a) => a.name)).toEqual(['Wingfoil', 'Kite', 'Surf', 'Pumping']);
+    // Les nuances sont celles de la famille, sans septième.
+    for (const a of DEFAULT_ACTIVITIES) expect(FAMILY_SHADES[activityFamily(a)]).toContain(a.color);
   });
 
   it('garde une liste vide, écarte les entrées abîmées et les doublons', () => {
@@ -70,13 +89,13 @@ describe('insertActivity', () => {
   const names = (list: Activity[]) => list.map((a) => a.name);
 
   it('range une activité après la dernière de sa famille', () => {
-    expect(names(insertActivity(DEFAULT_ACTIVITIES, moth))).toEqual(['Voile', 'Moth à foil', ...surfs]);
-    expect(names(insertActivity(DEFAULT_ACTIVITIES, paddle))).toEqual(['Voile', ...surfs, 'Paddle']);
+    expect(names(insertActivity(DEFAULT_ACTIVITIES, moth))).toEqual([...voiles, 'Moth à foil', ...surfs]);
+    expect(names(insertActivity(DEFAULT_ACTIVITIES, paddle))).toEqual([...voiles, ...surfs, 'Paddle']);
   });
 
   it('sans activité de sa famille, la place avant les familles qui la suivent', () => {
     expect(names(insertActivity([SURF_ACTIVITY], moth))).toEqual(['Moth à foil', 'Surf']);
-    expect(names(insertActivity([voile], paddle))).toEqual(['Voile', 'Paddle']);
+    expect(names(insertActivity([voile], paddle))).toEqual(['Wingfoil', 'Paddle']);
     expect(names(insertActivity([], moth))).toEqual(['Moth à foil']);
   });
 });
@@ -150,8 +169,9 @@ describe('activityCounts', () => {
 });
 
 describe('familles et activités cachées (point 100)', () => {
+  // Surf foil est déjà cachée au départ : `hiddenFoil` en garde la forme, `withFoilHidden` est la liste de départ.
   const hiddenFoil = withHidden(SURF_FOIL_ACTIVITY, true);
-  const withFoilHidden = DEFAULT_ACTIVITIES.map((a) => (a.id === SURF_FOIL_ACTIVITY.id ? hiddenFoil : a));
+  const withFoilHidden = DEFAULT_ACTIVITIES;
 
   it('readActivities garde « hidden: true » et ignore toute autre valeur', () => {
     const [kept, ignored] = readActivities([{ ...moth, hidden: true }, { ...paddle, hidden: 'oui' }]);
@@ -185,7 +205,7 @@ describe('familles et activités cachées (point 100)', () => {
   it('visibleFamilies et visibleActivities', () => {
     expect(visibleFamilies(withFoilHidden, ['surf'])).toEqual(['voile']);
     expect(visibleFamilies(withFoilHidden, [])).toEqual(['voile', 'surf']);
-    expect(visibleActivities(withFoilHidden, [], 'surf').map((a) => a.name)).toEqual(['Surf']);
+    expect(visibleActivities(withFoilHidden, [], 'surf').map((a) => a.name)).toEqual(['Surf', 'Pumping']);
     expect(visibleActivities(withFoilHidden, []).map((a) => a.name)).not.toContain('Surf foil');
   });
 

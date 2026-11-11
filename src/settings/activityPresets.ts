@@ -24,6 +24,10 @@ export interface ActivityPreset {
   jumps?: JumpSettings;
   /** Virages du surf mesurés par le gyroscope (case « Mesurer les virages »). */
   turns?: boolean;
+  /** Foil coché d'office, à la place du défaut du calcul (activités de départ « foil »). */
+  foil?: boolean;
+  /** Mesure du pumping cochée d'office (activité de départ « Pumping »). */
+  pumping?: boolean;
   heartRate?: boolean;
   /** Onglets des analyses montrés ou cachés à l'écart de ceux du module. */
   tabs?: Record<string, boolean>;
@@ -52,11 +56,19 @@ const BASE_PRESETS: Partial<Record<SportType, ActivityPreset>> = {
   kite: { jumps: { enabled: true, placement: 'poitrine', minHeightM: 1 } },
 };
 
-/** Par activité de départ (`core/activities.ts`) : remplace en entier celui de son calcul. */
+/**
+ * Par activité de départ (`core/activities.ts`) : remplace en entier celui de son calcul,
+ * d'où la reprise de celui du calcul quand l'activité n'ajoute que le foil.
+ */
 const ACTIVITY_PRESETS: Partial<Record<string, ActivityPreset>> = {
   // Virages mesurés d'office en surf (lot 40) ; le paddle, le kayak, le downwind, créés sur le même calcul, non.
   surf: { turns: true },
-  'a-surf-foil': { turns: true },
+  'a-surf-foil': { turns: true, foil: true },
+  // Pumping : un surf foil dont la mesure du pumping est cochée d'office (lot 335).
+  'a-pumping': { turns: true, foil: true, pumping: true },
+  // Foil coché d'office sur la planche et le kite ; le reste suit le calcul (wingfoil : foil par son profil).
+  'a-windfoil': { ...WING, foil: true },
+  'a-kitefoil': { ...BASE_PRESETS.kite, foil: true },
 };
 
 const NO_PRESET: ActivityPreset = {};

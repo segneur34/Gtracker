@@ -15,7 +15,9 @@ describe('icônes des activités', () => {
   });
 
   it('donne la sienne à chaque activité de départ', () => {
-    expect(DEFAULT_ACTIVITIES.map(activityIcon)).toEqual(['wingfoil', 'surf', 'surf-foil']);
+    expect(DEFAULT_ACTIVITIES.map(activityIcon)).toEqual([
+      'wingfoil', 'wingfoil', 'planche', 'planche', 'kite', 'kite', 'bateau', 'surf', 'paddle', 'surf-foil', 'surf-foil',
+    ]);
   });
 
   it('garde au Surf foil de départ son icône quand il est renommé', () => {
@@ -54,6 +56,9 @@ describe('icônes des activités', () => {
     expect(guessActivityBase('Planche', 'voile')).toBe('windsurf');
     expect(guessActivityBase('Windfoil', 'voile')).toBe('windsurf');
     expect(guessActivityBase('Wing', 'voile')).toBe('wingfoil');
+    // Les noms de départ (lot 335) : « Parawing » ne dit rien au mot-clé, le premier calcul de la voile est le wingfoil.
+    expect(guessActivityBase('Parawing', 'voile')).toBe('wingfoil');
+    expect(guessActivityBase('Windsurf', 'voile')).toBe('windsurf');
     // Un nom qui ne dit rien : le premier calcul de la famille.
     expect(guessActivityBase('Sortie', 'voile')).toBe('wingfoil');
     expect(guessActivityBase('', 'voile')).toBe('wingfoil');

@@ -48,3 +48,67 @@ L'étape 3 du lot 329 (découpage de `useRecorder.ts` en quatre pièces) n'est *
 - `npx vitest run src/hooks/useRecorder.test.ts src/hooks/useRecorder.resume.test.ts src/recording`, puis `node outils/verif.mjs --rapide`.
 - Banc : `session-save`, `session-save-resume`, `gps-perdu`, `notification`, `carte-direct`, `balises` (parcours de fin changé : le dire, le reste identique).
 - Essai au téléphone (un seul) : enregistrer deux minutes, finir → l'analyse s'ouvre seule ; « … », tenir « Jeter » une seconde, confirmer → la session disparaît ; puis enregistrer, couper l'application, la rouvrir → la session reprise se range et s'ouvre.
+
+## Plan (agent Plan, 11/11) et choix de l'orchestrateur
+
+Le plan ci-dessous complète le brief ; en cas d'écart, il l'emporte sur les sections « À faire » et « Vérification » plus haut.
+
+### Tranché par l'orchestrateur (ne pas reposer)
+
+- **Matériel de fin de session** (décision du §2 de DECISIONS, carte « Session terminée ») : la carte disparaît du parcours normal ; le matériel se choisit dans l'onglet « matos et conditions » de l'analyse, et la rangée ne reste que sur l'écran filet. L'analyse s'ouvre sur « général » seul, comme toujours. À faire confirmer par l'utilisateur à l'arrêt du paquet : garder ce point isolé et facile à changer.
+- **Session reprise après une coupure, encore continuable** (`canContinue`) : pour ce seul cas, la carte « Continuer / Analyser / Jeter » reste ; on ne range pas seul, pour ne pas perdre « Continuer l'enregistrement ». À faire confirmer aussi.
+- Confirmation par `window.confirm` (le banc sait la remplacer) ; durée de l'appui en constante d'interface (1 s) ; avertissements de l'enregistreur montrés dans l'analyse, jamais par `alert` ; navigation en `replace` depuis `/enregistrer` ; le « Jeter » de l'écran filet reste un simple bouton avec confirmation.
+
+### Fichiers à modifier
+
+- `src/hooks/useRecorder.ts` : `rangePendingSession` en deux `try` (329 étape 1) ; `catch` dans `discardPendingSession` (329 étape 2) ; fonction neuve `finishPendingSession()` qui range seule la session en attente, une seule fois par session (marquée, pour ne pas boucler sur un échec), ne fait rien pendant un rangement en cours, ignore une session `canContinue` ; commentaires du foil, du journal sans position, de l'en-tête et de `PendingSession`. Les lignes `:106-108` relèvent d'un autre lot : ne pas y toucher.
+- `src/App.tsx` : pièce `FinishRecording`, à côté de `LandOnRecording`, toujours montée ; elle appelle `finishPendingSession` puis ouvre `analysisPath(...)`.
+- `src/pages/RecordingPage.tsx` : la carte d'attente devient le filet (rangement échoué ou qui ne s'applique pas ; pendant le rangement, une ligne « Rangement… ») ; `handleDiscard` reçoit un `catch` ; la carte « Session rangée » ne reste que si la session n'a pas pu entrer dans la mémoire ou reste à classer ; retirer le texte « Analyser la range… l'abandonne ».
+- `src/components/SessionNameEditor.tsx` : entrée « Jeter » en dernier ; prop `back`, passée par `src/components/AnalysisShell.tsx`.
+- `src/components/AnalysisShell.tsx` : un avertissement de l'enregistreur s'affiche dans l'analyse quand `saved.libraryFile === file` ; sa fermeture appelle `dismissRecorderResult`.
+- `src/components/ui/HoldButton.tsx` : prop `hint` (défaut : le texte actuel « Maintenir X s pour arrêter »), `icon`, `aria-label`.
+- `src/components/ui/MoreMenu.tsx` : une entrée marquée `data-keep-open` ne referme pas le menu au clic.
+- `src/components/icons.tsx` : `IconTrash` (n'existe pas). `src/components/ui/ui.css` : couleur danger d'un bouton dans `.ui-more__panel`, par les variables du thème.
+- `src/hooks/leaveGuard.ts` : `dropLeaveWarning()`, qui abandonne le brouillon sans redemander.
+- `src/tutorials/lessons.ts` : lignes `:37`, `:45` et `:203` seulement (les lignes `:142-153`, leçon de planification, sont au lot 304).
+- Tests : `src/hooks/useRecorder.test.ts` (ajouter `removeFails` au faux journal), `src/hooks/useRecorder.resume.test.ts`.
+
+Pièces existantes à réutiliser : `analyzePendingSession` (promesse partagée `ranging`), `useOpenSession`, `analysisPath` et `libraryPath` (`core/parentPage.ts`), `removeSession`, `useLongPress`, `HoldButton`, `HoldDial`, `confirmLeave` et `useLeaveWarning`, `dismissRecorderResult`.
+
+### Parcours de fin
+
+- **Arrêt normal** : `FinishRecording` voit la session en attente, la range une fois, puis `dismissRecorderResult` et ouverture de l'analyse en `replace`. Le retour d'Android mène à la bibliothèque.
+- **Arrêt depuis la notification** : n'existe pas (la notification n'a pas de bouton). Le rangement appartient au module : il aboutit même si la page est quittée pendant le calcul.
+- **Application coupée puis rouverte** : `recoverOnce` remet la session en attente ; `FinishRecording` la range et ouvre l'analyse depuis l'accueil, seulement si `confirmLeave()` l'accepte ; exception `canContinue` (voir plus haut).
+- **Rangement qui échoue** : la session reste en attente avec son message actuel, à l'octet ; pas de relance automatique ; le filet garde Analyser (pour réessayer), Analyser sans les capteurs, Continuer, Télécharger le GPX, le matériel de fin, le partage et Jeter.
+- **Session rangée sans fichier dans la mémoire** (aucun dossier mémoire, ou session à classer) : pas d'ouverture, la carte « Session rangée » reste.
+- **Avertissements posés à l'arrêt** (« Capteurs : … ») et message de l'étape 1 du 329 : ils restent dans `state.error` et l'analyse ouverte les affiche.
+
+### Étapes
+
+1. 329 étape 1 : GPX dans un premier `try` (message actuel) ; ménage (journal puis `.imu`) dans un second qui, en cas d'échec, pose quand même `saved` avec « Session rangée ; le journal d'enregistrement n'a pas pu être effacé ».
+2. 329 étape 2 : `discardPendingSession` en `try/catch`, la session reste en attente, message « La session n'a pas pu être jetée : … ».
+3. `finishPendingSession` et ses tests.
+4. `FinishRecording` et l'affichage des avertissements dans l'analyse.
+5. Carte de `RecordingPage` réduite au filet.
+6. `HoldButton`, `MoreMenu`, `IconTrash`, couleur danger, `dropLeaveWarning`.
+7. « Jeter » dans `SessionNameEditor` : tenu 1 s, puis `window.confirm` (le texte ajoute que les modifications non enregistrées seront perdues s'il y a un brouillon) ; ensuite `dropLeaveWarning()`, navigation vers `back` en `replace`, puis `removeSession(file)` dont l'échec s'affiche sur la bibliothèque ; caché pour une fiche en lecture seule, comme « Supprimer » dans la bibliothèque.
+8. `lessons.ts`.
+9. Banc.
+
+L'entrée tenue dans un menu : un appui court affiche en place « Maintenir 1 s pour jeter » (`data-keep-open`) ; `aria-label` du type « Jeter la session : maintenir une seconde » ; au clavier, Espace ou Entrée tenus 1 s ; Échap ferme le menu ; vérifier que le cadran `HoldDial` se voit (le panneau du menu est en position absolue).
+
+### Tests
+
+- `useRecorder.test.ts` : journal qui refuse de s'effacer → `saved` posé, `pending` vide, message exact ; GPX qui refuse de s'écrire → message inchangé ; « Jeter » dont le `remove` échoue → session en attente, message, aucune promesse rejetée ; `finishPendingSession` (une fois par session, pas de relance après un échec, rien pendant un rangement en cours, ignore `canContinue`).
+- `useRecorder.resume.test.ts` : session reprise sans `canContinue` → rangée ; avec → laissée en attente.
+
+### Banc
+
+- Aide commune dans `outils/banc/lib/` : attendre `/analyse`, ouvrir « … », `pointerdown` sur Jeter, attendre 1,1 s, confirmation remplacée.
+- À mettre au nouveau parcours dans ce lot : `carte-direct`, `balises`, `notification`, `fluidite`, `gps-perdu`, `rendus`, `session-save`, `session-save-resume` (ajouter à la fin « Jeter » avec un brouillon ouvert → bibliothèque, session absente) ; noter le changement dans `outils/banc/SCRIPTS.md`.
+- Cassent aussi (ils cliquent « Analyser » après l'arrêt) et partent au lot 330, à lister dans le rapport : `activite`, `allure-session`, `bench`, `library`, `notes`, `partage`, `materiel-fin`, `tutoriels`. Si l'aide commune les répare en une ligne chacun, le faire et le dire.
+
+### Phrases de DECISIONS à changer à la passe de doc
+
+§6 ligne 64 (« À l'arrêt, rien n'est rangé… ») ; §2 ligne 37 (matériel proposé sur la carte « Session terminée ») ; §3 ligne 42 (« élaguée à « Analyser » »).

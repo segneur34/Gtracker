@@ -81,18 +81,30 @@ export const BASE_COLOR: Record<SportType, string> = {
   surf: FAMILY_SHADES.surf[0],
 };
 
-/** Activités de la famille Surf (§10, point 97) ; le foil de « Surf foil » est coché d'office (`useSportSettings.ts`). */
+/** Activités de la famille Surf (§10, point 97) ; le foil de « Surf foil » et de « Pumping » est coché d'office (`settings/activityPresets.ts`). */
 export const SURF_ACTIVITY: Activity = { id: 'surf', name: 'Surf', base: 'surf', color: BASE_COLOR.surf };
-export const SURF_FOIL_ACTIVITY: Activity = { id: 'a-surf-foil', name: 'Surf foil', base: 'surf', color: FAMILY_SHADES.surf[1] };
+export const SURF_FOIL_ACTIVITY: Activity = { id: 'a-surf-foil', name: 'Surf foil', base: 'surf', color: FAMILY_SHADES.surf[1], hidden: true };
 
 /**
- * Au premier lancement : Voile, sur l'identifiant de son calcul (celui des
- * anciens réglages), et les deux du surf.
+ * Au premier lancement (lot 335) : onze activités, quatre visibles (Wingfoil,
+ * Kite, Surf, Pumping) et sept cachées, que l'œil de Réglages ré-affiche. La
+ * principale de chaque calcul porte l'identifiant du calcul (celui des anciens
+ * réglages), les autres le préfixe `a-`. Le foil et le pumping d'office sont dans
+ * `settings/activityPresets.ts`. Les couleurs sont les six nuances de la famille,
+ * Windfoil et Kitefoil reprenant celle de leur calcul (provisoire, élément 338).
  */
 export const DEFAULT_ACTIVITIES: Activity[] = [
-  { id: 'wingfoil', name: 'Voile', base: 'wingfoil', color: BASE_COLOR.wingfoil },
+  { id: 'wingfoil', name: 'Wingfoil', base: 'wingfoil', color: BASE_COLOR.wingfoil },
+  { id: 'a-parawing', name: 'Parawing', base: 'wingfoil', color: FAMILY_SHADES.voile[2], hidden: true },
+  { id: 'windsurf', name: 'Windsurf', base: 'windsurf', color: BASE_COLOR.windsurf, hidden: true },
+  { id: 'a-windfoil', name: 'Windfoil', base: 'windsurf', color: BASE_COLOR.windsurf, hidden: true },
+  { id: 'kite', name: 'Kite', base: 'kite', color: BASE_COLOR.kite },
+  { id: 'a-kitefoil', name: 'Kitefoil', base: 'kite', color: BASE_COLOR.kite, hidden: true },
+  { id: 'bateau', name: 'Bateau', base: 'bateau', color: BASE_COLOR.bateau, hidden: true },
   SURF_ACTIVITY,
+  { id: 'a-paddle', name: 'Paddle', base: 'surf', color: FAMILY_SHADES.surf[2], hidden: true },
   SURF_FOIL_ACTIVITY,
+  { id: 'a-pumping', name: 'Pumping', base: 'surf', color: FAMILY_SHADES.surf[3] },
 ];
 
 /** Calcul par défaut d'une famille, pour un module sans activité. */

@@ -1,5 +1,5 @@
 import {
-  FAMILY_BASE, SURF_FOIL_ACTIVITY, activitiesOfFamily, activityFamily, activityTreatment, baseActivity, findActivity,
+  FAMILY_BASE, activitiesOfFamily, activityFamily, activityTreatment, baseActivity, findActivity,
   readActivities, visibleFamilies, type Activity,
 } from '../core/activities';
 import { presetOf } from './activityPresets';
@@ -294,9 +294,12 @@ export const resolveDistanceUnit = (stored: StoredSettings, activity: Activity):
 const sanitizeNotificationFields = (value: unknown, activity: Activity): LiveFieldKey[] | null =>
   sanitizeLiveFields(value, activityTreatment(activity), MAX_NOTIFICATION_FIELDS, 'notification');
 
-/** Foil d'une activité sans réglage : coché pour « Surf foil » (point 97), sinon le défaut du calcul. */
+/** Foil d'une activité sans réglage : celui de son pré-réglage (Windfoil, Kitefoil, Surf foil, Pumping), sinon le défaut du calcul. */
 export const defaultFoil = (activity: Activity): boolean =>
-  activity.id === SURF_FOIL_ACTIVITY.id || getSportProfile(activity.base).foilDefault;
+  presetOf(activity).foil ?? getSportProfile(activity.base).foilDefault;
+
+/** Pumping d'une activité sans réglage : coché pour « Pumping » seulement. */
+export const defaultPumpingOf = (activity: Activity): boolean => presetOf(activity).pumping ?? false;
 
 /** Foil d'une activité : celui réglé, sinon son défaut ; `null` hors voile et surf. */
 export const resolveFoil = (stored: StoredSettings, activity: Activity): boolean | null => {
@@ -306,10 +309,11 @@ export const resolveFoil = (stored: StoredSettings, activity: Activity): boolean
   return typeof foil === 'boolean' ? foil : defaultFoil(activity);
 };
 
-/** Pumping foil d'une activité : celui réglé, sinon non ; `null` si son calcul ne le mesure pas (bateau). */
+/** Pumping foil d'une activité : celui réglé, sinon son défaut ; `null` si son calcul ne le mesure pas (bateau). */
 export const resolvePumping = (stored: StoredSettings, activity: Activity): boolean | null => {
   if (getSportProfile(activity.base).pump === null) return null;
-  return stored.pumping?.[activity.id] === true;
+  const own = stored.pumping?.[activity.id];
+  return typeof own === 'boolean' ? own : defaultPumpingOf(activity);
 };
 
 /** Virages mesurés par le gyroscope : ceux réglés, sinon le défaut de l'activité ; `null` hors surf. */
@@ -554,11 +558,11 @@ export const SETTING_FIELDS: Record<SettingField, SettingFieldRule> = {
   },
   pumping: {
     key: 'pumping',
-    // Seul « oui » est rangé.
+    // Seul l'écart à son défaut est rangé : décocher le pumping d'office de « Pumping » range « non ».
     normalize: (v, activity, stored) => {
       if (!activity || resolvePumping(stored, activity) === null) return undefined;
       const on = booleanOrNull(v);
-      return on === undefined ? undefined : on === true ? true : null;
+      return on === undefined ? undefined : on === null || on === defaultPumpingOf(activity) ? null : on;
     },
   },
   turns: {
@@ -640,7 +644,7 @@ export const isActivityOverridden = (s: SportSettingsView): boolean => {
   return (
     s.isSpeedUnitOverridden || s.isDistanceUnitOverridden || (withThreshold && s.isThresholdOverridden) || s.isAutoPauseOverridden || s.speedRange !== null ||
     s.isLiveFieldsOverridden || s.isNotificationFieldsOverridden || s.isMarkGuideOverridden || s.isHrOffsetOverridden || s.gearLabels !== null || s.isTabsOverridden ||
-    s.isFoilOverridden || s.pumping === true || s.isTurnsOverridden || s.isJumpsOverridden || s.isHeartRateOverridden || s.hrZoneLines
+    s.isFoilOverridden || (s.pumping !== null && s.pumping !== defaultPumpingOf(activity)) || s.isTurnsOverridden || s.isJumpsOverridden || s.isHeartRateOverridden || s.hrZoneLines
   );
 };
 

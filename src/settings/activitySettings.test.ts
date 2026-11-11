@@ -8,7 +8,7 @@ import {
   PER_ACTIVITY_KEYS, TREATMENT_UNITS, defaultAutoPauseOf, defaultHeartRateOf,
   defaultHrOffsetOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultSpeedRangeOf, defaultSpeedUnitOf,
   defaultThresholdOf, hiddenFamiliesOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, rangeFollowsPace, resetOverrides,
-  resolveJumps, resolveRecordingProfile, resolveThresholdOverride, resolveTurns, defaultTurnsOf, withVisibility,
+  resolveFoil, resolveJumps, resolvePumping, resolveRecordingProfile, resolveThresholdOverride, resolveTurns, defaultTurnsOf, withVisibility,
   SETTING_FIELDS, defaultTabsOf, effectiveHrZoneLines, settingsView, tabsAfterJumpsChange, thresholdFollowsPace, withSetting, type StoredSettings,
 } from './activitySettings';
 
@@ -108,10 +108,36 @@ describe('virages mesurés par le gyroscope (lot 40)', () => {
     expect(resolveTurns(off, surf)).toBe(false);
     expect(settingsView(off, surf).isTurnsOverridden).toBe(true);
     expect(withSetting(off, surf.id, 'turns', true)!.turns).toEqual({});
-    expect(withSetting({}, paddle.id, 'turns', true)).toBeNull(); // activité inconnue des réglages : refusée
+    expect(withSetting({}, 'a-inconnue', 'turns', true)).toBeNull(); // activité inconnue des réglages : refusée
     expect(withSetting({ activities: [paddle] } as StoredSettings, paddle.id, 'turns', true)!.turns).toEqual({ 'a-paddle': true });
     expect(withSetting({}, 'wingfoil', 'turns', true)).toBeNull();
     expect(settingsView({}, surf).isTurnsOverridden).toBe(false);
+  });
+});
+
+describe("foil et pumping d'office des activités de départ (lot 335)", () => {
+  it('foil coché pour Wingfoil, Parawing, Windfoil, Kitefoil, Surf foil et Pumping, pas pour les autres', () => {
+    const on = DEFAULT_ACTIVITIES.filter((a) => resolveFoil({}, a)).map((a) => a.id);
+    expect(on).toEqual(['wingfoil', 'a-parawing', 'a-windfoil', 'a-kitefoil', 'a-surf-foil', 'a-pumping']);
+  });
+
+  it('pumping coché pour Pumping seul ; bateau : sans objet', () => {
+    expect(DEFAULT_ACTIVITIES.filter((a) => resolvePumping({}, a)).map((a) => a.id)).toEqual(['a-pumping']);
+    expect(resolvePumping({}, byId('bateau'))).toBeNull();
+  });
+
+  it("seul l'écart au défaut du pumping est rangé", () => {
+    const pumping = byId('a-pumping');
+    const stored = { activities: DEFAULT_ACTIVITIES } as StoredSettings;
+    expect(isActivityOverridden(settingsView(stored, pumping))).toBe(false);
+    const off = withSetting(stored, pumping.id, 'pumping', false)!;
+    expect(off.pumping).toEqual({ 'a-pumping': false });
+    expect(resolvePumping(off, pumping)).toBe(false);
+    expect(isActivityOverridden(settingsView(off, pumping))).toBe(true);
+    expect(withSetting(off, pumping.id, 'pumping', true)!.pumping).toEqual({});
+    const wing = byId('wingfoil');
+    expect(withSetting(stored, wing.id, 'pumping', true)!.pumping).toEqual({ wingfoil: true });
+    expect(withSetting(stored, wing.id, 'pumping', false)!.pumping).toEqual({});
   });
 });
 

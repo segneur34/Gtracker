@@ -42,7 +42,7 @@ const BASE_ICON: Record<SportType, ActivityIconId> = {
 };
 
 /** Activités de départ qui partagent leur calcul avec une autre (`DEFAULT_ACTIVITIES`). */
-const ID_ICON: Record<string, ActivityIconId> = { 'a-surf-foil': 'surf-foil' };
+const ID_ICON: Record<string, ActivityIconId> = { 'a-surf-foil': 'surf-foil', 'a-pumping': 'surf-foil' };
 
 /** Mots du nom, du plus précis au plus large : « paddle foil » avant « paddle », avant « foil ». */
 const NAME_ICON: { pattern: RegExp; icon: ActivityIconId; bases?: readonly SportType[] }[] = [
