@@ -583,6 +583,11 @@
   flex-shrink: 0;
 }
 
+/* Une action qui détruit (« Jeter ») garde sa couleur dans le menu. */
+.ui-more__panel .ui-btn--danger {
+  color: var(--danger);
+}
+
 @media (hover: hover) {
   .ui-more__panel .ui-btn:not(:disabled):not(.ui-btn--off):hover {
     filter: none;

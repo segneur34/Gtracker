@@ -3,6 +3,7 @@
 // Usage : node library.mjs <port> <dossier des GPX : voile.gpx, course.gpx, sans-type.gpx> <dossier des captures>
 import { join } from 'node:path';
 import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
+import { attendreAnalyse } from './lib/fin-enregistrement.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, gpxDir, shotDir] = process.argv.slice(2);
@@ -45,7 +46,7 @@ await go('/voile');
 console.log(await lines(/session|mémoire|Aucune/));
 await shot('voile-vide-mobile', 390, 844, true);
 
-step('2. Rejeu ×600, Arrêter, Analyser');
+step('2. Rejeu ×600, Arrêter, analyse ouverte seule');
 await go('/enregistrer');
 await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click(); 'ok'`);
 await wait(300);
@@ -59,7 +60,7 @@ console.log('Arrêter :', await holdStop());
 await waitFor(async () => (await records())?.length >= 1, { timeout: 6000, label: 'fiche rangée' });
 await settle({ max: 3000 });
 console.log(await lines(/points|Rangée|Session/));
-console.log('Analyser :', await clickText('Analyser'));
+console.log('analyse ouverte seule (lot 313) :', await attendreAnalyse(evaluate));
 await settle({ max: 6000 });
 console.log('url :', await evaluate('location.pathname + location.search'));
 console.log('h1 :', await evaluate(`document.querySelector('h1')?.textContent`), '| segments :', await evaluate(`document.querySelectorAll('path.leaflet-interactive').length`));

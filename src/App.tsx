@@ -1,9 +1,13 @@
-import { lazy, useEffect } from 'react';
-import { BrowserRouter as Router, Navigate, Routes, Route, useNavigate } from 'react-router-dom';
-import { RESTING_HR_PATH } from './core/parentPage';
+import { lazy, useEffect, useRef } from 'react';
+import { BrowserRouter as Router, Navigate, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { RESTING_HR_PATH, analysisPath } from './core/parentPage';
+import { sportFamily } from './core/sportProfiles';
 import AppShell from './components/AppShell';
 import { DevThrow } from './components/ErrorBoundary';
-import { acknowledgeRecordingLanding, useRecorderSelector } from './hooks/useRecorder';
+import { confirmLeave } from './hooks/leaveGuard';
+import {
+  acknowledgeRecordingLanding, dismissRecorderResult, finishPendingSession, getRecorderState, markRecorderResultOpened, useRecorderSelector,
+} from './hooks/useRecorder';
 import Home from './pages/Home';
 
 /**
@@ -89,11 +93,46 @@ function LandOnRecording() {
   return null;
 }
 
+/**
+ * Fin d'un enregistrement (lot 313) : la session en attente se range seule (`finishPendingSession`), à l'arrêt comme
+ * à la réouverture après une coupure, puis son analyse s'ouvre, à la place de la page Enregistrer (le retour mène à
+ * la bibliothèque). Un message de l'enregistreur (avertissement de l'arrêt, ménage en échec) reste pour l'analyse,
+ * qui le montre. Rien ne s'ouvre si le rangement échoue (la carte de la session sert de filet), si la session n'est
+ * pas entrée dans la mémoire ou reste à classer, ou si un brouillon ouvert n'est pas abandonné (`confirmLeave`) : la
+ * carte « Session rangée » d'Enregistrer l'annonce alors, avec son message et « Analyser ». Une session reprise qui
+ * peut continuer attend « Continuer » sur Enregistrer.
+ */
+function FinishRecording() {
+  const pending = useRecorderSelector((s) => s.pending);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  /** Page affichée à la fin du rangement, lue sans relancer l'effet à chaque navigation. */
+  const where = useRef(pathname);
+  useEffect(() => {
+    where.current = pathname;
+  });
+  useEffect(() => {
+    if (pending === null) return;
+    void finishPendingSession().then((saved) => {
+      if (saved?.libraryFile == null || saved.sport === null) return;
+      // Brouillon gardé : rien ne s'ouvre, la carte « Session rangée » d'Enregistrer reste (`resultOpened` faux).
+      if (!confirmLeave()) return;
+      if (getRecorderState().error === null) dismissRecorderResult();
+      else markRecorderResultOpened();
+      // Depuis Enregistrer, l'analyse prend sa place dans l'historique.
+      const fromRecording = where.current.replace(/\/+$/, '') === '/enregistrer';
+      navigate(analysisPath(sportFamily(saved.sport), saved.libraryFile), { replace: fromRecording });
+    });
+  }, [pending, navigate]);
+  return null;
+}
+
 function App() {
   useEffect(preloadPages, []);
   return (
     <Router>
       <LandOnRecording />
+      <FinishRecording />
       <Routes>
         {/* Toutes les pages dans le même cadre : navigation et bandeau d'enregistrement. */}
         <Route element={<AppShell />}>

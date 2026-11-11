@@ -52,6 +52,10 @@ const makeBrowser = (answers: boolean[]) => {
       entries.push({ href, guard: false });
       at += 1;
     },
+    /** Navigation du routeur qui remplace l'entrée courante (`replace: true`). */
+    replace: (href: string) => {
+      entries[at] = { href, guard: false };
+    },
     here: () => ({ ...entries[at], at, length: entries.length }),
   };
 };
@@ -130,6 +134,46 @@ describe('createHistoryGuard', () => {
     b.userBack();
     expect(b.here()).toEqual({ href: '/s', guard: false, at: 1, length: 4 });
     expect(b.asked).toHaveLength(0);
+  });
+
+  it('levée avant de remplacer la page (« Jeter », lot 313) : attendue, puis le retour ne ramène pas à la page quittée', async () => {
+    const b = makeBrowser([]);
+    b.guard.arm();
+    let released = false;
+    const done = b.guard.disarm().then(() => {
+      released = true;
+    });
+    await Promise.resolve();
+    // Le retrait est en route : remplacer maintenant écraserait la garde, l'analyse resterait dessous.
+    expect(released).toBe(false);
+    b.flush();
+    await done;
+    expect(b.here()).toEqual({ href: '/s', guard: false, at: 1, length: 3 });
+    // Le routeur remplace la page quittée par la bibliothèque : le retour mène à l'entrée d'avant, jamais à `/s`.
+    b.replace('/voile');
+    b.userBack();
+    expect(b.here().href).toBe('/a');
+    expect(b.asked).toHaveLength(0);
+  });
+
+  it('remplacer sans attendre la levée laisserait la page quittée sous la bibliothèque (le défaut évité)', () => {
+    const b = makeBrowser([]);
+    b.guard.arm();
+    b.replace('/voile');
+    void b.guard.disarm();
+    b.flush();
+    b.userBack();
+    expect(b.here().href).toBe('/s');
+  });
+
+  it('rien à retirer : la levée est tenue tout de suite', async () => {
+    const b = makeBrowser([]);
+    await expect(b.guard.disarm()).resolves.toBeUndefined();
+    b.guard.arm();
+    b.navigate('/liste');
+    // Garde restée dessous (départ par un lien) : rien à reculer, rien à attendre.
+    await expect(b.guard.disarm()).resolves.toBeUndefined();
+    expect(b.here().href).toBe('/liste');
   });
 
   it('un popstate sans garde posée ne fait rien', () => {

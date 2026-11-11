@@ -207,6 +207,15 @@ export const IconDownload = ({ size = 20, ...props }: IconProps) => (
   </svg>
 );
 
+/** Corbeille : jeter une session. */
+export const IconTrash = ({ size = 20, ...props }: IconProps) => (
+  <svg {...strokeProps(size)} {...props}>
+    <path d="M4 7h16M9 7V4.5h6V7" />
+    <path d="M6.5 7l1 12.5h9l1-12.5" />
+    <path d="M10 11v5M14 11v5" />
+  </svg>
+);
+
 /** Trois points reliés, comme le partage d'Android : partager l'image d'une session. */
 export const IconShare = ({ size = 20, ...props }: IconProps) => (
   <svg {...strokeProps(size)} {...props}>

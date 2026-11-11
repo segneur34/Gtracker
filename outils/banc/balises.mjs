@@ -16,6 +16,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BASE, CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
+import { analyseOuvertePuisJetee } from './lib/fin-enregistrement.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -256,8 +257,8 @@ console.log(beeps.map((b, k) => {
   check('bips ×1 : autant de courts dans les deux approches (à un près)', approche1.length > 0 && Math.abs(approche1.length - approche2.length) <= 1, `${approche1.length} / ${approche2.length}`);
 }
 console.log('Arrêter :', await holdStop());
-await wait(1500);
-console.log('Jeter :', await clickButton('Jeter'));
+// Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
+console.log('Jeter :', await analyseOuvertePuisJetee(evaluate));
 await wait(1000);
 
 // 3. Rejeu ×10, bips propres au parcours (validation à 280 m) : « Passer » puis « Bips » coupés.
@@ -288,8 +289,7 @@ console.log('fin :', await guideCard(), '; bips après la coupure :', apresCoupu
   '; avant :', beeps.filter((b) => b.at <= mutedAt).map((b) => b.text.split(' ')[1]).join(', '));
 check('bips coupés : aucun son ensuite', apresCoupure === 0, apresCoupure);
 await holdStop();
-await wait(1500);
-await clickButton('Jeter');
+console.log('Jeter :', await analyseOuvertePuisJetee(evaluate));
 await wait(1000);
 
 // 4. Réglages : éditeur de la courbe.

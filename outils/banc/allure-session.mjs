@@ -6,6 +6,7 @@
 // Depuis le 28/10, le champ « Allure de la session » est dans l'onglet « réglages » de l'analyse voile
 // (panneau « Réglages de la session ») : le script ouvre cet onglet avant de le lire.
 import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
+import { attendreAnalyse } from './lib/fin-enregistrement.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, gpx1, gpx2] = process.argv.slice(2);
@@ -60,8 +61,7 @@ const recordAndAnalyse = async (gpx) => {
   await clickText('Démarrer');
   await wait(8000);
   await holdStop();
-  await waitFor("[...document.querySelectorAll('button')].some((x) => x.textContent.trim().startsWith('Analyser'))", { timeout: 2500, label: 'bouton Analyser' });
-  console.log('Analyser :', await clickText('Analyser'));
+  console.log('analyse ouverte seule (lot 313) :', await attendreAnalyse(evaluate));
   await waitFor("location.pathname.includes('/analyse')", { timeout: 6000, label: 'analyse ouverte' });
   await settle({ max: 6000, label: 'analyse' });
   const url = await evaluate('location.pathname + location.search');

@@ -11,7 +11,7 @@ Briefs d'origine, à lire avant ce plan : `docs/backlog/319-revue-apres-fork.md`
 - Fiches d'itinéraire de l'autre application (Tracker) : plus relues ; un GPX simple se charge (le tracé seul).
 - Dénivelé et pente d'un GPX importé : retirés.
 - Recherche de lieu (Photon, `planning/geocoding.ts`) : **gardée**. Fonds de carte inchangés.
-- `ROUTE_VERSION` repart à 1, **sans** relecture des fiches de version 2 ou 3 écrites par Gtracker 0.00.12 et 0.00.13 (aucune installation n'est gardée avant la livraison, même règle qu'aux lots 322 et 323) : ces itinéraires d'essai seront à refaire ; l'orchestrateur le dit à l'utilisateur.
+- `ROUTE_VERSION` : d'abord remis à 1 sans relecture des fiches de version 2 ou 3, puis **passé à 4 le 11/11** après la relecture (à 1, les itinéraires d'essai des 0.00.12 et 0.00.13 s'ouvraient en lecture seule sous le message « vient d'une version plus récente ») : le lecteur tolère déjà ces fiches, elles se relisent modifiables, en lignes droites, et se réécrivent en version 4. La remise à 1 se fera à la livraison (lot 308), quand plus aucune installation n'est à ménager.
 - Une page sans activité planifiable s'affiche en parcours de balises ; la clé `gtracker.brouterProfile` reste orpheline sur les appareils (pas de purge) ; le champ `loop` des préférences de la page est ignoré ; `fetchJson.ts` reste dans `planning/`.
 - `PLANNING_FAMILIES`, les `usesMarkCourse` hors de `PlanningPage` et `ELEVATION_PRESETS` restent pour le lot 326.
 

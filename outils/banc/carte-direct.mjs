@@ -2,7 +2,7 @@
 // Usage : node carte-direct.mjs <port> <dossier de travail, chemin Windows>
 // Sur un profil neuf, sans réseau, environ 8 min en temps réel, 1 min avec `TEMPS=10` (horloge de la page accélérée).
 // Deux passages en rejeu ×1 d'une wing à 3 m/s vers l'est, 1 Hz, vitesse du capteur sur chaque point, chacun fini
-// par l'arrêt tenu puis « Jeter » :
+// par l'arrêt tenu, l'analyse ouverte seule, puis « Jeter » dans son menu « … » (lot 313) :
 //  1. pause manuelle (« Pause » de la page) de 60 à 90 s pendant laquelle le rejeu avance (la planche continue, le
 //     GPS reste allumé), puis « Reprendre » : la flèche suit pendant la pause, sans trace dessinée ni distance qui
 //     monte, et après la reprise aucun trait entre le point de la pause et celui de la reprise, ni passager (relevés
@@ -21,6 +21,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect, diag, TEMPS } from './lib/cdp.mjs';
+import { analyseOuvertePuisJetee } from './lib/fin-enregistrement.mjs';
 
 const [port, workDir] = process.argv.slice(2);
 if (!port || !workDir) {
@@ -223,10 +224,10 @@ const startReplay = async (track) => {
 const endReplay = async (pass) => {
   dumpSamples(pass);
   const stop = await holdStop();
-  await settle({ max: 3000 });
-  const thrown = await clickText('Jeter');
+  // Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
+  const thrown = await analyseOuvertePuisJetee(evaluate);
   await settle({ max: 2000 });
-  check(`${pass} : arrêt tenu puis « Jeter »`, stop === 'ok' && thrown === 'ok', `${stop} / ${thrown}`);
+  check(`${pass} : arrêt tenu, analyse ouverte, puis « Jeter »`, stop === 'ok' && thrown === 'ok', `${stop} / ${thrown}`);
 };
 
 // 1. Pause manuelle pendant laquelle la planche avance.

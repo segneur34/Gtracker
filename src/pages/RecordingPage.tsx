@@ -21,6 +21,7 @@ import {
 import {
   sportFamily, sportTreatment, usesMarkCourse, type SportFamily,
 } from '../core/sportProfiles';
+import type { SportType } from '../core/types';
 import { formatClock, formatDistance, formatShortDistance, formatSpeed, formatDecimal } from '../core/units';
 import LiveMap from '../components/LiveMap';
 import { clearFollowedTrace, useFollowedTrace } from '../hooks/useFollowedTrace';
@@ -47,8 +48,8 @@ import { useOpenSession } from '../hooks/useLibraryNavigation';
 import { librarySession, updateSessionRecord } from '../hooks/useSessionLibrary';
 import { EMPTY_NOTES, type GearChoice } from '../library/notes';
 import {
-  addRecordingMark, analyzePendingSession, changeRecordingActivity, continuePendingSession, discardPendingSession, dismissRecorderResult, getLastFix, getLiveFixes,
-  getLiveHeadingFixes, getLiveSegmentCount, pauseRecording,
+  addRecordingMark, analyzePendingSession, changeRecordingActivity, continuePendingSession, discardPendingSession, dismissRecorderResult,
+  finishingPendingSession, getLastFix, getLiveFixes, getLiveHeadingFixes, getLiveSegmentCount, getRecorderState, markRecorderResultOpened, pauseRecording,
   resumeRecording, startRecording, stopRecording, stopRecordingBeltSearch, type RecorderState,
   useLivePosition, useRecordingClock, useRecorderSelector,
 } from '../hooks/useRecorder';
@@ -72,9 +73,13 @@ import './RecordingPage.css';
 /**
  * Enregistrement d'une session : support, démarrer, arrêter, et ce qu'il faut
  * pour juger en direct que l'enregistrement tient (points, durée, plus long
- * trou, précision). À l'arrêt, la session n'est rangée dans la mémoire que
- * sur « Analyser » ; « Jeter » l'abandonne. L'onglet « Enregistrer » de la
- * barre de navigation.
+ * trou, précision). À l'arrêt, la session se range seule dans la mémoire et
+ * son analyse s'ouvre (`FinishRecording`, `App.tsx`, lot 313) ; on la jette
+ * depuis l'analyse. La carte de la session en attente ne reste que comme
+ * filet : rangement en échec (« Analyser » réessaie, « Jeter » l'abandonne),
+ * ou session reprise après une coupure qui peut encore continuer. La carte
+ * « Session rangée » ne reste que pour une session hors de la mémoire ou à
+ * classer. L'onglet « Enregistrer » de la barre de navigation.
  *
  * « Suivre une trace » choisit un itinéraire rangé ou une session déjà
  * enregistrée, dessiné sous la trace en cours, la partie faite en gris, avec
@@ -643,6 +648,18 @@ function RecordingScreen() {
   const beltLive = useBeltLive();
   const missingPermissions = useMissingPermissions();
   const analyzing = useRecorderSelector((s) => s.analyzing);
+  // Rangement seul à l'arrêt, ou celui d'« Analyser », en cours ou sur le point de partir : « Rangement… » au lieu de la carte.
+  const finishing = useRecorderSelector(finishingPendingSession);
+  // Session rangée dont l'analyse a été ouverte : son message y est dit, pas ici. Sinon (hors mémoire, à classer,
+  // ouverture refusée pour garder un brouillon), la carte « Session rangée » l'annonce, avec son message.
+  const resultOpened = useRecorderSelector((s) => s.resultOpened);
+  const savedOpened = saved !== null && resultOpened;
+  /** Ouvre l'analyse de la session rangée ; son message, s'il y en a un, la suit. */
+  const openSaved = (file: string, sport: SportType) => {
+    if (getRecorderState().error === null) dismissRecorderResult();
+    else markRecorderResultOpened();
+    openSession(file, sportFamily(sport));
+  };
   // Matériel choisi à la fin de la session, vide d'office : remis à zéro pour chaque session en attente (lot 143, 131).
   const [endGear, setEndGear] = useState<GearChoice[] | null>(null);
   const [endGearOf, setEndGearOf] = useState(pending);
@@ -681,8 +698,9 @@ function RecordingScreen() {
   };
 
   /**
-   * « Analyser » : range la session, puis l'ouvre si elle est entrée dans la mémoire.
-   * `withoutMotion` : « Analyser sans les capteurs », proposé après une capture illisible.
+   * « Analyser » de la carte filet (rangement seul en échec, ou session reprise qui peut continuer) : range la
+   * session, puis l'ouvre si elle est entrée dans la mémoire. `withoutMotion` : « Analyser sans les capteurs »,
+   * proposé après une capture illisible.
    */
   const handleAnalyze = async (withoutMotion = false) => {
     const gear = endGear;
@@ -691,13 +709,15 @@ function RecordingScreen() {
     const gearWritten = result && gear ? writeEndGear(result.libraryFile, gear) : true;
     setGearNotWritten(!gearWritten);
     if (!gearWritten && result?.libraryFile) window.alert(GEAR_NOT_WRITTEN);
-    if (result?.libraryFile) {
-      dismissRecorderResult();
-      if (result.sport !== null) openSession(result.libraryFile, sportFamily(result.sport));
-      // Session à classer (journal sans en-tête) : rangée sans activité, elle se classe depuis la bibliothèque.
+    // Session à classer (journal sans en-tête) : rangée sans activité, la carte « Session rangée » le dit, et elle se
+    // classe depuis la bibliothèque.
+    if (result?.libraryFile && result.sport !== null) {
+      // Un ménage en échec (journal resté sur l'appareil) est dit par l'analyse ouverte.
+      openSaved(result.libraryFile, result.sport);
     }
   };
 
+  /** « Jeter » du filet : un échec de l'effacement garde la session et s'affiche (`discardPendingSession` ne lève pas). */
   const handleDiscard = () => {
     if (window.confirm('Jeter cette session ? Elle ne sera pas rangée dans la mémoire, et ne pourra pas être récupérée.')) {
       void discardPendingSession();
@@ -931,7 +951,7 @@ function RecordingScreen() {
         <div className="ui-alert ui-alert--warning">En pause automatique : aucun mouvement détecté. Reprend dès que vous bougez.</div>
       )}
 
-      {error && <div className="ui-alert ui-alert--danger">{error}</div>}
+      {error && !savedOpened && <div className="ui-alert ui-alert--danger">{error}</div>}
 
       {liveActivity && <MarkGuideSlot activity={liveActivity} />}
 
@@ -949,7 +969,11 @@ function RecordingScreen() {
 
       <RecordingGpsCard busy={busy} deviceGps={native && sourceChoice === 'device'} />
 
-      {pending && (
+      {pending && finishing && (
+        <p role="status" aria-live="polite" className="ui-muted">Rangement…</p>
+      )}
+
+      {pending && !finishing && (
         <Card heading={(
           <span className="ui-flex-between">
             {pending.recovered ? 'Session interrompue récupérée' : 'Session terminée'}
@@ -961,14 +985,13 @@ function RecordingScreen() {
           <p className="rec-saved-text">
             {pending.activity?.name ?? 'À classer'}, {pending.pointCount} points.<br />
             <span className="ui-muted ui-text-s">
-              Pas encore rangée : « Analyser » la range dans la mémoire et l'ouvre, « Jeter » l'abandonne.
-              Aucun nouvel enregistrement avant ce choix.
+              Pas encore rangée dans la mémoire. Aucun nouvel enregistrement avant de l'analyser ou de la jeter.
             </span>
           </p>
           <SessionEndGear activity={pending.activity} gear={endGear} onChange={setEndGear} />
           <div className="ui-row-10 ui-wrap">
             <Button variant="primary" onClick={() => void handleAnalyze()} disabled={analyzing}>
-              {analyzing ? 'Rangement…' : 'Analyser'}
+              Analyser
             </Button>
             {motionUnreadable && (
               <Button onClick={() => void handleAnalyze(true)} disabled={analyzing}>
@@ -992,7 +1015,9 @@ function RecordingScreen() {
         </Card>
       )}
 
-      {saved && (
+      {/* Session rangée hors de la mémoire (aucun dossier), à classer, ou dont l'ouverture a été refusée pour garder un
+          brouillon : rien ne s'est ouvert, cette carte le dit. */}
+      {saved && !savedOpened && (
         <Card heading={(
           <span className="ui-flex-between">
             Session rangée
@@ -1020,8 +1045,9 @@ function RecordingScreen() {
             )}
           </p>
           <div className="ui-row-10 ui-wrap">
+            {/* Ouverture refusée pour garder un brouillon : elle se fait d'ici. */}
             {saved.libraryFile && saved.sport !== null && (
-              <Button variant="primary" onClick={() => openSession(saved.libraryFile!, sportFamily(saved.sport!))}>
+              <Button variant="primary" onClick={() => openSaved(saved.libraryFile!, saved.sport!)}>
                 Analyser
               </Button>
             )}

@@ -30,6 +30,29 @@ export const confirmLeave = (): boolean => {
   return true;
 };
 
+/** Vrai si un brouillon est en attente : partir demanderait confirmation. */
+export const hasLeaveWarning = (): boolean => current !== null;
+
+/** Plafond d'attente du retrait de la garde de l'historique, si son `popstate` se perdait. */
+const GUARD_RELEASE_MAX_MS = 1000;
+
+/**
+ * Abandonne le brouillon en attente sans rien redemander, quand l'utilisateur
+ * vient de confirmer un geste qui le perd (« Jeter » une session, lot 313).
+ * Dans le navigateur, l'entrée « garde » de l'historique est retirée d'abord :
+ * la promesse est tenue quand la page est revenue sur sa propre entrée, que
+ * l'appelant peut alors remplacer (`navigate(…, { replace: true })`) sans que
+ * le retour arrière ramène à la page quittée.
+ */
+export const dropLeaveWarning = async (): Promise<void> => {
+  if (current === null) return;
+  const { discard } = current;
+  current = null;
+  discard();
+  if (isNativeApp()) return;
+  await Promise.race([historyGuard.disarm(), new Promise<void>((resolve) => setTimeout(resolve, GUARD_RELEASE_MAX_MS))]);
+};
+
 /** Ce que la garde de l'historique demande au navigateur (injecté pour le test). */
 interface HistoryPort {
   /** Empile une entrée « garde » sur l'adresse courante (même état de routeur, marque en plus). */
@@ -57,6 +80,8 @@ export const createHistoryGuard = (port: HistoryPort, canLeave: () => boolean) =
   let armedAt: string | null = null;
   /** Retours que nous avons demandés et dont le `popstate` n'est pas encore arrivé. */
   let pending = 0;
+  /** Qui attend la fin de ces retours (`disarm`). */
+  let waiting: Array<() => void> = [];
 
   return {
     /** Pose la garde (une seule à la fois). */
@@ -65,14 +90,23 @@ export const createHistoryGuard = (port: HistoryPort, canLeave: () => boolean) =
       armedAt = port.href();
       if (!port.onGuard()) port.pushGuard();
     },
-    /** Retire la garde si elle est en tête. */
-    disarm: (): void => {
-      if (armedAt === null) return;
-      armedAt = null;
-      if (port.onGuard()) {
-        pending += 1;
-        port.back();
+    /**
+     * Retire la garde si elle est en tête. La promesse rendue est tenue une fois
+     * le retrait fait (son `popstate` arrivé), tout de suite s'il n'y a rien à
+     * retirer ; `releaseHistory` l'ignore.
+     */
+    disarm: (): Promise<void> => {
+      if (armedAt !== null) {
+        armedAt = null;
+        if (port.onGuard()) {
+          pending += 1;
+          port.back();
+        }
       }
+      if (pending === 0) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        waiting.push(resolve);
+      });
     },
     /** À appeler sur chaque `popstate`. */
     popstate: (): void => {
@@ -80,6 +114,11 @@ export const createHistoryGuard = (port: HistoryPort, canLeave: () => boolean) =
         pending -= 1;
         // Garde reposée pendant que son retrait était en route : la remettre.
         if (armedAt !== null && !port.onGuard()) port.pushGuard();
+        if (pending === 0) {
+          const done = waiting;
+          waiting = [];
+          for (const resolve of done) resolve();
+        }
         return;
       }
       if (armedAt !== null && port.href() === armedAt) {
@@ -156,7 +195,7 @@ export const installLeaveGuard = (): void => {
 const releaseHistory = (): void => {
   if (isNativeApp()) return;
   setTimeout(() => {
-    if (current === null) historyGuard.disarm();
+    if (current === null) void historyGuard.disarm();
   }, 0);
 };
 

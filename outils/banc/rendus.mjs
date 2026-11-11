@@ -10,6 +10,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect } from './lib/cdp.mjs';
+import { analyseOuvertePuisJetee } from './lib/fin-enregistrement.mjs';
 
 const [port, workDir] = process.argv.slice(2);
 if (!port || !workDir) {
@@ -122,8 +123,8 @@ if (down === 'ok') {
   await evaluate(`(() => { const b = window.__stopButton; b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); b.click(); return 'ok'; })()`);
 }
 console.log('Arrêter :', down);
-await settle({ max: 3000 });
-console.log('Jeter :', await clickText('Jeter'));
+// Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
+console.log('Jeter :', await analyseOuvertePuisJetee(evaluate));
 await settle({ max: 2000 });
 
 console.log('--- console ---');

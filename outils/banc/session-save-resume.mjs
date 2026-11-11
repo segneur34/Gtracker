@@ -1,11 +1,14 @@
 // Suite de session-save.mjs (24/09/2026, reprise sur la bibliothèque et la page d'aujourd'hui le 29/10, n° 84),
 // sur le même profil Chrome : la session déjà importée est classée en Voile (l'activité de la session change par
 // le choix d'activité de l'onglet réglages), puis son seuil est enregistré à 4 et 12 nœuds ; le résumé de la fiche
-// doit suivre.
+// doit suivre. Pour finir (lot 313), un brouillon ouvert, la session est jetée depuis le menu « … » de son analyse
+// (« Jeter » tenu une seconde, confirmé) : retour à la bibliothèque, session absente de la mémoire.
 // Usage : node session-save-resume.mjs <port>
 // Se branche sur le Chrome du profil de `session-save.mjs` (`BANC_WS` : l'onglet de ce profil), sinon ouvre un
 // onglet du Chrome du port : alors la bibliothèque doit déjà contenir la session.
 import { connect } from './lib/cdp.mjs';
+import { jeterDepuisAnalyse } from './lib/fin-enregistrement.mjs';
+import { ONGLETS } from './lib/onglets.mjs';
 
 const [port] = process.argv.slice(2);
 if (!port) {
@@ -14,7 +17,7 @@ if (!port) {
 }
 
 // --- Protocole (lib/cdp.mjs) ---
-const { evaluate, go, settle, waitFor, clickText, records, check, finish, logs } = await connect({ port, width: 1400, height: 1000 });
+const { send, evaluate, go, settle, waitFor, clickText, records, check, finish, logs } = await connect({ port, width: 1400, height: 1000 });
 
 const step = (title) => console.log(`\n== ${title}`);
 const typeInto = (selector, value) => evaluate(`(() => {
@@ -78,6 +81,44 @@ for (const seuil of ['4', '12']) {
   await settle({ max: 800, label: 'onglet général' });
   console.log('page :', await activeTime(), '| fiche :', await fiche(file));
 }
+
+step('« Jeter » depuis l\'analyse, un brouillon ouvert (lot 313) : bibliothèque, session absente');
+// Rangée « avancé » ouverte d'office (`lib/onglets.mjs`), pour atteindre « matos et conditions » ; l'analyse est rouverte.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
+// Bibliothèque, puis l'analyse : l'entrée sous l'analyse est la bibliothèque, comme sur le téléphone.
+await go('/voile', 3000);
+await go(url, 6000);
+await waitFor(`[...document.querySelectorAll('.an-carte-col .ui-tab')].some((t) => t.textContent.trim() === 'matos et conditions')`, { timeout: 30000, every: 200, label: 'onglets avancés' });
+await openTab('matos et conditions');
+await settle({ max: 800, label: 'onglet matos' });
+console.log('saisie du brouillon :', await evaluate(`(() => {
+  const el = document.querySelector('textarea[placeholder="Commentaire libre"]');
+  if (!el) return 'absent';
+  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(el, 'Brouillon à jeter avec la session');
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  return 'ok';
+})()`));
+await settle({ max: 2000, label: 'brouillon' });
+check('un brouillon est ouvert', await evaluate(`[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Enregistrer la session')`));
+// L'analyse ne doit jamais dire sa session introuvable entre la suppression et le départ.
+await evaluate(`(() => {
+  window.__introuvable = false;
+  const mo = new MutationObserver(() => { if (document.body.innerText.includes('pas dans la mémoire')) window.__introuvable = true; });
+  mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+  return 'ok';
+})()`);
+const thrown = await jeterDepuisAnalyse(evaluate);
+check('« Jeter » tenu puis confirmé', thrown === 'ok', thrown);
+const questions = await evaluate('window.__questionsJeter ?? []');
+check('une seule question, qui dit le brouillon perdu', questions.length === 1 && questions[0].includes('modifications non enregistrées'), JSON.stringify(questions));
+check('retour à la bibliothèque de la voile', (await evaluate('location.pathname')) === '/voile', await evaluate('location.pathname + location.search'));
+const gone = await waitFor(async () => !(await records()).some((r) => r.gpx === file), { timeout: 5000, label: 'fiche effacée' });
+check('la session n\'est plus dans la mémoire', Boolean(gone), file);
+check('jamais « pas dans la mémoire » affiché en partant', (await evaluate('window.__introuvable')) === false);
+await evaluate('history.back()');
+await settle({ max: 1500, label: 'retour arrière' });
+const afterBack = await evaluate('location.pathname + location.search');
+check('le retour arrière ne ramène pas à l\'analyse jetée', !afterBack.includes('/analyse'), afterBack);
 
 step('Console');
 console.log(logs.length ? logs.join('\n') : 'aucune erreur');

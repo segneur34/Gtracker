@@ -13,6 +13,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CLES, connect } from './lib/cdp.mjs';
+import { analyseOuvertePuisJetee } from './lib/fin-enregistrement.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir] = process.argv.slice(2);
@@ -166,7 +167,8 @@ mark = sent.length;
 console.log('Arrêter :', await holdStop());
 await wait(1500);
 check('arrêt : notification effacée', sent.slice(mark).some((s) => s.text === 'effacée'), sent.slice(mark).map((s) => s.text).join(' // '));
-console.log('Jeter :', await evaluate(`(() => { window.confirm = () => true; return 'ok'; })()`), await clickText('Jeter'));
+// Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
+console.log('Jeter :', await analyseOuvertePuisJetee(evaluate));
 await wait(800);
 
 // 6, joué ici : la moyenne active dans un rejeu de voile.
@@ -185,7 +187,8 @@ check('voile : « Moy. act. » dans la notification, jamais « Moy. » seul', av
   averages.slice(-3).join(' // '));
 console.log('Arrêter :', await holdStop());
 await wait(1500);
-console.log('Jeter :', await evaluate(`(() => { window.confirm = () => true; return 'ok'; })()`), await clickText('Jeter'));
+// Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
+console.log('Jeter :', await analyseOuvertePuisJetee(evaluate));
 await wait(800);
 
 console.log(logs.length ? `console :\n  ${logs.join('\n  ')}` : 'console : rien');

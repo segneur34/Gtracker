@@ -6,6 +6,7 @@ import { shareableStats } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
 import { libraryPath } from '../core/parentPage';
 import { useScrollToTopOnMount } from '../hooks/useRetainedScroll';
+import { dismissRecorderResult, useRecorderSelector } from '../hooks/useRecorder';
 import type { useSessionDraft } from '../hooks/useSessionDraft';
 import AnalysisMap, { ANALYSIS_MAP_ANCHOR, type AnalysisMapProps } from './AnalysisMap';
 import CollapsibleSectionTabs from './CollapsibleSectionTabs';
@@ -13,6 +14,7 @@ import type { SectionDefinition } from './SectionTabs';
 import SessionNameEditor from './SessionNameEditor';
 import SessionSaveBar from './SessionSaveBar';
 import type { TrackSegment } from './TrackSegmentsLayer';
+import Button from './ui/Button';
 import PageHeader from './ui/PageHeader';
 
 /** Carte de la page : les props d'`AnalysisMap` (l'ancre est posée ici), et le plan de sa rangée (la voile garde `zIndex: 0`). */
@@ -58,6 +60,23 @@ interface AnalysisShellProps<K extends string> {
   tabs: ShellTabs<K> | null;
 }
 
+/**
+ * Message de l'enregistreur sur la session qu'il vient de ranger et dont l'analyse s'ouvre (lot 313) :
+ * avertissements de l'arrêt (capteurs…) ou ménage en échec, dits ici et non plus sur la page Enregistrer.
+ * « Fermer » l'efface (`dismissRecorderResult`).
+ */
+function RecorderNotice({ file }: { file: string | null }) {
+  const savedFile = useRecorderSelector((s) => s.saved?.libraryFile ?? null);
+  const error = useRecorderSelector((s) => s.error);
+  if (file === null || savedFile !== file || error === null) return null;
+  return (
+    <div className="ui-alert ui-alert--warning ui-mb-10 ui-max-520 ui-row-10 ui-center">
+      <span className="ui-grow">{error}</span>
+      <Button size="s" variant="ghost" onClick={dismissRecorderResult}>Fermer</Button>
+    </div>
+  );
+}
+
 /** Rangée de la carte : un appel de fonction, pas un composant, pour ne rien ajouter à l'arbre de la page. */
 const mapRow = ({ rowZIndex, ...props }: ShellMap) => (
   <div className="an-map-row" style={{ marginTop: '10px', zIndex: rowZIndex }}>
@@ -85,7 +104,7 @@ function AnalysisShell<K extends string>({
       <div className="an-sheet">
         <div className="an-sheet__head">
           <PageHeader title={title} subtitle={file ? (
-            <SessionNameEditor file={file}
+            <SessionNameEditor file={file} back={back}
               share={share.stats.length > 0 ? { family, segments: share.segments, stats: shareableStats(share.stats) } : undefined} />
           ) : undefined} back={{ to: back, label: backLabel }} />
           {error && <div className="ui-alert ui-alert--warning ui-mt-10">{error}</div>}
@@ -99,6 +118,8 @@ function AnalysisShell<K extends string>({
           {loadError}
         </div>
       )}
+
+      <RecorderNotice file={file} />
 
       {alerts}
 

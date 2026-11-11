@@ -5,6 +5,7 @@
 // l'autre en Course (`planning.mjs` deux fois, le second avec un GPX de type course), le script
 // vérifie aussi que suivre un itinéraire propose son activité.
 import { CLES, connect } from './lib/cdp.mjs';
+import { attendreAnalyse } from './lib/fin-enregistrement.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, gpxPath, shotDir] = process.argv.slice(2);
@@ -122,7 +123,7 @@ console.log('carte montée :', await evaluate(`document.querySelectorAll('.leafl
 console.log('Arrêter :', await holdStop());
 await wait(2500);
 console.log('attente :', await lines('/points\\./'));
-console.log('Analyser :', await clickText('Analyser'));
+console.log('analyse ouverte seule (lot 313) :', await attendreAnalyse(evaluate));
 await waitFor(`location.pathname.includes('/analyse')`, { timeout: 5000, label: 'analyse ouverte' });
 await settle({ max: 5000 });
 console.log('ouverte :', await evaluate(`location.pathname + location.search`), await evaluate(`document.querySelector('h1')?.textContent`));

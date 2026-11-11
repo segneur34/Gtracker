@@ -799,6 +799,29 @@ describe('« Continuer l\'enregistrement », application tuée puis rouverte', (
     expect(fresh.getRecorderState().pending?.motion?.path).toBe(path);
   });
 
+  it('rangement seul à la réouverture (lot 313) : la session reprise trop vieille pour continuer est rangée, la fraîche attend', async () => {
+    await killedAt20(1);
+    vi.setSystemTime(T0 + 60_000);
+    let fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(fresh.getRecorderState().pending?.canContinue).toBe(true);
+    expect(fresh.finishingPendingSession(fresh.getRecorderState())).toBe(false);
+    expect(await fresh.finishPendingSession()).toBeNull();
+    expect(fresh.getRecorderState().pending).not.toBeNull();
+    expect(journal.text).not.toBeNull();
+
+    vi.setSystemTime(T0 + 3_600_000);
+    fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(fresh.getRecorderState().pending?.canContinue).toBe(false);
+    expect(fresh.finishingPendingSession(fresh.getRecorderState())).toBe(true);
+    const saved = await fresh.finishPendingSession();
+    expect(saved?.libraryFile).toBe('rangee.gpx');
+    expect(saved?.recovered).toBe(true);
+    expect(fresh.getRecorderState().pending).toBeNull();
+    expect(journal.text).toBeNull();
+  });
+
   it('sans offre : le bouton ne fait rien', async () => {
     await killedAt20(1);
     vi.setSystemTime(T0 + 3_600_000);

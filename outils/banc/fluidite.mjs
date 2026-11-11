@@ -32,10 +32,13 @@
 //  6. démarrage : du chargement de `/` à l'accueil rendu, puis au premier répit d'une seconde sans tâche longue
 //     (« interactif »), tâches longues et modules chargés sur 12 s ; avec le préchargement des pages
 //     (`preloadPages` d'`App.tsx`), puis sans (`requestIdleCallback` neutralisé depuis le script, rien dans `src/`) ;
-//  7. « Analyser » (lot 161), hors de la liste par défaut, `FLUIDITE_MESURES=analyser` : enregistrement rejoué à ×600
-//     (voile 3 h et course 2 h à 1 Hz), ralenti posé juste avant le clic ; clic → « Rangement… » peint, calcul au worker,
-//     première écriture, écritures, navigation, titre, trace, chiffres, tâches longues par phase ; puis la voile avec une
-//     capture de 3 h (serveur de développement seulement), dont l'élagage se lit à la taille du `.imu` rangé.
+//  7. fin d'enregistrement (lot 161 ; « analyser », hors de la liste par défaut, `FLUIDITE_MESURES=analyser`) :
+//     enregistrement rejoué à ×600 (voile 3 h et course 2 h à 1 Hz), ralenti posé juste avant l'arrêt. Depuis le lot
+//     313, l'arrêt range la session et ouvre l'analyse seul : le temps part de l'arrêt (fin des 2 s tenues sur
+//     « Arrêter ») et comprend la construction du GPX, que l'ancien clic sur « Analyser » laissait de côté ;
+//     « Rangement… » peint, calcul au worker, première écriture, écritures, navigation, titre, trace, chiffres, tâches
+//     longues par phase. La voile avec une capture de 3 h, posée sur la session en attente avant le clic, n'est plus
+//     mesurable : le rangement part avant qu'on puisse la poser.
 // Fin : un tableau des médianes (PC ×1 et ×6), à recopier dans le relevé du lot.
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -835,6 +838,9 @@ if (MESURES.includes('analyser')) {
     FileSystemWritableFileStream.prototype.close = function (...a) { return end.apply(this, a).then((v) => { log('written'); return v; }); };
     const push = history.pushState;
     history.pushState = function (...a) { log('push', String(a[2] ?? '')); return push.apply(this, a); };
+    // L'analyse ouverte à la fin d'un enregistrement prend la place d'Enregistrer (lot 313).
+    const replace = history.replaceState;
+    history.replaceState = function (...a) { log('push', String(a[2] ?? '')); return replace.apply(this, a); };
   })();` });
   await throttle(1);
   await go('/enregistrer', 5000);
@@ -846,7 +852,7 @@ if (MESURES.includes('analyser')) {
   const choose = (text) => evaluate(`(() => { const b = [...document.querySelectorAll('[role=radiogroup] button[role=radio]')].find((x) => x.textContent.trim() === ${JSON.stringify(text)}); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
   // Un GPX par prise, parti d'un autre jour : la même heure de départ serait un doublon.
   let prise = 0;
-  /** Enregistrement rejoué jusqu'à la carte « Analyser / Jeter » : le geste du téléphone, à ×600 (`bench.mjs`). */
+  /** Enregistrement rejoué jusqu'avant l'arrêt : le geste du téléphone, à ×600 (`bench.mjs`). */
   const recordReplay = async (cas) => {
     prise += 1;
     const path = join(workDir, `fluidite-analyser-${prise}.gpx`);
@@ -862,30 +868,30 @@ if (MESURES.includes('analyser')) {
     await wait(100);
     await evaluate(`[...document.querySelectorAll('button')].find((x) => x.textContent.includes('Démarrer')).click(); 'ok'`);
     await wait((cas.secondes / 600) * 1000 + 2000); // rejeu en temps réel : un vrai délai
-    // « Arrêter » se tient 2 s.
-    await evaluate(`(() => { const b = [...document.querySelectorAll('button.ui-btn--danger')].find((x) => x.textContent.includes('Arrêter') && !x.disabled && !x.closest('.ivl')); window.__stopButton = b; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
-    await wait(2300);
-    await evaluate(`(() => { const b = window.__stopButton; b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); b.click(); return 'ok'; })()`);
-    await waitFor(`[...document.querySelectorAll('button')].some((x) => x.textContent.trim() === 'Analyser')`, { timeout: 60000, every: 100, label: 'carte Analyser' });
-    await settle({ max: 3000, label: 'carte Analyser' });
-    console.log(`prise ${prise}, ${cas.nom} :`, await evaluate(`document.body.innerText.match(/[\\d\\s]+ points/)?.[0]?.trim() ?? '(points non lus)'`));
+    // L'arrêt, tenu 2 s, est le début de la mesure (`analyze`) : la session se range et s'ouvre seule (lot 313).
+    const points = await evaluate(`[...document.querySelectorAll('span.num')].find((v) => v.previousElementSibling?.textContent.trim() === 'Points')?.textContent.trim() ?? null`);
+    console.log(`prise ${prise}, ${cas.nom} :`, points === null ? '(points non lus)' : `${points} points`);
   };
   /**
-   * Clic sur « Analyser » jusqu'aux chiffres de l'analyse. « Rangement… » est peint à la seconde image qui le voit (une
-   * image attend que le fil soit libre). Le journal, en mémoire vive sur le banc, ne se mesure pas : l'écart entre la
-   * dernière écriture et la navigation le comprend sur le téléphone seulement.
+   * Arrêt tenu (« Arrêter », 2 s) jusqu'aux chiffres de l'analyse, ouverte seule (lot 313) : le temps part de la fin
+   * des 2 s. « Rangement… » est peint à la seconde image qui le voit (une image attend que le fil soit libre). Le
+   * journal, en mémoire vive sur le banc, ne se mesure pas : l'écart entre la dernière écriture et la navigation le
+   * comprend sur le téléphone seulement.
    */
   const analyze = async ({ profile = false } = {}) => {
     if (profile) await profileStart();
     const out = await evaluate(`new Promise((resolve) => {
-      const t0 = performance.now();
+      // L'arrêt part à la fin des 2 s tenues.
+      const t0 = performance.now() + 2000;
       const out = { t0, peint: null, titre: null, trace: null, chiffres: null };
       const paint = () => requestAnimationFrame(() => {
-        if ([...document.querySelectorAll('button')].some((x) => x.textContent.includes('Rangement'))) requestAnimationFrame(() => { out.peint = performance.now() - t0; });
+        if ([...document.querySelectorAll('[role=status]')].some((x) => x.textContent.includes('Rangement'))) requestAnimationFrame(() => { out.peint = performance.now() - t0; });
         else if (!location.search.includes('session=')) paint();
       });
       paint();
-      [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Analyser').click();
+      const stop = [...document.querySelectorAll('button.ui-btn--danger')].find((x) => x.textContent.includes('Arrêter') && !x.disabled);
+      stop.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' }));
+      setTimeout(() => { stop.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); stop.click(); }, 2300);
       const tick = () => {
         const now = performance.now();
         if (out.titre === null && document.querySelector('.an-page h1')?.textContent.trim()) out.titre = now - t0;
@@ -962,6 +968,8 @@ if (MESURES.includes('analyser')) {
   const measures = {};
   /** Trois prises par ralenti, plus une sous le profileur à ×6 ; `withCapture` : capture posée avant chaque clic. */
   const measureCase = async (label, cas, withCapture = false) => {
+    // Lot 313 : le rangement part seul à l'arrêt, avant qu'une capture puisse être posée sur la session en attente.
+    if (withCapture) return false;
     measures[label] = {};
     for (const rate of RATES) {
       const runs = [];
@@ -993,7 +1001,7 @@ if (MESURES.includes('analyser')) {
   for (const cas of CAS) await measureCase(cas.nom, cas);
   if (!(await measureCase('voile 3 h avec capture', CAS[0], true))) {
     delete measures['voile 3 h avec capture'];
-    console.log('capture non posée (modules de /src absents : version compilée) : mesure sans capture seulement');
+    console.log('capture non posée (le rangement part seul à l\'arrêt depuis le lot 313) : mesure sans capture seulement');
   }
   results.analyser = Object.entries(measures).flatMap(([label, m]) => [
     [`Analyser ${label} : « Rangement… » peint / 1re écriture / navigation / chiffres`, (r) => `${sec(m[r].peint)} / ${sec(m[r].premiereEcriture)} / ${sec(m[r].navigation)} / ${sec(m[r].chiffres)}`],

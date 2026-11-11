@@ -8,7 +8,8 @@ import { FILE_FORMATS } from '../core/appIdentity';
 
 /**
  * Journal en mémoire ; chaque écriture complète (l'en-tête) est relevée. `unreadable` : présent mais
- * illisible ; `aside` : contenus mis de côté ; `setAsideFails` : la mise de côté échoue.
+ * illisible ; `aside` : contenus mis de côté ; `setAsideFails` : la mise de côté échoue ; `removeFails` :
+ * l'effacement échoue, le journal reste.
  */
 const journal = vi.hoisted(() => {
   const file = {
@@ -17,6 +18,7 @@ const journal = vi.hoisted(() => {
     unreadable: false,
     aside: [] as (string | null)[],
     setAsideFails: false,
+    removeFails: false,
     read: async () => {
       if (file.unreadable) throw new Error('lecture impossible');
       return file.text;
@@ -36,6 +38,7 @@ const journal = vi.hoisted(() => {
       file.text = (file.text ?? '') + text;
     },
     remove: async () => {
+      if (file.removeFails) throw new Error('effacement refusé');
       file.text = null;
     },
   };
@@ -203,6 +206,7 @@ const fakeSource = () => {
 
 /** Ramène l'enregistreur au repos, session jetée. */
 const reset = async () => {
+  journal.removeFails = false;
   await recorder.stopRecording();
   await recorder.discardPendingSession();
   recorder.dismissRecorderResult();
@@ -897,6 +901,126 @@ describe('rangement en cours, état du module (lot 161)', () => {
     expect(await recorder.analyzePendingSession()).toBeNull();
     expect(recorder.getRecorderState().analyzing).toBe(false);
     expect(library.motions).toEqual([]);
+  });
+});
+
+describe('fin d\'enregistrement : rangement seul, ménage et « Jeter » en échec (lots 313 et 329)', () => {
+  /** Session arrêtée, en attente, sans capteurs. */
+  const stopped = async (): Promise<void> => {
+    const source = fakeSource();
+    await recorder.startRecording(activity, source);
+    source.emit(0);
+    source.emit(1);
+    await recorder.stopRecording();
+    expect(recorder.getRecorderState().pending).not.toBeNull();
+  };
+
+  it('journal qui ne s\'efface pas : la session est rangée quand même, et le message le dit', async () => {
+    await stopped();
+    journal.removeFails = true;
+    const saved = await recorder.analyzePendingSession();
+    expect(saved?.libraryFile).toBe('rangee.gpx');
+    const state = recorder.getRecorderState();
+    expect(state.pending).toBeNull();
+    expect(state.saved?.libraryFile).toBe('rangee.gpx');
+    expect(state.error).toBe("Session rangée ; le journal d'enregistrement n'a pas pu être effacé (effacement refusé).");
+    expect(journal.text).not.toBeNull();
+  });
+
+  it('GPX qui ne s\'écrit pas : le message de toujours, la session reste en attente', async () => {
+    await stopped();
+    library.fails = true;
+    expect(await recorder.analyzePendingSession()).toBeNull();
+    const state = recorder.getRecorderState();
+    expect(state.pending).not.toBeNull();
+    expect(state.saved).toBeNull();
+    expect(state.error).toBe('Enregistrement du GPX impossible : écriture refusée. La session reste en attente.');
+  });
+
+  it('« Jeter » dont l\'effacement échoue : la session reste en attente, c\'est dit, sans promesse rejetée', async () => {
+    await stopped();
+    const pending = recorder.getRecorderState().pending;
+    journal.removeFails = true;
+    await expect(recorder.discardPendingSession()).resolves.toBeUndefined();
+    const state = recorder.getRecorderState();
+    expect(state.pending).toBe(pending);
+    expect(state.error).toBe("La session n'a pas pu être jetée : effacement refusé.");
+    expect(journal.text).not.toBeNull();
+    // Un nouvel essai qui réussit la jette.
+    journal.removeFails = false;
+    await recorder.discardPendingSession();
+    expect(recorder.getRecorderState().pending).toBeNull();
+    expect(recorder.getRecorderState().error).toBeNull();
+  });
+
+  it('rangement seul : une fois par session, « Rangement… » annoncé avant, puis plus rien à faire', async () => {
+    await stopped();
+    expect(recorder.finishingPendingSession(recorder.getRecorderState())).toBe(true);
+    const run = recorder.finishPendingSession();
+    expect(recorder.getRecorderState().analyzing).toBe(true);
+    expect((await run)?.libraryFile).toBe('rangee.gpx');
+    expect(library.motions).toHaveLength(1);
+    expect(recorder.getRecorderState().pending).toBeNull();
+    expect(recorder.finishingPendingSession(recorder.getRecorderState())).toBe(false);
+    expect(await recorder.finishPendingSession()).toBeNull();
+    expect(library.motions).toHaveLength(1);
+  });
+
+  it('rangement seul en échec : pas de relance, la carte de la session sert de filet, « Analyser » réessaie', async () => {
+    await stopped();
+    library.fails = true;
+    expect(await recorder.finishPendingSession()).toBeNull();
+    let state = recorder.getRecorderState();
+    expect(state.pending).not.toBeNull();
+    expect(state.error).toBe('Enregistrement du GPX impossible : écriture refusée. La session reste en attente.');
+    expect(recorder.finishingPendingSession(state)).toBe(false);
+    library.fails = false;
+    expect(await recorder.finishPendingSession()).toBeNull();
+    expect(library.motions).toHaveLength(1);
+    expect((await recorder.analyzePendingSession())?.libraryFile).toBe('rangee.gpx');
+    state = recorder.getRecorderState();
+    expect(state.pending).toBeNull();
+    expect(state.error).toBeNull();
+  });
+
+  it('session rangée : annoncée sur Enregistrer tant que son analyse n\'est pas ouverte', async () => {
+    await stopped();
+    await recorder.finishPendingSession();
+    expect(recorder.getRecorderState().resultOpened).toBe(false);
+    recorder.markRecorderResultOpened();
+    expect(recorder.getRecorderState().resultOpened).toBe(true);
+    recorder.dismissRecorderResult();
+    expect(recorder.getRecorderState().resultOpened).toBe(false);
+    // Sans session rangée, rien à marquer.
+    recorder.markRecorderResultOpened();
+    expect(recorder.getRecorderState().resultOpened).toBe(false);
+  });
+
+  it('rangement seul pendant un rangement déjà lancé : rien de plus', async () => {
+    await stopped();
+    let open: () => void = () => undefined;
+    library.gate = new Promise((resolve) => {
+      open = resolve;
+    });
+    const first = recorder.analyzePendingSession();
+    expect(await recorder.finishPendingSession()).toBeNull();
+    open();
+    expect((await first)?.libraryFile).toBe('rangee.gpx');
+    expect(library.motions).toHaveLength(1);
+  });
+
+  it('les avertissements de l\'arrêt restent affichés après le rangement seul, pour l\'analyse ouverte', async () => {
+    sensors.stop = async () => ({ path: `capteurs/${T0}.imu`, bytes: 0, durationS: 0, samples: 0, longestGapS: 0, error: null });
+    sensors.read = async () => null;
+    const source = fakeSource();
+    await recorder.startRecording(activity, source, { motion: { placement: 'poitrine', foil: false } });
+    source.emit(0);
+    source.emit(1);
+    await recorder.stopRecording();
+    const warning = recorder.getRecorderState().error;
+    expect(warning).toMatch(/aucune mesure reçue/);
+    expect((await recorder.finishPendingSession())?.libraryFile).toBe('rangee.gpx');
+    expect(recorder.getRecorderState().error).toBe(warning);
   });
 });
 

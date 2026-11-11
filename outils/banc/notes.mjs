@@ -11,6 +11,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect, diag, DOSSIER_MEMOIRE, TEMPS } from './lib/cdp.mjs';
+import { attendreAnalyse } from './lib/fin-enregistrement.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -132,7 +133,7 @@ for (const [family, speedMs, graphTab] of [['À pied', 3, 'graphiques'], ['Voile
   await jusqua(demarre + 20_520);
   console.log('Arrêter :', await holdStop());
   await vwait(2500);
-  console.log('Analyser :', await clickText('Analyser'));
+  console.log('analyse ouverte seule (lot 313) :', await attendreAnalyse(evaluate));
   // L'analyse se calcule en vrai temps : l'adresse de l'analyse, puis une page immobile.
   await waitFor(`location.pathname.endsWith('/analyse')`, { timeout: 6000, label: 'analyse' });
   await settle({ max: 6000, label: 'analyse' });
