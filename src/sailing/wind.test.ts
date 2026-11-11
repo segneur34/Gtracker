@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PointData } from './pointData';
 import { sessionManeuverThresholds } from './sailingConfig';
-import { buildWindTimeline, circularStats, polarExcludedPoints, describeWindCandidate, estimateWindFromPolar, estimateWindPolar, interpolateDirection, observeTurns, pointerWindDeg, polarSampling, polarWindCandidates, prepareWindPolar, speedPolar, scoreWindCandidate, turnsDirectionOf, windDegFromText } from './wind';
+import { buildWindTimeline, circularStats, polarExcludedPoints, interpolateDirection, observeTurns, pointerWindDeg, polarSampling, prepareWindPolar, speedPolar, turnsDirectionOf, windDegFromText } from './wind';
 import { angleDiff, circularMean } from '../core/angles';
 
 describe('buildWindTimeline', () => {
@@ -106,31 +106,6 @@ describe('circularStats', () => {
   });
 });
 
-/** Polaire synthétique : vitesses max par cap, construites à la main. */
-const polarWith = (entries: [number, number][]): number[] => {
-  const maxSpeeds = new Array<number>(360).fill(0);
-  for (const [bearing, speed] of entries) maxSpeeds[((bearing % 360) + 360) % 360] = speed;
-  return maxSpeeds;
-};
-
-describe('scoreWindCandidate', () => {
-  it('pénalise lourdement la vitesse dans l\'angle mort', () => {
-    const maxSpeeds = polarWith([[0, 15], [45, 12], [315, 12]]);
-    const withFastNoGo = scoreWindCandidate(maxSpeeds, 0);
-    const clean = scoreWindCandidate(polarWith([[45, 12], [315, 12]]), 0);
-    expect(withFastNoGo.score).toBeLessThan(clean.score);
-    expect(withFastNoGo.noGo).toBe(15);
-  });
-
-  it('récompense les deux bords de près et sanctionne le déséquilibre', () => {
-    const balanced = scoreWindCandidate(polarWith([[45, 12], [315, 12]]), 0);
-    const oneSided = scoreWindCandidate(polarWith([[45, 24]]), 0);
-    expect(balanced.left).toBe(12);
-    expect(balanced.right).toBe(12);
-    expect(balanced.score).toBeGreaterThan(oneSided.score);
-  });
-});
-
 /** Trace immobile en position, mais avec cap et vitesse imposés. */
 const buildPoints = (samples: { bearing: number; speed: number }[]): PointData[] => {
   const start = Date.parse('2026-01-01T10:00:00Z');
@@ -158,23 +133,47 @@ const realisticPolar = (windDir: number): { bearing: number; speed: number }[] =
   return samples.map((s) => ({ ...s, bearing: ((s.bearing % 360) + 360) % 360 }));
 };
 
-describe('estimateWindFromPolar', () => {
+/**
+ * Score polaire d'une direction, par la voie livrée : une trace dont chaque
+ * point pose la vitesse max d'un cap, décrite par l'étage polaire.
+ */
+const scoreAt = (entries: [number, number][], w: number) =>
+  prepareWindPolar(buildPoints(entries.map(([bearing, speed]) => ({ bearing, speed })))).describe(w).best;
+
+describe('score polaire d\'une direction', () => {
+  it('pénalise lourdement la vitesse dans l\'angle mort', () => {
+    const withFastNoGo = scoreAt([[0, 15], [45, 12], [315, 12]], 0);
+    const clean = scoreAt([[45, 12], [315, 12]], 0);
+    expect(withFastNoGo.score).toBeLessThan(clean.score);
+    expect(withFastNoGo.noGo).toBe(15);
+  });
+
+  it('récompense les deux bords de près et sanctionne le déséquilibre', () => {
+    const balanced = scoreAt([[45, 12], [315, 12]], 0);
+    const oneSided = scoreAt([[45, 24]], 0);
+    expect(balanced.left).toBe(12);
+    expect(balanced.right).toBe(12);
+    expect(balanced.score).toBeGreaterThan(oneSided.score);
+  });
+});
+
+describe('meilleur candidat de la polaire', () => {
   it('centre le vent au milieu de l\'angle mort', () => {
-    const estimate = estimateWindFromPolar(buildPoints(realisticPolar(0)));
+    const estimate = prepareWindPolar(buildPoints(realisticPolar(0))).candidates[0];
     expect(Math.abs(angleDiff(estimate.direction, 0))).toBeLessThanOrEqual(3);
     expect(estimate.clarity).toBeGreaterThan(0.95);
     expect(estimate.symmetry).toBeGreaterThan(0.95);
   });
 
   it('distingue l\'angle mort de son jumeau au vent arrière', () => {
-    const estimate = estimateWindFromPolar(buildPoints(realisticPolar(90)));
+    const estimate = prepareWindPolar(buildPoints(realisticPolar(90))).candidates[0];
     expect(Math.abs(angleDiff(estimate.direction, 90))).toBeLessThanOrEqual(3);
     expect(estimate.contrast).toBeGreaterThan(0.15);
   });
 
   it('retrouve le vent quelle que soit sa direction', () => {
     for (const wind of [0, 38, 135, 200, 270, 350]) {
-      const estimate = estimateWindFromPolar(buildPoints(realisticPolar(wind)));
+      const estimate = prepareWindPolar(buildPoints(realisticPolar(wind))).candidates[0];
       expect(Math.abs(angleDiff(estimate.direction, wind))).toBeLessThanOrEqual(3);
     }
   });
@@ -183,27 +182,27 @@ describe('estimateWindFromPolar', () => {
     // Autant de vitesse dans le cône qu'au près.
     const samples: { bearing: number; speed: number }[] = [];
     for (let b = 0; b < 360; b += 2) samples.push({ bearing: b, speed: 12 });
-    const estimate = estimateWindFromPolar(buildPoints(samples));
+    const estimate = prepareWindPolar(buildPoints(samples)).candidates[0];
     expect(estimate.clarity).toBeLessThan(0.3);
   });
 });
 
-describe('describeWindCandidate', () => {
+describe('descripteur d\'une direction imposée', () => {
   it('décrit la direction imposée, et non le meilleur score', () => {
-    const points = buildPoints(realisticPolar(90));
-    const described = describeWindCandidate(points, 90);
+    const stage = prepareWindPolar(buildPoints(realisticPolar(90)));
+    const described = stage.describe(90);
 
     expect(described.direction).toBe(90);
-    expect(described).toEqual(estimateWindFromPolar(points));
+    expect(described).toEqual(stage.candidates[0]);
   });
 
   it('sépare le vent de son jumeau au vent arrière', () => {
     // C'est tout l'intérêt de pouvoir décrire une direction imposée : le
     // jumeau est testé comme candidat sans être un maximum du score polaire,
     // et sa confiance propre est bien plus basse que celle du vrai vent.
-    const points = buildPoints(realisticPolar(90));
+    const stage = prepareWindPolar(buildPoints(realisticPolar(90)));
     const confianceDe = (direction: number) => {
-      const c = describeWindCandidate(points, direction);
+      const c = stage.describe(direction);
       return c.symmetry * c.coverage * c.clarity;
     };
 
@@ -211,14 +210,14 @@ describe('describeWindCandidate', () => {
   });
 
   it('normalise la direction reçue', () => {
-    const points = buildPoints(realisticPolar(0));
-    expect(describeWindCandidate(points, -90).direction).toBe(270);
-    expect(describeWindCandidate(points, 450).direction).toBe(90);
+    const stage = prepareWindPolar(buildPoints(realisticPolar(0)));
+    expect(stage.describe(-90).direction).toBe(270);
+    expect(stage.describe(450).direction).toBe(90);
   });
 });
 
 describe('prepareWindPolar', () => {
-  it("rend les candidats, les descripteurs, l'estimation polaire et le soutien des fonctions qu'il remplace", () => {
+  it("rend des candidats triés et séparés, des descripteurs, une estimation polaire orientée sur le meilleur et le soutien", () => {
     // Polaires nettes (orientées par la polaire) et couverture symétrique
     // (orientée par les virages, contraste faible), trace vide comprise.
     const symmetric: { bearing: number; speed: number }[] = [];
@@ -231,12 +230,25 @@ describe('prepareWindPolar', () => {
           expect(stage.points).toBe(points);
           expect(stage.minSpeedKn).toBe(minSpeedKn);
           expect(stage.minEntrySpeedKn).toBe(minEntrySpeedKn ?? 4);
-          expect(stage.candidates).toEqual(polarWindCandidates(points, minSpeedKn, 3));
-          expect(stage.candidates[0]).toEqual(estimateWindFromPolar(points, minSpeedKn));
-          for (const direction of [0, 90, 211, -90, 450]) {
-            expect(stage.describe(direction)).toEqual(describeWindCandidate(points, direction, minSpeedKn));
+          // Trois candidats au plus, par score décroissant, écartés d'au moins 45°.
+          const { candidates } = stage;
+          expect(candidates.length).toBeGreaterThan(0);
+          expect(candidates.length).toBeLessThanOrEqual(3);
+          for (let k = 1; k < candidates.length; k++) {
+            expect(candidates[k].best.score).toBeLessThanOrEqual(candidates[k - 1].best.score);
           }
-          expect(stage.polar).toEqual(estimateWindPolar(points, { minSpeedKn, minEntrySpeedKn }));
+          for (let a = 0; a < candidates.length; a++) {
+            for (let b = a + 1; b < candidates.length; b++) {
+              expect(Math.abs(angleDiff(candidates[a].direction, candidates[b].direction))).toBeGreaterThanOrEqual(45);
+            }
+          }
+          // Le descripteur d'un candidat est le candidat lui-même.
+          const [c0] = candidates;
+          expect(stage.describe(c0.direction)).toEqual(c0);
+          // L'estimation polaire est le meilleur candidat ou son jumeau au vent
+          // arrière ; orientée par la polaire seule, le meilleur candidat.
+          expect([c0.direction, (c0.direction + 180) % 360]).toContain(stage.polar.direction);
+          if (stage.polar.orientedBy === 'polaire') expect(stage.polar.direction).toBe(c0.direction);
           expect(stage.sampling).toBe(polarSampling(points));
         }
       }

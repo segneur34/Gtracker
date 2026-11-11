@@ -25,12 +25,7 @@ import {
   type VmgStats,
   type WindStats,
 } from './sailingAnalytics';
-import {
-  resolveSailingThresholds,
-  sessionManeuverThresholds,
-  suggestSpeedRangeMs,
-  type SailingThresholds,
-} from './sailingConfig';
+import { sessionManeuverThresholds, suggestSpeedRangeMs } from './sailingConfig';
 import { buildSailingSessionStats, computeSailingTops, sailingActivityMask, sailingFlights, sailingRatioMask } from './sailingStats';
 import type { SessionStats } from './types';
 import { buildWindTimeline, polarExcludedPoints, prepareWindPolar, speedPolar, type PolarBin, type PolarManeuver, type WindEstimate, type WindPolarStage } from './wind';
@@ -53,9 +48,10 @@ import { buildWindTimeline, polarExcludedPoints, prepareWindPolar, speedPolar, t
  *    `sailingPolarGraph`, la polaire, qui ne dépend que du vent retenu : le
  *    seuil qui bouge ne la refait pas.
  *
- * `analyzeSailingSession` enchaîne les trois, après avoir résolu les seuils
- * (`resolveSailingThresholds`). La lecture de la fiche (seuil de l'activité
- * qu'elle porte, `library/`) reste au hook, qui passe un seuil déjà résolu.
+ * Le hook résout d'abord les seuils (`resolveSailingThresholds`) ; la lecture
+ * de la fiche (seuil de l'activité qu'elle porte, `library/`) lui reste, et il
+ * passe un seuil déjà résolu. Les tests enchaînent les mêmes étapes par
+ * l'aide `analyzeSailingSession` (`src/test/sailing.fixture.ts`).
  */
 
 /** Ce dont dépend la préparation d'une trace : son calcul et son allure. */
@@ -248,44 +244,3 @@ export const sailingPolarGraph = (
   prepared.trackData.length > 0 && currentWindValue !== null
     ? speedPolar(prepared.trackData, currentWindValue, prepared.maneuverThresholds.polarMinSpeedKn, polarExcludedPoints(prepared.trackData, maneuvers, currentWindValue))
     : [];
-
-/** Réglages d'une analyse de session à voile, seuils déjà lus (fiche, appareil) par l'appelant. */
-export interface SailingSessionSettings extends SailingTrackInput {
-  /** Seuil de l'activité (porté par la fiche, sinon réglé sur l'appareil), en nœuds ; `null` : la suggestion. */
-  activityThresholdKn: number | null;
-  /** Seuil propre de la session, en nœuds ; `null` : celui de l'activité. */
-  sessionThresholdKn: number | null;
-  /** Vent saisi, en degrés ; `null` : vent estimé. */
-  windDeg: number | null;
-  /**
-   * Seuil des calculs, en nœuds, quand il diffère du seuil effectif : celui du
-   * champ, différé dans le hook (HISTORIQUE, point 220). Par défaut, `thresholds.activeKn`.
-   */
-  computeThresholdKn?: number;
-}
-
-export type SailingSessionAnalysis = PreparedSailingTrack &
-  SailingThresholdAnalysis &
-  SailingWindAnalysis & {
-    polarGraphData: PolarBin[];
-    /** Seuils de la session (`resolveSailingThresholds`) : session, puis activité, puis suggestion ; fixe en bateau. */
-    thresholds: SailingThresholds;
-  };
-
-/** Seuils d'une session de voile, à partir de ses réglages et de son allure. */
-export const sailingSessionThresholds = (settings: SailingSessionSettings): SailingThresholds =>
-  resolveSailingThresholds(
-    settings.profile ?? getSportProfile(settings.sport),
-    settings.activityThresholdKn,
-    settings.sessionThresholdKn,
-    msToKnots(settings.referenceSpeedMs)
-  );
-
-/** Analyse complète d'une session à voile : les trois étapes et la polaire enchaînées, au seuil résolu. */
-export const analyzeSailingSession = (track: TrackPoint[], settings: SailingSessionSettings): SailingSessionAnalysis => {
-  const thresholds = sailingSessionThresholds(settings);
-  const prepared = prepareSailingTrack(track, settings);
-  const atThreshold = analyzeSailingAtThreshold(prepared, settings.computeThresholdKn ?? thresholds.activeKn);
-  const wind = analyzeSailingWind(prepared, atThreshold, settings.windDeg);
-  return { ...prepared, ...atThreshold, ...wind, polarGraphData: sailingPolarGraph(prepared, wind.currentWindValue, wind.maneuverStats?.locations), thresholds };
-};

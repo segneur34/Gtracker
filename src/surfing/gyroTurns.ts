@@ -30,7 +30,7 @@ const DEG_PER_RAD = 180 / Math.PI;
 export type TurnWave = { startMs: number; endMs: number };
 
 /** Un retournement du cap du buste, compté ou écarté selon sa vitesse de rotation. */
-export interface GyroTurn extends DirectionChange {
+interface GyroTurn extends DirectionChange {
   /** Indice de l'extrême suivant, où le virage s'achève (le dernier pas si la vague finit avant). */
   until: number;
   /** Durée la plus courte où le buste a tourné de `minDeg` dans son sens, entre `from` et `until`, en secondes ; `null` : jamais en moins de `minDeg / minRateDegS`. */
@@ -40,7 +40,7 @@ export interface GyroTurn extends DirectionChange {
 }
 
 /** Cap du buste sur une vague, pas à pas de la grille des capteurs (le diagnostic du banc le lit). */
-export interface WaveTurnTrace {
+interface WaveTurnTrace {
   /** Heure du premier pas, en ms, et pas de la grille, en secondes. */
   startMs: number;
   dt: number;

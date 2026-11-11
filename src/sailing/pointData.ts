@@ -37,7 +37,7 @@ export interface PointData {
 }
 
 /** Convertit le point `i` d'une trace du noyau vers la forme historique en nœuds. */
-export const toPointData = (track: TrackPoint[], i: number): PointData => {
+const toPointData = (track: TrackPoint[], i: number): PointData => {
   const point = track[i];
   return {
     lat: point.lat,

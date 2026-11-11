@@ -173,7 +173,7 @@ export const FAST_SESSION_REFERENCE_KN = 12;
 export const SLOW_SESSION_ACTIVE_THRESHOLD_KN = 1;
 
 /** Marge, en nœuds, ajoutée au pic de vitesse pour suggérer la borne haute de couleur. */
-export const SPEED_RANGE_MAX_MARGIN_KN = 1;
+const SPEED_RANGE_MAX_MARGIN_KN = 1;
 
 /**
  * Seuil d'activité suggéré, en nœuds, à partir de l'allure de la session.

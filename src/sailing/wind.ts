@@ -22,7 +22,7 @@ import {
  * Critère physique de base : un engin à voile ne va jamais vite face au vent.
  * Sur la polaire de la trace, le vent est au centre de l'angle mort, le
  * secteur sans point rapide, encadré symétriquement par les deux allures de
- * près. C'est ce que cherche `estimateWindFromPolar`.
+ * près. C'est ce que cherchent les candidats de la polaire (`prepareWindPolar`).
  *
  * L'angle mort a un jumeau : le vent arrière, lui aussi lent. Pour départager
  * les deux, la polaire d'un wingfoil est asymétrique en couverture, on
@@ -216,14 +216,14 @@ export const buildWindTimeline = (
 // ---------------------------------------------------------------------------
 
 /** Demi-ouverture de l'angle mort, en degrés. */
-export const NO_GO_HALF_ANGLE = 35;
+const NO_GO_HALF_ANGLE = 35;
 /** Secteur de près, de part et d'autre de l'angle mort, en degrés du vent. */
-export const UPWIND_SECTOR: [number, number] = [40, 85];
+const UPWIND_SECTOR: [number, number] = [40, 85];
 /** Poids de la pénalité des vitesses dans l'angle mort. */
 const NO_GO_PENALTY = 4;
 
 /** Vitesse maximale atteinte dans chaque secteur de 1° de cap. */
-export const buildMaxSpeedsByBearing = (points: PointData[], minSpeedKn: number): number[] => {
+const buildMaxSpeedsByBearing = (points: PointData[], minSpeedKn: number): number[] => {
   const maxSpeeds = new Array<number>(360).fill(0);
   for (const p of points) {
     if (p.smoothedSpeed <= minSpeedKn) continue;
@@ -243,7 +243,7 @@ export interface PolarScore {
   score: number;
 }
 
-export const scoreWindCandidate = (maxSpeeds: number[], w: number): PolarScore => {
+const scoreWindCandidate = (maxSpeeds: number[], w: number): PolarScore => {
   let noGo = 0;
   let left = 0;
   let right = 0;
@@ -291,7 +291,7 @@ export const CANDIDATE_MIN_SEPARATION = 45;
  * annonçait 90 % de confiance sur une direction fausse de 180°, que
  * l'utilisateur corrigeait par « Inverser ».
  */
-export const POLAR_SUPPORT_INTERVAL_S = 5;
+const POLAR_SUPPORT_INTERVAL_S = 5;
 
 /**
  * Soutien de la trace à la polaire, de 0 à 1 : `POLAR_SUPPORT_INTERVAL_S`
@@ -346,21 +346,17 @@ const describeCandidate = (
 };
 
 /**
- * Les meilleures directions candidates au sens du score de l'angle mort :
- * maxima locaux du score, séparés d'au moins 45°, par score décroissant.
+ * Les meilleures directions candidates au sens du score de l'angle mort, sur
+ * des vitesses max par cap déjà relevées : maxima locaux du score, séparés
+ * d'au moins 45°, par score décroissant. Le premier est la direction qui
+ * centre le mieux l'angle mort : peu de vitesse dans le cône, de la vitesse
+ * au près des deux côtés, et équilibre entre les deux bords.
  *
  * Le score seul peut se laisser piéger par un trou de couverture, un secteur
  * jamais navigué entre le près et le portant. Plutôt que de prendre
  * aveuglément le maximum, on remonte plusieurs candidats que les manœuvres
  * départageront.
  */
-export const polarWindCandidates = (
-  points: PointData[],
-  minSpeedKn = WIND_ESTIMATION_MIN_SPEED_KN,
-  count = 3
-): PolarWindEstimate[] => candidatesOf(buildMaxSpeedsByBearing(points, minSpeedKn), count);
-
-/** Candidats de `polarWindCandidates`, sur des vitesses max par cap déjà relevées. */
 const candidatesOf = (maxSpeeds: number[], count: number): PolarWindEstimate[] => {
   const scores = new Array<number>(360);
   for (let w = 0; w < 360; w++) scores[w] = scoreWindCandidate(maxSpeeds, w).score;
@@ -378,30 +374,14 @@ const candidatesOf = (maxSpeeds: number[], count: number): PolarWindEstimate[] =
 };
 
 /**
- * Descripteur d'une direction imposée, sans passer par la recherche des
- * maxima du score. Sert au jumeau au vent arrière, testé comme candidat mais
- * qui n'est pas un maximum local du score polaire : sans lui, une direction
- * retenue pourrait n'avoir aucun descripteur, et donc aucune confiance à elle.
+ * Descripteur d'une direction imposée, sur des vitesses max par cap déjà
+ * relevées, sans passer par la recherche des maxima du score. Sert au jumeau
+ * au vent arrière, testé comme candidat mais qui n'est pas un maximum local du
+ * score polaire : sans lui, une direction retenue pourrait n'avoir aucun
+ * descripteur, et donc aucune confiance à elle.
  */
-export const describeWindCandidate = (
-  points: PointData[],
-  direction: number,
-  minSpeedKn = WIND_ESTIMATION_MIN_SPEED_KN
-): PolarWindEstimate => describeDirection(buildMaxSpeedsByBearing(points, minSpeedKn), direction);
-
-/** Descripteur de `describeWindCandidate`, sur des vitesses max par cap déjà relevées. */
 const describeDirection = (maxSpeeds: number[], direction: number): PolarWindEstimate =>
   describeCandidate(maxSpeeds, normalizeAngle(direction), coverageOf(maxSpeeds));
-
-/**
- * Cherche la direction qui centre le mieux l'angle mort : peu de vitesse dans
- * le cône, de la vitesse au près des deux côtés, et équilibre entre les deux
- * bords. C'est la méthode d'origine de l'application.
- */
-export const estimateWindFromPolar = (
-  points: PointData[],
-  minSpeedKn = WIND_ESTIMATION_MIN_SPEED_KN
-): PolarWindEstimate => polarWindCandidates(points, minSpeedKn, 1)[0];
 
 // ---------------------------------------------------------------------------
 // Virages francs et orientation
@@ -421,7 +401,7 @@ const EXIT_MAX_STEP_DEG = 45;
  * « tourne franchement » d'un pas au suivant : 2° par pas à 1 Hz, comme
  * avant, et la même rotation à 5 Hz, où un pas de 2° voulait dire 10°/s.
  */
-export const TURNING_RATE_MIN_DEG_S = 2;
+const TURNING_RATE_MIN_DEG_S = 2;
 
 /**
  * Indice du point qui clôt un pas d'au moins `TURN_STRIDE_MIN_S` depuis le
@@ -468,7 +448,7 @@ export interface TurnWindowScan {
 
 /**
  * Balayage de la fenêtre d'observation d'un virage, commun à la détection des
- * manœuvres (`analyzeManeuvers`) et à l'orientation du vent (`observeTurns`),
+ * manœuvres (`prepareManeuverDetection`) et à l'orientation du vent (`observeTurns`),
  * pour que les deux voient les mêmes virages : les points qui tombent à
  * `windowMs` au plus du point `i`, ou, fenêtre vide, un pas unique jusqu'à
  * `maxStepMs`. Un enregistreur économique s'est alors tu pendant le virage,
@@ -604,7 +584,7 @@ export const observeTurns = (
   let i = 0;
 
   while (i < points.length - 1) {
-    // Même balayage que `analyzeManeuvers`, pour que les deux voient les mêmes virages.
+    // Même balayage que la détection des manœuvres (`prepareManeuverDetection`), pour que les deux voient les mêmes virages.
     const scan = scanTurnWindow(points, i, windowMs, MANEUVER_MAX_STEP_S * 1000);
     // Point le plus lent de la fenêtre, dernier point compris : la détection
     // des manœuvres l'omet, pas l'orientation (`slowestPoint`).
@@ -654,7 +634,7 @@ export const observeTurns = (
   return turns;
 };
 
-export interface OrientationVote {
+interface OrientationVote {
   /** Poids en faveur de `axis` comme direction d'où vient le vent. */
   forAxis: number;
   /** Poids en faveur de l'opposé. */
@@ -667,7 +647,7 @@ export interface OrientationVote {
  * un empannage, dont le milieu est au vent arrière ; une abattée de 90° a son
  * milieu au travers et ne pèse rien, d'où le cosinus.
  */
-export const orientationVotes = (turns: readonly TurnObservation[], axis: number): OrientationVote => {
+const orientationVotes = (turns: readonly TurnObservation[], axis: number): OrientationVote => {
   const vote: OrientationVote = { forAxis: 0, forOpposite: 0 };
   for (const t of turns) {
     if (t.slow) {
@@ -700,33 +680,17 @@ export interface WindEstimate {
   maneuverCount: number;
 }
 
-export interface WindEstimateOptions {
-  /** Vitesse plancher de la polaire, en nœuds (`WIND_ESTIMATION_MIN_SPEED_KN`). */
-  minSpeedKn?: number;
-  /** Vitesse d'entrée des virages qui orientent l'axe, en nœuds : celle de la détection des manœuvres (Q53). */
-  minEntrySpeedKn?: number;
-}
-
 /** Contraste minimal du score polaire pour que l'orientation soit acquise sans aide. */
 const POLAR_CONTRAST_MIN = 0.15;
 
 /**
- * Centre de l'angle mort, puis orientation. Le score polaire départage
- * lui-même l'angle mort de son jumeau quand la couverture est assez
- * asymétrique ; sinon les virages tranchent, sinon la polaire garde son
- * orientation avec une confiance réduite d'autant.
- */
-export const estimateWindPolar = (points: PointData[], options: WindEstimateOptions = {}): WindEstimate => {
-  const minSpeedKn = options.minSpeedKn ?? WIND_ESTIMATION_MIN_SPEED_KN;
-  const minEntrySpeedKn = options.minEntrySpeedKn ?? MANEUVER_MIN_ENTRY_SPEED_KN;
-  return orientPolar(estimateWindFromPolar(points, minSpeedKn), () => observeTurns(points, minEntrySpeedKn));
-};
-
-/**
- * Orientation de `estimateWindPolar`, sur le meilleur candidat de la polaire
- * déjà trouvé ; les virages qui tranchent (`turnsOf`, lus seulement si le
- * contraste polaire ne suffit pas) sont ceux d'`observeTurns` à la vitesse
- * d'entrée de la détection des manœuvres (Q53).
+ * Orientation de l'estimation polaire, sur le meilleur candidat de la polaire
+ * déjà trouvé (centre de l'angle mort). Le score polaire départage lui-même
+ * l'angle mort de son jumeau quand la couverture est assez asymétrique ;
+ * sinon les virages tranchent, sinon la polaire garde son orientation avec une
+ * confiance réduite d'autant. Les virages qui tranchent (`turnsOf`, lus
+ * seulement si le contraste polaire ne suffit pas) sont ceux d'`observeTurns`
+ * à la vitesse d'entrée de la détection des manœuvres (Q53).
  */
 const orientPolar = (polar: PolarWindEstimate, turnsOf: () => readonly TurnObservation[]): WindEstimate => {
   const candidateA = polar.direction;
@@ -770,11 +734,11 @@ export interface WindPolarStage {
   readonly minSpeedKn: number;
   /** Vitesse d'entrée des virages lus par l'orientation : celle de la détection des manœuvres (Q53). */
   readonly minEntrySpeedKn: number;
-  /** Candidats de la polaire, par score décroissant (`polarWindCandidates`, trois au plus). */
+  /** Candidats de la polaire, par score décroissant, séparés d'au moins 45°, trois au plus. */
   readonly candidates: readonly PolarWindEstimate[];
-  /** Descripteur d'une direction imposée, sur la même polaire (`describeWindCandidate`). */
+  /** Descripteur d'une direction imposée, sur la même polaire. */
   readonly describe: (direction: number) => PolarWindEstimate;
-  /** Estimation polaire orientée (`estimateWindPolar`). */
+  /** Estimation polaire : le meilleur candidat, orienté par la polaire ou par les virages. */
   readonly polar: WindEstimate;
   /** Soutien de la trace à la polaire (`polarSampling`). */
   readonly sampling: number;
@@ -804,9 +768,7 @@ export const turnsDirectionOf = (turns: readonly TurnObservation[]): number | nu
  * Prépare l'étage polaire de l'estimation du vent : les vitesses max par cap
  * sont relevées une fois, au lieu d'une fois pour l'estimation polaire, une
  * pour les candidats et une pour le jumeau au vent arrière ; les virages
- * francs aussi, pour l'orientation et pour la direction qu'ils votent. Le
- * meilleur candidat est le même que celui d'`estimateWindFromPolar` : le tri
- * ne dépend pas du nombre de candidats gardés.
+ * francs aussi, pour l'orientation et pour la direction qu'ils votent.
  */
 export const prepareWindPolar = (
   points: PointData[],

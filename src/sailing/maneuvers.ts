@@ -89,7 +89,7 @@ export type ManeuverKind = 'tack' | 'jibe' | 'undecided';
 export type Tack = 'starboard' | 'port';
 
 /** Amure d'un cap, en degrés, sous un vent donné : tribord quand le cap est à gauche du vent. */
-export const tackOf = (headingDeg: number, windDeg: number): Tack =>
+const tackOf = (headingDeg: number, windDeg: number): Tack =>
   angleDiff(headingDeg, windDeg) < 0 ? 'starboard' : 'port';
 
 export interface ManeuverLocation {
@@ -226,7 +226,7 @@ export interface ManeuverLocation {
  * manœuvre parce que le vent estimé est faux, ce qui range tous les demi-tours
  * « au travers », et rien à l'écran ne le laisse voir.
  */
-export interface ManeuverRejections {
+interface ManeuverRejections {
   /** Virage franc mais entamé sous la vitesse minimale d'entrée. */
   slowEntry: number;
   /** Rotation trop dispersée pour un virage : chute, hésitation. */
@@ -248,7 +248,7 @@ export interface ManeuverRejections {
 }
 
 /** Virage écarté, tel que la détection l'a vu : pour le diagnostic d'une session. */
-export interface RejectedTurn {
+interface RejectedTurn {
   motif: keyof ManeuverRejections;
   /**
    * Instant et indice de trace : le déclenchement de la détection, ou le
@@ -353,7 +353,7 @@ export const windSamplesFrom = (stats: ManeuverStats): ManeuverLocation[] =>
  * comme un virement et l'estimation part à l'opposé. Un rapport, lui, vaut la même chose à toutes les échelles — c'est
  * ce qui rend ce critère juste du bateau au kite.
  */
-export const maneuverAgreement = (
+const maneuverAgreement = (
   stats: ManeuverStats
 ): { agreement: number; count: number; consistent: number; inconsistent: number } => {
   const all = stats.locations.filter(isDirected);
@@ -963,22 +963,11 @@ const medianStableSegment = (window: HeadingWindow): StableSegment | null =>
     ? { heading: normalizeDeg(window.heading), meanSpeed: window.meanSpeed }
     : null;
 
-/** Virage détecté et classé, tel que la mesure le reçoit. */
-export interface DetectedTurn {
-  /** Point où la détection s'est déclenchée, quelques secondes avant le virage. */
-  triggerIndex: number;
-  /** Dernier point où le cap tournait encore franchement dans le sens du virage. */
-  endIndex: number;
-  /** Sens du virage : 1 à droite, −1 à gauche. */
-  turnSign: number;
-  type: 'tack' | 'jibe';
-}
-
 /**
  * Mesures de la vitesse d'une manœuvre, depuis son point d'entrée : définies
  * comme les champs de même nom de `ManeuverLocation`.
  */
-export interface SpeedMeasure {
+interface SpeedMeasure {
   /** Point d'où la manœuvre se lit : le début de la rotation, ou le décollage. */
   entryIndex: number;
   apexIndex: number;
@@ -1081,32 +1070,8 @@ const crossingMs = (points: PointData[], k: number, fromDeg: number, toDeg: numb
   return fromMid + Math.min(1, Math.max(0, ratio)) * (toMid - fromMid);
 };
 
-/**
- * Mesure une manœuvre que la détection a trouvée et classée.
- *
- * La détection se déclenche plusieurs secondes avant le virage et l'arrête au
- * premier pas de cap hésitant : ses bornes suffisent à classer, pas à mesurer.
- * Prises telles quelles, elles faisaient commencer la manœuvre en pleine
- * approche (5 s trop tôt en médiane sur une trace bruitée) et la finissaient
- * au point le plus lent, parfois au milieu du virage. La rotation est donc
- * rebornée sur le cap lui-même : elle commence quand le cap quitte celui
- * d'approche et s'achève quand il atteint celui de sortie, deux caps lus en
- * médiane, que le bruit ne déplace pas.
- *
- * Tout le reste en découle : la vitesse d'approche, lue avant la rotation et
- * non à son premier point, où le rider a souvent déjà ralenti ; le point le
- * plus lent, cherché sur toute la rotation et au-delà ; la relance, la
- * distance et le gain au vent.
- */
-export const measureManeuver = (points: PointData[], turn: DetectedTurn, windDeg: number): ManeuverMeasure => {
-  const { triggerIndex, endIndex, turnSign, type } = turn;
-  const rotation = measureRotation(points, triggerIndex, endIndex, turnSign, turnHeadings(points, triggerIndex, endIndex));
-  const { rotationStartMs: _startMs, rotationEndMs: _endMs, lostFlightMs: _lost, ...measure } = rotation;
-  return { ...measure, gainM: windwardGainM(points, rotation, type, windDeg) };
-};
-
 /** Mesures d'une manœuvre qui ne dépendent pas du vent : tout sauf le gain au vent. */
-export interface RotationMeasure extends Omit<ManeuverMeasure, 'gainM'> {
+interface RotationMeasure extends Omit<ManeuverMeasure, 'gainM'> {
   /** Instants où le cap quitte celui d'approche et atteint celui de sortie, pour le gain au vent. */
   rotationStartMs: number;
   rotationEndMs: number;
@@ -1120,7 +1085,7 @@ export interface RotationMeasure extends Omit<ManeuverMeasure, 'gainM'> {
 }
 
 /** Un point de la série de vitesse d'une manœuvre : instant et vitesse, en nœuds. */
-export interface SpeedSample {
+interface SpeedSample {
   timeMs: number;
   speedKn: number;
 }
@@ -1141,7 +1106,7 @@ const speedCrossingMs = (a: SpeedSample, b: SpeedSample, thresholdKn: number): n
  * la mesure comme elle borne la vitesse minimale. Une vitesse égale au seuil
  * n'est pas en dessous.
  */
-export const longestUnderMs = (samples: readonly SpeedSample[], thresholdKn: number): number => {
+const longestUnderMs = (samples: readonly SpeedSample[], thresholdKn: number): number => {
   let longest = 0;
   let startMs: number | null = null;
   for (let k = 0; k < samples.length; k++) {
@@ -1272,7 +1237,7 @@ const takeoffIndexOf = (
  * fait avancer. Seule mesure qui lise le vent : elle se refait par candidat,
  * sur une rotation mesurée une fois.
  */
-export const windwardGainM = (points: PointData[], rotation: RotationMeasure, type: 'tack' | 'jibe', windDeg: number): number => {
+const windwardGainM = (points: PointData[], rotation: RotationMeasure, type: 'tack' | 'jibe', windDeg: number): number => {
   const gainDirection = type === 'tack' ? windDeg : windDeg + 180;
   return distanceAlongBetween(
     points,
@@ -1287,9 +1252,23 @@ export const windwardGainM = (points: PointData[], rotation: RotationMeasure, ty
 /**
  * Mesure de la rotation d'un virage détecté, du cap d'approche au cap de
  * sortie (`headings`, lus sur `triggerIndex` et `endIndex`), sans le vent ni
- * le type : ce que `measureManeuver` fait, le gain au vent mis à part.
+ * le type : tout ce qu'on mesure d'une manœuvre, le gain au vent mis à part
+ * (`windwardGainM`).
+ *
+ * Les bornes de la détection suffisent à classer, pas à mesurer : prises
+ * telles quelles, elles faisaient commencer la manœuvre en pleine approche
+ * (5 s trop tôt en médiane sur une trace bruitée) et la finissaient au point
+ * le plus lent, parfois au milieu du virage. La rotation est donc rebornée sur
+ * le cap lui-même : elle commence quand le cap quitte celui d'approche et
+ * s'achève quand il atteint celui de sortie, deux caps lus en médiane, que le
+ * bruit ne déplace pas.
+ *
+ * Tout le reste en découle : la vitesse d'approche, lue avant la rotation et
+ * non à son premier point, où le rider a souvent déjà ralenti ; le point le
+ * plus lent, cherché sur toute la rotation et au-delà ; la relance et la
+ * distance.
  */
-export const measureRotation = (
+const measureRotation = (
   points: PointData[],
   triggerIndex: number,
   endIndex: number,
@@ -1352,7 +1331,7 @@ export const measureRotation = (
 // ---------------------------------------------------------------------------
 
 /** Réglages de la détection, résolus : ceux de `ManeuverOptions` que le vent ne touche pas. */
-export interface DetectionSettings {
+interface DetectionSettings {
   minEntrySpeedKn: number;
   windowMs: number;
   minWindowShare: number;
@@ -1417,7 +1396,7 @@ const NOTHING: WindowReading = { kind: 'nothing' };
  * le vent n'y change rien (planche arrêtée, virage trop petit, tour complet),
  * sinon tout ce que le classement et la mesure reçoivent.
  */
-export type TurnReading =
+type TurnReading =
   | { verdict: 'still' }
   | { verdict: 'small'; turn: number }
   | { verdict: 'fullTurn'; turn: number; turnStart: number; turnEnd: number; turnEndMs: number }
@@ -1928,15 +1907,3 @@ export const classifyManeuvers = (
 
   return stats;
 };
-
-/**
- * Détecte et classe virements et empannages, en une fois : la détection
- * préparée (`prepareManeuverDetection`) puis classée par `wind`
- * (`classifyManeuvers`). Pour classer une même trace par plusieurs vents,
- * préparer la détection une fois et la classer autant de fois.
- */
-export const analyzeManeuvers = (
-  points: PointData[],
-  wind: WindReference,
-  options: ManeuverOptions = {}
-): ManeuverStats => classifyManeuvers(prepareManeuverDetection(points, options), wind, options);

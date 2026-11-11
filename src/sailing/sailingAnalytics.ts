@@ -10,7 +10,7 @@ import { formatDecimal, msToKnots } from '../core/units';
 import { MAX_GAP_S } from '../core/sportProfiles';
 
 /** Meilleure et moyenne VMG d'une allure et d'une amure, en nœuds, non arrondies : la page les formate dans son unité. */
-export interface VmgCell {
+interface VmgCell {
   max: number;
   avg: number;
 }
@@ -293,7 +293,7 @@ export interface ManeuverTop {
   path: [number, number][];
 }
 
-export interface ManeuverTypeSummary {
+interface ManeuverTypeSummary {
   count: number;
   success: number;
   fail: number;
@@ -312,7 +312,7 @@ export interface ManeuverTypeSummary {
 }
 
 /** Virements ou empannages d'une amure : comptés, réussis, et leurs médianes. */
-export interface ManeuverTackSummary {
+interface ManeuverTackSummary {
   count: number;
   success: number;
   /** Vitesse minimale médiane, en nœuds, non arrondie. */
@@ -322,7 +322,7 @@ export interface ManeuverTackSummary {
 }
 
 /** Manœuvres d'un genre dirigé, par amure avant la manœuvre ; `null` sans manœuvre sur cette amure. */
-export type ManeuversByTack = Record<Tack, ManeuverTackSummary | null>;
+type ManeuversByTack = Record<Tack, ManeuverTackSummary | null>;
 
 export interface ManeuverSummary {
   tack: ManeuverTypeSummary | null;
@@ -468,7 +468,7 @@ const byTackOf = (locations: ManeuverLocation[], type: 'tack' | 'jibe'): Maneuve
 const EMPTY_BY_TACK: ManeuversByTack = { starboard: null, port: null };
 
 /** Écart, en degrés, au-delà duquel un vent saisi loin du vent calculé fiable est signalé (`windInputWarning`). */
-export const WIND_INPUT_WARNING_DEG = 45;
+const WIND_INPUT_WARNING_DEG = 45;
 
 /** Ce que la phrase d'avertissement sous le tableau des manœuvres dit : vent saisi, vent calculé, virages écartés. */
 export interface WindInputWarning {

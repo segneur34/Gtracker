@@ -39,7 +39,7 @@ const { median } = await load('core/basics.ts');
 const { msToKnots } = await load('core/units.ts');
 const { trackToPointData } = await load('sailing/pointData.ts');
 const { sessionManeuverThresholds, suggestActiveThresholdKn } = await load('sailing/sailingConfig.ts');
-const { analyzeManeuvers, estimateWind, windSamplesFrom, WIND_LOCAL_MAX_GAP_MIN } = await load('sailing/maneuvers.ts');
+const { classifyManeuvers, estimateWind, prepareManeuverDetection, windSamplesFrom, WIND_LOCAL_MAX_GAP_MIN } = await load('sailing/maneuvers.ts');
 const { buildSailingSessionStats } = await load('sailing/sailingStats.ts');
 const { buildWindTimeline } = await load('sailing/wind.ts');
 
@@ -144,13 +144,15 @@ const wind = flags.vent !== undefined ? Number(flags.vent) : estimate.direction;
 console.log(`Vent retenu ${wind}°${flags.vent !== undefined ? ' (donné)' : ' (estimé)'}`);
 
 const options = { successThresholdKn: seuil, minEntrySpeedKn: mt.minEntrySpeedKn, flightThresholdKn };
-const firstPass = analyzeManeuvers(pts, wind, options);
+// Comme l'application (`analyzeSailingWind`) : une détection par trace, classée par le vent global puis par le vent local.
+const detection = prepareManeuverDetection(pts, options);
+const firstPass = classifyManeuvers(detection, wind, options);
 const timeline = buildWindTimeline(
   windSamplesFrom(firstPass).map((m) => ({ timeMs: m.timeMs, direction: m.localWind })),
   wind,
   WIND_LOCAL_MAX_GAP_MIN * 60 * 1000
 );
-const result = analyzeManeuvers(pts, timeline, options);
+const result = classifyManeuvers(detection, timeline, options);
 const counted = result.locations.length;
 // Sens incertain (virage vu en un seul pas, lot 44) : compté dans le total, hors du % de réussite.
 const undecided = result.undecided ?? 0;

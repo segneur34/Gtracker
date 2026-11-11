@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { getSportProfile } from '../core/sportProfiles';
 import type { SportType, TrackPoint } from '../core/types';
 import { knotsToMs } from '../core/units';
-import { degApart, sailTrack, slowPolar, upDownLegs, type SailTrack } from '../test/sailing.fixture';
+import {
+  analyzeSailingSession,
+  degApart,
+  sailTrack,
+  slowPolar,
+  upDownLegs,
+  type SailTrack,
+  type SailingSessionSettings,
+} from '../test/sailing.fixture';
 import {
   FAST_SESSION_REFERENCE_KN,
   MANEUVER_ENTRY_SPEED_RATIO,
@@ -10,14 +18,7 @@ import {
   POLAR_MIN_SPEED_RATIO,
   SLOW_SESSION_ACTIVE_THRESHOLD_KN,
 } from './sailingConfig';
-import {
-  analyzeSailingAtThreshold,
-  analyzeSailingSession,
-  analyzeSailingWind,
-  prepareSailingTrack,
-  sailingPolarGraph,
-  type SailingSessionSettings,
-} from './sailingSession';
+import { analyzeSailingAtThreshold, analyzeSailingWind, prepareSailingTrack, sailingPolarGraph } from './sailingSession';
 
 const WIND = 20;
 

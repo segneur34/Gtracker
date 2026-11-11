@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { parseGpx } from '../core/gpxParser';
 import { analyzeSailing, counts, degApart, jibesOf, komootRaw, rawToGpx, sailRaw, tacksOf, topSpeeds, upDownLegs, NO_NOISE, SAIL_T0 } from '../test/sailing.fixture';
 import { windInputWarning } from './sailingAnalytics';
-import { polarWindCandidates } from './wind';
+import { prepareWindPolar } from './wind';
 
 /**
  * Sessions réalistes passées par la chaîne réelle (sondes C1 de l'audit du
@@ -77,7 +77,7 @@ describe('vent : longue session (C1-2)', () => {
   for (const c of cases) {
     it(c.name, () => {
       const a = analyzeSailing(sailRaw({ windDeg: WIND, legs: upDownLegs(c.legs, c.legS), hz: c.hz, seed: c.seed }));
-      const best = polarWindCandidates(a.points, a.polarMinSpeedKn, 1)[0].direction;
+      const best = prepareWindPolar(a.points, a.polarMinSpeedKn, a.minEntrySpeedKn).candidates[0].direction;
       expect(degApart(best, WIND)).toBeGreaterThan(60);
       expect(a.windEstimate.reliable).toBe(true);
       expect(a.windEstimate.orientedBy).toBe('virages');

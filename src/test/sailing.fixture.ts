@@ -3,12 +3,29 @@ import { kinematicsOptionsOf, referenceSpeedMs, scalesFiltersToSession } from '.
 import { buildCumulativeTrack } from '../core/sessionStats';
 import { getSportProfile } from '../core/sportProfiles';
 import type { CumulativeTrack, RawTrackPoint, SportType, TrackPoint } from '../core/types';
-import { knotsToMs } from '../core/units';
+import { knotsToMs, msToKnots } from '../core/units';
 import { angleDiff } from '../core/angles';
 import type { PointData } from '../sailing/pointData';
-import type { ManeuverStats } from '../sailing/maneuvers';
+import {
+  classifyManeuvers,
+  prepareManeuverDetection,
+  type ManeuverOptions,
+  type ManeuverStats,
+  type WindReference,
+} from '../sailing/maneuvers';
 import type { WindEstimate } from '../sailing/wind';
-import { analyzeSailingSession } from '../sailing/sailingSession';
+import {
+  analyzeSailingAtThreshold,
+  analyzeSailingWind,
+  prepareSailingTrack,
+  sailingPolarGraph,
+  type PreparedSailingTrack,
+  type SailingThresholdAnalysis,
+  type SailingTrackInput,
+  type SailingWindAnalysis,
+} from '../sailing/sailingSession';
+import { resolveSailingThresholds, type SailingThresholds } from '../sailing/sailingConfig';
+import type { PolarBin } from '../sailing/wind';
 import type { SessionStats } from '../sailing/types';
 import { M_PER_DEG_LAT, mPerDegLon } from './geo.fixture';
 import { GPX_EDITORS, corpusSegmentsOf, type CorpusMeta, type GpxEditor } from './gpx/corpus';
@@ -355,8 +372,68 @@ export const sailTrackOf = (raw: RawTrackPoint[], sport: SportType = 'wingfoil')
 export const sailTrack = (spec: SailSpec, sport: SportType = 'wingfoil'): SailTrack => sailTrackOf(sailRaw(spec), sport);
 
 // ---------------------------------------------------------------------------
+// Détection et classement des manœuvres, par la voie de l'application
+// ---------------------------------------------------------------------------
+
+/**
+ * Détecte et classe virements et empannages en une fois, par les deux étapes
+ * que l'application enchaîne (`prepareManeuverDetection`, puis
+ * `classifyManeuvers` au vent donné) : une détection neuve à chaque appel.
+ * Aide de test seulement : l'application prépare la détection une fois par
+ * trace et la classe autant de fois que le vent l'exige.
+ */
+export const detectAndClassify = (points: PointData[], wind: WindReference, options: ManeuverOptions = {}): ManeuverStats =>
+  classifyManeuvers(prepareManeuverDetection(points, options), wind, options);
+
+// ---------------------------------------------------------------------------
 // Chaîne de `useSailingSession`, hors React : `analyzeSailingSession`
 // ---------------------------------------------------------------------------
+
+/** Réglages d'une analyse de session à voile, seuils déjà lus (fiche, appareil) par l'appelant. */
+export interface SailingSessionSettings extends SailingTrackInput {
+  /** Seuil de l'activité (porté par la fiche, sinon réglé sur l'appareil), en nœuds ; `null` : la suggestion. */
+  activityThresholdKn: number | null;
+  /** Seuil propre de la session, en nœuds ; `null` : celui de l'activité. */
+  sessionThresholdKn: number | null;
+  /** Vent saisi, en degrés ; `null` : vent estimé. */
+  windDeg: number | null;
+  /**
+   * Seuil des calculs, en nœuds, quand il diffère du seuil effectif : celui du
+   * champ, différé dans le hook (HISTORIQUE, point 220). Par défaut, `thresholds.activeKn`.
+   */
+  computeThresholdKn?: number;
+}
+
+export type SailingSessionAnalysis = PreparedSailingTrack &
+  SailingThresholdAnalysis &
+  SailingWindAnalysis & {
+    polarGraphData: PolarBin[];
+    /** Seuils de la session (`resolveSailingThresholds`) : session, puis activité, puis suggestion ; fixe en bateau. */
+    thresholds: SailingThresholds;
+  };
+
+/** Seuils d'une session de voile, à partir de ses réglages et de son allure. */
+const sailingSessionThresholds = (settings: SailingSessionSettings): SailingThresholds =>
+  resolveSailingThresholds(
+    settings.profile ?? getSportProfile(settings.sport),
+    settings.activityThresholdKn,
+    settings.sessionThresholdKn,
+    msToKnots(settings.referenceSpeedMs)
+  );
+
+/**
+ * Analyse complète d'une session à voile : les trois étapes de
+ * `sailing/sailingSession.ts` et la polaire enchaînées au seuil résolu, dans
+ * l'ordre où `useSailingSession` les appelle sous ses `useMemo`. Aide de test
+ * seulement : l'application passe par le hook.
+ */
+export const analyzeSailingSession = (track: TrackPoint[], settings: SailingSessionSettings): SailingSessionAnalysis => {
+  const thresholds = sailingSessionThresholds(settings);
+  const prepared = prepareSailingTrack(track, settings);
+  const atThreshold = analyzeSailingAtThreshold(prepared, settings.computeThresholdKn ?? thresholds.activeKn);
+  const wind = analyzeSailingWind(prepared, atThreshold, settings.windDeg);
+  return { ...prepared, ...atThreshold, ...wind, polarGraphData: sailingPolarGraph(prepared, wind.currentWindValue, wind.maneuverStats?.locations), thresholds };
+};
 
 export interface SailingAnalysis {
   track: TrackPoint[];

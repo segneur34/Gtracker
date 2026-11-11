@@ -7,15 +7,12 @@ import { CHART_MAX_POINTS } from '../core/displayConfig';
 import { trackToPointData, type PointData } from './pointData';
 import {
   WIND_LOCAL_MAX_GAP_MIN,
-  analyzeManeuvers,
   classifyManeuvers,
   estimateWind,
-  maneuverAgreement,
-  measureManeuver,
+  isDirected,
   prepareManeuverDetection,
   selectWindCandidate,
   stableSegment,
-  tackOf,
   windSamplesFrom,
   type ManeuverLocation,
   type ManeuverOptions,
@@ -25,10 +22,10 @@ import {
 } from './maneuvers';
 import { sessionManeuverThresholds } from './sailingConfig';
 import { calculateWindStats, summarizeManeuvers, windChartRows } from './sailingAnalytics';
-import { buildWindTimeline, describeWindCandidate, estimateWindFromPolar, estimateWindPolar, observeTurns, polarSampling, prepareWindPolar, type TurnObservation } from './wind';
+import { buildWindTimeline, observeTurns, polarSampling, prepareWindPolar, type TurnObservation } from './wind';
 import { angleDiff, circularMean, normalizeDeg, toRad } from '../core/angles';
 import { M_PER_DEG_LAT, at as geoAt } from '../test/geo.fixture';
-import { TRACK_START_MS, buildLegSession, polarSpeed, slowPolar, upwindDownwindLegs, type Leg } from '../test/sailing.fixture';
+import { TRACK_START_MS, buildLegSession, detectAndClassify, polarSpeed, slowPolar, upwindDownwindLegs, type Leg } from '../test/sailing.fixture';
 
 /**
  * Trace synthétique décrite par une fonction cap(t) et une vitesse. Le cap est
@@ -397,18 +394,18 @@ const fakeManeuver = (overrides: Partial<ManeuverLocation>): ManeuverLocation =>
   ...overrides,
 });
 
-describe('analyzeManeuvers, seuils accordés à la session', () => {
+describe('détection et classement, seuils accordés à la session', () => {
   it('écarte un virage lent avec le seuil du wingfoil, le retient avec celui de la session', () => {
     const track = buildSlowTurnTrack(2, 12);
 
     // 4 nœuds à l'entrée : la valeur d'un wingfoil, que cette session
     // n'atteint jamais. Le virage est vu, mais écarté.
-    const auSeuilWingfoil = analyzeManeuvers(track, 200, { successThresholdKn: 1 });
+    const auSeuilWingfoil = detectAndClassify(track, 200, { successThresholdKn: 1 });
     expect(auSeuilWingfoil.locations).toHaveLength(0);
     expect(auSeuilWingfoil.rejected.slowEntry).toBeGreaterThan(0);
 
     // 0,7 nœud, soit la part correspondante d'une allure de 4,4 nœuds.
-    const auSeuilDeLaSession = analyzeManeuvers(track, 200, {
+    const auSeuilDeLaSession = detectAndClassify(track, 200, {
       successThresholdKn: 1,
       minEntrySpeedKn: 0.7,
     });
@@ -419,7 +416,7 @@ describe('analyzeManeuvers, seuils accordés à la session', () => {
     // Même virage, mais trois mètres parcourus : à cette distance l'écart de
     // cap ne mesure que l'incertitude de position.
     const track = buildSlowTurnTrack(0.2, 3);
-    const stats = analyzeManeuvers(track, 200, {
+    const stats = detectAndClassify(track, 200, {
       successThresholdKn: 1,
       minEntrySpeedKn: 0.05,
     });
@@ -456,11 +453,11 @@ describe('sessionManeuverThresholds', () => {
   });
 });
 
-describe('analyzeManeuvers, enregistrement économique', () => {
+describe('détection et classement, enregistrement économique', () => {
   it('lit le virage compressé dans un seul intervalle', () => {
     // Le cas réel : 22 s entre les deux bords, aucun point pendant le virement
     // puisque la planche s'était arrêtée. Vent à 23°, comme sur la trace.
-    const stats = analyzeManeuvers(buildSparseTurnTrack(22), 23, { successThresholdKn: 8 });
+    const stats = detectAndClassify(buildSparseTurnTrack(22), 23, { successThresholdKn: 8 });
 
     expect(stats.locations).toHaveLength(1);
     expect(stats.locations[0].type).toBe('tack');
@@ -469,7 +466,7 @@ describe('analyzeManeuvers, enregistrement économique', () => {
   it('compte un demi-tour de 175° vu en un pas de 20 s, sens incertain, hors du vent (lot 44)', () => {
     for (const legStepS of [1, 0.2, 6]) {
       const points = buildSilentUTurns(legStepS);
-      const stats = analyzeManeuvers(points, 0, { successThresholdKn: 8 });
+      const stats = detectAndClassify(points, 0, { successThresholdKn: 8 });
       expect(stats.locations.map((m) => m.type)).toEqual(['undecided', 'undecided', 'undecided']);
       expect(stats.undecided).toBe(3);
       expect(stats.tackSuccess + stats.tackFail + stats.jibeSuccess + stats.jibeFail).toBe(0);
@@ -481,15 +478,23 @@ describe('analyzeManeuvers, enregistrement économique', () => {
       }
       // Aucune n'alimente le vent : ni sa mesure, ni son orientation, ni sa courbe.
       expect(windSamplesFrom(stats)).toHaveLength(0);
-      expect(maneuverAgreement(stats).count).toBe(0);
+      expect(estimateWind(points, { successThresholdKn: 8 }).maneuverCount).toBe(0);
+      // L'orientation ne compte que virements et empannages (`isDirected`) :
+      // aucun candidat n'a d'accord, la polaire garde sa direction.
+      expect(stats.locations.filter(isDirected)).toHaveLength(0);
+      const polar = prepareWindPolar(points).polar;
+      const selection = selectWindCandidate(points, polar, { successThresholdKn: 8 });
+      expect(selection.direction).toBe(polar.direction);
+      expect(selection.orientedBy).toBe(polar.orientedBy);
+      expect(selection.agreementScore).toBe(0);
       expect(calculateWindStats(points, stats, 0)).toBeNull();
       // Le vent n'y change rien : le sens incertain ne le lit pas.
-      expect(analyzeManeuvers(points, 120, { successThresholdKn: 8 })).toEqual(stats);
+      expect(detectAndClassify(points, 120, { successThresholdKn: 8 })).toEqual(stats);
     }
   });
 
   it('met le sens incertain entamé sous le seuil de vol avec les demi-tours hors vol (lot 44)', () => {
-    const stats = analyzeManeuvers(buildSilentUTurns(1, 6), 0, { successThresholdKn: 8, flightThresholdKn: 8 });
+    const stats = detectAndClassify(buildSilentUTurns(1, 6), 0, { successThresholdKn: 8, flightThresholdKn: 8 });
     expect(stats.locations).toHaveLength(0);
     expect(stats.undecided).toBe(0);
     expect(stats.rejected.noFlight).toBe(3);
@@ -500,7 +505,7 @@ describe('analyzeManeuvers, enregistrement économique', () => {
     // La branche ne s'arme que sur une fenêtre vide : un virage de 180° vu
     // sur plusieurs points garde son sens.
     for (const stepS of [1, 0.2]) {
-      const stats = analyzeManeuvers(buildTrack(70, stepS, singleTackThroughNorth), 0, { successThresholdKn: 8 });
+      const stats = detectAndClassify(buildTrack(70, stepS, singleTackThroughNorth), 0, { successThresholdKn: 8 });
       expect(stats.tackSuccess + stats.tackFail).toBe(1);
       expect(stats.undecided).toBe(0);
     }
@@ -509,7 +514,7 @@ describe('analyzeManeuvers, enregistrement économique', () => {
   it('n\'invente pas de virage à travers une vraie coupure', () => {
     // Une minute sans un point : les deux bords n'ont plus de rapport entre
     // eux, et les lire comme un virage fabriquerait une manœuvre imaginaire.
-    const stats = analyzeManeuvers(buildSparseTurnTrack(60), 23, { successThresholdKn: 8 });
+    const stats = detectAndClassify(buildSparseTurnTrack(60), 23, { successThresholdKn: 8 });
 
     expect(stats.locations).toHaveLength(0);
   });
@@ -518,7 +523,7 @@ describe('analyzeManeuvers, enregistrement économique', () => {
     // La branche ne s'arme que si la fenêtre est vide : à 1 Hz elle contient
     // douze points, et rien ne change pour les traces qui fonctionnent.
     const track = buildTrack(70, 1, singleTackThroughNorth);
-    const stats = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const stats = detectAndClassify(track, 0, { successThresholdKn: 8 });
 
     expect(stats.tackSuccess + stats.tackFail).toBe(1);
   });
@@ -526,8 +531,8 @@ describe('analyzeManeuvers, enregistrement économique', () => {
   it('ne lit jamais un virage à travers une reprise de pause', () => {
     // Le même pas de 20 s, mais c'est une reprise après une pause de
     // l'enregistrement : rien n'y a été parcouru, ce n'est pas un virage.
-    expect(analyzeManeuvers(buildSparseTurnTrack(20), 23, { successThresholdKn: 8 }).locations).toHaveLength(1);
-    expect(analyzeManeuvers(buildSparseTurnTrack(20, true), 23, { successThresholdKn: 8 }).locations).toHaveLength(0);
+    expect(detectAndClassify(buildSparseTurnTrack(20), 23, { successThresholdKn: 8 }).locations).toHaveLength(1);
+    expect(detectAndClassify(buildSparseTurnTrack(20, true), 23, { successThresholdKn: 8 }).locations).toHaveLength(0);
   });
 
   it('n\'invente plus de virage sur un pas unique de 25 s dont la corde fait 3 m (règle 6, lot 79)', () => {
@@ -536,7 +541,7 @@ describe('analyzeManeuvers, enregistrement économique', () => {
     // 64 m au garde-fou des 10 m, et un « virage » sur place était compté. La
     // distance du noyau borne ce pas par sa corde × 1,5, soit 4,5 m.
     const track = buildTurnThroughHole({ heading: 282, kn: 5 }, { s: 25, chordM: 3, chordBearing: 123 }, { heading: 123, kn: 5 });
-    const stats = analyzeManeuvers(track, 200, { successThresholdKn: 1 });
+    const stats = detectAndClassify(track, 200, { successThresholdKn: 1 });
     expect(stats.locations).toHaveLength(0);
     expect(stats.rejected.tooShort).toBeGreaterThan(0);
   });
@@ -544,7 +549,7 @@ describe('analyzeManeuvers, enregistrement économique', () => {
   it('lit toujours le virage compressé en un pas quand la planche a vraiment avancé (cadence Komoot, chaîne réelle)', () => {
     // Le cas réel de 13:07, avec de vraies positions : un point toutes les 6 s, 22 s de silence, 40 m de corde.
     const track = buildTurnThroughHole({ heading: 324, kn: 4.7 }, { s: 22, chordM: 40, chordBearing: 110 }, { heading: 109, kn: 3.3 }, 60, 6);
-    const stats = analyzeManeuvers(track, 23, { successThresholdKn: 8 });
+    const stats = detectAndClassify(track, 23, { successThresholdKn: 8 });
     expect(stats.locations).toHaveLength(1);
     expect(stats.locations[0].type).toBe('tack');
   });
@@ -553,7 +558,7 @@ describe('analyzeManeuvers, enregistrement économique', () => {
     // Virement par le nord pendant 15 s de silence, reprise 10 m plus loin sur
     // le nouveau bord : 38,6 m à 5 nœuds, 15 m par la corde.
     const track = buildTurnThroughHole({ heading: 45, kn: 5 }, { s: 15, chordM: 10, chordBearing: 315 }, { heading: 315, kn: 5 });
-    const [m] = analyzeManeuvers(track, 0, { successThresholdKn: 2 }).locations;
+    const [m] = detectAndClassify(track, 0, { successThresholdKn: 2 }).locations;
     expect(m.type).toBe('tack');
     expect(m.distanceM!).toBeGreaterThan(10);
     expect(m.distanceM!).toBeLessThanOrEqual(10 * 1.5 + 0.1);
@@ -569,18 +574,18 @@ describe('analyzeManeuvers, enregistrement économique', () => {
       buildTrack(90, 1, singleTackThroughNorth, (t) => (t >= 31 && t <= 65 ? 3 : 12))
         .filter((p) => { const t = (p.timeMs - TRACK_START_MS) / 1000; return t < 40 || t >= 60; })
         .map((p) => ((p.timeMs - TRACK_START_MS) / 1000 === 60 && resume ? { ...p, segmentStart: true as const } : p));
-    const plain = analyzeManeuvers(withPause(false), 0, { successThresholdKn: 8 }).locations[0];
-    const resumed = analyzeManeuvers(withPause(true), 0, { successThresholdKn: 8 }).locations[0];
+    const plain = detectAndClassify(withPause(false), 0, { successThresholdKn: 8 }).locations[0];
+    const resumed = detectAndClassify(withPause(true), 0, { successThresholdKn: 8 }).locations[0];
     expect(plain.relaunchS).not.toBeNull();
     expect(resumed.relaunchS).toBe(plain.relaunchS);
     expect(plain.distanceM! - resumed.distanceM!).toBeCloseTo(knotsToMs(3) * 21, 0);
   });
 });
 
-describe('analyzeManeuvers', () => {
+describe('détection et classement', () => {
   it('compte un seul virement pour un seul virage, grâce au temps mort', () => {
     const track = buildTrack(70, 1, singleTackThroughNorth);
-    const stats = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const stats = detectAndClassify(track, 0, { successThresholdKn: 8 });
 
     expect(stats.tackSuccess + stats.tackFail).toBe(1);
     expect(stats.jibeSuccess + stats.jibeFail).toBe(0);
@@ -588,7 +593,7 @@ describe('analyzeManeuvers', () => {
 
   it('classe le virage en virement quand il traverse l\'axe du vent', () => {
     const track = buildTrack(70, 1, singleTackThroughNorth);
-    const stats = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const stats = detectAndClassify(track, 0, { successThresholdKn: 8 });
 
     expect(stats.tackSuccess).toBe(1);
     expect(stats.locations[0].type).toBe('tack');
@@ -596,7 +601,7 @@ describe('analyzeManeuvers', () => {
 
   it('classe le même virage en empannage si le vent vient du sud', () => {
     const track = buildTrack(70, 1, singleTackThroughNorth);
-    const stats = analyzeManeuvers(track, 180, { successThresholdKn: 8 });
+    const stats = detectAndClassify(track, 180, { successThresholdKn: 8 });
 
     expect(stats.jibeSuccess + stats.jibeFail).toBe(1);
     expect(stats.tackSuccess + stats.tackFail).toBe(0);
@@ -604,15 +609,15 @@ describe('analyzeManeuvers', () => {
 
   it('mesure le vent local sur les caps stabilisés, à 0° pour un virage 90° → 270°', () => {
     const track = buildTrack(70, 1, singleTackThroughNorth);
-    const stats = analyzeManeuvers(track, 0);
+    const stats = detectAndClassify(track, 0);
 
     expect(stats.locations[0].stableHeadings).toBe(true);
     expect(distanceTo(stats.locations[0].localWind, 0)).toBeLessThanOrEqual(3);
   });
 
   it('donne le même décompte à 1 Hz et à 5 Hz', () => {
-    const at1Hz = analyzeManeuvers(buildTrack(70, 1, singleTackThroughNorth), 0);
-    const at5Hz = analyzeManeuvers(buildTrack(70, 0.2, singleTackThroughNorth), 0);
+    const at1Hz = detectAndClassify(buildTrack(70, 1, singleTackThroughNorth), 0);
+    const at5Hz = detectAndClassify(buildTrack(70, 0.2, singleTackThroughNorth), 0);
 
     expect(at5Hz.tackSuccess + at5Hz.tackFail).toBe(at1Hz.tackSuccess + at1Hz.tackFail);
   });
@@ -620,18 +625,18 @@ describe('analyzeManeuvers', () => {
   it('juge la réussite sur le seuil injecté', () => {
     const track = buildTrack(70, 1, singleTackThroughNorth, 10);
 
-    expect(analyzeManeuvers(track, 0, { successThresholdKn: 8 }).tackSuccess).toBe(1);
-    expect(analyzeManeuvers(track, 0, { successThresholdKn: 12 }).tackFail).toBe(1);
+    expect(detectAndClassify(track, 0, { successThresholdKn: 8 }).tackSuccess).toBe(1);
+    expect(detectAndClassify(track, 0, { successThresholdKn: 12 }).tackFail).toBe(1);
   });
 
   it('ne détecte rien sur un cap constant', () => {
-    const stats = analyzeManeuvers(buildTrack(60, 1, () => 90), 0);
+    const stats = detectAndClassify(buildTrack(60, 1, () => 90), 0);
     expect(stats.locations).toHaveLength(0);
   });
 
   it('compte tous les virements et empannages d\'une session par bords', () => {
     const track = buildLegSession(upwindDownwindLegs(6), () => 0);
-    const stats = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const stats = detectAndClassify(track, 0, { successThresholdKn: 8 });
 
     // 5 virements entre les 6 bords de près, puis une abattée (aucun axe
     // franchi), un empannage, une remontée (aucun axe franchi).
@@ -641,7 +646,7 @@ describe('analyzeManeuvers', () => {
 
   it('mesure la qualité d\'un virement : conservation, relance, cap, distance', () => {
     const track = buildLegSession(upwindDownwindLegs(2), () => 0);
-    const stats = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const stats = detectAndClassify(track, 0, { successThresholdKn: 8 });
     const tack = stats.locations.find((m) => m.type === 'tack');
 
     expect(tack).toBeDefined();
@@ -661,8 +666,8 @@ describe('analyzeManeuvers', () => {
   });
 
   it('mesure le gain au vent des manœuvres réussies dans leur sens : vers le vent en virement, sous le vent en empannage, indépendant de la cadence', () => {
-    const at1Hz = analyzeManeuvers(buildLegSession(upwindDownwindLegs(2), () => 0), 0, { successThresholdKn: 2 }).locations;
-    const at5Hz = analyzeManeuvers(buildLegSession(upwindDownwindLegs(2), () => 0, { stepS: 0.2 }), 0, { successThresholdKn: 2 }).locations;
+    const at1Hz = detectAndClassify(buildLegSession(upwindDownwindLegs(2), () => 0), 0, { successThresholdKn: 2 }).locations;
+    const at5Hz = detectAndClassify(buildLegSession(upwindDownwindLegs(2), () => 0, { stepS: 0.2 }), 0, { successThresholdKn: 2 }).locations;
 
     for (const type of ['tack', 'jibe'] as const) {
       const at1 = at1Hz.find((m) => m.type === type)!;
@@ -679,14 +684,14 @@ describe('analyzeManeuvers', () => {
   it('laisse la relance indéfinie quand la vitesse ne revient pas', () => {
     // Après le virage, le rider reste à 3 nœuds : jamais relancé.
     const track = buildTrack(90, 1, singleTackThroughNorth, (t) => (t < 30 ? 10 : 3));
-    const stats = analyzeManeuvers(track, 0);
+    const stats = detectAndClassify(track, 0);
     expect(stats.locations).toHaveLength(1);
     expect(stats.locations[0].relaunchS).toBeNull();
   });
 
   it('résume les manœuvres avec moyennes et podiums', () => {
     const track = buildLegSession(upwindDownwindLegs(6), () => 0);
-    const summary = summarizeManeuvers(analyzeManeuvers(track, 0, { successThresholdKn: 8 }));
+    const summary = summarizeManeuvers(detectAndClassify(track, 0, { successThresholdKn: 8 }));
 
     expect(summary.tack).not.toBeNull();
     expect(summary.tack!.count).toBe(5);
@@ -700,7 +705,7 @@ describe('analyzeManeuvers', () => {
     // Gain au vent : réussies seulement (ici, aucun virement), puis le plus grand d'abord, affiché signé.
     expect(summary.tack!.tops.windwardGain).toHaveLength(0);
     expect(summary.tack!.averages.windwardGain).toBe('-');
-    const reussies = summarizeManeuvers(analyzeManeuvers(track, 0, { successThresholdKn: 2 }));
+    const reussies = summarizeManeuvers(detectAndClassify(track, 0, { successThresholdKn: 2 }));
     const gain = reussies.tack!.tops.windwardGain.map((t) => t.value);
     expect(gain).toHaveLength(3);
     expect(gain[0]).toBeGreaterThanOrEqual(gain[1]);
@@ -719,7 +724,7 @@ describe('analyzeManeuvers', () => {
 
   it('mesure le vent local d\'un empannage sur ses caps stabilisés', () => {
     const track = buildLegSession(upwindDownwindLegs(2), () => 0);
-    const stats = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const stats = detectAndClassify(track, 0, { successThresholdKn: 8 });
     const jibe = stats.locations.find((m) => m.type === 'jibe');
 
     expect(jibe).toBeDefined();
@@ -727,7 +732,7 @@ describe('analyzeManeuvers', () => {
   });
 });
 
-describe('measureManeuver', () => {
+describe('mesure d\'une manœuvre', () => {
   const at = (points: PointData[], index: number) => points[index].timeMs;
   const nearestTruth = (truth: { startMs: number; endMs: number }[], timeMs: number) =>
     truth.reduce((best, t) => (Math.abs(t.startMs - timeMs) < Math.abs(best.startMs - timeMs) ? t : best));
@@ -738,7 +743,7 @@ describe('measureManeuver', () => {
     for (const tack of [false, true]) {
       for (const seed of [1, 2, 3]) {
         const { points, truth } = buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { tack, legKn: tack ? 15 : 18, seed });
-        const found = analyzeManeuvers(points, 0, { successThresholdKn: 2 }).locations;
+        const found = detectAndClassify(points, 0, { successThresholdKn: 2 }).locations;
         expect(found).toHaveLength(3);
         for (const m of found) {
           expect(m.type).toBe(tack ? 'tack' : 'jibe');
@@ -752,14 +757,21 @@ describe('measureManeuver', () => {
   });
 
   it('garde les mêmes bornes où que la détection se soit déclenchée', () => {
+    // La fenêtre de détection, plus ou moins longue, déclenche plus ou moins
+    // tôt avant le virage (rotation de 40 à 44 s) : les bornes de la
+    // manœuvre, relues sur le cap lui-même, n'en dépendent pas.
     const { track } = scriptedTack(0);
+    const triggers = new Set<number>();
     const bounds = new Set<string>();
-    for (const triggerS of [30, 34, 38]) {
-      for (const endS of [43, 44, 45]) {
-        const m = measureManeuver(track, { triggerIndex: triggerS, endIndex: endS, turnSign: -1, type: 'tack' }, 0);
-        bounds.add(`${m.rotationStartIndex}-${m.rotationEndIndex}`);
-      }
+    for (const windowSeconds of [10, 12, 14]) {
+      const detection = prepareManeuverDetection(track, { windowSeconds });
+      triggers.add(track.findIndex((_, i) => detection.windowAt(i).kind === 'turn'));
+      const found = classifyManeuvers(detection, 0, { successThresholdKn: 2 }).locations;
+      expect(found, `fenêtre de ${windowSeconds} s`).toHaveLength(1);
+      expect(found[0].type).toBe('tack');
+      bounds.add(`${found[0].entryIndex}-${found[0].rotationEndIndex}`);
     }
+    expect(triggers.size).toBe(3);
     expect(bounds.size).toBe(1);
   });
 
@@ -767,7 +779,7 @@ describe('measureManeuver', () => {
     for (const tack of [false, true]) {
       for (const seed of [1, 2, 3]) {
         const { points } = buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { tack, legKn: tack ? 15 : 18, seed });
-        const stats = analyzeManeuvers(points, 0, { successThresholdKn: 2 });
+        const stats = detectAndClassify(points, 0, { successThresholdKn: 2 });
         // Dans l'ordre du temps : la meilleure, la moyenne, la moins bonne.
         const [good, medium, poor] = stats.locations;
         expect(good.conservation).toBeGreaterThan(medium.conservation);
@@ -790,7 +802,7 @@ describe('measureManeuver', () => {
       [{ conservation: 12 / 18, turnS: 6, recoveryS: 8, slowdown: { toKn: 12, overS: 6 } }],
       { seed: 3 }
     );
-    const jibe = analyzeManeuvers(points, 0, { successThresholdKn: 2 }).locations.find((m) => m.type === 'jibe')!;
+    const jibe = detectAndClassify(points, 0, { successThresholdKn: 2 }).locations.find((m) => m.type === 'jibe')!;
 
     expect(Math.abs(jibe.entrySpeed - 18)).toBeLessThanOrEqual(1);
     expect(jibe.conservation).toBeLessThan(0.75);
@@ -805,7 +817,7 @@ describe('measureManeuver', () => {
     // fenêtre initiale.
     for (const minLagS of [-1, 0, 2, 4, 8]) {
       const { track, apexMs } = scriptedTack(minLagS);
-      const tack = analyzeManeuvers(track, 0, { successThresholdKn: 2 }).locations.find((m) => m.type === 'tack')!;
+      const tack = detectAndClassify(track, 0, { successThresholdKn: 2 }).locations.find((m) => m.type === 'tack')!;
 
       expect(tack.vmin).toBeCloseTo(4.5, 6);
       expect(track[tack.apexIndex].timeMs).toBe(apexMs);
@@ -817,10 +829,10 @@ describe('measureManeuver', () => {
   it('lit le creux en V sur la vitesse brute, sous la médiane, identique à 1 Hz et à 5 Hz (lot 44)', () => {
     const conservations = [1, 5].map((hz) => {
       const points = buildDipTack(hz);
-      const [tack] = analyzeManeuvers(points, 0, { successThresholdKn: 2 }).locations;
+      const [tack] = detectAndClassify(points, 0, { successThresholdKn: 2 }).locations;
       // La même trace sans la vitesse non filtrée : la mesure lissée d'avant.
       const smoothedOnly = points.map(({ speedKn: _raw, ...p }) => p);
-      const [smoothed] = analyzeManeuvers(smoothedOnly, 0, { successThresholdKn: 2 }).locations;
+      const [smoothed] = detectAndClassify(smoothedOnly, 0, { successThresholdKn: 2 }).locations;
       expect(tack.type).toBe('tack');
       expect(smoothed.conservation).toBeCloseTo(1, 6);
       expect(tack.conservation).toBeLessThan(smoothed.conservation);
@@ -839,7 +851,7 @@ describe('measureManeuver', () => {
       const fast = { conservation: tack ? 0.6 : 0.85, turnS: 5, recoveryS: 3 };
       const slow = { conservation: tack ? 0.3 : 0.5, turnS: 5, recoveryS: 8 };
       const { points } = buildNoisySession([fast, slow], { tack, legKn: tack ? 15 : 18, noise: LOW_NOISE });
-      const [first, second] = analyzeManeuvers(points, 0, { successThresholdKn: 2 }).locations;
+      const [first, second] = detectAndClassify(points, 0, { successThresholdKn: 2 }).locations;
 
       expect(second.windwardGainM!).toBeGreaterThan(0);
       expect(first.windwardGainM!).toBeGreaterThan(second.windwardGainM!);
@@ -857,8 +869,8 @@ describe('measureManeuver', () => {
     for (const tack of [false, true]) {
       for (const seed of [1, 2, 3]) {
         const options = { tack, legKn: tack ? 15 : 18, noise, seed };
-        const at1Hz = analyzeManeuvers(buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, options).points, 0, { successThresholdKn: 2 }).locations;
-        const at5Hz = analyzeManeuvers(buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { ...options, hz: 5 }).points, 0, { successThresholdKn: 2 }).locations;
+        const at1Hz = detectAndClassify(buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, options).points, 0, { successThresholdKn: 2 }).locations;
+        const at5Hz = detectAndClassify(buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { ...options, hz: 5 }).points, 0, { successThresholdKn: 2 }).locations;
 
         expect(at5Hz).toHaveLength(at1Hz.length);
         at1Hz.forEach((a, k) => {
@@ -937,7 +949,7 @@ describe('measureManeuver', () => {
       for (const tack of [false, true]) {
         for (const seed of [1, 2, 3]) {
           const { points } = buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { tack, legKn: tack ? 15 : 18, noise: REALISTIC_NOISE, seed, hz });
-          const stats = analyzeManeuvers(points, 0, { successThresholdKn: 2 });
+          const stats = detectAndClassify(points, 0, { successThresholdKn: 2 });
           rows.push([stats.locations.length, stats.locations.filter((m) => m.stableHeadings).length, windSamplesFrom(stats).length]);
         }
       }
@@ -1057,7 +1069,7 @@ describe('estimateWind', () => {
 
     // La chute peut être comptée comme manœuvre ratée, mais elle n'a pas de
     // caps stabilisés de part et d'autre : elle ne sert jamais au vent.
-    const maneuvers = analyzeManeuvers(track, estimate.direction);
+    const maneuvers = detectAndClassify(track, estimate.direction);
     const duringFall = maneuvers.locations.filter(
       (m) => m.trackIndex >= fallStart - 15 && m.trackIndex <= fallStart + noise.length + 15
     );
@@ -1089,7 +1101,7 @@ describe('estimateWind', () => {
     const track = buildLegSession(legs, () => 0);
 
     const estimate = estimateWind(track);
-    const maneuvers = analyzeManeuvers(track, estimate.direction);
+    const maneuvers = detectAndClassify(track, estimate.direction);
     const localWinds = maneuvers.locations.map((m) => m.localWind);
 
     // Biais théorique de la bissectrice : 5°. On tolère le double.
@@ -1141,7 +1153,7 @@ describe('estimateWind', () => {
     // ici) : la même trace sans elle garde la mesure lissée de l'époque, à 51 %.
     const smoothedOnly = track.map(({ speedKn: _raw, ...p }) => p);
 
-    const tacks = analyzeManeuvers(smoothedOnly, 0).locations.filter((m) => m.type === 'tack');
+    const tacks = detectAndClassify(smoothedOnly, 0).locations.filter((m) => m.type === 'tack');
     expect(tacks.length).toBeGreaterThan(0);
     for (const m of tacks) {
       expect(m.windCriteria.conservation).toBeLessThan(0.5);
@@ -1149,7 +1161,7 @@ describe('estimateWind', () => {
     }
     expect(distanceTo(estimateWind(smoothedOnly).direction, 0)).toBeLessThanOrEqual(8);
     // Ni la détection ni le vent ne lisent la vitesse non filtrée.
-    const withRaw = analyzeManeuvers(track, 0).locations.filter((m) => m.type === 'tack');
+    const withRaw = detectAndClassify(track, 0).locations.filter((m) => m.type === 'tack');
     expect(withRaw.map((m) => m.windCriteria)).toEqual(tacks.map((m) => m.windCriteria));
     expect(estimateWind(track)).toEqual(estimateWind(smoothedOnly));
   });
@@ -1202,11 +1214,11 @@ describe('estimateWind, réglages du support', () => {
 
     // À 5 nœuds, seuls le largue et le portant dépassent le seuil : l'angle
     // mort trouvé est celui du vent arrière, à 180° du vrai vent.
-    expect(distanceTo(estimateWindFromPolar(track, 5).direction, 0)).toBeGreaterThan(90);
+    expect(distanceTo(prepareWindPolar(track, 5).candidates[0].direction, 0)).toBeGreaterThan(90);
 
     // À 2 nœuds, le seuil du profil bateau, seul le cône reste sous la barre
     // et la polaire retrouve le vent d'elle-même.
-    expect(distanceTo(estimateWindFromPolar(track, 2).direction, 0)).toBeLessThanOrEqual(15);
+    expect(distanceTo(prepareWindPolar(track, 2).candidates[0].direction, 0)).toBeLessThanOrEqual(15);
   });
 
   it('compte les virages écartés, une fois chacun', () => {
@@ -1214,8 +1226,8 @@ describe('estimateWind, réglages du support', () => {
     // classement, et disparaît sans laisser de trace au compteur près. C'est
     // le cas qui n'affichait « aucune manœuvre » sans dire pourquoi.
     const track = buildLegSession(upwindDownwindLegs(6), () => 0);
-    const justes = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
-    const fausses = analyzeManeuvers(track, 90, { successThresholdKn: 8 });
+    const justes = detectAndClassify(track, 0, { successThresholdKn: 8 });
+    const fausses = detectAndClassify(track, 90, { successThresholdKn: 8 });
 
     // Quelques virages très ouverts restent classables — la tolérance vaut la
     // moitié du virage — mais l'essentiel s'évapore, et c'est cette évaporation
@@ -1236,7 +1248,7 @@ describe('estimateWind, réglages du support', () => {
     // précédent), l'orientation par les virages rattrape le bon bord : le vol
     // perdu se juge sur la part de vitesse conservée et non sur des nœuds, si
     // bien qu'un empannage de support lent n'est plus pris pour un virement.
-    const estimate = estimateWindPolar(track, { minSpeedKn: 5 });
+    const estimate = prepareWindPolar(track, 5).polar;
     expect(distanceTo(estimate.direction, 0)).toBeLessThanOrEqual(15);
     expect(estimate.orientedBy).toBe('virages');
   });
@@ -1246,10 +1258,10 @@ describe('estimateWind, réglages du support', () => {
 
     // Les empannages sont détectés dans les deux cas : c'est leur réussite,
     // donc leur droit à mesurer le vent, qui dépend du seuil.
-    expect(analyzeManeuvers(track, 0, { successThresholdKn: 8 }).locations).not.toHaveLength(0);
+    expect(detectAndClassify(track, 0, { successThresholdKn: 8 }).locations).not.toHaveLength(0);
 
-    expect(windSamplesFrom(analyzeManeuvers(track, 0, { successThresholdKn: 8 }))).toHaveLength(0);
-    expect(windSamplesFrom(analyzeManeuvers(track, 0, { successThresholdKn: 3 })).length).toBeGreaterThan(0);
+    expect(windSamplesFrom(detectAndClassify(track, 0, { successThresholdKn: 8 }))).toHaveLength(0);
+    expect(windSamplesFrom(detectAndClassify(track, 0, { successThresholdKn: 3 })).length).toBeGreaterThan(0);
   });
 
   it('retrouve le vent d\'un support lent avec les seuils de son profil', () => {
@@ -1282,7 +1294,8 @@ describe('selectWindCandidate', () => {
   it.each(protocoles)('annonce la confiance de la direction qu\'elle retient (%s)', (_nom, track) => {
     for (const options of [{}, SLOW_SPORT] as WindEstimationOptions[]) {
       const minSpeedKn = options.minSpeedKn ?? 5;
-      const polar = estimateWindPolar(track, { minSpeedKn });
+      const stage = prepareWindPolar(track, minSpeedKn);
+      const polar = stage.polar;
       const selection = selectWindCandidate(track, polar, options);
 
       if (selection.direction === polar.direction) {
@@ -1291,7 +1304,7 @@ describe('selectWindCandidate', () => {
         continue;
       }
 
-      const retenu = describeWindCandidate(track, selection.direction, minSpeedKn);
+      const retenu = stage.describe(selection.direction);
       expect(selection.orientedBy).toBe('virages');
       expect(selection.polarConfidence).toBeCloseTo(
         retenu.symmetry * retenu.coverage * retenu.clarity,
@@ -1306,7 +1319,7 @@ describe('selectWindCandidate', () => {
     // candidat ne peut convaincre, mais une direction doit tout de même sortir,
     // accompagnée de la confiance qui lui correspond.
     const track = buildLegSession(downwindLegs(6), () => 0, { polar: slowPolar });
-    const polar = estimateWindPolar(track, { minSpeedKn: 2 });
+    const polar = prepareWindPolar(track, 2).polar;
     const selection = selectWindCandidate(track, polar, SLOW_SPORT);
 
     expect(Number.isFinite(selection.direction)).toBe(true);
@@ -1344,7 +1357,7 @@ describe('calculateWindStats', () => {
   it('renvoie null avec moins de deux manœuvres', () => {
     const track = buildTrack(120, 1, fullSweep, polarSpeed(0));
     expect(calculateWindStats(track, null)).toBeNull();
-    expect(calculateWindStats(track, analyzeManeuvers(track, 0))).toBeNull();
+    expect(calculateWindStats(track, detectAndClassify(track, 0))).toBeNull();
   });
 
   it('retient toutes les manœuvres, pas seulement celles à caps stabilisés', () => {
@@ -1355,7 +1368,7 @@ describe('calculateWindStats', () => {
     // en donnent un : une manœuvre sur deux est marquée sans cap stabilisé,
     // pour garder le cas.
     const track = buildLegSession(upwindDownwindLegs(10, 18), () => 0);
-    const detected = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const detected = detectAndClassify(track, 0, { successThresholdKn: 8 });
     const maneuvers: ManeuverStats = {
       ...detected,
       locations: detected.locations.map((m, k) => (k % 2 === 0 ? m : { ...m, stableHeadings: false })),
@@ -1380,7 +1393,7 @@ describe('calculateWindStats', () => {
       { twa: 120, durationS: 120 }, { twa: -45, durationS: 120 },
     ];
     const track = buildLegSession(legs, () => 0);
-    const maneuvers = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const maneuvers = detectAndClassify(track, 0, { successThresholdKn: 8 });
     const stats = calculateWindStats(track, maneuvers, 0);
 
     const brute = circularMean(maneuvers.locations.map((m) => m.localWind)).mean;
@@ -1390,7 +1403,7 @@ describe('calculateWindStats', () => {
 
   it('se rabat sur la moyenne des mesures sans vent de référence', () => {
     const track = buildLegSession(upwindDownwindLegs(6), () => 0);
-    const maneuvers = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const maneuvers = detectAndClassify(track, 0, { successThresholdKn: 8 });
 
     // Sur une session propre, l'amorce importe peu : les deux voies concordent.
     const avecReference = calculateWindStats(track, maneuvers, 0);
@@ -1403,7 +1416,7 @@ describe('calculateWindStats', () => {
     // Vent oscillant de ±20° autour de 0 : moyenne 0, plage 40, pas de dérive.
     const wind = (t: number) => 20 * Math.sin(t / 300);
     const track = buildLegSession(upwindDownwindLegs(14, 120), wind);
-    const stats = calculateWindStats(track, analyzeManeuvers(track, 0));
+    const stats = calculateWindStats(track, detectAndClassify(track, 0));
 
     expect(stats).not.toBeNull();
     expect(distanceTo(stats!.avgWind, 0)).toBeLessThanOrEqual(10);
@@ -1419,7 +1432,7 @@ describe('calculateWindStats', () => {
       { twa: 45, durationS: 180 }, { twa: -45, durationS: 180 }, { twa: 45, durationS: 180 },
     ];
     const track = buildLegSession(legs, () => 0);
-    const stats = calculateWindStats(track, analyzeManeuvers(track, 0));
+    const stats = calculateWindStats(track, detectAndClassify(track, 0));
 
     expect(stats).not.toBeNull();
     expect(stats!.windAt(TRACK_START_MS + 1800 * 1000)).toBeNull();
@@ -1428,7 +1441,7 @@ describe('calculateWindStats', () => {
 
   it('marque chaque manœuvre sur la courbe, là où se trouve la mesure', () => {
     const track = buildLegSession(upwindDownwindLegs(6), () => 0);
-    const maneuvers = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const maneuvers = detectAndClassify(track, 0, { successThresholdKn: 8 });
     const stats = calculateWindStats(track, maneuvers, 0);
 
     expect(stats).not.toBeNull();
@@ -1444,7 +1457,7 @@ describe('calculateWindStats', () => {
 
   it('ne marque, zoomé, que les manœuvres de la plage visible', () => {
     const track = buildLegSession(upwindDownwindLegs(6), () => 0);
-    const maneuvers = analyzeManeuvers(track, 0, { successThresholdKn: 8 });
+    const maneuvers = detectAndClassify(track, 0, { successThresholdKn: 8 });
     const stats = calculateWindStats(track, maneuvers, 0);
     expect(stats).not.toBeNull();
 
@@ -1468,7 +1481,7 @@ describe('calculateWindStats', () => {
     const wind = (t: number) => (t < 1200 ? 0 : t < 1380 ? ((t - 1200) / 180) * SHIFT : SHIFT);
     const track = buildLegSession(upwindDownwindLegs(16, 150), wind);
     const global = estimateWind(track);
-    const maneuvers = analyzeManeuvers(track, global.direction);
+    const maneuvers = detectAndClassify(track, global.direction);
     const stats = calculateWindStats(track, maneuvers);
 
     expect(stats).not.toBeNull();
@@ -1587,7 +1600,7 @@ const SCENARIOS: Record<string, { durationS: number; headings: [number, number][
 
 const scenarioStats = (name: string, stepS = 1, options: ManeuverOptions = FLIGHT_OPTIONS): ManeuverStats => {
   const s = SCENARIOS[name];
-  return analyzeManeuvers(scriptedSession(s.durationS, s.headings, s.speeds, stepS), 0, options);
+  return detectAndClassify(scriptedSession(s.durationS, s.headings, s.speeds, stepS), 0, options);
 };
 
 /** Ce qui doit être identique à 1 Hz et à 5 Hz : manœuvres comptées et mises de côté. */
@@ -1597,7 +1610,7 @@ const signature = (stats: ManeuverStats) => ({
   noFlight: stats.rejected.noFlight,
 });
 
-describe('analyzeManeuvers, détection robuste au bruit de cap', () => {
+describe('détection et classement, détection robuste au bruit de cap', () => {
   it('compte deux virements à 15 s d\'intervalle', () => {
     const stats = scenarioStats('deuxVirements');
     expect(signature(stats).counted).toEqual(['tack:ok', 'tack:ok']);
@@ -1645,7 +1658,7 @@ describe('analyzeManeuvers, détection robuste au bruit de cap', () => {
     const s = SCENARIOS.decollagePendantLeVirage;
     for (const stepS of [1, 0.2]) {
       const points = scriptedSession(s.durationS, s.headings, s.speeds, stepS);
-      const stats = analyzeManeuvers(points, 0, FLIGHT_OPTIONS);
+      const stats = detectAndClassify(points, 0, FLIGHT_OPTIONS);
       expect(signature(stats), `${stepS}`).toEqual({ counted: ['jibe:ok'], fullTurn: 0, noFlight: 0 });
       const [jibe] = stats.locations;
       expect(jibe.takeoff).toBe(true);
@@ -1678,11 +1691,11 @@ describe('analyzeManeuvers, détection robuste au bruit de cap', () => {
     for (const name of Object.keys(SCENARIOS)) {
       const s = SCENARIOS[name];
       const exact = scriptedSession(s.durationS, s.headings, s.speeds, 1);
-      expect(bounds(analyzeManeuvers(jitter(exact), 0, FLIGHT_OPTIONS)), name).toEqual(bounds(analyzeManeuvers(exact, 0, FLIGHT_OPTIONS)));
+      expect(bounds(detectAndClassify(jitter(exact), 0, FLIGHT_OPTIONS)), name).toEqual(bounds(detectAndClassify(exact, 0, FLIGHT_OPTIONS)));
     }
     for (const tack of [false, true]) {
       const { points } = buildNoisySession(tack ? GOOD_TACKS : GOOD_JIBES, { tack, legKn: tack ? 15 : 18, seed: 2 });
-      expect(bounds(analyzeManeuvers(jitter(points), 0, { successThresholdKn: 2 }))).toEqual(bounds(analyzeManeuvers(points, 0, { successThresholdKn: 2 })));
+      expect(bounds(detectAndClassify(jitter(points), 0, { successThresholdKn: 2 }))).toEqual(bounds(detectAndClassify(points, 0, { successThresholdKn: 2 })));
     }
   });
 
@@ -1715,7 +1728,7 @@ describe('réussite : vol perdu au moins 2 s d\'affilée (04/11)', () => {
   };
   const OPTIONS: ManeuverOptions = { successThresholdKn: 8, minEntrySpeedKn: 2 };
   const only = (points: PointData[], options: ManeuverOptions = OPTIONS): ManeuverLocation => {
-    const stats = analyzeManeuvers(points, 0, options);
+    const stats = detectAndClassify(points, 0, options);
     expect(stats.locations).toHaveLength(1);
     return stats.locations[0];
   };
@@ -1779,7 +1792,7 @@ describe('réussite : vol perdu au moins 2 s d\'affilée (04/11)', () => {
   });
 
   it('un demi-tour vu en un seul pas interpole sur ce pas : entré et ressorti sous le seuil, il est raté', () => {
-    const [turn] = analyzeManeuvers(buildSparseTurnTrack(22), 23, { successThresholdKn: 8 }).locations;
+    const [turn] = detectAndClassify(buildSparseTurnTrack(22), 23, { successThresholdKn: 8 }).locations;
     expect(turn.success).toBe(false);
     expect(turn.lostFlightS).toBeGreaterThanOrEqual(2);
   });
@@ -1790,13 +1803,13 @@ describe('réussite : vol perdu au moins 2 s d\'affilée (04/11)', () => {
     // 40° net, celles de la fin voient 90°, inobservables.
     const bearing = (t: number): number => (t < 27 ? 90 : t < 28 ? 90 - 50 * (t - 27) : 40 + 18 * (t - 28));
     for (const stepS of [1, 0.2]) {
-      const stats = analyzeManeuvers(buildTrack(33, stepS, bearing, 12), 0, OPTIONS);
+      const stats = detectAndClassify(buildTrack(33, stepS, bearing, 12), 0, OPTIONS);
       expect(stats.locations, `${stepS}`).toHaveLength(0);
       expect(stats.rejected.tooShort, `${stepS}`).toBe(1);
       expect(stats.rejectedTurns.map((r) => r.motif)).toEqual(['tooShort']);
     }
     // Planche presque arrêtée en fin de trace : le cap n'est que du bruit, rien n'est compté.
-    const stopped = analyzeManeuvers(buildTrack(33, 1, bearing, (t) => (t < 26 ? 12 : 1)), 0, OPTIONS);
+    const stopped = detectAndClassify(buildTrack(33, 1, bearing, (t) => (t < 26 ? 12 : 1)), 0, OPTIONS);
     expect(stopped.rejected.tooShort).toBe(0);
     expect(stopped.locations).toHaveLength(0);
   });
@@ -1808,7 +1821,7 @@ describe('vitesse d\'approche au départ de la rotation (04/11)', () => {
     // le cap parte : la médiane de 12 à 2 s avant la rotation lit encore 6.
     const speed = (t: number): number => (t < 26 ? 6 : t < 30 ? 6 + 1.5 * (t - 26) : 12);
     for (const stepS of [1, 0.2]) {
-      const stats = analyzeManeuvers(buildTrack(80, stepS, singleTackThroughNorth, speed), 0, { successThresholdKn: 8, minEntrySpeedKn: 2, flightThresholdKn: 8 });
+      const stats = detectAndClassify(buildTrack(80, stepS, singleTackThroughNorth, speed), 0, { successThresholdKn: 8, minEntrySpeedKn: 2, flightThresholdKn: 8 });
       expect(stats.rejected.noFlight, `${stepS}`).toBe(0);
       expect(stats.locations).toHaveLength(1);
       const [tack] = stats.locations;
@@ -1822,28 +1835,26 @@ describe('vitesse d\'approche au départ de la rotation (04/11)', () => {
 
   it('garde la médiane quand le rider a ralenti avant de virer : la vitesse au départ ne la remplace pas', () => {
     const speed = (t: number): number => (t < 24 ? 18 : t < 30 ? 18 - (t - 24) : 12);
-    const [tack] = analyzeManeuvers(buildTrack(80, 1, singleTackThroughNorth, speed), 0, { successThresholdKn: 2 }).locations;
+    const [tack] = detectAndClassify(buildTrack(80, 1, singleTackThroughNorth, speed), 0, { successThresholdKn: 2 }).locations;
     expect(tack.entrySpeed).toBeGreaterThan(14);
   });
 });
 
 describe('amures (note 135, 04/11)', () => {
-  it('tribord amure quand le vent vient de tribord : cap à gauche du vent', () => {
-    expect(tackOf(315, 0)).toBe('starboard');
-    expect(tackOf(45, 0)).toBe('port');
-    expect(tackOf(45, 90)).toBe('starboard');
-    expect(tackOf(135, 90)).toBe('port');
-  });
-
   it('pose l\'amure d\'avant la manœuvre sur chaque virement et empannage, jamais sur un sens incertain', () => {
     // Près bâbord amure (cap 45°, vent du nord), virement, près tribord amure,
-    // abattée, empannage depuis le cap 225°, tribord amure.
-    const stats = analyzeManeuvers(buildLegSession(upwindDownwindLegs(2), () => 0), 0, { successThresholdKn: 2 });
-    const tack = stats.locations.find((m) => m.type === 'tack')!;
-    const jibe = stats.locations.find((m) => m.type === 'jibe')!;
-    expect(tack.tack).toBe('port');
-    expect(jibe.tack).toBe('starboard');
-    for (const m of analyzeManeuvers(buildSilentUTurns(6), 0, { successThresholdKn: 8 }).locations) {
+    // abattée, empannage depuis le cap 225°, tribord amure : tribord amure
+    // quand le vent vient de tribord, cap à gauche du vent. Sous un vent
+    // d'est, la même session tournée de 90° (près bâbord au cap 135°,
+    // empannage depuis le cap 315°) garde ses amures.
+    for (const wind of [0, 90]) {
+      const stats = detectAndClassify(buildLegSession(upwindDownwindLegs(2), () => wind), wind, { successThresholdKn: 2 });
+      const tack = stats.locations.find((m) => m.type === 'tack')!;
+      const jibe = stats.locations.find((m) => m.type === 'jibe')!;
+      expect(tack.tack, `vent ${wind}`).toBe('port');
+      expect(jibe.tack, `vent ${wind}`).toBe('starboard');
+    }
+    for (const m of detectAndClassify(buildSilentUTurns(6), 0, { successThresholdKn: 8 }).locations) {
       expect(m.type).toBe('undecided');
       expect(m.tack).toBeNull();
     }
@@ -1914,12 +1925,12 @@ describe('prepareManeuverDetection et classifyManeuvers', () => {
     for (const [name, points, options] of sessions()) {
       const detection = prepareManeuverDetection(points, options);
       const timeline = buildWindTimeline(
-        windSamplesFrom(analyzeManeuvers(points, 0, options)).map((m) => ({ timeMs: m.timeMs, direction: m.localWind })),
+        windSamplesFrom(detectAndClassify(points, 0, options)).map((m) => ({ timeMs: m.timeMs, direction: m.localWind })),
         0,
         WIND_LOCAL_MAX_GAP_MIN * 60 * 1000
       );
       for (const wind of [0, 90, 180, 270, 23, timeline, 0]) {
-        expect(classifyManeuvers(detection, wind, options), name).toEqual(analyzeManeuvers(points, wind, options));
+        expect(classifyManeuvers(detection, wind, options), name).toEqual(detectAndClassify(points, wind, options));
       }
     }
   });
@@ -1950,15 +1961,15 @@ describe('prepareManeuverDetection et classifyManeuvers', () => {
 
   it('donne, avec le virage minimal passé en réglage à sa valeur par défaut, exactement ce que donnait la constante (lot 79)', () => {
     for (const [name, points, options] of sessions()) {
-      const plain = JSON.stringify(analyzeManeuvers(points, 0, options));
-      expect(JSON.stringify(analyzeManeuvers(points, 0, { ...options, minTurnDeg: 60 })), name).toBe(plain);
+      const plain = JSON.stringify(detectAndClassify(points, 0, options));
+      expect(JSON.stringify(detectAndClassify(points, 0, { ...options, minTurnDeg: 60 })), name).toBe(plain);
     }
   });
 
   it('donne, avec la part minimale de fenêtre passée en réglage à sa valeur par défaut, exactement ce que donnait le seuil écrit dans le calcul (lot 112)', () => {
     for (const [name, points, options] of sessions()) {
-      const plain = JSON.stringify(analyzeManeuvers(points, 0, options));
-      expect(JSON.stringify(analyzeManeuvers(points, 0, { ...options, minWindowShare: 0.5 })), name).toBe(plain);
+      const plain = JSON.stringify(detectAndClassify(points, 0, options));
+      expect(JSON.stringify(detectAndClassify(points, 0, { ...options, minWindowShare: 0.5 })), name).toBe(plain);
     }
   });
 
