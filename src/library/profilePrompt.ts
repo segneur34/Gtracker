@@ -23,7 +23,7 @@ export const validProfileNumber = (field: AthleteNumberField, raw: unknown): boo
  * Objectif par semaine de la racine du Profil, `ROOT_GOAL.defaultMin` à défaut ;
  * relu avec contrôle (fichier de réglages importé) : une valeur hors plage est
  * ignorée. Les anciens réglages de la racine (période, tour, recul, objectif
- * par période d'essai du 22/10) sont sans effet.
+ * par période d'essai) sont sans effet.
  */
 export const athleteRootGoalMin = (profile: Partial<Pick<AthleteProfile, 'rootWeeklyGoalMin'>>): number => {
   const raw: unknown = profile.rootWeeklyGoalMin;

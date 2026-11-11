@@ -35,7 +35,7 @@ export interface MarkGuideSettings {
   vibrate: boolean;
 }
 
-/** Réglage par défaut, voile et surf : trois balises sonores, 150 m, 100 m, puis validation à 50 m (demande du 14/10). */
+/** Réglage par défaut, voile et surf : trois balises sonores, 150 m, 100 m, puis validation à 50 m. */
 export const MARK_GUIDE_DEFAULTS: MarkGuideSettings = {
   curve: [
     { distanceM: 50, intervalMs: 250 },

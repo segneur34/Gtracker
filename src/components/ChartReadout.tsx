@@ -14,7 +14,7 @@ export interface Readout {
 }
 
 /**
- * Lecture d'un graphe, posée au-dessus de lui, à droite de son nom (23/10) :
+ * Lecture d'un graphe, posée au-dessus de lui, à droite de son nom :
  * elle remplace l'infobulle de Recharts, qui flottait sur la courbe et gênait
  * le zoom au doigt. Les valeurs du point survolé dans la couleur de leur
  * série, puis l'abscisse en gris ; rien quand rien n'est survolé. Une seule

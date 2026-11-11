@@ -368,7 +368,7 @@ describe('vols d’une suite de plages actives', () => {
   });
 });
 
-describe('pumping en voile sur foil : réglage du 06/11 (n° 27)', () => {
+describe('pumping en voile sur foil : réglage sur une session réelle', () => {
   const S = SPORT_PROFILES.wingfoil.pump!;
   /** Saut de 70 à 70,9 s, en heures. */
   const jump = { takeoffMs: W + 70_000, landingMs: W + 70_900 };

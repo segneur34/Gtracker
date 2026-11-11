@@ -15,14 +15,14 @@ describe('analysisTabs : onglets proposés par calcul', () => {
     expect(keys(analysisTabs(SPORT_PROFILES.bateau))).not.toContain('pumping');
   });
 
-  it('voile : « vols » puis « pumping » juste après « sauts » (lots 22 et 50)', () => {
+  it('voile : « vols » puis « pumping » juste après « sauts »', () => {
     const order = keys(SAILING_TABS);
     expect(order.indexOf('vols')).toBe(order.indexOf('sauts') + 1);
     expect(order.indexOf('pumping')).toBe(order.indexOf('vols') + 1);
     expect(keys(analysisTabs(SPORT_PROFILES.kite))).toContain('pumping');
   });
 
-  it('ni « fractionné », ni « test », ni « cadence » : partis avec la terre (lots 302 et 303)', () => {
+  it('ni « fractionné », ni « test », ni « cadence » : partis avec la terre', () => {
     for (const profile of Object.values(SPORT_PROFILES)) {
       for (const key of ['fractionne', 'test', 'cadence', 'zones', 'surface', 'energie']) expect(keys(analysisTabs(profile)), profile.id).not.toContain(key);
     }
@@ -43,7 +43,7 @@ describe('analysisTabs : onglets proposés par calcul', () => {
   });
 });
 
-describe("activityTabs : onglets de Réglages selon les options de l'activité (05/11)", () => {
+describe("activityTabs : onglets de Réglages selon les options de l'activité", () => {
   it("« sauts » seulement si l'activité mesure les sauts", () => {
     const wing = SPORT_PROFILES.wingfoil;
     expect(keys(activityTabs(wing, { foil: true, jumps: true }))).toContain('sauts');
@@ -121,7 +121,7 @@ describe('toggleTabChoice', () => {
   });
 });
 
-describe('toggleTabChoice : activité à pré-réglage (n° 174)', () => {
+describe('toggleTabChoice : activité à pré-réglage', () => {
   /** Ce que lit l'application (`resolveTabChoices`) : le choix rangé, sinon le pré-réglage tout entier. */
   const resolved = (choices: TabChoices | null, preset: TabChoices | null) => sanitizeTabChoices(choices) ?? preset;
   // Pré-réglages d'essai : un onglet natif caché, un générique montré.
@@ -171,7 +171,7 @@ describe('toggleTabChoice : activité à pré-réglage (n° 174)', () => {
   });
 
   it("un choix ancien, sans la clé du pré-réglage, ne retombe pas sur lui en se vidant", () => {
-    // Rangé avant le n° 174 : « sauts » y est montré parce qu'absent.
+    // Rangé avant la clé du pré-réglage : « sauts » y est montré parce qu'absent.
     const old = { cardio: false };
     expect(isTabShown(sauts, old)).toBe(true);
     const back = toggleTabChoice(old, cardio, HIDDEN);
@@ -243,7 +243,7 @@ describe('« avancé » et « général »', () => {
   });
 });
 
-describe('état des onglets : « général » seul à chaque ouverture (05/11)', () => {
+describe('état des onglets : « général » seul à chaque ouverture', () => {
   const defaults = tabDefaults(SURF_TABS);
 
   it('part des défauts, « avancé » fermé, sans partager l’objet des défauts', () => {

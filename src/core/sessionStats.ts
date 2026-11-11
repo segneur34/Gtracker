@@ -125,7 +125,7 @@ export const computeActivityMask = (
 /**
  * Masque d'activité d'un calcul à ce seuil, dans l'unité de son profil.
  * Seuil réglé à 0 (aucun seuil) : un arrêt complet est tout de même ôté, au
- * plancher d'arrêt du profil (`stillThreshold`, décision du 27/10). Bateau,
+ * plancher d'arrêt du profil (`stillThreshold`). Bateau,
  * sans seuil : toute la trace est en navigation, hors pauses de
  * l'enregistrement et trous immobiles (jugés au même plancher). Partout, un
  * trou de la trace n'est en action que si sa vitesse moyenne atteint la

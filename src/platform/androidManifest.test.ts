@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
  * sauvegarde ; le récepteur de démarrage du greffon GPS et sa permission retirés. Une mise à jour du greffon qui
  * changerait ce récepteur rendrait le retrait muet sans erreur de compilation.
  *
- * Les services et la permission batterie restent pour l'instant (n° 171 du reste à faire) : leur retrait se décidera
+ * Les services et la permission batterie restent pour l'instant : leur retrait se décidera
  * avec le reste, pas par accident.
  */
 

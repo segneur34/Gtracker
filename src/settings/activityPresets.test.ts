@@ -38,7 +38,7 @@ describe('presetOf', () => {
     expect(presetOf({ id: 'a-bateau', base: 'bateau' })).toBe(a);
   });
 
-  it("sauts mesurés d'office en voile (wing, planche, kite), pas ailleurs (05/11)", () => {
+  it("sauts mesurés d'office en voile (wing, planche, kite), pas ailleurs", () => {
     for (const base of ['wingfoil', 'windsurf', 'kite'] as const) {
       expect(presetOf({ id: `a-${base}-2`, base }).jumps?.enabled).toBe(true);
     }

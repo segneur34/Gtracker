@@ -12,7 +12,7 @@ import { setHoveredIndex } from '../hooks/useChartHover';
 
 /**
  * Contenu de l'infobulle de Recharts : rien. La valeur se lit au-dessus du
- * graphe (`ChartReadout`, 23/10) ; l'infobulle reste pour son trait vertical,
+ * graphe (`ChartReadout`) ; l'infobulle reste pour son trait vertical,
  * le point actif et l'indice survolé.
  */
 export const NO_TOOLTIP_CONTENT = () => null;

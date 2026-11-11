@@ -32,7 +32,7 @@ export interface ThemeSettings {
 /** Clé de stockage, propre à l'appareil (hors du fichier de réglages qui voyage, `library/settingsFile.ts`). */
 export const THEME_STORAGE_KEY = STORAGE_KEYS.theme;
 
-/** Réglage de départ (décision du 28/10) : Auto, sans Économe. */
+/** Réglage de départ : Auto, sans Économe. */
 export const THEME_DEFAULT: ThemeSettings = { choice: 'auto', eco: false };
 
 const isChoice = (value: unknown): value is ThemeChoice =>

@@ -631,7 +631,7 @@ const readRecordParts = (raw: unknown, formats: readonly string[]): RecordWithou
   if (!isObject(raw) || typeof raw.format !== 'string' || !formats.includes(raw.format) || !isFiniteNumber(raw.version)) return null;
   if (typeof raw.gpx !== 'string' || raw.gpx === '') return null;
   const summary = readSummary(raw.summary);
-  // Voies, altitude du terrain et sa source (course et vélo) passent bruts par `rest` (lots 301 et 304), comme tout champ inconnu.
+  // Voies, altitude du terrain et sa source (course et vélo) passent bruts par `rest`, comme tout champ inconnu.
   const { mapBase: rawMapBase, jumps: rawJumps, marks: rawMarks, ...rest } = raw;
   const jumps = readSessionJumps(rawJumps);
   const marks = readSessionMarks(rawMarks);

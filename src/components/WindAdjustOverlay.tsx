@@ -27,7 +27,7 @@ interface WindAdjustOverlayProps {
 
 /**
  * Réglage du vent posé sur la carte d'une analyse de voile (bouton « Régler »
- * de l'onglet « général », demande du 22/10) : une grande boussole
+ * de l'onglet « général ») : une grande boussole
  * translucide, la trace visible dessous, dont on tire la flèche à la souris ou
  * au doigt ; un bandeau pour saisir l'angle, l'inverser ou revenir au calculé ;
  * la polaire à la demande, qui suit la flèche. Le vent n'est écrit qu'au

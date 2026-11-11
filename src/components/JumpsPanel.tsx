@@ -86,7 +86,7 @@ const rank = (k: number) => `${k + 1}${k === 0 ? 'er' : 'e'}`;
 const doubtText = (jump: SessionJump) => `Mesure douteuse : ${jump.doubts.map((d) => jumpDoubtLabel(d, JUMP_DETECTION)).join(' ; ')}.`;
 
 /**
- * Courbe d'un saut, ou de deux calés sur leur décollage (25/10) : zoom
+ * Courbe d'un saut, ou de deux calés sur leur décollage : zoom
  * (double-clic, zone tirée, deux doigts) et lecture au-dessus du graphe ; le
  * survol déplace le repère sur la carte. Pas de « +carte » : « Voir »
  * y montre déjà le saut.

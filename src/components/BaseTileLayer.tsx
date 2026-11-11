@@ -12,7 +12,7 @@ import { isForeground, onForeground } from '../platform/screen';
 import { NARROW_QUERY } from '../hooks/useNarrowScreen';
 import { IconLayers } from './icons';
 // La feuille de Leaflet vient avec le fond, posé dans toutes les cartes (analyses, enregistrement, planification) :
-// aucune page chargée à la demande ne peut l'oublier (27/10).
+// aucune page chargée à la demande ne peut l'oublier.
 import 'leaflet/dist/leaflet.css';
 import './BaseTileLayer.css';
 

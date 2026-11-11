@@ -157,7 +157,7 @@ export interface StoredSettings {
   heartRate?: ByActivity<boolean>;
   /** Décalage des seuils cardio S1 et S2 par rapport à la référence, en bpm ; absent : `defaultHrOffsetOf`. */
   hrOffsets?: ByActivity<number>;
-  /** Limites des zones Z1 à Z5 tracées sur la courbe de FC des analyses (case « Zones » de l'onglet cardio, 05/11) ; absent : non. */
+  /** Limites des zones Z1 à Z5 tracées sur la courbe de FC des analyses (case « Zones » de l'onglet cardio) ; absent : non. */
   hrZoneLines?: ByActivity<boolean>;
   /** Intitulés des deux champs de matériel des notes (hors voile) ; un texte vide : celui par défaut. */
   gearLabels?: ByActivity<[string, string]>;
@@ -175,7 +175,7 @@ export interface StoredSettings {
   longPressMs?: number;
   /** Durée de l'appui long sur « Arrêter » qui termine l'enregistrement, en millisecondes ; 0 : un simple appui. */
   stopHoldMs?: number;
-  /** Son de tous les bips, plus ou moins grave (24/10) ; absent : `DEFAULT_BEEP_SOUND`. */
+  /** Son de tous les bips, plus ou moins grave ; absent : `DEFAULT_BEEP_SOUND`. */
   beepSound?: BeepSound;
 }
 

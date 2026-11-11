@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Cliquet du vocabulaire de la terre (lot 327, règle 13 de `CLAUDE.md`) : course, vélo et Entraînement sont partis aux
- * lots 302 et 303 ; leurs mots ne doivent plus remonter dans `src/`, commentaires et tests compris. Pour chaque motif de
+ * Cliquet du vocabulaire de la terre (règle 13 de `CLAUDE.md`) : course, vélo et Entraînement sont partis ;
+ * leurs mots ne doivent plus remonter dans `src/`, commentaires et tests compris. Pour chaque motif de
  * `outils/heritage.mjs`, le relevé `outils/heritage.json` fige un nombre par fichier : une hausse, ou une occurrence
  * dans un fichier absent du relevé, fait échouer ; une baisse est signalée pour qu'on la fige (`node outils/heritage.mjs
  * --figer`). Un motif à zéro est refusé en dur, de même que les chemins du poste et l'allure en min/km (`DURS`).

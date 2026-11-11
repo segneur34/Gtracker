@@ -10,10 +10,10 @@ import { parseGpx, parseGpxPath } from './gpxParser';
 
 /**
  * Filet du lecteur GPX réécrit sans `DOMParser` : sur le corpus de chaque éditeur (`test/gpx/corpus.ts`),
- * le lecteur rend, nombre à nombre, ce que rend la copie gelée du 04/11 (`test/gpxParser.legacy.ts`), refuse les
+ * le lecteur rend, nombre à nombre, ce que rend la copie gelée de l'ancien lecteur (`test/gpxParser.legacy.ts`), refuse les
  * mêmes fichiers avec le même message, puis tire de chaque fichier les chiffres attendus par construction.
  *
- * Écart voulu : le BOM en tête est ignoré (décision 1 du 04/11, comme le navigateur) ; xmldom refusait la déclaration
+ * Écart voulu : le BOM en tête est ignoré (comme le navigateur) ; xmldom refusait la déclaration
  * qui le suit, donc la copie gelée lit ce texte BOM retiré.
  */
 
@@ -54,7 +54,7 @@ const recorderEntry = (): CorpusEntry => {
 
 const ENTRIES: CorpusEntry[] = [...GPX_CORPUS, recorderEntry()];
 
-describe('corpus des éditeurs : même lecture que la copie gelée du 04/11', () => {
+describe('corpus des éditeurs : même lecture que la copie gelée', () => {
   it.each(ENTRIES.map((e) => [e.nom, e] as const))('%s', (_, entry) => {
     expect(outcome(() => parseGpx(entry.texte))).toEqual(outcome(() => legacyParseGpx(withoutBom(entry.texte))));
     expect(outcome(() => parseGpxPath(entry.texte))).toEqual(outcome(() => legacyParseGpxPath(withoutBom(entry.texte))));

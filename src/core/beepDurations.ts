@@ -19,7 +19,7 @@ export const TONE_MS: Record<ToneKind, number> = { court: BEEP_SHORT_MS, long: B
 /**
  * « GPS perdu » : deux notes descendantes, la hauteur réglée puis
  * ses 2/3, jouées deux fois. Nettement à part des bips brefs et d'une seule
- * hauteur des balises, du compteur et des tests (n° 88).
+ * hauteur des balises, du compteur et des tests.
  */
 export const GPS_LOST_HIGH_MS = 250;
 export const GPS_LOST_LOW_MS = 500;

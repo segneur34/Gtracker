@@ -51,7 +51,7 @@ const sameNotes = (a: SailingSessionNotes, b: SailingSessionNotes): boolean =>
 /**
  * État enregistré d'une session, tel que le module l'affiche. Ce que sa fiche
  * ne porte pas reste vide : aucune session n'emprunte le matériel d'une autre
- * (décision du 27/10, « vide si pas donné »).
+ * (« vide si pas donné »).
  */
 export const savedEdits = (record: SessionRecord | null): SessionEdits => {
   const analysis: AnalysisValues | null | undefined = record?.analysis;

@@ -77,7 +77,7 @@ export const analysisTabs = (profile: SportProfile): readonly AnalysisTab[] =>
 /**
  * Onglets d'une activité proposés dans Réglages › Onglets : ceux de son calcul
  * (`analysisTabs`), « vols » et « pumping » sur foil seulement, « sauts » si
- * l'activité mesure les sauts (case de Réglages, 05/11). Cocher cette case
+ * l'activité mesure les sauts (case de Réglages). Cocher cette case
  * montre l'onglet (`tabsAfterJumpsChange`). Dans une analyse, « sauts » paraît
  * si la session a sa capture (`useShownJumps`, `visible`) et que le choix
  * d'onglets de l'activité le montre : ce choix prime, la case décochée depuis
@@ -174,7 +174,7 @@ export const maskHiddenTabs = <K extends string>(
 /**
  * Sections ouvertes, celles de la rangée « avancé » fermées tant qu'elle l'est :
  * refermer « avancé » replie ses onglets et leurs panneaux, gardés pour sa
- * réouverture (demande du 22/10). Rend l'objet reçu tel quel quand rien ne change.
+ * réouverture. Rend l'objet reçu tel quel quand rien ne change.
  */
 export const maskAdvancedTabs = <K extends string>(
   open: Record<K, boolean>,
@@ -192,11 +192,11 @@ export const maskAdvancedTabs = <K extends string>(
   return masked ?? open;
 };
 
-/** « général » après un toucher sur « avancé » : l'ouvrir ferme « général », le refermer le rouvre (23/10). */
+/** « général » après un toucher sur « avancé » : l'ouvrir ferme « général », le refermer le rouvre. */
 export const generalOpenAfterAdvanced = (advancedOpen: boolean): boolean => !advancedOpen;
 
 /**
- * Onglets d'une analyse ouverte, en mémoire vive (05/11) : toute ouverture
+ * Onglets d'une analyse ouverte, en mémoire vive : toute ouverture
  * d'une analyse rend « général » seul ouvert, « avancé » fermé ; rien n'est
  * retenu d'une session à l'autre ni d'une visite à l'autre. `key` est la trace
  * dont l'état vient (`sessionKey`).
@@ -220,6 +220,6 @@ export const initialTabsState = <K extends string>(defaults: Record<K, boolean>,
 export const tabsStateFor = <K extends string>(state: AnalysisTabsState<K>, defaults: Record<K, boolean>, key: string | null): AnalysisTabsState<K> =>
   key !== null && key !== state.key ? initialTabsState(defaults, key) : state;
 
-/** « tout fermer » : chaque onglet fermé, « général » compris ; « avancé » ne change pas (05/11). */
+/** « tout fermer » : chaque onglet fermé, « général » compris ; « avancé » ne change pas. */
 export const closeAllTabs = <K extends string>(open: Record<K, boolean>): Record<K, boolean> =>
   Object.fromEntries(Object.keys(open).map((key) => [key, false])) as Record<K, boolean>;

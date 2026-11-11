@@ -28,7 +28,7 @@ export default function HeartRateChart<R extends { index: number; hr: number | n
   zones: readonly number[] | null;
   /** Seuils aérobie (S1) et anaérobie (S2), traits noirs ; `null` sans zones. */
   thresholds?: { s1: number; s2: number } | null;
-  /** Limites des zones en traits fins pointillés, en plus des bandes (case « Zones » de l'onglet cardio, 05/11). */
+  /** Limites des zones en traits fins pointillés, en plus des bandes (case « Zones » de l'onglet cardio). */
   zoneLines?: boolean;
   /** « Afficher » ou « +carte », zoomé ou non (voir `ZoomableChart`). */
   onShowOnMap?: () => void;

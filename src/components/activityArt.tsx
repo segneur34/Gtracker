@@ -3,8 +3,8 @@ import type { SVGProps } from 'react';
 import type { ActivityIconId } from '../core/activityIcons';
 
 /**
- * Dessins détaillés des activités, vectorisés depuis la planche de l'utilisateur
- * (17/10/2026) : silhouettes pleines à la couleur du texte, pour les grands formats
+ * Dessins détaillés des activités, vectorisés depuis une planche dessinée pour
+ * l'application : silhouettes pleines à la couleur du texte, pour les grands formats
  * (en-tête des bibliothèques). Les petites icônes stylisées sont dans `icons.tsx`.
  */
 const ART: Record<ActivityIconId, { w: number; h: number; d: string }> = {

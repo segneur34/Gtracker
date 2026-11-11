@@ -494,7 +494,7 @@ describe('porte d\'import : lecture de l\'ancien format (fonctions pures)', () =
   });
 
   it('fiche de septembre de l\'ancienne application (58aa8bb) : lue sans perte, réécrite sans perte au format neuf', () => {
-    // Déménagé de `compat.fiche.test.ts`. Forme de la fiche au 24/09 : pas d'activité, de nom, de gear1/2,
+    // Déménagé de `compat.fiche.test.ts`. Forme de la fiche de septembre : pas d'activité, de nom, de gear1/2,
     // conditions, gear ; analysis à trois champs ; un ancien `terrain`.
     const september = {
       format: 'tracker-session', version: 1, gpx: '2026-09-23_14-00-00_wingfoil.gpx', sport: 'wingfoil', source: 'enregistrement',

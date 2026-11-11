@@ -27,7 +27,7 @@ describe('périodes', () => {
 });
 
 describe('rootGrowth', () => {
-  it('la règle du 25/10 : 26 semaines, −3, −6, la graine ; 45 min par défaut', () => {
+  it('la règle : 26 semaines, −3, −6, la graine ; 45 min par défaut', () => {
     expect(ROOT_RULES).toEqual({ periodDays: 7, growthSteps: 26, losses: [3, 6, Infinity] });
     expect(ROOT_GOAL).toEqual({ defaultMin: 45, min: 15, max: 600 });
   });

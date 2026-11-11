@@ -11,7 +11,7 @@ import Button from './ui/Button';
  * appareil, fiches comprises). Dans le menu « … » des bibliothèques, et dans
  * Réglages › Mémoire pour le dossier seul (`gpx` à faux). Grisés pendant un
  * import, d'où qu'il parte, sans dossier mémoire (un import n'est jamais
- * mis en attente, décision du 27/10) et en mémoire en lecture seule.
+ * mis en attente) et en mémoire en lecture seule.
  */
 function ImportButtons({ gpx = true }: { gpx?: boolean }) {
   const library = useLibraryFields('status', 'memoryReadOnly', 'importing');

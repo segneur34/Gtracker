@@ -40,7 +40,7 @@ export const trackBounds = (points: ReadonlyArray<{ lat: number; lon: number }>)
   return south === Infinity ? null : [[south, west], [north, east]];
 };
 
-/** Écart à l'écran entre deux flèches de sens sur la carte d'une analyse, en pixels (05/11). */
+/** Écart à l'écran entre deux flèches de sens sur la carte d'une analyse, en pixels. */
 export const ARROW_SPACING_PX = 80;
 
 /** Flèches de sens au plus sur la carte d'une analyse, quel que soit le zoom. */

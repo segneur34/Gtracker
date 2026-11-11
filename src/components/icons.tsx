@@ -271,7 +271,7 @@ export const IconSailboat = ({ size = 24, ...props }: IconProps) => (
 );
 
 /**
- * Planche à voile : contour de la voile relevé sur la photo fournie par l'utilisateur (21/10), voile penchée,
+ * Planche à voile : contour de la voile relevé sur la photo fournie, voile penchée,
  * mât courbe ; deux lattes, et le wishbone qui dépasse du point d'écoute. Voile vide, traits pleins (son choix).
  */
 export const IconWindsurf = ({ size = 24, ...props }: IconProps) => (
@@ -282,14 +282,14 @@ export const IconWindsurf = ({ size = 24, ...props }: IconProps) => (
   </svg>
 );
 
-/** Wingfoil : l'aile, en aplat, vectorisée sur le modèle fourni par l'utilisateur (18/10) : bord d'attaque, boudin central, deux panneaux. */
+/** Wingfoil : l'aile, en aplat, vectorisée sur le modèle fourni : bord d'attaque, boudin central, deux panneaux. */
 export const IconWingfoil = ({ size = 24, ...props }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden focusable={false} {...props}>
     <path fillRule="evenodd" d="M14.9 1C12.2 1.6 9.4 3 7.4 4.8C5.4 6.6 4 8.3 3.1 10C0.1 15.2 0.2 19.5 3.3 22.5C3.9 23 4.5 23.3 4.5 23C4.4 22.9 4.2 22.5 4 22.1C1.6 18 2 14.6 5.3 10.2C7.2 7.7 6.7 7.7 9.4 10.3C10.8 11.6 11.1 11.9 11.5 12.2C11.7 12.4 12.1 12.7 12.3 12.9C12.5 13.1 13 13.5 13.3 13.8C13.6 14.1 14 14.4 14.2 14.6C15.3 15.6 15.8 15.9 15.8 15.4C15.8 15.3 14.9 14.2 14 13.2C13.8 13 13.4 12.5 13.1 12.2C12.8 11.9 12.4 11.5 12.2 11.2C11.9 10.9 11.6 10.6 11.5 10.5C11.5 10.4 11.3 10.1 11.1 9.9C10.3 9.1 10 8.7 9.6 8.2C9.3 7.9 9 7.6 8.9 7.4C8.4 6.9 8.4 6.8 9.3 6C13.5 1.9 17.8 1.1 21.9 3.6C23.4 4.5 23.5 4 22 2.8C19.9 1.2 17.3 0.5 14.9 1M17 2.9C17 2.9 16.8 3 16.6 3C15.8 3.1 14.4 3.6 13.4 4.1C13.1 4.3 12.6 4.6 12.4 4.7C10.3 5.9 10 7 11.3 8.6C11.4 8.7 11.6 8.9 11.6 9C11.7 9 12 9.5 12.4 9.9C13 10.7 13.2 10.9 14.1 11.9C14.3 12.2 14.7 12.6 14.8 12.7C15.6 13.7 15.9 13.7 16.2 12.9C17 10.3 18.5 8.4 21 6.6C22.9 5.1 22.3 3.8 19.3 3.1C18.7 3 17.1 2.8 17 2.9M6.8 10.3C5.9 10.6 5 11.8 3.9 14.1C2.7 16.4 2.9 20 4.2 21.4C5.1 22.2 5.6 22 7.1 20.2C8.3 18.7 9.4 17.8 10.9 17.1C11.8 16.6 11.9 16.5 12.9 16.2C14.1 15.8 14.2 15.8 10.3 12.3C10.1 12.2 9.8 11.9 9.6 11.7C9.4 11.6 9.1 11.3 9 11.2C7.8 10.2 7.5 10.1 6.8 10.3" />
   </svg>
 );
 
-/** Kite : aile pleine en croissant, bride en V, deux lignes jusqu'à la barre ; d'après le modèle de l'utilisateur (21/10), lignes raccourcies. */
+/** Kite : aile pleine en croissant, bride en V, deux lignes jusqu'à la barre ; d'après le modèle fourni, lignes raccourcies. */
 export const IconKite = ({ size = 24, ...props }: IconProps) => (
   <svg {...strokeProps(size)} strokeWidth={1.2} {...props}>
     <path d="M9.2 6.8C10.4 1.2 19.6-.6 22.6 3.6C24.8 6.8 23.2 12.8 18.6 16.4C20.2 12.4 20.4 7.6 18.4 5.4C16.2 3.2 12.4 3.6 9.2 6.8Z" fill="currentColor" stroke="none" />

@@ -2,7 +2,7 @@
  * Valeur d'une variable de `tokens.css` dans la palette claire, quel que soit
  * le thème posé sur la page : lue sur un élément `.theme-light`, qui la
  * reprend (`tokens.css`). Pour ce qui reste clair en thème sombre : l'image
- * de partage (décision du 28/10).
+ * de partage.
  */
 export const lightToken = (name: string, fallback: string): string => {
   if (typeof document === 'undefined') return fallback;

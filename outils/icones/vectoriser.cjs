@@ -1,8 +1,8 @@
 // Vectorise la planche des 16 dessins d'activité en src/components/activityArt.tsx, qui n'en garde que 9 :
-// ceux de la course, du vélo et du fractionné (`SKIPPED`) sont sautés depuis le lot 305.
+// ceux de la course, du vélo et du fractionné (`SKIPPED`) sont sautés.
 //
-// La planche (image de 2400 × 1792, 4 × 4 dessins légendés, fournie par l'utilisateur
-// le 17/10/2026) n'est pas versionnée : le fichier produit fait foi. Pour la refaire :
+// La planche (image de 2400 × 1792, 4 × 4 dessins légendés) n'est pas versionnée :
+// le fichier produit fait foi. Pour la refaire :
 //   dans un dossier de brouillon : npm i potrace@2.1.8   (apporte jimp)
 //   NODE_PATH=<brouillon>/node_modules node outils/icones/vectoriser.cjs <planche.jpg>
 // Les bandes ci-dessous (dessin sans sa légende) ont été relevées sur cette planche :
@@ -90,8 +90,8 @@ import type { SVGProps } from 'react';
 import type { ActivityIconId } from '../core/activityIcons';
 
 /**
- * Dessins détaillés des activités, vectorisés depuis la planche de l'utilisateur
- * (17/10/2026) : silhouettes pleines à la couleur du texte, pour les grands formats
+ * Dessins détaillés des activités, vectorisés depuis une planche dessinée pour
+ * l'application : silhouettes pleines à la couleur du texte, pour les grands formats
  * (en-tête des bibliothèques). Les petites icônes stylisées sont dans \`icons.tsx\`.
  */
 const ART: Record<ActivityIconId, { w: number; h: number; d: string }> = {

@@ -21,7 +21,7 @@ Tu exécutes un lot dans le dépôt Gtracker, sous la conduite d'un orchestrateu
 
 ## Avant de coder
 
-1. Lis `CLAUDE.md` (règles d'architecture 1 à 13, « Où ajouter quoi »), puis la ou les sections de `docs/DECISIONS.md` que le brief cite ou que la table de `CLAUDE.md` associe aux fichiers touchés ; `docs/MISE_EN_PAGE.md` si une page d'analyse est concernée.
+1. Lis `CLAUDE.md` (règles d'architecture 1 à 14, « Où ajouter quoi »), puis la ou les sections de `docs/DECISIONS.md` que le brief cite ou que la table de `CLAUDE.md` associe aux fichiers touchés ; `docs/MISE_EN_PAGE.md` si une page d'analyse est concernée.
 2. Lis le brief en entier et vérifie dans le code que chaque constat qu'il cite tient encore (des lots précédents ont pu le corriger).
 3. Si on te relance après un ÉCHEC, lis d'abord la section « Échec » du rapport précédent jointe à la demande : ce qui a cassé et ce qui a été essayé ; ne refais pas le même chemin. Si on te dit que l'arbre porte déjà un travail commencé (lot repris après une question), pars de `git diff`, ne le refais pas.
 

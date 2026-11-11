@@ -43,7 +43,7 @@
 }
 
 /*
- * « Afficher » ou « +carte » (25/10) : hors du tracé, sur la ligne du nom du graphe juste
+ * « Afficher » ou « +carte » : hors du tracé, sur la ligne du nom du graphe juste
  * au-dessus, collé à droite ; la lecture de cette ligne lui laisse la place.
  */
 .zoom-chart__map.ui-btn {
@@ -62,7 +62,7 @@
   padding-right: 84px;
 }
 
-/* 20 % sous `.ui-btn--s` (demande du 24/10) : ils couvraient trop du graphe. */
+/* 20 % sous `.ui-btn--s` : ils couvraient trop du graphe. */
 .zoom-chart__actions .ui-btn {
   min-height: 24px;
   padding: 0 calc(var(--space-3) * 0.8);

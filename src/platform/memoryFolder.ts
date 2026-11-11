@@ -471,7 +471,7 @@ export const folderImportPaths = (root: readonly NamedEntry[], sessions: readonl
 
 /**
  * Fichier à importer, lu seulement quand on en a besoin : un dossier entier
- * n'est jamais chargé en mémoire d'un coup (E-B1, 27/10).
+ * n'est jamais chargé en mémoire d'un coup.
  */
 export interface ImportEntry {
   /** Nom du fichier, sans son dossier. */
@@ -738,7 +738,7 @@ const createPrivateFolder = (base: string): MemoryFolder => {
 };
 
 /** Dit à qui veut écrire dans un dossier d'une version plus récente, et dans la carte de la mémoire. */
-/** Pourquoi un import est refusé : aucun dossier mémoire accessible (décision du 27/10). */
+/** Pourquoi un import est refusé : aucun dossier mémoire accessible. */
 export const NO_FOLDER_IMPORT_MESSAGE = "Désignez d'abord le dossier mémoire (Réglages › Mémoire) pour importer des sessions.";
 
 export const READ_ONLY_MEMORY_MESSAGE = "Ce dossier vient d'une version plus récente de Gtracker : il est lu sans rien y changer. Mettez l'application à jour pour y ranger vos sessions.";

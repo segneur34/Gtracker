@@ -31,13 +31,13 @@ export interface ElevationProfile {
 
 /**
  * Pas plus long que cette durée : trou de la trace (arrêt sans point, GPS
- * perdu), en secondes, commun à tous les supports (décision du 27/10).
+ * perdu), en secondes, commun à tous les supports.
  */
 export const MAX_GAP_S = 10;
 
 /**
  * Lissage de l'altitude et plus petit dénivelé compté. Le réglage « route »
- * sert partout depuis le 21/10 : l'altitude de l'IGN est déjà propre, et le
+ * sert partout : l'altitude de l'IGN est déjà propre, et le
  * choix du terrain par activité et par session a été retiré.
  */
 export const ELEVATION_PRESETS: Record<'route', ElevationProfile> = {
@@ -96,7 +96,7 @@ export interface RecordingProfile {
  * Le 1 Hz tient aussi le coût du recalcul du vent.
  * Pause automatique sous 0,3 m/s (environ 1 km/h, sous le bruit GPS au repos)
  * pendant 60 s. GPS perdu après 1 min sans position, signalé de nouveau
- * seulement après 2 min de positions revenues (décision du 01/11).
+ * seulement après 2 min de positions revenues.
  */
 export const DEFAULT_RECORDING: RecordingProfile = {
   intervalMs: 1000,
@@ -118,7 +118,7 @@ export const DEFAULT_RECORDING: RecordingProfile = {
 const SURF_RECORDING: RecordingProfile = { ...DEFAULT_RECORDING, autoPauseSpeedMs: 0 };
 
 /**
- * Bateau (21/10) : pause automatique sous 0,2 km/h pendant 60 s, plus bas que
+ * Bateau : pause automatique sous 0,2 km/h pendant 60 s, plus bas que
  * le défaut : un bord lent, sous 1 km/h, ne doit pas mettre la trace en pause.
  */
 const BOAT_RECORDING: RecordingProfile = { ...DEFAULT_RECORDING, autoPauseSpeedMs: kmhToMs(0.2) };
@@ -143,7 +143,7 @@ export interface HeartRateProfile {
   zoneModel: HeartRateZoneModel;
   /**
    * Décalage de S1 et de S2 pour ce calcul, en bpm, par rapport au cardio de
-   * référence (Gemini, 25/10 : masse musculaire, posture, contraction) ;
+   * référence (Gemini : masse musculaire, posture, contraction) ;
    * surchargeable par activité dans Réglages.
    */
   thresholdOffsetBpm: number;
@@ -155,7 +155,7 @@ export interface HeartRateProfile {
 }
 
 /**
- * Seuils et zones (25/10, d'après la synthèse demandée à Gemini) : S1 à 70 %
+ * Seuils et zones (d'après la synthèse demandée à Gemini) : S1 à 70 %
  * et S2 à 85 % de la réserve cardiaque (Karvonen), 78 et 89 % de la FC max
  * sans FC de repos. Z3 commence à S1, Z4 aux 2/3 de S1 à S2 (seuil lactique
  * stable), Z5 un peu au-dessus de S2. Z1 et Z2 sous S1, placées pour tomber
@@ -252,10 +252,10 @@ const ATTITUDE = {
 
 /**
  * Détection et mesure des sauts, communes aux supports qui sautent. Réglées sur
- * les séances de wingfoil du 08/10/2026, téléphone sur la poitrine : la séance
+ * des séances de wingfoil réelles, téléphone sur la poitrine : la séance
  * témoin ne donne aucun vol de 0,2 m, l'autre ses 10 sauts (0,66 à 1,72 m) et
  * rien d'autre au-dessus de 0,33 m. Les longs vols du kite restent à vérifier
- * sur une séance de kite. * Rebonds (n° 27, 06/11) : sur les wings des 08/10 et 21/10, les 7 petits vols
+ * sur une séance de kite. * Rebonds : sur des sessions de wing, les 7 petits vols
  * de 0,20 à 0,37 m trouvés à 1 à 3 s d'un vrai saut (0,75 à 1,70 m) sont son
  * appel ou son rebond ; aucun vrai saut n'en a un autre à moins de 3 s.
  */
@@ -273,7 +273,7 @@ export const JUMP_DETECTION: JumpDetection = {
  * Pumping sur foil, téléphone sur la poitrine : verticale calculée
  * comme pour les sauts ; coups, séries et décollage provisoires, à régler sur
  * une première session réelle. Cadence qui valide une série : fenêtre
- * de 6 s, corrélation 0,5, de 40 à 130 coups par minute, provisoires aussi (n° 27).
+ * de 6 s, corrélation 0,5, de 40 à 130 coups par minute, provisoires aussi.
  */
 const PUMP_DETECTION: PumpDetection = {
   ...ATTITUDE,
@@ -290,7 +290,7 @@ const PUMP_DETECTION: PumpDetection = {
 
 /**
  * Pumping en voile sur foil (wing, planche, kite) :
- * ceux du surf, réglés le 06/11 sur la wing du 02/11, capturée entière (n° 27).
+ * ceux du surf, réglés sur une session réelle de wingfoil, capturée entière.
  * Deux groupes bien séparés : les vrais coups de 90 à 130 par minute, amples et
  * réguliers ; le clapot de 20 à 70, trois fois plus faible ; presque rien entre
  * les deux, d'où le bas de la plage à 75. Le haut à 150 laisse de la marge, aucun
@@ -359,7 +359,7 @@ export interface SportProfile {
   /** Unité dans laquelle le seuil d'activité est saisi, stocké et comparé. */
   thresholdUnit: SpeedUnit;
   /**
-   * Calcul sans seuil d'activité (bateau, 21/10) : toute la session compte en
+   * Calcul sans seuil d'activité (bateau) : toute la session compte en
    * navigation, sans temps actif, ratio ni moyenne active ; la réussite des
    * manœuvres se lit à ce seuil fixe, non réglable, dans `thresholdUnit`.
    * `null` : seuil d'activité réglable (`defaultActiveThreshold`).
@@ -384,7 +384,7 @@ export interface SportProfile {
   /**
    * Plancher d'arrêt, dans `thresholdUnit` : quand aucun seuil d'activité
    * n'est réglé (seuil 0), un arrêt complet est ôté d'office du temps en
-   * mouvement sous ce plancher (décision du 27/10). En bateau, sans seuil, il
+   * mouvement sous ce plancher. En bateau, sans seuil, il
    * ne sert qu'à juger un trou de la trace immobile.
    */
   stillThreshold: number;
@@ -612,16 +612,16 @@ export const SPORT_PROFILES: Record<SportType, SportProfile> = {
     ...SAILING_DEFAULTS,
     id: 'bateau',
     label: 'Bateau',
-    // Sans seuil (21/10) : un bord peut passer sous 1 nœud ; une manœuvre sous 1 nœud est ratée.
+    // Sans seuil : un bord peut passer sous 1 nœud ; une manœuvre sous 1 nœud est ratée.
     defaultActiveThreshold: 1,
     withoutActiveThreshold: { maneuverSuccess: 1 },
     defaultPolarMinSpeed: 2,
-    // Couleurs de 1 à 15 nœuds, fixes, plutôt que selon l'allure (21/10).
+    // Couleurs de 1 à 15 nœuds, fixes, plutôt que selon l'allure.
     speedRange: { minMs: knotsToMs(1), maxMs: knotsToMs(15) },
     speedRangeFollowsPace: false,
     recording: BOAT_RECORDING,
     activeRatioLabel: 'Ratio de navigation',
-    // Voile au rappel, comme la planche (25/10).
+    // Voile au rappel, comme la planche.
     heartRate: heartRateOffset(-5),
     jumps: null,
     // Ni foil pompé ni capteurs du pumping.
@@ -708,7 +708,7 @@ export const familySports = (family: SportFamily): SportType[] =>
 /**
  * Détente basse d'un seuil plus petit que l'écart `exitOffset`, en fois le
  * seuil (rapport sans dimension, règle 4) : sans elle, la détente vaudrait 0 et
- * le masque d'activité ne sortirait plus jamais une fois entré (27/10).
+ * le masque d'activité ne sortirait plus jamais une fois entré.
  */
 const EXIT_FLOOR_RATIO = 0.5;
 

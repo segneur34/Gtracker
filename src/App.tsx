@@ -11,7 +11,7 @@ import {
 import Home from './pages/Home';
 
 /**
- * Pages chargées à la demande (27/10) : seul l'accueil est dans le paquet
+ * Pages chargées à la demande : seul l'accueil est dans le paquet
  * d'entrée ; chaque autre page, et avec elle Recharts (`vendor-charts`) ou
  * Leaflet (`vendor-map`), ne s'analyse qu'à sa première ouverture. `AppShell`
  * pose le `Suspense` ; les chemins, les `key` et `core/parentPage.ts` ne

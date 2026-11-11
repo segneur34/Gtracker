@@ -7,8 +7,8 @@ import { describe, expect, it } from 'vitest';
  *
  * Lit les fichiers texte de `src/`, `android/app/src/`, `outils/` et `public/`, plus quelques fichiers de la racine,
  * parmi ceux que git suit ou s'apprête à suivre (les dossiers de construction, ignorés, n'en font pas partie). Refuse
- * le mot sous toutes ses casses sauf quand il suit un « g » (Gtracker, gtracker).
- *
+ * le mot sous toutes ses casses sauf quand il suit un « g » (Gtracker, gtracker), et l'expression « application
+ * complète ». Les fichiers de `src/` qui importent la porte d'import sont gardés par `architecture.test.ts`.
  */
 
 interface ChildProcess {
@@ -28,8 +28,8 @@ const FOLDERS = ['src/', 'android/app/src/', 'outils/', 'public/'];
 const FILES = ['capacitor.config.ts', 'index.html', 'android/app/build.gradle', 'android/.gitignore'];
 const TEXT_EXTENSIONS = /\.(ts|tsx|css|mjs|cjs|js|java|xml|json|md|bat|html|svg|gradle)$/;
 
-/** Le mot interdit : « tracker » sans « g » devant. */
-const FORBIDDEN = /(?<![gG])tracker/i;
+/** Le mot interdit : « tracker » sans « g » devant, et l'expression qui désignait l'ancienne application. */
+const FORBIDDEN = /(?<![gG])tracker|application complète/i;
 
 /** Fichiers qui nomment l'ancienne application par métier : la porte d'import, ses essais, et cette garde elle-même. */
 const NAMED_FILES = [
@@ -84,7 +84,7 @@ describe('garde du nom : plus de « tracker » hors de la porte d\'import', () =
     for (const file of NAMED_FILES) expect(files, file).toContain(file);
   });
 
-  it('aucune ligne ne dit « tracker » (nom de fichier compris), hors exceptions', () => {
+  it('aucune ligne ne dit « tracker » ni « application complète » (nom de fichier compris), hors exceptions', () => {
     const scanned = files.filter((file) => !NAMED_FILES.includes(file));
     const lines = scanned.flatMap(offendingLines);
     const names = scanned.filter((file) => FORBIDDEN.test(file));

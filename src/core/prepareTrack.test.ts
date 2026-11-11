@@ -16,7 +16,7 @@ import type { RawTrackPoint, SportType } from './types';
 
 /**
  * `prepareTrack` rend ce que `useGpxSession` dérivait en `useMemo` avant d'aller dans le worker : la
- * copie gelée ci-dessous est l'enchaînement du hook tel qu'il était (version 0.4.77), recopié tel quel. Égalité
+ * copie gelée ci-dessous est l'enchaînement du hook tel qu'il était, recopié tel quel. Égalité
  * stricte, à 1 Hz et à 5 Hz, en voile avec et sans allure imposée, avec ou sans profil, avec trou et pause.
  */
 

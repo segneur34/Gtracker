@@ -1,7 +1,7 @@
 /*
  * Polices de l'application, chargées ici seulement : en changer, c'est ce
  * fichier et les variables --font et --font-title de `tokens.css`.
- * Montserrat pour les textes (refonte du 22/10) ; le logo est un SVG de GONG, sans police.
+ * Montserrat pour les textes ; le logo est un SVG de GONG, sans police.
  */
 
 @import '@fontsource/montserrat/latin-400.css';

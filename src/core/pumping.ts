@@ -134,7 +134,7 @@ export const flightSpans = (track: TrackPoint[], cum: CumulativeTrack, runs: Act
 
 /**
  * Capture d'une session sur foil, Pumping coché (fiche, sinon activité) : rangée
- * entière plutôt qu'élaguée autour des sauts (décision du 28/10), le pumping
+ * entière plutôt qu'élaguée autour des sauts, le pumping
  * se mesurant sur tout le vol. Seulement si le calcul mesure le pumping et ne
  * l'élague pas à sa façon (`pruneCapture`, propre au surf).
  */

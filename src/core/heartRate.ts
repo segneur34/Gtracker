@@ -26,7 +26,7 @@ const validBpm = (hr: number | undefined): hr is number =>
 /**
  * FC lissée sur `windowS` secondes, centrée, point par point ; `null` là où le
  * point n'a pas de FC. Le lissage porte sur la suite des seuls points à FC : un
- * point sans FC entre deux ne la coupe pas (GPS à 5 Hz, FC à 1 Hz, 27/10) ;
+ * point sans FC entre deux ne la coupe pas (GPS à 5 Hz, FC à 1 Hz) ;
  * elle est coupée par un trou de plus de `gapS` entre deux FC successives.
  */
 export const smoothHeartRate = (points: readonly HeartRatePoint[], windowS: number, gapS: number): (number | null)[] => {

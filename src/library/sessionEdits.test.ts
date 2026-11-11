@@ -34,7 +34,7 @@ describe('savedEdits', () => {
     expect(saved.notes).toEqual({ ...EMPTY_NOTES, comment: 'Belle session', rating: 4 });
   });
 
-  it("ne reprend jamais le matériel d'une autre session : sans notes, tout est vide (décision du 27/10)", () => {
+  it("ne reprend jamais le matériel d'une autre session : sans notes, tout est vide", () => {
     expect(savedEdits(record({ source: 'enregistrement' })).notes).toEqual(EMPTY_NOTES);
     expect(savedEdits(record({ source: 'import' })).notes).toEqual(EMPTY_NOTES);
     expect(savedEdits(null).notes).toEqual(EMPTY_NOTES);

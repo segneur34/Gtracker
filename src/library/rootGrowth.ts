@@ -5,7 +5,7 @@
  * Une semaine (du lundi au dimanche) est tenue quand son temps d'activité
  * atteint l'objectif. À sa clôture, la racine gagne une étape si elle est
  * tenue ; sinon elle recule, d'autant plus que les semaines manquées se
- * suivent (règle du 25/10 : −3, puis −6 de plus, puis retour à la graine ;
+ * suivent (règle : −3, puis −6 de plus, puis retour à la graine ;
  * une semaine tenue remet le compte à zéro). La semaine en cours ne compte
  * qu'à sa fin : son temps fait pousser des radicelles et ouvre la fleur, sans
  * effet sur la racine. Le plus haut niveau atteint reste dessiné sec.

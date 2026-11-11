@@ -14,7 +14,7 @@ import {
 const byId = (id: string) => DEFAULT_ACTIVITIES.find((a) => a.id === id)!;
 const kiteCree: Activity = { id: 'a-kite', name: 'Kite', base: 'kite', color: '#5b87f2' };
 
-describe('pré-réglages du bateau (21/10)', () => {
+describe('pré-réglages du bateau', () => {
   const boat = { id: 'a-voilier', name: 'Voilier', base: 'bateau' as const, color: '#014e86' };
 
   it('colore de 1 à 15 nœuds, sans seuil, pause sous 0,2 km/h pendant 60 s', () => {
@@ -30,7 +30,7 @@ describe('pré-réglages du bateau (21/10)', () => {
   });
 });
 
-describe('pré-réglages des activités (21/10)', () => {
+describe('pré-réglages des activités', () => {
   const voile = byId('wingfoil');
   const surf = byId('surf');
   const pav = { id: 'a-pav', name: 'Pav', base: 'windsurf' as const, color: '#5b87f2' };
@@ -76,7 +76,7 @@ describe('familles cachées', () => {
   });
 });
 
-describe('sauts mesurés par défaut (05/11)', () => {
+describe('sauts mesurés par défaut', () => {
   it('cochés en voile ; ni bateau ni surf', () => {
     expect(resolveJumps({}, byId('wingfoil'))?.enabled).toBe(true);
     expect(resolveJumps({}, kiteCree)).toEqual({ enabled: true, placement: 'poitrine', minHeightM: 1 });
@@ -140,7 +140,7 @@ describe("foil et pumping d'office des activités de départ", () => {
   });
 });
 
-describe('onglets et case « Sauts » (n° 174)', () => {
+describe('onglets et case « Sauts »', () => {
   const wing = byId('wingfoil');
   const tabOf = (activity: Activity, key: string) => analysisTabs(getSportProfile(activity.base)).find((t) => t.key === key)!;
   /** Un toucher sur le bouton d'un onglet, tel que le fait Réglages : relit la vue, écrit le choix. */
@@ -197,7 +197,7 @@ describe('onglets et case « Sauts » (n° 174)', () => {
   });
 });
 
-describe('décalage des seuils cardio (25/10)', () => {
+describe('décalage des seuils cardio', () => {
   const pav = { id: 'a-pav', name: 'Pav', base: 'windsurf' as const, color: '#5b87f2' };
 
   it('prend celui du calcul', () => {
@@ -440,7 +440,7 @@ describe("paire de bornes de Réglages : un champ vidé n'efface que sa borne", 
   });
 });
 
-describe('limites des zones sur la courbe de FC (case « Zones », 05/11)', () => {
+describe('limites des zones sur la courbe de FC (case « Zones »)', () => {
   const run = byId('surf');
   const bike = byId('wingfoil');
 

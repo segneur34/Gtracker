@@ -6,7 +6,7 @@ import type { LiveFieldKey } from '../recording/liveFields';
 import type { MarkGuideSettings } from '../recording/markGuide';
 
 /**
- * Pré-réglages des activités (21/10) : ce que Réglages montre comme « défaut »
+ * Pré-réglages des activités : ce que Réglages montre comme « défaut »
  * tant que l'utilisateur n'a rien changé, repris du téléphone de l'utilisateur
  * (sa référence en cas de doute). Un champ absent garde le défaut du calcul
  * (`sportProfiles.ts`) ; une surcharge de Réglages prime toujours.
@@ -52,7 +52,7 @@ const WING: ActivityPreset = {
 const BASE_PRESETS: Partial<Record<SportType, ActivityPreset>> = {
   wingfoil: WING,
   windsurf: WING,
-  // Sauts mesurés d'office en voile (05/11), à la hauteur du calcul ; le reste du kite suit son calcul.
+  // Sauts mesurés d'office en voile, à la hauteur du calcul ; le reste du kite suit son calcul.
   kite: { jumps: { enabled: true, placement: 'poitrine', minHeightM: 1 } },
 };
 

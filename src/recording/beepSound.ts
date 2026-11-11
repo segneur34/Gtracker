@@ -1,5 +1,5 @@
 /**
- * Son des bips (24/10) : plus ou moins grave, choisi dans Réglages pour tous
+ * Son des bips : plus ou moins grave, choisi dans Réglages pour tous
  * les bips de l'application (compteur, balises, tests, repos). Un haut-parleur
  * de téléphone porte le mieux vers 2 kHz, le son d'avant ce réglage ; plus
  * grave, il s'entend moins fort.

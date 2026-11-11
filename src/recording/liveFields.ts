@@ -77,8 +77,8 @@ export const DEFAULT_LIVE_FIELDS: Record<Treatment, LiveFieldKey[]> = {
 };
 
 /**
- * Lignes propres à un calcul, avant celles de son traitement : en bateau
- * (21/10), vitesse, moyenne, distance et cap.
+ * Lignes propres à un calcul, avant celles de son traitement : en bateau :
+ * vitesse, moyenne, distance et cap.
  */
 const SPORT_LIVE_FIELDS: Partial<Record<SportType, LiveFieldKey[]>> = {
   bateau: ['speed', 'average', 'distance', 'heading'],

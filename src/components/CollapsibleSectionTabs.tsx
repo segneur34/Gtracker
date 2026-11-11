@@ -13,7 +13,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * disparaît. Seule la barre se cache : les panneaux ouverts restent.
  * Un seul état pour toutes les analyses, retenu sur l'appareil. Après la
  * flèche, « tout fermer » ferme chaque onglet ouvert, « général » compris ;
- * « avancé » reste comme il est (05/11).
+ * « avancé » reste comme il est.
  */
 
 const BAR_DEFAULTS = { cachee: false };

@@ -346,7 +346,7 @@ export interface FollowCursor {
 }
 
 /**
- * `followProgress` repris d'un appel à l'autre, pour le direct (27/10) : tant
+ * `followProgress` repris d'un appel à l'autre, pour le direct : tant
  * que les segments ne font que s'allonger (segments fermés inchangés, dernier
  * segment prolongé, la dernière position lue de chacun étant le même objet),
  * seules les positions nouvelles sont lues ; sinon, tout est rejoué. Le

@@ -1,6 +1,6 @@
 /**
  * Onglet « graphiques » de la voile : vitesse, FC (si la session en a) et polaire de vitesse, chacun replié à
- * part par son titre pour ne comparer que ceux qui restent ouverts (16/10). Replié, un graphe se réduit à son
+ * part par son titre pour ne comparer que ceux qui restent ouverts. Replié, un graphe se réduit à son
  * titre ; sa taille mémorisée l'attend. Les replis sont tenus par le module (la FC et la carte en plein écran
  * les lisent).
  */

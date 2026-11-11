@@ -5,7 +5,7 @@ import { GUIDE_SIGNAL_TONES } from './signalTones';
  * Test de FC repos (sous le Profil) : 3 minutes immobile, la FC
  * lue sur la ceinture, sans GPS. Le résultat est la moyenne de 30 secondes la
  * plus basse après la première minute, le temps que le cœur se pose
- * (`library/restingHrResults.ts` ; 10 s sur les 3 minutes jusqu'au 25/10 : une
+ * (`library/restingHrResults.ts` ; 10 s sur les 3 minutes auparavant : une
  * fenêtre si courte saisit le creux d'une expiration, plus bas que le repos).
  *
  * Le test ne passe pas par l'enregistreur : pas de position, donc ni pause

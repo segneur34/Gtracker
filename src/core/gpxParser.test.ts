@@ -297,7 +297,7 @@ describe('parseGpx : lecture du XML sans DOMParser', () => {
     expect(r.rawPoints.map((p) => p.lat)).toEqual([45]);
   });
 
-  it('une entité inconnue ou un & seul restent tels quels (décision 2 du 04/11)', () => {
+  it('une entité inconnue ou un & seul restent tels quels', () => {
     expect(parseGpx(gpx('<trk><name>Pêche & voile &inconnue;</name></trk>')).trackName).toBe('Pêche & voile &inconnue;');
   });
 

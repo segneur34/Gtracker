@@ -48,7 +48,7 @@ export interface AthleteProfile {
   sex: 'f' | 'm' | null;
   /** Fréquence cardiaque maximale, en battements par minute. */
   hrMax: number | null;
-  /** Son origine ; absente sur un profil d'avant le 25/10 : saisie. */
+  /** Son origine ; absente sur un profil ancien : saisie. */
   hrMaxSource: HrSource | null;
   /** Fréquence cardiaque de repos, en battements par minute. */
   hrRest: number | null;

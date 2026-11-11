@@ -186,7 +186,7 @@ describe('summarizeSession', () => {
     expect(summary.movingTimeS).toBe(0);
   });
 
-  it('sans seuil (réglé à 0), ôte tout de même un arrêt complet du temps en mouvement (plancher, 27/10)', () => {
+  it('sans seuil (réglé à 0), ôte tout de même un arrêt complet du temps en mouvement (plancher)', () => {
     // 10 min à 3 m/s, 5 min immobile : l'arrêt sort au plancher d'arrêt de la voile.
     const summary = summarizeSession(buildTrack([[600, 3], [300, 0]]), 'wingfoil', { activeThreshold: 0 })!;
     expect(summary.movingTimeS!).toBeGreaterThan(595);
@@ -198,7 +198,7 @@ describe('summarizeSession', () => {
 
   it("ne compte ni la distance ni le temps en mouvement d'une pause de l'enregistrement, à 1 Hz comme à 5 Hz", () => {
     // 5 min à 3 m/s, pause de 10 min (un second `<trkseg>`), 5 min à 3 m/s ; vitesse Doppler sur chaque point,
-    // celle de la reprise comprise : intégrée sur la pause, elle ajoutait 1 800 m (bug du 17/10).
+    // celle de la reprise comprise : intégrée sur la pause, elle ajoutait 1 800 m.
     const paused = (hz: number): RawTrackPoint[] => {
       const pauseStart = START_MS + 300_000;
       const pauseEnd = START_MS + 900_000;

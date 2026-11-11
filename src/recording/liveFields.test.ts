@@ -85,7 +85,7 @@ describe('sanitizeLiveFields', () => {
   });
 });
 
-describe('moyenne du direct : « Moyenne active » en voile et en surf (04/11)', () => {
+describe('moyenne du direct : « Moyenne active » en voile et en surf', () => {
   const stats = { ...EMPTY_LIVE_STATS, averageSpeedMs: 3, activeAverageSpeedMs: 5 };
   const active = { ...LIVE_STATS_DEFAULTS, activeAverage: true };
 

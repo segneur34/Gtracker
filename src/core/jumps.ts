@@ -13,7 +13,7 @@ import {
  * instants du fichier en microsecondes, heures en millisecondes, hauteurs en
  * mètres, accélérations en m/s².
  *
- * Calcul, réglé sur les séances de wingfoil du 08/10/2026 (téléphone sur la
+ * Calcul, réglé sur les séances de wingfoil réelles (téléphone sur la
  * poitrine), où il retrouve 0 saut dans la séance témoin et les 10 de l'autre :
  * 1. accéléromètre et gyroscope ramenés sur une grille fixe (`gridStepS`) :
  *    une capture à 50, 100 ou 200 Hz donne le même résultat ;
@@ -378,7 +378,7 @@ export interface JumpsMeasure {
 }
 
 /**
- * Rebonds (n° 27, wings des 08/10 et 21/10) : autour d'un vrai saut, l'appel
+ * Rebonds : autour d'un vrai saut, l'appel
  * juste avant et le rebond de l'atterrissage juste après font chacun un petit
  * vol, à 1 à 3 s du saut et trois à cinq fois plus bas. Un vol est un rebond
  * s'il touche, à `satelliteGapS` près, un vol d'au moins sa hauteur divisée

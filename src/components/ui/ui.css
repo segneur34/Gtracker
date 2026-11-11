@@ -53,8 +53,8 @@
   stroke-linejoin: round;
 }
 
-/* Encre et épaisseur de chaque fond, réglées à l'œil sur la maquette du 23/10 : la couleur de la famille,
-   celle de l'image donnée par l'utilisateur (surf), le gris bleuté des courbes de niveau. */
+/* Encre et épaisseur de chaque fond, réglées à l'œil sur la maquette : la couleur de la famille,
+   celle de l'image fournie (surf), le gris bleuté des courbes de niveau. */
 .page-backdrop--contours {
   --backdrop-ink: var(--contour);
   --backdrop-stroke: 1.3;

@@ -191,7 +191,7 @@ describe('thresholdActivityMask', () => {
     expect(Math.abs(at5 - at1)).toBeLessThan(2);
   });
 
-  it('ôte un arrêt complet sans seuil réglé, au plancher d’arrêt (bug des pauses, 27/10)', () => {
+  it('ôte un arrêt complet sans seuil réglé, au plancher d’arrêt (bug des pauses)', () => {
     const at1 = movingS(analyzed(buildRaw(walkStopWalk, 1), KMH_PROFILE), KMH_PROFILE, 0);
     const at5 = movingS(analyzed(buildRaw(walkStopWalk, 5), KMH_PROFILE), KMH_PROFILE, 0);
     expect(at1).toBeGreaterThan(1190);

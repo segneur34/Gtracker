@@ -106,7 +106,7 @@
  * La palette claire vaut aussi pour `.theme-light` (ce qui reste clair dans
  * une interface sombre : outils posés sur une carte, lecture des couleurs de
  * l'image de partage) et pour `.leaflet-container` : la carte reste claire,
- * sans filtre (décision du 28/10), et ses boutons, sa légende et sa mention
+ * sans filtre, et ses boutons, sa légende et sa mention
  * gardent les couleurs de la carte, pas celles du thème.
  */
 
@@ -146,7 +146,7 @@
   --neutral-accent: #3d444d;
   /* Courbes de niveau du fond des pages (accueil, Profil, Statistiques, Réglages). */
   --contour: #b6c4d1;
-  /* Encre du fond surf : couleur de l'image donnée par l'utilisateur le 23/10. */
+  /* Encre du fond surf : couleur de l'image fournie. */
   --backdrop-surf: #1ba1e2;
   /* Racine du Profil (`components/drawRoot.ts`, lues par le canevas) : racine vivante, radicelles
      de la période, radicelle flétrie, partie sèche, pousse, sol, graine, fleur. */
@@ -162,7 +162,7 @@
   --root-flower: #f2c94c;
   --root-flower-edge: #c99a1a;
   --root-flower-heart: #b8641d;
-  /* Papillon de la fleur, monarque orange, ses deux dernières étapes : aplat et bord épais (maquette du 06/11). */
+  /* Papillon de la fleur, monarque orange, ses deux dernières étapes : aplat et bord épais. */
   --root-butterfly: #ec7a1c;
   --root-butterfly-edge: #3a2415;
   --record: #2e7d32;
@@ -203,7 +203,7 @@
 }
 
 /*
- * Sombre (maquette du 28/10). Familles éclaircies d'un cran, texte blanc
+ * Sombre. Familles éclaircies d'un cran, texte blanc
  * gardé dessus (contraste d'au moins 4,5) ; chacune est la première nuance sombre de sa famille
  * (`FAMILY_SHADES_DARK`, `palette.test.ts`).
  */

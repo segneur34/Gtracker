@@ -10,8 +10,8 @@ import { clamp } from '../core/basics';
  */
 
 /**
- * Étapes nommées de la fleur : ouverte à 1 fois l'objectif, épanouie à 4 (4e étape, maquette du 31/10), puis
- * le papillon, qui arrive à côté de la fleur à 4,6 fois (5e) et s'y pose à 5 fois (6e), maquette du 06/11.
+ * Étapes nommées de la fleur : ouverte à 1 fois l'objectif, épanouie à 4 (4e étape), puis
+ * le papillon, qui arrive à côté de la fleur à 4,6 fois (5e) et s'y pose à 5 fois (6e).
  */
 export const BLOOM_STEPS = 6;
 /** Multiple où tout est figé, papillon posé : `bloom` est plafonné là. */
@@ -35,7 +35,7 @@ const BLOOM_ROUNDING = 1e-9;
 const BUTTERFLY_SPAN = 13;
 /** Où il attend, à côté de la fleur : à droite, un peu plus haut que le cœur, en pixels du carré depuis le sommet de la tige. */
 const BUTTERFLY_BESIDE = { x: 17, y: -6 } as const;
-/** Pose du papillon dans chacun de ses deux états (maquette du 06/11) : largeur des ailes, de 0 à 1, et penché du corps, en radians. */
+/** Pose du papillon dans chacun de ses deux états : largeur des ailes, de 0 à 1, et penché du corps, en radians. */
 const BUTTERFLY_POSES = {
   beside: { flat: 0.72, tilt: -0.45 },
   perched: { flat: 0.95, tilt: 0 },
@@ -214,7 +214,7 @@ const drawRootlets = (
     ctx.moveTo(p.x, p.y);
     ctx.quadraticCurveTo(cx, cy, ex, ey);
     ctx.stroke();
-    // Poils absorbants ; le bout reste nu, sans coiffe (26/10).
+    // Poils absorbants ; le bout reste nu, sans coiffe.
     if (L > 5) {
       ctx.lineWidth = 0.8;
       for (const [f, a] of [[0.45, 1], [0.7, -1]]) {
@@ -246,7 +246,7 @@ const petal = (ctx: CanvasRenderingContext2D, angle: number, dist: number, len: 
 
 /**
  * La fleur, centrée sur l'origine (le sommet de la tige), pour `t` multiples de
- * l'objectif (maquette du 31/10, quatre étapes). Avant 1 : un bouton qui
+ * l'objectif (quatre étapes). Avant 1 : un bouton qui
  * grossit et s'entrouvre sur le dernier tiers ; à 1 : cinq pétales ; de 1 à 2 :
  * pétales plus longs et cœur plus gros ; de 2 à 3, un second rang de pétales
  * pousse derrière ; jusqu'à 4, tout grandit et le cœur se garnit de graines.
@@ -373,7 +373,7 @@ const bodyFromAbove = (ctx: CanvasRenderingContext2D, a: number, color: string) 
 };
 
 /**
- * Le papillon monarque (maquette du 06/11), centré sur (`x`, `y`), d'envergure `size`, vu de dessus : un grand aplat
+ * Le papillon monarque, centré sur (`x`, `y`), d'envergure `size`, vu de dessus : un grand aplat
  * et un bord épais, lisibles en petit, deux points blancs par aile haute, corps et antennes de la couleur du bord.
  */
 const drawButterfly = (

@@ -2,7 +2,7 @@ import { useId, type CSSProperties } from 'react';
 import { backdropTile, type BackdropVariant } from '../core/backdropPattern';
 
 /**
- * Fond dessiné d'une page (refonte du 22/10, dessins du 23/10) : courbes de
+ * Fond dessiné d'une page : courbes de
  * niveau sans session, sinon le motif d'une famille (souffles de vent,
  * sentier dans des courbes de niveau, vague, traits de vitesse), celle de
  * la bibliothèque ou du sport préféré (`useFavoriteBackdrop`). Une tuile

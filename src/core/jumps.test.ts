@@ -109,7 +109,7 @@ describe('sauts : hauteur', () => {
 
 describe('sauts : bornes du vol', () => {
   /**
-   * La marche qui précède un petit saut (course du 31/10) : une foulée appuyée,
+   * La marche qui précède un petit saut (vue sur une session réelle) : une foulée appuyée,
    * un pas dont l'accélération lissée dépasse à peine celle d'un atterrissage,
    * enfin le saut, 0,5 s de vol libre après une poussée douce (0,5 g).
    */

@@ -6,7 +6,7 @@ import { RATINGS, WIND_LEVELS, type Rating, type WindLevel } from './notes';
 import type { SessionSummary } from './record';
 
 /**
- * Lignes ajoutées à l'image de partage le 05/11, à la fin de la liste,
+ * Lignes ajoutées à l'image de partage, à la fin de la liste,
  * les mêmes clés dans l'analyse ouverte et dans le résumé d'une fiche : le choix
  * retenu pour l'activité vaut aux deux endroits. Voile : manœuvres réussies, part
  * du vol pompée (sur foil), vent ; partout : l'appréciation.
@@ -87,7 +87,7 @@ const flightRatioValue = (movingS: number | null, inMotionS: number | undefined)
  * distance, temps ni moyenne actifs, comme son onglet « général », mais un
  * « Temps en mouvement ». Sur foil
  * (`foil`), le temps actif est le temps en vol, et le dit, suivi du ratio de
- * vol. Les lignes ajoutées le 05/11 (`shareExtraStats`) suivent, l'appréciation
+ * vol. Les lignes ajoutées (`shareExtraStats`) suivent, l'appréciation
  * et la force du vent lues dans les notes de la fiche (`notes`).
  */
 export const summaryShareStats = (
@@ -135,7 +135,7 @@ const summaryBaseStats = (
       { key: 'totalTime', label: 'Temps total', value: formatDuration(totalS * 1000) },
       ...(withActiveThreshold ? [] : [movingTime]),
       { key: 'activeTime', label: foil ? 'Temps en vol' : 'Temps actif', value: movingS === null ? '—' : formatDuration(movingS * 1000) },
-      // Sur foil : la part du temps en mouvement passée en vol (05/11), comme « général ».
+      // Sur foil : la part du temps en mouvement passée en vol, comme « général ».
       ...(foil ? [{ key: 'activeRatio', label: FOIL_RATIO_LABEL, value: flightRatioValue(movingS, summary.inMotionS) }] : []),
       { key: 'averageSpeed', label: 'Vitesse moyenne', value: speed(per(summary.distanceM, totalS)) },
       { key: 'activeAverage', label: 'Moyenne active', value: speed(per(movingM, movingS)) },

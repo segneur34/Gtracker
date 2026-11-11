@@ -172,7 +172,7 @@ export const visibleIndexRange = (values: ArrayLike<number>, range: XRange | nul
  * qu'il soit ajouté au tracé, en part de l'étendue de la série sur la plage.
  * À 5 %, un pic de 2 s à plus d'un nœud au-dessus du bord reste tracé, et le
  * bruit du GPS n'ajoute que 10 à 25 % de points à la vitesse brute de la
- * voile (mesuré sur 22 traces réelles le 27/10 ; à 2 %, jusqu'à +75 %).
+ * voile (mesuré sur 22 traces réelles ; à 2 %, jusqu'à +75 %).
  */
 export const CHART_EXTREME_TOLERANCE = 0.05;
 
@@ -253,7 +253,7 @@ const keepExtremes = (out: number[], first: number, last: number, values: ArrayL
  * bout de la plage. Les extrêmes de chaque série de `series` (les courbes
  * que le graphe trace de ces lignes : vitesse, altitude, FC, cadence) que le
  * pas régulier sauterait sont ajoutés, chacun jugé sur l'étendue de sa
- * série (27/10, et 29/10 pour plusieurs séries) : un pic bref de FC ou un
+ * série (y compris pour plusieurs séries) : un pic bref de FC ou un
  * creux de cadence reste tracé même quand la vitesse ne bouge pas. La
  * tolérance (`CHART_EXTREME_TOLERANCE`) borne d'elle-même les points d'une
  * trace bruitée, sans autre plafond. Les indices, croissants et sans

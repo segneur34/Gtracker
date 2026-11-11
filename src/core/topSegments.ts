@@ -42,7 +42,7 @@ const interpolateAt = (
  *
  * Une fenêtre qui contient un trou de la trace (pas qui porte `gapDistanceM`)
  * est écartée : sur un pas plus long que la cible, sa vitesse n'est que celle
- * du point de reprise, une seule mesure (27/10).
+ * du point de reprise, une seule mesure.
  */
 export const computeTopSegments = (
   track: TrackPoint[],

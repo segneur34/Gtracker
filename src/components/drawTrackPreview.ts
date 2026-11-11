@@ -24,7 +24,7 @@ export const TRACK_PREVIEW = {
   maxZoom: 17,
   /** Épaisseur de la trace, celle de l'ancienne carte. */
   lineWidthPx: 3,
-  /** Un point de la trace est gardé dès qu'il s'écarte de ce nombre de pixels du précédent (réponse du 30/10). */
+  /** Un point de la trace est gardé dès qu'il s'écarte de ce nombre de pixels du précédent. */
   thinPx: 0.5,
 } as const;
 

@@ -11,13 +11,13 @@ import { formatDecimal, formatDuration } from '../core/units';
 import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
- * Racine du Profil (maquette validée le 22/10) : elle part du carré à droite
+ * Racine du Profil : elle part du carré à droite
  * du pseudo (`RootSlot`) et pousse autour des cadres de la page, d'une étape
  * par semaine tenue (`library/rootGrowth.ts`) ; elle recule des semaines
  * manquées (−3, −6, puis la graine), la partie perdue restant dessinée sèche.
  * Le temps de la semaine fait pousser des radicelles et la pousse au-dessus du
  * sol, dont la fleur paraît à la première minute, s'ouvre à l'objectif et
- * continue d'évoluer jusqu'à 4 fois l'objectif (maquette du 31/10), puis un
+ * continue d'évoluer jusqu'à 4 fois l'objectif, puis un
  * papillon arrive à côté d'elle à 4,6 fois et s'y pose à 5 fois (six étapes) ;
  * après une semaine manquée, ses feuilles tombent et restent mortes au sol, de
  * nouvelles repoussant avec le temps fait.
@@ -40,7 +40,7 @@ interface LastSeen {
 }
 const SEEN_NAMESPACE = STORAGE_KEYS.profil;
 const SEEN_KEY = 'racine';
-/** 2 : la semaine du 25/10 (1 : valeurs d'essai d'un jour, sans version). */
+/** 2 : la règle de la semaine (1 : valeurs d'essai d'un jour, sans version). */
 const SEEN_RULES = 2;
 /** Sans version : un état d'avant la règle, lu par-dessus ce défaut, n'en prend pas. */
 const SEEN_DEFAULT: LastSeen = { level: null, period: null, minutes: 0 };

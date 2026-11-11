@@ -4,9 +4,8 @@ import type { SportFamily } from './sportProfiles';
 /**
  * Tuiles des fonds de page (`components/PageBackdrop.tsx`), en pixels : la
  * tuile se répète en largeur et en hauteur, si bien que la densité du fond ne
- * dépend ni de la longueur de la page ni de la largeur de l'écran (avant le
- * 22/10, un seul dessin étiré sur toute la page grossissait et s'éclaircissait
- * sur une longue liste).
+ * dépend ni de la longueur de la page ni de la largeur de l'écran (un seul
+ * dessin étiré sur toute la page grossissait et s'éclaircissait sur une longue liste).
  *
  * Chaque tracé se raccorde à lui-même d'un bord à l'autre : les courbes de
  * niveau sont celles d'un relief périodique dans les deux sens, et les dessins

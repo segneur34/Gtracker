@@ -156,7 +156,7 @@ const skipDoctype = (text: string, from: number): number => {
  * interdit (en clair ou par référence numérique), `]]>` hors d'un CDATA. Le BOM
  * est ignoré ; commentaires, instructions et `DOCTYPE` sont sautés ; les entités
  * nommées ne sont pas vérifiées : une entité inconnue ou un `&` seul restent tels
- * quels, comme sous xmldom (décision du 04/11), là où le navigateur refusait.
+ * quels, comme sous xmldom, là où le navigateur refusait.
  */
 const scanXml = (text: string, visitor: XmlVisitor): void => {
   if (INVALID_CHARS.test(text)) malformed();
@@ -298,8 +298,8 @@ const NAMED_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quo
 const ENTITY = /&(?:#x([0-9a-fA-F]+)|#([0-9]+)|(amp|lt|gt|quot|apos));/g;
 
 /**
- * Entités prédéfinies et numériques décodées ; une entité inconnue ou un `&` seul restent tels quels (décision du
- * 04/11 : comme xmldom, quand le navigateur refusait le fichier). Une référence interdite est refusée au balayage.
+ * Entités prédéfinies et numériques décodées ; une entité inconnue ou un `&` seul restent tels quels
+ * (comme xmldom, quand le navigateur refusait le fichier). Une référence interdite est refusée au balayage.
  */
 const decodeEntities = (raw: string): string =>
   raw.indexOf('&') === -1

@@ -13,14 +13,14 @@ import { clamp } from './basics';
  * racine et de ses branches partent des ramifications (racines latérales et
  * sous-racines) qui plongent vers le bas et s'arrêtent au bord d'un cadre.
  *
- * Sa longueur, elle, ne suit pas la page (26/10) : une étape fait avancer la
+ * Sa longueur, elle, ne suit pas la page : une étape fait avancer la
  * racine d'une longueur fixe, tirée d'une page de référence (`tourLength`), si
  * bien qu'elle a la même taille quelle que soit la période affichée, dont
  * dépend la hauteur des cadres. Plus courte que cette référence, la page
  * prolonge la racine d'une queue sous le dernier cadre (`tail`).
  *
  * Tout est tiré d'un hasard reproductible : la même page donne la même racine
- * d'une ouverture à l'autre. Maquette validée le 22/10 (ondulation 6,
+ * d'une ouverture à l'autre. Réglages retenus sur la maquette (ondulation 6,
  * ramifications 1,4, épaisseur 2,8).
  */
 
@@ -104,7 +104,7 @@ export interface RootStyle {
   thickness: number;
 }
 
-/** Réglages du dessin retenus sur la maquette du 22/10. */
+/** Réglages du dessin retenus sur la maquette. */
 export const ROOT_STYLE: RootStyle = { wobble: 6, ramifications: 1.4, thickness: 2.8 };
 
 /** Une radicelle par tranche de ce nombre de minutes d'activité dans la période. */
@@ -266,7 +266,7 @@ export const rootRoute = ({ slot, cards }: RootLayout, tail = 0): Route | null =
 /**
  * Hauteurs des quatre cadres du Profil (périodes, chiffres, répartition,
  * graphe) sur la page de référence : le Profil en période « Année » à 390 px
- * (relevé du 27/10 : 34, 178, 318 et 273 px, gouttière de 20 px). Elles fixent
+ * (relevé : 34, 178, 318 et 273 px, gouttière de 20 px). Elles fixent
  * la longueur d'un tour de racine ; la racine y a l'allure qu'elle avait à
  * cette période avant que la longueur cesse de suivre la page.
  */

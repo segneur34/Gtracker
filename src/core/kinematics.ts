@@ -23,7 +23,7 @@ export const rawPointTimeMs = (point: Pick<RawTrackPoint, 'time' | 'rawTimeMs'>)
  * régulièrement jusqu'à la date suivante. Certaines applications tronquent
  * l'heure à la seconde : à 5 Hz, cinq points partagent alors la même date, les
  * quatre pas de durée nulle n'ont pas de vitesse et celui qui franchit la
- * seconde ne porte qu'un cinquième du chemin (27/10). Une suite de `n` points
+ * seconde ne porte qu'un cinquième du chemin. Une suite de `n` points
  * de date `T` suivie d'une date `T' > T` prend `T + k × (T' − T) / n` ; un point
  * à la même position que le précédent de la suite (vrai doublon) garde la date
  * de celui-ci, son pas reste nul. La dernière suite de la trace s'étale sur
@@ -146,7 +146,7 @@ const DETOUR_FLOOR_M = 1;
  * `maxAccel`. Le rapport ne dépend ni de la cadence ni de l'allure, et le test
  * ne regarde que les deux voisins, quel que soit leur écart de temps : un point
  * déplacé suivi d'un trou échappe à `clampByAcceleration`, qui cherche le
- * retour dans les 3 s (session Komoot à 41 nd, §10). La seconde condition
+ * retour dans les 3 s (session Komoot à 41 nd). La seconde condition
  * garde un vrai demi-tour serré, parcouru à vitesse constante. Deux points de
  * suite ne sont jamais écartés : le suivant d'un point écarté est sauté. Un
  * point de reprise après une pause (`segmentStart`), ou qui la précède, n'est
@@ -214,7 +214,7 @@ export interface KinematicsOptions {
 
 /**
  * Pas d'un trou de la trace : sa distance est bornée par la corde du pas
- * multipliée par ce facteur, sans dimension (27/10). La vitesse lue à la
+ * multipliée par ce facteur, sans dimension. La vitesse lue à la
  * reprise ne dit rien de ce qui s'est passé pendant le trou : intégrée sur
  * toute sa durée, une reprise à 20 nœuds après 45 min d'arrêt ajouterait 27 km.
  */
@@ -526,7 +526,7 @@ export const computeKinematics = (
 
 /**
  * Le même calcul, repris sur une trace qui ne fait que s'allonger (direct de
- * l'enregistrement, 27/10) : `previous` est le calcul précédent sur les
+ * l'enregistrement) : `previous` est le calcul précédent sur les
  * premiers points de `points` (mêmes objets) ; seule la fin est refaite, et
  * la trace rendue est celle de `computeKinematics`. Sans `previous`, ou s'il
  * ne vaut plus (autres points, autres réglages), tout est calculé. `null`

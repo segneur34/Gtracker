@@ -17,10 +17,10 @@ import './ZoomableChart.css';
  * deux doigts : écarter zoome, pincer dézoome, glisser déplace ; un seul
  * doigt garde le survol, qui déplace le repère sur la carte. Sur ordinateur,
  * tirer une zone à la souris zoome dessus. Un double-clic, ou deux touchers
- * rapprochés, zooment ×2 autour du point visé (23/10). Une fois zoomé
+ * rapprochés, zooment ×2 autour du point visé. Une fois zoomé
  * paraît « Tout voir », qui revient à toute l'étendue. Si le module le branche
  * (`onShowOnMap`), un bouton est toujours là, zoomé ou non, sur la ligne du
- * nom au-dessus du graphe (25/10) : « Afficher », qui montre sur la carte la
+ * nom au-dessus du graphe : « Afficher », qui montre sur la carte la
  * partie vue du graphe, sur ordinateur et sous la carte en plein écran ;
  * « +carte », qui ouvre carte + graphes, dans la page du téléphone. La souris
  * qui sort du graphe appelle `onLeave`, qui efface le repère ; au doigt, il
@@ -88,7 +88,7 @@ function ZoomableChart({ zoom, showReset = true, onShowOnMap, onLeave, style, cl
   /**
    * « Afficher » ou « +carte », sur la ligne du nom du graphe, collé à
    * droite, zoomé ou non : montre la partie vue sur la carte, ou, dans la page
-   * du téléphone, ouvre la carte avec les graphes de l'onglet (25/10).
+   * du téléphone, ouvre la carte avec les graphes de l'onglet.
    */
   onShowOnMap?: () => void;
   style?: CSSProperties;

@@ -20,7 +20,7 @@ import { EMPTY_LIVE_LEGS, combineLiveLegs, splitLiveLegs, type LiveLegSplit, typ
  * segment fermé n'est calculé qu'une fois et le segment en cours reprend sa
  * cinématique là où elle en était (`resumeKinematics`) : le coût de chaque
  * recalcul ne croît plus avec la durée que par le reste du segment en cours
- * (FC, tops), bien plus léger (27/10). Le résultat est
+ * (FC, tops), bien plus léger. Le résultat est
  * celui du calcul sans mémoire (`liveStats.test.ts`).
  */
 
@@ -110,7 +110,7 @@ const heartPart = (
   return stats === null ? null : { sum: stats.avgBpm * stats.coveredS, coveredS: stats.coveredS };
 };
 
-/** Le direct donne la moyenne active en voile et en surf (04/11) ; pas en bateau, sans seuil, ni dans les autres familles. */
+/** Le direct donne la moyenne active en voile et en surf ; pas en bateau, sans seuil, ni dans les autres familles. */
 export const usesActiveAverage = (profile: SportProfile): boolean => {
   const treatment = sportTreatment(profile.id);
   return (treatment === 'voile' || treatment === 'surf') && hasActiveThreshold(profile);

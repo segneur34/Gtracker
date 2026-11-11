@@ -363,7 +363,7 @@ describe('applyRecordPatch', () => {
     expect(applyRecordPatch(r, { sport: 'wingfoil', activityId: null, name: '  ' }).record).toBe(r);
   });
 
-  it("garde le terrain d'une fiche d'avant le 21/10, qui n'est plus lu", () => {
+  it("garde le terrain d'une fiche ancienne, qui n'est plus lu", () => {
     const raw = { ...analysis, terrain: 'trail' };
     expect(parseRecord(JSON.stringify(record({ analysis: raw as unknown as SessionAnalysis })))?.analysis).toMatchObject({ terrain: 'trail' });
   });
@@ -485,7 +485,7 @@ describe('repères de la fiche', () => {
 });
 
 describe('fiches anciennes et abîmées', () => {
-  /** Fiche telle que l'écrivait la première version de la mémoire (24/09, b8620ff). */
+  /** Fiche telle que l'écrivait la première version de la mémoire. */
   const firstFormat = {
     format: RECORD_FORMAT,
     version: 1,
