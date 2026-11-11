@@ -3,13 +3,14 @@ import { useState } from 'react';
 import { FAMILY_LABEL, sessionActivity } from '../core/activities';
 import type { ShareStat } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
-import { librarySession, readSessionExport, updateSessionRecord, useSessionName } from '../hooks/useSessionLibrary';
+import { librarySession, readSessionExport, readSessionGpx, updateSessionRecord, useSessionName } from '../hooks/useSessionLibrary';
 import { readStoredActivities } from '../hooks/useSportSettings';
 import { useTransientValue } from '../hooks/useTransientValue';
 import { downloadBaseName } from '../library/naming';
 import { bundleSessionGpx } from '../library/sessionBundle';
 import { shareLabels } from '../library/shareStats';
 import { safeFileName, saveToDownloads } from '../platform/files';
+import { shareFile } from '../platform/share';
 import { IconDownload, IconShare } from './icons';
 import SessionRenameField from './SessionRenameField';
 import ShareDialog from './ShareDialog';
@@ -72,6 +73,19 @@ function SessionNameEditor({ file, share }: { file: string | null; share?: Sessi
     }
   };
 
+  /** Le GPX rangé tel quel (un brouillon ne le change pas), confié au partage d'Android ; repli : téléchargement. */
+  const shareTrace = async () => {
+    try {
+      const text = await readSessionGpx(file);
+      if (text === null) throw new Error('GPX introuvable dans la mémoire.');
+      const labels = shareLabels(name, activityName, (share ? FAMILY_LABEL[share.family] : 'Session'), record.summary.startMs, file);
+      const outcome = await shareFile(new Blob([text], { type: 'application/gpx+xml' }), `${safeFileName(labels.baseName)}.gpx`, labels.title);
+      if (outcome === 'downloaded') setNote({ text: 'Ce navigateur ne partage pas de fichier : le GPX est téléchargé.', error: false });
+    } catch (err) {
+      setNote({ text: `Partage impossible : ${plainError(err, 'erreur inconnue')}`, error: true });
+    }
+  };
+
   if (draft !== null) {
     return (
       <span className="an-name-row">
@@ -101,6 +115,10 @@ function SessionNameEditor({ file, share }: { file: string | null; share?: Sessi
                 Partager
               </Button>
             )}
+            <Button onClick={() => void shareTrace()}>
+              <IconShare size={18} />
+              Partager la trace
+            </Button>
             <Button onClick={() => void download()}>
               <IconDownload size={18} />
               Télécharger la session
