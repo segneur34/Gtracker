@@ -2,7 +2,7 @@
 // Usage : node carte-reveil.mjs <port> <dossier de travail, chemin Windows>
 // Sur un profil neuf, sans réseau ; tuiles fausses (`lib/tuiles.mjs`), dont `setMode` simule la panne et le 404. Environ
 // 3 min en temps réel : les reprises attendent 3, 12 et 30 s de vrai temps de page (le script n'est pas `accelerable`).
-// Le script importe une course, ouvre son analyse, puis, à chaque passage, déplace la carte vers des cases jamais vues
+// Le script (remis sur la voile au lot 330) importe une session de wingfoil, ouvre son analyse, puis, à chaque passage, déplace la carte vers des cases jamais vues
 // (`panBy`, sans animation) pendant que les tuiles sont coupées : elles restent vides, Leaflet les croit chargées.
 //  1. Veille, réseau rendu pendant : page cachée, signaux `online` et `moveend` (rien ne part), page gelée (cachée et
 //     JavaScript suspendu par le débogueur, comme un écran éteint, voir `carte-direct.mjs`), réseau rendu, page rendue,
@@ -18,6 +18,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect, diag, DOSSIER_MEMOIRE, vwait } from './lib/cdp.mjs';
+import { traceDroite } from './lib/traces.mjs';
 import { BLOCKED_EXCEPT_TILES, fakeTiles } from './lib/tuiles.mjs';
 
 const [port, workDir] = process.argv.slice(2);
@@ -50,15 +51,9 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
 ` });
 await blockNetwork(BLOCKED_EXCEPT_TILES);
 
-// --- Trace : une course d'une demi-heure vers l'est, autour de Montpellier ---
-const POINTS = 1800;
-const t0 = Date.UTC(2026, 9, 1, 7, 0, 0);
-const run = [];
-for (let k = 0; k < POINTS; k++) {
-  run.push(`<trkpt lat="${(43.62 + k * 2e-6).toFixed(7)}" lon="${(3.86 + k * 4e-5).toFixed(7)}"><ele>50</ele><time>${new Date(t0 + k * 1000).toISOString()}</time></trkpt>`);
-}
+// --- Trace : une session de wingfoil d'une demi-heure vers l'est (3,2 m/s), autour de Montpellier ---
 const runPath = join(workDir, 'carte-reveil.gpx');
-writeFileSync(runPath, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Course</name><type>running</type><trkseg>\n${run.join('\n')}\n</trkseg></trk></gpx>\n`);
+writeFileSync(runPath, traceDroite({ debutMs: Date.UTC(2026, 9, 1, 7, 0, 0), secondes: 1800, vitesse: 3.2, type: 'wingfoil', nom: 'Demi-heure', lat0: 43.62, lon0: 3.86 }));
 
 const listSessions = () => evaluate(`(async () => {
   let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}');
@@ -169,12 +164,12 @@ const failNewTiles = async (mode, pass) => {
 };
 
 // --- Ouverture ---
-await go('/course');
+await go('/voile');
 check('import', (await importFiles(runPath, 'input[type=file][accept*=".gpx"][multiple]:not([disabled])')) === 'ok');
-const runName = await waitFor(async () => (await listSessions())?.find((n) => n.endsWith('.gpx')), { timeout: 20000, label: 'fiche course' });
+const runName = await waitFor(async () => (await listSessions())?.find((n) => n.endsWith('.gpx')), { timeout: 20000, label: 'fiche session' });
 await waitFor(async () => (await records()).length > 0, { timeout: 30000, label: 'fiche JSON' });
 await settle({ max: 3000, label: 'import' });
-await go(`/course/analyse?session=${encodeURIComponent(runName)}`, 20000);
+await go(`/voile/analyse?session=${encodeURIComponent(runName)}`, 20000);
 const opened = await waitFor(async () => {
   const p = await probe();
   return p && p.total > 0 && p.real === p.total ? p : null;

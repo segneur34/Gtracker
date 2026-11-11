@@ -1,18 +1,19 @@
 // Banc de test : bouton « Note » de l'enregistrement et repères dans l'analyse (lot 3 des demandes du 10-14/10).
 // Usage : node notes.mjs <port> <dossier de travail> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 2 min, 20 s avec `TEMPS=10` (horloge de la page accélérée). Pour chaque
-// famille (Course, Voile, Surf), le script :
+// famille (Voile, Surf), le script :
 //  1. à 390×844, lance un rejeu ×1 d'une trace datée de maintenant, pose deux notes (« Note N posée », vibreur
 //     relevé dans la console), vérifie que la page ne déborde pas, arrête et analyse ;
 //  2. dans l'analyse : deux fanions sur la carte, la liste de « Général », « Voir » (fanion violet), un trait
 //     par repère sur les graphes, deux repères dans la fiche ;
-//  3. en Course seulement : nomme la note 1, supprime la note 2, « Enregistrer la session », relit la fiche,
+//  3. en Voile seulement : nomme la note 1, supprime la note 2, « Enregistrer la session », relit la fiche,
 //     recharge la page (la liste garde « Saut »), puis à 1400×1000.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect, diag, DOSSIER_MEMOIRE, TEMPS } from './lib/cdp.mjs';
 import { attendreAnalyse } from './lib/fin-enregistrement.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { traceDroite } from './lib/traces.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
 if (!port || !workDir) {
@@ -20,9 +21,8 @@ if (!port || !workDir) {
   process.exit(1);
 }
 
-// --- Protocole ---
 // --- Protocole (lib/cdp.mjs) ---
-const { send, evaluate, go, settle, waitFor, wait, vwait, blockNetwork, importFiles, shoot, close, logs, onMessage } = await connect({ port, shotDir });
+const { send, evaluate, go, settle, waitFor, wait, vwait, blockNetwork, importFiles, shoot, check, finish, logs, onMessage } = await connect({ port, shotDir });
 /** Heure de la page (accélérée par `TEMPS`, lib/horloge.mjs), en ms. */
 const pageNow = () => evaluate('Date.now()');
 /** Attend que l'heure de la page atteigne `t` : les allers-retours du script, `TEMPS` fois plus longs pour la page, ne s'ajoutent pas. */
@@ -84,25 +84,19 @@ const openTab = (label) => evaluate(`(() => { const t = [...document.querySelect
 
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
-await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
+await blockNetwork(['*://*.openstreetmap.org/*']);
 
-/** Trace de 30 s datée de `t0` (l'heure de la page), à `speedMs`, pour un rejeu ×1. */
+/** Trace de 30 s datée de `t0` (l'heure de la page), à `speedMs`, pour un rejeu ×1 (`traceDroite`, `lib/traces.mjs`). */
 const replayGpx = (family, speedMs, t0) => {
-  const lat = 43.55;
-  const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
-  const pts = [];
-  for (let k = 0; k <= 30; k++) {
-    pts.push(`<trkpt lat="${lat}" lon="${(3.9 + (k * speedMs) / mPerDegLon).toFixed(7)}"><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${speedMs}</speed></extensions></trkpt>`);
-  }
   const path = join(workDir, `notes-${family}.gpx`);
-  writeFileSync(path, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Rejeu</name><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`);
+  writeFileSync(path, traceDroite({ debutMs: t0, secondes: 30, vitesse: speedMs, type: family === 'Surf' ? 'surf' : 'wingfoil', nom: 'Rejeu', lat0: 43.55, lon0: 3.9 }));
   return path;
 };
 
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 await go('/enregistrer', 4000);
 
-for (const [family, speedMs, graphTab] of [['À pied', 3, 'graphiques'], ['Voile', 8, 'graphiques'], ['Surf', 4, 'graphiques']]) {
+for (const [family, speedMs, graphTab] of [['Voile', 8, 'graphiques'], ['Surf', 4, 'graphiques']]) {
   console.log(`\n=== ${family} ===`);
   await go('/enregistrer');
   console.log('famille :', await clickText(family, '[aria-label=Famille] button'));
@@ -112,7 +106,9 @@ for (const [family, speedMs, graphTab] of [['À pied', 3, 'graphiques'], ['Voile
   await setFile('input[type=file][accept*=".gpx"]', replayGpx(family, speedMs, await pageNow()));
   await wait(500);
   await evaluate(`(() => { const s = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => o.value === '600')); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '1'); s.dispatchEvent(new Event('change', { bubbles: true })); return s.value; })()`);
-  console.log('bouton Note au repos :', await noteButton());
+  const repos = await noteButton();
+  console.log('bouton Note au repos :', repos);
+  check(`${family} : pas de bouton « Note » avant le départ`, repos === '(absent)', repos);
   // Les notes tombent à heure fixe du rejeu, 5,25 s et 16,5 s après le premier point, au milieu des plages où les anciens
   // sommeils les posaient (la distance affichée change à 5 s, 5,6 s, 16,25 s et 16,9 s selon la vitesse ; relevé du
   // 29/10). Le rejeu part environ 30 ms de vrai temps après l'heure lue avant « Démarrer », `TEMPS` fois plus pour la page.
@@ -122,36 +118,56 @@ for (const [family, speedMs, graphTab] of [['À pied', 3, 'graphiques'], ['Voile
   const before = sounds.length;
   const note1 = await pageNow();
   console.log('Note :', await clickText('Note'), '→', await noteButton());
+  const posee1 = await noteButton();
   console.log('vibreur :', sounds.slice(before).join(' | ') || '(rien)');
+  check(`${family} : « Note 1 posée » et un coup de vibreur`, posee1 === 'Note 1 posée' && sounds.slice(before).some((t) => t.includes('vibreur')), `${posee1} ; ${sounds.slice(before).join(' | ')}`);
   await shoot(`notes-${family}-enregistrer`);
-  console.log('débordement à 390 px :', await overflow());
+  const debordement = await overflow();
+  console.log('débordement à 390 px :', debordement);
+  check(`${family} : Enregistrer ne déborde pas à 390 px`, debordement <= 0, String(debordement));
   await jusqua(note1 + 3500);
-  console.log('retour revenu à :', await noteButton());
+  const revenu = await noteButton();
+  console.log('retour revenu à :', revenu);
+  check(`${family} : le bouton revient à « Note »`, revenu === 'Note', revenu);
   await jusqua(demarre + 16_520);
   const note2 = await pageNow();
   console.log('Note :', await clickText('Note'), '→', await noteButton());
+  const posee2 = await noteButton();
+  check(`${family} : « Note 2 posée »`, posee2 === 'Note 2 posée', posee2);
   await jusqua(demarre + 20_520);
   console.log('Arrêter :', await holdStop());
   await vwait(2500);
-  console.log('analyse ouverte seule (lot 313) :', await attendreAnalyse(evaluate));
+  const ouverte = await attendreAnalyse(evaluate);
+  console.log('analyse ouverte seule (lot 313) :', ouverte);
+  check(`${family} : à l'arrêt, l'analyse s'ouvre seule`, ouverte === 'ok', ouverte);
   // L'analyse se calcule en vrai temps : l'adresse de l'analyse, puis une page immobile.
   await waitFor(`location.pathname.endsWith('/analyse')`, { timeout: 6000, label: 'analyse' });
   await settle({ max: 6000, label: 'analyse' });
   console.log('page :', await evaluate('location.pathname + location.search'));
-  console.log('fanions :', await flags());
-  console.log('liste :', await marksList());
+  const fanions = await flags();
+  const liste = await marksList();
+  console.log('fanions :', fanions);
+  console.log('liste :', liste);
+  check(`${family} : deux fanions numérotés 1 et 2 sur la carte`, fanions === '1, 2' && !fanions.includes('(violet)'), fanions);
+  check(`${family} : la liste de « Général » porte deux repères`, liste.split(' | ').filter(Boolean).length === 2, liste);
   console.log('Voir :', await clickText('Voir', '.an-marks button'), '| fanions :', await flags());
+  check(`${family} : « Voir » : le fanion est violet`, (await flags()).includes('(violet)'), await flags());
   console.log(`onglet ${graphTab} :`, await openTab(graphTab));
   await settle({ max: 1500, label: graphTab });
-  console.log('traits des graphes :', await refLines());
+  const traits = await refLines();
+  console.log('traits des graphes :', traits);
+  check(`${family} : un trait par repère sur les graphes`, traits >= 2, String(traits));
   await shoot(`notes-${family}-analyse`);
   const recs = await records();
   const rec = recs.map((r) => r.record).sort((a, b) => b.summary.startMs - a.summary.startMs)[0];
   diag(`notes ${family} : repères à ${rec?.marks?.map((m) => m.timeMs - rec.summary.startMs).join(', ')} ms du premier point ; Note cliquée à Démarrer + ${note1 - demarre} et + ${note2 - demarre} (page)`);
+  check(`${family} : deux repères dans la fiche, de la bonne famille`, rec?.marks?.length === 2 && rec?.sport === (family === 'Surf' ? 'surf' : 'wingfoil'), `${rec?.sport} ${rec?.marks?.length}`);
   console.log('fiche :', rec ? `${rec.sport}, ${rec.marks?.length ?? 0} repères (${rec.marks?.map((m) => `${new Date(m.timeMs).toISOString().slice(11, 19)} ${m.label}`).join(', ')})` : '(aucune)');
-  console.log('bulle du fanion 1 :', await flagPopup(1));
+  const bulle = await flagPopup(1);
+  console.log('bulle du fanion 1 :', bulle);
+  check(`${family} : la bulle du fanion 1 s'ouvre`, bulle.startsWith('ok') && !bulle.includes('(aucune bulle)'), bulle);
 
-  if (family !== 'À pied') continue;
+  if (family !== 'Voile') continue;
   // Nommer, supprimer, enregistrer.
   const analysis = await evaluate('location.pathname + location.search');
   console.log('nom :', await typeInto('Nom de la note 1', 'Saut'));
@@ -162,15 +178,17 @@ for (const [family, speedMs, graphTab] of [['À pied', 3, 'graphiques'], ['Voile
   await wait(1500);
   const saved = (await records()).find((r) => r.record.marks?.some((m) => m.label === 'Saut'))?.record;
   console.log('fiche après :', saved ? saved.marks.map((m) => m.label).join(', ') : '(nom absent)');
+  check('Voile : nom gardé et note 2 supprimée dans la fiche', saved?.marks?.length === 1 && saved.marks[0].label === 'Saut', saved ? saved.marks.map((m) => m.label).join(', ') : '(nom absent)');
   await go(analysis, 4000);
-  console.log('après rechargement, liste :', await marksList(), '| fanions :', await flags());
+  const rechargee = await marksList();
+  console.log('après rechargement, liste :', rechargee, '| fanions :', await flags());
+  check('Voile : après rechargement, la liste garde « Saut »', rechargee.includes('Saut') && rechargee.split(' | ').filter(Boolean).length === 1, rechargee);
     await go(analysis, 4000);
   console.log('à 1400 px, liste :', await marksList(), '| débordement :', await overflow());
-  await shoot('notes-course-ordinateur');
+  await shoot('notes-voile-ordinateur');
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 }
 
 console.log('\n--- console (erreurs, avertissements) ---');
 logs.forEach((l) => console.log(l));
-await close();
-process.exit(0);
+await finish();

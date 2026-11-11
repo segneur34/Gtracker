@@ -2,22 +2,24 @@
 // Usage : node carte-perf.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf, sans réseau ; tuiles fausses (`lib/tuiles.mjs`), servies en 400 ms : les zooms rapides
 // laissent des tuiles en route, dont on compte les requêtes, les doubles et les annulées (lot 74). Le script :
-//  1. écrit une course synthétique de 3 h à 5 Hz (54 000 points, boucles qui se recoupent, vitesse de 2 à 4,5 m/s) ;
+//  1. écrit une longue session de wingfoil de 1 h à 5 Hz (18 000 points, `traceLongue` de `lib/traces.mjs` : des bords qui se
+//     recoupent ; remis sur la voile au lot 330, 3 h d'avant ramenées à 1 h pour que le passage reste court) ;
 //  2. l'importe, ouvre son analyse et relève, sur la carte de l'analyse : le nombre de couches de Leaflet
 //     (`map._layers`), les canevas du volet de la trace et l'histogramme des pixels de ce canevas (couleurs,
 //     parts) ;
 //  3. mesure 10 zooms puis 10 déplacements de la carte (sans animation) : durées du moteur (`Performance.getMetrics`,
 //     ScriptDuration et TaskDuration), durée de chaque geste jusqu'à l'image suivante, et requêtes de tuiles ;
 //  4. passe la carte sur le fond satellite (liseré blanc sous la trace) et refait 2 et 3 ;
-//  5. retourne à la bibliothèque et relève la vignette de la course (couches, histogramme ; image fixe depuis le
+//  5. retourne à la bibliothèque et relève la vignette de la session (couches, histogramme ; image fixe depuis le
 //     lot 74, sans carte ni canevas).
 // Les durées sont en secondes (le masque commun `N ms` les effacerait) : le relevé change d'un passage à l'autre,
-// il se lit à l'œil (couches et histogramme avant et après, durées comparées).
+// il se lit à l'œil (couches et histogramme avant et après, durées comparées) ; les `check` disent que chaque étape a eu lieu.
 // Les cartes sont trouvées par un crochet posé sur `window.L` (Leaflet 1.9 s'y publie toujours) : chaque carte créée
 // est gardée dans `window.__cartes`.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
+import { traceLongue } from './lib/traces.mjs';
 import { BLOCKED_EXCEPT_TILES, fakeTiles, formatTileStats } from './lib/tuiles.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -27,7 +29,7 @@ if (!port || !workDir) {
 }
 
 const b = await connect({ port, width: 1400, height: 1000, shotDir });
-const { send, evaluate, go, settle, waitFor, wait, blockNetwork, importFiles, records, shoot, close, logs } = b;
+const { send, evaluate, go, settle, waitFor, wait, blockNetwork, importFiles, records, shoot, logs, check, finish } = b;
 const tiles = await fakeTiles(b, { delayMs: 400 });
 
 // Crochet des cartes de Leaflet (la rangée « avancé », qu'on croyait ouverte ici, se refermait à chaque session neuve depuis le 23/10).
@@ -51,25 +53,13 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
 await blockNetwork(BLOCKED_EXCEPT_TILES);
 await send('Performance.enable');
 
-// 1. Course de 3 h à 5 Hz autour de Montpellier : boucles de 1 km de rayon environ, qui se recoupent.
+// 1. Longue session de wingfoil de 1 h à 5 Hz, à des bords qui se recoupent.
 const HZ = 5;
-const POINTS = 3 * 3600 * HZ;
-const t0 = Date.UTC(2026, 9, 1, 7, 0, 0);
-const R = 6_371_000;
-const run = [];
-let angle = 0;
-for (let k = 0; k < POINTS; k++) {
-  const s = k / HZ;
-  const speed = 3.25 + 1.25 * Math.sin(s / 300) + 0.3 * Math.sin(s / 17);
-  angle += speed / HZ / 1000;
-  const radius = 1000 + 150 * Math.sin(s / 900);
-  const lat = 43.62 + ((radius * Math.cos(angle)) / R) * (180 / Math.PI);
-  const lon = 3.86 + ((radius * Math.sin(angle)) / (R * Math.cos((43.62 * Math.PI) / 180))) * (180 / Math.PI);
-  run.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><ele>${(80 + 30 * Math.sin(s / 400)).toFixed(1)}</ele><time>${new Date(t0 + k * (1000 / HZ)).toISOString()}</time></trkpt>`);
-}
-const runPath = join(workDir, 'carte-perf-course.gpx');
-writeFileSync(runPath, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Course 5 Hz</name><type>running</type><trkseg>\n${run.join('\n')}\n</trkseg></trk></gpx>\n`);
-console.log('trace              :', `${POINTS} points à ${HZ} Hz`);
+const HEURES = 1;
+const POINTS = HEURES * 3600 * HZ;
+const runPath = join(workDir, 'carte-perf-longue.gpx');
+writeFileSync(runPath, traceLongue(HEURES, HZ, 'wingfoil', { debutMs: Date.UTC(2026, 9, 1, 7, 0, 0), nom: 'Longue session 5 Hz' }));
+console.log('trace              :', `${POINTS + 1} points à ${HZ} Hz`);
 
 const listOpfs = (path) => evaluate(`(async () => {
   let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}');
@@ -190,23 +180,25 @@ const measure = async (label) => {
 };
 
 // 2. Import et analyse.
-await go('/course');
+await go('/voile');
 console.log('import             :', await importFiles(runPath, 'input[type=file][accept*=".gpx"][multiple]:not([disabled])'));
-const runName = await waitFor(async () => (await listOpfs('sessions'))?.find((n) => n.endsWith('.gpx')), { timeout: 20000, label: 'fiche course' });
+const runName = await waitFor(async () => (await listOpfs('sessions'))?.find((n) => n.endsWith('.gpx')), { timeout: 20000, label: 'fiche longue' });
 // La fiche écrite et la vignette dessinée : la session se relit en entier (sous charge, l'écriture suit l'import de loin).
 await waitFor(async () => (await records()).length > 0, { timeout: 30000, label: 'fiche JSON' });
 await waitFor(`document.querySelectorAll('${VIGNETTE_READY}').length > 0`, { timeout: 30000, label: 'vignette après import' });
-await settle({ max: 3000, label: 'import course' });
+await settle({ max: 3000, label: 'import longue' });
 const tOpen = Date.now();
-await go(`/course/analyse?session=${encodeURIComponent(runName)}`, 20000);
+await go(`/voile/analyse?session=${encodeURIComponent(runName)}`, 20000);
 const analysisReady = `document.querySelectorAll('${ANALYSE} .leaflet-trace-pane canvas').length > 0 && Boolean(document.querySelector('h1'))`;
 if (!(await waitFor(analysisReady, { timeout: 20000, label: 'analyse prête' }))) {
   // Une seconde chance : la page rechargée relit la session.
-  await go(`/course/analyse?session=${encodeURIComponent(runName)}`, 20000);
+  await go(`/voile/analyse?session=${encodeURIComponent(runName)}`, 20000);
   await waitFor(analysisReady, { timeout: 30000, label: 'analyse prête (2e)' });
 }
 await settle({ max: 3000, label: 'analyse' });
 console.log('analyse ouverte    :', await evaluate(`document.querySelector('h1')?.textContent`), `(${seconds((Date.now() - tOpen) / 1000)} jusqu'à la carte)`);
+check('analyse ouverte : la carte porte la trace en un canevas', (await layers(ANALYSE)).includes('1 canevas de trace'), await layers(ANALYSE));
+check('analyse ouverte : trace colorée (pixels peints)', !(await histogram(ANALYSE)).startsWith('(') && /[1-9]\d* pixels peints/.test(await histogram(ANALYSE)));
 await evaluate(`document.querySelector('${ANALYSE}').scrollIntoView({ block: 'start' }); 'ok'`);
 await wait(300);
 await shoot('carte-perf-plan');
@@ -218,14 +210,17 @@ await wait(300);
 const chosen = await evaluate(`(() => { const b = [...document.querySelectorAll('${ANALYSE} .map-base-switch__choice')].find((x) => x.textContent.trim() === 'Satellite'); b?.click(); return Boolean(b); })()`);
 await settle({ max: 3000, label: 'satellite' });
 console.log('fond satellite     :', chosen ? 'choisi' : '(choix absent)');
+check('satellite : le choix existe et la trace reste en un canevas', chosen && (await layers(ANALYSE)).includes('1 canevas de trace'), await layers(ANALYSE));
 await shoot('carte-perf-satellite');
 await measure('satellite');
 
 // 5. Vignette de la bibliothèque.
-await go('/course', 8000);
+await go('/voile', 8000);
 await waitFor(`document.querySelectorAll('${VIGNETTE_READY}').length > 0`, { timeout: 20000, label: 'vignette' });
 await settle({ max: 3000, label: 'bibliothèque' });
-console.log('vignette : image fixe  :', (await evaluate(`Boolean(document.querySelector('${VIGNETTE} img.lib-row__preview-image'))`)) ? 'oui' : 'non');
+const fixedImage = await evaluate(`Boolean(document.querySelector('${VIGNETTE} img.lib-row__preview-image'))`);
+console.log('vignette : image fixe  :', fixedImage ? 'oui' : 'non');
+check('vignette : image fixe, sans carte ni canevas', fixedImage && (await layers(VIGNETTE)) === '(carte absente)', await layers(VIGNETTE));
 console.log('vignette : carte       :', await layers(VIGNETTE));
 console.log(`vignette : histogramme :\n${await histogram(VIGNETTE)}`);
 await dumpPixels(VIGNETTE, 'vignette');
@@ -233,5 +228,4 @@ await shoot('carte-perf-vignette');
 
 console.log('--- console (erreurs, avertissements) ---');
 [...new Set(logs)].slice(0, 10).forEach((l) => console.log(l));
-await close();
-process.exit(0);
+await finish('Tout passe.');

@@ -62,7 +62,7 @@ const waitFor = async (test, maxMs) => {
 /** Trace de voile à 1 Hz datée de maintenant : 21 points (0 à 20 s), un trou de 90 s, 31 points (110 à 140 s). */
 const gapTrace = (path) => writeFileSync(path, traceVoile({ debutMs: Date.now(), nom: 'Rejeu', bords: 1, secondes: 141, sauter: (t) => t > 20 && t < 110 }));
 
-await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
+await blockNetwork(['*://*.openstreetmap.org/*']);
 
 const path = join(workDir, 'gps-perdu.gpx');
 gapTrace(path);

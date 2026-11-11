@@ -11,12 +11,14 @@
 //     le bandeau le propose au lancement, « Fermer » le retire, et il ne revient pas au rechargement ;
 //  8. « Importer un fichier de réglages » : un JSON quelconque et le fichier de l'appareil refusés ; celui d'une
 //     tablette rangé sous son nom, reprise refusée puis faite depuis la liste ; pas de bandeau ensuite ;
-//  9. bornes de couleur de Course (lot 150) : 12-30, on efface 30, on retape 35 : 12-35 ; une borne vidée puis quittée
+//  9. bornes de couleur du Wingfoil (lot 150) : 12-30, on efface 30, on retape 35 : 12-35 ; une borne vidée puis quittée
 //     reprend son défaut et garde l'autre ; les deux vidées : plus de réglage, « défaut » ;
-// 10. le seuil suit la session (lot 148, Q57) : seuil de Course changé, sa fiche recalculée ; seconde ouverture, fiche
-//     intacte (lastModified) ; réglages d'un autre appareil (seuil différent, sans geste) : fiche intacte.
+// 10. le seuil suit la session (lot 148, Q57) : seuil du Wingfoil changé, la fiche de sa session recalculée ; seconde
+//     ouverture, fiche intacte (lastModified) ; réglages d'un autre appareil (seuil différent, sans geste) : fiche intacte.
+// Les activités de Léa sont de voile et de surf (lot 330) ; la session du pas 10 est la trace de voile de `lib/traces.mjs`.
 import { CLES, connect, DOSSIER_MEMOIRE, FORMATS } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { traceVoile } from './lib/traces.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -25,7 +27,7 @@ if (!port) {
 }
 
 // --- Protocole (lib/cdp.mjs) ---
-const { send, evaluate, go, settle, waitFor, wait, shoot, onMessage, check, logs, close } = await connect({ port, width: 1400, height: 1000, shotDir });
+const { send, evaluate, go, settle, waitFor, wait, shoot, onMessage, check, logs, close, importGpx, records, blockNetwork } =await connect({ port, width: 1400, height: 1000, shotDir });
 const dialogs = [];
 onMessage((msg) => { if (msg.method === 'Page.javascriptDialogOpening') dialogs.push(msg.params.message.split(String.fromCharCode(10))[0]); });
 /**
@@ -77,19 +79,19 @@ step('3. Le fichier de Léa, déposé dans reglages/');
 const leaActivities = [
   { id: 'wingfoil', name: 'Wing', base: 'wingfoil', color: '#1565c0' },
   { id: 'a-moth', name: 'Moth', base: 'wingfoil', color: '#2e7d32' },
-  { id: 'running', name: 'Course', base: 'running', color: '#bf360c' },
-  { id: 'a-trail', name: 'Trail', base: 'running', color: '#6a1b9a' },
-  { id: 'cycling', name: 'Route', base: 'cycling', color: '#00695c' },
+  { id: 'surf', name: 'Surf', base: 'surf', color: '#5b6670' },
+  { id: 'a-pad', name: 'Pad', base: 'surf', color: '#37474f' },
+  { id: 'bateau', name: 'Bateau', base: 'bateau', color: '#00695c' },
 ];
 const lea = {
   format: FORMATS.reglages, version: 2, savedAt: Date.now() - 3_600_000, device: { id: 'appareil-de-lea', name: 'Léa' },
   values: {
-    [CLES.sportSettings]: { activities: leaActivities, thresholds: { wingfoil: 13 }, recordActivity: 'a-trail' },
+    [CLES.sportSettings]: { activities: leaActivities, thresholds: { wingfoil: 13 }, speedUnits: { wingfoil: 'kmh' }, recordActivity: 'a-pad' },
     [CLES.athleteProfile]: { me: { weightKg: 58 } },
   },
 };
 // L'appareil retient une activité à l'enregistrement : elle doit survivre à la reprise.
-await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}'); s.recordActivity = 'running'; localStorage.setItem('${CLES.sportSettings}', JSON.stringify(s)); return 'ok'; })()`);
+await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}'); s.recordActivity = 'surf'; localStorage.setItem('${CLES.sportSettings}', JSON.stringify(s)); return 'ok'; })()`);
 console.log('écrit :', await writeFile('reglages/lea.json', lea));
 console.log('carte Mémoire :', await openMemory());
 await wait(500);
@@ -107,7 +109,7 @@ console.log('Reprendre :', await reloaded(() => clickInBanner('Reprendre'), 4500
 console.log('confirmation :', dialogs.at(-1) ?? '(aucune)');
 const after = await stored();
 console.log('activités :', after?.activities?.map((a) => `${a.name} ${a.color}`).join(', '));
-console.log('seuil wingfoil :', after?.thresholds?.wingfoil, '(13 attendu) | activité retenue à l\'enregistrement :', after?.recordActivity, '(running attendu)');
+console.log('seuil wingfoil :', after?.thresholds?.wingfoil, '(13 attendu) | activité retenue à l\'enregistrement :', after?.recordActivity, '(surf attendu)');
 console.log('poids du pratiquant :', await evaluate(`JSON.parse(localStorage.getItem('${CLES.athleteProfile}') ?? 'null')?.me?.weightKg`));
 const pc = await readSettings('pc.json');
 console.log('pc.json : seuil', pc.values[CLES.sportSettings]?.thresholds?.wingfoil, '| appareil', pc.device?.name);
@@ -172,19 +174,19 @@ await wait(500);
 console.log('bandeau après rechargement (aucun attendu) :', await banner());
 await shoot('reglages-import');
 
-// 9. Bornes de couleur : un champ vidé n'efface que sa borne. Course : la liste reprise de la Tablette n'a pas de vélo.
+// 9. Bornes de couleur : un champ vidé n'efface que sa borne. Wingfoil (appelé « Wing » dans la liste reprise), en km/h.
 await evaluate(`(() => {
   const sections = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
   sections.settings = { ...sections.settings, activites: true };
-  sections['settings-families'] = { ...sections['settings-families'], course: true };
-  sections['settings-activities'] = { ...sections['settings-activities'], running: true };
+  sections['settings-families'] = { ...sections['settings-families'], voile: true };
+  sections['settings-activities'] = { ...sections['settings-activities'], wingfoil: true };
   sections['settings-activity-parts'] = { ...sections['settings-activity-parts'], affichage: true };
   localStorage.setItem('${CLES.sections}', JSON.stringify(sections));
   return 'ok';
 })()`);
 await go('/parametres', 3000);
-const rangeRow = `[...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__name')?.textContent === 'Course')?.querySelector('.settings-sports__pair')`;
-await waitFor(`Boolean(${rangeRow}?.querySelector('input'))`, { timeout: 4000, label: 'bornes de Course' });
+const rangeRow = `[...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__name')?.textContent === 'Wing')?.querySelector('.settings-sports__pair')`;
+await waitFor(`Boolean(${rangeRow}?.querySelector('input'))`, { timeout: 4000, label: 'bornes du Wingfoil' });
 /** Saisie dans un des deux champs : 0 la borne basse, 1 la haute ; le champ garde le focus jusqu'à `leaveBound`. */
 const typeBound = async (k, text) => {
   await evaluate(`(() => {
@@ -201,12 +203,12 @@ const leaveBound = async (k) => {
   await wait(150);
 };
 const storedBounds = async () => {
-  const r = (await stored())?.speedRanges?.running;
+  const r = (await stored())?.speedRanges?.wingfoil;
   return r ? `${Math.round(r.minMs * 36) / 10}-${Math.round(r.maxMs * 36) / 10}` : 'aucune';
 };
 const shownBounds = () => evaluate(`[...${rangeRow}.querySelectorAll('input')].map((i) => i.value).join('-')`);
 const [defaultMin, defaultMax] = await evaluate(`[...${rangeRow}.querySelectorAll('input')].map((i) => i.placeholder)`);
-console.log('bornes de Course par défaut :', `${defaultMin}-${defaultMax}`);
+console.log('bornes du Wingfoil par défaut :', `${defaultMin}-${defaultMax}`);
 await typeBound(0, '12');
 await leaveBound(0);
 await typeBound(1, '30');
@@ -224,39 +226,50 @@ await leaveBound(1);
 check('bornes : borne haute vidée puis quittée : son défaut, le 12 reste', (await storedBounds()) === `12-${defaultMax}` && (await shownBounds()) === `12-${defaultMax}`, `${await storedBounds()} / ${await shownBounds()}`);
 await typeBound(0, '');
 await leaveBound(0);
-check('bornes : les deux vidées : plus de réglage, « défaut »', (await storedBounds()) === 'aucune' && (await evaluate(`${rangeRow}.innerText`)).includes('défaut'), await storedBounds());
+check("bornes : les deux vidées : plus de réglage, « défaut »", (await storedBounds()) === 'aucune' && /défaut/.test(await evaluate(`${rangeRow}.innerText`)), `${await storedBounds()} / ${JSON.stringify(await evaluate(`${rangeRow}.innerText`))}`);
 
 step('10. Le seuil suit la session');
-const COURSE_GPX = '2026-10-20_10-00-00_running.gpx';
-const COURSE_JSON = COURSE_GPX.replace(/\.gpx$/, '.json');
-const coursePoints = [];
-for (let k = 0; k <= 600; k++) coursePoints.push(`<trkpt lat="43.7700000" lon="${(3.8 + (k * 3) / 80500).toFixed(7)}"><time>${new Date(Date.UTC(2026, 9, 20, 8, 0, k)).toISOString()}</time></trkpt>`);
-const courseText = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Course</name><type>running</type><trkseg>\n${coursePoints.join('\n')}\n</trkseg></trk></gpx>\n`;
-await opfs(`const d = await root.getDirectoryHandle('sessions', { create: true }); const w = await (await d.getFileHandle(${JSON.stringify(COURSE_GPX)}, { create: true })).createWritable(); await w.write(${JSON.stringify(courseText)}); await w.close(); return 'ok';`);
-/** Fiche de la course : ses réglages portés et la date de son fichier ; `null` tant qu'elle n'existe pas. */
-const courseRecord = () => opfs(`try { const d = await root.getDirectoryHandle('sessions'); const f = await (await d.getFileHandle(${JSON.stringify(COURSE_JSON)})).getFile(); const r = JSON.parse(await f.text()); return { porte: r.summary.activitySettings?.threshold, cle: r.summary.optionsKey, date: f.lastModified }; } catch { return null; }`);
-const setCourseThreshold = (value) => evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}'); s.thresholds = { ...s.thresholds, running: ${value} }; localStorage.setItem('${CLES.sportSettings}', JSON.stringify(s)); return 'ok'; })()`);
-await setCourseThreshold(1);
-await go('/course', 4000);
-await waitFor(async () => (await courseRecord()) !== null, { timeout: 5000, label: 'fiche de la course' });
+const setThreshold = (value) => evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}'); s.thresholds = { ...s.thresholds, wingfoil: ${value} }; localStorage.setItem('${CLES.sportSettings}', JSON.stringify(s)); return 'ok'; })()`);
+// La session : la trace de voile du banc, importée par la page (sans réseau), rangée en wingfoil.
+await blockNetwork();
+await go('/voile', 3000);
+console.log('import :', await importGpx(traceVoile({ nom: 'Session du seuil', virageMin: 3 }), 'seuil.gpx'));
+await waitFor(async () => (await records())?.some((r) => r.summary?.movingTimeS !== undefined), { timeout: 8000, label: 'fiche importée' });
+await settle({ max: 2000, label: 'import' });
+const SESSION_GPX = (await records())?.[0]?.gpx ?? '';
+const SESSION_URL = `/voile/analyse?session=${encodeURIComponent(SESSION_GPX)}`;
+check('seuil : une session de voile rangée, en wingfoil', SESSION_GPX !== '' && (await records())[0].sport === 'wingfoil', SESSION_GPX);
+/** Fiche de la session : le seuil porté et la date de son fichier ; `null` tant qu'elle n'existe pas. */
+const sessionRecord = async () => {
+  const r = (await records())?.find((x) => x.gpx === SESSION_GPX);
+  if (!r) return null;
+  const date = await opfs(`try { const d = await root.getDirectoryHandle('sessions'); return (await (await d.getFileHandle(${JSON.stringify(SESSION_GPX.replace(/\.gpx$/, '.json'))})).getFile()).lastModified; } catch { return null; }`);
+  return { porte: r.summary?.activitySettings?.threshold, date };
+};
+/** Ouvre l'analyse de la session : la fiche se réécrit à l'ouverture si un geste l'attend. */
+const openAnalysis = async () => {
+  await go(SESSION_URL, 6000);
+  await waitFor(`document.querySelectorAll('.an-carte-col .ui-tab').length > 0`, { timeout: 30000, every: 200, label: 'onglets' });
+  await settle({ max: 2000 });
+};
+await setThreshold(1);
+await openAnalysis();
+await waitFor(async () => (await sessionRecord())?.porte === 1, { timeout: 5000, label: 'fiche au seuil' });
+const created = await sessionRecord();
+check("seuil : fiche portée au seuil de l'activité", created.porte === 1, JSON.stringify(created));
+await setThreshold(2);
+await openAnalysis();
+await waitFor(async () => (await sessionRecord())?.porte === 2, { timeout: 5000, label: 'recalcul du geste' });
 await settle({ max: 2000 });
-const created = await courseRecord();
-check('seuil : fiche créée au seuil de l\'activité', created.porte === 1, JSON.stringify(created));
-await setCourseThreshold(2);
-await go('/course', 4000);
-await waitFor(async () => (await courseRecord())?.porte === 2, { timeout: 5000, label: 'recalcul du geste' });
-await settle({ max: 2000 });
-const redone = await courseRecord();
+const redone = await sessionRecord();
 check('seuil : geste, fiche recalculée', redone.porte === 2 && redone.date > created.date, JSON.stringify(redone));
-await go('/course', 4000);
-await settle({ max: 2000 });
-check('seuil : seconde ouverture, fiche intacte', (await courseRecord()).date === redone.date, JSON.stringify(await courseRecord()));
+await openAnalysis();
+check('seuil : seconde ouverture, fiche intacte', (await sessionRecord()).date === redone.date, JSON.stringify(await sessionRecord()));
 // Autre appareil : un autre seuil dans ses réglages, sans geste de sa part.
-await setCourseThreshold(3);
-await evaluate(`(() => { const g = JSON.parse(localStorage.getItem('${CLES.summaryGestures}')); g.baseline.running = { threshold: 3 }; localStorage.setItem('${CLES.summaryGestures}', JSON.stringify(g)); return 'ok'; })()`);
-await go('/course', 4000);
-await settle({ max: 2000 });
-check('seuil : autres réglages sans geste, fiche intacte', (await courseRecord()).date === redone.date && (await courseRecord()).porte === 2, JSON.stringify(await courseRecord()));
+await setThreshold(3);
+await evaluate(`(() => { const g = JSON.parse(localStorage.getItem('${CLES.summaryGestures}')); g.baseline.wingfoil = { threshold: 3 }; localStorage.setItem('${CLES.summaryGestures}', JSON.stringify(g)); return 'ok'; })()`);
+await openAnalysis();
+check('seuil : autres réglages sans geste, fiche intacte', (await sessionRecord()).date === redone.date && (await sessionRecord()).porte === 2, JSON.stringify(await sessionRecord()));
 
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await go('/parametres', 3000);

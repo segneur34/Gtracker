@@ -134,3 +134,19 @@ export const traceLongue = (heures, hz = 1, type = 'wingfoil', { debutMs = DEBUT
 
 /** Une session de voile sans `<type>` : la bibliothèque la propose « à classer ». */
 export const traceSansType = (options = {}) => traceVoile({ ...options, type: null });
+
+/**
+ * Une ligne droite vers l'est à vitesse constante : `secondes` s à `vitesse` m/s, un point par seconde (à `hz` Hz), le
+ * premier à t = 0. `type` : calcul de base (null : sans type). `alt` : fonction du temps (s) vers l'altitude (m),
+ * `fc` : vers la FC ; sans elles, ni altitude ni FC. Les graduations des graphes y sont rondes (3 m/s pendant 1 800 s :
+ * 5,4 km), ce qui sert aux scripts de zoom.
+ */
+export const traceDroite = ({ debutMs = DEBUT_PAR_DEFAUT, secondes, vitesse, type = 'wingfoil', nom = 'Ligne', hz = 1, lat0 = 43.7, lon0 = 3.85, alt = null, fc = null }) => {
+  const pts = [];
+  const mParDegreLon = (Math.PI / 180) * R * Math.cos(lat0 * RAD);
+  for (let k = 0; k <= secondes * hz; k++) {
+    const t = k / hz;
+    pts.push(pointGpx({ lat: lat0, lon: lon0 + (t * vitesse) / mParDegreLon, ms: debutMs + Math.round(t * 1000), vitesse, cap: 90, alt: alt ? alt(t) : null, fc: fc ? fc(t) : null }));
+  }
+  return enveloppeGpx({ nom, type, fc: Boolean(fc) }, pts);
+};

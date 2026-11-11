@@ -1,6 +1,6 @@
 // Banc de test : onglet « général » complet et rangée « avancé » (demande du 22/10).
 // Usage : node general.mjs <port> [<dossier des captures>]
-// Sur un profil neuf, sans réseau (IGN, Overpass, tuiles bloqués). Dure environ 40 s (lib/cdp.mjs). Le script :
+// Sur un profil neuf, sans réseau (tuiles bloquées). Dure environ 40 s (lib/cdp.mjs). Le script :
 //  1. importe une wing (bords et manœuvres, vent du nord) et une session de surf (course et vélo retirés au lot 303) ;
 //  2. voile, à 1400×1000 : la première rangée « général · avancé », les chiffres du nouveau général (distance en vol,
 //     virements et empannages réussis, top 2 s et 100 m), la mini-boussole et « Régler » ; « avancé » déplie les

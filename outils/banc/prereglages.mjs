@@ -1,20 +1,19 @@
-// Banc de test : pré-réglages du bateau, puis de tous les sports hors surf (demandes du 21/10).
+// Banc de test : pré-réglages du bateau, du Wingfoil et du surf (demandes du 21/10, remis sur la voile et le surf au lot 330).
 // Usage : node prereglages.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 1 min. Vérifie :
-//  1. une liste d'activités avec une activité sur Bateau, sans aucun réglage ;
+//  1. une liste d'activités avec une activité sur Bateau (« Voilier »), le Wingfoil et le Surf de départ, sans aucun réglage ;
 //  2. Réglages : le bateau colore de 1 à 15 nd (« défaut »), pause sous 0,2 km/h pendant 60 s, chiffres vitesse,
 //     moyenne, distance et cap, notification vitesse et distance, pas de ligne « Seuil d'activité », sans « · modifié » ;
-//     la Voile à 8 nd (seuil, couleurs de 8 à 24) ; Course, Marche, Route, Gravel, VTT et fractionnés sans seuil
-//     (Marche sans seuil depuis le 28/10) ; couleurs, pause et poids du vélo pré-réglés ; plus de ligne « Terrain » ;
-//     « Dépense » sur Marche pour la Marche, sur Course pour la Course et le Fractionné à pied, aucune ligne à vélo ;
-//     aucune carte « modifié » ;
+//     le Wingfoil à 8 nd (seuil, couleurs de 8 à 24, pause sous 1,5 km/h pendant 60 s, chiffres du direct) ; le Surf
+//     avec les virages mesurés d'office et sans foil ; aucune carte « modifié » ;
 //  3. analyse d'une session bateau : « général » sans distance, temps, ratio ni moyenne actifs, onglet réglages sans
-//     seuil ; une session Voile les garde ;
-//  4. une course de deux `<trkseg>` séparés par 10 min de pause, vitesse Doppler comprise : ni la distance ni le temps
+//     seuil ; une session de Wingfoil les garde ;
+//  4. une session de deux `<trkseg>` séparés par 10 min de pause, vitesse Doppler comprise : ni la distance ni le temps
 //     en mouvement de la pause ne sont comptés (bug du 17/10), dans le résumé comme dans l'analyse ;
 //  5. un réglage du bateau reste au rechargement.
 import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { CREATEUR, enveloppeGpx, pointGpx } from './lib/traces.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -26,52 +25,44 @@ if (!port) {
 const { send, evaluate, go, settle, waitFor, blockNetwork, importGpx, records, shoot, close, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
-await blockNetwork(['*://*.openstreetmap.org/*', '*://server.arcgisonline.com/*', '*://data.geopf.fr/*', '*://overpass-api.de/*']);
+await blockNetwork(['*://*.openstreetmap.org/*', '*://server.arcgisonline.com/*']);
 let failures = 0;
 const check = (label, ok, detail = '') => {
   if (!ok) failures++;
   console.log(`${ok ? 'OK ' : 'ÉCHEC'} ${label}${detail ? ` : ${detail}` : ''}`);
 };
 const stored = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? 'null')`);
-const SAIL = { id: 'wingfoil', name: 'Voile', base: 'wingfoil', color: '#1976d2' };
-const RUN = { id: 'running', name: 'Course', base: 'running', color: '#d42a3c' };
+const WING = { id: 'wingfoil', name: 'Wingfoil', base: 'wingfoil', color: '#1976d2' };
+const SURF = { id: 'surf', name: 'Surf', base: 'surf', color: '#5b6670' };
 const BOAT = { id: 'a-voilier', name: 'Voilier', base: 'bateau', color: '#014e86' };
-// Les autres activités de départ, toutes pré-réglées.
-const OTHERS = [
-  { id: 'a-marche', name: 'Marche', base: 'running', color: '#970029' },
-  { id: 'cycling', name: 'Route', base: 'cycling', color: '#1e7a3c' },
-  { id: 'a-gravel', name: 'Gravel', base: 'cycling', color: '#015215' },
-  { id: 'a-vtt', name: 'VTT', base: 'cycling', color: '#6f9a3a' },
-  { id: 'run-intervals', name: 'Fractionné à pied', base: 'run-intervals', color: '#c25700' },
-  { id: 'bike-intervals', name: 'Fractionné vélo', base: 'bike-intervals', color: '#873e04' },
-];
 
 // 1. Une liste d'activités avec une activité sur Bateau, sans aucun réglage.
 await go('/');
 await evaluate(`(() => {
   localStorage.clear();
-  localStorage.setItem('${CLES.sportSettings}', JSON.stringify({ activities: ${JSON.stringify([SAIL, RUN, ...OTHERS, BOAT])} }));
+  localStorage.setItem('${CLES.sportSettings}', JSON.stringify({ activities: ${JSON.stringify([WING, BOAT, SURF])} }));
   return 'ok';
 })()`);
 
-// 2. Réglages : familles Voile, À pied, Vélo et Fractionné, leurs cartes ouvertes, toutes leurs parties dépliées.
+// 2. Réglages : familles Voile et Surf, leurs cartes ouvertes, toutes leurs parties dépliées.
 await evaluate(`(() => {
   const sections = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
   sections.settings = { ...sections.settings, activites: true };
-  sections['settings-families'] = { voile: true, course: true, velo: true, fractionne: true };
-  sections['settings-activities'] = Object.fromEntries(['wingfoil', 'a-voilier', 'running', 'a-marche', 'cycling', 'a-gravel', 'a-vtt', 'run-intervals', 'bike-intervals'].map((id) => [id, true]));
+  sections['settings-families'] = { voile: true, surf: true };
+  sections['settings-activities'] = Object.fromEntries(['wingfoil', 'a-voilier', 'surf'].map((id) => [id, true]));
   sections['settings-activity-parts'] = { affichage: true, analyse: true, enregistrement: true, itineraires: true, balises: true };
   localStorage.setItem('${CLES.sections}', JSON.stringify(sections));
   return 'ok';
 })()`);
 await go('/parametres');
 const card = (name) => `[...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__name')?.textContent === ${JSON.stringify(name)})`;
-await waitFor(`Boolean(${card('Voilier')})`, { timeout: 3000, label: 'cartes des activités' });
+await waitFor(`Boolean(${card('Voilier')}) && Boolean(${card('Surf')})`, { timeout: 3000, label: 'cartes des activités' });
 await settle({ max: 1000, label: 'cartes' });
 const rowOf = (name, label) => `[...(${card(name)}?.querySelectorAll('.setting-row, .settings-row, [class*=row]') ?? [])].find((r) => r.textContent.startsWith(${JSON.stringify(label)}))`;
 const inputs = (name, label) => evaluate(`[...(${rowOf(name, label)}?.querySelectorAll('input') ?? [])].map((i) => ({ value: i.value, placeholder: i.placeholder }))`);
 const selects = (name, label) => evaluate(`[...(${rowOf(name, label)}?.querySelectorAll('select') ?? [])].map((s) => s.value).filter(Boolean)`);
 const rowText = (name, label) => evaluate(`(${rowOf(name, label)})?.textContent ?? null`);
+const checkbox = (name, label) => evaluate(`${rowOf(name, label)}?.querySelector('input[type=checkbox]')?.checked ?? null`);
 
 const boatColors = await inputs('Voilier', 'Colorisation de la trace');
 check('bateau : couleurs de 1 à 15 nd, affichées', JSON.stringify(boatColors.map((i) => i.value)) === '["1","15"]', JSON.stringify(boatColors));
@@ -87,48 +78,19 @@ const boatHead = await evaluate(`${card('Voilier')}?.querySelector('.settings-ac
 check('bateau : sans « · modifié »', !boatHead.includes('modifié'), boatHead);
 const values = async (name, label) => (await inputs(name, label)).map((i) => i.value);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-check('Voile : seuil 8 nd, « défaut »', same(await values('Voile', "Seuil d'activité"), ['8']) && (await rowText('Voile', "Seuil d'activité"))?.includes('défaut') === true,
-  JSON.stringify(await values('Voile', "Seuil d'activité")));
-check('Voile : couleurs de 8 à 24 nd', same(await values('Voile', 'Colorisation de la trace'), ['8', '24']), JSON.stringify(await values('Voile', 'Colorisation de la trace')));
-check('Voile : pause sous 1,5 km/h pendant 60 s', same(await values('Voile', 'Pause automatique'), ['1.5', '60']));
-const EXPECTED = [
-  { name: 'Course', threshold: '0', colors: ['1', '13'], pause: ['0.5', '20'] },
-  { name: 'Marche', threshold: '0', colors: ['1', '8'], pause: ['0.5', '20'] },
-  { name: 'Route', threshold: '0', colors: ['8', '45'], pause: ['1.1', '30'], bikeKg: '12' },
-  { name: 'Gravel', threshold: '0', colors: ['5', '40'], pause: ['1.1', '20'], bikeKg: '13' },
-  { name: 'VTT', threshold: '0', colors: ['10', '40'], pause: ['1.1', '20'], bikeKg: '13' },
-  { name: 'Fractionné à pied', threshold: '0', colors: ['4', '20'], pause: ['0', '60'] },
-  { name: 'Fractionné vélo', threshold: '0', colors: ['10', '30'], pause: ['0', '60'] },
-];
-for (const e of EXPECTED) {
-  const threshold = await values(e.name, "Seuil d'activité");
-  const thresholdText = await rowText(e.name, "Seuil d'activité");
-  check(`${e.name} : seuil ${e.threshold === '0' ? 'aucun' : e.threshold}`, same(threshold, [e.threshold])
-    && (e.threshold !== '0' || thresholdText?.includes('aucun seuil') === true), `${JSON.stringify(threshold)} ${thresholdText}`);
-  check(`${e.name} : couleurs ${e.colors.join(' à ')}`, same(await values(e.name, 'Colorisation de la trace'), e.colors), JSON.stringify(await values(e.name, 'Colorisation de la trace')));
-  check(`${e.name} : pause ${e.pause.join(' / ')}`, same(await values(e.name, 'Pause automatique'), e.pause), JSON.stringify(await values(e.name, 'Pause automatique')));
-  if (e.bikeKg) {
-    const weight = await inputs(e.name, 'Poids du vélo');
-    check(`${e.name} : vélo de ${e.bikeKg} kg`, weight[0]?.placeholder === e.bikeKg, JSON.stringify(weight));
-  }
-  check(`${e.name} : plus de ligne « Terrain »`, (await rowText(e.name, 'Terrain')) === null);
-}
-// « Dépense » : Pandolf pour la Marche, Minetti pour les autres activités à pied, rien à vélo.
-const spending = (name) => evaluate(`(() => {
-  const row = ${rowOf(name, 'Dépense')};
-  if (!row) return null;
-  return { value: row.querySelector('[role=radio][aria-checked=true]')?.textContent ?? '', mark: row.textContent.includes('défaut') };
-})()`);
-for (const [name, expected] of [['Marche', 'Marche'], ['Course', 'Course'], ['Fractionné à pied', 'Course']]) {
-  const row = await spending(name);
-  check(`${name} : dépense « ${expected} », défaut`, row?.value === expected && row.mark === true, JSON.stringify(row));
-}
-for (const name of ['Route', 'Fractionné vélo']) check(`${name} : pas de ligne « Dépense »`, (await spending(name)) === null);
+check('Wingfoil : seuil 8 nd, « défaut »', same(await values('Wingfoil', "Seuil d'activité"), ['8']) && (await rowText('Wingfoil', "Seuil d'activité"))?.includes('défaut') === true,
+  JSON.stringify(await values('Wingfoil', "Seuil d'activité")));
+check('Wingfoil : couleurs de 8 à 24 nd', same(await values('Wingfoil', 'Colorisation de la trace'), ['8', '24']), JSON.stringify(await values('Wingfoil', 'Colorisation de la trace')));
+check('Wingfoil : pause sous 1,5 km/h pendant 60 s', same(await values('Wingfoil', 'Pause automatique'), ['1.5', '60']), JSON.stringify(await values('Wingfoil', 'Pause automatique')));
+const wingLive = await selects('Wingfoil', "Carte réduite à l'enregistrement");
+check('Wingfoil : vitesse, moyenne, meilleure courte, distance', same(wingLive, ['speed', 'average', 'recentTopShort', 'distance']), JSON.stringify(wingLive));
+check('Surf : virages mesurés d\'office, « défaut »', (await checkbox('Surf', 'Virages')) === true && (await rowText('Surf', 'Virages'))?.includes('défaut') === true, String(await checkbox('Surf', 'Virages')));
+check('Surf : sans foil d\'office', (await checkbox('Surf', 'Foil')) === false, String(await checkbox('Surf', 'Foil')));
 const modified = await evaluate(`[...document.querySelectorAll('.settings-activity')].filter((c) => c.querySelector('.settings-activity__head')?.textContent.includes('modifié')).map((c) => c.querySelector('.settings-activity__name')?.textContent)`);
 check('aucune carte « modifié »', modified?.length === 0, JSON.stringify(modified));
 await shoot('prereglages-reglages');
 
-// 3. Analyses : une session bateau et une session Voile, même trace (aller-retour lent à Palavas, 2 m/s).
+// 3. Analyses : une session bateau et une session de Wingfoil, même trace (aller-retour lent à Palavas, 2 m/s).
 const loopGpx = (type, t0) => {
   const lat0 = 43.515;
   const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat0 * Math.PI) / 180);
@@ -141,9 +103,9 @@ const loopGpx = (type, t0) => {
     const speed = k > 150 && k < 300 ? 0.3 : 2;
     if (k > 0) m += (k <= half ? 1 : -1) * speed;
     const lat = lat0 - (k <= half ? 0 : 0.002);
-    pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${(3.9 + m / mPerDegLon).toFixed(7)}"><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${speed}</speed></extensions></trkpt>`);
+    pts.push(pointGpx({ lat, lon: 3.9 + m / mPerDegLon, ms: t0 + k * 1000, vitesse: speed }));
   }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Bords</name><type>${type}</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
+  return enveloppeGpx({ nom: 'Bords', type }, pts);
 };
 const SESSIONS = [
   { name: 'bateau', type: 'bateau', start: Date.UTC(2026, 9, 10, 13) },
@@ -181,41 +143,41 @@ for (const s of SESSIONS) {
     check('analyse bateau : distance, temps total et moyenne', has('Temps total') && has('Vitesse moyenne'));
     await shoot('prereglages-analyse-bateau');
   } else {
-    check('analyse Voile : chiffres actifs et seuil gardés', ['Distance en vol', 'Temps en vol', 'Moyenne en vol', "Seuil d'activité"].every(has), JSON.stringify(shown));
+    check('analyse Wingfoil : chiffres actifs et seuil gardés', ['Distance en vol', 'Temps en vol', 'Moyenne en vol', "Seuil d'activité"].every(has), JSON.stringify(shown));
   }
 }
 
-// 4. Une course de deux `<trkseg>` : 5 min à 3 m/s, 10 min de pause, 5 min à 3 m/s, vitesse Doppler sur chaque point.
+// 4. Une session de deux `<trkseg>` : 5 min à 6 m/s, 10 min de pause, 5 min à 6 m/s, vitesse Doppler sur chaque point.
 const pausedGpx = (t0) => {
   const lat0 = 43.62;
   const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat0 * Math.PI) / 180);
   const seg = (fromS, toS, fromM) => {
     const pts = [];
     for (let k = fromS; k <= toS; k++) {
-      const m = fromM + (k - fromS) * 3;
-      pts.push(`<trkpt lat="${lat0}" lon="${(3.85 + m / mPerDegLon).toFixed(7)}"><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>3</speed></extensions></trkpt>`);
+      const m = fromM + (k - fromS) * 6;
+      pts.push(pointGpx({ lat: lat0, lon: 3.85 + m / mPerDegLon, ms: t0 + k * 1000, vitesse: 6 }));
     }
     return `<trkseg>\n${pts.join('\n')}\n</trkseg>`;
   };
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Pause</name><type>running</type>${seg(0, 300, 0)}${seg(900, 1200, 900)}</trk></gpx>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="${CREATEUR}" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Pause</name><type>wingfoil</type>${seg(0, 300, 0)}${seg(900, 1200, 1800)}</trk></gpx>\n`;
 };
-const runStart = Date.UTC(2026, 9, 12, 8);
-await go('/course', 3000);
-console.log('import course :', await importGpx(pausedGpx(runStart), 'pause.gpx'));
-await waitFor(async () => (await records())?.find((r) => Math.abs((r.summary?.startMs ?? 0) - runStart) < 2000), { timeout: 5000, label: 'fiche course' });
-await settle({ max: 2000, label: 'import course' });
-const runRec = (await records()).find((r) => Math.abs((r.summary?.startMs ?? 0) - runStart) < 2000);
-const runSum = runRec?.summary;
-check('course en pause : 1 800 m, pas 3 600', runSum && Math.abs(runSum.distanceM - 1800) < 20, String(runSum?.distanceM));
-check('course en pause : 10 min en mouvement, sur 20', runSum && Math.abs(runSum.movingTimeS - 600) < 5 && runSum.endMs - runSum.startMs === 1_200_000,
-  JSON.stringify({ moving: runSum?.movingTimeS, total: runSum && (runSum.endMs - runSum.startMs) / 1000 }));
+const pausedStart = Date.UTC(2026, 9, 12, 8);
+await go('/voile', 3000);
+console.log('import pause :', await importGpx(pausedGpx(pausedStart), 'pause.gpx'));
+await waitFor(async () => (await records())?.find((r) => Math.abs((r.summary?.startMs ?? 0) - pausedStart) < 2000), { timeout: 5000, label: 'fiche pause' });
+await settle({ max: 2000, label: 'import pause' });
+const pausedRec = (await records()).find((r) => Math.abs((r.summary?.startMs ?? 0) - pausedStart) < 2000);
+const pausedSum = pausedRec?.summary;
+check('session en pause : 3 600 m, pas 7 200', pausedSum && Math.abs(pausedSum.distanceM - 3600) < 40, String(pausedSum?.distanceM));
+check('session en pause : 10 min en mouvement, sur 20', pausedSum && Math.abs(pausedSum.movingTimeS - 600) < 5 && pausedSum.endMs - pausedSum.startMs === 1_200_000,
+  JSON.stringify({ moving: pausedSum?.movingTimeS, total: pausedSum && (pausedSum.endMs - pausedSum.startMs) / 1000 }));
 // « général » est ouvert d'office.
-await go(`/course/analyse?session=${encodeURIComponent(runRec?.gpx ?? '')}`, 6000);
-const runText = await evaluate(`document.body.innerText`);
-check('analyse de la course : 1,80 km, 10 min en mouvement sur 20', /Distance\n1[,.]80\s*km/.test(runText ?? '')
-  && /Temps de parcours\n20 min/.test(runText ?? '') && /Temps en mouvement \(50[,.]0 %\)\n10 min/.test(runText ?? ''),
-  (runText ?? '').split('\n').filter((l) => /km|min/.test(l)).slice(0, 12).join(' | '));
-await shoot('prereglages-course-pause');
+await go(`/voile/analyse?session=${encodeURIComponent(pausedRec?.gpx ?? '')}`, 6000);
+const pausedText = await evaluate(`document.body.innerText`);
+console.log('analyse, lignes de distance et de temps :', (pausedText ?? '').split('\n').filter((l) => /km|min/.test(l)).slice(0, 14).join(' | '));
+check('analyse de la session en pause : 3,60 km, 10 min en vol sur 20', /Distance[^\n]*\n3[,.]60\s*km/.test(pausedText ?? '') && /Temps (actif|en vol)[^\n]*\n10 min/.test(pausedText ?? ''),
+  (pausedText ?? '').split('\n').filter((l) => /km|min/.test(l)).slice(0, 12).join(' | '));
+await shoot('prereglages-session-pause');
 
 // 5. Un réglage du bateau reste au rechargement.
 await go('/parametres');
@@ -244,3 +206,4 @@ const errors = logs.filter((l) => !l.startsWith('warning'));
 console.log(errors.length ? `--- console ---\n${errors.join('\n')}` : 'console : rien');
 console.log(failures ? `${failures} échec(s)` : 'tout est passé');
 await close();
+process.exit(failures === 0 ? 0 : 1);

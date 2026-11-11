@@ -1,13 +1,13 @@
 // Banc de test : vue satellite (lot 4 des demandes du 20/10).
 // Usage : node satellite.mjs <port> [<dossier des captures>]
-// Sur un profil neuf, avec réseau vers server.arcgisonline.com (IGN, Overpass, BRouter et OSM bloqués). Dure environ 1 min 30.
+// Sur un profil neuf, avec réseau vers server.arcgisonline.com (OSM bloqué). Dure environ 1 min 30.
 // Le script :
-//  1. importe une voile, une course, une sortie à vélo et une session de surf ;
+//  1. importe une session de wingfoil, une de kite et une de surf (remis sur la voile et le surf au lot 330) ;
 //  2. dans chaque analyse, à 1400×1000 : un bouton « Fond de carte » sous le + et le −, mention OSM ; un toucher ouvre
 //     le choix Plan · Satellite sans rien changer, un toucher ailleurs ou Échap le ferme ; « Satellite » passe à la photo
 //     (mention Esri) et ferme le choix ; le texte de la page ne change pas hors mention ; le fond est rangé dans la
-//     fiche de la session (lot 193), pas pour la famille (`gtracker.fondCarte`), et retrouvé après rechargement ; la
-//     voile en satellite laisse la course en plan ;
+//     fiche de la session (lot 193), pas pour la famille (`gtracker.fondCarte`), et retrouvé après rechargement ; le
+//     wingfoil en satellite laisse le kite en plan ;
 //  3. bibliothèque (vignettes) : pas de bouton, mention OSM ; planification : le fond de la famille de son activité
 //     (la Voile, en satellite), son bouton qui ne pose pas de point, deux points posés sur la photo ;
 //  4. image de partage de la voile : capture de l'aperçu (photo et mention Esri, à l'œil) ;
@@ -19,6 +19,7 @@
 //     entier et sur une ligne ; à 1400 px, rien de replié ni d'aria sur la mention.
 import { CACHES, CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { enveloppeGpx, pointGpx } from './lib/traces.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -70,7 +71,7 @@ const cachedSatTiles = () => evaluate(`(async () => {
 
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
-const BLOCKED = ['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*'];
+const BLOCKED = ['*://*.openstreetmap.org/*'];
 await blockNetwork(BLOCKED);
 
 // --- 1. Sessions synthétiques : un aller-retour le long de la côte, à Palavas ---
@@ -82,41 +83,41 @@ const loopGpx = (type, seconds, speed, t0) => {
     const half = seconds / 2;
     const m = (k <= half ? k : seconds - k) * speed;
     const lat = lat0 - (k <= half ? 0 : 0.002);
-    pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${(3.9 + m / mPerDegLon).toFixed(7)}"><ele>2</ele><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${speed}</speed></extensions></trkpt>`);
+    pts.push(pointGpx({ lat, lon: 3.9 + m / mPerDegLon, ms: t0 + k * 1000, vitesse: speed, alt: 2 }));
   }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Boucle</name><type>${type}</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
+  return enveloppeGpx({ nom: 'Boucle', type }, pts);
 };
+/** `key` : le nom de la session dans ce script ; `page` : la page de sa famille (`/voile`, `/surf`). */
 const SESSIONS = [
-  { page: 'voile', start: Date.UTC(2026, 9, 5, 13), type: 'wingfoil', seconds: 900, speed: 7 },
-  { page: 'course', start: Date.UTC(2026, 9, 6, 8), type: 'running', seconds: 1200, speed: 3 },
-  { page: 'velo', start: Date.UTC(2026, 9, 7, 8), type: 'cycling', seconds: 900, speed: 7 },
-  { page: 'surf', start: Date.UTC(2026, 9, 8, 8), type: 'surf', seconds: 600, speed: 2 },
+  { key: 'voile', page: 'voile', start: Date.UTC(2026, 9, 5, 13), type: 'wingfoil', seconds: 900, speed: 7 },
+  { key: 'kite', page: 'voile', start: Date.UTC(2026, 9, 6, 8), type: 'kite', seconds: 1200, speed: 6 },
+  { key: 'surf', page: 'surf', start: Date.UTC(2026, 9, 8, 8), type: 'surf', seconds: 600, speed: 2 },
 ];
 const paths = {};
 const gpxs = {};
 for (const s of SESSIONS) {
   await go(`/${s.page}`, 3000);
-  console.log(`import ${s.page} :`, await importGpx(loopGpx(s.type, s.seconds, s.speed, s.start), `${s.page}.gpx`));
-  const rec = await waitFor(async () => (await records())?.find((r) => Math.abs((r.summary?.startMs ?? 0) - s.start) < 2000), { timeout: 6000, label: `fiche ${s.page}` });
-  await settle({ max: 2000, label: `import ${s.page}` });
-  paths[s.page] = `/${s.page}/analyse?session=${encodeURIComponent(rec?.gpx ?? '')}`;
-  gpxs[s.page] = rec?.gpx;
-  check(`${s.page} rangée`, Boolean(rec));
+  console.log(`import ${s.key} :`, await importGpx(loopGpx(s.type, s.seconds, s.speed, s.start), `${s.key}.gpx`));
+  const rec = await waitFor(async () => (await records())?.find((r) => Math.abs((r.summary?.startMs ?? 0) - s.start) < 2000), { timeout: 6000, label: `fiche ${s.key}` });
+  await settle({ max: 2000, label: `import ${s.key}` });
+  paths[s.key] = `/${s.page}/analyse?session=${encodeURIComponent(rec?.gpx ?? '')}`;
+  gpxs[s.key] = rec?.gpx;
+  check(`${s.key} rangée`, Boolean(rec));
 }
 
 // --- 2. Chaque analyse ---
 for (const s of SESSIONS) {
-  await go(paths[s.page], 6000);
-  check(`${s.page} : un bouton « Fond de carte », choix fermé`, (await buttons()) === 1 && !(await menuOpen()));
-  check(`${s.page} : mention OSM`, (await attribution()).includes('OpenStreetMap'), await attribution());
+  await go(paths[s.key], 6000);
+  check(`${s.key} : un bouton « Fond de carte », choix fermé`, (await buttons()) === 1 && !(await menuOpen()));
+  check(`${s.key} : mention OSM`, (await attribution()).includes('OpenStreetMap'), await attribution());
   const corner = await evaluate(`document.querySelector('.map-base-switch')?.closest('.leaflet-top.leaflet-left')?.querySelector('.leaflet-control-zoom') ? 'sous le zoom' : 'ailleurs'`);
-  check(`${s.page} : bouton dans le coin du + et du −`, corner === 'sous le zoom', corner);
+  check(`${s.key} : bouton dans le coin du + et du −`, corner === 'sous le zoom', corner);
   const textPlan = await pageText();
   const lines = await openMenu();
-  check(`${s.page} : un toucher ouvre Plan · Satellite, Plan coché, rien changé`,
+  check(`${s.key} : un toucher ouvre Plan · Satellite, Plan coché, rien changé`,
     JSON.stringify(lines) === JSON.stringify([{ label: 'Plan', checked: true }, { label: 'Satellite', checked: false }])
     && (await attribution()).includes('OpenStreetMap'), JSON.stringify(lines));
-  if (s.page === 'voile') {
+  if (s.key === 'voile') {
     // Un toucher ailleurs ferme le choix sans rien changer ; Échap aussi.
     await evaluate(`document.querySelector('.leaflet-container').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
     await wait(300);
@@ -126,28 +127,28 @@ for (const s of SESSIONS) {
     check('voile : Échap ferme le choix', !(await menuOpen()));
   }
   await choose('Satellite', '', 4000);
-  check(`${s.page} : « Satellite » ferme le choix`, !(await menuOpen()));
-  check(`${s.page} : mention Esri`, (await attribution()).includes('Esri'), await attribution());
-  check(`${s.page} : texte de la page inchangé hors mention`, (await pageText()) === textPlan);
+  check(`${s.key} : « Satellite » ferme le choix`, !(await menuOpen()));
+  check(`${s.key} : mention Esri`, (await attribution()).includes('Esri'), await attribution());
+  check(`${s.key} : texte de la page inchangé hors mention`, (await pageText()) === textPlan);
   const tiles = await loadedTiles();
-  check(`${s.page} : tuiles satellite affichées`, tiles > 0, tiles);
-  check(`${s.page} : Satellite coché`, (await current()) === 'Satellite');
+  check(`${s.key} : tuiles satellite affichées`, tiles > 0, tiles);
+  check(`${s.key} : Satellite coché`, (await current()) === 'Satellite');
   const stored = await storedBases();
   // Lot 193 (07/11) : le choix fait dans une analyse va dans la fiche de la session ; le fond de la famille
   // (`gtracker.fondCarte`) ne bouge pas, il ne se change plus que depuis la planification ou le direct.
-  const fiche = (await records())?.find((r) => r.gpx === gpxs[s.page]);
-  check(`${s.page} : fond rangé dans la fiche, pas pour la famille`, fiche?.mapBase === 'satellite' && stored[s.page] !== 'satellite', JSON.stringify({ fiche: fiche?.mapBase ?? null, stored }));
-  await shoot(`satellite-${s.page}`);
-  await go(paths[s.page], 5000);
-  check(`${s.page} : satellite retrouvé après rechargement`, (await current()) === 'Satellite' && (await attribution()).includes('Esri'));
-  if (s.page !== 'voile') {
+  const fiche = (await records())?.find((r) => r.gpx === gpxs[s.key]);
+  check(`${s.key} : fond rangé dans la fiche, pas pour la famille`, fiche?.mapBase === 'satellite' && stored[s.page] !== 'satellite', JSON.stringify({ fiche: fiche?.mapBase ?? null, stored }));
+  await shoot(`satellite-${s.key}`);
+  await go(paths[s.key], 5000);
+  check(`${s.key} : satellite retrouvé après rechargement`, (await current()) === 'Satellite' && (await attribution()).includes('Esri'));
+  if (s.key !== 'voile') {
     // Retour au plan : seule la voile reste en satellite pour la suite.
     await choose('Plan');
-    check(`${s.page} : retour au plan`, (await current()) === 'Plan' && (await attribution()).includes('OpenStreetMap'));
+    check(`${s.key} : retour au plan`, (await current()) === 'Plan' && (await attribution()).includes('OpenStreetMap'));
   }
-  if (s.page === 'voile') {
-    await go(paths.course, 5000);
-    check('voile en satellite, course en plan', (await current()) === 'Plan' && (await attribution()).includes('OpenStreetMap'));
+  if (s.key === 'voile') {
+    await go(paths.kite, 5000);
+    check('wingfoil en satellite, kite en plan', (await current()) === 'Plan' && (await attribution()).includes('OpenStreetMap'));
   }
 }
 console.log('fonds rangés :', JSON.stringify(await storedBases()));
@@ -253,7 +254,7 @@ for (const [w, h] of [[390, 844], [320, 640]]) {
   const again = await mention();
   check(`${w} : un second toucher replie`, !again.open && again.expanded === 'false' && again.h <= again.line + 2, JSON.stringify(again));
   check(`${w} : le toucher sur la mention ne déplace pas la carte ni n'ouvre le plein écran`, !(await fullscreen()));
-  await go(paths.course, 5000);
+  await go(paths.kite, 5000);
   const plan = await mention();
   check(`${w} : plan, « © OpenStreetMap » entier sur une ligne, sans bouton`, plan.visibleText.includes('OpenStreetMap') && !plan.clipped && plan.h <= plan.line + 2 && !plan.foldable && plan.role === null, JSON.stringify(plan));
 }

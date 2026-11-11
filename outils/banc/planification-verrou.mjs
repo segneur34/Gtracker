@@ -1,6 +1,6 @@
 // Banc de test : verrou de la carte de planification (crayon sur la carte).
 // Usage : node planification-verrou.mjs <port> [<dossier des captures>]
-// Sur un profil neuf, en Voile (balises en ligne droite : aucun calcul, aucun réseau). Le script :
+// Sur un profil neuf, en Wingfoil (balises en ligne droite : aucun calcul, aucun réseau). Le script :
 //  1. pose trois balises (nouvel itinéraire : modifiable, bouton « Verrouiller l'itinéraire ») ;
 //  2. verrouille : le bandeau d'une balise ouverte se ferme ; un clic sur la carte ne pose rien, toucher une balise
 //     ou le tronçon n'ouvre aucun bandeau ni n'insère rien, un glisser sur une balise ne la bouge pas seule ;
@@ -49,11 +49,11 @@ const clickButton = (text) => evaluate(`(() => {
   if (!b) return 'absent'; b.click(); return 'ok';
 })()`);
 const ready = () => waitFor(`document.querySelector('.plan-map .leaflet-container') !== null && document.querySelector('.plan-map-tools') !== null`, { timeout: 5000, label: 'carte de planification' });
-const chooseVoile = () => evaluate(`(async () => {
+const chooseWingfoil = () => evaluate(`(async () => {
   for (const button of document.querySelectorAll('button.activity-select:not(:disabled)')) {
     button.click();
     await new Promise((r) => setTimeout(r, 150));
-    const item = [...document.querySelectorAll('.activity-select__option')].find((o) => o.textContent.trim() === 'Voile');
+    const item = [...document.querySelectorAll('.activity-select__option')].find((o) => o.textContent.trim() === 'Wingfoil');
     if (item) { item.click(); return 'ok'; }
     document.querySelector('.activity-select__backdrop')?.click();
     await new Promise((r) => setTimeout(r, 150));
@@ -72,7 +72,7 @@ await go('/itineraires', 3000);
 await evaluate(`localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { profil: true, parcours: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
 await go('/itineraires', 3000);
 await ready();
-console.log('activité Voile :', await chooseVoile());
+console.log('activité Wingfoil :', await chooseWingfoil());
 await wait(300);
 
 // 1. Nouvel itinéraire : modifiable.

@@ -2,20 +2,16 @@
 // affichage des statistiques retenu (lot 1 des demandes du 16/10).
 // Usage : node barre.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau, environ 1 min. Le script :
-//  1. importe une course (10 jours avant aujourd'hui) et une session de voile (`make-gpx.mjs`, 20 jours avant) ;
-//  2. dans l'analyse de la course : la flèche en fin de barre, qui cache la barre seule (panneaux ouverts gardés) et
+//  1. importe une session de surf (10 jours avant aujourd'hui) et une de wingfoil (`lib/traces.mjs`, 20 jours avant) ;
+//  2. dans l'analyse de surf : la flèche en fin de barre, qui cache la barre seule (panneaux ouverts gardés) et
 //     laisse le bouton fin « onglets » ; caché après rechargement et dans l'analyse de voile ; le bouton fin rend la
 //     barre et disparaît ; à 390×844, sans débordement ;
-//  3. statistiques : Course sur « Année », « Semaines actives » comptées depuis la course, pas sur 52 semaines ;
+//  3. statistiques : Surf sur « Année », « Semaines actives » comptées depuis la session de surf, pas sur 52 semaines ;
 //  4. le dernier affichage repris à l'ouverture sans paramètre, une adresse avec paramètres qui l'emporte, « Tout »
 //     retenu aussi.
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { traceSurf, traceVoile } from './lib/traces.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -38,34 +34,19 @@ const check = (what, ok, detail = '') => { console.log(`${ok ? 'ok   ' : 'ÉCHEC
 
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
-await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
+await blockNetwork(['*://*.openstreetmap.org/*']);
 const desktop = () => send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
 await desktop();
 
-// --- 1. Sessions ---
+// --- 1. Sessions : une matinée de surf (10 jours avant aujourd'hui) et la voile du banc (20 jours avant) ---
 const DAY = 86_400_000;
-const lineGpx = (type, seconds, speed, t0) => {
-  const lat = 43.7;
-  const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
-  const pts = [];
-  for (let k = 0; k <= seconds; k++) {
-    pts.push(`<trkpt lat="${lat}" lon="${(3.85 + (k * speed) / mPerDegLon).toFixed(7)}"><ele>50</ele><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${speed}</speed></extensions></trkpt>`);
-  }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Ligne</name><type>${type}</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
-};
 const today = new Date();
-const T_RUN = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 8).getTime() - 10 * DAY;
-const voilePath = join(tmpdir(), 'barre-voile.gpx');
-execFileSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'make-gpx.mjs'), voilePath]);
-// Décale la voile à 20 jours avant aujourd'hui.
-const voileRaw = readFileSync(voilePath, 'utf8');
-const firstTime = Date.parse(voileRaw.match(/<time>([^<]+)<\/time>/)[1]);
-const shift = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 14).getTime() - 20 * DAY - firstTime;
-const voileGpx = voileRaw.replace(/<time>([^<]+)<\/time>/g, (_, t) => `<time>${new Date(Date.parse(t) + shift).toISOString()}</time>`);
-const T_VOILE = firstTime + shift;
+const T_SURF = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 8).getTime() - 10 * DAY;
+const T_VOILE = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 14).getTime() - 20 * DAY;
+const SURF_PHASES = [[60, 0], [120, 1.2], [6, 1.6, 180], [12, 5, 200], [100, 1], [60, 0.1], [5, 1.5, 180], [6, 6, 160], [40, 1], [30, 0.1]];
 
 const paths = {};
-for (const [page, start, gpx] of [['course', T_RUN, lineGpx('running', 1800, 3, T_RUN)], ['voile', T_VOILE, voileGpx]]) {
+for (const [page, start, gpx] of [['surf', T_SURF, traceSurf({ debutMs: T_SURF, phases: SURF_PHASES, nom: 'Matinée' })], ['voile', T_VOILE, traceVoile({ debutMs: T_VOILE, virageMin: 3 })]]) {
   await go(`/${page}`, 3000);
   await importGpx(gpx, `${page}.gpx`);
   await waitFor(async () => (await records())?.some((r) => Math.abs((r.summary?.startMs ?? 0) - start) < 2000), { timeout: 8000, label: `fiche ${page}` });
@@ -84,21 +65,22 @@ const bar = () => evaluate(`(() => {
     reveal: Boolean(col?.querySelector('.an-tabs-reveal')),
     revealHeight: col?.querySelector('.an-tabs-reveal')?.getBoundingClientRect().height ?? 0,
     panels: document.querySelectorAll('.an-carte-panels > *').length,
-    arrowLast: col?.querySelector('.ui-tabs')?.lastElementChild?.classList.contains('an-tabs-hide') ?? false,
+    // La flèche est en fin de rangée, suivie seulement du bouton « tout fermer » (05/11).
+    arrowLast: (() => { const a = col?.querySelector('.an-tabs-hide'); return Boolean(a) && a.nextElementSibling?.classList.contains('an-tabs-close-all') && a.nextElementSibling.nextElementSibling === null; })(),
   };
 })()`);
 const click = (selector) => evaluate(`(() => { const b = document.querySelector(${JSON.stringify(selector)}); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
 
-await go(paths.course, 6000);
+await go(paths.surf, 6000);
 let b = await bar();
-check('course : barre visible, flèche en fin de rangée, pas de bouton fin', b.tabs > 0 && b.arrow && b.arrowLast && !b.reveal, JSON.stringify(b));
+check('surf : barre visible, flèche en fin de rangée (avant « tout fermer »), pas de bouton fin', b.tabs > 0 && b.arrow && b.arrowLast && !b.reveal, JSON.stringify(b));
 const panelsBefore = b.panels;
 await click('.an-tabs-hide');
 await wait(500);
 b = await bar();
 check('flèche : barre cachée, bouton fin seul, panneaux gardés', b.tabs === 0 && !b.arrow && b.reveal && b.panels === panelsBefore, JSON.stringify(b));
 await shoot('barre-cachee-ordinateur');
-await go(paths.course, 6000);
+await go(paths.surf, 6000);
 b = await bar();
 check('cachée après rechargement', b.tabs === 0 && b.reveal, JSON.stringify(b));
 await go(paths.voile, 8000);
@@ -108,12 +90,12 @@ await click('.an-tabs-reveal');
 await wait(500);
 b = await bar();
 check('bouton fin : barre rendue, bouton disparu', b.tabs > 0 && b.arrow && !b.reveal, JSON.stringify(b));
-await go(paths.course, 6000);
+await go(paths.surf, 6000);
 b = await bar();
-check('rendue aussi dans la course', b.tabs > 0 && !b.reveal, JSON.stringify(b));
+check('rendue aussi dans le surf', b.tabs > 0 && !b.reveal, JSON.stringify(b));
 
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
-await go(paths.course, 6000);
+await go(paths.surf, 6000);
 check('390 px, barre visible : pas de débordement', (await overflow()) <= 0);
 await shoot('barre-visible-390');
 await click('.an-tabs-hide');
@@ -142,19 +124,19 @@ const stat =(label) => evaluate(`(() => {
 })()`);
 const search = () => evaluate('location.search');
 await go('/statistiques', 4000);
-await chip('Famille', 'À pied');
+await chip('Famille', 'Surf');
 await settle({ max: 800 });
 await chip('Période', 'Année');
 await settle({ max: 800 });
 const active = await stat('Semaines actives');
 const weeks = Number(active.split('/')[1]);
-check('Course sur « Année » : semaines comptées depuis la course', weeks >= 1 && weeks <= 3, active);
+check('Surf sur « Année » : semaines comptées depuis la session de surf', weeks >= 1 && weeks <= 3, active);
 
 // --- 4. Dernier affichage ---
 await go('/', 3000);
 await go('/statistiques', 4000);
-check('reprise sans paramètre : Course, Année', (await search()) === '?famille=course&periode=annee', await search());
-check('sous-titre de Course', (await evaluate(`document.querySelector('.ui-page-header')?.innerText ?? ''`)).includes('À pied'));
+check('reprise sans paramètre : Surf, Année', (await search()) === '?famille=surf&periode=annee', await search());
+check('titre de Surf', (await evaluate(`document.querySelector('.ui-page-header')?.innerText ?? ''`)).includes('Surf'));
 await go('/statistiques?famille=voile', 4000);
 check('une adresse avec paramètres l’emporte', (await search()) === '?famille=voile', await search());
 await chip('Famille', 'Tout');

@@ -1,17 +1,16 @@
 // Banc de test : mise en page commune des analyses (`AnalysisShell`, lot 65), relevée pour sa neutralité.
 // Usage : node coquille.mjs <port> [<dossier des captures>]
-// Sur un profil neuf, sans réseau (IGN, Overpass, tuiles bloqués). Dure environ 1 min (lib/cdp.mjs). Le script ne vérifie
-// presque rien : il relève, pour comparer la sortie avant et après.
-//  1. importe une wing, une course, une sortie à vélo, une session de surf (traces de `general.mjs`) ; la muscu est
-//     partie avec l'Entraînement (lot 302 : une session sans position n'a plus d'analyse) ;
-//  2. pour chaque analyse (les quatre sessions, `/voile/analyse`, `/course/analyse`, `/surf/analyse` et
-//     `/fractionne/analyse` sans session, une session introuvable en voile et en course), à 1400×1000, 390×844 et
-//     834×375 (carte en plein écran refermée) : le texte de `.an-page`, la classe de chacun de ses enfants, et les
-//     rectangles arrondis de `.an-page`, `.an-sheet`, `.an-map-row`, `.an-map-panel`, `.ui-savebar`, `.ui-alert`,
-//     `.an-carte-col` ;
-//  3. brouillon : en voile et en course, un commentaire écrit dans l'onglet des notes, puis le même relevé (barre
+// Sur un profil neuf, sans réseau (tuiles bloquées). Dure environ 1 min (lib/cdp.mjs). Le script relève surtout, pour
+// comparer la sortie avant et après, et vérifie que chaque page se monte à chaque taille, sans déborder à droite.
+//  1. importe une session de wingfoil et une de surf (`lib/traces.mjs`) ;
+//  2. pour chaque analyse (les deux sessions, `/voile/analyse` et `/surf/analyse` sans session, une session introuvable
+//     en voile et en surf), à 1400×1000, 390×844 et 834×375 (carte en plein écran refermée) : le texte de `.an-page`,
+//     la classe de chacun de ses enfants, et les rectangles arrondis de `.an-page`, `.an-sheet`, `.an-map-row`,
+//     `.an-map-panel`, `.ui-savebar`, `.ui-alert`, `.an-carte-col` ;
+//  3. brouillon : en voile et en surf, un commentaire écrit dans l'onglet des notes, puis le même relevé (barre
 //     « Enregistrer la session »), puis « Annuler ».
 import { BLOCKED_URLS, connect } from './lib/cdp.mjs';
+import { traceSurf, traceVoile } from './lib/traces.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -40,61 +39,7 @@ const setSize = async (s) => {
   await send('Emulation.setTouchEmulationEnabled', { enabled: s.mobile, maxTouchPoints: 5 });
 };
 
-// --- Sessions synthétiques (celles de `general.mjs`) ---
-const gpxOf = (type, pts) => `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Banc</name><type>${type}</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
-/** Wing : bords de près et de portant, virements et empannages, vent du nord. */
-const wingGpx = (t0) => {
-  let lat = 43.5, lon = 3.95, t = 0;
-  const R = 6371000;
-  const pts = [];
-  const step = (heading, speed) => {
-    lat += (speed * Math.cos(heading * Math.PI / 180)) / R * 180 / Math.PI;
-    lon += (speed * Math.sin(heading * Math.PI / 180)) / (R * Math.cos(lat * Math.PI / 180)) * 180 / Math.PI;
-    pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><time>${new Date(t0 + t * 1000).toISOString()}</time><extensions><speed>${speed.toFixed(2)}</speed></extensions></trkpt>`);
-    t++;
-  };
-  const leg = (h, s, n) => { for (let i = 0; i < n; i++) step(h + Math.sin(i / 7) * 3, s + Math.sin(i / 5) * 0.5); };
-  const turn = (from, to, sMin, sMax, n) => {
-    const diff = ((to - from + 540) % 360) - 180;
-    for (let i = 1; i <= n; i++) step((from + diff * (i / n) + 360) % 360, sMax - (sMax - sMin) * Math.sin(Math.PI * (i / n)));
-  };
-  for (let k = 0; k < 6; k++) { leg(45, 7, 150); turn(45, 315, 5, 7, 6); leg(315, 7, 150); turn(315, 45, 5, 7, 6); }
-  turn(45, 135, 6, 9, 5);
-  for (let k = 0; k < 6; k++) { leg(135, 9, 150); turn(135, 225, 6, 9, 6); leg(225, 9, 150); turn(225, 135, 6, 9, 6); }
-  return gpxOf('wingfoil', pts);
-};
-/** Aller et retour vers l'est, en côte de `grade` à l'aller, à vitesse constante, avec altitude. */
-const hillGpx = (type, seconds, speed, grade, t0) => {
-  const lat = 43.7;
-  const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
-  const pts = [];
-  const half = seconds / 2;
-  for (let k = 0; k <= seconds; k++) {
-    const m = (k <= half ? k : seconds - k) * speed;
-    pts.push(`<trkpt lat="${(lat + (k > half ? 0.0002 : 0)).toFixed(7)}" lon="${(3.85 + m / mPerDegLon).toFixed(7)}"><ele>${(50 + grade * m).toFixed(1)}</ele><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${speed}</speed></extensions></trkpt>`);
-  }
-  return gpxOf(type, pts);
-};
-// Surf : phases [durée en s, vitesse en m/s, cap].
-const M_PER_DEG_LAT = 111_195;
-const surfGpx = (startMs, phases) => {
-  let lat = 43.4;
-  let lon = 3.6;
-  let t = 0;
-  const pts = [];
-  const push = (speed, heading) => pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><time>${new Date(startMs + t * 1000).toISOString()}</time>`
-    + `<extensions><speed>${speed}</speed>${speed > 0 ? `<course>${heading}</course>` : ''}</extensions></trkpt>`);
-  push(0, 0);
-  for (const [s, speed, heading = 0] of phases) {
-    for (let k = 0; k < s; k++) {
-      lat += (speed * Math.cos((heading * Math.PI) / 180)) / M_PER_DEG_LAT;
-      lon += (speed * Math.sin((heading * Math.PI) / 180)) / (M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
-      t += 1;
-      push(speed, heading);
-    }
-  }
-  return gpxOf('surf', pts);
-};
+// --- Sessions synthétiques (`lib/traces.mjs`) : la voile du banc et la matinée de surf de `general.mjs` ---
 const MORNING = [
   [60, 0], [60, 1.2], [50, 1], [4, 0.1], [40, 1], [4, 0.1], [26, 1], [90, 0.1],
   [6, 1.6, 180], [12, 5, 200], [100, 1], [60, 0.1],
@@ -102,14 +47,10 @@ const MORNING = [
   [5, 1.6, 180], [8, 4.5, 190], [80, 1], [30, 0.1],
 ];
 const T_VOILE = Date.UTC(2026, 9, 5, 13, 0, 0);
-const T_RUN = Date.UTC(2026, 9, 6, 8, 0, 0);
-const T_BIKE = Date.UTC(2026, 9, 6, 14, 0, 0);
 const T_SURF = Date.UTC(2026, 9, 7, 7, 0, 0);
 const SESSIONS = [
-  { key: 'voile', page: 'voile', start: T_VOILE, gpx: wingGpx(T_VOILE) },
-  { key: 'course', page: 'course', start: T_RUN, gpx: hillGpx('running', 2400, 3, 0.03, T_RUN) },
-  { key: 'velo', page: 'velo', start: T_BIKE, gpx: hillGpx('cycling', 3000, 7, 0.02, T_BIKE) },
-  { key: 'surf', page: 'surf', start: T_SURF, gpx: surfGpx(T_SURF, MORNING) },
+  { key: 'voile', page: 'voile', start: T_VOILE, gpx: traceVoile({ debutMs: T_VOILE, virageMin: 3 }) },
+  { key: 'surf', page: 'surf', start: T_SURF, gpx: traceSurf({ debutMs: T_SURF, phases: MORNING, nom: 'Matinée' }) },
 ];
 
 // --- 1. Import ---
@@ -148,6 +89,8 @@ const sweep = async (label) => {
     await wait(200);
     const m = await evaluate(MEASURE);
     console.log(`\n== ${label} @ ${s.name}`);
+    const debordement = await evaluate(`document.documentElement.scrollWidth - document.documentElement.clientWidth`);
+    check(`${label} @ ${s.name} : page montée, sans débordement à droite`, m !== null && debordement <= 0, m === null ? 'pas de .an-page' : `débordement ${debordement}`);
     if (!m) {
       console.log('(pas de .an-page)');
       continue;
@@ -166,11 +109,9 @@ const sweep = async (label) => {
 const PAGES = [
   ...SESSIONS.filter((s) => paths[s.key]).map((s) => ({ label: s.key, path: paths[s.key], ms: 8000 })),
   { label: 'voile sans session', path: '/voile/analyse', ms: 4000 },
-  { label: 'course sans session', path: '/course/analyse', ms: 4000 },
   { label: 'surf sans session', path: '/surf/analyse', ms: 4000 },
-  { label: 'fractionne sans session', path: '/fractionne/analyse', ms: 4000 },
   { label: 'voile introuvable', path: '/voile/analyse?session=introuvable.gpx', ms: 4000, alert: true },
-  { label: 'course introuvable', path: '/course/analyse?session=introuvable.gpx', ms: 4000, alert: true },
+  { label: 'surf introuvable', path: '/surf/analyse?session=introuvable.gpx', ms: 4000, alert: true },
 ];
 for (const p of PAGES) {
   await setSize(SIZES[0]);
@@ -196,7 +137,7 @@ const typeNote = (text) => evaluate(`(() => {
   t.dispatchEvent(new Event('input', { bubbles: true }));
   return 'ok';
 })()`);
-for (const [key, notes] of [['voile', 'matos et conditions'], ['course', 'matériel et notes']]) {
+for (const [key, notes] of [['voile', 'matos et conditions'], ['surf', 'matériel et notes']]) {
   if (!paths[key]) continue;
   await setSize(SIZES[0]);
   await go(paths[key], 8000);

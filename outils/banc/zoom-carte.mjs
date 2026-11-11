@@ -1,35 +1,30 @@
 // Banc de test : graphe zoomé vu sur la carte, lecture au-dessus des graphes, double-clic qui zoome
-// (lot 2 des demandes du 23/10).
+// (lot 2 des demandes du 23/10 ; remis sur la voile et le surf au lot 330).
 // Usage : node zoom-carte.mjs <port> [<dossier des captures>]
-// Sur un profil neuf, sans réseau. Dure environ 2 min 30. Le script :
-//  1. importe une course en ligne droite (FC, altitude), une session de surf et une session de voile (`make-gpx.mjs`),
-//     toutes deux avec la FC ;
-//  2. course, sur ordinateur : survol sans bulle Recharts, la valeur lue au-dessus du graphe, sans le faire bouger ;
-//     double-clic à 25 % de la largeur : la plage passe de 5,4 km à 2,7 km autour du point visé (graduations 1, 2,
-//     3 km), un second à 1,35 km (1,5 et 2 km) ; « +carte » et « Tout voir » paraissent ; « +carte »
-//     allume le tronçon en violet et cadre la carte dessus, ramenée à l'écran ; un nouveau zoom met le violet à jour
-//     sans recadrer ; « Tout voir » l'efface, et il ne revient pas au zoom suivant ; fermer l'onglet l'efface aussi ;
-//  3. course : « +carte » des onglets cardio, énergie et zones de pente ; profil d'altitude de « général »
-//     (24/10) : nom et lecture, double-clic, « +carte », zoom à part de « graphiques », boutons du zoom à 24 px,
-//     titres à 13 px et noms des graphes à 10 px ;
-//  4. voile (vitesse, vent) et surf : lecture, double-clic, « +carte » ;
+// Sur un profil neuf, sans réseau. Dure environ 2 min. Le script :
+//  1. importe une session de wingfoil et une de surf (`lib/traces.mjs`), toutes deux avec la FC ;
+//  2. voile, sur ordinateur : survol sans bulle Recharts, la valeur lue au-dessus du graphe, sans le faire bouger ;
+//     double-clic à 25 % de la largeur : les graduations changent (la plage est divisée par deux autour du point visé),
+//     un second les change encore ; « Afficher » et « Tout voir » paraissent ; « Afficher » allume le tronçon en
+//     violet et cadre la carte dessus, ramenée à l'écran ; un nouveau zoom met le violet à jour sans recadrer ;
+//     « Tout voir » l'efface, et il ne revient pas au zoom suivant ; fermer l'onglet l'efface aussi ;
+//  3. voile : « Afficher » de l'onglet cardio ;
+//  4. voile (vent) et surf : lecture, double-clic, « Afficher » ;
 //  5. à 390×844, au doigt : double toucher qui zoome ; carte hors de vue : « +carte » ouvre le plein écran
-//     carte + graphes, × le ferme ; de même depuis le profil de « général » ; carte entière à l'écran (« général » replié) : « +carte » ouvre quand même le plein écran, tronçon allumé ;
+//     carte + graphes, × le ferme ; carte entière à l'écran (« général » replié) : « +carte » ouvre quand même le plein écran, tronçon allumé ;
 //  6. à 390×844 (25/10) : « +carte » seul sur un graphe non zoomé ; il ouvre carte + graphes de l'onglet, sans violet ;
 //     le retour d'Android (`window.gtrackerBack`, en développement) referme le plein écran et rend la page au même
 //     défilement, zoom compris ; de même zoomé, et pour la carte seule ouverte d'un toucher ;
 //  7. (25/10) « Afficher » sur chaque graphe, zoomé ou non, sur ordinateur et dans le plein écran (non zoomé :
 //     toute la trace) ; « +carte » dans la page du téléphone ; un second clic à la même plage retire le violet,
 //     zoom et plein écran gardés ; la plage changée entre-temps, il recadre ;
-//  8. (05/11) flèches de sens en course, voile et surf : moins au zoom −2, les mêmes au retour, plus au zoom +2.
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+//  8. (05/11) flèches de sens en voile et en surf : moins au zoom −2, les mêmes au retour, plus au zoom +2.
+// Les graduations ne sont pas écrites en dur : l'axe est le temps, elles dépendent de la durée de la trace ; on compare
+// leur suite avant et après chaque zoom.
 import { connect, POIGNEE_RETOUR } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { CHART, SCOPE, graphGestures } from './lib/graphes.mjs';
+import { traceSurf, traceVoile } from './lib/traces.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -82,59 +77,16 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork();
 
 // --- Sessions synthétiques ---
-/** Course en ligne droite vers l'est, 3 m/s, altitude qui monte puis redescend, FC qui croît. */
-const runGpx = (seconds, speed, t0) => {
-  const lat = 43.7;
-  const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
-  const pts = [];
-  let m = 0;
-  let ele = 50;
-  for (let k = 0; k <= seconds; k++) {
-    if (k > 0) { m += speed; ele += (k < seconds * 0.4 ? 0.08 : -0.05) * speed; }
-    pts.push(`<trkpt lat="${lat}" lon="${(3.85 + m / mPerDegLon).toFixed(7)}"><ele>${ele.toFixed(1)}</ele><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${speed}</speed><gpxtpx:TrackPointExtension><gpxtpx:hr>${Math.round(130 + k / 60)}</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions></trkpt>`);
-  }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"><trk><name>Ligne</name><type>running</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
-};
-const M_PER_DEG_LAT = 111_195;
-const surfGpx = (startMs, phases, hrAt) => {
-  let lat = 43.4;
-  let lon = 3.6;
-  let t = 0;
-  const pts = [];
-  const push = (speed, heading) => pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><time>${new Date(startMs + t * 1000).toISOString()}</time>`
-    + `<extensions><speed>${speed}</speed>${speed > 0 ? `<course>${heading}</course>` : ''}<gpxtpx:TrackPointExtension><gpxtpx:hr>${Math.round(hrAt(t))}</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions></trkpt>`);
-  push(0, 0);
-  for (const [s, speed, heading = 0] of phases) {
-    for (let k = 0; k < s; k++) {
-      lat += (speed * Math.cos((heading * Math.PI) / 180)) / M_PER_DEG_LAT;
-      lon += (speed * Math.sin((heading * Math.PI) / 180)) / (M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
-      t += 1;
-      push(speed, heading);
-    }
-  }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"><trk><name>Matinée</name><type>surf</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
-};
 const MORNING = [
   [60, 0], [60, 1.2, 90], [50, 1, 0], [4, 0.1], [40, 1, 270], [4, 0.1], [26, 1, 0], [90, 0.1],
   [6, 1.6, 180], [12, 5, 200], [100, 1, 20], [60, 0.1],
   [5, 1.5, 180], [6, 6, 160], [2, 6, 250], [2, 6, 120], [10, 6, 160], [40, 1, 90],
 ];
-const withHr = (gpx, hrAt) => {
-  let k = 0;
-  return gpx
-    .replace('xmlns="http://www.topografix.com/GPX/1/1"', 'xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"')
-    .replace(/<\/extensions><\/trkpt>/g, () => `<gpxtpx:TrackPointExtension><gpxtpx:hr>${Math.round(hrAt(k++))}</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions></trkpt>`);
-};
-const voilePath = join(tmpdir(), 'zoom-carte-voile.gpx');
-execFileSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'make-gpx.mjs'), voilePath]);
-
-const T_RUN = Date.UTC(2026, 9, 1, 8, 0, 0);
 const T_SURF = Date.UTC(2026, 9, 3, 7, 0, 0);
 const T_VOILE = Date.UTC(2026, 8, 20, 13, 0, 0);
 const SESSIONS = [
-  { key: 'course', page: 'course', start: T_RUN, gpx: runGpx(1800, 3, T_RUN) },
-  { key: 'surf', page: 'surf', start: T_SURF, gpx: surfGpx(T_SURF, MORNING, (k) => 110 + 20 * Math.sin(k / 120)) },
-  { key: 'voile', page: 'voile', start: T_VOILE, gpx: withHr(readFileSync(voilePath, 'utf8'), (k) => 120 + 25 * Math.sin(k / 300)) },
+  { key: 'voile', page: 'voile', start: T_VOILE, gpx: traceVoile({ debutMs: T_VOILE, nom: 'Ligne', virageMin: 3, fc: (t) => 120 + 25 * Math.sin(t / 300) }) },
+  { key: 'surf', page: 'surf', start: T_SURF, gpx: traceSurf({ debutMs: T_SURF, nom: 'Matinée', phases: MORNING, fc: (t) => 110 + 20 * Math.sin(t / 120) }) },
 ];
 
 // --- 1. Import ---
@@ -148,134 +100,103 @@ for (const s of SESSIONS) {
   check(`${s.key} rangée`, Boolean(rec));
 }
 
-// --- 2. Course, sur ordinateur ---
-await go(paths.course, 6000);
+// --- 2. Voile, sur ordinateur ---
+await go(paths.voile, 8000);
 console.log('  graphiques :', await clickTab('graphiques'));
 await settle({ max: 1500 });
-check(`course : graduations de départ (${await ticks('Graphiques', 0)})`, (await ticks('Graphiques', 0)) === '0 km | 2 km | 4 km');
-check(`course : « Afficher » seul avant le zoom (${await zoomButtons('Graphiques', 0)})`, (await zoomButtons('Graphiques', 0)) === 'Afficher');
+const T0 = await ticks('Graphiques', 0);
+check(`voile : graduations de départ (${T0})`, T0 !== '(absent)' && T0 !== '');
+check(`voile : « Afficher » seul avant le zoom (${await zoomButtons('Graphiques', 0)})`, (await zoomButtons('Graphiques', 0)) === 'Afficher');
 const deskPerChart = await evaluate(`(() => { const p = ${SCOPE('Graphiques')}; return p ? [...p.querySelectorAll('.zoom-chart')].map((c) => c.querySelectorAll(':scope > .zoom-chart__map').length).join('') : '(absent)'; })()`);
-check(`course : « Afficher » sur chaque graphe, FC comprise (${deskPerChart})`, /^1{3,}$/.test(deskPerChart));
+check(`voile : « Afficher » sur chaque graphe de temps, FC comprise (${deskPerChart})`, /^1{2,}/.test(deskPerChart));
 // Sans zoom : toute la trace en violet ; un second clic la retire.
 await clickZoomButton('Graphiques', 0, 'Afficher');
 await settle({ max: 1500 });
 const wholeV = await violet();
-check(`course : sans zoom, « Afficher » allume toute la trace (${wholeV.count}, ${wholeV.cover})`, wholeV.count >= 1 && wholeV.cover > 0.45);
+check(`voile : sans zoom, « Afficher » allume toute la trace (${wholeV.count}, ${wholeV.cover})`, wholeV.count >= 1 && wholeV.cover > 0.45);
 await clickZoomButton('Graphiques', 0, 'Afficher');
 await settle({ max: 800 });
-check(`course : second clic, violet retiré (${(await violet()).count})`, (await violet()).count === 0);
+check(`voile : second clic, violet retiré (${(await violet()).count})`, (await violet()).count === 0);
 await evaluate(`window.scrollTo(0, 0)`);
 await wait(500);
 const topBefore = await chartTop('Graphiques', 1);
 console.log('  survol :', await hover('Graphiques', 0, 0.5));
 const read = await readouts('Graphiques');
-check(`course : lecture au-dessus des graphes (${read})`, /km\/h · .*km/.test(read) && read.includes(' m, pente') && read.includes('bpm'));
-check(`course : aucune bulle Recharts (« ${await tooltipText()} »)`, (await tooltipText()) === '');
-check(`course : le graphe suivant ne bouge pas au survol (${topBefore} → ${await chartTop('Graphiques', 1)})`, topBefore === (await chartTop('Graphiques', 1)));
+check(`voile : lecture au-dessus des graphes (${read})`, /nds? · \d\d:\d\d:\d\d/.test(read) && read.includes('bpm'));
+check(`voile : aucune bulle Recharts (« ${await tooltipText()} »)`, (await tooltipText()) === '');
+check(`voile : le graphe suivant ne bouge pas au survol (${topBefore} → ${await chartTop('Graphiques', 1)})`, topBefore === (await chartTop('Graphiques', 1)));
 await shoot('zoom-lecture');
+const titleSize = await evaluate(`(() => { const t = ${SCOPE('Graphiques')}?.querySelector('[role=button]'); return t ? getComputedStyle(t).fontSize : null; })()`);
+check(`analyses : titres des panneaux à 13 px (${titleSize})`, titleSize === '13px');
 console.log('  double-clic à 25 % :', await doubleClick('Graphiques', 0, 0.25));
-check(`course : zoom ×2 autour du point visé (${await ticks('Graphiques', 0)})`, (await ticks('Graphiques', 0)) === '1 km | 2 km | 3 km');
-check(`course : les autres graphes suivent (${await ticks('Graphiques', 1)})`, (await ticks('Graphiques', 1)) === '1 km | 2 km | 3 km');
-check(`course : « Afficher » et « Tout voir » (${await zoomButtons('Graphiques', 0)})`, (await zoomButtons('Graphiques', 0)) === 'Afficher | Tout voir');
+const Z1 = await ticks('Graphiques', 0);
+check(`voile : zoom ×2 autour du point visé, graduations changées (${T0} → ${Z1})`, Z1 !== T0 && Z1 !== '(absent)' && Z1 !== '');
+check(`voile : les autres graphes suivent (${await ticks('Graphiques', 1)})`, (await ticks('Graphiques', 1)) === Z1);
+check(`voile : « Afficher » et « Tout voir » (${await zoomButtons('Graphiques', 0)})`, (await zoomButtons('Graphiques', 0)) === 'Afficher | Tout voir');
+const buttonBox = await evaluate(`(() => { const b = ${CHART('Graphiques', 0)}?.querySelector('.zoom-chart__actions button'); if (!b) return null; const s = getComputedStyle(b); return { h: Math.round(b.getBoundingClientRect().height), font: s.fontSize }; })()`);
+check(`boutons du zoom 20 % plus petits (${JSON.stringify(buttonBox)})`, buttonBox?.h === 24 && buttonBox?.font === '10.4px');
 console.log('  second double-clic :', await doubleClick('Graphiques', 0, 0.25));
-check(`course : zoom ×2 encore, sur le même point (${await ticks('Graphiques', 0)})`, (await ticks('Graphiques', 0)) === '1.5 km | 2 km');
-check(`course : pas de violet avant le bouton (${(await violet()).count})`, (await violet()).count === 0);
-const wholeCover = 1.35 / 5.4;
+const Z2 = await ticks('Graphiques', 0);
+check(`voile : zoom ×2 encore, sur le même point (${Z1} → ${Z2})`, Z2 !== Z1 && Z2 !== T0 && Z2 !== '(absent)');
+check(`voile : pas de violet avant le bouton (${(await violet()).count})`, (await violet()).count === 0);
 console.log('  Sur la carte :', await clickZoomButton('Graphiques', 0, 'Afficher'));
 await settle({ max: 1800 });
 const framed = await violet();
 // Leaflet cadre au cran de zoom entier : le tronçon remplit entre la moitié et toute la carte.
-check(`course : tronçon violet cadré, qui remplit la carte à un cran près (${framed.count} tracé, ${framed.cover})`, framed.count >= 1 && framed.cover > 0.45);
-check(`course : carte ramenée à l'écran (${await mapOnScreen()})`, (await mapOnScreen()) === true);
+check(`voile : tronçon violet cadré, qui remplit la carte à un cran près (${framed.count} tracé, ${framed.cover})`, framed.count >= 1 && framed.cover > 0.45);
+check(`voile : carte ramenée à l'écran (${await mapOnScreen()})`, (await mapOnScreen()) === true);
 await shoot('zoom-sur-la-carte');
 console.log('  double-clic à 50 % :', await doubleClick('Graphiques', 0, 0.5));
 const narrower = await violet();
-check(`course : le violet suit le zoom, sans recadrer (${framed.cover} → ${narrower.cover})`, narrower.count >= 1 && narrower.cover < framed.cover * 0.7 && narrower.cover > 0.2);
+check(`voile : le violet suit le zoom, sans recadrer (${framed.cover} → ${narrower.cover})`, narrower.count >= 1 && narrower.cover < framed.cover * 0.7 && narrower.cover > 0.2);
 console.log('  Tout voir :', await clickZoomButton('Graphiques', 0, 'Tout voir'));
 await settle({ max: 800 });
-check(`course : « Tout voir » efface le violet, « Afficher » reste (${(await violet()).count}, « ${await zoomButtons('Graphiques', 0)} »)`, (await violet()).count === 0 && (await zoomButtons('Graphiques', 0)) === 'Afficher');
+check(`voile : « Tout voir » efface le violet, « Afficher » reste (${(await violet()).count}, « ${await zoomButtons('Graphiques', 0)} »)`, (await violet()).count === 0 && (await zoomButtons('Graphiques', 0)) === 'Afficher');
+check(`voile : « Tout voir » rend les graduations de départ (${await ticks('Graphiques', 0)})`, (await ticks('Graphiques', 0)) === T0);
 await doubleClick('Graphiques', 0, 0.5);
-check(`course : le violet ne revient pas au zoom suivant (${(await violet()).count})`, (await violet()).count === 0);
+check(`voile : le violet ne revient pas au zoom suivant (${(await violet()).count})`, (await violet()).count === 0);
 await clickZoomButton('Graphiques', 0, 'Afficher');
 await settle({ max: 1500 });
-check('course : rallumé par le bouton', (await violet()).count >= 1);
+check('voile : rallumé par le bouton', (await violet()).count >= 1);
 await clickZoomButton('Graphiques', 0, 'Afficher');
 await settle({ max: 800 });
-check(`course : second clic sur la même plage, violet retiré, zoom gardé (${(await violet()).count}, « ${await zoomButtons('Graphiques', 0)} »)`, (await violet()).count === 0 && (await zoomButtons('Graphiques', 0)) === 'Afficher | Tout voir');
+check(`voile : second clic sur la même plage, violet retiré, zoom gardé (${(await violet()).count}, « ${await zoomButtons('Graphiques', 0)} »)`, (await violet()).count === 0 && (await zoomButtons('Graphiques', 0)) === 'Afficher | Tout voir');
 await clickZoomButton('Graphiques', 0, 'Afficher');
 await settle({ max: 1200 });
-check('course : troisième clic, rallumé', (await violet()).count >= 1);
+check('voile : troisième clic, rallumé', (await violet()).count >= 1);
 console.log('  graphiques fermé :', await clickTab('graphiques', true));
 await settle({ max: 800 });
-check(`course : onglet fermé, violet effacé (${(await violet()).count})`, (await violet()).count === 0);
+check(`voile : onglet fermé, violet effacé (${(await violet()).count})`, (await violet()).count === 0);
 await clickTab('graphiques');
 await settle({ max: 1200 });
-check(`course : rouvert, zoom gardé mais pas le violet (${(await violet()).count}, « ${await zoomButtons('Graphiques', 0)} »)`, (await violet()).count === 0 && (await zoomButtons('Graphiques', 0)) === 'Afficher | Tout voir');
+check(`voile : rouvert, zoom gardé mais pas le violet (${(await violet()).count}, « ${await zoomButtons('Graphiques', 0)} »)`, (await violet()).count === 0 && (await zoomButtons('Graphiques', 0)) === 'Afficher | Tout voir');
 await clickZoomButton('Graphiques', 0, 'Tout voir');
-check(`course : tronçon entier = ${wholeCover.toFixed(2)} de la trace, pour mémoire`, true);
 
-// --- 3. Course : cardio, énergie, zones de pente ---
+// --- 3. Voile : cardio ---
 await clickTab('graphiques', true);
-for (const [tab, title] of [['cardio', 'Cardio'], ['énergie', 'Énergie'], ['zones de pente', 'Allure par zone de pente']]) {
-  console.log(`  ${tab} :`, await clickTab(tab));
-  await settle({ max: 1500 });
-  await hover(title, 0, 0.4);
-  check(`${tab} : lecture (${await readouts(title)})`, (await readouts(title)).includes(' · '));
-  await doubleClick(title, 0, 0.5);
-  check(`${tab} : zoomé (${await zoomButtons(title, 0)})`, (await zoomButtons(title, 0)) === 'Afficher | Tout voir');
-  await clickZoomButton(title, 0, 'Afficher');
-  await settle({ max: 1500 });
-  const v = await violet();
-  check(`${tab} : tronçon violet cadré (${v.count}, ${v.cover})`, v.count >= 1 && v.cover > 0.45);
-  await clickZoomButton(title, 0, 'Tout voir');
-  await wait(600);
-  check(`${tab} : effacé par « Tout voir »`, (await violet()).count === 0);
-  await clickTab(tab, true);
-  await wait(600);
-}
-
-// --- 3 b. Course : profil d'altitude de « général » (lot 2 des demandes du 24/10) ---
-check(`général : graduations de départ (${await ticks('Général', 0)})`, (await ticks('Général', 0)) === '0 km | 2 km | 4 km');
-await hover('Général', 0, 0.5);
-const generalRead = await readouts('Général');
-check(`général : nom et lecture au-dessus du profil (${generalRead})`, /^Altitude\d+ m, pente -?\d+ % · [\d,]+ km$/.test(generalRead));
-check(`général : aucune bulle (« ${await tooltipText()} »)`, (await tooltipText()) === '');
-await doubleClick('Général', 0, 0.25);
-check(`général : zoom ×2 autour du point visé (${await ticks('Général', 0)})`, (await ticks('Général', 0)) === '1 km | 2 km | 3 km');
-check(`général : « Afficher » et « Tout voir » (${await zoomButtons('Général', 0)})`, (await zoomButtons('Général', 0)) === 'Afficher | Tout voir');
-const buttonBox = await evaluate(`(() => { const b = ${CHART('Général', 0)}?.querySelector('.zoom-chart__actions button'); if (!b) return null; const s = getComputedStyle(b); return { h: Math.round(b.getBoundingClientRect().height), font: s.fontSize }; })()`);
-check(`boutons du zoom 20 % plus petits (${JSON.stringify(buttonBox)})`, buttonBox?.h === 24 && buttonBox?.font === '10.4px');
-const mapButtonBox = await evaluate(`(() => { const c = ${CHART('Général', 0)}; const b = c?.querySelector('.zoom-chart__map'); const r = c?.previousElementSibling; if (!b || !r) return null; const cb = c.getBoundingClientRect(), bb = b.getBoundingClientRect(), rb = r.getBoundingClientRect(); return { above: Math.round(cb.top - bb.bottom), right: Math.round(cb.right - bb.right), readoutRight: Math.round(rb.right - parseFloat(getComputedStyle(r).paddingRight) - bb.left) }; })()`);
-check(`« Afficher » sur la ligne du nom, collé à droite, sans couvrir la lecture (${JSON.stringify(mapButtonBox)})`, mapButtonBox !== null && mapButtonBox.above >= 0 && mapButtonBox.right === 0 && mapButtonBox.readoutRight <= 0);
-await clickZoomButton('Général', 0, 'Afficher');
-await settle({ max: 1800 });
-const generalV = await violet();
-check(`général : tronçon violet cadré (${generalV.count}, ${generalV.cover})`, generalV.count >= 1 && generalV.cover > 0.45);
-await clickTab('graphiques');
+console.log('  cardio :', await clickTab('cardio'));
 await settle({ max: 1500 });
-check(`général : « graphiques » pas zoomé pour autant (${await ticks('Graphiques', 0)})`, (await ticks('Graphiques', 0)) === '0 km | 2 km | 4 km');
-await clickTab('graphiques', true);
+await hover('Cardio', 0, 0.4);
+check(`cardio : lecture (${await readouts('Cardio')})`, (await readouts('Cardio')).includes(' · '));
+await doubleClick('Cardio', 0, 0.5);
+check(`cardio : zoomé (${await zoomButtons('Cardio', 0)})`, (await zoomButtons('Cardio', 0)) === 'Afficher | Tout voir');
+await clickZoomButton('Cardio', 0, 'Afficher');
+await settle({ max: 1500 });
+const cardioV = await violet();
+check(`cardio : tronçon violet cadré (${cardioV.count}, ${cardioV.cover})`, cardioV.count >= 1 && cardioV.cover > 0.45);
+await clickZoomButton('Cardio', 0, 'Tout voir');
 await wait(600);
-await clickZoomButton('Général', 0, 'Tout voir');
+check('cardio : effacé par « Tout voir »', (await violet()).count === 0);
+await clickTab('cardio', true);
 await wait(600);
-check(`général : « Tout voir » efface le violet, « Afficher » reste (${(await violet()).count}, « ${await zoomButtons('Général', 0)} »)`, (await violet()).count === 0 && (await zoomButtons('Général', 0)) === 'Afficher');
-const sizes = await evaluate(`(() => { const t = ${SCOPE('Général')}?.querySelector('[role=button]'); const n = document.querySelector('.chart-readout__label'); return { titre: t && getComputedStyle(t).fontSize, nom: n && getComputedStyle(n).fontSize }; })()`);
-check(`analyses : titres à 13 px, noms des graphes à 10 px (${JSON.stringify(sizes)})`, sizes?.titre === '13px' && sizes?.nom === '10px');
 
 // --- 4. Voile et surf ---
 await go(paths.voile, 8000);
 await clickTab('graphiques');
 await settle({ max: 2000 });
-await hover('Graphiques', 0, 0.5);
-const sailRead = await readouts('Graphiques');
-check(`voile : lecture vitesse et FC, à l'heure (${sailRead})`, /nds? · \d\d:\d\d:\d\d/.test(sailRead) && sailRead.includes('bpm'));
-check(`voile : aucune bulle (« ${await tooltipText()} »)`, (await tooltipText()) === '');
 await doubleClick('Graphiques', 0, 0.5);
-check(`voile : zoomé (${await zoomButtons('Graphiques', 0)})`, (await zoomButtons('Graphiques', 0)) === 'Afficher | Tout voir');
 await clickZoomButton('Graphiques', 0, 'Afficher');
 await settle({ max: 1800 });
-const sailV = await violet();
-check(`voile : tronçon violet cadré (${sailV.count}, ${sailV.cover})`, sailV.count >= 1 && sailV.cover > 0.45);
 await clickTab('vent');
 await settle({ max: 1500 });
 await hover('Variations du Vent', 0, 0.5);
@@ -303,14 +224,16 @@ check(`surf : tronçon violet (${surfV.count}, ${surfV.cover})`, surfV.count >= 
 // --- 5. Téléphone, au doigt ---
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
-await go(paths.course, 6000);
+await go(paths.voile, 8000);
 await clickTab('graphiques');
 await settle({ max: 1500 });
+const P0 = await ticks('Graphiques', 0);
 check(`390 px : « +carte » seul avant le zoom (${await zoomButtons('Graphiques', 0)})`, (await zoomButtons('Graphiques', 0)) === '+carte');
 const perChart = await evaluate(`(() => { const p = ${SCOPE('Graphiques')}; return p ? [...p.querySelectorAll('.zoom-chart')].map((c) => c.querySelectorAll(':scope > .zoom-chart__map').length).join('') : '(absent)'; })()`);
-check(`390 px : « +carte » sur chaque graphe, FC comprise (${perChart})`, /^1{3,}$/.test(perChart));
+check(`390 px : « +carte » sur chaque graphe de temps, FC comprise (${perChart})`, /^1{2,}/.test(perChart));
 console.log('  double toucher :', await doubleTap('Graphiques', 0, 0.25));
-check(`390 px : le double toucher zoome ×2 (${await ticks('Graphiques', 0)})`, (await ticks('Graphiques', 0)) === '1 km | 2 km | 3 km');
+const P1 = await ticks('Graphiques', 0);
+check(`390 px : le double toucher zoome ×2 (${P0} → ${P1})`, P1 !== P0 && P1 !== '(absent)');
 check(`390 px : aucune bulle (« ${await tooltipText()} »)`, (await tooltipText()) === '');
 check(`390 px : carte hors de vue (${await mapOnScreen()})`, (await mapOnScreen()) === false);
 await clickZoomButton('Graphiques', 0, '+carte');
@@ -321,8 +244,8 @@ const overV = await violet('.an-map-overlay');
 check(`390 px : tronçon violet cadré dans le plein écran (${overV.count}, ${overV.cover})`, overV.count >= 1 && overV.cover > 0.45);
 await shoot('zoom-plein-ecran');
 console.log('  double toucher dans le plein écran :', await doubleTap(null, 0, 0.5));
-// Touché au milieu de 0,675-3,375 km (2,025 km) : 1,35-2,7 km.
-check(`390 px : on zoome encore sous la carte (${await ticks(null, 0)})`, (await ticks(null, 0)) === '1.5 km | 2 km | 2.5 km');
+const P2 = await ticks(null, 0);
+check(`390 px : on zoome encore sous la carte (${P1} → ${P2})`, P2 !== P1 && P2 !== '(absent)');
 const overV2 = await violet('.an-map-overlay');
 check(`390 px : le violet suit (${overV.cover} → ${overV2.cover})`, overV2.count >= 1 && overV2.cover < overV.cover * 0.7);
 // Plage changée depuis le clic : « Afficher » recadre ; un second clic retire le violet, le plein écran reste.
@@ -337,20 +260,6 @@ check(`390 px : second clic, violet retiré, plein écran ouvert (${(await viole
 await evaluate(`document.querySelector('.an-map-overlay__close')?.click()`);
 await settle({ max: 800 });
 check('390 px : × ferme le plein écran', (await evaluate(`Boolean(document.querySelector('.an-map-overlay'))`)) === false);
-// Profil de « général » : double toucher, puis plein écran carte + profil.
-console.log('  double toucher sur le profil de « général » :', await doubleTap('Général', 0, 0.25));
-check(`390 px : le profil de « général » zoome ×2 (${await ticks('Général', 0)})`, (await ticks('Général', 0)) === '1 km | 2 km | 3 km');
-await clickZoomButton('Général', 0, '+carte');
-await settle({ max: 1800 });
-const generalOverlay = await evaluate(`(() => { const o = document.querySelector('.an-map-overlay'); return o ? { charts: o.querySelectorAll('.an-map-overlay__charts .zoom-chart').length, name: o.querySelector('.an-map-overlay__charts .chart-readout__label')?.textContent ?? '' } : null; })()`);
-check(`390 px : plein écran carte + profil de « général » (${JSON.stringify(generalOverlay)})`, generalOverlay?.charts === 1 && generalOverlay?.name === 'Altitude' && (await violet('.an-map-overlay')).count >= 1);
-await shoot('zoom-general-plein-ecran');
-await evaluate(`document.querySelector('.an-map-overlay__close')?.click()`);
-await settle({ max: 800 });
-// 06/11 (lot 166) : sortir du plein écran carte + graphes retire aussi le tronçon violet de la carte de la page.
-check(`390 px : × du plein écran, plus de tronçon violet sur la carte (${(await violet()).count})`, (await violet()).count === 0);
-await clickZoomButton('Général', 0, 'Tout voir');
-await wait(600);
 // Tout replié sauf « graphiques », en haut de page : la carte est à l'écran, « +carte » ouvre quand même le plein
 // écran carte + graphes, tronçon allumé (05/11, à la place du cadrage sur place du 25/10).
 await clickTab('général', true);
@@ -393,7 +302,7 @@ await settle({ max: 800 });
 const scrollAfter = await evaluate(`Math.round(window.scrollY)`);
 check(`390 px : le retour ferme carte + graphes (${backed})`, backed === 'layer' && (await overlayOpen()) === false);
 check(`390 px : même défilement après le retour (${scrollBefore} → ${scrollAfter})`, Math.abs(scrollAfter - scrollBefore) <= 2);
-check(`390 px : toujours sur l'analyse (${await evaluate('location.pathname')})`, (await evaluate('location.pathname')) === paths.course.split('?')[0]);
+check(`390 px : toujours sur l'analyse (${await evaluate('location.pathname')})`, (await evaluate('location.pathname')) === paths.voile.split('?')[0]);
 // Zoomé, carte hors de vue : plein écran, retour, zoom gardé.
 console.log('  double toucher :', await doubleTap('Graphiques', 0, 0.25));
 await clickZoomButton('Graphiques', 0, '+carte');
@@ -401,7 +310,7 @@ await settle({ max: 1800 });
 check('390 px : zoomé, plein écran ouvert', (await overlayOpen()) === true);
 await back();
 await settle({ max: 800 });
-check(`390 px : zoomé, le retour ferme et garde le zoom (${await ticks('Graphiques', 0)})`, (await overlayOpen()) === false && (await ticks('Graphiques', 0)) === '1 km | 2 km | 3 km');
+check(`390 px : zoomé, le retour ferme et garde le zoom (${await ticks('Graphiques', 0)})`, (await overlayOpen()) === false && (await ticks('Graphiques', 0)) !== P0);
 check(`390 px : zoomé, le retour retire aussi le tronçon violet (${(await violet()).count})`, (await violet()).count === 0);
 // Carte seule, d'un toucher.
 await evaluate(`window.scrollTo(0, 0)`);
@@ -426,7 +335,7 @@ const zoomMap = async (sign, n) => {
   }
   return 'ok';
 };
-for (const page of ['course', 'voile', 'surf']) {
+for (const page of ['voile', 'surf']) {
   await go(paths[page], 7000);
   await settle({ max: 1500 });
   const base = await arrows();

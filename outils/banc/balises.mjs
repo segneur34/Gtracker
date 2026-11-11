@@ -1,7 +1,7 @@
 // Banc de test : parcours de voile et bips d'approche des balises (§10, point 77).
 // Usage : node balises.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf. Le script :
-//  1. pose un parcours en Voile sur la page Itinéraires (numéros, pas de type de voie, bloc « Parcours »),
+//  1. pose un parcours en Wingfoil sur la page Itinéraires (numéros, pas de type de voie, bloc « Parcours »),
 //     le boucle, règle des bips propres au parcours (validation tirée plus loin), l'enregistre (fiche avec
 //     ses bips, GPX à balises numérotées) et « Partir » (trace suivie avec ses balises et ses bips) ;
 //  2. remplace la trace suivie par un parcours synthétique de trois balises (départ, 300 m au nord, puis
@@ -120,14 +120,14 @@ const followedStats = () => evaluate(`document.body.innerText.split('\\n').filte
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 
-// 1. Itinéraires en Voile.
+// 1. Itinéraires en Wingfoil.
 await send('Page.navigate', { url: `${BASE}/itineraires` });
 await wait(3000);
 // Tous les onglets ouverts (seul le premier l'est par défaut), lus au chargement de la page.
 await evaluate(`localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { profil: true, parcours: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
 await send('Page.navigate', { url: `${BASE}/itineraires` });
 await wait(3000);
-console.log('activité Voile :', await chooseOption('Voile'));
+console.log('activité Wingfoil :', await chooseOption('Wingfoil'));
 await wait(300);
 await tapMap(0.3, 0.3);
 await tapMap(0.7, 0.35);
@@ -296,7 +296,7 @@ await wait(1000);
 await evaluate(`localStorage.setItem('${CLES.sections}', JSON.stringify({ settings: { activites: true }, 'settings-families': { voile: true }, 'settings-activity-parts': { balises: true } })); 'ok'`);
 await send('Page.navigate', { url: `${BASE}/parametres` });
 await wait(2500);
-await evaluate(`[...document.querySelectorAll('.settings-activity__toggle')].find((b) => b.textContent.includes('Voile')).click(); 'ok'`);
+await evaluate(`[...document.querySelectorAll('.settings-activity__toggle')].find((b) => b.textContent.includes('Wingfoil')).click(); 'ok'`);
 await wait(500);
 const stored = () => evaluate(`JSON.stringify(JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}').markGuide ?? null)`);
 const editorRows = () => evaluate(`[...document.querySelectorAll('.beep-editor__row')].map((r) => [...r.querySelectorAll('input')].map((i) => i.value).join('/')).join('  ')`);

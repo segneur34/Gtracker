@@ -30,7 +30,7 @@ const finish = async () => {
 
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
-await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
+await blockNetwork(['*://*.openstreetmap.org/*']);
 
 /** Tout ouvert : blocs, familles, parties des activités (mémoire des blocs), puis chaque carte d'activité. */
 const openAll = async () => {
@@ -54,7 +54,7 @@ await go('/parametres', 3000);
 await openAll();
 const count = await evaluate(`${helps}.length`);
 console.log('« ? » sur la page :', count);
-check('des « ? » partout (plus de 100, neuf activités ouvertes)', count > 100, count);
+check('des « ? » partout (plus de 100, onze activités ouvertes)', count > 100, count);
 check('plus aucun title sur une ligne de réglage', (await evaluate(`document.querySelectorAll('.settings-row[title]').length`)) === 0);
 check('plus de grande note sous les activités', (await evaluate(`document.querySelectorAll('.settings-block__note').length`)) === 0);
 check('aucune aide dépliée au départ', (await openTexts()).length === 0);
@@ -82,16 +82,16 @@ check('chaque « ? » déplie un texte, seul (le suivant referme le précédent)
 check('textes courts (moins de 300 signes ; 260 jusqu’au 26/10, l’aide « Étape » de la notification en compte 282)', sweep.longest < 300, sweep.longest);
 check('un second appui referme', sweep.closed === true);
 
-// Le « ? » du seuil de Voile : son texte, sous sa ligne.
+// Le « ? » du seuil du Wingfoil : son texte, sous sa ligne.
 const seuil = await evaluate(`(async () => {
-  const card = [...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('[aria-label="Couleur de Voile"]'));
+  const card = [...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('[aria-label="Couleur de Wingfoil"]'));
   const row = [...(card?.querySelectorAll('.settings-row') ?? [])].find((r) => r.querySelector('.settings-row__label')?.textContent === "Seuil d'activité");
   row?.querySelector('.ui-help')?.click();
   await new Promise((r) => setTimeout(r, 50));
   return { label: row?.querySelector('.settings-row__label')?.textContent, text: row?.querySelector('.settings-help')?.textContent ?? '(absente)' };
 })()`);
-check('seuil de Voile : le libellé garde son texte seul', seuil.label === "Seuil d'activité", seuil.label);
-check('seuil de Voile : aide sous la ligne', seuil.text.includes('en action'), seuil.text);
+check('seuil du Wingfoil : le libellé garde son texte seul', seuil.label === "Seuil d'activité", seuil.label);
+check('seuil du Wingfoil : aide sous la ligne', seuil.text.includes('en action'), seuil.text);
 await shoot('aide-seuil');
 
 // --- 3. Le « ? » d'un bloc ne le replie pas ---
@@ -109,17 +109,17 @@ check('bloc Activités : son aide seule, le seuil refermé', block?.texts.length
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await openAll();
 check('390×844, tout ouvert : aucun débordement', (await overflow()) === 0, await overflow());
-// La carte de Route peut ne pas être encore dépliée : on retente (ouvre ses cartes, puis l'aide) jusqu'à une seule aide dépliée.
+// La carte du Surf peut ne pas être encore dépliée : on retente (ouvre ses cartes, puis l'aide) jusqu'à une seule aide dépliée.
 await waitFor(`(() => {
   document.querySelectorAll('.settings-activity__toggle[aria-expanded="false"]').forEach((b) => b.click());
-  const card = [...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('[aria-label="Couleur de Route"]'));
-  const row = [...(card?.querySelectorAll('.settings-row') ?? [])].find((r) => r.querySelector('.settings-row__label')?.textContent === 'Type de vélo');
+  const card = [...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('[aria-label="Couleur de Surf"]'));
+  const row = [...(card?.querySelectorAll('.settings-row') ?? [])].find((r) => r.querySelector('.settings-row__label')?.textContent === 'Virages');
   const help = row?.querySelector('.ui-help');
   if (help && help.getAttribute('aria-expanded') !== 'true') help.click();
   row?.scrollIntoView({ block: 'center' });
   return document.querySelectorAll('.settings-help').length === 1;
 })()`, { timeout: 4000, every: 200 });
-check('390×844, aide du type de vélo ouverte : aucun débordement', (await overflow()) === 0 && (await openTexts()).length === 1, await overflow());
+check('390×844, aide des virages du surf ouverte : aucun débordement', (await overflow()) === 0 && (await openTexts()).length === 1, await overflow());
 await shoot('aide-telephone');
 
 // --- 5. Hors de Réglages ---

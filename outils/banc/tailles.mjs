@@ -1,7 +1,7 @@
 // Banc de test : relevé de toutes les pages à toutes les tailles de téléphone (lot 5 des demandes du 23/10).
 // Usage : node tailles.mjs <port> <dossier de travail> [<dossier des captures>]
-// Sur un profil neuf, sans réseau (IGN, Overpass, tuiles bloqués), environ 8 à 12 min. Le script ne corrige rien : il relève.
-//  1. importe une session de chaque famille (voile, course, vélo, surf) par la page ;
+// Sur un profil neuf, sans réseau (tuiles bloquées), environ 8 à 12 min. Le script ne corrige rien : il relève.
+//  1. importe une session de chaque famille (voile, surf) par la page ;
 //  2. pour chaque page (accueil, bibliothèques, analyses onglets tous ouverts, test de FC repos, Enregistrer,
 //     Planifier, Itinéraires, Statistiques, Profil, Réglages tout ouvert), la charge une fois puis la fait passer par
 //     chaque taille d'écran (changement de la taille émulée, sans recharger) et chaque taille de texte ;
@@ -20,6 +20,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { traceSurf, traceVoile } from './lib/traces.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
 if (!port || !workDir) {
@@ -30,7 +31,7 @@ mkdirSync(workDir, { recursive: true });
 if (shotDir) mkdirSync(shotDir, { recursive: true });
 
 // --- Protocole (lib/cdp.mjs) ---
-const { send, evaluate, go: goRaw, settle, waitFor, wait, blockNetwork, importGpx, importFiles, records, logs, close } = await connect({ port });
+const { send, evaluate, go: goRaw, settle, waitFor, wait, blockNetwork, importGpx, importFiles, records, logs, check, finish } = await connect({ port });
 /** Navigation, puis attente du premier rendu de l'application : sous charge, `settle` seul peut rendre la main avant. */
 const go = async (path, max) => {
   const ms = await goRaw(path, max);
@@ -161,68 +162,17 @@ const FONT_SCRIPT = (k) => `(() => {
   return els.length;
 })()`;
 
-// --- Sessions synthétiques (celles de general.mjs) ---
-const gpxOf = (type, pts) => `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Banc</name><type>${type}</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
-const wingGpx = (t0) => {
-  let lat = 43.5, lon = 3.95, t = 0;
-  const R = 6371000;
-  const pts = [];
-  const step = (heading, speed) => {
-    lat += (speed * Math.cos(heading * Math.PI / 180)) / R * 180 / Math.PI;
-    lon += (speed * Math.sin(heading * Math.PI / 180)) / (R * Math.cos(lat * Math.PI / 180)) * 180 / Math.PI;
-    pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><time>${new Date(t0 + t * 1000).toISOString()}</time><extensions><speed>${speed.toFixed(2)}</speed></extensions></trkpt>`);
-    t++;
-  };
-  const leg = (h, s, n) => { for (let i = 0; i < n; i++) step(h + Math.sin(i / 7) * 3, s + Math.sin(i / 5) * 0.5); };
-  const turn = (from, to, sMin, sMax, n) => {
-    const diff = ((to - from + 540) % 360) - 180;
-    for (let i = 1; i <= n; i++) step((from + diff * (i / n) + 360) % 360, sMax - (sMax - sMin) * Math.sin(Math.PI * (i / n)));
-  };
-  for (let k = 0; k < 6; k++) { leg(45, 7, 150); turn(45, 315, 5, 7, 6); leg(315, 7, 150); turn(315, 45, 5, 7, 6); }
-  turn(45, 135, 6, 9, 5);
-  for (let k = 0; k < 6; k++) { leg(135, 9, 150); turn(135, 225, 6, 9, 6); leg(225, 9, 150); turn(225, 135, 6, 9, 6); }
-  return gpxOf('wingfoil', pts);
-};
-const hillGpx = (type, seconds, speed, grade, t0) => {
-  const lat = 43.7;
-  const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
-  const pts = [];
-  const half = seconds / 2;
-  for (let k = 0; k <= seconds; k++) {
-    const m = (k <= half ? k : seconds - k) * speed;
-    pts.push(`<trkpt lat="${(lat + (k > half ? 0.0002 : 0)).toFixed(7)}" lon="${(3.85 + m / mPerDegLon).toFixed(7)}"><ele>${(50 + grade * m).toFixed(1)}</ele><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${speed}</speed></extensions></trkpt>`);
-  }
-  return gpxOf(type, pts);
-};
-const M_PER_DEG_LAT = 111_195;
-const surfGpx = (startMs, phases) => {
-  let lat = 43.4, lon = 3.6, t = 0;
-  const pts = [];
-  const push = (speed, heading) => pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><time>${new Date(startMs + t * 1000).toISOString()}</time>`
-    + `<extensions><speed>${speed}</speed>${speed > 0 ? `<course>${heading}</course>` : ''}</extensions></trkpt>`);
-  push(0, 0);
-  for (const [s, speed, heading = 0] of phases) {
-    for (let k = 0; k < s; k++) {
-      lat += (speed * Math.cos((heading * Math.PI) / 180)) / M_PER_DEG_LAT;
-      lon += (speed * Math.sin((heading * Math.PI) / 180)) / (M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
-      t += 1;
-      push(speed, heading);
-    }
-  }
-  return gpxOf('surf', pts);
-};
+// --- Sessions synthétiques (`lib/traces.mjs`) : la voile du banc et la matinée de surf de general.mjs ---
 const MORNING = [
   [60, 0], [60, 1.2], [50, 1], [4, 0.1], [40, 1], [4, 0.1], [26, 1], [90, 0.1],
   [6, 1.6, 180], [12, 5, 200], [100, 1], [60, 0.1],
   [5, 1.5, 180], [6, 6, 160], [2, 6, 250], [2, 6, 120], [10, 6, 160], [40, 1],
   [5, 1.6, 180], [8, 4.5, 190], [80, 1], [30, 0.1],
 ];
-const T = { voile: Date.UTC(2026, 9, 5, 13), course: Date.UTC(2026, 9, 6, 8), velo: Date.UTC(2026, 9, 6, 14), surf: Date.UTC(2026, 9, 7, 7) };
+const T = { voile: Date.UTC(2026, 9, 5, 13), surf: Date.UTC(2026, 9, 7, 7) };
 const SESSIONS = [
-  { key: 'voile', gpx: wingGpx(T.voile) },
-  { key: 'course', gpx: hillGpx('running', 2400, 3, 0.03, T.course) },
-  { key: 'velo', gpx: hillGpx('cycling', 3000, 7, 0.02, T.velo) },
-  { key: 'surf', gpx: surfGpx(T.surf, MORNING) },
+  { key: 'voile', gpx: traceVoile({ debutMs: T.voile, virageMin: 3 }) },
+  { key: 'surf', gpx: traceSurf({ debutMs: T.surf, phases: MORNING, nom: 'Matinée' }) },
 ];
 
 await blockNetwork();
@@ -232,7 +182,7 @@ await setSize(SIZES_ALL[0]);
 
 const paths = {};
 for (const s of SESSIONS) {
-  await go(`/${s.key === 'voile' ? 'voile' : s.key}`, 3000);
+  await go(`/${s.key}`, 3000);
   const imported = await importGpx(s.gpx, `${s.key}.gpx`);
   await waitFor(async () => (await records())?.some((r) => Math.abs((r.summary?.startMs ?? 0) - T[s.key]) < 2000), { timeout: 9000, label: `fiche ${s.key}` });
   await settle({ max: 2000, label: `import ${s.key}` });
@@ -257,12 +207,8 @@ const OPEN_ALL = `(async () => {
 const PAGES = [
   { name: 'accueil', path: '/' },
   { name: 'bibliothèque voile', path: '/voile' },
-  { name: 'bibliothèque à pied', path: '/course' },
-  { name: 'bibliothèque vélo', path: '/velo' },
   { name: 'bibliothèque surf', path: '/surf' },
   { name: 'analyse voile', path: paths.voile, open: true, ms: 7000 },
-  { name: 'analyse course', path: paths.course, open: true, ms: 6000 },
-  { name: 'analyse vélo', path: paths.velo, open: true, ms: 6000 },
   { name: 'analyse surf', path: paths.surf, open: true, ms: 6000 },
   { name: 'test FC repos', path: '/profil/fc-repos' },
   { name: 'enregistrer', path: '/enregistrer' },
@@ -313,10 +259,10 @@ for (const page of PAGES) {
   await sweep(page);
 }
 
-// Enregistrer en cours d'enregistrement (rejeu ×1 d'une course), les tailles passées sans recharger.
+// Enregistrer en cours d'enregistrement (rejeu ×1 d'une session de wingfoil), les tailles passées sans recharger.
 if (!process.env.PAGES || 'enregistrement'.includes(process.env.PAGES)) {
   const replay = join(workDir, 'rejeu.gpx');
-  writeFileSync(replay, hillGpx('running', 600, 3, 0, Date.now() - 700_000));
+  writeFileSync(replay, traceVoile({ debutMs: Date.now() - 700_000, secondes: 600, virageMin: 3, nom: 'Rejeu' }));
   await setSize(SIZES_ALL[3]);
   await go('/enregistrer', 2500);
   await evaluate(`[...document.querySelectorAll('input[type=radio]')][1]?.click(); 'ok'`);
@@ -372,5 +318,10 @@ writeFileSync(join(workDir, 'rapport.md'), md);
 writeFileSync(join(workDir, 'rapport.json'), JSON.stringify(report, null, 1));
 console.log(`\nRapport : ${join(workDir, 'rapport.md')}`);
 console.log('--- console (erreurs) ---');
-[...new Set(logs.filter((l) => l.startsWith('EXCEPTION:')))].slice(0, 10).forEach((l) => console.log(l));
-await close();
+const exceptions = [...new Set(logs.filter((l) => l.startsWith('EXCEPTION:')))];
+exceptions.slice(0, 10).forEach((l) => console.log(l));
+// Le relevé n'est pas un jugement sur les défauts de mise en page (il les liste) : le script vérifie qu'il a tout mesuré.
+check('chaque page est mesurée à chaque taille', pageNames.every((p) => report.filter((r) => r.page === p).length >= SIZES.length), pageNames.filter((p) => report.filter((r) => r.page === p).length < SIZES.length).join(', '));
+check("les deux bibliothèques, les deux analyses et l'enregistrement sont dans le relevé", !process.env.PAGES && ['bibliothèque voile', 'bibliothèque surf', 'analyse voile', 'analyse surf', 'enregistrement en cours', 'enregistrement terminé'].every((p) => pageNames.includes(p)) || Boolean(process.env.PAGES), pageNames.join(', '));
+check('aucune exception de la page', exceptions.length === 0, exceptions.join(' | '));
+await finish();

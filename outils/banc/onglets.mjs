@@ -1,27 +1,23 @@
-// Banc de test : onglets choisis par activité, et « tops » à pied et en surf (lot 3 des demandes du 14/10, seconde série).
+// Banc de test : onglets choisis par activité, et « tops » (lot 3 des demandes du 14/10, seconde série ; remis sur la voile
+// et le surf au lot 330).
 // Usage : node onglets.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 2 min. Le script :
-//  1. importe une course, une sortie à vélo, une session de surf et une session de voile (`make-gpx.mjs`), ouvre
-//     tous les onglets de chaque analyse et, avec `DUMP=x`, relève leur texte dans `x-course.txt`, `x-velo.txt`,
-//     `x-surf.txt` et `x-voile.txt` ; avec `RELEVE_SEUL=1`, il s'arrête là (pour la version d'avant le lot) ;
-//  2. dans Réglages, partie Onglet analyse : la ligne « Onglets » de Voile, Course, Route, Fractionné à pied, Surf et
-//     Surf foil, ses défauts (« tops » coché à vélo et en voile, pas à pied ni en surf ; « vols » et « pumping » sur foil seulement ;
-//     pas de « sauts » en fractionné ni en Course, qui ne les mesure pas d'office) ;
-//  3. « tops » coché et « vagues » caché en surf, « tops » coché en course, « vmg » caché en voile, rangés ;
-//  4. le surf : « tops » entre « rame » et « graphiques », « vagues » absent même laissé ouvert, le tableau,
-//     « Voir » puis « Masquer », surbrillance effacée quand l'onglet se ferme ; la course : « tops » et ses
-//     distances, « tout fermer » après la flèche (tout fermé, « avancé » tel quel), puis la même course rouverte
-//     sans `lib/onglets.mjs` : « général » seul, « avancé » fermé, anciens onglets retenus effacés (05/11) ; la voile :
-//     ni onglet ni panneau VMG ;
+//  1. importe une session de wingfoil, une de kite et une de surf (`lib/traces.mjs`), ouvre tous les onglets de chaque
+//     analyse et, avec `DUMP=x`, relève leur texte dans `x-wingfoil.txt`, `x-kite.txt` et `x-surf.txt` ; avec
+//     `RELEVE_SEUL=1`, il s'arrête là (pour la version d'avant un lot) ;
+//  2. dans Réglages, partie Onglet analyse : la ligne « Onglets » du Wingfoil, du Kite, du Surf et du Surf foil, ses
+//     défauts (« tops » montré en voile, pas en surf ; « vols » et « pumping » sur foil seulement) ;
+//  3. « tops » et « vagues » changés en surf, « tops » caché en kite, « vmg » caché en wingfoil, rangés par activité ;
+//  4. le surf : « tops » entre « rame » et « graphiques », « vagues » absent même laissé ouvert, le tableau, « Voir »
+//     puis « Masquer », surbrillance effacée quand l'onglet se ferme ; le wingfoil : « tops » et ses distances, « tout
+//     fermer » après la flèche (tout fermé, « avancé » tel quel), puis la même session rouverte sans `lib/onglets.mjs` :
+//     « général » seul, « avancé » fermé (05/11) ; le kite sans « tops » ; ni onglet ni panneau VMG en wingfoil ;
 //  5. à 390×844 : Réglages et l'analyse de surf sans débordement ;
-//  6. « Par défaut » (menu « … ») de la carte Surf : choix effacés, « tops » de nouveau caché.
-import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+//  6. « Par défaut » (menu « … ») de la carte Surf : choix effacés, « tops » de nouveau caché, les autres gardés.
+import { writeFileSync } from 'node:fs';
 import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { traceSurf, traceVoile } from './lib/traces.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -60,83 +56,43 @@ const panel = (title) => evaluate(`(() => {
   return t ? t.closest('.an-carte-panels > *').innerText.replace(/\\n+/g, ' / ') : '(absent)';
 })()`);
 
-// Le blocage par hôte ne vaut qu'avec `Network.enable` (fait par `connect`) : sans lui, Overpass répond parfois (504), et le relevé change.
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 let ongletsId = (await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS })).result.identifier;
-await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
+await blockNetwork(['*://*.openstreetmap.org/*']);
 
-// --- Sessions synthétiques ---
-/** Trace droite, vitesse par seconde donnée par `speedAt`, `type` lu par l'import. */
-const lineGpx = (type, seconds, speedAt, t0) => {
-  const lat = 43.7;
-  const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat * Math.PI) / 180);
-  const pts = [];
-  let m = 0;
-  for (let k = 0; k <= seconds; k++) {
-    const v = speedAt(k);
-    if (k > 0) m += v;
-    pts.push(`<trkpt lat="${lat}" lon="${(3.85 + m / mPerDegLon).toFixed(7)}"><ele>${(50 + 0.02 * m).toFixed(1)}</ele><time>${new Date(t0 + k * 1000).toISOString()}</time><extensions><speed>${v}</speed></extensions></trkpt>`);
-  }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Ligne</name><type>${type}</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
-};
-// Surf : la matinée de `surf.mjs`, phases [durée en s, vitesse en m/s, cap].
-const M_PER_DEG_LAT = 111_195;
-const surfGpx = (startMs, phases) => {
-  let lat = 43.4;
-  let lon = 3.6;
-  let t = 0;
-  const pts = [];
-  const push = (speed, heading) => pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><time>${new Date(startMs + t * 1000).toISOString()}</time>`
-    + `<extensions><speed>${speed}</speed>${speed > 0 ? `<course>${heading}</course>` : ''}</extensions></trkpt>`);
-  push(0, 0);
-  for (const [s, speed, heading = 0] of phases) {
-    for (let k = 0; k < s; k++) {
-      lat += (speed * Math.cos((heading * Math.PI) / 180)) / M_PER_DEG_LAT;
-      lon += (speed * Math.sin((heading * Math.PI) / 180)) / (M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
-      t += 1;
-      push(speed, heading);
-    }
-  }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Matinée</name><type>surf</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`;
-};
+// --- Sessions synthétiques : la matinée de surf [durée en s, vitesse en m/s, cap], un wingfoil et un kite ---
 const MORNING = [
   [60, 0], [60, 1.2], [50, 1], [4, 0.1], [40, 1], [4, 0.1], [26, 1], [90, 0.1],
   [6, 1.6, 180], [12, 5, 200], [100, 1], [60, 0.1],
   [5, 1.5, 180], [6, 6, 160], [2, 6, 250], [2, 6, 120], [10, 6, 160], [40, 1],
   [5, 1.6, 180], [8, 4.5, 190], [80, 1], [30, 0.1],
 ];
-const voilePath = join(tmpdir(), 'onglets-voile.gpx');
-execFileSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'make-gpx.mjs'), voilePath]);
-
-const T_RUN = Date.UTC(2026, 9, 1, 8, 0, 0);
-const T_BIKE = Date.UTC(2026, 9, 2, 8, 0, 0);
+const T_WING = Date.UTC(2026, 8, 20, 13, 0, 0);
+const T_KITE = Date.UTC(2026, 9, 2, 8, 0, 0);
 const T_SURF = Date.UTC(2026, 9, 3, 7, 0, 0);
-const T_VOILE = Date.UTC(2026, 8, 20, 13, 0, 0);
 const SESSIONS = [
-  // Course : 40 min à 3 m/s, dont 80 s à 5 m/s (400 m).
-  { page: 'course', start: T_RUN, gpx: lineGpx('running', 2400, (k) => (k >= 600 && k < 680 ? 5 : 3), T_RUN) },
-  { page: 'velo', start: T_BIKE, gpx: lineGpx('cycling', 1800, (k) => (k >= 300 && k < 400 ? 11 : 7), T_BIKE) },
-  { page: 'surf', start: T_SURF, gpx: surfGpx(T_SURF, MORNING) },
-  { page: 'voile', start: T_VOILE, gpx: readFileSync(voilePath, 'utf8') },
+  { cle: 'wingfoil', page: 'voile', start: T_WING, gpx: traceVoile({ debutMs: T_WING, type: 'wingfoil', bords: 2, virageMin: 3 }) },
+  { cle: 'kite', page: 'voile', start: T_KITE, gpx: traceVoile({ debutMs: T_KITE, type: 'kite', bords: 2, virageMin: 3, nom: 'Kite' }) },
+  { cle: 'surf', page: 'surf', start: T_SURF, gpx: traceSurf({ debutMs: T_SURF, phases: MORNING, nom: 'Matinée' }) },
 ];
 
 // --- 1. Import et relevé ---
 const paths = {};
 for (const s of SESSIONS) {
   await go(`/${s.page}`, 3000);
-  console.log(`import ${s.page} :`, await importGpx(s.gpx, `${s.page}.gpx`));
-  await waitFor(async () => (await records())?.some((r) => Math.abs((r.summary?.startMs ?? 0) - s.start) < 2000), { timeout: 8000, label: `fiche ${s.page}` });
-  await settle({ max: 2000, label: `import ${s.page}` });
+  console.log(`import ${s.cle} :`, await importGpx(s.gpx, `${s.cle}.gpx`));
+  await waitFor(async () => (await records())?.some((r) => Math.abs((r.summary?.startMs ?? 0) - s.start) < 2000), { timeout: 8000, label: `fiche ${s.cle}` });
+  await settle({ max: 2000, label: `import ${s.cle}` });
   const rec = (await records()).find((r) => Math.abs((r.summary?.startMs ?? 0) - s.start) < 2000);
-  paths[s.page] = `/${s.page}/analyse?session=${encodeURIComponent(rec?.gpx ?? '')}`;
-  check(`${s.page} rangée`, Boolean(rec));
+  paths[s.cle] = `/${s.page}/analyse?session=${encodeURIComponent(rec?.gpx ?? '')}`;
+  check(`${s.cle} rangée`, Boolean(rec));
 }
 for (const s of SESSIONS) {
-  await go(paths[s.page], 6000);
-  console.log(`${s.page}, onglets :`, await tabLabels());
+  await go(paths[s.cle], 6000);
+  console.log(`${s.cle}, onglets :`, await tabLabels());
   console.log('  ouverts :', await openAllTabs());
   await settle({ max: 5000 });
-  if (DUMP) writeFileSync(`${DUMP}-${s.page}.txt`, await evaluate('document.body.innerText'));
+  if (DUMP) writeFileSync(`${DUMP}-${s.cle}.txt`, await evaluate('document.body.innerText'));
 }
 if (RELEVE_SEUL) {
   console.log('\n--- console (erreurs, avertissements) ---');
@@ -146,7 +102,7 @@ if (RELEVE_SEUL) {
 }
 
 // --- 2. Réglages : la ligne « Onglets » ---
-const CARDS = { Voile: 'wingfoil', Course: 'running', Route: 'cycling', 'Fractionné à pied': 'run-intervals', Surf: 'surf', 'Surf foil': 'a-surf-foil' };
+const CARDS = { Wingfoil: 'wingfoil', Kite: 'kite', Surf: 'surf', 'Surf foil': 'a-surf-foil' };
 const openSettings = async () => {
   await go('/parametres', 3000);
   await evaluate(`(() => {
@@ -154,7 +110,7 @@ const openSettings = async () => {
     sections.settings = { ...sections.settings, activites: true };
     sections['settings-activities'] = ${JSON.stringify(Object.fromEntries(Object.values(CARDS).map((k) => [k, true])))};
     sections['settings-activity-parts'] = { analyse: true };
-    sections['settings-families'] = { voile: true, course: true, velo: true, fractionne: true, surf: true };
+    sections['settings-families'] = { voile: true, surf: true };
     localStorage.setItem('${CLES.sections}', JSON.stringify(sections));
     return 'ok';
   })()`);
@@ -174,7 +130,9 @@ const pressPill = (name, label) => evaluate(`(() => {
   if (!b) return 'absent'; b.click(); return 'ok';
 })()`);
 const rowMark = (name) => evaluate(`${tabsRow(name)}?.querySelector('.settings-sports__mark')?.textContent ?? '(aucune)'`);
-const storedTabs = () => evaluate(`JSON.stringify(JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}').tabs ?? null)`);
+/** Choix rangés, relus avec leurs clés triées : l'ordre d'écriture ne compte pas. */
+const triee = (valeur) => JSON.stringify(valeur, (_, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b))) : v));
+const storedTabs = async () => triee(JSON.parse(await evaluate(`JSON.stringify(JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}').tabs ?? null)`)));
 
 await openSettings();
 const shown = {};
@@ -182,23 +140,20 @@ for (const name of Object.keys(CARDS)) {
   shown[name] = await pills(name);
   console.log(`${name} :`, shown[name], '·', await rowMark(name));
 }
-check('Voile : tous montrés, « tops » et « sauts » compris', shown.Voile === 'général tops manœuvres graphiques cardio vmg sauts vols pumping vent matos et conditions réglages');
-// « sauts » absent de la ligne en Course : la Course ne mesure pas les sauts d'office (lot 165, 05/11).
-check('Course : « tops » relâché, pas de « sauts »', shown.Course.includes('(tops)') && !shown.Course.includes('sauts'));
-check('Route : « tops » enfoncé', / tops /.test(` ${shown.Route} `) && !shown.Route.includes('(tops)'));
-check('Fractionné à pied : pas de « sauts »', !shown['Fractionné à pied'].includes('sauts') && shown['Fractionné à pied'].includes('fractionné'));
-check('Surf : « tops » relâché, ni « vols » ni « pumping »', shown.Surf.includes('(tops)') && !shown.Surf.includes('vols') && !shown.Surf.includes('pumping'));
-check('Surf foil : « vols » puis « pumping »', shown['Surf foil'].includes('vols pumping'));
+check('Wingfoil : tous montrés, « tops », « sauts », « vols » et « pumping » compris', shown.Wingfoil === 'général tops manœuvres graphiques cardio vmg sauts vols pumping vent matos et conditions réglages', shown.Wingfoil);
+check('Kite : « tops » et « sauts » montrés, ni « vols » ni « pumping »', / tops /.test(` ${shown.Kite} `) && shown.Kite.includes('sauts') && !shown.Kite.includes('vols') && !shown.Kite.includes('pumping'), shown.Kite);
+check('Surf : « tops » relâché, ni « vols » ni « pumping »', shown.Surf.includes('(tops)') && !shown.Surf.includes('vols') && !shown.Surf.includes('pumping'), shown.Surf);
+check('Surf foil : « vols » puis « pumping »', shown['Surf foil'].includes('vols pumping'), shown['Surf foil']);
 check('« défaut » sans choix', (await rowMark('Surf')) === 'défaut');
 
 // --- 3. Choix ---
 console.log('Surf, tops :', await pressPill('Surf', 'tops')); await wait(300);
 console.log('Surf, vagues :', await pressPill('Surf', 'vagues')); await wait(300);
-console.log('Course, tops :', await pressPill('Course', 'tops')); await wait(300);
-console.log('Voile, vmg :', await pressPill('Voile', 'vmg')); await wait(500);
+console.log('Kite, tops :', await pressPill('Kite', 'tops')); await wait(300);
+console.log('Wingfoil, vmg :', await pressPill('Wingfoil', 'vmg')); await wait(500);
 const stored = await storedTabs();
 console.log('rangés :', stored);
-check('choix rangés par activité', stored === JSON.stringify({ surf: { tops: true, vagues: false }, running: { sauts: false, tops: true }, wingfoil: { vmg: false } }));
+check('choix rangés par activité', stored === triee({ surf: { tops: true, vagues: false }, kite: { tops: false }, wingfoil: { vmg: false } }), stored);
 check('Surf : « défaut » retiré', (await rowMark('Surf')) === '(aucune)');
 console.log('Surf :', await pills('Surf'));
 await shoot('onglets-reglages');
@@ -207,7 +162,7 @@ await shoot('onglets-reglages');
 await go(paths.surf, 6000);
 const surfTabs = await tabLabels();
 console.log('\nsurf, onglets :', surfTabs);
-check('surf : « tops » entre « rame » et « graphiques », sans « vagues »', /rame \| tops \| graphiques/.test(surfTabs) && !/vagues/.test(surfTabs));
+check('surf : « tops » entre « rame » et « graphiques », sans « vagues »', /rame \| tops \| graphiques/.test(surfTabs) && !/vagues/.test(surfTabs), surfTabs);
 // Ouvert au relevé du point 1 : l'application ne le retient plus (05/11), le banc le rejoue (`lib/onglets.mjs`).
 const memorized = await evaluate(`JSON.parse(localStorage.getItem('banc.onglets') ?? '{}').surf?.vagues`);
 check(`« vagues » laissé ouvert (${memorized}), son panneau absent`, memorized === true && (await panel('Vagues')) === '(absent)');
@@ -215,7 +170,7 @@ console.log('tops :', await clickTab('tops'));
 await settle({ max: 1500 });
 const surfTops = await panel('Meilleurs segments');
 console.log('panneau :', surfTops.slice(0, 400));
-check('surf : tableau des tops, 2 s à 10 km', /Sur\s+1er \(km\/h\)/.test(surfTops) && /2 s/.test(surfTops) && /10 km/.test(surfTops));
+check('surf : tableau des tops, 2 s à 10 km', /Sur\s+1er \(km\/h\)/.test(surfTops) && /2 s/.test(surfTops) && /10 km/.test(surfTops), surfTops.slice(0, 200));
 const voir = () => evaluate(`(() => {
   const p = [...document.querySelectorAll('.an-carte-panels [role=button]')].find((h) => h.textContent.trim().startsWith('Meilleurs segments'))?.closest('.an-carte-panels > *');
   const b = [...(p?.querySelectorAll('button') ?? [])].find((x) => !x.disabled && /Voir|Masquer/.test(x.textContent));
@@ -227,23 +182,24 @@ const before = await highlightPaths();
 console.log('Voir :', await voir()); await settle({ max: 800 });
 const during = await highlightPaths();
 console.log(`traits épais sur la carte : ${before} → ${during}`);
-check('« Voir » : « Masquer », podium tracé', (await shownButtons()) === 1 && during > before);
+check('« Voir » : « Masquer », podium tracé', (await shownButtons()) === 1 && during > before, `${await shownButtons()} ; ${before} → ${during}`);
 await shoot('onglets-surf-tops');
 console.log('fermer tops :', await clickTab('tops', true)); await wait(500);
 check('onglet fermé : surbrillance effacée', (await highlightPaths()) === before);
 console.log('rouvrir tops :', await clickTab('tops')); await settle({ max: 800 });
 check('rouvert : rien de ramené', (await shownButtons()) === 0);
 
-await go(paths.course, 6000);
-const runTabs = await tabLabels();
-console.log('\ncourse, onglets :', runTabs);
+await go(paths.wingfoil, 6000);
+const wingTabs = await tabLabels();
+console.log('\nwingfoil, onglets :', wingTabs);
 // « avancé » entre « général » et les autres onglets (22/10).
-check('course : « tops » juste après « général · avancé »', /^général \| avancé \| tops \|/.test(runTabs));
+check('wingfoil : « tops » juste après « général · avancé »', /^général \| avancé \| tops \|/.test(wingTabs), wingTabs);
+check('wingfoil : ni onglet ni panneau VMG', !/vmg/.test(wingTabs) && (await panel('Analyse VMG')) === '(absent)', wingTabs);
 console.log('tops :', await clickTab('tops'));
 await settle({ max: 1500 });
-const runTops = await panel('Meilleurs segments');
-console.log('panneau :', runTops.slice(0, 500));
-check('course : 400 m vers 18 km/h, semi et marathon', /400 m\s+18[.,]0/.test(runTops) && /semi/.test(runTops) && /marathon/.test(runTops));
+const wingTops = await panel('Meilleurs segments');
+console.log('panneau :', wingTops.slice(0, 500));
+check('wingfoil : tableau des tops, des 2 s aux distances', /Sur\s+1er/.test(wingTops) && /2 s/.test(wingTops) && /\d\s?(m|km|NM)\b/.test(wingTops), wingTops.slice(0, 300));
 
 // « tout fermer » (05/11) : après la flèche qui cache la barre ; ferme chaque onglet, « général » compris, « avancé » tel quel.
 const firstRow = () => evaluate(`[...(document.querySelector('.an-tabs > .ui-tabs')?.children ?? [])].map((b) => b.classList.contains('an-tabs-hide') ? '(flèche)' : b.textContent.trim()).join(' | ')`);
@@ -260,22 +216,21 @@ check('« tout fermer » : aucun panneau', (await evaluate(`document.querySelect
 check(`« tout fermer » : « avancé » inchangé (${advancedBefore})`, (await advancedState()) === advancedBefore);
 // Réouverture de la même session sans le banc qui rejoue les onglets : « général » seul, « avancé » fermé (05/11).
 await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: ongletsId });
-await go(paths.course, 6000);
+await go(paths.wingfoil, 6000);
 check('réouverture : « général » seul', (await pressedTabs()) === 'général', await pressedTabs());
 check('réouverture : « avancé » fermé', (await advancedState()) === 'false', await advancedState());
 await evaluate(`(() => { document.querySelector('.an-tabs-advanced-toggle')?.click(); return 'ok'; })()`);
 await settle({ max: 500 });
 console.log('tops (avancé ouvert) :', await clickTab('tops'));
 await settle({ max: 800 });
-await go(paths.course, 6000);
+await go(paths.wingfoil, 6000);
 check('même session rouverte après « tops » : « général » seul', (await pressedTabs()) === 'général', await pressedTabs());
 ongletsId = (await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS })).result.identifier;
 
-await go(paths.voile, 7000);
-const sailTabs = await tabLabels();
-console.log('\nvoile, onglets :', sailTabs);
-check('voile : ni onglet ni panneau VMG', !/vmg/.test(sailTabs) && (await panel('Analyse VMG')) === '(absent)');
-check('voile : « tops » toujours là', /tops/.test(sailTabs));
+await go(paths.kite, 7000);
+const kiteTabs = await tabLabels();
+console.log('\nkite, onglets :', kiteTabs);
+check('kite : « tops » caché par le choix de l\'activité, « vmg » toujours là', !/tops/.test(kiteTabs) && /vmg/.test(kiteTabs), kiteTabs);
 
 // --- 5. Téléphone ---
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
@@ -295,12 +250,12 @@ console.log('\nPar défaut :', await evaluate(`(async () => { const c = ${card('
 await wait(500);
 const afterReset = await storedTabs();
 console.log('rangés :', afterReset);
-check('Surf effacé, les autres gardés', afterReset === JSON.stringify({ running: { sauts: false, tops: true }, wingfoil: { vmg: false } }));
+check('Surf effacé, les autres gardés', afterReset === triee({ kite: { tops: false }, wingfoil: { vmg: false } }), afterReset);
 check('Surf : « défaut », « tops » relâché', (await rowMark('Surf')) === 'défaut' && (await pills('Surf')).includes('(tops)'));
 await go(paths.surf, 6000);
 const resetTabs = await tabLabels();
 console.log('surf, onglets :', resetTabs);
-check('surf : « vagues » revenu, « tops » parti', /vagues/.test(resetTabs) && !/tops/.test(resetTabs));
+check('surf : « vagues » revenu, « tops » parti', /vagues/.test(resetTabs) && !/tops/.test(resetTabs), resetTabs);
 
 console.log('\n--- console (erreurs, avertissements) ---');
 logs.forEach((l) => console.log(l));

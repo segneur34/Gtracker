@@ -47,8 +47,8 @@ export const POIGNEE_RETOUR = 'gtrackerBack';
 /** Dossier de travail du banc dans le dossier temporaire du système. */
 export const DOSSIER_BANC = `${PREFIXE_CLE}-banc`;
 
-/** Domaines bloqués d'ordinaire : relief de l'IGN, Overpass, tuiles, BRouter, imagerie satellite. */
-export const BLOCKED_URLS = ['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*', '*://server.arcgisonline.com/*'];
+/** Domaines bloqués d'ordinaire : tuiles d'OpenStreetMap et imagerie satellite (l'application n'appelle plus ni l'IGN, ni Overpass, ni BRouter). */
+export const BLOCKED_URLS = ['*://*.openstreetmap.org/*', '*://server.arcgisonline.com/*'];
 
 const DIAG = process.env.BANC_DIAG !== '0';
 /** Ligne de diagnostic, sur stderr. */

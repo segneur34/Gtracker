@@ -78,7 +78,7 @@ const runner = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.athletePr
 
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
-await blockNetwork(['*://data.geopf.fr/*', '*://overpass-api.de/*', '*://*.openstreetmap.org/*', '*://brouter.de/*']);
+await blockNetwork(['*://*.openstreetmap.org/*']);
 
 // --- Sessions synthétiques ---
 const lineGpx = (type, seconds, speedAt, t0) => {

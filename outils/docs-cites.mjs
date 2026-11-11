@@ -25,6 +25,9 @@ const DOCUMENTS = [
   'docs/INVENTAIRE.md',
   'docs/GLOSSAIRE.md',
   'docs/BACKLOG.md',
+  'outils/LISEZMOI.md',
+  'outils/banc/LISEZMOI.md',
+  'outils/banc/SCRIPTS.md',
 ]
 // Fichiers générés par la construction et ignorés par git : jamais parcourus, pour voir ici ce que voit un clone neuf
 // (vérification sur GitHub ; `licences.json` n'était trouvé que dans la copie Android, sur ce seul poste).

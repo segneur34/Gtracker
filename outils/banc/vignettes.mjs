@@ -2,7 +2,8 @@
 // Usage : node vignettes.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf ; tuiles fausses (`lib/tuiles.mjs` : damier beige et bleu pâle servi en 50 ms, sans réseau), le
 // reste bloqué. Le script :
-//  1. écrit 150 courses synthétiques de 20 min à 1 Hz (boucles de tailles et de lieux différents) et les importe ;
+//  1. écrit 60 sessions de voile synthétiques de 20 min à 1 Hz (boucles de tailles et de lieux différents, wingfoil et
+//     kite ; 150 avant le lot 330, ramenées à 60 pour tenir en quelques minutes) et les importe ;
 //  2. ouvre la bibliothèque à pied, la fait défiler jusqu'en bas puis attend que chaque vignette soit dessinée ;
 //     relève les cartes Leaflet vivantes (`.leaflet-container`), les compteurs du DOM (`Memory.getDOMCounters`), le
 //     tas JavaScript après un ramasse-miettes, les requêtes de tuiles (doubles, annulées) et leur répartition par
@@ -15,6 +16,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CACHES, CLES, connect } from './lib/cdp.mjs';
+import { enveloppeGpx, pointGpx } from './lib/traces.mjs';
 import { BLOCKED_EXCEPT_TILES, fakeTiles, formatTileStats } from './lib/tuiles.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -24,7 +26,7 @@ if (!port || !workDir) {
 }
 
 const b = await connect({ port, width: 1400, height: 1000, shotDir });
-const { send, evaluate, go, settle, waitFor, wait, blockNetwork, importFiles, records, close, logs } = b;
+const { send, evaluate, go, settle, waitFor, wait, blockNetwork, importFiles, records, logs, check, finish } = b;
 const tiles = await fakeTiles(b, { delayMs: 50 });
 await blockNetwork(BLOCKED_EXCEPT_TILES);
 const seconds = (ms) => `${(ms / 1000).toFixed(2).replace('.', ',')} s`;
@@ -35,8 +37,8 @@ b.onMessage((msg) => {
   if (msg.method === 'Network.responseReceived' && msg.params.type === 'Script') scripts.push(msg.params.response.url);
 });
 
-// 1. 150 courses : boucles de 300 à 1 200 m de rayon, sur une grille de lieux autour de Montpellier, une par jour.
-const COUNT = 150;
+// 1. 60 sessions : boucles de 300 à 1 200 m de rayon, sur une grille de lieux autour de Montpellier, une par jour.
+const COUNT = 60;
 const R = 6_371_000;
 const files = [];
 for (let i = 0; i < COUNT; i++) {
@@ -53,24 +55,25 @@ for (let i = 0; i < COUNT; i++) {
     const east = r * Math.cos(a) * (i % 2 ? Math.cos(a) : 1);
     const lat = lat0 + (north / R) * (180 / Math.PI);
     const lon = lon0 + (east / (R * Math.cos((lat0 * Math.PI) / 180))) * (180 / Math.PI);
-    pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><ele>50</ele><time>${new Date(t0 + s * 1000).toISOString()}</time></trkpt>`);
+    pts.push(pointGpx({ lat, lon, ms: t0 + s * 1000, vitesse: 4, alt: 50 }));
   }
   const path = join(workDir, `vignette-${String(i).padStart(3, '0')}.gpx`);
-  writeFileSync(path, `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Course ${i}</name><type>running</type><trkseg>\n${pts.join('\n')}\n</trkseg></trk></gpx>\n`);
+  writeFileSync(path, enveloppeGpx({ nom: `Session ${i}`, type: i % 4 === 0 ? 'kite' : 'wingfoil' }, pts));
   files.push(path);
 }
 
-await go('/course');
+await go('/voile');
 console.log('import             :', await importFiles(files, 'input[type=file][accept*=".gpx"][multiple]:not([disabled])'));
 const imported = await waitFor(async () => (await records()).length >= COUNT, { timeout: 240000, every: 1000, label: 'fiches' });
 console.log('fiches             :', imported ? COUNT : (await records()).length);
+check(`import : ${COUNT} fiches rangées`, Boolean(imported), (await records()).length);
 
 // 2. Bibliothèque rechargée, défilée jusqu'en bas.
 const READY = `[...document.querySelectorAll('.lib-row__preview')].filter((f) => f.querySelector('img.lib-row__preview-image, .leaflet-trace-pane canvas')).length`;
 const SCROLLER = `(() => { let el = document.querySelector('.lib-row'); while (el && el !== document.body) { const s = getComputedStyle(el).overflowY; if ((s === 'auto' || s === 'scroll') && el.scrollHeight > el.clientHeight) return el; el = el.parentElement; } return document.scrollingElement; })()`;
 scripts.length = 0;
 tiles.reset();
-await go('/course', 8000);
+await go('/voile', 8000);
 await waitFor(`document.querySelectorAll('.lib-row').length >= ${COUNT}`, { timeout: 20000, label: 'lignes' });
 await waitFor(`${READY} > 0`, { timeout: 20000, label: 'première vignette' });
 await settle({ max: 3000, label: 'bibliothèque' });
@@ -85,7 +88,9 @@ for (let step = 0; step < 400; step++) {
 await waitFor(`${READY} >= ${COUNT}`, { timeout: 120000, every: 250, label: 'toutes les vignettes' });
 await settle({ max: 5000, label: 'défilement' });
 console.log('défilement         :', seconds(Date.now() - t0), 'jusqu\'à la dernière vignette');
-console.log('vignettes prêtes   :', await evaluate(READY));
+const readyCount = await evaluate(READY);
+console.log('vignettes prêtes   :', readyCount);
+check(`bibliothèque : ${COUNT} vignettes dessinées après le défilement`, readyCount >= COUNT, readyCount);
 console.log('cartes vivantes    :', await evaluate(`document.querySelectorAll('.leaflet-container').length`));
 console.log('tuiles (défilement):', formatTileStats(tiles.stats()));
 console.log('tuiles par zoom    :', tiles.stats().byZoom || '(aucune)');
@@ -120,6 +125,7 @@ const mention = await evaluate(`(() => {
   ].join('\\n  ');
 })()`);
 console.log(`mention OSM        :\n  ${mention}`);
+check('vignette : mention d\'OpenStreetMap posée', mention.includes('OpenStreetMap'), mention.slice(0, 60));
 
 // 4. Captures : les six premières vignettes, par thème et par largeur.
 const capture = async (label) => {
@@ -136,7 +142,7 @@ for (const [sizeLabel, metrics] of SIZES) {
   await send('Emulation.setDeviceMetricsOverride', metrics);
   for (const [themeLabel, theme] of THEMES) {
     await evaluate(`localStorage.setItem('${CLES.theme}', ${JSON.stringify(JSON.stringify(theme))}); true`);
-    await go('/course', 8000);
+    await go('/voile', 8000);
     await waitFor(`[...document.querySelectorAll('.lib-row__preview')].slice(0, 6).every((f) => f.querySelector('img.lib-row__preview-image, .leaflet-tile-loaded, .leaflet-trace-pane canvas'))`, { timeout: 20000, label: `vignettes ${themeLabel} ${sizeLabel}` });
     // Tuiles et dernier dessin.
     await wait(800);
@@ -175,6 +181,7 @@ const timeList = async (label) => {
     return { n: list.length, ms: performance.now() - t };
   })()`);
   console.log(`list() ${label.padEnd(11)} :`, r ? `${r.n} tuiles en ${seconds(r.ms)}` : '(échec)');
+  check(`list() ${label.trim()} : les 10 000 tuiles écrites sont listées`, r?.n >= 10000, r?.n);
   // Calme pour l'écriture de l'index, s'il y en a un.
   await wait(1500);
 };
@@ -183,5 +190,4 @@ await timeList('2e charg.');
 
 console.log('--- console (erreurs, avertissements) ---');
 [...new Set(logs)].slice(0, 10).forEach((l) => console.log(l));
-await close();
-process.exit(0);
+await finish('Tout passe.');
