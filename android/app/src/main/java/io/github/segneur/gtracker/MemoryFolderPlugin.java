@@ -1,4 +1,4 @@
-package io.github.segneur.tracker;
+package io.github.segneur.gtracker;
 
 import android.app.Activity;
 import android.content.ContentResolver;

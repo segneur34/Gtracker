@@ -1,4 +1,4 @@
-package io.github.segneur.tracker;
+package io.github.segneur.gtracker;
 
 import android.os.Build;
 import android.os.Bundle;
@@ -14,7 +14,7 @@ import java.util.ArrayDeque;
 
 public class MainActivity extends BridgeActivity {
 
-    private static final String TAG = "TrackerRendu";
+    private static final String TAG = "GtrackerRendu";
     /** Recharges de la page permises après une chute du moteur de rendu, sur la fenêtre qui suit. */
     private static final int MAX_RENDER_RELOADS = 3;
     private static final long RENDER_RELOADS_WINDOW_MS = 10 * 60_000L;

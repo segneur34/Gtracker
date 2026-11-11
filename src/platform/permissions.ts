@@ -15,7 +15,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * navigateur, tout est sans objet et rien n'est demandé.
  */
 
-/** Plugin maison, `android/app/src/main/java/io/github/segneur/tracker/PermissionsPlugin.java`. */
+/** Plugin maison, `android/app/src/main/java/io/github/segneur/gtracker/PermissionsPlugin.java`. */
 interface PermissionsPlugin {
   batteryStatus(): Promise<{ unrestricted: boolean }>;
   requestUnrestrictedBattery(): Promise<void>;

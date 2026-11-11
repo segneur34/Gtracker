@@ -24,7 +24,7 @@ node outils/verif.mjs --rapide    typecheck, lint, tests des fichiers modifiés
 ## Android
 
 1. Clé de signature, une fois, **hors du dépôt** et sauvegardée ailleurs :
-   `keytool -genkeypair -v -keystore tracker-release.jks -alias tracker -keyalg RSA -keysize 2048 -validity 10000`
+   `keytool -genkeypair -v -keystore gtracker-release.jks -alias gtracker -keyalg RSA -keysize 2048 -validity 10000`
 2. Copier `android/keystore.properties.exemple` en `android/keystore.properties` (ignoré par git) et remplir `storeFile` (chemin du `.jks`, relatif à `android/app/` ou absolu), `storePassword`, `keyAlias`, `keyPassword`. Sans ce fichier, `assembleRelease` et `bundleRelease` refusent de sortir, et `assembleDebug` retombe sur la clé de debug du PC.
 3. Construire :
    ```
@@ -38,6 +38,6 @@ node outils/verif.mjs --rapide    typecheck, lint, tests des fichiers modifiés
 
 ## Ce qu'un changement casse
 
-- **`appId`** (`io.github.segneur.tracker.voile`, dans `capacitor.config.ts` et `android/app/build.gradle`) : Android y voit une autre application, installée à côté de la première, sans ses données.
+- **`appId`** (`io.github.segneur.gtracker`, dans `capacitor.config.ts` et `android/app/build.gradle`) : Android y voit une autre application, installée à côté de la première, sans ses données.
 - **La clé de signature** : Android refuse la mise à jour d'une application signée par une autre clé ; il faut la désinstaller, ce qui efface les données de l'application (réglages de l'appareil ; les sessions, dans le dossier mémoire hors de l'application, restent mais il faut le désigner de nouveau). Garder le `.jks` et ses mots de passe.
 - **`versionCode`** : il doit croître à chaque APK, sinon Android refuse la mise à jour. Il vaut majeure × 1 000 000 + mineure × 1 000 + correctif + 1 (0.00.00 → 1), le + 1 parce qu'Android exige un code d'au moins 1.

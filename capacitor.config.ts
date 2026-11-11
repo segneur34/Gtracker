@@ -7,7 +7,7 @@ const { version } = JSON.parse(readFileSync(new URL('./package.json', import.met
 // Application Android : `dist/` emballé dans une WebView (`docs/ETAT_DU_PROJET.md` §12).
 const config: CapacitorConfig = {
   // Identité de l'application sur le téléphone : la changer revient à en installer une autre.
-  appId: 'io.github.segneur.tracker.voile',
+  appId: 'io.github.segneur.gtracker',
   appName: 'Gtracker',
   webDir: 'dist',
   android: {

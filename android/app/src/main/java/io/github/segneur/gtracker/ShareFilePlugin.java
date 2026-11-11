@@ -1,4 +1,4 @@
-package io.github.segneur.tracker;
+package io.github.segneur.gtracker;
 
 import android.content.ClipData;
 import android.content.Intent;
@@ -68,8 +68,8 @@ public class ShareFilePlugin extends Plugin {
             getActivity().startActivity(chooser);
             call.resolve();
         } catch (Exception e) {
-            // Le détail technique va au journal (`adb logcat -s TrackerShare`), jamais à l'écran.
-            Log.w("TrackerShare", "partage impossible : " + e.getMessage());
+            // Le détail technique va au journal (`adb logcat -s GtrackerShare`), jamais à l'écran.
+            Log.w("GtrackerShare", "partage impossible : " + e.getMessage());
             call.reject("Partage impossible.");
         }
     }

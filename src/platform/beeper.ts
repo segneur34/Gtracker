@@ -43,7 +43,7 @@ export interface PatternTone {
   tone: ToneKind;
 }
 
-/** Greffon maison, `android/app/src/main/java/io/github/segneur/tracker/BeeperPlugin.java`. */
+/** Greffon maison, `android/app/src/main/java/io/github/segneur/gtracker/BeeperPlugin.java`. */
 interface BeeperPlugin {
   setInterval(options: { intervalMs: number | null; vibrate: boolean }): Promise<void>;
   validated(options: { vibrate: boolean }): Promise<void>;

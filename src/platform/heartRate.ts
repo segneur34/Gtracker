@@ -25,7 +25,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * rallumé) passe à `lost` sans être lâchée : personne ne rend la connexion,
  * et le greffon la cherche de nouveau seul, écran éteint compris, jusqu'à ce
  * qu'elle revienne ou que le dernier détenteur la rende (délais et journal
- * `TrackerHR` dans le greffon). Pendant la perte, `latestHeartRate` est nul :
+ * `GtrackerHR` dans le greffon). Pendant la perte, `latestHeartRate` est nul :
  * un trou dans la FC, jamais une valeur figée ; la première mesure revenue
  * rend l'état `connected`.
  *
@@ -78,7 +78,7 @@ export const BELT_STATE_LABEL: Record<BeltState, string> = {
   unsupported: "cet appareil ne donne pas de fréquence cardiaque",
 };
 
-/** Plugin maison, `android/app/src/main/java/io/github/segneur/tracker/HeartRatePlugin.java`. */
+/** Plugin maison, `android/app/src/main/java/io/github/segneur/gtracker/HeartRatePlugin.java`. */
 interface HeartRatePlugin {
   availability(): Promise<{ bluetooth: boolean; enabled: boolean; permitted: boolean; permission?: string }>;
   requestPermission(): Promise<{ permission: string }>;

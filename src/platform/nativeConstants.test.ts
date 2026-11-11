@@ -36,7 +36,7 @@ const packageSource = (path: string): string => {
 };
 
 const appJava = (name: string): string =>
-  fs.readFileSync(new URL(`../../android/app/src/main/java/io/github/segneur/tracker/${name}`, import.meta.url), 'utf8');
+  fs.readFileSync(new URL(`../../android/app/src/main/java/io/github/segneur/gtracker/${name}`, import.meta.url), 'utf8');
 
 const GPS_SERVICE = packageSource(
   '@capgo/background-geolocation/android/src/main/java/com/capgo/capacitor_background_geolocation/BackgroundGeolocationService.java'

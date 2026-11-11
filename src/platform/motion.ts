@@ -48,7 +48,7 @@ const MOTION_DIR = 'capteurs';
 /** Fichier de la capture d'un enregistrement, repéré par l'instant de l'en-tête de son journal. */
 export const motionCapturePath = (startedAtMs: number): string => `${MOTION_DIR}/${startedAtMs}.imu`;
 
-/** Plugin maison, `android/app/src/main/java/io/github/segneur/tracker/MotionPlugin.java`. */
+/** Plugin maison, `android/app/src/main/java/io/github/segneur/gtracker/MotionPlugin.java`. */
 interface MotionPlugin {
   capabilities(): Promise<{ accelerometer: boolean; gyroscope: boolean; barometer: boolean; accelMaxRange?: number }>;
   start(options: { startedAtMs: number; placement: JumpPlacement; foil: boolean }): Promise<{ path: string }>;

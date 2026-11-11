@@ -325,7 +325,7 @@ interface NativeEntry {
   mtimeMs: number;
 }
 
-/** Plugin maison, `android/app/src/main/java/io/github/segneur/tracker/MemoryFolderPlugin.java`. */
+/** Plugin maison, `android/app/src/main/java/io/github/segneur/gtracker/MemoryFolderPlugin.java`. */
 interface MemoryFolderPlugin {
   /** `persist: false` : accès le temps de la lecture, pas gardé par Android. */
   pickFolder(options?: { persist?: boolean }): Promise<{ uri: string | null; name?: string }>;

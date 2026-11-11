@@ -1,4 +1,4 @@
-package io.github.segneur.tracker;
+package io.github.segneur.gtracker;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -113,8 +113,8 @@ public class HeartRatePlugin extends Plugin {
      * liée n'est pas relancée en boucle.
      */
     private static final long STALL_MS = 20000;
-    /** Étiquette du journal (`adb logcat -s TrackerHR`). */
-    private static final String TAG = "TrackerHR";
+    /** Étiquette du journal (`adb logcat -s GtrackerHR`). */
+    private static final String TAG = "GtrackerHR";
 
     private final Handler main = new Handler(Looper.getMainLooper());
 

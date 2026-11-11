@@ -1,4 +1,4 @@
-package io.github.segneur.tracker;
+package io.github.segneur.gtracker;
 
 import android.app.Activity;
 import android.content.ComponentName;
@@ -61,7 +61,7 @@ import org.json.JSONObject;
 @CapacitorPlugin(name = "IncomingFile")
 public class IncomingFilePlugin extends Plugin {
 
-    private static final String TAG = "TrackerRecu";
+    private static final String TAG = "GtrackerRecu";
     /** Plafond d'un fichier reçu, le même qu'au listage de la mémoire (`MAX_LISTED_FILE_BYTES`, nativeConstants.test.ts). */
     private static final long MAX_BYTES = 30L * 1024 * 1024;
     /** Début du fichier où chercher sa signature. */

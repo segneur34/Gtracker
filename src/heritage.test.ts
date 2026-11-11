@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * Garde permanente du nom (lot 322) : plus aucun fichier du dépôt ne dit « tracker » (nom de l'ancienne application),
- * hors la porte d'import et quelques lignes qui attendent le lot 323. Les noms techniques viennent de
+ * hors la porte d'import et la ligne qui attend le lot 304. Les noms techniques viennent de
  * `core/appIdentity.ts`, les libellés disent « Gtracker ».
  *
  * Lit les fichiers texte de `src/`, `android/app/src/`, `outils/` et `public/`, plus quelques fichiers de la racine,
@@ -42,15 +42,6 @@ const NAMED_FILES = [
 
 /** Exceptions temporaires : motifs retirés de chaque ligne avant la recherche, avec le lot qui les retire. */
 const TEMPORARY: { lot: number; motif: RegExp; fichier?: string }[] = [
-  // Paquet Java et ses citations, identifiant d'application (lot 323).
-  { lot: 323, motif: /io\.github\.segneur\.tracker/g },
-  { lot: 323, motif: /io\/github\/segneur\/tracker/g },
-  // Étiquettes du journal Android (`adb logcat`), lot 323.
-  { lot: 323, motif: /Tracker[A-Z]\w+/g },
-  // Configuration de signature et sa mention dans `.gitignore`, lot 323.
-  { lot: 323, motif: /signingConfigs\.tracker/g },
-  { lot: 323, motif: /^\s*tracker \{/g, fichier: 'android/app/build.gradle' },
-  { lot: 323, motif: /Clé de signature et mot de passe de Tracker/g, fichier: 'android/.gitignore' },
   // Profil envoyé à BRouter, retiré avec le fichier au lot 304.
   { lot: 304, motif: /# Profil Tracker/g, fichier: 'src/planning/brouterProfile.ts' },
 ];
@@ -100,7 +91,7 @@ describe('garde du nom : plus de « tracker » hors de la porte d\'import', () =
   it('aucune ligne ne dit « tracker » (nom de fichier compris), hors exceptions', () => {
     const scanned = files.filter((file) => !NAMED_FILES.includes(file));
     const lines = scanned.flatMap(offendingLines);
-    const names = scanned.filter((file) => FORBIDDEN.test(file.replace(/io\/github\/segneur\/tracker\//g, '')));
+    const names = scanned.filter((file) => FORBIDDEN.test(file));
     expect([...names.map((file) => `nom de fichier : ${file}`), ...lines]).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-package io.github.segneur.tracker;
+package io.github.segneur.gtracker;
 
 import android.content.ContentResolver;
 import android.content.ContentValues;
@@ -72,8 +72,8 @@ public class DownloadsPlugin extends Plugin {
                     // Déjà absent.
                 }
             }
-            // Le détail technique va au journal (`adb logcat -s TrackerDownloads`), jamais à l'écran.
-            Log.w("TrackerDownloads", "écriture impossible : " + e.getMessage());
+            // Le détail technique va au journal (`adb logcat -s GtrackerDownloads`), jamais à l'écran.
+            Log.w("GtrackerDownloads", "écriture impossible : " + e.getMessage());
             call.reject("Écriture impossible.");
         }
     }

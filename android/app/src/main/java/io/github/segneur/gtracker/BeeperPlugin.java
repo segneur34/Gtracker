@@ -1,4 +1,4 @@
-package io.github.segneur.tracker;
+package io.github.segneur.gtracker;
 
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -38,7 +38,7 @@ import org.json.JSONObject;
 @CapacitorPlugin(name = "Beeper")
 public class BeeperPlugin extends Plugin {
 
-    private static final String TAG = "TrackerBeeper";
+    private static final String TAG = "GtrackerBeeper";
 
     /** Pause entre les trois bips de fin (comme beeper.ts), en millisecondes. */
     private static final int FINISH_GAP_MS = 250;
@@ -89,7 +89,7 @@ public class BeeperPlugin extends Plugin {
 
     private synchronized Handler handler() {
         if (handler == null) {
-            thread = new HandlerThread("TrackerBeeper");
+            thread = new HandlerThread("GtrackerBeeper");
             thread.start();
             handler = new Handler(thread.getLooper());
         }

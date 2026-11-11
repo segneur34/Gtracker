@@ -171,7 +171,7 @@ describe('référence du format des capteurs, écrite par le téléphone', () =>
 
   it('le plugin Android déclare les flux que le lecteur attend', () => {
     // Numéros, axes, unités et décalages ne vivent qu'en constantes privées de `MotionPlugin`, lié à Android : relus dans sa source.
-    const plugin = fs.readFileSync(new URL('../../android/app/src/main/java/io/github/segneur/tracker/MotionPlugin.java', import.meta.url), 'utf8');
+    const plugin = fs.readFileSync(new URL('../../android/app/src/main/java/io/github/segneur/gtracker/MotionPlugin.java', import.meta.url), 'utf8');
     expect(plugin).toContain(`header.put("format", "${IMU_FORMAT}")`);
     expect(plugin).toContain(`header.put("version", ${IMU_VERSION})`);
     for (const { id, kind, axes, unit, offset } of PHONE_STREAMS) {

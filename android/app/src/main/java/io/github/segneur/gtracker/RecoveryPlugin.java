@@ -1,4 +1,4 @@
-package io.github.segneur.tracker;
+package io.github.segneur.gtracker;
 
 import android.app.ActivityManager;
 import android.content.Context;
@@ -20,7 +20,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "Recovery")
 public class RecoveryPlugin extends Plugin {
 
-    private static final String TAG = "TrackerRecovery";
+    private static final String TAG = "GtrackerRecovery";
     /** Service du greffon @capgo/background-geolocation, nommé en toutes lettres : sa classe n'a pas à être publique. */
     private static final String GPS_SERVICE = "com.capgo.capacitor_background_geolocation.BackgroundGeolocationService";
 

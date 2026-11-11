@@ -14,7 +14,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const RACINE = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const PAQUET = 'java/io/github/segneur/tracker'
+const PAQUET = 'java/io/github/segneur/gtracker'
 const SOURCES = [
   join(RACINE, 'android/app/src/main', PAQUET, 'ImuWriter.java'),
   join(RACINE, 'android/app/src/test', PAQUET, 'ImuReference.java'),
@@ -33,7 +33,7 @@ const dossier = mkdtempSync(join(tmpdir(), 'imu-reference-'))
 try {
   const fichier = join(dossier, 'reference.imu')
   lancer('javac', ['-encoding', 'UTF-8', '-d', dossier, ...SOURCES])
-  lancer('java', ['-cp', dossier, 'io.github.segneur.tracker.ImuReference', fichier])
+  lancer('java', ['-cp', dossier, 'io.github.segneur.gtracker.ImuReference', fichier])
   // Remplacée seulement une fois entièrement écrite.
   copyFileSync(fichier, REFERENCE)
   console.log(`${relative(RACINE, REFERENCE)} : ${statSync(REFERENCE).size} octets.`)

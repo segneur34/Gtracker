@@ -25,10 +25,10 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "io.github.segneur.tracker"
+    namespace = "io.github.segneur.gtracker"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "io.github.segneur.tracker.voile"
+        applicationId "io.github.segneur.gtracker"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersionCode
@@ -40,7 +40,7 @@ android {
         }
     }
     signingConfigs {
-        tracker {
+        gtracker {
             if (keystorePropertiesFile.exists()) {
                 storeFile file(keystoreProperties['storeFile'])
                 storePassword keystoreProperties['storePassword']
@@ -51,10 +51,10 @@ android {
     }
     buildTypes {
         debug {
-            if (keystorePropertiesFile.exists()) signingConfig signingConfigs.tracker
+            if (keystorePropertiesFile.exists()) signingConfig signingConfigs.gtracker
         }
         release {
-            if (keystorePropertiesFile.exists()) signingConfig signingConfigs.tracker
+            if (keystorePropertiesFile.exists()) signingConfig signingConfigs.gtracker
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

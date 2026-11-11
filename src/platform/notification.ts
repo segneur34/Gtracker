@@ -24,7 +24,7 @@ export interface RecordingNotificationContent {
   chrono: { baseMs: number } | null;
 }
 
-/** Greffon maison, `android/app/src/main/java/io/github/segneur/tracker/RecordingNotificationPlugin.java`. */
+/** Greffon maison, `android/app/src/main/java/io/github/segneur/gtracker/RecordingNotificationPlugin.java`. */
 interface RecordingNotificationPlugin {
   show(options: {
     title: string;

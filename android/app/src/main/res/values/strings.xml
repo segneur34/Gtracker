@@ -2,8 +2,8 @@
 <resources>
     <string name="app_name">Gtracker</string>
     <string name="title_activity_main">Gtracker</string>
-    <string name="package_name">io.github.segneur.tracker.voile</string>
-    <string name="custom_url_scheme">io.github.segneur.tracker.voile</string>
+    <string name="package_name">io.github.segneur.gtracker</string>
+    <string name="custom_url_scheme">io.github.segneur.gtracker</string>
     <!-- Nom du canal de la notification de l'enregistrement (greffon @capgo/background-geolocation). -->
     <string name="capacitor_background_geolocation_notification_channel_name">Enregistrement</string>
 </resources>

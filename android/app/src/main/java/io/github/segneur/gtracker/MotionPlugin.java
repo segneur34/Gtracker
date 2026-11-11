@@ -1,4 +1,4 @@
-package io.github.segneur.tracker;
+package io.github.segneur.gtracker;
 
 import android.content.Context;
 import android.hardware.Sensor;
@@ -37,7 +37,7 @@ import org.json.JSONObject;
 @CapacitorPlugin(name = "Motion")
 public class MotionPlugin extends Plugin implements SensorEventListener {
 
-    private static final String TAG = "TrackerMotion";
+    private static final String TAG = "GtrackerMotion";
     /** Ce que la page dit d'une écriture en échec ; la cause va au journal d'Android. */
     private static final String WRITE_ERROR = "erreur du stockage du téléphone";
 
@@ -86,7 +86,7 @@ public class MotionPlugin extends Plugin implements SensorEventListener {
 
     private synchronized Handler handler() {
         if (handler == null) {
-            thread = new HandlerThread("TrackerCapteurs");
+            thread = new HandlerThread("GtrackerCapteurs");
             thread.start();
             handler = new Handler(thread.getLooper());
         }
