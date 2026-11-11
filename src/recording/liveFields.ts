@@ -10,8 +10,8 @@ import { LIVE_STATS_DEFAULTS, type LiveStats, type LiveStatsOptions } from './li
 /**
  * Chiffres en grand de l'enregistrement quand la carte est réduite, choisis
  * par activité dans Réglages : jusqu'à `MAX_LIVE_FIELDS`, parmi ceux qui ont
- * un sens pour son traitement. Un chiffre de la terre (pente, D+, puissance,
- * énergie) rangé par l'application complète est écarté à la lecture.
+ * un sens pour son traitement. Un chiffre inconnu de ce catalogue est écarté
+ * à la lecture.
  * Ceux de la notification de l'enregistrement viennent du même catalogue,
  * choisis à part, `MAX_NOTIFICATION_FIELDS` au plus, avec en plus ceux qui
  * ne vont qu'à elle (`NOTIFICATION_ONLY_FIELDS`). Libellés et valeurs sont

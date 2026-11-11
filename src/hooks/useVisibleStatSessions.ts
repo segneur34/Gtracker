@@ -13,8 +13,7 @@ import { effectiveFoil, useVisibility } from './useSportSettings';
  * activité de base, hors de la liste (son calcul sans activité créée, activité
  * supprimée) : elle est gardée, et son activité ajoutée à `activityById` pour
  * son nom et sa couleur. `foil` : celui de la session, sinon de son activité (`sessionFoil`).
- * Les sessions d'une famille retirée de cette version (l'Entraînement, lot 302)
- * restent comptées, bien que la famille soit toujours cachée.
+ * Une session à classer (sans calcul) n'a pas d'activité : elle n'est pas comptée.
  */
 export interface VisibleStatSessions {
   all: StatSession[];

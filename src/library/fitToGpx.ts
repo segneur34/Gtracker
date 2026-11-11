@@ -43,7 +43,7 @@ const fixOf = (record: FitRecord): LocationFix => ({
 
 /**
  * Points à positions de la trace, un tableau par continu de la minuterie : un point relevé pendant une pause (après
- * l'arrêt, avant le départ) n'est pas gardé, à l'image d'une pause de Tracker. Rien n'y dépend de la cadence.
+ * l'arrêt, avant le départ) n'est pas gardé, à l'image d'une pause de l'enregistrement. Rien n'y dépend de la cadence.
  */
 const fitSegments = (records: readonly FitRecord[], events: readonly FitTimerEvent[]): LocationFix[][] => {
   const located = records.filter((r) => r.lat !== undefined && r.lon !== undefined);

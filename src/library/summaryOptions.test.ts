@@ -53,10 +53,10 @@ describe('nouveau résumé gardé avec ses manœuvres', () => {
     expect(next.summary.maneuverResults).toEqual({ success: 10 });
     expect(withSummary({ ...record, summary: null }, fresh).summary).toEqual(fresh);
   });
-  it('garde aussi le pumping, le vent et la puissance posés par l’analyse (lot 145)', () => {
-    const record = sessionRecord({}, { pumpingShare: 0.3, windDirDeg: 200, avgPowerW: 150 });
+  it('garde aussi le pumping et le vent posés par l’analyse (lot 145)', () => {
+    const record = sessionRecord({}, { pumpingShare: 0.3, windDirDeg: 200 });
     const next = withSummary(record, sessionRecord({}, { distanceM: 30_000 }).summary);
-    expect(next.summary).toMatchObject({ distanceM: 30_000, pumpingShare: 0.3, windDirDeg: 200, avgPowerW: 150 });
+    expect(next.summary).toMatchObject({ distanceM: 30_000, pumpingShare: 0.3, windDirDeg: 200 });
   });
 });
 
@@ -121,9 +121,9 @@ describe('résumé à refaire quand les réglages changent (lot 37)', () => {
     expect(isSummaryOutdated(sessionRecord({ sport: 'kite' }), of(course))).toBe(true);
   });
 
-  it("calcul de l'application complète, inconnu ou absent : jamais, sauf version du calcul dépassée", () => {
-    // Calculs de l'application complète (lot 305) ou inconnus : la fiche n'est jamais réécrite d'office.
-    for (const sport of ['running', 'cycling', 'muscu', 'moth', null] as (SportType | null)[]) {
+  it('calcul inconnu ou absent : jamais, sauf version du calcul dépassée', () => {
+    // Calcul inconnu : la fiche n'est jamais réécrite d'office.
+    for (const sport of ['moth', null] as (SportType | null)[]) {
       const record = sessionRecord({ sport });
       expect(isSummaryOutdated(record, of(course))).toBe(false);
       expect(isSummaryOutdated({ ...record, summary: { ...record.summary, calcVersion: SUMMARY_CALC_VERSION - 1 } }, of(course))).toBe(true);

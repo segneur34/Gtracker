@@ -245,7 +245,7 @@ export const importFiles = (files: File[]): Promise<ImportReport> =>
 
 /**
  * Sur le téléphone, ajoute les sessions d'un dossier que l'utilisateur désigne
- * (un dossier Tracker copié depuis le PC) : `importEntries` sur ses GPX, ses FIT, ses
+ * (un dossier de sessions copié depuis le PC) : `importEntries` sur ses GPX, ses FIT, ses
  * fiches et ses capteurs, lus un par un. L'import est annoncé dès le
  * sélecteur, boutons grisés. `null` si l'utilisateur renonce.
  */

@@ -6,7 +6,7 @@ describe('isSportType', () => {
   it('ne reconnaît que les supports du profil', () => {
     expect(isSportType('wingfoil')).toBe(true);
     expect(isSportType('surf')).toBe(true);
-    // Les calculs de l'application complète n'en sont plus (lot 305).
+    // Ni la course ni l'Entraînement n'en sont (lot 305).
     expect(isSportType('running')).toBe(false);
     expect(isSportType('muscu')).toBe(false);
     expect(isSportType('toString')).toBe(false);

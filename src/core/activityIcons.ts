@@ -5,8 +5,8 @@ import type { SportType } from './types';
  * Icône d'une activité : choisie dans Réglages parmi cette liste, sinon
  * devinée de son nom puis de son calcul. Plus d'icônes que de calculs : kayak
  * ou paddle vont aux activités que l'utilisateur crée sur un calcul voisin
- * (surf). Une icône de l'application complète (course, vélo, fractionné) est
- * ignorée à la lecture (`isActivityIconId`) : l'icône redevient devinée.
+ * (surf). Une icône inconnue de cette liste est ignorée à la lecture
+ * (`isActivityIconId`) : l'icône redevient devinée.
  */
 
 export const ACTIVITY_ICON_IDS = [

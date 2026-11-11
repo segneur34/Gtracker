@@ -3,7 +3,7 @@ import type { HeartRateBelt } from './heartRate';
 /**
  * Appareils cardio retenus sur ce téléphone (lot 198) : ceintures, montres en
  * diffusion. L'application s'en souvient de plusieurs et n'en lit qu'un à la
- * fois, l'appareil actif, gardé à part sous l'ancienne clé (`savedBelt`). Ici,
+ * fois, l'appareil actif, marqué dans la liste (`savedBelt`). Ici,
  * les calculs purs sur la liste ; la lecture et l'écriture sont dans
  * `platform/heartRate.ts`. Les entrées lues du stockage peuvent être gelées :
  * rien n'est modifié en place, chaque calcul rend une liste neuve.
@@ -22,23 +22,37 @@ export const beltEntry = (belt: HeartRateBelt): HeartRateBelt => ({
   ...(belt.random !== undefined && { random: belt.random }),
 });
 
+/** Appareil retenu tel que rangé : l'actif, celui du prochain départ, porte `active: true`. */
+export type StoredBelt = HeartRateBelt & { active?: true };
+
+/** Appareils retenus : la liste, dans l'ordre où ils ont été ajoutés, et l'actif (`null` : aucun). */
+export interface BeltList {
+  list: HeartRateBelt[];
+  active: HeartRateBelt | null;
+}
+
 /**
- * Liste retenue, telle qu'elle doit se lire : `stored` (la nouvelle clé, brute)
- * et `active` (l'ancienne clé). Liste absente ou illisible : celle de l'appareil
- * actif seul, ou vide, sans rien effacer. Entrées illisibles écartées, adresses
- * en double fondues (la première reste). Appareil actif absent de la liste
- * (choisi par une version d'avant la liste) : ajouté en tête.
+ * Liste retenue, telle qu'elle doit se lire depuis sa clé (`stored`, brute) : absente ou illisible, vide.
+ * Entrées illisibles écartées, adresses en double fondues (la première reste) ; l'actif est la première
+ * entrée gardée marquée `active`, aucun sans marque.
  */
-export const readBeltList = (stored: unknown, active: HeartRateBelt | null): HeartRateBelt[] => {
+export const readBeltList = (stored: unknown): BeltList => {
   const list: HeartRateBelt[] = [];
+  let active: HeartRateBelt | null = null;
   if (Array.isArray(stored)) {
     for (const item of stored) {
-      if (isBelt(item) && !list.some((b) => b.address === item.address)) list.push(beltEntry(item));
+      if (!isBelt(item) || list.some((b) => b.address === item.address)) continue;
+      const entry = beltEntry(item);
+      list.push(entry);
+      if (active === null && (item as StoredBelt).active === true) active = entry;
     }
   }
-  if (active && !list.some((b) => b.address === active.address)) list.unshift(beltEntry(active));
-  return list;
+  return { list, active };
 };
+
+/** Liste à ranger : chaque appareil réduit à ce qui se retient, l'actif marqué (aucun si `active` n'y est pas). */
+export const storedBeltList = (list: readonly HeartRateBelt[], active: HeartRateBelt | null): StoredBelt[] =>
+  list.map((b) => (active !== null && b.address === active.address ? { ...beltEntry(b), active: true as const } : beltEntry(b)));
 
 /** Ajoute `belt` à la fin de la liste ; déjà retenu (même adresse), son entrée prend le nom et le type d'adresse donnés, à sa place. */
 export const addBelt = (list: readonly HeartRateBelt[], belt: HeartRateBelt): HeartRateBelt[] => {

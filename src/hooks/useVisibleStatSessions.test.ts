@@ -56,12 +56,12 @@ describe('foil des Statistiques', () => {
   });
 });
 
-describe("fiches de l'application complète (lot 305)", () => {
-  it("une session de l'Entraînement, relue sans calcul, n'est pas comptée ; celles d'une famille cachée non plus", async () => {
+describe('sessions à classer', () => {
+  it("une session sans calcul n'est pas comptée ; celles d'une famille cachée non plus", async () => {
     vi.resetModules();
     const { visibleStatSessions } = await import('./useVisibleStatSessions');
     const sessions = [
-      session(sessionRecord({ gpx: 'a.gpx', sport: null, activityId: 'run-intervals' })),
+      session(sessionRecord({ gpx: 'a.gpx', sport: null, activityId: 'moth' })),
       session(sessionRecord({ gpx: 'b.gpx', sport: 'surf', activityId: 'surf' })),
     ];
     expect(visibleStatSessions(sessions, [surf], () => false).all).toEqual([]);

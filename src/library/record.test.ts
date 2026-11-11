@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeDeg } from '../core/angles';
-import { isFiniteNumber, isObject } from '../core/basics';
+import { isFiniteNumber, isObject, stringifyJson } from '../core/basics';
 import { isValidSpeedRange } from '../core/speedGradient';
 
 import { EMPTY_NOTES } from './notes';
@@ -10,7 +10,6 @@ import {
   RECORD_LIGHT_FIELDS,
   RECORD_LIGHT_FIELDS_KEY,
   RECORD_VERSION,
-  SUMMARY_BESTS_BOUNDS,
   SUMMARY_CALC_VERSION,
   applyRecordPatch,
   carryRecordEdits,
@@ -34,23 +33,8 @@ import {
 } from './record';
 import type { SessionSurfaces } from '../planning/surface';
 import { carriedSettings } from './record';
+import { TRACKER_WING_RECORD } from '../test/legacyImport.fixture';
 import { familyRecords, sessionRecord } from '../test/record.fixture';
-
-/** Forme du test guidé (FC max) d'avant le lot 302, gardé brut dans la fiche (`record.test`) jusqu'au lot 305. */
-interface SessionTest {
-  protocol: string;
-  version: number;
-  settings: Record<string, unknown>;
-  startMs: number;
-  rampStartMs: number | null;
-  v0Ms: number | null;
-  steps: { startMs: number; targetMs: number }[];
-  rampEndMs: number | null;
-  dropMs: number | null;
-  endReason: string | null;
-  endMs: number | null;
-  signals: { t: number; s: string }[];
-}
 
 const START_MS = Date.UTC(2026, 8, 23, 12, 0, 0);
 
@@ -80,20 +64,14 @@ describe('parseRecord et serializeRecord', () => {
   });
 
   it('relisent les chiffres du partage (lot 145) et écartent les valeurs absurdes', () => {
-    const fields = { best1kmS: 272, best5minMs: 9.1, pumpingShare: 0.35, windDirDeg: 230, avgPowerW: 182 };
+    const fields = { pumpingShare: 0.35, windDirDeg: 230 };
     const back = parseRecord(serializeRecord(record({ summary: { ...record().summary, ...fields } })))!.summary;
     expect(back).toMatchObject(fields);
-    const abimee = { ...record(), summary: { ...record().summary, best1kmS: -3, best5minMs: 'x', pumpingShare: 1.5, windDirDeg: 400, avgPowerW: Number.NaN } };
+    const abimee = { ...record(), summary: { ...record().summary, pumpingShare: 1.5, windDirDeg: 400 } };
     const lue = parseRecord(JSON.stringify(abimee))!.summary;
     for (const key of Object.keys(fields)) expect(key in lue).toBe(false);
-    // Plages nommées : meilleur kilomètre de 60 à 3 600 s, meilleures 5 min de 0,5 à 40 m/s.
-    const horsPlage = { ...record(), summary: { ...record().summary, best1kmS: 30, best5minMs: 45 } };
-    const relue = parseRecord(JSON.stringify(horsPlage))!.summary;
-    expect('best1kmS' in relue).toBe(false);
-    expect('best5minMs' in relue).toBe(false);
-    const bornes = parseRecord(JSON.stringify({ ...record(), summary: { ...record().summary, best1kmS: 3600, best5minMs: 0.5 } }))!.summary;
-    expect(bornes).toMatchObject({ best1kmS: 3600, best5minMs: 0.5 });
-    expect('best1kmS' in parseRecord(JSON.stringify({ ...record(), summary: { ...record().summary, best1kmS: 3601 } }))!.summary).toBe(false);
+    const bornes = parseRecord(JSON.stringify({ ...record(), summary: { ...record().summary, pumpingShare: 1, windDirDeg: 0 } }))!.summary;
+    expect(bornes).toMatchObject({ pumpingShare: 1, windDirDeg: 0 });
   });
 
   it("relisent l'empreinte des réglages du résumé (lot 37), et écartent une empreinte qui n'est pas un texte", () => {
@@ -110,15 +88,6 @@ describe('parseRecord et serializeRecord', () => {
     expect(parseRecord(serializeRecord(r))?.summary.heartRate).toEqual(heartRate);
     const abimee = { ...record(), summary: { ...record().summary, heartRate: { avgBpm: 148, maxBpm: 171, coveredS: 2400, histogram: { fromBpm: 120, seconds: ['x'] } } } };
     expect(parseRecord(JSON.stringify(abimee))?.summary.heartRate).toBeUndefined();
-  });
-
-  it("gardent brut le test d'un résumé de l'application complète, et le réécrivent tel quel (lot 301)", () => {
-    for (const test of [{ hrMaxBpm: 189, lastStepSpeedMs: 3.9, steps: 12 }, { hrMaxBpm: 189, steps: 'x' }]) {
-      const text = JSON.stringify({ ...record(), summary: { ...record().summary, test } });
-      const read = parseRecord(text)!;
-      expect((read.summary as unknown as Record<string, unknown>).test).toEqual(test);
-      expect(JSON.parse(serializeRecord(read)).summary.test).toEqual(test);
-    }
   });
 
   it('relisent une fiche à l\'identique', () => {
@@ -187,18 +156,8 @@ describe('parseRecord et serializeRecord', () => {
 
 describe("réglages d'analyse de la fiche", () => {
   it("sont relus à l'identique", () => {
-    const r = record({ analysis: { windDeg: 315, activeThreshold: 6.5, referenceSpeedMs: 2.3, speedRange: { minMs: 2, maxMs: 8 }, effortThresholdMs: 3.6, foil: null, pumping: null, waveThreshold: null, bikeWeightKg: null, loadKg: null, savedAt: START_MS + 20 } });
+    const r = record({ analysis: { windDeg: 315, activeThreshold: 6.5, referenceSpeedMs: 2.3, speedRange: { minMs: 2, maxMs: 8 }, foil: null, pumping: null, waveThreshold: null, savedAt: START_MS + 20 } });
     expect(parseRecord(serializeRecord(r))?.analysis).toEqual(r.analysis);
-  });
-
-  it('relisent le poids du vélo et la charge, et écartent les valeurs hors bornes', () => {
-    const base = { windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, effortThresholdMs: null, foil: null, pumping: null, waveThreshold: null, terrain: null, savedAt: 1 };
-    const ok = record({ analysis: { ...base, bikeWeightKg: 14.5, loadKg: 0 } });
-    expect(parseRecord(serializeRecord(ok))?.analysis).toMatchObject({ bikeWeightKg: 14.5, loadKg: 0 });
-    const bad = record({ analysis: { ...base, bikeWeightKg: 1, loadKg: -3 } });
-    expect(parseRecord(serializeRecord(bad))?.analysis).toMatchObject({ bikeWeightKg: null, loadKg: null });
-    const { bikeWeightKg: _b, loadKg: _l, ...old } = ok.analysis!;
-    expect(parseRecord(serializeRecord(record({ analysis: old as typeof ok.analysis })))?.analysis).toMatchObject({ bikeWeightKg: null, loadKg: null });
   });
 
   it('valent `null` dans une fiche écrite avant eux', () => {
@@ -214,13 +173,6 @@ describe("réglages d'analyse de la fiche", () => {
   it("donnent les couleurs des Réglages à une fiche d'avant les couleurs par session", () => {
     const raw = { ...record(), analysis: { windDeg: 90, activeThreshold: 4, referenceSpeedMs: null, savedAt: START_MS } };
     expect(parseRecord(JSON.stringify(raw))?.analysis?.speedRange).toBeNull();
-  });
-
-  it("donnent le seuil d'effort tiré de la session à une fiche d'avant lui, ou qui en porte un mal formé", () => {
-    const before = { ...record(), analysis: { windDeg: 90, activeThreshold: 4, referenceSpeedMs: null, speedRange: null, savedAt: START_MS } };
-    expect(parseRecord(JSON.stringify(before))?.analysis?.effortThresholdMs).toBeNull();
-    const broken = { ...before, analysis: { ...before.analysis, effortThresholdMs: -2 } };
-    expect(parseRecord(JSON.stringify(broken))?.analysis?.effortThresholdMs).toBeNull();
   });
 
   it("donnent le foil de l'activité à une fiche d'avant le foil par session, ou qui en porte un mal formé", () => {
@@ -246,11 +198,11 @@ describe("réglages d'analyse de la fiche", () => {
   it('ramènent le vent dans [0, 360) et écartent les valeurs mal formées', () => {
     const raw = { ...record(), analysis: { windDeg: -45, activeThreshold: -2, referenceSpeedMs: 0, futur: true } };
     expect(parseRecord(JSON.stringify(raw))?.analysis).toEqual({
-      windDeg: 315, activeThreshold: null, referenceSpeedMs: null, speedRange: null, effortThresholdMs: null, foil: null, pumping: null, waveThreshold: null, bikeWeightKg: null, loadKg: null, savedAt: 0, futur: true,
+      windDeg: 315, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, savedAt: 0, futur: true,
     });
-    const texte = { ...record(), analysis: { windDeg: 'nord', activeThreshold: '8', referenceSpeedMs: '3', effortThresholdMs: '4' } };
+    const texte = { ...record(), analysis: { windDeg: 'nord', activeThreshold: '8', referenceSpeedMs: '3' } };
     expect(parseRecord(JSON.stringify(texte))?.analysis).toEqual({
-      windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, effortThresholdMs: null, foil: null, pumping: null, waveThreshold: null, bikeWeightKg: null, loadKg: null, savedAt: 0,
+      windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, savedAt: 0,
     });
     const negative = { ...record(), analysis: { windDeg: null, activeThreshold: null, referenceSpeedMs: -1.5 } };
     expect(parseRecord(JSON.stringify(negative))?.analysis?.referenceSpeedMs).toBeNull();
@@ -285,39 +237,6 @@ describe('voies suivies de la fiche', () => {
     expect(added).toEqual({ record: { ...record(), surfaces }, resummarize: false });
     expect(applyRecordPatch(added.record, { activityId: 'trail' }).record.surfaces).toEqual(surfaces);
     expect(applyRecordPatch(added.record, { surfaces: null }).record).not.toHaveProperty('surfaces');
-  });
-});
-
-describe('séances du compteur de la fiche', () => {
-  const intervals = [{
-    workout: { reps: 2, workS: 60, restS: 30 },
-    laps: [
-      { kind: 'travail' as const, rep: 1, startMs: START_MS, endMs: START_MS + 60_000 },
-      { kind: 'repos' as const, rep: 1, startMs: START_MS + 60_000, endMs: START_MS + 90_000 },
-    ],
-  }];
-
-  it('sont relues à l\'identique, absentes sans compteur', () => {
-    expect(parseRecord(serializeRecord(record({ intervals })))?.intervals).toEqual(intervals);
-    expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('intervals');
-  });
-
-  it('mal formées, sont gardées brutes : la fiche ne les lit plus (lot 301)', () => {
-    expect(parseRecord(JSON.stringify({ ...record(), intervals: 'trois fois' }))?.intervals).toBe('trois fois');
-    const bad = [{ workout: {}, laps: intervals[0].laps }];
-    expect(parseRecord(JSON.stringify({ ...record(), intervals: bad }))?.intervals).toEqual(bad);
-  });
-
-  it("complètent une fiche qui n'en a pas, sans écraser les siennes", () => {
-    expect(completeRecord(record(), record({ intervals })).record.intervals).toEqual(intervals);
-    const own = [{ ...intervals[0], workout: { reps: 3, workS: 30, restS: 30 } }];
-    expect(completeRecord(record({ intervals: own }), record({ intervals })).record.intervals).toEqual(own);
-    expect(completeRecord(record({ intervals: [] }), record({ intervals })).record.intervals).toEqual(intervals);
-  });
-
-  it('restent quand l\'activité ou le support changent, même une fiche de fractionné classée en surf (lot 305)', () => {
-    const changed = applyRecordPatch(record({ sport: null, intervals }), { sport: 'surf', activityId: 'surf' });
-    expect(changed.record.intervals).toEqual(intervals);
   });
 });
 
@@ -414,18 +333,14 @@ describe('fiche allégée du cache', () => {
     tags: ['highway=residential'], runs: [[0, 0]],
   };
   const jumps: SessionJumps = { version: 1, computedAt: '2026-10-08T14:00:00.000Z', jumps: [] };
-  const intervals = [{
-    workout: { reps: 1, workS: 60, restS: 30 },
-    laps: [{ kind: 'travail' as const, rep: 1, startMs: START_MS, endMs: START_MS + 60_000 }],
-  }];
   const full = {
-    ...record({ name: 'Sortie', elevationSource: 'gps', intervals, terrainElevation, surfaces, jumps }),
+    ...record({ name: 'Sortie', elevationSource: 'gps', terrainElevation, surfaces, jumps }),
     venuDuFutur: { lourd: true },
   } as SessionRecord;
 
   it("ne garde que ce que la liste montre et ce que l'utilisateur saisit", () => {
     const light = lightRecord(full);
-    expect(light).toEqual(record({ name: 'Sortie', elevationSource: 'gps', intervals }));
+    expect(light).toEqual(record({ name: 'Sortie', elevationSource: 'gps' }));
     for (const key of ['terrainElevation', 'surfaces', 'jumps', 'venuDuFutur']) expect(light).not.toHaveProperty(key);
   });
 
@@ -518,7 +433,7 @@ describe('dedupeSessions', () => {
 });
 
 describe('applyRecordPatch', () => {
-  const analysis: SessionAnalysis = { windDeg: 20, activeThreshold: 9, referenceSpeedMs: 7, speedRange: { minMs: 4, maxMs: 14 }, effortThresholdMs: null, foil: null, pumping: null, waveThreshold: null, bikeWeightKg: null, loadKg: null, savedAt: 1 };
+  const analysis: SessionAnalysis = { windDeg: 20, activeThreshold: 9, referenceSpeedMs: 7, speedRange: { minMs: 4, maxMs: 14 }, foil: null, pumping: null, waveThreshold: null, savedAt: 1 };
   const withAnalysis = record({ analysis, notes: { ...record().notes, comment: 'Belle session', savedAt: 2 } as SessionRecord['notes'] });
 
   it('rend la fiche telle quelle si rien ne change', () => {
@@ -582,12 +497,12 @@ describe('applyRecordPatch', () => {
   });
 
   it('pose et retire les chiffres du partage écrits par l’analyse, sans refaire le résumé', () => {
-    const posed = applyRecordPatch(record(), { pumpingShare: 0.4, windDirDeg: 230, avgPowerW: 180 });
-    expect(posed.record.summary).toMatchObject({ pumpingShare: 0.4, windDirDeg: 230, avgPowerW: 180 });
+    const posed = applyRecordPatch(record(), { pumpingShare: 0.4, windDirDeg: 230 });
+    expect(posed.record.summary).toMatchObject({ pumpingShare: 0.4, windDirDeg: 230 });
     expect(posed.resummarize).toBe(false);
     expect(applyRecordPatch(posed.record, { pumpingShare: 0.4, windDirDeg: 230 }).record).toBe(posed.record);
-    const removed = applyRecordPatch(posed.record, { avgPowerW: null }).record.summary;
-    expect('avgPowerW' in removed).toBe(false);
+    const removed = applyRecordPatch(posed.record, { pumpingShare: null }).record.summary;
+    expect('pumpingShare' in removed).toBe(false);
     expect(removed.windDirDeg).toBe(230);
   });
 });
@@ -623,42 +538,6 @@ describe('repères de la fiche', () => {
   });
 });
 
-describe('test guidé de la fiche', () => {
-  const TEST: SessionTest = {
-    protocol: 'fc-max',
-    version: 1,
-    settings: { warmupS: 480, age: 35, ageSource: 'profil', lowBpm: 110, highBpm: 147, zoneMethod: 'max' },
-    startMs: START_MS,
-    rampStartMs: START_MS + 480_000,
-    v0Ms: 2.5,
-    steps: [{ startMs: START_MS + 480_000, targetMs: 2.5 }],
-    rampEndMs: null,
-    dropMs: null,
-    endReason: null,
-    endMs: null,
-    signals: [{ t: START_MS, s: 'debut' }, { t: START_MS + 480_000, s: 'palier' }],
-  };
-
-  it("est relu à l'identique, absent sans test, gardé brut s'il est mal formé (lot 301)", () => {
-    expect(parseRecord(serializeRecord(record({ test: TEST })))?.test).toEqual(TEST);
-    expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('test');
-    const bad = { ...TEST, protocol: 'vma' };
-    expect(parseRecord(JSON.stringify({ ...record(), test: bad }))?.test).toEqual(bad);
-  });
-
-  it("complète une fiche sans test, sans écraser le sien ; le résumé ne le lit plus (lot 301)", () => {
-    const done = completeRecord(record(), record({ test: TEST }));
-    expect(done.record.test).toEqual(TEST);
-    expect(done.resummarize).toBe(false);
-    const own = { ...TEST, v0Ms: 3 };
-    expect(completeRecord(record({ test: own }), record({ test: TEST })).record.test).toEqual(own);
-  });
-
-  it('reste dans la fiche allégée du cache', () => {
-    expect(lightRecord(record({ test: TEST })).test).toEqual(TEST);
-  });
-});
-
 describe('fiches anciennes et abîmées', () => {
   /** Fiche telle que l'écrivait la première version de la mémoire (24/09, b8620ff). */
   const firstFormat = {
@@ -679,7 +558,7 @@ describe('fiches anciennes et abîmées', () => {
     expect(read?.activityId).toBeNull();
     expect(read?.name).toBeNull();
     expect(read?.analysis).toBeNull();
-    for (const key of ['intervals', 'jumps', 'marks', 'surfaces', 'terrainElevation', 'elevationSource']) expect(read).not.toHaveProperty(key);
+    for (const key of ['jumps', 'marks', 'surfaces', 'terrainElevation', 'elevationSource']) expect(read).not.toHaveProperty(key);
     expect(read?.notes?.foil).toBe('Axis 900');
     expect(read && isWritableRecord(read)).toBe(true);
   });
@@ -801,20 +680,13 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
       speedMs: 7.8, lengthM: 9.8, doubts: [], curve: { stepS: 0.05, startS: -0.5, heightsM: [0, 1.1, 0] },
     }],
   };
-  const test: SessionTest = {
-    protocol: 'fc-max', version: 1,
-    settings: { warmupS: 480, age: 35, ageSource: 'profil', lowBpm: 110, highBpm: 147, zoneMethod: 'max' },
-    startMs: START_MS, rampStartMs: START_MS + 480_000, v0Ms: 2.5, steps: [{ startMs: START_MS + 480_000, targetMs: 2.5 }],
-    rampEndMs: null, dropMs: null, endReason: null, endMs: null, signals: [{ t: START_MS, s: 'debut' }],
-  };
   const analysis: SessionAnalysis = {
-    windDeg: 40, activeThreshold: 8, referenceSpeedMs: null, speedRange: null, effortThresholdMs: null, foil: true,
-    pumping: null, waveThreshold: null, bikeWeightKg: null, loadKg: null, savedAt: 5,
+    windDeg: 40, activeThreshold: 8, referenceSpeedMs: null, speedRange: null, foil: true,
+    pumping: null, waveThreshold: null, savedAt: 5,
   };
   const valid = record({
-    name: 'Sortie', analysis, surfaces, terrainElevation, elevationSource: 'gps', jumps, test,
+    name: 'Sortie', analysis, surfaces, terrainElevation, elevationSource: 'gps', jumps,
     marks: [{ timeMs: START_MS + 60_000, lat: 43.5, lon: 3.9, label: 'Saut' }],
-    intervals: [{ workout: { reps: 1, workS: 60, restS: 30 }, laps: [{ kind: 'travail', rep: 1, startMs: START_MS, endMs: START_MS + 60_000 }] }],
     notes: { ...EMPTY_NOTES, comment: 'bien', rating: 4, savedAt: 3 },
   });
 
@@ -823,7 +695,6 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
     ...valid,
     surfaces: { source: 'overpass', format: 2, segments: [{ from: 0, kind: 'asphalte' }] },
     analysis: { ...analysis, windDeg: { from: 40, to: 60 } },
-    test: { ...test, settings: { ...test.settings, zoneMethod: 'lactate' } },
     summary: { ...valid.summary, heartRate: { zones: [1, 2, 3] } },
   };
   const futureText = serializeRecord(future as unknown as SessionRecord);
@@ -843,20 +714,19 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
 
   it('relue, renommée, réécrite : chaque champ de forme nouvelle revient identique au caractère près', () => {
     const parsed = parseRecordWithRaw(futureText)!;
-    // Voies et test guidé passent bruts (lot 301) : rien d'illisible, la fiche les garde tels quels.
+    // Les voies passent brutes (lot 301) : rien d'illisible, la fiche les garde telles quelles.
     expect(Object.keys(parsed.unreadable).sort()).toEqual(['analysis.windDeg', 'summary.heartRate']);
     const read: SessionRecord = { ...parsed.parts, summary: parsed.parts.summary! };
     expect(read.surfaces).toEqual(future.surfaces);
-    expect(read.test).toEqual(future.test);
     expect(read.analysis?.windDeg).toBeNull();
     const renamed = applyRecordPatch(read, { name: 'Autre nom' }).record;
     const written = serializeRecord(renamed, parsed.unreadable);
-    for (const path of [['surfaces'], ['analysis', 'windDeg'], ['test'], ['summary', 'heartRate']]) {
+    for (const path of [['surfaces'], ['analysis', 'windDeg'], ['summary', 'heartRate']]) {
       expect(fieldText(written, path)).toBe(fieldText(futureText, path));
     }
     expect(JSON.parse(written).name).toBe('Autre nom');
     // Les champs valides n'ont pas bougé.
-    for (const path of [['terrainElevation'], ['jumps'], ['marks'], ['intervals'], ['notes'], ['analysis', 'activeThreshold']]) {
+    for (const path of [['terrainElevation'], ['jumps'], ['marks'], ['notes'], ['analysis', 'activeThreshold']]) {
       expect(fieldText(written, path)).toBe(fieldText(futureText, path));
     }
   });
@@ -869,7 +739,7 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
     expect(written.analysis.windDeg).toBe(90);
     expect(written.surfaces).toEqual(surfaces);
     // Les autres champs illisibles restent bruts.
-    expect(written.test.settings.zoneMethod).toBe('lactate');
+    expect(written.summary.heartRate).toEqual({ zones: [1, 2, 3] });
   });
 
   it("un résumé entier illisible n'est pas gardé : il se refait depuis le GPX", () => {
@@ -886,10 +756,6 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
   });
 });
 
-/** Bornes de l'ancien `core/retiredLand.ts` (supprimé au lot 305), gelées ici. */
-const isValidBikeWeight = (value: unknown): value is number => typeof value === 'number' && isFinite(value) && value >= 3 && value <= 60;
-const isValidCarriedLoad = (value: unknown): value is number => typeof value === 'number' && isFinite(value) && value >= 0 && value <= 50;
-
 /** Copie gelée de la lecture des réglages d'avant la table `ANALYSIS_FIELDS` (lot 80). */
 const oldReadAnalysis = (raw: unknown): SessionAnalysis | null => {
   if (!isObject(raw)) return null;
@@ -899,38 +765,34 @@ const oldReadAnalysis = (raw: unknown): SessionAnalysis | null => {
     activeThreshold: isFiniteNumber(raw.activeThreshold) && raw.activeThreshold >= 0 ? raw.activeThreshold : null,
     referenceSpeedMs: isFiniteNumber(raw.referenceSpeedMs) && raw.referenceSpeedMs > 0 ? raw.referenceSpeedMs : null,
     speedRange: isObject(raw.speedRange) && isValidSpeedRange(raw.speedRange) ? { minMs: raw.speedRange.minMs, maxMs: raw.speedRange.maxMs } : null,
-    effortThresholdMs: isFiniteNumber(raw.effortThresholdMs) && raw.effortThresholdMs > 0 ? raw.effortThresholdMs : null,
     foil: typeof raw.foil === 'boolean' ? raw.foil : null,
     pumping: typeof raw.pumping === 'boolean' ? raw.pumping : null,
     waveThreshold: isFiniteNumber(raw.waveThreshold) && raw.waveThreshold > 0 ? raw.waveThreshold : null,
-    bikeWeightKg: isValidBikeWeight(raw.bikeWeightKg) ? raw.bikeWeightKg : null,
-    loadKg: isValidCarriedLoad(raw.loadKg) ? raw.loadKg : null,
     savedAt: isFiniteNumber(raw.savedAt) ? raw.savedAt : 0,
   };
 };
 
 describe('réglages relus par la table des champs (lot 80), comme avant', () => {
   const valid = {
-    windDeg: 312.5, activeThreshold: 8, referenceSpeedMs: 6.2, speedRange: { minMs: 3, maxMs: 14.5 }, effortThresholdMs: 4.1, foil: true,
-    pumping: false, waveThreshold: 9.5, bikeWeightKg: 9.8, loadKg: 0, savedAt: 5,
+    windDeg: 312.5, activeThreshold: 8, referenceSpeedMs: 6.2, speedRange: { minMs: 3, maxMs: 14.5 }, foil: true,
+    pumping: false, waveThreshold: 9.5, savedAt: 5,
   };
   const cases: [string, unknown][] = [
     ['valides', valid],
-    ['nuls', { windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, effortThresholdMs: null, foil: null, pumping: null, waveThreshold: null, bikeWeightKg: null, loadKg: null, savedAt: 0 }],
+    ['nuls', { windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, savedAt: 0 }],
     ['vides', {}],
     ['hors bornes', {
-      windDeg: -30, activeThreshold: -1, referenceSpeedMs: 0, speedRange: { minMs: 5, maxMs: 2 }, effortThresholdMs: -2, foil: 0, pumping: 1,
-      waveThreshold: 0, bikeWeightKg: 2, loadKg: 51, savedAt: Number.NaN,
+      windDeg: -30, activeThreshold: -1, referenceSpeedMs: 0, speedRange: { minMs: 5, maxMs: 2 }, foil: 0, pumping: 1,
+      waveThreshold: 0, savedAt: Number.NaN,
     }],
     ['vent au-delà du tour', { ...valid, windDeg: 725 }],
     ['mauvais types', {
-      windDeg: '40', activeThreshold: true, referenceSpeedMs: [3], speedRange: [1, 2], effortThresholdMs: { v: 1 }, foil: 'true', pumping: 'false',
-      waveThreshold: '9', bikeWeightKg: '10', loadKg: null, savedAt: '5',
+      windDeg: '40', activeThreshold: true, referenceSpeedMs: [3], speedRange: [1, 2], foil: 'true', pumping: 'false',
+      waveThreshold: '9', savedAt: '5',
     }],
-    ['infinis', { ...valid, windDeg: Infinity, activeThreshold: Infinity, bikeWeightKg: -Infinity }],
-    ['clés inconnues, en tête et au milieu', { futur: { a: [1, 2] }, windDeg: 10, autre: 'x', loadKg: 3, ['__proto__x']: 1 }],
-    ['ordre des clés mélangé', { savedAt: 9, loadKg: 4, foil: false, windDeg: 359.9 }],
-    ['bornes de couleur avec un champ de plus', { ...valid, speedRange: { minMs: 1, maxMs: 2, unite: 'kn' } }],
+    ['infinis', { ...valid, windDeg: Infinity, activeThreshold: Infinity, waveThreshold: -Infinity }],
+    ['clés inconnues, en tête et au milieu', { futur: { a: [1, 2] }, windDeg: 10, autre: 'x', pumping: true, ['__proto__x']: 1 }],
+    ['ordre des clés mélangé', { savedAt: 9, waveThreshold: 4, foil: false, windDeg: 359.9 }],    ['bornes de couleur avec un champ de plus', { ...valid, speedRange: { minMs: 1, maxMs: 2, unite: 'kn' } }],
     ['pas un objet', null],
     ['liste', [valid]],
     ['nombre', 5],
@@ -972,20 +834,18 @@ describe('fiches compactes, une par famille (lot 80)', () => {
   });
 
   it('les tableaux de nombres tiennent sur une ligne, les objets restent indentés', () => {
-    const text = serializeRecord(familyRecords().course);
-    expect(text).toMatch(/\n {4}"t": \[0,1800,3600,/);
-    expect(text).toMatch(/\n {4}"z": \[[^\n]*null[^\n]*\]\n {2}\},\n/);
-    expect(text).toMatch(/\n {8}"seconds": \[0,/);
-    expect(text).toContain('\n  "analysis": {\n    "windDeg": null,\n');
-    const velo = serializeRecord(familyRecords().velo);
-    expect(velo).toMatch(/\n {4}"runs": \[\[0,-1\],\[12000,0\],/);
-    expect(velo).toContain('"tags": [\n      "highway=residential",\n');
+    const { voile, surf, sauts } = familyRecords();
+    expect(serializeRecord(surf)).toMatch(/\n {8}"seconds": \[0,/);
+    expect(serializeRecord(surf)).toContain('\n  "analysis": {\n    "windDeg": null,\n');
+    expect(serializeRecord(sauts)).toMatch(/\n {10}"heightsM": \[0,/);
+    expect(serializeRecord(sauts)).toContain('\n        "doubts": [\n          "saturation"\n        ],\n');
+    expect(serializeRecord(voile)).toContain('\n  "marks": [\n    {\n      "timeMs": ');
   });
 });
 
 describe('réglages portés par le résumé (Q57)', () => {
   const analysis = (activeThreshold: number | null, foil: boolean | null = null) =>
-    ({ windDeg: null, activeThreshold, referenceSpeedMs: null, speedRange: null, effortThresholdMs: null, foil, pumping: null, waveThreshold: null, bikeWeightKg: null, loadKg: null, savedAt: 1 });
+    ({ windDeg: null, activeThreshold, referenceSpeedMs: null, speedRange: null, foil, pumping: null, waveThreshold: null, savedAt: 1 });
 
   it('le champ prime, composant absent : inconnu', () => {
     expect(carriedSettings(sessionRecord({}, { activitySettings: { threshold: 8 }, optionsKey: '[9,null,null,null]' }))).toEqual({ threshold: 8 });
@@ -1038,46 +898,64 @@ describe('réglages portés par le résumé (Q57)', () => {
   });
 });
 
-describe('meilleurs efforts déjà rangés (lot 146 ; plus calculés depuis le lot 303)', () => {
-  it('fiche relue : gardés, une valeur abîmée ou invraisemblable oubliée', () => {
-    const { summary } = sessionRecord();
-    const raw = { ...sessionRecord(), summary: { ...summary, bests: { d5kmS: 'abîmé', d10kmS: 2500, p20minW: -3, powerRiderKg: 70 } } };
-    expect(parseRecord(JSON.stringify(raw))!.summary.bests).toEqual({ d10kmS: 2500, powerRiderKg: 70 });
-    expect(parseRecord(JSON.stringify({ ...raw, summary: { ...summary, bests: { d5kmS: null } } }))!.summary.bests).toBeUndefined();
-    // Hors des bornes (`SUMMARY_BESTS_BOUNDS`) : 1 s au 5 km, 1e9 W, 0,001 kg.
-    const absurd = parseRecord(JSON.stringify({ ...raw, summary: { ...summary, bests: { d5kmS: 1, d10kmS: 2500, p20minW: 1e9, powerRiderKg: 0.001 } } }))!;
-    expect(absurd.summary.bests).toEqual({ d10kmS: 2500 });
-    expect(parseRecord(JSON.stringify({ ...raw, summary: { ...summary, bests: { d5kmS: 299, d10kmS: 599 } } }))!.summary.bests).toBeUndefined();
-    const edges = { d5kmS: SUMMARY_BESTS_BOUNDS.d5kmS.max, d10kmS: SUMMARY_BESTS_BOUNDS.d10kmS.min, p20minW: 2000, powerRiderKg: 20 };
-    expect(parseRecord(JSON.stringify({ ...raw, summary: { ...summary, bests: edges } }))!.summary.bests).toEqual(edges);
-  });
-});
-
-describe("fiche de l'application complète : course, vélo, fractionné (lot 305)", () => {
-  /** Fiche de course telle que l'écrit l'application complète, résumé à jour. */
-  const raw = (sport: string) => JSON.stringify({ ...sessionRecord({ gpx: `2026-09-23_14-00-00_${sport}.gpx`, activityId: sport, name: 'Sortie' }), sport }, null, 2);
+describe('calcul inconnu', () => {
+  /** Fiche dont le calcul n'est pas de cette version (`moth`), résumé à jour. */
+  const raw = JSON.stringify({ ...sessionRecord({ gpx: '2026-09-23_14-00-00_moth.gpx', activityId: 'moth', name: 'Sortie' }), sport: 'moth' }, null, 2);
 
   it('se relit sans calcul, son calcul gardé brut et rendu à chaque écriture', () => {
-    for (const sport of ['running', 'cycling', 'run-intervals', 'bike-intervals', 'run-test', 'muscu']) {
-      const parsed = parseRecordWithRaw(raw(sport))!;
-      expect(parsed.parts.sport, sport).toBeNull();
-      expect(parsed.unreadable.sport, sport).toEqual({ raw: sport, read: null });
-      const record = { ...parsed.parts, summary: parsed.parts.summary! };
-      // Renommée, puis réécrite : le calcul d'origine revient tel quel.
-      const renamed = applyRecordPatch(record, { name: 'Renommée' }).record;
-      const written = JSON.parse(serializeRecord(renamed, parsed.unreadable));
-      expect(written.sport, sport).toBe(sport);
-      expect(written.name).toBe('Renommée');
-      // Son résumé n'est jamais à refaire : rien ne la réécrit d'office.
-      expect(isSummaryStale(record), sport).toBe(false);
-    }
+    const parsed = parseRecordWithRaw(raw)!;
+    expect(parsed.parts.sport).toBeNull();
+    expect(parsed.unreadable.sport).toEqual({ raw: 'moth', read: null });
+    const record = { ...parsed.parts, summary: parsed.parts.summary! };
+    // Renommée, puis réécrite : le calcul d'origine revient tel quel.
+    const renamed = applyRecordPatch(record, { name: 'Renommée' }).record;
+    const written = JSON.parse(serializeRecord(renamed, parsed.unreadable));
+    expect(written.sport).toBe('moth');
+    expect(written.name).toBe('Renommée');
+    // Son résumé n'est jamais à refaire : rien ne la réécrit d'office.
+    expect(isSummaryStale(record)).toBe(false);
   });
 
   it("classée en voile ou en surf par l'utilisateur, elle prend le calcul choisi : un geste explicite", () => {
-    const parsed = parseRecordWithRaw(raw('running'))!;
+    const parsed = parseRecordWithRaw(raw)!;
     const record = { ...parsed.parts, summary: parsed.parts.summary! };
     const { record: classed, resummarize } = applyRecordPatch(record, { sport: 'surf', activityId: 'surf' });
     expect(resummarize).toBe(true);
     expect(JSON.parse(serializeRecord(classed, parsed.unreadable)).sport).toBe('surf');
   });
+});
+
+describe('fiche de Gtracker rangée avant le lot 306', () => {
+  /**
+   * Fiche au format de Gtracker portant les réglages d'analyse que cette version ne connaît plus (trois champs nuls,
+   * ceux de la fiche du jeu d'essai de la porte) : ils sont des champs inconnus, gardés tels quels.
+   */
+  const raw = JSON.parse(TRACKER_WING_RECORD) as Record<string, unknown>;
+  const stored = `${stringifyJson({ ...raw, format: RECORD_FORMAT })}\n`;
+  const unclassified = `${stringifyJson({ ...raw, format: RECORD_FORMAT, sport: null })}\n`;
+  const retired = (text: string): string[] => {
+    const analysis = (JSON.parse(text) as { analysis: Record<string, unknown> }).analysis;
+    return Object.keys(analysis).filter((key) => key !== 'savedAt' && !(ANALYSIS_KEYS as string[]).includes(key));
+  };
+
+  it('porte bien des champs retirés', () => {
+    expect(retired(stored)).toHaveLength(3);
+    expect(JSON.parse(unclassified).sport).toBeNull();
+  });
+
+  for (const [label, text] of [['classée', stored], ['à classer', unclassified]] as const) {
+    it(`${label} : se lit sans perte ni champ illisible, et se réécrit sans dégât`, () => {
+      const parsed = parseRecordWithRaw(text)!;
+      expect(parsed.unreadable).toEqual({});
+      const read: SessionRecord = { ...parsed.parts, summary: parsed.parts.summary! };
+      expect(serializeRecord(read, parsed.unreadable)).toBe(text);
+      const renamed = applyRecordPatch(read, { name: 'Renommée' }).record;
+      const written = serializeRecord(renamed, parsed.unreadable);
+      expect(JSON.parse(written)).toEqual({ ...JSON.parse(text), name: 'Renommée' });
+      expect(retired(written)).toEqual(retired(text));
+      // Réglages d'analyse changés dans le module : les champs retirés restent.
+      const windChanged = applyRecordPatch(read, { analysis: { ...read.analysis!, windDeg: 90 } }).record;
+      expect(retired(serializeRecord(windChanged, parsed.unreadable))).toEqual(retired(text));
+    });
+  }
 });

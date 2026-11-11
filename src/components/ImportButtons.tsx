@@ -7,7 +7,7 @@ import Button from './ui/Button';
 
 /**
  * Import dans la mémoire : « Importer des GPX ou FIT » (des fichiers choisis) et
- * « Ajouter les sessions d'un dossier » (un dossier Tracker copié d'un autre
+ * « Ajouter les sessions d'un dossier » (un dossier de sessions copié d'un autre
  * appareil, fiches comprises). Dans le menu « … » des bibliothèques, et dans
  * Réglages › Mémoire pour le dossier seul (`gpx` à faux). Grisés pendant un
  * import, d'où qu'il parte, sans dossier mémoire (un import n'est jamais

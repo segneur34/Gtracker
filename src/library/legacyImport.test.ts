@@ -139,20 +139,21 @@ describe('jeu d\'essai de la porte d\'import : le paquet de session', () => {
     it(`${kind} : la fiche écrite se relit puis se réécrit à l'octet`, () => {
       const parsed = parseImportedRecord(expected.record).parsed;
       expect(parsed?.unreadable).toEqual({});
-      // Lot 321 : réécrite au format de Gtracker, sans rien perdre ni changer. Plus à l'octet : les trois champs de
-      // l'analyse retirés à l'entrée (`withoutOriginFields`) reviennent, nuls, en fin d'objet jusqu'au lot 306 (B11).
+      // Lot 321 : réécrite au format de Gtracker, sans rien perdre ni changer ; lot 306 : sans les trois lignes de
+      // l'analyse retirées à l'entrée (`withoutOriginFields`).
       expect(expected.record).toContain('"format": "tracker-session"');
-      const rewritten = serializeRecord(recordOf(kind));
-      expect(JSON.parse(rewritten)).toEqual({ ...JSON.parse(expected.record), format: RECORD_FORMAT });
-      expect(rewritten.length).toBe(expected.record.length + RECORD_FORMAT.length - 'tracker-session'.length);
+      const lines = expected.record.replace('"format": "tracker-session"', `"format": "${RECORD_FORMAT}"`).split('\n');
+      const kept = lines.filter((line) => !/^ {4}"(effortThresholdMs|bikeWeightKg|loadKg)": null,$/.test(line));
+      expect(kept).toHaveLength(lines.length - 3);
+      expect(serializeRecord(recordOf(kind))).toBe(kept.join('\n'));
     });
   }
 
   it('wingfoil : réglages d\'analyse complets, vent, foil, pumping, notes et sauts', () => {
     const record = recordOf('wing');
     expect(record.analysis).toEqual({
-      windDeg: 300, activeThreshold: null, referenceSpeedMs: null, speedRange: null, effortThresholdMs: null, foil: true, pumping: true,
-      waveThreshold: null, bikeWeightKg: null, loadKg: null, savedAt: 1780310700000,
+      windDeg: 300, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: true, pumping: true,
+      waveThreshold: null, savedAt: 1780310700000,
     });
     expect(record.notes).toMatchObject({
       foil: 'Axis 1050', mast: 'Mât 85', wing: 'Aile 5 m', windLevel: 'moyen', waterState: 'clapot', rating: 4,
@@ -370,8 +371,7 @@ describe('porte d\'import : lecture de l\'ancien format (fonctions pures)', () =
     expect(parts.format).toBe(RECORD_FORMAT);
     for (const field of ['surfaces', 'terrainElevation', 'elevationSource', 'intervals', 'test']) expect(parts).not.toHaveProperty(field);
     for (const field of ['cadence', 'bests', 'best1kmS', 'best5minMs', 'avgPowerW']) expect(parts.summary).not.toHaveProperty(field);
-    // Retirés à l'entrée ; la lecture des réglages d'analyse les remet à nul jusqu'au lot 306 (B11).
-    expect(parts.analysis).toMatchObject({ effortThresholdMs: null, bikeWeightKg: null, loadKg: null });
+    for (const field of ['effortThresholdMs', 'bikeWeightKg', 'loadKg']) expect(parts.analysis).not.toHaveProperty(field);
     expect(read.parsed?.unreadable).toEqual({});
     expect(parts.name).toBe(SESSIONS.wing.name);
     expect(parts.marks).toEqual(SESSIONS.wing.marks);
@@ -522,7 +522,9 @@ describe('porte d\'import : ce que la bibliothèque range est au format de Gtrac
       const report = await library.importEntries(entries, { fromFolder: entries.length > 1 });
       expect(report.failed).toEqual([]);
       const got = stored(library, report.added);
-      expect(diskRecord(report.added[0]).format).toBe(RECORD_FORMAT);
+      const disk = diskRecord(report.added[0]);
+      expect(disk.format).toBe(RECORD_FORMAT);
+      for (const field of ['effortThresholdMs', 'bikeWeightKg', 'loadKg']) expect(disk.analysis).not.toHaveProperty(field);
       expect(imuHeaderJson(got.motion!).format).toBe(IMU_FORMAT);
       expectSameMeasures(got.motion, WING_IMU);
     }

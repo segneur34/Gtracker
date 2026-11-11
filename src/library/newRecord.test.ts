@@ -13,8 +13,6 @@ const analyzed: AnalyzedGpx = { summary: base.summary, sport: 'wingfoil', title:
 /** Horloge fixe. */
 const context = (): NewRecordContext => ({ now: () => NOW });
 
-// Le contenu du test guidé n'est pas lu ici : seul compte qu'il soit rangé tel quel.
-
 const motionWithJumps = (jumps: boolean) => encodeImu({
   format: IMU_FORMAT, version: IMU_VERSION, startedAtMs: NOW, clock: { elapsedUs: 0, wallMs: NOW },
   setup: { placement: 'poitrine', foil: false, jumps }, streams: [...PHONE_STREAMS],
@@ -49,9 +47,8 @@ describe('fiche d’une session qui entre dans la mémoire (lot 113)', () => {
     expect(record.activityId).toBe('wing');
     expect(record.analysis?.foil).toBe(true);
     expect(record.analysis?.savedAt).toBe(NOW);
-    expect(record.intervals).toBeUndefined();
     expect(record.marks).toHaveLength(1);
-    expect(record.test).toBeUndefined();
+    for (const field of ['intervals', 'test']) expect(record).not.toHaveProperty(field);
   });
 
   it('dit tout de suite « pas de sauts à chercher » pour une capture de la seule cadence', async () => {

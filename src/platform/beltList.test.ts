@@ -1,42 +1,40 @@
 import { describe, expect, it } from 'vitest';
-import { addBelt, beltLabels, forgetBelt, isBelt, learnBeltAddressType, readBeltList } from './beltList';
+import { addBelt, beltLabels, forgetBelt, isBelt, learnBeltAddressType, readBeltList, storedBeltList } from './beltList';
 
-/** Appareils cardio retenus (lot 198) : plusieurs en mémoire, un seul actif, rien perdu à la mise à jour. */
+/** Appareils cardio retenus (lot 198) : plusieurs en mémoire, un seul actif, marqué dans la liste. */
 
 const hrm = { address: 'AA:AA:AA:AA:11:11', name: 'HRM-Dual' };
 const decathlon = { address: 'BB:BB:BB:BB:22:22', name: 'Decathlon HR', random: true };
 const polar = { address: 'CC:CC:CC:CC:33:33', name: 'Polar H10' };
 
 describe('lecture de la liste retenue', () => {
-  it("ancienne clé seule (version d'avant la liste) : la ceinture choisie devient la liste, rien n'est perdu", () => {
-    expect(readBeltList(null, hrm)).toEqual([hrm]);
+  it('liste absente, vide ou illisible : vide, sans appareil actif', () => {
+    for (const stored of [null, undefined, [], 'abîmée', { address: hrm.address }]) {
+      expect(readBeltList(stored)).toEqual({ list: [], active: null });
+    }
   });
 
-  it('ni liste ni ceinture : liste vide', () => {
-    expect(readBeltList(null, null)).toEqual([]);
-    expect(readBeltList(undefined, null)).toEqual([]);
+  it("l'actif est l'entrée marquée, la liste garde son ordre ; sans marque, aucun actif", () => {
+    expect(readBeltList([hrm, { ...decathlon, active: true }, polar])).toEqual({ list: [hrm, decathlon, polar], active: decathlon });
+    expect(readBeltList([hrm, decathlon])).toEqual({ list: [hrm, decathlon], active: null });
+    expect(readBeltList([{ ...hrm, active: 'oui' }])).toEqual({ list: [hrm], active: null });
   });
 
-  it("liste vide gardée vide sans appareil actif ; l'actif s'y ajoute s'il existe", () => {
-    expect(readBeltList([], null)).toEqual([]);
-    expect(readBeltList([], hrm)).toEqual([hrm]);
-  });
-
-  it("appareil actif changé par une ancienne version, absent de la liste : ajouté en tête, la liste gardée", () => {
-    expect(readBeltList([hrm, decathlon], polar)).toEqual([polar, hrm, decathlon]);
-  });
-
-  it("appareil actif déjà dans la liste : rien n'est ajouté ni déplacé", () => {
-    expect(readBeltList([hrm, decathlon], decathlon)).toEqual([hrm, decathlon]);
-  });
-
-  it('liste illisible ou entrées abîmées : écartées, les lisibles gardées, adresses en double fondues', () => {
-    expect(readBeltList('abîmée', hrm)).toEqual([hrm]);
-    expect(readBeltList([hrm, { address: 3 }, null, { ...hrm, name: 'Autre nom' }, decathlon], null)).toEqual([hrm, decathlon]);
+  it('entrées abîmées écartées, les lisibles gardées, adresses en double fondues (la première reste, sa marque aussi)', () => {
+    expect(readBeltList([hrm, { address: 3 }, null, { ...hrm, name: 'Autre nom', active: true }, decathlon])).toEqual({ list: [hrm, decathlon], active: null });
+    expect(readBeltList([{ ...hrm, active: true }, { ...decathlon, active: true }]).active).toEqual(hrm);
   });
 
   it("une entrée lue ne garde que ce qui se retient (pas la force du signal d'une recherche)", () => {
-    expect(readBeltList([{ ...hrm, rssi: -50 }], null)).toEqual([hrm]);
+    expect(readBeltList([{ ...hrm, rssi: -50, active: true }])).toEqual({ list: [hrm], active: hrm });
+  });
+
+  it("liste rangée : l'actif marqué seul, chaque entrée réduite, relue à l'identique", () => {
+    const stored = storedBeltList([{ ...hrm, rssi: -50 } as typeof hrm, decathlon], decathlon);
+    expect(stored).toEqual([hrm, { ...decathlon, active: true }]);
+    expect(readBeltList(JSON.parse(JSON.stringify(stored)))).toEqual({ list: [hrm, decathlon], active: decathlon });
+    expect(storedBeltList([hrm], null)).toEqual([hrm]);
+    expect(storedBeltList([hrm], polar)).toEqual([hrm]);
   });
 
   it('isBelt : adresse et nom exigés, type d\'adresse booléen ou absent', () => {

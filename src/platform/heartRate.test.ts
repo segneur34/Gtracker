@@ -249,27 +249,27 @@ describe('recherche annulée', () => {
   });
 });
 
-/** Appareils retenus (lot 198) : nouvelle clé de liste, l'ancienne garde l'actif ; rien n'est perdu à la mise à jour. */
+/** Appareils retenus (lot 198) : une seule clé, la liste, l'actif marqué dedans. */
 describe('appareils retenus', () => {
   /** Stockage remis à vide : rien ne reste d'un test à l'autre. */
   beforeEach(async () => {
     const { jsonStore } = await import('./storage');
-    jsonStore.write('tracker.heartRateBelt', null);
     jsonStore.write('tracker.heartRateBelts', null);
   });
 
-  it("ancienne clé seule : la ceinture retenue est la liste et reste l'actif", async () => {
+  it("la liste rangée porte l'actif marqué, et se relit telle quelle", async () => {
     const { jsonStore } = await import('./storage');
-    const { savedBelt, savedBelts } = await import('./heartRate');
-    jsonStore.write('tracker.heartRateBelt', belt);
-    expect(savedBelts()).toEqual([belt]);
+    const { addSavedBelt, savedBelt, savedBelts } = await import('./heartRate');
+    addSavedBelt(belt, true);
+    addSavedBelt(other, false);
+    expect(jsonStore.read('tracker.heartRateBelts')).toEqual([{ ...belt, active: true }, other]);
+    expect(savedBelts()).toEqual([belt, other]);
     expect(savedBelt()).toEqual(belt);
   });
 
   it("ajouter sans activer garde l'actif ; le choisir le change ; oublier l'actif passe au suivant", async () => {
-    const { jsonStore } = await import('./storage');
     const { addSavedBelt, chooseSavedBelt, forgetSavedBelt, savedBelt, savedBelts } = await import('./heartRate');
-    jsonStore.write('tracker.heartRateBelt', belt);
+    addSavedBelt(belt, true);
     addSavedBelt(other, false);
     expect(savedBelts()).toEqual([belt, other]);
     expect(savedBelt()).toEqual(belt);
@@ -290,9 +290,8 @@ describe('appareils retenus', () => {
   });
 
   it("le type d'adresse appris par le greffon va sur l'entrée de la liste et sur l'actif", async () => {
-    const { jsonStore } = await import('./storage');
     const { addSavedBelt, holdBelt, savedBelt, savedBelts } = await import('./heartRate');
-    jsonStore.write('tracker.heartRateBelt', belt);
+    addSavedBelt(belt, true);
     addSavedBelt(other, false);
     const release = await holdBelt('reglages', belt);
     emit('status', { state: 'connected', address: belt.address, random: true });

@@ -16,9 +16,8 @@ import {
 /**
  * Ce que l'utilisateur change sur une session dans le module d'analyse : les
  * réglages d'analyse de la fiche (`ANALYSIS_FIELDS` : vent saisi, seuil
- * d'activité, allure imposée, couleurs de la trace, seuil d'effort du
- * fractionné, foil, pumping, seuil de vague en foil, poids du vélo et charge
- * portée), notes, repères du bouton « Note » (nommés ou supprimés). Les
+ * d'activité, allure imposée, couleurs de la trace, foil, pumping, seuil de
+ * vague en foil), notes, repères du bouton « Note » (nommés ou supprimés). Les
  * changements restent en brouillon jusqu'à « Enregistrer la session », qui les
  * écrit dans la fiche.
  */
@@ -79,11 +78,9 @@ export const EDITED_PART_LABEL: Record<EditedPart, string> = {
   seuil: "seuil d'activité",
   allure: 'allure de la session',
   couleurs: 'couleurs de la trace',
-  effort: "seuil d'effort",
   foil: 'foil',
   pumping: 'pumping',
   vague: 'seuil de vague',
-  charge: 'charge',
   notes: 'notes',
   reperes: 'repères',
 };
@@ -110,7 +107,7 @@ const sameMarks = (a: readonly SessionMark[], b: readonly SessionMark[]): boolea
 export const changedParts = (saved: SessionEdits, edits: SessionEdits): EditedPart[] => {
   const parts: EditedPart[] = [];
   for (const key of ANALYSIS_KEYS) {
-    // Une partie à plusieurs champs (« charge » : poids du vélo et charge portée) n'est annoncée qu'une fois.
+    // Une partie à plusieurs champs n'est annoncée qu'une fois.
     const { part } = ANALYSIS_FIELDS[key];
     if (!parts.includes(part) && !sameValue(key, saved[key], edits[key])) parts.push(part);
   }

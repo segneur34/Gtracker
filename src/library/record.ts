@@ -13,21 +13,6 @@ import { EMPTY_NOTES, type GearChoice, type SailingSessionNotes } from './notes'
 import { isFiniteNumber, isObject, parseJson, stringifyJson } from '../core/basics';
 
 /**
- * Bornes de vraisemblance des meilleurs efforts relus d'une fiche (`SummaryBests`, lot 146), comprises : hors
- * d'elles, une valeur est abîmée (fichier retouché, autre version) et le champ est oublié.
- */
-export const SUMMARY_BESTS_BOUNDS = {
-  /** Meilleur 5 km, en secondes : de 5 min (à vélo) à 3 h. */
-  d5kmS: { min: 300, max: 10_800 },
-  /** Meilleur 10 km, en secondes : de 10 min (à vélo) à 6 h. */
-  d10kmS: { min: 600, max: 21_600 },
-  /** Meilleure puissance sur 20 min, en W. */
-  p20minW: { min: 20, max: 2_000 },
-  /** Poids du pratiquant de l'estimation, en kg. */
-  powerRiderKg: { min: 20, max: 300 },
-} as const;
-
-/**
  * Fiche d'une session : le fichier JSON rangé à côté de son GPX dans le
  * dossier mémoire (`docs/ETAT_DU_PROJET.md` §6).
  *
@@ -63,8 +48,6 @@ export const RECORD_VERSION = 1;
  * 5 (16 octobre 2026) : distance en action (`movingDistanceM`) et temps de vol
  * en surf (`flightS`), pour le graphique des statistiques.
  *
- * 6 (17 octobre 2026) : cadence à pied (`cadence`), pour les statistiques.
- *
  * 7 (21 octobre 2026) : bateau sans seuil d'activité, toute la session en
  * navigation (`movingTimeS`, `movingDistanceM`).
  *
@@ -72,13 +55,6 @@ export const RECORD_VERSION = 1;
  * (`stillThreshold`), détente basse jamais nulle, trous de trace (pas plus long
  * que `maxGapS`) hors du temps en mouvement et distance bornée par la corde,
  * points d'une même seconde répartis.
- *
- * 10 (27 octobre 2026) : cadence à pied (`cadence`) en pas par minute selon
- * la longueur de pas (un GPX déjà en pas n'est plus doublé), couverture sans
- * les pauses ni les trous.
- *
- * 11 (28 octobre 2026) : la Marche sans seuil d'activité (pré-réglage à 0) :
- * son temps en mouvement est recalculé.
  *
  * 12 (28 octobre 2026) : voile à seuil, temps en mouvement (`inMotionS`),
  * dénominateur du ratio de vol, de navigation ou de planing ; détection des
@@ -103,12 +79,8 @@ export const RECORD_VERSION = 1;
  * lecteur GPX écarte un point à la date illisible ou qui recule (tops, temps
  * actif) ; le point qui suit un trou prend le cap du pas suivant (vent).
  *
- * 17 (5 novembre 2026, lot 145) : meilleur kilomètre en temps à pied
- * (`best1kmS`) et meilleures 5 min en vitesse à vélo (`best5minMs`), pour
- * l'image de partage d'une session dont l'analyse n'est pas ouverte.
- * 18 (5 novembre 2026, lot 146, après le 17 du lot 145 dans la même APK) : meilleurs 5 km et 10 km à pied et à vélo,
- * meilleure puissance estimée sur 20 min à vélo (`bests`), pour l'onglet
- * « niveau » des statistiques (les autres chiffres ne bougent pas).
+ * Les versions sautées (6, 10, 11, 17 et 18) ne changeaient aucun chiffre de la
+ * voile ni du surf ; le numéro est gardé.
  */
 export const SUMMARY_CALC_VERSION = 18;
 
@@ -155,20 +127,10 @@ export interface SessionSummary {
   flightS?: number | null;
   /** FC de la session, si elle en a assez (`HeartRateProfile.minCoverageS`) ; indépendante des zones du pratiquant. */
   heartRate?: SummaryHeartRate;
-  /** Cadence à pied, si la session en a assez (`CadenceDetection.minCoverageS`). */
-  cadence?: SummaryCadence;
-  /** À pied (traitement course) : temps du meilleur kilomètre, en secondes (tops, `d1km`) ; absent s'il n'est pas couru (version 17). */
-  best1kmS?: number;
-  /** À vélo : vitesse des meilleures 5 min, en m/s (tops, `t5min`) ; absente si la session est plus courte (version 17). */
-  best5minMs?: number;
   /** Voile sur foil, posé par l'analyse (capteurs du `.imu`) : part du vol pompée, de 0 à 1 (lot 145). */
   pumpingShare?: number;
   /** Voile, posé par l'analyse : direction du vent retenue (saisie, sinon estimée fiable), en degrés (lot 145). */
   windDirDeg?: number;
-  /** Vélo, posé par l'analyse : puissance mécanique moyenne en mouvement, en watts, d'après le poids du pratiquant (lot 145). */
-  avgPowerW?: number;
-  /** Meilleurs efforts à pied et à vélo (lot 146, version 18), pour l'onglet « niveau » des statistiques. */
-  bests?: SummaryBests;
   /**
    * Empreinte des réglages qui ont produit ce résumé (`summaryOptionsKey` : seuil, allure imposée,
    * foil et seuil de vague en surf), lot 37. Une empreinte qui ne correspond plus aux réglages
@@ -205,19 +167,6 @@ const readActivitySettings = (raw: unknown): SummaryActivitySettings | null => {
   };
 };
 
-/** Cadence d'une session à pied dans son résumé, comme l'onglet « cadence » la mesure. */
-export interface SummaryCadence {
-  /** Cadence moyenne en mouvement, en pas par minute. */
-  avgSpm: number;
-  /** Pas comptés sur la session. */
-  steps: number;
-}
-
-const readSummaryCadence = (raw: unknown): SummaryCadence | null => {
-  if (!isObject(raw) || !isFiniteNumber(raw.avgSpm) || !isFiniteNumber(raw.steps)) return null;
-  return { avgSpm: raw.avgSpm, steps: raw.steps };
-};
-
 /** Manœuvres réussies et manquées d'une session de voile. */
 export interface ManeuverResults {
   tackSuccess: number;
@@ -238,14 +187,11 @@ const readManeuverResults = (raw: unknown): ManeuverResults | null => {
  * Chiffres du résumé posés par l'analyse ouverte, pas par le calcul du GPX : ils
  * survivent à un résumé refait (`withSummary`) et se fondent à part (`recordMerge`).
  */
-export const ANALYSIS_SUMMARY_FIELDS = ['maneuverCount', 'maneuverResults', 'pumpingShare', 'windDirDeg', 'avgPowerW'] as const;
+export const ANALYSIS_SUMMARY_FIELDS = ['maneuverCount', 'maneuverResults', 'pumpingShare', 'windDirDeg'] as const;
 
-/**
- * Chiffres du partage contrôlés à la relecture, posés par l'analyse ou par le calcul (version 17) : hors de sa
- * plage, le champ est écarté. Meilleur kilomètre de 1 min à 1 h ; meilleures 5 min de 0,5 à 40 m/s.
- */
+/** Chiffres du partage posés par l'analyse, contrôlés à la relecture : hors de sa plage, le champ est écarté. */
 const SHARE_NUMBER_RANGES = {
-  pumpingShare: [0, 1], windDirDeg: [0, 360], avgPowerW: [0, 3000], best1kmS: [60, 3600], best5minMs: [0.5, 40],
+  pumpingShare: [0, 1], windDirDeg: [0, 360],
 } as const;
 
 export const sameManeuverResults = (a: ManeuverResults | undefined, b: ManeuverResults | undefined): boolean =>
@@ -296,12 +242,6 @@ export interface SessionAnalysis {
    */
   speedRange: SpeedRangeMs | null;
   /**
-   * Seuil d'effort de la détection des répétitions (fractionné sans compteur),
-   * en m/s ; `null` : celui tiré de la session. Il décrit la trace : un
-   * changement de support le garde. Absent des fiches plus anciennes.
-   */
-  effortThresholdMs: number | null;
-  /**
    * Support sur foil pour cette session ; `null` : celui de son activité
    * (Réglages). Il décrit le matériel du jour : un changement d'activité le
    * garde. Absent des fiches plus anciennes.
@@ -317,18 +257,6 @@ export interface SessionAnalysis {
    * un vol est porté par une vague ; `null` : celui du profil. Absent des fiches plus anciennes.
    */
   waveThreshold: number | null;
-  /**
-   * Poids du vélo et des bagages pour cette session, en kg (vélo, énergie) ;
-   * `null` : celui de son activité (Réglages). Il décrit le matériel du jour :
-   * un changement d'activité le garde. Absent des fiches plus anciennes.
-   */
-  bikeWeightKg: number | null;
-  /**
-   * Charge portée (sac, affaires) pour cette session, en kg (course, énergie) ;
-   * `null` : celle de son activité (Réglages). Un changement d'activité la
-   * garde. Absente des fiches plus anciennes.
-   */
-  loadKg: number | null;
   savedAt: number;
 }
 
@@ -387,9 +315,8 @@ export interface SessionRecord {
   analysis: SessionAnalysis | null;
   /**
    * Voies suivies (`planning/surface.ts`, `readSessionSurfaces`), absentes tant que l'onglet « surface » n'a rien
-   * trouvé. Comme l'altitude du terrain, les séances du compteur et le test guidé, un champ de la course, du vélo et
-   * de l'Entraînement : la fiche le garde brut, tel que lu sur le disque, et ne le lit plus (lot 301) ; son domaine
-   * le lit à l'emploi, une valeur mal formée y revenant à « absent ».
+   * trouvé. Comme l'altitude du terrain, un champ de la course et du vélo : la fiche le garde brut, tel que lu sur
+   * le disque, et ne le lit plus (lot 301) ; son domaine le lit à l'emploi, une valeur mal formée y revenant à « absent ».
    */
   surfaces?: unknown;
   /** Altitude du terrain de l'IGN (course et vélo, retirés au lot 303), absente tant que l'IGN n'a pas répondu ; brute. */
@@ -398,12 +325,6 @@ export interface SessionRecord {
   elevationSource?: 'gps';
   /** Fond de carte de cette session (plan ou satellite), changé tout de suite ; absent : celui de la famille (Réglages de l'appareil). */
   mapBase?: MapBase;
-  /**
-   * Séances du compteur faites pendant l'enregistrement (fractionné, §10, point 89 ;
-   * `recording/intervalTimer.ts`, `readIntervalSeries`), datées par l'horloge du téléphone :
-   * elles ne se tirent pas du GPX. Absent sans compteur ; brut.
-   */
-  intervals?: unknown;
   /** Sauts mesurés (voile, course, vélo) ; absent sans `.imu`, avant leur calcul, ou si la fiche en porte de mal formés. */
   jumps?: SessionJumps;
   /**
@@ -411,44 +332,7 @@ export interface SessionRecord {
    * supprimés dans l'analyse ; dans l'ordre du temps. Absent sans repère.
    */
   marks?: SessionMark[];
-  /**
-   * Test guidé fait pendant l'enregistrement (Entraînement › Tests ; `recording/fitnessTest.ts`,
-   * `readSessionTest`) : phases, paliers et signaux, en heure des positions. Absent sans test ; brut.
-   */
-  test?: unknown;
 }
-
-
-// --- Meilleurs efforts du résumé (lot 146) ---
-
-/**
- * Meilleurs efforts d'une session à pied ou à vélo, tirés des tops (`computeTopSegments`, distance retenue,
- * règle 6). Un champ manque quand la session est trop courte pour lui.
- */
-export interface SummaryBests {
-  /** Meilleur 5 km, en secondes. */
-  d5kmS?: number;
-  /** Meilleur 10 km, en secondes. */
-  d10kmS?: number;
-  /** Vélo : meilleure puissance mécanique moyenne estimée sur 20 min, en W (modèle du vélo, retiré au lot 303). */
-  p20minW?: number;
-  /**
-   * Vélo : poids du pratiquant avec lequel la puissance a été cherchée, en kg ; absent si le poids n'était pas
-   * renseigné au moment du résumé (rien n'est alors estimé, et le résumé est refait une fois le poids connu).
-   */
-  powerRiderKg?: number;
-}
-
-const readSummaryBests = (raw: unknown): SummaryBests | null => {
-  if (!isObject(raw)) return null;
-  const bests: SummaryBests = {};
-  for (const key of Object.keys(SUMMARY_BESTS_BOUNDS) as (keyof typeof SUMMARY_BESTS_BOUNDS)[]) {
-    const value = raw[key];
-    const { min, max } = SUMMARY_BESTS_BOUNDS[key];
-    if (isFiniteNumber(value) && value >= min && value <= max) bests[key] = value;
-  }
-  return Object.keys(bests).length > 0 ? bests : null;
-};
 
 const readSummary = (raw: unknown): SessionSummary | null => {
   if (!isObject(raw)) return null;
@@ -489,16 +373,10 @@ const readSummary = (raw: unknown): SessionSummary | null => {
   const heartRate = readSummaryHeartRate(raw.heartRate);
   if (heartRate) summary.heartRate = heartRate;
   else delete summary.heartRate;
-  const cadence = readSummaryCadence(raw.cadence);
-  if (cadence) summary.cadence = cadence;
-  else delete summary.cadence;
   for (const [field, [min, max]] of Object.entries(SHARE_NUMBER_RANGES) as [keyof typeof SHARE_NUMBER_RANGES, readonly [number, number]][]) {
     const value = raw[field];
     if (!isFiniteNumber(value) || value < min || value > max) delete summary[field];
   }
-  const bests = readSummaryBests(raw.bests);
-  if (bests) summary.bests = bests;
-  else delete summary.bests;
   if (typeof raw.optionsKey !== 'string') delete summary.optionsKey;
   const activitySettings = readActivitySettings(raw.activitySettings);
   if (activitySettings) summary.activitySettings = activitySettings;
@@ -563,7 +441,7 @@ export type AnalysisKey = Exclude<keyof SessionAnalysis, 'savedAt'>;
 export type AnalysisValues = Pick<SessionAnalysis, AnalysisKey>;
 
 /** Partie de l'écran où se saisit un réglage d'analyse, celle qu'annonce le brouillon (`library/sessionEdits.ts`). */
-export type AnalysisPart = 'vent' | 'seuil' | 'allure' | 'couleurs' | 'effort' | 'foil' | 'pumping' | 'vague' | 'charge';
+export type AnalysisPart = 'vent' | 'seuil' | 'allure' | 'couleurs' | 'foil' | 'pumping' | 'vague';
 
 /**
  * Un réglage d'analyse : sa partie à l'écran ; sa lecture depuis le JSON de
@@ -592,26 +470,10 @@ export const ANALYSIS_FIELDS: { readonly [K in AnalysisKey]: AnalysisField<K> } 
   activeThreshold: { part: 'seuil', read: (raw) => (isFiniteNumber(raw) && raw >= 0 ? raw : null) },
   referenceSpeedMs: { part: 'allure', read: (raw) => (isFiniteNumber(raw) && raw > 0 ? raw : null) },
   speedRange: { part: 'couleurs', read: (raw) => readSpeedRange(raw), same: sameRange },
-  effortThresholdMs: { part: 'effort', read: (raw) => (isFiniteNumber(raw) && raw > 0 ? raw : null) },
   foil: { part: 'foil', read: (raw) => (typeof raw === 'boolean' ? raw : null) },
   pumping: { part: 'pumping', read: (raw) => (typeof raw === 'boolean' ? raw : null) },
   waveThreshold: { part: 'vague', read: (raw) => (isFiniteNumber(raw) && raw > 0 ? raw : null) },
-  bikeWeightKg: { part: 'charge', read: (raw) => (isValidBikeWeight(raw) ? raw : null) },
-  loadKg: { part: 'charge', read: (raw) => (isValidCarriedLoad(raw) ? raw : null) },
 };
-
-/**
- * Poids du vélo et charge portée d'une session de l'application complète (vélo, course, retirés aux lots 303 et
- * 305) : lus et réécrits à l'identique, jusqu'au lot 306. Poids de vélo plausible, bagages compris, en kg.
- */
-function isValidBikeWeight(value: unknown): value is number {
-  return typeof value === 'number' && isFinite(value) && value >= 3 && value <= 60;
-}
-
-/** Charge portée plausible (sac, affaires), en kg ; 0 : aucune. */
-function isValidCarriedLoad(value: unknown): value is number {
-  return typeof value === 'number' && isFinite(value) && value >= 0 && value <= 50;
-}
 
 /** Les clés de `ANALYSIS_FIELDS`, dans leur ordre. */
 export const ANALYSIS_KEYS = Object.keys(ANALYSIS_FIELDS) as AnalysisKey[];
@@ -698,11 +560,11 @@ export interface UnreadableField {
 export type RecordUnreadable = Readonly<Record<string, UnreadableField>>;
 
 /**
- * Champs de premier niveau dont la lecture peut perdre quelque chose. Voies, altitude du terrain, séances et test
- * guidé passent bruts depuis le lot 301 (rien ne s'y perd) : gardés dans la liste, par sûreté, jusqu'à leur retrait.
+ * Champs de premier niveau dont la lecture peut perdre quelque chose. Voies et altitude du terrain passent bruts
+ * depuis le lot 301 (rien ne s'y perd) : gardés dans la liste, par sûreté, jusqu'à leur retrait.
  */
 const GUARDED_FIELDS = [
-  'sport', 'activityId', 'source', 'addedAt', 'title', 'name', 'surfaces', 'terrainElevation', 'elevationSource', 'mapBase', 'intervals', 'jumps', 'marks', 'test',
+  'sport', 'activityId', 'source', 'addedAt', 'title', 'name', 'surfaces', 'terrainElevation', 'elevationSource', 'mapBase', 'jumps', 'marks',
 ] as const;
 /** Objets relus champ par champ : un champ illisible y est gardé seul ; l'objet entier s'il est illisible (sauf le résumé, refait depuis le GPX). */
 const GUARDED_OBJECTS = ['summary', 'analysis', 'notes'] as const;
@@ -779,7 +641,7 @@ const readRecordParts = (raw: unknown, formats: readonly string[]): RecordWithou
   if (!isObject(raw) || typeof raw.format !== 'string' || !formats.includes(raw.format) || !isFiniteNumber(raw.version)) return null;
   if (typeof raw.gpx !== 'string' || raw.gpx === '') return null;
   const summary = readSummary(raw.summary);
-  // Voies, altitude du terrain, séances et test guidé (course, vélo, Entraînement) passent bruts par `rest` (lot 301).
+  // Voies et altitude du terrain (course et vélo) passent bruts par `rest` (lot 301), comme tout champ inconnu.
   const { elevationSource: rawSource, mapBase: rawMapBase, jumps: rawJumps, marks: rawMarks, ...rest } = raw;
   const jumps = readSessionJumps(rawJumps);
   const marks = readSessionMarks(rawMarks);
@@ -886,17 +748,14 @@ const withoutCarriedSettings = <T extends SessionRecord>(record: T): T => {
   return { ...record, summary };
 };
 
-/** Liste non vide (champ brut de la fiche). */
-const hasItems = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
-
 /**
  * Fiche de la mémoire complétée par celle d'une copie de la même session
  * (import d'un GPX complet, `library/sessionBundle.ts`, ou d'un GPX et de sa
- * fiche) : support et activité inconnus, séances du compteur, repères, test, nom,
- * notes, réglages, sauts, voies et altitude qu'elle n'a pas encore. Rien de ce
- * qu'elle porte n'est écrasé ; rend la même fiche si rien ne manque.
+ * fiche) : support et activité inconnus, repères, nom, notes, réglages, sauts,
+ * voies et altitude qu'elle n'a pas encore. Rien de ce qu'elle porte n'est
+ * écrasé ; rend la même fiche si rien ne manque.
  * `resummarize` : le résumé est à refaire (support, activité, réglages ou
- * altitude reçus ; le test guidé n'y entre plus, lot 301).
+ * altitude reçus).
  */
 export const completeRecord = (
   existing: SessionRecord,
@@ -907,9 +766,7 @@ export const completeRecord = (
   if (existing.activityId === null && incoming.activityId !== null && (patch.sport ?? existing.sport) === incoming.sport) {
     patch.activityId = incoming.activityId;
   }
-  if (!hasItems(existing.intervals) && hasItems(incoming.intervals)) patch.intervals = incoming.intervals;
   if (!existing.marks?.length && incoming.marks?.length) patch.marks = incoming.marks;
-  if (!existing.test && incoming.test) patch.test = incoming.test;
   if (existing.name === null && incoming.name !== null) patch.name = incoming.name;
   if (existing.notes === null && incoming.notes !== null) patch.notes = incoming.notes;
   if (existing.analysis === null && incoming.analysis !== null) patch.analysis = incoming.analysis;
@@ -938,7 +795,7 @@ export const RECORD_EDIT_FIELDS = [
  * Fiche `target` qui reçoit les saisies d'une autre copie de la même session (`edited`), celle de
  * la mémoire quand sa fiche n'a pas pu être écrite et qu'on change de dossier : chaque champ de
  * `RECORD_EDIT_FIELDS` y devient celui de `edited`, retiré s'il en est absent ; le reste (résumé,
- * sauts, voies, altitude, séances, test) est celui de `target`. Rend `target` si rien ne change.
+ * sauts, voies, altitude) est celui de `target`. Rend `target` si rien ne change.
  * `resummarize` : le résumé est à refaire (support, activité, réglages ou source de l'altitude changés).
  */
 export const carryRecordEdits = (target: SessionRecord, edited: SessionRecord): { record: SessionRecord; resummarize: boolean } => {
@@ -985,7 +842,7 @@ export const isBlankGpxText = (text: string): boolean => text.trim() === '';
  */
 export const RECORD_LIGHT_FIELDS = [
   'format', 'version', 'gpx', 'sport', 'activityId', 'source', 'addedAt', 'title', 'name',
-  'summary', 'notes', 'analysis', 'elevationSource', 'mapBase', 'intervals', 'marks', 'test',
+  'summary', 'notes', 'analysis', 'elevationSource', 'mapBase', 'marks',
 ] as const satisfies readonly (keyof SessionRecord)[];
 
 /**
@@ -999,12 +856,9 @@ export const RECORD_LIGHT_FIELDS_KEY = RECORD_LIGHT_FIELDS.join(',');
  * Version du lecteur des fiches (`readRecordParts` et ce qu'il appelle), rangée avec le cache : les
  * fiches du cache sont ce qu'a rendu le lecteur de la version qui l'a fait, et n'y repassent pas. À
  * augmenter dès qu'une fiche ne se lit plus pareil (nouveau défaut, champ normalisé autrement, borne) :
- * le cache d'avant est alors ignoré, toutes les fiches sont relues, puis il est refait. Un cache sans
- * ce numéro est de la version 1. Version 2 (lot 305) : une fiche de course, de vélo ou de l'Entraînement
- * se relit sans calcul (`sport` nul, le brut gardé pour l'écriture) ; un cache de la version 1 la
- * resservirait avec son calcul, que cette version ne connaît plus.
+ * le cache d'avant est alors ignoré, toutes les fiches sont relues, puis il est refait.
  */
-export const RECORD_READER_VERSION = 2;
+export const RECORD_READER_VERSION = 1;
 
 const LIGHT_FIELDS: ReadonlySet<string> = new Set(RECORD_LIGHT_FIELDS);
 
@@ -1084,8 +938,6 @@ export interface RecordPatch {
   pumpingShare?: number | null;
   /** Vent retenu par l'analyse (voile), en degrés ; `null` le retire. */
   windDirDeg?: number | null;
-  /** Puissance moyenne en mouvement (vélo), posée par l'analyse ; `null` la retire. */
-  avgPowerW?: number | null;
   /** Voies trouvées pour la trace (`SessionSurfaces`, `planning/surface.ts`) ; `null` les retire. */
   surfaces?: unknown;
   /** Altitude du terrain (course et vélo, retirés au lot 303), gardée brute ; `null` la retire. */
@@ -1166,7 +1018,7 @@ export const applyRecordPatch = (record: SessionRecord, patch: RecordPatch): { r
   if (patch.maneuverResults !== undefined && !sameManeuverResults(patch.maneuverResults, next.summary.maneuverResults)) {
     next = { ...next, summary: { ...next.summary, maneuverResults: patch.maneuverResults } };
   }
-  for (const field of ['pumpingShare', 'windDirDeg', 'avgPowerW'] as const) {
+  for (const field of ['pumpingShare', 'windDirDeg'] as const) {
     const value = patch[field];
     if (value === undefined || value === (next.summary[field] ?? null)) continue;
     const { [field]: _previous, ...others } = next.summary;

@@ -19,17 +19,14 @@ const record = (patch: Partial<SessionRecord> = {}): SessionRecord =>
     ...patch,
   }, { startMs: START_MS, endMs: START_MS + 1_800_000, distanceM: 5000, movingTimeS: 1700, maxSpeedMs: 6, pointCount: 1801 });
 
-const INTERVALS: NonNullable<SessionRecord['intervals']> = [{
-  workout: { reps: 2, workS: 10, restS: 10 },
-  laps: [
-    { kind: 'travail', rep: 1, startMs: START_MS, endMs: START_MS + 10_000 },
-    { kind: 'repos', rep: 1, startMs: START_MS + 10_000, endMs: START_MS + 20_000 },
-  ],
-}];
+const MARKS: NonNullable<SessionRecord['marks']> = [
+  { timeMs: START_MS + 10_000, lat: 43.6, lon: 3.8, label: 'Bouée <1> & 2' },
+  { timeMs: START_MS + 20_000, lat: null, lon: null, label: null },
+];
 
 describe('GPX complet', () => {
   it('rend le GPX d’origine à l’octet près, la fiche et les capteurs', () => {
-    const fiche = record({ name: 'Piste <10/10> & 20/20 ]]>', intervals: INTERVALS });
+    const fiche = record({ name: 'Piste <10/10> & 20/20 ]]>', marks: MARKS });
     const motion = new Uint8Array([0, 1, 2, 250, 255]);
     const bundled = bundleSessionGpx(GPX, fiche, motion);
     expect(bundled).not.toBe(GPX);
@@ -37,7 +34,7 @@ describe('GPX complet', () => {
     const back = unbundleSessionGpx(bundled);
     expect(back.gpx).toBe(GPX);
     expect(back.record?.name).toBe('Piste <10/10> & 20/20 ]]>');
-    expect(back.record?.intervals).toEqual(INTERVALS);
+    expect(back.record?.marks).toEqual(MARKS);
     expect(back.motion).toEqual(motion);
   });
 
@@ -191,7 +188,7 @@ describe('GPX complet et fiche compacte (lot 80)', () => {
   const marks = [{ timeMs: START_MS + 60_000, lat: 43.6, lon: 3.8, label: 'Bouée' }];
 
   it('un paquet d’avant, fiche indentée, se relit et se défait encore', () => {
-    const fiche = record({ ...familyRecords().course, name: 'Carnon', marks, gpx: '2026-10-10_09-00-00_course.gpx' });
+    const fiche = record({ ...familyRecords().surf, name: 'Carnon', marks, gpx: '2026-10-10_09-00-00_surf.gpx' });
     const bundled = bundleSessionGpx(GPX, fiche, new Uint8Array([1, 2, 3]));
     const compact = escapeXmlText(serializeRecord(fiche));
     expect(bundled).toContain(compact);
@@ -208,14 +205,14 @@ describe('GPX complet et fiche compacte (lot 80)', () => {
 describe('completeRecord', () => {
   it('reprend ce qui manque sans rien écraser', () => {
     const existing = record({ name: 'Nom du PC' });
-    const incoming = record({ name: 'Nom du téléphone', intervals: INTERVALS });
+    const incoming = record({ name: 'Nom du téléphone', marks: MARKS });
     const { record: done } = completeRecord(existing, incoming);
     expect(done.name).toBe('Nom du PC');
-    expect(done.intervals).toEqual(INTERVALS);
+    expect(done.marks).toEqual(MARKS);
   });
 
   it('rend la même fiche si rien ne manque', () => {
-    const existing = record({ intervals: INTERVALS });
-    expect(completeRecord(existing, record({ intervals: [] })).record).toBe(existing);
+    const existing = record({ marks: MARKS });
+    expect(completeRecord(existing, record({ marks: [] })).record).toBe(existing);
   });
 });

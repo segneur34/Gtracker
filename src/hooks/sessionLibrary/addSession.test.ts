@@ -130,7 +130,7 @@ afterEach(() => {
 const turn = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 1));
 
 const analysis = (patch: Partial<SessionAnalysis>): SessionAnalysis => ({
-  windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, effortThresholdMs: null, foil: null, waveThreshold: null, ...patch,
+  windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, waveThreshold: null, ...patch,
 } as SessionAnalysis);
 
 const sail = (hz: number, meta?: { name: string; type: string }): string => gpxOf(sailRaw({ windDeg: 20, legs: upDownLegs(2, 60), hz }), 'simple', meta);

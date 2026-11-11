@@ -687,7 +687,7 @@ function SessionLibrary({ family }: { family: SportFamily }) {
       {!planned && unclassified.length > 0 && (
         <Card heading="À classer">
           <p className="ui-hint ui-hint--m">
-            Traces dont l'activité n'est pas connue : choisissez-la pour les ranger en voile, à pied, à vélo, en surf ou en entraînement. Ouvrir l'une d'elles la demande d'abord.
+            Traces dont l'activité n'est pas connue : choisissez-la pour les ranger en voile ou en surf. Ouvrir l'une d'elles la demande d'abord.
           </p>
           <ul className="lib-list">{unclassified.map(row)}</ul>
         </Card>

@@ -13,7 +13,7 @@ import { analyzeGpx, type ActivitySummarySettings } from './summaryOptions';
  */
 
 const analysis = (patch: Partial<SessionAnalysis>): SessionAnalysis => ({
-  windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, effortThresholdMs: null, foil: null, waveThreshold: null, ...patch,
+  windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, waveThreshold: null, ...patch,
 } as SessionAnalysis);
 
 /** Réglages de l'activité par calcul, différents d'un calcul à l'autre : une table mal résolue se verrait. */

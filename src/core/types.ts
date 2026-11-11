@@ -10,9 +10,9 @@
 
 /**
  * Support / activité analysée. Le seuil d'activité et l'unité d'affichage en dépendent.
- * L'identifiant va dans le `<type>` du GPX enregistré et dans le nom de son fichier. Les calculs de l'application
- * complète (course, vélo, Entraînement, retirés aux lots 302, 303 et 305) ne sont plus des calculs : une fiche ou un
- * GPX qui les porte se relit sans calcul, « à classer » (`library/record.ts`, `library/naming.ts`).
+ * L'identifiant va dans le `<type>` du GPX enregistré et dans le nom de son fichier. Une fiche ou un GPX d'un type
+ * inconnu se relit sans calcul, « à classer » (`library/record.ts`) ; une session de course, de vélo ou
+ * d'entraînement venue d'une autre application est refusée à l'import (`library/naming.ts`).
  */
 export type SportType = 'wingfoil' | 'windsurf' | 'kite' | 'bateau' | 'surf';
 

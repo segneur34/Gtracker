@@ -1,6 +1,6 @@
 import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { isNativeApp } from './runtime';
-import { addBelt, beltEntry, forgetBelt, isBelt, learnBeltAddressType, readBeltList } from './beltList';
+import { addBelt, forgetBelt, learnBeltAddressType, readBeltList, storedBeltList, type BeltList } from './beltList';
 import { jsonStore } from './storage';
 
 /**
@@ -142,34 +142,23 @@ export const stopBeltScan = async (): Promise<void> => {
 
 // --- Appareils retenus ---
 
-/** Appareil actif, celui du prochain départ : l'ancienne clé, d'avant la liste, dont le sens ne change pas. */
-const BELT_KEY = 'tracker.heartRateBelt';
-/** Tous les appareils retenus, l'actif compris (lot 198). */
+/** Tous les appareils retenus (lot 198), l'actif, celui du prochain départ, marqué dedans (`storedBeltList`). */
 const BELTS_KEY = 'tracker.heartRateBelts';
 
+const readBelts = (): BeltList => readBeltList(jsonStore.read<unknown>(BELTS_KEY));
+
+const saveBelts = (list: readonly HeartRateBelt[], active: HeartRateBelt | null): void =>
+  jsonStore.write(BELTS_KEY, storedBeltList(list, active));
+
 /** Appareil actif, choisi dans Réglages ou par « Changer » à Enregistrer : celui que l'enregistrement prendra, ou `null`. */
-export const savedBelt = (): HeartRateBelt | null => {
-  const value = jsonStore.read<unknown>(BELT_KEY);
-  return isBelt(value) ? value : null;
-};
+export const savedBelt = (): HeartRateBelt | null => readBelts().active;
 
-/** Retient l'appareil actif (`null` : aucun). */
-const saveBelt = (belt: HeartRateBelt | null): void => jsonStore.write(BELT_KEY, belt);
-
-/**
- * Appareils retenus, dans l'ordre où ils ont été ajoutés, l'actif compris.
- * Avant la liste, la ceinture choisie en est le seul élément : rien n'est
- * perdu, rien n'est effacé (`readBeltList`).
- */
-export const savedBelts = (): HeartRateBelt[] => readBeltList(jsonStore.read<unknown>(BELTS_KEY), savedBelt());
-
-const saveBelts = (list: readonly HeartRateBelt[]): void => jsonStore.write(BELTS_KEY, list);
+/** Appareils retenus, dans l'ordre où ils ont été ajoutés, l'actif compris. */
+export const savedBelts = (): HeartRateBelt[] => readBelts().list;
 
 /** Fait de `belt` l'appareil actif ; il rejoint la liste s'il n'y était pas. */
 export const chooseSavedBelt = (belt: HeartRateBelt): void => {
-  const list = addBelt(savedBelts(), belt);
-  saveBelts(list);
-  saveBelt(list.find((b) => b.address === belt.address) ?? beltEntry(belt));
+  saveBelts(addBelt(savedBelts(), belt), belt);
 };
 
 /**
@@ -177,19 +166,15 @@ export const chooseSavedBelt = (belt: HeartRateBelt): void => {
  * l'appareil actif ; il le devient de toute façon s'il n'y en avait aucun.
  */
 export const addSavedBelt = (belt: HeartRateBelt, activate: boolean): void => {
-  const list = addBelt(savedBelts(), belt);
-  saveBelts(list);
-  const active = savedBelt();
-  const entry = list.find((b) => b.address === belt.address) ?? beltEntry(belt);
-  // Déjà actif : l'ancienne clé suit son entrée (nom, type d'adresse).
-  if (activate || active === null || active.address === belt.address) saveBelt(entry);
+  const { list, active } = readBelts();
+  saveBelts(addBelt(list, belt), activate || active === null ? belt : active);
 };
 
 /** Oublie l'appareil d'adresse `address` ; si c'était l'actif, le suivant de la liste le devient (aucun si elle est vide). */
 export const forgetSavedBelt = (address: string): void => {
-  const { list, active } = forgetBelt(savedBelts(), address, savedBelt());
-  saveBelts(list);
-  saveBelt(active);
+  const { list, active } = readBelts();
+  const rest = forgetBelt(list, address, active);
+  saveBelts(rest.list, rest.active);
 };
 
 /** Ouvre les réglages Bluetooth d'Android : le secours d'une ceinture introuvable. */
@@ -199,11 +184,9 @@ export const openBluetoothSettings = async (): Promise<void> => {
 
 /** Retient le type d'adresse que la recherche du greffon a appris, pour l'appareil retenu qui ne l'avait pas (l'actif compris). */
 const learnAddressType = (address: string | undefined, random: boolean | undefined): void => {
-  const list = savedBelts();
+  const { list, active } = readBelts();
   const learned = learnBeltAddressType(list, address, random);
-  if (learned !== list) saveBelts(learned);
-  const belt = savedBelt();
-  if (belt && random !== undefined && belt.random === undefined && belt.address === address) saveBelt({ ...belt, random });
+  if (learned !== list) saveBelts(learned, active);
 };
 
 // --- Connexion partagée ---

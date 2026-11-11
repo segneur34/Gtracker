@@ -88,7 +88,7 @@ describe('fiche, compatibilité (e) aller-retour sur une fiche complète', () =>
     activityId: 'wingfoil', name: 'Sortie', notes: {
       foil: 'a', mast: 'b', wing: 'c', gear1: '', gear2: '', conditions: '', gear: null, windLevel: 'fort', waterState: 'plat', rating: 5, comment: 'x', savedAt: 3,
     },
-    analysis: { windDeg: 10, activeThreshold: 8, referenceSpeedMs: 5, speedRange: { minMs: 2, maxMs: 12 }, effortThresholdMs: null, foil: true, pumping: false, waveThreshold: null, bikeWeightKg: null, loadKg: null, savedAt: 4 },
+    analysis: { windDeg: 10, activeThreshold: 8, referenceSpeedMs: 5, speedRange: { minMs: 2, maxMs: 12 }, foil: true, pumping: false, waveThreshold: null, savedAt: 4 },
     marks: [{ timeMs: 1790000100000, lat: 43.5, lon: 3.9, label: 'Bouée' }],
     jumps: { version: 2, computedAt: '2026-10-08T14:00:00.000Z', jumps: [] },
   }, { maneuverCount: 3, maneuverResults: { tackSuccess: 1, tackFail: 0, jibeSuccess: 2, jibeFail: 0 }, optionsKey: '[8,5,null,null]', inMotionS: 2900 });
@@ -103,42 +103,6 @@ describe('fiche, compatibilité (e) aller-retour sur une fiche complète', () =>
   });
   it('cache allégé puis fusion avec le disque : identique', () => {
     expect(mergeLightRecord(full, lightRecord(full))).toEqual(full);
-  });
-});
-
-describe("fiche, compatibilité (f) fiche de l'application complète, champs de la terre gardés bruts (lot 301)", () => {
-  // Fiche telle que l'écrit l'application complète : poids et charge, voies, altitude du terrain, séances (l'une
-  // mal formée), test guidé, cadence et test du résumé. La version voile et surf ne lit plus ces champs-là.
-  const START = 1790000000000;
-  const complete = {
-    ...sessionRecord({ gpx: '2026-09-23_14-00-00_course.gpx', activityId: 'course', name: 'Footing' },
-      { cadence: { avgSpm: 172.5, steps: 9800 } }),
-    // Calcul de l'application complète, inconnu ici depuis le lot 305 : relu sans calcul, réécrit tel quel.
-    sport: 'running',
-    analysis: {
-      windDeg: null, activeThreshold: 1.2, referenceSpeedMs: null, speedRange: null, effortThresholdMs: 4.35, foil: null, pumping: null,
-      waveThreshold: null, bikeWeightKg: 9.8, loadKg: 4.5, savedAt: 4,
-    },
-    surfaces: { source: 'overpass', fetchedAt: '2026-10-04T15:00:00.000Z', matchVersion: 3, startMs: START, tags: ['highway=track'], runs: [[0, 0]] },
-    terrainElevation: { source: 'ign', resource: 'ign_rge_alti_wld', version: 1, stepM: 10, fetchedAt: '2026-10-07T09:00:00.000Z', startMs: START, t: [0, 1800], z: [120.5, null] },
-    elevationSource: 'gps',
-    intervals: [{ workout: { reps: 1, workS: 60, restS: 30 }, laps: [{ kind: 'sprint', rep: 1, startMs: START, endMs: START + 60_000 }] }],
-    test: { protocol: 'fc-max', version: 1, settings: { warmupS: 480 }, startMs: START, steps: [], signals: [] },
-  };
-  const text = serializeRecord(complete as unknown as SessionRecord);
-
-  it('relue, renommée, réécrite : chaque champ revient identique, nom excepté', () => {
-    const rewritten = rewriteAfterRename(text);
-    expect(rewritten.name).toBe('Renommée');
-    expect({ ...rewritten, name: 'Footing' }).toEqual(JSON.parse(text));
-  });
-
-  it('les champs bruts suivent la fiche dans le cache allégé et la fusion avec le disque', () => {
-    const read = parseRecord(text)!;
-    expect(read.sport).toBeNull();
-    for (const key of ['surfaces', 'terrainElevation', 'intervals', 'test'] as const) expect(read[key]).toEqual(complete[key]);
-    expect((read.summary as unknown as Record<string, unknown>).cadence).toEqual({ avgSpm: 172.5, steps: 9800 });
-    expect(mergeLightRecord(read, lightRecord(read))).toEqual(read);
   });
 });
 

@@ -483,7 +483,7 @@ export interface ImportEntry {
 }
 
 /**
- * Sur le téléphone, fait désigner un dossier (par exemple un dossier Tracker
+ * Sur le téléphone, fait désigner un dossier (par exemple un dossier de sessions
  * copié depuis le PC) et en rend les GPX, les FIT, les fiches et les capteurs, à lire
  * un par un au moment de les ranger. `null` si l'utilisateur renonce.
  * L'accès au dossier n'est pas gardé : il n'est lu qu'une fois.

@@ -68,8 +68,8 @@ const mockPlatform = (): void => {
 const stored = new Map<string, string>();
 
 const analysis = (patch: Partial<SessionAnalysis>): SessionAnalysis => ({
-  windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, effortThresholdMs: null, foil: null,
-  pumping: null, waveThreshold: null, bikeWeightKg: null, loadKg: null, savedAt: 1, ...patch,
+  windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null,
+  pumping: null, waveThreshold: null, savedAt: 1, ...patch,
 });
 
 /**

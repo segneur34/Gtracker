@@ -28,9 +28,7 @@ describe('summarizeSession', () => {
     const run = summarizeSession(buildTrack([[200, 3], [200, 4], [200, 3]]), 'kite')!;
     const ride = summarizeSession(buildTrack([[150, 7], [300, 9], [150, 7]]), 'wingfoil')!;
     for (const summary of [run, ride]) {
-      expect(summary.best1kmS).toBeUndefined();
-      expect(summary.best5minMs).toBeUndefined();
-      expect(summary.bests).toBeUndefined();
+      for (const field of ['best1kmS', 'best5minMs', 'bests']) expect(summary).not.toHaveProperty(field);
     }
   });
 

@@ -21,7 +21,7 @@ interface Draft {
 
 /**
  * Brouillon des changements faits sur une session (vent saisi, seuil
- * d'activité, allure, couleurs, seuil d'effort, notes) : l'analyse les suit tout de suite,
+ * d'activité, allure, couleurs, notes) : l'analyse les suit tout de suite,
  * mais la fiche ne les reçoit qu'à `save`, et `cancel` revient à l'état
  * enregistré. Quitter la page avec un brouillon enregistrable demande
  * confirmation (`useLeaveWarning`).

@@ -10,19 +10,15 @@ import { indexByRecordName, type LibraryCache } from './reconcile';
 /** Le cache tel que rangé dans le stockage de l'appareil. */
 export interface StoredCache {
   folder: string;
-  /**
-   * Fiches allégées (`lightRecord`) : sans altitude du terrain, voies ni
-   * sauts, relus sur le disque quand on en a besoin. Absent d'un cache d'avant,
-   * dont les fiches sont entières.
-   */
-  light?: boolean;
+  /** Fiches allégées (`lightRecord`) : sans altitude du terrain, voies ni sauts, relus sur le disque quand on en a besoin. */
+  light: boolean;
   /**
    * Champs gardés par les fiches allégées (`RECORD_LIGHT_FIELDS_KEY`). Un cache fait sous une autre
-   * liste, ou d'avant cette empreinte, est ignoré : toutes les fiches sont relues, puis il est refait.
+   * liste est ignoré : toutes les fiches sont relues, puis il est refait.
    */
-  fields?: string;
-  /** Version du lecteur qui a rendu ces fiches (`RECORD_READER_VERSION`), 1 si absente : une autre est ignorée de même. */
-  reader?: number;
+  fields: string;
+  /** Version du lecteur qui a rendu ces fiches (`RECORD_READER_VERSION`) : une autre est ignorée de même. */
+  reader: number;
   entries: LibraryCache;
 }
 
@@ -40,8 +36,8 @@ export const folderId = (f: Pick<MemoryFolder, 'kind' | 'label'>): string => `${
  * de champs allégés ou d'un autre lecteur de fiches.
  */
 export const storedCacheFor = (cache: StoredCache | null, id: string): ReadCache =>
-  cache && cache.folder === id && cache.entries && cache.fields === RECORD_LIGHT_FIELDS_KEY && (cache.reader ?? 1) === RECORD_READER_VERSION
-    ? { entries: cache.entries, light: cache.light === true }
+  cache && cache.folder === id && cache.entries && cache.fields === RECORD_LIGHT_FIELDS_KEY && cache.reader === RECORD_READER_VERSION
+    ? { entries: cache.entries, light: cache.light }
     : { entries: {}, light: false };
 
 /** Cache à ranger pour le dossier `id`, fiches allégées. */

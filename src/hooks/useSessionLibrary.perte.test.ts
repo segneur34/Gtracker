@@ -725,18 +725,6 @@ describe('cache des fiches d\'une autre version du lecteur (lot 148, C5-7)', () 
     expect(library.librarySession('sortie.gpx')?.partial).toBeFalsy();
     expect(JSON.parse(stored.get(CACHE_KEY)!).reader).toBe(RECORD_READER_VERSION);
   });
-
-  it('un cache sans numéro vaut la version 1 : ignoré par le lecteur de la version 2 (lot 305), les fiches sont relues', async () => {
-    expect(RECORD_READER_VERSION).toBe(2);
-    const cache = await cacheMade();
-    delete cache.reader;
-    cache.entries['sortie.json'].record.name = 'Du cache';
-    stored.set(CACHE_KEY, JSON.stringify(cache));
-    const library = await openFresh();
-    await settle(library);
-    expect(library.librarySession('sortie.gpx')?.record.name).not.toBe('Du cache');
-    expect(JSON.parse(stored.get(CACHE_KEY)!).reader).toBe(2);
-  });
 });
 
 describe('marqueur d\'une version plus récente (lot 148, C5-9)', () => {
