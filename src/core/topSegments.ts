@@ -1,7 +1,7 @@
 import type { CumulativeTrack, TopSegment, TopTarget, TrackPoint } from './types';
 
 /** Nombre de meilleurs segments retenus par cible. */
-export const DEFAULT_TOP_COUNT = 3;
+const DEFAULT_TOP_COUNT = 3;
 
 export interface TopSegmentOptions {
   /** Nombre de segments retenus. */

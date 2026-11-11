@@ -1,7 +1,7 @@
 import { SPORT_PROFILES } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import type { RecordWithoutSummary, SessionAnalysis } from './record';
-import { analyzeGpx, type ActivitySummarySettings, type AnalyzedGpx, type SessionElevation } from './summaryOptions';
+import { analyzeGpx, type ActivitySummarySettings, type AnalyzedGpx } from './summaryOptions';
 
 /**
  * Résumé d'un GPX en une fonction pure dont les réglages sont des données (lot 126 B) : `analyzeGpx` prend les
@@ -16,21 +16,19 @@ export interface SummarizeGpxOptions {
   analysis: SessionAnalysis | null | undefined;
   /** Réglages de l'activité de la session par calcul : celui de la session, ou les cinq quand il est à deviner. */
   activitySettings: Partial<Record<SportType, ActivitySummarySettings>>;
-  /** Altitude du terrain de la fiche et la source choisie : portée, plus lue (`SessionElevation`). */
-  elevation: SessionElevation | null | undefined;
 }
 
 /** Les cinq calculs, pour une session dont le calcul est à deviner. */
 const ALL_SPORTS = Object.keys(SPORT_PROFILES) as SportType[];
 
 /**
- * Options du résumé d'une session (`summarizeGpx`) : le calcul, l'analyse et l'altitude de sa fiche
+ * Options du résumé d'une session (`summarizeGpx`) : le calcul, l'analyse de sa fiche
  * (`record`, absente pour un GPX neuf : calcul deviné ; `addGpx` y passe le calcul qu'il impose, `undefined` s'il
  * est à deviner) ; les réglages de son activité lus par `activityOf` pour le calcul de la fiche, ou pour chacun
  * des cinq si le calcul est à deviner.
  */
 export const summarizeGpxOptions = (
-  record: (Partial<Pick<RecordWithoutSummary, 'analysis' | 'terrainElevation' | 'elevationSource'>> & { sport: SportType | null | undefined }) | null | undefined,
+  record: (Partial<Pick<RecordWithoutSummary, 'analysis'>> & { sport: SportType | null | undefined }) | null | undefined,
   activityOf: (sport: SportType) => ActivitySummarySettings
 ): SummarizeGpxOptions => {
   const sport = record ? record.sport : undefined;
@@ -41,12 +39,6 @@ export const summarizeGpxOptions = (
     sport,
     analysis: record?.analysis,
     activitySettings,
-    elevation: record
-      ? {
-        ...(record.terrainElevation !== undefined ? { terrainElevation: record.terrainElevation } : {}),
-        ...(record.elevationSource !== undefined ? { elevationSource: record.elevationSource } : {}),
-      }
-      : undefined,
   };
 };
 

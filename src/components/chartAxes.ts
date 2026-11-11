@@ -2,7 +2,7 @@
  * Abscisse des graphes d'une trace : la clé des lignes et le format de ses
  * graduations (`ChartXSpec`), et la seule fabrique de leur `XAxis`
  * (`chartXAxis`) : axe numérique, domaine et graduations rondes de la plage
- * zoomée (`niceTicks`). Distance à pied et à vélo, temps écoulé (énergie,
+ * zoomée (`niceTicks`). Distance, temps écoulé (énergie,
  * « cardio »), heure du jour (voile, surf).
  */
 import { createElement, type ReactElement } from 'react';

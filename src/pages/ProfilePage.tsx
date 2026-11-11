@@ -9,15 +9,14 @@ import ProfileRoot, { RootSlot } from '../components/ProfileRoot';
 import { IconChevronRight } from '../components/icons';
 import SegmentedControl from '../components/ui/SegmentedControl';
 import { activityFamily, type Activity } from '../core/activities';
-import { plural } from '../core/basics';
 import { activityIcon } from '../core/activityIcons';
 import { DISTANCE_UNIT_SYMBOL, formatDuration, toDisplayDistance } from '../core/units';
 import { RESTING_HR_PATH, libraryPath } from '../core/parentPage';
 import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useProfileRoot } from '../hooks/useProfileRoot';
-import { runnerAvatar, runnerName } from '../library/athleteProfile';
-import { useRunnerProfile } from '../hooks/useRunnerProfile';
+import { athleteAvatar, athleteName } from '../library/athleteProfile';
+import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { useStoredRecord } from '../hooks/useStoredRecord';
 import { useThemedShade } from '../hooks/useTheme';
@@ -38,7 +37,7 @@ import './ProfilePage.css';
  * la période, qui règle toute la page : semaine, 30 jours, 6 mois, année (les
  * bornes du graphe d'activités et des statistiques) ou depuis le début ; choix
  * retenu sur l'appareil. Puis, dans une seule bande : nombre d'activités (et
- * leur temps), kilomètres parcourus, D+, sport préféré (l'activité qui a le
+ * leur temps), kilomètres parcourus, sport préféré (l'activité qui a le
  * plus de temps, avec son dessin) ; la répartition du temps par activité en
  * anneau (le total au centre ; « Autres » se déplie dans le détail), et le
  * graphe d'activités de la même période.
@@ -105,9 +104,9 @@ function ProfilePage() {
   const backdrop = useFavoriteBackdrop();
   const { activities } = useVisibility();
   /** Le nom ou pseudo de Réglages en titre, « Profil » sans lui. */
-  const { profile, setAvatar } = useRunnerProfile();
-  const name = runnerName(profile);
-  const avatar = runnerAvatar(profile);
+  const { profile, setAvatar } = useAthleteProfile();
+  const name = athleteName(profile);
+  const avatar = athleteAvatar(profile);
   /** Choix de la photo ouvert sous l'en-tête : non retenu. */
   const [picking, setPicking] = useState(false);
   const nowMs = useNow();
@@ -173,7 +172,6 @@ function ProfilePage() {
   const practised = favorite ?? overallFavorite;
   const distanceUnit = practised ? effectiveDistanceUnit(practised) : 'km';
   const km = toDisplayDistance(totals.distanceM, distanceUnit);
-  const hasElevation = totals.elevationSessions > 0;
   const activeSlice = slices.find((s) => s.key === active) ?? null;
 
   // Anneau : chaque part est un arc du même cercle, en trait épais, à partir du haut, dans le sens des aiguilles.
@@ -216,7 +214,7 @@ function ProfilePage() {
         <>
           {scanning && <p className="ui-hint">Fiches en cours de calcul ({scanning.done} / {scanning.total}) : chiffres provisoires.</p>}
 
-          <section className={`profile-figures${hasElevation ? '' : ' profile-figures--three'}`} aria-label="Totaux de la période">
+          <section className="profile-figures" aria-label="Totaux de la période">
             <div className="profile-figure">
               <span className="ui-eyebrow">Activités</span>
               <span className="profile-figure__value num">{totals.sessions.toLocaleString('fr-FR')}</span>
@@ -229,17 +227,6 @@ function ProfilePage() {
               </span>
               <span className="profile-figure__caption">parcourus</span>
             </div>
-            {hasElevation && (
-              <div className="profile-figure">
-                <span className="ui-eyebrow">Dénivelé</span>
-                <span className="profile-figure__value num">
-                  {Math.round(totals.elevationGainM).toLocaleString('fr-FR')}<small>m</small>
-                </span>
-                <span className="profile-figure__caption">
-                  D+{totals.elevationSessions < totals.sessions ? `, sur ${plural(totals.elevationSessions, 'session')}` : ''}
-                </span>
-              </div>
-            )}
             {favorite ? (
               <button type="button" className="profile-figure profile-figure--link" onClick={() => openLibrary(favorite)}
                 title={`${favorite.name} : voir ses sessions`}>

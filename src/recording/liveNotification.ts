@@ -53,7 +53,7 @@ export const liveNotification = ({
   const lines = values.map((v) => `${v.label} : ${v.value}`);
 
   let chrono: RecordingNotificationContent['chrono'] = null;
-  if (paused !== 'manual' && startedAtMs !== null) chrono = { baseMs: toSecond(startedAtMs), countDown: false };
+  if (paused !== 'manual' && startedAtMs !== null) chrono = { baseMs: toSecond(startedAtMs) };
 
   return { title: titleParts.join(SEPARATOR), text: text.join(SEPARATOR), lines, chrono };
 };
@@ -72,8 +72,7 @@ export const notificationStateKey = ({ status, pausedReason, gpsLost, beltLost, 
   activityId: string | null;
   computed: boolean;
 }): string =>
-  // Le champ vide tient la place de l'ancienne phase du compteur (retiré au lot 302) : les clés ne changent pas.
-  `${status}|${pausedReason ?? ''}|${activityId ?? ''}||${computed}${gpsLost ? '|gps-perdu' : ''}${beltLost ? '|fc-perdue' : ''}`;
+  `${status}|${pausedReason ?? ''}|${activityId ?? ''}|${computed}${gpsLost ? '|gps-perdu' : ''}${beltLost ? '|fc-perdue' : ''}`;
 
 /** Clé d'une notification : deux notifications de même clé disent la même chose. */
 export const liveNotificationKey = (content: RecordingNotificationContent, standalone: boolean): string =>

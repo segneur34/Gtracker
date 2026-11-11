@@ -27,7 +27,7 @@ import { isRouteGpx } from '../../planning/routeImport';
  */
 
 /** Verdict d'un fichier passé par `importEntries` : `retry` garde la copie, les autres la retirent. */
-export type IncomingVerdict =
+type IncomingVerdict =
   | { kind: 'added'; file: string }
   | { kind: 'duplicate'; file: string | null }
   | { kind: 'retry'; reason: string | null }
@@ -42,7 +42,7 @@ const refusedForMemory = (name: string, readOnly: boolean): string =>
   `${quoted(name)} n'a pas été rangé. ${readOnly ? READ_ONLY_MEMORY_MESSAGE : `${NO_FOLDER_IMPORT_MESSAGE} Le fichier d'origine n'a pas bougé : ouvrez-le de nouveau ensuite.`}`;
 
 /** Ce que `importEntries` a fait d'un seul fichier. Rien dit : prudence, la copie reste. */
-export const incomingVerdict = (report: ImportReport, name: string): IncomingVerdict => {
+const incomingVerdict = (report: ImportReport, name: string): IncomingVerdict => {
   if (report.added.length > 0) return { kind: 'added', file: report.added[0] };
   if (report.duplicates > 0) return { kind: 'duplicate', file: report.existing[0] ?? null };
   if (report.retryable.length > 0) return { kind: 'retry', reason: report.failed.length > 0 ? reasonOf(name, report.failed[0]) : null };

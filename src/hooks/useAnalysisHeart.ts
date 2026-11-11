@@ -1,20 +1,20 @@
 import { useCallback, useMemo } from 'react';
 import { heartRateZonePaths, type HeartRatePoint, type HeartRateZones } from '../core/heartRate';
 import type { HeartRateProfile } from '../core/sportProfiles';
-import { runnerHeartRateZones } from '../library/athleteProfile';
-import { useRunnerProfile } from './useRunnerProfile';
+import { athleteHeartRateZones } from '../library/athleteProfile';
+import { useAthleteProfile } from './useAthleteProfile';
 import { useSessionHeartRate, type SessionHeartRate } from './useSessionHeartRate';
 
 /**
- * FC d'une analyse, la même dans les quatre modules : le pratiquant (`runner`,
+ * FC d'une analyse, la même dans les quatre modules : le pratiquant (`athlete`,
  * son âge, `retainHr` pour garder une FC max lue dans la séance), la FC de la
  * session (`heart`) et ses zones, décalées de celui de l'activité (`hrZones`).
  */
 export const useAnalysisHeart = (track: readonly HeartRatePoint[], params: HeartRateProfile, hrOffsetBpm: number) => {
-  const { profile: runner, age, retainHr } = useRunnerProfile();
+  const { profile: athlete, age, retainHr } = useAthleteProfile();
   const heart = useSessionHeartRate(track, params);
-  const hrZones = useMemo(() => runnerHeartRateZones(runner, params, hrOffsetBpm), [runner, params, hrOffsetBpm]);
-  return { runner, age, retainHr, heart, hrZones };
+  const hrZones = useMemo(() => athleteHeartRateZones(athlete, params, hrOffsetBpm), [athlete, params, hrOffsetBpm]);
+  return { athlete, age, retainHr, heart, hrZones };
 };
 
 /** Surbrillance de l'onglet « cardio » : la zone montrée, par son numéro en chaîne. */

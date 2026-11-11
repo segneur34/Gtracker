@@ -27,7 +27,7 @@ import './StatusLine.css';
 
 const WHY: Record<PermissionKey, string> = {
   location: "Pour enregistrer la trace. « Pendant l'utilisation de l'application » suffit, écran éteint compris.",
-  notifications: "Pour la notification de l'enregistrement, lisible écran verrouillé, et celle du compteur du fractionné.",
+  notifications: "Pour la notification de l'enregistrement, lisible écran verrouillé.",
   battery: "Pour qu'Android ne coupe pas l'enregistrement écran éteint : « Autoriser », ou « Aucune restriction ».",
   bluetooth: 'Pour la ceinture cardio seulement.',
 };

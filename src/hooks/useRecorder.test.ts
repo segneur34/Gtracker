@@ -586,7 +586,7 @@ describe('prévenir quand ça rate (lot 115)', () => {
     sensors.resumeFails = true;
     try {
       const source = fakeSource();
-      await recorder.startRecording(activity, source, { motion: { placement: 'poitrine', foil: true, jumps: false } });
+      await recorder.startRecording(activity, source, { motion: { placement: 'poitrine', foil: true } });
       source.emit(0);
       source.emit(1);
       await recorder.pauseRecording();
@@ -658,7 +658,7 @@ describe('journal illisible (lot 143, 123a)', () => {
 
 describe('capteurs à l’arrêt (lot 143, 123c)', () => {
   const capture: MotionCapture = { path: `capteurs/${T0}.imu`, bytes: 4096, durationS: 2, samples: 200, longestGapS: 0.01, error: null };
-  const setup = { placement: 'poitrine' as const, foil: false, jumps: true };
+  const setup = { placement: 'poitrine' as const, foil: false };
 
   /** Enregistre deux positions avec les capteurs, puis arrête : l'alerte de l'arrêt. */
   const stopWith = async (stop: () => Promise<MotionCapture | null>): Promise<string | null> => {
@@ -693,7 +693,7 @@ describe('capteurs à l’arrêt (lot 143, 123c)', () => {
 
 describe('capture à « Analyser » (lot 148, T2-1)', () => {
   const capture: MotionCapture = { path: `capteurs/${T0}.imu`, bytes: 4096, durationS: 2, samples: 200, longestGapS: 0.01, error: null };
-  const setup = { placement: 'poitrine' as const, foil: true, jumps: true };
+  const setup = { placement: 'poitrine' as const, foil: true };
 
   /** Session de voile arrêtée, en attente : la capture n'a pas été lue à l'arrêt (chemin normal). */
   const stopped = async (): Promise<void> => {

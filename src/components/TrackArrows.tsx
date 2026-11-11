@@ -33,8 +33,7 @@ const meanLat = (track: ReadonlyArray<{ lat: number }>): number => {
 };
 
 /**
- * Flèches de sens sur la trace d'une analyse (voile, course, vélo, fractionné,
- * surf ; 05/11) : à peu près `ARROW_SPACING_PX` pixels entre deux à l'écran,
+ * Flèches de sens sur la trace d'une analyse (voile, surf ; 05/11) : à peu près `ARROW_SPACING_PX` pixels entre deux à l'écran,
  * donc moins en dézoomant et plus en zoomant, au plus `ARROW_MAX`. Recalculées
  * à la fin d'un zoom (`zoomend`), au cran entier ; une flèche gardée d'un zoom
  * à l'autre n'est pas reposée (clé : son point de trace).

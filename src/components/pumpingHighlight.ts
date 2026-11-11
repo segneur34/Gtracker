@@ -16,11 +16,11 @@ export const seriesKey = (n: number): PumpingHighlightKey => `serie:${n}`;
 export const flightKey = (n: number): PumpingHighlightKey => `vol:${n}`;
 
 /** Bulle d'une série sur la carte : numéro, heure, durée, coups, cadence. */
-export const seriesSpanLabel = (s: PumpingSeries): string =>
+const seriesSpanLabel = (s: PumpingSeries): string =>
   `Série ${s.n} · ${formatTimeOfDay(s.startMs)} · ${formatShortDuration(s.durationS)} · ${s.strokes} coups · ${Math.round(s.strokesPerMin)} /min`;
 
 /** Bulle d'un vol sur la carte : numéro, heure, durée, distance. */
-export const flightSpanLabel = (f: FlightSpan): string =>
+const flightSpanLabel = (f: FlightSpan): string =>
   `Vol ${f.n} · ${formatTimeOfDay(f.startMs)} · ${formatShortDuration(f.durationS)} · ${Math.round(f.distanceM)} m`;
 
 /**

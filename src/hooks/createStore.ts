@@ -76,60 +76,6 @@ export const createStore = <T>(initial: T): Store<T> => {
   };
 };
 
-export interface TickingStore<V> {
-  /** Dernière vue publiée. */
-  get: () => V;
-  /** Recalcule la vue, prévient les abonnés et règle la minuterie. */
-  publish: () => void;
-  subscribe: (listener: () => void) => () => void;
-}
-
-/**
- * Magasin d'une vue qui avance avec l'horloge (compteur d'intervalles, chrono).
- * `compute` rend la vue du moment ; la minuterie d'affichage ne tourne que
- * tant qu'une page regarde (`isRunning` sur la vue) ; `hasWork` dit s'il y a
- * quelque chose à montrer : une page qui arrive voit alors l'état du moment,
- * pas celui de la dernière fois qu'on a regardé.
- */
-export const createTickingStore = <V>(options: {
-  initial: V;
-  compute: () => V;
-  isRunning: (view: V) => boolean;
-  hasWork: () => boolean;
-  intervalMs: number;
-}): TickingStore<V> => {
-  let view = options.initial;
-  let timer: ReturnType<typeof setInterval> | null = null;
-  const listeners = createListeners();
-
-  const syncTimer = (): void => {
-    const wanted = listeners.size() > 0 && options.isRunning(view);
-    if (wanted && timer === null) timer = setInterval(publish, options.intervalMs);
-    if (!wanted && timer !== null) {
-      clearInterval(timer);
-      timer = null;
-    }
-  };
-
-  function publish(): void {
-    view = options.compute();
-    listeners.notify();
-    syncTimer();
-  }
-
-  const subscribe = (listener: () => void): (() => void) => {
-    const unsubscribe = listeners.subscribe(listener);
-    if (options.hasWork()) queueMicrotask(publish);
-    syncTimer();
-    return () => {
-      unsubscribe();
-      syncTimer();
-    };
-  };
-
-  return { get: () => view, publish, subscribe };
-};
-
 /** Même valeur au sens du texte JSON : la comparaison par défaut des lectures du magasin. */
 export const sameJson = (a: unknown, b: unknown): boolean => a === b || JSON.stringify(a) === JSON.stringify(b);
 

@@ -53,13 +53,6 @@ export const sessionFoil = (
 ): boolean => record?.analysis?.foil ?? sessionActivitySettings(record, { thresholdOverride: undefined, foil: deviceFoil }).foil ?? false;
 
 /**
- * Altitude de la fiche (celle du terrain, brute, et la source choisie) : portée par les options du résumé
- * (`summarizeGpx`) mais plus lue depuis le retrait de la course et du vélo (lots 303 et 305), le résumé de la
- * voile et du surf ne prenant que l'altitude du GPS.
- */
-export type SessionElevation = Pick<SessionRecord, 'terrainElevation' | 'elevationSource'>;
-
-/**
  * Réglages qui changent le résumé : ceux de l'activité de la session, et ceux
  * de la session (`analysis`, dans sa fiche). Le seuil de la session prime sur
  * celui de l'activité ; l'allure imposée n'existe que pour une session, et
@@ -85,7 +78,7 @@ export const summaryOptions = (
 /**
  * Empreinte des réglages qui changent le résumé, gardée dans le résumé (`SessionSummary.optionsKey`,
  * lot 37) : seuil, allure imposée, foil en surf (ailleurs il ne change pas le résumé) et seuil de
- * vague. Le vélo y avait une cinquième place (lot 146), partie avec lui sans changer les autres empreintes.
+ * vague.
  */
 export const summaryOptionsKey = (sport: SportType, options: SummaryOptions): string =>
   JSON.stringify([
@@ -102,7 +95,7 @@ export const summaryOptionsKey = (sport: SportType, options: SummaryOptions): st
  * un geste dans Réglages attend d'être appliqué à son activité (`pendingOf`). Des réglages différents
  * sur cet appareil, seuls, ne rendent rien à refaire (Q57) : `activityOf` ne vaut que pour ce que la fiche
  * ne porte pas. Ne lit que la fiche allégée et les réglages, jamais le GPX. Sans calcul connu ou sans
- * positions (muscu, résumé sans réglage), seule la version compte.
+ * positions (résumé sans réglage), seule la version compte.
  */
 export const isSummaryOutdated = (
   record: SessionRecord,

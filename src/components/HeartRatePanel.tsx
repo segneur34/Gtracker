@@ -21,7 +21,7 @@ import { estimateHrEnergy, hrEnergyKcal } from '../core/hrEnergy';
 import type { HeartRateProfile, HrEnergyProfile } from '../core/sportProfiles';
 import { formatClock, formatShortDuration } from '../core/units';
 import { useZoomState, type ChartZoomSource } from '../hooks/useChartZoom';
-import { runnerAge, type RunnerProfile } from '../library/athleteProfile';
+import { athleteAge, type AthleteProfile } from '../library/athleteProfile';
 import type { SessionHeartRate } from '../hooks/useSessionHeartRate';
 import { zonesOriginText } from './heartRateOrigin';
 import StatTile from './ui/StatTile';
@@ -34,14 +34,14 @@ interface Props {
   minutes: readonly number[];
   heart: SessionHeartRate;
   params: HeartRateProfile;
-  /** Énergie estimée par la FC (voile et surf, `SportProfile.hrEnergy`) ; `null` : pas de tuile (à pied, à vélo, l'énergie mécanique reste seule). */
+  /** Énergie estimée par la FC (voile et surf, `SportProfile.hrEnergy`) ; `null` : pas de tuile. */
   hrEnergy: HrEnergyProfile | null;
   /** Zones du pratiquant, `null` sans FC max ni âge. */
   zones: HeartRateZones | null;
   /** FC max saisie dans Pratiquant. */
   profileHrMax: number | null;
   /** Profil du pratiquant, pour dire d'où viennent les zones. */
-  runner: RunnerProfile;
+  athlete: AthleteProfile;
   /** « La retenir » : la FC max de la sortie devient celle du pratiquant. */
   onRetainHrMax: (bpm: number) => void;
   /** Zone montrée sur la carte (1 à 5, 0 sous Z1), ou `null`. */
@@ -64,7 +64,7 @@ const minutesLabel = (v: unknown) => formatClock(Number(v) * 60_000);
  * des éléments au graphe (bandes des phases, traits des repères). Elle suit
  * son zoom elle-même : zoomer ne redessine qu'elle (lot 127).
  */
-export function CardioCurve({ minutes, smoothed, zoom: source, zones, thresholds, zoneLines = false, onShowOnMap, style, children }: {
+function CardioCurve({ minutes, smoothed, zoom: source, zones, thresholds, zoneLines = false, onShowOnMap, style, children }: {
   minutes: readonly number[];
   smoothed: readonly (number | null)[];
   zoom: ChartZoomSource;
@@ -105,8 +105,7 @@ export function CardioCurve({ minutes, smoothed, zoom: source, zones, thresholds
 }
 
 /**
- * Courbe de FC qui accompagne les graphes de la voile, du surf et de la
- * course : rien sans FC, zones et seuils du pratiquant s'il en a.
+ * Courbe de FC qui accompagne les graphes de la voile et du surf : rien sans FC, zones et seuils du pratiquant s'il en a.
  */
 export function CardioCompanion({ minutes, heart, zoom, zones, zoneLines = false, onShowOnMap, style }: {
   minutes: readonly number[];
@@ -132,7 +131,7 @@ export function CardioCompanion({ minutes, heart, zoom, zones, zoneLines = false
  * Posé dans le `ResizablePanel` du module.
  */
 function HeartRatePanel({
-  track, minutes, heart, params, hrEnergy, zones, profileHrMax, runner, onRetainHrMax, selectedZone, onSelectZone,
+  track, minutes, heart, params, hrEnergy, zones, profileHrMax, athlete, onRetainHrMax, selectedZone, onSelectZone,
   zoom, onShowOnMap, open, onToggle,
 }: Props) {
   const { smoothed, stats } = heart;
@@ -142,9 +141,9 @@ function HeartRatePanel({
   /** Âge à la date de la session ; poids et sexe du pratiquant. */
   const energy = useMemo(() => {
     if (!hrEnergy || track.length === 0) return null;
-    const athlete = { weightKg: runner.weightKg, age: runnerAge(runner, track[0].timeMs), sex: runner.sex, hrMax: runner.hrMax };
-    return estimateHrEnergy(track, smoothed, athlete, params, hrEnergy);
-  }, [hrEnergy, track, smoothed, runner, params]);
+    const person = { weightKg: athlete.weightKg, age: athleteAge(athlete, track[0].timeMs), sex: athlete.sex, hrMax: athlete.hrMax };
+    return estimateHrEnergy(track, smoothed, person, params, hrEnergy);
+  }, [hrEnergy, track, smoothed, athlete, params]);
 
   if (!stats) return null;
   const aboveProfile = profileHrMax === null || stats.maxBpm > profileHrMax;
@@ -213,7 +212,7 @@ function HeartRatePanel({
             rows={zoneTimes.map((timeS, zone) => ({ color: HEART_ZONE_COLORS[zone], label: zoneLabel(zone), detail: bandRangeLabel(zones.bounds, zone), timeS }))}
             selected={selectedZone} onSelect={onSelectZone} />
           <div className="ui-muted ui-text-xs ui-mt-6">
-            Zones calées sur {zonesOriginText(zones, runner)}
+            Zones calées sur {zonesOriginText(zones, athlete)}
           </div>
         </>
       ) : (

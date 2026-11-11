@@ -68,8 +68,7 @@ const TREATMENT_TABS: Record<Treatment, readonly AnalysisTab[]> = { voile: SAILI
 
 /**
  * Onglets d'un calcul, proposés dans Réglages : « sauts » seulement s'il les mesure (ni bateau ni surf),
- * « pumping » de même (voile sur foil, pas le bateau). Les onglets « fractionné » et
- * « test » sont partis avec l'Entraînement (lot 302).
+ * « pumping » de même (voile sur foil, pas le bateau).
  */
 export const analysisTabs = (profile: SportProfile): readonly AnalysisTab[] =>
   TREATMENT_TABS[sportTreatment(profile.id)].filter((tab) => (tab.key !== 'sauts' || profile.jumps !== null)
@@ -82,17 +81,16 @@ export const analysisTabs = (profile: SportProfile): readonly AnalysisTab[] =>
  * montre l'onglet (`tabsAfterJumpsChange`). Dans une analyse, « sauts » paraît
  * si la session a sa capture (`useShownJumps`, `visible`) et que le choix
  * d'onglets de l'activité le montre : ce choix prime, la case décochée depuis
- * ne le change pas (un pré-réglage qui cache l'onglet, comme à la course, le
- * cache donc même sur une session à capture).
+ * ne le change pas (un pré-réglage qui cache l'onglet le cache donc même sur
+ * une session à capture).
  */
 export const activityTabs = (profile: SportProfile, options: { foil: boolean; jumps: boolean }): readonly AnalysisTab[] =>
   analysisTabs(profile).filter((tab) => ((tab.key !== 'vols' && tab.key !== 'pumping') || options.foil) && (tab.key !== 'sauts' || options.jumps));
 
 /**
  * Onglets ouverts à la première visite d'un module : ceux de la première rangée
- * (`primary`), tous les autres fermés. Plusieurs listes pour un module qui en
- * change avec l'activité (course et vélo : « cadence » n'est qu'à pied) ; le
- * résultat sert de défauts fixes à l'état des onglets (`initialTabsState`).
+ * (`primary`), tous les autres fermés. Plusieurs listes pour un module dont les onglets
+ * changent avec l'activité ; le résultat sert de défauts fixes à l'état des onglets (`initialTabsState`).
  */
 export const tabDefaults = <K extends string>(...lists: readonly (readonly AnalysisTab<K>[])[]): Record<K, boolean> => {
   const defaults = {} as Record<K, boolean>;
@@ -118,7 +116,7 @@ const MAX_TAB_KEY_LENGTH = 40;
 /**
  * Choix rangés relus : un objet de booléens aux clés courtes, le reste ignoré ;
  * `null` s'il n'en reste rien. Une clé d'onglet inconnue est gardée sans être
- * jamais lue : un onglet retiré ne casse rien, un onglet revenu retrouve son choix.
+ * jamais lue : le choix qu'elle porte n'est pas perdu si l'onglet existe de nouveau.
  */
 export const sanitizeTabChoices = (value: unknown): TabChoices | null => {
   if (!isObject(value)) return null;

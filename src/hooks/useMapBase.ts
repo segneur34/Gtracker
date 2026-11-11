@@ -16,7 +16,7 @@ const STORAGE_KEY = 'tracker.fondCarte';
 
 type StoredBases = Partial<Record<SportFamily, unknown>>;
 
-export const readMapBase = (family: SportFamily): MapBase => {
+const readMapBase = (family: SportFamily): MapBase => {
   const value = jsonStore.read<StoredBases>(STORAGE_KEY)?.[family];
   return isMapBase(value) ? value : MAP_BASE_DEFAULT;
 };

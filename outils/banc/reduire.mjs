@@ -34,7 +34,7 @@ await blockNetwork();
 const openAll = async () => {
   await evaluate(`(() => {
     const s = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}');
-    s.settings = { memoire: true, autorisations: true, activites: true, enregistrement: true, capteurs: true, cartes: true, coureur: true };
+    s.settings = { memoire: true, autorisations: true, activites: true, enregistrement: true, capteurs: true, cartes: true, pratiquant: true };
     s['settings-families'] = { voile: true, course: true, velo: true, fractionne: true, surf: true };
     s['settings-activity-parts'] = { affichage: true, analyse: true, enregistrement: true, itineraires: true, balises: true };
     localStorage.setItem('tracker.sections', JSON.stringify(s));
@@ -79,7 +79,7 @@ await clickText('Tout réduire');
 await wait(300);
 
 // --- 2. Pseudo ---
-await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}'); s.settings = { ...s.settings, coureur: true }; localStorage.setItem('tracker.sections', JSON.stringify(s)); return 'ok'; })()`);
+await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}'); s.settings = { ...s.settings, pratiquant: true }; localStorage.setItem('tracker.sections', JSON.stringify(s)); return 'ok'; })()`);
 await go('/parametres', 3000);
 const setPseudo = (v) => evaluate(`(() => {
   const input = document.querySelector('input[autocomplete="nickname"]');

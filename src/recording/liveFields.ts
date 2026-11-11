@@ -3,7 +3,7 @@ import { bandIndex } from '../core/basics';
 import { sportTreatment, type Treatment } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import {
-  formatClock, formatDistance, formatShortDistance, formatSpeed, formatTimeOfDay, isInverseUnit, type DistanceUnit, type SpeedUnit,
+  formatClock, formatDistance, formatShortDistance, formatSpeed, formatTimeOfDay, type DistanceUnit, type SpeedUnit,
 } from '../core/units';
 import { LIVE_STATS_DEFAULTS, type LiveStats, type LiveStatsOptions } from './liveStats';
 
@@ -139,14 +139,13 @@ export interface LiveFieldUnits {
 export const recentWindowLabel = (options: LiveStatsOptions = LIVE_STATS_DEFAULTS): string =>
   `${Math.round(options.recentWindowS / 60)} min`;
 
-/** Libellé d'un chiffre ; une allure (min/km) se dit « allure ». */
-export const liveFieldLabel = (key: LiveFieldKey, { speedUnit, distanceUnit, options = LIVE_STATS_DEFAULTS }: LiveFieldUnits): string => {
-  const pace = isInverseUnit(speedUnit);
+/** Libellé d'un chiffre. */
+export const liveFieldLabel = (key: LiveFieldKey, { distanceUnit, options = LIVE_STATS_DEFAULTS }: LiveFieldUnits): string => {
   const [topShortS, topLongS] = options.topDurationsS;
   switch (key) {
-    case 'speed': return pace ? 'Allure' : 'Vitesse';
-    case 'average': return options.activeAverage ? 'Moyenne active' : pace ? 'Allure moyenne' : 'Moyenne';
-    case 'max': return `${pace ? 'Meilleure' : 'Max'} (${options.maxDurationS} s)`;
+    case 'speed': return 'Vitesse';
+    case 'average': return options.activeAverage ? 'Moyenne active' : 'Moyenne';
+    case 'max': return `Max (${options.maxDurationS} s)`;
     case 'recentDistanceSpeed': return `${options.recentDistanceM} derniers m`;
     case 'lastDistance': return distanceUnit === 'nm' ? 'Dernier mille' : 'Dernier km';
     case 'distance': return 'Distance';
@@ -167,13 +166,12 @@ export const liveFieldLabel = (key: LiveFieldKey, { speedUnit, distanceUnit, opt
 };
 
 /** Libellé court d'un chiffre, devant sa valeur sur la ligne repliée de la notification. */
-export const liveFieldShortLabel = (key: LiveFieldKey, { speedUnit, distanceUnit, options = LIVE_STATS_DEFAULTS }: LiveFieldUnits): string => {
-  const pace = isInverseUnit(speedUnit);
+export const liveFieldShortLabel = (key: LiveFieldKey, { distanceUnit, options = LIVE_STATS_DEFAULTS }: LiveFieldUnits): string => {
   const [topShortS, topLongS] = options.topDurationsS;
   switch (key) {
-    case 'speed': return pace ? 'Allure' : 'Vit.';
+    case 'speed': return 'Vit.';
     case 'average': return options.activeAverage ? 'Moy. act.' : 'Moy.';
-    case 'max': return pace ? 'Meill.' : 'Max';
+    case 'max': return 'Max';
     case 'recentDistanceSpeed': return `${options.recentDistanceM} m`;
     case 'lastDistance': return distanceUnit === 'nm' ? 'Dern. mille' : 'Dern. km';
     case 'distance': return 'Dist.';
@@ -218,11 +216,11 @@ const NONE = '—';
 export const liveFieldValue = (key: LiveFieldKey, ctx: LiveFieldContext): string => {
   const { stats, speedUnit, distanceUnit } = ctx;
   switch (key) {
-    case 'speed': return formatSpeed(stats.currentSpeedMs, speedUnit, distanceUnit);
-    case 'average': return formatSpeed(ctx.options?.activeAverage ? stats.activeAverageSpeedMs : stats.averageSpeedMs, speedUnit, distanceUnit);
-    case 'max': return formatSpeed(stats.maxSpeedMs, speedUnit, distanceUnit);
-    case 'recentDistanceSpeed': return formatSpeed(stats.recentDistanceSpeedMs, speedUnit, distanceUnit);
-    case 'lastDistance': return formatSpeed(stats.lastDistanceSpeedMs, speedUnit, distanceUnit);
+    case 'speed': return formatSpeed(stats.currentSpeedMs, speedUnit);
+    case 'average': return formatSpeed(ctx.options?.activeAverage ? stats.activeAverageSpeedMs : stats.averageSpeedMs, speedUnit);
+    case 'max': return formatSpeed(stats.maxSpeedMs, speedUnit);
+    case 'recentDistanceSpeed': return formatSpeed(stats.recentDistanceSpeedMs, speedUnit);
+    case 'lastDistance': return formatSpeed(stats.lastDistanceSpeedMs, speedUnit);
     case 'distance': return formatDistance(stats.distanceM, distanceUnit);
     case 'duration': return formatClock(ctx.durationMs);
     case 'clock': return ctx.nowMs === null ? NONE : formatTimeOfDay(ctx.nowMs).slice(0, 5);
@@ -232,10 +230,10 @@ export const liveFieldValue = (key: LiveFieldKey, ctx: LiveFieldContext): string
       const speed = stats.averageSpeedMs;
       return ctx.remainingM === null || speed === null || speed <= 0 ? NONE : formatClock((ctx.remainingM / speed) * 1000);
     }
-    case 'recentTopShort': return formatSpeed(stats.recentTopsMs[0] ?? null, speedUnit, distanceUnit);
-    case 'recentTopLong': return formatSpeed(stats.recentTopsMs[1] ?? null, speedUnit, distanceUnit);
+    case 'recentTopShort': return formatSpeed(stats.recentTopsMs[0] ?? null, speedUnit);
+    case 'recentTopLong': return formatSpeed(stats.recentTopsMs[1] ?? null, speedUnit);
     case 'heading': return ctx.headingDeg === null ? NONE : `${roundBearingDeg(ctx.headingDeg)}°`;
-    case 'legAverage': return stats.legs.current ? formatSpeed(stats.legs.current.averageSpeedMs, speedUnit, distanceUnit) : NONE;
+    case 'legAverage': return stats.legs.current ? formatSpeed(stats.legs.current.averageSpeedMs, speedUnit) : NONE;
     case 'markDistance': return ctx.markDistanceM === null ? NONE : formatShortDistance(ctx.markDistanceM, distanceUnit);
     case 'markBearing': return ctx.markBearingDeg === null ? NONE : `${roundBearingDeg(ctx.markBearingDeg)}°`;
     case 'heartRate': return ctx.heartRateBpm === null ? NONE : `${Math.round(ctx.heartRateBpm)} bpm`;

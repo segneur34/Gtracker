@@ -54,13 +54,6 @@ describe('buildSailingSessionStats', () => {
       expect(sailingFlights(sailed, cumulative, sport, activityMask, 10)).toEqual(sailingFlights(sailed, cumulative, sport, activeThresholdKn, 10));
     }
   });
-
-  it("pas de dénivelé en voile, qui ne l'affiche pas, même sur une trace qui a son altitude", () => {
-    const climbing = computeKinematics(phasesTrack([[600, knotsToMs(10)]], 1, { startMs: START_MS, climbPerS: 0.1 }));
-    const stats = buildSailingSessionStats(climbing, { sport: 'wingfoil', activeThresholdKn: 3 })!;
-    expect(stats.hasElevation).toBe(false);
-    expect(stats.elevationGain).toBe('-');
-  });
 });
 
 describe('sailingFlights', () => {

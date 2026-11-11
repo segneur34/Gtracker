@@ -201,7 +201,7 @@ check('Échap ferme la bulle', (await bubbleText()) === null);
 
 // 3. Réglages.
 await setClock(dayAt(30, 0, 12));
-await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}'); s.settings = { ...s.settings, coureur: true }; localStorage.setItem('tracker.sections', JSON.stringify(s)); })()`);
+await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}'); s.settings = { ...s.settings, pratiquant: true }; localStorage.setItem('tracker.sections', JSON.stringify(s)); })()`);
 await go('/parametres', 3000);
 const labels = await evaluate(`[...document.querySelectorAll('label')].map((l) => l.textContent)`);
 check('Réglages : la ligne « Objectif par semaine »', labels.some((t) => t.startsWith('Objectif par semaine')));

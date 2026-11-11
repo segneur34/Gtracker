@@ -727,7 +727,7 @@ function PlanningPage() {
       const loaded = routeFromTrack(parsed.points);
       if (!loaded) throw new Error(`${file.name} ne contient pas de trace : aucun point de trace ou de route.`);
       if (!confirmDiscard()) return;
-      // Activité devinée parmi celles qui se planifient (ni cachée, ni de l'Entraînement), ses types de voie cochés avec elle.
+      // Activité devinée parmi celles qui se planifient (ni cachée), ses types de voie cochés avec elle.
       const sport = guessSport(parsed.trackType);
       const guessed = sport ? activities.find((a) => a.base === sport && plannable(a)) : undefined;
       // La trace reste telle quelle : pas de mode « Boucle ».
@@ -864,7 +864,7 @@ function PlanningPage() {
             <input
               type="search"
               className="ui-field"
-              placeholder="Chercher un lieu : commune, sommet, refuge…"
+              placeholder="Chercher un lieu : port, plage, spot…"
               aria-label="Chercher un lieu"
               value={query}
               onChange={(e) => setQuery(e.target.value)} />

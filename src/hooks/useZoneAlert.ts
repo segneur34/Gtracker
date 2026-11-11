@@ -4,7 +4,7 @@ import { getSportProfile } from '../core/sportProfiles';
 import { playPattern } from '../platform/beeper';
 import { subscribeHeartRate, type HeartRateSample } from '../platform/heartRate';
 import { jsonStore } from '../platform/storage';
-import { TEST_SIGNAL_TONES } from '../recording/signalTones';
+import { GUIDE_SIGNAL_TONES } from '../recording/signalTones';
 import { readableBpm } from '../recording/heartRate';
 import { isRecordingSession } from '../recording/session';
 import {
@@ -13,7 +13,7 @@ import {
 } from '../recording/zoneAlert';
 import { createStore } from './createStore';
 import { getRecorderState, subscribeToRecorder } from './useRecorder';
-import { readHeartRateZoneBounds } from './useRunnerProfile';
+import { readHeartRateZoneBounds } from './useAthleteProfile';
 
 /**
  * Bips de sortie de zone cardiaque pendant l'enregistrement (lot 28), hors des
@@ -43,7 +43,7 @@ const readStoredTarget = (): ZoneTarget => {
   return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 ? value : 0;
 };
 
-export interface ZoneAlertView {
+interface ZoneAlertView {
   /** Vrai pendant un enregistrement dont les bips de zone sont armés. */
   active: boolean;
   /** Zone visée, 0 sans bips. */
@@ -80,7 +80,7 @@ const setupFor = (target: ZoneTarget, activity: Activity): Omit<Session, 'activi
 
 const play = (signal: ZoneSignal, timeMs: number) => {
   console.debug(`[zone] ${signal} à ${timeMs}`);
-  void playPattern(TEST_SIGNAL_TONES[signal], true).catch(() => {});
+  void playPattern(GUIDE_SIGNAL_TONES[signal], true).catch(() => {});
 };
 
 /** Arme, réarme (autre activité) ou coupe les bips selon l'état de l'enregistreur. */

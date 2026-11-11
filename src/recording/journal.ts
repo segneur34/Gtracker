@@ -16,7 +16,7 @@ import { isSportType } from '../core/sportProfiles';
  * heures à 1 Hz en quelques centaines de kilo-octets.
  */
 
-export interface JournalHeader {
+interface JournalHeader {
   format: 'tracker-journal';
   version: 1;
   sport: SportType;
@@ -64,7 +64,7 @@ export const journalFixLine = (fix: LocationFix): string => {
 export const journalBreakLine = (timeMs: number): string => `${JSON.stringify(['break', timeMs])}\n`;
 
 /** Activité prise en cours d'enregistrement, avec son calcul. */
-export interface JournalActivity {
+interface JournalActivity {
   sport: SportType;
   activity: { id: string; name: string };
 }
@@ -105,7 +105,7 @@ export interface JournalPause {
 }
 
 /** Frontière de segment qui clôt une pause manuelle : l'indice de la position, et la part à garder. */
-export interface ManualBreak {
+interface ManualBreak {
   fixIndex: number;
   autoPartMs: number;
 }
@@ -188,9 +188,8 @@ const toFix = (value: unknown): LocationFix | null => {
 /**
  * Relit un journal. Les lignes illisibles sont ignorées, de même qu'une
  * position qui n'est pas plus récente que la précédente, comme à
- * l'enregistrement. Le dernier changement d'activité lisible l'emporte. Les
- * lignes d'un journal d'avant le lot 302 (FC seule `hr`, séances `intervals`,
- * test `test`) ne sont pas des positions (`toFix`) : ignorées comme les autres.
+ * l'enregistrement. Le dernier changement d'activité lisible l'emporte. Une
+ * ligne qui n'est pas une position (`toFix`) est ignorée comme les autres.
  */
 export const parseJournal = (text: string): ParsedJournal => {
   let header: JournalHeader | null = null;

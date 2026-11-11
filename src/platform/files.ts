@@ -69,7 +69,7 @@ let filesystemLoad: Promise<typeof import('@capacitor/filesystem')> | null = nul
 /**
  * Greffon de fichiers de Capacitor, chargé au premier besoin : le seul chargement, pour `files.ts`, `memoryFolder.ts`,
  * `tileCache.ts`. Une seule fois, et gardé : une minute après le passage en arrière-plan, un `import()` ne rend plus la
- * main avant le retour de la page (vu le 04/11, écran éteint : le journal d'une course sans écriture pendant 12 min),
+ * main avant le retour de la page (vu le 04/11, écran éteint : le journal d'une session sans écriture pendant 12 min),
  * alors que les positions arrivent toujours. Un échec n'est pas gardé.
  */
 export const filesystem = (): Promise<typeof import('@capacitor/filesystem')> => {

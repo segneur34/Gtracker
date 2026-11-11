@@ -92,7 +92,6 @@ describe('calcul des résumés de la file (setSummaryRunner)', () => {
     expect(text).toBe('<gpx rang="0"></gpx>');
     expect(options.sport).toBeUndefined();
     expect(options.analysis).toBeUndefined();
-    expect(options.elevation).toBeUndefined();
     expect(Object.keys(options.activitySettings)).toHaveLength(5);
     // Des données seulement : elles traversent un message vers le worker.
     expect(structuredClone(options)).toStrictEqual(options);

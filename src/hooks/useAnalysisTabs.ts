@@ -5,11 +5,11 @@ import {
   type AnalysisTab, type AnalysisTabsState,
 } from '../core/analysisTabs';
 import { useResetChartHover } from './useChartHover';
-import { useMapHighlight, type HighlightKeys } from './useMapHighlight';
+import { useMapHighlight } from './useMapHighlight';
 import { effectiveTabChoices } from './useSportSettings';
 
 export interface AnalysisTabsInput<K extends string> {
-  /** Onglets du module, dans l'ordre de sa barre ; ils peuvent changer avec l'activité (course et vélo). */
+  /** Onglets du module, dans l'ordre de sa barre ; ils peuvent changer avec l'activité. */
   tabs: readonly AnalysisTab<K>[];
   /** Onglets ouverts à chaque ouverture (`tabDefaults`) : une constante du module. */
   defaults: Record<K, boolean>;
@@ -27,9 +27,8 @@ export interface AnalysisTabsInput<K extends string> {
  * fermée (`maskAdvancedTabs`) ; la surbrillance unique de la carte, rattachée
  * aux onglets ouverts (`useMapHighlight`) ; le point survolé des graphes effacé
  * à chaque session (`useResetChartHover`).
- * `T` donne le type des clés de surbrillance d'un onglet (`zones` : une zone de pente).
  */
-export const useAnalysisTabs = <K extends string, T extends HighlightKeys<K> = Record<never, never>>({ tabs, defaults, activity, sessionKey }: AnalysisTabsInput<K>) => {
+export const useAnalysisTabs = <K extends string>({ tabs, defaults, activity, sessionKey }: AnalysisTabsInput<K>) => {
   const [stored, setStored] = useState<AnalysisTabsState<K>>(() => initialTabsState(defaults, sessionKey));
   // Une autre session est reconnue dès le rendu où sa clé change : « général » seul, sans monter d'abord les
   // panneaux de l'ancienne ; l'état rangé suit au premier geste (`change`).
@@ -60,7 +59,7 @@ export const useAnalysisTabs = <K extends string, T extends HighlightKeys<K> = R
     [state.open, tabs, tabChoices, state.advanced]
   );
   /** Une seule surbrillance sur la carte, effacée quand son onglet se ferme. */
-  const highlight = useMapHighlight<K, T>(open);
+  const highlight = useMapHighlight<K>(open);
   // Point survolé hors de l'état du module (`useChartHover`) : effacé à chaque session et au démontage.
   useResetChartHover(sessionKey);
 

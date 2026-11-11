@@ -19,13 +19,13 @@ import { median } from './basics';
 export const DEFAULT_MAX_ACCELERATION = 10;
 
 /** Durée maximale d'une aberration GPS, en secondes. Au-delà, le changement est jugé réel. */
-export const DEFAULT_MAX_OUTLIER_S = 3;
+const DEFAULT_MAX_OUTLIER_S = 3;
 
 /** Largeur par défaut du filtre médian, en secondes. */
 export const DEFAULT_MEDIAN_WINDOW_S = 3;
 
 /** Durée, en secondes, sur laquelle la médiane initiale amorce l'écrêtage. */
-export const SEED_WINDOW_S = 10;
+const SEED_WINDOW_S = 10;
 
 export interface ClampOptions {
   /** Accélération maximale plausible, en m/s². */

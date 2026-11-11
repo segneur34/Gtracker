@@ -26,7 +26,7 @@ export interface StoredRestingResult {
 export const MAX_STORED_RESTING_RESULTS = 60;
 
 /** Un test gardé, relu ; `null` s'il est mal formé. */
-export const readStoredRestingResult = (raw: unknown): StoredRestingResult | null => {
+const readStoredRestingResult = (raw: unknown): StoredRestingResult | null => {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
   if (!isFiniteNumber(r.startedAtMs) || !isFiniteNumber(r.version) || !isFiniteNumber(r.lowestBpm) || !isFiniteNumber(r.fromS)

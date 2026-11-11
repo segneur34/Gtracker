@@ -46,7 +46,6 @@ export const statSession = (startMs: number, over: Partial<StatSession> = {}): S
   movingTimeS: 3000,
   inMotionS: null,
   movingDistanceM: 9000,
-  elevationGainM: null,
   maxSpeedMs: 5,
   activityId: 'a-paddle',
   family: 'surf',

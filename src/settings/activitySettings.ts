@@ -29,8 +29,8 @@ import { sanitizeGearGroups, sanitizeGearLabels } from './gear';
  */
 
 /** Unités d'affichage proposées selon le traitement du calcul. */
-export const SAILING_UNITS: SpeedUnit[] = ['kn', 'kmh', 'ms'];
-export const SURF_UNITS: SpeedUnit[] = ['kmh', 'kn', 'ms'];
+const SAILING_UNITS: SpeedUnit[] = ['kn', 'kmh', 'ms'];
+const SURF_UNITS: SpeedUnit[] = ['kmh', 'kn', 'ms'];
 
 export const TREATMENT_UNITS: Record<Treatment, SpeedUnit[]> = { voile: SAILING_UNITS, surf: SURF_UNITS };
 
@@ -114,7 +114,7 @@ export const tabsAfterJumpsChange = (
 
 
 /** Réglage rangé par identifiant d'activité. */
-export type ByActivity<T> = Partial<Record<string, T>>;
+type ByActivity<T> = Partial<Record<string, T>>;
 
 export interface StoredSettings {
   /** Activité retenue par chaque module tant qu'aucune session ne l'impose. */
@@ -192,7 +192,7 @@ export const isValidStopHold = (value: unknown): value is number =>
   value === 0 || inRange(value, 500, 10_000);
 
 /** Seuil d'activité admis : un nombre fini, nul ou positif (même règle à l'écriture, `SETTING_FIELDS`, et à la lecture). */
-export const isValidThreshold = (value: unknown): value is number =>
+const isValidThreshold = (value: unknown): value is number =>
   typeof value === 'number' && isFinite(value) && value >= 0;
 
 /** Pause automatique admise : vitesse et délai finis, nuls ou positifs (même règle à l'écriture et à la lecture). */
@@ -253,7 +253,7 @@ export const nextSpeedRange = (
 /** Décalage des seuils cardio admis, en bpm entiers. */
 export const HR_OFFSET_RANGE = { min: -30, max: 30 };
 
-export const isValidHrOffset = (value: unknown): value is number =>
+const isValidHrOffset = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= HR_OFFSET_RANGE.min && value <= HR_OFFSET_RANGE.max;
 
 /** Décalage des seuils cardio à défaut de réglage : le pré-réglage, sinon celui du calcul. */
@@ -266,10 +266,10 @@ export const resolveHrOffset = (stored: StoredSettings, activity: Activity): num
 };
 
 
-export const isKnownSpeedUnit = (value: unknown): value is SpeedUnit =>
+const isKnownSpeedUnit = (value: unknown): value is SpeedUnit =>
   typeof value === 'string' && value in SPEED_UNIT_LABEL;
 
-export const isKnownDistanceUnit = (value: unknown): value is DistanceUnit =>
+const isKnownDistanceUnit = (value: unknown): value is DistanceUnit =>
   typeof value === 'string' && value in DISTANCE_UNIT_LABEL;
 
 
@@ -291,7 +291,7 @@ export const resolveDistanceUnit = (stored: StoredSettings, activity: Activity):
 };
 
 
-export const sanitizeNotificationFields = (value: unknown, activity: Activity): LiveFieldKey[] | null =>
+const sanitizeNotificationFields = (value: unknown, activity: Activity): LiveFieldKey[] | null =>
   sanitizeLiveFields(value, activityTreatment(activity), MAX_NOTIFICATION_FIELDS, 'notification');
 
 /** Foil d'une activité sans réglage : coché pour « Surf foil » (point 97), sinon le défaut du calcul. */
@@ -306,7 +306,7 @@ export const resolveFoil = (stored: StoredSettings, activity: Activity): boolean
   return typeof foil === 'boolean' ? foil : defaultFoil(activity);
 };
 
-/** Pumping foil d'une activité : celui réglé, sinon non ; `null` si son calcul ne le mesure pas (bateau, à pied, à vélo). */
+/** Pumping foil d'une activité : celui réglé, sinon non ; `null` si son calcul ne le mesure pas (bateau). */
 export const resolvePumping = (stored: StoredSettings, activity: Activity): boolean | null => {
   if (getSportProfile(activity.base).pump === null) return null;
   return stored.pumping?.[activity.id] === true;
@@ -385,15 +385,15 @@ export interface SportSettingsView {
   /** Support sur foil ; `null` hors voile et surf. */
   foil: boolean | null;
   isFoilOverridden: boolean;
-  /** Pumping foil ; `null` si le calcul ne le mesure pas (bateau, à pied, à vélo). */
+  /** Pumping foil ; `null` si le calcul ne le mesure pas (bateau). */
   pumping: boolean | null;
   /** Virages mesurés par le gyroscope ; `null` hors surf. */
   turns: boolean | null;
   /** Virages réglés à l'écart de leur défaut. */
   isTurnsOverridden: boolean;
-  /** Sauts mesurés par les capteurs ; `null` si le calcul ne les mesure pas (bateau, fractionné). */
+  /** Sauts mesurés par les capteurs ; `null` si le calcul ne les mesure pas (bateau, surf). */
   jumps: JumpSettings | null;
-  /** Ceinture cardio proposée à l'enregistrement ; `null` en voile et en surf. */
+  /** Ceinture cardio proposée à l'enregistrement par cette activité. */
   heartRate: boolean;
   isJumpsOverridden: boolean;
   /** Décalage des seuils cardio, en bpm. */

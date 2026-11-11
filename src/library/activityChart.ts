@@ -49,7 +49,7 @@ export interface ChartBar {
   sessions: ChartSession[];
 }
 
-export interface ChartTotal {
+interface ChartTotal {
   activityId: string;
   sessions: number;
   durationS: number;

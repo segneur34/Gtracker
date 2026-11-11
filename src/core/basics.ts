@@ -112,27 +112,6 @@ export const toFixedNumber = (x: number, decimals: number): number => parseFloat
 export const errorMessage = (err: unknown, fallback = 'erreur inconnue'): string =>
   err instanceof Error && err.message ? err.message : fallback;
 
-/** Commande datée d'un journal (chrono, compteur) : un genre connu et l'instant. */
-export interface DatedCommand<K extends string> {
-  kind: K;
-  atMs: number;
-}
-
-/**
- * Commandes d'un journal relues : celles dont le genre est dans `kinds` et
- * l'instant un nombre fini, les autres écartées ; `null` si `raw` n'est pas une liste.
- */
-export const readCommands = <K extends string>(raw: unknown, kinds: readonly K[]): DatedCommand<K>[] | null => {
-  if (!Array.isArray(raw)) return null;
-  const out: DatedCommand<K>[] = [];
-  for (const c of raw) {
-    if (typeof c !== 'object' || c === null) continue;
-    const { kind, atMs } = c as Record<string, unknown>;
-    if (kinds.includes(kind as K) && typeof atMs === 'number' && isFinite(atMs)) out.push({ kind: kind as K, atMs });
-  }
-  return out;
-};
-
 /** Rang d'une valeur parmi des bornes croissantes : 0 sous la première, puis 1 à `bounds.length`. */
 export const bandIndex = (value: number, bounds: readonly number[]): number => {
   let band = 0;

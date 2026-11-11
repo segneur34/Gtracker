@@ -8,7 +8,7 @@ import { SPEED_COLOR } from './chartStyle';
 import { HEART_RATE_COLOR } from './heartRateColors';
 
 /** Valeur de FC lue en un point : « 142 bpm », ou « — » sans valeur (trou de ceinture). */
-export const heartRateValue = (bpm: number | null | undefined): ReadoutValue => (
+const heartRateValue = (bpm: number | null | undefined): ReadoutValue => (
   { text: bpm === null || bpm === undefined ? '—' : `${Math.round(bpm)} bpm`, color: HEART_RATE_COLOR }
 );
 

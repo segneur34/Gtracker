@@ -264,7 +264,7 @@ const openSettings = async () => {
   await go('/parametres', 3000);
   await evaluate(`(() => {
     const sections = JSON.parse(localStorage.getItem('tracker.sections') ?? '{}');
-    sections.settings = { ...sections.settings, activites: true, coureur: true };
+    sections.settings = { ...sections.settings, activites: true, pratiquant: true };
     sections['settings-activities'] = { wingfoil: true, surf: true };
     sections['settings-families'] = { voile: true, surf: true };
     sections['settings-activity-parts'] = { enregistrement: true, analyse: true };

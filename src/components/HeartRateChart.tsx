@@ -13,8 +13,7 @@ const HR_AXIS: TrackYAxis[] = [{ id: 'hr', color: HEART_RATE_COLOR, unit: 'bpm',
 /**
  * Courbe de FC, zoomable, reliée à la carte par l'indice de chaque ligne
  * (`hoveredTrackIndex`) ; les zones du pratiquant en bandes pâles. L'abscisse
- * vient de la page : la distance dans l'onglet des graphes de la course et du
- * vélo, le temps ailleurs. La valeur se lit au-dessus, dans la lecture de la
+ * vient de la page : le temps, ou la distance selon la page. La valeur se lit au-dessus, dans la lecture de la
  * page (`ChartReadout`). Partagée par l'onglet « cardio » et les onglets des
  * graphes des trois modules.
  */

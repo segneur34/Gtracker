@@ -490,7 +490,6 @@ const runKinematics = (points: RawTrackPoint[], options: KinematicsOptions, prev
       timeMs: timesMs[i],
       ele: p.ele,
       hr: p.hr,
-      cadence: p.cadence,
       speedMs: clamped[i],
       smoothedSpeedMs: smoothed[i],
       bearing: bearings[i],

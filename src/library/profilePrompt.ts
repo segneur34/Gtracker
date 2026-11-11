@@ -1,5 +1,5 @@
 import { inRange } from '../core/basics';
-import { RUNNER_BOUNDS, runnerName, type RunnerNumberField, type RunnerProfile } from './athleteProfile';
+import { ATHLETE_BOUNDS, athleteName, type AthleteNumberField, type AthleteProfile } from './athleteProfile';
 import { ROOT_GOAL } from './rootGrowth';
 
 /**
@@ -8,13 +8,13 @@ import { ROOT_GOAL } from './rootGrowth';
  */
 
 /** Plages plausibles de chaque champ numérique du Profil, objectif de la racine compris. */
-export const PROFILE_BOUNDS: Record<RunnerNumberField, [number, number]> = {
-  ...RUNNER_BOUNDS,
+const PROFILE_BOUNDS: Record<AthleteNumberField, [number, number]> = {
+  ...ATHLETE_BOUNDS,
   rootWeeklyGoalMin: [ROOT_GOAL.min, ROOT_GOAL.max],
 };
 
 /** Une valeur numérique saisie et dans sa plage (relue avec contrôle : fichier de réglages importé). */
-export const validProfileNumber = (field: RunnerNumberField, raw: unknown): boolean => {
+export const validProfileNumber = (field: AthleteNumberField, raw: unknown): boolean => {
   const [lo, hi] = PROFILE_BOUNDS[field];
   return inRange(raw, lo, hi);
 };
@@ -25,7 +25,7 @@ export const validProfileNumber = (field: RunnerNumberField, raw: unknown): bool
  * ignorée. Les anciens réglages de la racine (période, tour, recul, objectif
  * par période d'essai du 22/10) sont sans effet.
  */
-export const runnerRootGoalMin = (profile: Partial<Pick<RunnerProfile, 'rootWeeklyGoalMin'>>): number => {
+export const athleteRootGoalMin = (profile: Partial<Pick<AthleteProfile, 'rootWeeklyGoalMin'>>): number => {
   const raw: unknown = profile.rootWeeklyGoalMin;
   const [lo, hi] = PROFILE_BOUNDS.rootWeeklyGoalMin;
   return inRange(raw, lo, hi) ? raw : ROOT_GOAL.defaultMin;
@@ -40,10 +40,10 @@ export const PROFILE_PROMPT_FIELDS = ['name', 'birthYear'] as const;
 export type ProfilePromptField = (typeof PROFILE_PROMPT_FIELDS)[number];
 
 /** Champs du pop-up qui manquent au profil, dans leur ordre ; vide : le profil est rempli. */
-export const missingProfileFields = (profile: Partial<RunnerProfile>): ProfilePromptField[] =>
+export const missingProfileFields = (profile: Partial<AthleteProfile>): ProfilePromptField[] =>
   PROFILE_PROMPT_FIELDS.filter((field) => {
     switch (field) {
-      case 'name': return runnerName({ name: profile.name ?? null }) === null;
+      case 'name': return athleteName({ name: profile.name ?? null }) === null;
       default: return !validProfileNumber(field, profile[field]);
     }
   });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bandIndex } from './basics';
 import {
   edwardsLoad, estimateHrMax, heartRateHistogram, heartRateStats, heartRateThresholds, heartRateZonePaths, heartRateZones,
-  histogramZoneTimes, isValidThresholds, smoothHeartRate, spanHeartRate, timeInZones, timeSpanHeartRate, type HeartRatePoint,
+  histogramZoneTimes, isValidThresholds, smoothHeartRate, timeInZones, type HeartRatePoint,
 } from './heartRate';
 import { REFERENCE_HEART_RATE } from './sportProfiles';
 
@@ -192,24 +192,6 @@ describe('zones et charge', () => {
   });
 });
 
-describe('spanHeartRate', () => {
-  it('donne moyenne, max et récupération', () => {
-    // Effort de 0 à 120 s à 170, puis récupération à 130.
-    const points = series(0, 300, 1, (t) => (t <= 120 ? 170 : 130));
-    const span = spanHeartRate(points, analyze(points), 0, 120, P.gapS, P.recoveryS)!;
-    expect(span.avgBpm).toBe(170);
-    expect(span.maxBpm).toBe(170);
-    // La FC de fin d'effort est lissée sur 5 s : la baisse de 40 bpm en paraît un peu moins.
-    expect(span.recoveryBpm).toBeGreaterThan(20);
-    expect(span.recoveryBpm).toBeLessThanOrEqual(40);
-  });
-
-  it('laisse la récupération vide après la fin de la trace', () => {
-    const points = series(0, 130, 1, () => 160);
-    expect(spanHeartRate(points, analyze(points), 0, 120, P.gapS, P.recoveryS)!.recoveryBpm).toBeNull();
-  });
-});
-
 describe('heartRateZonePaths', () => {
   it('coupe les passages aux changements de zone et aux trous', () => {
     const bounds = [100, 120, 140, 160, 180];
@@ -220,33 +202,5 @@ describe('heartRateZonePaths', () => {
     expect(heartRateZonePaths(points, smoothed, bounds, 2, P.gapS)).toHaveLength(3);
     expect(heartRateZonePaths(points, smoothed, bounds, 4, P.gapS)).toHaveLength(1);
     expect(heartRateZonePaths(points, smoothed, bounds, 5, P.gapS)).toHaveLength(0);
-  });
-});
-
-describe('timeSpanHeartRate', () => {
-  it('retrouve la répétition par ses instants, à 1 Hz comme à 5 Hz', () => {
-    const hrAt = (t: number) => (t >= 100 && t <= 220 ? 170 : 125);
-    for (const hz of [1, 5]) {
-      const points = series(0, 400, hz, hrAt);
-      const span = timeSpanHeartRate(points, analyze(points), T0 + 100_000, T0 + 220_000, P.gapS, P.recoveryS)!;
-      expect(Math.abs(span.avgBpm - 168)).toBeLessThanOrEqual(2);
-      expect(span.maxBpm).toBe(170);
-      expect(span.recoveryBpm).toBeGreaterThan(15);
-    }
-  });
-
-  it("ne garde pas un point daté d'une fraction de milliseconde après la fin", () => {
-    // Dates fractionnaires : le point à fin + 0,5 ms (FC 200) n'est pas dans la plage.
-    for (const hz of [1, 5]) {
-      const endMs = T0 + 60_000;
-      const points = series(0, 120, hz, (t) => (t < 60 ? 150 : 200)).map((p) => ({ ...p, timeMs: p.timeMs + 0.5 }));
-      const span = timeSpanHeartRate(points, points.map((p) => p.hr ?? null), T0 + 10_000, endMs, P.gapS, P.recoveryS)!;
-      expect(span.maxBpm).toBe(150);
-    }
-  });
-
-  it('rend null hors de la trace', () => {
-    const points = series(0, 100, 1, () => 150);
-    expect(timeSpanHeartRate(points, analyze(points), T0 + 500_000, T0 + 600_000, P.gapS, P.recoveryS)).toBeNull();
   });
 });

@@ -3,7 +3,7 @@ import { jsonStore } from '../platform/storage';
 
 /**
  * Enregistrement persistant de l'appareil, rangé par espace de noms et par
- * clé : sections ouvertes d'un module, profil du coureur.
+ * clé : sections ouvertes d'un module, profil du pratiquant.
  *
  * Sans clé, rien n'est lu ni écrit.
  *

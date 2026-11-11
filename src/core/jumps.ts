@@ -8,7 +8,7 @@ import {
 } from './imuVertical';
 
 /**
- * Sauts mesurés par l'accéléromètre et le gyroscope du téléphone (voile, course, vélo),
+ * Sauts mesurés par l'accéléromètre et le gyroscope du téléphone (voile),
  * depuis le fichier `.imu` d'une session (`core/imuFile.ts`). Tout est en SI :
  * instants du fichier en microsecondes, heures en millisecondes, hauteurs en
  * mètres, accélérations en m/s².
@@ -123,7 +123,7 @@ export const jumpDoubtLabel = (doubt: JumpDoubt, d: Pick<JumpDetection, 'attitud
 };
 
 /** Hauteur du téléphone autour d'un saut, au-dessus de son niveau au décollage. */
-export interface JumpCurve {
+interface JumpCurve {
   /** Pas, en secondes. */
   stepS: number;
   /** Instant du premier point, en secondes depuis le décollage (négatif). */
@@ -133,7 +133,7 @@ export interface JumpCurve {
 }
 
 /** Un vol repéré dans les mesures, rangé ou non. */
-export interface Flight {
+interface Flight {
   /** Décollage et atterrissage, en instants du fichier (µs depuis `clock.elapsedUs`). */
   takeoffUs: number;
   landingUs: number;
@@ -206,7 +206,7 @@ const peakAbs = (s: ImuSeries, fromUs: number, toUs: number): number => {
  * non : le calcul complet sur cet intervalle, qui ne lit aucune mesure en
  * dehors. Rend une liste vide sans accéléromètre ni gyroscope.
  */
-export const detectFlights = (rec: ImuRecording, d: JumpDetection, fromUs: number, toUs: number): Flight[] => {
+const detectFlights = (rec: ImuRecording, d: JumpDetection, fromUs: number, toUs: number): Flight[] => {
   const vertical = verticalAcceleration(rec, d, fromUs, toUs);
   if (!vertical) return [];
   const { acc, gyr, startUs, stepUs, dt, n, gLocal, aUp: measuredUp, horizontal, upF, upB, gap } = vertical;
@@ -383,7 +383,7 @@ export interface JumpsMeasure {
  * vol, à 1 à 3 s du saut et trois à cinq fois plus bas. Un vol est un rebond
  * s'il touche, à `satelliteGapS` près, un vol d'au moins sa hauteur divisée
  * par `satelliteHeightRatio`. Deux sauts voisins de hauteurs comparables
- * (un double à vélo) restent deux sauts.
+ * (un double saut) restent deux sauts.
  */
 const isSatellite = (f: Flight, others: readonly Flight[], d: JumpDetection): boolean => {
   const gapUs = d.satelliteGapS * 1e6;

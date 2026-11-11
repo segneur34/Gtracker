@@ -38,9 +38,9 @@ describe('statSessionOf', () => {
 });
 
 describe('statsTotals', () => {
-  it('additionne, et ne compte que les sessions qui connaissent le temps en action, le D+ ou les manœuvres', () => {
+  it('additionne, et ne compte que les sessions qui connaissent le temps en action ou les manœuvres', () => {
     const t = statsTotals([
-      session(at(2026, 3, 1), { elevationGainM: 120, maxSpeedMs: 6 }),
+      session(at(2026, 3, 1), { maxSpeedMs: 6 }),
       session(at(2026, 3, 2), { movingTimeS: null, distanceM: 5000 }),
       session(at(2026, 3, 3), { maneuverCount: 12, family: 'voile', treatment: 'voile' }),
     ]);
@@ -51,8 +51,6 @@ describe('statsTotals', () => {
     // La distance en action, pas la distance entière.
     expect(t.movingDistanceM).toBe(18_000);
     expect(averageMovingSpeedMs(t)).toBeCloseTo(18_000 / 6000);
-    expect(t.elevationGainM).toBe(120);
-    expect(t.elevationSessions).toBe(1);
     expect(t.maxSpeedMs).toBe(6);
     expect(t.maneuvers).toBe(12);
     expect(t.maneuverSessions).toBe(1);
@@ -149,8 +147,7 @@ describe('metricsOf', () => {
   const keys = (family: Parameters<typeof metricsOf>[0], list: StatSession[]) => metricsOf(family, list).map((m) => m.key);
 
   it('propose les données de la famille qui ont une valeur', () => {
-    // Le dénivelé et la cadence sont partis avec la course et le vélo (lot 303) ; un paddle sans vague n'a que les communes.
-    expect(keys('surf', [session(at(2026, 3, 1), { elevationGainM: 80 })])).toEqual(['vmax', 'moyenne', 'duree', 'distance']);
+    // Un paddle sans vague n'a que les données communes.
     expect(keys('surf', [session(at(2026, 3, 1))])).toEqual(['vmax', 'moyenne', 'duree', 'distance']);
     expect(keys('voile', [sailStatSession(at(2026, 3, 1))])).toEqual(['vmax', 'moyenne', 'duree', 'distance']);
     expect(keys('voile', [sailStatSession(at(2026, 3, 1), { foil: true, maneuverResults: { tackSuccess: 1, tackFail: 0, jibeSuccess: 0, jibeFail: 0 } })]))

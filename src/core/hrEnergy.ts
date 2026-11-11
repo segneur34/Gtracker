@@ -1,5 +1,4 @@
-import { forEachCounted } from './heartRate';
-import { activeDurationS, type HeartRateSessionPoint } from './heartRateSession';
+import { forEachCounted, type HeartRatePoint } from './heartRate';
 import type { HeartRateProfile, HrEnergyProfile, KeytelCoefficients } from './sportProfiles';
 import { J_PER_KCAL } from './units';
 
@@ -7,8 +6,8 @@ import { J_PER_KCAL } from './units';
  * Énergie dépensée estimée par la fréquence cardiaque (lot 96), en voile et en
  * surf, où la vitesse ne dit rien de l'effort : équation de Keytel (2005) sans
  * VO2max, à partir de la FC, du poids, de l'âge et du sexe. Un ordre de
- * grandeur (25 % d'écart et plus), jamais additionné à l'énergie mécanique de
- * la course et du vélo. Sorties en joules ; paramètres de `HrEnergyProfile`.
+ * grandeur (25 % d'écart et plus), jamais additionné à une énergie mécanique.
+ * Sorties en joules ; paramètres de `HrEnergyProfile`.
  *
  * Tout se mesure en temps (règle 2) : chaque intervalle compté de la FC
  * (`forEachCounted`, le « Temps mesuré » de l'onglet cardio) apporte le débit
@@ -17,7 +16,22 @@ import { J_PER_KCAL } from './units';
  * le plancher, le débit retombe au repos, et il n'est jamais plus bas.
  */
 
-/** Ce qu'il faut savoir du pratiquant (`RunnerProfile`, âge à la date de la session). */
+/** Point de FC d'une session : l'heure, la FC éventuelle, et la reprise après une pause. */
+export interface HeartRateSessionPoint extends HeartRatePoint {
+  segmentStart?: true;
+}
+
+/** Durée hors pauses, en secondes : la somme des pas, sauf celui qui mène à une reprise. */
+export const activeDurationS = (points: readonly HeartRateSessionPoint[]): number => {
+  let totalMs = 0;
+  for (let i = 1; i < points.length; i++) {
+    if (points[i].segmentStart) continue;
+    totalMs += points[i].timeMs - points[i - 1].timeMs;
+  }
+  return totalMs / 1000;
+};
+
+/** Ce qu'il faut savoir du pratiquant (`AthleteProfile`, âge à la date de la session). */
 export interface HrEnergyAthlete {
   weightKg: number | null;
   age: number | null;

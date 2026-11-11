@@ -124,10 +124,6 @@ export interface FitPointSpec {
   altitudeM?: number;
   speedMs?: number;
   hr?: number;
-  /** Cadence FIT : foulées par minute à pied, tours par minute à vélo. */
-  cadence?: number;
-  /** Fraction de cadence, en 1/128 (`fractional_cadence`). */
-  fractionalCadence?: number;
   /** Distance du fichier, en mètres (jamais relue). */
   distanceM?: number;
 }
@@ -153,8 +149,6 @@ const RECORD_FIELDS: FitFieldDef[] = [
   { num: 78, base: FIT_BASE.uint32 },
   { num: 73, base: FIT_BASE.uint32 },
   { num: 3, base: FIT_BASE.uint8 },
-  { num: 4, base: FIT_BASE.uint8 },
-  { num: 53, base: FIT_BASE.uint8 },
   { num: 5, base: FIT_BASE.uint32 },
 ];
 
@@ -182,8 +176,6 @@ export const buildFitActivity = (spec: FitActivitySpec): Uint8Array => {
         p.altitudeM === undefined ? FIT_INVALID.uint32 : Math.round((p.altitudeM + 500) * 5),
         p.speedMs === undefined ? FIT_INVALID.uint32 : Math.round(p.speedMs * 1000),
         p.hr ?? FIT_INVALID.uint8,
-        p.cadence ?? FIT_INVALID.uint8,
-        p.fractionalCadence ?? FIT_INVALID.uint8,
         p.distanceM === undefined ? FIT_INVALID.uint32 : Math.round(p.distanceM * 100),
       ]),
     })),

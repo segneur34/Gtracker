@@ -25,8 +25,6 @@ export interface FitRecord {
   altitudeM?: number;
   speedMs?: number;
   heartRateBpm?: number;
-  /** Cadence telle que le FIT la donne : foulées par minute à pied, tours par minute à vélo. */
-  cadence?: number;
 }
 
 /** Minuterie de la montre : `running` à vrai quand elle repart, à faux quand elle s'arrête. */
@@ -275,8 +273,6 @@ const readRecord = (timeMs: number, read: FieldReader): FitRecord => {
   // 0 : pas de mesure (capteur non porté), jamais une fréquence cardiaque.
   const heartRate = read(3);
   if (heartRate !== undefined && heartRate > 0) record.heartRateBpm = heartRate;
-  const cadence = read(4);
-  if (cadence !== undefined) record.cadence = cadence + (read(53) ?? 0) / 128;
   return record;
 };
 

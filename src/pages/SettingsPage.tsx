@@ -11,7 +11,7 @@ import {
 import { activityTabs, isTabShown, toggleTabChoice, type TabChoices } from '../core/analysisTabs';
 import type { SportType } from '../core/types';
 import {
-  DISTANCE_UNIT_LABEL, DISTANCE_UNIT_SYMBOL, SPEED_UNIT_LABEL, speedUnitLabel, editSpeedUnit, formatSpeedValue, fromDisplaySpeed, kmhToMs, msToKmh, toDisplaySpeed,
+  DISTANCE_UNIT_LABEL, DISTANCE_UNIT_SYMBOL, SPEED_UNIT_LABEL, formatSpeedValue, fromDisplaySpeed, kmhToMs, msToKmh, toDisplaySpeed,
   type DistanceUnit, type SpeedUnit, commaDecimal, parseDecimal
 } from '../core/units';
 import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
@@ -22,15 +22,15 @@ import { useTileCache } from '../hooks/useTileCache';
 import { isTileTemplate, type MapBase } from '../core/mapBase';
 import { useThemedShade, useThemeSettings } from '../hooks/useTheme';
 import { THEME_CHOICES } from '../theme/theme';
-import { RUNNER_NAME_MAX, runnerHeartRateZones, runnerHrSource, type RunnerNumberField, type RunnerProfile } from '../library/athleteProfile';
-import { useRunnerProfile } from '../hooks/useRunnerProfile';
+import { ATHLETE_NAME_MAX, athleteHeartRateZones, athleteHrSource, type AthleteNumberField, type AthleteProfile } from '../library/athleteProfile';
+import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { ROOT_GOAL } from '../library/rootGrowth';
 import { zoneLabel } from '../components/heartRateColors';
 import { hrSourceLabel } from '../components/heartRateOrigin';
 import Button from '../components/ui/Button';
 import MoreMenu from '../components/ui/MoreMenu';
 import SegmentedControl from '../components/ui/SegmentedControl';
-import { playPattern, setBeepPitch, type ClockTone } from '../platform/beeper';
+import { playPattern, setBeepPitch, type PatternTone } from '../platform/beeper';
 import { BEEP_SOUNDS, beepSoundHz } from '../recording/beepSound';
 import { DEFAULT_GEAR_LABELS, MAX_GEAR_LABEL_LENGTH, sanitizeGearLabels } from '../settings/gear';
 import {
@@ -71,7 +71,7 @@ import { useHelpCollapseAll } from '../components/helpContext';
 import './SettingsPage.css';
 
 /**
- * Sauts mesurés par les capteurs du téléphone (voile sauf bateau, course, vélo) : la case,
+ * Sauts mesurés par les capteurs du téléphone (voile sauf bateau) : la case,
  * puis, cochée, l'emplacement du téléphone et la hauteur minimale montrée. Le
  * foil, juste au-dessus, est un réglage de l'activité à part entière.
  */
@@ -115,10 +115,9 @@ function JumpsSetting({ id, jumps, overridden, onChange }: {
 
 /**
  * Onglets des analyses de l'activité : enfoncé, montré. Ceux du module le sont
- * d'office, un onglet générique (« tops » à pied et en surf) ne l'est qu'une
+ * d'office, un onglet générique (« tops » en surf) ne l'est qu'une
  * fois coché ; tous se cachent. « vols » et « pumping » ne sont proposés que sur foil,
- * « sauts » que si l'activité les mesure (`activityTabs`). Un pré-réglage (« sauts » à la
- * course, « tops » au VTT) change ce point de départ : `toggleTabChoice` le reçoit.
+ * « sauts » que si l'activité les mesure (`activityTabs`). Un pré-réglage change ce point de départ : `toggleTabChoice` le reçoit.
  */
 function AnalysisTabsSetting({ view, profile, onChange }: {
   view: SportSettingsView;
@@ -148,23 +147,22 @@ function AnalysisTabsSetting({ view, profile, onChange }: {
 const cardStyle = { ...CARD_STYLE, marginBottom: '15px' } as const;
 
 /** Blocs repliables de la page, tous fermés au départ ; l'état est mémorisé. */
-type SettingsBlock = 'memoire' | 'autorisations' | 'activites' | 'enregistrement' | 'capteurs' | 'affichage' | 'cartes' | 'coureur' | 'tutoriels' | 'apropos';
+type SettingsBlock = 'memoire' | 'autorisations' | 'activites' | 'enregistrement' | 'capteurs' | 'affichage' | 'cartes' | 'pratiquant' | 'tutoriels' | 'apropos';
 const SETTINGS_BLOCK_DEFAULTS: Record<SettingsBlock, boolean> = {
   memoire: false, autorisations: false, activites: false, enregistrement: false, capteurs: false, affichage: false, cartes: false,
-  coureur: false, tutoriels: false, apropos: false,
+  pratiquant: false, tutoriels: false, apropos: false,
 };
 /** Plafonds proposés pour les cartes gardées, en Mo : une liste plutôt qu'un champ, qui effacerait des tuiles à chaque chiffre tapé. */
 const TILE_CAP_CHOICES_MB = [100, 250, 500, 1000, 2000, 5000];
 /** « Écouter » le son des bips : le signal d'un changement de phase du compteur, court, court, long, une seconde entre deux. */
-const LISTEN_PATTERN: ClockTone[] = [{ delayMs: 0, tone: 'court' }, { delayMs: 1000, tone: 'court' }, { delayMs: 2000, tone: 'long' }];
+const LISTEN_PATTERN: PatternTone[] = [{ delayMs: 0, tone: 'court' }, { delayMs: 1000, tone: 'court' }, { delayMs: 2000, tone: 'long' }];
 const DISTANCE_UNITS = Object.keys(DISTANCE_UNIT_LABEL) as DistanceUnit[];
 /** Activités ouvertes, par identifiant ; absente : fermée. */
 const NO_ACTIVITY_OPEN: Record<string, boolean> = {};
 /** Parties d'une carte d'activité, toutes fermées au départ ; l'état, mémorisé, vaut pour toutes les activités. */
-// La notification est une sous-partie d'Enregistrement (19/10) ; la clé « itineraires » garde son nom pour l'état mémorisé.
-type ActivityPartKey = 'affichage' | 'analyse' | 'materiel' | 'enregistrement' | 'itineraires' | 'balises';
+type ActivityPartKey = 'affichage' | 'analyse' | 'materiel' | 'enregistrement' | 'balises';
 const ACTIVITY_PART_DEFAULTS: Record<ActivityPartKey, boolean> = {
-  affichage: false, analyse: false, materiel: false, enregistrement: false, itineraires: false, balises: false,
+  affichage: false, analyse: false, materiel: false, enregistrement: false, balises: false,
 };
 /** Familles de la liste des activités, toutes repliées au départ ; plusieurs s'ouvrent à la fois, l'état est mémorisé. */
 const FAMILY_OPEN_DEFAULTS = Object.fromEntries(SPORT_FAMILIES.map((f) => [f, false])) as Record<SportFamily, boolean>;
@@ -233,9 +231,6 @@ function NumberField({
   );
 }
 
-/** Seuils et zones de Pratiquant : le cardio de référence, sans décalage (chaque activité décale les siens). */
-const RUNNING_HEART_RATE = REFERENCE_HEART_RATE;
-
 const pct = (f: number): string => `${Math.round(f * 100)} %`;
 
 /**
@@ -243,10 +238,10 @@ const pct = (f: number): string => `${Math.round(f * 100)} %`;
  * d'office (réserve cardiaque, sinon FC max, estimée par l'âge s'il le faut),
  * ou saisis à la main ; puis les zones calées dessus.
  */
-function HeartRateThresholdsField({ profile, onChange }: { profile: RunnerProfile; onChange: (thresholds: number[] | null) => void }) {
-  const zones = runnerHeartRateZones(profile, RUNNING_HEART_RATE, 0);
+function HeartRateThresholdsField({ profile, onChange }: { profile: AthleteProfile; onChange: (thresholds: number[] | null) => void }) {
+  const zones = athleteHeartRateZones(profile, REFERENCE_HEART_RATE, 0);
   const entered = zones?.method === 'saisis' ? zones : null;
-  const model = RUNNING_HEART_RATE.zoneModel;
+  const model = REFERENCE_HEART_RATE.zoneModel;
   const method = zones === null ? null
     : zones.method === 'saisis' ? 'S1 et S2 saisis, S2 au-dessus de S1 (test en laboratoire, par exemple).'
       : zones.method === 'reserve'
@@ -285,7 +280,7 @@ function HeartRateThresholdsField({ profile, onChange }: { profile: RunnerProfil
       <HelpText helpKey="pratiquant:zones">
         {method
           ? <>{method} Les zones sont calées dessus : Z1 et Z2 sous S1, Z3 commence à S1, Z4 aux deux tiers de S1 à S2, Z5 juste
-            au-dessus de S2. Ces valeurs sont celles de la course ; chaque activité les décale (sa carte, partie « onglet analyse »).</>
+            au-dessus de S2. Ces valeurs sont celles de référence ; chaque activité les décale (sa carte, partie « onglet analyse »).</>
           : "Pas de zones : l'onglet cardio montre la courbe et la FC moyenne seulement."}
       </HelpText>
     </div>
@@ -294,8 +289,7 @@ function HeartRateThresholdsField({ profile, onChange }: { profile: RunnerProfil
 
 /**
  * Page Paramètres : mémoire, activités et tous leurs réglages (affichage,
- * enregistrement, terrain, vélo, temps estimé des itinéraires),
- * enregistrement, barre du bas, cartes hors ligne et caractéristiques du
+ * enregistrement, onglets, balises), barre du bas, cartes hors ligne et caractéristiques du
  * pratiquant, en blocs repliables (chaque activité se replie aussi). Tout est enregistré sur l'appareil
  * à la saisie, recopié dans le dossier mémoire (`reglages.json`), et relu par
  * chaque module à son ouverture.
@@ -349,13 +343,13 @@ const ActivityCard = memo(function ActivityCard({
   const withThreshold = hasActiveThreshold(p);
   /** Nom du seuil, sous son titre : de vague ou de vol en surf. */
   const thresholdLabel = treatment === 'surf' ? (s.foil ? 'Seuil de vol' : 'Seuil de vague') : "Seuil d'activité";
-  /** Famille du temps estimé des itinéraires, `null` en voile et en fractionné. */
+  /** Unités de vitesse et de distance proposées à son traitement. */
   const units = TREATMENT_UNITS[treatment];
   const renamingThis = renaming;
   /** Grisée : cachée elle-même, ou par sa famille. */
   const shownHidden = activity.hidden === true || familyHidden;
   const overridden = isActivityOverridden(s);
-  // Seuil : en voile dans l'unité choisie (rangé dans celle du calcul, les nœuds), en course en km/h.
+  // Seuil : en voile dans l'unité choisie (rangé dans celle du calcul, les nœuds), en surf dans l'unité de son calcul.
   const thresholdUnit: SpeedUnit = sailing ? s.speedUnit : p.thresholdUnit;
   const thresholdShown = parseFloat(
     toDisplaySpeed(fromDisplaySpeed(s.activeThreshold, p.thresholdUnit), thresholdUnit).toFixed(thresholdUnit === 'ms' ? 2 : 1)
@@ -366,16 +360,14 @@ const ActivityCard = memo(function ActivityCard({
   const noThreshold = s.activeThreshold === 0;
   const setThreshold = (next: number | null) =>
     setFor(id, 'activeThreshold', next === null ? null : toDisplaySpeed(fromDisplaySpeed(next, thresholdUnit), p.thresholdUnit));
-  // Bornes de couleur, saisies en km/h quand l'unité est une allure (min/km).
-  const rangeUnit = editSpeedUnit(s.speedUnit);
   const fallbackRange = defaultSpeedRangeOf(activity);
   const shownRange = s.speedRange ?? fallbackRange;
   // Voile sans réglage : champs vides, les bornes suivent l'allure de chaque session, sauf bornes fixes (pré-réglage, bateau).
   const followsPace = rangeFollowsPace(activity);
   const rangeEmpty = followsPace && s.speedRange === null;
-  const displayBound = (ms: number) => parseDecimal(formatSpeedValue(toDisplaySpeed(ms, rangeUnit), rangeUnit));
+  const displayBound = (ms: number) => parseDecimal(formatSpeedValue(toDisplaySpeed(ms, s.speedUnit), s.speedUnit));
   const setRangeBound = (bound: 'minMs' | 'maxMs', next: number | null) => {
-    const range = nextSpeedRange(s.speedRange, bound, next === null ? null : fromDisplaySpeed(next, rangeUnit), fallbackRange);
+    const range = nextSpeedRange(s.speedRange, bound, next === null ? null : fromDisplaySpeed(next, s.speedUnit), fallbackRange);
     if (range !== s.speedRange) setFor(id, 'speedRange', range);
   };
   const setAutoPauseField = (field: 'speedKmh' | 'delayS', next: number | null) => {
@@ -389,7 +381,7 @@ const ActivityCard = memo(function ActivityCard({
   // Les menus des chiffres du direct les nomment comme le direct : « Moyenne active » en voile et en surf.
   const fieldUnits: LiveFieldUnits = { ...s, options: { ...LIVE_STATS_DEFAULTS, activeAverage: usesActiveAverage(p) } };
   const summary = [
-    speedUnitLabel(s.speedUnit, s.distanceUnit),
+    SPEED_UNIT_LABEL[s.speedUnit],
     DISTANCE_UNIT_SYMBOL[s.distanceUnit],
     ...(!withThreshold ? [] : [
       thresholdEmpty ? "seuil selon l'allure" : noThreshold ? 'sans seuil' : `seuil ${commaDecimal(thresholdShown)} ${SPEED_UNIT_LABEL[thresholdUnit]}`,
@@ -452,7 +444,7 @@ const ActivityCard = memo(function ActivityCard({
           <SettingsPart label="Affichage" open={openPart.affichage} onToggle={() => togglePart('affichage')}>
             <SettingRow label="Unité de vitesse" helpKey={`${id}:unite-vitesse`} help={UNIT_HELP}>
               <select value={s.speedUnit} onChange={(e) => setFor(id, 'speedUnit', e.target.value as SpeedUnit)} className="ui-field ui-field--s">
-                {units.map((u) => <option key={u} value={u}>{speedUnitLabel(u, s.distanceUnit)}</option>)}
+                {units.map((u) => <option key={u} value={u}>{SPEED_UNIT_LABEL[u]}</option>)}
               </select>
             </SettingRow>
             <SettingRow label="Unité de distance" helpKey={`${id}:unite-distance`} help={UNIT_HELP}>
@@ -468,7 +460,7 @@ const ActivityCard = memo(function ActivityCard({
                   placeholder={String(displayBound(fallbackRange.minMs))}
                   onCommit={(v) => setRangeBound('minMs', v)} />
                 <span>à</span>
-                <NumberField unit={SPEED_UNIT_LABEL[rangeUnit]} step={0.5} min={0}
+                <NumberField unit={SPEED_UNIT_LABEL[s.speedUnit]} step={0.5} min={0}
                   value={rangeEmpty ? null : displayBound(shownRange.maxMs)}
                   placeholder={String(displayBound(fallbackRange.maxMs))}
                   onCommit={(v) => setRangeBound('maxMs', v)} />
@@ -523,7 +515,7 @@ const ActivityCard = memo(function ActivityCard({
               </SettingRow>
             )}
             <SettingRow label="Seuils cardio" helpKey={`${id}:seuils-cardio`}
-              help="S1, S2 et les zones cardio de cette activité, décalés par rapport à ceux de la course (Réglages › Pratiquant) : la FC y monte moins haut pour un même effort (vélo −7, marche −4, planche −5, wing et kite −8, surf −10 par défaut).">
+              help="S1, S2 et les zones cardio de cette activité, décalés par rapport aux valeurs de référence (Réglages › Pratiquant) : la FC y monte moins haut pour un même effort (planche et bateau −5, wing et kite −8, surf −10 par défaut).">
               <div className="settings-sports__pair">
                 <NumberField unit="bpm" step={1} min={HR_OFFSET_RANGE.min} max={HR_OFFSET_RANGE.max}
                   value={s.isHrOffsetOverridden ? s.hrOffset : null} placeholder={String(defaultHrOffsetOf(activity))}
@@ -548,7 +540,7 @@ const ActivityCard = memo(function ActivityCard({
             {/* Champs de texte remplacés par les groupes dès qu'il y en a un (onglet du matériel). */}
             {!sailing && !s.gearGroups?.length && (
               <SettingRow label="Matériel" helpKey={`${id}:materiel`}
-                help="Noms des deux champs de matériel de l'onglet « matériel et notes » (chaussures, vélo…).">
+                help="Noms des deux champs de matériel de l'onglet « matériel et notes » (aile, planche…).">
                 <div className="settings-sports__pair">
                   <GearLabelsField labels={s.gearLabels}
                     onCommit={(labels) => setFor(id, 'gearLabels', labels)} />
@@ -624,7 +616,7 @@ function SettingsPage() {
     activities, view, setFor, resetActivity, addActivity, updateActivity, removeActivity, longPressMs, setLongPressMs,
     stopHoldMs, setStopHoldMs, beepSound, setBeepSound, hiddenFamilies, setActivityHidden, setFamilyHidden,
   } = useAllSportSettings();
-  const { profile, setName, setNumber, setSex, setThresholds, age } = useRunnerProfile();
+  const { profile, setName, setNumber, setSex, setThresholds, age } = useAthleteProfile();
   const shown = useThemedShade();
   const { open, toggle, closeAll: closeBlocks } = useOpenSections<SettingsBlock>('settings', SETTINGS_BLOCK_DEFAULTS);
   const { open: openActivity, toggle: toggleActivity, closeAll: closeActivities } = useOpenSections<string>('settings-activities', NO_ACTIVITY_OPEN);
@@ -641,7 +633,7 @@ function SettingsPage() {
     setRenaming(null);
   };
   /**
-   * Activités rangées par famille (Voile, À pied, Vélo, Surf ; l'Entraînement est retiré), chacune dans l'ordre de
+   * Activités rangées par famille (Voile, Surf), chacune dans l'ordre de
    * la liste, les cachées en bas de leur famille (§10, point 100).
    */
   const familyOrdered = SPORT_FAMILIES.flatMap((f) => {
@@ -689,10 +681,10 @@ function SettingsPage() {
     return id;
   };
 
-  const profileField = (field: RunnerNumberField) => (next: number | null) => setNumber(field, next);
+  const profileField = (field: AthleteNumberField) => (next: number | null) => setNumber(field, next);
   /** Unité d'une FC de Pratiquant, suivie de son origine : « bpm · test du 24/10 ». */
   const hrUnit = (field: 'hrMax' | 'hrRest'): string => {
-    const source = runnerHrSource(profile, field);
+    const source = athleteHrSource(profile, field);
     return source ? `bpm · ${hrSourceLabel(source)}` : 'bpm';
   };
 
@@ -717,7 +709,7 @@ function SettingsPage() {
 
       <div style={cardStyle}>
         <BlockTitle label="Activités" open={open.activites} onToggle={() => toggle('activites')} helpKey="activites"
-          help="Chaque activité part des valeurs de son calcul (wingfoil, course, vélo…) ; « Défaut » les lui rend. L'œil cache une famille ou une activité partout, sessions comprises, sans rien effacer." />
+          help="Chaque activité part des valeurs de son calcul (wingfoil, kite, surf…) ; « Défaut » les lui rend. L'œil cache une famille ou une activité partout, sessions comprises, sans rien effacer." />
         {open.activites && (
           <>
             <div className="settings-activities">
@@ -790,18 +782,18 @@ function SettingsPage() {
       </div>
 
       <div style={cardStyle}>
-        <BlockTitle label="Pratiquant" open={open.coureur} onToggle={() => toggle('coureur')} helpKey="pratiquant"
-          help="Pour l'énergie des analyses à pied et à vélo, les zones cardiaques de toutes les activités, et la racine du Profil. Tout est facultatif." />
-        {open.coureur && (
+        <BlockTitle label="Pratiquant" open={open.pratiquant} onToggle={() => toggle('pratiquant')} helpKey="pratiquant"
+          help="Pour l'énergie estimée des analyses, les zones cardiaques de toutes les activités, et la racine du Profil. Tout est facultatif." />
+        {open.pratiquant && (
           <div className="settings-block__body">
             <label className="ui-field-row">
               <span className="ui-field-row__label">Nom ou pseudo<HelpToggle helpKey="pratiquant:nom" label="Nom ou pseudo" /></span>
-              <input type="text" value={profile.name ?? ''} maxLength={RUNNER_NAME_MAX} placeholder="ex. Tom" autoComplete="nickname"
+              <input type="text" value={profile.name ?? ''} maxLength={ATHLETE_NAME_MAX} placeholder="ex. Tom" autoComplete="nickname"
                 onChange={(e) => setName(e.target.value)} className="ui-field ui-field--s set-wide-input" />
             </label>
             <HelpText helpKey="pratiquant:nom">En titre de la page Profil et au pied des images partagées.</HelpText>
             <NumberField label="Poids" unit="kg" step={0.5} min={20} max={300} value={profile.weightKg} onCommit={profileField('weightKg')} placeholder="ex. 72"
-              helpKey="pratiquant:poids" help="Pour l'énergie, et la puissance à vélo." />
+              helpKey="pratiquant:poids" help="Pour l'énergie." />
             <NumberField label="Taille" unit="cm" min={100} max={250} value={profile.heightCm} onCommit={profileField('heightCm')} placeholder="ex. 178"
               helpKey="pratiquant:taille" help="Avec le poids, l'âge et le sexe, pour la dépense au repos." />
             <NumberField label="Année de naissance" unit={age !== null ? `${age} ans` : undefined} min={1900} max={2100} value={profile.birthYear} onCommit={profileField('birthYear')} placeholder="ex. 1985"
@@ -816,7 +808,7 @@ function SettingsPage() {
             </label>
             <HelpText helpKey="pratiquant:sexe">Pour la dépense au repos.</HelpText>
             <NumberField label="Fréquence cardiaque max" unit={hrUnit('hrMax')} min={100} max={250} value={profile.hrMax} onCommit={profileField('hrMax')} placeholder="ex. 185"
-              helpKey="pratiquant:fc-max" help="Pour les seuils et les zones cardiaques. Le test de FC max (Entraînement › Tests) la mesure ; sans elle, elle est estimée par l'âge." />
+              helpKey="pratiquant:fc-max" help="Pour les seuils et les zones cardiaques. Sans elle, elle est estimée par l'âge." />
             <NumberField label="Fréquence cardiaque de repos" unit={hrUnit('hrRest')} min={25} max={120} value={profile.hrRest} onCommit={profileField('hrRest')} placeholder="ex. 55"
               helpKey="pratiquant:fc-repos" help="Avec la FC max, les seuils se calculent sur la réserve cardiaque, plus juste. Le test de FC repos (page Profil) la mesure." />
             <HeartRateThresholdsField profile={profile} onChange={setThresholds} />
@@ -906,7 +898,7 @@ function BlockTitle({ label, open, onToggle, helpKey, help }: {
 /** Aide des deux unités d'une activité. */
 const UNIT_HELP = 'Utilisée partout pour cette activité : analyses, enregistrement, bibliothèque.';
 
-/** Aide du seuil d'une activité, selon son calcul : en voile, à pied ou à vélo, en surf (vague ou vol). */
+/** Aide du seuil d'une activité, selon son calcul : en voile, en surf (vague ou vol). */
 const thresholdHelp = (treatment: Treatment, foil: boolean): string => {
   if (treatment === 'surf') {
     return foil
@@ -1079,7 +1071,7 @@ function GearLabelsField({
   );
 }
 
-/** Ajout d'une activité : nom, famille, calcul (en voile et en fractionné), nuance de la famille, icône (devinée du nom tant qu'on n'en choisit pas). */
+/** Ajout d'une activité : nom, famille, calcul, nuance de la famille, icône (devinée du nom tant qu'on n'en choisit pas). */
 function AddActivityForm({
   activities, onAdd,
 }: {

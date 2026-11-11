@@ -103,15 +103,14 @@ import { createListeners } from './createStore';
  * d'en-tête de plus, service jamais relancé, un segment neuf à la position suivante. Application tuée et rouverte peu
  * après : « Continuer l'enregistrement » dans la carte de la session en attente (`continuePendingSession`).
  *
- * Toute session a des positions : la muscu (session à la ceinture seule), le compteur d'intervalles et les tests
- * guidés sont partis avec l'Entraînement (lot 302). Le journal d'une muscu coupée par une version d'avant est mis de
- * côté (`setJournalAside`) ; les lignes de FC seule, de séances et de test d'un vieux journal sont ignorées.
+ * Toute session a des positions. Un journal sans position est mis de côté (`setJournalAside`) ; ses lignes de FC
+ * seule sont ignorées.
  */
 
 export type RecorderStatus = 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
 
 /** Session terminée, pas encore rangée : l'utilisateur doit l'analyser ou la jeter. */
-export interface PendingSession {
+interface PendingSession {
   fileName: string;
   /** Le GPX lui-même, pour le ranger ou le télécharger sans le reconstruire. */
   content: string;
@@ -132,7 +131,7 @@ export interface PendingSession {
 }
 
 /** Session rangée par « Analyser ». */
-export interface SavedSession {
+interface SavedSession {
   fileName: string;
   /** Nom dans la mémoire, `null` si la session n'a pas pu y entrer (en attente, ou aucune mémoire). */
   libraryFile: string | null;
@@ -664,7 +663,7 @@ export const isRecordingActive = (): boolean => isBusy();
  * dit ; `blocked` : journal illisible resté en place, qu'aucun départ ne doit
  * écraser.
  */
-export type JournalRecovery = 'free' | 'setAside' | 'blocked';
+type JournalRecovery = 'free' | 'setAside' | 'blocked';
 
 /**
  * Met de côté le journal d'une session interrompue qui ne se reprend pas,
@@ -965,7 +964,7 @@ const resetSession = (init: { source: LocationSource | null; profile: RecordingP
  * Démarre un enregistrement. `motion` : capter l'accéléromètre et le gyroscope
  * (sauts, pumping en surf), avec l'emplacement du téléphone et le foil ; si les capteurs ne démarrent pas, l'enregistrement
  * continue sans eux, et le dit. `heartRate` : la ceinture cardio à joindre ; de même, sans elle si elle ne répond pas.
- * Un calcul sans position (muscu, retirée au lot 302) est refusé.
+ * Un calcul sans position est refusé.
  */
 export const startRecording = exclusive(async (
   activity: Activity,
@@ -1148,7 +1147,7 @@ export const resumeRecording = exclusive(async (): Promise<void> => {
  * journal : une session récupérée après un plantage garde l'activité choisie.
  * La source GPS n'est pas relancée (elle garde les réglages du départ),
  * pour ne pas risquer un trou dans la trace. Jamais vers un calcul sans
- * position (muscu, retirée au lot 302) : la session perdrait sa trace.
+ * position : la session perdrait sa trace.
  */
 export const changeRecordingActivity = (activity: Activity): void => {
   // Pas pendant le démarrage : l'en-tête du journal n'est peut-être pas encore écrit.

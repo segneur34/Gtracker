@@ -11,8 +11,7 @@ import { isNativeApp } from './runtime';
  * (`playPattern` : zone visée, test de FC repos, « Écouter » de Réglages), le
  * retour du bouton « Note » (`buzz`) et la veille du GPS et de la ceinture de
  * l'enregistrement (`armGpsWatch`, lot 115). La hauteur de tous les sons se
- * règle d'un coup (`setBeepPitch`, 24/10). Le compteur du fractionné et son
- * service sont partis avec l'Entraînement (lot 302).
+ * règle d'un coup (`setBeepPitch`, 24/10).
  *
  * Sur le téléphone, un greffon Android tient le rythme sur un fil à lui :
  * écran éteint, les minuteries de la WebView sont bridées (point 40), pas
@@ -39,7 +38,7 @@ export interface Beeper {
 }
 
 /** Un son d'un motif, après `delayMs` : bref, court, long, ou le long double. */
-export interface ClockTone {
+export interface PatternTone {
   delayMs: number;
   tone: ToneKind;
 }
@@ -51,7 +50,7 @@ interface BeeperPlugin {
   finished(options: { vibrate: boolean }): Promise<void>;
   stop(): Promise<void>;
   buzz(options: { durationMs: number }): Promise<void>;
-  pattern(options: { tones: ClockTone[]; vibrate: boolean }): Promise<void>;
+  pattern(options: { tones: PatternTone[]; vibrate: boolean }): Promise<void>;
   setPitch(options: { hz: number }): Promise<void>;
   watchGps(options: { delayMs: number }): Promise<void>;
   unwatchGps(): Promise<void>;
@@ -72,7 +71,7 @@ const nativeBeeper: Beeper = {
 /** Hauteur des bips du navigateur, en hertz : celle choisie dans Réglages, reçue par `setBeepPitch`. */
 let browserHz = 2000;
 
-/** Contexte audio du navigateur, partagé par les bips et le compteur. */
+/** Contexte audio du navigateur, partagé par les bips. */
 let browserAudio: AudioContext | null = null;
 
 /** Une note du navigateur, à `hz`, dans `atMs` millisecondes, sans journal. */
@@ -159,11 +158,11 @@ const createBrowserBeeper = (): Beeper => {
 };
 
 /**
- * Un motif joué une fois, chaque son à son délai : ne touche ni au rythme des
- * balises ni au programme du compteur. Sur le téléphone, joué sur le fil des
+ * Un motif joué une fois, chaque son à son délai : ne touche pas au rythme des
+ * balises. Sur le téléphone, joué sur le fil des
  * bips, écran éteint compris tant qu'un service garde le processeur éveillé.
  */
-export const playPattern = (tones: ClockTone[], vibrate: boolean): Promise<void> => {
+export const playPattern = (tones: PatternTone[], vibrate: boolean): Promise<void> => {
   if (isNativeApp()) return nativePlugin.pattern({ tones, vibrate });
   for (const t of tones) {
     const play = () => browserTone(TONE_MS[t.tone], vibrate, t.tone);

@@ -1,14 +1,14 @@
 import { createStore, type Store } from './createStore';
 
 /** État d'une liste lue une fois pour toutes les pages qui la montrent. */
-export interface LoadedList<T> {
+interface LoadedList<T> {
   items: T[];
   /** Vrai dès qu'une lecture a abouti pour la mémoire en cours : avant, le nombre d'éléments n'est pas connu. */
   loaded: boolean;
   error: string | null;
 }
 
-export interface LoadedListStore<T> {
+interface LoadedListStore<T> {
   store: Store<LoadedList<T>>;
   /**
    * Lit la liste si ce n'est pas déjà fait pour `key` (la mémoire ouverte, son

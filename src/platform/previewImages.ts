@@ -111,7 +111,7 @@ const cacheUrl = (name: string): string => `${CACHE_PATH}${name}.png`;
 const INDEX_URL = `${CACHE_PATH}_index.json`;
 
 /** Images dans le Cache API de `storage` (`null` : sans cache, rien n'est gardé). */
-export const createCachePreviewImageBackend = (storage: Pick<CacheStorage, 'open'> | null): PreviewImageBackend => {
+const createCachePreviewImageBackend = (storage: Pick<CacheStorage, 'open'> | null): PreviewImageBackend => {
   const openCache = async (): Promise<Cache | null> => {
     try {
       return storage ? await storage.open(CACHE_NAME) : null;

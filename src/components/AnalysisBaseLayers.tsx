@@ -25,8 +25,7 @@ function ZoomPathLayer({ source }: { source: ZoomPathSource }) {
 }
 
 /**
- * Couches de la carte communes aux analyses (voile, course, vélo, fractionné,
- * surf), dans leur ordre de pose, qui fait le dessus et le dessous : le fond
+ * Couches de la carte communes aux analyses (voile, surf), dans leur ordre de pose, qui fait le dessus et le dessous : le fond
  * de carte, puis celles du sport (`children` : trace colorée, surbrillances
  * propres), la zone cardiaque montrée, le tronçon du graphe zoomé, les
  * fanions des repères et le point survolé des graphes, au-dessus de tout.

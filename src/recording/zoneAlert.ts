@@ -65,11 +65,11 @@ export const validBand = (band: HeartBand | null | undefined): band is HeartBand
   return band.minBpm === null || band.maxBpm === null || band.minBpm <= band.maxBpm;
 };
 
-/** Signal de zone : les sons du test guidé (`TEST_SIGNAL_TONES`). */
+/** Signal de zone : les sons du test guidé (`GUIDE_SIGNAL_TONES`). */
 export type ZoneSignal = 'trop' | 'accelere' | 'bien';
 
 /** Délais des signaux, en secondes. */
-export interface ZoneAlertDelays {
+interface ZoneAlertDelays {
   /** Temps hors zone avant le premier signal. */
   firstDelayS: number;
   /** Écart entre le premier et le deuxième signal. */
@@ -82,7 +82,7 @@ export interface ZoneAlertDelays {
   minGapS: number;
 }
 
-export const ZONE_ALERT_DEFAULTS: ZoneAlertDelays = { firstDelayS: 10, secondDelayS: 40, repeatEveryS: 60, repeatCount: 3, minGapS: 3 };
+const ZONE_ALERT_DEFAULTS: ZoneAlertDelays = { firstDelayS: 10, secondDelayS: 40, repeatEveryS: 60, repeatCount: 3, minGapS: 3 };
 
 export interface ZoneAlertParams extends ZoneAlertDelays {
   /** Lissage de la FC, en secondes (profil du calcul, `heartRate.smoothS`). */
@@ -179,7 +179,7 @@ export const stepZoneAlert = (
   while (window.length > 1 && window[1].activeMs <= fromMs) window.shift();
   const next: ZoneAlertState = { ...base, window, lastTimeMs: timeMs };
 
-  const smoothed = windowMean(window, 'hrBpm', params.smoothS, timeMs);
+  const smoothed = windowMean(window, params.smoothS, timeMs);
   if (smoothed === null) return { state: next, signal: null };
 
   const bpmNow = Math.round(smoothed);

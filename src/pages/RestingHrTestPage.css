@@ -1,14 +1,12 @@
-/* Page du test de FC repos (sous le Profil depuis le lot 301) : règles reprises des pages de l'Entraînement, retirées au lot 302. */
+/* Page du test de FC repos (sous le Profil). */
 
-/* Boutons d'action et aides en orange, celui de l'ancienne famille Entraînement (27/10), gardé tel quel dans les deux
-   thèmes depuis le retrait de cette famille (lot 305). */
-.train-page {
-  --test-accent: #c25700;
-  --btn-accent: var(--test-accent);
+/* Boutons d'action et aides en orange (`--rest-accent`, `theme/tokens.css`). */
+.rest-page {
+  --btn-accent: var(--rest-accent);
 }
 
 /* Boutons d'action sous le déroulé. */
-.train-actions {
+.rest-buttons {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -16,7 +14,7 @@
 }
 
 /* Mesures précédentes : une liste de cartes. */
-.train-list {
+.rest-history {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -25,13 +23,14 @@
   list-style: none;
 }
 
-.train-item {
+.rest-history__item {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  align-items: flex-start;
 }
 
-.train-item__text {
+.rest-history__text {
   display: flex;
   flex: 1 1 14rem;
   flex-direction: column;
@@ -39,18 +38,18 @@
   min-width: 0;
 }
 
-.train-item__name {
+.rest-history__name {
   font-weight: 700;
   overflow-wrap: normal;
 }
 
-.train-item__detail {
+.rest-history__detail {
   color: var(--muted);
   font-size: var(--text-s);
   overflow-wrap: anywhere;
 }
 
-.train-item__actions {
+.rest-history__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -58,7 +57,7 @@
 }
 
 /* Déroulé du protocole. */
-.fit-steps {
+.rest-steps {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -113,10 +112,6 @@
 .rest-chart {
   margin: var(--space-2) 0;
   min-width: 0;
-}
-
-.rest-history__item {
-  align-items: flex-start;
 }
 
 .rest-history__chart {

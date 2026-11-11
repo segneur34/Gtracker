@@ -13,7 +13,7 @@ import { imuFileName, isGpxFileName, recordFileName } from './record';
  */
 
 /** Suffixe des temporaires, celui de `writeAtomically`. */
-export const PENDING_TEMP_SUFFIX = '.tmp';
+const PENDING_TEMP_SUFFIX = '.tmp';
 
 const isImuFileName = (name: string): boolean => /\.imu$/i.test(name);
 const isRecordName = (name: string): boolean => /\.json$/i.test(name);
@@ -25,7 +25,7 @@ const gpxOfImu = (imuName: string): string => imuName.replace(/\.imu$/i, '') + '
 const gpxOfRecord = (recordName: string): string => recordName.replace(/\.json$/i, '') + '.gpx';
 
 /** GPX sans son `.gpx`, à lire : session à reprendre si elle est complète. */
-export interface PendingTempSession {
+interface PendingTempSession {
   /** Le temporaire, `<nom>.gpx.tmp`. */
   temp: string;
   /** Le GPX qu'il devait devenir. */

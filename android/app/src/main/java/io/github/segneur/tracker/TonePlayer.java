@@ -13,8 +13,8 @@ import android.os.VibratorManager;
 
 /**
  * Sons et vibrations des bips (BeeperPlugin : balises, zone visée, test de FC
- * repos, « Écouter ») : un bip bref, un bip court, un bip long, et le long
- * double, chacun avec sa vibration ; et les sons « GPS perdu » et « FC perdue »
+ * repos, « Écouter ») : un bip bref, un bip court et un bip long, chacun avec
+ * sa vibration ; et les sons « GPS perdu » et « FC perdue »
  * de l'enregistrement (BeeperPlugin.watchGps, lot 115).
  *
  * Le son passe par le flux des alarmes : audible téléphone en silencieux, au
@@ -28,30 +28,26 @@ import android.os.VibratorManager;
  */
 final class TonePlayer {
 
-    /** Genre d'un son d'un motif (`ToneKind` de src/core/beepDurations.ts) : court, long, long double, bref. */
+    /** Genre d'un son d'un motif (`ToneKind` de src/core/beepDurations.ts) : court, long, bref. */
     static final int TONE_SHORT = 0;
     static final int TONE_LONG = 1;
-    static final int TONE_FINAL = 2;
     static final int TONE_BRIEF = 3;
 
-    /** Genre d'un son nommé par la couche web (« court », « long », « final », « bref ») ; court à défaut. */
+    /** Genre d'un son nommé par la couche web (« court », « long », « bref ») ; court à défaut. */
     static int toneKind(String tone) {
         if ("long".equals(tone)) return TONE_LONG;
-        if ("final".equals(tone)) return TONE_FINAL;
         if ("bref".equals(tone)) return TONE_BRIEF;
         return TONE_SHORT;
     }
 
-    /** Durées, en millisecondes : bip bref, bip court, bip long, long double (comme src/platform/beeper.ts). */
+    /** Durées, en millisecondes : bip bref, bip court, bip long (comme src/platform/beeper.ts). */
     static final int BRIEF_MS = 65;
     static final int SHORT_MS = 120;
     static final int LONG_MS = 800;
-    static final int FINAL_MS = 1600;
-    /** Vibrations, en millisecondes : avec un bip court, avec un bip long, avec le long double. */
+    /** Vibrations, en millisecondes : avec un bip bref, avec un bip court, avec un bip long. */
     static final int BRIEF_VIBRATION_MS = 40;
     static final int SHORT_VIBRATION_MS = 80;
     static final int LONG_VIBRATION_MS = 600;
-    static final int FINAL_VIBRATION_MS = 1300;
     /**
      * « GPS perdu » (comme src/core/beepDurations.ts) : deux notes
      * descendantes, la hauteur réglée puis ses 2/3, en millisecondes, jouées
@@ -83,7 +79,6 @@ final class TonePlayer {
     private AudioTrack briefTone;
     private AudioTrack shortTone;
     private AudioTrack longTone;
-    private AudioTrack finalTone;
     private AudioTrack gpsLostTone;
     private AudioTrack beltLostTone;
     /** Hauteur des sons synthétisés de cette instance. */
@@ -139,12 +134,6 @@ final class TonePlayer {
         play(longTone, vibrate ? LONG_VIBRATION_MS : 0);
     }
 
-    void playFinal(boolean vibrate) {
-        ensurePitch();
-        if (finalTone == null) finalTone = buildTone(FINAL_MS, builtHz);
-        play(finalTone, vibrate ? FINAL_VIBRATION_MS : 0);
-    }
-
     /** « GPS perdu » : un seul son synthétisé (les quatre notes et le silence), avec sa vibration en deux temps. */
     void playGpsLost() {
         ensurePitch();
@@ -165,13 +154,11 @@ final class TonePlayer {
         if (briefTone != null) briefTone.release();
         if (shortTone != null) shortTone.release();
         if (longTone != null) longTone.release();
-        if (finalTone != null) finalTone.release();
         if (gpsLostTone != null) gpsLostTone.release();
         if (beltLostTone != null) beltLostTone.release();
         briefTone = null;
         shortTone = null;
         longTone = null;
-        finalTone = null;
         gpsLostTone = null;
         beltLostTone = null;
     }

@@ -17,7 +17,7 @@ import SessionEndGear from '../components/SessionEndGear';
 import { IconFlag, IconLock, IconPause, IconPlay, IconRoute } from '../components/icons';
 import { parseGpx } from '../core/gpxParser';
 import {
-  FAMILY_ACCENT, FAMILY_LABEL, FAMILY_SHADES, activitiesOfFamily, activityFamily, type Activity,
+  FAMILY_ACCENT, FAMILY_LABEL, FAMILY_OF, FAMILY_SHADES, activitiesOfFamily, activityFamily, type Activity,
 } from '../core/activities';
 import {
   sportFamily, sportTreatment, usesMarkCourse, type SportFamily,
@@ -36,7 +36,7 @@ import { setBeepsMuted, skipMark, useMarkGuide } from '../hooks/useMarkGuide';
 import { usePerActivityChoice } from '../hooks/usePerActivityChoice';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { usePhoneLandscape } from '../hooks/useNarrowScreen';
-import { readHeartRateZoneBounds } from '../hooks/useRunnerProfile';
+import { readHeartRateZoneBounds } from '../hooks/useAthleteProfile';
 import {
   effectiveDistanceUnit, effectiveFoil, effectiveHeartRate, effectiveJumpSettings, effectiveLiveFields, effectivePumping, effectiveSpeedUnit, effectiveStopHoldMs, effectiveTurns, lastRecordActivity, rememberRecordActivity, useVisibility,
 } from '../hooks/useSportSettings';
@@ -86,10 +86,6 @@ import './RecordingPage.css';
  * une à une, avec des bips d'approche (`useMarkGuide`), et l'avancement se
  * compte par balises.
  *
- * L'Entraînement (compteur d'intervalles, chrono, tests guidés, muscu, course
- * à bornes) est retiré de cette version voile et surf (lot 302) : toute
- * session a des positions ; la ceinture, la zone visée et les balises restent.
- *
  * Dans le navigateur, une source « rejeu » relit un GPX en accéléré : toute la
  * chaîne s'éprouve sur le PC, jusqu'à l'analyse de la session obtenue.
  */
@@ -126,10 +122,6 @@ const BpmTile = ({ belt, target }: { belt: { state: BeltState; bpm: number | nul
 };
 
 const STAT_GRID = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 'var(--space-2)' } as const;
-
-/** Nom d'une famille dans « Aucune activité … ». */
-const FAMILY_NOUN: Record<SportFamily, string> = { voile: 'voile', surf: 'de surf' };
-
 
 /** Distance restante et part faite de la trace suivie ; « à rejoindre » tant qu'on ne l'a pas rejointe. */
 const followStatItems = (activity: Activity, progress: FollowProgress | null, totalM: number): { label: string; value: string }[] => {
@@ -193,16 +185,16 @@ const liveStatItems = (activity: Activity, live: LiveStats, options: LiveStatsOp
     return [
       ...options.topDurationsS.map((d, i) => ({
         label: `Top ${d} s (${recentWindowLabel(options)})`,
-        value: formatSpeed(live.recentTopsMs[i] ?? null, unit, distanceUnit),
+        value: formatSpeed(live.recentTopsMs[i] ?? null, unit),
       })),
       { label: 'Distance', value: formatDistance(live.distanceM, distanceUnit) },
     ];
   }
   // Surf.
   return [
-    { label: 'Vitesse', value: formatSpeed(live.currentSpeedMs, unit, distanceUnit) },
+    { label: 'Vitesse', value: formatSpeed(live.currentSpeedMs, unit) },
     // Sur toute la trace : pas la « Vitesse max » de l'analyse, celle d'une vague, que le direct ne détecte pas.
-    { label: liveFieldLabel('max', { speedUnit: unit, distanceUnit, options }), value: formatSpeed(live.maxSpeedMs, unit, distanceUnit) },
+    { label: liveFieldLabel('max', { speedUnit: unit, distanceUnit, options }), value: formatSpeed(live.maxSpeedMs, unit) },
     { label: 'Distance', value: formatDistance(live.distanceM, distanceUnit) },
   ];
 };
@@ -219,7 +211,6 @@ const formatLegDuration = (ms: number): string => {
  */
 const LegCard = ({ title, leg, empty, activity }: { title: string; leg: LiveLeg | null; empty: string; activity: Activity }) => {
   const unit = effectiveSpeedUnit(activity);
-  const distanceUnit = effectiveDistanceUnit(activity);
   const detail = leg
     ? `${leg.headingDeg === null ? 'cap —' : `cap ${roundBearingDeg(leg.headingDeg)}°`} · ${formatLegDuration(leg.endMs - leg.startMs)}`
     : empty;
@@ -230,8 +221,8 @@ const LegCard = ({ title, leg, empty, activity }: { title: string; leg: LiveLeg 
         <span className="num ui-muted ui-text-s">{detail}</span>
       </div>
       <div className="rec-leg-grid">
-        <Stat label="Moyenne" value={formatSpeed(leg?.averageSpeedMs ?? null, unit, distanceUnit)} />
-        <Stat label={`Max (${LIVE_LEG_DEFAULTS.topDurationS} s)`} value={formatSpeed(leg?.maxSpeedMs ?? null, unit, distanceUnit)} />
+        <Stat label="Moyenne" value={formatSpeed(leg?.averageSpeedMs ?? null, unit)} />
+        <Stat label={`Max (${LIVE_LEG_DEFAULTS.topDurationS} s)`} value={formatSpeed(leg?.maxSpeedMs ?? null, unit)} />
       </div>
     </div>
   );
@@ -477,7 +468,7 @@ function RecordingFigures({ summaryShown, clockShown, liveActivity, followed, co
           <div className="rec-belt-stop">
             <span className="ui-muted">Sans elle, l'enregistrement continue, sans cardio.</span>
             <Button size="s" onClick={() => {
-              // Sans retour possible pendant la sortie : un appui par mégarde, en courant, ne doit pas suffire.
+              // Sans retour possible pendant la sortie : un appui par mégarde, en navigation, ne doit pas suffire.
               if (window.confirm("Arrêter de chercher la ceinture ? L'enregistrement continue sans cardio jusqu'à la fin de la sortie.")) stopRecordingBeltSearch();
             }}>Arrêter de chercher</Button>
           </div>
@@ -725,13 +716,11 @@ function RecordingScreen() {
   /** Ce que mesurent les capteurs pendant l'enregistrement : sauts (pumping et virages en surf, sauts et pumping en voile sur foil). */
   const motionWhat = (() => {
     const setup = motionSetup;
-    const what: string[] = [];
     const treatment = liveActivity ? sportTreatment(liveActivity.base) : null;
     const pumpingToo = treatment === 'voile' && setup?.foil === true && liveActivity !== null && effectivePumping(liveActivity) === true;
     // Pumping seul en voile : les sauts n'ont pas été mesurés (case de Réglages ou de l'enregistrement décochée).
     const surfWhat = measurePumping && measureTurns ? 'Pumping et virages' : measureTurns ? 'Virages' : 'Pumping';
-    if (setup?.jumps !== false) what.push(treatment === 'surf' ? surfWhat : pumpingToo ? (measureJumps ? 'Sauts et pumping' : 'Pumping') : 'Sauts');
-    return what.join(' et ');
+    return treatment === 'surf' ? surfWhat : pumpingToo ? (measureJumps ? 'Sauts et pumping' : 'Pumping') : 'Sauts';
   })();
 
   const handleStart = () => {
@@ -743,10 +732,10 @@ function RecordingScreen() {
       : deviceLocationSource();
     const capture = motionCaps?.available === true && sourceChoice === 'device';
     const motion = capture && measureJumps && jumpSettings
-      ? { placement: jumpSettings.placement, foil: effectiveFoil(chosen) ?? false, jumps: true }
+      ? { placement: jumpSettings.placement, foil: effectiveFoil(chosen) ?? false }
       : capture && (measurePumping || measureTurns)
         // Pumping et virages : une seule capture, téléphone sur la poitrine.
-        ? { placement: 'poitrine' as const, foil: effectiveFoil(chosen) ?? false, jumps: true }
+        ? { placement: 'poitrine' as const, foil: effectiveFoil(chosen) ?? false }
         : null;
     const heartRate = native && sourceChoice === 'device' && measureHeartRate ? belt : null;
     void beltWarmup.handOver(() => startRecording(chosen, source, { motion, heartRate }));
@@ -769,7 +758,7 @@ function RecordingScreen() {
           </div>
           {familyActivities.length === 0 && (
             <div className="ui-alert ui-alert--warning">
-              Aucune activité {FAMILY_NOUN[family]} : ajoutez-en une dans <Link to="/parametres">Réglages</Link>.
+              Aucune activité {FAMILY_OF[family]} : ajoutez-en une dans <Link to="/parametres">Réglages</Link>.
             </div>
           )}
 

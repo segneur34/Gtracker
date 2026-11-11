@@ -45,7 +45,7 @@ export const IconSurf = ({ size = 24, ...props }: IconProps) => (
   </svg>
 );
 
-/** Cœur traversé d'un pouls : les tests de l'Entraînement (FC max). */
+/** Cœur traversé d'un pouls : l'icône du cardio. */
 export const IconPulse = ({ size = 24, ...props }: IconProps) => (
   <svg {...strokeProps(size)} {...props}>
     <path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z" />
@@ -249,7 +249,7 @@ export const IconLock = ({ size = 24, open = false, ...props }: IconProps & { op
   </svg>
 );
 
-/* Icônes d’activité (core/activityIcons.ts) : la course reprend IconRun. */
+/* Icônes d’activité (core/activityIcons.ts). */
 
 /** Voilier : mât, grand-voile, foc et coque. */
 export const IconSailboat = ({ size = 24, ...props }: IconProps) => (
@@ -383,15 +383,6 @@ export const IconFace = ({ mood, size = 24, ...props }: IconProps & { mood: Face
 export const IconCheck = ({ size = 20, ...props }: IconProps) => (
   <svg {...strokeProps(size)} {...props}>
     <path d="M5 12.5l4.5 4.5L19 7" />
-  </svg>
-);
-
-/** Livre ouvert : les tutoriels. */
-export const IconBook = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <path d="M12 6.5C10 5 7 4.5 3 5v13c4-.5 7 0 9 1.5" />
-    <path d="M12 6.5C14 5 17 4.5 21 5v13c-4-.5-7 0-9 1.5" />
-    <path d="M12 6.5v13" />
   </svg>
 );
 

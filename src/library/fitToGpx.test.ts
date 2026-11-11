@@ -10,7 +10,7 @@ const T0 = Date.UTC(2026, 9, 10, 10, 0, 0);
 
 /** Point à la seconde `s` d'une trace rectiligne à vitesse fixe, position et mesures comprises. */
 const point = (s: number, speedMs = 3): FitPointSpec => ({
-  timeMs: T0 + s * 1000, lat: 43.5 + (s * speedMs) / 111_195, lon: 3.9, altitudeM: 12.4, speedMs, hr: 150, cadence: 85, distanceM: 999_000 + s,
+  timeMs: T0 + s * 1000, lat: 43.5 + (s * speedMs) / 111_195, lon: 3.9, altitudeM: 12.4, speedMs, hr: 150, distanceM: 999_000 + s,
 });
 
 const seconds = (n: number, step = 1): FitPointSpec[] => Array.from({ length: n }, (_, k) => point(k * step));
@@ -26,7 +26,6 @@ describe('du FIT au GPX, relu par parseGpx', () => {
     const parsed = parseGpx(gpxOf(buildFitActivity({ points: seconds(3) })));
     expect(parsed.rawPoints).toHaveLength(3);
     expect(parsed.hasDeviceSpeed).toBe(true);
-    expect(parsed.timedPoints).toEqual([]);
     const [p] = parsed.rawPoints;
     expect(p.lat).toBeCloseTo(43.5, 6);
     expect(p.lon).toBeCloseTo(3.9, 6);
@@ -36,15 +35,10 @@ describe('du FIT au GPX, relu par parseGpx', () => {
     expect(p.hr).toBe(150);
   });
 
-  it('la cadence du FIT n\'est plus écrite (course et vélo retirés, lot 303)', () => {
-    const parsed = parseGpx(gpxOf(buildFitActivity({ points: [point(0), { ...point(1), cadence: 171 }, { ...point(2), cadence: 85, fractionalCadence: 64 }] })));
-    expect(parsed.rawPoints.map((p) => p.cadence)).toEqual([undefined, undefined, undefined]);
-  });
-
   it('un point sans mesure n\'écrit pas sa mesure', () => {
     const parsed = parseGpx(gpxOf(buildFitActivity({ points: [{ timeMs: T0, lat: 43.5, lon: 3.9 }, { timeMs: T0 + 1000, lat: 43.5001, lon: 3.9 }] })));
     expect(parsed.hasDeviceSpeed).toBe(false);
-    expect(parsed.rawPoints[0]).toMatchObject({ hr: undefined, cadence: undefined, speedMs: undefined, ele: undefined });
+    expect(parsed.rawPoints[0]).toMatchObject({ hr: undefined, speedMs: undefined, ele: undefined });
   });
 
   it('la distance du FIT n\'entre pas dans le GPX : celle de la session reste l\'intégrale de la vitesse (règle 6)', () => {
@@ -60,7 +54,6 @@ describe('du FIT au GPX, relu par parseGpx', () => {
     const { lat: _lat, lon: _lon, ...noFix } = point(1);
     const parsed = parseGpx(gpxOf(buildFitActivity({ points: [point(0), noFix, point(2)] })));
     expect(parsed.rawPoints.map((p) => p.rawTimeMs)).toEqual([T0, T0 + 2000]);
-    expect(parsed.timedPoints).toEqual([]);
   });
 
   it('nomme la session comme un enregistrement', () => {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { axisRangePath, type XRange } from '../core/chartZoom';
 import { trackBounds, type TrackBounds } from '../core/displayConfig';
 import { currentZoomView, type ChartZoomSource } from './useChartZoom';
-import type { HighlightKeys, MapHighlight } from './useMapHighlight';
+import type { MapHighlight } from './useMapHighlight';
 
 /** Demande de cadrage de la carte (`AnalysisMap`, prop `focus`) : un objet neuf à chaque demande. */
 export interface MapFocus {
@@ -10,7 +10,7 @@ export interface MapFocus {
 }
 
 /** Graphe d'un onglet : son zoom, et la valeur de son axe en chaque point de la trace (distance affichée, minutes). */
-export interface ZoomedChart {
+interface ZoomedChart {
   zoom: ChartZoomSource;
   axis: ArrayLike<number>;
 }
@@ -29,7 +29,7 @@ export interface ZoomPathSource {
   whole: boolean;
 }
 
-export interface ZoomOnMap<P extends string> {
+interface ZoomOnMap<P extends string> {
   /** Tronçon montré en violet : la partie vue du graphe montré (plage zoomée, ou toute la trace), `null` sinon. */
   path: ZoomPathSource | null;
   /** Dernier cadrage demandé, tant que le tronçon est montré. */
@@ -63,10 +63,10 @@ export interface ZoomOnMap<P extends string> {
  * cadre dessus. Le retour d'Android referme le plein écran (`AnalysisMap`) ;
  * en sortir (`closeCompanion`) retire aussi le tronçon violet, le zoom reste.
  */
-export const useZoomOnMap = <P extends string, T extends HighlightKeys<P> = Record<never, never>>({
+export const useZoomOnMap = <P extends string>({
   highlight, points, charts, narrow, mapAnchorId, mapExpanded, openMap,
 }: {
-  highlight: MapHighlight<P, T>;
+  highlight: MapHighlight<P>;
   points: ReadonlyArray<{ lat: number; lon: number }>;
   /** Graphe zoomable de chaque onglet qui a « Afficher ». */
   charts: Partial<Record<P, ZoomedChart>>;

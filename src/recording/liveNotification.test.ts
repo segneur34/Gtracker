@@ -37,13 +37,7 @@ describe('liveNotification', () => {
     expect(n.title).toBe('Wingfoil');
     expect(n.text).toBe('Vit. 36,0 km/h · Dist. 12,35 km');
     expect(n.lines).toEqual(['Vitesse : 36,0 km/h', 'Distance : 12,35 km']);
-    expect(n.chrono).toEqual({ baseMs: NOW - 3_725_000, countDown: false });
-  });
-
-  it("parle d'allure en min/km", () => {
-    const n = liveNotification(input({ fields: ['speed'], context: context({ speedUnit: 'minkm' }) }));
-    expect(n.text.startsWith('Allure ')).toBe(true);
-    expect(n.lines[0].startsWith('Allure : ')).toBe(true);
+    expect(n.chrono).toEqual({ baseMs: NOW - 3_725_000 });
   });
 
   it('dit la moyenne active en voile et en surf, la moyenne ailleurs', () => {
@@ -71,13 +65,13 @@ describe('liveNotification', () => {
   it('en pause automatique, le chronomètre continue', () => {
     const n = liveNotification(input({ paused: 'auto' }));
     expect(n.title).toBe('Wingfoil · pause auto');
-    expect(n.chrono?.countDown).toBe(false);
+    expect(n.chrono).not.toBeNull();
   });
 
   it('GPS perdu : dit au titre, le chronomètre continue (lot 115)', () => {
     const n = liveNotification(input({ gpsLost: true }));
     expect(n.title).toBe('Wingfoil · GPS perdu');
-    expect(n.chrono?.countDown).toBe(false);
+    expect(n.chrono).not.toBeNull();
     expect(liveNotification(input({ gpsLost: true, paused: 'auto' })).title).toBe('Wingfoil · GPS perdu · pause auto');
     expect(liveNotification(input({ beltLost: true })).title).toBe('Wingfoil · FC perdue');
     expect(liveNotification(input({ gpsLost: true, beltLost: true })).title).toBe('Wingfoil · GPS perdu · FC perdue');
@@ -103,9 +97,9 @@ describe('liveNotificationKey', () => {
 });
 
 describe('notificationStateKey (lot 67, sortie de recordingNotification)', () => {
-  /** Copie gelée de l'ancienne clé du service (`stateKeyNow`), sur les mêmes lectures. */
+  /** Clé reconstruite à la main, sur les mêmes lectures. */
   const oldKey = (status: string, pausedReason: 'manual' | 'auto' | null, activity: { id: string } | null, computed: boolean): string =>
-    `${status}|${pausedReason ?? ''}|${activity?.id ?? ''}||${computed}`;
+    `${status}|${pausedReason ?? ''}|${activity?.id ?? ''}|${computed}`;
   const cases: [string, 'manual' | 'auto' | null, string | null, boolean][] = [
     ['recording', null, 'kite', true],
     ['paused', 'auto', 'kite', true],
@@ -122,7 +116,7 @@ describe('notificationStateKey (lot 67, sortie de recordingNotification)', () =>
   it('change avec la pause et le premier calcul', () => {
     const key = (patch: Partial<Parameters<typeof notificationStateKey>[0]>) =>
       notificationStateKey({ status: 'recording', pausedReason: null, gpsLost: false, beltLost: false, activityId: 'kite', computed: true, ...patch });
-    expect(key({})).toBe('recording||kite||true');
+    expect(key({})).toBe('recording||kite|true');
     expect(key({ status: 'paused', pausedReason: 'auto' })).not.toBe(key({ status: 'paused', pausedReason: 'manual' }));
     expect(key({ computed: false })).not.toBe(key({}));
   });
@@ -131,6 +125,6 @@ describe('notificationStateKey (lot 67, sortie de recordingNotification)', () =>
     const key = (gpsLost: boolean) =>
       notificationStateKey({ status: 'recording', pausedReason: null, gpsLost, beltLost: false, activityId: 'kite', computed: true });
     expect(key(true)).not.toBe(key(false));
-    expect(key(false)).toBe('recording||kite||true');
+    expect(key(false)).toBe('recording||kite|true');
   });
 });

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { FAMILY_ACCENT } from '../core/activities';
 import { ACTIVITY_ICON_IDS, ACTIVITY_ICON_LABEL, type ActivityIconId } from '../core/activityIcons';
 import type { SportFamily } from '../core/sportProfiles';
-import { AVATAR_PHOTO_PX, type RunnerAvatar } from '../library/athleteProfile';
+import { AVATAR_PHOTO_PX, type AthleteAvatar } from '../library/athleteProfile';
 import { pushBackLayer } from '../platform/backButton';
 import { readPickedImage } from '../platform/files';
 import ActivityArt from './activityArt';
@@ -34,7 +34,7 @@ const ArtDisc = ({ icon, color }: AvatarFallback) => (
   </span>
 );
 
-export function ProfileAvatar({ avatar, fallback }: { avatar: RunnerAvatar | null; fallback: AvatarFallback | null }) {
+export function ProfileAvatar({ avatar, fallback }: { avatar: AthleteAvatar | null; fallback: AvatarFallback | null }) {
   if (avatar?.kind === 'photo') return <img className="profile-avatar__photo" src={avatar.dataUrl} alt="" />;
   if (avatar?.kind === 'dessin') return <ArtDisc icon={avatar.icon} color={FAMILY_ACCENT[ICON_FAMILY[avatar.icon]]} />;
   if (fallback) return <ArtDisc {...fallback} />;
@@ -51,8 +51,8 @@ export function ProfileAvatar({ avatar, fallback }: { avatar: RunnerAvatar | nul
  * une fois le choix fait.
  */
 export function AvatarPicker({ avatar, onPick, onClose }: {
-  avatar: RunnerAvatar | null;
-  onPick: (avatar: RunnerAvatar | null) => void;
+  avatar: AthleteAvatar | null;
+  onPick: (avatar: AthleteAvatar | null) => void;
   onClose: () => void;
 }) {
   const input = useRef<HTMLInputElement>(null);

@@ -107,15 +107,14 @@ describe('computeKinematics', () => {
     expect(computeKinematics(points)[1].speedMs).toBe(0);
   });
 
-  it('conserve altitude, fréquence cardiaque et cadence du point brut', () => {
+  it('conserve altitude et fréquence cardiaque du point brut', () => {
     const points: RawTrackPoint[] = [
-      { lat: 43.6, lon: 3.8, time: '2026-01-01T10:00:00Z', ele: 12, hr: 140, cadence: 85 },
-      { lat: 43.6, lon: 3.81, time: '2026-01-01T10:00:01Z', ele: 15, hr: 142, cadence: 86 },
+      { lat: 43.6, lon: 3.8, time: '2026-01-01T10:00:00Z', ele: 12, hr: 140 },
+      { lat: 43.6, lon: 3.81, time: '2026-01-01T10:00:01Z', ele: 15, hr: 142 },
     ];
     const track = computeKinematics(points);
     expect(track[1].ele).toBe(15);
     expect(track[1].hr).toBe(142);
-    expect(track[1].cadence).toBe(86);
   });
 
   it('préfère la vitesse de l\'appareil quand elle existe', () => {

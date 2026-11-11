@@ -12,9 +12,7 @@ import type { TrackPoint } from './types';
 /**
  * Lissage de la vitesse de couleur, en secondes, par traitement. En voile, la
  * vitesse lissée du noyau suffit, et une moyenne effacerait les accélérations
- * courtes ; en surf aussi, où une vague ne dure que quelques secondes. (À pied
- * et à vélo, retirés au lot 305, une moyenne de 15 s rendait lisible une trace
- * que le GPS fait trembler à basse vitesse.)
+ * courtes ; en surf aussi, où une vague ne dure que quelques secondes.
  */
 export const TRACK_COLOR_SMOOTHING_S: Record<Treatment, number> = { voile: 0, surf: 0 };
 

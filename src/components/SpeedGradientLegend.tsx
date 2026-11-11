@@ -1,5 +1,5 @@
 import { SLOW_COLOR, gradientCss, type SpeedRangeMs } from '../core/speedGradient';
-import { formatSpeedValue, speedUnitLabel, toDisplaySpeed, type DistanceUnit, type SpeedUnit } from '../core/units';
+import { SPEED_UNIT_LABEL, formatSpeedValue, toDisplaySpeed, type SpeedUnit } from '../core/units';
 import './SpeedGradientLegend.css';
 
 /**
@@ -15,18 +15,16 @@ import './SpeedGradientLegend.css';
 interface SpeedGradientLegendProps {
   /** Unité d'affichage des bornes. */
   unit: SpeedUnit;
-  /** Unité de distance de l'activité : une allure se lit au kilomètre ou au mille (km par défaut). */
-  distanceUnit?: DistanceUnit;
   /** Bornes en vigueur, en m/s. */
   range: SpeedRangeMs;
   /** Ce que représente le gris sous la borne basse : « marche », « sous le seuil »… */
   slowLabel: string;
 }
 
-function SpeedGradientLegend({ unit, distanceUnit = 'km', range, slowLabel }: SpeedGradientLegendProps) {
-  const low = formatSpeedValue(toDisplaySpeed(range.minMs, unit, distanceUnit), unit);
-  const high = formatSpeedValue(toDisplaySpeed(range.maxMs, unit, distanceUnit), unit);
-  const label = speedUnitLabel(unit, distanceUnit);
+function SpeedGradientLegend({ unit, range, slowLabel }: SpeedGradientLegendProps) {
+  const low = formatSpeedValue(toDisplaySpeed(range.minMs, unit), unit);
+  const high = formatSpeedValue(toDisplaySpeed(range.maxMs, unit), unit);
+  const label = SPEED_UNIT_LABEL[unit];
   const description = `Couleur de la trace (gris : ${slowLabel}), du bleu au rouge de ${low} à ${high} ${label}`;
 
   return (

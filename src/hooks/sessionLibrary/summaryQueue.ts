@@ -50,22 +50,20 @@ export const setSummaryRunner = (run: SummaryRunner | null): void => {
 const MAX_SUMMARY_RETRIES = 2;
 
 /**
- * Vrai si une donnée de la fiche qui change son résumé a changé (calcul, activité, analyse, altitude),
+ * Vrai si une donnée de la fiche qui change son résumé a changé (calcul, activité, analyse),
  * par identité : une saisie qui n'y touche pas (nom, notes) garde les mêmes objets.
  */
 const summaryInputsChanged = (before: RecordWithoutSummary, after: RecordWithoutSummary): boolean =>
   before.sport !== after.sport
   || before.activityId !== after.activityId
-  || before.analysis !== after.analysis
-  || before.terrainElevation !== after.terrainElevation
-  || before.elevationSource !== after.elevationSource;
+  || before.analysis !== after.analysis;
 
 /**
  * Crée une fiche, ou refait le résumé d'une fiche existante. Pour celle-ci,
  * la session est prise au moment du calcul, pas au début du balayage, et
  * relue quand le calcul rend son résultat : une saisie faite entre-temps
  * (nom, notes) est gardée ; une qui change le résumé (activité, seuil,
- * allure, altitude) le fait refaire. Seul un GPX qu'on n'a pas su lire est
+ * allure) le fait refaire. Seul un GPX qu'on n'a pas su lire est
  * « illisible » ; un échec d'écriture est dit en clair.
  */
 const runJob = async (f: MemoryFolder, gen: number, job: SummaryJob): Promise<JobOutcome> => {

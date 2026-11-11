@@ -15,8 +15,8 @@ import type { SportFamily } from '../core/sportProfiles';
 import { libraryPath } from '../core/parentPage';
 import { useRouteLibrary } from '../hooks/useRouteLibrary';
 import { profilePromptGate } from '../library/profilePrompt';
-import { runnerName } from '../library/athleteProfile';
-import { useRunnerProfile } from '../hooks/useRunnerProfile';
+import { athleteName } from '../library/athleteProfile';
+import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { useVisibility } from '../hooks/useSportSettings';
@@ -48,8 +48,8 @@ function Home() {
   const backdrop = useFavoriteBackdrop();
   const { routes: allRoutes, loaded: routesLoaded } = useRouteLibrary();
   const { activities, families, isShown, shownActivities } = useVisibility();
-  const { profile } = useRunnerProfile();
-  const name = runnerName(profile);
+  const { profile } = useAthleteProfile();
+  const name = athleteName(profile);
   const routes = useMemo(() => shownRoutes(allRoutes, activities, isShown), [allRoutes, activities, isShown]);
   // Premier lancement sur le téléphone, ou dossier devenu inaccessible : la mémoire d'abord. Une erreur
   // (écriture refusée, réglages du dossier illisibles) se voit aussi dès l'accueil.

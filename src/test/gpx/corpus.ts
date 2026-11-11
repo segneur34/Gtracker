@@ -282,7 +282,6 @@ export const corpusSegmentsOf = (raw: RawTrackPoint[]): CorpusPoint[][] => {
       speedMs: p.speedMs,
       courseDeg: p.courseDeg,
       hr: p.hr,
-      cad: p.cadence,
     });
   }
   return segments;

@@ -70,7 +70,7 @@ const LEADING_NAME = /^\s*<name>([\s\S]*?)<\/name>/;
 
 /**
  * Repères en points de passage, nommés comme dans l'analyse : leur nom, sinon « Note N ». Un repère à
- * l'heure seule (muscu) n'en a pas, faute de position : il reste dans la fiche, en extension.
+ * l'heure seule n'en a pas, faute de position : il reste dans la fiche, en extension.
  */
 const waypoints = (marks: readonly SessionMark[]): string =>
   sortMarks(marks).map((m, k) => (m.lat === null || m.lon === null ? ''

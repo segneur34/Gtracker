@@ -58,6 +58,7 @@ describe('référence du format des capteurs, écrite par le téléphone', () =>
       startedAtMs: 1_790_000_000_000,
       clock: { elapsedUs: 123_456_789_000, wallMs: 1_790_000_000_150 },
       device: { manufacturer: 'Société d\'essai', model: 'Téléphone €', android: 36 },
+      // Le téléphone n'écrit plus `jumps` ; le lecteur le garde tolérant (absent : vrai, comme les plus anciens fichiers).
       setup: { placement: 'poitrine', foil: true, jumps: true },
       streams: [
         {

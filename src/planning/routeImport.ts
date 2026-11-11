@@ -22,7 +22,7 @@ export const isRouteGpx = (text: string): boolean => {
   if (embeddedRouteRecord(text)) return true;
   try {
     const timed = parseGpx(text);
-    if (timed.rawPoints.length > 0 || timed.timedPoints.length > 0) return false;
+    if (timed.rawPoints.length > 0) return false;
     return parseGpxPath(text).points.length >= 2;
   } catch {
     return false;

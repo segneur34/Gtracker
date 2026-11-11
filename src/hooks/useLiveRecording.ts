@@ -39,7 +39,7 @@ const BACKGROUND_REFRESH_MS = 5000;
 /** Intervalle minimal entre deux mesures de l'allure de la session, qui ne sert qu'au seuil suggéré en voile. */
 const REFERENCE_REFRESH_MS = 60_000;
 
-export interface LiveRecording {
+interface LiveRecording {
   segments: LocationFix[][];
   stats: LiveStats;
   /** Instant du dernier calcul, en ms ; `null` avant le premier. */

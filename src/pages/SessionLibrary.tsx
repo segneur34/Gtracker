@@ -25,9 +25,9 @@ import MoreMenu from '../components/ui/MoreMenu';
 import { MAP_BASES } from '../core/mapBase';
 import { coloredSegments } from '../core/trackColor';
 import { createHeldCache } from '../core/heldCache';
-import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityCounts, sessionActivity, type Activity } from '../core/activities';
+import { FAMILY_ACCENT, FAMILY_LABEL, FAMILY_OF, activitiesOfFamily, activityCounts, sessionActivity, type Activity } from '../core/activities';
 import { sportFamily, sportTreatment, type SportFamily } from '../core/sportProfiles';
-import { formatDuration, formatShortDuration, formatLandSpeed, formatSpeed, formatDistanceAuto } from '../core/units';
+import { formatDuration, formatShortDuration, formatSpeed, formatDistanceAuto } from '../core/units';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
 import { useElementSize } from '../hooks/useElementSize';
 import { useNearViewport } from '../hooks/useNearViewport';
@@ -53,12 +53,12 @@ const [PREVIEW_CREDIT_MARK, ...previewCreditName] = MAP_BASES.plan.credit.split(
 const PREVIEW_CREDIT_NAME = previewCreditName.join(' ');
 
 /**
- * Bibliothèque d'une famille : Voile, À pied, Vélo, Surf, Entraînement (l'ancien Fractionné, 24/10). La liste des
+ * Bibliothèque d'une famille : Voile ou Surf. La liste des
  * sessions de la mémoire, filtrable par activité (`?activite=<id>` pour
  * arriver filtré, depuis l'accueil), les sessions à classer, l'import de GPX
  * ou d'un dossier entier, la suppression. La vue « Planifiées »
  * (`?vue=planifiees`) montre à la place les itinéraires de la famille, filtrés
- * par les mêmes onglets d'activité ; le fractionné et le surf, qui ne planifient pas, n'en ont pas.
+ * par les mêmes onglets d'activité ; chaque famille a la sienne.
  *
  * Les sessions et itinéraires d'une activité cachée dans Réglages n'y sont
  * pas, une ligne dit combien ; la page d'une famille cachée, ouverte par son
@@ -66,12 +66,12 @@ const PREVIEW_CREDIT_NAME = previewCreditName.join(' ');
  */
 
 /**
- * Tournure de chaque famille dans « Aucune session … » et photo de son bandeau (refonte du 22/10) ; nom et couleur :
- * `FAMILY_LABEL`, `FAMILY_ACCENT`.
+ * Photo du bandeau de chaque famille ; nom, couleur et tournure :
+ * `FAMILY_LABEL`, `FAMILY_ACCENT`, `FAMILY_OF`.
  */
-const FAMILY: Record<SportFamily, { title: string; accent: string; of: string; banner?: string }> = {
-  voile: { title: FAMILY_LABEL.voile, accent: FAMILY_ACCENT.voile, of: 'de voile', banner: bannerVoile },
-  surf: { title: FAMILY_LABEL.surf, accent: FAMILY_ACCENT.surf, of: 'de surf', banner: bannerSurf },
+const FAMILY: Record<SportFamily, { title: string; accent: string; banner?: string }> = {
+  voile: { title: FAMILY_LABEL.voile, accent: FAMILY_ACCENT.voile, banner: bannerVoile },
+  surf: { title: FAMILY_LABEL.surf, accent: FAMILY_ACCENT.surf, banner: bannerSurf },
 };
 
 /** Activité d'une session d'après sa fiche (`sessionActivity`), `null` pour une session à classer. */
@@ -98,7 +98,7 @@ const rowStats = (session: LibrarySession, activity: Activity | null): string[] 
     if (summary.longestFlightS != null) stats.push(`vol ${formatShortDuration(summary.longestFlightS)}`);
   } else {
     if (summary.movingTimeS && summary.distanceM > 0) {
-      stats.push(formatLandSpeed(summary.distanceM / summary.movingTimeS, effectiveSpeedUnit(activity), distanceUnit));
+      stats.push(formatSpeed(summary.distanceM / summary.movingTimeS, effectiveSpeedUnit(activity)));
     }
     if (summary.elevationGainM !== null) stats.push(`D+ ${Math.round(summary.elevationGainM)} m`);
   }
@@ -677,7 +677,7 @@ function SessionLibrary({ family }: { family: SportFamily }) {
             <RouteList routes={shownRoutes} activities={activities} />
           ) : (
             <p className="ui-hint ui-hint--m">
-              Aucun itinéraire {FAMILY[family].of} pour l'instant.{' '}
+              Aucun itinéraire {FAMILY_OF[family]} pour l'instant.{' '}
               <Link to="/itineraires">Planifiez-en un</Link> et rangez-le sous une de ces activités : il apparaîtra ici.
             </p>
           )}
@@ -699,7 +699,7 @@ function SessionLibrary({ family }: { family: SportFamily }) {
         library.status === 'ready' && !library.scanning && hiddenCount === 0 && (
           <Card>
             <p className="ui-hint ui-hint--m">
-              Aucune session {FAMILY[family].of} pour l'instant. Enregistrez-en une, ou
+              Aucune session {FAMILY_OF[family]} pour l'instant. Enregistrez-en une, ou
               importez des GPX : ils sont rangés dans la mémoire et analysés ici.
             </p>
           </Card>

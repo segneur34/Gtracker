@@ -31,6 +31,9 @@ export interface ElevationStats {
   coverage: number;
 }
 
+/** Part minimale de points avec altitude pour publier un dénivelé. */
+export const MIN_ELEVATION_COVERAGE = 0.5;
+
 export const EMPTY_ELEVATION: ElevationStats = {
   gainM: 0,
   lossM: 0,

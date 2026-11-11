@@ -2,7 +2,7 @@ import type { JumpPlacement } from '../core/domainTypes';
 import type { JumpProfile } from '../core/sportProfiles';
 
 /**
- * Réglages des sauts d'une activité (voile, course, vélo), tels que Réglages les présente :
+ * Réglages des sauts d'une activité (voile), tels que Réglages les présente :
  * la case « Sauts » et ses sous-options. Le foil, réglage de l'activité à part
  * entière, n'en fait pas partie (`StoredSettings.foils`).
  *
@@ -36,7 +36,7 @@ export interface JumpSettings {
   minHeightM: number;
 }
 
-export const isJumpPlacement = (value: unknown): value is JumpPlacement =>
+const isJumpPlacement = (value: unknown): value is JumpPlacement =>
   typeof value === 'string' && (JUMP_PLACEMENTS as string[]).includes(value);
 
 const isMinHeight = (value: unknown): value is number =>

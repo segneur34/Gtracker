@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { HelpText, HelpToggle } from './Help';
 import Button from './ui/Button';
 import Dialog from './ui/Dialog';
-import { RUNNER_NAME_MAX, type RunnerProfile } from '../library/athleteProfile';
+import { ATHLETE_NAME_MAX, type AthleteProfile } from '../library/athleteProfile';
 import { missingProfileFields, shouldPromptProfile } from '../library/profilePrompt';
-import { readRunnerProfile, useRunnerProfile } from '../hooks/useRunnerProfile';
+import { readAthleteProfile, useAthleteProfile } from '../hooks/useAthleteProfile';
 import { isNativeApp } from '../platform/runtime';
 import './ProfilePrompt.css';
 
@@ -21,7 +21,7 @@ interface Draft {
   birthYear: string;
 }
 
-const draftOf = (profile: RunnerProfile): Draft => ({
+const draftOf = (profile: AthleteProfile): Draft => ({
   name: profile.name ?? '',
   birthYear: profile.birthYear === null ? '' : String(profile.birthYear),
 });
@@ -35,9 +35,9 @@ const draftOf = (profile: RunnerProfile): Draft => ({
  * apprend une fois s'il s'ouvre (la carte du jour des tutoriels attend alors).
  */
 function ProfilePrompt({ otherCardShown, onDecided }: { otherCardShown: boolean; onDecided?: (shown: boolean) => void }) {
-  const { setName, setNumber } = useRunnerProfile();
+  const { setName, setNumber } = useAthleteProfile();
   // Le profil du hook est vide au premier rendu (il se relit dans un effet) : la décision lit le stockage.
-  const [stored] = useState(readRunnerProfile);
+  const [stored] = useState(readAthleteProfile);
   const [shown] = useState(() => {
     const open = shouldPromptProfile({
       native: isNativeApp(), missing: missingProfileFields(stored), askedThisLaunch, otherCardShown,
@@ -82,7 +82,7 @@ function ProfilePrompt({ otherCardShown, onDecided }: { otherCardShown: boolean;
       </p>
       <label className="profile-prompt__row">
         <span className="profile-prompt__label">Nom ou pseudo<HelpToggle helpKey="accueil-profil:nom" label="Nom ou pseudo" /></span>
-        <input type="text" className="ui-field ui-field--s profile-prompt__text" value={draft.name} maxLength={RUNNER_NAME_MAX}
+        <input type="text" className="ui-field ui-field--s profile-prompt__text" value={draft.name} maxLength={ATHLETE_NAME_MAX}
           placeholder="ex. Tom" autoComplete="nickname" onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
       </label>
       <HelpText helpKey="accueil-profil:nom">En titre de la page Profil et au pied des images partagées.</HelpText>

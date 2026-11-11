@@ -23,7 +23,7 @@ import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityFamily, type A
 import { REFERENCE_HEART_RATE, SPORT_FAMILIES, getSportProfile, type SportFamily } from '../core/sportProfiles';
 import {
   formatDistanceAuto, formatDecimal,
-  DISTANCE_UNIT_SYMBOL, speedUnitLabel, formatDuration, formatShortDuration, formatLandSpeed, formatSpeedValue, isInverseUnit,
+  DISTANCE_UNIT_SYMBOL, SPEED_UNIT_LABEL, formatDuration, formatShortDuration, formatSpeed, formatSpeedValue,
   toDisplayDistance, toDisplaySpeed, type DistanceUnit, type SpeedUnit,
 } from '../core/units';
 import { useChartZoom } from '../hooks/useChartZoom';
@@ -32,8 +32,8 @@ import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { useNow } from '../hooks/useNow';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
 import { useOpenSections } from '../hooks/useOpenSections';
-import { runnerHeartRateZones, type RunnerProfile } from '../library/athleteProfile';
-import { useRunnerProfile } from '../hooks/useRunnerProfile';
+import { athleteHeartRateZones, type AthleteProfile } from '../library/athleteProfile';
+import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { readStoredRecord, useStoredRecord } from '../hooks/useStoredRecord';
@@ -89,10 +89,10 @@ const STATS_SECTION_DEFAULTS: Record<StatsSection, boolean> = { general: true, v
 /** Coefficients de la charge : les mêmes dans tous les calculs (`HeartRateProfile`). */
 const LOAD_WEIGHTS = REFERENCE_HEART_RATE.loadWeights;
 
-/** Seuils et zones du pratiquant pour une activité (décalés pour elle), ceux de la course sans activité. */
-const zonesFor = (runner: RunnerProfile, activity: Activity | null) => activity
-  ? runnerHeartRateZones(runner, getSportProfile(activity.base).heartRate, effectiveHrOffset(activity))
-  : runnerHeartRateZones(runner, REFERENCE_HEART_RATE, 0);
+/** Seuils et zones du pratiquant pour une activité (décalés pour elle), ceux de référence sans activité. */
+const zonesFor = (athlete: AthleteProfile, activity: Activity | null) => activity
+  ? athleteHeartRateZones(athlete, getSportProfile(activity.base).heartRate, effectiveHrOffset(activity))
+  : athleteHeartRateZones(athlete, REFERENCE_HEART_RATE, 0);
 
 const STORAGE_ID = 'statistiques';
 
@@ -360,21 +360,21 @@ function StatisticsPage() {
   }, [all, family, activities, isShown, familyHidden, activity, activityById]);
 
   // Cardio : la FC du résumé, zones et charge recalculées avec le profil du moment.
-  const { profile: runner } = useRunnerProfile();
-  // Zones montrées : celles de l'activité choisie, de la course sinon ; chaque session compte avec celles de son activité.
-  const hrZones = useMemo(() => zonesFor(runner, activity), [runner, activity]);
+  const { profile: athlete } = useAthleteProfile();
+  // Zones montrées : celles de l'activité choisie, de référence sinon ; chaque session compte avec celles de son activité.
+  const hrZones = useMemo(() => zonesFor(athlete, activity), [athlete, activity]);
   const zoneBoundsOf = useMemo((): ZoneBoundsOf | null => {
     if (!hrZones) return null;
     const byActivity = new Map<string, readonly number[]>();
     return (s) => {
       let bounds = byActivity.get(s.activityId);
       if (!bounds) {
-        bounds = zonesFor(runner, activityById.get(s.activityId) ?? null)?.bounds ?? hrZones.bounds;
+        bounds = zonesFor(athlete, activityById.get(s.activityId) ?? null)?.bounds ?? hrZones.bounds;
         byActivity.set(s.activityId, bounds);
       }
       return bounds;
     };
-  }, [hrZones, runner, activityById]);
+  }, [hrZones, athlete, activityById]);
   const hasCardio = inPeriod.some((s) => s.heartRate !== null);
   const cardio = useMemo(() => cardioTotals(inPeriod, zoneBoundsOf, LOAD_WEIGHTS), [inPeriod, zoneBoundsOf]);
   const loadBars = useMemo(() => (zoneBoundsOf ? cardioLoadBars(regular.bars, inPeriod, zoneBoundsOf, LOAD_WEIGHTS) : []), [zoneBoundsOf, regular.bars, inPeriod]);
@@ -403,13 +403,13 @@ function StatisticsPage() {
     && (series.some((serie) => serie.points.some((p) => p.value >= 7200)) || weekly.some((w) => w.durationS >= 7200));
   const toAxis = (v: number): number => {
     switch (metric.unit) {
-      case 'vitesse': return toDisplaySpeed(v, speedUnit, distanceUnit);
+      case 'vitesse': return toDisplaySpeed(v, speedUnit);
       case 'duree': return inHours ? v / 3600 : v / 60;
       case 'distance': return toDisplayDistance(v, distanceUnit);
       default: return v;
     }
   };
-  const axisLabel = metric.unit === 'vitesse' ? speedUnitLabel(speedUnit, distanceUnit)
+  const axisLabel = metric.unit === 'vitesse' ? SPEED_UNIT_LABEL[speedUnit]
     : metric.unit === 'duree' ? (inHours ? 'h' : 'min')
     : metric.unit === 'distance' ? DISTANCE_UNIT_SYMBOL[distanceUnit]
     : metric.unit === 'pourcent' ? '%'
@@ -421,7 +421,7 @@ function StatisticsPage() {
   /** Valeur d'une session en clair, dans l'unité de la sélection. */
   const metricText = (value: number): string => {
     switch (metric.unit) {
-      case 'vitesse': return formatLandSpeed(value, speedUnit, distanceUnit);
+      case 'vitesse': return formatSpeed(value, speedUnit);
       case 'duree': return formatDuration(value * 1000);
       case 'distance': return formatDistanceAuto(value, distanceUnit);
       case 'pourcent': return `${Math.round(value)} %`;
@@ -456,7 +456,6 @@ function StatisticsPage() {
   const pickedPoints = pickedSession
     ? [...series].sort((a, b) => serieRank(a.key) - serieRank(b.key)).flatMap((serie) => serie.points.filter((p) => p.file === pickedSession.file).map((p) => ({ label: serie.label, point: p })))
     : [];
-  const inverse = metric.unit === 'vitesse' && isInverseUnit(speedUnit);
   const twoSeries = series.length > 1;
   const legendSeries = [...series].sort((a, b) => serieRank(a.key) - serieRank(b.key));
   /** Valeur d'une session pour une série, avec le détail des manœuvres. */
@@ -487,7 +486,7 @@ function StatisticsPage() {
   const recordValue = (kind: StatsRecordKind, value: number, s: StatSession): string => {
     const a = activityById.get(s.activityId);
     switch (kind) {
-      case 'vitesse': return formatLandSpeed(value, a ? effectiveSpeedUnit(a) : speedUnit, a ? effectiveDistanceUnit(a) : distanceUnit);
+      case 'vitesse': return formatSpeed(value, a ? effectiveSpeedUnit(a) : speedUnit);
       case 'distance': return formatDistanceAuto(value, a ? effectiveDistanceUnit(a) : distanceUnit);
       case 'duree': return formatDuration(value * 1000);
       case 'manoeuvres': return String(value);
@@ -586,7 +585,7 @@ function StatisticsPage() {
                       <StatTile label="Durée totale" value={formatDuration(totals.durationS * 1000)} title="Du premier au dernier point de chaque session" />
                       {totals.movingTimeS > 0 && <StatTile label="Temps en action" value={formatDuration(totals.movingTimeS * 1000)} />}
                       {family !== null && <StatTile label="Distance" value={formatDistanceAuto(totals.distanceM, distanceUnit)} />}
-                      {family !== null && totals.maxSpeedMs !== null && <StatTile label="Vitesse max" value={formatLandSpeed(totals.maxSpeedMs, speedUnit, distanceUnit)} />}
+                      {family !== null && totals.maxSpeedMs !== null && <StatTile label="Vitesse max" value={formatSpeed(totals.maxSpeedMs, speedUnit)} />}
                       {family === 'voile' && totals.maneuverSessions > 0 && (
                         <>
                           <StatTile label="Manœuvres" value={totals.maneuvers} />
@@ -669,8 +668,8 @@ function StatisticsPage() {
                             ticks={chartTicks?.ticks}
                             tickFormatter={(v: number) => formatDateTick(v, chartTicks?.unit ?? 'jour')}
                             tick={CHART_TICK} />
-                          <YAxis type="number" reversed={inverse}
-                            domain={inverse ? ['auto', 'auto'] : metric.unit === 'pourcent' ? [0, 100] : [0, 'auto']}
+                          <YAxis type="number"
+                            domain={metric.unit === 'pourcent' ? [0, 100] : [0, 'auto']}
                             allowDecimals={metric.unit !== 'nombre'}
                             tickFormatter={axisTick} width={46}
                             tick={CHART_TICK}

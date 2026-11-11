@@ -14,8 +14,7 @@ import type { SportFamily } from './sportProfiles';
  * copies d'une tuile à côté, ce qui dépasse d'un bord reprenant à l'autre.
  *
  * Dessins choisis par l'utilisateur sur maquette le 23/10 : voile et surf
- * d'après ses images (souffle de vent, vague) ; ceux de la course, du vélo et
- * du fractionné sont partis avec eux (lots 303 et 305). Chaque fond a sa taille de tuile et son
+ * d'après ses images (souffle de vent, vague). Chaque fond a sa taille de tuile et son
  * espacement (`scale`, qui agrandit la tuile sans épaissir le trait) ; l'encre
  * et l'épaisseur sont dans le CSS (`ui.css`, `.page-backdrop--<fond>`).
  */
@@ -23,10 +22,10 @@ import type { SportFamily } from './sportProfiles';
 export const TILE_W = 390;
 export const TILE_H = 640;
 
-/** Un tracé du motif : `dots` en pointillé, `fill` plein (repères), `major` plus épais, `thin` plus fin (courbes de fond) ; `alpha` éclaircit son encre. */
-export interface TilePath {
+/** Un tracé du motif : `major` plus épais (courbes maîtresses) ; `alpha` éclaircit son encre. */
+interface TilePath {
   d: string;
-  kind?: 'dots' | 'fill' | 'major' | 'thin';
+  kind?: 'major';
   alpha?: number;
 }
 
@@ -66,7 +65,7 @@ const RELIEF: readonly { k: number; l: number; a: number; phase: number }[] = [
 ];
 
 /** Hauteur en `(x, y)` d'une somme d'ondes entières sur une tuile `width` × `height`. */
-export const reliefOf = (terms: readonly { k: number; l: number; a: number; phase: number }[], width: number, height: number) =>
+const reliefOf = (terms: readonly { k: number; l: number; a: number; phase: number }[], width: number, height: number) =>
   (x: number, y: number): number =>
     terms.reduce((h, t) => h + t.a * Math.cos(TAU * ((t.k * x) / width + (t.l * y) / height) + t.phase), 0);
 

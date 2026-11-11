@@ -38,12 +38,10 @@ export const MAX_GAP_S = 10;
 /**
  * Lissage de l'altitude et plus petit dénivelé compté. Le réglage « route »
  * sert partout depuis le 21/10 : l'altitude de l'IGN est déjà propre, et le
- * choix du terrain par activité et par session a été retiré ; « trail » reste
- * pour mémoire et pour les tests.
+ * choix du terrain par activité et par session a été retiré.
  */
-export const ELEVATION_PRESETS: Record<'route' | 'trail', ElevationProfile> = {
+export const ELEVATION_PRESETS: Record<'route', ElevationProfile> = {
   route: { smoothingSeconds: 20, minGainM: 3 },
-  trail: { smoothingSeconds: 30, minGainM: 5 },
 };
 
 /**
@@ -114,8 +112,8 @@ export const DEFAULT_RECORDING: RecordingProfile = {
 };
 
 /**
- * Surf : pause automatique coupée, l'attente au pic est immobile (reprise du
- * fractionné, retiré au lot 302). Le délai reste, pour qui la rallume.
+ * Surf : pause automatique coupée, l'attente au pic est immobile. Le délai
+ * reste, pour qui la rallume.
  */
 const SURF_RECORDING: RecordingProfile = { ...DEFAULT_RECORDING, autoPauseSpeedMs: 0 };
 
@@ -144,9 +142,9 @@ export interface HeartRateProfile {
   /** Seuils S1 et S2, et zones 1 à 5 calées dessus (`heartRateZones`). */
   zoneModel: HeartRateZoneModel;
   /**
-   * Décalage de S1 et de S2 pour ce calcul, en bpm, par rapport à la course
-   * (Gemini, 25/10 : masse musculaire, posture, contraction) ; surchargeable
-   * par activité dans Réglages, la Marche a le sien en pré-réglage.
+   * Décalage de S1 et de S2 pour ce calcul, en bpm, par rapport au cardio de
+   * référence (Gemini, 25/10 : masse musculaire, posture, contraction) ;
+   * surchargeable par activité dans Réglages.
    */
   thresholdOffsetBpm: number;
   /**
@@ -154,14 +152,6 @@ export interface HeartRateProfile {
    * (1 à 5), plus le temps sous Z1, qui compte aussi (choix de l'utilisateur).
    */
   loadWeights: readonly number[];
-  /** Temps actif à FC au-dessous duquel la dérive n'est pas donnée, en secondes. */
-  driftMinS: number;
-  /** Dérive sous laquelle la FC est dite stable, en %. */
-  driftStablePct: number;
-  /** Délai de la récupération d'une répétition, en secondes. */
-  recoveryS: number;
-  /** Durée d'un bloc du nuage FC / vitesse, en secondes. */
-  scatterBlockS: number;
 }
 
 /**
@@ -171,7 +161,7 @@ export interface HeartRateProfile {
  * stable), Z5 un peu au-dessus de S2. Z1 et Z2 sous S1, placées pour tomber
  * au même endroit avec et sans FC de repos (Z2 environ 15 bpm sous S1).
  */
-export const HEART_RATE_ZONE_MODEL: HeartRateZoneModel = {
+const HEART_RATE_ZONE_MODEL: HeartRateZoneModel = {
   reserveThresholds: [0.7, 0.85],
   maxThresholds: [0.78, 0.89],
   belowS1Reserve: [0.65, 0.85],
@@ -188,16 +178,12 @@ const HEART_RATE: HeartRateProfile = {
   zoneModel: HEART_RATE_ZONE_MODEL,
   thresholdOffsetBpm: 0,
   loadWeights: [0.5, 1, 2, 3, 4, 5],
-  driftMinS: 20 * 60,
-  driftStablePct: 5,
-  recoveryS: 60,
-  scatterBlockS: 30,
 };
 
 /**
  * Réglage cardio de référence, sans décalage (lot 187) : celui du Pratiquant (seuils et zones affichés dans Réglages
  * et dans Statistiques hors activité), et la base que chaque calcul décale de `thresholdOffsetBpm`. C'est le même
- * objet que celui de la course, qui reste la référence des décalages ; le transverse le lit ici, sans nommer un calcul.
+ * objet que celui des calculs, qui reste la référence des décalages ; le transverse le lit ici, sans nommer un calcul.
  */
 export const REFERENCE_HEART_RATE: HeartRateProfile = HEART_RATE;
 
@@ -247,7 +233,7 @@ const HR_ENERGY: HrEnergyProfile = {
   displayStepKcal: 10,
 };
 
-/** Sauts mesurés par les capteurs du téléphone (`core/jumps.ts`) : voile, course, vélo. */
+/** Sauts mesurés par les capteurs du téléphone (`core/jumps.ts`) : voile. */
 export interface JumpProfile {
   /** Hauteur minimale d'un saut montré, en mètres, surchargeable par activité. */
   defaultMinHeightM: number;
@@ -269,9 +255,7 @@ const ATTITUDE = {
  * les séances de wingfoil du 08/10/2026, téléphone sur la poitrine : la séance
  * témoin ne donne aucun vol de 0,2 m, l'autre ses 10 sauts (0,66 à 1,72 m) et
  * rien d'autre au-dessus de 0,33 m. Les longs vols du kite restent à vérifier
- * sur une séance de kite. À pied et à vélo (VTT), les mêmes seuils écartent
- * la foulée (vol d'environ 0,1 s) ; ils restent à vérifier sur le terrain.
- * Rebonds (n° 27, 06/11) : sur les wings des 08/10 et 21/10, les 7 petits vols
+ * sur une séance de kite. * Rebonds (n° 27, 06/11) : sur les wings des 08/10 et 21/10, les 7 petits vols
  * de 0,20 à 0,37 m trouvés à 1 à 3 s d'un vrai saut (0,75 à 1,70 m) sont son
  * appel ou son rebond ; aucun vrai saut n'en a un autre à moins de 3 s.
  */
@@ -453,25 +437,24 @@ export interface SportProfile {
   elevation: ElevationProfile;
   /**
    * Cibles de recherche des meilleurs segments. L'onglet « tops » est natif en
-   * voile et à vélo, générique à pied et en surf (`core/analysisTabs.ts`).
+   * voile, générique en surf (`core/analysisTabs.ts`).
    */
   topTargets: readonly TopTarget[];
   /** Réglage de l'enregistrement GPS. */
   recording: RecordingProfile;
-  /** Sauts mesurés par les capteurs du téléphone ; `null` en bateau, en fractionné et en surf. */
+  /** Sauts mesurés par les capteurs du téléphone ; `null` en bateau et en surf. */
   jumps: JumpProfile | null;
   /** Ceinture cardio proposée à l'enregistrement et analyse de la FC, dans tous les sports. */
   heartRate: HeartRateProfile;
   /**
-   * Énergie estimée par la FC, dans l'onglet « cardio » : voile et surf seulement ;
-   * `null` à pied, à vélo et en Entraînement, où l'énergie mécanique reste seule.
+   * Énergie estimée par la FC, dans l'onglet « cardio » : voile et surf seulement.
    */
   hrEnergy: HrEnergyProfile | null;
   /** Analyse des vagues ; `null` hors surf. */
   surf: SurfProfile | null;
   /**
    * Pumping sur foil, mesuré par les capteurs du téléphone (`core/pumping.ts`) :
-   * surf (point 104) et voile sur foil (lot 22) ; `null` en bateau, à pied, à vélo.
+   * surf (point 104) et voile sur foil (lot 22) ; `null` en bateau.
    */
   pump: PumpDetection | null;
 }
@@ -524,7 +507,7 @@ const COMMON_DEFAULTS = {
 /**
  * Profil d'une session sans calcul connu (`sport` null : fiche non classée, lot 187) pour le peu que son résumé
  * calcule : dénivelé, fenêtre de la vitesse max et FC. Les valeurs communes à tous les calculs, et le cardio de
- * référence : le même résumé qu'avec le calcul de la course, qui tenait ce rôle avant (test d'identité).
+ * référence : le même résumé qu'avec les valeurs communes des calculs (test d'identité).
  */
 export const UNCLASSIFIED_PROFILE: Pick<SportProfile, 'elevation' | 'maxSpeedWindowS' | 'heartRate'> = {
   elevation: COMMON_DEFAULTS.elevation,
@@ -554,7 +537,7 @@ const SAILING_DEFAULTS = {
   pump: SAILING_PUMP_DETECTION,
 };
 
-/** Seuils cardio d'un calcul décalés de `offsetBpm` par rapport à la course. */
+/** Seuils cardio d'un calcul décalés de `offsetBpm` par rapport au cardio de référence. */
 const heartRateOffset = (offsetBpm: number): HeartRateProfile => ({ ...HEART_RATE, thresholdOffsetBpm: offsetBpm });
 
 /**
@@ -727,7 +710,7 @@ export const familySports = (family: SportFamily): SportType[] =>
  * seuil (rapport sans dimension, règle 4) : sans elle, la détente vaudrait 0 et
  * le masque d'activité ne sortirait plus jamais une fois entré (27/10).
  */
-export const EXIT_FLOOR_RATIO = 0.5;
+const EXIT_FLOOR_RATIO = 0.5;
 
 /**
  * Les deux détentes du seuil d'activité, dans l'unité du profil. La détente

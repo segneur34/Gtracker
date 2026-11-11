@@ -40,7 +40,7 @@ export const SCREEN_BREAKPOINTS = {
 } as const;
 
 /** Vrai tant que la requête répond, suivi en direct quand l'écran change de taille ou tourne. */
-export function useMediaQuery(media: string): boolean {
+function useMediaQuery(media: string): boolean {
   const [matches, setMatches] = useState(() => window.matchMedia(media).matches);
 
   useEffect(() => {

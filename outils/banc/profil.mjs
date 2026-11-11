@@ -5,7 +5,7 @@
 // surf de l'an passé ; course et vélo retirés au lot 303), les importe par la page Voile, et vérifie :
 //  1. l'accueil : plus de graphe d'activités, une ligne « Profil » qui ouvre la page ; « Profil » dans la barre du haut ;
 //  2. la période en tête (bouton glissant), « Année » au départ : distance (somme des vitesses × durées, à 5 % près),
-//     sport préféré (la Voile, avec son dessin, qui ouvre sa bibliothèque), D+ de la côte seule, nombre de sessions du graphe ; l'anneau et sa légende (une part par activité, la Voile à 50 %) ;
+//     sport préféré (la Voile, avec son dessin, qui ouvre sa bibliothèque), nombre de sessions du graphe ; l'anneau et sa légende (une part par activité, la Voile à 50 %) ;
 //     le graphe d'activités en bas, sans barre de période à lui ;
 //  3. les autres périodes règlent toute la page : « 30 jours » (trois sessions), « Depuis le début » (les six, une
 //     barre par mois), choix retenu au rechargement ;
@@ -134,15 +134,14 @@ check('périodes en tête, « Année » au départ', (await evaluate(`[...docume
   === 'Semaine | 30 jours | 6 mois | Année | Depuis le début' && (await pressed()) === 'Année', await pressed());
 check("plus de flèches d'année", (await evaluate(`!!document.querySelector('.profile-year')`)) === false);
 check("le graphe n'a plus sa propre barre de période", (await evaluate(`!!document.querySelector('.actchart__periods')`)) === false);
-let [count, distance, gain] = await figures();
+let [count, distance] = await figures();
 check('nombre d\'activités de l\'année, en tête de la bande', count === '4', count);
 const km = parseFr(distance);
 check('distance de l\'année, en km', distance?.endsWith('km') && Math.abs(km - kmOf(current)) / kmOf(current) < 0.05, `${distance} pour ${kmOf(current).toFixed(1)} attendus`);
 check('plus de case « Temps »', !(await evaluate(`[...document.querySelectorAll('.profile-figure .ui-eyebrow')].some((e) => e.textContent === 'Temps')`)));
 check('sport préféré : la Voile, avec son dessin', (await favorite()) === 'Voile'
   && (await evaluate(`!!document.querySelector('.profile-figure--link svg.profile-figure__art path')`)), await favorite());
-const gainM = parseFr(gain);
-check('D+ de l\'année : la côte', gain?.endsWith('m') && gainM > 150 && gainM < 230, gain);
+check('plus de case « Dénivelé »', !(await evaluate(`[...document.querySelectorAll('.profile-figure .ui-eyebrow')].some((e) => e.textContent === 'Dénivelé')`)));
 check('nombre de sessions (graphe)', (await chartCount()) === '4 sessions', await chartCount());
 const ordre = await evaluate(`[...document.querySelectorAll('.profile > *')].map((el) => (el.getAttribute('class') ?? '').split(' ')[0] || el.tagName).join(' > ')`);
 check('ordre : fond, en-tête, période, chiffres, répartition, graphe', /^page-backdrop > profile-head > ui-segmented.*profile-figures.*profile-split.*actchart/.test(ordre ?? ''), ordre);
@@ -202,10 +201,10 @@ check('390 px : rien ne déborde', !(await overflow()));
 /** Bande des chiffres : deux cases sur deux lignes, aucune hors de l'écran. */
 const twoByTwo = () => evaluate(`(() => {
   const f = [...document.querySelectorAll('.profile-figure')].map((el) => el.getBoundingClientRect());
-  return f.length === 4 && Math.abs(f[1].top - f[0].top) < 1 && Math.abs(f[3].top - f[2].top) < 1 && f[2].top > f[0].top
+  return f.length === 3 && Math.abs(f[1].top - f[0].top) < 1 && f[2].top > f[0].top
     && f.every((r) => r.left >= 0 && r.right <= window.innerWidth);
 })()`);
-check('390 px : chiffres en deux sur deux, dans l\'écran', await twoByTwo());
+check('390 px : chiffres deux puis un, dans l\'écran', await twoByTwo());
 const periodsFit = () => evaluate(`(() => { const r = document.querySelector('.profile-periods'); return r.scrollWidth <= r.clientWidth; })()`);
 check('390 px : les cinq périodes tiennent sans défiler', await periodsFit());
 check('390 px : détail par activité toujours déplié (état retenu)', (await legend()).length === 3);

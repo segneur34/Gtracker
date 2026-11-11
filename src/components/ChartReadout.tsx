@@ -21,7 +21,7 @@ export interface Readout {
  * ligne, sans retour, coupée par des points de suspension : sa hauteur ne
  * change jamais, et le graphe ne bouge pas sous le doigt.
  */
-export default function ChartReadout({ readout, label, color, line = false }: {
+function ChartReadout({ readout, label, color, line = false }: {
   readout: Readout | null;
   /** Nom du graphe quand rien ne le porte au-dessus de lui (cardio, énergie, graphe seul). */
   label?: string;

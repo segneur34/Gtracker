@@ -403,12 +403,12 @@ function BaseSwitch({ base, onChange }: { base: MapBase; onChange: (base: MapBas
   );
 }
 
-function BaseTileLayer({ family }: { family?: SportFamily }) {
-  const [base, setBase] = useMapBase(family ?? null);
+function BaseTileLayer({ family }: { family: SportFamily }) {
+  const [base, setBase] = useMapBase(family);
   return (
     <>
       <TileLayer base={base} />
-      {family && <BaseSwitch base={base} onChange={setBase} />}
+      <BaseSwitch base={base} onChange={setBase} />
     </>
   );
 }

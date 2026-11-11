@@ -61,7 +61,7 @@ export const createSessionAssetCache = <V>(): SessionAssetCache<V> => {
 };
 
 /** Champ de la fiche où une recherche range son résultat. */
-export type SessionAssetField = 'surfaces' | 'terrainElevation' | 'jumps';
+export type SessionAssetField = 'jumps';
 
 /** Range le résultat dans la fiche, si la session est dans la mémoire et que sa fiche peut être réécrite. */
 const store = (file: string | null, field: SessionAssetField, value: unknown): void => {
@@ -73,8 +73,7 @@ const store = (file: string | null, field: SessionAssetField, value: unknown): v
  * Résultat d'une recherche par trace : celui de la fiche s'il est à jour
  * (`isCurrent`), sinon celui trouvé pendant ce lancement, sinon cherché
  * (`compute`) quand `active` et la fiche relue en entier. Le champ de la fiche
- * est lu par `read` (le revêtement et l'altitude y sont bruts depuis le lot 301 :
- * leur domaine les lit ; une valeur mal formée vaut absente). Un résultat trouvé
+ * est lu par `read` (une valeur mal formée vaut absente). Un résultat trouvé
  * avant que la bibliothèque connaisse la session y est rangé dès qu'elle la
  * connaît. `error` : message de la dernière recherche échouée pour cette clé,
  * `retry` l'efface et relance.

@@ -40,24 +40,6 @@ describe('summarizeGpx : le résumé d’analyzeGpx, réglages en table', () => 
       expect(Object.keys(options.activitySettings)).toEqual(['wingfoil']);
     });
 
-    it(`kite et l'altitude du terrain d'une fiche, ignorée depuis le lot 303, à ${hz} Hz`, () => {
-      const raw = sailRaw({ windDeg: 0, legs: upDownLegs(2, 120), hz, polar: slowPolar });
-      const text = gpxOf(raw);
-      const startMs = Date.parse(String(raw[0].time));
-      const terrainElevation = {
-        source: 'ign' as const, resource: 'test', version: 1, stepM: 20, fetchedAt: '2026-11-04T08:00:00Z', startMs,
-        t: Array.from({ length: 24 }, (_, i) => i * 10_000), z: Array.from({ length: 24 }, (_, i) => 50 + (i % 6) * 3),
-      };
-      const record = sessionRecord({ sport: 'kite', terrainElevation });
-      const { direct, viaTable } = both(text, record);
-      expect(direct).not.toBeNull();
-      expect(viaTable).toStrictEqual(direct);
-      // L'altitude du terrain n'est plus substituée (lot 303) : l'altitude du GPS donne le même résumé.
-      const gps = both(text, { ...record, elevationSource: 'gps' });
-      expect(gps.viaTable).toStrictEqual(gps.direct);
-      expect(gps.direct?.summary).toStrictEqual(direct?.summary);
-    });
-
     it(`surf sur foil, à ${hz} Hz`, () => {
       const text = gpxOf(sailRaw({ windDeg: 90, legs: upDownLegs(3, 40), hz }));
       const record = sessionRecord({ sport: 'surf', analysis: analysis({ foil: true, waveThreshold: 6 }) });
@@ -93,6 +75,6 @@ describe('summarizeGpx : le résumé d’analyzeGpx, réglages en table', () => 
 
   it('table qui ne porte pas le calcul retenu : erreur, pas de réglages inventés', () => {
     const text = gpxOf(sailRaw({ windDeg: 0, legs: upDownLegs(2, 60) }));
-    expect(() => summarizeGpx(text, { sport: 'kite', analysis: null, activitySettings: {}, elevation: null })).toThrow(/kite/);
+    expect(() => summarizeGpx(text, { sport: 'kite', analysis: null, activitySettings: {} })).toThrow(/kite/);
   });
 });

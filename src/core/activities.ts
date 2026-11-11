@@ -7,7 +7,7 @@ import { isActivityIconId, type ActivityIconId } from './activityIcons';
 
 /**
  * Activités : ce que l'utilisateur pratique, sous le nom qu'il choisit
- * (« Moth à foil », « Trail », « 10 000 m »). Chacune s'appuie sur un des
+ * (« Moth à foil », « SUP foil »). Chacune s'appuie sur un des
  * calculs de `SPORT_PROFILES`, sa base, qui fixe ses valeurs par défaut, sa
  * famille et le module qui l'analyse. Les calculs ne connaissent que la base.
  *
@@ -100,6 +100,9 @@ export const FAMILY_BASE: Record<SportFamily, SportType> = { voile: 'wingfoil', 
 
 /** Nom d'une famille, tel que l'interface l'affiche. */
 export const FAMILY_LABEL: Record<SportFamily, string> = { voile: 'Voile', surf: 'Surf' };
+
+/** Tournure d'une famille dans « Aucune activité … », « Aucune session … » : « de voile », « de surf ». */
+export const FAMILY_OF: Record<SportFamily, string> = { voile: 'de voile', surf: 'de surf' };
 
 /** Couleur d'interface d'une famille (variable du thème). */
 export const FAMILY_ACCENT: Record<SportFamily, string> = { voile: 'var(--voile)', surf: 'var(--surf)' };

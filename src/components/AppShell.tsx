@@ -34,8 +34,7 @@ import IncomingFileNotice from './IncomingFileNotice';
  *
  * Pendant un enregistrement, un bandeau rouge rappelle sur chaque page qu'il
  * tourne et ramène à la page d'enregistrement ; sa durée (`RecordingClock`)
- * et le bouton rond (`RecordButton`) suivent seuls l'horloge, pas le cadre ; pendant une séance du
- * compteur du fractionné, un second bandeau dit la phase et son temps restant. Un appui long sur le bouton du
+ * et le bouton rond (`RecordButton`) suivent seuls l'horloge, pas le cadre. Un appui long sur le bouton du
  * milieu (2 s par défaut, réglable) met en pause ou relance, depuis n'importe
  * quelle page ; un appui court y ramène, comme au repos.
  */

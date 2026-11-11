@@ -10,8 +10,7 @@ export const RESTING_HR_PATH = '/profil/fc-repos';
  * Page au-dessus d'une adresse, où renvoie la touche retour d'Android (et le
  * geste du bord de l'écran) : l'analyse d'une session renvoie à la
  * bibliothèque de sa famille, comme le lien « ← » de son en-tête, et le test
- * de FC repos au Profil, où est son entrée ; une
- * leçon des tutoriels à leur liste, et celle-ci à Réglages ; les
+ * de FC repos au Profil, où est son entrée ; une leçon des tutoriels à leur liste, et celle-ci à Réglages ; les
  * Statistiques remontent d'un cran (activité, famille, vue d'ensemble), la
  * période gardée ; toute autre page renvoie à l'accueil. `null` à l'accueil :
  * rien au-dessus.

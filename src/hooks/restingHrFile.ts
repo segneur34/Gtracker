@@ -8,8 +8,7 @@ import { jsonStore, storageStartupFailure } from '../platform/storage';
 
 /**
  * Tests de FC repos dans le dossier mémoire (`fc-repos.json`, à la racine) : la sauvegarde Google est coupée, ce
- * fichier les fait suivre l'appareil. Lecture et écriture par l'interface du dossier (règle 12). Pont avant que
- * ces tests rejoignent les sessions (DECISIONS §5).
+ * fichier les fait suivre l'appareil. Lecture et écriture par l'interface du dossier (règle 12).
  *
  * Limite assumée : la fusion est une union sans mémoire des retraits (`mergeRestingResults`) ; un test retiré
  * sur un appareil peut revenir depuis un autre appareil du dossier qui l'a encore.

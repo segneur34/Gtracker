@@ -151,12 +151,13 @@ describe('manifeste Android : fichiers reçus d\'une autre application (lot 35)'
 });
 
 describe('logo et icône (lot 310)', () => {
-  const background = withoutComments(repoFile('android/app/src/main/res/drawable/ic_launcher_background.xml'));
+  const background = withoutComments(repoFile('android/app/src/main/res/values/ic_launcher_background.xml'));
 
-  it('fond de l’icône adaptative : blanc uni, sans la grille du gabarit', () => {
-    expect(background).toContain('#FFFFFF');
-    expect(background).not.toContain('strokeColor');
-    expect(background).not.toContain('strokeWidth');
+  it('fond de l’icône adaptative : une couleur unie (#F6F5F2), lue par les deux icônes adaptatives', () => {
+    expect(background).toContain('<color name="ic_launcher_background">#F6F5F2</color>');
+    for (const icon of ['ic_launcher', 'ic_launcher_round']) {
+      expect(repoFile(`android/app/src/main/res/mipmap-anydpi-v26/${icon}.xml`)).toContain('<background android:drawable="@color/ic_launcher_background"/>');
+    }
   });
 
   it('page web : titre « Gtracker » et favicon SVG de GONG', () => {

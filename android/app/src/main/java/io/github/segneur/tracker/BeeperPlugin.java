@@ -16,8 +16,7 @@ import org.json.JSONObject;
 /**
  * Bips et vibrations : le guidage vers les balises d'un parcours de voile
  * (src/recording/markGuide.ts, src/platform/beeper.ts), et les motifs joués une
- * fois (zone visée, test de FC repos, « Écouter » de Réglages). Le compteur du
- * fractionné et son service sont partis avec l'Entraînement (lot 302).
+ * fois (zone visée, test de FC repos, « Écouter » de Réglages).
  *
  * Le rythme des balises est tenu ici, sur un fil à lui : écran éteint, les
  * minuteries de la WebView sont bridées, pas celles d'Android, et le service
@@ -177,8 +176,7 @@ public class BeeperPlugin extends Plugin {
             for (int i = 0; i < delays.length; i++) {
                 int kind = kinds[i];
                 h.postDelayed(() -> {
-                    if (kind == TonePlayer.TONE_FINAL) tones().playFinal(vibrateRequested);
-                    else if (kind == TonePlayer.TONE_LONG) tones().playLong(vibrateRequested);
+                    if (kind == TonePlayer.TONE_LONG) tones().playLong(vibrateRequested);
                     else if (kind == TonePlayer.TONE_BRIEF) tones().playBrief(vibrateRequested);
                     else tones().playShort(vibrateRequested);
                 }, delays[i]);

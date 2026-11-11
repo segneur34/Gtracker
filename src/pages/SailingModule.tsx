@@ -111,8 +111,8 @@ function SailingModule() {
   // Session de la mémoire désignée par l'URL : son activité devient celle du module. Son brouillon (vent saisi,
   // seuil d'activité, allure imposée, couleurs et notes, écrits dans sa fiche par « Enregistrer la session »)
   // reste rattaché à la session demandée, comme avant le lot 62. Toutes les activités sont proposées pour une
-  // session de la mémoire, celles de la voile seules sinon ; vers une activité de course, la session part
-  // dans le module course (`useChangeSessionActivity`).
+  // session de la mémoire, celles de la voile seules sinon ; vers une activité de surf, la session part
+  // dans le module surf (`useChangeSessionActivity`).
   const {
     requested: requestedFile, sessionFile, error: sessionError, reading, draft, record: draftRecord, allActivities, changeActivity: changeSessionActivity,
   } = useAnalysisSession({ family: 'voile', activity, setActivity, load, loadedFile: shownFile, draftFor: 'requested' });
@@ -211,7 +211,7 @@ function SailingModule() {
   /** Pumping de la session (brouillon, puis fiche), sinon celui de l'activité ; sur foil seulement (lot 22). */
   const pumping = foil && profile.pump !== null && (edits.pumping ?? activityPumping);
   /** FC de la session (ceinture, montre) et zones du pratiquant : l'onglet « cardio » et sa courbe dans « graphiques ». */
-  const { runner, retainHr, heart, hrZones } = useAnalysisHeart(track, profile.heartRate, effectiveHrOffset(activity));
+  const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(track, profile.heartRate, effectiveHrOffset(activity));
   // Onglets de l'activité, rangée « avancé », point survolé effacé à chaque session ; une seule surbrillance
   // sur la carte, effacée quand son onglet se ferme (`useMapHighlight`).
   const { open, toggle, toggleOf, closeAll, advanced, shown, highlight } = useAnalysisTabs({
@@ -333,7 +333,7 @@ function SailingModule() {
    * Chiffres de l'onglet « général », proposés aussi pour l'image de partage. Sans seuil (bateau),
    * toute la session compte en navigation : ni distance, temps, ratio ni moyenne actifs.
    */
-  /** FC moyenne, en fin des chiffres de « général » et du partage, si la session a de la FC (comme à pied). */
+  /** FC moyenne, en fin des chiffres de « général » et du partage, si la session a de la FC. */
   const heartRateStat: ShareStat[] = heart.present && heart.stats
     ? [{ key: 'heartRate', label: 'FC moyenne', value: `${Math.round(heart.stats.avgBpm)} bpm` }]
     : [];
@@ -649,7 +649,7 @@ function SailingModule() {
             )}
 
             {open.cardio && heart.present && (
-              <CardioTab id="sailing.cardio" track={track} minutes={trackMinutes} heart={heart} params={profile.heartRate} hrEnergy={profile.hrEnergy} zones={hrZones} runner={runner}
+              <CardioTab id="sailing.cardio" track={track} minutes={trackMinutes} heart={heart} params={profile.heartRate} hrEnergy={profile.hrEnergy} zones={hrZones} athlete={athlete}
                 onRetainHrMax={retainSessionHrMax} zone={hrZone}
                 zoom={cardioZoom} onShowOnMap={showCardioOnMap}
                 open={open.cardio} onToggle={toggleOf('cardio')} />

@@ -8,7 +8,7 @@ import { isNativeApp } from './runtime';
  * échoue, aucun : la reprise silencieuse n'a jamais lieu sur un doute.
  */
 
-/** Services au premier plan vus vivants : le GPS (le service de la ceinture seule est parti avec la muscu, lot 302). */
+/** Services au premier plan vus vivants : le GPS. */
 export interface RecoveryServices {
   gps: boolean;
 }

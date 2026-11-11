@@ -1,16 +1,13 @@
 /*
- * Direction artistique de Tracker : toutes les valeurs visuelles de
- * l'application, en variables. C'est le seul fichier à modifier pour changer
- * de DA : pages et composants ne lisent que ces variables.
+ * Direction artistique : toutes les valeurs visuelles de l'application, en
+ * variables. C'est le seul fichier à modifier pour changer de DA : pages et
+ * composants ne lisent que ces variables.
  *
- * Refonte du 22 octobre 2026, sur la maquette Canva (police Montserrat, logo
- * en Shrikhand, remplacé le 08/11 par celui de GONG, fond gris bleuté, cartes blanches, vert Enregistrer). Couleurs
- * des familles : bleu roi voile, rouge à pied, vert vélo de la maquette ;
- * orange fractionné et gris surf gardés (point 97). Chacune est la
- * première nuance de sa famille (`FAMILY_SHADES` de `core/activities.ts`,
+ * Police Montserrat, logo GONG, fond gris bleuté, cartes blanches, vert
+ * Enregistrer. Deux couleurs de famille : bleu roi voile, gris surf. Chacune
+ * est la première nuance de sa famille (`FAMILY_SHADES` de `core/activities.ts`,
  * égalité vérifiée par `palette.test.ts`) et porte du texte blanc : contraste
- * d'au moins 4,5 sur blanc. Rouge, orange et vert ne se séparent que par leur
- * clarté pour un daltonien : une famille va toujours avec son icône ou son nom.
+ * d'au moins 4,5 sur blanc.
  */
 
 :root {
@@ -200,12 +197,14 @@
   --chart-tick: #666666;
   --chart-mark: #37474f;
   --chart-cursor: rgb(0 0 0 / 0.05);
+
+  /* Boutons d'action et aides du test de FC repos (`RestingHrTestPage.css`), la même dans les deux thèmes. */
+  --rest-accent: #c25700;
 }
 
 /*
  * Sombre (maquette du 28/10). Familles éclaircies d'un cran, texte blanc
- * gardé dessus (contraste d'au moins 4,5 : l'orange, déjà au plus clair,
- * reste tel quel) ; chacune est la première nuance sombre de sa famille
+ * gardé dessus (contraste d'au moins 4,5) ; chacune est la première nuance sombre de sa famille
  * (`FAMILY_SHADES_DARK`, `palette.test.ts`).
  */
 :root[data-theme='dark'] {

@@ -1,12 +1,12 @@
 import { readActivities } from '../core/activities';
 import { isObject, parseJson, stringifyJson } from '../core/basics';
-import { sanitizeRunnerProfile } from './athleteProfile';
+import { sanitizeAthleteProfile } from './athleteProfile';
 import { ROOT_GOAL } from './rootGrowth';
 
 /**
  * Fichiers de réglages du dossier mémoire (§10, point 90) : un par appareil,
  * `reglages/<nom de l'appareil>.json`. Ils portent ce qui voyage : activités
- * et leurs réglages, séances du compteur, barre du bas, profil du pratiquant.
+ * et leurs réglages, barre du bas, profil du pratiquant.
  * La disposition de l'écran (sections ouvertes, tailles des blocs) reste
  * propre à chaque appareil.
  *
@@ -230,7 +230,7 @@ export const settingsSignature = (values: Record<string, unknown>): string => {
 /**
  * Valeurs d'un fichier relues avec contrôle avant d'être reprises : chaque
  * profil du pratiquant (`tracker.runnerProfile`, rangé par clé) champ par
- * champ (`sanitizeRunnerProfile`) ; un profil qui n'a pas la forme d'une liste
+ * champ (`sanitizeAthleteProfile`) ; un profil qui n'a pas la forme d'une liste
  * rangée par clé n'est pas repris (celui de l'appareil reste).
  */
 export const checkedValues = (values: Record<string, unknown>): Record<string, unknown> => {
@@ -238,7 +238,7 @@ export const checkedValues = (values: Record<string, unknown>): Record<string, u
   if (!(key in values)) return values;
   const { [key]: profiles, ...rest } = values;
   if (!isObject(profiles)) return rest;
-  return { ...rest, [key]: Object.fromEntries(Object.entries(profiles).map(([k, v]) => [k, sanitizeRunnerProfile(v, ROOT_GOAL)])) };
+  return { ...rest, [key]: Object.fromEntries(Object.entries(profiles).map(([k, v]) => [k, sanitizeAthleteProfile(v, ROOT_GOAL)])) };
 };
 
 /**

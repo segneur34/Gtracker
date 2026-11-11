@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { heartRateZones } from '../core/heartRate';
 import { REFERENCE_HEART_RATE } from '../core/sportProfiles';
-import { EMPTY_RUNNER_PROFILE, type RunnerProfile } from '../library/athleteProfile';
+import { EMPTY_ATHLETE_PROFILE, type AthleteProfile } from '../library/athleteProfile';
 import { formatOffsetBpm, hrSourceLabel, zonesOriginText } from './heartRateOrigin';
 
 const MODEL = REFERENCE_HEART_RATE.zoneModel;
@@ -16,26 +16,26 @@ describe('hrSourceLabel', () => {
 });
 
 describe('zonesOriginText', () => {
-  const runner: RunnerProfile = {
-    ...EMPTY_RUNNER_PROFILE,
+  const athlete: AthleteProfile = {
+    ...EMPTY_ATHLETE_PROFILE,
     hrMax: 190, hrMaxSource: { kind: 'test', atMs: atDay(24, 10) },
     hrRest: 50, hrRestSource: { kind: 'test', atMs: atDay(25, 10) },
   };
 
   it('dit les seuils, le décalage et les deux FC avec leur origine', () => {
-    const zones = heartRateZones(runner, null, MODEL, -7)!;
-    expect(zonesOriginText(zones, runner)).toBe(
+    const zones = heartRateZones(athlete, null, MODEL, -7)!;
+    expect(zonesOriginText(zones, athlete)).toBe(
       'S1 141 et S2 162 bpm (−7 pour cette activité), tirés de la FC repos 50 (test du 25/10) et de la FC max 190 (test du 24/10).'
     );
   });
 
   it("dit une FC max estimée par l'âge, sans FC repos", () => {
-    const zones = heartRateZones(EMPTY_RUNNER_PROFILE, 40, MODEL)!;
-    expect(zonesOriginText(zones, EMPTY_RUNNER_PROFILE)).toBe("S1 140 et S2 160 bpm, tirés de la FC max 180 (estimée par l'âge), sans FC repos.");
+    const zones = heartRateZones(EMPTY_ATHLETE_PROFILE, 40, MODEL)!;
+    expect(zonesOriginText(zones, EMPTY_ATHLETE_PROFILE)).toBe("S1 140 et S2 160 bpm, tirés de la FC max 180 (estimée par l'âge), sans FC repos.");
   });
 
   it('dit des seuils saisis', () => {
-    const entered = { ...runner, hrThresholds: [150, 170] };
+    const entered = { ...athlete, hrThresholds: [150, 170] };
     expect(zonesOriginText(heartRateZones(entered, null, MODEL)!, entered)).toBe('S1 150 et S2 170 bpm, saisis dans Réglages › Pratiquant.');
     expect(formatOffsetBpm(3)).toBe('+3');
   });

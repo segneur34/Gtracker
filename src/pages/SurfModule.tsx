@@ -185,7 +185,7 @@ function SurfModule() {
   });
   const graphFolds = useOpenSections(`${STORAGE_ID}.graphes`, GRAPH_FOLDS_DEFAULT);
   /** FC de la session (ceinture, montre) et zones du pratiquant : l'onglet « cardio » et sa courbe sous la vitesse. */
-  const { runner, retainHr, heart, hrZones } = useAnalysisHeart(gpx.track, profile.heartRate, hrOffsetBpm);
+  const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(gpx.track, profile.heartRate, hrOffsetBpm);
   // Pumping des vols, par les capteurs de la session : il suit les vols, donc le seuil du brouillon.
   // Capteurs lus à l'ouverture de l'onglet « vols » ou « pumping », Pumping coché, comme en voile : une capture entière pèse plusieurs Mo ;
   // et à celle de l'onglet « vagues », pour les virages du gyroscope (lot 40).
@@ -766,7 +766,7 @@ function SurfModule() {
             })()}
 
             {open.cardio && heart.present && (
-              <CardioTab id={panelId('cardio')} track={track} minutes={trackMinutes} heart={heart} params={profile.heartRate} hrEnergy={profile.hrEnergy} zones={hrZones} runner={runner}
+              <CardioTab id={panelId('cardio')} track={track} minutes={trackMinutes} heart={heart} params={profile.heartRate} hrEnergy={profile.hrEnergy} zones={hrZones} athlete={athlete}
                 onRetainHrMax={retainSessionHrMax} zone={hrZone}
                 zoom={cardioZoom} onShowOnMap={showCardioOnMap}
                 open={open.cardio} onToggle={toggleOf('cardio')} />

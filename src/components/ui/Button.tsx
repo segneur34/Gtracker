@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes } from 'react';
 
-export type ButtonVariant = 'primary' | 'record' | 'danger' | 'secondary' | 'ghost';
+type ButtonVariant = 'primary' | 'record' | 'danger' | 'secondary' | 'ghost';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Rôle du bouton : `record` pour Enregistrer, `danger` pour Arrêter. */

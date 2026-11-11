@@ -15,7 +15,7 @@ export interface HeadingOptions {
   minStepM: number;
 }
 
-export const HEADING_DEFAULTS: HeadingOptions = {
+const HEADING_DEFAULTS: HeadingOptions = {
   movingSpeedMs: 0.8,
   minStepM: 5,
 };

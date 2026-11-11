@@ -172,8 +172,7 @@ export const visibleIndexRange = (values: ArrayLike<number>, range: XRange | nul
  * qu'il soit ajouté au tracé, en part de l'étendue de la série sur la plage.
  * À 5 %, un pic de 2 s à plus d'un nœud au-dessus du bord reste tracé, et le
  * bruit du GPS n'ajoute que 10 à 25 % de points à la vitesse brute de la
- * voile, presque rien à la vitesse lissée de la course (mesuré sur 22 traces
- * réelles le 27/10 ; à 2 %, jusqu'à +75 % en voile).
+ * voile (mesuré sur 22 traces réelles le 27/10 ; à 2 %, jusqu'à +75 %).
  */
 export const CHART_EXTREME_TOLERANCE = 0.05;
 

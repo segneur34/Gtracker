@@ -24,7 +24,7 @@ public class RecoveryPlugin extends Plugin {
     /** Service du greffon @capgo/background-geolocation, nommé en toutes lettres : sa classe n'a pas à être publique. */
     private static final String GPS_SERVICE = "com.capgo.capacitor_background_geolocation.BackgroundGeolocationService";
 
-    /** `gps` : le service GPS (celui de la ceinture seule est parti avec la muscu, lot 302). */
+    /** `gps` : le service GPS. */
     @PluginMethod
     @SuppressWarnings("deprecation")
     public void state(PluginCall call) {

@@ -51,7 +51,7 @@ export function SessionDate({ track }: { track: readonly { timeMs: number }[] })
 /**
  * Titre d'un panneau dans sa ligne, avec la marge qui le sépare du contenu :
  * l'en-tête de presque tous les onglets. `padRight` réserve 28 px à droite
- * (coin du panneau des sauts et du fractionné).
+ * (coin du panneau des sauts).
  */
 export function PanelHeading({ label, extra, open, onToggle, helpKey, padRight = false }: {
   label: ReactNode;

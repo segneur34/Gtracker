@@ -10,7 +10,7 @@ export const MS_TO_KMH = 3.6;
 export const STANDARD_G = 9.80665;
 
 /** Unité dans laquelle une vitesse est présentée à l'utilisateur. */
-export type SpeedUnit = 'kn' | 'kmh' | 'ms' | 'minkm';
+export type SpeedUnit = 'kn' | 'kmh' | 'ms';
 
 export const msToKnots = (ms: number): number => ms * MS_TO_KNOTS;
 export const knotsToMs = (kn: number): number => kn / MS_TO_KNOTS;
@@ -34,14 +34,6 @@ export const parseDecimal = (text: string): number => parseFloat(text.replace(',
 /** Entier sur deux chiffres, « 05 ». */
 export const pad2 = (n: number): string => String(n).padStart(2, '0');
 
-/** Minutes décimales en `m:ss`, avec le report de 60 s (5,999 donne « 6:00 ») ; « - » si `NaN` ou infinie (un écart négatif s'écrit « -2:30 »). */
-export const minutesSeconds = (totalMinutes: number): string => {
-  if (!isFinite(totalMinutes)) return '-';
-  const min = Math.floor(totalMinutes);
-  const sec = Math.round((totalMinutes - min) * 60);
-  return sec === 60 ? `${min + 1}:00` : `${min}:${pad2(sec)}`;
-};
-
 /**
  * Écart signé, en pourcentage, d'une fraction : « +1,2 % », « −3.0 % ». Un écart
  * nul s'écrit « 0 % » ; avec `zeroSign`, il garde son signe (« +0,0 % »).
@@ -52,32 +44,8 @@ export const signedPercent = (fraction: number, { decimals = 1, zeroSign = false
   return `${zeroSign ? (fraction >= 0 ? '+' : '−') : fraction < 0 ? '−' : '+'}${value} %`;
 };
 
-/** Sous cette vitesse (m/s), une allure tend vers l'infini : `msToPace` rend `null`. */
-export const PACE_MIN_SPEED_MS = 0.1;
-/** Graphes des analyses à pied et à vélo : sous cette vitesse en allure, un trou plutôt qu'une valeur absurde. */
-export const CHART_PACE_MIN_SPEED_MS = 0.3;
-/** Même seuil dans l'analyse des répétitions du fractionné. */
-export const INTERVAL_PACE_MIN_SPEED_MS = 0.3;
-
-/**
- * Allure en minutes par kilomètre, ou par mille nautique (1 852 m) si la
- * distance de l'activité est en `nm`. Grandeur inverse de la vitesse : elle
- * tend vers l'infini à l'arrêt, d'où le `null` en dessous d'un seuil de mouvement.
- */
-export const msToPace = (ms: number, distanceUnit: DistanceUnit = 'km', minSpeedMs = PACE_MIN_SPEED_MS): number | null => {
-  if (ms <= minSpeedMs) return null;
-  return METERS_PER_DISTANCE_UNIT[distanceUnit] / ms / 60;
-};
-
-/** Formate une allure en `m:ss`, ou `-` si la vitesse est trop faible. */
-export const formatPace = (ms: number, distanceUnit: DistanceUnit = 'km'): string => {
-  const pace = msToPace(ms, distanceUnit);
-  if (pace === null || !isFinite(pace)) return '-';
-  return minutesSeconds(pace);
-};
-
 /** Convertit une vitesse en m/s vers une unité d'affichage. */
-export function toDisplaySpeed(ms: number, unit: SpeedUnit, distanceUnit: DistanceUnit = 'km'): number {
+export function toDisplaySpeed(ms: number, unit: SpeedUnit): number {
   switch (unit) {
     case 'kn':
       return msToKnots(ms);
@@ -85,13 +53,11 @@ export function toDisplaySpeed(ms: number, unit: SpeedUnit, distanceUnit: Distan
       return msToKmh(ms);
     case 'ms':
       return ms;
-    case 'minkm':
-      return msToPace(ms, distanceUnit) ?? 0;
   }
 }
 
 /** Convertit une vitesse saisie dans une unité d'affichage vers des m/s. */
-export const fromDisplaySpeed = (value: number, unit: SpeedUnit, distanceUnit: DistanceUnit = 'km'): number => {
+export const fromDisplaySpeed = (value: number, unit: SpeedUnit): number => {
   switch (unit) {
     case 'kn':
       return knotsToMs(value);
@@ -99,8 +65,6 @@ export const fromDisplaySpeed = (value: number, unit: SpeedUnit, distanceUnit: D
       return kmhToMs(value);
     case 'ms':
       return value;
-    case 'minkm':
-      return value > 0 ? METERS_PER_DISTANCE_UNIT[distanceUnit] / (value * 60) : 0;
   }
 };
 
@@ -123,7 +87,6 @@ export const SPEED_UNIT_LABEL: Record<SpeedUnit, string> = {
   kn: 'nœuds',
   kmh: 'km/h',
   ms: 'm/s',
-  minkm: 'min/km',
 };
 
 /**
@@ -136,34 +99,15 @@ export const speedSourceText = (hasDeviceSpeed: boolean, deviceSpeedUnit: SpeedU
     ? `fournie par l'appareil${deviceSpeedUnit && deviceSpeedUnit !== 'ms' ? `, lue en ${SPEED_UNIT_LABEL[deviceSpeedUnit]} et convertie` : ''}`
     : 'dérivée des positions, filtrée';
 
-/** Libellé d'une unité de vitesse ; l'allure suit l'unité de distance (« min/km », « min/NM »). */
-export const speedUnitLabel = (unit: SpeedUnit, distanceUnit: DistanceUnit = 'km'): string =>
-  unit === 'minkm' ? `min/${DISTANCE_UNIT_SYMBOL[distanceUnit]}` : SPEED_UNIT_LABEL[unit];
-
-/** Symbole court d'une unité de vitesse ; l'allure suit l'unité de distance (« /km », « /NM »). */
-export const speedUnitSymbol = (unit: SpeedUnit, distanceUnit: DistanceUnit = 'km'): string =>
-  unit === 'minkm' ? `/${DISTANCE_UNIT_SYMBOL[distanceUnit]}` : SPEED_UNIT_SYMBOL[unit];
-
 /** Symbole court, accolé à une valeur (« 12,4 nds »). */
 export const SPEED_UNIT_SYMBOL: Record<SpeedUnit, string> = {
   kn: 'nds',
   kmh: 'km/h',
   ms: 'm/s',
-  minkm: '/km',
 };
 
-/** Vrai si, dans cette unité, une valeur plus grande signifie plus lent. */
-export const isInverseUnit = (unit: SpeedUnit): boolean => unit === 'minkm';
-
-/**
- * Unité de saisie d'une vitesse (bornes de couleur, seuils) : celle de
- * l'activité, sauf une allure, saisie en km/h (des minutes décimales se liraient
- * mal : « 5.30 » vaudrait 5 min 18 s).
- */
-export const editSpeedUnit = (unit: SpeedUnit): SpeedUnit => (isInverseUnit(unit) ? 'kmh' : unit);
-
 /** Formate une vitesse en m/s dans l'unité choisie, avec son symbole. */
-export function formatSpeed(ms: number | null, unit: SpeedUnit, distanceUnit: DistanceUnit = 'km'): string {
+export function formatSpeed(ms: number | null, unit: SpeedUnit): string {
   if (ms === null || !isFinite(ms)) return '-';
   switch (unit) {
     case 'kn':
@@ -172,24 +116,12 @@ export function formatSpeed(ms: number | null, unit: SpeedUnit, distanceUnit: Di
       return `${formatDecimal(msToKmh(ms), 1)} ${SPEED_UNIT_SYMBOL.kmh}`;
     case 'ms':
       return `${formatDecimal(ms, 2)} ${SPEED_UNIT_SYMBOL.ms}`;
-    case 'minkm':
-      return `${formatPace(ms, distanceUnit)} ${speedUnitSymbol(unit, distanceUnit)}`;
   }
 }
-
-/**
- * Comme `formatSpeed`, pour les modules à pied et à vélo (et la bibliothèque,
- * Statistiques, intervalles) où l'unité peut être une allure : l'unité de
- * distance est obligatoire au type, faute de quoi l'allure serait fausse en
- * silence en milles. Voile et surf gardent `formatSpeed`.
- */
-export const formatLandSpeed = (ms: number | null, unit: SpeedUnit, distanceUnit: DistanceUnit): string =>
-  formatSpeed(ms, unit, distanceUnit);
 
 /** Formate une valeur déjà exprimée dans l'unité, pour les axes de graphe. */
 export const formatSpeedValue = (value: number, unit: SpeedUnit): string => {
   if (!isFinite(value)) return '-';
-  if (unit === 'minkm') return minutesSeconds(value);
   return formatDecimal(value, unit === 'ms' ? 2 : 1);
 };
 
@@ -214,13 +146,12 @@ export const formatKnots = (kn: number | string, unit: SpeedUnit): string => {
 /**
  * Vitesse en nœuds pour un graphe, dans l'unité : le nombre que rend la
  * lecture de `formatKnots`, au même arrondi que l'affichage, sans passer par
- * le texte. L'allure garde la lecture du texte « m:ss », telle quelle.
+ * le texte.
  */
 export const knotsToChartValue = (kn: number, unit: SpeedUnit): number => {
   if (!isFinite(kn)) return kn;
   if (unit === 'kn') return toFixedNumber(kn, 1);
   const value = knotsToDisplay(kn, unit);
-  if (unit === 'minkm' || !isFinite(value)) return parseDecimal(formatSpeedValue(value, unit));
   return toFixedNumber(value, unit === 'ms' ? 2 : 1);
 };
 
@@ -300,18 +231,6 @@ export const formatClock = (ms: number): string => {
 
 /** Axe de temps d'un graphe, donné en minutes : `h:mm`, ou `h:mm:ss` hors de la minute ronde (graphe zoomé). */
 export const formatClockMinutes = (minutes: number): string => formatClock(minutes * 60_000).replace(/:00$/, '');
-
-/**
- * Secondes entières en `m:ss`, `h:mm:ss` à partir d'une heure ; `secondSuffix`
- * s'accroche aux secondes (les dixièmes d'un chronomètre).
- */
-export const formatMinSecHours = (totalSeconds: number, secondSuffix = ''): string => {
-  if (!isFinite(totalSeconds) || totalSeconds < 0) return '-';
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor(totalSeconds / 60) % 60;
-  const s = `${pad2(totalSeconds % 60)}${secondSuffix}`;
-  return h > 0 ? `${h}:${pad2(m)}:${s}` : `${m}:${s}`;
-};
 
 /** Joules par kilocalorie. */
 export const J_PER_KCAL = 4184;

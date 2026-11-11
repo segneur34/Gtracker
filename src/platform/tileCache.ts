@@ -341,7 +341,7 @@ export const tileStore: TileStore = isNativeApp() ? nativeStore : createBrowserS
 const CAP_STORAGE_KEY = 'tracker.tileCache';
 
 /** Plafond permis dans Réglages, en mégaoctets. */
-export const TILE_CAP_LIMITS_MB = { min: 10, max: 20_000 } as const;
+const TILE_CAP_LIMITS_MB = { min: 10, max: 20_000 } as const;
 
 export const isValidTileCap = (value: unknown): value is number =>
   inRange(value, TILE_CAP_LIMITS_MB.min, TILE_CAP_LIMITS_MB.max);

@@ -6,7 +6,7 @@ import { displayedDurationMs } from '../recording/session';
 import { getLiveRecording, liveStatsOptionsFor, subscribeToLiveRecording } from './useLiveRecording';
 import { getMarkGuideView } from './useMarkGuide';
 import { getLiveFixes, getRecorderState, subscribeToFixes, subscribeToRecorder } from './useRecorder';
-import { readHeartRateZoneBounds } from './useRunnerProfile';
+import { readHeartRateZoneBounds } from './useAthleteProfile';
 import { effectiveDistanceUnit, effectiveNotificationFields, effectiveSpeedUnit } from './useSportSettings';
 
 /**

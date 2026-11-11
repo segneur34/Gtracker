@@ -1,6 +1,6 @@
 import type { ShareStat } from '../core/shareImage';
 import { FOIL_RATIO_LABEL, type Treatment } from '../core/sportProfiles';
-import { commaDecimal, formatDistance, formatDuration, formatSessionDate, formatShortDuration, formatLandSpeed, type DistanceUnit, type SpeedUnit } from '../core/units';
+import { commaDecimal, formatDistance, formatDuration, formatSessionDate, formatShortDuration, formatSpeed, type DistanceUnit, type SpeedUnit } from '../core/units';
 import { downloadBaseName } from './naming';
 import { RATINGS, WIND_LEVELS, type Rating, type WindLevel } from './notes';
 import type { SessionSummary } from './record';
@@ -32,10 +32,10 @@ export interface ShareExtras {
 const DASH = '—';
 
 /** Libellé de l'appréciation, sans icône ni emoji (« Bien ») ; `null` sans appréciation. */
-export const ratingLabel = (rating: Rating | null | undefined): string | null => RATINGS.find((r) => r.value === rating)?.label ?? null;
+const ratingLabel = (rating: Rating | null | undefined): string | null => RATINGS.find((r) => r.value === rating)?.label ?? null;
 
 /** « 230° · moyen », « 230° », « Moyen » : le vent dit en clair, « — » sans rien. */
-export const windShareValue = (deg: number | null | undefined, level: WindLevel | null | undefined): string => {
+const windShareValue = (deg: number | null | undefined, level: WindLevel | null | undefined): string => {
   const dir = deg === null || deg === undefined || !Number.isFinite(deg) ? null : `${Math.round(((deg % 360) + 360) % 360)}°`;
   const force = WIND_LEVELS.find((w) => w.value === level)?.label ?? null;
   if (dir && force) return `${dir} · ${force.toLowerCase()}`;
@@ -43,7 +43,7 @@ export const windShareValue = (deg: number | null | undefined, level: WindLevel 
 };
 
 /** « 83 % (10/12) » : la réussite des manœuvres, « — » sans manœuvre classée. */
-export const maneuverSuccessValue = (m: { success: number; total: number } | null | undefined): string =>
+const maneuverSuccessValue = (m: { success: number; total: number } | null | undefined): string =>
   m && m.total > 0 ? `${Math.round((m.success / m.total) * 100)} % (${m.success}/${m.total})` : DASH;
 
 /**
@@ -114,7 +114,7 @@ const summaryBaseStats = (
   const movingS = summary.movingTimeS;
   const movingM = summary.movingDistanceM ?? null;
   const distance = formatDistance(summary.distanceM, units.distance);
-  const speed = (ms: number | null) => (ms === null || !Number.isFinite(ms) ? '—' : formatLandSpeed(ms, units.speed, units.distance));
+  const speed = (ms: number | null) => (ms === null || !Number.isFinite(ms) ? '—' : formatSpeed(ms, units.speed));
   const per = (m: number | null, s: number | null) => (m === null || s === null || s <= 0 ? null : m / s);
 
   if (treatment === 'voile') {

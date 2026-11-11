@@ -79,7 +79,7 @@ export const TURN_EXTENSION_MAX_WINDOWS = 2;
  * Durée maximale, en secondes, d'un intervalle unique tenu pour observable
  * quand la fenêtre d'observation ne contient aucun point.
  *
- * Les enregistreurs économiques — les applications de randonnée, par exemple —
+ * Les enregistreurs économiques d'autres applications
  * posent un point quand on se déplace, et se taisent quand on ralentit.
  * Pendant un virement de bord la planche s'arrête : toute la rotation se
  * retrouve compressée dans un seul intervalle, plus long que la fenêtre, et le

@@ -60,7 +60,6 @@ const mockPlatform = (): void => {
     parseGpx: (text: string) => ({
       rawPoints: [...text.matchAll(/<trkpt lat="([\d.]+)" lon="([\d.]+)"><time>([^<]+)<\/time>/g)]
         .map((m) => ({ lat: Number(m[1]), lon: Number(m[2]), time: m[3] })),
-      timedPoints: [],
       trackType: 'kite',
       hasDeviceSpeed: false,
     }),

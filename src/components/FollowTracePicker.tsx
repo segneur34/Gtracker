@@ -94,7 +94,7 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
     try {
       const text = await readSessionGpx(file);
       if (text === null) throw new Error('Session introuvable dans la mémoire.');
-      const trace = followedTraceFromSession(parseGpx(text).rawPoints, name, activityId, { land: false });
+      const trace = followedTraceFromSession(parseGpx(text).rawPoints, name, activityId);
       if (!trace) throw new Error('Cette session n\'a pas assez de points.');
       followTrace(trace);
       onPicked?.(trace);

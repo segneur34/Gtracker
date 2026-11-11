@@ -138,12 +138,6 @@ export const lastRecordActivity = (): Activity | null => {
   return readActivities(stored.activities).find((a) => a.id === stored.recordActivity) ?? null;
 };
 
-/** Parmi `candidates`, la dernière activité enregistrée si elle y est, sinon la première ; `null` si la liste est vide. */
-export const lastRecordedOrFirst = (candidates: readonly Activity[]): Activity | null => {
-  const last = lastRecordActivity();
-  return candidates.find((a) => a.id === last?.id) ?? candidates[0] ?? null;
-};
-
 export const rememberRecordActivity = (id: string): void => {
   const stored = readStoredSettings();
   if (stored.recordActivity !== id) writeStored({ ...stored, recordActivity: id });
@@ -185,7 +179,7 @@ export const effectiveStopHoldMs = (): number => {
 };
 
 /** Ce qui est visible (§10, point 100) : la liste complète, les familles cachées, et de quoi filtrer. */
-export interface Visibility {
+interface Visibility {
   /** Toutes les activités, cachées comprises : elles nomment les sessions (`sessionActivity`). */
   activities: Activity[];
   /** Familles cachées dans Réglages (`hiddenFamiliesOf`). */
@@ -444,7 +438,7 @@ const useStableByText = <T,>(value: T): T => {
 /**
  * Réglages d'un module d'analyse : son activité courante, le profil de son
  * calcul et les réglages rangés sous elle. Un module ne reprend que les
- * activités de sa famille : la course n'hérite pas du seuil de vol du
+ * activités de sa famille : le surf n'hérite pas du seuil de vol du
  * wingfoil (règle 9).
  */
 export const useSportSettings = (family: SportFamily) => {

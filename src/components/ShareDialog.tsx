@@ -4,8 +4,8 @@ import { FAMILY_ACCENT } from '../core/activities';
 import { pickShareStats, SHARE_IMAGE, type ShareStat } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
 import { useMapBase } from '../hooks/useMapBase';
-import { readRunnerProfile } from '../hooks/useRunnerProfile';
-import { runnerName } from '../library/athleteProfile';
+import { readAthleteProfile } from '../hooks/useAthleteProfile';
+import { athleteName } from '../library/athleteProfile';
 import { shareFile } from '../platform/share';
 import { jsonStore } from '../platform/storage';
 import { lightToken } from '../theme/lightToken';
@@ -58,7 +58,7 @@ interface ShareDialogProps {
 function ShareDialog({ family, file, activityId, title, subtitle, fileName, segments, stats, onClose }: ShareDialogProps) {
   const [choice, setChoice] = useState<ShareChoice>(() => readChoice(activityId));
   /** Nom ou pseudo de Réglages, au pied de l'image. */
-  const [author] = useState(() => runnerName(readRunnerProfile()));
+  const [author] = useState(() => athleteName(readAthleteProfile()));
   /** Dernière image dessinée, et ce qu'elle montre (`drawKey`). */
   const [image, setImage] = useState<{ blob: Blob; url: string; key: string } | null>(null);
   /** Échec du dessin, pour ce qu'il devait montrer. */
@@ -133,7 +133,7 @@ function ShareDialog({ family, file, activityId, title, subtitle, fileName, segm
           : <span className="share-dialog__wait">Préparation de l'image…</span>}
       </div>
 
-      {/* Sans trace (muscu), pas de fond de carte à choisir. */}
+      {/* Sans trace, pas de fond de carte à choisir. */}
       {segments.length > 0 && (
         <label className="share-dialog__check">
           <input type="checkbox" checked={withMap} onChange={(e) => update({ ...choice, map: e.target.checked })} />

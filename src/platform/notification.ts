@@ -20,8 +20,8 @@ export interface RecordingNotificationContent {
   text: string;
   /** Lignes du texte déplié. */
   lines: string[];
-  /** Chronomètre de l'en-tête : son instant de base, en ms, à rebours ou non ; `null` : aucun. */
-  chrono: { baseMs: number; countDown: boolean } | null;
+  /** Chronomètre de l'en-tête : son instant de base, en ms (il compte la durée en montant) ; `null` : aucun. */
+  chrono: { baseMs: number } | null;
 }
 
 /** Greffon maison, `android/app/src/main/java/io/github/segneur/tracker/RecordingNotificationPlugin.java`. */
@@ -31,7 +31,6 @@ interface RecordingNotificationPlugin {
     text: string;
     lines: string[];
     chronoMs: number | null;
-    countDown: boolean;
     standalone: boolean;
   }): Promise<void>;
   clear(): Promise<void>;
@@ -49,7 +48,7 @@ export const updateRecordingNotification = async (
   { standalone }: { standalone: boolean }
 ): Promise<void> => {
   if (!isNativeApp()) {
-    const chrono = content.chrono ? ` [${content.chrono.countDown ? 'rebours' : 'durée'} ${content.chrono.baseMs}]` : '';
+    const chrono = content.chrono ? ` [durée ${content.chrono.baseMs}]` : '';
     console.debug(`[notification] ${content.title} | ${content.text}${chrono}${standalone ? ' (seule)' : ''}`);
     return;
   }
@@ -58,7 +57,6 @@ export const updateRecordingNotification = async (
     text: content.text,
     lines: content.lines,
     chronoMs: content.chrono?.baseMs ?? null,
-    countDown: content.chrono?.countDown ?? false,
     standalone,
   });
 };

@@ -7,10 +7,9 @@ import type { LocationFix } from '../platform/location';
  * n'importe quelle autre application aussi.
  *
  * La vitesse du système va dans `gpxtpx:speed` (extension Garmin, en m/s), la
- * fréquence cardiaque de la ceinture dans `gpxtpx:hr` ; la cadence à pied
- * (`gpxtpx:cad`) est partie avec la course (lot 303). La précision,
- * utiles seulement en direct pendant l'enregistrement, ne sont pas écrits :
- * ils alourdiraient le fichier sans être relus par personne.
+ * fréquence cardiaque de la ceinture dans `gpxtpx:hr`. La précision,
+ * utile seulement en direct pendant l'enregistrement, n'est pas écrite :
+ * elle alourdirait le fichier sans être relue par personne.
  *
  * Une pause, manuelle ou automatique, sépare la trace en segments continus :
  * chacun devient un `<trkseg>`.

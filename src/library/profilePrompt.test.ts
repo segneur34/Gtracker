@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_RUNNER_PROFILE } from './athleteProfile';
+import { EMPTY_ATHLETE_PROFILE } from './athleteProfile';
 import { PROFILE_PROMPT_FIELDS, missingProfileFields, profilePromptGate, shouldPromptProfile } from './profilePrompt';
 
 describe('missingProfileFields', () => {
-  const full = { ...EMPTY_RUNNER_PROFILE, name: 'Tom', birthYear: 1985, sex: 'm' as const, weightKg: 72, heightCm: 178 };
+  const full = { ...EMPTY_ATHLETE_PROFILE, name: 'Tom', birthYear: 1985, sex: 'm' as const, weightKg: 72, heightCm: 178 };
 
   it('rend les deux champs pour un profil vide, dans leur ordre : pseudo et année de naissance (lot 301)', () => {
-    expect(missingProfileFields(EMPTY_RUNNER_PROFILE)).toEqual([...PROFILE_PROMPT_FIELDS]);
+    expect(missingProfileFields(EMPTY_ATHLETE_PROFILE)).toEqual([...PROFILE_PROMPT_FIELDS]);
     expect(PROFILE_PROMPT_FIELDS).toEqual(['name', 'birthYear']);
   });
 
   it('ne demande plus ni le sexe, ni le poids, ni la taille (lot 301)', () => {
-    expect(missingProfileFields({ ...EMPTY_RUNNER_PROFILE, name: 'Tom', birthYear: 1985 })).toEqual([]);
+    expect(missingProfileFields({ ...EMPTY_ATHLETE_PROFILE, name: 'Tom', birthYear: 1985 })).toEqual([]);
   });
 
   it('ne rend rien pour un profil rempli, FC comprises ou non', () => {

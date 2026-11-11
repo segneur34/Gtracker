@@ -60,7 +60,7 @@ describe('résumés de voile et de surf figés à l\'octet (garde du lot 187)', 
 
     it(`summarizeGpx : ${name}`, () => {
       const activitySettings = c.sport === null ? {} : { [c.sport]: { thresholdOverride: undefined, foil: c.foil } };
-      expect(JSON.stringify(summarizeGpx(gpxOf(c.raw, 'garmin-v2'), { sport: c.sport, analysis: null, activitySettings, elevation: null }))).toBe(FROZEN_GPX[name]);
+      expect(JSON.stringify(summarizeGpx(gpxOf(c.raw, 'garmin-v2'), { sport: c.sport, analysis: null, activitySettings }))).toBe(FROZEN_GPX[name]);
     });
   }
 

@@ -4,7 +4,7 @@ import { useStoredRecord } from '../hooks/useStoredRecord';
 
 /**
  * Barre d'onglets d'une analyse, sous la carte : la première rangée porte
- * « général » (et « fractionné »), puis « avancé », qui déplie dessous les
+ * « général », puis « avancé », qui déplie dessous les
  * autres onglets ; le refermer replie ces onglets et leurs panneaux, que le
  * module masque (`maskAdvancedTabs`) ; l'ouvrir ferme « général », le refermer
  * le rouvre (`useAnalysisTabs`). Une flèche en fin de rangée cache la

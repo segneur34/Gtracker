@@ -34,15 +34,15 @@ import { isObject, upperMedianOfSorted } from './basics';
  * instant / 1000.
  */
 
-export const IMU_MAGIC = 'TRKIMU1\n';
+const IMU_MAGIC = 'TRKIMU1\n';
 /** Format de l'en-tête (`core/appIdentity.ts`) ; celui de l'ancienne application n'est lu qu'à la porte d'import. */
 export const IMU_FORMAT = FILE_FORMATS.capteurs;
 export const IMU_VERSION = 1;
 
 /** Pas des instants dans un bloc, en microsecondes. */
-export const IMU_TIME_STEP_US = 100;
+const IMU_TIME_STEP_US = 100;
 
-export type ImuStreamKind = 'accel' | 'gyro' | 'pressure';
+type ImuStreamKind = 'accel' | 'gyro' | 'pressure';
 
 export interface ImuStreamInfo {
   /** Numéro du flux dans les blocs. */
@@ -473,7 +473,7 @@ export const selectImuWindows = (recording: ImuRecording, windows: [number, numb
   }),
 });
 
-export interface ImuStreamStats {
+interface ImuStreamStats {
   kind: ImuStreamKind;
   count: number;
   /** Cadence médiane, en Hz ; 0 sous deux mesures. */

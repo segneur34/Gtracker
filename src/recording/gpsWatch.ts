@@ -24,7 +24,7 @@ import type { RecordingProfile } from '../core/sportProfiles';
  * (`beltWatchSettings`). Une ceinture jamais jointe n'est donc pas « perdue ».
  */
 
-export type GpsWatchPhase = 'waiting' | 'watching' | 'lost' | 'rearming';
+type GpsWatchPhase = 'waiting' | 'watching' | 'lost' | 'rearming';
 
 export interface GpsWatchState {
   phase: GpsWatchPhase;

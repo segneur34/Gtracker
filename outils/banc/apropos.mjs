@@ -99,7 +99,7 @@ check('logo centré', logo.align === 'center', JSON.stringify(logo));
 const version = await evaluate(`document.querySelector('.about__version').textContent`);
 check('version', /^Version \d+\.\d+\.\d+$/.test(version), version);
 const paragraph = await evaluate(`document.querySelector('.about__text').textContent.trim()`);
-check('le paragraphe', paragraph === "Vos sessions restent sur cet appareil et dans votre dossier mémoire, sans compte. Les fonds de carte, la recherche de lieux, les itinéraires, ainsi que l'altitude et le revêtement des parcours à pied et à vélo, passent par des services en ligne.", paragraph);
+check('le paragraphe', paragraph === "Vos sessions restent sur cet appareil et dans votre dossier mémoire, sans compte. Les fonds de carte, la recherche de lieux, le calcul des itinéraires et leur altitude passent par des services en ligne.", paragraph);
 check('un filet au-dessus de la ligne des licences', (await evaluate(`getComputedStyle(document.querySelector('.about .settings-part')).borderTopWidth`)) === '1px');
 check('la ligne des licences, repliée', (await evaluate(`document.querySelector('.about .settings-part__toggle').getAttribute('aria-expanded')`)) === 'false');
 check('toujours aucune liste demandée', (await fetches()) === 0, await fetches());

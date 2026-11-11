@@ -26,7 +26,7 @@ export const HIGHLIGHT_SHOWN_COLOR = '#7b1fa2';
 export const MARK_FLAG_COLOR = '#37474f';
 
 /** Épaisseur du trait d'une surbrillance sur la carte, en pixels : bien plus que la trace (5). */
-export const HIGHLIGHT_WEIGHT = 10;
+const HIGHLIGHT_WEIGHT = 10;
 
 /** Opacité d'un tronçon montré : top, zone cardiaque, pente, cadence, revêtement, répétition, partie vue d'un graphe. */
 export const HIGHLIGHT_OPACITY = 0.8;

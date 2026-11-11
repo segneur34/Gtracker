@@ -1,5 +1,4 @@
 import { bandIndex } from './basics';
-import { firstIndexAtOrAfterTime, lastIndexAtOrBeforeTime } from './search';
 import { meanFilterByTime } from './speedFilter';
 import { pathsWhere, type TrackStep } from './trackPaths';
 
@@ -99,11 +98,11 @@ export const heartRateStats = (points: readonly HeartRatePoint[], smoothed: read
   return { avgBpm: sum / coveredS, maxBpm: Math.round(maxBpm), coveredS };
 };
 
-/** Données du pratiquant qui fixent les seuils et les zones (`RunnerProfile`). */
+/** Données du pratiquant qui fixent les seuils et les zones (`AthleteProfile`). */
 export interface HeartRateAthlete {
   hrMax: number | null;
   hrRest: number | null;
-  /** S1 et S2 saisis à la main (test en laboratoire), à pied, en bpm. */
+  /** S1 et S2 saisis à la main (test en laboratoire), en bpm. */
   hrThresholds?: readonly number[] | null;
 }
 
@@ -128,10 +127,10 @@ export interface HeartRateZoneModel {
 }
 
 /** D'où viennent S1 et S2 : saisis, réserve cardiaque, FC max seule. */
-export type ZoneMethod = 'saisis' | 'reserve' | 'max';
+type ZoneMethod = 'saisis' | 'reserve' | 'max';
 
 export interface HeartRateThresholds {
-  /** Seuils à pied, en bpm. */
+  /** Seuils de référence, en bpm. */
   s1: number;
   s2: number;
   method: ZoneMethod;
@@ -165,7 +164,7 @@ const enteredThresholds = (athlete: HeartRateAthlete): [number, number] | null =
   isValidThresholds(athlete.hrThresholds) ? [Math.round(athlete.hrThresholds[0]), Math.round(athlete.hrThresholds[1])] : null;
 
 /**
- * S1 et S2 à pied : saisis d'abord ; sinon en part de la réserve cardiaque
+ * S1 et S2 de référence : saisis d'abord ; sinon en part de la réserve cardiaque
  * (Karvonen) si la FC de repos est connue, de la FC max sinon ; FC max estimée
  * par l'âge si elle manque. `null` sans seuils saisis, FC max ni âge.
  */
@@ -262,46 +261,6 @@ export const histogramZoneTimes = (histogram: HeartRateHistogram, bounds: readon
   return times;
 };
 
-export interface SpanHeartRate {
-  avgBpm: number;
-  maxBpm: number;
-  /** Baisse de la FC `recoveryS` après la fin, en bpm ; `null` sans FC à ce moment. */
-  recoveryBpm: number | null;
-}
-
-/** FC d'un passage (une répétition), de `start` à `end` inclus ; `null` sans FC. */
-export const spanHeartRate = (
-  points: readonly HeartRatePoint[],
-  smoothed: readonly (number | null)[],
-  start: number,
-  end: number,
-  gapS: number,
-  recoveryS: number
-): SpanHeartRate | null => {
-  let sum = 0;
-  let coveredS = 0;
-  let maxBpm = 0;
-  // La FC lissée telle quelle, pas arrondie : arrondies à la fin.
-  forEachCounted(points, smoothed, gapS, (i, _, dtS) => {
-    const bpm = smoothed[i] as number;
-    sum += bpm * dtS;
-    coveredS += dtS;
-    maxBpm = Math.max(maxBpm, bpm);
-  }, start, end);
-  if (coveredS === 0) return null;
-  const endBpm = smoothed[end];
-  let recoveryBpm: number | null = null;
-  if (endBpm !== null && endBpm !== undefined) {
-    const targetMs = points[end].timeMs + recoveryS * 1000;
-    let j = end;
-    while (j + 1 < points.length && points[j + 1].timeMs <= targetMs) j++;
-    const near = j + 1 < points.length && points[j + 1].timeMs - targetMs < targetMs - points[j].timeMs ? j + 1 : j;
-    const later = smoothed[near];
-    if (j > end && later !== null && Math.abs(points[near].timeMs - targetMs) <= gapS * 1000) recoveryBpm = Math.round(endBpm - later);
-  }
-  return { avgBpm: Math.round(sum / coveredS), maxBpm: Math.round(maxBpm), recoveryBpm };
-};
-
 /**
  * Passages d'une zone, à montrer sur la carte : les suites d'intervalles
  * comptés dont la FC tombe dans la zone, coupées à chaque changement de zone
@@ -317,18 +276,4 @@ export const heartRateZonePaths = (
   const steps: (TrackStep & { bpm: number })[] = [];
   forEachCounted(points, smoothed, gapS, (i, bpm, _, from) => steps.push({ from, to: i, bpm }));
   return pathsWhere(points, steps, (s) => bandIndex(s.bpm, bounds) === zone);
-};
-
-/** FC d'une plage de temps (une répétition du fractionné), de `startMs` à `endMs` ; `null` sans FC. */
-export const timeSpanHeartRate = (
-  points: readonly HeartRatePoint[],
-  smoothed: readonly (number | null)[],
-  startMs: number,
-  endMs: number,
-  gapS: number,
-  recoveryS: number
-): SpanHeartRate | null => {
-  const start = firstIndexAtOrAfterTime(points, startMs);
-  const end = lastIndexAtOrBeforeTime(points, endMs);
-  return end > start ? spanHeartRate(points, smoothed, start, end, gapS, recoveryS) : null;
 };

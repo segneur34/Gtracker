@@ -109,7 +109,7 @@ export interface SessionSummary {
   /**
    * Vitesse max : la meilleure moyenne sur 2 s (`maxSpeedWindowS`, depuis la version 13) ; si aucune fenêtre ne
    * tient (trace clairsemée, pas plus longs que `maxGapS`), la plus haute vitesse lissée, comme avant. En surf,
-   * celle d'une vague (`maxWaveSpeedMs`, depuis la version 15). 0 : aucune, à ne pas montrer (surf sans vague, muscu).
+   * celle d'une vague (`maxWaveSpeedMs`, depuis la version 15). 0 : aucune, à ne pas montrer (surf sans vague).
    */
   maxSpeedMs: number;
   pointCount: number;
@@ -135,7 +135,7 @@ export interface SessionSummary {
    * Empreinte des réglages qui ont produit ce résumé (`summaryOptionsKey` : seuil, allure imposée,
    * foil et seuil de vague en surf), lot 37. Une empreinte qui ne correspond plus aux réglages
    * courants rend le résumé à refaire (`isSummaryOutdated`) ; absente d'une fiche d'avant, il est
-   * refait une fois. Absente aussi sans calcul ou sans positions (muscu), où elle ne sert pas.
+   * refait une fois. Absente aussi sans calcul ou sans positions, où elle ne sert pas.
    */
   optionsKey?: string;
   /**
@@ -194,7 +194,7 @@ const SHARE_NUMBER_RANGES = {
   pumpingShare: [0, 1], windDirDeg: [0, 360],
 } as const;
 
-export const sameManeuverResults = (a: ManeuverResults | undefined, b: ManeuverResults | undefined): boolean =>
+const sameManeuverResults = (a: ManeuverResults | undefined, b: ManeuverResults | undefined): boolean =>
   a === b || (a !== undefined && b !== undefined && a.tackSuccess === b.tackSuccess && a.tackFail === b.tackFail
     && a.jibeSuccess === b.jibeSuccess && a.jibeFail === b.jibeFail);
 
@@ -261,7 +261,7 @@ export interface SessionAnalysis {
 }
 
 /**
- * Sauts d'une session (voile, course, vélo), mesurés par les capteurs du téléphone
+ * Sauts d'une session (voile), mesurés par les capteurs du téléphone
  * (`core/jumps.ts`) : calculés depuis le `.imu` rangé à côté du GPX à
  * l'ouverture de l'analyse, puis gardés, puisqu'ils ne se tirent pas du GPX.
  */
@@ -277,7 +277,7 @@ export interface SessionJumps {
    */
   jumps: SessionJump[];
   /**
-   * `false` : la capture ne mesurait pas les sauts (cadence à pied seule,
+   * `false` : la capture ne mesurait pas les sauts (fichier venu d'ailleurs,
    * `setup.jumps` de son en-tête) ; la session n'a pas d'onglet « sauts ».
    */
   measured?: false;
@@ -325,7 +325,7 @@ export interface SessionRecord {
   elevationSource?: 'gps';
   /** Fond de carte de cette session (plan ou satellite), changé tout de suite ; absent : celui de la famille (Réglages de l'appareil). */
   mapBase?: MapBase;
-  /** Sauts mesurés (voile, course, vélo) ; absent sans `.imu`, avant leur calcul, ou si la fiche en porte de mal formés. */
+  /** Sauts mesurés (voile) ; absent sans `.imu`, avant leur calcul, ou si la fiche en porte de mal formés. */
   jumps?: SessionJumps;
   /**
    * Repères posés par le bouton « Note » pendant l'enregistrement, nommés ou
@@ -385,7 +385,7 @@ const readSummary = (raw: unknown): SessionSummary | null => {
 };
 
 /** Matériel enregistré relu : les entrées sans identifiant ou sans nom sont écartées ; aucune : `null`. */
-export const readGear = (raw: unknown): GearChoice[] | null => {
+const readGear = (raw: unknown): GearChoice[] | null => {
   if (!Array.isArray(raw)) return null;
   const text = (value: unknown): string => (typeof value === 'string' ? value : '');
   const gear = raw.flatMap((entry): GearChoice[] => {
@@ -420,7 +420,7 @@ export const readNotes = (raw: unknown): StoredSessionNotes | null => {
 };
 
 /** Nom de session saisi ou relu : rogné, `null` s'il est vide ou n'est pas un texte. */
-export const readSessionName = (raw: unknown): string | null => {
+const readSessionName = (raw: unknown): string | null => {
   if (typeof raw !== 'string') return null;
   const name = raw.trim();
   return name === '' ? null : name;
@@ -544,7 +544,7 @@ export type RecordWithoutSummary = Omit<SessionRecord, 'summary'> & { summary: S
  * `raw` est le texte du disque, relu en JSON, `read` ce que la lecture en a
  * fait (`undefined` : champ écarté).
  */
-export interface UnreadableField {
+interface UnreadableField {
   raw: unknown;
   read: unknown;
 }
@@ -787,7 +787,7 @@ export const completeRecord = (
  * l'analyse, repères, source de l'altitude), reportés d'une copie de la session à une autre par
  * `carryRecordEdits`.
  */
-export const RECORD_EDIT_FIELDS = [
+const RECORD_EDIT_FIELDS = [
   'sport', 'activityId', 'name', 'notes', 'analysis', 'marks', 'elevationSource', 'mapBase',
 ] as const satisfies readonly (keyof SessionRecord)[];
 
@@ -960,10 +960,10 @@ export interface RecordPatch {
  * imposée, altitude ou source de l'altitude changés).
  *
  * Un changement de support efface le seuil propre à la session, exprimé dans
- * l'unité de l'ancien support ; un changement de traitement (voile ↔ course ↔
- * vélo) efface aussi ses bornes de couleur, pensées pour les vitesses de
- * l'autre sport : passer de la course au fractionné à pied les garde. Le vent saisi, l'allure imposée (elle décrit la trace) et les notes
- * restent : sans effet en course, ils reviennent si la session repasse en
+ * l'unité de l'ancien support ; un changement de traitement (voile ↔ surf)
+ * efface aussi ses bornes de couleur, pensées pour les vitesses de l'autre
+ * sport. Le vent saisi, l'allure imposée (elle décrit la trace) et les notes
+ * restent : sans effet en surf, ils reviennent si la session repasse en
  * voile.
  */
 export const applyRecordPatch = (record: SessionRecord, patch: RecordPatch): { record: SessionRecord; resummarize: boolean } => {

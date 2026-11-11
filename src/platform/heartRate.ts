@@ -29,8 +29,7 @@ import { jsonStore } from './storage';
  * rend l'état `connected`.
  *
  * Écran éteint, le service au premier plan du GPS de l'enregistrement tient
- * l'application ; le service de la ceinture seule (muscu sans GPS) est parti
- * avec l'Entraînement (lot 302).
+ * l'application.
  *
  * Dans le navigateur, la ceinture d'exemple (`EXAMPLE_BELT`) joue une FC
  * chaque seconde, pour éprouver au banc le test de FC repos ; aucune autre ne s'y connecte.
@@ -94,8 +93,8 @@ interface HeartRatePlugin {
 
 const plugin = registerPlugin<HeartRatePlugin>('HeartRate');
 
-/** Ceinture d'exemple du navigateur : une FC jouée chaque seconde, sans Bluetooth (banc de la muscu). */
-export const EXAMPLE_BELT: HeartRateBelt = { address: 'exemple', name: "FC d'exemple" };
+/** Ceinture d'exemple du navigateur : une FC jouée chaque seconde, sans Bluetooth (banc du test de FC repos). */
+const EXAMPLE_BELT: HeartRateBelt = { address: 'exemple', name: "FC d'exemple" };
 
 /** FC d'exemple à `tS` secondes de la connexion : de 95 à 135 bpm, une montée par minute. */
 const exampleBpm = (tS: number): number => Math.round(115 - 20 * Math.cos((2 * Math.PI * tS) / 60));

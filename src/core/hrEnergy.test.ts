@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { smoothHeartRate } from './heartRate';
-import type { HeartRateSessionPoint } from './heartRateSession';
-import { estimateHrEnergy, hrEnergyKcal, type HrEnergyAthlete, type HrEnergyEstimate } from './hrEnergy';
+import { activeDurationS, estimateHrEnergy, hrEnergyKcal, type HeartRateSessionPoint, type HrEnergyAthlete, type HrEnergyEstimate } from './hrEnergy';
 import { SPORT_PROFILES } from './sportProfiles';
 import { J_PER_KCAL } from './units';
 
@@ -125,5 +124,15 @@ describe('estimateHrEnergy', () => {
     expect(e.sessionS).toBe(3600);
     expect(e.coverage).toBe(1);
     expect(Math.abs(kcal(e.totalJ) / 715.6 - 1)).toBeLessThan(0.01);
+  });
+});
+
+describe('activeDurationS', () => {
+  it("ne compte pas le pas qui mène à une reprise (la pause)", () => {
+    const T0 = Date.UTC(2026, 9, 28, 18, 0, 0);
+    const p: HeartRateSessionPoint[] = [
+      { timeMs: T0, hr: 90 }, { timeMs: T0 + 1000 }, { timeMs: T0 + 60_000, hr: 100, segmentStart: true }, { timeMs: T0 + 70_000, hr: 101 },
+    ];
+    expect(activeDurationS(p)).toBe(11);
   });
 });

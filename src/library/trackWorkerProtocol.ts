@@ -38,7 +38,7 @@ export const runTrackJob = <K extends TrackJobKind>(kind: K, gpxText: string, op
 };
 
 /** Erreur d'un calcul, en nom et message ; une valeur levée qui n'est pas une `Error` devient son texte. */
-export const jobErrorOf = (err: unknown): TrackJobError =>
+const jobErrorOf = (err: unknown): TrackJobError =>
   err instanceof Error ? { name: err.name, message: err.message } : { name: 'Error', message: String(err) };
 
 /** `Error` refaite d'une erreur rendue par le worker : même nom, même message que celle levée en ligne. */

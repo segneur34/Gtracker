@@ -61,21 +61,16 @@
   color: var(--ink);
 }
 
-/* Les chiffres de la période dans une seule bande blanche, cases séparées d'un trait : quatre de front,
+/* Les chiffres de la période dans une seule bande blanche, cases séparées d'un trait : trois de front,
    deux sur deux au téléphone ; rien ne dépasse de la page. */
 .profile-figures {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: repeat(3, auto);
   border-radius: var(--radius-l);
   background: var(--surface);
   border: 1px solid var(--line);
   overflow: hidden;
-}
-
-/* Sans dénivelé (aucune session n'a d'altitude) : trois cases, de même largeur. */
-.profile-figures--three {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 /* Libellé, valeur et légende sur trois rangées communes aux cases d'une ligne : un libellé sur deux lignes
@@ -325,8 +320,8 @@ button.profile-legend__row {
     border-top: 1px solid var(--line-soft);
   }
 
-  /* Sans dénivelé : la troisième case prend toute la largeur de sa rangée. */
-  .profile-figures--three .profile-figure:last-child {
+  /* La troisième case prend toute la largeur de sa rangée. */
+  .profile-figures .profile-figure:last-child {
     grid-column: 1 / -1;
   }
 

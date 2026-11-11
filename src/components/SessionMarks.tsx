@@ -9,7 +9,7 @@ import { IconClose, IconFlag } from './icons';
 import Button from './ui/Button';
 
 /**
- * Repères du bouton « Note » dans une analyse (voile, course, vélo, surf) :
+ * Repères du bouton « Note » dans une analyse (voile, surf) :
  * fanions numérotés sur la carte, toujours visibles, liste de l'onglet
  * « Général » (nommer, supprimer, montrer) ; leur trait sur les graphes est
  * dans `markReferenceLines.tsx`. Le repère montré passe au violet des
@@ -63,11 +63,9 @@ export function SessionMarksLayer({ located, shownMs }: { located: ReadonlyArray
  * Liste des repères, pour l'onglet « Général » : n°, heure, distance depuis
  * le départ, nom à saisir, « Voir » et supprimer. Rien sans repère.
  */
-export function SessionMarksList({ view, distanceUnit, shownMs, onShow, accent, withDistance = true }: {
+export function SessionMarksList({ view, distanceUnit, shownMs, onShow, accent }: {
   view: SessionMarksView;
   distanceUnit: DistanceUnit;
-  /** Faux sans trace (muscu) : pas de distance depuis le départ. */
-  withDistance?: boolean;
   shownMs: number | null;
   /** Montre un repère sur la carte, par son heure ; `null` le masque. */
   onShow: (timeMs: number | null) => void;
@@ -89,7 +87,7 @@ export function SessionMarksList({ view, distanceUnit, shownMs, onShow, accent, 
             <div key={`note-${m.mark.timeMs}`} className="ui-row-8 ui-center ui-wrap">
               <strong className="an-mark-n">{m.n}</strong>
               <span className="num">{formatTimeOfDay(m.mark.timeMs)}</span>
-              {withDistance && <span className="num ui-muted">{formatDistance(m.distanceM, distanceUnit)}</span>}
+              <span className="num ui-muted">{formatDistance(m.distanceM, distanceUnit)}</span>
               <input type="text" className="ui-field ui-field--s an-mark-label"
                 value={m.mark.label ?? ''} placeholder={`Note ${m.n}`} disabled={!editable} aria-label={`Nom de la note ${m.n}`}
                 onChange={(e) => rename(m.mark, e.target.value)} />

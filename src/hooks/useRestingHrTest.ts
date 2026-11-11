@@ -7,7 +7,7 @@ import {
 import { keepScreenOn } from '../platform/screen';
 import { readableBpm } from '../recording/heartRate';
 import {
-  RESTING_HR_TEST, RESTING_SIGNAL_TONES, advanceRestingTest, exampleRestingHr, startRestingTest, type RestingHrProtocol, type RestingHrState,
+  RESTING_HR_TEST, RESTING_SIGNAL_TONES, advanceRestingTest, exampleRestingHr, startRestingTest, type RestingHrState,
   type RestingSample,
 } from '../recording/restingHrTest';
 import { useBeltLive } from './useBeltLive';
@@ -53,9 +53,8 @@ const bpmOf = (sample: HeartRateSample | null): number | null => {
 
 export const useRestingHrTest = (
   onFinished: (result: RestingHrResult, startedAtMs: number) => void,
-  options: { speed?: number; protocol?: RestingHrProtocol } = {}
+  options: { speed?: number } = {}
 ) => {
-  const protocol = options.protocol ?? RESTING_HR_TEST;
   const speed = options.speed ?? 1;
   const belt = useMemo(() => savedBelt(), []);
   const native = heartRateSupported();
@@ -75,10 +74,10 @@ export const useRestingHrTest = (
 
   const publish = useCallback((state: RestingHrState, nowMs: number, simulated: boolean) => {
     const done = state.phase === 'fini';
-    const result = done ? restingHrResult(state.samples, state.startMs, protocol) : null;
+    const result = done ? restingHrResult(state.samples, state.startMs, RESTING_HR_TEST) : null;
     setRun({ state, nowMs, bpm: bpmRef.current, result, simulated });
     return result;
-  }, [protocol]);
+  }, []);
 
   /** Un pas du test : l'horloge, une mesure peut-être ; joue les signaux, et finit s'il y a lieu. */
   const apply = useCallback((nowMs: number, sample?: RestingSample) => {
@@ -154,7 +153,7 @@ export const useRestingHrTest = (
     const nowMs = Date.now();
     if (exemple) simRef.current = { realStartMs: nowMs, virtualStartMs: nowMs, lastSecond: 0 };
     else simRef.current = null;
-    const state = startRestingTest(nowMs, protocol);
+    const state = startRestingTest(nowMs, RESTING_HR_TEST);
     stateRef.current = state;
     keepScreenOn(true);
     if (!exemple && bpmRef.current !== null) {
@@ -162,7 +161,7 @@ export const useRestingHrTest = (
       state.samples.push({ timeMs: nowMs, bpm: bpmRef.current });
     }
     publish(state, nowMs, exemple);
-  }, [protocol, publish]);
+  }, [publish]);
 
   /** Arrête sans garder : la ceinture reste prise, la page prête à recommencer. */
   const cancel = useCallback(() => {

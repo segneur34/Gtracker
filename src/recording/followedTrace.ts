@@ -1,10 +1,9 @@
-import { smoothElevationAlong } from '../core/elevation';
 import { partitionPoint } from '../core/search';
 import { projectOnSegment } from '../core/geoPlane';
 import { cumulativeDistancesM, haversineDistance } from '../core/geo';
 import { simplifyAlongElevation } from '../core/simplify';
 import type { LatLon } from '../core/types';
-import { DEFAULT_IMPORT_SMOOTHING_M, routePoints } from '../planning/route';
+import { routePoints } from '../planning/route';
 import { recordToRoute, routeMarkGuide, type RouteRecord } from '../planning/routeRecord';
 import type { MarkGuideSettings } from './markGuide';
 
@@ -75,23 +74,12 @@ export const followedTraceFromRoute = (record: RouteRecord): FollowedTrace | nul
   return trace && markGuide ? { ...trace, markGuide } : trace;
 };
 
-/**
- * Trace d'une session déjà enregistrée. À terre (`land`), son altitude la suit :
- * celle du GPS, bruitée de quelques mètres, lissée sur `smoothingM` mètres le
- * long de la trace comme un GPX chargé en itinéraire (`routeFromTrack`), sur la
- * distance et non le nombre de points (règle 2). Ailleurs, les positions seules.
- */
+/** Trace d'une session déjà enregistrée : ses positions seules, sans altitude. */
 export const followedTraceFromSession = (
-  points: ReadonlyArray<LatLon & { ele?: number }>,
+  points: ReadonlyArray<LatLon>,
   name: string,
-  activityId: string | null,
-  { land, smoothingM = DEFAULT_IMPORT_SMOOTHING_M }: { land: boolean; smoothingM?: number }
-): FollowedTrace | null => {
-  if (!land) return followedTraceFromPoints(points, name, 'session', activityId);
-  const located = points.filter((p) => isFinite(p.lat) && isFinite(p.lon));
-  const smoothed = smoothElevationAlong(located.map((p) => p.ele ?? NaN), cumulativeDistancesM(located), smoothingM);
-  return followedTraceFromPoints(located.map((p, i) => ({ lat: p.lat, lon: p.lon, eleM: smoothed[i] })), name, 'session', activityId);
-};
+  activityId: string | null
+): FollowedTrace | null => followedTraceFromPoints(points, name, 'session', activityId);
 
 /**
  * Écart toléré quand la trace suivie est amincie pour être gardée sur

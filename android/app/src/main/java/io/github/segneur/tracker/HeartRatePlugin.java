@@ -60,8 +60,7 @@ import java.util.UUID;
  * Chaque mesure (caractéristique 0x2A37) part vers la page par l'événement
  * `heartRate` ; l'enregistreur la joint à la position suivante. Écran éteint,
  * le service au premier plan du GPS garde le processus en vie, et la pile
- * Bluetooth livre les mesures comme les positions (le service de la ceinture
- * seule, pour la muscu sans GPS, est parti avec l'Entraînement au lot 302).
+ * Bluetooth livre les mesures comme les positions.
  *
  * Une ceinture jointe puis perdue (hors de portée, retirée, liaison muette
  * `STALL_MS`, découverte en échec, Bluetooth éteint puis rallumé) est

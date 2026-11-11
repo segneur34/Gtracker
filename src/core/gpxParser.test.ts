@@ -12,7 +12,7 @@ const pt = (lat: number, lon: number, time: string | null, inner = '') =>
   `<trkpt lat="${lat}" lon="${lon}">${time ? `<time>${time}</time>` : ''}${inner}</trkpt>`;
 
 describe('parseGpx', () => {
-  it('lit position, altitude, heure, FC et cadence des extensions Garmin préfixées', () => {
+  it('lit position, altitude, heure et FC des extensions Garmin préfixées', () => {
     const xml = gpx(
       `<trk><name>Sortie</name><type>sailing</type><trkseg>${pt(
         45, 5, '2026-10-01T10:00:00Z', '<ele>120.5</ele><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>152</gpxtpx:hr><gpxtpx:cad>84</gpxtpx:cad></gpxtpx:TrackPointExtension></extensions>'
@@ -20,7 +20,7 @@ describe('parseGpx', () => {
     );
     const r = parseGpx(xml);
     expect(r.rawPoints).toHaveLength(1);
-    expect(r.rawPoints[0]).toMatchObject({ lat: 45, lon: 5, time: '2026-10-01T10:00:00Z', ele: 120.5, hr: 152, cadence: 84 });
+    expect(r.rawPoints[0]).toMatchObject({ lat: 45, lon: 5, time: '2026-10-01T10:00:00Z', ele: 120.5, hr: 152 });
     expect(r.trackName).toBe('Sortie');
     expect(r.trackType).toBe('sailing');
     expect(r.hasDeviceSpeed).toBe(false);
@@ -105,34 +105,24 @@ describe('parseGpxPath', () => {
   });
 });
 
-describe('parseGpx : points sans position (muscu, lot I du 25/10)', () => {
-  const hrPt = (time: string | null, bpm?: number) =>
-    `<trkpt>${time ? `<time>${time}</time>` : ''}${bpm === undefined ? '' : `<extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>${bpm}</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions>`}</trkpt>`;
+describe('parseGpx : points sans position', () => {
+  const hrPt = (time: string, bpm: number) =>
+    `<trkpt><time>${time}</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>${bpm}</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions></trkpt>`;
 
-  it('range dans timedPoints les points à l’heure sans position, FC comprise ; rawPoints vide', () => {
-    const r = parseGpx(gpx(`<trk><type>muscu</type><trkseg>${hrPt('2026-10-01T10:00:00Z', 90)}${hrPt('2026-10-01T10:00:01Z')}</trkseg></trk>`));
+  it('écarte les points à l’heure sans position, FC comprise', () => {
+    const r = parseGpx(gpx(`<trk><trkseg>${hrPt('2026-10-01T10:00:00Z', 90)}${hrPt('2026-10-01T10:00:01Z', 91)}</trkseg></trk>`));
     expect(r.rawPoints).toEqual([]);
-    expect(r.timedPoints).toEqual([{ time: '2026-10-01T10:00:00Z', hr: 90 }, { time: '2026-10-01T10:00:01Z' }]);
   });
 
-  it('un second <trkseg> pose segmentStart ; un point sans heure reste jeté', () => {
-    const r = parseGpx(gpx(
-      `<trk><trkseg>${hrPt('2026-10-01T10:00:00Z', 90)}${hrPt(null, 91)}</trkseg><trkseg>${hrPt(null, 92)}${hrPt('2026-10-01T10:05:00Z', 110)}</trkseg></trk>`
-    ));
-    expect(r.timedPoints.map((p) => p.hr)).toEqual([90, 110]);
-    expect(r.timedPoints.map((p) => p.segmentStart === true)).toEqual([false, true]);
-  });
-
-  it('un GPX à positions garde les mêmes rawPoints, et des timedPoints vides', () => {
+  it('un GPX à positions garde ses rawPoints, reprise après pause comprise', () => {
     // `rawTimeMs` : la date lue une fois (lot 56).
     const xml = gpx(`<trk><trkseg>${pt(45, 5, '2026-10-01T10:00:00Z', '<ele>3</ele>')}${pt(45, 5.001, '2026-10-01T10:00:01Z')}</trkseg>`
       + `<trkseg>${pt(45, 5.002, '2026-10-01T10:05:00Z')}</trkseg></trk>`);
     const r = parseGpx(xml);
-    expect(r.timedPoints).toEqual([]);
     expect(r.rawPoints).toEqual([
-      { lat: 45, lon: 5, time: '2026-10-01T10:00:00Z', rawTimeMs: Date.parse('2026-10-01T10:00:00Z'), ele: 3, speedMs: undefined, courseDeg: undefined, hr: undefined, cadence: undefined },
-      { lat: 45, lon: 5.001, time: '2026-10-01T10:00:01Z', rawTimeMs: Date.parse('2026-10-01T10:00:01Z'), ele: undefined, speedMs: undefined, courseDeg: undefined, hr: undefined, cadence: undefined },
-      { lat: 45, lon: 5.002, time: '2026-10-01T10:05:00Z', rawTimeMs: Date.parse('2026-10-01T10:05:00Z'), ele: undefined, speedMs: undefined, courseDeg: undefined, hr: undefined, cadence: undefined, segmentStart: true },
+      { lat: 45, lon: 5, time: '2026-10-01T10:00:00Z', rawTimeMs: Date.parse('2026-10-01T10:00:00Z'), ele: 3, speedMs: undefined, courseDeg: undefined, hr: undefined },
+      { lat: 45, lon: 5.001, time: '2026-10-01T10:00:01Z', rawTimeMs: Date.parse('2026-10-01T10:00:01Z'), ele: undefined, speedMs: undefined, courseDeg: undefined, hr: undefined },
+      { lat: 45, lon: 5.002, time: '2026-10-01T10:05:00Z', rawTimeMs: Date.parse('2026-10-01T10:05:00Z'), ele: undefined, speedMs: undefined, courseDeg: undefined, hr: undefined, segmentStart: true },
     ]);
   });
 
@@ -165,15 +155,6 @@ describe('parseGpx : la trace ne remonte jamais le temps (lot 149, C2-1, C1-4)',
     const r = parseGpx(xml);
     expect(r.rawPoints.map((p) => p.lon)).toEqual([5, 5.002]);
     expect(r.rawPoints.map((p) => p.segmentStart === true)).toEqual([false, true]);
-  });
-
-  it('même règle pour les points sans position (muscu) : date illisible ou qui recule écartée, reprise reportée', () => {
-    const hr = (time: string, bpm: number) => `<trkpt><time>${time}</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>${bpm}</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions></trkpt>`;
-    const xml = gpx(`<trk><trkseg>${hr(T(0), 100)}${hr('pas une date', 101)}${hr(T(2), 102)}${hr(T(1), 103)}${hr(T(2), 104)}</trkseg><trkseg>${hr(T(1), 105)}${hr(T(9), 106)}</trkseg></trk>`);
-    const r = parseGpx(xml);
-    expect(r.rawPoints).toEqual([]);
-    expect(r.timedPoints.map((p) => p.hr)).toEqual([100, 102, 104, 106]);
-    expect(r.timedPoints.map((p) => p.segmentStart === true)).toEqual([false, false, false, true]);
   });
 });
 
@@ -217,13 +198,11 @@ describe('parseGpx : un seul parcours des descendants par point (lot 56)', () =>
         speedMs: speed === undefined || speed < 0 || speed > 100 ? undefined : speed,
         courseDeg: course !== undefined && course >= 0 && course <= 360 ? course : undefined,
         hr: frozenNumber(trkpt, 'hr'),
-        cadence: frozenNumber(trkpt, 'cad'),
       });
     });
     // Les cas voulus sont bien là.
     expect(r.rawPoints.map((p) => p.hr)).toEqual([150, 141, undefined, undefined, undefined]);
     expect(r.rawPoints.map((p) => p.speedMs)).toEqual([4.5, undefined, undefined, 6.2, 2]);
-    expect(r.rawPoints[2].cadence).toBe(70);
   });
 });
 

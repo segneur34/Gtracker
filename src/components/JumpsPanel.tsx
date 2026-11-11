@@ -22,7 +22,7 @@ import MapToggle from './ui/MapToggle';
 import SegmentedControl from './ui/SegmentedControl';
 
 /**
- * Onglet « sauts » des analyses (voile, course, vélo) : les sauts mesurés par les capteurs du
+ * Onglet « sauts » des analyses (voile) : les sauts mesurés par les capteurs du
  * téléphone (`core/jumps.ts`, rangés dans la fiche par `useSessionJumps`).
  * Chiffres, podium des trois plus hauts, tableau trié au choix (hauteur, en l'air,
  * longueur), et courbe d'un saut, ou de deux pour les comparer. Le calcul est
@@ -49,7 +49,7 @@ const SORTS: { key: JumpSort; label: string }[] = [
 const sortValue = (j: SessionJump, sort: JumpSort): number =>
   sort === 'hauteur' ? j.heightM : sort === 'vol' ? j.flightS : (j.lengthM ?? -1);
 
-export interface JumpsPanelProps {
+interface JumpsPanelProps {
   status: JumpsStatus;
   error: string | null;
   /** Sauts montrés (hauteur minimale atteinte, pris au seuil d'activité ou plus), dans l'ordre du temps. */
@@ -71,13 +71,10 @@ export interface JumpsPanelProps {
   onTogglePodium: () => void;
   /** Point de trace le plus proche d'un instant : relie la courbe à la carte. */
   trackIndexAt: (ms: number) => number;
-  /** Début des `id` des blocs, dont la taille est mémorisée : `sailing`, `running`, `cycling`. */
-  panelPrefix?: string;
-  /** Couleur des boutons choisis : celle du module. */
-  accent?: string;
-  /** Voile : l'aide parle de la planche et du foil. */
-  sailing?: boolean;
 }
+
+/** Couleur des boutons choisis : celle de la voile. */
+const ACCENT = 'var(--voile)';
 
 const cellStyle: CSSProperties = { padding: '0.4em 0.6em', textAlign: 'center' };
 const noteStyle: CSSProperties = { color: 'var(--muted)', fontSize: 'var(--text-xs)', marginTop: '6px', lineHeight: 1.45 };
@@ -149,10 +146,9 @@ function JumpCurveChart({ first, second, numbers, trackIndexAt }: {
 function JumpsPanel({
   status, error, jumps, hiddenCount, minHeightM, thresholdLabel, speedUnit, distanceUnit, open, onToggle,
   shownJump, onShowJump, podiumShown, onTogglePodium, trackIndexAt,
-  panelPrefix = 'sailing', accent = 'var(--voile)', sailing = true,
 }: JumpsPanelProps) {
   /** Ancre de la courbe, pour « Détail ». */
-  const curveAnchorId = `${panelPrefix}-jump-curve`;
+  const curveAnchorId = 'sailing-jump-curve';
   const [sort, setSort] = useState<JumpSort>('hauteur');
   /** Sauts de la courbe, par l'heure de leur décollage : le premier (le plus haut d'office), et celui qu'on lui compare. */
   const [curveFirst, setCurveFirst] = useState<number | null>(null);
@@ -169,7 +165,7 @@ function JumpsPanel({
         ? `Sauts indisponibles : ${error ?? 'calcul impossible'}.`
         : `Aucun saut d'au moins ${meters(minHeightM)} pris à ${thresholdLabel} ou plus.`;
     return (
-      <ResizablePanel id={`${panelPrefix}.sauts`} style={ANALYSIS_PANEL_STYLE}>
+      <ResizablePanel id="sailing.sauts" style={ANALYSIS_PANEL_STYLE}>
         {heading('Sauts')}
         <div className="ui-muted">{text}</div>
         {status === 'ready' && hiddenNote && <div style={noteStyle}>{hiddenNote}</div>}
@@ -195,12 +191,12 @@ function JumpsPanel({
   };
 
   const jumpsPanel = (
-    <ResizablePanel id={`${panelPrefix}.sauts`} style={ANALYSIS_PANEL_STYLE}>
+    <ResizablePanel id="sailing.sauts" style={ANALYSIS_PANEL_STYLE}>
       {heading('Sauts', 'analyse:sauts')}
       <HelpText helpKey="analyse:sauts" note>
           Hauteur gagnée par le téléphone, donc par le buste, au-dessus de son niveau au décollage, mesurée par
-          l'accéléromètre et le gyroscope : ce n'est pas la hauteur {sailing ? "de la planche au-dessus de l'eau" : 'des pieds ou des roues au-dessus du sol'}. Précision attendue,
-          téléphone sur la poitrine : {sailing ? '±0,1 à 0,2 m sans foil, ±0,2 à 0,3 m sur foil' : '±0,1 à 0,2 m'} ; davantage au bras. En l'air : du décollage
+          l'accéléromètre et le gyroscope : ce n'est pas la hauteur de la planche au-dessus de l'eau. Précision attendue,
+          téléphone sur la poitrine : ±0,1 à 0,2 m sans foil, ±0,2 à 0,3 m sur foil ; davantage au bras. En l'air : du décollage
           à l'atterrissage. Longueur : chemin parcouru pendant le saut, lu sur la trace ; vitesse : au décollage. « ≈ » marque
           une mesure douteuse, dont la raison s'affiche au survol. « Voir » montre le saut sur la carte, « Détail » sur la
           courbe. Sont montrés les sauts d'au moins {meters(minHeightM)} (Réglages, carte de l'activité) pris à {thresholdLabel}
@@ -216,7 +212,7 @@ function JumpsPanel({
       <div className="ui-my-10">
         <div className="ui-row-15 ui-center">
           <strong>Les plus hauts</strong>
-          <MapToggle shown={podiumShown} color={accent} labels={['Voir (Carte)', 'Masquer (Carte)']} onClick={onTogglePodium} />
+          <MapToggle shown={podiumShown} color={ACCENT} labels={['Voir (Carte)', 'Masquer (Carte)']} onClick={onTogglePodium} />
         </div>
         <ol className="an-jump-podium">
           {byHeight.slice(0, 3).map((j, k) => (
@@ -230,7 +226,7 @@ function JumpsPanel({
 
       <div className="an-jump-sort">
         <span className="ui-muted">Trier par</span>
-        <SegmentedControl label="Trier les sauts" items={SORTS} value={sort} onChange={setSort} accent={accent} />
+        <SegmentedControl label="Trier les sauts" items={SORTS} value={sort} onChange={setSort} accent={ACCENT} />
       </div>
       <div className="ui-scroll-x">
         <table className="ui-table ui-table--cards an-jump-table">
@@ -288,7 +284,7 @@ function JumpsPanel({
     </select>
   );
   const curvePanel = (
-    <ResizablePanel id={`${panelPrefix}.sauts.courbe`} style={ANALYSIS_PANEL_STYLE}>
+    <ResizablePanel id="sailing.sauts.courbe" style={ANALYSIS_PANEL_STYLE}>
       <div id={curveAnchorId} className="an-jump-compare">
         <label>
           <span className="an-jump-compare__dot" style={{ backgroundColor: CURVE_COLORS[0] }} />

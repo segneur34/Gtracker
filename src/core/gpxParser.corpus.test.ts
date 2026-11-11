@@ -165,7 +165,6 @@ describe('corpus des éditeurs : chiffres attendus par construction', () => {
     expect(segments).toBe(attendu.segments);
     expect(parsed.hasDeviceSpeed).toBe(attendu.hasDeviceSpeed);
     expect(parsed.rawPoints.some((p) => p.hr !== undefined)).toBe(attendu.avecFc);
-    expect(parsed.timedPoints).toEqual([]);
     if (attendu.trackName !== undefined) expect(parsed.trackName).toBe(attendu.trackName);
     if (attendu.trackType !== undefined) expect(parsed.trackType).toBe(attendu.trackType);
     // Les points gardés vont dans l'ordre du temps, et chacun porte sa date relue une fois.
@@ -175,12 +174,12 @@ describe('corpus des éditeurs : chiffres attendus par construction', () => {
     expect(parseGpxPath(texte).points).toHaveLength(attendu.chemin ?? attendu.points);
   });
 
-  it('la trace de base garde ses valeurs : vitesse, cap, FC, cadence et altitude du format Garmin v2', () => {
+  it('la trace de base garde ses valeurs : vitesse, cap, FC et altitude du format Garmin v2', () => {
     const entry = GPX_CORPUS.find((e) => e.nom.startsWith('Garmin gpxtpx: v2'))!;
     const base = basePoints();
     const parsed = parseGpx(entry.texte).rawPoints;
-    expect(parsed.map((p) => [p.lat, p.lon, p.ele, p.speedMs, p.courseDeg, p.hr, p.cadence])).toEqual(
-      base.map((p) => [p.lat, p.lon, p.ele, p.speedMs, p.courseDeg, p.hr, p.cad]),
+    expect(parsed.map((p) => [p.lat, p.lon, p.ele, p.speedMs, p.courseDeg, p.hr])).toEqual(
+      base.map((p) => [p.lat, p.lon, p.ele, p.speedMs, p.courseDeg, p.hr]),
     );
   });
 

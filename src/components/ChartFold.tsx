@@ -4,8 +4,8 @@ import { IconChevronRight } from './icons';
 
 /**
  * Bouton qui replie ou montre une partie d'un panneau à sa place : un graphe
- * parmi d'autres (onglets « graphiques », « zones de pente »), le tableau des
- * zones de l'énergie ou de pente, les pastilles des statistiques. Chevron vers le haut quand la partie est montrée, vers
+ * parmi d'autres (onglet « graphiques »), le tableau des
+ * zones de l'énergie, les pastilles des statistiques. Chevron vers le haut quand la partie est montrée, vers
  * le bas quand elle est repliée. `color` teinte le nom, celle de la série du
  * graphe ; `aria-expanded` dit l'état (banc compris). Plus petit dans les
  * analyses (`--chart-name-size`, `analysisMobile.css`).

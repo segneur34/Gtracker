@@ -5,7 +5,7 @@
  * variables (`--chart-grid`, `--chart-axis`, `--chart-mark`).
  */
 
-/** Vitesse à pied, à vélo, en surf, dans le test guidé et le fractionné. */
+/** Vitesse en surf. */
 export const SPEED_COLOR = '#1e88e5';
 
 /** Vitesse de la voile : un autre bleu, voulu (Q36, 29/10). */
@@ -13,15 +13,6 @@ export const SAILING_SPEED_COLOR = '#1976d2';
 
 /** Altitude. */
 export const ALTITUDE_COLOR = '#e64a19';
-
-/** Énergie dépensée et puissance : l'orange de l'altitude. */
-export const ENERGY_COLOR = '#e64a19';
-
-/** Moyenne et tendance (fractionné), trait « lancé ». */
-export const TREND_COLOR = '#757575';
-
-/** Fond des phases d'un test guidé, en bandes alternées. */
-export const PHASE_FILL = '#90a4ae';
 
 /** Repères en pointillés d'un graphe (signaux d'un test, FC la plus basse). */
 export const CHART_MARK_COLOR = 'var(--chart-mark)';

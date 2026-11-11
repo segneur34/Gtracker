@@ -5,7 +5,7 @@ import HighlightSpan from './HighlightSpan';
 import { HIGHLIGHT_PODIUM_COLORS, HIGHLIGHT_SHOWN_COLOR } from './highlightColors';
 
 /**
- * Sauts sur la carte d'une analyse (voile, course, vélo) : celui choisi en
+ * Sauts sur la carte d'une analyse (voile) : celui choisi en
  * violet, ou le podium des trois plus hauts aux couleurs des tops ; un trait
  * sur la trace du vol (`jumpTrackSpan`) et un point au décollage.
  */

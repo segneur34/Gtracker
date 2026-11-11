@@ -27,7 +27,7 @@ export interface ChartHoverEvent {
 /**
  * Ligne du graphe survolée, ou `null` si aucune infobulle n'est active ou si
  * l'indice ne correspond à aucune ligne : la lecture d'un graphe dont les
- * lignes ne renvoient pas à un point de trace (profil superposé du fractionné).
+ * lignes ne renvoient pas à un point de trace (profil superposé).
  */
 export const hoveredRow = <T>(e: ChartHoverEvent | null | undefined, data: ReadonlyArray<T>): T | null => {
   if (!e || !e.isTooltipActive || e.activeTooltipIndex === undefined || e.activeTooltipIndex === null) {

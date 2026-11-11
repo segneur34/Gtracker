@@ -25,8 +25,7 @@ const signalLabel = (rssi: number): string => (rssi >= SIGNAL_NEAR_DBM ? 'proche
  * téléphone (lot 198), ajoutées par une recherche, essayées (fréquence en
  * direct), choisies ou oubliées. L'application s'en souvient de plusieurs et
  * n'en lit qu'une à la fois : celle « utilisée au prochain départ »
- * (`platform/heartRate.ts`), que chaque activité de course, de vélo ou de
- * fractionné propose à l'enregistrement si sa case est cochée. L'état de la
+ * (`platform/heartRate.ts`), que chaque activité propose à l'enregistrement si sa case est cochée. L'état de la
  * connexion se lit toujours, essai ou enregistrement en cours ; une recherche
  * dit, pour chaque appareil retenu, s'il est à portée, et propose les autres.
  * Pendant un enregistrement, rien ne change l'appareil utilisé : « Utiliser »,

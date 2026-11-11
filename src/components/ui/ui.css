@@ -74,20 +74,6 @@
   --backdrop-stroke: 2.85;
 }
 
-.page-backdrop .page-backdrop__dots {
-  --backdrop-stroke: 4;
-  stroke-dasharray: 0.1 12;
-}
-
-.page-backdrop .page-backdrop__thin {
-  --backdrop-stroke: 1.3;
-}
-
-.page-backdrop .page-backdrop__fill {
-  fill: var(--backdrop-ink);
-  stroke: none;
-}
-
 .ui-page-header {
   display: flex;
   flex-direction: column;
@@ -289,7 +275,7 @@
   width: 100%;
 }
 
-/* La couleur d'action vient du conteneur (`--btn-accent`, comme `--tab-accent`) : l'orange de l'Entraînement, sinon le bleu. */
+/* La couleur d'action vient du conteneur (`--btn-accent`, comme `--tab-accent`) (l'orange du test de FC repos, `--rest-accent`), sinon le bleu. */
 .ui-btn--primary {
   background: var(--btn-accent, var(--voile));
   color: var(--on-accent);
@@ -792,10 +778,6 @@
   text-transform: uppercase;
 }
 
-.ui-pointer {
-  cursor: pointer;
-}
-
 .ui-semibold {
   font-weight: 600;
 }
@@ -848,10 +830,6 @@
   margin-bottom: 10px;
 }
 
-.ui-mb-14 {
-  margin-bottom: 14px;
-}
-
 .ui-mb-15 {
   margin-bottom: 15px;
 }
@@ -864,20 +842,12 @@
   margin-left: auto;
 }
 
-.ui-mt-4 {
-  margin-top: 4px;
-}
-
 .ui-mt-6 {
   margin-top: 6px;
 }
 
 .ui-mt-8 {
   margin-top: 8px;
-}
-
-.ui-mt-8-only {
-  margin: 8px 0 0;
 }
 
 .ui-mt-10 {
@@ -1024,11 +994,6 @@
 }
 
 /* Tailles et défilement */
-.ui-chart-200 {
-  width: 100%;
-  height: 200px;
-}
-
 .ui-fill {
   height: 100%;
   width: 100%;

@@ -1,24 +1,22 @@
 /**
- * Moyenne glissante en temps actif (lot 187, sortie du test de FC max, retiré au lot 302) : une fenêtre de mesures
- * récentes, et sa moyenne pondérée par le temps sur les dernières secondes. Sert à l'alerte de
- * zone cardiaque et au test de FC de repos ; rien n'y dépend d'un sport (règle 2 : tout en secondes).
+ * Moyenne glissante de la FC en temps actif : une fenêtre de mesures récentes, et sa moyenne pondérée par le temps
+ * sur les dernières secondes. Sert à l'alerte de zone cardiaque ; rien n'y dépend d'un sport (règle 2 : tout en secondes).
  */
 
-/** Une mesure en temps actif (pauses ôtées), avec la vitesse et la FC si elles y sont. */
+/** Une mesure en temps actif (pauses ôtées), avec la FC si elle y est. */
 export interface WindowSample {
   activeMs: number;
-  speedMs?: number;
   hrBpm?: number;
 }
 
 /**
- * Moyenne pondérée par le temps d'un champ sur les `windowS` dernières
+ * Moyenne pondérée par le temps de la FC sur les `windowS` dernières
  * secondes actives : chaque mesure vaut depuis la précédente. `null` si la
  * fenêtre n'en couvre pas la moitié (départ, reprise après un trou).
  * `endMs` : fenêtre finissant à cet instant passé plutôt qu'à `nowMs`.
  */
 export const windowMean = (
-  window: WindowSample[], field: 'speedMs' | 'hrBpm', windowS: number, nowMs: number, endMs: number = nowMs
+  window: WindowSample[], windowS: number, nowMs: number, endMs: number = nowMs
 ): number | null => {
   const fromMs = endMs - windowS * 1000;
   let sum = 0;
@@ -28,7 +26,7 @@ export const windowMean = (
     const prevMs = window[i - 1].activeMs;
     if (cur.activeMs <= fromMs) break;
     if (prevMs >= endMs) continue;
-    const value = cur[field];
+    const value = cur.hrBpm;
     if (value === undefined) continue;
     const w = Math.min(cur.activeMs, endMs) - Math.max(prevMs, fromMs);
     sum += value * w;

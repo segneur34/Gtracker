@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ACTIVITIES } from '../core/activities';
-import { EMPTY_RUNNER_PROFILE } from './athleteProfile';
+import { EMPTY_ATHLETE_PROFILE } from './athleteProfile';
 import {
   SETTINGS_FORMAT,
   SETTINGS_VERSION,
@@ -251,7 +251,7 @@ describe('adoptedValues', () => {
       'tracker.sportSettings': {
         thresholds: { wingfoil: 12 }, gearLabels: { surf: ['Planche', 'Combi'] }, moduleActivity: { surf: 'a-surf-foil' }, recordActivity: 'wingfoil',
       },
-      'tracker.runnerProfile': { me: { ...EMPTY_RUNNER_PROFILE, weightKg: 80 } },
+      'tracker.runnerProfile': { me: { ...EMPTY_ATHLETE_PROFILE, weightKg: 80 } },
     });
   });
 
@@ -262,7 +262,7 @@ describe('adoptedValues', () => {
 
   it('relit le profil du pratiquant champ par champ (lot 143)', () => {
     const theirs = { 'tracker.runnerProfile': { me: { weightKg: 9000, hrMax: 190, inconnu: 1 } } };
-    expect(adoptedValues(theirs, {})).toEqual({ 'tracker.runnerProfile': { me: { ...EMPTY_RUNNER_PROFILE, hrMax: 190, hrMaxSource: { kind: 'saisie', atMs: null } } } });
+    expect(adoptedValues(theirs, {})).toEqual({ 'tracker.runnerProfile': { me: { ...EMPTY_ATHLETE_PROFILE, hrMax: 190, hrMaxSource: { kind: 'saisie', atMs: null } } } });
   });
 
   it("ne reprend pas un profil qui n'a pas la forme attendue", () => {

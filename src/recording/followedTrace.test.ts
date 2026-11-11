@@ -386,14 +386,11 @@ describe('altitude de la trace suivie', () => {
   /** Deux bosses de 60 et 40 m, sur 6 km : altitude à `d` mètres. */
   const twoHills = (d: number): number => 100 + (d < 3000 ? 60 * Math.sin((Math.PI * d) / 3000) : 40 * Math.sin((Math.PI * (d - 3000)) / 3000));
 
-  /** Session sur une route vers le nord à 3 m/s, à `hz` points par seconde, bruit d'altitude de ±`noiseM` mètres. */
-  const session = (hz: number, noiseM: number) => {
-    const noise = noiseFrom(7);
-    return Array.from({ length: 2000 * hz + 1 }, (_, i) => {
-      const d = (3 * i) / hz;
-      return { ...at(0, d), ele: twoHills(d) + 2 * noiseM * noise() };
-    });
-  };
+  /** Parcours sur une route vers le nord à 3 m/s, à 1 point par seconde, avec son altitude. */
+  const hilly = () => Array.from({ length: 2001 }, (_, i) => {
+    const d = 3 * i;
+    return { ...at(0, d), eleM: twoHills(d) };
+  });
 
   it('garde l\'altitude d\'un itinéraire calculé', () => {
     let route = [A, B].reduce((r, p) => addWaypoint(r, p, 'sentier'), EMPTY_ROUTE);
@@ -416,31 +413,16 @@ describe('altitude de la trace suivie', () => {
     expect(thinFollowedTrace(old, FOLLOWED_TRACE_TOLERANCE_M).points).toHaveLength(3);
   });
 
-  it('une session à terre porte son altitude lissée, le même D+ à 1 Hz et à 5 Hz', () => {
-    const at1Hz = followedTraceFromSession(session(1, 3), 'Sortie', 'surf', { land: true })!;
-    const at5Hz = followedTraceFromSession(session(5, 3), 'Sortie', 'surf', { land: true })!;
-    // Sans lissage, le bruit gonfle le D+ ; lissé, il reste celui des deux bosses (100 m).
-    const rough = accumulateElevation(session(1, 3).map((p) => p.ele), MIN_GAIN).gainM;
-    expect(gainOf(at1Hz)).toBeLessThan(rough);
-    expect(gainOf(at1Hz)).toBeGreaterThan(90);
-    expect(gainOf(at1Hz)).toBeLessThan(115);
-    expect(Math.abs(gainOf(at1Hz) - gainOf(at5Hz))).toBeLessThan(5);
-  });
-
-  it('une session hors terre garde ses positions seules', () => {
-    const trace = followedTraceFromSession(session(1, 0), 'Sortie', 'wingfoil', { land: false })!;
+  it('une session suivie ne garde que ses positions', () => {
+    const points = hilly().map(({ lat, lon, eleM }) => ({ lat, lon, ele: eleM }));
+    const trace = followedTraceFromSession(points, 'Sortie', 'wingfoil')!;
     expect(trace.points.every((p) => !('eleM' in p))).toBe(true);
     expect(trace.source).toBe('session');
     expect(trace.activityId).toBe('wingfoil');
   });
 
-  it('une session à terre sans altitude reste sans altitude', () => {
-    const flat = session(1, 0).map(({ lat, lon }) => ({ lat, lon }));
-    expect(followedTraceFromSession(flat, 'Sortie', 'surf', { land: true })!.points.every((p) => !('eleM' in p))).toBe(true);
-  });
-
   it('amincir garde les sommets, et deux fois garde le D+ à 1 m près', () => {
-    const full = followedTraceFromSession(session(1, 0), 'Sortie', 'surf', { land: true })!;
+    const full = followedTraceFromPoints(hilly(), 'Sortie', 'route')!;
     const once = thinFollowedTrace(full, FOLLOWED_TRACE_TOLERANCE_M);
     const twice = thinFollowedTrace(once, FOLLOWED_TRACE_TOLERANCE_M);
     // La route est droite : seul le relief garde des points.

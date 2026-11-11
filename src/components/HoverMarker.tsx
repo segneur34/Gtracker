@@ -26,5 +26,3 @@ export function HoveredTrackMarker({ points }: { points: ReadonlyArray<{ lat: nu
   const point = index === null ? undefined : points[index];
   return point ? <HoverMarker position={[point.lat, point.lon]} /> : null;
 }
-
-export default HoverMarker;

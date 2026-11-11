@@ -1,5 +1,5 @@
-import type { ClockTone } from '../platform/beeper';
-import { TEST_SIGNAL_TONES } from './signalTones';
+import type { PatternTone } from '../platform/beeper';
+import { GUIDE_SIGNAL_TONES } from './signalTones';
 
 /**
  * Test de FC repos (24/10 ; sous le Profil depuis le 08/11, lot 301) : 3 minutes immobile, la FC
@@ -15,11 +15,9 @@ import { TEST_SIGNAL_TONES } from './signalTones';
  * chose. Pur : l'horloge et les mesures viennent du hook.
  */
 
-export type RestingHrTestId = 'fc-repos';
-
 /** Protocole d'un test de FC au repos, en secondes et en bpm. */
 export interface RestingHrProtocol {
-  id: RestingHrTestId;
+  id: 'fc-repos';
   label: string;
   /** Version du protocole, rangée avec le résultat. */
   version: number;
@@ -63,7 +61,7 @@ export interface RestingSample {
   bpm: number | null;
 }
 
-export type RestingPhase = 'preparation' | 'mesure' | 'fini';
+type RestingPhase = 'preparation' | 'mesure' | 'fini';
 
 export type RestingSignal = 'debut' | 'fin';
 
@@ -123,9 +121,9 @@ export const restingRemainingS = (state: RestingHrState, nowMs: number): number 
 // --- Sons ---
 
 /** Départ : un court. Fin : un long. Les mêmes sons que l'alerte de zone (`signalTones.ts`). */
-export const RESTING_SIGNAL_TONES: Record<RestingSignal, ClockTone[]> = {
-  debut: TEST_SIGNAL_TONES.debut,
-  fin: TEST_SIGNAL_TONES.finTest,
+export const RESTING_SIGNAL_TONES: Record<RestingSignal, PatternTone[]> = {
+  debut: GUIDE_SIGNAL_TONES.debut,
+  fin: GUIDE_SIGNAL_TONES.finGuide,
 };
 
 // --- Exemple, pour essayer le test sans ceinture (navigateur) ---

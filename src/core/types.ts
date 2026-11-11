@@ -3,7 +3,7 @@
  *
  * Règle centrale : dans le noyau, toutes les vitesses sont en mètres par
  * seconde, les distances en mètres, les durées en secondes ou millisecondes.
- * La conversion vers l'unité d'affichage (nœuds, km/h, min/km) se fait
+ * La conversion vers l'unité d'affichage (nœuds, km/h, m/s) se fait
  * uniquement en sortie, via `core/units.ts` et le profil de support actif.
  * Les caps restent en degrés, plus lisibles et sans effet sur la justesse.
  */
@@ -47,25 +47,10 @@ export interface RawTrackPoint {
   courseDeg?: number;
   /** Fréquence cardiaque en battements par minute, si présente. */
   hr?: number;
-  /** Cadence, si présente. */
-  cadence?: number;
   /**
    * Premier point d'un `<trkseg>` après le premier : la trace reprend après une
    * pause de l'enregistrement. Le pas qui y mène n'est ni parcouru ni en action.
    */
-  segmentStart?: true;
-}
-
-/**
- * Point sans position, lu dans le GPX d'une session sans trace (muscu, lot I
- * du 25/10) : l'heure, et la FC si la ceinture l'a donnée. Jamais dans la
- * cinématique : seulement la FC (`core/heartRateSession.ts`).
- */
-export interface TimedTrackPoint {
-  time: string;
-  /** Fréquence cardiaque en battements par minute, si présente. */
-  hr?: number;
-  /** Premier point d'un `<trkseg>` après le premier : reprise après une pause. */
   segmentStart?: true;
 }
 
@@ -81,7 +66,6 @@ export interface TrackPoint {
   timeMs: number;
   ele?: number;
   hr?: number;
-  cadence?: number;
   /** Vitesse retenue après écrêtage des aberrations, en m/s. */
   speedMs: number;
   /** Vitesse filtrée servant à toutes les analyses, en m/s. */
@@ -148,15 +132,6 @@ export interface BaseSessionStats {
   activeAvgSpeedMs: number | null;
   /** Part des points dont la vitesse vient de l'appareil et non d'une dérivation. */
   speedSource: SpeedSource;
-  /** Dénivelé positif cumulé en mètres, formaté sans décimale. */
-  elevationGain: string;
-  /** Dénivelé négatif cumulé en mètres, formaté sans décimale. */
-  elevationLoss: string;
-  /** Altitude minimale et maximale lissées, en mètres, formatées. */
-  elevationMin: string;
-  elevationMax: string;
-  /** Vrai si la trace porte assez d'altitudes pour que le dénivelé ait un sens. */
-  hasElevation: boolean;
 }
 
 /** Sommes cumulées le long de la trace, utilisées par les calculs de segments. */

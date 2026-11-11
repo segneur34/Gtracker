@@ -26,8 +26,6 @@ export interface MotionCapabilities {
 export interface MotionSetup {
   placement: JumpPlacement;
   foil: boolean;
-  /** La capture sert aux sauts ; faux : au pumping seul. La cadence à pied est partie avec la course (lot 303). */
-  jumps: boolean;
 }
 
 /** Capture arrêtée : son fichier privé et ce qu'il faut savoir pour la juger. */
@@ -45,7 +43,7 @@ export interface MotionCapture {
 }
 
 /** Dossier des captures, dans le dossier privé de l'application. */
-export const MOTION_DIR = 'capteurs';
+const MOTION_DIR = 'capteurs';
 
 /** Fichier de la capture d'un enregistrement, repéré par l'instant de l'en-tête de son journal. */
 export const motionCapturePath = (startedAtMs: number): string => `${MOTION_DIR}/${startedAtMs}.imu`;
@@ -53,11 +51,11 @@ export const motionCapturePath = (startedAtMs: number): string => `${MOTION_DIR}
 /** Plugin maison, `android/app/src/main/java/io/github/segneur/tracker/MotionPlugin.java`. */
 interface MotionPlugin {
   capabilities(): Promise<{ accelerometer: boolean; gyroscope: boolean; barometer: boolean; accelMaxRange?: number }>;
-  start(options: { startedAtMs: number; placement: JumpPlacement; foil: boolean; jumps: boolean }): Promise<{ path: string }>;
+  start(options: { startedAtMs: number; placement: JumpPlacement; foil: boolean }): Promise<{ path: string }>;
   pause(): Promise<void>;
   resume(): Promise<void>;
   stop(): Promise<{ path: string | null; bytes?: number; durationS?: number; samples?: number; longestGapS?: number; error?: string }>;
-  status(): Promise<{ path: string | null; listening?: boolean; placement?: JumpPlacement; foil?: boolean; jumps?: boolean }>;
+  status(): Promise<{ path: string | null; listening?: boolean; placement?: JumpPlacement; foil?: boolean }>;
 }
 
 const plugin = registerPlugin<MotionPlugin>('Motion');
@@ -89,7 +87,7 @@ export const getMotionCapabilities = (): Promise<MotionCapabilities> => {
 /** Démarre la capture d'un enregistrement ; lève une erreur si le téléphone ne le permet pas. */
 export const startMotionCapture = async (startedAtMs: number, setup: MotionSetup): Promise<void> => {
   if (!isNativeApp()) throw new Error(UNAVAILABLE.reason ?? 'Capteurs indisponibles.');
-  await plugin.start({ startedAtMs, placement: setup.placement, foil: setup.foil, jumps: setup.jumps });
+  await plugin.start({ startedAtMs, placement: setup.placement, foil: setup.foil });
 };
 
 export const pauseMotionCapture = async (): Promise<void> => {
@@ -137,7 +135,7 @@ export const runningMotionCapture = async (): Promise<RunningMotionCapture | nul
   return {
     path: r.path,
     listening: r.listening === true,
-    setup: { placement: r.placement ?? 'poitrine', foil: r.foil === true, jumps: r.jumps !== false },
+    setup: { placement: r.placement ?? 'poitrine', foil: r.foil === true },
   };
 };
 

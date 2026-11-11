@@ -14,7 +14,7 @@ export type LessonIcon =
   | 'statistiques' | 'itineraires' | 'cardio' | 'voile' | 'capteurs' | 'partage';
 
 /** Page ouverte par « Essayer » : une adresse, ou la bibliothèque de la famille préférée (`'bibliotheque'`). */
-export type LessonTarget = `/${string}` | 'bibliotheque';
+type LessonTarget = `/${string}` | 'bibliotheque';
 
 export interface Lesson {
   /** Identifiant, dans l'adresse (`/tutoriels/:id`) et la liste des leçons lues : ne pas le changer. */
@@ -105,7 +105,7 @@ export const LESSONS: readonly Lesson[] = [
     icon: 'profil',
     target: '/profil',
     body: [
-      'Le Profil résume vos activités sur la période choisie : distance, dénivelé, sport préféré et temps par activité.',
+      'Le Profil résume vos activités sur la période choisie : distance, sport préféré et temps par activité.',
       'Autour des cadres pousse une racine : elle gagne une étape à chaque semaine où vous tenez votre objectif, et fait le tour de la page en 26 semaines. Des semaines manquées la font reculer.',
       "Au-dessus du sol, la pousse fleurit avec le temps de la semaine : un bouton, une fleur ouverte à l'objectif, épanouie à 4 fois l'objectif ; au-delà, un papillon arrive à côté d'elle, puis s'y pose.",
       'Touchez le carré à droite du pseudo : une bulle dit où vous en êtes et ce qu\'il reste à faire.',

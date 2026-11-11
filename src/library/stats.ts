@@ -47,7 +47,6 @@ export interface StatSession {
   inMotionS: number | null;
   /** Distance pendant le temps en action, `null` sur une fiche d'avant la version 5 du résumé. */
   movingDistanceM: number | null;
-  elevationGainM: number | null;
   maxSpeedMs: number;
   activityId: string;
   family: SportFamily;
@@ -84,7 +83,6 @@ export const statSessionOf = (file: string, record: SessionRecord, activity: Act
     movingTimeS: summary.movingTimeS,
     inMotionS: summary.inMotionS ?? null,
     movingDistanceM: summary.movingDistanceM ?? null,
-    elevationGainM: summary.elevationGainM,
     maxSpeedMs: summary.maxSpeedMs,
     activityId: activity.id,
     family: sportFamily(activity.base),
@@ -237,9 +235,6 @@ export interface StatsTotals {
   /** Distance en action de ces mêmes sessions : elle donne la vitesse moyenne en action. */
   movingDistanceM: number;
   distanceM: number;
-  /** D+ cumulé, sur les sessions qui en ont un (`elevationSessions`). */
-  elevationGainM: number;
-  elevationSessions: number;
   maxSpeedMs: number | null;
   /** Manœuvres, sur les sessions de voile déjà ouvertes (`maneuverSessions`). */
   maneuvers: number;
@@ -254,7 +249,7 @@ const maxOrNull = (a: number | null, b: number | null): number | null => (a === 
 
 export const statsTotals = (sessions: readonly StatSession[]): StatsTotals => {
   const t: StatsTotals = {
-    sessions: 0, durationS: 0, movingTimeS: 0, movingDistanceM: 0, distanceM: 0, elevationGainM: 0, elevationSessions: 0,
+    sessions: 0, durationS: 0, movingTimeS: 0, movingDistanceM: 0, distanceM: 0,
     maxSpeedMs: null, maneuvers: 0, maneuverSessions: 0, waves: 0, waveSessions: 0, longestWaveM: null, longestFlightS: null,
   };
   for (const s of sessions) {
@@ -265,10 +260,6 @@ export const statsTotals = (sessions: readonly StatSession[]): StatsTotals => {
       t.movingTimeS += s.movingTimeS;
       // La distance entière, le temps que la fiche soit recalculée (version 5 du résumé).
       t.movingDistanceM += s.movingDistanceM ?? s.distanceM;
-    }
-    if (s.elevationGainM !== null) {
-      t.elevationGainM += s.elevationGainM;
-      t.elevationSessions++;
     }
     if (s.maxSpeedMs > 0) t.maxSpeedMs = maxOrNull(t.maxSpeedMs, s.maxSpeedMs);
     if (s.maneuverCount !== null) {
@@ -313,9 +304,9 @@ export const groupTotals = <K extends string>(
 export type StatsMetricKey = 'vmax' | 'moyenne' | 'duree' | 'distance' | 'vol' | 'reussite' | 'vagues' | 'vague' | 'volMax';
 
 /** Sorte de valeur, qui donne l'axe et le format ; toutes en SI (m/s, s, m), le pourcentage de 0 à 100. */
-export type StatsMetricUnit = 'vitesse' | 'duree' | 'distance' | 'pourcent' | 'nombre' | 'metres' | 'secondes';
+type StatsMetricUnit = 'vitesse' | 'duree' | 'distance' | 'pourcent' | 'nombre' | 'metres' | 'secondes';
 
-export interface StatsMetricSeries {
+interface StatsMetricSeries {
   key: string;
   label: string;
   /** Valeur d'une session, `null` si elle n'en a pas. */
@@ -349,7 +340,7 @@ const successRate = (success: number, fail: number): number | null => percent(su
 const single = (key: string, label: string, value: StatsMetricSeries['value']): StatsMetricSeries[] => [{ key, label, value }];
 
 /** Les données du graphique, dans l'ordre des pastilles. */
-export const STATS_METRICS: readonly StatsMetric[] = [
+const STATS_METRICS: readonly StatsMetric[] = [
   {
     key: 'vmax', label: 'Vitesse max', unit: 'vitesse', families: null, overview: false, record: true,
     series: single('vmax', 'Vitesse max', (s) => positive(s.maxSpeedMs)),
@@ -593,7 +584,7 @@ export const regularity = (
 export type StatsRecordKind = 'vitesse' | 'distance' | 'duree' | 'manoeuvres' | 'vague' | 'vol';
 
 /** Valeur d'une session pour un record, `null` si elle n'en a pas. */
-export const RECORD_VALUE: Record<StatsRecordKind, (s: StatSession) => number | null> = {
+const RECORD_VALUE: Record<StatsRecordKind, (s: StatSession) => number | null> = {
   vitesse: (s) => (s.maxSpeedMs > 0 ? s.maxSpeedMs : null),
   distance: (s) => (s.distanceM > 0 ? s.distanceM : null),
   duree: (s) => (s.endMs > s.startMs ? (s.endMs - s.startMs) / 1000 : null),

@@ -1,4 +1,3 @@
-import { EMPTY_ELEVATION } from '../core/elevation';
 import { flightSpans, type FlightSpan } from '../core/pumping';
 import { activeRuns, buildCumulativeTrack, buildBaseSessionStats, thresholdActivityMask } from '../core/sessionStats';
 import { getActiveThresholds, getSportProfile, hasActiveThreshold } from '../core/sportProfiles';
@@ -82,8 +81,6 @@ export const buildSailingSessionStats = (
     cumulative,
     activityMask,
     ratioMask,
-    // La voile n'affiche pas l'altitude (DECISIONS §2, « Rien en voile ») : pas de dénivelé à calculer.
-    elevationStats: EMPTY_ELEVATION,
   });
 
   return { ...base, tops: options.tops ?? computeSailingTops(track, cumulative) };

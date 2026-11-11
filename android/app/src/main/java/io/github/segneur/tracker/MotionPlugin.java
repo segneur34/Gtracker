@@ -70,7 +70,6 @@ public class MotionPlugin extends Plugin implements SensorEventListener {
     // Réglages de la capture en cours, rendus par `status`.
     private String placement = "poitrine";
     private boolean foil = false;
-    private boolean jumps = true;
 
     private final Runnable flush = new Runnable() {
         @Override
@@ -119,9 +118,7 @@ public class MotionPlugin extends Plugin implements SensorEventListener {
     /**
      * Démarre la capture : `startedAtMs` (instant de l'en-tête du journal, qui
      * nomme le fichier), `placement` et `foil` (réglages des sauts, gardés dans
-     * l'en-tête) et `jumps` (ce que la capture mesure, gardé dans l'en-tête ;
-     * la cadence à pied est partie avec la course, lot 303). Une capture déjà
-     * en cours est d'abord close.
+     * l'en-tête). Une capture déjà en cours est d'abord close.
      */
     @PluginMethod
     public void start(PluginCall call) {
@@ -134,7 +131,6 @@ public class MotionPlugin extends Plugin implements SensorEventListener {
         long startedAtMs = ((Number) rawStart).longValue();
         String placement = call.getString("placement", "poitrine");
         boolean foil = Boolean.TRUE.equals(call.getBoolean("foil", false));
-        boolean jumps = !Boolean.FALSE.equals(call.getBoolean("jumps", true));
         handler().post(() -> {
             closeCapture();
             SensorManager sm = sensors();
@@ -156,7 +152,7 @@ public class MotionPlugin extends Plugin implements SensorEventListener {
                 ImuWriter.Stream[] streams = pressure != null
                     ? new ImuWriter.Stream[] { accelStream(), gyroStream(), pressureStream() }
                     : new ImuWriter.Stream[] { accelStream(), gyroStream() };
-                writer = new ImuWriter(file, header(startedAtMs, startNs, wallMs, placement, foil, jumps, accel, gyro, pressure).toString(), streams);
+                writer = new ImuWriter(file, header(startedAtMs, startNs, wallMs, placement, foil, accel, gyro, pressure).toString(), streams);
                 accelCount = 0;
                 lastAccelNs = 0;
                 firstNs = 0;
@@ -164,7 +160,6 @@ public class MotionPlugin extends Plugin implements SensorEventListener {
                 writeError = null;
                 this.placement = placement;
                 this.foil = foil;
-                this.jumps = jumps;
                 listen();
                 handler.postDelayed(flush, FLUSH_MS);
             } catch (Exception e) {
@@ -252,7 +247,6 @@ public class MotionPlugin extends Plugin implements SensorEventListener {
             ret.put("listening", listening);
             ret.put("placement", placement);
             ret.put("foil", foil);
-            ret.put("jumps", jumps);
             call.resolve(ret);
         });
     }
@@ -366,7 +360,7 @@ public class MotionPlugin extends Plugin implements SensorEventListener {
     }
 
     private static JSONObject header(
-        long startedAtMs, long startNs, long wallMs, String placement, boolean foil, boolean jumps,
+        long startedAtMs, long startNs, long wallMs, String placement, boolean foil,
         Sensor accel, Sensor gyro, Sensor pressure
     ) throws JSONException {
         JSONObject header = new JSONObject();
@@ -385,7 +379,6 @@ public class MotionPlugin extends Plugin implements SensorEventListener {
         JSONObject setup = new JSONObject();
         setup.put("placement", placement);
         setup.put("foil", foil);
-        setup.put("jumps", jumps);
         header.put("setup", setup);
         JSONArray streams = new JSONArray();
         streams.put(streamInfo(ACCEL, "accel", 3, 0.01, 0, accel));

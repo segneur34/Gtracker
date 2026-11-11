@@ -14,7 +14,7 @@ import { isGpxFileName, recordFileName, type SessionRecord } from './record';
  */
 
 /** Fiche gardée en cache, avec la taille et la date du fichier dont elle vient. */
-export interface CachedRecord {
+interface CachedRecord {
   size: number;
   mtimeMs: number;
   record: SessionRecord;

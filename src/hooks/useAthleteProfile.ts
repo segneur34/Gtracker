@@ -5,8 +5,8 @@ import { getSportProfile } from '../core/sportProfiles';
 import { validProfileNumber } from '../library/profilePrompt';
 import { ROOT_GOAL } from '../library/rootGrowth';
 import {
-  EMPTY_RUNNER_PROFILE, RUNNER_NAME_MAX, runnerAge, runnerAvatar, runnerHeartRateZones, storedRunnerProfile,
-  type HrSource, type RunnerAvatar, type RunnerNumberField, type RunnerProfile,
+  EMPTY_ATHLETE_PROFILE, ATHLETE_NAME_MAX, athleteAge, athleteAvatar, athleteHeartRateZones, storedAthleteProfile,
+  type HrSource, type AthleteAvatar, type AthleteNumberField, type AthleteProfile,
 } from '../library/athleteProfile';
 import { effectiveHrOffset } from './useSportSettings';
 import { readStoredRecord, useStoredRecord } from './useStoredRecord';
@@ -17,26 +17,26 @@ import { readStoredRecord, useStoredRecord } from './useStoredRecord';
  * et `library/profile.ts` (lot 72).
  */
 
-type NumberField = RunnerNumberField;
+type NumberField = AthleteNumberField;
 
 const NAMESPACE = 'tracker.runnerProfile';
 const KEY = 'me';
 
 /** Relecture contrôlée du profil rangé : il voyage par le fichier de réglages, d'où il peut revenir abîmé. */
-const readStored = (raw: unknown): RunnerProfile => storedRunnerProfile(raw, ROOT_GOAL);
+const readStored = (raw: unknown): AthleteProfile => storedAthleteProfile(raw, ROOT_GOAL);
 
 /** Profil du pratiquant, hors composant (statistiques du direct). */
-export const readRunnerProfile = (): RunnerProfile => readStoredRecord(NAMESPACE, KEY, EMPTY_RUNNER_PROFILE, readStored);
+export const readAthleteProfile = (): AthleteProfile => readStoredRecord(NAMESPACE, KEY, EMPTY_ATHLETE_PROFILE, readStored);
 
 /** Zones et seuils cardiaques du pratiquant pour une activité (décalage compris), hors composant. */
-export const readHeartRateZones = (activity: Activity): HeartRateZones | null =>
-  runnerHeartRateZones(readRunnerProfile(), getSportProfile(activity.base).heartRate, effectiveHrOffset(activity));
+const readHeartRateZones = (activity: Activity): HeartRateZones | null =>
+  athleteHeartRateZones(readAthleteProfile(), getSportProfile(activity.base).heartRate, effectiveHrOffset(activity));
 
 /** Bornes des zones cardiaques du pratiquant pour une activité, hors composant (chiffres du direct). */
 export const readHeartRateZoneBounds = (activity: Activity): number[] | null => readHeartRateZones(activity)?.bounds ?? null;
 
-export const useRunnerProfile = () => {
-  const { value, update } = useStoredRecord<RunnerProfile>(NAMESPACE, KEY, EMPTY_RUNNER_PROFILE, readStored);
+export const useAthleteProfile = () => {
+  const { value, update } = useStoredRecord<AthleteProfile>(NAMESPACE, KEY, EMPTY_ATHLETE_PROFILE, readStored);
 
   /** Écrit un champ numérique, `null` pour l'effacer ; les valeurs hors plage sont ignorées. Une FC tapée est dite saisie. */
   const setNumber = useCallback(
@@ -48,7 +48,7 @@ export const useRunnerProfile = () => {
       update({
         [field]: next,
         ...(field === 'hrMax' ? { hrMaxSource: source } : field === 'hrRest' ? { hrRestSource: source } : {}),
-      } as Partial<RunnerProfile>);
+      } as Partial<AthleteProfile>);
     },
     [update]
   );
@@ -64,16 +64,16 @@ export const useRunnerProfile = () => {
 
   /** Nom ou pseudo tel que tapé (espaces compris, pour la frappe en cours), tronqué ; vide : effacé. */
   const setName = useCallback(
-    (name: string) => update({ name: name.trim() === '' ? null : name.slice(0, RUNNER_NAME_MAX) }),
+    (name: string) => update({ name: name.trim() === '' ? null : name.slice(0, ATHLETE_NAME_MAX) }),
     [update]
   );
 
-  const setSex = useCallback((sex: RunnerProfile['sex']) => update({ sex }), [update]);
+  const setSex = useCallback((sex: AthleteProfile['sex']) => update({ sex }), [update]);
 
   /** Photo du Profil, `null` pour revenir au dessin du sport préféré ; une valeur invalide est ignorée. */
   const setAvatar = useCallback(
-    (avatar: RunnerAvatar | null) => {
-      if (avatar !== null && runnerAvatar({ avatar }) === null) return;
+    (avatar: AthleteAvatar | null) => {
+      if (avatar !== null && athleteAvatar({ avatar }) === null) return;
       update({ avatar });
     },
     [update]
@@ -88,5 +88,5 @@ export const useRunnerProfile = () => {
     [update]
   );
 
-  return { profile: value, setName, setAvatar, setNumber, retainHr, setSex, setThresholds, age: runnerAge(value) };
+  return { profile: value, setName, setAvatar, setNumber, retainHr, setSex, setThresholds, age: athleteAge(value) };
 };

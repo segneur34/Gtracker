@@ -40,7 +40,7 @@ export interface SynthMotion {
 }
 
 /** Bruit pseudo-aléatoire reproductible, centré, d'amplitude 1. */
-export const noiseSource = (seed: number) => {
+const noiseSource = (seed: number) => {
   let x = seed;
   return () => {
     x = (x * 1_103_515_245 + 12_345) % 2_147_483_648;

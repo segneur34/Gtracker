@@ -41,7 +41,7 @@ export interface RootPoint {
   ty: number;
 }
 
-export type RootPieceKind = 'trunk' | 'branch' | 'lateral' | 'sub';
+type RootPieceKind = 'trunk' | 'branch' | 'lateral' | 'sub';
 
 export interface RootPiece {
   pts: RootPoint[];
@@ -62,7 +62,7 @@ export interface RootPiece {
 }
 
 /** Radicelle de la semaine : place et forme tirées une fois pour toutes. */
-export interface Rootlet {
+interface Rootlet {
   /** Place le long de la racine visible, de 0 à 1. */
   u: number;
   ang: number;
@@ -270,9 +270,9 @@ export const rootRoute = ({ slot, cards }: RootLayout, tail = 0): Route | null =
  * la longueur d'un tour de racine ; la racine y a l'allure qu'elle avait à
  * cette période avant que la longueur cesse de suivre la page.
  */
-export const REFERENCE_CARD_HEIGHTS: readonly number[] = [34, 178, 318, 273];
+const REFERENCE_CARD_HEIGHTS: readonly number[] = [34, 178, 318, 273];
 /** Gouttière entre deux cadres de la page de référence. */
-export const REFERENCE_GAP = 20;
+const REFERENCE_GAP = 20;
 
 const routeLength = (route: Route): number => sampleRoute(route.trunk.vertices, route.trunk.radii).at(-1)!.s;
 
@@ -305,7 +305,7 @@ export const indexAt = (pts: readonly RootPoint[], s: number): number => {
 };
 
 /** Côté libre d'un point de racine : +1 ou −1 selon la normale, 0 si des cadres sont des deux côtés. */
-export const freeSide = (cards: readonly Box[], p: RootPoint, rng: () => number): -1 | 0 | 1 => {
+const freeSide = (cards: readonly Box[], p: RootPoint, rng: () => number): -1 | 0 | 1 => {
   const nx = -p.ty;
   const ny = p.tx;
   const a = inCard(cards, p.x + nx * 8, p.y + ny * 8, -1);

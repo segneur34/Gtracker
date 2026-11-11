@@ -27,8 +27,7 @@ import type { CumulativeTrack, TrackPoint } from './types';
  *   −`strokeMinG` puis au-dessus de +`strokeMinG` : un coup, à
  *   `strokeMinPeriodS` au moins du précédent.
  * - Cadence (`pumpCadence`) : sur une fenêtre glissante, la période du même
- *   signal est cherchée par autocorrélation, comme la cadence à pied
- *   (`core/periodicity.ts`) ; la fenêtre valide le pumping si elle corrèle
+ *   signal est cherchée par autocorrélation (`core/periodicity.ts`) ; la fenêtre valide le pumping si elle corrèle
  *   assez et que sa période tombe dans la plage de cadence du pumping. Un clapot
  *   irrégulier, une vibration rapide ou une houle lente ne valident rien.
  * - Séries : dans chaque plage validée, les coups espacés de `strokeMaxGapS`
@@ -268,7 +267,7 @@ export const pumpSeries = (strokeTimesS: number[], p: PumpDetection): PumpSeries
 };
 
 /** Une fenêtre de la cadence. */
-export interface PumpCadenceWindow {
+interface PumpCadenceWindow {
   /** Centre de la fenêtre, en secondes sur l'axe de la grille de `v` (0 à son premier point). */
   centerS: number;
   /** Cadence de sa période d'autocorrélation, en coups par minute ; `null` sans période (trop peu mesurée, sans régularité). */
@@ -278,7 +277,7 @@ export interface PumpCadenceWindow {
 }
 
 /** Cadence d'un vol : ses fenêtres, et les plages qu'elles valident. */
-export interface PumpCadence {
+interface PumpCadence {
   windows: PumpCadenceWindow[];
   /**
    * Plages validées, [début, fin] en secondes sur l'axe de la grille de `v`, dans
@@ -388,7 +387,7 @@ const withoutRanges = (ranges: [number, number][], excluded: readonly (readonly 
  * un coup hors des plages ne compte pas. Les plages `excluded` (les sauts) n'ont
  * aucun coup et coupent la série. Instants en secondes sur l'axe de la grille.
  */
-export const validatedPumpSeries = (
+const validatedPumpSeries = (
   v: ImuVertical, signal: Float64Array, from: number, to: number, p: PumpDetection, excluded: readonly (readonly [number, number])[] = []
 ): PumpSeries[] => {
   const ranges = withoutRanges(pumpCadence(v, signal, from, to, p).ranges, excluded);
@@ -410,7 +409,7 @@ export const validatedPumpSeries = (
  * qui commence dans la recherche. `null` si la recherche est calme de bout en
  * bout, ou jamais.
  */
-export const liftoffAt = (v: ImuVertical, around: number, p: PumpDetection, notBefore = 0): number | null => {
+const liftoffAt = (v: ImuVertical, around: number, p: PumpDetection, notBefore = 0): number | null => {
   const mean = centredMean(v.aUp, halfSteps(p.liftoffHighPassS, v.dt));
   const sq = new Float64Array(v.n);
   for (let i = 0; i < v.n; i++) sq[i] = (v.aUp[i] - mean[i]) ** 2;

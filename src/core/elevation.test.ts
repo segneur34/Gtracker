@@ -66,13 +66,6 @@ describe('accumulateElevation', () => {
     expect(lossM).toBe(10);
   });
 
-  it('applique un seuil plus exigeant en trail', () => {
-    // Bosses de 4 m : comptées sur route (seuil 3), ignorées en trail (seuil 5).
-    const bumps = [100, 104, 100, 104, 100, 104, 100];
-    expect(accumulateElevation(bumps, ELEVATION_PRESETS.route.minGainM).gainM).toBe(12);
-    expect(accumulateElevation(bumps, ELEVATION_PRESETS.trail.minGainM).gainM).toBe(0);
-  });
-
   it('renvoie zéro en dessous de deux altitudes valides', () => {
     expect(accumulateElevation([], 3)).toEqual({ gainM: 0, lossM: 0 });
     expect(accumulateElevation([100, NaN], 3)).toEqual({ gainM: 0, lossM: 0 });

@@ -1,9 +1,8 @@
-import { accumulateElevation, computeElevationStats, type ElevationStats } from '../core/elevation';
 import { heartRateStats, smoothHeartRate } from '../core/heartRate';
 import { resumeKinematics, type KinematicsRun } from '../core/kinematics';
 import { referenceSpeedMs } from '../core/sessionSpeed';
 import {
-  MIN_ELEVATION_COVERAGE, buildCumulativeTrack, computeActiveDistanceM, computeActiveTimeMs, segmentDistanceM, thresholdActivityMask,
+  buildCumulativeTrack, computeActiveDistanceM, computeActiveTimeMs, segmentDistanceM, thresholdActivityMask,
 } from '../core/sessionStats';
 import { SAILING_SPORTS, hasActiveThreshold, sportTreatment, type HeartRateProfile, type SportProfile } from '../core/sportProfiles';
 import { bestWindowSpeedMs } from '../core/topSegments';
@@ -13,21 +12,20 @@ import { EMPTY_LIVE_LEGS, combineLiveLegs, splitLiveLegs, type LiveLegSplit, typ
 
 /**
  * Statistiques affichées pendant l'enregistrement, calculées sur la trace en
- * cours avec la même chaîne que l'analyse (`computeKinematics`, dénivelé,
- * tops). La pente, la puissance et l'énergie de la course et du vélo sont
- * parties aux lots 303 et 305. Chaque segment est traité à part : rien ne
+ * cours avec la même chaîne que l'analyse (`computeKinematics`,
+ * tops). Chaque segment est traité à part : rien ne
  * franchit une pause. Tout en unités SI ; la page convertit.
  *
  * Avec une mémoire (`LiveStatsMemory`, tenue par `useLiveRecording`), un
  * segment fermé n'est calculé qu'une fois et le segment en cours reprend sa
  * cinématique là où elle en était (`resumeKinematics`) : le coût de chaque
  * recalcul ne croît plus avec la durée que par le reste du segment en cours
- * (dénivelé, FC, tops), bien plus léger (27/10). Le résultat est
+ * (FC, tops), bien plus léger (27/10). Le résultat est
  * celui du calcul sans mémoire (`liveStats.test.ts`).
  */
 
 export interface LiveStatsOptions {
-  /** Fenêtre glissante des tops de voile et du D+ récent, en secondes. */
+  /** Fenêtre glissante des tops de voile, en secondes. */
   recentWindowS: number;
   /** Durées des tops de voile sur la fenêtre récente, en secondes. */
   topDurationsS: number[];
@@ -77,11 +75,6 @@ export interface LiveStats {
   recentTopsMs: (number | null)[];
   /** Meilleure vitesse tenue `maxDurationS` sur toute la session, en m/s. */
   maxSpeedMs: number | null;
-  /** Dénivelé cumulé, `null` si l'altitude manque. */
-  elevationGainM: number | null;
-  elevationLossM: number | null;
-  /** D+ sur la fenêtre récente, `null` si l'altitude manque. */
-  recentGainM: number | null;
   /** Bord en cours et bord précédent, en voile seulement. */
   legs: LiveLegs;
   /** FC moyenne depuis le départ, pondérée par le temps, en bpm ; `null` sans ceinture. */
@@ -98,9 +91,6 @@ export const EMPTY_LIVE_STATS: LiveStats = {
   recentDistanceSpeedMs: null,
   recentTopsMs: [],
   maxSpeedMs: null,
-  elevationGainM: null,
-  elevationLossM: null,
-  recentGainM: null,
   legs: EMPTY_LIVE_LEGS,
   averageHeartRateBpm: null,
 };
@@ -178,8 +168,6 @@ interface SegmentParts {
   /** Trace du segment ; vide sous deux positions. */
   track: TrackPoint[];
   cum: CumulativeTrack;
-  pointCount: number;
-  withEle: number;
   distanceM: number;
   movingTimeMs: number;
   /** Distance et temps en action, avec un seuil passé (`activeThreshold`). */
@@ -189,8 +177,6 @@ interface SegmentParts {
   maxSpeedMs: number | null;
   /** Bords, en voile seulement. */
   legs: LiveLegSplit | null;
-  /** Dénivelé, demandé quand l'altitude est établie. */
-  elevation: { stats: ElevationStats } | null;
 }
 
 /** Un segment de l'enregistrement, tel que vu la dernière fois, et ce qui en a été calculé. */
@@ -260,15 +246,12 @@ export const computeLiveStats = (
     entry.parts = {
       track,
       cum,
-      pointCount: entry.fixes.length,
-      withEle: entry.fixes.filter((f) => f.altitudeM !== undefined && isFinite(f.altitudeM)).length,
       distanceM,
       movingTimeMs: track.length >= 2 ? track[track.length - 1].timeMs - track[0].timeMs : 0,
       active: mask === null ? null : { distanceM: computeActiveDistanceM(track, mask), timeMs: computeActiveTimeMs(track, mask) },
       heart: heartPart(entry.fixes, profile.heartRate),
       maxSpeedMs: bestWindowSpeedMs(track, cum, options.maxDurationS),
       legs: sailing && track.length >= 2 ? splitLiveLegs(track) : null,
-      elevation: null,
     };
   }
   // Un segment fermé ne reprend jamais : ses étapes intermédiaires et ses points bruts ne servent plus.
@@ -296,31 +279,6 @@ export const computeLiveStats = (
   const lastMs = lastTrack[lastTrack.length - 1].timeMs;
   const sinceMs = lastMs - options.recentWindowS * 1000;
 
-  let pointCount = 0;
-  let withEle = 0;
-  for (const entry of entries) {
-    pointCount += entry.parts!.pointCount;
-    withEle += entry.parts!.withEle;
-  }
-  const hasElevation = withEle / pointCount >= MIN_ELEVATION_COVERAGE;
-  let gainM = 0;
-  let lossM = 0;
-  let recentGainM = 0;
-  if (hasElevation) {
-    active.forEach((p) => {
-      const { track } = p;
-      p.elevation ??= { stats: computeElevationStats(track, profile.elevation) };
-      const elevation = p.elevation.stats;
-      gainM += elevation.gainM;
-      lossM += elevation.lossM;
-      // Un segment fini avant la fenêtre récente n'y apporte rien.
-      if (track[track.length - 1].timeMs >= sinceMs) {
-        const recent = elevation.smoothed.filter((_, i) => track[i].timeMs >= sinceMs);
-        recentGainM += accumulateElevation(recent, profile.elevation.minGainM).gainM;
-      }
-    });
-  }
-
   let maxSpeedMs: number | null = null;
   for (const p of active) if (p.maxSpeedMs !== null && (maxSpeedMs === null || p.maxSpeedMs > maxSpeedMs)) maxSpeedMs = p.maxSpeedMs;
 
@@ -343,9 +301,6 @@ export const computeLiveStats = (
     recentDistanceSpeedMs: lastDistanceSpeed(tracks, options.recentDistanceM),
     recentTopsMs: options.topDurationsS.map((d) => bestRecentTop(tracks, d, sinceMs)),
     maxSpeedMs,
-    elevationGainM: hasElevation ? gainM : null,
-    elevationLossM: hasElevation ? lossM : null,
-    recentGainM: hasElevation ? recentGainM : null,
     legs: sailing ? combineLiveLegs(active.map((p) => p.legs!)) : EMPTY_LIVE_LEGS,
     averageHeartRateBpm: heartCoveredS > 0 ? heartSum / heartCoveredS : null,
   };

@@ -1,7 +1,7 @@
 /**
  * Couleur de la trace : dégradé continu entre une vitesse basse et une
  * vitesse haute, réglables et propres à chaque support. En dessous de la
- * borne basse, gris (marche en course, déplacement lent ou non-vol en voile).
+ * borne basse, gris (déplacement lent ou non-vol en voile).
  * Au-dessus de la borne haute, rouge franc. Entre les deux, du bleu au rouge
  * en passant par le cyan, le vert, le jaune et l'orange.
  *

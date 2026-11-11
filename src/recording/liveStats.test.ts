@@ -3,7 +3,7 @@ import { computeKinematics } from '../core/kinematics';
 import { kinematicsOptionsOf, referenceSpeedMs, scalesFiltersToSession } from '../core/sessionSpeed';
 import { buildCumulativeTrack, computeActiveDistanceM, computeActiveTimeMs, thresholdActivityMask } from '../core/sessionStats';
 import { SPORT_PROFILES, type SportProfile } from '../core/sportProfiles';
-import { knotsToMs } from '../core/units';
+import { kmhToMs, knotsToMs } from '../core/units';
 import type { LocationFix } from '../platform/location';
 import { sameData } from '../test/sameData';
 import { runSurfSession, surfProfileOf } from '../surfing/surfSession';
@@ -11,7 +11,6 @@ import {
   EMPTY_LIVE_STATS, LIVE_STATS_DEFAULTS, computeLiveStats, createLiveStatsMemory, liveReferenceSpeedMs, usesActiveAverage,
 } from './liveStats';
 import { M_PER_DEG_LAT } from '../test/geo.fixture';
-import { WALK_PROFILE } from '../test/walkProfile.fixture';
 
 const T0 = Date.UTC(2026, 8, 23, 12, 0, 0);
 
@@ -38,13 +37,33 @@ const trace = (
   return fixes;
 };
 
-/** Profil à pied gelé (`WALK_PROFILE`), sans moyenne active ni bords. */
-const running = WALK_PROFILE;
+/**
+ * Profil synthétique, bâti sur le surf : un support lent dont le seuil se règle en km/h, avec une confirmation
+ * sur 3 s et une médiane sur 5 s, réglages qu'aucun calcul de voile ou de surf ne réunit. Il emprunte
+ * l'identifiant du surf, sans ses vagues ni son pumping : tout calcul qui choisit par `profile.id` le traite en surf.
+ */
+const KMH_PROFILE: SportProfile = {
+  ...SPORT_PROFILES.surf,
+  speedRange: { minMs: kmhToMs(4), maxMs: kmhToMs(15) },
+  speedUnit: 'kmh',
+  thresholdUnit: 'kmh',
+  defaultActiveThreshold: 3,
+  activeHysteresis: { enterOffset: 1, exitOffset: -1 },
+  stillThreshold: 1,
+  minStateDurationS: 3,
+  medianWindowSeconds: 5,
+  maxPlausibleSpeedMs: 12,
+  defaultPolarMinSpeed: 0,
+  jumps: null,
+  hrEnergy: null,
+  surf: null,
+  pump: null,
+};
 const wing = SPORT_PROFILES.wingfoil;
 
 describe('computeLiveStats', () => {
   it('rend des statistiques vides sans trace', () => {
-    const stats = computeLiveStats([], running);
+    const stats = computeLiveStats([], KMH_PROFILE);
     expect(stats.distanceM).toBe(0);
     expect(stats.lastDistanceSpeedMs).toBeNull();
     expect(stats.recentTopsMs).toEqual([null, null]);
@@ -54,11 +73,11 @@ describe('computeLiveStats', () => {
     const withHr = (fixes: LocationFix[], bpm: number) => fixes.map((f) => ({ ...f, heartRateBpm: bpm }));
     const stats = computeLiveStats([withHr(trace(0, 300, 1, () => 3), 120), withHr(trace(600, 900, 1, () => 3, undefined, 43.51), 160)], wing);
     expect(stats.averageHeartRateBpm).toBeCloseTo(140, 0);
-    expect(computeLiveStats([trace(0, 300, 1, () => 3)], running).averageHeartRateBpm).toBeNull();
+    expect(computeLiveStats([trace(0, 300, 1, () => 3)], KMH_PROFILE).averageHeartRateBpm).toBeNull();
   });
 
   it('donne distance, vitesse moyenne et allure du dernier km à vitesse constante', () => {
-    const stats = computeLiveStats([trace(0, 600, 1, () => 3)], running);
+    const stats = computeLiveStats([trace(0, 600, 1, () => 3)], KMH_PROFILE);
     expect(stats.distanceM).toBeCloseTo(1800, 0);
     expect(stats.averageSpeedMs).toBeCloseTo(3, 3);
     expect(stats.lastDistanceSpeedMs).toBeCloseTo(3, 3);
@@ -66,51 +85,31 @@ describe('computeLiveStats', () => {
   });
 
   it("laisse l'allure du dernier km vide tant qu'il n'est pas parcouru", () => {
-    expect(computeLiveStats([trace(0, 200, 1, () => 3)], running).lastDistanceSpeedMs).toBeNull();
+    expect(computeLiveStats([trace(0, 200, 1, () => 3)], KMH_PROFILE).lastDistanceSpeedMs).toBeNull();
   });
 
   it('mesure le dernier km sur la fin de trace seulement', () => {
     // 500 s à 2 m/s puis 400 s à 4 m/s : les 1000 derniers mètres tiennent dans la partie à 4 m/s.
-    const stats = computeLiveStats([trace(0, 900, 1, (t) => (t <= 500 ? 2 : 4))], running);
+    const stats = computeLiveStats([trace(0, 900, 1, (t) => (t <= 500 ? 2 : 4))], KMH_PROFILE);
     expect(stats.lastDistanceSpeedMs).toBeCloseTo(4, 1);
   });
 
   it('donne le même résultat à 1 Hz et à 5 Hz', () => {
     const speed = (t: number) => 3 + Math.sin(t / 30);
-    const ele = (t: number) => 50 + 20 * Math.sin(t / 120);
-    const a = computeLiveStats([trace(0, 1200, 1, speed, ele)], running);
-    const b = computeLiveStats([trace(0, 1200, 5, speed, ele)], running);
+    const a = computeLiveStats([trace(0, 1200, 1, speed)], KMH_PROFILE);
+    const b = computeLiveStats([trace(0, 1200, 5, speed)], KMH_PROFILE);
     expect(b.distanceM).toBeCloseTo(a.distanceM, -1);
     expect(b.lastDistanceSpeedMs!).toBeCloseTo(a.lastDistanceSpeedMs!, 1);
-    expect(b.elevationGainM!).toBeCloseTo(a.elevationGainM!, 0);
-    expect(b.recentGainM!).toBeCloseTo(a.recentGainM!, 0);
   });
 
   it('ne compte ni distance ni temps pendant une pause', () => {
     const before = trace(0, 300, 1, () => 3);
     const after = trace(900, 1200, 1, () => 3, undefined, before[before.length - 1].lat);
-    const stats = computeLiveStats([before, after], running);
+    const stats = computeLiveStats([before, after], KMH_PROFILE);
     expect(stats.distanceM).toBeCloseTo(1800, 0);
     expect(stats.movingTimeMs).toBe(600_000);
     // Le dernier km enjambe la pause sans la compter.
     expect(stats.lastDistanceSpeedMs).toBeCloseTo(3, 2);
-  });
-
-  it('compte D+ et D−, et le D+ des 5 dernières minutes seulement', () => {
-    // Montée de 60 m en 10 min, puis descente de 60 m en 10 min, puis montée de 30 m en 5 min.
-    const ele = (t: number) => (t <= 600 ? t / 10 : t <= 1200 ? 60 - (t - 600) / 10 : (t - 1200) / 10);
-    const stats = computeLiveStats([trace(0, 1500, 1, () => 3, ele)], running);
-    expect(stats.elevationGainM!).toBeGreaterThan(80);
-    expect(stats.elevationGainM!).toBeLessThan(95);
-    expect(stats.elevationLossM!).toBeGreaterThan(50);
-    expect(stats.recentGainM!).toBeGreaterThan(25);
-    expect(stats.recentGainM!).toBeLessThan(32);
-  });
-
-  it("laisse le dénivelé vide sans altitude", () => {
-    const stats = computeLiveStats([trace(0, 300, 1, () => 3)], running);
-    expect(stats.elevationGainM).toBeNull();
-    expect(stats.recentGainM).toBeNull();
   });
 
   it('prend les tops sur les 5 dernières minutes seulement', () => {
@@ -130,8 +129,8 @@ describe('computeLiveStats', () => {
     // Deux segments à 4 m/s séparés d'une pause d'un quart d'heure : pas de vitesse fictive par-dessus la pause.
     const before = trace(0, 120, 1, () => 4);
     const after = trace(1020, 1140, 1, () => 4, undefined, before[before.length - 1].lat + 0.05);
-    expect(computeLiveStats([before, after], running).maxSpeedMs).toBeCloseTo(4, 1);
-    expect(computeLiveStats([], running).maxSpeedMs).toBeNull();
+    expect(computeLiveStats([before, after], KMH_PROFILE).maxSpeedMs).toBeCloseTo(4, 1);
+    expect(computeLiveStats([], KMH_PROFILE).maxSpeedMs).toBeNull();
   });
 
   it('donne la même vitesse max à 1 Hz et à 5 Hz', () => {
@@ -192,7 +191,7 @@ describe('computeLiveStats : mémoire du direct', () => {
       const segments = replay(hz);
       const total = segments.reduce((n, s) => n + s.length, 0);
       const cases = [
-        { profile: running, options: LIVE_STATS_DEFAULTS },
+        { profile: KMH_PROFILE, options: LIVE_STATS_DEFAULTS },
         { profile: wing, options: LIVE_STATS_DEFAULTS },
       ];
       const checked = checkedPositions(segments, hz);
@@ -224,7 +223,7 @@ describe('computeLiveStats : mémoire du direct', () => {
   it('repart de zéro si le profil, les réglages ou les positions changent', () => {
     const segments = replay(1);
     const memory = createLiveStatsMemory();
-    computeLiveStats(seenAfter(segments, 500), running, LIVE_STATS_DEFAULTS, memory);
+    computeLiveStats(seenAfter(segments, 500), KMH_PROFILE, LIVE_STATS_DEFAULTS, memory);
     expect(computeLiveStats(seenAfter(segments, 520), wing, LIVE_STATS_DEFAULTS, memory)).toEqual(computeLiveStats(seenAfter(segments, 520), wing));
     const options = { ...LIVE_STATS_DEFAULTS, lastDistanceM: 1852 };
     expect(computeLiveStats(seenAfter(segments, 540), wing, options, memory)).toEqual(computeLiveStats(seenAfter(segments, 540), wing, options));
@@ -239,9 +238,9 @@ describe('computeLiveStats : mémoire du direct', () => {
 describe('computeLiveStats : derniers mètres', () => {
   it('donne la vitesse des 300 derniers mètres', () => {
     // 800 s à 2 m/s puis 100 s à 4 m/s : les 300 derniers mètres tiennent dans la partie à 4 m/s.
-    const stats = computeLiveStats([trace(0, 900, 1, (t) => (t <= 800 ? 2 : 4))], running);
+    const stats = computeLiveStats([trace(0, 900, 1, (t) => (t <= 800 ? 2 : 4))], KMH_PROFILE);
     expect(stats.recentDistanceSpeedMs).toBeCloseTo(4, 1);
-    expect(computeLiveStats([trace(0, 60, 1, () => 3)], running).recentDistanceSpeedMs).toBeNull();
+    expect(computeLiveStats([trace(0, 60, 1, () => 3)], KMH_PROFILE).recentDistanceSpeedMs).toBeNull();
   });
 });
 
@@ -337,9 +336,9 @@ describe("computeLiveStats : moyenne active, comme l'analyse (voile, surf)", () 
     const segments = driftingSegments();
     const memory = createLiveStatsMemory();
     const options = withThreshold(8);
-    const running = computeLiveStats(segments, wing, options, memory).activeAverageSpeedMs;
+    const slow = computeLiveStats(segments, wing, options, memory).activeAverageSpeedMs;
     const reread = segments.map((segment) => segment.map((f) => ({ ...f })));
-    expect(computeLiveStats(reread, wing, options, createLiveStatsMemory()).activeAverageSpeedMs).toBe(running);
+    expect(computeLiveStats(reread, wing, options, createLiveStatsMemory()).activeAverageSpeedMs).toBe(slow);
   });
 
   it('un seuil qui change refait le chiffre', () => {
@@ -352,7 +351,7 @@ describe("computeLiveStats : moyenne active, comme l'analyse (voile, surf)", () 
   it("sans seuil passé, rien n'est calculé ; sous le seuil, pas de chiffre", () => {
     const segments = driftingSegments();
     expect(computeLiveStats(segments, wing).activeAverageSpeedMs).toBeNull();
-    expect(computeLiveStats(segments, running).activeAverageSpeedMs).toBeNull();
+    expect(computeLiveStats(segments, KMH_PROFILE).activeAverageSpeedMs).toBeNull();
     expect(EMPTY_LIVE_STATS.activeAverageSpeedMs).toBeNull();
     expect(computeLiveStats([leg(0, 600, () => 1, 0).fixes], wing, withThreshold(20)).activeAverageSpeedMs).toBeNull();
     // Seuil à 0 : aucun seuil réglé, les arrêts complets seuls sont ôtés, comme dans l'analyse.

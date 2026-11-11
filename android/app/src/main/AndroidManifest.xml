@@ -82,7 +82,7 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- Récepteur du greffon GPS, retiré : il ne restaure au démarrage que des zones de géorepérage, jamais créées ici. -->
+        <!-- Marqueur `tools:node="remove"` : à la fusion des manifestes, il retire le récepteur du greffon GPS, qui ne restaure au démarrage que des zones de géorepérage, jamais créées ici. -->
         <receiver
             android:name="com.capgo.capacitor_background_geolocation.GeofenceBootReceiver"
             tools:node="remove" />

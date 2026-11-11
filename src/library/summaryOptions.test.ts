@@ -11,7 +11,7 @@ import {
 // Pas de `DOMParser` dans l'environnement node : le « GPX » de ces tests est le JSON des points bruts.
 vi.mock('../core/gpxParser', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../core/gpxParser')>()),
-  parseGpx: (text: string) => ({ rawPoints: JSON.parse(text), timedPoints: [], hasDeviceSpeed: false }),
+  parseGpx: (text: string) => ({ rawPoints: JSON.parse(text), hasDeviceSpeed: false }),
 }));
 
 const analysis = (patch: Partial<SessionAnalysis>): SessionAnalysis => ({

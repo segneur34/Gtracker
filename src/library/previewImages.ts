@@ -15,7 +15,7 @@ import { isFiniteNumber } from '../core/basics';
  * (`TRACK_PREVIEW`, fond de Leaflet, dégradé, ordre de peinture, réduction des
  * points) ; toutes les images gardées sont alors oubliées.
  */
-export const PREVIEW_IMAGE_VERSION = 1;
+const PREVIEW_IMAGE_VERSION = 1;
 
 /** Version de l'index rangé : l'augmenter oublie toutes les images gardées. */
 export const PREVIEW_IMAGE_INDEX_VERSION = 1;

@@ -8,8 +8,7 @@ import { currentMemoryFolder, reportStartupError } from './useSessionLibrary';
 /**
  * Tests de FC repos gardés sur l'appareil, du plus récent au plus ancien. Une
  * clé à part, hors des réglages recopiés dans le dossier mémoire : un test
- * sans GPS n'a pas encore de session (fiche ni GPX) où se ranger ; ce sera
- * celle du lot « Muscu ». En attendant, la liste est aussi recopiée dans
+ * sans GPS n'a pas de session (fiche ni GPX) où se ranger. La liste est aussi recopiée dans
  * `fc-repos.json` du dossier (`restingHrFile.ts`), qui la fait suivre l'appareil.
  */
 

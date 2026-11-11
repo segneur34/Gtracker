@@ -11,7 +11,7 @@ import { loadSessionMotion } from './sessionMotion';
 import { hasSessionMotion, useLibrarySession } from './useSessionLibrary';
 
 /**
- * Sauts d'une session (voile, course, vélo ; `core/jumps.ts`) : ceux de sa fiche s'ils sont
+ * Sauts d'une session (voile ; `core/jumps.ts`) : ceux de sa fiche s'ils sont
  * à jour, sinon calculés depuis son `.imu` à l'ouverture de l'analyse, puis
  * rangés dans la fiche (hors brouillon : ce n'est pas une saisie). Une session
  * sans `.imu` ni sauts rangés n'en a pas : l'onglet « sauts » ne paraît pas.
@@ -19,7 +19,7 @@ import { hasSessionMotion, useLibrarySession } from './useSessionLibrary';
 
 /**
  * Sauts calculés pendant ce lancement, par session et instant du premier point (fiche en lecture seule comprise) ;
- * `measured: false` : la capture ne mesurait pas les sauts (cadence seule).
+ * `measured: false` : capture sans mesure des sauts (fichier venu d'ailleurs).
  */
 const cache = createSessionAssetCache<SessionJumps>();
 
@@ -36,7 +36,7 @@ const nextFrame = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 const compute = async (file: string, track: TrackPoint[], detection: JumpDetection): Promise<SessionJumps> => {
   await nextFrame();
   const recording = await loadSessionMotion(file);
-  // Capture de la seule cadence : pas de sauts à chercher, et la fiche le retient.
+  // Capture sans mesure des sauts (fichier venu d'ailleurs) : pas de sauts à chercher, et la fiche le retient.
   const measured = recording.header.setup.jumps !== false;
   const jumps = measured ? measureJumps(recording, detection, track, buildCumulativeTrack(track).cumDist).jumps.map(toSessionJump) : [];
   return { version: JUMPS_CALC_VERSION, computedAt: new Date().toISOString(), jumps, ...(measured ? {} : { measured: false as const }) };
@@ -73,7 +73,7 @@ export interface JumpsHighlight {
 }
 
 /**
- * Sauts d'une analyse (voile, course, vélo) : ceux de la session (`useSessionJumps`)
+ * Sauts d'une analyse (voile) : ceux de la session (`useSessionJumps`)
  * montrés à la hauteur minimale de l'activité, pris au seuil d'activité ou plus,
  * et leur surbrillance sur la carte. L'onglet « sauts » ne paraît que si la
  * session en a (`visible`).

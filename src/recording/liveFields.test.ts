@@ -7,7 +7,7 @@ import {
 import { SPORT_PROFILES, sportTreatment } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import { EMPTY_LIVE_STATS, LIVE_STATS_DEFAULTS } from './liveStats';
-import { isInverseUnit, type DistanceUnit, type SpeedUnit } from '../core/units';
+import type { DistanceUnit, SpeedUnit } from '../core/units';
 import type { Treatment } from '../core/sportProfiles';
 
 const context = (patch: Partial<LiveFieldContext> = {}): LiveFieldContext => ({
@@ -101,7 +101,6 @@ describe('moyenne du direct : « Moyenne active » en voile et en surf (04/11)',
 
   it('le bateau, sans seuil, garde son chiffre et son nom', () => {
     expect(liveFieldLabel('average', { speedUnit: 'kmh', distanceUnit: 'km' })).toBe('Moyenne');
-    expect(liveFieldLabel('average', { speedUnit: 'minkm', distanceUnit: 'km' })).toBe('Allure moyenne');
     expect(liveFieldShortLabel('average', { speedUnit: 'kmh', distanceUnit: 'km' })).toBe('Moy.');
     expect(liveFieldValue('average', context({ stats, speedUnit: 'kmh' }))).toBe('10,8 km/h');
   });
@@ -112,8 +111,7 @@ describe('moyenne du direct : « Moyenne active » en voile et en surf (04/11)',
 });
 
 describe('liveFieldLabel', () => {
-  it("parle d'allure en min/km et de mille en milles nautiques", () => {
-    expect(liveFieldLabel('average', { speedUnit: 'minkm', distanceUnit: 'km' })).toBe('Allure moyenne');
+  it('parle de mille en milles nautiques', () => {
     expect(liveFieldLabel('average', { speedUnit: 'kn', distanceUnit: 'nm' })).toBe('Moyenne');
     expect(liveFieldLabel('lastDistance', { speedUnit: 'kn', distanceUnit: 'nm' })).toBe('Dernier mille');
     expect(liveFieldLabel('recentDistanceSpeed', { speedUnit: 'kmh', distanceUnit: 'km' })).toBe('300 derniers m');
@@ -121,9 +119,8 @@ describe('liveFieldLabel', () => {
 });
 
 describe('liveFieldShortLabel', () => {
-  it("abrège, et parle d'allure en min/km", () => {
+  it('abrège', () => {
     expect(liveFieldShortLabel('speed', { speedUnit: 'kmh', distanceUnit: 'km' })).toBe('Vit.');
-    expect(liveFieldShortLabel('speed', { speedUnit: 'minkm', distanceUnit: 'km' })).toBe('Allure');
     expect(liveFieldShortLabel('lastDistance', { speedUnit: 'kn', distanceUnit: 'nm' })).toBe('Dern. mille');
   });
 });
@@ -159,12 +156,11 @@ describe('libellés sur les options du direct (lot 67)', () => {
   const oldRecentWindowLabel = `${Math.round(LIVE_STATS_DEFAULTS.recentWindowS / 60)} min`;
   const [TOP_SHORT_S, TOP_LONG_S] = LIVE_STATS_DEFAULTS.topDurationsS;
 
-  const oldLiveFieldLabel = (key: LiveFieldKey, { speedUnit, distanceUnit }: LiveFieldUnits): string => {
-    const pace = isInverseUnit(speedUnit);
+  const oldLiveFieldLabel = (key: LiveFieldKey, { distanceUnit }: LiveFieldUnits): string => {
     switch (key) {
-      case 'speed': return pace ? 'Allure' : 'Vitesse';
-      case 'average': return pace ? 'Allure moyenne' : 'Moyenne';
-      case 'max': return `${pace ? 'Meilleure' : 'Max'} (${LIVE_STATS_DEFAULTS.maxDurationS} s)`;
+      case 'speed': return 'Vitesse';
+      case 'average': return 'Moyenne';
+      case 'max': return `Max (${LIVE_STATS_DEFAULTS.maxDurationS} s)`;
       case 'recentDistanceSpeed': return `${LIVE_STATS_DEFAULTS.recentDistanceM} derniers m`;
       case 'lastDistance': return distanceUnit === 'nm' ? 'Dernier mille' : 'Dernier km';
       case 'distance': return 'Distance';
@@ -184,12 +180,11 @@ describe('libellés sur les options du direct (lot 67)', () => {
     }
   };
 
-  const oldLiveFieldShortLabel = (key: LiveFieldKey, { speedUnit, distanceUnit }: LiveFieldUnits): string => {
-    const pace = isInverseUnit(speedUnit);
+  const oldLiveFieldShortLabel = (key: LiveFieldKey, { distanceUnit }: LiveFieldUnits): string => {
     switch (key) {
-      case 'speed': return pace ? 'Allure' : 'Vit.';
+      case 'speed': return 'Vit.';
       case 'average': return 'Moy.';
-      case 'max': return pace ? 'Meill.' : 'Max';
+      case 'max': return 'Max';
       case 'recentDistanceSpeed': return `${LIVE_STATS_DEFAULTS.recentDistanceM} m`;
       case 'lastDistance': return distanceUnit === 'nm' ? 'Dern. mille' : 'Dern. km';
       case 'distance': return 'Dist.';
@@ -212,7 +207,7 @@ describe('libellés sur les options du direct (lot 67)', () => {
 
   const KEYS = Object.keys(DEFAULT_LIVE_FIELDS).flatMap((t) => liveFieldsOfTreatment(t as Treatment, 'notification'));
   const UNITS: { speedUnit: SpeedUnit; distanceUnit: DistanceUnit }[] = [
-    { speedUnit: 'kmh', distanceUnit: 'km' }, { speedUnit: 'minkm', distanceUnit: 'km' }, { speedUnit: 'kn', distanceUnit: 'nm' },
+    { speedUnit: 'kmh', distanceUnit: 'km' }, { speedUnit: 'kn', distanceUnit: 'nm' },
   ];
 
   it('identiques à avant avec les options par défaut, données ou non', () => {

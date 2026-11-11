@@ -4,9 +4,8 @@ import { isFiniteNumber, isObject } from './basics';
 /**
  * Repères posés par le bouton « Note » pendant l'enregistrement : un instant
  * et une position, nommés ensuite dans l'analyse. Datés par l'horloge du
- * téléphone, comme les séances du compteur : ils ne se tirent pas du GPX.
- * Une session sans position (muscu, lot I du 25/10) pose des repères à
- * l'heure seule : latitude et longitude nulles, ni fanion ni `<wpt>`.
+ * téléphone, ils ne se tirent pas du GPX. Un repère sans position
+ * (latitude et longitude nulles) est à l'heure seule : ni fanion ni `<wpt>`.
  */
 export interface SessionMark {
   /** Instant de l'appui, en millisecondes. */

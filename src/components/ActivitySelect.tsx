@@ -10,7 +10,7 @@ import { IconChevronRight } from './icons';
 import './ActivitySelect.css';
 
 /**
- * Choix d'une activité, groupées par famille (Voile, À pied, Vélo, Fractionné) :
+ * Choix d'une activité, groupées par famille (Voile, Surf) :
  * planifier un itinéraire, classer une session, changer l'activité d'un
  * enregistrement en cours ou d'une session analysée. Passer d'une famille à
  * l'autre change le module qui analyse la session : c'est à l'appelant d'en

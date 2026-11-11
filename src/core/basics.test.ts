@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  bandIndex, clamp, errorMessage, finiteOr, inRange, isFiniteNumber, isObject, meanOf, median, medianOfSorted, parseJson, plural, readCommands, roundTo,
+  bandIndex, clamp, errorMessage, finiteOr, inRange, isFiniteNumber, isObject, meanOf, median, medianOfSorted, parseJson, plural, roundTo,
   stringifyJson, toFixedNumber, upperMedianOfSorted,
 } from './basics';
 
@@ -111,19 +111,6 @@ describe('basics', () => {
     expect(bandIndex(90, bounds)).toBe(0);
     expect(bandIndex(195, bounds)).toBe(5);
     expect(bandIndex(5, [])).toBe(0);
-  });
-
-  it('relit des commandes datées', () => {
-    const kinds = ['lap', 'pause'] as const;
-    expect(readCommands('x', kinds)).toBeNull();
-    expect(readCommands(null, kinds)).toBeNull();
-    expect(readCommands([], kinds)).toEqual([]);
-    expect(
-      readCommands(
-        [{ kind: 'lap', atMs: 5, extra: 1 }, { kind: 'resume', atMs: 6 }, { kind: 'pause', atMs: NaN }, { kind: 'pause', atMs: '7' }, null, 3, { kind: 'pause', atMs: 8 }],
-        kinds
-      )
-    ).toEqual([{ kind: 'lap', atMs: 5 }, { kind: 'pause', atMs: 8 }]);
   });
 });
 

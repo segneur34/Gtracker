@@ -5,11 +5,11 @@ import { FIT_FILE_ACTIVITY, parseFit, readFitFileType } from './fitParser';
 const T0 = Date.UTC(2026, 9, 10, 10, 0, 0);
 
 const point = (s: number) => ({
-  timeMs: T0 + s * 1000, lat: 43.5 + s * 1e-5, lon: 3.9 - s * 1e-5, altitudeM: 12.4, speedMs: 3.456, hr: 150, cadence: 85, fractionalCadence: 64,
+  timeMs: T0 + s * 1000, lat: 43.5 + s * 1e-5, lon: 3.9 - s * 1e-5, altitudeM: 12.4, speedMs: 3.456, hr: 150,
 });
 
 describe('lecteur FIT : valeurs et unités', () => {
-  it('rend les points en SI : semi-cercles en degrés, époque de 1989, altitude, vitesse, cadence fractionnaire', () => {
+  it('rend les points en SI : semi-cercles en degrés, époque de 1989, altitude, vitesse', () => {
     const { records, fileType, truncated } = parseFit(buildFitActivity({ points: [point(0), point(1)] }));
     expect(fileType).toBe(FIT_FILE_ACTIVITY);
     expect(truncated).toBe(false);
@@ -21,7 +21,6 @@ describe('lecteur FIT : valeurs et unités', () => {
     expect(r.altitudeM).toBe(12.4);
     expect(r.speedMs).toBe(3.456);
     expect(r.heartRateBpm).toBe(150);
-    expect(r.cadence).toBe(85.5);
   });
 
   it("l'époque du FIT est le 31/12/1989 à minuit UTC", () => {
@@ -52,15 +51,14 @@ describe('lecteur FIT : valeurs et unités', () => {
     expect(records[1]).toMatchObject({ altitudeM: 100, speedMs: 1 });
   });
 
-  it('une valeur invalide est absente, jamais un chiffre : position, altitude, vitesse, FC, cadence', () => {
+  it('une valeur invalide est absente, jamais un chiffre : position, altitude, vitesse, FC', () => {
     const { records } = parseFit(buildFitActivity({ points: [{ timeMs: T0 }] }));
     expect(records).toStrictEqual([{ timeMs: T0 }]);
   });
 
-  it('une FC à 0 (ceinture non portée) est absente, une cadence à 0 (arrêt) reste', () => {
-    const { records } = parseFit(buildFitActivity({ points: [{ timeMs: T0, hr: 0, cadence: 0 }] }));
+  it('une FC à 0 (ceinture non portée) est absente', () => {
+    const { records } = parseFit(buildFitActivity({ points: [{ timeMs: T0, hr: 0 }] }));
     expect(records[0].heartRateBpm).toBeUndefined();
-    expect(records[0].cadence).toBe(0);
   });
 
   it('une latitude hors de la Terre écarte la position, pas le point', () => {
@@ -120,10 +118,10 @@ describe('lecteur FIT : structure du fichier', () => {
   it('une redéfinition du message local remplace la précédente', () => {
     const writer = fitWriter();
     writer.define(0, FIT_MESG.record, RECORD_HR).message(0, [fitTime(T0), 120]);
-    writer.define(0, FIT_MESG.record, [{ num: 253, base: FIT_BASE.uint32 }, { num: 4, base: FIT_BASE.uint8 }]).message(0, [fitTime(T0 + 1000), 80]);
+    writer.define(0, FIT_MESG.record, [{ num: 253, base: FIT_BASE.uint32 }, { num: 2, base: FIT_BASE.uint16 }]).message(0, [fitTime(T0 + 1000), 2600]);
     writer.define(0, FIT_MESG.lap, [{ num: 253, base: FIT_BASE.uint32 }]).message(0, [fitTime(T0 + 2000)]);
     const { records } = parseFit(writer.bytes());
-    expect(records).toStrictEqual([{ timeMs: T0, heartRateBpm: 120 }, { timeMs: T0 + 1000, cadence: 80 }]);
+    expect(records).toStrictEqual([{ timeMs: T0, heartRateBpm: 120 }, { timeMs: T0 + 1000, altitudeM: 20 }]);
   });
 
   it('un message inconnu, même long, est sauté', () => {

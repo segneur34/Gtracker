@@ -4,13 +4,13 @@ import { activeRuns, buildBaseSessionStats, buildCumulativeTrack, computeActiveT
 import { getActiveThresholds, SPORT_PROFILES, type SportProfile } from './sportProfiles';
 import type { RawTrackPoint, TrackPoint } from './types';
 import { mPerDegLon } from '../test/geo.fixture';
-import { WALK_PROFILE } from '../test/walkProfile.fixture';
+import { kmhToMs } from './units';
 
 const START_MS = Date.parse('2026-10-27T10:00:00Z');
 const LAT = 43.6;
 const M_PER_DEG_LON = mPerDegLon(LAT);
 /** 5 km/h, en m/s. */
-const WALK_MS = 5 / 3.6;
+const SLOW_MS = 5 / 3.6;
 
 /**
  * Phase d'une trace vers l'est : `durationS` secondes à `speedMs`. Sans point
@@ -69,8 +69,28 @@ const totalDistanceM = (track: TrackPoint[]): number => {
   return cumDist[cumDist.length - 1];
 };
 
-/** Profil à pied gelé (`WALK_PROFILE`) : seuil en km/h, confirmation sur 3 s. */
-const RUNNING = WALK_PROFILE;
+/**
+ * Profil synthétique, bâti sur le surf : un support lent dont le seuil se règle en km/h, avec une confirmation
+ * sur 3 s et une médiane sur 5 s, réglages qu'aucun calcul de voile ou de surf ne réunit. Il emprunte
+ * l'identifiant du surf, sans ses vagues ni son pumping : tout calcul qui choisit par `profile.id` le traite en surf.
+ */
+const KMH_PROFILE: SportProfile = {
+  ...SPORT_PROFILES.surf,
+  speedRange: { minMs: kmhToMs(4), maxMs: kmhToMs(15) },
+  speedUnit: 'kmh',
+  thresholdUnit: 'kmh',
+  defaultActiveThreshold: 3,
+  activeHysteresis: { enterOffset: 1, exitOffset: -1 },
+  stillThreshold: 1,
+  minStateDurationS: 3,
+  medianWindowSeconds: 5,
+  maxPlausibleSpeedMs: 12,
+  defaultPolarMinSpeed: 0,
+  jumps: null,
+  hrEnergy: null,
+  surf: null,
+  pump: null,
+};
 
 describe('buildBaseSessionStats, dénominateur du ratio', () => {
   // 10 min à 10 m/s, 10 min à 2 m/s, 10 min à l'arrêt.
@@ -97,7 +117,7 @@ describe('buildBaseSessionStats, dénominateur du ratio', () => {
 });
 
 describe('activeRuns', () => {
-  const track = analyzed(buildRaw([{ durationS: 120, speedMs: WALK_MS }]), RUNNING);
+  const track = analyzed(buildRaw([{ durationS: 120, speedMs: SLOW_MS }]), KMH_PROFILE);
   // Deux suites : 10 à 30, 50 à 80.
   const mask = track.map((_, i) => (i >= 11 && i <= 30) || (i >= 51 && i <= 80));
 
@@ -139,60 +159,60 @@ describe('activeRuns', () => {
 describe('getActiveThresholds', () => {
   it('ne rend jamais une détente basse nulle sous un seuil plus petit que l’écart de sortie (A-B1)', () => {
     // Marche à 0,5 km/h : 0,5 − 1 ne serait pas positif, la sortie vaut la moitié du seuil.
-    const walk = getActiveThresholds(RUNNING, 0.5);
+    const walk = getActiveThresholds(KMH_PROFILE, 0.5);
     expect(walk.enter).toBeCloseTo(1.5, 9);
     expect(walk.exit).toBeCloseTo(0.25, 9);
   });
 
   it('garde seuil + écart quand il reste positif', () => {
-    expect(getActiveThresholds(RUNNING, 3)).toEqual({ enter: 4, exit: 2 });
+    expect(getActiveThresholds(KMH_PROFILE, 3)).toEqual({ enter: 4, exit: 2 });
     expect(getActiveThresholds(SPORT_PROFILES.surf, 5)).toEqual({ enter: 6, exit: 3 });
   });
 
   it('donne au plancher d’arrêt du bateau une sortie à 0,5 nœud, et rend 0 pour un seuil nul', () => {
     const boat = SPORT_PROFILES.bateau;
     expect(getActiveThresholds(boat, boat.stillThreshold)).toEqual({ enter: 1.5, exit: 0.5 });
-    expect(getActiveThresholds(RUNNING, 0)).toEqual({ enter: 1, exit: 0 });
+    expect(getActiveThresholds(KMH_PROFILE, 0)).toEqual({ enter: 1, exit: 0 });
   });
 });
 
 describe('thresholdActivityMask', () => {
   const walkStopWalk: Phase[] = [
-    { durationS: 600, speedMs: WALK_MS },
+    { durationS: 600, speedMs: SLOW_MS },
     { durationS: 600, speedMs: 0 },
-    { durationS: 600, speedMs: WALK_MS },
+    { durationS: 600, speedMs: SLOW_MS },
   ];
 
   it('sort pendant un arrêt au seuil de la marche, 0,5 km/h, à 1 Hz comme à 5 Hz (A-B1)', () => {
-    const at1 = movingS(analyzed(buildRaw(walkStopWalk, 1), RUNNING), RUNNING, 0.5);
-    const at5 = movingS(analyzed(buildRaw(walkStopWalk, 5), RUNNING), RUNNING, 0.5);
+    const at1 = movingS(analyzed(buildRaw(walkStopWalk, 1), KMH_PROFILE), KMH_PROFILE, 0.5);
+    const at5 = movingS(analyzed(buildRaw(walkStopWalk, 5), KMH_PROFILE), KMH_PROFILE, 0.5);
     expect(at1).toBeGreaterThan(1190);
     expect(at1).toBeLessThan(1210);
     expect(Math.abs(at5 - at1)).toBeLessThan(2);
   });
 
   it('ôte un arrêt complet sans seuil réglé, au plancher d’arrêt (bug des pauses, 27/10)', () => {
-    const at1 = movingS(analyzed(buildRaw(walkStopWalk, 1), RUNNING), RUNNING, 0);
-    const at5 = movingS(analyzed(buildRaw(walkStopWalk, 5), RUNNING), RUNNING, 0);
+    const at1 = movingS(analyzed(buildRaw(walkStopWalk, 1), KMH_PROFILE), KMH_PROFILE, 0);
+    const at5 = movingS(analyzed(buildRaw(walkStopWalk, 5), KMH_PROFILE), KMH_PROFILE, 0);
     expect(at1).toBeGreaterThan(1190);
     expect(at1).toBeLessThan(1210);
     expect(Math.abs(at5 - at1)).toBeLessThan(2);
   });
 
   it('n’ôte rien d’un arrêt de 2 s sans seuil réglé : la sortie se confirme sur 3 s', () => {
-    const track = analyzed(buildRaw([{ durationS: 600, speedMs: WALK_MS }, { durationS: 2, speedMs: 0 }, { durationS: 600, speedMs: WALK_MS }]), RUNNING);
+    const track = analyzed(buildRaw([{ durationS: 600, speedMs: SLOW_MS }, { durationS: 2, speedMs: 0 }, { durationS: 600, speedMs: SLOW_MS }]), KMH_PROFILE);
     // Seule l'entrée, au départ, attend sa confirmation.
-    expect(movingS(track, RUNNING, 0)).toBeGreaterThan(1202 - 4);
+    expect(movingS(track, KMH_PROFILE, 0)).toBeGreaterThan(1202 - 4);
   });
 
   it('ôte un trou immobile de la trace, en vitesse dérivée comme en Doppler (A-B3)', () => {
     for (const doppler of [false, true]) {
       const raw = buildRaw([
-        { durationS: 600, speedMs: WALK_MS },
+        { durationS: 600, speedMs: SLOW_MS },
         { durationS: 300, speedMs: 0, noPoints: true },
-        { durationS: 600, speedMs: WALK_MS },
+        { durationS: 600, speedMs: SLOW_MS },
       ], 1, doppler);
-      const moving = movingS(analyzed(raw, RUNNING), RUNNING, 3);
+      const moving = movingS(analyzed(raw, KMH_PROFILE), KMH_PROFILE, 3);
       expect(moving).toBeGreaterThan(1190);
       expect(moving).toBeLessThan(1205);
     }
@@ -200,11 +220,11 @@ describe('thresholdActivityMask', () => {
 
   it('garde en mouvement un trou parcouru à l’allure de la trace (A-B3)', () => {
     const raw = buildRaw([
-      { durationS: 600, speedMs: WALK_MS },
-      { durationS: 300, speedMs: WALK_MS, noPoints: true },
-      { durationS: 600, speedMs: WALK_MS },
+      { durationS: 600, speedMs: SLOW_MS },
+      { durationS: 300, speedMs: SLOW_MS, noPoints: true },
+      { durationS: 600, speedMs: SLOW_MS },
     ], 1, true);
-    const moving = movingS(analyzed(raw, RUNNING), RUNNING, 3);
+    const moving = movingS(analyzed(raw, KMH_PROFILE), KMH_PROFILE, 3);
     expect(moving).toBeGreaterThan(1495);
     expect(moving).toBeLessThan(1505);
   });
@@ -223,8 +243,8 @@ describe('thresholdActivityMask', () => {
 describe('distance d’un trou de la trace (A-B2)', () => {
   it('ne gagne pas plus que la corde × 1,5 sur un trou immobile suivi d’une reprise en Doppler', () => {
     const walk: Phase = { durationS: 600, speedMs: 1.2 };
-    const withGap = analyzed(buildRaw([walk, { durationS: 300, speedMs: 0, noPoints: true }, walk], 1, true), RUNNING);
-    const withoutGap = analyzed(buildRaw([walk, walk], 1, true), RUNNING);
+    const withGap = analyzed(buildRaw([walk, { durationS: 300, speedMs: 0, noPoints: true }, walk], 1, true), KMH_PROFILE);
+    const withoutGap = analyzed(buildRaw([walk, walk], 1, true), KMH_PROFILE);
     // Le pas du trou mesure 1,2 m de corde : au plus 1,8 m de plus, au lieu de 1,2 m/s × 301 s.
     expect(totalDistanceM(withGap) - totalDistanceM(withoutGap)).toBeLessThan(1.2 * 1.5 + 0.01);
     expect(withGap.filter((p) => p.gapDistanceM !== undefined)).toHaveLength(1);
@@ -232,7 +252,7 @@ describe('distance d’un trou de la trace (A-B2)', () => {
 
   it('garde la distance d’un trou de 60 s parcouru en ligne droite', () => {
     const run: Phase = { durationS: 600, speedMs: 3 };
-    const track = analyzed(buildRaw([run, { durationS: 60, speedMs: 3, noPoints: true }, run], 1, true), RUNNING);
+    const track = analyzed(buildRaw([run, { durationS: 60, speedMs: 3, noPoints: true }, run], 1, true), KMH_PROFILE);
     expect(totalDistanceM(track)).toBeCloseTo(3 * 1260, -1);
   });
 

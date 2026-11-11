@@ -31,7 +31,7 @@ export const confirmLeave = (): boolean => {
 };
 
 /** Ce que la garde de l'historique demande au navigateur (injecté pour le test). */
-export interface HistoryPort {
+interface HistoryPort {
   /** Empile une entrée « garde » sur l'adresse courante (même état de routeur, marque en plus). */
   pushGuard: () => void;
   /** Recule d'une entrée. */

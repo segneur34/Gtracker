@@ -53,10 +53,6 @@ export const bracketIndex = (length: number, atOrBefore: (index: number) => bool
   return lo;
 };
 
-/** Segment d'une suite croissante qui encadre `x` (`bracketIndex`). */
-export const bracketAt = (values: ArrayLike<number>, x: number): number =>
-  bracketIndex(values.length, (i) => values[i] <= x);
-
 /** Segment d'une trace qui encadre l'instant `ms` (`bracketIndex`). */
 export const bracketAtTime = (points: ArrayLike<{ timeMs: number }>, ms: number): number =>
   bracketIndex(points.length, (i) => points[i].timeMs <= ms);

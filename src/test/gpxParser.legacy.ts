@@ -2,7 +2,9 @@
 // Elle est la référence du lecteur d'avant le lot 126 : `core/gpxParser.corpus.test.ts` compare le lecteur de
 // l'application à elle, nombre à nombre, sur le corpus `test/gpx/corpus.ts`. Un écart voulu s'écrit dans ce test,
 // avec sa raison, jamais en retouchant cette copie. Fichier de test seulement : l'application ne l'importe pas.
-import type { RawTrackPoint, TimedTrackPoint } from '../core/types';
+// Seule retouche (lot 325e) : la cadence et les points sans position (`timedPoints`, muscu) n'ont plus de lecteur dans
+// l'application et sont retirés des deux côtés ; la copie n'est plus gelée que sur les champs vivants.
+import type { RawTrackPoint } from '../core/types';
 
 /**
  * Lecture d'un fichier GPX, sans dépendance externe.
@@ -24,12 +26,6 @@ export interface ParsedGpx {
    * écarté (une date égale est gardée).
    */
   rawPoints: RawTrackPoint[];
-  /**
-   * Points horodatés sans position (muscu, lot I du 25/10 : l'heure et la
-   * FC), dans l'ordre du fichier. Vide pour une trace à positions, dont les
-   * points vont tous dans `rawPoints`.
-   */
-  timedPoints: TimedTrackPoint[];
   /** Nom de la trace, si le fichier en porte un. */
   trackName?: string;
   /**
@@ -72,7 +68,7 @@ const textOf = (node: Element | null): string | undefined => {
 };
 
 /** Champs lus sur un point de trace. */
-const POINT_FIELDS = ['time', 'ele', 'speed', 'course', 'hr', 'cad'] as const;
+const POINT_FIELDS = ['time', 'ele', 'speed', 'course', 'hr'] as const;
 type PointField = (typeof POINT_FIELDS)[number];
 
 /**
@@ -81,8 +77,8 @@ type PointField = (typeof POINT_FIELDS)[number];
  * un seul parcours des descendants au lieu d'un par champ (lot 56).
  */
 const pointFieldNodes = (trkpt: Element): Record<PointField, Element | null> => {
-  const qualified: Record<PointField, Element | null> = { time: null, ele: null, speed: null, course: null, hr: null, cad: null };
-  const local: Record<PointField, Element | null> = { time: null, ele: null, speed: null, course: null, hr: null, cad: null };
+  const qualified: Record<PointField, Element | null> = { time: null, ele: null, speed: null, course: null, hr: null };
+  const local: Record<PointField, Element | null> = { time: null, ele: null, speed: null, course: null, hr: null };
   const all = trkpt.getElementsByTagName('*');
   for (let i = 0; i < all.length; i++) {
     const element = all[i];
@@ -98,7 +94,6 @@ const pointFieldNodes = (trkpt: Element): Record<PointField, Element | null> => 
     speed: qualified.speed ?? local.speed,
     course: qualified.course ?? local.course,
     hr: qualified.hr ?? local.hr,
-    cad: qualified.cad ?? local.cad,
   };
 };
 
@@ -141,17 +136,14 @@ export const parseGpx = (gpxContent: string): ParsedGpx => {
 
   const trkpts = doc.getElementsByTagName('trkpt');
   const rawPoints: RawTrackPoint[] = [];
-  const timedPoints: TimedTrackPoint[] = [];
   let hasDeviceSpeed = false;
   // Segment du dernier point retenu : un point d'un autre `<trkseg>` reprend
   // après une pause de l'enregistrement (un `<trkseg>` par pause, `gpxWriter.ts`).
   // Un point écarté en tête d'un segment ne fait pas perdre la reprise, qui
   // passe au suivant gardé.
   let lastSegment: Element | null = null;
-  let lastTimedSegment: Element | null = null;
-  // Date du dernier point gardé de chaque liste : la trace ne remonte jamais le temps.
+  // Date du dernier point gardé : la trace ne remonte jamais le temps.
   let lastRawTimeMs = -Infinity;
-  let lastTimedMs = -Infinity;
 
   for (let i = 0; i < trkpts.length; i++) {
     const trkpt = trkpts[i];
@@ -171,22 +163,7 @@ export const parseGpx = (gpxContent: string): ParsedGpx => {
     // date égale est gardée : `spreadEqualTimes` la répartit.
     const timeMs = new Date(time).getTime();
     if (!isFinite(timeMs)) continue;
-    // Sans position, mais à l'heure : un point d'une session sans trace (muscu),
-    // à part, jamais dans la cinématique.
-    if (!isFinite(lat) || !isFinite(lon)) {
-      if (timeMs < lastTimedMs) continue;
-      lastTimedMs = timeMs;
-      const segment = trkpt.parentElement;
-      const resumes = lastTimedSegment !== null && segment !== lastTimedSegment;
-      lastTimedSegment = segment;
-      const hr = numberOf(nodes.hr);
-      timedPoints.push({
-        time,
-        ...(hr !== undefined ? { hr } : {}),
-        ...(resumes ? { segmentStart: true as const } : {}),
-      });
-      continue;
-    }
+    if (!isFinite(lat) || !isFinite(lon)) continue;
     if (timeMs < lastRawTimeMs) continue;
     lastRawTimeMs = timeMs;
 
@@ -206,7 +183,6 @@ export const parseGpx = (gpxContent: string): ParsedGpx => {
       speedMs,
       courseDeg: readCourse(nodes.course),
       hr: numberOf(nodes.hr),
-      cadence: numberOf(nodes.cad),
       ...(resumes ? { segmentStart: true as const } : {}),
     });
   }
@@ -215,7 +191,6 @@ export const parseGpx = (gpxContent: string): ParsedGpx => {
 
   return {
     rawPoints,
-    timedPoints,
     trackName: trk ? readChildText(trk, 'name') : undefined,
     trackType: trk ? readChildText(trk, 'type') : undefined,
     hasDeviceSpeed,

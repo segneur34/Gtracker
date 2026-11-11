@@ -152,7 +152,7 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
   const muted = token('--muted', '#5b6470');
   ctx.textBaseline = 'alphabetic';
 
-  // Carte sur toute l'image ; sans fond (muscu, fond décoché), un aplat.
+  // Carte sur toute l'image ; sans fond (fond décoché), un aplat.
   ctx.fillStyle = token('--surface-sunken', '#e9e7e2');
   ctx.fillRect(0, 0, widthPx, heightPx);
   const track = drawTrack(ctx, content, count);
@@ -166,7 +166,7 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
     });
   }
   track.draw();
-  // Sans trace (muscu), pas de fond de carte : pas de mention non plus.
+  // Sans fond de carte, pas de mention non plus.
   if (content.withMap && track.view) {
     // Mention qu'exigent les conditions d'usage des tuiles du fond, au ras du bas, sous le cartouche.
     ctx.font = `400 22px ${family}`;

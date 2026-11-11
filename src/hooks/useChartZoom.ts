@@ -42,13 +42,13 @@ export interface ChartZoomSource {
 }
 
 /** Plage rangée d'un zoom, avec la session (`resetKey`) où elle a été posée. */
-export interface ChartZoomEntry {
+interface ChartZoomEntry {
   key: unknown;
   range: XRange | null;
 }
 
 /** Magasin d'un zoom : la dernière plage posée et sa session ; les abonnés ne sont prévenus que si l'une ou l'autre change. */
-export interface ChartZoomStore {
+interface ChartZoomStore {
   get: () => ChartZoomEntry;
   set: (key: unknown, range: XRange | null) => void;
   subscribe: (listener: () => void) => () => void;

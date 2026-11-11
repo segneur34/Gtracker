@@ -60,7 +60,6 @@ public class RecordingNotificationPlugin extends Plugin {
             }
         }
         Double chronoMs = call.getDouble("chronoMs");
-        boolean countDown = Boolean.TRUE.equals(call.getBoolean("countDown", false));
 
         Intent open = new Intent(context, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content = PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
@@ -78,7 +77,6 @@ public class RecordingNotificationPlugin extends Plugin {
         if (!lines.isEmpty()) builder.setStyle(new NotificationCompat.BigTextStyle().bigText(String.join("\n", lines)));
         if (chronoMs != null) {
             builder.setUsesChronometer(true)
-                .setChronometerCountDown(countDown)
                 .setShowWhen(true)
                 .setWhen(chronoMs.longValue());
         } else {

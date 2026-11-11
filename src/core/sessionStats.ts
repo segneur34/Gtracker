@@ -1,5 +1,4 @@
-import { computeElevationStats, type ElevationStats } from './elevation';
-import { ELEVATION_PRESETS, getActiveThresholds, hasActiveThreshold, type ElevationProfile, type SportProfile } from './sportProfiles';
+import { getActiveThresholds, hasActiveThreshold, type SportProfile } from './sportProfiles';
 import type { BaseSessionStats, CumulativeTrack, TrackPoint } from './types';
 import { formatDuration, fromDisplaySpeed } from './units';
 
@@ -45,7 +44,7 @@ export const buildCumulativeTrack = (track: TrackPoint[]): CumulativeTrack => {
 };
 
 /** Durée totale de la session, en millisecondes. */
-export const computeTotalTimeMs = (track: TrackPoint[]): number => {
+const computeTotalTimeMs = (track: TrackPoint[]): number => {
   if (track.length === 0) return 0;
   return track[track.length - 1].timeMs - track[0].timeMs;
 };
@@ -239,10 +238,6 @@ export interface BaseSessionStatsOptions extends ActivityMaskOptions {
   cumulative?: CumulativeTrack;
   /** Masque d'activité déjà calculé. */
   activityMask?: boolean[];
-  /** Réglage du dénivelé. Preset route par défaut. */
-  elevation?: ElevationProfile;
-  /** Dénivelé déjà calculé, pour éviter un second parcours. */
-  elevationStats?: ElevationStats;
   /**
    * Masque du dénominateur du ratio : le ratio est alors le temps actif sur le
    * temps où ce masque est vrai (le temps en mouvement, en voile), et non sur
@@ -251,9 +246,6 @@ export interface BaseSessionStatsOptions extends ActivityMaskOptions {
   ratioMask?: boolean[];
 }
 
-/** Part minimale de points avec altitude pour publier un dénivelé. */
-export const MIN_ELEVATION_COVERAGE = 0.5;
-
 /** Statistiques valables pour tous les supports. */
 export const buildBaseSessionStats = (
   track: TrackPoint[],
@@ -261,8 +253,6 @@ export const buildBaseSessionStats = (
 ): BaseSessionStats => {
   const cum = options.cumulative ?? buildCumulativeTrack(track);
   const mask = options.activityMask ?? computeActivityMask(track, options);
-  const elevation =
-    options.elevationStats ?? computeElevationStats(track, options.elevation ?? ELEVATION_PRESETS.route);
 
   const totalDistanceM = cum.cumDist[cum.cumDist.length - 1] ?? 0;
   const activeDistanceM = computeActiveDistanceM(track, mask);
@@ -270,7 +260,6 @@ export const buildBaseSessionStats = (
   const activeTimeMs = computeActiveTimeMs(track, mask);
   const inMotionTimeMs = options.ratioMask ? computeActiveTimeMs(track, options.ratioMask) : 0;
   const ratioBaseMs = options.ratioMask ? inMotionTimeMs : totalTimeMs;
-  const hasElevation = elevation.coverage >= MIN_ELEVATION_COVERAGE;
 
   return {
     distanceM: totalDistanceM,
@@ -282,10 +271,5 @@ export const buildBaseSessionStats = (
     avgSpeedMs: totalTimeMs > 0 ? totalDistanceM / (totalTimeMs / 1000) : null,
     activeAvgSpeedMs: activeTimeMs > 0 ? activeDistanceM / (activeTimeMs / 1000) : null,
     speedSource: track[0]?.speedSource ?? 'derived',
-    elevationGain: hasElevation ? Math.round(elevation.gainM).toString() : '-',
-    elevationLoss: hasElevation ? Math.round(elevation.lossM).toString() : '-',
-    elevationMin: hasElevation ? Math.round(elevation.minEleM).toString() : '-',
-    elevationMax: hasElevation ? Math.round(elevation.maxEleM).toString() : '-',
-    hasElevation,
   };
 };

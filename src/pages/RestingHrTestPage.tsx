@@ -11,7 +11,7 @@ import { IconPlay } from '../components/icons';
 import { formatMinSec } from '../core/units';
 import { useRestingHrResults } from '../hooks/useRestingHrResults';
 import { useRestingHrTest } from '../hooks/useRestingHrTest';
-import { useRunnerProfile } from '../hooks/useRunnerProfile';
+import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { BELT_STATE_LABEL } from '../platform/heartRate';
 import { RESTING_HR_TEST, restingRemainingS } from '../recording/restingHrTest';
 import { toStoredRestingResult, type StoredRestingResult } from '../library/restingHrStore';
@@ -19,7 +19,7 @@ import { restingHrSeries } from '../library/restingHrResults';
 import './RestingHrTestPage.css';
 
 const PROTOCOL = RESTING_HR_TEST;
-/** Plage de la FC repos de Pratiquant (`useRunnerProfile`), pour proposer de la retenir. */
+/** Plage de la FC repos de Pratiquant (`useAthleteProfile`), pour proposer de la retenir. */
 const RETAINABLE_BPM = [25, 120] as const;
 
 /** Vitesse de l'exemple du navigateur : `?vitesse=10` (banc), 1 par défaut. */
@@ -35,16 +35,16 @@ function StoredResultRow({ result, onRemove }: { result: StoredRestingResult; on
   const [open, setOpen] = useState(false);
   const incomplete = result.coverage < PROTOCOL.minCoverage;
   return (
-    <li className="train-item rest-history__item">
-      <span className="train-item__text">
-        <span className="train-item__name">{result.lowestBpm} bpm</span>
-        <span className="train-item__detail">
+    <li className="rest-history__item">
+      <span className="rest-history__text">
+        <span className="rest-history__name">{result.lowestBpm} bpm</span>
+        <span className="rest-history__detail">
           {dateText(result.startedAtMs)}
           {result.meanBpm !== null && ` · moyenne ${result.meanBpm} bpm`}
           {incomplete && ` · mesures sur ${Math.round(result.coverage * 100)} % du temps`}
         </span>
       </span>
-      <span className="train-item__actions">
+      <span className="rest-history__actions">
         <Button size="s" onClick={() => setOpen((o) => !o)}>{open ? 'Masquer' : 'Courbe'}</Button>
         <Button size="s" variant="ghost" onClick={onRemove} aria-label={`Retirer le test du ${dateText(result.startedAtMs)}`}>Retirer</Button>
       </span>
@@ -66,7 +66,7 @@ function StoredResultRow({ result, onRemove }: { result: StoredRestingResult; on
 function RestingHrTestPage() {
   const { search } = useLocation();
   const { results, add, remove } = useRestingHrResults();
-  const { profile, retainHr } = useRunnerProfile();
+  const { profile, retainHr } = useAthleteProfile();
   const { run, belt, beltChosen, native, error, start, cancel } = useRestingHrTest(
     (result, startedAtMs) => {
       const stored = toStoredRestingResult(result, startedAtMs, PROTOCOL);
@@ -89,7 +89,7 @@ function RestingHrTestPage() {
   const remainingS = run ? Math.ceil(restingRemainingS(run.state, run.nowMs)) : 0;
 
   return (
-    <div className="ui-page train-page" style={{ '--help-accent': 'var(--test-accent)' } as React.CSSProperties}>
+    <div className="ui-page rest-page" style={{ '--help-accent': 'var(--rest-accent)' } as React.CSSProperties}>
       <PageHeader title="FC repos" back={{ to: '/profil', label: 'Profil' }}
         subtitle={`Trois minutes immobile, la FC lue sur la ceinture, sans GPS : la moyenne de ${PROTOCOL.windowS} s la plus basse, après la première minute, est votre FC de repos.`} />
 
@@ -107,7 +107,7 @@ function RestingHrTestPage() {
               Le téléphone reste allumé pendant le test ; aucun GPS ni enregistrement, rien ne peut le couper.
               Si la ceinture lâche, le test va quand même à son terme, et dit la part du temps mesurée.
             </HelpText>
-            <ol className="fit-steps">
+            <ol className="rest-steps">
               <li><strong>Installez-vous</strong>, allongé ou assis, au calme, depuis quelques minutes (le matin au réveil est idéal),
                 la ceinture posée et connectée.</li>
               <li><strong>« Démarrer »</strong> : {PROTOCOL.leadInS} s pour vous poser, puis un bip court.</li>
@@ -126,7 +126,7 @@ function RestingHrTestPage() {
             ) : (
               <p className="ui-hint">Pas de ceinture dans le navigateur : l'exemple joue une FC d'exemple, pour voir le déroulé et le résultat.</p>
             )}
-            <div className="train-actions">
+            <div className="rest-buttons">
               {native ? (
                 <Button variant="primary" disabled={!beltReady} onClick={() => start(false)}>
                   <IconPlay size={18} />
@@ -148,7 +148,7 @@ function RestingHrTestPage() {
         <Card heading="Installez-vous">
           <p className="rest-count" role="timer" aria-live="off">{remainingS} s</p>
           <p className="ui-hint">Le bip court lance les {PROTOCOL.durationS / 60} minutes.{run.simulated && ' Exemple : FC simulée.'}</p>
-          <div className="train-actions rest-actions"><Button onClick={cancel}>Annuler</Button></div>
+          <div className="rest-buttons rest-actions"><Button onClick={cancel}>Annuler</Button></div>
         </Card>
       )}
 
@@ -160,7 +160,7 @@ function RestingHrTestPage() {
           </div>
           <RestingHrChart series={live} durationS={PROTOCOL.durationS} />
           <p className="ui-hint">Un bip long annoncera la fin.{run.simulated && ' Exemple : FC simulée.'}</p>
-          <div className="train-actions rest-actions"><Button onClick={cancel}>Annuler</Button></div>
+          <div className="rest-buttons rest-actions"><Button onClick={cancel}>Annuler</Button></div>
         </Card>
       )}
 
@@ -189,7 +189,7 @@ function RestingHrTestPage() {
           ) : (
             <div className="ui-alert ui-alert--warning">Aucune mesure exploitable : vérifiez la ceinture (peau humide, bien serrée) et refaites le test.</div>
           )}
-          <div className="train-actions rest-actions">
+          <div className="rest-buttons rest-actions">
             {canRetain && (
               <Button variant="primary" disabled={retained} onClick={() => retainHr('hrRest', result.lowestBpm!, { kind: 'test', atMs: run.state.startMs })}>
                 {retained ? 'Retenue comme FC repos' : 'La retenir comme FC repos'}
@@ -204,7 +204,7 @@ function RestingHrTestPage() {
       {results.length > 0 && phase === null && (
         <Card heading={<>Vos tests<HelpToggle helpKey="repos:historique" label="Vos tests" size="s" /></>}>
           <HelpText helpKey="repos:historique" note>Gardés sur cet appareil (les 60 derniers).</HelpText>
-          <ul className="train-list rest-history">
+          <ul className="rest-history">
             {results.map((r) => <StoredResultRow key={r.startedAtMs} result={r} onRemove={() => remove(r.startedAtMs)} />)}
           </ul>
         </Card>

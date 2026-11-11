@@ -18,7 +18,7 @@ import Button from './ui/Button';
 import MoreMenu from './ui/MoreMenu';
 
 /** Ce que l'image de partage montre : la trace colorée de l'analyse et les chiffres de son onglet « général ». */
-export interface SessionShare {
+interface SessionShare {
   family: SportFamily;
   segments: ReadonlyArray<TrackSegment>;
   stats: ReadonlyArray<ShareStat>;

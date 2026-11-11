@@ -1,9 +1,8 @@
-import { computeElevationStats } from '../core/elevation';
+import { MIN_ELEVATION_COVERAGE, computeElevationStats } from '../core/elevation';
 import { heartRateHistogram, heartRateStats, smoothHeartRate, type HeartRatePoint } from '../core/heartRate';
 import { computeKinematics } from '../core/kinematics';
 import { kinematicsOptionsOf, referenceSpeedMs, samplingIntervalS, scalesFiltersToSession } from '../core/sessionSpeed';
 import {
-  MIN_ELEVATION_COVERAGE,
   buildCumulativeTrack,
   computeActiveDistanceM,
   computeActiveTimeMs,
@@ -16,7 +15,6 @@ import {
   defaultActiveThresholdOf,
   getSportProfile,
   hasActiveThreshold,
-  type ElevationProfile,
   type HeartRateProfile,
 } from '../core/sportProfiles';
 import type { RawTrackPoint, SportType, TrackPoint } from '../core/types';
@@ -33,7 +31,6 @@ import { SUMMARY_CALC_VERSION, type SessionSummary, type SummaryHeartRate } from
  * liste et l'analyse donnent les mêmes chiffres :
  * - en voile, filtres et seuil d'activité accordés à l'allure de la session
  *   (`useSailingSession`, règle 4), sauf surcharge de l'utilisateur ;
- * - en course, filtres et seuil du profil, sauf surcharge ;
  * - en surf, les vagues de la page d'analyse (`runSurfSession`) : le temps et
  *   la distance en action sont ceux de la glisse, le résumé compte les vagues,
  *   et sa vitesse max est celle d'une vague (Q34), 0 sans vague.
@@ -47,8 +44,6 @@ export interface SummaryOptions {
   activeThreshold?: number;
   /** Allure de session imposée, en m/s (voile). */
   referenceSpeedOverrideMs?: number;
-  /** Réglage du dénivelé. Absent : celui du profil. */
-  elevation?: ElevationProfile;
   /** Support sur foil de la session (surf : il change le seuil par défaut et l'analyse). */
   foil?: boolean;
   /** Seuil de vague en foil de la session, dans l'unité du profil (surf). */
@@ -171,10 +166,9 @@ export const summarizeSession = (
   const cum = buildCumulativeTrack(analyzed.track);
   const { cumDist } = cum;
   const track = analyzed.track;
-  // Sans calcul connu : le profil neutre (valeurs communes, cardio de référence), le même résumé qu'avec la course.
+  // Sans calcul connu : le profil neutre (valeurs communes, cardio de référence), le même résumé pour toutes les fiches non classées.
   const profile = sport === null ? UNCLASSIFIED_PROFILE : getSportProfile(sport);
-  const elevationProfile = options.elevation ?? profile.elevation;
-  const elevation = computeElevationStats(track, elevationProfile);
+  const elevation = computeElevationStats(track, profile.elevation);
   // Vitesse max : la meilleure moyenne sur 2 s, comme partout (Q34) ; en surf, celle d'une vague, la même que sa
   // page. Aucune fenêtre ne tient (trace clairsemée, chaque pas plus long que `maxGapS` est un trou, règle 10) :
   // la plus haute vitesse lissée.

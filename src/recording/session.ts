@@ -198,7 +198,7 @@ export const shouldFlushJournal = (lastFlushMs: number | null, fixMs: number, fl
   lastFlushMs === null || fixMs - lastFlushMs >= flushS * 1000;
 
 /** Résultat d'une évaluation de pause automatique : que faire, et l'état à garder pour la suivante. */
-export type AutoPauseEvent = 'none' | 'pause' | 'resume';
+type AutoPauseEvent = 'none' | 'pause' | 'resume';
 export interface AutoPauseResult {
   event: AutoPauseEvent;
   belowSinceMs: number | null;

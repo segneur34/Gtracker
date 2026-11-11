@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  bracketAt,
   bracketAtTime,
   bracketIndex,
   firstIndexAfter,
@@ -130,7 +129,6 @@ describe('recherches dans le temps : mêmes bords que les copies remplacées', (
         expect(valueAtTime(pts, (i) => v[i], ms, 'null')).toBe(frozenNull(t, v, ms));
         expect(nearestIndexAtTime(pts, ms)).toBe(frozenNearest(t, ms));
         expect(bracketAtTime(pts, ms)).toBe(frozenBracket(t, t.length, ms)[0]);
-        expect(bracketAt(t, ms)).toBe(frozenBracket(t, t.length, ms)[0]);
         for (let n = 0; n <= t.length; n++) expect(bracketIndex(n, (i) => t[i] <= ms)).toBe(frozenBracket(t, n, ms)[0]);
       }
     }
