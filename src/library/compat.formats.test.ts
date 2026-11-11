@@ -10,15 +10,16 @@ import { sessionRecord } from '../test/record.fixture';
 import { FILE_FORMATS } from '../core/appIdentity';
 
 const route = (over: Record<string, unknown> = {}) => JSON.stringify({
-  format: FILE_FORMATS.itineraire, version: 3, name: 'Tour', activityId: null, createdAt: 'a', updatedAt: 'b',
+  format: FILE_FORMATS.itineraire, version: 4, name: 'Tour', activityId: null, createdAt: 'a', updatedAt: 'b',
   waypoints: [{ lat: 43, lon: 3 }, { lat: 43.1, lon: 3.1 }], legs: [{ mode: 'straight', points: [[43, 3], [43.1, 3.1]], futurTroncon: 1 }],
   ...over,
 });
 
 describe('itinéraire, compatibilité', () => {
   it('(a) version future : lue, non réécrivable', () => {
-    const r = parseRouteRecord(route({ version: 4 }))!;
+    const r = parseRouteRecord(route({ version: 5 }))!;
     expect(isWritableRouteRecord(r)).toBe(false);
+    expect(isWritableRouteRecord(parseRouteRecord(route())!)).toBe(true);
   });
   it('(b) point mal typé : fiche entière ignorée ; nom vide : « Itinéraire »', () => {
     expect(parseRouteRecord(route({ waypoints: [{ lat: '43', lon: 3 }, { lat: 43.1, lon: 3.1 }] }))).toBeNull();

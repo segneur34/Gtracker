@@ -1,11 +1,9 @@
-import { Fragment, type CSSProperties, type ReactNode } from 'react';
-import { Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, YAxis, type AxisDomainItem, type DotItemDotProps, type Margin } from 'recharts';
+import type { CSSProperties, ReactNode } from 'react';
+import { CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, YAxis, type AxisDomainItem, type DotItemDotProps, type Margin } from 'recharts';
 import type { ChartZoom } from '../hooks/useChartZoom';
-import type { GradientStop } from '../core/speedGradient';
 import { chartXAxis, type ChartXSpec } from './chartAxes';
 import { NO_TOOLTIP_CONTENT, clearTrackHover, trackHover, type ChartHoverEvent } from './chartHover';
 import { CHART_GRID_PROPS, chartTick, yAxisLabel } from './chartStyle';
-import { gradeGradientDefs } from './gradeGradientDefs';
 import ZoomableChart, { ChartZoomProbe } from './ZoomableChart';
 
 /** Axe vertical d'un graphe de trace, à la couleur de sa série. */
@@ -30,9 +28,9 @@ export interface TrackYAxis {
   tick?: { fill: string; fontSize: number; fontWeight?: number };
 }
 
-/** Série d'un graphe de trace : courbe, marches (`stepAfter`), ou aire (pleine, ou colorée par un dégradé de pente). */
+/** Série d'un graphe de trace : courbe, ou marches (`stepAfter`). */
 export interface TrackSeries<R> {
-  kind: 'line' | 'area' | 'step';
+  kind: 'line' | 'step';
   key: keyof R & string;
   name: string;
   yAxisId?: string;
@@ -44,9 +42,6 @@ export interface TrackSeries<R> {
   connectNulls?: boolean;
   /** Point dessiné à chaque ligne (par défaut, aucun). */
   dot?: (props: DotItemDotProps) => ReactNode;
-  fillOpacity?: number;
-  /** Dégradé horizontal de la pente (`gradeGradientDefs`), pour trait et remplissage ; `id` unique dans la page. */
-  gradient?: { id: string; stops: GradientStop[] };
 }
 
 const DEFAULT_MARGIN: Margin = { top: 5, right: 10, left: 0, bottom: 0 };
@@ -128,20 +123,12 @@ export default function TrackChart<R>(props: TrackChartProps<R>) {
           <Tooltip content={NO_TOOLTIP_CONTENT} isAnimationActive={false} />
           {series.map((s) => {
             const yAxis = s.yAxisId !== undefined ? { yAxisId: s.yAxisId } : {};
-            const paint = s.gradient ? `url(#${s.gradient.id})` : s.color;
             const dataKey: string = s.key;
             const activeDot = s.activeDotR === false ? false : { r: s.activeDotR };
             const dot = s.dot ?? false;
             const connectNulls = s.connectNulls ?? false;
-            return s.kind === 'area' ? (
-              <Fragment key={s.key}>
-                {s.gradient && gradeGradientDefs(s.gradient.id, s.gradient.stops)}
-                <Area {...yAxis} type="monotone" name={s.name} dataKey={dataKey} stroke={paint} strokeWidth={s.width}
-                  fill={paint} {...(s.fillOpacity !== undefined ? { fillOpacity: s.fillOpacity } : {})}
-                  dot={dot} activeDot={activeDot} connectNulls={connectNulls} isAnimationActive={false} />
-              </Fragment>
-            ) : (
-              <Line key={s.key} {...yAxis} type={s.kind === 'step' ? 'stepAfter' : 'monotone'} name={s.name} dataKey={dataKey} stroke={paint} strokeWidth={s.width}
+            return (
+              <Line key={s.key} {...yAxis} type={s.kind === 'step' ? 'stepAfter' : 'monotone'} name={s.name} dataKey={dataKey} stroke={s.color} strokeWidth={s.width}
                 dot={dot} activeDot={activeDot} connectNulls={connectNulls} isAnimationActive={false} />
             );
           })}

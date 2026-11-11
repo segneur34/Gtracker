@@ -2,7 +2,7 @@ import type { PathOptions } from 'leaflet';
 
 /**
  * Couleurs des surbrillances sur la carte, communes aux analyses : tops,
- * podiums de manœuvres et de sauts, zone de pente, répétition, saut montré.
+ * podiums de manœuvres et de sauts, zone cardiaque, saut, vol ou vague montrés.
  * Couleurs de données, en dur comme celles de la trace.
  */
 
@@ -19,7 +19,7 @@ export const podiumColor = (rank: number): string => HIGHLIGHT_PODIUM_COLORS[ran
 export const TACK_PORT_COLOR = '#d32f2f';
 export const TACK_STARBOARD_COLOR = '#388e3c';
 
-/** Passage seul montré sur la carte (zone de pente, répétition, saut) : un violet, absent du dégradé de la trace. */
+/** Passage seul montré sur la carte (saut, repère, pumping, part d'un tableau) : un violet, absent du dégradé de la trace. */
 export const HIGHLIGHT_SHOWN_COLOR = '#7b1fa2';
 
 /** Repère du bouton « Note » au repos, sur la carte et les graphes (`SessionMarks.tsx`) ; montré, il prend le violet. */
@@ -28,7 +28,7 @@ export const MARK_FLAG_COLOR = '#37474f';
 /** Épaisseur du trait d'une surbrillance sur la carte, en pixels : bien plus que la trace (5). */
 const HIGHLIGHT_WEIGHT = 10;
 
-/** Opacité d'un tronçon montré : top, zone cardiaque, pente, cadence, revêtement, répétition, partie vue d'un graphe. */
+/** Opacité d'un tronçon montré : top, zone cardiaque, partie vue d'un graphe. */
 export const HIGHLIGHT_OPACITY = 0.8;
 
 /** Opacité d'un passage avec son point de départ : saut, vague, vol, podium de manœuvres (un peu plus appuyée). */
@@ -38,15 +38,14 @@ const pathOptionsCache = new Map<string, PathOptions>();
 
 /**
  * Style Leaflet d'un trait de surbrillance, le même objet d'un rendu à l'autre
- * pour une couleur, une opacité et une interactivité données (les traits de
- * `components/map/` réappliquent le style dès que l'objet change). Toujours
- * par `pathOptions`.
+ * pour une couleur et une opacité données (les traits de `components/map/`
+ * réappliquent le style dès que l'objet change). Toujours par `pathOptions`.
  */
-export const highlightPathOptions = (color: string, opacity: number = HIGHLIGHT_OPACITY, interactive = true): PathOptions => {
-  const key = `${color}|${opacity}|${interactive}`;
+export const highlightPathOptions = (color: string, opacity: number = HIGHLIGHT_OPACITY): PathOptions => {
+  const key = `${color}|${opacity}`;
   let options = pathOptionsCache.get(key);
   if (!options) {
-    options = { color, weight: HIGHLIGHT_WEIGHT, opacity, ...(interactive ? {} : { interactive: false }) };
+    options = { color, weight: HIGHLIGHT_WEIGHT, opacity };
     pathOptionsCache.set(key, options);
   }
   return options;

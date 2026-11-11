@@ -64,7 +64,6 @@ export const STORAGE_KEYS = {
   summaryGestures: `${APP_SLUG}.summaryGestures` as const,
   followedTrace: `${APP_SLUG}.followedTrace` as const,
   fondCarte: `${APP_SLUG}.fondCarte` as const,
-  brouterProfile: `${APP_SLUG}.brouterProfile` as const,
   restingHr: `${APP_SLUG}.restingHr` as const,
   planning: `${APP_SLUG}.planning` as const,
   routeList: `${APP_SLUG}.routeList` as const,

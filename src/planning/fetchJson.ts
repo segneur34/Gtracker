@@ -1,7 +1,7 @@
 /**
- * Appel d'un service public (calcul d'itinéraire, recherche de lieux,
- * OpenStreetMap, altitude de l'IGN), commun à la planification : un échec
- * se dit toujours en clair, jamais par le message brut du navigateur.
+ * Appel réseau d'une page (recherche de lieux de la planification, liste des
+ * licences de Réglages) : un échec se dit toujours en clair, jamais par le
+ * message brut du navigateur.
  *
  * - Pas de réseau : `noNetwork`.
  * - Pas de réponse avant `timeoutMs` (s'il est donné) : `timeout`. Le délai
@@ -69,7 +69,7 @@ export const fetchWithin = async <T>(
 };
 
 /** Corps JSON d'une réponse ; `unreadable` s'il n'en est pas. Un abandon pendant la lecture est relancé tel quel. */
-export const readJson = async (response: Response, unreadable: string): Promise<unknown> => {
+const readJson = async (response: Response, unreadable: string): Promise<unknown> => {
   try {
     return await response.json();
   } catch (err) {
@@ -79,7 +79,7 @@ export const readJson = async (response: Response, unreadable: string): Promise<
 };
 
 /** Corps texte d'une réponse en erreur, vide s'il ne se lit pas. */
-export const readErrorBody = (response: Response): Promise<string> => response.text().catch(() => '');
+const readErrorBody = (response: Response): Promise<string> => response.text().catch(() => '');
 
 /** Messages de `fetchJson` : ceux de `fetchWithin`, la réponse illisible, et celui d'un code d'erreur. */
 export interface FetchJsonMessages extends FetchMessages {

@@ -41,10 +41,7 @@ const NAMED_FILES = [
 ];
 
 /** Exceptions temporaires : motifs retirés de chaque ligne avant la recherche, avec le lot qui les retire. */
-const TEMPORARY: { lot: number; motif: RegExp; fichier?: string }[] = [
-  // Profil envoyé à BRouter, retiré avec le fichier au lot 304.
-  { lot: 304, motif: /# Profil Tracker/g, fichier: 'src/planning/brouterProfile.ts' },
-];
+const TEMPORARY: { lot: number; motif: RegExp; fichier?: string }[] = [];
 
 const trackedFiles = (): string[] => {
   const listed = childProcess.execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {

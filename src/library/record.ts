@@ -313,16 +313,6 @@ export interface SessionRecord {
   notes: StoredSessionNotes | null;
   /** Absent des fiches écrites avant son introduction : lu comme `null`. */
   analysis: SessionAnalysis | null;
-  /**
-   * Voies suivies (`planning/surface.ts`, `readSessionSurfaces`), absentes tant que l'onglet « surface » n'a rien
-   * trouvé. Comme l'altitude du terrain, un champ de la course et du vélo : la fiche le garde brut, tel que lu sur
-   * le disque, et ne le lit plus (lot 301) ; son domaine le lit à l'emploi, une valeur mal formée y revenant à « absent ».
-   */
-  surfaces?: unknown;
-  /** Altitude du terrain de l'IGN (course et vélo, retirés au lot 303), absente tant que l'IGN n'a pas répondu ; brute. */
-  terrainElevation?: unknown;
-  /** `'gps'` : l'utilisateur garde l'altitude du GPS ; absent : celle de l'IGN (course et vélo). */
-  elevationSource?: 'gps';
   /** Fond de carte de cette session (plan ou satellite), changé tout de suite ; absent : celui de la famille (Réglages de l'appareil). */
   mapBase?: MapBase;
   /** Sauts mesurés (voile) ; absent sans `.imu`, avant leur calcul, ou si la fiche en porte de mal formés. */
@@ -560,11 +550,11 @@ interface UnreadableField {
 export type RecordUnreadable = Readonly<Record<string, UnreadableField>>;
 
 /**
- * Champs de premier niveau dont la lecture peut perdre quelque chose. Voies et altitude du terrain passent bruts
- * depuis le lot 301 (rien ne s'y perd) : gardés dans la liste, par sûreté, jusqu'à leur retrait.
+ * Champs de premier niveau dont la lecture peut perdre quelque chose. Les voies, l'altitude du terrain et sa
+ * source (course et vélo) ne sont plus des champs de la fiche (lot 304) : ils passent bruts, comme tout champ inconnu.
  */
 const GUARDED_FIELDS = [
-  'sport', 'activityId', 'source', 'addedAt', 'title', 'name', 'surfaces', 'terrainElevation', 'elevationSource', 'mapBase', 'jumps', 'marks',
+  'sport', 'activityId', 'source', 'addedAt', 'title', 'name', 'mapBase', 'jumps', 'marks',
 ] as const;
 /** Objets relus champ par champ : un champ illisible y est gardé seul ; l'objet entier s'il est illisible (sauf le résumé, refait depuis le GPX). */
 const GUARDED_OBJECTS = ['summary', 'analysis', 'notes'] as const;
@@ -641,8 +631,8 @@ const readRecordParts = (raw: unknown, formats: readonly string[]): RecordWithou
   if (!isObject(raw) || typeof raw.format !== 'string' || !formats.includes(raw.format) || !isFiniteNumber(raw.version)) return null;
   if (typeof raw.gpx !== 'string' || raw.gpx === '') return null;
   const summary = readSummary(raw.summary);
-  // Voies et altitude du terrain (course et vélo) passent bruts par `rest` (lot 301), comme tout champ inconnu.
-  const { elevationSource: rawSource, mapBase: rawMapBase, jumps: rawJumps, marks: rawMarks, ...rest } = raw;
+  // Voies, altitude du terrain et sa source (course et vélo) passent bruts par `rest` (lots 301 et 304), comme tout champ inconnu.
+  const { mapBase: rawMapBase, jumps: rawJumps, marks: rawMarks, ...rest } = raw;
   const jumps = readSessionJumps(rawJumps);
   const marks = readSessionMarks(rawMarks);
   return {
@@ -660,7 +650,6 @@ const readRecordParts = (raw: unknown, formats: readonly string[]): RecordWithou
     summary,
     notes: readNotes(raw.notes),
     analysis: readAnalysis(raw.analysis),
-    ...(rawSource === 'gps' ? { elevationSource: 'gps' as const } : {}),
     ...(isMapBase(rawMapBase) ? { mapBase: rawMapBase } : {}),
     ...(jumps ? { jumps } : {}),
     ...(marks ? { marks } : {}),
@@ -751,11 +740,10 @@ const withoutCarriedSettings = <T extends SessionRecord>(record: T): T => {
 /**
  * Fiche de la mémoire complétée par celle d'une copie de la même session
  * (import d'un GPX complet, `library/sessionBundle.ts`, ou d'un GPX et de sa
- * fiche) : support et activité inconnus, repères, nom, notes, réglages, sauts,
- * voies et altitude qu'elle n'a pas encore. Rien de ce qu'elle porte n'est
+ * fiche) : support et activité inconnus, repères, nom, notes, réglages, sauts
+ * et fond de carte qu'elle n'a pas encore. Rien de ce qu'elle porte n'est
  * écrasé ; rend la même fiche si rien ne manque.
- * `resummarize` : le résumé est à refaire (support, activité, réglages ou
- * altitude reçus).
+ * `resummarize` : le résumé est à refaire (support, activité ou réglages reçus).
  */
 export const completeRecord = (
   existing: SessionRecord,
@@ -771,12 +759,9 @@ export const completeRecord = (
   if (existing.notes === null && incoming.notes !== null) patch.notes = incoming.notes;
   if (existing.analysis === null && incoming.analysis !== null) patch.analysis = incoming.analysis;
   if (!existing.jumps && incoming.jumps) patch.jumps = incoming.jumps;
-  if (!existing.surfaces && incoming.surfaces) patch.surfaces = incoming.surfaces;
-  if (!existing.terrainElevation && incoming.terrainElevation) patch.terrainElevation = incoming.terrainElevation;
-  if (!existing.elevationSource && incoming.elevationSource) patch.elevationSource = incoming.elevationSource;
   if (!existing.mapBase && incoming.mapBase) patch.mapBase = incoming.mapBase;
   if (Object.keys(patch).length === 0) return { record: existing, resummarize: false };
-  const resummarize = ['sport', 'activityId', 'analysis', 'terrainElevation', 'elevationSource'].some((key) => key in patch);
+  const resummarize = ['sport', 'activityId', 'analysis'].some((key) => key in patch);
   // Support ou activité reçus : ce que portait le résumé était à une autre ; réglages reçus : il garde les siens.
   const next = 'sport' in patch || 'activityId' in patch ? withoutCarriedSettings(existing) : 'analysis' in patch ? withCarriedSettingsFixed(existing) : existing;
   return { record: { ...next, ...patch }, resummarize };
@@ -784,19 +769,19 @@ export const completeRecord = (
 
 /**
  * Champs que l'utilisateur saisit dans une fiche (support, activité, nom, notes, réglages de
- * l'analyse, repères, source de l'altitude), reportés d'une copie de la session à une autre par
+ * l'analyse, repères, fond de carte), reportés d'une copie de la session à une autre par
  * `carryRecordEdits`.
  */
 const RECORD_EDIT_FIELDS = [
-  'sport', 'activityId', 'name', 'notes', 'analysis', 'marks', 'elevationSource', 'mapBase',
+  'sport', 'activityId', 'name', 'notes', 'analysis', 'marks', 'mapBase',
 ] as const satisfies readonly (keyof SessionRecord)[];
 
 /**
  * Fiche `target` qui reçoit les saisies d'une autre copie de la même session (`edited`), celle de
  * la mémoire quand sa fiche n'a pas pu être écrite et qu'on change de dossier : chaque champ de
  * `RECORD_EDIT_FIELDS` y devient celui de `edited`, retiré s'il en est absent ; le reste (résumé,
- * sauts, voies, altitude) est celui de `target`. Rend `target` si rien ne change.
- * `resummarize` : le résumé est à refaire (support, activité, réglages ou source de l'altitude changés).
+ * sauts, champs inconnus) est celui de `target`. Rend `target` si rien ne change.
+ * `resummarize` : le résumé est à refaire (support, activité ou réglages changés).
  */
 export const carryRecordEdits = (target: SessionRecord, edited: SessionRecord): { record: SessionRecord; resummarize: boolean } => {
   const next: Record<string, unknown> = { ...target };
@@ -836,13 +821,13 @@ export const isBlankGpxText = (text: string): boolean => text.trim() === '';
 
 /**
  * Champs d'une fiche gardés dans le cache de la bibliothèque : ce que la liste
- * montre et ce que l'utilisateur saisit. Le reste (altitude du terrain, voies,
- * sauts, champs d'une version future) pèse lourd et ne sert qu'à l'analyse :
- * il est relu sur le disque quand on en a besoin.
+ * montre et ce que l'utilisateur saisit. Le reste (sauts, champs inconnus ou
+ * d'une version future) pèse lourd et ne sert qu'à l'analyse : il est relu
+ * sur le disque quand on en a besoin.
  */
 export const RECORD_LIGHT_FIELDS = [
   'format', 'version', 'gpx', 'sport', 'activityId', 'source', 'addedAt', 'title', 'name',
-  'summary', 'notes', 'analysis', 'elevationSource', 'mapBase', 'marks',
+  'summary', 'notes', 'analysis', 'mapBase', 'marks',
 ] as const satisfies readonly (keyof SessionRecord)[];
 
 /**
@@ -870,8 +855,8 @@ export const lightRecord = (record: SessionRecord): SessionRecord =>
  * Fiche entière, tirée de celle du disque (`disk`) et de la fiche allégée
  * tenue en mémoire (`light`) : les champs lourds et inconnus viennent du
  * disque, les champs légers de la mémoire seule, qui porte les saisies. Un
- * champ léger retiré en mémoire (la source de l'altitude) ne revient donc pas ;
- * un champ lourd posé en mémoire depuis (altitude trouvée) l'emporte.
+ * champ léger retiré en mémoire (le fond de carte) ne revient donc pas ; un
+ * champ lourd posé en mémoire depuis (sauts calculés) l'emporte.
  */
 export const mergeLightRecord = (disk: SessionRecord, light: SessionRecord): SessionRecord => ({
   ...(Object.fromEntries(Object.entries(disk).filter(([key]) => !LIGHT_FIELDS.has(key))) as Partial<SessionRecord>),
@@ -888,8 +873,8 @@ export interface LibrarySession {
   /** Ce qui cloche, en clair, s'il y a lieu. */
   warning: string | null;
   /**
-   * Vrai si la fiche vient du cache allégé (`lightRecord`) : altitude du
-   * terrain, voies et sauts n'y sont pas encore. La bibliothèque la relit en
+   * Vrai si la fiche vient du cache allégé (`lightRecord`) : sauts et champs
+   * inconnus n'y sont pas encore. La bibliothèque la relit en
    * entier avant de l'écrire ou de l'ouvrir dans une analyse.
    */
   partial?: boolean;
@@ -938,12 +923,6 @@ export interface RecordPatch {
   pumpingShare?: number | null;
   /** Vent retenu par l'analyse (voile), en degrés ; `null` le retire. */
   windDirDeg?: number | null;
-  /** Voies trouvées pour la trace (`SessionSurfaces`, `planning/surface.ts`) ; `null` les retire. */
-  surfaces?: unknown;
-  /** Altitude du terrain (course et vélo, retirés au lot 303), gardée brute ; `null` la retire. */
-  terrainElevation?: unknown;
-  /** Source de l'altitude ; `null` : celle de l'IGN. */
-  elevationSource?: 'gps' | null;
   /** Fond de carte de la session ; `null` la remet sur celui de la famille. Ne change pas le résumé. */
   mapBase?: MapBase | null;
   /** Sauts calculés ; `null` les retire. */
@@ -954,10 +933,10 @@ export interface RecordPatch {
 
 /**
  * Fiche après un changement : support, activité, nom, notes, réglages
- * d'analyse, nombre et réussite des manœuvres, voies suivies, altitude du terrain et sa
- * source, sauts, repères. Rend la fiche d'origine, à l'identique, si rien ne change.
+ * d'analyse, nombre et réussite des manœuvres, fond de carte, sauts, repères. Rend la
+ * fiche d'origine, à l'identique, si rien ne change.
  * `resummarize` : le résumé est à recalculer (support, activité, seuil, allure
- * imposée, altitude ou source de l'altitude changés).
+ * imposée, foil ou seuil de vague changés).
  *
  * Un changement d'activité ou de support efface le foil et le pumping de la
  * session (elle prend ceux de sa nouvelle activité). Un changement de support
@@ -983,22 +962,6 @@ export const applyRecordPatch = (record: SessionRecord, patch: RecordPatch): { r
   if (patch.marks !== undefined) {
     const { marks: _previous, ...others } = next;
     next = patch.marks?.length ? { ...others, marks: patch.marks } : others;
-  }
-  if (patch.surfaces !== undefined) {
-    const { surfaces: _previous, ...others } = next;
-    next = patch.surfaces ? { ...others, surfaces: patch.surfaces } : others;
-  }
-  // L'altitude change le dénivelé du résumé.
-  let elevationChanged = false;
-  if (patch.terrainElevation !== undefined && (patch.terrainElevation ?? undefined) !== next.terrainElevation) {
-    const { terrainElevation: _previous, ...others } = next;
-    next = patch.terrainElevation ? { ...others, terrainElevation: patch.terrainElevation } : others;
-    elevationChanged = true;
-  }
-  if (patch.elevationSource !== undefined && (patch.elevationSource ?? undefined) !== next.elevationSource) {
-    const { elevationSource: _previous, ...others } = next;
-    next = patch.elevationSource ? { ...others, elevationSource: patch.elevationSource } : others;
-    elevationChanged = true;
   }
   if (patch.mapBase !== undefined && (patch.mapBase ?? undefined) !== next.mapBase) {
     const { mapBase: _previous, ...others } = next;
@@ -1061,5 +1024,5 @@ export const applyRecordPatch = (record: SessionRecord, patch: RecordPatch): { r
     (next.analysis?.referenceSpeedMs ?? null) !== referenceBefore ||
     (next.analysis?.foil ?? null) !== foilBefore ||
     (next.analysis?.waveThreshold ?? null) !== waveBefore;
-  return { record: next, resummarize: sportChanged || activityChanged || analysisChanged || elevationChanged };
+  return { record: next, resummarize: sportChanged || activityChanged || analysisChanged };
 };

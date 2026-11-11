@@ -1,7 +1,7 @@
 import { partitionPoint } from '../core/search';
 import { projectOnSegment } from '../core/geoPlane';
 import { cumulativeDistancesM, haversineDistance } from '../core/geo';
-import { simplifyAlongElevation } from '../core/simplify';
+import { simplifyLatLon } from '../core/simplify';
 import type { LatLon } from '../core/types';
 import { routePoints } from '../planning/route';
 import { recordToRoute, routeMarkGuide, type RouteRecord } from '../planning/routeRecord';
@@ -19,11 +19,6 @@ import type { MarkGuideSettings } from './markGuide';
 
 export type FollowedSource = 'route' | 'session';
 
-/** Point de la trace suivie ; altitude en mètres quand l'itinéraire ou la session en donne une lisible. */
-export interface FollowedPoint extends LatLon {
-  eleM?: number;
-}
-
 export interface FollowedTrace {
   name: string;
   source: FollowedSource;
@@ -32,7 +27,7 @@ export interface FollowedTrace {
    * l'enregistrement qui la suit ; `null` : aucune.
    */
   activityId: string | null;
-  points: FollowedPoint[];
+  points: LatLon[];
   /**
    * Points posés de l'itinéraire, départ compris, dans l'ordre : les balises
    * du guidage des balises (voile, surf) (`markGuide.ts`). Absentes pour une session suivie.
@@ -42,14 +37,13 @@ export interface FollowedTrace {
   markGuide?: MarkGuideSettings;
 }
 
-/** Positions exploitables seulement, avec leur altitude si elle est lisible, sans le reste du point. */
-const usable = (points: ReadonlyArray<FollowedPoint>): FollowedPoint[] =>
-  points.filter((p) => isFinite(p.lat) && isFinite(p.lon)).map(({ lat, lon, eleM }) =>
-    (typeof eleM === 'number' && isFinite(eleM) ? { lat, lon, eleM } : { lat, lon }));
+/** Positions exploitables seulement, sans le reste du point (une altitude d'avant le lot 304 comprise). */
+const usable = (points: ReadonlyArray<LatLon>): LatLon[] =>
+  points.filter((p) => isFinite(p.lat) && isFinite(p.lon)).map(({ lat, lon }) => ({ lat, lon }));
 
 /** Trace faite des positions données ; `null` sous deux positions exploitables. Balises gardées s'il en reste. */
 export const followedTraceFromPoints = (
-  points: ReadonlyArray<FollowedPoint>,
+  points: ReadonlyArray<LatLon>,
   name: string,
   source: FollowedSource,
   activityId: string | null = null,
@@ -74,7 +68,7 @@ export const followedTraceFromRoute = (record: RouteRecord): FollowedTrace | nul
   return trace && markGuide ? { ...trace, markGuide } : trace;
 };
 
-/** Trace d'une session déjà enregistrée : ses positions seules, sans altitude. */
+/** Trace d'une session déjà enregistrée : ses positions seules. */
 export const followedTraceFromSession = (
   points: ReadonlyArray<LatLon>,
   name: string,
@@ -88,33 +82,19 @@ export const followedTraceFromSession = (
  */
 export const FOLLOWED_TRACE_TOLERANCE_M = 2;
 
-/**
- * Écart d'altitude toléré au même amincissement, en mètres : très en deçà du
- * plus petit dénivelé compté (`ELEVATION_PRESETS.route.minGainM`).
- */
-export const FOLLOWED_TRACE_ELEVATION_TOLERANCE_M = 1;
-
 /** Arrondi des positions gardées : 1e-6° vaut 0,1 m. */
 const roundDeg = (deg: number): number => Math.round(deg * 1e6) / 1e6;
 
-/** Arrondi des altitudes gardées : 0,1 m. */
-const roundEle = (eleM: number): number => Math.round(eleM * 10) / 10;
-
 /**
  * Trace suivie amincie pour être gardée sur l'appareil (`gtracker.followedTrace`) :
- * points simplifiés à `toleranceM` près, bouts compris, relief à
- * `elevationToleranceM` près (`simplifyAlongElevation`), et valeurs arrondies.
- * Trois heures à 1 Hz pèsent plusieurs centaines de Ko sinon, réécrites avec
- * chaque réglage sur le téléphone. Les balises ne bougent jamais.
+ * points simplifiés à `toleranceM` près, bouts compris (`simplifyLatLon`), et
+ * positions arrondies, sans rien d'autre (l'altitude d'une trace gardée avant
+ * le lot 304 part). Trois heures à 1 Hz pèsent plusieurs centaines de Ko sinon,
+ * réécrites avec chaque réglage sur le téléphone. Les balises ne bougent jamais.
  */
-export const thinFollowedTrace = (
-  trace: FollowedTrace,
-  toleranceM: number,
-  elevationToleranceM: number = FOLLOWED_TRACE_ELEVATION_TOLERANCE_M
-): FollowedTrace => ({
+export const thinFollowedTrace = (trace: FollowedTrace, toleranceM: number): FollowedTrace => ({
   ...trace,
-  points: simplifyAlongElevation(trace.points, toleranceM, elevationToleranceM).map(({ lat, lon, eleM }) =>
-    (eleM !== undefined ? { lat: roundDeg(lat), lon: roundDeg(lon), eleM: roundEle(eleM) } : { lat: roundDeg(lat), lon: roundDeg(lon) })),
+  points: simplifyLatLon(trace.points, toleranceM).map(({ lat, lon }) => ({ lat: roundDeg(lat), lon: roundDeg(lon) })),
 });
 
 export interface FollowOptions {

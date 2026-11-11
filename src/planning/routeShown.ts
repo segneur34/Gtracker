@@ -3,8 +3,8 @@ import { findActivity, type Activity } from '../core/activities';
 /**
  * Activité d'un itinéraire rangé et itinéraires visibles : un module à part,
  * sans autre dépendance que `core/activities`, pour que l'accueil les lise sans
- * tirer le calcul d'itinéraire (`route.ts`, durée, retour de boucle, revêtement)
- * dans le paquet du démarrage. Pur.
+ * tirer l'édition des itinéraires (`route.ts` et ses voisins) dans le paquet du
+ * démarrage. Pur.
  */
 
 export interface WithActivity {

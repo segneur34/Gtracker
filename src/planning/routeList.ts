@@ -28,11 +28,11 @@ export const routesOfFamily = <T extends WithActivity>(routes: T[], activities: 
  */
 const distances = new WeakMap<RouteRecord, number>();
 
-/** Distance d'un itinéraire rangé, en mètres ; elle ne dépend pas du seuil de dénivelé, d'où 0. Calculée une fois par fiche. */
+/** Distance d'un itinéraire rangé, en mètres. Calculée une fois par fiche. */
 export const routeDistanceM = (record: RouteRecord): number => {
   let known = distances.get(record);
   if (known === undefined) {
-    known = routeTotals(recordToRoute(record), 0).distanceM;
+    known = routeTotals(recordToRoute(record)).distanceM;
     distances.set(record, known);
   }
   return known;

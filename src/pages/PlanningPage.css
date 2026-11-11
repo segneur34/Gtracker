@@ -19,23 +19,12 @@
   min-width: 0;
 }
 
-/* Au-dessus de la carte : l'activité, puis le type de voie (ou la mention des balises en voile). */
+/* Au-dessus de la carte : l'activité, puis la mention des balises. */
 .plan-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-}
-
-.plan-toolbar .ui-tabs--compact .ui-tab {
-  min-height: 32px;
-  padding: 0 var(--space-3);
-}
-
-/* « Ligne droite » à part des types de voie, qui se cochent ensemble ; « Boucle » à part encore. */
-.plan-modes__straight,
-.plan-modes__loop {
-  margin-left: var(--space-2);
 }
 
 .plan-toolbar__note {
@@ -170,15 +159,6 @@
   font-size: var(--text-m);
 }
 
-.plan-overlay__field {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--muted);
-  font-size: var(--text-s);
-}
-
 .plan-overlay__place {
   flex: 1 1 12em;
   min-width: 0;
@@ -195,13 +175,6 @@
   font-size: var(--text-l);
   line-height: 1;
   cursor: pointer;
-}
-
-.plan-overlay__error {
-  flex-basis: 100%;
-  margin: 0;
-  color: var(--danger);
-  font-size: var(--text-s);
 }
 
 /* Titre d'un bloc du panneau : le replier ou le déplier, et son aide éventuelle. */
@@ -295,21 +268,6 @@
   padding-right: var(--space-2);
 }
 
-.plan-point__error,
-.plan-point__pending {
-  flex-basis: 100%;
-  margin: 0;
-  font-size: var(--text-s);
-}
-
-.plan-point__error {
-  color: var(--danger);
-}
-
-.plan-point__pending {
-  color: var(--muted);
-}
-
 .plan-help {
   margin: 0 0 var(--space-3);
   padding-left: var(--space-5);
@@ -324,28 +282,8 @@
   gap: var(--space-2);
 }
 
-.plan-status {
-  color: var(--muted);
-  font-size: var(--text-s);
-}
-
-/* Retour d'une boucle : ce qu'il évite de l'aller, et « Autre retour ». */
-.plan-loop-status {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.plan-error {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 /*
- * Chiffres du bloc Général, en tête du bloc : trois.
+ * Chiffres du bloc Parcours, en tête du bloc : trois.
  */
 .plan-stats {
   display: grid;
@@ -467,14 +405,6 @@
     height: calc(100vh - var(--topbar-h) - 190px);
     min-height: 420px;
   }
-}
-
-/* Bloc Surface : tronçons rangés sans revêtement, et le bouton qui les recalcule. */
-.plan-surface__missing {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-2);
 }
 
 /* Téléphone tourné (lot 5 b des demandes du 23/10) : la carte fixe à gauche, sur toute la hauteur ; l'activité,

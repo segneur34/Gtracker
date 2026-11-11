@@ -142,9 +142,9 @@ export const mergeChangedRecord = (disk: RecordWithoutSummary, mine: SessionReco
   return { record: out as unknown as SessionRecord, conflicts: conflicts.filter(isSaisie) };
 };
 
-/** Ce que l'utilisateur saisit, en clair, par champ de premier niveau ; les champs calculés (voies, altitude, sauts) ne s'annoncent pas. */
+/** Ce que l'utilisateur saisit, en clair, par champ de premier niveau ; les champs calculés (sauts) ne s'annoncent pas. */
 const SAISIE_LABEL: Readonly<Record<string, string>> = {
-  sport: 'activité', activityId: 'activité', name: 'nom', notes: 'notes', analysis: 'réglages', marks: 'repères', elevationSource: 'altitude', mapBase: 'fond de carte',
+  sport: 'activité', activityId: 'activité', name: 'nom', notes: 'notes', analysis: 'réglages', marks: 'repères', mapBase: 'fond de carte',
 };
 
 const topField = (path: string): string => path.split('.')[0];

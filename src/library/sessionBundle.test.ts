@@ -57,12 +57,11 @@ describe('GPX complet', () => {
   });
 
   it('garde à l’aller-retour les champs de fiche qu’elle ne sait pas lire, et les champs inconnus', () => {
-    // Fiche du disque écrite par une version plus récente : sauts d'une forme nouvelle, champ inconnu ; revêtement
-    // d'une forme nouvelle aussi, que la fiche garde brut sans le lire (lot 301).
-    const surfaces = { source: 'overpass', format: 2, segments: [{ from: 0, kind: 'asphalte' }] };
+    // Fiche du disque écrite par une version plus récente : sauts d'une forme nouvelle, champs inconnus, gardés bruts.
+    const houle = { format: 2, segments: [{ from: 0, kind: 'longue' }] };
     const jumps = { version: 9, format: 'nouveau', vols: [1] };
     const disk = JSON.parse(serializeRecord(record({ name: 'Carnon' })));
-    const read = parseRecordWithRaw(JSON.stringify({ ...disk, surfaces, jumps, futur: { vagues: [1, 2] } }));
+    const read = parseRecordWithRaw(JSON.stringify({ ...disk, houle, jumps, futur: { vagues: [1, 2] } }));
     expect(read).not.toBeNull();
     expect(Object.keys(read!.unreadable)).toEqual(['jumps']);
     const fiche = { ...read!.parts, summary: read!.parts.summary! };
@@ -70,7 +69,7 @@ describe('GPX complet', () => {
     expect(back.gpx).toBe(GPX);
     expect(back.unreadable).toEqual(read!.unreadable);
     const rewritten = JSON.parse(serializeRecord({ ...back.record!, summary: back.record!.summary! }, back.unreadable));
-    expect(rewritten.surfaces).toEqual(surfaces);
+    expect(rewritten.houle).toEqual(houle);
     expect(rewritten.jumps).toEqual(jumps);
     expect(rewritten.futur).toEqual({ vagues: [1, 2] });
     expect(rewritten.name).toBe('Carnon');

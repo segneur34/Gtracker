@@ -60,7 +60,6 @@ Ce que l'agent `banc` et Claude doivent savoir, en plus de la mise en place : le
 - `tailles`, `general`, `pentes` prennent le port Chrome en premier argument ; la plupart des scripts n'ont pas d'option `DUMP=` (copies `*-d.mjs` dans le brouillon).
 - Le texte de page n'inclut pas un tableau replié : pour les podiums de manœuvres, une copie du script dans le brouillon clique « Détails des manœuvres » avant le relevé.
 - Rejouer l'analyse hors navigateur, sans Vitest : `node --import <hook>` où le hook (`registerHooks` de `node:module`) ajoute `.ts` aux imports relatifs ; Node lit le TypeScript du projet tel quel. Les sessions réelles du PC se lisent en lecture seule dans la mémoire de l'utilisateur, avec les réglages du hook recopiés.
-- Overpass (onglet surface) met de quelques secondes à plus d'une minute selon sa charge ; ne pas l'interroger en rafale.
 - Un bug non reproduit vient souvent d'un état de l'utilisateur (onglets graphiques ouverts, mémorisés dans `gtracker.sections`) : demander tôt l'erreur de console et reproduire son état persistant.
 
 ### Pièges du poste

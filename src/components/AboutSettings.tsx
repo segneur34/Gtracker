@@ -112,7 +112,7 @@ function AboutSettings() {
       </div>
       <p className="about__version">Version {__APP_VERSION__}</p>
       <p className="about__text">
-        Vos sessions restent sur cet appareil et dans votre dossier mémoire, sans compte. Les fonds de carte, la recherche de lieux, le calcul des itinéraires et leur altitude passent par des services en ligne.
+        Vos sessions restent sur cet appareil et dans votre dossier mémoire, sans compte. Les fonds de carte et la recherche de lieux passent par des services en ligne.
       </p>
       <SettingsPart label="Licences des composants utilisés" open={licensesOpen} onToggle={() => setLicensesOpen((o) => !o)}>
         <LicensesList />

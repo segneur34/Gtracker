@@ -1,17 +1,9 @@
-import type { RouteMode, RoutePoint } from './route';
-import type { WaysMode } from './wayTypes';
+import type { RoutePoint } from './route';
 
 /**
  * Deux pièces de base des tronçons d'un itinéraire, sans autre dépendance que
- * les types de `route.ts` (`route.ts`, `surface.ts` et `loopReturn.ts` les
- * lisent tous trois, sans cycle). Pur.
+ * les types de `route.ts`. Pur.
  */
-
-/** Vrai pour un mode calculé par les types de voie (ni ligne droite, ni trace importée). */
-export const isWaysMode = (mode: RouteMode): mode is WaysMode => mode !== 'straight' && mode !== 'imported';
-
-/** Tronçon que la carte calcule (type de voie), par opposition à une ligne droite ou une trace importée. */
-export const isComputedLeg = (leg: { mode: RouteMode }): boolean => isWaysMode(leg.mode);
 
 /** Vrai si les deux points sont au même endroit (mêmes coordonnées). */
 export const samePlace = (a: RoutePoint | undefined, b: RoutePoint | undefined): boolean =>

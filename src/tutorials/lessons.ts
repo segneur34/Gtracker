@@ -34,7 +34,7 @@ export const LESSONS: readonly Lesson[] = [
   {
     id: 'enregistrer',
     title: 'Enregistrer une session',
-    hook: "Le bouton rond, le choix de l'activité, puis « Analyser » à la fin.",
+    hook: "Le bouton rond, le choix de l'activité, puis l'analyse s'ouvre à la fin.",
     icon: 'enregistrer',
     target: '/enregistrer',
     body: [
@@ -42,7 +42,7 @@ export const LESSONS: readonly Lesson[] = [
       "Choisissez d'abord l'activité : la liste ne propose que les vôtres, celles de Réglages. Elle se change encore pendant la sortie.",
       "« Démarrer » lance le GPS. L'écran peut s'éteindre, l'enregistrement continue ; un appui long de deux secondes sur le bouton rond met en pause, puis relance.",
       "Pour finir, tenez « Arrêter » appuyé deux secondes : l'appui long évite un arrêt par mégarde. Ces deux durées se règlent dans Réglages › Enregistrement.",
-      "À l'arrêt, rien n'est encore rangé : « Analyser » range la session dans la mémoire et l'ouvre, « Jeter » l'abandonne.",
+      "À l'arrêt, la session est rangée dans la mémoire et son analyse s'ouvre. Pour la jeter : « … » à côté de son nom, puis « Jeter », tenu une seconde et confirmé.",
     ],
   },
   {
@@ -141,14 +141,14 @@ export const LESSONS: readonly Lesson[] = [
   {
     id: 'itineraires',
     title: 'Planifier un parcours',
-    hook: "Tracer un itinéraire, puis le suivre à l'enregistrement.",
+    hook: "Poser des balises, puis les suivre à l'enregistrement.",
     icon: 'itineraires',
     target: '/itineraires',
     body: [
-      "Depuis l'accueil, « Créer un parcours » ouvre la planification : posez des points sur la carte, le tracé suit les chemins qui conviennent à l'activité choisie.",
-      'Le tracé donne la distance, le dénivelé et le temps estimé ; « Boucle » vous ramène au départ par un autre chemin.',
-      "Rangé, l'itinéraire se retrouve dans « Itinéraires planifiés ». À l'enregistrement, « Suivre une trace » le propose, avec son activité.",
-      "Un GPX venu d'ailleurs se charge aussi comme itinéraire, et un tracé s'exporte en GPX.",
+      "Depuis l'accueil, « Créer un parcours » ouvre la planification : touchez la carte pour poser les balises, reliées en ligne droite. La recherche trouve un port, une plage ou un spot.",
+      "Le parcours donne la distance et le cap de chaque bord ; « Boucler » ajoute un dernier bord qui ramène au départ.",
+      "Un GPX venu d'ailleurs se charge tel quel comme itinéraire, et un parcours s'exporte en GPX.",
+      "Enregistré, l'itinéraire se retrouve dans « Itinéraires planifiés » ; « Partir » ouvre l'enregistrement, où « Suivre une trace » le propose avec son activité.",
     ],
   },
   {
@@ -200,7 +200,7 @@ export const LESSONS: readonly Lesson[] = [
     target: 'bibliotheque',
     body: [
       'Dans une analyse, le « … » à côté du nom de la session propose « Partager » : une image carrée de la trace et des chiffres que vous choisissez, avec ou sans fond de carte.',
-      "Vos choix de chiffres sont retenus par activité ; « Partager » est aussi proposé à la fin d'un enregistrement.",
+      'Vos choix de chiffres sont retenus par activité.',
       "« Télécharger la session » range son fichier GPX dans Téléchargements : il s'ouvre dans les autres applications, et Gtracker le relit tout entier, notes comprises.",
     ],
   },

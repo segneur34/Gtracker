@@ -1,6 +1,5 @@
 import { sanitizeMarkGuide, type MarkGuideSettings } from '../recording/markGuide';
 import { DEFAULT_ROUTE_MODE, newLeg, readRouteMode, type PlannedRoute, type RouteLeg, type RouteMode, type RoutePoint, type Waypoint } from './route';
-import { readSurfaceRuns, type SurfaceRuns } from './surface';
 import { isFiniteNumber, isObject, parseJson } from '../core/basics';
 import { FILE_FORMATS } from '../core/appIdentity';
 
@@ -9,8 +8,8 @@ import { FILE_FORMATS } from '../core/appIdentity';
  * dossier mémoire, à côté de son GPX (`routeGpx.ts`).
  *
  * La fiche fait foi : elle seule porte les points de passage, le mode de
- * chaque tronçon et leur tracé, qui ne se recalcule pas sans réseau. Le GPX
- * n'en est que l'export, réécrit à chaque rangement.
+ * chaque tronçon et leur tracé. Le GPX n'en est que l'export, réécrit à
+ * chaque rangement.
  *
  * Mêmes règles de compatibilité que les fiches de session
  * (`library/record.ts`) : champs inconnus conservés à la réécriture, fiche
@@ -19,30 +18,23 @@ import { FILE_FORMATS } from '../core/appIdentity';
 
 export const ROUTE_FORMAT = FILE_FORMATS.itineraire;
 /**
- * 2 : tronçons `imported` (trace d'un GPX chargé). Une version d'avant les
- * lit sans les réécrire : elle les recalculerait par les chemins, et la trace
- * serait perdue.
- *
- * Les voies d'un tronçon calculé (`surfaces`) sont venues après, sans changer
- * de version : une version d'avant les perd en réécrivant la fiche, et le
- * tronçon redevient « à recalculer » pour son revêtement, sans rien d'autre.
- *
- * 3 : plusieurs types de voie cochés par tronçon (`route+grandeRoute`), et
- * « Chemin » devenu « Sentier » (`sentier`). Une version d'avant les
- * lirait en « Chemin » : elle lit la fiche sans la réécrire.
+ * 4 : balises reliées en ligne droite (`straight`) et traces d'un GPX chargé
+ * (`imported`), points en `[lat, lon]`, depuis le retrait du planificateur
+ * routier (lot 304). Les fiches de version 2 et 3, écrites avant lui, se
+ * relisent sans code à part et restent modifiables : un tronçon calculé (type
+ * de voie, mode inconnu) devient une ligne droite neuve, l'altitude des points
+ * est ignorée, leurs autres champs (`loop`, `surfaces`, `pending`) passent sans
+ * servir ; réécrites, elles prennent la version 4. Une version 5 ou plus vient
+ * d'une version plus récente : lue, jamais réécrite.
  */
-export const ROUTE_VERSION = 3;
+export const ROUTE_VERSION = 4;
 
-/** Point de tracé compact : `[lat, lon]` ou `[lat, lon, altitude]`. */
+/** Point de tracé compact : `[lat, lon]` ; une altitude en troisième place, d'avant le lot 304, est ignorée. */
 type StoredPoint = number[];
 
 interface StoredLeg {
   mode: RouteMode;
-  /** Vrai si le tronçon n'était pas calculé au rangement : il le sera à l'ouverture. */
-  pending?: boolean;
   points: StoredPoint[];
-  /** Voies suivies, en indices de `points` (`SurfaceRuns`) ; à relire par `readSurfaceRuns`. */
-  surfaces?: unknown;
 }
 
 export interface RouteRecord {
@@ -67,13 +59,10 @@ export interface RouteRecord {
 
 const round = (value: number, digits: number): number => Number(value.toFixed(digits));
 
-const storePoint = (p: RoutePoint): StoredPoint =>
-  p.eleM !== undefined ? [round(p.lat, 7), round(p.lon, 7), round(p.eleM, 1)] : [round(p.lat, 7), round(p.lon, 7)];
+const storePoint = (p: RoutePoint): StoredPoint => [round(p.lat, 7), round(p.lon, 7)];
 
-const readPoint = (raw: unknown): RoutePoint | null => {
-  if (!Array.isArray(raw) || !isFiniteNumber(raw[0]) || !isFiniteNumber(raw[1])) return null;
-  return isFiniteNumber(raw[2]) ? { lat: raw[0], lon: raw[1], eleM: raw[2] } : { lat: raw[0], lon: raw[1] };
-};
+const readPoint = (raw: unknown): RoutePoint | null =>
+  Array.isArray(raw) && isFiniteNumber(raw[0]) && isFiniteNumber(raw[1]) ? { lat: raw[0], lon: raw[1] } : null;
 
 const readWaypoint = (raw: unknown): Waypoint | null =>
   isObject(raw) && isFiniteNumber(raw.lat) && isFiniteNumber(raw.lon) ? { lat: raw.lat, lon: raw.lon } : null;
@@ -97,12 +86,7 @@ export const routeToRecord = (
     createdAt: meta.createdAt,
     updatedAt: meta.updatedAt,
     waypoints: route.waypoints.map((w) => ({ lat: round(w.lat, 7), lon: round(w.lon, 7) })),
-    legs: route.legs.map((leg) => ({
-      mode: leg.mode,
-      ...(leg.status !== 'ready' ? { pending: true } : {}),
-      points: leg.points.map(storePoint),
-      ...(leg.status === 'ready' && leg.surfaces ? { surfaces: leg.surfaces } : {}),
-    })),
+    legs: route.legs.map((leg) => ({ mode: leg.mode, points: leg.points.map(storePoint) })),
   };
   if (meta.markGuide === null) delete record.markGuide;
   else if (meta.markGuide !== undefined) record.markGuide = meta.markGuide;
@@ -113,28 +97,27 @@ export const routeToRecord = (
 export const routeMarkGuide = (record: RouteRecord): MarkGuideSettings | null => sanitizeMarkGuide(record.markGuide);
 
 /**
- * Itinéraire d'une fiche. Un tronçon illisible, ou des tronçons qui ne
- * correspondent pas aux points, sont recalculés plutôt que perdus (une trace
- * importée illisible devient une ligne droite, `newLeg`).
+ * Itinéraire d'une fiche. Un tronçon illisible, d'un mode inconnu (un type de
+ * voie d'avant le lot 304), ou des tronçons qui ne correspondent pas aux
+ * points, deviennent des lignes droites neuves plutôt que d'être perdus
+ * (`newLeg`).
  */
 export const recordToRoute = (record: RouteRecord): PlannedRoute => {
   const { waypoints } = record;
   const legs: RouteLeg[] = [];
   for (let i = 0; i + 1 < waypoints.length; i++) {
     const stored = record.legs.length === waypoints.length - 1 ? record.legs[i] : undefined;
-    const mode: RouteMode = readRouteMode(stored?.mode) ?? DEFAULT_ROUTE_MODE;
+    const mode = readRouteMode(stored?.mode);
     const points = (stored?.points ?? []).map(readPoint).filter((p): p is RoutePoint => p !== null);
-    if (!stored || stored.pending || points.length < 2) {
-      legs.push(newLeg(waypoints[i], waypoints[i + 1], mode));
-      continue;
-    }
-    // Des voies ne valent que pour le tracé où elles ont été rangées : sans point écarté à la lecture.
-    const surfaces: SurfaceRuns | null = mode !== 'straight' && mode !== 'imported' && points.length === stored.points.length
-      ? readSurfaceRuns(stored.surfaces, points.length)
-      : null;
-    legs.push(surfaces ? { mode, status: 'ready', points, surfaces } : { mode, status: 'ready', points });
+    legs.push(mode && points.length >= 2 ? { mode, status: 'ready', points } : newLeg(waypoints[i], waypoints[i + 1]));
   }
   return { waypoints, legs };
+};
+
+/** Tronçon relu d'une fiche : son mode, ou une ligne droite sans tracé (à refaire) s'il est inconnu. */
+const readStoredLeg = (leg: Record<string, unknown>): StoredLeg & Record<string, unknown> => {
+  const mode = readRouteMode(leg.mode);
+  return { ...leg, mode: mode ?? DEFAULT_ROUTE_MODE, points: mode && Array.isArray(leg.points) ? (leg.points as StoredPoint[]) : [] };
 };
 
 /** Lit une fiche ; `null` si le texte n'en est pas une lisible. Les champs inconnus sont gardés. */
@@ -155,12 +138,7 @@ export const parseRouteRecord = (text: string): RouteRecord | null => {
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
     waypoints: waypoints as Waypoint[],
-    legs: legs.map((leg) => ({
-      ...leg,
-      mode: readRouteMode(leg.mode) ?? DEFAULT_ROUTE_MODE,
-      ...(leg.pending === true ? { pending: true } : {}),
-      points: Array.isArray(leg.points) ? (leg.points as StoredPoint[]) : [],
-    })),
+    legs: legs.map(readStoredLeg),
   };
 };
 

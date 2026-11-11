@@ -47,7 +47,7 @@ Patron commun aux modules d'analyse (voile, surf) et à tout sport à venir. La 
 | `components/AnalysisShell.tsx` | Squelette de la page d'analyse, commun aux deux modules : page, en-tête, barre du brouillon, alertes, rangée de la carte et colonne d'onglets ; rendu pur, différences passées en paramètres (HISTORIQUE, point 206) |
 | `components/AnalysisMap.tsx` | Carte, légende donnée par le module posée dessus, outil posé dessus (`overlay`), plein écran au toucher ou piloté par le module |
 | `components/BaseTileLayer.tsx` | Fond de la carte (plan ou satellite) de la famille, et son choix sous le + et le − |
-| `components/GeneralStats.tsx`, `components/ElevationProfileMini.tsx` | Chiffres de « général », profil d'altitude compact relié à la carte, zoomable |
+| `components/GeneralStats.tsx` | Chiffres de « général » |
 | `components/EmptyTabPanel.tsx` | Onglet ouvert sans rien à montrer : pourquoi, et de quoi y remédier |
 | `pages/analysisMobile.css` | Disposition téléphone (classes `an-*`) |
 | `components/PanelTitle.tsx` | Titre de panneau qui le replie, et son « ? » (`helpKey`) |
@@ -61,7 +61,6 @@ Patron commun aux modules d'analyse (voile, surf) et à tout sport à venir. La 
 | `components/SessionSaveBar.tsx` | Barre du brouillon de la session |
 | `core/trackColor.ts`, `components/TrackSegmentsLayer.tsx` | Trace colorée par la vitesse, la même dans l'analyse et la vignette |
 | `hooks/useMapHighlight.ts`, `components/highlightColors.ts` | La surbrillance unique de la carte et ses couleurs |
-| `components/SurfaceHighlight.tsx` | Un revêtement choisi dans `SurfaceBar`, en violet sur la carte (planification) |
 | `components/ZoomableChart.tsx`, `hooks/useChartZoom.ts`, `components/HoverMarker.tsx` | Graphe zoomable, son zoom, le repère du survol sur la carte |
 | `components/ChartReadout.tsx`, `hooks/useZoomOnMap.ts` | Valeur lue au-dessus d'un graphe ; « Afficher » et « +carte » d'un graphe |
 

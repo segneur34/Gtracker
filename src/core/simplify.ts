@@ -1,12 +1,11 @@
-import { cumulativeDistancesM, planeProjection, type PlanePoint } from './geo';
+import { planeProjection, type PlanePoint } from './geo';
 import { pointSegmentDistanceM } from './geoPlane';
 import type { LatLon } from './types';
 
 /**
  * Simplification d'un tracé (Douglas-Peucker) : on garde les bouts et les
  * points qui s'écartent de plus de la tolérance de la corde qui les entoure.
- * Pièce commune au couloir du retour d'une boucle (`planning/loopReturn.ts`)
- * et à la trace suivie gardée sur l'appareil (`recording/followedTrace.ts`).
+ * Sert à la trace suivie gardée sur l'appareil (`recording/followedTrace.ts`).
  *
  * Tout est pur. Unités SI (règle 1) : mètres, degrés décimaux.
  */
@@ -51,35 +50,6 @@ export const simplifyLatLon = <P extends LatLon>(points: P[], toleranceM: number
   const refLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
   const plane = points.map(planeProjection(refLat).to);
   return keptIndices(plane, toleranceM).map((i) => points[i]);
-};
-
-/**
- * Comme `simplifyLatLon`, en gardant aussi le relief : amincir en plan perd les
- * sommets d'une route droite qui monte puis descend. Aux points gardés en plan
- * s'ajoutent ceux qu'un second Douglas-Peucker garde sur (distance le long du
- * tracé, altitude), à `elevationToleranceM` près. Une série d'altitudes se
- * traite par morceaux continus, dont les bouts restent : le profil ne s'invente
- * pas d'altitude au bord d'un trou. Sans altitude, le résultat de `simplifyLatLon`.
- */
-export const simplifyAlongElevation = <P extends LatLon & { eleM?: number }>(
-  points: P[],
-  toleranceM: number,
-  elevationToleranceM: number
-): P[] => {
-  if (points.length < 3) return points;
-  const refLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
-  const keep = new Set(keptIndices(points.map(planeProjection(refLat).to), toleranceM));
-  const cum = cumulativeDistancesM(points);
-  const hasEle = (i: number): boolean => i < points.length && isFinite(points[i].eleM ?? NaN);
-  for (let start = 0; start < points.length; start++) {
-    if (!hasEle(start)) continue;
-    let end = start;
-    while (hasEle(end + 1)) end++;
-    const run = points.slice(start, end + 1).map((p, k) => ({ x: cum[start + k], y: p.eleM as number }));
-    for (const k of keptIndices(run, elevationToleranceM)) keep.add(start + k);
-    start = end;
-  }
-  return points.filter((_, i) => keep.has(i));
 };
 
 /**

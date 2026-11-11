@@ -10,13 +10,13 @@ const A: Waypoint = { lat: 43.6, lon: 3.8 };
 const B: Waypoint = { lat: 43.61, lon: 3.8 };
 const C: Waypoint = { lat: 43.61, lon: 3.81 };
 
-const build = (points: Waypoint[]): PlannedRoute => points.reduce((route, p) => addWaypoint(route, p, 'straight'), EMPTY_ROUTE);
+const build = (points: Waypoint[]): PlannedRoute => points.reduce((route, p) => addWaypoint(route, p), EMPTY_ROUTE);
 
 const NOW = '2026-11-07T12:00:00.000Z';
 const options = (takenNames: string[] = []) => ({ nowIso: NOW, takenNames, activityFor: () => null });
 
 /** Parcours de balises bouclé, avec son activité et ses bips propres : ce qu'un téléphone partage. */
-const course = closeLoop(build([A, B, C]), 'straight');
+const course = closeLoop(build([A, B, C]));
 const courseRecord = routeToRecord(course, {
   name: 'Parcours <Carnon> & co', activityId: 'voile', createdAt: '2026-11-01T08:00:00.000Z', updatedAt: '2026-11-02T08:00:00.000Z',
   markGuide: MARK_GUIDE_DEFAULTS,

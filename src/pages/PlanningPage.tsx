@@ -1,5 +1,4 @@
 import { roundBearingDeg } from '../core/angles';
-import { toFixedNumber } from '../core/basics';
 import { pushBackLayer } from '../platform/backButton';
 import { plainError } from '../platform/errorText';
 import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
@@ -12,43 +11,32 @@ import { Link, useSearchParams } from 'react-router-dom';
 import './PlanningPage.css';
 import ActivitySelect from '../components/ActivitySelect';
 import BeepCurveEditor from '../components/BeepCurveEditor';
-import ElevationProfileMini from '../components/ElevationProfileMini';
 import MapAutoResize from '../components/MapAutoResize';
 import { divIconCache, haloStyle } from '../components/mapStyles';
 import BaseTileLayer from '../components/BaseTileLayer';
-import GradeLegendRow from '../components/GradeLegendRow';
 import { HelpText } from '../components/Help';
 import { useHelp } from '../components/helpContext';
 import PanelTitle from '../components/PanelTitle';
 import ResizablePanel from '../components/ResizablePanel';
 import RouteList from '../components/RouteList';
-import { useRouteProfileChart } from '../components/routeProfileChart';
 import SectionTabs, { type SectionDefinition } from '../components/SectionTabs';
-import SurfaceBar from '../components/SurfaceBar';
-import SurfaceHighlight from '../components/SurfaceHighlight';
-import SurfaceLayer from '../components/SurfaceLayer';
-import WayTypeTabs from '../components/WayTypeTabs';
-import { HoveredTrackMarker } from '../components/HoverMarker';
-import { useResetChartHover } from '../hooks/useChartHover';
 import { IconChevronRight, IconFile, IconPencil, IconPencilOff, IconUndo } from '../components/icons';
 import { CARD_STYLE } from '../components/styles';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/ui/PageHeader';
-import { activityFamily, activityTreatment, findActivity, type Activity } from '../core/activities';
+import { activityFamily, findActivity, type Activity } from '../core/activities';
 import { DEFAULT_MAP_CENTER, trackBounds } from '../core/displayConfig';
 import { parseGpxPath } from '../core/gpxParser';
-import { ELEVATION_PRESETS, usesMarkCourse } from '../core/sportProfiles';
-import { useExclusiveToggles } from '../hooks/useExclusiveToggles';
-import { DISTANCE_UNIT_SYMBOL, formatDistance, toDisplayDistance, formatMeters, commaDecimal } from '../core/units';
+import { formatDistance, toDisplayDistance } from '../core/units';
 import { useLeaveWarning } from '../hooks/leaveGuard';
 import { useGoOnRoute } from '../hooks/useGoOnRoute';
 import { useMapBase } from '../hooks/useMapBase';
 import { useOpenSections } from '../hooks/useOpenSections';
-import { usePlannedRoute, type ImportedElevationStatus } from '../hooks/usePlannedRoute';
+import { usePlannedRoute } from '../hooks/usePlannedRoute';
 import { getLastFix, useRecorderStatus } from '../hooks/useRecorder';
 import { useRouteLibrary, type SavedRoute } from '../hooks/useRouteLibrary';
 import {
-  effectiveDistanceUnit, effectiveGradeRange, effectiveLoopReturnRatio, effectiveMarkGuide, effectiveSpeedUnit, effectiveWayTypes, lastRecordActivity, useVisibility,
+  effectiveDistanceUnit, effectiveMarkGuide, effectiveSpeedUnit, lastRecordActivity, useVisibility,
 } from '../hooks/useSportSettings';
 import { PLANNING_FAMILIES } from '../settings/activitySettings';
 import { ROUTES_DIR } from '../library/folderLayout';
@@ -56,20 +44,13 @@ import { guessSport } from '../library/naming';
 import { shownRoutes } from '../planning/routeShown';
 import { isAbortError } from '../planning/fetchJson';
 import { searchPlaces, type Place } from '../planning/geocoding';
-import { WAY_TYPES } from '../planning/brouterProfile';
 import {
-  DEFAULT_ROUTE_MODE, EMPTY_ROUTE, STRAIGHT_HINT, STRAIGHT_LABEL, WAY_TYPE_HINT, WAY_TYPE_LABEL, acceptLoopReturn, courseLegs, isLooped, isWaysMode,
-  routeFromTrack,
-  routeModeLabel, routePoints, routeProfileRows, routeTotals, routeVehicle, setRouteMode, straightenRoute, toggleWayType, waypointDistances,
-  type PlannedRoute, type RouteMode, type RoutePoint, type Waypoint,
+  EMPTY_ROUTE, courseLegs, isLooped, routeFromTrack, routePoints, routeTotals, waypointDistances,
+  type PlannedRoute, type RoutePoint, type Waypoint,
 } from '../planning/route';
-import { wayTypesOf, waysMode } from '../planning/wayTypes';
-import { PLANNING_TERRAIN_STEP_M } from '../planning/importedElevation';
-import { buildRouteGpx, markLabel, waypointLabel } from '../planning/routeGpx';
+import { buildRouteGpx, markLabel } from '../planning/routeGpx';
 import { recordToRoute, routeMarkGuide } from '../planning/routeRecord';
-import { routeSurfacePaths, routeSurfaces, type SurfaceCategory } from '../planning/surface';
 import { beepStartM, simulatedApproachMs, validationRadiusM, type MarkGuideSettings } from '../recording/markGuide';
-import { gradeColorPaths } from '../planning/grade';
 import { canDownloadFiles, downloadTextFile, readPickedFile, safeFileName } from '../platform/files';
 import { currentPosition, locationPermissionGranted } from '../platform/location';
 import { isNativeApp } from '../platform/runtime';
@@ -77,26 +58,20 @@ import { jsonStore } from '../platform/storage';
 import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
- * Planification d'un itinéraire : on pose des points sur la carte, chaque
- * tronçon entre deux points suit la carte, par les types de voie cochés, ou
- * va en ligne droite. L'activité et les types de voie se choisissent
- * au-dessus de la carte ; choisir une activité coche les siens (Réglages,
- * `effectiveWayTypes`), que l'on change ensuite pour cet itinéraire. Les
- * changer, directement ou par l'activité, recalcule tout l'itinéraire
- * (`setRouteMode`) ; dessous, des onglets ouvrent les blocs (général, surface, tracé,
- * points, enregistrer, mes itinéraires), comme dans les analyses. Distance, dénivelés et profil d'altitude se mettent à jour
- * à chaque calcul, avec le revêtement des voies suivies (`planning/surface.ts`). L'itinéraire s'enregistre dans `itineraires/` du dossier
- * mémoire, avec son GPX.
+ * Planification d'un parcours : des balises numérotées, posées sur la carte et
+ * reliées en ligne droite, que l'enregistrement fait valider une à une, avec
+ * des bips d'approche (`recording/markGuide.ts`) : ceux de l'activité
+ * (Réglages), ou ceux propres au parcours, rangés dans sa fiche. Un GPX
+ * téléchargé ailleurs se charge tel quel (`routeFromTrack`). L'activité se
+ * choisit au-dessus de la carte ; dessous, des onglets ouvrent les blocs
+ * (parcours, tracé, balises, enregistrer, mes itinéraires), comme dans les
+ * analyses. Le parcours s'enregistre dans `itineraires/` du dossier mémoire,
+ * avec son GPX.
  *
- * En voile et en surf, c'est un parcours : des balises numérotées, reliées en ligne
- * droite, que l'enregistrement fait valider une à une, avec des bips
- * d'approche (`recording/markGuide.ts`) : ceux de l'activité (Réglages), ou
- * ceux propres au parcours, rangés dans sa fiche.
- *
- * Le calcul demande du réseau (`planning/brouter.ts`) ; un itinéraire rangé se
- * rouvre sans. On y arrive depuis l'accueil (« Planifier ») et, sur
- * ordinateur, depuis la barre du haut ; `?itineraire=<base>` ouvre un
- * itinéraire rangé (listes de l'accueil et des bibliothèques).
+ * Rien ne se calcule : seule la recherche de lieu demande du réseau. On y
+ * arrive depuis l'accueil (« Planifier ») et, sur ordinateur, depuis la barre
+ * du haut ; `?itineraire=<base>` ouvre un itinéraire rangé (listes de
+ * l'accueil et des bibliothèques).
  *
  * Le crayon, sur la carte, verrouille l'itinéraire : verrouillé, la carte ne fait
  * que se déplacer et se zoomer (ni point posé, ni point déplacé ou touché, ni
@@ -107,30 +82,23 @@ import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Préférences de la page sur l'appareil : dernière activité choisie, dernière
- * vue de la carte, dernier état choisi du bouton « Boucle ». Le mode n'y est
- * plus écrit depuis que chaque activité a ses types de voie (§10, point 81) :
- * un ancien `mode` y reste, ignoré.
+ * vue de la carte. Un ancien `mode` ou `loop` (planificateur routier, retiré
+ * au lot 304) y reste, ignoré.
  */
 const PREFS_KEY = STORAGE_KEYS.planning;
 
 interface PlanningPrefs {
   activityId?: string;
   view?: { lat: number; lon: number; zoom: number };
-  loop?: boolean;
 }
 
 /** Centrage sur soi à l'ouverture : délai accordé au GPS, et zoom minimal une fois centré. */
 const AUTO_LOCATE_TIMEOUT_MS = 15_000;
 const AUTO_LOCATE_MIN_ZOOM = 14;
 
-/** Hauteur du profil d'altitude du bloc Général, en px : plus haut que celui des analyses, seul graphe de la page. */
-const PROFILE_HEIGHT_PX = 170;
-
 const readPrefs = (): PlanningPrefs => jsonStore.read<PlanningPrefs>(PREFS_KEY) ?? {};
 const writePrefs = (patch: PlanningPrefs): void => jsonStore.write(PREFS_KEY, { ...readPrefs(), ...patch });
 
-/** Tronçon en échec, sur la carte (donnée de carte, donc en dur). */
-const ERROR_COLOR = '#c62828';
 /** Couleur de repli si celle de l'activité n'est pas un code couleur. */
 const FALLBACK_COLOR = '#6a1b9a';
 /**
@@ -139,37 +107,20 @@ const FALLBACK_COLOR = '#6a1b9a';
  * départ ou l'arrivée.
  */
 const ROUTE_COLOR = '#1565c0';
-/** Épaisseur du tracé prêt et des morceaux colorés par la pente. */
+/** Épaisseur du tracé. */
 const ROUTE_WEIGHT = 5;
 /** Liseré blanc sous le tracé, sur le fond satellite, le même que celui des analyses. */
 const HALO_STYLE = haloStyle(ROUTE_WEIGHT);
-/**
- * Styles du tracé, constants : Leaflet ne refait `setStyle` que si l'objet
- * change. Un tronçon prêt garde `dashArray` explicite : Leaflet garderait
- * sinon le pointillé du tronçon en attente.
- */
-const READY_STYLE: L.PathOptions = { color: ROUTE_COLOR, weight: ROUTE_WEIGHT, opacity: 0.9, dashArray: undefined, interactive: false };
-const PENDING_STYLE: L.PathOptions = { color: ROUTE_COLOR, weight: 4, opacity: 0.55, dashArray: '6 8', interactive: false };
-const ERROR_STYLE: L.PathOptions = { color: ERROR_COLOR, weight: 4, opacity: 0.9, dashArray: '6 8', interactive: false };
+/** Style du tracé, constant : Leaflet ne refait `setStyle` que si l'objet change. */
+const LEG_STYLE: L.PathOptions = { color: ROUTE_COLOR, weight: ROUTE_WEIGHT, opacity: 0.9, interactive: false };
 /** Trait invisible et large : le toucher qui insère un point n'a pas à viser un trait de 5 px. */
 const HIT_STYLE: L.PathOptions = { color: ROUTE_COLOR, weight: 24, opacity: 0, bubblingMouseEvents: false };
-const legStyle = (status: 'pending' | 'ready' | 'error'): L.PathOptions =>
-  status === 'ready' ? READY_STYLE : status === 'error' ? ERROR_STYLE : PENDING_STYLE;
-
-/** Style d'un morceau du tracé coloré par la pente, un par couleur. */
-const gradeStyles = new Map<string, L.PathOptions>();
-const gradeStyle = (color: string): L.PathOptions => {
-  let style = gradeStyles.get(color);
-  if (!style) {
-    style = { color, weight: ROUTE_WEIGHT, opacity: 0.9, interactive: false };
-    gradeStyles.set(color, style);
-  }
-  return style;
-};
+/** Rond du lieu trouvé ou de « Ma position », en attente d'être ajouté. */
+const CANDIDATE_STYLE: L.PathOptions = { color: '#ffffff', weight: 3, fillColor: ROUTE_COLOR, fillOpacity: 0.6 };
 
 /**
  * Positions Leaflet d'un tracé ou d'un point, gardées tant que la géométrie
- * ne change pas : un rendu de la page (survol du profil, saisie, onglet) ne
+ * ne change pas : un rendu de la page (saisie, onglet) ne
  * redonne pas à la carte des tableaux neufs, qu'elle reprojetterait.
  */
 const pathPositions = new WeakMap<ReadonlyArray<RoutePoint>, [number, number][]>();
@@ -238,15 +189,12 @@ const sameGuide = (a: MarkGuideSettings | null, b: MarkGuideSettings | null): bo
 const noop = () => {};
 
 /**
- * Onglets sous la carte. `profil` : l'onglet « général » (ex-« Dénivelé »),
- * `ranger` : « enregistrer » ; clés gardées pour l'état mémorisé. Seul le
- * premier est ouvert au départ, comme dans les analyses.
+ * Onglets sous la carte. `ranger` : « enregistrer » ; clés gardées pour l'état
+ * mémorisé. Seul le premier est ouvert au départ, comme dans les analyses.
  */
-type PlanningSection = 'profil' | 'surface' | 'parcours' | 'trace' | 'points' | 'ranger' | 'liste';
+type PlanningSection = 'parcours' | 'trace' | 'points' | 'ranger' | 'liste';
 
 const PLANNING_SECTION_DEFAULTS: Record<PlanningSection, boolean> = {
-  profil: true,
-  surface: false,
   parcours: true,
   trace: false,
   points: false,
@@ -281,48 +229,6 @@ function PlanBlock({ id, label, open, onToggle, aside, helpKey, children }: {
   );
 }
 
-/**
- * Façon de relier les points : les types de voie cochés, et la ligne droite à
- * part. Toucher un type le coche ou le décoche (le dernier reste coché) ;
- * toucher « Ligne droite » la choisit seule. Sert à la barre au-dessus de la
- * carte (tout l'itinéraire et les points suivants) et au tronçon d'un point sélectionné ; sur
- * une trace importée, rien n'est coché, et choisir refait le tronçon. `straightOff` : mode
- * rendu quand on retouche « Ligne droite » allumée (le tronçon d'un point) ; sans lui, elle
- * reste allumée. `children` suit la ligne droite, dans la même rangée (le bouton « Boucle »,
- * au-dessus de la carte).
- */
-function WayPicker({ mode, label, compact, className, style, straightOff, onChange, children }: {
-  mode: RouteMode;
-  label: string;
-  compact?: boolean;
-  className?: string;
-  style?: React.CSSProperties;
-  straightOff?: RouteMode;
-  onChange: (mode: RouteMode) => void;
-  children?: ReactNode;
-}) {
-  return (
-    <WayTypeTabs checked={isWaysMode(mode) ? wayTypesOf(mode) : []} onToggle={(t) => onChange(toggleWayType(mode, t))} label={label}
-      compact={compact} className={className} style={style}>
-      <button type="button" className="ui-tab plan-modes__straight" aria-pressed={mode === 'straight'} title={STRAIGHT_HINT}
-        onClick={() => onChange(mode === 'straight' && straightOff ? straightOff : 'straight')}>
-        {STRAIGHT_LABEL}
-      </button>
-      {children}
-    </WayTypeTabs>
-  );
-}
-
-/** Types de voie cochés à l'arrivée sur une activité : les siens ; sans eux (voile), le mode par défaut. */
-const activityMode = (activity: Activity | null): RouteMode => (activity ? waysMode(effectiveWayTypes(activity)) : null) ?? DEFAULT_ROUTE_MODE;
-
-const IMPORTED_ELEVATION_TEXT: Record<ImportedElevationStatus, string> = {
-  searching: 'Altitude IGN en cours… (celle du GPS en attendant)',
-  ign: 'Altitude IGN.',
-  outside: "Altitude du GPS : le tracé est hors de la couverture de l'IGN.",
-  error: "Altitude du GPS : l'IGN n'a pas répondu.",
-};
-
 function PlanningPage() {
   // Une activité cachée dans Réglages n'est ni proposée (`ActivitySheet`) ni reprise (§10, point 100).
   const { activities, isShown } = useVisibility();
@@ -336,65 +242,24 @@ function PlanningPage() {
     writePrefs({ activityId: id });
   };
   const activity = findActivity(activities, activityId) ?? activities.find(plannable) ?? null;
-  /** Parcours de balises (voile, surf) : balises numérotées, tronçons en ligne droite, bloc « Parcours » au lieu du dénivelé. */
-  const markCourse = activity !== null && usesMarkCourse(activityFamily(activity));
   const distanceUnit = activity ? effectiveDistanceUnit(activity) : 'km';
-  const minGainM = ELEVATION_PRESETS.route.minGainM;
-  const gradeRange = useMemo(() => (activity ? effectiveGradeRange(activity) : null), [activity]);
   const color = safeColor(activity?.color ?? FALLBACK_COLOR);
   /** Famille de l'activité planifiée : son fond de carte, celui de ses analyses. */
   // Sans activité, le fond de la voile (lot 305).
   const mapFamily = activity ? activityFamily(activity) : 'voile';
   const satellite = useMapBase(mapFamily)[0] === 'satellite';
 
-  const vehicle = routeVehicle(activity ? activityTreatment(activity) : 'voile');
-  /** Retour d'une boucle : au plus tant de fois l'aller (Réglages) ; `null` en voile. */
-  const loopRatio = useMemo(() => (activity ? effectiveLoopReturnRatio(activity) : null), [activity]);
-  // Types de voie de l'activité à l'ouverture et à chaque changement d'activité, puis ceux que l'on coche ; mode « Boucle »
-  // tel que laissé la dernière fois, jamais sur un parcours de balises.
-  const [initialLoop] = useState(() => readPrefs().loop === true);
-  const planner = usePlannedRoute(vehicle, activityMode(activity), initialLoop && !markCourse, { maxReturnRatio: loopRatio });
-  const { route, mode } = planner;
-  /** Mode « Boucle » : l'itinéraire reste bouclé, le retour évite l'aller. */
-  const loopOn = planner.loop && !markCourse;
-  /** Mode des éditions : sur un parcours de balises, toujours la ligne droite ; le type de voie choisi reste pour les autres activités. */
-  const editMode: RouteMode = markCourse ? 'straight' : mode;
+  const planner = usePlannedRoute();
+  const { route } = planner;
   const library = useRouteLibrary();
   /** « Mes itinéraires » : sans ceux d'une activité cachée. */
   const listedRoutes = useMemo(() => shownRoutes(library.routes, activities, isShown), [library.routes, activities, isShown]);
   const { go, canGo } = useGoOnRoute();
 
-  /** Types de voie cochés au-dessus de la carte : ceux de tout l'itinéraire, recalculé, et des points suivants (annulable). */
-  const chooseMode = (next: RouteMode) => planner.chooseMode(next, (r) => setRouteMode(r, next, mode));
-
-  /** Bouton « Boucle » : allumé, l'itinéraire se boucle ; éteint, le retour est retiré (annulable). Retenu pour la prochaine ouverture. */
-  const toggleLoop = () => {
-    planner.setLoop(!planner.loop);
-    writePrefs({ loop: !planner.loop });
-  };
-
-  /**
-   * Activité choisie dans le menu : ses types de voie, appliqués à tout
-   * l'itinéraire avec ses règles d'accès ; passer à la voile ou au surf redresse les
-   * tronçons calculés et éteint la boucle, en revenir les recalcule (annulable).
-   */
-  const chooseActivity = (id: string) => {
-    setActivityId(id);
-    const next = findActivity(activities, id);
-    const nextMode = activityMode(next);
-    const nextFamily = next ? activityFamily(next) : 'voile';
-    const nextEdit = usesMarkCourse(nextFamily) ? 'straight' : nextMode;
-    const nextVehicle = routeVehicle(next ? activityTreatment(next) : 'voile');
-    planner.chooseMode(nextMode, (r) => setRouteMode(r, nextEdit, editMode, nextVehicle !== vehicle),
-      usesMarkCourse(nextFamily) ? false : undefined);
-  };
-
   const [map, setMap] = useState<L.Map | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   /** Carte verrouillée : un toucher ou un glissement n'y change pas l'itinéraire. */
   const [locked, setLocked] = useState(false);
-  /** Le point survolé sur le profil vit dans le magasin du survol : la page ne se redessine pas à chaque mouvement. */
-  useResetChartHover(null);
   const helpOpen = useHelp('plan:trace')?.open ?? false;
   const { open, toggle } = useOpenSections<PlanningSection>('planning', PLANNING_SECTION_DEFAULTS);
 
@@ -432,69 +297,20 @@ function PlanningPage() {
     tookOver.current = true;
   };
 
-  const points = useMemo(() => routePoints(route), [route]);
-  const totals = useMemo(() => routeTotals(route, minGainM), [route, minGainM]);
-  /** Source de l'altitude d'une trace chargée, dite tant qu'une trace importée est sur la carte. */
-  const importedElevationText =
-    planner.importedElevation !== null && route.legs.some((l) => l.mode === 'imported') ? IMPORTED_ELEVATION_TEXT[planner.importedElevation] : null;
-  const surfaces = useMemo(() => routeSurfaces(route.legs), [route.legs]);
-  /**
-   * « Voir sur la carte » du bloc Surface, et celui de la pente sous le graphe
-   * du dénivelé : le tracé prend les couleurs du revêtement ou de la pente tant
-   * que leur bloc est ouvert, à la place du bleu ; un tronçon en calcul ou en
-   * échec garde son pointillé. Un seul à la fois : en allumer un éteint l'autre.
-   */
-  const { first: surfaceOnMap, second: gradeOnMap, toggleFirst: toggleSurfaceOnMap, toggleSecond: toggleGradeOnMap } = useExclusiveToggles();
-  const surfaceShown = !markCourse && open.surface && surfaceOnMap;
-  /** Revêtement choisi dans la barre, en surbrillance sur la carte ; effacé quand le bloc Surface se ferme. */
-  const [selectedSurface, setSelectedSurface] = useState<SurfaceCategory | null>(null);
-  if (selectedSurface !== null && (markCourse || !open.surface)) setSelectedSurface(null);
-  /** Morceaux du tracé par revêtement, calculés une fois pour « Voir sur la carte » et la surbrillance. */
-  const surfacePathsWanted = surfaceShown || selectedSurface !== null;
-  const allSurfacePaths = useMemo(() => (surfacePathsWanted ? routeSurfacePaths(route.legs) : null), [surfacePathsWanted, route.legs]);
-  const legSurfacePaths = surfaceShown ? allSurfacePaths : null;
-  const shownSurfacePaths = useMemo(
-    () => (selectedSurface && allSurfacePaths ? allSurfacePaths.flatMap((paths) => paths ?? []) : null),
-    [selectedSurface, allSurfacePaths]
-  );
-  const firstError = route.legs.find((l) => l.status === 'error')?.error ?? null;
+  const totals = useMemo(() => routeTotals(route), [route]);
   const distances = useMemo(() => waypointDistances(route), [route]);
   const looped = isLooped(route);
-  /** Retour de la boucle en mode « Boucle », quand il se calcule à part (`loopReturn`). */
-  const returnLeg = loopOn && looped ? route.legs[route.legs.length - 1] : undefined;
-  const returnMark = returnLeg?.loopReturn;
-  const returnPending = returnLeg?.status === 'pending' && returnMark !== undefined;
-  /** Tronçons de l'aller encore en calcul : le retour attend qu'ils le soient tous. */
-  const tracePending = totals.pendingLegs - (returnPending ? 1 : 0);
-  /** Ligne d'état du retour calculé : longueur, rapport à l'aller, part commune avec lui. */
-  const returnStatus = (() => {
-    if (!returnMark || returnLeg?.status !== 'ready') return null;
-    if (!returnMark.outcome || returnMark.sharedM === undefined) return 'Retour enregistré avec l\'itinéraire.';
-    const n = route.waypoints.length;
-    const returnM = distances[n - 1].legM;
-    const outboundM = distances[n - 2].cumulativeM;
-    const km = (m: number) => formatDistance(m, distanceUnit, 1);
-    const variant = returnMark.variant > 0 ? ` (variante ${returnMark.variant + 1})` : '';
-    if (returnMark.outcome === 'avoided') {
-      const ratio = outboundM > 0 ? ` (${commaDecimal(toFixedNumber(returnM / outboundM, 2))} × l'aller)` : '';
-      return `Retour par d'autres voies${variant} : ${km(returnM)}${ratio}, ${km(returnMark.sharedM)} sur l'aller.`;
-    }
-    const why = returnMark.tooLong
-      ? 'Aller trop long pour éviter ses voies'
-      : `Pas de retour par d'autres voies sous ${loopRatio ?? '—'} × l'aller`;
-    return `${why} : retour le plus court${variant}, ${km(returnMark.sharedM)} sur l'aller. Posez des points sur le retour pour le modeler.`;
-  })();
-  /** Nom des points : numéros des balises (voile, surf), lettres ailleurs. */
-  const label = markCourse ? markLabel : waypointLabel;
-  /** Nom d'un point ; sur une boucle, l'arrivée est le départ : A, ou 1. */
+  /** Nom des balises : 1, 2, 3… */
+  const label = markLabel;
+  /** Nom d'une balise ; sur une boucle, l'arrivée est le départ : 1. */
   const pointLabel = (i: number) => label(looped && i === route.waypoints.length - 1 ? 0 : i);
-  /** Nom d'un point au milieu du parcours, en toutes lettres. */
-  const pointName = (i: number) => (markCourse ? `Balise ${label(i)}` : `Point ${label(i)}`);
-  const legs = useMemo(() => (markCourse ? courseLegs(route) : []), [markCourse, route]);
+  /** Nom d'une balise au milieu du parcours, en toutes lettres. */
+  const pointName = (i: number) => `Balise ${label(i)}`;
+  const legs = useMemo(() => courseLegs(route), [route]);
   /** Bips d'approche propres au parcours (`null` : ceux de l'activité), et l'éditeur ouvert ou non. */
   const [courseGuide, setCourseGuide] = useState<MarkGuideSettings | null>(null);
   const [beepsOpen, setBeepsOpen] = useState(false);
-  const activityGuide = useMemo(() => (activity && markCourse ? effectiveMarkGuide(activity) : null), [activity, markCourse]);
+  const activityGuide = useMemo(() => (activity ? effectiveMarkGuide(activity) : null), [activity]);
   const guide = courseGuide ?? activityGuide;
   /** Fond d'un point de la liste : départ en vert, arrivée en rouge, les autres en bleu, comme le tracé. */
   const pointFill = (i: number) => (i === 0 ? START_COLOR : i === route.waypoints.length - 1 ? END_COLOR : ROUTE_COLOR);
@@ -507,20 +323,6 @@ function PlanningPage() {
     : route.waypoints.length > 0 || courseGuide !== null;
   useLeaveWarning(dirty ? { message: 'L\'itinéraire en cours n\'est pas enregistré. Quitter quand même ?', discard: noop } : null);
 
-  // --- Profil d'altitude ---
-
-  /** Profil à pas régulier ; ses lignes portent la position du repère de survol sur la carte. */
-  const profile = useMemo(() => routeProfileRows(points), [points]);
-  const { zoom, chartRows, gradeStops, gradientId, readProfile } = useRouteProfileChart(profile, distanceUnit, gradeRange);
-  const hasElevation = totals.gainM !== null && chartRows.some((r) => r.altitude !== null);
-  /** Tracé coloré par la pente, sur les lignes du profil (tous les 10 m), tant que le bloc Général est ouvert. */
-  const gradePaths = useMemo(
-    () => (!markCourse && open.profil && gradeOnMap && !surfaceShown && hasElevation && gradeRange
-      ? gradeColorPaths(profile.map((row): [number, number] => [row.lat, row.lon]), profile.map((row) => row.grade), gradeRange)
-      : null),
-    [markCourse, open.profil, gradeOnMap, surfaceShown, hasElevation, gradeRange, profile]
-  );
-
   // --- Carte ---
 
   const onMapTap = (w: Waypoint) => {
@@ -532,7 +334,7 @@ function PlanningPage() {
       return;
     }
     if (locked) return;
-    planner.add(w, editMode);
+    planner.add(w);
   };
 
   /** Le verrouillage ferme le bandeau d'un point ou d'un lieu proposé : plus rien à modifier sur la carte. */
@@ -580,8 +382,8 @@ function PlanningPage() {
       setCandidate(null);
       setSelected(i);
     },
-    dragend: (e) => movePoint(i, toWaypoint((e.target as L.Marker).getLatLng()), editMode),
-  })), [waypointCount, movePoint, editMode, locked]);
+    dragend: (e) => movePoint(i, toWaypoint((e.target as L.Marker).getLatLng())),
+  })), [waypointCount, movePoint, locked]);
 
   // --- Recherche ---
 
@@ -641,20 +443,7 @@ function PlanningPage() {
 
   // --- Enregistrement ---
 
-  /**
-   * Tronçons restés en ligne droite faute de calcul : on demande avant de les
-   * enregistrer ou de les exporter tels quels (« Partir » suivrait la ligne droite).
-   */
-  const confirmFailedLegs = (verb: string): boolean => {
-    const n = totals.errorLegs;
-    if (n === 0) return true;
-    return window.confirm(n > 1
-      ? `${n} tronçons n'ont pas pu être calculés : ils seront ${verb}s en ligne droite. Continuer ?`
-      : `Un tronçon n'a pas pu être calculé : il sera ${verb} en ligne droite. Continuer ?`);
-  };
-
   const handleSave = async () => {
-    if (!confirmFailedLegs('enregistré')) return;
     setSaving(true);
     setMessage(null);
     try {
@@ -676,15 +465,8 @@ function PlanningPage() {
   const openSaved = (saved: SavedRoute) => {
     if (!confirmDiscard()) return;
     const known = findActivity(activities, saved.record.activityId);
-    const openedActivity = known ?? activity;
-    const openedMarkCourse = openedActivity !== null && usesMarkCourse(activityFamily(openedActivity));
-    // Une boucle rouvre le mode « Boucle », son retour pris tel quel : rien à recalculer, rien à enregistrer.
-    const read = recordToRoute(saved.record);
-    const looping = !openedMarkCourse && isLooped(read);
-    const opened = looping ? acceptLoopReturn(read) : read;
-    // Un parcours de balises va de balise en balise : un tronçon calculé d'avant est redressé, à enregistrer.
-    // Les cases sont celles de l'activité de l'itinéraire ; rien n'est recalculé.
-    planner.replace(openedMarkCourse ? straightenRoute(opened) : opened, known ? activityMode(known) : undefined, looping);
+    const opened = recordToRoute(saved.record);
+    planner.replace(opened);
     setCourseGuide(routeMarkGuide(saved.record));
     setLocked(true);
     setCurrent(saved);
@@ -693,7 +475,6 @@ function PlanningPage() {
     if (known) setActivityId(known.id);
     setSelected(null);
     setMessage(null);
-    zoom.reset();
     fitTo(opened);
   };
 
@@ -707,7 +488,6 @@ function PlanningPage() {
     setCourseGuide(null);
     setSelected(null);
     setMessage(null);
-    zoom.reset();
   };
 
   /**
@@ -728,14 +508,10 @@ function PlanningPage() {
       const loaded = routeFromTrack(parsed.points);
       if (!loaded) throw new Error(`${file.name} ne contient pas de trace : aucun point de trace ou de route.`);
       if (!confirmDiscard()) return;
-      // Activité devinée parmi celles qui se planifient (ni cachée), ses types de voie cochés avec elle.
+      // Activité devinée parmi celles qui se planifient (ni cachée).
       const sport = guessSport(parsed.trackType);
       const guessed = sport ? activities.find((a) => a.base === sport && plannable(a)) : undefined;
-      // La trace reste telle quelle : pas de mode « Boucle ».
-      // Son altitude est demandée à l'IGN sans activité seulement (rien en voile ni en surf), au pas de `PLANNING_TERRAIN_STEP_M`.
-      const target = guessed ?? activity;
-      const terrainStepM = target ? null : PLANNING_TERRAIN_STEP_M;
-      planner.loadImported(loaded, terrainStepM, guessed ? activityMode(guessed) : undefined, false);
+      planner.replace(loaded);
       setLocked(false);
       setCurrent(null);
       setSavedRoute(EMPTY_ROUTE);
@@ -746,7 +522,6 @@ function PlanningPage() {
       setCandidate(null);
       setResults(null);
       setMessage(null);
-      zoom.reset();
       fitTo(loaded);
     } catch (err) {
       setLoadError(plainError(err, 'Lecture du fichier impossible.'));
@@ -766,7 +541,6 @@ function PlanningPage() {
         setName('');
         setCourseGuide(null);
         setSelected(null);
-        zoom.reset();
         setMessage('Itinéraire supprimé.');
       }
     } catch (err) {
@@ -775,7 +549,6 @@ function PlanningPage() {
   };
 
   const exportGpx = () => {
-    if (!confirmFailedLegs('exporté')) return;
     const fileName = `${current?.base ?? safeFileName(name.trim() || defaultName())}.gpx`;
     downloadTextFile(fileName, buildRouteGpx(route, name.trim() || defaultName(), label));
   };
@@ -817,20 +590,14 @@ function PlanningPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
 
-  const selectedLeg = selected !== null && selected > 0 ? route.legs[selected - 1] : undefined;
-  /** Aller ou retour encore en calcul : rien à enregistrer ni à exporter avant la fin, sinon la ligne droite provisoire partirait. */
-  const computing = tracePending > 0 || returnPending;
-  const canSave = library.canSave && route.waypoints.length >= 2 && !saving && !current?.readOnly && !computing;
-  const waitTitle = computing ? 'Attendez la fin du calcul du tracé' : undefined;
+  const canSave = library.canSave && route.waypoints.length >= 2 && !saving && !current?.readOnly;
 
-  /** Onglets sous la carte : en voile et en surf, le parcours et ses balises ; ailleurs, le général, le revêtement et les points. */
+  /** Onglets sous la carte : le parcours, ses balises, l'enregistrement et la liste. */
   const pointCount = route.waypoints.length;
   const sections: SectionDefinition<PlanningSection>[] = [
-    ...(markCourse
-      ? [{ key: 'parcours' as const, label: 'parcours' }]
-      : [{ key: 'profil' as const, label: 'général' }, { key: 'surface' as const, label: 'surface' }]),
+    { key: 'parcours', label: 'parcours' },
     { key: 'trace', label: 'tracé' },
-    { key: 'points', label: `${markCourse ? 'balises' : 'points'} (${pointCount})` },
+    { key: 'points', label: `balises (${pointCount})` },
     { key: 'ranger', label: 'enregistrer' },
     { key: 'liste', label: `mes itinéraires (${listedRoutes.length})` },
   ];
@@ -840,26 +607,14 @@ function PlanningPage() {
       <PageHeader
         title="Itinéraires"
         back={{ to: '/', label: 'Accueil' }}
-        subtitle={markCourse
-          ? 'Posez les balises sur la carte : le parcours les relie en ligne droite.'
-          : 'Posez des points sur la carte : le tracé suit les chemins entre eux.'} />
+        subtitle="Posez les balises sur la carte : le parcours les relie en ligne droite." />
 
       <div className="plan-layout">
         <div className="plan-map-col">
           <div className="plan-toolbar">
             <ActivitySelect activities={activities} value={activity?.id ?? null} label="Activité" families={PLANNING_FAMILIES}
-              onChange={(next) => chooseActivity(next.id)} />
-            {markCourse ? (
-              <span className="plan-toolbar__note">Balises reliées en ligne droite</span>
-            ) : (
-              <WayPicker mode={mode} label="Types de voie" compact className="plan-modes" onChange={chooseMode}
-                style={{ '--tab-accent': color } as React.CSSProperties}>
-                <button type="button" className="ui-tab plan-modes__loop" aria-pressed={planner.loop} onClick={toggleLoop}
-                  title="L'itinéraire revient toujours au départ, par un retour qui évite les voies de l'aller">
-                  Boucle
-                </button>
-              </WayPicker>
-            )}
+              onChange={(next) => setActivityId(next.id)} />
+            <span className="plan-toolbar__note">Balises reliées en ligne droite</span>
           </div>
           <form className="plan-search" onSubmit={(e) => void onSearch(e)}>
             <input
@@ -895,25 +650,16 @@ function PlanningPage() {
               {satellite && route.legs.map((leg, i) => (
                 <Polyline key={`halo-${i}`} positions={latLngsOf(leg.points)} pathOptions={HALO_STYLE} />
               ))}
-              {/* Sous les tronçons : un tronçon en calcul ou en échec garde son pointillé par-dessus. */}
-              {gradePaths?.map((path, idx) => (
-                <Polyline key={`grade-${idx}`} positions={path.positions} pathOptions={gradeStyle(path.color)} />
-              ))}
               {route.legs.map((leg, i) => {
                 const positions = latLngsOf(leg.points);
-                const surfacePaths = legSurfacePaths?.[i];
                 return (
                   <Fragment key={i}>
-                    {surfacePaths
-                      ? <SurfaceLayer paths={surfacePaths} />
-                      : gradePaths && leg.status === 'ready' ? null
-                        : <Polyline positions={positions} pathOptions={legStyle(leg.status)} />}
+                    <Polyline positions={positions} pathOptions={LEG_STYLE} />
                     {!locked && <Polyline positions={positions} pathOptions={HIT_STYLE} eventHandlers={legHandlers[i]} />}
                   </Fragment>
                 );
               })}
-              {selectedSurface && shownSurfacePaths && <SurfaceHighlight paths={shownSurfacePaths} category={selectedSurface} />}
-              {/* Sur une boucle, l'arrivée est au départ : un seul repère, A, qui les déplace ensemble. */}
+              {/* Sur une boucle, l'arrivée est au départ : un seul repère, 1, qui les déplace ensemble. */}
               {(looped ? route.waypoints.slice(0, -1) : route.waypoints).map((w, i) => (
                 <Marker
                   key={i}
@@ -924,9 +670,8 @@ function PlanningPage() {
               ))}
               {candidate && (
                 <CircleMarker center={[candidate.lat, candidate.lon]} radius={9}
-                  pathOptions={{ color: '#ffffff', weight: 3, fillColor: ROUTE_COLOR, fillOpacity: 0.6 }} />
+                  pathOptions={CANDIDATE_STYLE} />
               )}
-              <HoveredTrackMarker points={profile} />
             </MapContainer>
             <div className="plan-map-tools theme-light">
               <Button size="s" onClick={() => void locate()} disabled={locating}>
@@ -945,170 +690,81 @@ function PlanningPage() {
 
             {selected !== null && route.waypoints[selected] && (
               <div className="plan-overlay theme-light">
-                <strong>{markCourse ? 'Balise' : 'Point'} {pointLabel(selected)}</strong>
-                {selectedLeg && !markCourse && (
-                  <div className="plan-overlay__field">
-                    <span>Pour y venir{selectedLeg.mode === 'imported' && ' (trace importée)'}</span>
-                    <WayPicker mode={selectedLeg.mode} label={`Façon de venir au point ${pointLabel(selected)}`} compact
-                      straightOff={editMode !== 'straight' ? editMode : activityMode(activity)}
-                      onChange={(m) => planner.setLegMode(selected - 1, m)} />
-                  </div>
+                <strong>Balise {pointLabel(selected)}</strong>
+                {selected === 0 && route.waypoints.length >= 2 && !looped && (
+                  <Button size="s" variant="primary" onClick={() => { planner.closeLoop(); setSelected(null); }}>Boucler ici</Button>
                 )}
-                {selected === 0 && route.waypoints.length >= 2 && !looped && !loopOn && (
-                  <>
-                    <Button size="s" variant="primary" onClick={() => { planner.closeLoop(editMode); setSelected(null); }}>Boucler ici</Button>
-                    {editMode !== 'straight' && (
-                      <Button size="s" onClick={() => { planner.closeLoop('straight'); setSelected(null); }}>En ligne droite</Button>
-                    )}
-                  </>
-                )}
-                <Button size="s" variant="danger" onClick={() => { planner.remove(selected, editMode); setSelected(null); }}>Retirer</Button>
+                <Button size="s" variant="danger" onClick={() => { planner.remove(selected); setSelected(null); }}>Retirer</Button>
                 <button type="button" className="plan-overlay__close" aria-label="Fermer" onClick={() => setSelected(null)}>×</button>
-                {selectedLeg?.status === 'error' && <p className="plan-overlay__error">{selectedLeg.error}</p>}
               </div>
             )}
             {candidate && (
               <div className="plan-overlay theme-light">
                 <span className="plan-overlay__place"><strong>{candidate.label}</strong>{candidate.detail && ` · ${candidate.detail}`}</span>
-                <Button size="s" variant="primary" onClick={() => { planner.add(candidate, editMode); setCandidate(null); }}>
-                  {markCourse ? 'Ajouter cette balise' : 'Ajouter ce point'}
+                <Button size="s" variant="primary" onClick={() => { planner.add(candidate); setCandidate(null); }}>
+                  Ajouter cette balise
                 </Button>
                 <button type="button" className="plan-overlay__close" aria-label="Fermer" onClick={() => setCandidate(null)}>×</button>
               </div>
             )}
           </ResizablePanel>
-          {/* Hors des onglets : l'état du calcul se voit même onglet Tracé fermé. */}
+          {/* Hors des onglets : l'échec du chargement se voit même onglet Tracé fermé. */}
           {loadError && <div className="ui-alert ui-alert--warning">{loadError}</div>}
-          {tracePending > 0 && (
-            <div className="plan-status">Calcul du tracé… ({tracePending} tronçon{tracePending > 1 ? 's' : ''})</div>
-          )}
-          {tracePending === 0 && returnPending && <div className="plan-status">Calcul du retour…</div>}
-          {returnStatus && (
-            <div className="plan-status plan-loop-status">
-              <span>{returnStatus}</span>
-              <Button size="s" onClick={planner.otherReturn}>Autre retour</Button>
-            </div>
-          )}
-          {firstError && (
-            <div className="ui-alert ui-alert--warning plan-error">
-              <span>{totals.errorLegs > 1 ? `${totals.errorLegs} tronçons en ligne droite. ` : ''}{firstError}</span>
-              <Button size="s" onClick={planner.retry}>Réessayer</Button>
-            </div>
-          )}
         </div>
 
         <div className="plan-panel">
           <SectionTabs sections={sections} open={open} onToggle={toggle} accent={color} />
-          {markCourse ? (
-            <PlanBlock id="planning.parcours" label="Parcours" open={open.parcours} onToggle={() => toggle('parcours')}
-              helpKey={guide && activity ? 'plan:parcours' : undefined}>
-              {guide && activity && (
-                <HelpText helpKey="plan:parcours" note>
-                  En navigation, chaque balise, départ compris, se valide à moins de {validationRadiusM(guide)} m. Bips dès{' '}
-                  {beepStartM(guide)} m : {courseGuide
-                    ? 'propres à ce parcours.'
-                    : <>ceux de l'activité {activity.name}, réglés dans <Link to="/parametres">Réglages</Link>.</>}
-                  {' '}« Régler pour ce parcours » ouvre leur courbe : tirez un point pour le déplacer, touchez le graphe pour en ajouter un.
-                </HelpText>
-              )}
-              <div className="plan-stats">
-                <div className="plan-stat"><span>Distance</span><strong className="num">{formatDistance(totals.distanceM, distanceUnit, toDisplayDistance(totals.distanceM, distanceUnit) >= 100 ? 1 : 2)}</strong></div>
-                <div className="plan-stat"><span>Balises</span><strong className="num">{route.waypoints.length - (looped ? 1 : 0)}</strong></div>
-                <div className="plan-stat">
-                  <span>Plus long bord</span>
-                  <strong className="num">{legs.length > 0 ? formatDistance(Math.max(...legs.map((l) => l.distanceM)), distanceUnit) : '—'}</strong>
-                </div>
-              </div>
-              {legs.length > 0 ? (
-                <ol className="plan-course">
-                  {legs.map((leg, i) => (
-                    <li key={i} className="plan-course__leg">
-                      <span>{pointLabel(i)} → {pointLabel(i + 1)}</span>
-                      <span className="num">{formatDistance(leg.distanceM, distanceUnit)}</span>
-                      <span className="num">{roundBearingDeg(leg.bearingDeg)}°</span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="plan-note">Touchez la carte pour poser le départ, puis les balises.</p>
-              )}
-              {guide && activity && (
-                <div className="plan-beeps">
-                  <div className="plan-beeps__head">
-                    <Button size="s" onClick={() => setBeepsOpen((o) => !o)} aria-expanded={beepsOpen}>
-                      {beepsOpen ? 'Fermer' : 'Régler pour ce parcours'}
-                    </Button>
-                  </div>
-                  {beepsOpen && activityGuide && (
-                    <BeepCurveEditor value={guide} overridden={courseGuide !== null} fallback={activityGuide}
-                      resetLabel="Comme l'activité" fallbackMark={`ceux de l'activité ${activity.name}`}
-                      approachMs={simulatedApproachMs(activityFamily(activity))} speedUnit={effectiveSpeedUnit(activity)}
-                      onChange={setCourseGuide} />
-                  )}
-                </div>
-              )}
-            </PlanBlock>
-          ) : (
-            <PlanBlock id="planning.profil" label="Général" open={open.profil} onToggle={() => toggle('profil')}
-              helpKey={hasElevation && gradeRange ? 'plan:general' : undefined}>
-              <HelpText helpKey="plan:general" note>
-                {hasElevation && gradeRange && 'Pour zoomer : écartez deux doigts ou touchez deux fois la courbe ; à la souris, tirez une zone ou double-cliquez. '}
+          <PlanBlock id="planning.parcours" label="Parcours" open={open.parcours} onToggle={() => toggle('parcours')}
+            helpKey={guide && activity ? 'plan:parcours' : undefined}>
+            {guide && activity && (
+              <HelpText helpKey="plan:parcours" note>
+                En navigation, chaque balise, départ compris, se valide à moins de {validationRadiusM(guide)} m. Bips dès{' '}
+                {beepStartM(guide)} m : {courseGuide
+                  ? 'propres à ce parcours.'
+                  : <>ceux de l'activité {activity.name}, réglés dans <Link to="/parametres">Réglages</Link>.</>}
+                {' '}« Régler pour ce parcours » ouvre leur courbe : tirez un point pour le déplacer, touchez le graphe pour en ajouter un.
               </HelpText>
-              <div className="plan-stats">
-                {/* Au-delà de 100 km, une décimale : le chiffre tient dans sa case sur téléphone. */}
-                <div className="plan-stat"><span>Distance</span><strong className="num">{formatDistance(totals.distanceM, distanceUnit, toDisplayDistance(totals.distanceM, distanceUnit) >= 100 ? 1 : 2)}</strong></div>
-                <div className="plan-stat"><span>D+</span><strong className="num">{formatMeters(totals.gainM)}</strong></div>
-                <div className="plan-stat"><span>D−</span><strong className="num">{formatMeters(totals.lossM)}</strong></div>
+            )}
+            <div className="plan-stats">
+              <div className="plan-stat"><span>Distance</span><strong className="num">{formatDistance(totals.distanceM, distanceUnit, toDisplayDistance(totals.distanceM, distanceUnit) >= 100 ? 1 : 2)}</strong></div>
+              <div className="plan-stat"><span>Balises</span><strong className="num">{route.waypoints.length - (looped ? 1 : 0)}</strong></div>
+              <div className="plan-stat">
+                <span>Plus long bord</span>
+                <strong className="num">{legs.length > 0 ? formatDistance(Math.max(...legs.map((l) => l.distanceM)), distanceUnit) : '—'}</strong>
               </div>
-
-              {importedElevationText && <p className="plan-note">{importedElevationText}</p>}
-
-              {hasElevation && gradeRange ? (
-                <div>
-                  <ElevationProfileMini rows={chartRows} stops={gradeStops} gradientId={gradientId} distanceSymbol={DISTANCE_UNIT_SYMBOL[distanceUnit]}
-                    zoom={zoom} read={readProfile}
-                    height={PROFILE_HEIGHT_PX} grid />
-                  <GradeLegendRow label="Pente, montée ou descente :" gradeRange={gradeRange} onMap={gradeOnMap} onToggleMap={toggleGradeOnMap} />
+            </div>
+            {legs.length > 0 ? (
+              <ol className="plan-course">
+                {legs.map((leg, i) => (
+                  <li key={i} className="plan-course__leg">
+                    <span>{pointLabel(i)} → {pointLabel(i + 1)}</span>
+                    <span className="num">{formatDistance(leg.distanceM, distanceUnit)}</span>
+                    <span className="num">{roundBearingDeg(leg.bearingDeg)}°</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="plan-note">Touchez la carte pour poser le départ, puis les balises.</p>
+            )}
+            {guide && activity && (
+              <div className="plan-beeps">
+                <div className="plan-beeps__head">
+                  <Button size="s" onClick={() => setBeepsOpen((o) => !o)} aria-expanded={beepsOpen}>
+                    {beepsOpen ? 'Fermer' : 'Régler pour ce parcours'}
+                  </Button>
                 </div>
-              ) : (
-                route.waypoints.length >= 2 && totals.pendingLegs === 0 && (
-                  <p className="plan-note">Pas d'altitude sur ce tracé (lignes droites seulement) : pas de courbe de dénivelé.</p>
-                )
-              )}
-            </PlanBlock>
-          )}
-
-          {!markCourse && (
-            <PlanBlock id="planning.surface" label="Surface" open={open.surface} onToggle={() => toggle('surface')} helpKey="plan:surface">
-              <HelpText helpKey="plan:surface" note>
-                Revêtement des voies d'OpenStreetMap. Lignes droites et traces importées : « Inconnu ». « Voir sur la carte » y colore
-                le tracé selon le revêtement.
-              </HelpText>
-              {surfaces.totals.length > 0 ? (
-                <SurfaceBar totals={surfaces.totals} distanceUnit={distanceUnit}
-                  shownOnMap={surfaceOnMap} onToggleMap={toggleSurfaceOnMap}
-                  selected={selectedSurface} onSelect={setSelectedSurface} />
-              ) : (
-                <p className="plan-note">Le revêtement s'affiche dès le premier tronçon calculé.</p>
-              )}
-              {surfaces.pendingLegs > 0 && (
-                <p className="plan-note">Tronçons en calcul : ils s'ajouteront une fois calculés.</p>
-              )}
-              {surfaces.missingLegs > 0 && (
-                <div className="plan-surface__missing">
-                  <p className="plan-note">
-                    {surfaces.missingLegs > 1 ? `${surfaces.missingLegs} tronçons enregistrés` : 'Un tronçon enregistré'} avant
-                    qu'on garde le revêtement : compté « Inconnu ». Le calculer de nouveau le donne, mais le tracé peut
-                    changer si la carte a changé depuis.
-                  </p>
-                  <Button size="s" onClick={planner.recomputeSurfaces}>Calculer</Button>
-                </div>
-              )}
-            </PlanBlock>
-          )}
+                {beepsOpen && activityGuide && (
+                  <BeepCurveEditor value={guide} overridden={courseGuide !== null} fallback={activityGuide}
+                    resetLabel="Comme l'activité" fallbackMark={`ceux de l'activité ${activity.name}`}
+                    approachMs={simulatedApproachMs(activityFamily(activity))} speedUnit={effectiveSpeedUnit(activity)}
+                    onChange={setCourseGuide} />
+                )}
+              </div>
+            )}
+          </PlanBlock>
 
           <PlanBlock id="planning.trace" label="Tracé" open={open.trace} onToggle={() => toggle('trace')} helpKey="plan:trace">
-            {helpOpen && markCourse && (
+            {helpOpen && (
               <ul className="plan-help">
                 <li>Touchez la carte pour poser les balises : 1, puis 2, puis 3… Le départ est en vert, l'arrivée en rouge.</li>
                 <li>Les balises sont reliées en ligne droite : sur l'eau, pas de chemin à suivre.</li>
@@ -1123,61 +779,13 @@ function PlanningPage() {
                 <li>« Charger un GPX » reprend telle quelle une trace téléchargée ailleurs ; touchez-la pour y poser des balises.</li>
               </ul>
             )}
-            {helpOpen && !markCourse && (
-              <ul className="plan-help">
-                <li>Touchez la carte pour poser un point : A, puis B, puis C… Le départ est en vert, l'arrivée en rouge.</li>
-                <li>Touchez le tracé pour insérer un point entre deux autres.</li>
-                <li>Le crayon, sur la carte, verrouille l'itinéraire pour la déplacer sans poser de point ; un itinéraire rangé s'ouvre verrouillé, le crayon le rend modifiable.</li>
-                <li>Faites glisser un point pour le déplacer : seuls ses deux tronçons sont recalculés.</li>
-                <li>Touchez un point pour le retirer, ou changer la façon d'y venir ; touchez A pour boucler, par les chemins ou en ligne droite.</li>
-                <li>
-                  « Boucle », au-dessus de la carte : posez l'aller, l'itinéraire revient toujours au départ. Le retour évite les voies de
-                  l'aller tant qu'il ne dépasse pas {loopRatio ?? '—'} fois sa longueur (réglable dans Réglages) ; sinon, c'est le retour le
-                  plus court. « Autre retour » en propose une variante ; touchez le retour pour y poser un point et le modeler. A reste le
-                  départ : faites-le glisser pour le déplacer.
-                </li>
-                <li>« Précédent », sur la carte, défait la dernière modification.</li>
-                <li>La liste des points permet aussi de changer leur ordre.</li>
-                <li>
-                  Les types de voie cochés au-dessus de la carte valent pour tout l'itinéraire, recalculé dès qu'on les change, et pour les points
-                  suivants ; on peut en cocher plusieurs. Choisir une activité coche les siens, réglés dans sa carte de Réglages. Une trace importée
-                  garde son tracé. Le calcul demande du réseau.
-                </li>
-                <li>
-                  {WAY_TYPES.map((t, i) => (
-                    <Fragment key={t}>
-                      « {WAY_TYPE_LABEL[t]} » : {WAY_TYPE_HINT[t]}{i < WAY_TYPES.length - 1 ? ' ; ' : '. '}
-                    </Fragment>
-                  ))}
-                  Une voie est rangée selon ce qu'elle est : une route en terre ou en gravier compte comme piste, une piste goudronnée comme route.
-                </li>
-                <li>
-                  Le calcul suit les types cochés et prend les autres quand ils évitent un détour. À vélo, un type plus facile reste permis
-                  (une route pour rejoindre une piste), un plus dur est évité d'autant plus qu'il est dur ; à pied, tous se valent.
-                  Les grandes routes non cochées sont toujours évitées.
-                </li>
-                <li>
-                  Les règles d'accès suivent l'activité : à pied, escaliers permis et sens interdits ignorés ; à vélo, sens interdits respectés,
-                  et voies notées difficiles sur la carte (difficulté VTT 3 ou plus, randonnée T3 ou plus, escaliers) évitées même cochées.
-                </li>
-                <li>« Charger un GPX » reprend telle quelle une trace téléchargée ailleurs. Touchez-la pour y poser un point ; un point déplacé refait ses tronçons dans le mode choisi.</li>
-              </ul>
-            )}
             <div className="plan-actions">
               <Button size="s" onClick={planner.undo} disabled={!planner.canUndo}>
                 <IconUndo size={16} />
                 Précédent
               </Button>
               <Button size="s" onClick={planner.reverse} disabled={route.waypoints.length < 2}>Inverser</Button>
-              {/* En mode « Boucle », l'itinéraire est toujours bouclé. */}
-              {!loopOn && (
-                <Button size="s" onClick={() => planner.closeLoop(editMode)} disabled={route.waypoints.length < 2 || looped}>Boucler</Button>
-              )}
-              {!loopOn && editMode !== 'straight' && (
-                <Button size="s" onClick={() => planner.closeLoop('straight')} disabled={route.waypoints.length < 2 || looped}>
-                  Boucler en ligne droite
-                </Button>
-              )}
+              <Button size="s" onClick={planner.closeLoop} disabled={route.waypoints.length < 2 || looped}>Boucler</Button>
               <label className="ui-btn ui-btn--secondary ui-btn--s">
                 <IconFile size={16} />
                 Charger un GPX
@@ -1188,16 +796,13 @@ function PlanningPage() {
             </div>
           </PlanBlock>
 
-          <PlanBlock id="planning.points" label={`${markCourse ? 'Balises' : 'Points'} (${route.waypoints.length})`} open={open.points} onToggle={() => toggle('points')}>
+          <PlanBlock id="planning.points" label={`Balises (${route.waypoints.length})`} open={open.points} onToggle={() => toggle('points')}>
             {route.waypoints.length === 0 ? (
               <p className="plan-note">Aucun point : touchez la carte pour poser le départ.</p>
             ) : (
               <ol className="plan-points">
                 {route.waypoints.map((_, i) => {
-                  const leg = i > 0 ? route.legs[i - 1] : undefined;
                   const last = route.waypoints.length - 1;
-                  // En mode « Boucle », A reste le départ et le retour, le dernier tronçon : ni l'un ni l'autre ne change de place.
-                  const fixedLoop = loopOn && looped;
                   return (
                     <li key={i} className={selected === i ? 'plan-point plan-point--selected' : 'plan-point'}>
                       <button type="button" className="plan-point__main" onClick={() => selectPoint(i)}>
@@ -1209,25 +814,20 @@ function PlanningPage() {
                               ? formatDistance(0, distanceUnit)
                               : `${formatDistance(distances[i].cumulativeM, distanceUnit)} · tronçon ${formatDistance(distances[i].legM, distanceUnit)}`}
                           </span>
-                          {leg && !markCourse && <span className="plan-point__mode">{routeModeLabel(leg.mode)}</span>}
                         </span>
                       </button>
-                      {!(fixedLoop && i === last) && (
-                        <span className="plan-point__actions">
-                          <Button size="s" variant="ghost" className="plan-point__move" aria-label={`Monter : ${pointName(i)}`}
-                            disabled={i === 0 || (fixedLoop && i === 1)} onClick={() => { planner.reorder(i, i - 1, editMode); setSelected(null); }}>
-                            <IconChevronRight size={16} style={{ transform: 'rotate(-90deg)' }} />
-                          </Button>
-                          <Button size="s" variant="ghost" className="plan-point__move" aria-label={`Descendre : ${pointName(i)}`}
-                            disabled={i === last || (fixedLoop && (i === 0 || i === last - 1))}
-                            onClick={() => { planner.reorder(i, i + 1, editMode); setSelected(null); }}>
-                            <IconChevronRight size={16} style={{ transform: 'rotate(90deg)' }} />
-                          </Button>
-                          <Button size="s" variant="ghost" onClick={() => { planner.remove(i, editMode); setSelected(null); }}>Retirer</Button>
-                        </span>
-                      )}
-                      {leg?.status === 'error' && <p className="plan-point__error">{leg.error}</p>}
-                      {leg?.status === 'pending' && <p className="plan-point__pending">Calcul du tronçon…</p>}
+                      <span className="plan-point__actions">
+                        <Button size="s" variant="ghost" className="plan-point__move" aria-label={`Monter : ${pointName(i)}`}
+                          disabled={i === 0} onClick={() => { planner.reorder(i, i - 1); setSelected(null); }}>
+                          <IconChevronRight size={16} style={{ transform: 'rotate(-90deg)' }} />
+                        </Button>
+                        <Button size="s" variant="ghost" className="plan-point__move" aria-label={`Descendre : ${pointName(i)}`}
+                          disabled={i === last}
+                          onClick={() => { planner.reorder(i, i + 1); setSelected(null); }}>
+                          <IconChevronRight size={16} style={{ transform: 'rotate(90deg)' }} />
+                        </Button>
+                        <Button size="s" variant="ghost" onClick={() => { planner.remove(i); setSelected(null); }}>Retirer</Button>
+                      </span>
                     </li>
                   );
                 })}
@@ -1253,7 +853,7 @@ function PlanningPage() {
               <div className="ui-alert ui-alert--warning">Cet itinéraire vient d'une version plus récente de l'application : il se consulte sans se modifier.</div>
             )}
             <div className="plan-actions">
-              <Button variant="primary" onClick={() => void handleSave()} disabled={!canSave || (current !== null && !dirty)} title={waitTitle}>
+              <Button variant="primary" onClick={() => void handleSave()} disabled={!canSave || (current !== null && !dirty)}>
                 {saving ? 'Enregistrement…' : current ? 'Enregistrer les modifications' : 'Enregistrer'}
               </Button>
               {current !== null && (
@@ -1263,7 +863,7 @@ function PlanningPage() {
                 </Button>
               )}
               {canDownloadFiles() && (
-                <Button onClick={exportGpx} disabled={route.waypoints.length < 2 || computing} title={waitTitle}>Exporter le GPX</Button>
+                <Button onClick={exportGpx} disabled={route.waypoints.length < 2}>Exporter le GPX</Button>
               )}
               {(current !== null || route.waypoints.length > 0) && <Button variant="ghost" onClick={startNew}>Nouvel itinéraire</Button>}
               {current !== null && (confirmingDelete === current.base ? (

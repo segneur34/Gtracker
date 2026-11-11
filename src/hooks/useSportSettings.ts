@@ -17,8 +17,6 @@ import type { MarkGuideSettings } from '../recording/markGuide';
 import type { JumpSettings } from '../recording/jumpSettings';
 import type { GearGroup, GearItem } from '../library/notes';
 import type { ActivitySpeedRanges } from '../library/sessionTrack';
-import type { WayType } from '../planning/brouterProfile';
-import { DEFAULT_GRADE_RANGE, type GradeRange } from '../planning/grade';
 import { resolveGearGroups, resolveGearLabels, sanitizeGearGroups, withGearItem } from '../settings/gear';
 import {
   DEFAULT_LONG_PRESS_MS, DEFAULT_STOP_HOLD_MS, defaultSpeedRangeOf, hiddenFamiliesOf, isValidLongPress, isValidStopHold,
@@ -252,18 +250,6 @@ export const effectiveSpeedUnit = (activity: Activity): SpeedUnit => resolveSpee
 
 /** Unité de distance effective d'une activité : celle choisie dans Réglages, sinon le kilomètre. */
 export const effectiveDistanceUnit = (activity: Activity): DistanceUnit => resolveDistanceUnit(readStoredSettings(), activity);
-
-// Planification, valeurs neutres jusqu'au lot 304 (planificateur routier) : la voile et le surf ne règlent ni
-// boucle, ni pente, ni voies ; les fonctions restent pour la planification qui les lit.
-
-/** Retour de boucle d'une activité en planification : aucun en voile et en surf (lot 304). */
-export const effectiveLoopReturnRatio = (_activity: Activity): number | null => null;
-
-/** Bornes de la couleur de pente d'une activité : celles par défaut, sans réglage en voile et en surf (lot 304). */
-export const effectiveGradeRange = (_activity: Activity): GradeRange => DEFAULT_GRADE_RANGE;
-
-/** Types de voie cochés d'office en planification : aucun en voile et en surf (lot 304). */
-export const effectiveWayTypes = (_activity: Activity): WayType[] => [];
 
 /**
  * Accès à toutes les activités à la fois, pour la page Réglages : leurs

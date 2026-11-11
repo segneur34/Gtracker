@@ -207,16 +207,16 @@ describe('fiche de 0 octet (A2 : création interrompue)', () => {
 });
 
 describe("fiche d'une version future renommée (A1)", () => {
-  it('garde, au caractère près, le champ de forme nouvelle', async () => {
+  it('garde, au caractère près, le champ inconnu', async () => {
     const { RECORD_FORMAT, RECORD_VERSION, SUMMARY_CALC_VERSION } = await import('../library/record');
     const startMs = Date.parse('2026-10-27T10:00:00Z');
-    const surfaces = { source: 'overpass', format: 2, segments: [{ from: 0, kind: 'asphalte' }] };
+    const houle = { format: 2, segments: [{ from: 0, kind: 'longue' }] };
     files.set('sessions/sortie.gpx', gpxAt(0));
     files.set('sessions/sortie.json', JSON.stringify({
       format: RECORD_FORMAT, version: RECORD_VERSION, gpx: 'sortie.gpx', sport: 'surf', activityId: null, source: 'import',
       addedAt: '2026-10-27T11:00:00.000Z', title: null, name: null,
       summary: { calcVersion: SUMMARY_CALC_VERSION, startMs, endMs: startMs + 20_000, distanceM: 66, movingTimeS: 20, elevationGainM: null, maxSpeedMs: 3.3, pointCount: 3, samplingS: 10 },
-      notes: null, analysis: null, surfaces,
+      notes: null, analysis: null, houle,
     }, null, 2));
     const library = await openFresh();
     await settle(library);
@@ -226,7 +226,7 @@ describe("fiche d'une version future renommée (A1)", () => {
     vi.useRealTimers();
     const written = JSON.parse(files.get('sessions/sortie.json')!);
     expect(written.name).toBe('Matin');
-    expect(JSON.stringify(written.surfaces, null, 2)).toBe(JSON.stringify(surfaces, null, 2));
+    expect(JSON.stringify(written.houle, null, 2)).toBe(JSON.stringify(houle, null, 2));
   });
 });
 

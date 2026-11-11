@@ -31,7 +31,6 @@ import {
   type SessionJumps,
   type SessionRecord,
 } from './record';
-import type { SessionSurfaces } from '../planning/surface';
 import { carriedSettings } from './record';
 import { LEGACY_WING_RECORD } from '../test/legacyImport.fixture';
 import { familyRecords, sessionRecord } from '../test/record.fixture';
@@ -209,37 +208,6 @@ describe("réglages d'analyse de la fiche", () => {
   });
 });
 
-describe('voies suivies de la fiche', () => {
-  const surfaces: SessionSurfaces = {
-    source: 'overpass',
-    fetchedAt: '2026-10-04T15:00:00.000Z',
-    matchVersion: 1,
-    startMs: START_MS,
-    tags: ['highway=residential', 'highway=track tracktype=grade2'],
-    runs: [[0, 0], [125_000, 1], [300_000, -1]],
-  };
-
-  it('sont relues à l\'identique, et absentes d\'une fiche qui n\'en a pas', () => {
-    expect(parseRecord(serializeRecord(record({ surfaces })))?.surfaces).toEqual(surfaces);
-    expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('surfaces');
-  });
-
-  it('mal formées, sont gardées brutes et réécrites telles quelles : la fiche ne les lit plus (lot 301)', () => {
-    for (const bad of [{ ...surfaces, runs: [[5, 0]] }, { ...surfaces, source: 'ailleurs' }]) {
-      const read = parseRecord(JSON.stringify({ ...record(), surfaces: bad }))!;
-      expect(read.surfaces).toEqual(bad);
-      expect(JSON.parse(serializeRecord(read)).surfaces).toEqual(bad);
-    }
-  });
-
-  it('se rangent et se retirent sans recalcul, et restent quand l\'activité change', () => {
-    const added = applyRecordPatch(record(), { surfaces });
-    expect(added).toEqual({ record: { ...record(), surfaces }, resummarize: false });
-    expect(applyRecordPatch(added.record, { activityId: 'trail' }).record.surfaces).toEqual(surfaces);
-    expect(applyRecordPatch(added.record, { surfaces: null }).record).not.toHaveProperty('surfaces');
-  });
-});
-
 describe('sauts de la fiche', () => {
   const jumps: SessionJumps = {
     version: 1,
@@ -272,46 +240,7 @@ describe('sauts de la fiche', () => {
   });
 });
 
-describe('altitude du terrain de la fiche', () => {
-  const terrainElevation = {
-    source: 'ign',
-    resource: 'ign_rge_alti_wld',
-    version: 1,
-    stepM: 10,
-    fetchedAt: '2026-10-07T09:00:00.000Z',
-    startMs: START_MS,
-    t: [0, 3333, 6667],
-    z: [47.54, 46.87, null],
-  };
-
-  it('est relue à l\'identique, avec sa source', () => {
-    const read = parseRecord(serializeRecord(record({ terrainElevation, elevationSource: 'gps' })));
-    expect(read?.terrainElevation).toEqual(terrainElevation);
-    expect(read?.elevationSource).toBe('gps');
-    expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('terrainElevation');
-    expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('elevationSource');
-  });
-
-  it('mal formée, est gardée brute : la fiche ne la lit plus (lot 301) ; une source inconnue est écartée', () => {
-    const broken = { ...terrainElevation, t: [0, 6667, 3333] };
-    expect(parseRecord(JSON.stringify({ ...record(), terrainElevation: broken }))?.terrainElevation).toEqual(broken);
-    expect(parseRecord(JSON.stringify({ ...record(), elevationSource: 'ign' }))).not.toHaveProperty('elevationSource');
-  });
-
-  it('se range, se retire et change de source en recalculant le résumé, et reste quand l\'activité change', () => {
-    const added = applyRecordPatch(record(), { terrainElevation });
-    expect(added).toEqual({ record: { ...record(), terrainElevation }, resummarize: true });
-    expect(applyRecordPatch(added.record, { terrainElevation }).resummarize).toBe(false);
-    expect(applyRecordPatch(added.record, { activityId: 'trail' }).record.terrainElevation).toEqual(terrainElevation);
-    const removed = applyRecordPatch(added.record, { terrainElevation: null });
-    expect(removed.record).not.toHaveProperty('terrainElevation');
-    expect(removed.resummarize).toBe(true);
-    const gps = applyRecordPatch(added.record, { elevationSource: 'gps' });
-    expect(gps).toEqual({ record: { ...added.record, elevationSource: 'gps' }, resummarize: true });
-    expect(applyRecordPatch(gps.record, { elevationSource: null }).record).not.toHaveProperty('elevationSource');
-    expect(applyRecordPatch(record(), { elevationSource: null })).toEqual({ record: record(), resummarize: false });
-  });
-
+describe('fond de carte de la fiche', () => {
   it('fond de carte de la session (lot 193) : relu avec garde, changé sans refaire le résumé', () => {
     expect(parseRecord(serializeRecord(record({ mapBase: 'satellite' })))?.mapBase).toBe('satellite');
     expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('mapBase');
@@ -324,24 +253,16 @@ describe('altitude du terrain de la fiche', () => {
 });
 
 describe('fiche allégée du cache', () => {
-  const terrainElevation = {
-    source: 'ign', resource: 'ign_rge_alti_wld', version: 1, stepM: 10,
-    fetchedAt: '2026-10-07T09:00:00.000Z', startMs: START_MS, t: [0, 3333], z: [47.5, 46.9],
-  };
-  const surfaces: SessionSurfaces = {
-    source: 'overpass', fetchedAt: '2026-10-04T15:00:00.000Z', matchVersion: 1, startMs: START_MS,
-    tags: ['highway=residential'], runs: [[0, 0]],
-  };
   const jumps: SessionJumps = { version: 1, computedAt: '2026-10-08T14:00:00.000Z', jumps: [] };
   const full = {
-    ...record({ name: 'Sortie', elevationSource: 'gps', terrainElevation, surfaces, jumps }),
+    ...record({ name: 'Sortie', mapBase: 'satellite', jumps }),
     venuDuFutur: { lourd: true },
   } as SessionRecord;
 
   it("ne garde que ce que la liste montre et ce que l'utilisateur saisit", () => {
     const light = lightRecord(full);
-    expect(light).toEqual(record({ name: 'Sortie', elevationSource: 'gps' }));
-    for (const key of ['terrainElevation', 'surfaces', 'jumps', 'venuDuFutur']) expect(light).not.toHaveProperty(key);
+    expect(light).toEqual(record({ name: 'Sortie', mapBase: 'satellite' }));
+    for (const key of ['jumps', 'venuDuFutur']) expect(light).not.toHaveProperty(key);
   });
 
   it('se recompose avec la fiche du disque : champs lourds et inconnus gardés', () => {
@@ -349,16 +270,16 @@ describe('fiche allégée du cache', () => {
   });
 
   it('garde les saisies de la mémoire, y compris un champ léger retiré', () => {
-    const { elevationSource: _removed, ...edited } = { ...lightRecord(full), name: 'Nouveau nom', notes: null };
+    const { mapBase: _removed, ...edited } = { ...lightRecord(full), name: 'Nouveau nom', notes: null };
     const merged = mergeLightRecord(full, edited as SessionRecord);
     expect(merged.name).toBe('Nouveau nom');
-    expect(merged).not.toHaveProperty('elevationSource');
-    expect(merged.terrainElevation).toEqual(terrainElevation);
+    expect(merged).not.toHaveProperty('mapBase');
+    expect(merged.jumps).toEqual(jumps);
   });
 
   it("laisse l'emporter un champ lourd posé en mémoire depuis", () => {
-    const newer = { ...terrainElevation, fetchedAt: '2026-10-09T09:00:00.000Z' };
-    expect(mergeLightRecord(full, { ...lightRecord(full), terrainElevation: newer }).terrainElevation).toEqual(newer);
+    const newer: SessionJumps = { ...jumps, computedAt: '2026-10-09T09:00:00.000Z' };
+    expect(mergeLightRecord(full, { ...lightRecord(full), jumps: newer }).jumps).toEqual(newer);
   });
 });
 
@@ -583,7 +504,7 @@ describe('fiches anciennes et abîmées', () => {
     expect(read?.activityId).toBeNull();
     expect(read?.name).toBeNull();
     expect(read?.analysis).toBeNull();
-    for (const key of ['jumps', 'marks', 'surfaces', 'terrainElevation', 'elevationSource']) expect(read).not.toHaveProperty(key);
+    for (const key of ['jumps', 'marks', 'mapBase']) expect(read).not.toHaveProperty(key);
     expect(read?.notes?.foil).toBe('Axis 900');
     expect(read && isWritableRecord(read)).toBe(true);
   });
@@ -609,24 +530,13 @@ describe('fiches anciennes et abîmées', () => {
 });
 
 describe('completeRecord', () => {
-  const terrainElevation = {
-    source: 'ign', resource: 'ign_rge_alti_wld', version: 1, stepM: 10,
-    fetchedAt: '2026-10-07T09:00:00.000Z', startMs: START_MS, t: [0, 3333], z: [47.5, 46.9],
-  };
-  const surfaces: SessionSurfaces = {
-    source: 'overpass', fetchedAt: '2026-10-04T15:00:00.000Z', matchVersion: 1, startMs: START_MS,
-    tags: ['highway=residential'], runs: [[0, 0]],
-  };
   const jumps: SessionJumps = { version: 1, computedAt: '2026-10-08T14:00:00.000Z', jumps: [] };
 
-  it("reprend sauts, voies et altitude qui manquent, et refait le résumé pour l'altitude", () => {
-    const { record: done, resummarize } = completeRecord(record(), record({ jumps, surfaces, terrainElevation, elevationSource: 'gps' }));
+  it('reprend les sauts et le fond de carte qui manquent, sans refaire le résumé', () => {
+    const { record: done, resummarize } = completeRecord(record(), record({ jumps, mapBase: 'satellite' }));
     expect(done.jumps).toEqual(jumps);
-    expect(done.surfaces).toEqual(surfaces);
-    expect(done.terrainElevation).toEqual(terrainElevation);
-    expect(done.elevationSource).toBe('gps');
-    expect(resummarize).toBe(true);
-    expect(completeRecord(record(), record({ jumps, surfaces })).resummarize).toBe(false);
+    expect(done.mapBase).toBe('satellite');
+    expect(resummarize).toBe(false);
   });
 
   it("n'écrase rien de ce que la fiche porte", () => {
@@ -660,14 +570,14 @@ describe('carryRecordEdits (changement de dossier, lot 116)', () => {
 
   it('reporte les saisies, retire celles que la copie en mémoire n’a plus, et garde le reste de la cible', () => {
     const jumps: SessionJumps = { version: 2, computedAt: '2026-10-04T15:00:00.000Z', jumps: [] };
-    const target = record({ name: 'Ancien', marks, jumps, elevationSource: 'gps' }, { distanceM: 1 });
+    const target = record({ name: 'Ancien', marks, jumps, mapBase: 'satellite' }, { distanceM: 1 });
     const edited = record({ name: 'Matin', activityId: 'a-wing', notes: { ...EMPTY_NOTES, comment: 'Bien', savedAt: 1 } }, { distanceM: 2 });
     const { record: done, resummarize } = carryRecordEdits(target, edited);
     expect(done.name).toBe('Matin');
     expect(done.activityId).toBe('a-wing');
     expect(done.notes?.comment).toBe('Bien');
     expect(done).not.toHaveProperty('marks');
-    expect(done).not.toHaveProperty('elevationSource');
+    expect(done).not.toHaveProperty('mapBase');
     expect(done.jumps).toEqual(jumps);
     expect(done.summary.distanceM).toBe(1);
     expect(resummarize).toBe(true);
@@ -690,14 +600,6 @@ describe('empreinte des champs légers du cache (lot 116)', () => {
 });
 
 describe("fiche d'une version future relue puis réécrite (A1)", () => {
-  const surfaces: SessionSurfaces = {
-    source: 'overpass', fetchedAt: '2026-10-04T15:00:00.000Z', matchVersion: 1, startMs: START_MS,
-    tags: ['highway=residential'], runs: [[0, 0], [125_000, -1]],
-  };
-  const terrainElevation = {
-    source: 'ign', resource: 'ign_rge_alti_wld', version: 1, stepM: 10,
-    fetchedAt: '2026-10-07T09:00:00.000Z', startMs: START_MS, t: [0, 3333], z: [47.5, null],
-  };
   const jumps: SessionJumps = {
     version: 1, computedAt: '2026-10-08T14:00:00.000Z',
     jumps: [{
@@ -710,15 +612,15 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
     pumping: null, waveThreshold: null, savedAt: 5,
   };
   const valid = record({
-    name: 'Sortie', analysis, surfaces, terrainElevation, elevationSource: 'gps', jumps,
+    name: 'Sortie', analysis, mapBase: 'satellite', jumps,
     marks: [{ timeMs: START_MS + 60_000, lat: 43.5, lon: 3.9, label: 'Saut' }],
     notes: { ...EMPTY_NOTES, comment: 'bien', rating: 4, savedAt: 3 },
   });
 
-  /** Fiche écrite par une version plus récente : des champs connus sous une forme que celle-ci ne sait pas lire. */
+  /** Fiche écrite par une version plus récente : un champ inconnu, et des champs connus sous une forme que celle-ci ne sait pas lire. */
   const future = {
     ...valid,
-    surfaces: { source: 'overpass', format: 2, segments: [{ from: 0, kind: 'asphalte' }] },
+    vagues: { format: 2, segments: [{ from: 0, kind: 'déferlante' }] },
     analysis: { ...analysis, windDeg: { from: 40, to: 60 } },
     summary: { ...valid.summary, heartRate: { zones: [1, 2, 3] } },
   };
@@ -739,19 +641,19 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
 
   it('relue, renommée, réécrite : chaque champ de forme nouvelle revient identique au caractère près', () => {
     const parsed = parseRecordWithRaw(futureText)!;
-    // Les voies passent brutes (lot 301) : rien d'illisible, la fiche les garde telles quelles.
+    // Le champ inconnu passe brut : rien d'illisible, la fiche le garde tel quel.
     expect(Object.keys(parsed.unreadable).sort()).toEqual(['analysis.windDeg', 'summary.heartRate']);
     const read: SessionRecord = { ...parsed.parts, summary: parsed.parts.summary! };
-    expect(read.surfaces).toEqual(future.surfaces);
+    expect((read as unknown as Record<string, unknown>).vagues).toEqual(future.vagues);
     expect(read.analysis?.windDeg).toBeNull();
     const renamed = applyRecordPatch(read, { name: 'Autre nom' }).record;
     const written = serializeRecord(renamed, parsed.unreadable);
-    for (const path of [['surfaces'], ['analysis', 'windDeg'], ['summary', 'heartRate']]) {
+    for (const path of [['vagues'], ['analysis', 'windDeg'], ['summary', 'heartRate']]) {
       expect(fieldText(written, path)).toBe(fieldText(futureText, path));
     }
     expect(JSON.parse(written).name).toBe('Autre nom');
     // Les champs valides n'ont pas bougé.
-    for (const path of [['terrainElevation'], ['jumps'], ['marks'], ['notes'], ['analysis', 'activeThreshold']]) {
+    for (const path of [['mapBase'], ['jumps'], ['marks'], ['notes'], ['analysis', 'activeThreshold']]) {
       expect(fieldText(written, path)).toBe(fieldText(futureText, path));
     }
   });
@@ -759,10 +661,9 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
   it('une valeur neuve valide l\'emporte sur le brut', () => {
     const parsed = parseRecordWithRaw(futureText)!;
     const read: SessionRecord = { ...parsed.parts, summary: parsed.parts.summary! };
-    const changed = applyRecordPatch(read, { analysis: { ...read.analysis!, windDeg: 90 }, surfaces }).record;
+    const changed = applyRecordPatch(read, { analysis: { ...read.analysis!, windDeg: 90 } }).record;
     const written = JSON.parse(serializeRecord(changed, parsed.unreadable));
     expect(written.analysis.windDeg).toBe(90);
-    expect(written.surfaces).toEqual(surfaces);
     // Les autres champs illisibles restent bruts.
     expect(written.summary.heartRate).toEqual({ zones: [1, 2, 3] });
   });

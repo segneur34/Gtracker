@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_ACTIVITIES, type Activity } from '../core/activities';
 import { analysisTabs, isTabShown, toggleTabChoice } from '../core/analysisTabs';
 import { getSportProfile, hasActiveThreshold } from '../core/sportProfiles';
-import { isValidGradeRange } from '../planning/grade';
 import { knotsToMs } from '../core/units';
 import {
   PER_ACTIVITY_KEYS, TREATMENT_UNITS, defaultAutoPauseOf, defaultHeartRateOf,
@@ -415,12 +414,15 @@ describe("paire de bornes de Réglages : un champ vidé n'efface que sa borne", 
     expect(nextSpeedRange(null, 'minMs', 40, fallback)).toBeNull();
   });
 
-  it('pente : mêmes règles, avec ses bornes', () => {
-    const grades = { min: 0.02, max: 0.2 };
-    expect(nextBoundPair({ min: 0.05, max: 0.3 }, 'max', null, grades, isValidGradeRange)).toEqual({ min: 0.05, max: 0.2 });
-    expect(nextBoundPair({ min: 0.05, max: 0.2 }, 'min', null, grades, isValidGradeRange)).toBeNull();
-    expect(nextBoundPair(null, 'max', 0.1, grades, isValidGradeRange)).toEqual({ min: 0.02, max: 0.1 });
-    expect(nextBoundPair({ min: 0.05, max: 0.3 }, 'max', 0.01, grades, isValidGradeRange)).toEqual({ min: 0.05, max: 0.3 });
+  it('autres bornes (une paire min-max quelconque) : mêmes règles, avec leur validateur', () => {
+    /** Validateur local : bornes finies, basse positive ou nulle, haute au-dessus. */
+    const isValidPair = (range: { min: number; max: number }): boolean =>
+      isFinite(range.min) && isFinite(range.max) && range.min >= 0 && range.max > range.min;
+    const bounds = { min: 0.02, max: 0.2 };
+    expect(nextBoundPair({ min: 0.05, max: 0.3 }, 'max', null, bounds, isValidPair)).toEqual({ min: 0.05, max: 0.2 });
+    expect(nextBoundPair({ min: 0.05, max: 0.2 }, 'min', null, bounds, isValidPair)).toBeNull();
+    expect(nextBoundPair(null, 'max', 0.1, bounds, isValidPair)).toEqual({ min: 0.02, max: 0.1 });
+    expect(nextBoundPair({ min: 0.05, max: 0.3 }, 'max', 0.01, bounds, isValidPair)).toEqual({ min: 0.05, max: 0.3 });
   });
 
   it('pause automatique : vider le délai garde la vitesse ; 0 km/h reste permis', () => {

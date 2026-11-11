@@ -53,7 +53,7 @@ describe('sortRoutes', () => {
 
 describe('distance d\'une fiche', () => {
   const planned = [{ lat: 43.6, lon: 3.8 }, { lat: 43.61, lon: 3.8 }, { lat: 43.61, lon: 3.81 }]
-    .reduce((r, w) => addWaypoint(r, w, 'straight'), EMPTY_ROUTE);
+    .reduce((r, w) => addWaypoint(r, w), EMPTY_ROUTE);
   const meta = { name: 'boucle', activityId: 'kite', createdAt: '2026-10-27T10:00:00Z', updatedAt: '2026-10-27T10:00:00Z' };
 
   it('calculés une fois par fiche : la même valeur, sans refaire le tracé', () => {

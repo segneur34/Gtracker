@@ -59,10 +59,7 @@ export const buildRouteGpx = (
   const waypoints = shown.map(
     (w, i) => `  <wpt lat="${fixed(w.lat, 7)}" lon="${fixed(w.lon, 7)}"><name>${label(i)}</name></wpt>`
   );
-  const trackPoints = routePoints(route).map((p) => {
-    const ele = p.eleM !== undefined ? `<ele>${fixed(p.eleM, 1)}</ele>` : '';
-    return `      <trkpt lat="${fixed(p.lat, 7)}" lon="${fixed(p.lon, 7)}">${ele}</trkpt>`;
-  });
+  const trackPoints = routePoints(route).map((p) => `      <trkpt lat="${fixed(p.lat, 7)}" lon="${fixed(p.lon, 7)}"></trkpt>`);
   return gpxDocument([
     `  <metadata><name>${safeName}</name></metadata>`,
     ...waypoints,
