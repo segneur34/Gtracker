@@ -4,16 +4,16 @@
 // son chargement (`Date` remplacé, comme `racine.mjs`) pour passer d'un jour au suivant. Il vérifie :
 //  1. jour 1 : la carte « Aujourd'hui : Enregistrer une session » sur l'accueil, avant les familles, son accroche,
 //     « Lire » et la croix ; le jour rangé sur l'appareil (`gtracker.tutoriels`) ;
-//  2. « Lire » ouvre la leçon (`/tutoriels/enregistrer`) : titre, « Leçon 1 sur 14 », paragraphes, « Essayer » vers
+//  2. « Lire » ouvre la leçon (`/tutoriels/enregistrer`) : titre, « Leçon 1 sur 13 », paragraphes, « Essayer » vers
 //     Enregistrer, « Leçon suivante » sans « précédente » ; la leçon marquée lue ; le retour d'Android (`gtrackerBack`)
 //     mène à la liste, puis à Réglages ;
-//  3. la liste `/tutoriels` : quatorze leçons dans l'ordre, la première cochée seule, « 1 lue sur 14 » ;
+//  3. la liste `/tutoriels` : treize leçons dans l'ordre, la première cochée seule, « 1 lue sur 13 » ;
 //  4. l'accueil du même jour, la leçon lue : plus de carte ;
 //  5. jour 2 : « Aujourd'hui : Lire une analyse » ; la croix la ferme, et elle ne revient pas au rechargement du même
 //     jour ; un second chargement le même jour ne compte pas un jour de plus ; jour 3 : « La carte » ;
-//  6. Réglages : le bloc « Tutoriels » replié au départ, ouvert : « 1 leçon lue sur 14 » et « Voir tous les tutoriels »,
+//  6. Réglages : le bloc « Tutoriels » replié au départ, ouvert : « 1 leçon lue sur 13 » et « Voir tous les tutoriels »,
 //     qui ouvre la liste ;
-//  7. la voile cachée par son œil (Réglages › Activités) : la liste passe à treize leçons, sans « La voile » ;
+//  7. la voile cachée par son œil (Réglages › Activités) : la liste passe à douze leçons, sans « La voile » ;
 //  8. à 390×844 : l'accueil avec la carte, et une leçon d'une famille cachée (son adresse s'ouvre toujours), sans
 //     débordement.
 // Il finit par « Tout passe. » ou le nombre d'échecs.
@@ -102,7 +102,7 @@ const lesson = await evaluate(`(() => ({
 }))()`);
 console.log('leçon :', JSON.stringify(lesson));
 check('« Lire » ouvre la leçon : son titre', lesson?.title === 'Enregistrer une session', lesson?.title);
-check('… « Leçon 1 sur 14 »', (await subtitle()) === 'Leçon 1 sur 14', await subtitle());
+check('… « Leçon 1 sur 13 »', (await subtitle()) === 'Leçon 1 sur 13', await subtitle());
 check('… 3 à 6 paragraphes', lesson?.paragraphs >= 3 && lesson?.paragraphs <= 6, lesson?.paragraphs);
 check('… « Essayer » vers Enregistrer', lesson?.essayer === '/enregistrer', lesson?.essayer);
 check('… « Leçon suivante » seule', JSON.stringify(lesson?.links) === JSON.stringify(['Leçon suivante']), JSON.stringify(lesson?.links));
@@ -114,9 +114,9 @@ check('retour : de la leçon à la liste', (await back()) === 'page' && (await w
 // 3. La liste.
 await waitFor(`document.querySelectorAll('.tutorial-row').length > 0`, { timeout: 3000, label: 'liste' });
 const list = await rows();
-check('la liste : quatorze leçons, « Enregistrer une session » en tête', list.length === 14 && list[0]?.title === 'Enregistrer une session', `${list.length} : ${list.map((r) => r.title).join(', ')}`);
+check('la liste : treize leçons, « Enregistrer une session » en tête', list.length === 13 && list[0]?.title === 'Enregistrer une session', `${list.length} : ${list.map((r) => r.title).join(', ')}`);
 check('… seule la première cochée', list[0]?.read === true && list.slice(1).every((r) => !r.read), JSON.stringify(list.map((r) => r.read)));
-check('… « 1 lue sur 14 »', (await subtitle()) === '1 lue sur 14', await subtitle());
+check('… « 1 lue sur 13 »', (await subtitle()) === '1 lue sur 13', await subtitle());
 await shoot('tutoriels-liste');
 check('retour : de la liste à Réglages', (await back()) === 'page' && (await waitFor(`location.pathname === '/parametres'`, { timeout: 3000 })) === true, await path());
 
@@ -147,7 +147,7 @@ check('Réglages : le bloc « Tutoriels », replié', (await evaluate(`Boolean($
 await evaluate(`${blockTitle}.click()`);
 await wait(300);
 const block = await evaluate(`(() => { const a = document.querySelector('a[href="/tutoriels"]'); return a ? { link: a.textContent, text: a.parentElement.textContent } : null; })()`);
-check('… ouvert : « 1 leçon lue sur 14 » et « Voir tous les tutoriels »', block?.link === 'Voir tous les tutoriels' && block?.text.includes('1 leçon lue sur 14'), JSON.stringify(block));
+check('… ouvert : « 1 leçon lue sur 13 » et « Voir tous les tutoriels »', block?.link === 'Voir tous les tutoriels' && block?.text.includes('1 leçon lue sur 13'), JSON.stringify(block));
 await shoot('tutoriels-reglages');
 await evaluate(`document.querySelector('a[href="/tutoriels"]').click()`);
 check('… qui ouvre la liste', (await waitFor(`location.pathname === '/tutoriels' && document.querySelectorAll('.tutorial-row').length > 0`, { timeout: 3000 })) === true, await path());
@@ -162,8 +162,8 @@ await wait(300);
 await go('/tutoriels', 3000);
 await waitFor(`document.querySelectorAll('.tutorial-row').length > 0`, { timeout: 3000, label: 'liste' });
 const hidden = await rows();
-check('la voile cachée : treize leçons, sans « La voile »', hidden.length === 13 && !hidden.some((r) => r.title === 'La voile'), `${hidden.length} : ${hidden.map((r) => r.title).join(', ')}`);
-check('… « 1 lue sur 13 »', (await subtitle()) === '1 lue sur 13', await subtitle());
+check('la voile cachée : douze leçons, sans « La voile »', hidden.length === 12 && !hidden.some((r) => r.title === 'La voile'), `${hidden.length} : ${hidden.map((r) => r.title).join(', ')}`);
+check('… « 1 lue sur 12 »', (await subtitle()) === '1 lue sur 12', await subtitle());
 
 // 8. Téléphone.
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });

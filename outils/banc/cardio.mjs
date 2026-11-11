@@ -48,9 +48,17 @@ const clickTab = (label, close = false) => evaluate(`(() => {
   if (isOpen !== ${close}) return isOpen ? 'déjà ouvert' : 'déjà fermé';
   t.click(); return 'ok';
 })()`);
+/** Texte d'un panneau sans les graduations des axes : leur choix (« 170 » présent ou non) flotte d'un passage à l'autre. */
+const SANS_AXES = `(el) => {
+  const ticks = [...el.querySelectorAll('.recharts-cartesian-axis-tick-value')];
+  ticks.forEach((x) => { x.style.display = 'none'; });
+  const s = el.innerText.replace(/\\n+/g, ' / ');
+  ticks.forEach((x) => { x.style.display = ''; });
+  return s;
+}`;
 const panel = (title) => evaluate(`(() => {
   const t = [...document.querySelectorAll('.an-carte-panels [role=button]')].find((h) => h.textContent.trim().startsWith(${JSON.stringify(title)}));
-  return t ? t.closest('.an-carte-panels > *').innerText.replace(/\\n+/g, ' / ') : '(absent)';
+  return t ? (${SANS_AXES})(t.closest('.an-carte-panels > *')) : '(absent)';
 })()`);
 /** Graphes Recharts dans le panneau dont le titre commence ainsi. */
 const chartsIn = (title) => evaluate(`(() => {
@@ -297,15 +305,15 @@ const offsetPlaceholder = (name) => evaluate(`(() => {
   const l = [...(${card(name)}?.querySelectorAll('.settings-row__label') ?? [])].find((x) => x.textContent.trim() === 'Seuils cardio');
   return l ? l.closest('.settings-row')?.querySelector('input')?.placeholder ?? '(sans champ)' : '(absent)';
 })()`);
-for (const [name, expected] of [['Voile', '-8'], ['Surf', '-10']]) {
+for (const [name, expected] of [['Wingfoil', '-8'], ['Surf', '-10']]) {
   const got = await offsetPlaceholder(name);
   check(`Réglages, ${name} : « Seuils cardio » décalés de ${expected} par défaut (${got})`, got === expected);
 }
-for (const name of ['Voile', 'Surf']) {
+for (const name of ['Wingfoil', 'Surf']) {
   check(`Réglages, ${name} : case « Ceinture cardio »`, Boolean(await evaluate(`[...(${card(name)}?.querySelectorAll('.settings-row__label') ?? [])].some((l) => l.textContent.trim() === 'Ceinture cardio')`)));
 }
-const voileOptions = await evaluate(`[...(${card('Voile')}?.querySelectorAll('select[aria-label="Ligne 1"] option') ?? [])].map((o) => o.textContent.trim())`);
-check('Réglages, Voile : « Fréquence cardiaque », « FC moyenne » et « Zone cardiaque » proposés', ['Fréquence cardiaque', 'FC moyenne', 'Zone cardiaque'].every((o) => voileOptions?.includes(o)));
+const voileOptions = await evaluate(`[...(${card('Wingfoil')}?.querySelectorAll('select[aria-label="Ligne 1"] option') ?? [])].map((o) => o.textContent.trim())`);
+check('Réglages, Wingfoil : « Fréquence cardiaque », « FC moyenne » et « Zone cardiaque » proposés', ['Fréquence cardiaque', 'FC moyenne', 'Zone cardiaque'].every((o) => voileOptions?.includes(o)));
 
 // --- 7. Résumé et statistiques ---
 const recs = await records();
@@ -320,7 +328,7 @@ console.log('  ouvre cardio :', await evaluate(`(() => { const t = [...document.
 await settle({ max: 1500 });
 const statsText = await evaluate(`(() => {
   const t = [...document.querySelectorAll('.stats-panels [role=button]')].find((h) => h.textContent.trim().startsWith('Cardio'));
-  return t ? t.closest('.stats-panels > *').innerText.replace(/\\n+/g, ' / ') : '(absent)';
+  return t ? (${SANS_AXES})(t.closest('.stats-panels > *')) : '(absent)';
 })()`);
 console.log('  cardio :', statsText.slice(0, 400));
 // La voile de `make-gpx.mjs` n'a pas de `<type>` : à classer, elle n'entre pas dans les statistiques.

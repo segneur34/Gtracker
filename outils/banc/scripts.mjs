@@ -55,12 +55,10 @@ export const SCRIPTS = [
   { nom: 'carte-reveil', args: ['{port}', '{travail}'], pages: ['voile'], solo: true,
     manuel: 'course et vélo retirés (303), à revoir' },
   { nom: 'cardio', args: ['{port}', '{captures?}'], pages: ['surf', 'voile', 'reglages', 'statistiques'] },
-  { nom: 'classer', args: ['{port}', '{travail}', '{captures?}'], pages: ['bibliotheque'],
-    manuel: 'course et vélo retirés (303), à revoir' },
+  { nom: 'classer', args: ['{port}', '{travail}', '{captures?}'], pages: ['bibliotheque', 'voile', 'surf'] },
   { nom: 'coquille', args: ['{port}', '{captures?}'], pages: ['voile', 'surf'],
     manuel: 'course et vélo retirés (303), à revoir' },
-  { nom: 'donnees', args: ['{port}', '{travail}', '{captures?}'], pages: ['bibliotheque', 'accueil', 'profil'], dev: true,
-    manuel: 'course et vélo retirés (303), à revoir' },
+  { nom: 'donnees', args: ['{port}', '{travail}', '{captures?}'], pages: ['bibliotheque', 'accueil', 'profil'], dev: true },
   { nom: 'familles', args: ['{port}', '{captures?}'], pages: ['reglages'] },
   // Mesure (lot 114) : fluidité, ouverture d'une longue voile, seuil changé, zoom d'un graphe, résumés refaits, démarrage ; ×1 puis processeur ralenti ×6, en s ; seul (tâches longues et images par seconde), environ 12 min.
   { nom: 'fluidite', args: ['{port}', '{travail}', '{captures?}'], pages: ['voile', 'accueil', 'bibliotheque'], solo: true, sansCache: true, delaiMin: 45,
@@ -72,17 +70,13 @@ export const SCRIPTS = [
   { nom: 'graphes', args: ['{port}', '{captures?}'], pages: ['surf', 'voile'] },
   { nom: 'icones', args: ['{port}', '{captures?}'], pages: ['accueil', 'bibliotheque', 'reglages'] },
   // Fichiers FIT de montre (lot 35) : FIT fabriqués, chiffres et FC à l'écran, doublon, refus, question du dossier.
-  { nom: 'import-fit', args: ['{port}', '{travail}', '{captures?}'], pages: ['bibliotheque'],
-    manuel: 'course et vélo retirés (303), à revoir' },
+  { nom: 'import-fit', args: ['{port}', '{travail}', '{captures?}'], pages: ['bibliotheque', 'voile', 'surf'] },
   // Fichier reçu d'une autre application (lot 35) : bandeau, sur une fausse file privée à la place du greffon ; l'intention d'Android ne se prouve qu'au téléphone.
-  { nom: 'fichier-recu', args: ['{port}', '{captures?}'], pages: ['bibliotheque', 'accueil'], dev: true,
-    manuel: 'course et vélo retirés (303), à revoir' },
-  { nom: 'imports', args: ['{port}', '{captures?}'], pages: ['bibliotheque', 'voile', 'surf'],
-    manuel: 'course et vélo retirés (303), à revoir' },
-  { nom: 'library', args: ['{port}', '{dossierGpx}', '{captures?}'], pages: ['bibliotheque', 'reglages'],
-    manuel: 'il faut voile.gpx, course.gpx et sans-type.gpx dans le dossier de --gpx' },
-  { nom: 'library2', args: ['{port}', '{travail}'], pages: ['bibliotheque', 'reglages'],
-    manuel: 'à lancer après library.mjs, sur le même profil Chrome' },
+  { nom: 'fichier-recu', args: ['{port}', '{captures?}'], pages: ['bibliotheque', 'accueil'], dev: true },
+  // Porte d'import (lot 330) : les sessions de voile et de surf de l'ancienne application, par ses octets figés (`src/test/legacyImport.fixture.ts`) : paquets, GPX + fiche + capteurs, GPX seul, autre sport, fiche plus récente, dossier refusé.
+  { nom: 'import-session', args: ['{port}', '{captures?}'], pages: ['bibliotheque', 'voile', 'surf'] },
+  // Bibliothèque (rejeu, notes, import, doublon, à classer, suppression, relance, fichier de réglages de l'appareil, paire GPX + fiche, réglages d'un autre appareil) ; ses traces sont fabriquées dans le dossier de travail. Rejeu ×600 : 9 s en temps réel.
+  { nom: 'library', args: ['{port}', '{travail}', '{captures?}'], pages: ['bibliotheque', 'reglages'], solo: true },
   { nom: 'materiel', args: ['{port}', '{captures?}'], pages: ['surf', 'reglages'],
     manuel: 'course et vélo retirés (303), à revoir' },
   { nom: 'materiel-fin', args: ['{port}', '{travail}', '{captures?}'], pages: ['enregistrer', 'voile', 'surf'], solo: true, accelerable: true },
@@ -114,7 +108,7 @@ export const SCRIPTS = [
   { nom: 'sauts', args: ['{port}', '{captures?}'], pages: ['voile', 'reglages', 'bibliotheque'], dev: true },
   { nom: 'session-save', args: ['{port}'], pages: ['voile'] },
   { nom: 'session-save-resume', args: ['{port}'], pages: ['voile'] },
-  { nom: 'statistiques', args: ['{port}', '{captures?}'], pages: ['statistiques', 'voile'] },
+  { nom: 'statistiques', args: ['{port}', '{captures?}'], pages: ['statistiques', 'voile', 'surf'] },
   { nom: 'surf', args: ['{port}', '{captures?}'], pages: ['surf', 'accueil', 'reglages', 'bibliotheque'] },
   { nom: 'survol', args: ['{port}', '{travail}', '{captures?}'], pages: ['voile'], masques: [ms],
     manuel: 'course et vélo retirés (303), à revoir' },
@@ -141,6 +135,7 @@ export const SCRIPTS = [
 ];
 
 /** Le passage courant, sans nom ni `--pages` ni `--tous` (`library` et `planning` avec `--gpx` seulement ; sans `tailles`, 20 min : par son nom ou `--pages`). */
-export const PASSAGE_COURANT = ['general', 'library', 'statistiques', 'profil', 'planning', 'onglets', 'bench', 'familles', 'cardio'];
+export const PASSAGE_COURANT = ['general', 'surf', 'bench', 'cardio', 'graphes', 'sauts', 'virages', 'pumping', 'familles', 'statistiques', 'profil', 'racine',
+  'racine-periodes', 'rename', 'session-save', 'session-save-resume', 'library', 'import-session', 'apropos', 'tutoriels'];
 
 export const PAGES = ['voile', 'surf', 'enregistrer', 'bibliotheque', 'planification', 'statistiques', 'profil', 'reglages', 'accueil'];

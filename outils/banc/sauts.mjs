@@ -2,7 +2,7 @@
 // Usage : node sauts.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Le script fabrique lui-même, dans la page, une session de voile et ses
 // capteurs (`.imu`, par l'encodeur de l'application), et vérifie :
-//  1. Réglages, carte de l'activité « Voile » (familles, carte et parties ouvertes, sans refermer ce que la mémoire a ouvert) :
+//  1. Réglages, carte de l'activité « Wingfoil » (familles, carte et parties ouvertes, sans refermer ce que la mémoire a ouvert) :
 //     « Foil » (coché d'office en wingfoil, partie Onglet analyse) puis « Sauts » (cochés d'office depuis les pré-réglages du
 //     21/10, partie Enregistrement) et leurs sous-options (poitrine, 0,5 m) ; emplacement au bras, hauteur minimale 1,5 m,
 //     foil décoché ; tout relu après rechargement, résumé de la carte repliée compris ;
@@ -58,8 +58,8 @@ const openCard = (name) => evaluate(`(() => {
     }, 300);
   }, 300));
 })()`);
-const openVoile = () => openCard('Voile');
-const voileCard = `[...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__name')?.textContent.trim() === 'Voile' && c.querySelector('.settings-activity__body'))`;
+const openVoile = () => openCard('Wingfoil');
+const voileCard = `[...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__name')?.textContent.trim() === 'Wingfoil' && c.querySelector('.settings-activity__body'))`;
 /** Lignes de la carte ouverte : libellé, état de la case éventuelle, sous-option. */
 const rows = () => evaluate(`(() => {
   const card = ${voileCard};
@@ -79,14 +79,14 @@ const clickBox = (label) => evaluate(`(() => {
   return box.checked;
 })()`);
 
-console.log('carte Voile :', await openVoile());
+console.log('carte Wingfoil :',await openVoile());
 await wait(500);
 let list = await rows();
 const labels = list.map((r) => r.label);
 // « Taille du texte » retirée le 09/10 : Foil, puis Sauts plus bas.
 check('Foil puis Sauts', labels.indexOf('Foil') >= 0 && labels.indexOf('Sauts') > labels.indexOf('Foil'), labels.join(' | '));
 check('Foil coché d\'office (wingfoil)', list.find((r) => r.label === 'Foil')?.checked === true);
-// Pré-réglages du 21/10 : les sauts de la Voile sont cochés d'office (poitrine, 0,5 m), avec leurs deux sous-options.
+// Pré-réglages du 21/10 : les sauts du Wingfoil sont cochés d'office (poitrine, 0,5 m), avec leurs deux sous-options.
 check('Sauts cochés d\'office, avec leurs deux sous-options', list.find((r) => r.label === 'Sauts')?.checked === true && list.filter((r) => r.sub).length === 2);
 const subs = list.filter((r) => r.sub);
 const subValues = await evaluate(`[...(${voileCard}).querySelectorAll('.settings-row--sub')].map((r) => (r.querySelector('select') ?? r.querySelector('input'))?.value).join(' | ')`);
@@ -122,7 +122,7 @@ check('rangé par activité', stored.foils?.wingfoil === false && stored.jumps?.
 // Carte repliée : le résumé dit « sauts », plus « foil ».
 await evaluate(`(${voileCard}).querySelector('.settings-activity__toggle').click()`);
 await wait(300);
-const summary = await evaluate(`[...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__name')?.textContent.trim() === 'Voile')?.querySelector('.settings-activity__summary')?.textContent`);
+const summary = await evaluate(`[...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__name')?.textContent.trim() === 'Wingfoil')?.querySelector('.settings-activity__summary')?.textContent`);
 check('résumé de la carte repliée', /sauts/.test(summary ?? '') && !/foil/.test(summary ?? ''), summary);
 
 // --- 2. Import d'une session avec ses capteurs ---

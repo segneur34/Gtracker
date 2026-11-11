@@ -32,7 +32,9 @@ export const CLES = Object.freeze({
 /** Clés qui voyagent dans `values` de chaque `reglages/<appareil>.json` (`TRAVELLING_KEYS`, `library/settingsFile.ts`). */
 export const CLES_VOYAGEUSES = Object.freeze([CLES.sportSettings, CLES.athleteProfile]);
 /** Formats de fichier que les scripts écrivent pour éprouver une lecture (`FILE_FORMATS`, `core/appIdentity.ts`). */
-export const FORMATS = Object.freeze({ reglages: `${PREFIXE_CLE}-reglages`, fcRepos: `${PREFIXE_CLE}-fc-repos` });
+export const FORMATS = Object.freeze({ reglages: `${PREFIXE_CLE}-reglages`, fcRepos: `${PREFIXE_CLE}-fc-repos`, memoire: `${PREFIXE_CLE}-memoire` });
+/** Marqueur à la racine du dossier mémoire (`MARKER_FILE`, `core/appIdentity.ts`). */
+export const FICHIER_MARQUEUR = `${PREFIXE_CLE}.json`;
 /** Caches de l'application (Cache API), en-tête d'horodatage des tuiles et base IndexedDB du dossier choisi. */
 export const CACHES = Object.freeze({
   tuiles: `${PREFIXE_CLE}-tuiles`, entete: `x-${PREFIXE_CLE}-saved-at`, vignettes: `${PREFIXE_CLE}-vignettes`,

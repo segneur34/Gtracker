@@ -1,11 +1,11 @@
 // Banc de test : la racine du Profil, règle à la semaine du 25/10 (une étape par semaine tenue, 26 pour le tour ;
 // semaines manquées d'affilée : −3, −6, puis la graine ; objectif par semaine, 45 min par défaut).
 // Usage : node racine.mjs <port> [<dossier des captures>]
-// Sur un profil neuf, sans réseau. Le script écrit un historique de courses de 45 min, le lundi, sur les semaines 0 à 29,
+// Sur un profil neuf, sans réseau. Le script fabrique un historique de sessions de wingfoil de 45 min (`traceSurf`, ligne droite à 7 m/s), le lundi, sur les semaines 0 à 29,
 // 33 et 34 (la semaine 0 commence 50 semaines avant celle d'aujourd'hui), trois de 15 min les mardi, mercredi et jeudi
 // de la semaine 35, puis trois de 45 min les vendredi, samedi et dimanche (2, 3 et 4 fois l'objectif) et deux de plus le
 // dimanche, de 27 min à 13 h et de 18 min à 15 h (4,6 et 5 fois : le papillon, lot 147) ; il les importe par
-// la page Course. Puis il ouvre le Profil à des dates choisies, l'heure de la page décalée par un script posé avant son
+// la page Voile. Puis il ouvre le Profil à des dates choisies, l'heure de la page décalée par un script posé avant son
 // chargement (`Date` remplacé), et vérifie :
 //  1. le niveau : semaines 1, 6, 13, 26, 30 ; 1, 2, 3 semaines manquées (27, 21, 0), la reprise (1, puis 2) ;
 //  2. la bulle : recul de 3, « de 6 de plus », « revient à sa graine », feuilles tombées, temps de la semaine et radicelles ;
@@ -18,6 +18,7 @@
 // Avec un dossier, il y écrit les captures et une planche (`planche.html`) qui les rassemble.
 import { writeFileSync } from 'node:fs';
 import { BASE, CLES, connect } from './lib/cdp.mjs';
+import { traceSurf } from './lib/traces.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -26,18 +27,14 @@ if (!port) {
 }
 
 // --- Protocole (lib/cdp.mjs) ---
-const { send, evaluate, go, settle, waitFor, wait, records, close, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
+const { send, evaluate, go, settle, waitFor, wait, blockNetwork, records, check, finish, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
 // Capture de la page entière (au-delà de la fenêtre), pour la planche.
 const shoot = async (name) => {
   if (!shotDir) return;
   const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
   writeFileSync(`${shotDir}/${name}.png`, Buffer.from(shot.result.data, 'base64'));
 };
-let failures = 0;
-const check = (label, ok, detail = '') => {
-  if (!ok) failures++;
-  console.log(`${ok ? 'OK ' : 'ÉCHEC'} ${label}${detail ? ` : ${detail}` : ''}`);
-};
+await blockNetwork();
 
 // --- Historique synthétique ---
 const today = new Date();
@@ -45,18 +42,13 @@ const dow = (today.getDay() + 6) % 7;
 const mon0 = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dow - 50 * 7);
 /** Instant local : jour `d` (0 : lundi) de la semaine `w`, à `h` heures. */
 const dayAt = (w, d = 0, h = 12) => new Date(mon0.getFullYear(), mon0.getMonth(), mon0.getDate() + w * 7 + d, h).getTime();
-const gpxOf = (t0, minutes, name) => {
-  const points = [];
-  for (let k = 0; k <= minutes * 6; k++) {
-    points.push(`<trkpt lat="43.7000000" lon="${(3.8 + (k * 30) / 80500).toFixed(7)}"><ele>50</ele><time>${new Date(t0 + k * 10_000).toISOString()}</time></trkpt>`);
-  }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>${name}</name><type>running</type><trkseg>\n${points.join('\n')}\n</trkseg></trk></gpx>\n`;
-};
+// Une session de wingfoil en ligne droite à 7 m/s (13,6 nœuds, au-dessus du seuil d'activité), un point toutes les 10 s.
+const gpxOf = (t0, minutes, name) => traceSurf({ debutMs: t0, phases: [[minutes * 60, 7, 90]], hz: 0.1, type: 'wingfoil', nom: name });
 const files = [];
-for (const w of [...Array.from({ length: 30 }, (_, k) => k), 33, 34]) files.push([`course-s${w}.gpx`, gpxOf(dayAt(w, 0, 10), 45, `course s${w}`)]);
-for (const d of [1, 2, 3]) files.push([`course-s35-${d}.gpx`, gpxOf(dayAt(35, d, 10), 15, `course s35 j${d}`)]);
-for (const d of [4, 5, 6]) files.push([`course-s35-${d}.gpx`, gpxOf(dayAt(35, d, 10), 45, `course s35 j${d}`)]);
-for (const [h, min] of [[13, 27], [15, 18]]) files.push([`course-s35-6-${h}h.gpx`, gpxOf(dayAt(35, 6, h), min, `course s35 j6 ${h} h`)]);
+for (const w of [...Array.from({ length: 30 }, (_, k) => k), 33, 34]) files.push([`voile-s${w}.gpx`, gpxOf(dayAt(w, 0, 10), 45, `voile s${w}`)]);
+for (const d of [1, 2, 3]) files.push([`voile-s35-${d}.gpx`, gpxOf(dayAt(35, d, 10), 15, `voile s35 j${d}`)]);
+for (const d of [4, 5, 6]) files.push([`voile-s35-${d}.gpx`, gpxOf(dayAt(35, d, 10), 45, `voile s35 j${d}`)]);
+for (const [h, min] of [[13, 27], [15, 18]]) files.push([`voile-s35-6-${h}h.gpx`, gpxOf(dayAt(35, 6, h), min, `voile s35 j6 ${h} h`)]);
 
 const slotText = () => evaluate(`document.querySelector('.profile-root-slot')?.textContent ?? null`);
 /** Étape de la fleur dessinée, en multiples de l'objectif (0 à 5, papillon posé). */
@@ -136,7 +128,7 @@ const shootState = async (name, label) => {
 };
 
 // --- Mise en place ---
-await go('/course', 5000);
+await go('/voile', 5000);
 // Le champ de fichier n'est monté qu'une fois la bibliothèque relue (OPFS), ce que `settle` ne voit pas.
 await waitFor(`Boolean(document.querySelector('input[type=file][accept*=".gpx"]'))`, { timeout: 5000, every: 50, label: 'champ de fichier' });
 console.log('import :', await evaluate(`(() => {
@@ -274,6 +266,4 @@ figure{margin:0;background:#fff;border-radius:12px;padding:8px}img{width:100%;di
 const errors = logs.filter((l) => !l.startsWith('warning'));
 console.log(errors.length ? `Console :\n${errors.join('\n')}` : 'Console : rien');
 check('aucune erreur de console', errors.length === 0);
-console.log(failures === 0 ? 'Tout est passé.' : `${failures} échec(s).`);
-await close();
-process.exit(failures === 0 ? 0 : 1);
+await finish('Tout passe.');

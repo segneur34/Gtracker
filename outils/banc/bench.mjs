@@ -63,8 +63,8 @@ console.log('Arrêter :', await holdStop());
 // La session est rangée en mémoire (OPFS) : ni DOM ni réseau, d'où l'attente de la fiche avant `settle`.
 await waitFor(async () => (await records())?.length >= 1, { timeout: 6000, label: 'fiche rangée' });
 await settle({ max: 2000 });
-const pageEnregistrement = await evaluate(`document.body.innerText.split('\\n').filter((l) => /points|Rangée|Session/.test(l)).join(' | ')`);
-console.log('page enregistrement :', pageEnregistrement);
+const fiches = await records();
+console.log('fiche rangée : ' + fiches.length + ', points ' + fiches[0]?.summary?.pointCount);
 console.log('analyse ouverte seule (lot 313) :', await attendreAnalyse(evaluate));
 await settle({ max: 5000 });
 
@@ -110,7 +110,7 @@ console.log('--- console (erreurs, avertissements) ---');
 // --- Verdicts ---
 /** Valeur qui suit le libellé `label` sur la ligne suivante du texte de la page. */
 const apres = (label) => texte.match(new RegExp(`^${label}\\n([^\\n]+)`, 'm'))?.[1];
-check(`enregistrement : ${attendu.points} points, autant que de <trkpt> dans le GPX`, pageEnregistrement?.includes(`${attendu.points} points`), pageEnregistrement);
+check(`enregistrement : ${attendu.points} points rangés dans la fiche, autant que de <trkpt> dans le GPX`, fiches.length === 1 && fiches[0].summary?.pointCount === attendu.points, String(fiches[0]?.summary?.pointCount));
 // 6 × 2 bords de 150 s et 2 virements de 6 s, un empannage de 5 s, puis autant au portant : 3 749 s.
 check('général : temps total 1 h 02', apres('Temps total') === '1 h 02', apres('Temps total'));
 // Seules les quelques secondes sous 8 nds au cœur des virements (3 m/s au plus bas) sont hors du vol : moins de 1 %.

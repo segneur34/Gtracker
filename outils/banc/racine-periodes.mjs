@@ -1,7 +1,7 @@
 // Banc de test : la racine du Profil ne dépend pas de la période de la page (demande du 26/10, lot B).
 // Usage : node racine-periodes.mjs <port> [<dossier des captures>]
-// Sur un profil neuf, sans réseau, environ 2 min. Le script écrit 13 courses de 45 min, le lundi des semaines 0 à 12, les
-// importe par la page Course, fixe l'heure de la page à la semaine 13 (13 étapes), puis ouvre le Profil aux cinq périodes
+// Sur un profil neuf, sans réseau, environ 2 min. Le script fabrique 13 sessions de wingfoil de 45 min (`traceSurf`), le lundi des semaines 0 à 12, les
+// importe par la page Voile, fixe l'heure de la page à la semaine 13 (13 étapes), puis ouvre le Profil aux cinq périodes
 // (semaine, 30 jours, 6 mois, année, depuis le début), à 390×844 et à 1400×1000. Pour chaque période il relève :
 //  - le niveau et la longueur visible de la racine mère (`data-niveau`, `data-longueur` du canevas) ;
 //  - la hauteur de la page et de chacun des cadres entourés ;
@@ -9,6 +9,7 @@
 // Avec un dossier, il y écrit une capture réduite (échelle 0,35) par période et par taille.
 import { writeFileSync } from 'node:fs';
 import { CLES, connect } from './lib/cdp.mjs';
+import { traceSurf } from './lib/traces.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
 if (!port) {
@@ -17,26 +18,17 @@ if (!port) {
 }
 
 // --- Protocole (lib/cdp.mjs) ---
-const { send, evaluate, go, settle, waitFor, records, close, logs } = await connect({ port, width: 1400, height: 1000 });
-let failures = 0;
-const check = (label, ok, detail = '') => {
-  if (!ok) failures++;
-  console.log(`${ok ? 'OK ' : 'ÉCHEC'} ${label}${detail ? ` : ${detail}` : ''}`);
-};
+const { send, evaluate, go, settle, waitFor, blockNetwork, records, check, finish, logs } = await connect({ port, width: 1400, height: 1000 });
+await blockNetwork();
 
 // --- Historique synthétique ---
 const today = new Date();
 const dow = (today.getDay() + 6) % 7;
 const mon0 = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dow - 50 * 7);
 const dayAt = (w, d = 0, h = 12) => new Date(mon0.getFullYear(), mon0.getMonth(), mon0.getDate() + w * 7 + d, h).getTime();
-const gpxOf = (t0, minutes, name) => {
-  const points = [];
-  for (let k = 0; k <= minutes * 6; k++) {
-    points.push(`<trkpt lat="43.7000000" lon="${(3.8 + (k * 30) / 80500).toFixed(7)}"><ele>50</ele><time>${new Date(t0 + k * 10_000).toISOString()}</time></trkpt>`);
-  }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>${name}</name><type>running</type><trkseg>\n${points.join('\n')}\n</trkseg></trk></gpx>\n`;
-};
-const files = Array.from({ length: 13 }, (_, w) => [`course-s${w}.gpx`, gpxOf(dayAt(w, 0, 10), 45, `course s${w}`)]);
+// Une session de wingfoil en ligne droite à 7 m/s (13,6 nœuds, au-dessus du seuil d'activité), un point toutes les 10 s.
+const gpxOf = (t0, minutes, name) => traceSurf({ debutMs: t0, phases: [[minutes * 60, 7, 90]], hz: 0.1, type: 'wingfoil', nom: name });
+const files = Array.from({ length: 13 }, (_, w) => [`voile-s${w}.gpx`, gpxOf(dayAt(w, 0, 10), 45, `voile s${w}`)]);
 
 let clockScript = null;
 const setClock = async (fakeMs) => {
@@ -51,7 +43,7 @@ const setClock = async (fakeMs) => {
   clockScript = (await send('Page.addScriptToEvaluateOnNewDocument', { source })).result.identifier;
 };
 
-await go('/course', 5000);
+await go('/voile', 5000);
 // Le champ de fichier n'est monté qu'une fois la bibliothèque relue (OPFS), ce que `settle` ne voit pas.
 await waitFor(`Boolean(document.querySelector('input[type=file][accept*=".gpx"]'))`, { timeout: 5000, every: 50, label: 'champ de fichier' });
 console.log('import :', await evaluate(`(() => {
@@ -74,6 +66,7 @@ for (const size of sizes) {
   await send('Emulation.setDeviceMetricsOverride', { width: size.w, height: size.h, deviceScaleFactor: 1, mobile: size.mobile });
   const lengths = [];
   const overflows = [];
+  const niveaux = [];
   for (const period of PERIODS) {
     await evaluate(`(() => { const all = JSON.parse(localStorage.getItem('${CLES.profil}') ?? '{}'); all.affichage = { periode: ${JSON.stringify(period)} }; localStorage.setItem('${CLES.profil}', JSON.stringify(all)); })()`);
     await go('/profil', 4500);
@@ -96,16 +89,16 @@ for (const size of sizes) {
     console.log(`${size.name} ${period.padEnd(8)} niveau ${m.niveau} longueur ${m.longueur} px | page ${m.page} | cadres ${m.cadres.join('/')} | hauts ${m.hauts.join('/')} | sous le dernier cadre ${m.sous} | débordement ${m.debordement}`);
     lengths.push(m.longueur);
     overflows.push(m.debordement);
+    niveaux.push(Number(m.niveau));
     if (shotDir) {
       const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width: size.w, height: m.page, scale: 0.35 } });
       writeFileSync(`${shotDir}/racine-periode-${size.name}-${period}.png`, Buffer.from(shot.result.data, 'base64'));
     }
   }
+  check(`${size.name} : les 13 semaines tenues donnent 13 étapes, à chaque période`, niveaux.every((n) => n === 13), niveaux.join(', '));
   check(`${size.name} : longueur de la racine identique aux cinq périodes`, lengths.every((l) => l > 0 && l === lengths[0]), lengths.join(', '));
   check(`${size.name} : rien ne déborde`, overflows.every((t) => t === false));
 }
 console.log('\n--- console (erreurs) ---');
 logs.filter((l) => !l.startsWith('warning')).forEach((l) => console.log(l));
-console.log(failures === 0 ? '\nTout passe.' : `\n${failures} échec(s).`);
-await close();
-process.exit(failures === 0 ? 0 : 1);
+await finish('Tout passe.');
