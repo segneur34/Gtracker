@@ -1,6 +1,8 @@
-// Mesure de `fluidite.mjs` sur la version compilée, la seule qui compte pour l'APK (lot 164 : le serveur de développement
-// allonge les durées de 3 à 9 fois) : build dans un dossier de travail, `vite preview`, Chrome sans fenêtre.
-// Usage : node outils/banc/fluidite-compile.mjs <étiquette> ; variables FLUIDITE_* transmises. Relevé : <travail>/releves/prod-<étiquette>.txt
+// Mesure de `fluidite.mjs` sur la version compilée, la seule qui compte pour l'APK (le serveur de développement
+// allonge les durées de 3 à 9 fois) : build dans un dossier de travail (environ une minute), `vite preview`, Chrome
+// sans fenêtre. Hors du lanceur `passe.mjs` : elle lance son propre serveur (port 4193) et son propre Chrome (9490).
+// Usage : node outils/banc/fluidite-compile.mjs <étiquette> ; variables FLUIDITE_* transmises. Relevé :
+// <temporaire>/gtracker-banc/compile/releves/prod-<étiquette>.txt, le même texte que `fluidite.mjs` (sa dernière ligne dit « Tout passe. » ou le nombre d'échecs).
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, createWriteStream } from 'node:fs';
 import { tmpdir } from 'node:os';

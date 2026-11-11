@@ -54,9 +54,8 @@ export const SCRIPTS = [
   { nom: 'coquille', args: ['{port}', '{captures?}'], pages: ['voile', 'surf'] },
   { nom: 'donnees', args: ['{port}', '{travail}', '{captures?}'], pages: ['bibliotheque', 'accueil', 'profil'], dev: true },
   { nom: 'familles', args: ['{port}', '{captures?}'], pages: ['reglages'] },
-  // Mesure (lot 114) : fluidité, ouverture d'une longue voile, seuil changé, zoom d'un graphe, résumés refaits, démarrage ; ×1 puis processeur ralenti ×6, en s ; seul (tâches longues et images par seconde), environ 12 min.
-  { nom: 'fluidite', args: ['{port}', '{travail}', '{captures?}'], pages: ['voile', 'accueil', 'bibliotheque'], solo: true, sansCache: true, delaiMin: 45,
-    manuel: 'variantes de course (course-pc, course-tel, bruit-tel) à retirer et générateurs à passer à lib/traces.mjs' },
+  // Mesure : fluidité, ouverture d'une longue voile, seuil changé, zoom d'un graphe, résumés refaits, démarrage ; ×1 puis processeur ralenti ×6, en s ; seul (tâches longues et images par seconde), environ 10 min. Hors du passage courant.
+  { nom: 'fluidite', args: ['{port}', '{travail}', '{captures?}'], pages: ['voile', 'surf', 'accueil', 'bibliotheque'], solo: true, sansCache: true, delaiMin: 20 },
   { nom: 'general', args: ['{port}', '{captures?}'], pages: ['voile', 'surf'] },
   { nom: 'glisser', args: ['{port}', '{captures?}'], pages: ['profil', 'statistiques'] },
   // GPS perdu (lot 115) : rejeu ×1 avec un trou de 90 s ; alerte, son unique et notification, puis tout effacé au retour.
