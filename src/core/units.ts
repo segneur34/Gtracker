@@ -125,6 +125,13 @@ export const formatSpeedValue = (value: number, unit: SpeedUnit): string => {
   return formatDecimal(value, unit === 'ms' ? 2 : 1);
 };
 
+/** Valeur formatée, ou « — » quand elle manque (`null`). */
+export const orDash = (value: number | null, format: (v: number) => string): string => (value === null ? '—' : format(value));
+
+/** Case de tableau d'une vitesse en m/s, dans l'unité de l'activité (sans unité écrite) ; « — » sans valeur. */
+export const speedCellOf = (unit: SpeedUnit) => (ms: number | null): string =>
+  orDash(ms, (v) => formatSpeedValue(toDisplaySpeed(v, unit), unit));
+
 /**
  * Vitesse en nœuds convertie dans une unité d'affichage. Le module voile
  * calcule en nœuds (règle 5) : il ne convertit qu'en sortie.

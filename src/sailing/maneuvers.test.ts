@@ -8,10 +8,7 @@ import { trackToPointData, type PointData } from './pointData';
 import {
   WIND_LOCAL_MAX_GAP_MIN,
   classifyManeuvers,
-  estimateWind,
   isDirected,
-  prepareManeuverDetection,
-  selectWindCandidate,
   stableSegment,
   windSamplesFrom,
   type ManeuverLocation,
@@ -25,7 +22,7 @@ import { calculateWindStats, summarizeManeuvers, windChartRows } from './sailing
 import { buildWindTimeline, observeTurns, polarSampling, prepareWindPolar, type TurnObservation } from './wind';
 import { angleDiff, circularMean, normalizeDeg, toRad } from '../core/angles';
 import { M_PER_DEG_LAT, at as geoAt } from '../test/geo.fixture';
-import { TRACK_START_MS, buildLegSession, detectAndClassify, polarSpeed, slowPolar, upwindDownwindLegs, type Leg } from '../test/sailing.fixture';
+import { TRACK_START_MS, WINGFOIL_MANEUVER_THRESHOLDS, buildLegSession, detectAndClassify, estimateWindWing, prepareDetectionWing, selectWindCandidateWing, polarSpeed, slowPolar, upwindDownwindLegs, type Leg } from '../test/sailing.fixture';
 
 /**
  * Trace synthétique décrite par une fonction cap(t) et une vitesse. Le cap est
@@ -478,16 +475,16 @@ describe('détection et classement, enregistrement économique', () => {
       }
       // Aucune n'alimente le vent : ni sa mesure, ni son orientation, ni sa courbe.
       expect(windSamplesFrom(stats)).toHaveLength(0);
-      expect(estimateWind(points, { successThresholdKn: 8 }).maneuverCount).toBe(0);
+      expect(estimateWindWing(points, { successThresholdKn: 8 }).maneuverCount).toBe(0);
       // L'orientation ne compte que virements et empannages (`isDirected`) :
       // aucun candidat n'a d'accord, la polaire garde sa direction.
       expect(stats.locations.filter(isDirected)).toHaveLength(0);
       const polar = prepareWindPolar(points).polar;
-      const selection = selectWindCandidate(points, polar, { successThresholdKn: 8 });
+      const selection = selectWindCandidateWing(points, polar, { successThresholdKn: 8 });
       expect(selection.direction).toBe(polar.direction);
       expect(selection.orientedBy).toBe(polar.orientedBy);
       expect(selection.agreementScore).toBe(0);
-      expect(calculateWindStats(points, stats, 0)).toBeNull();
+      expect(calculateWindStats(stats, 0)).toBeNull();
       // Le vent n'y change rien : le sens incertain ne le lit pas.
       expect(detectAndClassify(points, 120, { successThresholdKn: 8 })).toEqual(stats);
     }
@@ -764,7 +761,7 @@ describe('mesure d\'une manœuvre', () => {
     const triggers = new Set<number>();
     const bounds = new Set<string>();
     for (const windowSeconds of [10, 12, 14]) {
-      const detection = prepareManeuverDetection(track, { windowSeconds });
+      const detection = prepareDetectionWing(track, { windowSeconds });
       triggers.add(track.findIndex((_, i) => detection.windowAt(i).kind === 'turn'));
       const found = classifyManeuvers(detection, 0, { successThresholdKn: 2 }).locations;
       expect(found, `fenêtre de ${windowSeconds} s`).toHaveLength(1);
@@ -1042,13 +1039,13 @@ describe('summarizeManeuvers', () => {
 
 describe('estimateWind', () => {
   it('signale une faible confiance sur un aller simple', () => {
-    const estimate = estimateWind(buildTrack(600, 1, () => 135));
+    const estimate = estimateWindWing(buildTrack(600, 1, () => 135));
     expect(estimate.reliable).toBe(false);
     expect(estimate.confidence).toBeLessThan(0.4);
   });
 
   it('retrouve le vent et son sens sur une session par bords', () => {
-    const estimate = estimateWind(buildLegSession(upwindDownwindLegs(6), () => 0));
+    const estimate = estimateWindWing(buildLegSession(upwindDownwindLegs(6), () => 0));
 
     expect(distanceTo(estimate.direction, 0)).toBeLessThanOrEqual(8);
     expect(estimate.reliable).toBe(true);
@@ -1064,7 +1061,7 @@ describe('estimateWind', () => {
       track[fallStart + k] = { ...track[fallStart + k], bearing: b, smoothedSpeed: 0.5 };
     });
 
-    const estimate = estimateWind(track);
+    const estimate = estimateWindWing(track);
     expect(distanceTo(estimate.direction, 0)).toBeLessThanOrEqual(8);
 
     // La chute peut être comptée comme manœuvre ratée, mais elle n'a pas de
@@ -1077,19 +1074,19 @@ describe('estimateWind', () => {
   });
 
   it('retrouve un vent d\'ouest sur une session par bords', () => {
-    const estimate = estimateWind(buildLegSession(upwindDownwindLegs(6), () => 270));
+    const estimate = estimateWindWing(buildLegSession(upwindDownwindLegs(6), () => 270));
     expect(distanceTo(estimate.direction, 270)).toBeLessThanOrEqual(8);
   });
 
   it('ne confond pas le vent et son opposé', () => {
     // C'est l'aberration observée sur une vraie session : 38° contre 176°.
-    const estimate = estimateWind(buildLegSession(upwindDownwindLegs(8), () => 38));
+    const estimate = estimateWindWing(buildLegSession(upwindDownwindLegs(8), () => 38));
     expect(distanceTo(estimate.direction, 38)).toBeLessThanOrEqual(8);
     expect(distanceTo(estimate.direction, 218)).toBeGreaterThan(90);
   });
 
   it('retrouve un vent de nord à partir de la seule polaire, sans virement', () => {
-    const estimate = estimateWind(buildTrack(600, 1, fullSweep, polarSpeed(0)));
+    const estimate = estimateWindWing(buildTrack(600, 1, fullSweep, polarSpeed(0)));
     expect(distanceTo(estimate.direction, 0)).toBeLessThanOrEqual(10);
     expect(estimate.orientedBy).toBe('polaire');
   });
@@ -1100,7 +1097,7 @@ describe('estimateWind', () => {
     for (let i = 0; i < 8; i++) legs.push({ twa: i % 2 === 0 ? 45 : -55, durationS: 180 });
     const track = buildLegSession(legs, () => 0);
 
-    const estimate = estimateWind(track);
+    const estimate = estimateWindWing(track);
     const maneuvers = detectAndClassify(track, estimate.direction);
     const localWinds = maneuvers.locations.map((m) => m.localWind);
 
@@ -1114,7 +1111,7 @@ describe('estimateWind', () => {
   it('résiste à l\'absence totale de bords de largue', () => {
     const legs: Leg[] = [];
     for (let i = 0; i < 8; i++) legs.push({ twa: i % 2 === 0 ? 45 : -45, durationS: 150 });
-    const estimate = estimateWind(buildLegSession(legs, () => 120));
+    const estimate = estimateWindWing(buildLegSession(legs, () => 120));
 
     expect(distanceTo(estimate.direction, 120)).toBeLessThanOrEqual(10);
     expect(estimate.reliable).toBe(true);
@@ -1159,11 +1156,11 @@ describe('estimateWind', () => {
       expect(m.windCriteria.conservation).toBeLessThan(0.5);
       expect(m.conservation).toBeGreaterThan(0.5);
     }
-    expect(distanceTo(estimateWind(smoothedOnly).direction, 0)).toBeLessThanOrEqual(8);
+    expect(distanceTo(estimateWindWing(smoothedOnly).direction, 0)).toBeLessThanOrEqual(8);
     // Ni la détection ni le vent ne lisent la vitesse non filtrée.
     const withRaw = detectAndClassify(track, 0).locations.filter((m) => m.type === 'tack');
     expect(withRaw.map((m) => m.windCriteria)).toEqual(tacks.map((m) => m.windCriteria));
-    expect(estimateWind(track)).toEqual(estimateWind(smoothedOnly));
+    expect(estimateWindWing(track)).toEqual(estimateWindWing(smoothedOnly));
   });
 
   it('rabat la confiance d\'une trace clairsemée sous le seuil de fiabilité', () => {
@@ -1179,8 +1176,8 @@ describe('estimateWind', () => {
 
     expect(polarSampling(dense)).toBe(1);
     expect(polarSampling(sparse)).toBeCloseTo(5 / 17, 6);
-    const denseEstimate = estimateWind(dense);
-    const sparseEstimate = estimateWind(sparse);
+    const denseEstimate = estimateWindWing(dense);
+    const sparseEstimate = estimateWindWing(sparse);
     expect(denseEstimate.reliable).toBe(true);
     expect(sparseEstimate.confidence).toBeLessThanOrEqual(denseEstimate.confidence / 2);
     expect(sparseEstimate.reliable).toBe(false);
@@ -1188,7 +1185,7 @@ describe('estimateWind', () => {
 
   // Protocole 3 : courant traversier constant.
   it('reste borné, sans diverger, sous un courant traversier de 2 nœuds', () => {
-    const estimate = estimateWind(
+    const estimate = estimateWindWing(
       buildLegSession(upwindDownwindLegs(8), () => 0, { currentKn: 2, currentDir: 90 })
     );
 
@@ -1206,7 +1203,7 @@ const downwindLegs = (count: number, legDurationS = 180): Leg[] => {
 };
 
 /** Les réglages du profil d'un support lent, un bateau : polaire à 2 nœuds, réussite à 3. */
-const SLOW_SPORT: WindEstimationOptions = { minSpeedKn: 2, successThresholdKn: 3 };
+const SLOW_SPORT: Partial<WindEstimationOptions> = { minSpeedKn: 2, successThresholdKn: 3 };
 
 describe('estimateWind, réglages du support', () => {
   it('la polaire d\'un support lent se trompe de bord au seuil du wingfoil', () => {
@@ -1266,17 +1263,12 @@ describe('estimateWind, réglages du support', () => {
 
   it('retrouve le vent d\'un support lent avec les seuils de son profil', () => {
     const track = buildLegSession(upwindDownwindLegs(6), () => 0, { polar: slowPolar });
-    const estimate = estimateWind(track, SLOW_SPORT);
+    const estimate = estimateWindWing(track, SLOW_SPORT);
 
     expect(distanceTo(estimate.direction, 0)).toBeLessThanOrEqual(15);
     expect(estimate.reliable).toBe(true);
     // L'empannage, raté au seuil du wingfoil, compte désormais parmi les mesures.
-    expect(estimate.maneuverCount).toBeGreaterThan(estimateWind(track).maneuverCount);
-  });
-
-  it('sans options, reproduit exactement les valeurs du wingfoil', () => {
-    const track = buildLegSession(upwindDownwindLegs(6), () => 0);
-    expect(estimateWind(track)).toEqual(estimateWind(track, { minSpeedKn: 5, successThresholdKn: 8 }));
+    expect(estimate.maneuverCount).toBeGreaterThan(estimateWindWing(track).maneuverCount);
   });
 });
 
@@ -1292,11 +1284,11 @@ describe('selectWindCandidate', () => {
   // score polaire : il n'avait donc pas de descripteur, et la confiance
   // annoncée retombait sur celle d'une direction qui n'avait pas été retenue.
   it.each(protocoles)('annonce la confiance de la direction qu\'elle retient (%s)', (_nom, track) => {
-    for (const options of [{}, SLOW_SPORT] as WindEstimationOptions[]) {
+    for (const options of [{}, SLOW_SPORT] as Partial<WindEstimationOptions>[]) {
       const minSpeedKn = options.minSpeedKn ?? 5;
       const stage = prepareWindPolar(track, minSpeedKn);
       const polar = stage.polar;
-      const selection = selectWindCandidate(track, polar, options);
+      const selection = selectWindCandidateWing(track, polar, options);
 
       if (selection.direction === polar.direction) {
         expect(selection.polarConfidence).toBe(polar.confidence);
@@ -1320,7 +1312,7 @@ describe('selectWindCandidate', () => {
     // accompagnée de la confiance qui lui correspond.
     const track = buildLegSession(downwindLegs(6), () => 0, { polar: slowPolar });
     const polar = prepareWindPolar(track, 2).polar;
-    const selection = selectWindCandidate(track, polar, SLOW_SPORT);
+    const selection = selectWindCandidateWing(track, polar, SLOW_SPORT);
 
     expect(Number.isFinite(selection.direction)).toBe(true);
     expect(selection.polarConfidence).toBeGreaterThanOrEqual(0);
@@ -1333,11 +1325,11 @@ describe('selectWindCandidate', () => {
     const stage = prepareWindPolar(track);
     const polar = stage.polar;
     expect(polar.confidence).toBeGreaterThan(0);
-    expect(selectWindCandidate(track, polar, { polarStage: stage }).polarConfidence).toBe(polar.confidence);
+    expect(selectWindCandidateWing(track, polar, { polarStage: stage }).polarConfidence).toBe(polar.confidence);
     // Les mêmes candidats, mais la trace a un virage que personne ne classe : la confiance est rabattue.
     const turn: TurnObservation = { headingAtMin: 0, midHeading: 0, minSpeed: 3, speedLoss: 9, cumulativeTurn: 90, slow: true };
     const withTurns = { ...stage, turns: [turn], turnsDirection: null };
-    expect(selectWindCandidate(track, polar, { polarStage: withTurns }).polarConfidence).toBeCloseTo(polar.confidence * 0.5, 12);
+    expect(selectWindCandidateWing(track, polar, { polarStage: withTurns }).polarConfidence).toBeCloseTo(polar.confidence * 0.5, 12);
   });
 
   it('ajoute aux candidats la direction votée par les virages et le jumeau de chacun, dédoublonnés à 45°', () => {
@@ -1348,7 +1340,7 @@ describe('selectWindCandidate', () => {
     const stage = prepareWindPolar(track);
     expect(stage.turnsDirection).not.toBeNull();
     expect(Math.abs(angleDiff(stage.turnsDirection!, 0))).toBeLessThanOrEqual(10);
-    const selection = selectWindCandidate(track, stage.polar, { polarStage: stage });
+    const selection = selectWindCandidateWing(track, stage.polar, { polarStage: stage });
     expect(Math.abs(angleDiff(selection.direction, 0))).toBeLessThanOrEqual(10);
   });
 });
@@ -1356,8 +1348,8 @@ describe('selectWindCandidate', () => {
 describe('calculateWindStats', () => {
   it('renvoie null avec moins de deux manœuvres', () => {
     const track = buildTrack(120, 1, fullSweep, polarSpeed(0));
-    expect(calculateWindStats(track, null)).toBeNull();
-    expect(calculateWindStats(track, detectAndClassify(track, 0))).toBeNull();
+    expect(calculateWindStats(null)).toBeNull();
+    expect(calculateWindStats(detectAndClassify(track, 0))).toBeNull();
   });
 
   it('retient toutes les manœuvres, pas seulement celles à caps stabilisés', () => {
@@ -1373,7 +1365,7 @@ describe('calculateWindStats', () => {
       ...detected,
       locations: detected.locations.map((m, k) => (k % 2 === 0 ? m : { ...m, stableHeadings: false })),
     };
-    const stats = calculateWindStats(track, maneuvers, 0);
+    const stats = calculateWindStats(maneuvers, 0);
 
     expect(stats).not.toBeNull();
     expect(windSamplesFrom(maneuvers).length).toBeLessThan(maneuvers.locations.length);
@@ -1394,7 +1386,7 @@ describe('calculateWindStats', () => {
     ];
     const track = buildLegSession(legs, () => 0);
     const maneuvers = detectAndClassify(track, 0, { successThresholdKn: 8 });
-    const stats = calculateWindStats(track, maneuvers, 0);
+    const stats = calculateWindStats(maneuvers, 0);
 
     const brute = circularMean(maneuvers.locations.map((m) => m.localWind)).mean;
     expect(distanceTo(brute, 0)).toBeGreaterThan(20);
@@ -1406,8 +1398,8 @@ describe('calculateWindStats', () => {
     const maneuvers = detectAndClassify(track, 0, { successThresholdKn: 8 });
 
     // Sur une session propre, l'amorce importe peu : les deux voies concordent.
-    const avecReference = calculateWindStats(track, maneuvers, 0);
-    const sansReference = calculateWindStats(track, maneuvers);
+    const avecReference = calculateWindStats(maneuvers, 0);
+    const sansReference = calculateWindStats(maneuvers);
     expect(sansReference).not.toBeNull();
     expect(distanceTo(sansReference!.avgWind, avecReference!.avgWind)).toBeLessThanOrEqual(5);
   });
@@ -1416,7 +1408,7 @@ describe('calculateWindStats', () => {
     // Vent oscillant de ±20° autour de 0 : moyenne 0, plage 40, pas de dérive.
     const wind = (t: number) => 20 * Math.sin(t / 300);
     const track = buildLegSession(upwindDownwindLegs(14, 120), wind);
-    const stats = calculateWindStats(track, detectAndClassify(track, 0));
+    const stats = calculateWindStats(detectAndClassify(track, 0));
 
     expect(stats).not.toBeNull();
     expect(distanceTo(stats!.avgWind, 0)).toBeLessThanOrEqual(10);
@@ -1432,7 +1424,7 @@ describe('calculateWindStats', () => {
       { twa: 45, durationS: 180 }, { twa: -45, durationS: 180 }, { twa: 45, durationS: 180 },
     ];
     const track = buildLegSession(legs, () => 0);
-    const stats = calculateWindStats(track, detectAndClassify(track, 0));
+    const stats = calculateWindStats(detectAndClassify(track, 0));
 
     expect(stats).not.toBeNull();
     expect(stats!.windAt(TRACK_START_MS + 1800 * 1000)).toBeNull();
@@ -1442,7 +1434,7 @@ describe('calculateWindStats', () => {
   it('marque chaque manœuvre sur la courbe, là où se trouve la mesure', () => {
     const track = buildLegSession(upwindDownwindLegs(6), () => 0);
     const maneuvers = detectAndClassify(track, 0, { successThresholdKn: 8 });
-    const stats = calculateWindStats(track, maneuvers, 0);
+    const stats = calculateWindStats(maneuvers, 0);
 
     expect(stats).not.toBeNull();
 
@@ -1458,7 +1450,7 @@ describe('calculateWindStats', () => {
   it('ne marque, zoomé, que les manœuvres de la plage visible', () => {
     const track = buildLegSession(upwindDownwindLegs(6), () => 0);
     const maneuvers = detectAndClassify(track, 0, { successThresholdKn: 8 });
-    const stats = calculateWindStats(track, maneuvers, 0);
+    const stats = calculateWindStats(maneuvers, 0);
     expect(stats).not.toBeNull();
 
     // Première moitié de la trace, à 50 lignes : seules ses manœuvres sont marquées.
@@ -1480,9 +1472,9 @@ describe('calculateWindStats', () => {
     const SHIFT = 50;
     const wind = (t: number) => (t < 1200 ? 0 : t < 1380 ? ((t - 1200) / 180) * SHIFT : SHIFT);
     const track = buildLegSession(upwindDownwindLegs(16, 150), wind);
-    const global = estimateWind(track);
+    const global = estimateWindWing(track);
     const maneuvers = detectAndClassify(track, global.direction);
-    const stats = calculateWindStats(track, maneuvers);
+    const stats = calculateWindStats(maneuvers);
 
     expect(stats).not.toBeNull();
 
@@ -1923,14 +1915,14 @@ describe('prepareManeuverDetection et classifyManeuvers', () => {
     // du cœur d'un virage dépend de la manœuvre précédente, donc du vent, et
     // chaque lecture mémorisée doit valoir pour le vent qui la relit.
     for (const [name, points, options] of sessions()) {
-      const detection = prepareManeuverDetection(points, options);
+      const detection = prepareDetectionWing(points, options);
       const timeline = buildWindTimeline(
         windSamplesFrom(detectAndClassify(points, 0, options)).map((m) => ({ timeMs: m.timeMs, direction: m.localWind })),
         0,
         WIND_LOCAL_MAX_GAP_MIN * 60 * 1000
       );
       for (const wind of [0, 90, 180, 270, 23, timeline, 0]) {
-        expect(classifyManeuvers(detection, wind, options), name).toEqual(detectAndClassify(points, wind, options));
+        expect(classifyManeuvers(detection, wind, { ...WINGFOIL_MANEUVER_THRESHOLDS, ...options }), name).toEqual(detectAndClassify(points, wind, options));
       }
     }
   });
@@ -1938,25 +1930,25 @@ describe('prepareManeuverDetection et classifyManeuvers', () => {
   it('estime le même vent avec et sans détection préparée', () => {
     for (const [name, points] of sessions()) {
       const options: WindEstimationOptions = { minSpeedKn: 3, successThresholdKn: 8, minEntrySpeedKn: 2, flightThresholdKn: 8, stillSpeedKn: 1 };
-      const detection = prepareManeuverDetection(points, { minEntrySpeedKn: 2, stillSpeedKn: 1 });
-      expect(estimateWind(points, { ...options, detection }), name).toEqual(estimateWind(points, options));
-      expect(estimateWind(points, { detection: prepareManeuverDetection(points) }), name).toEqual(estimateWind(points));
+      const detection = prepareDetectionWing(points, { minEntrySpeedKn: 2, stillSpeedKn: 1 });
+      expect(estimateWindWing(points, { ...options, detection }), name).toEqual(estimateWindWing(points, options));
+      expect(estimateWindWing(points, { detection: prepareDetectionWing(points) }), name).toEqual(estimateWindWing(points));
     }
   });
 
   it('refuse une détection préparée sur une autre trace ou avec d\'autres réglages', () => {
     const points = buildLegSession(upwindDownwindLegs(6), () => 0);
     const other = buildLegSession(upwindDownwindLegs(6), () => 0);
-    expect(() => estimateWind(points, { detection: prepareManeuverDetection(other) })).toThrow();
-    expect(() => estimateWind(points, { minEntrySpeedKn: 2, detection: prepareManeuverDetection(points) })).toThrow();
-    expect(() => estimateWind(points, { stillSpeedKn: 1, detection: prepareManeuverDetection(points, { stillSpeedKn: 2 }) })).toThrow();
-    expect(() => estimateWind(points, { minEntrySpeedKn: 2, detection: prepareManeuverDetection(points, { minEntrySpeedKn: 2 }) })).not.toThrow();
+    expect(() => estimateWindWing(points, { detection: prepareDetectionWing(other) })).toThrow();
+    expect(() => estimateWindWing(points, { minEntrySpeedKn: 2, detection: prepareDetectionWing(points) })).toThrow();
+    expect(() => estimateWindWing(points, { stillSpeedKn: 1, detection: prepareDetectionWing(points, { stillSpeedKn: 2 }) })).toThrow();
+    expect(() => estimateWindWing(points, { minEntrySpeedKn: 2, detection: prepareDetectionWing(points, { minEntrySpeedKn: 2 }) })).not.toThrow();
     // Le virage minimal est un réglage de détection comme les autres : l'estimation ne le surcharge pas, elle lit le défaut.
-    expect(() => estimateWind(points, { detection: prepareManeuverDetection(points, { minTurnDeg: 70 }) })).toThrow();
-    expect(() => estimateWind(points, { detection: prepareManeuverDetection(points, { minTurnDeg: 60 }) })).not.toThrow();
+    expect(() => estimateWindWing(points, { detection: prepareDetectionWing(points, { minTurnDeg: 70 }) })).toThrow();
+    expect(() => estimateWindWing(points, { detection: prepareDetectionWing(points, { minTurnDeg: 60 }) })).not.toThrow();
     // De même la part minimale de fenêtre.
-    expect(() => estimateWind(points, { detection: prepareManeuverDetection(points, { minWindowShare: 0.4 }) })).toThrow();
-    expect(() => estimateWind(points, { detection: prepareManeuverDetection(points, { minWindowShare: 0.5 }) })).not.toThrow();
+    expect(() => estimateWindWing(points, { detection: prepareDetectionWing(points, { minWindowShare: 0.4 }) })).toThrow();
+    expect(() => estimateWindWing(points, { detection: prepareDetectionWing(points, { minWindowShare: 0.5 }) })).not.toThrow();
   });
 
   it('donne, avec le virage minimal passé en réglage à sa valeur par défaut, exactement ce que donnait la constante', () => {
@@ -1980,28 +1972,28 @@ describe('prepareManeuverDetection et classifyManeuvers', () => {
       for (const minSpeedKn of [2, 5]) {
         // L'étage porte aussi la vitesse d'entrée des virages : celle de l'estimation.
         const polarStage = prepareWindPolar(points, minSpeedKn, 2);
-        const detection = prepareManeuverDetection(points, { minEntrySpeedKn: 2, stillSpeedKn: 1 });
+        const detection = prepareDetectionWing(points, { minEntrySpeedKn: 2, stillSpeedKn: 1 });
         for (const successThresholdKn of [2, 6.5, 8, 12, 6.5]) {
           const options: WindEstimationOptions = { minSpeedKn, successThresholdKn, minEntrySpeedKn: 2, flightThresholdKn: successThresholdKn, stillSpeedKn: 1 };
-          const fresh = estimateWind(points, options);
-          const staged = estimateWind(points, { ...options, detection, polarStage });
+          const fresh = estimateWindWing(points, options);
+          const staged = estimateWindWing(points, { ...options, detection, polarStage });
           expect(staged, `${name} ${minSpeedKn} ${successThresholdKn}`).toEqual(fresh);
           expect(JSON.stringify(staged)).toBe(JSON.stringify(fresh));
         }
       }
-      expect(estimateWind(points, { polarStage: prepareWindPolar(points) }), name).toEqual(estimateWind(points));
+      expect(estimateWindWing(points, { polarStage: prepareWindPolar(points) }), name).toEqual(estimateWindWing(points));
     }
   });
 
   it('refuse un étage polaire préparé sur une autre trace ou à une autre vitesse plancher', () => {
     const points = buildLegSession(upwindDownwindLegs(6), () => 0);
     const other = buildLegSession(upwindDownwindLegs(6), () => 0);
-    expect(() => estimateWind(points, { polarStage: prepareWindPolar(other) })).toThrow();
-    expect(() => estimateWind(points, { minSpeedKn: 2, polarStage: prepareWindPolar(points, 5) })).toThrow();
-    expect(() => estimateWind(points, { minSpeedKn: 2, polarStage: prepareWindPolar(points, 2) })).not.toThrow();
+    expect(() => estimateWindWing(points, { polarStage: prepareWindPolar(other) })).toThrow();
+    expect(() => estimateWindWing(points, { minSpeedKn: 2, polarStage: prepareWindPolar(points, 5) })).toThrow();
+    expect(() => estimateWindWing(points, { minSpeedKn: 2, polarStage: prepareWindPolar(points, 2) })).not.toThrow();
     // Et à une autre vitesse d'entrée des virages : l'orientation en dépend.
-    expect(() => estimateWind(points, { minEntrySpeedKn: 2, polarStage: prepareWindPolar(points) })).toThrow();
-    expect(() => estimateWind(points, { minEntrySpeedKn: 2, polarStage: prepareWindPolar(points, undefined, 2) })).not.toThrow();
+    expect(() => estimateWindWing(points, { minEntrySpeedKn: 2, polarStage: prepareWindPolar(points) })).toThrow();
+    expect(() => estimateWindWing(points, { minEntrySpeedKn: 2, polarStage: prepareWindPolar(points, undefined, 2) })).not.toThrow();
   });
 });
 
@@ -2255,7 +2247,7 @@ const count = (rules: string[]): Partial<Record<string, number>> => {
 
 /** Accord des virages vus par le vent (`observeTurns` à `windEntryKn`) et par la détection aux réglages par défaut. */
 const turnsAgreement = (points: PointData[], windEntryKn: number): TurnsAgreement => {
-  const detection = prepareManeuverDetection(points);
+  const detection = prepareDetectionWing(points);
   const { turns, jumps } = frozenObserveTurns(points, windEntryKn);
   const groups = new Map<number, number[]>();
   for (let i = 0; i < points.length; i++) {
@@ -2370,7 +2362,7 @@ describe('virages vus des deux côtés', () => {
 
   it('la fenêtre de la détection donne exactement ce que donnait sa copie gelée, pour tout point', () => {
     for (const [name, points] of sessions()) {
-      const detection = prepareManeuverDetection(points);
+      const detection = prepareDetectionWing(points);
       for (let i = 0; i < points.length; i++) {
         expect(detection.windowAt(i), `${name} ${i}`).toEqual(frozenReadWindow(points, i));
       }

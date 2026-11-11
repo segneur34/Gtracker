@@ -7,7 +7,7 @@ import type { TrackPoint } from '../core/types';
  * À une position par seconde, un bottom turn ou un top turn, qui dure à peu
  * près une seconde, ne laisse qu'un point : seuls les grands virages (cutback,
  * demi-tour) se voient. Ce compte est donc expérimental, et l'interface le
- * dit ; les vrais virages viendront du gyroscope.
+ * dit ; les virages du gyroscope les remplacent quand la capture existe.
  *
  * Le cap de chaque pas est celui de l'appareil s'il est là (Doppler, juste
  * même à 1 Hz), sinon celui des positions. On le déroule, puis on compte les

@@ -17,6 +17,22 @@ export const useAnalysisHeart = (track: readonly HeartRatePoint[], params: Heart
   return { athlete, age, retainHr, heart, hrZones };
 };
 
+/**
+ * Rappels de l'onglet « cardio », stables : le panneau, mémoïsé, ne se redessine pas au zoom d'un autre graphe.
+ * `retainSessionHrMax` garde une FC max lue dans la séance (datée du premier point), `showCardioOnMap` montre
+ * sur la carte la partie vue de la courbe (`useZoomOnMap`, `show`).
+ */
+export const useCardioShortcuts = (
+  track: ReadonlyArray<{ timeMs: number }>,
+  retainHr: ReturnType<typeof useAthleteProfile>['retainHr'],
+  showZoomOnMap: (panel: 'cardio') => void
+) => {
+  const firstMs = track[0]?.timeMs ?? null;
+  const retainSessionHrMax = useCallback((bpm: number) => retainHr('hrMax', bpm, { kind: 'seance', atMs: firstMs }), [retainHr, firstMs]);
+  const showCardioOnMap = useCallback(() => showZoomOnMap('cardio'), [showZoomOnMap]);
+  return { retainSessionHrMax, showCardioOnMap };
+};
+
 /** Surbrillance de l'onglet « cardio » : la zone montrée, par son numéro en chaîne. */
 export interface CardioHighlight {
   shownIn: (panel: 'cardio') => string | null;

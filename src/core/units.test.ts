@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   commaDecimal, formatDecimal, formatDuration, formatShortDuration, parseDecimal, formatDistanceAuto, formatMeters, pad2, signedPercent, speedSourceText,
-  formatClock, formatTimeOfDay, formatClockMinutes, formatDistance, formatMinSec, formatSessionDate, formatKnots, formatShortDistance, formatSpeed, formatSpeedValue, fromDisplaySpeed, knotsToChartValue, knotsToDisplay, kmhToMs, speedFromText, toDisplayDistance, toDisplaySpeed, SPEED_UNIT_LABEL, type SpeedUnit,
+  formatClock, formatTimeOfDay, formatClockMinutes, formatDistance, formatMinSec, formatSessionDate, formatKnots, formatShortDistance, formatSpeed, formatSpeedValue, fromDisplaySpeed, knotsToChartValue, knotsToDisplay, kmhToMs, speedFromText, toDisplayDistance, toDisplaySpeed, SPEED_UNIT_LABEL, type SpeedUnit, orDash, speedCellOf,
 } from './units';
 
 describe('distances', () => {
@@ -254,6 +254,19 @@ describe('speedFromText', () => {
     expect(speedFromText('-3', 'kn', 'ms')).toBeNull();
     expect(speedFromText('12a', 'kn', 'ms')).toBeNull();
     expect(speedFromText('abc', 'kn', 'ms')).toBeNull();
+  });
+});
+
+describe('orDash et speedCellOf', () => {
+  it('rendent « — » sans valeur, le format sinon', () => {
+    expect(orDash(null, (v) => `${v} m`)).toBe('—');
+    expect(orDash(0, (v) => `${v} m`)).toBe('0 m');
+  });
+  it('mettent la vitesse dans l unité de l activité, sans son symbole', () => {
+    expect(speedCellOf('ms')(null)).toBe('—');
+    expect(speedCellOf('ms')(5)).toBe(formatSpeedValue(toDisplaySpeed(5, 'ms'), 'ms'));
+    expect(speedCellOf('kn')(5)).toBe(formatSpeedValue(toDisplaySpeed(5, 'kn'), 'kn'));
+    expect(speedCellOf('kmh')(5)).toBe('18,0');
   });
 });
 

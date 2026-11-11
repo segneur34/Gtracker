@@ -1,16 +1,21 @@
 import { computeKinematics } from '../core/kinematics';
 import { kinematicsOptionsOf, referenceSpeedMs, scalesFiltersToSession } from '../core/sessionSpeed';
 import { buildCumulativeTrack } from '../core/sessionStats';
-import { getSportProfile } from '../core/sportProfiles';
+import { SPORT_PROFILES, getSportProfile } from '../core/sportProfiles';
 import type { CumulativeTrack, RawTrackPoint, SportType, TrackPoint } from '../core/types';
 import { knotsToMs, msToKnots } from '../core/units';
 import { angleDiff } from '../core/angles';
 import type { PointData } from '../sailing/pointData';
 import {
   classifyManeuvers,
+  estimateWind,
   prepareManeuverDetection,
+  selectWindCandidate,
+  type ManeuverDetection,
+  type ManeuverDetectionOptions,
   type ManeuverOptions,
   type ManeuverStats,
+  type WindEstimationOptions,
   type WindReference,
 } from '../sailing/maneuvers';
 import type { WindEstimate } from '../sailing/wind';
@@ -376,14 +381,39 @@ export const sailTrack = (spec: SailSpec, sport: SportType = 'wingfoil'): SailTr
 // ---------------------------------------------------------------------------
 
 /**
+ * Seuils du wingfoil, lus dans son profil : seuil de réussite des manœuvres
+ * (le seuil d'activité du calcul) et plancher d'arrêt. L'application les reçoit
+ * toujours de la session ; les tests qui n'en disent rien les prennent ici.
+ */
+export const WINGFOIL_MANEUVER_THRESHOLDS = {
+  successThresholdKn: SPORT_PROFILES.wingfoil.defaultActiveThreshold,
+  stillSpeedKn: SPORT_PROFILES.wingfoil.stillThreshold,
+};
+
+/** Détection préparée sur une trace, aux seuils du wingfoil sauf ceux que `options` donne. */
+export const prepareDetectionWing = (points: PointData[], options: Partial<ManeuverDetectionOptions> = {}): ManeuverDetection =>
+  prepareManeuverDetection(points, { ...WINGFOIL_MANEUVER_THRESHOLDS, ...options });
+
+/** Estimation du vent aux seuils du wingfoil sauf ceux que `options` donne. */
+export const estimateWindWing = (points: PointData[], options: Partial<WindEstimationOptions> = {}): WindEstimate =>
+  estimateWind(points, { ...WINGFOIL_MANEUVER_THRESHOLDS, ...options });
+
+/** Choix du candidat de vent aux seuils du wingfoil sauf ceux que `options` donne. */
+export const selectWindCandidateWing = (points: PointData[], polar: WindEstimate, options: Partial<WindEstimationOptions> = {}) =>
+  selectWindCandidate(points, polar, { ...WINGFOIL_MANEUVER_THRESHOLDS, ...options });
+
+/**
  * Détecte et classe virements et empannages en une fois, par les deux étapes
  * que l'application enchaîne (`prepareManeuverDetection`, puis
- * `classifyManeuvers` au vent donné) : une détection neuve à chaque appel.
- * Aide de test seulement : l'application prépare la détection une fois par
- * trace et la classe autant de fois que le vent l'exige.
+ * `classifyManeuvers` au vent donné) : une détection neuve à chaque appel,
+ * aux seuils du wingfoil sauf ceux que `options` donne. Aide de test
+ * seulement : l'application prépare la détection une fois par trace et la
+ * classe autant de fois que le vent l'exige.
  */
-export const detectAndClassify = (points: PointData[], wind: WindReference, options: ManeuverOptions = {}): ManeuverStats =>
-  classifyManeuvers(prepareManeuverDetection(points, options), wind, options);
+export const detectAndClassify = (points: PointData[], wind: WindReference, options: ManeuverOptions = {}): ManeuverStats => {
+  const all = { ...WINGFOIL_MANEUVER_THRESHOLDS, ...options };
+  return classifyManeuvers(prepareManeuverDetection(points, all), wind, all);
+};
 
 // ---------------------------------------------------------------------------
 // Chaîne de `useSailingSession`, hors React : `analyzeSailingSession`

@@ -9,12 +9,12 @@ import { useAnalysisSession } from '../hooks/useAnalysisSession';
 import { useAnalysisTabs } from '../hooks/useAnalysisTabs';
 import { useSailingSession } from '../hooks/useSailingSession';
 import { updateSessionRecord } from '../hooks/useSessionLibrary';
-import { shareExtraStats } from '../library/shareStats';
+import { heartRateShareStats, shareExtraStats } from '../library/shareStats';
 import { effectiveHrOffset, useSportSettings } from '../hooks/useSportSettings';
 import { useShownJumps } from '../hooks/useSessionJumps';
 import { useFlightPumping, useSessionPumping } from '../hooks/useSessionPumping';
-import { useSessionMarks } from '../hooks/useSessionMarks';
-import { useAnalysisHeart, useHeartRateZoneHighlight } from '../hooks/useAnalysisHeart';
+import { shownMarkOf, useSessionMarks } from '../hooks/useSessionMarks';
+import { useAnalysisHeart, useCardioShortcuts, useHeartRateZoneHighlight } from '../hooks/useAnalysisHeart';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useZoomOnMap } from '../hooks/useZoomOnMap';
 import { trackBounds } from '../core/displayConfig';
@@ -28,8 +28,8 @@ import { activeRatioLabel } from '../core/sportProfiles';
 import { effectiveSpeedRange, trackColorSegments } from '../core/trackColor';
 import type { TopSegment } from '../core/types';
 import {
-  SPEED_UNIT_LABEL, SPEED_UNIT_SYMBOL, formatDistance, formatKnots, formatSpeed, formatSpeedValue, formatTimeOfDay,
-  knotsToChartValue, knotsToMs, toDisplaySpeed, formatDecimal, commaDecimal
+  SPEED_UNIT_LABEL, SPEED_UNIT_SYMBOL, formatDistance, formatKnots, formatSpeed, formatTimeOfDay,
+  knotsToChartValue, knotsToMs, toDisplaySpeed, formatDecimal, commaDecimal, speedCellOf
 } from '../core/units';
 import { polarExcludedPoints, speedPolar, type PolarBin } from '../sailing/wind';
 import { MANEUVER_LABELS, TACK_LABELS, oppositeTack, windInputWarning, type ManeuverMetric, type ManeuverTop } from '../sailing/sailingAnalytics';
@@ -38,7 +38,7 @@ import CardioTab from '../components/CardioTab';
 import NotesTab from '../components/NotesTab';
 import JumpsPanel from '../components/JumpsPanel';
 import JumpMapLayer from '../components/JumpMapLayer';
-import { FlightsPanel, PumpingPanel } from '../components/FlightPumpingPanel';
+import { FlightsPanel, PumpingPanel, PUMPING_OFF_NOTE } from '../components/FlightPumpingPanel';
 import TrackSpanLayer from '../components/TrackSpanLayer';
 import { pumpingHighlightSpans } from '../components/pumpingHighlight';
 import { HIGHLIGHT_SPAN_OPACITY, podiumColor } from '../components/highlightColors';
@@ -273,8 +273,7 @@ function SailingModule() {
   const hrZone = useHeartRateZoneHighlight(highlight, open.cardio, heart, hrZones, track, profile.heartRate.gapS);
   // Repères du bouton « Note » : fanions, liste de « Général », traits des graphes.
   const marks = useSessionMarks(draft, track, cumulative.cumDist);
-  const shownMarkKey = highlight.shownIn('general');
-  const shownMark = shownMarkKey === null ? null : Number(shownMarkKey);
+  const shownMark = shownMarkOf(highlight);
 
   /** Bornes du dégradé de couleur de la trace, en m/s : celles de la session, sinon de Réglages, sinon la suggestion. */
   const colorRange = effectiveSpeedRange({
@@ -336,9 +335,7 @@ function SailingModule() {
    * toute la session compte en navigation : ni distance, temps, ratio ni moyenne actifs.
    */
   /** FC moyenne, en fin des chiffres de « général » et du partage, si la session a de la FC. */
-  const heartRateStat: ShareStat[] = heart.present && heart.stats
-    ? [{ key: 'heartRate', label: 'FC moyenne', value: `${Math.round(heart.stats.avgBpm)} bpm` }]
-    : [];
+  const heartRateStat = heartRateShareStats(heart);
   const generalStats: ShareStat[] = stats ? [
     { key: 'distance', label: 'Distance', value: formatDistance(stats.distanceM, distanceUnit) },
     ...(hasActiveThreshold ? [{ key: 'activeDistance', label: 'Distance active', value: formatDistance(stats.activeDistanceM, distanceUnit) }] : []),
@@ -481,11 +478,7 @@ function SailingModule() {
     mapExpanded,
     openMap: () => setMapExpanded(true),
   });
-  /** Rappels de l'onglet « cardio », stables : le panneau, mémoïsé, ne se redessine pas au zoom d'un autre graphe. */
-  const firstMs = track[0]?.timeMs ?? null;
-  const retainSessionHrMax = useCallback((bpm: number) => retainHr('hrMax', bpm, { kind: 'seance', atMs: firstMs }), [retainHr, firstMs]);
-  const { show: showZoomOnMap } = zoomOnMap;
-  const showCardioOnMap = useCallback(() => showZoomOnMap('cardio'), [showZoomOnMap]);
+  const { retainSessionHrMax, showCardioOnMap } = useCardioShortcuts(track, retainHr, zoomOnMap.show);
   const zoomText = zoomHint(narrow);
   /** Graphes de l'onglet d'où vient « +carte », sous la carte en plein écran (téléphone), si l'onglet en a. */
   const companionPanel = zoomOnMap.companionPanel;
@@ -700,7 +693,7 @@ function SailingModule() {
                   flights={flights} podium={podiumFlights}
                   pumping={flightPumping} pumpSummary={pumpSummary}
                   shown={flightShown} onShow={(key) => highlight.show('vols', key)} accent={FAMILY_ACCENT.voile}
-                  speedCell={(ms) => (ms === null ? '—' : formatSpeedValue(toDisplaySpeed(ms, speedUnit), speedUnit))}
+                  speedCell={speedCellOf(speedUnit)}
                   unitLabel={SPEED_UNIT_LABEL[speedUnit]}
                   sensors={pumpSensors} />
               </ResizablePanel>
@@ -721,10 +714,10 @@ function SailingModule() {
                   </>}
                   pumping={flightPumping} pumpSummary={pumpSummary} series={pumpSeriesList} seriesPodium={seriesPodium}
                   shown={pumpingShown} onShow={(key) => highlight.show('pumping', key)} accent={FAMILY_ACCENT.voile}
-                  speedCell={(ms) => (ms === null ? '—' : formatSpeedValue(toDisplaySpeed(ms, speedUnit), speedUnit))}
+                  speedCell={speedCellOf(speedUnit)}
                   unitLabel={SPEED_UNIT_LABEL[speedUnit]}
                   pumpingOn={pumping} sensors={pumpSensors} flightTimeS={flights.reduce((sum, f) => sum + f.durationS, 0)}
-                  offNote="Cochez « Pumping » dans l'onglet réglages pour compter les séries de coups en vol, téléphone fixé sur la poitrine." />
+                  offNote={PUMPING_OFF_NOTE} />
               </ResizablePanel>
             )}
 

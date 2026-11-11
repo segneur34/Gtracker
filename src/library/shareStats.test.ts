@@ -2,7 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { shareableStats } from '../core/shareImage';
 import { SAILING_SPORTS, getSportProfile, hasActiveThreshold } from '../core/sportProfiles';
 import type { SessionSummary } from './record';
-import { SHARE_EXTRA_KEYS, shareExtraStats, summaryShareStats } from './shareStats';
+import { SHARE_EXTRA_KEYS, heartRateShareStats, shareExtraStats, summaryShareStats } from './shareStats';
+
+describe('heartRateShareStats', () => {
+  it('donne la FC moyenne arrondie quand la session a de la FC', () => {
+    expect(heartRateShareStats({ present: true, stats: { avgBpm: 141.6 } })).toEqual([{ key: 'heartRate', label: 'FC moyenne', value: '142 bpm' }]);
+  });
+  it('ne donne rien sans FC suffisante ni statistiques', () => {
+    expect(heartRateShareStats({ present: false, stats: { avgBpm: 141.6 } })).toEqual([]);
+    expect(heartRateShareStats({ present: true, stats: null })).toEqual([]);
+  });
+});
 
 const summary = (patch: Partial<SessionSummary> = {}): SessionSummary => ({
   calcVersion: 6,

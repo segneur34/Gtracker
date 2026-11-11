@@ -8,7 +8,8 @@ import MapToggle from './ui/MapToggle';
 import StatTile from './ui/StatTile';
 import Swatch from './ui/Swatch';
 import type { FlightPumping, FlightSpan, PumpingSeries, PumpingSummary } from '../core/pumping';
-import { formatShortDuration, formatTimeOfDay, formatDecimal } from '../core/units';
+import { formatShortDuration, formatTimeOfDay, formatDecimal, orDash } from '../core/units';
+import { tdStyle, thStyle } from './tableStyle';
 import type { PumpingStatus } from '../hooks/useSessionPumping';
 import './FlightPumpingPanel.css';
 
@@ -67,14 +68,14 @@ export interface FlightsPanelProps<F extends FlightSpan> extends PanelBaseProps 
   allColumnsWithoutPumping?: FlightColumn<F>[];
 }
 
-const thStyle = { padding: '0.4em 0.5em', whiteSpace: 'nowrap' } as const;
-const tdStyle = { padding: '0.35em 0.5em', textAlign: 'center', whiteSpace: 'nowrap' } as const;
+/** Note de l'onglet « pumping » quand Pumping est décoché, la même dans la voile et le surf. */
+export const PUMPING_OFF_NOTE = "Cochez « Pumping » dans l'onglet réglages pour compter les séries de coups en vol, téléphone fixé sur la poitrine.";
+
 const boldStyle = { ...tdStyle, fontWeight: 700 } as const;
 const noteStyle = { color: 'var(--muted)', fontSize: 'var(--text-xs)', marginTop: '8px' } as const;
 const headRowStyle = { backgroundColor: 'var(--surface-sunken)' } as const;
 const headStyle = { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' } as const;
 
-const orDash = (value: number | null, format: (v: number) => string): string => (value === null ? '—' : format(value));
 const perMin = (v: number) => `${Math.round(v)} /min`;
 const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`;
 

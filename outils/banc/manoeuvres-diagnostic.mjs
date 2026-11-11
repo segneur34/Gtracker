@@ -138,12 +138,13 @@ const estimate = estimateWind(pts, {
   successThresholdKn: seuil,
   minEntrySpeedKn: mt.minEntrySpeedKn,
   flightThresholdKn,
+  stillSpeedKn: profile.stillThreshold,
 });
 console.log(`Vent estimé ${estimate.direction}° (confiance ${r1(estimate.confidence)}, ${estimate.reliable ? 'fiable' : 'peu fiable'}, orienté par ${estimate.orientedBy}, ${estimate.maneuverCount} manœuvre(s) à caps stabilisés)`);
 const wind = flags.vent !== undefined ? Number(flags.vent) : estimate.direction;
 console.log(`Vent retenu ${wind}°${flags.vent !== undefined ? ' (donné)' : ' (estimé)'}`);
 
-const options = { successThresholdKn: seuil, minEntrySpeedKn: mt.minEntrySpeedKn, flightThresholdKn };
+const options = { successThresholdKn: seuil, minEntrySpeedKn: mt.minEntrySpeedKn, flightThresholdKn, stillSpeedKn: profile.stillThreshold };
 // Comme l'application (`analyzeSailingWind`) : une détection par trace, classée par le vent global puis par le vent local.
 const detection = prepareManeuverDetection(pts, options);
 const firstPass = classifyManeuvers(detection, wind, options);

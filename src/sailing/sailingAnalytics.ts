@@ -3,7 +3,7 @@ import { firstIndexAtOrAfter } from '../core/search';
 import { pickTopWindows } from '../core/topSegments';
 import type { PointData } from './pointData';
 import { WIND_LOCAL_MAX_GAP_MIN, isDirected, windAt, type ManeuverKind, type ManeuverLocation, type ManeuverStats, type Tack, type WindReference } from './maneuvers';
-import { VMG_MIN_WINDOW_RATIO, VMG_WINDOW_S, getDefaultThresholdKn } from './sailingConfig';
+import { VMG_MIN_WINDOW_RATIO, VMG_WINDOW_S } from './sailingConfig';
 import { circularStats, interpolateDirection, type TimedDirection, type WindEstimate } from './wind';
 import { angleDiff, circularMean, normalizeDeg } from '../core/angles';
 import { formatDecimal, msToKnots } from '../core/units';
@@ -75,9 +75,6 @@ export interface WindStats {
   windAt: (timeMs: number) => number | null;
 }
 
-/** Trou maximal, en minutes, à travers lequel on interpole encore entre deux manœuvres : celui du classement. */
-const MAX_INTERPOLATION_GAP_MIN = WIND_LOCAL_MAX_GAP_MIN;
-
 /**
  * Manœuvres retenues pour suivre le vent : toutes celles que la détection a
  * classées, virements et empannages, réussis ou non, caps stabilisés ou non ;
@@ -123,12 +120,9 @@ const symmetryWeight = (m: ManeuverLocation, windDir: number): number => {
  * `null` s'il y a moins de deux manœuvres.
  */
 export const calculateWindStats = (
-  trackData: PointData[],
   maneuverStats: ManeuverStats | null,
   referenceWind?: number | null
 ): WindStats | null => {
-  if (trackData.length === 0) return null;
-
   const maneuvers = maneuverSamples(maneuverStats);
   if (maneuvers.length < 2) return null;
 
@@ -163,7 +157,8 @@ export const calculateWindStats = (
     direction: m.localWind,
   }));
 
-  const maxGapMs = MAX_INTERPOLATION_GAP_MIN * 60 * 1000;
+  // Trou maximal à travers lequel on interpole encore entre deux manœuvres : celui du classement.
+  const maxGapMs = WIND_LOCAL_MAX_GAP_MIN * 60 * 1000;
   const windAt = (timeMs: number) => interpolateDirection(samples, timeMs, reference, maxGapMs);
 
   // Arrondi puis normalisé : une moyenne à 359,7° s'affiche 0°, jamais 360°.
@@ -223,8 +218,6 @@ export const windChartRows = (
 
 export type ManeuverMetric = 'conservation' | 'relaunch' | 'headingChange' | 'distance' | 'windwardGain';
 
-type ManeuverType = ManeuverKind;
-
 /** Nom d'une manœuvre, par genre, dans le tableau, la carte et les listes. */
 export const MANEUVER_LABELS: Record<ManeuverKind, string> = {
   tack: 'Virement',
@@ -250,7 +243,7 @@ export const MANEUVER_METRICS: {
    * sans juger n'en a pas : le cap de sortie d'un empannage est un choix
    * d'allure, et son podium tombait au hasard.
    */
-  ranked: ManeuverType[];
+  ranked: ManeuverKind[];
 }[] = [
   {
     key: 'conservation',
@@ -392,7 +385,7 @@ const tieBreak = (metric: ManeuverMetric, a: ManeuverLocation, b: ManeuverLocati
 
 const summarizeType = (
   locations: ManeuverLocation[],
-  type: ManeuverType
+  type: ManeuverKind
 ): ManeuverTypeSummary | null => {
   const indexed = locations
     .map((m, index) => ({ m, index }))
@@ -570,6 +563,18 @@ const vmgSums = (trackData: PointData[], wind: WindReference, minSpeedKn: number
   return { cumDt, cumSpeedDt, cumVmgDt, cumStbdDt, cumBelow, cumManeuver, cumGap };
 };
 
+/** Réglages de la VMG, les mêmes pour les chiffres (`calculateVmgStats`) et la courbe (`vmgSeries`). */
+interface VmgOptions {
+  /** Vitesse minimale, en nœuds, pour qu'une fenêtre compte dans la VMG (l'allure moyenne de la fenêtre, pour la courbe). */
+  minSpeedKn: number;
+  /** Manœuvres de la session : écartées des chiffres, un trou dans la courbe. */
+  maneuvers: readonly ManeuverSpan[];
+  /** Durée de la fenêtre de moyennage, en secondes (`VMG_WINDOW_S`). */
+  windowSeconds?: number;
+  /** Un pas plus long est un trou de la trace (règle 6) : il pèse par sa distance, pas par la vitesse lissée du point de reprise (`MAX_GAP_S`). */
+  maxGapS?: number;
+}
+
 /**
  * VMG par allure et par bord, sur fenêtre temporelle glissante, en sommes
  * cumulées (`vmgSums`). La fenêtre `[i, j]` couvre les intervalles `i+1..j`,
@@ -581,15 +586,10 @@ const vmgSums = (trackData: PointData[], wind: WindReference, minSpeedKn: number
 export const calculateVmgStats = (
   trackData: PointData[],
   wind: WindReference | null,
-  /** Vitesse minimale, en nœuds, pour qu'une fenêtre compte dans la VMG. */
-  minSpeedKn: number = getDefaultThresholdKn(),
-  windowSeconds: number = VMG_WINDOW_S,
-  /** Un pas plus long est un trou de la trace (règle 6) : il pèse par sa distance, pas par la vitesse lissée du point de reprise. */
-  maxGapS: number = MAX_GAP_S,
-  /** Manœuvres de la session, écartées des chiffres. */
-  maneuvers: readonly ManeuverSpan[] = []
+  options: VmgOptions
 ): VmgStats | null => {
   if (trackData.length === 0 || wind === null) return null;
+  const { minSpeedKn, maneuvers, windowSeconds = VMG_WINDOW_S, maxGapS = MAX_GAP_S } = options;
 
   const windowMs = windowSeconds * 1000;
   const n = trackData.length;
@@ -681,14 +681,10 @@ export const calculateVmgStats = (
 export const vmgSeries = (
   trackData: PointData[],
   wind: WindReference | null,
-  /** Vitesse minimale, en nœuds, de la moyenne de la fenêtre. */
-  minSpeedKn: number = getDefaultThresholdKn(),
-  /** Manœuvres de la session : un trou dans la courbe. */
-  maneuvers: readonly ManeuverSpan[] = [],
-  windowSeconds: number = VMG_WINDOW_S,
-  maxGapS: number = MAX_GAP_S
+  options: VmgOptions
 ): (number | null)[] => {
   if (trackData.length === 0 || wind === null) return [];
+  const { minSpeedKn, maneuvers, windowSeconds = VMG_WINDOW_S, maxGapS = MAX_GAP_S } = options;
 
   const windowMs = windowSeconds * 1000;
   const n = trackData.length;

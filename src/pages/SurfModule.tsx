@@ -25,12 +25,13 @@ import SessionThresholdField from '../components/SessionThresholdField';
 import { SessionColorRangeField } from '../components/SpeedRangeEditor';
 import TrackSpanLayer, { type TrackSpanShown } from '../components/TrackSpanLayer';
 import { pumpingHighlightSpans } from '../components/pumpingHighlight';
-import { FlightsPanel, PumpingPanel, type FlightColumn } from '../components/FlightPumpingPanel';
+import { FlightsPanel, PumpingPanel, PUMPING_OFF_NOTE, type FlightColumn } from '../components/FlightPumpingPanel';
+import { tdStyle, thStyle } from '../components/tableStyle';
 import TopsPanel, { TopsHighlight } from '../components/TopsPanel';
 import HeartRateChart from '../components/HeartRateChart';
 import { CardioCompanion } from '../components/HeartRatePanel';
 import { heartRateReadout, speedReadout } from '../components/chartReadouts';
-import { useAnalysisHeart, useHeartRateZoneHighlight } from '../hooks/useAnalysisHeart';
+import { useAnalysisHeart, useCardioShortcuts, useHeartRateZoneHighlight } from '../hooks/useAnalysisHeart';
 import TrackArrows from '../components/TrackArrows';
 import TrackSegmentsLayer, { type TrackSegment } from '../components/TrackSegmentsLayer';
 import TrackChart, { type TrackSeries } from '../components/TrackChart';
@@ -47,7 +48,7 @@ import { computeAllTopSegments } from '../core/topSegments';
 import { effectiveSpeedRange, trackColorSegments } from '../core/trackColor';
 import {
   SPEED_UNIT_LABEL, speedSourceText, formatDistance, formatDuration, formatShortDuration, formatSpeed, formatSpeedValue, formatTimeOfDay,
-  fromDisplaySpeed, toDisplaySpeed, formatDecimal
+  fromDisplaySpeed, toDisplaySpeed, formatDecimal, orDash, speedCellOf
 } from '../core/units';
 import { useTimeChartAxis } from '../hooks/useTimeChartAxis';
 import { useGpxSession } from '../hooks/useGpxSession';
@@ -56,7 +57,7 @@ import { carriedSettings } from '../library/record';
 import { carriedThresholdNote, sessionActivitySettings } from '../library/summaryOptions';
 import { useAnalysisTabs } from '../hooks/useAnalysisTabs';
 import { useZoomOnMap } from '../hooks/useZoomOnMap';
-import { useSessionMarks } from '../hooks/useSessionMarks';
+import { shownMarkOf, useSessionMarks } from '../hooks/useSessionMarks';
 import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useFlightPumping, useSessionPumping, type PumpingStatus } from '../hooks/useSessionPumping';
@@ -71,7 +72,7 @@ import { SPEED_COLOR } from '../components/chartStyle';
 import AnalysisShell from '../components/AnalysisShell';
 import ZoomView from '../components/ZoomView';
 import type { ChartZoom } from '../hooks/useChartZoom';
-import { shareExtraStats } from '../library/shareStats';
+import { heartRateShareStats, shareExtraStats } from '../library/shareStats';
 
 /**
  * Analyse d'une session de surf, selon le patron commun
@@ -116,11 +117,6 @@ const FLIGHT_BAND_COLOR = '#7e57c2';
 type WaveSort = 'ordre' | 'distance' | 'vitesse' | 'duree';
 const WAVE_SORT_LABEL: Record<WaveSort, string> = { ordre: 'Ordre', distance: 'Distance', vitesse: 'Vitesse', duree: 'Durée' };
 
-
-const thStyle = { padding: '0.4em 0.5em', whiteSpace: 'nowrap' } as const;
-const tdStyle = { padding: '0.35em 0.5em', textAlign: 'center', whiteSpace: 'nowrap' } as const;
-
-const orDash = (value: number | null, format: (v: number) => string): string => (value === null ? '—' : format(value));
 
 /** Colonnes des vols propres au surf : vagues du vol, temps de vol hors des vagues vu par le GPS (ce n'est pas du pumping). */
 const SURF_FLIGHT_PODIUM_COLUMNS: FlightColumn<SurfFlight>[] = [
@@ -205,8 +201,7 @@ function SurfModule() {
   const { track, cumulative } = gpx;
   // Repères du bouton « Note » : fanions, liste de « Général », traits du graphe.
   const marks = useSessionMarks(draft, track, cumulative.cumDist);
-  const shownMarkKey = highlight.shownIn('general');
-  const shownMark = shownMarkKey === null ? null : Number(shownMarkKey);
+  const shownMark = shownMarkOf(highlight);
   /** Zone cardiaque montrée sur la carte (onglet « cardio »). */
   const hrZone = useHeartRateZoneHighlight(highlight, open.cardio, heart, hrZones, track, profile.heartRate.gapS);
   const result = useMemo(
@@ -253,7 +248,7 @@ function SurfModule() {
       { key: 'wavesInFlight', label: 'Vagues en un vol', value: String(summary.maxWavesInFlight ?? '—'), title: 'Le plus de vagues reliées par un même vol' },
     ] : []),
     { key: 'distance', label: 'Distance totale', value: formatDistance(totalDistanceM, distanceUnit) },
-    ...(heart.present && heart.stats ? [{ key: 'heartRate', label: 'FC moyenne', value: `${Math.round(heart.stats.avgBpm)} bpm` }] : []),
+    ...heartRateShareStats(heart),
     // Appréciation, comme le résumé d'une fiche.
     ...shareExtraStats('surf', { rating: draft.edits.notes.rating }),
   ] : [];
@@ -288,7 +283,7 @@ function SurfModule() {
   const {
     byFlight: flightPumping, summary: pumpSummary, podium: podiumFlights, series: pumpSeriesList, seriesPodium,
   } = useFlightPumping(pumpSensors.recording, pumpDetection, track, cumulative, flights);
-  const speedCell = (ms: number | null): string => (ms === null ? '—' : formatSpeedValue(toDisplaySpeed(ms, speedUnit), speedUnit));
+  const speedCell = speedCellOf(speedUnit);
   /** Colonnes « Tous les vols » du GPS, sans pumping mesuré : temps et vitesse hors des vagues (unité de l'activité). */
   const surfFlightGpsColumns: FlightColumn<SurfFlight>[] = [
     { header: 'Hors vague', cell: (f) => formatShortDuration(f.pumpS) },
@@ -382,11 +377,8 @@ function SurfModule() {
     mapExpanded,
     openMap: () => setMapExpanded(true),
   });
-  /** Rappels de l'onglet « cardio », stables : le panneau, mémoïsé, ne se redessine pas au zoom d'un autre graphe. */
-  const firstMs = track[0]?.timeMs ?? null;
-  const retainSessionHrMax = useCallback((bpm: number) => retainHr('hrMax', bpm, { kind: 'seance', atMs: firstMs }), [retainHr, firstMs]);
   const { show: showZoomOnMap } = zoomOnMap;
-  const showCardioOnMap = useCallback(() => showZoomOnMap('cardio'), [showZoomOnMap]);
+  const { retainSessionHrMax, showCardioOnMap } = useCardioShortcuts(track, retainHr, showZoomOnMap);
   const showGraphsOnMap = useCallback(() => showZoomOnMap('graphiques'), [showZoomOnMap]);
   /** Axes, repères et bandes des graphes : stables tant que la session, l'unité et les repères ne changent pas. */
   const speedYAxes = useMemo(
@@ -708,7 +700,7 @@ function SurfModule() {
                   shown={pumpingShown} onShow={(key) => highlight.show('pumping', key)} accent={ACCENT}
                   speedCell={speedCell} unitLabel={unitLabel}
                   pumpingOn={pumping} sensors={pumpSensors} flightTimeS={flights.reduce((sum, f) => sum + f.durationS, 0)}
-                  offNote="Cochez « Pumping » dans l'onglet réglages pour compter les séries de coups en vol, téléphone fixé sur la poitrine." />
+                  offNote={PUMPING_OFF_NOTE} />
               </ResizablePanel>
             )}
 

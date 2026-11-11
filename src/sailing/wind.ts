@@ -1,11 +1,14 @@
 import { bracketAtTime } from '../core/search';
 import { angleDiff, circularMean, normalizeDeg as normalizeAngle, toDeg, toRad } from '../core/angles';
 import { toFixedNumber } from '../core/basics';
+import type { ManeuverKind } from './maneuvers';
 import type { PointData } from './pointData';
 import {
   MANEUVER_MAX_STEP_S,
   MANEUVER_MIN_COHERENCE,
   MANEUVER_MIN_ENTRY_SPEED_KN,
+  MANEUVER_MIN_TURN_DEG,
+  MANEUVER_WINDOW_S,
   ORIENTATION_MAX_CONSERVATION,
   ORIENTATION_MIN_VOTE_WEIGHT,
   POLAR_TACK_FACE_WIND_DEG,
@@ -59,7 +62,7 @@ const POLAR_BIN_DEG = 10;
 
 /** Manœuvre vue par la polaire : son type et sa rotation, en indices de la trace (`ManeuverLocation`). */
 export interface PolarManeuver {
-  type: string;
+  type: ManeuverKind;
   entryIndex: number;
   rotationEndIndex: number;
 }
@@ -386,10 +389,6 @@ const describeDirection = (maxSpeeds: number[], direction: number): PolarWindEst
 // Virages francs et orientation
 // ---------------------------------------------------------------------------
 
-/** Virage cumulé minimal pour qu'une inflexion serve à orienter l'axe. */
-const ORIENTATION_MIN_TURN_DEG = 60;
-/** Durée d'observation d'un virage pour l'orientation, en secondes. */
-const ORIENTATION_WINDOW_S = 12;
 /** Durée, en secondes, de cap stable exigée après un virage. */
 const EXIT_STABILITY_S = 5;
 /** Variation de cap maximale sur un pas d'au moins `TURN_STRIDE_MIN_S`, en degrés, pour un cap tenu. */
@@ -565,21 +564,23 @@ export interface TurnObservation {
 }
 
 /**
- * Relève tous les virages cohérents de plus de 60° de la trace.
+ * Relève tous les virages cohérents de plus de `MANEUVER_MIN_TURN_DEG` de la trace.
  *
  * `minEntrySpeedKn` écarte les sorties de chute, où l'on repart d'un cap
  * quelconque. C'est la vitesse d'entrée de la détection des manœuvres,
  * accordée à l'allure de la session (`sessionManeuverThresholds`), lue avec la
  * même comparaison stricte, et la cohérence est la sienne aussi :
- * un virage est vu des deux côtés ou d'aucun (lire la vitesse plancher de la
- * polaire, 5 nd, et une cohérence de 0,6 ferait diverger les deux lectures).
+ * un virage est vu des deux côtés ou d'aucun : virage minimal, fenêtre
+ * d'observation et cohérence sont ceux de la détection (`MANEUVER_MIN_TURN_DEG`,
+ * `MANEUVER_WINDOW_S`, `MANEUVER_MIN_COHERENCE`). Lire la vitesse plancher de la
+ * polaire, 5 nd, et une cohérence de 0,6 ferait diverger les deux lectures.
  */
 export const observeTurns = (
   points: PointData[],
   minEntrySpeedKn: number = MANEUVER_MIN_ENTRY_SPEED_KN
 ): TurnObservation[] => {
   const turns: TurnObservation[] = [];
-  const windowMs = ORIENTATION_WINDOW_S * 1000;
+  const windowMs = MANEUVER_WINDOW_S * 1000;
   let i = 0;
 
   while (i < points.length - 1) {
@@ -595,7 +596,7 @@ export const observeTurns = (
     const entrySpeed = points[i].smoothedSpeed;
     const startsFlying = entrySpeed > minEntrySpeedKn;
 
-    if (Math.abs(scan.cumulativeTurn) > ORIENTATION_MIN_TURN_DEG && coherent && startsFlying) {
+    if (Math.abs(scan.cumulativeTurn) > MANEUVER_MIN_TURN_DEG && coherent && startsFlying) {
       // Prolongation tant que le cap tourne franchement dans le même sens (`extendTurn`).
       const { j, cumulativeTurn, slowest } = extendTurn(points, i, { j: scan.j, cumulativeTurn: scan.cumulativeTurn, slowest: initial }, windowMs);
 

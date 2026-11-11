@@ -48,6 +48,12 @@ Brief : `docs/backlog/319-revue-apres-fork.md`, section « ## Lot 328 » (lignes
 - :754 réorienté : `windowSeconds` 10, 12 et 14 déplacent bien le déclenchement (trois premiers points de virage distincts, lus par `detection.windowAt`) et les bornes `entryIndex`-`rotationEndIndex` restent les mêmes. La variation de la borne de fin passée à la mesure (43, 44, 45 s) n'a plus d'équivalent : la fin vient de la détection elle-même.
 - `stableSegment` garde son `export` (tranché plus haut) ; les autres exports de la liste du brief sont retirés.
 
+## Étape b, décisions d'exécution (11/11)
+
+- `stillSpeedKn` et `successThresholdKn` obligatoires dans `ManeuverDetectionOptions`, `ManeuverClassificationOptions` et `WindEstimationOptions` (donc `estimateWind`, `selectWindCandidate`, `prepareManeuverDetection`, `classifyManeuvers` sans options par défaut) ; `ManeuverOptions` garde tout optionnel. `SailingStatsOptions` : `sport` et `activeThresholdKn` obligatoires. La fixture porte `WINGFOIL_MANEUVER_THRESHOLDS` et les enveloppes `detectAndClassify`, `prepareDetectionWing`, `estimateWindWing`, `selectWindCandidateWing`.
+- Retraits de tests sans objet : « lit le plancher d'arrêt dans le profil » (`getStillSpeedKn`), « sans options, reproduit exactement les valeurs du wingfoil » (valeurs par défaut disparues ; les mêmes estimations sont jouées par `estimateWindWing` aux tests de vent du wingfoil), et une ligne tautologique de la VMG (`maneuvers: []` contre l'absence d'argument).
+- `buildSailingSessionStats` garde `sport` (il lit `getSportProfile(sport)`), seuls les trois masques et les vols reçoivent le profil.
+
 ## Après validation, passe de doc
 
 ETAT lignes 108, 119, 130, 314, 335 ; INVENTAIRE lignes 63, 64, 66, 300.

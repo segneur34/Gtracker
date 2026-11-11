@@ -121,7 +121,7 @@ console.log(`Mesuré : ${minutes(keptS)}${rec.header.windows ? ` sur ${minutes(s
 for (const [a, b] of windows) console.log(`  fenêtre ${clock(wallMsOf(rec, a))} → ${clock(wallMsOf(rec, b))} (${r1((b - a) / 1e6)} s)`);
 
 // --- Vols et pumping ---
-const flights = sailingFlights(track, cum, support, seuil, minVol);
+const flights = sailingFlights(track, cum, profile, seuil, minVol);
 const jumpDetection = profile.jumps?.detection;
 const jumps = jumpDetection && rec.header.setup.jumps !== false ? measureJumps(rec, jumpDetection, track, cum.cumDist).jumps : [];
 const pumping = measureFlightPumping(rec, P, track, cum, flights, jumps);

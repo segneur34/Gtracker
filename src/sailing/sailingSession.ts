@@ -114,7 +114,7 @@ export const prepareSailingTrack = (track: TrackPoint[], input: SailingTrackInpu
     referenceSpeedKn,
     trackData,
     tops: computeSailingTops(track, cumulative),
-    ratioMask: sailingRatioMask(track, sport),
+    ratioMask: sailingRatioMask(track, profile),
     suggestedSpeedRangeMs: suggestSpeedRangeMs(sport, referenceSpeedKn, track, cumulative),
     maneuverThresholds,
     detection: trackData.length > 0 ? prepareManeuverDetection(trackData, { minEntrySpeedKn, stillSpeedKn }) : null,
@@ -145,10 +145,10 @@ export interface SailingThresholdAnalysis {
 export const analyzeSailingAtThreshold = (prepared: PreparedSailingTrack, computeThresholdKn: number): SailingThresholdAnalysis => {
   const { track, cumulative, sport, profile, tops, ratioMask, trackData, detection, polarStage, maneuverThresholds } = prepared;
   const flightThresholdKn = hasActiveThreshold(profile) ? computeThresholdKn : undefined;
-  const activityMask = sailingActivityMask(track, sport, computeThresholdKn);
+  const activityMask = sailingActivityMask(track, profile, computeThresholdKn);
   const stats = buildSailingSessionStats(track, { sport, activeThresholdKn: computeThresholdKn, cumulative, tops, activityMask, ratioMask });
   const minFlightS = profile.pump?.minFlightS ?? null;
-  const flights = minFlightS === null ? [] : sailingFlights(track, cumulative, sport, activityMask, minFlightS);
+  const flights = minFlightS === null ? [] : sailingFlights(track, cumulative, profile, activityMask, minFlightS);
   const windEstimate =
     detection && polarStage
       ? estimateWind(trackData, {
@@ -211,7 +211,7 @@ export const analyzeSailingWind = (
   }
 
   // Variations du vent, mesurées aux manœuvres : la source retenue, la plus juste pour les angles.
-  const windStats = calculateWindStats(trackData, maneuverStats, currentWindValue);
+  const windStats = calculateWindStats(maneuverStats, currentWindValue);
   // Vent de référence de la VMG : le vent local interpolé entre manœuvres quand il existe, le vent global sinon.
   const windAt =
     currentWindValue === null ? null : windStats ? (timeMs: number) => windStats.windAt(timeMs) ?? currentWindValue : currentWindValue;
@@ -225,8 +225,8 @@ export const analyzeSailingWind = (
     maneuverStats,
     maneuverSummary: summarizeManeuvers(maneuverStats),
     windStats,
-    vmgStats: calculateVmgStats(trackData, windAt, computeThresholdKn, undefined, undefined, maneuvers),
-    vmgSeries: vmgSeries(trackData, windAt, computeThresholdKn, maneuvers),
+    vmgStats: calculateVmgStats(trackData, windAt, { minSpeedKn: computeThresholdKn, maneuvers }),
+    vmgSeries: vmgSeries(trackData, windAt, { minSpeedKn: computeThresholdKn, maneuvers }),
   };
 };
 

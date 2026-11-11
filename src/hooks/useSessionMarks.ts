@@ -14,6 +14,17 @@ export interface SessionMarksView {
   editable: boolean;
 }
 
+/** Surbrillance de « général » : le repère montré, par son instant en chaîne. */
+export interface MarkHighlight {
+  shownIn: (panel: 'general') => string | null;
+}
+
+/** Instant (ms) du repère de la liste de « général » montré sur les graphes et la carte, `null` sans repère montré. */
+export const shownMarkOf = (highlight: MarkHighlight): number | null => {
+  const key = highlight.shownIn('general');
+  return key === null ? null : Number(key);
+};
+
 /**
  * Repères du bouton « Note » d'une session, pour son analyse : ceux du
  * brouillon (`useSessionDraft`), placés sur la trace (`locateMarks`).

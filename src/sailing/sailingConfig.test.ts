@@ -8,7 +8,6 @@ import {
   MANEUVER_LOST_FLIGHT_S,
   MANEUVER_MIN_COHERENCE,
   SLOW_SESSION_ACTIVE_THRESHOLD_KN,
-  getStillSpeedKn,
   suggestActiveThresholdKn,
   resolveSailingThresholds,
   suggestSpeedRangeMs,
@@ -94,11 +93,6 @@ describe('seuils de la détection des manœuvres', () => {
 
   it('tient un virage de 270° ou plus pour un tour complet', () => {
     expect(MANEUVER_FULL_TURN_DEG).toBe(270);
-  });
-
-  it('lit le plancher d\'arrêt dans le profil du support, en nœuds', () => {
-    expect(getStillSpeedKn()).toBe(SPORT_PROFILES.wingfoil.stillThreshold);
-    expect(getStillSpeedKn('kite')).toBe(SPORT_PROFILES.kite.stillThreshold);
   });
 });
 

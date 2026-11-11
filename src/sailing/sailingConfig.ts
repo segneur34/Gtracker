@@ -13,18 +13,6 @@ import { knotsToMs } from '../core/units';
 /** Cibles de meilleurs segments de la voile : 2 s, 5 s, 10 s, 100 m, 500 m, 1000 m, 1 mille. */
 export { SAILING_TOP_TARGETS };
 
-/** Support voile retenu par défaut à l'ouverture du module. */
-export const DEFAULT_SAILING_SPORT: SportType = 'wingfoil';
-
-/** Seuil d'activité par défaut du support, en nœuds. */
-export const getDefaultThresholdKn = (sport: SportType = DEFAULT_SAILING_SPORT): number =>
-  SPORT_PROFILES[sport].defaultActiveThreshold;
-
-/** Plancher d'arrêt du support, en nœuds (`stillThreshold`) : en dessous, la planche est à l'arrêt. */
-export const getStillSpeedKn = (sport: SportType = DEFAULT_SAILING_SPORT): number =>
-  SPORT_PROFILES[sport].stillThreshold;
-
-
 /** Virage cumulé minimal, en degrés, pour qu'une inflexion soit une manœuvre. */
 export const MANEUVER_MIN_TURN_DEG = 60;
 

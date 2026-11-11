@@ -448,7 +448,7 @@ describe('polarExcludedPoints', () => {
     });
   };
   const rotation = (hz: number, faceS: number, before = 10) => ({
-    type: 'tack',
+    type: 'tack' as const,
     entryIndex: Math.round((before - 1) * hz),
     rotationEndIndex: Math.round((before + faceS + 1) * hz),
   });

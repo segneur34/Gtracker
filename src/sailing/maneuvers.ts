@@ -19,8 +19,6 @@ import {
   WIND_CONFIDENCE_MIN,
   WIND_ESTIMATION_MIN_SPEED_KN,
   WIND_UNCHECKED_CONFIDENCE_FACTOR,
-  getDefaultThresholdKn,
-  getStillSpeedKn,
 } from './sailingConfig';
 import { CANDIDATE_MIN_SEPARATION, buildWindTimeline, extendTurn, isTurningStep, prepareWindPolar, scanTurnWindow, slowestPoint, strideEnd, type PolarWindEstimate, type WindEstimate, type WindOrientationSource, type WindPolarStage } from './wind';
 
@@ -322,6 +320,8 @@ const POLAR_MIN_WEIGHT = 0.3;
 const MANEUVERS_FOR_FULL_WEIGHT = 4;
 /** Poids des manœuvres face à la polaire dans la fusion finale. */
 const MANEUVER_WEIGHT = 2;
+/** Coefficient appliqué à la confiance des manœuvres avant de la comparer à celle de la polaire, pour la confiance annoncée de l'estimation. */
+const MANEUVER_CONFIDENCE_DISCOUNT = 0.9;
 
 /**
  * Vrai pour une manœuvre dont on connaît le sens : virement ou empannage. Un
@@ -389,7 +389,7 @@ export interface WindEstimationOptions {
    * toute façon. C'est le seuil d'activité effectif du module, surcharge
    * comprise, pour qu'il n'y ait qu'une notion de réussite dans l'application.
    */
-  successThresholdKn?: number;
+  successThresholdKn: number;
   /**
    * Vitesse minimale d'entrée d'un virage, en nœuds, accordée à l'allure de la
    * session. Sans elle, aucun virage d'une session lente n'est observé, et
@@ -401,8 +401,8 @@ export interface WindEstimationOptions {
    * en dessous ne sont pas lues (`ManeuverOptions.flightThresholdKn`).
    */
   flightThresholdKn?: number;
-  /** Plancher d'arrêt, en nœuds (`ManeuverOptions.stillSpeedKn`). */
-  stillSpeedKn?: number;
+  /** Plancher d'arrêt, en nœuds (`stillThreshold` du profil, `ManeuverOptions.stillSpeedKn`). */
+  stillSpeedKn: number;
   /**
    * Détection préparée une fois sur `points` (`prepareManeuverDetection`), à
    * classer par candidat et par passe ; absente, l'estimation la prépare
@@ -494,7 +494,7 @@ export interface CandidateSelection {
 export const selectWindCandidate = (
   points: PointData[],
   polar: WindEstimate,
-  options: WindEstimationOptions = {}
+  options: WindEstimationOptions
 ): CandidateSelection => {
   const fallback: CandidateSelection = {
     direction: polar.direction,
@@ -578,7 +578,7 @@ export const selectWindCandidate = (
  */
 export const estimateWind = (
   points: PointData[],
-  options: WindEstimationOptions = {}
+  options: WindEstimationOptions
 ): WindEstimate => {
   // L'étage polaire et la détection sont préparés une fois, pour les candidats et les deux passes.
   const polarStage = polarStageFor(points, options);
@@ -624,7 +624,7 @@ export const estimateWind = (
   // confiance annoncée se rabat sur le soutien de la trace (`polarSampling`),
   // jusqu'à demander le vent à l'utilisateur. Les poids ci-dessus n'en
   // tiennent pas compte : la direction reste la même, seule la confiance baisse.
-  const confidence = Math.max(polarConfidence, maneuverConfidence * 0.9) * polarStage.sampling;
+  const confidence = Math.max(polarConfidence, maneuverConfidence * MANEUVER_CONFIDENCE_DISCOUNT) * polarStage.sampling;
 
   return {
     direction: roundBearingDeg(direction),
@@ -1345,14 +1345,15 @@ interface DetectionSettings {
   minTurnDeg: number;
 }
 
-/** Réglages de la seule détection, parmi `ManeuverOptions`. */
+/** Réglages de la seule détection, parmi `ManeuverOptions` ; le plancher d'arrêt, qui vient du profil, est obligatoire. */
 export type ManeuverDetectionOptions = Pick<
   ManeuverOptions,
-  'minEntrySpeedKn' | 'windowSeconds' | 'minWindowShare' | 'maxStepSeconds' | 'minDistanceM' | 'minCoherence' | 'fullTurnDeg' | 'coreRateDegS' | 'stillSpeedKn' | 'minTurnDeg'
->;
+  'minEntrySpeedKn' | 'windowSeconds' | 'minWindowShare' | 'maxStepSeconds' | 'minDistanceM' | 'minCoherence' | 'fullTurnDeg' | 'coreRateDegS' | 'minTurnDeg'
+> & Required<Pick<ManeuverOptions, 'stillSpeedKn'>>;
 
-/** Réglages du seul classement, parmi `ManeuverOptions` : ceux qui vont avec le vent. */
-export type ManeuverClassificationOptions = Pick<ManeuverOptions, 'successThresholdKn' | 'lostFlightSeconds' | 'flightThresholdKn' | 'cooldownSeconds'>;
+/** Réglages du seul classement, parmi `ManeuverOptions` : ceux qui vont avec le vent ; le seuil de réussite, qui vient de la session, est obligatoire. */
+export type ManeuverClassificationOptions = Pick<ManeuverOptions, 'lostFlightSeconds' | 'flightThresholdKn' | 'cooldownSeconds'> &
+  Required<Pick<ManeuverOptions, 'successThresholdKn'>>;
 
 const resolveDetectionSettings = (options: ManeuverDetectionOptions): DetectionSettings => ({
   minEntrySpeedKn: options.minEntrySpeedKn ?? MANEUVER_MIN_ENTRY_SPEED_KN,
@@ -1363,7 +1364,7 @@ const resolveDetectionSettings = (options: ManeuverDetectionOptions): DetectionS
   minCoherence: options.minCoherence ?? MANEUVER_MIN_COHERENCE,
   fullTurnDeg: options.fullTurnDeg ?? MANEUVER_FULL_TURN_DEG,
   coreRateDegS: options.coreRateDegS ?? MANEUVER_CORE_RATE_DEG_S,
-  stillSpeedKn: options.stillSpeedKn ?? getStillSpeedKn(),
+  stillSpeedKn: options.stillSpeedKn,
   minTurnDeg: options.minTurnDeg ?? MANEUVER_MIN_TURN_DEG,
 });
 
@@ -1476,7 +1477,7 @@ export interface ManeuverDetection {
  * borne basse de recherche du cœur du virage, qui seule dépend de la manœuvre
  * précédente, donc du vent.
  */
-export const prepareManeuverDetection = (points: PointData[], options: ManeuverDetectionOptions = {}): ManeuverDetection => {
+export const prepareManeuverDetection = (points: PointData[], options: ManeuverDetectionOptions): ManeuverDetection => {
   const settings = resolveDetectionSettings(options);
   const { minEntrySpeedKn, windowMs, minWindowShare, maxStepMs, minDistanceM, minCoherence, fullTurnDeg, coreRateDegS, stillSpeedKn, minTurnDeg } = settings;
   const n = points.length;
@@ -1667,11 +1668,11 @@ export const prepareManeuverDetection = (points: PointData[], options: ManeuverD
 export const classifyManeuvers = (
   detection: ManeuverDetection,
   wind: WindReference,
-  options: ManeuverClassificationOptions = {}
+  options: ManeuverClassificationOptions
 ): ManeuverStats => {
   const { points, settings } = detection;
   const { windowMs } = settings;
-  const successThresholdKn = options.successThresholdKn ?? getDefaultThresholdKn();
+  const { successThresholdKn } = options;
   const lostFlightMs = (options.lostFlightSeconds ?? MANEUVER_LOST_FLIGHT_S) * 1000;
   const cooldownMs = (options.cooldownSeconds ?? MANEUVER_COOLDOWN_S) * 1000;
   const flightThresholdKn = options.flightThresholdKn;

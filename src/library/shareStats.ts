@@ -47,6 +47,13 @@ const maneuverSuccessValue = (m: { success: number; total: number } | null | und
   m && m.total > 0 ? `${Math.round((m.success / m.total) * 100)} % (${m.success}/${m.total})` : DASH;
 
 /**
+ * Ligne « FC moyenne » de « général » et du partage, dans les deux modules : présente
+ * seulement si la session a assez de FC (`present`) ; une liste, à étaler dans les chiffres.
+ */
+export const heartRateShareStats = (heart: { present: boolean; stats: { avgBpm: number } | null }): ShareStat[] =>
+  heart.present && heart.stats ? [{ key: 'heartRate', label: 'FC moyenne', value: `${Math.round(heart.stats.avgBpm)} bpm` }] : [];
+
+/**
  * Lignes ajoutées de l'image de partage (`SHARE_EXTRA_KEYS`), dans leur ordre ;
  * la part du vol pompée sur foil seulement. Une valeur absente vaut « — ».
  */

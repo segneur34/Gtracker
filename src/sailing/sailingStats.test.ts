@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { computeKinematics } from '../core/kinematics';
 import { knotsToMs } from '../core/units';
 import { buildCumulativeTrack } from '../core/sessionStats';
+import { SPORT_PROFILES } from '../core/sportProfiles';
 import { phasesTrack } from '../test/track.fixture';
 import { buildSailingSessionStats, sailingActivityMask, sailingFlights, sailingRatioMask } from './sailingStats';
 
@@ -11,12 +12,15 @@ const START_MS = Date.parse('2026-10-21T10:00:00Z');
 const buildTrack = (phases: [number, number][], hz = 1) =>
   computeKinematics(phasesTrack(phases.map(([durationS, kn]): [number, number] => [durationS, knotsToMs(kn)]), hz, { startMs: START_MS }));
 
+/** Seuil par défaut du bateau : sans seuil d'activité, il est ignoré. */
+const BOAT_THRESHOLD_KN = SPORT_PROFILES.bateau.defaultActiveThreshold;
+
 describe('buildSailingSessionStats', () => {
   // 10 min à 4 nœuds, puis un bord de 5 min à 0,5 nœud.
   const track = buildTrack([[600, 4], [300, 0.5]]);
 
   it('bateau : toute la session en navigation, bord lent compris, seuil ignoré', () => {
-    for (const stats of [buildSailingSessionStats(track, { sport: 'bateau' })!, buildSailingSessionStats(track, { sport: 'bateau', activeThresholdKn: 3 })!]) {
+    for (const stats of [buildSailingSessionStats(track, { sport: 'bateau', activeThresholdKn: BOAT_THRESHOLD_KN })!, buildSailingSessionStats(track, { sport: 'bateau', activeThresholdKn: 3 })!]) {
       expect(stats.activeRatio).toBe('100.0');
       expect(stats.activeAvgSpeedMs!).toBeCloseTo(stats.avgSpeedMs!, 6);
     }
@@ -40,18 +44,18 @@ describe('buildSailingSessionStats', () => {
   });
 
   it('bateau : pas de temps en mouvement à part, sans seuil ni ratio', () => {
-    expect(buildSailingSessionStats(track, { sport: 'bateau' })!.inMotionTimeS).toBe(0);
+    expect(buildSailingSessionStats(track, { sport: 'bateau', activeThresholdKn: BOAT_THRESHOLD_KN })!.inMotionTimeS).toBe(0);
   });
 
   it.each(['wingfoil', 'windsurf', 'kite', 'bateau'] as const)("masques reçus tout faits : mêmes chiffres qu'à les refaire (%s)", (sport) => {
     const sailed = buildTrack([[300, 0], [600, 15], [300, 3], [120, 9], [300, 0]], 5);
     const cumulative = buildCumulativeTrack(sailed);
-    const ratioMask = sailingRatioMask(sailed, sport);
+    const ratioMask = sailingRatioMask(sailed, SPORT_PROFILES[sport]);
     for (const activeThresholdKn of [3, 7, 8.5, 12]) {
-      const activityMask = sailingActivityMask(sailed, sport, activeThresholdKn);
+      const activityMask = sailingActivityMask(sailed, SPORT_PROFILES[sport], activeThresholdKn);
       expect(buildSailingSessionStats(sailed, { sport, activeThresholdKn, cumulative, activityMask, ratioMask }))
         .toEqual(buildSailingSessionStats(sailed, { sport, activeThresholdKn, cumulative }));
-      expect(sailingFlights(sailed, cumulative, sport, activityMask, 10)).toEqual(sailingFlights(sailed, cumulative, sport, activeThresholdKn, 10));
+      expect(sailingFlights(sailed, cumulative, SPORT_PROFILES[sport], activityMask, 10)).toEqual(sailingFlights(sailed, cumulative, SPORT_PROFILES[sport], activeThresholdKn, 10));
     }
   });
 });
@@ -62,17 +66,17 @@ describe('sailingFlights', () => {
 
   it.each([1, 5])('vols au-dessus du seuil, ceux de moins de 10 s écartés, numérotés dans l’ordre (%s Hz)', (hz) => {
     const track = buildTrack(phases, hz);
-    const flights = sailingFlights(track, buildCumulativeTrack(track), 'wingfoil', 8, 10);
+    const flights = sailingFlights(track, buildCumulativeTrack(track), SPORT_PROFILES.wingfoil, 8, 10);
     expect(flights.map((f) => f.n)).toEqual([1, 2]);
     expect(Math.abs(flights[0].durationS - 120)).toBeLessThanOrEqual(2);
     expect(Math.abs(flights[1].durationS - 90)).toBeLessThanOrEqual(2);
     expect(Math.abs(flights[0].distanceM - 120 * knotsToMs(15)) / (120 * knotsToMs(15))).toBeLessThan(0.03);
-    expect(sailingFlights(track, buildCumulativeTrack(track), 'wingfoil', 8, 0)).toHaveLength(3);
+    expect(sailingFlights(track, buildCumulativeTrack(track), SPORT_PROFILES.wingfoil, 8, 0)).toHaveLength(3);
   });
 
   it('rien en bateau, sans seuil', () => {
     const track = buildTrack(phases);
-    expect(sailingFlights(track, buildCumulativeTrack(track), 'bateau', 8, 10)).toEqual([]);
+    expect(sailingFlights(track, buildCumulativeTrack(track), SPORT_PROFILES.bateau, 8, 10)).toEqual([]);
   });
 
   it.each([1, 5])('un trou de la trace parcouru en vol reste dans le vol, un trou immobile le coupe (%s Hz)', (hz) => {
@@ -82,14 +86,14 @@ describe('sailingFlights', () => {
     const moving = raw.filter((p) => t(p) <= 150 || t(p) >= 210);
     const profile = { medianWindowSeconds: 3, maxSpeedMs: 30, maxGapS: 10 };
     const movingTrack = computeKinematics(moving, profile);
-    const movingFlights = sailingFlights(movingTrack, buildCumulativeTrack(movingTrack), 'wingfoil', 8, 10);
+    const movingFlights = sailingFlights(movingTrack, buildCumulativeTrack(movingTrack), SPORT_PROFILES.wingfoil, 8, 10);
     expect(movingFlights.map((f) => f.n)).toEqual([1]);
     expect(Math.abs(movingFlights[0].durationS - 300)).toBeLessThanOrEqual(3);
     // Le même silence sans avancer (GPS coupé à l'arrêt, la trace est vers l'est) : deux vols, et le trou hors des deux.
     const lonShift = raw.find((q) => t(q) >= 210)!.lon - raw.find((q) => t(q) >= 150)!.lon;
     const still = moving.map((p) => (t(p) >= 210 ? { ...p, lon: p.lon - lonShift } : p));
     const stillTrack = computeKinematics(still, profile);
-    const stillFlights = sailingFlights(stillTrack, buildCumulativeTrack(stillTrack), 'wingfoil', 8, 10);
+    const stillFlights = sailingFlights(stillTrack, buildCumulativeTrack(stillTrack), SPORT_PROFILES.wingfoil, 8, 10);
     expect(stillFlights.map((f) => f.n)).toEqual([1, 2]);
     expect(Math.abs(stillFlights[0].durationS + stillFlights[1].durationS - 240)).toBeLessThanOrEqual(3);
   });
