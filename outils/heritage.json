@@ -17,8 +17,10 @@
   "land[A-Z]…": {
     "src/App.tsx": 3,
     "src/core/analysisTabs.test.ts": 1,
+    "src/hooks/recorder/recovery.ts": 2,
+    "src/hooks/recorder/store.ts": 2,
     "src/hooks/useRecorder.resume.test.ts": 5,
-    "src/hooks/useRecorder.ts": 6
+    "src/hooks/useRecorder.ts": 2
   },
   "fractionné, musculation, Entraînement": {
     "src/architecture.test.ts": 2,
