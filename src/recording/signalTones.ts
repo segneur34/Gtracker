@@ -1,7 +1,7 @@
 import type { PatternTone } from '../platform/beeper';
 
 /**
- * Signaux sonores du guidage du test de FC de repos (lot 187) : un court au départ, un long à la fin.
+ * Signaux sonores du guidage du test de FC de repos : un court au départ, un long à la fin.
  */
 
 /** Un signal du guidage : départ, fin du test. */

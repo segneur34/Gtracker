@@ -4,7 +4,7 @@ import { SPORT_FAMILIES, SPORT_PROFILES } from './sportProfiles';
 import type { SportType } from './types';
 
 /**
- * Couleurs des familles et nuances des activités (§10, point 90) : lisibles
+ * Couleurs des familles et nuances des activités : lisibles
  * sur fond blanc, distinctes, et la couleur de famille du thème égale à la
  * première nuance.
  */

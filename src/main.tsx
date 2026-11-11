@@ -59,7 +59,7 @@ void initStorage()
     const afterRecovery = () => {
       if (!isRecordingActive()) clearStaleScreenOn();
       // Fichiers reçus d'une autre application : rangés hors enregistrement, un enregistrement repris les fait attendre.
-      // Un GPX d'itinéraire va dans les itinéraires (lot 194).
+      // Un GPX d'itinéraire va dans les itinéraires.
       void startIncomingFiles(isRecordingActive, subscribeToRecorder, incomingFiles, importRouteGpx);
     };
     void recovered.then(afterRecovery, afterRecovery);

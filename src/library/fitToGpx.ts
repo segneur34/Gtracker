@@ -38,7 +38,7 @@ const fixOf = (record: FitRecord): LocationFix => ({
   altitudeM: record.altitudeM,
   speedMs: record.speedMs,
   heartRateBpm: record.heartRateBpm,
-  // La cadence du FIT n'est plus écrite : elle est partie avec la course et le vélo (lot 303).
+  // La cadence du FIT n'est plus écrite : elle est partie avec la course et le vélo.
 });
 
 /**
@@ -80,7 +80,7 @@ export type FitConversion =
   | { kind: 'not-activity' }
   /** Une activité qu'on ne peut pas ranger, avec la raison en clair. */
   | { kind: 'refused'; reason: string }
-  /** Une activité d'un sport que Gtracker ne range pas (course, vélo) : comptée à part, sans être nommée (lot 321). */
+  /** Une activité d'un sport que Gtracker ne range pas (course, vélo) : comptée à part, sans être nommée. */
   | { kind: 'other-sport' };
 
 /** Vrai si le FIT est une activité, sans en lire la suite : `false` pour un autre type ou un fichier qui n'est pas un FIT. */

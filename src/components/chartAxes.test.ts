@@ -6,7 +6,7 @@ import type { ChartZoom } from '../hooks/useChartZoom';
 import { chartXAxis, distanceX, elapsedX, timeOfDayX } from './chartAxes';
 import { CHART_TICK } from './chartStyle';
 
-/** Formats d'avant le lot 60, recopiés tels quels (copie gelée). */
+/** Formats d'axe d'avant `chartAxes`, recopiés tels quels (copie gelée). */
 const oldDistance = (symbol: string) => (v: number) => `${toFixedNumber(v, 3)} ${symbol}`;
 const oldElapsed = (v: number) => formatClockMinutes(v);
 const oldTimeOfDay = (startMs: number | undefined) => (v: number) => (startMs !== undefined ? formatTimeOfDay(startMs + v * 60000).slice(0, 5) : '');

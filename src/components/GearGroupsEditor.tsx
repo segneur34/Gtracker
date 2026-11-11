@@ -61,7 +61,7 @@ function AddField({ placeholder, button, testId, onAdd }: {
 }
 
 /**
- * Matériel enregistré d'une activité (Réglages, partie « Matériel », fiche 18), posé en ligne
+ * Matériel enregistré d'une activité (Réglages, partie « Matériel »), posé en ligne
  * sous la case : « Créer groupe matériel » ajoute un groupe (« Voile », « Aile avant », « Mât »…),
  * chaque groupe se déplie (chevron, replié par défaut, un groupe neuf s'ouvre) sur ses
  * lignes et le champ d'ajout d'une ligne. Groupes et lignes se renomment et se suppriment.

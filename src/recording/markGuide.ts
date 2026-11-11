@@ -192,8 +192,8 @@ export const stepMarkGuide = (
 };
 
 /**
- * Rejoue en silence le guidage sur les positions déjà gardées, à la reprise après une chute du moteur de la page
- * (lot 156). Entre deux segments, la position suivante se juge seule, comme à la reprise d'une pause manuelle. Rien
+ * Rejoue en silence le guidage sur les positions déjà gardées, à la reprise après une chute du moteur de la page.
+ * Entre deux segments, la position suivante se juge seule, comme à la reprise d'une pause manuelle. Rien
  * ne garde les balises passées à la main : une balise ainsi laissée redevient visée si le rejeu ne la valide pas.
  */
 export const replayMarkGuide = (

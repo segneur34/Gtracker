@@ -26,13 +26,13 @@ export const CLIQUET = {
   'fractionné, musculation, Entraînement': /[Ff]ractionn|[Mm]uscu|Entraînement/g,
   'à pied': /à pied|À pied/g,
   'vélo': /[Vv]élo/g,
-  'Gravel, VTT': /Gravel|VTT/g,
   'runner': /runner|Runner|RUNNER/g,
   'segneur34': /segneur34/g,
 }
 
 /** Motifs refusés en dur : aucune occurrence tolérée dans src/. */
 export const DURS = {
+  'Gravel, VTT': /Gravel|VTT/g,
   'chemin du poste (C:\\Users)': /C:\\Users/g,
   'plans de Claude': /\.claude\/plans/g,
   'dossier du poste (D:\\gong)': /D:\\gong/g,

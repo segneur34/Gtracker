@@ -151,8 +151,8 @@ describe('liveFieldValue', () => {
   });
 });
 
-describe('libellés sur les options du direct (lot 67)', () => {
-  // Copie gelée des libellés d'avant le lot 67, tirés de LIVE_STATS_DEFAULTS.
+describe('libellés sur les options du direct', () => {
+  // Copie gelée des libellés d'avant leur déplacement sur les options, tirés de LIVE_STATS_DEFAULTS.
   const oldRecentWindowLabel = `${Math.round(LIVE_STATS_DEFAULTS.recentWindowS / 60)} min`;
   const [TOP_SHORT_S, TOP_LONG_S] = LIVE_STATS_DEFAULTS.topDurationsS;
 

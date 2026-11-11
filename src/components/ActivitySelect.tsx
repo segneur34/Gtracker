@@ -25,7 +25,7 @@ import './ActivitySelect.css';
  *
  * Une activité cachée dans Réglages, ou d'une famille cachée, n'y est pas
  * proposée, sauf si c'est celle choisie : l'analyse d'une session cachée
- * garde son activité (§10, point 100).
+ * garde son activité.
  */
 
 interface ActivitySheetProps {

@@ -183,7 +183,7 @@ describe('fichier des capteurs', () => {
   });
 });
 
-describe('version du fichier (lot 160)', () => {
+describe('version du fichier', () => {
   it('refuse un fichier d une version plus récente, sans le lire de travers', async () => {
     const recent = await encodeImu({ ...HEADER, version: IMU_VERSION + 1 }, [], 1);
     expect(decodeImuHeader(recent)).toBeNull();

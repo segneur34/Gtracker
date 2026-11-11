@@ -24,7 +24,7 @@ export const parentPage = (pathname: string, search: string): string | null => {
   }
   // Le test de FC repos : le Profil, où est son entrée.
   if (path === RESTING_HR_PATH) return '/profil';
-  // Tutoriels (lot 147) : une leçon remonte à la liste, d'où qu'on l'ait ouverte (carte de l'accueil comprise), la liste à Réglages.
+  // Tutoriels : une leçon remonte à la liste, d'où qu'on l'ait ouverte (carte de l'accueil comprise), la liste à Réglages.
   if (parts[0] === 'tutoriels') return parts.length > 1 ? '/tutoriels' : '/parametres';
   if (path === '/statistiques') {
     const params = new URLSearchParams(search);

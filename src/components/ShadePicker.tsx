@@ -3,7 +3,7 @@ import './ShadePicker.css';
 
 /**
  * Couleur d'une activité : une rangée de pastilles, les nuances de sa famille
- * (`FAMILY_SHADES`, §10, point 90). Une couleur hors de la rangée (reprise
+ * (`FAMILY_SHADES`). Une couleur hors de la rangée (reprise
  * d'un autre appareil) n'en coche aucune. En sombre, chaque pastille montre sa
  * nuance sombre (`shadeForTheme`) ; la valeur choisie reste la nuance claire.
  */

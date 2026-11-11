@@ -14,13 +14,13 @@ describe('presetOf', () => {
     }
   });
 
-  it("virages mesurés d'office pour Surf et Surf foil, pas pour une activité créée en surf (lot 40)", () => {
+  it("virages mesurés d'office pour Surf et Surf foil, pas pour une activité créée en surf", () => {
     expect(presetOf(SURF_ACTIVITY).turns).toBe(true);
     expect(presetOf(SURF_FOIL_ACTIVITY).turns).toBe(true);
     expect(presetOf({ id: 'a-paddle', base: 'surf' }).turns).toBeUndefined();
   });
 
-  it("foil coché d'office pour Windfoil, Kitefoil, Surf foil et Pumping, pumping pour Pumping seul (lot 335)", () => {
+  it("foil coché d'office pour Windfoil, Kitefoil, Surf foil et Pumping, pumping pour Pumping seul", () => {
     const byId = (id: string) => DEFAULT_ACTIVITIES.find((a) => a.id === id)!;
     for (const id of ['a-windfoil', 'a-kitefoil', 'a-surf-foil', 'a-pumping']) expect(presetOf(byId(id)).foil, id).toBe(true);
     for (const id of ['windsurf', 'kite', 'surf', 'a-paddle', 'bateau', 'a-parawing']) expect(presetOf(byId(id)).foil, id).toBeUndefined();

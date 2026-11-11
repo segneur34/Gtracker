@@ -3,7 +3,7 @@ import { ATHLETE_BOUNDS, athleteName, type AthleteNumberField, type AthleteProfi
 import { ROOT_GOAL } from './rootGrowth';
 
 /**
- * Règles du Profil liées à la mémoire et à l'accueil, pures (lot 72) :
+ * Règles du Profil liées à la mémoire et à l'accueil, pures :
  * objectif de la racine, champs que le pop-up demande, et quand il s'ouvre.
  */
 
@@ -32,7 +32,7 @@ export const athleteRootGoalMin = (profile: Partial<Pick<AthleteProfile, 'rootWe
 };
 
 /**
- * Champs que le pop-up de l'accueil demande tant qu'ils manquent : le pseudo et l'année de naissance (lot 301) ;
+ * Champs que le pop-up de l'accueil demande tant qu'ils manquent : le pseudo et l'année de naissance ;
  * sexe, poids et taille ne sont plus demandés, ils se règlent dans Réglages › Pratiquant ; la FC max et la FC repos
  * viennent des tests.
  */

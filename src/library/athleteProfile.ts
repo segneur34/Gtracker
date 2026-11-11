@@ -4,7 +4,7 @@ import { heartRateZones, isValidThresholds, type HeartRateZones } from '../core/
 import type { HeartRateProfile } from '../core/sportProfiles';
 
 /**
- * Profil du pratiquant, pur (lot 72) : sa forme, ses champs relus avec
+ * Profil du pratiquant, pur : sa forme, ses champs relus avec
  * contrôle (fichier de réglages importé, ancien profil), son âge et ses zones
  * cardiaques. Le magasin et ses écritures restent dans `hooks/useAthleteProfile.ts`,
  * les règles du pop-up et de la racine dans `library/profile.ts`.

@@ -76,7 +76,7 @@ export default function SailingGraphsPanel({
 
       {folds.open.vitesse ? (
       <ResizablePanel id="sailing.graph.vitesse" defaultHeight={350} minWidth={250} minHeight={200} style={{ flex: 'none', width: '500px', overflow: 'hidden', border: '1px dashed var(--line-strong)', padding: '10px', backgroundColor: 'var(--surface)', display: 'flex', flexDirection: 'column' }}>
-        {/* Le graphe suit le zoom, pas le module ni la polaire (lot 127). */}
+        {/* Le graphe suit le zoom, pas le module ni la polaire. */}
         <ZoomView zoom={chartZoom}>
           {(z) => (
             <>

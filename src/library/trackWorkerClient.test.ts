@@ -8,7 +8,7 @@ import { resetTrackWorker, runInWorker } from './trackWorkerClient';
 import { handleTrackRequest, type TrackRequest, type TrackResponse } from './trackWorkerProtocol';
 
 /**
- * Client du worker des traces (lot 126 B), sous node par un faux worker : il répond par le vrai aiguillage
+ * Client du worker des traces, sous node par un faux worker : il répond par le vrai aiguillage
  * (`handleTrackRequest`), messages passés par un clonage structuré à l'aller et au retour, comme un vrai. Un seul
  * worker pour plusieurs demandes, réponses rendues par leur identifiant, worker mort ou refusé : calcul en ligne,
  * mêmes chiffres, mêmes erreurs.

@@ -87,7 +87,7 @@ describe('sauts mesurés par défaut (05/11)', () => {
   });
 });
 
-describe('virages mesurés par le gyroscope (lot 40)', () => {
+describe('virages mesurés par le gyroscope', () => {
   const paddle = { id: 'a-paddle', name: 'Paddle', base: 'surf' as const, color: '#8292a6' };
 
   it('cochés pour Surf et Surf foil, décochés pour une activité créée en surf, absents hors surf', () => {
@@ -114,7 +114,7 @@ describe('virages mesurés par le gyroscope (lot 40)', () => {
   });
 });
 
-describe("foil et pumping d'office des activités de départ (lot 335)", () => {
+describe("foil et pumping d'office des activités de départ", () => {
   it('foil coché pour Wingfoil, Parawing, Windfoil, Kitefoil, Surf foil et Pumping, pas pour les autres', () => {
     const on = DEFAULT_ACTIVITIES.filter((a) => resolveFoil({}, a)).map((a) => a.id);
     expect(on).toEqual(['wingfoil', 'a-parawing', 'a-windfoil', 'a-kitefoil', 'a-surf-foil', 'a-pumping']);
@@ -268,10 +268,10 @@ describe('isActivityOverridden', () => {
   });
 });
 
-describe('bornes de couleur par défaut, tenues par le profil du calcul (lot 72)', () => {
+describe('bornes de couleur par défaut, tenues par le profil du calcul', () => {
   const kmh = (v: number) => v / 3.6;
   const custom = (base: keyof typeof expected) => ({ id: `a-${base}`, name: base, base, color: '#000000' });
-  /** Valeurs d'avant le lot 72, gelées : les constantes de sport et la table du traitement qu'elles remplacent. */
+  /** Valeurs d'avant leur déplacement dans le profil, gelées : les constantes de sport et la table du traitement qu'elles remplacent. */
   const expected = {
     wingfoil: [knotsToMs(8), knotsToMs(28)], windsurf: [knotsToMs(8), knotsToMs(28)], kite: [knotsToMs(8), knotsToMs(28)],
     bateau: [knotsToMs(1), knotsToMs(15)], surf: [kmh(5), kmh(30)],
@@ -300,7 +300,7 @@ describe('bornes de couleur par défaut, tenues par le profil du calcul (lot 72)
   });
 });
 
-describe("écriture d'un réglage par la table des champs (lot 72)", () => {
+describe("écriture d'un réglage par la table des champs", () => {
   const run = byId('surf');
   const wing = byId('wingfoil');
   const base: StoredSettings = { thresholds: { kite: 9 } };
@@ -338,7 +338,7 @@ describe("écriture d'un réglage par la table des champs (lot 72)", () => {
   });
 });
 
-describe('réglages abîmés relus avec contrôle (lot 117)', () => {
+describe('réglages abîmés relus avec contrôle', () => {
   const run = byId('surf');
   const wrong = (v: unknown) => v as never;
 

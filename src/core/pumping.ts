@@ -9,14 +9,14 @@ import { spanOfRun, type ActiveRun, type TrackSpan } from './sessionStats';
 import type { CumulativeTrack, TrackPoint } from './types';
 
 /**
- * Pumping sur foil, commun au surf (§10, point 104) et à la voile (lot 22),
+ * Pumping sur foil, commun au surf et à la voile,
  * mesuré par l'accéléromètre et le gyroscope du téléphone fixé sur la
  * poitrine, depuis le `.imu` de la session, vol par vol : les vols viennent
  * du module (`SurfFlight` en surf, `sailingFlights` en voile). Tout est en
  * SI : instants du fichier en µs, heures en ms, accélérations en m/s²,
  * distances en mètres. L'élagage propre au surf reste dans `surfing/imuPrune.ts`.
  *
- * Le vol (la planche lancée) n'est pas le pumping (lot 50, décision du 31/10) :
+ * Le vol (la planche lancée) n'est pas le pumping :
  * le pumping se cherche seulement en vol, et seulement là où une cadence
  * régulière de coups le valide, par séries.
  *

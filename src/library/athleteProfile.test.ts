@@ -57,7 +57,7 @@ describe('athleteHrSource', () => {
   });
 });
 
-describe('sanitizeAthleteProfile (fichier de réglages repris, lot 143)', () => {
+describe('sanitizeAthleteProfile (fichier de réglages repris)', () => {
   const GOAL = { min: 15, max: 600 };
 
   it('garde les champs valides et vide ceux hors plage ou de travers', () => {

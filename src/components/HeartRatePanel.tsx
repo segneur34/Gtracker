@@ -62,7 +62,7 @@ const minutesLabel = (v: unknown) => formatClock(Number(v) * 60_000);
  * au-dessus : dans le panneau, et sous la carte en plein écran. `minutes` est
  * le temps de chaque point de la trace (`useTimeChartAxis`) ; `children` ajoute
  * des éléments au graphe (bandes des phases, traits des repères). Elle suit
- * son zoom elle-même : zoomer ne redessine qu'elle (lot 127).
+ * son zoom elle-même : zoomer ne redessine qu'elle.
  */
 function CardioCurve({ minutes, smoothed, zoom: source, zones, thresholds, zoneLines = false, onShowOnMap, style, children }: {
   minutes: readonly number[];
@@ -225,5 +225,5 @@ function HeartRatePanel({
   );
 }
 
-/** Mémoïsé : le zoom d'un autre graphe de l'analyse ne le redessine pas (lot 63). */
+/** Mémoïsé : le zoom d'un autre graphe de l'analyse ne le redessine pas. */
 export default memo(HeartRatePanel);

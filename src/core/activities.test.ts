@@ -24,7 +24,7 @@ describe('readActivities', () => {
     expect(DEFAULT_ACTIVITIES[0].name).toBe('Wingfoil');
   });
 
-  it('la liste de départ (lot 335) : onze activités, leur calcul, quatre visibles', () => {
+  it('la liste de départ : onze activités, leur calcul, quatre visibles', () => {
     expect(DEFAULT_ACTIVITIES.map((a) => [a.id, a.name, a.base, a.hidden === true])).toEqual([
       ['wingfoil', 'Wingfoil', 'wingfoil', false],
       ['a-parawing', 'Parawing', 'wingfoil', true],
@@ -168,7 +168,7 @@ describe('activityCounts', () => {
   });
 });
 
-describe('familles et activités cachées (point 100)', () => {
+describe('familles et activités cachées', () => {
   // Surf foil est déjà cachée au départ : `hiddenFoil` en garde la forme, `withFoilHidden` est la liste de départ.
   const hiddenFoil = withHidden(SURF_FOIL_ACTIVITY, true);
   const withFoilHidden = DEFAULT_ACTIVITIES;

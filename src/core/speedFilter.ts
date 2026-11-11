@@ -208,7 +208,7 @@ export const medianFilterByTimeFrom = (
   while (start > 0 && timesMs[from] - timesMs[start - 1] <= halfWindowMs) start--;
   let end = from;
 
-  // Fenêtre triée tenue à jour (lot 56) : `start` et `end` ne font qu'avancer,
+  // Fenêtre triée tenue à jour : `start` et `end` ne font qu'avancer,
   // on insère `values[end]` et on retire `values[start]` au lieu de trier la
   // fenêtre à chaque point. Même ordre que le tri stable de `median` : une
   // valeur entre après ses égales (elle a le plus grand indice de la fenêtre),

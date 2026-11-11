@@ -7,7 +7,7 @@ import {
 import { withSummary, type AnalyzedGpx } from './summaryOptions';
 
 /**
- * Fiche d'une session qui entre dans la mémoire (lot 113, sortie de la bibliothèque) : neuve, ou celle qui
+ * Fiche d'une session qui entre dans la mémoire : neuve, ou celle qui
  * l'accompagne, avec ce que l'enregistrement y range. L'horloge est passée en paramètre : la bibliothèque
  * donne `Date.now`.
  */

@@ -15,7 +15,7 @@ import { isActivityIconId, type ActivityIconId } from './activityIcons';
  * automatique) sont rangés sous l'identifiant de l'activité. Une activité de
  * base, construite à la volée pour un calcul sans activité, porte
  * l'identifiant du calcul lui-même : c'est sous lui que les réglages étaient
- * rangés avant les activités (§10, point 53), ils restent donc valables.
+ * rangés avant les activités, ils restent donc valables.
  */
 
 export interface Activity {
@@ -28,7 +28,7 @@ export interface Activity {
   color: string;
   /**
    * Cachée dans Réglages : ni proposée, ni listée, ses sessions comprises ;
-   * rien n'est effacé, la ré-afficher rend tout (§10, point 100).
+   * rien n'est effacé, la ré-afficher rend tout.
    */
   hidden?: true;
   /** Icône choisie dans Réglages ; absente, elle est devinée du nom et du calcul (`activityIcon`). */
@@ -36,7 +36,7 @@ export interface Activity {
 }
 
 /**
- * Nuances de chaque famille (§10, point 90) : la première est la couleur de la
+ * Nuances de chaque famille : la première est la couleur de la
  * famille (`--voile`, `--surf` de `theme/tokens.css`, qui porte du texte
  * blanc, contraste d'au moins 4,5 sur blanc) ; les suivantes, d'un contraste
  * d'au moins 3, vont aux activités dans cet ordre (`nextActivityColor`).
@@ -45,13 +45,12 @@ export interface Activity {
  */
 export const FAMILY_SHADES: Record<SportFamily, readonly string[]> = {
   voile: ['#004aad', '#014e86', '#5b87f2', '#4458c2', '#192f94', '#0c92ce'],
-  // Gris un peu teintés, bleutés ou chauds : des gris purs ne se sépareraient que par leur clarté (point 97).
+  // Gris un peu teintés, bleutés ou chauds : des gris purs ne se sépareraient que par leur clarté.
   surf: ['#5b6670', '#8292a6', '#847c6e', '#223246', '#2e2610', '#0a1a2e'],
 };
 
 /**
- * Les mêmes nuances, au même rang, en thème sombre (lot 12, décision du
- * 28/10) : la première est la couleur de famille sombre de `theme/tokens.css`,
+ * Les mêmes nuances, au même rang, en thème sombre : la première est la couleur de famille sombre de `theme/tokens.css`,
  * éclaircie d'un cran, texte blanc gardé (contraste d'au moins 4,5) ; une
  * nuance lisible sur le fond sombre (contraste d'au moins 3 sur `--surface`)
  * reste celle du clair, les autres sont éclaircies, teinte gardée, et restent
@@ -81,12 +80,12 @@ export const BASE_COLOR: Record<SportType, string> = {
   surf: FAMILY_SHADES.surf[0],
 };
 
-/** Activités de la famille Surf (§10, point 97) ; le foil de « Surf foil » et de « Pumping » est coché d'office (`settings/activityPresets.ts`). */
+/** Activités de la famille Surf ; le foil de « Surf foil » et de « Pumping » est coché d'office (`settings/activityPresets.ts`). */
 export const SURF_ACTIVITY: Activity = { id: 'surf', name: 'Surf', base: 'surf', color: BASE_COLOR.surf };
 export const SURF_FOIL_ACTIVITY: Activity = { id: 'a-surf-foil', name: 'Surf foil', base: 'surf', color: FAMILY_SHADES.surf[1], hidden: true };
 
 /**
- * Au premier lancement (lot 335) : onze activités, quatre visibles (Wingfoil,
+ * Au premier lancement : onze activités, quatre visibles (Wingfoil,
  * Kite, Surf, Pumping) et sept cachées, que l'œil de Réglages ré-affiche. La
  * principale de chaque calcul porte l'identifiant du calcul (celui des anciens
  * réglages), les autres le préfixe `a-`. Le foil et le pumping d'office sont dans
@@ -163,7 +162,7 @@ export const activitiesOfFamily = (activities: Activity[], family: SportFamily):
   activities.filter((a) => activityFamily(a) === family);
 
 /**
- * Famille cachée (§10, point 100) : cachée dans Réglages, ou sans activité
+ * Famille cachée : cachée dans Réglages, ou sans activité
  * visible, qu'elles soient toutes cachées ou qu'elle n'en ait aucune (choix de
  * l'utilisateur). Une activité ajoutée dans Réglages la fait revenir.
  */

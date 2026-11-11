@@ -28,7 +28,7 @@ const draftOf = (profile: AthleteProfile): Draft => ({
 
 /**
  * Pop-up de l'accueil, dans l'application : tant que le profil n'est pas rempli
- * (pseudo et année de naissance depuis le lot 301 : `missingProfileFields`), il
+ * (pseudo et année de naissance : `missingProfileFields`), il
  * s'ouvre une fois par lancement. Posé par l'accueil une fois la mémoire et la
  * carte des autorisations décidées, il tranche à son arrivée ; `otherCardShown` :
  * l'une d'elles est à l'écran, et il attend le lancement suivant. `onDecided`

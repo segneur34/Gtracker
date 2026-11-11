@@ -346,7 +346,7 @@ describe('vols d’une suite de plages actives', () => {
     }
     const t = (i: number) => (points[i].timeMs - W) / 1000;
     // Le trou, immobile (points posés au même endroit), est inactif dans le masque, comme `computeActivityMask`
-    // le poserait ; c'est le masque seul qui coupe (Q56), pas la durée du pas.
+    // le poserait ; c'est le masque seul qui coupe, pas la durée du pas.
     const mask = points.map((_, i) => ((t(i) > 10 && t(i) <= 40) || (t(i) > 50 && t(i) <= 55) || (t(i) > 70 && t(i) <= 120)) && t(i) !== 105);
     return { points, runs: activeRuns(points, mask) };
   };

@@ -9,7 +9,7 @@ import {
 import { summarizeSession, type SummaryOptions } from './summary';
 
 /**
- * Préparation du résumé d'une fiche (lot 72) : les réglages qui le changent,
+ * Préparation du résumé d'une fiche : les réglages qui le changent,
  * la lecture du GPX et le nouveau résumé gardé avec ses manœuvres. Pur : les
  * réglages de l'activité sont lus par l'appelant (`useSessionLibrary`) et
  * passés en paramètre.
@@ -22,7 +22,7 @@ import { summarizeSession, type SummaryOptions } from './summary';
  * cette lecture. Quand l'activité ou le calcul de la session change
  * (`applyRecordPatch`), le foil et le pumping de la fiche repassent à `null` et
  * le résumé porté est oublié : la session prend ceux de sa nouvelle activité
- * (lot 314), pas ceux du matériel de l'ancienne.
+ *, pas ceux du matériel de l'ancienne.
  */
 
 /** Réglages de l'activité d'une session qui changent son résumé, lus dans Réglages par l'appelant. */
@@ -35,7 +35,7 @@ export interface ActivitySummarySettings {
 
 /**
  * Réglages de l'activité qui valent pour une session : celui d'un geste dans Réglages en attente de
- * recalcul (`pending`, `library/summaryGestures.ts`), sinon ceux portés par sa fiche (Q57, lot 148), sinon
+ * recalcul (`pending`, `library/summaryGestures.ts`), sinon ceux portés par sa fiche, sinon
  * ceux de l'appareil (`device`) ; sans fiche ni porté connu, ceux de l'appareil. La seule lecture : liste et
  * analyses passent par elle. Le seuil propre de la session prime encore sur ce résultat (`summaryOptions`).
  */
@@ -86,8 +86,7 @@ export const summaryOptions = (
 };
 
 /**
- * Empreinte des réglages qui changent le résumé, gardée dans le résumé (`SessionSummary.optionsKey`,
- * lot 37) : seuil, allure imposée, foil en surf (ailleurs il ne change pas le résumé) et seuil de
+ * Empreinte des réglages qui changent le résumé, gardée dans le résumé (`SessionSummary.optionsKey`) : seuil, allure imposée, foil en surf (ailleurs il ne change pas le résumé) et seuil de
  * vague.
  */
 export const summaryOptionsKey = (sport: SportType, options: SummaryOptions): string =>
@@ -103,7 +102,7 @@ export const summaryOptionsKey = (sport: SportType, options: SummaryOptions): st
  * l'empreinte, ou avec d'autres réglages que ceux de sa fiche (allure imposée de la session changée,
  * fiche changée sur un autre appareil : le test est le même sur les deux, donc pas de renvoi), ou si
  * un geste dans Réglages attend d'être appliqué à son activité (`pendingOf`). Des réglages différents
- * sur cet appareil, seuls, ne rendent rien à refaire (Q57) : `activityOf` ne vaut que pour ce que la fiche
+ * sur cet appareil, seuls, ne rendent rien à refaire : `activityOf` ne vaut que pour ce que la fiche
  * ne porte pas. Ne lit que la fiche allégée et les réglages, jamais le GPX. Sans calcul connu ou sans
  * positions (résumé sans réglage), seule la version compte.
  */
@@ -188,7 +187,7 @@ export const analyzeGpx = (
   const summary = summarizeSession(parsed.rawPoints, resolved, options);
   if (!summary) return null;
   // Empreinte des réglages du calcul : un réglage changé plus tard rendra ce résumé à refaire ;
-  // et ceux de l'activité, que la session garde (Q57).
+  // et ceux de l'activité, que la session garde.
   return {
     summary: resolved === null || activity === null
       ? summary

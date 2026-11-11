@@ -309,7 +309,7 @@ describe('sauts : élagage et trace', () => {
   });
 
   for (const hz of [1, 5]) {
-    it(`à ${hz} Hz : vitesse lissée au décollage, longueur par la distance cumulée de la trace (Q41, lot 81)`, () => {
+    it(`à ${hz} Hz : vitesse lissée au décollage, longueur par la distance cumulée de la trace`, () => {
       // Vitesse lissée de 6 à 10 m/s en rampe : celle du décollage, interpolée.
       const n = 400 * hz;
       const at = (k: number) => 6 + (4 * k) / n;
@@ -405,7 +405,7 @@ describe('jumpDoubtLabel', () => {
   });
 });
 
-/** Courbe d'un saut et lignes de la courbe, telles que `JumpsPanel` les faisait avant le lot 61 (copie gelée). */
+/** Courbe d'un saut et lignes de la courbe, telles que `JumpsPanel` les faisait avant son extraction (copie gelée). */
 const frozenCurvePoints = (j: SessionJump): Map<number, number> => {
   const points = new Map<number, number>();
   j.curve.heightsM.forEach((h, k) => points.set(Math.round((j.curve.startS + k * j.curve.stepS) * 100), h));

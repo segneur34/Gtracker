@@ -11,7 +11,7 @@ import { buildCumulativeTrack } from './sessionStats';
 import type { CumulativeTrack, RawTrackPoint, TrackPoint } from './types';
 
 /**
- * Préparation d'une trace pour l'analyse (lot 126 B) : la lecture du GPX et
+ * Préparation d'une trace pour l'analyse : la lecture du GPX et
  * la cinématique que `useGpxSession` dérivait en `useMemo`, en une fonction
  * pure, appelée hors du fil de l'affichage (`library/trackWorker.ts`) ou en
  * ligne, avec les mêmes chiffres. Aucune notion de sport ici, au-delà des

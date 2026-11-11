@@ -6,7 +6,7 @@ import {
 
 /**
  * Traces réduites des vignettes de la bibliothèque, gardées sur l'appareil
- * d'un lancement à l'autre (lot 118). Un seul document par appareil
+ * d'un lancement à l'autre. Un seul document par appareil
  * (`platform/previewStore.ts`), lu une fois au premier besoin, tenu en
  * mémoire, réécrit `writeDelayMs` après le dernier changement et aussitôt
  * quand la page est quittée ou cachée. Aucune erreur ne remonte : un document

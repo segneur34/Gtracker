@@ -4,7 +4,7 @@ import {
   startOfDay, startOfMonth, weekdayDayMonthYear,
 } from './calendar';
 
-// Copies gelées des écritures d'avant le lot 55.
+// Copies gelées des écritures d'avant leur extraction en briques.
 const oldShortDate = (ms: number): string => new Date(ms).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 const oldPad = (n: number): string => String(n).padStart(2, '0');
 const oldLocalDate = (ms: number): string => {

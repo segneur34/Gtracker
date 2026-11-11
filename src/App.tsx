@@ -81,7 +81,7 @@ const preloadPages = (): (() => void) => {
   };
 };
 
-/** Une recharge mène toujours à l'accueil : après une reprise silencieuse (lot 156), retour sur Enregistrer. */
+/** Une recharge mène toujours à l'accueil : après une reprise silencieuse, retour sur Enregistrer. */
 function LandOnRecording() {
   const land = useRecorderSelector((s) => s.landOnRecording);
   const navigate = useNavigate();
@@ -94,7 +94,7 @@ function LandOnRecording() {
 }
 
 /**
- * Fin d'un enregistrement (lot 313) : la session en attente se range seule (`finishPendingSession`), à l'arrêt comme
+ * Fin d'un enregistrement : la session en attente se range seule (`finishPendingSession`), à l'arrêt comme
  * à la réouverture après une coupure, puis son analyse s'ouvre, à la place de la page Enregistrer (le retour mène à
  * la bibliothèque). Un message de l'enregistreur (avertissement de l'arrêt, ménage en échec) reste pour l'analyse,
  * qui le montre. Rien ne s'ouvre si le rangement échoue (la carte de la session sert de filet), si la session n'est
@@ -149,7 +149,7 @@ function App() {
           <Route path="/profil" element={<ProfilePage />} />
           <Route path={RESTING_HR_PATH} element={<RestingHrTestPage />} />
           <Route path="/parametres" element={<SettingsPage />} />
-          {/* Tutoriels (lot 147) : la liste, sous Réglages, et chaque leçon. */}
+          {/* Tutoriels : la liste, sous Réglages, et chaque leçon. */}
           <Route path="/tutoriels" element={<TutorialsPage />} />
           <Route path="/tutoriels/:id" element={<TutorialPage />} />
           {/* Développement seulement : une page qui lève au rendu, pour essayer la limite d'erreur au banc. */}

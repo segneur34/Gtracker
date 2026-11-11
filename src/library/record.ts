@@ -71,11 +71,11 @@ export const RECORD_VERSION = 1;
  * mouvement et vignette (les autres familles ne bougent pas).
  *
  * 15 (4 novembre 2026) : en surf, la vitesse max est celle d'une vague, comme sa
- * page (Q34), 0 sans vague ; plus celle de toute la trace (les autres familles
+ * page, 0 sans vague ; plus celle de toute la trace (les autres familles
  * ne bougent pas).
  *
- * 16 (4 novembre 2026, lot 149) : un trou de la trace parcouru en mouvement
- * reste dans un vol ou une glisse (Q56 : vols du surf dans le résumé) ; le
+ * 16 (4 novembre 2026) : un trou de la trace parcouru en mouvement
+ * reste dans un vol ou une glisse (vols du surf dans le résumé) ; le
  * lecteur GPX écarte un point à la date illisible ou qui recule (tops, temps
  * actif) ; le point qui suit un trou prend le cap du pas suivant (vent).
  *
@@ -127,19 +127,19 @@ export interface SessionSummary {
   flightS?: number | null;
   /** FC de la session, si elle en a assez (`HeartRateProfile.minCoverageS`) ; indépendante des zones du pratiquant. */
   heartRate?: SummaryHeartRate;
-  /** Voile sur foil, posé par l'analyse (capteurs du `.imu`) : part du vol pompée, de 0 à 1 (lot 145). */
+  /** Voile sur foil, posé par l'analyse (capteurs du `.imu`) : part du vol pompée, de 0 à 1. */
   pumpingShare?: number;
-  /** Voile, posé par l'analyse : direction du vent retenue (saisie, sinon estimée fiable), en degrés (lot 145). */
+  /** Voile, posé par l'analyse : direction du vent retenue (saisie, sinon estimée fiable), en degrés. */
   windDirDeg?: number;
   /**
    * Empreinte des réglages qui ont produit ce résumé (`summaryOptionsKey` : seuil, allure imposée,
-   * foil et seuil de vague en surf), lot 37. Une empreinte qui ne correspond plus aux réglages
+   * foil et seuil de vague en surf). Une empreinte qui ne correspond plus aux réglages
    * courants rend le résumé à refaire (`isSummaryOutdated`) ; absente d'une fiche d'avant, il est
    * refait une fois. Absente aussi sans calcul ou sans positions, où elle ne sert pas.
    */
   optionsKey?: string;
   /**
-   * Réglages de l'activité avec lesquels ce résumé a été calculé (Q57, lot 148) : la session les
+   * Réglages de l'activité avec lesquels ce résumé a été calculé : la session les
    * garde, mêmes chiffres sur tous les appareils, tant qu'un geste dans Réglages ne les change pas.
    * Absent d'une fiche d'avant : `carriedSettings` les lit alors dans `optionsKey`, sans réécriture.
    */
@@ -244,16 +244,16 @@ export interface SessionAnalysis {
   /**
    * Support sur foil pour cette session ; `null` : celui de son activité
    * (Réglages). Un changement d'activité ou de calcul le remet à `null` : la
-   * session prend le foil de sa nouvelle activité (lot 314). Absent des fiches plus anciennes.
+   * session prend le foil de sa nouvelle activité. Absent des fiches plus anciennes.
    */
   foil: boolean | null;
   /**
-   * Pumping foil pour cette session (surf, point 104 ; voile sur foil, lot 22) ; `null` : celui de son
+   * Pumping foil pour cette session (surf et voile sur foil) ; `null` : celui de son
    * activité (Réglages). Remis à `null` avec le foil au changement d'activité ou de calcul. Absent des fiches plus anciennes.
    */
   pumping: boolean | null;
   /**
-   * Seuil de vague sur foil (surf, point 97), dans l'unité du profil : au-dessus,
+   * Seuil de vague sur foil (surf), dans l'unité du profil : au-dessus,
    * un vol est porté par une vague ; `null` : celui du profil. Absent des fiches plus anciennes.
    */
   waveThreshold: number | null;
@@ -551,7 +551,7 @@ export type RecordUnreadable = Readonly<Record<string, UnreadableField>>;
 
 /**
  * Champs de premier niveau dont la lecture peut perdre quelque chose. Les voies, l'altitude du terrain et sa
- * source (course et vélo) ne sont plus des champs de la fiche (lot 304) : ils passent bruts, comme tout champ inconnu.
+ * source (course et vélo) ne sont plus des champs de la fiche : ils passent bruts, comme tout champ inconnu.
  */
 const GUARDED_FIELDS = [
   'sport', 'activityId', 'source', 'addedAt', 'title', 'name', 'mapBase', 'jumps', 'marks',
@@ -1012,7 +1012,7 @@ export const applyRecordPatch = (record: SessionRecord, patch: RecordPatch): { r
       }
     }
   }
-  // Le foil et le pumping de la fiche décrivent le matériel de l'ancienne activité : la nouvelle prend les siens (lot 314).
+  // Le foil et le pumping de la fiche décrivent le matériel de l'ancienne activité : la nouvelle prend les siens.
   if ((activityChanged || sportChanged) && next.analysis && (next.analysis.foil != null || next.analysis.pumping != null)) {
     next = { ...next, analysis: { ...next.analysis, foil: null, pumping: null } };
   }

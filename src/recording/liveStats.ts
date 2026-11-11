@@ -97,7 +97,7 @@ export const EMPTY_LIVE_STATS: LiveStats = {
 
 const toRawPoint = (fix: LocationFix): RawTrackPoint => {
   const time = new Date(fix.timeMs);
-  // Date lue une fois (lot 56) : celle de `time`, que `Date` arrondit à la milliseconde.
+  // Date lue une fois : celle de `time`, que `Date` arrondit à la milliseconde.
   return { lat: fix.lat, lon: fix.lon, time, rawTimeMs: time.getTime(), ele: fix.altitudeM, speedMs: fix.speedMs };
 };
 

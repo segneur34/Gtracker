@@ -1,7 +1,7 @@
 import type { HeartRateBelt } from './heartRate';
 
 /**
- * Appareils cardio retenus sur ce téléphone (lot 198) : ceintures, montres en
+ * Appareils cardio retenus sur ce téléphone : ceintures, montres en
  * diffusion. L'application s'en souvient de plusieurs et n'en lit qu'un à la
  * fois, l'appareil actif, marqué dans la liste (`savedBelt`). Ici,
  * les calculs purs sur la liste ; la lecture et l'écriture sont dans

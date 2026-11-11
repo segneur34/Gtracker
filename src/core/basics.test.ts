@@ -114,7 +114,7 @@ describe('basics', () => {
   });
 });
 
-describe('médianes (lot 57)', () => {
+describe('médianes', () => {
   // Copies gelées : `median` de speedFilter, `sortedMedian` de kinematics, médiane haute d'imuVertical.
   const oldMedian = (values: number[]): number => {
     if (values.length === 0) return 0;
@@ -150,7 +150,7 @@ describe('médianes (lot 57)', () => {
   });
 });
 
-describe('stringifyJson (lot 80)', () => {
+describe('stringifyJson', () => {
   /** Valeurs sans tableau de nombres : le texte est celui de `JSON.stringify(value, null, 2)`. */
   const plain: [string, unknown][] = [
     ['objet vide', {}],

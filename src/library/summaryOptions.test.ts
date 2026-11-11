@@ -18,7 +18,7 @@ const analysis = (patch: Partial<SessionAnalysis>): SessionAnalysis => ({
   activeThreshold: null, referenceSpeedMs: null, foil: null, waveThreshold: null, ...patch,
 } as SessionAnalysis);
 
-describe('réglages du résumé (lot 72)', () => {
+describe('réglages du résumé', () => {
   const activity: ActivitySummarySettings = { thresholdOverride: 9, foil: true };
 
   it("sans calcul, aucun réglage", () => {
@@ -53,14 +53,14 @@ describe('nouveau résumé gardé avec ses manœuvres', () => {
     expect(next.summary.maneuverResults).toEqual({ success: 10 });
     expect(withSummary({ ...record, summary: null }, fresh).summary).toEqual(fresh);
   });
-  it('garde aussi le pumping et le vent posés par l’analyse (lot 145)', () => {
+  it('garde aussi le pumping et le vent posés par l’analyse', () => {
     const record = sessionRecord({}, { pumpingShare: 0.3, windDirDeg: 200 });
     const next = withSummary(record, sessionRecord({}, { distanceM: 30_000 }).summary);
     expect(next.summary).toMatchObject({ distanceM: 30_000, pumpingShare: 0.3, windDirDeg: 200 });
   });
 });
 
-describe('résumé à refaire quand les réglages changent (lot 37)', () => {
+describe('résumé à refaire quand les réglages changent', () => {
   const course: ActivitySummarySettings = { thresholdOverride: 6, foil: null };
   const of = (activity: ActivitySummarySettings) => (): ActivitySummarySettings => activity;
   /** Fiche dont le résumé porte l'empreinte des réglages `activity`, comme `analyzeGpx` la poserait. */
@@ -69,7 +69,7 @@ describe('résumé à refaire quand les réglages changent (lot 37)', () => {
     return { ...record, summary: { ...record.summary, optionsKey: summaryOptionsKey(sport, summaryOptions(sport, record.analysis, activity)) } };
   };
 
-  it("autres réglages sur cet appareil : rien, la session garde les siens (Q57) ; un geste : périmée", () => {
+  it("autres réglages sur cet appareil : rien, la session garde les siens ; un geste : périmée", () => {
     const record = keyed('kite', course);
     expect(isSummaryOutdated(record, of(course))).toBe(false);
     expect(isSummaryOutdated(record, of({ ...course, thresholdOverride: 7 }))).toBe(false);
@@ -173,7 +173,7 @@ describe('résumé à refaire quand les réglages changent (lot 37)', () => {
   });
 });
 
-describe('réglages portés par la session (Q57)', () => {
+describe('réglages portés par la session', () => {
   const device: ActivitySummarySettings = { thresholdOverride: 10, foil: true };
 
   it('le geste, puis le porté, puis l\'appareil ; le même pour une fiche neuve (appareil)', () => {
@@ -232,7 +232,7 @@ describe('réglages portés par la session (Q57)', () => {
   });
 });
 
-describe("sessions à refaire, dans l'ordre de la liste (lot 37)", () => {
+describe("sessions à refaire, dans l'ordre de la liste", () => {
   it("garde l'ordre, écarte les fiches en lecture seule, les traces déjà tentées et les résumés à jour", () => {
     const session = (file: string, distanceM: number, readOnly = false) => ({ file, readOnly, record: sessionRecord({}, { distanceM }) });
     const sessions = [session('a', 1), session('b', 0), session('c', 1, true), session('d', 1), session('e', 1)];

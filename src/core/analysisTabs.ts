@@ -6,7 +6,7 @@ import { sportTreatment, type SportProfile, type Treatment } from './sportProfil
  * activité choisit dans Réglages ceux qu'elle montre : un onglet du module
  * est montré tant qu'on ne le cache pas, un onglet générique (`generic`) est
  * caché tant qu'on ne le coche pas. Tous se cachent, « général » et
- * « réglages » compris (choix de l'utilisateur, 14/10).
+ * « réglages » compris (choix du produit).
  *
  * Pour ajouter un onglet : une entrée dans la liste de son module (ouvert par
  * défaut s'il est `primary`, `tabDefaults`), puis, dans la page, un bloc
@@ -27,7 +27,7 @@ export type TabChoices = Readonly<Record<string, boolean>>;
 
 export type SailingTab = 'general' | 'tops' | 'manoeuvres' | 'graphiques' | 'cardio' | 'vmg' | 'sauts' | 'vols' | 'pumping' | 'vent' | 'matos' | 'reglages';
 
-/** Voile : une seule barre, dans l'ordre voulu par l'utilisateur. */
+/** Voile : une seule barre, dans l'ordre voulu par le produit. */
 export const SAILING_TABS: AnalysisTab<SailingTab>[] = [
   { key: 'general', label: 'général', primary: true },
   { key: 'tops', label: 'tops' },
@@ -38,8 +38,8 @@ export const SAILING_TABS: AnalysisTab<SailingTab>[] = [
   { key: 'vmg', label: 'vmg' },
   // Seulement pour une session aux sauts mesurés par les capteurs du téléphone.
   { key: 'sauts', label: 'sauts' },
-  // Sur foil seulement : les vols vus par le GPS, puis le pumping, pour une session qui a ses capteurs (lot 22),
-  // les mêmes que les sauts ; deux onglets à part (lot 50, 31/10).
+  // Sur foil seulement : les vols vus par le GPS, puis le pumping, pour une session qui a ses capteurs,
+  // les mêmes que les sauts ; deux onglets à part.
   { key: 'vols', label: 'vols' },
   { key: 'pumping', label: 'pumping' },
   { key: 'vent', label: 'vent' },
@@ -54,7 +54,7 @@ export const SURF_TABS: AnalysisTab<SurfTab>[] = [
   { key: 'general', label: 'général', primary: true },
   { key: 'vagues', label: 'vagues' },
   { key: 'rame', label: 'rame' },
-  // Sur foil seulement ; « pumping » pour une session qui a ses capteurs, à part des vols (lot 50, 31/10).
+  // Sur foil seulement ; « pumping » pour une session qui a ses capteurs, à part des vols.
   { key: 'vols', label: 'vols' },
   { key: 'pumping', label: 'pumping' },
   { key: 'tops', label: 'tops', generic: true },

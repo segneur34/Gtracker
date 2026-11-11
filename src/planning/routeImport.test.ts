@@ -30,7 +30,7 @@ const trackGpx = (withTime: boolean): string => '<?xml version="1.0"?><gpx versi
   + [0, 1, 2].map((s) => `<trkpt lat="43.6${s}" lon="3.8">${withTime ? `<time>2026-10-27T10:00:0${s}Z</time>` : ''}</trkpt>`).join('')
   + '</trkseg></trk></gpx>';
 
-describe('GPX d\'un itinéraire avec sa fiche (lot 194)', () => {
+describe('GPX d\'un itinéraire avec sa fiche', () => {
   it('la fiche portée en extension se relit à l\'identique, nom échappé compris', () => {
     expect(embeddedRouteRecord(sharedGpx)).toEqual(courseRecord);
   });

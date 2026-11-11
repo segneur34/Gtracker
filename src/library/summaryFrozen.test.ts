@@ -7,8 +7,8 @@ import { summarizeGpx } from './summarizeGpx';
 import { summarizeSession, type SummaryOptions } from './summary';
 
 /**
- * Garde du résumé (fiche 154, risque 2, lot 187) : le résumé d'une session de voile, de surf et d'une session sans
- * calcul est figé à l'octet, tel que le code d'avant le lot le rendait. Un déplacement de code, un profil neutre à la
+ * Garde du résumé : le résumé d'une session de voile, de surf et d'une session sans
+ * calcul est figé à l'octet, tel que le code d'avant le déplacement le rendait. Un déplacement de code, un profil neutre à la
  * place de la course, ne doivent rien y changer ; `SUMMARY_CALC_VERSION` ne bouge pas tant que ces chaînes tiennent.
  * Si un calcul change pour de bon, on relève les chaînes neuves et on augmente la version : jamais l'un sans l'autre.
  */
@@ -33,7 +33,7 @@ const CASES: Record<string, FrozenCase> = {
   sansCalcul: { raw: withHeartRate(phasesTrack([[300, 3], [300, 2]], 1, { startMs: SURF_T0, climbPerS: 0.05 })), sport: null, options: {}, foil: null },
 };
 
-/** Résumés relevés sur le code d'avant le lot 187 (07/11, version 18 du calcul), `JSON.stringify` tel quel. */
+/** Résumés relevés avant le déplacement du code (version 18 du calcul), `JSON.stringify` tel quel. */
 const FROZEN_SESSION: Record<keyof typeof CASES, string> = {
   wingfoil: '{"calcVersion":18,"startMs":1780308000000,"endMs":1780308480000,"distanceM":3263.4180594255995,"movingTimeS":468,"movingDistanceM":3235.0855528132383,"inMotionS":480,"elevationGainM":null,"maxSpeedMs":8.679119618379104,"pointCount":481,"samplingS":1,"heartRate":{"avgBpm":150,"maxBpm":165,"coveredS":480,"histogram":{"fromBpm":135,"seconds":[41,31,21,19,15,14,14,12,9,8,9,7,9,9,7,8,13,10,10,12,12,10,12,14,12,16,14,18,22,30,42]}}}',
   surf: '{"calcVersion":18,"startMs":1789898400000,"endMs":1789898776000,"distanceM":323.20000000000886,"movingTimeS":24,"movingDistanceM":108.00000000001506,"elevationGainM":null,"maxSpeedMs":5.000000000004324,"pointCount":377,"samplingS":1,"waveCount":2,"longestWaveM":60.000000000016094,"longestFlightS":null,"flightS":null}',
@@ -52,7 +52,7 @@ const FROZEN_GPX: Record<keyof typeof CASES, string> = {
   sansCalcul: '{"summary":{"calcVersion":18,"startMs":1789898400000,"endMs":1789899000000,"distanceM":1499.999999999986,"movingTimeS":null,"movingDistanceM":null,"elevationGainM":30,"maxSpeedMs":3.0000000000133866,"pointCount":601,"samplingS":1,"heartRate":{"avgBpm":152,"maxBpm":165,"coveredS":600,"histogram":{"fromBpm":135,"seconds":[41,31,21,19,15,14,14,13,12,11,12,10,11,12,10,10,16,13,13,14,15,13,15,17,16,22,22,28,32,46,62]}}},"sport":null,"title":null}',
 };
 
-describe('résumés de voile et de surf figés à l\'octet (garde du lot 187)', () => {
+describe('résumés de voile et de surf figés à l\'octet', () => {
   for (const [name, c] of Object.entries(CASES)) {
     it(`summarizeSession : ${name}`, () => {
       expect(JSON.stringify(summarizeSession(c.raw, c.sport, c.options))).toBe(FROZEN_SESSION[name]);

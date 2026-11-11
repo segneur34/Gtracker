@@ -3,7 +3,7 @@ import type { HeartRateProfile, HrEnergyProfile, KeytelCoefficients } from './sp
 import { J_PER_KCAL } from './units';
 
 /**
- * Énergie dépensée estimée par la fréquence cardiaque (lot 96), en voile et en
+ * Énergie dépensée estimée par la fréquence cardiaque, en voile et en
  * surf, où la vitesse ne dit rien de l'effort : équation de Keytel (2005) sans
  * VO2max, à partir de la FC, du poids, de l'âge et du sexe. Un ordre de
  * grandeur (25 % d'écart et plus), jamais additionné à une énergie mécanique.

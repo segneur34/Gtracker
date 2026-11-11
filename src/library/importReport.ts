@@ -2,7 +2,7 @@ import { plural } from '../core/basics';
 
 /**
  * Compte rendu d'un import de sessions (fichiers GPX ou FIT, dossier mémoire) et sa
- * phrase pour l'utilisateur, purs (lot 72).
+ * phrase pour l'utilisateur, purs.
  */
 
 export interface ImportReport {
@@ -97,7 +97,7 @@ export const describeImport = (report: ImportReport): string => {
 
 /**
  * Compte rendu de « Mettre à jour » : sessions apparues et disparues, d'après les débuts de trace d'avant et
- * d'après la relecture (lot 113, sorti de la bibliothèque).
+ * d'après la relecture.
  */
 export const describeRefresh = (before: ReadonlySet<number>, after: ReadonlySet<number>): string => {
   const added = [...after].filter((startMs) => !before.has(startMs)).length;

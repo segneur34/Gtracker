@@ -92,7 +92,7 @@ export const onForeground = (listener: () => void): (() => void) => {
 };
 
 /**
- * Le drapeau d'écran allumé survit à une chute du moteur de la page (lot 156), et la page neuve ne le connaît plus.
+ * Le drapeau d'écran allumé survit à une chute du moteur de la page, et la page neuve ne le connaît plus.
  * Sans enregistrement repris, personne ne le lèverait : à appeler une fois celui-ci tranché, pas avant, pour qu'une
  * reprise ne laisse pas l'écran s'éteindre le temps de revenir sur Enregistrer. Sans effet si la page l'a déjà redemandé.
  */

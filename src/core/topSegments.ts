@@ -55,7 +55,7 @@ export const computeTopSegments = (
 /**
  * Vitesse max d'une trace ou d'un passage, en m/s : la meilleure moyenne sur
  * `durationS` (`SportProfile.maxSpeedWindowS`, 2 s), une seule définition pour
- * la voile, le surf, le résumé de la bibliothèque et le direct (Q34, lot 81).
+ * la voile, le surf, le résumé de la bibliothèque et le direct.
  * `from` et `to` bornent le passage, en index de points (la fenêtre reste
  * entre eux) ; `null` si aucune fenêtre ne tient, trous de trace écartés comme
  * dans `computeTopSegments`.
@@ -102,7 +102,7 @@ const computeTopSegmentsWith = (
   const { cumDist, cumTime } = cum;
   const isDistance = target.kind === 'distance';
   const reference = isDistance ? cumDist : cumTime;
-  // Fenêtres en tableaux typés (lot 56) : une par point au plus.
+  // Fenêtres en tableaux typés : une par point au plus.
   const capacity = Math.max(0, track.length - 1);
   const starts = new Int32Array(capacity);
   const ends = new Int32Array(capacity);
@@ -156,7 +156,7 @@ const computeTopSegmentsWith = (
  * qui ne se chevauchent pas, de la meilleure à la moins bonne : à chaque tour,
  * la plus grande valeur parmi celles qui ne touchent aucune retenue, la
  * première à égalité. C'est le résultat d'un tri stable décroissant parcouru
- * dans l'ordre, sans trier (lot 56). Une valeur NaN rend le tri imprévisible :
+ * dans l'ordre, sans trier. Une valeur NaN rend le tri imprévisible :
  * au-delà d'une fenêtre, on garde alors le tri. Meilleurs segments, podium de la VMG.
  */
 export const pickTopWindows = (

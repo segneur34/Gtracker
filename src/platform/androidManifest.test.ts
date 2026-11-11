@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Le manifeste Android (lot 151) : ni sauvegarde Google ni transfert d'appareil, le dossier mémoire est la seule
+ * Le manifeste Android : ni sauvegarde Google ni transfert d'appareil, le dossier mémoire est la seule
  * sauvegarde ; le récepteur de démarrage du greffon GPS et sa permission retirés. Une mise à jour du greffon qui
  * changerait ce récepteur rendrait le retrait muet sans erreur de compilation.
  *
@@ -94,7 +94,7 @@ describe('manifeste Android : sauvegarde', () => {
   });
 });
 
-describe('manifeste Android : fichiers reçus d\'une autre application (lot 35)', () => {
+describe('manifeste Android : fichiers reçus d\'une autre application', () => {
   const activity = MANIFEST.match(/<activity\b[\s\S]*?<\/activity>/)?.[0] ?? '';
   const filters = [...activity.matchAll(/<intent-filter>([\s\S]*?)<\/intent-filter>/g)].map((m) => m[1]);
   const allWithAction = (action: string): string[] => filters.filter((f) => f.includes(`android.intent.action.${action}"`));
@@ -150,7 +150,7 @@ describe('manifeste Android : fichiers reçus d\'une autre application (lot 35)'
   });
 });
 
-describe('logo et icône (lot 310)', () => {
+describe('logo et icône', () => {
   const background = withoutComments(repoFile('android/app/src/main/res/values/ic_launcher_background.xml'));
 
   it('fond de l’icône adaptative : une couleur unie (#F6F5F2), lue par les deux icônes adaptatives', () => {

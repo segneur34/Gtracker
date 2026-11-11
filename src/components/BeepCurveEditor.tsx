@@ -14,7 +14,7 @@ import { clamp } from '../core/basics';
 /**
  * Réglage des bips d'approche des balises, pour une activité de voile ou de surf
  * (Réglages) ou pour un parcours (Itinéraires) : une courbe à points, distance à la balise en abscisse, intervalle entre deux
- * bips en ordonnée (choix de l'utilisateur). On tire un point au doigt ou à
+ * bips en ordonnée (choix du produit). On tire un point au doigt ou à
  * la souris ; un toucher ailleurs sur le graphe en ajoute un ; le point
  * choisi se retire. Le point le plus lointain fixe le début des bips, le plus
  * proche la validation. Les valeurs se lisent et se saisissent aussi sous le

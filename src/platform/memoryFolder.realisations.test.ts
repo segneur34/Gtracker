@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Les trois réalisations du dossier mémoire (lot 148) : `stat`, et l'absent distingué de l'illisible
+ * Les trois réalisations du dossier mémoire : `stat`, et l'absent distingué de l'illisible
  * dans le dossier privé. Greffons simulés : Filesystem de Capacitor et MemoryFolder.
  */
 

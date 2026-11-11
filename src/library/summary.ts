@@ -33,7 +33,7 @@ import { SUMMARY_CALC_VERSION, type SessionSummary, type SummaryHeartRate } from
  *   (`useSailingSession`, règle 4), sauf surcharge de l'utilisateur ;
  * - en surf, les vagues de la page d'analyse (`runSurfSession`) : le temps et
  *   la distance en action sont ceux de la glisse, le résumé compte les vagues,
- *   et sa vitesse max est celle d'une vague (Q34), 0 sans vague.
+ *   et sa vitesse max est celle d'une vague, 0 sans vague.
  *
  * Sans support connu, ni filtre de support ni seuil d'activité : distance et
  * durée restent justes, le temps en action attend que la session soit classée.
@@ -169,7 +169,7 @@ export const summarizeSession = (
   // Sans calcul connu : le profil neutre (valeurs communes, cardio de référence), le même résumé pour toutes les fiches non classées.
   const profile = sport === null ? UNCLASSIFIED_PROFILE : getSportProfile(sport);
   const elevation = computeElevationStats(track, profile.elevation);
-  // Vitesse max : la meilleure moyenne sur 2 s, comme partout (Q34) ; en surf, celle d'une vague, la même que sa
+  // Vitesse max : la meilleure moyenne sur 2 s, comme partout ; en surf, celle d'une vague, la même que sa
   // page. Aucune fenêtre ne tient (trace clairsemée, chaque pas plus long que `maxGapS` est un trou, règle 10) :
   // la plus haute vitesse lissée.
   const maxSpeedMs = analyzed.surf?.maxSpeedMs

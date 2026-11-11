@@ -16,7 +16,7 @@
 
 import { DAY_MS } from '../core/calendar';
 
-/** Règle de la racine, fixée par l'utilisateur le 25/10. */
+/** Règle de la racine, fixée par le produit. */
 export interface RootRules {
   /** Durée d'une période, en jours entiers ; 7 : la semaine. */
   periodDays: number;

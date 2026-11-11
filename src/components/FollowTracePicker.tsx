@@ -54,7 +54,7 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
   const [shown, setShown] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Ni itinéraire ni session d'une activité cachée dans Réglages (§10, point 100).
+  // Ni itinéraire ni session d'une activité cachée dans Réglages.
   const { activities, isShown } = useVisibility();
   const routes = useMemo(() => shownRoutes(library.routes, activities, isShown), [library.routes, activities, isShown]);
   /** Activité retenue dans l'onglet Sessions ; `null` : toutes. */

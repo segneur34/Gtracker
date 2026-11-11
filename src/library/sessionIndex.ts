@@ -1,5 +1,5 @@
 /**
- * Index d'une liste par une clé, tenu tant que la liste garde son identité (lot 113) : la liste des sessions
+ * Index d'une liste par une clé, tenu tant que la liste garde son identité : la liste des sessions
  * de la bibliothèque et celle qu'elle publie sont toujours remplacées, jamais modifiées en place.
  */
 

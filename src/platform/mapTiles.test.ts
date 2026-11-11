@@ -56,7 +56,7 @@ const setup = ({ stored = {}, serve, online = true, template }: {
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('resolveTile', () => {
-  it('demande à l’adresse choisie, et garde la tuile sous la clé de son fond (lot 188)', async () => {
+  it('demande à l’adresse choisie, et garde la tuile sous la clé de son fond', async () => {
     const { resolver, calls, kept } = setup({ serve: () => image('reçue'), template: () => 'https://autre.example.org/{z}/{x}/{y}.png' });
     await resolver.resolveTile(TILE, 'plan', 256);
     expect(calls.map((c) => c.url)).toEqual(['https://autre.example.org/15/16808/11953.png']);

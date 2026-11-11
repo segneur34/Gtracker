@@ -55,8 +55,8 @@ export const simplifyLatLon = <P extends LatLon>(points: P[], toleranceM: number
 /**
  * Points d'un tracé réduits pour un dessin : le premier, puis chaque point à
  * `tolerancePx` pixels ou plus du dernier gardé, et le dernier. `toPx` donne
- * le pixel d'un point au zoom du dessin (vignette de la bibliothèque, réponse
- * de l'utilisateur du 30/10 : un point dès qu'il s'écarte d'un demi-pixel du
+ * le pixel d'un point au zoom du dessin (vignette de la bibliothèque, choix
+ * du produit : un point dès qu'il s'écarte d'un demi-pixel du
  * précédent). Ni pas régulier ni Douglas-Peucker : chaque point qui se voit
  * reste, avec sa couleur ; seuls ceux confondus avec le précédent tombent.
  */

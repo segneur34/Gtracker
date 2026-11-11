@@ -428,7 +428,7 @@ describe('computeKinematics, positions répétées et reprises', () => {
   });
 });
 
-describe('computeKinematics, cap du point qui suit un trou de la trace (lot 149, C1-1)', () => {
+describe('computeKinematics, cap du point qui suit un trou de la trace', () => {
   /** Vers l'est à 3 m/s pendant 20 s, silence de `silenceS`, puis vers le nord à 3 m/s depuis le point atteint. */
   const turnThroughSilence = (silenceS: number): RawTrackPoint[] => {
     const raw: RawTrackPoint[] = [];

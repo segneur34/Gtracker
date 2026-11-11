@@ -3,7 +3,7 @@ import { newId } from '../core/basics';
 import type { StoredSettings } from './activitySettings';
 
 /**
- * Matériel d'une activité, pur (lot 72) : intitulés des deux champs des notes
+ * Matériel d'une activité, pur : intitulés des deux champs des notes
  * hors voile, et matériel enregistré (groupes et pièces), relus et nettoyés.
  * La lecture et l'écriture du magasin restent dans `hooks/useSportSettings.ts`.
  */

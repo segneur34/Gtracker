@@ -190,7 +190,7 @@ describe('rebaseDraft (E-B3)', () => {
   });
 });
 
-describe('matériel enregistré dans le brouillon (lot 20)', () => {
+describe('matériel enregistré dans le brouillon', () => {
   const wing = { groupId: 'g-aile', groupName: 'Aile', itemId: 'i-5', itemName: 'Duotone 5' };
   const mast = { groupId: 'g-mat', groupName: 'Mât', itemId: 'i-85', itemName: '85 cm' };
 
@@ -332,7 +332,7 @@ const expectSame = (actual: unknown, expected: unknown) => {
   expect(JSON.stringify(actual)).toBe(JSON.stringify(expected));
 };
 
-describe('brouillon tiré de la table des réglages (lot 80), comme avant', () => {
+describe('brouillon tiré de la table des réglages, comme avant', () => {
   const families = familyRecords();
   const records: [string, SessionRecord | null][] = [
     ['sans fiche', null],
@@ -388,7 +388,7 @@ describe('brouillon tiré de la table des réglages (lot 80), comme avant', () =
   });
 });
 
-describe("champ illisible d'une fiche compacte, autre réglage enregistré (lot 54, lot 80)", () => {
+describe("champ illisible d'une fiche compacte, autre réglage enregistré", () => {
   it('le vent de forme nouvelle revient brut, au caractère près, quand le seuil change', () => {
     const valid = familyRecords().voile;
     const future = { ...valid, analysis: { ...valid.analysis, windDeg: { from: 40, to: [60, 70.5] } } };

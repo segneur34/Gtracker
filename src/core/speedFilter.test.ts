@@ -113,7 +113,7 @@ describe('medianFilterByTime', () => {
   });
 });
 
-/** Copie gelée de `medianFilterByTimeFrom` d'avant le lot 56 : une médiane triée à chaque point. */
+/** Copie gelée de `medianFilterByTimeFrom` d'avant son remplacement : une médiane triée à chaque point. */
 const legacyMedianFilterByTimeFrom = (
   values: number[], timesMs: number[], windowSeconds: number, from: number, prefix: ArrayLike<number> | null
 ): number[] => {
@@ -153,7 +153,7 @@ const sameAsLegacy = (values: number[], timesMs: number[], windowS: number, from
   if (!sameData(got, want)) expect(got).toEqual(want);
 };
 
-describe('medianFilterByTimeFrom, fenêtre triée tenue à jour (lot 56)', () => {
+describe('medianFilterByTimeFrom, fenêtre triée tenue à jour', () => {
   it('identique au tri à chaque point, à 1 Hz et à 5 Hz, fenêtres de 3 et 5 s', () => {
     for (const step of [1, 0.2]) {
       const values = noisy(3000, 7);

@@ -31,7 +31,7 @@ interface SessionShare {
 /** Durée d'affichage du compte rendu d'un téléchargement. */
 const DOWNLOAD_NOTE_MS = 4000;
 
-/** Durée de l'appui sur « Jeter » (lot 313) : une seconde, puis la confirmation. */
+/** Durée de l'appui sur « Jeter » : une seconde, puis la confirmation. */
 const DISCARD_HOLD_MS = 1000;
 const discardHoldMs = (): number => DISCARD_HOLD_MS;
 

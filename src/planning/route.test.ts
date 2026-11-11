@@ -227,7 +227,7 @@ describe('trace importée', () => {
 });
 
 describe('mode relu d\'une fiche', () => {
-  it('ligne droite et trace importée seulement ; un mode d\'avant le lot 304 est inconnu', () => {
+  it('ligne droite et trace importée seulement ; un mode des anciens types de voie est inconnu', () => {
     expect(readRouteMode('straight')).toBe('straight');
     expect(readRouteMode('imported')).toBe('imported');
     for (const old of ['sentier', 'route+grandeRoute', 'foot', 'chemin', 'toString', '', undefined]) expect(readRouteMode(old)).toBeNull();

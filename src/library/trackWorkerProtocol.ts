@@ -3,7 +3,7 @@ import { summarizeGpx, type SummarizeGpxOptions } from './summarizeGpx';
 import type { AnalyzedGpx } from './summaryOptions';
 
 /**
- * Messages entre l'application et le worker des traces (lot 126 B) : lire un GPX et préparer sa trace pour
+ * Messages entre l'application et le worker des traces : lire un GPX et préparer sa trace pour
  * l'analyse (`prepare`), ou le résumer pour sa fiche (`summarize`). Le worker et le calcul en ligne passent par
  * le même aiguillage (`runTrackJob`) : mêmes chiffres par construction.
  */

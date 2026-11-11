@@ -3,7 +3,7 @@ import { sessionRecord } from '../test/record.fixture';
 import { RECORD_VERSION, parseRecordWithRaw, serializeRecord } from './record';
 import { FUTURE_RECORD_WARNING, UNREADABLE_RECORD_WARNING, isBlankRecordText, recordToKeep } from './recordText';
 
-describe('texte d’une fiche (lot 113)', () => {
+describe('texte d’une fiche', () => {
   it('tient une fiche de 0 octet ou blanche pour absente, pas une fiche manquante', () => {
     expect(isBlankRecordText('')).toBe(true);
     expect(isBlankRecordText(' \n\t')).toBe(true);

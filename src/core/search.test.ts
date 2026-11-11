@@ -46,7 +46,7 @@ describe('recherches dichotomiques', () => {
   });
 });
 
-// Copies gelées des dichotomies remplacées au lot 57 : chaque appelant garde sa sémantique aux bords, au bit près.
+// Copies gelées des dichotomies remplacées : chaque appelant garde sa sémantique aux bords, au bit près.
 const frozenBracket = (t: ArrayLike<number>, n: number, x: number): [number, number] => {
   let lo = 0;
   let hi = n - 1;
@@ -80,7 +80,7 @@ const frozenNearest = (t: number[], ms: number): number => {
   const [lo, hi] = frozenBracket(t, t.length, ms);
   return Math.abs(t[hi] - ms) < Math.abs(t[lo] - ms) ? hi : lo;
 };
-/** `firstFrom` de l'ancien calcul d'énergie de la course (retiré au lot 303). */
+/** `firstFrom` de l'ancien calcul d'énergie de la course (retiré). */
 const frozenFirstFrom = (t: number[], x: number, lo: number, hi: number, strict: boolean): number => {
   let a = lo;
   let b = hi + 1;

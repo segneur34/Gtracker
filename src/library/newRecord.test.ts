@@ -18,7 +18,7 @@ const motionWithJumps = (jumps: boolean) => encodeImu({
   setup: { placement: 'poitrine', foil: false, jumps }, streams: [...PHONE_STREAMS],
 }, []);
 
-describe('fiche neuve d’une session (lot 113)', () => {
+describe('fiche neuve d’une session', () => {
   it('prend le calcul, le titre et le résumé du GPX, l’heure de l’horloge donnée, sans nom ni réglages', () => {
     expect(newRecord('a.gpx', analyzed, 'import', null, context())).toEqual({
       format: RECORD_FORMAT, version: RECORD_VERSION, gpx: 'a.gpx', sport: 'wingfoil', activityId: null, source: 'import',
@@ -33,14 +33,14 @@ describe('fiche neuve d’une session (lot 113)', () => {
   });
 });
 
-describe('fiche d’une session qui entre dans la mémoire (lot 113)', () => {
+describe('fiche d’une session qui entre dans la mémoire', () => {
   it('garde la fiche apportée, résumé refait et calcul du GPX', () => {
     const apportee = { ...base, name: 'Sortie', sport: 'kite' as const };
     const record = recordFor('b.gpx', analyzed, 'import', { record: apportee }, context());
     expect(record).toMatchObject({ gpx: 'b.gpx', name: 'Sortie', sport: 'wingfoil', summary: base.summary });
   });
 
-  it('range dans une fiche neuve le foil et les repères de l’enregistrement ; ni séances ni test (lot 302)', () => {
+  it('range dans une fiche neuve le foil et les repères de l’enregistrement ; ni séances ni test', () => {
     const record = recordFor('c.gpx', analyzed, 'enregistrement', {
       activityId: 'wing', foil: true, marks: [{ timeMs: NOW, lat: null, lon: null, label: 'bouée' }],
     }, context());

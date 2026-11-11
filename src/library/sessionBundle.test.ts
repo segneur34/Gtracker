@@ -75,7 +75,7 @@ describe('GPX complet', () => {
     expect(rewritten.name).toBe('Carnon');
   });
 
-  it('ne lit pas une fiche écrite par une version plus récente, mais en rend le texte au caractère près (lot 148, C5-4)', () => {
+  it('ne lit pas une fiche écrite par une version plus récente, mais en rend le texte au caractère près', () => {
     const future = record({ version: RECORD_VERSION + 1, name: 'Carnon & <co>', marks: [{ timeMs: START_MS + 1000, lat: 43.6, lon: 3.8, label: 'Bouée' }] });
     const back = unbundleSessionGpx(bundleSessionGpx(GPX, future, new Uint8Array([1])));
     expect(back.record).toBeNull();
@@ -183,7 +183,7 @@ describe('GPX complet dont la fiche a un résumé abîmé', () => {
   });
 });
 
-describe('GPX complet et fiche compacte (lot 80)', () => {
+describe('GPX complet et fiche compacte', () => {
   const marks = [{ timeMs: START_MS + 60_000, lat: 43.6, lon: 3.8, label: 'Bouée' }];
 
   it('un paquet d’avant, fiche indentée, se relit et se défait encore', () => {

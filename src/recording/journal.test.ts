@@ -157,7 +157,7 @@ describe('notes du journal', () => {
   });
 });
 
-describe('journalActivity (lot 67, sortie de useRecorder)', () => {
+describe('journalActivity (sortie de useRecorder)', () => {
   const list: Activity[] = [
     { id: 'surf', name: 'Surf', base: 'surf', color: '#5b6670' },
     { id: 'paddle-1', name: 'Paddle', base: 'surf', color: '#8292a6' },

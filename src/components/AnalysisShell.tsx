@@ -61,7 +61,7 @@ interface AnalysisShellProps<K extends string> {
 }
 
 /**
- * Message de l'enregistreur sur la session qu'il vient de ranger et dont l'analyse s'ouvre (lot 313) :
+ * Message de l'enregistreur sur la session qu'il vient de ranger et dont l'analyse s'ouvre :
  * avertissements de l'arrêt (capteurs…) ou ménage en échec, dits ici et non plus sur la page Enregistrer.
  * « Fermer » l'efface (`dismissRecorderResult`).
  */
@@ -95,7 +95,7 @@ const mapRow = ({ rowZIndex, ...props }: ShellMap) => (
 function AnalysisShell<K extends string>({
   title, family, backLabel, file, share, error, draft, loadError, alerts, empty, reading = false, map, tabs,
 }: AnalysisShellProps<K>) {
-  // Le filtre d'activité de la bibliothèque d'où l'on vient (lot 158) est rendu au retour.
+  // Le filtre d'activité de la bibliothèque d'où l'on vient est rendu au retour.
   const [params] = useSearchParams();
   const back = libraryPath(family, params.get('activite') ?? undefined);
   useScrollToTopOnMount();

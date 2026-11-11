@@ -17,7 +17,7 @@ export type ToneKind = 'court' | 'long';
 export const TONE_MS: Record<ToneKind, number> = { court: BEEP_SHORT_MS, long: BEEP_LONG_MS };
 
 /**
- * « GPS perdu » (lot 115) : deux notes descendantes, la hauteur réglée puis
+ * « GPS perdu » : deux notes descendantes, la hauteur réglée puis
  * ses 2/3, jouées deux fois. Nettement à part des bips brefs et d'une seule
  * hauteur des balises, du compteur et des tests (n° 88).
  */
@@ -38,7 +38,7 @@ export const GPS_LOST_NOTES: ReadonlyArray<{ atMs: number; durationMs: number; r
 });
 
 /**
- * « FC perdue » (lot 177) : trois notes descendantes, une seule fois, la hauteur
+ * « FC perdue » : trois notes descendantes, une seule fois, la hauteur
  * réglée puis ses 5/6 et ses 2/3 ; à part du « GPS perdu », deux fois deux notes.
  */
 const BELT_LOST_NOTE_MS = 220;

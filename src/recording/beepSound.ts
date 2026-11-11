@@ -15,7 +15,7 @@ export const BEEP_SOUNDS: readonly { key: BeepSound; label: string; hz: number }
 ];
 
 /**
- * Son par défaut : médium (26/10, demande de l'utilisateur ; aigu avant).
+ * Son par défaut : médium (choix du produit).
  * Un son choisi dans Réglages est écrit tel quel et ne suit pas ce défaut.
  */
 export const DEFAULT_BEEP_SOUND: BeepSound = 'medium';

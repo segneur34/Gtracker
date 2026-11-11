@@ -14,7 +14,7 @@ import type { MarkGuideSettings } from './markGuide';
  * la position de proche en proche ; il ne saute plus loin qu'une fois ce saut
  * confirmé par une avance réelle le long de la trace, pour qu'un bref hors-piste
  * près d'une autre partie ne la compte pas comme faite. Pas d'alerte hors trace :
- * décision de l'utilisateur.
+ * choix du produit.
  */
 
 export type FollowedSource = 'route' | 'session';
@@ -37,7 +37,7 @@ export interface FollowedTrace {
   markGuide?: MarkGuideSettings;
 }
 
-/** Positions exploitables seulement, sans le reste du point (une altitude d'avant le lot 304 comprise). */
+/** Positions exploitables seulement, sans le reste du point (une altitude d'avant le retrait du routage comprise). */
 const usable = (points: ReadonlyArray<LatLon>): LatLon[] =>
   points.filter((p) => isFinite(p.lat) && isFinite(p.lon)).map(({ lat, lon }) => ({ lat, lon }));
 
@@ -89,7 +89,7 @@ const roundDeg = (deg: number): number => Math.round(deg * 1e6) / 1e6;
  * Trace suivie amincie pour être gardée sur l'appareil (`gtracker.followedTrace`) :
  * points simplifiés à `toleranceM` près, bouts compris (`simplifyLatLon`), et
  * positions arrondies, sans rien d'autre (l'altitude d'une trace gardée avant
- * le lot 304 part). Trois heures à 1 Hz pèsent plusieurs centaines de Ko sinon,
+ * le retrait du routage part). Trois heures à 1 Hz pèsent plusieurs centaines de Ko sinon,
  * réécrites avec chaque réglage sur le téléphone. Les balises ne bougent jamais.
  */
 export const thinFollowedTrace = (trace: FollowedTrace, toleranceM: number): FollowedTrace => ({

@@ -8,7 +8,7 @@
 /** Vitesse en surf. */
 export const SPEED_COLOR = '#1e88e5';
 
-/** Vitesse de la voile : un autre bleu, voulu (Q36, 29/10). */
+/** Vitesse de la voile : un autre bleu, voulu. */
 export const SAILING_SPEED_COLOR = '#1976d2';
 
 /** Altitude. */

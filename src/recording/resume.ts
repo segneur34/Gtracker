@@ -3,7 +3,7 @@ import type { RecoveryServices } from '../platform/recovery';
 import type { JournalPause, ParsedJournal } from './journal';
 
 /**
- * Reprise d'un enregistrement interrompu, sans accès au téléphone (lot 156).
+ * Reprise d'un enregistrement interrompu, sans accès au téléphone.
  *
  * Quand le moteur de la WebView tombe, seule la page repart : le processus, le service GPS et son verrou survivent
  * (`MainActivity.java`). Le journal et la preuve que le service vit (`platform/recovery.ts`) disent alors que faire :

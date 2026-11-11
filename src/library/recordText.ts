@@ -2,7 +2,7 @@ import { isWritableRecord, type ParsedRecord, type RecordWithoutSummary } from '
 
 /**
  * Texte d'une fiche lue sur le disque ou apportée par un import, et les avertissements d'une session qu'on ne
- * réécrit pas (lot 113, sortis de la bibliothèque).
+ * réécrit pas.
  */
 
 export const FUTURE_RECORD_WARNING = 'Fiche écrite par une version plus récente de Gtracker : lue sans être modifiée.';

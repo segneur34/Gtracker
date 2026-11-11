@@ -5,7 +5,7 @@ import { recordToRoute, type RouteRecord } from './routeRecord';
 import { routeActivity, shownRoutes, type WithActivity } from './routeShown';
 
 /**
- * Listes d'itinéraires rangés (point 68) : distance, tri, et vue depuis une
+ * Listes d'itinéraires rangés : distance, tri, et vue depuis une
  * famille (vue « Planifiées » de la bibliothèque Voile ou Surf). Un
  * itinéraire sans activité, ou d'une activité supprimée qui n'est pas un
  * calcul, n'appartient à aucune famille : il reste sur l'accueil et dans les

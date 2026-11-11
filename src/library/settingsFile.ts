@@ -5,7 +5,7 @@ import { ROOT_GOAL } from './rootGrowth';
 import { STORAGE_KEYS, FILE_FORMATS } from '../core/appIdentity';
 
 /**
- * Fichiers de réglages du dossier mémoire (§10, point 90) : un par appareil,
+ * Fichiers de réglages du dossier mémoire : un par appareil,
  * `reglages/<nom de l'appareil>.json`. Ils portent ce qui voyage : activités
  * et leurs réglages, barre du bas, profil du pratiquant.
  * La disposition de l'écran (sections ouvertes, tailles des blocs) reste

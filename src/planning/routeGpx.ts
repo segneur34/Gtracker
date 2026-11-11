@@ -13,7 +13,7 @@ import { XML } from '../core/appIdentity';
  *
  * C'est un export : la fiche (`routeRecord.ts`) fait foi, elle seule porte
  * les tronçons et leur mode. Pour passer l'itinéraire d'un téléphone à
- * l'autre (lot 194), le GPX rangé dans `itineraires/` et partagé porte sa
+ * l'autre, le GPX rangé dans `itineraires/` et partagé porte sa
  * fiche dans une extension posée juste avant `</gpx>`, que les autres
  * applications ignorent, comme le GPX complet d'une session
  * (`library/sessionBundle.ts`) : relu par `embeddedRouteRecord`.

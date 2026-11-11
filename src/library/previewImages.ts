@@ -2,8 +2,7 @@ import { isFiniteNumber } from '../core/basics';
 
 /**
  * Images finies des vignettes de la bibliothèque (trace sur son fond de
- * carte), gardées sur l'appareil d'un lancement à l'autre (lot 121, décision
- * du 01/11) : calculs purs de l'index que tient `library/previewImageStore.ts`
+ * carte), gardées sur l'appareil d'un lancement à l'autre : calculs purs de l'index que tient `library/previewImageStore.ts`
  * et des fichiers que range `platform/previewImages.ts`. Une entrée par
  * session, sous `previewKey(folderLabel, file)` comme les traces réduites
  * (`previewTracks.ts`), avec la clé complète de son image : une image d'une

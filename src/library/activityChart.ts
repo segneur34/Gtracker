@@ -154,7 +154,7 @@ const slotsOf = (period: ChartRange, nowMs: number, oldestMs: number | null = nu
     }
     return { slots, title: '30 derniers jours', range: `du ${shortDate(first)} à aujourd'hui` };
   }
-  // Par semaine : les 26 dernières, ou celles de l'année civile en cours (choix de l'utilisateur, 27/10), du 1er
+  // Par semaine : les 26 dernières, ou celles de l'année civile en cours (choix du produit), du 1er
   // janvier au 31 décembre : la première et la dernière semaine, à cheval sur deux années, sont coupées à ses bords.
   const thisMonday = startOfIsoWeek(nowMs);
   const { week: thisWeek } = isoWeek(nowMs);

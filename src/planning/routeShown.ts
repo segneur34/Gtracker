@@ -16,7 +16,7 @@ export const routeActivity = (route: WithActivity, activities: Activity[]): Acti
 
 /**
  * Itinéraires visibles : sans activité, ou d'une activité que `isShown`
- * montre (ni cachée dans Réglages, ni d'une famille cachée, §10, point 100).
+ * montre (ni cachée dans Réglages, ni d'une famille cachée).
  */
 export const shownRoutes = <T extends WithActivity>(routes: T[], activities: Activity[], isShown: (a: Activity) => boolean): T[] =>
   routes.filter((r) => {

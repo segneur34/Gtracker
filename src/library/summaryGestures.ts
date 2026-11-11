@@ -6,7 +6,7 @@ import type { LibrarySession, SummaryActivitySettings } from './record';
 import type { ActivitySummarySettings } from './summaryOptions';
 
 /**
- * Gestes dans Réglages qui changent les résumés (Q57, lot 148) : une session garde le seuil et le foil
+ * Gestes dans Réglages qui changent les résumés : une session garde le seuil et le foil
  * avec lesquels elle a été calculée (`SummaryActivitySettings`), mêmes chiffres sur tous les appareils, et
  * seul un changement fait sur cet appareil (saisi, repris d'un autre fichier, pré-réglage mis à jour) réécrit
  * les sessions de l'activité. Pur : l'état, rangé par appareil (`gtracker.summaryGestures`, ne voyage pas), est
@@ -87,7 +87,7 @@ export const settleGestures = (gestures: SummaryGestures, stillWaiting: (activit
 });
 
 /**
- * Activités dont un geste attend encore des sessions (lot 113, sorti de la bibliothèque) : celles de chaque session
+ * Activités dont un geste attend encore des sessions : celles de chaque session
  * `waiting` (résumé à refaire, ou en échec), sauf en lecture seule ou sans calcul ; `gestureActivity` dit
  * l'activité dont le geste s'applique à une session, `null` si elle n'en suit plus aucun.
  */

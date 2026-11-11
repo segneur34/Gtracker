@@ -24,7 +24,7 @@ const START_MS = Date.parse('2026-09-20T10:00:00Z');
 const buildTrack = (phases: [number, number][], hz = 1, climbPerS?: number): RawTrackPoint[] => phasesTrack(phases, hz, { startMs: START_MS, climbPerS });
 
 describe('summarizeSession', () => {
-  it('ne range plus ni le meilleur kilomètre ni les meilleures 5 min, ni les meilleurs efforts (course et vélo retirés, lot 303)', () => {
+  it('ne range plus ni le meilleur kilomètre ni les meilleures 5 min, ni les meilleurs efforts (course et vélo retirés)', () => {
     const run = summarizeSession(buildTrack([[200, 3], [200, 4], [200, 3]]), 'kite')!;
     const ride = summarizeSession(buildTrack([[150, 7], [300, 9], [150, 7]]), 'wingfoil')!;
     for (const summary of [run, ride]) {
@@ -42,7 +42,7 @@ describe('summarizeSession', () => {
     expect(summarizeSession(buildTrack([[600, 3]]), 'wingfoil')!.heartRate).toBeUndefined();
   });
 
-  it("ne range plus ni la cadence ni le test guidé (lot 301 : la version voile et surf n'en a pas)", () => {
+  it("ne range plus ni la cadence ni le test guidé (la version voile et surf n'en a pas)", () => {
     const points = buildTrack([[600, 3]]).map((p, i) => ({ ...p, cadence: 85, hr: 140 + (i % 20) }));
     for (const sport of ['kite', 'surf', 'wingfoil'] as const) {
       const summary = summarizeSession(points, sport)!;
@@ -62,7 +62,7 @@ describe('summarizeSession', () => {
     expect(summary.maxSpeedMs).toBeCloseTo(3, 1);
   });
 
-  it('trace clairsemée (un point toutes les 15 s, chaque pas est un trou) : vitesse max lissée, pas 0 (lot 81)', () => {
+  it('trace clairsemée (un point toutes les 15 s, chaque pas est un trou) : vitesse max lissée, pas 0', () => {
     const summary = summarizeSession(buildTrack([[1200, 4]], 1 / 15), 'wingfoil')!;
     expect(summary.maxSpeedMs).toBeCloseTo(4, 1);
   });
@@ -74,7 +74,7 @@ describe('summarizeSession', () => {
       const track = analysisTrack(raw, sport);
       const summary = summarizeSession(raw, sport)!;
       expect(summary.pointCount).toBe(track.length);
-      // Vitesse max : la meilleure moyenne sur 2 s de la trace d'analyse (Q34, lot 81).
+      // Vitesse max : la meilleure moyenne sur 2 s de la trace d'analyse.
       expect(summary.maxSpeedMs).toBe(bestWindowSpeedMs(track, buildCumulativeTrack(track), 2));
     }
     expect(Math.max(...analysisTrack(raw, 'wingfoil').map((p) => p.smoothedSpeedMs))).toBeLessThan(20);
@@ -82,7 +82,7 @@ describe('summarizeSession', () => {
     expect(analysisTrack(raw, null)).toEqual(computeKinematics(raw));
   });
 
-  it("donne la trace de l'analyse, mêmes options de cinématique, pour chaque famille (lot 72)", () => {
+  it("donne la trace de l'analyse, mêmes options de cinématique, pour chaque famille", () => {
     // Le module d'analyse (`useGpxSession`) calcule sa trace avec ces mêmes options.
     const raw = buildTrack([[120, 2], [1, 40], [240, 6], [60, 1]]);
     for (const sport of [...Object.values(FAMILY_BASE), 'bateau', 'kite'] as const) {
@@ -92,7 +92,7 @@ describe('summarizeSession', () => {
     }
   });
 
-  it("voile, vitesse Doppler en km/h : la liste donne les chiffres de l'analyse, à 1 Hz comme à 5 Hz (lot 95)", () => {
+  it("voile, vitesse Doppler en km/h : la liste donne les chiffres de l'analyse, à 1 Hz comme à 5 Hz", () => {
     // Wingfoil 10 min à 20 nœuds puis 5 min à 2 nœuds, positions bruitées de ±0,5 m (bruit déterministe),
     // vitesse de l'appareil écrite en km/h, absente sur un point sur 37.
     const dopplerKmh = (hz: number): RawTrackPoint[] => {
@@ -248,7 +248,7 @@ describe('summarizeSession', () => {
   });
 });
 
-describe('vitesse max du surf : celle de la page, une vague (Q34)', () => {
+describe('vitesse max du surf : celle de la page, une vague', () => {
   /** Vitesse max que la page d'analyse montre : `maxWaveSpeedMs`, de la même trace et du même seuil. */
   const pageMax = (raw: RawTrackPoint[], foil = false): number | null => {
     const profile = getSportProfile('surf');

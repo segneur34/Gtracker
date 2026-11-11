@@ -1,7 +1,7 @@
 import type { PlannedRoute } from './route';
 
 /**
- * État de la planification et son réducteur, purs (lot 72) : l'itinéraire et
+ * État de la planification et son réducteur, purs : l'itinéraire et
  * son annulation. Le hook `usePlannedRoute` y branche les éditions de la page.
  */
 

@@ -359,11 +359,11 @@ export const MISSING_FOLDER_MESSAGE = 'Le dossier mémoire est introuvable. Dés
 /**
  * Erreur du sélecteur d'Android rendue en clair : un dossier désigné qui
  * n'existe plus donne « … Missing file for primary:Documents/Gtracker at
- * /storage/… » (lot 143, idée 122), remplacé par `MISSING_FOLDER_MESSAGE` ;
+ * /storage/… », remplacé par `MISSING_FOLDER_MESSAGE` ;
  * le détail technique ne va qu'en console. Un code explicite du greffon prime
  * sur le texte (un accès refusé arrive souvent enveloppé dans une
  * `FileNotFoundException`, « EACCES ») : l'erreur est alors rendue avec la
- * phrase du traducteur (`plainError`, lot 158), le code conservé, sans le
+ * phrase du traducteur (`plainError`), le code conservé, sans le
  * détail d'Android. Une phrase française sans code est rendue telle quelle.
  */
 export const readableFolderError = (err: unknown): unknown => {

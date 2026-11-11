@@ -75,7 +75,7 @@ describe('formatClockMinutes', () => {
   });
 });
 
-// Copies gelées des écritures d'avant le lot 55 : les briques doivent rendre les mêmes textes.
+// Copies gelées des écritures d'avant leur extraction en briques : les briques doivent rendre les mêmes textes.
 const oldCadenceChange = (from: number, to: number): string => {
   const pct = from > 0 ? ((to - from) / from) * 100 : 0;
   return `${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(1)} %`;
@@ -159,7 +159,7 @@ describe('formatDistanceAuto, formatMeters et seuils', () => {
 });
 
 describe('speedSourceText', () => {
-  /** Copie gelée de l'expression recopiée dans les onglets réglages de la course et du surf (lot 64). */
+  /** Copie gelée de l'expression recopiée dans les onglets réglages de la course et du surf. */
   const frozen = (has: boolean, unit: SpeedUnit | null | undefined) =>
     has ? `fournie par l'appareil${unit && unit !== 'ms' ? `, lue en ${SPEED_UNIT_LABEL[unit]} et convertie` : ''}` : 'dérivée des positions, filtrée';
 
@@ -201,7 +201,7 @@ describe('formats d\'affichage uniques', () => {
   });
 });
 
-describe('gardes des formateurs de durée et de nombre (lot 149, C2-6)', () => {
+describe('gardes des formateurs de durée et de nombre', () => {
   it('« - » pour NaN et l’infini, partout ; pour le négatif dans les durées seulement', () => {
     for (const v of [NaN, Infinity, -Infinity]) {
       expect(formatDuration(v)).toBe('-');
@@ -231,7 +231,7 @@ describe('gardes des formateurs de durée et de nombre (lot 149, C2-6)', () => {
   });
 });
 
-describe('speedFromText (lot 157)', () => {
+describe('speedFromText', () => {
   it('lit une vitesse en nœuds et la range en m/s, ou en nœuds', () => {
     expect(speedFromText('12', 'kn', 'ms')).toBeCloseTo(12 / 1.94384, 9);
     expect(speedFromText('12', 'kn', 'kn')).toBeCloseTo(12, 9);
@@ -257,7 +257,7 @@ describe('speedFromText (lot 157)', () => {
   });
 });
 
-describe('formateurs sans valeur (lot 160)', () => {
+describe('formateurs sans valeur', () => {
   it('rendent « - » pour NaN, l infini et le négatif sans sens', () => {
     expect(formatTimeOfDay(NaN)).toBe('-');
     expect(formatSessionDate(NaN)).toBe('-');

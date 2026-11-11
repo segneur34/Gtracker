@@ -5,7 +5,7 @@ import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
 /**
  * Ce que le code Android de l'application suppose des greffons, sans moyen de
  * le lire autrement que dans leur source : une mise à jour qui le changerait
- * casserait la sortie écran éteint sans erreur de compilation (lot 156).
+ * casserait la sortie écran éteint sans erreur de compilation.
  *
  * - `RecordingNotificationPlugin.java` recopie le numéro et le canal de la
  *   notification du service GPS, constantes privées du greffon.
@@ -13,7 +13,7 @@ import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
  *   n'ont pas de verrou de veille : elles comptent sur celui du service GPS,
  *   sans échéance, pris au démarrage, que le chien de garde ne rend pas.
  * - `IncomingFilePlugin.java` lit l'intention de départ dans `handleOnNewIntent`, parce que `BridgeActivity` l'y passe
- *   lui-même au démarrage (lot 35).
+ *   lui-même au démarrage.
  * - La reprise après une chute du moteur de la WebView passe par
  *   `window.Capacitor.fromNative`, qui reçoit les réponses des greffons
  *   (`adoptRunningService`), et compte sur l'appel gardé du greffon.
@@ -155,7 +155,7 @@ describe('chute du moteur de rendu', () => {
   });
 });
 
-describe('fichiers reçus d\'une autre application (lot 35)', () => {
+describe('fichiers reçus d\'une autre application', () => {
   it('Capacitor passe l\'intention de départ à onNewIntent, une fois le pont créé, et relaie vers les greffons', () => {
     const load = between(BRIDGE_ACTIVITY, 'protected void load()', 'public void registerPlugin(');
     expect(load.indexOf('this.onNewIntent(getIntent());')).toBeGreaterThan(load.indexOf('bridge = bridgeBuilder'));

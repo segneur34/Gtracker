@@ -29,9 +29,9 @@ export interface RawTrackPoint {
   time: string | Date;
   /**
    * `time` en millisecondes, lu une fois à la lecture du fichier ou à
-   * l'enregistrement (lot 56) : `rawPointTimeMs` le préfère à une nouvelle
+   * l'enregistrement : `rawPointTimeMs` le préfère à une nouvelle
    * lecture de la date. Le lecteur GPX n'y laisse ni date illisible ni date
-   * qui recule (lot 149) ; une date illisible d'un point posé à la main vaut
+   * qui recule ; une date illisible d'un point posé à la main vaut
    * NaN, comme relue. Ce n'est pas `TrackPoint.timeMs`, la date répartie
    * (`spreadEqualTimes`).
    */

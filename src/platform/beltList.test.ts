@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addBelt, beltLabels, forgetBelt, isBelt, learnBeltAddressType, readBeltList, storedBeltList } from './beltList';
 
-/** Appareils cardio retenus (lot 198) : plusieurs en mémoire, un seul actif, marqué dans la liste. */
+/** Appareils cardio retenus : plusieurs en mémoire, un seul actif, marqué dans la liste. */
 
 const hrm = { address: 'AA:AA:AA:AA:11:11', name: 'HRM-Dual' };
 const decathlon = { address: 'BB:BB:BB:BB:22:22', name: 'Decathlon HR', random: true };

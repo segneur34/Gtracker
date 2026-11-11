@@ -96,7 +96,7 @@ describe('GPX complet, compatibilité (sessionBundle)', () => {
     expect(b.record?.name).toBe('Ma sortie');
     expect(b.gpx.startsWith('﻿')).toBe(true);
   });
-  it('fiche d\'une version future dans le paquet : non lue, son texte gardé (lot 148, C5-4)', () => {
+  it('fiche d\'une version future dans le paquet : non lue, son texte gardé', () => {
     const b = unbundleSessionGpx(bundleSessionGpx(gpx, { ...rec, version: 2 }, null));
     expect(b.record).toBeNull();
     expect(b.recordText).toBe(serializeRecord({ ...rec, version: 2 }));

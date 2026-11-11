@@ -11,19 +11,19 @@ describe('parentPage', () => {
     expect(parentPage('/surf/analyse', '?session=d.gpx')).toBe('/surf');
   });
 
-  it("l'analyse rend le filtre d'activité de la bibliothèque d'où l'on vient (lot 158)", () => {
+  it("l'analyse rend le filtre d'activité de la bibliothèque d'où l'on vient", () => {
     expect(parentPage('/surf/analyse', '?session=b.gpx&activite=a-surf-foil')).toBe('/surf?activite=a-surf-foil');
     expect(analysisPath('surf', 'b.gpx', 'a-surf-foil')).toBe('/surf/analyse?session=b.gpx&activite=a-surf-foil');
     expect(analysisPath('surf', 'b.gpx', null)).toBe('/surf/analyse?session=b.gpx');
     expect(analysisPath('surf', null, 'a-surf-foil')).toBe('/surf/analyse');
   });
 
-  it('le test de FC repos remonte au Profil (lot 301)', () => {
+  it('le test de FC repos remonte au Profil', () => {
     expect(parentPage('/profil/fc-repos', '')).toBe('/profil');
     expect(parentPage('/profil/fc-repos/', '?vitesse=10')).toBe('/profil');
   });
 
-  it('une leçon des tutoriels remonte à leur liste, la liste à Réglages (lot 147)', () => {
+  it('une leçon des tutoriels remonte à leur liste, la liste à Réglages', () => {
     expect(parentPage('/tutoriels/enregistrer', '')).toBe('/tutoriels');
     expect(parentPage('/tutoriels/voile/', '')).toBe('/tutoriels');
     expect(parentPage('/tutoriels', '')).toBe('/parametres');
@@ -62,7 +62,7 @@ describe('parentPage', () => {
   });
 });
 
-describe('chemins de la bibliothèque et des analyses (lot 72)', () => {
+describe('chemins de la bibliothèque et des analyses', () => {
   it("ouvre la bibliothèque d'une famille, filtrée sur une activité", () => {
     expect(libraryPath('voile')).toBe('/voile');
     expect(libraryPath('surf', 'a-paddle é')).toBe('/surf?activite=a-paddle%20%C3%A9');

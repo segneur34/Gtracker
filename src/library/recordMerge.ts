@@ -2,7 +2,7 @@ import type { FileStat } from '../platform/memoryFolder';
 import { ANALYSIS_SUMMARY_FIELDS, sameJson, type RecordWithoutSummary, type SessionRecord, type SessionSummary } from './record';
 
 /**
- * Fiche changée sur le disque pendant qu'on la tenait en mémoire (lot 148) : deux appareils sur un
+ * Fiche changée sur le disque pendant qu'on la tenait en mémoire : deux appareils sur un
  * même dossier (Syncthing, Drive, copie à chaud). Avant d'écrire, la fiche du disque est fondue
  * champ à champ avec ce qui a été saisi ici : le disque pour tout, sauf les chemins changés ici.
  */

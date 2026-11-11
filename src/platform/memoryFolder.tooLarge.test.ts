@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Grosse capture (lot 156) : au-delà du plafond, le fichier du dossier privé
+ * Grosse capture : au-delà du plafond, le fichier du dossier privé
  * n'est pas lu du tout, et l'erreur le distingue d'un fichier absent.
  */
 

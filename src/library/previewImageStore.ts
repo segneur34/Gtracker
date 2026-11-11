@@ -8,7 +8,7 @@ import { previewEntriesToEvict, unknownPreviewKeys } from './previewTracks';
 
 /**
  * Images finies des vignettes de la bibliothèque, gardées sur l'appareil d'un
- * lancement à l'autre (lot 121) : un PNG par session, sous la clé complète de
+ * lancement à l'autre : un PNG par session, sous la clé complète de
  * son image (`previewImageKey`), et un index lu une fois au premier besoin,
  * tenu en mémoire, réécrit `writeDelayMs` après le dernier changement et
  * aussitôt quand la page est cachée. Les moins récemment vues sont oubliées

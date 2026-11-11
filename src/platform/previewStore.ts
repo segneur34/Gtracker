@@ -4,7 +4,7 @@ import { CACHE_NAMES } from '../core/appIdentity';
 
 /**
  * Document des vignettes de la bibliothèque gardées sur l'appareil d'un
- * lancement à l'autre (lot 118) : seul point d'accès autorisé. Le document est
+ * lancement à l'autre : seul point d'accès autorisé. Le document est
  * opaque ici (du texte lu et écrit d'un bloc) ; son contenu, sa borne et son
  * écriture différée sont tenus par `library/previewStore.ts`.
  *

@@ -183,7 +183,7 @@ describe('recordingDurationMs', () => {
   });
 });
 
-describe('pause manuelle et durée (lot 158)', () => {
+describe('pause manuelle et durée', () => {
   const before = [fixAt(0), fixAt(60)].reduce(addFixToStats, EMPTY_RECORDING_STATS);
   const wall = 9_000_000;
 
@@ -287,7 +287,7 @@ describe('états de l’enregistreur', () => {
   });
 });
 
-describe('nothingToKeep (lot 67, sorti de useRecorder)', () => {
+describe('nothingToKeep (sorti de useRecorder)', () => {
   it('parle des positions, ou sans position (muscu) des mesures de la ceinture', () => {
     expect(nothingToKeep()).toBe('Moins de deux positions reçues : rien à enregistrer.');
   });

@@ -249,7 +249,7 @@
   pointer-events: none;
 }
 
-/* Survol réservé aux pointeurs qui survolent : au toucher, il resterait collé jusqu'au toucher suivant (lot 143). */
+/* Survol réservé aux pointeurs qui survolent : au toucher, il resterait collé jusqu'au toucher suivant. */
 @media (hover: hover) {
   .ui-btn:not(:disabled):hover {
     filter: brightness(0.95);

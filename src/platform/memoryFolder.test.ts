@@ -63,7 +63,7 @@ describe('folderImportPaths', () => {
   });
 });
 
-describe('readableFolderError (lot 143, idée 122)', () => {
+describe('readableFolderError', () => {
   it('rend en clair un dossier désigné qui n’existe plus, le détail en console', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const err = readableFolderError(new Error('Écriture impossible : Missing file for primary:Documents/Gtracker at /storage/emulated/0/Documents/Gtracker'));
@@ -78,7 +78,7 @@ describe('readableFolderError (lot 143, idée 122)', () => {
     expect(readableFolderError(other)).toBe(other);
   });
 
-  it('un code explicite du greffon prime sur le texte (lot 148)', () => {
+  it('un code explicite du greffon prime sur le texte', () => {
     const refused = Object.assign(new Error('Lecture impossible : java.io.FileNotFoundException: open failed: EACCES (Permission denied)'), { code: 'PERMISSION' });
     expect((readableFolderError(refused) as Error).message).toBe('Autorisation refusée : Réglages › Autorisations.');
     expect(fileErrorCode(readableFolderError(refused))).toBe('PERMISSION');
@@ -95,7 +95,7 @@ describe('readableFolderError (lot 143, idée 122)', () => {
   });
 });
 
-describe('fileErrorCode (lot 148)', () => {
+describe('fileErrorCode', () => {
   it('lit le code du greffon', () => {
     for (const code of ['NOT_FOUND', 'PERMISSION', 'NO_SPACE', 'TOO_LARGE', 'UNKNOWN'] as const) {
       expect(fileErrorCode(Object.assign(new Error('x'), { code }))).toBe(code);
@@ -117,7 +117,7 @@ describe('fileErrorCode (lot 148)', () => {
   });
 });
 
-describe('readOnlyFolder (lot 148)', () => {
+describe('readOnlyFolder', () => {
   it('lit, et refuse d\'écrire ou d\'effacer, sans toucher au dossier', async () => {
     const files = new Map([['a.txt', 'contenu']]);
     const log: string[] = [];

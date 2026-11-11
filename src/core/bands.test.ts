@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bandRangeLabel } from './bands';
 
-/** Copie gelée de l'expression recopiée dans `HeartRatePanel` et `CadencePanel` avant le lot 64. */
+/** Copie gelée de l'expression recopiée dans `HeartRatePanel` et `CadencePanel` avant son extraction. */
 const frozen = (bounds: readonly number[], band: number): string =>
   band === 0 ? `< ${bounds[0]}` : band === bounds.length ? `≥ ${bounds[band - 1]}` : `${bounds[band - 1]}-${bounds[band] - 1}`;
 

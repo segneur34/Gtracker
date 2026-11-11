@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MEMORY_FORMAT, MEMORY_VERSION, markerText, readMarkerVersion } from './folderLayout';
 
-describe('readMarkerVersion (lot 148, C5-9)', () => {
+describe('readMarkerVersion', () => {
   it('relit le marqueur écrit', () => {
     expect(readMarkerVersion(markerText())).toBe(MEMORY_VERSION);
   });

@@ -61,10 +61,10 @@ const BASE_PRESETS: Partial<Record<SportType, ActivityPreset>> = {
  * d'où la reprise de celui du calcul quand l'activité n'ajoute que le foil.
  */
 const ACTIVITY_PRESETS: Partial<Record<string, ActivityPreset>> = {
-  // Virages mesurés d'office en surf (lot 40) ; le paddle, le kayak, le downwind, créés sur le même calcul, non.
+  // Virages mesurés d'office en surf ; le paddle, le kayak, le downwind, créés sur le même calcul, non.
   surf: { turns: true },
   'a-surf-foil': { turns: true, foil: true },
-  // Pumping : un surf foil dont la mesure du pumping est cochée d'office (lot 335).
+  // Pumping : un surf foil dont la mesure du pumping est cochée d'office.
   'a-pumping': { turns: true, foil: true, pumping: true },
   // Foil coché d'office sur la planche et le kite ; le reste suit le calcul (wingfoil : foil par son profil).
   'a-windfoil': { ...WING, foil: true },

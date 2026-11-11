@@ -1,7 +1,7 @@
 import type { RecordingProfile } from '../core/sportProfiles';
 
 /**
- * Veille du GPS pendant un enregistrement (lot 115, décisions du 01/11) : le
+ * Veille du GPS pendant un enregistrement : le
  * GPS est dit perdu après `gpsLostDelayS` sans position (1 min), une seule
  * fois par perte, sans rappel ; une nouvelle perte n'est signalée qu'après le
  * retour du GPS pendant `gpsLostRearmS` (2 min) de positions sans trou d'au
@@ -19,7 +19,7 @@ import type { RecordingProfile } from '../core/sportProfiles';
  * minuteur repoussé à chaque position ; `lost`, signalé, plus rien d'armé ;
  * `rearming`, revenu, rien d'armé ni de signalé jusqu'au réarmement.
  *
- * La veille de la ceinture (lot 177) est la même machine, sur une autre source :
+ * La veille de la ceinture est la même machine, sur une autre source :
  * chaque mesure lisible y tient lieu de position, avec ses propres délais
  * (`beltWatchSettings`). Une ceinture jamais jointe n'est donc pas « perdue ».
  */

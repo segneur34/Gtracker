@@ -44,7 +44,7 @@ describe('isMapBase', () => {
   });
 });
 
-describe('resolveMapBase (lot 193)', () => {
+describe('resolveMapBase', () => {
   it('prend le fond de la session, sinon celui de la famille', () => {
     expect(resolveMapBase('satellite', 'plan')).toBe('satellite');
     expect(resolveMapBase('plan', 'satellite')).toBe('plan');
@@ -53,7 +53,7 @@ describe('resolveMapBase (lot 193)', () => {
   });
 });
 
-describe('adresse des tuiles réglable (lot 188)', () => {
+describe('adresse des tuiles réglable', () => {
   const tile = { z: 15, x: 16808, y: 11953 };
   const custom = 'https://tuiles.example.org/{z}/{x}/{y}.png';
 

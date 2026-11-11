@@ -20,7 +20,7 @@ describe('sanitizeGearLabels', () => {
   });
 });
 
-describe('matériel enregistré (lot 20)', () => {
+describe('matériel enregistré', () => {
   const wing: GearGroup = { id: 'g-aile', name: 'Aile', items: [{ id: 'i-5', name: 'Duotone 5' }, { id: 'i-6', name: 'Duotone 6' }] };
   const mast: GearGroup = { id: 'g-mat', name: 'Mât', items: [] };
 

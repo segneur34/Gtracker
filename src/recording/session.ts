@@ -34,7 +34,7 @@ export const isAutoPause = (state: RecorderPhase): boolean => state.status === '
  * Ce que devient une position reçue selon l'état de l'enregistreur :
  * `evaluate`, la pause automatique en juge puis elle est gardée hors pause ;
  * `show`, en pause manuelle, elle ne sert qu'à la carte du direct (le GPS
- * reste allumé, lot 104 ; rien n'est gardé ni compté, et la reprise reste
+ * reste allumé ; rien n'est gardé ni compté, et la reprise reste
  * manuelle) ; `ignore`, hors d'un enregistrement.
  */
 export const receivedFixRole = (state: RecorderPhase): 'evaluate' | 'show' | 'ignore' =>

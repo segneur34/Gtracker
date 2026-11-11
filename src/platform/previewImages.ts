@@ -5,7 +5,7 @@ import { CACHE_NAMES } from '../core/appIdentity';
 
 /**
  * Images finies des vignettes de la bibliothèque (trace sur son fond), gardées
- * sur l'appareil d'un lancement à l'autre (lot 121) : seul point d'accès
+ * sur l'appareil d'un lancement à l'autre : seul point d'accès
  * autorisé. Un fichier PNG par image et un index, opaque ici (du texte lu et
  * écrit d'un bloc) ; leur contenu, leur borne et l'écriture différée de
  * l'index sont tenus par `library/previewImageStore.ts`.

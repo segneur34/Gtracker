@@ -205,7 +205,7 @@ describe('balises à dessiner', () => {
   });
 });
 
-describe('markGuideView (lot 67, sortie de useMarkGuide)', () => {
+describe('markGuideView (sortie de useMarkGuide)', () => {
   /** Copie gelée de l'ancienne vue du service (`publish`), `isCourseFinished` appelé deux fois. */
   const oldView = (session: { marks: LatLon[]; state: MarkGuideState; distanceM: number | null; bearingDeg: number | null; muted: boolean; settings: typeof MARK_GUIDE_DEFAULTS }) => ({
     active: true,
@@ -240,7 +240,7 @@ describe('markGuideView (lot 67, sortie de useMarkGuide)', () => {
   });
 });
 
-describe('rejeu sur les positions relues d\'un journal (lot 156)', () => {
+describe('rejeu sur les positions relues d\'un journal', () => {
   const marks = [at(0, 0), at(0, 600), at(400, 600)];
   const course: [number, number][] = [[0, 0], [0, 600], [400, 600], [400, 900]];
 

@@ -7,7 +7,7 @@ import { summarizeGpx, summarizeGpxOptions } from './summarizeGpx';
 import { analyzeGpx, type ActivitySummarySettings } from './summaryOptions';
 
 /**
- * `summarizeGpx` (lot 126 B) : le résumé de la file, réglages résolus en table avant d'aller au worker, est celui
+ * `summarizeGpx` : le résumé de la file, réglages résolus en table avant d'aller au worker, est celui
  * d'`analyzeGpx` avec les réglages lus par une fonction, à 1 Hz et à 5 Hz. Les options traversent un clonage
  * structuré sans rien perdre.
  */

@@ -60,7 +60,7 @@ const CEILING_PER_REFERENCE = 3;
  * le filtrage qui en dépend.
  *
  * Le pas de reprise après une pause (`segmentStart`) et le pas plus long que
- * `maxGapS` (trou de la trace, `SportProfile.maxGapS`) sont écartés (lot 99) :
+ * `maxGapS` (trou de la trace, `SportProfile.maxGapS`) sont écartés :
  * leur vitesse est une moyenne sur un chemin inconnu, presque nulle quand le
  * pas enjambe une pause ou un arrêt, et ne dit rien de l'allure tenue ; la
  * cinématique ne leur prête pas non plus de vitesse propre (règle 6 : seule
@@ -84,7 +84,7 @@ export const referenceSpeedMs = (
   // Points d'une même date répartis dans leur intervalle, comme dans `computeKinematics`.
   const timesMs = spreadEqualTimes(points, points.map(rawPointTimeMs));
   const reference = referenceOf(points, timesMs, unit, deviceFactor, maxGapS, false);
-  // Rien que des trous ou des reprises : ils restent la seule mesure, comme avant le lot 99.
+  // Rien que des trous ou des reprises : ils restent la seule mesure.
   return reference ?? referenceOf(points, timesMs, unit, deviceFactor, maxGapS, true) ?? 0;
 };
 
@@ -103,7 +103,7 @@ const referenceOf = (
   maxGapS: number, keepGaps: boolean
 ): number | null => {
 
-  // Échantillons en tableaux typés, triés par indices (lot 56).
+  // Échantillons en tableaux typés, triés par indices.
   const speeds = new Float64Array(points.length - 1);
   const weights = new Float64Array(points.length - 1);
   let size = 0;
@@ -143,7 +143,7 @@ const referenceOf = (
  * Indices des `size` premières valeurs (sans NaN) dans l'ordre du tri stable
  * `(a, b) => a - b` : croissantes, et à égalité (−0 et +0 compris) dans
  * l'ordre des indices. Tri natif des valeurs, puis rangement par comptage :
- * sans fonction de comparaison, plusieurs fois plus rapide (lot 56).
+ * sans fonction de comparaison, plusieurs fois plus rapide.
  */
 const stableSortedOrder = (values: Float64Array, size: number): Uint32Array => {
   const sorted = values.slice(0, size).sort();
@@ -170,7 +170,7 @@ const stableSortedOrder = (values: Float64Array, size: number): Uint32Array => {
   return order;
 };
 
-/** `referenceSpeedMs` d'avant le lot 56, objets et tri, pour une trace qui porte une date illisible. */
+/** `referenceSpeedMs` d'avant son remplacement, objets et tri, pour une trace qui porte une date illisible. */
 const referenceFromSamples = (
   points: RawTrackPoint[], timesMs: number[], unit: DeviceSpeedUnit | null, deviceFactor: number,
   maxGapS: number, keepGaps: boolean
@@ -268,7 +268,7 @@ export type KinematicsProfile = Pick<SportProfile, 'id' | 'medianWindowSeconds' 
 export const scalesFiltersToSession = (profile: Pick<SportProfile, 'id'>): boolean => SAILING_SPORTS.includes(profile.id);
 
 /**
- * Options de la cinématique tirées du profil d'un calcul (lot 72) : fenêtre
+ * Options de la cinématique tirées du profil d'un calcul : fenêtre
  * médiane, détour, plafond de vitesse, trou de trace ; accélération et
  * plafond accordés à l'allure de la session (`referenceMs`, en m/s) si
  * `scaleToSession`, sinon le plafond du support seul. Une seule écriture,

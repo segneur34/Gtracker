@@ -7,7 +7,7 @@ import { isNativeApp } from './runtime';
  * (pas de `viewport-fit=cover`) : le fond derrière elles est celui du
  * téléphone (`app_colors.xml`, qui suit son mode clair ou sombre), donc
  * `dark` est le mode du téléphone et non le thème de l'appli
- * (`hooks/useTheme.ts`, lot 158). Sur le téléphone, par le greffon SystemBars de
+ * (`hooks/useTheme.ts`). Sur le téléphone, par le greffon SystemBars de
  * Capacitor, compris dans `@capacitor/core` ; dans le navigateur, rien : la
  * barre suit `<meta name="theme-color">`.
  */

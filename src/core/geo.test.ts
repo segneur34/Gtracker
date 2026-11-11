@@ -7,7 +7,7 @@ const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648
 const points = Array.from({ length: 300 }, () => ({ lat: 43.5 + (rnd() - 0.5) * 0.2, lon: 3.9 + (rnd() - 0.5) * 0.3 }));
 
 describe('géodésie', () => {
-  it('plan local centré sur un point : écriture gelée de projectOnSegment (lot 57)', () => {
+  it('plan local centré sur un point : écriture gelée de projectOnSegment', () => {
     for (const p of points.slice(0, 30)) {
       const cosLat = Math.cos(toRad(p.lat));
       const plane = planeProjection(p.lat, p);

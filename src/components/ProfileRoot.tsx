@@ -64,7 +64,7 @@ const timesText = (goalTimes: number): string => {
   return Number.isInteger(tenth) ? String(tenth) : formatDecimal(tenth, 1);
 };
 
-/** Où en est la fleur, en clair (textes de la maquette du 31/10 ; le papillon des étapes 5 et 6, lot 147). */
+/** Où en est la fleur, en clair (le papillon des étapes 5 et 6). */
 const flowerText = (growth: RootGrowth, goalMin: number): string => {
   if (growth.minutes <= 0) return 'Pas encore de fleur : elle paraît à la première minute.';
   const reached = Math.min(BLOOM_MAX, Math.floor(growth.goalTimes + 1e-9));

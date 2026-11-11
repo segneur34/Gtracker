@@ -20,7 +20,7 @@ export const ROUTE_FORMAT = FILE_FORMATS.itineraire;
 /**
  * 4 : balises reliées en ligne droite (`straight`) et traces d'un GPX chargé
  * (`imported`), points en `[lat, lon]`, depuis le retrait du planificateur
- * routier (lot 304). Les fiches de version 2 et 3, écrites avant lui, se
+ * routier. Les fiches de version 2 et 3, écrites avant lui, se
  * relisent sans code à part et restent modifiables : un tronçon calculé (type
  * de voie, mode inconnu) devient une ligne droite neuve, l'altitude des points
  * est ignorée, leurs autres champs (`loop`, `surfaces`, `pending`) passent sans
@@ -29,7 +29,7 @@ export const ROUTE_FORMAT = FILE_FORMATS.itineraire;
  */
 export const ROUTE_VERSION = 4;
 
-/** Point de tracé compact : `[lat, lon]` ; une altitude en troisième place, d'avant le lot 304, est ignorée. */
+/** Point de tracé compact : `[lat, lon]` ; une altitude en troisième place, d'avant le retrait du routage, est ignorée. */
 type StoredPoint = number[];
 
 interface StoredLeg {
@@ -98,7 +98,7 @@ export const routeMarkGuide = (record: RouteRecord): MarkGuideSettings | null =>
 
 /**
  * Itinéraire d'une fiche. Un tronçon illisible, d'un mode inconnu (un type de
- * voie d'avant le lot 304), ou des tronçons qui ne correspondent pas aux
+ * voie d'avant le retrait du routage), ou des tronçons qui ne correspondent pas aux
  * points, deviennent des lignes droites neuves plutôt que d'être perdus
  * (`newLeg`).
  */

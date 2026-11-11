@@ -10,11 +10,11 @@ import { isNativeApp } from './runtime';
  * usages : le guidage vers les balises (`getBeeper`), un motif joué une fois
  * (`playPattern` : test de FC repos, « Écouter » de Réglages), le
  * retour du bouton « Note » (`buzz`) et la veille du GPS et de la ceinture de
- * l'enregistrement (`armGpsWatch`, lot 115). La hauteur de tous les sons se
- * règle d'un coup (`setBeepPitch`, 24/10).
+ * l'enregistrement (`armGpsWatch`). La hauteur de tous les sons se
+ * règle d'un coup (`setBeepPitch`).
  *
  * Sur le téléphone, un greffon Android tient le rythme sur un fil à lui :
- * écran éteint, les minuteries de la WebView sont bridées (point 40), pas
+ * écran éteint, les minuteries de la WebView sont bridées, pas
  * celles d'Android. Pour les balises, le service GPS de l'enregistrement
  * garde le processeur éveillé. Le son passe par le flux des alarmes : audible
  * téléphone en silencieux, au volume des alarmes. Dans le navigateur, Web
@@ -195,7 +195,7 @@ export const getBeeper = (): Beeper => {
   return beeper;
 };
 
-// --- Veille du GPS de l'enregistrement (lot 115) ---
+// --- Veille du GPS de l'enregistrement ---
 
 /** Minuteur de la veille dans le navigateur ; `null` désarmé. */
 let gpsTimer: ReturnType<typeof setTimeout> | null = null;
@@ -256,7 +256,7 @@ export const onGpsLost = (listener: () => void): (() => void) => {
   };
 };
 
-// --- Veille de la ceinture de l'enregistrement (lot 177) ---
+// --- Veille de la ceinture de l'enregistrement ---
 
 /** Minuteur de la veille de la ceinture dans le navigateur ; `null` désarmé. */
 let beltTimer: ReturnType<typeof setTimeout> | null = null;

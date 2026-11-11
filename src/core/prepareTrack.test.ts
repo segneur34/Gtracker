@@ -15,12 +15,12 @@ import { getSportProfile } from './sportProfiles';
 import type { RawTrackPoint, SportType } from './types';
 
 /**
- * `prepareTrack` (lot 126 B) rend ce que `useGpxSession` dérivait en `useMemo` avant d'aller dans le worker : la
+ * `prepareTrack` rend ce que `useGpxSession` dérivait en `useMemo` avant d'aller dans le worker : la
  * copie gelée ci-dessous est l'enchaînement du hook tel qu'il était (version 0.4.77), recopié tel quel. Égalité
  * stricte, à 1 Hz et à 5 Hz, en voile avec et sans allure imposée, avec ou sans profil, avec trou et pause.
  */
 
-/** Copie gelée de l'enchaînement de `useGpxSession` avant le lot 126 B : ne pas la faire évoluer avec le code. */
+/** Copie gelée de l'enchaînement de `useGpxSession` avant son déplacement dans `prepareTrack` : ne pas la faire évoluer avec le code. */
 const frozenHookChain = (gpxContent: string, { fileName = null, profile, referenceSpeedOverrideMs }: PrepareTrackOptions) => {
   const { rawPoints, trackName: name, hasDeviceSpeed } = parseGpx(gpxContent);
   const trackName = name ?? null;

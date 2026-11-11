@@ -21,7 +21,7 @@ import { ALTITUDE_COLOR, SAILING_SPEED_COLOR } from '../chartStyle';
 /** Graphes de l'onglet « graphiques » dépliés tant qu'on ne les replie pas. */
 export const SAILING_GRAPH_FOLDS_DEFAULT = { vitesse: true, fc: true, polaire: true };
 export type SailingGraphFold = keyof typeof SAILING_GRAPH_FOLDS_DEFAULT;
-/** Nom de chaque graphe de « graphiques », à la couleur de sa courbe (règle commune des noms, Q37). */
+/** Nom de chaque graphe de « graphiques », à la couleur de sa courbe (règle commune des noms). */
 export const SAILING_GRAPH_COLORS: Record<SailingGraphFold, string> = { vitesse: SAILING_SPEED_COLOR, fc: HEART_RATE_COLOR, polaire: ALTITUDE_COLOR };
 
 /** Courbe du vent : le trait et les points des manœuvres partagent la couleur. */
@@ -52,7 +52,7 @@ const vmgAloneDot = (props: DotItemDotProps): ReactNode => {
   return <circle cx={props.cx} cy={props.cy} r={1.5} fill={VMG_COLOR} />;
 };
 
-/** Curseur commun aux graphes de vitesse et de FC (Q38) : leurs lignes viennent des mêmes points. */
+/** Curseur commun aux graphes de vitesse et de FC : leurs lignes viennent des mêmes points. */
 export const SAILING_SYNC_ID = 'sailing';
 /** Graduations des axes de la voile : encre grasse, sans unité. */
 const SAILING_TICK = { fill: 'var(--ink)', fontSize: 11, fontWeight: 700 };

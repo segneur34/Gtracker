@@ -9,7 +9,7 @@ import Button from './ui/Button';
 import { plural } from '../core/basics';
 
 /**
- * Réglages par appareil (§10, point 90), dans Réglages › Mémoire : le nom de
+ * Réglages par appareil, dans Réglages › Mémoire : le nom de
  * cet appareil, qui nomme son fichier dans `reglages/`, et la liste des
  * fichiers du dossier, avec « Reprendre » sur ceux des autres appareils.
  * « Importer un fichier de réglages » range un fichier choisi à la main, puis

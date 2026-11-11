@@ -133,7 +133,7 @@ describe('fiche changée sur le disque', () => {
   });
 });
 
-describe('tampon d’une fiche (lot 113)', () => {
+describe('tampon d’une fiche', () => {
   it('ne tient pour inchangé qu’un fichier de même taille et de même date, connues', () => {
     expect(sameStamp({ size: 10, mtimeMs: 5 }, { size: 10, mtimeMs: 5 })).toBe(true);
     expect(sameStamp({ size: 10, mtimeMs: 5 }, { size: 11, mtimeMs: 5 })).toBe(false);

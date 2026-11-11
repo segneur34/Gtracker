@@ -4,7 +4,7 @@ import { isBlankRecordText, recordToKeep, type KeptRecordText } from './recordTe
 import type { UnbundledGpx } from './sessionBundle';
 
 /**
- * Fiche d'un GPX importé (lot 113, sorti de la bibliothèque) : celle posée à côté de lui, à défaut celle que
+ * Fiche d'un GPX importé : celle posée à côté de lui, à défaut celle que
  * porte le GPX complet (`library/sessionBundle.ts`). L'une et l'autre se lisent par la porte d'import
  * (`library/legacyImport.ts`), qui accepte aussi l'ancienne application.
  */

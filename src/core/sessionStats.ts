@@ -182,14 +182,14 @@ export const spanOfRun = (track: readonly TrackPoint[], cum: Pick<CumulativeTrac
 });
 
 /**
- * Suites du masque d'activité : seul le masque décide (Q56, 04/11, la règle
+ * Suites du masque d'activité : seul le masque décide (la règle
  * écrite une fois). Un trou de la trace parcouru en mouvement (sa vitesse
  * moyenne atteint la détente basse, `computeActivityMask`) reste dans la suite
  * en cours, comme il reste dans le temps actif : un enregistreur économique se
  * tait en plein vol, et le silence n'est pas un posé (règle 10). Un trou
- * immobile est déjà inactif dans le masque, et coupe. Jusqu'au lot 149, un pas
- * plus long que `maxGapS` coupait ici quelle que soit sa vitesse : « 15 min en
- * vol » et deux vols qui en faisaient 10 sur la même page (C2-3). Avec `from`
+ * immobile est déjà inactif dans le masque, et coupe. La durée d'un pas
+ * ne coupe pas, quelle que soit sa vitesse : sinon « 15 min en vol » et deux
+ * vols qui en font 10 se contrediraient sur la même page. Avec `from`
  * et `to`, seuls les pas qui mènent aux points `from` à `to` comptent (les
  * vagues d'un vol en surf) : le même résultat qu'un masque faux hors de ces
  * bornes, sans parcourir toute la trace.

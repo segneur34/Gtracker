@@ -1,6 +1,6 @@
 /**
  * Position de la carte du direct. Hors pause manuelle, la dernière position
- * gardée ; en pause manuelle, le GPS reste allumé sans rien garder (lot 104) :
+ * gardée ; en pause manuelle, le GPS reste allumé sans rien garder :
  * la flèche suit la dernière position reçue depuis la pause, et son cap se
  * tire de ces positions, depuis le point de la pause.
  */

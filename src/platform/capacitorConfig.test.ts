@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Configuration Capacitor (lot 188) : l'agent ajouté à celui de la WebView, envoyé avec chaque tuile, nomme
+ * Configuration Capacitor : l'agent ajouté à celui de la WebView, envoyé avec chaque tuile, nomme
  * l'application, sa version et un contact public (OpenStreetMap l'exige). La version vient de `package.json`.
  */
 

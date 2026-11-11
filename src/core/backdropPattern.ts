@@ -13,7 +13,7 @@ import type { SportFamily } from './sportProfiles';
  * isolés (souffles, vague, repères, traits de vitesse) sont posés avec leurs
  * copies d'une tuile à côté, ce qui dépasse d'un bord reprenant à l'autre.
  *
- * Dessins choisis par l'utilisateur sur maquette le 23/10 : voile et surf
+ * Dessins choisis sur maquette : voile et surf
  * d'après ses images (souffle de vent, vague). Chaque fond a sa taille de tuile et son
  * espacement (`scale`, qui agrandit la tuile sans épaissir le trait) ; l'encre
  * et l'épaisseur sont dans le CSS (`ui.css`, `.page-backdrop--<fond>`).
@@ -186,7 +186,7 @@ const neighbours = (width: number, height: number): Point[] =>
   [[0, 0], [-width, 0], [width, 0], [0, -height], [0, height], [-width, -height]];
 
 /**
- * Souffle de vent, d'après l'image de l'utilisateur (23/10) : quatre longs traits, dont l'un finit en
+ * Souffle de vent, d'après l'image retenue : quatre longs traits, dont l'un finit en
  * spirale. Tracés absolus dans un cadre de 1080 × 370, posés à l'échelle voulue par `placeSouffle`.
  */
 const SOUFFLE = [
@@ -212,7 +212,7 @@ const SURF_W = 600;
 const SURF_H = 520;
 
 /**
- * Lignes de la vague, d'après l'image de l'utilisateur (23/10), dans un repère de 1520 × 1250 : droites à
+ * Lignes de la vague, d'après l'image retenue, dans un repère de 1520 × 1250 : droites à
  * gauche, elles montent en colline puis tournent d'un quart de cercle vers le bas autour d'un même centre.
  * Cette carte polaire est injective : des lignes qui ne se croisent pas avant le virage ne se croisent pas
  * après. Les lignes du bas finissent par un crochet ; l'encre croît de la plus haute à la plus basse.
@@ -258,7 +258,7 @@ const surfTile = (): TilePath[] => {
 
 export type BackdropVariant = 'contours' | SportFamily;
 
-/** Dessin, taille de tuile et espacement de chaque fond, réglés à l'œil par l'utilisateur sur la maquette du 23/10. */
+/** Dessin, taille de tuile et espacement de chaque fond, réglés à l'œil sur la maquette. */
 const BACKDROPS: Record<BackdropVariant, { draw: () => TilePath[]; width: number; height: number; scale: number }> = {
   contours: { draw: contourTile, width: TILE_W, height: TILE_H, scale: 1 },
   voile: { draw: voileTile, width: TILE_W, height: TILE_H, scale: 0.9 },

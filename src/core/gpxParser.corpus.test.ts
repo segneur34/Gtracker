@@ -9,7 +9,7 @@ import { gpxOf, rawToGpx, sailRaw, upDownLegs } from '../test/sailing.fixture';
 import { parseGpx, parseGpxPath } from './gpxParser';
 
 /**
- * Filet du lecteur GPX réécrit sans `DOMParser` (lot 126) : sur le corpus de chaque éditeur (`test/gpx/corpus.ts`),
+ * Filet du lecteur GPX réécrit sans `DOMParser` : sur le corpus de chaque éditeur (`test/gpx/corpus.ts`),
  * le lecteur rend, nombre à nombre, ce que rend la copie gelée du 04/11 (`test/gpxParser.legacy.ts`), refuse les
  * mêmes fichiers avec le même message, puis tire de chaque fichier les chiffres attendus par construction.
  *

@@ -99,7 +99,7 @@ describe('samplingIntervalS', () => {
     expect(samplingIntervalS([])).toBe(0);
   });
 
-  it('dates tronquées à la seconde : 5 Hz donne 0,2 s, 1 Hz reste 1 s (lot 81)', () => {
+  it('dates tronquées à la seconde : 5 Hz donne 0,2 s, 1 Hz reste 1 s', () => {
     const truncated = (stepS: number) => buildTrack(steady(200, 5), stepS).map((p) => ({
       ...p, time: new Date(Math.floor(Date.parse(p.time as string) / 1000) * 1000).toISOString(),
     }));
@@ -149,7 +149,7 @@ describe('sessionFilterThresholds', () => {
   });
 });
 
-/** Copie gelée de `referenceSpeedMs` d'avant le lot 56 : objets, tri, dates relues. */
+/** Copie gelée de `referenceSpeedMs` d'avant son remplacement : objets, tri, dates relues. */
 const frozenReferenceSpeedMs = (points: RawTrackPoint[]): number => {
   if (points.length < 2) return 0;
   const deviceUnit = detectTrackDeviceSpeedUnit(points.map(({ lat, lon, time, speedMs }) => ({ lat, lon, time, speedMs })));
@@ -177,7 +177,7 @@ const frozenReferenceSpeedMs = (points: RawTrackPoint[]): number => {
   return samples[samples.length - 1].speed;
 };
 
-/** Copie gelée de `samplingIntervalS` d'avant le lot 56. */
+/** Copie gelée de `samplingIntervalS` d'avant son remplacement. */
 const frozenSamplingIntervalS = (points: ReadonlyArray<Pick<RawTrackPoint, 'time'>>): number => {
   if (points.length < 2) return 0;
   const gaps: number[] = [];
@@ -193,7 +193,7 @@ const frozenSamplingIntervalS = (points: ReadonlyArray<Pick<RawTrackPoint, 'time
   return gaps.length % 2 === 0 ? (gaps[mid - 1] + gaps[mid]) / 2 : gaps[mid];
 };
 
-describe('dates lues une fois, tri par indices (lot 56)', () => {
+describe('dates lues une fois, tri par indices', () => {
   /** Trace bruitée, vitesses arrondies (égalités, 0 et −0), dates tronquées ou non, Doppler en km/h ou absent, reculs et dates illisibles. */
   const noisyTrace = (stepS: number, seed: number, o: { truncate?: boolean; doppler?: number; unreadable?: boolean } = {}): RawTrackPoint[] => {
     const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
@@ -234,7 +234,7 @@ describe('dates lues une fois, tri par indices (lot 56)', () => {
     }
   });
 
-  it('samplingIntervalS : identique à la version gelée, avec et sans rawTimeMs (dates tronquées à 5 Hz exceptées, lot 81)', () => {
+  it('samplingIntervalS : identique à la version gelée, avec et sans rawTimeMs (dates tronquées à 5 Hz exceptées)', () => {
     for (const [name, points] of cases()) {
       // Lot 81 : les dates égales sont réparties ; 5 Hz tronqué donne 0,2 s, la copie gelée 1 s.
       const want = name === '0.2 s, tronquées' ? 0.2 : frozenSamplingIntervalS(points);
@@ -258,7 +258,7 @@ describe('dates lues une fois, tri par indices (lot 56)', () => {
   });
 });
 
-describe('options de la cinématique tirées du profil (lot 72)', () => {
+describe('options de la cinématique tirées du profil', () => {
   it("accorde les filtres à l'allure en voile seulement, bateau compris", () => {
     const scaled = Object.values(SPORT_PROFILES).filter(scalesFiltersToSession).map((p) => p.id).sort();
     expect(scaled).toEqual(['bateau', 'kite', 'windsurf', 'wingfoil']);
@@ -289,7 +289,7 @@ describe('options de la cinématique tirées du profil (lot 72)', () => {
   });
 });
 
-describe('pas de reprise et trous de la trace (lot 99)', () => {
+describe('pas de reprise et trous de la trace', () => {
   /** Un pas de la trace : vitesse en m/s, durée en secondes, reprise après une pause. */
   type Step = { speedMs: number; dt: number; resume?: boolean };
 

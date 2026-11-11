@@ -1,7 +1,7 @@
 import type { SportFamily } from '../core/sportProfiles';
 
 /**
- * Programme des tutoriels (lot 147, idée 142) : une leçon par nouveau jour
+ * Programme des tutoriels : une leçon par nouveau jour
  * d'ouverture de l'application, dans cet ordre, pour faire découvrir ses
  * fonctions de l'enregistrement aux balises d'un parcours. Des données seules,
  * sans React : l'icône est un nom (`components/LessonIcon.tsx`), la page à

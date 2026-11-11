@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { angleDiff, circularMean, normalizeDeg, roundBearingDeg, signedDeltaHalfOpen, toDeg, toRad } from './angles';
 
-// Copies gelées des écritures remplacées (lot 57) : mêmes résultats au bit près.
+// Copies gelées des écritures remplacées : mêmes résultats au bit près.
 const frozenGpsTurnsDelta = (from: number, to: number): number => {
   const d = (((to - from) % 360) + 540) % 360 - 180;
   return d === -180 ? 180 : d;

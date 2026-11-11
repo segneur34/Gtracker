@@ -23,7 +23,7 @@ import { plural } from '../core/basics';
  * totaux de la période par activité, chacun ouvrant la bibliothèque filtrée
  * sur son activité, précédés de la légende (dates de la période, toucher une
  * barre) ; une ligne fine les replie ou les déplie tous d'un coup.
- * Les sessions d'une activité ou d'une famille cachée n'y sont pas (§10, point 100).
+ * Les sessions d'une activité ou d'une famille cachée n'y sont pas.
  */
 
 /** Hauteur de la zone des barres, en pixels (4 de marge en haut), hauteur maximale d'une session, et écart entre deux piles (`ActivityChart.css`). */

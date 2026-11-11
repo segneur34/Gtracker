@@ -3,7 +3,7 @@ import { RECORD_LIGHT_FIELDS_KEY, RECORD_READER_VERSION, lightRecord, recordFile
 import { indexByRecordName, type LibraryCache } from './reconcile';
 
 /**
- * Cache des fiches, gardé sur l'appareil hors du dossier (lot 113, sorti de la bibliothèque) : sa forme rangée,
+ * Cache des fiches, gardé sur l'appareil hors du dossier : sa forme rangée,
  * sa lecture et le calcul de ses entrées. La bibliothèque le lit et l'écrit (`hooks/sessionLibrary/cache.ts`).
  */
 

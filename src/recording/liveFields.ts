@@ -51,7 +51,7 @@ const LIVE_FIELD_TREATMENTS: Record<LiveFieldKey, readonly Treatment[]> = {
 
 /**
  * Chiffres de la notification seulement, pas de la carte réduite ; aucun
- * depuis le retrait de l'étape du compteur et des tests (lot 302).
+ * depuis le retrait de l'étape du compteur et des tests.
  */
 const NOTIFICATION_ONLY_FIELDS: readonly LiveFieldKey[] = [];
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { gearFieldsFor, type GearField } from './gearFields';
 
-/** Copies gelées des trois fonctions locales que `gearFieldsFor` remplace (lot 64). */
+/** Copies gelées des trois fonctions locales que `gearFieldsFor` remplace. */
 const frozenLand = (labels: [string, string]): GearField[] => [
   { field: 'gear1', label: labels[0], placeholder: 'ex. modèle, taille' },
   { field: 'gear2', label: labels[1], placeholder: 'ex. modèle, taille' },

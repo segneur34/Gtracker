@@ -147,7 +147,7 @@ describe('indexByRecordName', () => {
   });
 });
 
-describe('fiches à renommer en .json (lot 113)', () => {
+describe('fiches à renommer en .json', () => {
   it('désigne une fiche X.JSON à côté de X.gpx, sans X.json', () => {
     const odd = oddRecordExtensions([file('a.gpx'), file('a.JSON'), file('b.gpx'), file('b.Json'), file('b.json'), file('c.JSON'), file('d.gpx'), file('d.json')]);
     expect(odd.map((e) => e.name)).toEqual(['a.JSON']);

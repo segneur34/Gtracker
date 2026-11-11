@@ -1,7 +1,7 @@
 import { errorMessage } from '../core/basics';
 
 /**
- * Traducteur des erreurs de la plateforme (lot 158) : codes des greffons
+ * Traducteur des erreurs de la plateforme : codes des greffons
  * (`NOT_AUTHORIZED`, `NOT_FOUND`, `PERMISSION`, `NO_SPACE`, `TOO_LARGE`),
  * `DOMException.name` (`QuotaExceededError`, `NotAllowedError`…) et messages
  * techniques en anglais d'Android ou du navigateur. Jamais de texte brut

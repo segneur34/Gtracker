@@ -14,7 +14,7 @@ import './Tutorials.css';
 let decidedThisLaunch: 'blocked' | 'free' | null = null;
 
 /**
- * Carte « Aujourd'hui : … » de l'accueil (lot 147) : la leçon du jour d'ouverture,
+ * Carte « Aujourd'hui : … » de l'accueil : la leçon du jour d'ouverture,
  * son accroche, « Lire » qui ouvre la leçon, et une croix qui la ferme pour la
  * journée ; rien une fois la leçon lue, ou au-delà du programme. Le jour est
  * compté à chaque passage sur l'accueil (une fois par jour). `gate` : la garde

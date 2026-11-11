@@ -4,8 +4,8 @@ import { consecutiveSteps, pathsWhere } from './trackPaths';
 import { sailTrack, upDownLegs } from '../test/sailing.fixture';
 
 /**
- * Copie gelée d'un tracé conditionnel à la main (la boucle de `gradeZonePaths` avant le lot 70, sur un prédicat
- * quelconque) : `pathsWhere` doit la redonner. Fixture de voile depuis le retrait de la course (lot 303).
+ * Copie gelée d'un tracé conditionnel à la main (la boucle de `gradeZonePaths` avant son remplacement, sur un prédicat
+ * quelconque) : `pathsWhere` doit la redonner. Fixture de voile depuis le retrait de la course.
  */
 const frozenPathsWhere = (track: TrackPoint[], keep: (i: number) => boolean): [number, number][][] => {
   const paths: [number, number][][] = [];

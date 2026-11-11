@@ -6,7 +6,7 @@ describe('isSportType', () => {
   it('ne reconnaît que les supports du profil', () => {
     expect(isSportType('wingfoil')).toBe(true);
     expect(isSportType('surf')).toBe(true);
-    // Ni la course ni l'Entraînement n'en sont (lot 305).
+    // Ni la course ni l'Entraînement n'en sont.
     expect(isSportType('running')).toBe(false);
     expect(isSportType('muscu')).toBe(false);
     expect(isSportType('toString')).toBe(false);
@@ -23,8 +23,8 @@ describe('hrEnergy', () => {
   });
 });
 
-describe('références du transverse (lot 187)', () => {
-  it('le cardio de référence, sans décalage (valeurs de la course d\'avant le lot 305)', () => {
+describe('références du transverse', () => {
+  it('le cardio de référence, sans décalage (valeurs de la course d\'avant son retrait)', () => {
     expect(REFERENCE_HEART_RATE.thresholdOffsetBpm).toBe(0);
     expect([REFERENCE_HEART_RATE.maxAgeS, REFERENCE_HEART_RATE.smoothS, REFERENCE_HEART_RATE.gapS, REFERENCE_HEART_RATE.minCoverageS]).toEqual([3, 5, 10, 60]);
     expect(REFERENCE_HEART_RATE.loadWeights).toEqual([0.5, 1, 2, 3, 4, 5]);

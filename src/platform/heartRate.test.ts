@@ -107,7 +107,7 @@ describe('écoute de la ceinture', () => {
 });
 
 /**
- * Ceinture perdue pendant un enregistrement (lot 86) : la relance est au
+ * Ceinture perdue pendant un enregistrement : la relance est au
  * greffon ; la page garde la ceinture, montre la perte et un trou dans la FC,
  * et reprend d'elle-même à la première mesure revenue.
  */
@@ -197,7 +197,7 @@ describe('deux détenteurs de la ceinture', () => {
 
 const other = { address: '11:22:33:44:55:66', name: 'Montre' };
 
-/** Un seul appareil tenu à la fois (lot 198) : en demander un autre pendant qu'il l'est ne le lâche pas sans le dire. */
+/** Un seul appareil tenu à la fois : en demander un autre pendant qu'il l'est ne le lâche pas sans le dire. */
 describe('un seul appareil à la fois', () => {
   it("une autre adresse est refusée tant que la première est tenue : rien n'est coupé ni reconnecté", async () => {
     const { holdBelt, beltHeldBy, heldBeltAddress, OTHER_BELT_HELD } = await import('./heartRate');
@@ -250,7 +250,7 @@ describe('recherche annulée', () => {
   });
 });
 
-/** Appareils retenus (lot 198) : une seule clé, la liste, l'actif marqué dedans. */
+/** Appareils retenus : une seule clé, la liste, l'actif marqué dedans. */
 describe('appareils retenus', () => {
   /** Stockage remis à vide : rien ne reste d'un test à l'autre. */
   beforeEach(async () => {

@@ -77,7 +77,7 @@ const LOCATION_RETRY_MS = 2_000;
 const isLocationDisabled = (error: { message?: string }): boolean => /disabled/i.test(error.message ?? '');
 
 /**
- * Refus du plugin rendu en clair (lot 158) : `NOT_AUTHORIZED` (« User denied
+ * Refus du plugin rendu en clair : `NOT_AUTHORIZED` (« User denied
  * location permission ») dit où réactiver la localisation ; toute autre
  * erreur passe par le traducteur, son texte brut n'allant qu'en console.
  */
@@ -297,7 +297,7 @@ interface NativeMessage {
 type CapacitorBridge = { fromNative?: (message: NativeMessage) => void };
 
 /**
- * Rebranche la page rechargée sur le service GPS resté vivant après une chute du moteur de rendu (lot 156), sans
+ * Rebranche la page rechargée sur le service GPS resté vivant après une chute du moteur de rendu, sans
  * jamais le relancer : écran éteint, le système le laisserait sans position. L'appel gardé par le greffon
  * (`watchCall`) envoie déjà dans la page neuve, sous un numéro que celle-ci ne connaît plus : ses positions sont lues
  * au passage dans `window.Capacitor.fromNative`, puis laissées à leur chemin ; ses refus vont à `onError`, comme ceux

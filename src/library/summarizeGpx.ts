@@ -4,7 +4,7 @@ import type { RecordWithoutSummary, SessionAnalysis } from './record';
 import { analyzeGpx, type ActivitySummarySettings, type AnalyzedGpx } from './summaryOptions';
 
 /**
- * Résumé d'un GPX en une fonction pure dont les réglages sont des données (lot 126 B) : `analyzeGpx` prend les
+ * Résumé d'un GPX en une fonction pure dont les réglages sont des données : `analyzeGpx` prend les
  * réglages de l'activité par une fonction, qui ne traverse pas un message vers le worker
  * (`library/trackWorker.ts`). Ils sont donc résolus avant l'envoi, en une table par calcul.
  */

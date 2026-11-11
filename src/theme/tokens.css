@@ -99,7 +99,7 @@
 }
 
 /*
- * Palettes (lot 12) : claire, sombre, économe. Le thème est posé sur `<html>`
+ * Palettes : claire, sombre, économe. Le thème est posé sur `<html>`
  * par `hooks/useTheme.ts` (`data-theme`, `data-eco`), seul endroit qui décide :
  * pas de bloc `prefers-color-scheme` ici, « Auto » est résolu en JavaScript.
  *

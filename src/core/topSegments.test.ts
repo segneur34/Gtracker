@@ -309,7 +309,7 @@ describe('computeTopSegments, trou de la trace', () => {
   });
 });
 
-/** Copie gelée de `computeTopSegments` d'avant le lot 56 : une fenêtre objet par point, tri complet. */
+/** Copie gelée de `computeTopSegments` d'avant son remplacement : une fenêtre objet par point, tri complet. */
 const frozenTopSegments = (
   track: TrackPoint[], cum: ReturnType<typeof buildCumulativeTrack>, target: TopTarget, toDisplaySpeed: (ms: number) => number,
   options: { count?: number; decimals?: number } = {}
@@ -368,7 +368,7 @@ const frozenTopSegments = (
   return tops;
 };
 
-describe('computeTopSegments, sélection sans tri (lot 56)', () => {
+describe('computeTopSegments, sélection sans tri', () => {
   /** Trace brute bruitée, arrondie au dixième de m/s (beaucoup d'égalités), avec pauses et trous. */
   const rawTrace = (stepS: number, seed: number, constant = false): RawTrackPoint[] => {
     const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
@@ -423,21 +423,21 @@ describe('computeTopSegments, sélection sans tri (lot 56)', () => {
   });
 });
 
-/** Copie gelée de `maxWindowSpeedMs` (`sailing/sailingConfig.ts`) d'avant le lot 81. */
+/** Copie gelée de `maxWindowSpeedMs` (`sailing/sailingConfig.ts`) d'avant son remplacement. */
 const frozenMaxWindowSpeedMs = (track: TrackPoint[], cum: ReturnType<typeof buildCumulativeTrack>): number | null => {
   const t2s: TopTarget = { key: 't2s', label: '2 s', value: 2, kind: 'time' };
   const [top] = computeTopSegments(track, cum, t2s, (speedMs) => speedMs, { count: 1, decimals: 6 });
   return top?.speed ?? null;
 };
 
-/** Copie gelée de `bestTopOf` (`recording/liveStats.ts`) d'avant le lot 81. */
+/** Copie gelée de `bestTopOf` (`recording/liveStats.ts`) d'avant son remplacement. */
 const frozenBestTopOf = (track: TrackPoint[], cum: ReturnType<typeof buildCumulativeTrack>, durationS: number): number | null => {
   if (track.length < 2) return null;
   const [top] = computeTopSegments(track, cum, { key: 'live', label: '', value: durationS, kind: 'time' }, (ms) => ms, { count: 1, decimals: 6 });
   return top.speed;
 };
 
-describe('bestWindowSpeedMs : vitesse max, meilleure moyenne sur 2 s (Q34, lot 81)', () => {
+describe('bestWindowSpeedMs : vitesse max, meilleure moyenne sur 2 s', () => {
   for (const stepS of [1, 0.2]) {
     const hz = 1 / stepS;
     it(`à ${hz} Hz, un pic d'une seconde ne fait pas la vitesse max`, () => {

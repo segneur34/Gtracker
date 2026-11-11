@@ -9,7 +9,7 @@ import type { SessionColorTrack } from './sessionTrack';
 
 /**
  * Traces réduites des vignettes de la bibliothèque, gardées sur l'appareil
- * d'un lancement à l'autre (lot 118, décision du 01/11) : calculs purs du
+ * d'un lancement à l'autre : calculs purs du
  * document que range `platform/previewStore.ts`. Une entrée par session, sous
  * `folderLabel|file`, avec l'empreinte de ce dont sa trace dépend ; les
  * points y sont des entiers (millionièmes de degré, millièmes de m/s) codés en

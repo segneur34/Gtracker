@@ -32,7 +32,7 @@ const trackPoint = (fix: LocationFix): string => {
   if (fix.altitudeM !== undefined) children.push(`<ele>${fix.altitudeM}</ele>`);
   children.push(`<time>${isoTime(fix.timeMs)}</time>`);
 
-  // Vitesse et cap du système (Doppler) ; le cap sert aux virages du surf (§10, point 97).
+  // Vitesse et cap du système (Doppler) ; le cap sert aux virages du surf.
   const extension: string[] = [];
   // Ordre du schéma Garmin : la fréquence cardiaque, puis la vitesse.
   if (fix.heartRateBpm !== undefined) extension.push(`<gpxtpx:hr>${fix.heartRateBpm}</gpxtpx:hr>`);

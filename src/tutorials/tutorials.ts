@@ -2,7 +2,7 @@ import type { SportFamily } from '../core/sportProfiles';
 import { LESSONS, type Lesson } from './lessons';
 
 /**
- * Tutoriels, règles pures (lot 147) : quelle leçon montrer aujourd'hui, et
+ * Tutoriels, règles pures : quelle leçon montrer aujourd'hui, et
  * l'état gardé sur l'appareil (jours d'ouverture, leçons lues, carte fermée).
  * Le jour n (n-ième jour civil distinct où l'application a été ouverte,
  * aujourd'hui compris) montre la n-ième leçon du programme, celles des

@@ -8,7 +8,7 @@ const T0 = Date.UTC(2026, 9, 31, 9, 0, 0);
 const east = (s: number): LocationFix => ({ timeMs: T0 + s * 1000, lat: 43.7, lon: 3.85 + (3 * s) / 80_400, speedMs: 3 });
 const north = (s: number, from: LocationFix): LocationFix => ({ timeMs: T0 + s * 1000, lat: from.lat + (3 * (s - 30)) / 111_200, lon: from.lon, speedMs: 3 });
 
-describe('position de la carte du direct (lot 104)', () => {
+describe('position de la carte du direct', () => {
   const kept = Array.from({ length: 31 }, (_, s) => east(s));
   const pausePoint = kept[30];
   const pauseFixes = Array.from({ length: 20 }, (_, k) => north(31 + k, pausePoint));

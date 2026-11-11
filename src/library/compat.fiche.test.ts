@@ -38,7 +38,7 @@ describe('fiche, compatibilité (b) champs mal typés', () => {
     expect((out.analysis as Record<string, unknown>).windDeg).toBe('90');
     expect((out.notes as Record<string, unknown>).rating).toBe('5');
   });
-  it('champs de premier niveau gardés bruts (lot 148, C5-3) : source, activityId, addedAt, title, nom', () => {
+  it('champs de premier niveau gardés bruts : source, activityId, addedAt, title, nom', () => {
     const base = {
       ...sessionRecord(), source: 'montre', activityId: 7, addedAt: 1730000000000, title: { fr: 'Titre' },
     };
@@ -53,7 +53,7 @@ describe('fiche, compatibilité (b) champs mal typés', () => {
     expect(rec.name).toBeNull();
     expect((JSON.parse(serializeRecord(rec, parsed.unreadable)) as Record<string, unknown>).name).toEqual({ fr: 'Sortie' });
   });
-  it('une valeur neuve l\'emporte sur le brut gardé (lot 148, C5-3)', () => {
+  it('une valeur neuve l\'emporte sur le brut gardé', () => {
     const parsed = parseRecordWithRaw(JSON.stringify({ ...sessionRecord(), activityId: 7, source: 'montre' }))!;
     const rec = { ...parsed.parts, summary: parsed.parts.summary! } as SessionRecord;
     const { record } = applyRecordPatch(rec, { activityId: 'a-wing' });
@@ -81,7 +81,7 @@ describe('fiche, compatibilité (c) __proto__', () => {
   });
 });
 
-// (d) fiche de septembre de l'ancienne application : lue par la porte d'import, `legacyImport.test.ts` (lot 321).
+// (d) fiche de septembre de l'ancienne application : lue par la porte d'import, `legacyImport.test.ts`.
 
 describe('fiche, compatibilité (e) aller-retour sur une fiche complète', () => {
   const full = sessionRecord({

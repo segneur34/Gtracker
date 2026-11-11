@@ -3,7 +3,7 @@ import {
 } from './trackWorkerProtocol';
 
 /**
- * Client du worker des traces (lot 126 B) : `runInWorker` envoie un calcul au worker (`trackWorker.ts`) et rend sa
+ * Client du worker des traces : `runInWorker` envoie un calcul au worker (`trackWorker.ts`) et rend sa
  * réponse. Un seul worker, créé à la première demande. S'il meurt, les demandes en cours sont refaites en ligne et
  * la suivante le recrée ; s'il meurt avant d'avoir répondu une fois (fichier introuvable, worker refusé), tout se
  * calcule en ligne jusqu'au rechargement. Sans `Worker` (tests, vieux WebView) ou si sa création lève, le calcul se

@@ -1,7 +1,7 @@
 import type { LibrarySession } from './record';
 
 /**
- * Tri de la liste des sessions réalisées d'une bibliothèque (lot 109) : toujours
+ * Tri de la liste des sessions réalisées d'une bibliothèque : toujours
  * du plus grand au plus petit. La valeur vient du résumé de la fiche. Une
  * session sans la valeur (sans distance ni vitesse, résumé inutilisable)
  * passe en fin de liste, rangée par date ; à valeur égale, la plus récente

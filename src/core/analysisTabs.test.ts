@@ -124,7 +124,7 @@ describe('toggleTabChoice', () => {
 describe('toggleTabChoice : activité à pré-réglage (n° 174)', () => {
   /** Ce que lit l'application (`resolveTabChoices`) : le choix rangé, sinon le pré-réglage tout entier. */
   const resolved = (choices: TabChoices | null, preset: TabChoices | null) => sanitizeTabChoices(choices) ?? preset;
-  // Pré-réglages d'essai (ceux de la course et du VTT avant le lot 305) : un onglet natif caché, un générique montré.
+  // Pré-réglages d'essai : un onglet natif caché, un générique montré.
   const sauts = tab(SAILING_TABS, 'sauts');
   const cardio = tab(SAILING_TABS, 'cardio');
   const topsVoile = tab(SAILING_TABS, 'tops');
@@ -280,7 +280,7 @@ describe('closeAllTabs : « tout fermer »', () => {
 });
 
 describe('tabDefaults : onglets ouverts à la première visite', () => {
-  // Copies gelées des constantes écrites à la main avant le lot 62 (SailingModule, SurfModule ; celles de LandModule et MuscuModule
+  // Copies gelées des constantes écrites à la main avant leur déduction (SailingModule, SurfModule ; celles de LandModule et MuscuModule
   // sont parties avec la course, le vélo et l'Entraînement).
   const SAILING_PANEL_DEFAULTS = {
     general: true, tops: false, manoeuvres: false, graphiques: false, cardio: false, vmg: false, sauts: false, vols: false, pumping: false, vent: false, matos: false, reglages: false,

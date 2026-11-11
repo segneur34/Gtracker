@@ -3,7 +3,7 @@
  * toutes les 2 s au plus) est prolongée jusqu'à la position du moment par un
  * trait à part, entre deux calculs. Ce trait ne joint jamais deux segments :
  * juste après une reprise, la position est déjà dans le nouveau segment alors
- * que la trace calculée s'arrête encore au point de la pause (lot 104, trait
+ * que la trace calculée s'arrête encore au point de la pause (d'où le trait
  * droit vers la nouvelle position à la reprise d'une pause manuelle).
  */
 

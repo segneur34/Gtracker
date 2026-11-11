@@ -6,7 +6,7 @@ interface Item {
   startMs: number;
 }
 
-describe('index d’une liste de sessions (lot 113)', () => {
+describe('index d’une liste de sessions', () => {
   it('garde la première de chaque clé, comme `find`', () => {
     const index: ListIndex<Item, number> = new WeakMap();
     const list = [{ file: 'a', startMs: 1 }, { file: 'b', startMs: 1 }, { file: 'c', startMs: 2 }];

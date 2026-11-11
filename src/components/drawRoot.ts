@@ -10,7 +10,7 @@ import { clamp } from '../core/basics';
  */
 
 /**
- * Étapes nommées de la fleur (lot 147) : ouverte à 1 fois l'objectif, épanouie à 4 (4e étape, maquette du 31/10), puis
+ * Étapes nommées de la fleur : ouverte à 1 fois l'objectif, épanouie à 4 (4e étape, maquette du 31/10), puis
  * le papillon, qui arrive à côté de la fleur à 4,6 fois (5e) et s'y pose à 5 fois (6e), maquette du 06/11.
  */
 export const BLOOM_STEPS = 6;

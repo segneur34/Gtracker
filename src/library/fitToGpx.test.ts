@@ -135,7 +135,7 @@ describe('sport écrit dans le GPX', () => {
     for (const [code, sport] of cases) expect(guessSport(typeOf([code]))).toBe(sport);
   });
 
-  it('course et vélo : laissés de côté, sans GPX ni raison à nommer (lot 321)', () => {
+  it('course et vélo : laissés de côté, sans GPX ni raison à nommer', () => {
     for (const code of [1, 2, 21]) {
       expect(fitToGpx(buildFitActivity({ points: seconds(2), sessionSports: [code] }))).toStrictEqual({ kind: 'other-sport' });
     }

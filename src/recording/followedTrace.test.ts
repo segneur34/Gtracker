@@ -366,7 +366,7 @@ describe('trace suivie amincie pour être gardée', () => {
     expect(followProgress(thin, fixes)!.progressM).toBeCloseTo(followProgress(line, fixes)!.progressM, -1);
   });
 
-  it('une trace gardée avant le lot 304, avec son altitude, ressort amincie sans elle', () => {
+  it('une trace gardée avant le retrait du routage, avec son altitude, ressort amincie sans elle', () => {
     const old: FollowedTrace = {
       ...traceOf([[0, 0], [0, 250], [0, 500], [400, 900]]),
       points: [at(0, 0), at(0, 250), at(0, 500), at(400, 900)].map((p, i) => ({ ...p, eleM: 100 + 10 * i })),

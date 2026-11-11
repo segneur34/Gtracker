@@ -226,7 +226,7 @@ describe('graduations rondes', () => {
   });
 });
 
-/** `sampledIndices` d'avant le lot 61, recopiée telle quelle (copie gelée) : une seule série. */
+/** `sampledIndices` d'avant son remplacement, recopiée telle quelle (copie gelée) : une seule série. */
 const frozenSampledIndices = (first: number, last: number, maxPoints: number, values?: ArrayLike<number | null | undefined>): number[] => {
   if (last < first) return [];
   const step = Math.max(1, Math.ceil((last - first + 1) / Math.max(1, maxPoints)));
@@ -361,7 +361,7 @@ describe('indices tracés, plusieurs séries (pics gardés)', () => {
   });
 });
 
-describe('zoom hors du module (lot 127)', () => {
+describe('zoom hors du module', () => {
   it('sameRange : mêmes bornes, null compris', () => {
     expect(sameRange(null, null)).toBe(true);
     expect(sameRange({ min: 1, max: 2 }, { min: 1, max: 2 })).toBe(true);
@@ -410,7 +410,7 @@ describe('zoom hors du module (lot 127)', () => {
   });
 });
 
-describe('une plage zoomée garde toujours deux lignes (panneaux montrés hors du bloc du zoom, lot 127)', () => {
+describe('une plage zoomée garde toujours deux lignes (panneaux montrés hors du bloc du zoom)', () => {
   for (const hz of [1, 5]) {
     it(`${hz} Hz, avec un trou de 10 min : toute plage bornée garde au moins deux points`, () => {
       // 30 min de trace, un seul intervalle de 10 min au milieu (règle 10 : rien entre deux points).

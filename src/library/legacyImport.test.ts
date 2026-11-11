@@ -15,12 +15,12 @@ import { RECORD_FORMAT, applyRecordPatch, parseRecord, parseRecordWithRaw, seria
 import { bundleSessionGpx, unbundleSessionGpx } from './sessionBundle';
 
 /**
- * Porte d'import des sessions de l'ancienne application (lot 320) : ce que Tracker 1.0.0 écrit pour une session de
+ * Porte d'import des sessions de l'ancienne application : ce que Tracker 1.0.0 écrit pour une session de
  * wingfoil et une de surf (`test/legacyImport.fixture.ts`, produit par son propre code) est lu entièrement par le code
  * d'aujourd'hui : le GPX complet (paquet de session), la fiche et les capteurs posés à côté, le GPX seul.
  *
  * Les formats se disent par leurs constantes (`RECORD_FORMAT`, `IMU_FORMAT`) et non par leurs chaînes : le même test doit
- * rester vert quand ces constantes changent (lot 321).
+ * rester vert quand ces constantes changent.
  */
 
 const WING_IMU = base64ToBytes(LEGACY_WING_IMU);
@@ -62,7 +62,7 @@ const SESSIONS = {
 type Kind = keyof typeof SESSIONS;
 const KINDS: Kind[] = ['wing', 'surf'];
 
-/** Fiche du jeu d'essai, relue entièrement par la porte d'import (lot 321 : la mémoire ne lit plus l'ancien format). */
+/** Fiche du jeu d'essai, relue entièrement par la porte d'import (la mémoire ne lit plus l'ancien format). */
 const recordOf = (kind: Kind): SessionRecord => {
   const parts = parseImportedRecord(SESSIONS[kind].record).parsed?.parts;
   if (!parts?.summary) throw new Error(`fiche ${kind} illisible`);
@@ -89,7 +89,7 @@ const imuHeaderJson = (file: Uint8Array): Record<string, unknown> => {
 
 /**
  * Capteurs rangés depuis ceux de l'ancienne application (`original`) : les mesures à l'octet, l'en-tête récrit au
- * format de Gtracker (lot 321 : sa longueur change, le fichier entier ne se compare plus à l'octet).
+ * format de Gtracker (sa longueur change, le fichier entier ne se compare plus à l'octet).
  */
 const expectSameMeasures = (motion: Uint8Array | undefined, original: Uint8Array): void => {
   if (!motion) throw new Error('capteurs absents');
@@ -140,7 +140,7 @@ describe('jeu d\'essai de la porte d\'import : le paquet de session', () => {
     it(`${kind} : la fiche écrite se relit puis se réécrit à l'octet`, () => {
       const parsed = parseImportedRecord(expected.record).parsed;
       expect(parsed?.unreadable).toEqual({});
-      // Lot 321 : réécrite au format de Gtracker, sans rien perdre ni changer ; lot 306 : sans les trois lignes de
+      // Réécrite au format de Gtracker, sans rien perdre ni changer, sans les trois lignes de
       // l'analyse retirées à l'entrée (`withoutOriginFields`).
       expect(expected.record).toContain('"format": "tracker-session"');
       const lines = expected.record.replace('"format": "tracker-session"', `"format": "${RECORD_FORMAT}"`).split('\n');
@@ -284,7 +284,7 @@ describe('porte d\'import : la bibliothèque range les sessions de l\'ancienne a
       expect(got.onDisk?.format).toBe(RECORD_FORMAT);
     };
 
-    /** Les capteurs, mesures rangées octet pour octet sous l'en-tête de Gtracker (wingfoil, lot 321), ou absents (surf). */
+    /** Les capteurs, mesures rangées octet pour octet sous l'en-tête de Gtracker (wingfoil), ou absents (surf). */
     const expectMotion = (got: ReturnType<typeof stored>) => {
       if (expected.imu) expectSameMeasures(got.motion, expected.imu);
       else expect(got.motion).toBeUndefined();
@@ -482,7 +482,7 @@ describe('porte d\'import : lecture de l\'ancien format (fonctions pures)', () =
   });
 
   it('relit un paquet de l\'ancienne application sans retouches ni capteurs (0.2.82)', () => {
-    // Déménagé de `sessionBundle.test.ts` (lot 321) : la fiche et rien d'autre, sous l'ancien préfixe.
+    // Déménagé de `sessionBundle.test.ts` : la fiche et rien d'autre, sous l'ancien préfixe.
     const escaped = LEGACY_WING_RECORD.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const old = LEGACY_WING_GPX.replace('</gpx>', '<extensions><tracker:session xmlns:tracker="https://github.com/segneur34/Tracker/session" version="1">'
       + `<tracker:record>${escaped}</tracker:record></tracker:session></extensions></gpx>`);
@@ -494,7 +494,7 @@ describe('porte d\'import : lecture de l\'ancien format (fonctions pures)', () =
   });
 
   it('fiche de septembre de l\'ancienne application (58aa8bb) : lue sans perte, réécrite sans perte au format neuf', () => {
-    // Déménagé de `compat.fiche.test.ts` (lot 321). Forme de la fiche au 24/09 : pas d'activité, de nom, de gear1/2,
+    // Déménagé de `compat.fiche.test.ts`. Forme de la fiche au 24/09 : pas d'activité, de nom, de gear1/2,
     // conditions, gear ; analysis à trois champs ; un ancien `terrain`.
     const september = {
       format: 'tracker-session', version: 1, gpx: '2026-09-23_14-00-00_wingfoil.gpx', sport: 'wingfoil', source: 'enregistrement',

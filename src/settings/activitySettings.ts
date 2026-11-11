@@ -21,7 +21,7 @@ import type { GearGroup } from '../library/notes';
 import { sanitizeGearGroups, sanitizeGearLabels } from './gear';
 
 /**
- * Réglages d'une activité, purs (lot 72) : défauts tirés du pré-réglage et du
+ * Réglages d'une activité, purs : défauts tirés du pré-réglage et du
  * calcul, valeurs effectives (`resolve*`) lues sur un `StoredSettings` passé en
  * argument, vue de Réglages, « Par défaut ».
  * Le magasin (`gtracker.sportSettings`), sa lecture et ses écritures restent
@@ -77,7 +77,7 @@ export const defaultNotificationFieldsFor = (activity: Activity): LiveFieldKey[]
 /** Bips d'approche des balises à défaut de réglage. */
 export const defaultMarkGuideOf = (activity: Activity): MarkGuideSettings => presetOf(activity).markGuide ?? MARK_GUIDE_DEFAULTS;
 
-/** Virages du surf mesurés par le gyroscope à défaut de réglage (lot 40) : cochés pour Surf et Surf foil. */
+/** Virages du surf mesurés par le gyroscope à défaut de réglage : cochés pour Surf et Surf foil. */
 export const defaultTurnsOf = (activity: Activity): boolean => presetOf(activity).turns ?? false;
 
 /** Ceinture cardio à défaut de réglage. */
@@ -124,7 +124,7 @@ export interface StoredSettings {
   /** Activités de l'utilisateur ; absentes : celles du premier lancement. */
   activities?: Activity[];
   /**
-   * Familles cachées dans Réglages (§10, point 100) : ni proposées, ni listées ; rien n'est effacé. Lues par
+   * Familles cachées dans Réglages : ni proposées, ni listées ; rien n'est effacé. Lues par
    * `hiddenFamiliesOf`, qui écarte toute valeur hors de `SPORT_FAMILIES`.
    */
   hiddenFamilies?: SportFamily[];
@@ -147,9 +147,9 @@ export interface StoredSettings {
   markGuide?: ByActivity<MarkGuideSettings>;
   /** Support sur foil (voile, surf) ; absent : `foilDefault` du calcul, coché pour « Surf foil ». */
   foils?: ByActivity<boolean>;
-  /** Pumping foil (surf, point 104 ; voile sur foil, lot 22) : capteurs proposés à l'enregistrement, pumping des vols dans l'analyse ; absent : non. */
+  /** Pumping foil (surf et voile sur foil) : capteurs proposés à l'enregistrement, pumping des vols dans l'analyse ; absent : non. */
   pumping?: ByActivity<boolean>;
-  /** Virages du surf mesurés par le gyroscope (lot 40) : capteurs proposés à l'enregistrement ; absent : le pré-réglage (seul l'écart est rangé). */
+  /** Virages du surf mesurés par le gyroscope : capteurs proposés à l'enregistrement ; absent : le pré-réglage (seul l'écart est rangé). */
   turns?: ByActivity<boolean>;
   /** Sauts mesurés par les capteurs du téléphone (voile sauf bateau) ; absents : non mesurés. */
   jumps?: ByActivity<JumpSettings>;
@@ -162,7 +162,7 @@ export interface StoredSettings {
   /** Intitulés des deux champs de matériel des notes (hors voile) ; un texte vide : celui par défaut. */
   gearLabels?: ByActivity<[string, string]>;
   /**
-   * Matériel enregistré de l'activité (fiche 18, lot 20) : groupes et pièces créés par l'utilisateur, choisis
+   * Matériel enregistré de l'activité : groupes et pièces créés par l'utilisateur, choisis
    * dans l'onglet du matériel de l'analyse ; absent : option coupée ; liste vide : option cochée, rien de créé.
    */
   gearGroups?: ByActivity<GearGroup[]>;
@@ -531,7 +531,7 @@ const booleanOrNull = (value: unknown): boolean | null | undefined =>
   value === null || typeof value === 'boolean' ? value : undefined;
 
 /**
- * Écriture de chaque réglage d'une activité (lot 72) : valider, ranger, ou
+ * Écriture de chaque réglage d'une activité : valider, ranger, ou
  * n'écrire que l'écart au défaut. Une seule table, d'où `withSetting` se déduit.
  */
 export const SETTING_FIELDS: Record<SettingField, SettingFieldRule> = {
@@ -658,7 +658,7 @@ export const moduleActivity = (stored: StoredSettings, activities: Activity[], f
   const remembered = stored.moduleActivity?.[family];
   const found = findActivity(activities, remembered);
   if (found && activityFamily(found) === family && !found.hidden) return found;
-  // Cachée : la première visible de la famille, sinon celle retenue tout de même (§10, point 100).
+  // Cachée : la première visible de la famille, sinon celle retenue tout de même.
   const own = activitiesOfFamily(activities, family);
   return own.find((a) => !a.hidden) ?? (found && activityFamily(found) === family ? found : own[0]) ?? baseActivity(FAMILY_BASE[family]);
 };

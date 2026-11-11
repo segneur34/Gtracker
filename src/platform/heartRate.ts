@@ -15,7 +15,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * l'enregistreur la prennent chacun sous leur nom (`holdBelt`) et la rendent ;
  * elle tombe quand plus personne ne la tient. Un seul appareil est tenu à la
  * fois : en demander un autre pendant qu'il l'est est refusé. Les appareils
- * retenus (ceintures, montres en diffusion, lot 198) sont gardés sur
+ * retenus (ceintures, montres en diffusion) sont gardés sur
  * l'appareil, pas dans les réglages recopiés dans le dossier mémoire : ce sont
  * des objets à portée de ce téléphone. L'application s'en souvient de
  * plusieurs (`savedBelts`) et n'en lit qu'un, l'actif (`savedBelt`), pris au
@@ -142,7 +142,7 @@ export const stopBeltScan = async (): Promise<void> => {
 
 // --- Appareils retenus ---
 
-/** Tous les appareils retenus (lot 198), l'actif, celui du prochain départ, marqué dedans (`storedBeltList`). */
+/** Tous les appareils retenus, l'actif, celui du prochain départ, marqué dedans (`storedBeltList`). */
 const BELTS_KEY = STORAGE_KEYS.heartRateBelts;
 
 const readBelts = (): BeltList => readBeltList(jsonStore.read<unknown>(BELTS_KEY));

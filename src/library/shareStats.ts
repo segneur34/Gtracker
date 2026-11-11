@@ -6,7 +6,7 @@ import { RATINGS, WIND_LEVELS, type Rating, type WindLevel } from './notes';
 import type { SessionSummary } from './record';
 
 /**
- * Lignes ajoutées à l'image de partage le 05/11 (lot 145), à la fin de la liste,
+ * Lignes ajoutées à l'image de partage le 05/11, à la fin de la liste,
  * les mêmes clés dans l'analyse ouverte et dans le résumé d'une fiche : le choix
  * retenu pour l'activité vaut aux deux endroits. Voile : manœuvres réussies, part
  * du vol pompée (sur foil), vent ; partout : l'appréciation.
@@ -78,7 +78,7 @@ const flightRatioValue = (movingS: number | null, inMotionS: number | undefined)
  * aux deux endroits ; un chiffre que la session n'a pas vaut « — ». Sans
  * seuil d'activité (`withActiveThreshold` faux, bateau), la voile n'a ni
  * distance, temps ni moyenne actifs, comme son onglet « général », mais un
- * « Temps en mouvement » (lot 314). Sur foil
+ * « Temps en mouvement ». Sur foil
  * (`foil`), le temps actif est le temps en vol, et le dit, suivi du ratio de
  * vol. Les lignes ajoutées le 05/11 (`shareExtraStats`) suivent, l'appréciation
  * et la force du vent lues dans les notes de la fiche (`notes`).
@@ -141,7 +141,7 @@ const summaryBaseStats = (
     { key: 'totalTime', label: 'Durée de la session', value: formatDuration(totalS * 1000) },
     { key: 'waves', label: 'Vagues', value: summary.waveCount === undefined ? '—' : String(summary.waveCount) },
     { key: 'longestWave', label: 'Plus longue vague', value: summary.longestWaveM == null ? '—' : `${Math.round(summary.longestWaveM)} m` },
-    // Sans vague, pas de vitesse max (Q34) : « — », comme sa page.
+    // Sans vague, pas de vitesse max : « — », comme sa page.
     { key: 'maxSpeed', label: 'Vitesse max', value: summary.maxSpeedMs > 0 ? speed(summary.maxSpeedMs) : '—' },
     { key: 'longestFlight', label: 'Plus long vol', value: summary.longestFlightS == null ? '—' : formatShortDuration(summary.longestFlightS) },
     { key: 'distance', label: 'Distance totale', value: distance },

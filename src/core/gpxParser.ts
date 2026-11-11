@@ -1,7 +1,7 @@
 import type { RawTrackPoint } from './types';
 
 /**
- * Lecture d'un fichier GPX, sans dépendance externe ni `DOMParser` (lot 126) :
+ * Lecture d'un fichier GPX, sans dépendance externe ni `DOMParser` :
  * un balayage du texte, position par position, qui lit aussi hors du fil de
  * l'affichage, et rend ce que rendait la lecture par le DOM (copie gelée et
  * corpus des éditeurs : `test/gpxParser.legacy.ts`, `gpxParser.corpus.test.ts`).
@@ -546,9 +546,9 @@ export const parseGpx = (gpxContent: string): ParsedGpx => {
     // Un point sans horodatage ne sert à rien : toute la kinématique repose
     // sur la différence de temps entre deux points.
     if (!time) continue;
-    // Date lue une fois (lot 56), comme `pointTimeMs` la relirait. Une date
+    // Date lue une fois, comme `pointTimeMs` la relirait. Une date
     // illisible (`NaN`), ou qui recule sous le dernier point gardé, écarte le
-    // point ici, la seule place (lot 149, C2-1 et C2-2) : en aval, un recul
+    // point ici, la seule place : en aval, un recul
     // allongeait le pas suivant et fabriquait de faux tops, un `NaN` mettait
     // « NaN min » en temps actif et amputait les tops de toute la suite. Une
     // date égale est gardée : `spreadEqualTimes` la répartit.

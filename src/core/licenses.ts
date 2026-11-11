@@ -30,8 +30,8 @@ const PERMISSIVE_LICENSES: ReadonlySet<string> = new Set(['MIT', 'ISC', 'BSD-2-C
 /** Licences admises pour une dépendance de production. */
 export const ALLOWED_LICENSES: ReadonlySet<string> = new Set([...PERMISSIVE_LICENSES, 'MPL-2.0', 'OFL-1.1', 'Apache-2.0']);
 /**
- * Dépendances de production hors liste blanche, connues et nommées : aucune depuis le lot 189, où les composants
- * de carte sous Hippocratic 2.1 ont laissé place à `components/map/`. Une exception devenue inutile fait échouer le
+ * Dépendances de production hors liste blanche, connues et nommées : aucune, les composants
+ * de carte sous Hippocratic 2.1 ayant laissé place à `components/map/`. Une exception devenue inutile fait échouer le
  * test des licences.
  */
 export const LICENSE_EXCEPTIONS: readonly string[] = [];

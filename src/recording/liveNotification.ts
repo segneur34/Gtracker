@@ -5,7 +5,7 @@ import { liveFieldLabel, liveFieldShortLabel, liveFieldValue, type LiveFieldCont
 /**
  * Texte de la notification de l'enregistrement, visible écran verrouillé.
  *
- * - Titre : l'activité, puis l'état s'il y en a un : « GPS perdu » (lot 115), « FC perdue » (lot 177),
+ * - Titre : l'activité, puis l'état s'il y en a un : « GPS perdu », « FC perdue »,
  *   la pause.
  * - Chronomètre d'Android dans l'en-tête, qui tourne seul : la durée de la session (depuis
  *   son premier point, pauses comprises, comme `recordingDurationMs`). Aucun

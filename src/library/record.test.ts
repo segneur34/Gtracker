@@ -62,7 +62,7 @@ describe('parseRecord et serializeRecord', () => {
     expect('movingDistanceM' in parseRecord(serializeRecord(record()))!.summary).toBe(false);
   });
 
-  it('relisent les chiffres du partage (lot 145) et écartent les valeurs absurdes', () => {
+  it('relisent les chiffres du partage et écartent les valeurs absurdes', () => {
     const fields = { pumpingShare: 0.35, windDirDeg: 230 };
     const back = parseRecord(serializeRecord(record({ summary: { ...record().summary, ...fields } })))!.summary;
     expect(back).toMatchObject(fields);
@@ -73,7 +73,7 @@ describe('parseRecord et serializeRecord', () => {
     expect(bornes).toMatchObject({ pumpingShare: 1, windDirDeg: 0 });
   });
 
-  it("relisent l'empreinte des réglages du résumé (lot 37), et écartent une empreinte qui n'est pas un texte", () => {
+  it("relisent l'empreinte des réglages du résumé, et écartent une empreinte qui n'est pas un texte", () => {
     const optionsKey = '[6,null,null,null]';
     expect(parseRecord(serializeRecord(record({ summary: { ...record().summary, optionsKey } })))!.summary.optionsKey).toBe(optionsKey);
     const abimee = { ...record(), summary: { ...record().summary, optionsKey: 6 } };
@@ -241,7 +241,7 @@ describe('sauts de la fiche', () => {
 });
 
 describe('fond de carte de la fiche', () => {
-  it('fond de carte de la session (lot 193) : relu avec garde, changé sans refaire le résumé', () => {
+  it('fond de carte de la session : relu avec garde, changé sans refaire le résumé', () => {
     expect(parseRecord(serializeRecord(record({ mapBase: 'satellite' })))?.mapBase).toBe('satellite');
     expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('mapBase');
     expect(parseRecord(JSON.stringify({ ...record(), mapBase: 'hybride' }))).not.toHaveProperty('mapBase');
@@ -417,7 +417,7 @@ describe('applyRecordPatch', () => {
     expect(applyRecordPatch(scored.record, { maneuverCount: 12, maneuverResults: { ...results } }).record).toBe(scored.record);
   });
 
-  describe("foil et pumping de la fiche (lot 314)", () => {
+  describe("foil et pumping de la fiche", () => {
     const withFoil = (over: Partial<SessionRecord> = {}) =>
       record({ analysis: { ...analysis, foil: true, pumping: true }, ...over });
 
@@ -565,7 +565,7 @@ describe('completeRecord', () => {
   });
 });
 
-describe('carryRecordEdits (changement de dossier, lot 116)', () => {
+describe('carryRecordEdits (changement de dossier)', () => {
   const marks = [{ timeMs: START_MS + 60_000, lat: 43.5, lon: 3.9, label: 'Bouée' }];
 
   it('reporte les saisies, retire celles que la copie en mémoire n’a plus, et garde le reste de la cible', () => {
@@ -592,7 +592,7 @@ describe('carryRecordEdits (changement de dossier, lot 116)', () => {
   });
 });
 
-describe('empreinte des champs légers du cache (lot 116)', () => {
+describe('empreinte des champs légers du cache', () => {
   it('suit la liste des champs légers', () => {
     expect(RECORD_LIGHT_FIELDS_KEY).toBe(RECORD_LIGHT_FIELDS.join(','));
     expect(RECORD_LIGHT_FIELDS_KEY.split(',')).toContain('marks');
@@ -682,7 +682,7 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
   });
 });
 
-/** Copie gelée de la lecture des réglages d'avant la table `ANALYSIS_FIELDS` (lot 80). */
+/** Copie gelée de la lecture des réglages d'avant la table `ANALYSIS_FIELDS`. */
 const oldReadAnalysis = (raw: unknown): SessionAnalysis | null => {
   if (!isObject(raw)) return null;
   return {
@@ -698,7 +698,7 @@ const oldReadAnalysis = (raw: unknown): SessionAnalysis | null => {
   };
 };
 
-describe('réglages relus par la table des champs (lot 80), comme avant', () => {
+describe('réglages relus par la table des champs, comme avant', () => {
   const valid = {
     windDeg: 312.5, activeThreshold: 8, referenceSpeedMs: 6.2, speedRange: { minMs: 3, maxMs: 14.5 }, foil: true,
     pumping: false, waveThreshold: 9.5, savedAt: 5,
@@ -736,7 +736,7 @@ describe('réglages relus par la table des champs (lot 80), comme avant', () => 
   });
 });
 
-describe('fiches compactes, une par famille (lot 80)', () => {
+describe('fiches compactes, une par famille', () => {
   const families = Object.entries(familyRecords());
 
   it.each(families)('%s : relue à l\'identique, réécrite au caractère près', (_, r) => {
@@ -769,7 +769,7 @@ describe('fiches compactes, une par famille (lot 80)', () => {
   });
 });
 
-describe('réglages portés par le résumé (Q57)', () => {
+describe('réglages portés par le résumé', () => {
   const analysis = (activeThreshold: number | null, foil: boolean | null = null) =>
     ({ windDeg: null, activeThreshold, referenceSpeedMs: null, speedRange: null, foil, pumping: null, waveThreshold: null, savedAt: 1 });
 
@@ -851,7 +851,7 @@ describe('calcul inconnu', () => {
   });
 });
 
-describe('fiche de Gtracker rangée avant le lot 306', () => {
+describe('fiche de Gtracker rangée avec ses lignes d\'analyse d\'origine', () => {
   /**
    * Fiche au format de Gtracker portant les réglages d'analyse que cette version ne connaît plus (trois champs nuls,
    * ceux de la fiche du jeu d'essai de la porte) : ils sont des champs inconnus, gardés tels quels.

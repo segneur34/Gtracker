@@ -14,7 +14,7 @@ import { HIGHLIGHT_SHOWN_COLOR } from './highlightColors';
 /**
  * Tronçon du graphe montré, en violet : il suit le zoom de ce graphe (§2,
  * « le violet suit le zoom ») en ne redessinant que lui, pas le module ni
- * ses autres couches (lot 127).
+ * ses autres couches.
  */
 function ZoomPathLayer({ source }: { source: ZoomPathSource }) {
   const { view, full } = useZoomState(source.zoom);

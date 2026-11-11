@@ -8,7 +8,7 @@ const entry = (name: string, size = 10, mtimeMs = 5): FolderEntry => ({ name, ki
 const session = (file: string, readOnly = false): LibrarySession => ({ file, record: sessionRecord({ gpx: file }), readOnly, warning: null });
 const cached = () => ({ size: 1, mtimeMs: 1, record: sessionRecord() });
 
-describe('cache des fiches (lot 113)', () => {
+describe('cache des fiches', () => {
   it('identifie le dossier par sa sorte et son nom', () => {
     expect(folderId({ kind: 'browser', label: 'Mémoire du navigateur' })).toBe('browser:Mémoire du navigateur');
   });

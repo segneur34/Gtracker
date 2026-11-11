@@ -126,8 +126,7 @@ export const planReconcile = (
 
 /**
  * Fiches `X.JSON` (extension autre qu'en minuscules) posées à côté d'un `X.gpx`, dont `X.json` n'existe pas :
- * à renommer, toute la suite relisant et réécrivant la fiche par `recordFileName(gpx)` (lot 113, sorti de la
- * bibliothèque).
+ * à renommer, toute la suite relisant et réécrivant la fiche par `recordFileName(gpx)`.
  */
 export const oddRecordExtensions = (entries: readonly FolderEntry[]): FolderEntry[] => {
   const names = new Set(entries.map((e) => e.name));

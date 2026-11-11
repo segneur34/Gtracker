@@ -32,7 +32,7 @@ describe('summaryShareStats', () => {
     expect(v.elevationGain).toBeUndefined();
   });
 
-  it('un calcul sans seuil (bateau) montre « Temps en mouvement », jamais de temps actif ni en vol, foil ou non (lot 314)', () => {
+  it('un calcul sans seuil (bateau) montre « Temps en mouvement », jamais de temps actif ni en vol, foil ou non', () => {
     const units = { speed: 'kmh', distance: 'km' } as const;
     for (const sport of SAILING_SPORTS) {
       const withThreshold = hasActiveThreshold(getSportProfile(sport));
@@ -77,7 +77,7 @@ describe('summaryShareStats', () => {
   });
 });
 
-describe('lignes ajoutées du partage (lot 145)', () => {
+describe('lignes ajoutées du partage', () => {
   const kn = { speed: 'kn', distance: 'nm' } as const;
   const km = { speed: 'kmh', distance: 'km' } as const;
   const tail = (stats: ReturnType<typeof summaryShareStats>, n: number) => stats.slice(-n).map((s) => s.key);

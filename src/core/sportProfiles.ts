@@ -93,7 +93,7 @@ export interface RecordingProfile {
 
 /**
  * Identique pour tous les supports au départ : 1 Hz, sans filtre de distance.
- * Le 1 Hz tient aussi le coût du recalcul du vent (`docs/HISTORIQUE.md`, point 23).
+ * Le 1 Hz tient aussi le coût du recalcul du vent.
  * Pause automatique sous 0,3 m/s (environ 1 km/h, sous le bruit GPS au repos)
  * pendant 60 s. GPS perdu après 1 min sans position, signalé de nouveau
  * seulement après 2 min de positions revenues (décision du 01/11).
@@ -149,7 +149,7 @@ export interface HeartRateProfile {
   thresholdOffsetBpm: number;
   /**
    * Coefficients de la charge par minute, de « sous Z1 » à Z5 : ceux d'Edwards
-   * (1 à 5), plus le temps sous Z1, qui compte aussi (choix de l'utilisateur).
+   * (1 à 5), plus le temps sous Z1, qui compte aussi (choix du produit).
    */
   loadWeights: readonly number[];
 }
@@ -181,7 +181,7 @@ const HEART_RATE: HeartRateProfile = {
 };
 
 /**
- * Réglage cardio de référence, sans décalage (lot 187) : celui du Pratiquant (seuils et zones affichés dans Réglages
+ * Réglage cardio de référence, sans décalage : celui du Pratiquant (seuils et zones affichés dans Réglages
  * et dans Statistiques hors activité), et la base que chaque calcul décale de `thresholdOffsetBpm`. C'est le même
  * objet que celui des calculs, qui reste la référence des décalages ; le transverse le lit ici, sans nommer un calcul.
  */
@@ -198,7 +198,7 @@ export interface KeytelCoefficients {
 /**
  * Énergie estimée par la FC (`core/hrEnergy.ts`), en voile et en surf, où la
  * vitesse ne dit rien de l'effort. Un ordre de grandeur : la formule n'est
- * validée sur aucun de ces sports (recherche du lot 96).
+ * validée sur aucun de ces sports.
  */
 export interface HrEnergyProfile {
   /** Équations sans VO2max, homme et femme ; sans sexe connu, la moyenne des deux. */
@@ -270,9 +270,9 @@ export const JUMP_DETECTION: JumpDetection = {
 };
 
 /**
- * Pumping sur foil, téléphone sur la poitrine (point 104) : verticale calculée
+ * Pumping sur foil, téléphone sur la poitrine : verticale calculée
  * comme pour les sauts ; coups, séries et décollage provisoires, à régler sur
- * une première session réelle. Cadence qui valide une série (lot 50) : fenêtre
+ * une première session réelle. Cadence qui valide une série : fenêtre
  * de 6 s, corrélation 0,5, de 40 à 130 coups par minute, provisoires aussi (n° 27).
  */
 const PUMP_DETECTION: PumpDetection = {
@@ -289,13 +289,13 @@ const PUMP_DETECTION: PumpDetection = {
 };
 
 /**
- * Pumping en voile sur foil (wing, planche, kite ; lot 22, décision du 28/10) :
+ * Pumping en voile sur foil (wing, planche, kite) :
  * ceux du surf, réglés le 06/11 sur la wing du 02/11, capturée entière (n° 27).
  * Deux groupes bien séparés : les vrais coups de 90 à 130 par minute, amples et
  * réguliers ; le clapot de 20 à 70, trois fois plus faible ; presque rien entre
  * les deux, d'où le bas de la plage à 75. Le haut à 150 laisse de la marge, aucun
  * coup plus rapide n'ayant été capté. Une série compte 5 coups au moins (règle
- * de l'utilisateur : « 4 ou 5 coups bien marqués »). Le seuil de coup reste bas :
+ * du produit : « 4 ou 5 coups bien marqués »). Le seuil de coup reste bas :
  * le relever perd de vrais coups sans rien écarter de plus. Pas d'élagage propre
  * au pumping : Pumping coché, la capture est rangée entière
  * (`keepsWholeCaptureForPumping`). Un vol est une suite au-dessus du seuil
@@ -311,7 +311,7 @@ const SAILING_PUMP_DETECTION: PumpDetection = {
 export const FOIL_RATIO_LABEL = 'Ratio de vol';
 
 /**
- * Analyse d'une session de surf (`surfing/`, §10, point 97) : vagues, rame,
+ * Analyse d'une session de surf (`surfing/`) : vagues, rame,
  * attente, vols sur foil. Les seuils de vitesse de la vague et du vol sont le
  * seuil d'activité (`defaultActiveThreshold`, `foilActiveThreshold`) ; le
  * reste est ici. Défauts provisoires, à valider sur des sessions réelles.
@@ -392,7 +392,7 @@ export interface SportProfile {
   maxGapS: number;
   /**
    * Vitesse max : la meilleure moyenne sur cette durée, en secondes, partout
-   * (voile, vagues du surf, résumé de la bibliothèque ; Q34, lot 81), jamais
+   * (voile, vagues du surf, résumé de la bibliothèque), jamais
    * le pic d'un point (`bestWindowSpeedMs`).
    */
   maxSpeedWindowS: number;
@@ -454,7 +454,7 @@ export interface SportProfile {
   surf: SurfProfile | null;
   /**
    * Pumping sur foil, mesuré par les capteurs du téléphone (`core/pumping.ts`) :
-   * surf (point 104) et voile sur foil (lot 22) ; `null` en bateau.
+   * surf et voile sur foil ; `null` en bateau.
    */
   pump: PumpDetection | null;
 }
@@ -505,7 +505,7 @@ const COMMON_DEFAULTS = {
 };
 
 /**
- * Profil d'une session sans calcul connu (`sport` null : fiche non classée, lot 187) pour le peu que son résumé
+ * Profil d'une session sans calcul connu (`sport` null : fiche non classée) pour le peu que son résumé
  * calcule : dénivelé, fenêtre de la vitesse max et FC. Les valeurs communes à tous les calculs, et le cardio de
  * référence : le même résumé qu'avec les valeurs communes des calculs (test d'identité).
  */
@@ -641,7 +641,7 @@ export const isSportType = (value: unknown): value is SportType =>
 
 /**
  * Seuil d'activité par défaut d'un calcul, dans `thresholdUnit`. En surf, il dépend du foil : le
- * seuil de vague sans lui, le seuil de vol avec (point 97). En voile, le foil n'y touche pas.
+ * seuil de vague sans lui, le seuil de vol avec. En voile, le foil n'y touche pas.
  */
 export const defaultActiveThresholdOf = (profile: SportProfile, foil: boolean): number =>
   foil && profile.surf ? profile.surf.foilActiveThreshold : profile.defaultActiveThreshold;
@@ -661,7 +661,7 @@ export const activeRatioLabel = (profile: SportProfile, foil: boolean): string =
  * Traitement d'un calcul : la façon dont ses sessions se calculent et
  * s'affichent (unités, chiffres du direct, onglets, module d'analyse). À ne
  * pas confondre avec la famille, qui les range ; les deux portent les mêmes
- * noms depuis le retrait de la terre (lot 305).
+ * noms depuis le retrait de la terre.
  */
 export type Treatment = 'voile' | 'surf';
 

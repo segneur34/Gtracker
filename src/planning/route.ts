@@ -27,7 +27,7 @@ export type RouteMode = 'straight' | 'imported';
 /** Mode par défaut, et celui d'un tronçon illisible. */
 export const DEFAULT_ROUTE_MODE: RouteMode = 'straight';
 
-/** Mode relu d'une fiche ; `null` s'il est inconnu (dont les types de voie d'avant le lot 304). */
+/** Mode relu d'une fiche ; `null` s'il est inconnu (dont les types de voie d'avant le retrait du routage). */
 export const readRouteMode = (value: unknown): RouteMode | null =>
   value === 'straight' || value === 'imported' ? value : null;
 

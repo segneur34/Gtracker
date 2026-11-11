@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createMemoryFile, filesystem, safeFileName, setAsideName } from './files';
 
-describe('fichier mis de côté (lot 143, 123a)', () => {
+describe('fichier mis de côté', () => {
   const at = Date.UTC(2026, 10, 3, 14, 25, 1, 123);
 
   it('garde son extension, horodaté avant elle, sans deux-points', () => {
@@ -25,7 +25,7 @@ describe('greffon de fichiers', () => {
   });
 });
 
-describe('safeFileName (lot 160)', () => {
+describe('safeFileName', () => {
   it('garde un nom ordinaire tel quel', () => {
     expect(safeFileName('2026-10-10 Wingfoil - Carnon')).toBe('2026-10-10 Wingfoil - Carnon');
   });

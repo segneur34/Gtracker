@@ -71,7 +71,7 @@ describe('fiche d\'itinéraire', () => {
     expect(broken.legs[0]).toEqual({ mode: 'straight', status: 'ready', points: [A, B] });
   });
 
-  it('un mode inconnu (type de voie d\'avant le lot 304) se relit en ligne droite neuve, tracé laissé', () => {
+  it('un mode inconnu (type de voie d\'avant le retrait du routage) se relit en ligne droite neuve, tracé laissé', () => {
     const old = JSON.parse(serializeRouteRecord(routeToRecord(sample(), META))) as { legs: { mode: string; points: number[][] }[] };
     old.legs[0].mode = 'sentier';
     old.legs[1].mode = 'foot';

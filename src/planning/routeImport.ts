@@ -4,7 +4,7 @@ import { embeddedRouteRecord } from './routeGpx';
 import { routeToRecord, type RouteRecord } from './routeRecord';
 
 /**
- * Itinéraire reçu en GPX (lot 194) : partagé par un autre téléphone, reçu
+ * Itinéraire reçu en GPX : partagé par un autre téléphone, reçu
  * d'une autre application (« Ouvrir avec », « Partager vers Gtracker ») ou
  * choisi dans les fichiers depuis la page Itinéraires. Pur : la page et la
  * file des fichiers reçus rangent la fiche rendue (`hooks/routeFiles.ts`).

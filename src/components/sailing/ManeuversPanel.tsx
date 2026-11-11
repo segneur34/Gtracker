@@ -25,7 +25,7 @@ export interface ManeuversView {
   /** « Détails » plutôt que « Résumé ». */
   details: boolean;
   setDetails: (details: boolean) => void;
-  /** Genre montré dans le tableau par amure (note 135) : virements ou empannages. */
+  /** Genre montré dans le tableau par amure : virements ou empannages. */
   tackType: ManeuverKind;
   setTackType: (type: ManeuverKind) => void;
   /** Liste de toutes les manœuvres d'un type, sous « Détails » : repliée d'office, non mémorisée. */
@@ -99,7 +99,7 @@ export default function ManeuversPanel({
           {([
             ['Virements', maneuverSummary.tack, onMap.tack, () => onMap.toggle('tack'), undefined],
             ['Empannages', maneuverSummary.jibe, onMap.jibe, () => onMap.toggle('jibe'), undefined],
-            // Virages vus en un seul pas de la trace (lot 44) : la ligne n'apparaît que s'il y en a.
+            // Virages vus en un seul pas de la trace : la ligne n'apparaît que s'il y en a.
             ...(maneuverSummary.undecided
               ? [['Sens incertain', maneuverSummary.undecided, onMap.undecided, () => onMap.toggle('undecided'),
                 'Virage vu en un seul pas de la trace : on connaît le cap avant et après, pas le côté par lequel il est passé. Compté, ni virement ni empannage, et hors du vent.'] as const]
@@ -121,14 +121,14 @@ export default function ManeuversPanel({
       </table>
       </div>
 
-      {/* Vent saisi loin du vent calculé fiable (C1-3, lot 149) : les virages tombent en « sens incertain », on le dit. */}
+      {/* Vent saisi loin du vent calculé fiable : les virages tombent en « sens incertain », on le dit. */}
       {windWarning && (
         <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--warning-soft)', borderLeft: '3px solid var(--warning-line)', borderRadius: '4px', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
           Le vent saisi ({formatDecimal(windWarning.manualDeg, 0)}°) écarte <strong>{windWarning.unclassified}</strong> virage{windWarning.unclassified > 1 ? 's' : ''}, ni virement ni empannage ; le vent calculé est à {formatDecimal(windWarning.autoDeg, 0)}°. Vérifier la direction.
         </p>
       )}
 
-      {/* Par amure (note 135, 04/11) : virements ou empannages selon l'amure d'avant la manœuvre, médianes. */}
+      {/* Par amure : virements ou empannages selon l'amure d'avant la manœuvre, médianes. */}
       {(maneuverSummary.tack || maneuverSummary.jibe) && (
         <div className="an-man-scroll" style={{ marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>

@@ -68,7 +68,7 @@ describe('liveNotification', () => {
     expect(n.chrono).not.toBeNull();
   });
 
-  it('GPS perdu : dit au titre, le chronomètre continue (lot 115)', () => {
+  it('GPS perdu : dit au titre, le chronomètre continue', () => {
     const n = liveNotification(input({ gpsLost: true }));
     expect(n.title).toBe('Wingfoil · GPS perdu');
     expect(n.chrono).not.toBeNull();
@@ -96,7 +96,7 @@ describe('liveNotificationKey', () => {
   });
 });
 
-describe('notificationStateKey (lot 67, sortie de recordingNotification)', () => {
+describe('notificationStateKey (sortie de recordingNotification)', () => {
   /** Clé reconstruite à la main, sur les mêmes lectures. */
   const oldKey = (status: string, pausedReason: 'manual' | 'auto' | null, activity: { id: string } | null, computed: boolean): string =>
     `${status}|${pausedReason ?? ''}|${activity?.id ?? ''}|${computed}`;
@@ -121,7 +121,7 @@ describe('notificationStateKey (lot 67, sortie de recordingNotification)', () =>
     expect(key({ computed: false })).not.toBe(key({}));
   });
 
-  it('change quand le GPS est perdu, puis revient (lot 115)', () => {
+  it('change quand le GPS est perdu, puis revient', () => {
     const key = (gpsLost: boolean) =>
       notificationStateKey({ status: 'recording', pausedReason: null, gpsLost, beltLost: false, activityId: 'kite', computed: true });
     expect(key(true)).not.toBe(key(false));

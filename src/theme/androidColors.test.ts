@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * Le fond derrière les barres d'Android (`app_colors.xml`, clair et nuit)
- * est le `--bg` du thème correspondant (lot 158) : un changement de l'un sans
+ * est le `--bg` du thème correspondant : un changement de l'un sans
  * l'autre laisserait une bande de couleur étrangère sous l'heure et la
  * navigation.
  */

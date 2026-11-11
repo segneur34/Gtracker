@@ -35,7 +35,7 @@ describe('parseSettingsFile', () => {
     expect(file.version).toBe(2);
   });
 
-  it('écrit les tableaux de nombres sur une ligne, se relit pareil, et relit un fichier indenté d’avant (lot 80)', () => {
+  it('écrit les tableaux de nombres sur une ligne, se relit pareil, et relit un fichier indenté d’avant', () => {
     const rich = { ...values, 'gtracker.profile': { zones: [120, 140, 155, 170], poids: 72.5, noms: ['a', 'b'] }, 'gtracker.nav': [[1, 2], [3]] };
     const file = buildSettingsFile(rich, 1234, null, { id: 'abc', name: 'Téléphone' });
     const text = serializeSettingsFile(file);
@@ -169,14 +169,14 @@ describe('appareils et noms de fichier', () => {
     expect(ownSettingsEntry([sameName], 'tel')).toBeNull();
   });
 
-  it('montre un fichier comme Réglages › Mémoire : nom, date, activités, et s’il est celui de l’appareil (lot 113)', () => {
+  it('montre un fichier comme Réglages › Mémoire : nom, date, activités, et s’il est celui de l’appareil', () => {
     expect(settingsFileInfo(phone, 'tel')).toEqual({
       fileName: 'telephone.json', name: 'Téléphone', savedAt: 3000, activityCount: settingsActivityCount(phone.file), own: true,
     });
     expect(settingsFileInfo(friend, 'tel')).toMatchObject({ name: 'lea', own: false });
   });
 
-  it('range la liste : le fichier de l’appareil en tête, puis du plus récent au plus ancien (lot 113)', () => {
+  it('range la liste : le fichier de l’appareil en tête, puis du plus récent au plus ancien', () => {
     expect(sortedSettingsFiles([pc, friend, phone], 'pc').map((f) => f.fileName)).toEqual(['pc.json', 'lea.json', 'telephone.json']);
     expect(sortedSettingsFiles([], 'pc')).toEqual([]);
   });
@@ -261,7 +261,7 @@ describe('adoptedValues', () => {
     expect(adoptedValues(theirs, { [STORAGE_KEYS.sportSettings]: { recordActivity: 'x' } })).toBe(theirs);
   });
 
-  it('relit le profil du pratiquant champ par champ (lot 143)', () => {
+  it('relit le profil du pratiquant champ par champ', () => {
     const theirs = { [STORAGE_KEYS.athleteProfile]: { me: { weightKg: 9000, hrMax: 190, inconnu: 1 } } };
     expect(adoptedValues(theirs, {})).toEqual({ [STORAGE_KEYS.athleteProfile]: { me: { ...EMPTY_ATHLETE_PROFILE, hrMax: 190, hrMaxSource: { kind: 'saisie', atMs: null } } } });
   });

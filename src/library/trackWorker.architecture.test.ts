@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Ce que le worker des traces emporte (lot 126 B) : en suivant les imports réels depuis `library/trackWorker.ts`
+ * Ce que le worker des traces emporte : en suivant les imports réels depuis `library/trackWorker.ts`
  * (les `import type` s'effacent à la compilation et ne comptent pas), aucun fichier de `platform/`, `hooks/`,
  * `components/`, `pages/`, `settings/` ni `theme/`, aucun paquet npm (React compris), et ni `DOMParser`, ni
  * `document.`, ni `localStorage`, ni `navigator` dans le code atteint (commentaires exclus). Un worker n'a ni DOM ni

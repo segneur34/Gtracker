@@ -1,6 +1,6 @@
 import { STORAGE_KEYS } from '../core/appIdentity';
 /**
- * Thème de l'interface (lot 12, maquette du 28/10) : Clair, Sombre ou Auto,
+ * Thème de l'interface : Clair, Sombre ou Auto,
  * qui suit le réglage du téléphone ou du navigateur (`prefers-color-scheme`),
  * plus la case « Économe » (noir pur, moins d'effets), qui impose le sombre.
  * Réglé par appareil, dans Réglages › Affichage (clé `THEME_STORAGE_KEY`),

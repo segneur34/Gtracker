@@ -70,9 +70,6 @@
     "src/library/summaryOptions.ts": 1,
     "src/settings/gear.test.ts": 3
   },
-  "Gravel, VTT": {
-    "src/core/analysisTabs.test.ts": 1
-  },
   "runner": {
     "src/hooks/sessionLibrary/summaryQueue.test.ts": 23,
     "src/hooks/sessionLibrary/summaryQueue.ts": 13

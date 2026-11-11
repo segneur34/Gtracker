@@ -22,7 +22,7 @@ const signalLabel = (rssi: number): string => (rssi >= SIGNAL_NEAR_DBM ? 'proche
 
 /**
  * Bloc « Capteurs » de Réglages : les ceintures et montres retenues sur ce
- * téléphone (lot 198), ajoutées par une recherche, essayées (fréquence en
+ * téléphone, ajoutées par une recherche, essayées (fréquence en
  * direct), choisies ou oubliées. L'application s'en souvient de plusieurs et
  * n'en lit qu'une à la fois : celle « utilisée au prochain départ »
  * (`platform/heartRate.ts`), que chaque activité propose à l'enregistrement si sa case est cochée. L'état de la

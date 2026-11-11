@@ -360,7 +360,7 @@ const runKinematics = (points: RawTrackPoint[], options: KinematicsOptions, prev
   // Reprise après une pause : le pas qui y mène enjambe la pause, ni sa vitesse
   // ni son cap ne disent rien. Le point prend ceux du pas suivant, comme le
   // premier point de la trace ; une reprise en dernier point, ceux du pas précédent.
-  // Trou de la trace (pas plus long que `maxGapS`, lot 149, C1-1) : le cap de
+  // Trou de la trace (pas plus long que `maxGapS`) : le cap de
   // la corde pointe au milieu de ce qui s'est passé pendant le silence (un
   // enregistreur économique y compresse un virage entier, règle 10) et coupait
   // un virement de 90° en deux moitiés que personne ne lisait ; le point de

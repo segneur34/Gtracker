@@ -6,7 +6,7 @@ import { activityValues, noteGestures, readSummaryGestures, settleGestures, wait
 
 const activity = (id: string, base: Activity['base']): Activity => ({ id, name: id, base, color: '#000' });
 
-describe('réglages suivis par activité (Q57)', () => {
+describe('réglages suivis par activité', () => {
   it('le seuil réglé ou pré-réglé ; le foil en surf seulement', () => {
     const thresholds: Record<string, number> = { 'a-moth': 7, surf: 4 };
     const values = activityValues(
@@ -81,7 +81,7 @@ describe('gestes', () => {
   });
 });
 
-describe('activités dont un geste attend encore (lot 113)', () => {
+describe('activités dont un geste attend encore', () => {
   const session = (file: string, patch: Partial<LibrarySession> = {}, record: Parameters<typeof sessionRecord>[0] = {}): LibrarySession =>
     ({ file, record: sessionRecord({ gpx: file, ...record }), readOnly: false, warning: null, ...patch });
 

@@ -10,7 +10,7 @@ const futureText = serializeRecord({ ...sessionRecord({ name: 'Future' }), versi
 const bundle = { record: parseRecordWithRaw(bundleText)?.parts ?? null, recordText: bundleText, unreadable: {}, otherSport: null };
 const noBundle = { record: null, recordText: null, unreadable: {}, otherSport: null };
 
-describe('fiche d’un GPX importé (lot 113)', () => {
+describe('fiche d’un GPX importé', () => {
   it('prend la fiche posée à côté avant celle du paquet', () => {
     const choice = importRecordChoice(sidecarText, bundle);
     expect(choice.record?.name).toBe('À côté');

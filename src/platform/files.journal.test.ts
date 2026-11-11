@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Le journal du dossier privé, au téléphone (lot 148) : absent seulement sur une preuve, sinon
+ * Le journal du dossier privé, au téléphone : absent seulement sur une preuve, sinon
  * illisible, pour qu'il ne soit jamais écrasé au « Démarrer » suivant. Greffon Filesystem simulé.
  */
 

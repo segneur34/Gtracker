@@ -46,7 +46,7 @@ describe('icônes des activités', () => {
     expect(guessActivityIcon('Matin', 'surf')).toBe('surf');
   });
 
-  it("devine le calcul d'une activité qu'on ajoute d'après son nom, dans sa famille (lot 314)", () => {
+  it("devine le calcul d'une activité qu'on ajoute d'après son nom, dans sa famille", () => {
     expect(guessActivityBase('Bateau', 'voile')).toBe('bateau');
     expect(guessActivityBase('Mon voilier', 'voile')).toBe('bateau');
     expect(guessActivityBase('Dériveur', 'voile')).toBe('bateau');
@@ -56,7 +56,7 @@ describe('icônes des activités', () => {
     expect(guessActivityBase('Planche', 'voile')).toBe('windsurf');
     expect(guessActivityBase('Windfoil', 'voile')).toBe('windsurf');
     expect(guessActivityBase('Wing', 'voile')).toBe('wingfoil');
-    // Les noms de départ (lot 335) : « Parawing » ne dit rien au mot-clé, le premier calcul de la voile est le wingfoil.
+    // Les noms de départ :« Parawing » ne dit rien au mot-clé, le premier calcul de la voile est le wingfoil.
     expect(guessActivityBase('Parawing', 'voile')).toBe('wingfoil');
     expect(guessActivityBase('Windsurf', 'voile')).toBe('windsurf');
     // Un nom qui ne dit rien : le premier calcul de la famille.

@@ -1,5 +1,5 @@
 // @vitest-environment node
-// xmldom ne sert plus qu'au test du lot 56, qui relit les points par le DOM pour comparer : le lecteur s'en passe (lot 126).
+// xmldom ne sert plus qu'au test de la lecture en un seul parcours, qui relit les points par le DOM pour comparer : le lecteur s'en passe.
 import { DOMParser as XmlDomParser } from '@xmldom/xmldom';
 import { describe, expect, it } from 'vitest';
 import { parseGpx, parseGpxPath } from './gpxParser';
@@ -115,7 +115,7 @@ describe('parseGpx : points sans position', () => {
   });
 
   it('un GPX à positions garde ses rawPoints, reprise après pause comprise', () => {
-    // `rawTimeMs` : la date lue une fois (lot 56).
+    // `rawTimeMs` : la date lue une fois.
     const xml = gpx(`<trk><trkseg>${pt(45, 5, '2026-10-01T10:00:00Z', '<ele>3</ele>')}${pt(45, 5.001, '2026-10-01T10:00:01Z')}</trkseg>`
       + `<trkseg>${pt(45, 5.002, '2026-10-01T10:05:00Z')}</trkseg></trk>`);
     const r = parseGpx(xml);
@@ -134,7 +134,7 @@ describe('parseGpx : points sans position', () => {
   });
 });
 
-describe('parseGpx : la trace ne remonte jamais le temps (lot 149, C2-1, C1-4)', () => {
+describe('parseGpx : la trace ne remonte jamais le temps', () => {
   const T = (s: number) => `2026-10-01T10:00:${String(s).padStart(2, '0')}Z`;
 
   it('écarte un point daté avant le dernier gardé, et garde une date égale (répartie ensuite par spreadEqualTimes)', () => {
@@ -158,8 +158,8 @@ describe('parseGpx : la trace ne remonte jamais le temps (lot 149, C2-1, C1-4)',
   });
 });
 
-describe('parseGpx : un seul parcours des descendants par point (lot 56)', () => {
-  /** Copie gelée de la recherche d'avant le lot 56 : nom qualifié, sinon premier descendant de ce nom local, champ par champ. */
+describe('parseGpx : un seul parcours des descendants par point', () => {
+  /** Copie gelée de la recherche d'avant son remplacement : nom qualifié, sinon premier descendant de ce nom local, champ par champ. */
   const frozenFind = (element: Element, localName: string): Element | null => {
     const direct = element.getElementsByTagName(localName)[0];
     if (direct) return direct;
@@ -206,7 +206,7 @@ describe('parseGpx : un seul parcours des descendants par point (lot 56)', () =>
   });
 });
 
-describe('parseGpx : lecture du XML sans DOMParser (lot 126)', () => {
+describe('parseGpx : lecture du XML sans DOMParser', () => {
   const T = (s: number) => `2026-10-01T10:00:${String(s).padStart(2, '0')}Z`;
   const trk = (points: string, head = '') => gpx(`<trk>${head}<trkseg>${points}</trkseg></trk>`);
 

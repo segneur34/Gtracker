@@ -143,7 +143,7 @@ describe('service GPS du téléphone partagé (D-B1)', () => {
   });
 });
 
-describe('raccord au service GPS resté vivant (lot 156)', () => {
+describe('raccord au service GPS resté vivant', () => {
   type Message = { pluginId?: string; methodName?: string; save?: boolean; success?: boolean; callbackId?: string; data?: unknown; error?: unknown };
   const LOCATION = { latitude: 43.5, longitude: 3.5, accuracy: 4, altitude: 2, speed: 3, bearing: 90, time: T0 + 1000 };
   const fromGps = (patch: Partial<Message> = {}): Message => ({

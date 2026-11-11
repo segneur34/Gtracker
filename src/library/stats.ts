@@ -1,5 +1,5 @@
 /**
- * Statistiques des sessions (lot 5, étape 1) : totaux, graphique d'une donnée
+ * Statistiques des sessions : totaux, graphique d'une donnée
  * par session, régularité et records, tirés du résumé des fiches (`SessionSummary`),
  * sans relire un seul GPX. Logique pure, en unités SI ; l'heure est celle de
  * l'appareil, comme le graphe de l'accueil, dont on reprend les périodes et
@@ -146,7 +146,7 @@ export const matchesGear = (session: StatSession, item: GearFilterItem, knownIds
       && gearKey(c.itemName) === gearKey(item.itemName)
       && (c.groupId === item.groupId || gearKey(c.groupName) === gearKey(item.groupName))));
 
-// --- Matériel croisé (lot 146) : une pièce au plus par groupe, une session compte si elle les porte toutes ---
+// --- Matériel croisé : une pièce au plus par groupe, une session compte si elle les porte toutes ---
 
 /** Pièces choisies, une au plus par groupe, dans l'ordre des groupes de l'activité. */
 export type GearSelection = readonly GearFilterItem[];

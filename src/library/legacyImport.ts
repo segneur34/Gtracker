@@ -4,7 +4,7 @@ import { isOtherSportType } from './naming';
 import { RECORD_FORMAT, isWritableRecord, parseRecordValue, type ParsedRecord } from './record';
 
 /**
- * Porte d'import des sessions de l'ancienne application (lot 321) : le seul fichier qui connaît ses noms. Une session
+ * Porte d'import des sessions de l'ancienne application : le seul fichier qui connaît ses noms. Une session
  * de voile ou de surf entre par des fichiers (GPX, GPX complet, fiche `.json` et capteurs `.imu` posés à côté) et
  * s'y écrit aussitôt au format de Gtracker ; rien d'autre de l'ancienne application n'est lu.
  *

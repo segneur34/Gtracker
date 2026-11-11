@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isCompleteGpxText, planPendingTemps } from './pendingTemps';
 
-/** Temporaires du dossier en attente laissés par un plantage (lot 84, A), et fiches en attente (lot 116). */
+/** Temporaires du dossier en attente laissés par un plantage, et fiches en attente. */
 describe('planPendingTemps', () => {
   it('efface un temporaire dont la cible est là', () => {
     const plan = planPendingTemps(['s.gpx', 's.gpx.tmp', 's.imu', 's.imu.tmp']);

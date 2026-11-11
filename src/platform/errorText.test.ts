@@ -5,7 +5,7 @@ import { locationErrorText } from './location';
 const withCode = (message: string, code: string): Error => Object.assign(new Error(message), { code });
 const domException = (name: string): Error => Object.assign(new Error('x'), { name });
 
-describe('plainError (lot 158)', () => {
+describe('plainError', () => {
   beforeEach(() => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });

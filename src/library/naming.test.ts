@@ -28,7 +28,7 @@ describe('guessSport', () => {
     expect(guessSport('surf')).toBe('surf');
   });
 
-  it("une trace de course, de vélo ou d'entraînement, de l'ancienne application ou d'ailleurs, n'a pas de calcul et se reconnaît (lot 321)", () => {
+  it("une trace de course, de vélo ou d'entraînement, de l'ancienne application ou d'ailleurs, n'a pas de calcul et se reconnaît", () => {
     const others = [
       'running', 'cycling', 'run-intervals', 'bike-intervals', 'run-test', 'muscu', 'Trail Running', 'trail_running', 'Road Cycling',
       'mountain_biking', 'Ride', 'e_biking', 'Velo',

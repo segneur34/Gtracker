@@ -15,7 +15,7 @@ const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h)
 const session = statSession;
 
 describe('statSessionOf', () => {
-  it('reprend le résumé et la famille du calcul ; les séances d\'une fiche complète ne comptent pas (lot 302)', () => {
+  it('reprend le résumé et la famille du calcul ; les séances d\'une fiche complète ne comptent pas', () => {
     const record = {
       name: 'Piste',
       summary: { calcVersion: 2, startMs: 1000, endMs: 61_000, distanceM: 400, movingTimeS: 50, elevationGainM: 2, maxSpeedMs: 7, pointCount: 60, samplingS: 1 },
@@ -370,7 +370,7 @@ describe('weeklyDurations', () => {
   });
 });
 
-describe('filtre par matériel (lot 20)', () => {
+describe('filtre par matériel', () => {
   const groups: GearGroup[] = [
     { id: 'g-aile', name: 'Aile', items: [{ id: 'i-5', name: 'Duotone 5' }, { id: 'i-85', name: '85' }] },
     { id: 'g-mat', name: 'Mât', items: [{ id: 'm-85', name: ' 85 ' }, { id: 'm-75', name: '75 cm' }] },
@@ -426,7 +426,7 @@ describe('filtre par matériel (lot 20)', () => {
   });
 });
 
-describe('matériel croisé (lot 146)', () => {
+describe('matériel croisé', () => {
   const groups: GearGroup[] = [
     { id: 'g-foil', name: 'Foil', items: [{ id: 'f-700', name: '700' }, { id: 'f-1000', name: '1000' }] },
     { id: 'g-aile', name: 'Aile', items: [{ id: 'a-5', name: '5 m²' }, { id: 'a-6', name: '6 m²' }] },
@@ -510,7 +510,7 @@ describe('matériel croisé (lot 146)', () => {
 });
 
 describe('groupByActivity', () => {
-  /** Copie gelée du regroupement recopié dans StatisticsPage avant le lot 64. */
+  /** Copie gelée du regroupement qu'avait recopié StatisticsPage. */
   const frozen = <T extends { activityId: string }>(items: readonly T[]): [string, T[]][] => {
     const byActivity = new Map<string, T[]>();
     for (const p of items) {

@@ -106,7 +106,7 @@ const sensorNotes = (sensors: PanelBaseProps['sensors']) => (
 );
 
 /**
- * Onglet « pumping » de la voile et du surf sur foil (lot 50) : séries de coups
+ * Onglet « pumping » de la voile et du surf sur foil : séries de coups
  * mesurées par les capteurs du téléphone, validées par leur cadence ; tuiles
  * (cadence d'abord), les 3 plus longues séries, « Toutes les séries ». Les vols
  * ont leur onglet (`FlightsPanel`). Le panneau redimensionnable reste chez
@@ -202,7 +202,7 @@ export function PumpingPanel({
 }
 
 /**
- * Onglet « vols » de la voile et du surf sur foil (lot 50) : tuiles, les 3 plus
+ * Onglet « vols » de la voile et du surf sur foil : tuiles, les 3 plus
  * longs vols, « Tous les vols ». Avec le pumping mesuré, chaque vol porte sa
  * vitesse de décollage, ses séries et son temps pompé ; sans, les colonnes du
  * GPS du module. Le panneau redimensionnable reste chez l'appelant.

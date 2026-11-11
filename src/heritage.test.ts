@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Garde permanente du nom (lot 322) : plus aucun fichier du dépôt ne dit « tracker » (nom de l'ancienne application),
- * hors la porte d'import et la ligne qui attend le lot 304. Les noms techniques viennent de
+ * Garde permanente du nom : plus aucun fichier du dépôt ne dit « tracker » (nom de l'ancienne application),
+ * hors la porte d'import et ses essais (`NAMED_FILES`). Les noms techniques viennent de
  * `core/appIdentity.ts`, les libellés disent « Gtracker ».
  *
  * Lit les fichiers texte de `src/`, `android/app/src/`, `outils/` et `public/`, plus quelques fichiers de la racine,
  * parmi ceux que git suit ou s'apprête à suivre (les dossiers de construction, ignorés, n'en font pas partie). Refuse
  * le mot sous toutes ses casses sauf quand il suit un « g » (Gtracker, gtracker).
  *
- * Le lot 327 y ajoutera les mots de la terre.
  */
 
 interface ChildProcess {

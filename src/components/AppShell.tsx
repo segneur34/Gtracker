@@ -29,7 +29,7 @@ import IncomingFileNotice from './IncomingFileNotice';
  * Sur ordinateur, toutes les destinations dans une barre en haut (les
  * statistiques et le profil avant Réglages), et « Itinéraires » à côté du
  * bouton Enregistrer. Une famille cachée dans Réglages n'y est pas ; son
- * adresse s'ouvre toujours (§10, point 100). Le choix se fait en CSS (`AppShell.css`), sans lecture de la
+ * adresse s'ouvre toujours. Le choix se fait en CSS (`AppShell.css`), sans lecture de la
  * taille d'écran en JavaScript.
  *
  * Pendant un enregistrement, un bandeau rouge rappelle sur chaque page qu'il
