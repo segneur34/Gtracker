@@ -24,6 +24,7 @@ import { useThemedShade, useThemeSettings } from '../hooks/useTheme';
 import { THEME_CHOICES } from '../theme/theme';
 import { ATHLETE_NAME_MAX, athleteHeartRateZones, athleteHrSource, type AthleteNumberField, type AthleteProfile } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
+import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
 import { ROOT_GOAL } from '../library/rootGrowth';
 import { zoneLabel } from '../components/heartRateColors';
 import { hrSourceLabel } from '../components/heartRateOrigin';
@@ -783,7 +784,7 @@ function SettingsPage() {
 
       <div style={cardStyle}>
         <BlockTitle label="Pratiquant" open={open.pratiquant} onToggle={() => toggle('pratiquant')} helpKey="pratiquant"
-          help="Pour l'énergie estimée des analyses, les zones cardiaques de toutes les activités, et la racine du Profil. Tout est facultatif." />
+          help={`Pour l'énergie estimée des analyses, les zones cardiaques de toutes les activités${PROFILE_PLANT_VISIBLE ? ', et la racine du Profil' : ''}. Tout est facultatif.`} />
         {open.pratiquant && (
           <div className="settings-block__body">
             <label className="ui-field-row">
@@ -812,10 +813,14 @@ function SettingsPage() {
             <NumberField label="Fréquence cardiaque de repos" unit={hrUnit('hrRest')} min={25} max={120} value={profile.hrRest} onCommit={profileField('hrRest')} placeholder="ex. 55"
               helpKey="pratiquant:fc-repos" help="Avec la FC max, les seuils se calculent sur la réserve cardiaque, plus juste. Le test de FC repos (page Profil) la mesure." />
             <HeartRateThresholdsField profile={profile} onChange={setThresholds} />
-            <p className="ui-eyebrow set-subhead">Racine du Profil</p>
-            <NumberField label="Objectif par semaine" unit="min" min={ROOT_GOAL.min} max={ROOT_GOAL.max} value={profile.rootWeeklyGoalMin} onCommit={profileField('rootWeeklyGoalMin')}
-              placeholder={String(ROOT_GOAL.defaultMin)} helpKey="pratiquant:racine-objectif"
-              help={`Temps d'activité, toutes activités confondues, à faire du lundi au dimanche (de ${ROOT_GOAL.min} min à ${ROOT_GOAL.max / 60} h) : la semaine tenue, la racine gagne une étape, et fait le tour du Profil en 26 semaines. Semaines manquées d'affilée : −3 étapes, puis −6, puis retour à la graine.`} />
+            {PROFILE_PLANT_VISIBLE && (
+              <>
+                <p className="ui-eyebrow set-subhead">Racine du Profil</p>
+                <NumberField label="Objectif par semaine" unit="min" min={ROOT_GOAL.min} max={ROOT_GOAL.max} value={profile.rootWeeklyGoalMin} onCommit={profileField('rootWeeklyGoalMin')}
+                  placeholder={String(ROOT_GOAL.defaultMin)} helpKey="pratiquant:racine-objectif"
+                  help={`Temps d'activité, toutes activités confondues, à faire du lundi au dimanche (de ${ROOT_GOAL.min} min à ${ROOT_GOAL.max / 60} h) : la semaine tenue, la racine gagne une étape, et fait le tour du Profil en 26 semaines. Semaines manquées d'affilée : −3 étapes, puis −6, puis retour à la graine.`} />
+              </>
+            )}
           </div>
         )}
       </div>

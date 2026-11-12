@@ -24,6 +24,7 @@ import { useNow } from '../hooks/useNow';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
 import { CHART_PERIODS, type ChartRange } from '../library/activityChart';
+import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
 import { activityShares, favoriteActivity } from '../library/profile';
 import { inBounds, isStatsPeriod, statsPeriodBounds, statsTotals } from '../library/stats';
 import { OTHERS_COLOR } from '../components/chartStyle';
@@ -200,7 +201,7 @@ function ProfilePage() {
             Test de FC repos<IconChevronRight size={14} aria-hidden="true" />
           </Link>
         </div>
-        <RootSlot growth={root.growth} open={rootOpen} onToggle={() => setRootOpen(!rootOpen)} />
+        {PROFILE_PLANT_VISIBLE && <RootSlot growth={root.growth} open={rootOpen} onToggle={() => setRootOpen(!rootOpen)} />}
       </header>
       {picking && <AvatarPicker avatar={avatar} onPick={setAvatar} onClose={() => setPicking(false)} />}
 
@@ -317,8 +318,10 @@ function ProfilePage() {
       )}
 
       {sessions.length > 0 && <ActivityChart key={period} period={period} nowMs={nowMs} />}
-      <ProfileRoot growth={root.growth} goalMin={root.goalMin} cardSelectors={ROOT_CARDS}
-        ready={status === 'ready' && !scanning} open={rootOpen} onClose={closeRoot} />
+      {PROFILE_PLANT_VISIBLE && (
+        <ProfileRoot growth={root.growth} goalMin={root.goalMin} cardSelectors={ROOT_CARDS}
+          ready={status === 'ready' && !scanning} open={rootOpen} onClose={closeRoot} />
+      )}
     </div>
   );
 }

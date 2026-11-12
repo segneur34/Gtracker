@@ -55,6 +55,7 @@ Une ligne par fichier : son rôle et ses points d'entrée principaux. Les signat
 - `mapBase.ts` : fonds de carte (§10, point 134 : `MapBase` plan ou satellite, `MAP_BASES` : adresse, mention (satellite : « Powered by Esri » en tête, un même texte pour la carte, le partage et les vignettes), préfixe des tuiles gardées, profondeur d'agrandissement ; `tileUrl`, `baseOfTileKey`, `tileCacheUsageByBase`, `MAP_BASE_DEFAULT`).
 - `parentPage.ts` : page au-dessus d'une adresse, pour le retour d'Android (`parentPage` ; §10, point 136).
 - `backdropPattern.ts` : tuiles des fonds de page (`backdropTile` : courbes de niveau `contourTile`, motif de chaque famille, voile et surf ; `TILE_W`, `TILE_H` ; point 135).
+- `profilePlant.ts` : interrupteur unique de la plante du Profil (`PROFILE_PLANT_VISIBLE`, `false` : racine, fleur, papillon et réglage « Objectif par semaine » cachés), lu par le Profil, Réglages et la leçon « Le Profil ».
 - `rootPath.ts` : géométrie de la racine du Profil (§10, point 138) : tracé autour des cadres (`rootRoute`, `buildRootModel`, hasard à graine fixe `seededRandom`), partie visible selon le niveau (`rootVisibility`, `rootMaturity`), longueur du tour tirée d'une page de référence (`tourLength`, identique aux cinq périodes, point 170), radicelles de la période (`placeRootlets`, `ROOTLET_MINUTES`), `ROOT_STYLE`.
 
 ## `sailing/` : voile, en nœuds sur `PointData`

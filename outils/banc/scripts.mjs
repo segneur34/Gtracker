@@ -84,8 +84,10 @@ export const SCRIPTS = [
   { nom: 'prereglages', args: ['{port}', '{captures?}'], pages: ['reglages', 'voile'] },
   { nom: 'profil', args: ['{port}', '{captures?}'], pages: ['profil', 'accueil', 'bibliotheque'] },
   { nom: 'pumping', args: ['{port}', '{captures?}'], pages: ['surf', 'reglages'], dev: true },
-  { nom: 'racine-periodes', args: ['{port}', '{captures?}'], pages: ['profil'] },
-  { nom: 'racine', args: ['{port}', '{captures?}'], pages: ['profil', 'reglages'] },
+  { nom: 'racine-periodes', args: ['{port}', '{captures?}'], pages: ['profil'],
+    manuel: 'la plante du Profil est cachée (PROFILE_PLANT_VISIBLE = false) : le script lit son texte et ses dimensions ; à rejouer en remettant la constante à true' },
+  { nom: 'racine', args: ['{port}', '{captures?}'], pages: ['profil', 'reglages'],
+    manuel: 'la plante du Profil est cachée (PROFILE_PLANT_VISIBLE = false) : le script lit son texte et ses dimensions ; à rejouer en remettant la constante à true' },
   { nom: 'reduire', args: ['{port}', '{captures?}'], pages: ['reglages', 'profil'] },
   // Rendus de React pendant un enregistrement : un verdict par plafonds larges (les comptes varient de quelques unités d'un passage à l'autre) ; les comptes imprimés sont masqués.
   { nom: 'rendus', args: ['{port}', '{travail}'], pages: ['enregistrer'], solo: true, accelerable: true, masques: rendusMasques },
@@ -119,8 +121,7 @@ export const SCRIPTS = [
 ];
 
 /** Le passage courant, sans nom ni `--pages` ni `--tous` : scripts sans réseau ni fichier à fournir (sans `tailles`, 10 min : par son nom ou `--pages`). */
-export const PASSAGE_COURANT = ['general', 'surf', 'bench', 'cardio', 'graphes', 'sauts', 'virages', 'pumping', 'familles', 'statistiques', 'profil', 'racine',
-  'racine-periodes', 'rename', 'session-save', 'session-save-resume', 'library', 'import-session', 'apropos', 'tutoriels',
+export const PASSAGE_COURANT = ['general', 'surf', 'bench', 'cardio', 'graphes', 'sauts', 'virages', 'pumping', 'familles', 'statistiques', 'profil', 'rename', 'session-save', 'session-save-resume', 'library', 'import-session', 'apropos', 'tutoriels',
   'reglages', 'reglages-aide', 'prereglages', 'icones', 'cacher', 'planification-verrou', 'planning'];
 
 export const PAGES = ['voile', 'surf', 'enregistrer', 'bibliotheque', 'planification', 'statistiques', 'profil', 'reglages', 'accueil'];

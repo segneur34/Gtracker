@@ -1,4 +1,5 @@
 import type { SportFamily } from '../core/sportProfiles';
+import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
 
 /**
  * Programme des tutoriels : une leçon par nouveau jour
@@ -101,16 +102,24 @@ export const LESSONS: readonly Lesson[] = [
   {
     id: 'profil',
     title: 'Le Profil',
-    hook: 'La racine qui pousse à chaque semaine tenue, et sa fleur.',
+    hook: PROFILE_PLANT_VISIBLE
+      ? 'La racine qui pousse à chaque semaine tenue, et sa fleur.'
+      : 'Votre photo, la période choisie, vos chiffres et le temps par activité.',
     icon: 'profil',
     target: '/profil',
-    body: [
-      'Le Profil résume vos activités sur la période choisie : distance, sport préféré et temps par activité.',
-      'Autour des cadres pousse une racine : elle gagne une étape à chaque semaine où vous tenez votre objectif, et fait le tour de la page en 26 semaines. Des semaines manquées la font reculer.',
-      "Au-dessus du sol, la pousse fleurit avec le temps de la semaine : un bouton, une fleur ouverte à l'objectif, épanouie à 4 fois l'objectif ; au-delà, un papillon arrive à côté d'elle, puis s'y pose.",
-      'Touchez le carré à droite du pseudo : une bulle dit où vous en êtes et ce qu\'il reste à faire.',
-      "L'objectif par semaine se règle dans Réglages › Pratiquant (45 min au départ).",
-    ],
+    body: PROFILE_PLANT_VISIBLE
+      ? [
+        'Le Profil résume vos activités sur la période choisie : distance, sport préféré et temps par activité.',
+        'Autour des cadres pousse une racine : elle gagne une étape à chaque semaine où vous tenez votre objectif, et fait le tour de la page en 26 semaines. Des semaines manquées la font reculer.',
+        "Au-dessus du sol, la pousse fleurit avec le temps de la semaine : un bouton, une fleur ouverte à l'objectif, épanouie à 4 fois l'objectif ; au-delà, un papillon arrive à côté d'elle, puis s'y pose.",
+        'Touchez le carré à droite du pseudo : une bulle dit où vous en êtes et ce qu\'il reste à faire.',
+        "L'objectif par semaine se règle dans Réglages › Pratiquant (45 min au départ).",
+      ]
+      : [
+        'Le Profil résume vos activités sur la période choisie : distance, sport préféré et temps par activité.',
+        'Touchez la photo ronde pour la changer : un des dessins d\'activité, ou une image de votre téléphone. Le pseudo se règle dans Réglages › Pratiquant.',
+        'Une seule période pour toute la page : semaine, 30 jours, 6 mois, année ou depuis le début.',
+      ],
   },
   {
     id: 'notes',
