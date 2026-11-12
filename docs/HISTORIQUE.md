@@ -90,3 +90,43 @@ Ce fichier est le §10 de `docs/ETAT_DU_PROJET.md`. C'est le journal de Gtracker
     - **Décision** : un test (`src/landWords.test.ts`) et son relevé figé (`outils/heritage.json`) refusent toute hausse du vocabulaire de la terre ; les chemins du poste et l'allure en min/km sont refusés en dur ; la couture vide quitte `architecture.test.ts`, qui garde les deux familles et leurs adresses.
     - **Pourquoi** : ni la terre, ni l'ancien nom, ni l'allure min/km ne doivent revenir sans qu'un test échoue ; la contre-épreuve (un mot ajouté fait échouer le test) a été faite.
     - **Piège** : le relevé est figé, il ne peut que baisser ; la suite (aucun nom de calcul en dur, garde étendue) est l'élément 339 du reste à faire.
+
+340. « Partager l'image » (lot 341, validé le 12/11 sur lecture, version 0.00.21).
+    - **Décision** : dans le menu « … » d'une analyse, « Partager » devient « Partager l'image », à côté de « Partager la trace » ; la fenêtre de partage, la carte de fin d'enregistrement et la leçon « Partager et exporter » suivent. Le bouton « Partager » de la fenêtre et celui des itinéraires gardent leur nom.
+    - **Pourquoi** : deux entrées voisines, l'une pour l'image, l'autre pour le fichier de la trace, que l'utilisateur confondait à l'essai.
+    - **Piège** : les scripts du banc qui cherchaient le libellé « Partager » devaient suivre ; seul le libellé et le titre de la fenêtre changent à l'écran.
+
+341. Voile : une seule voie de calcul (lot 328, validé le 12/11 sur lecture, versions 0.00.23 et 0.00.25).
+    - **Décision** : la seconde voie de la voile, que seuls des tests et un script du banc appelaient (`estimateWindPolar`, `measureManeuver`, `analyzeManeuvers`…), est supprimée ; les tests passent par la voie livrée (aide `detectAndClassify`). Les seuils n'ont plus de défaut caché sur le wingfoil : plancher d'arrêt et seuil de réussite sont des paramètres obligatoires de la détection, du classement et de l'estimation du vent (les surcharges de `ManeuverOptions` restent). Cinq doublons de `SailingModule` et `SurfModule` deviennent des pièces partagées (`useCardioShortcuts`, `speedCellOf`, `heartRateShareStats`, `shownMarkOf`, `tableStyle`) ; trois sont laissés, leurs copies différant pour une raison.
+    - **Pourquoi** : un calcul qui n'existe que dans les tests prouve autre chose que ce que l'utilisateur voit, et un seuil par défaut oublié donnait les chiffres du wingfoil à un autre support (règle 3).
+    - **Piège** : une attente de test affaiblie en passant (aucune manœuvre dirigée quand les sens sont incertains) a été rétablie. Preuve de neutralité : résumés figés identiques sans refigeage. L'étape d (découpage des gros fichiers) n'est pas faite, elle reste avec la dette 309.
+
+342. Renvois d'atelier retirés de `src/` (lot 307, validé le 12/11 sur lecture, versions 0.00.22, 0.00.24, 0.00.27 et 0.00.28).
+    - **Décision** : plus de « lot N », « Qnn », « point N » du journal, date d'atelier ni numéro du reste à faire dans les commentaires et titres de test de `src/` et des sources Java ; la raison s'écrit en clair, le journal n'étant pas livré. `docs/GLOSSAIRE.md` dit les mots du code qui trompent (course, repère et balise, calcul, support et activité, noms de la FC, seuils).
+    - **Pourquoi** : l'acheteur reçoit le dépôt seul ; un commentaire doit tenir sans l'atelier.
+    - **Piège** : preuve de neutralité par le code transpilé sans commentaires, identique avant et après (trois titres de test paramétrés exceptés, relus). Dans le noyau de la voile, des pièges que le commentaire ne portait que par renvoi ont dû être récrits (marge des caps stabilisés, vitesse d'entrée commune au vent et aux manœuvres).
+
+343. Gardes d'architecture, suite (lot 339, validé le 12/11 sur lecture, version 0.00.28).
+    - **Décision** : `src/architecture.test.ts` refuse tout renvoi d'atelier dans `src/` (cinq faux amis nommés, liste qui ne fait que diminuer), tout nom de calcul en dur hors des tables qui les décrivent (`SPORT_TABLES`, sans exception), et limite à six fichiers nommés l'import de la porte d'import ; `src/heritage.test.ts` refuse aussi « application complète ». La règle 14 de `CLAUDE.md` et la fin de la règle 13 le disent.
+    - **Pourquoi** : poser les gardes dès que plus rien ne les violait, sans attendre la fusion famille et traitement.
+    - **Piège** : « surf » est écarté du motif des noms de calcul, car c'est aussi une famille ; chaque garde a été éprouvée par une contre-épreuve.
+
+344. Coupure hors du code (lot 324, validé le 12/11 sur lecture, sans version).
+    - **Décision** : les refus d'écriture quittent `.claude/settings.json` pour `.claude/settings.local.json` (ignoré par git, protection inchangée) ; identité git du dépôt passée à Gtracker ; l'acheteur reçoit le dépôt seul, le dossier parent est l'atelier et y reste, la livraison se préparera sur une copie du dépôt.
+    - **Pourquoi** : rien de l'atelier ni de l'ancien projet ne doit partir avec le dépôt vendu.
+    - **Piège** : un nom entre accents graves dans la ligne du reste à faire était pris par le contrôle des renvois pour un nom de code.
+
+345. Banc remis sur la voile et le surf (lot 330, validé le 12/11 sur lecture, sans version : outils seuls).
+    - **Décision** : registre et lanceur sans course, vélo ni fractionné ; `outils/banc/lib/traces.mjs` fabrique les traces (voile, surf, longue, sans type) pour tous les scripts, qui n'ont plus de fichier à fournir ni de réseau ; une cinquantaine de scripts réparés ou réécrits et sortis de « manuel », chacun éprouvé par une contre-épreuve (un contrôle faussé échoue). `import-session` remplace `imports` pour la porte d'import ; `fluidite.mjs` mesure de nouveau sur la voile et le surf.
+    - **Pourquoi** : le banc est la preuve de neutralité des changements ; la moitié de ses scripts échouaient sur une application qui n'avait plus la terre.
+    - **Piège** : la taille variable de l'image de partage venait des tuiles OpenStreetMap lues en direct, pas de l'application ; la graduation flottante des axes fait échouer les relevés de texte tant qu'elle n'est pas masquée. Aucun défaut de l'application trouvé. Non rejoués : la variante compilée de la fluidité et la mesure de l'arrêt d'un enregistrement, à la demande.
+
+346. Enregistreur découpé en couches (lot 329, étape 3, validée le 12/11 sur lecture, version 0.00.26).
+    - **Décision** : `useRecorder.ts` (1 422 lignes) garde les commandes publiques et reste le seul point d'entrée ; l'état, les veilles du GPS et de la ceinture, la réception des positions, le tampon du journal et la reprise après une coupure vivent sous `src/hooks/recorder/`. Un objet session remplace dix-sept variables de module.
+    - **Pourquoi** : un fichier unique que personne ne pouvait relire d'un trait, pour la fonction la plus sensible (ne jamais perdre une session).
+    - **Piège** : à comportement égal, il faut garder l'ordre des opérations, les réinitialisations et les liaisons vivantes ; preuves : aucun test existant modifié, 185 chaînes littérales identiques, banc d'enregistrement identique. Le faux ami `landOnRecording` du relevé de la terre se répartit sur trois fichiers, total inchangé.
+
+347. Note des Statistiques sans numéro de version (lot 342, validé le 12/11 sur lecture, version 0.00.27).
+    - **Décision** : la note dit « Réussite connue seulement des sessions déjà ouvertes dans l'analyse : N sessions à rouvrir », sans citer de version de l'ancienne série.
+    - **Pourquoi** : le numéro appartenait à une série de versions abandonnée et n'aurait rien dit à l'acheteur.
+    - **Piège** : aucun.

@@ -46,7 +46,7 @@ Les couches, de bas en haut. Tous les imports sont relatifs, sans alias de chemi
 - **Plateforme `platform/`** : seul accès au stockage, aux fichiers, à la position, au son, au vibreur, aux capteurs et à la notification (règle 12). `isNativeApp()` choisit la version navigateur ou téléphone de chaque module ; les hooks et les pages ne voient pas la différence. Exception : `compass`, la boussole, n'existe que dans le navigateur.
 - **Hooks** :
   - le pipeline : `useGpxSession`, `useSailingSession` (§4) ;
-  - deux stores hors des composants, qui survivent aux changements de page : l'enregistreur (`useRecorder`) et la bibliothèque (`useSessionLibrary`, point d'entrée de treize parties sous `hooks/sessionLibrary/`, lot 113) ;
+  - deux stores hors des composants, qui survivent aux changements de page : l'enregistreur (`useRecorder`, point d'entrée de cinq couches sous `hooks/recorder/`) et la bibliothèque (`useSessionLibrary`, point d'entrée de treize parties sous `hooks/sessionLibrary/`, lot 113) ;
   - cinq modules, branchés au démarrage dans `main.tsx` (`start…`), dont la plupart suivent l'enregistreur page fermée et écran éteint : l'interface de la bibliothèque (`startLibraryUi`), le guidage des balises (`startMarkGuide`), le direct (`startLiveRecording`), la notification (`startRecordingNotification`) et le son des bips (`startBeepSound`) ;
   - le brouillon d'une session : `useSessionDraft`, `leaveGuard` ;
   - les réglages : `useSportSettings` et `useAllSportSettings` sont des `useSyncExternalStore` abonnés à la seule clé `gtracker.sportSettings` (`jsonStore.subscribeKey`), toute écriture passe par `updateStoredSettings(change)`, qui relit au moment d'écrire ; les autres enregistrements de l'appareil passent par `useStoredRecord` ;
