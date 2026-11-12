@@ -1,6 +1,6 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type ReactNode } from 'react';
 import {
-  FAMILY_ACCENT, FAMILY_LABEL, FAMILY_SHADES, activitiesOfFamily, activityFamily, isFamilyHidden, nextActivityColor, visibleActivities, visibleFamilies,
+  FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityFamily, isFamilyHidden, nextActivityColor, visibleActivities, visibleFamilies,
   type Activity,
 } from '../core/activities';
 import {
@@ -20,7 +20,7 @@ import { useTutorials } from '../hooks/useTutorials';
 import { Link } from 'react-router-dom';
 import { useTileCache } from '../hooks/useTileCache';
 import { isTileTemplate, type MapBase } from '../core/mapBase';
-import { useThemedShade, useThemeSettings } from '../hooks/useTheme';
+import { useActivityInk, useThemeSettings } from '../hooks/useTheme';
 import { THEME_CHOICES } from '../theme/theme';
 import { ATHLETE_NAME_MAX, athleteHeartRateZones, athleteHrSource, type AthleteNumberField, type AthleteProfile } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
@@ -320,7 +320,7 @@ interface ActivityCardProps {
   /** Dernière activité visible : son œil ne se ferme pas. */
   lastActivity: boolean;
   openPart: Record<ActivityPartKey, boolean>;
-  /** Nuance de la couleur pour le thème (`useThemedShade`). */
+  /** Couleur de son icône pour le thème (`useActivityInk`). */
   shade: (color: string) => string;
   actions: ActivityCardActions;
 }
@@ -434,8 +434,8 @@ const ActivityCard = memo(function ActivityCard({
       {isOpen && (
         <div className="settings-activity__body">
           <SettingRow label="Couleur" helpKey={`${id}:couleur`}
-            help="Sa couleur dans les listes et les graphes, parmi les nuances de sa famille.">
-            <ShadePicker shades={FAMILY_SHADES[family]} value={activity.color} onChange={(color) => updateActivity(id, { color })}
+            help="Sa couleur dans les listes et les graphes, parmi les douze de la palette, communes à toutes les activités.">
+            <ShadePicker value={activity.color} onChange={(color) => updateActivity(id, { color })}
               label={`Couleur de ${activity.name}`} />
           </SettingRow>
           <SettingRow label="Icône" helpKey={`${id}:icone`} help="Son icône dans les listes ; sans choix, elle suit le nom.">
@@ -618,7 +618,7 @@ function SettingsPage() {
     stopHoldMs, setStopHoldMs, beepSound, setBeepSound, hiddenFamilies, setActivityHidden, setFamilyHidden,
   } = useAllSportSettings();
   const { profile, setName, setNumber, setSex, setThresholds, age } = useAthleteProfile();
-  const shown = useThemedShade();
+  const shown = useActivityInk();
   const { open, toggle, closeAll: closeBlocks } = useOpenSections<SettingsBlock>('settings', SETTINGS_BLOCK_DEFAULTS);
   const { open: openActivity, toggle: toggleActivity, closeAll: closeActivities } = useOpenSections<string>('settings-activities', NO_ACTIVITY_OPEN);
   const { open: openPart, toggle: togglePart, closeAll: closeParts } = useOpenSections<ActivityPartKey>('settings-activity-parts', ACTIVITY_PART_DEFAULTS);
@@ -1017,7 +1017,7 @@ function ActivityNameField({
   onDone: () => void;
 }) {
   const [draft, setDraft] = useState(activity.name);
-  const shown = useThemedShade();
+  const shown = useActivityInk();
   // Entrée et Échap ferment le champ eux-mêmes, sans attendre la perte du focus : la sortie qui suit ne refait rien.
   const closed = useRef(false);
   const close = (save: boolean) => {
@@ -1076,7 +1076,7 @@ function GearLabelsField({
   );
 }
 
-/** Ajout d'une activité : nom, famille, calcul, nuance de la famille, icône (devinée du nom tant qu'on n'en choisit pas). */
+/** Ajout d'une activité : nom, famille, calcul, couleur de la palette, icône (devinée du nom tant qu'on n'en choisit pas). */
 function AddActivityForm({
   activities, onAdd,
 }: {
@@ -1088,12 +1088,11 @@ function AddActivityForm({
   // Le calcul se devine du nom (« Bateau » → bateau) tant qu'on n'en choisit pas un soi-même.
   const [chosenBase, setChosenBase] = useState<SportType | null>(null);
   const base = chosenBase ?? guessActivityBase(name, family);
-  const [color, setColor] = useState(() => nextActivityColor(activities, 'voile'));
+  const [color, setColor] = useState(() => nextActivityColor(activities));
   const [icon, setIcon] = useState<ActivityIconId | null>(null);
   const pickFamily = (next: SportFamily) => {
     setFamily(next);
     setChosenBase(null);
-    setColor(nextActivityColor(activities, next));
     setIcon(null);
   };
   const submit = () => {
@@ -1101,7 +1100,7 @@ function AddActivityForm({
     setName('');
     setIcon(null);
     setChosenBase(null);
-    setColor(nextActivityColor([...activities, { id: '', name, base, color }], family));
+    setColor(nextActivityColor([...activities, { id: '', name, base, color }]));
   };
   return (
     <div className="settings-add">
@@ -1121,7 +1120,7 @@ function AddActivityForm({
           </select>
         </label>
       )}
-      <ShadePicker shades={FAMILY_SHADES[family]} value={color} onChange={setColor} label="Couleur de la nouvelle activité" />
+      <ShadePicker value={color} onChange={setColor} label="Couleur de la nouvelle activité" />
       <IconPicker value={icon ?? guessActivityIcon(name, base)} color={color} onChange={setIcon} label="Icône de la nouvelle activité" />
       <Button size="s" onClick={submit} disabled={name.trim() === ''}>Ajouter</Button>
       <HelpText helpKey="ajout">Elle part des valeurs de son calcul ; tout se règle ensuite dans sa carte.</HelpText>

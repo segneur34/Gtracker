@@ -1,29 +1,33 @@
-import { useThemedShade } from '../hooks/useTheme';
+import { ACTIVITY_PALETTE } from '../core/activities';
+import { useAppliedTheme } from '../hooks/useTheme';
 import './ShadePicker.css';
 
 /**
- * Couleur d'une activité : une rangée de pastilles, les nuances de sa famille
- * (`FAMILY_SHADES`). Une couleur hors de la rangée (reprise
- * d'un autre appareil) n'en coche aucune. En sombre, chaque pastille montre sa
- * nuance sombre (`shadeForTheme`) ; la valeur choisie reste la nuance claire.
+ * Couleur d'une activité : une rangée de pastilles cernées, les douze
+ * couleurs de la palette (`ACTIVITY_PALETTE`), communes à toutes les
+ * activités. Une couleur hors de la rangée (reprise d'un autre appareil) n'en
+ * coche aucune. En sombre, chaque pastille montre sa couleur de nuit et son
+ * nom de nuit ; la valeur choisie reste la couleur claire.
  */
 function ShadePicker({
-  shades, value, onChange, label,
+  value, onChange, label,
 }: {
-  shades: readonly string[];
   value: string;
   onChange: (color: string) => void;
   label: string;
 }) {
   const current = value.toLowerCase();
-  const shown = useThemedShade();
+  const dark = useAppliedTheme().theme === 'dark';
   return (
     <div className="shade-picker" role="group" aria-label={label}>
-      {shades.map((shade, i) => (
-        <button key={shade} type="button" className="shade-picker__swatch" style={{ backgroundColor: shown(shade) }}
-          aria-pressed={shade === current} aria-label={`Nuance ${i + 1}`} title={`Nuance ${i + 1}`}
-          onClick={() => onChange(shade)} />
-      ))}
+      {ACTIVITY_PALETTE.map((c) => {
+        const name = dark ? c.darkName ?? c.name : c.name;
+        return (
+          <button key={c.light} type="button" className="shade-picker__swatch" style={{ backgroundColor: dark ? c.dark : c.light }}
+            aria-pressed={c.light === current} aria-label={name} title={name}
+            onClick={() => onChange(c.light)} />
+        );
+      })}
     </div>
   );
 }

@@ -19,7 +19,7 @@ import { athleteAvatar, athleteName } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { useStoredRecord } from '../hooks/useStoredRecord';
-import { useThemedShade } from '../hooks/useTheme';
+import { useActivityInk, useThemedShade } from '../hooks/useTheme';
 import { useNow } from '../hooks/useNow';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
@@ -135,6 +135,7 @@ function ProfilePage() {
   const activityOrder = useMemo(() => activities.map((a) => a.id), [activities]);
 
   const shown = useThemedShade();
+  const ink = useActivityInk();
   const { slices, others } = useMemo((): { slices: Slice[]; others: Slice[] } => {
     const shares = activityShares(inPeriod, activityOrder).filter((s) => s.totals.durationS > 0);
     const ofShare = (s: (typeof shares)[number]): Slice => {
@@ -234,7 +235,7 @@ function ProfilePage() {
                 title={`${favorite.name} : voir ses sessions`}>
                 <span className="ui-eyebrow">Sport préféré</span>
                 <span className="profile-figure__value">
-                  <ActivityArt icon={activityIcon(favorite)} className="profile-figure__art" style={{ color: shown(favorite.color) }} />
+                  <ActivityArt icon={activityIcon(favorite)} className="profile-figure__art" style={{ color: ink(favorite.color) }} />
                 </span>
                 <span className="profile-figure__caption profile-figure__name">{favorite.name}</span>
               </button>
@@ -253,6 +254,10 @@ function ProfilePage() {
               <div className="profile-split__body">
                 <div className="profile-donut">
                   <svg viewBox="0 0 200 200" role="img" aria-label="Part de chaque activité dans le temps de la période">
+                    {/* Bords gris de l'anneau, juste dehors : une part blanche se voit sur blanc, une noire sur noir. */}
+                    {[RING_R - RING_W / 2 - 0.5, RING_R + RING_W / 2 + 0.5].map((r) => (
+                      <circle key={r} cx="100" cy="100" r={r} fill="none" stroke="var(--line-strong)" strokeWidth={1} />
+                    ))}
                     <g transform="rotate(-90 100 100)" onMouseLeave={() => setActive(null)}>
                       {arcs.map(({ slice, dash, offset: o }) => (
                         <circle key={slice.key} cx="100" cy="100" r={RING_R} fill="none" stroke={slice.color} strokeWidth={RING_W}

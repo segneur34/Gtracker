@@ -67,6 +67,21 @@ Les onze dessins validés le 12/11 (« ok pour les images », « surf foil ok »
 - Étapes : 1. script d'allègement et comparaison, `logoPaths.ts`, poids relevé ; 2. cœur (identifiants, libellés, devinette, reprise, rotation) et tests ; 3. `LogoSprite` et `ActivityLogo`/`LogoGlyph`, test d'architecture ; 4. remplacement des appels (`ActivityIcon` supprimé, `IconPicker`, `ProfilePage`, `ProfileAvatar`) ; 5. nettoyage (`ACTIVITY_ICON`, `activityArt.tsx`, les `Icon*` d'activité sauf `IconWingfoil` que `LessonIcon.tsx` emploie) ; 6. banc `icones`.
 - Pièges : un seul `LogoSprite` dans la page (identifiants en double sinon) ; le commentaire d'en-tête du fichier produit ne cite aucun numéro de lot (règle 14).
 
+## Première moitié faite le 12/11 (fichiers neufs, pas encore branchés)
+
+- Poids : 339,7 Ko de sources, 107,2 Ko dans `src/components/logos/logoPaths.ts` (35,9 Ko compressé), gardé sous 112 000 octets par un test. Comparaison au pixel près sur 1 000 × 1 000 : aucun dessin ne bouge de plus d'un pixel ; planche avant et après à 132 px regardée par l'orchestrateur, identique. Script : `D:\gong tracker\atelier\maquette-da-1211\icones-v3\outils\alleger.mjs`.
+- `src/core/activityLogos.ts` (et son test) : `LOGO_IDS`, `LogoId`, `LOGO_LABEL`, `isLogoId`, `LOGO_FRAME_MIN_PX = 40`, `LOGO_GLYPH_SCALE = 0.6`, `legacyIconToLogo(icon)`, `storedLogo(value: unknown): LogoId | undefined` (relit un logo ou une ancienne icône : à brancher dans `readActivities` et dans la lecture de l'avatar), `logoRotation(id)`. Déjà ajouté à `SPORT_TABLES` de `src/architecture.test.ts`.
+- `src/components/logos/` : `ActivityLogo` (export par défaut, `{ logo, color, size, label?, activityId?, className? }` : cadre à partir de 40 px, dessin seul à l'encre en dessous), `LogoGlyph` (export nommé, `{ logo, size, label?, className? }`, en `currentColor`), `LogoSprite` (export par défaut, sans propriété, seul importateur de `logoPaths.ts`, à charger par `lazy()` et monter une fois dans `AppShell` sous `Suspense`), `logoSymbols.ts`, `ActivityLogo.css`, `logoPaths.test.ts`.
+- Libellés pris sur les noms des activités (« Kite », « Bateau »).
+
+## Seconde moitié : ce qui reste
+
+- Tranché par l'orchestrateur après la première moitié : le hachage donne au Wingfoil et au Kite, voisins dans toutes les listes, des cadres presque au même angle (220° et 238°). La rotation se déduit donc du logo, par les angles de la planche validée : rang dans `LOGO_IDS` × 47, modulo 360 (wingfoil 0, parawing 47, windsurf 94, windfoil 141, kite 188, kitefoil 235, bateau 282, surf 329, paddle 16, surf-foil 63, pumping 110). `logoRotation` prend le logo, `activityId` n'a plus d'emploi dans `ActivityLogo`.
+- Brancher : `LogoSprite` monté dans `AppShell` ; `storedLogo` dans `readActivities` et `athleteProfile` ; la devinette sur les onze dessins (plan) ; le type d'icône d'une activité devient `LogoId`.
+- Remplacer : les appels d'`ActivityIcon` (supprimé), `IconPicker` (onze choix), `ProfilePage` (dessin seul), `ProfileAvatar` (logo dans son cadre, grille sur les onze) ; la pastille de couleur à côté du dessin là où le brief le dit. La couleur affichée d'une activité se prend comme le lot 338 l'a laissée (`shadeForTheme`, `useThemedShade`).
+- Nettoyer : `ACTIVITY_ICON`, `activityArt.tsx`, les `Icon*` d'activité sauf `IconWingfoil`, l'ancien `core/activityIcons.ts` si tout est passé dans `activityLogos.ts` ; `SPORT_TABLES` ; le test d'architecture sur l'import de `logoPaths.ts`.
+- Banc : `outils/banc/icones.mjs` et `outils/banc/SCRIPTS.md`.
+
 ## Rapport attendu
 
 Le rapport habituel, avec : le poids avant et après, où les dessins sont rangés et comment ils se chargent, la table ancienne icône → nouveau logo, et la liste des écrans où le logo s'affiche dans son cadre.

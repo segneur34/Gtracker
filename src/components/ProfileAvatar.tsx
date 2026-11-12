@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { FAMILY_ACCENT } from '../core/activities';
+import { FAMILY_ACCENT, readableInk } from '../core/activities';
 import { ACTIVITY_ICON_IDS, ACTIVITY_ICON_LABEL, type ActivityIconId } from '../core/activityIcons';
 import type { SportFamily } from '../core/sportProfiles';
 import { AVATAR_PHOTO_PX, type AthleteAvatar } from '../library/athleteProfile';
@@ -11,8 +11,8 @@ import Button from './ui/Button';
 import './ProfileAvatar.css';
 
 /**
- * Photo ronde du Profil : une image importée, ou un dessin d'activité blanc
- * sur la couleur de sa famille. Sans choix, le dessin du sport préféré sur la
+ * Photo ronde du Profil : une image importée, ou un dessin d'activité sur
+ * l'accent de sa famille. Sans choix, le dessin du sport préféré sur la
  * couleur de son activité (`fallback`), sinon une silhouette.
  */
 
@@ -28,11 +28,14 @@ interface AvatarFallback {
 }
 
 /**
- * Disque d'un dessin : couleur de fond et dessin blanc, à 60 % du diamètre ; sur
- * l'accent de la famille, qui vaut l'encre, le dessin prend `--on-ink`.
+ * Disque d'un dessin : couleur de fond et dessin, à 60 % du diamètre ; sur
+ * l'accent de la famille, qui vaut l'encre, le dessin prend `--on-ink`. Sur la
+ * couleur d'une activité (sans `ink`), il prend le noir ou le blanc qui s'y lit
+ * (`readableInk`), et le disque un cerne gris, pour le blanc sur blanc.
  */
 const ArtDisc = ({ icon, color, ink }: AvatarFallback & { ink?: string }) => (
-  <span className="profile-avatar__disc" style={{ background: color, color: ink }}>
+  <span className={ink ? 'profile-avatar__disc' : 'profile-avatar__disc profile-avatar__disc--activity'}
+    style={{ background: color, color: ink ?? readableInk(color) }}>
     <ActivityArt icon={icon} size={100} className="profile-avatar__art" />
   </span>
 );

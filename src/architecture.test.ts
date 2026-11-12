@@ -253,7 +253,7 @@ const matchesIn = (files: string[], re: RegExp, code = false): { where: string; 
  * `=== 'kite'`. `'surf'` est aussi une famille : sa comparaison n'est pas un nom de calcul. Sans exception aujourd'hui.
  */
 const SPORT_TABLES = [
-  'core/types.ts', 'core/sportProfiles.ts', 'core/activities.ts', 'core/activityIcons.ts', 'settings/activityPresets.ts',
+  'core/types.ts', 'core/sportProfiles.ts', 'core/activities.ts', 'core/activityIcons.ts', 'core/activityLogos.ts', 'settings/activityPresets.ts',
   'library/naming.ts', 'recording/liveFields.ts', 'components/familyIcons.ts', 'components/activityArt.tsx', 'components/ProfileAvatar.tsx',
 ];
 const SPORT_NAME_EXCEPTIONS: readonly string[] = [];

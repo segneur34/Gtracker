@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_ACTIVITIES, FAMILY_SHADES, SURF_ACTIVITY, SURF_FOIL_ACTIVITY, activitiesOfFamily,
+  ACTIVITY_PALETTE, DEFAULT_ACTIVITIES, SURF_ACTIVITY, SURF_FOIL_ACTIVITY, activitiesOfFamily,
   activityCounts, activityFamily, activityTreatment, baseActivity, findActivity, insertActivity, isActivityShown, isFamilyHidden,
   newActivityId, nextActivityColor, readActivities, sessionActivity,
-  visibleActivities, visibleFamilies, withHidden, type Activity,
+  visibleActivities, visibleFamilies, withHidden, withPaletteColors, type Activity,
 } from './activities';
 import { SPORT_FAMILIES, usesMarkCourse } from './sportProfiles';
 
 const moth: Activity = { id: 'a-moth', name: 'Moth à foil', base: 'wingfoil', color: '#2e7d32' };
-const paddle: Activity = { id: 'a-paddle', name: 'Paddle', base: 'surf', color: '#847c6e' };
+const paddle: Activity = { id: 'a-paddle', name: 'Paddle', base: 'surf', color: '#e6c229' };
 const voile = DEFAULT_ACTIVITIES[0];
 const voiles = DEFAULT_ACTIVITIES.filter((a) => activityFamily(a) === 'voile').map((a) => a.name);
 const surfs = DEFAULT_ACTIVITIES.filter((a) => activityFamily(a) === 'surf').map((a) => a.name);
@@ -39,8 +39,12 @@ describe('readActivities', () => {
       ['a-pumping', 'Pumping', 'surf', false],
     ]);
     expect(visibleActivities(DEFAULT_ACTIVITIES, []).map((a) => a.name)).toEqual(['Wingfoil', 'Kite', 'Surf', 'Pumping']);
-    // Les nuances sont celles de la famille, sans septième.
-    for (const a of DEFAULT_ACTIVITIES) expect(FAMILY_SHADES[activityFamily(a)]).toContain(a.color);
+    expect(DEFAULT_ACTIVITIES.map((a) => [a.name, a.color])).toEqual([
+      ['Wingfoil', '#003e52'], ['Parawing', '#72b0bd'], ['Windsurf', '#1e88e5'], ['Windfoil', '#6236c9'],
+      ['Kite', '#ff7a1a'], ['Kitefoil', '#e0218a'], ['Bateau', '#8e1b2e'], ['Surf', '#000000'],
+      ['Paddle', '#e6c229'], ['Surf foil', '#646464'], ['Pumping', '#0e8f4f'],
+    ]);
+    for (const a of DEFAULT_ACTIVITIES) expect(ACTIVITY_PALETTE.map((c) => c.light)).toContain(a.color);
   });
 
   it('garde une liste vide, écarte les entrées abîmées et les doublons', () => {
@@ -67,8 +71,63 @@ describe('readActivities', () => {
   });
 
   it('ignore une icône inconnue : elle redevient devinée', () => {
-    const [kite] = readActivities([{ id: 'a-kite', name: 'Kite', base: 'kite', color: '#4458c2', icon: 'course' }]);
-    expect(kite).toEqual({ id: 'a-kite', name: 'Kite', base: 'kite', color: '#4458c2' });
+    const [kite] = readActivities([{ id: 'a-kite', name: 'Kite', base: 'kite', color: '#ff7a1a', icon: 'course' }]);
+    expect(kite).toEqual({ id: 'a-kite', name: 'Kite', base: 'kite', color: '#ff7a1a' });
+  });
+});
+
+describe('reprise des couleurs de l’ancienne palette', () => {
+  const colorOf = (list: Activity[], id: string) => list.find((a) => a.id === id)?.color;
+
+  it('une activité de départ à une ancienne nuance, claire ou sombre, prend sa couleur de départ', () => {
+    const list = readActivities([
+      { id: 'wingfoil', name: 'Wingfoil', base: 'wingfoil', color: '#004aad' },
+      { id: 'kite', name: 'Kite', base: 'kite', color: '#7c98ff' },
+      { id: 'a-pumping', name: 'Pumping', base: 'surf', color: '#223246' },
+    ]);
+    expect(list.map((a) => a.color)).toEqual(['#003e52', '#ff7a1a', '#0e8f4f']);
+  });
+
+  it('une activité créée prend la première couleur libre ; deux, dans l’ordre de la liste', () => {
+    const list = readActivities([
+      ...DEFAULT_ACTIVITIES,
+      { id: 'a-moth', name: 'Moth', base: 'wingfoil', color: '#192f94' },
+      { id: 'a-sup', name: 'SUP', base: 'surf', color: '#0a1a2e' },
+    ]);
+    // Le blanc, seul libre, va à la première ; les douze prises, la seconde reprend la palette dans l'ordre.
+    expect(colorOf(list, 'a-moth')).toBe('#ffffff');
+    expect(colorOf(list, 'a-sup')).toBe(ACTIVITY_PALETTE[list.length % ACTIVITY_PALETTE.length].light);
+    const few = readActivities([
+      { id: 'wingfoil', name: 'Wingfoil', base: 'wingfoil', color: '#004aad' },
+      { id: 'a-moth', name: 'Moth', base: 'wingfoil', color: '#192f94' },
+      { id: 'a-sup', name: 'SUP', base: 'surf', color: '#0A1A2E' },
+    ]);
+    expect(few.map((a) => a.color)).toEqual(['#003e52', '#ffffff', '#72b0bd']);
+  });
+
+  it('les majuscules ne gênent pas la reprise', () => {
+    expect(readActivities([{ id: 'surf', name: 'Surf', base: 'surf', color: '#5B6670' }])[0].color).toBe('#000000');
+  });
+
+  it('une couleur déjà neuve ou inconnue ne bouge pas', () => {
+    const kept = [
+      { id: 'wingfoil', name: 'Wingfoil', base: 'wingfoil' as const, color: '#e0218a' },
+      { id: 'a-moth', name: 'Moth', base: 'wingfoil' as const, color: '#2e7d32' },
+      { id: 'kite', name: 'Kite', base: 'kite' as const, color: '#123456' },
+    ];
+    expect(readActivities(kept)).toEqual(kept);
+    // Rien d'ancien : la liste lue est rendue telle quelle, sans copie de plus.
+    expect(withPaletteColors(kept)).toBe(kept);
+  });
+
+  it('une activité créée ne prend pas la couleur qu’une activité de départ vient de reprendre', () => {
+    const list = readActivities([
+      { id: 'a-moth', name: 'Moth', base: 'wingfoil', color: '#014e86' },
+      { id: 'wingfoil', name: 'Wingfoil', base: 'wingfoil', color: '#004aad' },
+      { id: 'surf', name: 'Surf', base: 'surf', color: '#ffffff' },
+    ]);
+    // Le blanc est déjà porté par Surf, l'océan par Wingfoil : la suivante est le lagon.
+    expect(list.map((a) => a.color)).toEqual(['#72b0bd', '#003e52', '#ffffff']);
   });
 });
 
@@ -151,12 +210,15 @@ describe('newActivityId et nextActivityColor', () => {
     expect(newActivityId('!!!', [])).toBe('a-activite');
   });
 
-  it('propose la première nuance libre de la famille, puis les reprend dans l\'ordre', () => {
-    expect(nextActivityColor([voile], 'voile')).toBe(FAMILY_SHADES.voile[1]);
-    expect(nextActivityColor([voile], 'surf')).toBe(FAMILY_SHADES.surf[0]);
-    const six = FAMILY_SHADES.surf.map((color, i): Activity => ({ id: `s${i}`, name: `S${i}`, base: 'surf', color }));
-    expect(nextActivityColor(six, 'surf')).toBe(FAMILY_SHADES.surf[0]);
-    expect(nextActivityColor([...six, { ...six[0], id: 's6' }], 'surf')).toBe(FAMILY_SHADES.surf[1]);
+  it('propose la première couleur libre de la palette, le blanc d\'abord, puis les reprend dans l\'ordre', () => {
+    expect(nextActivityColor([])).toBe('#ffffff');
+    expect(nextActivityColor(DEFAULT_ACTIVITIES)).toBe('#ffffff');
+    expect(nextActivityColor([{ ...voile, color: '#FFFFFF' }])).toBe(ACTIVITY_PALETTE[1].light);
+    // Toute activité, de voile ou de surf, puise dans la même palette.
+    expect(nextActivityColor([{ ...paddle, color: '#ffffff' }, voile])).toBe(ACTIVITY_PALETTE[2].light);
+    const twelve = ACTIVITY_PALETTE.map((c, i): Activity => ({ id: `s${i}`, name: `S${i}`, base: 'surf', color: c.light }));
+    expect(nextActivityColor(twelve)).toBe(ACTIVITY_PALETTE[0].light);
+    expect(nextActivityColor([...twelve, { ...twelve[0], id: 's12' }])).toBe(ACTIVITY_PALETTE[1].light);
   });
 });
 

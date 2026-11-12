@@ -140,7 +140,7 @@ await wait(300);
 let rows = await legend();
 check('légende : une ligne par activité, Wingfoil en tête à 50 %', rows?.length === 3 && rows[0].endsWith('50 %') && rows[0].includes('40 min')
   && rows.slice(1).every((r) => r.endsWith('25 %')), JSON.stringify(rows));
-check('anneau : trois parts', (await evaluate(`document.querySelectorAll('.profile-donut circle').length`)) === 3);
+check('anneau : trois parts', (await evaluate(`document.querySelectorAll('.profile-donut g circle').length`)) === 3);
 check('centre de l\'anneau : le total', (await text('.profile-donut__center')) === 'Total1 h 20', await text('.profile-donut__center'));
 await evaluate(`document.querySelector('.profile-legend li').dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))`);
 await wait(200);
@@ -236,7 +236,7 @@ check('les deux fiches de planche à voile et de bateau sont rangées', (await r
 await go('/profil');
 await wait(300);
 check('activités cachées : toujours quatre sessions, trois parts, sans « Autres »', (await figures())[0] === '4'
-  && (await evaluate(`document.querySelectorAll('.profile-donut circle').length`)) === 3 && !(await legend())?.some((row) => row.startsWith('Autres')),
+  && (await evaluate(`document.querySelectorAll('.profile-donut g circle').length`)) === 3 && !(await legend())?.some((row) => row.startsWith('Autres')),
   `${(await figures())[0]} ; ${JSON.stringify(await legend())}`);
 // Une session de surf, importée par la page Surf, passée en Pumping dans l'onglet réglages de son analyse.
 await go('/surf', 4000);
@@ -268,7 +268,7 @@ check('la session de surf passe en Pumping', pumping === 'ok' && Boolean(passee)
 await go('/profil');
 await wait(300);
 rows = await legend();
-check('quatre parts dans l\'anneau, Pumping avec sa part, sans « Autres »', (await evaluate(`document.querySelectorAll('.profile-donut circle').length`)) === 4
+check('quatre parts dans l\'anneau, Pumping avec sa part, sans « Autres »', (await evaluate(`document.querySelectorAll('.profile-donut g circle').length`)) === 4
   && rows?.some((row) => row.startsWith('Pumping')) && !rows?.some((row) => row.startsWith('Autres')), JSON.stringify(rows));
 await shoot('profil-quatre');
 // Détail déplié, pour toucher une ligne de la légende.

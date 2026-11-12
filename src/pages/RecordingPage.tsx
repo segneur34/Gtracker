@@ -16,8 +16,9 @@ import SessionEndGear from '../components/SessionEndGear';
 import { IconFlag, IconLock, IconPause, IconPlay, IconRoute } from '../components/icons';
 import { parseGpx } from '../core/gpxParser';
 import {
-  FAMILY_ACCENT, FAMILY_LABEL, FAMILY_OF, FAMILY_SHADES, activitiesOfFamily, activityFamily, type Activity,
+  FAMILY_ACCENT, FAMILY_LABEL, FAMILY_OF, activitiesOfFamily, activityFamily, type Activity,
 } from '../core/activities';
+import { LIVE_TRACK_COLOR } from '../components/mapStyles';
 import {
   sportFamily, sportTreatment, usesMarkCourse, type SportFamily,
 } from '../core/sportProfiles';
@@ -407,7 +408,7 @@ function RecordingMap({ busy, followed, courseMarksOf, liveActivity, family, onR
         guide={guide.remaining} guideDone={guide.done} travel={travel}
         marks={mapMarks} validationRadiusM={markGuide.active ? markGuide.validationRadiusM : undefined}
         notes={busy ? notes : undefined}
-        color={FAMILY_SHADES[liveActivity ? sportFamily(liveActivity.base) : 'voile'][0]}
+        color={LIVE_TRACK_COLOR[liveActivity ? sportFamily(liveActivity.base) : 'voile']}
         family={liveActivity ? activityFamily(liveActivity) : family}
         overlay={busy ? (
           <Button size="s" onClick={onReduce} className="rec-tool-shadow">

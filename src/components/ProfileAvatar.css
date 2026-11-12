@@ -19,6 +19,11 @@
   color: var(--on-accent);
 }
 
+/* Sur la couleur d'une activité : cerne gris, qui fait voir le blanc sur blanc et le noir sur noir. */
+.profile-avatar__disc--activity {
+  box-shadow: var(--ring-line);
+}
+
 .profile-avatar__disc--empty {
   color: var(--on-ink);
   background: var(--home-action);

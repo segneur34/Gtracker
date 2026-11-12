@@ -30,7 +30,7 @@ interface LiveMapProps {
    * prolonge la trace jusqu'à elle ne joint jamais deux segments (`liveTail`). Sans lui, aucun trait.
    */
   positionSegment?: number | null;
-  /** Couleur de la trace, celle de la famille du support. */
+  /** Couleur de la trace et de la flèche, celle de la famille du support (`LIVE_TRACK_COLOR`). */
   color: string;
   /** Famille de l'activité : son fond de carte, plan ou satellite (`BaseTileLayer`). */
   family: SportFamily;

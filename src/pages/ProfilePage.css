@@ -260,11 +260,13 @@ button.profile-legend__row {
   font-size: var(--text-s);
 }
 
+/* Pastille de l'activité, cernée de gris comme `.ui-swatch`. */
 .profile-legend__dot {
   flex-shrink: 0;
   width: 10px;
   height: 10px;
   border-radius: var(--radius-pill);
+  box-shadow: var(--ring-line);
 }
 
 .profile-legend__name {

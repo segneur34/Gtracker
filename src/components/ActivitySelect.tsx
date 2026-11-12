@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, type Activity } from '../core/activities';
 import { SPORT_FAMILIES, type SportFamily } from '../core/sportProfiles';
 import { useVisibility } from '../hooks/useSportSettings';
-import { useThemedShade } from '../hooks/useTheme';
+import { useActivityInk } from '../hooks/useTheme';
 import { ChoiceOption, ChoiceSheet } from './ui/ChoiceSheet';
 import ActivityIcon from './ActivityIcon';
 import { FAMILY_ICON } from './familyIcons';
@@ -47,7 +47,7 @@ interface ActivitySheetProps {
 export function ActivitySheet({ activities, value, families = SPORT_FAMILIES, label, heading, reset, onChoose, onClose }: ActivitySheetProps) {
   const selectedRef = useRef<HTMLButtonElement>(null);
   const { isShown } = useVisibility();
-  const shown = useThemedShade();
+  const shown = useActivityInk();
   const groups = families
     .map((family) => ({ family, items: activitiesOfFamily(activities, family).filter((a) => a.id === value || isShown(a)) }))
     .filter((g) => g.items.length > 0);
@@ -114,6 +114,7 @@ function ActivitySelect({
   activities, value, onChange, extra, families, reset, placeholder, disabled, className = 'ui-field ui-field--s', label,
 }: ActivitySelectProps) {
   const [open, setOpen] = useState(false);
+  const ink = useActivityInk();
   const list = extra && !activities.some((a) => a.id === extra.id) ? [...activities, extra] : activities;
   const current = list.find((a) => a.id === value) ?? null;
 
@@ -132,7 +133,7 @@ function ActivitySelect({
         aria-label={label ? `${label} : ${current?.name ?? placeholder ?? 'à choisir'}` : undefined}
         disabled={disabled}
         onClick={() => setOpen(true)}>
-        {current && <ActivityIcon activity={current} size={18} className="activity-select__icon" style={{ color: current.color }} />}
+        {current && <ActivityIcon activity={current} size={18} className="activity-select__icon" style={{ color: ink(current.color) }} />}
         <span className={current ? 'activity-select__name' : 'activity-select__name activity-select__name--empty'}>
           {current?.name ?? placeholder ?? 'Choisir…'}
         </span>

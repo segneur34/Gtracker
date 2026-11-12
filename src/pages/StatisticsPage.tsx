@@ -180,6 +180,11 @@ const SERIE_STYLE: Record<string, { shape: 'circle' | 'triangle'; dash: string; 
   empannages: { shape: 'circle', dash: '4 3', legend: 'empannage (jibe)' },
   virements: { shape: 'triangle', dash: '1 3', legend: 'virement (tack)' },
 };
+/**
+ * Trait gris fin autour des points et des barres à la couleur d'une activité : deux activités voisines s'y
+ * séparent, le blanc se voit sur blanc et le noir sur noir.
+ */
+const ACTIVITY_MARK_EDGE = { stroke: 'var(--line-strong)', strokeWidth: 1 } as const;
 /** Ligne des heures totales par semaine (donnée « Durée »). */
 const WEEK_LINE_COLOR = '#5f6b76';
 const SINGLE_SERIE_STYLE = { shape: 'circle' as const, dash: '4 3', legend: '' };
@@ -705,7 +710,7 @@ function StatisticsPage() {
                               dot={false} activeDot={{ r: 3 }} isAnimationActive={false} name="Heures par semaine" />
                           )}
                           {chartSeries.flatMap((serie) => serie.byActivity.map(([activityId, rows]) => (
-                            <Scatter key={`${serie.key}-${activityId}`} data={rows} dataKey="y" fill={activityColor(activityId)} isAnimationActive={false}
+                            <Scatter key={`${serie.key}-${activityId}`} data={rows} dataKey="y" fill={activityColor(activityId)} {...ACTIVITY_MARK_EDGE} isAnimationActive={false}
                               shape={serieStyle(serie.key).shape} name={activityName(activityId)}
                               onClick={(_, index) => setPicked(rows[index]?.file ?? null)} style={{ cursor: 'pointer' }} />
                           )))}
@@ -764,7 +769,7 @@ function StatisticsPage() {
                             formatter={(value, name) => [value, activityName(String(name))]}
                             contentStyle={{ fontSize: 'var(--text-xs)' }} />
                           {barActivities.map((id) => (
-                            <Bar key={id} dataKey={id} stackId="sessions" fill={activityColor(id)} isAnimationActive={false} />
+                            <Bar key={id} dataKey={id} stackId="sessions" fill={activityColor(id)} {...ACTIVITY_MARK_EDGE} isAnimationActive={false} />
                           ))}
                         </BarChart>
                       </ResponsiveContainer>
@@ -849,7 +854,7 @@ function StatisticsPage() {
                               );
                             }} />
                           {hrSeries.map(([activityId, rows]) => (
-                            <Scatter key={activityId} data={rows} dataKey="avgBpm" fill={activityColor(activityId)} isAnimationActive={false}
+                            <Scatter key={activityId} data={rows} dataKey="avgBpm" fill={activityColor(activityId)} {...ACTIVITY_MARK_EDGE} isAnimationActive={false}
                               name={activityName(activityId)} onClick={(_, index) => { const r = rows[index]; const s = r ? inPeriod.find((x) => x.file === r.file) : undefined; if (r && s) openSession(r.file, s.family); }}
                               style={{ cursor: 'pointer' }} />
                           ))}

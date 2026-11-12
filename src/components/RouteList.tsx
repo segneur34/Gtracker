@@ -5,7 +5,7 @@ import { formatDistance } from '../core/units';
 import { useGoOnRoute } from '../hooks/useGoOnRoute';
 import type { SavedRoute } from '../hooks/useRouteLibrary';
 import { effectiveDistanceUnit } from '../hooks/useSportSettings';
-import { useThemedShade } from '../hooks/useTheme';
+import { useActivityInk } from '../hooks/useTheme';
 import { routeActivity, routeDistanceM } from '../planning/routeList';
 import ActivityIcon from './ActivityIcon';
 import Button from './ui/Button';
@@ -39,7 +39,7 @@ const routePath = (saved: SavedRoute): string => `/itineraires?itineraire=${enco
 
 function RouteList({ routes, activities, onOpen, currentBase = null, actions, go: withGo = true }: RouteListProps) {
   const distances = useMemo(() => new Map(routes.map((s) => [s.base, routeDistanceM(s.record)])), [routes]);
-  const shown = useThemedShade();
+  const shown = useActivityInk();
   const { go, canGo } = useGoOnRoute();
 
   return (

@@ -92,7 +92,7 @@ function ActivityChart({ period, nowMs }: { period: ChartRange; nowMs: number })
               <span
                 key={s.activityId}
                 className="actchart__stack"
-                style={{ height: `${Math.max(STACK_MIN_H, s.count * unitH)}px`, background: activityById.get(s.activityId)?.color }} />
+                style={{ height: `${Math.max(STACK_MIN_H, s.count * unitH)}px`, background: shown(activityById.get(s.activityId)?.color ?? '') }} />
             ))}
           </button>
         ))}

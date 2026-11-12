@@ -33,7 +33,7 @@ import { useElementSize } from '../hooks/useElementSize';
 import { useNearViewport } from '../hooks/useNearViewport';
 import { useRetainedScroll } from '../hooks/useRetainedScroll';
 import { useRouteLibrary } from '../hooks/useRouteLibrary';
-import { useAppliedTheme, useThemedShade } from '../hooks/useTheme';
+import { useActivityInk, useAppliedTheme } from '../hooks/useTheme';
 import { readSessionGpx, removeSession, updateSessionRecord, useLibraryFields } from '../hooks/useSessionLibrary';
 import { PLANNING_FAMILIES } from '../settings/activitySettings';
 import { activitySpeedRanges, effectiveDistanceUnit, effectiveSpeedUnit, useVisibility } from '../hooks/useSportSettings';
@@ -363,7 +363,7 @@ const SessionRow = memo(function SessionRow({
   onCancelDelete: () => void;
 }) {
   const openSession = useOpenSession();
-  const shown = useThemedShade();
+  const shown = useActivityInk();
   const { record } = session;
   const { startMs } = record.summary;
   const unclassified = record.sport === null;

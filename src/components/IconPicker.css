@@ -1,4 +1,4 @@
-/* Seize icônes au choix pour une activité, sur le modèle des nuances (ShadePicker) ; repliées sous « Changer ». */
+/* Seize icônes au choix pour une activité, sur le modèle du choix de couleur (ShadePicker) ; repliées sous « Changer ». */
 .icon-picker {
   display: inline-flex;
   flex-direction: column;

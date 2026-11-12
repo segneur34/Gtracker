@@ -1,4 +1,5 @@
-/* Nuances d'une famille, au choix pour la couleur d'une activité. */
+/* Les douze couleurs de la palette, au choix pour la couleur d'une activité ; le cerne gris fait voir le blanc sur
+   blanc et le noir sur noir. */
 .shade-picker {
   display: inline-flex;
   flex-wrap: wrap;

@@ -81,7 +81,7 @@ export const LESSONS: readonly Lesson[] = [
     target: '/parametres',
     body: [
       'Dans Réglages › Activités, chaque famille (voile, surf) range ses activités. Seules celles-là sont proposées partout : à l\'enregistrement, dans les analyses, les bibliothèques et l\'accueil.',
-      "Au bas du bloc, créez la vôtre : un nom, une couleur parmi les nuances de sa famille, et le calcul sur lequel elle repose (wingfoil, kite, surf…).",
+      "Au bas du bloc, créez la vôtre : un nom, une couleur parmi les douze de la palette, et le calcul sur lequel elle repose (wingfoil, kite, surf…).",
       "L'œil cache une activité, ou une famille entière : elle disparaît partout, sessions comprises, sans rien effacer.",
       'Chaque activité démarre sur des réglages tout faits ; « Par défaut », dans le menu « … » de sa carte, les lui rend.',
     ],

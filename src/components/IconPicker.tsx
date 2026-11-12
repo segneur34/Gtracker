@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useHelpCollapsed } from './helpContext';
 import { ACTIVITY_ICON_IDS, ACTIVITY_ICON_LABEL, type ActivityIconId } from '../core/activityIcons';
 import { ACTIVITY_ICON } from './familyIcons';
-import { useThemedShade } from '../hooks/useTheme';
+import { useActivityInk } from '../hooks/useTheme';
 import './IconPicker.css';
 import Button from './ui/Button';
 
@@ -21,7 +21,7 @@ function IconPicker({
   label: string;
 }) {
   const collapsed = useHelpCollapsed();
-  const color = useThemedShade()(storedColor);
+  const color = useActivityInk()(storedColor);
   /** Repère du « Tout réduire » au moment de l'ouverture ; un appui suivant le rend périmé, donc replié. */
   const [openedAt, setOpenedAt] = useState<number | null>(null);
   const open = openedAt === collapsed;

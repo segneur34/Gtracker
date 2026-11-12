@@ -1,4 +1,5 @@
 import L from 'leaflet';
+import type { SportFamily } from '../core/sportProfiles';
 
 /**
  * Styles et repères communs aux cartes (données de carte, donc en dur).
@@ -12,6 +13,13 @@ import L from 'leaflet';
  * à chaque nouvel objet (règle 11).
  */
 export const haloStyle = (weight: number) => ({ color: '#ffffff', weight: weight + 3, opacity: 0.85, interactive: false }) as const;
+
+/**
+ * Trait et flèche de la carte du direct, par famille : couleurs de carte,
+ * détachées de la couleur des activités, comme le bleu du tracé de la
+ * planification.
+ */
+export const LIVE_TRACK_COLOR: Record<SportFamily, string> = { voile: '#004aad', surf: '#5b6670' };
 
 /** Couleurs du repère du survol (`HoverMarker`), tour et fond, et de la position sur un graphe qui lui répond. */
 export const HOVER_MARKER_COLOR = { stroke: '#1b1f24', fill: '#ffffff' } as const;

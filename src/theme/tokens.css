@@ -147,7 +147,8 @@
   --on-ink: var(--bg);
 
   /* Accents : l'encre, partout. Les noms de famille restent pour les lecteurs (`FAMILY_ACCENT`), la couleur
-     s'efface ; les couleurs d'activité sont celles de `FAMILY_SHADES` (`core/activities.ts`). */
+     s'efface ; les couleurs d'activité sont celles de la palette `ACTIVITY_PALETTE` (`core/activities.ts`), des
+     données qui ne servent jamais d'accent. */
   --voile: var(--ink);
   --surf: var(--ink);
   /* Fond d'un choix ou d'une ligne allumés (`SessionNotesPanel`, `ManeuversPanel`). */

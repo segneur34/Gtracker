@@ -175,12 +175,14 @@
   border: 1px solid var(--line);
 }
 
-/* Pastille de couleur 10 × 10 devant un nom (légendes, lignes de statistiques). */
+/* Pastille de couleur 10 × 10 devant un nom (légendes, lignes de statistiques) ; son cerne gris fait voir le blanc
+   sur blanc et le noir sur noir. */
 .ui-swatch {
   flex: 0 0 auto;
   width: 10px;
   height: 10px;
   border-radius: var(--radius-s);
+  box-shadow: var(--ring-line);
 }
 
 /* Bandeau photo qui déborde des marges de la page (accueil, bibliothèque) ; hauteur, marges intérieures et ombre du texte restent à la page. */

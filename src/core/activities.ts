@@ -24,7 +24,10 @@ export interface Activity {
   name: string;
   /** Calcul sur lequel l'activité s'appuie. */
   base: SportType;
-  /** Couleur de l'activité dans le graphe de l'accueil (donnée de graphe, en dur). */
+  /**
+   * Couleur de l'activité (pastille, part de graphe), en `#rrggbb` : une de
+   * `ACTIVITY_PALETTE`, dans sa version claire ; affichée par `shadeForTheme`.
+   */
   color: string;
   /**
    * Cachée dans Réglages : ni proposée, ni listée, ses sessions comprises ;
@@ -35,76 +38,164 @@ export interface Activity {
   icon?: ActivityIconId;
 }
 
-/**
- * Nuances de chaque famille : la première est la couleur de la
- * famille (`--voile`, `--surf` de `theme/tokens.css`, qui porte du texte
- * blanc, contraste d'au moins 4,5 sur blanc) ; les suivantes, d'un contraste
- * d'au moins 3, vont aux activités dans cet ordre (`nextActivityColor`).
- * Toutes distinctes, d'une famille à l'autre comprises (`palette.test.ts`).
- * Une famille ne se montre jamais par sa seule couleur.
- */
-export const FAMILY_SHADES: Record<SportFamily, readonly string[]> = {
-  voile: ['#004aad', '#014e86', '#5b87f2', '#4458c2', '#192f94', '#0c92ce'],
-  // Gris un peu teintés, bleutés ou chauds : des gris purs ne se sépareraient que par leur clarté.
-  surf: ['#5b6670', '#8292a6', '#847c6e', '#223246', '#2e2610', '#0a1a2e'],
-};
+/** Une couleur de la palette des activités : celle de la fiche, celle de nuit, son nom dans Réglages. */
+export interface PaletteColor {
+  /** Couleur rangée dans la fiche de l'activité, en minuscules. */
+  light: string;
+  /** Couleur montrée en thème sombre ; seule à l'écran, jamais rangée. */
+  dark: string;
+  name: string;
+  /** Nom montré en thème sombre, quand la couleur y change d'aspect (le blanc devient noir). */
+  darkName?: string;
+}
 
 /**
- * Les mêmes nuances, au même rang, en thème sombre : la première est la couleur de famille sombre de `theme/tokens.css`,
- * éclaircie d'un cran, texte blanc gardé (contraste d'au moins 4,5) ; une
- * nuance lisible sur le fond sombre (contraste d'au moins 3 sur `--surface`)
- * reste celle du clair, les autres sont éclaircies, teinte gardée, et restent
- * distinctes (`palette.test.ts`). La fiche d'une activité garde sa couleur
- * claire : seul l'affichage passe par `shadeForTheme`.
+ * Palette des activités : douze couleurs, communes aux deux familles ; toute
+ * activité peut prendre n'importe laquelle, deux activités la même. Le blanc
+ * en tête, proposé d'abord à une activité créée (`nextActivityColor`). En
+ * thème sombre, le noir devient blanc et le blanc noir, les dix autres ne
+ * changent pas (le bleu océan reste tel quel, même peu contrasté sur le fond
+ * noir). Une couleur d'activité ne remplit jamais une grande surface et ne
+ * porte pas de texte : une pastille cernée de gris à côté du nom, une part de
+ * graphe, un rond. Distinctes entre elles, et du vert et du rouge
+ * d'Enregistrer (`palette.test.ts`).
  */
-export const FAMILY_SHADES_DARK: Record<SportFamily, readonly string[]> = {
-  voile: ['#2f6fd6', '#3c7cb7', '#5b87f2', '#7c98ff', '#86afff', '#0c92ce'],
-  surf: ['#627386', '#8292a6', '#847c6e', '#92a5be', '#746b52', '#a4b9d4'],
-};
+export const ACTIVITY_PALETTE: readonly PaletteColor[] = [
+  { light: '#ffffff', dark: '#000000', name: 'Blanc', darkName: 'Noir' },
+  { light: '#003e52', dark: '#003e52', name: 'Océan' },
+  { light: '#72b0bd', dark: '#72b0bd', name: 'Lagon' },
+  { light: '#1e88e5', dark: '#1e88e5', name: 'Bleu' },
+  { light: '#6236c9', dark: '#6236c9', name: 'Violet' },
+  { light: '#ff7a1a', dark: '#ff7a1a', name: 'Orange' },
+  { light: '#e0218a', dark: '#e0218a', name: 'Magenta' },
+  { light: '#8e1b2e', dark: '#8e1b2e', name: 'Bordeaux' },
+  { light: '#000000', dark: '#ffffff', name: 'Noir', darkName: 'Blanc' },
+  { light: '#e6c229', dark: '#e6c229', name: 'Jaune' },
+  { light: '#646464', dark: '#646464', name: 'Graphite' },
+  { light: '#0e8f4f', dark: '#0e8f4f', name: 'Vert' },
+];
 
-/** Nuance sombre de chaque nuance claire. */
-const DARK_SHADE = new Map(
-  SPORT_FAMILIES.flatMap((family) => FAMILY_SHADES[family].map((shade, i) => [shade, FAMILY_SHADES_DARK[family][i]] as const))
-);
+/** Couleur de la palette par son nom, pour les activités de départ et les calculs. */
+const paletteColor = (name: string): string => ACTIVITY_PALETTE.find((c) => c.name === name)!.light;
 
-/** Couleur d'une activité à l'écran : en sombre, la nuance sombre de même rang ; une couleur hors palette reste telle quelle. */
+/** Couleur de nuit de chaque couleur de la palette. */
+const DARK_SHADE = new Map(ACTIVITY_PALETTE.map((c) => [c.light, c.dark] as const));
+
+/** Couleur d'une activité à l'écran : en sombre, sa version de nuit ; une couleur hors palette reste telle quelle. */
 export const shadeForTheme = (color: string, dark: boolean): string =>
   dark ? DARK_SHADE.get(color.toLowerCase()) ?? color : color;
 
-/** Couleur de chaque calcul, pour ses activités de base : une nuance de sa famille. */
+/** Fond des pages, clair et sombre (`--bg` de `theme/tokens.css`, relu par `palette.test.ts`). */
+export const THEME_BACKGROUND = { light: '#ffffff', dark: '#0e0e0e' } as const;
+
+/** Sous ce contraste avec le fond, un dessin à la couleur d'une activité s'y confond (le blanc sur blanc, le noir sur noir). */
+const LOST_ON_BACKGROUND = 1.5;
+
+/** Les trois canaux d'une couleur `#rrggbb`, linéarisés ; `null` pour une autre écriture. */
+const linearRgb = (color: string): [number, number, number] | null => {
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return null;
+  const channel = (i: number) => {
+    const c = parseInt(color.slice(1 + 2 * i, 3 + 2 * i), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return [channel(0), channel(1), channel(2)];
+};
+
+/** Luminance relative (WCAG) d'une couleur `#rrggbb`, `null` pour une autre écriture. */
+const luminance = (color: string): number | null => {
+  const rgb = linearRgb(color);
+  return rgb && 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+};
+
+/** Contraste WCAG de deux couleurs `#rrggbb` (de 1 à 21) ; `null` si l'une n'en est pas une. */
+export const contrastRatio = (a: string, b: string): number | null => {
+  const [la, lb] = [luminance(a), luminance(b)];
+  if (la === null || lb === null) return null;
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+};
+
+/** Texte lisible sur une couleur d'activité : le noir ou le blanc, celui qui contraste le plus. */
+export const readableInk = (color: string): '#000000' | '#ffffff' =>
+  (contrastRatio(color, '#000000') ?? 0) >= (contrastRatio(color, '#ffffff') ?? 0) ? '#000000' : '#ffffff';
+
+/**
+ * Couleur d'un dessin (icône) à la couleur d'une activité : sa couleur du
+ * thème, ou l'encre quand elle se confond avec le fond de la page.
+ */
+export const drawnShadeForTheme = (color: string, dark: boolean): string => {
+  const shade = shadeForTheme(color, dark);
+  const ratio = contrastRatio(shade, dark ? THEME_BACKGROUND.dark : THEME_BACKGROUND.light);
+  return ratio !== null && ratio < LOST_ON_BACKGROUND ? 'var(--ink)' : shade;
+};
+
+/** Couleur de chaque calcul, pour ses activités de base : celle de son activité principale. */
 export const BASE_COLOR: Record<SportType, string> = {
-  wingfoil: FAMILY_SHADES.voile[0],
-  windsurf: FAMILY_SHADES.voile[5],
-  kite: FAMILY_SHADES.voile[3],
-  bateau: FAMILY_SHADES.voile[1],
-  surf: FAMILY_SHADES.surf[0],
+  wingfoil: paletteColor('Océan'),
+  windsurf: paletteColor('Bleu'),
+  kite: paletteColor('Orange'),
+  bateau: paletteColor('Bordeaux'),
+  surf: paletteColor('Noir'),
 };
 
 /** Activités de la famille Surf ; le foil de « Surf foil » et de « Pumping » est coché d'office (`settings/activityPresets.ts`). */
 export const SURF_ACTIVITY: Activity = { id: 'surf', name: 'Surf', base: 'surf', color: BASE_COLOR.surf };
-export const SURF_FOIL_ACTIVITY: Activity = { id: 'a-surf-foil', name: 'Surf foil', base: 'surf', color: FAMILY_SHADES.surf[1], hidden: true };
+export const SURF_FOIL_ACTIVITY: Activity = { id: 'a-surf-foil', name: 'Surf foil', base: 'surf', color: paletteColor('Graphite'), hidden: true };
 
 /**
  * Au premier lancement : onze activités, quatre visibles (Wingfoil,
  * Kite, Surf, Pumping) et sept cachées, que l'œil de Réglages ré-affiche. La
  * principale de chaque calcul porte l'identifiant du calcul (celui des anciens
  * réglages), les autres le préfixe `a-`. Le foil et le pumping d'office sont dans
- * `settings/activityPresets.ts`. Les couleurs sont les six nuances de la famille,
- * Windfoil et Kitefoil reprenant celle de leur calcul (provisoire, élément 338).
+ * `settings/activityPresets.ts`. Chacune a sa couleur de la palette, toutes
+ * différentes ; le blanc reste libre pour la première activité créée.
  */
 export const DEFAULT_ACTIVITIES: Activity[] = [
   { id: 'wingfoil', name: 'Wingfoil', base: 'wingfoil', color: BASE_COLOR.wingfoil },
-  { id: 'a-parawing', name: 'Parawing', base: 'wingfoil', color: FAMILY_SHADES.voile[2], hidden: true },
+  { id: 'a-parawing', name: 'Parawing', base: 'wingfoil', color: paletteColor('Lagon'), hidden: true },
   { id: 'windsurf', name: 'Windsurf', base: 'windsurf', color: BASE_COLOR.windsurf, hidden: true },
-  { id: 'a-windfoil', name: 'Windfoil', base: 'windsurf', color: BASE_COLOR.windsurf, hidden: true },
+  { id: 'a-windfoil', name: 'Windfoil', base: 'windsurf', color: paletteColor('Violet'), hidden: true },
   { id: 'kite', name: 'Kite', base: 'kite', color: BASE_COLOR.kite },
-  { id: 'a-kitefoil', name: 'Kitefoil', base: 'kite', color: BASE_COLOR.kite, hidden: true },
+  { id: 'a-kitefoil', name: 'Kitefoil', base: 'kite', color: paletteColor('Magenta'), hidden: true },
   { id: 'bateau', name: 'Bateau', base: 'bateau', color: BASE_COLOR.bateau, hidden: true },
   SURF_ACTIVITY,
-  { id: 'a-paddle', name: 'Paddle', base: 'surf', color: FAMILY_SHADES.surf[2], hidden: true },
+  { id: 'a-paddle', name: 'Paddle', base: 'surf', color: paletteColor('Jaune'), hidden: true },
   SURF_FOIL_ACTIVITY,
-  { id: 'a-pumping', name: 'Pumping', base: 'surf', color: FAMILY_SHADES.surf[3] },
+  { id: 'a-pumping', name: 'Pumping', base: 'surf', color: paletteColor('Vert') },
 ];
+
+/**
+ * Nuances de l'ancienne palette, par famille, claires puis sombres : une
+ * activité enregistrée qui en porte encore une est reprise à la lecture
+ * (`withPaletteColors`). Figées : elles ne servent qu'à les reconnaître.
+ */
+const OLD_SHADES: ReadonlySet<string> = new Set([
+  '#004aad', '#014e86', '#5b87f2', '#4458c2', '#192f94', '#0c92ce',
+  '#5b6670', '#8292a6', '#847c6e', '#223246', '#2e2610', '#0a1a2e',
+  '#2f6fd6', '#3c7cb7', '#7c98ff', '#86afff',
+  '#627386', '#92a5be', '#746b52', '#a4b9d4',
+]);
+
+/**
+ * Activités enregistrées avec l'ancienne palette, reprises sans remise à
+ * zéro : une activité de départ (reconnue par son identifiant) qui porte une
+ * ancienne nuance prend sa couleur de départ ; puis, dans l'ordre de la liste,
+ * une activité créée qui en porte une prend la première couleur que personne
+ * ne porte (`nextActivityColor`). Une couleur de la palette ou inconnue ne
+ * bouge pas. Rend la liste elle-même quand rien ne change.
+ */
+export const withPaletteColors = (activities: Activity[]): Activity[] => {
+  const isOld = (a: Activity) => OLD_SHADES.has(a.color.toLowerCase());
+  if (!activities.some(isOld)) return activities;
+  const defaults = new Map(DEFAULT_ACTIVITIES.map((a) => [a.id, a.color]));
+  const list = activities.map((a) => {
+    const start = defaults.get(a.id);
+    return start !== undefined && isOld(a) ? { ...a, color: start } : a;
+  });
+  for (let i = 0; i < list.length; i++) {
+    if (isOld(list[i])) list[i] = { ...list[i], color: nextActivityColor(list) };
+  }
+  return list;
+};
 
 /** Calcul par défaut d'une famille, pour un module sans activité. */
 export const FAMILY_BASE: Record<SportFamily, SportType> = { voile: 'wingfoil', surf: 'surf' };
@@ -143,7 +234,8 @@ export const readActivities = (raw: unknown): Activity[] => {
       ...(isActivityIconId(icon) ? { icon } : {}),
     });
   }
-  return list;
+  // Rien n'est réécrit ici : la nouvelle forme s'enregistre à la prochaine écriture des activités.
+  return withPaletteColors(list);
 };
 
 /** Activité de base d'un calcul : son libellé, sa couleur, son identifiant. */
@@ -258,14 +350,13 @@ export const newActivityId = (name: string, existing: Activity[]): string => {
 };
 
 /**
- * Couleur d'une nouvelle activité de la famille : la première de ses nuances
- * qu'aucune activité ne porte encore ; les six prises, elles reviennent dans
- * l'ordre.
+ * Couleur d'une nouvelle activité, de voile ou de surf : la première de la
+ * palette qu'aucune activité ne porte encore, le blanc d'abord ; les douze
+ * prises, elles reviennent dans l'ordre.
  */
-export const nextActivityColor = (activities: Activity[], family: SportFamily): string => {
-  const shades = FAMILY_SHADES[family];
+export const nextActivityColor = (activities: Activity[]): string => {
   const used = new Set(activities.map((a) => a.color.toLowerCase()));
-  return shades.find((c) => !used.has(c)) ?? shades[activitiesOfFamily(activities, family).length % shades.length];
+  return (ACTIVITY_PALETTE.find((c) => !used.has(c.light)) ?? ACTIVITY_PALETTE[activities.length % ACTIVITY_PALETTE.length]).light;
 };
 
 export interface ActivityCount {
