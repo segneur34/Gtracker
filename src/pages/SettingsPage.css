@@ -222,7 +222,7 @@
   color: var(--muted);
   font-size: var(--text-xs);
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: var(--title-case);
   letter-spacing: var(--title-spacing);
 }
 
@@ -313,7 +313,7 @@
   font-weight: var(--action-weight);
   letter-spacing: var(--title-spacing);
   line-height: 1.1;
-  text-transform: uppercase;
+  text-transform: var(--title-case);
 }
 
 .about__version {

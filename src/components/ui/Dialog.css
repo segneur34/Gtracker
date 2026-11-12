@@ -10,6 +10,8 @@
   overflow-y: auto;
   padding: var(--space-4);
   background: var(--surface);
+  /* Fenêtre flottante : un trait fin et une ombre légère (les cadres posés dans la page n'en ont pas). */
+  border: 1px solid var(--line);
   border-radius: var(--radius-l);
   box-shadow: 0 10px 40px color-mix(in srgb, var(--shadow-color) 25%, transparent);
   color: var(--ink);

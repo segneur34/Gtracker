@@ -35,7 +35,7 @@
   gap: var(--space-3);
   min-height: 44px;
   padding: 0 var(--space-5);
-  background: var(--recording);
+  background: var(--stop);
   color: var(--on-accent);
   font-size: var(--text-m);
   font-weight: 600;
@@ -84,7 +84,8 @@
   margin-left: auto;
 }
 
-/* --- Barre d'onglets, téléphone --- */
+/* --- Barre d'onglets, téléphone : noire dans tous les thèmes, case allumée en vert vif ; la marge du bas d'Android
+   (`--inset-bottom`) est dans sa hauteur, donc peinte avec elle. --- */
 
 .shell-tabbar {
   position: sticky;
@@ -95,8 +96,7 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
   height: calc(var(--tabbar-h) + var(--inset-bottom));
   padding-bottom: var(--inset-bottom);
-  background: var(--surface);
-  border-top: 1px solid var(--line);
+  background: var(--tabbar-bg);
 }
 
 /* Libellé qui rétrécit avec l'écran (« Statistiques » tient dans sa case dès 340 px), coupé par « … » en dernier
@@ -108,9 +108,9 @@
   justify-content: center;
   gap: 3px;
   min-width: 0;
-  color: var(--muted);
+  color: var(--tabbar-ink);
   font-size: clamp(10px, 3.1vw, var(--text-xs));
-  font-weight: 500;
+  font-weight: 400;
   text-decoration: none;
 }
 
@@ -133,7 +133,7 @@
 }
 
 .shell-tab.active {
-  color: var(--tab-color, var(--ink));
+  color: var(--tabbar-on);
   font-weight: 700;
 }
 
@@ -152,8 +152,9 @@
   margin-top: -22px;
   border-radius: 50%;
   background: var(--record);
-  color: var(--on-accent);
-  box-shadow: 0 0 0 5px var(--bg);
+  color: var(--on-record);
+  /* Anneau de la couleur de la barre, qui détache le disque qui la déborde. */
+  box-shadow: 0 0 0 5px var(--tabbar-bg);
 }
 
 .shell-record .ui-record-dot {
@@ -161,12 +162,15 @@
   height: 20px;
 }
 
+/* Rouge pendant l'enregistrement, pictogramme blanc ; vert vif en pause, pictogramme noir. */
 .shell-record--busy {
   background: var(--recording);
+  color: var(--on-accent);
 }
 
 .shell-record--paused {
-  background: var(--muted);
+  background: var(--record);
+  color: var(--on-record);
 }
 
 /* Anneau qui se remplit pendant l'appui long (`--press-ms`, posé par AppShell.tsx).
@@ -194,7 +198,7 @@
 
 .shell-record__ring circle {
   fill: none;
-  stroke: var(--ink);
+  stroke: var(--tabbar-ink);
   stroke-width: 4;
   stroke-dasharray: 100;
   stroke-dashoffset: 100;
@@ -264,8 +268,6 @@
     padding: 0 0 var(--inset-bottom) var(--inset-left);
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: repeat(5, minmax(0, 1fr));
-    border-top: none;
-    border-right: 1px solid var(--line);
   }
 
   .shell-tab span {
@@ -302,13 +304,15 @@
 .shell-brand__name {
   font-family: var(--font);
   font-size: var(--text-l);
-  font-weight: var(--action-weight);
+  font-weight: var(--title-weight);
   letter-spacing: var(--title-spacing);
-  text-transform: uppercase;
+  text-transform: var(--title-case);
 }
 
+/* Liens en gris ; l'allumé en encre, gras, souligné d'un trait posé sur le bas de la barre. */
 .shell-toplinks {
   display: flex;
+  align-self: stretch;
   gap: var(--space-1);
   flex: 1;
 }
@@ -318,23 +322,25 @@
   align-items: center;
   min-height: 36px;
   padding: 0 var(--space-3);
-  border-radius: var(--radius-pill);
+  border-top: 2px solid transparent;
+  border-bottom: 2px solid transparent;
   color: var(--muted);
   font-size: var(--text-m);
-  font-weight: 600;
+  font-weight: 400;
   text-decoration: none;
   white-space: nowrap;
 }
 
 @media (hover: hover) {
   .shell-toplink:hover {
-    background: var(--surface-hover);
+    color: var(--ink);
   }
 }
 
 .shell-toplink.active {
-  color: var(--tab-color, var(--ink));
-  background: var(--surface-sunken);
+  color: var(--ink);
+  font-weight: 700;
+  border-bottom-color: var(--ink);
 }
 
 /* Itinéraires et Enregistrer, côte à côte à droite de la barre du haut. */
@@ -374,12 +380,12 @@
   gap: var(--space-2);
   min-height: 38px;
   padding: 0 var(--space-4);
-  border: 1px solid var(--line-strong);
+  border: var(--stroke) solid var(--ink);
   border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--ink-2);
+  background: transparent;
+  color: var(--ink);
   font-size: var(--text-m);
-  font-weight: 600;
+  font-weight: 400;
   text-decoration: none;
 }
 
@@ -390,8 +396,8 @@
 }
 
 .shell-topplan.active {
-  background: var(--surface-sunken);
-  color: var(--ink);
+  background: var(--ink);
+  color: var(--on-ink);
 }
 
 .shell-toprecord {
@@ -402,9 +408,9 @@
   padding: 0 var(--space-4);
   border-radius: var(--radius-pill);
   background: var(--record);
-  color: var(--on-accent);
+  color: var(--on-record);
   font-size: var(--text-m);
-  font-weight: 700;
+  font-weight: var(--action-strong);
   text-decoration: none;
 }
 
@@ -413,6 +419,8 @@
   height: 12px;
 }
 
+/* Rouge sombre pendant l'enregistrement : il porte la durée, en blanc. */
 .shell-toprecord--busy {
-  background: var(--recording);
+  background: var(--stop);
+  color: var(--on-accent);
 }

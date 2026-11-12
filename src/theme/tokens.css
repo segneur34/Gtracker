@@ -3,17 +3,21 @@
  * variables. C'est le seul fichier à modifier pour changer de DA : pages et
  * composants ne lisent que ces variables.
  *
- * Police Montserrat, logo GONG, fond gris bleuté, cartes blanches, vert
- * Enregistrer. Deux couleurs de famille : bleu roi voile, gris surf. Chacune
- * est la première nuance de sa famille (`FAMILY_SHADES` de `core/activities.ts`,
- * égalité vérifiée par `palette.test.ts`) et porte du texte blanc : contraste
- * d'au moins 4,5 sur blanc.
+ * D'après le site de GONG : police Inter, fond blanc, encre noire, cadres à
+ * bords francs dessinés d'un trait fin, sans ombre ni rayon ; boutons, pastilles
+ * et bouton glissant en pilule, pleins (fond d'encre, texte `--on-ink`) ou
+ * creux (trait d'encre). Une seule touche de couleur : le vert vif
+ * d'Enregistrer, toujours en aplat sous du noir (`--on-record`), jamais en
+ * texte ; rouge pendant l'enregistrement. Plus de couleur de famille : les
+ * variables d'accent (`--voile`, `--surf`, `--neutral-accent`, `--home-action`)
+ * valent l'encre, et les fonds de page sont unis. Contrastes vérifiés par
+ * `tokens.test.ts`.
  */
 
 :root {
   /* Typographie */
   /* Une variable par rôle ; les polices se chargent dans `fonts.css`. */
-  --font: 'Montserrat', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-title: var(--font);
   /* Noms des graphes dans les analyses (`analysisMobile.css`, `--chart-name-size`). */
   --text-2xs: 10px;
@@ -25,20 +29,27 @@
   --text-title: 28px;
   /* Grands chiffres lus d'un coup d'œil (vitesses de l'enregistrement, carte réduite). */
   --text-display: 40px;
-  /* Rôles du texte, sur le modèle de l'accueil (`Home.css`) : titres en capitales espacées et légères, boutons
-     d'action en capitales grasses ; le logo est celui de GONG (`GongLogo`), suivi du nom en police de titre. */
-  --title-weight: 500;
-  --title-spacing: 0.04em;
-  --action-weight: 700;
+  /* Rôles du texte : titres gras, dans leur casse, serrés ; boutons d'action en capitales, graisse normale, sauf le
+     bouton vert « Enregistrer » (`--action-strong`) ; le logo est celui de GONG (`GongLogo`), suivi du nom en police
+     de titre. */
+  --title-weight: 700;
+  --title-spacing: -0.01em;
+  --title-case: none;
+  --action-weight: 400;
   --action-spacing: 0.02em;
+  --action-case: uppercase;
+  --action-strong: 700;
+  /* Trait des boutons, pastilles et bouton glissant. */
+  --stroke: 0.8px;
   /* Hauteur du logo GONG : accueil et bloc « À propos » (--logo-height), barre du haut (--brand-height). */
   --logo-height: 28px;
   --brand-height: 20px;
 
-  /* Rayons */
-  --radius-s: 8px;
-  --radius-m: 12px;
-  --radius-l: 16px;
+  /* Rayons : bords francs pour les cadres et cartes (`--radius-m`, `--radius-l`), presque francs pour les champs
+     de saisie et petites pièces (`--radius-s`), pilule pour les boutons et pastilles. */
+  --radius-s: 2px;
+  --radius-m: 0;
+  --radius-l: 0;
   --radius-pill: 999px;
 
   /* Espacements */
@@ -115,39 +126,42 @@
 .leaflet-container {
   color-scheme: light;
 
-  /* Fonds et surfaces */
-  --bg: #eaeff3;
+  /* Fonds et surfaces : les cadres ont le fond de la page, un trait seul les dessine. */
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-sunken: #dfe5ea;
-  --surface-hover: #e6ebef;
+  --surface-sunken: #fbfbfb;
+  --surface-hover: #f5f5f5;
 
   /* Traits */
-  --line: #dbe1e6;
-  --line-soft: #e6ebef;
-  --line-strong: #cbd3da;
+  --line: #efefef;
+  --line-soft: #f5f5f5;
+  --line-strong: #cfcfcf;
 
-  /* Encres */
-  --ink: #1b1f24;
-  --ink-2: #3d444d;
-  --muted: #5b6470;
-  --faint: #8a9099;
+  /* Encres. `--on-accent` : texte blanc sur le rouge, une photo ou une couleur de donnée ; `--on-ink` : texte posé
+     sur l'encre (bouton plein, onglet ou pastille allumés). */
+  --ink: #000000;
+  --ink-2: #333333;
+  --muted: #6b6b6b;
+  --faint: #959595;
   --on-accent: #ffffff;
+  --on-ink: var(--bg);
 
-  /* Familles et actions */
-  --voile: #004aad;
-  --voile-soft: #e5eefb;
-  --surf: #5b6670;
-  --surf-soft: #eceff2;
-  /* Boutons de planification de l'accueil (ardoise de la maquette). */
-  --home-action: #374c75;
-  /* Liseré du bouton « Créer un parcours » de l'accueil. */
-  --home-action-edge: #d11a1a;
-  /* Fond d'un onglet allumé hors famille (Statistiques sans famille, Itinéraires), sous du texte blanc. */
-  --neutral-accent: #3d444d;
-  /* Courbes de niveau du fond des pages (accueil, Profil, Statistiques, Réglages). */
-  --contour: #b6c4d1;
-  /* Encre du fond surf : couleur de l'image fournie. */
-  --backdrop-surf: #1ba1e2;
+  /* Accents : l'encre, partout. Les noms de famille restent pour les lecteurs (`FAMILY_ACCENT`), la couleur
+     s'efface ; les couleurs d'activité sont celles de `FAMILY_SHADES` (`core/activities.ts`). */
+  --voile: var(--ink);
+  --surf: var(--ink);
+  /* Fond d'un choix ou d'une ligne allumés (`SessionNotesPanel`, `ManeuversPanel`). */
+  --voile-soft: var(--surface-sunken);
+  --surf-soft: var(--surface-sunken);
+  /* Boutons de planification de l'accueil, et liseré de « Créer un parcours ». */
+  --home-action: var(--ink);
+  --home-action-edge: var(--ink);
+  /* Onglet allumé hors famille (Statistiques sans famille, Itinéraires). */
+  --neutral-accent: var(--ink);
+  /* Fonds des pages, unis : courbes de niveau et motifs des familles effacés. */
+  --contour: transparent;
+  --backdrop-voile: transparent;
+  --backdrop-surf: transparent;
   /* Racine du Profil (`components/drawRoot.ts`, lues par le canevas) : racine vivante, radicelles
      de la période, radicelle flétrie, partie sèche, pousse, sol, graine, fleur. */
   --root-live: #4c8a43;
@@ -165,8 +179,17 @@
   /* Papillon de la fleur, monarque orange, ses deux dernières étapes : aplat et bord épais. */
   --root-butterfly: #ec7a1c;
   --root-butterfly-edge: #3a2415;
-  --record: #2e7d32;
-  --recording: #c62828;
+  /* Enregistrer : vert vif au repos (sous du noir, `--on-record`), rouge pendant l'enregistrement (sans texte) ;
+     `--stop` porte du texte blanc (bandeau d'enregistrement, « Arrêter », bouton de danger). Les mêmes dans tous
+     les thèmes. */
+  --record: #aaff00;
+  --on-record: #000000;
+  --recording: #e53935;
+  --stop: #c62828;
+  /* Barre du bas et rail du téléphone tourné : noirs dans tous les thèmes, case allumée en vert vif. */
+  --tabbar-bg: #000000;
+  --tabbar-ink: #ffffff;
+  --tabbar-on: var(--record);
 
   /* États */
   --success: #2e7d32;
@@ -203,35 +226,26 @@
 }
 
 /*
- * Sombre. Familles éclaircies d'un cran, texte blanc
- * gardé dessus (contraste d'au moins 4,5) ; chacune est la première nuance sombre de sa famille
- * (`FAMILY_SHADES_DARK`, `palette.test.ts`).
+ * Sombre : fond presque noir, encre blanche ; les accents, qui valent l'encre,
+ * deviennent blancs sous du texte sombre (`--on-ink`).
  */
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: #12161b;
-  --surface: #1c2229;
-  --surface-sunken: #161b21;
-  --surface-hover: #242b33;
+  --bg: #0e0e0e;
+  --surface: #0e0e0e;
+  --surface-sunken: #1a1a1a;
+  --surface-hover: #222222;
 
-  --line: #2c343d;
-  --line-soft: #252c34;
-  --line-strong: #3a434d;
+  --line: #2a2a2a;
+  --line-soft: #1f1f1f;
+  --line-strong: #3a3a3a;
 
-  --ink: #e8ecf0;
-  --ink-2: #c3cad2;
-  --muted: #98a2ad;
-  --faint: #6f7883;
+  --ink: #ffffff;
+  --ink-2: #d4d4d4;
+  --muted: #a8a8a8;
+  --faint: #7d7d7d;
 
-  --voile: #2f6fd6;
-  --voile-soft: #1a2a44;
-  --surf: #627386;
-  --surf-soft: #262c33;
-  --home-action: #4b64a0;
-  --home-action-edge: #e04848;
-  --neutral-accent: #4a5562;
-  --contour: #263039;
   /* Sol et parties sèches plus foncés, fleur gardée. */
   --root-live: #5a9a50;
   --root-withered: #7d6c55;
@@ -242,8 +256,6 @@
   /* Papillon un cran plus clair, bord plus sombre ; le thème économe en hérite. */
   --root-butterfly: #ff9a45;
   --root-butterfly-edge: #21140b;
-  --record: #3a9a40;
-  --recording: #e04848;
 
   --success: #5cb860;
   --success-soft: #16301a;
@@ -256,7 +268,7 @@
 
   --shadow-color: #000000;
 
-  --chart-grid: #2c343d;
+  --chart-grid: #2a2a2a;
   --chart-axis: #a3acb6;
   --chart-tick: #98a2ad;
   --chart-mark: #b0bec5;
@@ -264,23 +276,19 @@
 }
 
 /*
- * Économe : noir pur et moins d'effets (ni ombres, ni courbes de niveau, ni
+ * Économe : noir pur et moins d'effets (ni ombres, ni
  * photos de l'accueil : `ui.css`, `Home.css`). Toujours avec le sombre, qu'il
  * impose (`theme/theme.ts`) ; n'agit que sur l'aspect.
  */
 :root[data-eco] {
   --bg: #000000;
-  --surface: #0d0f12;
-  --surface-sunken: #07080a;
-  --surface-hover: #15181c;
+  --surface: #000000;
+  --surface-sunken: #0e0e0e;
+  --surface-hover: #141414;
 
-  --line: #22262b;
-  --line-soft: #1a1d21;
-  --line-strong: #2f353b;
-
-  --voile-soft: #121c2e;
-  --surf-soft: #16191d;
-  --contour: transparent;
+  --line: #222222;
+  --line-soft: #1a1a1a;
+  --line-strong: #2f2f2f;
 
   --shadow-color: transparent;
 

@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useRef, type ComponentType } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { FAMILY_ACCENT, FAMILY_LABEL } from '../core/activities';
+import { FAMILY_LABEL } from '../core/activities';
 import { parentPage } from '../core/parentPage';
 import type { SportFamily } from '../core/sportProfiles';
 import { formatClock } from '../core/units';
@@ -24,8 +24,9 @@ import IncomingFileNotice from './IncomingFileNotice';
  * Sur téléphone (moins de 768 px de large, ou tourné : `NARROW_QUERY`), une barre d'onglets en bas, en
  * cinq cases fixes, à la verticale à gauche sur le téléphone tourné, le bouton rond au milieu : Accueil · Profil ·
  * Enregistrer · Statistiques · Réglages. Les sports et les itinéraires s'ouvrent
- * depuis l'accueil. Le bouton rond est vert au repos, rouge pendant un
- * enregistrement.
+ * depuis l'accueil. La barre du bas est noire, sa case allumée en vert vif ; le
+ * bouton rond est vert vif au repos et en pause, rouge pendant un
+ * enregistrement. En haut, le lien allumé est à l'encre, souligné.
  * Sur ordinateur, toutes les destinations dans une barre en haut (les
  * statistiques et le profil avant Réglages), et « Itinéraires » à côté du
  * bouton Enregistrer. Une famille cachée dans Réglages n'y est pas ; son
@@ -43,22 +44,20 @@ interface Destination {
   to: string;
   label: string;
   Icon: ComponentType<{ size?: number }>;
-  /** Couleur de l'onglet actif. */
-  accent: string;
 }
 
-const HOME: Destination = { to: '/', label: 'Accueil', Icon: IconHome, accent: 'var(--ink)' };
+const HOME: Destination = { to: '/', label: 'Accueil', Icon: IconHome };
 const familyDestination = (family: SportFamily, to: string): Destination =>
-  ({ to, label: FAMILY_LABEL[family], Icon: FAMILY_ICON[family], accent: FAMILY_ACCENT[family] });
+  ({ to, label: FAMILY_LABEL[family], Icon: FAMILY_ICON[family] });
 const VOILE = familyDestination('voile', '/voile');
 const SURF = familyDestination('surf', '/surf');
-const SETTINGS: Destination = { to: '/parametres', label: 'Réglages', Icon: IconSettings, accent: 'var(--ink)' };
+const SETTINGS: Destination = { to: '/parametres', label: 'Réglages', Icon: IconSettings };
 /** Onglets des familles. */
 const FAMILY_TABS: Record<SportFamily, Destination> = { voile: VOILE, surf: SURF };
 const RECORD_PATH = '/enregistrer';
 const PLAN_PATH = '/itineraires';
-const STATISTIQUES: Destination = { to: '/statistiques', label: 'Statistiques', Icon: IconChart, accent: 'var(--ink-2)' };
-const PROFIL: Destination = { to: '/profil', label: 'Profil', Icon: IconUser, accent: 'var(--ink-2)' };
+const STATISTIQUES: Destination = { to: '/statistiques', label: 'Statistiques', Icon: IconChart };
+const PROFIL: Destination = { to: '/profil', label: 'Profil', Icon: IconUser };
 
 /**
  * Durée de l'enregistrement, seule abonnée à l'horloge : chaque position la
@@ -119,8 +118,7 @@ const tabLink = (d: Destination) => (
     key={d.to}
     to={d.to}
     end={d.to === '/'}
-    className="shell-tab"
-    style={{ '--tab-color': d.accent } as React.CSSProperties}>
+    className="shell-tab">
     <d.Icon size={24} />
     <span>{d.label}</span>
   </NavLink>
@@ -131,8 +129,7 @@ const topLink = (d: Destination) => (
     key={d.to}
     to={d.to}
     end={d.to === '/'}
-    className="shell-toplink"
-    style={{ '--tab-color': d.accent } as React.CSSProperties}>
+    className="shell-toplink">
     {d.label}
   </NavLink>
 );
@@ -239,7 +236,8 @@ function AppShell() {
 
       {pressingMs !== null && (
         // Le doigt cache l'anneau du bouton : le même remplissage, en grand, au milieu de l'écran.
-        <HoldDial pressMs={pressingMs} color={paused ? 'var(--record)' : 'var(--recording)'}
+        // Reprise : l'arc à l'encre, le vert vif ne se verrait pas sur la piste claire ; pause : le rouge de l'enregistrement.
+        <HoldDial pressMs={pressingMs} color={paused ? 'var(--ink)' : 'var(--recording)'}
           icon={paused ? <IconPlay size={56} strokeWidth={2.5} /> : <IconPause size={56} strokeWidth={3} />}
           title={paused ? 'Reprise' : 'Pause'} hint="Maintenez le bouton" />
       )}

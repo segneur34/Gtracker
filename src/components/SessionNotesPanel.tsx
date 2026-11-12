@@ -62,8 +62,8 @@ export default function SessionNotesPanel({ notes, setNotes, family, gearFields,
   const accent = `var(--${family})`;
   const accentSoft = `var(--${family}-soft)`;
   const choiceStyle = (chosen: boolean) => ({
-    padding: '5px 10px', cursor: 'pointer', border: '1px solid var(--line-strong)', borderRadius: '4px', fontSize: 'var(--text-xs)',
-    backgroundColor: chosen ? accent : 'var(--surface)', color: chosen ? 'var(--on-accent)' : 'var(--ink)',
+    padding: '5px 10px', cursor: 'pointer', border: 'var(--stroke) solid var(--ink)', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-xs)',
+    backgroundColor: chosen ? accent : 'transparent', color: chosen ? 'var(--on-ink)' : 'var(--ink)',
   });
   return (
     <>
@@ -145,7 +145,7 @@ export default function SessionNotesPanel({ notes, setNotes, family, gearFields,
             <button key={r.value} onClick={() => setNotes({ rating: notes.rating === r.value ? null : r.value })}
               title={r.label} aria-label={r.label}
               aria-pressed={notes.rating === r.value}
-              style={{ display: 'inline-flex', lineHeight: 1, padding: '6px', cursor: 'pointer', border: notes.rating === r.value ? `2px solid ${accent}` : '1px solid var(--line-strong)', borderRadius: '8px', backgroundColor: notes.rating === r.value ? accentSoft : 'var(--surface)', color: notes.rating === r.value ? accent : 'var(--muted)' }}>
+              style={{ display: 'inline-flex', lineHeight: 1, padding: '6px', cursor: 'pointer', border: notes.rating === r.value ? `2px solid ${accent}` : '1px solid var(--line-strong)', borderRadius: 'var(--radius-pill)', backgroundColor: notes.rating === r.value ? accentSoft : 'var(--surface)', color: notes.rating === r.value ? accent : 'var(--muted)' }}>
               <IconFace mood={r.face} size={28} />
             </button>
           ))}

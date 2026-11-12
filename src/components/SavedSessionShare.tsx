@@ -86,7 +86,7 @@ function SavedSessionShare({ gpx, activity, fileName, libraryFile }: SavedSessio
           Partager l'image
         </Button>
       </MoreMenu>
-      {error && <span role="status" style={{ fontSize: 'var(--text-s)', color: 'var(--recording)' }}>{error}</span>}
+      {error && <span role="status" style={{ fontSize: 'var(--text-s)', color: 'var(--danger)' }}>{error}</span>}
       {prepared && <ShareDialog {...prepared.props} segments={prepared.segments} onClose={() => setPrepared(null)} />}
     </>
   );

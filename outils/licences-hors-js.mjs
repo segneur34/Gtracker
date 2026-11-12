@@ -137,7 +137,7 @@ const principal = () => {
   const composants = composantsNatifs(readFileSync(fichier, 'utf8'))
   if (composants.length === 0) throw new Error(`Aucun composant dans ${fichier} : est-ce bien la sortie de gradlew ?`)
   const lignes = [
-    lignePaquet('@fontsource/montserrat'),
+    lignePaquet('@fontsource/inter'),
     lignePaquet('@capacitor/android'),
     lignePaquet('@capgo/background-geolocation', { notice: 'Utilisé sans modification. Sources :', url: GREFFON_GPS }),
     LOGO_GONG,

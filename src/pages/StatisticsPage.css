@@ -219,7 +219,7 @@
 .stats-zone-bar {
   display: flex;
   height: 14px;
-  border-radius: 4px;
+  border-radius: var(--radius-s);
   overflow: hidden;
   margin: 6px 0;
 }

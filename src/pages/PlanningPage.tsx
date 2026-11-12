@@ -98,8 +98,6 @@ const AUTO_LOCATE_MIN_ZOOM = 14;
 const readPrefs = (): PlanningPrefs => jsonStore.read<PlanningPrefs>(PREFS_KEY) ?? {};
 const writePrefs = (patch: PlanningPrefs): void => jsonStore.write(PREFS_KEY, { ...readPrefs(), ...patch });
 
-/** Couleur de repli si celle de l'activité n'est pas un code couleur. */
-const FALLBACK_COLOR = '#6a1b9a';
 /**
  * Tracé et points intermédiaires toujours en bleu, celui de la voile, quelle
  * que soit l'activité : une activité verte ou rouge se confondrait avec le
@@ -145,8 +143,6 @@ const START_COLOR = '#2e7d32';
 const END_COLOR = '#b71c1c';
 /** Sur une boucle, un seul repère au départ, qui est aussi l'arrivée : moitié vert, moitié rouge. */
 const LOOP_FILL = `linear-gradient(90deg, ${START_COLOR} 50%, ${END_COLOR} 50%)`;
-
-const safeColor = (color: string): string => (/^#[0-9a-f]{3,8}$/i.test(color) ? color : FALLBACK_COLOR);
 
 /**
  * Repères des points, lettrés, gardés d'un rendu à l'autre : Leaflet ne les
@@ -242,7 +238,6 @@ function PlanningPage() {
   };
   const activity = findActivity(activities, activityId) ?? activities.find(plannable) ?? null;
   const distanceUnit = activity ? effectiveDistanceUnit(activity) : 'km';
-  const color = safeColor(activity?.color ?? FALLBACK_COLOR);
   /** Famille de l'activité planifiée : son fond de carte, celui de ses analyses. */
   // Sans activité, le fond de la voile.
   const mapFamily = activity ? activityFamily(activity) : 'voile';
@@ -712,7 +707,7 @@ function PlanningPage() {
         </div>
 
         <div className="plan-panel">
-          <SectionTabs sections={sections} open={open} onToggle={toggle} accent={color} />
+          <SectionTabs sections={sections} open={open} onToggle={toggle} />
           <PlanBlock id="planning.parcours" label="Parcours" open={open.parcours} onToggle={() => toggle('parcours')}
             helpKey={guide && activity ? 'plan:parcours' : undefined}>
             {guide && activity && (

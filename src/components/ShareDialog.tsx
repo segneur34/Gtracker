@@ -87,7 +87,7 @@ function ShareDialog({ family, file, activityId, title, subtitle, fileName, segm
   useEffect(() => {
     let cancelled = false;
     // Couleur de la famille dans la palette claire : l'image reste claire en thème sombre.
-    const accent = lightToken(`--${family}`, '#1976d2');
+    const accent = lightToken(`--${family}`, '#000000');
     const [shown, map] = JSON.parse(drawKey) as [ShareStat[], boolean];
     drawShareImage({ title, subtitle, accent, segments, stats: shown, withMap: map, base, author }, tileImage)
       .then((blob) => {

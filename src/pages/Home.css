@@ -1,4 +1,4 @@
-/* Accueil : en-tête photo, cartes des familles à photo fondue, boutons de planification, fond de courbes de niveau. */
+/* Accueil : en-tête photo, cartes des familles à photo fondue, boutons de planification. */
 
 /* Colonne plus étroite que les autres pages sur ordinateur (la maquette est au format téléphone). */
 .ui-page.home {
@@ -34,10 +34,10 @@
 .home-logo__name {
   font-family: var(--font);
   font-size: var(--text-l);
-  font-weight: var(--action-weight);
+  font-weight: var(--title-weight);
   letter-spacing: var(--title-spacing);
   line-height: 1.1;
-  text-transform: uppercase;
+  text-transform: var(--title-case);
 }
 
 .home-version {
@@ -63,7 +63,7 @@
   gap: var(--space-3);
 }
 
-/* Carte de famille : icône, nom en capitales, activités ; la photo à droite, fondue dans la couleur. */
+/* Carte de famille : icône, nom, activités ; la photo à droite, fondue dans le fond d'encre. */
 .home-family {
   position: relative;
   display: flex;
@@ -71,9 +71,9 @@
   gap: var(--space-4);
   min-height: 56px;
   padding: var(--space-1) 34% var(--space-1) var(--space-4);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-pill);
   background: var(--family-color);
-  color: var(--on-accent);
+  color: var(--on-ink);
   text-decoration: none;
   overflow: hidden;
 }
@@ -95,7 +95,7 @@
   font-size: clamp(var(--text-l), 5.6vw, var(--text-xl));
   font-weight: var(--title-weight);
   letter-spacing: var(--title-spacing);
-  text-transform: uppercase;
+  text-transform: var(--title-case);
 }
 
 .home-family__activities {
@@ -133,13 +133,13 @@
   box-sizing: border-box;
   min-height: 42px;
   padding: 0 var(--space-3);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-pill);
   background: var(--home-action);
-  color: var(--on-accent);
+  color: var(--on-ink);
   font-size: var(--text-s);
   font-weight: var(--action-weight);
   letter-spacing: var(--action-spacing);
-  text-transform: uppercase;
+  text-transform: var(--action-case);
   text-decoration: none;
 }
 

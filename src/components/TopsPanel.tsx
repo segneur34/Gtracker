@@ -58,7 +58,7 @@ export default function TopsPanel({ targets, tops, unit, selected, onSelect, acc
                       <td key={idx} style={{ padding: '0.4em 0.6em', textAlign: 'center', fontWeight: idx === 0 ? 'bold' : 'normal' }}>{values[idx]?.val ?? '-'}</td>
                     ))}
                     <td className="ui-cell ui-cell--center">
-                      <MapToggle shown={shown} disabled={!reached} color={accent} onClick={() => onSelect(shown ? null : target.key)} />
+                      <MapToggle shown={shown} disabled={!reached} color={accent} ink="var(--on-ink)" onClick={() => onSelect(shown ? null : target.key)} />
                     </td>
                   </tr>
                 );

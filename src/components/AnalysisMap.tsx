@@ -140,7 +140,7 @@ function AnalysisMap({
             if ((e.target as Element).closest('.leaflet-control, .an-map-tool')) return;
             if (narrow) setExpanded(true);
           }}
-          style={{ position: 'relative', flex: '1 1 auto', minHeight: 0, overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--line-strong)' }}>
+          style={{ position: 'relative', flex: '1 1 auto', minHeight: 0, overflow: 'hidden', borderRadius: 'var(--radius-m)', border: '1px solid var(--line-strong)' }}>
           <MapContainer key={sessionKey ?? 'empty'} {...initialView(bounds)} className="ui-fill">
             <MapAutoResize />
             {focusControl}

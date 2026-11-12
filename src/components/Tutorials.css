@@ -9,7 +9,7 @@
   height: 32px;
   border-radius: var(--radius-pill);
   background: var(--voile);
-  color: var(--on-accent);
+  color: var(--on-ink);
 }
 
 /* --- Carte du jour --- */

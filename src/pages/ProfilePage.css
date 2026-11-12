@@ -16,7 +16,6 @@
   border: 3px solid var(--surface);
   border-radius: var(--radius-pill);
   background: var(--surface);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--shadow-color) 18%, transparent);
   cursor: pointer;
 }
 
@@ -57,7 +56,7 @@
   font-weight: var(--title-weight);
   letter-spacing: var(--title-spacing);
   line-height: 1.1;
-  text-transform: uppercase;
+  text-transform: var(--title-case);
   color: var(--ink);
 }
 
@@ -146,7 +145,7 @@
   font-size: var(--text-l);
   font-weight: var(--title-weight);
   letter-spacing: var(--title-spacing);
-  text-transform: uppercase;
+  text-transform: var(--title-case);
   color: var(--ink);
 }
 

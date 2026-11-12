@@ -43,6 +43,7 @@
   max-height: 80vh;
   overflow-y: auto;
   padding: var(--space-1) 0;
+  border: 1px solid var(--line);
   border-radius: var(--radius-m);
   background: var(--surface);
   box-shadow: 0 8px 32px color-mix(in srgb, var(--shadow-color) 25%, transparent);

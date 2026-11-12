@@ -212,7 +212,7 @@ function JumpsPanel({
       <div className="ui-my-10">
         <div className="ui-row-15 ui-center">
           <strong>Les plus hauts</strong>
-          <MapToggle shown={podiumShown} color={ACCENT} labels={['Voir (Carte)', 'Masquer (Carte)']} onClick={onTogglePodium} />
+          <MapToggle shown={podiumShown} color={ACCENT} ink="var(--on-ink)" labels={['Voir (Carte)', 'Masquer (Carte)']} onClick={onTogglePodium} />
         </div>
         <ol className="an-jump-podium">
           {byHeight.slice(0, 3).map((j, k) => (

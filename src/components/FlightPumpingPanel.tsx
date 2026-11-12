@@ -89,7 +89,7 @@ const isMeasuring = (pumping: PanelBaseProps['pumping'], summary: PumpingSummary
 /** Bouton « Voir » d'une ligne et bouton d'un podium, qui montrent ou retirent leur surbrillance. */
 const showButtons = ({ shown, onShow, accent }: Pick<PanelBaseProps, 'shown' | 'onShow' | 'accent'>) => {
   const toggleShown = (key: PumpingHighlightKey) => onShow(shown === key ? null : key);
-  const mapButton = (key: PumpingHighlightKey) => <MapToggle shown={shown === key} color={accent} onClick={() => toggleShown(key)} />;
+  const mapButton = (key: PumpingHighlightKey) => <MapToggle shown={shown === key} color={accent} ink="var(--on-ink)" onClick={() => toggleShown(key)} />;
   const podiumButton = (key: PumpingHighlightKey, label: string) => (
     <Button size="s" aria-pressed={shown === key} onClick={() => toggleShown(key)}>
       {shown === key ? `Masquer ${label}` : label.charAt(0).toUpperCase() + label.slice(1)}

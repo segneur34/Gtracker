@@ -27,16 +27,19 @@ interface AvatarFallback {
   color: string;
 }
 
-/** Disque d'un dessin : couleur de fond et dessin blanc, à 60 % du diamètre. */
-const ArtDisc = ({ icon, color }: AvatarFallback) => (
-  <span className="profile-avatar__disc" style={{ background: color }}>
+/**
+ * Disque d'un dessin : couleur de fond et dessin blanc, à 60 % du diamètre ; sur
+ * l'accent de la famille, qui vaut l'encre, le dessin prend `--on-ink`.
+ */
+const ArtDisc = ({ icon, color, ink }: AvatarFallback & { ink?: string }) => (
+  <span className="profile-avatar__disc" style={{ background: color, color: ink }}>
     <ActivityArt icon={icon} size={100} className="profile-avatar__art" />
   </span>
 );
 
 export function ProfileAvatar({ avatar, fallback }: { avatar: AthleteAvatar | null; fallback: AvatarFallback | null }) {
   if (avatar?.kind === 'photo') return <img className="profile-avatar__photo" src={avatar.dataUrl} alt="" />;
-  if (avatar?.kind === 'dessin') return <ArtDisc icon={avatar.icon} color={FAMILY_ACCENT[ICON_FAMILY[avatar.icon]]} />;
+  if (avatar?.kind === 'dessin') return <ArtDisc icon={avatar.icon} color={FAMILY_ACCENT[ICON_FAMILY[avatar.icon]]} ink="var(--on-ink)" />;
   if (fallback) return <ArtDisc {...fallback} />;
   return (
     <span className="profile-avatar__disc profile-avatar__disc--empty">
@@ -94,7 +97,7 @@ export function AvatarPicker({ avatar, onPick, onClose }: {
             aria-label={ACTIVITY_ICON_LABEL[icon]} aria-pressed={avatar?.kind === 'dessin' && avatar.icon === icon}
             style={{ '--choice-color': FAMILY_ACCENT[ICON_FAMILY[icon]] } as CSSProperties}
             onClick={() => { onPick({ kind: 'dessin', icon }); onClose(); }}>
-            <ArtDisc icon={icon} color={FAMILY_ACCENT[ICON_FAMILY[icon]]} />
+            <ArtDisc icon={icon} color={FAMILY_ACCENT[ICON_FAMILY[icon]]} ink="var(--on-ink)" />
           </button>
         ))}
       </div>

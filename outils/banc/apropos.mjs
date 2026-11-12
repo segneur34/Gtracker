@@ -123,7 +123,8 @@ check('le greffon GPS, présent dans les deux listes, une seule fois', before.fi
 check('lignes de 44 px au moins', before.every((r) => r.h >= 44), before.map((r) => r.h).join(', '));
 const pageBg = await tokenColor('--bg');
 check('lignes sur le fond de page', before.every((r) => r.bg === pageBg), `${before[0].bg} / ${pageBg}`);
-check('rayon --radius-s', before.every((r) => r.radius === '8px'), before[0].radius);
+const smallRadius = await evaluate(`getComputedStyle(document.documentElement).getPropertyValue('--radius-s').trim()`);
+check('rayon --radius-s', before.every((r) => r.radius === smallRadius), `${before[0].radius} / ${smallRadius}`);
 check('« Voir les 4 autres »', (await clickText('Voir les 4 autres')) === 'ok');
 await settle({ max: 500 });
 const firstGroupAll = await evaluate(`document.querySelectorAll('.about-licenses__list')[0].querySelectorAll('.about-license').length`);

@@ -110,7 +110,7 @@ const drawTrack = (ctx: CanvasRenderingContext2D, content: ShareImageContent, co
     // puis un tracé par couleur, tranche par tranche, comme sur la carte (`ColoredTrackPath`).
     strokeColoredTrack(ctx, content.segments, at, { width: 8, halo: { color: 'rgba(255, 255, 255, 0.9)', width: 15 } });
     // Départ en blanc cerclé, arrivée pleine.
-    const ink = token('--ink', '#1b1f24');
+    const ink = token('--ink', '#000000');
     const dot = (p: { x: number; y: number }, fill: string, ring: string) => {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 13, 0, 2 * Math.PI);
@@ -148,12 +148,12 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
   if (!ctx) throw new Error('Dessin impossible sur cet appareil.');
   const family = fontFamily();
   await ensureFonts(family);
-  const ink = token('--ink', '#1b1f24');
-  const muted = token('--muted', '#5b6470');
+  const ink = token('--ink', '#000000');
+  const muted = token('--muted', '#6b6b6b');
   ctx.textBaseline = 'alphabetic';
 
   // Carte sur toute l'image ; sans fond (fond décoché), un aplat.
-  ctx.fillStyle = token('--surface-sunken', '#e9e7e2');
+  ctx.fillStyle = token('--surface-sunken', '#fbfbfb');
   ctx.fillRect(0, 0, widthPx, heightPx);
   const track = drawTrack(ctx, content, count);
   if (content.withMap && track.view) {
@@ -202,7 +202,7 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
     ctx.beginPath();
     roundedRect(ctx, cardMarginXPx, cardY, cardW, cardH, cardRadiusPx);
     ctx.fill();
-    // Barre de la famille découpée dans la forme du cartouche : elle épouse ses coins arrondis.
+    // Barre d'accent découpée dans la forme du cartouche : elle épouse ses coins arrondis.
     ctx.save();
     ctx.beginPath();
     roundedRect(ctx, cardMarginXPx, cardY, cardW, cardH, cardRadiusPx);
@@ -221,7 +221,7 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
       ctx.fillStyle = ink;
       drawFitted(ctx, stat.value, x, y + statValueBaselinePx, columnPx - 24, { weight: 700, maxPx: 50, minPx: 32, family });
     });
-    ctx.fillStyle = token('--line', '#e3e1dc');
+    ctx.fillStyle = token('--line-strong', '#cfcfcf');
     ctx.fillRect(statsMarginXPx, cardY + cardH - ruleFromBottomPx, widthPx - 2 * statsMarginXPx, 2);
   } else {
     const foot = ctx.createLinearGradient(0, heightPx - footerVeilPx, 0, heightPx);
@@ -233,7 +233,7 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
 
   // Pied, à la même hauteur avec ou sans cartouche.
   const footerY = cardY + cardH - footerFromBottomPx;
-  ctx.fillStyle = token('--faint', '#8a9099');
+  ctx.fillStyle = token('--faint', '#959595');
   // Logo GONG complet (tracé du SVG mis à l'échelle), base sur la ligne du pied, puis « Gtracker » à sa droite.
   const logoScale = FOOTER_LOGO_HEIGHT_PX / GONG_LOGO_HEIGHT;
   ctx.save();

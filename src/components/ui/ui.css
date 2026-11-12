@@ -53,8 +53,8 @@
   stroke-linejoin: round;
 }
 
-/* Encre et épaisseur de chaque fond, réglées à l'œil sur la maquette : la couleur de la famille,
-   celle de l'image fournie (surf), le gris bleuté des courbes de niveau. */
+/* Encre et épaisseur de chaque fond : courbes de niveau, motif voile, motif surf. Les fonds de page sont unis, leurs
+   encres transparentes (`tokens.css`) ; les classes restent. */
 .page-backdrop--contours {
   --backdrop-ink: var(--contour);
   --backdrop-stroke: 1.3;
@@ -65,7 +65,7 @@
 }
 
 .page-backdrop--voile {
-  --backdrop-ink: color-mix(in srgb, var(--voile) 41%, transparent);
+  --backdrop-ink: color-mix(in srgb, var(--backdrop-voile) 41%, transparent);
   --backdrop-stroke: 1.65;
 }
 
@@ -95,7 +95,7 @@
   font-weight: var(--title-weight);
   letter-spacing: var(--title-spacing);
   line-height: 1.15;
-  text-transform: uppercase;
+  text-transform: var(--title-case);
 }
 
 .ui-page-header__subtitle {
@@ -112,7 +112,7 @@
   min-height: 44px;
   color: var(--voile);
   font-size: var(--text-m);
-  font-weight: 600;
+  font-weight: 400;
   text-decoration: none;
 }
 
@@ -132,7 +132,7 @@
   font-size: var(--text-l);
   font-weight: var(--title-weight);
   letter-spacing: var(--title-spacing);
-  text-transform: uppercase;
+  text-transform: var(--title-case);
 }
 
 /* Intertitre dans un panneau ou une carte (« Tops distance », « Conditions ») : le style des titres, en plus petit. */
@@ -141,14 +141,14 @@
   font-size: var(--text-m);
   font-weight: var(--title-weight);
   letter-spacing: var(--title-spacing);
-  text-transform: uppercase;
+  text-transform: var(--title-case);
 }
 
 .ui-eyebrow {
   font-size: var(--text-s);
   font-weight: 600;
   color: var(--muted);
-  text-transform: uppercase;
+  text-transform: var(--title-case);
   letter-spacing: var(--title-spacing);
 }
 
@@ -180,7 +180,7 @@
   flex: 0 0 auto;
   width: 10px;
   height: 10px;
-  border-radius: 3px;
+  border-radius: var(--radius-s);
 }
 
 /* Bandeau photo qui déborde des marges de la page (accueil, bibliothèque) ; hauteur, marges intérieures et ombre du texte restent à la page. */
@@ -216,15 +216,15 @@
   gap: var(--space-2);
   min-height: 44px;
   padding: 0 var(--space-5);
-  border: 1.5px solid transparent;
+  border: var(--stroke) solid transparent;
   border-radius: var(--radius-pill);
-  /* Comme les boutons de l'accueil : capitales grasses, en petit. */
+  /* Pilule à trait fin : capitales, en petit (`--action-*`). */
   font-size: var(--text-s);
   font-weight: var(--action-weight);
   letter-spacing: var(--action-spacing);
   line-height: 1.2;
   text-align: center;
-  text-transform: uppercase;
+  text-transform: var(--action-case);
   text-decoration: none;
   cursor: pointer;
   transition: filter 0.15s ease, background-color 0.15s ease;
@@ -275,40 +275,48 @@
   width: 100%;
 }
 
-/* La couleur d'action vient du conteneur (`--btn-accent`, comme `--tab-accent`) (l'orange du test de FC repos, `--rest-accent`), sinon le bleu. */
+/* Plein : fond d'encre, texte inversé. La couleur d'action peut venir du conteneur (`--btn-accent` et son texte
+   `--btn-ink` : l'orange du test de FC repos, `--rest-accent`). */
 .ui-btn--primary {
-  background: var(--btn-accent, var(--voile));
-  color: var(--on-accent);
+  background: var(--btn-accent, var(--ink));
+  border-color: var(--btn-accent, var(--ink));
+  color: var(--btn-ink, var(--on-ink));
 }
 
+/* Vert vif sous du noir, en gras : la seule touche de couleur. */
 .ui-btn--record {
   background: var(--record);
-  color: var(--on-accent);
+  border-color: var(--record);
+  color: var(--on-record);
+  font-weight: var(--action-strong);
 }
 
 .ui-btn--danger {
-  background: var(--recording);
+  background: var(--stop);
+  border-color: var(--stop);
   color: var(--on-accent);
 }
 
-.ui-btn--secondary {
+/* Creux : trait d'encre. Le secondaire garde le fond des cadres (égal au fond de la page), pour rester lisible posé
+   sur une carte ou un graphe ; le fantôme est transparent. */
+.ui-btn--secondary,
+.ui-btn--ghost {
   background: var(--surface);
-  border-color: var(--line-strong);
-  color: var(--ink-2);
+  border-color: var(--ink);
+  color: var(--ink);
 }
 
 .ui-btn--ghost {
   background: transparent;
-  color: var(--voile);
 }
 
-/* Pictogramme d'enregistrement : disque blanc, rond rouge au centre (45 % du diamètre) ;
-   carré plein de la couleur du texte pendant l'enregistrement. */
+/* Pictogramme d'enregistrement : point noir au centre du vert vif ; carré plein de la couleur du texte pendant
+   l'enregistrement. */
 .ui-record-dot {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: radial-gradient(circle closest-side, var(--recording) 0 82%, var(--on-accent) 85%);
+  background: var(--on-record);
 }
 
 .ui-record-dot--stop {
@@ -330,12 +338,12 @@
 .ui-tab {
   min-height: 36px;
   padding: 0 var(--space-4);
-  border: 1px solid var(--line-strong);
+  border: var(--stroke) solid var(--ink);
   border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--ink-2);
+  background: transparent;
+  color: var(--ink);
   font-size: var(--text-s);
-  font-weight: 600;
+  font-weight: 400;
   cursor: pointer;
 }
 
@@ -350,9 +358,9 @@
 }
 
 .ui-tab[aria-pressed='true'] {
-  background: var(--tab-accent, var(--voile));
-  border-color: var(--tab-accent, var(--voile));
-  color: var(--on-accent);
+  background: var(--tab-accent, var(--ink));
+  border-color: var(--tab-accent, var(--ink));
+  color: var(--on-ink);
 }
 
 /* Rangée resserrée, sans trait dessous : dans une ligne de réglage ou un encart sur la carte. */
@@ -368,15 +376,16 @@
   padding: 0 var(--space-2);
 }
 
-/* --- Bouton glissant (`SegmentedControl`) : gouttière creuse, case blanche sous le choix --- */
+/* --- Bouton glissant (`SegmentedControl`) : pilule à trait d'encre, case d'encre sous le choix --- */
 
 .ui-segmented {
   position: relative;
   display: flex;
   gap: 2px;
   padding: 2px;
-  border-radius: var(--radius-m);
-  background: var(--surface-sunken);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-pill);
+  background: transparent;
   overflow-x: auto;
   scrollbar-width: none;
   /* La case s'attrape au doigt ou à la souris : pas de sélection du texte en glissant. */
@@ -393,8 +402,8 @@
   top: 2px;
   bottom: 2px;
   left: 0;
-  border-radius: var(--radius-s);
-  background: var(--surface);
+  border-radius: var(--radius-pill);
+  background: var(--seg-accent, var(--ink));
   pointer-events: none;
 }
 
@@ -421,12 +430,12 @@
   min-height: 30px;
   padding: 0 clamp(var(--space-1), 1.6vw, var(--space-2));
   border: none;
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--muted);
+  color: var(--ink);
   font: inherit;
   font-size: clamp(10px, 3.2vw, var(--text-xs));
-  font-weight: 600;
+  font-weight: 400;
   white-space: nowrap;
   cursor: pointer;
   transition: color 0.18s;
@@ -448,9 +457,10 @@
   }
 }
 
-/* Choix en couleur : le choix en cours, ou celui sous la case pendant qu'on la glisse. */
-.ui-segmented button.is-lit {
-  color: var(--seg-accent, var(--ink));
+/* Choix sur la case : le choix en cours, ou celui sous la case pendant qu'on la glisse ; texte inversé une fois la
+   case posée. */
+.ui-segmented:has(.ui-segmented__thumb) button.is-lit {
+  color: var(--on-ink);
 }
 
 /* La case se prend sur le choix en cours : le geste horizontal est à elle, pas au défilement de la page. */
@@ -573,7 +583,7 @@
   width: 100%;
   padding: 0 var(--space-3);
   border: none;
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--ink);
   text-align: left;
@@ -780,7 +790,7 @@
   font-family: var(--font-title);
   font-weight: var(--title-weight);
   letter-spacing: var(--title-spacing);
-  text-transform: uppercase;
+  text-transform: var(--title-case);
 }
 
 .ui-semibold {

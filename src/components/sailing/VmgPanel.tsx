@@ -51,7 +51,7 @@ export default function VmgPanel({
       <div className="an-vmg-top__head">
         <strong>{title}</strong>
         <MapToggle
-          shown={selected === topKey} color="var(--voile)" labels={['Voir (Carte)', 'Masquer (Carte)']}
+          shown={selected === topKey} color="var(--voile)" ink="var(--on-ink)" labels={['Voir (Carte)', 'Masquer (Carte)']}
           onClick={() => onSelect(selected === topKey ? null : topKey)} />
       </div>
       <div className="an-vmg-top__ranks">

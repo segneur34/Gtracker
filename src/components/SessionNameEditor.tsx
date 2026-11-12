@@ -181,7 +181,7 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
         );
       })()}
       {note && (
-        <span role="status" style={{ fontSize: 'var(--text-s)', color: note.error ? 'var(--recording)' : 'var(--muted)' }}>
+        <span role="status" style={{ fontSize: 'var(--text-s)', color: note.error ? 'var(--danger)' : 'var(--muted)' }}>
           {note.text}
         </span>
       )}

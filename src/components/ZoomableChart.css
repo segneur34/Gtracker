@@ -114,6 +114,6 @@
   font-size: var(--chart-name-size, var(--text-xs));
   font-weight: 600;
   letter-spacing: var(--title-spacing);
-  text-transform: uppercase;
+  text-transform: var(--title-case);
   margin-right: var(--space-2);
 }

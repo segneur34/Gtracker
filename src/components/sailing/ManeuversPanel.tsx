@@ -112,7 +112,7 @@ export default function ManeuversPanel({
               <td style={{ textAlign: 'center' }}>{summary ? showKn(summary.vminAvg) : '-'}</td>
               <td style={{ textAlign: 'center', fontWeight: 700 }}>{summary ? showKn(summary.vminMax) : '-'}</td>
               <td style={{ padding: '4px 10px', textAlign: 'center' }}>
-                <MapToggle shown={shown} color="var(--voile)" title={`Afficher les ${hint ? 'manœuvres de sens incertain' : label.toLowerCase()} sur la carte`} onClick={toggle}
+                <MapToggle shown={shown} color="var(--voile)" ink="var(--on-ink)" title={`Afficher les ${hint ? 'manœuvres de sens incertain' : label.toLowerCase()} sur la carte`} onClick={toggle}
                   style={{ padding: '3px 10px', border: 'none' }} />
               </td>
             </tr>
@@ -123,7 +123,7 @@ export default function ManeuversPanel({
 
       {/* Vent saisi loin du vent calculé fiable : les virages tombent en « sens incertain », on le dit. */}
       {windWarning && (
-        <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--warning-soft)', borderLeft: '3px solid var(--warning-line)', borderRadius: '4px', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
+        <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--warning-soft)', borderLeft: '3px solid var(--warning-line)', borderRadius: 'var(--radius-s)', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
           Le vent saisi ({formatDecimal(windWarning.manualDeg, 0)}°) écarte <strong>{windWarning.unclassified}</strong> virage{windWarning.unclassified > 1 ? 's' : ''}, ni virement ni empannage ; le vent calculé est à {formatDecimal(windWarning.autoDeg, 0)}°. Vérifier la direction.
         </p>
       )}
@@ -165,7 +165,7 @@ export default function ManeuversPanel({
       )}
 
       {maneuverHelpOpen && (<>
-      <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--bg)', borderLeft: '3px solid var(--line-strong)', borderRadius: '4px', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
+      <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--bg)', borderLeft: '3px solid var(--line-strong)', borderRadius: 'var(--radius-s)', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
         <strong>Enregistrement :</strong> {pointCount} points, un toutes les {samplingS < 10 ? formatDecimal(samplingS, 1) : Math.round(samplingS)} s en médiane. Entrée de virage retenue au-dessus de {showKn(minEntrySpeedKn)} {speedSymbol}, d'après l'allure de la session.
         {samplingS > 10 && (
           <>
@@ -183,7 +183,7 @@ export default function ManeuversPanel({
         m.rejected.tooShort > 0 ||
         m.rejected.noFlight > 0 ||
         m.rejected.fullTurn > 0) && (
-        <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--bg)', borderLeft: '3px solid var(--line-strong)', borderRadius: '4px', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
+        <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--bg)', borderLeft: '3px solid var(--line-strong)', borderRadius: 'var(--radius-s)', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
           <strong>{m.locations.length} virage{m.locations.length > 1 ? 's' : ''} retenu{m.locations.length > 1 ? 's' : ''}</strong>, et d'autres écartés en chemin :
           {m.rejected.noFlight > 0 && (
             <>
@@ -249,7 +249,7 @@ export default function ManeuversPanel({
           const ofType = m.locations.filter((loc) => loc.type === type);
           const listOpen = view.listOpen[type];
           return (
-          <div key={type} className="an-man-detail" style={{ flex: '1 1 380px', backgroundColor: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '6px', padding: '10px 12px' }}>
+          <div key={type} className="an-man-detail" style={{ flex: '1 1 380px', backgroundColor: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-m)', padding: '10px 12px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
               <strong className="ui-subtitle">{title}</strong>
               {summary ? (
@@ -300,7 +300,7 @@ export default function ManeuversPanel({
                         ))}
                         <td style={{ padding: '2px 4px', textAlign: 'right' }}>
                           <MapToggle
-                            shown={active} color="var(--voile)" labels={['Carte', 'Masquer']} disabled={tops.length === 0}
+                            shown={active} color="var(--voile)" ink="var(--on-ink)" labels={['Carte', 'Masquer']} disabled={tops.length === 0}
                             onClick={() => onSelectTop(active ? null : key)}
                             style={{ padding: '2px 7px', opacity: tops.length === 0 ? 0.5 : 1 }} />
                         </td>

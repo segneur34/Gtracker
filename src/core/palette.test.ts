@@ -4,9 +4,10 @@ import { SPORT_FAMILIES, SPORT_PROFILES } from './sportProfiles';
 import type { SportType } from './types';
 
 /**
- * Couleurs des familles et nuances des activités : lisibles
- * sur fond blanc, distinctes, et la couleur de famille du thème égale à la
- * première nuance.
+ * Nuances des activités : lisibles sur fond blanc et sur les cadres sombres,
+ * distinctes. Le thème n'a plus de couleur de famille (ses accents valent
+ * l'encre, `theme/tokens.test.ts`) : les nuances ne sont plus liées à
+ * `tokens.css`.
  */
 
 const channel = (hex: string, i: number) => {
@@ -43,16 +44,10 @@ const distance = (a: string, b: string) => {
 };
 
 /**
- * Texte de `theme/tokens.css`. Vitest rend vide un CSS importé, même en
- * `?raw`, et la config TypeScript de l'application ne connaît pas Node : le
- * module `fs` est chargé à l'exécution, sous un type minimal.
+ * Surface des cadres de l'ancien thème sombre, contre laquelle les nuances
+ * sombres ont été choisies ; figée ici tant que les nuances restent celles-là.
  */
-const readTokensCss = async (): Promise<string> => {
-  const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync: (path: URL, encoding: 'utf8') => string };
-  return fs.readFileSync(new URL('../theme/tokens.css', import.meta.url), 'utf8');
-};
-
-const TOKEN: Record<string, string> = { voile: '--voile', surf: '--surf' };
+const DARK_SHADES_SURFACE = '#1c2229';
 
 describe('nuances des familles', () => {
   it('six nuances par famille, en minuscules', () => {
@@ -62,15 +57,7 @@ describe('nuances des familles', () => {
     }
   });
 
-  it('la couleur de famille du thème est la première nuance', async () => {
-    const tokensCss = await readTokensCss();
-    for (const family of SPORT_FAMILIES) {
-      const match = tokensCss.match(new RegExp(`${TOKEN[family]}:\\s*(#[0-9a-fA-F]{6});`));
-      expect(match?.[1].toLowerCase(), family).toBe(FAMILY_SHADES[family][0]);
-    }
-  });
-
-  it('contraste sur blanc : 4,5 pour la couleur de famille (texte blanc), 3 pour les autres', () => {
+  it('contraste sur blanc : 4,5 pour la première nuance (texte blanc), 3 pour les autres', () => {
     for (const family of SPORT_FAMILIES) {
       const [first, ...others] = FAMILY_SHADES[family];
       expect(contrastOnWhite(first), first).toBeGreaterThanOrEqual(4.5);
@@ -95,14 +82,6 @@ describe('nuances des familles', () => {
   });
 });
 
-/** Bloc du thème sombre de `tokens.css`, et une variable qui y est posée. */
-const darkBlock = (css: string): string => {
-  const start = css.indexOf(":root[data-theme='dark']");
-  return css.slice(start, css.indexOf('}', start));
-};
-const tokenIn = (block: string, name: string): string | undefined =>
-  block.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6});`))?.[1].toLowerCase();
-
 describe('nuances des familles en sombre', () => {
   it('six nuances par famille, en minuscules', () => {
     for (const family of SPORT_FAMILIES) {
@@ -111,16 +90,14 @@ describe('nuances des familles en sombre', () => {
     }
   });
 
-  it('la couleur de famille du thème sombre est la première nuance sombre, et porte du texte blanc', async () => {
-    const dark = darkBlock(await readTokensCss());
+  it('la première nuance sombre porte du texte blanc', () => {
     for (const family of SPORT_FAMILIES) {
-      expect(tokenIn(dark, TOKEN[family]), family).toBe(FAMILY_SHADES_DARK[family][0]);
       expect(contrastOnWhite(FAMILY_SHADES_DARK[family][0]), family).toBeGreaterThanOrEqual(4.5);
     }
   });
 
-  it('lisibles sur les cartes sombres (contraste de 3) ; une nuance déjà lisible reste celle du clair', async () => {
-    const surface = tokenIn(darkBlock(await readTokensCss()), '--surface')!;
+  it('lisibles sur les cartes sombres (contraste de 3) ; une nuance déjà lisible reste celle du clair', () => {
+    const surface = DARK_SHADES_SURFACE;
     for (const family of SPORT_FAMILIES) {
       FAMILY_SHADES_DARK[family].forEach((shade, i) => {
         expect(contrast(shade, surface), shade).toBeGreaterThanOrEqual(3);

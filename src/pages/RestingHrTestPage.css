@@ -1,8 +1,9 @@
 /* Page du test de FC repos (sous le Profil). */
 
-/* Boutons d'action et aides en orange (`--rest-accent`, `theme/tokens.css`). */
+/* Boutons d'action et aides en orange (`--rest-accent`, `theme/tokens.css`), texte blanc dessus. */
 .rest-page {
   --btn-accent: var(--rest-accent);
+  --btn-ink: var(--on-accent);
 }
 
 /* Boutons d'action sous le déroulé. */

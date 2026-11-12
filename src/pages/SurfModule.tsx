@@ -127,7 +127,7 @@ const SURF_FLIGHT_ALL_COLUMNS: FlightColumn<SurfFlight>[] = [{ header: 'Vagues',
 
 /** Bouton « Voir » d'une ligne de tableau : montre ou masque son passage sur la carte. */
 const ShowButton = ({ shown, onClick, disabled }: { shown: boolean; onClick: () => void; disabled?: boolean }) => (
-  <MapToggle shown={shown} disabled={disabled} color={ACCENT} onClick={onClick} />
+  <MapToggle shown={shown} disabled={disabled} color={ACCENT} ink="var(--on-ink)" onClick={onClick} />
 );
 
 /** Une ligne du graphe : `index` renvoie au point de trace d'origine. */
