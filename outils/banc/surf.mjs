@@ -2,9 +2,10 @@
 // Usage : node surf.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Le script écrit lui-même deux sessions synthétiques et les importe par la page,
 // dans un `File`. Il vérifie :
-//  1. la famille Surf sur l'accueil, dans la barre du haut, et ses deux activités dans Réglages (carte d'activité :
-//     « Seuil de vague », « Seuil de vol » pour Surf foil, ni pente ni terrain) ;
-//  2. une matinée (trois vagues, la troisième enchaînée) : la ligne de la bibliothèque, puis l'analyse, onglets
+//  1. les activités du surf dans la rangée de logos de la page Sessions, la barre du haut (Profil, Sessions, Planifier,
+//     Statistiques, Réglages), et leurs deux cartes dans Réglages (« Seuil de vague », « Seuil de vol » pour Surf foil,
+//     ni pente ni terrain) ;
+//  2. une matinée (trois vagues, la troisième enchaînée) : la ligne de la page Sessions, puis l'analyse, onglets
 //     général, vagues (tableau, tri, « Voir », podium), rame (retours, première sortie), graphiques ;
 //  3. les réglages de la session : seuil de vague imposé (une vague en moins), enregistré dans la fiche, relu après
 //     rechargement, puis « Défaut » et « Annuler » ;
@@ -95,13 +96,14 @@ const setField = (label, value) => evaluate(`(() => {
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork();
 
-// 1. Accueil, barre, Réglages.
-await go('/');
-// Tuiles des familles de l'accueil (`.home-family__name`, le sélecteur `.shell-main a` d'avant ne trouvait plus rien).
-const accueil = await evaluate(`[...document.querySelectorAll('.home-family__name')].map((n) => n.textContent.trim()).join(', ')`);
+// 1. Sessions (rangée de logos), barre, Réglages.
+await go('/sessions');
+// Les activités du surf sont dans la rangée de logos de la page Sessions : la barre ne porte plus de famille.
+const ronds = await evaluate(`[...document.querySelectorAll('.activity-bubbles .activity-bubble__name')].map((n) => n.textContent.trim()).join(', ')`);
 const barre = await evaluate(`[...document.querySelectorAll('.shell-toplink')].map((a) => a.textContent).join(', ')`);
-console.log('accueil :', accueil, '| barre :', barre);
-check('accueil et barre : la famille Surf', /\bSurf\b/.test(accueil ?? '') && /\bSurf\b/.test(barre ?? ''), `${accueil} | ${barre}`);
+console.log('rangée de logos :', ronds, '| barre :', barre);
+check('Sessions : les activités du surf (Surf, Pumping) dans la rangée de logos', /\bSurf\b/.test(ronds ?? '') && /\bPumping\b/.test(ronds ?? ''), ronds);
+check('barre du haut : Profil, Sessions, Planifier, Statistiques, Réglages', barre === 'Profil, Sessions, Planifier, Statistiques, Réglages', barre);
 await go('/parametres');
 await clickText('Activités', '[role=button]');
 await wait(400);
@@ -122,7 +124,7 @@ check('Réglages : « Seuil de vague » (Surf) et « Seuil de vol » (Surf foil)
 await shoot('surf-reglages');
 
 // 2. La matinée : import, bibliothèque, analyse.
-await go('/surf');
+await go('/sessions');
 console.log('import matinée :', await importGpx(buildGpx('Matinée', T_MORNING, MORNING), 'matinee.gpx'));
 const morning = await waitFor(() => recordAt(T_MORNING), { timeout: 6000, label: 'fiche matinée' });
 await settle({ max: 2000, label: 'import matinée' });
@@ -131,8 +133,7 @@ console.log('fiche :', morning ? `${morning.gpx}, ${morning.sport}, activité ${
 check('matinée, fiche : 3 vagues, plus longue 120 m, 40 s sur la vague',
   morning?.summary?.waveCount === 3 && Math.round(morning.summary.longestWaveM) === 120 && Math.round(morning.summary.movingTimeS) === 40, JSON.stringify(morning?.summary));
 const ligneMatinee = await evaluate(`document.querySelector('.lib-list')?.innerText.replace(/\\n+/g, ' / ').slice(0, 300) ?? '(vide)'`);
-console.log('bibliothèque :', ligneMatinee,
-  '| vue planifiées :', await evaluate(`[...document.querySelectorAll('.ui-tab')].some((t) => /planifi/.test(t.textContent))`));
+console.log('liste des sessions :', ligneMatinee);
 // 668 m : l'intégrale des vitesses (règle 6), 1,2 m/s × 60 s de départ comprises.
 contient('matinée, bibliothèque : 11 min, 0,67 km, 3 vagues, plus longue 120 m', ligneMatinee, '11 min · 0,67 km · 3 vagues · plus longue 120 m');
 const morningPath = `/surf/analyse?session=${encodeURIComponent(morning?.gpx ?? '')}`;
@@ -217,7 +218,7 @@ console.log('Annuler :', await clickText('Annuler'));
 await wait(400);
 
 // 4. Surf foil : case de la session, onglet vols.
-await go('/surf');
+await go('/sessions');
 console.log('import foil :', await importGpx(buildGpx('Foil', T_FOIL, FOIL), 'foil.gpx'));
 const foil = await waitFor(() => recordAt(T_FOIL), { timeout: 6000, label: 'fiche foil' });
 await settle({ max: 2000, label: 'import foil' });
@@ -251,8 +252,8 @@ await waitFor(async () => (await recordAt(T_FOIL))?.analysis?.foil !== undefined
 const foilSaved = await recordAt(T_FOIL);
 console.log('fiche : foil', foilSaved?.analysis?.foil, '| plus long vol', foilSaved?.summary?.longestFlightS, 's | vagues', foilSaved?.summary?.waveCount);
 check('foil, fiche : foil vrai, plus long vol 80 s', foilSaved?.analysis?.foil === true && foilSaved?.summary?.longestFlightS === 80, `${foilSaved?.analysis?.foil} / ${foilSaved?.summary?.longestFlightS}`);
-await go('/surf');
-console.log('bibliothèque :', await evaluate(`document.querySelector('.lib-list')?.innerText.replace(/\\n+/g, ' / ').slice(0, 400) ?? '(vide)'`));
+await go('/sessions');
+console.log('liste des sessions :', await evaluate(`document.querySelector('.lib-list')?.innerText.replace(/\\n+/g, ' / ').slice(0, 400) ?? '(vide)'`));
 
 // 5. Vitesse max : la page et la fiche donnent la même, celle d'une vague ; une rame sans vague n'en a pas.
 await go(morningPath, 5000);
@@ -261,7 +262,7 @@ await wait(300);
 const morningMax = (await recordAt(T_MORNING))?.summary?.maxSpeedMs ?? 0;
 const morningShown = `Vitesse max / ${(morningMax * 3.6).toFixed(1).replace('.', ',')} km/h`;
 check(`matinée : la fiche et la page, ${morningShown}`, morningMax > 0 && (await panel('Général')).includes(morningShown), (await panel('Général')).slice(0, 400));
-await go('/surf');
+await go('/sessions');
 console.log('import rame :', await importGpx(buildGpx('Rame', T_PADDLE, PADDLE), 'rame.gpx'));
 const paddle = await waitFor(() => recordAt(T_PADDLE), { timeout: 6000, label: 'fiche rame' });
 await settle({ max: 2000, label: 'import rame' });

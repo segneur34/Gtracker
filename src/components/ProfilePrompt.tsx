@@ -27,9 +27,9 @@ const draftOf = (profile: AthleteProfile): Draft => ({
 });
 
 /**
- * Pop-up de l'accueil, dans l'application : tant que le profil n'est pas rempli
+ * Pop-up du Profil, où s'ouvre l'application : tant que le profil n'est pas rempli
  * (pseudo et année de naissance : `missingProfileFields`), il
- * s'ouvre une fois par lancement. Posé par l'accueil une fois la mémoire et la
+ * s'ouvre une fois par lancement. Posé par le Profil une fois la mémoire et la
  * carte des autorisations décidées, il tranche à son arrivée ; `otherCardShown` :
  * l'une d'elles est à l'écran, et il attend le lancement suivant. `onDecided`
  * apprend une fois s'il s'ouvre (la carte du jour des tutoriels attend alors).

@@ -2,19 +2,22 @@
 // Usage : node profil.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Le script fabrique six sessions de 20 min en ligne droite (`traceSurf`, une seule
 // phase), datées en jours avant aujourd'hui (deux de wingfoil, une de surf et une de kite cette année, une de wingfoil
-// et une de surf l'an passé), les importe par la page Voile, et vérifie :
-//  1. l'accueil : plus de graphe d'activités, pas de ligne « Profil » ; « Profil » dans la barre du haut, qui ouvre la page ;
-//  2. la période en tête (bouton glissant), « Année » au départ : distance (somme des vitesses × durées, à 5 % près),
-//     sport préféré (Wingfoil, avec son dessin, qui ouvre sa bibliothèque), nombre de sessions du graphe ; l'anneau et
-//     sa légende (une part par activité, Wingfoil à 50 %) ; le graphe d'activités en bas, sans barre de période à lui ;
+// et une de surf l'an passé), les importe par la page Sessions, et vérifie :
+//  1. l'ouverture : « / » mène au Profil, sans fond dessiné, allumé dans la barre du haut ; « Profil » dans la barre du
+//     haut, depuis Sessions, ouvre la page ;
+//  2. l'en-tête (« Live for it. », « Bienvenue » seul sans pseudo, lien du test de FC repos) ; la période en tête
+//     (bouton glissant), « Année » au départ : distance (somme des vitesses × durées, à 5 % près), sport préféré
+//     (Wingfoil, avec son dessin, qui ouvre ses sessions), nombre de sessions du graphe ; l'anneau et sa légende (une
+//     part par activité, Wingfoil à 50 %) ; le graphe d'activités en bas, sans barre de période à lui ; sur ordinateur,
+//     la colonne « Vos activités » (rangée de logos qui filtre sur place, cinq lignes sans « … », « Toutes les sessions ») ;
 //  3. les autres périodes règlent toute la page : « 30 jours » (trois sessions), « Depuis le début » (les six, une
 //     barre par mois), choix retenu au rechargement ;
-//  4. une ligne de la légende ouvre la bibliothèque filtrée sur son activité ;
-//  5. à 390×844 : rien ne déborde, chiffres en une bande de deux sur deux, détail par activité retenu déplié ; la case « Profil » de la barre du bas ouvre la page, allumée ;
+//  4. une ligne de la légende ouvre la page Sessions filtrée sur son activité ;
+//  5. à 390×844 : rien ne déborde, « Gtracker » sur la photo, pas de colonne « Vos activités », chiffres en une bande de deux sur deux, détail par activité retenu déplié ; la case « Profil » de la barre du bas (Profil, Sessions, Statistiques, Réglages) ouvre la page, allumée ;
 //     à 320 px, aucune case de la bande ne sort de l'écran (la bande « qui dépasse » de la maquette du 22/10) ;
 //  6. deux sessions d'activités cachées (planche à voile et bateau, cachées au départ) : absentes du Profil, rien ne
 //     change (quatre sessions, trois parts, ni « Autres ») ; une session de surf passée en Pumping dans son analyse :
-//     une quatrième part, la ligne de la légende ouvre sa bibliothèque ;
+//     une quatrième part, la ligne de la légende ouvre ses sessions ;
 //  7. la photo (22/10) : au départ le dessin du sport préféré ; toucher la photo ouvre le choix des neuf dessins ;
 //     un dessin choisi, puis une image importée (réduite à 256 px, en JPEG), tous deux retenus au rechargement ;
 //     « Retirer » rend le dessin du sport préféré.
@@ -81,7 +84,7 @@ const chartCount = () => text('.actchart__head span');
 const parseFr = (s) => Number((s ?? '').replace(/[^\d,]/g, '').replace(',', '.'));
 
 // --- Mise en place ---
-await go('/voile', 5000);
+await go('/sessions', 5000);
 await waitFor(`Boolean(document.querySelector('input[type=file][accept*=".gpx"]'))`, { timeout: 3000, every: 50 });
 console.log('import :', await evaluate(`(() => {
   const input = document.querySelector('input[type=file][accept*=".gpx"]');
@@ -97,13 +100,13 @@ console.log('import :', await evaluate(`(() => {
 await waitFor(async () => (await records())?.length === SESSIONS.length, { timeout: 12000, label: 'fiches' });
 await settle({ max: 2000, label: 'import' });
 
-// 1. Accueil.
+// 1. L'ouverture : « / » mène au Profil, d'où la liste des sessions se prend par la barre du haut.
 await go('/');
-check('accueil : plus de graphe d\'activités', (await evaluate(`!!document.querySelector('.actchart')`)) === false);
-const backdrop = () => evaluate(`document.querySelector('.page-backdrop')?.getAttribute('class')`);
-// Fond des pages hors sport (lot 3 du 23/10) : le motif de la famille du sport préféré de toutes les sessions, la voile.
-check('accueil : fond de la famille du sport préféré', (await backdrop()) === 'page-backdrop page-backdrop--voile', await backdrop());
-check('accueil : plus de ligne « Profil » (demande du 19/10)', !(await evaluate(`[...document.querySelectorAll('.home-link')].some((el) => el.textContent.trim() === 'Profil')`)));
+check("ouverture : « / » mène à /profil", (await search()) === '/profil', await search());
+const backdrop = () => evaluate(`document.querySelector('.page-backdrop')?.getAttribute('class') ?? null`);
+check('Profil : pas de fond dessiné derrière la page', (await backdrop()) === null, await backdrop());
+check('barre du haut : Profil allumé à l\'ouverture', await evaluate(`[...document.querySelectorAll('.shell-toplink')].some((a) => a.textContent.trim() === 'Profil' && a.classList.contains('active'))`));
+await go('/sessions');
 const opened = await evaluate(`(() => {
   const a = [...document.querySelectorAll('.shell-toplink')].find((el) => el.textContent.trim() === 'Profil');
   if (!a) return false;
@@ -116,7 +119,9 @@ check('le lien ouvre la page', (await search()) === '/profil', await search());
 check('barre du haut : Profil, allumé', await evaluate(`[...document.querySelectorAll('.shell-toplink')].some((a) => a.textContent.trim() === 'Profil' && a.classList.contains('active'))`));
 
 // 2. L'année en cours.
-check('titre', (await text('.profile-head__title')) === 'Profil', await text('.profile-head__title'));
+check('en-tête : « Live for it. » sur la photo', (await text('.profile-hero__motto')) === 'Live for it.', await text('.profile-hero__motto'));
+check('titre : « Bienvenue » seul, sans pseudo', (await text('.profile-head__title')) === 'Bienvenue' && (await evaluate(`document.querySelector('.profile-head__hello') === null`)), await text('.profile-head__title'));
+check('lien du test de FC repos sous le titre', (await text('.profile-head__link')) === 'Test de FC repos', await text('.profile-head__link'));
 check('périodes en tête, « Année » au départ', (await evaluate(`[...document.querySelectorAll('.profile-periods [role=radio]')].map((b) => b.textContent.replace(/\\u00a0/g, ' ').trim()).join(' | ')`))
   === 'Semaine | 30 jours | 6 mois | Année | Depuis le début' && (await pressed()) === 'Année', await pressed());
 check("plus de flèches d'année", (await evaluate(`!!document.querySelector('.profile-year')`)) === false);
@@ -131,8 +136,26 @@ check('sport préféré : Wingfoil, avec son dessin', (await favorite()) === 'Wi
 check('plus de case « Dénivelé »', !(await evaluate(`[...document.querySelectorAll('.profile-figure .ui-eyebrow')].some((e) => e.textContent === 'Dénivelé')`)));
 check('nombre de sessions (graphe)', (await chartCount()) === '4 sessions', await chartCount());
 const ordre = await evaluate(`[...document.querySelectorAll('.profile > *')].map((el) => (el.getAttribute('class') ?? '').split(' ')[0] || el.tagName).join(' > ')`);
-check('ordre : fond, en-tête, période, chiffres, répartition, graphe', /^page-backdrop > profile-head > ui-segmented.*profile-figures.*profile-split.*actchart/.test(ordre ?? ''), ordre);
-check('Profil : fond de la famille du sport préféré', (await backdrop()) === 'page-backdrop page-backdrop--voile', await backdrop());
+check('ordre : en-tête, période, chiffres, répartition, graphe', /^profile-head > ui-segmented.*profile-figures.*profile-split.*actchart/.test(ordre ?? ''), ordre);
+// Colonne de droite, sur ordinateur (à partir de 1000 px) : « Vos activités », la rangée de logos et les cinq dernières sessions.
+const activites = () => evaluate(`(() => {
+  const s = document.querySelector('.profile-activities');
+  if (!s) return null;
+  return { titre: s.querySelector('h2')?.textContent ?? '', lien: s.querySelector('a.ui-btn')?.textContent.trim() ?? '', href: s.querySelector('a.ui-btn')?.getAttribute('href') ?? '',
+    lignes: s.querySelectorAll('.lib-row').length, menus: s.querySelectorAll('button[aria-label="Plus d\\'actions sur la session"]').length };
+})()`);
+const roundsHere = () => evaluate(`[...document.querySelectorAll('.profile-activities .activity-bubble')].map((x) => x.querySelector('.activity-bubble__name')?.textContent.trim() + (x.getAttribute('aria-pressed') === 'true' ? '*' : '')).join(', ')`);
+const act = await activites();
+check('ordinateur : colonne « Vos activités », « Toutes les sessions », cinq lignes sans « … »', act?.titre === 'Vos activités' && act.lien === 'Toutes les sessions'
+  && act.href === '/sessions' && act.lignes === 5 && act.menus === 0, JSON.stringify(act));
+check('ordinateur : rangée de logos de la colonne', (await roundsHere()) === 'Toutes*, Wingfoil, Kite, Surf, Pumping', await roundsHere());
+await evaluate(`[...document.querySelectorAll('.profile-activities .activity-bubble')].find((x) => x.textContent.includes('Kite'))?.click()`);
+await wait(300);
+const actKite = await activites();
+check('un logo filtre les lignes sur place, le lien garde le filtre', actKite?.lignes === 1 && actKite.href.startsWith('/sessions?activite=') && (await search()) === '/profil', JSON.stringify(actKite));
+await evaluate(`[...document.querySelectorAll('.profile-activities .activity-bubble')].find((x) => x.textContent.includes('Toutes'))?.click()`);
+await wait(300);
+check('« Toutes » rend les cinq lignes', (await activites())?.lignes === 5 && (await activites())?.href === '/sessions');
 check('détail par activité replié au départ', (await evaluate(`document.querySelector('.profile-fold')?.getAttribute('aria-expanded')`)) === 'false'
   && (await legend()).length === 0);
 await evaluate(`document.querySelector('.profile-fold').click()`);
@@ -175,16 +198,17 @@ check("retour à l'année", (await chartCount()) === '4 sessions', await chartCo
 // 4. Le sport préféré, puis une ligne de la légende, ouvrent la bibliothèque de leur activité.
 await evaluate(`document.querySelector('.profile-figure--link').click()`);
 await settle({ max: 1500 });
-check('le sport préféré ouvre sa bibliothèque', (await search())?.startsWith('/voile?activite=wingfoil'), await search());
+check('le sport préféré ouvre sa liste de sessions', (await search())?.startsWith('/sessions?activite=wingfoil'), await search());
 await go('/profil');
 await evaluate(`document.querySelector('.profile-legend__row').click()`);
 await settle({ max: 1500 });
-check('la ligne ouvre la bibliothèque filtrée', (await search())?.startsWith('/voile?activite='), await search());
+check('la ligne ouvre la page Sessions filtrée', (await search())?.startsWith('/sessions?activite='), await search());
 
 // 5. Téléphone.
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await go('/profil');
 check('390 px : rien ne déborde', !(await overflow()));
+check('390 px : « Gtracker » sur la photo, pas de colonne « Vos activités »', (await text('.profile-hero__name')) === 'Gtracker' && (await activites()) === null, await text('.profile-hero__name'));
 /** Bande des chiffres : deux cases sur deux lignes, aucune hors de l'écran. */
 const twoByTwo = () => evaluate(`(() => {
   const f = [...document.querySelectorAll('.profile-figure')].map((el) => el.getBoundingClientRect());
@@ -203,10 +227,10 @@ check('320 px : les cinq périodes tiennent sans défiler', await periodsFit());
 check('320 px : aucun chiffre plus large que sa case', await evaluate(`[...document.querySelectorAll('.profile-figure__value')].every((v) => v.scrollWidth <= v.clientWidth + 1)`));
 await shoot('profil-320');
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
-await go('/');
+await go('/sessions');
 const tab = `[...document.querySelectorAll('.shell-tabbar .shell-tab')].find((t) => t.textContent.trim() === 'Profil')`;
-check('barre du bas : Accueil, Profil, Statistiques, Réglages',
-  (await evaluate(`[...document.querySelectorAll('.shell-tabbar .shell-tab')].map((t) => t.textContent.trim()).join(' | ')`)) === 'Accueil | Profil | Statistiques | Réglages');
+check('barre du bas : Profil, Sessions, Statistiques, Réglages',
+  (await evaluate(`[...document.querySelectorAll('.shell-tabbar .shell-tab')].map((t) => t.textContent.trim()).join(' | ')`)) === 'Profil | Sessions | Statistiques | Réglages');
 await evaluate(`${tab}.click()`);
 await settle({ max: 1000 });
 check('la case Profil ouvre la page, allumée', (await search()) === '/profil' && (await evaluate(`${tab}.classList.contains('active')`)), await search());
@@ -226,7 +250,7 @@ const importMany = (list) => evaluate(`(() => {
   return 'ok';
 })()`);
 const HIDDEN = [['windsurf', 3, 8], ['bateau', 4, 4]];
-await go('/voile', 4000);
+await go('/sessions', 4000);
 await waitFor(`Boolean(document.querySelector('input[type=file][accept*=".gpx"]'))`, { timeout: 3000, every: 50 });
 console.log('import des deux sessions cachées :', await importMany(HIDDEN.map(([type, d, v]) => [`${type}-${d}.gpx`, gpxOf(type, d, v)])));
 await waitFor(async () => (await records())?.length === SESSIONS.length + HIDDEN.length, { timeout: 12000, label: 'fiches' });
@@ -239,7 +263,7 @@ check('activités cachées : toujours quatre sessions, trois parts, sans « Autr
   && (await evaluate(`document.querySelectorAll('.profile-donut g circle').length`)) === 3 && !(await legend())?.some((row) => row.startsWith('Autres')),
   `${(await figures())[0]} ; ${JSON.stringify(await legend())}`);
 // Une session de surf, importée par la page Surf, passée en Pumping dans l'onglet réglages de son analyse.
-await go('/surf', 4000);
+await go('/sessions', 4000);
 await waitFor(`Boolean(document.querySelector('input[type=file][accept*=".gpx"]'))`, { timeout: 3000, every: 50 });
 console.log('import de la session à passer en Pumping :', await importMany([['pompage-5.gpx', traceSurf({ debutMs: day(5), phases: [[1200, 4, 90]], type: 'surf', nom: 'pompage 5' })]]));
 await waitFor(async () => (await records())?.some((r) => Math.abs(r.summary.startMs - day(5)) < 2000), { timeout: 12000, label: 'fiche du pumping' });
@@ -276,7 +300,7 @@ if ((await evaluate(`document.querySelector('.profile-fold')?.getAttribute('aria
 await wait(300);
 await evaluate(`[...document.querySelectorAll('.profile-legend__row')].find((row) => row.textContent.startsWith('Pumping'))?.click()`);
 await settle({ max: 1500 });
-check('la ligne Pumping ouvre sa bibliothèque', /^\/surf\?activite=/.test((await search()) ?? ''), await search());
+check('la ligne Pumping ouvre sa liste de sessions', /^\/sessions\?activite=/.test((await search()) ?? ''), await search());
 
 // 7. La photo.
 await go('/profil');

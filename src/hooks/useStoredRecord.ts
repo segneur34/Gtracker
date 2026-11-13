@@ -42,7 +42,7 @@ export const useStoredRecord = <T extends object>(
     snapshot.current = { namespace, key, stored, value };
     return value;
   };
-  // Abonné au stockage : deux composants qui lisent la même clé (l'accueil et le pop-up du profil)
+  // Abonné au stockage : deux composants qui lisent la même clé (le Profil et son pop-up)
   // voient chacun les écritures de l'autre, dès le premier rendu.
   const value = useSyncExternalStore(jsonStore.subscribe, getValue);
 

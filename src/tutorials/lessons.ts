@@ -104,11 +104,12 @@ export const LESSONS: readonly Lesson[] = [
     title: 'Le Profil',
     hook: PROFILE_PLANT_VISIBLE
       ? 'La racine qui pousse à chaque semaine tenue, et sa fleur.'
-      : 'Votre photo, la période choisie, vos chiffres et le temps par activité.',
+      : "La page où s'ouvre l'application : votre photo, vos chiffres et le temps par activité.",
     icon: 'profil',
     target: '/profil',
     body: PROFILE_PLANT_VISIBLE
       ? [
+        "L'application s'ouvre sur le Profil ; vos sessions sont juste à côté, dans « Sessions ».",
         'Le Profil résume vos activités sur la période choisie : distance, sport préféré et temps par activité.',
         'Autour des cadres pousse une racine : elle gagne une étape à chaque semaine où vous tenez votre objectif, et fait le tour de la page en 26 semaines. Des semaines manquées la font reculer.',
         "Au-dessus du sol, la pousse fleurit avec le temps de la semaine : un bouton, une fleur ouverte à l'objectif, épanouie à 4 fois l'objectif ; au-delà, un papillon arrive à côté d'elle, puis s'y pose.",
@@ -116,9 +117,11 @@ export const LESSONS: readonly Lesson[] = [
         "L'objectif par semaine se règle dans Réglages › Pratiquant (45 min au départ).",
       ]
       : [
+        "L'application s'ouvre sur le Profil. Vos sessions sont juste à côté : « Sessions », la case voisine de la barre du bas, ou le lien du haut sur ordinateur.",
         'Le Profil résume vos activités sur la période choisie : distance, sport préféré et temps par activité.',
         'Touchez la photo ronde pour la changer : un des dessins d\'activité, ou une image de votre téléphone. Le pseudo se règle dans Réglages › Pratiquant.',
         'Une seule période pour toute la page : semaine, 30 jours, 6 mois, année ou depuis le début.',
+        "Sur ordinateur, « Vos activités » se tient à droite avec vos cinq dernières sessions : touchez le logo d'une activité pour ne voir que les siennes ; « Toutes les sessions » ouvre la liste entière.",
       ],
   },
   {
@@ -154,7 +157,7 @@ export const LESSONS: readonly Lesson[] = [
     icon: 'itineraires',
     target: '/itineraires',
     body: [
-      "En bas de la page Sessions, « Créer un parcours » ouvre la planification : touchez la carte pour poser les balises, reliées en ligne droite. La recherche trouve un port, une plage ou un spot.",
+      "En bas de la page Sessions, « Créer un parcours » ouvre la planification (sur ordinateur, « Planifier » dans la barre du haut) : touchez la carte pour poser les balises, reliées en ligne droite. La recherche trouve un port, une plage ou un spot.",
       "Le parcours donne la distance et le cap de chaque bord ; « Boucler » ajoute un dernier bord qui ramène au départ.",
       "Un GPX venu d'ailleurs se charge tel quel comme itinéraire, et un parcours s'exporte en GPX.",
       "Enregistré, l'itinéraire se retrouve sous « Itinéraires », juste à côté ; « Partir » ouvre l'enregistrement, où « Suivre une trace » le propose avec son activité.",

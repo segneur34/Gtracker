@@ -1,17 +1,168 @@
 /* Profil (`ProfilePage.tsx`), sur les variables de `theme/tokens.css` ; les couleurs des parts de l'anneau
    sont celles des activités, posées par le composant. */
 
-/* En-tête de la maquette : la photo ronde, cerclée de blanc, et le pseudo en capitales. */
-.profile-head {
+/* --- Photo d'en-tête : pleine largeur, texte blanc de jour comme de nuit sur un voile sombre. Les photos sont à GONG
+   ou à ses photographes : leur accord est à obtenir avant toute diffusion hors d'une démonstration faite à GONG. Chacune
+   sous la requête de son écran, pour que seule celle-là se télécharge ; aucune en économe ; l'aplat `--photo-bg` tient
+   la place pendant le chargement. --- */
+
+.profile-page {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.profile-hero {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 160px;
+  padding: var(--space-3);
+  background-color: var(--photo-bg);
+  background-position: center 30%;
+  background-size: cover;
+  background-repeat: no-repeat;
+  color: var(--on-accent);
+}
+
+.profile-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, var(--photo-shade), transparent 60%, var(--photo-shade-top));
+}
+
+/* Logo GONG et « Gtracker » en haut à gauche, sur téléphone seulement : l'ordinateur les a dans sa barre du haut. */
+.profile-hero__brand {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-2);
+}
+
+.profile-hero__mark {
+  height: 16px;
+  width: auto;
+}
+
+.profile-hero__name {
+  font-size: var(--text-m);
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-spacing);
+}
+
+.profile-hero__motto {
+  position: relative;
+  margin: 0;
+  text-align: right;
+  font-family: var(--font-title);
+  font-size: var(--text-title);
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-spacing);
+  line-height: 1;
+}
+
+@media (max-width: 767.98px), (max-height: 499.98px) and (pointer: coarse) {
+  .profile-hero {
+    background-image: url('../assets/profil/entete-telephone.webp');
+  }
+}
+
+/* Téléphone tourné : un bandeau plus bas, la page commence à droite du rail. */
+@media (orientation: landscape) and (max-height: 499.98px) and (pointer: coarse) {
+  .profile-hero {
+    height: 110px;
+    /* Bande plus basse sur une photo plus large : le cadrage descend sur la pratiquante et sa planche. */
+    background-position: center 55%;
+  }
+}
+
+@media (min-width: 768px) and (min-height: 500px), (min-width: 768px) and (pointer: fine), (min-width: 768px) and (pointer: none) {
+  .profile-page {
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+
+  .profile-hero {
+    height: 230px;
+    padding: var(--space-6) calc(var(--space-6) + var(--space-2));
+    background-image: url('../assets/profil/entete-ordinateur.webp');
+    background-position: center 42%;
+    /* Un peu plus large que l'en-tête : le liseré clair des bords de la capture reste dehors. */
+    background-size: 101% auto;
+  }
+
+  .profile-hero__brand {
+    display: none;
+  }
+
+  .profile-hero__motto {
+    font-size: var(--text-hero);
+  }
+
+  .profile-body {
+    display: grid;
+    gap: var(--space-5);
+    padding-bottom: var(--space-6);
+  }
+
+  /* « Vos activités » sous le Profil, à sa largeur. */
+  .profile-body > .profile-activities {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 var(--space-5);
+  }
+}
+
+/* Deux colonnes, le Profil à gauche, « Vos activités » à droite, chacune de la moitié de la page. */
+@media (min-width: 1000px) {
+  .profile-body--columns {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: calc(var(--space-6) + var(--space-2));
+    padding: 0 calc(var(--space-6) + var(--space-2)) var(--space-6);
+  }
+
+  .profile-body--columns > .ui-page,
+  .profile-body--columns > .profile-activities {
+    max-width: none;
+    margin: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .profile-body--columns > .profile-activities {
+    padding-top: var(--space-5);
+  }
+}
+
+:root[data-eco] .profile-hero {
+  background-image: none;
+}
+
+/* --- En-tête du Profil : la photo ronde, cerclée du fond, à cheval sur le bas de la photo d'en-tête ; « Bienvenue »
+   et le pseudo à côté, sous la photo, puis le lien du test de FC repos. --- */
+
+.ui-page.profile {
+  padding-top: 0;
+}
+
+.profile-head {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: -34px;
 }
 
 .profile-head__avatar {
   flex: 0 0 auto;
-  width: 88px;
-  height: 88px;
+  width: 80px;
+  height: 80px;
   padding: 0;
   border: 3px solid var(--surface);
   border-radius: var(--radius-pill);
@@ -24,12 +175,18 @@
   outline-offset: 2px;
 }
 
+/* Le texte commence sous la photo d'en-tête, que l'avatar déborde de 34 px. */
 .profile-head__text {
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--space-1);
+  padding-top: calc(34px + var(--space-1));
+}
+
+.profile-head__hello {
+  color: var(--muted);
+  font-size: var(--text-xs);
 }
 
 /* Entrée du test de FC repos, discrète sous le titre. */
@@ -290,15 +447,6 @@ button.profile-legend__row {
 }
 
 @media (max-width: 599px) {
-  .profile-head {
-    gap: var(--space-3);
-  }
-
-  .profile-head__avatar {
-    width: 72px;
-    height: 72px;
-  }
-
   .profile-head__title {
     font-size: var(--text-xl);
   }

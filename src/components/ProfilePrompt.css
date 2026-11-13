@@ -1,4 +1,4 @@
-/* Pop-up du profil sur l'accueil (`ProfilePrompt.tsx`), dans une `Dialog` : une ligne par champ. */
+/* Pop-up du profil sur le Profil (`ProfilePrompt.tsx`), dans une `Dialog` : une ligne par champ. */
 
 .profile-prompt {
   width: min(440px, 100%);

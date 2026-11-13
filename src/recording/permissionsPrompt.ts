@@ -1,6 +1,6 @@
 /**
  * Autorisations du téléphone dont l'enregistrement a besoin, et quand les
- * demander d'office (carte « Autorisations » de l'accueil). Pur : l'état vient
+ * demander d'office (carte « Autorisations » du Profil). Pur : l'état vient
  * de `platform/permissions.ts`, la version vue en dernier de l'appareil.
  */
 

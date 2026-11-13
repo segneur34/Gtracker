@@ -1,6 +1,6 @@
 import { lazy, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Navigate, Routes, Route, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { RESTING_HR_PATH, SESSIONS_PATH, analysisPath, sessionsPath } from './core/parentPage';
+import { PROFILE_PATH, RESTING_HR_PATH, SESSIONS_PATH, analysisPath, sessionsPath } from './core/parentPage';
 import { sportFamily } from './core/sportProfiles';
 import AppShell from './components/AppShell';
 import { DevThrow } from './components/ErrorBoundary';
@@ -8,10 +8,10 @@ import { confirmLeave } from './hooks/leaveGuard';
 import {
   acknowledgeRecordingLanding, dismissRecorderResult, finishPendingSession, getRecorderState, markRecorderResultOpened, useRecorderSelector,
 } from './hooks/useRecorder';
-import SessionsPage from './pages/SessionsPage';
+import ProfilePage from './pages/ProfilePage';
 
 /**
- * Pages chargées à la demande : seule la page Sessions, où mène l'accueil, est dans le paquet
+ * Pages chargées à la demande : seul le Profil, où s'ouvre l'application, est dans le paquet
  * d'entrée ; chaque autre page, et avec elle Recharts (`vendor-charts`) ou
  * Leaflet (`vendor-map`), ne s'analyse qu'à sa première ouverture. `AppShell`
  * pose le `Suspense` ; les chemins, les `key` et `core/parentPage.ts` ne
@@ -19,6 +19,7 @@ import SessionsPage from './pages/SessionsPage';
  * paquet : c'est du temps d'analyse JS déplacé hors du premier rendu.
  */
 const loaders = {
+  SessionsPage: () => import('./pages/SessionsPage'),
   RecordingPage: () => import('./pages/RecordingPage'),
   SailingModule: () => import('./pages/SailingModule'),
   SurfModule: () => import('./pages/SurfModule'),
@@ -26,12 +27,12 @@ const loaders = {
   PlanningPage: () => import('./pages/PlanningPage'),
   RoutesPage: () => import('./pages/RoutesPage'),
   StatisticsPage: () => import('./pages/StatisticsPage'),
-  ProfilePage: () => import('./pages/ProfilePage'),
   RestingHrTestPage: () => import('./pages/RestingHrTestPage'),
   TutorialsPage: () => import('./pages/TutorialsPage'),
   TutorialPage: () => import('./pages/TutorialPage'),
 };
 
+const SessionsPage = lazy(loaders.SessionsPage);
 const RecordingPage = lazy(loaders.RecordingPage);
 const SailingModule = lazy(loaders.SailingModule);
 const SurfModule = lazy(loaders.SurfModule);
@@ -39,7 +40,6 @@ const SettingsPage = lazy(loaders.SettingsPage);
 const PlanningPage = lazy(loaders.PlanningPage);
 const RoutesPage = lazy(loaders.RoutesPage);
 const StatisticsPage = lazy(loaders.StatisticsPage);
-const ProfilePage = lazy(loaders.ProfilePage);
 const RestingHrTestPage = lazy(loaders.RestingHrTestPage);
 const TutorialsPage = lazy(loaders.TutorialsPage);
 const TutorialPage = lazy(loaders.TutorialPage);
@@ -49,14 +49,14 @@ const PRELOAD_FALLBACK_MS = 1500;
 
 /**
  * Précharge les pages une fois la première rendue et le fil libre, dans l'ordre
- * où l'utilisateur y va le plus : Enregistrer, les
+ * où l'utilisateur y va le plus : Sessions, Enregistrer, les
  * analyses, puis le reste ; un morceau à la fois, pour ne pas peser sur le
  * premier rendu. Une page ouverte entre-temps ne l'attend pas : `React.lazy`
  * la charge lui-même.
  */
 const preloadPages = (): (() => void) => {
   const order: (keyof typeof loaders)[] = [
-    'RecordingPage', 'SailingModule', 'SurfModule', 'StatisticsPage', 'ProfilePage',
+    'SessionsPage', 'RecordingPage', 'SailingModule', 'SurfModule', 'StatisticsPage',
     'SettingsPage', 'PlanningPage', 'RoutesPage', 'RestingHrTestPage', 'TutorialPage', 'TutorialsPage',
   ];
   let cancelled = false;
@@ -89,7 +89,7 @@ function FormerLibrary() {
   return <Navigate to={sessionsPath(params.get('activite'))} replace />;
 }
 
-/** Une recharge mène toujours à l'accueil : après une reprise silencieuse, retour sur Enregistrer. */
+/** Une recharge mène toujours au Profil : après une reprise silencieuse, retour sur Enregistrer. */
 function LandOnRecording() {
   const land = useRecorderSelector((s) => s.landOnRecording);
   const navigate = useNavigate();
@@ -144,8 +144,9 @@ function App() {
       <Routes>
         {/* Toutes les pages dans le même cadre : navigation et bandeau d'enregistrement. */}
         <Route element={<AppShell />}>
-          {/* L'accueil mène à la page Sessions, qui liste les sessions des deux familles. */}
-          <Route path="/" element={<Navigate to={SESSIONS_PATH} replace />} />
+          {/* L'application s'ouvre sur le Profil ; la page Sessions liste les sessions des deux familles. */}
+          <Route path="/" element={<Navigate to={PROFILE_PATH} replace />} />
+          <Route path={PROFILE_PATH} element={<ProfilePage />} />
           <Route path={SESSIONS_PATH} element={<SessionsPage />} />
           {/* Chaque famille : son module d'analyse ouvert sur une session (`?session=`), et l'ancienne adresse de sa bibliothèque. */}
           <Route path="/voile" element={<FormerLibrary />} />
@@ -156,7 +157,6 @@ function App() {
           <Route path="/itineraires" element={<PlanningPage />} />
           <Route path="/itineraires/liste" element={<RoutesPage />} />
           <Route path="/statistiques" element={<StatisticsPage />} />
-          <Route path="/profil" element={<ProfilePage />} />
           <Route path={RESTING_HR_PATH} element={<RestingHrTestPage />} />
           <Route path="/parametres" element={<SettingsPage />} />
           {/* Tutoriels : la liste, sous Réglages, et chaque leçon. */}
@@ -164,8 +164,8 @@ function App() {
           <Route path="/tutoriels/:id" element={<TutorialPage />} />
           {/* Développement seulement : une page qui lève au rendu, pour essayer la limite d'erreur au banc. */}
           {import.meta.env.DEV && <Route path="/essai/erreur" element={<DevThrow />} />}
-          {/* Toute autre adresse mène à l'accueil, au lieu d'une page vide. */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Toute autre adresse mène au Profil, au lieu d'une page vide. */}
+          <Route path="*" element={<Navigate to={PROFILE_PATH} replace />} />
         </Route>
       </Routes>
     </Router>

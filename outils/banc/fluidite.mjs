@@ -30,10 +30,10 @@
 //     dégradé, avant et après le geste. Avec un dossier de captures : le panneau « Graphiques » entier, puis zoomé ×2
 //     (`zoom-<variante>-entier`, `-zoome`) ;
 //  5. mise à jour des résumés : les fiches des sessions d'une heure sont marquées d'une version de calcul antérieure
-//     (cache des fiches effacé), la page est relancée sur l'accueil ; temps jusqu'aux résumés refaits, tâches longues,
+//     (cache des fiches effacé), la page est relancée sur l'ouverture de l'application, le Profil ; temps jusqu'aux résumés refaits, tâches longues,
 //     et la latence d'un mouvement de souris envoyé toutes les 300 ms pendant ce temps (la page répond-elle ?) ; une
 //     prise de plus sous le profileur ;
-//  6. démarrage : du chargement de `/` à l'accueil rendu, puis au premier répit d'une seconde sans tâche longue
+//  6. démarrage : du chargement de `/` au Profil rendu (en-tête `.profile-head__title`), puis au premier répit d'une seconde sans tâche longue
 //     (« interactif »), tâches longues et modules chargés sur 8 s ; avec le préchargement des pages
 //     (`preloadPages` d'`App.tsx`), puis sans (`requestIdleCallback` neutralisé depuis le script, rien dans `src/`) ;
 //  7. fin d'enregistrement (« analyser », hors de la liste par défaut, `FLUIDITE_MESURES=analyser`) : enregistrement
@@ -75,7 +75,7 @@ await send('Profiler.enable');
 await send('Profiler.setSamplingInterval', { interval: 500 });
 
 // Script de page : tâches longues (API Long Tasks), durée de chaque `DOMParser.parseFromString`, latence des entrées
-// (heure du traitement moins heure de l'événement), instant du premier rendu de l'accueil.
+// (heure du traitement moins heure de l'événement), instant du premier rendu du Profil.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
   const f = { longtasks: [], domparser: [], inputs: [], homeAt: null };
   Object.defineProperty(window, '__fluidite', { value: f, enumerable: false });
@@ -92,7 +92,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
   };
   for (const type of ['mousemove', 'click']) document.addEventListener(type, (e) => { f.inputs.push({ type, at: performance.now(), delay: performance.now() - e.timeStamp }); }, true);
   const mo = new MutationObserver(() => {
-    if (f.homeAt === null && document.querySelector('.home-families')) { f.homeAt = performance.now(); mo.disconnect(); }
+    if (f.homeAt === null && document.querySelector('.profile-head__title')) { f.homeAt = performance.now(); mo.disconnect(); }
   });
   mo.observe(document, { subtree: true, childList: true });
 })();` });
@@ -229,7 +229,7 @@ for (let i = 0; i < COUNT; i++) {
 
 // --- Import ---
 const MULTI = 'input[type=file][accept*=".gpx"][multiple]:not([disabled])';
-await go('/voile', 5000);
+await go('/sessions', 5000);
 console.log('import voile          :', await importFiles([longPath, shortPath], MULTI));
 await waitFor(async () => (await records()).length >= 2, { timeout: 60000, every: 500, label: 'fiches voile' });
 await settle({ max: 5000, label: 'import voile' });
@@ -247,7 +247,7 @@ const importOne = async (page, name, text, datePart) => {
   const path = join(workDir, name);
   writeFileSync(path, text);
   const before = (await records()).length;
-  await go(`/${page}`, 5000);
+  await go('/sessions', 5000);
   console.log(`import ${name.padEnd(22)}:`, await importFiles(path, MULTI));
   await waitFor(async () => (await records()).length > before, { timeout: 90000, every: 500, label: name });
   await settle({ max: 5000, label: name });
@@ -301,7 +301,7 @@ const openLong = async ({ profile = false } = {}) => {
     libre: lt.lastEnd === null ? 0 : lt.lastEnd - out.t0, dom, script: (after.ScriptDuration - before.ScriptDuration) * 1000, prof };
   // Retour à la bibliothèque (navigation dans la page) : l'analyse démontée, la liste rendue (sous ralenti, React peut
   // n'avoir rien rendu quand `settle` voit un DOM immobile).
-  await evaluate(`${SPA_GO('/voile')} 'ok'`);
+  await evaluate(`${SPA_GO('/sessions')} 'ok'`);
   await waitFor(`!document.querySelector('.an-page') && document.querySelectorAll('.lib-row').length >= 2`, { timeout: 30000, every: 50, label: 'bibliothèque rendue' });
   await settle({ max: 10000, label: 'retour bibliothèque' });
   return r;
@@ -310,7 +310,7 @@ const openText = (r) => `titre ${sec(r.titre)} | trace ${sec(r.trace)} | chiffre
 
 if (MESURES.includes('ouverture')) {
   console.log(`\n== Ouverture de la session de voile (${HEURES} h à 5 Hz) depuis la bibliothèque, onglets par défaut [${minutes()}] ==`);
-  await go('/voile', 5000);
+  await go('/sessions', 5000);
   await waitFor(`document.querySelectorAll('.lib-row').length >= 2`, { timeout: 10000, label: 'bibliothèque' });
   await throttle(1);
   await openLong(); // chauffe : modules de l'analyse chargés
@@ -349,7 +349,7 @@ const quitLong = async () => {
       const now = performance.now();
       if (out.lecture === null && [...document.querySelectorAll('.an-page p')].some((p) => p.textContent.includes('Lecture de la session'))) out.lecture = now - t0;
       if (now - t0 >= 100) {
-        ${SPA_GO('/voile')}
+        ${SPA_GO('/sessions')}
         out.quitte = now - t0;
         resolve(out);
       } else setTimeout(tick, 5);
@@ -369,7 +369,7 @@ const quitText = (r) => `retour à ${sec(r.quitte)} | « Lecture de la session�
 
 if (MESURES.includes('quitter')) {
   console.log(`\n== Quitter la session de voile (${HEURES} h à 5 Hz) 100 ms après l'avoir ouverte, retour à la bibliothèque [${minutes()}] ==`);
-  await go('/voile', 5000);
+  await go('/sessions', 5000);
   await waitFor(`document.querySelectorAll('.lib-row').length >= 2`, { timeout: 10000, label: 'bibliothèque' });
   await throttle(1);
   await quitLong(); // chauffe : modules de l'analyse chargés
@@ -590,7 +590,7 @@ if (MESURES.includes('zoom')) {
 // --- 5. Mise à jour des résumés ---
 if (MESURES.includes('resumes') || MESURES.includes('demarrage')) {
   await throttle(1);
-  await go('/voile', 5000);
+  await go('/sessions', 5000);
   console.log(`\nimport de ${COUNT} sessions :`, await importFiles(manyPaths, MULTI));
   const attendues = 2 + zoomImported + COUNT;
   const got = await waitFor(async () => (await records()).length >= attendues, { timeout: 240000, every: 1000, label: `fiches des ${COUNT} sessions` });
@@ -635,7 +635,7 @@ const reload = async (path) => {
 };
 
 if (MESURES.includes('resumes')) {
-  console.log(`\n== Mise à jour des résumés de ${COUNT} sessions de voile (1 h à 1 Hz) au lancement, sur l'accueil [${minutes()}] ==`);
+  console.log(`\n== Mise à jour des résumés de ${COUNT} sessions de voile (1 h à 1 Hz) au lancement, sur le Profil [${minutes()}] ==`);
   const refreshOnce = async ({ profile = false } = {}) => {
     const n = await outdateRecords();
     await reload('/');
@@ -700,11 +700,11 @@ if (MESURES.includes('resumes')) {
 
 // --- 6. Démarrage ---
 if (MESURES.includes('demarrage')) {
-  console.log(`\n== Démarrage : chargement de « / » jusqu'à l'accueil, ${2 + zoomImported + COUNT} sessions en mémoire, cache des fiches à jour [${minutes()}] ==`);
+  console.log(`\n== Démarrage : chargement de « / » jusqu'au Profil, ${2 + zoomImported + COUNT} sessions en mémoire, cache des fiches à jour [${minutes()}] ==`);
   const WINDOW_MS = FENETRE_S * 1000;
   await throttle(1);
   await reload('/');
-  await settle({ max: 20000, label: 'accueil, cache refait' });
+  await settle({ max: 20000, label: 'Profil, cache refait' });
   await wait(3000);
   let scripts = 0;
   const unlisten = b.onMessage((msg) => { if (msg.method === 'Network.requestWillBeSent' && msg.params.type === 'Script') scripts++; });
@@ -716,7 +716,7 @@ if (MESURES.includes('demarrage')) {
     const m1 = await metrics();
     const homeAt = await evaluate('window.__fluidite.homeAt');
     const lt = await longTasks(0, WINDOW_MS);
-    // Interactif : premier instant, après l'accueil rendu, suivi d'une seconde sans tâche longue.
+    // Interactif : premier instant, après le Profil rendu, suivi d'une seconde sans tâche longue.
     let interactive = null;
     if (homeAt !== null) {
       const tasks = [...lt.tasks].sort((a, c) => a.start - c.start);
@@ -730,7 +730,7 @@ if (MESURES.includes('demarrage')) {
     }
     return { rendu: homeAt, interactif: interactive, max: lt.max, total: lt.total, count: lt.count, script: (m1.ScriptDuration - m0.ScriptDuration) * 1000, modules: scripts };
   };
-  const startText = (r) => `accueil rendu ${sec(r.rendu)} | interactif ${r.interactif == null ? `> ${FENETRE_S} s` : sec(r.interactif)} | ${ltText(r)} | script ${sec(r.script)} | ${r.modules} modules chargés`;
+  const startText = (r) => `Profil rendu ${sec(r.rendu)} | interactif ${r.interactif == null ? `> ${FENETRE_S} s` : sec(r.interactif)} | ${ltText(r)} | script ${sec(r.script)} | ${r.modules} modules chargés`;
   results.demarrage = {};
   let noPreload = null;
   for (const mode of ['avec préchargement', 'sans préchargement']) {
@@ -750,7 +750,7 @@ if (MESURES.includes('demarrage')) {
       if (runs.some((r) => r.interactif == null)) med.interactif = null;
       results.demarrage[mode][rate] = med;
       console.log(`${mode}, ×${rate} médiane : ${startText(med)}`);
-      check(`démarrage ${mode} ×${rate} : l'accueil est rendu à chaque prise, modules comptés`, runs.every((r) => fini(r.rendu) && fini(r.modules) && fini(r.script)),
+      check(`démarrage ${mode} ×${rate} : le Profil est rendu à chaque prise, modules comptés`, runs.every((r) => fini(r.rendu) && fini(r.modules) && fini(r.script)),
         runs.map((r) => `${sec(r.rendu)}, ${r.modules} modules`).join(' ; '));
     }
   }
@@ -945,7 +945,7 @@ if (results.resumes) {
 if (results.demarrage) {
   for (const mode of Object.keys(results.demarrage)) {
     const d = results.demarrage[mode];
-    row(`Démarrage ${mode} : accueil / interactif`, (r) => `${sec(d[r].rendu)} / ${d[r].interactif == null ? `> ${FENETRE_S} s` : sec(d[r].interactif)}`);
+    row(`Démarrage ${mode} : Profil / interactif`, (r) => `${sec(d[r].rendu)} / ${d[r].interactif == null ? `> ${FENETRE_S} s` : sec(d[r].interactif)}`);
     row(`Démarrage ${mode} : tâche max / bloqué (${FENETRE_S} s) / modules`, (r) => `${sec(d[r].max)} / ${sec(d[r].total)} / ${d[r].modules}`);
   }
 }

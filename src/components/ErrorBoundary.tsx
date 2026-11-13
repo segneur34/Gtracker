@@ -6,13 +6,13 @@ import Button from './ui/Button';
  * l'application. Autour de la page (`AppShell`), la barre, les bandeaux et le
  * bouton rond restent, et un enregistrement en cours peut toujours s'arrêter ;
  * la clé `resetKey` (l'adresse) la réarme à chaque page. Autour de toute
- * l'application (`main.tsx`), sans `onHome`, le bouton la recharge sur
- * l'accueil, qui mène à la page Sessions.
+ * l'application (`main.tsx`), sans `onHome`, le bouton la recharge à son
+ * adresse de départ, qui mène au Profil.
  */
 
 interface ErrorBoundaryProps {
   children: ReactNode;
-  /** Revenir à l'accueil depuis la page en erreur ; sans lui, l'application est rechargée sur l'accueil. */
+  /** Revenir au Profil depuis la page en erreur ; sans lui, l'application est rechargée sur le Profil. */
   onHome?: () => void;
 }
 
@@ -37,7 +37,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       window.location.replace('/');
       return;
     }
-    // Remise à zéro d'abord : l'erreur peut venir de l'accueil lui-même, dont l'adresse ne change pas.
+    // Remise à zéro d'abord : l'erreur peut venir du Profil lui-même, dont l'adresse ne change pas.
     this.setState({ error: null });
     onHome();
   };
@@ -55,7 +55,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           <p className="num" style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--muted)', overflowWrap: 'anywhere' }}>
             {error.message || error.name}
           </p>
-          <Button variant="primary" onClick={this.goHome}>Revenir aux sessions</Button>
+          <Button variant="primary" onClick={this.goHome}>Revenir au Profil</Button>
         </section>
       </div>
     );

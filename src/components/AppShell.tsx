@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, type ComponentType } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { SESSIONS_PATH, parentPage } from '../core/parentPage';
+import { RECORD_PATH, TAB_BAR, TOP_LINKS, alsoActiveOn, type NavDestination, type NavId } from '../core/navigation';
+import { PROFILE_PATH, parentPage } from '../core/parentPage';
 import { formatClock } from '../core/units';
 import { useLongPress } from '../hooks/useLongPress';
 import { togglePauseRecording, useRecorderStatus, useRecordingClock, type RecorderStatus } from '../hooks/useRecorder';
@@ -19,14 +20,14 @@ import IncomingFileNotice from './IncomingFileNotice';
  * Cadre de toutes les pages : navigation et bandeau d'enregistrement.
  *
  * Sur téléphone (moins de 768 px de large, ou tourné : `NARROW_QUERY`), une barre d'onglets en bas, en
- * cinq cases fixes, à la verticale à gauche sur le téléphone tourné, le bouton rond au milieu : Sessions · Profil ·
+ * cinq cases fixes, à la verticale à gauche sur le téléphone tourné, le bouton rond au milieu : Profil · Sessions ·
  * Enregistrer · Statistiques · Réglages. Les itinéraires s'ouvrent depuis la page
  * Sessions, dont la case reste allumée sur l'analyse d'une session. La barre du bas est noire, sa case allumée en vert vif ; le
  * bouton rond est vert vif au repos et en pause, rouge pendant un
  * enregistrement. En haut, le lien allumé est à l'encre, souligné.
- * Sur ordinateur, toutes les destinations dans une barre en haut (Sessions en tête, les
- * statistiques et le profil avant Réglages), et « Itinéraires » à côté du
- * bouton Enregistrer. Le logo mène à l'accueil. Le choix se fait en CSS (`AppShell.css`), sans lecture de la
+ * Sur ordinateur, toutes les destinations dans une barre en haut (Profil, Sessions, Planifier, Statistiques,
+ * Réglages), puis le bouton vert « Enregistrer ». L'ordre des deux barres vient de `core/navigation.ts`. Le logo
+ * mène au Profil. Le choix se fait en CSS (`AppShell.css`), sans lecture de la
  * taille d'écran en JavaScript.
  *
  * Pendant un enregistrement, un bandeau rouge rappelle sur chaque page qu'il
@@ -36,24 +37,14 @@ import IncomingFileNotice from './IncomingFileNotice';
  * quelle page ; un appui court y ramène, comme au repos.
  */
 
-interface Destination {
-  to: string;
-  label: string;
-  Icon: ComponentType<{ size?: number }>;
-  /** Pages, en plus de la sienne, où sa case reste allumée. */
-  alsoOn?: (pathname: string) => boolean;
-}
-
-/** Sessions : allumée aussi sur l'analyse d'une session, ouverte depuis sa liste. */
-const SESSIONS: Destination = {
-  to: SESSIONS_PATH, label: 'Sessions', Icon: IconList,
-  alsoOn: (pathname) => /^\/(?:voile|surf)\/analyse\/?$/.test(pathname),
+/** Icône de chaque destination des barres. */
+const NAV_ICON: Record<NavId, ComponentType<{ size?: number }>> = {
+  profil: IconUser,
+  sessions: IconList,
+  planifier: IconRoute,
+  statistiques: IconChart,
+  reglages: IconSettings,
 };
-const SETTINGS: Destination = { to: '/parametres', label: 'Réglages', Icon: IconSettings };
-const RECORD_PATH = '/enregistrer';
-const PLAN_PATH = '/itineraires';
-const STATISTIQUES: Destination = { to: '/statistiques', label: 'Statistiques', Icon: IconChart };
-const PROFIL: Destination = { to: '/profil', label: 'Profil', Icon: IconUser };
 
 /**
  * Feuille de symboles des logos d'activité, lue à part pour ne pas alourdir l'ouverture : les logos restent vides le
@@ -116,26 +107,21 @@ function RecordButton({ status, pressingMs, handlers }: {
 }
 
 /** Classe d'un lien des barres : `active` sur sa page, et sur celles où sa case reste allumée. */
-const linkClass = (base: string, d: Destination, pathname: string) => ({ isActive }: { isActive: boolean }) =>
-  isActive || d.alsoOn?.(pathname) ? `${base} active` : base;
+const linkClass = (base: string, d: NavDestination, pathname: string) => ({ isActive }: { isActive: boolean }) =>
+  isActive || alsoActiveOn(d.id, pathname) ? `${base} active` : base;
 
-const tabLink = (d: Destination, pathname: string) => (
-  <NavLink
-    key={d.to}
-    to={d.to}
-    end={d.to === '/'}
-    className={linkClass('shell-tab', d, pathname)}>
-    <d.Icon size={24} />
-    <span>{d.label}</span>
-  </NavLink>
-);
+const tabLink = (d: NavDestination, pathname: string) => {
+  const Icon = NAV_ICON[d.id];
+  return (
+    <NavLink key={d.to} to={d.to} className={linkClass('shell-tab', d, pathname)}>
+      <Icon size={24} />
+      <span>{d.label}</span>
+    </NavLink>
+  );
+};
 
-const topLink = (d: Destination, pathname: string) => (
-  <NavLink
-    key={d.to}
-    to={d.to}
-    end={d.to === '/'}
-    className={linkClass('shell-toplink', d, pathname)}>
+const topLink = (d: NavDestination, pathname: string) => (
+  <NavLink key={d.to} to={d.to} className={linkClass('shell-toplink', d, pathname)}>
     {d.label}
   </NavLink>
 );
@@ -158,7 +144,7 @@ function AppShell() {
   const paused = status === 'paused';
   const canToggle = status === 'recording' || paused;
   const onLongPress = useCallback(() => void togglePauseRecording(), []);
-  const goHome = useCallback(() => navigate('/'), [navigate]);
+  const goHome = useCallback(() => navigate(PROFILE_PATH), [navigate]);
   const { pressingMs, handlers } = useLongPress(onLongPress, effectiveLongPressMs, canToggle);
 
   // Orientation figée par le cadenas d'Enregistrer : rendue libre à la fin de l'enregistrement.
@@ -186,21 +172,14 @@ function AppShell() {
         <LogoSprite />
       </Suspense>
       <header className="shell-topbar">
-        <Link to="/" className="shell-brand" aria-label="GONG Gtracker">
+        <Link to={PROFILE_PATH} className="shell-brand" aria-label="GONG Gtracker">
           <GongLogo className="shell-brand__mark" />
           <span className="shell-brand__name" aria-hidden="true">Gtracker</span>
         </Link>
         <nav aria-label="Navigation principale" className="shell-toplinks">
-          {topLink(SESSIONS, pathname)}
-          {topLink(STATISTIQUES, pathname)}
-          {topLink(PROFIL, pathname)}
-          {topLink(SETTINGS, pathname)}
+          {TOP_LINKS.map((d) => topLink(d, pathname))}
         </nav>
         <div className="shell-topactions">
-          <NavLink to={PLAN_PATH} className="shell-topplan">
-            <IconRoute size={18} />
-            Itinéraires
-          </NavLink>
           <NavLink to={RECORD_PATH} className={`shell-toprecord${busy ? ' shell-toprecord--busy' : ''}`}>
             <span className={`ui-record-dot${busy ? ' ui-record-dot--stop' : ''}`} />
             {busy ? <RecordingClock /> : 'Enregistrer'}
@@ -232,13 +211,11 @@ function AppShell() {
       </main>
 
       <nav aria-label="Navigation principale" className="shell-tabbar">
-        {tabLink(SESSIONS, pathname)}
-        {tabLink(PROFIL, pathname)}
+        {TAB_BAR.before.map((d) => tabLink(d, pathname))}
         <div className="shell-tabbar__record">
           <RecordButton status={status} pressingMs={pressingMs} handlers={handlers} />
         </div>
-        {tabLink(STATISTIQUES, pathname)}
-        {tabLink(SETTINGS, pathname)}
+        {TAB_BAR.after.map((d) => tabLink(d, pathname))}
       </nav>
 
       {pressingMs !== null && (

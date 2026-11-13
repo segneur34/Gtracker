@@ -1,11 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { SESSIONS_PATH, analysisPath, parentPage, sessionFamily, sessionsPath } from './parentPage';
+import { PROFILE_PATH, SESSIONS_PATH, analysisPath, parentPage, sessionFamily, sessionsPath } from './parentPage';
 
 describe('parentPage', () => {
-  it("rien au-dessus de l'accueil ni de Sessions, où il mène : le retour quitte l'application", () => {
+  it("Profil : rien au-dessus, ni à l'adresse /, qui y mène ; le retour quitte l'application", () => {
+    expect(PROFILE_PATH).toBe('/profil');
     expect(parentPage('/', '')).toBeNull();
-    expect(parentPage('/sessions', '')).toBeNull();
-    expect(parentPage('/sessions/', '?activite=kite')).toBeNull();
+    expect(parentPage('/profil', '')).toBeNull();
+    expect(parentPage('/profil/', '?x=1')).toBeNull();
+  });
+
+  it('Sessions remonte au Profil, filtre ou pas', () => {
+    expect(parentPage('/sessions', '')).toBe('/profil');
+    expect(parentPage('/sessions/', '?activite=kite')).toBe('/profil');
+  });
+
+  it('Planifier et la liste des itinéraires remontent à Sessions, où est leur entrée', () => {
+    expect(parentPage('/itineraires', '')).toBe('/sessions');
+    expect(parentPage('/itineraires', '?itineraire=x')).toBe('/sessions');
+    expect(parentPage('/itineraires/liste', '')).toBe('/sessions');
+    expect(parentPage('/itineraires-autre', '')).toBe('/profil');
   });
 
   it("l'analyse renvoie à Sessions, quelle que soit sa famille", () => {
@@ -23,6 +36,7 @@ describe('parentPage', () => {
   it('le test de FC repos remonte au Profil', () => {
     expect(parentPage('/profil/fc-repos', '')).toBe('/profil');
     expect(parentPage('/profil/fc-repos/', '?vitesse=10')).toBe('/profil');
+    expect(parentPage('/profil/fc-repos/autre', '')).toBe('/profil');
   });
 
   it('une leçon des tutoriels remonte à leur liste, la liste à Réglages', () => {
@@ -31,22 +45,21 @@ describe('parentPage', () => {
     expect(parentPage('/tutoriels', '')).toBe('/parametres');
   });
 
-  it("Enregistrer renvoie à l'accueil, filtre d'activité compris", () => {
-    expect(parentPage('/enregistrer', '')).toBe('/');
-    expect(parentPage('/enregistrer', '?activite=a-surf-foil')).toBe('/');
+  it("Enregistrer renvoie au Profil, filtre d'activité compris", () => {
+    expect(parentPage('/enregistrer', '')).toBe('/profil');
+    expect(parentPage('/enregistrer', '?activite=a-surf-foil')).toBe('/profil');
   });
 
-  it("les anciennes adresses des bibliothèques renvoient à l'accueil, filtre compris", () => {
-    expect(parentPage('/voile', '')).toBe('/');
-    expect(parentPage('/surf', '?activite=a-surf-foil')).toBe('/');
-    expect(parentPage('/voile', '?vue=planifiees')).toBe('/');
+  it('les anciennes adresses des bibliothèques renvoient au Profil, filtre compris', () => {
+    expect(parentPage('/voile', '')).toBe('/profil');
+    expect(parentPage('/surf', '?activite=a-surf-foil')).toBe('/profil');
+    expect(parentPage('/voile', '?vue=planifiees')).toBe('/profil');
   });
 
-  it("les autres pages, connues ou non, renvoient à l'accueil", () => {
-    for (const p of ['/ski/analyse', '/parapente/seances', '/enregistrer', '/profil', '/parametres', '/itineraires', '/itineraires/liste', '/inconnue', '/voile/autre']) {
-      expect(parentPage(p, '')).toBe('/');
+  it('les autres pages, connues ou non, renvoient au Profil', () => {
+    for (const p of ['/ski/analyse', '/parapente/seances', '/enregistrer', '/parametres', '/inconnue', '/voile/autre']) {
+      expect(parentPage(p, '')).toBe('/profil');
     }
-    expect(parentPage('/itineraires', '?itineraire=x')).toBe('/');
   });
 
   it('les Statistiques remontent d\'un cran, la période gardée', () => {
@@ -54,8 +67,8 @@ describe('parentPage', () => {
     expect(parentPage('/statistiques', '?famille=voile&activite=kite')).toBe('/statistiques?famille=voile');
     expect(parentPage('/statistiques', '?famille=voile&periode=annee')).toBe('/statistiques?periode=annee');
     expect(parentPage('/statistiques', '?famille=surf')).toBe('/statistiques');
-    expect(parentPage('/statistiques', '?periode=annee')).toBe('/');
-    expect(parentPage('/statistiques', '')).toBe('/');
+    expect(parentPage('/statistiques', '?periode=annee')).toBe('/profil');
+    expect(parentPage('/statistiques', '')).toBe('/profil');
   });
 
   it('une barre oblique finale ne change rien', () => {

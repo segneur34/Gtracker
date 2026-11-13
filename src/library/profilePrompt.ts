@@ -3,7 +3,7 @@ import { ATHLETE_BOUNDS, athleteName, type AthleteNumberField, type AthleteProfi
 import { ROOT_GOAL } from './rootGrowth';
 
 /**
- * Règles du Profil liées à la mémoire et à l'accueil, pures :
+ * Règles du Profil liées à la mémoire et aux cartes d'ouverture, pures :
  * objectif de la racine, champs que le pop-up demande, et quand il s'ouvre.
  */
 
@@ -32,7 +32,7 @@ export const athleteRootGoalMin = (profile: Partial<Pick<AthleteProfile, 'rootWe
 };
 
 /**
- * Champs que le pop-up de l'accueil demande tant qu'ils manquent : le pseudo et l'année de naissance ;
+ * Champs que le pop-up du Profil demande tant qu'ils manquent : le pseudo et l'année de naissance ;
  * sexe, poids et taille ne sont plus demandés, ils se règlent dans Réglages › Pratiquant ; la FC max et la FC repos
  * viennent des tests.
  */
@@ -49,7 +49,7 @@ export const missingProfileFields = (profile: Partial<AthleteProfile>): ProfileP
   });
 
 /**
- * Le pop-up du profil s'ouvre-t-il sur l'accueil ? Dans l'application seulement,
+ * Le pop-up du profil s'ouvre-t-il sur le Profil ? Dans l'application seulement,
  * une fois par lancement, tant qu'un champ manque, et jamais par-dessus la carte
  * de la mémoire ou celle des autorisations (il attend alors le lancement suivant).
  */
@@ -61,7 +61,7 @@ export const shouldPromptProfile = ({ native, missing, askedThisLaunch, otherCar
 }): boolean => native && missing.length > 0 && !askedThisLaunch && !otherCardShown;
 
 /**
- * Ordre de l'accueil : la mémoire, puis les autorisations, puis le profil. Le pop-up
+ * Ordre des cartes d'ouverture du Profil : la mémoire, puis les autorisations, puis le profil. Le pop-up
  * n'est posé qu'une fois les deux décidées (`permissionsShown` : `null` tant que les
  * autorisations ne sont pas lues) ; `otherCardShown` : l'une d'elles est à l'écran.
  */

@@ -7,7 +7,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Autorisations du téléphone : seul passage autorisé vers elles (règle 12),
- * pour la carte « Autorisations » (accueil et Réglages). Sur le téléphone, la
+ * pour la carte « Autorisations » (Profil et Réglages). Sur le téléphone, la
  * position et les notifications passent par le greffon du GPS
  * (`@capgo/background-geolocation`), le Bluetooth par celui de la ceinture
  * (`HeartRate`), la batterie et le démarrage automatique par le greffon

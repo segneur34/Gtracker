@@ -8,13 +8,14 @@
 //  3. depuis l'analyse, de Kite à Wingfoil (même famille : même module, fiche mise à jour), puis de Wingfoil à Surf avec un
 //     brouillon (seuil saisi) : la confirmation est posée, la session change de module (`/surf/analyse`) et le brouillon
 //     est abandonné ;
-//  4. les bibliothèques : la session est rangée en surf, plus en voile.
+//  4. la page Sessions : la session y est rangée sous Surf (le rond Surf la montre, ceux de Wingfoil et de Kite non).
 // Verdicts par `check` ; fin par « Tout passe. » ou le nombre d'échecs, code 0 ou 1.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CLES, connect } from './lib/cdp.mjs';
 import { attendreAnalyse } from './lib/fin-enregistrement.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { choisirActivite, lignes } from './lib/sessions.mjs';
 import { traceVoile } from './lib/traces.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -189,14 +190,20 @@ check('le brouillon est abandonné avec le changement de famille', brouillonSurf
 const sousSurf = (await fichesDe()).find((r) => r.gpx === aiguilles);
 check('la fiche est en surf', sousSurf?.sport === 'surf' && sousSurf?.activityId === 'surf', JSON.stringify([sousSurf?.sport, sousSurf?.activityId]));
 
-// 4. Bibliothèques : la session est rangée en surf, plus en voile.
-await go('/surf', 2500);
-const bibliothequeSurf = await evaluate(`document.querySelector('.shell-main').innerText`);
-console.log('bibliothèque surf :', bibliothequeSurf.split('\n').filter((l) => /^\d+ sessions?\s*$|^Réalisées/.test(l)).join(' | '));
-check('bibliothèque du surf : la session est là', /^1 session\s*$/m.test(bibliothequeSurf) && /Réalisées \(1\)/.test(bibliothequeSurf), bibliothequeSurf.slice(0, 200));
-await go('/voile', 2500);
-const bibliothequeVoile = await evaluate(`document.querySelector('.shell-main').innerText`);
-check('bibliothèque de la voile : plus de session', /Réalisées \(0\)/.test(bibliothequeVoile), bibliothequeVoile.slice(0, 200));
+// 4. Page Sessions : la session est rangée sous Surf, plus sous les activités de la voile.
+await go('/sessions', 2500);
+await waitFor(`Boolean(document.querySelector('.activity-bubbles'))`, { timeout: 4000, label: 'page Sessions' });
+const toutes = await lignes(evaluate);
+console.log('liste des sessions :', JSON.stringify(toutes));
+check('page Sessions, « Toutes » : une seule ligne, en Surf', toutes.length === 1 && toutes[0].startsWith('Surf'), JSON.stringify(toutes));
+check('rond Surf : la session est là', (await choisirActivite(evaluate, 'Surf')) === 'ok' && (await wait(300), (await lignes(evaluate)).length) === 1);
+const surfSeul = await evaluate(`document.querySelector('.shell-main').innerText`);
+check('rond Surf : le total dit « 1 session »', /1 session/.test(surfSeul), surfSeul.slice(0, 200));
+for (const nom of ['Wingfoil', 'Kite']) {
+  await choisirActivite(evaluate, nom);
+  await wait(300);
+  check(`rond ${nom} : plus de session`, (await lignes(evaluate)).length === 0 && /Aucune session/.test(await evaluate(`document.querySelector('.shell-main').innerText`)), (await lignes(evaluate)).join(' | '));
+}
 
 console.log('--- confirmations ---');
 dialogs.forEach((d) => console.log(d));

@@ -343,7 +343,7 @@
   border-bottom-color: var(--ink);
 }
 
-/* Itinéraires et Enregistrer, côte à côte à droite de la barre du haut. */
+/* Enregistrer, à droite de la barre du haut. */
 .shell-topactions {
   display: flex;
   align-items: center;
@@ -367,37 +367,10 @@
     font-size: var(--text-s);
   }
 
-  .shell-topplan,
   .shell-toprecord {
     padding: 0 var(--space-3);
     font-size: var(--text-s);
   }
-}
-
-.shell-topplan {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 38px;
-  padding: 0 var(--space-4);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--ink);
-  font-size: var(--text-m);
-  font-weight: 400;
-  text-decoration: none;
-}
-
-@media (hover: hover) {
-  .shell-topplan:hover {
-    background: var(--surface-hover);
-  }
-}
-
-.shell-topplan.active {
-  background: var(--ink);
-  color: var(--on-ink);
 }
 
 .shell-toprecord {

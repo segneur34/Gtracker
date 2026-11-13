@@ -91,7 +91,7 @@ export const todayLesson = (
 export const TUTORIAL_OF_DAY_VISIBLE: boolean = false;
 
 /**
- * Ordre de l'accueil : la mémoire, les autorisations, le pop-up du profil, puis la carte du jour,
+ * Ordre des cartes d'ouverture du Profil : la mémoire, les autorisations, le pop-up du profil, puis la carte du jour,
  * qui ne s'empile pas sur eux. `wait` tant que l'un n'est pas décidé (`null`) ; `blocked` si l'un
  * est à l'écran : elle attend alors le lancement suivant ; `free` sinon.
  */

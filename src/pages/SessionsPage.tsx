@@ -5,11 +5,8 @@ import { useHelp } from '../components/helpContext';
 import { IconChevronDown, IconChevronUp, IconFlag, IconHelp, IconRoute } from '../components/icons';
 import ImportButtons from '../components/ImportButtons';
 import MemoryStatus from '../components/MemoryStatus';
-import { PermissionsPrompt } from '../components/PermissionsStatus';
-import ProfilePrompt from '../components/ProfilePrompt';
 import RefreshLibraryButton from '../components/RefreshLibraryButton';
 import SessionRow from '../components/SessionRow';
-import TutorialOfDay from '../components/TutorialOfDay';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import MoreMenu from '../components/ui/MoreMenu';
@@ -25,19 +22,17 @@ import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
 import { previewImageStore } from '../library/previewImageStore';
 import { previewStore } from '../library/previewStore';
-import { profilePromptGate } from '../library/profilePrompt';
 import type { LibrarySession } from '../library/record';
 import { SESSION_SORTS, SESSION_SORT_DEFAULT, isSessionSort, sortSessions, type SessionSort } from '../library/sessionSort';
 import { commonDistanceUnit, filterChoices, filterSessions, ofActivity, sessionsTotals, totalsLine } from '../library/sessionsList';
 import { shownRoutes } from '../planning/routeShown';
 import { isNativeApp } from '../platform/runtime';
 import { jsonStore } from '../platform/storage';
-import { TUTORIAL_OF_DAY_VISIBLE, tutorialCardGate } from '../tutorials/tutorials';
 import './SessionsPage.css';
 
 /**
- * Page Sessions : toutes les sessions de la mémoire, voile et surf ensemble. En tête, les cartes de la mémoire, des
- * autorisations et du profil quand il y a lieu ; le titre et son « … » (imports, mise à jour) ; la ligne des totaux
+ * Page Sessions : toutes les sessions de la mémoire, voile et surf ensemble. En tête, le titre et son « … » (imports,
+ * mise à jour) ; la ligne des totaux
  * de la liste et « Tris » ; la rangée des activités visibles, en logos, qui filtre la liste (`?activite=<id>`, gardé
  * dans l'adresse pour le retour d'une analyse) ; les sessions à classer ; la liste ; puis « Créer un parcours » et les
  * itinéraires planifiés.
@@ -71,7 +66,7 @@ const rowFamily = (session: LibrarySession) => sessionFamily(session, SPORT_FAMI
 
 function SessionsPage() {
   // Les champs lus seulement : ni le compteur du balayage ni les messages ne redessinent la liste.
-  const library = useLibraryFields('sessions', 'status', 'scanning', 'folderLabel', 'error');
+  const library = useLibraryFields('sessions', 'status', 'scanning', 'folderLabel');
   // Une fois par lancement, la mémoire complète : les vignettes gardées des sessions qu'elle ne porte plus sont oubliées.
   // Vide, elle n'oublie rien (dossier mémoire mal ouvert) : la borne du magasin finit par les écarter.
   const complete = library.status === 'ready' && library.scanning === null && library.sessions.length > 0;
@@ -82,16 +77,6 @@ function SessionsPage() {
     void previewStore.prune(library.folderLabel, files);
     void previewImageStore.prune(library.folderLabel, files);
   }, [complete, library.folderLabel, library.sessions]);
-
-  // Cartes d'ouverture : la mémoire d'abord (premier lancement, dossier inaccessible, erreur), puis les autorisations,
-  // le profil, et la leçon du jour (en pause), chacune sans s'empiler sur les précédentes.
-  const memoryNeedsAction = library.status === 'unavailable' || library.status === 'needs-permission' || library.error !== null;
-  /** La carte des autorisations paraît-elle ? `null` tant qu'elle n'a pas lu les autorisations. */
-  const [permissionsShown, setPermissionsShown] = useState<boolean | null>(null);
-  const gate = profilePromptGate({ memoryNeedsAction, memoryReady: library.status === 'ready', permissionsShown });
-  /** Le pop-up du profil s'ouvre-t-il ? `null` tant qu'il n'a pas tranché. */
-  const [profileShown, setProfileShown] = useState<boolean | null>(null);
-  const tutorialGate = tutorialCardGate({ memoryNeedsAction, memoryReady: library.status === 'ready', permissionsShown, profileShown });
 
   const { activities, isShown, shownActivities } = useVisibility();
   const { routes: allRoutes, loaded: routesLoaded } = useRouteLibrary();
@@ -163,13 +148,6 @@ function SessionsPage() {
 
   return (
     <div className="ui-page sessions-page">
-      {memoryNeedsAction && <MemoryStatus />}
-      {/* Le dossier de la mémoire d'abord, puis les autorisations (téléphone seulement, s'il en manque). */}
-      {!memoryNeedsAction && library.status === 'ready' && <PermissionsPrompt onDecided={setPermissionsShown} />}
-      {/* Puis le profil, s'il manque un champ, une fois par lancement ; jamais par-dessus ces deux cartes. */}
-      {gate.mount && <ProfilePrompt otherCardShown={gate.otherCardShown} onDecided={setProfileShown} />}
-      {TUTORIAL_OF_DAY_VISIBLE && <TutorialOfDay gate={tutorialGate} />}
-
       <header className="sessions-head">
         <div className="sessions-head__line">
           <h1 className="sessions-head__title">Sessions</h1>
@@ -201,7 +179,8 @@ function SessionsPage() {
         )}
       </header>
 
-      {!memoryNeedsAction && <MemoryStatus compact />}
+      {/* Ce qui demande attention dans la mémoire (dossier à rouvrir, erreur, lecture en cours) ; rien quand tout va bien. */}
+      <MemoryStatus compact />
       <OutdatedSummaries />
       {helpOpen && (
         <p className="ui-hint ui-hint--m">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SESSIONS_PATH } from './core/parentPage';
+import { PROFILE_PATH, SESSIONS_PATH } from './core/parentPage';
 import { SPORT_FAMILIES } from './core/sportProfiles';
 
 /**
@@ -169,7 +169,15 @@ describe('familles et adresses (règle 9)', () => {
     expect(SESSIONS_PATH).toBe('/sessions');
   });
 
-  it("App.tsx n'a plus de route de la course, du vélo ni du fractionné, et mène toute autre adresse à l'accueil", () => {
+  it("l'application s'ouvre sur le Profil, à sa propre adresse, à côté de la page Sessions", () => {
+    const app = withoutComments(fs.readFileSync(new URL('App.tsx', SRC), 'utf8'));
+    expect(PROFILE_PATH).toBe('/profil');
+    expect(app).toContain('path={PROFILE_PATH} element={<ProfilePage />}');
+    expect(app).toContain('<Route path="/" element={<Navigate to={PROFILE_PATH} replace />} />');
+    expect(app).toContain('<Route path="*" element={<Navigate to={PROFILE_PATH} replace />} />');
+  });
+
+  it("App.tsx n'a plus de route de la course, du vélo ni du fractionné, et mène toute autre adresse au Profil", () => {
     const app = withoutComments(fs.readFileSync(new URL('App.tsx', SRC), 'utf8'));
     const paths = [...app.matchAll(/<Route\s[^>]*?path=["{]['"]?([^'"}]+)/g)].map((m) => m[1]);
     expect(paths.filter((p) => /^\/(?:course|velo|fractionne)\b/.test(p))).toEqual([]);

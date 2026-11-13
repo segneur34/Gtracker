@@ -1,4 +1,4 @@
-/* Carte « Autorisations » (accueil et Réglages) : une ligne par autorisation, son pourquoi à gauche, son état et son bouton à droite. */
+/* Carte « Autorisations » (Profil et Réglages) : une ligne par autorisation, son pourquoi à gauche, son état et son bouton à droite. */
 .permissions {
   display: flex;
   flex-direction: column;

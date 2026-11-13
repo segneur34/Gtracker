@@ -290,7 +290,7 @@ function HeartRateThresholdsField({ profile, onChange }: { profile: AthleteProfi
 
 /**
  * Page Paramètres : mémoire, activités et tous leurs réglages (affichage,
- * enregistrement, onglets, balises), barre du bas, cartes hors ligne et caractéristiques du
+ * enregistrement, onglets, balises), cartes hors ligne et caractéristiques du
  * pratiquant, en blocs repliables (chaque activité se replie aussi). Tout est enregistré sur l'appareil
  * à la saisie, recopié dans le dossier mémoire (`reglages.json`), et relu par
  * chaque module à son ouverture.
@@ -638,7 +638,7 @@ function SettingsPage() {
     const own = activitiesOfFamily(activities, f);
     return [...own.filter((a) => !a.hidden), ...own.filter((a) => a.hidden)];
   });
-  /** Familles visibles, proposées pour la barre du bas. */
+  /** Familles visibles : la dernière ne se cache pas. */
   const shownFamilies = visibleFamilies(activities, hiddenFamilies);
   /** Il reste toujours une famille visible, et une activité visible : leur œil ne se ferme pas. */
   const lastFamily = shownFamilies.length <= 1;

@@ -1,18 +1,20 @@
-import { useCallback, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ActivityChart from '../components/ActivityChart';
+import GongLogo from '../components/GongLogo';
 import MemoryStatus from '../components/MemoryStatus';
-import PageBackdrop from '../components/PageBackdrop';
+import { PermissionsPrompt } from '../components/PermissionsStatus';
 import { AvatarPicker, ProfileAvatar } from '../components/ProfileAvatar';
+import ProfilePrompt from '../components/ProfilePrompt';
+import TutorialOfDay from '../components/TutorialOfDay';
 import { LogoGlyph } from '../components/logos/ActivityLogo';
-import ProfileRoot, { RootSlot } from '../components/ProfileRoot';
 import { IconChevronRight } from '../components/icons';
 import SegmentedControl from '../components/ui/SegmentedControl';
 import { logoColor, type Activity } from '../core/activities';
 import { activityLogo, type LogoId } from '../core/activityLogos';
 import { DISTANCE_UNIT_SYMBOL, formatDuration, toDisplayDistance } from '../core/units';
 import { RESTING_HR_PATH, sessionsPath } from '../core/parentPage';
-import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
+import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useProfileRoot } from '../hooks/useProfileRoot';
 import { athleteAvatar, athleteName } from '../library/athleteProfile';
@@ -26,27 +28,40 @@ import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
 import { CHART_PERIODS, type ChartRange } from '../library/activityChart';
 import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
 import { activityShares, favoriteActivity } from '../library/profile';
+import { profilePromptGate } from '../library/profilePrompt';
 import { inBounds, isStatsPeriod, statsPeriodBounds, statsTotals } from '../library/stats';
+import { TUTORIAL_OF_DAY_VISIBLE, tutorialCardGate } from '../tutorials/tutorials';
 import { OTHERS_COLOR } from '../components/chartStyle';
 import './ProfilePage.css';
 import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
- * Profil : une période en un coup d'œil (`library/profile.ts`), sur la
- * maquette et un fond de courbes de niveau. En tête, la photo ronde
- * (un dessin d'activité ou une image importée, choisis en la touchant ; sans
- * choix, le dessin du sport préféré de toutes les sessions) et le pseudo. Puis
+ * Profil, la page où s'ouvre l'application : une période en un coup d'œil (`library/profile.ts`). En tête, une photo
+ * (logo GONG et « Gtracker » en haut à gauche sur téléphone, « Live for it. » en bas à droite), puis, à cheval sur son
+ * bord, la photo ronde (un dessin d'activité ou une image importée, choisis en la touchant ; sans
+ * choix, le dessin du sport préféré de toutes les sessions), « Bienvenue » et le pseudo. Puis les cartes d'ouverture
+ * (mémoire à désigner, autorisations, invitation du profil), quand il y a lieu. Puis
  * la période, qui règle toute la page : semaine, 30 jours, 6 mois, année (les
  * bornes du graphe d'activités et des statistiques) ou depuis le début ; choix
  * retenu sur l'appareil. Puis, dans une seule bande : nombre d'activités (et
  * leur temps), kilomètres parcourus, sport préféré (l'activité qui a le
  * plus de temps, avec son dessin) ; la répartition du temps par activité en
  * anneau (le total au centre ; « Autres » se déplie dans le détail), et le
- * graphe d'activités de la même période.
+ * graphe d'activités de la même période. Sur ordinateur, « Vos activités » à droite à partir de 1000 px de large,
+ * dessous en deçà (`ProfileActivities`, ni chargé ni monté sur téléphone).
  * Mêmes sessions que les statistiques : ni celles d'une activité ou d'une
  * famille cachée, ni celles à classer. Distance en km quelle que soit l'unité
  * des activités : une somme de toutes les familles ne tient qu'en une unité.
+ *
+ * Les photos d'en-tête (`assets/profil/`) sont à GONG ou à ses photographes : leur accord est à obtenir avant toute
+ * diffusion de l'application hors d'une démonstration faite à GONG.
  */
+
+/** La racine, cachée pour l'instant (`PROFILE_PLANT_VISIBLE`) : son dessin n'est lu que si elle se montre. */
+const ProfileRoot = lazy(() => import('../components/ProfileRoot'));
+const RootSlot = lazy(() => import('../components/ProfileRoot').then((m) => ({ default: m.RootSlot })));
+/** « Vos activités », sur ordinateur seulement : ses lignes et leurs vignettes ne pèsent pas sur le téléphone. */
+const ProfileActivities = lazy(() => import('../components/ProfileActivities'));
 
 /** Espaces insécables, sauf après « Depuis » : sur un téléphone étroit, seul ce libellé passe sur deux lignes. */
 const PROFILE_PERIODS: { id: ChartRange; label: string }[] = [...CHART_PERIODS, { id: 'tout' as const, label: 'Depuis le début' }]
@@ -102,10 +117,21 @@ const LegendContent = ({ slice: s }: { slice: Slice }) => (
 
 function ProfilePage() {
   const navigate = useNavigate();
-  const { status, sessions, scanning } = useLibraryFields('status', 'sessions', 'scanning');
-  const backdrop = useFavoriteBackdrop();
+  const { status, sessions, scanning, error } = useLibraryFields('status', 'sessions', 'scanning', 'error');
+  const narrow = useNarrowScreen();
   const { activities } = useVisibility();
-  /** Le nom ou pseudo de Réglages en titre, « Profil » sans lui. */
+
+  // Cartes d'ouverture : la mémoire d'abord (premier lancement, dossier inaccessible, erreur), puis les autorisations,
+  // le profil, et la leçon du jour (en pause), chacune sans s'empiler sur les précédentes.
+  const memoryNeedsAction = status === 'unavailable' || status === 'needs-permission' || error !== null;
+  /** La carte des autorisations paraît-elle ? `null` tant qu'elle n'a pas lu les autorisations. */
+  const [permissionsShown, setPermissionsShown] = useState<boolean | null>(null);
+  const gate = profilePromptGate({ memoryNeedsAction, memoryReady: status === 'ready', permissionsShown });
+  /** Le pop-up du profil s'ouvre-t-il ? `null` tant qu'il n'a pas tranché. */
+  const [profileShown, setProfileShown] = useState<boolean | null>(null);
+  const tutorialGate = tutorialCardGate({ memoryNeedsAction, memoryReady: status === 'ready', permissionsShown, profileShown });
+
+  /** « Bienvenue » au-dessus du nom ou pseudo de Réglages, « Bienvenue » seul sans lui. */
   const { profile, setAvatar } = useAthleteProfile();
   const name = athleteName(profile);
   const avatar = athleteAvatar(profile);
@@ -186,9 +212,9 @@ function ProfilePage() {
     return { slice: s, dash: `${Math.max(0, len - gap)} ${circumference}`, offset: -before };
   });
 
-  return (
-    <div className="ui-page ui-page--backdrop profile">
-      <PageBackdrop variant={backdrop} />
+  /** Le Profil lui-même : la colonne de gauche sur ordinateur, la page entière sur téléphone. */
+  const column = (
+    <div className="ui-page profile">
       <header className="profile-head">
         <button type="button" className="profile-head__avatar" aria-label="Changer la photo de profil" aria-expanded={picking}
           onClick={() => setPicking(!picking)}>
@@ -197,20 +223,32 @@ function ProfilePage() {
             logoColor={shownLogoColor} />
         </button>
         <div className="profile-head__text">
-          <h1 className="profile-head__title">{name ?? 'Profil'}</h1>
+          {name !== null && <span className="profile-head__hello">Bienvenue</span>}
+          <h1 className="profile-head__title">{name ?? 'Bienvenue'}</h1>
           {/* Le test de FC repos, sous le titre : la hauteur de l'en-tête, et donc la racine, ne bougent pas. */}
           <Link to={RESTING_HR_PATH} className="profile-head__link">
             Test de FC repos<IconChevronRight size={14} aria-hidden="true" />
           </Link>
         </div>
-        {PROFILE_PLANT_VISIBLE && <RootSlot growth={root.growth} open={rootOpen} onToggle={() => setRootOpen(!rootOpen)} />}
+        {PROFILE_PLANT_VISIBLE && (
+          <Suspense fallback={null}>
+            <RootSlot growth={root.growth} open={rootOpen} onToggle={() => setRootOpen(!rootOpen)} />
+          </Suspense>
+        )}
       </header>
       {picking && <AvatarPicker avatar={avatar} logoColor={shownLogoColor} onPick={setAvatar} onClose={() => setPicking(false)} />}
+
+      {memoryNeedsAction && <MemoryStatus />}
+      {/* Le dossier de la mémoire d'abord, puis les autorisations (téléphone seulement, s'il en manque). */}
+      {!memoryNeedsAction && status === 'ready' && <PermissionsPrompt onDecided={setPermissionsShown} />}
+      {/* Puis le profil, s'il manque un champ, une fois par lancement ; jamais par-dessus ces deux cartes. */}
+      {gate.mount && <ProfilePrompt otherCardShown={gate.otherCardShown} onDecided={setProfileShown} />}
+      {TUTORIAL_OF_DAY_VISIBLE && <TutorialOfDay gate={tutorialGate} />}
 
       <SegmentedControl fit className="profile-periods" label="Période" items={PROFILE_PERIODS.map((p) => ({ key: p.id, label: p.label }))}
         value={period} onChange={(key) => rememberView({ periode: key })} />
 
-      <MemoryStatus compact />
+      {!memoryNeedsAction && <MemoryStatus compact />}
 
       {status === 'opening' ? (
         <p className="ui-hint">Lecture de la mémoire…</p>
@@ -325,9 +363,32 @@ function ProfilePage() {
 
       {sessions.length > 0 && <ActivityChart key={period} period={period} nowMs={nowMs} />}
       {PROFILE_PLANT_VISIBLE && (
-        <ProfileRoot growth={root.growth} goalMin={root.goalMin} cardSelectors={ROOT_CARDS}
-          ready={status === 'ready' && !scanning} open={rootOpen} onClose={closeRoot} />
+        <Suspense fallback={null}>
+          <ProfileRoot growth={root.growth} goalMin={root.goalMin} cardSelectors={ROOT_CARDS}
+            ready={status === 'ready' && !scanning} open={rootOpen} onClose={closeRoot} />
+        </Suspense>
       )}
+    </div>
+  );
+
+  return (
+    <div className="profile-page">
+      {/* Photo d'en-tête, posée en fond par le CSS : celle de l'écran seule se télécharge, aucune en économe. */}
+      <div className="profile-hero">
+        <span className="profile-hero__brand">
+          <GongLogo className="profile-hero__mark" />
+          <span className="profile-hero__name">Gtracker</span>
+        </span>
+        <p className="profile-hero__motto">Live for it.</p>
+      </div>
+      <div className={narrow ? 'profile-body' : 'profile-body profile-body--columns'}>
+        {column}
+        {!narrow && (
+          <Suspense fallback={null}>
+            <ProfileActivities />
+          </Suspense>
+        )}
+      </div>
     </div>
   );
 }

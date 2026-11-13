@@ -5,7 +5,7 @@
 // ne compare pas deux relevés, il contrôle des plafonds (`check`, voir PLAFONDS). Un faux crochet des outils de React (`__REACT_DEVTOOLS_GLOBAL_HOOK__`), posé avant tout script de la page,
 // reçoit chaque commit ; l'arbre des fibres y est parcouru, et une fibre de composant compte un rendu quand elle est
 // neuve dans l'arbre (clonée pour ce rendu, ou montée) et porte le drapeau « travail fait » (`PerformedWork`, 1).
-// Rejeu ×1 d'une session de voile (wingfoil) de 400 s à 1 Hz : 60 s carte ouverte, 60 s carte réduite, 60 s sur l'accueil ; une ligne
+// Rejeu ×1 d'une session de voile (wingfoil) de 400 s à 1 Hz : 60 s carte ouverte, 60 s carte réduite, 60 s sur le Profil (le logo y mène) ; une ligne
 // par phase et par composant suivi, puis les autres composants les plus rendus.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -105,9 +105,11 @@ const ouverte = await phase('carte ouverte');
 console.log('Réduire la carte :', await clickText('Réduire la carte'));
 await vwait(1000);
 const reduite = await phase('carte réduite');
-console.log('Accueil :', await click('.shell-brand'));
+// Le logo mène au Profil, la page d'ouverture : l'enregistrement continue derrière, sans rien redessiner.
+console.log('Profil par le logo :', await click('.shell-brand'));
 await vwait(1000);
-const accueil = await phase('accueil');
+check('le logo mène au Profil, hors de la page d\'enregistrement', (await evaluate('location.pathname')) === '/profil', await evaluate('location.pathname'));
+const profil = await phase('Profil');
 
 // Retour à Enregistrer par le lien du haut (sans recharger), arrêt tenu, session jetée.
 console.log('Enregistrer :', await click('.shell-toprecord'));
@@ -128,7 +130,7 @@ await settle({ max: 2000 });
 const n = (phase, name) => phase.counts[name] ?? 0;
 /** Le détail (les comptes) n'est écrit qu'en cas d'échec : le relevé d'un passage reste comparable à l'autre. */
 const plafond = (label, ok, detail = '') => check(label, ok, ok ? '' : detail);
-for (const [label, phase] of [['carte ouverte', ouverte], ['carte réduite', reduite], ['accueil', accueil]]) {
+for (const [label, phase] of [['carte ouverte', ouverte], ['carte réduite', reduite], ['Profil', profil]]) {
   const page = n(phase, 'AppShell') + n(phase, 'RecordingPage') + n(phase, 'RecordingScreen');
   plafond(`${label} : la page entière ne se redessine pas (AppShell, RecordingPage, RecordingScreen)`, page <= 10, `${page} rendus en 60 s`);
   plafond(`${label} : pas plus de 2 commits par seconde`, phase.commits <= 120, `${phase.commits} commits`);
@@ -136,7 +138,7 @@ for (const [label, phase] of [['carte ouverte', ouverte], ['carte réduite', red
 }
 plafond('carte ouverte : la carte du direct se redessine à chaque position, au plus 2 fois par seconde', n(ouverte, 'LiveMap') >= 30 && n(ouverte, 'LiveMap') <= 120, String(n(ouverte, 'LiveMap')));
 plafond("carte réduite : la carte du direct n'est plus dessinée", n(reduite, 'RecordingMap') === 0 && n(reduite, 'LiveMap') === 0, `${n(reduite, 'RecordingMap')} / ${n(reduite, 'LiveMap')}`);
-plafond('accueil : ni chiffres ni carte du direct redessinés', n(accueil, 'RecordingFigures') === 0 && n(accueil, 'RecordingMap') === 0 && n(accueil, 'LiveMap') === 0);
+plafond('Profil : ni chiffres ni carte du direct redessinés', n(profil, 'RecordingFigures') === 0 && n(profil, 'RecordingMap') === 0 && n(profil, 'LiveMap') === 0);
 
 console.log('--- console ---');
 for (const l of logs) console.log(l);

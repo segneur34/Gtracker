@@ -1,9 +1,10 @@
 // Banc de test : la page des statistiques (lot 5 des demandes du 10-13/10, remise sur la voile et le surf, lot 330).
 // Usage : node statistiques.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Le script fabrique neuf sessions (`lib/traces.mjs`) : cinq de wingfoil, deux de kite
-// (sans activité créée pour lui) et deux de surf, datées en jours avant aujourd'hui, les importe par la page Voile, puis
+// (sans activité créée pour lui) et deux de surf, datées en jours avant aujourd'hui, les importe par la page Sessions, puis
 // vérifie :
-//  1. l'accès : « Statistiques » dans la barre du haut, qui ouvre la page ; plus de lien sur l'accueil ;
+//  1. l'accès : « / » mène au Profil ; « Statistiques » dans la barre du haut (Profil, Sessions, Planifier, Statistiques,
+//     Réglages), qui ouvre la page ; pas de lien dans le Profil ;
 //  1 bis. les boutons glissants, repliés sous « Sélection » : replié au départ, le choix en cours affiché, ouvert et retenu
 //     après rechargement ; pas de rangée d'activités sur « Tout » ; la flèche droite du clavier passe à la famille suivante ;
 //  2. la vue d'ensemble : 9 sessions, une ligne par famille, pas de records, le graphique de la durée seule ;
@@ -16,7 +17,8 @@
 //  5b. une session de wingfoil ouverte dans son analyse : la réussite de ses manœuvres rangée dans sa fiche, et « % de
 //     manœuvres réussies » tracé en deux séries, avec sa légende (empannage en rond, virement en triangle), les autres
 //     sessions de voile restant « à rouvrir » ;
-//  6. à 390×844 et 320×640 : rien ne déborde ; la case « Statistiques » de la barre du bas ouvre la page, allumée.
+//  6. à 390×844 et 320×640 : rien ne déborde ; la barre du bas (Profil, Sessions, Statistiques, Réglages) ; sa case
+//     « Statistiques » ouvre la page, allumée.
 import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { traceSurf, traceVoile } from './lib/traces.mjs';
@@ -88,7 +90,7 @@ const openTab = (label) => evaluate(`(() => {
 })()`);
 
 // --- Mise en place ---
-await go('/voile', 5000);
+await go('/sessions', 5000);
 await waitFor(`Boolean(document.querySelector('input[type=file][accept*=".gpx"]'))`, { timeout: 3000, every: 50 });
 console.log('import :', await evaluate(`(() => {
   const input = document.querySelector('input[type=file][accept*=".gpx"]');
@@ -106,8 +108,9 @@ await settle({ max: 2000, label: 'import' });
 
 // 1. Accès.
 await go('/');
-check('lien dans la barre du haut', (await evaluate(`document.querySelector('.shell-toplinks')?.textContent`))?.includes('Statistiques'));
-check('plus de lien sur l\'accueil (demande du 19/10)', !(await evaluate(`[...document.querySelectorAll('.shell-main a')].some((a) => a.textContent.trim().startsWith('Statistiques'))`)));
+check("ouverture : « / » mène au Profil", (await search()) === '/profil', await search());
+check('lien dans la barre du haut, entre Planifier et Réglages', (await evaluate(`document.querySelector('.shell-toplinks')?.textContent`)) === 'ProfilSessionsPlanifierStatistiquesRéglages');
+check('plus de lien « Statistiques » dans le Profil (demande du 19/10)', !(await evaluate(`[...document.querySelectorAll('.shell-main a')].some((a) => a.textContent.trim().startsWith('Statistiques'))`)));
 check('lien de la barre du haut', await click('.shell-toplinks a', 'Statistiques'));
 await settle({ max: 1500 });
 check('le lien ouvre la page', (await search()) === '/statistiques', await search());
@@ -332,7 +335,7 @@ await shoot('stats-320');
 
 await go('/');
 const tab = (label) => `[...document.querySelectorAll('.shell-tabbar .shell-tab')].find((t) => t.textContent.trim() === ${JSON.stringify(label)})`;
-check('barre du bas : case Statistiques', await evaluate(`!!${tab('Statistiques')}`));
+check('barre du bas : Profil, Sessions, Statistiques, Réglages', (await evaluate(`[...document.querySelectorAll('.shell-tabbar .shell-tab')].map((t) => t.textContent.trim()).join(' | ')`)) === 'Profil | Sessions | Statistiques | Réglages');
 await evaluate(`${tab('Statistiques')}.click()`);
 await settle({ max: 1500 });
 // La page reprend le dernier affichage : l'adresse peut porter des paramètres.

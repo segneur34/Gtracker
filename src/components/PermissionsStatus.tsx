@@ -19,7 +19,7 @@ import './StatusLine.css';
 /**
  * Autorisations du téléphone dont l'enregistrement a besoin : une ligne par
  * autorisation (pourquoi, état, bouton), plus le démarrage automatique de
- * Xiaomi, sans état lisible. En tête de l'accueil (`PermissionsPrompt`) au
+ * Xiaomi, sans état lisible. En tête du Profil, où s'ouvre l'application (`PermissionsPrompt`), au
  * premier lancement et après une mise à jour s'il en manque une ; dans
  * Réglages, bloc « Autorisations » (`PermissionsSettings`). Rien dans le
  * navigateur. Les états sont relus au retour d'un écran système.
@@ -59,7 +59,7 @@ const ask = async (key: PermissionKey, state: PermissionState, refresh: () => Pr
 
 /**
  * Une ligne : le nom, le pourquoi, l'état et le bouton. Dans Réglages, le pourquoi
- * passe sous un « ? » ; sur la carte de l'accueil, il reste à découvert.
+ * passe sous un « ? » ; sur la carte du Profil, il reste à découvert.
  */
 function PermissionRow({ helpKey, label, why, children }: { helpKey: string; label: string; why: string; children: ReactNode }) {
   const help = useHelp(helpKey);
@@ -120,7 +120,7 @@ const askAll = async (keys: PermissionKey[], refresh: () => Promise<Status>): Pr
 };
 
 /**
- * Carte de l'accueil : seulement s'il faut (`shouldPromptPermissions`) ; « Plus tard » la renvoie à la version suivante.
+ * Carte du Profil : seulement s'il faut (`shouldPromptPermissions`) ; « Plus tard » la renvoie à la version suivante.
  * `onDecided` apprend une fois, après la lecture des autorisations, si la carte paraît (le pop-up du profil attend alors).
  */
 export function PermissionsPrompt({ onDecided }: { onDecided?: (shown: boolean) => void }) {

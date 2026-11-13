@@ -29,6 +29,8 @@ export const SCREEN_BREAKPOINTS = {
   profileStacked: '(max-width: 599px)',
   /** Profil : très petit écran (`ProfilePage.css`). */
   profileTiny: '(max-width: 359px)',
+  /** Profil sur ordinateur : le Profil et « Vos activités » en deux colonnes (`ProfilePage.css`). */
+  profileColumns: '(min-width: 1000px)',
   /** Enregistrement, petit téléphone tourné : la page s'empile comme droite (`RecordingPage.css`). */
   recordingNarrow: '(max-width: 699.98px)',
   /** Barre du haut resserrée sur un ordinateur étroit (`AppShell.css`). */

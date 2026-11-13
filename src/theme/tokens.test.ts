@@ -62,6 +62,8 @@ const READABLE: [text: string, background: string][] = [
   ['--tabbar-ink', '--tabbar-bg'],
   ['--tabbar-on', '--tabbar-bg'],
   ['--on-accent', '--stop'],
+  /* Texte blanc de l'en-tête du Profil sur l'aplat qui tient la place de sa photo. */
+  ['--on-accent', '--photo-bg'],
   ['--danger', '--bg'],
   ['--danger-ink', '--danger-soft'],
 ];

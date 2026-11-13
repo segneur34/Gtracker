@@ -8,8 +8,10 @@
 //  3. voile : le « ? » des manœuvres, puis celui du vent, qui referme le premier ;
 //  4. Statistiques : rien d'ouvert, la note du graphique sous son « ? » ; passer par Profil et revenir, par la barre,
 //     referme l'aide (une aide ne survit pas à un changement de page) ;
-//  5. barre du haut à 1400 et 1000 px (800 px relevé pour information) : plus de lien « Accueil » (le logo y mène), chaque lien sur une ligne,
-//     « Itinéraires » entier ; au téléphone, « Accueil » reste dans la barre du bas, et pas de pop-up du profil.
+//  5. barre du haut à 1400 et 1000 px (800 px relevé pour information) : Profil, Sessions, Planifier (vers les
+//     itinéraires), Statistiques, Réglages, le logo qui mène au Profil, chaque lien sur une ligne ; l'application
+//     s'ouvre sur le Profil ; au téléphone, barre du bas Profil, Sessions, Statistiques, Réglages, et pas de pop-up
+//     du profil.
 import { connect } from './lib/cdp.mjs';
 import { traceSurf, traceVoile } from './lib/traces.mjs';
 
@@ -58,7 +60,7 @@ const SESSIONS = [
 
 const paths = {};
 for (const s of SESSIONS) {
-  await go(`/${s.page}`, 3000);
+  await go('/sessions', 3000);
   console.log(`import ${s.key} :`, await importGpx(s.gpx, `${s.key}.gpx`));
   const rec = await waitFor(async () => (await records())?.find((r) => Math.abs((r.summary?.startMs ?? 0) - s.start) < 2000), { timeout: 7000, label: `fiche ${s.key}` });
   await settle({ max: 2000, label: `import ${s.key}` });
@@ -133,7 +135,9 @@ check("changer de page referme l'aide", (await evaluate('location.pathname')) ==
 // --- 5. Barre du haut ---
 const topLinks = () => evaluate(`[...document.querySelectorAll('.shell-toplinks a')].map((a) => a.textContent.trim())`);
 check('ordinateur : plus de lien « Accueil » en haut', !(await topLinks()).includes('Accueil'), (await topLinks()).join(', '));
-check("ordinateur : le logo mène à l'accueil", (await evaluate(`document.querySelector('.shell-brand')?.getAttribute('href')`)) === '/');
+check('ordinateur : barre du haut Profil, Sessions, Planifier, Statistiques, Réglages', (await topLinks()).join(', ') === 'Profil, Sessions, Planifier, Statistiques, Réglages', (await topLinks()).join(', '));
+check('ordinateur : « Planifier » mène aux itinéraires, plus de bouton « Itinéraires » à part', (await evaluate(`[...document.querySelectorAll('.shell-toplinks a')].find((a) => a.textContent.trim() === 'Planifier')?.getAttribute('href')`)) === '/itineraires' && (await evaluate(`document.querySelector('.shell-topplan') === null`)));
+check('ordinateur : le logo mène au Profil', (await evaluate(`document.querySelector('.shell-brand')?.getAttribute('href')`)) === '/profil', await evaluate(`document.querySelector('.shell-brand')?.getAttribute('href')`));
 for (const width of [1400, 1000, 800]) {
   await send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false });
   await wait(600);
@@ -141,19 +145,20 @@ for (const width of [1400, 1000, 800]) {
     // Une ligne : chaque lien garde la hauteur d'une seule ligne de texte ; rien ne sort de l'écran.
     const links = [...document.querySelectorAll('.shell-toplinks a')];
     const heights = links.map((a) => a.getBoundingClientRect().height);
-    const all = [...links, ...document.querySelectorAll('.shell-topplan, .shell-toprecord')];
+    const all = [...links, ...document.querySelectorAll('.shell-toprecord')];
     const cut = all.filter((a) => a.scrollWidth > a.clientWidth + 1 || a.getBoundingClientRect().right > document.documentElement.clientWidth).map((a) => a.textContent.trim());
     return { spread: Math.max(...heights) - Math.min(...heights), cut, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
   })()`);
-  // 800 px : relevé seulement ; la barre n'y tient pas encore (familles, Statistiques, Profil, Réglages et deux boutons).
+  // 800 px : relevé seulement ; la barre n'y tient pas forcément (cinq liens et le bouton « Enregistrer »).
   if (width < 1000) console.log(`${width} px, pour information :`, JSON.stringify(bar));
   else check(`${width} px : liens de la barre du haut sur une ligne, aucun coupé`, bar.spread <= 1 && bar.cut.length === 0 && bar.overflow === 0, JSON.stringify(bar));
   await shoot(`aides-barre-${width}`);
 }
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await go('/', 2500);
+check("ouverture : « / » mène au Profil", (await evaluate('location.pathname')) === '/profil', await evaluate('location.pathname'));
 const tabs = await evaluate(`[...document.querySelectorAll('.shell-tabbar .shell-tab')].map((a) => a.textContent.trim())`);
-check('téléphone : « Accueil » dans la barre du bas', tabs.includes('Accueil'), tabs.join(', '));
+check('téléphone : barre du bas Profil, Sessions, Statistiques, Réglages (le bouton rond au milieu)', tabs.join(', ') === 'Profil, Sessions, Statistiques, Réglages', tabs.join(', '));
 check('navigateur : pas de pop-up du profil (téléphone seulement)', await evaluate(`document.querySelector('.profile-prompt') === null`));
 
 console.log('\n--- console (erreurs, avertissements) ---');

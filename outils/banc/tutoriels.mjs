@@ -1,20 +1,19 @@
-// Banc de test : les tutoriels (lot 147, idée 142), une leçon par nouveau jour d'ouverture.
+// Banc de test : les tutoriels (lot 147, idée 142). La leçon du jour (carte « Aujourd'hui : … ») est en pause : les
+// leçons, leur liste et le bloc de Réglages restent.
 // Usage : node tutoriels.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau ni session, environ 30 s. L'heure de la page est décalée par un script posé avant
 // son chargement (`Date` remplacé, comme `racine.mjs`) pour passer d'un jour au suivant. Il vérifie :
-//  1. jour 1 : la carte « Aujourd'hui : Enregistrer une session » sur l'accueil, avant les familles, son accroche,
-//     « Lire » et la croix ; le jour rangé sur l'appareil (`gtracker.tutoriels`) ;
-//  2. « Lire » ouvre la leçon (`/tutoriels/enregistrer`) : titre, « Leçon 1 sur 13 », paragraphes, « Essayer » vers
-//     Enregistrer, « Leçon suivante » sans « précédente » ; la leçon marquée lue ; le retour d'Android (`gtrackerBack`)
-//     mène à la liste, puis à Réglages ;
-//  3. la liste `/tutoriels` : treize leçons dans l'ordre, la première cochée seule, « 1 lue sur 13 » ;
-//  4. l'accueil du même jour, la leçon lue : plus de carte ;
-//  5. jour 2 : « Aujourd'hui : Lire une analyse » ; la croix la ferme, et elle ne revient pas au rechargement du même
-//     jour ; un second chargement le même jour ne compte pas un jour de plus ; jour 3 : « La carte » ;
-//  6. Réglages : le bloc « Tutoriels » replié au départ, ouvert : « 1 leçon lue sur 13 » et « Voir tous les tutoriels »,
-//     qui ouvre la liste ;
-//  7. la voile cachée par son œil (Réglages › Activités) : la liste passe à douze leçons, sans « La voile » ;
-//  8. à 390×844 : l'accueil avec la carte, et une leçon d'une famille cachée (son adresse s'ouvre toujours), sans
+//  1. la pause : aux jours 1, 2 et 3, ni le Profil (l'ouverture) ni la page Sessions ne montrent de carte
+//     « Aujourd'hui : … », et les jours d'ouverture ne sont plus comptés sur l'appareil (`gtracker.tutoriels`) ;
+//  2. Réglages : le bloc « Tutoriels » replié au départ, ouvert : « Voir tous les tutoriels », qui ouvre la liste
+//     `/tutoriels` : treize leçons dans l'ordre, aucune cochée, « 0 lue sur 13 » ;
+//  3. la première leçon ouverte depuis la liste (`/tutoriels/enregistrer`) : titre, « Leçon 1 sur 13 », paragraphes,
+//     « Essayer » vers Enregistrer, « Leçon suivante » sans « précédente » ; la leçon marquée lue ; le retour d'Android
+//     (`gtrackerBack`) mène à la liste, puis à Réglages ;
+//  4. la liste : la première cochée seule, « 1 lue sur 13 » ; le bloc de Réglages « 1 leçon lue sur 13 » ;
+//  5. la pause tient encore au jour suivant, leçon lue ou non, sur le Profil ;
+//  6. la voile cachée par son œil (Réglages › Activités) : la liste passe à douze leçons, sans « La voile » ;
+//  7. à 390×844 : le Profil sans carte, et une leçon d'une famille cachée (son adresse s'ouvre toujours), sans
 //     débordement.
 // Il finit par « Tout passe. » ou le nombre d'échecs.
 import { CLES, connect, POIGNEE_RETOUR } from './lib/cdp.mjs';
@@ -49,49 +48,56 @@ const setClock = async (fakeMs) => {
 const now = new Date();
 /** Midi du jour `n` (1 : aujourd'hui). */
 const dayAt = (n) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + n - 1, 12).getTime();
-const keyOf = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 const stored = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.tutoriels}') ?? '{}').etat ?? null`);
 const path = () => evaluate('location.pathname');
-/** La carte du jour : titre, accroche, bouton, croix ; `null` si elle n'est pas là. */
-const card = () => evaluate(`(() => {
-  const c = document.querySelector('.tutorial-card');
-  if (!c) return null;
-  return {
-    title: c.querySelector('h2')?.textContent ?? null,
-    hook: c.querySelector('.tutorial-card__hook')?.textContent ?? null,
-    read: c.querySelector('a.tutorial-card__read')?.textContent ?? null,
-    href: c.querySelector('a.tutorial-card__read')?.getAttribute('href') ?? null,
-    close: !!c.querySelector('button[aria-label="Fermer pour aujourd\\'hui"]'),
-    beforeFamilies: !!document.querySelector('.home-families') && !!(c.compareDocumentPosition(document.querySelector('.home-families')) & Node.DOCUMENT_POSITION_FOLLOWING),
-  };
-})()`);
-/** L'accueil posé : la mémoire lue (les familles sont là), puis le temps que la garde décide. */
-const homeAt = async (dayMs) => {
+/** Une carte « Aujourd'hui : … » à l'écran : titre, ou `null` quand il n'y en a pas (la leçon du jour est en pause). */
+const card = () => evaluate(`document.querySelector('.tutorial-card')?.querySelector('h2')?.textContent ?? null`);
+/** Le Profil posé (l'ouverture de l'application) au jour donné : la mémoire lue, puis le temps que la garde déciderait. */
+const profileAt = async (dayMs) => {
   await setClock(dayMs);
   await go('/', 4000);
-  await waitFor(`Boolean(document.querySelector('.home-families'))`, { timeout: 4000, label: 'accueil' });
-  await waitFor(`Boolean(document.querySelector('.tutorial-card'))`, { timeout: 2000, label: 'carte du jour' });
+  await waitFor(`Boolean(document.querySelector('.profile-head__title'))`, { timeout: 4000, label: 'Profil' });
+  await waitFor(`Boolean(document.querySelector('.profile-figures'))`, { timeout: 4000, label: 'chiffres du Profil' });
+  await wait(600);
 };
+/** La page Sessions au jour donné, la liste lue. */
+const sessionsAt = async (dayMs) => {
+  await setClock(dayMs);
+  await go('/sessions', 4000);
+  await waitFor(`Boolean(document.querySelector('.activity-bubbles'))`, { timeout: 4000, label: 'Sessions' });
+  await wait(600);
+};
+const days = async () => ((await stored())?.days ?? []).length;
 const rows = () => evaluate(`[...document.querySelectorAll('.tutorial-row')].map((r) => ({ title: r.querySelector('.tutorial-row__title')?.textContent, read: !!r.querySelector('.tutorial-row__read') }))`);
 const subtitle = () => evaluate(`document.querySelector('.ui-page-header__subtitle')?.textContent ?? null`);
 const back = () => evaluate(`window.${POIGNEE_RETOUR} ? window.${POIGNEE_RETOUR}() : 'absent'`);
 const overflow = () => evaluate('document.documentElement.scrollWidth > window.innerWidth');
 
-// 1. Jour 1.
-await homeAt(dayAt(1));
-let c = await card();
-console.log('jour 1 :', JSON.stringify(c));
-check("jour 1 : la carte « Aujourd'hui : Enregistrer une session »", c?.title === "Aujourd'hui : Enregistrer une session", c?.title);
-check('… son accroche', c?.hook === "Le bouton rond, le choix de l'activité, puis l'analyse s'ouvre à la fin.", c?.hook);
-check('… « Lire » vers la leçon, une croix', c?.read === 'Lire' && c?.href === '/tutoriels/enregistrer' && c?.close === true, JSON.stringify(c));
-check('… avant les familles', c?.beforeFamilies === true);
-const s1 = await stored();
-check('le jour rangé sur l\'appareil', JSON.stringify(s1?.days) === JSON.stringify([keyOf(dayAt(1))]), JSON.stringify(s1));
-await shoot('tutoriels-accueil');
+// 1. La pause de la leçon du jour : ni carte sur le Profil ni sur Sessions, aucun jour compté.
+await profileAt(dayAt(1));
+check("jour 1 : le Profil (ouverture) sans carte « Aujourd'hui : … »", (await card()) === null, await card());
+check('… ni jour compté sur l\'appareil', (await days()) === 0, JSON.stringify(await stored()));
+await shoot('tutoriels-profil');
+await sessionsAt(dayAt(1));
+check("jour 1 : la page Sessions sans carte « Aujourd'hui : … »", (await card()) === null, await card());
 
-// 2. La leçon.
-await evaluate(`document.querySelector('a.tutorial-card__read').click()`);
+// 2. Réglages, la liste, la leçon.
+await go('/parametres', 3000);
+const blockTitle = `[...document.querySelectorAll('[role=button]')].find((b) => b.textContent.trim() === 'Tutoriels')`;
+await waitFor(`Boolean(${blockTitle})`, { timeout: 3000, label: 'bloc' });
+check('Réglages : le bloc « Tutoriels », replié', (await evaluate(`Boolean(${blockTitle}) && !document.querySelector('a[href="/tutoriels"]')`)) === true);
+await evaluate(`${blockTitle}.click()`);
+await wait(300);
+let block = await evaluate(`(() => { const a = document.querySelector('a[href="/tutoriels"]'); return a ? { link: a.textContent, text: a.parentElement.textContent } : null; })()`);
+console.log('bloc ouvert :', JSON.stringify(block));
+check('… ouvert : « 0 leçon lue sur 13 » et « Voir tous les tutoriels »', block?.link === 'Voir tous les tutoriels' && block?.text.includes('0 leçon lue sur 13'), JSON.stringify(block));
+await evaluate(`document.querySelector('a[href="/tutoriels"]').click()`);
+check('… qui ouvre la liste', (await waitFor(`location.pathname === '/tutoriels' && document.querySelectorAll('.tutorial-row').length > 0`, { timeout: 3000 })) === true, await path());
+const list0 = await rows();
+check('la liste : treize leçons, « Enregistrer une session » en tête, aucune cochée', list0.length === 13 && list0[0]?.title === 'Enregistrer une session' && list0.every((r) => !r.read), `${list0.length} : ${JSON.stringify(list0.map((r) => r.read))}`);
+check('… « 0 lue sur 13 »', (await subtitle()) === '0 lue sur 13', await subtitle());
+await evaluate(`document.querySelector('a.tutorial-row').click()`);
 await waitFor(`location.pathname === '/tutoriels/enregistrer' && Boolean(document.querySelector('.tutorial-lesson'))`, { timeout: 4000, label: 'leçon' });
 const lesson = await evaluate(`(() => ({
   title: document.querySelector('.ui-page-header h1')?.textContent ?? null,
@@ -101,7 +107,7 @@ const lesson = await evaluate(`(() => ({
   back: document.querySelector('.ui-back')?.textContent ?? null,
 }))()`);
 console.log('leçon :', JSON.stringify(lesson));
-check('« Lire » ouvre la leçon : son titre', lesson?.title === 'Enregistrer une session', lesson?.title);
+check('la première ligne ouvre la leçon : son titre', lesson?.title === 'Enregistrer une session', lesson?.title);
 check('… « Leçon 1 sur 13 »', (await subtitle()) === 'Leçon 1 sur 13', await subtitle());
 check('… 3 à 6 paragraphes', lesson?.paragraphs >= 3 && lesson?.paragraphs <= 6, lesson?.paragraphs);
 check('… « Essayer » vers Enregistrer', lesson?.essayer === '/enregistrer', lesson?.essayer);
@@ -120,39 +126,24 @@ check('… « 1 lue sur 13 »', (await subtitle()) === '1 lue sur 13', await sub
 await shoot('tutoriels-liste');
 check('retour : de la liste à Réglages', (await back()) === 'page' && (await waitFor(`location.pathname === '/parametres'`, { timeout: 3000 })) === true, await path());
 
-// 4. L'accueil du même jour : la leçon lue, plus de carte.
-await homeAt(dayAt(1));
-check('même jour, leçon lue : plus de carte', (await card()) === null, JSON.stringify(await card()));
-
-// 5. Jour 2, la croix ; jour 3.
-await homeAt(dayAt(2));
-c = await card();
-check("jour 2 : « Aujourd'hui : Lire une analyse »", c?.title === "Aujourd'hui : Lire une analyse", c?.title);
-await evaluate(`document.querySelector('.tutorial-card__close').click()`);
-await wait(300);
-check('la croix ferme la carte', (await card()) === null);
-check('… rangée fermée pour la journée', (await stored())?.dismissed === keyOf(dayAt(2)), JSON.stringify(await stored()));
-await homeAt(dayAt(2));
-check('… et elle ne revient pas au rechargement du même jour', (await card()) === null, JSON.stringify(await card()));
-check('deux chargements le même jour : deux jours comptés', (await stored())?.days?.length === 2, JSON.stringify((await stored())?.days));
-await homeAt(dayAt(3));
-c = await card();
-check("jour 3 : « Aujourd'hui : La carte »", c?.title === "Aujourd'hui : La carte", c?.title);
-
-// 6. Réglages.
+// 4. Le bloc de Réglages compte la leçon lue.
 await go('/parametres', 3000);
-const blockTitle = `[...document.querySelectorAll('[role=button]')].find((b) => b.textContent.trim() === 'Tutoriels')`;
 await waitFor(`Boolean(${blockTitle})`, { timeout: 3000, label: 'bloc' });
-check('Réglages : le bloc « Tutoriels », replié', (await evaluate(`Boolean(${blockTitle}) && !document.querySelector('a[href="/tutoriels"]')`)) === true);
-await evaluate(`${blockTitle}.click()`);
+await evaluate(`(() => { if (!document.querySelector('a[href="/tutoriels"]')) ${blockTitle}.click(); })()`);
 await wait(300);
-const block = await evaluate(`(() => { const a = document.querySelector('a[href="/tutoriels"]'); return a ? { link: a.textContent, text: a.parentElement.textContent } : null; })()`);
-check('… ouvert : « 1 leçon lue sur 13 » et « Voir tous les tutoriels »', block?.link === 'Voir tous les tutoriels' && block?.text.includes('1 leçon lue sur 13'), JSON.stringify(block));
+block = await evaluate(`(() => { const a = document.querySelector('a[href="/tutoriels"]'); return a ? { link: a.textContent, text: a.parentElement.textContent } : null; })()`);
+check('Réglages : « 1 leçon lue sur 13 » et « Voir tous les tutoriels »', block?.link === 'Voir tous les tutoriels' && block?.text.includes('1 leçon lue sur 13'), JSON.stringify(block));
 await shoot('tutoriels-reglages');
 await evaluate(`document.querySelector('a[href="/tutoriels"]').click()`);
 check('… qui ouvre la liste', (await waitFor(`location.pathname === '/tutoriels' && document.querySelectorAll('.tutorial-row').length > 0`, { timeout: 3000 })) === true, await path());
 
-// 7. La voile cachée par son œil dans Réglages › Activités : sa leçon retirée de la liste.
+// 5. La pause tient aux jours suivants, leçon lue ou non.
+await profileAt(dayAt(2));
+check("jour 2 : toujours pas de carte « Aujourd'hui : … » sur le Profil", (await card()) === null, await card());
+await profileAt(dayAt(3));
+check("jour 3 : toujours pas de carte, aucun jour compté", (await card()) === null && (await days()) === 0, `${await card()} ; ${JSON.stringify(await stored())}`);
+
+// 6. La voile cachée par son œil dans Réglages › Activités : sa leçon retirée de la liste.
 await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}'); s.settings = { ...s.settings, activites: true }; localStorage.setItem('${CLES.sections}', JSON.stringify(s)); })()`);
 await go('/parametres', 3000);
 const eye = `[...document.querySelectorAll('.settings-eye')].find((b) => (b.getAttribute('aria-label') ?? '').startsWith('Cacher Voile'))`;
@@ -165,12 +156,12 @@ const hidden = await rows();
 check('la voile cachée : douze leçons, sans « La voile »', hidden.length === 12 && !hidden.some((r) => r.title === 'La voile'), `${hidden.length} : ${hidden.map((r) => r.title).join(', ')}`);
 check('… « 1 lue sur 12 »', (await subtitle()) === '1 lue sur 12', await subtitle());
 
-// 8. Téléphone.
+// 7. Téléphone.
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
-await homeAt(dayAt(3));
-check('390 px : la carte du jour sur l\'accueil', (await card())?.title === "Aujourd'hui : La carte", JSON.stringify(await card()));
-check('390 px : rien ne déborde sur l\'accueil', (await overflow()) === false);
-await shoot('tutoriels-accueil-390');
+await profileAt(dayAt(3));
+check('390 px : le Profil sans carte du jour', (await card()) === null, await card());
+check('390 px : rien ne déborde sur le Profil', (await overflow()) === false);
+await shoot('tutoriels-profil-390');
 await go('/tutoriels/voile', 3000);
 await waitFor(`Boolean(document.querySelector('.tutorial-lesson'))`, { timeout: 3000, label: 'leçon' });
 check('390 px : une leçon, sans débordement', (await overflow()) === false);

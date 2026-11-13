@@ -1,21 +1,20 @@
 // Banc de test : logos des activités (demande du 17/10, remis sur la voile et le surf au lot 330, onze logos au lot 349).
 // Usage : node icones.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 1 min. Le script importe cinq sessions synthétiques (`lib/traces.mjs`) par
-// la page Voile (deux de wingfoil, une de kite, une de surf, une sans type, à classer), puis vérifie :
-//  1. l'accueil : boutons de famille (Voile, Surf) sans petites icônes d'activité (retirées le 17/10) ; la feuille des
-//     logos posée une seule fois (onze dessins et le cadre) ;
-//  2. la bibliothèque Voile : le bandeau nomme les activités visibles (Wingfoil, Kite), le titre lui-même inchangé ;
-//     un dessin et sa pastille de couleur devant chaque ligne, un dessin dans chaque onglet d'activité ; l'onglet
-//     « Kite » ne laisse que sa ligne ; « tous » les rend ;
-//  3. la bibliothèque Surf : le bandeau nomme ses deux activités visibles (Surf, Pumping) ;
-//  4. la liste de choix d'activité (session à classer) : un dessin et une pastille colorée par activité ;
-//  5. Réglages : onze dessins au choix, celui deviné coché (Wingfoil), « Windsurf » choisi, rangé dans la liste des
-//     activités (`windsurf`), gardé après rechargement, repris par l'onglet de la bibliothèque ;
+// la page Sessions (deux de wingfoil, une de kite, une de surf, une sans type, à classer), puis vérifie :
+//  1. l'ouverture : « / » mène au Profil ; la feuille des logos posée une seule fois (onze dessins et le cadre) ;
+//  2. la page Sessions : le titre, la rangée de logos (Toutes, Wingfoil, Kite, Surf, Pumping : les activités visibles),
+//     un logo dans son cadre par rond ; une pastille de couleur devant chaque ligne rangée ; le rond « Kite » ne laisse
+//     que sa ligne ; « Toutes » les rend ;
+//  3. la liste de choix d'activité (session à classer) : un dessin et une pastille colorée par activité ;
+//  4. Réglages : onze dessins au choix, celui deviné coché (Wingfoil), « Windsurf » choisi, rangé dans la liste des
+//     activités (`windsurf`), gardé après rechargement, repris par le rond de la page Sessions ;
 //     une activité « Kayak » ajoutée en surf, son dessin deviné (« Paddle ») coché pendant la saisie, rangée sans choix ;
-//  6. le Profil : la photo est le logo du sport préféré dans son cadre, le « Sport préféré » son dessin seul ;
-//  7. à 390×844 : bibliothèque et accueil sans débordement.
+//  5. le Profil : la photo est le logo du sport préféré dans son cadre, le « Sport préféré » son dessin seul ;
+//  6. à 390×844 : Sessions et Profil sans débordement.
 import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { choisirActivite, ouvrirLigne, ronds } from './lib/sessions.mjs';
 import { traceSansType, traceSurf, traceVoile } from './lib/traces.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -56,15 +55,15 @@ const SESSIONS = [
   ['sans-type-6.gpx', traceSansType({ debutMs: dixHeures(6), nom: 'sans type 6', bords: 1, virageMin: 3 })],
 ];
 
-/** Lignes à icône de la bibliothèque Voile : deux wingfoil et un kite (la session sans type, à classer, n'en a pas). */
-const ROWS_VOILE = 3;
+/** Lignes à pastille de la page Sessions : deux wingfoil, un kite et un surf (la session sans type, à classer, n'en a pas). */
+const ROWS = 4;
+/** Ronds de la rangée de logos, « Toutes » compris : un logo dans son cadre par activité visible. */
+const RONDS = 'Toutes*, Wingfoil, Kite, Surf, Pumping';
 
-const bannerActivities = () => evaluate(`document.querySelector('.lib-banner__activities')?.textContent ?? ''`);
 const rowIcons = () => evaluate(`document.querySelectorAll('.lib-row .lib-row__icon').length`);
-/** Dessin de l'icône de l'onglet d'une activité de la bibliothèque. */
-const tabIcon = (label) => evaluate(`[...document.querySelectorAll('.ui-tab')].find((t) => t.textContent.trim().startsWith(${JSON.stringify(label + ' (')}))?.querySelector('.ui-tab__icon')?.innerHTML ?? ''`);
+/** Dessin du logo du rond d'une activité de la rangée. */
+const bubbleLogo = (label) => evaluate(`[...document.querySelectorAll('.activity-bubbles .activity-bubble')].find((b) => b.querySelector('.activity-bubble__name')?.textContent.trim() === ${JSON.stringify(label)})?.querySelector('.activity-bubble__logo')?.innerHTML ?? ''`);
 const h1 = () => evaluate(`document.querySelector('h1')?.textContent ?? null`);
-const tab = (label) => `[...document.querySelectorAll('.ui-tab')].find((b) => b.textContent.trim().startsWith(${JSON.stringify(label)}))`;
 const overflow = () => evaluate('document.documentElement.scrollWidth > window.innerWidth');
 const stored = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.sportSettings}') ?? '{}').activities ?? null`);
 
@@ -72,7 +71,7 @@ const stored = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.sportSett
 const ready = (selector) => waitFor(`document.querySelector(${JSON.stringify(selector)}) !== null`, { timeout: 3000, label: selector });
 
 // --- Mise en place ---
-await go('/voile', 5000);
+await go('/sessions', 5000);
 console.log('import :', await evaluate(`(() => {
   const input = document.querySelector('input[type=file][accept*=".gpx"]');
   if (!input) return 'absent';
@@ -87,48 +86,44 @@ console.log('import :', await evaluate(`(() => {
 await waitFor(async () => ((await records()) ?? []).length >= SESSIONS.length, { timeout: 10000, label: 'cinq fiches' });
 await settle({ max: 2500, label: 'import' });
 
-// 1. Accueil.
+// 1. Ouverture : le Profil.
 await go('/');
-await ready('.home-family__name');
-const homeLabels = await evaluate(`[...document.querySelectorAll('.home-family__name')].map((s) => s.textContent)`);
-check('accueil : noms des familles', JSON.stringify(homeLabels) === JSON.stringify(['Voile', 'Surf']), JSON.stringify(homeLabels));
-check('accueil : pas de petites icônes', (await evaluate(`document.querySelectorAll('.home-family__acts').length`)) === 0);
+await ready('.profile-head__title');
+check("ouverture : « / » mène au Profil", (await evaluate('location.pathname')) === '/profil', await evaluate('location.pathname'));
 // La feuille des logos se lit à part : on attend qu'elle soit posée.
 await waitFor(`document.querySelector('svg.logo-sprite') !== null`, { timeout: 3000, label: 'feuille des logos' });
 const sprite = await evaluate(`({ sheets: document.querySelectorAll('svg.logo-sprite').length, symbols: [...document.querySelectorAll('svg.logo-sprite symbol')].map((s) => s.id) })`);
 check('feuille des logos : une seule, onze dessins et le cadre', sprite.sheets === 1 && sprite.symbols.length === 12
   && sprite.symbols.includes('gt-logo-frame') && sprite.symbols.includes('gt-logo-surf-foil'), JSON.stringify(sprite));
-await shoot('icones-accueil');
+await shoot('icones-profil-ouverture');
 
-// 2. Bibliothèque Voile.
-await go('/voile');
+// 2. Page Sessions.
+await go('/sessions');
 await ready('.lib-row');
-check('Voile : titre inchangé', (await h1()) === 'Voile', await h1());
-check('Voile : bandeau des activités visibles', (await bannerActivities()) === 'Wingfoil, Kite', await bannerActivities());
-check('Voile : une icône par ligne', (await rowIcons()) === ROWS_VOILE, await rowIcons());
-const rowMarks = await evaluate(`[...document.querySelectorAll('.lib-row .lib-row__icon')].filter((i) =>
-  i.querySelector('use')?.getAttribute('href')?.startsWith('#gt-logo-') && i.querySelector('.ui-swatch')?.style.background).length`);
-check('Voile : dessin et pastille de couleur sur chaque ligne', rowMarks === ROWS_VOILE, rowMarks);
-const wingIcon = await tabIcon('Wingfoil');
-check('Voile : icônes des onglets', (await evaluate(`document.querySelectorAll('.ui-tab .ui-tab__icon').length`)) === 2);
-await shoot('icones-voile-tous');
-await evaluate(`${tab('Kite')}?.click()`);
+check('Sessions : titre', (await h1()) === 'Sessions', await h1());
+check('Sessions : rangée de logos des activités visibles', (await ronds(evaluate)) === RONDS, await ronds(evaluate));
+const bubbleMarks = await evaluate(`[...document.querySelectorAll('.activity-bubbles .activity-bubble__logo')].filter((l) =>
+  l.querySelectorAll('use').length === 2 && l.querySelector('use')?.getAttribute('href') === '#gt-logo-frame'
+  && l.querySelector('use:nth-of-type(2)')?.getAttribute('href')?.startsWith('#gt-logo-')).length`);
+check('Sessions : un logo dans son cadre par activité de la rangée', bubbleMarks === 4, bubbleMarks);
+check('Sessions : une pastille par ligne rangée', (await rowIcons()) === ROWS, await rowIcons());
+const rowMarks = await evaluate(`[...document.querySelectorAll('.lib-row .lib-row__icon')].filter((i) => i.classList.contains('ui-swatch') && i.style.background).length`);
+check('Sessions : pastille de couleur sur chaque ligne', rowMarks === ROWS, rowMarks);
+const wingIcon = await bubbleLogo('Wingfoil');
+check('Sessions : logo du rond Wingfoil', wingIcon.includes('#gt-logo-wingfoil'), wingIcon);
+await shoot('icones-sessions-toutes');
+check('rond Kite', (await choisirActivite(evaluate, 'Kite')) === 'ok');
 await wait(400);
-check('onglet Kite : sa seule ligne', (await rowIcons()) === 1);
-await shoot('icones-voile-kite');
-await evaluate(`${tab('tous')}?.click()`);
+check('rond Kite : sa seule ligne', (await rowIcons()) === 1, await rowIcons());
+await shoot('icones-sessions-kite');
+check('rond Toutes', (await choisirActivite(evaluate, 'Toutes')) === 'ok');
 await wait(400);
-check('« tous » rend toutes les lignes', (await rowIcons()) === ROWS_VOILE, await rowIcons());
+check('« Toutes » rend toutes les lignes', (await rowIcons()) === ROWS, await rowIcons());
 
-// 3. Bibliothèque Surf.
-await go('/surf');
-await ready('.lib-banner__activities');
-check('Surf : bandeau des deux activités visibles', (await bannerActivities()) === 'Surf, Pumping', await bannerActivities());
-
-// 4. Liste de choix : la session à classer.
-await go('/voile');
+// 3. Liste de choix : la session à classer.
+await go('/sessions');
 await ready('.lib-row__main');
-await evaluate(`[...document.querySelectorAll('.lib-row__main')].find((b) => b.textContent.includes('À classer'))?.click()`);
+console.log('ouvrir À classer :', await ouvrirLigne(evaluate, 'À classer'));
 await wait(600);
 const sheet = await evaluate(`(() => {
   const opts = [...document.querySelectorAll('.activity-select__option')];
@@ -195,12 +190,12 @@ await wait(600);
 const paddle = (await stored())?.find((a) => a.name === 'Kayak');
 check('Kayak rangée, sans icône imposée', paddle !== undefined && paddle.icon === undefined, JSON.stringify(paddle));
 
-await go('/voile');
+await go('/sessions');
 await ready('.lib-row');
-const boardIcon = await tabIcon('Wingfoil');
-check('bibliothèque : dessin du windsurf dans son onglet', boardIcon.includes('#gt-logo-windsurf') && boardIcon !== wingIcon, boardIcon);
+const boardIcon = await bubbleLogo('Wingfoil');
+check('Sessions : dessin du windsurf dans le rond de Wingfoil', boardIcon.includes('#gt-logo-windsurf') && boardIcon !== wingIcon, boardIcon);
 
-// 6. Profil : la photo, sans choix, est le logo du sport préféré dans son cadre ; « Sport préféré » montre son dessin seul.
+// 5. Profil : la photo, sans choix, est le logo du sport préféré dans son cadre ; « Sport préféré » montre son dessin seul.
 await go('/profil');
 await ready('.profile-head__avatar');
 const avatar = await evaluate(`(() => {
@@ -213,15 +208,15 @@ check('Profil : photo au logo dans son cadre', avatar.uses.length === 2 && avata
 check('Profil : sport préféré en dessin seul', avatar.favorite?.startsWith('#gt-logo-') && !avatar.framed, JSON.stringify(avatar));
 await shoot('icones-profil');
 
-// 7. Téléphone.
+// 6. Téléphone.
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
-await go('/voile');
+await go('/sessions');
 await ready('.lib-row');
-check('390 : bibliothèque sans débordement', (await overflow()) === false);
-await shoot('icones-voile-390');
+check('390 : Sessions sans débordement', (await overflow()) === false);
+await shoot('icones-sessions-390');
 await go('/');
-await ready('.home-family__name');
-check('390 : accueil sans débordement', (await overflow()) === false);
-await shoot('icones-accueil-390');
+await ready('.profile-head__title');
+check('390 : Profil sans débordement', (await overflow()) === false);
+await shoot('icones-profil-390');
 
 await finish();

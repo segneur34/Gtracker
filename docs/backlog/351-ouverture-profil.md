@@ -43,6 +43,12 @@ Demande du 12/11 : « ce serait bien que la page d'accueil soit la page de profi
 - La photo du téléphone ne fait que 565 px de large : embarquée telle quelle, sans agrandissement ; sa netteté est à regarder au téléphone, l'original se demandera à GONG.
 - L'ordre des barres vit dans un module pur `src/core/navigation.ts`, testé. Deux colonnes à partir de 1000 px. Sans pseudo : « Bienvenue » seul. Les cartes d'ouverture viennent sous l'en-tête à photo. Les lignes de session du Profil n'ont pas de « … ». `PageBackdrop`, `useFavoriteBackdrop` et les variables `--backdrop-*` s'en vont s'ils n'ont plus d'emploi. Titres des cadres : ceux d'aujourd'hui, sauf s'ils contredisent la planche ; « Depuis le début » gardé. Le lien du test de FC repos reste sous le pseudo. Le script de conversion des photos reste hors du dépôt.
 
+## Depuis le lot 346 (13/11), à savoir avant de suivre le plan
+
+- Le 346 est commité tel que son plan le disait : `src/pages/SessionsPage.tsx` (`/sessions`), `components/ActivityBubbles`, `SessionRow`, `SessionPreviewMap`, `library/sessionsList.ts`, `SESSIONS_PATH` et `sessionsPath` dans `core/parentPage.ts`, `TUTORIAL_OF_DAY_VISIBLE` dans `tutorials/tutorials.ts`. `IconHome` n'existe plus (`IconList` pour Sessions) ; `ErrorBoundary` garde `goHome` vers `/` et son libellé est à revoir ici ; toutes les images de l'accueil sont parties, `src/assets/` ne garde que `logo/`.
+- Toute requête `@media` d'une feuille de style reprend mot pour mot `WIDE_QUERY` ou `PHONE_LANDSCAPE_QUERY` (ou une rupture nommée de `SCREEN_BREAKPOINTS`) : `src/hooks/mediaQueries.test.ts` le garde et a fait échouer le 346 une première fois. La rupture de 1000 px des deux colonnes doit donc être une rupture nommée, existante ou ajoutée là.
+- Un cadre de logo blanc le jour ou noir la nuit a déjà son cerne (`isLostOnBackground`, dans `ActivityLogo`).
+
 ## Plan (agent Plan, 13/11), à suivre sauf constat contraire dans le code
 
 Il part de l'état où le 346 est fait ; les numéros de ligne sont ceux d'avant le 346 et le 349, à retrouver.

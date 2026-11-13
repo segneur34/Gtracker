@@ -49,10 +49,11 @@ type Sheet = 'open' | 'classify' | null;
  * Ligne d'une session de la page Sessions : la pastille et le nom de l'activité avec la date, le nom de la session
  * en gras (celui de l'activité quand elle n'en a pas), ses chiffres, le commentaire et l'avertissement en petites
  * lignes, la vignette de la trace à droite, puis un « … » : Classer (session à classer), Renommer, Supprimer (avec
- * confirmation). Mémorisée, rappels stables : un balayage de la mémoire ne redessine que les lignes dont la fiche change.
+ * confirmation), sauf avec `menu` faux (dernières sessions du Profil). Mémorisée, rappels stables : un balayage de la
+ * mémoire ne redessine que les lignes dont la fiche change.
  */
 const SessionRow = memo(function SessionRow({
-  session, activity, activities, family, fromActivityId, folderLabel, confirming, onAskDelete, onCancelDelete,
+  session, activity, activities, family, fromActivityId, folderLabel, confirming, onAskDelete, onCancelDelete, menu = true,
 }: {
   session: LibrarySession;
   activity: Activity | null;
@@ -66,6 +67,8 @@ const SessionRow = memo(function SessionRow({
   confirming: boolean;
   onAskDelete: (file: string) => void;
   onCancelDelete: () => void;
+  /** Le « … » des actions sur la session ; faux : la ligne ne fait qu'ouvrir l'analyse. */
+  menu?: boolean;
 }) {
   const openSession = useOpenSession();
   const shade = useThemedShade();
@@ -134,7 +137,7 @@ const SessionRow = memo(function SessionRow({
           {session.warning && <span className="lib-row__warning">{session.warning}</span>}
         </button>
         <SessionPreviewMap session={session} activity={activity} family={family} folderLabel={folderLabel} onOpen={open} />
-        {!session.readOnly && (
+        {menu && !session.readOnly && (
           <MoreMenu label="Plus d'actions sur la session">
             {unclassified && <Button size="s" variant="ghost" onClick={startClassify}>Classer…</Button>}
             <Button size="s" variant="ghost" onClick={startRename}>Renommer</Button>

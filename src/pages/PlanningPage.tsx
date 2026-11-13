@@ -69,9 +69,8 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * avec son GPX.
  *
  * Rien ne se calcule : seule la recherche de lieu demande du réseau. On y
- * arrive depuis l'accueil (« Planifier ») et, sur ordinateur, depuis la barre
- * du haut ; `?itineraire=<base>` ouvre un itinéraire rangé (listes de
- * l'accueil et des bibliothèques).
+ * arrive depuis la page Sessions (« Créer un parcours ») et, sur ordinateur, depuis « Planifier » dans la barre
+ * du haut ; `?itineraire=<base>` ouvre un itinéraire rangé (liste des itinéraires).
  *
  * Le crayon, sur la carte, verrouille l'itinéraire : verrouillé, la carte ne fait
  * que se déplacer et se zoomer (ni point posé, ni point déplacé ou touché, ni
