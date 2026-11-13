@@ -21,7 +21,11 @@
     </style>
 
 
+    <!-- Fenêtre de lancement : fond noir de jour comme de nuit, comme l'image de démarrage, pour
+         qu'aucun éclair blanc ne la précède. Sans effet une fois l'application ouverte (autre thème). -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@android:color/black</item>
+        <item name="android:windowBackground">@android:color/black</item>
         <item name="android:background">@drawable/splash</item>
     </style>
 </resources>
