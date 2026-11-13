@@ -37,7 +37,7 @@ export interface HrSource {
 export interface AthleteProfile {
   /** Nom ou pseudo, affiché en titre du Profil et au pied de l'image partagée. */
   name: string | null;
-  /** Photo du Profil ; `null` : le dessin du sport préféré. */
+  /** Photo du Profil ; `null` : l'avatar vide. */
   avatar: AthleteAvatar | null;
   /** Masse en kilogrammes. */
   weightKg: number | null;

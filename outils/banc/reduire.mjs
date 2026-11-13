@@ -3,7 +3,7 @@
 // Sur un profil neuf, sans réseau. Dure environ 20 s. Le script :
 //  1. ouvre tous les blocs, familles, activités et parties, un choix d'icône et une aide, puis appuie sur
 //     « Tout réduire » : plus rien d'ouvert sur la page, et après rechargement non plus ;
-//  2. saisit un pseudo dans Pratiquant : il devient le titre du Profil ; effacé, le titre redevient « Profil » ;
+//  2. saisit un pseudo dans Pratiquant : il devient le titre du Profil ; effacé, le titre redevient « Bienvenue » seul ;
 //  3. à 390×844 : l'en-tête et son bouton sans débordement.
 import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
@@ -98,7 +98,7 @@ await go('/parametres', 3000);
 await setPseudo('');
 await wait(300);
 await go('/profil', 3000);
-check('Profil : sans pseudo, « Profil »', (await evaluate(`document.querySelector('h1')?.textContent`)) === 'Profil');
+check('Profil : sans pseudo, « Bienvenue » seul', (await evaluate(`document.querySelector('h1')?.textContent`)) === 'Bienvenue' && (await evaluate(`document.querySelector('.profile-head__hello') === null`)) === true);
 
 // --- 3. Téléphone ---
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });

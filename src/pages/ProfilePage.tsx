@@ -39,7 +39,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * Profil, la page où s'ouvre l'application : une période en un coup d'œil (`library/profile.ts`). En tête, une photo
  * (logo GONG et « Gtracker » en haut à gauche sur téléphone, « Live for it. » en bas à droite), puis, à cheval sur son
  * bord, la photo ronde (un dessin d'activité ou une image importée, choisis en la touchant ; sans
- * choix, le dessin du sport préféré de toutes les sessions), « Bienvenue » et le pseudo. Puis les cartes d'ouverture
+ * choix, un disque vide à silhouette), « Bienvenue » et le pseudo. Puis les cartes d'ouverture
  * (mémoire à désigner, autorisations, invitation du profil), quand il y a lieu. Puis
  * la période, qui règle toute la page : semaine, 30 jours, 6 mois, année (les
  * bornes du graphe d'activités et des statistiques) ou depuis le début ; choix
@@ -183,7 +183,7 @@ function ProfilePage() {
   }, [inPeriod, activityOrder, activityById, shown]);
   const favoriteId = useMemo(() => favoriteActivity(inPeriod, activityOrder), [inPeriod, activityOrder]);
   const favorite = favoriteId ? activityById.get(favoriteId) ?? null : null;
-  // Photo par défaut : le sport préféré de toutes les sessions, qui ne change pas avec la période (voile et surf seuls).
+  // Sport préféré de toutes les sessions, qui ne change pas avec la période : donne l'unité de distance quand la période est vide.
   const overallFavoriteId = useMemo(() => favoriteActivity(all, activityOrder), [all, activityOrder]);
   const overallFavorite = overallFavoriteId ? activityById.get(overallFavoriteId) ?? null : null;
   const openLibrary = (a: Activity) => navigate(sessionsPath(a.id));
@@ -216,11 +216,10 @@ function ProfilePage() {
   const column = (
     <div className="ui-page profile">
       <header className="profile-head">
-        <button type="button" className="profile-head__avatar" aria-label="Changer la photo de profil" aria-expanded={picking}
+        <button type="button" className="profile-head__avatar" aria-expanded={picking}
+          aria-label={avatar ? 'Changer la photo de profil' : 'Choisir une photo de profil'}
           onClick={() => setPicking(!picking)}>
-          <ProfileAvatar avatar={avatar}
-            fallback={overallFavorite ? { icon: activityLogo(overallFavorite), color: shown(overallFavorite.color) } : null}
-            logoColor={shownLogoColor} />
+          <ProfileAvatar avatar={avatar} logoColor={shownLogoColor} />
         </button>
         <div className="profile-head__text">
           {name !== null && <span className="profile-head__hello">Bienvenue</span>}

@@ -10,34 +10,26 @@ import './ProfileAvatar.css';
 
 /**
  * Photo ronde du Profil : une image importée, ou un logo d'activité dans son cadre, sur un disque au fond de la page.
- * Sans choix, le logo du sport préféré à la couleur de son activité (`fallback`), sinon une silhouette.
+ * Sans choix, un disque vide à silhouette : il se remplit quand l'utilisateur choisit.
  */
-
-interface AvatarFallback {
-  icon: LogoId;
-  /** Couleur du cadre, déjà celle du thème. */
-  color: string;
-}
 
 /** Côté donné au logo, au-dessus du seuil du cadre : le disque le remet à sa taille, celle de son parent. */
 const AVATAR_LOGO_PX = 88;
 
 /** Disque d'un logo : le dessin à l'encre dans son cadre au pinceau, à la couleur reçue. */
-const LogoDisc = ({ icon, color }: AvatarFallback) => (
+const LogoDisc = ({ icon, color }: { icon: LogoId; color: string }) => (
   <span className="profile-avatar__disc profile-avatar__disc--logo">
     <ActivityLogo logo={icon} color={color} size={AVATAR_LOGO_PX} className="profile-avatar__logo" />
   </span>
 );
 
-export function ProfileAvatar({ avatar, fallback, logoColor }: {
+export function ProfileAvatar({ avatar, logoColor }: {
   avatar: AthleteAvatar | null;
-  fallback: AvatarFallback | null;
   /** Couleur du cadre d'un logo choisi, déjà celle du thème. */
   logoColor: (logo: LogoId) => string;
 }) {
   if (avatar?.kind === 'photo') return <img className="profile-avatar__photo" src={avatar.dataUrl} alt="" />;
   if (avatar?.kind === 'dessin') return <LogoDisc icon={avatar.icon} color={logoColor(avatar.icon)} />;
-  if (fallback) return <LogoDisc {...fallback} />;
   return (
     <span className="profile-avatar__disc profile-avatar__disc--empty">
       <IconUser size={100} className="profile-avatar__art" />

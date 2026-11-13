@@ -18,9 +18,9 @@
 //  6. deux sessions d'activités cachées (planche à voile et bateau, cachées au départ) : absentes du Profil, rien ne
 //     change (quatre sessions, trois parts, ni « Autres ») ; une session de surf passée en Pumping dans son analyse :
 //     une quatrième part, la ligne de la légende ouvre ses sessions ;
-//  7. la photo (22/10) : au départ le dessin du sport préféré ; toucher la photo ouvre le choix des neuf dessins ;
-//     un dessin choisi, puis une image importée (réduite à 256 px, en JPEG), tous deux retenus au rechargement ;
-//     « Retirer » rend le dessin du sport préféré.
+//  7. la photo : au départ l'avatar vide (disque à silhouette, même avec des sessions), nommé « Choisir une photo de
+//     profil » ; toucher la photo ouvre le choix des onze logos ; un logo choisi (dans son cadre), puis une image
+//     importée (réduite à 256 px, en JPEG), tous deux retenus au rechargement ; « Retirer » rend l'avatar vide.
 import { connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { traceSurf } from './lib/traces.mjs';
@@ -308,13 +308,16 @@ const avatarState = () => evaluate(`(() => {
   const b = document.querySelector('.profile-head__avatar');
   const img = b?.querySelector('img');
   if (img) return 'photo ' + img.naturalWidth + ' ' + img.getAttribute('src').slice(0, 15);
+  if (b?.querySelector('.profile-avatar__disc--empty svg')) return 'vide';
   const logo = b?.querySelector('.profile-avatar__disc svg.activity-logo');
   if (!logo) return 'rien';
   const [frame, glyph] = [...logo.querySelectorAll('use')];
   return 'logo ' + glyph?.getAttribute('href') + (frame?.getAttribute('href') === '#gt-logo-frame' && frame.getAttribute('color') ? ' encadré' : '');
 })()`);
 const before = await avatarState();
-check('photo au départ : le logo du sport préféré, dans son cadre', before === 'logo #gt-logo-wingfoil encadré', before);
+check('photo au départ : l\'avatar vide, malgré des sessions et un sport préféré', before === 'vide', before);
+check('l\'avatar vide dit qu\'on peut le choisir', (await evaluate(`document.querySelector('.profile-head__avatar')?.getAttribute('aria-label')`)) === 'Choisir une photo de profil');
+await shoot('profil-avatar-vide');
 await evaluate(`document.querySelector('.profile-head__avatar').click()`);
 await wait(300);
 check('toucher la photo ouvre le choix des onze logos', (await evaluate(`document.querySelectorAll('.avatar-picker__choice').length`)) === 11);
@@ -350,7 +353,9 @@ await evaluate(`document.querySelector('.profile-head__avatar').click()`);
 await wait(300);
 await evaluate(`[...document.querySelectorAll('.avatar-picker button')].find((b) => b.textContent.trim() === 'Retirer').click()`);
 await wait(300);
-check('« Retirer » rend le dessin du sport préféré', (await avatarState()) === before, await avatarState());
+check('« Retirer » rend l\'avatar vide', (await avatarState()) === 'vide', await avatarState());
+await go('/profil');
+check('… vide au rechargement', (await avatarState()) === 'vide', await avatarState());
 
 // Ce script ne relève que les erreurs de console, pas les avertissements.
 const errors = logs.filter((l) => !l.startsWith('warning:'));

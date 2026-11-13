@@ -71,7 +71,7 @@ export const useAthleteProfile = () => {
 
   const setSex = useCallback((sex: AthleteProfile['sex']) => update({ sex }), [update]);
 
-  /** Photo du Profil, `null` pour revenir au dessin du sport préféré ; une valeur invalide est ignorée. */
+  /** Photo du Profil, `null` pour la retirer (avatar vide) ; une valeur invalide est ignorée. */
   const setAvatar = useCallback(
     (avatar: AthleteAvatar | null) => {
       if (avatar !== null && athleteAvatar({ avatar }) === null) return;

@@ -10,7 +10,8 @@
 //  4. Réglages : onze dessins au choix, celui deviné coché (Wingfoil), « Windsurf » choisi, rangé dans la liste des
 //     activités (`windsurf`), gardé après rechargement, repris par le rond de la page Sessions ;
 //     une activité « Kayak » ajoutée en surf, son dessin deviné (« Paddle ») coché pendant la saisie, rangée sans choix ;
-//  5. le Profil : la photo est le logo du sport préféré dans son cadre, le « Sport préféré » son dessin seul ;
+//  5. le Profil : la photo est vide au départ, un logo choisi y paraît dans son cadre, « Retirer » la vide ; le
+//     « Sport préféré » est un dessin seul ;
 //  6. à 390×844 : Sessions et Profil sans débordement.
 import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
@@ -195,18 +196,33 @@ await ready('.lib-row');
 const boardIcon = await bubbleLogo('Wingfoil');
 check('Sessions : dessin du windsurf dans le rond de Wingfoil', boardIcon.includes('#gt-logo-windsurf') && boardIcon !== wingIcon, boardIcon);
 
-// 5. Profil : la photo, sans choix, est le logo du sport préféré dans son cadre ; « Sport préféré » montre son dessin seul.
+// 5. Profil : la photo, sans choix, est vide (malgré les sessions) ; un logo choisi y paraît dans son cadre, « Retirer »
+// la vide ; « Sport préféré » montre son dessin seul.
 await go('/profil');
 await ready('.profile-head__avatar');
-const avatar = await evaluate(`(() => {
+const avatarState = () => evaluate(`(() => {
+  const empty = document.querySelector('.profile-head__avatar .profile-avatar__disc--empty svg') !== null;
   const logo = document.querySelector('.profile-head__avatar svg.activity-logo');
   const uses = logo ? [...logo.querySelectorAll('use')].map((u) => u.getAttribute('href')) : [];
   const favorite = document.querySelector('.profile-figure__art');
-  return { uses, favorite: favorite?.querySelector('use')?.getAttribute('href') ?? null, framed: favorite?.querySelector('use[href="#gt-logo-frame"]') !== null };
+  return { empty, uses, favorite: favorite?.querySelector('use')?.getAttribute('href') ?? null, framed: favorite?.querySelector('use[href="#gt-logo-frame"]') !== null };
 })()`);
-check('Profil : photo au logo dans son cadre', avatar.uses.length === 2 && avatar.uses[0] === '#gt-logo-frame' && avatar.uses[1].startsWith('#gt-logo-'), JSON.stringify(avatar));
+const avatar = await avatarState();
+check('Profil : avatar vide au départ, sans logo', avatar.empty && avatar.uses.length === 0, JSON.stringify(avatar));
 check('Profil : sport préféré en dessin seul', avatar.favorite?.startsWith('#gt-logo-') && !avatar.framed, JSON.stringify(avatar));
 await shoot('icones-profil');
+await evaluate(`document.querySelector('.profile-head__avatar').click()`);
+await wait(300);
+await evaluate(`document.querySelector('.avatar-picker__choice[aria-label="Kite"]').click()`);
+await wait(300);
+const chosen = await avatarState();
+check('Profil : logo choisi dans son cadre', !chosen.empty && chosen.uses.length === 2 && chosen.uses[0] === '#gt-logo-frame' && chosen.uses[1] === '#gt-logo-kite', JSON.stringify(chosen));
+await evaluate(`document.querySelector('.profile-head__avatar').click()`);
+await wait(300);
+await evaluate(`[...document.querySelectorAll('.avatar-picker button')].find((b) => b.textContent.trim() === 'Retirer')?.click()`);
+await wait(300);
+const removed = await avatarState();
+check('Profil : « Retirer » rend l\'avatar vide', removed.empty && removed.uses.length === 0, JSON.stringify(removed));
 
 // 6. Téléphone.
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });

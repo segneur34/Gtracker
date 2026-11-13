@@ -119,7 +119,7 @@ export const LESSONS: readonly Lesson[] = [
       : [
         "L'application s'ouvre sur le Profil. Vos sessions sont juste à côté : « Sessions », la case voisine de la barre du bas, ou le lien du haut sur ordinateur.",
         'Le Profil résume vos activités sur la période choisie : distance, sport préféré et temps par activité.',
-        'Touchez la photo ronde pour la changer : un des dessins d\'activité, ou une image de votre téléphone. Le pseudo se règle dans Réglages › Pratiquant.',
+        'La photo ronde est vide au départ : touchez-la pour choisir un des logos d\'activité, ou une image de votre téléphone ; « Retirer » la vide de nouveau. Le pseudo se règle dans Réglages › Pratiquant.',
         'Une seule période pour toute la page : semaine, 30 jours, 6 mois, année ou depuis le début.',
         "Sur ordinateur, « Vos activités » se tient à droite avec vos cinq dernières sessions : touchez le logo d'une activité pour ne voir que les siennes ; « Toutes les sessions » ouvre la liste entière.",
       ],
