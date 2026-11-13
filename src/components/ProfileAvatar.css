@@ -19,9 +19,14 @@
   color: var(--on-accent);
 }
 
-/* Sur la couleur d'une activité : cerne gris, qui fait voir le blanc sur blanc et le noir sur noir. */
-.profile-avatar__disc--activity {
-  box-shadow: var(--ring-line);
+/* Un logo dans son cadre, sur le fond de la page ; le logo prend toute la place du disque. */
+.profile-avatar__disc--logo {
+  background: var(--bg);
+}
+
+.profile-avatar__logo {
+  width: 100%;
+  height: 100%;
 }
 
 .profile-avatar__disc--empty {
@@ -67,7 +72,7 @@
   cursor: pointer;
 }
 
-/* Seize dessins : huit de front, quatre sur quatre au téléphone. */
+/* Onze logos : huit de front, quatre au téléphone. */
 .avatar-picker__grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -90,9 +95,9 @@
   cursor: pointer;
 }
 
-/* Le dessin choisi, cerclé de la couleur de sa famille. */
+/* Le logo choisi, cerclé à l'encre. */
 .avatar-picker__choice[aria-pressed='true'] {
-  box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--choice-color);
+  box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--ink);
 }
 
 .avatar-picker__actions {

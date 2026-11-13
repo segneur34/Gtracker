@@ -26,8 +26,16 @@ describe('athleteName', () => {
 describe('athleteAvatar', () => {
   it('reprend un dessin connu et une photo réduite', () => {
     expect(athleteAvatar({ avatar: { kind: 'dessin', icon: 'kite' } })).toEqual({ kind: 'dessin', icon: 'kite' });
+    expect(athleteAvatar({ avatar: { kind: 'dessin', icon: 'pumping' } })).toEqual({ kind: 'dessin', icon: 'pumping' });
     const photo = { kind: 'photo' as const, dataUrl: 'data:image/jpeg;base64,AAAA' };
     expect(athleteAvatar({ avatar: photo })).toEqual(photo);
+  });
+
+  it('relit un dessin choisi parmi les anciennes icônes en son logo', () => {
+    const legacy = (icon: string) => athleteAvatar({ avatar: { kind: 'dessin', icon } as unknown as AthleteAvatar });
+    expect(legacy('planche')).toEqual({ kind: 'dessin', icon: 'windsurf' });
+    expect(legacy('kayak')).toEqual({ kind: 'dessin', icon: 'paddle' });
+    expect(legacy('paddle-foil')).toEqual({ kind: 'dessin', icon: 'surf-foil' });
   });
 
   it('écarte un profil sans photo, un dessin inconnu, une adresse qui n’est pas une image ou une image trop lourde', () => {

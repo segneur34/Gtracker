@@ -20,7 +20,7 @@ import { useTutorials } from '../hooks/useTutorials';
 import { Link } from 'react-router-dom';
 import { useTileCache } from '../hooks/useTileCache';
 import { isTileTemplate, type MapBase } from '../core/mapBase';
-import { useActivityInk, useThemeSettings } from '../hooks/useTheme';
+import { useThemeSettings } from '../hooks/useTheme';
 import { THEME_CHOICES } from '../theme/theme';
 import { ATHLETE_NAME_MAX, athleteHeartRateZones, athleteHrSource, type AthleteNumberField, type AthleteProfile } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
@@ -60,9 +60,9 @@ import PanelTitle from '../components/PanelTitle';
 import AboutSettings from '../components/AboutSettings';
 import SettingsPart from '../components/SettingsPart';
 import ShadePicker from '../components/ShadePicker';
-import ActivityIcon from '../components/ActivityIcon';
+import ActivityGlyph from '../components/logos/ActivityGlyph';
 import IconPicker from '../components/IconPicker';
-import { activityIcon, guessActivityBase, guessActivityIcon, type ActivityIconId } from '../core/activityIcons';
+import { activityLogo, guessActivityBase, guessActivityLogo, type LogoId } from '../core/activityLogos';
 import {
   JUMP_MIN_HEIGHT_RANGE, JUMP_PLACEMENTS, JUMP_PLACEMENT_LABEL, type JumpPlacement, type JumpSettings,
 } from '../recording/jumpSettings';
@@ -320,8 +320,6 @@ interface ActivityCardProps {
   /** Dernière activité visible : son œil ne se ferme pas. */
   lastActivity: boolean;
   openPart: Record<ActivityPartKey, boolean>;
-  /** Couleur de son icône pour le thème (`useActivityInk`). */
-  shade: (color: string) => string;
   actions: ActivityCardActions;
 }
 
@@ -332,7 +330,7 @@ interface ActivityCardProps {
  * leur texte : relus à chaque écriture, ils sont un objet neuf même inchangés.
  */
 const ActivityCard = memo(function ActivityCard({
-  activity, view: s, isOpen, renaming, familyHidden, lastActivity, openPart, shade: shown, actions,
+  activity, view: s, isOpen, renaming, familyHidden, lastActivity, openPart, actions,
 }: ActivityCardProps) {
   const { setFor, updateActivity, resetActivity, setActivityHidden, askRemove, toggleGear, toggleActivity, togglePart, setRenaming } = actions;
   const id = activity.id;
@@ -404,7 +402,7 @@ const ActivityCard = memo(function ActivityCard({
             if (renamingThis) setRenaming(null);
           }}>
           <IconChevronRight size={14} className="settings-activity__chevron" style={{ transform: isOpen ? 'rotate(90deg)' : undefined }} />
-          {!renamingThis && <ActivityIcon activity={activity} size={18} className="settings-activity__icon" style={{ color: shown(activity.color) }} />}
+          {!renamingThis && <ActivityGlyph activity={activity} size={18} swatch className="settings-activity__icon" />}
           {!renamingThis && <strong className="settings-activity__name">{activity.name}</strong>}
           {!renamingThis && <span className="settings-sports__mark">{p.label}</span>}
           {!isOpen && (
@@ -439,7 +437,7 @@ const ActivityCard = memo(function ActivityCard({
               label={`Couleur de ${activity.name}`} />
           </SettingRow>
           <SettingRow label="Icône" helpKey={`${id}:icone`} help="Son icône dans les listes ; sans choix, elle suit le nom.">
-            <IconPicker value={activityIcon(activity)} color={activity.color} onChange={(icon) => updateActivity(id, { icon })}
+            <IconPicker value={activityLogo(activity)} onChange={(icon) => updateActivity(id, { icon })}
               label={`Icône de ${activity.name}`} />
           </SettingRow>
           <SettingsPart label="Affichage" open={openPart.affichage} onToggle={() => togglePart('affichage')}>
@@ -608,7 +606,7 @@ const ActivityCard = memo(function ActivityCard({
     </div>
   );
 }, (a, b) => a.activity === b.activity && a.isOpen === b.isOpen && a.renaming === b.renaming && a.familyHidden === b.familyHidden
-  && a.lastActivity === b.lastActivity && a.openPart === b.openPart && a.shade === b.shade && a.actions === b.actions
+  && a.lastActivity === b.lastActivity && a.openPart === b.openPart && a.actions === b.actions
   && sameJson(a.view, b.view));
 
 function SettingsPage() {
@@ -618,7 +616,6 @@ function SettingsPage() {
     stopHoldMs, setStopHoldMs, beepSound, setBeepSound, hiddenFamilies, setActivityHidden, setFamilyHidden,
   } = useAllSportSettings();
   const { profile, setName, setNumber, setSex, setThresholds, age } = useAthleteProfile();
-  const shown = useActivityInk();
   const { open, toggle, closeAll: closeBlocks } = useOpenSections<SettingsBlock>('settings', SETTINGS_BLOCK_DEFAULTS);
   const { open: openActivity, toggle: toggleActivity, closeAll: closeActivities } = useOpenSections<string>('settings-activities', NO_ACTIVITY_OPEN);
   const { open: openPart, toggle: togglePart, closeAll: closeParts } = useOpenSections<ActivityPartKey>('settings-activity-parts', ACTIVITY_PART_DEFAULTS);
@@ -674,7 +671,7 @@ function SettingsPage() {
   }), [setFor, updateActivity, resetActivity, setActivityHidden, askRemove, toggleGear, toggleActivity, togglePart]);
 
   /** Une activité ajoutée s'ouvre, sa famille aussi, pour la régler aussitôt. */
-  const addAndOpen = (name: string, base: SportType, color: string, icon?: ActivityIconId): string | null => {
+  const addAndOpen = (name: string, base: SportType, color: string, icon?: LogoId): string | null => {
     const id = addActivity(name, base, color, icon);
     if (id === null) return null;
     if (!openActivity[id]) toggleActivity(id);
@@ -731,7 +728,7 @@ function SettingsPage() {
                     {heading}
                     <ActivityCard activity={activity} view={view(activity)} isOpen={openActivity[id] === true}
                       renaming={openActivity[id] === true && renaming === id} familyHidden={familyHidden} lastActivity={lastActivity}
-                      openPart={openPart} shade={shown} actions={cardActions} />
+                      openPart={openPart} actions={cardActions} />
                   </Fragment>
                 );
               })}
@@ -1005,7 +1002,7 @@ function EyeButton({ name, hidden, disabled, onToggle }: { name: string; hidden:
 
 /**
  * Nom d'une activité en cours de saisie, ouvert par « Renommer », après son
- * icône. Le nom s'enregistre en quittant le champ ou sur Entrée ; vide, ou
+ * dessin et sa pastille. Le nom s'enregistre en quittant le champ ou sur Entrée ; vide, ou
  * sur Échap, le précédent reste. Dans les deux cas le champ se referme
  * (`onDone`).
  */
@@ -1017,7 +1014,6 @@ function ActivityNameField({
   onDone: () => void;
 }) {
   const [draft, setDraft] = useState(activity.name);
-  const shown = useActivityInk();
   // Entrée et Échap ferment le champ eux-mêmes, sans attendre la perte du focus : la sortie qui suit ne refait rien.
   const closed = useRef(false);
   const close = (save: boolean) => {
@@ -1028,7 +1024,7 @@ function ActivityNameField({
   };
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-      <ActivityIcon activity={activity} size={18} className="settings-activity__icon" style={{ color: shown(activity.color) }} />
+      <ActivityGlyph activity={activity} size={18} swatch className="settings-activity__icon" />
       <input value={draft} maxLength={40} aria-label="Nom de l'activité" className="ui-field ui-field--s set-name-input"
         autoFocus
         onFocus={(e) => e.target.select()}
@@ -1081,7 +1077,7 @@ function AddActivityForm({
   activities, onAdd,
 }: {
   activities: Activity[];
-  onAdd: (name: string, base: SportType, color: string, icon?: ActivityIconId) => string | null;
+  onAdd: (name: string, base: SportType, color: string, icon?: LogoId) => string | null;
 }) {
   const [name, setName] = useState('');
   const [family, setFamily] = useState<SportFamily>('voile');
@@ -1089,7 +1085,7 @@ function AddActivityForm({
   const [chosenBase, setChosenBase] = useState<SportType | null>(null);
   const base = chosenBase ?? guessActivityBase(name, family);
   const [color, setColor] = useState(() => nextActivityColor(activities));
-  const [icon, setIcon] = useState<ActivityIconId | null>(null);
+  const [icon, setIcon] = useState<LogoId | null>(null);
   const pickFamily = (next: SportFamily) => {
     setFamily(next);
     setChosenBase(null);
@@ -1121,7 +1117,7 @@ function AddActivityForm({
         </label>
       )}
       <ShadePicker value={color} onChange={setColor} label="Couleur de la nouvelle activité" />
-      <IconPicker value={icon ?? guessActivityIcon(name, base)} color={color} onChange={setIcon} label="Icône de la nouvelle activité" />
+      <IconPicker value={icon ?? guessActivityLogo(name, base)} onChange={setIcon} label="Icône de la nouvelle activité" />
       <Button size="s" onClick={submit} disabled={name.trim() === ''}>Ajouter</Button>
       <HelpText helpKey="ajout">Elle part des valeurs de son calcul ; tout se règle ensuite dans sa carte.</HelpText>
     </div>

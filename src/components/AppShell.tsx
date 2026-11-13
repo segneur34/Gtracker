@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useRef, type ComponentType } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, type ComponentType } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { FAMILY_LABEL } from '../core/activities';
 import { parentPage } from '../core/parentPage';
@@ -58,6 +58,12 @@ const RECORD_PATH = '/enregistrer';
 const PLAN_PATH = '/itineraires';
 const STATISTIQUES: Destination = { to: '/statistiques', label: 'Statistiques', Icon: IconChart };
 const PROFIL: Destination = { to: '/profil', label: 'Profil', Icon: IconUser };
+
+/**
+ * Feuille de symboles des logos d'activité, lue à part pour ne pas alourdir l'ouverture : les logos restent vides le
+ * temps de la lire. Montée une seule fois, ici, pour toutes les pages.
+ */
+const LogoSprite = lazy(() => import('./logos/LogoSprite'));
 
 /**
  * Durée de l'enregistrement, seule abonnée à l'horloge : chaque position la
@@ -178,6 +184,9 @@ function AppShell() {
 
   return (
     <div className="shell">
+      <Suspense fallback={null}>
+        <LogoSprite />
+      </Suspense>
       <header className="shell-topbar">
         <Link to="/" className="shell-brand" aria-label="GONG Gtracker">
           <GongLogo className="shell-brand__mark" />

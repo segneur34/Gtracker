@@ -5,9 +5,8 @@ import { formatDistance } from '../core/units';
 import { useGoOnRoute } from '../hooks/useGoOnRoute';
 import type { SavedRoute } from '../hooks/useRouteLibrary';
 import { effectiveDistanceUnit } from '../hooks/useSportSettings';
-import { useActivityInk } from '../hooks/useTheme';
 import { routeActivity, routeDistanceM } from '../planning/routeList';
-import ActivityIcon from './ActivityIcon';
+import ActivityGlyph from './logos/ActivityGlyph';
 import Button from './ui/Button';
 import './RouteList.css';
 
@@ -39,7 +38,6 @@ const routePath = (saved: SavedRoute): string => `/itineraires?itineraire=${enco
 
 function RouteList({ routes, activities, onOpen, currentBase = null, actions, go: withGo = true }: RouteListProps) {
   const distances = useMemo(() => new Map(routes.map((s) => [s.base, routeDistanceM(s.record)])), [routes]);
-  const shown = useActivityInk();
   const { go, canGo } = useGoOnRoute();
 
   return (
@@ -51,7 +49,7 @@ function RouteList({ routes, activities, onOpen, currentBase = null, actions, go
             <strong>{saved.record.name}</strong>
             <span className="route-list__meta">
               {activity
-                ? <ActivityIcon activity={activity} size={14} className="route-list__icon" style={{ color: shown(activity.color) }} />
+                ? <ActivityGlyph activity={activity} size={14} className="route-list__icon" />
                 : <span className="route-list__dot" style={{ background: 'var(--faint)' }} />}
               <span>{activity?.name ?? 'Sans activité'}</span>
               <span className="num">

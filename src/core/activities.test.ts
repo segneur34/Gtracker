@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ACTIVITY_PALETTE, DEFAULT_ACTIVITIES, SURF_ACTIVITY, SURF_FOIL_ACTIVITY, activitiesOfFamily,
   activityCounts, activityFamily, activityTreatment, baseActivity, findActivity, insertActivity, isActivityShown, isFamilyHidden,
-  newActivityId, nextActivityColor, readActivities, sessionActivity,
+  logoColor, newActivityId, nextActivityColor, readActivities, sessionActivity,
   visibleActivities, visibleFamilies, withHidden, withPaletteColors, type Activity,
 } from './activities';
 import { SPORT_FAMILIES, usesMarkCourse } from './sportProfiles';
@@ -73,6 +73,23 @@ describe('readActivities', () => {
   it('ignore une icône inconnue : elle redevient devinée', () => {
     const [kite] = readActivities([{ id: 'a-kite', name: 'Kite', base: 'kite', color: '#ff7a1a', icon: 'course' }]);
     expect(kite).toEqual({ id: 'a-kite', name: 'Kite', base: 'kite', color: '#ff7a1a' });
+  });
+
+  it('relit une ancienne icône en son logo, sans remise à zéro', () => {
+    const list = readActivities([
+      { id: 'a-planche', name: 'Planche', base: 'windsurf', color: '#ff7a1a', icon: 'planche' },
+      { id: 'a-pirogue', name: 'Pirogue', base: 'surf', color: '#ff7a1a', icon: 'kayak' },
+      { id: 'a-sup-foil', name: 'Sup foil', base: 'surf', color: '#ff7a1a', icon: 'paddle-foil' },
+      { id: 'a-wing', name: 'Wing', base: 'wingfoil', color: '#ff7a1a', icon: 'kite' },
+    ]);
+    expect(list.map((a) => a.icon)).toEqual(['windsurf', 'paddle', 'surf-foil', 'kite']);
+  });
+
+  it('colore un logo choisi hors d’une activité de celle qui le porte, sinon de l’activité de départ', () => {
+    const red = { ...moth, color: '#d11a1a', icon: 'kite' as const };
+    expect(logoColor('kite', [red, ...DEFAULT_ACTIVITIES])).toBe('#d11a1a');
+    expect(logoColor('kite', [])).toBe(DEFAULT_ACTIVITIES.find((a) => a.id === 'kite')!.color);
+    expect(logoColor('pumping', [moth])).toBe(DEFAULT_ACTIVITIES.find((a) => a.id === 'a-pumping')!.color);
   });
 });
 

@@ -23,3 +23,16 @@
   flex: none;
   vertical-align: middle;
 }
+
+/* Dessin seul suivi de la pastille de couleur de l'activité (`ActivityGlyph`). */
+.activity-glyph {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  vertical-align: middle;
+}
+
+.activity-glyph__swatch {
+  display: inline-block;
+}

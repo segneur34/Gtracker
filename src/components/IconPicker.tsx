@@ -1,37 +1,32 @@
 import { useState } from 'react';
 import { useHelpCollapsed } from './helpContext';
-import { ACTIVITY_ICON_IDS, ACTIVITY_ICON_LABEL, type ActivityIconId } from '../core/activityIcons';
-import { ACTIVITY_ICON } from './familyIcons';
-import { useActivityInk } from '../hooks/useTheme';
+import { LOGO_IDS, LOGO_LABEL, type LogoId } from '../core/activityLogos';
+import { LogoGlyph } from './logos/ActivityLogo';
 import './IconPicker.css';
 import Button from './ui/Button';
 
 /**
- * Icône d'une activité : les neuf dessins, à la couleur de l'activité. Celle
- * cochée est la choisie, ou à défaut celle devinée du nom (`activityIcon`).
- * Repliée au départ : l'icône en cours et « Changer », qui déplie la
- * grille ; un choix la replie, « Tout réduire » de Réglages aussi.
+ * Logo d'une activité : les onze dessins, seuls (sans leur cadre) et à l'encre. Celui coché est le choisi, ou à défaut
+ * celui deviné du nom (`activityLogo`). Repliée au départ : le dessin en cours et « Changer », qui déplie la grille ;
+ * un choix la replie, « Tout réduire » de Réglages aussi.
  */
 function IconPicker({
-  value, color: storedColor, onChange, label,
+  value, onChange, label,
 }: {
-  value: ActivityIconId;
-  color: string;
-  onChange: (icon: ActivityIconId) => void;
+  value: LogoId;
+  onChange: (logo: LogoId) => void;
   label: string;
 }) {
   const collapsed = useHelpCollapsed();
-  const color = useActivityInk()(storedColor);
   /** Repère du « Tout réduire » au moment de l'ouverture ; un appui suivant le rend périmé, donc replié. */
   const [openedAt, setOpenedAt] = useState<number | null>(null);
   const open = openedAt === collapsed;
   const setOpen = (next: boolean) => setOpenedAt(next ? collapsed : null);
-  const Current = ACTIVITY_ICON[value];
   return (
     <div className="icon-picker" role="group" aria-label={label}>
       <div className="icon-picker__head">
-        <span className="icon-picker__current" style={{ color }} title={ACTIVITY_ICON_LABEL[value]}>
-          <Current size={20} />
+        <span className="icon-picker__current" title={LOGO_LABEL[value]}>
+          <LogoGlyph logo={value} size={20} />
         </span>
         <Button size="s" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? 'Réduire' : 'Changer'}
@@ -39,16 +34,13 @@ function IconPicker({
       </div>
       {open && (
         <div className="icon-picker__grid">
-          {ACTIVITY_ICON_IDS.map((id) => {
-            const Icon = ACTIVITY_ICON[id];
-            return (
-              <button key={id} type="button" className="icon-picker__choice" style={{ color }}
-                aria-pressed={id === value} aria-label={ACTIVITY_ICON_LABEL[id]} title={ACTIVITY_ICON_LABEL[id]}
-                onClick={() => { onChange(id); setOpen(false); }}>
-                <Icon size={20} />
-              </button>
-            );
-          })}
+          {LOGO_IDS.map((id) => (
+            <button key={id} type="button" className="icon-picker__choice"
+              aria-pressed={id === value} aria-label={LOGO_LABEL[id]} title={LOGO_LABEL[id]}
+              onClick={() => { onChange(id); setOpen(false); }}>
+              <LogoGlyph logo={id} size={20} />
+            </button>
+          ))}
         </div>
       )}
     </div>

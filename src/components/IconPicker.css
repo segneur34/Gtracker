@@ -1,4 +1,5 @@
-/* Seize icônes au choix pour une activité, sur le modèle du choix de couleur (ShadePicker) ; repliées sous « Changer ». */
+/* Onze dessins au choix pour une activité, à l'encre, sur le modèle du choix de couleur (ShadePicker) ; repliés sous
+   « Changer ». */
 .icon-picker {
   display: inline-flex;
   flex-direction: column;
@@ -18,6 +19,7 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-s);
+  color: var(--ink);
   background: var(--surface);
   box-shadow: var(--ring-ink);
 }
@@ -37,6 +39,7 @@
   padding: 0;
   border: none;
   border-radius: var(--radius-s);
+  color: var(--ink);
   background: var(--surface);
   box-shadow: var(--ring-line);
   cursor: pointer;

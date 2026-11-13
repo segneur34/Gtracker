@@ -1,17 +1,19 @@
-// Banc de test : icônes des activités (demande du 17/10, remis sur la voile et le surf au lot 330).
+// Banc de test : logos des activités (demande du 17/10, remis sur la voile et le surf au lot 330, onze logos au lot 349).
 // Usage : node icones.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 1 min. Le script importe cinq sessions synthétiques (`lib/traces.mjs`) par
 // la page Voile (deux de wingfoil, une de kite, une de surf, une sans type, à classer), puis vérifie :
-//  1. l'accueil : boutons de famille (Voile, Surf) sans petites icônes d'activité (retirées le 17/10) ;
+//  1. l'accueil : boutons de famille (Voile, Surf) sans petites icônes d'activité (retirées le 17/10) ; la feuille des
+//     logos posée une seule fois (onze dessins et le cadre) ;
 //  2. la bibliothèque Voile : le bandeau nomme les activités visibles (Wingfoil, Kite), le titre lui-même inchangé ;
-//     une icône devant chaque ligne et dans chaque onglet d'activité ; l'onglet « Kite » ne laisse que sa ligne ;
-//     « tous » les rend ;
+//     un dessin et sa pastille de couleur devant chaque ligne, un dessin dans chaque onglet d'activité ; l'onglet
+//     « Kite » ne laisse que sa ligne ; « tous » les rend ;
 //  3. la bibliothèque Surf : le bandeau nomme ses deux activités visibles (Surf, Pumping) ;
-//  4. la liste de choix d'activité (session à classer) : une icône par activité, à sa couleur ;
-//  5. Réglages : neuf icônes au choix, celle devinée cochée (Wingfoil), « Planche à voile » choisie, rangée dans la
-//     liste des activités, gardée après rechargement, reprise par l'onglet de la bibliothèque ;
-//     une activité « Kayak » ajoutée en surf, son icône devinée cochée pendant la saisie, rangée sans choix ;
-//  6. à 390×844 : bibliothèque et accueil sans débordement.
+//  4. la liste de choix d'activité (session à classer) : un dessin et une pastille colorée par activité ;
+//  5. Réglages : onze dessins au choix, celui deviné coché (Wingfoil), « Windsurf » choisi, rangé dans la liste des
+//     activités (`windsurf`), gardé après rechargement, repris par l'onglet de la bibliothèque ;
+//     une activité « Kayak » ajoutée en surf, son dessin deviné (« Paddle ») coché pendant la saisie, rangée sans choix ;
+//  6. le Profil : la photo est le logo du sport préféré dans son cadre, le « Sport préféré » son dessin seul ;
+//  7. à 390×844 : bibliothèque et accueil sans débordement.
 import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { traceSansType, traceSurf, traceVoile } from './lib/traces.mjs';
@@ -91,6 +93,11 @@ await ready('.home-family__name');
 const homeLabels = await evaluate(`[...document.querySelectorAll('.home-family__name')].map((s) => s.textContent)`);
 check('accueil : noms des familles', JSON.stringify(homeLabels) === JSON.stringify(['Voile', 'Surf']), JSON.stringify(homeLabels));
 check('accueil : pas de petites icônes', (await evaluate(`document.querySelectorAll('.home-family__acts').length`)) === 0);
+// La feuille des logos se lit à part : on attend qu'elle soit posée.
+await waitFor(`document.querySelector('svg.logo-sprite') !== null`, { timeout: 3000, label: 'feuille des logos' });
+const sprite = await evaluate(`({ sheets: document.querySelectorAll('svg.logo-sprite').length, symbols: [...document.querySelectorAll('svg.logo-sprite symbol')].map((s) => s.id) })`);
+check('feuille des logos : une seule, onze dessins et le cadre', sprite.sheets === 1 && sprite.symbols.length === 12
+  && sprite.symbols.includes('gt-logo-frame') && sprite.symbols.includes('gt-logo-surf-foil'), JSON.stringify(sprite));
 await shoot('icones-accueil');
 
 // 2. Bibliothèque Voile.
@@ -99,6 +106,9 @@ await ready('.lib-row');
 check('Voile : titre inchangé', (await h1()) === 'Voile', await h1());
 check('Voile : bandeau des activités visibles', (await bannerActivities()) === 'Wingfoil, Kite', await bannerActivities());
 check('Voile : une icône par ligne', (await rowIcons()) === ROWS_VOILE, await rowIcons());
+const rowMarks = await evaluate(`[...document.querySelectorAll('.lib-row .lib-row__icon')].filter((i) =>
+  i.querySelector('use')?.getAttribute('href')?.startsWith('#gt-logo-') && i.querySelector('.ui-swatch')?.style.background).length`);
+check('Voile : dessin et pastille de couleur sur chaque ligne', rowMarks === ROWS_VOILE, rowMarks);
 const wingIcon = await tabIcon('Wingfoil');
 check('Voile : icônes des onglets', (await evaluate(`document.querySelectorAll('.ui-tab .ui-tab__icon').length`)) === 2);
 await shoot('icones-voile-tous');
@@ -122,9 +132,11 @@ await evaluate(`[...document.querySelectorAll('.lib-row__main')].find((b) => b.t
 await wait(600);
 const sheet = await evaluate(`(() => {
   const opts = [...document.querySelectorAll('.activity-select__option')];
-  return { options: opts.length, icons: opts.filter((o) => o.querySelector('svg.activity-select__icon')?.style.color).length };
+  const marked = (o) => o.querySelector('.activity-select__icon use')?.getAttribute('href')?.startsWith('#gt-logo-')
+    && o.querySelector('.activity-select__icon .ui-swatch')?.style.background;
+  return { options: opts.length, icons: opts.filter(marked).length };
 })()`);
-check('liste de choix : une icône colorée par activité', sheet && sheet.options > 0 && sheet.icons === sheet.options, JSON.stringify(sheet));
+check('liste de choix : un dessin et une pastille colorée par activité', sheet && sheet.options > 0 && sheet.icons === sheet.options, JSON.stringify(sheet));
 await shoot('icones-liste');
 await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
 await wait(300);
@@ -148,19 +160,19 @@ const choices = () => evaluate(`${picker}?.querySelectorAll('.icon-picker__choic
 check('Réglages : grille repliée, Wingfoil d\'office', (await choices()) === 0 && (await current(picker)) === 'Wingfoil');
 await evaluate(`[...${picker}.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Changer')?.click()`);
 await wait(300);
-check('Réglages : « Changer » déplie neuf icônes', (await choices()) === 9, await choices());
+check('Réglages : « Changer » déplie onze dessins', (await choices()) === 11, await choices());
 check('Réglages : Wingfoil cochée', (await evaluate(`${picker}?.querySelector('[aria-pressed=true]')?.getAttribute('aria-label')`)) === 'Wingfoil');
 await shoot('icones-reglages');
-await evaluate(`${picker}?.querySelector('[aria-label="Planche à voile"]')?.click()`);
+await evaluate(`${picker}?.querySelector('[aria-label="Windsurf"]')?.click()`);
 await wait(400);
-check('Planche à voile rangée', (await stored())?.find((a) => a.id === 'wingfoil')?.icon === 'planche');
-check('un choix replie la grille', (await choices()) === 0 && (await current(picker)) === 'Planche à voile');
+check('Windsurf rangé', (await stored())?.find((a) => a.id === 'wingfoil')?.icon === 'windsurf');
+check('un choix replie la grille', (await choices()) === 0 && (await current(picker)) === 'Windsurf');
 await go('/parametres');
 await ready('.settings-activity__toggle');
 // La carte ouverte est retenue d'un chargement à l'autre : ne la rouvrir que si elle est fermée.
 await evaluate(`[...document.querySelectorAll('.settings-activity__toggle')].find((b) => b.textContent.includes('Wingfoil') && b.getAttribute('aria-expanded') !== 'true')?.click()`);
 await wait(400);
-check('gardée après rechargement', (await current(picker)) === 'Planche à voile');
+check('gardé après rechargement', (await current(picker)) === 'Windsurf');
 
 // Activité ajoutée en surf : l'icône devinée suit le nom.
 await evaluate(`(() => {
@@ -177,7 +189,7 @@ await evaluate(`(() => {
   return 'ok';
 })()`);
 await wait(200);
-check('ajout : Kayak devinée', (await current(`document.querySelector('.icon-picker[aria-label="Icône de la nouvelle activité"]')`)) === 'Kayak');
+check('ajout : Kayak devinée en Paddle', (await current(`document.querySelector('.icon-picker[aria-label="Icône de la nouvelle activité"]')`)) === 'Paddle');
 await evaluate(`[...document.querySelectorAll('.settings-add button')].find((b) => b.textContent.trim() === 'Ajouter')?.click()`);
 await wait(600);
 const paddle = (await stored())?.find((a) => a.name === 'Kayak');
@@ -186,9 +198,22 @@ check('Kayak rangée, sans icône imposée', paddle !== undefined && paddle.icon
 await go('/voile');
 await ready('.lib-row');
 const boardIcon = await tabIcon('Wingfoil');
-check('bibliothèque : dessin de la planche dans son onglet', boardIcon !== '' && boardIcon !== wingIcon);
+check('bibliothèque : dessin du windsurf dans son onglet', boardIcon.includes('#gt-logo-windsurf') && boardIcon !== wingIcon, boardIcon);
 
-// 6. Téléphone.
+// 6. Profil : la photo, sans choix, est le logo du sport préféré dans son cadre ; « Sport préféré » montre son dessin seul.
+await go('/profil');
+await ready('.profile-head__avatar');
+const avatar = await evaluate(`(() => {
+  const logo = document.querySelector('.profile-head__avatar svg.activity-logo');
+  const uses = logo ? [...logo.querySelectorAll('use')].map((u) => u.getAttribute('href')) : [];
+  const favorite = document.querySelector('.profile-figure__art');
+  return { uses, favorite: favorite?.querySelector('use')?.getAttribute('href') ?? null, framed: favorite?.querySelector('use[href="#gt-logo-frame"]') !== null };
+})()`);
+check('Profil : photo au logo dans son cadre', avatar.uses.length === 2 && avatar.uses[0] === '#gt-logo-frame' && avatar.uses[1].startsWith('#gt-logo-'), JSON.stringify(avatar));
+check('Profil : sport préféré en dessin seul', avatar.favorite?.startsWith('#gt-logo-') && !avatar.framed, JSON.stringify(avatar));
+await shoot('icones-profil');
+
+// 7. Téléphone.
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await go('/voile');
 await ready('.lib-row');

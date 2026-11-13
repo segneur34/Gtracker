@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Activity } from '../core/activities';
-import ActivityIcon from './ActivityIcon';
+import ActivityGlyph from './logos/ActivityGlyph';
 
 /**
  * Onglets de filtre par activité d'une liste (sessions, itinéraires) : « tous »,
@@ -27,7 +27,7 @@ export default function ActivityFilterTabs({ total, counts, selected, onSelect, 
       </button>
       {counts.map(({ activity, count }) => (
         <button key={activity.id} type="button" className="ui-tab" aria-pressed={selected === activity.id} onClick={() => onSelect(activity.id)}>
-          <ActivityIcon activity={activity} className="ui-tab__icon" />
+          <ActivityGlyph activity={activity} className="ui-tab__icon" />
           {activity.name} ({count})
         </button>
       ))}

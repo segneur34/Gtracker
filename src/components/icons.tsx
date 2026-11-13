@@ -258,105 +258,15 @@ export const IconLock = ({ size = 24, open = false, ...props }: IconProps & { op
   </svg>
 );
 
-/* Icônes d’activité (core/activityIcons.ts). */
-
-/** Voilier : mât, grand-voile, foc et coque. */
-export const IconSailboat = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <path d="M12 3v13" />
-    <path d="M12 3.5l6.5 11H12" />
-    <path d="M10 6.5l-4.5 8H10" />
-    <path d="M3.5 17.5h17l-2.5 3H6z" />
-  </svg>
-);
-
-/**
- * Planche à voile : contour de la voile relevé sur la photo fournie, voile penchée,
- * mât courbe ; deux lattes, et le wishbone qui dépasse du point d'écoute. Voile vide, traits pleins (son choix).
+/*
+ * Les activités se montrent par leur logo (`components/logos/`) ; l'aile du wingfoil reste ici pour l'icône d'une leçon
+ * (`LessonIcon`).
  */
-export const IconWindsurf = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} strokeWidth={1.6} {...props}>
-    <path d="M8.7 1.3L11.9 1C15 5.4 16.6 9.2 17.2 13.2L17.4 22.9C14 21.6 11 20.8 9.9 20.4L7.6 18L6.3 17.7Z" />
-    <path d="M8 6.6l6.5-.7M7.3 11.4l9.4-.8" strokeWidth={1.3} />
-    <path d="M17.6 15.8L4.3 17.9" strokeWidth={1.8} />
-  </svg>
-);
 
 /** Wingfoil : l'aile, en aplat, vectorisée sur le modèle fourni : bord d'attaque, boudin central, deux panneaux. */
 export const IconWingfoil = ({ size = 24, ...props }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden focusable={false} {...props}>
     <path fillRule="evenodd" d="M14.9 1C12.2 1.6 9.4 3 7.4 4.8C5.4 6.6 4 8.3 3.1 10C0.1 15.2 0.2 19.5 3.3 22.5C3.9 23 4.5 23.3 4.5 23C4.4 22.9 4.2 22.5 4 22.1C1.6 18 2 14.6 5.3 10.2C7.2 7.7 6.7 7.7 9.4 10.3C10.8 11.6 11.1 11.9 11.5 12.2C11.7 12.4 12.1 12.7 12.3 12.9C12.5 13.1 13 13.5 13.3 13.8C13.6 14.1 14 14.4 14.2 14.6C15.3 15.6 15.8 15.9 15.8 15.4C15.8 15.3 14.9 14.2 14 13.2C13.8 13 13.4 12.5 13.1 12.2C12.8 11.9 12.4 11.5 12.2 11.2C11.9 10.9 11.6 10.6 11.5 10.5C11.5 10.4 11.3 10.1 11.1 9.9C10.3 9.1 10 8.7 9.6 8.2C9.3 7.9 9 7.6 8.9 7.4C8.4 6.9 8.4 6.8 9.3 6C13.5 1.9 17.8 1.1 21.9 3.6C23.4 4.5 23.5 4 22 2.8C19.9 1.2 17.3 0.5 14.9 1M17 2.9C17 2.9 16.8 3 16.6 3C15.8 3.1 14.4 3.6 13.4 4.1C13.1 4.3 12.6 4.6 12.4 4.7C10.3 5.9 10 7 11.3 8.6C11.4 8.7 11.6 8.9 11.6 9C11.7 9 12 9.5 12.4 9.9C13 10.7 13.2 10.9 14.1 11.9C14.3 12.2 14.7 12.6 14.8 12.7C15.6 13.7 15.9 13.7 16.2 12.9C17 10.3 18.5 8.4 21 6.6C22.9 5.1 22.3 3.8 19.3 3.1C18.7 3 17.1 2.8 17 2.9M6.8 10.3C5.9 10.6 5 11.8 3.9 14.1C2.7 16.4 2.9 20 4.2 21.4C5.1 22.2 5.6 22 7.1 20.2C8.3 18.7 9.4 17.8 10.9 17.1C11.8 16.6 11.9 16.5 12.9 16.2C14.1 15.8 14.2 15.8 10.3 12.3C10.1 12.2 9.8 11.9 9.6 11.7C9.4 11.6 9.1 11.3 9 11.2C7.8 10.2 7.5 10.1 6.8 10.3" />
-  </svg>
-);
-
-/** Kite : aile pleine en croissant, bride en V, deux lignes jusqu'à la barre ; d'après le modèle fourni, lignes raccourcies. */
-export const IconKite = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} strokeWidth={1.2} {...props}>
-    <path d="M9.2 6.8C10.4 1.2 19.6-.6 22.6 3.6C24.8 6.8 23.2 12.8 18.6 16.4C20.2 12.4 20.4 7.6 18.4 5.4C16.2 3.2 12.4 3.6 9.2 6.8Z" fill="currentColor" stroke="none" />
-    <path d="M9.2 6.8L12.9 12L18.6 16.4M9.2 6.8L3.2 18.4M18.6 16.4L5.4 20.6" />
-    <path d="M3.2 18.4L5.4 20.6" strokeWidth={2.2} />
-  </svg>
-);
-
-/** Surf : vague qui déferle et planche. */
-export const IconSurfer = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <path d="M2.5 20.5C2.5 11 8 5 14.5 5c3 0 5.5 2 5.5 4.5-2.5-1.5-6-1-7.5 2" />
-    <path d="M9 20c3-3.5 7-6 12-6.5-1.5 3.5-6 6-12 6.5z" />
-  </svg>
-);
-
-/** Surf foil : surfeur debout, planche sur son foil. */
-export const IconSurfFoil = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <circle cx="12" cy="3.5" r="1.6" fill="currentColor" stroke="none" />
-    <path d="M12 6.5v3.5" />
-    <path d="M8 8.5l4-1.5 4 1.5" />
-    <path d="M9.5 14l2.5-4 2.5 4" />
-    <path d="M4 14h16" />
-    <path d="M12.5 14v6" />
-    <path d="M9 20h7" />
-  </svg>
-);
-
-/** Kayak et pagaie double. */
-export const IconKayak = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <path d="M2.5 16c6 2.5 13 2.5 19 0-6-1.8-13-1.8-19 0z" />
-    <circle cx="12" cy="9.5" r="1.6" fill="currentColor" stroke="none" />
-    <path d="M12 12v2.5" />
-    <path d="M5.5 20L19 5" />
-    <path d="M18 3.5l2.5 2.5" />
-    <path d="M4 18.5l2.5 2.5" />
-  </svg>
-);
-
-/** Paddle : debout sur la planche, pagaie simple. */
-export const IconPaddle = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <circle cx="10.5" cy="3.5" r="1.6" fill="currentColor" stroke="none" />
-    <path d="M10.5 6.5v6.5" />
-    <path d="M10.5 13l-2 6" />
-    <path d="M10.5 13l2 6" />
-    <path d="M10.5 8.5l4 1.5 3-2" />
-    <path d="M18.5 3.5l-2.5 14" />
-    <path d="M15 17l.5 3.5" />
-    <path d="M3 20.5h18" />
-  </svg>
-);
-
-/** Paddle foil : pagayeur debout, planche sur son foil. */
-export const IconPaddleFoil = ({ size = 24, ...props }: IconProps) => (
-  <svg {...strokeProps(size)} {...props}>
-    <circle cx="10.5" cy="3" r="1.6" fill="currentColor" stroke="none" />
-    <path d="M10.5 5.5v4.5" />
-    <path d="M10.5 10l-1.5 4" />
-    <path d="M10.5 10l1.5 4" />
-    <path d="M10.5 7l3.5 1.5 2.5-2" />
-    <path d="M17.5 3l-2 11" />
-    <path d="M4 14h16" />
-    <path d="M12.5 14v6" />
-    <path d="M9 20h7" />
   </svg>
 );
 

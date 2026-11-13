@@ -32,20 +32,19 @@ interface ActivityLogoProps {
   /** Côté, en pixels : le cadre à partir de `LOGO_FRAME_MIN_PX`, le dessin seul en dessous. */
   size: number;
   label?: string;
-  /** Identifiant de l'activité, d'où se tire la rotation du cadre ; à défaut, celui du logo. */
-  activityId?: string;
   className?: string;
 }
 
 /**
  * Logo d'une activité : son dessin à l'encre, posé à 60 % au centre du cadre au pinceau, à la couleur de l'activité et
- * tourné selon son identifiant ; en dessous de 40 px, le dessin seul à l'encre. Les symboles viennent de `LogoSprite`.
+ * tourné selon le logo (`logoRotation`) ; en dessous de 40 px, le dessin seul à l'encre. Les symboles viennent de
+ * `LogoSprite`.
  */
-function ActivityLogo({ logo, color, size, label, activityId, className }: ActivityLogoProps) {
+function ActivityLogo({ logo, color, size, label, className }: ActivityLogoProps) {
   if (size < LOGO_FRAME_MIN_PX) {
     return <LogoGlyph logo={logo} size={size} label={label} className={className ? `activity-logo__glyph ${className}` : 'activity-logo__glyph'} />;
   }
-  const rotation = logoRotation(activityId ?? logo);
+  const rotation = logoRotation(logo);
   return (
     <svg className={className ? `activity-logo ${className}` : 'activity-logo'} width={size} height={size} viewBox={LOGO_VIEWBOX} focusable="false" {...a11y(label)}>
       <use href={`#${LOGO_FRAME_SYMBOL}`} color={color} transform={`rotate(${rotation} ${LOGO_BOX / 2} ${LOGO_BOX / 2})`} />

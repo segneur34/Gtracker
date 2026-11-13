@@ -49,7 +49,7 @@ Quatrième lot du paquet de la nouvelle apparence, après le 344 (habillage), le
 - Une adresse s'ouvre toujours (décision de `CLAUDE.md`) : `/sessions?activite=<une activité cachée>` montre ses sessions ; « Toutes » ne les liste pas, et la ligne « n sessions en moins » le dit.
 - Pas de fond dessiné sur la page. Les images de l'accueil et des bandeaux, sans emploi, sont supprimées.
 - La case « Sessions » des barres reste allumée sur une analyse.
-- Actions d'une ligne (Classer, Renommer, Supprimer) : question posée à l'utilisateur (Q110). En attendant sa réponse, le défaut : un « … » par ligne, comme dans la liste des itinéraires, Supprimer gardant sa confirmation.
+- Actions d'une ligne (Classer, Renommer, Supprimer) : réponse de l'utilisateur du 13/11 à Q110 : un « … » par ligne, comme dans la liste des itinéraires, Supprimer gardant sa confirmation.
 - Banc : l'adaptation des scripts ne fait pas partie du travail de l'agent qui code la page ; elle part ensuite, par paquets, chez d'autres agents. L'agent qui code garde les classes `lib-list`, `lib-row`, `lib-row__main`, `lib-row__name`, `lib-row__icon`, `lib-row__warning`, `lib-row__rename`, `lib-row__preview`, `lib-row__preview-image`, `lib-row__preview-credit*` et le libellé du « … », que la plupart des scripts lisent.
 
 ## Plan (agent Plan, 12/11), à suivre sauf constat contraire dans le code

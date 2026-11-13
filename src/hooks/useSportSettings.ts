@@ -3,7 +3,7 @@ import {
   activitiesOfFamily, activityFamily, findActivity, isActivityShown, newActivityId, insertActivity,
   readActivities, visibleActivities, visibleFamilies, withHidden, type Activity,
 } from '../core/activities';
-import type { ActivityIconId } from '../core/activityIcons';
+import type { LogoId } from '../core/activityLogos';
 import { defaultActiveThresholdOf, getSportProfile, type RecordingProfile, type SportFamily } from '../core/sportProfiles';
 import type { TabChoices } from '../core/analysisTabs';
 import type { SportType } from '../core/types';
@@ -277,7 +277,7 @@ export const useAllSportSettings = () => {
 
   /** Ajoute une activité, rangée avec sa famille ; rend son identifiant, `null` si le nom est vide. */
   const addActivity = useCallback(
-    (name: string, base: SportType, color: string, icon?: ActivityIconId): string | null => {
+    (name: string, base: SportType, color: string, icon?: LogoId): string | null => {
       const trimmed = name.trim();
       if (trimmed === '') return null;
       let id = '';
@@ -294,7 +294,7 @@ export const useAllSportSettings = () => {
 
   /** Renomme, recolore ou change l'icône d'une activité ; un nom vide est ignoré. */
   const updateActivity = useCallback(
-    (id: string, patch: { name?: string; color?: string; icon?: ActivityIconId }) => {
+    (id: string, patch: { name?: string; color?: string; icon?: LogoId }) => {
       const name = patch.name?.trim();
       updateStoredSettings((stored) => ({
         ...stored,

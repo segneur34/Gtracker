@@ -1,49 +1,43 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { FAMILY_ACCENT, readableInk } from '../core/activities';
-import { ACTIVITY_ICON_IDS, ACTIVITY_ICON_LABEL, type ActivityIconId } from '../core/activityIcons';
-import type { SportFamily } from '../core/sportProfiles';
+import { useEffect, useRef, useState } from 'react';
+import { LOGO_IDS, LOGO_LABEL, type LogoId } from '../core/activityLogos';
 import { AVATAR_PHOTO_PX, type AthleteAvatar } from '../library/athleteProfile';
 import { pushBackLayer } from '../platform/backButton';
 import { readPickedImage } from '../platform/files';
-import ActivityArt from './activityArt';
 import { IconClose, IconImage, IconUser } from './icons';
+import ActivityLogo from './logos/ActivityLogo';
 import Button from './ui/Button';
 import './ProfileAvatar.css';
 
 /**
- * Photo ronde du Profil : une image importée, ou un dessin d'activité sur
- * l'accent de sa famille. Sans choix, le dessin du sport préféré sur la
- * couleur de son activité (`fallback`), sinon une silhouette.
+ * Photo ronde du Profil : une image importée, ou un logo d'activité dans son cadre, sur un disque au fond de la page.
+ * Sans choix, le logo du sport préféré à la couleur de son activité (`fallback`), sinon une silhouette.
  */
 
-/** Famille de chaque dessin : sa couleur de fond. */
-const ICON_FAMILY: Record<ActivityIconId, SportFamily> = {
-  bateau: 'voile', planche: 'voile', wingfoil: 'voile', kite: 'voile',
-  surf: 'surf', 'surf-foil': 'surf', kayak: 'surf', paddle: 'surf', 'paddle-foil': 'surf',
-};
-
 interface AvatarFallback {
-  icon: ActivityIconId;
+  icon: LogoId;
+  /** Couleur du cadre, déjà celle du thème. */
   color: string;
 }
 
-/**
- * Disque d'un dessin : couleur de fond et dessin, à 60 % du diamètre ; sur
- * l'accent de la famille, qui vaut l'encre, le dessin prend `--on-ink`. Sur la
- * couleur d'une activité (sans `ink`), il prend le noir ou le blanc qui s'y lit
- * (`readableInk`), et le disque un cerne gris, pour le blanc sur blanc.
- */
-const ArtDisc = ({ icon, color, ink }: AvatarFallback & { ink?: string }) => (
-  <span className={ink ? 'profile-avatar__disc' : 'profile-avatar__disc profile-avatar__disc--activity'}
-    style={{ background: color, color: ink ?? readableInk(color) }}>
-    <ActivityArt icon={icon} size={100} className="profile-avatar__art" />
+/** Côté donné au logo, au-dessus du seuil du cadre : le disque le remet à sa taille, celle de son parent. */
+const AVATAR_LOGO_PX = 88;
+
+/** Disque d'un logo : le dessin à l'encre dans son cadre au pinceau, à la couleur reçue. */
+const LogoDisc = ({ icon, color }: AvatarFallback) => (
+  <span className="profile-avatar__disc profile-avatar__disc--logo">
+    <ActivityLogo logo={icon} color={color} size={AVATAR_LOGO_PX} className="profile-avatar__logo" />
   </span>
 );
 
-export function ProfileAvatar({ avatar, fallback }: { avatar: AthleteAvatar | null; fallback: AvatarFallback | null }) {
+export function ProfileAvatar({ avatar, fallback, logoColor }: {
+  avatar: AthleteAvatar | null;
+  fallback: AvatarFallback | null;
+  /** Couleur du cadre d'un logo choisi, déjà celle du thème. */
+  logoColor: (logo: LogoId) => string;
+}) {
   if (avatar?.kind === 'photo') return <img className="profile-avatar__photo" src={avatar.dataUrl} alt="" />;
-  if (avatar?.kind === 'dessin') return <ArtDisc icon={avatar.icon} color={FAMILY_ACCENT[ICON_FAMILY[avatar.icon]]} ink="var(--on-ink)" />;
-  if (fallback) return <ArtDisc {...fallback} />;
+  if (avatar?.kind === 'dessin') return <LogoDisc icon={avatar.icon} color={logoColor(avatar.icon)} />;
+  if (fallback) return <LogoDisc {...fallback} />;
   return (
     <span className="profile-avatar__disc profile-avatar__disc--empty">
       <IconUser size={100} className="profile-avatar__art" />
@@ -52,12 +46,14 @@ export function ProfileAvatar({ avatar, fallback }: { avatar: AthleteAvatar | nu
 }
 
 /**
- * Choix de la photo : les seize dessins sur leur couleur, une image importée
+ * Choix de la photo : les onze logos dans leur cadre, une image importée
  * (la galerie ou l'appareil photo sur le téléphone), ou aucun choix. Se ferme
  * une fois le choix fait.
  */
-export function AvatarPicker({ avatar, onPick, onClose }: {
+export function AvatarPicker({ avatar, logoColor, onPick, onClose }: {
   avatar: AthleteAvatar | null;
+  /** Couleur du cadre de chaque logo, déjà celle du thème. */
+  logoColor: (logo: LogoId) => string;
   onPick: (avatar: AthleteAvatar | null) => void;
   onClose: () => void;
 }) {
@@ -95,12 +91,11 @@ export function AvatarPicker({ avatar, onPick, onClose }: {
         </button>
       </div>
       <div className="avatar-picker__grid">
-        {ACTIVITY_ICON_IDS.map((icon) => (
-          <button key={icon} type="button" className="avatar-picker__choice" title={ACTIVITY_ICON_LABEL[icon]}
-            aria-label={ACTIVITY_ICON_LABEL[icon]} aria-pressed={avatar?.kind === 'dessin' && avatar.icon === icon}
-            style={{ '--choice-color': FAMILY_ACCENT[ICON_FAMILY[icon]] } as CSSProperties}
+        {LOGO_IDS.map((icon) => (
+          <button key={icon} type="button" className="avatar-picker__choice" title={LOGO_LABEL[icon]}
+            aria-label={LOGO_LABEL[icon]} aria-pressed={avatar?.kind === 'dessin' && avatar.icon === icon}
             onClick={() => { onPick({ kind: 'dessin', icon }); onClose(); }}>
-            <ArtDisc icon={icon} color={FAMILY_ACCENT[ICON_FAMILY[icon]]} ink="var(--on-ink)" />
+            <LogoDisc icon={icon} color={logoColor(icon)} />
           </button>
         ))}
       </div>

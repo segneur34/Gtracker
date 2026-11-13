@@ -1,5 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react';
-import { drawnShadeForTheme, shadeForTheme } from '../core/activities';
+import { shadeForTheme } from '../core/activities';
 import { systemPrefersDark, subscribeSystemDark } from '../platform/screen';
 import { jsonStore } from '../platform/storage';
 import { setSystemBarsDark } from '../platform/systemBars';
@@ -79,16 +79,6 @@ export const useAppliedTheme = (): AppliedTheme => useSyncExternalStore(listener
 export const useThemedShade = (): ((color: string) => string) => {
   const dark = useAppliedTheme().theme === 'dark';
   return useCallback((color: string) => shadeForTheme(color, dark), [dark]);
-};
-
-/**
- * Couleur d'une icône dessinée à la couleur de son activité, selon le thème
- * posé (`drawnShadeForTheme`) : l'encre quand la couleur se confond avec le
- * fond (le blanc sur blanc, le noir sur noir).
- */
-export const useActivityInk = (): ((color: string) => string) => {
-  const dark = useAppliedTheme().theme === 'dark';
-  return useCallback((color: string) => drawnShadeForTheme(color, dark), [dark]);
 };
 
 /** Réglage de l'appareil (Réglages › Affichage) et son changement, champ par champ. */

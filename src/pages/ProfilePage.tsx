@@ -1,15 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ActivityChart from '../components/ActivityChart';
-import ActivityArt from '../components/activityArt';
 import MemoryStatus from '../components/MemoryStatus';
 import PageBackdrop from '../components/PageBackdrop';
 import { AvatarPicker, ProfileAvatar } from '../components/ProfileAvatar';
+import { LogoGlyph } from '../components/logos/ActivityLogo';
 import ProfileRoot, { RootSlot } from '../components/ProfileRoot';
 import { IconChevronRight } from '../components/icons';
 import SegmentedControl from '../components/ui/SegmentedControl';
-import { activityFamily, type Activity } from '../core/activities';
-import { activityIcon } from '../core/activityIcons';
+import { activityFamily, logoColor, type Activity } from '../core/activities';
+import { activityLogo, type LogoId } from '../core/activityLogos';
 import { DISTANCE_UNIT_SYMBOL, formatDuration, toDisplayDistance } from '../core/units';
 import { RESTING_HR_PATH, libraryPath } from '../core/parentPage';
 import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
@@ -19,7 +19,7 @@ import { athleteAvatar, athleteName } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { useStoredRecord } from '../hooks/useStoredRecord';
-import { useActivityInk, useThemedShade } from '../hooks/useTheme';
+import { useThemedShade } from '../hooks/useTheme';
 import { useNow } from '../hooks/useNow';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
@@ -135,7 +135,7 @@ function ProfilePage() {
   const activityOrder = useMemo(() => activities.map((a) => a.id), [activities]);
 
   const shown = useThemedShade();
-  const ink = useActivityInk();
+  const shownLogoColor = useCallback((logo: LogoId) => shown(logoColor(logo, activities)), [shown, activities]);
   const { slices, others } = useMemo((): { slices: Slice[]; others: Slice[] } => {
     const shares = activityShares(inPeriod, activityOrder).filter((s) => s.totals.durationS > 0);
     const ofShare = (s: (typeof shares)[number]): Slice => {
@@ -193,7 +193,8 @@ function ProfilePage() {
         <button type="button" className="profile-head__avatar" aria-label="Changer la photo de profil" aria-expanded={picking}
           onClick={() => setPicking(!picking)}>
           <ProfileAvatar avatar={avatar}
-            fallback={overallFavorite ? { icon: activityIcon(overallFavorite), color: shown(overallFavorite.color) } : null} />
+            fallback={overallFavorite ? { icon: activityLogo(overallFavorite), color: shown(overallFavorite.color) } : null}
+            logoColor={shownLogoColor} />
         </button>
         <div className="profile-head__text">
           <h1 className="profile-head__title">{name ?? 'Profil'}</h1>
@@ -204,7 +205,7 @@ function ProfilePage() {
         </div>
         {PROFILE_PLANT_VISIBLE && <RootSlot growth={root.growth} open={rootOpen} onToggle={() => setRootOpen(!rootOpen)} />}
       </header>
-      {picking && <AvatarPicker avatar={avatar} onPick={setAvatar} onClose={() => setPicking(false)} />}
+      {picking && <AvatarPicker avatar={avatar} logoColor={shownLogoColor} onPick={setAvatar} onClose={() => setPicking(false)} />}
 
       <SegmentedControl fit className="profile-periods" label="Période" items={PROFILE_PERIODS.map((p) => ({ key: p.id, label: p.label }))}
         value={period} onChange={(key) => rememberView({ periode: key })} />
@@ -235,7 +236,7 @@ function ProfilePage() {
                 title={`${favorite.name} : voir ses sessions`}>
                 <span className="ui-eyebrow">Sport préféré</span>
                 <span className="profile-figure__value">
-                  <ActivityArt icon={activityIcon(favorite)} className="profile-figure__art" style={{ color: ink(favorite.color) }} />
+                  <LogoGlyph logo={activityLogo(favorite)} size={35} className="profile-figure__art" />
                 </span>
                 <span className="profile-figure__caption profile-figure__name">{favorite.name}</span>
               </button>

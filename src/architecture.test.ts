@@ -253,8 +253,8 @@ const matchesIn = (files: string[], re: RegExp, code = false): { where: string; 
  * `=== 'kite'`. `'surf'` est aussi une famille : sa comparaison n'est pas un nom de calcul. Sans exception aujourd'hui.
  */
 const SPORT_TABLES = [
-  'core/types.ts', 'core/sportProfiles.ts', 'core/activities.ts', 'core/activityIcons.ts', 'core/activityLogos.ts', 'settings/activityPresets.ts',
-  'library/naming.ts', 'recording/liveFields.ts', 'components/familyIcons.ts', 'components/activityArt.tsx', 'components/ProfileAvatar.tsx',
+  'core/types.ts', 'core/sportProfiles.ts', 'core/activities.ts', 'core/activityLogos.ts', 'settings/activityPresets.ts',
+  'library/naming.ts', 'recording/liveFields.ts',
 ];
 const SPORT_NAME_EXCEPTIONS: readonly string[] = [];
 const SPORT_NAME = /[=!]==\s*'(?:wingfoil|windsurf|kite|bateau)'|'(?:wingfoil|windsurf|kite|bateau)'\s*[,)\]]/;
@@ -327,6 +327,32 @@ const IMPORT_DOOR_USERS: readonly string[] = [
   'library/legacyImport.test.ts',
   'library/sessionBundle.ts',
 ];
+
+/**
+ * Tracés des logos d'activité (une centaine de Ko) : lus par la seule feuille de symboles, elle-même chargée à part par
+ * `import()` (`lazy`), jamais par un import ordinaire, pour ne pas alourdir l'ouverture de l'application.
+ */
+describe('tracés des logos chargés à part', () => {
+  const STATIC_IMPORT = [
+    /^import\s[^'";]*?from\s*['"]([^'"]+)['"]/gm,
+    /^import\s*['"]([^'"]+)['"]/gm,
+    /^export\s+(?:type\s+)?(?:\{[^}]*\}|\*(?:\s+as\s+\w+)?)\s*from\s*['"]([^'"]+)['"]/gm,
+  ];
+  const DYNAMIC_IMPORT = /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g;
+  const code = sourceFiles(SRC).map((file) => ({ file, text: fs.readFileSync(new URL(file, SRC), 'utf8') }));
+  const importers = (target: string, patterns: RegExp[]) => code
+    .filter(({ file, text }) => patterns.some((re) => [...text.matchAll(re)].some((m) => resolveTarget(file, m[1]) === target)))
+    .map(({ file }) => file);
+
+  it('seule la feuille de symboles importe les tracés', () => {
+    expect(importers('components/logos/logoPaths', [...STATIC_IMPORT, DYNAMIC_IMPORT])).toEqual(['components/logos/LogoSprite.tsx']);
+  });
+
+  it('la feuille de symboles ne se charge que par import()', () => {
+    expect(importers('components/logos/LogoSprite', STATIC_IMPORT)).toEqual([]);
+    expect(importers('components/logos/LogoSprite', [DYNAMIC_IMPORT])).toEqual(['components/AppShell.tsx']);
+  });
+});
 
 describe("porte d'import de l'ancienne application", () => {
   const users = everyFile()

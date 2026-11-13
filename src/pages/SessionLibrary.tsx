@@ -9,7 +9,7 @@ import SegmentedControl from '../components/ui/SegmentedControl';
 import { SESSION_SORTS, SESSION_SORT_DEFAULT, isSessionSort, sortSessions, type SessionSort } from '../library/sessionSort';
 import { jsonStore } from '../platform/storage';
 import ActivityFilterTabs from '../components/ActivityFilterTabs';
-import ActivityIcon from '../components/ActivityIcon';
+import ActivityGlyph from '../components/logos/ActivityGlyph';
 import ActivitySelect, { ActivitySheet } from '../components/ActivitySelect';
 import ImportButtons from '../components/ImportButtons';
 import { useHelp } from '../components/helpContext';
@@ -33,7 +33,7 @@ import { useElementSize } from '../hooks/useElementSize';
 import { useNearViewport } from '../hooks/useNearViewport';
 import { useRetainedScroll } from '../hooks/useRetainedScroll';
 import { useRouteLibrary } from '../hooks/useRouteLibrary';
-import { useActivityInk, useAppliedTheme } from '../hooks/useTheme';
+import { useAppliedTheme } from '../hooks/useTheme';
 import { readSessionGpx, removeSession, updateSessionRecord, useLibraryFields } from '../hooks/useSessionLibrary';
 import { PLANNING_FAMILIES } from '../settings/activitySettings';
 import { activitySpeedRanges, effectiveDistanceUnit, effectiveSpeedUnit, useVisibility } from '../hooks/useSportSettings';
@@ -363,7 +363,6 @@ const SessionRow = memo(function SessionRow({
   onCancelDelete: () => void;
 }) {
   const openSession = useOpenSession();
-  const shown = useActivityInk();
   const { record } = session;
   const { startMs } = record.summary;
   const unclassified = record.sport === null;
@@ -401,7 +400,7 @@ const SessionRow = memo(function SessionRow({
           {record.name && <span className="lib-row__name">{record.name}</span>}
           <span className="lib-row__head">
             <span className={record.name ? 'lib-row__sport lib-row__sport--sub' : 'lib-row__sport'}>
-              {activity && <ActivityIcon activity={activity} className="lib-row__icon" style={{ color: shown(activity.color) }} />}
+              {activity && <ActivityGlyph activity={activity} swatch className="lib-row__icon" />}
               {activity ? activity.name : 'À classer'}
             </span>
             <span className="lib-row__date">{weekdayDayMonthYear(startMs)} · {formatTime(startMs)}</span>

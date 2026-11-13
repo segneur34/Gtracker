@@ -1,5 +1,5 @@
 import { finiteOr, inRange } from '../core/basics';
-import { isActivityIconId, type ActivityIconId } from '../core/activityIcons';
+import { storedLogo, type LogoId } from '../core/activityLogos';
 import { heartRateZones, isValidThresholds, type HeartRateZones } from '../core/heartRate';
 import type { HeartRateProfile } from '../core/sportProfiles';
 
@@ -11,11 +11,11 @@ import type { HeartRateProfile } from '../core/sportProfiles';
  */
 
 /**
- * Photo du Profil : un dessin d'activité, ou une image importée, recadrée au
+ * Photo du Profil : un logo d'activité (une ancienne icône se relit en son logo), ou une image importée, recadrée au
  * carré et réduite (data URL JPEG, `readPickedImage`). Elle voyage avec le
  * profil dans le fichier de réglages.
  */
-export type AthleteAvatar = { kind: 'dessin'; icon: ActivityIconId } | { kind: 'photo'; dataUrl: string };
+export type AthleteAvatar = { kind: 'dessin'; icon: LogoId } | { kind: 'photo'; dataUrl: string };
 
 /** Taille d'une photo importée, en pixels de côté. */
 export const AVATAR_PHOTO_PX = 256;
@@ -93,7 +93,8 @@ export const athleteAvatar = (profile: Partial<Pick<AthleteProfile, 'avatar'>>):
   const raw: unknown = profile.avatar;
   if (typeof raw !== 'object' || raw === null) return null;
   const { kind, icon, dataUrl } = raw as Record<string, unknown>;
-  if (kind === 'dessin' && isActivityIconId(icon)) return { kind, icon };
+  const logo = kind === 'dessin' ? storedLogo(icon) : undefined;
+  if (logo) return { kind: 'dessin', icon: logo };
   if (kind === 'photo' && typeof dataUrl === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(dataUrl)
     && dataUrl.length <= AVATAR_PHOTO_MAX_CHARS) return { kind, dataUrl };
   return null;

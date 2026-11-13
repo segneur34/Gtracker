@@ -3,7 +3,6 @@
 - `lancer-gtracker.bat` : ouvre Gtracker dans le navigateur. Il démarre d'abord le serveur de développement (`npm run dev`, port 5174) dans une fenêtre réduite « Gtracker - serveur » si celui-ci ne tourne pas déjà. Fermer cette fenêtre arrête le serveur. Le raccourci « Gtracker » du bureau pointe vers ce fichier, avec l'icône `icone-gtracker.ico`, tirée du symbole GONG comme l'icône Android.
 - `icone-gtracker.ico` : l'icône du raccourci, refaite par `logo/icones-android.mjs`.
 - `logo/icones-android.mjs` : refait depuis `src/assets/logo/gong-symbol.svg` l'icône Android, la favicon et `icone-gtracker.ico` ; mode d'emploi en tête du fichier.
-- `icones/vectoriser.cjs` : vectorise la planche des dessins d'activité en `src/components/activityArt.tsx` (la planche n'est pas versionnée ; mode d'emploi en tête du fichier).
 - `banc/` : banc de test dans un Chrome sans fenêtre (son `LISEZMOI.md` pour le lanceur et les pièges, son `SCRIPTS.md` pour chaque script).
 - `verif.mjs` : vérification en une commande (`npm run verif`), complète ou `--rapide` (typecheck, lint, tests touchés) ; lance aussi les deux contrôles de documents ci-dessous.
 - `docs-cites.mjs` : contrôle que chaque fichier ou nom de code cité entre accents graves dans les documents vivants existe (`node outils/docs-cites.mjs [document.md …]`, sans argument la liste `DOCUMENTS` du fichier).

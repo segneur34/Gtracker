@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ELEVATION_PRESETS, REFERENCE_HEART_RATE, SAILING_SPORTS, SPORT_PROFILES, UNCLASSIFIED_PROFILE, isSportType } from './sportProfiles';
 import type { SportType } from './types';
+import { guessActivityLogo, isLogoId } from './activityLogos';
+
+describe('chaque calcul est complet', () => {
+  it('a son logo, quand le nom de l’activité ne dit rien', () => {
+    for (const sport of Object.keys(SPORT_PROFILES) as SportType[]) expect(isLogoId(guessActivityLogo('', sport)), sport).toBe(true);
+  });
+});
 
 describe('isSportType', () => {
   it('ne reconnaît que les supports du profil', () => {

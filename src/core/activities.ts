@@ -3,7 +3,7 @@ import {
   SPORT_FAMILIES, SPORT_PROFILES, isSportType, sportFamily, sportTreatment, type SportFamily, type Treatment,
 } from './sportProfiles';
 import type { SportType } from './types';
-import { isActivityIconId, type ActivityIconId } from './activityIcons';
+import { activityLogo, storedLogo, type LogoId } from './activityLogos';
 
 /**
  * Activités : ce que l'utilisateur pratique, sous le nom qu'il choisit
@@ -34,8 +34,11 @@ export interface Activity {
    * rien n'est effacé, la ré-afficher rend tout.
    */
   hidden?: true;
-  /** Icône choisie dans Réglages ; absente, elle est devinée du nom et du calcul (`activityIcon`). */
-  icon?: ActivityIconId;
+  /**
+   * Logo choisi dans Réglages parmi les onze ; absent, il est deviné du nom et du calcul (`activityLogo`). Une
+   * ancienne icône enregistrée se relit en son logo (`storedLogo`).
+   */
+  icon?: LogoId;
 }
 
 /** Une couleur de la palette des activités : celle de la fiche, celle de nuit, son nom dans Réglages. */
@@ -164,6 +167,13 @@ export const DEFAULT_ACTIVITIES: Activity[] = [
 ];
 
 /**
+ * Couleur d'un logo choisi hors d'une activité (photo du Profil) : celle de la première activité de la liste qui le
+ * porte, sinon celle de l'activité de départ qui le porte. Couleur claire, à passer par `shadeForTheme` pour l'afficher.
+ */
+export const logoColor = (logo: LogoId, activities: readonly Activity[]): string =>
+  (activities.find((a) => activityLogo(a) === logo) ?? DEFAULT_ACTIVITIES.find((a) => activityLogo(a) === logo) ?? DEFAULT_ACTIVITIES[0]).color;
+
+/**
  * Nuances de l'ancienne palette, par famille, claires puis sombres : une
  * activité enregistrée qui en porte encore une est reprise à la lecture
  * (`withPaletteColors`). Figées : elles ne servent qu'à les reconnaître.
@@ -224,14 +234,15 @@ export const readActivities = (raw: unknown): Activity[] => {
   const list: Activity[] = [];
   for (const item of raw) {
     if (!isObject(item)) continue;
-    const { id, name, base, color, hidden, icon } = item;
+    const { id, name, base, color, hidden } = item;
+    const icon = storedLogo(item.icon);
     if (typeof id !== 'string' || id === '' || seen.has(id)) continue;
     if (typeof name !== 'string' || name.trim() === '' || !isSportType(base)) continue;
     seen.add(id);
     list.push({
       id, name: name.trim(), base, color: isColor(color) ? color : BASE_COLOR[base],
       ...(hidden === true ? { hidden } : {}),
-      ...(isActivityIconId(icon) ? { icon } : {}),
+      ...(icon ? { icon } : {}),
     });
   }
   // Rien n'est réécrit ici : la nouvelle forme s'enregistre à la prochaine écriture des activités.

@@ -36,7 +36,7 @@ interface ChoiceOptionProps {
   label: string;
   selected: boolean;
   onClick: () => void;
-  /** Pastille posée avant le nom (l'icône d'une activité). */
+  /** Marque posée avant le nom (le dessin d'une activité et sa pastille de couleur). */
   icon?: ReactNode;
   buttonRef?: Ref<HTMLButtonElement>;
 }
