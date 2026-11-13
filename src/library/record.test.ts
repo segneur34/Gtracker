@@ -264,6 +264,16 @@ describe('lieu de la fiche', () => {
     expect(lightRecord(back).place).toEqual(place);
   });
 
+  it('son arrivée se relit ; une fiche sans arrivée (écrite avant elle) se relit sans rien perdre', () => {
+    const arrival = { name: 'Palavas-les-Flots', source: 'utilisateur' as const, lat: 43.53, lon: 3.93 };
+    expect(parseRecord(serializeRecord(record({ place: { ...place, arrival } })))!.place).toEqual({ ...place, arrival });
+    expect(parseRecord(serializeRecord(record({ place: { ...place, arrival: null } })))!.place).toEqual({ ...place, arrival: null });
+    const before = { ...record(), place };
+    const parsed = parseRecordWithRaw(JSON.stringify(before))!;
+    expect(parsed.parts.place).toEqual(place);
+    expect(parsed.unreadable).toEqual({});
+  });
+
   it('mal formé : lu absent, mais réécrit tel quel tant qu\'aucun lieu neuf ne le remplace', () => {
     const raw = { ...record(), place: { name: 'Futur', source: 'satellite', lat: 1, lon: 2 } };
     const parsed = parseRecordWithRaw(JSON.stringify(raw))!;

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { parsePhotonFeatures } from '../planning/geocoding';
-import { PLACE_RULES, choosePlace, firstTrackPoint, foundPlace, isUsablePlaceName, readSessionPlace } from './places';
+import {
+  PLACE_RULES, choosePlace, correctedPlace, firstTrackPoint, foundPlace, isElsewhere, isPlaceToFind, isUsablePlaceName,
+  lastTrackPoint, learnPlace, learnedSpot, nearestLearnedPlace, placeDraftOf, placesToLearn, readSessionPlace, trackEnds,
+  type LearnedPlace, type SessionPlace,
+} from './places';
 
 const START = { lat: 43.54, lon: 3.95 };
 /** Mètres par degré de latitude, sur le rayon terrestre de `haversineDistance`. */
@@ -79,6 +83,100 @@ describe('lieu de la fiche', () => {
     expect(readSessionPlace({ name: 'X', source: 'carte', lat: 91, lon: 1 })).toBeNull();
     expect(readSessionPlace({ name: 3, source: 'carte', lat: 1, lon: 1 })).toBeNull();
     expect(readSessionPlace({ name: '123', source: 'appris', lat: 1, lon: 1 })).toEqual({ name: null, source: 'appris', lat: 1, lon: 1 });
+  });
+});
+
+describe('arrivée dans la fiche', () => {
+  const carte = { name: 'Carnon-Plage', source: 'carte' as const, lat: 43.549, lon: 3.981 };
+
+  it('absente (fiche plus ancienne) : à regarder ; nulle ou lieu : regardée', () => {
+    expect(readSessionPlace(carte)).toEqual(carte);
+    expect(isPlaceToFind(readSessionPlace(carte)!)).toBe(true);
+    expect(readSessionPlace({ ...carte, arrival: null })).toEqual({ ...carte, arrival: null });
+    const arrival = { name: 'Palavas-les-Flots', source: 'carte' as const, lat: 43.53, lon: 3.93 };
+    expect(readSessionPlace({ ...carte, arrival })).toEqual({ ...carte, arrival });
+    expect(isPlaceToFind({ ...carte, arrival: null })).toBe(false);
+    expect(isPlaceToFind(undefined)).toBe(true);
+    // Mal formée : lue comme pas encore regardée, le départ gardé.
+    expect(readSessionPlace({ ...carte, arrival: { name: 'X', source: 'deviné', lat: 1, lon: 1 } })).toEqual(carte);
+  });
+
+  it('une arrivée compte comme ailleurs au-delà de `elsewhereM`', () => {
+    const at = (m: number) => ({ lat: START.lat + m / M_PER_DEG, lon: START.lon });
+    expect(isElsewhere(START, at(1999), PLACE_RULES)).toBe(false);
+    expect(isElsewhere(START, at(2001), PLACE_RULES)).toBe(true);
+    expect(isElsewhere(START, null, PLACE_RULES)).toBe(false);
+  });
+});
+
+describe('lieux appris', () => {
+  const at = (m: number) => ({ lat: START.lat + m / M_PER_DEG, lon: START.lon });
+  const learned = (name: string, m: number, savedAt = 1): LearnedPlace => ({ name, ...at(m), savedAt });
+
+  it('un lieu appris vaut à moins de `learnedRadiusM` : 499 m oui, 501 m non', () => {
+    expect(nearestLearnedPlace(START, [learned('Les Roquilles', 499)], PLACE_RULES)?.name).toBe('Les Roquilles');
+    expect(nearestLearnedPlace(START, [learned('Les Roquilles', 501)], PLACE_RULES)).toBeNull();
+    expect(nearestLearnedPlace(START, [learned('Loin', 450), learned('Près', -100)], PLACE_RULES)?.name).toBe('Près');
+    expect(nearestLearnedPlace(START, [], PLACE_RULES)).toBeNull();
+  });
+
+  it('corriger deux fois au même endroit remplace le lieu appris, sans doublon ; ailleurs, il s\'ajoute', () => {
+    const first = learnPlace([], { name: 'Les Roquilles', source: 'utilisateur', ...at(0) }, PLACE_RULES, 1);
+    const second = learnPlace(first, { name: 'Plage des Roquilles', source: 'utilisateur', ...at(300) }, PLACE_RULES, 2);
+    expect(second).toEqual([{ name: 'Plage des Roquilles', ...at(300), savedAt: 2 }]);
+    const third = learnPlace(second, { name: 'Port de Carnon', source: 'utilisateur', ...at(3000) }, PLACE_RULES, 3);
+    expect(third.map((p) => p.name)).toEqual(['Port de Carnon', 'Plage des Roquilles']);
+  });
+
+  it('pris d\'un lieu appris : source `appris`, au point arrondi', () => {
+    expect(learnedSpot(learned('Les Roquilles', 100), { lat: 43.54012, lon: 3.95049 }))
+      .toEqual({ name: 'Les Roquilles', source: 'appris', lat: 43.54, lon: 3.95 });
+  });
+});
+
+describe('« Lieu » : correction', () => {
+  const carte: SessionPlace = { name: 'Carnon-Plage', source: 'carte', lat: 43.549, lon: 3.981, arrival: null };
+
+  it('le nom saisi passe en `utilisateur` et s\'apprend ; inchangé, rien ne bouge', () => {
+    const after = correctedPlace(carte, START, '  Les Roquilles ');
+    expect(after).toEqual({ ...carte, name: 'Les Roquilles', source: 'utilisateur' });
+    expect(placesToLearn(carte, after)).toEqual([after]);
+    expect(correctedPlace(carte, START, 'Carnon-Plage')).toBe(carte);
+    // Valider de nouveau le même nom corrigé n'apprend rien de plus.
+    expect(placesToLearn(after, correctedPlace(after, START, 'Les Roquilles'))).toEqual([]);
+  });
+
+  it('vidé : plus de lieu, `utilisateur`, rien d\'appris', () => {
+    const after = correctedPlace(carte, START, '   ');
+    expect(after).toEqual({ ...carte, name: null, source: 'utilisateur' });
+    expect(placesToLearn(carte, after)).toEqual([]);
+  });
+
+  it('jamais cherché : le lieu saisi au point de départ arrondi, l\'arrivée laissée à regarder', () => {
+    expect(correctedPlace(undefined, { lat: 43.54012, lon: 3.95049 }, 'Les Roquilles'))
+      .toEqual({ name: 'Les Roquilles', source: 'utilisateur', lat: 43.54, lon: 3.95 });
+    expect(correctedPlace(undefined, START, '')).toEqual({ name: null, source: 'utilisateur', lat: 43.54, lon: 3.95 });
+  });
+
+  it('arrivée corrigée seule : le départ garde sa source, l\'arrivée s\'apprend à son point', () => {
+    const arrival = { name: 'Palavas', source: 'carte' as const, lat: 43.53, lon: 3.93 };
+    const place = { ...carte, arrival };
+    const after = correctedPlace(place, START, 'Carnon-Plage', 'Port de Palavas');
+    expect(after).toEqual({ ...carte, arrival: { ...arrival, name: 'Port de Palavas', source: 'utilisateur' } });
+    expect(placesToLearn(place, after)).toEqual([after.arrival]);
+    expect(placeDraftOf(after)).toEqual({ departure: 'Carnon-Plage', arrival: 'Port de Palavas' });
+    expect(placeDraftOf(carte)).toEqual({ departure: 'Carnon-Plage', arrival: null });
+    expect(placeDraftOf(undefined)).toEqual({ departure: '', arrival: null });
+  });
+});
+
+describe('lastTrackPoint et trackEnds', () => {
+  it('lit le dernier point lisible, préfixe d\'espace de noms compris', () => {
+    const gpx = '<gpx><trk><trkseg><trkpt lat="43.54" lon="3.95"/><gpx:trkpt lon="4" lat="44"><time>t</time></gpx:trkpt><trkpt lat="x" lon="1"></trkpt></trkseg></trk></gpx>';
+    expect(lastTrackPoint(gpx)).toEqual({ lat: 44, lon: 4 });
+    expect(trackEnds(gpx)).toEqual({ start: { lat: 43.54, lon: 3.95 }, end: { lat: 44, lon: 4 } });
+    expect(lastTrackPoint('<gpx><trk/></gpx>')).toBeNull();
+    expect(trackEnds('<gpx><trk/></gpx>')).toBeNull();
   });
 });
 

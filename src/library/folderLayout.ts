@@ -14,6 +14,8 @@ export { MARKER_FILE };
  *       LISEZMOI.txt     ce qu'est ce dossier, pour qui l'ouvre à la main
  *       fc-repos.json    les tests de FC repos, fusionnés entre appareils
  *                        (`restingHrStore.ts`)
+ *       lieux.json       les lieux appris, fusionnés entre appareils
+ *                        (`learnedPlaces.ts`)
  *       sessions/        un GPX et sa fiche JSON par session (`record.ts`), et
  *                        ses capteurs `.imu` si les sauts ont été mesurés
  *                        (`core/imuFile.ts`)
@@ -27,6 +29,8 @@ export const SETTINGS_DIR = 'reglages';
 export const README_FILE = 'LISEZMOI.txt';
 /** Tests de FC repos, à la racine (`restingHrStore.ts`) : pas dans `reglages/`, dont chaque fichier est lu comme un réglage. */
 export const RESTING_HR_FILE = 'fc-repos.json';
+/** Lieux appris, à la racine pour la même raison (`learnedPlaces.ts`). */
+export const LEARNED_PLACES_FILE = 'lieux.json';
 
 export const MEMORY_FORMAT = FILE_FORMATS.memoire;
 export const MEMORY_VERSION = 1;
@@ -70,6 +74,8 @@ export const readmeText = (): string =>
     '  Réglages > Mémoire, « Mettre à jour » et « Reprendre ».',
     '- fc-repos.json : vos tests de FC repos. Chaque appareil y ajoute les siens et',
     '  reprend ceux des autres à l\'ouverture du dossier.',
+    '- lieux.json : les lieux que vous avez corrigés, pour nommer les sessions',
+    '  suivantes parties du même endroit. Partagés entre appareils comme fc-repos.json.',
     `- ${MARKER_FILE} : permet à l'application de reconnaître ce dossier.`,
     '',
     'Sauvegarder ou changer d\'appareil : copiez le dossier Gtracker entier.',

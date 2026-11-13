@@ -20,7 +20,7 @@ describe('cache des fiches', () => {
     expect(storedCacheFor({ ...cache, fields: 'autre' }, 'f:1').entries).toEqual({});
     expect(storedCacheFor({ ...cache, reader: RECORD_READER_VERSION + 1 }, 'f:1').entries).toEqual({});
     expect(storedCacheFor(null, 'f:1')).toEqual({ entries: {}, light: false });
-    expect(RECORD_READER_VERSION).toBe(1);
+    expect(RECORD_READER_VERSION).toBe(2);
   });
 
   it('range un cache allégé, avec l’empreinte de ses champs et la version du lecteur', () => {

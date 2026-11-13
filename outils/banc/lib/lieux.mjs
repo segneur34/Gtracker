@@ -2,7 +2,9 @@
 // interceptées (`Fetch`) et servies par une réponse enregistrée, sans jamais toucher au réseau ; chacune est notée.
 // Usage : `const lieux = await fakePlaces(b)` après `connect` (le service, bloqué d'office, est alors débloqué pour être
 // servi ici) ; `lieux.count()`, `lieux.list()` et `lieux.reset()` autour d'une séquence ; `lieux.setMode('panne')` fait
-// échouer les requêtes comme un réseau coupé, `'reponse'` rend `lieux.setAnswer(json)` (par défaut `PLAGE`).
+// échouer les requêtes comme un réseau coupé, `'reponse'` rend `lieux.setAnswer(json)` (par défaut `PLAGE`) ; une
+// fonction passée à `setAnswer` reçoit l'adresse de la requête et rend la réponse (`autour(nom)` : un plan d'eau au
+// point demandé).
 // `Fetch.enable` ne garde que ses derniers motifs : ne pas l'employer avec `lib/tuiles.mjs` dans le même onglet.
 import { PLACES_URL } from './cdp.mjs';
 
@@ -14,6 +16,15 @@ export const PLAGE = {
     { type: 'Feature', geometry: { type: 'Point', coordinates: [3.9800, 43.5480] }, properties: { osm_key: 'place', osm_value: 'village', name: 'Carnon-Plage', city: 'Mauguio', country: 'France' } },
     { type: 'Feature', geometry: { type: 'Point', coordinates: [3.9740, 43.5465] }, properties: { osm_key: 'natural', osm_value: 'beach', name: 'Plage du Petit Travers', city: 'Mauguio', country: 'France' } },
   ],
+};
+
+/** Réponse à passer à `setAnswer` : une plage nommée `nom` au point même de chaque requête. */
+export const autour = (nom) => (url) => {
+  const q = new URL(url).searchParams;
+  return {
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [Number(q.get('lon')), Number(q.get('lat'))] }, properties: { osm_key: 'natural', osm_value: 'beach', name: nom, country: 'France' } }],
+  };
 };
 
 /**
@@ -43,7 +54,7 @@ export const fakePlaces = async (b) => {
           { name: 'Access-Control-Allow-Origin', value: '*' },
           { name: 'Cache-Control', value: 'no-store' },
         ],
-        body: Buffer.from(JSON.stringify(answer)).toString('base64'),
+        body: Buffer.from(JSON.stringify(typeof answer === 'function' ? answer(p.request.url) : answer)).toString('base64'),
       });
     void reply.catch(() => undefined);
   });

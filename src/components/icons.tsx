@@ -254,6 +254,14 @@ export const IconFlag = ({ size = 24, ...props }: IconProps) => (
   </svg>
 );
 
+/** Repère de lieu : « Lieu » d'une session, qui corrige le lieu de son nom. */
+export const IconPin = ({ size = 24, ...props }: IconProps) => (
+  <svg {...strokeProps(size)} {...props}>
+    <path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z" />
+    <circle cx="12" cy="10" r="2.2" />
+  </svg>
+);
+
 /** Cadenas fermé ou ouvert : l'orientation de l'écran figée pendant l'enregistrement, ou libre. */
 export const IconLock = ({ size = 24, open = false, ...props }: IconProps & { open?: boolean }) => (
   <svg {...strokeProps(size)} {...props}>

@@ -9,13 +9,19 @@
 //  3. l'analyse porte le même nom, sans nouvelle requête ;
 //  4. renommer puis effacer le nom : le nom donné prime, l'effacer rend le nom calculé ;
 //  5. changer d'activité (Kite) : le nom suit, le lieu reste, sans requête ;
-//  6. case de Réglages › Mémoire décochée : une seconde session importée n'envoie rien et garde l'activité seule.
+//  6. case de Réglages › Mémoire décochée : une seconde session importée n'envoie rien et garde l'activité seule ;
+//  7. « Lieu » du « … » de la ligne : le lieu corrigé (`utilisateur`) prime, il est appris (clé de l'appareil et
+//     `lieux.json` du dossier), et la seconde session, partie du même endroit, le prend (`appris`) sans requête ;
+//  8. « Lieu » du « … » de l'en-tête de l'analyse : corriger de nouveau au même endroit remplace le lieu appris (un seul
+//     lieu appris), la seconde session garde le sien ;
+//  9. recherche rallumée, une troisième session partie du même endroit et finie à près de 3 km : départ appris, une
+//     seule requête, pour l'arrivée, et la ligne « Wingfoil · Départ → Arrivée ».
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
-import { fakePlaces } from './lib/lieux.mjs';
+import { autour, fakePlaces } from './lib/lieux.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
-import { actionLigne, lignes } from './lib/sessions.mjs';
+import { actionLigne, lignes, ouvrirLigne } from './lib/sessions.mjs';
 import { traceVoile } from './lib/traces.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -24,12 +30,15 @@ if (!port || !workDir) {
   process.exit(1);
 }
 
-// Deux sorties de wingfoil parties de la plage du Petit Travers, à un jour d'écart.
+// Trois sorties de wingfoil parties de la plage du Petit Travers, à un jour d'écart : les deux premières de 5 min
+// finissent à 1,5 km du départ (sans lieu d'arrivée), la troisième, de 10 min, à près de 3 km (plus de 2 km : ailleurs).
 const DEPART = { lat0: 43.5468, lon0: 3.9738 };
 const premier = join(workDir, 'lieu-1.gpx');
 const second = join(workDir, 'lieu-2.gpx');
-writeFileSync(premier, traceVoile({ ...DEPART, debutMs: Date.UTC(2026, 9, 2, 8, 0, 0), bords: 2, secondes: 600 }));
-writeFileSync(second, traceVoile({ ...DEPART, debutMs: Date.UTC(2026, 9, 3, 8, 0, 0), bords: 2, secondes: 600 }));
+const troisieme = join(workDir, 'lieu-3.gpx');
+writeFileSync(premier, traceVoile({ ...DEPART, debutMs: Date.UTC(2026, 9, 2, 8, 0, 0), bords: 2, secondes: 300 }));
+writeFileSync(second, traceVoile({ ...DEPART, debutMs: Date.UTC(2026, 9, 3, 8, 0, 0), bords: 2, secondes: 300 }));
+writeFileSync(troisieme, traceVoile({ ...DEPART, debutMs: Date.UTC(2026, 9, 4, 8, 0, 0), bords: 2, secondes: 600 }));
 
 const b = await connect({ port, width: 1400, height: 1000, shotDir });
 const { send, evaluate, go, settle, waitFor, wait, importFiles, shoot, check, finish, logs } = b;
@@ -169,6 +178,86 @@ console.log('lignes :', await rows());
 console.log('fiche :', JSON.stringify((await fiches())[1]));
 check('aucune requête, case décochée', lieux.count() === 0, lieux.count());
 check('la seconde session garde l\'activité seule, sans lieu', (await fiches())[1].place === null && (await rows()).startsWith('Wingfoil / '), await rows());
+
+/** Lieux appris de l'appareil (clé `lieuxAppris`), `[]` sans clé. */
+const appris = async () => JSON.parse((await evaluate(`localStorage.getItem('${CLES.lieuxAppris}')`)) ?? '[]');
+/** Lieux de `lieux.json` à la racine du dossier mémoire, `null` sans fichier. */
+const fichierLieux = async () => JSON.parse(await evaluate(`(async () => {
+  try {
+    const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}');
+    return JSON.stringify(JSON.parse(await (await (await d.getFileHandle('lieux.json')).getFile()).text()).places);
+  } catch { return 'null'; }
+})()`));
+/** Saisit `value` dans le champ `selector`, puis la touche `key`. */
+const typeIn = async (selector, value, key) => {
+  await evaluate(`(() => { const i = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ${JSON.stringify(value)}); i.dispatchEvent(new Event('input', { bubbles: true })); return 'ok'; })()`);
+  await wait(200);
+  await evaluate(`document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true })), 'ok'`);
+};
+
+step('7. « Lieu » depuis la liste, puis la seconde session au même départ');
+lieux.reset();
+await go('/sessions');
+await listReady();
+console.log('Lieu :', await actionLigne(evaluate, wait, 'Kite', 'Lieu'));
+console.log('champ :', await evaluate(`document.querySelector('.lib-row__place')?.value ?? 'absent'`));
+check('le champ du lieu part du lieu de la fiche', (await evaluate(`document.querySelector('.lib-row__place')?.value ?? 'absent'`)) === 'Plage du Petit Travers');
+await typeIn('.lib-row__place', 'Les Roquilles', 'Enter');
+await waitFor(async () => (await fiches())[0].place?.name === 'Les Roquilles', { timeout: 2000, label: 'lieu corrigé' });
+await waitFor(async () => (await fiches())[1].place !== null, { timeout: 4000, label: 'lieu appris pris' });
+await settle({ max: 1500, label: 'lieu' });
+console.log('lignes :', await rows());
+console.log('fiches :', JSON.stringify((await fiches()).map((f) => f.place)));
+console.log('appris :', JSON.stringify(await appris()));
+console.log('lieux.json :', JSON.stringify(await fichierLieux()));
+check('le lieu corrigé est celui de l\'utilisateur, le nom suit', (await fiches())[0].place?.source === 'utilisateur'
+  && (await rows()).includes('Kite · Les Roquilles'), await rows());
+check('il est appris sur l\'appareil et dans lieux.json', (await appris()).length === 1 && (await appris())[0].name === 'Les Roquilles'
+  && (await fichierLieux())?.[0]?.name === 'Les Roquilles', JSON.stringify(await fichierLieux()));
+check('la seconde session prend le lieu appris, sans requête (recherche coupée)', (await fiches())[1].place?.source === 'appris'
+  && (await rows()).includes('Wingfoil · Les Roquilles') && lieux.count() === 0, `${await rows()} ; ${lieux.count()} requête(s)`);
+
+step('8. « Lieu » depuis l\'analyse : corriger de nouveau au même endroit');
+await ouvrirLigne(evaluate, 'Kite');
+await waitFor(`location.pathname.includes('/analyse')`, { timeout: 6000, label: 'analyse ouverte' });
+await settle({ max: 6000, label: 'analyse' });
+console.log('« … » :', await evaluate(`(() => { const m = document.querySelector('button[aria-label="Plus d\\'actions sur la session"]'); if (!m) return 'absent'; m.click(); return 'ok'; })()`));
+await wait(150);
+console.log('Lieu :', await evaluate(`(() => { const b = [...document.querySelectorAll('.ui-more__panel button')].find((x) => x.textContent.trim() === 'Lieu'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
+await wait(150);
+const champ = 'input[aria-label="Lieu de la session"]';
+check('le champ du lieu s\'ouvre dans l\'en-tête', (await evaluate(`document.querySelector('${champ}')?.value ?? 'absent'`)) === 'Les Roquilles');
+await typeIn(champ, 'Plage des Roquilles', 'Enter');
+await waitFor(async () => (await fiches())[0].place?.name === 'Plage des Roquilles', { timeout: 2000, label: 'lieu corrigé' });
+await settle({ max: 1500, label: 'lieu' });
+console.log('en-tête :', await subtitle());
+console.log('appris :', JSON.stringify(await appris()));
+console.log('lieux.json :', JSON.stringify(await fichierLieux()));
+check('l\'en-tête porte le lieu corrigé', (await subtitle()) === 'Kite · Plage des Roquilles', await subtitle());
+check('le lieu appris est remplacé, sans doublon', (await appris()).length === 1 && (await appris())[0].name === 'Plage des Roquilles'
+  && (await fichierLieux())?.length === 1 && (await fichierLieux())[0].name === 'Plage des Roquilles', JSON.stringify(await appris()));
+check('la seconde session garde son lieu', (await fiches())[1].place?.name === 'Les Roquilles', JSON.stringify((await fiches())[1].place));
+
+step('9. Arrivée loin du départ : « Départ → Arrivée »');
+await evaluate(`localStorage.setItem('${CLES.rechercheLieu}', 'true'), 'ok'`);
+lieux.setAnswer(autour('Plage du Grand Travers'));
+lieux.reset();
+await go('/sessions');
+await listReady();
+await importFiles([troisieme]);
+await waitFor(async () => (await fiches()).length === 3 && (await fiches())[2].place?.arrival, { timeout: 6000, label: 'arrivée écrite' });
+await settle({ max: 2000, label: 'import' });
+const asked3 = lieux.list();
+console.log('lignes :', await rows());
+console.log('lieu :', JSON.stringify((await fiches())[2].place));
+console.log('requêtes :', asked3.join(' ; '));
+const latArrivee = asked3.length === 1 ? Number(new URL(asked3[0]).searchParams.get('lat')) : NaN;
+check('départ appris, une seule requête, pour l\'arrivée', asked3.length === 1 && latArrivee > 43.565, asked3.join(' ; '));
+check('la fiche porte le départ appris et l\'arrivée trouvée', (await fiches())[2].place?.source === 'appris'
+  && (await fiches())[2].place?.arrival?.name === 'Plage du Grand Travers', JSON.stringify((await fiches())[2].place));
+check('la ligne porte « Activité · Départ → Arrivée »', (await rows()).includes('Wingfoil · Plage des Roquilles → Plage du Grand Travers'), await rows());
+check('les deux premières finissent près du départ : sans arrivée', (await fiches())[0].place?.arrival === null && (await fiches())[1].place?.arrival === null,
+  JSON.stringify((await fiches()).map((f) => f.place?.arrival)));
 
 console.log('\n== Console :', logs.some((l) => !l.startsWith('warning')) ? logs.filter((l) => !l.startsWith('warning')).join('\n') : 'rien');
 await finish('Tout passe.');

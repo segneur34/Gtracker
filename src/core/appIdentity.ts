@@ -29,6 +29,8 @@ export const FILE_FORMATS = {
   journal: `${APP_SLUG}-journal` as const,
   /** Fiche d'un itinéraire (`planning/routeRecord.ts`). */
   itineraire: `${APP_SLUG}-itineraire` as const,
+  /** Lieux appris, à la racine du dossier mémoire (`library/learnedPlaces.ts`). */
+  lieux: `${APP_SLUG}-lieux` as const,
 };
 
 /** Blocs du GPX : préfixe des éléments et espace de noms, sans domaine ni dépôt. */
@@ -74,6 +76,7 @@ export const STORAGE_KEYS = {
   tileCache: `${APP_SLUG}.tileCache` as const,
   tileUrls: `${APP_SLUG}.tileUrls` as const,
   rechercheLieu: `${APP_SLUG}.rechercheLieu` as const,
+  lieuxAppris: `${APP_SLUG}.lieuxAppris` as const,
 };
 
 /** Caches du navigateur (Cache API, IndexedDB) et en-tête des tuiles gardées. */

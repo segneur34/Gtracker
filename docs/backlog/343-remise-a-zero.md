@@ -65,6 +65,8 @@ Demande du 11/11 au soir, après une réinstallation qui rendait l'ancienne list
 - « Le profil n'est pas touché » par U couvre tout le bloc Pratiquant (pseudo, année de naissance, photo, poids, taille, FC max et de repos, objectif par semaine) et les tests de FC repos : U n'y touche pas. À dire à l'utilisateur.
 - Un GPX déposé à la main dans `sessions/` est une session pour l'application : T l'efface, comme l'utilisateur l'a demandé pour les fichiers de sessions ; l'aide « ? » le dit (« toutes les sessions du dossier, y compris un GPX que vous y auriez déposé vous-même »). À dire à l'utilisateur.
 - Noms des fichiers et des fonctions : ceux du plan.
+- Arrivé depuis le plan, avec le lot 352 (nom de session par le lieu), à classer aussi : la clé de la case « Chercher le lieu des sessions » (`rechercheLieu` dans `STORAGE_KEYS`) est un réglage, effacé par U et T (elle revient cochée) ; les lieux appris (clé de l'appareil `lieuxAppris` de `STORAGE_KEYS`, et le fichier `lieux.json` à la racine du dossier mémoire, `LEARNED_PLACES_FILE` de `src/library/folderLayout.ts`, écrit par `src/hooks/learnedPlacesFile.ts`) sont une donnée saisie par l'utilisateur, comme le profil : U n'y touche pas, T les efface, `lieux.json` rejoignant la liste des fichiers de l'application à la racine. Le lieu d'une session vit dans sa fiche : il part avec elle. À dire à l'utilisateur.
+- Le compte des fermetures du rappel du matériel (lot 345) vit dans les réglages des activités : il repart à zéro avec U comme avec T.
 
 ## Voulu
 

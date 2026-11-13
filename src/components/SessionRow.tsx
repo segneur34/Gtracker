@@ -5,13 +5,17 @@ import type { Activity } from '../core/activities';
 import { sportFamily, sportTreatment, type SportFamily } from '../core/sportProfiles';
 import { formatDistanceAuto, formatDuration, formatShortDuration, formatSpeed } from '../core/units';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
+import { useLearnedPlaces } from '../hooks/learnedPlacesFile';
 import { useNearViewport } from '../hooks/useNearViewport';
-import { queueSessionPlace, removeSession, updateSessionRecord } from '../hooks/useSessionLibrary';
+import { usePlaceSearch } from '../hooks/usePlaceSearch';
+import { correctSessionPlace, queueSessionPlace, removeSession, updateSessionRecord } from '../hooks/useSessionLibrary';
 import { effectiveDistanceUnit, effectiveSpeedUnit } from '../hooks/useSportSettings';
 import { useThemedShade } from '../hooks/useTheme';
+import { isPlaceToFind, placeDraftOf, type PlaceDraft } from '../library/places';
 import type { LibrarySession } from '../library/record';
 import { customName, sessionDisplayName } from '../library/sessionName';
 import { ActivitySheet } from './ActivitySelect';
+import SessionPlaceField from './SessionPlaceField';
 import SessionPreviewMap from './SessionPreviewMap';
 import SessionRenameField from './SessionRenameField';
 import Button from './ui/Button';
@@ -53,7 +57,8 @@ type Sheet = 'open' | 'classify' | null;
 /**
  * Ligne d'une session de la page Sessions : la pastille et le nom de l'activité avec la date, le nom montré de la
  * session en gras (`sessionDisplayName` : le nom donné, sinon l'activité et le lieu), ses chiffres, le commentaire et l'avertissement en petites
- * lignes, la vignette de la trace à droite, puis un « … » : Classer (session à classer), Renommer, Supprimer (avec
+ * lignes, la vignette de la trace à droite, puis un « … » : Classer (session à classer), Renommer, Lieu (corrige le
+ * lieu seul, `correctSessionPlace`), Supprimer (avec
  * confirmation), sauf avec `menu` faux (dernières sessions du Profil). Mémorisée, rappels stables : un balayage de la
  * mémoire ne redessine que les lignes dont la fiche change.
  */
@@ -82,14 +87,19 @@ const SessionRow = memo(function SessionRow({
   const unclassified = record.sport === null;
   /** Nom en cours de saisie ; `null` hors renommage. */
   const [nameDraft, setNameDraft] = useState<string | null>(null);
+  /** Lieu en cours de saisie ; `null` hors correction. */
+  const [placeDraft, setPlaceDraft] = useState<PlaceDraft | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
-  // Une ligne qui paraît à l'écran met sa session dans la file des lieux, si son lieu n'a jamais été cherché.
+  // Une ligne qui paraît à l'écran met sa session dans la file des lieux, si son lieu reste à trouver.
   const rowRef = useRef<HTMLLIElement>(null);
-  const placeUnknown = record.place === undefined && !session.readOnly;
+  const placeUnknown = isPlaceToFind(record.place) && !session.readOnly;
   const near = useNearViewport(rowRef, !placeUnknown, ROW_PLACE_MARGIN);
+  // Un lieu appris ou la recherche rallumée : la ligne visible regarde de nouveau son lieu.
+  const learned = useLearnedPlaces();
+  const [searchOn] = usePlaceSearch();
   useEffect(() => {
     if (near && placeUnknown) queueSessionPlace(session.file);
-  }, [near, placeUnknown, session.file]);
+  }, [near, placeUnknown, session.file, learned, searchOn]);
 
   /**
    * Ouvre l'analyse. Une session à classer (le fichier ne dit pas son
@@ -113,19 +123,32 @@ const SessionRow = memo(function SessionRow({
     updateSessionRecord(session.file, { name: nameDraft });
     setNameDraft(null);
   };
+  const savePlace = () => {
+    if (placeDraft === null) return;
+    void correctSessionPlace(session.file, placeDraft.departure, placeDraft.arrival ?? undefined);
+    setPlaceDraft(null);
+  };
 
   // Une seule action en cours par ligne : en lancer une abandonne l'autre, rien ne revient tout seul.
   const startRename = () => {
     if (confirming) onCancelDelete();
+    setPlaceDraft(null);
     setNameDraft(record.name ?? '');
+  };
+  const startPlace = () => {
+    if (confirming) onCancelDelete();
+    setNameDraft(null);
+    setPlaceDraft(placeDraftOf(record.place));
   };
   const startClassify = () => {
     if (confirming) onCancelDelete();
     setNameDraft(null);
+    setPlaceDraft(null);
     setSheet('classify');
   };
   const askDelete = () => {
     setNameDraft(null);
+    setPlaceDraft(null);
     onAskDelete(session.file);
   };
 
@@ -153,6 +176,7 @@ const SessionRow = memo(function SessionRow({
           <MoreMenu label="Plus d'actions sur la session">
             {unclassified && <Button size="s" variant="ghost" onClick={startClassify}>Classer…</Button>}
             <Button size="s" variant="ghost" onClick={startRename}>Renommer</Button>
+            <Button size="s" variant="ghost" onClick={startPlace}>Lieu</Button>
             <Button size="s" variant="ghost" onClick={askDelete}>Supprimer</Button>
           </MoreMenu>
         )}
@@ -172,6 +196,12 @@ const SessionRow = memo(function SessionRow({
         <div className="lib-row__actions">
           <SessionRenameField value={nameDraft} onChange={setNameDraft} onSave={saveName} onCancel={() => setNameDraft(null)}
             className="ui-field ui-field--s lib-row__rename" />
+        </div>
+      )}
+      {placeDraft !== null && (
+        <div className="lib-row__actions">
+          <SessionPlaceField value={placeDraft} onChange={setPlaceDraft} onSave={savePlace} onCancel={() => setPlaceDraft(null)}
+            className="ui-field ui-field--s lib-row__place" />
         </div>
       )}
       {confirming && !session.readOnly && (

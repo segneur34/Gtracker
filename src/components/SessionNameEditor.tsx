@@ -5,15 +5,19 @@ import { FAMILY_LABEL, sessionActivity } from '../core/activities';
 import type { ShareStat } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
 import { dropLeaveWarning, hasLeaveWarning } from '../hooks/leaveGuard';
-import { readSessionExport, readSessionGpx, removeSession, updateSessionRecord, useLibrarySession } from '../hooks/useSessionLibrary';
+import {
+  correctSessionPlace, readSessionExport, readSessionGpx, removeSession, updateSessionRecord, useLibrarySession,
+} from '../hooks/useSessionLibrary';
 import { readStoredActivities } from '../hooks/useSportSettings';
 import { useTransientValue } from '../hooks/useTransientValue';
 import { bundleSessionGpx } from '../library/sessionBundle';
+import { placeDraftOf, type PlaceDraft } from '../library/places';
 import { customName, sessionDisplayName, sessionFileBaseName } from '../library/sessionName';
 import { shareLabels } from '../library/shareStats';
 import { safeFileName, saveToDownloads } from '../platform/files';
 import { shareFile } from '../platform/share';
-import { IconDownload, IconShare, IconTrash } from './icons';
+import { IconDownload, IconPin, IconShare, IconTrash } from './icons';
+import SessionPlaceField from './SessionPlaceField';
 import SessionRenameField from './SessionRenameField';
 import ShareDialog from './ShareDialog';
 import type { TrackSegment } from './TrackSegmentsLayer';
@@ -42,7 +46,7 @@ const discardQuestion = (drafted: boolean): string =>
 
 /**
  * Nom montré d'une session de la mémoire (`sessionDisplayName`), en tête de son analyse, son bouton
- * « Renommer » et son menu « … » (« Partager l'image », qui ouvre `ShareDialog` avec
+ * « Renommer » et son menu « … » (« Lieu », qui corrige le lieu seul, `correctSessionPlace` ; « Partager l'image », qui ouvre `ShareDialog` avec
  * ce que l'analyse passe dans `share` ; « Télécharger la session », dans
  * Téléchargements : un GPX complet, fiche et capteurs compris, que « Importer
  * des GPX » range tout entier sur un autre appareil ; « Jeter », en dernier,
@@ -66,6 +70,8 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
   const [sharing, setSharing] = useState(false);
   /** Nom en cours de saisie ; `null` hors renommage. */
   const [draft, setDraft] = useState<string | null>(null);
+  /** Lieu en cours de saisie ; `null` hors correction. */
+  const [placeDraft, setPlaceDraft] = useState<PlaceDraft | null>(null);
   /** Compte rendu du dernier téléchargement, effacé après quelques secondes. */
   const [note, setNote] = useTransientValue<{ text: string; error: boolean }>(DOWNLOAD_NOTE_MS);
   if (!session || file === null) return null;
@@ -80,6 +86,11 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
     if (draft === null) return;
     updateSessionRecord(file, { name: draft });
     setDraft(null);
+  };
+  const savePlace = () => {
+    if (placeDraft === null) return;
+    void correctSessionPlace(file, placeDraft.departure, placeDraft.arrival ?? undefined);
+    setPlaceDraft(null);
   };
 
   /**
@@ -133,6 +144,14 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
       </span>
     );
   }
+  if (placeDraft !== null) {
+    return (
+      <span className="an-name-row">
+        <SessionPlaceField value={placeDraft} onChange={setPlaceDraft} onSave={savePlace} onCancel={() => setPlaceDraft(null)}
+          className="an-name-input" />
+      </span>
+    );
+  }
 
   return (
     // Une seule ligne : un nom long se tronque, « Renommer » et « … » restent à droite (le menu s'ouvre à l'écran).
@@ -148,6 +167,12 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
             <Button size="s" variant="ghost" onClick={() => setDraft(name ?? '')}>Renommer</Button>
           )}
           <MoreMenu label="Plus d'actions sur la session">
+            {!session.readOnly && (
+              <Button onClick={() => setPlaceDraft(placeDraftOf(record.place))}>
+                <IconPin size={18} />
+                Lieu
+              </Button>
+            )}
             {share && (
               <Button onClick={() => setSharing(true)}>
                 <IconShare size={18} />

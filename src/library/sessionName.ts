@@ -5,7 +5,8 @@ import type { SessionRecord } from './record';
 /**
  * Nom montré d'une session, la seule place où il se compose : celui que l'utilisateur a donné, sinon
  * « Activité · Lieu », calculé à chaque affichage et jamais écrit dans la fiche. Changer l'activité d'une
- * session change donc son nom ; effacer le nom donné rend le nom calculé. Sans lieu connu, l'activité seule.
+ * session change donc son nom ; effacer le nom donné rend le nom calculé. Sans lieu connu, l'activité seule ;
+ * une session qui finit ailleurs, « Activité · Départ → Arrivée ».
  */
 
 /** Séparateur de l'activité et du lieu. */
@@ -14,8 +15,21 @@ export const NAME_SEPARATOR = ' · ';
 /** Ce que le nom lit de la fiche. */
 export type NamedRecord = Pick<SessionRecord, 'name'> & { place?: SessionPlace };
 
-/** Nom du lieu de la session, `null` s'il n'est pas connu (pas encore cherché, ou rien trouvé). */
-export const placeLabel = (place: SessionPlace | null | undefined): string | null => place?.name?.trim() || null;
+/** Séparateur du lieu de départ et de celui d'arrivée. */
+export const ARRIVAL_SEPARATOR = ' → ';
+
+/**
+ * Nom du lieu de la session, `null` s'il n'est pas connu (pas encore cherché, rien trouvé, ou vidé) :
+ * « Départ → Arrivée » quand l'arrivée, loin du départ, porte un autre nom ; sinon le départ seul.
+ */
+export const placeLabel = (place: SessionPlace | null | undefined): string | null => {
+  const departure = place?.name?.trim() || null;
+  if (departure === null) return null;
+  const arrival = place?.arrival?.name?.trim() || null;
+  return arrival !== null && arrival.toLocaleLowerCase('fr') !== departure.toLocaleLowerCase('fr')
+    ? `${departure}${ARRIVAL_SEPARATOR}${arrival}`
+    : departure;
+};
 
 /** Nom donné par l'utilisateur, rogné, `null` sans nom. */
 export const customName = (record: NamedRecord): string | null => record.name?.trim() || null;

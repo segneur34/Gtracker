@@ -855,8 +855,10 @@ export const RECORD_LIGHT_FIELDS_KEY = RECORD_LIGHT_FIELDS.join(',');
  * fiches du cache sont ce qu'a rendu le lecteur de la version qui l'a fait, et n'y repassent pas. À
  * augmenter dès qu'une fiche ne se lit plus pareil (nouveau défaut, champ normalisé autrement, borne) :
  * le cache d'avant est alors ignoré, toutes les fiches sont relues, puis il est refait.
+ *
+ * 2 : le lieu garde son arrivée (`SessionPlace.arrival`), que le lecteur d'avant écartait.
  */
-export const RECORD_READER_VERSION = 1;
+export const RECORD_READER_VERSION = 2;
 
 const LIGHT_FIELDS: ReadonlySet<string> = new Set(RECORD_LIGHT_FIELDS);
 

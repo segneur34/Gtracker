@@ -5,7 +5,8 @@
 // Une ligne (`.lib-row`) : la pastille et le nom de l'activité avec la date, le nom de la session en gras (le nom
 // calculé quand elle n'en a pas : l'activité, suivie du lieu s'il est connu, « Wingfoil · Plage du Petit Travers »), ses chiffres. Sans nom de session, le nom de l'activité vient après la date : le
 // texte d'une ligne que les scripts comparent commence donc toujours par l'activité (« Wingfoil / … », « À classer / … »).
-// Classer, Renommer et Supprimer sont derrière le « … » de la ligne (« Plus d'actions sur la session »).
+// Classer, Renommer, Lieu et Supprimer sont derrière le « … » de la ligne (« Plus d'actions sur la session ») ; le
+// champ de « Lieu » porte la classe `lib-row__place`, celui de « Renommer » `lib-row__rename`.
 
 /** Texte d'une ligne en expression de la page : l'activité d'abord, puis le texte de la ligne, les sauts de ligne en « / ». */
 export const TEXTE_LIGNE = `((r) => {
@@ -34,7 +35,7 @@ export const ouvrirLigne = (evaluate, debut) => evaluate(`(() => {
 
 /**
  * Joue une action du « … » d'une ligne : ouvre le menu de la ligne qui commence par `debut`, puis clique l'entrée dont
- * le texte commence par `action` (« Supprimer », « Renommer », « Classer »).
+ * le texte commence par `action` (« Supprimer », « Renommer », « Lieu », « Classer »).
  */
 export const actionLigne = async (evaluate, wait, debut, action) => {
   const ouvert = await evaluate(`(() => {

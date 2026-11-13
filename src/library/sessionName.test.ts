@@ -37,6 +37,36 @@ describe('sessionDisplayName', () => {
   });
 });
 
+describe('« Départ → Arrivée »', () => {
+  const arrival = (name: string | null): SessionPlace => ({ name, source: 'carte', lat: 43.53, lon: 3.93 });
+
+  it('une arrivée loin du départ, d\'un autre nom, se montre après une flèche', () => {
+    expect(sessionDisplayName({ name: null, place: { ...carte, arrival: arrival('Palavas-les-Flots') } }, 'Bateau'))
+      .toBe('Bateau · Carnon-Plage → Palavas-les-Flots');
+  });
+
+  it('même nom, arrivée sans nom ou au départ : le départ seul ; départ sans nom : l\'activité seule', () => {
+    expect(placeLabel({ ...carte, arrival: arrival('carnon-plage') })).toBe('Carnon-Plage');
+    expect(placeLabel({ ...carte, arrival: arrival(null) })).toBe('Carnon-Plage');
+    expect(placeLabel({ ...carte, arrival: null })).toBe('Carnon-Plage');
+    expect(sessionDisplayName({ name: null, place: { ...carte, name: null, source: 'utilisateur', arrival: arrival('Palavas') } }, 'Bateau'))
+      .toBe('Bateau');
+  });
+
+  it('le nom donné prime toujours', () => {
+    expect(sessionDisplayName({ name: 'Convoyage', place: { ...carte, arrival: arrival('Palavas') } }, 'Bateau')).toBe('Convoyage');
+  });
+});
+
+describe('lieu corrigé contre lieu de la carte', () => {
+  it('le lieu corrigé est celui du nom, à la place de celui de la carte', () => {
+    const corrected: SessionPlace = { ...carte, name: 'Les Roquilles', source: 'utilisateur' };
+    expect(sessionDisplayName({ name: null, place: carte }, 'Wingfoil')).toBe('Wingfoil · Carnon-Plage');
+    expect(sessionDisplayName({ name: null, place: corrected }, 'Wingfoil')).toBe('Wingfoil · Les Roquilles');
+    expect(sessionFileBaseName({ name: null, place: corrected }, 'Wingfoil', startMs, 'x.gpx')).toBe('2026-10-10 Wingfoil - Les Roquilles');
+  });
+});
+
 describe('sessionFileBaseName', () => {
   it('nom donné, puis lieu, puis activité seule ; sans rien, null', () => {
     expect(sessionFileBaseName({ name: 'Soir', place: carte }, 'Wingfoil', startMs, 'x.gpx')).toBe('2026-10-10 Wingfoil - Soir');

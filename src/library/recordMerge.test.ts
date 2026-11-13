@@ -83,6 +83,68 @@ describe('fiche changée sur le disque', () => {
     expect(conflictLabels(conflicts)).toEqual(['nom']);
   });
 
+  it('lieu : corrigé l\'emporte sur appris, appris sur carte ; deux corrections différentes, la mémoire, et c\'est dit', () => {
+    const at = { lat: 43.54, lon: 3.95, arrival: null };
+    const carte = { name: 'Carnon-Plage', source: 'carte' as const, ...at };
+    const appris = { name: 'Les Roquilles', source: 'appris' as const, ...at };
+    const corrige = { name: 'Plage des Roquilles', source: 'utilisateur' as const, ...at };
+    // Trouvé ici par la carte, corrigé là-bas : la correction reste.
+    const mine = { ...read, place: carte };
+    const kept = mergeChangedRecord({ ...read, place: corrige }, mine, editsOf(read, mine));
+    expect(kept.record.place).toEqual(corrige);
+    expect(kept.conflicts).toEqual([]);
+    // Appris ici, trouvé par la carte là-bas : l'appris.
+    const learned = { ...read, place: appris };
+    expect(mergeChangedRecord({ ...read, place: carte }, learned, editsOf(read, learned)).record.place).toEqual(appris);
+    // Corrigé ici, appris là-bas : la correction.
+    const mineCorrected = { ...read, place: corrige };
+    expect(mergeChangedRecord({ ...read, place: appris }, mineCorrected, editsOf(read, mineCorrected)).record.place).toEqual(corrige);
+    // Corrigé des deux côtés, autrement : la mémoire, et c'est dit en clair.
+    const other = { ...read, place: { ...corrige, name: 'Le Grand Travers' } };
+    const both = mergeChangedRecord({ ...read, place: corrige }, other, editsOf(read, other));
+    expect(both.record.place?.name).toBe('Le Grand Travers');
+    expect(conflictLabels(both.conflicts)).toEqual(['lieu']);
+  });
+
+  it('lieu : départ et arrivée se fondent chacun à son rang ; une arrivée corrigée n\'est jamais perdue', () => {
+    const at = { lat: 43.54, lon: 3.95 };
+    const arrivee = { name: 'Palavas', source: 'carte' as const, lat: 43.58, lon: 3.95 };
+    const carte = { name: 'Carnon-Plage', source: 'carte' as const, ...at, arrival: arrivee };
+    const base = { ...read, place: carte };
+    // Ici, l'arrivée seule corrigée ; là-bas, un départ appris.
+    const mine = { ...base, place: { ...carte, arrival: { ...arrivee, name: 'Port de Palavas', source: 'utilisateur' as const } } };
+    const disk = { ...base, place: { ...carte, name: 'Les Roquilles', source: 'appris' as const } };
+    const merged = mergeChangedRecord(disk, mine, editsOf(base, mine));
+    expect(merged.record.place).toEqual({ ...carte, name: 'Les Roquilles', source: 'appris', arrival: { ...arrivee, name: 'Port de Palavas', source: 'utilisateur' } });
+    expect(merged.conflicts).toEqual([]);
+    // Dans l'autre sens : départ appris ici, arrivée corrigée là-bas.
+    const reverse = mergeChangedRecord(mine, disk, editsOf(base, disk));
+    expect(reverse.record.place).toEqual(merged.record.place);
+  });
+
+  it('lieu : une arrivée absente d\'un côté ne détruit pas celle de l\'autre', () => {
+    const at = { lat: 43.54, lon: 3.95 };
+    const arrivee = { name: 'Palavas', source: 'carte' as const, lat: 43.58, lon: 3.95 };
+    // Fiche d'avant l'arrivée ici, corrigée au départ ; arrivée regardée là-bas.
+    const mine = { ...read, place: { name: 'Les Roquilles', source: 'utilisateur' as const, ...at } };
+    const disk = { ...read, place: { name: 'Carnon-Plage', source: 'carte' as const, ...at, arrival: arrivee } };
+    const kept = mergeChangedRecord(disk, mine, editsOf(read, mine)).record.place;
+    expect(kept).toEqual({ name: 'Les Roquilles', source: 'utilisateur', ...at, arrival: arrivee });
+    const near = { ...disk, place: { ...disk.place, arrival: null } };
+    expect(mergeChangedRecord(near, mine, editsOf(read, mine)).record.place?.arrival).toBeNull();
+  });
+
+  it('lieu : deux corrections différentes de l\'arrivée, la mémoire, et c\'est dit', () => {
+    const at = { lat: 43.54, lon: 3.95 };
+    const arrivee = { name: 'Palavas', source: 'carte' as const, lat: 43.58, lon: 3.95 };
+    const base = { ...read, place: { name: 'Carnon-Plage', source: 'carte' as const, ...at, arrival: arrivee } };
+    const mine = { ...base, place: { ...base.place, arrival: { ...arrivee, name: 'Ici', source: 'utilisateur' as const } } };
+    const disk = { ...base, place: { ...base.place, arrival: { ...arrivee, name: 'Là-bas', source: 'utilisateur' as const } } };
+    const both = mergeChangedRecord(disk, mine, editsOf(base, mine));
+    expect(both.record.place?.arrival?.name).toBe('Ici');
+    expect(conflictLabels(both.conflicts)).toEqual(['lieu']);
+  });
+
   it('notes vidées ici, inchangées là-bas : vidées', () => {
     const mine = { ...read, notes: null };
     expect(mergeChangedRecord(read, mine, editsOf(read, mine)).record.notes).toBeNull();

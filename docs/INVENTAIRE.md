@@ -131,6 +131,7 @@ Dans `sailing/` aussi : `pointData.ts` (`PointData` et `trackToPointData`, vue e
 - `naming.ts` : `uniqueSessionFileName`, `guessSport` (types d'autres applications).
 - `sessionName.ts` (+ test) : nom montré d'une session, la seule place où il se compose (`sessionDisplayName` : le nom donné, sinon « Activité · Lieu ») ; nom du GPX téléchargé ou partagé (`sessionFileBaseName`).
 - `places.ts` (+ test) : lieu d'une session (`SessionPlace`, champ `place` de la fiche), choix du plan d'eau nommé sinon de la commune parmi la réponse de la recherche inverse (`choosePlace`), distances `PLACE_RULES`, premier point d'un GPX (`firstTrackPoint`).
+- `learnedPlaces.ts` (+ test) : lieux appris gardés sur l'appareil (clé `gtracker.lieuxAppris`) et dans le fichier lieux.json du dossier : relecture tolérante, fusion entre appareils (le plus récent dans le rayon), texte du fichier.
 - `fitToGpx.ts` : conversion unique d'un FIT en texte GPX à l'import (`buildGpx`, lot 35) ; FC et vitesse gardées, une pause donne deux segments.
 - `folderLayout.ts` : noms des fichiers et sous-dossiers du dossier (`sessions/`, `itineraires/`, `reglages/`), marqueur, `LISEZMOI.txt`.
 
@@ -201,6 +202,7 @@ Dans `sailing/` aussi : `pointData.ts` (`PointData` et `trackToPointData`, vue e
 - `sessionMotion.ts` : `loadSessionMotion`, le `.imu` d'une session décodé une seule fois, partagé par les sauts et le pumping (cache à un fichier, garde `readers > 0`).
 - `useSessionJumps.ts` : sauts d'une session de voile, repris de la fiche ou calculés depuis son `.imu` à l'ouverture de l'analyse, puis rangés (§10, point 91).
 - `restingHrFile.ts` : tests de FC repos recopiés à la racine du dossier mémoire (fusion à l'ouverture, écriture à chaque ajout ou retrait).
+- `learnedPlacesFile.ts` : lieux appris de l'appareil et leur copie lieux.json à la racine du dossier mémoire (fusion à l'ouverture, écriture à chaque lieu corrigé).
 - `useRestingHrTest.ts` : test de FC repos tenu par sa page (ceinture prise à l'ouverture, horloge, bips, écran allumé ; exemple dans le navigateur) ; `useRestingHrResults.ts`, ses résultats gardés sur l'appareil (`gtracker.restingHr`, point 145) et recopiés dans le dossier mémoire.
 - `useBeltLive.ts` : état de la connexion à la ceinture et dernière FC lisible, suivis en direct quel que soit celui qui tient la connexion. `useBeltWarmup.ts` : ceinture connectée dès la case cochée, avant le départ, puis passée à l'enregistreur sans reconnexion (point 146). `usePermissions.ts` : état des autorisations du téléphone, relu au retour au premier plan.
 - `useZoomOnMap.ts` : « Afficher » et « +carte » d'un graphe : partie vue (plage zoomée ou toute la trace) en violet qui suit le zoom, second clic qui la retire, carte cadrée sur place ou plein écran carte + graphes au téléphone (points 142, 155, 156).
@@ -255,6 +257,7 @@ Dans `sailing/` aussi : `pointData.ts` (`PointData` et `trackToPointData`, vue e
 - `components/GearReminder.tsx` : fenêtre « Voulez-vous ajouter le matériel ? », pièce commune aux deux analyses, branchée dans `AnalysisShell` ; ne s'ouvre qu'à l'analyse qui suit la fin d'un enregistrement (compte rendu de l'enregistreur), « Oui » ouvre l'onglet du matériel.
 - `components/ActivityBubbles.tsx` (+ `.css`) : rangée « Toutes » puis un logo par activité visible, qui filtre la liste et se fait glisser de côté.
 - `components/SessionRow.tsx` (+ `.css`) : ligne d'une session (`React.memo` à rappels stables) et son « … » : Classer, Renommer, Supprimer (avec confirmation) ; `menu={false}` pour une ligne sans « … » (Profil).
+- `components/SessionPlaceField.tsx` : saisie de « Lieu » (lieu de départ, et d'arrivée quand la session finit ailleurs), dans la ligne d'une session et l'en-tête de son analyse.
 - `components/SessionPreviewMap.tsx` (+ `.css`) : vignette de la trace à droite des chiffres : image fixe sur canevas (`drawTrackPreview.ts`, trace réduite au demi-pixel (`thinToPixels`)), images tenues en mémoire (`heldCache`, 200 au plus) puis image finie gardée sur l'appareil (lot 121), GPX relu quand la ligne approche de l'écran, un toucher ouvre l'analyse ; bornes de couleur comme le module d'analyse ; aucune carte Leaflet (point 213).
 - `library/sessionsList.ts` (+ test) : calculs purs de la page Sessions : choix du filtre (`filterChoices`), filtre (`filterSessions`), totaux (`sessionsTotals`, unité commune `commonDistanceUnit`) et ligne de totaux (`totalsLine`).
 - `SailingModule.tsx` : analyse voile (dans `AnalysisShell` depuis le point 206 ; en-tête ; barre d'enregistrement ; carte ; onglets dessous, `SAILING_TABS` : « général » avec la synthèse et le vent en premier, réglages de la session en dernier).

@@ -18,6 +18,7 @@ describe('noms techniques de l\'application', () => {
       fcRepos: 'gtracker-fc-repos',
       journal: 'gtracker-journal',
       itineraire: 'gtracker-itineraire',
+      lieux: 'gtracker-lieux',
     });
     expect(XML).toEqual({
       session: { prefix: 'gtracker', ns: 'urn:gtracker:session' },
@@ -55,6 +56,7 @@ describe('noms techniques de l\'application', () => {
       tileCache: 'gtracker.tileCache',
       tileUrls: 'gtracker.tileUrls',
       rechercheLieu: 'gtracker.rechercheLieu',
+      lieuxAppris: 'gtracker.lieuxAppris',
     });
   });
 

@@ -107,11 +107,12 @@
   padding-top: var(--space-2);
 }
 
-.lib-row__actions > :not(.lib-row__rename) {
+.lib-row__actions > :not(.lib-row__rename, .lib-row__place) {
   flex-shrink: 0;
 }
 
-.lib-row__rename {
+.lib-row__rename,
+.lib-row__place {
   flex: 1 1 180px;
   min-width: 0;
 }

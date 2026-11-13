@@ -52,7 +52,7 @@ export {
   loadFullSession, loadSessionGpx, readSessionExport, readSessionGpx, readSessionMotion, removeSession,
   updateSessionRecord,
 } from './sessionLibrary/sessionRecords';
-export { queueSessionPlace } from './sessionLibrary/placeQueue';
+export { correctSessionPlace, queueSessionPlace } from './sessionLibrary/placeQueue';
 export {
   canChooseMemoryFolder, chooseFolder, currentMemoryFolder, openLibrary, reconnectFolder, refreshLibrary,
   startLibraryUi, switchToBrowserMemory,

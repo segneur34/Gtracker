@@ -28,7 +28,7 @@ export const CLES = Object.freeze({
   restingHr: cle('restingHr'), planning: cle('planning'), routeList: cle('routeList'),
   triBibliotheque: cle('triBibliotheque'), heartRateBelts: cle('heartRateBelts'), memoryFolder: cle('memoryFolder'),
   permissionsSeenVersion: cle('permissionsSeenVersion'), tileCache: cle('tileCache'), tileUrls: cle('tileUrls'),
-  rechercheLieu: cle('rechercheLieu'),
+  rechercheLieu: cle('rechercheLieu'), lieuxAppris: cle('lieuxAppris'),
 });
 /** Clés qui voyagent dans `values` de chaque `reglages/<appareil>.json` (`TRAVELLING_KEYS`, `library/settingsFile.ts`). */
 export const CLES_VOYAGEUSES = Object.freeze([CLES.sportSettings, CLES.athleteProfile]);

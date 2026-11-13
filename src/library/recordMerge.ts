@@ -1,4 +1,5 @@
 import type { FileStat } from '../platform/memoryFolder';
+import type { PlaceSource, PlaceSpot, SessionPlace } from './places';
 import { ANALYSIS_SUMMARY_FIELDS, sameJson, type RecordWithoutSummary, type SessionRecord, type SessionSummary } from './record';
 
 /**
@@ -114,6 +115,42 @@ const mergedBlock = (
   return out ? { ...out, savedAt: Math.max(diskAt, mineAt) } : null;
 };
 
+/** Rang d'un lieu à la fonte : corrigé par l'utilisateur, puis appris, puis trouvé sur la carte, puis aucun. */
+const PLACE_RANK: Readonly<Record<PlaceSource, number>> = { utilisateur: 3, appris: 2, carte: 1 };
+
+/** Rang d'une arrivée : pas encore regardée, puis au départ (`null`, tirée du GPX comme un lieu de la carte), puis son lieu. */
+const arrivalRank = (a: PlaceSpot | null | undefined): number => (a === undefined ? 0 : a === null ? PLACE_RANK.carte : PLACE_RANK[a.source]);
+
+/** Vrai si deux lieux en un point sont deux corrections différentes de l'utilisateur. */
+const twoCorrections = (a: PlaceSpot | null | undefined, b: PlaceSpot | null | undefined): boolean =>
+  a?.source === 'utilisateur' && b?.source === 'utilisateur' && !sameJson(a, b);
+
+/**
+ * Lieu fondu, changé ici et peut-être aussi sur le disque : départ et arrivée chacun à part, celui de plus haut rang
+ * (`PLACE_RANK`) l'emporte, celui de la mémoire à rang égal. Un lieu corrigé, au départ comme à l'arrivée, n'est donc
+ * jamais remplacé par un lieu trouvé ailleurs, et une arrivée regardée d'un côté n'est pas perdue de l'autre.
+ * `conflict` : une correction différente de chaque côté, au départ ou à l'arrivée, faite là-bas depuis `original`.
+ */
+const mergedPlace = (
+  disk: SessionPlace | undefined, mine: SessionPlace | undefined, original: SessionPlace | undefined
+): { place: SessionPlace | undefined; conflict: boolean } => {
+  const rank = (p: SessionPlace | undefined): number => (p ? PLACE_RANK[p.source] : 0);
+  const head = rank(disk) > rank(mine) ? disk : mine;
+  const arrival = arrivalRank(disk?.arrival) > arrivalRank(mine?.arrival) ? disk?.arrival : mine?.arrival;
+  const conflict = (twoCorrections(disk, mine) && !sameJson(spotOf(disk), spotOf(original)))
+    || (twoCorrections(disk?.arrival, mine?.arrival) && !sameJson(disk?.arrival, original?.arrival));
+  if (!head) return { place: undefined, conflict };
+  const { arrival: _previous, ...spot } = head;
+  return { place: arrival === undefined ? spot : { ...spot, arrival }, conflict };
+};
+
+/** Le départ seul d'un lieu, sans son arrivée. */
+const spotOf = (p: SessionPlace | undefined): PlaceSpot | undefined => {
+  if (!p) return undefined;
+  const { arrival: _arrival, ...spot } = p;
+  return spot;
+};
+
 export interface MergedRecord {
   record: SessionRecord;
   /** Chemins saisis par l'utilisateur et changés aussi sur le disque, à dire (`conflictLabels`). Les autres fontes sont silencieuses. */
@@ -133,6 +170,14 @@ export const mergeChangedRecord = (disk: RecordWithoutSummary, mine: SessionReco
   const fromMine = loose(mine);
   for (const path of edits.keys()) {
     if (path.includes('.') || path === 'summary' || (DATED_BLOCKS as readonly string[]).includes(path)) continue;
+    if (path === 'place') {
+      // Deux corrections différentes, une de chaque côté : la mémoire l'emporte, et c'est dit.
+      const { place: kept, conflict } = mergedPlace(disk.place, mine.place, edits.get(path) as SessionPlace | undefined);
+      if (conflict) conflicts.push(path);
+      if (kept === undefined) delete out.place;
+      else out.place = kept;
+      continue;
+    }
     if (!sameJson(out[path], edits.get(path)) && !sameJson(out[path], fromMine[path])) conflicts.push(path);
     if (fromMine[path] === undefined) delete out[path];
     else out[path] = fromMine[path];
@@ -144,7 +189,8 @@ export const mergeChangedRecord = (disk: RecordWithoutSummary, mine: SessionReco
 
 /** Ce que l'utilisateur saisit, en clair, par champ de premier niveau ; les champs calculés (sauts) ne s'annoncent pas. */
 const SAISIE_LABEL: Readonly<Record<string, string>> = {
-  sport: 'activité', activityId: 'activité', name: 'nom', notes: 'notes', analysis: 'réglages', marks: 'repères', mapBase: 'fond de carte',
+  sport: 'activité', activityId: 'activité', name: 'nom', place: 'lieu', notes: 'notes', analysis: 'réglages', marks: 'repères',
+  mapBase: 'fond de carte',
 };
 
 const topField = (path: string): string => path.split('.')[0];
