@@ -8,7 +8,7 @@
 //  2. l'en-tête (« Live for it. », « Bienvenue » seul sans pseudo, lien du test de FC repos) ; la période en tête
 //     (bouton glissant), « Année » au départ : les trois activités favorites en ligne (Wingfoil, Surf, Kite : logos
 //     de plus en plus petits, sessions et distance de chacune, à 5 % près pour la distance, somme des vitesses ×
-//     durées ; une touche ne fait rien), la case « Total » à droite, nombre de sessions du graphe ; l'anneau et sa légende (une
+//     durées ; chaque logo est un lien vers Sessions filtrée), la case « Total » à droite, nombre de sessions du graphe ; l'anneau et sa légende (une
 //     part par activité, Wingfoil à 50 %) ; le graphe d'activités en bas, sans barre de période à lui ; sur ordinateur,
 //     la colonne « Vos activités » (rangée de logos qui filtre sur place, cinq lignes sans « … », « Toutes les sessions ») ;
 //  3. l'autre période règle toute la page : « Tout » (les six sessions, une barre par mois), choix retenu au
@@ -160,7 +160,9 @@ check('distance de chacune, en km, et du total', near(cells[0].distance, kmOfAct
 check('logos de plus en plus petits, du premier au troisième (celui de Wingfoil, de Kite)', cells[0].logo === '#gt-logo-wingfoil' && cells[2].logo === '#gt-logo-kite'
   && cells[0].size > cells[1].size && cells[1].size > cells[2].size && cells[2].size >= 40 && cells[3].logo === null, cells.map((c) => `${c.logo} ${c.size}`).join(' ; '));
 check('en ligne, de gauche à droite, le total à droite', cells.every((c, i) => i === 0 || (c.left >= cells[i - 1].right - 1 && Math.abs(c.top - cells[0].top) < 1)), JSON.stringify(cells.map((c) => [c.left, c.top])));
-check('une touche ne fait rien : ni lien ni bouton', cells.every((c) => !c.interactive));
+check('chaque logo favori est un lien « Sessions de … », la case « Total » n\'en est pas un',
+  (await evaluate(`[...document.querySelectorAll('.profile-favs__cell a')].map((a) => a.getAttribute('aria-label')).join(' | ')`)) === 'Sessions de Wingfoil | Sessions de Surf | Sessions de Kite'
+  && cells.slice(0, 3).every((c) => c.interactive) && !cells[3].interactive);
 check('ancienne bande des trois chiffres disparue', !(await evaluate(`!!document.querySelector('.profile-figures, .profile-figure')`)));
 check('nombre de sessions (graphe)', (await chartCount()) === '4 sessions', await chartCount());
 const ordre = await evaluate(`[...document.querySelectorAll('.profile > :not(.profile-openers), .profile > .profile-openers > *')].map((el) => (el.getAttribute('class') ?? '').split(' ')[0] || el.tagName).join(' > ')`);
@@ -214,10 +216,13 @@ check('« Année » de nouveau', await pick(ANNEE_AFFICHEE));
 await wait(500);
 check("retour à l'année", (await chartCount()) === '4 sessions', await chartCount());
 
-// 4. Une ligne de la légende ouvre la bibliothèque de son activité ; toucher une activité favorite ne fait rien.
-await evaluate(`document.querySelector('.profile-favs__cell').click()`);
-await settle({ max: 800 });
-check('toucher une activité favorite ne change pas de page', (await search()) === '/profil', await search());
+// 4. Une ligne de la légende ouvre la bibliothèque de son activité ; toucher un logo favori ouvre Sessions filtrée sur lui.
+await evaluate(`document.querySelector('.profile-favs__cell a').click()`);
+await settle({ max: 1500 });
+check('toucher le premier logo favori ouvre Sessions filtrée, ce logo allumé dans la rangée',
+  (await search())?.startsWith('/sessions?activite=')
+  && (await evaluate(`document.querySelector('.activity-bubble[aria-pressed="true"] .activity-bubble__name')?.textContent`)) === 'Wingfoil', await search());
+await go('/profil');
 await evaluate(`document.querySelector('.profile-legend__row').click()`);
 await settle({ max: 1500 });
 check('la ligne ouvre la page Sessions filtrée', (await search())?.startsWith('/sessions?activite='), await search());

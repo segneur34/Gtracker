@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { LogoId } from '../core/activityLogos';
 import { plural } from '../core/basics';
 import type { BrushFrameProps } from './brushFrame';
@@ -22,6 +23,8 @@ export interface FavoriteCell {
   sessions: number;
   /** Distance de la période, déjà dans l'unité de l'activité et au format de l'application. */
   distance: string;
+  /** Adresse de Sessions, filtrée sur l'activité (sans filtre si elle est cachée). */
+  to: string;
 }
 
 function ProfileFavorites({ cells, total, frame }: {
@@ -39,10 +42,10 @@ function ProfileFavorites({ cells, total, frame }: {
       <ol className="profile-favs__row">
         {cells.map((c, i) => (
           <li key={c.key} className="profile-favs__cell">
-            <span className="profile-favs__art">
+            <Link to={c.to} className="profile-favs__art profile-favs__link" aria-label={`Sessions de ${c.name}`}>
               <ActivityLogo logo={c.logo} color={c.color} size={FAVORITE_LOGO_PX[i] ?? FAVORITE_LOGO_PX[FAVORITE_LOGO_PX.length - 1]}
                 className={`profile-favs__logo profile-favs__logo--${Math.min(i, FAVORITE_LOGO_PX.length - 1) + 1}`} />
-            </span>
+            </Link>
             <span className="profile-favs__name">{c.name}</span>
             <span className="profile-favs__sessions num">{plural(c.sessions, 'session')}</span>
             <span className="profile-favs__distance num">{c.distance}</span>

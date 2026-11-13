@@ -40,6 +40,13 @@
   margin-bottom: var(--space-1);
 }
 
+/* Le logo est un lien : zone de toucher d'au moins 44 px, sans changer l'aspect. */
+.profile-favs__link {
+  min-width: 44px;
+  color: inherit;
+  text-decoration: none;
+}
+
 .profile-favs__logo {
   flex: 0 1 auto;
   min-width: 0;

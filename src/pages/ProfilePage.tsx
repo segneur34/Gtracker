@@ -124,7 +124,7 @@ function ProfilePage() {
   const navigate = useNavigate();
   const { status, sessions, scanning, error } = useLibraryFields('status', 'sessions', 'scanning', 'error');
   const narrow = useNarrowScreen();
-  const { activities } = useVisibility();
+  const { activities, isShown } = useVisibility();
 
   // Cartes d'ouverture : la mémoire d'abord (premier lancement, dossier inaccessible, erreur), puis les autorisations,
   // le profil, et la leçon du jour (en pause), chacune sans s'empiler sur les précédentes.
@@ -215,8 +215,10 @@ function ProfilePage() {
     return [{
       key: a.id, name: a.name, logo: activityLogo(a), color: shown(a.color),
       sessions: f.totals.sessions, distance: distanceText(f.totals.distanceM, effectiveDistanceUnit(a)),
+      // Une activité cachée par l'œil de Réglages n'a pas de filtre dans Sessions : le lien y mène sans filtre.
+      to: sessionsPath(isShown(a) ? a.id : null),
     }];
-  }), [inPeriod, activityOrder, activityById, shown]);
+  }), [inPeriod, activityOrder, activityById, shown, isShown]);
   // Coup de pinceau des cadres : la couleur de la première favorite de la période (l'encre sans session), vue du thème.
   const dark = useAppliedTheme().theme === 'dark';
   const brushColor = useMemo(() => {
