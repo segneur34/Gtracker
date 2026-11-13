@@ -21,7 +21,7 @@ Tu exécutes un lot dans le dépôt Gtracker, sous la conduite d'un orchestrateu
 
 ## Avant de coder
 
-1. Lis `CLAUDE.md` (règles d'architecture 1 à 14, « Où ajouter quoi »), puis la ou les sections de `docs/DECISIONS.md` que le brief cite ou que la table de `CLAUDE.md` associe aux fichiers touchés ; `docs/MISE_EN_PAGE.md` si une page d'analyse est concernée.
+1. `CLAUDE.md` est déjà chargé (règles d'architecture 1 à 14, « Où ajouter quoi ») : ne le relis pas. Lis la ou les sections de `docs/DECISIONS.md` que le brief cite ou que la table de `CLAUDE.md` associe aux fichiers touchés ; `docs/MISE_EN_PAGE.md` si une page d'analyse est concernée.
 2. Lis le brief en entier et vérifie dans le code que chaque constat qu'il cite tient encore (des lots précédents ont pu le corriger).
 3. Si on te relance après un ÉCHEC, lis d'abord la section « Échec » du rapport précédent jointe à la demande : ce qui a cassé et ce qui a été essayé ; ne refais pas le même chemin. Si on te dit que l'arbre porte déjà un travail commencé (lot repris après une question), pars de `git diff`, ne le refais pas.
 
@@ -29,7 +29,10 @@ Tu exécutes un lot dans le dépôt Gtracker, sous la conduite d'un orchestrateu
 
 - Code en français (interface, commentaires), dans le style du dépôt ; réutilise ce qui existe avant d'écrire du neuf : Grep dans `docs/INVENTAIRE.md` (gros fichier, jamais lu en entier), puis dans le code.
 - Un calcul pur reçoit son test synthétique (`*.test.ts`, 1 Hz et 5 Hz quand une fenêtre en secondes est en jeu).
-- Après chaque étape : `node outils/verif.mjs --rapide 2>&1` (typecheck, lint, tests touchés ; sortie de quelques lignes). Tout doit passer avant de rendre la main.
+- À la fin de chaque étape, pas après chaque retouche : `node outils/verif.mjs --rapide 2>&1` (typecheck, lint, tests touchés ; sortie de quelques lignes). Tout doit passer avant de rendre la main.
+- Économie de gestes, à qualité égale (chacun de tes appels relit tout ton contexte, et c'est la moitié du coût d'un lot) : lis en un seul tour les fichiers dont tu sais avoir besoin (plusieurs Read ensemble) ; un fichier de plus de 400 lignes se lit par Grep puis `offset` et `limit`, pas en entier ; ne relis pas un fichier que tu viens d'éditer ; groupe les éditions indépendantes dans un même tour.
+- Budget : vers 90 appels d'outils, si plus d'un tiers du lot reste à faire, finis l'étape en cours, laisse l'arbre vert (`verif.mjs --rapide`), et rends un rapport FAIT partiel qui dit précisément ce qui est fait et ce qui reste ; la suite partira sur un agent neuf. Ne bâcle rien pour tenir ce budget : il sert à couper, pas à aller plus vite.
+- Les fichiers s'éditent par Write et Edit seulement : ni Python, ni PowerShell, ni sed, ni heredoc pour modifier un fichier.
 - Tu ne lances ni la vérification complète (`npm run verif`) ni le banc (l'orchestrateur s'en charge après toi), mais tu peux lancer un script du banc toi-même si le brief te demande de mesurer.
 
 ## Interdits

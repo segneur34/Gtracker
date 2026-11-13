@@ -6,6 +6,8 @@ Claude Code propose quatre modèles, du plus lourd au plus léger : Fable 5.2 (a
 
 Vérifié le 10/11/2026 sur `code.claude.com/docs` et la page de Fable.
 
+Mesure du 13/11/2026 (journaux d'une matinée de `/chaine`, neuf lots ; rapport d'analyse gardé hors dépôt) : lots Opus 56 % de l'usage, orchestrateur Fable 25 %, lots Sonnet 9 %, plans 5 %, relectures 4 %. Le coût d'un agent est le nombre de ses appels multiplié par la taille de son contexte, qu'il relit à chaque appel : un lot deux fois plus long coûte à peu près quatre fois plus. Le nombre de jetons qu'affiche un agent à sa fin est la taille de son contexte, pas sa consommation. Au tarif public, Fable vaut deux fois Opus en entrée et en sortie mais le même prix en relecture du cache, soit environ 1,5 fois sur une longue conversation. Sur l'abonnement Max, Fable est inclus jusqu'à la moitié de la limite de la semaine ; le poids exact de chaque modèle n'est pas publié. Règle qui en découle, l'utilisateur touchant la limite et ne voulant rien perdre en qualité : on retire ce qui consomme sans rien apporter (lots trop longs d'une traite, gestes mécaniques de l'orchestrateur, relectures de fichiers), jamais la relecture, le banc, ni le modèle ou l'effort d'un lot.
+
 ## Tableau
 
 | Tâche | Modèle | Effort | Où |
@@ -33,12 +35,12 @@ Effort (`/effort`) : `low` pour un échange court qu'on relit à chaque pas (ren
 - **Un lot, un modèle** : un lot commence et finit sur le même modèle. Hors mode chaîne, si Sonnet cale (« il ne savait pas assez »), relancer le lot sur Opus dans une conversation neuve avec le brief ; ne pas changer de modèle en route. En mode chaîne, `/chaine` relance par le paramètre `model` de l'agent `lot`.
 - **Effort avant modèle** : quand le problème est « il n'a pas assez essayé », remonter l'effort d'un cran avant de changer de modèle.
 - **Fable** : décrire le résultat attendu et lui laisser la main ; ne pas lui redire de vérifier, il le fait seul ; un tour peut durer plusieurs minutes.
-- **`/clear` entre deux lots, hors mode chaîne** (qui en enchaîne plusieurs dans une conversation) ; `/context` quand une session devient lourde ; `/usage` pour lire la part de chaque sous-agent et les recommandations (touche `w` pour la semaine).
+- **`/clear` entre deux lots, hors mode chaîne** (qui en enchaîne plusieurs dans une conversation ; en mode chaîne, une conversation neuve se propose entre deux paquets au-delà d'environ 200 000 jetons, jamais au milieu d'un paquet : `/chaine`, § 4) ; `/context` quand une session devient lourde ; `/usage` pour lire la part de chaque sous-agent et les recommandations (touche `w` pour la semaine).
 - **Mauvais modèle, à dire tout de suite** : quand la demande arrive sur un modèle nettement inadapté d'après le tableau (une retouche de libellé sur Fable, un bug du noyau ou une page neuve sur Sonnet), Claude le signale dans son premier message, avant tout travail : le modèle recommandé et pourquoi, en deux phrases, puis il attend la réponse. Il faut un gros décalage, dans un sens comme dans l'autre (trop lourd : quota gaspillé ; trop léger : risque de caler), pas un simple cran d'écart. Changer de modèle, c'est une conversation neuve (`/clear`, puis `claude --model <alias>` ou `/model` et `s`, et recoller la demande) : d'où l'intérêt de le dire avant d'avoir commencé, jamais en cours de lot.
 
 ## Sous-agents (`.claude/agents/`)
 
-Tous repartent à froid, donc ils valent pour une étape autonome à sortie volumineuse, pas pour une retouche de deux lignes. Ils rechargent `CLAUDE.md`, sauf `banc` et `Explore` qui s'en passent (`omitClaudeMd`) ; aucun ne voit la conversation ni la mémoire automatique (d'où les pièges du banc dans `outils/banc/LISEZMOI.md`, pas dans une mémoire) ; aucun ne peut appeler un autre agent (`Agent` absent de leurs outils) : seule la conversation qui tient `/chaine` ou `/clore` les enchaîne. Leur modèle et leur effort sont fixés dans leur en-tête et priment sur celui de la session ; les gros fichiers (INVENTAIRE, ETAT, HISTORIQUE, LISEZMOI du banc) se lisent par Grep puis `offset`, jamais en entier.
+Tous repartent à froid, donc ils valent pour une étape autonome à sortie volumineuse, pas pour une retouche de deux lignes. Ils rechargent `CLAUDE.md`, sauf `banc` et `Explore` qui s'en passent (`omitClaudeMd`) ; aucun ne voit la conversation ni la mémoire automatique (d'où les pièges du banc dans `outils/banc/LISEZMOI.md`, pas dans une mémoire) ; aucun ne peut appeler un autre agent (`Agent` absent de leurs outils) : seule la conversation qui tient `/chaine` ou `/clore` les enchaîne. Leur modèle et leur effort sont fixés dans leur en-tête et priment sur celui de la session ; les gros fichiers (INVENTAIRE, ETAT, HISTORIQUE, LISEZMOI du banc, et tout fichier de code de plus de 400 lignes) se lisent par Grep puis `offset`, jamais en entier.
 
 Modèle et effort de chacun se lisent dans son en-tête (`lot` les reçoit à chaque appel d'après la colonne « Modèle | Réflexion » du brief).
 
@@ -49,7 +51,7 @@ Modèle et effort de chacun se lisent dans son en-tête (`lot` les reçoit à ch
 - `doc` : la passe de documentation d'un lot validé ; ne touche pas au code, ne committe pas.
 - `lot` : exécute un lot d'après son brief et rend un rapport FAIT / BLOQUÉ / ÉCHEC ; ne committe pas, ne pose pas la version, ne tranche aucune décision de l'utilisateur.
 
-Tout autre sous-agent sans modèle dans son en-tête (fork, agent général) tourne sur Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL` dans les réglages de l'utilisateur), jamais sur le modèle de la session. Pour appeler un agent : « avec l'agent banc, lis ce diff », ou `@banc`. Cache : une heure pour la conversation principale, cinq minutes pour les sous-agents ; un `SendMessage` à `lot` après la vérification et la relecture lui fait relire tout son contexte, ce qui reste préférable à un agent neuf.
+Tout autre sous-agent sans modèle dans son en-tête (fork, agent général) tourne sur Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL` dans les réglages de l'utilisateur), jamais sur le modèle de la session. Pour appeler un agent : « avec l'agent banc, lis ce diff », ou `@banc`. Cache : une heure pour la conversation principale, cinq minutes pour les sous-agents ; un `SendMessage` à `lot` plus de cinq minutes après son rapport lui fait réécrire tout son contexte, ce qui reste préférable à un agent neuf : d'où la vérification et la relecture lancées ensemble dès le rapport, et leurs retours envoyés en un seul message (`/chaine`, étape 4).
 
 ## Commandes (`.claude/skills/`)
 

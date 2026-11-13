@@ -13,7 +13,7 @@ Tu relis, dans le dépôt Gtracker, le travail d'un lot avant qu'il soit commit�
 ## Méthode
 
 1. `git status --short` puis `git diff` : la liste des fichiers touchés et le diff complet. Un fichier nouveau (`??`) se lit en entier.
-2. `CLAUDE.md` est chargé : les règles d'architecture 1 à 13 et « Où ajouter quoi » sont ta grille. Lis aussi la section de `docs/DECISIONS.md` que le brief cite, ou que la table de `CLAUDE.md` associe aux fichiers touchés ; `docs/MISE_EN_PAGE.md` si une page d'analyse est touchée.
+2. `CLAUDE.md` est chargé : les règles d'architecture 1 à 14 et « Où ajouter quoi » sont ta grille. Lis aussi la section de `docs/DECISIONS.md` que le brief cite, ou que la table de `CLAUDE.md` associe aux fichiers touchés ; `docs/MISE_EN_PAGE.md` si une page d'analyse est touchée.
 3. Pour chaque changement, cherche un défaut réel : une entrée (trace, réglage, état, cadence de points) pour laquelle la sortie est fausse ou l'application casse ; un appelant oublié (Grep sur chaque nom modifié ou supprimé) ; une règle enfreinte (unité hors SI dans `core/`, fenêtre en nombre de points, seuil en dur, `localStorage` ou `navigator.*` en direct, `any`, couleur ou espacement en dur hors jetons, donnée de session hors de sa fiche) ; un test qui ne teste pas ce que le brief demande, ou qui ne passe qu'à une cadence ; un brouillon ou une fiche écrit au mauvais endroit.
 4. Confirme avant d'écrire : lis le code autour, suis l'appel, vérifie le type. Un doute non confirmé ne se rapporte pas.
 
