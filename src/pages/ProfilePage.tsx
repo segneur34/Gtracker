@@ -242,9 +242,9 @@ function ProfilePage() {
       {gate.mount && <ProfilePrompt otherCardShown={gate.otherCardShown} onDecided={setProfileShown} />}
       {TUTORIAL_OF_DAY_VISIBLE && <TutorialOfDay gate={tutorialGate} />}
 
-      <Button className="profile-periods" aria-label={`Période : ${periodLabel}. Toucher pour afficher : ${otherPeriodLabel}.`}
+      <Button size="s" className="profile-periods" aria-label={`Période : ${periodLabel}. Toucher pour afficher : ${otherPeriodLabel}.`}
         onClick={() => rememberView({ periode: period === 'tout' ? 'annee' : 'tout' })}>
-        {periodLabel}
+        {period === 'tout' ? 'Tout' : String(new Date(nowMs).getFullYear())}
       </Button>
 
       {!memoryNeedsAction && <MemoryStatus compact />}

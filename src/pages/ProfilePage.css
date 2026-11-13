@@ -489,8 +489,16 @@ button.profile-legend__row {
 }
 
 /* Le bouton de période : une pilule à sa largeur, à gauche de la page. */
+/* Petit bouton calé à droite de sa rangée ; la zone tactile déborde de la pilule pour rester confortable au doigt. */
 .ui-btn.profile-periods {
-  align-self: flex-start;
+  align-self: flex-end;
+  position: relative;
+}
+
+.ui-btn.profile-periods::after {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--space-2)) calc(-1 * var(--space-2));
 }
 
 /* Détail par activité : replié ou déplié d'un geste, sous l'anneau sur un écran étroit. */

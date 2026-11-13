@@ -71,7 +71,8 @@ const figures = () => evaluate(`[...document.querySelectorAll('.profile-figure')
 const legend = () => evaluate(`[...document.querySelectorAll('.profile-legend li')].map((li) => li.textContent)`);
 const search = () => evaluate('location.pathname + location.search');
 const overflow = () => evaluate('document.documentElement.scrollWidth > window.innerWidth');
-const ANNEE = `Année ${new Date().getFullYear()}`;
+const ANNEE = `Année ${new Date().getFullYear()}`; // nom lu par un lecteur d'écran
+const ANNEE_AFFICHEE = String(new Date().getFullYear()); // libellé du bouton
 /** Un seul bouton bascule entre « Année <n> » et « Tout » : on le touche seulement s'il ne montre pas déjà la période voulue. */
 const pick = (label) => evaluate(`(() => {
   const b = document.querySelector('.profile-periods');
@@ -125,7 +126,7 @@ check('en-tête : « Live for it. » sur la photo', (await text('.profile-hero__
 check('titre : « Bienvenue » seul, sans pseudo', (await text('.profile-head__title')) === 'Bienvenue' && (await evaluate(`document.querySelector('.profile-head__hello') === null`)), await text('.profile-head__title'));
 check('lien du test de FC repos sous le titre', (await text('.profile-head__link')) === 'Test de FC repos', await text('.profile-head__link'));
 check('période en tête : un seul bouton, « Année <n> » au départ, son libellé dit ce que fait le toucher',
-  (await evaluate(`document.querySelectorAll('.profile-periods').length`)) === 1 && (await pressed()) === ANNEE
+  (await evaluate(`document.querySelectorAll('.profile-periods').length`)) === 1 && (await pressed()) === ANNEE_AFFICHEE
   && (await evaluate(`document.querySelector('.profile-periods').getAttribute('aria-label')`)) === `Période : ${ANNEE}. Toucher pour afficher : Tout.`, await pressed());
 check("plus de flèches d'année", (await evaluate(`!!document.querySelector('.profile-year')`)) === false);
 check("le graphe n'a plus sa propre barre de période", (await evaluate(`!!document.querySelector('.actchart__periods')`)) === false);
@@ -185,7 +186,7 @@ check('depuis le début : un mois par barre', (await text('.actchart__head h2'))
   && (await evaluate(`document.querySelectorAll('.actchart__bar').length`)) >= 14, await text('.actchart__head h2'));
 await go('/profil');
 check('choix retenu au rechargement', (await pressed()) === 'Tout', await pressed());
-check('« Année » de nouveau', await pick(ANNEE));
+check('« Année » de nouveau', await pick(ANNEE_AFFICHEE));
 await wait(500);
 check("retour à l'année", (await chartCount()) === '4 sessions', await chartCount());
 
