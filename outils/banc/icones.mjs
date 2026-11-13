@@ -11,7 +11,7 @@
 //     activités (`windsurf`), gardé après rechargement, repris par le rond de la page Sessions ;
 //     une activité « Kayak » ajoutée en surf, son dessin deviné (« Paddle ») coché pendant la saisie, rangée sans choix ;
 //  5. le Profil : la photo est vide au départ, un logo choisi y paraît dans son cadre, « Retirer » la vide ; le
-//     « Sport préféré » est un dessin seul ;
+//     première activité favorite est un logo dans son cadre ;
 //  6. à 390×844 : Sessions et Profil sans débordement.
 import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
@@ -197,19 +197,19 @@ const boardIcon = await bubbleLogo('Wingfoil');
 check('Sessions : dessin du windsurf dans le rond de Wingfoil', boardIcon.includes('#gt-logo-windsurf') && boardIcon !== wingIcon, boardIcon);
 
 // 5. Profil : la photo, sans choix, est vide (malgré les sessions) ; un logo choisi y paraît dans son cadre, « Retirer »
-// la vide ; « Sport préféré » montre son dessin seul.
+// la vide ; la première activité favorite montre son logo dans son cadre.
 await go('/profil');
 await ready('.profile-head__avatar');
 const avatarState = () => evaluate(`(() => {
   const empty = document.querySelector('.profile-head__avatar .profile-avatar__disc--empty svg') !== null;
   const logo = document.querySelector('.profile-head__avatar svg.activity-logo');
   const uses = logo ? [...logo.querySelectorAll('use')].map((u) => u.getAttribute('href')) : [];
-  const favorite = document.querySelector('.profile-figure__art');
+  const favorite = document.querySelector('.profile-favs__cell svg');
   return { empty, uses, favorite: favorite?.querySelector('use')?.getAttribute('href') ?? null, framed: favorite?.querySelector('use[href="#gt-logo-frame"]') !== null };
 })()`);
 const avatar = await avatarState();
 check('Profil : avatar vide au départ, sans logo', avatar.empty && avatar.uses.length === 0, JSON.stringify(avatar));
-check('Profil : sport préféré en dessin seul', avatar.favorite?.startsWith('#gt-logo-') && !avatar.framed, JSON.stringify(avatar));
+check('Profil : première activité favorite dans son cadre au pinceau', avatar.favorite === '#gt-logo-frame' && avatar.framed, JSON.stringify(avatar));
 await shoot('icones-profil');
 await evaluate(`document.querySelector('.profile-head__avatar').click()`);
 await wait(300);

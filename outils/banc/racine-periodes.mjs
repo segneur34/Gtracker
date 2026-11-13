@@ -60,7 +60,7 @@ await settle({ max: 3000, label: 'import' });
 await setClock(dayAt(13, 0, 12));
 
 const PERIODS = ['annee', 'tout'];
-const SELECTORS = ['.profile-periods', '.profile-figures', '.profile-split', '.actchart'];
+const SELECTORS = ['.profile-periods', '.profile-favs', '.profile-split', '.actchart'];
 const sizes = [{ name: '390x844', w: 390, h: 844, mobile: true }, { name: '1400x1000', w: 1400, h: 1000, mobile: false }];
 for (const size of sizes) {
   await send('Emulation.setDeviceMetricsOverride', { width: size.w, height: size.h, deviceScaleFactor: 1, mobile: size.mobile });

@@ -1,0 +1,118 @@
+/* Activités favorites : une rangée de cases (les trois activités, puis le total à droite), logos posés sur une même
+   ligne de base pour que les noms, les sessions et les distances s'alignent d'une case à l'autre. Les côtés des logos
+   sont des variables du cadre : le téléphone les réduit, et un logo ne dépasse jamais sa case (`max-width`). */
+.profile-favs {
+  --favs-logo-1: 76px;
+  --favs-logo-2: 58px;
+  --favs-logo-3: 44px;
+}
+
+.profile-favs__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-favs__cell {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Hauteur du plus grand logo : les plus petits s'y posent par le bas. */
+.profile-favs__art {
+  display: flex;
+  align-items: flex-end;
+  height: var(--favs-logo-1);
+  margin-bottom: var(--space-1);
+}
+
+.profile-favs__logo {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.profile-favs__logo--1 {
+  width: var(--favs-logo-1);
+}
+
+.profile-favs__logo--2 {
+  width: var(--favs-logo-2);
+}
+
+.profile-favs__logo--3 {
+  width: var(--favs-logo-3);
+}
+
+.profile-favs__name {
+  overflow-wrap: anywhere;
+  font-size: var(--text-s);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.profile-favs__sessions {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.profile-favs__distance {
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* Le total reste à droite de la rangée, quelle que soit la place laissée par les activités. */
+.profile-favs__cell--total {
+  flex: 1 0 auto;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.profile-favs__cell--total .profile-favs__name {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.profile-favs__cell--total .profile-favs__distance {
+  font-size: var(--text-l);
+}
+
+.profile-favs__empty {
+  margin: 0;
+}
+
+/* Téléphone : cadre plus étroit, logos réduits (trois tailles décroissantes gardées), « sessions » qui passe à la
+   ligne plutôt que de déborder. À 320 px la rangée dispose de 246 px, pour quatre cases et trois intervalles de 8 px. */
+@media (max-width: 599px) {
+  .ui-card-col.profile-favs {
+    --favs-logo-1: 60px;
+    --favs-logo-2: 48px;
+    --favs-logo-3: 40px;
+    padding-right: var(--space-4);
+    padding-left: var(--space-4);
+  }
+
+  .profile-favs__row {
+    gap: var(--space-2);
+  }
+
+  .profile-favs__sessions {
+    white-space: normal;
+  }
+
+  .profile-favs__cell--total .profile-favs__distance {
+    font-size: var(--text-m);
+  }
+}

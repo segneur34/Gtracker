@@ -7,12 +7,12 @@ import { PermissionsPrompt } from '../components/PermissionsStatus';
 import { AvatarPicker, ProfileAvatar } from '../components/ProfileAvatar';
 import ProfilePrompt from '../components/ProfilePrompt';
 import TutorialOfDay from '../components/TutorialOfDay';
-import { LogoGlyph } from '../components/logos/ActivityLogo';
+import ProfileFavorites, { type FavoriteCell } from '../components/ProfileFavorites';
 import { IconChevronRight } from '../components/icons';
 import Button from '../components/ui/Button';
 import { logoColor, type Activity } from '../core/activities';
 import { activityLogo, type LogoId } from '../core/activityLogos';
-import { DISTANCE_UNIT_SYMBOL, formatDuration, toDisplayDistance } from '../core/units';
+import { DISTANCE_UNIT_SYMBOL, formatDecimal, formatDuration, toDisplayDistance, type DistanceUnit } from '../core/units';
 import { RESTING_HR_PATH, sessionsPath } from '../core/parentPage';
 import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { useOpenSections } from '../hooks/useOpenSections';
@@ -26,7 +26,7 @@ import { useNow } from '../hooks/useNow';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
 import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
-import { activityShares, favoriteActivity } from '../library/profile';
+import { activityShares, favoriteActivities, favoriteActivity } from '../library/profile';
 import { profilePromptGate } from '../library/profilePrompt';
 import { inBounds, profilePeriodOf, statsPeriodBounds, statsTotals } from '../library/stats';
 import { TUTORIAL_OF_DAY_VISIBLE, tutorialCardGate } from '../tutorials/tutorials';
@@ -42,9 +42,9 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * (mémoire à désigner, autorisations, invitation du profil), quand il y a lieu. Puis
  * la période, qui règle toute la page : semaine, 30 jours, 6 mois, année (les
  * bornes du graphe d'activités et des statistiques) ou depuis le début ; choix
- * retenu sur l'appareil. Puis, dans une seule bande : nombre d'activités (et
- * leur temps), kilomètres parcourus, sport préféré (l'activité qui a le
- * plus de temps, avec son dessin) ; la répartition du temps par activité en
+ * retenu sur l'appareil. Puis les trois activités favorites (celles qui ont le
+ * plus de temps, du plus grand logo au plus petit, avec leurs sessions et leur
+ * distance) et la case du total des kilomètres ; la répartition du temps par activité en
  * anneau (le total au centre ; « Autres » se déplie dans le détail), et le
  * graphe d'activités de la même période. Sur ordinateur, « Vos activités » à droite à partir de 1000 px de large,
  * dessous en deçà (`ProfileActivities`, ni chargé ni monté sur téléphone).
@@ -75,7 +75,7 @@ const VIEW_DEFAULTS: ProfileView = { periode: 'annee' };
 const DETAIL_DEFAULT = { detail: false };
 
 /** Cadres que la racine entoure (`ProfileRoot`), dans l'ordre de la page. */
-const ROOT_CARDS = ['.profile-periods', '.profile-figures', '.profile-split', '.actchart'];
+const ROOT_CARDS = ['.profile-periods', '.profile-favs','.profile-split', '.actchart'];
 
 /** Au-delà, les plus petites parts se regroupent en « Autres » : un anneau ne se lit plus. */
 const MAX_SLICES = 6;
@@ -97,6 +97,13 @@ interface Slice {
 }
 
 const hoursText = (s: number): string => formatDuration(s * 1000);
+
+/** Distance dans l'unité donnée, avec son symbole : une décimale sous 100, aucune au-delà (« 4,5 km », « 310 km »). */
+const distanceText = (m: number, unit: DistanceUnit): string => {
+  const v = toDisplayDistance(m, unit);
+  const shownValue = v < 100 ? formatDecimal(v, 1).replace(/,0$/, '') : Math.round(v).toLocaleString('fr-FR');
+  return `${shownValue} ${DISTANCE_UNIT_SYMBOL[unit]}`;
+};
 
 const percentText = (share: number): string =>
   share > 0 && share < 0.01 ? '< 1 %' : `${Math.round(share * 100)} %`;
@@ -198,7 +205,16 @@ function ProfilePage() {
   // Distance dans l'unité de l'activité la plus pratiquée de la période (sinon de toutes), le kilomètre à défaut.
   const practised = favorite ?? overallFavorite;
   const distanceUnit = practised ? effectiveDistanceUnit(practised) : 'km';
-  const km = toDisplayDistance(totals.distanceM, distanceUnit);
+  // Les trois activités favorites, chacune avec sa distance dans l'unité de son activité.
+  const favoriteCells = useMemo((): FavoriteCell[] => favoriteActivities(inPeriod, activityOrder).flatMap((f) => {
+    // Une activité supprimée garde ses sessions sous son calcul : `activityById` porte cette activité de base (nom et logo).
+    const a = activityById.get(f.activityId);
+    if (!a) return [];
+    return [{
+      key: a.id, name: a.name, logo: activityLogo(a), color: shown(a.color),
+      sessions: f.totals.sessions, distance: distanceText(f.totals.distanceM, effectiveDistanceUnit(a)),
+    }];
+  }), [inPeriod, activityOrder, activityById, shown]);
   const activeSlice = slices.find((s) => s.key === active) ?? null;
 
   // Anneau : chaque part est un arc du même cercle, en trait épais, à partir du haut, dans le sens des aiguilles.
@@ -255,36 +271,7 @@ function ProfilePage() {
         <>
           {scanning && <p className="ui-hint">Fiches en cours de calcul ({scanning.done} / {scanning.total}) : chiffres provisoires.</p>}
 
-          <section className="profile-figures" aria-label="Totaux de la période">
-            <div className="profile-figure">
-              <span className="ui-eyebrow">Activités</span>
-              <span className="profile-figure__value num">{totals.sessions.toLocaleString('fr-FR')}</span>
-              <span className="profile-figure__caption">{totals.sessions > 0 ? `en ${hoursText(totals.durationS)}` : 'aucune session'}</span>
-            </div>
-            <div className="profile-figure">
-              <span className="ui-eyebrow">Distance</span>
-              <span className="profile-figure__value num">
-                {km.toLocaleString('fr-FR', { maximumFractionDigits: km < 100 ? 1 : 0 })}<small>{DISTANCE_UNIT_SYMBOL[distanceUnit]}</small>
-              </span>
-              <span className="profile-figure__caption">parcourus</span>
-            </div>
-            {favorite ? (
-              <button type="button" className="profile-figure profile-figure--link" onClick={() => openLibrary(favorite)}
-                title={`${favorite.name} : voir ses sessions`}>
-                <span className="ui-eyebrow">Sport préféré</span>
-                <span className="profile-figure__value">
-                  <LogoGlyph logo={activityLogo(favorite)} size={35} className="profile-figure__art" />
-                </span>
-                <span className="profile-figure__caption profile-figure__name">{favorite.name}</span>
-              </button>
-            ) : (
-              <div className="profile-figure">
-                <span className="ui-eyebrow">Sport préféré</span>
-                <span className="profile-figure__value">—</span>
-                <span className="profile-figure__caption">aucune session</span>
-              </div>
-            )}
-          </section>
+          <ProfileFavorites cells={favoriteCells} total={distanceText(totals.distanceM, distanceUnit)} />
 
           {slices.length > 0 && (
             <section className="profile-split ui-card-col" aria-label="Répartition par activité">

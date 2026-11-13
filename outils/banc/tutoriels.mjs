@@ -58,7 +58,7 @@ const profileAt = async (dayMs) => {
   await setClock(dayMs);
   await go('/', 4000);
   await waitFor(`Boolean(document.querySelector('.profile-head__title'))`, { timeout: 4000, label: 'Profil' });
-  await waitFor(`Boolean(document.querySelector('.profile-figures'))`, { timeout: 4000, label: 'chiffres du Profil' });
+  await waitFor(`Boolean(document.querySelector('.profile-favs'))`, { timeout: 4000, label: 'activités favorites du Profil' });
   await wait(600);
 };
 /** La page Sessions au jour donné, la liste lue. */

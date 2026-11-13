@@ -57,6 +57,17 @@ describe('foil des Statistiques', () => {
   });
 });
 
+describe('activité supprimée', () => {
+  it("la session est gardée sous le calcul de base, dont l'activité est dans la table (nom et logo des favorites du Profil)", async () => {
+    vi.resetModules();
+    const { visibleStatSessions } = await import('./useVisibleStatSessions');
+    const gone = session(sessionRecord({ gpx: 'c.gpx', sport: 'wingfoil', activityId: 'a-supprimee' }));
+    const { all, activityById } = visibleStatSessions([gone], [surf], () => true);
+    expect(all.map((s) => s.activityId)).toEqual(['wingfoil']);
+    expect(activityById.get('wingfoil')?.base).toBe('wingfoil');
+  });
+});
+
 describe('sessions à classer', () => {
   it("une session sans calcul n'est pas comptée ; celles d'une famille cachée non plus", async () => {
     vi.resetModules();

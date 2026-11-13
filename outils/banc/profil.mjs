@@ -6,15 +6,16 @@
 //  1. l'ouverture : « / » mène au Profil, sans fond dessiné, allumé dans la barre du haut ; « Profil » dans la barre du
 //     haut, depuis Sessions, ouvre la page ;
 //  2. l'en-tête (« Live for it. », « Bienvenue » seul sans pseudo, lien du test de FC repos) ; la période en tête
-//     (bouton glissant), « Année » au départ : distance (somme des vitesses × durées, à 5 % près), sport préféré
-//     (Wingfoil, avec son dessin, qui ouvre ses sessions), nombre de sessions du graphe ; l'anneau et sa légende (une
+//     (bouton glissant), « Année » au départ : les trois activités favorites en ligne (Wingfoil, Surf, Kite : logos
+//     de plus en plus petits, sessions et distance de chacune, à 5 % près pour la distance, somme des vitesses ×
+//     durées ; une touche ne fait rien), la case « Total » à droite, nombre de sessions du graphe ; l'anneau et sa légende (une
 //     part par activité, Wingfoil à 50 %) ; le graphe d'activités en bas, sans barre de période à lui ; sur ordinateur,
 //     la colonne « Vos activités » (rangée de logos qui filtre sur place, cinq lignes sans « … », « Toutes les sessions ») ;
 //  3. l'autre période règle toute la page : « Tout » (les six sessions, une barre par mois), choix retenu au
 //     rechargement, puis retour à « Année <n> » ;
 //  4. une ligne de la légende ouvre la page Sessions filtrée sur son activité ;
-//  5. à 390×844 : rien ne déborde, « Gtracker » sur la photo, pas de colonne « Vos activités », chiffres en une bande de deux sur deux, détail par activité retenu déplié ; la case « Profil » de la barre du bas (Profil, Sessions, Statistiques, Réglages) ouvre la page, allumée ;
-//     à 320 px, aucune case de la bande ne sort de l'écran (la bande « qui dépasse » de la maquette du 22/10) ;
+//  5. à 390×844 : rien ne déborde, « Gtracker » sur la photo, pas de colonne « Vos activités », les activités favorites et le total sur une seule rangée, détail par activité retenu déplié ; la case « Profil » de la barre du bas (Profil, Sessions, Statistiques, Réglages) ouvre la page, allumée ;
+//     à 320 px, aucune case de la rangée ne sort de l'écran ni ne déborde de son texte ;
 //  6. deux sessions d'activités cachées (planche à voile et bateau, cachées au départ) : absentes du Profil, rien ne
 //     change (quatre sessions, trois parts, ni « Autres ») ; une session de surf passée en Pumping dans son analyse :
 //     une quatrième part, la ligne de la légende ouvre ses sessions ;
@@ -67,7 +68,27 @@ if (current.length !== 4 || previous.length !== 2) {
 const kmOf = (list) => list.reduce((n, [, , v]) => n + v * 1200, 0) / 1000;
 
 const text = (selector) => evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent ?? null`);
-const figures = () => evaluate(`[...document.querySelectorAll('.profile-figure')].map((f) => f.querySelector('.profile-figure__value')?.textContent ?? '')`);
+/** Cases des activités favorites, puis du total : nom, sessions, distance, logo et côté du dessin, bords de la case. */
+const favs = () => evaluate(`[...document.querySelectorAll('.profile-favs__cell')].map((c) => {
+  const r = c.getBoundingClientRect();
+  const svg = c.querySelector('svg');
+  const uses = [...c.querySelectorAll('svg use')];
+  return {
+    name: c.querySelector('.profile-favs__name').textContent.trim(),
+    sessions: c.querySelector('.profile-favs__sessions').textContent.trim(),
+    distance: c.querySelector('.profile-favs__distance').textContent.trim(),
+    logo: uses.length ? uses[uses.length - 1].getAttribute('href') : null,
+    size: svg ? svg.getBoundingClientRect().width : 0,
+    left: r.left, right: r.right, top: r.top,
+    interactive: c.querySelector('a, button') !== null,
+    // Ni un texte ni un logo ne sort de sa case : texte coupé (largeur du contenu) et rectangles des éléments contenus.
+    fits: [...c.querySelectorAll('.profile-favs__name, .profile-favs__sessions, .profile-favs__distance')].every((t) => t.scrollWidth <= t.clientWidth + 1)
+      && [...c.querySelectorAll('svg, .profile-favs__name, .profile-favs__sessions, .profile-favs__distance')].every((e) => {
+        const b = e.getBoundingClientRect();
+        return b.left >= r.left - 1 && b.right <= r.right + 1;
+      }),
+  };
+})`);
 const legend = () => evaluate(`[...document.querySelectorAll('.profile-legend li')].map((li) => li.textContent)`);
 const search = () => evaluate('location.pathname + location.search');
 const overflow = () => evaluate('document.documentElement.scrollWidth > window.innerWidth');
@@ -81,7 +102,6 @@ const pick = (label) => evaluate(`(() => {
   return true;
 })()`);
 const pressed = () => evaluate(`document.querySelector('.profile-periods')?.textContent.trim() ?? null`);
-const favorite = () => text('.profile-figure__name');
 const chartCount = () => text('.actchart__head span');
 /** Nombre lu à la française : espaces fines de milliers, virgule décimale. */
 const parseFr = (s) => Number((s ?? '').replace(/[^\d,]/g, '').replace(',', '.'));
@@ -130,17 +150,21 @@ check('période en tête : un seul bouton, « Année <n> » au départ, son libe
   && (await evaluate(`document.querySelector('.profile-periods').getAttribute('aria-label')`)) === `Période : ${ANNEE}. Toucher pour afficher : Tout.`, await pressed());
 check("plus de flèches d'année", (await evaluate(`!!document.querySelector('.profile-year')`)) === false);
 check("le graphe n'a plus sa propre barre de période", (await evaluate(`!!document.querySelector('.actchart__periods')`)) === false);
-let [count, distance] = await figures();
-check('nombre d\'activités de l\'année, en tête de la bande', count === '4', count);
-const km = parseFr(distance);
-check('distance de l\'année, en km', distance?.endsWith('km') && Math.abs(km - kmOf(current)) / kmOf(current) < 0.05, `${distance} pour ${kmOf(current).toFixed(1)} attendus`);
-check('plus de case « Temps »', !(await evaluate(`[...document.querySelectorAll('.profile-figure .ui-eyebrow')].some((e) => e.textContent === 'Temps')`)));
-check('sport préféré : Wingfoil, avec son dessin', (await favorite()) === 'Wingfoil'
-  && (await evaluate(`!!document.querySelector('.profile-figure--link svg.profile-figure__art use[href="#gt-logo-wingfoil"]')`)), await favorite());
-check('plus de case « Dénivelé »', !(await evaluate(`[...document.querySelectorAll('.profile-figure .ui-eyebrow')].some((e) => e.textContent === 'Dénivelé')`)));
+const kmOfActivity = (list, type) => kmOf(list.filter(([t]) => t === type));
+const near = (text, km) => text?.endsWith('km') && Math.abs(parseFr(text) - km) / km < 0.05;
+let cells = await favs();
+check('activités favorites : Wingfoil, Surf, Kite, puis la case « Total »', cells.map((c) => c.name).join(' | ') === 'Wingfoil | Surf | Kite | Total', cells.map((c) => c.name).join(' | '));
+check('sessions de chacune : « 2 sessions », « 1 session », « 1 session »', cells.slice(0, 3).map((c) => c.sessions).join(' | ') === '2 sessions | 1 session | 1 session', cells.map((c) => c.sessions).join(' | '));
+check('distance de chacune, en km, et du total', near(cells[0].distance, kmOfActivity(current, 'wingfoil')) && near(cells[1].distance, kmOfActivity(current, 'surf'))
+  && near(cells[2].distance, kmOfActivity(current, 'kite')) && near(cells[3].distance, kmOf(current)), cells.map((c) => c.distance).join(' | '));
+check('logos de plus en plus petits, du premier au troisième (celui de Wingfoil, de Kite)', cells[0].logo === '#gt-logo-wingfoil' && cells[2].logo === '#gt-logo-kite'
+  && cells[0].size > cells[1].size && cells[1].size > cells[2].size && cells[2].size >= 40 && cells[3].logo === null, cells.map((c) => `${c.logo} ${c.size}`).join(' ; '));
+check('en ligne, de gauche à droite, le total à droite', cells.every((c, i) => i === 0 || (c.left >= cells[i - 1].right - 1 && Math.abs(c.top - cells[0].top) < 1)), JSON.stringify(cells.map((c) => [c.left, c.top])));
+check('une touche ne fait rien : ni lien ni bouton', cells.every((c) => !c.interactive));
+check('ancienne bande des trois chiffres disparue', !(await evaluate(`!!document.querySelector('.profile-figures, .profile-figure')`)));
 check('nombre de sessions (graphe)', (await chartCount()) === '4 sessions', await chartCount());
 const ordre = await evaluate(`[...document.querySelectorAll('.profile > *')].map((el) => (el.getAttribute('class') ?? '').split(' ')[0] || el.tagName).join(' > ')`);
-check('ordre : en-tête, période, chiffres, répartition, graphe', /^profile-head > ui-btn.*profile-figures.*profile-split.*actchart/.test(ordre ?? ''), ordre);
+check('ordre : en-tête, période, activités favorites, répartition, graphe', /^profile-head > ui-btn.*profile-favs.*profile-split.*actchart/.test(ordre ?? ''), ordre);
 // Colonne de droite, sur ordinateur (à partir de 1000 px) : « Vos activités », la rangée de logos et les cinq dernières sessions.
 const activites = () => evaluate(`(() => {
   const s = document.querySelector('.profile-activities');
@@ -178,10 +202,10 @@ await shoot('profil-ordinateur');
 // 3. Les autres périodes règlent toute la page.
 check('« Tout »', await pick('Tout'));
 await wait(500);
-[count, distance] = await figures();
-check('depuis le début : six sessions', count === '6', count);
-check('depuis le début : les six sessions', Math.abs(parseFr(distance) - kmOf(SESSIONS)) / kmOf(SESSIONS) < 0.05 && (await text('.profile-donut__center')) === 'Total2 h 00'
-  && (await chartCount()) === '6 sessions', `${distance} ; ${await text('.profile-donut__center')} ; ${await chartCount()}`);
+cells = await favs();
+check('depuis le début : Wingfoil (3 sessions), Surf (2), Kite (1)', cells.map((c) => `${c.name} ${c.sessions}`).slice(0, 3).join(' | ') === 'Wingfoil 3 sessions | Surf 2 sessions | Kite 1 session', JSON.stringify(cells.map((c) => [c.name, c.sessions])));
+check('depuis le début : les six sessions', near(cells[3].distance, kmOf(SESSIONS)) && (await text('.profile-donut__center')) === 'Total2 h 00'
+  && (await chartCount()) === '6 sessions', `${cells[3].distance} ; ${await text('.profile-donut__center')} ; ${await chartCount()}`);
 check('depuis le début : un mois par barre', (await text('.actchart__head h2')) === 'Depuis le début, par mois'
   && (await evaluate(`document.querySelectorAll('.actchart__bar').length`)) >= 14, await text('.actchart__head h2'));
 await go('/profil');
@@ -190,11 +214,10 @@ check('« Année » de nouveau', await pick(ANNEE_AFFICHEE));
 await wait(500);
 check("retour à l'année", (await chartCount()) === '4 sessions', await chartCount());
 
-// 4. Le sport préféré, puis une ligne de la légende, ouvrent la bibliothèque de leur activité.
-await evaluate(`document.querySelector('.profile-figure--link').click()`);
-await settle({ max: 1500 });
-check('le sport préféré ouvre sa liste de sessions', (await search())?.startsWith('/sessions?activite=wingfoil'), await search());
-await go('/profil');
+// 4. Une ligne de la légende ouvre la bibliothèque de son activité ; toucher une activité favorite ne fait rien.
+await evaluate(`document.querySelector('.profile-favs__cell').click()`);
+await settle({ max: 800 });
+check('toucher une activité favorite ne change pas de page', (await search()) === '/profil', await search());
 await evaluate(`document.querySelector('.profile-legend__row').click()`);
 await settle({ max: 1500 });
 check('la ligne ouvre la page Sessions filtrée', (await search())?.startsWith('/sessions?activite='), await search());
@@ -204,22 +227,21 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, devi
 await go('/profil');
 check('390 px : rien ne déborde', !(await overflow()));
 check('390 px : « Gtracker » sur la photo, pas de colonne « Vos activités »', (await text('.profile-hero__name')) === 'Gtracker' && (await activites()) === null, await text('.profile-hero__name'));
-/** Bande des chiffres : deux cases sur deux lignes, aucune hors de l'écran. */
-const twoByTwo = () => evaluate(`(() => {
-  const f = [...document.querySelectorAll('.profile-figure')].map((el) => el.getBoundingClientRect());
-  return f.length === 3 && Math.abs(f[1].top - f[0].top) < 1 && f[2].top > f[0].top
-    && f.every((r) => r.left >= 0 && r.right <= window.innerWidth);
-})()`);
-check('390 px : chiffres deux puis un, dans l\'écran', await twoByTwo());
+/** Rangée des activités favorites : quatre cases sur une seule ligne, dans l'écran, sans texte qui déborde de sa case. */
+const viewportWidth = () => evaluate('window.innerWidth');
+const rowFits = async () => {
+  const [c, w] = [await favs(), await viewportWidth()];
+  return c.length === 4 && c.every((x, i) => Math.abs(x.top - c[0].top) < 1 && x.left >= 0 && x.right <= w && x.fits && (i === 0 || x.left >= c[i - 1].right - 1));
+};
+check('390 px : activités favorites et total sur une rangée, dans l\'écran', await rowFits(), JSON.stringify(await favs()));
 const periodsFit = () => evaluate(`(() => { const r = document.querySelector('.profile-periods').getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; })()`);
 check('390 px : le bouton de période tient dans l\'écran', await periodsFit());
 check('390 px : détail par activité toujours déplié (état retenu)', (await legend()).length === 3);
 await shoot('profil-telephone');
 await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 640, deviceScaleFactor: 2, mobile: true });
 await go('/profil');
-check('320 px : rien ne déborde, la bande non plus', !(await overflow()) && (await twoByTwo()));
+check('320 px : rien ne déborde, la rangée des activités favorites non plus', !(await overflow()) && (await rowFits()), JSON.stringify(await favs()));
 check('320 px : le bouton de période tient dans l\'écran', await periodsFit());
-check('320 px : aucun chiffre plus large que sa case', await evaluate(`[...document.querySelectorAll('.profile-figure__value')].every((v) => v.scrollWidth <= v.clientWidth + 1)`));
 await shoot('profil-320');
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await go('/sessions');
@@ -254,9 +276,10 @@ check('les deux fiches de planche à voile et de bateau sont rangées', (await r
   (await records()).map((r) => r.sport).join(' '));
 await go('/profil');
 await wait(300);
-check('activités cachées : toujours quatre sessions, trois parts, sans « Autres »', (await figures())[0] === '4'
-  && (await evaluate(`document.querySelectorAll('.profile-donut g circle').length`)) === 3 && !(await legend())?.some((row) => row.startsWith('Autres')),
-  `${(await figures())[0]} ; ${JSON.stringify(await legend())}`);
+check('activités cachées : toujours quatre sessions, trois parts, sans « Autres », ni Planche à voile ni Bateau parmi les favorites', (await chartCount()) === '4 sessions'
+  && (await evaluate(`document.querySelectorAll('.profile-donut g circle').length`)) === 3 && !(await legend())?.some((row) => row.startsWith('Autres'))
+  && (await favs()).map((c) => c.name).join(' | ') === 'Wingfoil | Surf | Kite | Total',
+  `${await chartCount()} ; ${JSON.stringify(await legend())} ; ${(await favs()).map((c) => c.name).join(' | ')}`);
 // Une session de surf, importée par la page Surf, passée en Pumping dans l'onglet réglages de son analyse.
 await go('/sessions', 4000);
 await waitFor(`Boolean(document.querySelector('input[type=file][accept*=".gpx"]'))`, { timeout: 3000, every: 50 });
@@ -289,6 +312,8 @@ await wait(300);
 rows = await legend();
 check('quatre parts dans l\'anneau, Pumping avec sa part, sans « Autres »', (await evaluate(`document.querySelectorAll('.profile-donut g circle').length`)) === 4
   && rows?.some((row) => row.startsWith('Pumping')) && !rows?.some((row) => row.startsWith('Autres')), JSON.stringify(rows));
+check('activités favorites : à durée égale la plus récente prend la place (Wingfoil, Pumping, Surf)', (await favs()).map((c) => c.name).join(' | ') === 'Wingfoil | Pumping | Surf | Total',
+  (await favs()).map((c) => c.name).join(' | '));
 await shoot('profil-quatre');
 // Détail déplié, pour toucher une ligne de la légende.
 if ((await evaluate(`document.querySelector('.profile-fold')?.getAttribute('aria-expanded')`)) !== 'true') await evaluate(`document.querySelector('.profile-fold')?.click()`);

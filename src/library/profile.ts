@@ -42,6 +42,22 @@ export const favoriteActivity = (sessions: readonly StatSession[], activityOrder
     .reduce((best, s) => (lastStart(s.activityId) > lastStart(best.activityId) ? s : best)).activityId;
 };
 
+/**
+ * Les activités favorites : celles qui ont le plus de temps sur la période, au plus `count`, de la première à la
+ * dernière place, avec leurs sessions et leur distance. À durée égale, celle qui a le plus de sessions, puis la
+ * pratiquée le plus récemment, puis l'ordre des activités. Une activité sans temps n'y est pas.
+ */
+export const favoriteActivities = (sessions: readonly StatSession[], activityOrder: readonly string[], count = 3): ActivityShare[] => {
+  const lastStart = new Map<string, number>();
+  for (const s of sessions) lastStart.set(s.activityId, Math.max(lastStart.get(s.activityId) ?? -Infinity, s.startMs));
+  return activityShares(sessions, activityOrder)
+    .filter((s) => s.totals.durationS > 0)
+    .sort((a, b) => b.totals.durationS - a.totals.durationS
+      || b.totals.sessions - a.totals.sessions
+      || (lastStart.get(b.activityId) ?? 0) - (lastStart.get(a.activityId) ?? 0))
+    .slice(0, count);
+};
+
 /** Famille du sport préféré, qui choisit le fond des pages (`useFavoriteBackdrop`) ; `null` sans temps. */
 export const favoriteFamily = (sessions: readonly StatSession[], activityOrder: readonly string[]): SportFamily | null => {
   const id = favoriteActivity(sessions, activityOrder);

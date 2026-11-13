@@ -110,7 +110,7 @@ export const LESSONS: readonly Lesson[] = [
     body: PROFILE_PLANT_VISIBLE
       ? [
         "L'application s'ouvre sur le Profil ; vos sessions sont juste à côté, dans « Sessions ».",
-        'Le Profil résume vos activités sur la période choisie : distance, sport préféré et temps par activité.',
+        'Le Profil résume vos activités sur la période choisie : vos trois activités favorites, la distance et le temps par activité.',
         'Autour des cadres pousse une racine : elle gagne une étape à chaque semaine où vous tenez votre objectif, et fait le tour de la page en 26 semaines. Des semaines manquées la font reculer.',
         "Au-dessus du sol, la pousse fleurit avec le temps de la semaine : un bouton, une fleur ouverte à l'objectif, épanouie à 4 fois l'objectif ; au-delà, un papillon arrive à côté d'elle, puis s'y pose.",
         'Touchez le carré à droite du pseudo : une bulle dit où vous en êtes et ce qu\'il reste à faire.',
@@ -118,7 +118,7 @@ export const LESSONS: readonly Lesson[] = [
       ]
       : [
         "L'application s'ouvre sur le Profil. Vos sessions sont juste à côté : « Sessions », la case voisine de la barre du bas, ou le lien du haut sur ordinateur.",
-        'Le Profil résume vos activités sur la période choisie : distance, sport préféré et temps par activité.',
+        'Le Profil résume vos activités sur la période choisie : vos trois activités favorites, la distance et le temps par activité.',
         'La photo ronde est vide au départ : touchez-la pour choisir un des logos d\'activité, ou une image de votre téléphone ; « Retirer » la vide de nouveau. Le pseudo se règle dans Réglages › Pratiquant.',
         'Une seule période pour toute la page : semaine, 30 jours, 6 mois, année ou depuis le début.',
         "Sur ordinateur, « Vos activités » se tient à droite avec vos cinq dernières sessions : touchez le logo d'une activité pour ne voir que les siennes ; « Toutes les sessions » ouvre la liste entière.",

@@ -217,84 +217,6 @@
   color: var(--ink);
 }
 
-/* Les chiffres de la période dans une seule bande blanche, cases séparées d'un trait : trois de front,
-   deux sur deux au téléphone ; rien ne dépasse de la page. */
-.profile-figures {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(3, auto);
-  border-radius: var(--radius-l);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  overflow: hidden;
-}
-
-/* Libellé, valeur et légende sur trois rangées communes aux cases d'une ligne : un libellé sur deux lignes
-   n'en décale pas la valeur. */
-.profile-figure {
-  display: grid;
-  grid-row: span 3;
-  grid-template-rows: subgrid;
-  align-items: start;
-  gap: var(--space-1);
-  min-width: 0;
-  padding: var(--space-4) var(--space-5);
-  border: none;
-  background: none;
-}
-
-.profile-figure + .profile-figure {
-  border-left: 1px solid var(--line-soft);
-}
-
-.profile-figure__value {
-  align-self: center;
-  font-size: var(--text-title);
-  font-weight: 700;
-  line-height: 1.1;
-  color: var(--ink);
-  white-space: nowrap;
-}
-
-.profile-figure__value small {
-  margin-left: var(--space-1);
-  font-size: var(--text-l);
-  font-weight: 600;
-  color: var(--muted);
-}
-
-.profile-figure__caption {
-  color: var(--muted);
-  font-size: var(--text-s);
-}
-
-/* Sport préféré : la case mène à la bibliothèque de l'activité ; son dessin a la hauteur du chiffre voisin. */
-.profile-figure--link {
-  min-width: 0;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-@media (hover: hover) {
-  .profile-figure--link:hover {
-    background: var(--surface-hover);
-  }
-}
-
-.profile-figure__art {
-  display: block;
-  width: 1.25em;
-  height: 1.25em;
-}
-
-.profile-figure__name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Titre d'une carte, comme ceux des cartes de l'accueil. */
 .profile-card__title {
   margin: 0;
@@ -451,41 +373,6 @@ button.profile-legend__row {
     font-size: var(--text-xl);
   }
 
-  .profile-figures {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: repeat(6, auto);
-  }
-
-  .profile-figure {
-    padding: var(--space-3) var(--space-4);
-    gap: 2px;
-  }
-
-  .profile-figure:nth-child(odd) {
-    border-left: none;
-  }
-
-  .profile-figure:nth-child(n + 3) {
-    border-top: 1px solid var(--line-soft);
-  }
-
-  /* La troisième case prend toute la largeur de sa rangée. */
-  .profile-figures .profile-figure:last-child {
-    grid-column: 1 / -1;
-  }
-
-  .profile-figure .ui-eyebrow,
-  .profile-figure__caption {
-    font-size: var(--text-xs);
-  }
-
-  .profile-figure__value {
-    font-size: clamp(var(--text-l), 6.4vw, var(--text-title));
-  }
-
-  .profile-figure__value small {
-    font-size: var(--text-xs);
-  }
 }
 
 /* Le bouton de période : une pilule à sa largeur, à gauche de la page. */
