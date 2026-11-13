@@ -12,7 +12,8 @@
 
    `.brush-panels` se pose sur un conteneur dont tous les enfants directs sont des panneaux peints, en trait fin
    (`--brush-trait-fine`, `tokens.css`) : panneaux des analyses. Leur bordure et leurs marges viennent d'un style en ligne,
-   que `!important` remplace. Un panneau redimensionné plus petit que son contenu défile : le trait défile avec lui. */
+   que `!important` remplace. Un panneau redimensionné plus petit que son contenu défile : le trait défile avec lui.
+   `.brush-panels--hair`, avec `.brush-panels`, prend le trait très fin et ses marges (`--brush-trait-hair`, `tokens.css`). */
 
 @supports (-webkit-mask-box-image: none) {
   section.brush-frame,
@@ -27,6 +28,13 @@
     --brush-trait: var(--brush-trait-fine);
     --brush-pad-y: var(--brush-pad-y-fine);
     --brush-pad-x: var(--brush-pad-x-fine);
+  }
+
+  /* Trait très fin (`--brush-trait-hair`) : cadres de Réglages. */
+  .brush-panels--hair {
+    --brush-trait: var(--brush-trait-hair);
+    --brush-pad-y: var(--brush-pad-y-hair);
+    --brush-pad-x: var(--brush-pad-x-hair);
   }
 
   .brush-panels > * {

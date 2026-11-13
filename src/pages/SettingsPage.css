@@ -1,6 +1,12 @@
 /* Page Réglages (`SettingsPage.tsx`), sur les variables de `theme/tokens.css`.
    Blocs repliables par leur titre ; une carte repliable par activité, un réglage par ligne. */
 
+/* Cadres de la page, peints en trait très fin (`BrushFrame.css`) : la carte Mémoire, seule à ne pas porter la marge
+   en ligne des autres, prend le même écart. */
+.set-cards > .ui-card {
+  margin-bottom: 15px;
+}
+
 .settings-block__intro {
   color: var(--muted);
   font-size: var(--text-xs);

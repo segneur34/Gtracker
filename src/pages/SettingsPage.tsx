@@ -15,6 +15,8 @@ import {
   type DistanceUnit, type SpeedUnit, commaDecimal, parseDecimal
 } from '../core/units';
 import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
+import { useFavoriteBrush } from '../hooks/useFavoriteBrush';
+import '../components/BrushFrame.css';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useTutorials } from '../hooks/useTutorials';
 import { Link } from 'react-router-dom';
@@ -611,6 +613,7 @@ const ActivityCard = memo(function ActivityCard({
 
 function SettingsPage() {
   const backdrop = useFavoriteBackdrop();
+  const brush = useFavoriteBrush();
   const {
     activities, view, setFor, resetActivity, addActivity, updateActivity, removeActivity, longPressMs, setLongPressMs,
     stopHoldMs, setStopHoldMs, beepSound, setBeepSound, hiddenFamilies, setActivityHidden, setFamilyHidden,
@@ -695,9 +698,8 @@ function SettingsPage() {
           aside={<CollapseAllButton onCollapse={collapseAll} />} />
       </div>
 
-      <div className="ui-mb-15">
-        <MemoryStatus detailed collapse={{ open: open.memoire, onToggle: () => toggle('memoire') }} />
-      </div>
+      <div className="set-cards brush-panels brush-panels--hair" style={brush}>
+      <MemoryStatus detailed collapse={{ open: open.memoire, onToggle: () => toggle('memoire') }} />
 
       <div style={cardStyle}>
         <BlockTitle label="Autorisations" open={open.autorisations} onToggle={() => toggle('autorisations')} helpKey="autorisations"
@@ -830,6 +832,7 @@ function SettingsPage() {
       <div style={cardStyle}>
         <PanelTitle label="À propos" open={open.apropos} onToggle={() => toggle('apropos')} />
         {open.apropos && <div className="settings-block__body"><AboutSettings /></div>}
+      </div>
       </div>
     </div>
     </SettingsScope>
