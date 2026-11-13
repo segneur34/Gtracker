@@ -22,6 +22,27 @@ Pièces hors dépôt, à lire : `D:\memoire Tracker\essais\360-ceinture-apres-fe
 - `holdBelt` (`src/platform/heartRate.ts`) ne demande la connexion que pour le premier preneur ou un état éteint ; l'ordre entre `stopOrphans` (qui coupe la ceinture restée sans preneur), le préchauffage de la page (`useBeltWarmup`) et « Continuer » peut laisser la ceinture coupée alors que l'enregistreur la croit tenue.
 - La reprise seule (`resumeSilently`, `src/hooks/recorder/recovery.ts`) ne fait que reprendre une liaison que le greffon tient encore (`adoptBelt`) ; s'il n'en tient plus, elle continue sans ceinture, sans la redemander et sans message. Défaut réel, lu dans le code, même s'il n'est peut-être pas celui de ces essais.
 
+## Cause établie (plan du 13/11, lu et retenu par l'orchestrateur)
+
+- La fermeture de force détruit l'activité Android, pas le processus : le greffon de la ceinture lâche sa liaison sans rien écrire (`handleOnDestroy` de `HeartRatePlugin.java`), le service GPS tombe de même, et un greffon neuf naît à la réouverture. La reprise seule est alors impossible : c'est l'écran des trois boutons.
+- Au départ normal, la ceinture vient de la case de la page Enregistrer, un choix de la séance qui n'est pas rangé (`RecordingPage.tsx`, `usePerActivityChoice`), passée en `options.heartRate`. « Continuer » relit le seul réglage rangé (`effectiveHeartRate(activity) ? savedBelt() : null`, `useRecorder.ts`). Le journal ne garde ni la case ni la ceinture.
+- Pour Wingfoil ce réglage vaut faux par défaut, et le fichier de réglages du téléphone ne le porte pas (vérifié le 13/11 par l'orchestrateur : aucune entrée de fréquence cardiaque). `belt` vaut donc `null` : ni `takeBelt`, ni `connect`, ni message. Tous les faits s'expliquent.
+
+## Plan retenu
+
+1. Tests qui reproduisent la panne, en échec sur le code actuel (`src/hooks/useRecorder.resume.test.ts`, faux greffon : le faux `holdBelt` note l'adresse demandée et peut échouer sur commande).
+2. `src/recording/journal.ts` : l'en-tête du journal garde la ceinture demandée au départ (`belt?: { address, name, random? }`), absente sans ceinture et dans les anciens journaux ; tests dans le fichier voisin (l'en-tête se relit à l'identique, avec et sans ceinture).
+3. `src/hooks/useRecorder.ts` : le départ écrit `options.heartRate` dans l'en-tête ; « Continuer » prend la ceinture de l'en-tête et, pour un ancien journal seulement, l'expression actuelle.
+4. `src/hooks/recorder/recovery.ts`, reprise seule : si aucune liaison n'est à reprendre et que l'en-tête porte une ceinture, la redemander (`takeBelt`) ; un échec est attrapé sur place, rend la ceinture (`releaseRecordingBelt`) et pose le message « Ceinture cardio injoignable… », sans jamais faire renoncer à la reprise. Ce message devient une constante partagée, à la place de ses copies.
+5. `HeartRatePlugin.java` : une ligne de journal à chaque `connect` reçu (adresse, nom), à chaque `disconnect`, à chaque refus (permission, adresse, Bluetooth éteint), et à la destruction de l'activité (« activité détruite : ceinture lâchée »). Rien d'autre n'y change.
+6. Pièces à réutiliser : `takeBelt`, `wireBelt`, `releaseRecordingBelt`, `adoptBelt`, `holdBelt` ; la veille de la ceinture est armée par `wireBelt` comme à un départ.
+
+Tranché par l'orchestrateur : un champ de l'en-tête plutôt qu'une ligne à part ; `handleOnDestroy` garde son comportement ; une ceinture que l'utilisateur a cessé de chercher en route est redemandée par « Continuer », comme le code le prévoit déjà. Pas de changement de `SUMMARY_CALC_VERSION`.
+
+Tests attendus : départ avec ceinture, réglage de l'activité à faux, application tuée puis « Continuer » → la ceinture est redemandée à la bonne adresse, tuile BPM et veille armée ; « Continuer » avec une ceinture qui échoue → l'enregistrement continue, le message s'affiche ; reprise seule sans liaison à reprendre, ceinture dans l'en-tête → redemandée ; reprise seule avec liaison à reprendre → aucune demande de plus ; reprise seule avec échec → la reprise aboutit, le message s'affiche ; ancien journal sans ceinture → comportement actuel.
+
+Capteurs (rien à coder ici, élément à part) : la capture est fermée avec l'activité (`MotionPlugin.handleOnDestroy`) et « Continuer » ne fait que retrouver son fichier ; pour reprendre, il faudrait garder le réglage des capteurs dans l'en-tête du journal, relancer la capture en ajoutant au même fichier, et des lecteurs du fichier qui acceptent un trou.
+
 ## Ce qui est demandé
 
 1. Établir la cause de la panne vue (les faits ci-dessus doivent tous s'expliquer), par lecture du code et par un test qui la reproduit.

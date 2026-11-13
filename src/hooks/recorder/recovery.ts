@@ -23,7 +23,7 @@ import { buildPendingSession, onSourceError, receiveFix, resetSession } from './
 import {
   SENSORS_PAUSE_ERROR, SENSORS_RESUME_ERROR, isBusy, isCommandRunning, runCommand, session, setState, state,
 } from './store';
-import { applyBeltWatch, applyGpsWatch, releaseRecordingBelt, stopGpsWatch, watch, wireBelt } from './watches';
+import { applyBeltWatch, applyGpsWatch, releaseRecordingBelt, stopGpsWatch, takeBeltOrWarn, watch, wireBelt } from './watches';
 
 /**
  * Récupération d'un enregistrement que l'application n'a pas vu se conclure : relecture du journal, reprise
@@ -134,8 +134,9 @@ export const restoreFromJournal = (parsed: ParsedJournal, activity: Activity, so
 
 /**
  * Reprise silencieuse : le service a survécu à la chute du moteur de la page. Rien n'est relancé ni récrit : capture,
- * ceinture et GPS sont rebranchés tels qu'ils tournent, la session reprend où le journal l'a laissée (pause manuelle
- * comprise), et le point suivant ouvre un segment. Faux, enregistreur au repos et journal intact, si un maillon manque.
+ * ceinture et GPS sont rebranchés tels qu'ils tournent (une ceinture que le téléphone ne tient plus est redemandée),
+ * la session reprend où le journal l'a laissée (pause manuelle comprise), et le point suivant ouvre un segment. Faux,
+ * enregistreur au repos et journal intact, si un maillon manque.
  */
 const resumeSilently = async (parsed: ParsedJournal, activity: Activity): Promise<boolean> => {
   const sport = activity.base;
@@ -154,8 +155,12 @@ const resumeSilently = async (parsed: ParsedJournal, activity: Activity): Promis
       if (phase.pauseClock !== null && capture.listening) await pauseMotionCapture().catch(() => setState({ error: SENSORS_PAUSE_ERROR }));
       if (phase.pauseClock === null && !capture.listening) await resumeMotionCapture().catch(() => setState({ error: SENSORS_RESUME_ERROR }));
     }
+    const beltMaxAgeS = getSportProfile(sport).heartRate.maxAgeS;
     const release = await adoptBelt(RECORDING_BELT_HOLDER).catch(() => null);
-    if (release) wireBelt(release, getSportProfile(sport).heartRate.maxAgeS);
+    if (release) wireBelt(release, beltMaxAgeS);
+    // Le téléphone ne tient plus la liaison (greffon neuf) : la ceinture du départ est redemandée, sauf si
+    // l'utilisateur a cessé de la chercher en route. Un refus est dit, et la reprise continue sans elle.
+    else if (parsed.header?.belt && !parsed.beltStopped) await takeBeltOrWarn(parsed.header.belt, beltMaxAgeS);
     // Sans attente jusqu'au passage en enregistrement : aucune position ne peut arriver d'ici là, ni être mal jugée.
     session.stopSource = adoptRunningService(receiveFix, onSourceError);
     setState({
@@ -167,10 +172,14 @@ const resumeSilently = async (parsed: ParsedJournal, activity: Activity): Promis
       const armedStep = gpsWatchOnFix(START_GPS_WATCH, Date.now(), session.currentProfile);
       applyGpsWatch(phase.pauseClock ? gpsWatchOnPause(armedStep.state) : armedStep);
     }
-    if (watch.beltOn && session.currentProfile) {
+    if (release && watch.beltOn && session.currentProfile) {
       // Comme le GPS : le minuteur de la page tombée est repris par une veille qui saura lire son échéance.
       const armedBelt = gpsWatchOnFix(START_GPS_WATCH, Date.now(), beltWatchSettings(session.currentProfile));
       applyBeltWatch(phase.pauseClock ? gpsWatchOnPause(armedBelt.state) : armedBelt);
+    } else if (watch.beltOn && phase.pauseClock) {
+      // Une ceinture redemandée est veillée comme à un départ, dès sa première mesure, mais pas pendant la pause
+      // manuelle : sa veille l'attend, et la reprise manuelle la rend.
+      applyBeltWatch(gpsWatchOnPause(watch.belt));
     }
     console.info(`[reprise] enregistrement repris seul après une chute du moteur : ${session.fixes.length} points relus`);
     return true;

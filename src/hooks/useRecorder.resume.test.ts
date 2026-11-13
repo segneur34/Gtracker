@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { baseActivity } from '../core/activities';
+import { STORAGE_KEYS } from '../core/appIdentity';
 import type { LocationFix, LocationSource, StopLocation } from '../platform/location';
 import { parseJournal } from '../recording/journal';
 import { EMPTY_RECORDING_STATS, addFixAfterManualPause, addFixToStats, displayedDurationMs, type RecordingStats } from '../recording/session';
@@ -105,7 +106,7 @@ vi.mock('../platform/motion', async (importOriginal) => ({
   removeMotionCapture: async () => undefined,
 }));
 
-/** Ceinture : reprise sans `connect` ; prises à neuf comptées. */
+/** Ceinture : reprise sans `connect` ; prises à neuf comptées, adresse demandée notée, refus sur commande. */
 const belt = vi.hoisted(() => {
   const listeners = new Set<(sample: { bpm: number; timeMs: number; contact: boolean | null }) => void>();
   return {
@@ -113,6 +114,9 @@ const belt = vi.hoisted(() => {
     adoptable: false,
     holds: 0,
     adoptions: 0,
+    /** Adresses demandées au greffon, dans l'ordre, refus compris. */
+    asked: [] as string[],
+    holdFails: false,
     saved: null as { address: string; name: string } | null,
     emit: (timeMs: number, bpm: number) => listeners.forEach((l) => l({ bpm, timeMs, contact: true })),
   };
@@ -124,7 +128,9 @@ vi.mock('../platform/heartRate', async (importOriginal) => ({
     belt.adoptions += 1;
     return () => undefined;
   },
-  holdBelt: async () => {
+  holdBelt: async (_holder: string, wanted: { address: string }) => {
+    belt.asked.push(wanted.address);
+    if (belt.holdFails) throw new Error('Bluetooth éteint');
     belt.holds += 1;
     return () => undefined;
   },
@@ -137,6 +143,8 @@ vi.mock('../platform/heartRate', async (importOriginal) => ({
 }));
 
 const gpsTimer = vi.hoisted(() => ({ arms: [] as number[], disarms: 0 }));
+/** Minuteur de la veille de la ceinture : délais armés. */
+const beltTimer = vi.hoisted(() => ({ arms: [] as number[] }));
 /** Sons joués, par nom. */
 const sounds = vi.hoisted(() => ({ validated: 0, finished: 0, patterns: 0 }));
 vi.mock('../platform/beeper', async (importOriginal) => ({
@@ -161,6 +169,11 @@ vi.mock('../platform/beeper', async (importOriginal) => ({
     gpsTimer.disarms += 1;
   },
   onGpsLost: () => () => undefined,
+  armBeltWatch: async (delayMs: number) => {
+    beltTimer.arms.push(delayMs);
+  },
+  disarmBeltWatch: async () => undefined,
+  onBeltLost: () => () => undefined,
 }));
 
 vi.mock('./useSessionLibrary', async (importOriginal) => ({
@@ -183,6 +196,8 @@ let recorder: typeof import('./useRecorder');
 
 /** La page repart : plus rien en mémoire, le journal et les services du téléphone restent. */
 const reload = async () => {
+  // Les abonnés de la page tombée disparaissent avec elle.
+  belt.listeners.clear();
   vi.resetModules();
   recorder = await import('./useRecorder');
   return recorder;
@@ -250,7 +265,10 @@ beforeEach(async () => {
   belt.adoptable = false;
   belt.holds = 0;
   belt.adoptions = 0;
+  belt.asked = [];
+  belt.holdFails = false;
   belt.saved = null;
+  beltTimer.arms = [];
   gpsTimer.arms = [];
   gpsTimer.disarms = 0;
   sounds.validated = 0;
@@ -831,6 +849,199 @@ describe('« Continuer l\'enregistrement », application tuée puis rouverte', (
     await fresh.continuePendingSession(next);
     expect(next.starts).toBe(0);
     expect(fresh.getRecorderState().pending).not.toBeNull();
+  });
+});
+
+describe('ceinture cardio après une coupure', () => {
+  /** Ceinture cochée sur la page Enregistrer, au départ ; le réglage de l'activité reste à son défaut, sans ceinture. */
+  const strap = { address: 'AA:BB:CC:DD:EE:FF', name: 'Polar H10' };
+
+  /** Enregistre jusqu'à 20 s, ceinture prise au départ ; `options` comme la page les passe. */
+  const recordUntil20 = async (options: { heartRate?: { address: string; name: string } } = { heartRate: strap }) => {
+    const live = fakeSource();
+    await recorder.startRecording(activity, live, options);
+    run(live.emit, 0, 20, 1);
+    await settle();
+  };
+
+  /** L'application est tuée, rouverte à 60 s, et « Continuer l'enregistrement » est touché. */
+  const killThenContinue = async () => {
+    vi.setSystemTime(T0 + 60_000);
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    const next = fakeSource();
+    await fresh.continuePendingSession(next);
+    return { fresh, next };
+  };
+
+  it('« Continuer » redemande la ceinture du départ, réglage de l\'activité à faux : tuile BPM et veille armée', async () => {
+    belt.saved = { address: 'autre', name: 'Montre' };
+    await recordUntil20();
+    expect(belt.asked).toEqual([strap.address]);
+    const { fresh } = await killThenContinue();
+    expect(belt.asked).toEqual([strap.address, strap.address]);
+    const state = fresh.getRecorderState();
+    expect(state.status).toBe('recording');
+    expect(state.heartRate).not.toBeNull();
+    belt.emit(Date.now(), 120);
+    expect(beltTimer.arms).toHaveLength(1);
+  });
+
+  it('« Continuer » avec une ceinture qui ne répond pas : l\'enregistrement continue, et c\'est dit', async () => {
+    await recordUntil20();
+    belt.holdFails = true;
+    const { fresh, next } = await killThenContinue();
+    expect(belt.asked).toEqual([strap.address, strap.address]);
+    const state = fresh.getRecorderState();
+    expect(state.status).toBe('recording');
+    expect(state.heartRate).toBeNull();
+    expect(state.error).toContain('Ceinture cardio injoignable');
+    run(next.emit, 61, 65, 1);
+    await settle();
+    await fresh.stopRecording();
+    expect(fresh.getRecorderState().pending?.pointCount).toBe(26);
+  });
+
+  it('« Continuer » sans ceinture au départ : rien n\'est demandé, même réglage de l\'activité à vrai', async () => {
+    memory.set(STORAGE_KEYS.sportSettings, JSON.stringify({ heartRate: { [activity.id]: true } }));
+    belt.saved = strap;
+    await recordUntil20({});
+    const { fresh } = await killThenContinue();
+    expect(belt.asked).toEqual([]);
+    expect(fresh.getRecorderState().heartRate).toBeNull();
+  });
+
+  /** Le journal tel qu'une version d'avant l'écrivait : sans ceinture dans l'en-tête. */
+  const toOldJournal = () => {
+    journal.text = journal.text!.replace(/,"belt":null/, '');
+    expect(parseJournal(journal.text).header).not.toHaveProperty('belt');
+  };
+
+  it('journal d\'avant, réglage de l\'activité à faux : « Continuer » ne demande rien, comme avant', async () => {
+    await recordUntil20({});
+    toOldJournal();
+    belt.saved = strap;
+    await killThenContinue();
+    expect(belt.asked).toEqual([]);
+  });
+
+  it('journal d\'avant, réglage de l\'activité à vrai : « Continuer » prend la ceinture retenue, comme avant', async () => {
+    await recordUntil20({});
+    toOldJournal();
+    memory.set(STORAGE_KEYS.sportSettings, JSON.stringify({ heartRate: { [activity.id]: true } }));
+    belt.saved = strap;
+    const { fresh } = await killThenContinue();
+    expect(belt.asked).toEqual([strap.address]);
+    expect(fresh.getRecorderState().heartRate).not.toBeNull();
+  });
+
+  it('reprise seule, aucune liaison à reprendre : la ceinture de l\'en-tête est redemandée', async () => {
+    await recordUntil20();
+    services.gps = true;
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(belt.adoptions).toBe(0);
+    expect(belt.asked).toEqual([strap.address, strap.address]);
+    const state = fresh.getRecorderState();
+    expect(state.status).toBe('recording');
+    expect(state.heartRate).not.toBeNull();
+    belt.emit(Date.now(), 120);
+    expect(beltTimer.arms).toHaveLength(1);
+  });
+
+  /** Pause manuelle à 20 s, puis chute du moteur, service vivant : la session reprend seule, en pause. */
+  const pausedThenCrash = async () => {
+    await recordUntil20();
+    await recorder.pauseRecording();
+    await settle();
+    services.gps = true;
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(fresh.getRecorderState().status).toBe('paused');
+    beltTimer.arms = [];
+    return fresh;
+  };
+
+  it('reprise seule en pause manuelle, ceinture redemandée : pas de veille pendant la pause, elle repart à la première mesure après', async () => {
+    const fresh = await pausedThenCrash();
+    expect(belt.asked).toEqual([strap.address, strap.address]);
+    belt.emit(Date.now(), 120);
+    expect(beltTimer.arms).toEqual([]);
+    vi.setSystemTime(T0 + 30_000);
+    await fresh.resumeRecording();
+    expect(beltTimer.arms).toEqual([]);
+    belt.emit(Date.now(), 120);
+    expect(beltTimer.arms).toHaveLength(1);
+  });
+
+  it('reprise seule en pause manuelle, ceinture reprise : en pause aussi, minuteur réarmé à la reprise', async () => {
+    belt.adoptable = true;
+    const fresh = await pausedThenCrash();
+    expect(belt.asked).toEqual([strap.address]);
+    belt.emit(Date.now(), 120);
+    expect(beltTimer.arms).toEqual([]);
+    vi.setSystemTime(T0 + 30_000);
+    await fresh.resumeRecording();
+    expect(beltTimer.arms).toHaveLength(1);
+  });
+
+  it('reprise seule, liaison à reprendre : aucune demande de plus', async () => {
+    await recordUntil20();
+    belt.adoptable = true;
+    services.gps = true;
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(belt.adoptions).toBe(1);
+    expect(belt.asked).toEqual([strap.address]);
+    expect(fresh.getRecorderState().heartRate).not.toBeNull();
+  });
+
+  it('reprise seule, la ceinture ne répond pas : la reprise aboutit, et c\'est dit', async () => {
+    await recordUntil20();
+    belt.holdFails = true;
+    services.gps = true;
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    const state = fresh.getRecorderState();
+    expect(state.status).toBe('recording');
+    expect(gpsService.adoptions).toBe(1);
+    expect(state.pending).toBeNull();
+    expect(state.heartRate).toBeNull();
+    expect(state.error).toContain('Ceinture cardio injoignable');
+  });
+
+  it('reprise seule, journal d\'avant : aucune demande, comme avant', async () => {
+    await recordUntil20({});
+    toOldJournal();
+    memory.set(STORAGE_KEYS.sportSettings, JSON.stringify({ heartRate: { [activity.id]: true } }));
+    belt.saved = strap;
+    services.gps = true;
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(fresh.getRecorderState().status).toBe('recording');
+    expect(belt.asked).toEqual([]);
+  });
+
+  it('« Arrêter de chercher » en route : la reprise seule ne la redemande pas, « Continuer » si, puis la reprise suivante aussi', async () => {
+    await recordUntil20();
+    recorder.stopRecordingBeltSearch();
+    await settle();
+    services.gps = true;
+    let fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(fresh.getRecorderState().status).toBe('recording');
+    expect(belt.asked).toEqual([strap.address]);
+
+    services.gps = false;
+    const { next } = await killThenContinue();
+    expect(belt.asked).toEqual([strap.address, strap.address]);
+    run(next.emit, 61, 70, 1);
+    await settle();
+    services.gps = true;
+    fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(fresh.getRecorderState().status).toBe('recording');
+    expect(belt.asked).toEqual([strap.address, strap.address, strap.address]);
   });
 });
 

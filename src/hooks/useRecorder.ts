@@ -15,7 +15,8 @@ import type { LocationFix, LocationSource } from '../platform/location';
 import { beltWatchSettings, gpsWatchOnPause, gpsWatchOnResume } from '../recording/gpsWatch';
 import { headingFixes, shownLiveFix } from '../recording/livePosition';
 import {
-  journalActivityLine, journalHeaderLine, journalNoteLine, journalPauseLine, journalResumeLine, journalStopLine, parseJournal, type ParsedJournal,
+  journalActivityLine, journalBeltLine, journalHeaderLine, journalNoteLine, journalPauseLine, journalResumeLine, journalStopLine, parseJournal,
+  type ParsedJournal,
 } from '../recording/journal';
 import { continuedPause } from '../recording/resume';
 import {
@@ -28,7 +29,7 @@ import {
 } from './recorder/store';
 import { flushJournal, queueJournalLines } from './recorder/journalBuffer';
 import {
-  applyBeltWatch, applyGpsWatch, releaseRecordingBelt, stopBeltWatch, stopGpsWatch, takeBelt, watch, withoutBeltLost, withoutGpsLost,
+  applyBeltWatch, applyGpsWatch, releaseRecordingBelt, stopBeltWatch, stopGpsWatch, takeBeltOrWarn, watch, withoutBeltLost, withoutGpsLost,
 } from './recorder/watches';
 import { buildPendingSession, markManualResume, onSourceError, receiveFix, resetSession, sourceOptions } from './recorder/live';
 import { abandonResume, recoverInterruptedRecording, restoreFromJournal } from './recorder/recovery';
@@ -269,7 +270,8 @@ export const startRecording = exclusive(async (
   });
 
   try {
-    await recordingJournal.write(journalHeaderLine(sport, session.startedAtMs, activity));
+    // La ceinture du départ est gardée dans l'en-tête : c'est elle que « Continuer » et la reprise seule redemandent.
+    await recordingJournal.write(journalHeaderLine(sport, session.startedAtMs, activity, options.heartRate ?? null));
     session.stopSource = await source.start(sourceOptions(activity, profile), receiveFix, onSourceError);
     setState({ status: 'recording' });
   } catch (err) {
@@ -287,14 +289,7 @@ export const startRecording = exclusive(async (
       setState({ error: `Mesure des capteurs impossible : ${errorMessage(err, 'erreur inconnue')}. L'enregistrement continue sans elle.` });
     }
   }
-  if (options.heartRate) {
-    try {
-      await takeBelt(options.heartRate, getSportProfile(sport).heartRate.maxAgeS);
-    } catch (err) {
-      releaseRecordingBelt();
-      setState({ heartRate: null, error: `Ceinture cardio injoignable : ${errorMessage(err, 'erreur inconnue')}. L'enregistrement continue sans elle.` });
-    }
-  }
+  if (options.heartRate) await takeBeltOrWarn(options.heartRate, getSportProfile(sport).heartRate.maxAgeS);
   // Après les messages du départ (capteurs, ceinture), pour s'y ajouter sans être effacé par eux.
   void warnIfNotificationsOff();
 });
@@ -302,7 +297,8 @@ export const startRecording = exclusive(async (
 /**
  * « Continuer l'enregistrement » : la session en attente reprend sur son journal, dans un segment neuf, service
  * relancé par ce geste (l'application est au premier plan). Le temps hors de l'application ne compte pas (`continuedPause`).
- * La capture ne reprend pas, son fichier est retrouvé à l'arrêt. En échec, la session reste en attente et le journal est gardé.
+ * La capture ne reprend pas, son fichier est retrouvé à l'arrêt ; la ceinture du départ est redemandée, et son refus
+ * dit sans arrêter la reprise. En échec, la session reste en attente et le journal est gardé.
  */
 export const continuePendingSession = exclusive(async (source: LocationSource | null): Promise<void> => {
   const before = state.pending;
@@ -330,16 +326,16 @@ export const continuePendingSession = exclusive(async (source: LocationSource | 
     if (lifted.resumeLine) queueJournalLines(journalResumeLine(nowMs));
     session.pendingBreak = true;
     session.manualBreakAutoPartMs = lifted.autoPartMs;
+    // La ceinture du départ, gardée dans l'en-tête, même cessée d'être cherchée en route ; un journal d'avant, qui ne
+    // la porte pas, suit le réglage de l'activité.
+    const fromHeader = parsed.header?.belt;
+    const belt = fromHeader !== undefined ? fromHeader : effectiveHeartRate(activity) ? savedBelt() : null;
+    // Redemandée ici : une reprise seule après une nouvelle chute la redemandera aussi.
+    if (belt && parsed.beltStopped) queueJournalLines(journalBeltLine(nowMs, 'asked'));
     await flushJournal();
     const heartRate = getSportProfile(activity.base).heartRate;
     session.stopSource = await source.start(sourceOptions(activity, effectiveRecordingProfile(activity)), receiveFix, onSourceError);
-    const belt = effectiveHeartRate(activity) ? savedBelt() : null;
-    if (belt) {
-      await takeBelt(belt, heartRate.maxAgeS).catch((err: unknown) => {
-        releaseRecordingBelt();
-        setState({ heartRate: null, error: `Ceinture cardio injoignable : ${errorMessage(err, 'erreur inconnue')}. L'enregistrement continue sans elle.` });
-      });
-    }
+    if (belt) await takeBeltOrWarn(belt, heartRate.maxAgeS);
     const captured = await findMotionCapture(session.startedAtMs).catch(() => null);
     setState({
       status: 'recording', resuming: false,

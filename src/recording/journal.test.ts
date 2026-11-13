@@ -3,7 +3,7 @@ import { BASE_COLOR, baseActivity, type Activity } from '../core/activities';
 import type { LocationFix } from '../platform/location';
 import { buildGpx } from './gpxWriter';
 import {
-  journalActivity, journalActivityLine, journalBreakLine, journalFixLine, journalHeaderLine, journalNoteLine, parseJournal,
+  journalActivity, journalActivityLine, journalBeltLine, journalBreakLine, journalFixLine, journalHeaderLine, journalNoteLine, parseJournal,
 } from './journal';
 import { roundFix, splitIntoSegments } from './session';
 import { FILE_FORMATS } from '../core/appIdentity';
@@ -103,6 +103,31 @@ describe('journal', () => {
     expect(parseJournal(withActivity).header?.activity).toEqual({ id: 'a-kite-lac', name: 'Kite au lac' });
     const broken = JSON.stringify({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0, activity: { id: 3 } }) + '\n';
     expect(parseJournal(broken).header).toEqual({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0 });
+  });
+
+  it("garde la ceinture du départ dans l'en-tête, avec ou sans, et l'ignore abîmée", () => {
+    const activity = { id: 'kite', name: 'Kite' };
+    const strap = { address: 'AA:BB:CC:DD:EE:FF', name: 'Polar H10', random: true };
+    const header = (belt?: typeof strap | null) => parseJournal(journalHeaderLine('kite', T0, activity, belt)).header;
+    expect(header(strap)).toEqual({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0, activity, belt: strap });
+    expect(header({ address: 'a', name: 'b' } as typeof strap)?.belt).toEqual({ address: 'a', name: 'b' });
+    expect(header(null)).toEqual({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0, activity, belt: null });
+    // Journal d'avant : ni la ceinture, ni son absence ne sont dites.
+    expect(header()).not.toHaveProperty('belt');
+    const broken = JSON.stringify({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0, belt: { address: 3 } }) + '\n';
+    expect(parseJournal(broken).header).toEqual({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0 });
+  });
+
+  it('suit la ceinture cessée en route, puis redemandée, la dernière ligne lisible l\'emportant', () => {
+    const head = journalHeaderLine('kite', T0, undefined, { address: 'a', name: 'b' }) + journalFixLine(fixes[0]);
+    expect(parseJournal(head).beltStopped).toBe(false);
+    const stopped = head + journalBeltLine(T0 + 1000, 'stopped');
+    expect(parseJournal(stopped).beltStopped).toBe(true);
+    expect(parseJournal(stopped).lastLineMs).toBe(T0 + 1000);
+    expect(parseJournal(stopped + JSON.stringify(['belt', T0 + 2000, 'autre']) + '\n').beltStopped).toBe(true);
+    const asked = stopped + journalBeltLine(T0 + 3000, 'asked') + journalFixLine(fixes[1]);
+    expect(parseJournal(asked).beltStopped).toBe(false);
+    expect(parseJournal(asked).fixes).toHaveLength(2);
   });
 
   it('retient le dernier changement d\'activité, sans rien perdre des positions ni des coupures', () => {

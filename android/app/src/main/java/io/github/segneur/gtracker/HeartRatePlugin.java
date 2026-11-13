@@ -375,22 +375,26 @@ public class HeartRatePlugin extends Plugin {
     /** Se connecte à la ceinture `address` et s'abonne à sa fréquence ; une connexion en cours est d'abord close. */
     @PluginMethod
     public void connect(PluginCall call) {
+        Log.d(TAG, "connexion demandée par la page, adresse " + call.getString("address") + ", nom " + call.getString("name"));
         withPermission(call, "connectAfterPermission");
     }
 
     @PermissionCallback
     private void connectAfterPermission(PluginCall call) {
         if (!permitted()) {
+            Log.d(TAG, "connexion refusée : permission Bluetooth refusée");
             call.reject("permission Bluetooth refusée");
             return;
         }
         String target = call.getString("address");
         BluetoothAdapter adapter = adapter();
         if (target == null || !BluetoothAdapter.checkBluetoothAddress(target)) {
+            Log.d(TAG, "connexion refusée : adresse de ceinture invalide (" + target + ")");
             call.reject("adresse de ceinture invalide");
             return;
         }
         if (adapter == null || !adapter.isEnabled()) {
+            Log.d(TAG, "connexion refusée : Bluetooth éteint");
             call.reject("Bluetooth éteint");
             return;
         }
@@ -418,6 +422,7 @@ public class HeartRatePlugin extends Plugin {
     /** Coupe la connexion et n'essaie plus de la relancer. */
     @PluginMethod
     public void disconnect(PluginCall call) {
+        Log.d(TAG, "coupure demandée par la page");
         main.post(() -> {
             wanted = false;
             disarm();
@@ -464,6 +469,7 @@ public class HeartRatePlugin extends Plugin {
 
     @Override
     protected void handleOnDestroy() {
+        Log.d(TAG, "activité détruite : ceinture lâchée");
         if (receiving) {
             receiving = false;
             try {

@@ -2,6 +2,7 @@ import { finiteOr, parseJson } from '../core/basics';
 import { BASE_COLOR, baseActivity, findActivity, type Activity } from '../core/activities';
 import { readSessionMark, sortMarks, type SessionMark } from '../core/sessionMarks';
 import type { SportType } from '../core/types';
+import type { HeartRateBelt } from '../platform/heartRate';
 import type { LocationFix } from '../platform/location';
 import { isSportType } from '../core/sportProfiles';
 import { FILE_FORMATS } from '../core/appIdentity';
@@ -29,12 +30,36 @@ interface JournalHeader {
    * Absente des journaux d'avant les activités.
    */
   activity?: { id: string; name: string };
+  /**
+   * Ceinture cardio demandée au départ, `null` si le départ s'est fait sans :
+   * après une coupure, c'est elle qui est redemandée, quel que soit le réglage
+   * de l'activité. Absente des journaux d'avant, qui ne la gardaient pas.
+   */
+  belt?: HeartRateBelt | null;
 }
 
-export const journalHeaderLine = (sport: SportType, startedAtMs: number, activity?: { id: string; name: string }): string => {
+/** `belt` : la ceinture demandée au départ, `null` sans ceinture ; non écrite si `undefined`. */
+export const journalHeaderLine = (
+  sport: SportType, startedAtMs: number, activity?: { id: string; name: string }, belt?: HeartRateBelt | null,
+): string => {
   const header: JournalHeader = { format: FILE_FORMATS.journal, version: 1, sport, startedAtMs };
   if (activity) header.activity = { id: activity.id, name: activity.name };
+  if (belt !== undefined) header.belt = belt && copyBelt(belt);
   return `${JSON.stringify(header)}\n`;
+};
+
+/** La ceinture réduite à ce que le journal en garde. */
+const copyBelt = (belt: HeartRateBelt): HeartRateBelt => ({
+  address: belt.address, name: belt.name, ...(belt.random !== undefined && { random: belt.random }),
+});
+
+/** Ceinture lue dans un en-tête : `null` si c'est écrit, `undefined` si elle manque ou est abîmée. */
+const toBelt = (value: unknown): HeartRateBelt | null | undefined => {
+  if (value === null) return null;
+  if (typeof value !== 'object') return undefined;
+  const { address, name, random } = value as Record<string, unknown>;
+  if (typeof address !== 'string' || address === '' || typeof name !== 'string') return undefined;
+  return copyBelt({ address, name, ...(typeof random === 'boolean' && { random }) });
 };
 
 /**
@@ -99,6 +124,13 @@ export const journalResumeLine = (atMs: number): string => `${JSON.stringify(['r
 /** « Arrêter » : la session attend sa décision, jamais de reprise ni d'offre de continuer. */
 export const journalStopLine = (atMs: number): string => `${JSON.stringify(['stop', atMs])}\n`;
 
+/**
+ * Ceinture de la session : `'stopped'` quand l'utilisateur cesse de la chercher en route, et une reprise seule ne la
+ * redemande pas ; `'asked'` quand « Continuer l'enregistrement » la redemande malgré tout. Marquée par `'belt'` en
+ * tête, ignorée des anciennes versions.
+ */
+export const journalBeltLine = (atMs: number, what: 'stopped' | 'asked'): string => `${JSON.stringify(['belt', atMs, what])}\n`;
+
 /** Pause manuelle d'un journal relu : son instant, et sa part déjà passée en pause automatique (qui reste comptée). */
 export interface JournalPause {
   atMs: number;
@@ -129,6 +161,8 @@ export interface ParsedJournal {
   resumedPause: JournalPause | null;
   /** Instant de « Arrêter », `null` si la session n'a pas été arrêtée. */
   stoppedAtMs: number | null;
+  /** Vrai si l'utilisateur a cessé de chercher la ceinture en route, et que rien ne l'a redemandée depuis. */
+  beltStopped: boolean;
   /** Heure de la dernière ligne lisible qui en porte une ; `null` sans aucune. */
   lastLineMs: number | null;
 }
@@ -142,6 +176,8 @@ const toHeader = (value: unknown): JournalHeader | null => {
   if (typeof a === 'object' && a !== null && typeof a.id === 'string' && a.id !== '' && typeof a.name === 'string') {
     header.activity = { id: a.id, name: a.name };
   }
+  const belt = toBelt(v.belt);
+  if (belt !== undefined) header.belt = belt;
   return header;
 };
 
@@ -202,6 +238,7 @@ export const parseJournal = (text: string): ParsedJournal => {
   let openPause: JournalPause | null = null;
   let resumedPause: JournalPause | null = null;
   let stoppedAtMs: number | null = null;
+  let beltStopped = false;
   let lastLineMs: number | null = null;
 
   text.split('\n').forEach((line, i) => {
@@ -245,6 +282,13 @@ export const parseJournal = (text: string): ParsedJournal => {
       stoppedAtMs = stopAt;
       return;
     }
+    const beltAt = timedMarker(value, 'belt');
+    if (beltAt !== null) {
+      lastLineMs = beltAt;
+      const what = (value as unknown[])[2];
+      if (what === 'stopped' || what === 'asked') beltStopped = what === 'stopped';
+      return;
+    }
     const { marker, change } = toActivityMarker(value);
     if (marker) {
       if (change) activityChange = change;
@@ -269,7 +313,7 @@ export const parseJournal = (text: string): ParsedJournal => {
 
   return {
     header, fixes, breaks, activityChange, marks: sortMarks(marks),
-    manualBreaks, openPause, resumedPause, stoppedAtMs, lastLineMs,
+    manualBreaks, openPause, resumedPause, stoppedAtMs, beltStopped, lastLineMs,
   };
 };
 

@@ -1,3 +1,4 @@
+import { errorMessage } from '../../core/basics';
 import type { RecordingProfile } from '../../core/sportProfiles';
 import { armBeltWatch, armGpsWatch, disarmBeltWatch, disarmGpsWatch, onBeltLost, onGpsLost } from '../../platform/beeper';
 import {
@@ -7,6 +8,8 @@ import {
   START_GPS_WATCH, beltWatchSettings, gpsWatchOnExpired, gpsWatchOnFix, watchesGps, type GpsWatchState, type GpsWatchStep,
 } from '../../recording/gpsWatch';
 import { readableBpm } from '../../recording/heartRate';
+import { journalBeltLine } from '../../recording/journal';
+import { flushJournal, queueJournalLines } from './journalBuffer';
 import { session, setState, state } from './store';
 
 /**
@@ -135,6 +138,23 @@ export const takeBelt = async (belt: HeartRateBelt, maxAgeS: number): Promise<vo
   wireBelt(await holdBelt(RECORDING_BELT_HOLDER, belt), maxAgeS);
 };
 
+/** Alerte d'une ceinture qui ne répond pas, au départ comme à la reprise : l'enregistrement continue sans elle. */
+export const beltUnreachableError = (err: unknown): string =>
+  `Ceinture cardio injoignable : ${errorMessage(err, 'erreur inconnue')}. L'enregistrement continue sans elle.`;
+
+/**
+ * Prend la ceinture comme `takeBelt`, sans jamais lever : si elle ne répond pas, elle est rendue, la tuile BPM
+ * retirée, et l'alerte le dit (`beltUnreachableError`). L'enregistrement, départ ou reprise, continue sans elle.
+ */
+export const takeBeltOrWarn = async (belt: HeartRateBelt, maxAgeS: number): Promise<void> => {
+  try {
+    await takeBelt(belt, maxAgeS);
+  } catch (err) {
+    releaseRecordingBelt();
+    setState({ heartRate: null, error: beltUnreachableError(err) });
+  }
+};
+
 /** Suit dans l'état les mesures d'une ceinture tenue ; `release` la rend. */
 export const wireBelt = (release: () => void, maxAgeS: number): void => {
   session.heartRateMaxAgeS = maxAgeS;
@@ -172,12 +192,14 @@ export const releaseRecordingBelt = (): void => {
  * « Arrêter de chercher », ceinture perdue ou jamais trouvée en route : l'enregistrement la rend et continue
  * sans cardio, tuile BPM et alerte de FC perdue retirées. Plus rien ne la recherche jusqu'à la fin de la sortie : le
  * greffon n'est plus demandé (fin de sa reprise seule), la pause ne la reprend pas, et une reprise après une chute de
- * la page la trouve lâchée (`adoptBelt` rend `null`). Seul « Continuer l'enregistrement », après une application
+ * la page ne la redemande pas, le journal le disant. Seul « Continuer l'enregistrement », après une application
  * tuée, la redemande, comme au départ.
  */
 export const stopRecordingBeltSearch = (): void => {
   if (session.dropBelt === null) return;
   if (state.status === 'idle' || state.status === 'stopping') return;
   releaseRecordingBelt();
+  queueJournalLines(journalBeltLine(Date.now(), 'stopped'));
+  void flushJournal();
   setState({ heartRate: null, beltLost: false, error: withoutBeltLost(state.error) });
 };
