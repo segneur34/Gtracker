@@ -184,6 +184,7 @@
 
 /* Le texte commence sous la photo d'en-tête, que l'avatar déborde de 34 px. */
 .profile-head__text {
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -194,6 +195,26 @@
 .profile-head__hello {
   color: var(--muted);
   font-size: var(--text-xs);
+}
+
+/* Rangée du lien du test et du bouton de période : le lien à gauche, le bouton calé à droite. */
+.profile-head__row {
+  align-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--space-2);
+  min-width: 0;
+}
+
+/* Quand la place manque (texte agrandi), le bouton passe sous le lien, à droite. */
+.profile-head__row .profile-periods {
+  margin-left: auto;
+}
+
+.profile-head__row .profile-head__link {
+  white-space: nowrap;
 }
 
 /* Entrée du test de FC repos, discrète sous le titre. */
@@ -382,10 +403,9 @@ button.profile-legend__row {
 
 }
 
-/* Le bouton de période : une pilule à sa largeur, à gauche de la page. */
-/* Petit bouton calé à droite de sa rangée ; la zone tactile déborde de la pilule pour rester confortable au doigt. */
+/* Petit bouton à droite de la rangée du test de FC repos ; la zone tactile déborde de la pilule pour rester confortable au doigt. */
 .ui-btn.profile-periods {
-  align-self: flex-end;
+  flex: 0 0 auto;
   position: relative;
 }
 

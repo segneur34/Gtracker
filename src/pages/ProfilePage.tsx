@@ -257,9 +257,15 @@ function ProfilePage() {
           {name !== null && <span className="profile-head__hello">Bienvenue</span>}
           <h1 className="profile-head__title">{name ?? 'Bienvenue'}</h1>
           {/* Le test de FC repos, sous le titre : la hauteur de l'en-tête, et donc la racine, ne bougent pas. */}
-          <Link to={RESTING_HR_PATH} className="profile-head__link">
-            Test de FC repos<IconChevronRight size={14} aria-hidden="true" />
-          </Link>
+          <div className="profile-head__row">
+            <Link to={RESTING_HR_PATH} className="profile-head__link">
+              Test de FC repos<IconChevronRight size={14} aria-hidden="true" />
+            </Link>
+            <Button size="s" className="profile-periods" aria-label={`Période : ${periodLabel}. Toucher pour afficher : ${otherPeriodLabel}.`}
+              onClick={() => rememberView({ periode: period === 'tout' ? 'annee' : 'tout' })}>
+              {period === 'tout' ? 'Tout' : String(new Date(nowMs).getFullYear())}
+            </Button>
+          </div>
         </div>
         {PROFILE_PLANT_VISIBLE && (
           <Suspense fallback={null}>
@@ -278,11 +284,6 @@ function ProfilePage() {
       </div>
       {/* Puis le profil, s'il manque un champ, une fois par lancement ; jamais par-dessus ces deux cartes. */}
       {gate.mount && <ProfilePrompt otherCardShown={gate.otherCardShown} onDecided={setProfileShown} />}
-
-      <Button size="s" className="profile-periods" aria-label={`Période : ${periodLabel}. Toucher pour afficher : ${otherPeriodLabel}.`}
-        onClick={() => rememberView({ periode: period === 'tout' ? 'annee' : 'tout' })}>
-        {period === 'tout' ? 'Tout' : String(new Date(nowMs).getFullYear())}
-      </Button>
 
       {!memoryNeedsAction && <MemoryStatus compact />}
 

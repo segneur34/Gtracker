@@ -166,7 +166,8 @@ check('chaque logo favori est un lien « Sessions de … », la case « Total »
 check('ancienne bande des trois chiffres disparue', !(await evaluate(`!!document.querySelector('.profile-figures, .profile-figure')`)));
 check('nombre de sessions (graphe)', (await chartCount()) === '4 sessions', await chartCount());
 const ordre = await evaluate(`[...document.querySelectorAll('.profile > :not(.profile-openers), .profile > .profile-openers > *')].map((el) => (el.getAttribute('class') ?? '').split(' ')[0] || el.tagName).join(' > ')`);
-check('ordre : en-tête, période, activités favorites, répartition, graphe', /^profile-head > ui-btn.*profile-favs.*profile-split.*actchart/.test(ordre ?? ''), ordre);
+check('ordre : en-tête, activités favorites, répartition, graphe (sans ligne de période)', /^profile-head > (?!ui-btn).*profile-favs.*profile-split.*actchart/.test(ordre ?? '') && !/ui-btn/.test(ordre ?? ''), ordre);
+check('le bouton de période est dans l\'en-tête, à la hauteur du lien du test', await evaluate(`(() => { const b = document.querySelector('.profile-head .profile-periods')?.getBoundingClientRect(); const l = document.querySelector('.profile-head__link')?.getBoundingClientRect(); return !!b && !!l && Math.abs((b.top + b.bottom) / 2 - (l.top + l.bottom) / 2) < 4 && b.left >= l.right; })()`));
 // Colonne de droite, sur ordinateur (à partir de 1000 px) : « Vos activités », la rangée de logos et les cinq dernières sessions.
 const activites = () => evaluate(`(() => {
   const s = document.querySelector('.profile-activities');
