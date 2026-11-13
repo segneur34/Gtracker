@@ -14,7 +14,7 @@ import { errorMessage } from '../../core/basics';
 import { libraryState, reportError, setState } from './store';
 import { holdUnwritten, lib, publish, takeUnwritten, writableFolder } from './memory';
 import { noteSettingsGestures, readGestures, refreshFailed } from './summarySettings';
-import { carryUnwritten, recordEdits } from './recordWrites';
+import { cancelRecordWrite, carryUnwritten, recordEdits, recordTimers } from './recordWrites';
 import { cancelCacheUpdate } from './cache';
 import { scan } from './scan';
 import { completeScan } from './summaryQueue';
@@ -145,6 +145,22 @@ const detach = (status: 'needs-permission' | 'unavailable', label: string | null
     settingsFiles: [],
     settingsOffer: null,
   });
+};
+
+/**
+ * Remise à zéro : la mémoire cesse tout ce qu'elle fait (balayage, résumés, écritures différées des fiches, cache
+ * des fiches), comme si elle quittait son dossier, mais le dossier reste désigné et la liste affichée telle quelle
+ * jusqu'au rechargement. Rend le dossier qu'elle tenait, `null` s'il n'y en avait aucun. Une remise à zéro
+ * interrompue rouvre la mémoire (`openLibrary`).
+ */
+export const stopForReset = (): MemoryFolder | null => {
+  const f = lib.folder;
+  lib.generation += 1;
+  cancelCacheUpdate();
+  [...recordTimers.keys()].forEach(cancelRecordWrite);
+  lib.folder = null;
+  lib.publishPending = false;
+  return f;
 };
 
 /**

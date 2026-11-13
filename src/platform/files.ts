@@ -152,6 +152,26 @@ export const recordingJournal: TextFile = isNativeApp()
   ? createPrivateFile(RECORDING_JOURNAL)
   : createMemoryFile(RECORDING_JOURNAL);
 
+/** Le journal et ceux mis de côté (`recording-journal-<horodatage>.jsonl`), à la racine du dossier privé. */
+export const isRecordingJournalName = (name: string): boolean => /^recording-journal(-[\w-]+)?\.jsonl$/.test(name);
+
+/**
+ * Efface le journal de l'enregistrement et ceux mis de côté (remise à zéro, jamais pendant un enregistrement). Sur
+ * le téléphone, seuls ces fichiers de la racine du dossier privé sont visés.
+ */
+export const clearRecordingJournals = async (): Promise<void> => {
+  if (!isNativeApp()) {
+    await recordingJournal.remove();
+    return;
+  }
+  const { Filesystem, Directory } = await filesystem();
+  const { files } = await Filesystem.readdir({ path: '', directory: Directory.Data }).catch(() => ({ files: [] }));
+  for (const file of files) {
+    if (file.type !== 'file' || !isRecordingJournalName(file.name)) continue;
+    await Filesystem.deleteFile({ path: file.name, directory: Directory.Data }).catch(() => undefined);
+  }
+};
+
 /** Faux sur le téléphone, où les sessions sont dans le dossier mémoire. */
 export const canDownloadFiles = (): boolean => !isNativeApp();
 

@@ -43,7 +43,7 @@ export interface MotionCapture {
 }
 
 /** Dossier des captures, dans le dossier privé de l'application. */
-const MOTION_DIR = 'capteurs';
+export const MOTION_DIR = 'capteurs';
 
 /** Fichier de la capture d'un enregistrement, repéré par l'instant de l'en-tête de son journal. */
 export const motionCapturePath = (startedAtMs: number): string => `${MOTION_DIR}/${startedAtMs}.imu`;

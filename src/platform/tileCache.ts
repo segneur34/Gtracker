@@ -4,7 +4,7 @@ import { isMapBase, type MapBase, type TileUrlOverrides } from '../core/mapBase'
 import { shouldCheckCap, TILE_CACHE_DEFAULTS, tilesToEvict, type CachedTileEntry } from '../core/tiles';
 import { filesystem } from './files';
 import { isNativeApp } from './runtime';
-import { jsonStore } from './storage';
+import { jsonStore, writesSuspended } from './storage';
 import { STORAGE_KEYS, CACHE_NAMES } from '../core/appIdentity';
 
 /**
@@ -215,7 +215,8 @@ export const createBrowserTileStore = (storage: Pick<CacheStorage, 'open' | 'del
       clearTimeout(timer);
       timer = null;
     }
-    if (!dirty || !index) return;
+    // Remise à zéro en cours : l'index réécrit recréerait le cache tout juste effacé.
+    if (!dirty || !index || writesSuspended()) return;
     dirty = false;
     const tiles: StoredIndex['tiles'] = {};
     for (const e of (await index).values()) tiles[e.key] = [e.bytes, e.savedAtMs];
@@ -394,6 +395,8 @@ let lastCapCheckMs = 0;
 
 /** Garde une tuile reçue, puis contrôle le plafond, au plus une fois par intervalle. */
 export const keepTile = async (key: string, blob: Blob): Promise<void> => {
+  // Remise à zéro en cours : rien n'est gardé derrière l'effacement.
+  if (writesSuspended()) return;
   await tileStore.write(key, blob);
   const now = Date.now();
   if (!shouldCheckCap(lastCapCheckMs, now, TILE_CACHE_DEFAULTS.evictIntervalMs)) return;

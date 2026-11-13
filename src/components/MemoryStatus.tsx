@@ -14,6 +14,7 @@ import { isNativeApp } from '../platform/runtime';
 import ImportButtons from './ImportButtons';
 import PanelTitle from './PanelTitle';
 import RefreshLibraryButton from './RefreshLibraryButton';
+import ResetZone from './ResetZone';
 import SettingsFiles, { SettingsOfferBanner } from './SettingsFiles';
 import { HelpText, HelpToggle } from './Help';
 import { useInSettings } from './helpContext';
@@ -30,7 +31,8 @@ import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
  * attention : mémoire fermée, lecture en cours, sessions en attente,
  * doublons, GPX illisibles, messages et fichier de réglages proposé. Dans
  * Réglages en version détaillée (changer de dossier, fichiers de réglages
- * par appareil par `SettingsFiles`, mode d'emploi du copier-coller, recherche du lieu des sessions). Avec `collapse`, la carte se replie par son titre et ne
+ * par appareil par `SettingsFiles`, mode d'emploi du copier-coller, recherche du lieu des sessions, et en
+ * dernier la remise à zéro, `ResetZone`). Avec `collapse`, la carte se replie par son titre et ne
  * garde, fermée, que sa ligne d'état et ses alertes, dont la proposition d'un
  * nouveau fichier de réglages (`SettingsOfferBanner`). Dans Réglages, les
  * explications passent sous des « ? » (`Help.tsx`) ; ailleurs, elles restent à découvert.
@@ -286,6 +288,7 @@ function MemoryStatus({
         {detailed && <PlaceSearchSetting />}
 
         {alert}
+        {detailed && <ResetZone />}
       </div>
     </Card>
   );

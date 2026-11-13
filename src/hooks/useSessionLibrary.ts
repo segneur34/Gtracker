@@ -36,7 +36,7 @@ import { findSession, sessionOfFile } from './sessionLibrary/memory';
  * chacune n'importe que les précédentes (`couches.test.ts`) : `store`,
  * `memory`, `summarySettings`, `recordWrites`, `cache`, `scan`,
  * `summaryQueue`, `deviceSettings`, `addSession`, `pending`, `importer`, `incoming`,
- * `sessionRecords`, `placeQueue`, `lifecycle`.
+ * `sessionRecords`, `placeQueue`, `lifecycle`, `reset`.
  */
 
 export type { LibraryState, LibraryStatus } from './sessionLibrary/store';
@@ -57,6 +57,8 @@ export {
   canChooseMemoryFolder, chooseFolder, currentMemoryFolder, openLibrary, reconnectFolder, refreshLibrary,
   startLibraryUi, switchToBrowserMemory,
 } from './sessionLibrary/lifecycle';
+export { countErasable, eraseEverything, factoryReset } from './sessionLibrary/reset';
+export type { ResetProgress } from './sessionLibrary/reset';
 export type { SettingsFileInfo } from '../library/settingsFile';
 
 /**

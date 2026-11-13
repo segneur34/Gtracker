@@ -5,7 +5,7 @@ import { base64ToBytes, bytesToBase64 } from '../core/base64';
 import { fileErrorCode, plainError } from './errorText';
 import { filesystem, isMissingPrivateFile } from './files';
 import { isNativeApp } from './runtime';
-import { jsonStore } from './storage';
+import { jsonStore, writesSuspended } from './storage';
 
 /**
  * Le dossier mémoire : seul point d'accès autorisé (`docs/ETAT_DU_PROJET.md` §6).
@@ -87,6 +87,17 @@ const splitPath = (path: string): string[] => path.split('/').filter((part) => p
 const isNotFound = (err: unknown): boolean =>
   err instanceof DOMException && (err.name === 'NotFoundError' || err.name === 'TypeMismatchError');
 
+/** Phrase d'une écriture refusée pendant une remise à zéro. */
+export const RESET_WRITE_REFUSAL = 'Remise à zéro en cours : rien ne s\'écrit.';
+
+/**
+ * Pendant une remise à zéro (`suspendWrites`), aucune écriture n'entre dans un dossier, mémoire ou sessions en
+ * attente : ce qui tourne encore dans la page réécrirait derrière l'effacement. Les retraits restent permis.
+ */
+const refuseWhileSuspended = (): void => {
+  if (writesSuspended()) throw new Error(RESET_WRITE_REFUSAL);
+};
+
 // --- Navigateur : poignées de dossier ---
 
 /** Fichiers dont la taille et la date sont lues ensemble au listage d'un dossier : 1 500 fiches ne font pas 1 500 allers-retours. */
@@ -113,6 +124,7 @@ const createHandleFolder = (root: FileSystemDirectoryHandle, kind: MemoryKind, l
   };
 
   const write = async (path: string, data: string | Uint8Array): Promise<void> => {
+    refuseWhileSuspended();
     const parts = splitPath(path);
     const name = parts.pop();
     if (!name) throw new Error(`Chemin invalide : ${path}`);
@@ -190,6 +202,20 @@ let persistRequest: Promise<boolean> | null = null;
  * (Firefox sur PC, hors dossier choisi) ou n'a pas la fonction ; vrai tant que la demande n'a pas été faite.
  */
 export const browserMemoryIsGuaranteed = (): Promise<boolean> => persistRequest ?? Promise.resolve(true);
+
+/**
+ * La mémoire du navigateur, sans la créer ni la mettre en service ; `null` si elle n'existe pas. Pour la remise à
+ * zéro quand un dossier du PC est désigné : elle garde les sessions d'avant le choix du dossier.
+ */
+export const browserMemoryCopy = async (): Promise<MemoryFolder | null> => {
+  if (isNativeApp() || typeof navigator === 'undefined' || !navigator.storage?.getDirectory) return null;
+  try {
+    const root = await navigator.storage.getDirectory();
+    return createHandleFolder(await root.getDirectoryHandle(MEMORY_FOLDER_NAME), 'browser', 'mémoire de ce navigateur');
+  } catch {
+    return null;
+  }
+};
 
 const openBrowserMemory = async (): Promise<MemoryFolder> => {
   // Demande au navigateur de ne pas vider cette mémoire quand le disque se remplit ; sa réponse est gardée pour Réglages.
@@ -396,6 +422,7 @@ const createDeviceFolder = ({ uri, base, label }: DeviceFolderChoice): MemoryFol
     list: async (path) => (await inPlainWords(nativeFolder.list({ uri, path: full(path) }))).entries,
     readText: async (path) => (await inPlainWords(nativeFolder.readText({ uri, path: full(path) }))).text,
     writeText: async (path, text) => {
+      refuseWhileSuspended();
       await inPlainWords(nativeFolder.writeText({ uri, path: full(path), text }));
     },
     readBytes: async (path) => {
@@ -407,6 +434,7 @@ const createDeviceFolder = ({ uri, base, label }: DeviceFolderChoice): MemoryFol
       return found.exists ? { size: found.size ?? 0, mtimeMs: found.mtimeMs ?? 0 } : null;
     },
     writeBytes: async (path, bytes) => {
+      refuseWhileSuspended();
       await inPlainWords(nativeFolder.writeBase64({ uri, path: full(path), data: bytesToBase64(bytes) }));
     },
     remove: async (path) => {
@@ -569,6 +597,13 @@ export const reconnectMemoryFolder = async (check?: FolderCheck): Promise<Memory
   return folder;
 };
 
+/**
+ * Vrai si un dossier a été désigné (téléphone) ou choisi (navigateur), qu'il soit ouvert ou non : une remise à zéro
+ * qui ne peut pas l'ouvrir ne doit pas faire comme s'il n'y en avait pas.
+ */
+export const isFolderDesignated = async (): Promise<boolean> =>
+  isNativeApp() ? readDeviceChoice() !== null : (await readSavedHandle()) !== null;
+
 /** Oublie le dossier choisi : la mémoire revient à celle du navigateur. */
 export const forgetChosenFolder = async (): Promise<void> => {
   if (isNativeApp()) {
@@ -661,6 +696,9 @@ export const removePrivateFile = async (path: string): Promise<void> => {
   }
 };
 
+/** Dossier privé des sessions en attente (`pendingFolder`). */
+export const PENDING_DIR = 'en-attente';
+
 /** Suffixe d'un fichier du dossier privé le temps de l'écrire : seul un fichier complet porte son nom. */
 const PRIVATE_TEMP_SUFFIX = '.tmp';
 
@@ -676,6 +714,7 @@ const createPrivateFolder = (base: string): MemoryFolder => {
   const full = (path: string) => [base, ...splitPath(path)].join('/');
   /** Écrit `data` sous un nom temporaire, puis le renomme (le renommage remplace un fichier du même nom). */
   const writeAtomically = async (path: string, data: string, utf8: boolean): Promise<void> => {
+    refuseWhileSuspended();
     const { Filesystem, Directory, Encoding } = await filesystem();
     const temp = full(path) + PRIVATE_TEMP_SUFFIX;
     try {
@@ -759,4 +798,4 @@ export const readOnlyFolder = (f: MemoryFolder): MemoryFolder => {
  * Sessions en attente d'un dossier : dossier privé sur le téléphone, `null`
  * dans le navigateur, où la mémoire du navigateur est toujours là.
  */
-export const pendingFolder = (): MemoryFolder | null => (isNativeApp() ? createPrivateFolder('en-attente') : null);
+export const pendingFolder = (): MemoryFolder | null => (isNativeApp() ? createPrivateFolder(PENDING_DIR) : null);

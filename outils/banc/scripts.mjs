@@ -95,6 +95,8 @@ export const SCRIPTS = [
   { nom: 'rendus', args: ['{port}', '{travail}'], pages: ['enregistrer'], solo: true, accelerable: true, masques: rendusMasques },
   { nom: 'reglages-aide', args: ['{port}', '{captures?}'], pages: ['reglages', 'planification'] },
   { nom: 'reglages', args: ['{port}', '{captures?}'], pages: ['reglages'] },
+  // Remise à zéro de Réglages › Mémoire : réglages d'usine puis tout supprimer, fichiers étrangers posés dans le dossier.
+  { nom: 'remise-a-zero', args: ['{port}', '{travail}', '{captures?}'], pages: ['reglages', 'sessions', 'profil'] },
   { nom: 'rename', args: ['{port}', '{gpx}'], pages: ['sessions', 'voile'] },
   { nom: 'satellite', args: ['{port}', '{captures?}'], pages: ['voile', 'surf', 'sessions', 'planification'], reseau: true },
   { nom: 'sauts', args: ['{port}', '{captures?}'], pages: ['voile', 'reglages', 'sessions'], dev: true },

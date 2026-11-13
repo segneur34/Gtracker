@@ -13,6 +13,7 @@ import { subscribeStoredSettings } from '../useSportSettings';
 import { syncRestingHrFile } from '../restingHrFile';
 import { syncLearnedPlacesFile } from '../learnedPlacesFile';
 import { PLACE_RULES } from '../../library/places';
+import { ownSettingsFiles } from '../../library/resetPlan';
 import { errorMessage, finiteOr, newId } from '../../core/basics';
 import { libraryState, reportError, setState } from './store';
 import { lib, unwritten } from './memory';
@@ -62,6 +63,24 @@ let settingsTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Vrai pendant qu'on applique des réglages repris : ce ne sont pas des changements de l'utilisateur. */
 let applyingSettings = false;
+
+/**
+ * Vrai pendant une remise à zéro : un réglage qui change (remis à son défaut) ne réécrit plus le fichier de
+ * l'appareil et ne fait plus refaire les résumés ; la page va être rechargée.
+ */
+let resetting = false;
+
+/** Remise à zéro : l'écriture différée du fichier de l'appareil est annulée, et plus rien ne suit les réglages. */
+export const stopSettingsWrites = (): void => {
+  resetting = true;
+  if (settingsTimer !== null) clearTimeout(settingsTimer);
+  settingsTimer = null;
+};
+
+/** Remise à zéro interrompue : les réglages sont de nouveau suivis. */
+export const resumeSettingsWrites = (): void => {
+  resetting = false;
+};
 
 const readLocalSavedAt = (): number | null => {
   const value = jsonStore.read<number>(SETTINGS_SAVED_AT_KEY);
@@ -124,6 +143,12 @@ const readSettingsListing = async (f: MemoryFolder): Promise<{ entries: Settings
     else unreadable.push(entry.name);
   }
   return { entries, unreadable };
+};
+
+/** Noms des fichiers de `reglages/` écrits par cet appareil (« Réglages d'usine » les retire), relus à l'instant. */
+export const ownSettingsFileNames = async (f: MemoryFolder): Promise<string[]> => {
+  const { entries } = await readSettingsListing(f);
+  return ownSettingsFiles(entries.map((e) => ({ fileName: e.fileName, deviceId: e.file.device?.id ?? null })), deviceId());
 };
 
 /** Relit `reglages/` dans `settingsEntries` et `unreadableSettings`, et rend les lisibles. */
@@ -417,7 +442,7 @@ export const watchDeviceSettings = (isBusy: () => boolean): void => {
   uiStarted = true;
   canReload = () => !isBusy();
   jsonStore.subscribe((key) => {
-    if (applyingSettings || !(TRAVELLING_KEYS as readonly string[]).includes(key)) return;
+    if (applyingSettings || resetting || !(TRAVELLING_KEYS as readonly string[]).includes(key)) return;
     const signature = settingsSignature(localTravellingValues());
     if (signature === lastSignature) return;
     lastSignature = signature;
@@ -430,10 +455,11 @@ export const watchDeviceSettings = (isBusy: () => boolean): void => {
   // recharge, ou ils valent au prochain lancement, dont la comparaison voit le geste (`attach`).
   let settingsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   subscribeStoredSettings(() => {
-    if (applyingSettings) return;
+    if (applyingSettings || resetting) return;
     if (settingsRefreshTimer !== null) clearTimeout(settingsRefreshTimer);
     settingsRefreshTimer = setTimeout(() => {
       settingsRefreshTimer = null;
+      if (resetting) return;
       void queueOutdatedRefresh();
     }, SETTINGS_REFRESH_DELAY_MS);
   });

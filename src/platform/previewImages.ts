@@ -1,6 +1,7 @@
 import { base64ToBlob, blobToBase64 } from '../core/base64';
 import { filesystem } from './files';
 import { isNativeApp } from './runtime';
+import { writesSuspended } from './storage';
 import { CACHE_NAMES } from '../core/appIdentity';
 
 /**
@@ -159,7 +160,29 @@ const createCachePreviewImageBackend = (storage: Pick<CacheStorage, 'open'> | nu
   };
 };
 
+/** Le même magasin, dont les écritures n'ont pas lieu pendant une remise à zéro : elles réécriraient derrière l'effacement. */
+const unlessSuspended = (backend: PreviewImageBackend): PreviewImageBackend => ({
+  ...backend,
+  writeIndex: async (text) => {
+    if (!writesSuspended()) await backend.writeIndex(text);
+  },
+  write: async (name, blob) => {
+    if (!writesSuspended()) await backend.write(name, blob);
+  },
+});
+
 /** Images de l'appareil, téléphone ou navigateur. */
-export const previewImageFiles: PreviewImageBackend = isNativeApp()
+export const previewImageFiles: PreviewImageBackend = unlessSuspended(isNativeApp()
   ? nativeBackend
-  : createCachePreviewImageBackend(typeof caches === 'undefined' ? null : caches);
+  : createCachePreviewImageBackend(typeof caches === 'undefined' ? null : caches));
+
+/** Efface toutes les images et leur index (remise à zéro) ; sans effet s'il n'y en a pas. */
+export const clearPreviewImages = async (): Promise<void> => {
+  if (isNativeApp()) {
+    const { Filesystem, Directory } = await filesystem();
+    await Filesystem.rmdir({ path: NATIVE_DIR, directory: Directory.Data, recursive: true }).catch(() => undefined);
+    nativeDir = null;
+    return;
+  }
+  if (typeof caches !== 'undefined') await caches.delete(CACHE_NAME).catch(() => false);
+};

@@ -20,6 +20,11 @@ import { isNativeApp } from './runtime';
 export interface StorageBackend {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  /** Retire une clé ; absent d'un stockage qui ne sait pas retirer (faux stockages des tests). */
+  removeItem?(key: string): void;
+  /** Nombre de clés et clé de rang `index`, comme `localStorage`, pour les énumérer. */
+  readonly length?: number;
+  key?(index: number): string | null;
 }
 
 export interface JsonStore {
@@ -50,6 +55,21 @@ export interface JsonStore {
   subscribeFailure(listener: (key: string) => void): () => void;
   /** Signale le refus d'une écriture constaté plus tard (Preferences natives, qui écrivent en arrière-plan). */
   reportFailure(key: string): void;
+  /**
+   * Retire `key`, valeur gardée en mémoire comprise, sans prévenir les abonnés : seule la remise à zéro s'en sert,
+   * juste avant de recharger la page. Permis même écritures suspendues.
+   */
+  remove(key: string): void;
+  /** Clés rangées, telles que le stockage les énumère ; vide s'il ne sait pas le faire. */
+  keys(): string[];
+  /**
+   * Suspend toutes les écritures, jusqu'à `resumeWrites` : une écriture suspendue est perdue, sans prévenir
+   * personne. Pour la remise à zéro, que rien d'encore vivant dans la page ne doit réécrire derrière elle.
+   */
+  suspendWrites(): void;
+  resumeWrites(): void;
+  /** Vrai entre `suspendWrites` et `resumeWrites`. */
+  writesSuspended(): boolean;
 }
 
 /** Gèle un objet lu et tout ce qu'il contient : une modification lève une erreur au lieu de corrompre le cache. */
@@ -87,6 +107,7 @@ export const createJsonStore = (getBackend: () => StorageBackend): JsonStore => 
     return value as T;
   };
   const reportFailure = (key: string): void => failureListeners.forEach((listener) => listener(key));
+  let suspended = false;
   return {
     read: <T,>(key: string): T | null => {
       try {
@@ -97,6 +118,7 @@ export const createJsonStore = (getBackend: () => StorageBackend): JsonStore => 
       }
     },
     write: (key: string, value: unknown): void => {
+      if (suspended) return;
       const raw = JSON.stringify(value);
       let refused = false;
       try {
@@ -131,13 +153,44 @@ export const createJsonStore = (getBackend: () => StorageBackend): JsonStore => 
       };
     },
     reportFailure,
+    remove: (key) => {
+      unsaved.delete(key);
+      parsedCache.delete(key);
+      try {
+        getBackend().removeItem?.(key);
+      } catch {
+        // Stockage bloqué : rien à retirer.
+      }
+    },
+    keys: () => {
+      try {
+        const backend = getBackend();
+        const count = backend.length ?? 0;
+        const keys: string[] = [];
+        for (let i = 0; i < count; i++) {
+          const key = backend.key?.(i);
+          if (typeof key === 'string') keys.push(key);
+        }
+        return [...new Set([...keys, ...unsaved.keys()])];
+      } catch {
+        return [...unsaved.keys()];
+      }
+    },
+    suspendWrites: () => {
+      suspended = true;
+    },
+    resumeWrites: () => {
+      suspended = false;
+    },
+    writesSuspended: () => suspended,
   };
 };
 
 /**
  * Stockage en mémoire, amorcé par `initial`, qui recopie chaque écriture vers
  * `persist`. C'est la forme native : lecture synchrone depuis la mémoire,
- * écriture durable en arrière-plan.
+ * écriture durable en arrière-plan. Un retrait ne vaut qu'en mémoire : celui du
+ * stockage durable s'attend à part (`removeStoredKeys`).
  */
 export const createMirroredBackend = (
   initial: Record<string, string>,
@@ -150,6 +203,13 @@ export const createMirroredBackend = (
       data.set(key, value);
       persist(key, value);
     },
+    removeItem: (key) => {
+      data.delete(key);
+    },
+    get length() {
+      return data.size;
+    },
+    key: (index) => [...data.keys()][index] ?? null,
   };
 };
 
@@ -171,6 +231,67 @@ export interface PreferencesReader {
   keys(): Promise<{ keys: string[] }>;
   get(options: { key: string }): Promise<{ value: string | null }>;
 }
+
+/** Les Preferences natives, réduites à ce que la remise à zéro en retire. */
+export interface PreferencesEraser {
+  keys(): Promise<{ keys: string[] }>;
+  remove(options: { key: string }): Promise<void>;
+}
+
+/** Preferences natives une fois chargées ; `null` dans le navigateur, ou si elles n'ont pas pu l'être. */
+let nativePreferences: PreferencesEraser | null = null;
+
+/** Écritures des Preferences natives encore en cours (`settleStoredWrites`). */
+const nativeWrites = new Set<Promise<void>>();
+
+/**
+ * Retire des clés, du stockage en mémoire comme du stockage durable, et attend la fin des retraits des Preferences
+ * natives : la page peut ensuite être rechargée sans qu'une clé revienne. Silencieux : un retrait refusé est retenté
+ * une fois, puis laissé. `preferences` : celles du téléphone par défaut (tests : un faux).
+ */
+export const removeStoredKeys = async (
+  keys: readonly string[],
+  store: Pick<JsonStore, 'remove'> = jsonStore,
+  preferences: PreferencesEraser | null = nativePreferences,
+): Promise<void> => {
+  for (const key of keys) store.remove(key);
+  if (!preferences) return;
+  await Promise.all(keys.map(async (key) => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await preferences.remove({ key });
+        return;
+      } catch {
+        // Second essai, puis la clé est laissée.
+      }
+    }
+  }));
+};
+
+/** Toutes les clés rangées sur l'appareil, Preferences natives comprises (même celles qu'on n'a pas su lire). */
+export const storedKeys = async (
+  store: Pick<JsonStore, 'keys'> = jsonStore,
+  preferences: PreferencesEraser | null = nativePreferences,
+): Promise<string[]> => {
+  const keys = store.keys();
+  if (preferences) {
+    try {
+      keys.push(...(await preferences.keys()).keys);
+    } catch {
+      // Liste illisible : celles de la mémoire suffisent.
+    }
+  }
+  return [...new Set(keys)];
+};
+
+/**
+ * Suspend toute écriture durable de l'application : clés de l'appareil (`jsonStore`), et, par `writesSuspended`,
+ * dossier mémoire, tuiles et vignettes gardées. Pour la remise à zéro, jusqu'au rechargement de la page, ou jusqu'à
+ * `resumeWrites` si elle s'interrompt.
+ */
+export const suspendWrites = (): void => jsonStore.suspendWrites();
+export const resumeWrites = (): void => jsonStore.resumeWrites();
+export const writesSuspended = (): boolean => jsonStore.writesSuspended();
 
 /**
  * Lit les Preferences clé par clé : une lecture qui échoue est refaite une
@@ -231,6 +352,7 @@ export const initStorage = async (): Promise<void> => {
   let load: NativeStorageLoad;
   try {
     ({ Preferences: preferences } = await import('@capacitor/preferences'));
+    nativePreferences = preferences;
     load = await loadNativeEntries(preferences);
   } catch {
     startupFailure = { all: true, keys: [] };
@@ -242,6 +364,13 @@ export const initStorage = async (): Promise<void> => {
   nativeBackend = createMirroredBackend(load.initial, (key, value) => {
     if (unreadable.has(key)) return;
     // Écriture refusée : la valeur, déjà en mémoire, vaut pour la session en cours.
-    preferences.set({ key, value }).catch(() => jsonStore.reportFailure(key));
+    const pending = preferences.set({ key, value }).catch(() => jsonStore.reportFailure(key));
+    nativeWrites.add(pending);
+    void pending.finally(() => nativeWrites.delete(pending));
   });
+};
+
+/** Attend la fin des écritures des Preferences natives en cours : avant un rechargement voulu de la page. */
+export const settleStoredWrites = async (): Promise<void> => {
+  await Promise.all([...nativeWrites]);
 };

@@ -66,6 +66,8 @@ Demande du 11/11 au soir, après une réinstallation qui rendait l'ancienne list
 - Un GPX déposé à la main dans `sessions/` est une session pour l'application : T l'efface, comme l'utilisateur l'a demandé pour les fichiers de sessions ; l'aide « ? » le dit (« toutes les sessions du dossier, y compris un GPX que vous y auriez déposé vous-même »). À dire à l'utilisateur.
 - Noms des fichiers et des fonctions : ceux du plan.
 - Arrivé depuis le plan, avec le lot 352 (nom de session par le lieu), à classer aussi : la clé de la case « Chercher le lieu des sessions » (`rechercheLieu` dans `STORAGE_KEYS`) est un réglage, effacé par U et T (elle revient cochée) ; les lieux appris (clé de l'appareil `lieuxAppris` de `STORAGE_KEYS`, et le fichier `lieux.json` à la racine du dossier mémoire, `LEARNED_PLACES_FILE` de `src/library/folderLayout.ts`, écrit par `src/hooks/learnedPlacesFile.ts`) sont une donnée saisie par l'utilisateur, comme le profil : U n'y touche pas, T les efface, `lieux.json` rejoignant la liste des fichiers de l'application à la racine. Le lieu d'une session vit dans sa fiche : il part avec elle. À dire à l'utilisateur.
+- Accepté par l'utilisateur le 13/11 (« je suis d'accord avec tes choix »), après explication : les lieux corrigés sont gardés par « réglages d'usine » et effacés par « tout supprimer ».
+- Constaté au code du lot, dit à l'utilisateur : « réglages d'usine » remet les activités de départ, donc efface les activités créées et les listes de matériel des activités ; les sessions gardent leur matériel et s'affichent sous le nom de leur calcul ; la confirmation et l'aide le disent.
 - Le compte des fermetures du rappel du matériel (lot 345) vit dans les réglages des activités : il repart à zéro avec U comme avec T.
 
 ## Voulu

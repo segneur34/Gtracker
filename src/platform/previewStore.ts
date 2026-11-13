@@ -1,5 +1,6 @@
 import { filesystem } from './files';
 import { isNativeApp } from './runtime';
+import { writesSuspended } from './storage';
 import { CACHE_NAMES } from '../core/appIdentity';
 
 /**
@@ -69,10 +70,28 @@ export const createCachePreviewBackend = (storage: Pick<CacheStorage, 'open'> | 
   };
 };
 
+/** Le même document, dont l'écriture n'a pas lieu pendant une remise à zéro : elle réécrirait derrière l'effacement. */
+const unlessSuspended = (backend: PreviewBackend): PreviewBackend => ({
+  read: () => backend.read(),
+  write: async (text) => {
+    if (!writesSuspended()) await backend.write(text);
+  },
+});
+
 /** Document de l'appareil, téléphone ou navigateur. */
-export const previewDocument: PreviewBackend = isNativeApp()
+export const previewDocument: PreviewBackend = unlessSuspended(isNativeApp()
   ? nativeBackend
-  : createCachePreviewBackend(typeof caches === 'undefined' ? null : caches);
+  : createCachePreviewBackend(typeof caches === 'undefined' ? null : caches));
+
+/** Efface le document (remise à zéro) ; sans effet s'il n'existe pas. */
+export const clearPreviewDocument = async (): Promise<void> => {
+  if (isNativeApp()) {
+    const { Filesystem, Directory } = await filesystem();
+    await Filesystem.deleteFile({ path: NATIVE_FILE, directory: Directory.Data }).catch(() => undefined);
+    return;
+  }
+  if (typeof caches !== 'undefined') await caches.delete(CACHE_NAME).catch(() => false);
+};
 
 /**
  * Appelle `callback` quand la page est quittée ou cachée (l'application passée

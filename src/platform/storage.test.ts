@@ -31,6 +31,9 @@ vi.mock('@capacitor/preferences', () => ({
     set: async ({ key }: { key: string }) => {
       preferences.written.push(key);
     },
+    remove: async ({ key }: { key: string }) => {
+      delete preferences.values[key];
+    },
   },
 }));
 
@@ -279,5 +282,94 @@ describe('chargement du stockage du téléphone (A3)', () => {
     await storage.initStorage();
     expect(storage.storageStartupFailure()).toBeNull();
     expect(storage.jsonStore.read('gtracker.a')).toBe('un');
+  });
+});
+
+describe('remise à zéro du stockage', () => {
+  /** Stockage en mémoire qui sait retirer et énumérer, comme `localStorage`. */
+  const fullBackend = (initial: Record<string, string> = {}): StorageBackend & { data: Map<string, string> } => {
+    const data = new Map(Object.entries(initial));
+    return {
+      data,
+      getItem: (key) => data.get(key) ?? null,
+      setItem: (key, value) => void data.set(key, value),
+      removeItem: (key) => void data.delete(key),
+      get length() {
+        return data.size;
+      },
+      key: (i) => [...data.keys()][i] ?? null,
+    };
+  };
+
+  it('retire une clé sans prévenir les abonnés, et la relit absente', () => {
+    const backend = fullBackend({ 'gtracker.a': '"un"', 'gtracker.b': '"deux"' });
+    const store = createJsonStore(() => backend);
+    expect(store.read('gtracker.a')).toBe('un');
+    const heard: string[] = [];
+    store.subscribe((key) => heard.push(key));
+    store.remove('gtracker.a');
+    expect(store.read('gtracker.a')).toBeNull();
+    expect(backend.data.has('gtracker.a')).toBe(false);
+    expect(heard).toEqual([]);
+    expect(store.keys()).toEqual(['gtracker.b']);
+  });
+
+  it('écritures suspendues : rien n\'est écrit ni annoncé, jusqu\'à la reprise ; un retrait reste permis', () => {
+    const backend = fullBackend({ 'gtracker.a': '"un"' });
+    const store = createJsonStore(() => backend);
+    const heard: string[] = [];
+    store.subscribe((key) => heard.push(key));
+    store.suspendWrites();
+    expect(store.writesSuspended()).toBe(true);
+    store.write('gtracker.b', 'deux');
+    store.remove('gtracker.a');
+    expect([...backend.data.keys()]).toEqual([]);
+    expect(heard).toEqual([]);
+    store.resumeWrites();
+    store.write('gtracker.b', 'deux');
+    expect(backend.data.get('gtracker.b')).toBe('"deux"');
+  });
+
+  it('un stockage sans retrait ni liste ne lève pas', () => {
+    const store = createJsonStore(() => memoryBackend({ 'gtracker.a': '"un"' }));
+    store.remove('gtracker.a');
+    expect(store.keys()).toEqual([]);
+  });
+
+  it('la version miroir retire de la mémoire, et l\'attente retire des Preferences', async () => {
+    const persisted: Record<string, string> = { 'gtracker.a': '"un"', 'gtracker.b': '"deux"' };
+    const removed: string[] = [];
+    const backend = createMirroredBackend({ ...persisted }, () => undefined);
+    const store = createJsonStore(() => backend);
+    const { removeStoredKeys, storedKeys } = await freshStorage();
+    let refusals = 1;
+    const prefs = {
+      keys: async () => ({ keys: Object.keys(persisted) }),
+      remove: async ({ key }: { key: string }) => {
+        if (key === 'gtracker.b' && refusals-- > 0) throw new Error('refusé une fois');
+        removed.push(key);
+        delete persisted[key];
+      },
+    };
+    expect((await storedKeys(store, prefs)).sort()).toEqual(['gtracker.a', 'gtracker.b']);
+    await removeStoredKeys(['gtracker.a', 'gtracker.b'], store, prefs);
+    expect(store.read('gtracker.a')).toBeNull();
+    expect(store.keys()).toEqual([]);
+    expect(removed.sort()).toEqual(['gtracker.a', 'gtracker.b']);
+    expect(persisted).toEqual({});
+  });
+
+  it('au téléphone, les retraits vont aux Preferences chargées au démarrage', async () => {
+    preferences.values = { 'gtracker.a': '"un"', 'gtracker.memoryFolder': '"d"' };
+    const storage = await freshStorage();
+    await storage.initStorage();
+    expect((await storage.storedKeys()).sort()).toEqual(['gtracker.a', 'gtracker.memoryFolder']);
+    await storage.removeStoredKeys(['gtracker.a']);
+    expect(preferences.values).toEqual({ 'gtracker.memoryFolder': '"d"' });
+    expect(storage.jsonStore.read('gtracker.a')).toBeNull();
+    storage.suspendWrites();
+    storage.jsonStore.write('gtracker.c', 'trois');
+    expect(preferences.written).toEqual([]);
+    expect(storage.writesSuspended()).toBe(true);
   });
 });
