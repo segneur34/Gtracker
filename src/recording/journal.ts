@@ -4,6 +4,8 @@ import { readSessionMark, sortMarks, type SessionMark } from '../core/sessionMar
 import type { SportType } from '../core/types';
 import type { HeartRateBelt } from '../platform/heartRate';
 import type { LocationFix } from '../platform/location';
+import type { MotionSetup } from '../platform/motion';
+import { isJumpPlacement } from './jumpSettings';
 import { isSportType } from '../core/sportProfiles';
 import { FILE_FORMATS } from '../core/appIdentity';
 
@@ -36,16 +38,39 @@ interface JournalHeader {
    * de l'activité. Absente des journaux d'avant, qui ne la gardaient pas.
    */
   belt?: HeartRateBelt | null;
+  /**
+   * Réglages de la capture des capteurs demandée au départ, `null` si le départ s'est fait sans : après une
+   * coupure, c'est elle qui est relancée, en complétant son fichier. Absents des journaux d'avant, qui ne les
+   * gardaient pas.
+   */
+  motion?: MotionSetup | null;
 }
 
-/** `belt` : la ceinture demandée au départ, `null` sans ceinture ; non écrite si `undefined`. */
+/**
+ * `belt` : la ceinture demandée au départ, `null` sans ceinture ; `motion` : les réglages de la capture des capteurs,
+ * `null` sans capture. L'un ou l'autre n'est pas écrit si `undefined`.
+ */
 export const journalHeaderLine = (
   sport: SportType, startedAtMs: number, activity?: { id: string; name: string }, belt?: HeartRateBelt | null,
+  motion?: MotionSetup | null,
 ): string => {
   const header: JournalHeader = { format: FILE_FORMATS.journal, version: 1, sport, startedAtMs };
   if (activity) header.activity = { id: activity.id, name: activity.name };
   if (belt !== undefined) header.belt = belt && copyBelt(belt);
+  if (motion !== undefined) header.motion = motion && copyMotion(motion);
   return `${JSON.stringify(header)}\n`;
+};
+
+/** Les réglages de la capture réduits à ce que le journal en garde. */
+const copyMotion = (motion: MotionSetup): MotionSetup => ({ placement: motion.placement, foil: motion.foil });
+
+/** Réglages de la capture lus dans un en-tête : `null` si c'est écrit, `undefined` s'ils manquent ou sont abîmés. */
+const toMotion = (value: unknown): MotionSetup | null | undefined => {
+  if (value === null) return null;
+  if (typeof value !== 'object') return undefined;
+  const { placement, foil } = value as Record<string, unknown>;
+  if (!isJumpPlacement(placement) || typeof foil !== 'boolean') return undefined;
+  return { placement, foil };
 };
 
 /** La ceinture réduite à ce que le journal en garde. */
@@ -178,6 +203,8 @@ const toHeader = (value: unknown): JournalHeader | null => {
   }
   const belt = toBelt(v.belt);
   if (belt !== undefined) header.belt = belt;
+  const motion = toMotion(v.motion);
+  if (motion !== undefined) header.motion = motion;
   return header;
 };
 

@@ -8,7 +8,8 @@ import { recordingJournal } from '../../platform/files';
 import { RECORDING_BELT_HOLDER, adoptBelt, releaseOrphanedBelt } from '../../platform/heartRate';
 import { adoptRunningService, deviceLocationSource, stopOrphanedDeviceLocation, type LocationSource } from '../../platform/location';
 import {
-  findMotionCapture, motionCapturePath, pauseMotionCapture, resumeMotionCapture, runningMotionCapture, stopMotionCapture,
+  continueMotionCapture, findMotionCapture, motionCapturePath, pauseMotionCapture, resumeMotionCapture, runningMotionCapture,
+  stopMotionCapture, type MotionSetup,
 } from '../../platform/motion';
 import { readRecoveryServices, type RecoveryServices } from '../../platform/recovery';
 import { START_GPS_WATCH, beltWatchSettings, gpsWatchOnFix, gpsWatchOnPause } from '../../recording/gpsWatch';
@@ -21,7 +22,8 @@ import { effectiveRecordingProfile, readStoredActivities } from '../useSportSett
 import { dropJournalLines, queueJournalLines } from './journalBuffer';
 import { buildPendingSession, onSourceError, receiveFix, resetSession } from './live';
 import {
-  SENSORS_PAUSE_ERROR, SENSORS_RESUME_ERROR, isBusy, isCommandRunning, runCommand, session, setState, state,
+  CAPTURE_NOT_RESUMED, SENSORS_PAUSE_ERROR, SENSORS_RESUME_ERROR, isBusy, isCommandRunning, joinMessages, runCommand, session, setState,
+  state,
 } from './store';
 import { applyBeltWatch, applyGpsWatch, releaseRecordingBelt, stopGpsWatch, takeBeltOrWarn, watch, wireBelt } from './watches';
 
@@ -88,6 +90,26 @@ const stopOrphans = async (): Promise<void> => {
   await getBeeper().stop().catch(() => {});
 };
 
+/**
+ * Relance la capture d'une session reprise après une coupure, quand elle ne tourne plus : son fichier est complété
+ * (`continueMotionCapture`). `paused` : la session est en pause manuelle, la capture aussi. Un échec est ajouté aux
+ * messages déjà là, et la reprise continue sans elle.
+ */
+export const continueCapture = async (setup: MotionSetup, paused: boolean): Promise<void> => {
+  try {
+    await continueMotionCapture(session.startedAtMs, setup);
+  } catch (err) {
+    // Ce qui a été mesuré avant la coupure reste dans son fichier, retrouvé à l'arrêt ; sans fichier, rien ne l'a été.
+    const kept = await findMotionCapture(session.startedAtMs).catch(() => null);
+    const why = kept ? CAPTURE_NOT_RESUMED
+      : `Mesure des capteurs impossible : ${errorMessage(err, 'erreur inconnue')}. L'enregistrement continue sans elle.`;
+    setState({ error: joinMessages(state.error, why) });
+    return;
+  }
+  setState({ measuringMotion: true, motionSetup: setup });
+  if (paused) await pauseMotionCapture().catch(() => setState({ error: joinMessages(state.error, SENSORS_PAUSE_ERROR) }));
+};
+
 /** Remet l'enregistreur au repos, sans rien écrire : une reprise qui n'a pas abouti laisse son journal intact. */
 export const abandonResume = async (): Promise<void> => {
   const stop = session.stopSource;
@@ -134,7 +156,8 @@ export const restoreFromJournal = (parsed: ParsedJournal, activity: Activity, so
 
 /**
  * Reprise silencieuse : le service a survécu à la chute du moteur de la page. Rien n'est relancé ni récrit : capture,
- * ceinture et GPS sont rebranchés tels qu'ils tournent (une ceinture que le téléphone ne tient plus est redemandée),
+ * ceinture et GPS sont rebranchés tels qu'ils tournent (une ceinture que le téléphone ne tient plus est redemandée,
+ * une capture qui ne tourne plus est relancée en complétant son fichier),
  * la session reprend où le journal l'a laissée (pause manuelle comprise), et le point suivant ouvre un segment. Faux,
  * enregistreur au repos et journal intact, si un maillon manque.
  */
@@ -147,13 +170,14 @@ const resumeSilently = async (parsed: ParsedJournal, activity: Activity): Promis
     session.manualBreakAutoPartMs = phase.manualBreakAutoPartMs;
     // Capteurs et ceinture ne valent pas la trace : leur lecture en échec ne fait pas renoncer à la reprise.
     const capture = await runningMotionCapture().catch(() => null);
+    const ours = capture?.path === motionCapturePath(session.startedAtMs) ? capture : null;
     // Celle d'une autre session n'a rien à faire là.
-    if (capture && capture.path !== motionCapturePath(session.startedAtMs)) await stopMotionCapture().catch(() => null);
-    else if (capture) {
-      setState({ measuringMotion: true, motionSetup: capture.setup });
+    if (capture && !ours) await stopMotionCapture().catch(() => null);
+    else if (ours) {
+      setState({ measuringMotion: true, motionSetup: ours.setup });
       // Un ordre de pause ou de reprise perdu avec la page : la capture suit la session.
-      if (phase.pauseClock !== null && capture.listening) await pauseMotionCapture().catch(() => setState({ error: SENSORS_PAUSE_ERROR }));
-      if (phase.pauseClock === null && !capture.listening) await resumeMotionCapture().catch(() => setState({ error: SENSORS_RESUME_ERROR }));
+      if (phase.pauseClock !== null && ours.listening) await pauseMotionCapture().catch(() => setState({ error: SENSORS_PAUSE_ERROR }));
+      if (phase.pauseClock === null && !ours.listening) await resumeMotionCapture().catch(() => setState({ error: SENSORS_RESUME_ERROR }));
     }
     const beltMaxAgeS = getSportProfile(sport).heartRate.maxAgeS;
     const release = await adoptBelt(RECORDING_BELT_HOLDER).catch(() => null);
@@ -161,6 +185,9 @@ const resumeSilently = async (parsed: ParsedJournal, activity: Activity): Promis
     // Le téléphone ne tient plus la liaison (greffon neuf) : la ceinture du départ est redemandée, sauf si
     // l'utilisateur a cessé de la chercher en route. Un refus est dit, et la reprise continue sans elle.
     else if (parsed.header?.belt && !parsed.beltStopped) await takeBeltOrWarn(parsed.header.belt, beltMaxAgeS);
+    // La capture du départ ne tourne plus (fermée avec l'activité) : relancée en complétant son fichier, après la
+    // ceinture, dont le refus remplace les messages. Un journal d'avant, qui ne la porte pas, la laisse arrêtée.
+    if (!ours && parsed.header?.motion) await continueCapture(parsed.header.motion, phase.pauseClock !== null);
     // Sans attente jusqu'au passage en enregistrement : aucune position ne peut arriver d'ici là, ni être mal jugée.
     session.stopSource = adoptRunningService(receiveFix, onSourceError);
     setState({

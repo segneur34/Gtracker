@@ -118,6 +118,21 @@ describe('journal', () => {
     expect(parseJournal(broken).header).toEqual({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0 });
   });
 
+  it("garde les réglages de la capture des capteurs dans l'en-tête, avec ou sans, et les ignore abîmés", () => {
+    const setup = { placement: 'taille' as const, foil: true };
+    const header = (motion?: typeof setup | null) => parseJournal(journalHeaderLine('kite', T0, undefined, null, motion)).header;
+    expect(header(setup)).toEqual({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0, belt: null, motion: setup });
+    expect(header({ ...setup, extra: 1 } as typeof setup)?.motion).toEqual(setup);
+    expect(header(null)?.motion).toBeNull();
+    // Journal d'avant : ni la capture, ni son absence ne sont dites.
+    expect(header()).not.toHaveProperty('motion');
+    expect(header()?.motion).toBeUndefined();
+    for (const motion of [{ placement: 'tete', foil: false }, { placement: 'poitrine' }, 'poitrine']) {
+      const broken = JSON.stringify({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0, motion }) + '\n';
+      expect(parseJournal(broken).header).toEqual({ format: FILE_FORMATS.journal, version: 1, sport: 'kite', startedAtMs: T0 });
+    }
+  });
+
   it('suit la ceinture cessée en route, puis redemandée, la dernière ligne lisible l\'emportant', () => {
     const head = journalHeaderLine('kite', T0, undefined, { address: 'a', name: 'b' }) + journalFixLine(fixes[0]);
     expect(parseJournal(head).beltStopped).toBe(false);

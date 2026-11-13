@@ -230,6 +230,12 @@ export const session: LiveSession = {
 export const SENSORS_PAUSE_ERROR = 'Capteurs : pause impossible, la mesure continue pendant la pause';
 /** Échec de la reprise de la capture des capteurs. */
 export const SENSORS_RESUME_ERROR = 'Capteurs : reprise impossible, sauts arrêtés';
+/** Session reprise après une coupure, capture qui ne repart pas : ce qu'elle a mesuré avant reste dans son fichier. */
+export const CAPTURE_NOT_RESUMED = 'Capteurs : la mesure ne reprend pas ; ce qu\'ils ont mesuré avant la coupure est gardé.';
+
+/** Deux messages à la suite, l'un ou l'autre absent. */
+export const joinMessages = (first: string | null, second: string | null): string | null =>
+  first && second ? `${first} ${second}` : first ?? second;
 
 export const isBusy = (): boolean => state.status !== 'idle';
 

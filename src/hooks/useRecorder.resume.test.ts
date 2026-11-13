@@ -69,12 +69,16 @@ vi.mock('../platform/location', async (importOriginal) => ({
   },
 }));
 
-/** Capture : jamais de `start` pendant une reprise. */
+/** Capture : jamais de `start` pendant une reprise ; une relance en ajout au même fichier notée dans `continued`. */
 const sensors = vi.hoisted(() => ({
   starts: 0,
   stops: 0,
   pauses: 0,
   resumes: 0,
+  continued: [] as { startedAtMs: number; setup: { placement: string; foil: boolean }; append: true }[],
+  continueFails: false,
+  /** Ce que l'arrêt rend en plus ; `null` : deux mesures. */
+  stopped: null as null | { samples: number; earlierMeasures: boolean },
   running: null as null | { path: string; listening: boolean; setup: { placement: 'poitrine'; foil: boolean } },
   found: null as null | { path: string; bytes: number; durationS: number; samples: number; longestGapS: number; error: null },
   /** La lecture de la capture attend ceci : la reprise reste en `starting` le temps d'une commande. */
@@ -84,6 +88,11 @@ vi.mock('../platform/motion', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../platform/motion')>()),
   startMotionCapture: async () => {
     sensors.starts += 1;
+  },
+  continueMotionCapture: async (startedAtMs: number, setup: { placement: 'poitrine'; foil: boolean }) => {
+    if (sensors.continueFails) throw new Error('fichier de mesures illisible');
+    sensors.continued.push({ startedAtMs, setup, append: true });
+    sensors.running = { path: `capteurs/${startedAtMs}.imu`, listening: true, setup };
   },
   pauseMotionCapture: async () => {
     sensors.pauses += 1;
@@ -99,7 +108,7 @@ vi.mock('../platform/motion', async (importOriginal) => ({
     sensors.stops += 1;
     const path = sensors.running?.path;
     sensors.running = null;
-    return path ? { path, bytes: 10, durationS: 1, samples: 2, longestGapS: 0, error: null } : null;
+    return path ? { path, bytes: 10, durationS: 1, samples: 2, longestGapS: 0, error: null, ...sensors.stopped } : null;
   },
   findMotionCapture: async () => sensors.found,
   readMotionCapture: async () => null,
@@ -241,6 +250,15 @@ const run = (emit: (s: number) => void, from: number, to: number, hz: number) =>
 const lineCount = (marker: string): number => (journal.text ?? '').split('\n').filter((l) => l.startsWith(`["${marker}"`)).length;
 const headerCount = (): number => (journal.text ?? '').split('\n').filter((l) => l.startsWith('{"format"')).length;
 
+/** Le journal tel que l'écrivaient les versions d'avant : en-tête sans les réglages de la capture. */
+const withoutMotionInHeader = () => {
+  const [head, ...rest] = journal.text!.split('\n');
+  const header = JSON.parse(head) as Record<string, unknown>;
+  expect(header).toHaveProperty('motion');
+  delete header.motion;
+  journal.text = [JSON.stringify(header), ...rest].join('\n');
+};
+
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(T0);
@@ -258,6 +276,9 @@ beforeEach(async () => {
   sensors.stops = 0;
   sensors.pauses = 0;
   sensors.resumes = 0;
+  sensors.continued = [];
+  sensors.continueFails = false;
+  sensors.stopped = null;
   sensors.running = null;
   sensors.found = null;
   sensors.gate = null;
@@ -538,10 +559,102 @@ describe('reprise silencieuse, cas limites', () => {
     expect(state.measuringMotion).toBe(true);
     expect(state.motionSetup).toEqual({ placement: 'poitrine', foil: false });
     expect(sensors.starts).toBe(1);
+    expect(sensors.continued).toEqual([]);
     expect(sensors.stops).toBe(0);
     await fresh.stopRecording();
     expect(sensors.stops).toBe(1);
     expect(fresh.getRecorderState().pending?.motion?.path).toBe(`capteurs/${startedAtMs}.imu`);
+  });
+
+  it('capture fermée avec l\'activité : relancée en complétant son fichier, rendue à l\'arrêt', async () => {
+    const live = source();
+    const setup = { placement: 'poitrine' as const, foil: true };
+    await recorder.startRecording(activity, live, { motion: setup });
+    run(live.emit, 0, 10, 1);
+    await settle();
+    const startedAtMs = parseJournal(journal.text!).header!.startedAtMs;
+    // Rien ne tourne plus côté téléphone : le greffon a été refait avec l'activité.
+    services.gps = true;
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    const state = fresh.getRecorderState();
+    expect(state.status).toBe('recording');
+    expect(sensors.continued).toEqual([{ startedAtMs, setup, append: true }]);
+    expect(sensors.starts).toBe(1);
+    expect(state.measuringMotion).toBe(true);
+    expect(state.motionSetup).toEqual(setup);
+    expect(state.error).toBeNull();
+    await fresh.stopRecording();
+    expect(fresh.getRecorderState().pending?.motion?.path).toBe(`capteurs/${startedAtMs}.imu`);
+  });
+
+  it('capture fermée et session en pause manuelle : relancée puis mise en pause', async () => {
+    const live = source();
+    await recorder.startRecording(activity, live, { motion: { placement: 'poitrine', foil: false } });
+    run(live.emit, 0, 10, 1);
+    await recorder.pauseRecording();
+    const pausesBefore = sensors.pauses;
+    services.gps = true;
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(fresh.getRecorderState().status).toBe('paused');
+    expect(sensors.continued).toHaveLength(1);
+    expect(sensors.pauses).toBe(pausesBefore + 1);
+    expect(fresh.getRecorderState().measuringMotion).toBe(true);
+  });
+
+  it.each([
+    [true, false],
+    [false, true],
+  ])('capture relancée puis arrêtée sans mesure depuis, fichier qui en gardait d\'avant : %s ; averti : %s', async (earlierMeasures, warned) => {
+    const live = source();
+    await recorder.startRecording(activity, live, { motion: { placement: 'poitrine', foil: false } });
+    run(live.emit, 0, 10, 1);
+    await recorder.pauseRecording();
+    const startedAtMs = parseJournal(journal.text!).header!.startedAtMs;
+    services.gps = true;
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(fresh.getRecorderState().status).toBe('paused');
+    // Relancée puis mise en pause aussitôt : rien de mesuré depuis la relance.
+    sensors.stopped = { samples: 0, earlierMeasures };
+    await fresh.stopRecording();
+    const state = fresh.getRecorderState();
+    expect(state.pending?.motion?.path).toBe(`capteurs/${startedAtMs}.imu`);
+    expect((state.error ?? '').includes('aucune mesure reçue')).toBe(warned);
+  });
+
+  it('capture qui ne repart pas : c\'est dit, la reprise continue', async () => {
+    const live = source();
+    await recorder.startRecording(activity, live, { motion: { placement: 'poitrine', foil: false } });
+    run(live.emit, 0, 10, 1);
+    await settle();
+    const startedAtMs = parseJournal(journal.text!).header!.startedAtMs;
+    sensors.found = { path: `capteurs/${startedAtMs}.imu`, bytes: 10, durationS: 0, samples: 0, longestGapS: 0, error: null };
+    sensors.continueFails = true;
+    services.gps = true;
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    const state = fresh.getRecorderState();
+    expect(state.status).toBe('recording');
+    expect(state.measuringMotion).toBe(false);
+    expect(state.error).toContain('la mesure ne reprend pas');
+    await fresh.stopRecording();
+    expect(fresh.getRecorderState().pending?.motion?.path).toBe(`capteurs/${startedAtMs}.imu`);
+  });
+
+  it('journal d\'avant, sans les réglages de la capture : rien n\'est relancé', async () => {
+    const live = source();
+    await recorder.startRecording(activity, live, { motion: { placement: 'poitrine', foil: false } });
+    run(live.emit, 0, 10, 1);
+    await settle();
+    withoutMotionInHeader();
+    services.gps = true;
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(fresh.getRecorderState().status).toBe('recording');
+    expect(sensors.continued).toEqual([]);
+    expect(fresh.getRecorderState().measuringMotion).toBe(false);
   });
 
   it('capture et pause manuelle : un ordre perdu avec la page est rattrapé', async () => {
@@ -799,22 +912,94 @@ describe('« Continuer l\'enregistrement », application tuée puis rouverte', (
     expect(headerCount()).toBe(1);
   });
 
-  it('capture : ne reprend pas, c\'est dit, et le fichier d\'avant reste avec la session', async () => {
-    await killedAt20(1);
-    const path = `capteurs/${parseJournal(journal.text!).header!.startedAtMs}.imu`;
-    sensors.found = { path, bytes: 10, durationS: 0, samples: 0, longestGapS: 0, error: null };
-    vi.setSystemTime(T0 + 60_000);
-    const fresh = await reload();
-    await fresh.recoverInterruptedRecording();
-    const next = fakeSource();
-    await fresh.continuePendingSession(next);
-    const starts = sensors.starts;
-    expect(fresh.getRecorderState().measuringMotion).toBe(false);
-    expect(fresh.getRecorderState().error).toContain('Capteurs');
-    run(next.emit, 61, 65, 1);
-    await fresh.stopRecording();
-    expect(sensors.starts).toBe(starts);
-    expect(fresh.getRecorderState().pending?.motion?.path).toBe(path);
+  describe('capture des capteurs', () => {
+    const setup = { placement: 'taille' as const, foil: true };
+
+    /** Enregistre jusqu'à 20 s, capture prise au départ, puis l'application est tuée : son fichier reste sur le téléphone. */
+    const killedWithCapture = async (motion: typeof setup | null = setup) => {
+      const live = fakeSource();
+      await recorder.startRecording(activity, live, { motion });
+      run(live.emit, 0, 20, 1);
+      await settle();
+      const startedAtMs = parseJournal(journal.text!).header!.startedAtMs;
+      const path = `capteurs/${startedAtMs}.imu`;
+      if (motion) sensors.found = { path, bytes: 10, durationS: 0, samples: 0, longestGapS: 0, error: null };
+      return { startedAtMs, path };
+    };
+
+    /** Rouverte à 60 s, « Continuer l'enregistrement ». */
+    const continueAt60 = async () => {
+      vi.setSystemTime(T0 + 60_000);
+      const fresh = await reload();
+      await fresh.recoverInterruptedRecording();
+      const next = fakeSource();
+      await fresh.continuePendingSession(next);
+      return { fresh, next };
+    };
+
+    it('relancée en complétant son fichier : elle mesure de nouveau, et le même fichier est rendu à l\'arrêt', async () => {
+      const { startedAtMs, path } = await killedWithCapture();
+      const { fresh, next } = await continueAt60();
+      const state = fresh.getRecorderState();
+      expect(state.status).toBe('recording');
+      expect(sensors.continued).toEqual([{ startedAtMs, setup, append: true }]);
+      expect(sensors.starts).toBe(1);
+      expect(state.measuringMotion).toBe(true);
+      expect(state.motionSetup).toEqual(setup);
+      expect(state.error ?? '').not.toContain('Capteurs');
+      run(next.emit, 61, 65, 1);
+      const stops = sensors.stops;
+      await fresh.stopRecording();
+      expect(sensors.stops).toBe(stops + 1);
+      expect(sensors.starts).toBe(1);
+      expect(fresh.getRecorderState().pending?.motion?.path).toBe(path);
+      expect(fresh.getRecorderState().error ?? '').not.toContain('Capteurs');
+    });
+
+    it('journal d\'avant, sans ses réglages : elle ne reprend pas, c\'est dit, et le fichier d\'avant reste avec la session', async () => {
+      const { path } = await killedWithCapture();
+      withoutMotionInHeader();
+      const { fresh, next } = await continueAt60();
+      expect(sensors.continued).toEqual([]);
+      expect(fresh.getRecorderState().status).toBe('recording');
+      expect(fresh.getRecorderState().measuringMotion).toBe(false);
+      expect(fresh.getRecorderState().error).toContain('Capteurs : la mesure ne reprend pas');
+      run(next.emit, 61, 65, 1);
+      await fresh.stopRecording();
+      expect(sensors.starts).toBe(1);
+      expect(fresh.getRecorderState().pending?.motion?.path).toBe(path);
+    });
+
+    it('relance refusée : c\'est dit, l\'enregistrement continue, le fichier d\'avant reste avec la session', async () => {
+      const { path } = await killedWithCapture();
+      sensors.continueFails = true;
+      const { fresh, next } = await continueAt60();
+      const state = fresh.getRecorderState();
+      expect(state.status).toBe('recording');
+      expect(state.measuringMotion).toBe(false);
+      expect(state.error).toContain('Capteurs : la mesure ne reprend pas');
+      run(next.emit, 61, 65, 1);
+      await fresh.stopRecording();
+      expect(fresh.getRecorderState().pending?.motion?.path).toBe(path);
+    });
+
+    it('relance refusée sans fichier d\'avant : dit comme au départ, sans parler de mesures gardées', async () => {
+      await killedWithCapture();
+      sensors.found = null;
+      sensors.continueFails = true;
+      const { fresh } = await continueAt60();
+      expect(fresh.getRecorderState().status).toBe('recording');
+      expect(fresh.getRecorderState().error).toContain('Mesure des capteurs impossible');
+      expect(fresh.getRecorderState().error).not.toContain('gardé');
+    });
+
+    it('départ sans capture : rien n\'est relancé ni dit', async () => {
+      await killedWithCapture(null);
+      const { fresh } = await continueAt60();
+      expect(sensors.continued).toEqual([]);
+      expect(fresh.getRecorderState().measuringMotion).toBe(false);
+      expect(fresh.getRecorderState().error ?? '').not.toContain('Capteurs');
+    });
   });
 
   it('rangement seul à la réouverture : la session reprise trop vieille pour continuer est rangée, la fraîche attend', async () => {

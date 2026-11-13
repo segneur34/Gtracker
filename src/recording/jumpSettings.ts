@@ -36,7 +36,7 @@ export interface JumpSettings {
   minHeightM: number;
 }
 
-const isJumpPlacement = (value: unknown): value is JumpPlacement =>
+export const isJumpPlacement = (value: unknown): value is JumpPlacement =>
   typeof value === 'string' && (JUMP_PLACEMENTS as string[]).includes(value);
 
 const isMinHeight = (value: unknown): value is number =>

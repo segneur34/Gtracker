@@ -16,6 +16,10 @@ import { isObject, upperMedianOfSorted } from './basics';
  *    octets compressés en deflate brut (RFC 1951, sans enveloppe zlib).
  *    Un paquet tient environ une seconde de mesures ; il se lit seul, si bien
  *    qu'un arrêt brutal ne perd que le dernier, tronqué, qui est ignoré.
+ *    Une capture reprise après une coupure complète le même fichier : le
+ *    paquet tronqué est d'abord coupé, puis les paquets suivants s'ajoutent,
+ *    sans nouvel en-tête et dans la même base de temps (`clock`). Le trou
+ *    entre les deux parties est voulu : aucune mesure n'y figure.
  *
  * Un paquet décompressé est une suite de blocs, chacun d'un seul flux :
  * - numéro du flux (uint8), nombre n de mesures (uint16, au moins 1) ;

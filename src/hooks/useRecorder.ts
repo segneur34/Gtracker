@@ -24,15 +24,15 @@ import {
 } from '../recording/session';
 import { saveRecordedSession } from './useSessionLibrary';
 import {
-  SENSORS_PAUSE_ERROR, SENSORS_RESUME_ERROR, afterCurrent, exclusive, isBusy, pausePositionListeners, session, setState, state, subscribe,
-  type PendingSession, type RecorderState, type RecorderStatus, type SavedSession,
+  CAPTURE_NOT_RESUMED, SENSORS_PAUSE_ERROR, SENSORS_RESUME_ERROR, afterCurrent, exclusive, isBusy, joinMessages, pausePositionListeners, session,
+  setState, state, subscribe, type PendingSession, type RecorderState, type RecorderStatus, type SavedSession,
 } from './recorder/store';
 import { flushJournal, queueJournalLines } from './recorder/journalBuffer';
 import {
   applyBeltWatch, applyGpsWatch, releaseRecordingBelt, stopBeltWatch, stopGpsWatch, takeBeltOrWarn, watch, withoutBeltLost, withoutGpsLost,
 } from './recorder/watches';
 import { buildPendingSession, markManualResume, onSourceError, receiveFix, resetSession, sourceOptions } from './recorder/live';
-import { abandonResume, recoverInterruptedRecording, restoreFromJournal } from './recorder/recovery';
+import { abandonResume, continueCapture, recoverInterruptedRecording, restoreFromJournal } from './recorder/recovery';
 
 export type { RecorderState, RecorderStatus } from './recorder/store';
 export { getRecorderState, subscribeToFixes, subscribeToRecorder } from './recorder/store';
@@ -93,8 +93,6 @@ export { recoverInterruptedRecording };
  * seule sont ignorées.
  */
 
-/** « Continuer » après une capture des capteurs : elle ne reprend pas, ce qu'elle a mesuré reste. */
-const CAPTURE_NOT_RESUMED = 'Capteurs : la mesure ne reprend pas ; ce qu\'ils ont mesuré avant la coupure est gardé.';
 /** Notifications refusées au départ d'un enregistrement : ajouté une fois à l'alerte. */
 const NOTIFICATIONS_OFF_WARNING = "Notifications refusées : rien ne s'affichera sur l'écran verrouillé pendant l'enregistrement (Réglages › Autorisations).";
 
@@ -270,8 +268,9 @@ export const startRecording = exclusive(async (
   });
 
   try {
-    // La ceinture du départ est gardée dans l'en-tête : c'est elle que « Continuer » et la reprise seule redemandent.
-    await recordingJournal.write(journalHeaderLine(sport, session.startedAtMs, activity, options.heartRate ?? null));
+    // La ceinture et la capture du départ sont gardées dans l'en-tête : ce sont elles que « Continuer » et la reprise
+    // seule redemandent.
+    await recordingJournal.write(journalHeaderLine(sport, session.startedAtMs, activity, options.heartRate ?? null, options.motion ?? null));
     session.stopSource = await source.start(sourceOptions(activity, profile), receiveFix, onSourceError);
     setState({ status: 'recording' });
   } catch (err) {
@@ -297,8 +296,9 @@ export const startRecording = exclusive(async (
 /**
  * « Continuer l'enregistrement » : la session en attente reprend sur son journal, dans un segment neuf, service
  * relancé par ce geste (l'application est au premier plan). Le temps hors de l'application ne compte pas (`continuedPause`).
- * La capture ne reprend pas, son fichier est retrouvé à l'arrêt ; la ceinture du départ est redemandée, et son refus
- * dit sans arrêter la reprise. En échec, la session reste en attente et le journal est gardé.
+ * La capture du départ, gardée dans l'en-tête, est relancée en complétant son fichier ; un journal d'avant, qui ne la
+ * porte pas, la laisse arrêtée, son fichier retrouvé à l'arrêt. La ceinture du départ est redemandée. Un refus de
+ * l'une ou de l'autre est dit sans arrêter la reprise. En échec, la session reste en attente et le journal est gardé.
  */
 export const continuePendingSession = exclusive(async (source: LocationSource | null): Promise<void> => {
   const before = state.pending;
@@ -336,11 +336,14 @@ export const continuePendingSession = exclusive(async (source: LocationSource | 
     const heartRate = getSportProfile(activity.base).heartRate;
     session.stopSource = await source.start(sourceOptions(activity, effectiveRecordingProfile(activity)), receiveFix, onSourceError);
     if (belt) await takeBeltOrWarn(belt, heartRate.maxAgeS);
-    const captured = await findMotionCapture(session.startedAtMs).catch(() => null);
-    setState({
-      status: 'recording', resuming: false,
-      ...(captured ? { error: joinMessages(state.error, CAPTURE_NOT_RESUMED) } : {}),
-    });
+    // Après la ceinture, dont le refus remplace les messages : celui des capteurs s'y ajoute. `continuedPause` a levé
+    // la pause manuelle, la capture reprend donc sa mesure.
+    const motion = parsed.header?.motion;
+    if (motion) await continueCapture(motion, false);
+    else if (motion === undefined && await findMotionCapture(session.startedAtMs).catch(() => null)) {
+      setState({ error: joinMessages(state.error, CAPTURE_NOT_RESUMED) });
+    }
+    setState({ status: 'recording', resuming: false });
   } catch (err) {
     await backToPending(err);
     return;
@@ -477,13 +480,10 @@ export const motionCaptureWarning = (capture: MotionCapture | null, failure: str
   if (capture.error !== null) {
     return `Capteurs : écriture interrompue (${capture.error}), leurs mesures sont incomplètes : sauts ou pumping peuvent manquer.`;
   }
-  if (capture.samples === 0) return `Capteurs : aucune mesure reçue, ${lost}`;
+  // Capture reprise sans mesure depuis sa relance (session en pause, arrêt aussitôt) : celles d'avant la coupure restent.
+  if (capture.samples === 0 && capture.earlierMeasures !== true) return `Capteurs : aucune mesure reçue, ${lost}`;
   return null;
 };
-
-/** Deux messages à la suite, l'un ou l'autre absent. */
-const joinMessages = (first: string | null, second: string | null): string | null =>
-  first && second ? `${first} ${second}` : first ?? second;
 
 /** Arrête l'enregistrement, après la pause ou la reprise en cours s'il y en a une (`afterCurrent`). */
 export const stopRecording = afterCurrent(async (): Promise<void> => {
