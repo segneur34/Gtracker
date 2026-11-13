@@ -9,7 +9,7 @@ import ProfilePrompt from '../components/ProfilePrompt';
 import TutorialOfDay from '../components/TutorialOfDay';
 import { LogoGlyph } from '../components/logos/ActivityLogo';
 import { IconChevronRight } from '../components/icons';
-import SegmentedControl from '../components/ui/SegmentedControl';
+import Button from '../components/ui/Button';
 import { logoColor, type Activity } from '../core/activities';
 import { activityLogo, type LogoId } from '../core/activityLogos';
 import { DISTANCE_UNIT_SYMBOL, formatDuration, toDisplayDistance } from '../core/units';
@@ -25,11 +25,10 @@ import { useThemedShade } from '../hooks/useTheme';
 import { useNow } from '../hooks/useNow';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
-import { CHART_PERIODS, type ChartRange } from '../library/activityChart';
 import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
 import { activityShares, favoriteActivity } from '../library/profile';
 import { profilePromptGate } from '../library/profilePrompt';
-import { inBounds, isStatsPeriod, statsPeriodBounds, statsTotals } from '../library/stats';
+import { inBounds, profilePeriodOf, statsPeriodBounds, statsTotals } from '../library/stats';
 import { TUTORIAL_OF_DAY_VISIBLE, tutorialCardGate } from '../tutorials/tutorials';
 import { OTHERS_COLOR } from '../components/chartStyle';
 import './ProfilePage.css';
@@ -63,9 +62,6 @@ const RootSlot = lazy(() => import('../components/ProfileRoot').then((m) => ({ d
 /** « Vos activités », sur ordinateur seulement : ses lignes et leurs vignettes ne pèsent pas sur le téléphone. */
 const ProfileActivities = lazy(() => import('../components/ProfileActivities'));
 
-/** Espaces insécables, sauf après « Depuis » : sur un téléphone étroit, seul ce libellé passe sur deux lignes. */
-const PROFILE_PERIODS: { id: ChartRange; label: string }[] = [...CHART_PERIODS, { id: 'tout' as const, label: 'Depuis le début' }]
-  .map((p) => ({ ...p, label: p.label.replace(/ /g, '\u00a0').replace('Depuis\u00a0', 'Depuis ') }));
 
 /** Période retenue sur l'appareil ; l'année au départ. */
 interface ProfileView {
@@ -139,7 +135,9 @@ function ProfilePage() {
   const [picking, setPicking] = useState(false);
   const nowMs = useNow();
   const { value: view, update: rememberView } = useStoredRecord<ProfileView>(VIEW_NAMESPACE, VIEW_KEY, VIEW_DEFAULTS);
-  const period: ChartRange = isStatsPeriod(view.periode) ? view.periode : 'annee';
+  const period = profilePeriodOf(view.periode);
+  const periodLabel = period === 'tout' ? 'Tout' : `Année ${new Date(nowMs).getFullYear()}`;
+  const otherPeriodLabel = period === 'tout' ? `Année ${new Date(nowMs).getFullYear()}` : 'Tout';
   const [active, setActive] = useState<string | null>(null);
   /** Activités regroupées dans « Autres », dépliées sous sa ligne : non retenu. */
   const [othersOpen, setOthersOpen] = useState(false);
@@ -244,8 +242,10 @@ function ProfilePage() {
       {gate.mount && <ProfilePrompt otherCardShown={gate.otherCardShown} onDecided={setProfileShown} />}
       {TUTORIAL_OF_DAY_VISIBLE && <TutorialOfDay gate={tutorialGate} />}
 
-      <SegmentedControl fit className="profile-periods" label="Période" items={PROFILE_PERIODS.map((p) => ({ key: p.id, label: p.label }))}
-        value={period} onChange={(key) => rememberView({ periode: key })} />
+      <Button className="profile-periods" aria-label={`Période : ${periodLabel}. Toucher pour afficher : ${otherPeriodLabel}.`}
+        onClick={() => rememberView({ periode: period === 'tout' ? 'annee' : 'tout' })}>
+        {periodLabel}
+      </Button>
 
       {!memoryNeedsAction && <MemoryStatus compact />}
 

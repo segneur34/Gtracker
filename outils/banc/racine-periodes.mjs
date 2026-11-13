@@ -2,7 +2,7 @@
 // Usage : node racine-periodes.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau, environ 2 min. Le script fabrique 13 sessions de wingfoil de 45 min (`traceSurf`), le lundi des semaines 0 à 12, les
 // importe par la page Voile, fixe l'heure de la page à la semaine 13 (13 étapes), puis ouvre le Profil aux cinq périodes
-// (semaine, 30 jours, 6 mois, année, depuis le début), à 390×844 et à 1400×1000. Pour chaque période il relève :
+// (année, depuis le début), à 390×844 et à 1400×1000. Pour chaque période il relève :
 //  - le niveau et la longueur visible de la racine mère (`data-niveau`, `data-longueur` du canevas) ;
 //  - la hauteur de la page et de chacun des cadres entourés ;
 // et il vérifie que la longueur de la racine est la même aux cinq périodes, pour chaque taille d'écran.
@@ -59,7 +59,7 @@ await waitFor(async () => ((await records())?.length ?? 0) >= files.length, { ti
 await settle({ max: 3000, label: 'import' });
 await setClock(dayAt(13, 0, 12));
 
-const PERIODS = ['semaine', 'trente', 'sixmois', 'annee', 'tout'];
+const PERIODS = ['annee', 'tout'];
 const SELECTORS = ['.profile-periods', '.profile-figures', '.profile-split', '.actchart'];
 const sizes = [{ name: '390x844', w: 390, h: 844, mobile: true }, { name: '1400x1000', w: 1400, h: 1000, mobile: false }];
 for (const size of sizes) {

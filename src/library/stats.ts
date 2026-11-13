@@ -22,6 +22,12 @@ export const STATS_PERIODS: { id: StatsPeriod; label: string }[] = [...CHART_PER
 
 export const isStatsPeriod = (value: unknown): value is StatsPeriod => STATS_PERIODS.some((p) => p.id === value);
 
+/** Les deux périodes du Profil : l'année civile en cours, ou toutes les sessions. */
+export type ProfilePeriod = 'annee' | 'tout';
+
+/** Période mémorisée lue pour le Profil : toute valeur autre que « tout » (ancienne semaine, 30 jours, 6 mois) retombe sur l'année. */
+export const profilePeriodOf = (value: unknown): ProfilePeriod => (value === 'tout' ? 'tout' : 'annee');
+
 /** Bornes d'une période, `[fromMs, toMs[` ; `null` : sans borne de ce côté. */
 export interface StatsBounds {
   fromMs: number | null;

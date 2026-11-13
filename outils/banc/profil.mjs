@@ -10,8 +10,8 @@
 //     (Wingfoil, avec son dessin, qui ouvre ses sessions), nombre de sessions du graphe ; l'anneau et sa légende (une
 //     part par activité, Wingfoil à 50 %) ; le graphe d'activités en bas, sans barre de période à lui ; sur ordinateur,
 //     la colonne « Vos activités » (rangée de logos qui filtre sur place, cinq lignes sans « … », « Toutes les sessions ») ;
-//  3. les autres périodes règlent toute la page : « 30 jours » (trois sessions), « Depuis le début » (les six, une
-//     barre par mois), choix retenu au rechargement ;
+//  3. l'autre période règle toute la page : « Tout » (les six sessions, une barre par mois), choix retenu au
+//     rechargement, puis retour à « Année <n> » ;
 //  4. une ligne de la légende ouvre la page Sessions filtrée sur son activité ;
 //  5. à 390×844 : rien ne déborde, « Gtracker » sur la photo, pas de colonne « Vos activités », chiffres en une bande de deux sur deux, détail par activité retenu déplié ; la case « Profil » de la barre du bas (Profil, Sessions, Statistiques, Réglages) ouvre la page, allumée ;
 //     à 320 px, aucune case de la bande ne sort de l'écran (la bande « qui dépasse » de la maquette du 22/10) ;
@@ -71,13 +71,15 @@ const figures = () => evaluate(`[...document.querySelectorAll('.profile-figure')
 const legend = () => evaluate(`[...document.querySelectorAll('.profile-legend li')].map((li) => li.textContent)`);
 const search = () => evaluate('location.pathname + location.search');
 const overflow = () => evaluate('document.documentElement.scrollWidth > window.innerWidth');
+const ANNEE = `Année ${new Date().getFullYear()}`;
+/** Un seul bouton bascule entre « Année <n> » et « Tout » : on le touche seulement s'il ne montre pas déjà la période voulue. */
 const pick = (label) => evaluate(`(() => {
-  const b = [...document.querySelectorAll('.profile-periods [role=radio]')].find((el) => el.textContent.replace(/\\u00a0/g, ' ').trim() === ${JSON.stringify(label)});
+  const b = document.querySelector('.profile-periods');
   if (!b) return false;
-  b.click();
+  if (b.textContent.trim() !== ${JSON.stringify(label)}) b.click();
   return true;
 })()`);
-const pressed = () => evaluate(`document.querySelector('.profile-periods [role=radio][aria-checked=true]')?.textContent.replace(/\\u00a0/g, ' ').trim() ?? null`);
+const pressed = () => evaluate(`document.querySelector('.profile-periods')?.textContent.trim() ?? null`);
 const favorite = () => text('.profile-figure__name');
 const chartCount = () => text('.actchart__head span');
 /** Nombre lu à la française : espaces fines de milliers, virgule décimale. */
@@ -122,8 +124,9 @@ check('barre du haut : Profil, allumé', await evaluate(`[...document.querySelec
 check('en-tête : « Live for it. » sur la photo', (await text('.profile-hero__motto')) === 'Live for it.', await text('.profile-hero__motto'));
 check('titre : « Bienvenue » seul, sans pseudo', (await text('.profile-head__title')) === 'Bienvenue' && (await evaluate(`document.querySelector('.profile-head__hello') === null`)), await text('.profile-head__title'));
 check('lien du test de FC repos sous le titre', (await text('.profile-head__link')) === 'Test de FC repos', await text('.profile-head__link'));
-check('périodes en tête, « Année » au départ', (await evaluate(`[...document.querySelectorAll('.profile-periods [role=radio]')].map((b) => b.textContent.replace(/\\u00a0/g, ' ').trim()).join(' | ')`))
-  === 'Semaine | 30 jours | 6 mois | Année | Depuis le début' && (await pressed()) === 'Année', await pressed());
+check('période en tête : un seul bouton, « Année <n> » au départ, son libellé dit ce que fait le toucher',
+  (await evaluate(`document.querySelectorAll('.profile-periods').length`)) === 1 && (await pressed()) === ANNEE
+  && (await evaluate(`document.querySelector('.profile-periods').getAttribute('aria-label')`)) === `Période : ${ANNEE}. Toucher pour afficher : Tout.`, await pressed());
 check("plus de flèches d'année", (await evaluate(`!!document.querySelector('.profile-year')`)) === false);
 check("le graphe n'a plus sa propre barre de période", (await evaluate(`!!document.querySelector('.actchart__periods')`)) === false);
 let [count, distance] = await figures();
@@ -136,7 +139,7 @@ check('sport préféré : Wingfoil, avec son dessin', (await favorite()) === 'Wi
 check('plus de case « Dénivelé »', !(await evaluate(`[...document.querySelectorAll('.profile-figure .ui-eyebrow')].some((e) => e.textContent === 'Dénivelé')`)));
 check('nombre de sessions (graphe)', (await chartCount()) === '4 sessions', await chartCount());
 const ordre = await evaluate(`[...document.querySelectorAll('.profile > *')].map((el) => (el.getAttribute('class') ?? '').split(' ')[0] || el.tagName).join(' > ')`);
-check('ordre : en-tête, période, chiffres, répartition, graphe', /^profile-head > ui-segmented.*profile-figures.*profile-split.*actchart/.test(ordre ?? ''), ordre);
+check('ordre : en-tête, période, chiffres, répartition, graphe', /^profile-head > ui-btn.*profile-figures.*profile-split.*actchart/.test(ordre ?? ''), ordre);
 // Colonne de droite, sur ordinateur (à partir de 1000 px) : « Vos activités », la rangée de logos et les cinq dernières sessions.
 const activites = () => evaluate(`(() => {
   const s = document.querySelector('.profile-activities');
@@ -172,16 +175,7 @@ await evaluate(`document.querySelector('.profile-legend li').dispatchEvent(new M
 await shoot('profil-ordinateur');
 
 // 3. Les autres périodes règlent toute la page.
-const recent = SESSIONS.filter(([, d]) => d <= 29);
-check('« 30 jours »', await pick('30 jours'));
-await wait(500);
-[, distance] = await figures();
-check('30 jours : chiffres', Math.abs(parseFr(distance) - kmOf(recent)) / kmOf(recent) < 0.05 && (await favorite()) === 'Wingfoil' && (await chartCount()) === '3 sessions',
-  `${distance} ; ${await favorite()} ; ${await chartCount()}`);
-rows = await legend();
-check('30 jours : légende sans le kite', rows?.length === 2, JSON.stringify(rows));
-check('30 jours : une barre par jour', (await evaluate(`document.querySelectorAll('.actchart__bar').length`)) === 30);
-check('« Depuis le début »', await pick('Depuis le début'));
+check('« Tout »', await pick('Tout'));
 await wait(500);
 [count, distance] = await figures();
 check('depuis le début : six sessions', count === '6', count);
@@ -190,8 +184,8 @@ check('depuis le début : les six sessions', Math.abs(parseFr(distance) - kmOf(S
 check('depuis le début : un mois par barre', (await text('.actchart__head h2')) === 'Depuis le début, par mois'
   && (await evaluate(`document.querySelectorAll('.actchart__bar').length`)) >= 14, await text('.actchart__head h2'));
 await go('/profil');
-check('choix retenu au rechargement', (await pressed()) === 'Depuis le début', await pressed());
-check('« Année » de nouveau', await pick('Année'));
+check('choix retenu au rechargement', (await pressed()) === 'Tout', await pressed());
+check('« Année » de nouveau', await pick(ANNEE));
 await wait(500);
 check("retour à l'année", (await chartCount()) === '4 sessions', await chartCount());
 
@@ -216,14 +210,14 @@ const twoByTwo = () => evaluate(`(() => {
     && f.every((r) => r.left >= 0 && r.right <= window.innerWidth);
 })()`);
 check('390 px : chiffres deux puis un, dans l\'écran', await twoByTwo());
-const periodsFit = () => evaluate(`(() => { const r = document.querySelector('.profile-periods'); return r.scrollWidth <= r.clientWidth; })()`);
-check('390 px : les cinq périodes tiennent sans défiler', await periodsFit());
+const periodsFit = () => evaluate(`(() => { const r = document.querySelector('.profile-periods').getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; })()`);
+check('390 px : le bouton de période tient dans l\'écran', await periodsFit());
 check('390 px : détail par activité toujours déplié (état retenu)', (await legend()).length === 3);
 await shoot('profil-telephone');
 await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 640, deviceScaleFactor: 2, mobile: true });
 await go('/profil');
 check('320 px : rien ne déborde, la bande non plus', !(await overflow()) && (await twoByTwo()));
-check('320 px : les cinq périodes tiennent sans défiler', await periodsFit());
+check('320 px : le bouton de période tient dans l\'écran', await periodsFit());
 check('320 px : aucun chiffre plus large que sa case', await evaluate(`[...document.querySelectorAll('.profile-figure__value')].every((v) => v.scrollWidth <= v.clientWidth + 1)`));
 await shoot('profil-320');
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });

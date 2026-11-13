@@ -488,11 +488,9 @@ button.profile-legend__row {
   }
 }
 
-/* Écran le plus étroit : les périodes se serrent pour tenir sans défiler. */
-@media (max-width: 359px) {
-  .ui-segmented.profile-periods button {
-    padding: 0 2px;
-  }
+/* Le bouton de période : une pilule à sa largeur, à gauche de la page. */
+.ui-btn.profile-periods {
+  align-self: flex-start;
 }
 
 /* Détail par activité : replié ou déplié d'un geste, sous l'anneau sur un écran étroit. */

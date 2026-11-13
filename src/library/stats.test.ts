@@ -4,7 +4,7 @@ import type { SessionRecord } from './record';
 import {
   averageMovingSpeedMs, cardioLoadBars, cardioTotals, dateTicks, groupTotals, heartRatePoints, metricSeries, metricsOf, recordKindsOf, regularity,
   inBounds, sessionLoad, statSessionOf, statsMetric, statsPeriodBounds, statsTotals, topSessions, weeklyDurations, type StatSession,
-  gearFilterItems, matchesGear, groupByActivity, readGearParam, gearParamOf, withGearPick, matchesGearSelection, gearFilterRows, gearPickLabel,
+  profilePeriodOf, gearFilterItems, matchesGear, groupByActivity, readGearParam, gearParamOf, withGearPick, matchesGearSelection, gearFilterRows, gearPickLabel,
 } from './stats';
 import type { GearGroup } from './notes';
 import { sailStatSession, statSession, surfStatSession } from '../test/record.fixture';
@@ -13,6 +13,14 @@ import { sailStatSession, statSession, surfStatSession } from '../test/record.fi
 const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime();
 
 const session = statSession;
+
+describe('profilePeriodOf', () => {
+  it('garde « tout » et l\'année ; une ancienne période ou une valeur inconnue retombe sur l\'année', () => {
+    expect(profilePeriodOf('tout')).toBe('tout');
+    expect(profilePeriodOf('annee')).toBe('annee');
+    for (const old of ['semaine', 'trente', 'sixmois', 'n\'importe quoi', undefined, 3]) expect(profilePeriodOf(old)).toBe('annee');
+  });
+});
 
 describe('statSessionOf', () => {
   it('reprend le résumé et la famille du calcul ; les séances d\'une fiche complète ne comptent pas', () => {

@@ -27,8 +27,6 @@ export const SCREEN_BREAKPOINTS = {
   iconTabs: '(max-width: 339.98px)',
   /** Profil : anneau, légende et en-tête empilés (`ProfilePage.css`, `ProfileRoot.css`, `ProfileAvatar.css`). */
   profileStacked: '(max-width: 599px)',
-  /** Profil : très petit écran (`ProfilePage.css`). */
-  profileTiny: '(max-width: 359px)',
   /** Profil sur ordinateur : le Profil et « Vos activités » en deux colonnes (`ProfilePage.css`). */
   profileColumns: '(min-width: 1000px)',
   /** Enregistrement, petit téléphone tourné : la page s'empile comme droite (`RecordingPage.css`). */
