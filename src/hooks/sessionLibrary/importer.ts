@@ -42,6 +42,8 @@ export const saveRecordedSession = async (
     // Calcul inconnu (journal sans en-tête) : rien de deviné, la session est rangée « à classer ».
     sport, activityId: activityId ?? undefined, marks, motion: motion ?? undefined, foil: foil ?? undefined,
   });
+  // Rangée, ou déjà là : son lieu est cherché s'il ne l'a jamais été.
+  if ((result.status === 'added' || result.status === 'duplicate') && result.file) lib.onSessionsAdded([result.file]);
   switch (result.status) {
     case 'added':
       return { file: result.file, location: libraryState().folderLabel ?? 'mémoire' };
@@ -223,6 +225,8 @@ export const importEntries = async (
       }
     }
     if (lib.folder) scheduleCacheUpdate(lib.folder);
+    // Quelques fichiers choisis : leur lieu est cherché tout de suite. Un dossier entier, au fil de l'eau (liste, analyse).
+    if (!fromFolder && report.added.length > 0) lib.onSessionsAdded(report.added);
     if (quiet) return report;
     if (report.failed.length === 0) {
       setState({ message: describeImport(report) });

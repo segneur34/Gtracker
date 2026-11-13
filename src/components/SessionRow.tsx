@@ -1,20 +1,25 @@
-import { memo, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { plural } from '../core/basics';
 import { weekdayDayMonthYear } from '../core/calendar';
 import type { Activity } from '../core/activities';
 import { sportFamily, sportTreatment, type SportFamily } from '../core/sportProfiles';
 import { formatDistanceAuto, formatDuration, formatShortDuration, formatSpeed } from '../core/units';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
-import { removeSession, updateSessionRecord } from '../hooks/useSessionLibrary';
+import { useNearViewport } from '../hooks/useNearViewport';
+import { queueSessionPlace, removeSession, updateSessionRecord } from '../hooks/useSessionLibrary';
 import { effectiveDistanceUnit, effectiveSpeedUnit } from '../hooks/useSportSettings';
 import { useThemedShade } from '../hooks/useTheme';
 import type { LibrarySession } from '../library/record';
+import { customName, sessionDisplayName } from '../library/sessionName';
 import { ActivitySheet } from './ActivitySelect';
 import SessionPreviewMap from './SessionPreviewMap';
 import SessionRenameField from './SessionRenameField';
 import Button from './ui/Button';
 import MoreMenu from './ui/MoreMenu';
 import './SessionRow.css';
+
+/** Marge de la ligne à l'écran pour la file des lieux : aucune, seules les lignes vues comptent. */
+const ROW_PLACE_MARGIN = '0px';
 
 const formatTime = (ms: number): string =>
   new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -46,8 +51,8 @@ const rowStats =(session: LibrarySession, activity: Activity | null): string[] =
 type Sheet = 'open' | 'classify' | null;
 
 /**
- * Ligne d'une session de la page Sessions : la pastille et le nom de l'activité avec la date, le nom de la session
- * en gras (celui de l'activité quand elle n'en a pas), ses chiffres, le commentaire et l'avertissement en petites
+ * Ligne d'une session de la page Sessions : la pastille et le nom de l'activité avec la date, le nom montré de la
+ * session en gras (`sessionDisplayName` : le nom donné, sinon l'activité et le lieu), ses chiffres, le commentaire et l'avertissement en petites
  * lignes, la vignette de la trace à droite, puis un « … » : Classer (session à classer), Renommer, Supprimer (avec
  * confirmation), sauf avec `menu` faux (dernières sessions du Profil). Mémorisée, rappels stables : un balayage de la
  * mémoire ne redessine que les lignes dont la fiche change.
@@ -78,6 +83,13 @@ const SessionRow = memo(function SessionRow({
   /** Nom en cours de saisie ; `null` hors renommage. */
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
+  // Une ligne qui paraît à l'écran met sa session dans la file des lieux, si son lieu n'a jamais été cherché.
+  const rowRef = useRef<HTMLLIElement>(null);
+  const placeUnknown = record.place === undefined && !session.readOnly;
+  const near = useNearViewport(rowRef, !placeUnknown, ROW_PLACE_MARGIN);
+  useEffect(() => {
+    if (near && placeUnknown) queueSessionPlace(session.file);
+  }, [near, placeUnknown, session.file]);
 
   /**
    * Ouvre l'analyse. Une session à classer (le fichier ne dit pas son
@@ -119,19 +131,19 @@ const SessionRow = memo(function SessionRow({
 
   const activityLabel = activity ? activity.name : 'À classer';
   const date = `${weekdayDayMonthYear(startMs)} · ${formatTime(startMs)}`;
+  // Sous un nom donné, l'activité reste écrite à côté de la date ; le nom calculé la porte déjà.
+  const named = customName(record) !== null;
 
   return (
-    <li className="lib-row">
+    <li className="lib-row" ref={rowRef}>
       <div className="lib-row__head-line">
         <button type="button" className="lib-row__main" onClick={open}>
           <span className="lib-row__head">
             {activity && <span className="ui-swatch lib-row__icon" style={{ background: shade(activity.color) }} />}
-            {record.name && <span className="lib-row__sport lib-row__sport--sub">{activityLabel}</span>}
-            <span className="lib-row__date">{record.name ? `· ${date}` : date}</span>
+            {named && <span className="lib-row__sport lib-row__sport--sub">{activityLabel}</span>}
+            <span className="lib-row__date">{named ? `· ${date}` : date}</span>
           </span>
-          {record.name
-            ? <span className="lib-row__title lib-row__name">{record.name}</span>
-            : <span className="lib-row__title lib-row__sport">{activityLabel}</span>}
+          <span className={`lib-row__title ${named ? 'lib-row__name' : 'lib-row__sport'}`}>{sessionDisplayName(record, activityLabel)}</span>
           <span className="lib-row__stats num">{rowStats(session, activity).join(' · ')}</span>
           {record.notes?.comment && <span className="lib-row__note">{record.notes.comment}</span>}
           {session.warning && <span className="lib-row__warning">{session.warning}</span>}

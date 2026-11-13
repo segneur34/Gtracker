@@ -1,6 +1,7 @@
 // Banc du renommage d'une session (lot II) : nom saisi depuis le « … » d'une ligne de la page Sessions, écrit dans la
 // fiche, relu après rechargement, affiché en tête de l'analyse, effacé par un nom vide, puis donné depuis l'en-tête de
-// l'analyse et relu dans la liste. Profil Chrome neuf.
+// l'analyse et relu dans la liste. Sans nom donné, ligne et en-tête portent le nom calculé (l'activité seule : le
+// service de lieux est bloqué au banc, `lieu.mjs` le simule). Profil Chrome neuf.
 // Usage : node rename.mjs <port> <gpx de voile, produit par make-gpx.mjs>
 import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
@@ -87,6 +88,8 @@ await settle({ max: 1500, label: 'renommage' });
 console.log('lignes :', await rows());
 console.log('fiche :', await record());
 check('nom vide : la fiche n\'a plus de nom, la ligne non plus', JSON.parse(await record()).name === null && !(await rows()).includes('Sortie du soir'), await rows());
+// Sans nom donné ni lieu (service de lieux bloqué au banc), le nom montré est l'activité seule.
+check('nom vide : la ligne porte le nom calculé, l\'activité', (await rows()).startsWith('["Wingfoil / '), await rows());
 
 step('7. Renommer depuis l\'en-tête de l\'analyse');
 await evaluate(`document.querySelector('.lib-row__main').click(), 'ok'`);
@@ -94,6 +97,7 @@ await waitFor(`location.pathname.includes('/analyse')`, { timeout: 6000, label: 
 await settle({ max: 6000, label: 'analyse' });
 const subtitle = () => evaluate(`document.querySelector('.ui-page-header__subtitle')?.innerText.split('\\n').join(' / ')`);
 console.log('en-tête avant :', await subtitle());
+check('en-tête sans nom donné : le nom calculé, plus « Sans nom »', String(await subtitle()).startsWith('Wingfoil') && !String(await subtitle()).includes('Sans nom'), await subtitle());
 console.log('Renommer :', await clickText('Renommer'));
 await wait(300);
 await evaluate(`(() => { const i = document.querySelector('input[aria-label="Nom de la session"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'Bord au Grand Travers'); i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return 'ok'; })()`);

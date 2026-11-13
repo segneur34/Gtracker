@@ -2,8 +2,8 @@
 // Ces aides prennent l'`evaluate` d'une connexion (`connect`, lib/cdp.mjs) et rendent 'ok' ou ce qui a manqué, sans
 // lever : le `check` ou le `console.log` du script le dit.
 //
-// Une ligne (`.lib-row`) : la pastille et le nom de l'activité avec la date, le nom de la session en gras (celui de
-// l'activité quand elle n'en a pas), ses chiffres. Sans nom de session, le nom de l'activité vient après la date : le
+// Une ligne (`.lib-row`) : la pastille et le nom de l'activité avec la date, le nom de la session en gras (le nom
+// calculé quand elle n'en a pas : l'activité, suivie du lieu s'il est connu, « Wingfoil · Plage du Petit Travers »), ses chiffres. Sans nom de session, le nom de l'activité vient après la date : le
 // texte d'une ligne que les scripts comparent commence donc toujours par l'activité (« Wingfoil / … », « À classer / … »).
 // Classer, Renommer et Supprimer sont derrière le « … » de la ligne (« Plus d'actions sur la session »).
 

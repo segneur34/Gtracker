@@ -36,7 +36,7 @@ import { findSession, sessionOfFile } from './sessionLibrary/memory';
  * chacune n'importe que les précédentes (`couches.test.ts`) : `store`,
  * `memory`, `summarySettings`, `recordWrites`, `cache`, `scan`,
  * `summaryQueue`, `deviceSettings`, `addSession`, `pending`, `importer`, `incoming`,
- * `sessionRecords`, `lifecycle`.
+ * `sessionRecords`, `placeQueue`, `lifecycle`.
  */
 
 export type { LibraryState, LibraryStatus } from './sessionLibrary/store';
@@ -52,6 +52,7 @@ export {
   loadFullSession, loadSessionGpx, readSessionExport, readSessionGpx, readSessionMotion, removeSession,
   updateSessionRecord,
 } from './sessionLibrary/sessionRecords';
+export { queueSessionPlace } from './sessionLibrary/placeQueue';
 export {
   canChooseMemoryFolder, chooseFolder, currentMemoryFolder, openLibrary, reconnectFolder, refreshLibrary,
   startLibraryUi, switchToBrowserMemory,
@@ -97,7 +98,3 @@ export const useLibrarySelector = <T>(select: (s: LibraryState) => T): T =>
  */
 export const useLibrarySession = (file: string | null): LibrarySession | undefined =>
   useLibrarySelector((s) => findLibrarySession(s.sessions, file));
-
-/** Nom donné par l'utilisateur à la session d'un fichier, `null` sans nom ou hors de la mémoire. */
-export const useSessionName = (file: string | null): string | null =>
-  useLibrarySelector((s) => findLibrarySession(s.sessions, file)?.record.name ?? null);

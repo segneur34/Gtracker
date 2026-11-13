@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { shareableStats } from '../core/shareImage';
 import { SAILING_SPORTS, getSportProfile, hasActiveThreshold } from '../core/sportProfiles';
 import type { SessionSummary } from './record';
-import { SHARE_EXTRA_KEYS, heartRateShareStats, shareExtraStats, summaryShareStats } from './shareStats';
+import { formatSessionDate } from '../core/units';
+import { SHARE_EXTRA_KEYS, heartRateShareStats, shareExtraStats, shareLabels, summaryShareStats } from './shareStats';
 
 describe('heartRateShareStats', () => {
   it('donne la FC moyenne arrondie quand la session a de la FC', () => {
@@ -129,4 +130,26 @@ describe('lignes ajoutées du partage', () => {
     expect(notFoil.pumpingShare).toBeUndefined();
   });
 
+});
+
+describe('shareLabels', () => {
+  const startMs = new Date(2026, 9, 10, 14, 5).getTime();
+  const place = { name: 'Carnon-Plage', source: 'carte' as const, lat: 43.549, lon: 3.981 };
+  const date = formatSessionDate(startMs);
+
+  it('session nommée : son nom en titre, l\'activité avec la date, le nom dans le fichier', () => {
+    expect(shareLabels({ name: 'Soir', place }, 'Wingfoil', 'Voile', startMs, 'x.gpx'))
+      .toEqual({ title: 'Soir', subtitle: `Wingfoil · ${date}`, baseName: '2026-10-10 Wingfoil - Soir' });
+  });
+
+  it('sans nom : le nom calculé en titre et le lieu dans le fichier ; sans lieu, l\'activité', () => {
+    expect(shareLabels({ name: null, place }, 'Wingfoil', 'Voile', startMs, 'x.gpx'))
+      .toEqual({ title: 'Wingfoil · Carnon-Plage', subtitle: date, baseName: '2026-10-10 Wingfoil - Carnon-Plage' });
+    expect(shareLabels({ name: null }, 'Wingfoil', 'Voile', startMs, 'x.gpx'))
+      .toEqual({ title: 'Wingfoil', subtitle: date, baseName: '2026-10-10 Wingfoil' });
+  });
+
+  it('hors de la mémoire et sans activité : la famille', () => {
+    expect(shareLabels(null, null, 'Voile', startMs, 'x.gpx')).toEqual({ title: 'Voile', subtitle: date, baseName: '2026-10-10 Voile' });
+  });
 });

@@ -72,6 +72,11 @@ interface LibraryMemory {
    * `queueOutdatedRefresh`, posé par la file des résumés à son chargement, la file venant après les écritures.
    */
   onOutdated: () => void;
+  /**
+   * Sessions qui viennent d'entrer dans la mémoire (un enregistrement, un import de quelques fichiers) :
+   * leur lieu est à chercher. Posé par la file des lieux à son chargement, qui vient après l'import.
+   */
+  onSessionsAdded: (files: readonly string[]) => void;
 }
 
 export const lib: LibraryMemory = {
@@ -88,6 +93,7 @@ export const lib: LibraryMemory = {
   scanPass: null,
   refreshing: null,
   onOutdated: () => undefined,
+  onSessionsAdded: () => undefined,
 };
 
 /** Dossier où l'on peut ranger : aucun tant que la mémoire est en lecture seule, comme sans dossier. */

@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react';
 import { sessionActivity, type Activity } from '../core/activities';
 import type { SportFamily } from '../core/sportProfiles';
+import { firstTrackPoint } from '../library/places';
 import type { LibrarySession } from '../library/record';
 import { useChangeSessionActivity, useSessionFromUrl } from './useLibraryNavigation';
 import { useSessionDraft } from './useSessionDraft';
-import { useLibrarySession } from './useSessionLibrary';
+import { queueSessionPlace, useLibrarySession } from './useSessionLibrary';
 import { readStoredActivities } from './useSportSettings';
 
 export interface AnalysisSessionInput {
@@ -42,6 +43,8 @@ export const useAnalysisSession = ({ family, activity, setActivity, load, loaded
       const recorded = sessionActivity(readStoredActivities(), session.record.activityId, session.record.sport);
       if (recorded && recorded.id !== activity.id) setActivity(recorded.id);
       load(content, session.file);
+      // Lieu jamais cherché : en tête de la file des lieux, d'après la trace déjà lue.
+      if (session.record.place === undefined) queueSessionPlace(session.file, firstTrackPoint(content));
     },
     [activity.id, setActivity, load]
   );

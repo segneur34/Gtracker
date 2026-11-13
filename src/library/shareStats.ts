@@ -4,6 +4,7 @@ import { commaDecimal, formatDistance, formatDuration, formatSessionDate, format
 import { downloadBaseName } from './naming';
 import { RATINGS, WIND_LEVELS, type Rating, type WindLevel } from './notes';
 import type { SessionSummary } from './record';
+import { customName, sessionDisplayName, sessionFileBaseName, type NamedRecord } from './sessionName';
 
 /**
  * Lignes ajoutées à l'image de partage, à la fin de la liste,
@@ -156,22 +157,23 @@ const summaryBaseStats = (
 };
 
 /**
- * Titre de l'image de partage (nom de la session, sinon son activité, sinon sa
- * famille), sa ligne d'activité et de date, et le nom du fichier partagé, sans
- * extension ni nettoyage (`safeFileName`).
+ * Titre de l'image de partage (le nom montré de la session, `sessionDisplayName`, sinon sa famille), sa
+ * ligne d'activité et de date (l'activité seulement sous un nom donné, le nom calculé la porte déjà), et le
+ * nom du fichier partagé (`sessionFileBaseName`), sans extension ni nettoyage (`safeFileName`). `record` :
+ * la fiche, `null` hors de la mémoire.
  */
 export const shareLabels = (
-  name: string | null,
+  record: NamedRecord | null,
   activityName: string | null,
   familyLabel: string,
   startMs: number,
   file: string
 ): { title: string; subtitle: string; baseName: string } => {
-  const named = name?.trim() || null;
-  const title = named ?? activityName ?? familyLabel;
+  const named = record ?? { name: null };
+  const custom = customName(named);
   return {
-    title,
-    subtitle: [named ? activityName : null, formatSessionDate(startMs)].filter(Boolean).join(' · '),
-    baseName: downloadBaseName(title, named ? activityName : null, startMs, file),
+    title: sessionDisplayName(named, activityName, familyLabel),
+    subtitle: [custom ? activityName : null, formatSessionDate(startMs)].filter(Boolean).join(' · '),
+    baseName: sessionFileBaseName(named, activityName, startMs, file) ?? downloadBaseName(familyLabel, null, startMs, file),
   };
 };

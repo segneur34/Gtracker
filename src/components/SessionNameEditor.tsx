@@ -5,11 +5,11 @@ import { FAMILY_LABEL, sessionActivity } from '../core/activities';
 import type { ShareStat } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
 import { dropLeaveWarning, hasLeaveWarning } from '../hooks/leaveGuard';
-import { librarySession, readSessionExport, readSessionGpx, removeSession, updateSessionRecord, useSessionName } from '../hooks/useSessionLibrary';
+import { readSessionExport, readSessionGpx, removeSession, updateSessionRecord, useLibrarySession } from '../hooks/useSessionLibrary';
 import { readStoredActivities } from '../hooks/useSportSettings';
 import { useTransientValue } from '../hooks/useTransientValue';
-import { downloadBaseName } from '../library/naming';
 import { bundleSessionGpx } from '../library/sessionBundle';
+import { customName, sessionDisplayName, sessionFileBaseName } from '../library/sessionName';
 import { shareLabels } from '../library/shareStats';
 import { safeFileName, saveToDownloads } from '../platform/files';
 import { shareFile } from '../platform/share';
@@ -41,7 +41,7 @@ const discardQuestion = (drafted: boolean): string =>
   + (drafted ? ' Les modifications non enregistrées seront perdues.' : '');
 
 /**
- * Nom d'une session de la mémoire, en tête de son analyse, son bouton
+ * Nom montré d'une session de la mémoire (`sessionDisplayName`), en tête de son analyse, son bouton
  * « Renommer » et son menu « … » (« Partager l'image », qui ouvre `ShareDialog` avec
  * ce que l'analyse passe dans `share` ; « Télécharger la session », dans
  * Téléchargements : un GPX complet, fiche et capteurs compris, que « Importer
@@ -61,17 +61,20 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
     discarded.current = null;
     if (gone !== null) void removeSession(gone);
   }, []);
-  const name = useSessionName(file);
+  // La fiche entière, suivie : le nom montré change avec le nom donné, l'activité et le lieu trouvé.
+  const session = useLibrarySession(file);
   const [sharing, setSharing] = useState(false);
   /** Nom en cours de saisie ; `null` hors renommage. */
   const [draft, setDraft] = useState<string | null>(null);
   /** Compte rendu du dernier téléchargement, effacé après quelques secondes. */
   const [note, setNote] = useTransientValue<{ text: string; error: boolean }>(DOWNLOAD_NOTE_MS);
-  const session = file === null ? undefined : librarySession(file);
   if (!session || file === null) return null;
 
   const { record } = session;
   const activityName = sessionActivity(readStoredActivities(), record.activityId, record.sport)?.name ?? null;
+  /** Nom donné, `null` sans nom : le champ « Renommer » part vide, et l'effacer rend le nom calculé. */
+  const name = customName(record);
+  const shownName = sessionDisplayName(record, activityName);
 
   const save = () => {
     if (draft === null) return;
@@ -81,13 +84,15 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
 
   /**
    * Le GPX tel que rangé, avec sa fiche et ses capteurs. Une session nommée part sous
-   * `AAAA-MM-JJ Activité - Nom.gpx`, son nom écrit dans le GPX ; les autres, sous leur nom de fichier.
+   * `AAAA-MM-JJ Activité - Nom.gpx`, son nom écrit dans le GPX ; les autres sous `AAAA-MM-JJ Activité - Lieu.gpx`
+   * (`sessionFileBaseName`), sans rien écrire dans le GPX ; sans activité ni nom, sous leur nom de fichier.
    */
   const download = async () => {
     try {
       const session = await readSessionExport(file);
       if (session === null) throw new Error('GPX illisible dans la mémoire.');
-      const named = name?.trim() ? safeFileName(downloadBaseName(name, activityName, session.record.summary.startMs, file)) : '';
+      const base = sessionFileBaseName(session.record, activityName, session.record.summary.startMs, file);
+      const named = base ? safeFileName(base) : '';
       await saveToDownloads(named ? `${named}.gpx` : file, bundleSessionGpx(session.gpx, session.record, session.motion, session.unreadable));
       setNote({ text: 'Session enregistrée dans Téléchargements.', error: false });
     } catch (err) {
@@ -100,7 +105,7 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
     try {
       const text = await readSessionGpx(file);
       if (text === null) throw new Error('GPX introuvable dans la mémoire.');
-      const labels = shareLabels(name, activityName, (share ? FAMILY_LABEL[share.family] : 'Session'), record.summary.startMs, file);
+      const labels = shareLabels(record, activityName, (share ? FAMILY_LABEL[share.family] : 'Session'), record.summary.startMs, file);
       const outcome = await shareFile(new Blob([text], { type: 'application/gpx+xml' }), `${safeFileName(labels.baseName)}.gpx`, labels.title);
       if (outcome === 'downloaded') setNote({ text: 'Ce navigateur ne partage pas de fichier : le GPX est téléchargé.', error: false });
     } catch (err) {
@@ -134,9 +139,9 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
     <span className="ui-stack ui-min-w-0">
       <span className="an-name-line">
         <span
-          title={name ?? undefined}
-          style={{ flex: '0 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...(name ? { color: 'var(--ink)', fontWeight: 600 } : {}) }}>
-          {name ?? 'Sans nom'}
+          title={shownName}
+          style={{ flex: '0 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--ink)', fontWeight: 600 }}>
+          {shownName}
         </span>
         <span className="ui-row-s2 ui-center ui-no-shrink">
           {!session.readOnly && (
@@ -166,7 +171,7 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
         </span>
       </span>
       {sharing && share && (() => {
-        const labels = shareLabels(name, activityName, FAMILY_LABEL[share.family], record.summary.startMs, file);
+        const labels = shareLabels(record, activityName, FAMILY_LABEL[share.family], record.summary.startMs, file);
         return (
           <ShareDialog
             family={share.family}

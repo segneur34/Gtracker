@@ -19,7 +19,7 @@ const SRC = new URL('../../', import.meta.url);
 /** Les couches, de la plus basse à la plus haute. */
 const LAYERS = [
   'store', 'memory', 'summarySettings', 'recordWrites', 'cache', 'scan', 'summaryQueue', 'deviceSettings',
-  'addSession', 'pending', 'importer', 'incoming', 'sessionRecords', 'lifecycle',
+  'addSession', 'pending', 'importer', 'incoming', 'sessionRecords', 'placeQueue', 'lifecycle',
 ] as const;
 
 /** Valeurs exportées par le point d'entrée, les mêmes qu'avant le découpage (et cinq types). */
@@ -27,10 +27,10 @@ const ENTRY_VALUES = [
   'adoptSettingsFile', 'answerImportQuestion', 'canChooseMemoryFolder', 'canImportSessions', 'chooseFolder', 'currentMemoryFolder', 'dismissIncomingNotice', 'dismissLibraryMessage',
   'dismissSettingsOffer', 'findLibrarySession', 'hasSessionMotion', 'importEntries', 'importFiles', 'importFromFolder',
   'importSettingsFile', 'librarySession', 'loadFullSession', 'loadSessionGpx', 'openLibrary', 'queueOutdatedRefresh',
-  'readLibraryState', 'readSessionExport', 'readSessionGpx', 'readSessionMotion', 'reconnectFolder', 'refreshLibrary',
+  'queueSessionPlace', 'readLibraryState', 'readSessionExport', 'readSessionGpx', 'readSessionMotion', 'reconnectFolder', 'refreshLibrary',
   'removeSession', 'renameDevice', 'reportStartupError', 'saveRecordedSession', 'startIncomingFiles', 'startLibraryUi',
   'summarizeGpxText', 'switchToBrowserMemory', 'updateSessionRecord', 'useLibraryFields', 'useLibrarySelector',
-  'useLibrarySession', 'useSessionName',
+  'useLibrarySession',
 ];
 const ENTRY_TYPES = ['AddResult', 'AddStatus', 'LibraryState', 'LibraryStatus', 'SettingsFileInfo'];
 

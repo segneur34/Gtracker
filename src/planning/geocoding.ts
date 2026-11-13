@@ -3,13 +3,23 @@ import type { Waypoint } from './route';
 import { isObject } from '../core/basics';
 
 /**
- * Recherche d'un lieu par son nom (commune, sommet, refuge, adresse), par le
- * service public Photon de komoot, bâti sur les données OpenStreetMap. Sans
- * clé ; il autorise l'appel depuis n'importe quelle page. Seul `searchPlaces`
- * touche au réseau.
+ * Recherche d'un lieu par son nom (commune, sommet, refuge, adresse), et
+ * recherche inverse (les lieux autour d'une position), par le service public
+ * Photon de komoot, bâti sur les données OpenStreetMap. Sans clé ; il autorise
+ * l'appel depuis n'importe quelle page. Seuls `searchPlaces` et `reversePlaces`
+ * touchent au réseau.
  */
 
 export const PHOTON_URL = 'https://photon.komoot.io/api/';
+
+/** Adresse de la recherche inverse du même service. */
+export const PHOTON_REVERSE_URL = 'https://photon.komoot.io/reverse';
+
+/**
+ * Décimales gardées d'une position envoyée à la recherche inverse : trois, une centaine de mètres. Le
+ * service ne reçoit jamais la position exacte.
+ */
+export const REVERSE_COORD_DECIMALS = 3;
 
 /** Délai accordé à la recherche, en millisecondes : au-delà, elle échoue, et l'on peut relancer. */
 export const PHOTON_TIMEOUT_MS = 20_000;
@@ -36,18 +46,45 @@ export const photonUrl = (query: string, near?: Waypoint, limit = 6): string => 
 
 const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null);
 
-/** Lieux de la réponse ; les entrées mal formées sont écartées. */
-export const parsePhoton = (json: unknown): Place[] => {
+/** Entrées de la réponse qui ont une position lisible, avec leurs propriétés. */
+const readFeatures = (json: unknown): { p: Record<string, unknown>; lat: number; lon: number }[] => {
   if (!isObject(json) || !Array.isArray(json.features)) return [];
-  const places: Place[] = [];
+  const out: { p: Record<string, unknown>; lat: number; lon: number }[] = [];
   for (const feature of json.features) {
     if (!isObject(feature) || !isObject(feature.properties) || !isObject(feature.geometry)) continue;
     const coordinates = feature.geometry.coordinates;
     if (!Array.isArray(coordinates)) continue;
     const [lon, lat] = coordinates as unknown[];
     if (typeof lat !== 'number' || typeof lon !== 'number' || !isFinite(lat) || !isFinite(lon)) continue;
+    out.push({ p: feature.properties, lat, lon });
+  }
+  return out;
+};
 
-    const p = feature.properties;
+/**
+ * Objet de la carte rendu par la recherche inverse : son nom tel quel (`null` sans nom), son étiquette
+ * principale dans OpenStreetMap (`osm_key`, `osm_value` : `natural` et `beach` pour une plage), sa commune
+ * et sa position.
+ */
+export interface PhotonFeature {
+  name: string | null;
+  osmKey: string | null;
+  osmValue: string | null;
+  city: string | null;
+  lat: number;
+  lon: number;
+}
+
+/** Objets de la réponse, dans son ordre ; les entrées sans position sont écartées. */
+export const parsePhotonFeatures = (json: unknown): PhotonFeature[] =>
+  readFeatures(json).map(({ p, lat, lon }) => ({
+    name: text(p.name), osmKey: text(p.osm_key), osmValue: text(p.osm_value), city: text(p.city), lat, lon,
+  }));
+
+/** Lieux de la réponse ; les entrées mal formées sont écartées. */
+export const parsePhoton = (json: unknown): Place[] => {
+  const places: Place[] = [];
+  for (const { p, lat, lon } of readFeatures(json)) {
     const street = text(p.street);
     const label = text(p.name) ?? (street ? [text(p.housenumber), street].filter(Boolean).join(' ') : null) ?? text(p.city);
     if (!label) continue;
@@ -58,6 +95,45 @@ export const parsePhoton = (json: unknown): Place[] => {
   }
   return places;
 };
+
+/** Position arrondie à `REVERSE_COORD_DECIMALS` décimales, celle qui part en ligne. */
+export const roundedPoint = (point: Waypoint): Waypoint => {
+  const factor = 10 ** REVERSE_COORD_DECIMALS;
+  return { lat: Math.round(point.lat * factor) / factor, lon: Math.round(point.lon * factor) / factor };
+};
+
+/** Ce que demande une recherche inverse, en plus de la position : nombre d'objets rendus, rayon en mètres. */
+export interface ReverseQuery {
+  limit: number;
+  radiusM: number;
+}
+
+/**
+ * Adresse de la recherche inverse : la position arrondie (`roundedPoint`), la langue, le nombre d'objets
+ * et le rayon (en kilomètres pour le service), rien d'autre. Aucun filtre côté serveur : le choix se
+ * fait dans l'application, sur les étiquettes de chaque objet.
+ */
+export const photonReverseUrl = (point: Waypoint, { limit, radiusM }: ReverseQuery): string => {
+  const at = roundedPoint(point);
+  const params = new URLSearchParams({
+    lat: at.lat.toFixed(REVERSE_COORD_DECIMALS),
+    lon: at.lon.toFixed(REVERSE_COORD_DECIMALS),
+    lang: 'fr',
+    limit: String(limit),
+    radius: String(radiusM / 1000),
+  });
+  return `${PHOTON_REVERSE_URL}?${params.toString()}`;
+};
+
+/** Objets de la carte autour de `point` (`photonReverseUrl`). Lève une erreur au message lisible, réseau absent compris. */
+export const reversePlaces = async (point: Waypoint, query: ReverseQuery, signal?: AbortSignal): Promise<PhotonFeature[]> =>
+  parsePhotonFeatures(await fetchJson(photonReverseUrl(point, query), { signal }, {
+    noNetwork: 'Pas de réseau : le lieu de la session sera cherché plus tard.',
+    timeout: 'La recherche du lieu ne répond pas.',
+    timeoutMs: PHOTON_TIMEOUT_MS,
+    unreadable: 'Réponse de la recherche du lieu illisible.',
+    httpError: (status) => `La recherche du lieu n'a pas répondu (erreur ${status}).`,
+  }));
 
 /** Lieux qui répondent à `query`. Lève une erreur au message lisible. */
 export const searchPlaces = async (query: string, near?: Waypoint, signal?: AbortSignal): Promise<Place[]> =>

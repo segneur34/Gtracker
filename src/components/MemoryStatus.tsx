@@ -8,6 +8,7 @@ import {
   switchToBrowserMemory,
   useLibraryFields,
 } from '../hooks/useSessionLibrary';
+import { usePlaceSearch } from '../hooks/usePlaceSearch';
 import { READ_ONLY_MEMORY_MESSAGE, browserMemoryIsGuaranteed } from '../platform/memoryFolder';
 import { isNativeApp } from '../platform/runtime';
 import ImportButtons from './ImportButtons';
@@ -29,7 +30,7 @@ import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
  * attention : mémoire fermée, lecture en cours, sessions en attente,
  * doublons, GPX illisibles, messages et fichier de réglages proposé. Dans
  * Réglages en version détaillée (changer de dossier, fichiers de réglages
- * par appareil par `SettingsFiles`, mode d'emploi du copier-coller). Avec `collapse`, la carte se replie par son titre et ne
+ * par appareil par `SettingsFiles`, mode d'emploi du copier-coller, recherche du lieu des sessions). Avec `collapse`, la carte se replie par son titre et ne
  * garde, fermée, que sa ligne d'état et ses alertes, dont la proposition d'un
  * nouveau fichier de réglages (`SettingsOfferBanner`). Dans Réglages, les
  * explications passent sous des « ? » (`Help.tsx`) ; ailleurs, elles restent à découvert.
@@ -282,10 +283,31 @@ function MemoryStatus({
 
         <SettingsOfferBanner />
         {detailed && status === 'ready' && <SettingsFiles />}
+        {detailed && <PlaceSearchSetting />}
 
         {alert}
       </div>
     </Card>
+  );
+}
+
+/**
+ * Recherche du lieu des sessions, propre à cet appareil (`usePlaceSearch`) : la case, et la phrase qui dit
+ * ce qui part en ligne, toujours à découvert.
+ */
+function PlaceSearchSetting() {
+  const [on, setOn] = usePlaceSearch();
+  return (
+    <div className="ui-stack-3">
+      <label className="ui-row-s2 ui-center">
+        <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} />
+        <span>Chercher le lieu des sessions</span>
+      </label>
+      <p style={mutedStyle}>
+        Le lieu d'une session est cherché en ligne d'après son point de départ, arrondi à une centaine de mètres :
+        un départ de chez vous en dit le quartier. Case décochée, rien n'est envoyé et le nom d'une session est son activité seule.
+      </p>
+    </div>
   );
 }
 

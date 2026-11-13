@@ -10,6 +10,8 @@ const LICENSES_PREVIEW = 3;
 /** Fichiers servis avec l'application : le délai ne couvre qu'un serveur qui ne répondrait pas. */
 const LOAD_TIMEOUT_MS = 10_000;
 const UNAVAILABLE = 'Liste des licences indisponible.';
+/** Page du droit d'auteur d'OpenStreetMap, due avec la mention de ses données. */
+const OSM_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
 
 /** Liste rendue par `file`, à côté de l'application ; `null` si elle n'existe pas ou ne se lit pas. */
 const loadList = (file: string, signal: AbortSignal): Promise<LicenseEntry[] | null> =>
@@ -113,6 +115,15 @@ function AboutSettings() {
       <p className="about__version">Version {__APP_VERSION__}</p>
       <p className="about__text">
         Vos sessions restent sur cet appareil et dans votre dossier mémoire, sans compte. Les fonds de carte et la recherche de lieux passent par des services en ligne.
+      </p>
+      <p className="about__text">
+        Le lieu qui nomme une session est cherché par le service Photon de komoot : il reçoit le point de départ de la
+        session arrondi à une centaine de mètres, la langue et le rayon de recherche, rien d'autre (Réglages › Mémoire pour
+        s'en passer).
+      </p>
+      <p className="about__text">
+        Données des cartes et des lieux : © les contributeurs d'OpenStreetMap, sous licence ODbL
+        (<a href={OSM_COPYRIGHT_URL} target="_blank" rel="noreferrer">openstreetmap.org/copyright</a>).
       </p>
       <SettingsPart label="Licences des composants utilisés" open={licensesOpen} onToggle={() => setLicensesOpen((o) => !o)}>
         <LicensesList />

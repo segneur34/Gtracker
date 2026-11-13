@@ -10,6 +10,7 @@ import type { SportType } from '../core/types';
 import { isSportType } from '../core/sportProfiles';
 
 import { EMPTY_NOTES, type GearChoice, type SailingSessionNotes } from './notes';
+import { readSessionPlace, type SessionPlace } from './places';
 import { isFiniteNumber, isObject, parseJson, stringifyJson } from '../core/basics';
 
 /**
@@ -309,6 +310,12 @@ export interface SessionRecord {
    * fiche gardent leur nom de fichier. Absent des fiches plus anciennes.
    */
   name: string | null;
+  /**
+   * Lieu de la session, trouvé d'après son point de départ (`library/places.ts`), qui compose son nom tant
+   * que l'utilisateur n'en a pas donné (`library/sessionName.ts`). Absent : pas encore cherché ; son
+   * `name` nul : cherché, rien trouvé. Il ne se tire pas du GPX : hors du résumé.
+   */
+  place?: SessionPlace;
   summary: SessionSummary;
   notes: StoredSessionNotes | null;
   /** Absent des fiches écrites avant son introduction : lu comme `null`. */
@@ -554,7 +561,7 @@ export type RecordUnreadable = Readonly<Record<string, UnreadableField>>;
  * source (course et vélo) ne sont plus des champs de la fiche : ils passent bruts, comme tout champ inconnu.
  */
 const GUARDED_FIELDS = [
-  'sport', 'activityId', 'source', 'addedAt', 'title', 'name', 'mapBase', 'jumps', 'marks',
+  'sport', 'activityId', 'source', 'addedAt', 'title', 'name', 'place', 'mapBase', 'jumps', 'marks',
 ] as const;
 /** Objets relus champ par champ : un champ illisible y est gardé seul ; l'objet entier s'il est illisible (sauf le résumé, refait depuis le GPX). */
 const GUARDED_OBJECTS = ['summary', 'analysis', 'notes'] as const;
@@ -632,7 +639,8 @@ const readRecordParts = (raw: unknown, formats: readonly string[]): RecordWithou
   if (typeof raw.gpx !== 'string' || raw.gpx === '') return null;
   const summary = readSummary(raw.summary);
   // Voies, altitude du terrain et sa source (course et vélo) passent bruts par `rest`, comme tout champ inconnu.
-  const { mapBase: rawMapBase, jumps: rawJumps, marks: rawMarks, ...rest } = raw;
+  const { place: rawPlace, mapBase: rawMapBase, jumps: rawJumps, marks: rawMarks, ...rest } = raw;
+  const place = readSessionPlace(rawPlace);
   const jumps = readSessionJumps(rawJumps);
   const marks = readSessionMarks(rawMarks);
   return {
@@ -647,6 +655,7 @@ const readRecordParts = (raw: unknown, formats: readonly string[]): RecordWithou
     addedAt: typeof raw.addedAt === 'string' ? raw.addedAt : new Date(summary?.startMs ?? Date.now()).toISOString(),
     title: typeof raw.title === 'string' ? raw.title : null,
     name: readSessionName(raw.name),
+    ...(place ? { place } : {}),
     summary,
     notes: readNotes(raw.notes),
     analysis: readAnalysis(raw.analysis),
@@ -740,7 +749,7 @@ const withoutCarriedSettings = <T extends SessionRecord>(record: T): T => {
 /**
  * Fiche de la mémoire complétée par celle d'une copie de la même session
  * (import d'un GPX complet, `library/sessionBundle.ts`, ou d'un GPX et de sa
- * fiche) : support et activité inconnus, repères, nom, notes, réglages, sauts
+ * fiche) : support et activité inconnus, repères, nom, lieu, notes, réglages, sauts
  * et fond de carte qu'elle n'a pas encore. Rien de ce qu'elle porte n'est
  * écrasé ; rend la même fiche si rien ne manque.
  * `resummarize` : le résumé est à refaire (support, activité ou réglages reçus).
@@ -756,6 +765,7 @@ export const completeRecord = (
   }
   if (!existing.marks?.length && incoming.marks?.length) patch.marks = incoming.marks;
   if (existing.name === null && incoming.name !== null) patch.name = incoming.name;
+  if (!existing.place && incoming.place) patch.place = incoming.place;
   if (existing.notes === null && incoming.notes !== null) patch.notes = incoming.notes;
   if (existing.analysis === null && incoming.analysis !== null) patch.analysis = incoming.analysis;
   if (!existing.jumps && incoming.jumps) patch.jumps = incoming.jumps;
@@ -769,12 +779,15 @@ export const completeRecord = (
 
 /**
  * Champs que l'utilisateur saisit dans une fiche (support, activité, nom, notes, réglages de
- * l'analyse, repères, fond de carte), reportés d'une copie de la session à une autre par
+ * l'analyse, repères, fond de carte), et le lieu, qui ne se tire pas du GPX, reportés d'une copie de la session à une autre par
  * `carryRecordEdits`.
  */
 const RECORD_EDIT_FIELDS = [
-  'sport', 'activityId', 'name', 'notes', 'analysis', 'marks', 'mapBase',
+  'sport', 'activityId', 'name', 'place', 'notes', 'analysis', 'marks', 'mapBase',
 ] as const satisfies readonly (keyof SessionRecord)[];
+
+/** Champs de `RECORD_EDIT_FIELDS` qui ne changent pas le résumé. */
+const EDITS_WITHOUT_SUMMARY: ReadonlySet<string> = new Set(['name', 'place', 'notes', 'marks', 'mapBase']);
 
 /**
  * Fiche `target` qui reçoit les saisies d'une autre copie de la même session (`edited`), celle de
@@ -791,7 +804,7 @@ export const carryRecordEdits = (target: SessionRecord, edited: SessionRecord): 
     if (edited[key] === undefined) delete next[key];
     else next[key] = edited[key];
   }
-  const resummarize = changed.some((key) => key !== 'name' && key !== 'notes' && key !== 'marks' && key !== 'mapBase');
+  const resummarize = changed.some((key) => !EDITS_WITHOUT_SUMMARY.has(key));
   const summary = changed.includes('sport') || changed.includes('activityId')
     ? withoutCarriedSettings(target).summary
     : changed.includes('analysis') ? withCarriedSettingsFixed(target).summary : target.summary;
@@ -826,7 +839,7 @@ export const isBlankGpxText = (text: string): boolean => text.trim() === '';
  * sur le disque quand on en a besoin.
  */
 export const RECORD_LIGHT_FIELDS = [
-  'format', 'version', 'gpx', 'sport', 'activityId', 'source', 'addedAt', 'title', 'name',
+  'format', 'version', 'gpx', 'sport', 'activityId', 'source', 'addedAt', 'title', 'name', 'place',
   'summary', 'notes', 'analysis', 'mapBase', 'marks',
 ] as const satisfies readonly (keyof SessionRecord)[];
 
@@ -915,6 +928,8 @@ export interface RecordPatch {
   activityId?: string | null;
   /** Nom donné par l'utilisateur ; vide ou `null` : plus de nom. */
   name?: string | null;
+  /** Lieu trouvé ou corrigé ; `null` le retire (il sera cherché de nouveau). Ne change pas le résumé. */
+  place?: SessionPlace | null;
   notes?: StoredSessionNotes | null;
   analysis?: SessionAnalysis | null;
   maneuverCount?: number;
@@ -932,7 +947,7 @@ export interface RecordPatch {
 }
 
 /**
- * Fiche après un changement : support, activité, nom, notes, réglages
+ * Fiche après un changement : support, activité, nom, lieu, notes, réglages
  * d'analyse, nombre et réussite des manœuvres, fond de carte, sauts, repères. Rend la
  * fiche d'origine, à l'identique, si rien ne change.
  * `resummarize` : le résumé est à recalculer (support, activité, seuil, allure
@@ -953,6 +968,10 @@ export const applyRecordPatch = (record: SessionRecord, patch: RecordPatch): { r
   if (patch.name !== undefined) {
     const name = readSessionName(patch.name);
     if (name !== next.name) next = { ...next, name };
+  }
+  if (patch.place !== undefined && !sameJson(patch.place ?? undefined, next.place)) {
+    const { place: _previous, ...others } = next;
+    next = patch.place ? { ...others, place: patch.place } : others;
   }
   if (patch.notes !== undefined) next = { ...next, notes: patch.notes };
   if (patch.jumps !== undefined) {

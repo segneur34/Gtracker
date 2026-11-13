@@ -70,6 +70,8 @@ export const SCRIPTS = [
   { nom: 'import-session', args: ['{port}', '{captures?}'], pages: ['sessions', 'voile', 'surf'] },
   // Bibliothèque (rejeu, notes, import, doublon, à classer, suppression, relance, fichier de réglages de l'appareil, paire GPX + fiche, réglages d'un autre appareil) ; ses traces sont fabriquées dans le dossier de travail. Rejeu ×600 : 9 s en temps réel.
   { nom: 'library', args: ['{port}', '{travail}', '{captures?}'], pages: ['sessions', 'reglages'], solo: true },
+  // Nom d'une session par l'activité et le lieu : service de lieux simulé (`lib/lieux.mjs`), jamais le vrai.
+  { nom: 'lieu', args: ['{port}', '{travail}', '{captures?}'], pages: ['sessions', 'voile', 'reglages'] },
   { nom: 'materiel', args: ['{port}', '{captures?}'], pages: ['surf', 'reglages'] },
   { nom: 'materiel-fin', args: ['{port}', '{travail}', '{captures?}'], pages: ['enregistrer', 'voile', 'surf'], solo: true, accelerable: true },
   { nom: 'miseajour', args: ['{port}', '{travail}', '{captures?}'], pages: ['sessions', 'reglages'] },
@@ -121,7 +123,7 @@ export const SCRIPTS = [
 ];
 
 /** Le passage courant, sans nom ni `--pages` ni `--tous` : scripts sans réseau ni fichier à fournir (sans `tailles`, 10 min : par son nom ou `--pages`). */
-export const PASSAGE_COURANT = ['general', 'surf', 'bench', 'cardio', 'graphes', 'sauts', 'virages', 'pumping', 'familles', 'statistiques', 'profil', 'rename', 'session-save', 'session-save-resume', 'library', 'import-session', 'apropos', 'tutoriels',
+export const PASSAGE_COURANT = ['general', 'surf', 'bench', 'cardio', 'graphes', 'sauts', 'virages', 'pumping', 'familles', 'statistiques', 'profil', 'rename', 'lieu', 'session-save', 'session-save-resume', 'library', 'import-session', 'apropos', 'tutoriels',
   'reglages', 'reglages-aide', 'prereglages', 'icones', 'cacher', 'planification-verrou', 'planning'];
 
 export const PAGES = ['voile', 'surf', 'enregistrer', 'sessions', 'planification', 'statistiques', 'profil', 'reglages'];

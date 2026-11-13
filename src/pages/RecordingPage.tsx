@@ -46,8 +46,9 @@ import { BELT_STATE_LABEL, chooseSavedBelt, savedBelt, savedBelts, type BeltStat
 import { JUMP_PLACEMENT_LABEL } from '../recording/jumpSettings';
 import { PERMISSION_LABEL } from '../recording/permissionsPrompt';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
-import { librarySession, updateSessionRecord } from '../hooks/useSessionLibrary';
+import { librarySession, updateSessionRecord, useLibrarySession } from '../hooks/useSessionLibrary';
 import { EMPTY_NOTES, type GearChoice } from '../library/notes';
+import { sessionDisplayName } from '../library/sessionName';
 import {
   addRecordingMark, analyzePendingSession, changeRecordingActivity, continuePendingSession, discardPendingSession, dismissRecorderResult,
   finishingPendingSession, getLastFix, getLiveFixes, getLiveHeadingFixes, getLiveSegmentCount, markRecorderResultOpened, pauseRecording,
@@ -558,6 +559,8 @@ function RecordingScreen() {
   const pending = useRecorderSelector((s) => s.pending);
   const motionUnreadable = useRecorderSelector((s) => s.motionUnreadable);
   const saved = useRecorderSelector((s) => s.saved);
+  // Fiche de la session rangée : son nom montré, qui se complète quand son lieu est trouvé.
+  const savedRecord = useLibrarySession(saved?.libraryFile ?? null)?.record ?? null;
   const error = useRecorderSelector((s) => s.error);
   const manualPause = isManualPause({ status, pausedReason });
   const autoPause = isAutoPause({ status, pausedReason });
@@ -1027,7 +1030,9 @@ function RecordingScreen() {
           </span>
         )}>
           <p className="rec-saved-text">
-            {saved.activity?.name ?? 'À classer'}, {saved.pointCount} points.<br />
+            {savedRecord
+              ? sessionDisplayName(savedRecord, saved.activity?.name ?? 'À classer')
+              : saved.activity?.name ?? 'À classer'}, {saved.pointCount} points.<br />
             <span className="ui-muted ui-text-s rec-break-all">Rangée dans : {saved.location}</span>
             {gearNotWritten && (
               <>

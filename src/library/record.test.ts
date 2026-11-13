@@ -252,6 +252,45 @@ describe('fond de carte de la fiche', () => {
   });
 });
 
+describe('lieu de la fiche', () => {
+  const place = { name: 'Carnon-Plage', source: 'carte' as const, lat: 43.549, lon: 3.981 };
+
+  it('relu, absent tant qu\'il n\'a pas été cherché, et gardé dans la fiche allégée', () => {
+    const back = parseRecord(serializeRecord(record({ place })))!;
+    expect(back.place).toEqual(place);
+    expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('place');
+    expect(parseRecord(serializeRecord(record({ place: { ...place, name: null } })))!.place).toEqual({ ...place, name: null });
+    expect(RECORD_LIGHT_FIELDS).toContain('place');
+    expect(lightRecord(back).place).toEqual(place);
+  });
+
+  it('mal formé : lu absent, mais réécrit tel quel tant qu\'aucun lieu neuf ne le remplace', () => {
+    const raw = { ...record(), place: { name: 'Futur', source: 'satellite', lat: 1, lon: 2 } };
+    const parsed = parseRecordWithRaw(JSON.stringify(raw))!;
+    expect(parsed.parts).not.toHaveProperty('place');
+    const kept = JSON.parse(serializeRecord(parsed.parts as SessionRecord, parsed.unreadable));
+    expect(kept.place).toEqual(raw.place);
+    const replaced = applyRecordPatch(parsed.parts as SessionRecord, { place }).record;
+    expect(JSON.parse(serializeRecord(replaced, parsed.unreadable)).place).toEqual(place);
+  });
+
+  it('posé ou retiré sans refaire le résumé ; un changement d\'activité ne le touche pas', () => {
+    const found = applyRecordPatch(record(), { place });
+    expect(found).toEqual({ record: { ...record(), place }, resummarize: false });
+    expect(applyRecordPatch(found.record, { place: { ...place } }).record).toBe(found.record);
+    expect(applyRecordPatch(found.record, { place: null }).record).not.toHaveProperty('place');
+    expect(applyRecordPatch(found.record, { activityId: 'kite', sport: 'kite' }).record.place).toEqual(place);
+  });
+
+  it('complété depuis une copie de la session, jamais écrasé', () => {
+    const { summary: _summary, ...incoming } = record({ place });
+    expect(completeRecord(record(), { ...incoming, summary: null })).toEqual({ record: record({ place }), resummarize: false });
+    const other = { ...place, name: 'Autre' };
+    expect(completeRecord(record({ place: other }), { ...incoming, summary: null }).record.place).toEqual(other);
+    expect(carryRecordEdits(record(), record({ place }))).toEqual({ record: record({ place }), resummarize: false });
+  });
+});
+
 describe('fiche allégée du cache', () => {
   const jumps: SessionJumps = { version: 1, computedAt: '2026-10-08T14:00:00.000Z', jumps: [] };
   const full = {

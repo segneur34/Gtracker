@@ -28,6 +28,7 @@ export const CLES = Object.freeze({
   restingHr: cle('restingHr'), planning: cle('planning'), routeList: cle('routeList'),
   triBibliotheque: cle('triBibliotheque'), heartRateBelts: cle('heartRateBelts'), memoryFolder: cle('memoryFolder'),
   permissionsSeenVersion: cle('permissionsSeenVersion'), tileCache: cle('tileCache'), tileUrls: cle('tileUrls'),
+  rechercheLieu: cle('rechercheLieu'),
 });
 /** Clés qui voyagent dans `values` de chaque `reglages/<appareil>.json` (`TRAVELLING_KEYS`, `library/settingsFile.ts`). */
 export const CLES_VOYAGEUSES = Object.freeze([CLES.sportSettings, CLES.athleteProfile]);
@@ -47,8 +48,13 @@ export const POIGNEE_RETOUR = 'gtrackerBack';
 /** Dossier de travail du banc dans le dossier temporaire du système. */
 export const DOSSIER_BANC = `${PREFIXE_CLE}-banc`;
 
-/** Domaines bloqués d'ordinaire : tuiles d'OpenStreetMap et imagerie satellite (l'application n'appelle plus ni l'IGN, ni Overpass, ni BRouter). */
-export const BLOCKED_URLS = ['*://*.openstreetmap.org/*', '*://server.arcgisonline.com/*'];
+/**
+ * Service de lieux (Photon), interrogé par la file des lieux de chaque session : bloqué dans tous les scripts, dès
+ * `connect` et quelle que soit la liste passée à `blockNetwork`, sauf une fois remplacé par `lib/lieux.mjs`.
+ */
+export const PLACES_URL = '*://photon.komoot.io/*';
+/** Domaines bloqués d'ordinaire : tuiles d'OpenStreetMap, imagerie satellite et service de lieux (l'application n'appelle plus ni l'IGN, ni Overpass, ni BRouter). */
+export const BLOCKED_URLS = ['*://*.openstreetmap.org/*', '*://server.arcgisonline.com/*', PLACES_URL];
 
 const DIAG = process.env.BANC_DIAG !== '0';
 /** Ligne de diagnostic, sur stderr. */
@@ -276,8 +282,24 @@ export const connect = async ({ port, base = BASE, width, height, shotDir, logEn
     return value;
   };
 
-  /** Bloque les adresses données (motifs de `Network.setBlockedURLs`) ; le réseau est déjà activé par `connect`. */
-  const blockNetwork = (urls = BLOCKED_URLS) => send('Network.setBlockedURLs', { urls });
+  /** Liste bloquée en vigueur, et service de lieux remplacé par `lib/lieux.mjs` (`allowPlaces`). */
+  let blocked = [];
+  let placesFaked = false;
+  /**
+   * Bloque les adresses données (motifs de `Network.setBlockedURLs`) ; le réseau est déjà activé par `connect`. Le
+   * service de lieux (`PLACES_URL`) y est toujours ajouté, sauf s'il est simulé.
+   */
+  const blockNetwork = (urls = BLOCKED_URLS) => {
+    blocked = urls.filter((u) => u !== PLACES_URL);
+    return send('Network.setBlockedURLs', { urls: placesFaked ? blocked : [...blocked, PLACES_URL] });
+  };
+  /** Débloque le service de lieux, que `lib/lieux.mjs` sert lui-même. */
+  const allowPlaces = () => {
+    placesFaked = true;
+    return blockNetwork(blocked);
+  };
+  // Aucun script n'interroge le vrai service de lieux, même sans appeler `blockNetwork`.
+  await blockNetwork([]);
 
   /**
    * Importe un GPX par le champ de fichier de la page (`File` et `DataTransfer`) : 'ok' ou 'absent'. L'écriture en
@@ -376,7 +398,7 @@ export const connect = async ({ port, base = BASE, width, height, shotDir, logEn
   };
 
   return {
-    send, evaluate, go, settle, waitFor, wait, vwait, blockNetwork, importGpx, importFiles, records, dumpText, shoot,
+    send, evaluate, go, settle, waitFor, wait, vwait, blockNetwork, allowPlaces, importGpx, importFiles, records, dumpText, shoot,
     mouse, click, clickText, check, finish, logs, close,
     /** Nombre d'échecs comptés par `check`. */
     failures: () => failures,

@@ -54,6 +54,7 @@ describe('noms techniques de l\'application', () => {
       permissionsSeenVersion: 'gtracker.permissionsSeenVersion',
       tileCache: 'gtracker.tileCache',
       tileUrls: 'gtracker.tileUrls',
+      rechercheLieu: 'gtracker.rechercheLieu',
     });
   });
 

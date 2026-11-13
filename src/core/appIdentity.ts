@@ -73,6 +73,7 @@ export const STORAGE_KEYS = {
   permissionsSeenVersion: `${APP_SLUG}.permissionsSeenVersion` as const,
   tileCache: `${APP_SLUG}.tileCache` as const,
   tileUrls: `${APP_SLUG}.tileUrls` as const,
+  rechercheLieu: `${APP_SLUG}.rechercheLieu` as const,
 };
 
 /** Caches du navigateur (Cache API, IndexedDB) et en-tête des tuiles gardées. */

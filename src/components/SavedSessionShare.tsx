@@ -54,7 +54,7 @@ function SavedSessionShare({ gpx, activity, fileName, libraryFile }: SavedSessio
       const track = sessionColorTrack(gpx, sport, record?.analysis?.referenceSpeedMs ?? null, family);
       if (track === null || summary === null) throw new Error('trace trop courte.');
       const range = track ? sessionSpeedRange(record ?? { analysis: null, sport }, activity ? activitySpeedRanges(activity) : null, family, track.suggested) : null;
-      const labels = shareLabels(record?.name ?? null, activity.name, FAMILY_LABEL[family], summary.startMs, libraryFile ?? fileName);
+      const labels = shareLabels(record ?? null, activity.name, FAMILY_LABEL[family], summary.startMs, libraryFile ?? fileName);
       const units = { speed: effectiveSpeedUnit(activity), distance: effectiveDistanceUnit(activity) };
       // Foil de la session, sinon celui de l'activité : « Temps en vol » au lieu de « Temps actif ».
       const foil = sessionFoil(record, effectiveFoil(activity));

@@ -39,7 +39,7 @@ export const sessionRecord = (patch: Partial<SessionRecord> = {}, summary: Parti
 /** Session des statistiques d'essai : un paddle d'une heure (calcul du surf, sans vague), 10 km, qui commence à `startMs`. */
 export const statSession = (startMs: number, over: Partial<StatSession> = {}): StatSession => ({
   file: `s-${startMs}.json`,
-  name: null,
+  name: 'Paddle',
   startMs,
   endMs: startMs + 3_600_000,
   distanceM: 10_000,

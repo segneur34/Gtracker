@@ -723,7 +723,7 @@ function StatisticsPage() {
                           <span className="ui-swatch" style={{ background: activityColor(pickedSession.activityId) }} />
                           <span className="stats-row__name">{dayMonthYear(pickedSession.startMs)}</span>
                           <span className="stats-row__meta num">
-                            {pickedSession.name ?? activityName(pickedSession.activityId)} · {pickedPoints.map(({ label, point }) => pointText(label, point)).join(' · ')}
+                            {pickedSession.name} · {pickedPoints.map(({ label, point }) => pointText(label, point)).join(' · ')}
                             {pickedPoints.some(({ point }) => point.isRecord) ? ' · record' : ''}
                           </span>
                           <span className="stats-row__open">Ouvrir</span>
@@ -889,7 +889,7 @@ function StatisticsPage() {
                                   <span className="ui-swatch" style={{ background: activityColor(s.activityId) }} />
                                   <span className="stats-row__name num">{recordValue(kind, value, s)}</span>
                                   <span className="stats-row__meta">
-                                    {dayMonthYear(s.startMs)} · {s.name ?? activityName(s.activityId)}
+                                    {dayMonthYear(s.startMs)} · {s.name}
                                   </span>
                                   <IconChevronRight size={16} className="stats-row__chevron" />
                                 </button>
