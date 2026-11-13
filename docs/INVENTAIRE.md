@@ -188,6 +188,7 @@ Dans `sailing/` aussi : `pointData.ts` (`PointData` et `trackToPointData`, vue e
 
 - `activityPresets.ts` : pré-réglages des activités (point 130), par calcul et par activité de départ (`presetOf`) ; peut importer les domaines, seul `hooks/useSportSettings.ts` l'appelle.
 - `activitySettings.ts` (+ test) : calcul pur des réglages par activité (lot 72) : valeurs par défaut, assainissement, réglages effectifs (seuil, allure, couleurs, options du résumé et de l'analyse), sorti de `hooks/useSportSettings.ts` ; `gear.ts` (+ test) : calcul des groupes de matériel.
+- `gearReminder.ts` (+ test) : règle pure du rappel du matériel à l'analyse qui suit un enregistrement (liste de matériel cochée, session sans matériel, moins de deux fermetures) et son compte par activité.
 
 ## `hooks/`
 
@@ -248,6 +249,7 @@ Dans `sailing/` aussi : `pointData.ts` (`PointData` et `trackToPointData`, vue e
 - `components/ProfileActivities.tsx` (+ `.css`) : colonne « Vos activités » du Profil sur ordinateur seulement : rangée de logos (`ActivityBubbles`) qui filtre sur place, « Toutes les sessions » (ouvre Sessions avec le filtre), les cinq dernières sessions en `SessionRow` sans « … ».
 - `StatisticsPage.tsx` (+ `.css`) : statistiques (§10, point 103) ; boutons glissants de famille, d'activité et de période (point 132), choix dans l'adresse, dernier choix retenu sur l'appareil et repris sans paramètre (point 121) ; onglets général, graphique (donnée au choix, retenue, point 122), régularité, records et cardio, panneaux comme les analyses, sans carte.
 - `TutorialsPage.tsx`, `TutorialPage.tsx` : liste des 14 leçons (lues cochées) et page d'une leçon avec « Essayer », précédente et suivante ; retour d'Android leçon → liste → Réglages (`core/parentPage.ts`, point 277).
+- `components/GearReminder.tsx` : fenêtre « Voulez-vous ajouter le matériel ? », pièce commune aux deux analyses, branchée dans `AnalysisShell` ; ne s'ouvre qu'à l'analyse qui suit la fin d'un enregistrement (compte rendu de l'enregistreur), « Oui » ouvre l'onglet du matériel.
 - `components/ActivityBubbles.tsx` (+ `.css`) : rangée « Toutes » puis un logo par activité visible, qui filtre la liste et se fait glisser de côté.
 - `components/SessionRow.tsx` (+ `.css`) : ligne d'une session (`React.memo` à rappels stables) et son « … » : Classer, Renommer, Supprimer (avec confirmation) ; `menu={false}` pour une ligne sans « … » (Profil).
 - `components/SessionPreviewMap.tsx` (+ `.css`) : vignette de la trace à droite des chiffres : image fixe sur canevas (`drawTrackPreview.ts`, trace réduite au demi-pixel (`thinToPixels`)), images tenues en mémoire (`heldCache`, 200 au plus) puis image finie gardée sur l'appareil (lot 121), GPX relu quand la ligne approche de l'écran, un toucher ouvre l'analyse ; bornes de couleur comme le module d'analyse ; aucune carte Leaflet (point 213).

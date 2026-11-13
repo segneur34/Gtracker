@@ -167,6 +167,11 @@ export interface StoredSettings {
    */
   gearGroups?: ByActivity<GearGroup[]>;
   /**
+   * Fois où la fenêtre « Voulez-vous ajouter le matériel ? » a été fermée sans rien ajouter, par activité ;
+   * absent : zéro. Sans case dans Réglages : le compte seul décide si le rappel revient (`settings/gearReminder.ts`).
+   */
+  gearReminderCloses?: ByActivity<number>;
+  /**
    * Onglets des analyses montrés ou cachés à l'écart de leur défaut, par clé
    * d'onglet (`core/analysisTabs.ts`) ; absents : ceux du module, sans les génériques.
    */
@@ -202,6 +207,16 @@ export const isValidAutoPause = (value: unknown): value is { speedMs: number; de
   return isValidThreshold(speedMs) && isValidThreshold(delayS);
 };
 
+
+/** Compte de fermetures admis : un entier positif ou nul. */
+const isValidReminderCloses = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0;
+
+/** Fermetures sans ajout du rappel du matériel pour cette activité ; zéro sans compte ou compte abîmé. */
+export const resolveGearReminderCloses = (stored: StoredSettings, id: string): number => {
+  const own = stored.gearReminderCloses?.[id];
+  return isValidReminderCloses(own) ? own : 0;
+};
 
 /** Seuil fixé pour une activité, réglé ou pré-réglé ; `null` : le défaut du calcul (en voile, la suggestion selon l'allure). */
 export const resolveThresholdOverride = (stored: StoredSettings, activity: Activity): number | null => {
@@ -409,6 +424,8 @@ export interface SportSettingsView {
   gearLabels: [string, string] | null;
   /** Matériel enregistré ; `null` : option coupée ; liste vide : option cochée, rien de créé. */
   gearGroups: GearGroup[] | null;
+  /** Fermetures sans ajout du rappel du matériel à l'analyse ; zéro sans compte. */
+  gearReminderCloses: number;
   /** Onglets des analyses montrés ou cachés à l'écart de ceux du module ; `null` sans choix ni pré-réglage. */
   tabs: TabChoices | null;
   isTabsOverridden: boolean;
@@ -420,16 +437,16 @@ export interface SportSettingsView {
 export type PerActivityKey = (typeof PER_ACTIVITY_KEYS)[number];
 export const PER_ACTIVITY_KEYS = [
   'thresholds', 'speedUnits', 'distanceUnits', 'speedRanges', 'autoPause', 'hrOffsets', 'gearLabels', 'gearGroups',
-  'tabs', 'liveFields', 'notificationFields', 'markGuide', 'foils', 'pumping', 'turns', 'jumps',
+  'gearReminderCloses', 'tabs', 'liveFields', 'notificationFields', 'markGuide', 'foils', 'pumping', 'turns', 'jumps',
   'heartRate', 'hrZoneLines',
 ] as const;
 
 /**
  * Ce que « Par défaut » garde : le matériel enregistré, une liste de
- * l'utilisateur et non une surcharge d'un défaut ; la suppression de
- * l'activité l'efface.
+ * l'utilisateur et non une surcharge d'un défaut, et le compte des fermetures du
+ * rappel du matériel, qui n'est pas un réglage ; la suppression de l'activité les efface.
  */
-const KEPT_BY_RESET: readonly PerActivityKey[] = ['gearGroups'];
+const KEPT_BY_RESET: readonly PerActivityKey[] = ['gearGroups', 'gearReminderCloses'];
 
 /** Réglages sans aucune surcharge rangée sous `id`, hors des clés de `keep`. */
 export const withoutOverrides = (stored: StoredSettings, id: string, keep: readonly PerActivityKey[] = []): StoredSettings => {
@@ -495,6 +512,7 @@ export const settingsView = (stored: StoredSettings, activity: Activity): SportS
     hrZoneLines: effectiveHrZoneLines(stored, activity),
     gearLabels: sanitizeGearLabels(stored.gearLabels?.[id]),
     gearGroups: sanitizeGearGroups(stored.gearGroups?.[id]),
+    gearReminderCloses: resolveGearReminderCloses(stored, id),
     tabs: sanitizeTabChoices(stored.tabs?.[id]) ?? defaultTabsOf(activity),
     isTabsOverridden: sanitizeTabChoices(stored.tabs?.[id]) !== null,
   };
@@ -504,7 +522,7 @@ export const settingsView = (stored: StoredSettings, activity: Activity): SportS
 export type SettingField =
   | 'speedUnit' | 'distanceUnit' | 'activeThreshold' | 'speedRange' | 'autoPause' | 'liveFields'
   | 'notificationFields' | 'markGuide' | 'foil' | 'pumping' | 'turns' | 'jumps' | 'heartRate'
-  | 'hrOffset' | 'gearLabels' | 'gearGroups' | 'tabs' | 'hrZoneLines';
+  | 'hrOffset' | 'gearLabels' | 'gearGroups' | 'gearReminderCloses' | 'tabs' | 'hrZoneLines';
 
 /**
  * Règle d'écriture d'un champ : la table où il se range, et la valeur rangée
@@ -595,6 +613,7 @@ export const SETTING_FIELDS: Record<SettingField, SettingFieldRule> = {
   // Deux intitulés vides : ceux par défaut, la surcharge est effacée.
   gearLabels: { key: 'gearLabels', normalize: (v) => (v === null ? null : Array.isArray(v) ? sanitizeGearLabels(v) : undefined) },
   gearGroups: { key: 'gearGroups', normalize: sanitized(sanitizeGearGroups) },
+  gearReminderCloses: { key: 'gearReminderCloses', normalize: plain(isValidReminderCloses) },
   tabs: {
     key: 'tabs',
     normalize: (v) => {

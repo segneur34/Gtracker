@@ -61,7 +61,8 @@ import { shownMarkOf, useSessionMarks } from '../hooks/useSessionMarks';
 import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useFlightPumping, useSessionPumping, type PumpingStatus } from '../hooks/useSessionPumping';
-import { useSportSettings } from '../hooks/useSportSettings';
+import { useHasGearList, useSportSettings } from '../hooks/useSportSettings';
+import { notesHaveGear } from '../settings/gearReminder';
 import type { SurfFlight, SurfPhase, SurfReturn, SurfSpan, SurfWave } from '../surfing/surfAnalysis';
 import { effectiveWaveThreshold, runSurfSession, surfProfileOf } from '../surfing/surfSession';
 import { gyroWaveTurns } from '../surfing/gyroTurns';
@@ -176,9 +177,11 @@ function SurfModule() {
   const waveThreshold = surfProfile ? effectiveWaveThreshold(surfProfile.surf, draft.edits.waveThreshold) : 0;
 
   // Onglets de l'activité, rangée « avancé », surbrillance unique de la carte, point survolé effacé à chaque session.
-  const { open, toggle, toggleOf, closeAll, advanced, shown, highlight } = useAnalysisTabs({
+  const { open, toggle, toggleOf, reveal, closeAll, advanced, shown, highlight } = useAnalysisTabs({
     tabs: SURF_TABS, defaults: SURF_SECTION_DEFAULTS, activity, sessionKey: gpx.sessionKey,
   });
+  /** L'activité a une liste de matériel : de quoi proposer le rappel qui suit un enregistrement (`GearReminder`). */
+  const hasGearList = useHasGearList(activity);
   const graphFolds = useOpenSections(`${STORAGE_ID}.graphes`, GRAPH_FOLDS_DEFAULT);
   /** FC de la session (ceinture, montre) et zones du pratiquant : l'onglet « cardio » et sa courbe sous la vitesse. */
   const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(gpx.track, profile.heartRate, hrOffsetBpm);
@@ -474,6 +477,12 @@ function SurfModule() {
       share={{ segments: mapSegments, stats: generalStats }} error={sessionError} draft={draft} loadError={gpx.error}
       reading={reading}
       empty={!summary && !gpx.error && requestedFile === null}
+      gearReminder={{
+        activityId: activity.id, hasGearList, ready: shownFile !== null && draftRecord !== null,
+        sessionHasGear: notesHaveGear(draft.edits.notes, gearFieldsFor(gearLabels)),
+        tabShown: sections.some((s) => s.key === 'notes'), tabLabel: 'matériel et notes',
+        covered: mapExpanded, onAdd: () => reveal('notes'),
+      }}
       map={{
         panelId: panelId('carte'),
         expanded: mapExpanded,

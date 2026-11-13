@@ -10,6 +10,7 @@ import { dismissRecorderResult, useRecorderSelector } from '../hooks/useRecorder
 import type { useSessionDraft } from '../hooks/useSessionDraft';
 import AnalysisMap, { ANALYSIS_MAP_ANCHOR, type AnalysisMapProps } from './AnalysisMap';
 import CollapsibleSectionTabs from './CollapsibleSectionTabs';
+import GearReminder, { type GearReminderProps } from './GearReminder';
 import type { SectionDefinition } from './SectionTabs';
 import SessionNameEditor from './SessionNameEditor';
 import SessionSaveBar from './SessionSaveBar';
@@ -55,6 +56,8 @@ interface AnalysisShellProps<K extends string> {
   empty: boolean;
   /** Session demandée pas encore lue : « Lecture de la session… », à la place de la phrase d'`empty`. */
   reading?: boolean;
+  /** Rappel du matériel (`GearReminder`) ; absent pour ne pas en poser. Le fichier est celui de la page. */
+  gearReminder?: Omit<GearReminderProps, 'file'>;
   /** Rangée de la carte ; absente pour une session sans trace. */
   map?: ShellMap;
   tabs: ShellTabs<K> | null;
@@ -93,7 +96,7 @@ const mapRow = ({ rowZIndex, ...props }: ShellMap) => (
  * sont celles d'`analysisMobile.css`.
  */
 function AnalysisShell<K extends string>({
-  title, family, backLabel, file, share, error, draft, loadError, alerts, empty, reading = false, map, tabs,
+  title, family, backLabel, file, share, error, draft, loadError, alerts, empty, reading = false, gearReminder, map, tabs,
 }: AnalysisShellProps<K>) {
   // Le filtre d'activité de la page Sessions d'où l'on vient est rendu au retour.
   const [params] = useSearchParams();
@@ -120,6 +123,7 @@ function AnalysisShell<K extends string>({
       )}
 
       <RecorderNotice file={file} />
+      {gearReminder && <GearReminder file={file} {...gearReminder} />}
 
       {alerts}
 

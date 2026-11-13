@@ -238,8 +238,8 @@ describe('isActivityOverridden', () => {
     hrZoneLines: { activity: surf, value: true },
   };
 
-  it('couvre chaque table rangée par activité, le matériel enregistré excepté', () => {
-    expect([...PER_ACTIVITY_KEYS].filter((k) => k !== 'gearGroups').sort()).toEqual(Object.keys(SAMPLES).sort());
+  it('couvre chaque table rangée par activité, le matériel enregistré et le compte du rappel du matériel exceptés', () => {
+    expect([...PER_ACTIVITY_KEYS].filter((k) => k !== 'gearGroups' && k !== 'gearReminderCloses').sort()).toEqual(Object.keys(SAMPLES).sort());
   });
 
   it('est faux sans aucun réglage', () => {
@@ -264,6 +264,12 @@ describe('isActivityOverridden', () => {
     const groups = [{ id: 'g-mat', name: 'Aile', items: [{ id: 'i1', name: '5 m' }] }];
     const stored = { gearGroups: { [wing.id]: groups } } as StoredSettings;
     expect(resetOverrides(stored, wing.id).gearGroups?.[wing.id]).toEqual(groups);
+    expect(isActivityOverridden(settingsView(stored, wing))).toBe(false);
+  });
+
+  it('ne compte pas le compte des fermetures du rappel du matériel, que « Par défaut » garde', () => {
+    const stored = { gearReminderCloses: { [wing.id]: 2 } } as StoredSettings;
+    expect(resetOverrides(stored, wing.id).gearReminderCloses?.[wing.id]).toBe(2);
     expect(isActivityOverridden(settingsView(stored, wing))).toBe(false);
   });
 });

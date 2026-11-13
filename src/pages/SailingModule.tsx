@@ -10,7 +10,8 @@ import { useAnalysisTabs } from '../hooks/useAnalysisTabs';
 import { useSailingSession } from '../hooks/useSailingSession';
 import { updateSessionRecord } from '../hooks/useSessionLibrary';
 import { heartRateShareStats, shareExtraStats } from '../library/shareStats';
-import { effectiveHrOffset, useSportSettings } from '../hooks/useSportSettings';
+import { effectiveHrOffset, useHasGearList, useSportSettings } from '../hooks/useSportSettings';
+import { notesHaveGear } from '../settings/gearReminder';
 import { useShownJumps } from '../hooks/useSessionJumps';
 import { useFlightPumping, useSessionPumping } from '../hooks/useSessionPumping';
 import { shownMarkOf, useSessionMarks } from '../hooks/useSessionMarks';
@@ -214,9 +215,11 @@ function SailingModule() {
   const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(track, profile.heartRate, effectiveHrOffset(activity));
   // Onglets de l'activité, rangée « avancé », point survolé effacé à chaque session ; une seule surbrillance
   // sur la carte, effacée quand son onglet se ferme (`useMapHighlight`).
-  const { open, toggle, toggleOf, closeAll, advanced, shown, highlight } = useAnalysisTabs({
+  const { open, toggle, toggleOf, reveal, closeAll, advanced, shown, highlight } = useAnalysisTabs({
     tabs: SAILING_TABS, defaults: SAILING_PANEL_DEFAULTS, activity, sessionKey,
   });
+  /** L'activité a une liste de matériel : de quoi proposer le rappel qui suit un enregistrement (`GearReminder`). */
+  const hasGearList = useHasGearList(activity);
   // Sauts mesurés par les capteurs du téléphone : ceux de la fiche, sinon calculés depuis le `.imu`.
   const jumps = useShownJumps({
     file: loadedFromMemory ? sessionFile : null, track, profile, activity, thresholdMs: knotsToMs(activeThresholdKn), highlight,
@@ -561,6 +564,12 @@ function SailingModule() {
       )}
       empty={trackData.length === 0 && requestedFile === null}
       reading={reading || trackReading}
+      gearReminder={{
+        activityId: activity.id, hasGearList, ready: loadedFromMemory && draftRecord !== null,
+        sessionHasGear: notesHaveGear(edits.notes, foil ? SAILING_GEAR_FIELDS_FOIL : SAILING_GEAR_FIELDS),
+        tabShown: sailingPanels.some((p) => p.key === 'matos'), tabLabel: 'matos et conditions',
+        covered: mapExpanded || windAdjust, onAdd: () => reveal('matos'),
+      }}
       map={{
         panelId: 'sailing.carte',
         rowZIndex: 0,

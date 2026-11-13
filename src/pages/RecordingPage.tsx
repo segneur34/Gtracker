@@ -50,7 +50,7 @@ import { librarySession, updateSessionRecord } from '../hooks/useSessionLibrary'
 import { EMPTY_NOTES, type GearChoice } from '../library/notes';
 import {
   addRecordingMark, analyzePendingSession, changeRecordingActivity, continuePendingSession, discardPendingSession, dismissRecorderResult,
-  finishingPendingSession, getLastFix, getLiveFixes, getLiveHeadingFixes, getLiveSegmentCount, getRecorderState, markRecorderResultOpened, pauseRecording,
+  finishingPendingSession, getLastFix, getLiveFixes, getLiveHeadingFixes, getLiveSegmentCount, markRecorderResultOpened, pauseRecording,
   resumeRecording, startRecording, stopRecording, stopRecordingBeltSearch, type RecorderState,
   useLivePosition, useRecordingClock, useRecorderSelector,
 } from '../hooks/useRecorder';
@@ -655,10 +655,9 @@ function RecordingScreen() {
   // ouverture refusée pour garder un brouillon), la carte « Session rangée » l'annonce, avec son message.
   const resultOpened = useRecorderSelector((s) => s.resultOpened);
   const savedOpened = saved !== null && resultOpened;
-  /** Ouvre l'analyse de la session rangée ; son message, s'il y en a un, la suit. */
+  /** Ouvre l'analyse de la session rangée ; son message, s'il y en a un, et le rappel du matériel la suivent. */
   const openSaved = (file: string, sport: SportType) => {
-    if (getRecorderState().error === null) dismissRecorderResult();
-    else markRecorderResultOpened();
+    markRecorderResultOpened();
     openSession(file, sportFamily(sport));
   };
   // Matériel choisi à la fin de la session, vide d'office : remis à zéro pour chaque session en attente.

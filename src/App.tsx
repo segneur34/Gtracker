@@ -6,7 +6,7 @@ import AppShell from './components/AppShell';
 import { DevThrow } from './components/ErrorBoundary';
 import { confirmLeave } from './hooks/leaveGuard';
 import {
-  acknowledgeRecordingLanding, dismissRecorderResult, finishPendingSession, getRecorderState, markRecorderResultOpened, useRecorderSelector,
+  acknowledgeRecordingLanding, finishPendingSession, markRecorderResultOpened, useRecorderSelector,
 } from './hooks/useRecorder';
 import ProfilePage from './pages/ProfilePage';
 
@@ -104,8 +104,8 @@ function LandOnRecording() {
 /**
  * Fin d'un enregistrement : la session en attente se range seule (`finishPendingSession`), à l'arrêt comme
  * à la réouverture après une coupure, puis son analyse s'ouvre, à la place de la page Enregistrer (le retour mène à
- * la page Sessions). Un message de l'enregistreur (avertissement de l'arrêt, ménage en échec) reste pour l'analyse,
- * qui le montre. Rien ne s'ouvre si le rangement échoue (la carte de la session sert de filet), si la session n'est
+ * la page Sessions). Le compte rendu de l'enregistreur reste pour l'analyse, qui y reconnaît sa propre fin
+ * d'enregistrement : le message (avertissement de l'arrêt, ménage en échec) qu'elle montre, le rappel du matériel. Rien ne s'ouvre si le rangement échoue (la carte de la session sert de filet), si la session n'est
  * pas entrée dans la mémoire ou reste à classer, ou si un brouillon ouvert n'est pas abandonné (`confirmLeave`) : la
  * carte « Session rangée » d'Enregistrer l'annonce alors, avec son message et « Analyser ». Une session reprise qui
  * peut continuer attend « Continuer » sur Enregistrer.
@@ -125,8 +125,9 @@ function FinishRecording() {
       if (saved?.libraryFile == null || saved.sport === null) return;
       // Brouillon gardé : rien ne s'ouvre, la carte « Session rangée » d'Enregistrer reste (`resultOpened` faux).
       if (!confirmLeave()) return;
-      if (getRecorderState().error === null) dismissRecorderResult();
-      else markRecorderResultOpened();
+      // Le compte rendu reste, marqué ouvert : l'analyse y lit sa propre fin d'enregistrement (avertissement, rappel
+      // du matériel) et l'efface elle-même.
+      markRecorderResultOpened();
       // Depuis Enregistrer, l'analyse prend sa place dans l'historique.
       const fromRecording = where.current.replace(/\/+$/, '') === '/enregistrer';
       navigate(analysisPath(sportFamily(saved.sport), saved.libraryFile), { replace: fromRecording });

@@ -21,7 +21,7 @@ import { resolveGearGroups, resolveGearLabels, sanitizeGearGroups, withGearItem 
 import {
   DEFAULT_LONG_PRESS_MS, DEFAULT_STOP_HOLD_MS, defaultSpeedRangeOf, hiddenFamiliesOf, isValidLongPress, isValidStopHold,
   moduleActivity, resetOverrides,
-  resolveDistanceUnit, resolveFoil, resolveHeartRate, resolveHrOffset, resolveJumps, resolveLiveFields,
+  resolveDistanceUnit, resolveFoil, resolveGearReminderCloses, resolveHeartRate, resolveHrOffset, resolveJumps, resolveLiveFields,
   resolveMarkGuide, resolveNotificationFields, resolvePumping, resolveRecordingProfile, resolveTurns, resolveSpeedRange, resolveSpeedUnit,
   resolveTabChoices, resolveThresholdOverride, settingsView, withSetting, withVisibility, withoutOverrides,
   type SettingField, type SportSettingsView, type StoredSettings,
@@ -75,6 +75,26 @@ export const addGearItem = (activityId: string, groupId: string, name: string): 
   if (!next) return null;
   writeStored({ ...stored, gearGroups: { ...stored.gearGroups, [activityId]: next.groups } });
   return next.item;
+};
+
+/**
+ * Vrai si l'activité a une liste de matériel : l'option est cochée dans Réglages, avec ou sans pièce créée.
+ * Suivi en direct, sur la même table que `useGearGroups`.
+ */
+export const useHasGearList = (activity: Activity | null): boolean => {
+  const map = useSyncExternalStore(gearGroupsMap.subscribe, gearGroupsMap.get);
+  const id = activity?.id ?? null;
+  return id !== null && sanitizeGearGroups(map?.[id]) !== null;
+};
+
+/** Fermetures sans ajout du rappel du matériel déjà comptées pour l'activité, relues à l'instant. */
+export const gearReminderClosesOf = (activityId: string): number => resolveGearReminderCloses(readStoredSettings(), activityId);
+
+/** Compte une fermeture de plus du rappel du matériel pour l'activité (rangée dans les réglages de l'appareil). */
+export const countGearReminderClose = (activityId: string): void => {
+  const stored = readStoredSettings();
+  const next = withSetting(stored, activityId, 'gearReminderCloses', resolveGearReminderCloses(stored, activityId) + 1);
+  if (next) writeStored(next);
 };
 
 /** Décalage des seuils cardio d'une activité, hors composant (direct, test guidé). */

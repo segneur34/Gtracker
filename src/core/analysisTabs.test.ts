@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SAILING_TABS, SURF_TABS, activityTabs, analysisTabs, closeAllTabs, generalOpenAfterAdvanced, initialTabsState, isTabShown, maskAdvancedTabs, maskHiddenTabs, sanitizeTabChoices, shownTabs, tabDefaults, tabsStateFor, toggleTabChoice,
+  SAILING_TABS, SURF_TABS, activityTabs, analysisTabs, closeAllTabs, generalOpenAfterAdvanced, initialTabsState, isTabShown, maskAdvancedTabs, maskHiddenTabs, revealTab, sanitizeTabChoices, shownTabs, tabDefaults, tabsStateFor, toggleTabChoice,
   type TabChoices,
 } from './analysisTabs';
 import { SPORT_PROFILES } from './sportProfiles';
@@ -240,6 +240,36 @@ describe('« avancé » et « général »', () => {
   it('ouvrir « avancé » ferme « général », le refermer le rouvre', () => {
     expect(generalOpenAfterAdvanced(true)).toBe(false);
     expect(generalOpenAfterAdvanced(false)).toBe(true);
+  });
+
+  const openKeys = (open: Record<string, boolean>) => Object.entries(open).filter(([, v]) => v).map(([k]) => k);
+
+  it('ouvrir un onglet depuis ailleurs déplie « avancé », ferme « général » et ouvre l\'onglet (voile et surf)', () => {
+    const sailing = revealTab(initialTabsState(tabDefaults(SAILING_TABS), 'a|1'), SAILING_TABS, 'matos');
+    expect(sailing.advanced).toBe(true);
+    expect(openKeys(sailing.open)).toEqual(['matos']);
+    const surf = revealTab(initialTabsState(tabDefaults(SURF_TABS), 'a|1'), SURF_TABS, 'notes');
+    expect(surf.advanced).toBe(true);
+    expect(openKeys(surf.open)).toEqual(['notes']);
+  });
+
+  it('« avancé » déjà ouvert : les autres onglets ouverts restent, « général » n\'est pas touché', () => {
+    const state = { key: 'a|1', open: { ...tabDefaults(SAILING_TABS), general: false, tops: true }, advanced: true };
+    const next = revealTab(state, SAILING_TABS, 'matos');
+    expect(openKeys(next.open)).toEqual(['tops', 'matos']);
+    expect(next.advanced).toBe(true);
+  });
+
+  it('l\'onglet déjà ouvert : l\'état est rendu tel quel', () => {
+    const state = { key: 'a|1', open: { ...tabDefaults(SAILING_TABS), general: false, matos: true }, advanced: true };
+    expect(revealTab(state, SAILING_TABS, 'matos')).toBe(state);
+  });
+
+  it('un onglet de la première rangée s\'ouvre sans déplier « avancé »', () => {
+    const state = { key: 'a|1', open: { ...tabDefaults(SAILING_TABS), general: false }, advanced: false };
+    const next = revealTab(state, SAILING_TABS, 'general');
+    expect(next.advanced).toBe(false);
+    expect(next.open.general).toBe(true);
   });
 });
 

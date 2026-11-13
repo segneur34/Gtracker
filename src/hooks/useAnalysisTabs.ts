@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { Activity } from '../core/activities';
 import {
-  closeAllTabs, generalOpenAfterAdvanced, initialTabsState, maskAdvancedTabs, maskHiddenTabs, shownTabs, tabsStateFor,
+  closeAllTabs, generalOpenAfterAdvanced, initialTabsState, maskAdvancedTabs, maskHiddenTabs, revealTab, shownTabs, tabsStateFor,
   type AnalysisTab, type AnalysisTabsState,
 } from '../core/analysisTabs';
 import { useResetChartHover } from './useChartHover';
@@ -43,6 +43,8 @@ export const useAnalysisTabs = <K extends string>({ tabs, defaults, activity, se
   const toggle = useCallback((key: K) => change((s) => ({ ...s, open: { ...s.open, [key]: !s.open[key] } })), [change]);
   /** Ouvrir ou fermer des clés données, sans les basculer. */
   const set = useCallback((patch: Partial<Record<K, boolean>>) => change((s) => ({ ...s, open: { ...s.open, ...patch } })), [change]);
+  /** Ouvre un onglet depuis ailleurs que la barre, en dépliant « avancé » s'il en fait partie (`revealTab`). */
+  const reveal = useCallback((key: K) => change((s) => revealTab(s, tabs, key)), [change, tabs]);
   /** « tout fermer » : chaque onglet fermé, « général » compris ; « avancé » reste comme il est. */
   const closeAll = useCallback(() => change((s) => ({ ...s, open: closeAllTabs(s.open) })), [change]);
 
@@ -78,5 +80,5 @@ export const useAnalysisTabs = <K extends string>({ tabs, defaults, activity, se
     [tabs, tabChoices]
   );
 
-  return { open, toggle, toggleOf, set, closeAll, tabChoices, advanced, shown, highlight };
+  return { open, toggle, toggleOf, set, reveal, closeAll, tabChoices, advanced, shown, highlight };
 };

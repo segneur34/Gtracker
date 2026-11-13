@@ -220,6 +220,21 @@ export const initialTabsState = <K extends string>(defaults: Record<K, boolean>,
 export const tabsStateFor = <K extends string>(state: AnalysisTabsState<K>, defaults: Record<K, boolean>, key: string | null): AnalysisTabsState<K> =>
   key !== null && key !== state.key ? initialTabsState(defaults, key) : state;
 
+/**
+ * Onglet ouvert depuis ailleurs que la barre (« Oui » du rappel du matériel) : la rangée « avancé » s'ouvre s'il en
+ * fait partie, ce qui ferme « général » comme le fait sa pastille, et l'onglet s'ouvre. Rend l'état reçu tel quel
+ * quand l'onglet est déjà ouvert sans rien à déplier.
+ */
+export const revealTab = <K extends string>(state: AnalysisTabsState<K>, tabs: readonly AnalysisTab<K>[], key: K): AnalysisTabsState<K> => {
+  const inAdvanced = tabs.find((tab) => tab.key === key)?.primary !== true;
+  if (state.open[key] && (!inAdvanced || state.advanced)) return state;
+  const open: Record<K, boolean> = { ...state.open, [key]: true };
+  if (inAdvanced && !state.advanced) {
+    for (const tab of tabs) if (tab.primary === true) open[tab.key] = generalOpenAfterAdvanced(true);
+  }
+  return { ...state, advanced: inAdvanced ? true : state.advanced, open };
+};
+
 /** « tout fermer » : chaque onglet fermé, « général » compris ; « avancé » ne change pas. */
 export const closeAllTabs = <K extends string>(open: Record<K, boolean>): Record<K, boolean> =>
   Object.fromEntries(Object.keys(open).map((key) => [key, false])) as Record<K, boolean>;
