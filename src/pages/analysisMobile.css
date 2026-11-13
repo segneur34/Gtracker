@@ -343,7 +343,13 @@
   .an-map-panel {
     order: -1;
     flex: none !important;
-    width: 100% !important;
+    /* Téléphone droit : la carte sort des marges de la page et va d'un bord à l'autre de l'écran, sans
+       cadre ni coins sur les côtés (le haut et le bas gardent leur trait) ; le téléphone tourné, plus bas,
+       annule ces trois points. */
+    width: calc(100% + 2 * var(--space-5)) !important;
+    max-width: none !important;
+    margin-left: calc(-1 * var(--space-5));
+    margin-right: calc(-1 * var(--space-5));
     height: auto !important;
     resize: none !important;
     margin-bottom: var(--space-2);
@@ -353,6 +359,18 @@
     flex: none !important;
     height: 30vh;
     cursor: pointer;
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  /* Boutons et mention OSM en retrait des bords, marges sûres comprises. */
+  .an-map-frame .leaflet-left .leaflet-control {
+    margin-left: max(10px, var(--inset-left));
+  }
+
+  .an-map-frame .leaflet-right .leaflet-control {
+    margin-right: max(10px, var(--inset-right));
   }
 
   /* Feuille réduite à l'en-tête, sur une ligne au-dessus de la carte : la flèche de retour, le nom
@@ -562,12 +580,22 @@
     bottom: calc(var(--space-3) + var(--inset-bottom));
     left: calc(var(--shell-left) + var(--space-3));
     width: calc(var(--an-map-w) - var(--space-3)) !important;
-    margin-bottom: 0;
+    margin: 0;
   }
 
   .an-map-frame {
     flex: 1 1 auto !important;
     height: auto;
+    border-radius: var(--radius-m) !important;
+    border: 1px solid var(--line-strong) !important;
+  }
+
+  .an-map-frame .leaflet-left .leaflet-control {
+    margin-left: 10px;
+  }
+
+  .an-map-frame .leaflet-right .leaflet-control {
+    margin-right: 10px;
   }
 
   .an-map-overlay {

@@ -22,7 +22,7 @@ Patron commun aux modules d'analyse (voile, surf) et à tout sport à venir. La 
   - un simple bloc en demi-ligne doit compter sa marge intérieure (`box-sizing: border-box`, porté par `HALF_PANEL_STYLE`), sinon il ne tient plus à côté de son voisin.
 - **Sur téléphone** :
   - l'en-tête tient sur une ligne, tout en haut (`order: -2`) : la flèche de retour, le nom et « Renommer ». Le titre et le texte du lien de retour restent lus par un lecteur d'écran ;
-  - la rangée de la carte s'efface (`display: contents`) : la carte suit l'en-tête (`order: -1`), en pleine largeur, haute de 30 vh ; la colonne d'onglets (`an-carte-col`) vient ensuite ;
+  - la rangée de la carte s'efface (`display: contents`) : la carte suit l'en-tête (`order: -1`), en pleine largeur, haute de 30 vh ; téléphone droit, elle sort des marges de la page et va d'un bord à l'autre de l'écran, sans cadre ni coins sur les côtés (boutons et mention OSM en retrait des bords, marges sûres comprises) ; la colonne d'onglets (`an-carte-col`) vient ensuite ;
   - les onglets sont de petites pastilles serrées, sans trait dessous, qui suivent de près la carte ;
   - les blocs `ResizablePanel` y sont en pleine largeur, sans poignée, à leur hauteur par défaut ; les explications longues se replient derrière `HelpButton` ;
   - un toucher sur la carte l'ouvre en plein écran (× pour fermer) ;
