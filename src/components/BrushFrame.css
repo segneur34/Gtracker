@@ -8,7 +8,11 @@
    `--brush-trait`. Sans prise en charge du masque en bordure, le cadre garde son trait fin d'origine.
 
    `.brush-frame` se pose sur un cadre ; `.brush-frames` sur un conteneur dont les cartes (`.ui-card`) sont toutes peintes,
-   l'ouverture tournant d'une carte à la suivante. Le type en tête (`section`) l'emporte sur `.ui-card-col`. */
+   l'ouverture tournant d'une carte à la suivante. Le type en tête (`section`) l'emporte sur `.ui-card-col`.
+
+   `.brush-panels` se pose sur un conteneur dont tous les enfants directs sont des panneaux peints, en trait fin
+   (`--brush-trait-fine`, `tokens.css`) : panneaux des analyses. Leur bordure et leurs marges viennent d'un style en ligne,
+   que `!important` remplace. Un panneau redimensionné plus petit que son contenu défile : le trait défile avec lui. */
 
 @supports (-webkit-mask-box-image: none) {
   section.brush-frame,
@@ -19,8 +23,22 @@
     border: 0;
   }
 
+  .brush-panels {
+    --brush-trait: var(--brush-trait-fine);
+    --brush-pad-y: var(--brush-pad-y-fine);
+    --brush-pad-x: var(--brush-pad-x-fine);
+  }
+
+  .brush-panels > * {
+    position: relative;
+    box-sizing: border-box;
+    padding: var(--brush-pad-y) var(--brush-pad-x) !important;
+    border: 0 !important;
+  }
+
   section.brush-frame::before,
-  .brush-frames > .ui-card::before {
+  .brush-frames > .ui-card::before,
+  .brush-panels > *::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -51,6 +69,20 @@
   }
 
   .brush-frames > .ui-card:nth-child(4n + 4) {
+    --brush-fx: -1;
+    --brush-fy: -1;
+  }
+
+  /* Panneaux d'un même conteneur : la même rotation que les cartes, dans l'ordre d'affichage. */
+  .brush-panels > :nth-child(4n + 1) {
+    --brush-fy: -1;
+  }
+
+  .brush-panels > :nth-child(4n + 3) {
+    --brush-fx: -1;
+  }
+
+  .brush-panels > :nth-child(4n + 4) {
     --brush-fx: -1;
     --brush-fy: -1;
   }

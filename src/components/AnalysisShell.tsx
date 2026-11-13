@@ -1,11 +1,14 @@
-import type { ReactNode } from 'react';
+import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import '../pages/analysisMobile.css';
+import './BrushFrame.css';
+import { brushColorFor } from '../core/brushColor';
 import type { ShareStat } from '../core/shareImage';
 import { shareableStats } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
 import { sessionsPath } from '../core/parentPage';
 import { useScrollToTopOnMount } from '../hooks/useRetainedScroll';
+import { useAppliedTheme } from '../hooks/useTheme';
 import { dismissRecorderResult, useRecorderSelector } from '../hooks/useRecorder';
 import type { useSessionDraft } from '../hooks/useSessionDraft';
 import AnalysisMap, { ANALYSIS_MAP_ANCHOR, type AnalysisMapProps } from './AnalysisMap';
@@ -30,6 +33,8 @@ interface ShellTabs<K extends string> {
   onCloseAll: () => void;
   advanced: { open: boolean; toggle: () => void };
   accent?: string;
+  /** Couleur de fiche de l'activité de la session : celle du trait de pinceau des panneaux (l'encre sans elle). */
+  activityColor?: string;
   panels: ReactNode;
 }
 
@@ -102,6 +107,13 @@ function AnalysisShell<K extends string>({
   const [params] = useSearchParams();
   const back = sessionsPath(params.get('activite'));
   useScrollToTopOnMount();
+  // Trait de pinceau des panneaux : la couleur de l'activité, vue du thème appliqué.
+  const dark = useAppliedTheme().theme === 'dark';
+  const activityColor = tabs?.activityColor;
+  const panelsStyle = useMemo(
+    () => ({ '--brush': activityColor ? brushColorFor(activityColor, dark) : 'var(--ink)' }) as CSSProperties,
+    [activityColor, dark]
+  );
   return (
     <div className="an-page ui-p-20">
       <div className="an-sheet">
@@ -145,7 +157,7 @@ function AnalysisShell<K extends string>({
         <div className="an-carte-col" style={map ? undefined : { marginTop: '10px' }}>
           <CollapsibleSectionTabs sections={tabs.sections} open={tabs.open} onToggle={tabs.onToggle} onCloseAll={tabs.onCloseAll}
             advancedOpen={tabs.advanced.open} onToggleAdvanced={tabs.advanced.toggle} accent={tabs.accent} />
-          <div className="an-carte-panels">
+          <div className="an-carte-panels brush-panels" style={panelsStyle}>
             {tabs.panels}
           </div>
         </div>

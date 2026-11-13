@@ -602,7 +602,7 @@ function SailingModule() {
       }}
       // Onglets sous la carte, et leurs panneaux deux par ligne sur ordinateur (`docs/MISE_EN_PAGE.md`).
       tabs={stats ? {
-        sections: sailingPanels, open, onToggle: toggle, onCloseAll: closeAll, advanced, panels: (
+        sections: sailingPanels, open, onToggle: toggle, onCloseAll: closeAll, advanced, activityColor: activity.color, panels: (
           <>
             {open.general && (
               <ResizablePanel id="sailing.general" style={PANEL_BLOCK_STYLE}>

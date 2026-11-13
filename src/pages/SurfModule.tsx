@@ -499,7 +499,7 @@ function SurfModule() {
         legend: track.length === 0 ? null : <SpeedGradientLegend unit={speedUnit} range={range} slowLabel="rame et attente" />,
       }}
       tabs={summary && analysis && surfProfile ? {
-        sections, open, onToggle: toggle, onCloseAll: closeAll, advanced, accent: ACCENT, panels: (
+        sections, open, onToggle: toggle, onCloseAll: closeAll, advanced, accent: ACCENT, activityColor: activity.color, panels: (
           <>
             {open.general && (
               <ResizablePanel id={panelId('general')} style={ANALYSIS_PANEL_STYLE}>
