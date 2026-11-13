@@ -130,3 +130,48 @@ Ce fichier est le §10 de `docs/ETAT_DU_PROJET.md`. C'est le journal de Gtracker
     - **Décision** : la note dit « Réussite connue seulement des sessions déjà ouvertes dans l'analyse : N sessions à rouvrir », sans citer de version de l'ancienne série.
     - **Pourquoi** : le numéro appartenait à une série de versions abandonnée et n'aurait rien dit à l'acheteur.
     - **Piège** : aucun.
+
+348. Plante du Profil cachée (lot 347, validé le 13/11 sur l'APK 0.00.40, version 0.00.29).
+    - **Décision** : un interrupteur unique, `PROFILE_PLANT_VISIBLE` (`core/profilePlant.ts`), à faux : racine, fleur, papillon, bulle et carré à droite du pseudo ne sont plus montés, « Objectif par semaine » disparaît de Réglages, la leçon « Le Profil » est réécrite sans la plante. Rien n'est supprimé : calculs, tests et objectif enregistré restent, la remettre à vrai rend tout.
+    - **Pourquoi** : demande de l'utilisateur, la plante ne s'accorde pas à ces sports.
+    - **Piège** : le calcul de la racine tourne encore sans être montré ; un test garantit que plus aucune leçon ne la cite.
+
+349. Habillage de la planche A dans les variables du thème (lot 344, validé le 13/11 sur l'APK 0.00.40, version 0.00.30).
+    - **Décision** : Inter, fond blanc, encre noire, traits fins, cadres francs sans ombre, pilules ; plus de bleu voile ni de gris surf, ce qui est allumé l'est à l'encre (`--on-ink`) ; le vert vif porte du noir (`--on-record`), le rouge vif ne porte pas de texte, le bandeau d'enregistrement garde le rouge sombre (`--stop`). Mode sombre repeint aux mêmes couleurs.
+    - **Pourquoi** : tout passe par les variables pour qu'un habillage ne demande plus de toucher aux écrans.
+    - **Piège** : deux défauts de lisibilité à la relecture (onglet de Planifier en sombre, arc de l'appui long à la reprise) ; les titres changent de casse, seul écart du banc.
+
+350. Couleurs d'activité libres (lot 338, validé le 13/11 sur l'APK 0.00.40, version 0.00.31).
+    - **Décision** : une palette de douze couleurs commune aux deux familles remplace les nuances par famille ; le blanc cerclé va d'abord à une activité créée. Les activités déjà enregistrées prennent leur nouvelle couleur à la lecture (`withPaletteColors`), sans remise à zéro.
+    - **Pourquoi** : une activité n'a plus de couleur de famille ; chacune a la sienne.
+    - **Piège** : la nuit, noir et blanc s'échangent à l'affichage seulement ; une pastille blanche ou noire se confond avec le fond, d'où le cerne gris et les icônes passées à l'encre.
+
+351. Logos d'activité et cadre au pinceau (lot 349, validé le 13/11 sur l'APK 0.00.40, version 0.00.32).
+    - **Décision** : onze dessins remplacent les neuf icônes, partout ; une ancienne icône enregistrée est reprise à la lecture (planche vers windsurf, kayak vers paddle, paddle-foil vers surf foil). L'angle du cadre vient du logo (rang fois 47 degrés), pas de l'activité. Le logo dans son coup de pinceau ne se voit que sur le Profil, ailleurs le dessin seul à l'encre.
+    - **Pourquoi** : les logos sont ceux de la planche validée.
+    - **Piège** : la feuille des dessins est chargée à part et montée une seule fois ; dessins allégés de 340 à 107 Ko, au pixel près.
+
+352. La page Sessions (lot 346, validé le 13/11 sur l'APK 0.00.40, version 0.00.33).
+    - **Décision** : une seule page `/sessions` remplace l'accueil et les deux bibliothèques ; les adresses `/voile` et `/surf` y mènent, filtre gardé. Une rangée de logos filtre la liste ; Classer, Renommer et Supprimer passent derrière un « … » par ligne (réponse du 13/11), Supprimer gardant sa confirmation. La leçon du jour est en pause par un interrupteur.
+    - **Pourquoi** : plus de groupes Voile et Surf à l'écran, les activités visibles suffisent.
+    - **Piège** : la barre de suppression revenait après un renommage annulé ; vignettes de 96 sur 72 sur téléphone, écart à la planche accepté.
+
+353. L'application s'ouvre sur le Profil (lot 351, validé le 13/11 sur l'APK 0.00.40, version 0.00.34).
+    - **Décision** : l'ouverture et toute adresse inconnue mènent au Profil ; l'ordre des barres vit dans `core/navigation.ts` (testé) ; retour d'Android : analyse, Sessions, Profil, sortie. Le Profil a un en-tête à photo (deux photos de GONG, une seule téléchargée selon l'écran, aucune en mode économe) et, sur ordinateur dès 1000 px, la colonne « Vos activités ».
+    - **Pourquoi** : le Profil est la porte d'entrée, Sessions une page comme les autres.
+    - **Piège** : accord de GONG à obtenir pour les photos avant diffusion ; la photo du téléphone est une capture de 565 points de large, jugée très légèrement pixelisée, sans gravité, le 13/11.
+
+354. Avatar du Profil vide au départ (lot 350, validé le 13/11 sur l'APK 0.00.40, version 0.00.35).
+    - **Décision** : sans choix, la photo ronde est le rond à silhouette, plus le logo du sport préféré ; un choix déjà enregistré est gardé. Le bouton porte un nom accessible selon son état.
+    - **Pourquoi** : le logo du sport préféré laissait croire à un choix de l'utilisateur.
+    - **Piège** : aucun.
+
+355. Écran de démarrage GONG (lot 311, validé le 13/11 sur l'APK 0.00.40, version 0.00.36).
+    - **Décision** : douze images refaites à leur taille exacte, fond noir, logo GONG blanc et « Live for it. » au centre ; la fenêtre de lancement d'Android est noire de jour comme de nuit.
+    - **Pourquoi** : aucun éclair blanc avant l'image, aucun rognage en portrait ou en paysage.
+    - **Piège** : le thème de l'application ouverte ne doit pas changer ; seule la fenêtre de lancement est noire.
+
+356. Rappel du matériel à l'analyse (lot 345, validé le 13/11 sur l'APK 0.00.40, version 0.00.37).
+    - **Décision** : à l'analyse qui suit un enregistrement, « Voulez-vous ajouter le matériel ? » s'ouvre si l'option matériel de l'activité est cochée et la session sans matériel ; « Oui » ouvre l'onglet du matériel. « Non », la croix et le retour comptent une fermeture, deux et elle ne revient plus pour cette activité (compte gardé par « Par défaut »). Rouvrir une ancienne session ne rappelle rien.
+    - **Pourquoi** : le matériel se renseigne mieux juste après la séance.
+    - **Piège** : le compte rendu de l'enregistreur reste désormais jusqu'à l'analyse dans tous les cas, plus seulement avec un avertissement ; l'analyse l'efface une fois lu.
