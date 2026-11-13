@@ -18,6 +18,52 @@ Copie du brief écrit par l'utilisateur depuis son autre projet (`D:\gong tracke
 - Service de cartes (point 1) : pas une décision de l'utilisateur ; ses conditions d'usage se vérifient dans le plan du lot, et le résultat lui est dit avant de coder s'il gêne la vente.
 - Rang : à coder juste après le paquet de la nouvelle apparence (après l'avatar, élément 350), sur l'APK suivante.
 
+## Service de lieux, vérifié en ligne le 13/11 (point 1 des « Points propres à la version vendue »)
+
+- Serveur public de Photon (page d'accueil, « Terms of Use ») : « You can use the API for your project, but please be fair - extensive usage will be throttled. We do not guarantee for the availability and usage might be subject of change in the future. » ; le README ajoute qu'un usage excessif peut être coupé (« throttled or completely banned ») et conseille un serveur à soi pour un grand volume. Rien sur l'usage commercial, ni chiffre de cadence, ni identification demandée.
+- Lecture de l'orchestrateur : une recherche par session, gardée dans la fiche, sans rafale ni rattrapage de masse, est un usage loyal ; rien n'empêche de coder. Ce qui reste pour la vente est l'absence de garantie de disponibilité : à redire à la livraison (élément 308), avec le choix d'un service garanti ou d'un Photon hébergé si l'acheteur le veut. Dit à l'utilisateur le 13/11.
+- Recherche inverse (`docs/api-v1.md` du projet) : `/reverse?lon=…&lat=…`, `radius` en kilomètres, `limit`, `lang` (une seule langue), `osm_tag` répétable (`key:value`, `key`, `!key`…) mais marqué « Deprecated » au profit de filtres `include`/`exclude` par catégorie, et qui ne porte que sur les étiquettes principales (« not all OSM tag/value combinations can be searched »). Donc : demander plusieurs résultats sans filtre côté serveur et choisir côté application d'après `osm_key`, `osm_value` et la distance. Propriétés rendues : `name`, `osm_key`, `osm_value`, `osm_type`, `osm_id`, `city`, `state`, `country`, `street`, `postcode`, `extent`.
+- Attribution : la mention des données OpenStreetMap et de leur licence ODbL est due dans « À propos », avec un lien vers la page du droit d'auteur d'OpenStreetMap.
+- Nominatim, écarté : sa politique décourage les requêtes lancées par une application sans geste de l'utilisateur (« periodic requests from apps are considered bulk geocoding »).
+
+## Questions tranchées par l'orchestrateur (13/11), d'après le plan
+
+- Deux parties, deux commits : A, le nom calculé et le lieu trouvé (points 1 à 3 et 7 du « Voulu », la partie « plan d'eau sinon commune » du point 4, l'interrupteur de Réglages) ; B, à la suite, la correction du lieu, les lieux appris et « Départ → Arrivée » (reste du point 4, points 5 et 6).
+- Ce qui part en ligne : le point de départ arrondi à trois décimales (environ 100 m), la langue, le nombre de résultats et le rayon ; rien d'autre, aucune donnée personnelle. La phrase de Réglages dit que le lieu est cherché en ligne d'après le point de départ.
+- Le champ `place` est en haut de la fiche, pas dans `summary` (il ne se recalcule pas depuis le GPX ; `SUMMARY_CALC_VERSION` inchangé). `place` absent : pas encore cherché ; `place.name` nul : cherché, rien trouvé (pas de recherche en boucle).
+- `PLACE_RULES` (rayon de recherche, rayon d'un lieu appris de 500 m, distance d'une arrivée « ailleurs ») : un objet passé en paramètre, sans réglage persisté.
+- `fetchJson` reste dans `planning/` (la règle 12 ne vise pas le réseau).
+- L'interrupteur va dans Réglages › Mémoire, avec sa phrase ; clé de l'appareil.
+- Partie B : les lieux appris vivent sur l'appareil et dans un fichier `lieux.json` du dossier mémoire, fondus entre appareils comme le fichier de la FC de repos ; ils ne s'appliquent qu'aux sessions qui n'ont pas encore de lieu, interrupteur coupé compris. « Départ → Arrivée » : une seconde recherche seulement quand l'arrivée est loin du départ.
+- Le lieu trouvé n'entre pas dans le brouillon d'une analyse : il s'écrit tout de suite dans la fiche, sans déclencher l'avertissement en quittant.
+- Un import d'un dossier entier ne met rien en file d'office : ses sessions prennent leur lieu au fil de l'eau.
+
+## Plan (agent Plan, 13/11), à suivre sauf constat contraire dans le code
+
+Aujourd'hui :
+- Le nom est `record.name` (`src/library/record.ts`), modifié par `applyRecordPatch`, dans `RECORD_LIGHT_FIELDS`. La position de départ n'est ni dans la fiche ni dans `summary`.
+- Le nom est recomposé à six endroits : `components/SessionRow.tsx` (à défaut, l'activité), `components/SessionNameEditor.tsx` (« Sans nom », téléchargement, partage), `shareStats.ts` (`shareLabels`), `library/stats.ts` avec `pages/StatisticsPage.tsx`, `naming.ts` (`downloadBaseName`). `ProfileActivities` passe par `SessionRow`. L'écran de fin (`RecordingPage.tsx`) ne montre que l'activité.
+- Service de lieux : Photon, `src/planning/geocoding.ts`, recherche par texte seulement, `fetchJson` de `planning/fetchJson.ts`, délai de 20 s ; `parsePhoton` jette `osm_key` et `osm_value`.
+
+Structure :
+- Créer `src/library/sessionName.ts` (+ test) : `sessionDisplayName(record, activityName)` et `placeLabel(place)`, seule source du nom. `src/library/places.ts` (+ test) : `SessionPlace`, `readSessionPlace`, `choosePlace(features, start, rules)`, `nearestLearnedPlace(point, learned, rules)` sur `haversineDistance`, `PLACE_RULES`, `firstTrackPoint(gpxText)` (premier `trkpt` sans tout lire). `src/hooks/sessionLibrary/placeQueue.ts` (+ test), nouvelle couche à déclarer dans `couches.test.ts`. Partie B seulement : `src/hooks/learnedPlacesFile.ts`, sur le modèle de `restingHrFile.ts`.
+- Modifier `record.ts` (champ `place`, `RecordPatch.place`, `RECORD_LIGHT_FIELDS`) ; `geocoding.ts` (`photonReverseUrl`, `reversePlaces`, `parsePhoton` garde `osm_key`, `osm_value`, `city`) ; `naming.ts`, `shareStats.ts`, `stats.ts`, `StatisticsPage.tsx`, `SessionRow.tsx`, `SessionNameEditor.tsx` ; `importer.ts` (`saveRecordedSession` et l'import : mise en file) ; `appIdentity.ts` (clé de l'interrupteur ; en partie B la clé des lieux et `lieux.json` dans `folderLayout.ts`) ; `SettingsPage.tsx` (phrase et interrupteur) ; `AboutSettings.tsx` (ce qui part en ligne, mention d'OpenStreetMap).
+
+Étapes, partie A, chacune suivie de `node outils/verif.mjs --rapide` :
+1. Fonction pure du nom et champ `place` de la fiche (`{ name: string | null, source: 'carte' | 'appris' | 'utilisateur', lat, lon (arrondis) }`), avec leurs tests. Un changement d'activité ne touche pas `place`. Un nom vide rend le nom calculé.
+2. `sessionDisplayName` branchée aux six endroits ; « Sans nom » disparaît ; `shareLabels` et `downloadBaseName` reçoivent le nom composé ; le GPX téléchargé d'une session non renommée part sous `AAAA-MM-JJ Activité - Lieu.gpx`, le nom écrit dans le GPX ne change pas (`retouchGpx` inchangé) ; le titre de l'enregistreur et le nom du fichier rangé ne bougent pas.
+3. Recherche inverse pure : une adresse au point arrondi à trois décimales, `lang=fr`, `limit`, `radius`, sans filtre côté serveur ; choix parmi plage, port, marina, étang et baie, le plus proche dans le rayon ; sinon la commune ; sinon nul. Un nom vide ou réduit à des chiffres est écarté.
+4. File d'attente : une requête à la fois, au plus une par seconde, au plus vingt sessions en attente (l'appel le plus récent passe devant), sans doublon ; un échec de réseau suspend la file jusqu'au prochain appel, sans rien écrire ; interrupteur coupé : rien en file, rien d'envoyé ; résultat écrit par `updateSessionRecord`, une fiche en lecture seule sautée. Appels : fin d'enregistrement et import d'un ou de quelques fichiers ; ouverture d'une analyse, en tête de file ; une ligne de la liste visible (`useNearViewport`, déjà employé par la vignette), qui ne fait que mettre en file. Le point de départ vient de `readSessionGpx` puis `firstTrackPoint`, ou de la trace déjà lue par l'analyse.
+5. Réglages : la phrase et l'interrupteur, actif d'office ; « À propos ».
+
+Partie B : 6. Le « … » qui porte Renommer, dans la liste comme dans l'analyse, reçoit « Lieu », qui corrige le lieu seul ; un lieu corrigé passe en `source: 'utilisateur'` et est appris. 7. Lieux appris sur l'appareil et dans `lieux.json`, fondus entre appareils ; une session neuve partie à moins de 500 m d'un lieu appris le prend (`'appris'`) sans interroger le service. 8. « Départ → Arrivée ».
+
+Tests : `sessionName.test` (nom saisi qui prime, nom effacé, changement d'activité, sans lieu, lieu corrigé contre lieu de la carte) ; `places.test` (réponses Photon enregistrées : plage à 300 m, commune seule, réponse vide, nom absurde ; 499 et 501 m) ; `geocoding.test` (arrondi et paramètres) ; `record.test` (lecture, champ inconnu conservé, patch) ; `placeQueue.test` avec un faux `fetch` et de faux minuteurs (une requête à la fois, plafond de vingt, aucune requête interrupteur coupé, arrêt hors ligne puis reprise, pas de rafale quand cent lignes défilent) ; tests de `naming` et `shareStats` mis à jour.
+
+Banc : ajouter `*://photon.komoot.io/*` à `BLOCKED_URLS` (`outils/banc/lib/cdp.mjs`), sans quoi tous les scripts interrogeraient le vrai service ; `outils/banc/lib/lieux.mjs` sur le modèle de `lib/tuiles.mjs` (interception, réponse enregistrée, compte des requêtes) ; script neuf `outils/banc/lieu.mjs` : import sans réseau (activité seule), réponse simulée (le nom se complète, une seule requête), renommer, effacer le nom, changer d'activité, couper l'interrupteur (zéro requête), et en partie B corriger le lieu puis une seconde session au même départ (zéro requête) ; `rename.mjs` adapté.
+
+Pièges : ne pas confondre « pas encore cherché » et « rien trouvé » ; le départ est parfois le domicile, l'arrondi protège peu, la phrase de Réglages le dit ; une écriture de fond pendant qu'une analyse a un brouillon ouvert ne déclenche pas l'avertissement en quittant (`useSessionDraft`, `noteRecordEdits`) ; `SUMMARY_CALC_VERSION` inchangé.
+
 ## Brief d'origine : nom de base d'une session, l'activité et le lieu
 
 Écrit le 12/11/2026 depuis le projet Tracker, où la même fonction porte le n° 215 (`C:\Users\segne\tracker\docs\backlog\215-nom-de-session-lieu.md`, prête, pas encore codée). Ce fichier est posé hors du dépôt Gtracker, qui avait ce soir-là un lot en cours : à ranger dans son reste à faire par `/todo` (numéro pris dans « Prochains numéros »), puis à copier dans `docs/backlog/N-nom-de-session-lieu.md`.
