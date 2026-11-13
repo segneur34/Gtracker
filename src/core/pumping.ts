@@ -1,7 +1,7 @@
 import { nearestIndexAtTime, valueAtTime } from './search';
 import type { ImuRecording } from './imuFile';
 import {
-  captureBounds, centredMean, fileUsOf, verticalAcceleration, wallMsOf,
+  centredMean, fileUsOf, measuredPieces, verticalAcceleration, wallMsOf,
   type AttitudeParams, type ImuVertical, type ImuWindow,
 } from './imuVertical';
 import { autocorrelation, firstStrongPeak, refinedPeak } from './periodicity';
@@ -427,12 +427,13 @@ const liftoffAt = (v: ImuVertical, around: number, p: PumpDetection, notBefore =
   return null;
 };
 
-/** Fenêtres mesurées d'un fichier : celles de l'élagage, sinon toute la capture. */
-export const capturedWindows = (rec: ImuRecording): ImuWindow[] => {
-  if (rec.header.windows) return rec.header.windows;
-  const bounds = captureBounds(rec);
-  return bounds ? [bounds] : [];
-};
+/**
+ * Fenêtres mesurées d'un fichier : celles de l'élagage, sinon les morceaux de
+ * la capture (`measuredPieces`), un seul sans trou ; aucun calcul ne traverse
+ * le trou d'une capture reprise après une coupure.
+ */
+export const capturedWindows = (rec: ImuRecording, d: Pick<AttitudeParams, 'captureBreakS'>): ImuWindow[] =>
+  rec.header.windows ?? measuredPieces(rec, d.captureBreakS);
 
 /** Capture d'un vol, prête au compte des coups. */
 export interface FlightCapture {
@@ -512,7 +513,7 @@ export const measureFlightPumping = (
   rec: ImuRecording, p: PumpDetection, track: TrackPoint[], cum: CumulativeTrack, flights: Pick<FlightSpan, 'n' | 'startMs' | 'endMs'>[],
   jumps: readonly PumpJump[] = []
 ): (FlightPumping | null)[] => {
-  const windows = capturedWindows(rec);
+  const windows = capturedWindows(rec, p);
   const distanceAt = (ms: number) => valueAtTime(track, (i) => cum.cumDist[i], ms, 'clamp');
   const speedAt = (ms: number) => valueAtTime(track, (i) => track[i].smoothedSpeedMs, ms, 'clamp');
   const lastPoint = track.length - 1;

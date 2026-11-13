@@ -118,7 +118,7 @@ vi.mock('../platform/motion', async (importOriginal) => ({
 /** Ceinture : reprise sans `connect` ; prises à neuf comptées, adresse demandée notée, refus sur commande. */
 const belt = vi.hoisted(() => {
   const listeners = new Set<(sample: { bpm: number; timeMs: number; contact: boolean | null }) => void>();
-  return {
+  const strap = {
     listeners,
     adoptable: false,
     holds: 0,
@@ -127,8 +127,15 @@ const belt = vi.hoisted(() => {
     asked: [] as string[],
     holdFails: false,
     saved: null as { address: string; name: string } | null,
-    emit: (timeMs: number, bpm: number) => listeners.forEach((l) => l({ bpm, timeMs, contact: true })),
+    /** Dernière mesure reçue, jointe aux positions comme le fait le greffon. */
+    latest: null as { bpm: number; timeMs: number; contact: boolean | null } | null,
+    emit: (timeMs: number, bpm: number) => {
+      const sample = { bpm, timeMs, contact: true };
+      strap.latest = sample;
+      listeners.forEach((l) => l(sample));
+    },
   };
+  return strap;
 });
 vi.mock('../platform/heartRate', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../platform/heartRate')>()),
@@ -144,6 +151,7 @@ vi.mock('../platform/heartRate', async (importOriginal) => ({
     return () => undefined;
   },
   savedBelt: () => belt.saved,
+  latestHeartRate: () => belt.latest,
   subscribeHeartRate: (listener: (sample: { bpm: number; timeMs: number; contact: boolean | null }) => void) => {
     belt.listeners.add(listener);
     return () => belt.listeners.delete(listener);
@@ -152,8 +160,8 @@ vi.mock('../platform/heartRate', async (importOriginal) => ({
 }));
 
 const gpsTimer = vi.hoisted(() => ({ arms: [] as number[], disarms: 0 }));
-/** Minuteur de la veille de la ceinture : délais armés. */
-const beltTimer = vi.hoisted(() => ({ arms: [] as number[] }));
+/** Minuteur de la veille de la ceinture : délais armés, et l'écoute de son échéance par la page en cours. */
+const beltTimer = vi.hoisted(() => ({ arms: [] as number[], onLost: null as (() => void) | null }));
 /** Sons joués, par nom. */
 const sounds = vi.hoisted(() => ({ validated: 0, finished: 0, patterns: 0 }));
 vi.mock('../platform/beeper', async (importOriginal) => ({
@@ -182,7 +190,10 @@ vi.mock('../platform/beeper', async (importOriginal) => ({
     beltTimer.arms.push(delayMs);
   },
   disarmBeltWatch: async () => undefined,
-  onBeltLost: () => () => undefined,
+  onBeltLost: (listener: () => void) => {
+    beltTimer.onLost = listener;
+    return () => undefined;
+  },
 }));
 
 vi.mock('./useSessionLibrary', async (importOriginal) => ({
@@ -289,7 +300,9 @@ beforeEach(async () => {
   belt.asked = [];
   belt.holdFails = false;
   belt.saved = null;
+  belt.latest = null;
   beltTimer.arms = [];
+  beltTimer.onLost = null;
   gpsTimer.arms = [];
   gpsTimer.disarms = 0;
   sounds.validated = 0;
@@ -1227,6 +1240,103 @@ describe('ceinture cardio après une coupure', () => {
     await fresh.recoverInterruptedRecording();
     expect(fresh.getRecorderState().status).toBe('recording');
     expect(belt.asked).toEqual([strap.address, strap.address, strap.address]);
+  });
+
+  describe('ceinture qui mesurait avant la coupure et ne revient pas', () => {
+    /** Enregistre jusqu'à 20 s, ceinture prise au départ et qui mesure : sa FC est jointe aux positions du journal. */
+    const recordWithHeartRateUntil20 = async () => {
+      const live = fakeSource();
+      await recorder.startRecording(activity, live, { heartRate: strap });
+      run((s) => {
+        belt.emit(Date.now(), 120);
+        live.emit(s);
+      }, 0, 20, 1);
+      await settle();
+      expect(parseJournal(journal.text!).fixes.every((fix) => fix.heartRateBpm === 120)).toBe(true);
+      beltTimer.arms = [];
+    };
+
+    /** Échéance du minuteur natif de la ceinture à `atMs`, telle que la page la reçoit. */
+    const beltTimerFiresAt = (atMs: number) => {
+      vi.setSystemTime(atMs);
+      beltTimer.onLost?.();
+    };
+
+    /** Reprise à `atMs`, par « Continuer » (application tuée) ou seule (service vivant). */
+    const resumeAt = async (how: 'continuer' | 'seule', atMs: number) => {
+      vi.setSystemTime(atMs);
+      services.gps = how === 'seule';
+      const fresh = await reload();
+      await fresh.recoverInterruptedRecording();
+      if (how === 'continuer') await fresh.continuePendingSession(fakeSource());
+      expect(fresh.getRecorderState().status).toBe('recording');
+      return fresh;
+    };
+
+    it.each([['continuer' as const], ['seule' as const]])('reprise %s : FC perdue au bout d\'une minute, pas avant, et l\'enregistrement continue', async (how) => {
+      await recordWithHeartRateUntil20();
+      const fresh = await resumeAt(how, T0 + 60_000);
+      expect(belt.asked).toEqual([strap.address, strap.address]);
+      expect(beltTimer.arms).toEqual([60_000]);
+      beltTimerFiresAt(T0 + 119_000);
+      expect(fresh.getRecorderState().beltLost).toBe(false);
+      beltTimerFiresAt(T0 + 120_000);
+      const state = fresh.getRecorderState();
+      expect(state.beltLost).toBe(true);
+      expect(state.error).toContain(fresh.BELT_LOST_ERROR);
+      expect(state.status).toBe('recording');
+    });
+
+    it.each([['continuer' as const], ['seule' as const]])('reprise %s sans FC dans le journal : aucune alerte, comme une ceinture jamais jointe', async (how) => {
+      await recordUntil20();
+      beltTimer.arms = [];
+      const fresh = await resumeAt(how, T0 + 60_000);
+      expect(belt.asked).toEqual([strap.address, strap.address]);
+      expect(beltTimer.arms).toEqual([]);
+      beltTimerFiresAt(T0 + 600_000);
+      expect(fresh.getRecorderState().beltLost).toBe(false);
+    });
+
+    it.each([['continuer' as const], ['seule' as const]])('reprise %s, la ceinture revient avant le délai : aucune alerte', async (how) => {
+      await recordWithHeartRateUntil20();
+      const fresh = await resumeAt(how, T0 + 60_000);
+      vi.setSystemTime(T0 + 100_000);
+      belt.emit(Date.now(), 118);
+      expect(beltTimer.arms).toEqual([60_000, 60_000]);
+      beltTimerFiresAt(T0 + 120_000);
+      expect(fresh.getRecorderState().beltLost).toBe(false);
+      expect(fresh.getRecorderState().error ?? '').not.toContain(fresh.BELT_LOST_ERROR);
+    });
+
+    it('reprise seule en pause manuelle : rien pendant la pause, la veille repart à la reprise', async () => {
+      await recordWithHeartRateUntil20();
+      await recorder.pauseRecording();
+      await settle();
+      vi.setSystemTime(T0 + 60_000);
+      services.gps = true;
+      const fresh = await reload();
+      await fresh.recoverInterruptedRecording();
+      expect(fresh.getRecorderState().status).toBe('paused');
+      expect(belt.asked).toEqual([strap.address, strap.address]);
+      expect(beltTimer.arms).toEqual([]);
+      beltTimerFiresAt(T0 + 600_000);
+      expect(fresh.getRecorderState().beltLost).toBe(false);
+      await fresh.resumeRecording();
+      expect(beltTimer.arms).toEqual([60_000]);
+      beltTimerFiresAt(T0 + 660_000);
+      expect(fresh.getRecorderState().beltLost).toBe(true);
+    });
+
+    it('« Arrêter de chercher » avant la coupure : « Continuer » la redemande, sans la veiller avant sa première mesure', async () => {
+      await recordWithHeartRateUntil20();
+      recorder.stopRecordingBeltSearch();
+      await settle();
+      const fresh = await resumeAt('continuer', T0 + 60_000);
+      expect(belt.asked).toEqual([strap.address, strap.address]);
+      expect(beltTimer.arms).toEqual([]);
+      beltTimerFiresAt(T0 + 600_000);
+      expect(fresh.getRecorderState().beltLost).toBe(false);
+    });
   });
 });
 

@@ -32,7 +32,7 @@ import {
   applyBeltWatch, applyGpsWatch, releaseRecordingBelt, stopBeltWatch, stopGpsWatch, takeBeltOrWarn, watch, withoutBeltLost, withoutGpsLost,
 } from './recorder/watches';
 import { buildPendingSession, markManualResume, onSourceError, receiveFix, resetSession, sourceOptions } from './recorder/live';
-import { abandonResume, continueCapture, recoverInterruptedRecording, restoreFromJournal } from './recorder/recovery';
+import { abandonResume, continueCapture, recoverInterruptedRecording, restoreFromJournal, watchResumedBelt } from './recorder/recovery';
 
 export type { RecorderState, RecorderStatus } from './recorder/store';
 export { getRecorderState, subscribeToFixes, subscribeToRecorder } from './recorder/store';
@@ -82,7 +82,9 @@ export { recoverInterruptedRecording };
  *
  * Veille de la ceinture : la même machine, passé `beltLostDelayS` sans
  * mesure lisible d'une ceinture qui en donnait, hors pause manuelle (`beltLost`,
- * alerte `BELT_LOST_ERROR`, son et notification), une fois par perte.
+ * alerte `BELT_LOST_ERROR`, son et notification), une fois par perte. Une
+ * ceinture redemandée après une coupure, qui mesurait avant, est veillée dès
+ * la reprise (`watchResumedBelt`), sans attendre sa première mesure.
  *
  * Reprise : si le moteur de la page tombe, seule la page repart (`MainActivity.java`).
  * Le service GPS encore vivant, la session reprend seule (`resumeSilently`) : mémoire refaite depuis le journal, jamais
@@ -297,7 +299,8 @@ export const startRecording = exclusive(async (
  * « Continuer l'enregistrement » : la session en attente reprend sur son journal, dans un segment neuf, service
  * relancé par ce geste (l'application est au premier plan). Le temps hors de l'application ne compte pas (`continuedPause`).
  * La capture du départ, gardée dans l'en-tête, est relancée en complétant son fichier ; un journal d'avant, qui ne la
- * porte pas, la laisse arrêtée, son fichier retrouvé à l'arrêt. La ceinture du départ est redemandée. Un refus de
+ * porte pas, la laisse arrêtée, son fichier retrouvé à l'arrêt. La ceinture du départ est redemandée, et veillée dès ici si elle mesurait avant
+ * la coupure : sans mesure pendant une minute, l'alerte de FC perdue part. Un refus de
  * l'une ou de l'autre est dit sans arrêter la reprise. En échec, la session reste en attente et le journal est gardé.
  */
 export const continuePendingSession = exclusive(async (source: LocationSource | null): Promise<void> => {
@@ -335,7 +338,11 @@ export const continuePendingSession = exclusive(async (source: LocationSource | 
     await flushJournal();
     const heartRate = getSportProfile(activity.base).heartRate;
     session.stopSource = await source.start(sourceOptions(activity, effectiveRecordingProfile(activity)), receiveFix, onSourceError);
-    if (belt) await takeBeltOrWarn(belt, heartRate.maxAgeS);
+    if (belt) {
+      await takeBeltOrWarn(belt, heartRate.maxAgeS);
+      // `continuedPause` a levé la pause manuelle : une ceinture qui mesurait avant la coupure est veillée dès ici.
+      watchResumedBelt(parsed, false);
+    }
     // Après la ceinture, dont le refus remplace les messages : celui des capteurs s'y ajoute. `continuedPause` a levé
     // la pause manuelle, la capture reprend donc sa mesure.
     const motion = parsed.header?.motion;

@@ -8,6 +8,8 @@ Modèle | Réflexion : Sonnet | high. Décisions du domaine : `docs/DECISIONS.md
 - Sur une première planche à traits séparés : « non, le trait doit faire quasiment le tour, genre 4/5, en un seul trait », puis « des traits légèrement plus fins ».
 - Sur la seconde planche : « c'est pas mal du tout. Je changerais juste un truc. Actuellement, c'est un côté qui n'est pas dessiné. Ce serait bien que ce soit un angle qui ne soit pas peint. Genre l'angle en bas à droite. Avec l'épaisseur du trait du milieu, de l'option B. »
 
+- Sur la planche finale : « c'est vraiment pas mal. Ensuite, l'idée ça serait que tous les angles soient pas les mêmes, qui soient pas coloriés. Genre avec une rotation. »
+
 C'est un essai, à garder ou à défaire à l'œil sur le téléphone, comme les boutons colorés du 13/11 : un écart voulu à la charte (traits fins, cadres à bords francs).
 
 ## Maquette validée
@@ -16,7 +18,7 @@ C'est un essai, à garder ou à défaire à l'œil sur le téléphone, comme les
 
 ## À faire
 
-1. Chaque cadre de la page Profil (le bloc des activités favorites, l'anneau du temps par activité, le graphe d'activités, et tout autre cadre de la page, cartes d'ouverture comprises si elles ont un cadre) perd son trait fin et reçoit un seul coup de pinceau qui en fait presque le tour, ouvert à l'angle d'en bas à droite, à l'épaisseur de la planche.
+1. Chaque cadre de la page Profil (le bloc des activités favorites, l'anneau du temps par activité, le graphe d'activités, et tout autre cadre de la page, cartes d'ouverture comprises si elles ont un cadre) perd son trait fin et reçoit un seul coup de pinceau qui en fait presque le tour, ouvert à un angle, à l'épaisseur de la planche. L'angle ouvert tourne d'un cadre au suivant, dans l'ordre de la page : en bas à droite pour le premier cadre, puis en bas à gauche, en haut à gauche, en haut à droite, et de nouveau en bas à droite. La planche ne montre que l'angle d'en bas à droite : les trois autres s'obtiennent en retournant le même trait (miroir horizontal, vertical, ou les deux), sans autre fichier.
 2. Le trait est le tracé du cadre des logos, repris tel quel (déjà dans l'application, pièce des logos d'activité) : étiré en neuf tranches pour que les coins gardent leur forme et que l'épaisseur reste égale sur un cadre allongé. Rien n'est redessiné.
 3. Sa couleur est celle de l'activité favorite de la période affichée (la première du bloc des favorites) ; elle suit le bouton de période. Aucune session sur la période : le trait est à l'encre.
 4. En mode sombre, la couleur est éclaircie par la règle générale du `LISEZMOI.md` de la planche, valable pour les douze couleurs de la palette ; une couleur qui ne se verrait pas sur le fond (le blanc le jour, le noir la nuit) suit la règle déjà en place pour les logos (la nuit le noir devient blanc et le blanc noir).
@@ -36,6 +38,8 @@ Le contenu des cadres, le bouton de période, la racine (toujours cachée), les 
 - « L'épaisseur du trait du milieu, de l'option B » : l'épaisseur de la proposition B, celle du milieu de la planche.
 - Mode sombre : la couleur éclaircie, que la planche montrait à côté de la couleur telle quelle, à peine visible sur fond noir.
 - Activité favorite : la première du bloc des favorites, donc celle qui a le plus de temps sur la période.
+- Rotation de l'angle ouvert : dans le sens des aiguilles d'une montre en partant d'en bas à droite, un cran par cadre, dans l'ordre où les cadres se suivent sur le téléphone ; elle ne dépend pas de la période affichée.
+- Les cadres des analyses ne sont pas de ce lot : l'utilisateur veut y essayer le même trait en plus fin, élément 365, après avoir vu celui-ci sur le téléphone. Écrire la pièce du cadre peint pour qu'elle resserve ailleurs (épaisseur et couleur en paramètres), sans la poser hors du Profil.
 
 ## Vérification
 
@@ -43,4 +47,4 @@ Le contenu des cadres, le bouton de période, la racine (toujours cachée), les 
 
 ## Essai au téléphone
 
-Ouvrir le Profil en clair puis en sombre, téléphone droit puis tourné : chaque cadre est entouré d'un seul coup de pinceau à la couleur de l'activité favorite, ouvert en bas à droite ; dire si l'essai est à garder ou à défaire.
+Ouvrir le Profil en clair puis en sombre, téléphone droit puis tourné : chaque cadre est entouré d'un seul coup de pinceau à la couleur de l'activité favorite, ouvert à un angle qui tourne d'un cadre au suivant ; dire si l'essai est à garder ou à défaire.

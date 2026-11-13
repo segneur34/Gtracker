@@ -110,6 +110,29 @@ export const continueCapture = async (setup: MotionSetup, paused: boolean): Prom
   if (paused) await pauseMotionCapture().catch(() => setState({ error: joinMessages(state.error, SENSORS_PAUSE_ERROR) }));
 };
 
+/**
+ * Vrai si la ceinture mesurait avant la coupure : des positions du journal portent sa FC, et l'utilisateur n'a
+ * pas cessé de la chercher en route.
+ */
+const beltMeasuredBeforeCut = (parsed: ParsedJournal): boolean =>
+  !parsed.beltStopped && parsed.fixes.some((fix) => fix.heartRateBpm !== undefined);
+
+/**
+ * Veille d'une ceinture redemandée après une coupure, à appeler juste après `takeBeltOrWarn`. Si elle mesurait
+ * avant la coupure, elle est veillée comme déjà jointe : sans mesure pendant `beltLostDelayS`, l'alerte de FC perdue
+ * part, son compris, et l'enregistrement continue. Sinon, la règle d'un départ : rien avant sa première mesure.
+ * `paused` : la session est en pause manuelle, la veille attend la reprise manuelle.
+ */
+export const watchResumedBelt = (parsed: ParsedJournal, paused: boolean): void => {
+  if (!watch.beltOn || session.currentProfile === null) return;
+  if (beltMeasuredBeforeCut(parsed)) {
+    const armed = gpsWatchOnFix(watch.belt, Date.now(), beltWatchSettings(session.currentProfile));
+    applyBeltWatch(paused ? gpsWatchOnPause(armed.state) : armed);
+  } else if (paused) {
+    applyBeltWatch(gpsWatchOnPause(watch.belt));
+  }
+};
+
 /** Remet l'enregistreur au repos, sans rien écrire : une reprise qui n'a pas abouti laisse son journal intact. */
 export const abandonResume = async (): Promise<void> => {
   const stop = session.stopSource;
@@ -203,10 +226,10 @@ const resumeSilently = async (parsed: ParsedJournal, activity: Activity): Promis
       // Comme le GPS : le minuteur de la page tombée est repris par une veille qui saura lire son échéance.
       const armedBelt = gpsWatchOnFix(START_GPS_WATCH, Date.now(), beltWatchSettings(session.currentProfile));
       applyBeltWatch(phase.pauseClock ? gpsWatchOnPause(armedBelt.state) : armedBelt);
-    } else if (watch.beltOn && phase.pauseClock) {
-      // Une ceinture redemandée est veillée comme à un départ, dès sa première mesure, mais pas pendant la pause
-      // manuelle : sa veille l'attend, et la reprise manuelle la rend.
-      applyBeltWatch(gpsWatchOnPause(watch.belt));
+    } else {
+      // Une ceinture redemandée est veillée dès maintenant si elle mesurait avant la coupure, sinon dès sa première
+      // mesure ; jamais pendant la pause manuelle : sa veille l'attend, et la reprise manuelle la rend.
+      watchResumedBelt(parsed, phase.pauseClock !== null);
     }
     console.info(`[reprise] enregistrement repris seul après une chute du moteur : ${session.fixes.length} points relus`);
     return true;

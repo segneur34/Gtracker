@@ -82,7 +82,7 @@ const fastestSteps = (heading: Float64Array, from: number, until: number, direct
  * couvre pas en entier (`windows` : les fenêtres mesurées du fichier).
  */
 export const waveTurnTrace = (
-  rec: ImuRecording, d: GyroTurnDetection, wave: TurnWave, windows: readonly ImuWindow[] = capturedWindows(rec)
+  rec: ImuRecording, d: GyroTurnDetection, wave: TurnWave, windows: readonly ImuWindow[] = capturedWindows(rec, d)
 ): WaveTurnTrace | null => {
   const fromUs = fileUsOf(rec, wave.startMs);
   const toUs = fileUsOf(rec, wave.endMs);
@@ -118,7 +118,7 @@ export const waveTurnTrace = (
  * GPS).
  */
 export const gyroWaveTurns = (rec: ImuRecording, d: GyroTurnDetection, waves: readonly TurnWave[]): (number | null)[] => {
-  const windows = capturedWindows(rec);
+  const windows = capturedWindows(rec, d);
   return waves.map((wave) => {
     const trace = waveTurnTrace(rec, d, wave, windows);
     return trace ? trace.changes.filter((c) => c.counted).length : null;

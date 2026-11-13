@@ -242,10 +242,13 @@ export interface JumpProfile {
 
 /**
  * Grille et verticale des capteurs, communes aux sauts et au pumping : pas de
- * la grille, trou toléré, repos qui amorce la gravité, filtre d'attitude.
+ * la grille, trou toléré, coupure de la capture (une capture reprise après
+ * une fermeture de l'application laisse un trou de plusieurs minutes, bien
+ * plus long que ceux d'une capture qui tourne), repos qui amorce la gravité,
+ * filtre d'attitude.
  */
 const ATTITUDE = {
-  gridStepS: 0.01, maxGapS: 0.05,
+  gridStepS: 0.01, maxGapS: 0.05, captureBreakS: 5,
   calmForceFraction: 0.15, calmRotationRadS: 0.3, minCalmS: 1,
   attitudeTauS: 3, attitudeMaxRotationRadS: 1.5, attitudeInitS: 1,
 };

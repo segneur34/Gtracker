@@ -5,7 +5,7 @@ import { captureBounds, mergeWindows, rangeOf, verticalAcceleration, type Attitu
 import { STANDARD_G } from './units';
 
 const P: AttitudeParams = {
-  gridStepS: 0.01, maxGapS: 0.05, calmForceFraction: 0.1, calmRotationRadS: 0.5, minCalmS: 1, attitudeTauS: 3, attitudeMaxRotationRadS: 1.5, attitudeInitS: 1,
+  gridStepS: 0.01, maxGapS: 0.05, captureBreakS: 5, calmForceFraction: 0.1, calmRotationRadS: 0.5, minCalmS: 1, attitudeTauS: 3, attitudeMaxRotationRadS: 1.5, attitudeInitS: 1,
 };
 
 const stream = (kind: 'accel' | 'gyro', rateHz: number, durationS: number, value: (t: number, axis: number) => number, startUs = 0): ImuSeries => {
