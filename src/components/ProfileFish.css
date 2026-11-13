@@ -3,6 +3,7 @@
    FC repos gardent leur place, le nom n'est jamais poussé. */
 .profile-fish {
   --fish-m: max(20px, min(84px, 100cqi - var(--fish-reserve, 222px)));
+  position: relative;
   flex: 0 0 auto;
   box-sizing: border-box;
   width: calc(var(--fish-f, 1) * var(--fish-m));
@@ -15,6 +16,20 @@
   /* À la taille du lien du test de FC repos : la place qu'il lui laisse se compte en em (`--fish-reserve`). */
   font-size: var(--text-s);
   cursor: pointer;
+}
+
+/* Zone de toucher d'au moins 44 px autour d'un petit bocal, sans changer sa taille visible : le bouton est carré, la
+   moitié de sa largeur vaut celle de sa hauteur. Dès 320 px de large, le plus petit bocal déborde de 8 px de chaque
+   côté, moins que l'écart de l'en-tête (12 px) : le lien voisin reste hors d'atteinte. */
+.profile-fish::before {
+  content: '';
+  position: absolute;
+  inset: min(0px, calc(50% - 22px));
+}
+
+.profile-fish:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .fish-drawing {

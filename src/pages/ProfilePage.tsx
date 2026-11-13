@@ -66,6 +66,8 @@ const ProfileRoot = lazy(() => import('../components/ProfileRoot'));
 const RootSlot = lazy(() => import('../components/ProfileRoot').then((m) => ({ default: m.RootSlot })));
 /** « Vos activités », sur ordinateur seulement : ses lignes et leurs vignettes ne pèsent pas sur le téléphone. */
 const ProfileActivities = lazy(() => import('../components/ProfileActivities'));
+/** Fenêtre de choix du poisson : lue en touchant le bocal seulement. */
+const FishPicker = lazy(() => import('../components/FishPicker'));
 
 
 /** Période retenue sur l'appareil ; l'année au départ. */
@@ -140,7 +142,7 @@ function ProfilePage() {
   const tutorialGate = tutorialCardGate({ memoryNeedsAction, memoryReady: status === 'ready', permissionsShown, profileShown });
 
   /** « Bienvenue » au-dessus du nom ou pseudo de Réglages, « Bienvenue » seul sans lui. */
-  const { profile, setAvatar } = useAthleteProfile();
+  const { profile, setAvatar, setFish } = useAthleteProfile();
   const name = athleteName(profile);
   const avatar = athleteAvatar(profile);
   /** Choix de la photo ouvert sous l'en-tête : non retenu. */
@@ -162,6 +164,8 @@ function ProfilePage() {
   const root = useProfileRoot(all, profile, nowMs);
   // Poisson : les mêmes semaines tenues, le niveau d'essai de Pratiquant s'il est réglé.
   const fish = useProfileFish(all, profile, nowMs);
+  const [fishOpen, setFishOpen] = useState(false);
+  const closeFish = useCallback(() => setFishOpen(false), []);
   const [rootOpen, setRootOpen] = useState(false);
   const closeRoot = useCallback(() => setRootOpen(false), []);
 
@@ -277,7 +281,8 @@ function ProfilePage() {
               </Link>
             </div>
           </div>
-          <ProfileFish level={fish.level} style={fish.style} path={fish.path} brushColor={brushColor} />
+          <ProfileFish level={fish.level} style={fish.style} path={fish.path} brushColor={brushColor}
+            onOpen={() => setFishOpen(true)} />
         </div>
         {PROFILE_PLANT_VISIBLE && (
           <Suspense fallback={null}>
@@ -386,6 +391,12 @@ function ProfilePage() {
         <Suspense fallback={null}>
           <ProfileRoot growth={root.growth} goalMin={root.goalMin} cardSelectors={ROOT_CARDS}
             ready={status === 'ready' && !scanning} open={rootOpen} onClose={closeRoot} />
+        </Suspense>
+      )}
+      {fishOpen && (
+        <Suspense fallback={null}>
+          <FishPicker level={fish.level} unlocked={fish.unlocked} style={fish.style} path={fish.path}
+            brushColor={brushColor} onChoose={setFish} onClose={closeFish} />
         </Suspense>
       )}
     </div>
