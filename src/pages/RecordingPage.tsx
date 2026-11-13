@@ -1002,7 +1002,7 @@ function RecordingScreen() {
               </Button>
             )}
             {pending.canContinue && (
-              <Button onClick={() => void continuePendingSession(deviceLocationSource())} disabled={analyzing}>
+              <Button variant="record" onClick={() => void continuePendingSession(deviceLocationSource())} disabled={analyzing}>
                 Continuer l'enregistrement
               </Button>
             )}
