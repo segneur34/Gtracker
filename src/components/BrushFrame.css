@@ -1,0 +1,57 @@
+/* Cadre peint : un seul coup de pinceau qui fait presque le tour d'un cadre, ouvert à un angle (`brushFrame.ts`).
+   Le trait est le tracé du cadre des logos d'activité, tourné pour ouvrir l'angle en bas à droite, posé en masque sur un
+   aplat de la couleur voulue. Neuf tranches (coupe à 350 sur 1000) : les coins gardent leur forme, les milieux de côtés
+   s'étirent, le centre reste vide ; la bordure du masque vaut quatre fois le trait (`--brush-trait`, `tokens.css`). Les
+   trois autres ouvertures retournent le même trait. Le trait occupe la bordure du cadre, que les marges intérieures
+   (`--brush-pad-y`, `--brush-pad-x`) laissent libre : aucun texte dessous, et le cadre ne coupe rien (pas d'`overflow`).
+   Variables lues : `--brush` (couleur, l'encre à défaut), `--brush-fx` et `--brush-fy` (retournements, 1 ou -1),
+   `--brush-trait`. Sans prise en charge du masque en bordure, le cadre garde son trait fin d'origine.
+
+   `.brush-frame` se pose sur un cadre ; `.brush-frames` sur un conteneur dont les cartes (`.ui-card`) sont toutes peintes,
+   l'ouverture tournant d'une carte à la suivante. Le type en tête (`section`) l'emporte sur `.ui-card-col`. */
+
+@supports (-webkit-mask-box-image: none) {
+  section.brush-frame,
+  .brush-frames > .ui-card {
+    position: relative;
+    box-sizing: border-box;
+    padding: var(--brush-pad-y) var(--brush-pad-x);
+    border: 0;
+  }
+
+  section.brush-frame::before,
+  .brush-frames > .ui-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: var(--brush, var(--ink));
+    -webkit-mask-box-image: url('../assets/profil/trait-cadre-pinceau.svg') 350 / calc(4 * var(--brush-trait)) / 0 stretch;
+    transform: scale(var(--brush-fx, 1), var(--brush-fy, 1));
+  }
+
+  /* Ouvertures : bas droite (le trait tel quel), bas gauche, haut gauche, haut droite. */
+  .brush-frame--bg,
+  .brush-frame--hg {
+    --brush-fx: -1;
+  }
+
+  .brush-frame--hg,
+  .brush-frame--hd {
+    --brush-fy: -1;
+  }
+
+  /* Cartes d'un même conteneur : la première s'ouvre en haut à droite, puis bas droite, bas gauche, haut gauche. */
+  .brush-frames > .ui-card:nth-child(4n + 1) {
+    --brush-fy: -1;
+  }
+
+  .brush-frames > .ui-card:nth-child(4n + 3) {
+    --brush-fx: -1;
+  }
+
+  .brush-frames > .ui-card:nth-child(4n + 4) {
+    --brush-fx: -1;
+    --brush-fy: -1;
+  }
+}

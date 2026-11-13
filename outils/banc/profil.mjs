@@ -163,7 +163,7 @@ check('en ligne, de gauche à droite, le total à droite', cells.every((c, i) =>
 check('une touche ne fait rien : ni lien ni bouton', cells.every((c) => !c.interactive));
 check('ancienne bande des trois chiffres disparue', !(await evaluate(`!!document.querySelector('.profile-figures, .profile-figure')`)));
 check('nombre de sessions (graphe)', (await chartCount()) === '4 sessions', await chartCount());
-const ordre = await evaluate(`[...document.querySelectorAll('.profile > *')].map((el) => (el.getAttribute('class') ?? '').split(' ')[0] || el.tagName).join(' > ')`);
+const ordre = await evaluate(`[...document.querySelectorAll('.profile > :not(.profile-openers), .profile > .profile-openers > *')].map((el) => (el.getAttribute('class') ?? '').split(' ')[0] || el.tagName).join(' > ')`);
 check('ordre : en-tête, période, activités favorites, répartition, graphe', /^profile-head > ui-btn.*profile-favs.*profile-split.*actchart/.test(ordre ?? ''), ordre);
 // Colonne de droite, sur ordinateur (à partir de 1000 px) : « Vos activités », la rangée de logos et les cinq dernières sessions.
 const activites = () => evaluate(`(() => {

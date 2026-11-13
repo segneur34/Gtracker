@@ -62,6 +62,16 @@
   --space-5: 20px;
   --space-6: 24px;
 
+  /* Cadre peint du Profil (`components/BrushFrame.css`) : épaisseur du trait (la bordure du masque en vaut quatre fois
+     plus), marges intérieures qui le laissent libre, bloc des favoris plus étroit sur les côtés, écart entre cartes. */
+  --brush-trait: 12px;
+  --brush-pad-y: 38px;
+  /* Marges latérales : 24 px (20 px pour les favoris) à 320 px de large, qui montent avec l'écran jusqu'à 38 px (28 px)
+     dès 355 px (340 px). */
+  --brush-pad-x: clamp(24px, calc(24px + (100vw - 320px) * 0.4), 38px);
+  --brush-pad-x-tight: clamp(20px, calc(20px + (100vw - 320px) * 0.4), 28px);
+  --brush-gap: 30px;
+
   /* Pages d'analyse, sur ordinateur : largeur de la carte, centrée, la place de part et d'autre
      servant à faire défiler la page à la souris (`analysisMobile.css`). */
   --analysis-map-width: 80%;

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Activity } from '../core/activities';
 import { sportFamily } from '../core/sportProfiles';
 import { formatDistance, formatDuration } from '../core/units';
+import type { BrushFrameProps } from './brushFrame';
 import { HelpText, HelpToggle } from './Help';
 import { IconChevronRight } from './icons';
 import { sessionsPath } from '../core/parentPage';
@@ -43,7 +44,7 @@ const formatTime = (ms: number): string =>
   new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
 
-function ActivityChart({ period, nowMs }: { period: ChartRange; nowMs: number }) {
+function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: number; frame: BrushFrameProps }) {
   const { all, activityById } = useVisibleStatSessions();
   const openSession = useOpenSession();
   const navigate = useNavigate();
@@ -72,7 +73,7 @@ function ActivityChart({ period, nowMs }: { period: ChartRange; nowMs: number })
   const weekly = period === 'sixmois' || period === 'annee' || period === 'tout';
 
   return (
-    <section className="actchart ui-card-col" aria-label="Activités">
+    <section className={`actchart ui-card-col ${frame.className}`} style={frame.style} aria-label="Activités">
       <div className="actchart__head">
         <h2>{chart.title}<HelpToggle helpKey="profil:activites" label={chart.title} /></h2>
         <span className="num">{plural(totalSessions, 'session')}</span>

@@ -1,5 +1,6 @@
 import type { LogoId } from '../core/activityLogos';
 import { plural } from '../core/basics';
+import type { BrushFrameProps } from './brushFrame';
 import ActivityLogo from './logos/ActivityLogo';
 import './ProfileFavorites.css';
 
@@ -23,14 +24,16 @@ export interface FavoriteCell {
   distance: string;
 }
 
-function ProfileFavorites({ cells, total }: {
+function ProfileFavorites({ cells, total, frame }: {
   /** Du premier au troisième ; moins de trois, ou aucun. */
   cells: readonly FavoriteCell[];
   /** Distance totale de la période, déjà mise en forme. */
   total: string;
+  /** Cadre peint du bloc (`brushFrame`). */
+  frame: BrushFrameProps;
 }) {
   return (
-    <section className="profile-favs ui-card-col" aria-label="Activités favorites">
+    <section className={`profile-favs ui-card-col ${frame.className}`} style={frame.style} aria-label="Activités favorites">
       <h2 className="profile-card__title">Activités favorites</h2>
       {cells.length === 0 && <p className="ui-hint profile-favs__empty">Aucune session rangée sur cette période.</p>}
       <ol className="profile-favs__row">

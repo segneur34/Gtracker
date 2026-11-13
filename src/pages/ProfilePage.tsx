@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useMemo, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ActivityChart from '../components/ActivityChart';
 import GongLogo from '../components/GongLogo';
@@ -8,6 +8,8 @@ import { AvatarPicker, ProfileAvatar } from '../components/ProfileAvatar';
 import ProfilePrompt from '../components/ProfilePrompt';
 import TutorialOfDay from '../components/TutorialOfDay';
 import ProfileFavorites, { type FavoriteCell } from '../components/ProfileFavorites';
+import { brushFrame } from '../components/brushFrame';
+import { brushColorFor } from '../core/brushColor';
 import { IconChevronRight } from '../components/icons';
 import Button from '../components/ui/Button';
 import { logoColor, type Activity } from '../core/activities';
@@ -21,7 +23,7 @@ import { athleteAvatar, athleteName } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { useStoredRecord } from '../hooks/useStoredRecord';
-import { useThemedShade } from '../hooks/useTheme';
+import { useAppliedTheme, useThemedShade } from '../hooks/useTheme';
 import { useNow } from '../hooks/useNow';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
@@ -215,6 +217,20 @@ function ProfilePage() {
       sessions: f.totals.sessions, distance: distanceText(f.totals.distanceM, effectiveDistanceUnit(a)),
     }];
   }), [inPeriod, activityOrder, activityById, shown]);
+  // Coup de pinceau des cadres : la couleur de la première favorite de la période (l'encre sans session), vue du thème.
+  const dark = useAppliedTheme().theme === 'dark';
+  const brushColor = useMemo(() => {
+    const first = favoriteActivities(inPeriod, activityOrder)[0];
+    const a = first ? activityById.get(first.activityId) : undefined;
+    return a ? brushColorFor(a.color, dark) : 'var(--ink)';
+  }, [inPeriod, activityOrder, activityById, dark]);
+  // Un cadre par rang dans la page : favoris, répartition, graphe ; l'ouverture tourne de l'un à l'autre.
+  const frames = useMemo(
+    () => ({ favs: brushFrame(0, brushColor), split: brushFrame(1, brushColor), chart: brushFrame(2, brushColor) }),
+    [brushColor]
+  );
+  /** Couleur du pinceau des cartes d'ouverture, posée sur leur conteneur. */
+  const openersStyle = useMemo(() => ({ '--brush': brushColor }) as CSSProperties, [brushColor]);
   const activeSlice = slices.find((s) => s.key === active) ?? null;
 
   // Anneau : chaque part est un arc du même cercle, en trait épais, à partir du haut, dans le sens des aiguilles.
@@ -251,12 +267,15 @@ function ProfilePage() {
       </header>
       {picking && <AvatarPicker avatar={avatar} logoColor={shownLogoColor} onPick={setAvatar} onClose={() => setPicking(false)} />}
 
-      {memoryNeedsAction && <MemoryStatus />}
-      {/* Le dossier de la mémoire d'abord, puis les autorisations (téléphone seulement, s'il en manque). */}
-      {!memoryNeedsAction && status === 'ready' && <PermissionsPrompt onDecided={setPermissionsShown} />}
+      {/* Cartes d'ouverture, peintes comme les autres cadres : un conteneur sans boîte (`display: contents`). */}
+      <div className="profile-openers brush-frames" style={openersStyle}>
+        {memoryNeedsAction && <MemoryStatus />}
+        {/* Le dossier de la mémoire d'abord, puis les autorisations (téléphone seulement, s'il en manque). */}
+        {!memoryNeedsAction && status === 'ready' && <PermissionsPrompt onDecided={setPermissionsShown} />}
+        {TUTORIAL_OF_DAY_VISIBLE && <TutorialOfDay gate={tutorialGate} />}
+      </div>
       {/* Puis le profil, s'il manque un champ, une fois par lancement ; jamais par-dessus ces deux cartes. */}
       {gate.mount && <ProfilePrompt otherCardShown={gate.otherCardShown} onDecided={setProfileShown} />}
-      {TUTORIAL_OF_DAY_VISIBLE && <TutorialOfDay gate={tutorialGate} />}
 
       <Button size="s" className="profile-periods" aria-label={`Période : ${periodLabel}. Toucher pour afficher : ${otherPeriodLabel}.`}
         onClick={() => rememberView({ periode: period === 'tout' ? 'annee' : 'tout' })}>
@@ -271,10 +290,10 @@ function ProfilePage() {
         <>
           {scanning && <p className="ui-hint">Fiches en cours de calcul ({scanning.done} / {scanning.total}) : chiffres provisoires.</p>}
 
-          <ProfileFavorites cells={favoriteCells} total={distanceText(totals.distanceM, distanceUnit)} />
+          <ProfileFavorites cells={favoriteCells} total={distanceText(totals.distanceM, distanceUnit)} frame={frames.favs} />
 
           {slices.length > 0 && (
-            <section className="profile-split ui-card-col" aria-label="Répartition par activité">
+            <section className={`profile-split ui-card-col ${frames.split.className}`} style={frames.split.style} aria-label="Répartition par activité">
               <h2 className="profile-card__title">Répartition du temps</h2>
               <div className="profile-split__body">
                 <div className="profile-donut">
@@ -347,7 +366,7 @@ function ProfilePage() {
         </>
       )}
 
-      {sessions.length > 0 && <ActivityChart key={period} period={period} nowMs={nowMs} />}
+      {sessions.length > 0 && <ActivityChart key={period} period={period} nowMs={nowMs} frame={frames.chart} />}
       {PROFILE_PLANT_VISIBLE && (
         <Suspense fallback={null}>
           <ProfileRoot growth={root.growth} goalMin={root.goalMin} cardSelectors={ROOT_CARDS}

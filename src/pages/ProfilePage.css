@@ -149,6 +149,13 @@
 
 .ui-page.profile {
   padding-top: 0;
+  /* Les cadres sont peints d'un coup de pinceau (`components/BrushFrame.css`) : plus d'air entre eux. */
+  gap: var(--brush-gap);
+}
+
+/* Conteneur des cartes d'ouverture : sans boîte, ses cartes restent des enfants de la colonne (écart compris). */
+.profile-openers {
+  display: contents;
 }
 
 .profile-head {

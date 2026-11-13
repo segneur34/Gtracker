@@ -89,7 +89,7 @@ check('la session est sous Wingfoil', before.voile.includes('Wingfoil'), before.
 check('barre du bas : Profil, Sessions, Statistiques, Réglages', before.barreBas === 'Profil | Sessions | Statistiques | Réglages', before.barreBas);
 check('barre du haut : Profil, Sessions, Planifier, Statistiques, Réglages', before.barreHaut === 'ProfilSessionsPlanifierStatistiquesRéglages', before.barreHaut);
 check('rangée de logos : Toutes, Wingfoil, Kite, Surf, Pumping, « Toutes » enfoncé', before.ronds === 'Toutes*, Wingfoil, Kite, Surf, Pumping', before.ronds);
-check('le Profil (ouverture) compte la session de Wingfoil', before.profil.includes('Wingfoil') && !before.profil.includes('aucune session'), before.profil.replace(/\s+/g, ' ').slice(0, 200));
+check('le Profil (ouverture) compte la session de Wingfoil', before.profil.includes('Wingfoil') && !before.profil.includes('Aucune session rangée'), before.profil.replace(/\s+/g, ' ').slice(0, 200));
 
 // --- 2. Surf, puis Route, cachés ---
 await go('/parametres');
@@ -108,7 +108,7 @@ console.log('\n--- caché ---');
 for (const [k, v] of Object.entries(hidden)) console.log(`${k} : ${String(v).replace(/\s+/g, ' ').slice(0, 220)}`);
 check('barre du haut inchangée (elle ne porte plus de famille)', hidden.barreHaut === before.barreHaut, hidden.barreHaut);
 check('barre du bas inchangée', hidden.barreBas === before.barreBas, hidden.barreBas);
-check('Profil sans la session de Wingfoil cachée', hidden.profil.includes('aucune session') && !hidden.profil.includes('Wingfoil'), hidden.profil.replace(/\s+/g, ' ').slice(0, 200));
+check('Profil sans la session de Wingfoil cachée', /Activités favorites\s+Aucune session rangée/.test(hidden.profil) && /Total\s+0 km/.test(hidden.profil) && /\b0 session\b/.test(hidden.profil) && !hidden.profil.includes('Wingfoil'), hidden.profil.replace(/\s+/g, ' ').slice(0, 200));
 check('rangée de logos de Sessions sans Wingfoil, Surf ni Pumping (et avec, au départ)', hidden.ronds === 'Toutes*, Kite' && before.ronds.includes('Surf, Pumping'), hidden.ronds);
 check('Sessions : session retirée de la liste et signalée', hidden.voile.includes('Activités cachées : 1 session') && hidden.voile.includes('Aucune session'), hidden.voile.replace(/\s+/g, ' ').slice(0, 200));
 check("Enregistrer sans l'onglet Surf", !/\bSurf\b/.test(hidden.enregistrer));

@@ -7,6 +7,14 @@
   --favs-logo-3: 44px;
 }
 
+/* Cadre peint : ce bloc garde des marges latérales plus étroites que les autres cartes (la rangée y tient à 320 px). */
+@supports (-webkit-mask-box-image: none) {
+  section.brush-frame.profile-favs {
+    padding-right: var(--brush-pad-x-tight);
+    padding-left: var(--brush-pad-x-tight);
+  }
+}
+
 .profile-favs__row {
   display: flex;
   align-items: flex-start;
@@ -100,8 +108,6 @@
     --favs-logo-1: 60px;
     --favs-logo-2: 48px;
     --favs-logo-3: 40px;
-    padding-right: var(--space-4);
-    padding-left: var(--space-4);
   }
 
   .profile-favs__row {
