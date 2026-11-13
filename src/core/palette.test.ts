@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ACTIVITY_PALETTE, BASE_COLOR, DEFAULT_ACTIVITIES, THEME_BACKGROUND, contrastRatio, drawnShadeForTheme, readableInk,
-  shadeForTheme,
+  ACTIVITY_PALETTE, BASE_COLOR, DEFAULT_ACTIVITIES, THEME_BACKGROUND, contrastRatio, drawnShadeForTheme, isLostOnBackground,
+  readableInk, shadeForTheme,
 } from './activities';
 import { SPORT_PROFILES } from './sportProfiles';
 import type { SportType } from './types';
@@ -148,5 +148,16 @@ describe('lisibilité sur le fond du thème', () => {
     // Seuls le blanc de jour et le noir de nuit passent à l'encre.
     expect(LIGHT.filter((c) => drawnShadeForTheme(c, false) === 'var(--ink)')).toEqual(['#ffffff']);
     expect(LIGHT.filter((c) => drawnShadeForTheme(c, true) === 'var(--ink)')).toEqual(['#ffffff']);
+  });
+
+  it('isLostOnBackground : le cadre qui se confond avec le fond reçoit un cerne (couleur déjà celle du thème)', () => {
+    expect(isLostOnBackground('#ffffff', false)).toBe(true);
+    expect(isLostOnBackground(shadeForTheme('#ffffff', true), true)).toBe(true);
+    expect(isLostOnBackground('#000000', false)).toBe(false);
+    expect(isLostOnBackground(shadeForTheme('#000000', true), true)).toBe(false);
+    expect(isLostOnBackground('#003e52', true)).toBe(false);
+    expect(isLostOnBackground('var(--ink)', false)).toBe(false);
+    expect(LIGHT.filter((c) => isLostOnBackground(c, false))).toEqual(['#ffffff']);
+    expect(LIGHT.filter((c) => isLostOnBackground(shadeForTheme(c, true), true))).toEqual(['#ffffff']);
   });
 });

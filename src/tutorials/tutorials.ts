@@ -84,6 +84,13 @@ export const todayLesson = (
 };
 
 /**
+ * Interrupteur unique de la carte « Aujourd'hui : … » (leçon du jour) : à `false`, elle ne se montre plus et les jours
+ * d'ouverture ne se comptent plus ; les leçons, leur liste dans Réglages et ce qui est déjà retenu sur l'appareil
+ * restent, la remettre à `true` reprend le programme où il s'était arrêté.
+ */
+export const TUTORIAL_OF_DAY_VISIBLE: boolean = false;
+
+/**
  * Ordre de l'accueil : la mémoire, les autorisations, le pop-up du profil, puis la carte du jour,
  * qui ne s'empile pas sur eux. `wait` tant que l'un n'est pas décidé (`null`) ; `blocked` si l'un
  * est à l'écran : elle attend alors le lancement suivant ; `free` sinon.

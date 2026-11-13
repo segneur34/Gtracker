@@ -4,7 +4,7 @@
 // Aucun réseau (les tuiles de la carte sont bloquées, les demandes à l'IGN, à Overpass et à BRouter relevées : aucune). Le script fabrique ses GPX (`lib/traces.mjs`, wingfoil). Il vérifie :
 //  1. le cache allégé : une session de wingfoil dont la fiche porte ses sauts (champ lourd, pris dans le jeu d'essai de la
 //     porte d'import) et un champ inconnu ; après deux lancements, `gtracker.libraryCache` ne les contient plus ; un
-//     renommage depuis la bibliothèque les laisse intacts dans la fiche ; l'analyse s'ouvre ;
+//     renommage depuis la page Sessions les laisse intacts dans la fiche ; l'analyse s'ouvre ;
 //  2. le recalcul de fond : 30 fiches au résumé périmé (`calcVersion` 1) ; la dernière, renommée pendant le balayage,
 //     garde son nom et reçoit son nouveau résumé ;
 //  3. « Mettre à jour » : une session renommée pendant la relecture garde son nom, dans la liste et la fiche ;
@@ -16,6 +16,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BASE, CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { actionLigne } from './lib/sessions.mjs';
 import { traceSurf, traceVoile } from './lib/traces.mjs';
 
 // Les sauts d'une fiche (le champ lourd du cache) : ceux du jeu d'essai de la porte d'import, figé, sans rien inventer.
@@ -76,7 +77,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
 // 1. Cache allégé.
 console.log('— 1. cache allégé');
-await go('/voile');
+await go('/sessions');
 await importFiles([firstPath], 'input[type=file][accept*=".gpx"][multiple]');
 // Le dossier n'existe qu'à la première écriture, après le calcul dans le worker (lot 161) : `listOpfs` ne rend pas de liste avant.
 await waitFor(async () => { const names = await listOpfs('sessions'); return Array.isArray(names) && names.some((n) => n.endsWith('.json')); }, { timeout: 10000, label: 'fiche' });
@@ -86,9 +87,9 @@ const base = await fiche(gpx);
 const lourde = { ...base, jumps: SAUTS, nouveau: { forme: [1, 2, 3] } };
 await writeOpfs('sessions', gpx.replace(/\.gpx$/, '.json'), JSON.stringify(lourde, null, 2));
 const ficheSize = JSON.stringify(lourde).length;
-await go('/voile');
+await go('/sessions');
 await waitScan();
-await go('/voile');
+await go('/sessions');
 await waitScan();
 const cache = await evaluate(`localStorage.getItem('${CLES.libraryCache}') ?? ''`);
 console.log(`fiche : ${ficheSize} car. | cache : ${cache.length} car., allégé : ${cache.includes('"light":true')}, sauts dedans : ${cache.includes('"jumps"')}, champ inconnu dedans : ${cache.includes('"nouveau"')}`);
@@ -96,15 +97,15 @@ check('le cache est allégé : ni les sauts ni le champ inconnu', cache.includes
 const partielle = await evaluate(`(async () => (${LIB}).librarySession(${JSON.stringify(gpx)})?.partial === true)()`);
 console.log('session partielle :', partielle);
 check('la session est tenue en mémoire sans ses champs lourds (partielle)', partielle === true);
-console.log('Renommer :', await evaluate(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Renommer'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
+console.log('« … » de la ligne, Renommer :', await actionLigne(evaluate, wait, '', 'Renommer'));
 await wait(300);
 await evaluate(`(() => { const i = document.querySelector('.lib-row__rename'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'Renommée depuis la liste'); i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return 'ok'; })()`);
 await waitFor(async () => (await fiche(gpx)).name === 'Renommée depuis la liste', { timeout: 2000, label: 'fiche renommée' });
 const renamed = await fiche(gpx);
 console.log(`fiche après renommage : nom « ${renamed.name} », sauts ${renamed.jumps?.jumps?.length ?? 'ABSENTS'}, champ inconnu ${renamed.nouveau ? 'gardé' : 'ABSENT'}`);
-check('un renommage depuis la bibliothèque laisse les sauts et le champ inconnu intacts dans la fiche',
+check('un renommage depuis la page Sessions laisse les sauts et le champ inconnu intacts dans la fiche',
   renamed.name === 'Renommée depuis la liste' && renamed.jumps?.jumps?.length === SAUTS.jumps.length && JSON.stringify(renamed.nouveau) === JSON.stringify(lourde.nouveau), JSON.stringify([renamed.name, renamed.jumps?.jumps?.length]));
-await go('/voile');
+await go('/sessions');
 await waitScan();
 requests.length = 0;
 await go(`/voile/analyse?session=${encodeURIComponent(gpx)}`, 5000);
@@ -127,7 +128,7 @@ for (let k = 0; k < STALE; k++) {
   }, null, 2));
 }
 const LAST = staleName(STALE - 1);
-await send('Page.navigate', { url: `${BASE}/voile` });
+await send('Page.navigate', { url: `${BASE}/sessions` });
 let known = false;
 for (let k = 0; k < 80 && !known; k++) {
   await wait(100);
@@ -180,7 +181,7 @@ writeFileSync(brokenPath, '<gpx><trk><trkseg><trkpt lat="43"');
 writeFileSync(blockedPath, sortieGpx('Import bloqué', T_BLOCKED));
 const blockedGpx = await evaluate(`(async () => (await import('/src/recording/session.ts')).sessionFileName(${T_BLOCKED}, 'wingfoil'))()`);
 const blockedJson = blockedGpx.replace(/\.gpx$/, '.json');
-await go('/voile');
+await go('/sessions');
 await waitScan();
 // Un dossier au nom de la fiche, posé après la lecture du dossier : l'application ne le connaît pas, et l'écriture de la fiche échoue.
 await evaluate(`(async () => { await (await ${dirJs('sessions')}).getDirectoryHandle(${JSON.stringify(blockedJson)}, { create: true }); return 'ok'; })()`);

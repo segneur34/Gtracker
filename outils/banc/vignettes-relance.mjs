@@ -1,9 +1,9 @@
-// Banc de test : vignettes de la bibliothèque gardées d'un lancement à l'autre (lot 118 : traces ; lot 121 : images finies).
+// Banc de test : vignettes de la page Sessions gardées d'un lancement à l'autre (lot 118 : traces ; lot 121 : images finies).
 // Usage : node vignettes-relance.mjs <port> <dossier de travail, chemin Windows>
 // Sur un profil neuf ; tuiles fausses (`lib/tuiles.mjs`, servies en 50 ms, sans réseau), le reste bloqué. Le script :
 //  1. écrit 30 sessions de voile synthétiques de 20 min à 1 Hz (boucles de tailles et de lieux différents, wingfoil et
 //     kite ; remis sur la voile au lot 330) et les importe ;
-//  2. efface les vignettes gardées (caches `gtracker-vignettes` et `gtracker-vignettes-images`), puis ouvre la bibliothèque
+//  2. efface les vignettes gardées (caches `gtracker-vignettes` et `gtracker-vignettes-images`), puis ouvre la page Sessions
 //     à pied à 390 × 844, densité 2 (premier lancement : chaque vignette relit son GPX), attend les vignettes visibles,
 //     laisse 3 s à l'écriture du magasin et relève l'empreinte SHA-1 de chaque image visible (la référence), puis le
 //     nombre et le poids moyen des images finies gardées (cache `gtracker-vignettes-images` ; 0 avant le lot 121) ;
@@ -58,7 +58,7 @@ for (let i = 0; i < COUNT; i++) {
   files.push(path);
 }
 
-await go('/voile');
+await go('/sessions');
 console.log('import                :', await importFiles(files, 'input[type=file][accept*=".gpx"][multiple]:not([disabled])'));
 const imported = await waitFor(async () => (await records()).length >= COUNT, { timeout: 120000, every: 1000, label: 'fiches' });
 console.log('fiches                :', imported ? COUNT : (await records()).length);
@@ -99,13 +99,13 @@ const KEPT_IMAGES = `(async () => {
 })()`;
 
 /**
- * Lance `/voile` et rend, en ms depuis le début de la navigation (horloge de la page), `trace` : le temps jusqu'à ce
+ * Lance `/sessions` et rend, en ms depuis le début de la navigation (horloge de la page), `trace` : le temps jusqu'à ce
  * que chaque vignette visible porte une image, et `fond` : jusqu'à ce que chacune ait montré l'image d'empreinte
  * `expected[i]` (la plus tardive des heures d'apparition de ces images ; `null` sans `expected`). `null` après 60 s.
  */
 const launch = async (expected = null) => {
   const before = await evaluate(`window.__banc?.doc ?? null`);
-  await send('Page.navigate', { url: `${BASE}/voile` });
+  await send('Page.navigate', { url: `${BASE}/sessions` });
   await waitFor(async () => {
     const doc = await evaluate(`window.__banc?.doc ?? null`);
     return doc && doc !== before;
@@ -158,7 +158,7 @@ const finalHashes = async (label) => {
 };
 
 // 2. Premier lancement : rien de gardé.
-await go('/', 5000);
+await go('/sessions', 5000);
 await evaluate(`Promise.all(['${CACHES.vignettes}', '${CACHES.vignettesImages}'].map((name) => caches.delete(name))).then(() => true, () => true)`);
 const firstMs = (await launch()).trace;
 console.log('1er lancement         :', firstMs == null ? '(vignettes absentes après 60 s)' : `${seconds(firstMs)}, sans ralenti`);

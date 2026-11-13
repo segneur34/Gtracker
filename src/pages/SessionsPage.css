@@ -1,0 +1,83 @@
+/* Page Sessions (`SessionsPage.tsx`) : disposition seulement, sur les variables de `theme/tokens.css` ; la ligne d'une
+   session est dans `components/SessionRow.css`, la rangée des activités dans `components/ActivityBubbles.css`. */
+
+.ui-page.sessions-page {
+  gap: var(--space-3);
+}
+
+/* Titre et « … », puis la ligne des totaux et « Tris ». */
+.sessions-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sessions-head__line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.sessions-head__title {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: var(--text-title);
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-spacing);
+  line-height: 1.1;
+  text-transform: var(--title-case);
+}
+
+.sessions-head__totals {
+  margin: 0;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.ui-tab.sessions-head__sort {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 28px;
+  padding: 0 var(--space-3);
+}
+
+.sessions-head__choice {
+  margin-top: var(--space-2);
+}
+
+/* Rangée des activités, carte des sessions à classer et liste, serrées comme sur la planche. */
+.sessions-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.sessions-empty {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3);
+}
+
+/* « Créer un parcours » et « Itinéraires » l'un sous l'autre sur téléphone droit ; côte à côte sur ordinateur
+   (`WIDE_QUERY`) et sur téléphone tourné (`PHONE_LANDSCAPE_QUERY`), où la largeur le permet et la hauteur manque. */
+.sessions-actions {
+  display: grid;
+  gap: var(--space-2);
+}
+
+@media (min-width: 768px) and (min-height: 500px), (min-width: 768px) and (pointer: fine), (min-width: 768px) and (pointer: none) {
+  .sessions-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 499.98px) and (pointer: coarse) {
+  .sessions-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

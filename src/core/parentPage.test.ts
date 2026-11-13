@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { analysisPath, libraryPath, parentPage, sessionFamily } from './parentPage';
+import { SESSIONS_PATH, analysisPath, parentPage, sessionFamily, sessionsPath } from './parentPage';
 
 describe('parentPage', () => {
-  it("rien au-dessus de l'accueil", () => {
+  it("rien au-dessus de l'accueil ni de Sessions, où il mène : le retour quitte l'application", () => {
     expect(parentPage('/', '')).toBeNull();
+    expect(parentPage('/sessions', '')).toBeNull();
+    expect(parentPage('/sessions/', '?activite=kite')).toBeNull();
   });
 
-  it("l'analyse renvoie à la bibliothèque de sa famille", () => {
-    expect(parentPage('/voile/analyse', '?session=a.gpx')).toBe('/voile');
-    expect(parentPage('/surf/analyse', '?session=d.gpx')).toBe('/surf');
+  it("l'analyse renvoie à Sessions, quelle que soit sa famille", () => {
+    expect(parentPage('/voile/analyse', '?session=a.gpx')).toBe('/sessions');
+    expect(parentPage('/surf/analyse', '?session=d.gpx')).toBe('/sessions');
   });
 
-  it("l'analyse rend le filtre d'activité de la bibliothèque d'où l'on vient", () => {
-    expect(parentPage('/surf/analyse', '?session=b.gpx&activite=a-surf-foil')).toBe('/surf?activite=a-surf-foil');
+  it("l'analyse rend le filtre d'activité de la page Sessions d'où l'on vient", () => {
+    expect(parentPage('/surf/analyse', '?session=b.gpx&activite=a-surf-foil')).toBe('/sessions?activite=a-surf-foil');
     expect(analysisPath('surf', 'b.gpx', 'a-surf-foil')).toBe('/surf/analyse?session=b.gpx&activite=a-surf-foil');
     expect(analysisPath('surf', 'b.gpx', null)).toBe('/surf/analyse?session=b.gpx');
     expect(analysisPath('surf', null, 'a-surf-foil')).toBe('/surf/analyse');
@@ -34,7 +36,7 @@ describe('parentPage', () => {
     expect(parentPage('/enregistrer', '?activite=a-surf-foil')).toBe('/');
   });
 
-  it("une bibliothèque renvoie à l'accueil, filtre compris", () => {
+  it("les anciennes adresses des bibliothèques renvoient à l'accueil, filtre compris", () => {
     expect(parentPage('/voile', '')).toBe('/');
     expect(parentPage('/surf', '?activite=a-surf-foil')).toBe('/');
     expect(parentPage('/voile', '?vue=planifiees')).toBe('/');
@@ -57,21 +59,23 @@ describe('parentPage', () => {
   });
 
   it('une barre oblique finale ne change rien', () => {
-    expect(parentPage('/voile/analyse/', '')).toBe('/voile');
+    expect(parentPage('/voile/analyse/', '')).toBe('/sessions');
     expect(parentPage('/statistiques/', '?famille=surf')).toBe('/statistiques');
   });
 });
 
-describe('chemins de la bibliothèque et des analyses', () => {
-  it("ouvre la bibliothèque d'une famille, filtrée sur une activité", () => {
-    expect(libraryPath('voile')).toBe('/voile');
-    expect(libraryPath('surf', 'a-paddle é')).toBe('/surf?activite=a-paddle%20%C3%A9');
+describe('chemins de la page Sessions et des analyses', () => {
+  it('ouvre la page Sessions, filtrée sur une activité', () => {
+    expect(SESSIONS_PATH).toBe('/sessions');
+    expect(sessionsPath()).toBe('/sessions');
+    expect(sessionsPath(null)).toBe('/sessions');
+    expect(sessionsPath('a-paddle é')).toBe('/sessions?activite=a-paddle%20%C3%A9');
   });
 
   it("ouvre l'analyse d'une famille, sur une session si elle est donnée", () => {
     expect(analysisPath('voile')).toBe('/voile/analyse');
     expect(analysisPath('surf', '2026-09-23 surf.gpx')).toBe('/surf/analyse?session=2026-09-23%20surf.gpx');
-    expect(parentPage('/surf/analyse', '?session=x')).toBe('/surf');
+    expect(parentPage('/surf/analyse', '?session=x')).toBe('/sessions');
   });
 
   it('range une session dans la famille de son calcul, une session à classer dans celle donnée', () => {

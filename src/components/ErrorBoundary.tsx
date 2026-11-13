@@ -7,7 +7,7 @@ import Button from './ui/Button';
  * bouton rond restent, et un enregistrement en cours peut toujours s'arrêter ;
  * la clé `resetKey` (l'adresse) la réarme à chaque page. Autour de toute
  * l'application (`main.tsx`), sans `onHome`, le bouton la recharge sur
- * l'accueil.
+ * l'accueil, qui mène à la page Sessions.
  */
 
 interface ErrorBoundaryProps {
@@ -55,7 +55,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           <p className="num" style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--muted)', overflowWrap: 'anywhere' }}>
             {error.message || error.name}
           </p>
-          <Button variant="primary" onClick={this.goHome}>Revenir à l'accueil</Button>
+          <Button variant="primary" onClick={this.goHome}>Revenir aux sessions</Button>
         </section>
       </div>
     );

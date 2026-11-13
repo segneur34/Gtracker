@@ -278,7 +278,7 @@
 
 /*
  * Économe : noir pur et moins d'effets (ni ombres, ni
- * photos de l'accueil : `ui.css`, `Home.css`). Toujours avec le sombre, qu'il
+ * photos en bandeau : `ui.css`). Toujours avec le sombre, qu'il
  * impose (`theme/theme.ts`) ; n'agit que sur l'aspect.
  */
 :root[data-eco] {

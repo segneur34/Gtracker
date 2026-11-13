@@ -4,7 +4,7 @@ import '../pages/analysisMobile.css';
 import type { ShareStat } from '../core/shareImage';
 import { shareableStats } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
-import { libraryPath } from '../core/parentPage';
+import { sessionsPath } from '../core/parentPage';
 import { useScrollToTopOnMount } from '../hooks/useRetainedScroll';
 import { dismissRecorderResult, useRecorderSelector } from '../hooks/useRecorder';
 import type { useSessionDraft } from '../hooks/useSessionDraft';
@@ -95,9 +95,9 @@ const mapRow = ({ rowZIndex, ...props }: ShellMap) => (
 function AnalysisShell<K extends string>({
   title, family, backLabel, file, share, error, draft, loadError, alerts, empty, reading = false, map, tabs,
 }: AnalysisShellProps<K>) {
-  // Le filtre d'activité de la bibliothèque d'où l'on vient est rendu au retour.
+  // Le filtre d'activité de la page Sessions d'où l'on vient est rendu au retour.
   const [params] = useSearchParams();
-  const back = libraryPath(family, params.get('activite') ?? undefined);
+  const back = sessionsPath(params.get('activite'));
   useScrollToTopOnMount();
   return (
     <div className="an-page ui-p-20">

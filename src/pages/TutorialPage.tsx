@@ -5,7 +5,7 @@ import PageBackdrop from '../components/PageBackdrop';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
-import { useLessonPath, useTutorials } from '../hooks/useTutorials';
+import { useTutorials } from '../hooks/useTutorials';
 import { LESSONS } from '../tutorials/lessons';
 import '../components/Tutorials.css';
 
@@ -21,7 +21,6 @@ function TutorialPage() {
   const backdrop = useFavoriteBackdrop();
   const { lessons, read } = useTutorials();
   const lesson = LESSONS.find((l) => l.id === id) ?? null;
-  const tryPath = useLessonPath(lesson);
   useEffect(() => {
     if (lesson) read(lesson.id);
   }, [lesson, read]);
@@ -44,7 +43,7 @@ function TutorialPage() {
           <p className="tutorial-card__hook">{lesson.hook}</p>
         </div>
         {lesson.body.map((text) => <p key={text}>{text}</p>)}
-        {tryPath && <Link to={tryPath} className="ui-btn ui-btn--primary tutorial-lesson__try">Essayer</Link>}
+        <Link to={lesson.target} className="ui-btn ui-btn--primary tutorial-lesson__try">Essayer</Link>
       </Card>
       <nav className="tutorial-nav" aria-label="Leçons">
         {previous ? <Link to={`/tutoriels/${previous.id}`} className="ui-btn ui-btn--ghost">Leçon précédente</Link> : <span />}

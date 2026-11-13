@@ -600,7 +600,7 @@ function PlanningPage() {
     <div className="ui-page ui-page--wide plan-page">
       <PageHeader
         title="Itinéraires"
-        back={{ to: '/', label: 'Accueil' }}
+        back={{ to: '/sessions', label: 'Sessions' }}
         subtitle="Posez les balises sur la carte : le parcours les relie en ligne droite." />
 
       <div className="plan-layout">

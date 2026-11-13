@@ -1,0 +1,68 @@
+/* Vignette de la trace d'une session (`SessionPreviewMap.tsx`), à droite de sa ligne. */
+
+.lib-row__preview {
+  position: relative;
+  flex: 0 0 auto;
+  width: 96px;
+  height: 72px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+  background: var(--surface-sunken);
+  cursor: pointer;
+  z-index: 0;
+}
+
+/* Disposition ordinateur (`WIDE_QUERY`) : la vignette grandit avec la place ; le téléphone tourné garde celle du téléphone. */
+@media (min-width: 768px) and (min-height: 500px), (min-width: 768px) and (pointer: fine), (min-width: 768px) and (pointer: none) {
+  .lib-row__preview {
+    width: 168px;
+    height: 104px;
+  }
+}
+
+/* Économe : la vignette, sans plan, sur le fond des cartes de la page. */
+:root[data-eco] .lib-row__preview {
+  background: var(--surface);
+}
+
+/* Image fixe de la vignette (`drawTrackPreview`), à la taille du cadre. */
+.lib-row__preview-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+}
+
+/* Mention d'OSM posée sur l'image, au style de celle de Leaflet (`leaflet.css`, `base.css`) : couleurs de la carte,
+   en dur comme les données de carte (encre #333, nom en bleu #0078a8 sur un voile blanc). */
+.lib-row__preview-credit {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 0 3px;
+  background: rgba(255, 255, 255, 0.8);
+  color: #333;
+  font-family: var(--font);
+  font-size: var(--text-2xs);
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.lib-row__preview-credit-name {
+  color: #0078a8;
+}
+
+.lib-row__preview-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}

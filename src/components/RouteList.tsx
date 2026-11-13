@@ -12,8 +12,8 @@ import './RouteList.css';
 
 /**
  * Liste d'itinéraires rangés : nom, activité, distance dans l'unité de son
- * activité, date. Commune à l'accueil, aux bibliothèques Voile et Surf
- * (vue « Planifiées ») et à la page Itinéraires (« Mes itinéraires »).
+ * activité, date. Commune à la planification et à la page des itinéraires
+ * planifiés.
  *
  * Toucher un itinéraire l'ouvre dans la page Itinéraires
  * (`/itineraires?itineraire=<base>`), sauf si la page fournit `onOpen`.

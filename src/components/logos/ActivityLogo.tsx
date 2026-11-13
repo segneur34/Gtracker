@@ -1,4 +1,6 @@
+import { isLostOnBackground } from '../../core/activities';
 import { LOGO_FRAME_MIN_PX, LOGO_GLYPH_SCALE, logoRotation, type LogoId } from '../../core/activityLogos';
+import { useAppliedTheme } from '../../hooks/useTheme';
 import { LOGO_BOX, LOGO_FRAME_SYMBOL, LOGO_VIEWBOX, logoSymbolId } from './logoSymbols';
 import './ActivityLogo.css';
 
@@ -37,17 +39,21 @@ interface ActivityLogoProps {
 
 /**
  * Logo d'une activité : son dessin à l'encre, posé à 60 % au centre du cadre au pinceau, à la couleur de l'activité et
- * tourné selon le logo (`logoRotation`) ; en dessous de 40 px, le dessin seul à l'encre. Les symboles viennent de
- * `LogoSprite`.
+ * tourné selon le logo (`logoRotation`) ; en dessous de 40 px, le dessin seul à l'encre. Un cadre qui se confond avec
+ * le fond (le blanc le jour, le noir la nuit) est cerné d'un trait gris d'un pixel, celui des pastilles. Les symboles
+ * viennent de `LogoSprite`.
  */
 function ActivityLogo({ logo, color, size, label, className }: ActivityLogoProps) {
+  const dark = useAppliedTheme().theme === 'dark';
   if (size < LOGO_FRAME_MIN_PX) {
     return <LogoGlyph logo={logo} size={size} label={label} className={className ? `activity-logo__glyph ${className}` : 'activity-logo__glyph'} />;
   }
   const rotation = logoRotation(logo);
+  // Le trait suit le bord du pinceau ; son épaisseur, en unités du dessin, vaut un pixel à l'écran.
+  const ring = isLostOnBackground(color, dark) ? { className: 'activity-logo__frame--ringed', strokeWidth: LOGO_BOX / size } : {};
   return (
     <svg className={className ? `activity-logo ${className}` : 'activity-logo'} width={size} height={size} viewBox={LOGO_VIEWBOX} focusable="false" {...a11y(label)}>
-      <use href={`#${LOGO_FRAME_SYMBOL}`} color={color} transform={`rotate(${rotation} ${LOGO_BOX / 2} ${LOGO_BOX / 2})`} />
+      <use href={`#${LOGO_FRAME_SYMBOL}`} color={color} transform={`rotate(${rotation} ${LOGO_BOX / 2} ${LOGO_BOX / 2})`} {...ring} />
       <use className="activity-logo__glyph" href={`#${logoSymbolId(logo)}`} x={GLYPH_OFFSET} y={GLYPH_OFFSET} width={GLYPH_SIDE} height={GLYPH_SIDE} />
     </svg>
   );

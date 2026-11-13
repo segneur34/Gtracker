@@ -292,7 +292,7 @@
 }
 
 /* Bloc « À propos » (`AboutSettings`) : logo centré, version, paragraphe, puis les licences en partie repliable. */
-/* Logo GONG complet puis « Gtracker », comme à l'accueil (`.home-logo`). */
+/* Logo GONG complet puis « Gtracker », comme dans la barre du haut. */
 .about__logo {
   display: flex;
   flex-wrap: wrap;

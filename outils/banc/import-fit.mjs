@@ -1,7 +1,7 @@
 // Banc de test : import de fichiers FIT de montre (lot 35, partie A, remis sur la voile et le surf au lot 330). À verdict.
 // Usage : node import-fit.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 40 s. Le script fabrique ses FIT (`src/test/fit.fixture.ts`, aucun vrai
-// fichier), les importe par les vrais champs de fichier de la bibliothèque (`DOM.setFileInputFiles`), et vérifie :
+// fichier), les importe par les vrais champs de fichier de la page Sessions (`DOM.setFileInputFiles`), et vérifie :
 //  1. une sortie de kitesurf de deux fois 10 min à 3 m/s, avec une pause de 1 min : session de kite, 1 200 points,
 //     distance de la vitesse et non celle du fichier, deux continus, GPX rangé seul, sans le .fit ; chiffres et FC à l'écran ;
 //  2. le même FIT réimporté : « déjà présente », rien de plus ;
@@ -84,7 +84,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork();
 
 // --- 1. Une course ---
-await go('/voile', 4000);
+await go('/sessions', 4000);
 await waitFor(`Boolean(document.querySelector(${JSON.stringify(IMPORT_INPUT)}))`, { timeout: 5000, every: 50, label: 'champ de fichier' });
 check('champ d\'import accepte les GPX et les FIT', (await evaluate(`document.querySelector(${JSON.stringify(IMPORT_INPUT)})?.accept ?? ''`)) === '.gpx,.fit');
 check('libellé « Importer des GPX ou FIT »', await evaluate(`[...document.querySelectorAll('label')].some((l) => l.textContent.includes('Importer des GPX ou FIT'))`));
@@ -112,14 +112,14 @@ check('analyse : FC moyenne de 150 bpm à l\'écran', /FC moyenne\s*150 bpm/.tes
 await shoot('import-fit-analyse');
 
 // --- 2. Le même FIT, de nouveau ---
-await go('/voile', 4000);
+await go('/sessions', 4000);
 console.log('réimport :', await importFiles(coursePath, IMPORT_INPUT));
 await waitText('1 déjà présente', 'déjà présente');
 check('réimport : « déjà présente »', await bodyHas('0 sessions ajoutées, 1 déjà présente'));
 check('réimport : rien de plus dans la mémoire', (await sessionFiles()).length === 2);
 
 // --- 3. Refusés, avec leur raison ---
-await go('/voile', 4000);
+await go('/sessions', 4000);
 console.log('faux FIT et FIT de salle :', await importFiles([fauxPath, sallePath], IMPORT_INPUT));
 await waitText('faux.fit', 'faux FIT nommé');
 const refused = await bodyText();
@@ -129,7 +129,7 @@ check('refusés : rien de rangé', (await sessionFiles()).length === 2);
 await shoot('import-fit-refus');
 
 // --- 3 bis. Un FIT d'un autre sport (une course), seul : laissé de côté ---
-await go('/voile', 4000);
+await go('/sessions', 4000);
 console.log('FIT de course :', await importFiles(autrePath, IMPORT_INPUT));
 await waitText('laissée de côté', 'autre sport');
 check('FIT d\'un autre sport : laissé de côté, la phrase dit ce que Gtracker range',
@@ -137,14 +137,14 @@ check('FIT d\'un autre sport : laissé de côté, la phrase dit ce que Gtracker 
 check('FIT d\'un autre sport : rien de rangé', (await sessionFiles()).length === 2);
 
 // --- 4. Pas une activité, seul ---
-await go('/voile', 4000);
+await go('/sessions', 4000);
 console.log('réglages de montre :', await importFiles(reglagesPath, IMPORT_INPUT));
 await waitText("n'est pas une activité", 'phrase claire');
 check('pas une activité : phrase claire', await bodyHas("Ce fichier de montre n'est pas une activité (réglages, parcours…) : rien n'a été importé."));
 check('pas une activité : rien de rangé', (await sessionFiles()).length === 2);
 
 // --- 5. Un dossier de deux activités ---
-await go('/voile', 4000);
+await go('/sessions', 4000);
 const dialogText = () => evaluate(`document.querySelector('.ui-dialog')?.innerText ?? ''`);
 console.log('dossier :', await importFiles(dossier, FOLDER_INPUT));
 await waitFor(async () => (await dialogText()) !== '', { timeout: 8000, label: 'question' });
@@ -154,7 +154,7 @@ console.log('  Annuler :', await clickText('Annuler', '.ui-dialog button'));
 await waitText('Import annulé', 'annulé');
 check('Annuler : rien de rangé, et c\'est dit', (await sessionFiles()).length === 2 && await bodyHas("Import annulé : rien n'a été importé."));
 
-await go('/voile', 4000);
+await go('/sessions', 4000);
 console.log('dossier, de nouveau :', await importFiles(dossier, FOLDER_INPUT));
 await waitFor(async () => (await dialogText()) !== '', { timeout: 8000, label: 'question' });
 console.log('  Tout importer :', await clickText('Tout importer', '.ui-dialog button'));

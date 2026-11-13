@@ -1,15 +1,17 @@
 // Banc de test : session à classer, activité demandée avant l'analyse (§10, point 88, remis sur la voile et le surf au lot 330).
 // Usage : node classer.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Le script fabrique un GPX dont la balise <type> ne dit rien (« other », comme certaines
-// applications), l'importe depuis la page Voile, et vérifie :
+// applications), l'importe depuis la page Sessions, et vérifie :
 //  1. la session est « À classer » (fiche sans calcul ni activité) ;
 //  2. l'ouvrir montre la question « Quelle activité ? » au lieu d'ouvrir l'analyse ; Échap la ferme sans rien changer ;
+//     « Classer… » du « … » de la ligne pose « Classer la session », Échap la ferme ;
 //  3. choisir Surf range l'activité dans la fiche et ouvre l'analyse du surf, pas celle de la voile (une session à classer
 //     s'ouvre sur l'analyse de la famille de l'activité choisie).
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { actionLigne, ouvrirLigne } from './lib/sessions.mjs';
 import { traceVoile } from './lib/traces.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -38,8 +40,8 @@ const sheet = () => evaluate(`(() => {
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
-// 1. Import depuis la page Voile.
-await go('/voile');
+// 1. Import depuis la page Sessions.
+await go('/sessions');
 await importFiles(gpxPath, 'input[type=file][accept*=".gpx"][multiple]');
 await waitFor(async () => (await readRecord()) !== null, { timeout: 3000, label: 'fiche' });
 await settle({ max: 3000, label: 'import' });
@@ -51,19 +53,29 @@ console.log('fiche :', `support ${before?.sport}, activité ${before?.activityId
 check('sa fiche n\'a ni calcul ni activité', (before?.sport ?? null) === null && (before?.activityId ?? null) === null, `${before?.sport} ; ${before?.activityId}`);
 
 // 2. L'ouvrir pose la question ; Échap la ferme.
-const openRow = () => evaluate(`(() => { const b = [...document.querySelectorAll('.lib-row__main')].find((x) => /À classer/.test(x.textContent)); if (!b) return 'absente'; b.click(); return 'ok'; })()`);
+const openRow = () => ouvrirLigne(evaluate, 'À classer');
 console.log('ouvrir :', await openRow());
 await wait(500);
 const question = await sheet();
 console.log('question :', question, '| page :', await evaluate('location.pathname'));
-check('l\'ouvrir pose la question « Quelle activité ? », on reste sur la bibliothèque', /Quelle activité/.test(question) && (await evaluate('location.pathname')) === '/voile', question);
+check('l\'ouvrir pose la question « Quelle activité ? », on reste sur la page Sessions', /Quelle activité/.test(question) && (await evaluate('location.pathname')) === '/sessions', question);
 await shoot('classer-question');
 await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
 await wait(300);
 console.log('Échap :', await sheet(), '| page :', await evaluate('location.pathname'), '| support', (await readRecord())?.sport);
-check('Échap ferme la question, rien n\'est changé', (await sheet()) === '(pas de liste)' && (await evaluate('location.pathname')) === '/voile' && ((await readRecord())?.sport ?? null) === null);
+check('Échap ferme la question, rien n\'est changé', (await sheet()) === '(pas de liste)' && (await evaluate('location.pathname')) === '/sessions' && ((await readRecord())?.sport ?? null) === null);
 
-// 3. Surf choisi : fiche rangée, analyse du surf ouverte (la session venait de la page Voile).
+// 2 bis. « Classer… » du « … » de la ligne pose la question « Classer la session » ; Échap la ferme.
+console.log('« … » de la ligne, Classer :', await actionLigne(evaluate, wait, 'À classer', 'Classer'));
+await wait(500);
+const questionMenu = await sheet();
+console.log('question :', questionMenu, '| page :', await evaluate('location.pathname'));
+check('« Classer… » du menu de la ligne pose la question « Classer la session »', /Classer la session/.test(questionMenu) && (await evaluate('location.pathname')) === '/sessions', questionMenu);
+await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+await wait(300);
+check('Échap la ferme, rien n\'est changé', (await sheet()) === '(pas de liste)' && ((await readRecord())?.sport ?? null) === null);
+
+// 3. Surf choisi : fiche rangée, analyse du surf ouverte (la session s'ouvre sur la famille de l'activité choisie).
 console.log('ouvrir :', await openRow());
 await wait(500);
 console.log('Surf :', await evaluate(`(() => { const b = [...document.querySelectorAll('.activity-select__option')].find((x) => x.textContent.trim() === 'Surf'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));

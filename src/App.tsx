@@ -1,6 +1,6 @@
 import { lazy, useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Navigate, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { RESTING_HR_PATH, analysisPath } from './core/parentPage';
+import { BrowserRouter as Router, Navigate, Routes, Route, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { RESTING_HR_PATH, SESSIONS_PATH, analysisPath, sessionsPath } from './core/parentPage';
 import { sportFamily } from './core/sportProfiles';
 import AppShell from './components/AppShell';
 import { DevThrow } from './components/ErrorBoundary';
@@ -8,10 +8,10 @@ import { confirmLeave } from './hooks/leaveGuard';
 import {
   acknowledgeRecordingLanding, dismissRecorderResult, finishPendingSession, getRecorderState, markRecorderResultOpened, useRecorderSelector,
 } from './hooks/useRecorder';
-import Home from './pages/Home';
+import SessionsPage from './pages/SessionsPage';
 
 /**
- * Pages chargées à la demande : seul l'accueil est dans le paquet
+ * Pages chargées à la demande : seule la page Sessions, où mène l'accueil, est dans le paquet
  * d'entrée ; chaque autre page, et avec elle Recharts (`vendor-charts`) ou
  * Leaflet (`vendor-map`), ne s'analyse qu'à sa première ouverture. `AppShell`
  * pose le `Suspense` ; les chemins, les `key` et `core/parentPage.ts` ne
@@ -19,7 +19,6 @@ import Home from './pages/Home';
  * paquet : c'est du temps d'analyse JS déplacé hors du premier rendu.
  */
 const loaders = {
-  SessionLibrary: () => import('./pages/SessionLibrary'),
   RecordingPage: () => import('./pages/RecordingPage'),
   SailingModule: () => import('./pages/SailingModule'),
   SurfModule: () => import('./pages/SurfModule'),
@@ -33,7 +32,6 @@ const loaders = {
   TutorialPage: () => import('./pages/TutorialPage'),
 };
 
-const SessionLibrary = lazy(loaders.SessionLibrary);
 const RecordingPage = lazy(loaders.RecordingPage);
 const SailingModule = lazy(loaders.SailingModule);
 const SurfModule = lazy(loaders.SurfModule);
@@ -50,15 +48,15 @@ const TutorialPage = lazy(loaders.TutorialPage);
 const PRELOAD_FALLBACK_MS = 1500;
 
 /**
- * Précharge les pages une fois l'accueil rendu et le fil libre, dans l'ordre
- * où l'utilisateur y va le plus : Enregistrer, une bibliothèque, les
+ * Précharge les pages une fois la première rendue et le fil libre, dans l'ordre
+ * où l'utilisateur y va le plus : Enregistrer, les
  * analyses, puis le reste ; un morceau à la fois, pour ne pas peser sur le
  * premier rendu. Une page ouverte entre-temps ne l'attend pas : `React.lazy`
  * la charge lui-même.
  */
 const preloadPages = (): (() => void) => {
   const order: (keyof typeof loaders)[] = [
-    'RecordingPage', 'SessionLibrary', 'SailingModule', 'SurfModule', 'StatisticsPage', 'ProfilePage',
+    'RecordingPage', 'SailingModule', 'SurfModule', 'StatisticsPage', 'ProfilePage',
     'SettingsPage', 'PlanningPage', 'RoutesPage', 'RestingHrTestPage', 'TutorialPage', 'TutorialsPage',
   ];
   let cancelled = false;
@@ -81,6 +79,16 @@ const preloadPages = (): (() => void) => {
   };
 };
 
+/**
+ * Anciennes adresses des bibliothèques Voile et Surf (`/voile`, `/surf`) : la page Sessions, filtre d'activité gardé ;
+ * leur vue des itinéraires (`?vue=planifiees`), la liste des itinéraires.
+ */
+function FormerLibrary() {
+  const [params] = useSearchParams();
+  if (params.get('vue') === 'planifiees') return <Navigate to="/itineraires/liste" replace />;
+  return <Navigate to={sessionsPath(params.get('activite'))} replace />;
+}
+
 /** Une recharge mène toujours à l'accueil : après une reprise silencieuse, retour sur Enregistrer. */
 function LandOnRecording() {
   const land = useRecorderSelector((s) => s.landOnRecording);
@@ -96,7 +104,7 @@ function LandOnRecording() {
 /**
  * Fin d'un enregistrement : la session en attente se range seule (`finishPendingSession`), à l'arrêt comme
  * à la réouverture après une coupure, puis son analyse s'ouvre, à la place de la page Enregistrer (le retour mène à
- * la bibliothèque). Un message de l'enregistreur (avertissement de l'arrêt, ménage en échec) reste pour l'analyse,
+ * la page Sessions). Un message de l'enregistreur (avertissement de l'arrêt, ménage en échec) reste pour l'analyse,
  * qui le montre. Rien ne s'ouvre si le rangement échoue (la carte de la session sert de filet), si la session n'est
  * pas entrée dans la mémoire ou reste à classer, ou si un brouillon ouvert n'est pas abandonné (`confirmLeave`) : la
  * carte « Session rangée » d'Enregistrer l'annonce alors, avec son message et « Analyser ». Une session reprise qui
@@ -136,11 +144,13 @@ function App() {
       <Routes>
         {/* Toutes les pages dans le même cadre : navigation et bandeau d'enregistrement. */}
         <Route element={<AppShell />}>
-          <Route path="/" element={<Home />} />
-          {/* Chaque famille : sa bibliothèque, et son module d'analyse ouvert sur une session (`?session=`). */}
-          <Route path="/voile" element={<SessionLibrary key="voile" family="voile" />} />
+          {/* L'accueil mène à la page Sessions, qui liste les sessions des deux familles. */}
+          <Route path="/" element={<Navigate to={SESSIONS_PATH} replace />} />
+          <Route path={SESSIONS_PATH} element={<SessionsPage />} />
+          {/* Chaque famille : son module d'analyse ouvert sur une session (`?session=`), et l'ancienne adresse de sa bibliothèque. */}
+          <Route path="/voile" element={<FormerLibrary />} />
           <Route path="/voile/analyse" element={<SailingModule />} />
-          <Route path="/surf" element={<SessionLibrary key="surf" family="surf" />} />
+          <Route path="/surf" element={<FormerLibrary />} />
           <Route path="/surf/analyse" element={<SurfModule />} />
           <Route path="/enregistrer" element={<RecordingPage />} />
           <Route path="/itineraires" element={<PlanningPage />} />

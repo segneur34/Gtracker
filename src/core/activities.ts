@@ -122,13 +122,21 @@ export const readableInk = (color: string): '#000000' | '#ffffff' =>
   (contrastRatio(color, '#000000') ?? 0) >= (contrastRatio(color, '#ffffff') ?? 0) ? '#000000' : '#ffffff';
 
 /**
+ * Couleur déjà celle du thème (`shadeForTheme`) qui se confond avec le fond de la page : le blanc le jour, le noir la
+ * nuit. Une couleur hors de l'écriture `#rrggbb` (une variable du thème) ne s'y confond pas.
+ */
+export const isLostOnBackground = (shade: string, dark: boolean): boolean => {
+  const ratio = contrastRatio(shade, dark ? THEME_BACKGROUND.dark : THEME_BACKGROUND.light);
+  return ratio !== null && ratio < LOST_ON_BACKGROUND;
+};
+
+/**
  * Couleur d'un dessin (icône) à la couleur d'une activité : sa couleur du
  * thème, ou l'encre quand elle se confond avec le fond de la page.
  */
 export const drawnShadeForTheme = (color: string, dark: boolean): string => {
   const shade = shadeForTheme(color, dark);
-  const ratio = contrastRatio(shade, dark ? THEME_BACKGROUND.dark : THEME_BACKGROUND.light);
-  return ratio !== null && ratio < LOST_ON_BACKGROUND ? 'var(--ink)' : shade;
+  return isLostOnBackground(shade, dark) ? 'var(--ink)' : shade;
 };
 
 /** Couleur de chaque calcul, pour ses activités de base : celle de son activité principale. */

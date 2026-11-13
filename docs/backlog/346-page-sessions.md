@@ -52,6 +52,12 @@ Quatrième lot du paquet de la nouvelle apparence, après le 344 (habillage), le
 - Actions d'une ligne (Classer, Renommer, Supprimer) : réponse de l'utilisateur du 13/11 à Q110 : un « … » par ligne, comme dans la liste des itinéraires, Supprimer gardant sa confirmation.
 - Banc : l'adaptation des scripts ne fait pas partie du travail de l'agent qui code la page ; elle part ensuite, par paquets, chez d'autres agents. L'agent qui code garde les classes `lib-list`, `lib-row`, `lib-row__main`, `lib-row__name`, `lib-row__icon`, `lib-row__warning`, `lib-row__rename`, `lib-row__preview`, `lib-row__preview-image`, `lib-row__preview-credit*` et le libellé du « … », que la plupart des scripts lisent.
 
+## Depuis le lot 349 (13/11), à savoir avant de suivre le plan
+
+- `ActivityIcon` n'existe plus. Les pièces sont dans `src/components/logos/` : `ActivityLogo` (`{ logo, color, size, label?, className? }`, cadre à partir de 40 px), `LogoGlyph` (dessin seul, `currentColor`), `ActivityGlyph` (dessin puis pastille cernée, lignes de liste). Le logo d'une activité : `activityLogo(activity)` de `core/activityLogos.ts` ; sa couleur affichée se prend comme le fait `ProfileAvatar`.
+- Tranché par l'orchestrateur : un cadre dont la couleur se confond avec le fond (le blanc d'une activité créée le jour, son noir la nuit) reçoit un cerne gris fin, celui des pastilles (`.ui-swatch`), posé dans `ActivityLogo` pour valoir partout, photo du Profil comprise.
+- Les numéros de ligne du plan sont ceux d'avant le 349 : les retrouver.
+
 ## Plan (agent Plan, 12/11), à suivre sauf constat contraire dans le code
 
 Aujourd'hui (A = `src/pages/Home.tsx`, B = `src/pages/SessionLibrary.tsx`), et où va chaque fonction :

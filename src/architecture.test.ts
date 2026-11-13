@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SESSIONS_PATH } from './core/parentPage';
 import { SPORT_FAMILIES } from './core/sportProfiles';
 
 /**
@@ -152,18 +153,20 @@ describe("sens des dépendances entre dossiers de src/", () => {
 });
 
 /**
- * Règle 9 de `CLAUDE.md` : chaque famille a sa bibliothèque et son module d'analyse, à une adresse ; il n'y a que deux
- * familles. Un dossier de la terre recréé (`running`, `cycling`, `land`) n'aurait pas de ligne dans `ALLOWED` et ferait
+ * Règle 9 de `CLAUDE.md` : chaque famille a son module d'analyse, à une adresse, et une seule page Sessions les liste
+ * toutes ; il n'y a que deux familles. Un dossier de la terre recréé (`running`, `cycling`, `land`) n'aurait pas de ligne dans `ALLOWED` et ferait
  * déjà échouer « chaque dossier de src/ a une règle » ; son vocabulaire est gardé par le cliquet de `outils/heritage.mjs`.
  */
 describe('familles et adresses (règle 9)', () => {
-  it('chaque famille a sa bibliothèque et son module', () => {
+  it("chaque famille a son module ; l'ancienne adresse de sa bibliothèque s'ouvre toujours ; une page Sessions pour les deux", () => {
     const app = fs.readFileSync(new URL('App.tsx', SRC), 'utf8');
     for (const f of SPORT_FAMILIES) {
       expect(app).toContain(`path="/${f}"`);
       expect(app).toContain(`path="/${f}/analyse"`);
     }
     expect([...SPORT_FAMILIES]).toEqual(['voile', 'surf']);
+    expect(app).toContain('path={SESSIONS_PATH} element={<SessionsPage />}');
+    expect(SESSIONS_PATH).toBe('/sessions');
   });
 
   it("App.tsx n'a plus de route de la course, du vélo ni du fractionné, et mène toute autre adresse à l'accueil", () => {

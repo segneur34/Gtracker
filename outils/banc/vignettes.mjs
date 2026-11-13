@@ -1,10 +1,10 @@
-// Banc de test : vignettes de la bibliothèque et tuiles gardées (lot 74, « tuiles et vignettes de la bibliothèque »).
+// Banc de test : vignettes de la page Sessions et tuiles gardées (lot 74).
 // Usage : node vignettes.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf ; tuiles fausses (`lib/tuiles.mjs` : damier beige et bleu pâle servi en 50 ms, sans réseau), le
 // reste bloqué. Le script :
 //  1. écrit 60 sessions de voile synthétiques de 20 min à 1 Hz (boucles de tailles et de lieux différents, wingfoil et
 //     kite ; 150 avant le lot 330, ramenées à 60 pour tenir en quelques minutes) et les importe ;
-//  2. ouvre la bibliothèque à pied, la fait défiler jusqu'en bas puis attend que chaque vignette soit dessinée ;
+//  2. ouvre la page Sessions à pied, la fait défiler jusqu'en bas puis attend que chaque vignette soit dessinée ;
 //     relève les cartes Leaflet vivantes (`.leaflet-container`), les compteurs du DOM (`Memory.getDOMCounters`), le
 //     tas JavaScript après un ramasse-miettes, les requêtes de tuiles (doubles, annulées) et leur répartition par
 //     zoom (mêmes tuiles demandées = même cadrage), et si Leaflet a été chargé par la page ;
@@ -62,7 +62,7 @@ for (let i = 0; i < COUNT; i++) {
   files.push(path);
 }
 
-await go('/voile');
+await go('/sessions');
 console.log('import             :', await importFiles(files, 'input[type=file][accept*=".gpx"][multiple]:not([disabled])'));
 const imported = await waitFor(async () => (await records()).length >= COUNT, { timeout: 240000, every: 1000, label: 'fiches' });
 console.log('fiches             :', imported ? COUNT : (await records()).length);
@@ -73,10 +73,10 @@ const READY = `[...document.querySelectorAll('.lib-row__preview')].filter((f) =>
 const SCROLLER = `(() => { let el = document.querySelector('.lib-row'); while (el && el !== document.body) { const s = getComputedStyle(el).overflowY; if ((s === 'auto' || s === 'scroll') && el.scrollHeight > el.clientHeight) return el; el = el.parentElement; } return document.scrollingElement; })()`;
 scripts.length = 0;
 tiles.reset();
-await go('/voile', 8000);
+await go('/sessions', 8000);
 await waitFor(`document.querySelectorAll('.lib-row').length >= ${COUNT}`, { timeout: 20000, label: 'lignes' });
 await waitFor(`${READY} > 0`, { timeout: 20000, label: 'première vignette' });
-await settle({ max: 3000, label: 'bibliothèque' });
+await settle({ max: 3000, label: 'page Sessions' });
 console.log('lignes             :', await evaluate(`document.querySelectorAll('.lib-row').length`));
 console.log('Leaflet chargé     :', (await evaluate("'L' in window")) || scripts.some((u) => /leaflet/i.test(u)) ? 'oui' : 'non');
 const t0 = Date.now();
@@ -90,7 +90,7 @@ await settle({ max: 5000, label: 'défilement' });
 console.log('défilement         :', seconds(Date.now() - t0), 'jusqu\'à la dernière vignette');
 const readyCount = await evaluate(READY);
 console.log('vignettes prêtes   :', readyCount);
-check(`bibliothèque : ${COUNT} vignettes dessinées après le défilement`, readyCount >= COUNT, readyCount);
+check(`page Sessions : ${COUNT} vignettes dessinées après le défilement`, readyCount >= COUNT, readyCount);
 console.log('cartes vivantes    :', await evaluate(`document.querySelectorAll('.leaflet-container').length`));
 console.log('tuiles (défilement):', formatTileStats(tiles.stats()));
 console.log('tuiles par zoom    :', tiles.stats().byZoom || '(aucune)');
@@ -142,7 +142,7 @@ for (const [sizeLabel, metrics] of SIZES) {
   await send('Emulation.setDeviceMetricsOverride', metrics);
   for (const [themeLabel, theme] of THEMES) {
     await evaluate(`localStorage.setItem('${CLES.theme}', ${JSON.stringify(JSON.stringify(theme))}); true`);
-    await go('/voile', 8000);
+    await go('/sessions', 8000);
     await waitFor(`[...document.querySelectorAll('.lib-row__preview')].slice(0, 6).every((f) => f.querySelector('img.lib-row__preview-image, .leaflet-tile-loaded, .leaflet-trace-pane canvas'))`, { timeout: 20000, label: `vignettes ${themeLabel} ${sizeLabel}` });
     // Tuiles et dernier dessin.
     await wait(800);
@@ -156,7 +156,7 @@ await evaluate(`localStorage.removeItem('${CLES.theme}'); true`);
 await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
 
 // 5. 10 000 tuiles gardées : liste au premier chargement, puis au suivant.
-await go('/', 5000);
+await go('/sessions', 5000);
 const filled = await evaluate(`(async () => {
   const cache = await caches.open('${CACHES.tuiles}');
   const body = new Uint8Array(2000);
@@ -173,7 +173,7 @@ const filled = await evaluate(`(async () => {
 })()`);
 console.log('tuiles écrites     :', filled);
 const timeList = async (label) => {
-  await go('/', 5000);
+  await go('/sessions', 5000);
   const r = await evaluate(`(async () => {
     const { tileStore } = await import('/src/platform/tileCache.ts');
     const t = performance.now();

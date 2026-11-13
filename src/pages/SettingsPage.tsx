@@ -898,7 +898,7 @@ function BlockTitle({ label, open, onToggle, helpKey, help }: {
 }
 
 /** Aide des deux unités d'une activité. */
-const UNIT_HELP = 'Utilisée partout pour cette activité : analyses, enregistrement, bibliothèque.';
+const UNIT_HELP = 'Utilisée partout pour cette activité : analyses, enregistrement, page Sessions.';
 
 /** Aide du seuil d'une activité, selon son calcul : en voile, en surf (vague ou vol). */
 const thresholdHelp = (treatment: Treatment, foil: boolean): string => {

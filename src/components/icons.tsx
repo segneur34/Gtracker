@@ -20,9 +20,13 @@ const strokeProps = (size: number) => ({
   focusable: false,
 });
 
-export const IconHome = ({ size = 24, ...props }: IconProps) => (
+/** Liste : la page Sessions. */
+export const IconList = ({ size = 24, ...props }: IconProps) => (
   <svg {...strokeProps(size)} {...props}>
-    <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />
+    <path d="M9 6h11M9 12h11M9 18h11" />
+    <circle cx="4.5" cy="6" r="0.5" />
+    <circle cx="4.5" cy="12" r="0.5" />
+    <circle cx="4.5" cy="18" r="0.5" />
   </svg>
 );
 

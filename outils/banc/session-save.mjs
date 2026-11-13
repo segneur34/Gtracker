@@ -4,7 +4,7 @@
 // Usage : node session-save.mjs <port>
 // La session est la trace de voile de `lib/traces.mjs` (wingfoil, le calcul par défaut de la voile : « Wingfoil »).
 // Ce que la page d'aujourd'hui change par rapport à la première version : l'analyse s'ouvre par son adresse (la
-// ligne de la bibliothèque n'y mène plus), le vent se saisit par « Régler » (boussole sur la carte), le seuil
+// ligne de la page Sessions n'y mène plus), le vent se saisit par « Régler » (boussole sur la carte), le seuil
 // d'activité est dans l'onglet « réglages », les notes dans « matos et conditions », et la barre est
 // `.ui-savebar` (« Non enregistré : … », « Annuler », « Enregistrer la session »).
 // Chaque étape dit « ok » ou « ÉCHEC » ; le script rend 1 au premier échec compté.
@@ -24,7 +24,7 @@ await blockNetwork();
 // Rangée « avancé » des analyses ouverte d'office, avec « général » : tous les onglets restent dans la barre.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
-// Les confirmations de la page sont acceptées d'office par la bibliothèque ; pour en refuser une, `confirm` répond
+// Les confirmations de la page sont acceptées d'office par le banc ; pour en refuser une, `confirm` répond
 // non (et note son message), le temps d'y renoncer.
 const dialogs = [];
 onMessage((msg) => { if (msg.method === 'Page.javascriptDialogOpening') dialogs.push(msg.params.message); });
@@ -62,7 +62,7 @@ const fiche = async (gpx) => {
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 step('1. Import du GPX, ouverture de la session');
-await go('/voile', 3000);
+await go('/sessions', 3000);
 console.log('import :', await importGpx(traceVoile({ nom: 'Synthétique', virageMin: 3 }), 'synthetique.gpx'));
 await waitFor(async () => (await records())?.some((r) => r.summary?.movingTimeS !== undefined), { timeout: 8000, label: 'fiche' });
 await settle({ max: 2000, label: 'import' });
@@ -98,7 +98,7 @@ check('fiche intacte', same(await fiche(file), start));
 
 step('3. Retour à la liste refusé : on reste sur la page');
 await refuseDialogs(true);
-console.log('clic retour :', await evaluate(`(() => { const a = [...document.querySelectorAll('a')].find((x) => x.textContent.trim().startsWith('Sessions voile')); if (!a) return 'absent'; a.click(); return 'ok'; })()`));
+console.log('clic retour :', await evaluate(`(() => { const a = document.querySelector('a.ui-back'); if (!a) return 'absent'; a.click(); return 'ok'; })()`));
 await settle({ max: 1000, label: 'retour refusé' });
 console.log('dialogue :', (await refusals()).at(-1) ?? '(aucun)');
 console.log('url :', await evaluate('location.pathname + location.search'));
@@ -171,13 +171,13 @@ check('brouillon intact', (await evaluate(`${COMMENT_AREA}?.value`)) === 'Brouil
 check('barre « Non enregistré »', /Non enregistré/.test(await bar()), await bar());
 
 step('9. Retour à la liste accepté : brouillon abandonné');
-console.log('clic retour :', await evaluate(`(() => { const a = [...document.querySelectorAll('a')].find((x) => x.textContent.trim().startsWith('Sessions voile')); if (!a) return 'absent'; a.click(); return 'ok'; })()`));
-await waitFor(`location.pathname === '/voile'`, { timeout: 1500, label: 'retour à la liste' });
+console.log('clic retour :', await evaluate(`(() => { const a = document.querySelector('a.ui-back'); if (!a) return 'absent'; a.click(); return 'ok'; })()`));
+await waitFor(`location.pathname === '/sessions'`, { timeout: 1500, label: 'retour à la liste' });
 await settle({ max: 1500, label: 'liste' });
 console.log('url :', await evaluate('location.pathname'));
 console.log('fiche :', JSON.stringify(await fiche(file)));
 check('avertissement accepté', dialogs.length >= 1, dialogs.at(-1));
-check('de retour sur la liste', (await evaluate('location.pathname')) === '/voile');
+check('de retour sur la liste', (await evaluate('location.pathname')) === '/sessions');
 check('fiche sans le brouillon', (await fiche(file))?.comment === null || (await fiche(file))?.comment === '');
 
 step('9b. Retour depuis la liste : la garde restée dessous est traversée sans bruit');
@@ -190,7 +190,7 @@ check('garde périmée traversée', (await evaluate('history.state?.leaveGuard ?
 
 step('10. Retour arrière du navigateur accepté : brouillon abandonné, on part');
 const dialogsBefore = dialogs.length;
-await go('/voile', 3000);
+await go('/sessions', 3000);
 await go(url, 7000);
 await waitWind();
 await openTab('matos et conditions');
@@ -199,12 +199,12 @@ await typeInto(COMMENT_AREA, 'Brouillon à jeter');
 await settle({ max: 800, label: 'commentaire' });
 check('barre « Non enregistré »', /Non enregistré/.test(await bar()), await bar());
 await evaluate('history.back()');
-await waitFor(`location.pathname === '/voile'`, { timeout: 4000, label: 'retour arrière accepté' });
+await waitFor(`location.pathname === '/sessions'`, { timeout: 4000, label: 'retour arrière accepté' });
 await settle({ max: 1500, label: 'liste' });
 console.log('url :', await evaluate('location.pathname'));
 console.log('fiche :', JSON.stringify(await fiche(file)));
 check('avertissement accepté', dialogs.length === dialogsBefore + 1, dialogs.at(-1));
-check('de retour sur la liste', (await evaluate('location.pathname')) === '/voile');
+check('de retour sur la liste', (await evaluate('location.pathname')) === '/sessions');
 check('fiche sans le brouillon', (await fiche(file))?.comment === null || (await fiche(file))?.comment === '');
 
 step('Console');

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
 import { LESSONS, type Lesson } from './lessons';
 import {
-  EMPTY_TUTORIAL_STATE, TUTORIAL_DAYS_MAX, dayIndexOf, dayKey, dismissToday, lessonOfDay, markOpened, markRead,
+  EMPTY_TUTORIAL_STATE, TUTORIAL_DAYS_MAX, TUTORIAL_OF_DAY_VISIBLE, dayIndexOf, dayKey, dismissToday, lessonOfDay, markOpened, markRead,
   readTutorialState, shownLessons, todayLesson, tutorialCardGate,
 } from './tutorials';
 
@@ -24,6 +24,14 @@ describe('programme des tutoriels', () => {
     expect(PROFILE_PLANT_VISIBLE).toBe(false);
     const texte = LESSONS.flatMap((l) => [l.title, l.hook, ...l.body]).join(' ').toLowerCase();
     expect(texte).not.toMatch(/racine|fleur|papillon|objectif par semaine/);
+  });
+
+  it("leçon du jour en pause, sans rien de retiré ; aucune leçon ne parle plus de l'accueil ni des bibliothèques", () => {
+    expect(TUTORIAL_OF_DAY_VISIBLE).toBe(false);
+    expect(LESSONS).toHaveLength(13);
+    const texte = LESSONS.flatMap((l) => [l.title, l.hook, ...l.body]).join(' ').toLowerCase();
+    expect(texte).not.toMatch(/accueil|biblioth/);
+    expect(LESSONS.filter((l) => /^\/(?:voile|surf)(?:$|\?)/.test(l.target))).toEqual([]);
   });
 
   it('jour 1 : enregistrer une session', () => {

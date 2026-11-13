@@ -18,6 +18,7 @@
 import './charge-ts.mjs';
 import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { lignes } from './lib/sessions.mjs';
 
 const { APP_NAME, FILE_FORMATS, XML } = await import('../../src/core/appIdentity.ts');
 const { LEGACY_BUNDLE, LEGACY_MARKER_FILE } = await import('../../src/library/legacyImport.ts');
@@ -73,16 +74,16 @@ const poserSessions = (fichiers) => opfs(`
   const d = await root.getDirectoryHandle('sessions', { create: true });
   for (const [nom, texte] of ${JSON.stringify(Object.entries(fichiers))}) { const w = await (await d.getFileHandle(nom, { create: true })).createWritable(); await w.write(texte); await w.close(); }
   return 'ok';`);
-/** Vide sessions/ et le cache de la liste, puis recharge la bibliothèque : une mémoire vide. */
+/** Vide sessions/ et le cache de la liste, puis recharge la page Sessions : une mémoire vide. */
 const viderMemoire = async () => {
   await opfs(`try { const d = await root.getDirectoryHandle('sessions'); for await (const [n] of d.entries()) await d.removeEntry(n); } catch { /* rien à vider */ } return 'ok';`);
   await evaluate(`localStorage.removeItem('${CLES.libraryCache}')`);
-  await go('/voile', 4000);
+  await go('/sessions', 4000);
   await waitFor(async () => (await records()).length === 0, { timeout: 4000, label: 'mémoire vide' });
 };
 /**
  * Pose des fichiers dans le champ de fichiers `selector` : `texte` (GPX, fiche) ou `base64` (capteurs). Le champ n'est
- * monté qu'une fois la bibliothèque relue (OPFS), ce que `settle` ne voit pas.
+ * monté qu une fois la mémoire relue (OPFS), ce que `settle` ne voit pas.
  */
 const importer = async (fichiers, selector = 'input[type=file][accept*=".gpx"]') => {
   await waitFor(`Boolean(document.querySelector(${JSON.stringify(selector)}))`, { timeout: 4000, every: 50, label: 'champ de fichier' });
@@ -112,8 +113,8 @@ const fiches = async (n) => {
   await settle({ max: 1500, label: 'fiches' });
   return records();
 };
-const rows = async () => JSON.parse(await evaluate(`JSON.stringify([...document.querySelectorAll('.lib-row__main')].map((r) => r.innerText.replace(/\\n/g, ' / ')))`));
-/** Avertissements des lignes de la bibliothèque (une session en lecture seule dit pourquoi). */
+const rows = () => lignes(evaluate);
+/** Avertissements des lignes de la page Sessions (une session en lecture seule dit pourquoi). */
 const warnings = () => evaluate(`[...document.querySelectorAll('.lib-row__warning')].map((w) => w.textContent.trim()).join(' | ') || '(aucun)'`);
 const editable = () => evaluate(`[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Renommer')`);
 const ficheDe = async (sport) => (await records()).find((r) => r.sport === sport) ?? null;
@@ -122,7 +123,7 @@ const ficheDe = async (sport) => (await records()).find((r) => r.sport === sport
 // a. Les deux paquets, ensemble
 // =====================================================================================================================
 console.log('\n== a. Paquet de voile et paquet de surf');
-await go('/voile', 5000);
+await go('/sessions', 5000);
 console.log('import :', await importer([
   { nom: 'voile-paquet.gpx', texte: SESSIONS.wing.bundle },
   { nom: 'surf-paquet.gpx', texte: SESSIONS.surf.bundle },
@@ -155,13 +156,16 @@ const gpxRange = Object.keys(arbre).find((n) => n.endsWith('_wingfoil.gpx'));
 check('voile : le GPX rangé est celui de la trace, sans le paquet', gpxRange !== undefined && (await lireTexte(gpxRange)) === SESSIONS.wing.gpx);
 const lignesA = await rows();
 console.log('lignes voile :', JSON.stringify(lignesA));
-check('la bibliothèque de la voile montre la session de wingfoil sous son nom', lignesA.length === 1 && lignesA[0].includes(SESSIONS.wing.fiche.name), JSON.stringify(lignesA));
-await go('/surf');
-const lignesSurf = await rows();
+check('la page Sessions montre la session de wingfoil sous son nom', lignesA.length === 1 && lignesA[0].includes(SESSIONS.wing.fiche.name), JSON.stringify(lignesA));
 // Le jeu d'essai du surf est sur foil : « Surf foil » est une activité cachée au départ, la liste le dit et ne la montre pas.
-check('la session de surf est rangée sur une activité cachée : la liste du surf le dit, sans la montrer', lignesSurf.length === 0
-  && /Activités cachées : 1 session en moins dans la liste/.test(await evaluate('document.body.innerText')), JSON.stringify(lignesSurf));
+check('la session de surf est rangée sur une activité cachée : la liste le dit, sans la montrer', !lignesA.some((l) => l.includes(SESSIONS.surf.fiche.name))
+  && /Activités cachées : 1 session en moins dans la liste/.test(await evaluate('document.body.innerText')), JSON.stringify(lignesA));
 const surfRange = await ficheDe('surf');
+// Une adresse s'ouvre toujours : le filtre de l'activité cachée montre sa session.
+await go(`/sessions?activite=${encodeURIComponent(surfRange.activityId)}`, 4000);
+await waitFor(async () => (await rows()).length >= 1, { timeout: 5000, label: 'ligne' });
+const lignesCachee = await rows();
+check('?activite= d\'une activité cachée : sa session est montrée', lignesCachee.length === 1 && lignesCachee[0].includes(SESSIONS.surf.fiche.name), JSON.stringify(lignesCachee));
 await go(`/surf/analyse?session=${encodeURIComponent(surfRange.gpx)}`, 6000);
 await waitFor(`document.querySelectorAll('.an-carte-col .ui-tab').length > 0`, { timeout: 30000, every: 200, label: 'onglets' });
 await settle({ max: 1000, label: 'analyse du surf' });
@@ -212,7 +216,7 @@ console.log(phraseC1);
 check('GPX + fiche d\'un autre sport : laissés de côté, la phrase dit ce que Gtracker range', phraseC1 === `1 session de course, de vélo ou d'entraînement laissée de côté : ${APP_NAME} ne range que la voile et le surf.`, phraseC1);
 await wait(500);
 check('… rien n\'est rangé', (await records()).length === 0 && Object.keys(await sessionsDir()).length === 0);
-await go('/voile', 4000);
+await go('/sessions', 4000);
 console.log('GPX seul de cet autre sport :', await importer([{ nom: 'autre-seul.gpx', texte: SESSIONS.wing.gpx.replace('<type>wingfoil</type>', `<type>${AUTRE_SPORT}</type>`) }]));
 const phraseC2 = await phrase();
 console.log(phraseC2);
@@ -231,11 +235,11 @@ console.log('Mettre à jour :', await clickText('Mettre à jour'));
 await waitFor(`/Dossier relu/.test(document.body.innerText)`, { timeout: 6000, label: 'dossier relu' });
 await settle({ max: 2000, label: 'relecture' });
 console.log(await evaluate(`document.body.innerText.split('\\n').find((l) => /Dossier relu/.test(l)) ?? '(aucune phrase)'`));
-await go('/voile', 4000);
+await go('/sessions', 4000);
 await waitFor(async () => (await rows()).length >= 1, { timeout: 5000, label: 'ligne' });
 const avertissementD = await warnings();
 console.log('ligne :', JSON.stringify(await rows()), '| avertissement :', avertissementD);
-check('la ligne de la bibliothèque dit la fiche illisible, laissée telle quelle', /illisible/.test(avertissementD), avertissementD);
+check('la ligne de la page Sessions dit la fiche illisible, laissée telle quelle', /illisible/.test(avertissementD), avertissementD);
 await go(`/voile/analyse?session=${encodeURIComponent(`${NOM_D}.gpx`)}`, 6000);
 await waitFor(`document.querySelectorAll('.an-carte-col .ui-tab').length > 0`, { timeout: 30000, every: 200, label: 'onglets' });
 await settle({ max: 1500, label: 'analyse' });
@@ -272,9 +276,9 @@ const jsonE = Object.keys(dossierE).find((n) => n.endsWith('.json'));
 const gpxE = Object.keys(dossierE).find((n) => n.endsWith('.gpx'));
 check('paquet à fiche plus récente : la fiche est rangée au caractère près', jsonE !== undefined && (await lireTexte(jsonE)) === futurTexte, jsonE);
 check('… le GPX rangé est celui de la trace, sans le paquet', gpxE !== undefined && (await lireTexte(gpxE)) === SESSIONS.wing.gpx);
-await go('/voile', 4000);
+await go('/sessions', 4000);
 await waitFor(async () => (await rows()).length >= 1, { timeout: 5000, label: 'ligne' });
-check('… la ligne de la bibliothèque dit la fiche d\'une version plus récente, lue sans être modifiée', /version plus récente/.test(await warnings()), await warnings());
+check('… la ligne de la page Sessions dit la fiche d\'une version plus récente, lue sans être modifiée', /version plus récente/.test(await warnings()), await warnings());
 await go(`/voile/analyse?session=${encodeURIComponent(gpxE ?? '')}`, 6000);
 await waitFor(`document.querySelectorAll('.an-carte-col .ui-tab').length > 0`, { timeout: 30000, every: 200, label: 'onglets' });
 await settle({ max: 1500, label: 'analyse' });

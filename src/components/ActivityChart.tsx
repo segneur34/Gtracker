@@ -5,7 +5,7 @@ import { sportFamily } from '../core/sportProfiles';
 import { formatDistance, formatDuration } from '../core/units';
 import { HelpText, HelpToggle } from './Help';
 import { IconChevronRight } from './icons';
-import { libraryPath } from '../core/parentPage';
+import { sessionsPath } from '../core/parentPage';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
@@ -148,7 +148,7 @@ function ActivityChart({ period, nowMs }: { period: ChartRange; nowMs: number })
             const activity = activityById.get(t.activityId)!;
             return (
               <li key={t.activityId}>
-                <button type="button" onClick={() => navigate(libraryPath(sportFamily(activity.base), activity.id))}>
+                <button type="button" onClick={() => navigate(sessionsPath(activity.id))}>
                   <span className="ui-swatch" style={{ background: shown(activity.color) }} />
                   <span className="actchart__name">{activity.name}</span>
                   <span className="actchart__meta num">

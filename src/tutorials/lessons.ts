@@ -6,7 +6,7 @@ import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
  * d'ouverture de l'application, dans cet ordre, pour faire découvrir ses
  * fonctions de l'enregistrement aux balises d'un parcours. Des données seules,
  * sans React : l'icône est un nom (`components/LessonIcon.tsx`), la page à
- * essayer une adresse ou la bibliothèque de la famille préférée.
+ * essayer une adresse.
  */
 
 /** Icône d'une leçon, dessinée par `components/LessonIcon.tsx`. */
@@ -14,8 +14,8 @@ export type LessonIcon =
   | 'enregistrer' | 'analyse' | 'carte' | 'activites' | 'memoire' | 'profil' | 'notes'
   | 'statistiques' | 'itineraires' | 'cardio' | 'voile' | 'capteurs' | 'partage';
 
-/** Page ouverte par « Essayer » : une adresse, ou la bibliothèque de la famille préférée (`'bibliotheque'`). */
-type LessonTarget = `/${string}` | 'bibliotheque';
+/** Page ouverte par « Essayer » : une adresse de l'application. */
+type LessonTarget = `/${string}`;
 
 export interface Lesson {
   /** Identifiant, dans l'adresse (`/tutoriels/:id`) et la liste des leçons lues : ne pas le changer. */
@@ -51,9 +51,9 @@ export const LESSONS: readonly Lesson[] = [
     title: 'Lire une analyse',
     hook: '« Général » pour l\'essentiel, « avancé » pour le détail, des panneaux à votre taille.',
     icon: 'analyse',
-    target: 'bibliotheque',
+    target: '/sessions',
     body: [
-      "Touchez une session dans la bibliothèque de son sport : son analyse s'ouvre sur l'onglet « général », qui porte l'essentiel des chiffres.",
+      "Touchez une session dans la page Sessions : son analyse s'ouvre sur l'onglet « général », qui porte l'essentiel des chiffres.",
       "La pastille « avancé » déplie les autres onglets : tops, graphiques, cardio et la suite, selon le sport. Chaque session s'ouvre sur « général » seul ; « tout fermer », à droite de la barre, replie tout d'un geste.",
       'Un panneau se redimensionne en tirant sa poignée ; sa taille est gardée.',
       'Les onglets montrés se choisissent par activité, dans Réglages, ligne « Onglets ».',
@@ -65,7 +65,7 @@ export const LESSONS: readonly Lesson[] = [
     title: 'La carte',
     hook: 'Zoomer, passer en plein écran, et lire la vitesse dans les couleurs de la trace.',
     icon: 'carte',
-    target: 'bibliotheque',
+    target: '/sessions',
     body: [
       "La trace est colorée par la vitesse : grise quand vous allez lentement, puis un dégradé jusqu'aux plus grandes vitesses. Les bornes se règlent par activité dans Réglages, ou pour une seule session dans son onglet « réglages ».",
       'Deux doigts pour zoomer, un pour se déplacer. Sur le téléphone, un toucher sur la carte l\'ouvre en plein écran ; tourné, il s\'y met de lui-même. Le retour la referme.',
@@ -80,7 +80,7 @@ export const LESSONS: readonly Lesson[] = [
     icon: 'activites',
     target: '/parametres',
     body: [
-      'Dans Réglages › Activités, chaque famille (voile, surf) range ses activités. Seules celles-là sont proposées partout : à l\'enregistrement, dans les analyses, les bibliothèques et l\'accueil.',
+      'Dans Réglages › Activités, chaque famille (voile, surf) range ses activités. Seules celles-là sont proposées partout : à l\'enregistrement, dans les analyses et sur la page Sessions, où chacune a son logo.',
       "Au bas du bloc, créez la vôtre : un nom, une couleur parmi les douze de la palette, et le calcul sur lequel elle repose (wingfoil, kite, surf…).",
       "L'œil cache une activité, ou une famille entière : elle disparaît partout, sessions comprises, sans rien effacer.",
       'Chaque activité démarre sur des réglages tout faits ; « Par défaut », dans le menu « … » de sa carte, les lui rend.',
@@ -96,7 +96,7 @@ export const LESSONS: readonly Lesson[] = [
       'Sur le téléphone, vos sessions vivent dans un dossier « Gtracker » que vous désignez dans Réglages › Mémoire : pour chacune, son fichier GPX et sa fiche (notes, matériel, réglages de la session).',
       'Ce dossier est votre sauvegarde : copiez-le sur un ordinateur ou un disque pour tout garder, ou pour changer de téléphone.',
       "Deux appareils peuvent partager le même dossier. Chacun y garde son fichier de réglages ; « Reprendre », dans Réglages › Mémoire, prend ceux d'un autre appareil.",
-      "Pour ajouter des sessions venues d'ailleurs, « Importer des GPX ou FIT » est dans le « … » en haut de chaque bibliothèque.",
+      "Pour ajouter des sessions venues d'ailleurs, « Importer des GPX ou FIT » est dans le « … » à droite du titre de la page Sessions.",
     ],
   },
   {
@@ -126,7 +126,7 @@ export const LESSONS: readonly Lesson[] = [
     title: 'Matériel et notes',
     hook: 'Une appréciation, un commentaire et le matériel de chaque session.',
     icon: 'notes',
-    target: 'bibliotheque',
+    target: '/sessions',
     body: [
       "Dans chaque analyse, l'onglet « matériel et notes » (« matos et conditions » en voile), juste avant « réglages », garde votre appréciation de la séance et un commentaire.",
       'Le matériel se choisit dans la liste de l\'activité, que vous créez dans Réglages (« Créer liste matériel ») ; une session sans matériel donné reste vide, rien n\'est repris d\'une autre.',
@@ -154,10 +154,10 @@ export const LESSONS: readonly Lesson[] = [
     icon: 'itineraires',
     target: '/itineraires',
     body: [
-      "Depuis l'accueil, « Créer un parcours » ouvre la planification : touchez la carte pour poser les balises, reliées en ligne droite. La recherche trouve un port, une plage ou un spot.",
+      "En bas de la page Sessions, « Créer un parcours » ouvre la planification : touchez la carte pour poser les balises, reliées en ligne droite. La recherche trouve un port, une plage ou un spot.",
       "Le parcours donne la distance et le cap de chaque bord ; « Boucler » ajoute un dernier bord qui ramène au départ.",
       "Un GPX venu d'ailleurs se charge tel quel comme itinéraire, et un parcours s'exporte en GPX.",
-      "Enregistré, l'itinéraire se retrouve dans « Itinéraires planifiés » ; « Partir » ouvre l'enregistrement, où « Suivre une trace » le propose avec son activité.",
+      "Enregistré, l'itinéraire se retrouve sous « Itinéraires », juste à côté ; « Partir » ouvre l'enregistrement, où « Suivre une trace » le propose avec son activité.",
     ],
   },
   {
@@ -179,7 +179,7 @@ export const LESSONS: readonly Lesson[] = [
     hook: "Le vent, les virements et empannages, et les balises d'un parcours.",
     families: ['voile'],
     icon: 'voile',
-    target: '/voile',
+    target: '/sessions',
     body: [
       "Une session de voile s'analyse sans rien saisir : le vent est estimé d'après vos manœuvres et vos vitesses selon le cap.",
       'Si vous le connaissez, saisissez-le (« Régler ») : tous les angles suivent.',
@@ -206,7 +206,7 @@ export const LESSONS: readonly Lesson[] = [
     title: 'Partager et exporter',
     hook: 'Une image de votre session, ou son fichier GPX.',
     icon: 'partage',
-    target: 'bibliotheque',
+    target: '/sessions',
     body: [
       "Dans une analyse, le « … » à côté du nom de la session propose « Partager l'image » : une image carrée de la trace et des chiffres que vous choisissez, avec ou sans fond de carte.",
       'Vos choix de chiffres sont retenus par activité.',

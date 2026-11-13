@@ -72,9 +72,9 @@ const count = () => evaluate(`document.querySelectorAll('.lib-row').length`);
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 
 // 1. Une session importée, puis retirée du dossier derrière le dos de l'application.
-await go('/voile');
-// La bibliothèque n'est montée qu'une fois la mémoire (OPFS) ouverte, ce que `settle` ne voit pas.
-await waitFor(`/Aucune session de voile/.test(document.body.innerText)`, { timeout: 5000, label: 'bibliothèque vide' });
+await go('/sessions');
+// La liste n'est montée qu'une fois la mémoire (OPFS) ouverte, ce que `settle` ne voit pas.
+await waitFor(`/Aucune session pour l'instant/.test(document.body.innerText)`, { timeout: 5000, label: 'page Sessions vide' });
 console.log('au départ :', String(await count()));
 check('au départ : 0 session', (await count()) === 0, String(await count()));
 await importFiles(firstPath, 'input[type=file][accept*=".gpx"][multiple]');
@@ -115,7 +115,7 @@ check('la fiche créée du second : wingfoil, une distance', created.sport === '
 const liste = await sessionNames();
 console.log('liste :', liste);
 check('la liste porte le nom de la fiche rangée', liste.includes('Sortie copiée du téléphone'), liste);
-await shoot('miseajour-voile');
+await shoot('miseajour-sessions');
 
 // 3. Rien de nouveau ; le bouton dans Réglages › Mémoire.
 console.log('Mettre à jour :', await refresh());
@@ -166,7 +166,7 @@ await writeOpfs('', FICHIER_MARQUEUR, JSON.stringify({ format: FORMATS.memoire, 
 await writeOpfs('', '2026-10-07_10-00-00_wingfoil.gpx', sortieGpx('Racine', Date.UTC(2026, 9, 7, 8, 0, 0)));
 await writeOpfs('sessions', '2026-10-08_10-00-00_wingfoil.gpx', sortieGpx('Sans fiche', Date.UTC(2026, 9, 8, 8, 0, 0)));
 const beforeOpening = await snapshot();
-await go('/voile');
+await go('/sessions');
 await settle({ max: 3000, label: 'ouverture en lecture seule' });
 console.log('marqueur v2, à l\'ouverture :', String(await count()));
 const carte = await evaluate(`document.body.innerText.match(/[^\\n]*version plus récente de Gtracker[^\\n]*/)?.[0] ?? '(absente)'`);

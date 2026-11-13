@@ -470,7 +470,7 @@ function SurfModule() {
   const firstOut = returns.find((r) => r.after === 0) ?? null;
 
   return (
-    <AnalysisShell title="Analyse Surf" family="surf" backLabel="Surf" file={gpx.fileName}
+    <AnalysisShell title="Analyse Surf" family="surf" backLabel="Sessions" file={gpx.fileName}
       share={{ segments: mapSegments, stats: generalStats }} error={sessionError} draft={draft} loadError={gpx.error}
       reading={reading}
       empty={!summary && !gpx.error && requestedFile === null}

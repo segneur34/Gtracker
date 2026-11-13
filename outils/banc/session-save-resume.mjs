@@ -1,9 +1,9 @@
-// Suite de session-save.mjs (24/09/2026, reprise sur la bibliothèque et la page d'aujourd'hui le 29/10, n° 84), mais
+// Suite de session-save.mjs (24/09/2026, reprise sur la page Sessions le 29/10, n° 84), mais
 // autonome : le lanceur donne un profil Chrome neuf à chaque script. Il importe lui-même la session de voile de
 // `lib/traces.mjs` (wingfoil), y enregistre un seuil de 15 nœuds, puis change l'activité de la session dans l'onglet
 // réglages (Wingfoil vers Kite : recalcul complet) ; ensuite son seuil est enregistré à 4 et 12 nœuds, et le résumé de
 // la fiche doit suivre. Pour finir (lot 313), un brouillon ouvert, la session est jetée depuis le menu « … » de son
-// analyse (« Jeter » tenu une seconde, confirmé) : retour à la bibliothèque, session absente de la mémoire.
+// analyse (« Jeter » tenu une seconde, confirmé) : retour à la page Sessions, session absente de la mémoire.
 // Usage : node session-save-resume.mjs <port>
 import { connect } from './lib/cdp.mjs';
 import { jeterDepuisAnalyse } from './lib/fin-enregistrement.mjs';
@@ -57,7 +57,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await blockNetwork();
 
 step('Import de la session de voile (wingfoil), ouverture de son analyse');
-await go('/voile', 3000);
+await go('/sessions', 3000);
 console.log('import :', await importGpx(traceVoile({ nom: 'Synthétique', virageMin: 3 }), 'synthetique.gpx'));
 await waitFor(async () => (await records())?.some((r) => r.summary?.movingTimeS !== undefined), { timeout: 8000, label: 'fiche' });
 await settle({ max: 2000, label: 'import' });
@@ -110,10 +110,10 @@ for (const seuil of ['4', '12']) {
   check(`le résumé de la fiche suit le seuil de ${seuil} nds`, now.movingTimeS !== JSON.parse(before).movingTimeS, `${JSON.parse(before).movingTimeS} → ${now.movingTimeS}`);
 }
 
-step('« Jeter » depuis l\'analyse, un brouillon ouvert (lot 313) : bibliothèque, session absente');
+step('« Jeter » depuis l\'analyse, un brouillon ouvert (lot 313) : page Sessions, session absente');
 // L'analyse est rouverte.
-// Bibliothèque, puis l'analyse : l'entrée sous l'analyse est la bibliothèque, comme sur le téléphone.
-await go('/voile', 3000);
+// La page Sessions, puis l'analyse : l'entrée sous l'analyse est la page Sessions, comme sur le téléphone.
+await go('/sessions', 3000);
 await go(url, 6000);
 await waitFor(`[...document.querySelectorAll('.an-carte-col .ui-tab')].some((t) => t.textContent.trim() === 'matos et conditions')`, { timeout: 30000, every: 200, label: 'onglets avancés' });
 await openTab('matos et conditions');
@@ -138,7 +138,7 @@ const thrown = await jeterDepuisAnalyse(evaluate);
 check('« Jeter » tenu puis confirmé', thrown === 'ok', thrown);
 const questions = await evaluate('window.__questionsJeter ?? []');
 check('une seule question, qui dit le brouillon perdu', questions.length === 1 && questions[0].includes('modifications non enregistrées'), JSON.stringify(questions));
-check('retour à la bibliothèque de la voile', (await evaluate('location.pathname')) === '/voile', await evaluate('location.pathname + location.search'));
+check('retour à la page Sessions', (await evaluate('location.pathname')) === '/sessions', await evaluate('location.pathname + location.search'));
 const gone = await waitFor(async () => !(await records()).some((r) => r.gpx === file), { timeout: 5000, label: 'fiche effacée' });
 check('la session n\'est plus dans la mémoire', Boolean(gone), file);
 check('jamais « pas dans la mémoire » affiché en partant', (await evaluate('window.__introuvable')) === false);

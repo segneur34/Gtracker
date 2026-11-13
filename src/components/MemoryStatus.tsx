@@ -23,7 +23,7 @@ import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
 
 /**
  * État de la mémoire : où elle est, combien de sessions, ce qu'il faut faire
- * si elle est inaccessible. En tête des bibliothèques en version `compact`,
+ * si elle est inaccessible. Sous les totaux de la page Sessions en version `compact`,
  * qui ne montre rien quand tout va bien (le nombre de sessions et
  * l'emplacement sont dans leur menu « … »), seulement ce qui demande
  * attention : mémoire fermée, lecture en cours, sessions en attente,

@@ -4,7 +4,7 @@
 // L'intention d'Android, le greffon et sa copie ne se prouvent qu'au téléphone : ici, une fausse file privée remplace le
 // greffon (`startIncomingFiles`, troisième argument), et le reste est le vrai chemin, de `importEntries` au bandeau :
 //  1. page sans fichier reçu : aucun bandeau, comme une ouverture normale ;
-//  2. un GPX reçu, sur l'accueil : session rangée, copie retirée, bandeau, « Voir la session » ouvre son analyse ;
+//  2. un GPX reçu, sur la page Sessions : session rangée, copie retirée, bandeau, « Voir la session » ouvre son analyse ;
 //  3. le même de nouveau, depuis l'analyse de cette session : « déjà présente », le bandeau se ferme ;
 //  4. un brouillon ouvert sur l'analyse : aucune navigation seule ; « Voir la session » demande confirmation, refus : on reste ;
 //  5. un fichier refusé par le téléphone, et un FIT illisible : dits, copies retirées ;
@@ -72,20 +72,20 @@ const queueSize = () => evaluate('window.__fauxRecus.queue.size');
 const noticeWith = (text, label) => waitFor(async () => (await notices()).some((n) => n.includes(text)), { timeout: 8000, label });
 
 // --- 1. Sans fichier reçu ---
-await go('/', 3000);
+await go('/sessions', 3000);
 check('ouverture normale : aucun bandeau', (await notices()).length === 0);
 await plugQueue();
 await wait(300);
 check('file vide : toujours aucun bandeau', (await notices()).length === 0);
 
-// --- 2. Un GPX reçu, sur l'accueil ---
+// --- 2. Un GPX reçu, sur la page Sessions ---
 const WING = gpxText(0, 'wingfoil');
 await receive('ma sortie.gpx', WING);
 await noticeWith('rangé dans la mémoire', 'bandeau rangée');
 check('rangée : bandeau, nom du fichier en français', (await notices())[0] === '« ma sortie.gpx » est rangé dans la mémoire.', (await notices())[0]);
 check('rangée : copie retirée', (await queueSize()) === 0);
 check('rangée : une fiche', (await records()).length === 1);
-check('rangée : on reste sur la page', await evaluate(`location.pathname === '/'`));
+check('rangée : on reste sur la page', await evaluate(`location.pathname === '/sessions'`));
 await shoot('fichier-recu-range');
 console.log('Voir la session :', await seeSession());
 await waitFor(`location.pathname === '/voile/analyse'`, { timeout: 5000, label: 'analyse ouverte' });
@@ -136,7 +136,7 @@ check('d\'une analyse à une autre : le brouillon abandonné ne suit pas', !(awa
 check('d\'une analyse à une autre : une seule question de plus', (await questions()).length === 2);
 
 // --- 5. Refusés ---
-await go('/', 3000);
+await go('/sessions', 3000);
 await plugQueue();
 await receive('photo.jpg', '', 'format');
 await noticeWith('ni un GPX ni un FIT', 'refus du téléphone');
@@ -157,7 +157,7 @@ await receive('sans type.gpx', gpxText(20, null));
 await noticeWith('sans type.gpx', 'bandeau à classer');
 console.log('Voir la session :', await seeSession());
 await waitFor(() => bodyHas('Quelle activité ?'), { timeout: 3000, label: 'question de l\'activité' });
-check('à classer : l\'activité est demandée avant l\'analyse', await evaluate(`location.pathname === '/'`));
+check('à classer : l\'activité est demandée avant l\'analyse', await evaluate(`location.pathname === '/sessions'`));
 await shoot('fichier-recu-classer');
 console.log('choisit Kite :', await clickText('Kite', 'button'));
 await waitFor(`location.pathname === '/voile/analyse'`, { timeout: 5000, label: 'analyse après choix' });
@@ -166,7 +166,7 @@ await waitFor(async () => (await records()).some((r) => r.sport === 'kite'), { t
 check('à classer : analyse ouverte, activité gardée dans la fiche', true);
 
 // --- 7. Enregistrement en cours ---
-await go('/', 3000);
+await go('/sessions', 3000);
 await plugQueue();
 await evaluate('window.__fauxEnregistrement = true');
 await receive('pendant.gpx', gpxText(30, 'wingfoil'));

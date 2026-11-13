@@ -8,10 +8,10 @@ import { LogoGlyph } from '../components/logos/ActivityLogo';
 import ProfileRoot, { RootSlot } from '../components/ProfileRoot';
 import { IconChevronRight } from '../components/icons';
 import SegmentedControl from '../components/ui/SegmentedControl';
-import { activityFamily, logoColor, type Activity } from '../core/activities';
+import { logoColor, type Activity } from '../core/activities';
 import { activityLogo, type LogoId } from '../core/activityLogos';
 import { DISTANCE_UNIT_SYMBOL, formatDuration, toDisplayDistance } from '../core/units';
-import { RESTING_HR_PATH, libraryPath } from '../core/parentPage';
+import { RESTING_HR_PATH, sessionsPath } from '../core/parentPage';
 import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useProfileRoot } from '../hooks/useProfileRoot';
@@ -160,7 +160,7 @@ function ProfilePage() {
   // Photo par défaut : le sport préféré de toutes les sessions, qui ne change pas avec la période (voile et surf seuls).
   const overallFavoriteId = useMemo(() => favoriteActivity(all, activityOrder), [all, activityOrder]);
   const overallFavorite = overallFavoriteId ? activityById.get(overallFavoriteId) ?? null : null;
-  const openLibrary = (a: Activity) => navigate(libraryPath(activityFamily(a), a.id));
+  const openLibrary = (a: Activity) => navigate(sessionsPath(a.id));
 
   /** Toucher une part l'éclaire ; « Autres » ouvre aussi le détail et y déplie ses activités. */
   const pickSlice = (key: string) => {

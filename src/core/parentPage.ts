@@ -6,21 +6,24 @@ const isFamily = (s: string): s is SportFamily => (SPORT_FAMILIES as string[]).i
 /** Page du test de FC repos, ouverte depuis le Profil. */
 export const RESTING_HR_PATH = '/profil/fc-repos';
 
+/** Page Sessions : la liste de toutes les sessions, filtrable par activité (`?activite=`). */
+export const SESSIONS_PATH = '/sessions';
+
 /**
  * Page au-dessus d'une adresse, où renvoie la touche retour d'Android (et le
- * geste du bord de l'écran) : l'analyse d'une session renvoie à la
- * bibliothèque de sa famille, comme le lien « ← » de son en-tête, et le test
+ * geste du bord de l'écran) : l'analyse d'une session renvoie à la page
+ * Sessions, filtre d'activité compris, comme le lien « ← » de son en-tête, et le test
  * de FC repos au Profil, où est son entrée ; une leçon des tutoriels à leur liste, et celle-ci à Réglages ; les
  * Statistiques remontent d'un cran (activité, famille, vue d'ensemble), la
- * période gardée ; toute autre page renvoie à l'accueil. `null` à l'accueil :
- * rien au-dessus.
+ * période gardée ; toute autre page renvoie à l'accueil. `null` à l'accueil et
+ * sur Sessions, où l'accueil mène : rien au-dessus, le retour quitte l'application.
  */
 export const parentPage = (pathname: string, search: string): string | null => {
   const path = pathname.replace(/\/+$/, '') || '/';
-  if (path === '/') return null;
+  if (path === '/' || path === SESSIONS_PATH) return null;
   const parts = path.split('/').filter(Boolean);
   if (parts.length === 2 && parts[1] === 'analyse' && isFamily(parts[0])) {
-    return libraryPath(parts[0], new URLSearchParams(search).get('activite') ?? undefined);
+    return sessionsPath(new URLSearchParams(search).get('activite') ?? undefined);
   }
   // Le test de FC repos : le Profil, où est son entrée.
   if (path === RESTING_HR_PATH) return '/profil';
@@ -40,13 +43,13 @@ export const parentPage = (pathname: string, search: string): string | null => {
   return '/';
 };
 
-/** Bibliothèque d'une famille, filtrée sur une activité si `activityId` est donné. */
-export const libraryPath = (family: SportFamily, activityId?: string): string =>
-  `/${family}${activityId ? `?activite=${encodeURIComponent(activityId)}` : ''}`;
+/** Page Sessions, filtrée sur une activité si `activityId` est donné. */
+export const sessionsPath = (activityId?: string | null): string =>
+  `${SESSIONS_PATH}${activityId ? `?activite=${encodeURIComponent(activityId)}` : ''}`;
 
 /**
  * Module d'analyse d'une famille, ouvert sur une session de la mémoire si `file`
- * est donné. `fromActivityId` : le filtre d'activité de la bibliothèque d'où l'on
+ * est donné. `fromActivityId` : le filtre d'activité de la page Sessions d'où l'on
  * vient (`?activite=`), que le retour rend.
  */
 export const analysisPath = (family: SportFamily, file?: string | null, fromActivityId?: string | null): string => {

@@ -110,7 +110,7 @@ function RoutesPage() {
     <div className="ui-page" style={{ '--tab-accent': 'var(--neutral-accent)' } as React.CSSProperties}>
       <PageHeader
         title="Itinéraires planifiés"
-        back={{ to: '/', label: 'Accueil' }}
+        back={{ to: '/sessions', label: 'Sessions' }}
         subtitle={loaded ? plural(routes.length, 'itinéraire') : undefined} />
 
       <MemoryStatus />

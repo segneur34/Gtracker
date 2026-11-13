@@ -18,6 +18,11 @@
   color: var(--ink);
 }
 
+/* Cadre qui se confond avec le fond : cerné du gris des pastilles (`--ring-line`), le trait hérité par son tracé. */
+.activity-logo__frame--ringed {
+  stroke: var(--line-strong);
+}
+
 .logo-glyph {
   display: inline-block;
   flex: none;
