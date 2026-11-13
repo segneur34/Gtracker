@@ -108,7 +108,7 @@ const PAGE_SCRIPT = `(() => {
     .observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
 })();`;
 
-const STATE = `(() => { const b = window.__banc; if (!b) return null; return { doc: b.doc, ready: document.readyState, mounted: (document.getElementById('root')?.childElementCount ?? 1) > 0, fetches: b.fetches, timers: b.timers.size, last: b.lastMutation, quiet: b.now() - b.lastMutation }; })()`;
+const STATE = `(() => { const b = window.__banc; if (!b) return null; return { doc: b.doc, ready: document.readyState, mounted: (document.getElementById('root')?.childElementCount ?? 1) > 0, fonts: document.fonts.status, fetches: b.fetches, timers: b.timers.size, last: b.lastMutation, quiet: b.now() - b.lastMutation }; })()`;
 // Deux images, et au plus 500 ms de vrai temps si la page n'en dessine pas.
 const TWO_FRAMES = `new Promise((r) => { let done = false; const f = () => { if (!done) { done = true; r(true); } }; requestAnimationFrame(() => requestAnimationFrame(f)); (window.__banc?.setTimeout ?? setTimeout)(f, 500); })`;
 
@@ -225,7 +225,7 @@ export const connect = async ({ port, base = BASE, width, height, shotDir, logEn
 
   /**
    * Attend une page prête : document chargé, racine React non vide (sous charge, le premier rendu peut suivre le
-   * chargement), aucun fetch ni requête en vol, aucun minuteur d'au plus 1 s en attente, DOM immobile depuis `quiet` ms,
+   * chargement), polices chargées (`document.fonts`), aucun fetch ni requête en vol, aucun minuteur d'au plus 1 s en attente, DOM immobile depuis `quiet` ms,
    * puis deux images. Plafond `max` (l'ancien sommeil fixe du script). Rend la durée.
    */
   const settle = async ({ max = 3000, quiet = 150, label = '' } = {}) => {
@@ -234,7 +234,7 @@ export const connect = async ({ port, base = BASE, width, height, shotDir, logEn
     let state = null;
     while (Date.now() - t0 < max) {
       state = await evaluate(STATE);
-      if (state && state.ready === 'complete' && state.mounted && state.fetches === 0 && state.timers === 0 && requests.size === 0 && state.quiet >= quiet) {
+      if (state && state.ready === 'complete' && state.mounted && state.fonts !== 'loading' && state.fetches === 0 && state.timers === 0 && requests.size === 0 && state.quiet >= quiet) {
         await evaluate(TWO_FRAMES);
         const after = await evaluate(STATE);
         if (after && after.doc === state.doc && after.last === state.last && after.timers === 0 && after.fetches === 0 && requests.size === 0) {

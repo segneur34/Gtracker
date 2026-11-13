@@ -230,6 +230,10 @@ async function cdp(wsUrl) {
 
 // --- Serveurs Vite ---
 const posix = (p) => p.replace(/\\/g, '/');
+// Le dossier de travail de Vite est celui du `node_modules` servi, la racine de l'arbre étant donnée par la config
+// (`root`) : sous Windows, Vite sert un fichier hors de la racine (`/@fs/D:/…`) en retirant la lettre du lecteur et en le
+// cherchant sur le lecteur du dossier de travail. Un worktree « avant » dans %TEMP% (C:) avec `node_modules` sur D: voyait
+// donc ses polices @fontsource répondre par la page d'accueil, et retombait sur la police de secours.
 async function demarrerServeur(cote) {
   const racine = RACINE[cote];
   const port = cote === 'avant' ? opts.port + (PORT_AVANT - PORT_APRES) : opts.port;
@@ -240,14 +244,14 @@ async function demarrerServeur(cote) {
     `import base from ${JSON.stringify(posix(path.join(racine, 'vite.config.ts')))};`,
     `export default async (env: any) => {`,
     `  const b: any = typeof base === 'function' ? await (base as any)(env) : base;`,
-    `  return { ...b, cacheDir: ${JSON.stringify(posix(path.join(B.vite, `cache-${cote}`)))},`,
+    `  return { ...b, root: ${JSON.stringify(posix(racine))}, cacheDir: ${JSON.stringify(posix(path.join(B.vite, `cache-${cote}`)))},`,
     `    server: { ...(b.server ?? {}), fs: { ...(b.server?.fs ?? {}), allow: ['.', ${JSON.stringify(posix(MODULES))}] } } };`,
     `};`,
     '',
   ].join('\n'));
   const journal = fs.createWriteStream(path.join(B.vite, `${cote}.log`));
   const child = lancer(process.execPath, [path.join(modulesDe(racine), 'vite', 'bin', 'vite.js'), '--port', String(port), '--strictPort',
-    '--host', '127.0.0.1', '--config', config], { cwd: racine, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, BROWSER: 'none' } });
+    '--host', '127.0.0.1', '--config', config], { cwd: path.dirname(MODULES), stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, BROWSER: 'none' } });
   child.stdout.pipe(journal);
   child.stderr.pipe(journal);
   const limite = Date.now() + 90000;
@@ -264,6 +268,7 @@ async function prechauffer(cote, serveur) {
   try {
     const cible = await (await fetch(`http://127.0.0.1:${chrome.port}/json/new?about:blank`, { method: 'PUT' })).json();
     const page = await cdp(cible.webSocketDebuggerUrl);
+    const polices = new Set(); // polices refusées par le serveur : une police de secours fausserait toute mesure de largeur
     for (const chemin of PRECHAUFFE) {
       await page.send('Page.navigate', { url: serveur.base + chemin });
       const limite = Date.now() + 30000;
@@ -273,8 +278,11 @@ async function prechauffer(cote, serveur) {
         await pause(300);
       }
       await pause(500);
+      const etat = await page.send('Runtime.evaluate', { expression: `document.fonts.ready.then(() => JSON.stringify([...document.fonts].filter((f) => f.status === 'error').map((f) => f.family + ' ' + f.weight)))`, returnByValue: true, awaitPromise: true });
+      for (const f of JSON.parse(etat.result?.result?.value ?? '[]')) polices.add(f);
     }
     page.close();
+    if (polices.size) throw new Error(`police(s) non chargée(s) côté ${NOM_COTE[cote]} : ${[...polices].join(', ')} (les largeurs de texte ne seraient pas comparables ; journal : ${path.join(B.vite, `${cote}.log`)})`);
   } finally {
     await fermerChrome(chrome);
   }
