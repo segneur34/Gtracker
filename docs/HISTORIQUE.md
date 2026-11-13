@@ -175,3 +175,22 @@ Ce fichier est le §10 de `docs/ETAT_DU_PROJET.md`. C'est le journal de Gtracker
     - **Décision** : à l'analyse qui suit un enregistrement, « Voulez-vous ajouter le matériel ? » s'ouvre si l'option matériel de l'activité est cochée et la session sans matériel ; « Oui » ouvre l'onglet du matériel. « Non », la croix et le retour comptent une fermeture, deux et elle ne revient plus pour cette activité (compte gardé par « Par défaut »). Rouvrir une ancienne session ne rappelle rien.
     - **Pourquoi** : le matériel se renseigne mieux juste après la séance.
     - **Piège** : le compte rendu de l'enregistreur reste désormais jusqu'à l'analyse dans tous les cas, plus seulement avec un avertissement ; l'analyse l'efface une fois lu.
+
+357. Activité changée, bateau et calcul deviné (lot 314, validé le 13/11 sur l'APK 0.00.43, version 0.00.14).
+    - **Décision** : changer l'activité ou le calcul d'une session remet à zéro son foil et son pumping (« Surf foil » → « Surf » compris), qui n'ont plus de sens ailleurs ; un calcul sans seuil d'activité (le bateau) affiche « Temps en mouvement », dans « général » et sur l'image de partage, jamais « Temps en vol » ; à l'ajout d'une activité dans Réglages, le calcul se devine du nom, le sélecteur restant modifiable (« moth », « laser » et « optimist » restent sur le premier calcul de la famille).
+    - **Pourquoi** : un bateau affichait un temps en vol qui n'existe pas pour lui, et une fiche gardait le matériel de son ancienne activité.
+    - **Piège** : le recalcul suivait déjà le changement d'activité, seule la fiche restait en retard ; une garde de test interdit « Temps en vol » à tout calcul sans seuil.
+
+358. Onze activités de départ séparées (lot 335, validé le 13/11 sur l'APK 0.00.43 remise à zéro, version 0.00.17).
+    - **Décision** : onze activités pré-créées au lieu d'une « Voile » unique (voile : Wingfoil, Parawing, Windsurf, Windfoil, Kite, Kitefoil, Bateau ; surf : Surf, Paddle, Surf foil, Pumping), quatre visibles (Wingfoil, Kite, Surf, Pumping), sept cachées que l'œil de Réglages montre ; le foil et le pumping d'office sont des données du pré-réglage de l'activité, et la case Pumping range son écart au défaut. Pas de mise à jour d'une liste d'activités déjà installée (décision du 11/11) : on repart de zéro.
+    - **Pourquoi** : demande de l'utilisateur du 11/11 : chaque activité avec sa nuance, son icône et son pré-réglage, toutes sur la feuille de départ dès l'installation.
+    - **Piège** : désinstaller ne suffit pas, le dossier mémoire `Documents/Gtracker` survit et son fichier de réglages rend l'ancienne liste à chaque réinstallation ; la remise à zéro de Réglages (lot 343) y répond.
+
+359. La fin d'un enregistrement ouvre l'analyse (lot 313, validé le 13/11 sur l'APK 0.00.40 puis 0.00.43, version 0.00.19 ; mené avec les étapes 1 et 2 du lot 329).
+    - **Décision** : à l'arrêt la session se range seule et son analyse s'ouvre, sans écran « Analyser / Jeter » ; l'écran ne reste que comme filet (rangement en échec, session hors mémoire ou à classer, session reprise encore continuable). « Jeter » passe en dernière entrée du menu « … » de toute analyse, tenu une seconde puis confirmé, et sert aussi à supprimer une ancienne session ; les avertissements de l'arrêt s'affichent en tête de l'analyse ; le matériel se choisit dans l'onglet « matos et conditions » (confirmé le 12/11).
+    - **Piège** : la relecture a trouvé deux défauts, corrigés : le retour arrière du navigateur après « Jeter » avec un brouillon, et la session rangée restée sans annonce quand on refuse de quitter un brouillon (d'où la carte « Session rangée » dans ce cas).
+
+360. Boutons colorés, exception à la charte (lot 359, essai 238 réussi le 13/11 sur l'APK 0.00.43, version 0.00.41).
+    - **Décision** : « tout fermer », à droite de la barre d'onglets des analyses (voile et surf), est en contour et texte rouges, fond inchangé ; sur l'écran d'une session en attente de la page Enregistrer, « Continuer l'enregistrement » est en aplat vert à texte noir, « Analyser » reste à l'encre et « Jeter » en rouge. Aucune variable ajoutée. L'utilisateur garde le rouge de « tout fermer » (« 238 ok »). C'est une exception assumée à la charte, qui réserve le rouge à l'enregistrement et le vert à trois éléments.
+    - **Pourquoi** : demande du 13/11 : « il ne se différencie pas assez des autres », et « il faudrait colorier en vert continuer, noir analyser et rouge jeter ».
+    - **Piège** : aucun.
