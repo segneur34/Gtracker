@@ -25,7 +25,7 @@ const cssBg = (selector: string): string => {
 
 describe('fond des barres d\'Android', () => {
   it('clair : --bg du thème clair', () => {
-    expect(androidColor('values')).toBe(cssBg(':root {'));
+    expect(androidColor('values')).toBe(cssBg('html:root {'));
   });
 
   it('nuit : --bg du thème sombre', () => {

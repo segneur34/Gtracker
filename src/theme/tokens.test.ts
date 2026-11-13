@@ -21,7 +21,7 @@ const block = (selector: string): Record<string, string> => {
   return Object.fromEntries([...body.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
 };
 
-const light = block(':root,\n.theme-light,\n.leaflet-container {');
+const light = { ...block(':root,\n.theme-light,\n.leaflet-container {'), ...block('html:root {') };
 const dark = { ...light, ...block(":root[data-theme='dark'] {") };
 const eco = { ...dark, ...block(':root[data-eco] {') };
 const PALETTES = { clair: light, sombre: dark, économe: eco };

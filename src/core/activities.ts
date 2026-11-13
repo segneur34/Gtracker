@@ -89,7 +89,7 @@ export const shadeForTheme = (color: string, dark: boolean): string =>
   dark ? DARK_SHADE.get(color.toLowerCase()) ?? color : color;
 
 /** Fond des pages, clair et sombre (`--bg` de `theme/tokens.css`, relu par `palette.test.ts`). */
-export const THEME_BACKGROUND = { light: '#ffffff', dark: '#0e0e0e' } as const;
+export const THEME_BACKGROUND = { light: '#f7f5f0', dark: '#0e0e0e' } as const;
 
 /** Sous ce contraste avec le fond, un dessin à la couleur d'une activité s'y confond (le blanc sur blanc, le noir sur noir). */
 const LOST_ON_BACKGROUND = 1.5;

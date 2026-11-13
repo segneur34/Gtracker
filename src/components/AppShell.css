@@ -14,6 +14,33 @@
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  /* Contexte d'empilement propre : le champ (`.shell-field`, plan -1) passe devant ce fond mais derrière tout le reste. */
+  isolation: isolate;
+}
+
+/*
+ * Champ de traînées derrière toutes les pages : une image fixe à l'écran (pas `background-attachment: fixed`, capricieux
+ * dans la WebView), qui couvre l'écran droit comme tourné et la fenêtre d'ordinateur, sans prendre les touchers. Un
+ * contenu à fond plein (barres, cartes, vues en plein écran, enregistrement) le cache ; les cadres et les blocs de texte
+ * le voilent (`--field-veil`, `tokens.css`). L'image est claire le jour, sombre la nuit ; Économe n'en met pas.
+ */
+.shell-field {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: url('../assets/champ/champ-clair.svg') center / cover no-repeat;
+  opacity: var(--field-opacity);
+}
+
+:root[data-theme='dark'] .shell-field {
+  background-image: url('../assets/champ/champ-sombre.svg');
+}
+
+:root[data-eco] .shell-field,
+/* Enregistrement en cours : un fond plein, rien ne bouge derrière les chiffres. */
+:root:has(.rec-page--busy) .shell-field {
+  display: none;
 }
 
 .shell-main {

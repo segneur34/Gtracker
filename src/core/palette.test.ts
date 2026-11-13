@@ -113,7 +113,7 @@ describe('palette des activités', () => {
 
 describe('lisibilité sur le fond du thème', () => {
   it('les fonds connus du calcul sont ceux de tokens.css', () => {
-    expect(background(':root,\n.theme-light,\n.leaflet-container {')).toBe(THEME_BACKGROUND.light);
+    expect(background('html:root {')).toBe(THEME_BACKGROUND.light);
     expect(background(":root[data-theme='dark'] {")).toBe(THEME_BACKGROUND.dark);
   });
 

@@ -12,6 +12,8 @@
 .lib-row {
   border-top: 1px solid var(--line);
   padding: var(--space-2) 0;
+  /* Le texte ne passe pas sur le champ nu (`AppShell.css`). */
+  background: var(--field-veil);
 }
 
 /* Textes à gauche, vignette de la trace puis « … » à droite. */

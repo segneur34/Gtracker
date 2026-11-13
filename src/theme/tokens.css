@@ -248,6 +248,25 @@
 }
 
 /*
+ * Pages claires : le fond est un blanc cassé chaud, devant lequel passe le champ de traînées (`AppShell.css`). Le bloc
+ * partagé ci-dessus garde le blanc pur de ce qui doit rester blanc dans une interface claire ou sombre (carte, image de
+ * partage, lecture des couleurs) : seule la page elle-même prend ces valeurs. `--faint`, un peu plus foncé, garde son
+ * contraste sur ce fond.
+ */
+html:root {
+  --bg: #f7f5f0;
+  --surface: #f7f5f0;
+  --surface-sunken: #f2f0eb;
+  --surface-hover: #eceae4;
+  --faint: #8c8c8c;
+  /* Champ de traînées derrière les pages (`AppShell.css`) : l'opacité de l'image (plus forte la nuit, où l'encre claire
+     paraît plus faible sur le noir) et le voile que reçoivent les cadres et les blocs de texte, à la couleur de la page :
+     le champ n'y paraît qu'à 20 %. */
+  --field-opacity: 0.62;
+  --field-veil: color-mix(in srgb, var(--bg) 80%, transparent);
+}
+
+/*
  * Sombre : fond presque noir, encre blanche ; les accents, qui valent l'encre,
  * deviennent blancs sous du texte sombre (`--on-ink`).
  */
@@ -289,6 +308,8 @@
   --focus: #64a0f0;
 
   --shadow-color: #000000;
+
+  --field-opacity: 0.85;
 
   --chart-grid: #2a2a2a;
   --chart-axis: #a3acb6;

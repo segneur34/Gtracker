@@ -18,7 +18,7 @@
   flex-direction: column;
   border: 1px solid var(--line);
   border-radius: var(--radius-m);
-  background-color: var(--surface);
+  background-color: var(--field-veil);
 }
 
 .settings-activity + .settings-activity {

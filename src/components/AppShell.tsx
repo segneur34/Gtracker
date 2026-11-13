@@ -168,6 +168,7 @@ function AppShell() {
 
   return (
     <div className="shell">
+      <div className="shell-field" aria-hidden="true" />
       <Suspense fallback={null}>
         <LogoSprite />
       </Suspense>
