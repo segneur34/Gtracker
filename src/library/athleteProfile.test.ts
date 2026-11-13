@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EMPTY_ATHLETE_PROFILE, ATHLETE_NAME_MAX, athleteAge, athleteAvatar, athleteHrSource, athleteName, sanitizeAthleteProfile, type AthleteAvatar, type AthleteProfile,
+  EMPTY_ATHLETE_PROFILE, ATHLETE_NAME_MAX, athleteAge, athleteAvatar, athleteFishPath, athleteFishStyle, athleteFishTrialLevel, athleteHrSource, athleteName,
+  sanitizeAthleteProfile, type AthleteAvatar, type AthleteProfile,
 } from './athleteProfile';
 
 describe('athleteName', () => {
@@ -73,12 +74,30 @@ describe('sanitizeAthleteProfile (fichier de réglages repris)', () => {
       name: '  Léa ', weightKg: 62, heightCm: 1000, birthYear: '1990', sex: 'f', hrMax: 188,
       hrMaxSource: { kind: 'test', atMs: 5 }, hrRest: 10, hrRestSource: { kind: 'test', atMs: 5 },
       hrThresholds: [150, 140], economyMlKgKm: 200, rootWeeklyGoalMin: 5, autre: true,
+      fishStyle: 'C', fishPath: 'joli', fishTrialLevel: 9,
     }, GOAL);
     expect(p).toEqual({
       name: 'Léa', avatar: null, weightKg: 62, heightCm: null, birthYear: null, sex: 'f',
       hrMax: 188, hrMaxSource: { kind: 'test', atMs: 5 }, hrRest: null, hrRestSource: null,
-      hrThresholds: null, rootWeeklyGoalMin: null,
+      hrThresholds: null, rootWeeklyGoalMin: null, fishStyle: null, fishPath: null, fishTrialLevel: null,
     });
+  });
+
+  it('garde le style, la voie et le niveau d’essai du poisson valides', () => {
+    const p = sanitizeAthleteProfile({ fishStyle: 'G', fishPath: 'lesDeux', fishTrialLevel: 4 }, GOAL);
+    expect([p.fishStyle, p.fishPath, p.fishTrialLevel]).toEqual(['G', 'lesDeux', 4]);
+    expect(sanitizeAthleteProfile({ fishTrialLevel: 2.5 }, GOAL).fishTrialLevel).toBeNull();
+    expect(sanitizeAthleteProfile({ fishTrialLevel: '3' }, GOAL).fishTrialLevel).toBeNull();
+  });
+
+  it('style et voie du poisson : ceux de départ sans choix ou pour une valeur inconnue', () => {
+    expect(athleteFishStyle(EMPTY_ATHLETE_PROFILE)).toBe('A');
+    expect(athleteFishPath(EMPTY_ATHLETE_PROFILE)).toBe('beau');
+    expect(athleteFishStyle({ fishStyle: 'Z' as unknown as AthleteProfile['fishStyle'] })).toBe('A');
+    expect(athleteFishStyle({ fishStyle: 'F' })).toBe('F');
+    expect(athleteFishPath({ fishPath: 'agressif' })).toBe('agressif');
+    expect(athleteFishTrialLevel({ fishTrialLevel: 6 })).toBe(6);
+    expect(athleteFishTrialLevel({ fishTrialLevel: 0 })).toBeNull();
   });
 
   it('rend un profil vide pour ce qui n’est pas un objet', () => {

@@ -15,14 +15,17 @@
 //     rechargement, puis retour à « Année <n> » ;
 //  4. une ligne de la légende ouvre la page Sessions filtrée sur son activité ;
 //  5. à 390×844 : rien ne déborde, « Gtracker » sur la photo, pas de colonne « Vos activités », les activités favorites et le total sur une seule rangée, détail par activité retenu déplié ; la case « Profil » de la barre du bas (Profil, Sessions, Statistiques, Réglages) ouvre la page, allumée ;
-//     à 320 px, aucune case de la rangée ne sort de l'écran ni ne déborde de son texte ;
+//     à 320 px, aucune case de la rangée ne sort de l'écran ni ne déborde de son texte ; le bouton de période sous la
+//     photo ronde ; le poisson dans son bocal, nommé (« Poisson, niveau 1 sur 6 » sans semaine tenue), puis à chaque
+//     niveau d'essai de 1 à 6 (profil du pratiquant) à 390 et 320 px : dessiné, à droite du texte, dans l'écran, sous
+//     la photo, de plus en plus grand (captures aux niveaux 1, 3 et 6, et au niveau 6 en sombre) ;
 //  6. deux sessions d'activités cachées (planche à voile et bateau, cachées au départ) : absentes du Profil, rien ne
 //     change (quatre sessions, trois parts, ni « Autres ») ; une session de surf passée en Pumping dans son analyse :
 //     une quatrième part, la ligne de la légende ouvre ses sessions ;
 //  7. la photo : au départ l'avatar vide (disque à silhouette, même avec des sessions), nommé « Choisir une photo de
 //     profil » ; toucher la photo ouvre le choix des onze logos ; un logo choisi (dans son cadre), puis une image
 //     importée (réduite à 256 px, en JPEG), tous deux retenus au rechargement ; « Retirer » rend l'avatar vide.
-import { connect } from './lib/cdp.mjs';
+import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { traceSurf } from './lib/traces.mjs';
 
@@ -167,7 +170,11 @@ check('ancienne bande des trois chiffres disparue', !(await evaluate(`!!document
 check('nombre de sessions (graphe)', (await chartCount()) === '4 sessions', await chartCount());
 const ordre = await evaluate(`[...document.querySelectorAll('.profile > :not(.profile-openers), .profile > .profile-openers > *')].map((el) => (el.getAttribute('class') ?? '').split(' ')[0] || el.tagName).join(' > ')`);
 check('ordre : en-tête, activités favorites, répartition, graphe (sans ligne de période)', /^profile-head > (?!ui-btn).*profile-favs.*profile-split.*actchart/.test(ordre ?? '') && !/ui-btn/.test(ordre ?? ''), ordre);
-check('le bouton de période est dans l\'en-tête, à la hauteur du lien du test', await evaluate(`(() => { const b = document.querySelector('.profile-head .profile-periods')?.getBoundingClientRect(); const l = document.querySelector('.profile-head__link')?.getBoundingClientRect(); return !!b && !!l && Math.abs((b.top + b.bottom) / 2 - (l.top + l.bottom) / 2) < 4 && b.left >= l.right; })()`));
+/** Le bouton de période est-il sous la photo ronde, de sa largeur à peu près ? */
+const periodsUnderAvatar = () => evaluate(`(() => { const b = document.querySelector('.profile-head .profile-periods')?.getBoundingClientRect(); const a = document.querySelector('.profile-head__avatar')?.getBoundingClientRect(); return !!b && !!a && b.top >= a.bottom - 1 && b.top - a.bottom < 16 && b.left >= a.left - 1 && b.right <= a.right + 1 && b.width >= a.width * 0.8; })()`);
+check('le bouton de période est dans l\'en-tête, sous la photo ronde', await periodsUnderAvatar());
+check('le bocal du poisson, nommé, au niveau 1 sans semaine tenue', (await evaluate(`document.querySelector('.profile-head .profile-fish')?.getAttribute('aria-label') ?? null`)) === 'Poisson, niveau 1 sur 6',
+  await evaluate(`document.querySelector('.profile-fish')?.getAttribute('aria-label') ?? null`));
 // Colonne de droite, sur ordinateur (à partir de 1000 px) : « Vos activités », la rangée de logos et les cinq dernières sessions.
 const activites = () => evaluate(`(() => {
   const s = document.querySelector('.profile-activities');
@@ -249,6 +256,71 @@ await go('/profil');
 check('320 px : rien ne déborde, la rangée des activités favorites non plus', !(await overflow()) && (await rowFits()), JSON.stringify(await favs()));
 check('320 px : le bouton de période tient dans l\'écran', await periodsFit());
 await shoot('profil-320');
+
+// 5 bis. Le poisson dans son bocal, à droite du lien du test de FC repos : le niveau d'essai de Pratiquant l'impose ;
+// le bocal grandit du niveau 1 au niveau 6, sans passer sur le texte, la photo d'en-tête ni le bord de l'écran.
+/** Pose des champs du profil du pratiquant. */
+const setAthlete = (fields) => evaluate(`(() => {
+  const all = JSON.parse(localStorage.getItem('${CLES.athleteProfile}') ?? '{}');
+  all.me = { ...(all.me ?? {}), ...${JSON.stringify(fields)} };
+  localStorage.setItem('${CLES.athleteProfile}', JSON.stringify(all));
+  return 'ok';
+})()`);
+/** Pose le niveau d'essai du poisson (`null` : automatique). */
+const setTrial = (level) => setAthlete({ fishTrialLevel: level });
+/** Le bocal mesuré : nom, côté, dessin chargé, et sa place à côté du texte de l'en-tête. */
+const bowl = () => evaluate(`(() => {
+  const f = document.querySelector('.profile-fish');
+  if (!f) return null;
+  const r = f.getBoundingClientRect();
+  const t = document.querySelector('.profile-head__text').getBoundingClientRect();
+  const l = document.querySelector('.profile-head__link');
+  const hero = document.querySelector('.profile-hero').getBoundingClientRect();
+  return { nom: f.getAttribute('aria-label'), cote: Math.round(r.width), carre: Math.abs(r.width - r.height) < 1,
+    dessin: f.querySelector('.fish-drawing')?.getAttribute('data-drawing') ?? null, svg: !!f.querySelector('.fish-drawing svg'),
+    aCote: r.left >= t.right - 1, dansEcran: r.right <= window.innerWidth && r.left >= 0, sousPhoto: r.top >= hero.bottom - 1,
+    lienEntier: l.scrollWidth <= l.clientWidth + 1 && l.getBoundingClientRect().right <= r.left + 1 };
+})()`);
+const fishShots = { 390: [1, 3, 6], 320: [1, 3, 6] };
+for (const width of [390, 320]) {
+  await send('Emulation.setDeviceMetricsOverride', { width, height: width === 390 ? 844 : 640, deviceScaleFactor: 2, mobile: true });
+  const sizes = [];
+  let fine = true;
+  let detail = '';
+  for (let level = 1; level <= 6; level++) {
+    await setTrial(level);
+    await go('/profil');
+    await waitFor(`Boolean(document.querySelector('.profile-fish .fish-drawing svg'))`, { timeout: 3000, every: 50, label: 'dessin du poisson' });
+    const b = await bowl();
+    sizes.push(b?.cote ?? 0);
+    const ok = !!b && b.nom === `Poisson, niveau ${level} sur 6` && b.svg && b.carre && b.aCote && b.dansEcran && b.sousPhoto && b.lienEntier
+      && b.dessin === (level === 1 ? 'A/depart-1' : `A/beau-${level}`) && !(await overflow());
+    if (!ok) { fine = false; detail += ` n${level} ${JSON.stringify(b)}`; }
+    if (fishShots[width].includes(level)) await shoot(`poisson-${width}-n${level}`);
+  }
+  check(`${width} px : bocal nommé et dessiné à chaque niveau d'essai, à droite du texte, dans l'écran, sous la photo`, fine, detail);
+  check(`${width} px : le bocal grandit du niveau 1 au niveau 6`, sizes.every((s, i) => i === 0 || s > sizes[i - 1]) && sizes[0] >= 20, sizes.join(' '));
+  console.log(`${width} px : côté du bocal, niveaux 1 à 6 : ${sizes.join(', ')} px`);
+  check(`${width} px : le bouton de période sous la photo ronde`, await periodsUnderAvatar());
+}
+// Le même en sombre, au niveau 6, pour l'œil.
+await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+await evaluate(`localStorage.setItem('${CLES.theme}', JSON.stringify({ choice: 'sombre', eco: false })); 'ok'`);
+await go('/profil');
+await waitFor(`Boolean(document.querySelector('.profile-fish .fish-drawing svg'))`, { timeout: 3000, every: 50, label: 'dessin du poisson' });
+await shoot('poisson-390-n6-sombre');
+await evaluate(`localStorage.removeItem('${CLES.theme}'); 'ok'`);
+// Les trois autres styles (pinceau, estampe, pictogramme), au niveau 6, rangés dans le profil.
+const drawnStyles = [];
+for (const style of ['B', 'F', 'G']) {
+  await setAthlete({ fishStyle: style });
+  await go('/profil');
+  await waitFor(`document.querySelector('.profile-fish .fish-drawing')?.getAttribute('data-drawing') === '${style}/beau-6'`, { timeout: 3000, every: 50, label: 'dessin du poisson' });
+  drawnStyles.push(await evaluate(`document.querySelector('.profile-fish .fish-drawing')?.getAttribute('data-drawing') ?? null`));
+  await shoot(`poisson-390-n6-${style}`);
+}
+check('390 px : le style rangé dans le profil choisit le dessin (pinceau, estampe, pictogramme)', drawnStyles.join(' ') === 'B/beau-6 F/beau-6 G/beau-6', drawnStyles.join(' '));
+await setAthlete({ fishStyle: null, fishTrialLevel: null });
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await go('/sessions');
 const tab = `[...document.querySelectorAll('.shell-tabbar .shell-tab')].find((t) => t.textContent.trim() === 'Profil')`;

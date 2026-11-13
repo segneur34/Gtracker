@@ -164,6 +164,31 @@
   align-items: flex-start;
   gap: var(--space-3);
   margin-top: -34px;
+  /* Conteneur du bocal du poisson, dont la taille suit la largeur de l'en-tête (`components/ProfileFish.css`) :
+     la photo ronde (80 px), deux écarts et le lien du test de FC repos (son texte, en em du bocal, qui est à la
+     taille du lien, et son chevron) lui laissent le reste. */
+  container-type: inline-size;
+  --fish-reserve: calc(80px + 2 * var(--space-3) + 16px + 7.9em);
+}
+
+/* Colonne de la photo ronde, avec dessous le bouton de période, de sa largeur. */
+.profile-head__side {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 80px;
+}
+
+/* Le texte, puis le bocal calé en bas, sur la ligne du test de FC repos ; plus grand que le texte, il descend
+   sous la ligne sans pousser le nom. Le tout commence sous la photo d'en-tête, que l'avatar déborde de 34 px. */
+.profile-head__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding-top: calc(34px + var(--space-1));
 }
 
 .profile-head__avatar {
@@ -182,14 +207,13 @@
   outline-offset: 2px;
 }
 
-/* Le texte commence sous la photo d'en-tête, que l'avatar déborde de 34 px. */
 .profile-head__text {
   flex: 1;
   min-width: 0;
+  align-self: flex-start;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding-top: calc(34px + var(--space-1));
 }
 
 .profile-head__hello {
@@ -197,20 +221,12 @@
   font-size: var(--text-xs);
 }
 
-/* Rangée du lien du test et du bouton de période : le lien à gauche, le bouton calé à droite. */
+/* Rangée du lien du test de FC repos. */
 .profile-head__row {
   align-self: stretch;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 0 var(--space-2);
   min-width: 0;
-}
-
-/* Quand la place manque (texte agrandi), le bouton passe sous le lien, à droite. */
-.profile-head__row .profile-periods {
-  margin-left: auto;
 }
 
 .profile-head__row .profile-head__link {
@@ -403,16 +419,12 @@ button.profile-legend__row {
 
 }
 
-/* Petit bouton à droite de la rangée du test de FC repos ; la zone tactile déborde de la pilule pour rester confortable au doigt. */
+/* Bouton de période sous la photo ronde, de sa largeur, en grand. */
 .ui-btn.profile-periods {
   flex: 0 0 auto;
-  position: relative;
-}
-
-.ui-btn.profile-periods::after {
-  content: '';
-  position: absolute;
-  inset: calc(-1 * var(--space-2)) calc(-1 * var(--space-2));
+  width: 100%;
+  padding: 0;
+  font-size: var(--text-l);
 }
 
 /* Détail par activité : replié ou déplié d'un geste, sous l'anneau sur un écran étroit. */

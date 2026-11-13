@@ -2,6 +2,9 @@ import { finiteOr, inRange } from '../core/basics';
 import { storedLogo, type LogoId } from '../core/activityLogos';
 import { heartRateZones, isValidThresholds, type HeartRateZones } from '../core/heartRate';
 import type { HeartRateProfile } from '../core/sportProfiles';
+import {
+  DEFAULT_FISH_PATH, DEFAULT_FISH_STYLE, isFishLevel, isFishPath, isFishStyle, type FishPath, type FishStyle,
+} from './fishGrowth';
 
 /**
  * Profil du pratiquant, pur : sa forme, ses champs relus avec
@@ -57,6 +60,12 @@ export interface AthleteProfile {
   hrThresholds: number[] | null;
   /** Racine du Profil (`library/rootGrowth.ts`) : objectif par semaine, en minutes ; `null` : `ROOT_GOAL.defaultMin`. */
   rootWeeklyGoalMin: number | null;
+  /** Poisson du Profil (`library/fishGrowth.ts`) : style de dessin ; `null` : `DEFAULT_FISH_STYLE`. */
+  fishStyle: FishStyle | null;
+  /** Sa voie ; `null` : `DEFAULT_FISH_PATH`. */
+  fishPath: FishPath | null;
+  /** Niveau d'essai, de 1 à `FISH_LEVELS`, réglage provisoire qui impose le niveau montré ; `null` : celui des semaines tenues. */
+  fishTrialLevel: number | null;
 }
 
 export const EMPTY_ATHLETE_PROFILE: AthleteProfile = {
@@ -72,10 +81,17 @@ export const EMPTY_ATHLETE_PROFILE: AthleteProfile = {
   hrRestSource: null,
   hrThresholds: null,
   rootWeeklyGoalMin: null,
+  fishStyle: null,
+  fishPath: null,
+  fishTrialLevel: null,
 };
 
 /** Plages plausibles de chaque champ numérique. */
-export type AthleteNumberField = Exclude<keyof AthleteProfile, 'name' | 'avatar' | 'sex' | 'hrThresholds' | 'hrMaxSource' | 'hrRestSource'>;
+export type AthleteNumberField = Exclude<keyof AthleteProfile,
+  'name' | 'avatar' | 'sex' | 'hrThresholds' | 'hrMaxSource' | 'hrRestSource' | 'fishStyle' | 'fishPath'>;
+
+/** Champs numériques du Profil dont la plage n'est pas dans `ATHLETE_BOUNDS` (`library/profilePrompt.ts`). */
+type ProfileOnlyNumberField = 'rootWeeklyGoalMin' | 'fishTrialLevel';
 
 /** Longueur maximale du nom ou pseudo. */
 export const ATHLETE_NAME_MAX = 40;
@@ -100,8 +116,20 @@ export const athleteAvatar = (profile: Partial<Pick<AthleteProfile, 'avatar'>>):
   return null;
 };
 
-/** Plages plausibles des champs numériques du pratiquant (celle de l'objectif de la racine : `library/profile.ts`). */
-export const ATHLETE_BOUNDS: Record<Exclude<AthleteNumberField, 'rootWeeklyGoalMin'>, [number, number]> = {
+/** Style de dessin du poisson du Profil, celui de départ sans choix ou pour une valeur inconnue (fichier de réglages importé). */
+export const athleteFishStyle = (profile: Partial<Pick<AthleteProfile, 'fishStyle'>>): FishStyle =>
+  isFishStyle(profile.fishStyle) ? profile.fishStyle : DEFAULT_FISH_STYLE;
+
+/** Voie du poisson du Profil, celle de départ sans choix ou pour une valeur inconnue. */
+export const athleteFishPath = (profile: Partial<Pick<AthleteProfile, 'fishPath'>>): FishPath =>
+  isFishPath(profile.fishPath) ? profile.fishPath : DEFAULT_FISH_PATH;
+
+/** Niveau d'essai du poisson, `null` sans essai (automatique) ou pour une valeur hors de 1 à 6. */
+export const athleteFishTrialLevel = (profile: Partial<Pick<AthleteProfile, 'fishTrialLevel'>>): number | null =>
+  isFishLevel(profile.fishTrialLevel) ? profile.fishTrialLevel : null;
+
+/** Plages plausibles des champs numériques du pratiquant (celles de l'objectif de la racine et du niveau d'essai du poisson : `library/profilePrompt.ts`). */
+export const ATHLETE_BOUNDS: Record<Exclude<AthleteNumberField, ProfileOnlyNumberField>, [number, number]> = {
   weightKg: [20, 300],
   heightCm: [100, 250],
   birthYear: [1900, 2100],
@@ -150,7 +178,7 @@ export const athleteHeartRateZones = (profile: AthleteProfile, heartRate: HeartR
 export const sanitizeAthleteProfile = (raw: unknown, rootGoal: { min: number; max: number }): AthleteProfile => {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { ...EMPTY_ATHLETE_PROFILE };
   const p = raw as Partial<Record<keyof AthleteProfile, unknown>>;
-  const bounded = (field: Exclude<AthleteNumberField, 'rootWeeklyGoalMin'>): number | null => {
+  const bounded = (field: Exclude<AthleteNumberField, ProfileOnlyNumberField>): number | null => {
     const [lo, hi] = ATHLETE_BOUNDS[field];
     return inRange(p[field], lo, hi) ? p[field] : null;
   };
@@ -172,6 +200,9 @@ export const sanitizeAthleteProfile = (raw: unknown, rootGoal: { min: number; ma
     hrRestSource: athleteHrSource(forSource, 'hrRest'),
     hrThresholds: isValidThresholds(thresholds) ? thresholds : null,
     rootWeeklyGoalMin: inRange(p.rootWeeklyGoalMin, rootGoal.min, rootGoal.max) ? p.rootWeeklyGoalMin : null,
+    fishStyle: isFishStyle(p.fishStyle) ? p.fishStyle : null,
+    fishPath: isFishPath(p.fishPath) ? p.fishPath : null,
+    fishTrialLevel: isFishLevel(p.fishTrialLevel) ? p.fishTrialLevel : null,
   };
 };
 

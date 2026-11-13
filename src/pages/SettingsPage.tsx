@@ -28,6 +28,7 @@ import { ATHLETE_NAME_MAX, athleteHeartRateZones, athleteHrSource, type AthleteN
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
 import { ROOT_GOAL } from '../library/rootGrowth';
+import { FISH_LEVELS } from '../library/fishGrowth';
 import { zoneLabel } from '../components/heartRateColors';
 import { hrSourceLabel } from '../components/heartRateOrigin';
 import Button from '../components/ui/Button';
@@ -812,6 +813,17 @@ function SettingsPage() {
             <NumberField label="Fréquence cardiaque de repos" unit={hrUnit('hrRest')} min={25} max={120} value={profile.hrRest} onCommit={profileField('hrRest')} placeholder="ex. 55"
               helpKey="pratiquant:fc-repos" help="Avec la FC max, les seuils se calculent sur la réserve cardiaque, plus juste. Le test de FC repos (page Profil) la mesure." />
             <HeartRateThresholdsField profile={profile} onChange={setThresholds} />
+            <label className="ui-field-row">
+              <span className="ui-field-row__label">Niveau du poisson (essai, provisoire)<HelpToggle helpKey="pratiquant:poisson-essai" label="Niveau du poisson" /></span>
+              <select value={profile.fishTrialLevel ?? ''} className="ui-field ui-field--s"
+                onChange={(e) => setNumber('fishTrialLevel', e.target.value === '' ? null : Number(e.target.value))}>
+                <option value="">Automatique</option>
+                {Array.from({ length: FISH_LEVELS }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+            <HelpText helpKey="pratiquant:poisson-essai">
+              Réglage provisoire, pour essayer : impose le niveau du poisson du Profil et débloque les niveaux jusqu'à lui. Automatique : le niveau gagné par les semaines tenues.
+            </HelpText>
             {PROFILE_PLANT_VISIBLE && (
               <>
                 <p className="ui-eyebrow set-subhead">Racine du Profil</p>

@@ -1,0 +1,52 @@
+/* Bocal du poisson du Profil. Son côté : une part du plus grand (`--fish-f`, du niveau), lui-même 84 px au plus,
+   moins quand l'en-tête est étroit (conteneur `.profile-head`) : la photo ronde, les écarts et le lien du test de
+   FC repos gardent leur place, le nom n'est jamais poussé. */
+.profile-fish {
+  --fish-m: max(20px, min(84px, 100cqi - var(--fish-reserve, 222px)));
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: calc(var(--fish-f, 1) * var(--fish-m));
+  aspect-ratio: 1;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--ink);
+  /* À la taille du lien du test de FC repos : la place qu'il lui laisse se compte en em (`--fish-reserve`). */
+  font-size: var(--text-s);
+  cursor: pointer;
+}
+
+.fish-drawing {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.fish-drawing > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Papier et verre des dessins, reliés au thème : le fond de la page, la couleur des cadres au pinceau. */
+.fish-drawing .pz-p {
+  fill: var(--bg);
+}
+
+.fish-drawing .pz-ps {
+  stroke: var(--bg);
+}
+
+.fish-drawing .pz-b {
+  fill: var(--brush, var(--ink));
+}
+
+.fish-drawing .pz-bs {
+  stroke: var(--brush, var(--ink));
+}
+
+/* Économe : le pinceau sans son filtre, figé. */
+:root[data-eco] .fish-drawing [filter] {
+  filter: none;
+}

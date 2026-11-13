@@ -19,6 +19,8 @@ import { RESTING_HR_PATH, sessionsPath } from '../core/parentPage';
 import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useProfileRoot } from '../hooks/useProfileRoot';
+import { useProfileFish } from '../hooks/useProfileFish';
+import ProfileFish from '../components/ProfileFish';
 import { athleteAvatar, athleteName } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
@@ -40,7 +42,8 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * Profil, la page où s'ouvre l'application : une période en un coup d'œil (`library/profile.ts`). En tête, une photo
  * (logo GONG et « Gtracker » en haut à gauche sur téléphone, « Live for it. » en bas à droite), puis, à cheval sur son
  * bord, la photo ronde (un dessin d'activité ou une image importée, choisis en la touchant ; sans
- * choix, un disque vide à silhouette), « Bienvenue » et le pseudo. Puis les cartes d'ouverture
+ * choix, un disque vide à silhouette) et dessous le bouton de période, « Bienvenue » et le pseudo, et à droite du lien
+ * du test de FC repos le poisson dans son bocal (`ProfileFish`), qui grandit avec les semaines tenues. Puis les cartes d'ouverture
  * (mémoire à désigner, autorisations, invitation du profil), quand il y a lieu. Puis
  * la période, qui règle toute la page : semaine, 30 jours, 6 mois, année (les
  * bornes du graphe d'activités et des statistiques) ou depuis le début ; choix
@@ -157,6 +160,8 @@ function ProfilePage() {
 
   // Racine : toutes les sessions, quelle que soit la période ; son détail s'ouvre sous le carré, non retenu.
   const root = useProfileRoot(all, profile, nowMs);
+  // Poisson : les mêmes semaines tenues, le niveau d'essai de Pratiquant s'il est réglé.
+  const fish = useProfileFish(all, profile, nowMs);
   const [rootOpen, setRootOpen] = useState(false);
   const closeRoot = useCallback(() => setRootOpen(false), []);
 
@@ -248,24 +253,31 @@ function ProfilePage() {
   const column = (
     <div className="ui-page profile">
       <header className="profile-head">
-        <button type="button" className="profile-head__avatar" aria-expanded={picking}
-          aria-label={avatar ? 'Changer la photo de profil' : 'Choisir une photo de profil'}
-          onClick={() => setPicking(!picking)}>
-          <ProfileAvatar avatar={avatar} logoColor={shownLogoColor} />
-        </button>
-        <div className="profile-head__text">
-          {name !== null && <span className="profile-head__hello">Bienvenue</span>}
-          <h1 className="profile-head__title">{name ?? 'Bienvenue'}</h1>
-          {/* Le test de FC repos, sous le titre : la hauteur de l'en-tête, et donc la racine, ne bougent pas. */}
-          <div className="profile-head__row">
-            <Link to={RESTING_HR_PATH} className="profile-head__link">
-              Test de FC repos<IconChevronRight size={14} aria-hidden="true" />
-            </Link>
-            <Button size="s" className="profile-periods" aria-label={`Période : ${periodLabel}. Toucher pour afficher : ${otherPeriodLabel}.`}
-              onClick={() => rememberView({ periode: period === 'tout' ? 'annee' : 'tout' })}>
-              {period === 'tout' ? 'Tout' : String(new Date(nowMs).getFullYear())}
-            </Button>
+        {/* La photo ronde, et dessous, en grand, le bouton de la période de toute la page. */}
+        <div className="profile-head__side">
+          <button type="button" className="profile-head__avatar" aria-expanded={picking}
+            aria-label={avatar ? 'Changer la photo de profil' : 'Choisir une photo de profil'}
+            onClick={() => setPicking(!picking)}>
+            <ProfileAvatar avatar={avatar} logoColor={shownLogoColor} />
+          </button>
+          <Button className="profile-periods" aria-label={`Période : ${periodLabel}. Toucher pour afficher : ${otherPeriodLabel}.`}
+            onClick={() => rememberView({ periode: period === 'tout' ? 'annee' : 'tout' })}>
+            {period === 'tout' ? 'Tout' : String(new Date(nowMs).getFullYear())}
+          </Button>
+        </div>
+        {/* Le texte, et à sa droite le bocal du poisson, calé sur la ligne du test de FC repos. */}
+        <div className="profile-head__main">
+          <div className="profile-head__text">
+            {name !== null && <span className="profile-head__hello">Bienvenue</span>}
+            <h1 className="profile-head__title">{name ?? 'Bienvenue'}</h1>
+            {/* Le test de FC repos, sous le titre : la hauteur de l'en-tête, et donc la racine, ne bougent pas. */}
+            <div className="profile-head__row">
+              <Link to={RESTING_HR_PATH} className="profile-head__link">
+                Test de FC repos<IconChevronRight size={14} aria-hidden="true" />
+              </Link>
+            </div>
           </div>
+          <ProfileFish level={fish.level} style={fish.style} path={fish.path} brushColor={brushColor} />
         </div>
         {PROFILE_PLANT_VISIBLE && (
           <Suspense fallback={null}>

@@ -1,8 +1,12 @@
 import { useMemo } from 'react';
 import type { StatSession } from '../library/stats';
-import { rootGrowth, type RootGrowth } from '../library/rootGrowth';
+import { rootGrowth, type RootGrowth, type RootSession } from '../library/rootGrowth';
 import { athleteRootGoalMin } from '../library/profilePrompt';
 import type { AthleteProfile } from '../library/athleteProfile';
+
+/** Ce que la racine et le poisson retiennent d'une session : son début et son temps en mouvement, sinon sa durée. */
+export const rootSessionsOf = (sessions: readonly StatSession[]): RootSession[] =>
+  sessions.map((s) => ({ startMs: s.startMs, durationS: s.movingTimeS ?? (s.endMs - s.startMs) / 1000 }));
 
 /**
  * Racine du Profil : son niveau, rejoué sur les sessions du Profil (classées,
@@ -11,9 +15,6 @@ import type { AthleteProfile } from '../library/athleteProfile';
  */
 export const useProfileRoot = (sessions: readonly StatSession[], profile: AthleteProfile, nowMs: number): { growth: RootGrowth; goalMin: number } => {
   const goalMin = athleteRootGoalMin(profile);
-  const growth = useMemo(
-    () => rootGrowth(sessions.map((s) => ({ startMs: s.startMs, durationS: s.movingTimeS ?? (s.endMs - s.startMs) / 1000 })), goalMin, nowMs),
-    [sessions, goalMin, nowMs]
-  );
+  const growth = useMemo(() => rootGrowth(rootSessionsOf(sessions), goalMin, nowMs), [sessions, goalMin, nowMs]);
   return { growth, goalMin };
 };

@@ -69,6 +69,7 @@ describe("profil repris d'un autre appareil, contrôlé champ par champ", () => 
     const valid: AthleteProfile = {
       ...EMPTY_ATHLETE_PROFILE, name: 'Tom', weightKg: 72, heightCm: 178, birthYear: 1985, sex: 'm', hrMax: 190, hrMaxSource: { kind: 'test', atMs: 1000 },
       hrRest: 50, hrRestSource: { kind: 'saisie', atMs: null }, hrThresholds: [140, 170], rootWeeklyGoalMin: 120,
+      fishStyle: 'B', fishPath: 'agressif', fishTrialLevel: 3,
     };
     expect(storedAthleteProfile(valid, ROOT_GOAL)).toEqual(valid);
     jsonStore.write(STORAGE_KEYS.athleteProfile, { me: valid });
