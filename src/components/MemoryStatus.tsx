@@ -55,7 +55,7 @@ function MemoryStatus({
   collapse?: { open: boolean; onToggle: () => void };
 }) {
   const library = useLibraryFields(
-    'status', 'folderKind', 'folderLabel', 'memoryReadOnly', 'reason', 'sessions', 'scanning', 'pendingCount', 'duplicates', 'unreadable', 'tooLarge', 'message', 'error'
+    'status', 'folderKind', 'folderLabel', 'memoryReadOnly', 'reason', 'sessions', 'scanning', 'pendingCount', 'duplicates', 'unreadable', 'tooLarge', 'message', 'error', 'settingsOffer'
   );
   const { status, folderKind, folderLabel } = library;
   const canChoose = canChooseMemoryFolder();
@@ -127,10 +127,12 @@ function MemoryStatus({
     : detailed ? 'Mémoire' : undefined;
 
   if (collapse && !collapse.open) {
+    // Replié : le titre seul quand tout va bien ; ce qui demande une action reste montré.
+    if (!attention && !library.message && !library.error && !library.settingsOffer) return <Card heading={heading} />;
     return (
       <Card heading={heading}>
         <div className="ui-stack-3">
-          {statusLine}
+          {attention && statusLine}
           <SettingsOfferBanner />
           {alert}
         </div>

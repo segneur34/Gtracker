@@ -55,6 +55,12 @@
   gap: var(--space-3);
 }
 
+/* Flèche décorative après le mot : vers le bas replié, vers le haut déplié. */
+.avatar-picker__chevron {
+  flex: none;
+  margin-left: var(--space-2);
+}
+
 .avatar-picker__preview {
   flex: none;
   width: 48px;

@@ -422,8 +422,18 @@ check('toucher la photo ouvre « Réglages du Profil » et ses quatre réglages'
 check('fenêtre au repos : photo en petit rond et « Changer l\'image », ni grille ni « Importer une image »', (await pickerState2('.profile-settings-window')) === PICKER_REST, await pickerState2('.profile-settings-window'));
 await toggleChange('.profile-settings-window', 11);
 check('« Changer l\'image » déplie les onze logos et « Importer une image » (pas « Retirer » sans photo)', (await pickerState2('.profile-settings-window')) === PICKER_OPEN, await pickerState2('.profile-settings-window'));
+/** Flèche du bouton « Changer l'image » : déplié lu, et le dessin de son trait (vers le bas ou vers le haut). */
+const chevronState = (root) => evaluate(`(() => {
+  const b = document.querySelector('${root} .avatar-picker__current button');
+  const s = b?.querySelector('svg.avatar-picker__chevron');
+  return s ? 'déplié=' + b.getAttribute('aria-expanded') + ' ; masquée=' + s.getAttribute('aria-hidden') + ' ; ' + [...s.querySelectorAll('path, polyline')].map((p) => p.getAttribute('d') ?? p.getAttribute('points')).join('|') : 'sans flèche';
+})()`);
+const chevronOpen = await chevronState('.profile-settings-window');
 await shoot('profil-fenetre-photo-ouverte');
 await toggleChange('.profile-settings-window', 0);
+const chevronClosed = await chevronState('.profile-settings-window');
+check('« Changer l\'image » porte une flèche décorative qui change de sens avec le déploiement', chevronOpen.startsWith('déplié=true ; masquée=true') && chevronClosed.startsWith('déplié=false ; masquée=true')
+  && chevronOpen.split(' ; ')[2] !== chevronClosed.split(' ; ')[2], chevronOpen + ' // ' + chevronClosed);
 check('le bouton retouché replie les propositions', (await pickerState2('.profile-settings-window')) === PICKER_REST, await pickerState2('.profile-settings-window'));
 await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
 await wait(300);

@@ -2,7 +2,7 @@ import { useId, useRef, useState } from 'react';
 import { LOGO_IDS, LOGO_LABEL, type LogoId } from '../core/activityLogos';
 import { AVATAR_PHOTO_PX, type AthleteAvatar } from '../library/athleteProfile';
 import { readPickedImage } from '../platform/files';
-import { IconImage, IconUser } from './icons';
+import { IconChevronDown, IconChevronUp, IconImage, IconUser } from './icons';
 import ActivityLogo from './logos/ActivityLogo';
 import Button from './ui/Button';
 import './ProfileAvatar.css';
@@ -74,6 +74,9 @@ export function AvatarPicker({ avatar, logoColor, onPick }: {
         <span className="avatar-picker__preview"><ProfileAvatar avatar={avatar} logoColor={logoColor} /></span>
         <Button variant="secondary" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((o) => !o)}>
           Changer l'image
+          {open
+            ? <IconChevronUp size={14} className="avatar-picker__chevron" aria-hidden="true" />
+            : <IconChevronDown size={14} className="avatar-picker__chevron" aria-hidden="true" />}
         </Button>
       </div>
       {open && (

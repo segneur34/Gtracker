@@ -122,6 +122,19 @@ console.log('Mettre à jour :', await refresh());
 console.log('après :', String(await count()));
 check('relue une fois de plus : toujours 2 sessions', (await count()) === 2, String(await count()));
 await go('/parametres');
+// Replié, le cadre Mémoire se réduit à son titre quand tout va bien : on le déplie pour lire la ligne et les boutons.
+const foldedMemory = await evaluate(`(() => {
+  const b = [...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Mémoire');
+  if (!b) return 'absent';
+  const card = b.closest('section');
+  const lines = [...card.querySelectorAll('p, button')].length;
+  const folded = lines === 0;
+  if (folded) b.click();
+  return folded ? 'replié, 0 ligne(s) ou bouton(s)' : 'déjà ouvert, ' + lines + ' ligne(s) ou bouton(s)';
+})()`);
+console.log('cadre Mémoire :', foldedMemory);
+check('Réglages › Mémoire replié : le titre seul, sans ligne d\'état', foldedMemory === 'replié, 0 ligne(s) ou bouton(s)', foldedMemory);
+await wait(300);
 const reglages = await memory();
 const importDossier = await evaluate(`[...document.querySelectorAll('label, button')].some((x) => x.textContent.trim() === "Ajouter les sessions d'un dossier")`);
 console.log('Réglages :', reglages, '| import d\'un dossier :', importDossier);
