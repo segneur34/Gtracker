@@ -31,7 +31,7 @@ export default function ProfileScreenSettings() {
   return (
     <div className="profile-settings">
       <SettingRow label="Photo de profil" helpKey="pratiquant:photo"
-        help="La photo ronde en tête du Profil : un logo d'activité, une image du téléphone, ou rien.">
+        help="La photo ronde en tête du Profil : « Changer l'image » déplie les propositions, un logo d'activité ou une image du téléphone ; « Retirer » la vide.">
         <AvatarPicker avatar={athleteAvatar(profile)} logoColor={shownLogoColor} onPick={setAvatar} />
       </SettingRow>
       <label className="ui-field-row">

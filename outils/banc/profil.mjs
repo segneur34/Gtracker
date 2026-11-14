@@ -375,8 +375,32 @@ await shoot('profil-avatar-vide');
 /** Ouvre la fenêtre des réglages du Profil en touchant la photo ; elle se charge à la demande. */
 const openWindow = async () => {
   await evaluate(`document.querySelector('.profile-head__avatar').click()`);
-  await waitFor(`document.querySelectorAll('.profile-settings-window .avatar-picker__choice').length === 11`, { timeout: 8000, every: 100, label: 'fenêtre des réglages du Profil' });
+  await waitFor(`!!document.querySelector('.profile-settings-window .avatar-picker__current')`, { timeout: 8000, every: 100, label: 'fenêtre des réglages du Profil' });
 };
+/** Relevé du choix de la photo sous `root` : bouton, état, petit rond, logos proposés, import et « Retirer ». */
+const pickerState2 = (root) => evaluate(`(() => {
+  const r = document.querySelector('${root}');
+  const b = r?.querySelector('.avatar-picker__current button');
+  if (!b) return 'bouton absent';
+  const rect = b.getBoundingClientRect();
+  return [
+    b.textContent.trim(),
+    'déplié=' + b.getAttribute('aria-expanded'),
+    'liée=' + (b.getAttribute('aria-controls') ? (r.querySelector('#' + CSS.escape(b.getAttribute('aria-controls'))) ? 'oui' : 'non') : 'sans'),
+    'rond=' + (r.querySelector('.avatar-picker__preview .profile-avatar__photo, .avatar-picker__preview .profile-avatar__disc') ? 'oui' : 'non'),
+    r.querySelectorAll('.avatar-picker__choice').length + ' logos',
+    'import=' + (r.querySelector('.avatar-picker input[type=file]') ? 'oui' : 'non'),
+    'retirer=' + ([...r.querySelectorAll('.avatar-picker__actions button')].some((x) => x.textContent.trim() === 'Retirer') ? 'oui' : 'non'),
+    'haut=' + (rect.height >= 44 ? 'ok' : Math.round(rect.height)),
+  ].join(' ; ');
+})()`);
+/** Touche « Changer l'image » sous `root` pour en changer l'état, puis attend le nombre de logos attendu (0 ou 11). */
+const toggleChange = async (root, logos) => {
+  await evaluate(`document.querySelector('${root} .avatar-picker__current button').click()`);
+  await waitFor(`document.querySelectorAll('${root} .avatar-picker__choice').length === ${logos}`, { timeout: 4000, every: 100, label: 'propositions de photo' });
+};
+const PICKER_REST = 'Changer l\'image ; déplié=false ; liée=non ; rond=oui ; 0 logos ; import=non ; retirer=non ; haut=ok';
+const PICKER_OPEN = 'Changer l\'image ; déplié=true ; liée=oui ; rond=oui ; 11 logos ; import=oui ; retirer=non ; haut=ok';
 /** Les quatre réglages de l'écran Profil sous `root` : photo, nom, poisson (huit choix), sessions du banc. */
 const screenSettings = (root) => evaluate(`(() => {
   const r = document.querySelector('${root}');
@@ -390,11 +414,17 @@ const screenSettings = (root) => evaluate(`(() => {
     labels.join(' | '),
   ].join(' ; ');
 })()`);
-const SCREEN_SETTINGS = '11 logos ; nom ; 8 poissons ; essai ; Photo de profil | Nom ou pseudo | Poisson du banc | Nombre de sessions du banc (essai, provisoire)';
+const SCREEN_SETTINGS = '0 logos ; nom ; 8 poissons ; essai ; Photo de profil | Nom ou pseudo | Poisson du banc | Nombre de sessions du banc (essai, provisoire)';
 await openWindow();
 await waitFor(`document.querySelectorAll('.profile-settings-window .fish-style-picker [data-style]').length === 8`, { timeout: 8000, every: 100, label: 'choix du poisson' });
 check('toucher la photo ouvre « Réglages du Profil » et ses quatre réglages', (await text('.profile-settings-window__title')) === 'Réglages du Profil'
   && (await screenSettings('.profile-settings-window')) === SCREEN_SETTINGS, await screenSettings('.profile-settings-window'));
+check('fenêtre au repos : photo en petit rond et « Changer l\'image », ni grille ni « Importer une image »', (await pickerState2('.profile-settings-window')) === PICKER_REST, await pickerState2('.profile-settings-window'));
+await toggleChange('.profile-settings-window', 11);
+check('« Changer l\'image » déplie les onze logos et « Importer une image » (pas « Retirer » sans photo)', (await pickerState2('.profile-settings-window')) === PICKER_OPEN, await pickerState2('.profile-settings-window'));
+await shoot('profil-fenetre-photo-ouverte');
+await toggleChange('.profile-settings-window', 0);
+check('le bouton retouché replie les propositions', (await pickerState2('.profile-settings-window')) === PICKER_REST, await pickerState2('.profile-settings-window'));
 await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
 await wait(300);
 check('Échap ferme la fenêtre', !(await evaluate(`!!document.querySelector('.profile-settings-window')`)));
@@ -403,12 +433,17 @@ await evaluate(`window.gtrackerBack?.()`);
 await wait(300);
 check('le retour ferme la fenêtre, sans quitter le Profil', !(await evaluate(`!!document.querySelector('.profile-settings-window')`)) && (await search()) === '/profil', await search());
 await openWindow();
+check('rouverte, la fenêtre est repliée', (await pickerState2('.profile-settings-window')) === PICKER_REST, await pickerState2('.profile-settings-window'));
+await toggleChange('.profile-settings-window', 11);
 await evaluate(`document.querySelector('.avatar-picker__choice[aria-label="Kite"]').click()`);
 await wait(300);
 check('un logo choisi : la photo suit, la fenêtre reste ouverte', (await evaluate(`!!document.querySelector('.profile-settings-window')`)) && (await avatarState()) === 'logo #gt-logo-kite encadré', await avatarState());
+check('… les propositions restent ouvertes, « Retirer » apparaît, le petit rond montre le logo', (await pickerState2('.profile-settings-window')) === PICKER_OPEN.replace('retirer=non', 'retirer=oui')
+  && (await evaluate(`!!document.querySelector('.profile-settings-window .avatar-picker__preview svg.activity-logo')`)), await pickerState2('.profile-settings-window'));
 await go('/profil');
 check('… retenu au rechargement', (await avatarState()) === 'logo #gt-logo-kite encadré', await avatarState());
 await openWindow();
+await toggleChange('.profile-settings-window', 11);
 check('le logo choisi est cerclé', (await evaluate(`document.querySelector('.avatar-picker__choice[aria-pressed=true]')?.getAttribute('aria-label')`)) === 'Kite');
 console.log('image importée :', await evaluate(`(async () => {
   const canvas = document.createElement('canvas');
@@ -431,6 +466,7 @@ await go('/profil');
 check('… retenue au rechargement', (await avatarState()) === 'photo 256 data:image/jpeg', await avatarState());
 await shoot('profil-photo');
 await openWindow();
+await toggleChange('.profile-settings-window', 11);
 await evaluate(`[...document.querySelectorAll('.avatar-picker button')].find((b) => b.textContent.trim() === 'Retirer').click()`);
 await wait(300);
 check('« Retirer » rend l\'avatar vide', (await avatarState()) === 'vide', await avatarState());
@@ -544,6 +580,11 @@ await go('/parametres');
 const pickerState = () => evaluate(`[...document.querySelectorAll('.fish-style-picker [data-style]')].map((b) => b.getAttribute('data-style') + (b.getAttribute('aria-pressed') === 'true' ? '*' : '')).join(' ')`);
 await waitFor(`document.querySelectorAll('.fish-style-picker [data-style]').length === 8`, { timeout: 8000, every: 100, label: 'choix du dessin' });
 check('réglages : les quatre réglages de l\'écran Profil, en tête de Pratiquant', (await screenSettings('.profile-settings')) === SCREEN_SETTINGS, await screenSettings('.profile-settings'));
+check('réglages : photo au repos, « Changer l\'image » seul, ni grille ni « Importer une image »', (await pickerState2('.profile-settings')) === PICKER_REST, await pickerState2('.profile-settings'));
+await toggleChange('.profile-settings', 11);
+check('réglages : « Changer l\'image » déplie les logos et « Importer une image »', (await pickerState2('.profile-settings')) === PICKER_OPEN, await pickerState2('.profile-settings'));
+await toggleChange('.profile-settings', 0);
+check('réglages : le bouton retouché replie les propositions', (await pickerState2('.profile-settings')) === PICKER_REST, await pickerState2('.profile-settings'));
 check('réglages : sept dessins et « Aucun », P4 enfoncé au départ', (await pickerState()) === 'P1 P2 P3 P4* P5 P6 P7 aucun', await pickerState());
 await evaluate(`document.querySelector('.fish-style-picker [data-style="P5"]').click()`);
 await wait(300);

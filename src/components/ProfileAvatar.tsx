@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { LOGO_IDS, LOGO_LABEL, type LogoId } from '../core/activityLogos';
 import { AVATAR_PHOTO_PX, type AthleteAvatar } from '../library/athleteProfile';
 import { readPickedImage } from '../platform/files';
@@ -37,9 +37,9 @@ export function ProfileAvatar({ avatar, logoColor }: {
 }
 
 /**
- * Choix de la photo : les onze logos dans leur cadre, une image importée
- * (la galerie ou l'appareil photo sur le téléphone), ou aucun choix. Le choix
- * s'applique tout de suite ; c'est la fenêtre ou la page autour qui se ferme.
+ * Choix de la photo : au repos, la photo actuelle en petit rond et un bouton « Changer l'image » ; le bouton déplie
+ * les onze logos dans leur cadre, une image importée (la galerie ou l'appareil photo sur le téléphone) et « Retirer ».
+ * Le choix s'applique tout de suite et les propositions restent ouvertes ; c'est la fenêtre ou la page autour qui se ferme.
  */
 export function AvatarPicker({ avatar, logoColor, onPick }: {
   avatar: AthleteAvatar | null;
@@ -48,6 +48,9 @@ export function AvatarPicker({ avatar, logoColor, onPick }: {
   onPick: (avatar: AthleteAvatar | null) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const panelId = useId();
+  /** Replié à chaque ouverture, et gardé ouvert après un choix pour en essayer plusieurs. */
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
 
@@ -67,26 +70,36 @@ export function AvatarPicker({ avatar, logoColor, onPick }: {
 
   return (
     <div className="avatar-picker" role="group" aria-label="Photo de profil">
-      <div className="avatar-picker__grid">
-        {LOGO_IDS.map((icon) => (
-          <button key={icon} type="button" className="avatar-picker__choice" title={LOGO_LABEL[icon]}
-            aria-label={LOGO_LABEL[icon]} aria-pressed={avatar?.kind === 'dessin' && avatar.icon === icon}
-            onClick={() => onPick({ kind: 'dessin', icon })}>
-            <LogoDisc icon={icon} color={logoColor(icon)} />
-          </button>
-        ))}
+      <div className="avatar-picker__current">
+        <span className="avatar-picker__preview"><ProfileAvatar avatar={avatar} logoColor={logoColor} /></span>
+        <Button variant="secondary" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((o) => !o)}>
+          Changer l'image
+        </Button>
       </div>
-      <div className="avatar-picker__actions">
-        <label className={`ui-btn ui-btn--secondary avatar-picker__import${reading ? ' is-busy' : ''}`}>
-          <IconImage size={18} /> {reading ? 'Lecture…' : 'Importer une image'}
-          <input ref={input} type="file" accept="image/*" hidden disabled={reading}
-            onChange={(e) => void importImage(e.target.files?.[0])} />
-        </label>
-        {avatar && (
-          <Button variant="ghost" onClick={() => onPick(null)}>Retirer</Button>
-        )}
-      </div>
-      {error && <p className="avatar-picker__error" role="alert">{error}</p>}
+      {open && (
+        <div id={panelId} className="avatar-picker__panel">
+          <div className="avatar-picker__grid">
+            {LOGO_IDS.map((icon) => (
+              <button key={icon} type="button" className="avatar-picker__choice" title={LOGO_LABEL[icon]}
+                aria-label={LOGO_LABEL[icon]} aria-pressed={avatar?.kind === 'dessin' && avatar.icon === icon}
+                onClick={() => onPick({ kind: 'dessin', icon })}>
+                <LogoDisc icon={icon} color={logoColor(icon)} />
+              </button>
+            ))}
+          </div>
+          <div className="avatar-picker__actions">
+            <label className={`ui-btn ui-btn--secondary avatar-picker__import${reading ? ' is-busy' : ''}`}>
+              <IconImage size={18} /> {reading ? 'Lecture…' : 'Importer une image'}
+              <input ref={input} type="file" accept="image/*" hidden disabled={reading}
+                onChange={(e) => void importImage(e.target.files?.[0])} />
+            </label>
+            {avatar && (
+              <Button variant="ghost" onClick={() => onPick(null)}>Retirer</Button>
+            )}
+          </div>
+          {error && <p className="avatar-picker__error" role="alert">{error}</p>}
+        </div>
+      )}
     </div>
   );
 }

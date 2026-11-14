@@ -213,13 +213,21 @@ check('Profil : première activité favorite dans son cadre au pinceau', avatar.
 await shoot('icones-profil');
 await evaluate(`document.querySelector('.profile-head__avatar').click()`);
 await wait(300);
+// Les propositions de photo se dépliient par « Changer l'image ».
+await evaluate(`document.querySelector('.avatar-picker__current button').click()`);
+await wait(300);
 await evaluate(`document.querySelector('.avatar-picker__choice[aria-label="Kite"]').click()`);
 await wait(300);
 const chosen = await avatarState();
 check('Profil : logo choisi dans son cadre', !chosen.empty && chosen.uses.length === 2 && chosen.uses[0] === '#gt-logo-frame' && chosen.uses[1] === '#gt-logo-kite', JSON.stringify(chosen));
-await evaluate(`document.querySelector('.profile-head__avatar').click()`);
+// La fenêtre des réglages reste ouverte après un choix : la photo ne la rouvre que si elle s'est fermée.
+await evaluate(`if (!document.querySelector('.profile-settings-window')) document.querySelector('.profile-head__avatar').click()`);
 await wait(300);
-await evaluate(`[...document.querySelectorAll('.avatar-picker button')].find((b) => b.textContent.trim() === 'Retirer')?.click()`);
+await evaluate(`(() => {
+  const retirer = () => [...document.querySelectorAll('.avatar-picker button')].find((b) => b.textContent.trim() === 'Retirer');
+  if (!retirer()) document.querySelector('.avatar-picker__current button')?.click();
+  return new Promise((done) => setTimeout(() => { retirer()?.click(); done(); }, 300));
+})()`);
 await wait(300);
 const removed = await avatarState();
 check('Profil : « Retirer » rend l\'avatar vide', removed.empty && removed.uses.length === 0, JSON.stringify(removed));
