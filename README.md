@@ -2,7 +2,7 @@
 
 Analyse de sessions de voile (wingfoil, planche, kite, bateau) et de surf à partir de traces GPX, et enregistrement GPS sur le téléphone. Application 100 % client, sans backend à nous : les traces et les sessions ne partent jamais sur internet, mais l'application interroge des services publics (liste plus bas). Elle tourne dans le navigateur et, emballée par Capacitor, sur Android, avec enregistrement GPS natif, ceinture cardio Bluetooth et mémoire en dossier portable.
 
-Deux familles d'activités, chacune avec sa bibliothèque et sa page d'analyse (carte, graphes, meilleurs segments, notes) : **Voile** (wingfoil, planche, kite, bateau) et **Surf** (surf, surf foil). Autour : **Enregistrer**, **Planifier** (parcours de balises, export GPX), **Statistiques** (onglets général, graphique, régularité, records, cardio), **Profil** (avec le test de FC repos) et **Réglages**.
+Deux familles d'activités, chacune avec sa bibliothèque et sa page d'analyse (carte, graphes, meilleurs segments, notes) : **Voile** (wingfoil, planche, kite, bateau) et **Surf** (surf, surf foil). Autour : **Enregistrer**, **Planifier** (parcours de balises, export GPX), **Statistiques** (onglets général, graphique, régularité, records, cardio), **Profil** et **Réglages** (avec le test de FC repos).
 
 ## Mémoire
 
