@@ -265,7 +265,7 @@ function ProfilePage() {
   const column = (
     <div className="ui-page profile">
       <header className="profile-head">
-        {/* La photo ronde, et dessous, en grand, le bouton de la période de toute la page. */}
+        {/* La photo ronde, et dessous, dans son ovale au pinceau, le bouton de la période de toute la page. */}
         <div className="profile-head__side">
           <button type="button" className="profile-head__avatar" aria-expanded={picking}
             aria-label="Photo de profil : ouvrir les réglages du Profil"
