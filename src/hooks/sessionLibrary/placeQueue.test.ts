@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LatLon } from '../../core/types';
-import { PLACE_RULES, type LearnedPlace, type SessionPlace } from '../../library/places';
+import { PLACE_RULES, type LearnedPlace, type PlaceSource, type PlaceSpot, type SessionPlace } from '../../library/places';
 import { reversePlaces } from '../../planning/geocoding';
-import { createPlaceQueue, type PlaceQueueDeps, type PlaceQueueSession } from './placeQueue';
+import {
+  createPlaceCorrection, createPlaceQueue, type PlaceCorrectionSession, type PlaceQueueDeps, type PlaceQueueSession,
+} from './placeQueue';
 
 const START: LatLon = { lat: 43.5401, lon: 3.9502 };
 const BEACH = { features: [{ properties: { name: 'Plage du Grand Travers', osm_key: 'natural', osm_value: 'beach' }, geometry: { coordinates: [3.951, 43.541] } }] };
@@ -287,6 +289,23 @@ describe('file des lieux', () => {
     expect(written[0][1]).toMatchObject({ name: 'Les Roquilles', source: 'utilisateur', arrival: { source: 'carte' } });
   });
 
+  it('un nom de la carte renommé alentour par l\'utilisateur : c\'est le nouveau nom qui est écrit', async () => {
+    learned = [{ name: 'Les Vailhes', lat: START.lat + 2000 / M_PER_DEG, lon: START.lon, savedAt: 1, replaces: ['Plage du Grand Travers'] }];
+    add('a');
+    add('b');
+    const q = queueWith();
+    q.queue('a');
+    await answerAll();
+    await q.idle();
+    expect(written).toEqual([['a', { name: 'Les Vailhes', source: 'appris', lat: 43.54, lon: 3.95, arrival: null }]]);
+    // Hors du rayon des renommages, le nom de la carte reste.
+    learned = [{ ...learned[0], lat: START.lat + 3100 / M_PER_DEG }];
+    q.queue('b');
+    await answerAll();
+    await q.idle();
+    expect(written[1]).toEqual(['b', { name: 'Plage du Grand Travers', source: 'carte', lat: 43.54, lon: 3.95, arrival: null }]);
+  });
+
   it('lieu corrigé pendant la recherche : rien n\'est écrasé', async () => {
     add('a');
     const q = queueWith();
@@ -296,5 +315,102 @@ describe('file des lieux', () => {
     requests.splice(0)[0].answer(BEACH);
     await q.idle();
     expect(written).toEqual([]);
+  });
+});
+
+describe('« Lieu » : les voisines du même nom suivent', () => {
+  const at = (m: number) => ({ lat: START.lat + m / M_PER_DEG, lon: START.lon });
+  const spot = (name: string | null, m: number, source: PlaceSource = 'carte'): PlaceSpot => ({ name, source, ...at(m) });
+  const place = (name: string | null, m: number, source: PlaceSource = 'carte'): SessionPlace => ({ ...spot(name, m, source), arrival: null });
+
+  /** Sessions de la mémoire, avec leur nom saisi, que « Lieu » ne doit jamais toucher. */
+  let memory: Map<string, PlaceCorrectionSession & { name: string | null }>;
+  let writes: { file: string; place: SessionPlace }[][];
+  let saved: (readonly LearnedPlace[])[];
+
+  const correction = () => createPlaceCorrection({
+    session: (file) => memory.get(file) ?? null,
+    sessions: () => [...memory.values()],
+    startOf: async () => START,
+    write: (places) => {
+      writes.push([...places]);
+      for (const { file, place: p } of places) memory.set(file, { ...memory.get(file)!, place: p });
+    },
+    learned: () => learned,
+    saveLearned: async (places) => {
+      saved.push(places);
+    },
+    rules: PLACE_RULES,
+    now: () => 9,
+  });
+
+  const put = (file: string, p: SessionPlace | undefined, extra: { readOnly?: boolean; name?: string } = {}): void => {
+    memory.set(file, { file, place: p, readOnly: extra.readOnly ?? false, name: extra.name ?? null });
+  };
+
+  beforeEach(() => {
+    memory = new Map();
+    writes = [];
+    saved = [];
+  });
+
+  it('les sessions du même nom alentour prennent le nouveau ; un autre nom, la lecture seule et le lointain ne bougent pas', async () => {
+    put('corrigee', place('Les Vailhés', 0));
+    put('meme', place('Les Vailhés', 1500));
+    put('autre-bout', place('Les Vailhés', -2800));
+    put('celles', place('Celles', 300));
+    put('lecture', place('Les Vailhés', 200), { readOnly: true });
+    put('loin', place('Les Vailhés', 4000));
+    put('nommee', place('Les Vailhés', 600, 'utilisateur'), { name: 'Sortie du matin' });
+    put('arrivee', { ...spot('Celles', -2600), arrival: spot('Les Vailhés', 900) });
+    put('jamais', undefined);
+    await correction()('corrigee', 'Les Vailhes');
+    // Une seule écriture groupée : la liste n'est redessinée qu'une fois.
+    expect(writes).toHaveLength(1);
+    expect(writes[0].map((w) => w.file)).toEqual(['corrigee', 'meme', 'autre-bout', 'nommee', 'arrivee']);
+    expect(memory.get('corrigee')!.place).toEqual(place('Les Vailhes', 0, 'utilisateur'));
+    expect(memory.get('meme')!.place).toEqual(place('Les Vailhes', 1500, 'appris'));
+    expect(memory.get('autre-bout')!.place).toEqual(place('Les Vailhes', -2800, 'appris'));
+    expect(memory.get('celles')!.place).toEqual(place('Celles', 300));
+    expect(memory.get('lecture')!.place).toEqual(place('Les Vailhés', 200));
+    expect(memory.get('loin')!.place).toEqual(place('Les Vailhés', 4000));
+    expect(memory.get('arrivee')!.place).toEqual({ ...spot('Celles', -2600), arrival: spot('Les Vailhes', 900, 'appris') });
+    expect(memory.get('jamais')!.place).toBeUndefined();
+    // Un nom saisi n'est pas touché : seul le lieu est écrit, et un lieu corrigé le reste.
+    expect(memory.get('nommee')).toMatchObject({ name: 'Sortie du matin', place: place('Les Vailhes', 600, 'utilisateur') });
+    expect(Object.keys(writes[0][0])).toEqual(['file', 'place']);
+    // Le nom corrigé est appris, l'ancien nom retenu.
+    expect(saved).toEqual([[{ name: 'Les Vailhes', ...at(0), savedAt: 9, replaces: ['Les Vailhés'] }]]);
+  });
+
+  it('les lieux appris de l\'ancien nom alentour suivent ; ailleurs, ils restent', async () => {
+    learned = [
+      { name: 'Les Vailhés', ...at(2000), savedAt: 1 },
+      { name: 'Les Vailhés', ...at(9000), savedAt: 1 },
+    ];
+    put('corrigee', place('Les Vailhés', 0));
+    await correction()('corrigee', 'Les Vailhes');
+    expect(saved).toEqual([[
+      { name: 'Les Vailhes', ...at(0), savedAt: 9, replaces: ['Les Vailhés'] },
+      { name: 'Les Vailhes', ...at(2000), savedAt: 9, replaces: ['Les Vailhés'] },
+      { name: 'Les Vailhés', ...at(9000), savedAt: 1 },
+    ]]);
+  });
+
+  it('un lieu vidé ne vide pas les autres sessions, et n\'apprend rien', async () => {
+    put('corrigee', place('Les Vailhés', 0));
+    put('meme', place('Les Vailhés', 1500));
+    await correction()('corrigee', '   ');
+    expect(writes).toEqual([[{ file: 'corrigee', place: place(null, 0, 'utilisateur') }]]);
+    expect(memory.get('meme')!.place).toEqual(place('Les Vailhés', 1500));
+    expect(saved).toEqual([]);
+  });
+
+  it('une session sans lieu reçoit le lieu saisi sans renommer personne', async () => {
+    put('neuve', undefined);
+    put('meme', place('Les Vailhés', 100));
+    await correction()('neuve', 'Les Vailhes');
+    expect(writes).toEqual([[{ file: 'neuve', place: { name: 'Les Vailhes', source: 'utilisateur', lat: 43.54, lon: 3.95 } }]]);
+    expect(memory.get('meme')!.place).toEqual(place('Les Vailhés', 100));
   });
 });

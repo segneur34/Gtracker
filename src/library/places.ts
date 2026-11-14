@@ -37,33 +37,43 @@ export interface SessionPlace extends PlaceSpot {
 
 /**
  * Lieu appris : un nom corrigé par l'utilisateur, retenu au point de départ (ou d'arrivée) de sa session ;
- * `savedAt`, l'instant de la correction, départage deux appareils. Les champs inconnus sont gardés.
+ * `savedAt`, l'instant de la correction, départage deux appareils. `replaces` : les anciens noms qu'il a
+ * remplacés à cet endroit ; un de ces noms trouvé sur la carte à moins de `renameRadiusM` prend le sien.
+ * Absent d'un fichier plus ancien ; une version qui ne le connaît pas le garde sans le lire, comme tout
+ * champ inconnu.
  */
 export interface LearnedPlace {
   name: string;
   lat: number;
   lon: number;
   savedAt: number;
+  replaces?: string[];
 }
 
 /**
  * Distances du choix d'un lieu, en mètres : rayon où un plan d'eau nommé est retenu (`waterRadiusM`, aussi
  * le rayon demandé au service), rayon où une session prend un lieu appris (`learnedRadiusM`), distance
- * entre départ et arrivée à partir de laquelle l'arrivée compte comme un autre lieu (`elsewhereM`) ; et
- * nombre d'objets demandés au service (`resultLimit`).
+ * entre départ et arrivée à partir de laquelle l'arrivée compte comme un autre lieu (`elsewhereM`), rayon
+ * où un lieu renommé renomme aussi les lieux du même nom des autres sessions (`renameRadiusM`) ; et nombre
+ * d'objets demandés au service (`resultLimit`).
  */
 export interface PlaceRules {
   waterRadiusM: number;
   learnedRadiusM: number;
   elsewhereM: number;
+  renameRadiusM: number;
   resultLimit: number;
 }
 
-/** Valeurs par défaut, passées en paramètre partout où elles servent. */
+/**
+ * Valeurs par défaut, passées en paramètre partout où elles servent. `renameRadiusM` vaut le double de
+ * `waterRadiusM` : deux sessions qui ont trouvé le même plan d'eau sont chacune à `waterRadiusM` au plus de lui.
+ */
 export const PLACE_RULES: PlaceRules = {
   waterRadiusM: 1500,
   learnedRadiusM: 500,
   elsewhereM: 2000,
+  renameRadiusM: 3000,
   resultLimit: 25,
 };
 
@@ -182,14 +192,143 @@ export const placesToLearn = (before: SessionPlace | undefined, after: SessionPl
   return learned;
 };
 
+/** Noms distincts de `names`, sans `name` lui-même. */
+const otherNames = (names: readonly string[], name: string): string[] => [...new Set(names)].filter((n) => n !== name);
+
 /**
  * Lieux appris après une correction en `spot` : ceux à moins de `rules.learnedRadiusM` sont remplacés (corriger
- * deux fois au même endroit ne garde que la dernière), le nouveau en tête.
+ * deux fois au même endroit ne garde que la dernière), le nouveau en tête ; `replaces`, les anciens noms qu'il
+ * remplace (absent s'il n'y en a pas).
  */
-export const learnPlace = (learned: readonly LearnedPlace[], spot: NamedSpot, rules: PlaceRules, nowMs: number): LearnedPlace[] => [
-  { name: spot.name, lat: spot.lat, lon: spot.lon, savedAt: nowMs },
-  ...learned.filter((p) => haversineDistance(p.lat, p.lon, spot.lat, spot.lon) >= rules.learnedRadiusM),
-];
+export const learnPlace = (
+  learned: readonly LearnedPlace[], spot: NamedSpot, rules: PlaceRules, nowMs: number, replaces: readonly string[] = []
+): LearnedPlace[] => {
+  const names = otherNames(replaces, spot.name);
+  return [
+    { name: spot.name, lat: spot.lat, lon: spot.lon, savedAt: nowMs, ...(names.length > 0 ? { replaces: names } : {}) },
+    ...learned.filter((p) => haversineDistance(p.lat, p.lon, spot.lat, spot.lon) >= rules.learnedRadiusM),
+  ];
+};
+
+/** Un nom de lieu changé par « Lieu » : `from` devient `to`, au point arrondi du lieu corrigé. */
+export interface PlaceRename {
+  from: string;
+  to: string;
+  lat: number;
+  lon: number;
+}
+
+/**
+ * Noms changés par une correction : chaque point (départ, arrivée) dont un nom non vide devient un autre nom
+ * non vide. Un lieu vidé ne renomme rien.
+ */
+export const placeRenames = (before: SessionPlace | undefined, after: SessionPlace): PlaceRename[] => {
+  const renames: PlaceRename[] = [];
+  const add = (a: PlaceSpot | null | undefined, b: PlaceSpot | null | undefined): void => {
+    if (a?.name && b?.name && a.name !== b.name) renames.push({ from: a.name, to: b.name, lat: b.lat, lon: b.lon });
+  };
+  add(before, after);
+  add(before?.arrival, after.arrival);
+  return renames;
+};
+
+/**
+ * Changement de nom qui vaut pour un lieu nommé `name` en `point` : celui dont l'ancien nom s'écrit exactement
+ * pareil (accents et casse compris) et dont le point est à moins de `rules.renameRadiusM`, le plus proche ;
+ * départs et arrivées se répondent dans les deux sens. `null` sinon.
+ */
+const renameFor = (name: string | null, point: LatLon, renames: readonly PlaceRename[], rules: PlaceRules): PlaceRename | null => {
+  let best: PlaceRename | null = null;
+  let bestD = rules.renameRadiusM;
+  for (const r of renames) {
+    if (r.from !== name) continue;
+    const d = haversineDistance(point.lat, point.lon, r.lat, r.lon);
+    if (d < bestD) {
+      best = r;
+      bestD = d;
+    }
+  }
+  return best;
+};
+
+/** Lieu en un point renommé (`renameFor`) : `appris`, sauf corrigé par l'utilisateur, qui le reste ; le même s'il ne bouge pas. */
+const renamedSpot = <T extends PlaceSpot>(spot: T, renames: readonly PlaceRename[], rules: PlaceRules): T => {
+  const r = renameFor(spot.name, spot, renames, rules);
+  return r ? { ...spot, name: r.to, source: spot.source === 'utilisateur' ? 'utilisateur' : 'appris' } : spot;
+};
+
+/**
+ * Lieu d'une autre session après une correction : son départ et son arrivée prennent le nouveau nom s'ils
+ * portaient exactement l'ancien, à moins de `rules.renameRadiusM` du lieu corrigé ; un autre nom, même tout
+ * près, ne bouge pas. Rend `place` si rien ne change.
+ */
+export const renamedPlace = (place: SessionPlace, renames: readonly PlaceRename[], rules: PlaceRules): SessionPlace => {
+  const head = renamedSpot(place, renames, rules);
+  const arrival = place.arrival ? renamedSpot(place.arrival, renames, rules) : place.arrival;
+  if (head === place && arrival === place.arrival) return place;
+  return { ...head, ...(arrival === undefined ? {} : { arrival }) };
+};
+
+/**
+ * Lieux appris après une correction : ceux qui portaient exactement l'ancien nom, à moins de
+ * `rules.renameRadiusM`, prennent le nouveau, datés de `nowMs` (la fusion entre appareils garde le plus
+ * récent) et retiennent l'ancien nom dans `replaces`. Rend `learned` si rien ne change.
+ */
+export const renamedLearnedPlaces = (
+  learned: readonly LearnedPlace[], renames: readonly PlaceRename[], rules: PlaceRules, nowMs: number
+): readonly LearnedPlace[] => {
+  let changed = false;
+  const list = learned.map((p) => {
+    const r = renameFor(p.name, p, renames, rules);
+    if (!r) return p;
+    changed = true;
+    return { ...p, name: r.to, savedAt: nowMs, replaces: otherNames([r.from, ...(p.replaces ?? [])], r.to) };
+  });
+  return changed ? list : learned;
+};
+
+/**
+ * Lieux appris après « Lieu » : les lieux appris de l'ancien nom renommés (`renamedLearnedPlaces`), puis chaque
+ * nom corrigé appris à son point (`learnPlace`), qui retient l'ancien nom de ce point et ceux que retenaient les
+ * lieux appris du même nom qu'il remplace : un nom de la carte remplacé deux fois mène au dernier.
+ */
+export const learnedAfterCorrection = (
+  learned: readonly LearnedPlace[], before: SessionPlace | undefined, after: SessionPlace, rules: PlaceRules, nowMs: number
+): readonly LearnedPlace[] => {
+  const renames = placeRenames(before, after);
+  let list = renamedLearnedPlaces(learned, renames, rules, nowMs);
+  for (const spot of placesToLearn(before, after)) {
+    const replaced = [
+      ...renames.filter((r) => r.to === spot.name && r.lat === spot.lat && r.lon === spot.lon).map((r) => r.from),
+      ...list
+        .filter((p) => p.name === spot.name && haversineDistance(p.lat, p.lon, spot.lat, spot.lon) < rules.learnedRadiusM)
+        .flatMap((p) => p.replaces ?? []),
+    ];
+    list = learnPlace(list, spot, rules, nowMs, replaced);
+  }
+  return list;
+};
+
+/**
+ * Lieu appris qui remplace `name`, trouvé sur la carte en `point` : celui qui retient exactement ce nom dans
+ * `replaces`, à moins de `rules.renameRadiusM`, le plus proche ; `null` sinon.
+ */
+export const learnedReplacing = (
+  name: string | null, point: LatLon, learned: readonly LearnedPlace[], rules: PlaceRules
+): LearnedPlace | null => {
+  if (name === null) return null;
+  let best: LearnedPlace | null = null;
+  let bestD = rules.renameRadiusM;
+  for (const p of learned) {
+    if (!p.replaces?.includes(name)) continue;
+    const d = haversineDistance(point.lat, point.lon, p.lat, p.lon);
+    if (d < bestD) {
+      best = p;
+      bestD = d;
+    }
+  }
+  return best;
+};
 
 /**
  * Étiquettes OpenStreetMap d'un plan d'eau nommé, `clé` ou `clé:valeur` : plage, baie, marina, port,

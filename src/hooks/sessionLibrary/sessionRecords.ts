@@ -80,6 +80,21 @@ export const readSessionMotion = async (file: string): Promise<Uint8Array | null
   return lib.folder && hasSessionMotion(file) ? lib.folder.readBytes(sessionPath(imuFileName(file))) : null;
 };
 
+/** Applique `patch` à la fiche de `file` ; `quiet` : la liste n'est pas redessinée. Vrai si la fiche a changé. */
+const patchSessionRecord = (file: string, patch: RecordPatch, quiet: boolean): boolean => {
+  const session = findSession(file);
+  if (!session || session.readOnly) return false;
+  const { record, resummarize: stale } = applyRecordPatch(session.record, patch);
+  if (record === session.record) return false;
+  lib.editCount += 1;
+  lastEdit.set(file, lib.editCount);
+  noteRecordEdits(file, session.record, record);
+  replaceSession({ ...session, record }, quiet);
+  scheduleRecordWrite(file);
+  if (stale) void resummarize(file);
+  return true;
+};
+
 /**
  * Modifie la fiche d'une session (`applyRecordPatch`) : support, activité,
  * nom, notes, réglages d'analyse, nombre de manœuvres. La liste suit tout de
@@ -87,16 +102,17 @@ export const readSessionMotion = async (file: string): Promise<Uint8Array | null
  * si le changement le demande.
  */
 export const updateSessionRecord = (file: string, patch: RecordPatch): void => {
-  const session = findSession(file);
-  if (!session || session.readOnly) return;
-  const { record, resummarize: stale } = applyRecordPatch(session.record, patch);
-  if (record === session.record) return;
-  lib.editCount += 1;
-  lastEdit.set(file, lib.editCount);
-  noteRecordEdits(file, session.record, record);
-  replaceSession({ ...session, record });
-  scheduleRecordWrite(file);
-  if (stale) void resummarize(file);
+  patchSessionRecord(file, patch, false);
+};
+
+/**
+ * Modifie les fiches de plusieurs sessions d'un coup, chacune comme `updateSessionRecord`, la liste redessinée
+ * une seule fois à la fin. Une session inconnue ou en lecture seule est sautée.
+ */
+export const updateSessionRecords = (patches: readonly { file: string; patch: RecordPatch }[]): void => {
+  let changed = false;
+  for (const { file, patch } of patches) changed = patchSessionRecord(file, patch, true) || changed;
+  if (changed) publish();
 };
 
 /**

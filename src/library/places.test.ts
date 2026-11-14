@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { parsePhotonFeatures } from '../planning/geocoding';
 import {
   PLACE_RULES, choosePlace, correctedPlace, firstTrackPoint, foundPlace, isElsewhere, isPlaceToFind, isUsablePlaceName,
-  lastTrackPoint, learnPlace, learnedSpot, nearestLearnedPlace, placeDraftOf, placesToLearn, readSessionPlace, trackEnds,
-  type LearnedPlace, type SessionPlace,
+  lastTrackPoint, learnPlace, learnedAfterCorrection, learnedReplacing, learnedSpot, nearestLearnedPlace, placeDraftOf,
+  placeRenames, placesToLearn, readSessionPlace, renamedLearnedPlaces, renamedPlace, trackEnds,
+  type LearnedPlace, type PlaceSource, type PlaceSpot, type SessionPlace,
 } from './places';
 
 const START = { lat: 43.54, lon: 3.95 };
@@ -167,6 +168,81 @@ describe('« Lieu » : correction', () => {
     expect(placeDraftOf(after)).toEqual({ departure: 'Carnon-Plage', arrival: 'Port de Palavas' });
     expect(placeDraftOf(carte)).toEqual({ departure: 'Carnon-Plage', arrival: null });
     expect(placeDraftOf(undefined)).toEqual({ departure: '', arrival: null });
+  });
+});
+
+describe('lieu renommé : les voisines du même nom', () => {
+  const at = (m: number) => ({ lat: START.lat + m / M_PER_DEG, lon: START.lon });
+  const spot = (name: string | null, m: number, source: PlaceSource = 'carte'): PlaceSpot => ({ name, source, ...at(m) });
+  const vailhes = (m: number, source: PlaceSource = 'carte'): SessionPlace => ({ ...spot('Les Vailhés', m, source), arrival: null });
+  const corrected = correctedPlace(vailhes(0), START, 'Les Vailhes');
+  const renames = placeRenames(vailhes(0), corrected);
+
+  it('un nom non vide changé en un autre est un renommage, au point du lieu corrigé ; vidé ou neuf, non', () => {
+    expect(renames).toEqual([{ from: 'Les Vailhés', to: 'Les Vailhes', ...at(0) }]);
+    expect(placeRenames(vailhes(0), correctedPlace(vailhes(0), START, '  '))).toEqual([]);
+    expect(placeRenames(undefined, correctedPlace(undefined, START, 'Les Vailhes'))).toEqual([]);
+    expect(placeRenames({ ...vailhes(0), name: null }, correctedPlace({ ...vailhes(0), name: null }, START, 'Les Vailhes'))).toEqual([]);
+    const withArrival: SessionPlace = { ...vailhes(0), arrival: spot('Port de Celles', 2500) };
+    expect(placeRenames(withArrival, correctedPlace(withArrival, START, 'Les Vailhés', 'Celles')))
+      .toEqual([{ from: 'Port de Celles', to: 'Celles', ...at(2500) }]);
+  });
+
+  it('le même nom exactement, à moins de `renameRadiusM` : renommé, `appris` ; 2 999 m oui, 3 001 m non', () => {
+    expect(renamedPlace(vailhes(2999), renames, PLACE_RULES)).toEqual({ ...vailhes(2999), name: 'Les Vailhes', source: 'appris' });
+    const far = vailhes(3001);
+    expect(renamedPlace(far, renames, PLACE_RULES)).toBe(far);
+  });
+
+  it('un autre nom, même tout près, ne bouge pas : accents et casse comptent', () => {
+    for (const name of ['Celles', 'Les Vailhes', 'les Vailhés', 'Lac des Vailhés']) {
+      const place: SessionPlace = { ...spot(name, 300), arrival: null };
+      expect(renamedPlace(place, renames, PLACE_RULES)).toBe(place);
+    }
+  });
+
+  it('un lieu déjà corrigé par l\'utilisateur le reste ; départ et arrivée se répondent dans les deux sens', () => {
+    expect(renamedPlace(vailhes(500, 'utilisateur'), renames, PLACE_RULES).source).toBe('utilisateur');
+    const arriving: SessionPlace = { ...spot('Celles', -2500), arrival: spot('Les Vailhés', 800) };
+    expect(renamedPlace(arriving, renames, PLACE_RULES)).toEqual({ ...arriving, arrival: { ...spot('Les Vailhes', 800, 'appris') } });
+    // Une arrivée renommée renomme le départ d'une autre session.
+    const fromArrival = [{ from: 'Les Vailhés', to: 'Les Vailhes', ...at(800) }];
+    expect(renamedPlace(vailhes(0), fromArrival, PLACE_RULES).name).toBe('Les Vailhes');
+  });
+
+  it('lieux appris : l\'ancien nom alentour renommé, daté, l\'ancien nom retenu ; rien à changer, la même liste', () => {
+    const learned: LearnedPlace[] = [
+      { name: 'Les Vailhés', ...at(1500), savedAt: 1 },
+      { name: 'Celles', ...at(300), savedAt: 1 },
+      { name: 'Les Vailhés', ...at(5000), savedAt: 1 },
+    ];
+    expect(renamedLearnedPlaces(learned, renames, PLACE_RULES, 9)).toEqual([
+      { name: 'Les Vailhes', ...at(1500), savedAt: 9, replaces: ['Les Vailhés'] },
+      learned[1],
+      learned[2],
+    ]);
+    expect(renamedLearnedPlaces(learned, [], PLACE_RULES, 9)).toBe(learned);
+  });
+
+  it('après « Lieu » : le nom corrigé appris retient l\'ancien nom, et ceux du lieu appris qu\'il remplace', () => {
+    expect(learnedAfterCorrection([], vailhes(0), corrected, PLACE_RULES, 5))
+      .toEqual([{ name: 'Les Vailhes', ...at(0), savedAt: 5, replaces: ['Les Vailhés'] }]);
+    // Deuxième changement au même endroit : le nom de la carte mène au dernier.
+    const learned = learnedAfterCorrection([], vailhes(0), corrected, PLACE_RULES, 5);
+    const second = correctedPlace({ ...corrected, source: 'appris' }, START, 'Lac des Vailhés');
+    expect(learnedAfterCorrection(learned, { ...corrected, source: 'appris' }, second, PLACE_RULES, 6))
+      .toEqual([{ name: 'Lac des Vailhés', ...at(0), savedAt: 6, replaces: ['Les Vailhes', 'Les Vailhés'] }]);
+    // Ni renommage ni nom appris : la même liste.
+    const empty: LearnedPlace[] = [];
+    expect(learnedAfterCorrection(empty, corrected, corrected, PLACE_RULES, 7)).toBe(empty);
+  });
+
+  it('un nom de la carte remplacé alentour prend le nom appris ; ailleurs, ou un autre nom, non', () => {
+    const learned: LearnedPlace[] = [{ name: 'Les Vailhes', ...at(0), savedAt: 5, replaces: ['Les Vailhés'] }];
+    expect(learnedReplacing('Les Vailhés', at(2900), learned, PLACE_RULES)?.name).toBe('Les Vailhes');
+    expect(learnedReplacing('Les Vailhés', at(3100), learned, PLACE_RULES)).toBeNull();
+    expect(learnedReplacing('Celles', at(100), learned, PLACE_RULES)).toBeNull();
+    expect(learnedReplacing(null, at(100), learned, PLACE_RULES)).toBeNull();
   });
 });
 

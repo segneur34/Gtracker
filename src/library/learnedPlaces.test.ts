@@ -26,6 +26,22 @@ describe('lieux appris : lecture', () => {
     expect(readLearnedPlaces({ places: [] })).toEqual([]);
   });
 
+  it('anciens noms retenus : relus rognés, sans doublon ; mal formés, laissés ; absents, rien de plus', () => {
+    const raw = [
+      { ...place('Les Vailhes', 0, 3), replaces: [' Les Vailhés ', 'Les Vailhés', 42, ''] },
+      { ...place('Celles', 9000, 2), replaces: 'Les Vailhés' },
+      { ...place('Lac du Salagou', 20000, 1), replaces: ['123'] },
+    ];
+    expect(readLearnedPlaces(raw)).toEqual([
+      { ...place('Les Vailhes', 0, 3), replaces: ['Les Vailhés'] },
+      place('Celles', 9000, 2),
+      place('Lac du Salagou', 20000, 1),
+    ]);
+    expect(Object.keys(readLearnedPlaces([place('Celles', 0, 1)])[0])).toEqual(['name', 'lat', 'lon', 'savedAt']);
+    const file = learnedPlacesFileText([{ ...place('Les Vailhes', 0, 3), replaces: ['Les Vailhés'] }]);
+    expect(parseLearnedPlacesFile(file)?.places[0].replaces).toEqual(['Les Vailhés']);
+  });
+
   it(`au plus ${MAX_LEARNED_PLACES}`, () => {
     const many = Array.from({ length: MAX_LEARNED_PLACES + 5 }, (_, i) => place(`Lieu ${String.fromCharCode(65 + (i % 26))}`, i * 1000, i));
     expect(readLearnedPlaces(many)).toHaveLength(MAX_LEARNED_PLACES);

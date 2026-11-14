@@ -1,15 +1,16 @@
 import { errorMessage } from '../../core/basics';
 import type { LatLon } from '../../core/types';
 import {
-  PLACE_RULES, choosePlace, correctedPlace, isElsewhere, isPlaceToFind, learnPlace, learnedSpot, nearestLearnedPlace,
-  placesToLearn, trackEnds, type LearnedPlace, type PlaceRules, type PlaceSpot, type SessionPlace, type TrackEnds,
+  PLACE_RULES, choosePlace, correctedPlace, isElsewhere, isPlaceToFind, learnedAfterCorrection, learnedReplacing, learnedSpot,
+  nearestLearnedPlace, placeRenames, renamedPlace, trackEnds, type LearnedPlace, type PlaceRules, type PlaceSpot,
+  type SessionPlace, type TrackEnds,
 } from '../../library/places';
 import { sameJson } from '../../library/record';
 import { reversePlaces, roundedPoint, type PhotonFeature } from '../../planning/geocoding';
 import { readDeviceLearnedPlaces, saveLearnedPlacesFile, writeDeviceLearnedPlaces } from '../learnedPlacesFile';
 import { isPlaceSearchOn } from '../usePlaceSearch';
 import { findSession, lib, writableFolder } from './memory';
-import { readSessionGpx, updateSessionRecord } from './sessionRecords';
+import { readSessionGpx, updateSessionRecord, updateSessionRecords } from './sessionRecords';
 import { reportError } from './store';
 
 /**
@@ -142,7 +143,10 @@ export const createPlaceQueue = (deps: PlaceQueueDeps): PlaceQueue => {
       return 'suspend';
     }
     if (!deps.enabled()) return null;
-    return { name: choosePlace(features, point, deps.rules), source: 'carte', ...roundedPoint(point) };
+    const name = choosePlace(features, point, deps.rules);
+    // Un nom de la carte que l'utilisateur a renommé alentour prend le nom qu'il lui a donné.
+    const renamed = learnedReplacing(name, point, learned(), deps.rules);
+    return renamed ? learnedSpot(renamed, point) : { name, source: 'carte', ...roundedPoint(point) };
   };
 
   /** Écrit `place` si la session n'a pas changé depuis `before` (même début, même lieu). */
@@ -259,41 +263,103 @@ const placeQueue = createPlaceQueue({
  */
 export const queueSessionPlace = (file: string, points?: TrackEnds | null): void => placeQueue.queue(file, points);
 
+/** Ce que « Lieu » sait d'une session : son fichier, son lieu (`undefined` : jamais cherché), sa lecture seule. */
+export interface PlaceCorrectionSession {
+  file: string;
+  place: SessionPlace | undefined;
+  readOnly: boolean;
+}
+
+/** Ce dont « Lieu » a besoin, remplaçable dans les tests. */
+export interface PlaceCorrectionDeps {
+  /** Session d'un fichier, `null` si la mémoire ne la connaît pas. */
+  session: (file: string) => PlaceCorrectionSession | null;
+  /** Toutes les sessions de la mémoire. */
+  sessions: () => readonly PlaceCorrectionSession[];
+  /** Point de départ lu dans le GPX, `null` s'il ne se lit pas. */
+  startOf: (file: string) => Promise<LatLon | null>;
+  /** Range les lieux dans leurs fiches, d'un seul coup. */
+  write: (places: readonly { file: string; place: SessionPlace }[]) => void;
+  /** Lieux appris de l'appareil. */
+  learned: () => readonly LearnedPlace[];
+  /** Range les lieux appris sur l'appareil puis dans le dossier. */
+  saveLearned: (places: readonly LearnedPlace[]) => Promise<void>;
+  rules: PlaceRules;
+  now: () => number;
+}
+
+/**
+ * « Lieu » sur `deps` : voir `correctSessionPlace`. Les autres sessions dont le départ ou l'arrivée s'écrivait
+ * exactement comme l'ancien nom, à moins de `renameRadiusM` du lieu corrigé, prennent le nouveau (`renamedPlace`),
+ * hors lecture seule ; leur nom saisi n'est pas touché, seul leur lieu l'est.
+ */
+export const createPlaceCorrection = (deps: PlaceCorrectionDeps) =>
+  async (file: string, departure: string, arrival?: string): Promise<void> => {
+    let session = deps.session(file);
+    if (!session || session.readOnly) return;
+    let start: LatLon | null = null;
+    if (session.place === undefined) {
+      start = await deps.startOf(file);
+      if (start === null) return;
+      // La fiche a pu changer pendant la lecture (lieu trouvé entre-temps) : c'est sur elle que porte la correction.
+      session = deps.session(file);
+      if (!session || session.readOnly) return;
+    }
+    const before = session.place;
+    const at = before ?? start;
+    if (!at) return;
+    const after = correctedPlace(before, at, departure, arrival);
+    if (after === before) return;
+    const renames = placeRenames(before, after);
+    const places: { file: string; place: SessionPlace }[] = [{ file, place: after }];
+    if (renames.length > 0) {
+      for (const other of deps.sessions()) {
+        if (other.file === file || other.readOnly || other.place === undefined) continue;
+        const place = renamedPlace(other.place, renames, deps.rules);
+        if (place !== other.place) places.push({ file: other.file, place });
+      }
+    }
+    deps.write(places);
+    const learned = deps.learned();
+    const next = learnedAfterCorrection(learned, before, after, deps.rules, deps.now());
+    if (next !== learned) await deps.saveLearned(next);
+  };
+
+const placeCorrection = createPlaceCorrection({
+  session: (file) => {
+    const s = findSession(file);
+    return s ? { file, place: s.record.place, readOnly: s.readOnly } : null;
+  },
+  sessions: () => lib.all.map((s) => ({ file: s.file, place: s.record.place, readOnly: s.readOnly })),
+  startOf: async (file) => {
+    const text = await readSessionGpx(file);
+    return text === null ? null : trackEnds(text)?.start ?? null;
+  },
+  write: (places) => updateSessionRecords(places.map(({ file, place }) => ({ file, patch: { place } }))),
+  learned: readDeviceLearnedPlaces,
+  saveLearned: async (places) => {
+    writeDeviceLearnedPlaces(places);
+    await lib.opening;
+    const folder = writableFolder();
+    if (!folder) return;
+    await saveLearnedPlacesFile(folder, places, PLACE_RULES).catch((err: unknown) =>
+      reportError(`Lieux appris non recopiés dans le dossier : ${errorMessage(err, 'erreur inconnue')}`));
+  },
+  rules: PLACE_RULES,
+  now: Date.now,
+});
+
 /**
  * « Lieu » d'une session : son lieu de départ devient `departure`, celui de son arrivée `arrival` (absent : inchangé),
- * `source: 'utilisateur'` ; ils ne sont plus jamais cherchés ni remplacés. Chaque nom corrigé, non vide, est appris
+ * `source: 'utilisateur'` ; ils ne sont plus jamais cherchés ni remplacés. Un nom changé l'est aussi dans les autres
+ * sessions qui portaient exactement l'ancien nom alentour (`renameRadiusM`), sans toucher à leur nom saisi, et dans
+ * les lieux appris, qui retiennent l'ancien nom pour une session à venir. Chaque nom corrigé, non vide, est appris
  * au point de la session (`learnPlace`), sur l'appareil puis dans `lieux.json` du dossier ; un échec d'écriture du
- * dossier est dit sans rien défaire. Un nom vidé laisse la session sans lieu, rien n'est appris ni désappris.
+ * dossier est dit sans rien défaire. Un nom vidé laisse la session sans lieu, ne vide pas les autres, et rien n'est
+ * appris ni désappris.
  */
-export const correctSessionPlace = async (file: string, departure: string, arrival?: string): Promise<void> => {
-  let session = findSession(file);
-  if (!session || session.readOnly) return;
-  let start: LatLon | null = null;
-  if (session.record.place === undefined) {
-    const text = await readSessionGpx(file);
-    start = text === null ? null : trackEnds(text)?.start ?? null;
-    if (start === null) return;
-    // La fiche a pu changer pendant la lecture (lieu trouvé entre-temps) : c'est sur elle que porte la correction.
-    session = findSession(file);
-    if (!session || session.readOnly) return;
-  }
-  const before = session.record.place;
-  const at = before ?? start;
-  if (!at) return;
-  const after = correctedPlace(before, at, departure, arrival);
-  if (after === before) return;
-  updateSessionRecord(file, { place: after });
-  const spots = placesToLearn(before, after);
-  if (spots.length === 0) return;
-  const now = Date.now();
-  const learned = spots.reduce<LearnedPlace[]>((list, spot) => learnPlace(list, spot, PLACE_RULES, now), [...readDeviceLearnedPlaces()]);
-  writeDeviceLearnedPlaces(learned);
-  await lib.opening;
-  const folder = writableFolder();
-  if (!folder) return;
-  await saveLearnedPlacesFile(folder, learned, PLACE_RULES).catch((err: unknown) =>
-    reportError(`Lieux appris non recopiés dans le dossier : ${errorMessage(err, 'erreur inconnue')}`));
-};
+export const correctSessionPlace = (file: string, departure: string, arrival?: string): Promise<void> =>
+  placeCorrection(file, departure, arrival);
 
 // La file des lieux vient après l'import, qui la demande par `lib.onSessionsAdded`.
 lib.onSessionsAdded = (files) => {

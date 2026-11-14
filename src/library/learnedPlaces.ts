@@ -15,13 +15,25 @@ export const LEARNED_PLACES_KEY = STORAGE_KEYS.lieuxAppris;
 /** Nombre de lieux appris gardés : les plus récents. */
 export const MAX_LEARNED_PLACES = 1000;
 
-/** Un lieu appris relu, champs inconnus compris ; `null` s'il est mal formé. */
+/** Anciens noms relus (`LearnedPlace.replaces`) : les noms lisibles, rognés ; `undefined` s'il n'y en a aucun. */
+const readReplacedNames = (raw: unknown): string[] | undefined => {
+  if (!Array.isArray(raw)) return undefined;
+  const names = raw.filter((n): n is string => typeof n === 'string').map((n) => n.trim()).filter(isUsablePlaceName);
+  return names.length > 0 ? [...new Set(names)] : undefined;
+};
+
+/** Un lieu appris relu, champs inconnus compris ; `null` s'il est mal formé. Des anciens noms mal formés sont laissés. */
 const readLearnedPlace = (raw: unknown): LearnedPlace | null => {
   if (!isObject(raw)) return null;
   const { name, lat, lon, savedAt } = raw;
   if (typeof name !== 'string' || !isUsablePlaceName(name.trim())) return null;
   if (!isFiniteNumber(lat) || !isFiniteNumber(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
-  return { ...raw, name: name.trim(), lat, lon, savedAt: isFiniteNumber(savedAt) ? savedAt : 0 };
+  // Les champs gardent leur ordre : deux listes se comparent par leur texte (`sameLearnedPlaces`).
+  const place: LearnedPlace = { ...raw, name: name.trim(), lat, lon, savedAt: isFiniteNumber(savedAt) ? savedAt : 0 };
+  const replaces = readReplacedNames(raw.replaces);
+  if (replaces) place.replaces = replaces;
+  else delete place.replaces;
+  return place;
 };
 
 /** Liste relue : les lieux bien formés, du plus récent au plus ancien, au plus `MAX_LEARNED_PLACES`. */
