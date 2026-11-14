@@ -14,7 +14,7 @@
 //  3. l'autre période règle toute la page : « Tout » (les six sessions, une barre par mois), choix retenu au
 //     rechargement, puis retour à « Année <n> » ;
 //  4. une ligne de la légende ouvre la page Sessions filtrée sur son activité ;
-//  5. à 390×844 : rien ne déborde, « Gtracker » sur la photo, pas de colonne « Vos activités », les activités favorites et le total sur une seule rangée, détail par activité retenu déplié ; la case « Profil » de la barre du bas (Profil, Sessions, Statistiques, Réglages) ouvre la page, allumée ;
+//  5. à 390×844 : rien ne déborde, le nom sans son G sous le logo GONG sur la photo, pas de colonne « Vos activités », les activités favorites et le total sur une seule rangée, détail par activité retenu déplié ; la case « Profil » de la barre du bas (Profil, Sessions, Statistiques, Réglages) ouvre la page, allumée ;
 //     à 320 px, aucune case de la rangée ne sort de l'écran ni ne déborde de son texte ; le bouton de période sous la
 //     photo ronde, à 390 et 320 px ; un ancien profil qui porte encore les champs du poisson dans son bocal (retiré)
 //     ouvre le Profil sans erreur, sans bocal ;
@@ -237,7 +237,7 @@ check('la ligne ouvre la page Sessions filtrée', (await search())?.startsWith('
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await go('/profil');
 check('390 px : rien ne déborde', !(await overflow()));
-check('390 px : « Gtracker » sur la photo, pas de colonne « Vos activités »', (await text('.profile-hero__name')) === 'Gtracker' && (await activites()) === null, await text('.profile-hero__name'));
+check('390 px : le nom sans son G sous le logo GONG sur la photo, pas de colonne « Vos activités »', (await text('.profile-hero__name')) === 'tracker' && (await activites()) === null, await text('.profile-hero__name'));
 /** Rangée des activités favorites : quatre cases sur une seule ligne, dans l'écran, sans texte qui déborde de sa case. */
 const viewportWidth = () => evaluate('window.innerWidth');
 const rowFits = async () => {

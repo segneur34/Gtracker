@@ -25,7 +25,10 @@ import {
   toDisplayDistance, toDisplaySpeed, type DistanceUnit, type SpeedUnit,
 } from '../core/units';
 import { useChartZoom } from '../hooks/useChartZoom';
-import { useThemedShade } from '../hooks/useTheme';
+import { useAppliedTheme, useThemedShade } from '../hooks/useTheme';
+import { useFavoriteBrush } from '../hooks/useFavoriteBrush';
+import { brushColorFor } from '../core/brushColor';
+import '../components/BrushFrame.css';
 import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { useNow } from '../hooks/useNow';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
@@ -363,6 +366,13 @@ function StatisticsPage() {
   const distanceUnit: DistanceUnit = unitActivity ? effectiveDistanceUnit(unitActivity) : 'km';
   /** Fond des onglets et pastilles allumés, sous du texte blanc : sans famille, le gris neutre du thème. */
   const tabAccent = family ? FAMILY_ACCENT[family] : 'var(--neutral-accent)';
+  /** Coup de pinceau des panneaux : la couleur de l'activité choisie, sinon celle du sport préféré, comme dans Réglages. */
+  const favoriteBrush = useFavoriteBrush();
+  const darkTheme = useAppliedTheme().theme === 'dark';
+  const panelsBrush = useMemo(
+    () => (activity ? ({ '--brush': brushColorFor(activity.color, darkTheme) } as React.CSSProperties) : favoriteBrush),
+    [activity, darkTheme, favoriteBrush]
+  );
 
   // Cardio : la FC du résumé, zones et charge recalculées avec le profil du moment.
   const { profile: athlete } = useAthleteProfile();
@@ -553,7 +563,7 @@ function StatisticsPage() {
           {scanning && (
             <p className="ui-hint">Fiches en cours de calcul ({scanning.done} / {scanning.total}) : chiffres provisoires.</p>
           )}
-          <div className="an-carte-panels stats-panels">
+          <div className="an-carte-panels stats-panels brush-panels" style={panelsBrush}>
             {open.general && (
               <ResizablePanel id={panelId('general')} style={ANALYSIS_PANEL_STYLE}>
                 <PanelHeading label="Général" open={open.general} onToggle={() => toggle('general')}

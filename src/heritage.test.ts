@@ -42,6 +42,15 @@ const NAMED_FILES = [
 /** Exceptions temporaires : motifs retirés de chaque ligne avant la recherche, avec le lot qui les retire. */
 const TEMPORARY: { lot: number; motif: RegExp; fichier?: string }[] = [];
 
+/**
+ * Le nom montré sur la photo du Profil : le logo GONG, et dessous le nom de l'application sans son G, choix de
+ * l'utilisateur. Seules ces deux lignes le portent : celle qui l'affiche et celle du banc qui le relit.
+ */
+const SHOWN_NAME: { fichier: string; motif: RegExp }[] = [
+  { fichier: 'src/pages/ProfilePage.tsx', motif: /<span className="profile-hero__name">tracker<\/span>/ },
+  { fichier: 'outils/banc/profil.mjs', motif: /=== 'tracker'/ },
+];
+
 const trackedFiles = (): string[] => {
   const listed = childProcess.execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
     cwd: ROOT,
@@ -66,6 +75,7 @@ const offendingLines = (file: string): string[] => {
   text.split('\n').forEach((line, index) => {
     let rest = line;
     for (const exception of TEMPORARY) if (exception.fichier === undefined || exception.fichier === file) rest = rest.replace(exception.motif, '');
+    for (const shown of SHOWN_NAME) if (shown.fichier === file) rest = rest.replace(shown.motif, '');
     if (FORBIDDEN.test(rest)) found.push(`${file}:${index + 1}: ${line.trim().slice(0, 140)}`);
   });
   return found;

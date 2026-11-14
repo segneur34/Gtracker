@@ -41,7 +41,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
  * Profil, la page où s'ouvre l'application : une période en un coup d'œil (`library/profile.ts`). En tête, une photo
- * (logo GONG et « Gtracker » en haut à gauche sur téléphone, « Live for it. » en bas à droite), puis, à cheval sur son
+ * (logo GONG et, dessous, le nom de l'application sans son G, en haut à gauche sur téléphone, « Live for it. » en bas à droite), puis, à cheval sur son
  * bord, la photo ronde (un dessin d'activité ou une image importée, choisis en la touchant ; sans
  * choix, un disque vide à silhouette) et dessous le bouton de période, « Bienvenue » et le pseudo. Puis les cartes d'ouverture
  * (mémoire à désigner, autorisations, invitation du profil), quand il y a lieu. Puis
@@ -415,7 +415,7 @@ function ProfilePage() {
       <div className="profile-hero">
         <span className="profile-hero__brand">
           <GongLogo className="profile-hero__mark" />
-          <span className="profile-hero__name">Gtracker</span>
+          <span className="profile-hero__name">tracker</span>
         </span>
         <p className="profile-hero__motto">Live for it.</p>
       </div>
