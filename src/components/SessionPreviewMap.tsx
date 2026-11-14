@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Activity } from '../core/activities';
 import { createHeldCache } from '../core/heldCache';
+import { t } from '../core/i18n';
 import { MAP_BASES } from '../core/mapBase';
 import type { SportFamily } from '../core/sportProfiles';
 import { coloredSegments } from '../core/trackColor';
@@ -246,7 +247,7 @@ function SessionPreviewMap({ session, activity, family, folderLabel, onOpen }: {
   }, [meta, minMs, maxMs, width, height, eco, cacheKey, loadTrack, storeKey, fingerprint]);
 
   return (
-    <div ref={frame} className="lib-row__preview" role="link" aria-label="Ouvrir l'analyse" onClick={onOpen}>
+    <div ref={frame} className="lib-row__preview" role="link" aria-label={t("Ouvrir l'analyse")} onClick={onOpen}>
       {image ? (
         <>
           <img className="lib-row__preview-image" src={image} alt="" draggable={false} />
@@ -254,7 +255,7 @@ function SessionPreviewMap({ session, activity, family, folderLabel, onOpen }: {
           {!eco && <span className="lib-row__preview-credit">{PREVIEW_CREDIT_MARK} <span className="lib-row__preview-credit-name">{PREVIEW_CREDIT_NAME}</span></span>}
         </>
       ) : (
-        <span className="lib-row__preview-status">{failed ? 'Carte indisponible' : 'Carte…'}</span>
+        <span className="lib-row__preview-status">{failed ? t('Carte indisponible') : t('Carte…')}</span>
       )}
     </div>
   );

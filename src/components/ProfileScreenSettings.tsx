@@ -5,6 +5,7 @@ import { DEFAULT_SCHOOL_STYLE } from '../core/schoolBasics';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { useVisibility } from '../hooks/useSportSettings';
 import { useThemedShade } from '../hooks/useTheme';
+import { t } from '../core/i18n';
 import { ATHLETE_NAME_MAX, SCHOOL_TRIAL_BOUNDS, athleteAvatar, athleteSchoolHidden } from '../library/athleteProfile';
 import ErrorBoundary from './ErrorBoundary';
 import { HelpText, HelpToggle, SettingRow } from './Help';
@@ -30,18 +31,18 @@ export default function ProfileScreenSettings() {
 
   return (
     <div className="profile-settings">
-      <SettingRow label="Photo de profil" helpKey="pratiquant:photo"
-        help="La photo ronde en tête du Profil : « Changer l'image » déplie les propositions, un logo d'activité ou une image du téléphone ; « Retirer » la vide.">
+      <SettingRow label={t('Photo de profil')} helpKey="pratiquant:photo"
+        help={t("La photo ronde en tête du Profil : « Changer l'image » déplie les propositions, un logo d'activité ou une image du téléphone ; « Retirer » la vide.")}>
         <AvatarPicker avatar={athleteAvatar(profile)} logoColor={shownLogoColor} onPick={setAvatar} />
       </SettingRow>
       <label className="ui-field-row">
-        <span className="ui-field-row__label">Nom ou pseudo<HelpToggle helpKey="pratiquant:nom" label="Nom ou pseudo" /></span>
-        <input type="text" value={profile.name ?? ''} maxLength={ATHLETE_NAME_MAX} placeholder="ex. Tom" autoComplete="nickname"
+        <span className="ui-field-row__label">{t('Nom ou pseudo')}<HelpToggle helpKey="pratiquant:nom" label={t('Nom ou pseudo')} /></span>
+        <input type="text" value={profile.name ?? ''} maxLength={ATHLETE_NAME_MAX} placeholder={t('ex. Tom')} autoComplete="nickname"
           onChange={(e) => setName(e.target.value)} className="ui-field ui-field--s profile-settings__name" />
       </label>
-      <HelpText helpKey="pratiquant:nom">En titre de la page Profil et au pied des images partagées.</HelpText>
-      <SettingRow label="Poisson du banc" helpKey="pratiquant:banc-poisson"
-        help="Le dessin des poissons du banc du Profil, « Deux arcs » au départ ; « Couleur d'activité » peint chaque poisson à la couleur de l'activité de sa session. Changer de poisson ne déplace aucun poisson. « Aucun » cache le banc et l'eau ; choisir un poisson les remontre.">
+      <HelpText helpKey="pratiquant:nom">{t('En titre de la page Profil et au pied des images partagées.')}</HelpText>
+      <SettingRow label={t('Poisson du banc')} helpKey="pratiquant:banc-poisson"
+        help={t("Le dessin des poissons du banc du Profil, « Deux arcs » au départ ; « Couleur d'activité » peint chaque poisson à la couleur de l'activité de sa session. Changer de poisson ne déplace aucun poisson. « Aucun » cache le banc et l'eau ; choisir un poisson les remontre.")}>
         {/* Décoratif et chargé à part : s'il ne se charge pas (hors ligne), le reste des réglages demeure. */}
         <ErrorBoundary silent>
           <Suspense fallback={null}>
@@ -49,10 +50,10 @@ export default function ProfileScreenSettings() {
           </Suspense>
         </ErrorBoundary>
       </SettingRow>
-      <NumberField label="Nombre de sessions du banc (essai, provisoire)" min={SCHOOL_TRIAL_BOUNDS[0]} max={SCHOOL_TRIAL_BOUNDS[1]}
-        value={profile.schoolTrialSessions} onCommit={(next) => setNumber('schoolTrialSessions', next)} placeholder="Auto"
+      <NumberField label={t('Nombre de sessions du banc (essai, provisoire)')} min={SCHOOL_TRIAL_BOUNDS[0]} max={SCHOOL_TRIAL_BOUNDS[1]}
+        value={profile.schoolTrialSessions} onCommit={(next) => setNumber('schoolTrialSessions', next)} placeholder={t('Auto')}
         helpKey="pratiquant:banc-essai"
-        help={`Réglage provisoire, pour essayer : impose le nombre de sessions que compte le banc de poissons du Profil (de ${SCHOOL_TRIAL_BOUNDS[0]} à ${SCHOOL_TRIAL_BOUNDS[1]}). Vide : automatique, toutes les sessions de la bibliothèque.`} />
+        help={t('Réglage provisoire, pour essayer : impose le nombre de sessions que compte le banc de poissons du Profil (de {min} à {max}). Vide : automatique, toutes les sessions de la bibliothèque.', { min: SCHOOL_TRIAL_BOUNDS[0], max: SCHOOL_TRIAL_BOUNDS[1] })} />
     </div>
   );
 }

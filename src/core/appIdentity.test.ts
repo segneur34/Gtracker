@@ -57,6 +57,7 @@ describe('noms techniques de l\'application', () => {
       tileUrls: 'gtracker.tileUrls',
       rechercheLieu: 'gtracker.rechercheLieu',
       lieuxAppris: 'gtracker.lieuxAppris',
+      langue: 'gtracker.langue',
     });
   });
 

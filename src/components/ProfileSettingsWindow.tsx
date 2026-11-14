@@ -1,4 +1,5 @@
 import { useCloseOnEscapeOrBack } from '../hooks/useDismiss';
+import { t } from '../core/i18n';
 import { IconClose } from './icons';
 import ProfileScreenSettings from './ProfileScreenSettings';
 import './ProfileScreenSettings.css';
@@ -13,8 +14,8 @@ export default function ProfileSettingsWindow({ onClose }: { onClose: () => void
   return (
     <section className="profile-settings-window" aria-labelledby="profile-settings-window-title">
       <div className="profile-settings-window__head">
-        <h2 id="profile-settings-window-title" className="profile-settings-window__title">Réglages du Profil</h2>
-        <button type="button" className="profile-settings-window__close" aria-label="Fermer" onClick={onClose}>
+        <h2 id="profile-settings-window-title" className="profile-settings-window__title">{t('Réglages du Profil')}</h2>
+        <button type="button" className="profile-settings-window__close" aria-label={t('Fermer')} onClick={onClose}>
           <IconClose size={18} />
         </button>
       </div>

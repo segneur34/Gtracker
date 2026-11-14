@@ -8,7 +8,7 @@ import { effectiveDistanceUnit } from '../hooks/useSportSettings';
 import { routeActivity, routeDistanceM } from '../planning/routeList';
 import ActivityGlyph from './logos/ActivityGlyph';
 import Button from './ui/Button';
-import { dateLocale } from '../core/i18n';
+import { dateLocale, t } from '../core/i18n';
 import './RouteList.css';
 
 /**
@@ -52,7 +52,7 @@ function RouteList({ routes, activities, onOpen, currentBase = null, actions, go
               {activity
                 ? <ActivityGlyph activity={activity} size={14} className="route-list__icon" />
                 : <span className="route-list__dot" style={{ background: 'var(--faint)' }} />}
-              <span>{activity?.name ?? 'Sans activité'}</span>
+              <span>{activity?.name ?? t('Sans activité')}</span>
               <span className="num">
                 {' · '}
                 {formatDistance(distances.get(saved.base) ?? 0, activity ? effectiveDistanceUnit(activity) : 'km')}
@@ -71,8 +71,8 @@ function RouteList({ routes, activities, onOpen, currentBase = null, actions, go
             )}
             {withGo && (
               <Button size="s" variant="record" disabled={!canGo} onClick={() => go(saved)}
-                title={canGo ? undefined : 'Un enregistrement est en cours'} aria-label={`Partir sur ${saved.record.name}`}>
-                Partir
+                title={canGo ? undefined : t('Un enregistrement est en cours')} aria-label={t('Partir sur {name}', { name: saved.record.name })}>
+                {t('Partir')}
               </Button>
             )}
             {actions?.(saved)}

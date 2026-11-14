@@ -1,4 +1,5 @@
 import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
+import { browserDarkQuery, browserPrefersDark } from './darkScheme';
 import { onAppResume } from './permissions';
 import { isNativeApp } from './runtime';
 
@@ -143,16 +144,9 @@ let nativeDark: boolean | null = null;
 let nativeDarkStarted = false;
 const darkListeners = new Set<(dark: boolean) => void>();
 
-/** Requête du thème sombre du système, lue par « Auto » (`theme/theme.ts`). */
-const DARK_SCHEME_QUERY = '(prefers-color-scheme: dark)';
-
-/** Requête du thème sombre du navigateur ; `null` hors navigateur (tests). */
-const browserDarkQuery = (): MediaQueryList | null =>
-  typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(DARK_SCHEME_QUERY) : null;
-
 /** Vrai si le système est en sombre : dernière valeur connue du greffon sur le téléphone, sinon celle du navigateur. */
 export const systemPrefersDark = (): boolean =>
-  isNativeApp() && nativeDark !== null ? nativeDark : (browserDarkQuery()?.matches ?? false);
+  isNativeApp() && nativeDark !== null ? nativeDark : browserPrefersDark();
 
 const setNativeDark = (dark: boolean): void => {
   if (nativeDark === dark) return;

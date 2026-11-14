@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { CartesianGrid, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatMinSec } from '../core/units';
+import { t } from '../core/i18n';
 import { HEART_RATE_COLOR } from './heartRateColors';
 import { CHART_GRID_PROPS, CHART_MARK_COLOR, CHART_TICK, chartTick, yAxisLabel } from './chartStyle';
 
@@ -31,14 +32,14 @@ function RestingHrChart({ series, durationS, lowest = null, height = 220 }: Prop
   const yTicks = Array.from({ length: Math.floor((hi - lo) / 5) + 1 }, (_, k) => lo + k * 5);
 
   return (
-    <figure className="rest-chart" aria-label="FC pendant le test, en battements par minute">
+    <figure className="rest-chart" aria-label={t('FC pendant le test, en battements par minute')}>
       <ResponsiveContainer width="100%" height={height}>
         <ComposedChart data={rows} accessibilityLayer={false} margin={{ top: 22, right: 12, bottom: 0, left: 0 }}>
           <CartesianGrid {...CHART_GRID_PROPS} vertical={false} />
           <XAxis dataKey="t" type="number" domain={[0, durationS]} ticks={ticks} tickFormatter={formatMinSec} tick={CHART_TICK} />
           <YAxis domain={[lo, hi]} ticks={yTicks} allowDecimals={false} width={40} tick={chartTick(HEART_RATE_COLOR)}
             label={yAxisLabel('bpm', HEART_RATE_COLOR)} />
-          <Tooltip labelFormatter={(v) => formatMinSec(Math.floor(Number(v)))} formatter={(v) => [`${v} bpm`, 'FC']} />
+          <Tooltip labelFormatter={(v) => formatMinSec(Math.floor(Number(v)))} formatter={(v) => [`${v} bpm`, t('FC')]} />
           {lowest && (
             <ReferenceArea x1={lowest.fromS} x2={lowest.toS} fill={HEART_RATE_COLOR} fillOpacity={0.18} ifOverflow="hidden"
               label={{ value: `${lowest.bpm} bpm`, position: 'top', fill: CHART_MARK_COLOR, fontSize: 12, fontWeight: 700 }} />

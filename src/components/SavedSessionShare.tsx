@@ -1,4 +1,5 @@
 import { plainError } from '../platform/errorText';
+import { t } from '../core/i18n';
 import { useState } from 'react';
 import { FAMILY_LABEL, type Activity } from '../core/activities';
 import { shareableStats } from '../core/shareImage';
@@ -52,7 +53,7 @@ function SavedSessionShare({ gpx, activity, fileName, libraryFile }: SavedSessio
       // Hors de la mémoire : calculé avec les réglages de l'activité, comme la fiche le sera (E-B12).
       const summary = record?.summary ?? summarizeGpxText(gpx, sport, activity.id);
       const track = sessionColorTrack(gpx, sport, record?.analysis?.referenceSpeedMs ?? null, family);
-      if (track === null || summary === null) throw new Error('trace trop courte.');
+      if (track === null || summary === null) throw new Error(t('trace trop courte.'));
       const range = track ? sessionSpeedRange(record ?? { analysis: null, sport }, activity ? activitySpeedRanges(activity) : null, family, track.suggested) : null;
       const labels = shareLabels(record ?? null, activity.name, FAMILY_LABEL[family], summary.startMs, libraryFile ?? fileName);
       const units = { speed: effectiveSpeedUnit(activity), distance: effectiveDistanceUnit(activity) };
@@ -74,16 +75,16 @@ function SavedSessionShare({ gpx, activity, fileName, libraryFile }: SavedSessio
         },
       });
     } catch (err) {
-      setError(`Partage impossible : ${plainError(err, 'erreur inconnue')}`);
+      setError(t('Partage impossible : {reason}', { reason: plainError(err, t('erreur inconnue')) }));
     }
   };
 
   return (
     <>
-      <MoreMenu label="Plus d'actions sur la session">
+      <MoreMenu label={t("Plus d'actions sur la session")}>
         <Button onClick={open}>
           <IconShare size={18} />
-          Partager l'image
+          {t("Partager l'image")}
         </Button>
       </MoreMenu>
       {error && <span role="status" style={{ fontSize: 'var(--text-s)', color: 'var(--danger)' }}>{error}</span>}

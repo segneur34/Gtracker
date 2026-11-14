@@ -1,5 +1,6 @@
 import type { GearGroup, GearItem } from '../library/notes';
 import { newId } from '../core/basics';
+import { t } from '../core/i18n';
 import type { StoredSettings } from './activitySettings';
 
 /**
@@ -9,7 +10,7 @@ import type { StoredSettings } from './activitySettings';
  */
 
 /** Intitulés des champs de matériel des notes à défaut de réglage. */
-export const DEFAULT_GEAR_LABELS: [string, string] = ['Matériel 1', 'Matériel 2'];
+export const DEFAULT_GEAR_LABELS: [string, string] = [t('Matériel 1'), t('Matériel 2')];
 export const MAX_GEAR_LABEL_LENGTH = 30;
 
 /** Intitulés de matériel rognés et tronqués ; `null` s'ils sont mal formés ou tous deux vides (intitulés par défaut). */

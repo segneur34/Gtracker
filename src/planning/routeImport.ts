@@ -1,5 +1,6 @@
 import { parseGpx, parseGpxPath } from '../core/gpxParser';
 import { routeFromTrack } from './route';
+import { t } from '../core/i18n';
 import { embeddedRouteRecord } from './routeGpx';
 import { routeToRecord, type RouteRecord } from './routeRecord';
 
@@ -36,7 +37,7 @@ export const isRouteGpx = (text: string): boolean => {
  */
 export const uniqueRouteName = (name: string, taken: Iterable<string>): string => {
   const used = new Set([...taken].map((n) => n.trim().toLowerCase()));
-  const base = name.trim() || 'Itinéraire';
+  const base = name.trim() || t('Itinéraire');
   if (!used.has(base.toLowerCase())) return base;
   for (let i = 2; ; i++) {
     const candidate = `${base} (${i})`;

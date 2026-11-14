@@ -1,3 +1,4 @@
+import { t } from '../core/i18n';
 import type { SportFamily } from '../core/sportProfiles';
 import { addGearItem } from '../hooks/useSportSettings';
 import type { GearGroup } from '../library/notes';
@@ -68,12 +69,11 @@ export default function SessionNotesPanel({ notes, setNotes, family, gearFields,
   return (
     <>
       <div className="an-notes-col">
-        <PanelHeading label="Matériel" open={open} onToggle={onToggle} helpKey={gearGroups ? 'analyse:materiel' : undefined} />
+        <PanelHeading label={t('Matériel')} open={open} onToggle={onToggle} helpKey={gearGroups ? 'analyse:materiel' : undefined} />
         {gearGroups ? (
           <>
             <HelpText helpKey="analyse:materiel" note>
-              Une pièce par groupe, prise dans le matériel de l'activité (Réglages). « Ajouter à la liste » l'y range tout de suite, même si la session
-              n'est pas enregistrée ensuite ; « Pour cette session » la garde pour elle seule.
+              {t("Une pièce par groupe, prise dans le matériel de l'activité (Réglages). « Ajouter à la liste » l'y range tout de suite, même si la session n'est pas enregistrée ensuite ; « Pour cette session » la garde pour elle seule.")}
             </HelpText>
             {shownGroups(gearGroups, notes.gear).map(({ group, listed }) => (
               <GearPicker key={group.id} group={group} choice={notes.gear?.find((c) => c.groupId === group.id) ?? null}
@@ -83,7 +83,7 @@ export default function SessionNotesPanel({ notes, setNotes, family, gearFields,
             {/* Texte saisi avant le matériel enregistré : montré tel quel, il reste dans la fiche. */}
             {gearFields.some(({ field }) => notes[field].trim() !== '') && (
               <div className="gear-picker__legacy">
-                {gearFields.filter(({ field }) => notes[field].trim() !== '').map(({ field, label }) => `${label} : ${notes[field]}`).join(' · ')}
+                {gearFields.filter(({ field }) => notes[field].trim() !== '').map(({ field, label }) => t('{label} : {value}', { label, value: notes[field] })).join(' · ')}
               </div>
             )}
           </>
@@ -101,11 +101,11 @@ export default function SessionNotesPanel({ notes, setNotes, family, gearFields,
       </div>
 
       <div className="an-notes-col">
-        <strong className="ui-subtitle ui-block ui-mb-10">Conditions</strong>
+        <strong className="ui-subtitle ui-block ui-mb-10">{t('Conditions')}</strong>
         {conditions === 'voile' ? (
           <>
             <div className="ui-mb-10">
-              <span className="ui-block ui-text-s ui-mb-4">Vent</span>
+              <span className="ui-block ui-text-s ui-mb-4">{t('Vent')}</span>
               <div className="ui-row-6 ui-wrap">
                 {WIND_LEVELS.map((w) => (
                   <button key={w.value} onClick={() => setNotes({ windLevel: notes.windLevel === w.value ? null : w.value })}
@@ -116,7 +116,7 @@ export default function SessionNotesPanel({ notes, setNotes, family, gearFields,
               </div>
             </div>
             <div>
-              <span className="ui-block ui-text-s ui-mb-4">Plan d'eau</span>
+              <span className="ui-block ui-text-s ui-mb-4">{t("Plan d'eau")}</span>
               <div className="ui-row-6 ui-wrap">
                 {WATER_STATES.map((s) => (
                   <button key={s.value} onClick={() => setNotes({ waterState: notes.waterState === s.value ? null : s.value })}
@@ -131,15 +131,15 @@ export default function SessionNotesPanel({ notes, setNotes, family, gearFields,
           <textarea
             value={notes.conditions}
             onChange={(e) => setNotes({ conditions: e.target.value })}
-            placeholder="Météo, état du terrain…"
-            aria-label="Conditions"
+            placeholder={t('Météo, état du terrain…')}
+            aria-label={t('Conditions')}
             rows={3}
             className="an-notes-text" />
         )}
       </div>
 
       <div className="an-notes-col">
-        <strong className="ui-subtitle ui-block ui-mb-10">Appréciation de la séance</strong>
+        <strong className="ui-subtitle ui-block ui-mb-10">{t('Appréciation de la séance')}</strong>
         <div className="ui-row-8 ui-wrap ui-mb-10">
           {RATINGS.map((r) => (
             <button key={r.value} onClick={() => setNotes({ rating: notes.rating === r.value ? null : r.value })}
@@ -156,17 +156,17 @@ export default function SessionNotesPanel({ notes, setNotes, family, gearFields,
         <textarea
           value={notes.comment}
           onChange={(e) => setNotes({ comment: e.target.value })}
-          placeholder="Commentaire libre"
+          placeholder={t('Commentaire libre')}
           rows={3}
           className="an-notes-text" />
         <div className="ui-muted ui-text-xs ui-mt-6">
           {!draft.savable
-            ? 'Notes indisponibles : cette trace n\'est pas dans la mémoire.'
+            ? t("Notes indisponibles : cette trace n'est pas dans la mémoire.")
             : draft.changed.includes('notes')
-              ? 'Non enregistrées : « Enregistrer la session », en haut de la page.'
+              ? t('Non enregistrées : « Enregistrer la session », en haut de la page.')
               : draft.hasSavedNotes
-                ? 'Enregistrées dans la fiche de la session, dans le dossier mémoire.'
-                : 'Enregistrées avec la session, par « Enregistrer la session ».'}
+                ? t('Enregistrées dans la fiche de la session, dans le dossier mémoire.')
+                : t('Enregistrées avec la session, par « Enregistrer la session ».')}
         </div>
       </div>
     </>

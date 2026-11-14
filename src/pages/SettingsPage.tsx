@@ -74,7 +74,10 @@ import { HelpText, HelpToggle, SettingRow, SettingsScope } from '../components/H
 import { useHelpCollapseAll } from '../components/helpContext';
 import NumberField from '../components/NumberField';
 import ProfileScreenSettings from '../components/ProfileScreenSettings';
-import { dateLocale } from '../core/i18n';
+import { LANGUAGES, LANGUAGE_NAME, currentLang, dateLocale, t, type Lang } from '../core/i18n';
+import { storeLanguage } from '../platform/language';
+import { reloadAfterWrites } from '../hooks/useSessionLibrary';
+import { useRecorderSelector } from '../hooks/useRecorder';
 import './SettingsPage.css';
 
 /**
@@ -794,7 +797,30 @@ function DisplaySettings() {
         </label>
         {theme.eco && <p className="settings-display__note">Cochée, elle garde l'interface en sombre, quel que soit le thème choisi.</p>}
       </SettingRow>
+      <LanguageSetting />
     </>
+  );
+}
+
+/** Choix de la langue, propre à cet appareil ; les noms des langues ne se traduisent pas. */
+const LANGUAGE_ITEMS = LANGUAGES.map((key) => ({ key, label: LANGUAGE_NAME[key] }));
+
+/**
+ * Langue de l'interface, pour cet appareil (`platform/language.ts`) : le choix recharge l'application, qui ne lit la
+ * langue qu'à son démarrage ; grisé pendant un enregistrement.
+ */
+function LanguageSetting() {
+  const recording = useRecorderSelector((s) => s.status !== 'idle');
+  const choose = (lang: Lang) => {
+    if (lang === currentLang() || recording) return;
+    storeLanguage(lang);
+    void reloadAfterWrites();
+  };
+  return (
+    <SettingRow label={t('Langue')} helpKey="affichage:langue"
+      help={t("Propre à cet appareil. Changer de langue relance l'application ; impossible pendant un enregistrement.")}>
+      <SegmentedControl label={t('Langue')} items={LANGUAGE_ITEMS} value={currentLang()} onChange={choose} disabled={recording} />
+    </SettingRow>
   );
 }
 

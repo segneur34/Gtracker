@@ -1,6 +1,10 @@
 import { fetchJson } from './fetchJson';
 import type { Waypoint } from './route';
 import { isObject } from '../core/basics';
+import { currentLang, t } from '../core/i18n';
+
+/** Langue demandée au service de noms de lieux : il ne connaît pas l'espagnol, l'anglais le remplace. */
+const placesLang = (): string => (currentLang() === 'fr' ? 'fr' : 'en');
 
 /**
  * Recherche d'un lieu par son nom (commune, sommet, refuge, adresse), et
@@ -36,7 +40,7 @@ export interface Place extends Waypoint {
  * lieux proches passent devant leurs homonymes lointains.
  */
 export const photonUrl = (query: string, near?: Waypoint, limit = 6): string => {
-  const params = new URLSearchParams({ q: query, limit: String(limit), lang: 'fr' });
+  const params = new URLSearchParams({ q: query, limit: String(limit), lang: placesLang() });
   if (near) {
     params.set('lat', near.lat.toFixed(4));
     params.set('lon', near.lon.toFixed(4));
@@ -118,7 +122,7 @@ export const photonReverseUrl = (point: Waypoint, { limit, radiusM }: ReverseQue
   const params = new URLSearchParams({
     lat: at.lat.toFixed(REVERSE_COORD_DECIMALS),
     lon: at.lon.toFixed(REVERSE_COORD_DECIMALS),
-    lang: 'fr',
+    lang: placesLang(),
     limit: String(limit),
     radius: String(radiusM / 1000),
   });
@@ -128,19 +132,19 @@ export const photonReverseUrl = (point: Waypoint, { limit, radiusM }: ReverseQue
 /** Objets de la carte autour de `point` (`photonReverseUrl`). Lève une erreur au message lisible, réseau absent compris. */
 export const reversePlaces = async (point: Waypoint, query: ReverseQuery, signal?: AbortSignal): Promise<PhotonFeature[]> =>
   parsePhotonFeatures(await fetchJson(photonReverseUrl(point, query), { signal }, {
-    noNetwork: 'Pas de réseau : le lieu de la session sera cherché plus tard.',
-    timeout: 'La recherche du lieu ne répond pas.',
+    noNetwork: t('Pas de réseau : le lieu de la session sera cherché plus tard.'),
+    timeout: t('La recherche du lieu ne répond pas.'),
     timeoutMs: PHOTON_TIMEOUT_MS,
-    unreadable: 'Réponse de la recherche du lieu illisible.',
-    httpError: (status) => `La recherche du lieu n'a pas répondu (erreur ${status}).`,
+    unreadable: t('Réponse de la recherche du lieu illisible.'),
+    httpError: (status) => t("La recherche du lieu n'a pas répondu (erreur {status}).", { status }),
   }));
 
 /** Lieux qui répondent à `query`. Lève une erreur au message lisible. */
 export const searchPlaces = async (query: string, near?: Waypoint, signal?: AbortSignal): Promise<Place[]> =>
   parsePhoton(await fetchJson(photonUrl(query, near), { signal }, {
-    noNetwork: 'Pas de réseau : la recherche de lieux est impossible.',
-    timeout: 'La recherche de lieux ne répond pas : réessayez.',
+    noNetwork: t('Pas de réseau : la recherche de lieux est impossible.'),
+    timeout: t('La recherche de lieux ne répond pas : réessayez.'),
     timeoutMs: PHOTON_TIMEOUT_MS,
-    unreadable: 'Réponse de la recherche de lieux illisible.',
-    httpError: (status) => `La recherche de lieux n'a pas répondu (erreur ${status}).`,
+    unreadable: t('Réponse de la recherche de lieux illisible.'),
+    httpError: (status) => t("La recherche de lieux n'a pas répondu (erreur {status}).", { status }),
   }));

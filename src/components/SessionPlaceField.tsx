@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from 'react';
+import { t } from '../core/i18n';
 import type { PlaceDraft } from '../library/places';
 import Button from './ui/Button';
 
@@ -28,8 +29,8 @@ export default function SessionPlaceField({ value, onChange, onSave, onCancel, c
         value={value.departure}
         autoFocus
         maxLength={80}
-        placeholder={both ? 'Lieu de départ' : 'Lieu de la session'}
-        aria-label={both ? 'Lieu de départ' : 'Lieu de la session'}
+        placeholder={both ? t('Lieu de départ') : t('Lieu de la session')}
+        aria-label={both ? t('Lieu de départ') : t('Lieu de la session')}
         onChange={(e) => onChange({ ...value, departure: e.target.value })}
         onKeyDown={keys} />
       {value.arrival !== null && (
@@ -37,13 +38,13 @@ export default function SessionPlaceField({ value, onChange, onSave, onCancel, c
           className={className}
           value={value.arrival}
           maxLength={80}
-          placeholder="Lieu d'arrivée"
-          aria-label="Lieu d'arrivée"
+          placeholder={t("Lieu d'arrivée")}
+          aria-label={t("Lieu d'arrivée")}
           onChange={(e) => onChange({ ...value, arrival: e.target.value })}
           onKeyDown={keys} />
       )}
-      <Button size="s" onClick={onSave}>Valider</Button>
-      <Button size="s" variant="ghost" onClick={onCancel}>Annuler</Button>
+      <Button size="s" onClick={onSave}>{t('Valider')}</Button>
+      <Button size="s" variant="ghost" onClick={onCancel}>{t('Annuler')}</Button>
     </>
   );
 }

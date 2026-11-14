@@ -1,4 +1,5 @@
 import { refreshLibrary, useLibraryFields } from '../hooks/useSessionLibrary';
+import { t } from '../core/i18n';
 import { IconRefresh } from './icons';
 import Button from './ui/Button';
 
@@ -14,9 +15,9 @@ function RefreshLibraryButton() {
   if (status !== 'ready') return null;
   return (
     <Button disabled={refreshing || scanning !== null} onClick={() => void refreshLibrary()}
-      title="Relit le dossier mémoire : sessions et itinéraires copiés depuis un autre appareil, réglages plus récents">
+      title={t('Relit le dossier mémoire : sessions et itinéraires copiés depuis un autre appareil, réglages plus récents')}>
       <IconRefresh size={18} />
-      {refreshing ? 'Mise à jour…' : 'Mettre à jour'}
+      {refreshing ? t('Mise à jour…') : t('Mettre à jour')}
     </Button>
   );
 }

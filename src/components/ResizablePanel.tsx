@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Mous
 import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { jsonStore } from '../platform/storage';
 import { STORAGE_KEYS } from '../core/appIdentity';
+import { t } from '../core/i18n';
 
 /**
  * Panneau redimensionnable par sa poignée en bas à droite, en largeur et en
@@ -176,7 +177,7 @@ function ResizablePanel({
       {stored !== null && !narrow && (
         <button
           onClick={reset}
-          title="Revenir à la taille par défaut"
+          title={t('Revenir à la taille par défaut')}
           style={{ position: 'absolute', top: 4, right: 4, padding: '0 6px', fontSize: 'var(--text-xs)', lineHeight: '18px', cursor: 'pointer', border: '1px solid var(--line-strong)', borderRadius: 'var(--radius-pill)', backgroundColor: 'color-mix(in srgb, var(--surface) 90%, transparent)', color: 'var(--muted)' }}>
           ↺
         </button>

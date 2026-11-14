@@ -8,7 +8,8 @@ import { IconTrash, IconUndo } from './icons';
 import PanelTitle from './PanelTitle';
 import Dialog from './ui/Dialog';
 import HoldButton from './ui/HoldButton';
-import { dateLocale } from '../core/i18n';
+import { dateLocale, t } from '../core/i18n';
+import { tRich } from './tRich';
 
 /**
  * Zone « Remise à zéro », au bas de la carte Mémoire de Réglages, repliée au départ : « Réglages d'usine » et
@@ -26,9 +27,9 @@ const NO_COUNTS: EraseCounts = { sessions: 0, pending: 0, routes: 0 };
 
 /** Ce que dit la fenêtre pendant l'effacement. */
 const runningText = (kind: ResetKind, progress: ResetProgress | null): string => {
-  if (kind === 'usine') return "Retour aux réglages d'usine…";
-  if (progress === null || progress.total === 0) return 'Suppression en cours…';
-  return `Suppression en cours : ${progress.done.toLocaleString(dateLocale())} fichiers sur ${progress.total.toLocaleString(dateLocale())}…`;
+  if (kind === 'usine') return t("Retour aux réglages d'usine…");
+  if (progress === null || progress.total === 0) return t('Suppression en cours…');
+  return t('Suppression en cours : {done} fichiers sur {total}…', { done: progress.done.toLocaleString(dateLocale()), total: progress.total.toLocaleString(dateLocale()) });
 };
 
 function ResetZone() {
@@ -84,40 +85,27 @@ function ResetZone() {
 
   return (
     <div className="ui-stack-3">
-      <PanelTitle label="Remise à zéro" open={open} onToggle={() => setOpen((o) => !o)} helpKey="memoire:remise" />
+      <PanelTitle label={t('Remise à zéro')} open={open} onToggle={() => setOpen((o) => !o)} helpKey="memoire:remise" />
       {open && (
         <>
           <HelpText helpKey="memoire:remise">
-            « Réglages d'usine » remet tous les réglages de cet appareil à leur valeur de départ : activités de départ
-            et leurs pré-réglages, unités, onglets, tailles des panneaux, couleurs de trace, thème, tutoriels lus… Il
-            retire aussi du dossier mémoire le fichier de réglages de cet appareil ; ceux des autres appareils restent.
-            Les activités que vous avez créées et vos listes de matériel sont effacées ; leurs sessions restent, avec
-            leur matériel, sous le nom de leur calcul. Il ne touche ni aux sessions, ni aux itinéraires, ni au profil
-            (pseudo, photo, mesures, tests de FC repos), ni aux lieux corrigés.
-            <br />
-            « Tout supprimer » est définitif : il efface toutes les sessions du dossier, y compris un GPX que vous y
-            auriez déposé vous-même, leurs fiches, les itinéraires, les fichiers de réglages de tous les appareils, le
-            profil, les tests de FC repos, les lieux corrigés, les réglages et les cartes gardées. Les autres fichiers
-            posés à la main dans le dossier restent, et le dossier reste choisi. L'application repart comme à sa
-            première ouverture.
-            <br />
-            Chaque bouton se tient une seconde, puis demande confirmation.
+            {tRich("« Réglages d'usine » remet tous les réglages de cet appareil à leur valeur de départ : activités de départ et leurs pré-réglages, unités, onglets, tailles des panneaux, couleurs de trace, thème, tutoriels lus… Il retire aussi du dossier mémoire le fichier de réglages de cet appareil ; ceux des autres appareils restent. Les activités que vous avez créées et vos listes de matériel sont effacées ; leurs sessions restent, avec leur matériel, sous le nom de leur calcul. Il ne touche ni aux sessions, ni aux itinéraires, ni au profil (pseudo, photo, mesures, tests de FC repos), ni aux lieux corrigés.<br/>« Tout supprimer » est définitif : il efface toutes les sessions du dossier, y compris un GPX que vous y auriez déposé vous-même, leurs fiches, les itinéraires, les fichiers de réglages de tous les appareils, le profil, les tests de FC repos, les lieux corrigés, les réglages et les cartes gardées. Les autres fichiers posés à la main dans le dossier restent, et le dossier reste choisi. L'application repart comme à sa première ouverture.<br/>Chaque bouton se tient une seconde, puis demande confirmation.")}
           </HelpText>
           <div className="ui-row-s2 ui-wrap">
-            <HoldButton onHold={() => void run('usine')} getHoldMs={resetHoldMs} label="Réglages d'usine"
-              lead={<IconUndo size={18} />} dialTitle="Réglages d'usine" icon={<IconUndo size={48} />}
-              action="revenir aux réglages d'usine" disabled={refusals.usine !== null || busy}
-              ariaLabel="Réglages d'usine : maintenir une seconde" />
-            <HoldButton onHold={() => void run('tout')} getHoldMs={resetHoldMs} label="Tout supprimer"
-              lead={<IconTrash size={18} />} dialTitle="Tout supprimer" icon={<IconTrash size={48} />}
-              action="tout supprimer" disabled={refusals.tout !== null || busy}
-              ariaLabel="Tout supprimer : maintenir une seconde" />
+            <HoldButton onHold={() => void run('usine')} getHoldMs={resetHoldMs} label={t("Réglages d'usine")}
+              lead={<IconUndo size={18} />} dialTitle={t("Réglages d'usine")} icon={<IconUndo size={48} />}
+              action={t("revenir aux réglages d'usine")} disabled={refusals.usine !== null || busy}
+              ariaLabel={t("Réglages d'usine : maintenir une seconde")} />
+            <HoldButton onHold={() => void run('tout')} getHoldMs={resetHoldMs} label={t('Tout supprimer')}
+              lead={<IconTrash size={18} />} dialTitle={t('Tout supprimer')} icon={<IconTrash size={48} />}
+              action={t('tout supprimer')} disabled={refusals.tout !== null || busy}
+              ariaLabel={t('Tout supprimer : maintenir une seconde')} />
           </div>
           {phrases.map((phrase) => <p key={phrase} className="ui-muted ui-text-s ui-m-0">{phrase}</p>)}
         </>
       )}
       {running && (
-        <Dialog title="Remise à zéro" onClose={() => undefined}>
+        <Dialog title={t('Remise à zéro')} onClose={() => undefined}>
           <p className="ui-m-0" aria-live="polite">{runningText(running.kind, running.progress)}</p>
         </Dialog>
       )}

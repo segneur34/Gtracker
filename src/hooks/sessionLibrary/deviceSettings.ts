@@ -8,7 +8,7 @@ import {
 import { readPickedFile } from '../../platform/files';
 import type { MemoryFolder } from '../../platform/memoryFolder';
 import { isNativeApp } from '../../platform/runtime';
-import { jsonStore, storageStartupFailure } from '../../platform/storage';
+import { jsonStore, settleStoredWrites, storageStartupFailure } from '../../platform/storage';
 import { subscribeStoredSettings } from '../useSportSettings';
 import { syncRestingHrFile } from '../restingHrFile';
 import { syncLearnedPlacesFile } from '../learnedPlacesFile';
@@ -416,6 +416,17 @@ let canReload: () => boolean = () => true;
 
 /** Vrai une fois l'interface affichée (`startLibraryUi`). */
 export const libraryUiStarted = (): boolean => uiStarted;
+
+/**
+ * Recharge la page pour un réglage qui ne vaut qu'au démarrage (la langue de l'interface) : fiches, réglages et
+ * mémoire de l'appareil en attente d'écriture d'abord. Rien pendant un enregistrement.
+ */
+export const reloadAfterWrites = async (): Promise<void> => {
+  if (!canReload()) return;
+  await flushWrites();
+  await settleStoredWrites();
+  window.location.reload();
+};
 
 /**
  * Les pages lisent les réglages à leur premier affichage : des réglages repris

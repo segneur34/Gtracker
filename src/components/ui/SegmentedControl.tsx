@@ -11,6 +11,8 @@ interface SegmentedControlProps<K extends string> {
   className?: string;
   /** Liste courte et fixe (familles, périodes) : les choix se resserrent jusqu'au « … » plutôt que de défiler. */
   fit?: boolean;
+  /** Grisé : le choix reste lisible, aucun ne se prend (ni clic, ni glisser, ni clavier). */
+  disabled?: boolean;
 }
 
 /** Déplacement au-delà duquel un appui sur la case devient un glisser (px) ; en deçà, c'est un clic. */
@@ -23,7 +25,7 @@ const TAP_SLOP_PX = 6;
  * Flèches du clavier d'un choix à l'autre. Trop large, la rangée défile et
  * garde le choix en vue.
  */
-function SegmentedControl<K extends string>({ label, items, value, onChange, accent, className, fit }: SegmentedControlProps<K>) {
+function SegmentedControl<K extends string>({ label, items, value, onChange, accent, className, fit, disabled }: SegmentedControlProps<K>) {
   const rowRef = useRef<HTMLDivElement>(null);
   const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null);
   /** Pas de glissement à la première mesure : la case apparaît à sa place. */
@@ -74,7 +76,7 @@ function SegmentedControl<K extends string>({ label, items, value, onChange, acc
       : e.key === 'Home' ? 0
       : e.key === 'End' ? items.length - 1
       : null;
-    if (next === null || items.length === 0) return;
+    if (disabled || next === null || items.length === 0) return;
     e.preventDefault();
     const key = items[next].key;
     if (key === value) return;
@@ -84,7 +86,7 @@ function SegmentedControl<K extends string>({ label, items, value, onChange, acc
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     swallowClick.current = false;
-    if (!thumb || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (disabled || !thumb || (e.pointerType === 'mouse' && e.button !== 0)) return;
     // La case s'attrape sur le choix en cours ; ailleurs, un appui reste un clic (ou fait défiler la rangée).
     const button = (e.target as Element).closest('button');
     if (!button || button.getAttribute('aria-checked') !== 'true') return;
@@ -149,8 +151,8 @@ function SegmentedControl<K extends string>({ label, items, value, onChange, acc
   const lit = drag ? drag.under : value;
 
   return (
-    <div ref={rowRef} className={`ui-segmented${fit ? ' ui-segmented--fit' : ''}${measured ? ' is-ready' : ''}${drag ? ' is-dragging' : ''}${className ? ` ${className}` : ''}`}
-      role="radiogroup" aria-label={label} onKeyDown={onKeyDown}
+    <div ref={rowRef} className={`ui-segmented${fit ? ' ui-segmented--fit' : ''}${measured ? ' is-ready' : ''}${drag ? ' is-dragging' : ''}${disabled ? ' is-disabled' : ''}${className ? ` ${className}` : ''}`}
+      role="radiogroup" aria-label={label} aria-disabled={disabled || undefined} onKeyDown={onKeyDown}
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}
       onClickCapture={onClickCapture}
       style={accent ? ({ '--seg-accent': accent } as CSSProperties) : undefined}>
@@ -161,7 +163,7 @@ function SegmentedControl<K extends string>({ label, items, value, onChange, acc
         const focusable = checked || (i === 0 && !items.some((it) => it.key === value));
         return (
           <button key={item.key} type="button" role="radio" aria-checked={checked} tabIndex={focusable ? 0 : -1}
-            className={item.key === lit ? 'is-lit' : undefined}
+            className={item.key === lit ? 'is-lit' : undefined} disabled={disabled}
             title={item.title} aria-label={item.title} onClick={() => onChange(item.key)}>
             {item.label}
           </button>

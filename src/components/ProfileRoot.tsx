@@ -9,6 +9,7 @@ import { BLOOM_BESIDE, BLOOM_MAX, BLOOM_STEPS, drawRoot, readRootColors, type Ro
 import './ProfileRoot.css';
 import { formatDecimal, formatDuration } from '../core/units';
 import { STORAGE_KEYS } from '../core/appIdentity';
+import { t, tn } from '../core/i18n';
 
 /**
  * Racine du Profil : elle part du carré à droite
@@ -51,9 +52,9 @@ const readSeen = (): LastSeen => {
 
 const SLOT_CLASS = 'profile-root-slot';
 
-const plural = (n: number, word: string): string => `${word}${n >= 2 ? 's' : ''}`;
-/** Nombre et mot liés par une espace insécable : jamais séparés en fin de ligne. */
-const count = (n: number, word: string): string => `${levelText(n)} ${plural(n, word)}`;
+/** Pluriel français de ce lot : dès 2 (et non dès plus de 1). */
+const isPlural = (n: number): boolean => n >= 2;
+/** Nombre et mot liés par une espace insécable (dans les clés de `tn`) : jamais séparés en fin de ligne. */
 const minutesText = (min: number): string => formatDuration(Math.round(min) * 60_000);
 const ease = (t: number): number => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 /** Étape de la fleur pour des minutes de la semaine, en multiples de l'objectif, plafonnée à la dernière. */
@@ -66,25 +67,25 @@ const timesText = (goalTimes: number): string => {
 
 /** Où en est la fleur, en clair (le papillon des étapes 5 et 6). */
 const flowerText = (growth: RootGrowth, goalMin: number): string => {
-  if (growth.minutes <= 0) return 'Pas encore de fleur : elle paraît à la première minute.';
+  if (growth.minutes <= 0) return t('Pas encore de fleur : elle paraît à la première minute.');
   const reached = Math.min(BLOOM_MAX, Math.floor(growth.goalTimes + 1e-9));
   const at = (times: number) => minutesText(times * goalMin);
-  if (reached <= 0) return `Fleur en bouton ; elle s'ouvre à ${minutesText(goalMin)}.`;
+  if (reached <= 0) return t("Fleur en bouton ; elle s'ouvre à {m}.", { m: minutesText(goalMin) });
   // Fleur épanouie à 4 fois (4e étape), papillon à côté d'elle à 4,6 (5e), posé à 5 fois (6e), tout figé au-delà.
-  if (reached >= BLOOM_MAX) return `Papillon posé : étape ${BLOOM_STEPS} sur ${BLOOM_STEPS}.`;
-  if (growth.goalTimes + 1e-9 >= BLOOM_BESIDE) return `Le papillon est là : étape ${BLOOM_STEPS - 1} sur ${BLOOM_STEPS} ; il se pose à ${at(BLOOM_MAX)}.`;
-  if (reached === BLOOM_MAX - 1) return `Fleur épanouie : étape ${reached} sur ${BLOOM_STEPS} ; un papillon arrive à ${minutesText(Math.ceil(BLOOM_BESIDE * goalMin - 1e-9))}.`;
-  return `Fleur à l'étape ${reached} sur ${BLOOM_STEPS} ; la suivante à ${at(reached + 1)}.`;
+  if (reached >= BLOOM_MAX) return t('Papillon posé : étape {a} sur {b}.', { a: BLOOM_STEPS, b: BLOOM_STEPS });
+  if (growth.goalTimes + 1e-9 >= BLOOM_BESIDE) return t('Le papillon est là : étape {a} sur {b} ; il se pose à {m}.', { a: BLOOM_STEPS - 1, b: BLOOM_STEPS, m: at(BLOOM_MAX) });
+  if (reached === BLOOM_MAX - 1) return t('Fleur épanouie : étape {a} sur {b} ; un papillon arrive à {m}.', { a: reached, b: BLOOM_STEPS, m: minutesText(Math.ceil(BLOOM_BESIDE * goalMin - 1e-9)) });
+  return t("Fleur à l'étape {a} sur {b} ; la suivante à {m}.", { a: reached, b: BLOOM_STEPS, m: at(reached + 1) });
 };
 
 /** Carré à droite du pseudo : le niveau de la racine ; le toucher ouvre le détail. */
 export function RootSlot({ growth, open, onToggle }: { growth: RootGrowth; open: boolean; onToggle: () => void }) {
   return (
     <button type="button" className={SLOT_CLASS} aria-expanded={open} onClick={onToggle}
-      aria-label={`Racine : ${levelText(growth.level)} ${plural(growth.level, 'étape')} ; voir le détail`}>
+      aria-label={tn(growth.level, 'Racine : {n} étape ; voir le détail', 'Racine : {n} étapes ; voir le détail', { n: levelText(growth.level) }, isPlural(growth.level))}>
       <span className="profile-root-slot__count num">
         <b>{levelText(growth.level)}</b>
-        <small>{plural(growth.level, 'étape')}</small>
+        <small>{tn(growth.level, 'étape', 'étapes', undefined, isPlural(growth.level))}</small>
       </span>
     </button>
   );
@@ -92,8 +93,12 @@ export function RootSlot({ growth, open, onToggle }: { growth: RootGrowth; open:
 
 /** Ce qu'une semaine manquée coûterait, en clair. */
 const lossText = (growth: RootGrowth): string => {
-  if (!isFinite(growth.lossStep) || growth.lossStep >= growth.level) return 'elle revient à sa graine';
-  return `elle recule de ${count(growth.lossStep, 'étape')}${growth.missedInRow > 0 ? ' de plus' : ''}`;
+  if (!isFinite(growth.lossStep) || growth.lossStep >= growth.level) return t('elle revient à sa graine');
+  const vars = { n: levelText(growth.lossStep) };
+  const plural = isPlural(growth.lossStep);
+  return growth.missedInRow > 0
+    ? tn(growth.lossStep, 'elle recule de {n} étape de plus', 'elle recule de {n} étapes de plus', vars, plural)
+    : tn(growth.lossStep, 'elle recule de {n} étape', 'elle recule de {n} étapes', vars, plural);
 };
 
 function RootBubble({ growth, goalMin, top, right, onClose }: {
@@ -127,35 +132,37 @@ function RootBubble({ growth, goalMin, top, right, onClose }: {
   const missing = minutesText(goalMin - growth.minutes);
   return (
     <div ref={ref} className="profile-root__bubble" role="status" style={{ top, right }}>
-      <strong>Racine : {count(growth.level, 'étape')}</strong>
+      <strong>{tn(growth.level, 'Racine : {n} étape', 'Racine : {n} étapes', { n: levelText(growth.level) }, isPlural(growth.level))}</strong>
       <span className="profile-root__muted">
         {left <= 0
-          ? "Tous les cadres sont entourés : elle s'épaissit et se ramifie."
-          : `Encore ${count(left, 'semaine')} ${plural(left, 'tenue')} pour entourer tous les cadres.`}
+          ? t("Tous les cadres sont entourés : elle s'épaissit et se ramifie.")
+          : tn(left, 'Encore {n} semaine tenue pour entourer tous les cadres.', 'Encore {n} semaines tenues pour entourer tous les cadres.', { n: levelText(left) }, isPlural(left))}
       </span>
       {growth.maxLevel > growth.level && (
         <span className="profile-root__muted">
-          Partie sèche : {count(growth.maxLevel - growth.level, 'étape')} à regagner.
+          {tn(growth.maxLevel - growth.level, 'Partie sèche : {n} étape à regagner.', 'Partie sèche : {n} étapes à regagner.',
+            { n: levelText(growth.maxLevel - growth.level) }, isPlural(growth.maxLevel - growth.level))}
         </span>
       )}
       <span>
-        Cette semaine : {minutesText(growth.minutes)} sur {minutesText(goalMin)}
-        {growth.goalTimes >= 1 && ` · ${timesText(growth.goalTimes)} fois l'objectif`}
-        {rootlets > 0 && ` · ${count(rootlets, 'radicelle')}`}
+        {t('Cette semaine : {a} sur {b}', { a: minutesText(growth.minutes), b: minutesText(goalMin) })}
+        {growth.goalTimes >= 1 && ` · ${t("{x} fois l'objectif", { x: timesText(growth.goalTimes) })}`}
+        {rootlets > 0 && ` · ${tn(rootlets, '{n} radicelle', '{n} radicelles', { n: levelText(rootlets) }, isPlural(rootlets))}`}
       </span>
       <span className="profile-root__bar"><span style={{ width: `${Math.round(growth.progress * 100)}%` }} /></span>
       <span className="profile-root__muted">{flowerText(growth, goalMin)}</span>
       <span className="profile-root__muted">
         {growth.held
-          ? 'Objectif tenu : la racine gagne une étape dimanche soir.'
+          ? t('Objectif tenu : la racine gagne une étape dimanche soir.')
           : growth.level <= 0
-            ? `Sans ${missing} de plus d'ici dimanche soir, elle reste à sa graine.`
-            : `Sans ${missing} de plus d'ici dimanche soir, ${lossText(growth)}.`}
+            ? t("Sans {missing} de plus d'ici dimanche soir, elle reste à sa graine.", { missing })
+            : t("Sans {missing} de plus d'ici dimanche soir, {loss}.", { missing, loss: lossText(growth) })}
       </span>
       {growth.losing && (
         <span className="profile-root__muted">
-          {growth.missedInRow >= 2 ? `${count(growth.missedInRow, 'semaine')} manquées d'affilée` : 'Semaine dernière manquée'} : ses
-          feuilles sont tombées ; de nouvelles repoussent avec le temps de la semaine.
+          {growth.missedInRow >= 2
+            ? t("{n} semaines manquées d'affilée : ses feuilles sont tombées ; de nouvelles repoussent avec le temps de la semaine.", { n: levelText(growth.missedInRow) })
+            : t('Semaine dernière manquée : ses feuilles sont tombées ; de nouvelles repoussent avec le temps de la semaine.')}
         </span>
       )}
     </div>

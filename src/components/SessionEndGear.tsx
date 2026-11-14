@@ -1,4 +1,5 @@
 import type { Activity } from '../core/activities';
+import { t } from '../core/i18n';
 import { addGearItem, useGearGroups } from '../hooks/useSportSettings';
 import type { GearChoice } from '../library/notes';
 import GearPicker from './GearPicker';
@@ -30,7 +31,7 @@ export default function SessionEndGear({ activity, gear, onChange }: Props) {
   };
   return (
     <div className="rec-end-gear" data-testid="rec-end-gear">
-      <strong className="ui-subtitle rec-end-gear__title">Matériel</strong>
+      <strong className="ui-subtitle rec-end-gear__title">{t('Matériel')}</strong>
       {groups.map((group) => (
         <GearPicker key={group.id} group={group} choice={gear?.find((c) => c.groupId === group.id) ?? null}
           onChoose={(choice) => choose(group.id, choice)}

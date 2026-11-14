@@ -2,6 +2,7 @@ import { plainError } from '../platform/errorText';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FAMILY_LABEL, sessionActivity } from '../core/activities';
+import { t } from '../core/i18n';
 import type { ShareStat } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
 import { dropLeaveWarning, hasLeaveWarning } from '../hooks/leaveGuard';
@@ -40,9 +41,9 @@ const DISCARD_HOLD_MS = 1000;
 const discardHoldMs = (): number => DISCARD_HOLD_MS;
 
 /** Question posée après l'appui tenu sur « Jeter » ; `drafted` : un brouillon de la session serait perdu. */
-const discardQuestion = (drafted: boolean): string =>
-  'Jeter cette session ? Elle sera supprimée de la mémoire, avec sa fiche et ses capteurs, et ne pourra pas être récupérée.'
-  + (drafted ? ' Les modifications non enregistrées seront perdues.' : '');
+const discardQuestion = (drafted: boolean): string => drafted
+  ? t('Jeter cette session ? Elle sera supprimée de la mémoire, avec sa fiche et ses capteurs, et ne pourra pas être récupérée. Les modifications non enregistrées seront perdues.')
+  : t('Jeter cette session ? Elle sera supprimée de la mémoire, avec sa fiche et ses capteurs, et ne pourra pas être récupérée.');
 
 /**
  * Nom montré d'une session de la mémoire (`sessionDisplayName`), en tête de son analyse, son bouton
@@ -101,13 +102,13 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
   const download = async () => {
     try {
       const session = await readSessionExport(file);
-      if (session === null) throw new Error('GPX illisible dans la mémoire.');
+      if (session === null) throw new Error(t('GPX illisible dans la mémoire.'));
       const base = sessionFileBaseName(session.record, activityName, session.record.summary.startMs, file);
       const named = base ? safeFileName(base) : '';
       await saveToDownloads(named ? `${named}.gpx` : file, bundleSessionGpx(session.gpx, session.record, session.motion, session.unreadable));
-      setNote({ text: 'Session enregistrée dans Téléchargements.', error: false });
+      setNote({ text: t('Session enregistrée dans Téléchargements.'), error: false });
     } catch (err) {
-      setNote({ text: `Téléchargement impossible : ${plainError(err, 'erreur inconnue')}`, error: true });
+      setNote({ text: t('Téléchargement impossible : {reason}', { reason: plainError(err, t('erreur inconnue')) }), error: true });
     }
   };
 
@@ -115,12 +116,12 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
   const shareTrace = async () => {
     try {
       const text = await readSessionGpx(file);
-      if (text === null) throw new Error('GPX introuvable dans la mémoire.');
-      const labels = shareLabels(record, activityName, (share ? FAMILY_LABEL[share.family] : 'Session'), record.summary.startMs, file);
+      if (text === null) throw new Error(t('GPX introuvable dans la mémoire.'));
+      const labels = shareLabels(record, activityName, (share ? FAMILY_LABEL[share.family] : t('Session')), record.summary.startMs, file);
       const outcome = await shareFile(new Blob([text], { type: 'application/gpx+xml' }), `${safeFileName(labels.baseName)}.gpx`, labels.title);
-      if (outcome === 'downloaded') setNote({ text: 'Ce navigateur ne partage pas de fichier : le GPX est téléchargé.', error: false });
+      if (outcome === 'downloaded') setNote({ text: t('Ce navigateur ne partage pas de fichier : le GPX est téléchargé.'), error: false });
     } catch (err) {
-      setNote({ text: `Partage impossible : ${plainError(err, 'erreur inconnue')}`, error: true });
+      setNote({ text: t('Partage impossible : {reason}', { reason: plainError(err, t('erreur inconnue')) }), error: true });
     }
   };
 
@@ -164,33 +165,33 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
         </span>
         <span className="ui-row-s2 ui-center ui-no-shrink">
           {!session.readOnly && (
-            <Button size="s" variant="ghost" onClick={() => setDraft(name ?? '')}>Renommer</Button>
+            <Button size="s" variant="ghost" onClick={() => setDraft(name ?? '')}>{t('Renommer')}</Button>
           )}
-          <MoreMenu label="Plus d'actions sur la session">
+          <MoreMenu label={t("Plus d'actions sur la session")}>
             {!session.readOnly && (
               <Button onClick={() => setPlaceDraft(placeDraftOf(record.place))}>
                 <IconPin size={18} />
-                Lieu
+                {t('Lieu')}
               </Button>
             )}
             {share && (
               <Button onClick={() => setSharing(true)}>
                 <IconShare size={18} />
-                Partager l'image
+                {t("Partager l'image")}
               </Button>
             )}
             <Button onClick={() => void shareTrace()}>
               <IconShare size={18} />
-              Partager la trace
+              {t('Partager la trace')}
             </Button>
             <Button onClick={() => void download()}>
               <IconDownload size={18} />
-              Télécharger la session
+              {t('Télécharger la session')}
             </Button>
             {!session.readOnly && (
-              <HoldButton onHold={() => void discard()} getHoldMs={discardHoldMs} label="Jeter" lead={<IconTrash size={18} />}
-                dialTitle="Jeter" icon={<IconTrash size={48} />} action="jeter" keepMenuOpen
-                ariaLabel="Jeter la session : maintenir une seconde" />
+              <HoldButton onHold={() => void discard()} getHoldMs={discardHoldMs} label={t('Jeter')} lead={<IconTrash size={18} />}
+                dialTitle={t('Jeter')} icon={<IconTrash size={48} />} action={t('jeter')} keepMenuOpen
+                ariaLabel={t('Jeter la session : maintenir une seconde')} />
             )}
           </MoreMenu>
         </span>

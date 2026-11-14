@@ -3,6 +3,7 @@
 // Usage : node outils/banc/passe.mjs [noms…] [--pages a,b] [--tous] [--avant <commit>] [--scripts-par-cote] [-j N]
 //         [--sans-reseau] [--gpx <dossier>] [--brouillon <dossier>] [--temps k] [--captures] [--garder]
 //         [--sans-cache] [--nettoyer-avant] [--chrome <premier port>] [--port <port Vite>] (l'avant sur le port suivant)
+//         [--langue fr|en|es] (langue de Chrome, donc de l'application sans réglage : français par défaut)
 // Mode d'emploi : LISEZMOI.md, section « Lanceur ». Registre des scripts : scripts.mjs. Node 22 ou plus, sans dépendance.
 // Le passage courant (sans nom) ne comprend plus `tailles` : le jouer par son nom ou `--pages` quand le lot touche la mise en page, le thème ou Réglages.
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
@@ -34,10 +35,14 @@ const PORT_AVANT = 4196;
 const PRECHAUFFE = ['/sessions', '/voile/analyse', '/surf/analyse',
   '/enregistrer', '/itineraires', '/itineraires/liste', '/statistiques', '/profil', '/parametres'];
 const debut = Date.now();
+// Langue de Chrome (interface et `navigator.language`) : sans réglage dans son profil neuf, l'application prend celle-là.
+// Les scripts cliquent par texte français : le passage courant reste en français.
+const LANGUES = { fr: 'fr-FR', en: 'en-GB', es: 'es-ES' };
 
 // --- Options ---
 const opts = { noms: [], pages: null, tous: false, avant: null, parCote: false, j: 4, sansReseau: false, gpx: null,
-  brouillon: path.join(os.tmpdir(), DOSSIER_BANC), temps: null, captures: false, garder: false, sansCache: false, nettoyerAvant: false, chrome: 9480, port: PORT_APRES };
+  brouillon: path.join(os.tmpdir(), DOSSIER_BANC), temps: null, captures: false, garder: false, sansCache: false, nettoyerAvant: false, chrome: 9480, port: PORT_APRES,
+  langue: 'fr' };
 {
   const a = process.argv.slice(2);
   const valeur = (i, nom) => { if (a[i + 1] === undefined) sortie(2, `${nom} attend une valeur`); return a[i + 1]; };
@@ -58,12 +63,14 @@ const opts = { noms: [], pages: null, tous: false, avant: null, parCote: false, 
     else if (x === '--nettoyer-avant') opts.nettoyerAvant = true;
     else if (x === '--chrome') opts.chrome = Number(valeur(i++, x));
     else if (x === '--port') opts.port = Number(valeur(i++, x));
-    else if (x === '--aide' || x === '-h') { console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 6).join('\n')); process.exit(0); }
+    else if (x === '--langue') opts.langue = valeur(i++, x);
+    else if (x === '--aide' || x === '-h') { console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 7).join('\n')); process.exit(0); }
     else if (x.startsWith('-')) sortie(2, `option inconnue : ${x}`);
     else opts.noms.push(x.replace(/\.mjs$/, ''));
   }
   if (opts.parCote && !opts.avant) sortie(2, '--scripts-par-cote demande --avant <commit>');
   if (opts.pages) for (const p of opts.pages) if (!PAGES.includes(p)) sortie(2, `page inconnue : ${p} (${PAGES.join(', ')})`);
+  if (!LANGUES[opts.langue]) sortie(2, `langue inconnue : ${opts.langue} (${Object.keys(LANGUES).join(', ')})`);
 }
 
 function sortie(code, message) { console.error(message); process.exit(code); }
@@ -191,8 +198,9 @@ async function ouvrirChrome(profil) {
   const port = await prendrePort();
   // Sans bac à sable seulement en root (conteneur Linux), où Chrome refuse de démarrer avec.
   const sansBac = process.getuid?.() === 0 ? ['--no-sandbox'] : [];
+  const langue = LANGUES[opts.langue];
   const child = lancer(CHROME, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profil}`,
-    '--window-size=1400,1000', '--no-first-run', '--no-default-browser-check', ...sansBac, 'about:blank'], { stdio: 'ignore' });
+    '--window-size=1400,1000', '--no-first-run', '--no-default-browser-check', `--lang=${langue}`, `--accept-lang=${langue}`, ...sansBac, 'about:blank'], { stdio: 'ignore' });
   const limite = Date.now() + 30000;
   while (Date.now() < limite) {
     if (child.exitCode !== null) break;
@@ -314,7 +322,8 @@ const accelerable = (cote, s) => {
   return new RegExp(`\\{\\s*nom:\\s*'${s.nom}'[^}]*accelerable:\\s*true`).test(registresAvant.get(f));
 };
 const cleReleve = (cote, s) => createHash('sha1').update([cote === 'avant' ? commitAvant : commitApres, empreinteScript(bancDe(cote), s.nom),
-  s.args.join(' '), JSON.stringify(s.env ?? {}), accelerable(cote, s) ? `TEMPS=${opts.temps}` : ''].join('\n')).digest('hex');
+  s.args.join(' '), JSON.stringify(s.env ?? {}), accelerable(cote, s) ? `TEMPS=${opts.temps}` : '',
+  opts.langue === 'fr' ? '' : `langue=${opts.langue}`].join('\n')).digest('hex');
 
 // Masques communs à tous les scripts : ce qui change à chaque passage sans rien prouver (identifiant d'appareil,
 // horodatage de fiche ou nom de session daté, instant en ms, durée mesurée). Les masques propres à un script s'ajoutent (`scripts.mjs`).

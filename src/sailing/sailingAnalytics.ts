@@ -8,6 +8,7 @@ import { circularStats, interpolateDirection, type TimedDirection, type WindEsti
 import { angleDiff, circularMean, normalizeDeg } from '../core/angles';
 import { formatDecimal, msToKnots } from '../core/units';
 import { MAX_GAP_S } from '../core/sportProfiles';
+import { t } from '../core/i18n';
 
 /** Meilleure et moyenne VMG d'une allure et d'une amure, en nœuds, non arrondies : la page les formate dans son unité. */
 interface VmgCell {
@@ -220,15 +221,15 @@ export type ManeuverMetric = 'conservation' | 'relaunch' | 'headingChange' | 'di
 
 /** Nom d'une manœuvre, par genre, dans le tableau, la carte et les listes. */
 export const MANEUVER_LABELS: Record<ManeuverKind, string> = {
-  tack: 'Virement',
-  jibe: 'Empannage',
-  undecided: 'Sens incertain',
+  tack: t('Virement'),
+  jibe: t('Empannage'),
+  undecided: t('Sens incertain'),
 };
 
 /** Nom d'une amure, dans le tableau par amure et le détail d'une manœuvre. */
 export const TACK_LABELS: Record<Tack, string> = {
-  starboard: 'Tribord',
-  port: 'Bâbord',
+  starboard: t('Tribord'),
+  port: t('Bâbord'),
 };
 
 /** L'autre amure : celle d'après un virement ou un empannage. */
@@ -247,32 +248,32 @@ export const MANEUVER_METRICS: {
 }[] = [
   {
     key: 'conservation',
-    label: 'Conservation de vitesse',
-    hint: 'Vitesse minimale sur vitesse d\'approche. Isole la technique de la force du vent.',
+    label: t('Conservation de vitesse'),
+    hint: t("Vitesse minimale sur vitesse d'approche. Isole la technique de la force du vent."),
     ranked: ['tack', 'jibe'],
   },
   {
     key: 'relaunch',
-    label: 'Temps de relance',
-    hint: 'Du point le plus lent au retour à 90 % de la vitesse d\'approche. Long : relance laborieuse en archimédien. Sans retour dans la minute, la manœuvre est comptée à part.',
+    label: t('Temps de relance'),
+    hint: t("Du point le plus lent au retour à 90 % de la vitesse d'approche. Long : relance laborieuse en archimédien. Sans retour dans la minute, la manœuvre est comptée à part."),
     ranked: ['tack', 'jibe'],
   },
   {
     key: 'headingChange',
-    label: 'Changement de cap',
-    hint: 'Du cap d\'approche au cap de sortie. Un virement qui s\'ouvre à 120° a perdu du cap pour reprendre le vol. Pas de podium pour les empannages : leur cap de sortie est un choix d\'allure.',
+    label: t('Changement de cap'),
+    hint: t("Du cap d'approche au cap de sortie. Un virement qui s'ouvre à 120° a perdu du cap pour reprendre le vol. Pas de podium pour les empannages : leur cap de sortie est un choix d'allure."),
     ranked: ['tack'],
   },
   {
     key: 'distance',
-    label: 'Distance de manœuvre',
-    hint: 'Du début du virage à la relance. Empreinte spatiale de la manœuvre.',
+    label: t('Distance de manœuvre'),
+    hint: t('Du début du virage à la relance. Empreinte spatiale de la manœuvre.'),
     ranked: ['tack', 'jibe'],
   },
   {
     key: 'windwardGain',
-    label: 'Gain au vent',
-    hint: 'Pendant le virage : mètres parcourus vers le vent au virement, sous le vent à l\'empannage. Manœuvres réussies seulement.',
+    label: t('Gain au vent'),
+    hint: t("Pendant le virage : mètres parcourus vers le vent au virement, sous le vent à l'empannage. Manœuvres réussies seulement."),
     ranked: ['tack', 'jibe'],
   },
 ];

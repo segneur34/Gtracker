@@ -76,7 +76,40 @@ Outil de garde `outils/i18n.mjs` et son test dans `src/` :
 - Réglages : une ligne « Langue » en bouton glissant (`SegmentedControl`), avec les réglages de l'appareil, grisée pendant un enregistrement ; le choix écrit la clé puis recharge la page.
 - Banc : `outils/banc/passe.mjs` lance Chrome en `--lang=fr-FR` par défaut, option `--langue fr|en|es`.
 
+## Ce que S0-A a posé (commit du 14/11)
+
+- `src/core/i18n.ts` : `t(key, vars?)`, `tn(n, singular, pluralText, vars?, frenchPlural = n > 1)`, `currentLang()`, `setLanguage(lang, dict)`, `decimalSeparator()`, `dateLocale()`, `CONTEXT_MARK` (`'||'`), `LANGUAGES`, `LANGUAGE_NAME`, `isLang`. Dans `tn`, `{n}` vaut `n` sauf si `vars.n` est donné (nombre déjà formaté).
+- `src/components/tRich.ts` : `tRich(key, vars?, tags?)` rend un `ReactNode` ; `<b>`, `<strong>`, `<em>`, `<i>`, `<br/>` marchent sans rien passer, toute autre balise passe par `tags` (`{ a: (enfants) => <a href=…>{enfants}</a> }`) ; une variable peut valoir un texte, un nombre ou un élément.
+- `node outils/i18n.mjs` : compte les clés et imprime les refus (clé non littérale, contexte non littéral) ; `src/i18nGuard.test.ts` les refuse.
+- Dictionnaires : `src/locales/en.json`, `src/locales/es.json`. Pour S0-B : `tsconfig.app.json` n'a pas `resolveJsonModule`.
+- Restés en dur, à traiter à la pose : `DAY_LETTERS` et `MONTH_LETTERS` de `library/activityChart.ts` ; `lang: 'fr'` de `planning/geocoding.ts` (vérifier que le service connaît `es` avant de le brancher sur `currentLang()`, sinon replier sur l'anglais).
+
+## Ce que S0-B a posé (14/11, à commiter)
+
+- `main.tsx` : CSS, premier thème (`hooks/themePaint.ts`, `paintEarlyTheme`), `initStorage`, `startupLanguage()` (`platform/language.ts`), dictionnaire par `import.meta.glob('./locales/*.json')` (sans `resolveJsonModule`), `document.documentElement.lang`, puis `(await import('./boot')).startApp()`. `boot.tsx` reprend tout l'ancien `main.tsx` après le stockage, dans le même ordre.
+- Imports de `main.tsx` figés par `src/mainImports.test.ts` (treize fichiers, CSS compris). Pour cela : `theme/themeSettings.ts` (réglage et résolution du thème, sans texte ; `theme/theme.ts` le réexporte et garde `THEME_CHOICES`), `platform/darkScheme.ts` (`matchMedia`, repris par `platform/screen.ts`).
+- Clé `STORAGE_KEYS.langue` (`gtracker.langue`), classée « réglage » (retirée par « Réglages d'usine »), hors de `TRAVELLING_KEYS`.
+- Réglages › Affichage : ligne « Langue » (`SegmentedControl` reçoit `disabled`), grisée pendant un enregistrement ; le choix écrit la clé puis `reloadAfterWrites` (`hooks/useSessionLibrary`) écrit ce qui attend et recharge.
+- Banc : `passe.mjs --langue fr|en|es`, `fr-FR` par défaut.
+
 ## Consignes communes de pose (étapes P)
+
+Une étape P reçoit une liste de fichiers. Pour chacun : lire, envelopper chaque texte qui se lit à l'écran, ne rien changer d'autre. La clé est le texte français exact, au caractère près (espaces insécables, apostrophes typographiques, fautes éventuelles comprises : ne rien corriger).
+
+- **JSX** : `<p>Texte</p>` devient `<p>{t('Texte')}</p>`. Un texte JSX sur plusieurs lignes se lit comme le navigateur le rend : retours à la ligne et retraits réduits à une espace, espaces de début et de fin retirées ; la clé est ce texte-là. Une entité (`&nbsp;`, `&gt;`, `&amp;`) n'est pas décodée dans une chaîne : écrire le caractère lui-même dans la clé (` ` pour l'insécable). Un texte mêlé d'expressions devient une seule phrase : `Vent {x} nds` donne `t('Vent {x} nds', { x })`, ou `tRich` si une expression est un élément ou si la phrase porte des balises.
+- **Ponctuation** : elle suit la langue, donc elle est dans la clé (`t('Vent :')`, deux-points et son espace compris). Un séparateur neutre entre deux textes (` · `, ` / `, tiret d'une plage de nombres) reste hors de `t()`.
+- **Unités** : envelopper celles qui sont françaises (`nds`, `j`, `mille`, `milles`, `NM` s'il est affiché) ; laisser les symboles internationaux (`km`, `km/h`, `m`, `s`, `h`, `min`, `%`, `°`, `bpm`).
+- **Dans le doute, envelopper** : un sigle ou un mot identique dans les trois langues ne coûte rien une fois enveloppé (`FC`, `VMG`, `GPS`). Ne jamais envelopper un nom propre ou de marque (`Gtracker`, `GONG`, `OpenStreetMap`), ni un nom de fichier, ni une valeur technique.
+- **Erreurs** : le message d'une erreur que l'utilisateur lira (lancée puis montrée par `errorMessage`, ou rendue par une fonction) s'enveloppe ; un `console.*` ou un message de mise au point ne s'enveloppe pas. Si tu ne sais pas si un message arrive à l'écran, cherche qui l'affiche (Grep) avant de trancher.
+- **Texte lu par la logique** : avant d'envelopper un libellé de table, vérifie par Grep qu'il ne sert pas de clé (`key=`, recherche par nom, comparaison, tri, donnée écrite dans une fiche ou un réglage). S'il sert aux deux, le laisser tel quel à la définition et envelopper à l'affichage seulement (`t()` veut un littéral : passer alors par une table de libellés à côté, ou le signaler dans le rapport sans le traiter).
+- **Imports** : `t` et `tn` de `core/i18n` (chemin relatif, permis depuis tout dossier), `tRich` de `components/tRich` (composants et pages seulement).
+- **Un `t` local masque l'import** : avant de poser dans un fichier, chercher un `t` déjà déclaré (`const t =`, `(t) =>`, `t =>`, paramètre `t`) et le renommer (`ProfileRoot` avait `const t = now - t0`).
+- **Espace insécable** : l'outil Edit écrit le vrai caractère, et la clé doit le porter tel qu'il est dans le texte d'origine ; le repérer par Grep de ` ` avant de poser, ne jamais le remplacer par une espace simple.
+- **`plural(n, mot)`, `count()` et accords à la main** : refondre l'appel en `tn` avec deux phrases entières, en gardant la règle française exacte du site (cinquième argument si ce n'est pas `n > 1`) et le texte rendu au caractère près.
+- **Libellé reçu d'ailleurs** (prop, table d'un autre dossier : `section.label`, `FAMILY_LABEL[family]`, `RATINGS`) : il se pose à sa source, dans le paquet de ce fichier ; ici, ne rien faire et le lister dans le rapport.
+- **Repérage** : dans un module de calcul, la plupart des chaînes sont des identifiants. Chercher d'abord les chaînes à espace ou à lettre accentuée hors commentaires, puis les mots seuls à majuscule (`'Virement'`, `'Tribord'`), et pour chacune qui l'affiche.
+- **Rapport** : nombre de clés posées (`node outils/i18n.mjs`, 0 refus), et la liste des textes laissés sans `t()` par doute, avec `chemin:ligne` et la raison, pour que l'orchestrateur tranche.
+
 
 - **Envelopper** : texte JSX, `title`, `aria-label`, `placeholder`, `alt`, `label`, messages, libellés de table, abréviations d'unités, phrases rendues par les fonctions pures.
 - **Laisser** : identifiants et clés (`key`, adresses, noms de fichiers, `STORAGE_KEYS`), noms servant de clé de recherche (couleurs de la palette : `paletteColor('Lagon')`, traduits à l'affichage seulement), données saisies par l'utilisateur, commentaires, journaux techniques (`console.*`), textes des tests, mots français lus par la logique (`guessActivityLogo`, filtres de recherche, tris).

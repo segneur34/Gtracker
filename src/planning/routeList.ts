@@ -1,6 +1,7 @@
 import { activityFamily, type Activity } from '../core/activities';
 import type { SportFamily } from '../core/sportProfiles';
 import { routeTotals } from './route';
+import { t } from '../core/i18n';
 import { recordToRoute, type RouteRecord } from './routeRecord';
 import { routeActivity, shownRoutes, type WithActivity } from './routeShown';
 
@@ -41,11 +42,11 @@ export const routeDistanceM = (record: RouteRecord): number => {
 export type RouteSort = 'recent' | 'ancien' | 'nom' | 'distance-croissante' | 'distance-decroissante';
 
 export const ROUTE_SORTS: { id: RouteSort; label: string }[] = [
-  { id: 'recent', label: 'Plus récents' },
-  { id: 'ancien', label: 'Plus anciens' },
-  { id: 'nom', label: 'Nom (A → Z)' },
-  { id: 'distance-croissante', label: 'Plus courts' },
-  { id: 'distance-decroissante', label: 'Plus longs' },
+  { id: 'recent', label: t('Plus récents') },
+  { id: 'ancien', label: t('Plus anciens') },
+  { id: 'nom', label: t('Nom (A → Z)') },
+  { id: 'distance-croissante', label: t('Plus courts') },
+  { id: 'distance-decroissante', label: t('Plus longs') },
 ];
 
 export const isRouteSort = (value: unknown): value is RouteSort => ROUTE_SORTS.some((s) => s.id === value);

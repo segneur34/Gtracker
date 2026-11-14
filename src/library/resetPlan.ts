@@ -53,6 +53,7 @@ export const KEY_CLASSES: Record<keyof typeof STORAGE_KEYS, KeyClass> = {
   tileUrls: 'reglage',
   rechercheLieu: 'reglage',
   lieuxAppris: 'donnee',
+  langue: 'reglage',
 };
 
 const keysOf = (wanted: (c: KeyClass) => boolean): string[] =>

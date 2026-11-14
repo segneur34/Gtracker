@@ -1,4 +1,5 @@
 import type { FlightSpan, PumpingSeries } from '../core/pumping';
+import { t } from '../core/i18n';
 import { formatShortDuration, formatTimeOfDay } from '../core/units';
 import { HIGHLIGHT_PODIUM_COLORS, HIGHLIGHT_SHOWN_COLOR } from './highlightColors';
 import type { TrackSpanShown } from './TrackSpanLayer';
@@ -17,11 +18,15 @@ export const flightKey = (n: number): PumpingHighlightKey => `vol:${n}`;
 
 /** Bulle d'une série sur la carte : numéro, heure, durée, coups, cadence. */
 const seriesSpanLabel = (s: PumpingSeries): string =>
-  `Série ${s.n} · ${formatTimeOfDay(s.startMs)} · ${formatShortDuration(s.durationS)} · ${s.strokes} coups · ${Math.round(s.strokesPerMin)} /min`;
+  t('Série {n} · {time} · {duration} · {strokes} coups · {rate} /min', {
+    n: s.n, time: formatTimeOfDay(s.startMs), duration: formatShortDuration(s.durationS), strokes: s.strokes, rate: Math.round(s.strokesPerMin),
+  });
 
 /** Bulle d'un vol sur la carte : numéro, heure, durée, distance. */
 const flightSpanLabel = (f: FlightSpan): string =>
-  `Vol ${f.n} · ${formatTimeOfDay(f.startMs)} · ${formatShortDuration(f.durationS)} · ${Math.round(f.distanceM)} m`;
+  t('Vol {n} · {time} · {duration} · {distance} m', {
+    n: f.n, time: formatTimeOfDay(f.startMs), duration: formatShortDuration(f.durationS), distance: Math.round(f.distanceM),
+  });
 
 /**
  * Passages montrés sur la carte pour la clé `key` de l'onglet (`null` : aucun) :

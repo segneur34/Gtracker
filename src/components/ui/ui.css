@@ -440,6 +440,15 @@
   outline-offset: -2px;
 }
 
+/* Grisé (`disabled`) : le choix reste lisible, comme un bouton grisé. */
+.ui-segmented.is-disabled {
+  opacity: 0.45;
+}
+
+.ui-segmented.is-disabled button {
+  cursor: default;
+}
+
 /* --- Choix en gros boutons qui passent à la ligne (`ChoiceButtons`) : pilules à fond plein, le choix à l'encre --- */
 
 .ui-choices {

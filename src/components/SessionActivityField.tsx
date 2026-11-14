@@ -1,4 +1,5 @@
 import type { Activity } from '../core/activities';
+import { t } from '../core/i18n';
 import type { SportFamily } from '../core/sportProfiles';
 import ActivitySelect from './ActivitySelect';
 
@@ -17,7 +18,7 @@ export default function SessionActivityField({ activities, activity, families, o
 }) {
   return (
     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-s)' }}>
-      <strong>Activité :</strong>
+      <strong>{t('Activité :')}</strong>
       <ActivitySelect
         activities={activities}
         value={activity.id}

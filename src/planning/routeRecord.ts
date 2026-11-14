@@ -2,6 +2,7 @@ import { sanitizeMarkGuide, type MarkGuideSettings } from '../recording/markGuid
 import { DEFAULT_ROUTE_MODE, newLeg, readRouteMode, type PlannedRoute, type RouteLeg, type RouteMode, type RoutePoint, type Waypoint } from './route';
 import { isFiniteNumber, isObject, parseJson } from '../core/basics';
 import { FILE_FORMATS } from '../core/appIdentity';
+import { t } from '../core/i18n';
 
 /**
  * Fiche d'un itinéraire : le fichier JSON rangé dans `itineraires/` du
@@ -133,7 +134,7 @@ export const parseRouteRecord = (text: string): RouteRecord | null => {
     ...raw,
     format: ROUTE_FORMAT,
     version: raw.version,
-    name: typeof raw.name === 'string' && raw.name.trim() !== '' ? raw.name.trim() : 'Itinéraire',
+    name: typeof raw.name === 'string' && raw.name.trim() !== '' ? raw.name.trim() : t('Itinéraire'),
     activityId: typeof raw.activityId === 'string' && raw.activityId !== '' ? raw.activityId : null,
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,

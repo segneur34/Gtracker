@@ -1,5 +1,6 @@
 import Marker from './map/Marker';
 import Popup from './map/Popup';
+import { t } from '../core/i18n';
 import type { LocatedMark } from '../core/sessionMarks';
 import { formatDistance, formatTimeOfDay, type DistanceUnit } from '../core/units';
 import type { SessionMarksView } from '../hooks/useSessionMarks';
@@ -40,7 +41,7 @@ const flagIcon = (n: number, shown: boolean) => flagIcons(`${n}|${shown}`, () =>
 /** Repère numéroté, ce qu'il faut aux fanions : l'analyse les situe sur la trace, la carte du direct non. */
 type NumberedMark = Pick<LocatedMark, 'mark' | 'n'>;
 
-const markTitle = (m: NumberedMark): string => m.mark.label ?? `Note ${m.n}`;
+const markTitle = (m: NumberedMark): string => m.mark.label ?? t('Note {n}', { n: m.n });
 
 /**
  * Fanions de la carte, dans les analyses et sur la carte du direct ; `shownMs` :
@@ -78,7 +79,7 @@ export function SessionMarksList({ view, distanceUnit, shownMs, onShow, accent }
     <div className="an-marks ui-mt-12">
       <div className="ui-row-6 ui-center ui-semibold ui-mb-6">
         <IconFlag size={16} />
-        Notes posées pendant l'enregistrement
+        {t("Notes posées pendant l'enregistrement")}
       </div>
       <div className="ui-stack-6">
         {located.map((m) => {
@@ -89,14 +90,14 @@ export function SessionMarksList({ view, distanceUnit, shownMs, onShow, accent }
               <span className="num">{formatTimeOfDay(m.mark.timeMs)}</span>
               <span className="num ui-muted">{formatDistance(m.distanceM, distanceUnit)}</span>
               <input type="text" className="ui-field ui-field--s an-mark-label"
-                value={m.mark.label ?? ''} placeholder={`Note ${m.n}`} disabled={!editable} aria-label={`Nom de la note ${m.n}`}
+                value={m.mark.label ?? ''} placeholder={t('Note {n}', { n: m.n })} disabled={!editable} aria-label={t('Nom de la note {n}', { n: m.n })}
                 onChange={(e) => rename(m.mark, e.target.value)} />
               <Button size="s" aria-pressed={shown} onClick={() => onShow(shown ? null : m.mark.timeMs)}
                 style={shown ? { backgroundColor: accent, color: 'var(--on-ink)', borderColor: accent } : undefined}>
-                {shown ? 'Masquer' : 'Voir'}
+                {shown ? t('Masquer') : t('Voir')}
               </Button>
               {editable && (
-                <Button size="s" variant="ghost" onClick={() => remove(m.mark)} aria-label={`Supprimer la note ${m.n}`} title="Supprimer">
+                <Button size="s" variant="ghost" onClick={() => remove(m.mark)} aria-label={t('Supprimer la note {n}', { n: m.n })} title={t('Supprimer')}>
                   <IconClose size={16} />
                 </Button>
               )}

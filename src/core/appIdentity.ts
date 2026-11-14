@@ -77,6 +77,7 @@ export const STORAGE_KEYS = {
   tileUrls: `${APP_SLUG}.tileUrls` as const,
   rechercheLieu: `${APP_SLUG}.rechercheLieu` as const,
   lieuxAppris: `${APP_SLUG}.lieuxAppris` as const,
+  langue: `${APP_SLUG}.langue` as const,
 };
 
 /** Caches du navigateur (Cache API, IndexedDB) et en-tête des tuiles gardées. */
