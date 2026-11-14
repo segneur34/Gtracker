@@ -19,8 +19,6 @@ import { sessionsPath } from '../core/parentPage';
 import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useProfileRoot } from '../hooks/useProfileRoot';
-import { useProfileFish } from '../hooks/useProfileFish';
-import ProfileFish from '../components/ProfileFish';
 import { athleteAvatar, athleteName } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
@@ -42,8 +40,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * Profil, la page où s'ouvre l'application : une période en un coup d'œil (`library/profile.ts`). En tête, une photo
  * (logo GONG et « Gtracker » en haut à gauche sur téléphone, « Live for it. » en bas à droite), puis, à cheval sur son
  * bord, la photo ronde (un dessin d'activité ou une image importée, choisis en la touchant ; sans
- * choix, un disque vide à silhouette) et dessous le bouton de période, « Bienvenue » et le pseudo, et à leur droite
- * le poisson dans son bocal (`ProfileFish`), qui grandit avec les semaines tenues. Puis les cartes d'ouverture
+ * choix, un disque vide à silhouette) et dessous le bouton de période, « Bienvenue » et le pseudo. Puis les cartes d'ouverture
  * (mémoire à désigner, autorisations, invitation du profil), quand il y a lieu. Puis
  * la période, qui règle toute la page : semaine, 30 jours, 6 mois, année (les
  * bornes du graphe d'activités et des statistiques) ou depuis le début ; choix
@@ -66,8 +63,6 @@ const ProfileRoot = lazy(() => import('../components/ProfileRoot'));
 const RootSlot = lazy(() => import('../components/ProfileRoot').then((m) => ({ default: m.RootSlot })));
 /** « Vos activités », sur ordinateur seulement : ses lignes et leurs vignettes ne pèsent pas sur le téléphone. */
 const ProfileActivities = lazy(() => import('../components/ProfileActivities'));
-/** Fenêtre de choix du poisson : lue en touchant le bocal seulement. */
-const FishPicker = lazy(() => import('../components/FishPicker'));
 
 
 /** Période retenue sur l'appareil ; l'année au départ. */
@@ -142,7 +137,7 @@ function ProfilePage() {
   const tutorialGate = tutorialCardGate({ memoryNeedsAction, memoryReady: status === 'ready', permissionsShown, profileShown });
 
   /** « Bienvenue » au-dessus du nom ou pseudo de Réglages, « Bienvenue » seul sans lui. */
-  const { profile, setAvatar, setFish } = useAthleteProfile();
+  const { profile, setAvatar } = useAthleteProfile();
   const name = athleteName(profile);
   const avatar = athleteAvatar(profile);
   /** Choix de la photo ouvert sous l'en-tête : non retenu. */
@@ -162,10 +157,6 @@ function ProfilePage() {
 
   // Racine : toutes les sessions, quelle que soit la période ; son détail s'ouvre sous le carré, non retenu.
   const root = useProfileRoot(all, profile, nowMs);
-  // Poisson : les mêmes semaines tenues, le niveau d'essai de Pratiquant s'il est réglé.
-  const fish = useProfileFish(all, profile, nowMs);
-  const [fishOpen, setFishOpen] = useState(false);
-  const closeFish = useCallback(() => setFishOpen(false), []);
   const [rootOpen, setRootOpen] = useState(false);
   const closeRoot = useCallback(() => setRootOpen(false), []);
 
@@ -269,14 +260,11 @@ function ProfilePage() {
             {period === 'tout' ? 'Tout' : String(new Date(nowMs).getFullYear())}
           </Button>
         </div>
-        {/* Le texte, et à sa droite le bocal du poisson, calé sur le bas du texte. */}
         <div className="profile-head__main">
           <div className="profile-head__text">
             {name !== null && <span className="profile-head__hello">Bienvenue</span>}
             <h1 className="profile-head__title">{name ?? 'Bienvenue'}</h1>
           </div>
-          <ProfileFish level={fish.level} style={fish.style} path={fish.path} brushColor={brushColor}
-            onOpen={() => setFishOpen(true)} />
         </div>
         {PROFILE_PLANT_VISIBLE && (
           <Suspense fallback={null}>
@@ -385,12 +373,6 @@ function ProfilePage() {
         <Suspense fallback={null}>
           <ProfileRoot growth={root.growth} goalMin={root.goalMin} cardSelectors={ROOT_CARDS}
             ready={status === 'ready' && !scanning} open={rootOpen} onClose={closeRoot} />
-        </Suspense>
-      )}
-      {fishOpen && (
-        <Suspense fallback={null}>
-          <FishPicker level={fish.level} unlocked={fish.unlocked} style={fish.style} path={fish.path}
-            brushColor={brushColor} onChoose={setFish} onClose={closeFish} />
         </Suspense>
       )}
     </div>

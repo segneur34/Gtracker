@@ -365,6 +365,35 @@ describe('tracés des logos chargés à part', () => {
   });
 });
 
+/**
+ * Géométrie du banc de poissons du Profil (places, eau, distances sur grille) : chargée par sa couche, à la demande ;
+ * le profil du pratiquant et Réglages ne lisent que `core/schoolBasics.ts`, sans dépendance, pour ne pas la tirer dans
+ * le paquet de l'ouverture.
+ */
+describe('géométrie du banc de poissons hors du paquet de l’ouverture', () => {
+  const IMPORT = [
+    /^import\s[^'";]*?from\s*['"]([^'"]+)['"]/gm,
+    /^export\s+(?:type\s+)?(?:\{[^}]*\}|\*(?:\s+as\s+\w+)?)\s*from\s*['"]([^'"]+)['"]/gm,
+  ];
+  const code = sourceFiles(SRC).map((file) => ({ file, text: fs.readFileSync(new URL(file, SRC), 'utf8') }));
+  const importers = (target: string) => code
+    .filter(({ file, text }) => IMPORT.some((re) => [...text.matchAll(re)].some((m) => resolveTarget(file, m[1]) === target)))
+    .map(({ file }) => file);
+  const forbidden = (file: string) => file.startsWith('library/') || file.startsWith('settings/') || file === 'pages/SettingsPage.tsx';
+
+  it('ni library/, ni settings/, ni Réglages n’importent fishSchool, schoolWater ou gridDistance', () => {
+    for (const target of ['core/fishSchool', 'core/schoolWater', 'core/gridDistance']) {
+      expect(importers(target).filter(forbidden), target).toEqual([]);
+    }
+  });
+
+  it('schoolBasics n’importe rien', () => {
+    const basics = code.find(({ file }) => file === 'core/schoolBasics.ts');
+    expect(basics).toBeDefined();
+    expect(IMPORT.flatMap((re) => [...basics!.text.matchAll(re)])).toEqual([]);
+  });
+});
+
 describe("porte d'import de l'ancienne application", () => {
   const users = everyFile()
     .filter((file) => /\.tsx?$/.test(file))

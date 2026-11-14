@@ -1,6 +1,5 @@
 import { inRange } from '../core/basics';
-import { ATHLETE_BOUNDS, athleteName, type AthleteNumberField, type AthleteProfile } from './athleteProfile';
-import { FISH_LEVELS } from './fishGrowth';
+import { ATHLETE_BOUNDS, athleteName, SCHOOL_TRIAL_BOUNDS, type AthleteNumberField, type AthleteProfile } from './athleteProfile';
 import { ROOT_GOAL } from './rootGrowth';
 
 /**
@@ -8,15 +7,15 @@ import { ROOT_GOAL } from './rootGrowth';
  * objectif de la racine, champs que le pop-up demande, et quand il s'ouvre.
  */
 
-/** Plages plausibles de chaque champ numérique du Profil, objectif de la racine et niveau d'essai du poisson compris. */
+/** Plages plausibles de chaque champ numérique du Profil, objectif de la racine et réglage d'essai du banc de poissons compris. */
 const PROFILE_BOUNDS: Record<AthleteNumberField, [number, number]> = {
   ...ATHLETE_BOUNDS,
   rootWeeklyGoalMin: [ROOT_GOAL.min, ROOT_GOAL.max],
-  fishTrialLevel: [1, FISH_LEVELS],
+  schoolTrialSessions: SCHOOL_TRIAL_BOUNDS,
 };
 
 /** Champs numériques qui ne prennent qu'un entier. */
-const INTEGER_FIELDS: ReadonlySet<AthleteNumberField> = new Set(['fishTrialLevel']);
+const INTEGER_FIELDS: ReadonlySet<AthleteNumberField> = new Set(['schoolTrialSessions']);
 
 /** Une valeur numérique saisie et dans sa plage (relue avec contrôle : fichier de réglages importé). */
 export const validProfileNumber = (field: AthleteNumberField, raw: unknown): boolean => {

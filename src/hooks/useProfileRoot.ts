@@ -4,7 +4,7 @@ import { rootGrowth, type RootGrowth, type RootSession } from '../library/rootGr
 import { athleteRootGoalMin } from '../library/profilePrompt';
 import type { AthleteProfile } from '../library/athleteProfile';
 
-/** Ce que la racine et le poisson retiennent d'une session : son début et son temps en mouvement, sinon sa durée. */
+/** Ce que la racine retient d'une session : son début et son temps en mouvement, sinon sa durée. */
 export const rootSessionsOf = (sessions: readonly StatSession[]): RootSession[] =>
   sessions.map((s) => ({ startMs: s.startMs, durationS: s.movingTimeS ?? (s.endMs - s.startMs) / 1000 }));
 

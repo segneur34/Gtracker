@@ -4,7 +4,6 @@ import { isValidThresholds, type HeartRateZones } from '../core/heartRate';
 import { getSportProfile } from '../core/sportProfiles';
 import { validProfileNumber } from '../library/profilePrompt';
 import { ROOT_GOAL } from '../library/rootGrowth';
-import { isFishPath, isFishStyle, type FishPath, type FishStyle } from '../library/fishGrowth';
 import {
   EMPTY_ATHLETE_PROFILE, ATHLETE_NAME_MAX, athleteAge, athleteAvatar, athleteHeartRateZones, storedAthleteProfile,
   type HrSource, type AthleteAvatar, type AthleteNumberField, type AthleteProfile,
@@ -90,16 +89,5 @@ export const useAthleteProfile = () => {
     [update]
   );
 
-  /** Style ou voie du poisson du Profil ; une valeur inconnue est ignorée. */
-  const setFish = useCallback(
-    (choice: { style?: FishStyle; path?: FishPath }) => {
-      const next: Partial<AthleteProfile> = {};
-      if (choice.style !== undefined && isFishStyle(choice.style)) next.fishStyle = choice.style;
-      if (choice.path !== undefined && isFishPath(choice.path)) next.fishPath = choice.path;
-      if (Object.keys(next).length > 0) update(next);
-    },
-    [update]
-  );
-
-  return { profile: value, setName, setAvatar, setNumber, retainHr, setSex, setThresholds, setFish, age: athleteAge(value) };
+  return { profile: value, setName, setAvatar, setNumber, retainHr, setSex, setThresholds, age: athleteAge(value) };
 };

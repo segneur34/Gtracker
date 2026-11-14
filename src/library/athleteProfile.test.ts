@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EMPTY_ATHLETE_PROFILE, ATHLETE_NAME_MAX, athleteAge, athleteAvatar, athleteFishPath, athleteFishStyle, athleteFishTrialLevel, athleteHrSource, athleteName,
+  EMPTY_ATHLETE_PROFILE, ATHLETE_NAME_MAX, athleteAge, athleteAvatar, athleteHrSource, athleteName, athleteSchoolTrialSessions,
   sanitizeAthleteProfile, type AthleteAvatar, type AthleteProfile,
 } from './athleteProfile';
 
@@ -74,30 +74,30 @@ describe('sanitizeAthleteProfile (fichier de réglages repris)', () => {
       name: '  Léa ', weightKg: 62, heightCm: 1000, birthYear: '1990', sex: 'f', hrMax: 188,
       hrMaxSource: { kind: 'test', atMs: 5 }, hrRest: 10, hrRestSource: { kind: 'test', atMs: 5 },
       hrThresholds: [150, 140], economyMlKgKm: 200, rootWeeklyGoalMin: 5, autre: true,
-      fishStyle: 'C', fishPath: 'joli', fishTrialLevel: 9,
+      schoolTrialSessions: 400,
     }, GOAL);
     expect(p).toEqual({
       name: 'Léa', avatar: null, weightKg: 62, heightCm: null, birthYear: null, sex: 'f',
       hrMax: 188, hrMaxSource: { kind: 'test', atMs: 5 }, hrRest: null, hrRestSource: null,
-      hrThresholds: null, rootWeeklyGoalMin: null, fishStyle: null, fishPath: null, fishTrialLevel: null,
+      hrThresholds: null, rootWeeklyGoalMin: null, schoolTrialSessions: null,
     });
   });
 
-  it('garde le style, la voie et le niveau d’essai du poisson valides', () => {
-    const p = sanitizeAthleteProfile({ fishStyle: 'G', fishPath: 'lesDeux', fishTrialLevel: 4 }, GOAL);
-    expect([p.fishStyle, p.fishPath, p.fishTrialLevel]).toEqual(['G', 'lesDeux', 4]);
-    expect(sanitizeAthleteProfile({ fishTrialLevel: 2.5 }, GOAL).fishTrialLevel).toBeNull();
-    expect(sanitizeAthleteProfile({ fishTrialLevel: '3' }, GOAL).fishTrialLevel).toBeNull();
+  it('un ancien profil qui porte les champs du poisson dans son bocal se relit sans eux, le reste intact', () => {
+    const p = sanitizeAthleteProfile({ name: 'Tom', hrMax: 190, fishStyle: 'G', fishPath: 'lesDeux', fishTrialLevel: 4 }, GOAL);
+    expect(p).toEqual({ ...EMPTY_ATHLETE_PROFILE, name: 'Tom', hrMax: 190, hrMaxSource: { kind: 'saisie', atMs: null } });
+    expect(Object.keys(p)).not.toContain('fishStyle');
   });
 
-  it('style et voie du poisson : ceux de départ sans choix ou pour une valeur inconnue', () => {
-    expect(athleteFishStyle(EMPTY_ATHLETE_PROFILE)).toBe('A');
-    expect(athleteFishPath(EMPTY_ATHLETE_PROFILE)).toBe('beau');
-    expect(athleteFishStyle({ fishStyle: 'Z' as unknown as AthleteProfile['fishStyle'] })).toBe('A');
-    expect(athleteFishStyle({ fishStyle: 'F' })).toBe('F');
-    expect(athleteFishPath({ fishPath: 'agressif' })).toBe('agressif');
-    expect(athleteFishTrialLevel({ fishTrialLevel: 6 })).toBe(6);
-    expect(athleteFishTrialLevel({ fishTrialLevel: 0 })).toBeNull();
+  it('nombre de sessions d’essai du banc : un entier de 0 à 300, sinon automatique', () => {
+    expect(sanitizeAthleteProfile({ schoolTrialSessions: 0 }, GOAL).schoolTrialSessions).toBe(0);
+    expect(sanitizeAthleteProfile({ schoolTrialSessions: 150 }, GOAL).schoolTrialSessions).toBe(150);
+    expect(athleteSchoolTrialSessions({ schoolTrialSessions: 300 })).toBe(300);
+    expect(athleteSchoolTrialSessions({ schoolTrialSessions: 301 })).toBeNull();
+    expect(athleteSchoolTrialSessions({ schoolTrialSessions: -1 })).toBeNull();
+    expect(athleteSchoolTrialSessions({ schoolTrialSessions: 2.5 })).toBeNull();
+    expect(athleteSchoolTrialSessions({ schoolTrialSessions: '3' as unknown as number })).toBeNull();
+    expect(athleteSchoolTrialSessions(EMPTY_ATHLETE_PROFILE)).toBeNull();
   });
 
   it('rend un profil vide pour ce qui n’est pas un objet', () => {

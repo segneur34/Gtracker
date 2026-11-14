@@ -2,9 +2,7 @@ import { finiteOr, inRange } from '../core/basics';
 import { storedLogo, type LogoId } from '../core/activityLogos';
 import { heartRateZones, isValidThresholds, type HeartRateZones } from '../core/heartRate';
 import type { HeartRateProfile } from '../core/sportProfiles';
-import {
-  DEFAULT_FISH_PATH, DEFAULT_FISH_STYLE, isFishLevel, isFishPath, isFishStyle, type FishPath, type FishStyle,
-} from './fishGrowth';
+import { SCHOOL_TRIAL_MAX } from '../core/schoolBasics';
 
 /**
  * Profil du pratiquant, pur : sa forme, ses champs relus avec
@@ -60,12 +58,11 @@ export interface AthleteProfile {
   hrThresholds: number[] | null;
   /** Racine du Profil (`library/rootGrowth.ts`) : objectif par semaine, en minutes ; `null` : `ROOT_GOAL.defaultMin`. */
   rootWeeklyGoalMin: number | null;
-  /** Poisson du Profil (`library/fishGrowth.ts`) : style de dessin ; `null` : `DEFAULT_FISH_STYLE`. */
-  fishStyle: FishStyle | null;
-  /** Sa voie ; `null` : `DEFAULT_FISH_PATH`. */
-  fishPath: FishPath | null;
-  /** Niveau d'essai, de 1 à `FISH_LEVELS`, réglage provisoire qui impose le niveau montré ; `null` : celui des semaines tenues. */
-  fishTrialLevel: number | null;
+  /**
+   * Banc de poissons du Profil (`core/fishSchool.ts`) : nombre de sessions imposé, entier de 0 à `SCHOOL_TRIAL_MAX`,
+   * réglage d'essai provisoire ; `null` : le vrai compte des sessions.
+   */
+  schoolTrialSessions: number | null;
 }
 
 export const EMPTY_ATHLETE_PROFILE: AthleteProfile = {
@@ -81,17 +78,18 @@ export const EMPTY_ATHLETE_PROFILE: AthleteProfile = {
   hrRestSource: null,
   hrThresholds: null,
   rootWeeklyGoalMin: null,
-  fishStyle: null,
-  fishPath: null,
-  fishTrialLevel: null,
+  schoolTrialSessions: null,
 };
 
 /** Plages plausibles de chaque champ numérique. */
 export type AthleteNumberField = Exclude<keyof AthleteProfile,
-  'name' | 'avatar' | 'sex' | 'hrThresholds' | 'hrMaxSource' | 'hrRestSource' | 'fishStyle' | 'fishPath'>;
+  'name' | 'avatar' | 'sex' | 'hrThresholds' | 'hrMaxSource' | 'hrRestSource'>;
 
 /** Champs numériques du Profil dont la plage n'est pas dans `ATHLETE_BOUNDS` (`library/profilePrompt.ts`). */
-type ProfileOnlyNumberField = 'rootWeeklyGoalMin' | 'fishTrialLevel';
+type ProfileOnlyNumberField = 'rootWeeklyGoalMin' | 'schoolTrialSessions';
+
+/** Plage du nombre de sessions imposé au banc de poissons (réglage d'essai). */
+export const SCHOOL_TRIAL_BOUNDS: [number, number] = [0, SCHOOL_TRIAL_MAX];
 
 /** Longueur maximale du nom ou pseudo. */
 export const ATHLETE_NAME_MAX = 40;
@@ -116,19 +114,13 @@ export const athleteAvatar = (profile: Partial<Pick<AthleteProfile, 'avatar'>>):
   return null;
 };
 
-/** Style de dessin du poisson du Profil, celui de départ sans choix ou pour une valeur inconnue (fichier de réglages importé). */
-export const athleteFishStyle = (profile: Partial<Pick<AthleteProfile, 'fishStyle'>>): FishStyle =>
-  isFishStyle(profile.fishStyle) ? profile.fishStyle : DEFAULT_FISH_STYLE;
+/** Nombre de sessions imposé au banc de poissons, `null` sans essai (automatique) ou pour une valeur qui n'est pas un entier de sa plage. */
+export const athleteSchoolTrialSessions = (profile: Partial<Pick<AthleteProfile, 'schoolTrialSessions'>>): number | null => {
+  const raw: unknown = profile.schoolTrialSessions;
+  return inRange(raw, ...SCHOOL_TRIAL_BOUNDS) && Number.isInteger(raw) ? raw : null;
+};
 
-/** Voie du poisson du Profil, celle de départ sans choix ou pour une valeur inconnue. */
-export const athleteFishPath = (profile: Partial<Pick<AthleteProfile, 'fishPath'>>): FishPath =>
-  isFishPath(profile.fishPath) ? profile.fishPath : DEFAULT_FISH_PATH;
-
-/** Niveau d'essai du poisson, `null` sans essai (automatique) ou pour une valeur hors de 1 à 6. */
-export const athleteFishTrialLevel = (profile: Partial<Pick<AthleteProfile, 'fishTrialLevel'>>): number | null =>
-  isFishLevel(profile.fishTrialLevel) ? profile.fishTrialLevel : null;
-
-/** Plages plausibles des champs numériques du pratiquant (celles de l'objectif de la racine et du niveau d'essai du poisson : `library/profilePrompt.ts`). */
+/** Plages plausibles des champs numériques du pratiquant (celles de l'objectif de la racine et du réglage d'essai du banc : `library/profilePrompt.ts`). */
 export const ATHLETE_BOUNDS: Record<Exclude<AthleteNumberField, ProfileOnlyNumberField>, [number, number]> = {
   weightKg: [20, 300],
   heightCm: [100, 250],
@@ -173,7 +165,7 @@ export const athleteHeartRateZones = (profile: AthleteProfile, heartRate: HeartR
  * 143) : un champ d'une forme inattendue ou hors de sa plage (`ATHLETE_BOUNDS`,
  * `rootGoal` pour l'objectif de la racine, `ROOT_GOAL` de `library/rootGrowth.ts`
  * passé par l'appelant) est remis à vide, jamais repris tel quel ; un champ
- * inconnu est écarté.
+ * inconnu, celui d'une ancienne version compris, est écarté.
  */
 export const sanitizeAthleteProfile = (raw: unknown, rootGoal: { min: number; max: number }): AthleteProfile => {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { ...EMPTY_ATHLETE_PROFILE };
@@ -200,9 +192,7 @@ export const sanitizeAthleteProfile = (raw: unknown, rootGoal: { min: number; ma
     hrRestSource: athleteHrSource(forSource, 'hrRest'),
     hrThresholds: isValidThresholds(thresholds) ? thresholds : null,
     rootWeeklyGoalMin: inRange(p.rootWeeklyGoalMin, rootGoal.min, rootGoal.max) ? p.rootWeeklyGoalMin : null,
-    fishStyle: isFishStyle(p.fishStyle) ? p.fishStyle : null,
-    fishPath: isFishPath(p.fishPath) ? p.fishPath : null,
-    fishTrialLevel: isFishLevel(p.fishTrialLevel) ? p.fishTrialLevel : null,
+    schoolTrialSessions: athleteSchoolTrialSessions({ schoolTrialSessions: p.schoolTrialSessions as number | null }),
   };
 };
 

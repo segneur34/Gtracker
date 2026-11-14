@@ -65,8 +65,6 @@ export interface RootGrowth {
   lossStep: number;
   /** La dernière période close a été manquée alors que la racine avait de quoi perdre : on est en train de la tuer. */
   losing: boolean;
-  /** Périodes closes tenues depuis la plus vieille session, sans recul : le compte du poisson (`library/fishGrowth.ts`). */
-  heldTotal: number;
 }
 
 /** Lundi 1er janvier 2024 : origine des périodes. */
@@ -115,12 +113,10 @@ export const rootGrowth = (sessions: readonly RootSession[], goalMin: number, no
   let maxLevel = 0;
   let missed = 0;
   let losing = false;
-  let heldTotal = 0;
   for (let i = first; i < current; i++) {
     const held = (minutesOf.get(i) ?? 0) >= goal;
     losing = !held && level > 0;
     if (held) {
-      heldTotal += 1;
       missed = 0;
       level += 1;
     } else {
@@ -135,7 +131,7 @@ export const rootGrowth = (sessions: readonly RootSession[], goalMin: number, no
     level, maxLevel, growthSteps, fraction: level / growthSteps,
     periodIndex: current, periodStartMs: periodStart(current, days), periodEndMs: periodStart(current + 1, days),
     minutes, held: minutes >= goal, progress: Math.min(1, minutes / goal), goalTimes: minutes / goal,
-    missedInRow: missed, lossStep: lossOf(rules, missed + 1), losing, heldTotal,
+    missedInRow: missed, lossStep: lossOf(rules, missed + 1), losing,
   };
 };
 

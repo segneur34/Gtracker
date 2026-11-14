@@ -25,11 +25,12 @@ import { useTileCache } from '../hooks/useTileCache';
 import { isTileTemplate, type MapBase } from '../core/mapBase';
 import { useThemeSettings } from '../hooks/useTheme';
 import { THEME_CHOICES } from '../theme/theme';
-import { ATHLETE_NAME_MAX, athleteHeartRateZones, athleteHrSource, type AthleteNumberField, type AthleteProfile } from '../library/athleteProfile';
+import {
+  ATHLETE_NAME_MAX, athleteHeartRateZones, athleteHrSource, SCHOOL_TRIAL_BOUNDS, type AthleteNumberField, type AthleteProfile,
+} from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
 import { ROOT_GOAL } from '../library/rootGrowth';
-import { FISH_LEVELS } from '../library/fishGrowth';
 import { zoneLabel } from '../components/heartRateColors';
 import { hrSourceLabel } from '../components/heartRateOrigin';
 import Button from '../components/ui/Button';
@@ -738,17 +739,10 @@ function SettingsPage() {
               before={<Link to={RESTING_HR_PATH} className="ui-btn ui-btn--secondary ui-btn--s set-test-btn" aria-label="Test de FC repos">Test</Link>}
               helpKey="pratiquant:fc-repos" help="Avec la FC max, les seuils se calculent sur la réserve cardiaque, plus juste. Le bouton Test la mesure avec la ceinture." />
             <HeartRateThresholdsField profile={profile} onChange={setThresholds} />
-            <label className="ui-field-row">
-              <span className="ui-field-row__label">Niveau du poisson (essai, provisoire)<HelpToggle helpKey="pratiquant:poisson-essai" label="Niveau du poisson" /></span>
-              <select value={profile.fishTrialLevel ?? ''} className="ui-field ui-field--s"
-                onChange={(e) => setNumber('fishTrialLevel', e.target.value === '' ? null : Number(e.target.value))}>
-                <option value="">Automatique</option>
-                {Array.from({ length: FISH_LEVELS }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-            <HelpText helpKey="pratiquant:poisson-essai">
-              Réglage provisoire, pour essayer : impose le niveau du poisson du Profil et débloque les niveaux jusqu'à lui. Automatique : le niveau gagné par les semaines tenues.
-            </HelpText>
+            <NumberField label="Nombre de sessions du banc (essai, provisoire)" min={SCHOOL_TRIAL_BOUNDS[0]} max={SCHOOL_TRIAL_BOUNDS[1]}
+              value={profile.schoolTrialSessions} onCommit={profileField('schoolTrialSessions')} placeholder="Auto"
+              helpKey="pratiquant:banc-essai"
+              help={`Réglage provisoire, pour essayer : impose le nombre de sessions que compte le banc de poissons du Profil (de ${SCHOOL_TRIAL_BOUNDS[0]} à ${SCHOOL_TRIAL_BOUNDS[1]}). Vide : automatique, toutes les sessions de la bibliothèque.`} />
             {PROFILE_PLANT_VISIBLE && (
               <>
                 <p className="ui-eyebrow set-subhead">Racine du Profil</p>

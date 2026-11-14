@@ -145,7 +145,7 @@
 }
 
 /* --- En-tête du Profil : la photo ronde, cerclée du fond, à cheval sur le bas de la photo d'en-tête ; « Bienvenue »
-   et le pseudo à côté, sous la photo, puis le bocal du poisson. --- */
+   et le pseudo à côté, sous la photo. --- */
 
 .ui-page.profile {
   padding-top: 0;
@@ -164,11 +164,6 @@
   align-items: flex-start;
   gap: var(--space-3);
   margin-top: -34px;
-  /* Conteneur du bocal du poisson, dont la taille suit la largeur de l'en-tête (`components/ProfileFish.css`) :
-     la photo ronde (80 px), deux écarts et la place du texte (« Bienvenue » et le pseudo, en em du bocal, qui est à la
-     taille du petit texte) lui laissent le reste. */
-  container-type: inline-size;
-  --fish-reserve: calc(80px + 2 * var(--space-3) + 16px + 7.9em);
 }
 
 /* Colonne de la photo ronde, avec dessous le bouton de période, de sa largeur. */
@@ -180,8 +175,7 @@
   width: 80px;
 }
 
-/* Le texte, puis le bocal calé en bas, sur le bas du texte ; plus grand que le texte, il descend
-   sous lui sans pousser le nom. Le tout commence sous la photo d'en-tête, que l'avatar déborde de 34 px. */
+/* Le texte, qui commence sous la photo d'en-tête, que l'avatar déborde de 34 px. */
 .profile-head__main {
   flex: 1;
   min-width: 0;
