@@ -357,7 +357,7 @@ Même interface interne que `react-leaflet` pour les pièces employées ; écrit
 
 - `architecture.test.ts` : lit les `import` de `src/` et garde le sens des dépendances (§3 de l'état) ; ses exceptions nommées ne doivent que diminuer ; il garde aussi les deux familles et leurs adresses dans `App.tsx` (règles 9 et 13) ; les dossiers `running`, `cycling` et `land` ne reviennent pas. Trois gardes de plus : aucun nom de calcul en dur hors des tables qui les décrivent (`SPORT_TABLES`), aucun renvoi d'atelier dans les commentaires et les titres de test de `src/` (règle 14, faux amis nommés), et les seuls fichiers qui importent la porte d'import `library/legacyImport`.
 - `landWords.test.ts` : cliquet du vocabulaire de la terre (course, vélo, Entraînement) : lit les `.ts`, `.tsx` et `.css` de `src/`, commentaires compris, et refuse qu'un fichier compte plus d'occurrences que `outils/heritage.json`, ou qu'un fichier absent du relevé en ait ; refuse en dur les chemins du poste et l'allure en min/km.
-- `heritage.test.ts` : garde permanente du renommage (lot 322) : refuse l'ancien nom « tracker » et l'expression « application complète » dans `src/`, `android/app/src/`, `outils/` et `public/`, hors les trois fichiers de la porte d'import et des exceptions temporaires (lots 323 et 304).
+- `heritage.test.ts` : garde permanente du renommage (lot 322) : refuse l'ancien nom « tracker » et l'expression « application complète » dans `src/`, `android/app/src/`, `outils/` et `public/`, hors les trois fichiers de la porte d'import, des exceptions temporaires (lots 323 et 304) et de deux lignes exactes : celle qui montre « tracker » sous le logo GONG sur la photo du Profil et celle du banc qui la relit.
 
 ## `tutorials/` : leçons, pur (point 277)
 
