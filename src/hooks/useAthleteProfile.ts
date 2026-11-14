@@ -4,6 +4,7 @@ import { isValidThresholds, type HeartRateZones } from '../core/heartRate';
 import { getSportProfile } from '../core/sportProfiles';
 import { validProfileNumber } from '../library/profilePrompt';
 import { ROOT_GOAL } from '../library/rootGrowth';
+import { isSchoolStyle, type SchoolStyle } from '../core/schoolBasics';
 import {
   EMPTY_ATHLETE_PROFILE, ATHLETE_NAME_MAX, athleteAge, athleteAvatar, athleteHeartRateZones, storedAthleteProfile,
   type HrSource, type AthleteAvatar, type AthleteNumberField, type AthleteProfile,
@@ -89,5 +90,14 @@ export const useAthleteProfile = () => {
     [update]
   );
 
-  return { profile: value, setName, setAvatar, setNumber, retainHr, setSex, setThresholds, age: athleteAge(value) };
+  /** Dessin des poissons du banc du Profil, `null` pour le style par défaut ; un style inconnu est ignoré. */
+  const setSchoolStyle = useCallback(
+    (schoolStyle: SchoolStyle | null) => {
+      if (schoolStyle !== null && !isSchoolStyle(schoolStyle)) return;
+      update({ schoolStyle });
+    },
+    [update]
+  );
+
+  return { profile: value, setName, setAvatar, setNumber, retainHr, setSex, setThresholds, setSchoolStyle, age: athleteAge(value) };
 };

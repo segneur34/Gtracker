@@ -400,6 +400,16 @@ describe('géométrie du banc de poissons hors du paquet de l’ouverture', () =
     const lazyUsers = outside.filter(({ file, text }) =>
       [...text.matchAll(DYNAMIC_IMPORT)].some((m) => resolveTarget(file, m[1]) === 'components/fishSchool/FishSchool'));
     expect(lazyUsers.map(({ file }) => file)).toEqual(['pages/ProfilePage.tsx']);
+    const pickerUsers = outside.filter(({ file, text }) =>
+      [...text.matchAll(DYNAMIC_IMPORT)].some((m) => resolveTarget(file, m[1]) === 'components/fishSchool/FishStylePicker'));
+    expect(pickerUsers.map(({ file }) => file)).toEqual(['pages/SettingsPage.tsx']);
+  });
+
+  it('le choix du poisson ne tire pas la géométrie du banc', () => {
+    const picker = code.find(({ file }) => file === 'components/fishSchool/FishStylePicker.tsx');
+    expect(picker).toBeDefined();
+    const targets = IMPORT.flatMap((re) => [...picker!.text.matchAll(re)].map((m) => resolveTarget(picker!.file, m[1])));
+    expect(targets.filter((t) => ['core/fishSchool', 'core/schoolWater', 'core/gridDistance'].includes(t))).toEqual([]);
   });
 
   it('schoolBasics n’importe rien', () => {

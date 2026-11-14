@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EMPTY_ATHLETE_PROFILE, ATHLETE_NAME_MAX, athleteAge, athleteAvatar, athleteHrSource, athleteName, athleteSchoolTrialSessions,
+  EMPTY_ATHLETE_PROFILE, ATHLETE_NAME_MAX, athleteAge, athleteAvatar, athleteHrSource, athleteName, athleteSchoolStyle, athleteSchoolTrialSessions,
   sanitizeAthleteProfile, type AthleteAvatar, type AthleteProfile,
 } from './athleteProfile';
 
@@ -74,12 +74,12 @@ describe('sanitizeAthleteProfile (fichier de réglages repris)', () => {
       name: '  Léa ', weightKg: 62, heightCm: 1000, birthYear: '1990', sex: 'f', hrMax: 188,
       hrMaxSource: { kind: 'test', atMs: 5 }, hrRest: 10, hrRestSource: { kind: 'test', atMs: 5 },
       hrThresholds: [150, 140], economyMlKgKm: 200, rootWeeklyGoalMin: 5, autre: true,
-      schoolTrialSessions: 400,
+      schoolTrialSessions: 400, schoolStyle: 'P9',
     }, GOAL);
     expect(p).toEqual({
       name: 'Léa', avatar: null, weightKg: 62, heightCm: null, birthYear: null, sex: 'f',
       hrMax: 188, hrMaxSource: { kind: 'test', atMs: 5 }, hrRest: null, hrRestSource: null,
-      hrThresholds: null, rootWeeklyGoalMin: null, schoolTrialSessions: null,
+      hrThresholds: null, rootWeeklyGoalMin: null, schoolTrialSessions: null, schoolStyle: null,
     });
   });
 
@@ -98,6 +98,17 @@ describe('sanitizeAthleteProfile (fichier de réglages repris)', () => {
     expect(athleteSchoolTrialSessions({ schoolTrialSessions: 2.5 })).toBeNull();
     expect(athleteSchoolTrialSessions({ schoolTrialSessions: '3' as unknown as number })).toBeNull();
     expect(athleteSchoolTrialSessions(EMPTY_ATHLETE_PROFILE)).toBeNull();
+  });
+
+  it('dessin des poissons du banc : un des sept styles, sinon le style par défaut (null)', () => {
+    expect(sanitizeAthleteProfile({ schoolStyle: 'P5' }, GOAL).schoolStyle).toBe('P5');
+    expect(sanitizeAthleteProfile({ schoolStyle: 'P1' }, GOAL).schoolStyle).toBe('P1');
+    expect(sanitizeAthleteProfile({ schoolStyle: 'P8' }, GOAL).schoolStyle).toBeNull();
+    expect(sanitizeAthleteProfile({ schoolStyle: 'p4' }, GOAL).schoolStyle).toBeNull();
+    expect(sanitizeAthleteProfile({ schoolStyle: 4 }, GOAL).schoolStyle).toBeNull();
+    expect(athleteSchoolStyle({ schoolStyle: 'P7' })).toBe('P7');
+    expect(athleteSchoolStyle({ schoolStyle: { id: 'P4' } as unknown as 'P4' })).toBeNull();
+    expect(athleteSchoolStyle(EMPTY_ATHLETE_PROFILE)).toBeNull();
   });
 
   it('rend un profil vide pour ce qui n’est pas un objet', () => {

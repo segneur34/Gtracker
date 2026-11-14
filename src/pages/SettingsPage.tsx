@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type ReactNode } from 'react';
+import { Fragment, Suspense, lazy, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type ReactNode } from 'react';
 import { RESTING_HR_PATH } from '../core/parentPage';
 import {
   FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityFamily, isFamilyHidden, nextActivityColor, visibleActivities, visibleFamilies,
@@ -74,7 +74,12 @@ import {
 import PageHeader from '../components/ui/PageHeader';
 import { HelpText, HelpToggle, SettingRow, SettingsScope } from '../components/Help';
 import { useHelpCollapseAll } from '../components/helpContext';
+import ErrorBoundary from '../components/ErrorBoundary';
+import { DEFAULT_SCHOOL_STYLE } from '../core/schoolBasics';
 import './SettingsPage.css';
+
+/** Choix du poisson du banc du Profil, chargé à part avec les dessins des poissons. */
+const FishStylePicker = lazy(() => import('../components/fishSchool/FishStylePicker'));
 
 /**
  * Sauts mesurés par les capteurs du téléphone (voile sauf bateau) : la case,
@@ -626,7 +631,7 @@ function SettingsPage() {
     activities, view, setFor, resetActivity, addActivity, updateActivity, removeActivity, longPressMs, setLongPressMs,
     stopHoldMs, setStopHoldMs, beepSound, setBeepSound, hiddenFamilies, setActivityHidden, setFamilyHidden,
   } = useAllSportSettings();
-  const { profile, setName, setNumber, setSex, setThresholds, age } = useAthleteProfile();
+  const { profile, setName, setNumber, setSex, setThresholds, setSchoolStyle, age } = useAthleteProfile();
   const { open, toggle, closeAll: closeBlocks } = useOpenSections<SettingsBlock>('settings', SETTINGS_BLOCK_DEFAULTS);
   const { open: openActivity, toggle: toggleActivity, closeAll: closeActivities } = useOpenSections<string>('settings-activities', NO_ACTIVITY_OPEN);
   const { open: openPart, toggle: togglePart, closeAll: closeParts } = useOpenSections<ActivityPartKey>('settings-activity-parts', ACTIVITY_PART_DEFAULTS);
@@ -654,6 +659,8 @@ function SettingsPage() {
   /** Il reste toujours une famille visible, et une activité visible : leur œil ne se ferme pas. */
   const lastFamily = shownFamilies.length <= 1;
   const lastActivity = visibleActivities(activities, hiddenFamilies).length <= 1;
+  /** Couleurs de l'aperçu du poisson à la couleur d'activité : celles des activités visibles. */
+  const pickerColors = useMemo(() => visibleActivities(activities, hiddenFamilies).map((a) => a.color), [activities, hiddenFamilies]);
 
   /** Case « Créer liste matériel » : cochée, une liste vide, éditée en ligne dessous ; décochée, la liste effacée, après confirmation si elle n'est pas vide. */
   const toggleGear = useCallback((a: Activity, groups: GearGroup[] | null, on: boolean) => {
@@ -743,6 +750,16 @@ function SettingsPage() {
               value={profile.schoolTrialSessions} onCommit={profileField('schoolTrialSessions')} placeholder="Auto"
               helpKey="pratiquant:banc-essai"
               help={`Réglage provisoire, pour essayer : impose le nombre de sessions que compte le banc de poissons du Profil (de ${SCHOOL_TRIAL_BOUNDS[0]} à ${SCHOOL_TRIAL_BOUNDS[1]}). Vide : automatique, toutes les sessions de la bibliothèque.`} />
+            <SettingRow label="Poisson du banc" helpKey="pratiquant:banc-poisson"
+              help="Le dessin des poissons du banc du Profil, « Deux arcs » au départ ; « Couleur d'activité » peint chaque poisson à la couleur de l'activité de sa session. Changer de poisson ne déplace aucun poisson.">
+              {/* Décoratif et chargé à part : s'il ne se charge pas (hors ligne), le reste de Réglages demeure. */}
+              <ErrorBoundary silent>
+                <Suspense fallback={null}>
+                  <FishStylePicker value={profile.schoolStyle ?? DEFAULT_SCHOOL_STYLE} onChange={setSchoolStyle}
+                    activityColors={pickerColors} />
+                </Suspense>
+              </ErrorBoundary>
+            </SettingRow>
             {PROFILE_PLANT_VISIBLE && (
               <>
                 <p className="ui-eyebrow set-subhead">Racine du Profil</p>

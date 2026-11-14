@@ -2,7 +2,7 @@ import { finiteOr, inRange } from '../core/basics';
 import { storedLogo, type LogoId } from '../core/activityLogos';
 import { heartRateZones, isValidThresholds, type HeartRateZones } from '../core/heartRate';
 import type { HeartRateProfile } from '../core/sportProfiles';
-import { SCHOOL_TRIAL_MAX } from '../core/schoolBasics';
+import { SCHOOL_TRIAL_MAX, isSchoolStyle, type SchoolStyle } from '../core/schoolBasics';
 
 /**
  * Profil du pratiquant, pur : sa forme, ses champs relus avec
@@ -63,6 +63,8 @@ export interface AthleteProfile {
    * réglage d'essai provisoire ; `null` : le vrai compte des sessions.
    */
   schoolTrialSessions: number | null;
+  /** Dessin des poissons du banc du Profil, choisi dans Réglages › Pratiquant ; `null` : `DEFAULT_SCHOOL_STYLE`. */
+  schoolStyle: SchoolStyle | null;
 }
 
 export const EMPTY_ATHLETE_PROFILE: AthleteProfile = {
@@ -79,11 +81,12 @@ export const EMPTY_ATHLETE_PROFILE: AthleteProfile = {
   hrThresholds: null,
   rootWeeklyGoalMin: null,
   schoolTrialSessions: null,
+  schoolStyle: null,
 };
 
 /** Plages plausibles de chaque champ numérique. */
 export type AthleteNumberField = Exclude<keyof AthleteProfile,
-  'name' | 'avatar' | 'sex' | 'hrThresholds' | 'hrMaxSource' | 'hrRestSource'>;
+  'name' | 'avatar' | 'sex' | 'hrThresholds' | 'hrMaxSource' | 'hrRestSource' | 'schoolStyle'>;
 
 /** Champs numériques du Profil dont la plage n'est pas dans `ATHLETE_BOUNDS` (`library/profilePrompt.ts`). */
 type ProfileOnlyNumberField = 'rootWeeklyGoalMin' | 'schoolTrialSessions';
@@ -118,6 +121,12 @@ export const athleteAvatar = (profile: Partial<Pick<AthleteProfile, 'avatar'>>):
 export const athleteSchoolTrialSessions = (profile: Partial<Pick<AthleteProfile, 'schoolTrialSessions'>>): number | null => {
   const raw: unknown = profile.schoolTrialSessions;
   return inRange(raw, ...SCHOOL_TRIAL_BOUNDS) && Number.isInteger(raw) ? raw : null;
+};
+
+/** Dessin des poissons du banc choisi, `null` sans choix ou pour un style inconnu (le style par défaut). */
+export const athleteSchoolStyle = (profile: Partial<Pick<AthleteProfile, 'schoolStyle'>>): SchoolStyle | null => {
+  const raw: unknown = profile.schoolStyle;
+  return isSchoolStyle(raw) ? raw : null;
 };
 
 /** Plages plausibles des champs numériques du pratiquant (celles de l'objectif de la racine et du réglage d'essai du banc : `library/profilePrompt.ts`). */
@@ -193,6 +202,7 @@ export const sanitizeAthleteProfile = (raw: unknown, rootGoal: { min: number; ma
     hrThresholds: isValidThresholds(thresholds) ? thresholds : null,
     rootWeeklyGoalMin: inRange(p.rootWeeklyGoalMin, rootGoal.min, rootGoal.max) ? p.rootWeeklyGoalMin : null,
     schoolTrialSessions: athleteSchoolTrialSessions({ schoolTrialSessions: p.schoolTrialSessions as number | null }),
+    schoolStyle: athleteSchoolStyle({ schoolStyle: p.schoolStyle as SchoolStyle | null }),
   };
 };
 

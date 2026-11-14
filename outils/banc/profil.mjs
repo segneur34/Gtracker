@@ -408,6 +408,121 @@ check('« Retirer » rend l\'avatar vide', (await avatarState()) === 'vide', awa
 await go('/profil');
 check('… vide au rechargement', (await avatarState()) === 'vide', await avatarState());
 
+// 8. Le banc de poissons du Profil, par le réglage d'essai « Nombre de sessions du banc » (posé dans le profil du
+// pratiquant, `schoolTrialSessions`) : nombre de poissons, eau, aucun poisson sur un texte, places stables, choix du dessin.
+/** Poissons attendus : trois par session jusqu'à 30, deux de la 31e à la 40e, puis un. */
+const fishExpected = (n) => 3 * Math.min(n, 30) + 2 * Math.max(0, Math.min(n, 40) - 30) + Math.max(0, n - 40);
+const SCHOOL_COUNTS = [0, 1, 15, 30, 31, 50, 100];
+const sizeOf = (width) => ({ width, height: width === 390 ? 844 : 640, deviceScaleFactor: 2, mobile: true });
+/** Ouvre le Profil avec ce compte d'essai et ce dessin (`null` : le choix par défaut) ; rend le relevé de la couche. */
+const openSchool = async (n, style = null) => {
+  await setAthlete({ schoolTrialSessions: n, schoolStyle: style });
+  await go('/profil');
+  if (n === 0) {
+    await wait(700);
+  } else {
+    await waitFor(`document.querySelector('.fish-school')?.getAttribute('data-fish') === '${fishExpected(n)}'`, { timeout: 15000, every: 100, label: `banc de ${n} sessions` });
+  }
+  return evaluate(`(() => {
+    const svg = document.querySelector('.fish-school');
+    const uses = svg ? [...svg.querySelectorAll(':scope > use')] : [];
+    return {
+      present: !!svg,
+      fish: uses.length,
+      attr: svg?.getAttribute('data-fish') ?? null,
+      water: !!svg?.querySelector('.fish-school__water'),
+      hrefs: uses.map((u) => u.getAttribute('href')),
+      transforms: uses.map((u) => u.getAttribute('transform')),
+      ms: Number(svg?.getAttribute('data-ms') ?? -1),
+    };
+  })()`);
+};
+/** Poissons dont la boîte recouvre un texte visible du Profil (hors couche et barres de navigation), à `tol` px près. */
+const fishOnText = (tol) => evaluate(`(() => {
+  const tol = ${tol};
+  const root = document.querySelector('.profile') ?? document.body;
+  const skip = '.fish-school, .shell-tabbar, nav, [class*="shell-top"]';
+  const texts = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const el = node.parentElement;
+    if (!el || el.closest(skip) || !node.textContent.trim()) continue;
+    const st = getComputedStyle(el);
+    if (st.visibility === 'hidden' || st.display === 'none' || Number(st.opacity) === 0) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    for (const r of range.getClientRects()) if (r.width > 0 && r.height > 0) texts.push({ r, t: node.textContent.trim().slice(0, 24) });
+  }
+  const hits = [];
+  document.querySelectorAll('.fish-school > use').forEach((u, i) => {
+    const b = u.getBoundingClientRect();
+    for (const { r, t } of texts) {
+      if (Math.min(b.right, r.right) - Math.max(b.left, r.left) > tol && Math.min(b.bottom, r.bottom) - Math.max(b.top, r.top) > tol) {
+        hits.push(i + ' sur « ' + t + ' » poisson [' + Math.round(b.left) + ',' + Math.round(b.top) + ',' + Math.round(b.right) + ',' + Math.round(b.bottom) + '] texte [' + Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.right) + ',' + Math.round(r.bottom) + ']');
+        break;
+      }
+    }
+  });
+  return hits;
+})()`);
+
+for (const width of [390, 320]) {
+  await send('Emulation.setDeviceMetricsOverride', sizeOf(width));
+  const byCount = {};
+  for (const n of SCHOOL_COUNTS) {
+    byCount[n] = await openSchool(n);
+    if (n === 0) {
+      check(`banc ${width} px : à 0 session, pas de couche`, !byCount[0].present, JSON.stringify({ present: byCount[0].present }));
+    } else if ([1, 15, 30, 50, 100].includes(n)) {
+      check(`banc ${width} px : ${n} session${n > 1 ? 's' : ''}, ${fishExpected(n)} poissons et l'eau dessinée`,
+        byCount[n].fish === fishExpected(n) && byCount[n].attr === String(fishExpected(n)) && byCount[n].water, JSON.stringify({ fish: byCount[n].fish, water: byCount[n].water }));
+    }
+    if (n === 30 || n === 100) {
+      const hits = await fishOnText(2);
+      check(`banc ${width} px : ${n} sessions, aucun poisson sur un texte`, hits.length === 0, hits.join(' ; '));
+      if (n === 30) await shoot(`profil-banc-${width}`);
+    }
+  }
+  const a = byCount[30].transforms;
+  const b = byCount[31].transforms;
+  check(`banc ${width} px : les places de 30 sessions sont le début de celles de 31`, a.length === 90 && b.length === 92 && a.every((t, i) => t === b[i]),
+    `${a.length} / ${b.length}`);
+  const p5 = await openSchool(30, 'P5');
+  check(`banc ${width} px : de P4 à P5, mêmes places, seuls les dessins changent`,
+    p5.transforms.length === 90 && p5.transforms.every((t, i) => t === a[i]) && p5.hrefs.every((h) => h.startsWith('#fz-P5-')) && byCount[30].hrefs.every((h) => h.startsWith('#fz-P4-')),
+    `${p5.hrefs[0]} / ${byCount[30].hrefs[0]}`);
+}
+
+// Le choix du dessin par Réglages › Pratiquant.
+await send('Emulation.setDeviceMetricsOverride', sizeOf(390));
+await setAthlete({ schoolTrialSessions: 30, schoolStyle: null });
+await evaluate(`(() => {
+  const s = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
+  s.settings = { ...(s.settings ?? {}), pratiquant: true };
+  localStorage.setItem('${CLES.sections}', JSON.stringify(s));
+})()`);
+await go('/parametres');
+const pickerState = () => evaluate(`[...document.querySelectorAll('.fish-style-picker [data-style]')].map((b) => b.getAttribute('data-style') + (b.getAttribute('aria-pressed') === 'true' ? '*' : '')).join(' ')`);
+await waitFor(`document.querySelectorAll('.fish-style-picker [data-style]').length === 7`, { timeout: 8000, every: 100, label: 'choix du dessin' });
+check('réglages : sept dessins, P4 enfoncé au départ', (await pickerState()) === 'P1 P2 P3 P4* P5 P6 P7', await pickerState());
+await evaluate(`document.querySelector('.fish-style-picker [data-style="P5"]').click()`);
+await wait(300);
+check('réglages : un clic sur P5 l\'enfonce', (await pickerState()) === 'P1 P2 P3 P4 P5* P6 P7', await pickerState());
+await go('/profil');
+await waitFor(`document.querySelector('.fish-school')?.getAttribute('data-fish') === '90'`, { timeout: 15000, every: 100, label: 'banc de 30 sessions' });
+check('le Profil rouvert montre les dessins P5', await evaluate(`(() => { const u = [...document.querySelectorAll('.fish-school > use')]; return u.length === 90 && u.every((x) => x.getAttribute('href').startsWith('#fz-P5-')); })()`));
+await go('/parametres');
+await waitFor(`document.querySelectorAll('.fish-style-picker [data-style]').length === 7`, { timeout: 8000, every: 100, label: 'choix du dessin' });
+check('le choix de P5 tient au rechargement', (await pickerState()) === 'P1 P2 P3 P4 P5* P6 P7', await pickerState());
+
+// Temps de calcul sous processeur ralenti quatre fois, à 100 sessions : le nombre va dans la console, pas dans le relevé.
+await send('Emulation.setCPUThrottlingRate', { rate: 4 });
+const slow = await openSchool(100);
+await send('Emulation.setCPUThrottlingRate', { rate: 1 });
+console.log(`temps de calcul du banc (processeur ralenti ×4, 100 sessions, 390 px) : ${slow.ms} ms`);
+check('banc : calcul à 100 sessions sous processeur ralenti ×4 en moins de 600 ms', slow.fish === 170 && slow.ms >= 0 && slow.ms < 600);
+await setAthlete({ schoolTrialSessions: null, schoolStyle: null });
+
 // Ce script ne relève que les erreurs de console, pas les avertissements.
 const errors = logs.filter((l) => !l.startsWith('warning:'));
 console.log(errors.length ? `Console :\n${errors.join('\n')}` : 'Console : aucune erreur');

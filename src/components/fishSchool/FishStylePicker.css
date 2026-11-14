@@ -1,0 +1,55 @@
+/* Choix du poisson du banc (`FishStylePicker.tsx`) : sept boutons en grille, sur le modèle du choix de couleur et du
+   choix d'icône ; la grille passe d'elle-même de deux colonnes (320 px) à plusieurs, sans requête d'écran. */
+.fish-style-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.fish-style-picker__choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-1);
+  border: none;
+  border-radius: var(--radius-s);
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--ring-line);
+  font: inherit;
+  cursor: pointer;
+}
+
+.fish-style-picker__choice[aria-pressed='true'] {
+  box-shadow: var(--ring-ink);
+}
+
+.fish-style-picker__choice:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.fish-style-picker__preview {
+  display: block;
+  width: 64px;
+  height: 28px;
+  overflow: visible;
+}
+
+.fish-style-picker__name {
+  max-width: 100%;
+  font-size: var(--text-xs);
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.fish-style-picker__choice[aria-pressed='true'] .fish-style-picker__name {
+  font-weight: 700;
+}

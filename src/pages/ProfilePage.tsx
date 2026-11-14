@@ -398,7 +398,7 @@ function ProfilePage() {
       {school.sessions > 0 && (
         <ErrorBoundary silent>
           <Suspense fallback={null}>
-            <FishSchool sessions={school.sessions} colors={school.colors} style={DEFAULT_SCHOOL_STYLE}
+            <FishSchool sessions={school.sessions} colors={school.colors} style={profile.schoolStyle ?? DEFAULT_SCHOOL_STYLE}
               ready={status === 'ready' && !scanning} onShown={setSchoolShown} />
           </Suspense>
         </ErrorBoundary>
