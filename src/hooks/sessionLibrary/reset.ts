@@ -4,6 +4,7 @@ import {
   resetInterruptedText, type EraseCounts,
 } from '../../library/resetPlan';
 import { clearDeviceFiles } from '../../platform/appReset';
+import { t } from '../../core/i18n';
 import { plainError } from '../../platform/errorText';
 import { browserMemoryCopy, isFolderDesignated, type MemoryFolder } from '../../platform/memoryFolder';
 import {
@@ -107,7 +108,7 @@ export const eraseEverything = async (onProgress: (progress: ResetProgress) => v
     resumeSettingsWrites();
     resetRunning = false;
     await openLibrary();
-    const message = resetInterruptedText(result, plainError(result.error, 'le dossier ne répond pas'));
+    const message = resetInterruptedText(result, plainError(result.error, t('le dossier ne répond pas')));
     setState({ error: message });
     return message;
   }

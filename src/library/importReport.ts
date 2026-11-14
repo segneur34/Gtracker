@@ -1,4 +1,4 @@
-import { plural } from '../core/basics';
+import { t, tn } from '../core/i18n';
 
 /**
  * Compte rendu d'un import de sessions (fichiers GPX ou FIT, dossier mémoire) et sa
@@ -47,10 +47,14 @@ export interface ImportReport {
 }
 
 /** Phrase des sessions d'un sport que Gtracker ne range pas. */
-const otherSportsSentence = (n: number): string => {
-  const s = n > 1 ? 's' : '';
-  return `${n} session${s} de course, de vélo ou d'entraînement laissée${s} de côté : Gtracker ne range que la voile et le surf.`;
-};
+const otherSportsSentence = (n: number): string =>
+  // Les sports écartés entrent par une variable : la phrase existe au singulier et au pluriel, leur liste une seule fois.
+  tn(
+    n,
+    '{n} session {sports} laissée de côté : Gtracker ne range que la voile et le surf.',
+    '{n} sessions {sports} laissées de côté : Gtracker ne range que la voile et le surf.',
+    { sports: t("de course, de vélo ou d'entraînement") }
+  );
 
 /** Phrase du compte rendu : sessions ajoutées, déjà présentes, complétées ou non, illisibles, non rangées, d'un autre sport. */
 export const describeImport = (report: ImportReport): string => {
@@ -58,35 +62,50 @@ export const describeImport = (report: ImportReport): string => {
     && report.failed.length === 0 && report.otherSports.length === 0;
   if (report.notActivities.length > 0 && nothingElse) {
     return report.notActivities.length > 1
-      ? `Ces ${report.notActivities.length} fichiers de montre ne sont pas des activités (réglages, parcours…) : rien n'a été importé.`
-      : "Ce fichier de montre n'est pas une activité (réglages, parcours…) : rien n'a été importé.";
+      ? t("Ces {n} fichiers de montre ne sont pas des activités (réglages, parcours…) : rien n'a été importé.", { n: report.notActivities.length })
+      : t("Ce fichier de montre n'est pas une activité (réglages, parcours…) : rien n'a été importé.");
   }
   const parts: string[] = [];
-  parts.push(report.added.length === 1 ? '1 session ajoutée' : `${report.added.length} sessions ajoutées`);
-  if (report.duplicates > 0) parts.push(`${report.duplicates} déjà présente${report.duplicates > 1 ? 's' : ''}`);
+  parts.push(tn(report.added.length, '{n} session ajoutée', '{n} sessions ajoutées', undefined, report.added.length !== 1));
+  if (report.duplicates > 0) parts.push(tn(report.duplicates, '{n} déjà présente', '{n} déjà présentes'));
   if (report.motionAdded > 0) {
-    parts.push(`capteurs ajoutés à ${report.motionAdded} session${report.motionAdded > 1 ? 's' : ''} déjà présente${report.motionAdded > 1 ? 's' : ''}`);
+    parts.push(tn(report.motionAdded, 'capteurs ajoutés à {n} session déjà présente', 'capteurs ajoutés à {n} sessions déjà présentes'));
   }
   if (report.motionFailed.length > 0) {
-    const s = report.motionFailed.length > 1 ? 's' : '';
-    parts.push(`capteurs illisibles pour ${report.motionFailed.length} session${s} (${report.motionFailed.join(', ')}), gardée${s} sans eux : un nouvel import les ajoutera`);
+    parts.push(tn(
+      report.motionFailed.length,
+      'capteurs illisibles pour {n} session ({names}), gardée sans eux : un nouvel import les ajoutera',
+      'capteurs illisibles pour {n} sessions ({names}), gardées sans eux : un nouvel import les ajoutera',
+      { names: report.motionFailed.join(', ') }
+    ));
   }
   if (report.recordCompleted > 0) {
-    parts.push(`fiche complétée pour ${report.recordCompleted} session${report.recordCompleted > 1 ? 's' : ''} déjà présente${report.recordCompleted > 1 ? 's' : ''}`);
+    parts.push(tn(report.recordCompleted, 'fiche complétée pour {n} session déjà présente', 'fiche complétée pour {n} sessions déjà présentes'));
   }
   if (report.recordNotRead > 0) {
-    const s = report.recordNotRead > 1 ? 's' : '';
-    parts.push(`fiche non relue pour ${report.recordNotRead} session${s} déjà présente${s} : non complétée${s}`);
+    parts.push(tn(
+      report.recordNotRead,
+      'fiche non relue pour {n} session déjà présente : non complétée',
+      'fiche non relue pour {n} sessions déjà présentes : non complétées'
+    ));
   }
-  if (report.invalid.length > 0) parts.push(`${report.invalid.length} illisible${report.invalid.length > 1 ? 's' : ''} (${report.invalid.join(', ')})`);
+  if (report.invalid.length > 0) {
+    parts.push(tn(report.invalid.length, '{n} illisible ({names})', '{n} illisibles ({names})', { names: report.invalid.join(', ') }));
+  }
   if (report.unsaved > 0) {
-    parts.push(`${report.unsaved} non rangée${report.unsaved > 1 ? 's' : ''} : désignez d'abord le dossier mémoire (Réglages › Mémoire)`);
+    parts.push(tn(
+      report.unsaved,
+      "{n} non rangée : désignez d'abord le dossier mémoire (Réglages › Mémoire)",
+      "{n} non rangées : désignez d'abord le dossier mémoire (Réglages › Mémoire)"
+    ));
   }
   if (report.legacyRecordsIgnored.length > 0) {
-    const n = report.legacyRecordsIgnored.length;
-    const s = n > 1 ? 's' : '';
-    parts.push(`fiche de l'autre application d'une version plus récente ou illisible pour ${n} session${s} (${report.legacyRecordsIgnored.join(', ')}) : `
-      + `trace seule rangée, sans nom, notes ni repères`);
+    parts.push(tn(
+      report.legacyRecordsIgnored.length,
+      "fiche de l'autre application d'une version plus récente ou illisible pour {n} session ({names}) : trace seule rangée, sans nom, notes ni repères",
+      "fiche de l'autre application d'une version plus récente ou illisible pour {n} sessions ({names}) : trace seule rangée, sans nom, notes ni repères",
+      { names: report.legacyRecordsIgnored.join(', ') }
+    ));
   }
   const others = report.otherSports.length;
   if (others === 0) return `${parts.join(', ')}.`;
@@ -103,8 +122,8 @@ export const describeRefresh = (before: ReadonlySet<number>, after: ReadonlySet<
   const added = [...after].filter((startMs) => !before.has(startMs)).length;
   const removed = [...before].filter((startMs) => !after.has(startMs)).length;
   const changes = [
-    ...(added > 0 ? [`${plural(added, 'session')} de plus`] : []),
-    ...(removed > 0 ? [`${plural(removed, 'session')} en moins`] : []),
+    ...(added > 0 ? [tn(added, '{n} session de plus', '{n} sessions de plus')] : []),
+    ...(removed > 0 ? [tn(removed, '{n} session en moins', '{n} sessions en moins')] : []),
   ];
-  return `Dossier relu : ${changes.length > 0 ? changes.join(', ') : 'rien de nouveau'}.`;
+  return t('Dossier relu : {changes}.', { changes: changes.length > 0 ? changes.join(', ') : t('rien de nouveau') });
 };

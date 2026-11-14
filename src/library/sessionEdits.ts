@@ -1,3 +1,4 @@
+import { t } from '../core/i18n';
 import type { SessionMark } from '../core/sessionMarks';
 import { EMPTY_NOTES, type GearChoice, type SailingSessionNotes } from './notes';
 import {
@@ -74,15 +75,15 @@ export type EditedPart = AnalysisPart | 'notes' | 'reperes';
 
 /** Nom de chaque partie, tel que l'écran l'annonce. */
 export const EDITED_PART_LABEL: Record<EditedPart, string> = {
-  vent: 'vent',
-  seuil: "seuil d'activité",
-  allure: 'allure de la session',
-  couleurs: 'couleurs de la trace',
-  foil: 'foil',
-  pumping: 'pumping',
-  vague: 'seuil de vague',
-  notes: 'notes',
-  reperes: 'repères',
+  vent: t('vent'),
+  seuil: t("seuil d'activité"),
+  allure: t('allure de la session'),
+  couleurs: t('couleurs de la trace'),
+  foil: t('foil'),
+  pumping: t('pumping'),
+  vague: t('seuil de vague'),
+  notes: t('notes'),
+  reperes: t('repères'),
 };
 
 /** Égalité d'un réglage d'analyse, selon sa ligne de la table (`===` par défaut). */

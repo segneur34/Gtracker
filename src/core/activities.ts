@@ -1,4 +1,5 @@
 import { isObject } from './basics';
+import { t } from './i18n';
 import {
   SPORT_FAMILIES, SPORT_PROFILES, isSportType, sportFamily, sportTreatment, type SportFamily, type Treatment,
 } from './sportProfiles';
@@ -219,7 +220,7 @@ export const withPaletteColors = (activities: Activity[]): Activity[] => {
 export const FAMILY_BASE: Record<SportFamily, SportType> = { voile: 'wingfoil', surf: 'surf' };
 
 /** Nom d'une famille, tel que l'interface l'affiche. */
-export const FAMILY_LABEL: Record<SportFamily, string> = { voile: 'Voile', surf: 'Surf' };
+export const FAMILY_LABEL: Record<SportFamily, string> = { voile: t('Voile'), surf: t('Surf') };
 
 /** Tournure d'une famille dans « Aucune activité … », « Aucune session … » : « de voile », « de surf ». */
 export const FAMILY_OF: Record<SportFamily, string> = { voile: 'de voile', surf: 'de surf' };

@@ -1,4 +1,5 @@
 import { errorMessage } from '../../core/basics';
+import { t } from '../../core/i18n';
 import { describeImport, type ImportReport } from '../../library/importReport';
 import { MAX_LISTED_FILE_BYTES } from '../../library/reconcile';
 import { incomingFiles, type IncomingFile, type IncomingFilesPort, type IncomingRefusal } from '../../platform/incomingFile';
@@ -35,23 +36,28 @@ type IncomingVerdict =
 
 const reasonOf = (name: string, failed: string): string => (failed.startsWith(`${name} : `) ? failed.slice(name.length + 3) : failed);
 
-const quoted = (name: string): string => `« ${name} »`;
+const quoted = (name: string): string => t('« {name} »', { name });
 
 /** Refus sans mémoire ou en lecture seule : la phrase de l'import, et de quoi recommencer. */
 const refusedForMemory = (name: string, readOnly: boolean): string =>
-  `${quoted(name)} n'a pas été rangé. ${readOnly ? READ_ONLY_MEMORY_MESSAGE : `${NO_FOLDER_IMPORT_MESSAGE} Le fichier d'origine n'a pas bougé : ouvrez-le de nouveau ensuite.`}`;
+  t("{quoted} n'a pas été rangé. {why}", {
+    quoted: quoted(name),
+    why: readOnly
+      ? READ_ONLY_MEMORY_MESSAGE
+      : t("{message} Le fichier d'origine n'a pas bougé : ouvrez-le de nouveau ensuite.", { message: NO_FOLDER_IMPORT_MESSAGE }),
+  });
 
 /** Ce que `importEntries` a fait d'un seul fichier. Rien dit : prudence, la copie reste. */
 const incomingVerdict = (report: ImportReport, name: string): IncomingVerdict => {
   if (report.added.length > 0) return { kind: 'added', file: report.added[0] };
   if (report.duplicates > 0) return { kind: 'duplicate', file: report.existing[0] ?? null };
   if (report.retryable.length > 0) return { kind: 'retry', reason: report.failed.length > 0 ? reasonOf(name, report.failed[0]) : null };
-  if (report.failed.length > 0) return { kind: 'refused', text: `${quoted(name)} n'a pas été rangé : ${sentence(reasonOf(name, report.failed[0]))}` };
-  if (report.invalid.length > 0) return { kind: 'refused', text: `${quoted(name)} n'a pas été rangé : fichier illisible.` };
+  if (report.failed.length > 0) return { kind: 'refused', text: t("{quoted} n'a pas été rangé : {reason}", { quoted: quoted(name), reason: sentence(reasonOf(name, report.failed[0])) }) };
+  if (report.invalid.length > 0) return { kind: 'refused', text: t("{quoted} n'a pas été rangé : fichier illisible.", { quoted: quoted(name) }) };
   if (report.notActivities.length > 0) return { kind: 'refused', text: describeImport(report) };
   // Course, vélo, entraînement : refusé pour de bon, la copie est retirée.
   if (report.otherSports.length > 0) return { kind: 'refused', text: describeImport(report) };
-  if (report.ignored.length > 0) return { kind: 'refused', text: `${quoted(name)} n'a pas été rangé : fichier vide.` };
+  if (report.ignored.length > 0) return { kind: 'refused', text: t("{quoted} n'a pas été rangé : fichier vide.", { quoted: quoted(name) }) };
   if (report.unsaved > 0) return { kind: 'refused', text: refusedForMemory(name, false) };
   return { kind: 'retry', reason: null };
 };
@@ -60,11 +66,11 @@ const incomingVerdict = (report: ImportReport, name: string): IncomingVerdict =>
 const refusalText = (name: string, refusal: IncomingRefusal): string => {
   switch (refusal) {
     case 'format':
-      return `${quoted(name)} n'a pas été rangé : ce n'est ni un GPX ni un FIT.`;
+      return t("{quoted} n'a pas été rangé : ce n'est ni un GPX ni un FIT.", { quoted: quoted(name) });
     case 'trop-gros':
-      return `${quoted(name)} n'a pas été rangé : il dépasse ${MAX_LISTED_FILE_BYTES / (1024 * 1024)} Mo.`;
+      return t("{quoted} n'a pas été rangé : il dépasse {size} Mo.", { quoted: quoted(name), size: MAX_LISTED_FILE_BYTES / (1024 * 1024) });
     default:
-      return `${quoted(name)} n'a pas été rangé : Gtracker n'a pas pu le lire. Essayez de l'ouvrir de nouveau.`;
+      return t("{quoted} n'a pas été rangé : Gtracker n'a pas pu le lire. Essayez de l'ouvrir de nouveau.", { quoted: quoted(name) });
   }
 };
 
@@ -126,12 +132,15 @@ const routeArrival = async (file: IncomingFile): Promise<'route' | Uint8Array | 
   if (!isRouteGpx(new TextDecoder().decode(bytes))) return bytes;
   try {
     const saved = await importRoute(new TextDecoder().decode(bytes), name);
-    notify({ id, text: `${quoted(name)} est rangé dans les itinéraires, sous « ${saved.record.name} ».`, file: null, route: saved.base, trouble: false });
+    notify({ id, text: t('{quoted} est rangé dans les itinéraires, sous « {route} ».', { quoted: quoted(name), route: saved.record.name }), file: null, route: saved.base, trouble: false });
     await forget(file);
   } catch (err) {
     notify({
       id,
-      text: `${quoted(name)} n'a pas pu être rangé dans les itinéraires (${errorMessage(err, 'erreur inconnue')}). Gtracker le garde et réessaiera au prochain lancement.`,
+      text: t("{quoted} n'a pas pu être rangé dans les itinéraires ({detail}). Gtracker le garde et réessaiera au prochain lancement.", {
+        quoted: quoted(name),
+        detail: errorMessage(err, t('erreur inconnue')),
+      }),
       file: null,
       trouble: true,
     });
@@ -158,10 +167,10 @@ const handle = async (file: IncomingFile): Promise<void> => {
   const verdict = incomingVerdict(await importEntries([entryOf(file, arrival)], { quiet: true }), name);
   switch (verdict.kind) {
     case 'added':
-      notify({ id, text: `${quoted(name)} est rangé dans la mémoire.`, file: verdict.file, trouble: false });
+      notify({ id, text: t('{quoted} est rangé dans la mémoire.', { quoted: quoted(name) }), file: verdict.file, trouble: false });
       break;
     case 'duplicate':
-      notify({ id, text: `${quoted(name)} : cette session est déjà présente.`, file: verdict.file, trouble: false });
+      notify({ id, text: t('{quoted} : cette session est déjà présente.', { quoted: quoted(name) }), file: verdict.file, trouble: false });
       break;
     case 'refused':
       notify({ id, text: verdict.text, file: null, trouble: true });
@@ -169,7 +178,9 @@ const handle = async (file: IncomingFile): Promise<void> => {
     case 'retry':
       notify({
         id,
-        text: `${quoted(name)} n'a pas pu être rangé${verdict.reason ? ` (${verdict.reason})` : ''}. Gtracker le garde et réessaiera au prochain lancement.`,
+        text: verdict.reason
+          ? t("{quoted} n'a pas pu être rangé ({reason}). Gtracker le garde et réessaiera au prochain lancement.", { quoted: quoted(name), reason: verdict.reason })
+          : t("{quoted} n'a pas pu être rangé. Gtracker le garde et réessaiera au prochain lancement.", { quoted: quoted(name) }),
         file: null,
         trouble: true,
       });

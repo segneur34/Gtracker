@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { tileCacheUsage, type CachedTileEntry, type TileCacheUsage, type TileCoord } from './tiles';
 
 /**
@@ -45,8 +46,8 @@ export const MAP_BASES: Record<MapBase, MapBaseSource> = {
   satellite: {
     // Attention à l'ordre : y puis x.
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?blankTile=false',
-    attribution: 'Powered by Esri &middot; Imagerie &copy; Esri, Vantor, Earthstar Geographics, GIS User Community',
-    credit: 'Powered by Esri · Imagerie © Esri, Vantor, Earthstar Geographics, GIS User Community',
+    attribution: t('Powered by Esri &middot; Imagerie &copy; Esri, Vantor, Earthstar Geographics, GIS User Community'),
+    credit: t('Powered by Esri · Imagerie © Esri, Vantor, Earthstar Geographics, GIS User Community'),
     keyPrefix: 'sat_',
     overzoomDepth: 6,
     fetchAncestors: true,

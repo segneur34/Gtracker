@@ -1,4 +1,5 @@
 import { roundBearingDeg } from '../core/angles';
+import { t } from '../core/i18n';
 import { bandIndex } from '../core/basics';
 import { sportTreatment, type Treatment } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
@@ -143,25 +144,25 @@ export const recentWindowLabel = (options: LiveStatsOptions = LIVE_STATS_DEFAULT
 export const liveFieldLabel = (key: LiveFieldKey, { distanceUnit, options = LIVE_STATS_DEFAULTS }: LiveFieldUnits): string => {
   const [topShortS, topLongS] = options.topDurationsS;
   switch (key) {
-    case 'speed': return 'Vitesse';
-    case 'average': return options.activeAverage ? 'Moyenne active' : 'Moyenne';
-    case 'max': return `Max (${options.maxDurationS} s)`;
-    case 'recentDistanceSpeed': return `${options.recentDistanceM} derniers m`;
-    case 'lastDistance': return distanceUnit === 'nm' ? 'Dernier mille' : 'Dernier km';
-    case 'distance': return 'Distance';
-    case 'duration': return 'Durée';
-    case 'clock': return 'Heure';
-    case 'remaining': return 'Restant';
-    case 'remainingTime': return 'Temps restant';
-    case 'recentTopShort': return `Top ${topShortS} s (${recentWindowLabel(options)})`;
-    case 'recentTopLong': return `Top ${topLongS} s (${recentWindowLabel(options)})`;
-    case 'heading': return 'Cap';
-    case 'legAverage': return 'Moyenne du bord';
-    case 'markDistance': return 'Balise';
-    case 'markBearing': return 'Cap balise';
-    case 'heartRate': return 'Fréquence cardiaque';
-    case 'averageHeartRate': return 'FC moyenne';
-    case 'heartRateZone': return 'Zone cardiaque';
+    case 'speed': return t('Vitesse');
+    case 'average': return options.activeAverage ? t('Moyenne active') : t('Moyenne');
+    case 'max': return t('Max ({s} s)', { s: options.maxDurationS });
+    case 'recentDistanceSpeed': return t('{m} derniers m', { m: options.recentDistanceM });
+    case 'lastDistance': return distanceUnit === 'nm' ? t('Dernier mille') : t('Dernier km');
+    case 'distance': return t('Distance');
+    case 'duration': return t('Durée');
+    case 'clock': return t('Heure');
+    case 'remaining': return t('Restant');
+    case 'remainingTime': return t('Temps restant');
+    case 'recentTopShort': return t('Top {s} s ({fenetre})', { s: topShortS, fenetre: recentWindowLabel(options) });
+    case 'recentTopLong': return t('Top {s} s ({fenetre})', { s: topLongS, fenetre: recentWindowLabel(options) });
+    case 'heading': return t('Cap');
+    case 'legAverage': return t('Moyenne du bord');
+    case 'markDistance': return t('Balise');
+    case 'markBearing': return t('Cap balise');
+    case 'heartRate': return t('Fréquence cardiaque');
+    case 'averageHeartRate': return t('FC moyenne');
+    case 'heartRateZone': return t('Zone cardiaque');
   }
 };
 
@@ -169,25 +170,25 @@ export const liveFieldLabel = (key: LiveFieldKey, { distanceUnit, options = LIVE
 export const liveFieldShortLabel = (key: LiveFieldKey, { distanceUnit, options = LIVE_STATS_DEFAULTS }: LiveFieldUnits): string => {
   const [topShortS, topLongS] = options.topDurationsS;
   switch (key) {
-    case 'speed': return 'Vit.';
-    case 'average': return options.activeAverage ? 'Moy. act.' : 'Moy.';
-    case 'max': return 'Max';
+    case 'speed': return t('Vit.');
+    case 'average': return options.activeAverage ? t('Moy. act.') : t('Moy.');
+    case 'max': return t('Max');
     case 'recentDistanceSpeed': return `${options.recentDistanceM} m`;
-    case 'lastDistance': return distanceUnit === 'nm' ? 'Dern. mille' : 'Dern. km';
-    case 'distance': return 'Dist.';
-    case 'duration': return 'Durée';
-    case 'clock': return 'Heure';
-    case 'remaining': return 'Reste';
-    case 'remainingTime': return 'Temps rest.';
-    case 'recentTopShort': return `Top ${topShortS} s`;
-    case 'recentTopLong': return `Top ${topLongS} s`;
-    case 'heading': return 'Cap';
-    case 'legAverage': return 'Bord';
-    case 'markDistance': return 'Balise';
-    case 'markBearing': return 'Cap bal.';
-    case 'heartRate': return 'FC';
-    case 'averageHeartRate': return 'FC moy.';
-    case 'heartRateZone': return 'Zone';
+    case 'lastDistance': return distanceUnit === 'nm' ? t('Dern. mille') : t('Dern. km');
+    case 'distance': return t('Dist.');
+    case 'duration': return t('Durée');
+    case 'clock': return t('Heure');
+    case 'remaining': return t('Reste');
+    case 'remainingTime': return t('Temps rest.');
+    case 'recentTopShort': return t('Top {s} s', { s: topShortS });
+    case 'recentTopLong': return t('Top {s} s', { s: topLongS });
+    case 'heading': return t('Cap');
+    case 'legAverage': return t('Bord');
+    case 'markDistance': return t('Balise');
+    case 'markBearing': return t('Cap bal.');
+    case 'heartRate': return t('FC');
+    case 'averageHeartRate': return t('FC moy.');
+    case 'heartRateZone': return t('Zone');
   }
 };
 
@@ -242,7 +243,7 @@ export const liveFieldValue = (key: LiveFieldKey, ctx: LiveFieldContext): string
       if (ctx.heartRateBpm === null || ctx.heartRateZoneBounds === null) return NONE;
       const bpm = Math.round(ctx.heartRateBpm);
       const zone = bandIndex(bpm, ctx.heartRateZoneBounds);
-      return `${zone === 0 ? 'sous Z1' : `Z${zone}`} · ${bpm}`;
+      return `${zone === 0 ? t('sous Z1') : `Z${zone}`} · ${bpm}`;
     }
   }
 };

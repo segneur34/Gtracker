@@ -107,6 +107,8 @@ Une étape P reçoit une liste de fichiers. Pour chacun : lire, envelopper chaqu
 - **Espace insécable** : l'outil Edit écrit le vrai caractère, et la clé doit le porter tel qu'il est dans le texte d'origine ; le repérer par Grep de ` ` avant de poser, ne jamais le remplacer par une espace simple.
 - **`plural(n, mot)`, `count()` et accords à la main** : refondre l'appel en `tn` avec deux phrases entières, en gardant la règle française exacte du site (cinquième argument si ce n'est pas `n > 1`) et le texte rendu au caractère près.
 - **Libellé reçu d'ailleurs** (prop, table d'un autre dossier : `section.label`, `FAMILY_LABEL[family]`, `RATINGS`) : il se pose à sa source, dans le paquet de ce fichier ; ici, ne rien faire et le lister dans le rapport.
+- **Constante exportée d'un fichier de composant** (`export const NOTE = '…'` dans un `.tsx`) : passée par `t()`, le lint la refuse (`only-export-components`). Si un fichier `.ts` de ta liste peut l'accueillir, déplace-la et corrige ses imports ; sinon laisse-la telle quelle et signale-la.
+- **Vérification finale** : en plus de `verif.mjs --rapide`, lance `npx oxlint --deny-warnings` sur tes fichiers à la fin ; un avertissement est un échec.
 - **Repérage** : dans un module de calcul, la plupart des chaînes sont des identifiants. Chercher d'abord les chaînes à espace ou à lettre accentuée hors commentaires, puis les mots seuls à majuscule (`'Virement'`, `'Tribord'`), et pour chacune qui l'affiche.
 - **Rapport** : nombre de clés posées (`node outils/i18n.mjs`, 0 refus), et la liste des textes laissés sans `t()` par doute, avec `chemin:ligne` et la raison, pour que l'orchestrateur tranche.
 
@@ -121,6 +123,23 @@ Une étape P reçoit une liste de fichiers. Pour chacun : lire, envelopper chaqu
 - **Texte riche** : `tRich`, DOM identique.
 - **Neutralité** : aucun test réécrit. `node outils/verif.mjs --rapide` à la fin de chaque groupe de fichiers.
 - **Parallèle** : plusieurs étapes P tournent dans le même arbre, chacune sur sa liste de fichiers ; ne toucher à aucun autre fichier, ignorer un échec venu d'un fichier hors de sa liste et le dire dans le rapport ; aucune commande git qui défait un travail.
+
+## Reprises après la pose (relevées par les paquets, à traiter en une étape à part)
+
+- **Noms d'activités de départ et `LOGO_LABEL`** (`core/activities.ts:152-174`, `core/activityLogos.ts:22-33`) : traduits à l'affichage seulement, et seulement « Bateau » tant que le nom n'a pas été changé ; `activityLogos.test.ts` exige onze libellés distincts.
+- **Noms de couleur de la palette** (`core/activities.ts:67-78`) : clés de recherche, traduits à l'affichage (Réglages, choix de couleur).
+- **Styles de poissons** (`core/schoolBasics.ts:12-18`) : le fichier n'a droit à aucun import ; traduire à l'affichage dans `components/fishSchool/FishStylePicker.tsx`.
+- **`plainError`** (`platform/errorText.ts`) : reconnaît un message technique à des mots anglais (`file`, `read`, `error`…) ; un message de l'application traduit en anglais serait pris pour du technique et remplacé par le texte générique. Rendre le critère indépendant de la langue, sans rien changer en français.
+- **Nom du dossier mémoire** (`platform/memoryFolder.ts:214, 225, 341, 449, 457, 627, 730`) : identité du cache (`folderId`) et valeur gardée ; traduire à l'affichage (`folderLabel`, `hooks/sessionLibrary/lifecycle.ts:90`).
+- **Fragments restés** : `FAMILY_OF` (« de voile », lu par `RecordingPage.tsx:774`) ; `ofActivity` de `library/sessionsList.ts` (« de x », « d'x »), composé dans `components/ProfileActivities.tsx:84` et `pages/SessionsPage.tsx:218`.
+- **`LISEZMOI.txt` du dossier mémoire** (`library/folderLayout.ts:58-90`) : écrit une fois, lu hors de l'application ; laissé en français, à trancher.
+- **Repli « Session »** du nom de trace écrit dans le GPX (`library/fitToGpx.ts:113`) et message d'invariant de `library/summarizeGpx.ts:52` : vérifier s'ils arrivent à l'écran.
+- **Nom du fichier partagé** : `t('Session')` de `SessionNameEditor.tsx:120` entre dans le nom du fichier GPX partagé ; voulu dans la langue du moment.
+- **Banc** : `outils/banc/fluidite-compile.mjs` lance son propre Chrome sans `--lang`.
+- **Nom par défaut de l'appareil** (« Téléphone », « PC », `hooks/sessionLibrary/deviceSettings.ts:115`) : écrit dans le réglage et le fichier du dossier ; traduire à l'affichage (Réglages › Mémoire) tant qu'il n'a pas été changé.
+- **Message lu par son texte** : `hooks/sessionLibrary/incoming.ts` (`reasonOf`) découpe une entrée de `report.failed` sur `nom : ` ; le préfixe reste donc hors de `t()` dans `importer.ts`. À rendre indépendant de la ponctuation (nom et raison gardés à part).
+- **Sports écartés à l'import** (`library/importReport.ts`) : la liste « de course, de vélo ou d'entraînement » est une clé à part, passée en variable `{sports}`, pour que le garde-fou du vocabulaire de la terre ne la compte qu'une fois.
+- **Constante à texte exportée d'un composant** : le lint la refuse (`only-export-components`) dès qu'elle passe par `t()` ; la déplacer dans un fichier `.ts` voisin (`PUMPING_OFF_NOTE` est allée dans `components/pumpingHighlight.ts`).
 
 ## Pièges relevés par le plan
 

@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { SCHOOL_STYLES, type SchoolStyle } from '../../core/schoolBasics';
 import { brushColorFor } from '../../core/brushColor';
 import { useAppliedTheme } from '../../hooks/useTheme';
+import { t } from '../../core/i18n';
 import FishSprite from './FishSprite';
 import { fishScale, fishSymbolId } from './fishSymbols';
 import './FishStylePicker.css';
@@ -32,7 +33,7 @@ interface Props {
 function FishStylePicker({ value, onChange, activityColors }: Props) {
   const dark = useAppliedTheme().theme === 'dark';
   return (
-    <div className="fish-style-picker" role="group" aria-label="Poisson du banc">
+    <div className="fish-style-picker" role="group" aria-label={t('Poisson du banc')}>
       {SCHOOL_STYLES.map(({ id, name }) => (
         <button key={id} type="button" className="fish-style-picker__choice" aria-pressed={id === value}
           data-style={id} onClick={() => onChange(id)}>
@@ -54,7 +55,7 @@ function FishStylePicker({ value, onChange, activityColors }: Props) {
       <button type="button" className="fish-style-picker__choice" aria-pressed={value === null}
         data-style="aucun" onClick={() => onChange(null)}>
         <svg className="fish-style-picker__preview" viewBox="0 0 64 28" aria-hidden="true" focusable="false" />
-        <span className="fish-style-picker__name">Aucun</span>
+        <span className="fish-style-picker__name">{t('Aucun')}</span>
       </button>
     </div>
   );

@@ -6,6 +6,8 @@
  * le commentaire sont communs à toutes les activités.
  */
 
+import { t } from '../core/i18n';
+
 export type WindLevel = 'tres-faible' | 'faible' | 'moyen' | 'fort' | 'tres-fort';
 export type WaterState = 'plat' | 'clapot' | 'vagues';
 export type Rating = 1 | 2 | 3 | 4 | 5;
@@ -68,24 +70,24 @@ export const EMPTY_NOTES: SailingSessionNotes = {
 };
 
 export const WIND_LEVELS: { value: WindLevel; label: string }[] = [
-  { value: 'tres-faible', label: 'Très faible' },
-  { value: 'faible', label: 'Faible' },
-  { value: 'moyen', label: 'Moyen' },
-  { value: 'fort', label: 'Fort' },
-  { value: 'tres-fort', label: 'Très fort' },
+  { value: 'tres-faible', label: t('Très faible') },
+  { value: 'faible', label: t('Faible') },
+  { value: 'moyen', label: t('Moyen', { ctx: 'vent' }) },
+  { value: 'fort', label: t('Fort') },
+  { value: 'tres-fort', label: t('Très fort') },
 ];
 
 export const WATER_STATES: { value: WaterState; label: string }[] = [
-  { value: 'plat', label: 'Plat' },
-  { value: 'clapot', label: 'Clapot' },
-  { value: 'vagues', label: 'Vagues' },
+  { value: 'plat', label: t('Plat') },
+  { value: 'clapot', label: t('Clapot') },
+  { value: 'vagues', label: t('Vagues') },
 ];
 
 /** Appréciation, du plus triste au plus content : son visage (`IconFace` de `components/icons.tsx`), sans emoji. */
 export const RATINGS: { value: Rating; label: string; face: 'triste' | 'decu' | 'neutre' | 'content' | 'ravi' }[] = [
-  { value: 1, label: 'Nul', face: 'triste' },
-  { value: 2, label: 'Bof', face: 'decu' },
-  { value: 3, label: 'Moyen', face: 'neutre' },
-  { value: 4, label: 'Bien', face: 'content' },
-  { value: 5, label: 'Très bien', face: 'ravi' },
+  { value: 1, label: t('Nul'), face: 'triste' },
+  { value: 2, label: t('Bof'), face: 'decu' },
+  { value: 3, label: t('Moyen', { ctx: 'appréciation' }), face: 'neutre' },
+  { value: 4, label: t('Bien'), face: 'content' },
+  { value: 5, label: t('Très bien'), face: 'ravi' },
 ];

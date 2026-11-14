@@ -14,7 +14,8 @@ import ActivitySelect from './ActivitySelect';
 import Button from './ui/Button';
 import Card from './ui/Card';
 import SegmentedControl from './ui/SegmentedControl';
-import { dateLocale } from '../core/i18n';
+import { dateLocale, t } from '../core/i18n';
+import { tRich } from './tRich';
 
 /**
  * Choix de la trace à suivre pendant l'enregistrement : un itinéraire rangé
@@ -82,7 +83,7 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
   const pickRoute = (saved: SavedRoute) => {
     const trace = followedTraceFromRoute(saved.record);
     if (!trace) {
-      setError('Cet itinéraire n\'a pas assez de points.');
+      setError(t('Cet itinéraire n\'a pas assez de points.'));
       return;
     }
     followTrace(trace);
@@ -95,35 +96,36 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
     setError(null);
     try {
       const text = await readSessionGpx(file);
-      if (text === null) throw new Error('Session introuvable dans la mémoire.');
+      if (text === null) throw new Error(t('Session introuvable dans la mémoire.'));
       const trace = followedTraceFromSession(parseGpx(text).rawPoints, name, activityId);
-      if (!trace) throw new Error('Cette session n\'a pas assez de points.');
+      if (!trace) throw new Error(t('Cette session n\'a pas assez de points.'));
       followTrace(trace);
       onPicked?.(trace);
       onClose();
     } catch (err) {
-      setError(plainError(err, 'Lecture de la session impossible.'));
+      setError(plainError(err, t('Lecture de la session impossible.')));
     } finally {
       setLoading(null);
     }
   };
 
   return (
-    <Card heading="Suivre une trace">
+    <Card heading={t('Suivre une trace')}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: 'var(--text-m)' }}>
-        <SegmentedControl<PickerTab> fit label="Trace à suivre" value={tab} onChange={setTab}
-          items={[{ key: 'route', label: library.loaded ? `Itinéraires (${routes.length})` : 'Itinéraires' }, { key: 'session', label: `Sessions (${sortedSessions.length})` }]} />
+        <SegmentedControl<PickerTab> fit label={t('Trace à suivre')} value={tab} onChange={setTab}
+          items={[{ key: 'route', label: library.loaded ? t('Itinéraires ({n})', { n: routes.length }) : t('Itinéraires') }, { key: 'session', label: t('Sessions ({n})', { n: sortedSessions.length }) }]} />
 
         {status !== 'ready' && (
           <div className="ui-alert ui-alert--warning">
-            Aucun dossier mémoire ouvert : choisissez-le dans <Link to="/parametres">Réglages</Link> pour retrouver vos traces.
+            {tRich('Aucun dossier mémoire ouvert : choisissez-le dans <lien>Réglages</lien> pour retrouver vos traces.', undefined,
+              { lien: (children) => <Link to="/parametres">{children}</Link> })}
           </div>
         )}
         {error && <div className="ui-alert ui-alert--danger">{error}</div>}
 
         {tab === 'route' && status === 'ready' && library.loaded && (routes.length === 0 ? (
           <p className="ui-muted ui-m-0">
-            Aucun itinéraire enregistré : planifiez-en un depuis la page Sessions (« Créer un parcours »).
+            {t('Aucun itinéraire enregistré : planifiez-en un depuis la page Sessions (« Créer un parcours »).')}
           </p>
         ) : (
           <ul style={LIST_STYLE}>
@@ -131,7 +133,7 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
               <li key={saved.base}>
                 <button type="button" style={ROW_STYLE} onClick={() => pickRoute(saved)}>
                   <strong>{saved.record.name}</strong>
-                  <span style={DETAIL_STYLE}>Enregistré le {formatDate(saved.record.updatedAt)}</span>
+                  <span style={DETAIL_STYLE}>{t('Enregistré le {date}', { date: formatDate(saved.record.updatedAt) })}</span>
                 </button>
               </li>
             ))}
@@ -139,15 +141,15 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
         ))}
 
         {tab === 'session' && status === 'ready' && (sortedSessions.length === 0 ? (
-          <p className="ui-muted ui-m-0">Aucune session enregistrée pour l'instant.</p>
+          <p className="ui-muted ui-m-0">{t('Aucune session enregistrée pour l\'instant.')}</p>
         ) : (
           <>
             {sessionActivities.length > 1 && (
               <label className="ui-row-10 ui-center ui-wrap">
-                <span className="ui-eyebrow">Activité</span>
-                <ActivitySelect activities={sessionActivities} value={activityFilter} label="Activité" className="ui-field"
-                  placeholder={`Toutes (${sortedSessions.length})`}
-                  reset={{ label: `Toutes (${sortedSessions.length})`, onChoose: () => { setActivityFilter(null); setShown(PAGE_SIZE); } }}
+                <span className="ui-eyebrow">{t('Activité')}</span>
+                <ActivitySelect activities={sessionActivities} value={activityFilter} label={t('Activité')} className="ui-field"
+                  placeholder={t('Toutes ({n})', { n: sortedSessions.length })}
+                  reset={{ label: t('Toutes ({n})', { n: sortedSessions.length }), onChoose: () => { setActivityFilter(null); setShown(PAGE_SIZE); } }}
                   onChange={(next) => { setActivityFilter(next.id); setShown(PAGE_SIZE); }} />
               </label>
             )}
@@ -160,7 +162,7 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
                       onClick={() => void pickSession(file, name, activity?.id ?? null)}>
                       <strong>{name}</strong>
                       <span style={DETAIL_STYLE}>
-                        {loading === file ? 'Lecture…' : [activity?.name, formatDate(record.summary.startMs)].filter(Boolean).join(' · ')}
+                        {loading === file ? t('Lecture…') : [activity?.name, formatDate(record.summary.startMs)].filter(Boolean).join(' · ')}
                       </span>
                     </button>
                   </li>
@@ -168,12 +170,12 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
               })}
             </ul>
             {filteredSessions.length > shown && (
-              <Button variant="ghost" onClick={() => setShown((n) => n + PAGE_SIZE)}>Afficher plus</Button>
+              <Button variant="ghost" onClick={() => setShown((n) => n + PAGE_SIZE)}>{t('Afficher plus')}</Button>
             )}
           </>
         ))}
 
-        <Button variant="ghost" onClick={onClose}>Fermer</Button>
+        <Button variant="ghost" onClick={onClose}>{t('Fermer')}</Button>
       </div>
     </Card>
   );

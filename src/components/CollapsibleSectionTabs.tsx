@@ -2,6 +2,7 @@ import SectionTabs, { type SectionDefinition } from './SectionTabs';
 import { IconChevronDown, IconChevronUp } from './icons';
 import { useStoredRecord } from '../hooks/useStoredRecord';
 import { STORAGE_KEYS } from '../core/appIdentity';
+import { t } from '../core/i18n';
 
 /**
  * Barre d'onglets d'une analyse, sous la carte : la première rangée porte
@@ -36,8 +37,8 @@ function CollapsibleSectionTabs<K extends string>({ sections, open, onToggle, on
 
   if (value.cachee) {
     return (
-      <button type="button" className="an-tabs-reveal" onClick={() => update({ cachee: false })} aria-label="Montrer les onglets">
-        onglets <IconChevronDown size={14} />
+      <button type="button" className="an-tabs-reveal" onClick={() => update({ cachee: false })} aria-label={t('Montrer les onglets')}>
+        {t('onglets')} <IconChevronDown size={14} />
       </button>
     );
   }
@@ -50,16 +51,16 @@ function CollapsibleSectionTabs<K extends string>({ sections, open, onToggle, on
           <>
             {advanced.length > 0 && (
               <button type="button" className="ui-tab an-tabs-advanced-toggle" onClick={onToggleAdvanced} aria-expanded={advancedOpen}
-                title={advancedOpen ? 'Replier les onglets avancés et leurs panneaux' : 'Montrer les onglets avancés'}>
-                avancé {advancedOpen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+                title={advancedOpen ? t('Replier les onglets avancés et leurs panneaux') : t('Montrer les onglets avancés')}>
+                {t('avancé')} {advancedOpen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
               </button>
             )}
             <button type="button" className="an-tabs-hide" onClick={() => update({ cachee: true })}
-              aria-label="Cacher les onglets" title="Cacher les onglets">
+              aria-label={t('Cacher les onglets')} title={t('Cacher les onglets')}>
               <IconChevronUp size={16} />
             </button>
-            <button type="button" className="an-tabs-close-all" onClick={onCloseAll} title="Fermer tous les onglets ouverts">
-              tout fermer
+            <button type="button" className="an-tabs-close-all" onClick={onCloseAll} title={t('Fermer tous les onglets ouverts')}>
+              {t('tout fermer')}
             </button>
           </>
         )} />

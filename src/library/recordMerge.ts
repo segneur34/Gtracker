@@ -1,3 +1,4 @@
+import { t } from '../core/i18n';
 import type { FileStat } from '../platform/memoryFolder';
 import type { PlaceSource, PlaceSpot, SessionPlace } from './places';
 import { ANALYSIS_SUMMARY_FIELDS, sameJson, type RecordWithoutSummary, type SessionRecord, type SessionSummary } from './record';
@@ -189,8 +190,8 @@ export const mergeChangedRecord = (disk: RecordWithoutSummary, mine: SessionReco
 
 /** Ce que l'utilisateur saisit, en clair, par champ de premier niveau ; les champs calculés (sauts) ne s'annoncent pas. */
 const SAISIE_LABEL: Readonly<Record<string, string>> = {
-  sport: 'activité', activityId: 'activité', name: 'nom', place: 'lieu', notes: 'notes', analysis: 'réglages', marks: 'repères',
-  mapBase: 'fond de carte',
+  sport: t('activité'), activityId: t('activité'), name: t('nom'), place: t('lieu'), notes: t('notes'), analysis: t('réglages'),
+  marks: t('repères'), mapBase: t('fond de carte'),
 };
 
 const topField = (path: string): string => path.split('.')[0];

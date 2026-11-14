@@ -1,4 +1,5 @@
 import type { Activity } from '../../core/activities';
+import { t } from '../../core/i18n';
 import type { SessionMark } from '../../core/sessionMarks';
 import type { RecordingProfile } from '../../core/sportProfiles';
 import { recordingJournal } from '../../platform/files';
@@ -136,8 +137,8 @@ export const buildPendingSession = async (
 export const sourceOptions = (activity: Activity, recording: RecordingProfile): LocationWatchOptions => ({
   intervalMs: recording.intervalMs,
   distanceFilterM: recording.distanceFilterM,
-  notificationTitle: 'Gtracker enregistre',
-  notificationText: `Session ${activity.name} en cours`,
+  notificationTitle: t('Gtracker enregistre'),
+  notificationText: t('Session {name} en cours', { name: activity.name }),
 });
 
 /** Variables de la session qui démarre, ou qui reprend d'un journal relu, remises au départ. */

@@ -1,5 +1,6 @@
 import { registerPlugin } from '@capacitor/core';
 import { errorMessage } from '../core/basics';
+import { t } from '../core/i18n';
 import { isNativeApp } from './runtime';
 
 /**
@@ -253,7 +254,7 @@ export const readPickedImage = async (file: File, sizePx: number): Promise<strin
     canvas.width = sizePx;
     canvas.height = sizePx;
     const context = canvas.getContext('2d');
-    if (!context) throw new Error('Image impossible à réduire.');
+    if (!context) throw new Error(t('Image impossible à réduire.'));
     context.imageSmoothingQuality = 'high';
     context.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, sizePx, sizePx);
     return canvas.toDataURL('image/jpeg', 0.85);

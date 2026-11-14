@@ -1,4 +1,5 @@
 import { activityFamily, findActivity } from '../core/activities';
+import { t } from '../core/i18n';
 import { usesMarkCourse } from '../core/sportProfiles';
 import { plainError } from '../platform/errorText';
 import { ROUTES_DIR, routePath } from '../library/folderLayout';
@@ -38,7 +39,7 @@ const gpxLabel = (activityId: string | null): ((index: number) => string) => {
   return activity && usesMarkCourse(activityFamily(activity)) ? markLabel : waypointLabel;
 };
 
-const NO_FOLDER = 'Aucun dossier mémoire accessible : choisissez-le dans Réglages pour enregistrer vos itinéraires.';
+const NO_FOLDER = t('Aucun dossier mémoire accessible : choisissez-le dans Réglages pour enregistrer vos itinéraires.');
 
 const requireFolder = async () => {
   const folder = await currentMemoryFolder();
@@ -62,7 +63,7 @@ const listRoutes = async (): Promise<SavedRoute[]> => {
 };
 
 /** Itinéraires de la mémoire ouverte, lus une fois pour toutes les pages et relus après chaque rangement ou suppression. */
-export const routeStore = createLoadedListStore(listRoutes, (err) => plainError(err, 'Lecture des itinéraires impossible.'));
+export const routeStore = createLoadedListStore(listRoutes, (err) => plainError(err, t('Lecture des itinéraires impossible.')));
 
 /** GPX rangé d'une fiche, et partagé : le tracé pour les autres applications, la fiche en extension pour Gtracker. */
 const routeGpxOf = (route: PlannedRoute, record: RouteRecord): string =>
@@ -86,7 +87,7 @@ export const saveRoute = async (
   meta: { name: string; activityId: string | null; markGuide?: MarkGuideSettings | null },
   existing?: SavedRoute
 ): Promise<SavedRoute> => {
-  if (existing?.readOnly) throw new Error('Cet itinéraire vient d\'une version plus récente de l\'application : rangez-le sous un autre nom.');
+  if (existing?.readOnly) throw new Error(t("Cet itinéraire vient d'une version plus récente de l'application : rangez-le sous un autre nom."));
   const folder = await requireFolder();
   const base = existing?.base ?? routeFileBase(meta.name, (await folder.list(ROUTES_DIR)).map((e) => e.name));
   const now = new Date().toISOString();
@@ -124,7 +125,7 @@ export const importRouteGpx = async (text: string, fileName: string): Promise<Sa
     takenNames: taken.map((r) => r.record.name),
     activityFor,
   });
-  if (!record) throw new Error(`${fileName} ne contient pas d'itinéraire : aucun point de trace ou de route.`);
+  if (!record) throw new Error(t("{fileName} ne contient pas d'itinéraire : aucun point de trace ou de route.", { fileName }));
   const base = routeFileBase(record.name, (await folder.list(ROUTES_DIR)).map((e) => e.name));
   if (!isWritableRouteRecord(record)) {
     // Fiche d'une version plus récente : rangée telle quelle, jamais réécrite (son GPX est celui reçu).
@@ -145,7 +146,7 @@ export const routeShareFile = async (saved: SavedRoute): Promise<{ fileName: str
   const fileName = `${saved.base}.gpx`;
   if (saved.readOnly) {
     const text = await (await requireFolder()).readText(routePath(fileName));
-    if (text === null) throw new Error(`${fileName} est introuvable dans la mémoire.`);
+    if (text === null) throw new Error(t('{fileName} est introuvable dans la mémoire.', { fileName }));
     return { fileName, text };
   }
   return { fileName, text: routeGpxOf(recordToRoute(saved.record), saved.record) };

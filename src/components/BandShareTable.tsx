@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { t } from '../core/i18n';
 import { formatShortDuration } from '../core/units';
 import { HIGHLIGHT_SHOWN_COLOR } from './highlightColors';
 import MapToggle from './ui/MapToggle';
@@ -44,9 +45,9 @@ export default function BandShareTable({ head, detailHead, rows, selected, onSel
         <tr className="ui-sunken">
           <th className="ui-cell ui-cell--left">{head}</th>
           {detailHead && <th style={{ ...cell, fontWeight: 'normal', color: 'var(--muted)' }}>{detailHead}</th>}
-          <th style={cell}>Temps</th>
-          <th style={{ ...cell, width: shareWidth }}>Part</th>
-          {onSelect && <th style={cell}>Carte</th>}
+          <th style={cell}>{t('Temps')}</th>
+          <th style={{ ...cell, width: shareWidth }}>{t('Part')}</th>
+          {onSelect && <th style={cell}>{t('Carte')}</th>}
         </tr>
       </thead>
       <tbody>

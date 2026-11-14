@@ -1,6 +1,5 @@
 import type { Activity } from '../core/activities';
-import { plural } from '../core/basics';
-import { dateLocale } from '../core/i18n';
+import { dateLocale, t, tn } from '../core/i18n';
 import { DISTANCE_UNIT_SYMBOL, formatDuration, toDisplayDistance, type DistanceUnit } from '../core/units';
 
 /**
@@ -99,8 +98,14 @@ const totalDuration = (ms: number): string =>
  * (« de SUP »).
  */
 export const ofActivity = (name: string): string => {
+  const { word, elided } = activityWord(name);
+  return elided ? t("d'{word}", { word }) : t('de {word}', { word });
+};
+
+/** Le nom de l'activité dans une phrase (majuscule retirée sauf pour un sigle), et si « de » s'élide devant lui. */
+const activityWord = (name: string): { word: string; elided: boolean } => {
   const word = /^\p{Lu}\p{Ll}/u.test(name) ? name[0].toLowerCase() + name.slice(1) : name;
-  return /^[aeiouyàâéèêëîïôöûü]/i.test(word) ? `d'${word}` : `de ${word}`;
+  return { word, elided: /^[aeiouyàâéèêëîïôöûü]/i.test(word) };
 };
 
 /**
@@ -108,8 +113,16 @@ export const ofActivity = (name: string): string => {
  * wingfoil · 1 204 km · 61 h ». Sans session : « Aucune session », « Aucune session de kite ».
  */
 export const totalsLine = (totals: SessionsTotals, unit: DistanceUnit, activityName: string | null = null): string => {
-  const of = activityName === null ? '' : ` ${ofActivity(activityName)}`;
-  if (totals.count === 0) return `Aucune session${of}`;
-  const parts = [`${plural(totals.count, 'session')}${of}`, totalDistance(totals.distanceM, unit), totalDuration(totals.durationMs)];
-  return `${parts.join(' · ')}${activityName === null ? " sur l'eau" : ''}`;
+  let count: string;
+  if (activityName === null) {
+    count = totals.count === 0 ? t('Aucune session') : tn(totals.count, '{n} session', '{n} sessions');
+  } else {
+    const { word, elided } = activityWord(activityName);
+    if (totals.count === 0) count = elided ? t("Aucune session d'{word}", { word }) : t('Aucune session de {word}', { word });
+    else if (elided) count = tn(totals.count, "{n} session d'{word}", "{n} sessions d'{word}", { word });
+    else count = tn(totals.count, '{n} session de {word}', '{n} sessions de {word}', { word });
+  }
+  if (totals.count === 0) return count;
+  const parts = [count, totalDistance(totals.distanceM, unit), totalDuration(totals.durationMs)].join(' · ');
+  return activityName === null ? t("{parts} sur l'eau", { parts }) : parts;
 };

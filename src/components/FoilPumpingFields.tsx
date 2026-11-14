@@ -1,3 +1,5 @@
+import { t } from '../core/i18n';
+
 /**
  * Cases « Foil » et « Pumping » de l'onglet réglages (voile et surf). Chacune
  * dit si sa valeur est celle de l'activité (`…IsDefault`, rien de saisi dans la
@@ -20,15 +22,15 @@ export default function FoilPumpingFields({ foilTitle, foil, foilIsDefault, onFo
     <>
       <label style={labelStyle} title={foilTitle}>
         <input type="checkbox" checked={foil} onChange={(e) => onFoilChange(e.target.checked)} />
-        <strong>Foil</strong>
-        {foilIsDefault && <span style={hintStyle}>(supposé : celui de l'activité)</span>}
+        <strong>{t('Foil')}</strong>
+        {foilIsDefault && <span style={hintStyle}>{t('(supposé : celui de l\'activité)')}</span>}
       </label>
       {showPumping && (
         <label style={labelStyle}
-          title="Pumping des vols par les capteurs du téléphone, pour cette session, enregistré avec elle. Celui de l'activité se règle dans Réglages.">
+          title={t('Pumping des vols par les capteurs du téléphone, pour cette session, enregistré avec elle. Celui de l\'activité se règle dans Réglages.')}>
           <input type="checkbox" checked={pumping} onChange={(e) => onPumpingChange(e.target.checked)} />
-          <strong>Pumping</strong>
-          {pumpingIsDefault && <span style={hintStyle}>(celui de l'activité)</span>}
+          <strong>{t('Pumping')}</strong>
+          {pumpingIsDefault && <span style={hintStyle}>{t('(celui de l\'activité)')}</span>}
         </label>
       )}
     </>

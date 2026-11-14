@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { newId } from '../core/basics';
+import { t } from '../core/i18n';
 import { MAX_GEAR_LABEL_LENGTH, cleanGearName, sameGearName } from '../settings/gear';
 import type { GearGroup, GearItem } from '../library/notes';
 import { ChoiceOption, ChoiceSheet } from './ui/ChoiceSheet';
@@ -60,31 +61,31 @@ function GearPicker({ group, choice, onChoose, onAddToList }: Props) {
     <div className="gear-picker">
       <span className="gear-picker__label">{group.name}</span>
       <button type="button" className="ui-field ui-field--s activity-select gear-picker__button" data-testid={`gear-picker-${group.id}`}
-        aria-haspopup="listbox" aria-expanded={open} aria-label={`${group.name} : ${shownName ?? 'aucun'}`}
+        aria-haspopup="listbox" aria-expanded={open} aria-label={shownName ? t('{group} : {name}', { group: group.name, name: shownName }) : t('{group} : aucun', { group: group.name })}
         onClick={() => setOpen(true)}>
-        <span className={shownName ? 'activity-select__name' : 'activity-select__name activity-select__name--empty'}>{shownName ?? 'Aucun'}</span>
+        <span className={shownName ? 'activity-select__name' : 'activity-select__name activity-select__name--empty'}>{shownName ?? t('Aucun')}</span>
         <IconChevronRight size={14} className="activity-select__chevron" />
       </button>
       {open && (
         <GearSheet title={group.name} onClose={close}>
           {adding ? (
             <div className="gear-picker__add">
-              <input value={name} maxLength={MAX_GEAR_LABEL_LENGTH} placeholder="Nom de la pièce" aria-label={`Nouvelle pièce de ${group.name}`}
+              <input value={name} maxLength={MAX_GEAR_LABEL_LENGTH} placeholder={t('Nom de la pièce')} aria-label={t('Nouvelle pièce de {group}', { group: group.name })}
                 className="ui-field" autoFocus data-testid="gear-add-name"
                 onChange={(e) => setName(e.target.value)} />
               <div className="gear-picker__add-actions">
                 {onAddToList && (
                   <Button size="s" variant="primary" disabled={cleanGearName(name) === ''} onClick={addToList} data-testid="gear-add-list">
-                    Ajouter à la liste
+                    {t('Ajouter à la liste')}
                   </Button>
                 )}
-                <Button size="s" disabled={cleanGearName(name) === ''} onClick={addForSession} data-testid="gear-add-session">Pour cette session</Button>
-                <Button size="s" variant="ghost" onClick={() => setAdding(false)}>Retour</Button>
+                <Button size="s" disabled={cleanGearName(name) === ''} onClick={addForSession} data-testid="gear-add-session">{t('Pour cette session')}</Button>
+                <Button size="s" variant="ghost" onClick={() => setAdding(false)}>{t('Retour')}</Button>
               </div>
             </div>
           ) : (
             <>
-              <ChoiceOption label="Aucun" selected={choice === null} onClick={() => pick(null)} />
+              <ChoiceOption label={t('Aucun')} selected={choice === null} onClick={() => pick(null)} />
               {group.items.map((item) => (
                 <ChoiceOption key={item.id} label={item.name} selected={choice?.itemId === item.id} onClick={() => pick(item)} />
               ))}
@@ -93,7 +94,7 @@ function GearPicker({ group, choice, onChoose, onAddToList }: Props) {
                 <ChoiceOption label={choice.itemName} selected onClick={() => close()} />
               )}
               <button type="button" className="activity-select__option gear-picker__option--add" data-testid="gear-add" onClick={() => setAdding(true)}>
-                <span className="activity-select__option-name">Ajouter…</span>
+                <span className="activity-select__option-name">{t('Ajouter…')}</span>
               </button>
             </>
           )}

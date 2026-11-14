@@ -1,4 +1,5 @@
 import { parseGpx } from '../core/gpxParser';
+import { t } from '../core/i18n';
 import { SAILING_SPORTS, getSportProfile, isSportType } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import { guessSport, isOtherSportType } from './naming';
@@ -149,10 +150,13 @@ export const carriedThresholdNote = (
   show: (threshold: number) => string
 ): string | null => {
   if (carried === undefined || carried === device) return null;
-  const computed = carried === null ? 'Calculée sans seuil réglé pour l\'activité.' : `Calculée avec ${show(carried)}, le réglage de l'activité à ce moment-là.`;
+  if (carried === null) {
+    // Les deux seuils nuls sont écartés plus haut : l'appareil en a un.
+    return t("Calculée sans seuil réglé pour l'activité. Réglages dit {device} sur cet appareil : le changer recalcule les sessions de l'activité.", { device: show(device as number) });
+  }
   return device === null
-    ? `${computed} Réglages n'en règle aucun sur cet appareil : en régler un recalcule les sessions de l'activité.`
-    : `${computed} Réglages dit ${show(device)} sur cet appareil : le changer recalcule les sessions de l'activité.`;
+    ? t("Calculée avec {carried}, le réglage de l'activité à ce moment-là. Réglages n'en règle aucun sur cet appareil : en régler un recalcule les sessions de l'activité.", { carried: show(carried) })
+    : t("Calculée avec {carried}, le réglage de l'activité à ce moment-là. Réglages dit {device} sur cet appareil : le changer recalcule les sessions de l'activité.", { carried: show(carried), device: show(device) });
 };
 
 export interface AnalyzedGpx {

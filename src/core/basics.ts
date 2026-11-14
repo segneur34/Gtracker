@@ -4,6 +4,8 @@
  * erreur, pluriel d'un compte, identifiant tiré au hasard. Pur, hors `newId`.
  */
 
+import { t } from './i18n';
+
 /** Valeur ramenée dans `[min, max]`. */
 export const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
@@ -109,7 +111,7 @@ export const roundTo = (x: number, decimals: number): number => {
 export const toFixedNumber = (x: number, decimals: number): number => parseFloat(x.toFixed(decimals));
 
 /** Message d'une erreur attrapée ; `fallback` si ce n'est pas une `Error` ou si son message est vide. */
-export const errorMessage = (err: unknown, fallback = 'erreur inconnue'): string =>
+export const errorMessage = (err: unknown, fallback = t('erreur inconnue')): string =>
   err instanceof Error && err.message ? err.message : fallback;
 
 /** Rang d'une valeur parmi des bornes croissantes : 0 sous la première, puis 1 à `bounds.length`. */

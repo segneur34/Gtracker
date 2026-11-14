@@ -1,4 +1,5 @@
 import { parseGpx } from '../../core/gpxParser';
+import { t } from '../../core/i18n';
 import { decodeImuHeader } from '../../core/imuFile';
 import { pruneImuFile } from '../../core/imuPrune';
 import { keepsWholeCaptureForPumping } from '../../core/pumping';
@@ -128,9 +129,9 @@ export const addGpx = async (text: string, source: SessionSource, options: AddOp
     // avant l'envoi ; le GPX seul part, jamais les capteurs ; mêmes chiffres et mêmes erreurs qu'en ligne (`runTrackJob`).
     analyzed = await runInWorker('summarize', text, summarizeGpxOptions({ ...from, sport }, sessionSummarySettings(from, options.activityId ?? from?.activityId)));
   } catch (err) {
-    return { status: 'invalid', file: null, message: errorMessage(err, 'GPX illisible.') };
+    return { status: 'invalid', file: null, message: errorMessage(err, t('GPX illisible.')) };
   }
-  if (!analyzed) return { status: 'invalid', file: null, message: 'Pas assez de points horodatés.' };
+  if (!analyzed) return { status: 'invalid', file: null, message: t('Pas assez de points horodatés.') };
   // Import d'un GPX sans fiche ni calcul imposé, dont le `<type>` dit la course, le vélo ou l'entraînement : refusé.
   // Jamais pour une session qui a sa fiche : la recopie de la mémoire du navigateur garde ses sessions « à classer ».
   if (source === 'import' && !from && options.sport === undefined && analyzed.otherSport) return { status: 'other-sport', file: null };

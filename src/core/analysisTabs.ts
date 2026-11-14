@@ -1,4 +1,5 @@
 import { isObject } from './basics';
+import { t } from './i18n';
 import { sportTreatment, type SportProfile, type Treatment } from './sportProfiles';
 
 /**
@@ -29,39 +30,39 @@ export type SailingTab = 'general' | 'tops' | 'manoeuvres' | 'graphiques' | 'car
 
 /** Voile : une seule barre, dans l'ordre voulu par le produit. */
 export const SAILING_TABS: AnalysisTab<SailingTab>[] = [
-  { key: 'general', label: 'général', primary: true },
-  { key: 'tops', label: 'tops' },
-  { key: 'manoeuvres', label: 'manœuvres' },
-  { key: 'graphiques', label: 'graphiques' },
+  { key: 'general', label: t('général'), primary: true },
+  { key: 'tops', label: t('tops') },
+  { key: 'manoeuvres', label: t('manœuvres') },
+  { key: 'graphiques', label: t('graphiques') },
   // Seulement pour une session qui a de la FC (ceinture, montre).
-  { key: 'cardio', label: 'cardio' },
-  { key: 'vmg', label: 'vmg' },
+  { key: 'cardio', label: t('cardio') },
+  { key: 'vmg', label: t('vmg') },
   // Seulement pour une session aux sauts mesurés par les capteurs du téléphone.
-  { key: 'sauts', label: 'sauts' },
+  { key: 'sauts', label: t('sauts') },
   // Sur foil seulement : les vols vus par le GPS, puis le pumping, pour une session qui a ses capteurs,
   // les mêmes que les sauts ; deux onglets à part.
-  { key: 'vols', label: 'vols' },
-  { key: 'pumping', label: 'pumping' },
-  { key: 'vent', label: 'vent' },
-  { key: 'matos', label: 'matos et conditions' },
-  { key: 'reglages', label: 'réglages' },
+  { key: 'vols', label: t('vols') },
+  { key: 'pumping', label: t('pumping') },
+  { key: 'vent', label: t('vent') },
+  { key: 'matos', label: t('matos et conditions') },
+  { key: 'reglages', label: t('réglages') },
 ];
 
 export type SurfTab = 'general' | 'vagues' | 'rame' | 'vols' | 'pumping' | 'tops' | 'graphiques' | 'cardio' | 'notes' | 'reglages';
 
 /** Surf (surf, paddle, SUP foil, kayak, downwind) : « tops » est générique. */
 export const SURF_TABS: AnalysisTab<SurfTab>[] = [
-  { key: 'general', label: 'général', primary: true },
-  { key: 'vagues', label: 'vagues' },
-  { key: 'rame', label: 'rame' },
+  { key: 'general', label: t('général'), primary: true },
+  { key: 'vagues', label: t('vagues') },
+  { key: 'rame', label: t('rame') },
   // Sur foil seulement ; « pumping » pour une session qui a ses capteurs, à part des vols.
-  { key: 'vols', label: 'vols' },
-  { key: 'pumping', label: 'pumping' },
-  { key: 'tops', label: 'tops', generic: true },
-  { key: 'graphiques', label: 'graphiques' },
-  { key: 'cardio', label: 'cardio' },
-  { key: 'notes', label: 'matériel et notes' },
-  { key: 'reglages', label: 'réglages' },
+  { key: 'vols', label: t('vols') },
+  { key: 'pumping', label: t('pumping') },
+  { key: 'tops', label: t('tops'), generic: true },
+  { key: 'graphiques', label: t('graphiques') },
+  { key: 'cardio', label: t('cardio') },
+  { key: 'notes', label: t('matériel et notes') },
+  { key: 'reglages', label: t('réglages') },
 ];
 
 const TREATMENT_TABS: Record<Treatment, readonly AnalysisTab[]> = { voile: SAILING_TABS, surf: SURF_TABS };

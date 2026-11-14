@@ -14,8 +14,7 @@ import { useThemedShade } from '../hooks/useTheme';
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
 import { activityBarUnit, buildActivityChart, type ChartRange, type ChartSession } from '../library/activityChart';
 import './ActivityChart.css';
-import { plural } from '../core/basics';
-import { dateLocale } from '../core/i18n';
+import { dateLocale, t, tn } from '../core/i18n';
 
 /**
  * Graphe d'activités du profil, venu de l'accueil (maquette du 23 septembre 2026), sur la
@@ -68,18 +67,18 @@ function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: nu
   );
 
   const unitH = activityBarUnit(chart.bars, PLOT_H - 4, STACK_GAP, UNIT_MAX_H);
-  const totalSessions = chart.totals.reduce((n, t) => n + t.sessions, 0);
+  const totalSessions = chart.totals.reduce((n, tot) => n + tot.sessions, 0);
   const bar = picked === null ? null : chart.bars[picked] ?? null;
   // Une barre par semaine ou par mois : le détail donne aussi le jour de chaque session.
   const weekly = period === 'sixmois' || period === 'annee' || period === 'tout';
 
   return (
-    <section className={`actchart ui-card-col ${frame.className}`} style={frame.style} aria-label="Activités">
+    <section className={`actchart ui-card-col ${frame.className}`} style={frame.style} aria-label={t('Activités')}>
       <div className="actchart__head">
         <h2>{chart.title}<HelpToggle helpKey="profil:activites" label={chart.title} /></h2>
-        <span className="num">{plural(totalSessions, 'session')}</span>
+        <span className="num">{tn(totalSessions, '{n} session', '{n} sessions', { n: totalSessions })}</span>
       </div>
-      <HelpText helpKey="profil:activites" note>Toucher une barre pour le détail de ses sessions.</HelpText>
+      <HelpText helpKey="profil:activites" note>{t('Toucher une barre pour le détail de ses sessions.')}</HelpText>
 
       <div className="actchart__plot" style={{ height: `${PLOT_H}px`, gap: chart.bars.length > 30 ? '2px' : '3px' }}>
         {chart.bars.map((b, i) => (
@@ -87,7 +86,9 @@ function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: nu
             key={b.startMs}
             type="button"
             className={`actchart__bar${picked === i ? ' actchart__bar--picked' : ''}${b.future ? ' actchart__bar--future' : ''}${b.weekStart ? ' actchart__bar--week' : ''}`}
-            aria-label={`${b.title} : ${b.sessions.length ? plural(b.sessions.length, 'session') : 'aucune session'}`}
+            aria-label={b.sessions.length
+              ? tn(b.sessions.length, '{title} : {n} session', '{title} : {n} sessions', { title: b.title, n: b.sessions.length })
+              : t('{title} : aucune session', { title: b.title })}
             aria-pressed={picked === i}
             onClick={() => setPicked(picked === i ? null : i)}>
             {b.stacks.map((s) => (
@@ -111,7 +112,7 @@ function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: nu
         <div className="actchart__detail">
           <strong>{bar.title}</strong>
           {bar.sessions.length === 0 ? (
-            <span className="actchart__hint">Aucune session.</span>
+            <span className="actchart__hint">{t('Aucune session.')}</span>
           ) : (
             <ul className="actchart__sessions">
               {bar.sessions.map((s) => {
@@ -136,9 +137,9 @@ function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: nu
 
       {chart.totals.length > 0 && (
         <button type="button" className="actchart__fold" aria-expanded={open.totaux} onClick={() => toggle('totaux')}>
-          <span className="actchart__name">Par activité</span>
+          <span className="actchart__name">{t('Par activité')}</span>
           <span className="actchart__meta num">
-            {chart.totals.length} activité{chart.totals.length > 1 ? 's' : ''}
+            {tn(chart.totals.length, '{n} activité', '{n} activités', { n: chart.totals.length })}
           </span>
           <IconChevronRight size={16} className="actchart__chevron" style={{ transform: `rotate(${open.totaux ? -90 : 90}deg)` }} />
         </button>
@@ -146,15 +147,15 @@ function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: nu
       {chart.totals.length > 0 && open.totaux && (
         <ul className="actchart__totals">
           <li className="actchart__hint actchart__legend">{chart.range}.</li>
-          {chart.totals.map((t) => {
-            const activity = activityById.get(t.activityId)!;
+          {chart.totals.map((tot) => {
+            const activity = activityById.get(tot.activityId)!;
             return (
-              <li key={t.activityId}>
+              <li key={tot.activityId}>
                 <button type="button" onClick={() => navigate(sessionsPath(activity.id))}>
                   <span className="ui-swatch" style={{ background: shown(activity.color) }} />
                   <span className="actchart__name">{activity.name}</span>
                   <span className="actchart__meta num">
-                    {plural(t.sessions, 'session')} · {formatDuration(t.durationS * 1000)} · {distanceText(t.distanceM, activity)}
+                    {tn(tot.sessions, '{n} session', '{n} sessions', { n: tot.sessions })} · {formatDuration(tot.durationS * 1000)} · {distanceText(tot.distanceM, activity)}
                   </span>
                   <IconChevronRight size={16} className="actchart__chevron" />
                 </button>

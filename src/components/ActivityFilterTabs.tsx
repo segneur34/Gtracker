@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Activity } from '../core/activities';
+import { t } from '../core/i18n';
 import ActivityGlyph from './logos/ActivityGlyph';
 
 /**
@@ -23,7 +24,7 @@ export default function ActivityFilterTabs({ total, counts, selected, onSelect, 
   return (
     <div className="ui-tabs" style={accent ? ({ '--tab-accent': accent } as CSSProperties) : undefined}>
       <button type="button" className="ui-tab" aria-pressed={selected === null} onClick={() => onSelect(null)}>
-        tous ({total})
+        {t('tous ({total})', { total })}
       </button>
       {counts.map(({ activity, count }) => (
         <button key={activity.id} type="button" className="ui-tab" aria-pressed={selected === activity.id} onClick={() => onSelect(activity.id)}>
@@ -33,7 +34,7 @@ export default function ActivityFilterTabs({ total, counts, selected, onSelect, 
       ))}
       {withoutCount > 0 && (
         <button type="button" className="ui-tab" aria-pressed={selected === withoutId} onClick={() => onSelect(withoutId)}>
-          sans activité ({withoutCount})
+          {t('sans activité ({withoutCount})', { withoutCount })}
         </button>
       )}
     </div>

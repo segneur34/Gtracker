@@ -7,6 +7,7 @@
  */
 
 import type { Activity } from '../core/activities';
+import { t } from '../core/i18n';
 import { ZONE_COUNT, edwardsLoad, histogramZoneTimes } from '../core/heartRate';
 import { sportFamily, sportTreatment, type SportFamily, type Treatment } from '../core/sportProfiles';
 import { DAY_MS, addDays, addMonths, isoWeek, monthYearLong, monthYearShort, shortDate, stacksByActivity, startOfDay, startOfIsoWeek, startOfMonth } from '../core/calendar';
@@ -18,7 +19,7 @@ import { sessionDisplayName } from './sessionName';
 export type StatsPeriod = ChartRange;
 
 /** Les périodes du graphe de l'accueil, et toutes les sessions. */
-export const STATS_PERIODS: { id: StatsPeriod; label: string }[] = [...CHART_PERIODS, { id: 'tout', label: 'Tout' }];
+export const STATS_PERIODS: { id: StatsPeriod; label: string }[] = [...CHART_PERIODS, { id: 'tout', label: t('Tout') }];
 
 export const isStatsPeriod = (value: unknown): value is StatsPeriod => STATS_PERIODS.some((p) => p.id === value);
 
@@ -377,35 +378,44 @@ const single = (key: string, label: string, value: StatsMetricSeries['value']): 
 /** Les données du graphique, dans l'ordre des pastilles. */
 const STATS_METRICS: readonly StatsMetric[] = [
   {
-    key: 'vmax', label: 'Vitesse max', unit: 'vitesse', families: null, overview: false, record: true,
-    series: single('vmax', 'Vitesse max', (s) => positive(s.maxSpeedMs)),
+    key: 'vmax', label: t('Vitesse max'), unit: 'vitesse', families: null, overview: false, record: true,
+    series: single('vmax', t('Vitesse max'), (s) => positive(s.maxSpeedMs)),
   },
   {
-    key: 'moyenne', label: 'Moyenne en action', unit: 'vitesse', families: null, overview: false, record: false,
-    series: single('moyenne', 'Moyenne en action', (s) =>
+    key: 'moyenne', label: t('Moyenne en action'), unit: 'vitesse', families: null, overview: false, record: false,
+    series: single('moyenne', t('Moyenne en action'), (s) =>
       s.movingDistanceM !== null && s.movingTimeS !== null && s.movingTimeS > 0 ? positive(s.movingDistanceM / s.movingTimeS) : null),
   },
-  { key: 'duree', label: 'Durée', unit: 'duree', families: null, overview: true, record: false, series: single('duree', 'Durée', durationOf) },
-  { key: 'distance', label: 'Distance', unit: 'distance', families: null, overview: false, record: false, series: single('distance', 'Distance', (s) => positive(s.distanceM)) },
+  { key: 'duree', label: t('Durée'), unit: 'duree', families: null, overview: true, record: false, series: single('duree', t('Durée'), durationOf) },
+  {
+    key: 'distance', label: t('Distance'), unit: 'distance', families: null, overview: false, record: false,
+    series: single('distance', t('Distance'), (s) => positive(s.distanceM)),
+  },
   {
     // Voile : le « Ratio de vol » de l'analyse, temps en action sur le temps en mouvement (sur la durée pour
     // une fiche d'avant la version 12), sur foil seulement ; surf : le temps des vols.
-    key: 'vol', label: '% de vol', unit: 'pourcent', families: ['voile', 'surf'], overview: false, record: false,
-    series: single('vol', '% de vol', (s) => {
+    key: 'vol', label: t('% de vol'), unit: 'pourcent', families: ['voile', 'surf'], overview: false, record: false,
+    series: single('vol', t('% de vol'), (s) => {
       if (s.family === 'surf') return s.flightS !== null ? percent(s.flightS, durationOf(s)) : null;
       return s.foil && s.movingTimeS !== null ? percent(s.movingTimeS, s.inMotionS ?? durationOf(s)) : null;
     }),
   },
   {
-    key: 'reussite', label: '% de manœuvres réussies', unit: 'pourcent', families: ['voile'], overview: false, record: false,
+    key: 'reussite', label: t('% de manœuvres réussies'), unit: 'pourcent', families: ['voile'], overview: false, record: false,
     series: [
-      { key: 'virements', label: 'Virements', value: (s) => (s.maneuverResults ? successRate(s.maneuverResults.tackSuccess, s.maneuverResults.tackFail) : null) },
-      { key: 'empannages', label: 'Empannages', value: (s) => (s.maneuverResults ? successRate(s.maneuverResults.jibeSuccess, s.maneuverResults.jibeFail) : null) },
+      { key: 'virements', label: t('Virements'), value: (s) => (s.maneuverResults ? successRate(s.maneuverResults.tackSuccess, s.maneuverResults.tackFail) : null) },
+      { key: 'empannages', label: t('Empannages'), value: (s) => (s.maneuverResults ? successRate(s.maneuverResults.jibeSuccess, s.maneuverResults.jibeFail) : null) },
     ],
   },
-  { key: 'vagues', label: 'Vagues', unit: 'nombre', families: ['surf'], overview: false, record: false, series: single('vagues', 'Vagues', (s) => s.waveCount) },
-  { key: 'vague', label: 'Plus longue vague', unit: 'metres', families: ['surf'], overview: false, record: false, series: single('vague', 'Plus longue vague', (s) => positive(s.longestWaveM)) },
-  { key: 'volMax', label: 'Plus long vol', unit: 'secondes', families: ['surf'], overview: false, record: false, series: single('volMax', 'Plus long vol', (s) => positive(s.longestFlightS)) },
+  { key: 'vagues', label: t('Vagues'), unit: 'nombre', families: ['surf'], overview: false, record: false, series: single('vagues', t('Vagues'), (s) => s.waveCount) },
+  {
+    key: 'vague', label: t('Plus longue vague'), unit: 'metres', families: ['surf'], overview: false, record: false,
+    series: single('vague', t('Plus longue vague'), (s) => positive(s.longestWaveM)),
+  },
+  {
+    key: 'volMax', label: t('Plus long vol'), unit: 'secondes', families: ['surf'], overview: false, record: false,
+    series: single('volMax', t('Plus long vol'), (s) => positive(s.longestFlightS)),
+  },
 ];
 
 export const isStatsMetricKey = (value: unknown): value is StatsMetricKey => STATS_METRICS.some((m) => m.key === value);
@@ -581,7 +591,9 @@ export const regularity = (
     if (barUnit === 'semaine') {
       for (const w of weekStarts) {
         const { week } = isoWeek(w);
-        slots.push({ startMs: w, endMs: addDays(w, 7), label: `S${week}`, title: `Semaine ${week}, du ${shortDate(w)} au ${shortDate(addDays(w, 6))}` });
+        slots.push({ startMs: w, endMs: addDays(w, 7), label: t('S{week}', { week }),
+          title: t('Semaine {week}, du {from} au {to}', { week, from: shortDate(w), to: shortDate(addDays(w, 6)) }),
+        });
       }
     } else {
       const lastMonth = startOfMonth(nowMs);

@@ -1,3 +1,4 @@
+import { t } from '../core/i18n';
 import { plainError } from '../platform/errorText';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { holdBelt, releaseBelt, type HeartRateBelt } from '../platform/heartRate';
@@ -41,7 +42,7 @@ export function useBeltWarmup(belt: HeartRateBelt | null, active: boolean): {
         if (cancelled && !handingOver.current && generation.current === mine) releaseBelt(HOLDER);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(plainError(err, 'erreur inconnue'));
+        if (!cancelled) setError(plainError(err, t('erreur inconnue')));
       });
     return () => {
       cancelled = true;

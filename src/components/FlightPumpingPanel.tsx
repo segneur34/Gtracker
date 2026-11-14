@@ -9,6 +9,7 @@ import StatTile from './ui/StatTile';
 import Swatch from './ui/Swatch';
 import type { FlightPumping, FlightSpan, PumpingSeries, PumpingSummary } from '../core/pumping';
 import { formatShortDuration, formatTimeOfDay, formatDecimal, orDash } from '../core/units';
+import { t, tn } from '../core/i18n';
 import { tdStyle, thStyle } from './tableStyle';
 import type { PumpingStatus } from '../hooks/useSessionPumping';
 import './FlightPumpingPanel.css';
@@ -68,16 +69,12 @@ export interface FlightsPanelProps<F extends FlightSpan> extends PanelBaseProps 
   allColumnsWithoutPumping?: FlightColumn<F>[];
 }
 
-/** Note de l'onglet « pumping » quand Pumping est décoché, la même dans la voile et le surf. */
-export const PUMPING_OFF_NOTE = "Cochez « Pumping » dans l'onglet réglages pour compter les séries de coups en vol, téléphone fixé sur la poitrine.";
-
 const boldStyle = { ...tdStyle, fontWeight: 700 } as const;
 const noteStyle = { color: 'var(--muted)', fontSize: 'var(--text-xs)', marginTop: '8px' } as const;
 const headRowStyle = { backgroundColor: 'var(--surface-sunken)' } as const;
 const headStyle = { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' } as const;
 
 const perMin = (v: number) => `${Math.round(v)} /min`;
-const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`;
 
 /** Sous cette part du temps de vol mesurée, le panneau dit que ses chiffres ne valent que pour ces passages. */
 const PARTIAL_CAPTURE_BELOW = 0.9;
@@ -90,9 +87,9 @@ const isMeasuring = (pumping: PanelBaseProps['pumping'], summary: PumpingSummary
 const showButtons = ({ shown, onShow, accent }: Pick<PanelBaseProps, 'shown' | 'onShow' | 'accent'>) => {
   const toggleShown = (key: PumpingHighlightKey) => onShow(shown === key ? null : key);
   const mapButton = (key: PumpingHighlightKey) => <MapToggle shown={shown === key} color={accent} ink="var(--on-ink)" onClick={() => toggleShown(key)} />;
-  const podiumButton = (key: PumpingHighlightKey, label: string) => (
+  const podiumButton = (key: PumpingHighlightKey, hideLabel: string, showLabel: string) => (
     <Button size="s" aria-pressed={shown === key} onClick={() => toggleShown(key)}>
-      {shown === key ? `Masquer ${label}` : label.charAt(0).toUpperCase() + label.slice(1)}
+      {shown === key ? hideLabel : showLabel}
     </Button>
   );
   return { mapButton, podiumButton };
@@ -101,8 +98,8 @@ const showButtons = ({ shown, onShow, accent }: Pick<PanelBaseProps, 'shown' | '
 /** Lecture des capteurs en cours ou impossible. */
 const sensorNotes = (sensors: PanelBaseProps['sensors']) => (
   <>
-    {sensors.status === 'loading' && <div style={noteStyle}>Lecture des capteurs…</div>}
-    {sensors.error && <div style={noteStyle}>Capteurs : {sensors.error}</div>}
+    {sensors.status === 'loading' && <div style={noteStyle}>{t('Lecture des capteurs…')}</div>}
+    {sensors.error && <div style={noteStyle}>{t('Capteurs : {error}', { error: sensors.error })}</div>}
   </>
 );
 
@@ -125,14 +122,14 @@ export function PumpingPanel({
       <table className="ui-table ui-table--cards an-pump-table">
         <thead>
           <tr style={headRowStyle}>
-            <th style={thStyle}>Cadence</th>
-            <th style={thStyle}>Début</th>
-            <th style={thStyle}>Durée</th>
-            <th style={thStyle}>Coups</th>
-            <th style={thStyle}>m/coup</th>
-            <th style={thStyle} title="Vitesse au début, puis à la fin de la série">Vitesse ({unitLabel})</th>
-            <th style={thStyle}>Vol</th>
-            <th style={thStyle}>Carte</th>
+            <th style={thStyle}>{t('Cadence')}</th>
+            <th style={thStyle}>{t('Début')}</th>
+            <th style={thStyle}>{t('Durée')}</th>
+            <th style={thStyle}>{t('Coups')}</th>
+            <th style={thStyle}>{t('m/coup')}</th>
+            <th style={thStyle} title={t('Vitesse au début, puis à la fin de la série')}>{t('Vitesse ({unitLabel})', { unitLabel })}</th>
+            <th style={thStyle}>{t('Vol')}</th>
+            <th style={thStyle}>{t('Carte')}</th>
           </tr>
         </thead>
         <tbody>
@@ -143,11 +140,11 @@ export function PumpingPanel({
                 {perMin(s.strokesPerMin)}
               </td>
               <td className="num" style={tdStyle}>{formatTimeOfDay(s.startMs)}</td>
-              <td data-label="durée" style={tdStyle}>{formatShortDuration(s.durationS)}</td>
-              <td data-label="coups" style={tdStyle}>{s.strokes}</td>
-              <td data-label="m/coup" style={tdStyle}>{formatDecimal(s.perStrokeM, 1)}</td>
-              <td data-label={`vitesse (${unitLabel})`} style={tdStyle}>{speedCell(s.speedBeforeMs)} → {speedCell(s.speedAfterMs)}</td>
-              <td data-label="vol" style={tdStyle}>{s.flight}</td>
+              <td data-label={t('durée')} style={tdStyle}>{formatShortDuration(s.durationS)}</td>
+              <td data-label={t('coups')} style={tdStyle}>{s.strokes}</td>
+              <td data-label={t('m/coup')} style={tdStyle}>{formatDecimal(s.perStrokeM, 1)}</td>
+              <td data-label={t('vitesse ({unitLabel})', { unitLabel })} style={tdStyle}>{speedCell(s.speedBeforeMs)} → {speedCell(s.speedAfterMs)}</td>
+              <td data-label={t('vol')} style={tdStyle}>{s.flight}</td>
               <td className="an-pump-map" style={tdStyle}>{mapButton(seriesKey(s.n))}</td>
             </tr>
           ))}
@@ -159,34 +156,34 @@ export function PumpingPanel({
   return (
     <>
       <div style={headStyle}>
-        <PanelTitle label={measuring ? `Pumping (${plural(series.length, 'série')})` : 'Pumping'} open={open} onToggle={onToggle} helpKey={helpKey} />
+        <PanelTitle label={measuring ? tn(series.length, 'Pumping ({n} série)', 'Pumping ({n} séries)') : t('Pumping')} open={open} onToggle={onToggle} helpKey={helpKey} />
         <span className="ui-grow" />
-        {measuring && series.length > 1 && podiumButton(SERIES_PODIUM_KEY, 'les 3 plus longues séries')}
+        {measuring && series.length > 1 && podiumButton(SERIES_PODIUM_KEY, t('Masquer les 3 plus longues séries'), t('Les 3 plus longues séries'))}
       </div>
       <HelpText helpKey={helpKey} note>{help}</HelpText>
 
       {measuring && pumpSummary && (
         <>
           <div className="an-sheet__stats an-sheet__stats--always">
-            <StatTile label="Cadence" value={orDash(pumpSummary.strokesPerMin, perMin)} title="Coups par minute, sur les séries" />
-            <StatTile label="Séries" value={pumpSummary.series} />
-            <StatTile label="Temps pompé" value={formatShortDuration(pumpSummary.pumpS)} />
-            <StatTile label="Coups" value={pumpSummary.strokes} />
-            <StatTile label="Par coup" value={orDash(pumpSummary.perStrokeM, (v) => `${formatDecimal(v, 1)} m`)} title="Distance des séries divisée par leurs coups" />
-            <StatTile label="Part du vol pompée" value={`${Math.round(pumpSummary.pumpShare * 100)} %`} title="Temps pompé sur le temps de vol couvert par les capteurs" />
+            <StatTile label={t('Cadence')} value={orDash(pumpSummary.strokesPerMin, perMin)} title={t('Coups par minute, sur les séries')} />
+            <StatTile label={t('Séries')} value={pumpSummary.series} />
+            <StatTile label={t('Temps pompé')} value={formatShortDuration(pumpSummary.pumpS)} />
+            <StatTile label={t('Coups')} value={pumpSummary.strokes} />
+            <StatTile label={t('Par coup')} value={orDash(pumpSummary.perStrokeM, (v) => `${formatDecimal(v, 1)} m`)} title={t('Distance des séries divisée par leurs coups')} />
+            <StatTile label={t('Part du vol pompée')} value={`${Math.round(pumpSummary.pumpShare * 100)} %`} title={t('Temps pompé sur le temps de vol couvert par les capteurs')} />
           </div>
           {pumpSummary.coveredS < PARTIAL_CAPTURE_BELOW * flightTimeS && (
             <div style={noteStyle}>
-              Mesuré sur {formatShortDuration(pumpSummary.coveredS)} des {formatShortDuration(flightTimeS)} de vol : les capteurs de cette session ne couvrent qu'une partie des vols, ces chiffres ne valent que pour elle.
+              {t('Mesuré sur {covered} des {total} de vol : les capteurs de cette session ne couvrent qu\'une partie des vols, ces chiffres ne valent que pour elle.', { covered: formatShortDuration(pumpSummary.coveredS), total: formatShortDuration(flightTimeS) })}
             </div>
           )}
           {series.length === 0 && (
-            <div style={noteStyle}>Aucune série de coups à une cadence régulière : rien n'est compté comme du pumping.</div>
+            <div style={noteStyle}>{t('Aucune série de coups à une cadence régulière : rien n\'est compté comme du pumping.')}</div>
           )}
           {series.length > 0 && seriesTable(seriesPodium, series.length > 1)}
           {series.length > 3 && (
             <Button size="s" className="ui-mt-10" aria-expanded={allSeriesOpen} onClick={() => setAllSeriesOpen(!allSeriesOpen)}>
-              {allSeriesOpen ? 'Replier les séries ▲' : `Toutes les séries (${series.length}) ▼`}
+              {allSeriesOpen ? t('Replier les séries ▲') : t('Toutes les séries ({n}) ▼', { n: series.length })}
             </Button>
           )}
           {allSeriesOpen && series.length > 3 && seriesTable(series, false)}
@@ -194,7 +191,7 @@ export function PumpingPanel({
       )}
 
       {pumping && !measuring && sensors.status === 'ready' && (
-        <div style={noteStyle}>Les capteurs de cette session ne couvrent aucun vol.</div>
+        <div style={noteStyle}>{t('Les capteurs de cette session ne couvrent aucun vol.')}</div>
       )}
       {!pumpingOn && offNote && <div style={noteStyle}>{offNote}</div>}
       {sensorNotes(sensors)}
@@ -227,19 +224,19 @@ export function FlightsPanel<F extends FlightSpan>({
         <table className="ui-table ui-table--cards an-pump-table">
           <thead>
             <tr style={headRowStyle}>
-              <th style={thStyle}>Vol</th>
-              <th style={thStyle}>Début</th>
-              <th style={thStyle}>Durée</th>
-              <th style={thStyle}>Distance</th>
-              {measuring && <th style={thStyle}>Décollage ({unitLabel})</th>}
+              <th style={thStyle}>{t('Vol')}</th>
+              <th style={thStyle}>{t('Début')}</th>
+              <th style={thStyle}>{t('Durée')}</th>
+              <th style={thStyle}>{t('Distance')}</th>
+              {measuring && <th style={thStyle}>{t('Décollage ({unitLabel})', { unitLabel })}</th>}
               {moduleColumns.map((c) => <th key={c.header} style={thStyle}>{c.header}</th>)}
               {measuring && (
                 <>
-                  <th style={thStyle}>Séries</th>
-                  <th style={thStyle}>Temps pompé</th>
+                  <th style={thStyle}>{t('Séries')}</th>
+                  <th style={thStyle}>{t('Temps pompé')}</th>
                 </>
               )}
-              <th style={thStyle}>Carte</th>
+              <th style={thStyle}>{t('Carte')}</th>
             </tr>
           </thead>
           <tbody>
@@ -249,17 +246,17 @@ export function FlightsPanel<F extends FlightSpan>({
                 <tr key={f.n} className="ui-table__row">
                   <td className="an-pump-lead" style={boldStyle}>
                     {podiumRows && <Swatch color={HIGHLIGHT_PODIUM_COLORS[k]} round gap />}
-                    <span className="an-pump-lead__word">Vol </span>{flightName(f)}
+                    <span className="an-pump-lead__word">{t('Vol')}{' '}</span>{flightName(f)}
                   </td>
                   <td className="num" style={tdStyle}>{formatTimeOfDay(f.startMs)}</td>
-                  <td data-label="durée" style={tdStyle}>{formatShortDuration(f.durationS)}</td>
+                  <td data-label={t('durée')} style={tdStyle}>{formatShortDuration(f.durationS)}</td>
                   <td style={tdStyle}>{Math.round(f.distanceM)} m</td>
-                  {measuring && <td data-label={`décollage (${unitLabel})`} style={tdStyle}>{speedCell(pump?.takeoffSpeedMs ?? null)}</td>}
+                  {measuring && <td data-label={t('décollage ({unitLabel})', { unitLabel })} style={tdStyle}>{speedCell(pump?.takeoffSpeedMs ?? null)}</td>}
                   {moduleColumns.map((c) => <td key={c.header} data-label={c.header.toLowerCase()} style={tdStyle}>{c.cell(f)}</td>)}
                   {measuring && (
                     <>
-                      <td data-label="séries" style={tdStyle}>{pump ? pump.series.length : '—'}</td>
-                      <td data-label="pompé" style={tdStyle}>{pump ? formatShortDuration(pump.pumpS) : '—'}</td>
+                      <td data-label={t('séries')} style={tdStyle}>{pump ? pump.series.length : '—'}</td>
+                      <td data-label={t('pompé')} style={tdStyle}>{pump ? formatShortDuration(pump.pumpS) : '—'}</td>
                     </>
                   )}
                   <td className="an-pump-map" style={tdStyle}>{mapButton(flightKey(f.n))}</td>
@@ -275,28 +272,28 @@ export function FlightsPanel<F extends FlightSpan>({
   return (
     <>
       <div style={headStyle}>
-        <PanelTitle label={`Vols (${flights.length})`} open={open} onToggle={onToggle} helpKey={helpKey} />
+        <PanelTitle label={t('Vols ({n})', { n: flights.length })} open={open} onToggle={onToggle} helpKey={helpKey} />
         <span className="ui-grow" />
-        {flights.length > 1 && podiumButton(FLIGHT_PODIUM_KEY, 'les 3 plus longs vols')}
+        {flights.length > 1 && podiumButton(FLIGHT_PODIUM_KEY, t('Masquer les 3 plus longs vols'), t('Les 3 plus longs vols'))}
       </div>
       <HelpText helpKey={helpKey} note>{help}</HelpText>
 
       <div className="an-sheet__stats an-sheet__stats--always">
-        <StatTile label="Vols" value={flights.length} />
-        <StatTile label="Temps de vol" value={formatShortDuration(totalFlightS)} />
-        <StatTile label="Plus long vol" value={flights.length > 0 ? formatShortDuration(longestFlightS) : '—'} />
+        <StatTile label={t('Vols')} value={flights.length} />
+        <StatTile label={t('Temps de vol')} value={formatShortDuration(totalFlightS)} />
+        <StatTile label={t('Plus long vol')} value={flights.length > 0 ? formatShortDuration(longestFlightS) : '—'} />
         {extraFlightTiles}
       </div>
       {flights.length > 0 && flightTable(podium, flights.length > 1)}
       {flights.length > 3 && (
         <Button size="s" className="ui-mt-10" aria-expanded={allFlightsOpen} onClick={() => setAllFlightsOpen(!allFlightsOpen)}>
-          {allFlightsOpen ? 'Replier les vols ▲' : `Tous les vols (${flights.length}) ▼`}
+          {allFlightsOpen ? t('Replier les vols ▲') : t('Tous les vols ({n}) ▼', { n: flights.length })}
         </Button>
       )}
       {allFlightsOpen && flights.length > 3 && flightTable(flights, false)}
 
       {pumping && [...pumping.values()].some((x) => !x.covered) && (
-        <div style={noteStyle}>* : capteurs sur une partie du vol seulement.</div>
+        <div style={noteStyle}>{t('* : capteurs sur une partie du vol seulement.')}</div>
       )}
       {sensorNotes(sensors)}
     </>

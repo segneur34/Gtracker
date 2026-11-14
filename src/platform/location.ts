@@ -1,4 +1,5 @@
 import { finiteOr } from '../core/basics';
+import { t } from '../core/i18n';
 import { LOCATION_DENIED_TEXT, plainError } from './errorText';
 import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import type { Location as PluginLocation } from '@capgo/background-geolocation';
@@ -84,7 +85,7 @@ const isLocationDisabled = (error: { message?: string }): boolean => /disabled/i
 export const locationErrorText = (error: { message?: string; code?: string }): string => {
   if (error.code === 'NOT_AUTHORIZED' || /denied/i.test(error.message ?? '')) return LOCATION_DENIED_TEXT;
   const err = Object.assign(new Error(error.message ?? ''), error.code ? { code: error.code } : {});
-  return plainError(err, 'Localisation indisponible.');
+  return plainError(err, t('Localisation indisponible.'));
 };
 
 /** Rôle de qui tient le service GPS du téléphone. */
@@ -99,10 +100,10 @@ type NativeRole = 'ponctuelle' | 'enregistrement';
  */
 let nativeHolder: { role: NativeRole; interrupt: () => Promise<void> } | null = null;
 
-const INTERRUPTED_BY_RECORDING = "Recherche interrompue par l'enregistrement.";
-const HELD_BY_RECORDING = "Position suivie par l'enregistrement : prendre sa dernière position.";
-const SERVICE_BUSY = 'GPS déjà occupé : mettez en pause, puis reprenez.';
-const LOCATION_DISABLED_TEXT = "Localisation du téléphone coupée : activez-la, l'enregistrement démarre à la première position.";
+const INTERRUPTED_BY_RECORDING = t("Recherche interrompue par l'enregistrement.");
+const HELD_BY_RECORDING = t("Position suivie par l'enregistrement : prendre sa dernière position.");
+const SERVICE_BUSY = t('GPS déjà occupé : mettez en pause, puis reprenez.');
+const LOCATION_DISABLED_TEXT = t("Localisation du téléphone coupée : activez-la, l'enregistrement démarre à la première position.");
 
 /**
  * GPS du téléphone, par `@capgo/background-geolocation` : un service de
@@ -169,7 +170,7 @@ const startNative = async (
             toldDisabled = true;
             retry = setTimeout(() => {
               retry = null;
-              if (!stopped) launch().catch((err: unknown) => onError(plainError(err, 'Localisation indisponible.')));
+              if (!stopped) launch().catch((err: unknown) => onError(plainError(err, t('Localisation indisponible.'))));
             }, LOCATION_RETRY_MS);
             return;
           }
@@ -181,7 +182,7 @@ const startNative = async (
             relaunched = true;
             BackgroundGeolocation.stop()
               .then(launch)
-              .catch((err: unknown) => onError(plainError(err, 'Localisation indisponible.')));
+              .catch((err: unknown) => onError(plainError(err, t('Localisation indisponible.'))));
             return;
           }
           onError(locationErrorText(error));
@@ -196,7 +197,7 @@ const startNative = async (
 };
 
 const nativeSource: LocationSource = {
-  label: 'GPS du téléphone',
+  label: t('GPS du téléphone'),
   start: (options, onFix, onError) => startNative('enregistrement', options, onFix, onError),
 };
 
@@ -205,10 +206,10 @@ const nativeSource: LocationSource = {
  * pour une vraie session, le navigateur coupant la localisation écran éteint.
  */
 const browserSource: LocationSource = {
-  label: 'GPS du navigateur',
+  label: t('GPS du navigateur'),
   start: async (_options, onFix, onError) => {
     if (!('geolocation' in navigator)) {
-      onError('Ce navigateur ne donne pas accès à la position.');
+      onError(t('Ce navigateur ne donne pas accès à la position.'));
       return async () => {};
     }
     const id = navigator.geolocation.watchPosition(
@@ -222,7 +223,7 @@ const browserSource: LocationSource = {
           speedMs: finiteOr(p.coords.speed, undefined),
           bearingDeg: finiteOr(p.coords.heading, undefined),
         }),
-      (e) => onError(e.code === e.PERMISSION_DENIED ? LOCATION_DENIED_TEXT : 'Localisation indisponible.'),
+      (e) => onError(e.code === e.PERMISSION_DENIED ? LOCATION_DENIED_TEXT : t('Localisation indisponible.')),
       { enableHighAccuracy: true, maximumAge: 0 }
     );
     return async () => navigator.geolocation.clearWatch(id);
@@ -240,7 +241,7 @@ export const deviceLocationSource = (): LocationSource => (isNativeApp() ? nativ
  * en retard émet d'un coup tout ce qui est échu.
  */
 export const createReplaySource = (fixes: LocationFix[], speedFactor: number): LocationSource => ({
-  label: `Rejeu ×${speedFactor}`,
+  label: t('Rejeu ×{n}', { n: speedFactor }),
   start: async (_options, onFix) => {
     let next = 0;
     let stopped = false;
@@ -307,7 +308,7 @@ type CapacitorBridge = { fromNative?: (message: NativeMessage) => void };
 export const adoptRunningService = (onFix: (fix: LocationFix) => void, onError: (message: string) => void): StopLocation => {
   const bridge = (window as unknown as { Capacitor?: CapacitorBridge }).Capacitor;
   const original = bridge?.fromNative;
-  if (!bridge || !original) throw new Error('Pont du téléphone introuvable.');
+  if (!bridge || !original) throw new Error(t('Pont du téléphone introuvable.'));
   if (nativeHolder !== null) throw new Error(SERVICE_BUSY);
   let stopping: Promise<void> | null = null;
   const stop: StopLocation = () => (stopping ??= (async () => {
@@ -372,7 +373,7 @@ export const currentPosition = (timeoutMs = 30_000): Promise<LocationFix> =>
       void stop?.();
     };
     const timer = setTimeout(
-      () => finish(() => reject(new Error('Position introuvable : vérifiez que la localisation est activée.'))),
+      () => finish(() => reject(new Error(t('Position introuvable : vérifiez que la localisation est activée.')))),
       timeoutMs
     );
     const source: LocationSource = isNativeApp()
@@ -380,7 +381,7 @@ export const currentPosition = (timeoutMs = 30_000): Promise<LocationFix> =>
       : browserSource;
     source
       .start(
-        { intervalMs: 1000, distanceFilterM: 0, notificationTitle: 'Gtracker', notificationText: 'Recherche de votre position' },
+        { intervalMs: 1000, distanceFilterM: 0, notificationTitle: 'Gtracker', notificationText: t('Recherche de votre position') },
         (fix) => finish(() => resolve(fix)),
         (message) => finish(() => reject(new Error(message)))
       )
@@ -390,7 +391,7 @@ export const currentPosition = (timeoutMs = 30_000): Promise<LocationFix> =>
           // Position trouvée avant que le démarrage ne rende la main : on arrête tout de suite.
           if (settled) void stopFn();
         },
-        (err) => finish(() => reject(err instanceof Error ? err : new Error('Localisation indisponible.')))
+        (err) => finish(() => reject(err instanceof Error ? err : new Error(t('Localisation indisponible.'))))
       );
   });
 

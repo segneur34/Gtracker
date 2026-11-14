@@ -1,4 +1,5 @@
 import { registerPlugin } from '@capacitor/core';
+import { t } from '../core/i18n';
 import { STANDARD_G } from '../core/units';
 import type { JumpPlacement } from '../core/domainTypes';
 import { privateFileSize, readPrivateBytes, removePrivateFile } from './memoryFolder';
@@ -69,7 +70,7 @@ const plugin = registerPlugin<MotionPlugin>('Motion');
 
 const UNAVAILABLE: MotionCapabilities = {
   available: false,
-  reason: "Sur l'application Android seulement : écran éteint, le navigateur coupe les capteurs.",
+  reason: t("Sur l'application Android seulement : écran éteint, le navigateur coupe les capteurs."),
   accelMaxG: null,
   barometer: false,
 };
@@ -82,18 +83,18 @@ export const getMotionCapabilities = (): Promise<MotionCapabilities> => {
   capabilities ??= plugin.capabilities().then(
     (c): MotionCapabilities => ({
       available: c.accelerometer && c.gyroscope,
-      reason: c.accelerometer && c.gyroscope ? null : "Ce téléphone n'a pas de gyroscope : la hauteur des sauts ne peut pas être mesurée.",
+      reason: c.accelerometer && c.gyroscope ? null : t("Ce téléphone n'a pas de gyroscope : la hauteur des sauts ne peut pas être mesurée."),
       accelMaxG: typeof c.accelMaxRange === 'number' && c.accelMaxRange > 0 ? c.accelMaxRange / STANDARD_G : null,
       barometer: c.barometer,
     }),
-    (): MotionCapabilities => ({ ...UNAVAILABLE, reason: 'Capteurs du téléphone illisibles.' })
+    (): MotionCapabilities => ({ ...UNAVAILABLE, reason: t('Capteurs du téléphone illisibles.') })
   );
   return capabilities;
 };
 
 /** Démarre la capture d'un enregistrement ; lève une erreur si le téléphone ne le permet pas. */
 export const startMotionCapture = async (startedAtMs: number, setup: MotionSetup): Promise<void> => {
-  if (!isNativeApp()) throw new Error(UNAVAILABLE.reason ?? 'Capteurs indisponibles.');
+  if (!isNativeApp()) throw new Error(UNAVAILABLE.reason ?? t('Capteurs indisponibles.'));
   await plugin.start({ startedAtMs, placement: setup.placement, foil: setup.foil });
 };
 
@@ -104,7 +105,7 @@ export const startMotionCapture = async (startedAtMs: number, setup: MotionSetup
  * permet pas ou si le fichier est illisible, laissé alors tel quel.
  */
 export const continueMotionCapture = async (startedAtMs: number, setup: MotionSetup): Promise<void> => {
-  if (!isNativeApp()) throw new Error(UNAVAILABLE.reason ?? 'Capteurs indisponibles.');
+  if (!isNativeApp()) throw new Error(UNAVAILABLE.reason ?? t('Capteurs indisponibles.'));
   await plugin.start({ startedAtMs, placement: setup.placement, foil: setup.foil, append: true });
 };
 

@@ -4,6 +4,7 @@ import { countGearReminderClose, gearReminderClosesOf } from '../hooks/useSportS
 import { shouldRemindGear } from '../settings/gearReminder';
 import Button from './ui/Button';
 import Dialog from './ui/Dialog';
+import { t } from '../core/i18n';
 
 export interface GearReminderProps {
   /** Fichier de la session ouverte (celui de l'adresse) ; `null` sans session. */
@@ -69,13 +70,13 @@ export default function GearReminder({ file, activityId, hasGearList, sessionHas
     onAdd();
   };
   return (
-    <Dialog title="Voulez-vous ajouter le matériel ?" onClose={close}>
+    <Dialog title={t('Voulez-vous ajouter le matériel ?')} onClose={close}>
       <p className="ui-hint">
-        Cette session n'en porte pas encore. Il se choisit dans l'onglet « {tabLabel} ».
+        {t('Cette session n\'en porte pas encore. Il se choisit dans l\'onglet « {tabLabel} ».', { tabLabel })}
       </p>
       <div style={ACTIONS_STYLE}>
-        <Button variant="primary" onClick={add}>Oui</Button>
-        <Button variant="ghost" onClick={close}>Non</Button>
+        <Button variant="primary" onClick={add}>{t('Oui')}</Button>
+        <Button variant="ghost" onClick={close}>{t('Non')}</Button>
       </div>
     </Dialog>
   );

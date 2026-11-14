@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { RawTrackPoint } from './types';
 
 /**
@@ -39,7 +40,7 @@ export interface ParsedGpx {
 // Balayage du XML
 // ---------------------------------------------------------------------------
 
-const MALFORMED = 'Fichier GPX illisible : le XML est mal formé.';
+const MALFORMED = t('Fichier GPX illisible : le XML est mal formé.');
 const malformed = (): never => {
   throw new Error(MALFORMED);
 };

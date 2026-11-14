@@ -1,5 +1,6 @@
 import { nearestIndexAtTime, valueAtTime } from './search';
 import { roundTo } from './basics';
+import { t } from './i18n';
 import type { ImuRecording, ImuSeries } from './imuFile';
 import { STANDARD_G } from './units';
 import {
@@ -115,10 +116,10 @@ export const JUMP_DOUBTS: readonly JumpDoubt[] = ['parabole', 'saturation', 'tro
 /** Raison d'un doute, en clair ; la borne de la verticale (`attitudeMaxErrorM`) est dite en centimètres. */
 export const jumpDoubtLabel = (doubt: JumpDoubt, d: Pick<JumpDetection, 'attitudeMaxErrorM'>): string => {
   switch (doubt) {
-    case 'parabole': return "plus haut qu'un vol sans portance de même durée : l'aile a pu tirer vers le bas";
-    case 'saturation': return 'capteur saturé pendant la poussée ou le vol';
-    case 'trou': return 'mesures interrompues autour du saut';
-    case 'verticale': return `verticale incertaine : la hauteur peut s'écarter de plus de ${Math.round(d.attitudeMaxErrorM * 100)} cm`;
+    case 'parabole': return t("plus haut qu'un vol sans portance de même durée : l'aile a pu tirer vers le bas");
+    case 'saturation': return t('capteur saturé pendant la poussée ou le vol');
+    case 'trou': return t('mesures interrompues autour du saut');
+    case 'verticale': return t("verticale incertaine : la hauteur peut s'écarter de plus de {cm} cm", { cm: Math.round(d.attitudeMaxErrorM * 100) });
   }
 };
 

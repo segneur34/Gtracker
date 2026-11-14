@@ -1,3 +1,4 @@
+import { t } from '../core/i18n';
 import type { LibrarySession } from './record';
 
 /**
@@ -11,10 +12,10 @@ import type { LibrarySession } from './record';
 export type SessionSort = 'recent' | 'distance' | 'duration' | 'maxSpeed';
 
 export const SESSION_SORTS: { key: SessionSort; label: string }[] = [
-  { key: 'recent', label: 'récentes' },
-  { key: 'distance', label: 'distance' },
-  { key: 'duration', label: 'durée' },
-  { key: 'maxSpeed', label: 'v. max' },
+  { key: 'recent', label: t('récentes') },
+  { key: 'distance', label: t('distance') },
+  { key: 'duration', label: t('durée') },
+  { key: 'maxSpeed', label: t('v. max') },
 ];
 
 export const SESSION_SORT_DEFAULT: SessionSort = 'recent';

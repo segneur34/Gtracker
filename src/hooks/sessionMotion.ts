@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { t } from '../core/i18n';
 import { decodeImu, type ImuRecording } from '../core/imuFile';
 import { readSessionMotion } from './useSessionLibrary';
 
@@ -24,9 +25,9 @@ export const loadSessionMotion = (file: string): Promise<ImuRecording> => {
   if (loading?.file === file) return loading.promise;
   const promise = (async () => {
     const bytes = await readSessionMotion(file);
-    if (!bytes) throw new Error('Fichier des capteurs introuvable.');
+    if (!bytes) throw new Error(t('Fichier des capteurs introuvable.'));
     const recording = await decodeImu(bytes);
-    if (!recording) throw new Error('Fichier des capteurs illisible.');
+    if (!recording) throw new Error(t('Fichier des capteurs illisible.'));
     // Plus aucune analyse ne lit la capture (page quittée pendant la lecture) : elle n'est pas gardée.
     if (readers > 0) cached = { file, recording };
     return recording;

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, type Activity } from '../core/activities';
+import { t } from '../core/i18n';
 import { SPORT_FAMILIES, type SportFamily } from '../core/sportProfiles';
 import { useVisibility } from '../hooks/useSportSettings';
 import { ChoiceOption, ChoiceSheet } from './ui/ChoiceSheet';
@@ -55,7 +56,7 @@ export function ActivitySheet({ activities, value, families = SPORT_FAMILIES, la
   }, []);
 
   return (
-    <ChoiceSheet label={heading?.title ?? label ?? 'Activité'} onClose={onClose}>
+    <ChoiceSheet label={heading?.title ?? label ?? t('Activité')} onClose={onClose}>
       {heading && (
         <div className="activity-select__heading">
           <strong>{heading.title}</strong>
@@ -127,12 +128,12 @@ function ActivitySelect({
         className={`${className} activity-select`}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={label ? `${label} : ${current?.name ?? placeholder ?? 'à choisir'}` : undefined}
+        aria-label={label ? t('{label} : {value}', { label, value: current?.name ?? placeholder ?? t('à choisir') }) : undefined}
         disabled={disabled}
         onClick={() => setOpen(true)}>
         {current && <ActivityGlyph activity={current} size={18} swatch className="activity-select__icon" />}
         <span className={current ? 'activity-select__name' : 'activity-select__name activity-select__name--empty'}>
-          {current?.name ?? placeholder ?? 'Choisir…'}
+          {current?.name ?? placeholder ?? t('Choisir…')}
         </span>
         <IconChevronRight size={14} className="activity-select__chevron" />
       </button>

@@ -1,4 +1,5 @@
 import { errorMessage } from '../core/basics';
+import { t } from '../core/i18n';
 import { MARKER_FILE, STORAGE_KEYS, CACHE_NAMES } from '../core/appIdentity';
 import { registerPlugin } from '@capacitor/core';
 import { base64ToBytes, bytesToBase64 } from '../core/base64';
@@ -88,7 +89,7 @@ const isNotFound = (err: unknown): boolean =>
   err instanceof DOMException && (err.name === 'NotFoundError' || err.name === 'TypeMismatchError');
 
 /** Phrase d'une écriture refusée pendant une remise à zéro. */
-export const RESET_WRITE_REFUSAL = 'Remise à zéro en cours : rien ne s\'écrit.';
+export const RESET_WRITE_REFUSAL = t('Remise à zéro en cours : rien ne s\'écrit.');
 
 /**
  * Pendant une remise à zéro (`suspendWrites`), aucune écriture n'entre dans un dossier, mémoire ou sessions en
@@ -303,7 +304,7 @@ const checkRefusal = async (folder: MemoryFolder, check: FolderCheck | undefined
 
 const subfolderRefusal = (pickedName: string): FolderRefusedError =>
   new FolderRefusedError(
-    `« ${pickedName.split('/').pop()} » est un dossier de la mémoire Gtracker, pas la mémoire elle-même : choisissez le dossier Gtracker qui le contient.`
+    t('« {name} » est un dossier de la mémoire Gtracker, pas la mémoire elle-même : choisissez le dossier Gtracker qui le contient.', { name: pickedName.split('/').pop() })
   );
 
 /** Noms du contenu d'un dossier choisi. */
@@ -380,7 +381,7 @@ interface DeviceFolderChoice {
 }
 
 /** Phrase montrée quand le dossier désigné n'existe plus (déplacé, renommé ou effacé). */
-export const MISSING_FOLDER_MESSAGE = 'Le dossier mémoire est introuvable. Désignez-le de nouveau dans Réglages › Mémoire.';
+export const MISSING_FOLDER_MESSAGE = t('Le dossier mémoire est introuvable. Désignez-le de nouveau dans Réglages › Mémoire.');
 
 /**
  * Erreur du sélecteur d'Android rendue en clair : un dossier désigné qui
@@ -399,7 +400,7 @@ export const readableFolderError = (err: unknown): unknown => {
     console.warn(`Dossier mémoire introuvable : ${detail}`);
     return Object.assign(new Error(MISSING_FOLDER_MESSAGE), { code: 'NOT_FOUND' });
   }
-  const plain = plainError(err, 'Le dossier mémoire ne répond pas.');
+  const plain = plainError(err, t('Le dossier mémoire ne répond pas.'));
   return plain === detail ? err : Object.assign(new Error(plain), { code });
 };
 
@@ -473,7 +474,7 @@ const readDeviceChoice = (): DeviceFolderChoice | null => {
 
 const openDeviceFolder = async (): Promise<MemoryAccess> => {
   const choice = readDeviceChoice();
-  if (!choice) return { state: 'unavailable', reason: 'Aucun dossier mémoire choisi.' };
+  if (!choice) return { state: 'unavailable', reason: t('Aucun dossier mémoire choisi.') };
   const { granted } = await inPlainWords(nativeFolder.hasAccess({ uri: choice.uri }));
   return granted
     ? { state: 'ready', folder: createDeviceFolder(choice) }
@@ -634,7 +635,7 @@ export const openMemoryFolder = async (): Promise<MemoryAccess> => {
   } catch (err) {
     return {
       state: 'unavailable',
-      reason: plainError(err, 'Ce navigateur ne permet pas de garder les sessions.'),
+      reason: plainError(err, t('Ce navigateur ne permet pas de garder les sessions.')),
     };
   }
 };
@@ -659,7 +660,7 @@ export const readPrivateBytes = async (path: string): Promise<Uint8Array | null>
   const { Filesystem, Directory } = await filesystem();
   // Taille inconnue : la lecture tranche, comme sans ce contrôle. Hors du `try` : ce refus n'est pas une absence.
   if (((await privateFileSize(path).catch(() => null)) ?? 0) > MAX_PRIVATE_READ_BYTES) {
-    throw Object.assign(new Error('Fichier trop gros pour être lu en une fois.'), { code: 'TOO_LARGE' });
+    throw Object.assign(new Error(t('Fichier trop gros pour être lu en une fois.')), { code: 'TOO_LARGE' });
   }
   try {
     const { data } = await Filesystem.readFile({ path, directory: Directory.Data });
@@ -778,9 +779,9 @@ const createPrivateFolder = (base: string): MemoryFolder => {
 
 /** Dit à qui veut écrire dans un dossier d'une version plus récente, et dans la carte de la mémoire. */
 /** Pourquoi un import est refusé : aucun dossier mémoire accessible. */
-export const NO_FOLDER_IMPORT_MESSAGE = "Désignez d'abord le dossier mémoire (Réglages › Mémoire) pour importer des sessions.";
+export const NO_FOLDER_IMPORT_MESSAGE = t("Désignez d'abord le dossier mémoire (Réglages › Mémoire) pour importer des sessions.");
 
-export const READ_ONLY_MEMORY_MESSAGE = "Ce dossier vient d'une version plus récente de Gtracker : il est lu sans rien y changer. Mettez l'application à jour pour y ranger vos sessions.";
+export const READ_ONLY_MEMORY_MESSAGE = t("Ce dossier vient d'une version plus récente de Gtracker : il est lu sans rien y changer. Mettez l'application à jour pour y ranger vos sessions.");
 
 /**
  * Le même dossier, qui lit et refuse toute écriture : à l'ouverture d'une mémoire

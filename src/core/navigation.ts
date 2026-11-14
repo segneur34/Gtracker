@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { PLAN_PATH, PROFILE_PATH, SESSIONS_PATH } from './parentPage';
 
 /**
@@ -18,11 +19,11 @@ export interface NavDestination {
 /** Page Enregistrer : le bouton rond du bas, le bouton vert « Enregistrer » du haut. */
 export const RECORD_PATH = '/enregistrer';
 
-const PROFIL: NavDestination = { id: 'profil', to: PROFILE_PATH, label: 'Profil' };
-const SESSIONS: NavDestination = { id: 'sessions', to: SESSIONS_PATH, label: 'Sessions' };
-const PLANIFIER: NavDestination = { id: 'planifier', to: PLAN_PATH, label: 'Planifier' };
-const STATISTIQUES: NavDestination = { id: 'statistiques', to: '/statistiques', label: 'Statistiques' };
-const REGLAGES: NavDestination = { id: 'reglages', to: '/parametres', label: 'Réglages' };
+const PROFIL: NavDestination = { id: 'profil', to: PROFILE_PATH, label: t('Profil') };
+const SESSIONS: NavDestination = { id: 'sessions', to: SESSIONS_PATH, label: t('Sessions') };
+const PLANIFIER: NavDestination = { id: 'planifier', to: PLAN_PATH, label: t('Planifier') };
+const STATISTIQUES: NavDestination = { id: 'statistiques', to: '/statistiques', label: t('Statistiques') };
+const REGLAGES: NavDestination = { id: 'reglages', to: '/parametres', label: t('Réglages') };
 
 /** Barre du bas et rail : deux cases, le bouton rond, deux cases. Planifier s'ouvre depuis Sessions. */
 export const TAB_BAR: { before: readonly NavDestination[]; after: readonly NavDestination[] } = {

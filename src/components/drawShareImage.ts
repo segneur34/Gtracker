@@ -3,6 +3,7 @@ import { MAP_BASES, type MapBase } from '../core/mapBase';
 import { tileKey, type TileCoord } from '../core/tiles';
 import { GONG_LOGO_HEIGHT, GONG_LOGO_PATH, GONG_LOGO_WIDTH } from './gongLogoPath';
 import { lightToken } from '../theme/lightToken';
+import { t } from '../core/i18n';
 import { loadMapTile, tileImage } from '../platform/mapTiles';
 import { strokeColoredTrack } from './drawTrackPreview';
 import type { TrackSegment } from './TrackSegmentsLayer';
@@ -145,7 +146,7 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
   canvas.width = widthPx;
   canvas.height = heightPx;
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Dessin impossible sur cet appareil.');
+  if (!ctx) throw new Error(t('Dessin impossible sur cet appareil.'));
   const family = fontFamily();
   await ensureFonts(family);
   const ink = token('--ink', '#000000');
@@ -250,6 +251,6 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
   }
 
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Image impossible à produire.'))), 'image/png');
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error(t('Image impossible à produire.')))), 'image/png');
   });
 };

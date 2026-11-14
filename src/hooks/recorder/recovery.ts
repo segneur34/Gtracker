@@ -1,5 +1,6 @@
 import { errorMessage } from '../../core/basics';
 import type { Activity } from '../../core/activities';
+import { t } from '../../core/i18n';
 import { marksWithin } from '../../core/sessionMarks';
 import { DEFAULT_RECORDING, getSportProfile } from '../../core/sportProfiles';
 import type { SportType } from '../../core/types';
@@ -50,12 +51,14 @@ type JournalRecovery = 'free' | 'setAside' | 'blocked';
 const setJournalAside = async (why: string): Promise<JournalRecovery> => {
   try {
     const name = await recordingJournal.setAside();
-    setState({ error: `${why} : son journal est gardé de côté sur le téléphone (${name}), un nouvel enregistrement peut démarrer.` });
+    setState({ error: t('{why} : son journal est gardé de côté sur le téléphone ({name}), un nouvel enregistrement peut démarrer.', { why, name }) });
     return 'setAside';
   } catch (err) {
     setState({
-      error: `${why}, et son journal n'a pas pu être mis de côté (${errorMessage(err, 'erreur inconnue')}) : `
-        + "aucun enregistrement ne démarre, pour ne pas l'écraser. Relancez l'application.",
+      error: t(
+        "{why}, et son journal n'a pas pu être mis de côté ({detail}) : aucun enregistrement ne démarre, pour ne pas l'écraser. Relancez l'application.",
+        { why, detail: errorMessage(err, t('erreur inconnue')) },
+      ),
     });
     return 'blocked';
   }
@@ -102,7 +105,7 @@ export const continueCapture = async (setup: MotionSetup, paused: boolean): Prom
     // Ce qui a été mesuré avant la coupure reste dans son fichier, retrouvé à l'arrêt ; sans fichier, rien ne l'a été.
     const kept = await findMotionCapture(session.startedAtMs).catch(() => null);
     const why = kept ? CAPTURE_NOT_RESUMED
-      : `Mesure des capteurs impossible : ${errorMessage(err, 'erreur inconnue')}. L'enregistrement continue sans elle.`;
+      : t("Mesure des capteurs impossible : {detail}. L'enregistrement continue sans elle.", { detail: errorMessage(err, t('erreur inconnue')) });
     setState({ error: joinMessages(state.error, why) });
     return;
   }
@@ -265,7 +268,7 @@ const recoverOnce = async (): Promise<JournalRecovery> => {
     text = await recordingJournal.read();
   } catch (err) {
     await stopOrphans();
-    return setJournalAside(`Session interrompue illisible (${errorMessage(err, 'erreur inconnue')})`);
+    return setJournalAside(t('Session interrompue illisible ({detail})', { detail: errorMessage(err, t('erreur inconnue')) }));
   }
   const nowMs = Date.now();
   if (text === null) {
@@ -294,7 +297,7 @@ const recoverOnce = async (): Promise<JournalRecovery> => {
     if (pending) setState({ pending: { ...pending, canContinue }, saved: null, error: null, landOnRecording: canContinue });
     return 'free';
   } catch (err) {
-    return setJournalAside(`Session interrompue non récupérée (${errorMessage(err, 'erreur inconnue')})`);
+    return setJournalAside(t('Session interrompue non récupérée ({detail})', { detail: errorMessage(err, t('erreur inconnue')) }));
   }
 };
 

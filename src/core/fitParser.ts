@@ -13,6 +13,8 @@
  * qu'un refus. Seul un fichier qui n'est pas un FIT lève une erreur.
  */
 
+import { t } from './i18n';
+
 /** Type de fichier d'une activité (`file` du profil FIT). */
 export const FIT_FILE_ACTIVITY = 4;
 
@@ -164,8 +166,8 @@ type MessageVisitor = (global: number, timestampS: number | undefined, read: Fie
  * bout à bout se lisent à la suite. Rend vrai si le fichier s'est arrêté avant sa fin.
  */
 const walkFit = (bytes: Uint8Array, visit: MessageVisitor): boolean => {
-  if (bytes.length === 0) throw new Error('fichier vide');
-  if (!hasSignature(bytes, 0)) throw new Error("ce n'est pas un fichier FIT");
+  if (bytes.length === 0) throw new Error(t('fichier vide'));
+  if (!hasSignature(bytes, 0)) throw new Error(t("ce n'est pas un fichier FIT"));
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
   let start = 0;

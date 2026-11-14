@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, type ComponentType } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { RECORD_PATH, TAB_BAR, TOP_LINKS, alsoActiveOn, type NavDestination, type NavId } from '../core/navigation';
+import { t } from '../core/i18n';
 import { PROFILE_PATH, parentPage } from '../core/parentPage';
 import { formatClock } from '../core/units';
 import { useLongPress } from '../hooks/useLongPress';
@@ -81,7 +82,9 @@ function RecordButton({ status, pressingMs, handlers }: {
     // Un bouton, pas un lien : la WebView d'Android affiche l'adresse d'un lien tenu longtemps.
     <button
       type="button"
-      aria-label={`Enregistrement ${paused ? 'en pause' : 'en cours'}, ${clock} ; appui long : ${paused ? 'reprendre' : 'pause'}`}
+      aria-label={paused
+        ? t('Enregistrement en pause, {clock} ; appui long : reprendre', { clock })
+        : t('Enregistrement en cours, {clock} ; appui long : pause', { clock })}
       className={`shell-record shell-record--busy${paused ? ' shell-record--paused' : ''}`}
       {...handlers}
       onClick={(e) => {
@@ -99,7 +102,7 @@ function RecordButton({ status, pressingMs, handlers }: {
   ) : (
     <NavLink
       to={RECORD_PATH}
-      aria-label={busy ? `Enregistrement en cours, ${clock}` : 'Enregistrer'}
+      aria-label={busy ? t('Enregistrement en cours, {clock}', { clock }) : t('Enregistrer')}
       className={`shell-record${busy ? ' shell-record--busy' : ''}`}>
       <span className={`ui-record-dot${busy ? ' ui-record-dot--stop' : ''}`} />
     </NavLink>
@@ -177,13 +180,13 @@ function AppShell() {
           <GongLogo className="shell-brand__mark" />
           <span className="shell-brand__name" aria-hidden="true">Gtracker</span>
         </Link>
-        <nav aria-label="Navigation principale" className="shell-toplinks">
+        <nav aria-label={t('Navigation principale')} className="shell-toplinks">
           {TOP_LINKS.map((d) => topLink(d, pathname))}
         </nav>
         <div className="shell-topactions">
           <NavLink to={RECORD_PATH} className={`shell-toprecord${busy ? ' shell-toprecord--busy' : ''}`}>
             <span className={`ui-record-dot${busy ? ' ui-record-dot--stop' : ''}`} />
-            {busy ? <RecordingClock /> : 'Enregistrer'}
+            {busy ? <RecordingClock /> : t('Enregistrer')}
           </NavLink>
         </div>
       </header>
@@ -192,7 +195,7 @@ function AppShell() {
         {busy && pathname !== RECORD_PATH && (
           <Link to={RECORD_PATH} className="shell-banner">
             <span className="shell-banner__dot" />
-            <span className="shell-banner__text">{paused ? 'Enregistrement en pause' : 'Enregistrement en cours'}</span>
+            <span className="shell-banner__text">{paused ? t('Enregistrement en pause') : t('Enregistrement en cours')}</span>
             <RecordingClock />
           </Link>
         )}
@@ -211,7 +214,7 @@ function AppShell() {
         </HelpProvider>
       </main>
 
-      <nav aria-label="Navigation principale" className="shell-tabbar">
+      <nav aria-label={t('Navigation principale')} className="shell-tabbar">
         {TAB_BAR.before.map((d) => tabLink(d, pathname))}
         <div className="shell-tabbar__record">
           <RecordButton status={status} pressingMs={pressingMs} handlers={handlers} />
@@ -224,7 +227,7 @@ function AppShell() {
         // Reprise : l'arc à l'encre, le vert vif ne se verrait pas sur la piste claire ; pause : le rouge de l'enregistrement.
         <HoldDial pressMs={pressingMs} color={paused ? 'var(--ink)' : 'var(--recording)'}
           icon={paused ? <IconPlay size={56} strokeWidth={2.5} /> : <IconPause size={56} strokeWidth={3} />}
-          title={paused ? 'Reprise' : 'Pause'} hint="Maintenez le bouton" />
+          title={paused ? t('Reprise') : t('Pause')} hint={t('Maintenez le bouton')} />
       )}
 
       <ImportQuestion />

@@ -5,13 +5,15 @@
  * grave, il s'entend moins fort.
  */
 
+import { t } from '../core/i18n';
+
 export type BeepSound = 'grave' | 'medium' | 'aigu' | 'tres-aigu';
 
 export const BEEP_SOUNDS: readonly { key: BeepSound; label: string; hz: number }[] = [
-  { key: 'grave', label: 'grave', hz: 1000 },
-  { key: 'medium', label: 'médium', hz: 1500 },
-  { key: 'aigu', label: 'aigu', hz: 2000 },
-  { key: 'tres-aigu', label: 'très aigu', hz: 3000 },
+  { key: 'grave', label: t('grave'), hz: 1000 },
+  { key: 'medium', label: t('médium'), hz: 1500 },
+  { key: 'aigu', label: t('aigu'), hz: 2000 },
+  { key: 'tres-aigu', label: t('très aigu'), hz: 3000 },
 ];
 
 /**

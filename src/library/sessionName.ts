@@ -1,3 +1,4 @@
+import { t } from '../core/i18n';
 import { downloadBaseName } from './naming';
 import type { SessionPlace } from './places';
 import type { SessionRecord } from './record';
@@ -38,7 +39,7 @@ export const customName = (record: NamedRecord): string | null => record.name?.t
  * Nom montré : le nom donné, sinon l'activité et le lieu (`NAME_SEPARATOR`), sinon ce qu'on en connaît,
  * sinon `fallback`. `activityName` : nom de l'activité de la session, `null` si elle n'en a pas.
  */
-export const sessionDisplayName = (record: NamedRecord, activityName: string | null, fallback = 'Session'): string =>
+export const sessionDisplayName = (record: NamedRecord, activityName: string | null, fallback = t('Session')): string =>
   customName(record) ?? ([activityName?.trim() || null, placeLabel(record.place)].filter(Boolean).join(NAME_SEPARATOR) || fallback);
 
 /**

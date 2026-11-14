@@ -3,6 +3,7 @@ import { useCloseOnOutsideOrEscape } from '../hooks/useDismiss';
 import { createPortal } from 'react-dom';
 import { useMap } from './map/mapContext';
 import L from 'leaflet';
+import { t } from '../core/i18n';
 import { MAP_BASES, type MapBase } from '../core/mapBase';
 import type { SportFamily } from '../core/sportProfiles';
 import { TILE_CACHE_DEFAULTS, tilesToRetry, tileViewOf, type TileCoord, type TileView } from '../core/tiles';
@@ -350,8 +351,8 @@ function TileLayer({ base }: { base: MapBase }) {
 
 /** Choix du menu, dans l'ordre. */
 const BASE_CHOICES: ReadonlyArray<{ base: MapBase; label: string }> = [
-  { base: 'plan', label: 'Plan' },
-  { base: 'satellite', label: 'Satellite' },
+  { base: 'plan', label: t('Plan') },
+  { base: 'satellite', label: t('Satellite') },
 ];
 
 /**
@@ -381,11 +382,11 @@ function BaseSwitch({ base, onChange }: { base: MapBase; onChange: (base: MapBas
   return createPortal(
     <>
       <button type="button" className="map-base-switch__button" aria-expanded={open} aria-haspopup="menu"
-        aria-label="Fond de carte" title="Fond de carte" onClick={() => setOpen((o) => !o)}>
+        aria-label={t('Fond de carte')} title={t('Fond de carte')} onClick={() => setOpen((o) => !o)}>
         <IconLayers size={18} />
       </button>
       {open && (
-        <div className="map-base-switch__menu" role="menu" aria-label="Fond de carte">
+        <div className="map-base-switch__menu" role="menu" aria-label={t('Fond de carte')}>
           {BASE_CHOICES.map((choice) => (
             <button key={choice.base} type="button" role="menuitemradio" aria-checked={choice.base === base}
               className="map-base-switch__choice"

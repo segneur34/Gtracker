@@ -1,6 +1,7 @@
 import {
   MARKER_FILE, MEMORY_VERSION, README_FILE, markerText, readMarkerVersion, readmeText, sessionPath,
 } from '../../library/folderLayout';
+import { t, tn } from '../../core/i18n';
 import { describeRefresh } from '../../library/importReport';
 import { LEGACY_MARKER_FILE } from '../../library/legacyImport';
 import { folderId } from '../../library/libraryCache';
@@ -40,7 +41,7 @@ const guardedFolder = async (f: MemoryFolder): Promise<MemoryFolder> => {
 };
 
 /** Refus du dossier mémoire de l'ancienne application choisi comme mémoire : ses sessions entrent par l'import. */
-export const LEGACY_FOLDER_REFUSAL = 'Ce dossier est celui de l\'autre application : ajoutez ses sessions par « Ajouter les sessions d\'un dossier ».';
+export const LEGACY_FOLDER_REFUSAL = t("Ce dossier est celui de l'autre application : ajoutez ses sessions par « Ajouter les sessions d'un dossier ».");
 
 /**
  * Vrai pour le dossier mémoire de l'ancienne application : son marqueur, sans celui de Gtracker. Il n'est pas ouvert
@@ -101,7 +102,7 @@ const attach = async (opened: MemoryFolder): Promise<boolean> => {
   try {
     await ensureLayout(f);
   } catch (err) {
-    reportError(`Marqueur du dossier non écrit : ${errorMessage(err, 'erreur inconnue')}`);
+    reportError(t('Marqueur du dossier non écrit : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }));
   }
   const settingsChanged = await syncSettingsSafely(f);
   noteSettingsGestures(settingsChanged);
@@ -111,7 +112,7 @@ const attach = async (opened: MemoryFolder): Promise<boolean> => {
   // Le balayage d'abord : une session en attente déjà rangée, mais coupée avant sa fiche, est retrouvée
   // (`scanCompletion`, attendu par `addGpx`) au lieu d'être rangée une seconde fois sous un autre nom.
   void completeScan(f, gen, jobs).catch((err) =>
-    setState({ scanning: null, toUpdate: 0, error: `Lecture du dossier interrompue : ${errorMessage(err, 'erreur inconnue')}` })
+    setState({ scanning: null, toUpdate: 0, error: t('Lecture du dossier interrompue : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) })
   );
   await flushPending();
   return settingsChanged;
@@ -172,8 +173,8 @@ const reportStorageStartupFailure = (): void => {
   const failure = storageStartupFailure();
   if (!failure) return;
   reportError(failure.all
-    ? "Réglages de l'appareil illisibles au démarrage : les réglages par défaut valent jusqu'à la fermeture, et les changements faits d'ici là ne seront pas gardés. Relancez l'application"
-    : "Une partie des réglages de l'appareil n'a pas pu être lue au démarrage : elle vaut par défaut jusqu'à la fermeture, et ses changements ne seront pas gardés. Relancez l'application");
+    ? t("Réglages de l'appareil illisibles au démarrage : les réglages par défaut valent jusqu'à la fermeture, et les changements faits d'ici là ne seront pas gardés. Relancez l'application")
+    : t("Une partie des réglages de l'appareil n'a pas pu être lue au démarrage : elle vaut par défaut jusqu'à la fermeture, et ses changements ne seront pas gardés. Relancez l'application"));
 };
 
 /**
@@ -202,7 +203,7 @@ export const openLibrary = (): Promise<void> => {
     );
     await countPending();
   })().catch((err) => {
-    detach('unavailable', null, errorMessage(err, 'Ouverture de la mémoire impossible.'));
+    detach('unavailable', null, errorMessage(err, t('Ouverture de la mémoire impossible.')));
   });
   return lib.opening;
 };
@@ -219,7 +220,7 @@ export const startLibraryUi = (isBusy: () => boolean): void => {
   jsonStore.subscribeFailure(() => {
     if (storageFailureShown) return;
     storageFailureShown = true;
-    reportError('Stockage de l\'appareil plein ou bloqué : les derniers changements de réglages valent jusqu\'à la fermeture de l\'application, sans être gardés');
+    reportError(t("Stockage de l'appareil plein ou bloqué : les derniers changements de réglages valent jusqu'à la fermeture de l'application, sans être gardés"));
   });
   // Écritures différées vidées dès que l'application passe en arrière-plan.
   const flushAll = () => void flushWrites();
@@ -243,7 +244,7 @@ export const chooseFolder = async (): Promise<void> => {
     // Dossier de l'ancienne application : refusé avant d'être gardé ni écrit, la mémoire en service reste en place.
     picked = await chooseMemoryFolder(legacyFolderCheck);
   } catch (err) {
-    setState({ error: err instanceof FolderRefusedError ? err.message : `Dossier inaccessible : ${errorMessage(err, 'erreur inconnue')}` });
+    setState({ error: err instanceof FolderRefusedError ? err.message : t('Dossier inaccessible : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
     return;
   }
   if (!picked) return;
@@ -256,7 +257,7 @@ export const chooseFolder = async (): Promise<void> => {
   try {
     settingsChanged = await attach(picked);
   } catch (err) {
-    detach('unavailable', picked.label, `Dossier inutilisable : ${errorMessage(err, 'erreur inconnue')}`);
+    detach('unavailable', picked.label, t('Dossier inutilisable : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }));
     await carryUnwritten(carried);
     return;
   }
@@ -273,11 +274,11 @@ export const chooseFolder = async (): Promise<void> => {
         const result = await addGpx(text, session.record.source, { ...await recordToCopy(previous, session), motion: motion ?? undefined });
         if (result.status === 'added') copied += 1;
       } catch (err) {
-        reportError(`${session.file} non recopiée dans le dossier : ${errorMessage(err, 'erreur inconnue')}`);
+        reportError(t('{file} non recopiée dans le dossier : {detail}', { file: session.file, detail: errorMessage(err, t('erreur inconnue')) }));
       }
     }
     if (copied > 0) {
-      setState({ message: `${copied} session${copied > 1 ? 's' : ''} de la mémoire du navigateur recopiée${copied > 1 ? 's' : ''} dans le dossier.` });
+      setState({ message: tn(copied, '{n} session de la mémoire du navigateur recopiée dans le dossier.', '{n} sessions de la mémoire du navigateur recopiées dans le dossier.') });
     }
   }
   // Après la recopie : une session de la mémoire du navigateur que le dossier n'avait pas y est maintenant.
@@ -302,11 +303,11 @@ export const reconnectFolder = async (): Promise<void> => {
       await carryUnwritten(carried);
       return;
     }
-    setState({ error: `Dossier inaccessible : ${errorMessage(err, 'erreur inconnue')}` });
+    setState({ error: t('Dossier inaccessible : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
     return;
   }
   if (!f) {
-    setState({ error: 'Autorisation refusée : le dossier reste inaccessible.' });
+    setState({ error: t('Autorisation refusée : le dossier reste inaccessible.') });
     return;
   }
   // Sur le téléphone, le dossier est désigné de nouveau : les changements pas encore écrits y sont reportés,
@@ -316,7 +317,7 @@ export const reconnectFolder = async (): Promise<void> => {
   try {
     settingsChanged = await attach(f);
   } catch (err) {
-    detach('unavailable', f.label, `Dossier inutilisable : ${errorMessage(err, 'erreur inconnue')}`);
+    detach('unavailable', f.label, t('Dossier inutilisable : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }));
   }
   await carryUnwritten(carried);
   await applySettingsChange(settingsChanged);
@@ -382,7 +383,7 @@ export const refreshLibrary = (): Promise<void> => {
       await applySettingsChange(read.settingsChanged);
     })
     .catch((err: unknown) => {
-      setState({ scanning: null, toUpdate: 0, error: `Relecture du dossier impossible : ${errorMessage(err, 'erreur inconnue')}` });
+      setState({ scanning: null, toUpdate: 0, error: t('Relecture du dossier impossible : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
     })
     .finally(() => {
       lib.refreshing = null;

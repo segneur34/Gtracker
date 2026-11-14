@@ -10,7 +10,7 @@
 import {
   DAY_MS, addDays, isoWeek, isoWeekday, monthYearLong, shortDate, stacksByActivity, startOfDay, startOfIsoWeek,
 } from '../core/calendar';
-import { dateLocale } from '../core/i18n';
+import { currentLang, dateLocale, t } from '../core/i18n';
 
 export type ChartPeriod = 'semaine' | 'trente' | 'sixmois' | 'annee';
 
@@ -18,10 +18,10 @@ export type ChartPeriod = 'semaine' | 'trente' | 'sixmois' | 'annee';
 export type ChartRange = ChartPeriod | 'tout';
 
 export const CHART_PERIODS: { id: ChartPeriod; label: string }[] = [
-  { id: 'semaine', label: 'Semaine' },
-  { id: 'trente', label: '30 jours' },
-  { id: 'sixmois', label: '6 mois' },
-  { id: 'annee', label: 'Année' },
+  { id: 'semaine', label: t('Semaine') },
+  { id: 'trente', label: t('30 jours') },
+  { id: 'sixmois', label: t('6 mois') },
+  { id: 'annee', label: t('Année') },
 ];
 
 /** Ce que le graphe retient d'une session. */
@@ -68,6 +68,9 @@ export interface ActivityChartData {
 }
 
 const DAY_LETTERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+/** Initiale du jour `i` de la semaine (0 : lundi) : les lettres françaises en français, `Intl` ailleurs. */
+const dayLetter = (i: number): string =>
+  currentLang() === 'fr' ? DAY_LETTERS[i] : new Date(2024, 0, 1 + i).toLocaleDateString(dateLocale(), { weekday: 'narrow' });
 /**
  * Vue 30 jours : barres d'avant le premier lundi en dessous desquelles la
  * première barre ne porte pas de numéro de semaine. Sur téléphone, une barre
@@ -81,6 +84,9 @@ const longDay = (ms: number): string =>
 
 
 const MONTH_LETTERS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+/** Initiale du mois `m` (0 : janvier) : les lettres françaises en français, `Intl` ailleurs. */
+const monthLetter = (m: number): string =>
+  currentLang() === 'fr' ? MONTH_LETTERS[m] : new Date(2024, m, 1).toLocaleDateString(dateLocale(), { month: 'narrow' });
 
 interface Slot {
   startMs: number;
@@ -108,7 +114,7 @@ const monthSlotsOf = (nowMs: number, oldestMs: number | null): { slots: Slot[]; 
     const start = new Date(oldest.getFullYear(), oldest.getMonth() + i, 1);
     const january = start.getMonth() === 0;
     const label = count <= 12
-      ? MONTH_LETTERS[start.getMonth()]
+      ? monthLetter(start.getMonth())
       : january || (i === 0 && labelFirst) ? String(start.getFullYear()) : '';
     slots.push({
       startMs: start.getTime(),
@@ -118,8 +124,8 @@ const monthSlotsOf = (nowMs: number, oldestMs: number | null): { slots: Slot[]; 
   }
   return {
     slots,
-    title: 'Depuis le début, par mois',
-    range: `depuis ${monthYearLong(slots[0].startMs)}`,
+    title: t('Depuis le début, par mois'),
+    range: t('depuis {date}', { date: monthYearLong(slots[0].startMs) }),
   };
 };
 
@@ -132,10 +138,14 @@ const slotsOf = (period: ChartRange, nowMs: number, oldestMs: number | null = nu
     const monday = startOfIsoWeek(nowMs);
     for (let i = 0; i < 7; i++) {
       const day = addDays(monday, i);
-      slots.push({ startMs: day, endMs: addDays(day, 1), label: DAY_LETTERS[i], title: longDay(day), weekStart: false, future: day > today });
+      slots.push({ startMs: day, endMs: addDays(day, 1), label: dayLetter(i), title: longDay(day), weekStart: false, future: day > today });
     }
     const sunday = addDays(monday, 6);
-    return { slots, title: `Semaine ${isoWeek(nowMs).week}`, range: `du ${shortDate(monday)} au ${shortDate(sunday)}` };
+    return {
+      slots,
+      title: t('Semaine {week}', { week: isoWeek(nowMs).week }),
+      range: t('du {from} au {to}', { from: shortDate(monday), to: shortDate(sunday) }),
+    };
   }
   if (period === 'trente') {
     const first = addDays(today, -29);
@@ -148,12 +158,12 @@ const slotsOf = (period: ChartRange, nowMs: number, oldestMs: number | null = nu
       const week = isoWeek(day).week;
       slots.push({
         startMs: day, endMs: addDays(day, 1),
-        label: monday || (i === 0 && labelFirst) ? `S${week}` : '',
-        title: `${longDay(day)} (S${week})`,
+        label: monday || (i === 0 && labelFirst) ? t('S{week}', { week }) : '',
+        title: t('{day} (S{week})', { day: longDay(day), week }),
         weekStart: monday && i > 0, future: false,
       });
     }
-    return { slots, title: '30 derniers jours', range: `du ${shortDate(first)} à aujourd'hui` };
+    return { slots, title: t('30 derniers jours'), range: t("du {from} à aujourd'hui", { from: shortDate(first) }) };
   }
   // Par semaine : les 26 dernières, ou celles de l'année civile en cours (choix du produit), du 1er
   // janvier au 31 décembre : la première et la dernière semaine, à cheval sur deux années, sont coupées à ses bords.
@@ -171,16 +181,20 @@ const slotsOf = (period: ChartRange, nowMs: number, oldestMs: number | null = nu
     const endMs = period === 'annee' ? Math.min(addDays(monday, 7), yearEnd) : addDays(monday, 7);
     slots.push({
       startMs, endMs,
-      label: marked ? `S${week}` : '',
-      title: `Semaine ${week}, du ${shortDate(startMs)} au ${shortDate(addDays(endMs, -1))}`,
+      label: marked ? t('S{week}', { week }) : '',
+      title: t('Semaine {week}, du {from} au {to}', { week, from: shortDate(startMs), to: shortDate(addDays(endMs, -1)) }),
       weekStart: false, future: false,
     });
   }
   if (period === 'annee') {
-    return { slots, title: `Année ${year}, par semaine`, range: `du ${shortDate(yearStart)} à aujourd'hui` };
+    return {
+      slots,
+      title: t('Année {year}, par semaine', { year }),
+      range: t("du {from} à aujourd'hui", { from: shortDate(yearStart) }),
+    };
   }
   const firstWeek = isoWeek(slots[0].startMs).week;
-  return { slots, title: '6 derniers mois, par semaine', range: `S${firstWeek} à S${thisWeek}` };
+  return { slots, title: t('6 derniers mois, par semaine'), range: t('S{from} à S{to}', { from: firstWeek, to: thisWeek }) };
 };
 
 /**

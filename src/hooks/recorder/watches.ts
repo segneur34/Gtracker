@@ -1,4 +1,5 @@
 import { errorMessage } from '../../core/basics';
+import { t } from '../../core/i18n';
 import type { RecordingProfile } from '../../core/sportProfiles';
 import { armBeltWatch, armGpsWatch, disarmBeltWatch, disarmGpsWatch, onBeltLost, onGpsLost } from '../../platform/beeper';
 import {
@@ -46,7 +47,7 @@ export const watch: Watches = {
 };
 
 /** Alerte de la page Enregistrer quand le GPS se tait. */
-export const GPS_LOST_ERROR = "GPS perdu : plus aucune position. L'enregistrement continue, la trace reprendra au retour du GPS.";
+export const GPS_LOST_ERROR = t("GPS perdu : plus aucune position. L'enregistrement continue, la trace reprendra au retour du GPS.");
 
 /** L'alerte avec « GPS perdu » ajouté à la suite de ce qu'elle disait déjà. */
 const withGpsLost = (error: string | null): string => (error ? `${withoutGpsLost(error)} ${GPS_LOST_ERROR}` : GPS_LOST_ERROR);
@@ -95,7 +96,7 @@ export const startGpsWatchFor = (profile: RecordingProfile): void => {
 };
 
 /** Message de la perte de la fréquence cardiaque, ajouté à l'alerte comme « GPS perdu ». */
-export const BELT_LOST_ERROR = "Fréquence cardiaque perdue : plus aucune mesure de la ceinture. L'enregistrement continue, elle reprendra à son retour.";
+export const BELT_LOST_ERROR = t("Fréquence cardiaque perdue : plus aucune mesure de la ceinture. L'enregistrement continue, elle reprendra à son retour.");
 
 /** L'alerte sans la perte de la FC : ce qu'elle disait par ailleurs est gardé ; `null` s'il ne reste rien. */
 export const withoutBeltLost = (error: string | null): string | null => {
@@ -140,7 +141,7 @@ export const takeBelt = async (belt: HeartRateBelt, maxAgeS: number): Promise<vo
 
 /** Alerte d'une ceinture qui ne répond pas, au départ comme à la reprise : l'enregistrement continue sans elle. */
 export const beltUnreachableError = (err: unknown): string =>
-  `Ceinture cardio injoignable : ${errorMessage(err, 'erreur inconnue')}. L'enregistrement continue sans elle.`;
+  t("Ceinture cardio injoignable : {detail}. L'enregistrement continue sans elle.", { detail: errorMessage(err, t('erreur inconnue')) });
 
 /**
  * Prend la ceinture comme `takeBelt`, sans jamais lever : si elle ne répond pas, elle est rendue, la tuile BPM

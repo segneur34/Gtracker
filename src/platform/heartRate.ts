@@ -1,4 +1,5 @@
 import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
+import { t } from '../core/i18n';
 import { isNativeApp } from './runtime';
 import { addBelt, forgetBelt, learnBeltAddressType, readBeltList, storedBeltList, type BeltList } from './beltList';
 import { jsonStore } from './storage';
@@ -70,12 +71,12 @@ export type BeltState = 'off' | 'connecting' | 'connected' | 'searching' | 'lost
 
 /** État de la connexion, en clair. */
 export const BELT_STATE_LABEL: Record<BeltState, string> = {
-  off: 'non connectée',
-  connecting: 'connexion…',
-  connected: 'connectée',
-  searching: 'introuvable pour le moment : portez-la, électrodes humidifiées ; recherche en cours',
-  lost: 'perdue, en attente de la ceinture',
-  unsupported: "cet appareil ne donne pas de fréquence cardiaque",
+  off: t('non connectée'),
+  connecting: t('connexion…'),
+  connected: t('connectée'),
+  searching: t('introuvable pour le moment : portez-la, électrodes humidifiées ; recherche en cours'),
+  lost: t('perdue, en attente de la ceinture'),
+  unsupported: t('cet appareil ne donne pas de fréquence cardiaque'),
 };
 
 /** Plugin maison, `android/app/src/main/java/io/github/segneur/gtracker/HeartRatePlugin.java`. */
@@ -240,7 +241,7 @@ const listen = (): Promise<void> => {
 };
 
 /** Refus d'un second appareil pendant qu'un autre est tenu. */
-export const OTHER_BELT_HELD = "un autre appareil cardio est déjà utilisé : l'application n'en lit qu'un à la fois";
+export const OTHER_BELT_HELD = t("un autre appareil cardio est déjà utilisé : l'application n'en lit qu'un à la fois");
 
 /** `holder` prend la connexion à `belt`, refusée si un autre appareil est tenu ; vrai s'il est le premier. */
 const addHolder = (holder: string, belt: HeartRateBelt): boolean => {
@@ -260,7 +261,7 @@ const addHolder = (holder: string, belt: HeartRateBelt): boolean => {
  */
 export const holdBelt = async (holder: string, belt: HeartRateBelt): Promise<() => void> => {
   if (!isNativeApp()) {
-    if (belt.address !== EXAMPLE_BELT.address) throw new Error("Ceinture cardio sur l'application Android seulement.");
+    if (belt.address !== EXAMPLE_BELT.address) throw new Error(t("Ceinture cardio sur l'application Android seulement."));
     addHolder(holder, belt);
     startExampleBelt();
     return () => releaseBelt(holder);

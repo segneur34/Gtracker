@@ -1,4 +1,5 @@
 import { sessionPath } from '../../library/folderLayout';
+import { t } from '../../core/i18n';
 import { isBlankRecordText, recordToKeep } from '../../library/recordText';
 import {
   applyRecordPatch, imuFileName, mergeLightRecord, parseRecordWithRaw, recordFileName, type LibrarySession,
@@ -40,7 +41,7 @@ export const loadFullSession = async (file: string): Promise<void> => {
     // Déjà relue par le balayage de fond, pas encore publiée : l'analyse la voit entière tout de suite.
     if (lib.publishPending) publish();
   } catch (err) {
-    reportError(`Fiche de ${file} non relue : ${errorMessage(err, 'erreur inconnue')}`);
+    reportError(t('Fiche de {file} non relue : {detail}', { file, detail: errorMessage(err, t('erreur inconnue')) }));
   }
 };
 
@@ -152,7 +153,7 @@ export const removeSession = async (file: string): Promise<void> => {
       lib.knownNames.delete(imuFileName(name));
     }
   } catch (err) {
-    setState({ error: `Suppression incomplète : ${errorMessage(err, 'erreur inconnue')}` });
+    setState({ error: t('Suppression incomplète : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
   } finally {
     for (const name of files) removing.delete(name);
   }

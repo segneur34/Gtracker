@@ -1,3 +1,5 @@
+import { t } from '../core/i18n';
+
 /** Champ texte du matériel : clé dans les notes, intitulé, exemple. */
 export interface GearField {
   field: 'foil' | 'mast' | 'wing' | 'gear1' | 'gear2';
@@ -11,7 +13,7 @@ export interface GearField {
  */
 export const gearFieldsFor = (
   labels: readonly [string, string],
-  placeholders: readonly [string, string] = ['ex. modèle, taille', 'ex. modèle, taille']
+  placeholders: readonly [string, string] = [t('ex. modèle, taille'), t('ex. modèle, taille')]
 ): GearField[] => [
   { field: 'gear1', label: labels[0], placeholder: placeholders[0] },
   { field: 'gear2', label: labels[1], placeholder: placeholders[1] },

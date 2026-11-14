@@ -10,6 +10,7 @@ import {
   type BeepPoint, type MarkGuideSettings,
 } from '../recording/markGuide';
 import { clamp } from '../core/basics';
+import { t } from '../core/i18n';
 
 /**
  * Réglage des bips d'approche des balises, pour une activité de voile ou de surf
@@ -89,7 +90,7 @@ function CommitField({ value, unit, step, label, onCommit }: {
 }
 
 function BeepCurveEditor({
-  value, overridden, onChange, approachMs, speedUnit, fallback = MARK_GUIDE_DEFAULTS, resetLabel = 'Par défaut', fallbackMark = 'défaut',
+  value, overridden, onChange, approachMs, speedUnit, fallback = MARK_GUIDE_DEFAULTS, resetLabel = t('Par défaut'), fallbackMark = t('défaut'),
 }: {
   value: MarkGuideSettings;
   overridden: boolean;
@@ -243,7 +244,7 @@ function BeepCurveEditor({
   return (
     <div className="beep-editor">
       <svg className="beep-editor__chart" viewBox={`0 0 ${W} ${H}`} role="img"
-        aria-label="Courbe des bips : intervalle entre deux bips selon la distance à la balise"
+        aria-label={t('Courbe des bips : intervalle entre deux bips selon la distance à la balise')}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
         onPointerCancel={() => { drag.current = null; setDraft(null); setFrozenAxes(null); }}>
         {/* Zone de validation, à gauche de la distance la plus proche. */}
@@ -271,23 +272,23 @@ function BeepCurveEditor({
           </g>
         ))}
       </svg>
-      <p className="beep-editor__hint">Bips dès {startM} m ; validée à {radiusM} m.</p>
+      <p className="beep-editor__hint">{t('Bips dès {startM} m ; validée à {radiusM} m.', { startM, radiusM })}</p>
 
       <ol className="beep-editor__points">
         <li className="beep-editor__row beep-editor__row--head" aria-hidden="true">
           <span />
-          <span>Distance</span>
-          <span>Entre deux bips</span>
+          <span>{t('Distance')}</span>
+          <span>{t('Entre deux bips')}</span>
         </li>
         {curve.map((p, i) => (
           <li key={`${i}-${p.distanceM}-${p.intervalMs}`} className={selected === i ? 'beep-editor__row beep-editor__row--selected' : 'beep-editor__row'}>
             <button type="button" className="beep-editor__pick" onClick={() => setSelected(selected === i ? null : i)}
               aria-pressed={selected === i}>
-              {i === 0 ? 'Validation' : i === curve.length - 1 ? 'Début' : `Point ${i + 1}`}
+              {i === 0 ? t('Validation') : i === curve.length - 1 ? t('Début') : t('Point {n}', { n: i + 1 })}
             </button>
-            <CommitField value={p.distanceM} unit="m" step={5} label={`Distance du point ${i + 1}`}
+            <CommitField value={p.distanceM} unit="m" step={5} label={t('Distance du point {n}', { n: i + 1 })}
               onCommit={(v) => setPoint(i, { distanceM: v })} />
-            <CommitField value={parseFloat((p.intervalMs / 1000).toFixed(2))} unit="s" step={0.05} label={`Intervalle entre deux bips, point ${i + 1}`}
+            <CommitField value={parseFloat((p.intervalMs / 1000).toFixed(2))} unit="s" step={0.05} label={t('Intervalle entre deux bips, point {n}', { n: i + 1 })}
               onCommit={(v) => setPoint(i, { intervalMs: v * 1000 })} />
           </li>
         ))}
@@ -296,18 +297,18 @@ function BeepCurveEditor({
       <div className="beep-editor__actions">
         <label className="beep-editor__check">
           <input type="checkbox" checked={value.vibrate} onChange={(e) => commit({ vibrate: e.target.checked })} />
-          Vibrer aussi
+          {t('Vibrer aussi')}
         </label>
         {playing ? (
-          <Button size="s" onClick={stopListening}>Arrêter</Button>
+          <Button size="s" onClick={stopListening}>{t('Arrêter')}</Button>
         ) : (
           <Button size="s" onClick={listen} disabled={!idle}
-            title={idle ? `Approche à ${formatSpeed(approachMs, speedUnit)}, ${listenSeconds} s` : 'Pas pendant un enregistrement'}>
-            Écouter
+            title={idle ? t('Approche à {vitesse}, {n} s', { vitesse: formatSpeed(approachMs, speedUnit), n: listenSeconds }) : t('Pas pendant un enregistrement')}>
+            {t('Écouter')}
           </Button>
         )}
         <Button size="s" variant="ghost" onClick={removeSelected} disabled={selected === null || curve.length <= L.minPoints}>
-          Retirer le point
+          {t('Retirer le point')}
         </Button>
         {overridden && <Button size="s" variant="ghost" onClick={() => { onChange(null); setSelected(null); }}>{resetLabel}</Button>}
         {!overridden && <span className="beep-editor__mark">{fallbackMark}</span>}

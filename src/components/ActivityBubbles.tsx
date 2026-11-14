@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { Activity } from '../core/activities';
 import { activityLogo } from '../core/activityLogos';
+import { t } from '../core/i18n';
 import { useThemedShade } from '../hooks/useTheme';
 import ActivityLogo from './logos/ActivityLogo';
 import './ActivityBubbles.css';
@@ -37,10 +38,10 @@ function ActivityBubbles({ total, choices, selected, onSelect }: {
   }, []);
 
   return (
-    <div className="activity-bubbles" ref={row} role="group" aria-label="Filtrer par activité">
+    <div className="activity-bubbles" ref={row} role="group" aria-label={t('Filtrer par activité')}>
       <button type="button" className="activity-bubble" aria-pressed={selected === null} onClick={() => onSelect(null)}>
         <span className="activity-bubble__all num" aria-hidden="true">{total}</span>
-        <span className="activity-bubble__name">Toutes</span>
+        <span className="activity-bubble__name">{t('Toutes')}</span>
       </button>
       {choices.map((activity) => (
         <button key={activity.id} type="button" className="activity-bubble" aria-pressed={selected === activity.id}

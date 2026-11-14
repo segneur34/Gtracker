@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { licenseGroup, mergeLicenseLists, parseLicenseList, type LicenseEntry } from '../core/licenses';
+import { t, tn } from '../core/i18n';
 import { fetchWithin } from '../planning/fetchJson';
+import { tRich } from './tRich';
 import GongLogo from './GongLogo';
 import Button from './ui/Button';
 import SettingsPart from './SettingsPart';
@@ -9,7 +11,7 @@ import SettingsPart from './SettingsPart';
 const LICENSES_PREVIEW = 3;
 /** Fichiers servis avec l'application : le délai ne couvre qu'un serveur qui ne répondrait pas. */
 const LOAD_TIMEOUT_MS = 10_000;
-const UNAVAILABLE = 'Liste des licences indisponible.';
+const UNAVAILABLE = t('Liste des licences indisponible.');
 /** Page du droit d'auteur d'OpenStreetMap, due avec la mention de ses données. */
 const OSM_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
 
@@ -30,14 +32,14 @@ function LicenseRow({ entry, open, onToggle }: { entry: LicenseEntry; open: bool
         <span className="about-license__name">
           {entry.name} <span className="about-license__version">{entry.version}</span>
         </span>
-        <span className="about-license__id">{entry.identifier || 'Licence non indiquée'}</span>
+        <span className="about-license__id">{entry.identifier || t('Licence non indiquée')}</span>
       </button>
       {open && (
         <div className="about-license__text" tabIndex={0}>
           {entry.notice && <p>{entry.notice}</p>}
           {entry.url && <p><a href={entry.url} target="_blank" rel="noreferrer">{entry.url}</a></p>}
           {entry.components && <p>{entry.components.join(', ')}</p>}
-          <pre>{entry.text || 'Le paquet ne fournit pas le texte de sa licence.'}</pre>
+          <pre>{entry.text || t('Le paquet ne fournit pas le texte de sa licence.')}</pre>
         </div>
       )}
     </li>
@@ -67,7 +69,7 @@ function LicenseGroupList({ title, entries, limit, openKey, onToggle }: {
       </ul>
       {hiddenCount > 0 && (
         <Button size="s" className="about-licenses__more" onClick={() => setShowAll(true)}>
-          {hiddenCount === 1 ? "Voir l'autre" : `Voir les ${hiddenCount} autres`}
+          {tn(hiddenCount, "Voir l'autre", 'Voir les {n} autres', { n: hiddenCount }, hiddenCount !== 1)}
         </Button>
       )}
     </>
@@ -88,17 +90,17 @@ function LicensesList() {
     return () => controller.abort();
   }, []);
 
-  if (!lists) return <p className="about-licenses__intro">Chargement…</p>;
+  if (!lists) return <p className="about-licenses__intro">{t('Chargement…')}</p>;
   const entries = mergeLicenseLists(lists.built, lists.extra);
   if (entries.length === 0) return <p className="about-licenses__intro">{UNAVAILABLE}</p>;
   const toggle = (key: string) => setOpenKey((current) => (current === key ? null : key));
   return (
     <>
-      <p className="about-licenses__intro">Gtracker s'appuie sur ces composants. Touchez-en un pour lire sa licence.</p>
+      <p className="about-licenses__intro">{t("Gtracker s'appuie sur ces composants. Touchez-en un pour lire sa licence.")}</p>
       {/* Sous `npm run dev` : Vite n'écrit la liste du JS qu'à la construction. */}
-      {!lists.built && <p className="about-licenses__intro">Liste complète dans la version construite.</p>}
+      {!lists.built && <p className="about-licenses__intro">{t('Liste complète dans la version construite.')}</p>}
       <LicenseGroupList title="MIT, ISC, BSD" entries={entries.filter((e) => licenseGroup(e.identifier) === 'permissive')} limit={LICENSES_PREVIEW} openKey={openKey} onToggle={toggle} />
-      <LicenseGroupList title="Autres licences" entries={entries.filter((e) => licenseGroup(e.identifier) === 'other')} openKey={openKey} onToggle={toggle} />
+      <LicenseGroupList title={t('Autres licences')}entries={entries.filter((e) => licenseGroup(e.identifier) === 'other')} openKey={openKey} onToggle={toggle} />
     </>
   );
 }
@@ -112,20 +114,19 @@ function AboutSettings() {
         <GongLogo className="about__logo-mark" />
         <span className="about__logo-name">Gtracker</span>
       </div>
-      <p className="about__version">Version {__APP_VERSION__}</p>
+      <p className="about__version">{t('Version {v}', { v: __APP_VERSION__ })}</p>
       <p className="about__text">
-        Vos sessions restent sur cet appareil et dans votre dossier mémoire, sans compte. Les fonds de carte et la recherche de lieux passent par des services en ligne.
+        {t('Vos sessions restent sur cet appareil et dans votre dossier mémoire, sans compte. Les fonds de carte et la recherche de lieux passent par des services en ligne.')}
       </p>
       <p className="about__text">
-        Le lieu qui nomme une session est cherché par le service Photon de komoot : il reçoit le point de départ de la
-        session arrondi à une centaine de mètres, la langue et le rayon de recherche, rien d'autre (Réglages › Mémoire pour
-        s'en passer).
+        {t("Le lieu qui nomme une session est cherché par le service Photon de komoot : il reçoit le point de départ de la session arrondi à une centaine de mètres, la langue et le rayon de recherche, rien d'autre (Réglages › Mémoire pour s'en passer).")}
       </p>
       <p className="about__text">
-        Données des cartes et des lieux : © les contributeurs d'OpenStreetMap, sous licence ODbL
-        (<a href={OSM_COPYRIGHT_URL} target="_blank" rel="noreferrer">openstreetmap.org/copyright</a>).
+        {tRich("Données des cartes et des lieux : © les contributeurs d'OpenStreetMap, sous licence ODbL (<a>openstreetmap.org/copyright</a>).", undefined, {
+          a: (children) => <a href={OSM_COPYRIGHT_URL} target="_blank" rel="noreferrer">{children}</a>,
+        })}
       </p>
-      <SettingsPart label="Licences des composants utilisés" open={licensesOpen} onToggle={() => setLicensesOpen((o) => !o)}>
+      <SettingsPart label={t('Licences des composants utilisés')} open={licensesOpen} onToggle={() => setLicensesOpen((o) => !o)}>
         <LicensesList />
       </SettingsPart>
     </div>

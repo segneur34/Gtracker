@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import Button from './ui/Button';
+import { t } from '../core/i18n';
 
 /**
  * Limite d'erreur : une exception au rendu d'une page n'efface plus toute
@@ -51,14 +52,14 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     return (
       <div className="ui-page">
         <section className="ui-card" role="alert">
-          <h2 className="ui-card__title">Cette page n'a pas pu s'afficher</h2>
+          <h2 className="ui-card__title">{t('Cette page n\'a pas pu s\'afficher')}</h2>
           <p style={{ margin: '0 0 var(--space-3)' }}>
-            Une erreur inattendue l'a interrompue. Rien n'est effacé, et un enregistrement en cours continue.
+            {t('Une erreur inattendue l\'a interrompue. Rien n\'est effacé, et un enregistrement en cours continue.')}
           </p>
           <p className="num" style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--muted)', overflowWrap: 'anywhere' }}>
             {error.message || error.name}
           </p>
-          <Button variant="primary" onClick={this.goHome}>Revenir au Profil</Button>
+          <Button variant="primary" onClick={this.goHome}>{t('Revenir au Profil')}</Button>
         </section>
       </div>
     );

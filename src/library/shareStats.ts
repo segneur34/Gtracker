@@ -1,3 +1,4 @@
+import { t } from '../core/i18n';
 import type { ShareStat } from '../core/shareImage';
 import { FOIL_RATIO_LABEL, type Treatment } from '../core/sportProfiles';
 import { commaDecimal, formatDistance, formatDuration, formatSessionDate, formatShortDuration, formatSpeed, type DistanceUnit, type SpeedUnit } from '../core/units';
@@ -52,7 +53,7 @@ const maneuverSuccessValue = (m: { success: number; total: number } | null | und
  * seulement si la session a assez de FC (`present`) ; une liste, à étaler dans les chiffres.
  */
 export const heartRateShareStats = (heart: { present: boolean; stats: { avgBpm: number } | null }): ShareStat[] =>
-  heart.present && heart.stats ? [{ key: 'heartRate', label: 'FC moyenne', value: `${Math.round(heart.stats.avgBpm)} bpm` }] : [];
+  heart.present && heart.stats ? [{ key: 'heartRate', label: t('FC moyenne'), value: `${Math.round(heart.stats.avgBpm)} bpm` }] : [];
 
 /**
  * Lignes ajoutées de l'image de partage (`SHARE_EXTRA_KEYS`), dans leur ordre ;
@@ -67,10 +68,10 @@ export const shareExtraStats = (
   const value = (v: number | null | undefined, format: (n: number) => string): string =>
     v === null || v === undefined || !Number.isFinite(v) ? DASH : format(v);
   const rows: Record<string, ShareStat> = {
-    maneuverSuccess: { key: 'maneuverSuccess', label: 'Manœuvres réussies', value: maneuverSuccessValue(extras.maneuvers) },
-    pumpingShare: { key: 'pumpingShare', label: 'Pumping', value: value(extras.pumpingShare, (s) => `${Math.round(s * 100)} % du vol`) },
-    wind: { key: 'wind', label: 'Vent', value: windShareValue(extras.windDeg, extras.windLevel) },
-    rating: { key: 'rating', label: 'Appréciation', value: ratingLabel(extras.rating) ?? DASH },
+    maneuverSuccess: { key: 'maneuverSuccess', label: t('Manœuvres réussies'), value: maneuverSuccessValue(extras.maneuvers) },
+    pumpingShare: { key: 'pumpingShare', label: t('Pumping'), value: value(extras.pumpingShare, (s) => t('{n} % du vol', { n: Math.round(s * 100) })) },
+    wind: { key: 'wind', label: t('Vent'), value: windShareValue(extras.windDeg, extras.windLevel) },
+    rating: { key: 'rating', label: t('Appréciation'), value: ratingLabel(extras.rating) ?? DASH },
   };
   return SHARE_EXTRA_KEYS[treatment].filter((key) => key !== 'pumpingShare' || foil).map((key) => rows[key]);
 };
@@ -129,30 +130,30 @@ const summaryBaseStats = (
   if (treatment === 'voile') {
     const active = new Set(['activeDistance', 'activeTime', 'activeRatio', 'activeAverage']);
     // Sans seuil (bateau), `movingTimeS` est le temps en mouvement (toute la navigation, pauses et trous immobiles ôtés).
-    const movingTime = { key: 'movingTime', label: 'Temps en mouvement', value: movingS === null ? '—' : formatDuration(movingS * 1000) };
+    const movingTime = { key: 'movingTime', label: t('Temps en mouvement'), value: movingS === null ? '—' : formatDuration(movingS * 1000) };
     return [
-      { key: 'distance', label: 'Distance', value: distance },
-      { key: 'activeDistance', label: 'Distance active', value: movingM === null ? '—' : formatDistance(movingM, units.distance) },
-      { key: 'totalTime', label: 'Temps total', value: formatDuration(totalS * 1000) },
+      { key: 'distance', label: t('Distance'), value: distance },
+      { key: 'activeDistance', label: t('Distance active'), value: movingM === null ? '—' : formatDistance(movingM, units.distance) },
+      { key: 'totalTime', label: t('Temps total'), value: formatDuration(totalS * 1000) },
       ...(withActiveThreshold ? [] : [movingTime]),
-      { key: 'activeTime', label: foil ? 'Temps en vol' : 'Temps actif', value: movingS === null ? '—' : formatDuration(movingS * 1000) },
+      { key: 'activeTime', label: foil ? t('Temps en vol') : t('Temps actif'), value: movingS === null ? '—' : formatDuration(movingS * 1000) },
       // Sur foil : la part du temps en mouvement passée en vol, comme « général ».
       ...(foil ? [{ key: 'activeRatio', label: FOIL_RATIO_LABEL, value: flightRatioValue(movingS, summary.inMotionS) }] : []),
-      { key: 'averageSpeed', label: 'Vitesse moyenne', value: speed(per(summary.distanceM, totalS)) },
-      { key: 'activeAverage', label: 'Moyenne active', value: speed(per(movingM, movingS)) },
-      { key: 'maxSpeed', label: 'Vitesse max', value: speed(summary.maxSpeedMs) },
-      { key: 'maneuvers', label: 'Manœuvres', value: summary.maneuverCount === undefined ? '—' : String(summary.maneuverCount) },
+      { key: 'averageSpeed', label: t('Vitesse moyenne'), value: speed(per(summary.distanceM, totalS)) },
+      { key: 'activeAverage', label: t('Moyenne active'), value: speed(per(movingM, movingS)) },
+      { key: 'maxSpeed', label: t('Vitesse max'), value: speed(summary.maxSpeedMs) },
+      { key: 'maneuvers', label: t('Manœuvres'), value: summary.maneuverCount === undefined ? '—' : String(summary.maneuverCount) },
     ].filter((stat) => withActiveThreshold || !active.has(stat.key));
   }
   // Surf.
   return [
-    { key: 'totalTime', label: 'Durée de la session', value: formatDuration(totalS * 1000) },
-    { key: 'waves', label: 'Vagues', value: summary.waveCount === undefined ? '—' : String(summary.waveCount) },
-    { key: 'longestWave', label: 'Plus longue vague', value: summary.longestWaveM == null ? '—' : `${Math.round(summary.longestWaveM)} m` },
+    { key: 'totalTime', label: t('Durée de la session'), value: formatDuration(totalS * 1000) },
+    { key: 'waves', label: t('Vagues'), value: summary.waveCount === undefined ? '—' : String(summary.waveCount) },
+    { key: 'longestWave', label: t('Plus longue vague'), value: summary.longestWaveM == null ? '—' : `${Math.round(summary.longestWaveM)} m` },
     // Sans vague, pas de vitesse max : « — », comme sa page.
-    { key: 'maxSpeed', label: 'Vitesse max', value: summary.maxSpeedMs > 0 ? speed(summary.maxSpeedMs) : '—' },
-    { key: 'longestFlight', label: 'Plus long vol', value: summary.longestFlightS == null ? '—' : formatShortDuration(summary.longestFlightS) },
-    { key: 'distance', label: 'Distance totale', value: distance },
+    { key: 'maxSpeed', label: t('Vitesse max'), value: summary.maxSpeedMs > 0 ? speed(summary.maxSpeedMs) : '—' },
+    { key: 'longestFlight', label: t('Plus long vol'), value: summary.longestFlightS == null ? '—' : formatShortDuration(summary.longestFlightS) },
+    { key: 'distance', label: t('Distance totale'), value: distance },
   ];
 };
 

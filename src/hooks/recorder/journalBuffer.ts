@@ -1,4 +1,5 @@
 import { errorMessage } from '../../core/basics';
+import { t } from '../../core/i18n';
 import { recordingJournal } from '../../platform/files';
 import { shouldFlushJournal } from '../../recording/session';
 import { setState } from './store';
@@ -41,7 +42,7 @@ export const journalFlushDue = (fixMs: number, journalFlushS: number): boolean =
 
 const enqueueWrite = (write: () => Promise<void>): Promise<void> => {
   writes = writes.then(write).catch((err) => {
-    setState({ error: `Écriture du journal impossible : ${errorMessage(err, 'erreur inconnue')}` });
+    setState({ error: t('Écriture du journal impossible : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
   });
   return writes;
 };

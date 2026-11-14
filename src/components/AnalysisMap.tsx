@@ -4,6 +4,7 @@ import L from 'leaflet';
 import MapContainer from './map/MapContainer';
 import { useMap } from './map/mapContext';
 import { DEFAULT_MAP_CENTER, type TrackBounds } from '../core/displayConfig';
+import { t } from '../core/i18n';
 import { useNarrowScreen, usePhoneLandscape } from '../hooks/useNarrowScreen';
 import type { MapFocus } from '../hooks/useZoomOnMap';
 import { pushBackLayer } from '../platform/backButton';
@@ -154,7 +155,7 @@ function AnalysisMap({
 
       {expanded && (
         <div className={companion ? 'an-map-overlay an-map-overlay--charts' : 'an-map-overlay'} onClick={() => setExpanded(false)}>
-          <button type="button" className="an-map-overlay__close theme-light" onClick={() => setExpanded(false)} aria-label="Fermer la carte">×</button>
+          <button type="button" className="an-map-overlay__close theme-light" onClick={() => setExpanded(false)} aria-label={t('Fermer la carte')}>×</button>
           <div className="an-map-overlay__map an-map-corner" onClick={(e) => e.stopPropagation()} style={{ position: 'relative' }}>
             <MapContainer key={`expanded-${sessionKey ?? 'empty'}`} {...initialView(focus?.bounds ?? bounds)} className="ui-fill">
               <MapAutoResize />

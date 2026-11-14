@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { t } from '../core/i18n';
 import { HoverReadout, type Readout } from './ChartReadout';
 import { IconChevronRight } from './icons';
 
@@ -23,7 +24,7 @@ function ChartFold({ label, open, onToggle, color, title, style, className, disa
 }) {
   return (
     <button type="button" aria-expanded={open} onClick={disabled ? undefined : onToggle} disabled={disabled} aria-disabled={disabled || undefined} data-chart-fold="" className={className}
-      title={title ?? (open ? 'Replier' : 'Montrer')}
+      title={title ?? (open ? t('Replier') : t('Montrer'))}
       style={{
         alignSelf: 'flex-start', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
         padding: '3px 8px 3px 10px', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : undefined, border: 'none', borderRadius: 'var(--radius-pill)', fontSize: 'var(--chart-name-size, var(--text-xs))',

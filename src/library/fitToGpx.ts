@@ -1,4 +1,5 @@
 import { FIT_FILE_ACTIVITY, parseFit, readFitFileType, type FitRecord, type FitTimerEvent } from '../core/fitParser';
+import { t } from '../core/i18n';
 import { getSportProfile } from '../core/sportProfiles';
 import type { LocationFix } from '../platform/location';
 import { buildGpx } from '../recording/gpxWriter';
@@ -105,8 +106,8 @@ export const fitToGpx = (bytes: Uint8Array): FitConversion => {
     return {
       kind: 'refused',
       reason: fit.truncated && fit.records.length === 0
-        ? 'fichier coupé avant le premier point'
-        : 'aucune position dans ce fichier (tapis, salle) : pas de trace à ranger',
+        ? t('fichier coupé avant le premier point')
+        : t('aucune position dans ce fichier (tapis, salle) : pas de trace à ranger'),
     };
   }
   const sport = guessSport(type ?? undefined);

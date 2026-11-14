@@ -1,6 +1,6 @@
 # 382 · Paquets de pose
 
-Listes de fichiers des paquets de pose du lot 382 (consignes : `docs/backlog/382-traduction.md`). Un paquet ne touche que ses fichiers. Faits le 14/11 : P2-1 et P6-2.
+Listes de fichiers des paquets de pose du lot 382 (consignes : `docs/backlog/382-traduction.md`). Un paquet ne touche que ses fichiers. Faits le 14/11 : P2-1 et P6-2, puis P1-1+2, P3-1+2, P3-3+4, P4-1+2, P5-1, P5-2 et P7-2. Restent les douze sections à partir de P4-3+4.
 
 ## P1-1+2 (36 fichiers)
 

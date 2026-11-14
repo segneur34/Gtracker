@@ -1,3 +1,4 @@
+import { t } from '../../core/i18n';
 import { sessionPath } from '../../library/folderLayout';
 import { DAMAGED_RECORD_WARNING, FUTURE_RECORD_WARNING, isBlankRecordText } from '../../library/recordText';
 import {
@@ -84,7 +85,7 @@ const reconcileWithDisk = async (f: MemoryFolder, file: string): Promise<'write'
     const warning = parsed ? FUTURE_RECORD_WARNING : DAMAGED_RECORD_WARNING;
     const record = parsed ? { ...parsed.parts, summary: parsed.parts.summary ?? current.record.summary, gpx: file } : current.record;
     replaceSession({ ...current, record, readOnly: true, warning }, quiet);
-    if (recordEdits.delete(file)) reportError(`Changements de ${file} non enregistrés. ${warning}`);
+    if (recordEdits.delete(file)) reportError(t('Changements de {file} non enregistrés. {warning}', { file, warning }));
     return 'stop';
   }
   rememberUnreadable(f, file, parsed.unreadable);
@@ -93,7 +94,7 @@ const reconcileWithDisk = async (f: MemoryFolder, file: string): Promise<'write'
   const { record, conflicts } = mergeChangedRecord(parsed.parts, current.record, recordEdits.get(file) ?? NO_EDITS);
   if (!sameJson(record, current.record)) replaceSession({ ...current, record }, quiet);
   if (conflicts.length > 0) {
-    reportError(`${file} a aussi changé sur un autre appareil (${conflictLabels(conflicts).join(', ')}) : la saisie la plus récente est gardée`);
+    reportError(t('{file} a aussi changé sur un autre appareil ({list}) : la saisie la plus récente est gardée', { file, list: conflictLabels(conflicts).join(', ') }));
   }
   // Réglages changés sur le disque, ou résumé d'un calcul plus récent gardé : la session est peut-être à refaire. Dans le
   // second cas, ce calcul-ci ne le remplacerait jamais : pas de nouvel essai avant la prochaine ouverture.
@@ -156,7 +157,7 @@ const writeRecordOnce = async (f: MemoryFolder, file: string): Promise<boolean> 
       return false;
     }
     unwritten.add(file);
-    reportError(`Fiche de ${file} non enregistrée : ${errorMessage(err, 'erreur inconnue')}`);
+    reportError(t('Fiche de {file} non enregistrée : {detail}', { file, detail: errorMessage(err, t('erreur inconnue')) }));
     return false;
   } finally {
     // Fichier récrit, ou fiche qui n'entre plus dans le cache : son entrée est à refaire.
@@ -263,6 +264,6 @@ export const carryUnwritten = async (carried: readonly LibrarySession[]): Promis
     if (stale) void resummarize(target.file);
   }
   if (missed.length > 0) {
-    reportError(`Changements non reportés dans le nouveau dossier, la session n'y est pas ou sa fiche ne s'y écrit pas : ${missed.join(', ')}`);
+    reportError(t("Changements non reportés dans le nouveau dossier, la session n'y est pas ou sa fiche ne s'y écrit pas : {list}", { list: missed.join(', ') }));
   }
 };

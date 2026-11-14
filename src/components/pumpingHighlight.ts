@@ -11,6 +11,9 @@ import type { TrackSpanShown } from './TrackSpanLayer';
  */
 export type PumpingHighlightKey = `serie:${number}` | 'serie:podium' | `vol:${number}` | 'vol:podium';
 
+/** Note de l'onglet « pumping » quand Pumping est décoché, la même dans la voile et le surf. */
+export const PUMPING_OFF_NOTE = t("Cochez « Pumping » dans l'onglet réglages pour compter les séries de coups en vol, téléphone fixé sur la poitrine.");
+
 export const SERIES_PODIUM_KEY: PumpingHighlightKey = 'serie:podium';
 export const FLIGHT_PODIUM_KEY: PumpingHighlightKey = 'vol:podium';
 export const seriesKey = (n: number): PumpingHighlightKey => `serie:${n}`;

@@ -1,3 +1,4 @@
+import { t } from '../../core/i18n';
 import { decodeImuHeader } from '../../core/imuFile';
 import { isBlankRecordText } from '../../library/recordText';
 import { imuFileName, isBlankGpxText, isGpxFileName, isWritableRecord, parseRecordWithRaw, recordFileName } from '../../library/record';
@@ -22,7 +23,7 @@ const readPendingImu = async (pending: MemoryFolder, name: string): Promise<Uint
   try {
     return await pending.readBytes(name);
   } catch (err) {
-    throw new Error(`capteurs illisibles, session laissée en attente (${errorMessage(err, 'erreur inconnue')})`);
+    throw new Error(t('capteurs illisibles, session laissée en attente ({detail})', { detail: errorMessage(err, t('erreur inconnue')) }));
   }
 };
 
@@ -59,7 +60,7 @@ const readPendingRecord = async (pending: MemoryFolder, name: string | null): Pr
 
 /** Fiche d'une session en attente rangée sans elle, illisible. */
 const reportPendingRecordUnreadable = (gpx: string): void =>
-  reportError(`Fiche de la session en attente ${gpx} illisible : session rangée sans son activité, ses repères, ses séances ni son test`);
+  reportError(t('Fiche de la session en attente {gpx} illisible : session rangée sans son activité, ses repères, ses séances ni son test', { gpx }));
 
 /**
  * Session en attente déjà dans la mémoire, dont la fiche n'a pas pu être complétée (non relue, ou en
@@ -67,8 +68,8 @@ const reportPendingRecordUnreadable = (gpx: string): void =>
  */
 const reportPendingNotCompleted = (gpx: string, result: AddResult): void =>
   reportError(result.recordReadOnly
-    ? `Session en attente ${gpx} déjà dans la mémoire, mais sa fiche y est en lecture seule (non lue, illisible ou plus récente) : laissée en attente`
-    : `Session en attente ${gpx} déjà dans la mémoire, mais sa fiche n'a pas pu être relue pour la compléter : laissée en attente`);
+    ? t('Session en attente {gpx} déjà dans la mémoire, mais sa fiche y est en lecture seule (non lue, illisible ou plus récente) : laissée en attente', { gpx })
+    : t("Session en attente {gpx} déjà dans la mémoire, mais sa fiche n'a pas pu être relue pour la compléter : laissée en attente", { gpx }));
 
 /** Vrai si la session était déjà là et que sa fiche n'a pas reçu celle apportée (non relue, lecture seule). */
 const notCompleted = (result: AddResult): boolean => result.recordNotRead === true || result.recordReadOnly === true;
@@ -97,7 +98,7 @@ export const flushPending = async (): Promise<void> => {
   try {
     names = (await pending.list('')).filter((e) => e.kind === 'file').map((e) => e.name);
   } catch (err) {
-    reportError(`Sessions en attente illisibles : ${errorMessage(err, 'erreur inconnue')}`);
+    reportError(t('Sessions en attente illisibles : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }));
     return;
   }
   const temps = planPendingTemps(names, pendingWriting);
@@ -105,7 +106,7 @@ export const flushPending = async (): Promise<void> => {
   for (const name of temps.orphanRecords) await pending.remove(name).catch(() => undefined);
   for (const name of temps.orphanImuTemps) {
     await pending.remove(name).catch(() => undefined);
-    reportError(`Capteurs en attente ${name} sans leur trace (écriture interrompue), effacés`);
+    reportError(t('Capteurs en attente {name} sans leur trace (écriture interrompue), effacés', { name }));
   }
   const listed = new Set(names);
   let ranged = false;
@@ -136,36 +137,36 @@ export const flushPending = async (): Promise<void> => {
         if (fromTemp && imuTemp) await pending.remove(imuTemp);
         if (record.unreadable) reportPendingRecordUnreadable(name);
       } else if (result.status === 'invalid') {
-        reportError(`Session en attente ${name} illisible, laissée en attente : ${result.message ?? 'GPX illisible'}`);
+        reportError(t('Session en attente {name} illisible, laissée en attente : {detail}', { name, detail: result.message ?? t('GPX illisible') }));
       }
     } catch (err) {
-      reportError(`Session en attente ${name} non rangée : ${errorMessage(err, 'erreur inconnue')}`);
+      reportError(t('Session en attente {name} non rangée : {detail}', { name, detail: errorMessage(err, t('erreur inconnue')) }));
     }
   }
 
   for (const session of temps.sessions) {
-    const drop = async (why: string) => {
+    const drop = async (message: string) => {
       await pending.remove(session.temp);
       if (session.imuTemp) await pending.remove(session.imuTemp);
       if (session.record) await pending.remove(session.record);
-      reportError(`Session en attente ${session.gpx} ${why}, effacée`);
+      reportError(message);
     };
     try {
       const text = await pending.readText(session.temp);
       // Lecture en échec : rien n'est effacé, le temporaire sera repris au prochain dossier ouvert.
       if (text === null) continue;
       if (isBlankGpxText(text)) {
-        await drop('vide (écriture interrompue)');
+        await drop(t('Session en attente {gpx} vide (écriture interrompue), effacée', { gpx: session.gpx }));
         continue;
       }
       if (!isCompleteGpxText(text)) {
-        await drop('incomplète (écriture interrompue)');
+        await drop(t('Session en attente {gpx} incomplète (écriture interrompue), effacée', { gpx: session.gpx }));
         continue;
       }
       const record = await readPendingRecord(pending, session.record);
       // Fiche là mais non lue : rien n'est effacé, le temporaire sera repris au prochain dossier ouvert.
       if (!record) {
-        reportError(`Session en attente ${session.gpx} laissée en attente : sa fiche n'a pas pu être lue`);
+        reportError(t("Session en attente {gpx} laissée en attente : sa fiche n'a pas pu être lue", { gpx: session.gpx }));
         continue;
       }
       const imu = session.imu ? await readPendingImu(pending, session.imu) : null;
@@ -187,10 +188,10 @@ export const flushPending = async (): Promise<void> => {
         await pending.remove(session.temp);
         if (fromTemp && session.imuTemp) await pending.remove(session.imuTemp);
       } else if (result.status === 'invalid') {
-        await drop(`illisible (${result.message ?? 'GPX illisible'})`);
+        await drop(t('Session en attente {gpx} illisible ({detail}), effacée', { gpx: session.gpx, detail: result.message ?? t('GPX illisible') }));
       }
     } catch (err) {
-      reportError(`Session en attente ${session.gpx} non rangée : ${errorMessage(err, 'erreur inconnue')}`);
+      reportError(t('Session en attente {name} non rangée : {detail}', { name: session.gpx, detail: errorMessage(err, t('erreur inconnue')) }));
     }
   }
   // Rangées après le balayage, qui a déjà refait le cache des fiches : leurs entrées y sont ajoutées.

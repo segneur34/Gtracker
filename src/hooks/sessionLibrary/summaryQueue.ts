@@ -1,4 +1,5 @@
 import { sessionPath } from '../../library/folderLayout';
+import { t } from '../../core/i18n';
 import { READ_ONLY_MEMORY_WARNING } from '../../library/recordText';
 import { isBlankGpxText, recordFileName, serializeRecord } from '../../library/record';
 import type { LibrarySession, RecordWithoutSummary } from '../../library/record';
@@ -85,7 +86,7 @@ const runJob = async (f: MemoryFolder, gen: number, job: SummaryJob): Promise<Jo
     try {
       await hydrateSession(f, job.file, true);
     } catch (err) {
-      reportError(`Fiche de ${job.file} non relue : ${errorMessage(err, 'erreur inconnue')}`);
+      reportError(t('Fiche de {file} non relue : {detail}', { file: job.file, detail: errorMessage(err, t('erreur inconnue')) }));
       refreshFailed.add(job.file);
       return 'done';
     }
@@ -143,7 +144,7 @@ const runJob = async (f: MemoryFolder, gen: number, job: SummaryJob): Promise<Jo
       // Dossier quitté pendant l'écriture : le balayage s'arrête juste après, rien à retenter ici.
       if (lib.folder === f) {
         unwritten.add(job.file);
-        reportError(`Fiche de ${job.file} non enregistrée : ${errorMessage(err, 'erreur inconnue')}`);
+        reportError(t('Fiche de {file} non enregistrée : {detail}', { file: job.file, detail: errorMessage(err, t('erreur inconnue')) }));
       }
     }
   }
@@ -255,7 +256,7 @@ export const queueOutdatedRefresh = (): Promise<void> => {
     } while (outdatedAgain);
   })()
     .catch((err: unknown) => {
-      setState({ scanning: null, toUpdate: 0, error: `Mise à jour des résumés interrompue : ${errorMessage(err, 'erreur inconnue')}` });
+      setState({ scanning: null, toUpdate: 0, error: t('Mise à jour des résumés interrompue : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
     })
     .finally(() => {
       outdatedRefresh = null;

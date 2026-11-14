@@ -1,4 +1,5 @@
 import { errorMessage } from '../../core/basics';
+import { t } from '../../core/i18n';
 import type { LatLon } from '../../core/types';
 import {
   PLACE_RULES, choosePlace, correctedPlace, isElsewhere, isPlaceToFind, learnedAfterCorrection, learnedReplacing, learnedSpot,
@@ -247,7 +248,7 @@ const placeQueue = createPlaceQueue({
   },
   pointsOf: async (file) => {
     const text = await readSessionGpx(file);
-    if (text === null) throw new Error('GPX illisible');
+    if (text === null) throw new Error(t('GPX illisible'));
     return trackEnds(text);
   },
   search: (point, rules) => reversePlaces(point, { limit: rules.resultLimit, radiusM: rules.waterRadiusM }),
@@ -343,7 +344,7 @@ const placeCorrection = createPlaceCorrection({
     const folder = writableFolder();
     if (!folder) return;
     await saveLearnedPlacesFile(folder, places, PLACE_RULES).catch((err: unknown) =>
-      reportError(`Lieux appris non recopiés dans le dossier : ${errorMessage(err, 'erreur inconnue')}`));
+      reportError(t('Lieux appris non recopiés dans le dossier : {detail}', { detail: errorMessage(err, t('erreur inconnue')) })));
   },
   rules: PLACE_RULES,
   now: Date.now,

@@ -1,3 +1,4 @@
+import { t, tn } from '../../core/i18n';
 import type { SessionMark } from '../../core/sessionMarks';
 import type { SportType } from '../../core/types';
 import { describeImport, type ImportReport } from '../../library/importReport';
@@ -46,18 +47,18 @@ export const saveRecordedSession = async (
   if ((result.status === 'added' || result.status === 'duplicate') && result.file) lib.onSessionsAdded([result.file]);
   switch (result.status) {
     case 'added':
-      return { file: result.file, location: libraryState().folderLabel ?? 'mémoire' };
+      return { file: result.file, location: libraryState().folderLabel ?? t('mémoire') };
     case 'duplicate':
       // Fiche de la session déjà rangée non relue ou en lecture seule : rien n'y est ajouté, l'enregistreur garde son journal.
-      if (result.recordNotRead) throw new Error('session déjà dans la mémoire, mais sa fiche n\'a pas pu être relue pour la compléter');
-      if (result.recordReadOnly) throw new Error('session déjà dans la mémoire, mais sa fiche y est en lecture seule (non lue, illisible ou plus récente)');
-      return { file: result.file, location: 'déjà dans la mémoire' };
+      if (result.recordNotRead) throw new Error(t("session déjà dans la mémoire, mais sa fiche n'a pas pu être relue pour la compléter"));
+      if (result.recordReadOnly) throw new Error(t('session déjà dans la mémoire, mais sa fiche y est en lecture seule (non lue, illisible ou plus récente)'));
+      return { file: result.file, location: t('déjà dans la mémoire') };
     case 'pending':
-      return { file: null, location: 'en attente d\'un dossier mémoire (dossier privé de l\'application)' };
+      return { file: null, location: t("en attente d'un dossier mémoire (dossier privé de l'application)") };
     case 'unsaved':
-      return { file: null, location: 'non rangée, aucune mémoire accessible : à télécharger' };
+      return { file: null, location: t('non rangée, aucune mémoire accessible : à télécharger') };
     default:
-      throw new Error(result.message ?? 'session illisible');
+      throw new Error(result.message ?? t('session illisible'));
   }
 };
 
@@ -145,7 +146,7 @@ export const importEntries = async (
   try {
     await lib.opening;
     if (fromFolder && !(await confirmWatchFolder(entries))) {
-      setState({ message: 'Import annulé : rien n\'a été importé.' });
+      setState({ message: t("Import annulé : rien n'a été importé.") });
       return report;
     }
     const records = new Map<string, ImportEntry>();
@@ -195,7 +196,7 @@ export const importEntries = async (
         // Une session qui a déjà ses capteurs n'a rien perdu.
         if (motionFailed && !motion && result.file && !hasSessionMotion(result.file)) report.motionFailed.push(entry.name);
       } catch (err) {
-        report.failed.push(`${entry.name} : ${errorMessage(err, 'erreur inconnue')}`);
+        report.failed.push(`${entry.name} : ${errorMessage(err, t('erreur inconnue'))}`);
         report.retryable.push(entry.name);
       }
     }
@@ -204,7 +205,7 @@ export const importEntries = async (
       try {
         const bytes = await entry.readBytes();
         if (bytes === null) {
-          report.failed.push(`${entry.name} : illisible`);
+          report.failed.push(`${entry.name} : ${t('illisible')}`);
           continue;
         }
         // Un fichier qui n'est pas un FIT ne le deviendra pas : refusé pour de bon, à la différence d'une écriture en échec.
@@ -212,7 +213,7 @@ export const importEntries = async (
         try {
           fit = fitToGpx(bytes);
         } catch (err) {
-          report.failed.push(`${entry.name} : ${errorMessage(err, 'fichier illisible')}`);
+          report.failed.push(`${entry.name} : ${errorMessage(err, t('fichier illisible'))}`);
           continue;
         }
         if (fit.kind === 'not-activity') report.notActivities.push(entry.name);
@@ -220,7 +221,7 @@ export const importEntries = async (
         else if (fit.kind === 'refused') report.failed.push(`${entry.name} : ${fit.reason}`);
         else noteAddResult(report, await addGpx(fit.gpx, 'import', {}), entry.name);
       } catch (err) {
-        report.failed.push(`${entry.name} : ${errorMessage(err, 'erreur inconnue')}`);
+        report.failed.push(`${entry.name} : ${errorMessage(err, t('erreur inconnue'))}`);
         report.retryable.push(entry.name);
       }
     }
@@ -233,10 +234,10 @@ export const importEntries = async (
     } else {
       // Le compte rendu va avec l'échec : le bandeau d'erreur cacherait sinon le message.
       const n = report.failed.length;
-      reportError(`${describeImport(report)} ${n} fichier${n > 1 ? 's' : ''} non rangé${n > 1 ? 's' : ''} (${report.failed.join(' ; ')})`);
+      reportError(`${describeImport(report)} ${tn(n, '{n} fichier non rangé ({list})', '{n} fichiers non rangés ({list})', { list: report.failed.join(' ; ') })}`);
     }
   } catch (err) {
-    if (!quiet) reportError(`Import interrompu : ${errorMessage(err, 'erreur inconnue')}`);
+    if (!quiet) reportError(t('Import interrompu : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }));
   } finally {
     setState({ importing: false });
   }
@@ -259,7 +260,7 @@ export const importFromFolder = async (): Promise<ImportReport | null> => {
   try {
     entries = await pickFolderToImport();
   } catch (err) {
-    setState({ importing: false, message: `Lecture du dossier impossible : ${errorMessage(err, String(err))}` });
+    setState({ importing: false, message: t('Lecture du dossier impossible : {detail}', { detail: errorMessage(err, String(err)) }) });
     return null;
   }
   if (!entries) {

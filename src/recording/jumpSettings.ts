@@ -1,4 +1,5 @@
 import type { JumpPlacement } from '../core/domainTypes';
+import { t } from '../core/i18n';
 import type { JumpProfile } from '../core/sportProfiles';
 
 /**
@@ -17,10 +18,10 @@ export type { JumpPlacement };
 export const JUMP_PLACEMENTS: JumpPlacement[] = ['poitrine', 'taille', 'bras', 'dos'];
 
 export const JUMP_PLACEMENT_LABEL: Record<JumpPlacement, string> = {
-  poitrine: 'Poitrine (gilet, harnais haut)',
-  taille: 'Taille (harnais, ceinture)',
-  bras: 'Bras (brassard)',
-  dos: 'Dos (sac)',
+  poitrine: t('Poitrine (gilet, harnais haut)'),
+  taille: t('Taille (harnais, ceinture)'),
+  bras: t('Bras (brassard)'),
+  dos: t('Dos (sac)'),
 };
 
 export const DEFAULT_JUMP_PLACEMENT: JumpPlacement = 'poitrine';

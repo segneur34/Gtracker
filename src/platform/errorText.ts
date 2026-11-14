@@ -1,4 +1,5 @@
 import { errorMessage } from '../core/basics';
+import { t } from '../core/i18n';
 
 /**
  * Traducteur des erreurs de la plateforme : codes des greffons
@@ -36,15 +37,15 @@ export const fileErrorCode = (err: unknown): FileErrorCode => {
   return (typeof name === 'string' && Object.hasOwn(BROWSER_ERROR_CODES, name) ? BROWSER_ERROR_CODES[name] : undefined) ?? 'UNKNOWN';
 };
 
-export const DENIED_TEXT = 'Autorisation refusée : Réglages › Autorisations.';
-export const LOCATION_DENIED_TEXT = 'Localisation refusée : Réglages › Autorisations.';
-const NOT_FOUND_TEXT = 'Fichier ou dossier introuvable.';
-const NO_SPACE_TEXT = 'Plus de place sur le téléphone ou dans le navigateur.';
-const TOO_LARGE_TEXT = 'Fichier trop volumineux.';
-const NETWORK_TEXT = 'Réseau indisponible.';
-const TIMEOUT_TEXT = 'Délai dépassé.';
-const ABORT_TEXT = 'Opération interrompue.';
-export const UNKNOWN_ERROR_TEXT = "Une erreur est survenue. Réessayez ; si elle revient, redémarrez l'application.";
+export const DENIED_TEXT = t('Autorisation refusée : Réglages › Autorisations.');
+export const LOCATION_DENIED_TEXT = t('Localisation refusée : Réglages › Autorisations.');
+const NOT_FOUND_TEXT = t('Fichier ou dossier introuvable.');
+const NO_SPACE_TEXT = t('Plus de place sur le téléphone ou dans le navigateur.');
+const TOO_LARGE_TEXT = t('Fichier trop volumineux.');
+const NETWORK_TEXT = t('Réseau indisponible.');
+const TIMEOUT_TEXT = t('Délai dépassé.');
+const ABORT_TEXT = t('Opération interrompue.');
+export const UNKNOWN_ERROR_TEXT = t("Une erreur est survenue. Réessayez ; si elle revient, redémarrez l'application.");
 
 const BY_FILE_CODE: Partial<Record<FileErrorCode, string>> = {
   PERMISSION: DENIED_TEXT,

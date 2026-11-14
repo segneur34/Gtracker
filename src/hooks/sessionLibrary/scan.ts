@@ -1,4 +1,5 @@
 import { SESSIONS_DIR, sessionPath } from '../../library/folderLayout';
+import { t } from '../../core/i18n';
 import { uniqueSessionFileName } from '../../library/naming';
 import {
   FUTURE_RECORD_WARNING, NOT_READ_RECORD_WARNING, READ_ONLY_MEMORY_WARNING, UNREADABLE_RECORD_WARNING,
@@ -72,7 +73,7 @@ const normalizeRecordExtensions = async (f: MemoryFolder, entries: FolderEntry[]
       const after = await f.list(SESSIONS_DIR);
       if (after.some((e) => e.name === target) && after.some((e) => e.name === entry.name)) await f.remove(sessionPath(entry.name));
     } catch (err) {
-      reportError(`${entry.name} n'a pas pu être renommée en .json : ${errorMessage(err, 'erreur inconnue')}`);
+      reportError(t("{name} n'a pas pu être renommée en .json : {detail}", { name: entry.name, detail: errorMessage(err, t('erreur inconnue')) }));
     }
   }
   return f.list(SESSIONS_DIR);
@@ -115,7 +116,7 @@ export const scan = async (f: MemoryFolder, gen: number, editsBefore = lib.editC
         }
         await f.remove(name);
       } catch (err) {
-        reportError(`${name} n'a pas pu être rangé dans sessions/ : ${errorMessage(err, 'erreur inconnue')}`);
+        reportError(t("{name} n'a pas pu être rangé dans sessions/ : {detail}", { name, detail: errorMessage(err, t('erreur inconnue')) }));
       }
     }
     entries = await f.list(SESSIONS_DIR);

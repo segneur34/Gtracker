@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import '../pages/analysisMobile.css';
 import './BrushFrame.css';
 import { brushColorFor } from '../core/brushColor';
+import { t } from '../core/i18n';
 import type { ShareStat } from '../core/shareImage';
 import { shareableStats } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
@@ -17,6 +18,7 @@ import GearReminder, { type GearReminderProps } from './GearReminder';
 import type { SectionDefinition } from './SectionTabs';
 import SessionNameEditor from './SessionNameEditor';
 import SessionSaveBar from './SessionSaveBar';
+import { tRich } from './tRich';
 import type { TrackSegment } from './TrackSegmentsLayer';
 import Button from './ui/Button';
 import PageHeader from './ui/PageHeader';
@@ -80,7 +82,7 @@ function RecorderNotice({ file }: { file: string | null }) {
   return (
     <div className="ui-alert ui-alert--warning ui-mb-10 ui-max-520 ui-row-10 ui-center">
       <span className="ui-grow">{error}</span>
-      <Button size="s" variant="ghost" onClick={dismissRecorderResult}>Fermer</Button>
+      <Button size="s" variant="ghost" onClick={dismissRecorderResult}>{t('Fermer')}</Button>
     </div>
   );
 }
@@ -141,13 +143,13 @@ function AnalysisShell<K extends string>({
 
       {empty && (
         <p className="ui-muted">
-          Aucune session ouverte : choisissez-en une dans <Link to={back}>{backLabel}</Link>.
+          {tRich('Aucune session ouverte : choisissez-en une dans {lien}.', { lien: <Link to={back}>{backLabel}</Link> })}
         </p>
       )}
 
       {reading && (
         <p role="status" aria-live="polite" className="ui-muted">
-          Lecture de la session…
+          {t('Lecture de la session…')}
         </p>
       )}
 

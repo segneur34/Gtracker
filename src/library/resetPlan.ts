@@ -1,5 +1,5 @@
 import { APP_SLUG, STORAGE_KEYS } from '../core/appIdentity';
-import { plural } from '../core/basics';
+import { t, tn } from '../core/i18n';
 import type { FolderEntry, MemoryFolder } from '../platform/memoryFolder';
 import {
   LEARNED_PLACES_FILE, MARKER_FILE, README_FILE, RESTING_HR_FILE, ROUTES_DIR, SESSIONS_DIR, SETTINGS_DIR,
@@ -236,22 +236,22 @@ export interface EraseCounts {
 /** Question posée après l'appui tenu. */
 export const resetConfirmText = (kind: ResetKind, counts: EraseCounts): string => {
   if (kind === 'usine') {
-    return "Revenir aux réglages d'usine ? Les activités, les unités, les onglets, les couleurs de trace et tous les autres "
-      + "réglages de cet appareil reprennent leur valeur de départ. Les activités que vous avez créées et vos listes de "
-      + 'matériel sont effacées ; leurs sessions restent, sous le nom de leur calcul. Les sessions, les itinéraires, le '
-      + "profil et les lieux corrigés restent. L'application va redémarrer.";
+    // Une seule clé : le texte tient sur une ligne, que le lecteur de clés lit en entier.
+    // prettier-ignore
+    return t("Revenir aux réglages d'usine ? Les activités, les unités, les onglets, les couleurs de trace et tous les autres réglages de cet appareil reprennent leur valeur de départ. Les activités que vous avez créées et vos listes de matériel sont effacées ; leurs sessions restent, sous le nom de leur calcul. Les sessions, les itinéraires, le profil et les lieux corrigés restent. L'application va redémarrer.");
   }
   const total = counts.sessions + counts.pending;
+  const sessionsText = tn(total, '{n} session et leur fiche', '{n} sessions et leurs fiches');
   const sessions = total === 0 ? null
-    : `${plural(total, 'session')} et leur${total > 1 ? 's' : ''} fiche${total > 1 ? 's' : ''}`
-      + (counts.pending > 0 ? ` (dont ${counts.pending} en attente d'un dossier)` : '');
+    : counts.pending > 0 ? t("{base} (dont {pending} en attente d'un dossier)", { base: sessionsText, pending: counts.pending })
+      : sessionsText;
   const items = [
     sessions,
-    counts.routes > 0 ? plural(counts.routes, 'itinéraire') : null,
-    'le profil', 'les tests de FC repos', 'les lieux corrigés', 'les réglages', 'les cartes gardées',
+    counts.routes > 0 ? tn(counts.routes, '{n} itinéraire', '{n} itinéraires') : null,
+    t('le profil'), t('les tests de FC repos'), t('les lieux corrigés'), t('les réglages'), t('les cartes gardées'),
   ].filter((item): item is string => item !== null);
-  return `Tout supprimer ? Seront effacés définitivement : ${items.slice(0, -1).join(', ')} et ${items[items.length - 1]}. `
-    + "Les autres fichiers posés à la main dans le dossier restent. L'application redémarrera comme à sa première ouverture.";
+  return `${t('Tout supprimer ? Seront effacés définitivement : {others} et {last}.', { others: items.slice(0, -1).join(', '), last: items[items.length - 1] })} `
+    + t("Les autres fichiers posés à la main dans le dossier restent. L'application redémarrera comme à sa première ouverture.");
 };
 
 /** Ce qui décide si les boutons sont permis. */
@@ -268,31 +268,37 @@ export interface ResetContext {
 }
 
 /** Phrase d'un enregistrement en cours, qui grise les deux boutons. */
-export const RECORDING_REFUSAL = "Impossible pendant un enregistrement : arrêtez-le d'abord.";
+export const RECORDING_REFUSAL = t("Impossible pendant un enregistrement : arrêtez-le d'abord.");
 
 /** Phrase de « Tout supprimer » refusé : un dossier est désigné, mais la mémoire ne l'a pas ouvert. */
-export const FOLDER_CLOSED_REFUSAL = "Redonnez d'abord l'accès au dossier mémoire, plus haut : sans lui, ses sessions ne peuvent pas être effacées.";
+export const FOLDER_CLOSED_REFUSAL = t(
+  "Redonnez d'abord l'accès au dossier mémoire, plus haut : sans lui, ses sessions ne peuvent pas être effacées."
+);
 
 /** Pourquoi un bouton est refusé, `null` s'il est permis. */
 export const resetRefusal = (kind: ResetKind, c: ResetContext): string | null => {
   if (c.recording) return RECORDING_REFUSAL;
-  if (c.pendingSession) return "Une session arrêtée attend d'être rangée : terminez-la d'abord, page Enregistrer.";
-  if (c.importing) return 'Un import est en cours : attendez sa fin.';
-  if (c.memoryStatus === 'opening') return "La mémoire s'ouvre encore : patientez un instant.";
+  if (c.pendingSession) return t("Une session arrêtée attend d'être rangée : terminez-la d'abord, page Enregistrer.");
+  if (c.importing) return t('Un import est en cours : attendez sa fin.');
+  if (c.memoryStatus === 'opening') return t("La mémoire s'ouvre encore : patientez un instant.");
   if (kind === 'tout' && (c.memoryStatus === 'needs-permission' || (c.memoryStatus === 'unavailable' && c.designated))) {
     return FOLDER_CLOSED_REFUSAL;
   }
   if (kind === 'tout' && c.memoryStatus === 'ready' && c.readOnly) {
-    return 'Ce dossier vient d\'une version plus récente de Gtracker : mettez l\'application à jour avant de tout supprimer.';
+    return t("Ce dossier vient d'une version plus récente de Gtracker : mettez l'application à jour avant de tout supprimer.");
   }
   return null;
 };
 
 /** Refus d'une remise à zéro demandée pendant qu'une autre est en cours. */
-export const RESET_RUNNING_REFUSAL = 'Une remise à zéro est déjà en cours.';
+export const RESET_RUNNING_REFUSAL = t('Une remise à zéro est déjà en cours.');
 
 /** Compte rendu d'une remise à zéro arrêtée par le dossier mémoire : rien d'autre n'a été touché. */
 export const resetInterruptedText = (result: Pick<EraseResult, 'sessionsDone' | 'sessionsTotal'>, reason: string): string =>
-  `Remise à zéro interrompue (${reason}) : ${result.sessionsDone} session${result.sessionsDone > 1 ? 's' : ''} effacée`
-  + `${result.sessionsDone > 1 ? 's' : ''} sur ${result.sessionsTotal} ; réglages, profil et cartes intacts. `
-  + "Vérifiez l'accès au dossier mémoire, puis recommencez.";
+  `${tn(
+    result.sessionsDone,
+    'Remise à zéro interrompue ({reason}) : {n} session effacée sur {total} ; réglages, profil et cartes intacts.',
+    'Remise à zéro interrompue ({reason}) : {n} sessions effacées sur {total} ; réglages, profil et cartes intacts.',
+    { reason, total: result.sessionsTotal }
+  )} `
+  + t("Vérifiez l'accès au dossier mémoire, puis recommencez.");

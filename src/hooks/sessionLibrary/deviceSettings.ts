@@ -1,3 +1,4 @@
+import { t } from '../../core/i18n';
 import { SETTINGS_DIR, settingsPath } from '../../library/folderLayout';
 import {
   TRAVELLING_KEYS, adoptedValues, buildSettingsFile, cleanDeviceName, deviceFileName,
@@ -188,8 +189,8 @@ const writeOwnSettings = async (f: MemoryFolder, savedAt: number): Promise<void>
     const blocked = deviceFileName(wanted);
     setState({
       message: unreadable.has(blocked) && !settingsEntries.some((e) => e !== own && e.fileName.toLowerCase() === blocked)
-        ? `Cet appareil s'appelle désormais « ${name} » : le fichier de réglages ${blocked} du dossier ne se lit pas, il est gardé tel quel.`
-        : `Cet appareil s'appelle désormais « ${name} » : un autre appareil du dossier s'appelle déjà « ${wanted} ».`,
+        ? t("Cet appareil s'appelle désormais « {name} » : le fichier de réglages {blocked} du dossier ne se lit pas, il est gardé tel quel.", { name, blocked })
+        : t("Cet appareil s'appelle désormais « {name} » : un autre appareil du dossier s'appelle déjà « {wanted} ».", { name, wanted }),
     });
   }
   const fileName = deviceFileName(name);
@@ -210,7 +211,7 @@ const flushSettings = async (): Promise<void> => {
     await readSettingsEntries(f);
     await writeOwnSettings(f, savedAt);
   } catch (err) {
-    setState({ error: `Réglages non recopiés dans le dossier : ${errorMessage(err, 'erreur inconnue')}` });
+    setState({ error: t('Réglages non recopiés dans le dossier : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
   }
 };
 
@@ -283,7 +284,7 @@ const syncSettings = async (f: MemoryFolder): Promise<boolean> => {
       autoAdopted = true;
       changed = applySettingsValues(adoptedValues(newest.file.values, localTravellingValues()));
       savedAt = newest.file.savedAt;
-      if (newest !== own) setState({ message: `Réglages repris de « ${settingsEntryName(newest)} », le fichier le plus récent du dossier.` });
+      if (newest !== own) setState({ message: t('Réglages repris de « {name} », le fichier le plus récent du dossier.', { name: settingsEntryName(newest) }) });
     }
   }
   if (savedAt === null) savedAt = Date.now();
@@ -301,14 +302,14 @@ const syncSettings = async (f: MemoryFolder): Promise<boolean> => {
 export const syncSettingsSafely = async (f: MemoryFolder): Promise<boolean> => {
   // Tests de FC repos (`fc-repos.json`) : leur échec est dit, sans empêcher les réglages ni l'ouverture.
   await syncRestingHrFile(f).catch((err: unknown) =>
-    reportError(`Tests de FC repos du dossier non relus : ${errorMessage(err, 'erreur inconnue')}`));
+    reportError(t('Tests de FC repos du dossier non relus : {detail}', { detail: errorMessage(err, t('erreur inconnue')) })));
   // Lieux appris (`lieux.json`), de même.
   await syncLearnedPlacesFile(f, PLACE_RULES).catch((err: unknown) =>
-    reportError(`Lieux appris du dossier non relus : ${errorMessage(err, 'erreur inconnue')}`));
+    reportError(t('Lieux appris du dossier non relus : {detail}', { detail: errorMessage(err, t('erreur inconnue')) })));
   try {
     return await syncSettings(f);
   } catch (err) {
-    reportError(`Réglages du dossier non relus : ${errorMessage(err, 'erreur inconnue')}`);
+    reportError(t('Réglages du dossier non relus : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }));
     return false;
   }
 };
@@ -327,7 +328,7 @@ export const adoptSettingsFile = async (fileName: string): Promise<void> => {
   try {
     const file = parseSettingsFile(await f.readText(settingsPath(fileName)));
     if (!file) {
-      setState({ error: `Fichier de réglages illisible : ${fileName}.` });
+      setState({ error: t('Fichier de réglages illisible : {fileName}.', { fileName }) });
       return;
     }
     if (settingsTimer !== null) clearTimeout(settingsTimer);
@@ -338,10 +339,10 @@ export const adoptSettingsFile = async (fileName: string): Promise<void> => {
     lastSignature = settingsSignature(localTravellingValues());
     await readSettingsEntries(f);
     await writeOwnSettings(f, now);
-    setState({ message: `Réglages repris de « ${settingsEntryName({ fileName, file })} ».`, settingsOffer: null });
+    setState({ message: t('Réglages repris de « {name} ».', { name: settingsEntryName({ fileName, file }) }), settingsOffer: null });
     await applySettingsChange(true);
   } catch (err) {
-    setState({ error: `Reprise des réglages impossible : ${errorMessage(err, 'erreur inconnue')}` });
+    setState({ error: t('Reprise des réglages impossible : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
   }
 };
 
@@ -352,7 +353,7 @@ export const adoptSettingsFile = async (fileName: string): Promise<void> => {
  */
 export const renameDevice = async (raw: string): Promise<string | null> => {
   const name = cleanDeviceName(raw);
-  if (name === '') return 'Donnez un nom à cet appareil.';
+  if (name === '') return t('Donnez un nom à cet appareil.');
   if (name === deviceName()) return null;
   await lib.opening;
   const f = lib.folder;
@@ -360,9 +361,9 @@ export const renameDevice = async (raw: string): Promise<string | null> => {
     const { entries, unreadable } = f ? await readSettingsListing(f) : { entries: [], unreadable: [] };
     const own = ownSettingsEntry(entries, deviceId());
     const clash = entries.find((e) => e !== own && e.fileName.toLowerCase() === deviceFileName(name));
-    if (clash) return `Le fichier ${clash.fileName} est déjà celui de « ${settingsEntryName(clash)} » : choisissez un autre nom.`;
+    if (clash) return t('Le fichier {fileName} est déjà celui de « {name} » : choisissez un autre nom.', { fileName: clash.fileName, name: settingsEntryName(clash) });
     const unreadableClash = unreadable.find((n) => n.toLowerCase() === deviceFileName(name));
-    if (unreadableClash) return `Le fichier ${unreadableClash} du dossier ne se lit pas et porte déjà ce nom : choisissez un autre nom.`;
+    if (unreadableClash) return t('Le fichier {fileName} du dossier ne se lit pas et porte déjà ce nom : choisissez un autre nom.', { fileName: unreadableClash });
     jsonStore.write(DEVICE_NAME_KEY, name);
     if (!f) {
       setState({ deviceName: name });
@@ -373,7 +374,7 @@ export const renameDevice = async (raw: string): Promise<string | null> => {
     await writeOwnSettings(f, readLocalSavedAt() ?? Date.now());
     return null;
   } catch (err) {
-    return `Renommage impossible : ${errorMessage(err, 'erreur inconnue')}`;
+    return t('Renommage impossible : {detail}', { detail: errorMessage(err, t('erreur inconnue')) });
   }
 };
 
@@ -387,13 +388,13 @@ export const renameDevice = async (raw: string): Promise<string | null> => {
 export const importSettingsFile = async (picked: File): Promise<{ file: SettingsFileInfo } | { refusal: string }> => {
   await lib.opening;
   const f = lib.folder;
-  if (!f) return { refusal: 'Aucune mémoire ouverte.' };
+  if (!f) return { refusal: t('Aucune mémoire ouverte.') };
   try {
     const text = await readPickedFile(picked);
     const file = parseSettingsFile(text);
-    if (!file) return { refusal: `${picked.name} n'est pas un fichier de réglages de Gtracker.` };
+    if (!file) return { refusal: t("{name} n'est pas un fichier de réglages de Gtracker.", { name: picked.name }) };
     const id = deviceId();
-    if (file.device?.id === id) return { refusal: `${picked.name} est le fichier de réglages de cet appareil.` };
+    if (file.device?.id === id) return { refusal: t('{name} est le fichier de réglages de cet appareil.', { name: picked.name }) };
     await readSettingsEntries(f);
     const taken = new Set((await f.list(SETTINGS_DIR)).map((e) => e.name.toLowerCase()));
     const fileName = importedSettingsFileName(file, picked.name, settingsEntries, taken);
@@ -404,7 +405,7 @@ export const importSettingsFile = async (picked: File): Promise<{ file: Settings
     publishSettingsFiles();
     return { file: settingsFileInfo(entry, id) };
   } catch (err) {
-    return { refusal: `Import impossible : ${errorMessage(err, 'erreur inconnue')}` };
+    return { refusal: t('Import impossible : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) };
   }
 };
 
@@ -440,7 +441,7 @@ export const applySettingsChange = async (changed: boolean): Promise<void> => {
     await flushWrites();
     window.location.reload();
   } else {
-    setState({ message: 'Réglages repris du dossier : ils s\'appliqueront au prochain lancement.' });
+    setState({ message: t("Réglages repris du dossier : ils s'appliqueront au prochain lancement.") });
   }
 };
 
