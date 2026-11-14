@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { alertes, lireBacklog, lireDate, principal, tableauDeBord } from './backlog.mjs'
+import { alertes, lignesDeElement, lignesDeZone, lireBacklog, lireDate, lireOptions, principal, tableauDeBord } from './backlog.mjs'
 
 const AUJOURDHUI = new Date(2026, 9, 28) // 28/10/2026
 
@@ -218,5 +218,63 @@ describe('erreurs de forme', () => {
       'titre de zone inconnu « Divers »',
       'zone « Questions » manquante',
     ])
+  })
+})
+
+describe('une zone ou une ligne', () => {
+  const texte = fichier()
+  const brut = texte.split('\n')
+
+  it('imprime les lignes d\'une zone telles qu\'elles sont, sans son titre ni ses blancs de bord', () => {
+    expect(lignesDeZone(texte, 'Maintenant')).toEqual(brut.slice(brut.indexOf('## Maintenant') + 2, brut.indexOf('## Ensuite') - 1))
+    expect(lignesDeZone(texte, 'Ensuite')).toEqual([
+      '1. 13 · [dette] Dépendances : TypeScript · noté 21/10 · petit · Opus/medium · à briefer',
+      '2. 14 · [idée] Tests guidés : VMA · noté 22/10 · gros · Opus/high · à briefer · dépend de : maquette · détail : docs/backlog/14-vma.md',
+    ])
+    expect(lignesDeZone(texte, 'Ça attend une occasion')).toContain('') // le blanc entre deux conditions reste
+    expect(lignesDeZone(texte, 'Questions')).toEqual(['- Q3 · lot 15 · Lequel ? · par défaut : le premier · posée le 20/10'])
+    expect(lignesDeZone(texte, 'Divers')).toBeNull()
+  })
+
+  it('imprime la ligne d\'un élément et ses sous-lignes d\'essais, et rien si le numéro n\'existe pas', () => {
+    expect(lignesDeElement(texte, 10)).toEqual([
+      '- 10 · [idée] Icône : rond rouge · noté 20/10 · petit · Sonnet/medium · à valider (abc123, 1.2.3)',
+      '  - essai 5 : bouton rond → disque blanc et rond rouge.',
+    ])
+    expect(lignesDeElement(texte, 11)).toEqual(['- 11 · [dette] Petites dettes · noté 20/10 · petit · Sonnet/medium · à valider sur lecture (def456)'])
+    expect(lignesDeElement(texte, 14)?.[0]).toMatch(/^2\. 14 · /)
+    expect(lignesDeElement(texte, 99)).toBeNull()
+  })
+
+  it('lit les options : chemin, --zone (casse libre), --ligne, et refuse le reste', () => {
+    expect(lireOptions([])).toEqual({ chemin: undefined, zone: null, ligne: null })
+    expect(lireOptions(['x.md', '--zone', 'plus tard'])).toEqual({ chemin: 'x.md', zone: 'Plus tard', ligne: null })
+    expect(lireOptions(['--zone', 'occasion']).zone).toBe('Ça attend une occasion')
+    expect(lireOptions(['--ligne', '353']).ligne).toBe(353)
+    expect(lireOptions(['--zone', 'rien']).erreur).toMatch(/zone inconnue/)
+    expect(lireOptions(['--ligne', 'abc']).erreur).toMatch(/numéro/)
+    expect(lireOptions(['--zone']).erreur).toMatch(/demande une valeur/)
+    expect(lireOptions(['--zone', 'Ensuite', '--ligne', '3']).erreur).toMatch(/s'excluent/)
+    expect(lireOptions(['--vite']).erreur).toMatch(/option inconnue/)
+  })
+
+  it('principal imprime la zone ou la ligne demandée, et garde le tableau de bord sans option', () => {
+    const chemin = join(mkdtempSync(join(tmpdir(), 'backlog-')), 'BACKLOG.md')
+    writeFileSync(chemin, texte)
+    const sortie = []
+    expect(principal(chemin, AUJOURDHUI, (s) => sortie.push(s), { zone: 'Questions' })).toBe(0)
+    expect(sortie).toEqual(['- Q3 · lot 15 · Lequel ? · par défaut : le premier · posée le 20/10'])
+    sortie.length = 0
+    expect(principal(chemin, AUJOURDHUI, (s) => sortie.push(s), { ligne: 10 })).toBe(0)
+    expect(sortie.join('\n').split('\n')).toHaveLength(2)
+    sortie.length = 0
+    expect(principal(chemin, AUJOURDHUI, (s) => sortie.push(s), { ligne: 99 })).toBe(1)
+    expect(sortie[0]).toContain('Élément 99 introuvable')
+    const sans = []
+    const avec = []
+    principal(chemin, AUJOURDHUI, (s) => sans.push(s))
+    principal(chemin, AUJOURDHUI, (s) => avec.push(s), {})
+    expect(avec).toEqual(sans)
+    expect(sans[0].startsWith('Vous\n')).toBe(true)
   })
 })

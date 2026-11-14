@@ -3,6 +3,11 @@
 // ce qui dort en « Plus tard », puis les alertes.
 //
 //   node outils/backlog.mjs [chemin]     (défaut : docs/BACKLOG.md, depuis la racine du dépôt)
+//   node outils/backlog.mjs --zone <Maintenant|Ensuite|occasion|Plus tard|Questions>
+//                                        les lignes de cette zone, telles qu'elles sont dans le fichier
+//   node outils/backlog.mjs --ligne <N>  la ligne de l'élément N et ses sous-lignes d'essais
+//
+// Avec --zone ou --ligne, le tableau de bord n'est pas imprimé (le chemin reste un argument possible).
 //
 // Code de sortie 1 s'il y a une erreur de forme (ligne illisible, zone manquante, numéro en double), 0 sinon :
 // une limite dépassée (Maintenant, Ensuite, questions) n'est qu'une alerte. Sans dépendance.
@@ -366,8 +371,66 @@ export function tableauDeBord(r, aujourdhui = new Date(), chemin = 'docs/BACKLOG
   return out
 }
 
-/** Lance le tableau de bord sur un fichier ; rend le code de sortie. */
-export function principal(chemin = 'docs/BACKLOG.md', aujourdhui = new Date(), ecrire = console.log) {
+/** Noms de zone acceptés par `--zone` (sans casse ni accent de « Ça »), vers le titre exact du fichier. */
+const NOMS_DE_ZONE = {
+  maintenant: 'Maintenant',
+  ensuite: 'Ensuite',
+  occasion: 'Ça attend une occasion',
+  'ça attend une occasion': 'Ça attend une occasion',
+  'plus tard': 'Plus tard',
+  questions: 'Questions',
+}
+
+/**
+ * Les lignes d'une zone, telles qu'elles sont dans le fichier : entre son titre (exclu) et le titre suivant, sans les
+ * lignes vides de tête ni de queue. Rend `null` si la zone n'existe pas dans le texte.
+ */
+export function lignesDeZone(texte, titre) {
+  const lignes = texte.split(/\r?\n/)
+  const debut = lignes.findIndex((l) => l.trimEnd() === `## ${titre}`)
+  if (debut < 0) return null
+  let fin = lignes.findIndex((l, i) => i > debut && /^## /.test(l))
+  if (fin < 0) fin = lignes.length
+  const zone = lignes.slice(debut + 1, fin)
+  while (zone.length && !zone[0].trim()) zone.shift()
+  while (zone.length && !zone.at(-1).trim()) zone.pop()
+  return zone
+}
+
+/** La ligne de l'élément `numero` et ses sous-lignes d'essais, telles qu'elles sont dans le fichier ; `null` si absent. */
+export function lignesDeElement(texte, numero) {
+  const r = lireBacklog(texte)
+  const element = tousLesElements(r).find((e) => e.numero === numero)
+  if (!element) return null
+  const lignes = texte.split(/\r?\n/)
+  return [lignes[element.ligne - 1], ...element.essais.map((e) => lignes[e.ligne - 1])]
+}
+
+/** Lit la ligne de commande : chemin facultatif, `--zone <nom>` ou `--ligne <N>` (l'un ou l'autre). */
+export function lireOptions(argv) {
+  const o = { chemin: undefined, zone: null, ligne: null }
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]
+    if (a === '--zone' || a === '--ligne') {
+      const valeur = argv[++i]
+      if (valeur === undefined || valeur.startsWith('--')) return { erreur: `${a} demande une valeur` }
+      if (a === '--zone') {
+        const titre = NOMS_DE_ZONE[valeur.toLowerCase()]
+        if (!titre) return { erreur: `zone inconnue « ${valeur} » (Maintenant, Ensuite, occasion, Plus tard ou Questions)` }
+        o.zone = titre
+      } else {
+        if (!/^\d+$/.test(valeur)) return { erreur: `--ligne demande un numéro d'élément, pas « ${valeur} »` }
+        o.ligne = Number(valeur)
+      }
+    } else if (a.startsWith('--')) return { erreur: `option inconnue « ${a} »` }
+    else o.chemin = a
+  }
+  if (o.zone && o.ligne !== null) return { erreur: '--zone et --ligne s\'excluent' }
+  return o
+}
+
+/** Lance le tableau de bord (ou une zone, ou une ligne) sur un fichier ; rend le code de sortie. */
+export function principal(chemin = 'docs/BACKLOG.md', aujourdhui = new Date(), ecrire = console.log, options = {}) {
   let texte
   try {
     texte = readFileSync(chemin, 'utf8')
@@ -375,11 +438,33 @@ export function principal(chemin = 'docs/BACKLOG.md', aujourdhui = new Date(), e
     ecrire(`Impossible de lire ${chemin} : ${e.message}`)
     return 1
   }
+  if (options.zone) {
+    const zone = lignesDeZone(texte, options.zone)
+    if (!zone) {
+      ecrire(`Zone « ${options.zone} » introuvable dans ${chemin}.`)
+      return 1
+    }
+    ecrire(zone.join('\n'))
+    return 0
+  }
+  if (options.ligne != null) {
+    const ligne = lignesDeElement(texte, options.ligne)
+    if (!ligne) {
+      ecrire(`Élément ${options.ligne} introuvable dans ${chemin}.`)
+      return 1
+    }
+    ecrire(ligne.join('\n'))
+    return 0
+  }
   const r = lireBacklog(texte, aujourdhui)
   ecrire(tableauDeBord(r, aujourdhui, chemin).join('\n'))
   return r.erreurs.length ? 1 : 0
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exitCode = principal(process.argv[2])
+  const o = lireOptions(process.argv.slice(2))
+  if (o.erreur) {
+    console.log(`${o.erreur}. Usage : node outils/backlog.mjs [chemin] [--zone <Maintenant|Ensuite|occasion|Plus tard|Questions> | --ligne <N>]`)
+    process.exitCode = 1
+  } else process.exitCode = principal(o.chemin, new Date(), console.log, o)
 }
