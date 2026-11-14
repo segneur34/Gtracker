@@ -57,7 +57,7 @@ export const SCRIPTS = [
   // Mesure : fluidité, ouverture d'une longue voile, seuil changé, zoom d'un graphe, résumés refaits, démarrage ; ×1 puis processeur ralenti ×6, en s ; seul (tâches longues et images par seconde), environ 10 min. Hors du passage courant.
   { nom: 'fluidite', args: ['{port}', '{travail}', '{captures?}'], pages: ['voile', 'surf', 'sessions'], solo: true, sansCache: true, delaiMin: 20 },
   { nom: 'general', args: ['{port}', '{captures?}'], pages: ['voile', 'surf'] },
-  { nom: 'glisser', args: ['{port}', '{captures?}'], pages: ['profil', 'statistiques'] },
+  { nom: 'glisser', args: ['{port}', '{captures?}'], pages: ['reglages'] },
   // GPS perdu (lot 115) : rejeu ×1 avec un trou de 90 s ; alerte, son unique et notification, puis tout effacé au retour.
   { nom: 'gps-perdu', args: ['{port}', '{travail}'], pages: ['enregistrer'], solo: true },
   { nom: 'graphes', args: ['{port}', '{captures?}'], pages: ['surf', 'voile'] },

@@ -21,10 +21,11 @@ APK 0.00.68 construite et contrôlée le 14/11 en fin de soirée (versionCode 69
   - essai 256 : Statistiques, toucher la ligne « Sélection », toutes les activités montrées dans Réglages → la fenêtre prend presque tout l'écran, tous les choix se voient sans glisser de côté, « Valider » applique d'un coup, le retour d'Android ferme sans rien changer
   - essai 257 : Statistiques, une activité avec une liste de matériel, bouton « Matériel » sous la ligne → on bascule d'une pièce à l'autre en un appui, les boutons ont la bonne taille, les traits du fond ne passent derrière aucun bouton
 
+- 383 · [outil] Banc : le script du bouton glissant (`outils/banc/glisser.mjs`) plante dès sa première partie, parce qu'il cherche sur le Profil un bouton glissant de période qui n'y est plus depuis le bouton ovale unique (relevé le 14/11 en adaptant les scripts à la fenêtre de sélection des Statistiques ; sa partie Statistiques, réécrite ce jour-là, n'a donc pas pu être rejouée) ; le faire viser un bouton glissant qui existe encore (Réglages ou Sessions) ; outil de l'atelier, aucun essai au téléphone ; résultat attendu : le script repasse en entier et garde la preuve que la case s'attrape et glisse · noté 14/11 · petit · Sonnet/medium · à valider sur lecture (commit en cours, 14/11) · détail : docs/backlog/383-banc-glisser.md
+
 ## Ensuite
 
-1. 383 · [outil] Banc : le script du bouton glissant (`outils/banc/glisser.mjs`) plante dès sa première partie, parce qu'il cherche sur le Profil un bouton glissant de période qui n'y est plus depuis le bouton ovale unique (relevé le 14/11 en adaptant les scripts à la fenêtre de sélection des Statistiques ; sa partie Statistiques, réécrite ce jour-là, n'a donc pas pu être rejouée) ; le faire viser un bouton glissant qui existe encore (Réglages ou Sessions) ; outil de l'atelier, aucun essai au téléphone ; résultat attendu : le script repasse en entier et garde la preuve que la case s'attrape et glisse · noté 14/11 · petit · Sonnet/medium
-2. 326 · [dette] Familles aplaties (traitement fondu dans la famille, conditions toujours vraies retirées) ; résultat attendu : résumés figés identiques · noté 11/11 · gros · Opus/high · dépend de : 304, 306, 346 · détail : docs/backlog/319-revue-apres-fork.md
+1. 326 · [dette] Familles aplaties (traitement fondu dans la famille, conditions toujours vraies retirées) ; résultat attendu : résumés figés identiques · noté 11/11 · gros · Opus/high · dépend de : 304, 306, 346 · détail : docs/backlog/319-revue-apres-fork.md
 
 ## Ça attend une occasion
 

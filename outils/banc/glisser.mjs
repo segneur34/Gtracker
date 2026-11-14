@@ -1,5 +1,6 @@
-// Banc de test : le bouton glissant qu'on fait glisser (demande du 22/10), sur le Profil (période) et les
-// Statistiques (famille).
+// Banc de test : le bouton glissant qu'on fait glisser (demande du 22/10), sur le thème de Réglages (Clair, Sombre, Auto).
+// Ni le Profil (période en bouton ovale) ni les Statistiques (fenêtre de sélection) n'ont plus de bouton glissant ;
+// la fenêtre de sélection est éprouvée par statistiques.mjs.
 // Usage : node glisser.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau, sans session. À 390×844 en écran tactile, puis sur ordinateur. Le script vérifie :
 //  1. à la souris, la case tenue sur le choix en cours et glissée de deux crans : elle suit le pointeur, le choix sous
@@ -7,7 +8,7 @@
 //  2. au doigt, la même chose dans l'autre sens, sans que la page défile de côté ;
 //  3. un toucher sur un autre choix le prend toujours (clic) ; un appui qui bouge à peine ne change rien ;
 //  4. un glisser parti d'un choix qui n'est pas le choix en cours ne déplace pas la case ;
-//  5. Statistiques : la famille glissée ne change l'adresse qu'au lâcher ; la vue choisie est retenue au rechargement.
+//  5. le choix pris au lâcher est retenu au rechargement.
 import { connect } from './lib/cdp.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -82,48 +83,48 @@ const dragTwo = async (label, kind, step = '') => {
   check(`${step}${label}, ${kind} : la page ne défile pas de côté`, after.scrollX === 0 && during.row.scrollX === 0, `scrollX ${during.row.scrollX}`);
 };
 
+/** Déplie le bloc « Affichage » de Réglages (replié au départ) et attend la rangée du thème. */
+const openDisplay = async () => {
+  const title = `[...document.querySelectorAll('.ui-panel-title')].find((b) => b.textContent.trim().startsWith('Affichage'))`;
+  await waitFor(`Boolean(${title})`, { timeout: 3000, every: 50, label: 'bloc Affichage' });
+  await evaluate(`(() => { if (!document.querySelector('.ui-segmented[aria-label="Thème"]')) ${title}?.click(); })()`);
+};
+
 const runOn = async (screen) => {
   console.log(`--- ${screen} ---`);
-  // 1-4. Profil : la période.
-  await go('/profil');
-  await dragTwo('Période', 'souris', `${screen}, Profil, `);
+  // 1-4. Réglages : le thème (Clair, Sombre, Auto), seul bouton glissant sans condition de données.
+  const L = 'Thème';
+  await go('/parametres');
+  await openDisplay();
+  await dragTwo(L, 'souris', `${screen}, Réglages, `);
   if (screen === 'téléphone') {
-    await dragTwo('Période', 'doigt', `${screen}, Profil, `);
-    await shoot('glisser-profil-390');
+    await dragTwo(L, 'doigt', `${screen}, Réglages, `);
+    await shoot('glisser-reglages-390');
     // Toucher sur un autre choix : il est pris.
-    let row = await readRow('Période');
+    let row = await readRow(L);
     let i = checkedIndex(row);
     const k = i === 0 ? 1 : 0;
     await touch('touchStart', row.items[k].x, row.items[k].y);
     await touch('touchEnd', row.items[k].x, row.items[k].y);
     await wait(400);
-    row = await readRow('Période');
+    row = await readRow(L);
     check(`${screen} : un toucher sur un autre choix le prend`, checkedIndex(row) === k, row.items[checkedIndex(row)]?.label);
     // Appui qui bouge à peine, sur le choix en cours : rien ne change.
     i = checkedIndex(row);
     await dragWith('doigt', row.items[i], { x: row.items[i].x + 3, y: row.items[i].y });
-    const still = await readRow('Période');
+    const still = await readRow(L);
     check(`${screen} : un appui qui bouge à peine ne change rien`, checkedIndex(still) === i && !still.dragging);
     // Glisser parti d'un autre choix : la case ne bouge pas.
     const other = i === 0 ? 2 : 0;
-    const during = await dragWith('doigt', row.items[other], row.items[i], () => readRow('Période'));
+    const during = await dragWith('doigt', row.items[other], row.items[i], () => readRow(L));
     check(`${screen} : un glisser parti d'un autre choix ne prend pas la case`, !during.dragging);
   }
-  // 5. Statistiques : la famille.
-  await go('/statistiques');
-  // La page n'a plus de bouton glissant : la famille se choisit dans la fenêtre « Sélection » (gros boutons, « Valider »).
-  await evaluate(`document.querySelector('button.stats-selection')?.click()`);
-  await waitFor(`Boolean(document.querySelector('[role="dialog"][aria-label="Sélection"]'))`, { timeout: 3000, every: 50, label: 'fenêtre Sélection' });
-  await evaluate(`[...document.querySelectorAll('.stats-selection-dialog [role=radiogroup][aria-label="Famille"] button')].find((x) => (x.querySelector('.ui-choice__label') ?? x).textContent.trim() === 'Voile')?.click()`);
-  await waitFor(`[...document.querySelectorAll('.stats-selection-dialog [role=radiogroup][aria-label="Famille"] [aria-checked=true]')].some((x) => (x.querySelector('.ui-choice__label') ?? x).textContent.trim() === 'Voile')`, { timeout: 3000, every: 50, label: 'Voile coché' });
-  await evaluate(`document.querySelector('.stats-selection__foot .ui-btn--primary')?.click()`);
-  await waitFor(`!document.querySelector('[role="dialog"][aria-label="Sélection"]') && location.search.includes('famille=voile')`, { timeout: 3000, every: 50, label: 'fenêtre fermée, famille dans l\'adresse' });
-  const search = await evaluate('location.search');
-  check(`${screen}, Statistiques : famille dans l'adresse`, /famille=/.test(search), search);
-  await go('/statistiques');
-  const resumed = await evaluate('location.search');
-  check(`${screen}, Statistiques : vue retenue au rechargement`, resumed === search, resumed);
-  // Retour à la vue d'ensemble pour l'écran suivant.
+  // 5. Le choix pris au lâcher est retenu au rechargement.
+  const chosen = checkedIndex(await readRow(L));
+  await go('/parametres');
+  await openDisplay();
+  const reloaded = await waitFor(() => readRow(L), { timeout: 3000, label: `rangée ${L} rechargée` });
+  check(`${screen}, Réglages : thème retenu au rechargement`, reloaded && checkedIndex(reloaded) === chosen, reloaded?.items[checkedIndex(reloaded)]?.label);
   await evaluate(`localStorage.clear()`);
 };
 
