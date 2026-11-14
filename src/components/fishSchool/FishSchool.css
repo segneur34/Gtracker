@@ -1,0 +1,72 @@
+/* Banc de poissons du Profil (`FishSchool.tsx`) et couleurs de ses dessins (`FishSprite.tsx`), sur les variables de
+   `theme/tokens.css`.
+
+   Un seul SVG, sous le contenu de la page et devant le champ de traînées (plan -1, après lui dans la page), de la photo
+   d'en-tête au bas de la page, qui défile avec elle. Dans l'ordre : le voile des cadres, repeint ici pour que les
+   poissons s'y voient pâlis (les cadres deviennent transparents, `ProfilePage.css`), l'eau et ses lignes de marée,
+   puis les poissons. Ni filtre ni animation. */
+
+.fish-school {
+  position: absolute;
+  left: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Bords au pixel, comme le fond d'un cadre : aucun liseré du champ autour d'un voile posé entre deux pixels. */
+.fish-school__veil {
+  fill: var(--field-veil);
+  shape-rendering: crispEdges;
+}
+
+/* L'eau presque opaque : 3 % des traînées passent dessous. */
+.fish-school__water {
+  fill: var(--school-water);
+  fill-opacity: 0.97;
+  fill-rule: evenodd;
+}
+
+.fish-school__edge,
+.fish-school__tide {
+  fill: none;
+  stroke: var(--school-tide);
+  stroke-width: 1;
+}
+
+.fish-school__edge {
+  opacity: 0.6;
+}
+
+.fish-school__tide {
+  opacity: 0.55;
+}
+
+.fish-school__tide + .fish-school__tide {
+  opacity: 0.35;
+}
+
+/* Couleurs des dessins : encre, papier, couleur de l'activité de la session du poisson (l'encre sans elle), vert. */
+.fz-i {
+  fill: var(--ink);
+}
+
+.fz-p {
+  fill: var(--bg);
+}
+
+.fz-a {
+  fill: var(--fish-act, var(--ink));
+}
+
+.fz-g {
+  fill: var(--record);
+}
+
+.fz-is {
+  stroke: var(--ink);
+}
+
+.fz-ps {
+  stroke: var(--bg);
+}

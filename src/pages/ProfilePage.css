@@ -7,8 +7,15 @@
    la place pendant le chargement. --- */
 
 .profile-page {
+  position: relative;
   box-sizing: border-box;
   width: 100%;
+}
+
+/* Banc de poissons dessiné (`components/fishSchool/`) : les cadres au voile de la page deviennent transparents, leur voile
+   est repeint sous le banc, si bien que hors de l'eau rien ne change et qu'un poisson sous un cadre s'y voit pâli. */
+.profile-page--school :is(.profile-favs, .profile-split, .actchart) {
+  background: transparent;
 }
 
 .profile-hero {

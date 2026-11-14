@@ -50,7 +50,7 @@ export const forNodesIn = (spec: GridSpec, box: Box, paint: (k: number) => void)
 };
 
 /** Tas binaire minimal sur des paires (clé, nœud), en tableaux typés qui s'agrandissent. */
-class MinHeap {
+export class MinHeap {
   private keys: Float64Array;
   private nodes: Int32Array;
   size = 0;

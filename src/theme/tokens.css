@@ -268,6 +268,9 @@ html:root {
      le champ n'y paraît qu'à 20 %. */
   --field-opacity: 0.62;
   --field-veil: color-mix(in srgb, var(--bg) 80%, transparent);
+  /* Eau du banc de poissons du Profil (`components/fishSchool/`) : un bleu très pâle, et ses lignes de marée. */
+  --school-water: #eef5f7;
+  --school-tide: #9db6c1;
 }
 
 /*
@@ -314,6 +317,8 @@ html:root {
   --shadow-color: #000000;
 
   --field-opacity: 0.85;
+  --school-water: #121b21;
+  --school-tide: #4a6672;
 
   --chart-grid: #2a2a2a;
   --chart-axis: #a3acb6;

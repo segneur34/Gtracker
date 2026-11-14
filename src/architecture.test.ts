@@ -387,6 +387,21 @@ describe('géométrie du banc de poissons hors du paquet de l’ouverture', () =
     }
   });
 
+  it('les dessins des poissons ne sont lus que par leur feuille de symboles', () => {
+    expect(importers('components/fishSchool/fishShapes')).toEqual(['components/fishSchool/FishSprite.tsx']);
+  });
+
+  it('hors de son dossier, la couche du banc ne se charge que par import(), depuis le Profil', () => {
+    const DYNAMIC_IMPORT = /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g;
+    const outside = code.filter(({ file }) => !file.startsWith('components/fishSchool/'));
+    const staticUsers = outside.filter(({ file, text }) => IMPORT.some((re) =>
+      [...text.matchAll(re)].some((m) => resolveTarget(file, m[1]).startsWith('components/fishSchool/'))));
+    expect(staticUsers.map(({ file }) => file)).toEqual([]);
+    const lazyUsers = outside.filter(({ file, text }) =>
+      [...text.matchAll(DYNAMIC_IMPORT)].some((m) => resolveTarget(file, m[1]) === 'components/fishSchool/FishSchool'));
+    expect(lazyUsers.map(({ file }) => file)).toEqual(['pages/ProfilePage.tsx']);
+  });
+
   it('schoolBasics n’importe rien', () => {
     const basics = code.find(({ file }) => file === 'core/schoolBasics.ts');
     expect(basics).toBeDefined();

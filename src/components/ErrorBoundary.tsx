@@ -14,6 +14,8 @@ interface ErrorBoundaryProps {
   children: ReactNode;
   /** Revenir au Profil depuis la page en erreur ; sans lui, l'application est rechargée sur le Profil. */
   onHome?: () => void;
+  /** Autour d'une pièce décorative (banc de poissons du Profil) : en erreur, rien n'est rendu, et la page reste. */
+  silent?: boolean;
 }
 
 interface ErrorBoundaryState {
@@ -45,6 +47,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   override render() {
     const { error } = this.state;
     if (error === null) return this.props.children;
+    if (this.props.silent) return null;
     return (
       <div className="ui-page">
         <section className="ui-card" role="alert">

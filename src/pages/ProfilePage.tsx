@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ActivityChart from '../components/ActivityChart';
+import ErrorBoundary from '../components/ErrorBoundary';
 import GongLogo from '../components/GongLogo';
 import MemoryStatus from '../components/MemoryStatus';
 import { PermissionsPrompt } from '../components/PermissionsStatus';
@@ -19,6 +20,8 @@ import { sessionsPath } from '../core/parentPage';
 import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useProfileRoot } from '../hooks/useProfileRoot';
+import { useProfileSchool } from '../hooks/useProfileSchool';
+import { DEFAULT_SCHOOL_STYLE } from '../core/schoolBasics';
 import { athleteAvatar, athleteName } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
@@ -54,6 +57,9 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * famille cachée, ni celles à classer. Distance en km quelle que soit l'unité
  * des activités : une somme de toutes les familles ne tient qu'en une unité.
  *
+ * Sous le contenu, de la photo au bas de la page, le banc de poissons et son eau (`components/fishSchool/`), qui
+ * grandit à chaque session, toutes sessions comptées quelle que soit la période ; chargé à part.
+ *
  * Les photos d'en-tête (`assets/profil/`) sont à GONG ou à ses photographes : leur accord est à obtenir avant toute
  * diffusion de l'application hors d'une démonstration faite à GONG.
  */
@@ -63,6 +69,8 @@ const ProfileRoot = lazy(() => import('../components/ProfileRoot'));
 const RootSlot = lazy(() => import('../components/ProfileRoot').then((m) => ({ default: m.RootSlot })));
 /** « Vos activités », sur ordinateur seulement : ses lignes et leurs vignettes ne pèsent pas sur le téléphone. */
 const ProfileActivities = lazy(() => import('../components/ProfileActivities'));
+/** Le banc de poissons et son eau, sous le contenu : son calcul et ses dessins ne se chargent qu'avec lui. */
+const FishSchool = lazy(() => import('../components/fishSchool/FishSchool'));
 
 
 /** Période retenue sur l'appareil ; l'année au départ. */
@@ -159,6 +167,11 @@ function ProfilePage() {
   const root = useProfileRoot(all, profile, nowMs);
   const [rootOpen, setRootOpen] = useState(false);
   const closeRoot = useCallback(() => setRootOpen(false), []);
+
+  // Banc de poissons : toutes les sessions de la bibliothèque (ou le réglage d'essai), quelle que soit la période.
+  const school = useProfileSchool(sessions, profile);
+  /** Le banc est dessiné, voile des cadres compris : les cadres deviennent transparents. */
+  const [schoolShown, setSchoolShown] = useState(false);
 
   const inPeriod = useMemo(() => {
     const bounds = statsPeriodBounds(period, nowMs);
@@ -379,7 +392,17 @@ function ProfilePage() {
   );
 
   return (
-    <div className="profile-page">
+    <div className={schoolShown ? 'profile-page profile-page--school' : 'profile-page'}>
+      {/* Décoratif : un morceau qui ne se charge pas (hors ligne) ou une erreur n'enlèvent que le banc, les cadres
+          gardent leur fond. */}
+      {school.sessions > 0 && (
+        <ErrorBoundary silent>
+          <Suspense fallback={null}>
+            <FishSchool sessions={school.sessions} colors={school.colors} style={DEFAULT_SCHOOL_STYLE}
+              ready={status === 'ready' && !scanning} onShown={setSchoolShown} />
+          </Suspense>
+        </ErrorBoundary>
+      )}
       {/* Photo d'en-tête, posée en fond par le CSS : celle de l'écran seule se télécharge, aucune en économe. */}
       <div className="profile-hero">
         <span className="profile-hero__brand">
