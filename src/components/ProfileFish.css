@@ -1,6 +1,6 @@
 /* Bocal du poisson du Profil. Son côté : une part du plus grand (`--fish-f`, du niveau), lui-même 84 px au plus,
-   moins quand l'en-tête est étroit (conteneur `.profile-head`) : la photo ronde, les écarts et le lien du test de
-   FC repos gardent leur place, le nom n'est jamais poussé. */
+   moins quand l'en-tête est étroit (conteneur `.profile-head`) : la photo ronde, les écarts et la place du texte
+   gardent la leur, le nom n'est jamais poussé. */
 .profile-fish {
   --fish-m: max(20px, min(84px, 100cqi - var(--fish-reserve, 222px)));
   position: relative;
@@ -13,14 +13,14 @@
   border-radius: var(--radius-s);
   background: none;
   color: var(--ink);
-  /* À la taille du lien du test de FC repos : la place qu'il lui laisse se compte en em (`--fish-reserve`). */
+  /* À la taille du petit texte de l'en-tête : la place laissée au texte se compte en em (`--fish-reserve`). */
   font-size: var(--text-s);
   cursor: pointer;
 }
 
 /* Zone de toucher d'au moins 44 px autour d'un petit bocal, sans changer sa taille visible : le bouton est carré, la
    moitié de sa largeur vaut celle de sa hauteur. Dès 320 px de large, le plus petit bocal déborde de 8 px de chaque
-   côté, moins que l'écart de l'en-tête (12 px) : le lien voisin reste hors d'atteinte. */
+   côté, moins que l'écart de l'en-tête (12 px) : le texte voisin reste hors d'atteinte. */
 .profile-fish::before {
   content: '';
   position: absolute;

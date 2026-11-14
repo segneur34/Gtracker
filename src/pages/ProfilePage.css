@@ -145,7 +145,7 @@
 }
 
 /* --- En-tête du Profil : la photo ronde, cerclée du fond, à cheval sur le bas de la photo d'en-tête ; « Bienvenue »
-   et le pseudo à côté, sous la photo, puis le lien du test de FC repos. --- */
+   et le pseudo à côté, sous la photo, puis le bocal du poisson. --- */
 
 .ui-page.profile {
   padding-top: 0;
@@ -165,8 +165,8 @@
   gap: var(--space-3);
   margin-top: -34px;
   /* Conteneur du bocal du poisson, dont la taille suit la largeur de l'en-tête (`components/ProfileFish.css`) :
-     la photo ronde (80 px), deux écarts et le lien du test de FC repos (son texte, en em du bocal, qui est à la
-     taille du lien, et son chevron) lui laissent le reste. */
+     la photo ronde (80 px), deux écarts et la place du texte (« Bienvenue » et le pseudo, en em du bocal, qui est à la
+     taille du petit texte) lui laissent le reste. */
   container-type: inline-size;
   --fish-reserve: calc(80px + 2 * var(--space-3) + 16px + 7.9em);
 }
@@ -180,8 +180,8 @@
   width: 80px;
 }
 
-/* Le texte, puis le bocal calé en bas, sur la ligne du test de FC repos ; plus grand que le texte, il descend
-   sous la ligne sans pousser le nom. Le tout commence sous la photo d'en-tête, que l'avatar déborde de 34 px. */
+/* Le texte, puis le bocal calé en bas, sur le bas du texte ; plus grand que le texte, il descend
+   sous lui sans pousser le nom. Le tout commence sous la photo d'en-tête, que l'avatar déborde de 34 px. */
 .profile-head__main {
   flex: 1;
   min-width: 0;
@@ -219,33 +219,6 @@
 .profile-head__hello {
   color: var(--muted);
   font-size: var(--text-xs);
-}
-
-/* Rangée du lien du test de FC repos. */
-.profile-head__row {
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-
-.profile-head__row .profile-head__link {
-  white-space: nowrap;
-}
-
-/* Entrée du test de FC repos, discrète sous le titre. */
-.profile-head__link {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  min-height: 32px;
-  color: var(--muted);
-  font-size: var(--text-s);
-  text-decoration: none;
-}
-
-.profile-head__link:hover {
-  color: var(--ink);
 }
 
 .profile-head__title {

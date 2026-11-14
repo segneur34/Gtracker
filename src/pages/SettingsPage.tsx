@@ -1,4 +1,5 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type ReactNode } from 'react';
+import { Fragment, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type ReactNode } from 'react';
+import { RESTING_HR_PATH } from '../core/parentPage';
 import {
   FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityFamily, isFamilyHidden, nextActivityColor, visibleActivities, visibleFamilies,
   type Activity,
@@ -180,9 +181,11 @@ const FAMILY_OPEN_DEFAULTS = Object.fromEntries(SPORT_FAMILIES.map((f) => [f, fa
  * un rendu ; à la sortie du champ, le brouillon revient à la valeur commise.
  */
 function NumberField({
-  label, help, helpKey, unit, value, onCommit, placeholder, step = 1, min, max,
+  label, help, helpKey, before, unit, value, onCommit, placeholder, step = 1, min, max,
 }: {
   label?: string;
+  /** Pièce posée entre le libellé et la case (un bouton) ; le libellé reste lié à la case par son identifiant. */
+  before?: ReactNode;
   /** Aide du champ à libellé, sous son « ? » (`helpKey` : sa clé). */
   help?: ReactNode;
   helpKey?: string;
@@ -196,6 +199,7 @@ function NumberField({
 }) {
   const [draft, setDraft] = useState(value === null ? '' : String(value));
   const focused = useRef(false);
+  const inputId = useId();
 
   useEffect(() => {
     if (!focused.current) setDraft(value === null ? '' : String(value));
@@ -210,9 +214,11 @@ function NumberField({
   };
 
   const field = (
-    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: label ? '8px' : 0, fontSize: 'var(--text-s)' }}>
+    <label htmlFor={inputId} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: label ? '8px' : 0, fontSize: 'var(--text-s)' }}>
       {label && <span className="ui-field-row__label">{label}{helpKey && <HelpToggle helpKey={helpKey} label={label} />}</span>}
+      {before}
       <input
+        id={inputId}
         type="number"
         step={step}
         min={min}
@@ -700,12 +706,59 @@ function SettingsPage() {
       </div>
 
       <div className="set-cards brush-panels brush-panels--hair" style={brush}>
-      <MemoryStatus detailed collapse={{ open: open.memoire, onToggle: () => toggle('memoire') }} />
-
       <div style={cardStyle}>
-        <BlockTitle label="Autorisations" open={open.autorisations} onToggle={() => toggle('autorisations')} helpKey="autorisations"
-          help="Ce qu'il faut pour enregistrer écran éteint. Refusée deux fois, une autorisation ne se redemande plus : « Ouvrir les réglages » mène à celles de l'application." />
-        {open.autorisations && <div className="settings-block__body"><PermissionsSettings /></div>}
+        <BlockTitle label="Pratiquant" open={open.pratiquant} onToggle={() => toggle('pratiquant')} helpKey="pratiquant"
+          help={`Pour l'énergie estimée des analyses, les zones cardiaques de toutes les activités${PROFILE_PLANT_VISIBLE ? ', et la racine du Profil' : ''}. Tout est facultatif.`} />
+        {open.pratiquant && (
+          <div className="settings-block__body">
+            <label className="ui-field-row">
+              <span className="ui-field-row__label">Nom ou pseudo<HelpToggle helpKey="pratiquant:nom" label="Nom ou pseudo" /></span>
+              <input type="text" value={profile.name ?? ''} maxLength={ATHLETE_NAME_MAX} placeholder="ex. Tom" autoComplete="nickname"
+                onChange={(e) => setName(e.target.value)} className="ui-field ui-field--s set-wide-input" />
+            </label>
+            <HelpText helpKey="pratiquant:nom">En titre de la page Profil et au pied des images partagées.</HelpText>
+            <NumberField label="Poids" unit="kg" step={0.5} min={20} max={300} value={profile.weightKg} onCommit={profileField('weightKg')} placeholder="ex. 72"
+              helpKey="pratiquant:poids" help="Pour l'énergie." />
+            <NumberField label="Taille" unit="cm" min={100} max={250} value={profile.heightCm} onCommit={profileField('heightCm')} placeholder="ex. 178"
+              helpKey="pratiquant:taille" help="Avec le poids, l'âge et le sexe, pour la dépense au repos." />
+            <NumberField label="Année de naissance" unit={age !== null ? `${age} ans` : undefined} min={1900} max={2100} value={profile.birthYear} onCommit={profileField('birthYear')} placeholder="ex. 1985"
+              helpKey="pratiquant:naissance" help="Pour la dépense au repos, et la FC max estimée quand elle n'est pas saisie." />
+            <label className="ui-field-row">
+              <span className="ui-field-row__label">Sexe<HelpToggle helpKey="pratiquant:sexe" label="Sexe" /></span>
+              <select value={profile.sex ?? ''} onChange={(e) => setSex(e.target.value === '' ? null : (e.target.value as 'f' | 'm'))} className="ui-field ui-field--s">
+                <option value="">Non renseigné</option>
+                <option value="f">Femme</option>
+                <option value="m">Homme</option>
+              </select>
+            </label>
+            <HelpText helpKey="pratiquant:sexe">Pour la dépense au repos.</HelpText>
+            <NumberField label="Fréquence cardiaque max" unit={hrUnit('hrMax')} min={100} max={250} value={profile.hrMax} onCommit={profileField('hrMax')} placeholder="ex. 185"
+              helpKey="pratiquant:fc-max" help="Pour les seuils et les zones cardiaques. Sans elle, elle est estimée par l'âge." />
+            <NumberField label="Fréquence cardiaque de repos" unit={hrUnit('hrRest')} min={25} max={120} value={profile.hrRest} onCommit={profileField('hrRest')} placeholder="ex. 55"
+              before={<Link to={RESTING_HR_PATH} className="ui-btn ui-btn--secondary ui-btn--s set-test-btn" aria-label="Test de FC repos">Test</Link>}
+              helpKey="pratiquant:fc-repos" help="Avec la FC max, les seuils se calculent sur la réserve cardiaque, plus juste. Le bouton Test la mesure avec la ceinture." />
+            <HeartRateThresholdsField profile={profile} onChange={setThresholds} />
+            <label className="ui-field-row">
+              <span className="ui-field-row__label">Niveau du poisson (essai, provisoire)<HelpToggle helpKey="pratiquant:poisson-essai" label="Niveau du poisson" /></span>
+              <select value={profile.fishTrialLevel ?? ''} className="ui-field ui-field--s"
+                onChange={(e) => setNumber('fishTrialLevel', e.target.value === '' ? null : Number(e.target.value))}>
+                <option value="">Automatique</option>
+                {Array.from({ length: FISH_LEVELS }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+            <HelpText helpKey="pratiquant:poisson-essai">
+              Réglage provisoire, pour essayer : impose le niveau du poisson du Profil et débloque les niveaux jusqu'à lui. Automatique : le niveau gagné par les semaines tenues.
+            </HelpText>
+            {PROFILE_PLANT_VISIBLE && (
+              <>
+                <p className="ui-eyebrow set-subhead">Racine du Profil</p>
+                <NumberField label="Objectif par semaine" unit="min" min={ROOT_GOAL.min} max={ROOT_GOAL.max} value={profile.rootWeeklyGoalMin} onCommit={profileField('rootWeeklyGoalMin')}
+                  placeholder={String(ROOT_GOAL.defaultMin)} helpKey="pratiquant:racine-objectif"
+                  help={`Temps d'activité, toutes activités confondues, à faire du lundi au dimanche (de ${ROOT_GOAL.min} min à ${ROOT_GOAL.max / 60} h) : la semaine tenue, la racine gagne une étape, et fait le tour du Profil en 26 semaines. Semaines manquées d'affilée : −3 étapes, puis −6, puis retour à la graine.`} />
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={cardStyle}>
@@ -742,6 +795,11 @@ function SettingsPage() {
       </div>
 
       <div style={cardStyle}>
+        <PanelTitle label="Capteurs" open={open.capteurs} onToggle={() => toggle('capteurs')} />
+        {open.capteurs && <div className="settings-block__body"><HeartRateBeltSettings /></div>}
+      </div>
+
+      <div style={cardStyle}>
         <PanelTitle label="Enregistrement" open={open.enregistrement} onToggle={() => toggle('enregistrement')} />
         {open.enregistrement && (
           <div className="settings-block__body">
@@ -766,11 +824,6 @@ function SettingsPage() {
       </div>
 
       <div style={cardStyle}>
-        <PanelTitle label="Capteurs" open={open.capteurs} onToggle={() => toggle('capteurs')} />
-        {open.capteurs && <div className="settings-block__body"><HeartRateBeltSettings /></div>}
-      </div>
-
-      <div style={cardStyle}>
         <BlockTitle label="Affichage" open={open.affichage} onToggle={() => toggle('affichage')} helpKey="affichage"
           help="Propre à cet appareil : il n'est pas repris par un autre téléphone ni par le fichier de réglages." />
         {open.affichage && <div className="settings-block__body"><DisplaySettings /></div>}
@@ -782,58 +835,12 @@ function SettingsPage() {
         {open.cartes && <div className="settings-block__body"><OfflineMapsSettings /></div>}
       </div>
 
+      <MemoryStatus detailed collapse={{ open: open.memoire, onToggle: () => toggle('memoire') }} />
+
       <div style={cardStyle}>
-        <BlockTitle label="Pratiquant" open={open.pratiquant} onToggle={() => toggle('pratiquant')} helpKey="pratiquant"
-          help={`Pour l'énergie estimée des analyses, les zones cardiaques de toutes les activités${PROFILE_PLANT_VISIBLE ? ', et la racine du Profil' : ''}. Tout est facultatif.`} />
-        {open.pratiquant && (
-          <div className="settings-block__body">
-            <label className="ui-field-row">
-              <span className="ui-field-row__label">Nom ou pseudo<HelpToggle helpKey="pratiquant:nom" label="Nom ou pseudo" /></span>
-              <input type="text" value={profile.name ?? ''} maxLength={ATHLETE_NAME_MAX} placeholder="ex. Tom" autoComplete="nickname"
-                onChange={(e) => setName(e.target.value)} className="ui-field ui-field--s set-wide-input" />
-            </label>
-            <HelpText helpKey="pratiquant:nom">En titre de la page Profil et au pied des images partagées.</HelpText>
-            <NumberField label="Poids" unit="kg" step={0.5} min={20} max={300} value={profile.weightKg} onCommit={profileField('weightKg')} placeholder="ex. 72"
-              helpKey="pratiquant:poids" help="Pour l'énergie." />
-            <NumberField label="Taille" unit="cm" min={100} max={250} value={profile.heightCm} onCommit={profileField('heightCm')} placeholder="ex. 178"
-              helpKey="pratiquant:taille" help="Avec le poids, l'âge et le sexe, pour la dépense au repos." />
-            <NumberField label="Année de naissance" unit={age !== null ? `${age} ans` : undefined} min={1900} max={2100} value={profile.birthYear} onCommit={profileField('birthYear')} placeholder="ex. 1985"
-              helpKey="pratiquant:naissance" help="Pour la dépense au repos, et la FC max estimée quand elle n'est pas saisie." />
-            <label className="ui-field-row">
-              <span className="ui-field-row__label">Sexe<HelpToggle helpKey="pratiquant:sexe" label="Sexe" /></span>
-              <select value={profile.sex ?? ''} onChange={(e) => setSex(e.target.value === '' ? null : (e.target.value as 'f' | 'm'))} className="ui-field ui-field--s">
-                <option value="">Non renseigné</option>
-                <option value="f">Femme</option>
-                <option value="m">Homme</option>
-              </select>
-            </label>
-            <HelpText helpKey="pratiquant:sexe">Pour la dépense au repos.</HelpText>
-            <NumberField label="Fréquence cardiaque max" unit={hrUnit('hrMax')} min={100} max={250} value={profile.hrMax} onCommit={profileField('hrMax')} placeholder="ex. 185"
-              helpKey="pratiquant:fc-max" help="Pour les seuils et les zones cardiaques. Sans elle, elle est estimée par l'âge." />
-            <NumberField label="Fréquence cardiaque de repos" unit={hrUnit('hrRest')} min={25} max={120} value={profile.hrRest} onCommit={profileField('hrRest')} placeholder="ex. 55"
-              helpKey="pratiquant:fc-repos" help="Avec la FC max, les seuils se calculent sur la réserve cardiaque, plus juste. Le test de FC repos (page Profil) la mesure." />
-            <HeartRateThresholdsField profile={profile} onChange={setThresholds} />
-            <label className="ui-field-row">
-              <span className="ui-field-row__label">Niveau du poisson (essai, provisoire)<HelpToggle helpKey="pratiquant:poisson-essai" label="Niveau du poisson" /></span>
-              <select value={profile.fishTrialLevel ?? ''} className="ui-field ui-field--s"
-                onChange={(e) => setNumber('fishTrialLevel', e.target.value === '' ? null : Number(e.target.value))}>
-                <option value="">Automatique</option>
-                {Array.from({ length: FISH_LEVELS }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-            <HelpText helpKey="pratiquant:poisson-essai">
-              Réglage provisoire, pour essayer : impose le niveau du poisson du Profil et débloque les niveaux jusqu'à lui. Automatique : le niveau gagné par les semaines tenues.
-            </HelpText>
-            {PROFILE_PLANT_VISIBLE && (
-              <>
-                <p className="ui-eyebrow set-subhead">Racine du Profil</p>
-                <NumberField label="Objectif par semaine" unit="min" min={ROOT_GOAL.min} max={ROOT_GOAL.max} value={profile.rootWeeklyGoalMin} onCommit={profileField('rootWeeklyGoalMin')}
-                  placeholder={String(ROOT_GOAL.defaultMin)} helpKey="pratiquant:racine-objectif"
-                  help={`Temps d'activité, toutes activités confondues, à faire du lundi au dimanche (de ${ROOT_GOAL.min} min à ${ROOT_GOAL.max / 60} h) : la semaine tenue, la racine gagne une étape, et fait le tour du Profil en 26 semaines. Semaines manquées d'affilée : −3 étapes, puis −6, puis retour à la graine.`} />
-              </>
-            )}
-          </div>
-        )}
+        <BlockTitle label="Autorisations" open={open.autorisations} onToggle={() => toggle('autorisations')} helpKey="autorisations"
+          help="Ce qu'il faut pour enregistrer écran éteint. Refusée deux fois, une autorisation ne se redemande plus : « Ouvrir les réglages » mène à celles de l'application." />
+        {open.autorisations && <div className="settings-block__body"><PermissionsSettings /></div>}
       </div>
 
       <div style={cardStyle}>

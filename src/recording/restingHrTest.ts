@@ -2,7 +2,7 @@ import type { PatternTone } from '../platform/beeper';
 import { GUIDE_SIGNAL_TONES } from './signalTones';
 
 /**
- * Test de FC repos (sous le Profil) : 3 minutes immobile, la FC
+ * Test de FC repos (ouvert depuis Réglages) : 3 minutes immobile, la FC
  * lue sur la ceinture, sans GPS. Le résultat est la moyenne de 30 secondes la
  * plus basse après la première minute, le temps que le cœur se pose
  * (`library/restingHrResults.ts` ; 10 s sur les 3 minutes auparavant : une

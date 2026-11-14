@@ -1,8 +1,8 @@
-// Banc de test : test de FC repos (24/10), sous le Profil depuis le lot 301.
+// Banc de test : test de FC repos (24/10), ouvert depuis Réglages › Pratiquant (bouton « Test ») depuis le 14/11.
 // Usage : node test-fcrepos.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Pas de ceinture dans le navigateur : la page joue une FC d'exemple
 // (`exampleRestingHr`), à ×1 pour le décompte et la mesure, à ×30 (`?vitesse=30`) pour le test entier. Le script vérifie :
-//  1. le lien « Test de FC repos » du Profil, la page (déroulé, aucun GPS demandé) ;
+//  1. plus de lien sur le Profil ; le bouton « Test » de Réglages › Pratiquant, la page (déroulé, aucun GPS demandé, retour à Réglages) ;
 //  2. à ×1 : le décompte de préparation, la mesure (courbe qui se remplit, FC lue), « Annuler » qui ne garde rien ;
 //  3. à ×30 : les bips (un court, un long), le résultat (moyenne de 30 s la plus basse après la première minute, comparée à un calcul
 //     refait ici sur la même FC d'exemple), la fenêtre surlignée, la courbe de 180 secondes, le test gardé ;
@@ -60,11 +60,20 @@ const openHelp = async (label) => {
 
 await blockNetwork(['https://*']);
 
-// --- 1. Lien du Profil et page ---
+// --- 1. Bouton « Test » de Réglages › Pratiquant et page ---
 await go('/profil');
-console.log('lien :', await clickText('Test de FC repos', '.profile-head__link'));
+check('le Profil ne porte plus le lien du test', await evaluate(`!document.querySelector('.profile-head__link') && !document.body.innerText.includes('Test de FC repos')`));
+await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}'); s.settings = { ...s.settings, pratiquant: true }; localStorage.setItem('${CLES.sections}', JSON.stringify(s)); return 'ok'; })()`);
+await go('/parametres', 2500);
+check('Réglages : « Test » à gauche de la case de la FC de repos', await evaluate(`(() => {
+  const a = document.querySelector('a[aria-label="Test de FC repos"]');
+  const input = a?.closest('label')?.querySelector('input[type=number]');
+  return !!a && a.textContent.trim() === 'Test' && !!input && a.getBoundingClientRect().right <= input.getBoundingClientRect().left;
+})()`));
+console.log('bouton :', await clickText('Test', 'a[aria-label="Test de FC repos"]'));
 await wait(1000);
 check('page du test', (await evaluate('location.pathname')) === '/profil/fc-repos', await evaluate('location.pathname'));
+check('le retour de la page mène à Réglages', await evaluate(`(() => { const a = [...document.querySelectorAll('a')].find((x) => x.textContent.includes('Réglages') && x.getAttribute('href') === '/parametres'); return !!a; })()`));
 check('« ? » du déroulé', await openHelp('Déroulé'), '');
 const text = await pageText();
 check('déroulé : 10 s, 3 min, bip court puis long, moyenne de 30 s après 60 s', /10 s pour vous poser, puis un bip court/.test(text) && /3 min/.test(text) && /bip long à la fin/.test(text) && /moyenne de 30 s la plus basse après les 60 premières secondes/.test(text), '');

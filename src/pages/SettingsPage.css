@@ -469,6 +469,19 @@
   text-align: right;
 }
 
+/* Petit bouton « Test » à gauche d'une case numérique : sa taille visible reste celle d'un petit bouton (30 px) ;
+   la zone de toucher, elle, fait 46 px de haut. */
+.set-test-btn {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.set-test-btn::before {
+  content: '';
+  position: absolute;
+  inset: -8px -4px;
+}
+
 .set-name-input {
   width: 120px;
   font-weight: 600;

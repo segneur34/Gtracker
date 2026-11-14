@@ -9,6 +9,7 @@ import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import { IconPlay } from '../components/icons';
 import { formatMinSec } from '../core/units';
+import { SETTINGS_PATH } from '../core/parentPage';
 import { useRestingHrResults } from '../hooks/useRestingHrResults';
 import { useRestingHrTest } from '../hooks/useRestingHrTest';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
@@ -58,7 +59,7 @@ function StoredResultRow({ result, onRemove }: { result: StoredRestingResult; on
 }
 
 /**
- * Test de FC repos, ouvert depuis le Profil : 3 minutes immobile, la FC lue sur
+ * Test de FC repos, ouvert depuis Réglages (Pratiquant) : 3 minutes immobile, la FC lue sur
  * la ceinture, sans GPS ni enregistreur (`useRestingHrTest`). Le résultat est
  * la moyenne de 30 s la plus basse après la première minute, avec la courbe des 3 minutes ; on peut la
  * retenir comme FC repos de Pratiquant. Les tests faits restent sur l'appareil.
@@ -90,12 +91,12 @@ function RestingHrTestPage() {
 
   return (
     <div className="ui-page rest-page" style={{ '--help-accent': 'var(--rest-accent)' } as React.CSSProperties}>
-      <PageHeader title="FC repos" back={{ to: '/profil', label: 'Profil' }}
+      <PageHeader title="FC repos" back={{ to: SETTINGS_PATH, label: 'Réglages' }}
         subtitle={`Trois minutes immobile, la FC lue sur la ceinture, sans GPS : la moyenne de ${PROTOCOL.windowS} s la plus basse, après la première minute, est votre FC de repos.`} />
 
       {native && !beltChosen && (
         <div className="ui-alert ui-alert--warning">
-          Aucune ceinture cardio choisie : choisissez-la dans <Link to="/parametres">Réglages</Link>, bloc « Capteurs ».
+          Aucune ceinture cardio choisie : choisissez-la dans <Link to={SETTINGS_PATH}>Réglages</Link>, bloc « Capteurs ».
         </div>
       )}
       {error && <div className="ui-alert ui-alert--danger">{error}</div>}

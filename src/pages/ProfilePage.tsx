@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useMemo, useState, type CSSProperties } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import ActivityChart from '../components/ActivityChart';
 import GongLogo from '../components/GongLogo';
 import MemoryStatus from '../components/MemoryStatus';
@@ -15,7 +15,7 @@ import Button from '../components/ui/Button';
 import { logoColor, type Activity } from '../core/activities';
 import { activityLogo, type LogoId } from '../core/activityLogos';
 import { DISTANCE_UNIT_SYMBOL, formatDecimal, formatDuration, toDisplayDistance, type DistanceUnit } from '../core/units';
-import { RESTING_HR_PATH, sessionsPath } from '../core/parentPage';
+import { sessionsPath } from '../core/parentPage';
 import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useProfileRoot } from '../hooks/useProfileRoot';
@@ -42,8 +42,8 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * Profil, la page où s'ouvre l'application : une période en un coup d'œil (`library/profile.ts`). En tête, une photo
  * (logo GONG et « Gtracker » en haut à gauche sur téléphone, « Live for it. » en bas à droite), puis, à cheval sur son
  * bord, la photo ronde (un dessin d'activité ou une image importée, choisis en la touchant ; sans
- * choix, un disque vide à silhouette) et dessous le bouton de période, « Bienvenue » et le pseudo, et à droite du lien
- * du test de FC repos le poisson dans son bocal (`ProfileFish`), qui grandit avec les semaines tenues. Puis les cartes d'ouverture
+ * choix, un disque vide à silhouette) et dessous le bouton de période, « Bienvenue » et le pseudo, et à leur droite
+ * le poisson dans son bocal (`ProfileFish`), qui grandit avec les semaines tenues. Puis les cartes d'ouverture
  * (mémoire à désigner, autorisations, invitation du profil), quand il y a lieu. Puis
  * la période, qui règle toute la page : semaine, 30 jours, 6 mois, année (les
  * bornes du graphe d'activités et des statistiques) ou depuis le début ; choix
@@ -269,17 +269,11 @@ function ProfilePage() {
             {period === 'tout' ? 'Tout' : String(new Date(nowMs).getFullYear())}
           </Button>
         </div>
-        {/* Le texte, et à sa droite le bocal du poisson, calé sur la ligne du test de FC repos. */}
+        {/* Le texte, et à sa droite le bocal du poisson, calé sur le bas du texte. */}
         <div className="profile-head__main">
           <div className="profile-head__text">
             {name !== null && <span className="profile-head__hello">Bienvenue</span>}
             <h1 className="profile-head__title">{name ?? 'Bienvenue'}</h1>
-            {/* Le test de FC repos, sous le titre : la hauteur de l'en-tête, et donc la racine, ne bougent pas. */}
-            <div className="profile-head__row">
-              <Link to={RESTING_HR_PATH} className="profile-head__link">
-                Test de FC repos<IconChevronRight size={14} aria-hidden="true" />
-              </Link>
-            </div>
           </div>
           <ProfileFish level={fish.level} style={fish.style} path={fish.path} brushColor={brushColor}
             onOpen={() => setFishOpen(true)} />

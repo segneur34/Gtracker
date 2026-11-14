@@ -33,9 +33,9 @@ describe('parentPage', () => {
     expect(analysisPath('surf', null, 'a-surf-foil')).toBe('/surf/analyse');
   });
 
-  it('le test de FC repos remonte au Profil', () => {
-    expect(parentPage('/profil/fc-repos', '')).toBe('/profil');
-    expect(parentPage('/profil/fc-repos/', '?vitesse=10')).toBe('/profil');
+  it('le test de FC repos remonte à Réglages, où est son entrée', () => {
+    expect(parentPage('/profil/fc-repos', '')).toBe('/parametres');
+    expect(parentPage('/profil/fc-repos/', '?vitesse=10')).toBe('/parametres');
     expect(parentPage('/profil/fc-repos/autre', '')).toBe('/profil');
   });
 

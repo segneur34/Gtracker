@@ -98,7 +98,7 @@ Celles d'un domaine sont dans `docs/DECISIONS.md`, celles de la disposition des 
 | graphes et leur zoom, temps en mouvement, matériel et notes, altitude | 2. Analyses communes |
 | sauts (`core/jumps.ts`, `platform/motion.ts`, `useSessionJumps`, `JumpsPanel`) | 3. Sauts |
 | `surfing/`, `SurfModule` | 4. Surf |
-| test de FC repos (`restingHrTest`, `RestingHrTestPage`, sous le Profil) | 5. Test de FC repos |
+| test de FC repos (`restingHrTest`, `RestingHrTestPage`, sous Réglages) | 5. Test de FC repos |
 | `recording/`, `useRecorder`, `RecordingPage`, pause, journal | 6. Enregistrement |
 | `planning/`, `PlanningPage`, `RoutesPage`, `usePlannedRoute` | 7. Planification et itinéraires |
 | `library/`, `useSessionLibrary`, `pages/SessionsPage`, `SessionRow`, `platform/memoryFolder.ts`, `platform/tileCache.ts`, fond des cartes (`BaseTileLayer`), réglages par appareil, GPX téléchargé | 8. Mémoire et fichiers |

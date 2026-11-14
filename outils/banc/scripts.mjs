@@ -109,7 +109,7 @@ export const SCRIPTS = [
     pages: ['voile', 'surf', 'enregistrer', 'sessions', 'planification', 'statistiques', 'profil', 'reglages'],
     sansCache: true, releve: ['rapport.md'], delaiMin: 20 },
   { nom: 'fc-repos', args: ['{port}', '{captures?}'], pages: ['profil'], solo: true },
-  { nom: 'test-fcrepos', args: ['{port}', '{captures?}'], pages: ['profil'], solo: true },
+  { nom: 'test-fcrepos', args: ['{port}', '{captures?}'], pages: ['profil', 'reglages'], solo: true },
   // Carte du direct sur un itinéraire suivi : hors-piste sans saut, attributs SVG des tracés en plan et en satellite.
   // Tutoriels (lot 147) : carte du jour de l'accueil, leçon, liste, bloc de Réglages ; jours changés par l'heure de la page.
   { nom: 'tutoriels', args: ['{port}', '{captures?}'], pages: ['sessions', 'reglages'] },

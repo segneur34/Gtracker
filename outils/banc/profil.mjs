@@ -5,7 +5,7 @@
 // et une de surf l'an passé), les importe par la page Sessions, et vérifie :
 //  1. l'ouverture : « / » mène au Profil, sans fond dessiné, allumé dans la barre du haut ; « Profil » dans la barre du
 //     haut, depuis Sessions, ouvre la page ;
-//  2. l'en-tête (« Live for it. », « Bienvenue » seul sans pseudo, lien du test de FC repos) ; la période en tête
+//  2. l'en-tête (« Live for it. », « Bienvenue » seul sans pseudo, aucun lien du test de FC repos) ; la période en tête
 //     (bouton glissant), « Année » au départ : les trois activités favorites en ligne (Wingfoil, Surf, Kite : logos
 //     de plus en plus petits, sessions et distance de chacune, à 5 % près pour la distance, somme des vitesses ×
 //     durées ; chaque logo est un lien vers Sessions filtrée), la case « Total » à droite, nombre de sessions du graphe ; l'anneau et sa légende (une
@@ -153,7 +153,7 @@ check('barre du haut : Profil, allumé', await evaluate(`[...document.querySelec
 // 2. L'année en cours.
 check('en-tête : « Live for it. » sur la photo', (await text('.profile-hero__motto')) === 'Live for it.', await text('.profile-hero__motto'));
 check('titre : « Bienvenue » seul, sans pseudo', (await text('.profile-head__title')) === 'Bienvenue' && (await evaluate(`document.querySelector('.profile-head__hello') === null`)), await text('.profile-head__title'));
-check('lien du test de FC repos sous le titre', (await text('.profile-head__link')) === 'Test de FC repos', await text('.profile-head__link'));
+check('aucun lien du test de FC repos dans l\'en-tête', await evaluate(`!document.querySelector('.profile-head__link') && !document.querySelector('.profile-head').innerText.includes('Test de FC repos')`));
 check('période en tête : un seul bouton, « Année <n> » au départ, son libellé dit ce que fait le toucher',
   (await evaluate(`document.querySelectorAll('.profile-periods').length`)) === 1 && (await pressed()) === ANNEE_AFFICHEE
   && (await evaluate(`document.querySelector('.profile-periods').getAttribute('aria-label')`)) === `Période : ${ANNEE}. Toucher pour afficher : Tout.`, await pressed());
@@ -263,7 +263,7 @@ check('320 px : rien ne déborde, la rangée des activités favorites non plus',
 check('320 px : le bouton de période tient dans l\'écran', await periodsFit());
 await shoot('profil-320');
 
-// 5 bis. Le poisson dans son bocal, à droite du lien du test de FC repos : le niveau d'essai de Pratiquant l'impose ;
+// 5 bis. Le poisson dans son bocal, à droite du texte de l'en-tête : le niveau d'essai de Pratiquant l'impose ;
 // le bocal grandit du niveau 1 au niveau 6, sans passer sur le texte, la photo d'en-tête ni le bord de l'écran.
 /** Pose des champs du profil du pratiquant. */
 const setAthlete = (fields) => evaluate(`(() => {
@@ -280,12 +280,11 @@ const bowl = () => evaluate(`(() => {
   if (!f) return null;
   const r = f.getBoundingClientRect();
   const t = document.querySelector('.profile-head__text').getBoundingClientRect();
-  const l = document.querySelector('.profile-head__link');
   const hero = document.querySelector('.profile-hero').getBoundingClientRect();
   return { nom: f.getAttribute('aria-label'), cote: Math.round(r.width), carre: Math.abs(r.width - r.height) < 1,
     dessin: f.querySelector('.fish-drawing')?.getAttribute('data-drawing') ?? null, svg: !!f.querySelector('.fish-drawing svg'),
     aCote: r.left >= t.right - 1, dansEcran: r.right <= window.innerWidth && r.left >= 0, sousPhoto: r.top >= hero.bottom - 1,
-    lienEntier: l.scrollWidth <= l.clientWidth + 1 && l.getBoundingClientRect().right <= r.left + 1 };
+    texteEntier: t.right <= r.left + 1 && document.querySelector('.profile-head__text').scrollWidth <= document.querySelector('.profile-head__text').clientWidth + 1 };
 })()`);
 const fishShots = { 390: [1, 3, 6], 320: [1, 3, 6] };
 for (const width of [390, 320]) {
@@ -299,7 +298,7 @@ for (const width of [390, 320]) {
     await waitFor(`Boolean(document.querySelector('.profile-fish .fish-drawing svg'))`, { timeout: 3000, every: 50, label: 'dessin du poisson' });
     const b = await bowl();
     sizes.push(b?.cote ?? 0);
-    const ok = !!b && b.nom === `Poisson, niveau ${level} sur 6` && b.svg && b.carre && b.aCote && b.dansEcran && b.sousPhoto && b.lienEntier
+    const ok = !!b && b.nom === `Poisson, niveau ${level} sur 6` && b.svg && b.carre && b.aCote && b.dansEcran && b.sousPhoto && b.texteEntier
       && b.dessin === (level === 1 ? 'A/depart-1' : `A/beau-${level}`) && !(await overflow());
     if (!ok) { fine = false; detail += ` n${level} ${JSON.stringify(b)}`; }
     if (fishShots[width].includes(level)) await shoot(`poisson-${width}-n${level}`);
@@ -401,10 +400,9 @@ const reach = await evaluate(`(() => {
   const r = f.getBoundingClientRect();
   const [cx, cy] = [(r.left + r.right) / 2, (r.top + r.bottom) / 2];
   const hit = (x, y) => document.elementFromPoint(x, y)?.closest('.profile-fish') === f;
-  return { cote: Math.round(r.width), touche: [hit(cx - 21, cy), hit(cx + 21, cy), hit(cx, cy - 21), hit(cx, cy + 21)].every(Boolean),
-    lienLibre: (() => { const l = document.querySelector('.profile-head__link').getBoundingClientRect(); return document.elementFromPoint(l.right - 2, (l.top + l.bottom) / 2)?.closest('.profile-head__link') !== null; })() };
+  return { cote: Math.round(r.width), touche: [hit(cx - 21, cy), hit(cx + 21, cy), hit(cx, cy - 21), hit(cx, cy + 21)].every(Boolean) };
 })()`);
-check('320 px, niveau 1 : zone de toucher du bocal d\'au moins 44 px, le lien voisin toujours touchable', reach.cote < 44 && reach.touche && reach.lienLibre, JSON.stringify(reach));
+check('320 px, niveau 1 : zone de toucher du bocal d\'au moins 44 px', reach.cote < 44 && reach.touche, JSON.stringify(reach));
 // Un choix : le bocal change tout de suite, la frise suit, le choix est gardé au rechargement ; Échap ferme.
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await setTrial(3);
