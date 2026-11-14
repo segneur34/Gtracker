@@ -13,9 +13,13 @@
 //  7. « Lieu » du « … » de la ligne : le lieu corrigé (`utilisateur`) prime, il est appris (clé de l'appareil et
 //     `lieux.json` du dossier), et la seconde session, partie du même endroit, le prend (`appris`) sans requête ;
 //  8. « Lieu » du « … » de l'en-tête de l'analyse : corriger de nouveau au même endroit remplace le lieu appris (un seul
-//     lieu appris), la seconde session garde le sien ;
+//     lieu appris, qui retient l'ancien nom), la seconde session, de même nom, suit ;
 //  9. recherche rallumée, une troisième session partie du même endroit et finie à près de 3 km : départ appris, une
-//     seule requête, pour l'arrivée, et la ligne « Wingfoil · Départ → Arrivée ».
+//     seule requête, pour l'arrivée, et la ligne « Wingfoil · Départ → Arrivée » ;
+// 10. loin de là, deux sessions trouvées par la carte sous le même nom, une troisième d'un nom proche (accent
+//     différent) à 330 m, une quatrième nommée à la main : corriger le lieu de la première renomme la deuxième
+//     (fiche, ligne, analyse) et le lieu de la quatrième (son nom saisi reste), pas la troisième ; tout est gardé après
+//     rechargement ; vider le lieu de l'une ne vide pas les autres.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
@@ -39,6 +43,16 @@ const troisieme = join(workDir, 'lieu-3.gpx');
 writeFileSync(premier, traceVoile({ ...DEPART, debutMs: Date.UTC(2026, 9, 2, 8, 0, 0), bords: 2, secondes: 300 }));
 writeFileSync(second, traceVoile({ ...DEPART, debutMs: Date.UTC(2026, 9, 3, 8, 0, 0), bords: 2, secondes: 300 }));
 writeFileSync(troisieme, traceVoile({ ...DEPART, debutMs: Date.UTC(2026, 9, 4, 8, 0, 0), bords: 2, secondes: 600 }));
+// Étape 10, loin du premier endroit (17 km) : deux wingfoil au même point, un troisième à 330 m, un kite au même point.
+const LOIN = { lat0: 43.70, lon0: 3.85 };
+const jumelle1 = join(workDir, 'lieu-4.gpx');
+const jumelle2 = join(workDir, 'lieu-5.gpx');
+const voisine = join(workDir, 'lieu-6.gpx');
+const kiteLoin = join(workDir, 'lieu-7.gpx');
+writeFileSync(jumelle1, traceVoile({ ...LOIN, debutMs: Date.UTC(2026, 9, 10, 8, 0, 0), bords: 2, secondes: 300 }));
+writeFileSync(jumelle2, traceVoile({ ...LOIN, debutMs: Date.UTC(2026, 9, 11, 8, 0, 0), bords: 2, secondes: 300 }));
+writeFileSync(voisine, traceVoile({ ...LOIN, lat0: LOIN.lat0 + 0.003, debutMs: Date.UTC(2026, 9, 12, 8, 0, 0), bords: 2, secondes: 300 }));
+writeFileSync(kiteLoin, traceVoile({ ...LOIN, type: 'kite', debutMs: Date.UTC(2026, 9, 13, 8, 0, 0), bords: 2, secondes: 300 }));
 
 const b = await connect({ port, width: 1400, height: 1000, shotDir });
 const { send, evaluate, go, settle, waitFor, wait, importFiles, shoot, check, finish, logs } = b;
@@ -214,6 +228,8 @@ check('le lieu corrigé est celui de l\'utilisateur, le nom suit', (await fiches
   && (await rows()).includes('Kite · Les Roquilles'), await rows());
 check('il est appris sur l\'appareil et dans lieux.json', (await appris()).length === 1 && (await appris())[0].name === 'Les Roquilles'
   && (await fichierLieux())?.[0]?.name === 'Les Roquilles', JSON.stringify(await fichierLieux()));
+check('le lieu appris retient l\'ancien nom, sur l\'appareil et dans lieux.json', (await appris())[0].replaces?.includes('Plage du Petit Travers')
+  && (await fichierLieux())?.[0]?.replaces?.includes('Plage du Petit Travers'), JSON.stringify(await appris()));
 check('la seconde session prend le lieu appris, sans requête (recherche coupée)', (await fiches())[1].place?.source === 'appris'
   && (await rows()).includes('Wingfoil · Les Roquilles') && lieux.count() === 0, `${await rows()} ; ${lieux.count()} requête(s)`);
 
@@ -236,7 +252,11 @@ console.log('lieux.json :', JSON.stringify(await fichierLieux()));
 check('l\'en-tête porte le lieu corrigé', (await subtitle()) === 'Kite · Plage des Roquilles', await subtitle());
 check('le lieu appris est remplacé, sans doublon', (await appris()).length === 1 && (await appris())[0].name === 'Plage des Roquilles'
   && (await fichierLieux())?.length === 1 && (await fichierLieux())[0].name === 'Plage des Roquilles', JSON.stringify(await appris()));
-check('la seconde session garde son lieu', (await fiches())[1].place?.name === 'Les Roquilles', JSON.stringify((await fiches())[1].place));
+const remplaces8 = (await appris())[0]?.replaces ?? [];
+check('le lieu appris retient les deux anciens noms', ['Les Roquilles', 'Plage du Petit Travers'].every((n) => remplaces8.includes(n))
+  && (await fichierLieux())?.[0]?.replaces?.length === 2, JSON.stringify(await appris()));
+check('la seconde session, de même nom, suit : lieu appris, sans requête', (await fiches())[1].place?.name === 'Plage des Roquilles'
+  && (await fiches())[1].place?.source === 'appris' && lieux.count() === 0, JSON.stringify((await fiches())[1].place));
 
 step('9. Arrivée loin du départ : « Départ → Arrivée »');
 await evaluate(`localStorage.setItem('${CLES.rechercheLieu}', 'true'), 'ok'`);
@@ -258,6 +278,87 @@ check('la fiche porte le départ appris et l\'arrivée trouvée', (await fiches(
 check('la ligne porte « Activité · Départ → Arrivée »', (await rows()).includes('Wingfoil · Plage des Roquilles → Plage du Grand Travers'), await rows());
 check('les deux premières finissent près du départ : sans arrivée', (await fiches())[0].place?.arrival === null && (await fiches())[1].place?.arrival === null,
   JSON.stringify((await fiches()).map((f) => f.place?.arrival)));
+
+step('10. Un lieu corrigé renomme les sessions voisines du même nom');
+const connues10 = new Set((await fiches()).map((f) => f.gpx));
+const neuves = async () => (await fiches()).filter((f) => !connues10.has(f.gpx));
+/** Importe `fichier` dont la carte (simulée) rend `nom`, et attend que la fiche neuve le porte (`attendues` : fiches neuves en tout). */
+const importerTrouve = async (fichier, nom, attendues) => {
+  lieux.setAnswer(autour(nom));
+  lieux.reset();
+  await importFiles([fichier]);
+  await waitFor(async () => { const n = await neuves(); return n.length === attendues && n.filter((f) => f.place?.name).length === attendues; }, { timeout: 8000, label: `lieu trouvé : ${nom}` });
+  await settle({ max: 2000, label: 'import' });
+};
+await go('/sessions');
+await listReady();
+await importerTrouve(jumelle1, 'Plage de Test', 1);
+await importerTrouve(jumelle2, 'Plage de Test', 2);
+await importerTrouve(voisine, 'Plage de Tést', 3);
+await importerTrouve(kiteLoin, 'Plage de Test', 4);
+console.log('Renommer :', await actionLigne(evaluate, wait, 'Kite · Plage de Test', 'Renommer'));
+await typeName('Ma sortie', 'Enter');
+await waitFor(async () => (await neuves()).some((f) => f.name === 'Ma sortie'), { timeout: 2000, label: 'nom saisi écrit' });
+await settle({ max: 1500, label: 'nom saisi' });
+const resume = async () => (await neuves()).map((f) => `${f.activityId}:${f.name ?? '-'}:${f.place?.name ?? '-'}:${f.place?.source ?? '-'}`).join(' | ');
+console.log('avant correction :', await resume());
+console.log('lignes :', await rows());
+check('quatre sessions neuves, trouvées par la carte', (await neuves()).length === 4 && (await neuves()).every((f) => f.place?.source === 'carte'), await resume());
+check('deux wingfoil sous « Plage de Test », une voisine « Plage de Tést », un kite nommé à la main',
+  (await neuves()).filter((f) => !f.name && f.place?.name === 'Plage de Test').length === 2
+  && (await neuves()).filter((f) => f.place?.name === 'Plage de Tést').length === 1
+  && (await neuves()).filter((f) => f.name === 'Ma sortie' && f.place?.name === 'Plage de Test').length === 1, await resume());
+
+lieux.reset();
+console.log('Lieu :', await actionLigne(evaluate, wait, 'Wingfoil · Plage de Test', 'Lieu'));
+await typeIn('.lib-row__place', 'Plage Corrigée', 'Enter');
+await waitFor(async () => (await neuves()).filter((f) => f.place?.name === 'Plage Corrigée').length === 3, { timeout: 4000, label: 'voisines renommées' });
+await settle({ max: 1500, label: 'lieu' });
+console.log('après correction :', await resume());
+console.log('lignes :', await rows());
+const wing = async () => (await neuves()).filter((f) => !f.name && f.place?.name === 'Plage Corrigée');
+check('la corrigée est « utilisateur », sa jumelle suit en « appris »',
+  (await wing()).length === 2 && (await wing()).map((f) => f.place?.source).sort().join(',') === 'appris,utilisateur', await resume());
+check('la voisine d\'un autre nom (accent) ne bouge pas', (await neuves()).filter((f) => f.place?.name === 'Plage de Tést' && f.place?.source === 'carte').length === 1, await resume());
+check('le kite nommé à la main : lieu changé, nom saisi gardé',
+  (await neuves()).some((f) => f.name === 'Ma sortie' && f.place?.name === 'Plage Corrigée'), await resume());
+check('les lignes : deux « Wingfoil · Plage Corrigée », une « Wingfoil · Plage de Tést », « Ma sortie » nommée, plus aucune « Plage de Test »',
+  (await lignes(evaluate)).filter((l) => l.startsWith('Wingfoil · Plage Corrigée / ')).length === 2
+  && (await lignes(evaluate)).filter((l) => l.startsWith('Wingfoil · Plage de Tést / ')).length === 1
+  && (await rows()).includes('Ma sortie') && !(await rows()).includes('Plage de Test'), await rows());
+check('aucune requête pour renommer', lieux.count() === 0, lieux.count());
+const appris10 = (await appris()).find((p) => p.name === 'Plage Corrigée');
+check('le lieu corrigé est appris et retient l\'ancien nom', appris10?.replaces?.includes('Plage de Test') === true, JSON.stringify(await appris()));
+
+// Une des deux jumelles : son analyse porte le nouveau nom.
+console.log('Ouvrir :', await ouvrirLigne(evaluate, 'Wingfoil · Plage Corrigée'));
+await waitFor(`location.pathname.includes('/analyse')`, { timeout: 6000, label: 'analyse ouverte' });
+await settle({ max: 6000, label: 'analyse' });
+console.log('en-tête :', await subtitle());
+check('l\'analyse d\'une des deux porte le nouveau nom', (await subtitle()) === 'Wingfoil · Plage Corrigée', await subtitle());
+
+// Rechargement : tout est gardé, sans requête.
+lieux.reset();
+await go('/sessions');
+await listReady();
+await settle({ max: 2000, label: 'rechargement' });
+console.log('après rechargement :', await resume());
+check('après rechargement, fiches et lignes gardées, sans requête', (await neuves()).filter((f) => f.place?.name === 'Plage Corrigée').length === 3
+  && (await neuves()).filter((f) => f.place?.name === 'Plage de Tést').length === 1
+  && (await lignes(evaluate)).filter((l) => l.startsWith('Wingfoil · Plage Corrigée / ')).length === 2 && lieux.count() === 0, `${await resume()} ; ${lieux.count()} requête(s)`);
+check('le nom saisi est gardé après rechargement', (await rows()).includes('Ma sortie')
+  && (await neuves()).some((f) => f.name === 'Ma sortie'), await rows());
+
+// Vider un lieu ne vide pas les autres.
+console.log('Lieu :', await actionLigne(evaluate, wait, 'Wingfoil · Plage Corrigée', 'Lieu'));
+await typeIn('.lib-row__place', '', 'Enter');
+await waitFor(async () => (await neuves()).filter((f) => f.place?.name === 'Plage Corrigée').length < 3, { timeout: 3000, label: 'lieu vidé' });
+await settle({ max: 1500, label: 'lieu vidé' });
+console.log('après lieu vidé :', await resume());
+check('un lieu vidé ne vide pas les autres : une seule session de moins sous « Plage Corrigée »',
+  (await neuves()).filter((f) => f.place?.name === 'Plage Corrigée').length === 2
+  && (await neuves()).filter((f) => f.place?.name === 'Plage de Tést').length === 1
+  && (await neuves()).filter((f) => !f.place?.name).length === 1, await resume());
 
 console.log('\n== Console :', logs.some((l) => !l.startsWith('warning')) ? logs.filter((l) => !l.startsWith('warning')).join('\n') : 'rien');
 await finish('Tout passe.');
