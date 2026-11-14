@@ -148,9 +148,6 @@ await settle({ max: 800 });
 
 // 2. Vue d'ensemble.
 check('9 sessions', (await stat('Sessions')) === '9', await stat('Sessions'));
-const backdrop = () => evaluate(`document.querySelector('.page-backdrop')?.getAttribute('class')`);
-// Fond (lot 3 du 23/10) : dans « Tout », le motif du sport préféré (sept sessions de voile sur neuf) ; dans une famille, celui de la famille choisie.
-check('« Tout » : fond de la voile, la famille du sport préféré', (await backdrop()) === 'page-backdrop page-backdrop--voile', await backdrop());
 check('onglets de la vue d\'ensemble', (await tabs()) === 'général, graphique, régularité', await tabs());
 check('graphique de la vue d\'ensemble : la durée seule, sans pastilles', (await chips('Donnée')) === '' && (await points()) === 9 && (await yLabel()) === 'min',
   `${await chips('Donnée')} ; ${await points()} ; ${await yLabel()}`);
@@ -165,7 +162,6 @@ await click('.ui-segmented[aria-label="Famille"] [role=radio]', 'Voile');
 await settle({ max: 800 });
 check('famille dans l\'adresse', (await search()) === '/statistiques?famille=voile', await search());
 check('Voile : 7 sessions', (await stat('Sessions')) === '7', await stat('Sessions'));
-check('Voile : fond de la famille', (await backdrop()) === 'page-backdrop page-backdrop--voile', await backdrop());
 check('onglets d\'une famille', (await tabs()) === 'général, graphique, régularité, records', await tabs());
 check('vitesse max, distance et temps en action', (await stat('Vitesse max')) !== null && (await stat('Distance')) !== null && (await stat('Temps en action')) !== null,
   `${await stat('Vitesse max')} ; ${await stat('Distance')} ; ${await stat('Temps en action')}`);
@@ -201,7 +197,7 @@ await click('.ui-segmented[aria-label="Famille"] [role=radio]', 'Surf');
 await settle({ max: 800 });
 const surfActivites = await chips('Activité');
 check('activités du surf : Surf en tête', surfActivites?.startsWith('Toutes, Surf'), surfActivites);
-check('Surf : 2 sessions, fond de la famille', (await stat('Sessions')) === '2' && (await backdrop()) === 'page-backdrop page-backdrop--surf', `${await stat('Sessions')} ; ${await backdrop()}`);
+check('Surf : 2 sessions', (await stat('Sessions')) === '2', await stat('Sessions'));
 
 // 4. Un point du graphe : en surf, pour que l'analyse ouverte ne range pas la réussite d'une session de voile (5b).
 await go('/statistiques?famille=surf');

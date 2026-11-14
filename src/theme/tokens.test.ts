@@ -77,13 +77,11 @@ describe('palettes du thème', () => {
       }
     });
 
-    it(`${name} : les accents valent l'encre, les fonds de page sont unis`, () => {
+    it(`${name} : les accents valent l'encre`, () => {
       const ink = resolve(palette, '--ink');
       for (const accent of ['--voile', '--surf', '--neutral-accent', '--home-action', '--home-action-edge']) {
         expect(resolve(palette, accent), accent).toBe(ink);
       }
-      expect(resolve(palette, '--contour')).toBe('transparent');
-      expect(resolve(palette, '--backdrop-surf')).toBe('transparent');
     });
 
     it(`${name} : texte faible encore visible (près de 3 sur le fond)`, () => {

@@ -20,58 +20,15 @@
   max-width: none;
 }
 
-/* Page à fond dessiné (`PageBackdrop`) : le dessin couvre au moins l'écran et passe sous le contenu.
+/* Page qui remplit au moins l'écran, contenu en position relative (Statistiques, Réglages, tutoriels).
    `:where` ne pèse rien : la position propre d'un enfant (collant, absolu) l'emporte. */
 .ui-page--backdrop {
   position: relative;
   min-height: calc(100dvh - var(--tabbar-h) - var(--inset-bottom));
 }
 
-:where(.ui-page--backdrop > :not(.page-backdrop)) {
+:where(.ui-page--backdrop > *) {
   position: relative;
-}
-
-.page-backdrop {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-/* Économe : pas de fond dessiné, ni courbes de niveau ni motif de famille. */
-:root[data-eco] .page-backdrop {
-  display: none;
-}
-
-.page-backdrop path {
-  fill: none;
-  stroke: var(--backdrop-ink);
-  /* Épaisseur à l'écran : la tuile agrandie de son espacement (`--backdrop-scale`) n'épaissit pas le trait. */
-  stroke-width: calc(var(--backdrop-stroke) / var(--backdrop-scale, 1));
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* Encre et épaisseur de chaque fond : courbes de niveau, motif voile, motif surf. Les fonds de page sont unis, leurs
-   encres transparentes (`tokens.css`) ; les classes restent. */
-.page-backdrop--contours {
-  --backdrop-ink: var(--contour);
-  --backdrop-stroke: 1.3;
-}
-
-.page-backdrop--contours .page-backdrop__major {
-  --backdrop-stroke: 2.4;
-}
-
-.page-backdrop--voile {
-  --backdrop-ink: color-mix(in srgb, var(--backdrop-voile) 41%, transparent);
-  --backdrop-stroke: 1.65;
-}
-
-.page-backdrop--surf {
-  --backdrop-ink: color-mix(in srgb, var(--backdrop-surf) 59%, transparent);
-  --backdrop-stroke: 2.85;
 }
 
 .ui-page-header {

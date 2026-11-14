@@ -131,8 +131,6 @@ await settle({ max: 2000, label: 'import' });
 // 1. L'ouverture : « / » mène au Profil, d'où la liste des sessions se prend par la barre du haut.
 await go('/');
 check("ouverture : « / » mène à /profil", (await search()) === '/profil', await search());
-const backdrop = () => evaluate(`document.querySelector('.page-backdrop')?.getAttribute('class') ?? null`);
-check('Profil : pas de fond dessiné derrière la page', (await backdrop()) === null, await backdrop());
 check('barre du haut : Profil allumé à l\'ouverture', await evaluate(`[...document.querySelectorAll('.shell-toplink')].some((a) => a.textContent.trim() === 'Profil' && a.classList.contains('active'))`));
 await go('/sessions');
 const opened = await evaluate(`(() => {

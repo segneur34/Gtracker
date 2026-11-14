@@ -7,7 +7,7 @@ import { useVisibleStatSessions } from './useVisibleStatSessions';
 
 /**
  * Couleur du coup de pinceau des pages sans période (Réglages) : celle du sport préféré de toutes les sessions
- * visibles, comme le fond de page (`useFavoriteBackdrop`) ; l'encre sans session. Vue du thème (`brushColorFor`).
+ * visibles ; l'encre sans session. Vue du thème (`brushColorFor`).
  * Rendue en style (`--brush`), à poser sur le conteneur des cadres peints (`BrushFrame.css`).
  */
 export function useFavoriteBrush(): CSSProperties {

@@ -1,10 +1,8 @@
 import { useEffect } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import LessonIcon from '../components/LessonIcon';
-import PageBackdrop from '../components/PageBackdrop';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
-import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
 import { useTutorials } from '../hooks/useTutorials';
 import { LESSONS } from '../tutorials/lessons';
 import '../components/Tutorials.css';
@@ -18,7 +16,6 @@ import '../components/Tutorials.css';
  */
 function TutorialPage() {
   const { id } = useParams();
-  const backdrop = useFavoriteBackdrop();
   const { lessons, read } = useTutorials();
   const lesson = LESSONS.find((l) => l.id === id) ?? null;
   useEffect(() => {
@@ -34,7 +31,6 @@ function TutorialPage() {
 
   return (
     <div className="ui-page ui-page--backdrop">
-      <PageBackdrop variant={backdrop} />
       <PageHeader title={lesson.title} back={{ to: '/tutoriels', label: 'Toutes les leçons' }}
         subtitle={`Leçon ${at + 1} sur ${order.length}`} />
       <Card className="tutorial-lesson">

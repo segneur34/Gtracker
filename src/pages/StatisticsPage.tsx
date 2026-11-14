@@ -5,7 +5,6 @@ import {
   Bar, BarChart, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import MemoryStatus from '../components/MemoryStatus';
-import PageBackdrop from '../components/PageBackdrop';
 import ChartFold from '../components/ChartFold';
 import { HelpText, HelpToggle } from '../components/Help';
 import { useHelp } from '../components/helpContext';
@@ -34,7 +33,6 @@ import { useOpenSession } from '../hooks/useLibraryNavigation';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { athleteHeartRateZones, type AthleteProfile } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
-import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { readStoredRecord, useStoredRecord } from '../hooks/useStoredRecord';
 import { useVisibleStatSessions, visibleStatSessions } from '../hooks/useVisibleStatSessions';
@@ -232,7 +230,6 @@ function CardioLoadHelpSlot({ bounds }: { bounds: Parameters<typeof CardioLoadHe
 function StatisticsPage() {
   const [params, setParams] = useSearchParams();
   const { status, sessions, scanning } = useLibraryFields('status', 'sessions', 'scanning');
-  const favoriteBackdrop = useFavoriteBackdrop();
   const { activities, families, isShown, shownActivities } = useVisibility();
   const openSession = useOpenSession();
   const narrow = useNarrowScreen();
@@ -515,8 +512,6 @@ function StatisticsPage() {
 
   return (
     <div className="ui-page ui-page--wide ui-page--backdrop an-page stats-page">
-      {/* Le motif de la famille choisie ; dans « Tout », celui du sport préféré. */}
-      <PageBackdrop variant={family ?? favoriteBackdrop} />
       <PageHeader title="Statistiques" subtitle={`${title} · ${periodLabel === 'Tout' ? 'depuis le début' : periodLabel}`} />
 
       <div className="stats-choice">

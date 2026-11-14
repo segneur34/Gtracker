@@ -1,7 +1,7 @@
 {
   "name": "gtracker",
   "private": true,
-  "version": "0.00.66",
+  "version": "0.00.67",
   "type": "module",
   "engines": {
     "node": "^22.18.0 || ^24.0.0 || >=26.0.0"

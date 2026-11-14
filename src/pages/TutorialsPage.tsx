@@ -1,9 +1,7 @@
 import { Link } from 'react-router-dom';
 import LessonIcon from '../components/LessonIcon';
-import PageBackdrop from '../components/PageBackdrop';
 import { IconCheck, IconChevronRight } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
-import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
 import { useTutorials } from '../hooks/useTutorials';
 import '../components/Tutorials.css';
 
@@ -13,12 +11,10 @@ import '../components/Tutorials.css';
  * ouverte depuis Réglages › Tutoriels, où le retour ramène.
  */
 function TutorialsPage() {
-  const backdrop = useFavoriteBackdrop();
   const { state, lessons } = useTutorials();
   const readCount = lessons.filter((l) => state.read.includes(l.id)).length;
   return (
     <div className="ui-page ui-page--backdrop">
-      <PageBackdrop variant={backdrop} />
       <PageHeader title="Tutoriels" back={{ to: '/parametres', label: 'Réglages' }}
         subtitle={`${readCount} ${readCount >= 2 ? 'lues' : 'lue'} sur ${lessons.length}`} />
       <ol className="tutorial-list" aria-label="Leçons">

@@ -15,7 +15,6 @@ import {
   DISTANCE_UNIT_LABEL, DISTANCE_UNIT_SYMBOL, SPEED_UNIT_LABEL, formatSpeedValue, fromDisplaySpeed, kmhToMs, msToKmh, toDisplaySpeed,
   type DistanceUnit, type SpeedUnit, commaDecimal, parseDecimal
 } from '../core/units';
-import { useFavoriteBackdrop } from '../hooks/useFavoriteBackdrop';
 import { useFavoriteBrush } from '../hooks/useFavoriteBrush';
 import '../components/BrushFrame.css';
 import { useOpenSections } from '../hooks/useOpenSections';
@@ -59,7 +58,6 @@ import { CARD_STYLE } from '../components/styles';
 import { FAMILY_ICON } from '../components/familyIcons';
 import { IconChevronRight, IconEye, IconEyeOff } from '../components/icons';
 import MemoryStatus from '../components/MemoryStatus';
-import PageBackdrop from '../components/PageBackdrop';
 import { PermissionsSettings } from '../components/PermissionsStatus';
 import PanelTitle from '../components/PanelTitle';
 import AboutSettings from '../components/AboutSettings';
@@ -553,7 +551,6 @@ const ActivityCard = memo(function ActivityCard({
   && sameJson(a.view, b.view));
 
 function SettingsPage() {
-  const backdrop = useFavoriteBackdrop();
   const brush = useFavoriteBrush();
   const {
     activities, view, setFor, resetActivity, addActivity, updateActivity, removeActivity, longPressMs, setLongPressMs,
@@ -633,7 +630,6 @@ function SettingsPage() {
   return (
     <SettingsScope>
     <div className="ui-page--backdrop set-page-box">
-      <PageBackdrop variant={backdrop} />
       <div className="ui-mb-15">
         <PageHeader title="Réglages" subtitle="Enregistrés sur cet appareil et dans le dossier mémoire."
           aside={<CollapseAllButton onCollapse={collapseAll} />} />

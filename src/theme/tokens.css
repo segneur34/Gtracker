@@ -179,10 +179,6 @@
   --home-action-edge: var(--ink);
   /* Onglet allumé hors famille (Statistiques sans famille, Itinéraires). */
   --neutral-accent: var(--ink);
-  /* Fonds des pages, unis : courbes de niveau et motifs des familles effacés. */
-  --contour: transparent;
-  --backdrop-voile: transparent;
-  --backdrop-surf: transparent;
   /* Photo d'en-tête du Profil : l'aplat qui tient sa place pendant le chargement (et la remplace en économe), et le
      voile sombre, en bas et en haut, sous le texte blanc (`--on-accent`). Les mêmes de jour et de nuit. */
   --photo-bg: #003e52;

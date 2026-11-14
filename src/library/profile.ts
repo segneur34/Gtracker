@@ -5,7 +5,6 @@
  * d'activités et les statistiques.
  */
 
-import type { SportFamily } from '../core/sportProfiles';
 import { groupTotals, type StatSession, type StatsTotals } from './stats';
 
 /** Part d'une activité dans le temps total de la période. */
@@ -56,10 +55,4 @@ export const favoriteActivities = (sessions: readonly StatSession[], activityOrd
       || b.totals.sessions - a.totals.sessions
       || (lastStart.get(b.activityId) ?? 0) - (lastStart.get(a.activityId) ?? 0))
     .slice(0, count);
-};
-
-/** Famille du sport préféré, qui choisit le fond des pages (`useFavoriteBackdrop`) ; `null` sans temps. */
-export const favoriteFamily = (sessions: readonly StatSession[], activityOrder: readonly string[]): SportFamily | null => {
-  const id = favoriteActivity(sessions, activityOrder);
-  return id === null ? null : sessions.find((s) => s.activityId === id)?.family ?? null;
 };
