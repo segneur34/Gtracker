@@ -1,4 +1,4 @@
-import { Fragment, Suspense, lazy, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type ReactNode } from 'react';
+import { Fragment, memo, useCallback, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { RESTING_HR_PATH } from '../core/parentPage';
 import {
   FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityFamily, isFamilyHidden, nextActivityColor, visibleActivities, visibleFamilies,
@@ -26,7 +26,7 @@ import { isTileTemplate, type MapBase } from '../core/mapBase';
 import { useThemeSettings } from '../hooks/useTheme';
 import { THEME_CHOICES } from '../theme/theme';
 import {
-  ATHLETE_NAME_MAX, athleteHeartRateZones, athleteHrSource, SCHOOL_TRIAL_BOUNDS, type AthleteNumberField, type AthleteProfile,
+  athleteHeartRateZones, athleteHrSource, type AthleteNumberField, type AthleteProfile,
 } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
@@ -74,12 +74,9 @@ import {
 import PageHeader from '../components/ui/PageHeader';
 import { HelpText, HelpToggle, SettingRow, SettingsScope } from '../components/Help';
 import { useHelpCollapseAll } from '../components/helpContext';
-import ErrorBoundary from '../components/ErrorBoundary';
-import { DEFAULT_SCHOOL_STYLE } from '../core/schoolBasics';
+import NumberField from '../components/NumberField';
+import ProfileScreenSettings from '../components/ProfileScreenSettings';
 import './SettingsPage.css';
-
-/** Choix du poisson du banc du Profil, chargé à part avec les dessins des poissons. */
-const FishStylePicker = lazy(() => import('../components/fishSchool/FishStylePicker'));
 
 /**
  * Sauts mesurés par les capteurs du téléphone (voile sauf bateau) : la case,
@@ -177,75 +174,6 @@ const ACTIVITY_PART_DEFAULTS: Record<ActivityPartKey, boolean> = {
 };
 /** Familles de la liste des activités, toutes repliées au départ ; plusieurs s'ouvrent à la fois, l'état est mémorisé. */
 const FAMILY_OPEN_DEFAULTS = Object.fromEntries(SPORT_FAMILIES.map((f) => [f, false])) as Record<SportFamily, boolean>;
-
-/**
- * Champ numérique optionnel, en `type="number"` avec flèches ↕, même
- * principe que le seuil d'activité du module voile : la valeur s'applique
- * immédiatement. L'affichage suit un brouillon local tant que le champ a le
- * focus, pour ne pas effacer une frappe en cours (valeur hors bornes en
- * cours de saisie, "." d'un décimal) quand un commit sans effet redéclenche
- * un rendu ; à la sortie du champ, le brouillon revient à la valeur commise.
- */
-function NumberField({
-  label, help, helpKey, before, unit, value, onCommit, placeholder, step = 1, min, max,
-}: {
-  label?: string;
-  /** Pièce posée entre le libellé et la case (un bouton) ; le libellé reste lié à la case par son identifiant. */
-  before?: ReactNode;
-  /** Aide du champ à libellé, sous son « ? » (`helpKey` : sa clé). */
-  help?: ReactNode;
-  helpKey?: string;
-  unit?: string;
-  value: number | null;
-  onCommit: (next: number | null) => void;
-  placeholder?: string;
-  step?: number;
-  min?: number;
-  max?: number;
-}) {
-  const [draft, setDraft] = useState(value === null ? '' : String(value));
-  const focused = useRef(false);
-  const inputId = useId();
-
-  useEffect(() => {
-    if (!focused.current) setDraft(value === null ? '' : String(value));
-  }, [value]);
-
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const text = e.target.value;
-    setDraft(text);
-    if (text === '') { onCommit(null); return; }
-    const parsed = parseFloat(text);
-    if (!isNaN(parsed)) onCommit(parsed);
-  };
-
-  const field = (
-    <label htmlFor={inputId} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: label ? '8px' : 0, fontSize: 'var(--text-s)' }}>
-      {label && <span className="ui-field-row__label">{label}{helpKey && <HelpToggle helpKey={helpKey} label={label} />}</span>}
-      {before}
-      <input
-        id={inputId}
-        type="number"
-        step={step}
-        min={min}
-        max={max}
-        value={draft}
-        placeholder={placeholder}
-        onChange={handleChange}
-        onFocus={() => { focused.current = true; }}
-        onBlur={() => { focused.current = false; setDraft(value === null ? '' : String(value)); }}
-        className="ui-field ui-field--s num set-input-84" />
-      {unit && <span className="ui-muted">{unit}</span>}
-    </label>
-  );
-  if (!helpKey) return field;
-  return (
-    <>
-      {field}
-      <HelpText helpKey={helpKey}>{help}</HelpText>
-    </>
-  );
-}
 
 const pct = (f: number): string => `${Math.round(f * 100)} %`;
 
@@ -631,7 +559,7 @@ function SettingsPage() {
     activities, view, setFor, resetActivity, addActivity, updateActivity, removeActivity, longPressMs, setLongPressMs,
     stopHoldMs, setStopHoldMs, beepSound, setBeepSound, hiddenFamilies, setActivityHidden, setFamilyHidden,
   } = useAllSportSettings();
-  const { profile, setName, setNumber, setSex, setThresholds, setSchoolStyle, age } = useAthleteProfile();
+  const { profile, setNumber, setSex, setThresholds, age } = useAthleteProfile();
   const { open, toggle, closeAll: closeBlocks } = useOpenSections<SettingsBlock>('settings', SETTINGS_BLOCK_DEFAULTS);
   const { open: openActivity, toggle: toggleActivity, closeAll: closeActivities } = useOpenSections<string>('settings-activities', NO_ACTIVITY_OPEN);
   const { open: openPart, toggle: togglePart, closeAll: closeParts } = useOpenSections<ActivityPartKey>('settings-activity-parts', ACTIVITY_PART_DEFAULTS);
@@ -659,8 +587,6 @@ function SettingsPage() {
   /** Il reste toujours une famille visible, et une activité visible : leur œil ne se ferme pas. */
   const lastFamily = shownFamilies.length <= 1;
   const lastActivity = visibleActivities(activities, hiddenFamilies).length <= 1;
-  /** Couleurs de l'aperçu du poisson à la couleur d'activité : celles des activités visibles. */
-  const pickerColors = useMemo(() => visibleActivities(activities, hiddenFamilies).map((a) => a.color), [activities, hiddenFamilies]);
 
   /** Case « Créer liste matériel » : cochée, une liste vide, éditée en ligne dessous ; décochée, la liste effacée, après confirmation si elle n'est pas vide. */
   const toggleGear = useCallback((a: Activity, groups: GearGroup[] | null, on: boolean) => {
@@ -719,12 +645,8 @@ function SettingsPage() {
           help={`Pour l'énergie estimée des analyses, les zones cardiaques de toutes les activités${PROFILE_PLANT_VISIBLE ? ', et la racine du Profil' : ''}. Tout est facultatif.`} />
         {open.pratiquant && (
           <div className="settings-block__body">
-            <label className="ui-field-row">
-              <span className="ui-field-row__label">Nom ou pseudo<HelpToggle helpKey="pratiquant:nom" label="Nom ou pseudo" /></span>
-              <input type="text" value={profile.name ?? ''} maxLength={ATHLETE_NAME_MAX} placeholder="ex. Tom" autoComplete="nickname"
-                onChange={(e) => setName(e.target.value)} className="ui-field ui-field--s set-wide-input" />
-            </label>
-            <HelpText helpKey="pratiquant:nom">En titre de la page Profil et au pied des images partagées.</HelpText>
+            {/* Les réglages de l'écran Profil, les mêmes que dans la fenêtre de sa photo ronde. */}
+            <ProfileScreenSettings />
             <NumberField label="Poids" unit="kg" step={0.5} min={20} max={300} value={profile.weightKg} onCommit={profileField('weightKg')} placeholder="ex. 72"
               helpKey="pratiquant:poids" help="Pour l'énergie." />
             <NumberField label="Taille" unit="cm" min={100} max={250} value={profile.heightCm} onCommit={profileField('heightCm')} placeholder="ex. 178"
@@ -746,20 +668,6 @@ function SettingsPage() {
               before={<Link to={RESTING_HR_PATH} className="ui-btn ui-btn--secondary ui-btn--s set-test-btn" aria-label="Test de FC repos">Test</Link>}
               helpKey="pratiquant:fc-repos" help="Avec la FC max, les seuils se calculent sur la réserve cardiaque, plus juste. Le bouton Test la mesure avec la ceinture." />
             <HeartRateThresholdsField profile={profile} onChange={setThresholds} />
-            <NumberField label="Nombre de sessions du banc (essai, provisoire)" min={SCHOOL_TRIAL_BOUNDS[0]} max={SCHOOL_TRIAL_BOUNDS[1]}
-              value={profile.schoolTrialSessions} onCommit={profileField('schoolTrialSessions')} placeholder="Auto"
-              helpKey="pratiquant:banc-essai"
-              help={`Réglage provisoire, pour essayer : impose le nombre de sessions que compte le banc de poissons du Profil (de ${SCHOOL_TRIAL_BOUNDS[0]} à ${SCHOOL_TRIAL_BOUNDS[1]}). Vide : automatique, toutes les sessions de la bibliothèque.`} />
-            <SettingRow label="Poisson du banc" helpKey="pratiquant:banc-poisson"
-              help="Le dessin des poissons du banc du Profil, « Deux arcs » au départ ; « Couleur d'activité » peint chaque poisson à la couleur de l'activité de sa session. Changer de poisson ne déplace aucun poisson.">
-              {/* Décoratif et chargé à part : s'il ne se charge pas (hors ligne), le reste de Réglages demeure. */}
-              <ErrorBoundary silent>
-                <Suspense fallback={null}>
-                  <FishStylePicker value={profile.schoolStyle ?? DEFAULT_SCHOOL_STYLE} onChange={setSchoolStyle}
-                    activityColors={pickerColors} />
-                </Suspense>
-              </ErrorBoundary>
-            </SettingRow>
             {PROFILE_PLANT_VISIBLE && (
               <>
                 <p className="ui-eyebrow set-subhead">Racine du Profil</p>

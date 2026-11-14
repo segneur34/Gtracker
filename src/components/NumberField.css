@@ -1,0 +1,18 @@
+/* Ligne d'un champ numérique : libellé, pièce éventuelle, case et unité ; un champ à libellé s'espace du suivant. */
+.number-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+  font-size: var(--text-s);
+}
+
+.number-field--labelled {
+  margin-bottom: 8px;
+}
+
+/* Case d'un champ numérique (`NumberField.tsx`), dans Réglages comme dans les réglages de l'écran Profil. */
+.set-input-84 {
+  width: 84px;
+  text-align: right;
+}

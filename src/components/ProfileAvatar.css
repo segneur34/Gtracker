@@ -40,36 +40,12 @@
   height: 60%;
 }
 
-/* Choix de la photo : une carte sous l'en-tête. */
+/* Choix de la photo, dans les réglages de l'écran Profil (sa fenêtre et Réglages › Pratiquant). */
 .avatar-picker {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-4);
-  border-radius: var(--radius-l);
-  background: var(--surface);
-  border: 1px solid var(--line);
-}
-
-.avatar-picker__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.avatar-picker__title {
-  font-weight: 700;
-  font-size: var(--text-m);
-}
-
-.avatar-picker__close {
-  display: flex;
-  padding: var(--space-1);
-  border: none;
-  border-radius: var(--radius-pill);
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
+  min-width: 0;
 }
 
 /* Onze logos : huit de front, quatre au téléphone. */

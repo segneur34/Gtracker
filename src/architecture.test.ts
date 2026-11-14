@@ -367,8 +367,8 @@ describe('tracés des logos chargés à part', () => {
 
 /**
  * Géométrie du banc de poissons du Profil (places, eau, distances sur grille) : chargée par sa couche, à la demande ;
- * le profil du pratiquant et Réglages ne lisent que `core/schoolBasics.ts`, sans dépendance, pour ne pas la tirer dans
- * le paquet de l'ouverture.
+ * le profil du pratiquant, Réglages et les réglages de l'écran Profil ne lisent que `core/schoolBasics.ts`, sans
+ * dépendance, pour ne pas la tirer dans le paquet de l'ouverture ; le choix du poisson, lui, se charge par import().
  */
 describe('géométrie du banc de poissons hors du paquet de l’ouverture', () => {
   const IMPORT = [
@@ -379,7 +379,8 @@ describe('géométrie du banc de poissons hors du paquet de l’ouverture', () =
   const importers = (target: string) => code
     .filter(({ file, text }) => IMPORT.some((re) => [...text.matchAll(re)].some((m) => resolveTarget(file, m[1]) === target)))
     .map(({ file }) => file);
-  const forbidden = (file: string) => file.startsWith('library/') || file.startsWith('settings/') || file === 'pages/SettingsPage.tsx';
+  const forbidden = (file: string) => file.startsWith('library/') || file.startsWith('settings/') || file === 'pages/SettingsPage.tsx'
+    || file === 'components/ProfileScreenSettings.tsx';
 
   it('ni library/, ni settings/, ni Réglages n’importent fishSchool, schoolWater ou gridDistance', () => {
     for (const target of ['core/fishSchool', 'core/schoolWater', 'core/gridDistance']) {
@@ -402,7 +403,7 @@ describe('géométrie du banc de poissons hors du paquet de l’ouverture', () =
     expect(lazyUsers.map(({ file }) => file)).toEqual(['pages/ProfilePage.tsx']);
     const pickerUsers = outside.filter(({ file, text }) =>
       [...text.matchAll(DYNAMIC_IMPORT)].some((m) => resolveTarget(file, m[1]) === 'components/fishSchool/FishStylePicker'));
-    expect(pickerUsers.map(({ file }) => file)).toEqual(['pages/SettingsPage.tsx']);
+    expect(pickerUsers.map(({ file }) => file)).toEqual(['components/ProfileScreenSettings.tsx']);
   });
 
   it('le choix du poisson ne tire pas la géométrie du banc', () => {

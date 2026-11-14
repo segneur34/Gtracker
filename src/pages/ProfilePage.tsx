@@ -5,7 +5,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import GongLogo from '../components/GongLogo';
 import MemoryStatus from '../components/MemoryStatus';
 import { PermissionsPrompt } from '../components/PermissionsStatus';
-import { AvatarPicker, ProfileAvatar } from '../components/ProfileAvatar';
+import { ProfileAvatar } from '../components/ProfileAvatar';
 import ProfilePrompt from '../components/ProfilePrompt';
 import TutorialOfDay from '../components/TutorialOfDay';
 import ProfileFavorites, { type FavoriteCell } from '../components/ProfileFavorites';
@@ -22,7 +22,7 @@ import { useOpenSections } from '../hooks/useOpenSections';
 import { useProfileRoot } from '../hooks/useProfileRoot';
 import { useProfileSchool } from '../hooks/useProfileSchool';
 import { DEFAULT_SCHOOL_STYLE } from '../core/schoolBasics';
-import { athleteAvatar, athleteName } from '../library/athleteProfile';
+import { athleteAvatar, athleteName, athleteSchoolHidden } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { useStoredRecord } from '../hooks/useStoredRecord';
@@ -71,6 +71,8 @@ const RootSlot = lazy(() => import('../components/ProfileRoot').then((m) => ({ d
 const ProfileActivities = lazy(() => import('../components/ProfileActivities'));
 /** Le banc de poissons et son eau, sous le contenu : son calcul et ses dessins ne se chargent qu'avec lui. */
 const FishSchool = lazy(() => import('../components/fishSchool/FishSchool'));
+/** Fenêtre des réglages de l'écran Profil : chargée au premier toucher de la photo, hors du paquet de l'ouverture. */
+const ProfileSettingsWindow = lazy(() => import('../components/ProfileSettingsWindow'));
 
 
 /** Période retenue sur l'appareil ; l'année au départ. */
@@ -145,10 +147,10 @@ function ProfilePage() {
   const tutorialGate = tutorialCardGate({ memoryNeedsAction, memoryReady: status === 'ready', permissionsShown, profileShown });
 
   /** « Bienvenue » au-dessus du nom ou pseudo de Réglages, « Bienvenue » seul sans lui. */
-  const { profile, setAvatar } = useAthleteProfile();
+  const { profile } = useAthleteProfile();
   const name = athleteName(profile);
   const avatar = athleteAvatar(profile);
-  /** Choix de la photo ouvert sous l'en-tête : non retenu. */
+  /** Réglages de l'écran Profil ouverts sous l'en-tête : non retenu. */
   const [picking, setPicking] = useState(false);
   const nowMs = useNow();
   const { value: view, update: rememberView } = useStoredRecord<ProfileView>(VIEW_NAMESPACE, VIEW_KEY, VIEW_DEFAULTS);
@@ -170,6 +172,8 @@ function ProfilePage() {
 
   // Banc de poissons : toutes les sessions de la bibliothèque (ou le réglage d'essai), quelle que soit la période.
   const school = useProfileSchool(sessions, profile);
+  /** « Aucun » poisson : ni banc ni eau, la couche n'est pas montée et les cadres gardent leur fond. */
+  const schoolOn = school.sessions > 0 && !athleteSchoolHidden(profile);
   /** Le banc est dessiné, voile des cadres compris : les cadres deviennent transparents. */
   const [schoolShown, setSchoolShown] = useState(false);
 
@@ -264,7 +268,7 @@ function ProfilePage() {
         {/* La photo ronde, et dessous, en grand, le bouton de la période de toute la page. */}
         <div className="profile-head__side">
           <button type="button" className="profile-head__avatar" aria-expanded={picking}
-            aria-label={avatar ? 'Changer la photo de profil' : 'Choisir une photo de profil'}
+            aria-label="Photo de profil : ouvrir les réglages du Profil"
             onClick={() => setPicking(!picking)}>
             <ProfileAvatar avatar={avatar} logoColor={shownLogoColor} />
           </button>
@@ -285,7 +289,11 @@ function ProfilePage() {
           </Suspense>
         )}
       </header>
-      {picking && <AvatarPicker avatar={avatar} logoColor={shownLogoColor} onPick={setAvatar} onClose={() => setPicking(false)} />}
+      {picking && (
+        <Suspense fallback={null}>
+          <ProfileSettingsWindow onClose={() => setPicking(false)} />
+        </Suspense>
+      )}
 
       {/* Cartes d'ouverture, peintes comme les autres cadres : un conteneur sans boîte (`display: contents`). */}
       <div className="profile-openers brush-frames" style={openersStyle}>
@@ -392,10 +400,10 @@ function ProfilePage() {
   );
 
   return (
-    <div className={schoolShown ? 'profile-page profile-page--school' : 'profile-page'}>
+    <div className={schoolOn && schoolShown ? 'profile-page profile-page--school' : 'profile-page'}>
       {/* Décoratif : un morceau qui ne se charge pas (hors ligne) ou une erreur n'enlèvent que le banc, les cadres
           gardent leur fond. */}
-      {school.sessions > 0 && (
+      {schoolOn && (
         <ErrorBoundary silent>
           <Suspense fallback={null}>
             <FishSchool sessions={school.sessions} colors={school.colors} style={profile.schoolStyle ?? DEFAULT_SCHOOL_STYLE}

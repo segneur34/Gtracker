@@ -7,8 +7,9 @@ import { fishScale, fishSymbolId } from './fishSymbols';
 import './FishStylePicker.css';
 
 /**
- * Choix du dessin des poissons du banc du Profil (Réglages › Pratiquant) : un bouton enfoncé par style, avec quelques
- * poissons de ce style en aperçu, les mêmes symboles que le banc (`FishSprite`). Chargé à part, avec les dessins.
+ * Choix du dessin des poissons du banc du Profil (réglages de l'écran Profil) : un bouton enfoncé par style, avec
+ * quelques poissons de ce style en aperçu, les mêmes symboles que le banc (`FishSprite`), puis « Aucun », qui cache le
+ * banc. Chargé à part, avec les dessins.
  * Le style « Couleur d'activité » se montre aux couleurs des activités reçues, vues du thème comme sur le Profil.
  */
 
@@ -20,8 +21,10 @@ const PREVIEW = [
 ] as const;
 
 interface Props {
-  value: SchoolStyle;
-  onChange: (style: SchoolStyle) => void;
+  /** Style montré, `null` : banc caché (« Aucun »). */
+  value: SchoolStyle | null;
+  /** Un style montre le banc dans ce dessin, `null` le cache. */
+  onChange: (style: SchoolStyle | null) => void;
   /** Couleurs des activités (claires, telles que rangées) pour l'aperçu du style à la couleur d'activité. */
   activityColors: readonly string[];
 }
@@ -47,6 +50,12 @@ function FishStylePicker({ value, onChange, activityColors }: Props) {
           <span className="fish-style-picker__name">{name}</span>
         </button>
       ))}
+      {/* Huitième choix : ni banc ni eau, le Profil d'avant le banc. Aperçu vide, de la taille des autres. */}
+      <button type="button" className="fish-style-picker__choice" aria-pressed={value === null}
+        data-style="aucun" onClick={() => onChange(null)}>
+        <svg className="fish-style-picker__preview" viewBox="0 0 64 28" aria-hidden="true" focusable="false" />
+        <span className="fish-style-picker__name">Aucun</span>
+      </button>
     </div>
   );
 }

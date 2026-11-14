@@ -1,0 +1,59 @@
+/* Réglages de l'écran Profil (`ProfileScreenSettings.tsx`) et leur fenêtre sur le Profil (`ProfileSettingsWindow.tsx`). */
+.profile-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.profile-settings__name {
+  width: 200px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* La fenêtre : une carte sous l'en-tête du Profil, fond plein. */
+.profile-settings-window {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.profile-settings-window__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.profile-settings-window__title {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--text-m);
+}
+
+.profile-settings-window__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  margin: calc(-1 * var(--space-2));
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.profile-settings-window__close:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

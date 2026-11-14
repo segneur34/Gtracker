@@ -21,9 +21,12 @@
 //  6. deux sessions d'activités cachées (planche à voile et bateau, cachées au départ) : absentes du Profil, rien ne
 //     change (quatre sessions, trois parts, ni « Autres ») ; une session de surf passée en Pumping dans son analyse :
 //     une quatrième part, la ligne de la légende ouvre ses sessions ;
-//  7. la photo : au départ l'avatar vide (disque à silhouette, même avec des sessions), nommé « Choisir une photo de
-//     profil » ; toucher la photo ouvre le choix des onze logos ; un logo choisi (dans son cadre), puis une image
-//     importée (réduite à 256 px, en JPEG), tous deux retenus au rechargement ; « Retirer » rend l'avatar vide.
+//  7. la photo : au départ l'avatar vide (disque à silhouette, même avec des sessions) ; la toucher ouvre la fenêtre
+//     « Réglages du Profil » (photo, nom, poisson du banc, sessions du banc à l'essai), que ferment Échap et le retour ;
+//     un logo choisi (dans son cadre), puis une image importée (réduite à 256 px, en JPEG), fenêtre restée ouverte,
+//     tous deux retenus au rechargement ; « Retirer » rend l'avatar vide ; le nom tapé passe en titre ;
+//  8. le banc de poissons (compte, eau, textes, places, dessin) ; dans Réglages › Pratiquant les mêmes quatre réglages ;
+//     « Aucun » cache le banc et l'eau, un poisson les remontre, depuis Réglages puis depuis la fenêtre du Profil.
 import { CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { traceSurf } from './lib/traces.mjs';
@@ -367,18 +370,45 @@ const avatarState = () => evaluate(`(() => {
 })()`);
 const before = await avatarState();
 check('photo au départ : l\'avatar vide, malgré des sessions et un sport préféré', before === 'vide', before);
-check('l\'avatar vide dit qu\'on peut le choisir', (await evaluate(`document.querySelector('.profile-head__avatar')?.getAttribute('aria-label')`)) === 'Choisir une photo de profil');
+check('la photo dit ce qu\'elle ouvre', (await evaluate(`document.querySelector('.profile-head__avatar')?.getAttribute('aria-label')`)) === 'Photo de profil : ouvrir les réglages du Profil');
 await shoot('profil-avatar-vide');
-await evaluate(`document.querySelector('.profile-head__avatar').click()`);
+/** Ouvre la fenêtre des réglages du Profil en touchant la photo ; elle se charge à la demande. */
+const openWindow = async () => {
+  await evaluate(`document.querySelector('.profile-head__avatar').click()`);
+  await waitFor(`document.querySelectorAll('.profile-settings-window .avatar-picker__choice').length === 11`, { timeout: 8000, every: 100, label: 'fenêtre des réglages du Profil' });
+};
+/** Les quatre réglages de l'écran Profil sous `root` : photo, nom, poisson (huit choix), sessions du banc. */
+const screenSettings = (root) => evaluate(`(() => {
+  const r = document.querySelector('${root}');
+  if (!r) return 'absent';
+  const labels = [...r.querySelectorAll('.settings-row__label, .ui-field-row__label')].map((e) => e.firstChild?.textContent?.trim() ?? '');
+  return [
+    r.querySelectorAll('.avatar-picker__choice').length + ' logos',
+    r.querySelector('input[autocomplete=nickname]') ? 'nom' : 'sans nom',
+    r.querySelectorAll('.fish-style-picker [data-style]').length + ' poissons',
+    r.querySelector('input[type=number][placeholder=Auto]') ? 'essai' : 'sans essai',
+    labels.join(' | '),
+  ].join(' ; ');
+})()`);
+const SCREEN_SETTINGS = '11 logos ; nom ; 8 poissons ; essai ; Photo de profil | Nom ou pseudo | Poisson du banc | Nombre de sessions du banc (essai, provisoire)';
+await openWindow();
+await waitFor(`document.querySelectorAll('.profile-settings-window .fish-style-picker [data-style]').length === 8`, { timeout: 8000, every: 100, label: 'choix du poisson' });
+check('toucher la photo ouvre « Réglages du Profil » et ses quatre réglages', (await text('.profile-settings-window__title')) === 'Réglages du Profil'
+  && (await screenSettings('.profile-settings-window')) === SCREEN_SETTINGS, await screenSettings('.profile-settings-window'));
+await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
 await wait(300);
-check('toucher la photo ouvre le choix des onze logos', (await evaluate(`document.querySelectorAll('.avatar-picker__choice').length`)) === 11);
+check('Échap ferme la fenêtre', !(await evaluate(`!!document.querySelector('.profile-settings-window')`)));
+await openWindow();
+await evaluate(`window.gtrackerBack?.()`);
+await wait(300);
+check('le retour ferme la fenêtre, sans quitter le Profil', !(await evaluate(`!!document.querySelector('.profile-settings-window')`)) && (await search()) === '/profil', await search());
+await openWindow();
 await evaluate(`document.querySelector('.avatar-picker__choice[aria-label="Kite"]').click()`);
 await wait(300);
-check('un logo choisi : le choix se ferme, la photo suit', !(await evaluate(`!!document.querySelector('.avatar-picker')`)) && (await avatarState()) === 'logo #gt-logo-kite encadré', await avatarState());
+check('un logo choisi : la photo suit, la fenêtre reste ouverte', (await evaluate(`!!document.querySelector('.profile-settings-window')`)) && (await avatarState()) === 'logo #gt-logo-kite encadré', await avatarState());
 await go('/profil');
 check('… retenu au rechargement', (await avatarState()) === 'logo #gt-logo-kite encadré', await avatarState());
-await evaluate(`document.querySelector('.profile-head__avatar').click()`);
-await wait(300);
+await openWindow();
 check('le logo choisi est cerclé', (await evaluate(`document.querySelector('.avatar-picker__choice[aria-pressed=true]')?.getAttribute('aria-label')`)) === 'Kite');
 console.log('image importée :', await evaluate(`(async () => {
   const canvas = document.createElement('canvas');
@@ -396,17 +426,26 @@ console.log('image importée :', await evaluate(`(async () => {
   return 'ok';
 })()`));
 await settle({ max: 1500 });
-check('image importée : réduite à 256 px, en JPEG, le choix fermé', (await avatarState()) === 'photo 256 data:image/jpeg' && !(await evaluate(`!!document.querySelector('.avatar-picker')`)), await avatarState());
+check('image importée : réduite à 256 px, en JPEG, la fenêtre ouverte', (await avatarState()) === 'photo 256 data:image/jpeg' && (await evaluate(`!!document.querySelector('.profile-settings-window')`)), await avatarState());
 await go('/profil');
 check('… retenue au rechargement', (await avatarState()) === 'photo 256 data:image/jpeg', await avatarState());
 await shoot('profil-photo');
-await evaluate(`document.querySelector('.profile-head__avatar').click()`);
-await wait(300);
+await openWindow();
 await evaluate(`[...document.querySelectorAll('.avatar-picker button')].find((b) => b.textContent.trim() === 'Retirer').click()`);
 await wait(300);
 check('« Retirer » rend l\'avatar vide', (await avatarState()) === 'vide', await avatarState());
+// Le nom tapé dans la fenêtre passe en titre du Profil.
+await evaluate(`(() => {
+  const input = document.querySelector('.profile-settings-window input[autocomplete=nickname]');
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  set.call(input, 'Lou');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+})()`);
+await wait(300);
+check('le nom tapé dans la fenêtre passe en titre', (await text('.profile-head__title')) === 'Lou', await text('.profile-head__title'));
 await go('/profil');
 check('… vide au rechargement', (await avatarState()) === 'vide', await avatarState());
+await setAthlete({ name: null });
 
 // 8. Le banc de poissons du Profil, par le réglage d'essai « Nombre de sessions du banc » (posé dans le profil du
 // pratiquant, `schoolTrialSessions`) : nombre de poissons, eau, aucun poisson sur un texte, places stables, choix du dessin.
@@ -503,17 +542,47 @@ await evaluate(`(() => {
 })()`);
 await go('/parametres');
 const pickerState = () => evaluate(`[...document.querySelectorAll('.fish-style-picker [data-style]')].map((b) => b.getAttribute('data-style') + (b.getAttribute('aria-pressed') === 'true' ? '*' : '')).join(' ')`);
-await waitFor(`document.querySelectorAll('.fish-style-picker [data-style]').length === 7`, { timeout: 8000, every: 100, label: 'choix du dessin' });
-check('réglages : sept dessins, P4 enfoncé au départ', (await pickerState()) === 'P1 P2 P3 P4* P5 P6 P7', await pickerState());
+await waitFor(`document.querySelectorAll('.fish-style-picker [data-style]').length === 8`, { timeout: 8000, every: 100, label: 'choix du dessin' });
+check('réglages : les quatre réglages de l\'écran Profil, en tête de Pratiquant', (await screenSettings('.profile-settings')) === SCREEN_SETTINGS, await screenSettings('.profile-settings'));
+check('réglages : sept dessins et « Aucun », P4 enfoncé au départ', (await pickerState()) === 'P1 P2 P3 P4* P5 P6 P7 aucun', await pickerState());
 await evaluate(`document.querySelector('.fish-style-picker [data-style="P5"]').click()`);
 await wait(300);
-check('réglages : un clic sur P5 l\'enfonce', (await pickerState()) === 'P1 P2 P3 P4 P5* P6 P7', await pickerState());
+check('réglages : un clic sur P5 l\'enfonce', (await pickerState()) === 'P1 P2 P3 P4 P5* P6 P7 aucun', await pickerState());
 await go('/profil');
 await waitFor(`document.querySelector('.fish-school')?.getAttribute('data-fish') === '90'`, { timeout: 15000, every: 100, label: 'banc de 30 sessions' });
 check('le Profil rouvert montre les dessins P5', await evaluate(`(() => { const u = [...document.querySelectorAll('.fish-school > use')]; return u.length === 90 && u.every((x) => x.getAttribute('href').startsWith('#fz-P5-')); })()`));
 await go('/parametres');
-await waitFor(`document.querySelectorAll('.fish-style-picker [data-style]').length === 7`, { timeout: 8000, every: 100, label: 'choix du dessin' });
-check('le choix de P5 tient au rechargement', (await pickerState()) === 'P1 P2 P3 P4 P5* P6 P7', await pickerState());
+await waitFor(`document.querySelectorAll('.fish-style-picker [data-style]').length === 8`, { timeout: 8000, every: 100, label: 'choix du dessin' });
+check('le choix de P5 tient au rechargement', (await pickerState()) === 'P1 P2 P3 P4 P5* P6 P7 aucun', await pickerState());
+
+// « Aucun » cache le banc et l'eau, un poisson les remontre : depuis Réglages, puis depuis la fenêtre du Profil.
+const schoolHere = () => evaluate(`({ couche: !!document.querySelector('.fish-school'), eau: !!document.querySelector('.fish-school__water'), voile: !!document.querySelector('.profile-page--school') })`);
+await evaluate(`document.querySelector('.fish-style-picker [data-style="aucun"]').click()`);
+await wait(300);
+check('réglages : « Aucun » s\'enfonce', (await pickerState()) === 'P1 P2 P3 P4 P5 P6 P7 aucun*', await pickerState());
+await go('/profil');
+await wait(1200);
+check('« Aucun » depuis Réglages : ni banc, ni eau, les cadres gardent leur fond', JSON.stringify(await schoolHere()) === '{"couche":false,"eau":false,"voile":false}', JSON.stringify(await schoolHere()));
+await go('/parametres');
+await waitFor(`document.querySelectorAll('.fish-style-picker [data-style]').length === 8`, { timeout: 8000, every: 100, label: 'choix du dessin' });
+check('« Aucun » tient au rechargement', (await pickerState()) === 'P1 P2 P3 P4 P5 P6 P7 aucun*', await pickerState());
+await shoot('reglages-pratiquant-aucun');
+await evaluate(`document.querySelector('.fish-style-picker [data-style="P2"]').click()`);
+await wait(300);
+await go('/profil');
+await waitFor(`document.querySelector('.fish-school')?.getAttribute('data-fish') === '90'`, { timeout: 15000, every: 100, label: 'banc remontré' });
+check('un poisson choisi dans Réglages remontre le banc, dans son dessin', await evaluate(`(() => { const u = [...document.querySelectorAll('.fish-school > use')]; return u.length === 90 && u.every((x) => x.getAttribute('href').startsWith('#fz-P2-')) && !!document.querySelector('.fish-school__water'); })()`));
+await openWindow();
+await waitFor(`document.querySelectorAll('.profile-settings-window .fish-style-picker [data-style]').length === 8`, { timeout: 8000, every: 100, label: 'choix du poisson' });
+await evaluate(`document.querySelector('.profile-settings-window .fish-style-picker [data-style="aucun"]').click()`);
+await wait(600);
+check('« Aucun » depuis la fenêtre : le banc et l\'eau partent aussitôt', JSON.stringify(await schoolHere()) === '{"couche":false,"eau":false,"voile":false}', JSON.stringify(await schoolHere()));
+await shoot('profil-fenetre-aucun');
+await evaluate(`document.querySelector('.profile-settings-window .fish-style-picker [data-style="P4"]').click()`);
+await waitFor(`document.querySelector('.fish-school')?.getAttribute('data-fish') === '90'`, { timeout: 15000, every: 100, label: 'banc remontré depuis la fenêtre' });
+check('un poisson choisi dans la fenêtre remontre le banc et l\'eau', JSON.stringify(await schoolHere()) === '{"couche":true,"eau":true,"voile":true}', JSON.stringify(await schoolHere()));
+await evaluate(`document.querySelector('.profile-settings-window__close').click()`);
+await setAthlete({ schoolStyle: null, schoolHidden: false });
 
 // Temps de calcul sous processeur ralenti quatre fois, à 100 sessions : le nombre va dans la console, pas dans le relevé.
 await send('Emulation.setCPUThrottlingRate', { rate: 4 });

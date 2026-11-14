@@ -90,14 +90,21 @@ export const useAthleteProfile = () => {
     [update]
   );
 
-  /** Dessin des poissons du banc du Profil, `null` pour le style par défaut ; un style inconnu est ignoré. */
-  const setSchoolStyle = useCallback(
-    (schoolStyle: SchoolStyle | null) => {
-      if (schoolStyle !== null && !isSchoolStyle(schoolStyle)) return;
-      update({ schoolStyle });
+  /**
+   * Poisson du banc du Profil : un style le montre dans ce dessin ; `null` (« Aucun ») cache le banc et l'eau, en
+   * gardant le style choisi. Un style inconnu est ignoré.
+   */
+  const setSchoolChoice = useCallback(
+    (choice: SchoolStyle | null) => {
+      if (choice === null) {
+        update({ schoolHidden: true });
+        return;
+      }
+      if (!isSchoolStyle(choice)) return;
+      update({ schoolStyle: choice, schoolHidden: false });
     },
     [update]
   );
 
-  return { profile: value, setName, setAvatar, setNumber, retainHr, setSex, setThresholds, setSchoolStyle, age: athleteAge(value) };
+  return { profile: value, setName, setAvatar, setNumber, retainHr, setSex, setThresholds, setSchoolChoice, age: athleteAge(value) };
 };

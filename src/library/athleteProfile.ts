@@ -65,6 +65,8 @@ export interface AthleteProfile {
   schoolTrialSessions: number | null;
   /** Dessin des poissons du banc du Profil, choisi dans Réglages › Pratiquant ; `null` : `DEFAULT_SCHOOL_STYLE`. */
   schoolStyle: SchoolStyle | null;
+  /** Banc de poissons et eau cachés (choix « Aucun ») ; le style choisi est gardé pour le jour où il revient. */
+  schoolHidden: boolean;
 }
 
 export const EMPTY_ATHLETE_PROFILE: AthleteProfile = {
@@ -82,11 +84,12 @@ export const EMPTY_ATHLETE_PROFILE: AthleteProfile = {
   rootWeeklyGoalMin: null,
   schoolTrialSessions: null,
   schoolStyle: null,
+  schoolHidden: false,
 };
 
 /** Plages plausibles de chaque champ numérique. */
 export type AthleteNumberField = Exclude<keyof AthleteProfile,
-  'name' | 'avatar' | 'sex' | 'hrThresholds' | 'hrMaxSource' | 'hrRestSource' | 'schoolStyle'>;
+  'name' | 'avatar' | 'sex' | 'hrThresholds' | 'hrMaxSource' | 'hrRestSource' | 'schoolStyle' | 'schoolHidden'>;
 
 /** Champs numériques du Profil dont la plage n'est pas dans `ATHLETE_BOUNDS` (`library/profilePrompt.ts`). */
 type ProfileOnlyNumberField = 'rootWeeklyGoalMin' | 'schoolTrialSessions';
@@ -127,6 +130,12 @@ export const athleteSchoolTrialSessions = (profile: Partial<Pick<AthleteProfile,
 export const athleteSchoolStyle = (profile: Partial<Pick<AthleteProfile, 'schoolStyle'>>): SchoolStyle | null => {
   const raw: unknown = profile.schoolStyle;
   return isSchoolStyle(raw) ? raw : null;
+};
+
+/** Banc caché par le choix « Aucun » ; tout ce qui n'est pas `true` (ancien profil sans le champ compris) le montre. */
+export const athleteSchoolHidden = (profile: Partial<Pick<AthleteProfile, 'schoolHidden'>>): boolean => {
+  const raw: unknown = profile.schoolHidden;
+  return raw === true;
 };
 
 /** Plages plausibles des champs numériques du pratiquant (celles de l'objectif de la racine et du réglage d'essai du banc : `library/profilePrompt.ts`). */
@@ -203,6 +212,7 @@ export const sanitizeAthleteProfile = (raw: unknown, rootGoal: { min: number; ma
     rootWeeklyGoalMin: inRange(p.rootWeeklyGoalMin, rootGoal.min, rootGoal.max) ? p.rootWeeklyGoalMin : null,
     schoolTrialSessions: athleteSchoolTrialSessions({ schoolTrialSessions: p.schoolTrialSessions as number | null }),
     schoolStyle: athleteSchoolStyle({ schoolStyle: p.schoolStyle as SchoolStyle | null }),
+    schoolHidden: athleteSchoolHidden({ schoolHidden: p.schoolHidden as boolean }),
   };
 };
 
