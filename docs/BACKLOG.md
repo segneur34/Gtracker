@@ -1,6 +1,6 @@
 # Reste à faire
 
-Tenu par Claude ; l'utilisateur n'a jamais à l'ouvrir. `node outils/backlog.mjs` vérifie la forme et imprime le tableau de bord : aucun résumé fait à la main ne le remplace. Prochains numéros : élément 379, essai 256, question Q117.
+Tenu par Claude ; l'utilisateur n'a jamais à l'ouvrir. `node outils/backlog.mjs` vérifie la forme et imprime le tableau de bord : aucun résumé fait à la main ne le remplace. Prochains numéros : élément 380, essai 256, question Q117.
 - Une ligne par élément : `- N · [type] Titre · noté jj/mm · petit|gros · Modèle/effort · état · dépend de : … · détail : chemin` (champs sans objet omis, ordre gardé). N unique, dans la suite des lots, jamais réutilisé ; type `[bogue]`, `[idée]`, `[dette]` ou `[outil]` ; petit = un lot Sonnet ou Opus, une session ; gros = plusieurs lots, Fable, ou des données réelles ; détail dans `docs/backlog/N-titre.md` quand la ligne ne suffit pas.
 - Quatre zones, un élément dans une seule : **Maintenant** (en cours ou à valider ; 3 lots avec essais au téléphone au plus, un lot validé sur lecture ne compte pas ; première ligne : l'APK installée) ; **Ensuite** (prêts, liste numérotée, l'ordre est la priorité, 7 au plus) ; **Ça attend une occasion** (sous une condition écrite en gras, hors de toute limite) ; **Plus tard** (daté, une phrase avec le résultat attendu ; proposé à l'abandon à la revue après 90 jours).
 - Rangement à la mise au propre, posé en clair à l'utilisateur : un chiffre faux ou un usage cassé → tête d'Ensuite ; « vous en servirez-vous à votre prochaine sortie ? » oui → Ensuite, non → Plus tard ; petit et utile passe avant gros et utile.
@@ -47,6 +47,7 @@ APK 0.00.66 construite et contrôlée le 14/11 au soir (versionCode 67, `Gtracke
 
 
 - 309 · [dette] Reste de la dette de l'audit du 03/11, à piocher au fil des lots : styles en ligne des panneaux voile, utilitaires `ui-*` sur l'échelle `--space-*`, `!important`, `PlanningPage` d'une seule fonction, petits ; résultat attendu : rien de visible, un code plus simple à reprendre · noté 08/11 · gros · Sonnet/medium · détail : docs/backlog/160-dette-audit-vente.md
+- 379 · [dette] L'ancien fond dessiné des pages (`PageBackdrop`, motif en tuile par famille) est encore posé par Statistiques, Réglages et les tutoriels, alors que le champ de traînées du lot 367 est devenu le fond de toutes les pages (relevé le 14/11 à la passe de documentation, pas regardé à l'écran) ; résultat attendu : savoir s'il se voit encore sous le champ, et le retirer avec son calcul s'il ne sert plus · noté 14/11 · petit · Sonnet/medium
 ## Questions
 
 - Q111 · lot 326 · Essayer le modèle le plus capable, seul et sans plan séparé, sur le prochain gros lot (le 326 est le premier candidat), pour mesurer si la qualité monte à coût égal, comme le suggère l'analyse du 13/11 ? Il compte dans la part de la semaine réservée à ce modèle, limitée à la moitié de la limite. · par défaut : non, le lot part comme aujourd'hui (plan, code et relecture par les modèles habituels) · posée le 13/11
