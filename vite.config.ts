@@ -23,7 +23,7 @@ export default defineConfig({
     // Des tests lourds (corpus GPX, vent à tous les seuils) dépassaient les 5 s par défaut dès que le poste était occupé, un test différent à chaque fois.
     testTimeout: 30_000,
     // Copies de travail des lots menés en parallèle (`/chaine`) : jamais testées depuis le dépôt principal.
-    exclude: [...configDefaults.exclude, '.claude/**'],
+    exclude: [...configDefaults.exclude, '.claude/worktrees/**'],
   },
   build: {
     // Une seule feuille de style, dans l'ordre d'aujourd'hui : aucune page chargée à la demande ne peut en manquer
