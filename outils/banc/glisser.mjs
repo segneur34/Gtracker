@@ -111,10 +111,13 @@ const runOn = async (screen) => {
   }
   // 5. Statistiques : la famille.
   await go('/statistiques');
-  // Les rangées sont repliées sous « Sélection » (17/10) : déplier d'abord.
-  await evaluate(`document.querySelector('.stats-choice > button[data-chart-fold][aria-expanded=false]')?.click()`);
-  await wait(300);
-  await dragTwo('Famille', screen === 'téléphone' ? 'doigt' : 'souris', `${screen}, Statistiques, `);
+  // La page n'a plus de bouton glissant : la famille se choisit dans la fenêtre « Sélection » (gros boutons, « Valider »).
+  await evaluate(`document.querySelector('button.stats-selection')?.click()`);
+  await waitFor(`Boolean(document.querySelector('[role="dialog"][aria-label="Sélection"]'))`, { timeout: 3000, every: 50, label: 'fenêtre Sélection' });
+  await evaluate(`[...document.querySelectorAll('.stats-selection-dialog [role=radiogroup][aria-label="Famille"] button')].find((x) => (x.querySelector('.ui-choice__label') ?? x).textContent.trim() === 'Voile')?.click()`);
+  await waitFor(`[...document.querySelectorAll('.stats-selection-dialog [role=radiogroup][aria-label="Famille"] [aria-checked=true]')].some((x) => (x.querySelector('.ui-choice__label') ?? x).textContent.trim() === 'Voile')`, { timeout: 3000, every: 50, label: 'Voile coché' });
+  await evaluate(`document.querySelector('.stats-selection__foot .ui-btn--primary')?.click()`);
+  await waitFor(`!document.querySelector('[role="dialog"][aria-label="Sélection"]') && location.search.includes('famille=voile')`, { timeout: 3000, every: 50, label: 'fenêtre fermée, famille dans l\'adresse' });
   const search = await evaluate('location.search');
   check(`${screen}, Statistiques : famille dans l'adresse`, /famille=/.test(search), search);
   await go('/statistiques');

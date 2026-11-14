@@ -202,81 +202,82 @@ await equipped('2026-10-07T08:00:00Z', 'Aile 6 m', 'Foil 900');
 
 const statSessions = () => evaluate(`[...document.querySelectorAll('.an-sheet__stat')].find((el) => el.querySelector('.an-sheet__stat-label')?.textContent === 'Sessions')?.querySelector('.an-sheet__stat-value')?.textContent ?? null`);
 /** Lignes du filtre « Matériel » : « Groupe : Tous, pièce… », le choix entre crochets. */
-const gearRows = () => evaluate(`[...document.querySelectorAll('.stats-gear')].map((r) => r.querySelector('.stats-gear__label')?.textContent + ' : ' + [...r.querySelectorAll('[role=radio]')].map((b) => (b.getAttribute('aria-checked') === 'true' ? '[' + b.textContent + ']' : b.textContent)).join(', ')).join(' | ')`);
-const pickGear = (group, item) => evaluate(`(() => {
-  const b = [...document.querySelectorAll(${JSON.stringify(`.ui-segmented[aria-label="Matériel : ${group}"] [role=radio]`)})].find((x) => x.textContent.trim() === ${JSON.stringify(item)});
+// Le matériel se règle sur la page (bloc `.stats-choice__gear`, replié au départ, absent sans activité ou sans liste) et dans la fenêtre « Sélection ».
+const gearRows = (root = '.stats-choice__gear') => evaluate(`[...document.querySelectorAll(${JSON.stringify(`${root} [role=radiogroup][aria-label^="Matériel : "]`)})].map((r) => r.getAttribute('aria-label').slice('Matériel : '.length) + ' : ' + [...r.querySelectorAll('[role=radio]')].map((b) => { const t = (b.querySelector('.ui-choice__label') ?? b).textContent.trim(); return b.getAttribute('aria-checked') === 'true' ? '[' + t + ']' : t; }).join(', ')).join(' | ')`);
+const pickGear = (group, item, root = '.stats-choice__gear') => evaluate(`(() => {
+  const g = document.querySelector(${JSON.stringify(`${root} [role=radiogroup][aria-label="Matériel : ${group}"]`)});
+  const b = g && [...g.querySelectorAll('[role=radio]')].find((x) => (x.querySelector('.ui-choice__label') ?? x).textContent.trim() === ${JSON.stringify(item)});
   if (!b) return 'absent'; b.click(); return 'ok';
 })()`);
-const choiceText = () => evaluate(`document.querySelector('.stats-choice button[data-chart-fold]')?.textContent ?? ''`);
+const choiceText = () => evaluate(`document.querySelector('button.stats-selection .stats-selection__summary')?.textContent ?? ''`);
 const address = () => evaluate('location.pathname + location.search');
 await go('/statistiques?famille=voile&activite=wingfoil', 4000);
-if ((await evaluate(`document.querySelector('.stats-choice button[data-chart-fold]')?.getAttribute('aria-expanded')`)) !== 'true') {
-  await evaluate(`document.querySelector('.stats-choice button[data-chart-fold]')?.click()`);
-  await settle({ max: 800, label: 'sélection' });
-}
-// Lot 178 : « Matériel » est un bouton de « Sélection », replié au départ, grisé sans liste de matériel.
-const partFold = (name) => `[...document.querySelectorAll('.stats-choice__part button[data-chart-fold]')].find((b) => b.textContent.trim().startsWith(${JSON.stringify(name)}))`;
-check('Matériel replié au départ, bouton actif, aucune rangée', (await evaluate(`${partFold('Matériel')}?.getAttribute('aria-expanded')`)) === 'false'
-  && (await evaluate(`${partFold('Matériel')}?.disabled`)) === false && (await gearRows()) === '', await gearRows());
-await evaluate(`${partFold('Matériel')}?.click()`);
-await settle({ max: 800, label: 'matériel déplié' });
+const gearFold = `document.querySelector('.stats-choice__gear button[data-chart-fold]')`;
+/** Attend une condition de la page (expression) ; sert après chaque geste sur le matériel ou la fenêtre. */
+const until = (expr, label) => waitFor(expr, { timeout: 4000, every: 50, label });
+const folded = (v) => until(`${gearFold}?.getAttribute('aria-expanded') === '${v}'`, `matériel ${v === 'true' ? 'déplié' : 'replié'}`);
+const sessionsNow = `[...document.querySelectorAll('.an-sheet__stat')].find((el) => el.querySelector('.an-sheet__stat-label')?.textContent === 'Sessions')?.querySelector('.an-sheet__stat-value')?.textContent`;
+await until(`Boolean(${gearFold})`, 'bloc matériel');
+check('Matériel replié au départ, bouton présent, aucune rangée', (await evaluate(`${gearFold}?.getAttribute('aria-expanded')`)) === 'false' && (await gearRows()) === '', await gearRows());
+await evaluate(`${gearFold}?.click()`);
+await folded('true');
 console.log('\nlignes du matériel :', await gearRows());
 check('Wingfoil : 4 sessions, une ligne par groupe porté (pas « Mât »)', (await statSessions()) === '4'
   && (await gearRows()) === 'Aile : [Tous], Aile 5 m, Aile 6 m | Foil : [Tous], Foil 900, Foil 1200', `${await statSessions()} ; ${await gearRows()}`);
 console.log('Aile 5 m :', await pickGear('Aile', 'Aile 5 m'));
-await settle({ max: 800, label: 'Aile 5 m' });
+await until(`${sessionsNow} === '2' && location.search.includes('g-aile%3Aa-5')`, 'Aile 5 m appliquée');
 check('Aile 5 m : 2 sessions, adresse à une pièce', (await statSessions()) === '2' && (await address()) === '/statistiques?famille=voile&activite=wingfoil&materiel=g-aile%3Aa-5',
   `${await statSessions()} ; ${await address()}`);
 console.log('Foil 900 :', await pickGear('Foil', 'Foil 900'));
-await settle({ max: 800, label: 'Foil 900' });
+await until(`${sessionsNow} === '1' && location.search.includes('g-foil%3Af-900')`, 'Foil 900 appliqué');
 console.log('sélection :', await choiceText());
 check('Aile 5 m et Foil 900 : 1 session, croisée dans l\'adresse et le résumé', (await statSessions()) === '1'
   && (await address()) === '/statistiques?famille=voile&activite=wingfoil&materiel=g-aile%3Aa-5%2Cg-foil%3Af-900'
   && (await choiceText()).includes('Voile · Wingfoil · Aile 5 m · Foil 900'), `${await statSessions()} ; ${await address()} ; ${await choiceText()}`);
 await shoot('materiel-statistiques');
 await evaluate('history.back()');
-await settle({ max: 1000, label: 'retour' });
+await until(`${sessionsNow} === '2' && !location.search.includes('g-foil')`, 'retour arrière');
 check('retour arrière : Aile 5 m seule, 2 sessions', (await statSessions()) === '2' && (await gearRows()) === 'Aile : Tous, [Aile 5 m], Aile 6 m | Foil : [Tous], Foil 900, Foil 1200',
   `${await statSessions()} ; ${await gearRows()}`);
 await go('/statistiques?famille=voile&activite=wingfoil&materiel=f-1200', 4000);
+await until(`${sessionsNow} === '1' && document.querySelectorAll('.stats-choice__gear [role=radio]').length > 0`, 'ancienne adresse lue');
 check('ancienne adresse à une pièce : Foil 1200, rangée dans Foil', (await statSessions()) === '1' && (await gearRows()) === 'Aile : [Tous], Aile 5 m, Aile 6 m | Foil : Tous, Foil 900, [Foil 1200]',
   `${await statSessions()} ; ${await gearRows()}`);
 
-// Lot 178 : sans liste de matériel (Surf), « Matériel » reste grisé, non cliquable et replié ; avec « Toutes », de même.
-const mat = (expr) => evaluate(`${partFold('Matériel')}${expr}`);
+// Sans liste de matériel (Surf) ou sans activité choisie, le bloc « Matériel » de la page n'existe pas.
+const gearBlock = () => evaluate(`Boolean(document.querySelector('.stats-choice__gear'))`);
 await go('/statistiques?famille=surf&activite=surf', 4000);
-check('Surf : Matériel grisé et replié', (await mat('?.disabled')) === true && (await mat("?.getAttribute('aria-expanded')")) === 'false');
-await mat('?.click()');
-await wait(300);
-check('Surf : un clic sur Matériel ne déplie rien', (await mat("?.getAttribute('aria-expanded')")) === 'false' && (await gearRows()) === '');
+check('Surf : pas de bloc Matériel', !(await gearBlock()));
 await go('/statistiques?famille=voile', 4000);
-check('« Toutes » les activités : Matériel grisé', (await mat('?.disabled')) === true);
-// Activité : repliée puis rouverte.
-const act = (expr) => evaluate(`${partFold('Activité')}${expr}`);
-await go('/statistiques?famille=voile&activite=wingfoil', 4000);
-check('Activité ouverte au départ, libellé du choix en cours', (await act("?.getAttribute('aria-expanded')")) === 'true' && (await act('?.textContent')).includes('Wingfoil'));
-await act('?.click()');
-await wait(300);
-check('Activité repliée : rangée partie, choix gardé dans le bouton', (await act("?.getAttribute('aria-expanded')")) === 'false'
-  && (await evaluate(`document.querySelector('.ui-segmented[aria-label="Activité"]')`)) === null && (await act('?.textContent')).includes('Wingfoil'));
-await go('/statistiques?famille=voile&activite=wingfoil', 4000);
-check('Activité repliée retenue après rechargement', (await act("?.getAttribute('aria-expanded')")) === 'false');
-await act('?.click()');
-await wait(300);
-check('Activité rouverte', (await act("?.getAttribute('aria-expanded')")) === 'true' && (await evaluate(`!!document.querySelector('.ui-segmented[aria-label="Activité"]')`)));
+check('« Toutes » les activités : pas de bloc Matériel', !(await gearBlock()));
 // Matériel : un filtre posé reste dit une fois replié ; état retenu ; rien ne déborde à 320 px.
 await go('/statistiques?famille=voile&activite=wingfoil&materiel=g-aile%3Aa-5', 4000);
-if ((await mat("?.getAttribute('aria-expanded')")) !== 'true') { await mat('?.click()'); await wait(300); }
-await mat('?.click()');
-await wait(300);
-check('Matériel replié : le choix reste dit dans le bouton', (await mat("?.getAttribute('aria-expanded')")) === 'false' && (await mat('?.textContent')).includes('Aile 5 m'), await mat('?.textContent'));
+await until(`Boolean(${gearFold})`, 'bloc matériel');
+if ((await evaluate(`${gearFold}?.getAttribute('aria-expanded')`)) !== 'true') { await evaluate(`${gearFold}?.click()`); await folded('true'); }
+await evaluate(`${gearFold}?.click()`);
+await folded('false');
+const foldText = () => evaluate(`${gearFold}?.textContent`);
+check('Matériel replié : le choix reste dit dans le bouton', (await evaluate(`${gearFold}?.getAttribute('aria-expanded')`)) === 'false' && (await foldText()).includes('Aile 5 m'), await foldText());
 await go('/statistiques?famille=voile&activite=wingfoil&materiel=g-aile%3Aa-5', 4000);
-check('Matériel replié retenu après rechargement', (await mat("?.getAttribute('aria-expanded')")) === 'false');
+await until(`Boolean(${gearFold})`, 'bloc matériel');
+check('Matériel replié retenu après rechargement', (await evaluate(`${gearFold}?.getAttribute('aria-expanded')`)) === 'false');
+// Par la fenêtre : la pièce choisie ne s'applique qu'à « Valider ».
+await evaluate(`document.querySelector('button.stats-selection').click()`);
+await waitFor(`Boolean(document.querySelector('[role="dialog"][aria-label="Sélection"]'))`, { timeout: 3000, every: 50, label: 'fenêtre Sélection' });
+console.log('Aile 6 m (fenêtre) :', await pickGear('Aile', 'Aile 6 m', '.stats-selection-dialog'));
+await until(`document.querySelector('.stats-selection-dialog [role=radiogroup][aria-label="Matériel : Aile"] [aria-checked=true]')?.textContent.trim().startsWith('Aile 6 m')`, 'Aile 6 m cochée');
+check('fenêtre : pièce choisie, pas encore appliquée (adresse inchangée)', (await address()) === '/statistiques?famille=voile&activite=wingfoil&materiel=g-aile%3Aa-5'
+  && (await gearRows('.stats-selection-dialog')).startsWith('Aile : Tous, Aile 5 m, [Aile 6 m]'), `${await address()} ; ${await gearRows('.stats-selection-dialog')}`);
+await evaluate(`document.querySelector('.stats-selection__foot .ui-btn--primary').click()`);
+await until(`!document.querySelector('[role="dialog"][aria-label="Sélection"]') && location.search.includes('g-aile%3Aa-6') && ${sessionsNow} === '1'`, 'fenêtre fermée, Aile 6 m appliquée');
+check('fenêtre, Valider : Aile 6 m, 1 session, adresse à une pièce', (await statSessions()) === '1' && (await address()) === '/statistiques?famille=voile&activite=wingfoil&materiel=g-aile%3Aa-6',
+  `${await statSessions()} ; ${await address()}`);
 await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 640, deviceScaleFactor: 2, mobile: true });
 await go('/statistiques?famille=voile&activite=wingfoil&materiel=g-aile%3Aa-5', 4000);
-await mat('?.click()');
-await wait(300);
-check('320 px : rien ne déborde, chevrons visibles', await evaluate(`document.documentElement.scrollWidth <= window.innerWidth && [...document.querySelectorAll('.stats-choice button[data-chart-fold]')].every((b) => { const c = b.querySelector('svg')?.getBoundingClientRect(); return !!c && c.right <= window.innerWidth + 1; })`));
+await until(`Boolean(${gearFold})`, 'bloc matériel');
+await evaluate(`${gearFold}?.click()`);
+await until(`${gearFold}?.getAttribute('aria-expanded') !== null && document.documentElement.scrollWidth > 0`, 'bascule du repli');
+check('320 px : rien ne déborde, chevrons visibles', await evaluate(`document.documentElement.scrollWidth <= window.innerWidth && [...document.querySelectorAll('.stats-choice__gear button[data-chart-fold]')].every((b) => { const c = b.querySelector('svg')?.getBoundingClientRect(); return !!c && c.right <= window.innerWidth + 1; })`));
 await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
 
 console.log('\n--- console (erreurs, avertissements) ---');

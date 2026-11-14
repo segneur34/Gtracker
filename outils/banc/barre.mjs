@@ -108,16 +108,22 @@ await wait(300);
 await desktop();
 
 // --- 3. Régularité ---
-// Pastilles repliées sous « Sélection » depuis le 17/10 : déplier d'abord.
-const chip = (group, label) => evaluate(`(() => {
-  const fold = document.querySelector('.stats-choice > button[data-chart-fold][aria-expanded=false]');
-  if (fold) fold.click();
-  return new Promise((r) => setTimeout(r, 300));
-})()`).then(() => evaluate(`(() => {
-  const g = document.querySelector('[role=group][aria-label=${JSON.stringify(group)}], [role=radiogroup][aria-label=${JSON.stringify(group)}]');
-  const b = g && [...g.querySelectorAll('button')].find((x) => x.textContent.trim() === ${JSON.stringify(label)});
-  if (!b) return 'absent'; b.click(); return 'ok';
-})()`));
+// Le choix se fait dans la fenêtre « Sélection » : l'ouvrir, cliquer le gros bouton, « Valider ».
+const chip = async (group, label) => {
+  await evaluate(`document.querySelector('button.stats-selection')?.click()`);
+  await waitFor(`Boolean(document.querySelector('[role="dialog"][aria-label="Sélection"]'))`, { timeout: 3000, every: 50, label: 'fenêtre Sélection' });
+  const r = await evaluate(`(() => {
+  const g = document.querySelector('.stats-selection-dialog [role=radiogroup][aria-label=${JSON.stringify(group)}]');
+  const b = g && [...g.querySelectorAll('button')].find((x) => (x.querySelector('.ui-choice__label') ?? x).textContent.trim() === ${JSON.stringify(label)});
+  if (!b) return 'absent'; b.click();
+  return 'ok';
+})()`);
+  // Le brouillon de la fenêtre doit avoir rendu le choix avant « Valider ».
+  await waitFor(`[...document.querySelectorAll('.stats-selection-dialog [role=radiogroup][aria-label=${JSON.stringify(group)}] [aria-checked=true]')].some((x) => (x.querySelector('.ui-choice__label') ?? x).textContent.trim() === ${JSON.stringify(label)})`, { timeout: 3000, every: 50, label: 'choix coché' });
+  await evaluate(`document.querySelector('.stats-selection__foot .ui-btn--primary').click()`);
+  await waitFor(`!document.querySelector('[role="dialog"][aria-label="Sélection"]')`, { timeout: 3000, every: 50, label: 'fenêtre fermée' });
+  return r;
+};
 const stat =(label) => evaluate(`(() => {
   const s = [...document.querySelectorAll('.an-sheet__stat')].find((x) => x.querySelector('.an-sheet__stat-label')?.textContent.trim() === ${JSON.stringify(label)});
   return s?.querySelector('.an-sheet__stat-value')?.textContent.trim() ?? '(absent)';
@@ -125,8 +131,9 @@ const stat =(label) => evaluate(`(() => {
 const search = () => evaluate('location.search');
 await go('/statistiques', 4000);
 await chip('Famille', 'Surf');
-await settle({ max: 800 });
+await waitFor(async () => (await search()).includes('famille=surf') && (await evaluate(`document.querySelector('.stats-selection__summary')?.textContent.includes('Surf')`)), { timeout: 3000, every: 50, label: 'famille Surf dans l\'adresse et le résumé' });
 await chip('Période', 'Année');
+await waitFor(async () => (await search()).includes('periode=annee'), { timeout: 3000, every: 50, label: 'période Année dans l\'adresse' });
 await settle({ max: 800 });
 const active = await stat('Semaines actives');
 const weeks = Number(active.split('/')[1]);
