@@ -65,6 +65,16 @@ export const IconSettings = ({ size = 24, ...props }: IconProps) => (
   </svg>
 );
 
+/** Trois curseurs verticaux, chacun à sa hauteur, comme une table de mixage : la sélection des Statistiques. */
+export const IconSliders = ({ size = 24, ...props }: IconProps) => (
+  <svg {...strokeProps(size)} {...props}>
+    <path d="M6 3v9.5M6 17.5V21M12 3v2.5M12 10.5V21M18 3v7.5M18 15.5V21" />
+    <circle cx="6" cy="15" r="2.5" />
+    <circle cx="12" cy="8" r="2.5" />
+    <circle cx="18" cy="13" r="2.5" />
+  </svg>
+);
+
 export const IconFile = ({ size = 24, ...props }: IconProps) => (
   <svg {...strokeProps(size)} {...props}>
     <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />

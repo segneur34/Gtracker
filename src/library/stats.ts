@@ -232,6 +232,34 @@ export const gearPickLabel = (item: GearFilterItem): string => {
   return group === '' || gearKey(name).startsWith(gearKey(group)) ? name : `${group} ${name}`;
 };
 
+/** Choix de Statistiques, tel que l'adresse le porte ; `null` : « Tout », « Toutes », « Tous ». */
+export interface StatsChoice {
+  family: SportFamily | null;
+  activityId: string | null;
+  period: StatsPeriod;
+  /** Paramètre `materiel` (`gearParamOf`). */
+  gear: string | null;
+}
+
+/** Choix ramené à ce que l'adresse garde : pas d'activité sans famille, pas de matériel sans activité, vide comme « Tout ». */
+export const normalizeStatsChoice = (choice: StatsChoice): StatsChoice => {
+  const family = choice.family;
+  const activityId = family !== null && choice.activityId !== null && choice.activityId !== '' ? choice.activityId : null;
+  const gear = activityId !== null && choice.gear !== null && choice.gear !== '' ? choice.gear : null;
+  return { family, activityId, period: choice.period, gear };
+};
+
+/**
+ * Ce qui change de `current` à `next` : `'aucun'`, rien ; `'periode'`, la période seule (l'adresse est remplacée) ;
+ * `'niveau'`, la famille, l'activité ou le matériel (l'adresse s'empile dans l'historique), période comprise ou non.
+ */
+export const statsChoiceChange = (current: StatsChoice, next: StatsChoice): 'aucun' | 'periode' | 'niveau' => {
+  const a = normalizeStatsChoice(current);
+  const b = normalizeStatsChoice(next);
+  if (a.family !== b.family || a.activityId !== b.activityId || a.gear !== b.gear) return 'niveau';
+  return a.period !== b.period ? 'periode' : 'aucun';
+};
+
 /** Totaux d'un ensemble de sessions. */
 export interface StatsTotals {
   sessions: number;

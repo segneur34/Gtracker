@@ -12,12 +12,11 @@ import PanelTitle, { PanelHeading } from '../components/PanelTitle';
 import ResizablePanel from '../components/ResizablePanel';
 import SectionTabs, { type SectionDefinition } from '../components/SectionTabs';
 import ZoomableChart, { ChartZoomProbe } from '../components/ZoomableChart';
-import { IconChevronRight } from '../components/icons';
+import { IconChevronRight, IconSliders } from '../components/icons';
 import CardioLoadHelp from '../components/CardioLoadHelp';
 import { HEART_RATE_COLOR, HEART_ZONE_COLORS, zoneLabel } from '../components/heartRateColors';
 import { ANALYSIS_PANEL_STYLE, CARD_STYLE, HALF_PANEL_STYLE } from '../components/styles';
 import PageHeader from '../components/ui/PageHeader';
-import SegmentedControl from '../components/ui/SegmentedControl';
 import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityFamily, type Activity } from '../core/activities';
 import { REFERENCE_HEART_RATE, SPORT_FAMILIES, getSportProfile, type SportFamily } from '../core/sportProfiles';
 import {
@@ -39,11 +38,13 @@ import { useVisibleStatSessions, visibleStatSessions } from '../hooks/useVisible
 import { effectiveDistanceUnit, effectiveHrOffset, effectiveSpeedUnit, useGearGroups, useVisibility } from '../hooks/useSportSettings';
 import {
   STATS_PERIODS, TREND_SESSIONS, cardioLoadBars, cardioTotals, dateTicks, defaultMetricKey, heartRatePoints, formatDateTick,
-  gearFilterItems, gearFilterRows, gearParamOf, gearPickLabel, groupTotals, inBounds, isStatsMetricKey, matchesGearSelection, isStatsPeriod, readGearParam, withGearPick, metricSeries, metricsOf, recordKindsOf, regularity, statsMetric,
+  gearFilterItems, gearFilterRows, gearParamOf, gearPickLabel, groupTotals, inBounds, isStatsMetricKey, matchesGearSelection, isStatsPeriod, readGearParam, metricSeries, metricsOf, recordKindsOf, regularity, statsMetric,
+  statsChoiceChange, type StatsChoice,
   statsPeriodBounds, statsTotals, topSessions, weeklyDurations, type MetricPoint, type StatSession, type StatsMetricKey, type StatsPeriod, type StatsRecordKind,
   type StatsTotals, type ZoneBoundsOf,
   groupByActivity,
 } from '../library/stats';
+import StatsSelectionDialog, { GearChoiceRows, NO_GEAR_TEXT } from './StatisticsSelection';
 import './analysisMobile.css';
 import './StatisticsPage.css';
 import { plural } from '../core/basics';
@@ -214,9 +215,14 @@ const WeekLineShape = () => (
   </svg>
 );
 
-const PART_FOLD_STYLE = { maxWidth: '100%', minWidth: 0 } as const;
+/** Bouton « Matériel » de la page, à fond plein : le champ du fond ne passe pas derrière. */
+const GEAR_FOLD_STYLE = {
+  maxWidth: '100%', minWidth: 0, minHeight: '36px', padding: '0 var(--space-3)', fontSize: 'var(--text-s)',
+  backgroundColor: 'var(--surface)', border: 'var(--stroke) solid var(--ink)',
+} as const;
 
-const CHOICE_DEFAULT = { choix: false, activite: true, materiel: false };
+/** Matériel de la page replié au départ ; la clé garde le nom de l'ancien bloc « Sélection », qui la portait. */
+const GEAR_FOLD_DEFAULT = { materiel: false };
 
 /**
  * Aide de la charge, sous les chiffres du cardio : seul ce petit composant lit l'état des aides, pour qu'un « ? »
@@ -236,8 +242,10 @@ function StatisticsPage() {
   const nowMs = useNow();
   const [picked, setPicked] = useState<string | null>(null);
   const { open, toggle } = useOpenSections<StatsSection>(STORAGE_ID, STATS_SECTION_DEFAULTS);
-  /** Boutons glissants de famille, d'activité et de période : repliés sous « Sélection » au départ, état retenu. */
-  const choice = useOpenSections(`${STORAGE_ID}.choix`, CHOICE_DEFAULT);
+  /** Le choix du matériel sur la page, replié ou non, état retenu. */
+  const gearFold = useOpenSections(`${STORAGE_ID}.choix`, GEAR_FOLD_DEFAULT);
+  /** Fenêtre « Sélection » ouverte. */
+  const [selecting, setSelecting] = useState(false);
   const { value: view, update: rememberView } = useStoredRecord<StatsView>(VIEW_NAMESPACE, VIEW_KEY, VIEW_DEFAULTS);
 
   // À l'ouverture sans paramètre (barre, accueil), reprendre le dernier affichage, si sa famille est visible.
@@ -320,6 +328,15 @@ function StatisticsPage() {
     setParams(p, { replace });
   };
 
+  /** Le choix en cours, comme l'adresse le porte : point de départ du brouillon de la fenêtre « Sélection ». */
+  const currentChoice: StatsChoice = { family, activityId: activity?.id ?? null, period, gear: gearParamOf(gearSelection) };
+  /** « Valider » de la fenêtre : un seul changement d'adresse, empilé, remplacé (la période seule) ou aucun. */
+  const applyChoice = (next: StatsChoice) => {
+    const change = statsChoiceChange(currentChoice, next);
+    if (change !== 'aucun') go({ famille: next.family, activite: next.activityId, materiel: next.gear, periode: next.period }, change === 'periode');
+    setSelecting(false);
+  };
+
   const ofActivity = useMemo(
     () => all.filter((s) => (family === null || s.family === family) && (activity === null || s.activityId === activity.id)),
     [all, family, activity]
@@ -344,23 +361,8 @@ function StatisticsPage() {
   const unitActivity = activity ?? (family ? unitActivityOf(family) : null);
   const speedUnit: SpeedUnit = unitActivity ? effectiveSpeedUnit(unitActivity) : 'kmh';
   const distanceUnit: DistanceUnit = unitActivity ? effectiveDistanceUnit(unitActivity) : 'km';
-  const accent = family ? FAMILY_ACCENT[family] : 'var(--ink-2)';
   /** Fond des onglets et pastilles allumés, sous du texte blanc : sans famille, le gris neutre du thème. */
   const tabAccent = family ? FAMILY_ACCENT[family] : 'var(--neutral-accent)';
-
-  // Boutons glissants : les familles visibles (et celle ouverte par l'adresse), puis toutes les activités visibles de la
-  // famille, avec ou sans session, et celles de base qui en ont.
-  const familyItems: { key: SportFamily | 'tout'; label: string }[] = [
-    { key: 'tout', label: 'Tout' },
-    ...SPORT_FAMILIES.filter((f) => families.includes(f) || f === family).map((f) => ({ key: f, label: FAMILY_LABEL[f] })),
-  ];
-  const activityItems = useMemo(() => {
-    if (family === null) return [];
-    const withSessions = new Set(all.filter((s) => s.family === family).map((s) => s.activityId));
-    const listed = activitiesOfFamily(activities, family).filter((a) => isShown(a) || familyHidden || withSessions.has(a.id) || a.id === activity?.id);
-    const extra = [...withSessions].filter((id) => !listed.some((a) => a.id === id)).map((id) => activityById.get(id)!);
-    return [...listed, ...extra].map((a) => ({ key: a.id, label: a.name }));
-  }, [all, family, activities, isShown, familyHidden, activity, activityById]);
 
   // Cardio : la FC du résumé, zones et charge recalculées avec le profil du moment.
   const { profile: athlete } = useAthleteProfile();
@@ -500,9 +502,9 @@ function StatisticsPage() {
 
   const title = activity ? activity.name : family ? FAMILY_LABEL[family] : 'Toutes les activités';
   const periodLabel = STATS_PERIODS.find((p) => p.id === period)!.label;
-  /** Le choix en cours, dans le bouton « Sélection » : lisible bloc replié. */
-  /** Matériel déplié : jamais quand il est grisé, quoi que l'état retenu dise. */
-  const gearOpen = choice.open.materiel && gearGroups !== null;
+  /** Matériel sur la page : seulement pour une activité qui a sa liste de matériel. */
+  const gearShown = activity !== null && gearGroups !== null;
+  /** Le choix en cours, dans la ligne « Sélection ». */
   const choiceSummary = [family ? FAMILY_LABEL[family] : 'Toutes les familles', ...(activity ? [activity.name] : []), ...gearSelection.map(gearPickLabel), periodLabel === 'Tout' ? 'depuis le début' : periodLabel].join(' · ');
   const empty = inPeriod.length === 0;
   const lastText = regular.weeksSinceLast === null ? '—'
@@ -515,48 +517,31 @@ function StatisticsPage() {
       <PageHeader title="Statistiques" subtitle={`${title} · ${periodLabel === 'Tout' ? 'depuis le début' : periodLabel}`} />
 
       <div className="stats-choice">
-        <ChartFold open={choice.open.choix} onToggle={() => choice.toggle('choix')}
-          title={choice.open.choix ? 'Replier la sélection' : 'Choisir la famille, l’activité et la période'}
-          style={{ padding: 'var(--space-2) var(--space-3)', minHeight: 'var(--touch-target)', fontSize: 'var(--text-m)' }}
-          label={<>
+        <button type="button" className="stats-selection" aria-haspopup="dialog" onClick={() => setSelecting(true)}
+          title="Choisir la famille, l’activité, la période et le matériel">
+          <span className="stats-selection__text">
             <strong>Sélection</strong>
-            <span className="stats-choice__summary">{choiceSummary}</span>
-          </>} />
-        {choice.open.choix && (<>
-        <SegmentedControl fit label="Famille" items={familyItems} value={family ?? 'tout'} accent={accent}
-          onChange={(key) => go({ famille: key === 'tout' ? null : key, activite: null })} />
-        {family !== null && activityItems.length > 0 && (<>
-          <div className="stats-choice__part">
-            <ChartFold open={choice.open.activite} onToggle={() => choice.toggle('activite')}
-              title={choice.open.activite ? 'Replier le choix de l’activité' : 'Choisir l’activité'}
-              style={PART_FOLD_STYLE}
-              label={<><strong>Activité</strong><span className="stats-choice__summary">{activity ? activity.name : 'Toutes'}</span></>} />
-            {choice.open.activite && (
-              <SegmentedControl label="Activité" items={[{ key: '', label: 'Toutes' }, ...activityItems]} value={activity?.id ?? ''} accent={accent}
-                onChange={(key) => go({ activite: key === '' ? null : key })} />
-            )}
-          </div>
-          <div className="stats-choice__part">
-            <ChartFold open={gearOpen} disabled={gearGroups === null} onToggle={() => choice.toggle('materiel')}
-              title={gearGroups === null ? 'Aucune liste de matériel pour cette activité (Réglages : « Créer liste matériel »)' : gearOpen ? 'Replier le choix du matériel' : 'Choisir le matériel'}
-              style={PART_FOLD_STYLE}
-              label={<><strong>Matériel</strong>{gearSelection.length > 0 && <span className="stats-choice__summary">{gearSelection.map(gearPickLabel).join(' · ')}</span>}</>} />
-            {gearOpen && gearRows.length === 0 && <p className="ui-hint">Aucun matériel sur les sessions de cette période.</p>}
-            {gearOpen && activity !== null && gearRows.map((row) => (
-              <div key={row.groupId} className="stats-gear">
-                <span className="stats-gear__label">{row.groupName}</span>
-                <SegmentedControl label={`Matériel : ${row.groupName}`} items={[{ key: '', label: 'Tous' }, ...row.items.map((it) => ({ key: it.key, label: it.itemName }))]}
-                  value={gearSelection.find((it) => it.groupId === row.groupId)?.key ?? ''} accent={accent}
-                  onChange={(key) => go({ materiel: gearParamOf(withGearPick(gearSelection, row.groupId, row.items.find((it) => it.key === key) ?? null, gearItems)) })} />
-              </div>
-            ))}
-          </div>
-        </>)}
-        <SegmentedControl fit label="Période" items={STATS_PERIODS.map((p) => ({ key: p.id, label: p.label }))} value={period}
-          onChange={(key) => go({ periode: key }, true)} />
-        </>)}
+            <span className="stats-selection__summary">{choiceSummary}</span>
+          </span>
+          <span className="stats-selection__knob"><IconSliders size={20} /></span>
+        </button>
         {familyHidden && <p style={noteStyle}>Cette famille est cachée dans Réglages : elle n'apparaît ici que par son adresse.</p>}
+        {gearShown && (
+          <div className="stats-choice__gear">
+            <ChartFold open={gearFold.open.materiel} onToggle={() => gearFold.toggle('materiel')}
+              title={gearFold.open.materiel ? 'Replier le choix du matériel' : 'Choisir le matériel'}
+              style={GEAR_FOLD_STYLE}
+              label={<><strong>Matériel</strong>{gearSelection.length > 0 && <span className="stats-choice__summary">{gearSelection.map(gearPickLabel).join(' · ')}</span>}</>} />
+            {gearFold.open.materiel && (gearRows.length === 0
+              ? <p className="ui-hint">{NO_GEAR_TEXT}</p>
+              : <GearChoiceRows small rows={gearRows} selection={gearSelection} items={gearItems} onChange={(gear) => go({ materiel: gear })} />)}
+          </div>
+        )}
       </div>
+      {selecting && (
+        <StatsSelectionDialog initial={currentChoice} all={all} activityById={activityById} nowMs={nowMs}
+          onApply={applyChoice} onClose={() => setSelecting(false)} />
+      )}
 
       <MemoryStatus compact />
 

@@ -11,7 +11,65 @@
   gap: var(--space-2);
 }
 
-/* Choix en cours dans « Sélection », en casse normale (`ChartFold` écrit en capitales). */
+/* Ligne « Sélection » : une seule pilule à fond plein, sur toute la largeur, qui ouvre la fenêtre de choix ; le
+   choix en cours coupé s'il déborde, à droite un disque d'encre aux trois curseurs. */
+.stats-selection {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-m);
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .stats-selection:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.stats-selection__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-selection__summary {
+  margin-left: var(--space-2);
+  color: var(--muted);
+}
+
+.stats-selection__knob {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+/* Matériel posé sur la page, sous la ligne « Sélection » : son bouton, puis une ligne par groupe. */
+.stats-choice__gear {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Pièces choisies dans le bouton « Matériel », en casse normale (`ChartFold` écrit en capitales). */
 .stats-choice__summary {
   color: var(--muted);
   font-weight: normal;
@@ -25,44 +83,85 @@
   white-space: nowrap;
 }
 
-.stats-choice button[data-chart-fold] {
-  max-width: 100%;
-  min-width: 0;
-}
-
-.stats-choice button[data-chart-fold] > svg {
+.stats-choice__gear button[data-chart-fold] > svg {
   flex-shrink: 0;
 }
 
-/* Une partie de « Sélection » : son bouton, puis ce qu'il déplie. */
-.stats-choice__part {
+/* Une ligne du filtre « Matériel » par groupe, dans la fenêtre et sur la page : le nom du groupe, puis ses pièces,
+   qui passent à la ligne. */
+.stats-gear {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  align-items: flex-start;
+  gap: var(--space-1);
   min-width: 0;
 }
 
-/* Une ligne du filtre « Matériel » par groupe : le nom du groupe, puis ses pièces ; la rangée défile si elle ne tient pas. */
-.stats-gear {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
+.stats-gear > .ui-choices {
+  align-self: stretch;
 }
 
 .stats-gear__label {
-  flex: 0 0 auto;
-  max-width: 30%;
+  max-width: 100%;
+  padding: 0 var(--space-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  background: var(--surface);
   color: var(--muted);
   font-size: var(--text-xs);
+  font-weight: 600;
 }
 
-.stats-gear > .ui-segmented {
+/* Onglets et pastilles de la page à fond plein : le champ du fond ne passe pas derrière. */
+.stats-page .ui-tab:not([aria-pressed='true']) {
+  background: var(--surface);
+}
+
+/* Fenêtre « Sélection » (`StatisticsSelection.tsx`) : grande au milieu sur ordinateur, presque tout l'écran sur
+   téléphone ; le corps défile, « Annuler » et « Valider » restent en bas. */
+.ui-dialog.stats-selection-dialog {
+  width: min(720px, 100%);
+  height: min(75dvh, 100%);
+  max-height: 100%;
+  overflow: hidden;
+  padding: 0;
+  gap: 0;
+}
+
+.stats-selection-dialog .ui-dialog__head {
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.stats-selection__body {
   flex: 1 1 auto;
-  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4);
+}
+
+.stats-selection__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.stats-selection__foot {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.stats-selection__foot > .ui-btn {
+  flex: 1 1 0;
+  min-height: 48px;
 }
 
 /* Légende des séries du graphique (empannages, virements), formes dessinées comme sur le graphe. */
@@ -192,6 +291,12 @@
   /* Onglets en petites pastilles, comme les analyses (`.an-page`), un peu détachés des panneaux. */
   .stats-col > .ui-tabs {
     margin-bottom: var(--space-3);
+  }
+
+  /* La fenêtre « Sélection » prend presque tout l'écran. */
+  .ui-dialog.stats-selection-dialog {
+    width: 100%;
+    height: 100%;
   }
 
   /* Rien n'élargit la page : un panneau ne dépasse pas l'écran. */

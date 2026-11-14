@@ -5,6 +5,7 @@ import {
   averageMovingSpeedMs, cardioLoadBars, cardioTotals, dateTicks, groupTotals, heartRatePoints, metricSeries, metricsOf, recordKindsOf, regularity,
   inBounds, sessionLoad, statSessionOf, statsMetric, statsPeriodBounds, statsTotals, topSessions, weeklyDurations, type StatSession,
   profilePeriodOf, gearFilterItems, matchesGear, groupByActivity, readGearParam, gearParamOf, withGearPick, matchesGearSelection, gearFilterRows, gearPickLabel,
+  normalizeStatsChoice, statsChoiceChange, type StatsChoice,
 } from './stats';
 import type { GearGroup } from './notes';
 import { sailStatSession, statSession, surfStatSession } from '../test/record.fixture';
@@ -514,6 +515,30 @@ describe('matériel croisé', () => {
     expect(readGearParam('g-foil:f-700,g-aile:a-5', items).map(gearPickLabel).join(' · ')).toBe('Foil 700 · Aile 5 m²');
     const named = gearFilterItems([{ id: 'g', name: 'Foil', items: [{ id: 'p', name: 'foil 700' }] }]);
     expect(gearPickLabel(named[0])).toBe('foil 700');
+  });
+});
+
+describe('choix de la fenêtre de sélection', () => {
+  const base: StatsChoice = { family: 'voile', activityId: 'wing', period: 'annee', gear: 'g:p' };
+
+  it('rien de changé : aucun pas dans l’historique', () => {
+    expect(statsChoiceChange(base, { ...base })).toBe('aucun');
+  });
+  it('la période seule remplace l’adresse', () => {
+    expect(statsChoiceChange(base, { ...base, period: 'tout' })).toBe('periode');
+  });
+  it('famille, activité ou matériel s’empilent, période changée ou non', () => {
+    expect(statsChoiceChange(base, { ...base, family: 'surf', activityId: null, gear: null })).toBe('niveau');
+    expect(statsChoiceChange(base, { ...base, activityId: 'kite', gear: null })).toBe('niveau');
+    expect(statsChoiceChange(base, { ...base, gear: null })).toBe('niveau');
+    expect(statsChoiceChange(base, { ...base, gear: 'g:q', period: 'tout' })).toBe('niveau');
+  });
+  it('ce que l’adresse ne garde pas ne compte pas : activité sans famille, matériel sans activité, vide', () => {
+    expect(normalizeStatsChoice({ family: null, activityId: 'wing', period: 'tout', gear: 'g:p' }))
+      .toEqual({ family: null, activityId: null, period: 'tout', gear: null });
+    expect(statsChoiceChange({ family: null, activityId: null, period: 'tout', gear: null }, { family: null, activityId: 'wing', period: 'tout', gear: 'g:p' })).toBe('aucun');
+    expect(statsChoiceChange({ ...base, activityId: null, gear: null }, { ...base, activityId: '', gear: 'g:p' })).toBe('aucun');
+    expect(statsChoiceChange({ ...base, gear: null }, { ...base, gear: '' })).toBe('aucun');
   });
 });
 

@@ -440,6 +440,85 @@
   outline-offset: -2px;
 }
 
+/* --- Choix en gros boutons qui passent à la ligne (`ChoiceButtons`) : pilules à fond plein, le choix à l'encre --- */
+
+.ui-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ui-choices--grid {
+  display: grid;
+}
+
+.ui-choices--cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ui-choices--cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ui-choice {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: var(--space-1) var(--space-4);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-m);
+  font-weight: 400;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* En grille, le libellé au milieu de sa case ; un nom trop long passe sur deux lignes plutôt que de déborder. */
+.ui-choices--grid .ui-choice {
+  justify-content: center;
+  padding: var(--space-1) var(--space-2);
+}
+
+.ui-choice__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ui-choice[aria-checked='true'] {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.ui-choice:focus-visible {
+  outline: 2px solid var(--ink-2);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .ui-choice[aria-checked='false']:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* Petite taille, pour un réglage posé sur la page : nettement sous les boutons d'une fenêtre. */
+.ui-choices--s {
+  gap: var(--space-1);
+}
+
+.ui-choices--s .ui-choice {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-s);
+}
+
 /* --- Point d'interrogation qui déplie une explication (`HelpButton`) --- */
 
 .ui-help {
