@@ -74,6 +74,7 @@ import { HelpText, HelpToggle, SettingRow, SettingsScope } from '../components/H
 import { useHelpCollapseAll } from '../components/helpContext';
 import NumberField from '../components/NumberField';
 import ProfileScreenSettings from '../components/ProfileScreenSettings';
+import { dateLocale } from '../core/i18n';
 import './SettingsPage.css';
 
 /**
@@ -1061,7 +1062,7 @@ function AddActivityForm({
   );
 }
 
-const megabytes = (bytes: number): string => (bytes / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 1 });
+const megabytes = (bytes: number): string => (bytes / 1e6).toLocaleString(dateLocale(), { maximumFractionDigits: 1 });
 
 /**
  * Cartes gardées sur l'appareil (plan et satellite) : place occupée, plafond, vidage. Monté
@@ -1082,7 +1083,7 @@ function OfflineMapsSettings() {
       <div className="ui-field-row">
         <span className="ui-field-row__label">Place occupée</span>
         <span className="num">
-          {usage === null ? '…' : `${megabytes(usage.bytes)} Mo (${usage.tiles.toLocaleString('fr-FR')} morceaux)`}
+          {usage === null ? '…' : `${megabytes(usage.bytes)} Mo (${usage.tiles.toLocaleString(dateLocale())} morceaux)`}
           {satellite && satellite.tiles > 0 && `, dont satellite ${megabytes(satellite.bytes)} Mo`}
         </span>
       </div>

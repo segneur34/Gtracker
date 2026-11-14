@@ -20,13 +20,14 @@ import SessionPreviewMap from './SessionPreviewMap';
 import SessionRenameField from './SessionRenameField';
 import Button from './ui/Button';
 import MoreMenu from './ui/MoreMenu';
+import { dateLocale } from '../core/i18n';
 import './SessionRow.css';
 
 /** Marge de la ligne à l'écran pour la file des lieux : aucune, seules les lignes vues comptent. */
 const ROW_PLACE_MARGIN = '0px';
 
 const formatTime = (ms: number): string =>
-  new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  new Date(ms).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
 
 /** Chiffres d'une ligne, selon le traitement de son calcul. */
 const rowStats =(session: LibrarySession, activity: Activity | null): string[] => {

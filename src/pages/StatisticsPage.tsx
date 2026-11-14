@@ -54,6 +54,7 @@ import { plural } from '../core/basics';
 import StatTile from '../components/ui/StatTile';
 import { CHART_GRID_PROPS, CHART_TICK, OTHERS_COLOR, chartTick, yAxisLabel } from '../components/chartStyle';
 import { STORAGE_KEYS } from '../core/appIdentity';
+import { dateLocale } from '../core/i18n';
 
 /**
  * Statistiques : une vue d'ensemble, puis une famille, puis
@@ -432,7 +433,7 @@ function StatisticsPage() {
     : metric.unit === 'secondes' ? 's'
     : '';
   const axisTick = (v: number): string =>
-    metric.unit === 'vitesse' ? formatSpeedValue(v, speedUnit) : v.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
+    metric.unit === 'vitesse' ? formatSpeedValue(v, speedUnit) : v.toLocaleString(dateLocale(), { maximumFractionDigits: 1 });
   /** Valeur d'une session en clair, dans l'unité de la sélection. */
   const metricText = (value: number): string => {
     switch (metric.unit) {
@@ -675,7 +676,7 @@ function StatisticsPage() {
                               const row = active ? (payload?.[0]?.payload as ChartRow | WeekRow | undefined) : undefined;
                               if (!row || row.y === undefined) return null;
                               if (isWeekRow(row)) {
-                                const monday = new Date(row.weekStartMs).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+                                const monday = new Date(row.weekStartMs).toLocaleDateString(dateLocale(), { day: '2-digit', month: '2-digit' });
                                 return (
                                   <div className="stats-tooltip">
                                     <strong>Semaine du {monday}</strong>

@@ -2,6 +2,7 @@
  * Conversions d'unités. Le noyau travaille en m/s, l'affichage se fait ici.
  */
 import { toFixedNumber } from './basics';
+import { currentLang, dateLocale, decimalSeparator } from './i18n';
 
 export const MS_TO_KNOTS = 1.94384;
 export const MS_TO_KMH = 3.6;
@@ -19,14 +20,14 @@ export const msToKmh = (ms: number): number => ms * MS_TO_KMH;
 export const kmhToMs = (kmh: number): number => kmh / MS_TO_KMH;
 
 /**
- * Nombre décimal à l'affichage : virgule française, `decimals` chiffres fixes
- * (« 12,40 »). Le seul formateur des décimales d'écran : les valeurs passées aux
- * bibliothèques, aux fichiers et aux fiches restent des nombres à point.
+ * Nombre décimal à l'affichage : séparateur de la langue (virgule en français),
+ * `decimals` chiffres fixes (« 12,40 »). Le seul formateur des décimales d'écran :
+ * les valeurs passées aux bibliothèques, aux fichiers et aux fiches restent des nombres à point.
  */
-export const formatDecimal = (value: number, decimals = 1): string => (isFinite(value) ? value.toFixed(decimals).replace('.', ',') : '-');
+export const formatDecimal = (value: number, decimals = 1): string => (isFinite(value) ? value.toFixed(decimals).replace('.', decimalSeparator()) : '-');
 
-/** Texte décimal déjà arrondi (« 12.4 ») mis à la virgule pour l'affichage ; tout autre texte est rendu tel quel. */
-export const commaDecimal = (text: string | number): string => String(text).replace(/^(-?\d+)\.(\d+)$/, '$1,$2');
+/** Texte décimal déjà arrondi (« 12.4 ») mis au séparateur de la langue pour l'affichage ; tout autre texte est rendu tel quel. */
+export const commaDecimal = (text: string | number): string => String(text).replace(/^(-?\d+)\.(\d+)$/, `$1${decimalSeparator()}$2`);
 
 /** Nombre lu dans un texte d'affichage (virgule ou point) : l'inverse de `formatDecimal`. */
 export const parseDecimal = (text: string): number => parseFloat(text.replace(',', '.'));
@@ -209,7 +210,7 @@ export const formatDuration = (ms: number): string => {
   const totalMin = Math.floor(ms / 60000);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  return h > 0 ? `${h.toLocaleString('fr-FR')} h ${pad2(m)}` : `${m} min`;
+  return h > 0 ? `${h.toLocaleString(dateLocale())} h ${pad2(m)}` : `${m} min`;
 };
 
 /**
@@ -258,9 +259,13 @@ export const formatTimeOfDay = (ms: number): string => {
 
 const WEEKDAYS_FR = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 
+/** Jour de la semaine abrégé : la table française, sinon celui de la locale de la langue (« Wed », « mié »). */
+const shortWeekday = (date: Date): string =>
+  currentLang() === 'fr' ? WEEKDAYS_FR[date.getDay()] : date.toLocaleDateString(dateLocale(), { weekday: 'short' });
+
 /** Date et heure de départ d'une session, en heure locale : « mer. 14/10/2026 · 10:02 ». */
 export const formatSessionDate = (ms: number): string => {
   const date = new Date(ms);
   if (isNaN(date.getTime())) return '-';
-  return `${WEEKDAYS_FR[date.getDay()]} ${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()} · ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+  return `${shortWeekday(date)} ${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()} · ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 };

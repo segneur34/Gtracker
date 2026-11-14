@@ -56,6 +56,7 @@ import { currentPosition, locationPermissionGranted } from '../platform/location
 import { isNativeApp } from '../platform/runtime';
 import { jsonStore } from '../platform/storage';
 import { STORAGE_KEYS } from '../core/appIdentity';
+import { dateLocale } from '../core/i18n';
 
 /**
  * Planification d'un parcours : des balises numérotées, posées sur la carte et
@@ -175,7 +176,7 @@ function MapEvents({ onTap, onTakeOver }: { onTap: (w: Waypoint) => void; onTake
   return null;
 }
 
-const defaultName = (): string => `Itinéraire du ${new Date().toLocaleDateString('fr-FR')}`;
+const defaultName = (): string => `Itinéraire du ${new Date().toLocaleDateString(dateLocale())}`;
 
 const sameGuide = (a: MarkGuideSettings | null, b: MarkGuideSettings | null): boolean => JSON.stringify(a) === JSON.stringify(b);
 

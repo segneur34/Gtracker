@@ -15,6 +15,7 @@
  */
 
 import { DAY_MS } from '../core/calendar';
+import { dateLocale } from '../core/i18n';
 
 /** Règle de la racine, fixée par le produit. */
 export interface RootRules {
@@ -137,4 +138,4 @@ export const rootGrowth = (sessions: readonly RootSession[], goalMin: number, no
 
 /** Niveau en clair : entier, ou une décimale pendant une animation. */
 export const levelText = (level: number): string =>
-  level.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
+  level.toLocaleString(dateLocale(), { maximumFractionDigits: 1 });

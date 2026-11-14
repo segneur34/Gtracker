@@ -1,5 +1,6 @@
 import type { Activity } from '../core/activities';
 import { plural } from '../core/basics';
+import { dateLocale } from '../core/i18n';
 import { DISTANCE_UNIT_SYMBOL, formatDuration, toDisplayDistance, type DistanceUnit } from '../core/units';
 
 /**
@@ -87,11 +88,11 @@ const WHOLE_DISTANCE_FROM = 100;
 
 const totalDistance = (m: number, unit: DistanceUnit): string => {
   const value = toDisplayDistance(m, unit);
-  return `${value.toLocaleString('fr-FR', { maximumFractionDigits: value < WHOLE_DISTANCE_FROM ? 1 : 0 })} ${DISTANCE_UNIT_SYMBOL[unit]}`;
+  return `${value.toLocaleString(dateLocale(), { maximumFractionDigits: value < WHOLE_DISTANCE_FROM ? 1 : 0 })} ${DISTANCE_UNIT_SYMBOL[unit]}`;
 };
 
 const totalDuration = (ms: number): string =>
-  ms >= WHOLE_HOURS_FROM_MS ? `${Math.round(ms / 3600_000).toLocaleString('fr-FR')} h` : formatDuration(ms);
+  ms >= WHOLE_HOURS_FROM_MS ? `${Math.round(ms / 3600_000).toLocaleString(dateLocale())} h` : formatDuration(ms);
 
 /**
  * « de wingfoil », « d'optimist » : le nom de l'activité dans la phrase, sa majuscule retirée sauf pour un sigle

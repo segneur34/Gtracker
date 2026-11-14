@@ -4,6 +4,7 @@ import { useLongPress } from '../../hooks/useLongPress';
 import { useTransientValue } from '../../hooks/useTransientValue';
 import Button from './Button';
 import HoldDial from './HoldDial';
+import { dateLocale } from '../../core/i18n';
 
 /** Carré rouge de l'arrêt, dans le grand cadran. */
 const STOP_ICON = <span className="ui-record-dot ui-record-dot--stop" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />;
@@ -53,7 +54,7 @@ function HoldButton({
     if (!e.defaultPrevented) setHint(true);
   };
 
-  const holdS = (holdMs / 1000).toLocaleString('fr-FR');
+  const holdS = (holdMs / 1000).toLocaleString(dateLocale());
   return (
     <>
       <Button variant="danger" size={size} className="ui-btn--hold" style={style} disabled={disabled} aria-label={ariaLabel}

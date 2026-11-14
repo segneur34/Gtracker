@@ -38,6 +38,7 @@ import { TUTORIAL_OF_DAY_VISIBLE, tutorialCardGate } from '../tutorials/tutorial
 import { OTHERS_COLOR } from '../components/chartStyle';
 import './ProfilePage.css';
 import { STORAGE_KEYS } from '../core/appIdentity';
+import { dateLocale } from '../core/i18n';
 
 /**
  * Profil, la page où s'ouvre l'application : une période en un coup d'œil (`library/profile.ts`). En tête, une photo
@@ -113,7 +114,7 @@ const hoursText = (s: number): string => formatDuration(s * 1000);
 /** Distance dans l'unité donnée, avec son symbole : une décimale sous 100, aucune au-delà (« 4,5 km », « 310 km »). */
 const distanceText = (m: number, unit: DistanceUnit): string => {
   const v = toDisplayDistance(m, unit);
-  const shownValue = v < 100 ? formatDecimal(v, 1).replace(/,0$/, '') : Math.round(v).toLocaleString('fr-FR');
+  const shownValue = v < 100 ? formatDecimal(v, 1).replace(/[,.]0$/, '') : Math.round(v).toLocaleString(dateLocale());
   return `${shownValue} ${DISTANCE_UNIT_SYMBOL[unit]}`;
 };
 

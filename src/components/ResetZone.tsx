@@ -8,6 +8,7 @@ import { IconTrash, IconUndo } from './icons';
 import PanelTitle from './PanelTitle';
 import Dialog from './ui/Dialog';
 import HoldButton from './ui/HoldButton';
+import { dateLocale } from '../core/i18n';
 
 /**
  * Zone « Remise à zéro », au bas de la carte Mémoire de Réglages, repliée au départ : « Réglages d'usine » et
@@ -27,7 +28,7 @@ const NO_COUNTS: EraseCounts = { sessions: 0, pending: 0, routes: 0 };
 const runningText = (kind: ResetKind, progress: ResetProgress | null): string => {
   if (kind === 'usine') return "Retour aux réglages d'usine…";
   if (progress === null || progress.total === 0) return 'Suppression en cours…';
-  return `Suppression en cours : ${progress.done.toLocaleString('fr-FR')} fichiers sur ${progress.total.toLocaleString('fr-FR')}…`;
+  return `Suppression en cours : ${progress.done.toLocaleString(dateLocale())} fichiers sur ${progress.total.toLocaleString(dateLocale())}…`;
 };
 
 function ResetZone() {

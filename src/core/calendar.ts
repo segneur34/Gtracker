@@ -2,6 +2,7 @@
  * Calendrier local : jours, semaines ISO, mois, dates en clair. Les bornes sont
  * des minuits locaux (juste aux changements d'heure) ; pur.
  */
+import { dateLocale } from './i18n';
 import { pad2 } from './units';
 
 export const DAY_MS = 86_400_000;
@@ -56,10 +57,17 @@ export const formatLocalDate = (ms: number): string => {
 /** Plus grand écart à l'origine d'une date valide, en ms ; au-delà, `toLocaleDateString` rend « Invalid Date ». */
 const MAX_DATE_MS = 8.64e15;
 
-/** Formateur français nommé ; une date invalide donne « Invalid Date », comme `toLocaleDateString`. */
+/**
+ * Formateur nommé, dans la locale de la langue (`dateLocale`), construit au premier emploi puis gardé tant que la
+ * locale ne change pas ; une date invalide donne « Invalid Date », comme `toLocaleDateString`.
+ */
 const dateFormatter = (options: Intl.DateTimeFormatOptions): ((when: number | Date) => string) => {
-  const format = new Intl.DateTimeFormat('fr-FR', options);
-  return (when) => (Math.abs(+when) <= MAX_DATE_MS ? format.format(when) : 'Invalid Date');
+  let built: { locale: string; format: Intl.DateTimeFormat } | null = null;
+  return (when) => {
+    const locale = dateLocale();
+    if (built?.locale !== locale) built = { locale, format: new Intl.DateTimeFormat(locale, options) };
+    return Math.abs(+when) <= MAX_DATE_MS ? built.format.format(when) : 'Invalid Date';
+  };
 };
 
 /** « 12 mars » */

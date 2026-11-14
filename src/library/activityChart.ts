@@ -10,6 +10,7 @@
 import {
   DAY_MS, addDays, isoWeek, isoWeekday, monthYearLong, shortDate, stacksByActivity, startOfDay, startOfIsoWeek,
 } from '../core/calendar';
+import { dateLocale } from '../core/i18n';
 
 export type ChartPeriod = 'semaine' | 'trente' | 'sixmois' | 'annee';
 
@@ -76,7 +77,7 @@ const DAY_LETTERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const FIRST_LABEL_MIN_SLOTS = 4;
 
 const longDay = (ms: number): string =>
-  new Date(ms).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  new Date(ms).toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' });
 
 
 const MONTH_LETTERS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
