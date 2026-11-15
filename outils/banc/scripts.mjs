@@ -108,6 +108,8 @@ export const SCRIPTS = [
   { nom: 'tailles', args: ['{port}', '{travail}', '{captures?}'],
     pages: ['voile', 'surf', 'enregistrer', 'sessions', 'planification', 'statistiques', 'profil', 'reglages'],
     sansCache: true, releve: ['rapport.md'], delaiMin: 20 },
+  // Textes restés en français et largeurs, dans la langue du passage (`--langue en` ou `es`) ; en français, largeurs seules.
+  { nom: 'langues', args: ['{port}', '{travail}'], pages: [], sansCache: true, releve: ['rapport.md'], delaiMin: 15 },
   { nom: 'fc-repos', args: ['{port}', '{captures?}'], pages: ['profil'], solo: true },
   { nom: 'test-fcrepos', args: ['{port}', '{captures?}'], pages: ['profil', 'reglages'], solo: true },
   // Carte du direct sur un itinéraire suivi : hors-piste sans saut, attributs SVG des tracés en plan et en satellite.

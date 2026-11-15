@@ -477,3 +477,13 @@ button.profile-legend__row {
   flex: 0 0 auto;
   color: var(--faint);
 }
+
+/* Hors du français, les deux libellés sont plus longs : quand ils ne tiennent pas côte à côte, le compte passe sous
+   le titre, le chevron au bout de sa ligne, au lieu de sortir du bouton. */
+:root:not([lang='fr']) .profile-fold {
+  flex-wrap: wrap;
+}
+
+:root:not([lang='fr']) .profile-fold__chevron {
+  margin-left: auto;
+}

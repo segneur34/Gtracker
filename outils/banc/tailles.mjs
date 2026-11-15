@@ -19,6 +19,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect } from './lib/cdp.mjs';
+import { dictionnaire, echappe, langueDeLaPage, traducteur } from './lib/langue.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { traceSurf, traceVoile } from './lib/traces.mjs';
 
@@ -38,8 +39,10 @@ const go = async (path, max) => {
   await waitFor(`Boolean(document.querySelector('.shell-main'))`, { timeout: 5000, every: 50, label: 'premier rendu' });
   return ms;
 };
+// Langue du passage (`lib/langue.mjs`), lue dans la page au premier chargement : les textes cliqués sont traduits.
+let tr = (cle) => cle;
 const holdStop = async () => {
-  const down = await evaluate(`(() => { const b = [...document.querySelectorAll('button.ui-btn--danger')].find((x) => x.textContent.includes('Arrêter') && !x.disabled && !x.closest('.ivl')); if (!b) return 'absent'; window.__stopButton = b; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
+  const down = await evaluate(`(() => { const b = [...document.querySelectorAll('button.ui-btn--danger')].find((x) => x.textContent.includes(${JSON.stringify(tr('Arrêter'))}) && !x.disabled && !x.closest('.ivl')); if (!b) return 'absent'; window.__stopButton = b; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
   if (down !== 'ok') return down;
   await wait(2300);
   return evaluate(`(() => { const b = window.__stopButton; b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); b.click(); return 'ok'; })()`);
@@ -183,6 +186,7 @@ await setSize(SIZES_ALL[0]);
 const paths = {};
 for (const s of SESSIONS) {
   await go(`/${s.key}`, 3000);
+  if (s === SESSIONS[0]) tr = traducteur(dictionnaire(await langueDeLaPage(evaluate)));
   const imported = await importGpx(s.gpx, `${s.key}.gpx`);
   await waitFor(async () => (await records())?.some((r) => Math.abs((r.summary?.startMs ?? 0) - T[s.key]) < 2000), { timeout: 9000, label: `fiche ${s.key}` });
   await settle({ max: 2000, label: `import ${s.key}` });
@@ -195,8 +199,8 @@ for (const s of SESSIONS) {
 const OPEN_ALL = `(async () => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   for (let pass = 0; pass < 6; pass++) {
-    const tabs = [...document.querySelectorAll('.an-carte-col .ui-tab')].filter((b) => b.getAttribute('aria-pressed') === 'false' && b.textContent.trim() !== 'avancé');
-    const folds = [...document.querySelectorAll('[aria-expanded="false"]')].filter((b) => !b.classList.contains('an-tabs-advanced-toggle') && !b.hasAttribute('aria-haspopup') && !b.closest('.activity-select, .ui-more') && !b.closest('.shell-tabbar, .shell-topbar') && !/aide|help/i.test(b.getAttribute('aria-label') ?? ''));
+    const tabs = [...document.querySelectorAll('.an-carte-col .ui-tab')].filter((b) => b.getAttribute('aria-pressed') === 'false' && b.textContent.trim() !== ${JSON.stringify(tr('avancé'))});
+    const folds = [...document.querySelectorAll('[aria-expanded="false"]')].filter((b) => !b.classList.contains('an-tabs-advanced-toggle') && !b.hasAttribute('aria-haspopup') && !b.closest('.activity-select, .ui-more') && !b.closest('.shell-tabbar, .shell-topbar') && !/aide|help${tr('Aide : {label}').startsWith('Aide') ? '' : `|${echappe(tr('Aide : {label}').split(/[\s:]/)[0])}`}/i.test(b.getAttribute('aria-label') ?? ''));
     if (!tabs.length && !folds.length) break;
     for (const b of [...tabs, ...folds]) b.click();
     await wait(500);
@@ -269,7 +273,7 @@ if (!process.env.PAGES || 'enregistrement'.includes(process.env.PAGES)) {
   await wait(300);
   await importFiles(replay, 'input[type=file]');
   await settle({ max: 800 });
-  const started = await evaluate(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.includes('Démarrer')); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
+  const started = await evaluate(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.includes(${JSON.stringify(tr('Démarrer'))})); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
   console.log('rejeu :', started);
   if (started === 'ok') {
     await wait(5000);
