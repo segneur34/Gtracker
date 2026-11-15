@@ -128,7 +128,7 @@ Limites connues : un trou au milieu du journal de la page (messages calés puis 
 
 ### État au 15/11
 
-Quatre parties commitées, vérification complète verte, relectures sans défaut confirmé, banc identique (`session-save-resume`, `gps-perdu`, `notification`, `carte-direct`, `apropos`). Reste : la version à poser après 0.00.99 (question à l'utilisateur), l'APK, les essais 277 à 279, puis la passe de documentation (ETAT §12, HISTORIQUE).
+Quatre parties commitées, vérification complète verte, relectures sans défaut confirmé, banc identique (`session-save-resume`, `gps-perdu`, `notification`, `carte-direct`, `apropos`). APK 0.01.00 construite et installée le 15/11 (version choisie par l'utilisateur après 0.00.99). Reste : les essais 277 à 279, puis la passe de documentation (ETAT §12, HISTORIQUE).
 
 ### Non vérifié, à lever au téléphone
 
