@@ -16,6 +16,10 @@ Le graphe est `src/components/ActivityChart.tsx` (et son CSS), ses étiquettes v
 - Le moyen est libre (blanc minimal garanti, étiquette une semaine sur deux quand la place manque, taille de police…), tant qu'il ne suppose pas une largeur de lettre : la mesure ou la mise en page doit tenir pour une autre langue et pour un texte agrandi.
 - `src/library/stats.ts` emploie la même clé `S{week}` pour les Statistiques : regarder si le même défaut s'y produit ; si la pièce est la même, la correction le couvre ; sinon le signaler dans le rapport sans élargir.
 
+## Retour de l'essai 262 (15/11, APK 0.00.77)
+
+« ok, mais plutôt que de 10 en 10 il y a la place pour le 5 en 5 écrit un tout petit peu plus petit. » La première correction cachait une étiquette sur deux sur l'année. Retouche : si deux étiquettes se touchent à la taille normale, tout l'axe passe à la taille du dessous (`--text-2xs`), avec un blanc minimal de 4 px ; une étiquette n'est cachée que si elle touche encore. En français, où les étiquettes tiennent, l'axe garde sa taille.
+
 ## Vérification
 
 - Mesurer avec le banc (`outils/banc/langues.mjs` contrôle déjà les largeurs par langue ; `outils/banc/profil.mjs` relève le Profil) : en anglais à 390 et 320 px, les boîtes de deux étiquettes voisines ne se touchent plus. Si un contrôle de ce chevauchement s'ajoute en quelques lignes à `langues.mjs`, l'ajouter.
