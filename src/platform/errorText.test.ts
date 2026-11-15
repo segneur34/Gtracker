@@ -114,7 +114,12 @@ describe('plainError dans une autre langue', () => {
 
 describe('locationErrorText', () => {
   it('dit où réactiver la localisation au premier refus', () => {
-    expect(locationErrorText({ message: 'User denied location permission', code: 'NOT_AUTHORIZED' })).toBe(LOCATION_DENIED_TEXT);
-    expect(locationErrorText({ message: 'User denied location permission' })).toBe(LOCATION_DENIED_TEXT);
+    expect(locationErrorText({ message: 'Position non autorisée', code: 'NOT_AUTHORIZED' })).toBe(LOCATION_DENIED_TEXT);
+  });
+
+  it("ne montre jamais le message du téléphone : seul le code se traduit", () => {
+    expect(locationErrorText({ message: 'GPS du téléphone indisponible', code: 'START_FAILED' })).toBe('Localisation indisponible.');
+    expect(locationErrorText(new Error('Position non autorisée'))).toBe('Localisation indisponible.');
+    expect(locationErrorText(null)).toBe('Localisation indisponible.');
   });
 });

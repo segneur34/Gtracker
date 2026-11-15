@@ -2,11 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * Le manifeste Android : ni sauvegarde Google ni transfert d'appareil, le dossier mémoire est la seule
- * sauvegarde ; le récepteur de démarrage du greffon GPS et sa permission retirés. Une mise à jour du greffon qui
- * changerait ce récepteur rendrait le retrait muet sans erreur de compilation.
+ * sauvegarde ; le service de l'enregistrement et ses autorisations déclarés ici, sans compter sur le manifeste d'un
+ * greffon ; rien qui démarre avec le téléphone.
  *
- * Les services et la permission batterie restent pour l'instant : leur retrait se décidera
- * avec le reste, pas par accident.
+ * La permission batterie reste pour l'instant : son retrait se décidera avec le reste, pas par accident.
  */
 
 // Les types de Node ne sont pas ceux de l'app (voir `hooks/mediaQueries.test.ts`) : le peu qui sert est décrit à la main.
@@ -16,23 +15,12 @@ interface Fs {
 }
 const fs = (await import(/* @vite-ignore */ 'node:fs' as string)) as Fs;
 
-/** Source d'un fichier d'un paquet, cherché en remontant les `node_modules` comme le fait Node. */
-const packageSource = (path: string): string => {
-  for (let dir = new URL('./', import.meta.url); ; dir = new URL('../', dir)) {
-    const file = new URL(`node_modules/${path}`, dir);
-    if (fs.existsSync(file)) return fs.readFileSync(file, 'utf8');
-    if (new URL('../', dir).href === dir.href) throw new Error(`Introuvable dans node_modules : ${path}`);
-  }
-};
 const repoFile = (path: string): string => fs.readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
 /** Commentaires XML retirés : un mot cité dans un commentaire ne prouve rien. */
 const withoutComments = (xml: string): string => xml.replace(/<!--[\s\S]*?-->/g, '');
 const MANIFEST = withoutComments(repoFile('android/app/src/main/AndroidManifest.xml'));
 const RULES = withoutComments(repoFile('android/app/src/main/res/xml/data_extraction_rules.xml'));
-const PLUGIN_MANIFEST = packageSource('@capgo/background-geolocation/android/src/main/AndroidManifest.xml');
-
-const BOOT_RECEIVER = 'com.capgo.capacitor_background_geolocation.GeofenceBootReceiver';
 /** Tous les emplacements que connaît `data-extraction-rules` (developer.android.com/identity/data/autobackup). */
 const DOMAINS = ['root', 'file', 'database', 'sharedpref', 'external', 'device_root', 'device_file', 'device_database', 'device_sharedpref'];
 
@@ -40,26 +28,21 @@ const DOMAINS = ['root', 'file', 'database', 'sharedpref', 'external', 'device_r
 const tagWithName = (xml: string, tag: string, name: string): string | undefined =>
   xml.match(new RegExp(`<${tag}\\b[^>]*android:name="${name.replace(/\./g, '\\.')}"[^>]*>`))?.[0];
 
-describe('manifeste Android : retraits', () => {
-  it('déclare l\'espace de noms tools', () => {
-    expect(MANIFEST).toContain('xmlns:tools="http://schemas.android.com/tools"');
+describe('manifeste Android : rien ne démarre avec le téléphone', () => {
+  /** Une balise est hors du manifeste final si elle manque, ou si elle ne fait que retirer celle d'une bibliothèque. */
+  const absentOrRemoved = (tag: string | undefined): boolean => tag === undefined || tag.includes('tools:node="remove"');
+
+  it('aucune permission de démarrage', () => {
+    expect(absentOrRemoved(tagWithName(MANIFEST, 'uses-permission', 'android.permission.RECEIVE_BOOT_COMPLETED'))).toBe(true);
   });
 
-  it('retire le récepteur de démarrage du greffon GPS', () => {
-    expect(tagWithName(MANIFEST, 'receiver', BOOT_RECEIVER)).toContain('tools:node="remove"');
+  it('aucun récepteur déclaré, hors ceux retirés à une bibliothèque', () => {
+    const receivers = MANIFEST.match(/<receiver\b[^>]*>/g) ?? [];
+    expect(receivers.filter((tag) => !absentOrRemoved(tag))).toEqual([]);
   });
 
-  it('retire la permission de démarrage', () => {
-    expect(tagWithName(MANIFEST, 'uses-permission', 'android.permission.RECEIVE_BOOT_COMPLETED')).toContain('tools:node="remove"');
-  });
-
-  it('le greffon déclare toujours ce récepteur et cette permission : le retrait vise juste', () => {
-    expect(PLUGIN_MANIFEST).toContain(`android:name="${BOOT_RECEIVER}"`);
-    expect(PLUGIN_MANIFEST).toContain('android:name="android.permission.RECEIVE_BOOT_COMPLETED"');
-  });
-
-  it('l\'application ne crée aucune zone de géorepérage, seule chose que ce récepteur restaure', () => {
-    expect(repoFile('src/platform/location.ts')).not.toMatch(/addGeofence/);
+  it("une balise qui retire a besoin de l'espace de noms tools", () => {
+    if (MANIFEST.includes('tools:node=')) expect(MANIFEST).toContain('xmlns:tools="http://schemas.android.com/tools"');
   });
 });
 
@@ -114,10 +97,6 @@ describe('manifeste Android : ce qui reste', () => {
   it("changer la taille ou la graisse du texte du téléphone ne recrée pas l'activité (enregistrement en cours)", () => {
     const changes = tagWithName(MANIFEST, 'activity', '.MainActivity')?.match(/android:configChanges="([^"]*)"/)?.[1].split('|') ?? [];
     expect(changes).toEqual(expect.arrayContaining(['fontScale', 'fontWeightAdjustment', 'orientation', 'screenSize', 'uiMode', 'density']));
-  });
-
-  it('ne retire pas le récepteur de géorepérage du greffon', () => {
-    expect(MANIFEST).not.toContain('GeofenceBroadcastReceiver');
   });
 });
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { baseActivity } from '../core/activities';
-import { STORAGE_KEYS } from '../core/appIdentity';
+import { FILE_FORMATS, STORAGE_KEYS } from '../core/appIdentity';
 import type { LocationFix, LocationSource, StopLocation } from '../platform/location';
 import { parseJournal } from '../recording/journal';
 import { EMPTY_RECORDING_STATS, addFixAfterManualPause, addFixToStats, displayedDurationMs, type RecordingStats } from '../recording/session';
@@ -39,11 +39,25 @@ vi.mock('../platform/files', async (importOriginal) => ({
   recordingJournal: journal,
 }));
 
-/** Services vivants vus par `Recovery.state()`. */
-const services = vi.hoisted(() => ({ gps: false }));
-vi.mock('../platform/recovery', () => ({ readRecoveryServices: async () => ({ gps: services.gps }) }));
+/**
+ * Service de position vu par `Recording.state()` : en route (`gps`), pour la session du journal de la page sauf
+ * `session` dite, en pause manuelle ou non.
+ */
+const services = vi.hoisted(() => ({ gps: false, session: null as number | null, paused: false }));
+vi.mock('../platform/recovery', () => ({
+  readRecoveryServices: async () => {
+    if (!services.gps) return { gps: false, session: null, paused: false };
+    let ofJournal: number | null = null;
+    try {
+      ofJournal = (JSON.parse((journal.text ?? '').split('\n')[0]) as { startedAtMs?: number }).startedAtMs ?? null;
+    } catch {
+      // Journal illisible : le service ne dit aucune session connue.
+    }
+    return { gps: true, session: services.session ?? ofJournal, paused: services.paused };
+  },
+}));
 
-/** Service GPS : le raccord sans relance, et les arrêts. */
+/** Service de position : le raccord sans relance, les arrêts, et son journal des positions. */
 const gpsService = vi.hoisted(() => ({
   onFix: null as ((fix: LocationFix) => void) | null,
   onError: null as ((message: string) => void) | null,
@@ -51,10 +65,18 @@ const gpsService = vi.hoisted(() => ({
   adoptFails: false,
   stops: 0,
   orphanStops: 0,
+  /** Journal des positions du service, en texte ; `null` : aucun (comme dans le navigateur). */
+  log: null as string | null,
+  /** Heures après lesquelles la page a demandé le journal, dans l'ordre. */
+  logReads: [] as (number | null)[],
+  logClears: 0,
+  /** Juste avant, puis juste après que le service a lu son fichier : une position qui arrive à ce moment-là. */
+  beforeLogRead: null as (() => void) | null,
+  afterLogRead: null as (() => void) | null,
 }));
 vi.mock('../platform/location', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../platform/location')>()),
-  adoptRunningService: (onFix: (fix: LocationFix) => void, onError: (message: string) => void): StopLocation => {
+  attachDeviceLocation: async (onFix: (fix: LocationFix) => void, onError: (message: string) => void): Promise<StopLocation> => {
     if (gpsService.adoptFails) throw new Error('pont introuvable');
     gpsService.adoptions += 1;
     gpsService.onFix = onFix;
@@ -66,6 +88,17 @@ vi.mock('../platform/location', async (importOriginal) => ({
   },
   stopOrphanedDeviceLocation: async () => {
     gpsService.orphanStops += 1;
+  },
+  readLoggedFixes: async (afterMs: number | null) => {
+    gpsService.logReads.push(afterMs);
+    gpsService.beforeLogRead?.();
+    const text = gpsService.log;
+    gpsService.afterLogRead?.();
+    return text;
+  },
+  clearLoggedFixes: async () => {
+    gpsService.logClears += 1;
+    gpsService.log = null;
   },
 }));
 
@@ -258,7 +291,37 @@ const run = (emit: (s: number) => void, from: number, to: number, hz: number) =>
   }
 };
 
+/** Une position telle que le service l'écrit dans son journal : brute, sans fréquence cardiaque. */
+const nativeFix = (s: number, speedMs = 3): string => {
+  const fix = fixAt(s, speedMs);
+  return `[${fix.timeMs},${fix.lat},${fix.lon},${fix.accuracyM},null,${fix.speedMs},null]\n`;
+};
+
+/** Les positions du service de `from` à `to` secondes, à `hz` Hz. */
+const nativeFixes = (from: number, to: number, hz: number, speedMs = 3): string => {
+  let lines = '';
+  for (let k = Math.round(from * hz); k <= Math.round(to * hz); k++) lines += nativeFix(k / hz, speedMs);
+  return lines;
+};
+
+/** Journal du service pour la session démarrée à `T0`, celle de tous les départs de ce fichier. */
+const nativeLog = (...lines: string[]): string => `{"format":"${FILE_FORMATS.positions}","version":1,"session":${T0}}\n${lines.join('')}`;
+
+/** Source qui, comme le service du téléphone, reçoit les ordres de pause : chacun relevé avec son heure. */
+const serviceSource = () => {
+  const pauses: { paused: boolean; atMs: number }[] = [];
+  return Object.assign(fakeSource(), {
+    pauses,
+    setPaused: async (paused: boolean, atMs: number) => {
+      pauses.push({ paused, atMs });
+    },
+  });
+};
+
 const lineCount = (marker: string): number => (journal.text ?? '').split('\n').filter((l) => l.startsWith(`["${marker}"`)).length;
+/** Heure de la dernière ligne `marker` du journal de la page. */
+const lastLineAt = (marker: string): number | undefined =>
+  (journal.text ?? '').split('\n').filter((l) => l.startsWith(`["${marker}"`)).map((l) => (JSON.parse(l) as [string, number])[1]).at(-1);
 const headerCount = (): number => (journal.text ?? '').split('\n').filter((l) => l.startsWith('{"format"')).length;
 
 /** Le journal tel que l'écrivaient les versions d'avant : en-tête sans les réglages de la capture. */
@@ -278,11 +341,18 @@ beforeEach(async () => {
   journal.writes = 0;
   journal.readFails = false;
   services.gps = false;
+  services.session = null;
+  services.paused = false;
   gpsService.onFix = null;
   gpsService.adoptions = 0;
   gpsService.adoptFails = false;
   gpsService.stops = 0;
   gpsService.orphanStops = 0;
+  gpsService.log = null;
+  gpsService.logReads = [];
+  gpsService.logClears = 0;
+  gpsService.beforeLogRead = null;
+  gpsService.afterLogRead = null;
   sensors.starts = 0;
   sensors.stops = 0;
   sensors.pauses = 0;
@@ -1337,6 +1407,276 @@ describe('ceinture cardio après une coupure', () => {
       beltTimerFiresAt(T0 + 600_000);
       expect(fresh.getRecorderState().beltLost).toBe(false);
     });
+  });
+});
+
+describe.each([[1], [5]])('journal du service : ce que la page n\'a pas reçu est rattrapé, à %i Hz', (hz) => {
+  /** Enregistre de 0 à `toS`, journal de la page à jour ; le service, lui, continue d'écrire seul ensuite. */
+  const recordUntil = async (toS: number) => {
+    const source = serviceSource();
+    await recorder.startRecording(activity, source);
+    run(source.emit, 0, toS, hz);
+    await settle();
+    // Un départ efface le journal du service laissé par la session d'avant : les relevés repartent d'ici.
+    gpsService.logClears = 0;
+    gpsService.logReads = [];
+    return source;
+  };
+
+  /** Lignes de position écrites au journal de la page, doublons compris. */
+  const journalFixLines = (): number => (journal.text ?? '').split('\n').filter((l) => /^\[\d/.test(l)).length;
+
+  const uncutStats = (toS: number): RecordingStats => {
+    let stats: RecordingStats = EMPTY_RECORDING_STATS;
+    for (let k = 0; k <= Math.round(toS * hz); k++) stats = addFixToStats(stats, fixAt(k / hz));
+    return stats;
+  };
+
+  const liveTimes = (page: typeof recorder): number[] => page.getLiveFixes().map((f) => f.timeMs);
+  const strictlyIncreasing = (times: number[]): boolean => times.every((ms, i) => i === 0 || ms > times[i - 1]);
+
+  it('reprise silencieuse après 20 s sans la page : aucune position perdue ni doublée, aucune frontière', async () => {
+    await recordUntil(20);
+    gpsService.log = nativeLog(nativeFixes(0, 40, hz));
+    services.gps = true;
+    vi.setSystemTime(T0 + 40_000);
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+
+    const state = fresh.getRecorderState();
+    expect(state.status).toBe('recording');
+    expect(gpsService.adoptions).toBe(1);
+    // Demandé après la dernière position du journal de la page, puis après la dernière rattrapée.
+    expect(gpsService.logReads).toEqual([T0 + 20_000, T0 + 40_000]);
+    expect(state.stats).toEqual(uncutStats(40));
+    expect(fresh.getLiveSegmentCount()).toBe(1);
+    expect(parseJournal(journal.text!).fixes).toHaveLength(40 * hz + 1);
+    // Les positions rattrapées ne portent pas de fréquence cardiaque.
+    expect(fresh.getLiveFixes().every((f) => f.heartRateBpm === undefined)).toBe(true);
+
+    // Redélivrance écartée, puis la suite en direct : toujours un seul segment.
+    gpsService.onFix!(fixAt(40));
+    run((s) => gpsService.onFix!(fixAt(s)), 40 + 1 / hz, 50, hz);
+    await settle();
+    expect(fresh.getRecorderState().stats).toEqual(uncutStats(50));
+    expect(lineCount('break')).toBe(0);
+    expect(headerCount()).toBe(1);
+    expect(journal.writes).toBe(1);
+    expect(strictlyIncreasing(liveTimes(fresh))).toBe(true);
+    // Le journal du service n'est effacé qu'une fois la session rangée.
+    expect(gpsService.logClears).toBe(0);
+  });
+
+  it('une position arrivée pendant la lecture du journal du service : ni perdue ni doublée', async () => {
+    await recordUntil(20);
+    gpsService.log = nativeLog(nativeFixes(0, 30, hz));
+    // La page écoute déjà (seconde lecture) : une position écrite juste avant que le service lise son fichier, donc
+    // dans le texte rendu et dans le tampon ; une autre juste après, dans le tampon seul.
+    gpsService.beforeLogRead = () => {
+      if (!gpsService.onFix) return;
+      gpsService.beforeLogRead = null;
+      gpsService.log += nativeFix(31);
+      gpsService.onFix(fixAt(31));
+    };
+    gpsService.afterLogRead = () => {
+      if (!gpsService.onFix) return;
+      gpsService.afterLogRead = null;
+      gpsService.log += nativeFix(32);
+      gpsService.onFix(fixAt(32));
+    };
+    services.gps = true;
+    vi.setSystemTime(T0 + 32_000);
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+
+    const times = liveTimes(fresh);
+    expect(times).toHaveLength(30 * hz + 1 + 2);
+    expect(strictlyIncreasing(times)).toBe(true);
+    expect(times.slice(-2)).toEqual([T0 + 31_000, T0 + 32_000]);
+    expect(fresh.getLiveSegmentCount()).toBe(1);
+    expect(fresh.getRecorderState().stats.pointCount).toBe(30 * hz + 3);
+    run((s) => gpsService.onFix!(fixAt(s)), 33, 40, hz);
+    await settle();
+    expect(liveTimes(fresh)).toHaveLength(30 * hz + 3 + 7 * hz + 1);
+    // Au journal de la page aussi : chaque position une seule fois, les deux de la relecture comprises.
+    const written = parseJournal(journal.text!).fixes;
+    expect(written.length).toBeGreaterThanOrEqual(30 * hz + 3);
+    expect(journalFixLines()).toBe(written.length);
+    expect(lineCount('break')).toBe(0);
+  });
+
+  it('pause manuelle ouverte, page absente : rien de gardé, toujours en pause, la suite repart dans un segment neuf', async () => {
+    const source = await recordUntil(20);
+    vi.setSystemTime(T0 + 20_500);
+    await recorder.pauseRecording();
+    gpsService.log = nativeLog(nativeFixes(0, 20, hz), `["pause",${T0 + 20_500}]\n`, nativeFixes(21, 40, hz));
+    services.gps = true;
+    services.paused = true;
+    vi.setSystemTime(T0 + 40_000);
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(source.starts).toBe(1);
+
+    const state = fresh.getRecorderState();
+    expect(state.status).toBe('paused');
+    expect(state.pausedReason).toBe('manual');
+    expect(state.stats.pointCount).toBe(20 * hz + 1);
+    expect(displayedDurationMs(state.stats, state.pauseClock, T0 + 300_000)).toBe(20_000);
+    // Une position de la pause, redonnée par le service, reste écartée : la carte ne recule pas.
+    gpsService.onFix!(fixAt(40));
+    expect(fresh.getLivePosition()?.timeMs).toBe(T0 + 20_000);
+    gpsService.onFix!(fixAt(41));
+    expect(fresh.getLivePosition()?.timeMs).toBe(T0 + 41_000);
+
+    vi.setSystemTime(T0 + 45_000);
+    await fresh.resumeRecording();
+    run((s) => gpsService.onFix!(fixAt(s)), 46, 50, hz);
+    await settle();
+    expect(fresh.getRecorderState().stats.pointCount).toBe(20 * hz + 1 + 4 * hz + 1);
+    expect(displayedDurationMs(fresh.getRecorderState().stats, null, T0)).toBe(24_000);
+    expect(lineCount('break')).toBe(1);
+  });
+
+  it('service mort avec l\'application, puis « Continuer » : la trace va jusqu\'à sa dernière position, la suite dans un segment neuf', async () => {
+    await recordUntil(20);
+    // Le service a écrit seul jusqu'à 35 s, puis le processus a été tué.
+    gpsService.log = nativeLog(nativeFixes(0, 35, hz));
+    vi.setSystemTime(T0 + 100_000);
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    const pending = fresh.getRecorderState().pending!;
+    expect(pending.pointCount).toBe(35 * hz + 1);
+    expect((pending.content.match(/<trkseg>/g) ?? []).length).toBe(1);
+    expect(pending.canContinue).toBe(true);
+    expect(gpsService.orphanStops).toBe(1);
+    expect(parseJournal(journal.text!).fixes).toHaveLength(35 * hz + 1);
+
+    const next = serviceSource();
+    await fresh.continuePendingSession(next);
+    expect(fresh.getRecorderState().status).toBe('recording');
+    expect(next.starts).toBe(1);
+    // La levée de la pause posée par « Continuer » est dite au service, à l'heure de sa ligne.
+    expect(next.pauses).toEqual([{ paused: false, atMs: T0 + 100_000 }]);
+    expect(lastLineAt('resume')).toBe(T0 + 100_000);
+    run(next.emit, 101, 110, hz);
+    await settle();
+    // 35 s, puis 9 s : le temps hors de l'application ne compte pas.
+    expect(displayedDurationMs(fresh.getRecorderState().stats, null, T0)).toBe(44_000);
+    expect(lineCount('break')).toBe(1);
+    expect(headerCount()).toBe(1);
+
+    await fresh.stopRecording();
+    const stopped = fresh.getRecorderState().pending!;
+    expect(stopped.pointCount).toBe(35 * hz + 1 + 9 * hz + 1);
+    expect((stopped.content.match(/<trkseg>/g) ?? []).length).toBe(2);
+    expect(gpsService.logClears).toBe(0);
+    await fresh.analyzePendingSession();
+    expect(fresh.getRecorderState().saved).not.toBeNull();
+    expect(gpsService.logClears).toBe(1);
+  });
+
+  it('« Continuer » depuis une pause manuelle, puis « Arrêter » aussitôt : les positions de la pause n\'entrent jamais dans la trace', async () => {
+    await recordUntil(20);
+    vi.setSystemTime(T0 + 20_500);
+    await recorder.pauseRecording();
+    gpsService.log = nativeLog(nativeFixes(0, 20, hz), `["pause",${T0 + 20_500}]\n`, nativeFixes(21, 30, hz));
+    vi.setSystemTime(T0 + 100_000);
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(fresh.getRecorderState().pending?.pointCount).toBe(20 * hz + 1);
+    await fresh.continuePendingSession(serviceSource());
+    vi.setSystemTime(T0 + 101_000);
+    await fresh.stopRecording();
+    expect(fresh.getRecorderState().pending?.pointCount).toBe(20 * hz + 1);
+    expect(parseJournal(journal.text!).fixes).toHaveLength(20 * hz + 1);
+  });
+
+  it('arrêt par la garde, application fermée : session en attente sans « Continuer », trace entière jusqu\'à l\'arrêt, rangée seule', async () => {
+    await recordUntil(20);
+    gpsService.log = nativeLog(nativeFixes(0, 50, hz), `["stop",${T0 + 60_000},"still"]\n`);
+    // Rouverte 5 s après : sans la ligne d'arrêt, « Continuer » serait proposé.
+    vi.setSystemTime(T0 + 65_000);
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    const state = fresh.getRecorderState();
+    expect(state.status).toBe('idle');
+    expect(state.pending?.pointCount).toBe(50 * hz + 1);
+    expect((state.pending?.content.match(/<trkseg>/g) ?? []).length).toBe(1);
+    expect(state.pending?.canContinue).toBe(false);
+    expect(gpsService.adoptions).toBe(0);
+    expect(parseJournal(journal.text!).stoppedAtMs).toBe(T0 + 60_000);
+    expect(fresh.finishingPendingSession(state)).toBe(true);
+    expect(await fresh.finishPendingSession()).not.toBeNull();
+    expect(journal.text).toBeNull();
+    expect(gpsService.logClears).toBe(1);
+  });
+
+  it('garde passée pendant que la page revenait : pas de reprise, la session se range', async () => {
+    await recordUntil(20);
+    gpsService.log = nativeLog(nativeFixes(0, 30, hz), `["stop",${T0 + 31_000},"timeout"]\n`);
+    // Le service s'est dit en route, puis sa garde l'a arrêté avant la relecture de son journal.
+    services.gps = true;
+    vi.setSystemTime(T0 + 32_000);
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    const state = fresh.getRecorderState();
+    expect(state.status).toBe('idle');
+    expect(gpsService.adoptions).toBe(0);
+    expect(state.pending?.pointCount).toBe(30 * hz + 1);
+    expect(state.pending?.canContinue).toBe(false);
+  });
+
+  it('service en route pour une autre session : ni reprise ni rattrapage, il est arrêté', async () => {
+    await recordUntil(20);
+    gpsService.log = `{"format":"${FILE_FORMATS.positions}","version":1,"session":${T0 + 7}}\n${nativeFixes(0, 40, hz)}`;
+    services.gps = true;
+    services.session = T0 + 7;
+    vi.setSystemTime(T0 + 40_000);
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(gpsService.adoptions).toBe(0);
+    expect(gpsService.orphanStops).toBe(1);
+    expect(fresh.getRecorderState().pending?.pointCount).toBe(20 * hz + 1);
+    expect(fresh.getRecorderState().pending?.canContinue).toBe(true);
+  });
+
+  it('« Arrêter », messages calés écran éteint : ce que la page n\'a pas reçu entre dans le GPX, pas ce qui suit l\'arrêt', async () => {
+    await recordUntil(20);
+    gpsService.log = nativeLog(nativeFixes(0, 30, hz), nativeFix(45));
+    vi.setSystemTime(T0 + 31_000);
+    await recorder.stopRecording();
+    const pending = recorder.getRecorderState().pending!;
+    expect(pending.pointCount).toBe(30 * hz + 1);
+    expect((pending.content.match(/<trkseg>/g) ?? []).length).toBe(1);
+    expect(pending.recovered).toBe(false);
+    const parsed = parseJournal(journal.text!);
+    expect(parsed.fixes).toHaveLength(30 * hz + 1);
+    expect(parsed.stoppedAtMs).toBe(T0 + 31_000);
+    expect(lineCount('break')).toBe(0);
+  });
+
+  it('« Arrêter », page qui a tout reçu : rien n\'est relu du journal de la page ni ajouté', async () => {
+    await recordUntil(20);
+    gpsService.log = nativeLog(nativeFixes(0, 20, hz));
+    vi.setSystemTime(T0 + 21_000);
+    await recorder.stopRecording();
+    const text = journal.text!;
+    expect(recorder.getRecorderState().pending?.pointCount).toBe(20 * hz + 1);
+    expect(gpsService.logReads).toEqual([T0 + 20_000]);
+    expect(text.trimEnd().endsWith(`["stop",${T0 + 21_000}]`)).toBe(true);
+  });
+
+  it('pause manuelle et reprise : dites au service, chacune à l\'heure de sa ligne du journal', async () => {
+    const source = await recordUntil(20);
+    vi.setSystemTime(T0 + 20_500);
+    await recorder.pauseRecording();
+    expect(source.pauses).toEqual([{ paused: true, atMs: T0 + 20_500 }]);
+    expect(lastLineAt('pause')).toBe(T0 + 20_500);
+    vi.setSystemTime(T0 + 30_250);
+    await recorder.resumeRecording();
+    await settle();
+    expect(source.pauses).toEqual([{ paused: true, atMs: T0 + 20_500 }, { paused: false, atMs: T0 + 30_250 }]);
+    expect(lastLineAt('resume')).toBe(T0 + 30_250);
   });
 });
 

@@ -13,13 +13,14 @@ import {
   type MotionCapture, type MotionSetup,
 } from '../platform/motion';
 import { savedBelt, type HeartRateBelt } from '../platform/heartRate';
-import type { LocationFix, LocationSource } from '../platform/location';
+import { clearLoggedFixes, type LocationFix, type LocationSource } from '../platform/location';
 import { beltWatchSettings, gpsWatchOnPause, gpsWatchOnResume } from '../recording/gpsWatch';
 import { headingFixes, shownLiveFix } from '../recording/livePosition';
 import {
   journalActivityLine, journalBeltLine, journalHeaderLine, journalNoteLine, journalPauseLine, journalResumeLine, journalStopLine, parseJournal,
   type ParsedJournal,
 } from '../recording/journal';
+import type { NativeCatchUp } from '../recording/nativeLog';
 import { continuedPause } from '../recording/resume';
 import {
   isAutoPause, isManualPause, EMPTY_RECORDING_STATS, displayedDurationMs, nothingToKeep, segmentCount, splitIntoSegments, type PauseClock,
@@ -33,8 +34,11 @@ import { flushJournal, queueJournalLines } from './recorder/journalBuffer';
 import {
   applyBeltWatch, applyGpsWatch, releaseRecordingBelt, stopBeltWatch, stopGpsWatch, takeBeltOrWarn, watch, withoutBeltLost, withoutGpsLost,
 } from './recorder/watches';
-import { buildPendingSession, markManualResume, onSourceError, receiveFix, resetSession, sourceOptions } from './recorder/live';
-import { abandonResume, continueCapture, recoverInterruptedRecording, restoreFromJournal, watchResumedBelt } from './recorder/recovery';
+import { buildPendingSession, markManualResume, onSourceError, receiveFix, resetSession, sourceOptions, tellSourcePaused } from './recorder/live';
+import {
+  abandonResume, catchUpJournal, continueCapture, markCaughtUp, recoverInterruptedRecording, restoreFromJournal, segmentsCaughtUpAtStop,
+  watchResumedBelt,
+} from './recorder/recovery';
 
 export type { RecorderState, RecorderStatus } from './recorder/store';
 export { getRecorderState, subscribeToFixes, subscribeToRecorder } from './recorder/store';
@@ -90,10 +94,17 @@ export { recoverInterruptedRecording };
  * ceinture redemandée après une coupure, qui mesurait avant, est veillée dès
  * la reprise (`watchResumedBelt`), sans attendre sa première mesure.
  *
- * Reprise : si le moteur de la page tombe, seule la page repart (`MainActivity.java`).
- * Le service GPS encore vivant, la session reprend seule (`resumeSilently`) : mémoire refaite depuis le journal, jamais
- * d'en-tête de plus, service jamais relancé, un segment neuf à la position suivante. Application tuée et rouverte peu
- * après : « Continuer l'enregistrement » dans la carte de la session en attente (`continuePendingSession`).
+ * Service de position : sur le téléphone, il survit à la page (application balayée hors des applications récentes,
+ * moteur de rendu tombé) et écrit chaque position dans son propre journal. La page qui revient complète le sien de
+ * ce qu'elle n'a pas reçu (`recording/nativeLog.ts`) : sans fréquence cardiaque, sans bip ni alerte pour ces
+ * positions-là. Le journal de la page reste le registre des décisions : pauses, segments, activité, notes.
+ *
+ * Reprise : le service encore en route, la session reprend seule (`resumeSilently`) : journal complété, mémoire
+ * refaite depuis lui, jamais d'en-tête de plus, service jamais relancé, et aucune coupure de segment tant que le
+ * journal du service est continu. Service mort avec l'application, rouverte peu après : « Continuer
+ * l'enregistrement » dans la carte de la session en attente (`continuePendingSession`). Service arrêté par sa garde
+ * (application fermée, resté sur place ou trop longtemps) : la session se range seule, trace entière jusqu'à l'arrêt.
+ * À l'arrêt, les positions que les messages calés écran éteint n'ont pas portées à la page sont reprises avant le GPX.
  *
  * Toute session a des positions. Un journal sans position est mis de côté (`setJournalAside`) ; ses lignes de FC
  * seule sont ignorées.
@@ -158,6 +169,8 @@ const rangePendingSession = async (pending: PendingSession, withoutMotion: boole
   let cleanup: string | null = null;
   try {
     await recordingJournal.remove();
+    // Le journal du service n'a plus rien à compléter ; la notification laissée par sa garde part avec lui.
+    await clearLoggedFixes();
     if (pending.motion && !withoutMotion) await removeMotionCapture(pending.motion.path);
   } catch (err) {
     cleanup = t("Session rangée ; le journal d'enregistrement n'a pas pu être effacé ({why}).", { why: errorMessage(err, t('erreur inconnue')) });
@@ -226,6 +239,7 @@ export const discardPendingSession = async (): Promise<void> => {
   if (!pending || ranging) return;
   try {
     await recordingJournal.remove();
+    await clearLoggedFixes();
     if (pending.motion) await removeMotionCapture(pending.motion.path);
   } catch (err) {
     setState({ error: t("La session n'a pas pu être jetée : {why}.", { why: errorMessage(err, t('erreur inconnue')) }) });
@@ -285,6 +299,7 @@ export const startRecording = exclusive(async (
     session.stopSource = null;
     stopGpsWatch();
     await recordingJournal.remove();
+    await clearLoggedFixes();
     setState({ status: 'idle', error: t('Démarrage impossible : {why}', { why: errorMessage(err, t('erreur inconnue')) }) });
     return;
   }
@@ -303,7 +318,9 @@ export const startRecording = exclusive(async (
 
 /**
  * « Continuer l'enregistrement » : la session en attente reprend sur son journal, dans un segment neuf, service
- * relancé par ce geste (l'application est au premier plan). Le temps hors de l'application ne compte pas (`continuedPause`).
+ * relancé par ce geste (l'application est au premier plan), sur la même session : il complète son propre journal.
+ * Le temps hors de l'application ne compte pas (`continuedPause`), et sa levée est dite au service, à l'heure de sa
+ * ligne : ce qu'il avait écrit avant, pendant une pause manuelle, ne sera jamais pris pour des positions à garder.
  * La capture du départ, gardée dans l'en-tête, est relancée en complétant son fichier ; un journal d'avant, qui ne la
  * porte pas, la laisse arrêtée, son fichier retrouvé à l'arrêt. La ceinture du départ est redemandée, et veillée dès ici si elle mesurait avant
  * la coupure : sans mesure pendant une minute, l'alerte de FC perdue part. Un refus de
@@ -319,10 +336,12 @@ export const continuePendingSession = exclusive(async (source: LocationSource | 
     setState({ pending: before, error: t('Reprise impossible : {why}. La session reste en attente.', { why: errorMessage(why, t('erreur inconnue')) }) });
   };
   let parsed: ParsedJournal;
+  let caughtUp: NativeCatchUp;
   try {
     const text = await recordingJournal.read();
     if (text === null) throw new Error('journal introuvable');
-    parsed = parseJournal(text);
+    // Déjà complété à la réouverture ; refait ici, sans rien ajouter, pour savoir jusqu'où le service a écrit.
+    ({ parsed, catchUp: caughtUp } = await catchUpJournal(text, parseJournal(text), activity));
   } catch (err) {
     setState({ error: t('Reprise impossible : {why}. La session reste en attente.', { why: errorMessage(err, t('erreur inconnue')) }) });
     return;
@@ -330,6 +349,7 @@ export const continuePendingSession = exclusive(async (source: LocationSource | 
   try {
     const nowMs = Date.now();
     restoreFromJournal(parsed, activity, source);
+    markCaughtUp(caughtUp);
     const lifted = continuedPause(parsed, nowMs);
     if (lifted.pause) queueJournalLines(journalPauseLine(lifted.pause.atMs, lifted.pause.autoPartMs));
     if (lifted.resumeLine) queueJournalLines(journalResumeLine(nowMs));
@@ -344,6 +364,7 @@ export const continuePendingSession = exclusive(async (source: LocationSource | 
     await flushJournal();
     const heartRate = getSportProfile(activity.base).heartRate;
     session.stopSource = await source.start(sourceOptions(activity, effectiveRecordingProfile(activity)), receiveFix, onSourceError);
+    if (lifted.resumeLine) await tellSourcePaused(false, nowMs);
     if (belt) {
       await takeBeltOrWarn(belt, heartRate.maxAgeS);
       // `continuedPause` a levé la pause manuelle : une ceinture qui mesurait avant la coupure est veillée dès ici.
@@ -383,6 +404,8 @@ export const pauseRecording = exclusive(async (): Promise<void> => {
   if (watch.beltOn) applyBeltWatch(gpsWatchOnPause(watch.belt));
   queueJournalLines(journalPauseLine(frozenAtMs, frozenAtMs - pauseClock.sinceMs));
   await flushJournal();
+  // Le journal d'abord, le service ensuite, à l'heure de la ligne : il n'apprend jamais une pause que le journal ignore.
+  await tellSourcePaused(true, frozenAtMs);
   if (state.measuringMotion) await pauseMotionCapture().catch(() => setState({ error: SENSORS_PAUSE_ERROR }));
 });
 
@@ -395,11 +418,14 @@ export const resumeRecording = exclusive(async (): Promise<void> => {
   if (session.stopSource !== null) {
     // Le GPS est resté allumé pendant la pause : la position suivante ouvre le segment. Jusque-là, la carte reste sur
     // la dernière position reçue en pause (`pauseFixes`, vidé au premier point gardé), pas sur le point de la pause.
-    markManualResume();
+    const resumedAtMs = markManualResume();
     const sensorsFailed = state.measuringMotion && await resumeMotionCapture().then(() => false, () => true);
     setState({ status: 'recording', pausedReason: null, pauseClock: null, ...(sensorsFailed ? { error: SENSORS_RESUME_ERROR } : {}) });
     if (watch.gpsOn) applyGpsWatch(gpsWatchOnResume(watch.gps, Date.now(), session.currentProfile));
     if (watch.beltOn) applyBeltWatch(gpsWatchOnResume(watch.belt, Date.now(), beltWatchSettings(session.currentProfile)));
+    // Une fois la levée écrite au journal, le service l'apprend, à la même heure.
+    await flushJournal();
+    await tellSourcePaused(false, resumedAtMs);
     return;
   }
   if (session.currentSource === null) return;
@@ -408,9 +434,11 @@ export const resumeRecording = exclusive(async (): Promise<void> => {
   const source = session.currentSource;
   const profile = session.currentProfile;
   try {
-    markManualResume();
+    const resumedAtMs = markManualResume();
     session.sourceError = null;
     session.stopSource = await source.start(sourceOptions(activity, profile), receiveFix, onSourceError);
+    await flushJournal();
+    await tellSourcePaused(false, resumedAtMs);
     const sensorsFailed = state.measuringMotion && await resumeMotionCapture().then(() => false, () => true);
     // L'erreur de la source peut arriver avant la fin du démarrage (localisation coupée) : elle reste affichée.
     setState({ status: 'recording', pausedReason: null, pauseClock: null, error: session.sourceError ?? (sensorsFailed ? SENSORS_RESUME_ERROR : null) });
@@ -526,6 +554,8 @@ export const stopRecording = afterCurrent(async (): Promise<void> => {
   session.stopSource = null;
   session.currentSource = null;
   session.currentProfile = null;
+  // Service arrêté, son journal fermé : ce qu'il a écrit sans que la page le reçoive entre dans la trace, avant le GPX.
+  const caughtUpSegments = await segmentsCaughtUpAtStop(activity);
   const measuringMotion = state.measuringMotion;
   let motionFailure: string | null = null;
   const motion = measuringMotion
@@ -541,7 +571,8 @@ export const stopRecording = afterCurrent(async (): Promise<void> => {
   releaseRecordingBelt();
 
   try {
-    const pending = await buildPendingSession(activity, splitIntoSegments(session.fixes, session.segmentBreaks), false, [...session.marks], keptMotion);
+    const segments = caughtUpSegments ?? splitIntoSegments(session.fixes, session.segmentBreaks);
+    const pending = await buildPendingSession(activity, segments, false, [...session.marks], keptMotion);
     setState({
       status: 'idle',
       pausedReason: null,

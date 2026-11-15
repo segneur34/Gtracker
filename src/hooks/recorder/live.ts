@@ -4,9 +4,9 @@ import type { SessionMark } from '../../core/sessionMarks';
 import type { RecordingProfile } from '../../core/sportProfiles';
 import { recordingJournal } from '../../platform/files';
 import { latestHeartRate } from '../../platform/heartRate';
-import type { LocationErrorCause, LocationFix, LocationSource, LocationWatchOptions } from '../../platform/location';
+import { clearLoggedFixes, type LocationErrorCause, type LocationFix, type LocationSource, type LocationWatchOptions } from '../../platform/location';
 import { removeMotionCapture, type MotionCapture } from '../../platform/motion';
-import { gpsWatchOnFix } from '../../recording/gpsWatch';
+import { gpsWatchOnFix, watchesGps } from '../../recording/gpsWatch';
 import { heartRateAt } from '../../recording/heartRate';
 import { journalBreakLine, journalFixLine, journalResumeLine } from '../../recording/journal';
 import { sessionGpx } from '../../recording/resume';
@@ -28,14 +28,32 @@ export const onSourceError = (message: string, cause?: LocationErrorCause): void
   setState({ error: message, locationOff: cause === 'locationOff' });
 };
 
-/** Reprise d'une pause manuelle : le prochain point gardé ouvre un segment et ne compte pas la pause dans la durée. */
-export const markManualResume = (): void => {
+/**
+ * Reprise d'une pause manuelle : le prochain point gardé ouvre un segment et ne compte pas la pause dans la durée.
+ * Rend l'heure de la ligne écrite au journal : c'est elle que le service du téléphone doit recevoir avec l'ordre.
+ */
+export const markManualResume = (): number => {
   session.pendingBreak = true;
   const clock = state.pauseClock;
   session.manualBreakAutoPartMs = clock?.frozenAtMs != null ? Math.max(0, clock.frozenAtMs - clock.sinceMs) : 0;
   // Écrit tout de suite : une reprise après une chute doit savoir la pause levée, même sans point gardé depuis.
-  queueJournalLines(journalResumeLine(Date.now()));
+  const atMs = Date.now();
+  queueJournalLines(journalResumeLine(atMs));
   void flushJournal();
+  return atMs;
+};
+
+/**
+ * Dit au service du téléphone la pause manuelle ouverte ou levée, à l'heure de la ligne du journal. Sans objet pour
+ * une source qui n'est pas ce service. Un ordre perdu ne coûte que la veille du GPS, application fermée : les
+ * positions restent gardées par le journal de la page, qui fait foi.
+ */
+export const tellSourcePaused = async (paused: boolean, atMs: number): Promise<void> => {
+  try {
+    await session.currentSource?.setPaused?.(paused, atMs);
+  } catch (err) {
+    console.warn(`Pause non transmise au service de position : ${err instanceof Error ? err.message : 'erreur inconnue'}`);
+  }
 };
 
 /**
@@ -125,18 +143,36 @@ export const buildPendingSession = async (
   const gpx = sessionGpx(segments, activity);
   if (gpx === null) {
     await recordingJournal.remove();
+    await clearLoggedFixes();
     if (motion) await removeMotionCapture(motion.path);
     return null;
   }
   return { ...gpx, sport: activity?.base ?? null, activity, recovered, canContinue: false, marks, motion };
 };
 
-/** Options de démarrage d'une source, communes au premier démarrage et à une reprise manuelle. */
+/**
+ * Options de démarrage d'une source, communes au premier démarrage, à « Continuer » et à une reprise manuelle. Pour
+ * le service du téléphone : la session en cours (`session.startedAtMs`, celui de l'en-tête du journal), ses textes
+ * quand l'application est fermée, et les délais de sa veille du GPS et de sa garde, ceux du profil. La veille n'y
+ * tourne que si la page veille aussi (`watchesGps`).
+ */
 export const sourceOptions = (activity: Activity, recording: RecordingProfile): LocationWatchOptions => ({
   intervalMs: recording.intervalMs,
   distanceFilterM: recording.distanceFilterM,
   notificationTitle: t('Gtracker enregistre'),
   notificationText: t('Session {name} en cours', { name: activityDisplayName(activity) }),
+  service: {
+    session: session.startedAtMs,
+    closedText: t("Application fermée : l'enregistrement continue"),
+    gpsLostTitle: t('GPS perdu'),
+    stoppedTitle: t('Enregistrement arrêté'),
+    stoppedText: t('Touchez pour le ranger'),
+    gpsLostDelayS: watchesGps(recording, true) ? recording.gpsLostDelayS : 0,
+    gpsLostRearmS: recording.gpsLostRearmS,
+    guardStillRadiusM: recording.guardStillRadiusM,
+    guardStillDelayS: recording.guardStillDelayS,
+    guardMaxClosedS: recording.guardMaxClosedS,
+  },
 });
 
 /** Variables de la session qui démarre, ou qui reprend d'un journal relu, remises au départ. */

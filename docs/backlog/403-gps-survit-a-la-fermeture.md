@@ -105,6 +105,23 @@ Classes : `RecordingService.java` (service, notification, veille et garde détac
 - Le canal de notification garde son identifiant et lit encore le texte `capacitor_background_geolocation_notification_channel_name` de `strings.xml` ; à renommer en partie C si on veut, avec `RecordingService.ensureChannel`.
 - `docs/INVENTAIRE.md` doit citer les cinq classes neuves, sans quoi `verif.mjs` signale la carte des fichiers.
 
+### Partie C, livrée (la page branchée sur le service ; le paquet tiers reste à désinstaller)
+
+Plus rien dans `src/` ni dans `android/app/src/main/java` ne s'appuie sur `@capgo/background-geolocation`. Ce qui s'écarte du plan ou le précise :
+
+- `platform/location.ts` : la source du téléphone écoute `fix` et `error` puis appelle `start` ; `attachDeviceLocation` (écoute sans relance) remplace `adoptRunningService` ; `readLoggedFixes`, `clearLoggedFixes`, `deviceLocationState` ; `setPaused` est une méthode optionnelle de `LocationSource`, que seul le service porte ; `LocationWatchOptions.service` porte la session, les textes et les délais. `currentPosition` n'emprunte plus le service. Un refus se traduit par son code, jamais par son message.
+- Reprise silencieuse en deux passes de rattrapage : la première avant de rebrancher capteurs et ceinture (la session revient entière, avec la bonne pause), la seconde une fois l'écoute posée en tampon (ce que le service a écrit pendant ces secondes), puis le tampon est vidé par `receiveFix`. Le rattrapage passe toujours par le journal : lignes ajoutées au fichier, journal relu, mémoire refaite depuis lui ; aucune position rattrapée ne passe par `receiveFix`, donc ni FC, ni bip, ni veille. Une garde passée entre-temps fait renoncer à la reprise : la session se range.
+- La reprise silencieuse exige que le service enregistre la session du journal (`recoveryDecision`) ; celui d'une autre session est arrêté.
+- « Continuer » : la levée de la pause qu'il pose est dite au service (`setPaused(false, heure de la ligne)`), et l'heure de la dernière position lue du journal du service est retenue (`markCaughtUp`). Sans cela, « Continuer » depuis une pause manuelle suivi d'un « Arrêter » immédiat aurait pris les positions de la pause pour des positions à garder (testé).
+- « Arrêter » : le journal de la page n'est relu que si le journal du service porte une position plus récente que la dernière reçue ; sinon la mémoire fait foi, comme avant (aucun changement quand la page a tout reçu).
+- `clearLog` : après le rangement, après « Jeter », quand une session de moins de deux positions est effacée, au départ sans journal, et après un départ refusé. Un échec n'est que consigné.
+- `RecoveryPlugin.java` supprimé : `Recording.state()` donne l'état et signale la page revenue. La ressource du nom du canal s'appelle `recording_notification_channel_name` ; l'identifiant du canal ne change pas.
+- Gardé tel quel : le mode « seule » de la notification en pause manuelle (`platform/notification.ts`), parce que le script de banc `notification.mjs` l'exige (« (seule) », ligne 144) ; à retirer avec lui.
+- Laissé à l'orchestrateur, avec le paquet : les deux balises `tools:node="remove"` d'`AndroidManifest.xml` (récepteur de démarrage du greffon, `RECEIVE_BOOT_COMPLETED`), sans objet une fois le paquet parti ; les tests du manifeste passent avec ou sans elles.
+- Passe de documentation : `docs/ETAT_DU_PROJET.md` l. 424 (`ALREADY_STARTED`), `docs/INVENTAIRE.md` l. 170 (`addGeofence`), l. 174 et 199 (`RecoveryPlugin.java`) ; `verif.mjs` les signale.
+
+Limites connues : un trou au milieu du journal de la page (messages calés puis repartis, page vivante) n'est pas comblé, seule la fin l'est ; une position rattrapée n'a pas de FC ; un ordre de pause que le service n'a pas reçu n'est que consigné (le journal de la page fait foi).
+
 ### Non vérifié
 
 Le comportement de HyperOS au balayage avec un service au premier plan (essai 277, démarrage automatique et batterie « Aucune restriction » réglés) ; si l'ancien pont reste nécessaire sans le greffon ; le formulaire exact de la Play Console.

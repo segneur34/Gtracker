@@ -12,17 +12,20 @@ import { journalSessionActivity, type JournalPause, type ParsedJournal } from '.
 /**
  * Reprise d'un enregistrement interrompu, sans accès au téléphone.
  *
- * Quand le moteur de la WebView tombe, seule la page repart : le processus, le service GPS et son verrou survivent
- * (`MainActivity.java`). Le journal et la preuve que le service vit (`platform/recovery.ts`) disent alors que faire :
- * reprendre seul, proposer « Continuer l'enregistrement », ou remettre la session en attente, comme avant.
+ * Quand le moteur de la WebView tombe, ou que l'application est balayée hors des applications récentes, la page
+ * disparaît et le service de position continue (`RecordingService.java`). Le journal et ce que le service dit de lui
+ * (`platform/recovery.ts`) disent alors que faire au retour de la page : reprendre seul, proposer « Continuer
+ * l'enregistrement », ou remettre la session en attente.
  */
 
-export const NO_RECOVERY_SERVICES: RecoveryServices = { gps: false };
+export const NO_RECOVERY_SERVICES: RecoveryServices = { gps: false, session: null, paused: false };
 
 /** Ce qu'un journal relu dit de la reprise ; `null` sans journal. */
 export interface RecoveryJournal {
   /** En-tête lisible : sans lui, l'activité est inconnue et rien ne se reprend. */
   hasHeader: boolean;
+  /** Identifiant de la session : le `startedAtMs` de l'en-tête ; `null` sans en-tête lisible. */
+  startedAtMs: number | null;
   /** Une ligne `stop` : l'utilisateur a arrêté la session. */
   stopped: boolean;
   lastLineMs: number | null;
@@ -37,16 +40,17 @@ export interface RecoveryFacts {
 }
 
 /**
- * `none` : rien à faire. `stopServices` : un service tourne sans journal (recherche de position coupée par la chute),
- * à arrêter. `resume` : reprise silencieuse. `offer` : session en attente, avec « Continuer ». `pending` : session en
- * attente seulement.
+ * `none` : rien à faire. `stopServices` : un service tourne sans journal, à arrêter. `resume` : reprise silencieuse,
+ * seulement si le service en route enregistre la session de ce journal ; celui d'une autre session ne prouve rien.
+ * `offer` : session en attente, avec « Continuer ». `pending` : session en attente seulement, comme après une ligne
+ * `stop` (« Arrêter », ou l'arrêt par la garde du service).
  */
 export type RecoveryChoice = 'none' | 'stopServices' | 'resume' | 'offer' | 'pending';
 
 export const recoveryDecision = ({ journal, services, nowMs, offerMaxAgeS }: RecoveryFacts): RecoveryChoice => {
   if (journal === null) return services.gps ? 'stopServices' : 'none';
   if (journal.stopped || !journal.hasHeader) return 'pending';
-  if (services.gps) return 'resume';
+  if (services.gps && services.session !== null && services.session === journal.startedAtMs) return 'resume';
   if (journal.lastLineMs === null) return 'pending';
   const ageMs = nowMs - journal.lastLineMs;
   return ageMs >= 0 && ageMs < offerMaxAgeS * 1000 ? 'offer' : 'pending';

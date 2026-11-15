@@ -294,7 +294,7 @@ public class RecordingService extends Service {
         if (manager == null) return;
         NotificationChannel channel = new NotificationChannel(
             CHANNEL_ID,
-            context.getString(R.string.capacitor_background_geolocation_notification_channel_name),
+            context.getString(R.string.recording_notification_channel_name),
             NotificationManager.IMPORTANCE_DEFAULT
         );
         channel.enableLights(false);

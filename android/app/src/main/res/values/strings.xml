@@ -8,8 +8,8 @@
         Textes que le téléphone montre lui-même, hors de la page : ils suivent la langue du téléphone, pas celle choisie
         dans Réglages. Ce fichier porte l'anglais, langue de repli ; le français est dans values-fr, l'espagnol dans values-es.
     -->
-    <!-- Nom du canal de la notification de l'enregistrement (greffon @capgo/background-geolocation). -->
-    <string name="capacitor_background_geolocation_notification_channel_name">Recording</string>
+    <!-- Nom du canal de la notification de l'enregistrement (RecordingService), tel que les réglages d'Android le montrent. -->
+    <string name="recording_notification_channel_name">Recording</string>
     <!-- Dit par le téléphone quand un fichier reçu d'une autre application n'a pas pu être gardé pour la page. -->
     <string name="incoming_file_refused">Gtracker could not receive this file.</string>
 </resources>

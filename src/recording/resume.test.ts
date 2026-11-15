@@ -14,10 +14,12 @@ import {
 
 const T0 = Date.UTC(2026, 10, 4, 9, 0, 0);
 const OFFER_S = 600;
-const GPS_ALIVE = { gps: true };
+const SESSION = T0 - 60_000;
+/** Service en route pour la session du journal. */
+const GPS_ALIVE = { gps: true, session: SESSION, paused: false };
 
 const facts = (patch: Partial<NonNullable<RecoveryFacts['journal']>> = {}, rest: Partial<RecoveryFacts> = {}): RecoveryFacts => ({
-  journal: { hasHeader: true, stopped: false, lastLineMs: T0, ...patch },
+  journal: { hasHeader: true, startedAtMs: SESSION, stopped: false, lastLineMs: T0, ...patch },
   services: NO_RECOVERY_SERVICES,
   nowMs: T0,
   offerMaxAgeS: OFFER_S,
@@ -28,6 +30,13 @@ describe('recoveryDecision', () => {
   it('service vivant et journal : reprise, quel que soit son âge', () => {
     expect(recoveryDecision(facts({}, { services: GPS_ALIVE }))).toBe('resume');
     expect(recoveryDecision(facts({}, { services: GPS_ALIVE, nowMs: T0 + 5 * 3600_000 }))).toBe('resume');
+  });
+
+  it("service en route pour une autre session, ou sans session dite : il ne prouve rien, seul l'âge du journal décide", () => {
+    const other = { gps: true, session: SESSION + 1, paused: false };
+    expect(recoveryDecision(facts({}, { services: other, nowMs: T0 + 1000 }))).toBe('offer');
+    expect(recoveryDecision(facts({}, { services: other, nowMs: T0 + 601_000 }))).toBe('pending');
+    expect(recoveryDecision(facts({}, { services: { gps: true, session: null, paused: false }, nowMs: T0 + 1000 }))).toBe('offer');
   });
 
   it('application tuée : « Continuer » proposé à 9 min 59, plus à 10 min ni à 10 min 01', () => {
@@ -47,8 +56,8 @@ describe('recoveryDecision', () => {
   });
 
   it('journal illisible (sans en-tête) : en attente, service vivant compris', () => {
-    expect(recoveryDecision(facts({ hasHeader: false }))).toBe('pending');
-    expect(recoveryDecision(facts({ hasHeader: false }, { services: GPS_ALIVE }))).toBe('pending');
+    expect(recoveryDecision(facts({ hasHeader: false, startedAtMs: null }))).toBe('pending');
+    expect(recoveryDecision(facts({ hasHeader: false, startedAtMs: null }, { services: GPS_ALIVE }))).toBe('pending');
   });
 
   it('sans journal : rien, sauf un service qui tourne pour personne', () => {

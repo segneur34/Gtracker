@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="capacitor_background_geolocation_notification_channel_name">Enregistrement</string>
+    <string name="recording_notification_channel_name">Enregistrement</string>
     <string name="incoming_file_refused">Gtracker n\'a pas pu recevoir ce fichier.</string>
 </resources>

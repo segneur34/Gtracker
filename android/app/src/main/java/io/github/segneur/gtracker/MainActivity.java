@@ -31,7 +31,10 @@ public class MainActivity extends BridgeActivity {
 
     private final Handler main = new Handler(Looper.getMainLooper());
 
-    /** La page n'est pas revenue : le son « GPS perdu » prévient, puis l'activité repart, service GPS arrêté avec elle. */
+    /**
+     * La page n'est pas revenue : le son « GPS perdu » prévient, puis l'activité repart. Le service de position
+     * (RecordingService) ne tient pas à elle : il continue, et la page neuve le rejoint.
+     */
     private final Runnable pageLoadMissed = () -> {
         Log.e(TAG, "Page non rechargée après une chute du moteur de rendu : activité relancée");
         if (pageLostTone == null) pageLostTone = new TonePlayer(getApplicationContext());
@@ -52,10 +55,9 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PermissionsPlugin.class);
         registerPlugin(GnssPlugin.class);
         registerPlugin(ShareFilePlugin.class);
-        registerPlugin(RecoveryPlugin.class);
         registerPlugin(IncomingFilePlugin.class);
         registerPlugin(RecordingPlugin.class);
-        // Sans écouteur qui réponde vrai, Android tue tout le processus avec le moteur de rendu, service GPS compris.
+        // Sans écouteur qui réponde vrai, Android tue tout le processus avec le moteur de rendu, service de position compris.
         bridgeBuilder.addWebViewListener(new WebViewListener() {
             @Override
             public boolean onRenderProcessGone(WebView webView, RenderProcessGoneDetail detail) {
@@ -79,17 +81,18 @@ public class MainActivity extends BridgeActivity {
         super.onDestroy();
     }
 
-    /** La page répond (RecoveryPlugin) : elle est revenue, même si Capacitor n'a pas dit `onPageLoaded`. */
+    /** La page répond (RecordingPlugin, `state`) : elle est revenue, même si Capacitor n'a pas dit `onPageLoaded`. */
     void pageAnswered() {
         main.removeCallbacks(pageLoadMissed);
     }
 
     /**
-     * Recharge la page, sur la même WebView : une activité recréée arrêterait le service GPS
-     * (`BackgroundGeolocation.handleOnDestroy`). Une sonde a montré qu'elle repart, écran
-     * éteint compris, et que le service et ses positions survivent. Au-delà de la garde, ou sans
-     * pont : faux, Android tue le processus, et la réouverture propose de continuer. Compté ici
-     * seulement, une seule fois par chute.
+     * Recharge la page, sur la même WebView : recréer l'activité n'arrêterait plus rien de la trace (le service
+     * de position ne tient pas à elle), mais fermerait la ceinture et la capture des capteurs, que la page seule
+     * rechargée retrouve telles qu'elles tournent. Une sonde a montré qu'elle repart, écran éteint compris.
+     * Pendant la recharge, le service écrit ses positions dans son journal, que la page relit à son retour.
+     * Au-delà de la garde, ou sans pont : faux, Android tue le processus, et la réouverture propose de continuer.
+     * Compté ici seulement, une seule fois par chute.
      */
     private boolean reloadAfterRendererGone(RenderProcessGoneDetail detail) {
         Log.e(TAG, "Moteur de rendu tombé : " + describe(detail));
