@@ -8,9 +8,11 @@ import {
   ErreurFinDeLot,
   appliquerFinDeLot,
   codeAChange,
+  couvert,
   etatFinal,
   lireArguments,
   lireEssais,
+  lireListeFichiers,
   poserVersionLock,
   poserVersionPackage,
   principal,
@@ -71,6 +73,20 @@ describe('version', () => {
     expect(codeAChange(' M docs/BACKLOG.md\n M outils/verif.mjs\n M package.json')).toBe(false)
     expect(codeAChange(' M source/x.ts')).toBe(false)
     expect(codeAChange('')).toBe(false)
+  })
+
+  it('avec une liste de fichiers, seuls les chemins couverts comptent', () => {
+    const statut = ' M src/core/units.ts\n M outils/verif.mjs\n?? docs/backlog/12.md'
+    expect(codeAChange(statut, ['outils/verif.mjs', 'docs/backlog'])).toBe(false)
+    expect(codeAChange(statut, ['src/core'])).toBe(true)
+    expect(codeAChange(statut, ['src/core/units.ts'])).toBe(true)
+    expect(codeAChange(statut, ['src/co'])).toBe(false)
+  })
+
+  it('lit une liste de chemins : un par ligne, barres droites, lignes vides ignorées', () => {
+    expect(lireListeFichiers('outils/a.mjs\r\n\n .\\docs\\b.md \nsrc/dossier/\n')).toEqual(['outils/a.mjs', 'docs/b.md', 'src/dossier'])
+    expect(couvert('src/dossier/x.ts', ['src/dossier'])).toBe(true)
+    expect(couvert('src/dossier2/x.ts', ['src/dossier'])).toBe(false)
   })
 
   it('pose la version dans package.json et dans le verrou (tête et paquet racine), le reste au caractère près', () => {
@@ -181,8 +197,9 @@ describe('appliquerFinDeLot', () => {
 describe('lireArguments', () => {
   it('lit le numéro et les options', () => {
     expect(lireArguments(['353', '--message', 'm.txt', '--essais', 'e.txt', '--a-blanc'])).toEqual({
-      numero: 353, message: 'm.txt', essais: 'e.txt', lecture: false, enCours: false, aBlanc: true,
+      numero: 353, message: 'm.txt', essais: 'e.txt', fichiers: null, lecture: false, enCours: false, aBlanc: true,
     })
+    expect(lireArguments(['7', '--message', 'm.txt', '--fichiers', 'f.txt']).fichiers).toBe('f.txt')
     expect(lireArguments(['--lecture', '7', '--message', 'm.txt']).lecture).toBe(true)
   })
   it('refuse l\'oubli du numéro ou du message, et une option inconnue', () => {
@@ -245,6 +262,38 @@ describe('de bout en bout, dans un dépôt jetable', () => {
     expect(texte).toContain('à valider (commit en cours, version 0.00.67)')
     expect(texte).toContain('  - essai 20 : ouvrir → ça marche')
     expect(lireBacklog(texte, AUJOURDHUI).erreurs).toEqual([])
+  })
+
+  it('avec --fichiers : ne commite que la liste et le reste à faire, laisse le travail d\'une autre session, version d\'après la liste seule', () => {
+    const racine = depot()
+    writeFileSync(join(racine, 'src', 'a.ts'), 'export const a = 2\n') // travail d'une autre session
+    mkdirSync(join(racine, 'outils'))
+    writeFileSync(join(racine, 'outils', 'x.mjs'), 'export {}\n') // travail du lot
+    writeFileSync(join(racine, 'liste.txt'), 'outils/x.mjs\n')
+
+    const blanc = lancer(racine, ['12', '--message', join(racine, 'message.txt'), '--lecture', '--fichiers', join(racine, 'liste.txt'), '--a-blanc'])
+    expect(blanc.code).toBe(0)
+    expect(blanc.sortie[0]).toBe('Version : inchangée (0.00.66)')
+    expect(blanc.sortie.join('\n')).toContain('Au commit (2 fichiers) : outils/x.mjs, docs/BACKLOG.md')
+
+    const vrai = lancer(racine, ['12', '--message', join(racine, 'message.txt'), '--lecture', '--fichiers', join(racine, 'liste.txt')])
+    expect(vrai.code).toBe(0)
+    expect(vrai.sortie[0]).toBe('Version : inchangée (0.00.66)')
+    expect(git(racine, 'show', '--name-only', '--format=', 'HEAD').trim().split('\n').sort()).toEqual(['docs/BACKLOG.md', 'outils/x.mjs'])
+    expect(git(racine, 'status', '--porcelain')).toContain(' M src/a.ts')
+    expect(readFileSync(join(racine, 'package.json'), 'utf8')).toContain('0.00.66')
+  })
+
+  it('avec --fichiers sous src/ : la version augmente et package.json part avec le commit', () => {
+    const racine = depot()
+    writeFileSync(join(racine, 'src', 'a.ts'), 'export const a = 2\n')
+    writeFileSync(join(racine, 'autre.txt'), 'autre session\n')
+    writeFileSync(join(racine, 'liste.txt'), 'src/a.ts\n')
+    const vrai = lancer(racine, ['12', '--message', join(racine, 'message.txt'), '--lecture', '--fichiers', join(racine, 'liste.txt')])
+    expect(vrai.code).toBe(0)
+    expect(vrai.sortie[0]).toBe('Version : 0.00.66 → 0.00.67')
+    expect(git(racine, 'show', '--name-only', '--format=', 'HEAD').trim().split('\n').sort()).toEqual(['docs/BACKLOG.md', 'package-lock.json', 'package.json', 'src/a.ts'])
+    expect(git(racine, 'status', '--porcelain')).toContain('?? autre.txt')
   })
 
   it('laisse la version quand seul docs/ a changé, et refuse un lot qui n\'est plus en cours sans rien toucher', () => {

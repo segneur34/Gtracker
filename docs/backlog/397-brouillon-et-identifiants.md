@@ -24,6 +24,13 @@ Attendu : une constante de format à part (par exemple `FORMAT_ID`), figée, dis
 
 Le calcul en arrière-plan (`src/library/trackWorker.ts`, `trackWorkerProtocol.ts`) ne reçoit jamais de dictionnaire : les textes qu'il produit restent en français pour un utilisateur anglais ou espagnol (« Fichier GPX illisible : le XML est mal formé. »). Vérifier d'abord le constat. Attendu : soit le message traverse sous forme de clé et se traduit côté page, soit le dictionnaire est donné au calcul ; choisir le plus simple qui garde `trackWorker.architecture.test.ts` et la garde `outils/i18n.mjs` au vert.
 
+## Plan du 15/11 (agent Plan) et questions tranchées par l'orchestrateur
+
+- Partie 2, constat à moitié démenti : `src/core/appIdentity.test.ts` fige déjà en toutes lettres `APP_SLUG`, `FILE_FORMATS`, `XML`, `MARKER_FILE`, `STORAGE_KEYS` et `CACHE_NAMES` ; il reste à renommer `APP_SLUG` en `FORMAT_ID` (emplois : `core/appIdentity.ts` et son test, `library/resetPlan.ts`, `platform/nativeConstants.test.ts`), à dire dans le commentaire du module que le nom affiché se renomme librement et l'identifiant de format jamais, et à écrire la raison dans le titre du test.
+- Partie 3, constat tenu pour une seule phrase (`core/gpxParser.ts:43`, le XML mal formé) : traduite côté page, dans `library/trackWorkerClient.ts`, par une table texte français → `t('…')` sur le modèle de `platform/nativeMessages.ts`, appliquée au rejet du calcul en arrière-plan comme du repli en ligne. Le texte sans `t()` de `library/summarizeGpx.ts:52` (erreur interne) reste tel quel. Aucune clé ajoutée ni retirée dans `src/locales/`.
+- Partie 1 : une seule clé neuve `STORAGE_KEYS.brouillons` (objet fichier → brouillon) plutôt qu'une clé par fichier, parce que `jsonStore.remove` n'efface rien des préférences du téléphone ; classée « donnée » dans `library/resetPlan.ts` ; écriture différée d'environ une seconde, vidée tout de suite quand la page passe en arrière-plan (`onPageHidden`) ; aucun plafond du nombre de brouillons (un plafond jetterait une saisie), la purge des sessions disparues suffit, faite une fois la lecture du dossier finie, jamais pendant ; le brouillon n'est ni relu ni rebasé tant que la session n'est pas chargée ; pas de bandeau « brouillon repris », la barre « non enregistré » suffit.
+- Ordre : partie 2, partie 3, partie 1.
+
 ## Fichiers à ne pas toucher
 
 `src/hooks/recorder/**`, `src/platform/files.ts`, `src/recording/**`, `android/**` (lot 396 dans le même paquet).

@@ -1,9 +1,14 @@
 // Fin de lot : les gestes mécaniques que l'orchestrateur faisait à la main, en une commande, depuis la racine du dépôt.
 //
-//   node outils/fin-de-lot.mjs <N> --message <fichier> [--essais <fichier>] [--lecture] [--en-cours] [--a-blanc]
+//   node outils/fin-de-lot.mjs <N> --message <fichier> [--essais <fichier>] [--fichiers <fichier>] [--lecture] [--en-cours] [--a-blanc]
 //
 //   <N>                 numéro de l'élément, dont la ligne est dans Maintenant, état « en cours »
 //   --message <fichier> message du commit (UTF-8), commité tel quel par `git commit -F`
+//   --fichiers <fichier> les fichiers du lot, un chemin par ligne (relatif à la racine ; un dossier compte pour tout ce
+//                       qu'il contient) : à utiliser quand une autre session a des fichiers modifiés dans le même arbre.
+//                       Le commit ne prend alors que ces chemins plus ceux que le script écrit lui-même
+//                       (`docs/BACKLOG.md`, `package.json`, `package-lock.json`) ; la version n'augmente que si l'un
+//                       de ces chemins est sous `src/` ou `android/`. Sans cette option : `git add -A`, tout l'arbre
 //   --essais <fichier>  un essai par ligne, « quoi → attendu » : numérotés à partir de « Prochains numéros »,
 //                       posés en sous-lignes de la ligne du lot ; l'en-tête est mis à jour
 //   --lecture           rien à essayer au téléphone : état « à valider sur lecture » (obligatoire sans --essais,
@@ -13,7 +18,7 @@
 //
 // Version : si `git status` montre un changement sous `src/` ou `android/`, le troisième nombre de la version de
 // `package.json` (et de `package-lock.json`, s'il la porte) augmente de un, sur deux chiffres. Puis `git add -A` et
-// `git commit -F` sur tout l'arbre. La forme du reste à faire est contrôlée par `outils/backlog.mjs` avant toute
+// `git commit -F` sur tout l'arbre (ou sur la liste de `--fichiers`). La forme du reste à faire est contrôlée par `outils/backlog.mjs` avant toute
 // écriture : une erreur de forme arrête tout, rien n'est touché. Sans dépendance.
 
 import { execFileSync } from 'node:child_process'
@@ -50,9 +55,27 @@ export function cheminsDuStatut(porcelain) {
   return chemins
 }
 
-/** Vrai si un fichier de l'application ou de l'APK a changé (`src/` ou `android/`) : la version doit augmenter. */
-export function codeAChange(porcelain) {
-  return cheminsDuStatut(porcelain).some((c) => c.startsWith('src/') || c.startsWith('android/'))
+/**
+ * Vrai si un fichier de l'application ou de l'APK a changé (`src/` ou `android/`) : la version doit augmenter.
+ * Avec `retenus` (liste de `--fichiers`), seuls comptent les chemins du statut que cette liste couvre : une
+ * modification de `src/` faite par une autre session ne fait pas augmenter la version.
+ */
+export function codeAChange(porcelain, retenus = null) {
+  const chemins = cheminsDuStatut(porcelain).filter((c) => retenus === null || couvert(c, retenus))
+  return chemins.some((c) => c.startsWith('src/') || c.startsWith('android/'))
+}
+
+/** Les chemins d'un fichier de liste : un par ligne, barres droites, lignes vides ignorées. */
+export function lireListeFichiers(texte) {
+  return texte
+    .split(/\r?\n/)
+    .map((l) => l.trim().replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, ''))
+    .filter(Boolean)
+}
+
+/** Vrai si `chemin` est l'un des chemins de la liste ou se trouve sous l'un d'eux (dossier). */
+export function couvert(chemin, liste) {
+  return liste.some((l) => chemin === l || chemin.startsWith(`${l}/`))
 }
 
 /** Version lue en tête de `package.json` (le premier `"version"`). */
@@ -156,12 +179,12 @@ export function appliquerFinDeLot(texte, opts) {
   return { texte: nouveau, etat: etat ?? element.etat, ligne: ligneLot, essais: numerotes }
 }
 
-/** Les options de la ligne de commande. Rend `{ numero, message, essais, lecture, enCours, aBlanc }`. */
+/** Les options de la ligne de commande. Rend `{ numero, message, essais, fichiers, lecture, enCours, aBlanc }`. */
 export function lireArguments(argv) {
-  const o = { numero: null, message: null, essais: null, lecture: false, enCours: false, aBlanc: false }
+  const o = { numero: null, message: null, essais: null, fichiers: null, lecture: false, enCours: false, aBlanc: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
-    if (a === '--message' || a === '--essais') {
+    if (a === '--message' || a === '--essais' || a === '--fichiers') {
       const valeur = argv[++i]
       if (!valeur || valeur.startsWith('--')) throw new ErreurFinDeLot(`${a} demande un fichier`)
       o[a.slice(2)] = valeur
@@ -171,7 +194,7 @@ export function lireArguments(argv) {
     else if (/^\d+$/.test(a) && o.numero === null) o.numero = Number(a)
     else throw new ErreurFinDeLot(`argument inconnu « ${a} »`)
   }
-  if (o.numero === null) throw new ErreurFinDeLot('usage : node outils/fin-de-lot.mjs <N> --message <fichier> [--essais <fichier>] [--lecture] [--en-cours] [--a-blanc]')
+  if (o.numero === null) throw new ErreurFinDeLot('usage : node outils/fin-de-lot.mjs <N> --message <fichier> [--essais <fichier>] [--fichiers <fichier>] [--lecture] [--en-cours] [--a-blanc]')
   if (!o.message) throw new ErreurFinDeLot('--message <fichier> est obligatoire')
   return o
 }
@@ -207,6 +230,9 @@ export function principal(argv, { racine = process.cwd(), aujourdhui = new Date(
     const essais = o.essais ? lireEssais(lire(resolve(o.essais), 'fichier d\'essais')) : []
     if (o.essais && !essais.length) throw new ErreurFinDeLot('le fichier d\'essais est vide')
 
+    const retenus = o.fichiers ? lireListeFichiers(lire(resolve(o.fichiers), 'fichier de liste')) : null
+    if (retenus && !retenus.length) throw new ErreurFinDeLot('le fichier de liste (--fichiers) est vide')
+
     const backlog = lire(cheminBacklog, 'reste à faire')
     const paquet = lire(cheminPackage, 'package.json')
     let lock = null
@@ -218,7 +244,7 @@ export function principal(argv, { racine = process.cwd(), aujourdhui = new Date(
 
     const statut = git(racine, ['status', '--porcelain', '-uall'])
     const ancienne = versionDuPackage(paquet)
-    const bouge = codeAChange(statut)
+    const bouge = codeAChange(statut, retenus)
     const nouvelle = bouge ? versionSuivante(ancienne) : null
 
     const res = appliquerFinDeLot(backlog, { numero: o.numero, version: nouvelle, aujourdhui, lecture: o.lecture, enCours: o.enCours, essais })
@@ -239,7 +265,7 @@ export function principal(argv, { racine = process.cwd(), aujourdhui = new Date(
     const sortieEssais = res.essais.length ? `Essais : ${res.essais.map((e) => e.numero).join(', ')}` : 'Essais : aucun'
 
     if (o.aBlanc) {
-      const posés = new Set(cheminsDuStatut(statut))
+      const posés = new Set(retenus ?? cheminsDuStatut(statut))
       posés.add('docs/BACKLOG.md')
       if (nouvelle) posés.add('package.json')
       if (verrou.change) posés.add('package-lock.json')
@@ -264,7 +290,12 @@ export function principal(argv, { racine = process.cwd(), aujourdhui = new Date(
         writeFileSync(cheminLock, verrou.texte)
       }
     }
-    git(racine, ['add', '-A'])
+    if (retenus) {
+      const ecrits = ['docs/BACKLOG.md', ...(nouvelle ? ['package.json'] : []), ...(nouvelle && verrou.change ? ['package-lock.json'] : [])]
+      git(racine, ['add', '--', ...new Set([...retenus, ...ecrits])])
+    } else {
+      git(racine, ['add', '-A'])
+    }
     git(racine, ['commit', '-F', resolve(o.message)])
     const court = git(racine, ['rev-parse', '--short', 'HEAD']).trim()
     lignes.push(`Commit : ${court}`, sortieEssais, `État : lot ${o.numero} → ${res.etat}`)

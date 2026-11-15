@@ -7,7 +7,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 maxTurns: 40
 ---
 
-Tu fais la passe de documentation d'un lot validé dans le dépôt Gtracker, selon la règle « Documentation » de `CLAUDE.md`, que tu lis d'abord. Tu ne modifies aucun fichier de `src/`, `outils/` ni `android/`, et tu ne committes pas.
+Tu fais la passe de documentation d'un lot validé dans le dépôt Gtracker, selon la règle « Documentation » de `CLAUDE.md`, déjà chargé : ne le relis pas. Tu ne modifies aucun fichier de `src/`, `outils/` ni `android/`, et tu ne committes pas.
 
 Ce qu'on te donne : le sujet du lot, les commits concernés (`git log` et `git show --stat` pour voir les fichiers), le numéro du prochain point d'HISTORIQUE.
 

@@ -21,6 +21,21 @@ Revue globale du 15/11 (auditeurs « robustesse » et « Android », constats 1 
 - Repères écartés quand l'horloge du téléphone avance sur l'heure GPS (`recovery.ts:297-298`) : très rare, à corriger seulement si c'est une ligne.
 - La survie du GPS à la fermeture de l'application : c'est le lot 403.
 
+## Plan du 15/11 (agent Plan) et questions tranchées par l'orchestrateur
+
+Les sept constats tiennent dans le code. Le 3 demande un garde-fou à part : `retryLostIn` ne sert à rien avant la jonction (`retryLost()` sort aussitôt hors du mode perte) ; il faut un `openGuard` distinct, armé dans `open()` tant que la ceinture n'a jamais été jointe, retiré à la connexion, à la fermeture et au désarmement.
+
+Coupe en deux agents successifs, chacun avec son commit : partie A = corrections 4, 5, 6, 7 et 3 (locales, plus la compilation du Java) ; partie B = corrections 2 et 1 (cœur de l'enregistreur et module neuf). Le lot 397, codé en même temps, n'ajoute ni ne retire aucune clé des dictionnaires (son plan le dit) : `src/locales/` revient donc au 396.
+
+Tranché par l'orchestrateur (implémentation, aucune donnée perdue dans aucun cas) :
+- sous-dossier du dossier mémoire : `journaux/`, ajouté à la disposition (`library/folderLayout.ts`, `MEMORY_SUBFOLDERS`) ; c'est un nom de rangement, le brief demandait « un sous-dossier dédié » ;
+- un journal mis de côté qui se relit enfin est rangé comme une session, sans l'écran « Continuer / Analyser / Jeter » (« Continuer » n'a plus de sens après coup), et l'utilisateur en est prévenu par le message de démarrage ;
+- sans dossier mémoire, ou dossier en lecture seule : le journal reste dans le dossier privé, rien n'est effacé, et c'est dit une fois par lancement ;
+- capteurs d'un journal reconstruit : repris si la reprise normale offre déjà la fonction à appeler telle quelle ; sinon la session est rangée sans eux et le fichier des capteurs n'est pas effacé ;
+- repères : un seul par instant ; une coupure identique n'est pas poussée deux fois ;
+- un seul message pour le journal mis de côté, celui du démarrage ;
+- le `.tmp` invalide gardé est retenté et signalé à chaque ouverture, comme son équivalent sous son vrai nom (c'est l'attendu du point 5).
+
 ## Vérification
 
 `node outils/verif.mjs --rapide` pendant le travail, `npm run verif` à la fin ; compilation du Java (procédure du §12 d'ETAT, sans construire d'APK). Banc : `gps-perdu` et `notification` contre HEAD, relevés identiques.

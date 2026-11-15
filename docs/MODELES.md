@@ -30,7 +30,7 @@ Effort (`/effort`) : `low` pour un échange court qu'on relit à chaque pas (ren
 
 ## En pratique
 
-- **Au brief** : remplir la colonne « Modèle | Réflexion » du LISEZMOI du lot avec les valeurs du tableau.
+- **Au brief** : remplir la colonne « Modèle | Réflexion » de la fiche du lot (`docs/backlog/N-*.md`) avec les valeurs du tableau.
 - **À la reprise** : ouvrir la conversation avec `claude --model <alias>` (`sonnet`, `opus`, `fable`, `opusplan`), puis `/effort <niveau>` si le brief en demande un autre que le défaut. `/model` en session : `s` change pour la session, `Entrée` écrit le défaut dans les réglages.
 - **Un lot, un modèle** : un lot commence et finit sur le même modèle. Hors mode chaîne, si Sonnet cale (« il ne savait pas assez »), relancer le lot sur Opus dans une conversation neuve avec le brief ; ne pas changer de modèle en route. En mode chaîne, `/chaine` relance par le paramètre `model` de l'agent `lot`.
 - **Effort avant modèle** : quand le problème est « il n'a pas assez essayé », remonter l'effort d'un cran avant de changer de modèle.
@@ -70,7 +70,7 @@ Fable 5.2 conduit le paquet, à `medium` ; `high` seulement si le paquet a un lo
 
 ## Réglages de l'utilisateur (hors dépôt)
 
-Dans ses réglages personnels : `model` vaut `fable` ; `CLAUDE_CODE_SUBAGENT_MODEL` vaut `sonnet` ; `modelSettings` force `high` sur Fable 5.2 et Opus 5.5, `medium` sur Sonnet 5.5. Ils ne se changent que sur demande. Le hook `.claude/hooks/garde-lot.mjs`, branché dans l'en-tête de l'agent `lot`, refuse `git commit`, `git push` et toute modification de `package.json`.
+Dans ses réglages personnels : `model` vaut `fable` ; `CLAUDE_CODE_SUBAGENT_MODEL` vaut `sonnet` ; `modelSettings` force `high` sur Fable 5.2 et Opus 5.5, `medium` sur Sonnet 5.5. Ils ne se changent que sur demande. Le hook `.claude/hooks/garde-lot.mjs`, branché dans l'en-tête de l'agent `lot`, refuse `git commit`, `git push`, les commandes git qui défont ou déplacent un travail (stash, checkout, restore, clean, reset, switch, rebase, merge, worktree, tag, `branch -D`), l'édition d'un fichier par un script, l'écriture hors du dépôt, dans `docs/` hors de `docs/backlog/` et dans `.claude/`, toute modification de `package.json`, et l'écriture hors de la liste de fichiers du lot (« lot-fichiers.json », dans `.claude/`) quand elle existe.
 
 ## Ajuster le tableau
 
