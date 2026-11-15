@@ -10,7 +10,7 @@ import { useMap, useMapEvents } from './map/mapContext';
 import { useCompassHeading } from '../hooks/useCompassHeading';
 import type { LocationFix } from '../platform/location';
 import { displayHeading, type TravelHeading } from '../recording/heading';
-import { liveTail } from '../recording/livePath';
+import { liveBlocks, liveTail } from '../recording/livePath';
 import type { CourseMark } from '../recording/markGuide';
 import type { SessionMark } from '../core/sessionMarks';
 import type { SportFamily } from '../core/sportProfiles';
@@ -155,23 +155,29 @@ function FollowPosition({ position, following, onUserMove }: {
 const latLngs = (points: ReadonlyArray<{ lat: number; lon: number }>): [number, number][] => points.map((p) => [p.lat, p.lon]);
 
 /**
- * Tracés des segments, dans la forme de Leaflet, gardés d'un calcul à
- * l'autre et retrouvés par la première position de leur segment : un segment
- * fermé par une pause ne change plus et garde son tableau (Leaflet ne le
- * reprojette pas), le dernier n'est prolongé que de ses nouveaux points.
+ * Tracés des blocs de la trace (`liveBlocks`), dans la forme de Leaflet, gardés
+ * d'un calcul à l'autre et retrouvés par la première position de leur bloc : un
+ * bloc plein, ou d'un segment fermé par une pause, ne change plus et garde son
+ * tableau, que Leaflet ne retravaille pas ; seul le dernier bloc du segment en
+ * cours est prolongé de ses nouveaux points. Un bloc entièrement hors de la vue
+ * est en outre sauté d'un coup quand la carte suit la position.
  */
-const pathCache = new WeakMap<LocationFix, [number, number][]>();
+const blockCache = new WeakMap<LocationFix, [number, number][]>();
 
-const segmentPath = (segment: LocationFix[]): [number, number][] => {
-  const first = segment[0];
-  if (!first) return [];
-  const kept = pathCache.get(first);
-  const path = kept && kept.length === segment.length ? kept
-    : kept && kept.length < segment.length ? kept.concat(latLngs(segment.slice(kept.length)))
-    : latLngs(segment);
-  pathCache.set(first, path);
+const blockPath = (segment: LocationFix[], start: number, end: number): [number, number][] => {
+  const first = segment[start];
+  const size = end - start;
+  const kept = blockCache.get(first);
+  const path = kept && kept.length === size ? kept
+    : kept && kept.length < size ? kept.concat(latLngs(segment.slice(start + kept.length, end)))
+    : latLngs(segment.slice(start, end));
+  blockCache.set(first, path);
   return path;
 };
+
+/** Tracés d'un segment, un par bloc ; deux blocs voisins partagent leur point de jonction. */
+const segmentBlocks = (segment: LocationFix[]): [number, number][][] =>
+  liveBlocks(segment.length).map(([start, end]) => blockPath(segment, start, end));
 
 /**
  * Carte de l'enregistrement en cours : la trace d'une seule couleur (un
@@ -186,8 +192,8 @@ function LiveMap({ segments, position, positionSegment = null, color, family, he
   const [following, setFollowing] = useState(true);
   const halo = useMapBase(family)[0] === 'satellite';
   // Tracés mémorisés : `segments` ne change qu'au recalcul (toutes les 2 s, `useLiveRecording`), la position à chaque mesure.
-  // Leaflet ne reprend un tracé que si son tableau de points change : les segments fermés gardent le leur.
-  const paths = useMemo(() => segments.map(segmentPath), [segments]);
+  // Leaflet ne reprend un tracé que si son tableau de points change : les blocs fermés gardent le leur.
+  const paths = useMemo(() => segments.map(segmentBlocks), [segments]);
   const guidePath = useMemo(() => (guide && guide.length > 1 ? latLngs(guide) : null), [guide]);
   const guideDonePath = useMemo(() => (guideDone && guideDone.length > 1 ? latLngs(guideDone) : null), [guideDone]);
   const trackStyle = useMemo(() => ({ color, weight: TRACK_WEIGHT, opacity: 0.9 }), [color]);
@@ -225,13 +231,17 @@ function LiveMap({ segments, position, positionSegment = null, color, family, he
         )}
         {halo && (
           <Pane {...TRACK_HALO_PANE}>
-            {paths.map((positions, i) => <Polyline key={`halo-${i}`} positions={positions} pathOptions={HALO_STYLE} />)}
+            {paths.map((blocks, i) => blocks.map((positions, k) => (
+              <Polyline key={`halo-${i}-${k}`} positions={positions} pathOptions={HALO_STYLE} />
+            )))}
             {tail && (
               <Polyline positions={[[tail[0].lat, tail[0].lon], [tail[1].lat, tail[1].lon]]} pathOptions={HALO_STYLE} />
             )}
           </Pane>
         )}
-        {paths.map((positions, i) => <Polyline key={i} positions={positions} pathOptions={trackStyle} />)}
+        {paths.map((blocks, i) => blocks.map((positions, k) => (
+          <Polyline key={`${i}-${k}`} positions={positions} pathOptions={trackStyle} />
+        )))}
         {tail && (
           <Polyline positions={[[tail[0].lat, tail[0].lon], [tail[1].lat, tail[1].lon]]} pathOptions={trackStyle} />
         )}

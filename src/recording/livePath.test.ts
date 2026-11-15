@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LocationFix } from '../platform/location';
 import { segmentCount, splitIntoSegments } from './session';
-import { liveTail } from './livePath';
+import { LIVE_BLOCK_POINTS, liveBlocks, liveTail } from './livePath';
 
 const T0 = Date.UTC(2026, 9, 31, 9, 0, 0);
 /** Course vers l'est à 3 m/s, une position par seconde ; `lonAt` pour une position prise ailleurs. */
@@ -44,5 +44,52 @@ describe('liveTail (raccord de la carte du direct)', () => {
     expect(liveTail(segments, fixAt(45), null)).toBeNull();
     expect(liveTail([], fixAt(1), 0)).toBeNull();
     expect(liveTail(segments, null, 0)).toBeNull();
+  });
+});
+
+describe('liveBlocks (blocs de dessin de la carte du direct)', () => {
+  /** Chaque point est dans au moins un bloc, les blocs se suivent en partageant leur point de jonction. */
+  const expectCover = (length: number, size: number) => {
+    const blocks = liveBlocks(length, size);
+    expect(blocks[0]?.[0]).toBe(0);
+    expect(blocks.at(-1)?.[1]).toBe(length);
+    blocks.forEach(([start, end], k) => {
+      expect(end - start).toBeGreaterThanOrEqual(Math.min(2, length));
+      expect(end - start).toBeLessThanOrEqual(size);
+      if (k > 0) expect(start).toBe(blocks[k - 1][1] - 1);
+    });
+  };
+
+  it('couvre tous les points, jonctions partagées', () => {
+    for (const length of [2, 3, 10, 299, 300, 301, 302, 599, 600, 1000, 14_400]) expectCover(length, LIVE_BLOCK_POINTS);
+    expect(liveBlocks(601, 300)).toEqual([[0, 300], [299, 599], [598, 601]]);
+  });
+
+  it('0, 1 et 2 points', () => {
+    expect(liveBlocks(0)).toEqual([]);
+    expect(liveBlocks(1)).toEqual([[0, 1]]);
+    expect(liveBlocks(2)).toEqual([[0, 2]]);
+  });
+
+  it('longueur multiple exact de la taille', () => {
+    expect(liveBlocks(300, 300)).toEqual([[0, 300]]);
+    expect(liveBlocks(600, 300)).toEqual([[0, 300], [299, 599], [598, 600]]);
+    expect(liveBlocks(10, 5)).toEqual([[0, 5], [4, 9], [8, 10]]);
+  });
+
+  it('quand le segment s\'allonge, les blocs pleins ne changent pas et seul le dernier grandit', () => {
+    let before = liveBlocks(1, 50);
+    for (let length = 2; length <= 400; length++) {
+      const after = liveBlocks(length, 50);
+      // Tous les blocs d'avant sauf le dernier restent identiques ; le dernier garde son début.
+      expect(after.slice(0, before.length - 1)).toEqual(before.slice(0, -1));
+      expect(after[before.length - 1][0]).toBe(before.at(-1)![0]);
+      expect(after.length - before.length).toBeLessThanOrEqual(1);
+      before = after;
+    }
+  });
+
+  it('une taille sous 2 points ne bloque pas la découpe', () => {
+    expect(liveBlocks(4, 1)).toEqual([[0, 2], [1, 3], [2, 4]]);
   });
 });
