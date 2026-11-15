@@ -21,6 +21,7 @@ describe('noms techniques de l\'application', () => {
       reglages: 'gtracker-reglages',
       fcRepos: 'gtracker-fc-repos',
       journal: 'gtracker-journal',
+      positions: 'gtracker-positions',
       itineraire: 'gtracker-itineraire',
       lieux: 'gtracker-lieux',
     });

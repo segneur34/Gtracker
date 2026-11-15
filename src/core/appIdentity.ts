@@ -32,6 +32,8 @@ export const FILE_FORMATS = {
   fcRepos: `${FORMAT_ID}-fc-repos` as const,
   /** En-tête du journal d'enregistrement (`recording/journal.ts`). */
   journal: `${FORMAT_ID}-journal` as const,
+  /** En-tête du journal des positions tenu par le service du téléphone (`recording/nativeLog.ts`, et le Java qui l'écrit). */
+  positions: `${FORMAT_ID}-positions` as const,
   /** Fiche d'un itinéraire (`planning/routeRecord.ts`). */
   itineraire: `${FORMAT_ID}-itineraire` as const,
   /** Lieux appris, à la racine du dossier mémoire (`library/learnedPlaces.ts`). */

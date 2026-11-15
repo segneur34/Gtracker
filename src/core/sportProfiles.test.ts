@@ -21,6 +21,15 @@ describe('isSportType', () => {
   });
 });
 
+describe('garde contre un enregistrement jamais repris', () => {
+  it('la même pour tous les supports : 200 m, 1 h, et 12 h après la fermeture', () => {
+    for (const sport of Object.keys(SPORT_PROFILES) as SportType[]) {
+      const { guardStillRadiusM, guardStillDelayS, guardMaxClosedS } = SPORT_PROFILES[sport].recording;
+      expect([guardStillRadiusM, guardStillDelayS, guardMaxClosedS], sport).toEqual([200, 3600, 43200]);
+    }
+  });
+});
+
 describe('hrEnergy', () => {
   it("n'est donné qu'en voile et en surf", () => {
     for (const sport of Object.keys(SPORT_PROFILES) as SportType[]) {

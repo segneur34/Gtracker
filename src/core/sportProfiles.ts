@@ -90,6 +90,15 @@ export interface RecordingProfile {
    * (`recording/resume.ts`) ; au-delà, la session attend sa décision.
    */
   resumeOfferMaxAgeS: number;
+  /**
+   * Garde contre un enregistrement jamais repris, application fermée : rayon, en mètres, dont le téléphone ne
+   * s'est pas éloigné pendant `guardStillDelayS` ; l'enregistrement s'arrête alors seul. Commun à tous les supports.
+   */
+  guardStillRadiusM: number;
+  /** Temps réel, en secondes, sans sortir de `guardStillRadiusM`, application fermée, avant l'arrêt par la garde. */
+  guardStillDelayS: number;
+  /** Temps réel, en secondes, depuis la fermeture de l'application, au bout duquel la garde arrête l'enregistrement. */
+  guardMaxClosedS: number;
 }
 
 /**
@@ -97,7 +106,9 @@ export interface RecordingProfile {
  * Le 1 Hz tient aussi le coût du recalcul du vent.
  * Pause automatique sous 0,3 m/s (environ 1 km/h, sous le bruit GPS au repos)
  * pendant 60 s. GPS perdu après 1 min sans position, signalé de nouveau
- * seulement après 2 min de positions revenues.
+ * seulement après 2 min de positions revenues. Application fermée, la garde
+ * arrête l'enregistrement après 1 h sans s'éloigner de 200 m, ou 12 h après
+ * la fermeture.
  */
 export const DEFAULT_RECORDING: RecordingProfile = {
   intervalMs: 1000,
@@ -110,6 +121,9 @@ export const DEFAULT_RECORDING: RecordingProfile = {
   beltLostDelayS: 60,
   beltLostRearmS: 120,
   resumeOfferMaxAgeS: 600,
+  guardStillRadiusM: 200,
+  guardStillDelayS: 3600,
+  guardMaxClosedS: 12 * 3600,
 };
 
 /**
