@@ -112,19 +112,14 @@
   border-bottom: none;
 }
 
-/* « avancé » : une pastille au contour en tirets, qui ne se remplit pas une fois dépliée. */
-.an-tabs-advanced-toggle {
-  border-style: dashed;
-}
-
 /* Bloc en ligne, pas flex : la majuscule de `.ui-tab::first-letter` s'y applique. */
 .an-tabs-advanced-toggle svg {
   margin-left: var(--space-1);
   vertical-align: -2px;
 }
 
+/* « avancé » dépliée : son contour et son texte s'allument, sans se remplir comme un onglet ouvert. */
 .an-tabs-advanced-toggle[aria-expanded='true'] {
-  border-style: solid;
   border-color: var(--tab-accent, var(--voile));
   color: var(--tab-accent, var(--voile));
 }
