@@ -1,10 +1,10 @@
 import { normalizeDeg } from '../core/angles';
 import type { FlightSpan } from '../core/pumping';
-import { buildCumulativeTrack } from '../core/sessionStats';
+import { buildCumulativeTrack, computeActiveTimeMs, computeTotalTimeMs } from '../core/sessionStats';
 import type { SpeedRangeMs } from '../core/speedGradient';
 import { getSportProfile, hasActiveThreshold, type SportProfile } from '../core/sportProfiles';
 import type { CumulativeTrack, SportType, TrackPoint } from '../core/types';
-import { msToKnots } from '../core/units';
+import { formatDuration, msToKnots } from '../core/units';
 import {
   WIND_LOCAL_MAX_GAP_MIN,
   classifyManeuvers,
@@ -21,9 +21,12 @@ import {
   summarizeManeuvers,
   vmgManeuverSpans,
   vmgSeries,
+  withWindAt,
+  withoutWindAt,
   type ManeuverSummary,
   type VmgStats,
   type WindStats,
+  type WindStatsData,
 } from './sailingAnalytics';
 import { sessionManeuverThresholds, suggestSpeedRangeMs } from './sailingConfig';
 import { buildSailingSessionStats, computeSailingTops, sailingActivityMask, sailingFlights, sailingRatioMask } from './sailingStats';
@@ -51,7 +54,9 @@ import { buildWindTimeline, polarExcludedPoints, prepareWindPolar, speedPolar, t
  * Le hook résout d'abord les seuils (`resolveSailingThresholds`) ; la lecture
  * de la fiche (seuil de l'activité qu'elle porte, `library/`) lui reste, et il
  * passe un seuil déjà résolu. Les tests enchaînent les mêmes étapes par
- * l'aide `analyzeSailingSession` (`src/test/sailing.fixture.ts`).
+ * l'aide `analyzeSailingSession` (`src/test/sailing.fixture.ts`), et le calcul
+ * en arrière-plan par `runSailingAnalysis` (`library/analysisStore.ts`), qui
+ * rend à la page `sailingAnalysisResult`, qu'elle relit par `sailingAnalysisShown`.
  */
 
 /** Ce dont dépend la préparation d'une trace : son calcul et son allure. */
@@ -245,3 +250,126 @@ export const sailingPolarGraph = (
   prepared.trackData.length > 0 && currentWindValue !== null
     ? speedPolar(prepared.trackData, currentWindValue, prepared.maneuverThresholds.polarMinSpeedKn, polarExcludedPoints(prepared.trackData, maneuvers, currentWindValue))
     : [];
+
+/** Les étapes d'une analyse de session à voile, dans l'ordre où elles s'enchaînent. */
+export interface SailingAnalysisStages {
+  prepared: PreparedSailingTrack;
+  atThreshold: SailingThresholdAnalysis;
+  wind: SailingWindAnalysis;
+  /** Polaire au vent retenu (`sailingPolarGraph`), refaite avec le vent. */
+  polarGraphData: PolarBin[];
+}
+
+/**
+ * Analyse complète d'une session à voile : les trois étapes et la polaire, enchaînées comme `useSailingSession` les
+ * appelle, mêmes fonctions et mêmes arguments, au seuil des calculs déjà résolu (règle 4 : la mise à l'échelle du seuil
+ * reste à l'appelant). Une étape donnée dans `reuse` est reprise telle quelle au lieu d'être refaite : c'est à
+ * l'appelant de ne la donner que si ses entrées n'ont pas changé, avec les étapes dont elle découle (une étape au seuil
+ * avec sa préparation, le vent et la polaire avec les deux).
+ */
+export const runSailingAnalysis = (
+  track: TrackPoint[],
+  input: SailingTrackInput,
+  computeThresholdKn: number,
+  /** Vent saisi, en degrés ; `null` : vent estimé. */
+  windDeg: number | null,
+  reuse: Partial<SailingAnalysisStages> = {}
+): SailingAnalysisStages => {
+  const prepared = reuse.prepared ?? prepareSailingTrack(track, input);
+  const atThreshold = reuse.atThreshold ?? analyzeSailingAtThreshold(prepared, computeThresholdKn);
+  const wind = reuse.wind ?? analyzeSailingWind(prepared, atThreshold, windDeg);
+  const polarGraphData = reuse.polarGraphData ?? sailingPolarGraph(prepared, wind.currentWindValue, wind.maneuverStats?.locations);
+  return { prepared, atThreshold, wind, polarGraphData };
+};
+
+/**
+ * Statistiques d'une session à voile sans leurs durées écrites (`formatDuration` suit la langue de l'interface) :
+ * les durées en nombres, que la page écrit dans sa langue (`sailingAnalysisShown`).
+ */
+export type SailingStatsData = Omit<SessionStats, 'totalTime' | 'activeTime'> & {
+  /** Durée totale, en millisecondes (`computeTotalTimeMs`). */
+  totalTimeMs: number;
+  /** Temps au-dessus du seuil d'activité, en millisecondes (`computeActiveTimeMs` sur le masque d'activité). */
+  activeTimeMs: number;
+};
+
+/**
+ * Ce qu'une analyse de session à voile rend à la page, sans fonction, sans texte qui dépende de la langue et sans
+ * grand tableau qu'elle ne lit pas. Restent dans le calcul : la trace (la page l'a déjà), sa vue en nœuds
+ * (`trackToPointData`, refaite par la page), le masque d'activité, la détection des virages et l'étage polaire du vent,
+ * qui portent des fonctions. Le calcul en arrière-plan n'a pas la langue de l'interface : les variations du vent
+ * viennent sans leur `windAt`, les statistiques sans leurs durées écrites, et le résumé des manœuvres, qui écrit ses
+ * valeurs (`formatMetric`), n'en vient pas ; la page rebâtit le tout par `sailingAnalysisShown`.
+ */
+export interface SailingAnalysisResult {
+  /** Bornes de couleur suggérées à partir de l'allure de la session et du pic de vitesse. */
+  suggestedSpeedRangeMs: SpeedRangeMs;
+  /** Seuils de manœuvre accordés à l'allure de la session (règle 4). */
+  maneuverThresholds: { minEntrySpeedKn: number; polarMinSpeedKn: number };
+  computeThresholdKn: number;
+  flightThresholdKn: number | undefined;
+  stats: SailingStatsData | null;
+  flights: FlightSpan[];
+  windEstimate: WindEstimate | null;
+  autoWind: number | null;
+  currentWindValue: number | null;
+  windInputRequired: boolean;
+  maneuverStats: ManeuverStats | null;
+  windStats: WindStatsData | null;
+  vmgStats: VmgStats | null;
+  vmgSeries: (number | null)[];
+  polarGraphData: PolarBin[];
+}
+
+/** Statistiques sans leurs durées écrites, et ces durées en nombres, prises aux mêmes fonctions que `buildBaseSessionStats`. */
+const statsData = (stats: SessionStats | null, track: TrackPoint[], activityMask: boolean[]): SailingStatsData | null => {
+  if (!stats) return null;
+  const { totalTime: _totalTime, activeTime: _activeTime, ...data } = stats;
+  return { ...data, totalTimeMs: computeTotalTimeMs(track), activeTimeMs: computeActiveTimeMs(track, activityMask) };
+};
+
+/** Ce qui, des étapes d'une analyse, revient à la page (`SailingAnalysisResult`) : les mêmes objets, rien de recalculé. */
+export const sailingAnalysisResult = ({ prepared, atThreshold, wind, polarGraphData }: SailingAnalysisStages): SailingAnalysisResult => ({
+  suggestedSpeedRangeMs: prepared.suggestedSpeedRangeMs,
+  maneuverThresholds: prepared.maneuverThresholds,
+  computeThresholdKn: atThreshold.computeThresholdKn,
+  flightThresholdKn: atThreshold.flightThresholdKn,
+  stats: statsData(atThreshold.stats, prepared.track, atThreshold.activityMask),
+  flights: atThreshold.flights,
+  windEstimate: atThreshold.windEstimate,
+  autoWind: wind.autoWind,
+  currentWindValue: wind.currentWindValue,
+  windInputRequired: wind.windInputRequired,
+  maneuverStats: wind.maneuverStats,
+  windStats: wind.windStats ? withoutWindAt(wind.windStats) : null,
+  vmgStats: wind.vmgStats,
+  vmgSeries: wind.vmgSeries,
+  polarGraphData,
+});
+
+/** L'analyse telle que la page la lit : le résultat du calcul, avec ce qui en a été ôté rebâti dans sa langue. */
+export type SailingAnalysisShown = Omit<SailingAnalysisResult, 'stats' | 'windStats'> & {
+  stats: SessionStats | null;
+  windStats: WindStats | null;
+  maneuverSummary: ManeuverSummary;
+};
+
+/**
+ * Rebâtit, côté page et dans la langue de l'interface, ce que le calcul en arrière-plan n'a pas rendu : les durées
+ * écrites (`formatDuration`), le résumé des manœuvres (`summarizeManeuvers` sur les manœuvres rendues) et la fonction du
+ * vent (`withWindAt`). Mêmes fonctions et mêmes entrées que la chaîne en ligne : mêmes valeurs.
+ */
+export const sailingAnalysisShown = (result: SailingAnalysisResult): SailingAnalysisShown => {
+  const { stats, windStats, ...rest } = result;
+  let shownStats: SessionStats | null = null;
+  if (stats) {
+    const { totalTimeMs, activeTimeMs, ...data } = stats;
+    shownStats = { ...data, totalTime: formatDuration(totalTimeMs), activeTime: formatDuration(activeTimeMs) };
+  }
+  return {
+    ...rest,
+    stats: shownStats,
+    windStats: windStats ? withWindAt(windStats) : null,
+    maneuverSummary: summarizeManeuvers(result.maneuverStats),
+  };
+};

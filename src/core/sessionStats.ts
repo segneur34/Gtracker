@@ -44,7 +44,7 @@ export const buildCumulativeTrack = (track: TrackPoint[]): CumulativeTrack => {
 };
 
 /** Durée totale de la session, en millisecondes. */
-const computeTotalTimeMs = (track: TrackPoint[]): number => {
+export const computeTotalTimeMs = (track: TrackPoint[]): number => {
   if (track.length === 0) return 0;
   return track[track.length - 1].timeMs - track[0].timeMs;
 };

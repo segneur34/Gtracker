@@ -95,6 +95,9 @@ describe('worker des traces : ni React, ni platform/, ni DOM dans ce qu’il emp
     expect(files).toContain('core/gpxParser.ts');
     expect(files).toContain('library/summary.ts');
     expect(files).toContain('library/sessionTrack.ts');
+    expect(files).toContain('library/analysisStore.ts');
+    expect(files).toContain('sailing/sailingSession.ts');
+    expect(files).toContain('surfing/surfSession.ts');
     expect(files.length).toBeGreaterThan(20);
     // Un `import type` ne compte pas, un import de valeur à côté d'un type si.
     expect(valueSpecifiersOf("import type { A } from './a';\nimport { b, type C } from './b';\nexport type { D } from './d';\nexport * from './e';"))

@@ -1,6 +1,13 @@
 import { prepareTrack, type PreparedTrack, type PrepareTrackOptions } from '../core/prepareTrack';
 import type { SportFamily } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
+import {
+  createAnalysisStore,
+  type AnalyzeSailingOptions,
+  type AnalyzeSurfOptions,
+  type SailingAnalysisReply,
+  type SurfAnalysisReply,
+} from './analysisStore';
 import { sessionColorTrack, type SessionColorTrack } from './sessionTrack';
 import { summarizeGpx, type SummarizeGpxOptions } from './summarizeGpx';
 import type { AnalyzedGpx } from './summaryOptions';
@@ -8,9 +15,30 @@ import type { AnalyzedGpx } from './summaryOptions';
 /**
  * Messages entre l'application et le worker des traces : lire un GPX et préparer sa trace pour
  * l'analyse (`prepare`), le résumer pour sa fiche (`summarize`), ou tirer sa trace colorée pour une vignette ou une
- * image partagée (`colorTrack`). Le worker et le calcul en ligne passent par le même aiguillage (`runTrackJob`) :
- * mêmes chiffres par construction.
+ * image partagée (`colorTrack`) ; analyser la session ouverte, à voile (`analyzeSailing`) ou de surf (`analyzeSurf`),
+ * et oublier sa mémoire quand la page la quitte (`release`). Le worker et le calcul en ligne passent par le même
+ * aiguillage (`runTrackJob`) : mêmes chiffres par construction.
  */
+
+/**
+ * Mémoire de la session ouverte (`analysisStore.ts`) : dans le worker, celle du worker ; en ligne, celle du fil de
+ * l'affichage. Un worker recréé, ou une demande refaite en ligne, la trouve vide : la tâche relit alors la trace.
+ */
+const analysisMemory = createAnalysisStore();
+
+/** Clé de la session gardée dans la mémoire de ce fil, `null` : aucune (tests du client). */
+export const analysisMemoryKey = (): string | null => analysisMemory.key;
+
+/** Options de `prepare` : celles de `prepareTrack`, et la clé sous laquelle garder la trace pour l'analyse qui suit. */
+export interface PrepareJobOptions extends PrepareTrackOptions {
+  /** Clé de la session donnée par la page : la trace lue est gardée pour `analyzeSailing` et `analyzeSurf`. Absente : rien n'est gardé. */
+  analysisKey?: string;
+}
+
+/** Options de `release` : la clé de la session quittée. */
+export interface ReleaseOptions {
+  key: string;
+}
 
 /** Ce que prend la trace colorée d'une session (`sessionColorTrack`) : son calcul, son allure imposée, sa famille. */
 export interface ColorTrackOptions {
@@ -21,9 +49,13 @@ export interface ColorTrackOptions {
 
 /** Ce que prend et rend chaque calcul. */
 export interface TrackJobs {
-  prepare: { options: PrepareTrackOptions; result: PreparedTrack };
+  prepare: { options: PrepareJobOptions; result: PreparedTrack };
   summarize: { options: SummarizeGpxOptions; result: AnalyzedGpx | null };
   colorTrack: { options: ColorTrackOptions; result: SessionColorTrack | null };
+  analyzeSailing: { options: AnalyzeSailingOptions; result: SailingAnalysisReply };
+  analyzeSurf: { options: AnalyzeSurfOptions; result: SurfAnalysisReply };
+  /** Le texte du GPX n'y sert pas : une chaîne vide. */
+  release: { options: ReleaseOptions; result: null };
 }
 
 export type TrackJobKind = keyof TrackJobs;
@@ -45,7 +77,18 @@ export type TrackResponse =
 /** Le calcul demandé, sur le fil où il est appelé. */
 export const runTrackJob = <K extends TrackJobKind>(kind: K, gpxText: string, options: TrackJobs[K]['options']): TrackJobs[K]['result'] => {
   // Chaque branche rend le type de son calcul ; TypeScript ne relie pas `kind` au type rendu.
-  if (kind === 'prepare') return prepareTrack(gpxText, options as PrepareTrackOptions) as TrackJobs[K]['result'];
+  if (kind === 'prepare') {
+    const { analysisKey, ...prepare } = options as PrepareJobOptions;
+    const prepared = prepareTrack(gpxText, prepare);
+    if (analysisKey !== undefined) analysisMemory.keepTrack(analysisKey, gpxText, prepare, prepared);
+    return prepared as TrackJobs[K]['result'];
+  }
+  if (kind === 'analyzeSailing') return analysisMemory.analyzeSailing(gpxText, options as AnalyzeSailingOptions) as TrackJobs[K]['result'];
+  if (kind === 'analyzeSurf') return analysisMemory.analyzeSurf(gpxText, options as AnalyzeSurfOptions) as TrackJobs[K]['result'];
+  if (kind === 'release') {
+    analysisMemory.release((options as ReleaseOptions).key);
+    return null as TrackJobs[K]['result'];
+  }
   if (kind === 'colorTrack') {
     const { sport, referenceOverrideMs, family } = options as ColorTrackOptions;
     return sessionColorTrack(gpxText, sport, referenceOverrideMs, family) as TrackJobs[K]['result'];

@@ -6,7 +6,8 @@ import {
 /**
  * Client des workers des traces : `runInWorker` envoie un calcul à un worker (`trackWorker.ts`) et rend sa
  * réponse. Deux files, chacune son worker, le même script lancé deux fois : « analyse » pour la trace d'une analyse
- * qu'on ouvre (`prepare`), « fond » pour les résumés et les vignettes (`summarize`, `colorTrack`). Un worker traite
+ * qu'on ouvre et ses calculs (`prepare`, `analyzeSailing`, `analyzeSurf`, `release` : la mémoire de la session ouverte
+ * vit dans ce worker-là), « fond » pour les résumés et les vignettes (`summarize`, `colorTrack`). Un worker traite
  * ses demandes dans l'ordre d'arrivée : sans cette séparation, l'analyse touchée attendrait derrière toutes les
  * vignettes déjà demandées. Chaque worker est créé à la première demande de sa file. S'il meurt, les demandes en cours
  * de sa file sont refaites en ligne et la suivante le recrée ; s'il meurt avant d'avoir répondu une fois (fichier
@@ -28,6 +29,9 @@ export type TrackQueue = 'analyse' | 'fond';
 /** File de chaque calcul : l'analyse ouverte ne passe jamais derrière les calculs de fond. */
 export const TRACK_QUEUE: Readonly<Record<TrackJobKind, TrackQueue>> = {
   prepare: 'analyse',
+  analyzeSailing: 'analyse',
+  analyzeSurf: 'analyse',
+  release: 'analyse',
   summarize: 'fond',
   colorTrack: 'fond',
 };
@@ -117,13 +121,28 @@ const currentWorker = (queue: QueueState): Worker | null => {
  * Lit et prépare un GPX (`prepare`, `core/prepareTrack.ts`), le résume (`summarize`, `summarizeGpx.ts`) ou en tire
  * la trace colorée d'une vignette (`colorTrack`, `sessionTrack.ts`) hors du fil de l'affichage, dans la file du
  * calcul (`TRACK_QUEUE`). La promesse rend le même résultat que le calcul en ligne, ou est rejetée par une erreur de
- * même nom et même message, dans la langue de l'interface.
+ * même nom et même message, dans la langue de l'interface. Analyse de la session ouverte (`analyzeSailing`,
+ * `analyzeSurf`) de même ; `release` vide sa mémoire sans jamais créer de worker.
  */
 export const runInWorker = <K extends TrackJobKind>(kind: K, gpxText: string, options: TrackJobs[K]['options']): Promise<TrackJobs[K]['result']> => {
   const queue = queues[TRACK_QUEUE[kind]];
+  if (kind === 'release') {
+    // La trace a pu être gardée des deux côtés (un `prepare` refait en ligne, worker mort) : la mémoire en ligne est
+    // toujours vidée, celle du worker s'il vit ; jamais un worker créé pour être vidé.
+    const inline = runInline(kind, gpxText, options);
+    if (!queue.worker) return inline;
+    return Promise.all([inline, send(queue, queue.worker, kind, gpxText, options)]).then(() => null as TrackJobs[K]['result']);
+  }
   const target = currentWorker(queue);
   if (!target) return runInline(kind, gpxText, options);
-  return new Promise<TrackJobs[K]['result']>((resolve, reject) => {
+  return send(queue, target, kind, gpxText, options);
+};
+
+/** Envoie un calcul au worker d'une file et rend sa réponse ; refait en ligne s'il meurt ou si les options ne se clonent pas. */
+const send = <K extends TrackJobKind>(
+  queue: QueueState, target: Worker, kind: K, gpxText: string, options: TrackJobs[K]['options']
+): Promise<TrackJobs[K]['result']> =>
+  new Promise<TrackJobs[K]['result']>((resolve, reject) => {
     const id = nextId++;
     const redo = () => {
       runInline(kind, gpxText, options).then(resolve, reject);
@@ -144,7 +163,6 @@ export const runInWorker = <K extends TrackJobKind>(kind: K, gpxText: string, op
       redo();
     }
   });
-};
 
 /** Oublie les workers des deux files (tests) : le prochain appel relit `Worker` et en crée un. Les demandes en cours sont refaites en ligne. */
 export const resetTrackWorker = (): void => {
