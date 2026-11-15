@@ -1,4 +1,5 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { brushColorFor } from '../core/brushColor';
 import { weekdayDayMonthYear } from '../core/calendar';
 import { activityDisplayName, type Activity } from '../core/activities';
 import { sportFamily, sportTreatment, type SportFamily } from '../core/sportProfiles';
@@ -9,7 +10,7 @@ import { useNearViewport } from '../hooks/useNearViewport';
 import { usePlaceSearch } from '../hooks/usePlaceSearch';
 import { correctSessionPlace, queueSessionPlace, removeSession, updateSessionRecord } from '../hooks/useSessionLibrary';
 import { effectiveDistanceUnit, effectiveSpeedUnit } from '../hooks/useSportSettings';
-import { useThemedShade } from '../hooks/useTheme';
+import { useAppliedTheme, useThemedShade } from '../hooks/useTheme';
 import { isPlaceToFind, placeDraftOf, type PlaceDraft } from '../library/places';
 import type { LibrarySession } from '../library/record';
 import { customName, sessionDisplayName } from '../library/sessionName';
@@ -63,7 +64,7 @@ type Sheet = 'open' | 'classify' | null;
  * mémoire ne redessine que les lignes dont la fiche change.
  */
 const SessionRow = memo(function SessionRow({
-  session, activity, activities, family, fromActivityId, folderLabel, confirming, onAskDelete, onCancelDelete, menu = true,
+  session, activity, activities, family, fromActivityId, folderLabel, confirming, onAskDelete, onCancelDelete, menu = true, brushed = false,
 }: {
   session: LibrarySession;
   activity: Activity | null;
@@ -79,9 +80,16 @@ const SessionRow = memo(function SessionRow({
   onCancelDelete: () => void;
   /** Le « … » des actions sur la session ; faux : la ligne ne fait qu'ouvrir l'analyse. */
   menu?: boolean;
+  /** Ligne dans un cadre peint à la couleur de son activité : le conteneur porte `brush-panels brush-panels--hair` (`BrushFrame.css`). */
+  brushed?: boolean;
 }) {
   const openSession = useOpenSession();
   const shade = useThemedShade();
+  const dark = useAppliedTheme().theme === 'dark';
+  const brushStyle = useMemo(
+    () => (brushed ? ({ '--brush': activity ? brushColorFor(activity.color, dark) : 'var(--ink)' } as CSSProperties) : undefined),
+    [brushed, activity, dark]
+  );
   const { record } = session;
   const { startMs } = record.summary;
   const unclassified = record.sport === null;
@@ -158,7 +166,7 @@ const SessionRow = memo(function SessionRow({
   const named = customName(record) !== null;
 
   return (
-    <li className="lib-row" ref={rowRef}>
+    <li className={brushed ? 'lib-row lib-row--brushed' : 'lib-row'} style={brushStyle} ref={rowRef}>
       <div className="lib-row__head-line">
         <button type="button" className="lib-row__main" onClick={open}>
           <span className="lib-row__head">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { activityDisplayName, type Activity } from '../core/activities';
 import { sportFamily } from '../core/sportProfiles';
@@ -34,6 +34,9 @@ const STACK_GAP = 2;
 /** Une pile reste visible, si tassée soit-elle. */
 const STACK_MIN_H = 1;
 
+/** Blanc minimal, en pixels, entre deux étiquettes de l'axe. */
+const TICK_GAP_PX = 6;
+
 /** Totaux par activité dépliés tant qu'on ne les a pas repliés. */
 const TOTALS_DEFAULT = { totaux: true };
 
@@ -65,6 +68,31 @@ function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: nu
     () => buildActivityChart(chartSessions, period, nowMs, activities.map((a) => a.id)),
     [chartSessions, period, nowMs, activities]
   );
+
+  // Étiquettes de l'axe : une étiquette qui toucherait la précédente (blanc inférieur à TICK_GAP_PX) est masquée,
+  // d'après les largeurs réellement mesurées, donc quelle que soit la langue ou la taille du texte.
+  const axisRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const axis = axisRef.current;
+    if (!axis) return;
+    const fit = () => {
+      const ticks = Array.from(axis.children) as HTMLElement[];
+      for (const el of ticks) el.style.visibility = '';
+      let lastRight = -Infinity;
+      for (const el of ticks) {
+        if (!el.textContent) continue;
+        const text = document.createRange();
+        text.selectNodeContents(el);
+        const box = text.getBoundingClientRect();
+        if (box.left < lastRight + TICK_GAP_PX) { el.style.visibility = 'hidden'; continue; }
+        lastRight = box.right;
+      }
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(axis);
+    return () => observer.disconnect();
+  }, [chart.bars]);
 
   const unitH = activityBarUnit(chart.bars, PLOT_H - 4, STACK_GAP, UNIT_MAX_H);
   const totalSessions = chart.totals.reduce((n, tot) => n + tot.sessions, 0);
@@ -100,7 +128,7 @@ function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: nu
           </button>
         ))}
       </div>
-      <div className="actchart__axis" aria-hidden="true" style={{ gap: chart.bars.length > 30 ? '2px' : '3px' }}>
+      <div ref={axisRef} className="actchart__axis" aria-hidden="true" style={{ gap: chart.bars.length > 30 ? '2px' : '3px' }}>
         {chart.bars.map((b) => (
           <span key={b.startMs} className={chart.bars.length === 7 ? 'actchart__tick actchart__tick--center' : 'actchart__tick'}>
             {b.label}

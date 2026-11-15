@@ -144,7 +144,8 @@ function SessionsPage() {
       folderLabel={library.folderLabel}
       confirming={confirmFile === session.file}
       onAskDelete={setConfirmFile}
-      onCancelDelete={cancelDelete} />
+      onCancelDelete={cancelDelete}
+      brushed />
   );
   const settled = library.status === 'ready' && !library.scanning;
 
@@ -210,12 +211,12 @@ function SessionsPage() {
             <p className="ui-hint ui-hint--m">
               {t("Traces dont l'activité n'est pas connue : choisissez-la pour les ranger en voile ou en surf. Ouvrir l'une d'elles la demande d'abord.")}
             </p>
-            <ul className="lib-list">{unclassified.map(row)}</ul>
+            <ul className="lib-list lib-list--framed brush-panels brush-panels--hair">{unclassified.map(row)}</ul>
           </Card>
         )}
 
         {shown.length > 0 ? (
-          <ul className="lib-list">{shown.map(row)}</ul>
+          <ul className="lib-list lib-list--framed brush-panels brush-panels--hair">{shown.map(row)}</ul>
         ) : (
           settled && (selected !== null || everything.hidden === 0) && (
             <p className="ui-hint ui-hint--m sessions-empty">
