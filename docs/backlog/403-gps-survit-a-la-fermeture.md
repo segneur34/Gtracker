@@ -122,9 +122,21 @@ Plus rien dans `src/` ni dans `android/app/src/main/java` ne s'appuie sur `@capg
 
 Limites connues : un trou au milieu du journal de la page (messages calés puis repartis, page vivante) n'est pas comblé, seule la fin l'est ; une position rattrapée n'a pas de FC ; un ordre de pause que le service n'a pas reçu n'est que consigné (le journal de la page fait foi).
 
-### Non vérifié
+### Partie D, livrée (le paquet tiers parti)
 
-Le comportement de HyperOS au balayage avec un service au premier plan (essai 277, démarrage automatique et batterie « Aucune restriction » réglés) ; si l'ancien pont reste nécessaire sans le greffon ; le formulaire exact de la Play Console.
+`@capgo/background-geolocation` désinstallé, fichiers Capacitor d'Android régénérés ; licences refaites (la ligne du greffon et le groupe « Services Google Play » sortent, 69 composants natifs cités avant, 53 après) ; marqueurs du manifeste retirés avec le récepteur et `RECEIVE_BOOT_COMPLETED`, que plus aucune dépendance n'ajoute ; les lignes de documents relevées à la partie C sont accordées, DECISIONS §6 réécrit. Seul reste du mot : l'identifiant du canal de notification, gardé pour les réglages d'écran verrouillé.
+
+### État au 15/11
+
+Quatre parties commitées, vérification complète verte, relectures sans défaut confirmé, banc identique (`session-save-resume`, `gps-perdu`, `notification`, `carte-direct`, `apropos`). Reste : la version à poser après 0.00.99 (question à l'utilisateur), l'APK, les essais 277 à 279, puis la passe de documentation (ETAT §12, HISTORIQUE).
+
+### Non vérifié, à lever au téléphone
+
+- Le comportement de HyperOS au balayage avec un service au premier plan (essai 277, démarrage automatique et batterie « Aucune restriction » réglés).
+- Android 14 et plus accepte-t-il le service de type position lancé depuis l'écran de réponse aux autorisations (premier départ après installation).
+- La localisation déjà coupée au départ : l'alerte de la page dépend d'un rappel d'Android au premier abonnement (essai 273 du lot 387, à rejouer sur cette APK).
+- Les positions arrivent-elles à la page écran éteint au-delà de cinq minutes, avec l'ancien pont gardé (essai 278) ; sinon, « Arrêter » les rattrape par le journal du service.
+- Le formulaire exact de la Play Console (lot 308).
 
 ## Attendu
 
