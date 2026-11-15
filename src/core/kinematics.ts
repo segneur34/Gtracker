@@ -1,5 +1,5 @@
-import { firstIndexAtOrAfter } from './search';
-import { median, medianOfSorted } from './basics';
+import { firstIndexAfter, firstIndexAtOrAfter } from './search';
+import { median } from './basics';
 import { haversineDistance, initialBearing } from './geo';
 import {
   DEFAULT_MAX_ACCELERATION,
@@ -226,7 +226,8 @@ const NULL_STEP_M = 0.01;
 /**
  * Mémoire d'un calcul de cinématique, pour le reprendre sur la même trace
  * prolongée (`resumeKinematics`, direct de l'enregistrement) : les points,
- * la trace rendue, les étapes intermédiaires, et d'où les refaire.
+ * la trace rendue, les étapes intermédiaires, et d'où les refaire. Une
+ * reprise prolonge ses tableaux sur place : elle la consomme.
  */
 export interface KinematicsRun {
   points: RawTrackPoint[];
@@ -239,6 +240,14 @@ export interface KinematicsRun {
   /** Vitesse dérivée et cap de chaque pas, avant reprise de pause et sauts de position. */
   derivedRaw: number[];
   bearingsRaw: number[];
+  /** Les mêmes après reprise de pause, trous et pas nuls, avant les sauts de position. */
+  derivedAdjusted: number[];
+  bearingsAdjusted: number[];
+  /** Premier indice dont le cap, reprise de pause et trous faits, est connu ; -1 s'il n'y en a pas. */
+  firstBearingAt: number;
+  /** Les mêmes, sauts de position compris : ceux de la trace. */
+  derivedSpeeds: number[];
+  bearings: number[];
   /** Points dont la position a sauté (`detourSpikes`), croissants. */
   spikes: number[];
   rawSpeeds: number[];
@@ -269,18 +278,60 @@ const sameOptions = (a: KinematicsOptions, b: KinematicsOptions): boolean =>
   && a.maxAcceleration === b.maxAcceleration && a.maxSpeedMs === b.maxSpeedMs
   && a.forceDerivedSpeed === b.forceDerivedSpeed && a.maxGapS === b.maxGapS;
 
-/** Les points du calcul précédent sont les mêmes objets, au début de `points`. */
+/**
+ * Les points du calcul précédent sont les mêmes objets, au début de `points`.
+ * Le même tableau que celui du calcul précédent n'a pu que s'allonger : il
+ * n'est pas relu.
+ */
 const samePrefix = (points: RawTrackPoint[], previous: KinematicsRun): boolean => {
-  if (points.length < previous.points.length) return false;
-  for (let k = 0; k < previous.points.length; k++) if (points[k] !== previous.points[k]) return false;
+  // `timesMs` a un rang par point du calcul précédent, même si `previous.points` s'est allongé depuis.
+  const count = previous.timesMs.length;
+  if (points.length < count) return false;
+  if (points === previous.points) return true;
+  for (let k = 0; k < count; k++) if (points[k] !== previous.points[k]) return false;
   return true;
 };
+
+/** Un point de `from` à la fin porte une vitesse appareil. */
+const hasDeviceSpeedFrom = (points: RawTrackPoint[], from: number): boolean => {
+  for (let i = from; i < points.length; i++) if (points[i].speedMs !== undefined) return true;
+  return false;
+};
+
+/**
+ * Point qui prend la vitesse ou le cap du pas suivant : reprise après une
+ * pause, ou point d'arrivée d'un trou de la trace (son cap seulement).
+ */
+const takesNextStep = (points: RawTrackPoint[], timesMs: number[], maxGapS: number, i: number): boolean =>
+  points[i].segmentStart === true || (timesMs[i] - timesMs[i - 1]) / 1000 > maxGapS;
+
+/**
+ * Premier indice dont la vitesse et le cap, reprise de pause, trous et pas
+ * nuls faits, peuvent changer à la reprise qui refait les pas depuis `from` :
+ * un point qui prend le pas suivant dépend de lui, de proche en proche ; et
+ * tant qu'aucun cap n'est connu avant, les pas nuls du début attendent le
+ * premier (1 : tout est refait). Les dates d'avant `from` sont figées.
+ */
+const adjustStart = (points: RawTrackPoint[], timesMs: number[], maxGapS: number, from: number, firstBearingAt: number): number => {
+  let start = from;
+  while (start >= 2 && takesNextStep(points, timesMs, maxGapS, start - 1)) start--;
+  return firstBearingAt >= 0 && firstBearingAt < start ? start : 1;
+};
+
+/** Premier indice d'où vitesses et caps de la trace (sauts de position compris) sont refaits : un saut touche aussi le point suivant. */
+const finalStart = (adjustFrom: number): number => Math.max(1, adjustFrom - 1);
 
 /** Début de la dernière suite de dates brutes égales. */
 const lastEqualRunStart = (rawTimesMs: number[]): number => {
   let start = rawTimesMs.length - 1;
   while (start > 0 && rawTimesMs[start - 1] === rawTimesMs[start]) start--;
   return start;
+};
+
+/** `values` ramené à ses `length` premières valeurs, sur place. */
+const truncated = <T>(values: T[], length: number): T[] => {
+  values.length = length;
+  return values;
 };
 
 /** Insère `value` dans `sorted` (croissant), à sa place. */
@@ -291,12 +342,46 @@ const insertSorted = (sorted: number[], value: number): void => {
 /** Au-delà, des valeurs à ajouter à un tableau trié sont ajoutées puis le tout retrié, plutôt qu'insérées une à une. */
 const INSERT_ONE_BY_ONE_MAX = 32;
 
-/** Copie de `sorted` (croissant) avec `added` à sa place. */
-const withSorted = (sorted: number[], added: number[]): number[] => {
-  if (added.length > INSERT_ONE_BY_ONE_MAX) return sorted.concat(added).sort((a, b) => a - b);
-  const out = sorted.slice();
-  for (const value of added) insertSorted(out, value);
-  return out;
+/** Ajoute `added` à `sorted` (croissant), sur place, chacun à sa place. */
+const addSorted = (sorted: number[], added: number[]): void => {
+  if (added.length > INSERT_ONE_BY_ONE_MAX) {
+    for (const value of added) sorted.push(value);
+    sorted.sort((a, b) => a - b);
+    return;
+  }
+  for (const value of added) insertSorted(sorted, value);
+};
+
+/**
+ * Valeur de rang `k` (à partir de 0) de la réunion de deux tableaux
+ * croissants non vides ensemble, sans les fusionner : la plus petite valeur
+ * de l'un ou de l'autre dont le nombre de valeurs inférieures ou égales, dans
+ * les deux, dépasse `k`.
+ */
+const kthOfSorted = (a: number[], b: number[], k: number): number => {
+  const firstOver = (s: number[], other: number[]): number => {
+    let lo = 0;
+    let hi = s.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (firstIndexAfter(s, s[mid]) + firstIndexAfter(other, s[mid]) > k) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo;
+  };
+  const inA = firstOver(a, b);
+  const inB = firstOver(b, a);
+  if (inA === a.length) return b[inB];
+  if (inB === b.length) return a[inA];
+  return Math.min(a[inA], b[inB]);
+};
+
+/** Médiane de la réunion de deux tableaux croissants, comme `medianOfSorted` de leur fusion. */
+const medianOfTwoSorted = (a: number[], b: number[]): number => {
+  const count = a.length + b.length;
+  if (count === 0) return 0;
+  const mid = Math.floor(count / 2);
+  return count % 2 === 0 ? (kthOfSorted(a, b, mid - 1) + kthOfSorted(a, b, mid)) / 2 : kthOfSorted(a, b, mid);
 };
 
 /** Rapport vitesse appareil / dérivée d'un point, s'il sert à la détection de l'unité ; `null` sinon. */
@@ -306,17 +391,20 @@ const unitRatio = (device: number | undefined, derived: number): number | null =
 /**
  * Le calcul, entier (`previous` nul) ou repris sur une trace prolongée.
  *
- * Reprise : les étapes locales (dates réparties, cordes, caps, sauts de
+ * Reprise : les tableaux du calcul précédent sont tronqués puis prolongés
+ * sur place. Les étapes locales (dates réparties, cordes, caps, sauts de
  * position) ne sont refaites qu'à partir de `previous.resumeFrom`, quatre
- * points avant la dernière suite de dates égales ; l'unité de la vitesse
- * appareil est relue sur toutes les mesures (les rapports des points figés
- * restent triés) ; l'écrêtage reprend à `previous.clampRestart`, dernier
- * passage de sa boucle dont la fenêtre de retour de 3 s ne touchait aucun
- * point qui pouvait changer, avec la valeur retenue juste avant ; la médiane
- * reprend une demi-fenêtre plus tôt. Tout ce qui précède est repris tel quel,
- * points de la trace compris. Si l'unité change, ou si la vitesse appareil
- * apparaît, tout est refait. Le résultat est celui du calcul entier
- * (`kinematics.test.ts`).
+ * points avant la dernière suite de dates égales ; reprise de pause, trous
+ * et pas nuls depuis `adjustStart`, vitesses et caps de la trace un point
+ * plus tôt (`finalStart`), d'où la vitesse brute aussi ; l'unité de la
+ * vitesse appareil est relue sur toutes les mesures (les rapports des points
+ * figés restent triés, la médiane est lue sans fusionner) ; l'écrêtage
+ * reprend à `previous.clampRestart`, dernier passage de sa boucle dont la
+ * fenêtre de retour de 3 s ne touchait aucun point qui pouvait changer, avec
+ * la valeur retenue juste avant ; la médiane reprend une demi-fenêtre plus
+ * tôt. Tout ce qui précède est repris tel quel, points de la trace compris.
+ * Si l'unité change, ou si la vitesse appareil apparaît, tout est refait. Le
+ * résultat est celui du calcul entier (`kinematics.test.ts`).
  */
 const runKinematics = (points: RawTrackPoint[], options: KinematicsOptions, previous: KinematicsRun | null): KinematicsRun => {
   const n = points.length;
@@ -324,26 +412,34 @@ const runKinematics = (points: RawTrackPoint[], options: KinematicsOptions, prev
   const maxAcceleration = options.maxAcceleration ?? DEFAULT_MAX_ACCELERATION;
   const maxGapS = options.maxGapS ?? Infinity;
 
-  const useDeviceSpeed =
-    !options.forceDerivedSpeed && points.some((p) => p.speedMs !== undefined);
-  const speedSource: SpeedSource = useDeviceSpeed ? 'doppler' : 'derived';
-
-  const resumed = previous !== null && previous.useDeviceSpeed === useDeviceSpeed && sameOptions(previous.options, options)
-    && previous.resumeFrom >= 3 && samePrefix(points, previous)
+  // Mêmes réglages et mêmes premiers points : la vitesse appareil n'est cherchée que dans les points neufs.
+  const seen = previous !== null && sameOptions(previous.options, options) && previous.resumeFrom >= 3
+    && samePrefix(points, previous)
     ? previous
     : null;
+  const useDeviceSpeed = !options.forceDerivedSpeed
+    && (seen ? seen.useDeviceSpeed || hasDeviceSpeedFrom(points, seen.timesMs.length) : hasDeviceSpeedFrom(points, 0));
+  const speedSource: SpeedSource = useDeviceSpeed ? 'doppler' : 'derived';
+
+  const resumed = seen !== null && seen.useDeviceSpeed === useDeviceSpeed ? seen : null;
   /** Premier indice dont les étapes locales sont refaites. */
   const R = resumed ? resumed.resumeFrom : 1;
+  /** Premier indice dont reprise de pause, trous et pas nuls sont refaits (dates d'avant `R` figées). */
+  const A = resumed ? adjustStart(points, resumed.timesMs, maxGapS, R, resumed.firstBearingAt) : 0;
+  /** Premier indice dont vitesses et caps de la trace sont refaits. */
+  const F = resumed ? finalStart(A) : 0;
 
   // Dates réparties (`spreadEqualTimes`) : refaites depuis la dernière suite de dates égales du calcul précédent.
   let rawTimesMs: number[];
   let timesMs: number[];
   if (resumed) {
     const from = resumed.tailStart - 1;
-    rawTimesMs = resumed.rawTimesMs.slice(0, from);
+    rawTimesMs = resumed.rawTimesMs;
+    rawTimesMs.length = from;
     for (let i = from; i < n; i++) rawTimesMs.push(rawPointTimeMs(points[i]));
     const spread = spreadEqualTimes(points.slice(from), rawTimesMs.slice(from));
-    timesMs = resumed.timesMs.slice(0, from + 1);
+    timesMs = resumed.timesMs;
+    timesMs.length = from + 1;
     for (let k = 1; k < spread.length; k++) timesMs.push(spread[k]);
   } else {
     rawTimesMs = points.map(rawPointTimeMs);
@@ -351,9 +447,9 @@ const runKinematics = (points: RawTrackPoint[], options: KinematicsOptions, prev
   }
 
   // Pas : corde, vitesse dérivée, cap (`NaN` pour un pas nul, sans direction).
-  const chordsM = resumed ? resumed.chordsM.slice(0, R) : [0];
-  const derivedRaw = resumed ? resumed.derivedRaw.slice(0, R) : [0];
-  const bearingsRaw = resumed ? resumed.bearingsRaw.slice(0, R) : [NaN];
+  const chordsM = resumed ? truncated(resumed.chordsM, R) : [0];
+  const derivedRaw = resumed ? truncated(resumed.derivedRaw, R) : [0];
+  const bearingsRaw = resumed ? truncated(resumed.bearingsRaw, R) : [NaN];
   for (let i = R; i < n; i++) {
     const p0 = points[i - 1];
     const p1 = points[i];
@@ -374,39 +470,66 @@ const runKinematics = (points: RawTrackPoint[], options: KinematicsOptions, prev
   // reprise prend le cap du pas suivant, son cap de bord. Sa vitesse dérivée,
   // corde sur durée, reste la moyenne du trou (`gapDistanceM`, masque d'activité).
   // Un dernier point après un trou garde la corde, faute de pas suivant.
-  const derivedSpeeds = derivedRaw.slice();
-  const bearings = bearingsRaw.slice();
-  for (let i = n - 2; i >= 1; i--) {
+  // À la reprise, rien n'est refait avant `A` : ce qui précède ne lit que des pas figés.
+  const derivedAdjusted = resumed ? truncated(resumed.derivedAdjusted, A) : [];
+  const bearingsAdjusted = resumed ? truncated(resumed.bearingsAdjusted, A) : [];
+  for (let i = A; i < n; i++) {
+    derivedAdjusted.push(derivedRaw[i]);
+    bearingsAdjusted.push(bearingsRaw[i]);
+  }
+  for (let i = n - 2; i >= Math.max(A, 1); i--) {
     if (points[i].segmentStart) {
-      derivedSpeeds[i] = derivedSpeeds[i + 1];
-      bearings[i] = bearings[i + 1];
+      derivedAdjusted[i] = derivedAdjusted[i + 1];
+      bearingsAdjusted[i] = bearingsAdjusted[i + 1];
     } else if ((timesMs[i] - timesMs[i - 1]) / 1000 > maxGapS) {
-      bearings[i] = bearings[i + 1];
+      bearingsAdjusted[i] = bearingsAdjusted[i + 1];
     }
   }
   const last = n - 1;
   if (last >= 2 && points[last].segmentStart) {
-    derivedSpeeds[last] = derivedSpeeds[last - 1];
-    bearings[last] = bearings[last - 1];
+    derivedAdjusted[last] = derivedAdjusted[last - 1];
+    bearingsAdjusted[last] = bearingsAdjusted[last - 1];
   }
 
   // Pas nul : il garde le cap du pas précédent (un arrêt sur place ne tourne pas
   // au nord) ; les premiers pas nuls prennent celui du premier pas qui avance.
-  const firstBearing = bearings.find((b) => !Number.isNaN(b)) ?? 0;
-  for (let i = 1; i < bearings.length; i++) {
-    if (Number.isNaN(bearings[i])) bearings[i] = i === 1 ? firstBearing : bearings[i - 1];
+  const firstBearingAt = resumed && resumed.firstBearingAt >= 0 && resumed.firstBearingAt < A
+    ? resumed.firstBearingAt
+    : bearingsAdjusted.findIndex((b) => !Number.isNaN(b));
+  const firstBearing = firstBearingAt >= 0 ? bearingsAdjusted[firstBearingAt] : 0;
+  for (let i = Math.max(A, 1); i < n; i++) {
+    if (Number.isNaN(bearingsAdjusted[i])) bearingsAdjusted[i] = i === 1 ? firstBearing : bearingsAdjusted[i - 1];
   }
+
+  // Jusqu'où les entrées du prochain calcul sont figées : quatre points avant la dernière suite de dates égales,
+  // et, pour ce qui suit les vitesses et les caps, le `F` de la prochaine reprise.
+  const tailStart = lastEqualRunStart(rawTimesMs);
+  const resumeFrom = Math.max(1, tailStart - 4);
+  const nextFinalStart = finalStart(adjustStart(points, timesMs, maxGapS, resumeFrom, firstBearingAt));
 
   // Position qui saute puis revient : les deux intervalles du point prennent
   // la vitesse et le cap du chemin direct entre ses voisins. Le point reste
   // sur la carte ; seule sa vitesse tirée des positions change. Un point qui a
   // sa vitesse Doppler n'est pas touché, son cap non plus. À la reprise, les
   // sauts d'avant `R - 1` sont ceux du calcul précédent.
-  const spikes = resumed ? resumed.spikes.filter((i) => i < R - 1) : [];
+  const spikes = resumed ? resumed.spikes : [];
+  while (resumed && spikes.length > 0 && spikes[spikes.length - 1] >= R - 1) spikes.pop();
   const spikeFrom = resumed ? R - 1 : 1;
   const skipFirst = resumed !== null && spikes.length > 0 && spikes[spikes.length - 1] === R - 2;
-  spikes.push(...detourSpikesFrom(points, timesMs, options.maxDetourRatio ?? DEFAULT_MAX_DETOUR_RATIO, maxAcceleration, spikeFrom, skipFirst, chordsM));
-  for (const i of spikes) {
+  for (const i of detourSpikesFrom(points, timesMs, options.maxDetourRatio ?? DEFAULT_MAX_DETOUR_RATIO, maxAcceleration, spikeFrom, skipFirst, chordsM)) {
+    spikes.push(i);
+  }
+  const derivedSpeeds = resumed ? truncated(resumed.derivedSpeeds, F) : [];
+  const bearings = resumed ? truncated(resumed.bearings, F) : [];
+  for (let i = F; i < n; i++) {
+    derivedSpeeds.push(derivedAdjusted[i]);
+    bearings.push(bearingsAdjusted[i]);
+  }
+  // Un saut touche son point et le suivant : ceux d'avant `F - 1` sont déjà dans la trace reprise.
+  let firstSpike = spikes.length;
+  while (firstSpike > 0 && spikes[firstSpike - 1] >= F - 1) firstSpike--;
+  for (let k = firstSpike; k < spikes.length; k++) {
+    const i = spikes[k];
     if (useDeviceSpeed && points[i].speedMs !== undefined) continue;
     const p0 = points[i - 1];
     const p2 = points[i + 1];
@@ -431,21 +554,26 @@ const runKinematics = (points: RawTrackPoint[], options: KinematicsOptions, prev
       }
       return out;
     };
-    // Rapports des points figés, triés ; ceux de la queue s'y ajoutent pour la médiane.
-    ratiosUpTo = resumed ? Math.max(resumed.ratiosUpTo, R - 2) : 0;
-    sortedRatios = withSorted(resumed ? resumed.sortedRatios : [], ratiosOf(resumed ? resumed.ratiosUpTo : 0, ratiosUpTo));
-    const all = withSorted(sortedRatios, ratiosOf(ratiosUpTo, n));
-    unit = all.length < UNIT_DETECTION_MIN_SAMPLES ? 'ms' : unitFromRatio(medianOfSorted(all));
+    // Rapports des points figés (avant le `F` de la prochaine reprise), triés ; ceux de la queue comptent pour la médiane.
+    if (resumed) {
+      sortedRatios = resumed.sortedRatios;
+      ratiosUpTo = Math.max(resumed.ratiosUpTo, Math.min(R - 2, nextFinalStart));
+      addSorted(sortedRatios, ratiosOf(resumed.ratiosUpTo, ratiosUpTo));
+    }
+    const tail = ratiosOf(ratiosUpTo, n).sort((a, b) => a - b);
+    unit = sortedRatios.length + tail.length < UNIT_DETECTION_MIN_SAMPLES ? 'ms' : unitFromRatio(medianOfTwoSorted(sortedRatios, tail));
     // L'unité a changé : tout ce qui suit en dépend, on refait le calcul entier.
     if (resumed && unit !== resumed.unit) return runKinematics(points, options, null);
   }
   const deviceFactor = DEVICE_SPEED_FACTOR[unit];
 
-  const rawSpeeds = points.map((p, i) => {
-    if (!useDeviceSpeed) return derivedSpeeds[i];
+  // Vitesse brute : celle de l'appareil, sinon la dérivée ; reprise avec les vitesses dérivées.
+  const rawSpeeds = resumed ? truncated(resumed.rawSpeeds, F) : [];
+  for (let i = F; i < n; i++) {
+    const p = points[i];
     // Repli sur la vitesse dérivée pour les points où l'appareil n'a rien fourni.
-    return p.speedMs === undefined ? derivedSpeeds[i] : p.speedMs * deviceFactor;
-  });
+    rawSpeeds.push(!useDeviceSpeed || p.speedMs === undefined ? derivedSpeeds[i] : p.speedMs * deviceFactor);
+  }
 
   // Sans vitesse appareil, le premier point n'a pas de vitesse propre. Lui
   // donner zéro créerait un faux démarrage brutal que l'écrêtage prendrait
@@ -458,10 +586,7 @@ const runKinematics = (points: RawTrackPoint[], options: KinematicsOptions, prev
   // cap du second.
   bearings[0] = bearings[1];
 
-  // Jusqu'où les entrées du prochain calcul sont figées : quatre points avant la dernière suite de dates égales.
-  const tailStart = lastEqualRunStart(rawTimesMs);
-  const resumeFrom = Math.max(1, tailStart - 4);
-  const clampFrom = resumed && resumed.clampRestart >= 1 && resumed.clampRestart <= R - 1
+  const clampFrom = resumed && resumed.clampRestart >= 1 && resumed.clampRestart <= F
     ? { from: resumed.clampRestart, previous: resumed.clamped[resumed.clampRestart - 1], prefix: resumed.clamped }
     : null;
   const { out: clamped, restart: clampRestart } = clampByAccelerationFrom(
@@ -469,7 +594,7 @@ const runKinematics = (points: RawTrackPoint[], options: KinematicsOptions, prev
     timesMs,
     { maxAccel: maxAcceleration, maxSpeedMs: options.maxSpeedMs },
     clampFrom,
-    resumeFrom - 1
+    nextFinalStart
   );
   // La médiane est centrée : elle reprend une demi-fenêtre avant l'écrêtage.
   const halfWindowMs = (medianWindowSeconds * 1000) / 2;
@@ -480,8 +605,8 @@ const runKinematics = (points: RawTrackPoint[], options: KinematicsOptions, prev
   }
   const smoothed = medianFilterByTimeFrom(clamped, timesMs, medianWindowSeconds, Q, resumed ? resumed.smoothed : null);
 
-  // Points de la trace : ceux d'avant `Q` sont repris tels quels.
-  const track: TrackPoint[] = resumed && Q > 0 ? resumed.track.slice(0, Q) : [];
+  // Points de la trace : ceux d'avant `Q` sont repris tels quels ; `Q` ne dépasse pas `F`, d'où vitesses et caps sont refaits.
+  const track: TrackPoint[] = resumed ? truncated(resumed.track, Q) : [];
   for (let i = Q; i < n; i++) {
     const p = points[i];
     // Trou de la trace : la distance du pas est bornée par sa corde (`GAP_CHORD_FACTOR`).
@@ -509,13 +634,14 @@ const runKinematics = (points: RawTrackPoint[], options: KinematicsOptions, prev
 
   // Le `Q` de la prochaine reprise, lu sur des dates qu'elle reprendra telles quelles (indices avant `tailStart - 1`).
   let frozenUpTo = 0;
-  if (resumeFrom >= 3 && clampRestart >= 1 && clampRestart <= resumeFrom - 1) {
+  if (resumeFrom >= 3 && clampRestart >= 1 && clampRestart <= nextFinalStart) {
     frozenUpTo = clampRestart;
     while (frozenUpTo > 0 && timesMs[frozenUpTo - 1] >= timesMs[clampRestart] - halfWindowMs) frozenUpTo--;
   }
 
   return {
-    points, track, options, useDeviceSpeed, rawTimesMs, timesMs, chordsM, derivedRaw, bearingsRaw, spikes, rawSpeeds, clamped, smoothed,
+    points, track, options, useDeviceSpeed, rawTimesMs, timesMs, chordsM, derivedRaw, bearingsRaw, derivedAdjusted, bearingsAdjusted,
+    firstBearingAt, derivedSpeeds, bearings, spikes, rawSpeeds, clamped, smoothed,
     unit, sortedRatios, ratiosUpTo, tailStart, resumeFrom, clampRestart, frozenUpTo,
   };
 };
@@ -545,6 +671,11 @@ export const computeKinematics = (
  * la trace rendue est celle de `computeKinematics`. Sans `previous`, ou s'il
  * ne vaut plus (autres points, autres réglages), tout est calculé. `null`
  * sous deux points.
+ *
+ * `previous` est consommé quand il sert : ses tableaux, trace comprise, sont
+ * tronqués puis prolongés sur place pour devenir ceux du résultat ; ne plus
+ * le relire. `points` peut être le tableau même de `previous.points`, s'il
+ * n'a fait que s'allonger depuis.
  */
 export const resumeKinematics = (
   points: RawTrackPoint[],

@@ -225,9 +225,11 @@ describe('resumeKinematics', () => {
         // événement de la trace, sur un point sur 37 ailleurs et au dernier.
         for (let n = 2; n <= points.length; n++) {
           const prefix = points.slice(0, n);
+          // La reprise prolonge sur place les tableaux de `run` : ce qu'on en compare est lu avant.
+          const firstBefore = run ? run.track[0] : null;
           const next = resumeKinematics(prefix, options, run);
           expect(next).not.toBeNull();
-          if (run && next!.track[0] === run.track[0] && n > 60 * hz) resumed++;
+          if (next!.track[0] === firstBefore && n > 60 * hz) resumed++;
           run = next;
           const lastS = (n - 1) / hz;
           const checked = n <= 40 || n % 37 === 0 || n === points.length || EVENTS_S.some((e) => Math.abs(lastS - e) <= 2 + 1e-9);
@@ -247,15 +249,84 @@ describe('resumeKinematics', () => {
       let run: KinematicsRun | null = null;
       let near = 0;
       for (let n = 2; n <= points.length; n++) {
+        // La reprise prolonge sur place les tableaux de `run` : les points figés sont relevés avant.
+        const frozen = run ? run.track.slice(0, run.frozenUpTo) : [];
+        const trackBefore = run ? run.track : null;
+        const firstBefore = run ? run.track[0] : null;
         const next: KinematicsRun = resumeKinematics(points.slice(0, n), options, run)!;
-        if (run && next.track[0] === run.track[0]) {
-          for (let k = 0; k < run.frozenUpTo; k++) if (next.track[k] !== run.track[k]) expect.fail(`point ${k} recréé (n = ${n})`);
+        if (run && next.track[0] === firstBefore) {
+          // Reprise : la trace du calcul précédent est prolongée, pas recopiée.
+          if (next.track !== trackBefore) expect.fail(`trace recopiée (n = ${n})`);
+          for (let k = 0; k < frozen.length; k++) if (next.track[k] !== frozen[k]) expect.fail(`point ${k} recréé (n = ${n})`);
           if (n > 60 * hz && run.frozenUpTo >= n - 1 - 10 * hz) near++;
         }
         run = next;
       }
       // Le figé suit la fin de la trace à quelques secondes près, hors dates égales.
       expect(near).toBeGreaterThan(points.length / 2);
+    });
+  }
+
+  /**
+   * Reprend `points` point par point et compare chaque trace rendue au calcul entier, une fois sur des tableaux
+   * neufs, une fois sur un même tableau allongé sur place (comme le direct).
+   */
+  const resumesLikeWhole = (points: RawTrackPoint[], opts: typeof options) => {
+    let run: KinematicsRun | null = null;
+    let grown: KinematicsRun | null = null;
+    const growing: RawTrackPoint[] = [points[0]];
+    for (let n = 2; n <= points.length; n++) {
+      const prefix = points.slice(0, n);
+      growing.push(points[n - 1]);
+      run = resumeKinematics(prefix, opts, run)!;
+      grown = resumeKinematics(growing, opts, grown)!;
+      const whole = computeKinematics(prefix, opts);
+      if (!sameData(run.track, whole)) expect({ n, track: run.track }).toEqual({ n, track: whole });
+      if (!sameData(grown.track, whole)) expect({ n, grown: grown.track }).toEqual({ n, grown: whole });
+    }
+  };
+
+  for (const hz of [1, 5]) {
+    it(`départ immobile à positions identiques, vitesse Doppler non nulle, à ${hz} Hz`, () => {
+      // 90 s sans bouger (positions identiques, aucun cap), puis un bord vers le nord-est qui tourne doucement :
+      // le premier cap connu ne l'est qu'au départ, et vaut pour tous les pas immobiles d'avant.
+      const points: RawTrackPoint[] = [];
+      let north = 0;
+      let east = 0;
+      for (let k = 0; k <= 240 * hz; k++) {
+        const t = k / hz;
+        const speed = t < 90 ? 0 : 4;
+        const heading = ((45 + (t > 90 ? (t - 90) / 2 : 0)) * Math.PI) / 180;
+        north += (speed / hz) * Math.cos(heading);
+        east += (speed / hz) * Math.sin(heading);
+        points.push({
+          lat: lat + north / M_PER_DEG_LAT, lon: 3.8 + east / metersPerDegLon,
+          time: new Date(startTime + t * 1000).toISOString(), speedMs: t < 90 ? 1.5 : speed,
+        });
+      }
+      resumesLikeWhole(points, options);
+    });
+
+    it(`cadence de 1 à 15 s, pas plus longs que le trou permis à la suite, à ${hz} Hz`, () => {
+      // Après 60 s régulières, des pas de 1 à 15 s, puis une longue suite de trous (pas au-delà de `maxGapS`), un
+      // cap qui tourne et un virage entier dans un seul pas, puis la cadence régulière revient.
+      const steps = [12, 13, 1, 15, 11, 2, 14, 14, 12, 1, 1, 15, 3, 11, 12, 13, 1];
+      const gaps = [11, 12, 13, 14, 15];
+      const points: RawTrackPoint[] = [];
+      let t = 0;
+      let north = 0;
+      let east = 0;
+      let k = 0;
+      while (t <= 800) {
+        const heading = ((k % 40 < 20 ? 60 : 300) * Math.PI) / 180;
+        points.push({ lat: lat + north / M_PER_DEG_LAT, lon: 3.8 + east / metersPerDegLon, time: new Date(startTime + t * 1000).toISOString() });
+        const dt = t < 60 || t > 700 ? 1 / hz : t < 300 ? steps[k % steps.length] : gaps[k % gaps.length];
+        north += 5 * dt * Math.cos(heading);
+        east += 5 * dt * Math.sin(heading);
+        t += dt;
+        k++;
+      }
+      resumesLikeWhole(points, options);
     });
   }
 

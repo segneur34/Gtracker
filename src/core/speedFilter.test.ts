@@ -189,9 +189,19 @@ describe('medianFilterByTimeFrom, fenêtre triée tenue à jour', () => {
     const timesMs = secondsToMs(1000, 0.2);
     const prefix = legacyMedianFilterByTimeFrom(values, timesMs, 3, 0, null);
     for (const from of [0, 1, 7, 500, 999]) {
-      sameAsLegacy(values, timesMs, 3, from, prefix);
+      sameAsLegacy(values, timesMs, 3, from, prefix.slice());
       sameAsLegacy(values, timesMs, 3, from, null);
     }
+  });
+
+  it('prolonge sur place le tableau du calcul précédent, sans copie', () => {
+    const values = noisy(400, 23);
+    const timesMs = secondsToMs(400, 0.2);
+    const whole = medianFilterByTimeFrom(values, timesMs, 3, 0, null);
+    const previous = medianFilterByTimeFrom(values.slice(0, 300), timesMs.slice(0, 300), 3, 0, null);
+    const resumed = medianFilterByTimeFrom(values, timesMs, 3, 280, previous);
+    expect(resumed).toBe(previous);
+    if (!sameData(resumed, whole)) expect(resumed).toEqual(whole);
   });
 });
 

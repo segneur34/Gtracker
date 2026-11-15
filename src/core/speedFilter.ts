@@ -71,11 +71,15 @@ export const clampByAcceleration = (
   return clampByAccelerationFrom(speedsMs, timesMs, options, null, -1).out;
 };
 
-/** Reprise de l'écrêtage : à `from`, la valeur retenue au point d'avant, et les valeurs déjà retenues avant `from`. */
+/**
+ * Reprise de l'écrêtage : à `from`, la valeur retenue au point d'avant, et
+ * les valeurs déjà retenues (au moins jusqu'à `from`), tableau tronqué puis
+ * prolongé sur place pour devenir la sortie.
+ */
 export interface ClampResume {
   from: number;
   previous: number;
-  prefix: ArrayLike<number>;
+  prefix: number[];
 }
 
 /**
@@ -102,7 +106,8 @@ export const clampByAccelerationFrom = (
   const n = speedsMs.length;
   if (n === 0) return { out: [], restart: -1 };
 
-  const out = new Array<number>(n);
+  // Reprise : les valeurs d'avant `from` restent en place, les suivantes sont écrites dans l'ordre des indices.
+  const out = resume ? resume.prefix : new Array<number>(n);
 
   const isPlausible = (fromIndex: number, toIndex: number, fromSpeed: number): boolean => {
     if (speedsMs[toIndex] > maxSpeedMs) return false;
@@ -113,7 +118,7 @@ export const clampByAccelerationFrom = (
 
   let i: number;
   if (resume) {
-    for (let k = 0; k < resume.from; k++) out[k] = resume.prefix[k];
+    out.length = resume.from;
     i = resume.from;
   } else {
     // Amorce : médiane des vitesses plausibles des premières secondes.
@@ -191,19 +196,26 @@ export const medianFilterByTime = (
  * `prefix` (calcul précédent, `resumeKinematics`) : la fenêtre étant
  * centrée, les médianes d'avant `from` ne lisent que des valeurs figées
  * quand `from` est pris une demi-fenêtre avant la première valeur changée.
+ * `prefix` est tronqué à `from` puis prolongé sur place : il devient la sortie.
  */
 export const medianFilterByTimeFrom = (
   values: number[],
   timesMs: number[],
   windowSeconds: number,
   from: number,
-  prefix: ArrayLike<number> | null
+  prefix: number[] | null
 ): number[] => {
   if (values.length === 0) return [];
 
   const halfWindowMs = (windowSeconds * 1000) / 2;
-  const out = new Array<number>(values.length);
-  for (let k = 0; k < from; k++) out[k] = prefix ? prefix[k] : NaN;
+  let out: number[];
+  if (prefix) {
+    out = prefix;
+    out.length = from;
+  } else {
+    out = new Array<number>(values.length);
+    for (let k = 0; k < from; k++) out[k] = NaN;
+  }
   let start = from;
   while (start > 0 && timesMs[from] - timesMs[start - 1] <= halfWindowMs) start--;
   let end = from;

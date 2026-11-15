@@ -36,6 +36,8 @@ Un plan (agent `Plan`) avant de coder.
 
 **Mesure** (dix minutes au plus, sonde dans le dossier temporaire) : copie de l'avant par `git archive HEAD src`, deux sondes empaquetées par `rolldown` depuis le dépôt, trace synthétique de wingfoil de 6 h à 1 Hz (Doppler, FC, virement toutes les 90 s, pause à 2 h 30, trou de 40 s à 4 h, seuil passé), un calcul toutes les 2 positions ; relever le temps médian par calcul avant 1 h, 3 h et 6 h, le cumul à 3 h et 6 h, et l'égalité stricte avec le calcul sans mémoire ; avant A, après A, après B.
 
+**Partie B, faite (15/11).** Tableaux de la reprise tronqués puis prolongés sur place (dates, pas, vitesses et caps ajustés et finals, sauts, vitesse brute, écrêtage, médiane, trace) ; médiane des rapports d'unité lue sans fusion ; vitesse appareil cherchée dans les points neufs ; même tableau de points allongé : préfixe non relu. Écart d'avant corrigé dans la reprise : départ immobile (premier cap connu tard) et longue suite de trous (le cap d'un point de trou suit le pas suivant, de proche en proche) ; la reprise refait maintenant vitesses et caps depuis `adjustStart`/`finalStart`, et l'écrêtage, les rapports et `frozenUpTo` se figent avant. Mesure à 6 h : 0,13 ms par calcul à la fin, 1,0 s de cumul (0,83 ms et 3,7 s avant). Reste O(n) mais bon marché : insertion des rapports (Doppler), `samePrefix` des positions dans `liveStats.ts`.
+
 Hors du lot : `liveReferenceSpeedMs`, refait en entier toutes les 60 s (à noter si la mesure le voit).
 
 ## Vérification
