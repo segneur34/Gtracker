@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { APP_NAME, APP_SLUG, CACHE_NAMES, FILE_FORMATS, MARKER_FILE, STORAGE_KEYS, XML } from './appIdentity';
+import { APP_NAME, CACHE_NAMES, FILE_FORMATS, FORMAT_ID, MARKER_FILE, STORAGE_KEYS, XML } from './appIdentity';
 
 /**
  * Noms techniques figés : la première installation les range dans les fichiers de l'utilisateur et dans la mémoire de
  * l'appareil, les changer ensuite ferait perdre ses données. Ce test les écrit en toutes lettres pour qu'un
- * changement se voie.
+ * changement se voie. Renommer l'application, c'est changer `APP_NAME` seulement : `FORMAT_ID` et tout ce qui en
+ * dérive restent tels quels.
  */
 describe('noms techniques de l\'application', () => {
-  it('sont ceux de Gtracker, figés', () => {
+  it('le nom affiché est Gtracker', () => {
     expect(APP_NAME).toBe('Gtracker');
-    expect(APP_SLUG).toBe('gtracker');
+  });
+
+  it("l'identifiant de format et les formats écrits ne changent jamais, sans quoi les fichiers déjà écrits deviendraient illisibles", () => {
+    expect(FORMAT_ID).toBe('gtracker');
     expect(FILE_FORMATS).toEqual({
       session: 'gtracker-session',
       capteurs: 'gtracker-capteurs',
@@ -27,7 +31,7 @@ describe('noms techniques de l\'application', () => {
     expect(MARKER_FILE).toBe('gtracker.json');
   });
 
-  it('clés de l\'appareil figées', () => {
+  it("clés de l'appareil figées, sans quoi réglages et données déjà gardés sur l'appareil seraient perdus", () => {
     expect(STORAGE_KEYS).toEqual({
       sportSettings: 'gtracker.sportSettings',
       athleteProfile: 'gtracker.athleteProfile',
@@ -58,10 +62,11 @@ describe('noms techniques de l\'application', () => {
       rechercheLieu: 'gtracker.rechercheLieu',
       lieuxAppris: 'gtracker.lieuxAppris',
       langue: 'gtracker.langue',
+      brouillons: 'gtracker.brouillons',
     });
   });
 
-  it('caches figés', () => {
+  it('caches figés, sans quoi tuiles et vignettes gardées seraient perdues', () => {
     expect(CACHE_NAMES).toEqual({
       tuiles: 'gtracker-tuiles',
       vignettes: 'gtracker-vignettes',
@@ -71,7 +76,7 @@ describe('noms techniques de l\'application', () => {
     });
   });
 
-  it('commencent tous par le nom technique', () => {
+  it("commencent tous par l'identifiant de format", () => {
     const values = [
       ...Object.values(FILE_FORMATS),
       ...Object.values(STORAGE_KEYS),
@@ -80,9 +85,9 @@ describe('noms techniques de l\'application', () => {
       XML.itineraire.prefix,
       MARKER_FILE,
     ];
-    for (const value of values) expect(value.startsWith(APP_SLUG), value).toBe(true);
-    for (const xml of Object.values(XML)) expect(xml.ns.startsWith(`urn:${APP_SLUG}:`)).toBe(true);
-    expect(CACHE_NAMES.savedAtHeader.startsWith(`x-${APP_SLUG}-`)).toBe(true);
+    for (const value of values) expect(value.startsWith(FORMAT_ID), value).toBe(true);
+    for (const xml of Object.values(XML)) expect(xml.ns.startsWith(`urn:${FORMAT_ID}:`)).toBe(true);
+    expect(CACHE_NAMES.savedAtHeader.startsWith(`x-${FORMAT_ID}-`)).toBe(true);
   });
 
   it('chaque clé de l\'appareil est unique', () => {

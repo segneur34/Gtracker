@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setLanguage } from '../core/i18n';
 import { kinematicsProfileOf, prepareTrack } from '../core/prepareTrack';
 import { getSportProfile } from '../core/sportProfiles';
 import { sessionRecord } from '../test/record.fixture';
@@ -123,6 +124,25 @@ describe('runInWorker', () => {
     expect(viaWorker?.message).toBe(inline?.message);
     expect(viaWorker?.name).toBe(inline?.name);
     expect(inline?.message).toMatch(/illisible/);
+  });
+
+  it('erreur de lecture rendue dans la langue de l’interface, par le worker comme en ligne', async () => {
+    // Le calcul a été chargé en français, comme le worker, qui n'a jamais de dictionnaire.
+    setLanguage('en', { 'Fichier GPX illisible : le XML est mal formé.': 'Unreadable GPX file: malformed XML.' });
+    try {
+      vi.stubGlobal('Worker', FakeWorker);
+      const viaWorker = await thrown(() => runInWorker('prepare', BAD, {}));
+      vi.stubGlobal('Worker', undefined);
+      resetTrackWorker();
+      const inline = await thrown(() => runInWorker('prepare', BAD, {}));
+      expect(viaWorker?.message).toBe('Unreadable GPX file: malformed XML.');
+      expect(inline?.message).toBe('Unreadable GPX file: malformed XML.');
+      expect(viaWorker?.name).toBe('Error');
+    } finally {
+      setLanguage('fr', {});
+    }
+    const french = await thrown(() => runInWorker('prepare', BAD, {}));
+    expect(french?.message).toBe('Fichier GPX illisible : le XML est mal formé.');
   });
 
   it('worker mort après avoir répondu : demandes en cours refaites en ligne, le suivant est recréé', async () => {

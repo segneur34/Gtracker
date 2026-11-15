@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { APP_SLUG } from '../core/appIdentity';
+import { FORMAT_ID } from '../core/appIdentity';
 import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
 
 /**
@@ -200,11 +200,11 @@ describe('fichiers reçus d\'une autre application', () => {
 describe('noms techniques du Java', () => {
   it('fichiers temporaires du dossier mémoire', () => {
     const memory = appJava('MemoryFolderPlugin.java');
-    expect(captured(memory, /\bTEMP_SUFFIX = "([^"]+)";/)).toBe(`.${APP_SLUG}-tmp`);
-    expect(captured(memory, /\bNEW_SUFFIX = "([^"]+)";/)).toBe(`.${APP_SLUG}-new`);
+    expect(captured(memory, /\bTEMP_SUFFIX = "([^"]+)";/)).toBe(`.${FORMAT_ID}-tmp`);
+    expect(captured(memory, /\bNEW_SUFFIX = "([^"]+)";/)).toBe(`.${FORMAT_ID}-new`);
   });
 
   it('préférences des bips', () => {
-    expect(captured(appJava('TonePlayer.java'), /\bPREFS = "([^"]+)";/)).toBe(`${APP_SLUG}.sons`);
+    expect(captured(appJava('TonePlayer.java'), /\bPREFS = "([^"]+)";/)).toBe(`${FORMAT_ID}.sons`);
   });
 });

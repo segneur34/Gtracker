@@ -188,6 +188,24 @@ describe('rebaseDraft (E-B3)', () => {
   it('rend le brouillon tel quel quand la fiche ne change pas', () => {
     expect(rebaseDraft(before, before, draft)).toBe(draft);
   });
+
+  it("brouillon passé par JSON puis rebasé sur la fiche relue : garde ce qu'il avait changé, vidage compris", () => {
+    const wing = { groupId: 'g-aile', groupName: 'Aile', itemId: 'i-5', itemName: 'Duotone 5' };
+    const fiche = savedEdits(record({
+      analysis: { ...analysis, windDeg: 240, speedRange: { minMs: 3, maxMs: 12 } },
+      notes: notes({ foil: 'Axis 900', gear: [wing] }),
+    }));
+    // Vent vidé exprès, seuil saisi, commentaire écrit ; bornes et matériel hérités de la fiche.
+    const edited = { ...fiche, windDeg: null, activeThreshold: 9, notes: { ...fiche.notes, comment: 'Rafales' } };
+    const relu = JSON.parse(JSON.stringify({ base: fiche, edits: edited })) as { base: SessionEdits; edits: SessionEdits };
+    expect(relu.base).not.toBe(fiche);
+    const rebased = rebaseDraft(relu.base, fiche, relu.edits);
+    expect(changedParts(fiche, rebased)).toEqual(['vent', 'seuil', 'notes']);
+    expect(rebased.windDeg).toBeNull();
+    expect(rebased.activeThreshold).toBe(9);
+    expect(rebased.notes.comment).toBe('Rafales');
+    expect(rebased.speedRange).toEqual({ minMs: 3, maxMs: 12 });
+  });
 });
 
 describe('matériel enregistré dans le brouillon', () => {

@@ -12,6 +12,8 @@
 //  4. passe la carte sur le fond satellite (liseré blanc sous la trace) et refait 2 et 3 ;
 //  5. retourne à la bibliothèque et relève la vignette de la session (couches, histogramme ; image fixe depuis le
 //     lot 74, sans carte ni canevas).
+// Un compteur de tracés (`stroke` du canevas de la trace, posé avant le chargement de la page) relève « tracés au premier
+// dessin » et « tracés sur un geste » (moyenne des 10 zooms du plan) : ces deux nombres baissent quand la trace compte moins de couleurs.
 // Les durées sont en secondes (le masque commun `N ms` les effacerait) : le relevé change d'un passage à l'autre,
 // il se lit à l'œil (couches et histogramme avant et après, durées comparées) ; les `check` disent que chaque étape a eu lieu.
 // Les cartes sont trouvées par un crochet posé sur `window.L` (Leaflet 1.9 s'y publie toujours) : chaque carte créée
@@ -48,6 +50,15 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
         }
       },
     });
+    // Compteur de tracés (stroke) du canevas de la trace : un par couleur et par tranche, plus le liseré. Il ne touche pas au dessin.
+    window.__traces = 0;
+    const strokeOrigine = CanvasRenderingContext2D.prototype.stroke;
+    CanvasRenderingContext2D.prototype.stroke = function () {
+      try {
+        if (this.canvas && this.canvas.closest && this.canvas.closest('.leaflet-trace-pane')) window.__traces += 1;
+      } catch (e) { /* le compteur ne doit rien casser */ }
+      return strokeOrigine.apply(this, arguments);
+    };
   })();
 ` });
 await blockNetwork(BLOCKED_EXCEPT_TILES);
@@ -163,14 +174,22 @@ const gestures = async (scope, kind) => {
   return `script ${seconds(after.ScriptDuration - before.ScriptDuration)}, tâches ${seconds(after.TaskDuration - before.TaskDuration)}, geste médian ${seconds(median)}, max ${seconds(max)}`;
 };
 
-const measure = async (label) => {
+/** Nombre de tracés (stroke) faits depuis le chargement de la page sur le canevas de la trace (-1 : compteur absent). */
+const traces = () => evaluate('window.__traces ?? -1');
+
+const measure = async (label, compterTraces = false) => {
   console.log(`${label} : carte       :`, await layers(ANALYSE));
   console.log(`${label} : histogramme :\n${await histogram(ANALYSE)}`);
   await dumpPixels(ANALYSE, label.trim());
   // Tuiles du cadrage de départ arrivées : seules comptent celles des gestes.
   await wait(1000);
   tiles.reset();
+  const tracesAvant = await traces();
   console.log(`${label} : 10 zooms    :`, await gestures(ANALYSE, 'zoom'));
+  if (compterTraces) {
+    const moyenne = (((await traces()) - tracesAvant) / 10).toFixed(1).replace('.', ',');
+    console.log(`tracés sur un geste : ${moyenne} (moyenne des 10 zooms)`);
+  }
   await wait(1000);
   console.log(`${label} : tuiles      :`, formatTileStats(tiles.stats()));
   tiles.reset();
@@ -202,7 +221,11 @@ check('analyse ouverte : trace colorée (pixels peints)', !(await histogram(ANAL
 await evaluate(`document.querySelector('${ANALYSE}').scrollIntoView({ block: 'start' }); 'ok'`);
 await wait(300);
 await shoot('carte-perf-plan');
-await measure('plan     ');
+// Tracés du canevas depuis le chargement de l'analyse : le premier dessin de la trace et ses éventuels redessins de cadrage.
+const tracesPremierDessin = await traces();
+console.log(`tracés au premier dessin : ${tracesPremierDessin}`);
+check('compteur de tracés actif (la trace a été tracée)', tracesPremierDessin > 0);
+await measure('plan     ', true);
 
 // 4. Fond satellite : le liseré blanc s'ajoute sous la trace.
 await evaluate(`document.querySelector('${ANALYSE} .map-base-switch__button')?.click(); 'ok'`);

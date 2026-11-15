@@ -26,6 +26,7 @@ import {
 import { addGpx, countPending } from './addSession';
 import { flushPending } from './pending';
 import { recordToCopy } from './sessionRecords';
+import { sessionDraftStore } from '../sessionDraftStore';
 
 /**
  * Ouverture de la mémoire : le dossier mis en service ou quitté, le lancement, le choix d'un autre
@@ -80,6 +81,7 @@ const attach = async (opened: MemoryFolder): Promise<boolean> => {
   // Fiches pas écrites de l'ancien dossier : mises de côté, pour le report dans un dossier désigné (`carryUnwritten`).
   holdUnwritten();
   lib.folder = f;
+  sessionDraftStore.enterMemory(folderId(f));
   lib.all = [];
   lib.publishPending = false;
   lib.knownNames = new Set();
@@ -110,6 +112,10 @@ const attach = async (opened: MemoryFolder): Promise<boolean> => {
   const jobs = await scan(f, gen);
   if (gen !== lib.generation) return settingsChanged;
   setState({ status: 'ready' });
+  // `sessions/` lu en entier : les brouillons faits dans cette mémoire, dont elle ne porte plus la session, sont jetés.
+  // Jamais avant (une session pas encore lue n'est pas une session supprimée), jamais ceux d'une autre mémoire (un
+  // dossier désigné à l'instant ne porte pas encore les sessions recopiées), et aucun si le dossier est vide (mal ouvert ?).
+  if (lib.knownNames.size > 0) sessionDraftStore.keepOnly(folderId(f), lib.knownNames);
   // Le balayage d'abord : une session en attente déjà rangée, mais coupée avant sa fiche, est retrouvée
   // (`scanCompletion`, attendu par `addGpx`) au lieu d'être rangée une seconde fois sous un autre nom.
   void completeScan(f, gen, jobs).catch((err) =>
@@ -125,6 +131,7 @@ const detach = (status: 'needs-permission' | 'unavailable', label: string | null
   // Accès perdu (« needs-permission ») ou dossier inutilisable : les fiches pas écrites attendent le dossier désigné ensuite.
   holdUnwritten();
   lib.folder = null;
+  sessionDraftStore.enterMemory(null);
   lib.all = [];
   lib.publishPending = false;
   lib.knownNames = new Set();

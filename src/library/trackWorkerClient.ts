@@ -1,3 +1,4 @@
+import { t } from '../core/i18n';
 import {
   errorFromJob, runTrackJob, type TrackJobKind, type TrackJobs, type TrackRequest, type TrackResponse,
 } from './trackWorkerProtocol';
@@ -26,11 +27,29 @@ let nextId = 1;
 const pending = new Map<number, PendingJob>();
 
 /**
+ * Messages d'erreur du calcul qui peuvent arriver à l'écran, indexés par leur texte français au caractère près. Le
+ * worker n'a pas de dictionnaire : ses messages sortent toujours en français, et se traduisent ici, côté page, dans
+ * la langue de l'interface. La traduction se lit à l'appel, pas au chargement du module, pour suivre la langue
+ * posée. Une phrase changée dans le calcul se change ici aussi.
+ */
+const JOB_MESSAGES: Readonly<Record<string, () => string>> = {
+  'Fichier GPX illisible : le XML est mal formé.': () => t('Fichier GPX illisible : le XML est mal formé.'),
+};
+
+/** Erreur du calcul dans la langue de l'interface, même nom ; tout autre message, tel quel. */
+const inPageLanguage = (error: unknown): unknown => {
+  if (!(error instanceof Error) || !Object.hasOwn(JOB_MESSAGES, error.message)) return error;
+  const translated = new Error(JOB_MESSAGES[error.message]());
+  translated.name = error.name;
+  return translated;
+};
+
+/**
  * Calcul en ligne, rendu par une promesse résolue au tour suivant : jamais par une minuterie (les tests de la
  * file des résumés comptent les leurs).
  */
 const runInline = <K extends TrackJobKind>(kind: K, gpxText: string, options: TrackJobs[K]['options']): Promise<TrackJobs[K]['result']> =>
-  Promise.resolve().then(() => runTrackJob(kind, gpxText, options));
+  Promise.resolve().then(() => runTrackJob(kind, gpxText, options)).catch((error: unknown) => Promise.reject(inPageLanguage(error)));
 
 /** Worker mort : oublié, et ce qu'il devait rendre refait en ligne. */
 const fail = (dead: Worker): void => {
@@ -71,7 +90,7 @@ const currentWorker = (): Worker | null => {
 /**
  * Lit et prépare un GPX (`prepare`, `core/prepareTrack.ts`) ou le résume (`summarize`, `summarizeGpx.ts`) hors du
  * fil de l'affichage. La promesse rend le même résultat que le calcul en ligne, ou est rejetée par une erreur de
- * même nom et même message.
+ * même nom et même message, dans la langue de l'interface.
  */
 export const runInWorker = <K extends TrackJobKind>(kind: K, gpxText: string, options: TrackJobs[K]['options']): Promise<TrackJobs[K]['result']> => {
   const target = currentWorker();
@@ -83,7 +102,7 @@ export const runInWorker = <K extends TrackJobKind>(kind: K, gpxText: string, op
     };
     pending.set(id, {
       answer: (response) => {
-        if ('error' in response) reject(errorFromJob(response.error));
+        if ('error' in response) reject(inPageLanguage(errorFromJob(response.error)));
         // La réponse à la demande `id` est celle de son calcul : TypeScript ne relie pas l'identifiant au type.
         else resolve(response.result as TrackJobs[K]['result']);
       },

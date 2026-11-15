@@ -14,7 +14,7 @@ export { TEMPS };
 // `src/core/appIdentity.ts` sans le crochet `charge-ts` : les valeurs en sont recopiées. Une clé changée côté application se
 // change ici, jamais dans un script : une clé fausse ne casse rien, le script injecte dans une clé que plus rien ne lit et
 // « passe » à tort.
-/** Préfixe commun des clés de l'appareil (`localStorage`) et des noms de cache (`APP_SLUG`). */
+/** Préfixe commun des clés de l'appareil (`localStorage`) et des noms de cache (`FORMAT_ID`). */
 export const PREFIXE_CLE = 'gtracker';
 /** Clé de l'appareil : `cle('sections')` donne la clé des sections ouvertes. */
 export const cle = (nom) => `${PREFIXE_CLE}.${nom}`;

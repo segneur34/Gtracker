@@ -1,4 +1,4 @@
-import { APP_SLUG, STORAGE_KEYS } from '../core/appIdentity';
+import { FORMAT_ID, STORAGE_KEYS } from '../core/appIdentity';
 import { t, tn } from '../core/i18n';
 import type { FolderEntry, MemoryFolder } from '../platform/memoryFolder';
 import {
@@ -54,6 +54,7 @@ export const KEY_CLASSES: Record<keyof typeof STORAGE_KEYS, KeyClass> = {
   rechercheLieu: 'reglage',
   lieuxAppris: 'donnee',
   langue: 'reglage',
+  brouillons: 'donnee',
 };
 
 const keysOf = (wanted: (c: KeyClass) => boolean): string[] =>
@@ -80,7 +81,7 @@ export const factoryKeyPlan = (nowMs: number): { remove: string[]; write: Record
  * l'appareil (`stored`, préfixe `gtracker.`), sauf le dossier désigné.
  */
 export const eraseKeyPlan = (stored: readonly string[]): string[] => {
-  const prefix = `${APP_SLUG}.`;
+  const prefix = `${FORMAT_ID}.`;
   return [...new Set([...keysOf((c) => c !== 'dossier'), ...stored.filter((key) => key.startsWith(prefix))])]
     .filter((key) => !KEPT_KEYS.has(key));
 };
@@ -101,7 +102,7 @@ const DIR_FILES: Readonly<Record<string, RegExp>> = {
 };
 
 /** Suffixes d'une écriture interrompue : le fichier qu'elle remplaçait ou créait, puis ce suffixe. */
-const TEMP_SUFFIXES = [`.${APP_SLUG}-tmp`, `.${APP_SLUG}-new`, '.tmp'];
+const TEMP_SUFFIXES = [`.${FORMAT_ID}-tmp`, `.${FORMAT_ID}-new`, '.tmp'];
 
 const withoutTempSuffix = (name: string): string => {
   const suffix = TEMP_SUFFIXES.find((s) => name.toLowerCase().endsWith(s) && name.length > s.length);
