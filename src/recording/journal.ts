@@ -151,10 +151,14 @@ export const journalStopLine = (atMs: number): string => `${JSON.stringify(['sto
 
 /**
  * Ceinture de la session : `'stopped'` quand l'utilisateur cesse de la chercher en route, et une reprise seule ne la
- * redemande pas ; `'asked'` quand « Continuer l'enregistrement » la redemande malgré tout. Marquée par `'belt'` en
- * tête, ignorée des anciennes versions.
+ * redemande pas ; `'asked'` quand « Continuer l'enregistrement » ou « Reprendre la ceinture » la redemande. Les autres
+ * ne servent qu'à comprendre une panne après coup : `'retry'`, un appui sur « Réessayer », puis son résultat,
+ * `'found'` (vue par la recherche), `'missed'` (pas vue) ou `'failed'` (refusé : Bluetooth éteint, permission).
+ * Marquée par `'belt'` en tête, ignorée des anciennes versions.
  */
-export const journalBeltLine = (atMs: number, what: 'stopped' | 'asked'): string => `${JSON.stringify(['belt', atMs, what])}\n`;
+export type JournalBeltEvent = 'stopped' | 'asked' | 'retry' | 'found' | 'missed' | 'failed';
+
+export const journalBeltLine = (atMs: number, what: JournalBeltEvent): string => `${JSON.stringify(['belt', atMs, what])}\n`;
 
 /** Pause manuelle d'un journal relu : son instant, et sa part déjà passée en pause automatique (qui reste comptée). */
 export interface JournalPause {

@@ -113,6 +113,11 @@ public class HeartRatePlugin extends Plugin {
      * liée n'est pas relancée en boucle.
      */
     private static final long STALL_MS = 20000;
+    /**
+     * Écart minimal entre le début d'une recherche et celui d'un nouvel essai demandé par la page, en
+     * millisecondes : Android refuse plus de 5 recherches par 30 s.
+     */
+    private static final long RETRY_GAP_MS = 6000;
     /** Étiquette du journal (`adb logcat -s GtrackerHR`). */
     private static final String TAG = "GtrackerHR";
 
@@ -140,6 +145,15 @@ public class HeartRatePlugin extends Plugin {
     private long lostSince = -1;
     /** Recherches vaines depuis le début de la perte en cours. */
     private int vainSearches = 0;
+    /** Début de la dernière recherche de la ceinture (`SystemClock.elapsedRealtime`), ou -1 : un nouvel essai en garde l'écart. */
+    private long lastSearchAt = -1;
+    /**
+     * Dernier nouvel essai demandé par la page (`SystemClock.elapsedRealtime`), ou -1 depuis `connect` : les
+     * tentatives suivantes repartent au rythme rapide, comptées depuis lui.
+     */
+    private long retriedAt = -1;
+    /** Nouveaux essais demandés par la page, résolus à la fin de la recherche qui les sert, ou quand la ceinture est lâchée. */
+    private final List<PluginCall> retryCalls = new ArrayList<>();
     /** Recherche en cours avant l'ouverture, ou `null`. */
     private ScanCallback locating;
     private final Runnable locateTimeout = () -> locatedBy(locating, null);
@@ -411,6 +425,7 @@ public class HeartRatePlugin extends Plugin {
             wanted = true;
             joined = false;
             connectedAt = SystemClock.elapsedRealtime();
+            retriedAt = -1;
             lostSince = -1;
             vainSearches = 0;
             sendStatus("connecting");
@@ -431,11 +446,73 @@ public class HeartRatePlugin extends Plugin {
         });
     }
 
-    /** Arrête recherche, relances, garde-fous et connexion : plus aucune minuterie armée. */
+    /** Arrête recherche, relances, garde-fous et connexion : plus aucune minuterie armée, plus aucun nouvel essai en attente. */
     private void disarm() {
         stopLocating();
         main.removeCallbacks(lostRetry);
         closeGatt();
+        answerRetries(false);
+    }
+
+    /**
+     * Nouvel essai demandé par la page (bouton « Réessayer »), sans attendre la tentative armée : une ouverture
+     * restée sans réponse est close, les relances armées retirées, le rythme rapide repris, puis la ceinture
+     * recherchée, au plus tôt `RETRY_GAP_MS` après le début de la recherche précédente ; la suite est celle d'une
+     * tentative ordinaire. Une recherche déjà en cours sert l'appel. Rend `seen` (la ceinture vue par la recherche)
+     * à sa fin, faux si la ceinture est lâchée entre-temps ; déjà liée, rien n'est touché. Refusé si aucune ceinture
+     * n'est demandée ou si le Bluetooth est éteint. Chaque appel laisse une ligne au journal.
+     */
+    @PluginMethod
+    public void retryNow(PluginCall call) {
+        main.post(() -> {
+            if (!wanted || device == null) {
+                Log.d(TAG, "nouvel essai refusé : aucune ceinture demandée");
+                call.reject("aucune ceinture demandée");
+                return;
+            }
+            BluetoothAdapter adapter = adapter();
+            if (adapter == null || !adapter.isEnabled()) {
+                Log.d(TAG, "nouvel essai refusé : Bluetooth éteint");
+                call.reject("Bluetooth éteint");
+                return;
+            }
+            if (gatt != null && linked) {
+                Log.d(TAG, "nouvel essai demandé : déjà liée, rien à faire");
+                JSObject ret = new JSObject();
+                ret.put("seen", true);
+                call.resolve(ret);
+                return;
+            }
+            retryCalls.add(call);
+            if (locating != null) {
+                Log.d(TAG, "nouvel essai demandé : recherche déjà en cours, réponse à sa fin");
+                return;
+            }
+            if (gatt != null) {
+                Log.d(TAG, "nouvel essai demandé : ouverture sans réponse, abandonnée");
+                closeGatt();
+            }
+            main.removeCallbacks(lostRetry);
+            main.removeCallbacks(relocate);
+            retriedAt = SystemClock.elapsedRealtime();
+            long waitMs = lastSearchAt < 0 ? 0 : Math.max(0, lastSearchAt + RETRY_GAP_MS - retriedAt);
+            Log.d(TAG, "nouvel essai demandé par la page (" + (joined ? "perdue depuis " + lostSeconds() + " s" : "pas encore jointe")
+                + "), recherche dans " + waitMs + " ms");
+            if (waitMs > 0) main.postDelayed(relocate, waitMs);
+            else locate();
+        });
+    }
+
+    /** Répond aux nouveaux essais en attente : `seen`, la ceinture vue par la recherche qui les a servis. */
+    private void answerRetries(boolean seen) {
+        if (retryCalls.isEmpty()) return;
+        Log.d(TAG, "nouvel essai : ceinture " + (seen ? "vue par la recherche" : "pas vue"));
+        for (PluginCall pending : retryCalls) {
+            JSObject ret = new JSObject();
+            ret.put("seen", seen);
+            pending.resolve(ret);
+        }
+        retryCalls.clear();
     }
 
     /**
@@ -495,7 +572,8 @@ public class HeartRatePlugin extends Plugin {
 
     /** Pause avant la prochaine tentative d'une ceinture perdue : rapprochée au début de la perte, espacée ensuite. */
     private long lostDelay() {
-        long lostMs = lostSince < 0 ? 0 : SystemClock.elapsedRealtime() - lostSince;
+        // Un nouvel essai demandé par la page fait repartir le rythme rapide.
+        long lostMs = lostSince < 0 ? 0 : SystemClock.elapsedRealtime() - Math.max(lostSince, retriedAt);
         return lostMs < LOST_FAST_MS ? LOST_RETRY_MS : LOST_RETRY_SLOW_MS;
     }
 
@@ -534,14 +612,19 @@ public class HeartRatePlugin extends Plugin {
     private void locate() {
         stopLocating();
         main.removeCallbacks(lostRetry);
-        if (!wanted || device == null) return;
+        if (!wanted || device == null) {
+            answerRetries(false);
+            return;
+        }
         BluetoothAdapter adapter = adapter();
         if (adapter == null || !adapter.isEnabled()) {
             Log.d(TAG, "Bluetooth éteint : reprise à son retour");
+            answerRetries(false);
             return;
         }
         BluetoothLeScanner scanner = adapter.getBluetoothLeScanner();
         if (scanner == null) {
+            answerRetries(false);
             afterSearch(null);
             return;
         }
@@ -569,10 +652,12 @@ public class HeartRatePlugin extends Plugin {
             scanner.startScan(filters, settings, cb);
         } catch (Exception e) {
             Log.d(TAG, "recherche impossible : " + e.getMessage());
+            answerRetries(false);
             afterSearch(null);
             return;
         }
         if (lostMode()) Log.d(TAG, "perdue depuis " + lostSeconds() + " s : recherche");
+        lastSearchAt = SystemClock.elapsedRealtime();
         locating = cb;
         main.postDelayed(locateTimeout, LOCATE_MS);
     }
@@ -581,6 +666,7 @@ public class HeartRatePlugin extends Plugin {
     private void locatedBy(ScanCallback cb, BluetoothDevice found) {
         if (cb == null || cb != locating) return;
         stopLocating();
+        answerRetries(found != null);
         afterSearch(found);
     }
 
@@ -710,9 +796,10 @@ public class HeartRatePlugin extends Plugin {
             if (fresh) locate();
             else retryLostIn(lostDelay());
         } else {
-            // Jamais jointe depuis `connect` (laissée à la maison ?) : recherchée de nouveau, de plus en plus rarement.
+            // Jamais jointe depuis `connect` (laissée à la maison ?) : recherchée de nouveau, de plus en plus rarement,
+            // au rythme rapide de nouveau après un nouvel essai demandé par la page.
             sendStatus("searching");
-            long sinceConnectMs = SystemClock.elapsedRealtime() - connectedAt;
+            long sinceConnectMs = SystemClock.elapsedRealtime() - Math.max(connectedAt, retriedAt);
             main.postDelayed(relocate, sinceConnectMs < LOST_FAST_MS ? LOST_RETRY_MS : LOST_RETRY_SLOW_MS);
         }
     }
@@ -744,6 +831,7 @@ public class HeartRatePlugin extends Plugin {
             stopLocating();
             main.removeCallbacks(lostRetry);
             closeGatt();
+            answerRetries(false);
             if (joined && lostSince < 0) lostSince = SystemClock.elapsedRealtime();
             sendStatus("lost");
         } else if (state == BluetoothAdapter.STATE_ON) {

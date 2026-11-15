@@ -54,7 +54,7 @@ import { sessionDisplayName } from '../library/sessionName';
 import {
   addRecordingMark, analyzePendingSession, changeRecordingActivity, continuePendingSession, discardPendingSession, dismissRecorderResult,
   finishingPendingSession, getLastFix, getLiveFixes, getLiveHeadingFixes, getLiveSegmentCount, markRecorderResultOpened, pauseRecording,
-  resumeRecording, startRecording, stopRecording, stopRecordingBeltSearch, type RecorderState,
+  resumeRecording, retakeRecordingBelt, retryRecordingBelt, startRecording, stopRecording, stopRecordingBeltSearch, type RecorderState,
   useLivePosition, useRecordingClock, useRecorderSelector,
 } from '../hooks/useRecorder';
 import { followedTraceLengthM, splitFollowedTrace, type FollowProgress, type FollowedTrace } from '../recording/followedTrace';
@@ -64,6 +64,7 @@ import {
   liveFieldLabel, liveFieldValue, type LiveFieldContext, type LiveFieldUnits,
 } from '../recording/liveFields';
 import { LIVE_LEG_DEFAULTS, type LiveLeg } from '../recording/liveLegs';
+import { beltRetryOffer, beltRetryUnderAlert, warmupRetryShown } from '../recording/recordingRetry';
 import { courseMarks, markName, type LatLon, type MarkGuideView } from '../recording/markGuide';
 import { LIVE_STATS_DEFAULTS, type LiveStats, type LiveStatsOptions } from '../recording/liveStats';
 import { canDownloadFiles, downloadTextFile, readPickedFile } from '../platform/files';
@@ -438,6 +439,42 @@ function MarkGuideSlot({ activity }: { activity: Activity }) {
 }
 
 /**
+ * Boutons de secours de la ceinture pendant l'enregistrement (`beltRetryOffer`) : « Réessayer » une ceinture
+ * cherchée, perdue ou injoignable, « Arrêter de chercher » (sans confirmation : « Reprendre la ceinture » la rend), et
+ * « Reprendre la ceinture » après l'abandon. `underAlert` : la rangée posée sous l'alerte rouge, montrée seulement
+ * quand l'alerte parle de la ceinture. Aucun ne touche à la trace ni à la notification.
+ */
+function BeltRescue({ underAlert }: { underAlert: boolean }) {
+  const status = useRecorderSelector((s) => s.status);
+  const heartRate = useRecorderSelector((s) => s.heartRate);
+  const beltLost = useRecorderSelector((s) => s.beltLost);
+  const beltAside = useRecorderSelector((s) => s.beltAside);
+  const retrying = useRecorderSelector((s) => s.beltRetrying);
+  const input = { active: status === 'recording' || status === 'paused', heartRate, beltLost, beltAside };
+  const offer = beltRetryOffer(input);
+  if (underAlert && !beltRetryUnderAlert(input)) return null;
+  if (!offer.retry && !offer.stop && !offer.retake) return null;
+  return (
+    <div className="rec-belt-stop">
+      {!underAlert && offer.stop && <span className="ui-muted">{t("Sans elle, l'enregistrement continue, sans cardio.")}</span>}
+      <span className="rec-belt-stop__actions">
+        {offer.retry && (
+          <Button size="s" disabled={retrying} onClick={() => void retryRecordingBelt()}>
+            {retrying ? t('nouvelle tentative…') : t('Réessayer')}
+          </Button>
+        )}
+        {offer.stop && <Button size="s" onClick={stopRecordingBeltSearch}>{t('Arrêter de chercher')}</Button>}
+        {offer.retake && (
+          <Button size="s" disabled={retrying} onClick={() => void retakeRecordingBelt()}>
+            {retrying ? t('nouvelle tentative…') : t('Reprendre la ceinture')}
+          </Button>
+        )}
+      </span>
+    </div>
+  );
+}
+
+/**
  * Chiffres de l'enregistrement en cours : les grands chiffres de la carte
  * réduite (ou du téléphone tourné), puis la carte « En cours ». Seuls à suivre
  * l'horloge, le direct, la ceinture et le guidage : le reste de la page n'est
@@ -477,16 +514,7 @@ function RecordingFigures({ summaryShown, clockShown, liveActivity, followed, co
 
       <Card heading={t('En cours')}>
         {heartRate && <BpmTile belt={heartRate} />}
-        {heartRate && (heartRate.state === 'searching' || heartRate.state === 'lost') && liveActivity && (
-          // Ceinture perdue ou jamais trouvée : on peut renoncer à elle, l'enregistrement continue sans cardio.
-          <div className="rec-belt-stop">
-            <span className="ui-muted">{t("Sans elle, l'enregistrement continue, sans cardio.")}</span>
-            <Button size="s" onClick={() => {
-              // Sans retour possible pendant la sortie : un appui par mégarde, en navigation, ne doit pas suffire.
-              if (window.confirm(t("Arrêter de chercher la ceinture ? L'enregistrement continue sans cardio jusqu'à la fin de la sortie."))) stopRecordingBeltSearch();
-            }}>{t('Arrêter de chercher')}</Button>
-          </div>
-        )}
+        <BeltRescue underAlert={false} />
         <div style={STAT_GRID}>
           <Stat label={t('Durée')} value={formatClock(durationMs)} />
           {liveActivity && followed && (courseMarksOf && markGuide.active
@@ -815,8 +843,11 @@ function RecordingScreen() {
                 <span className="ui-text-s rec-indent">
                   <BeltStatus state={beltLive.state} bpm={beltLive.bpm}
                     offText={beltWarmup.error ? t('connexion impossible : {error}', { error: beltWarmup.error }) : null}>
-                    {beltWarmup.error && (
-                      <Button size="s" onClick={beltWarmup.retry}>{t('Réessayer')}</Button>
+                    {/* Échec de la connexion, ou ceinture encore cherchée : un essai tout de suite, sans attendre le suivant. */}
+                    {warmupRetryShown(beltLive.state, beltWarmup.error !== null) && (
+                      <Button size="s" disabled={beltWarmup.retrying} onClick={beltWarmup.retry}>
+                        {beltWarmup.retrying ? t('nouvelle tentative…') : t('Réessayer')}
+                      </Button>
                     )}
                     {/* Ceinture encore cherchée : on peut y renoncer, comme en décochant la case. */}
                     {(beltLive.state === 'connecting' || beltLive.state === 'searching' || beltLive.state === 'lost') && (
@@ -972,6 +1003,7 @@ function RecordingScreen() {
       )}
 
       {error && !savedOpened && <div className="ui-alert ui-alert--danger">{error}</div>}
+      {error && !savedOpened && busy && <BeltRescue underAlert />}
 
       {liveActivity && <MarkGuideSlot activity={liveActivity} />}
 

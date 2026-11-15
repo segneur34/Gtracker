@@ -38,7 +38,7 @@ import { abandonResume, continueCapture, recoverInterruptedRecording, restoreFro
 
 export type { RecorderState, RecorderStatus } from './recorder/store';
 export { getRecorderState, subscribeToFixes, subscribeToRecorder } from './recorder/store';
-export { BELT_LOST_ERROR, GPS_LOST_ERROR, stopRecordingBeltSearch } from './recorder/watches';
+export { BELT_LOST_ERROR, GPS_LOST_ERROR, retakeRecordingBelt, retryRecordingBelt, stopRecordingBeltSearch } from './recorder/watches';
 export { recoverInterruptedRecording };
 
 /**
@@ -269,7 +269,7 @@ export const startRecording = exclusive(async (
   setState({
     status: 'starting', sport, activity, sourceLabel: source.label, pausedReason: null, pauseClock: null,
     measuringMotion: false, motionSetup: null, heartRate: null, marks: session.marks, stats: EMPTY_RECORDING_STATS,
-    saved: null, error: recoveryNotice, gpsLost: false, beltLost: false,
+    saved: null, error: recoveryNotice, gpsLost: false, beltLost: false, beltAside: null, beltRetrying: false,
   });
 
   try {
@@ -508,7 +508,7 @@ export const stopRecording = afterCurrent(async (): Promise<void> => {
   stopGpsWatch();
   stopBeltWatch();
   // Les alertes de perte du GPS et de la FC ne survivent pas à l'enregistrement.
-  setState({ status: 'stopping', gpsLost: false, beltLost: false, error: withoutBeltLost(withoutGpsLost(state.error)) });
+  setState({ status: 'stopping', gpsLost: false, beltLost: false, beltAside: null, beltRetrying: false, error: withoutBeltLost(withoutGpsLost(state.error)) });
   // Écrit avant de couper le GPS : une chute d'ici la fin ne propose ni reprise ni « Continuer ».
   queueJournalLines(journalStopLine(stoppedAtMs));
   await flushJournal();

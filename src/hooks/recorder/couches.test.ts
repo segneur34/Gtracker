@@ -25,7 +25,7 @@ const ENTRY_VALUES = [
   'changeRecordingActivity', 'continuePendingSession', 'discardPendingSession', 'dismissRecorderResult', 'finishPendingSession',
   'finishingPendingSession', 'getLastFix', 'getLiveFixes', 'getLiveHeadingFixes', 'getLivePosition', 'getLiveSegmentCount',
   'getLiveSegments', 'getRecorderState', 'isRecordingActive', 'markRecorderResultOpened', 'motionCaptureWarning', 'pauseRecording',
-  'recoverInterruptedRecording', 'resumeRecording', 'startRecording', 'stopRecording', 'stopRecordingBeltSearch', 'subscribeToFixes',
+  'recoverInterruptedRecording', 'resumeRecording', 'retakeRecordingBelt', 'retryRecordingBelt', 'startRecording', 'stopRecording', 'stopRecordingBeltSearch', 'subscribeToFixes',
   'subscribeToRecorder', 'togglePauseRecording', 'useLivePosition', 'useRecorderSelector', 'useRecorderStatus', 'useRecordingClock',
 ];
 const ENTRY_TYPES = ['RecorderState', 'RecorderStatus'];

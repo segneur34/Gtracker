@@ -27,7 +27,9 @@ import {
   CAPTURE_NOT_RESUMED, SENSORS_PAUSE_ERROR, SENSORS_RESUME_ERROR, isBusy, isCommandRunning, joinMessages, runCommand, session, setState,
   state,
 } from './store';
-import { applyBeltWatch, applyGpsWatch, releaseRecordingBelt, stopGpsWatch, takeBeltOrWarn, watch, wireBelt } from './watches';
+import {
+  applyBeltWatch, applyGpsWatch, releaseRecordingBelt, rememberRecordingBelt, stopGpsWatch, takeBeltOrWarn, watch, wireBelt,
+} from './watches';
 
 /**
  * Récupération d'un enregistrement que l'application n'a pas vu se conclure : relecture du journal, reprise
@@ -155,6 +157,7 @@ export const abandonResume = async (): Promise<void> => {
   setState({
     status: 'idle', resuming: false, sport: null, activity: null, sourceLabel: null, pausedReason: null, pauseClock: null,
     measuringMotion: false, motionSetup: null, heartRate: null, marks: [], stats: EMPTY_RECORDING_STATS, gpsLost: false, beltLost: false,
+    beltAside: null, beltRetrying: false,
   });
 };
 
@@ -178,6 +181,7 @@ export const restoreFromJournal = (parsed: ParsedJournal, activity: Activity, so
   setState({
     status: 'starting', resuming: true, sport: activity.base, activity, sourceLabel: source?.label ?? null, pausedReason: null, pauseClock: null,
     measuringMotion: false, motionSetup: null, heartRate: null, marks: session.marks, stats, pending: null, motionUnreadable: false, saved: null, error: null, gpsLost: false, beltLost: false,
+    beltAside: null, beltRetrying: false,
   });
 };
 
@@ -207,6 +211,8 @@ const resumeSilently = async (parsed: ParsedJournal, activity: Activity): Promis
       if (phase.pauseClock === null && !ours.listening) await resumeMotionCapture().catch(() => setState({ error: SENSORS_RESUME_ERROR }));
     }
     const beltMaxAgeS = getSportProfile(sport).heartRate.maxAgeS;
+    // Retenue pour « Réessayer » et « Reprendre la ceinture », même cessée d'être cherchée en route.
+    if (parsed.header?.belt) rememberRecordingBelt(parsed.header.belt, beltMaxAgeS, parsed.beltStopped);
     const release = await adoptBelt(RECORDING_BELT_HOLDER).catch(() => null);
     if (release) wireBelt(release, beltMaxAgeS);
     // Le téléphone ne tient plus la liaison (greffon neuf) : la ceinture du départ est redemandée, sauf si

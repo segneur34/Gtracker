@@ -2,16 +2,16 @@ import { t } from '../../core/i18n';
 import type { RecordingProfile } from '../../core/sportProfiles';
 import { armBeltWatch, armGpsWatch, disarmBeltWatch, disarmGpsWatch, onBeltLost, onGpsLost } from '../../platform/beeper';
 import {
-  RECORDING_BELT_HOLDER, beltState, holdBelt, subscribeBeltState, subscribeHeartRate, type HeartRateBelt,
+  RECORDING_BELT_HOLDER, beltState, holdBelt, retryBelt, subscribeBeltState, subscribeHeartRate, type HeartRateBelt,
 } from '../../platform/heartRate';
 import {
-  START_GPS_WATCH, beltWatchSettings, gpsWatchOnExpired, gpsWatchOnFix, watchesGps, type GpsWatchState, type GpsWatchStep,
+  START_GPS_WATCH, beltWatchSettings, gpsWatchOnExpired, gpsWatchOnFix, gpsWatchOnPause, watchesGps, type GpsWatchState, type GpsWatchStep,
 } from '../../recording/gpsWatch';
 import { nativeErrorMessage } from '../../platform/nativeMessages';
 import { readableBpm } from '../../recording/heartRate';
-import { journalBeltLine } from '../../recording/journal';
+import { journalBeltLine, type JournalBeltEvent } from '../../recording/journal';
 import { flushJournal, queueJournalLines } from './journalBuffer';
-import { session, setState, state } from './store';
+import { exclusive, joinMessages, session, setState, state } from './store';
 
 /**
  * Veilles de l'enregistrement en cours : le GPS qui se tait, la ceinture qui ne mesure plus (machine
@@ -144,16 +144,114 @@ export const beltUnreachableError = (err: unknown): string =>
   t("Ceinture cardio injoignable : {detail}. L'enregistrement continue sans elle.", { detail: nativeErrorMessage(err, t('erreur inconnue')) });
 
 /**
+ * Retient la ceinture demandée par la session, même rendue ensuite : « Réessayer » et « Reprendre la ceinture » la
+ * redemandent. `stopped` : l'utilisateur avait cessé de la chercher (journal relu), la page propose de la reprendre.
+ */
+export const rememberRecordingBelt = (belt: HeartRateBelt, maxAgeS: number, stopped = false): void => {
+  session.recordingBelt = { belt, maxAgeS };
+  if (stopped) setState({ beltAside: 'stopped' });
+};
+
+/**
  * Prend la ceinture comme `takeBelt`, sans jamais lever : si elle ne répond pas, elle est rendue, la tuile BPM
- * retirée, et l'alerte le dit (`beltUnreachableError`). L'enregistrement, départ ou reprise, continue sans elle.
+ * retirée, et l'alerte le dit (`beltUnreachableError`). L'enregistrement, départ ou reprise, continue sans elle ; la
+ * ceinture reste retenue pour « Réessayer ».
  */
 export const takeBeltOrWarn = async (belt: HeartRateBelt, maxAgeS: number): Promise<void> => {
+  rememberRecordingBelt(belt, maxAgeS);
+  session.beltError = null;
   try {
     await takeBelt(belt, maxAgeS);
   } catch (err) {
     releaseRecordingBelt();
-    setState({ heartRate: null, error: beltUnreachableError(err) });
+    session.beltError = beltUnreachableError(err);
+    setState({ heartRate: null, beltAside: 'failed', error: session.beltError });
   }
+};
+
+/** L'alerte sans le message de la ceinture injoignable : ce qu'elle disait par ailleurs est gardé ; `null` s'il ne reste rien. */
+const withoutBeltError = (error: string | null): string | null => {
+  const message = session.beltError;
+  if (error === null || message === null) return error;
+  const rest = error.replace(` ${message}`, '').replace(message, '').trim();
+  return rest === '' ? null : rest;
+};
+
+/** Vrai pendant l'enregistrement, en cours ou en pause : les boutons de la ceinture n'agissent que là. */
+const recordingNow = (): boolean => state.status === 'recording' || state.status === 'paused';
+
+/** Numéro du dernier essai ou de la dernière reprise : seul le plus récent éteint « nouvelle tentative… ». */
+let beltAttempt = 0;
+
+/** Écrit une ligne de la ceinture au journal, tout de suite. */
+const journalBelt = (what: JournalBeltEvent): void => {
+  queueJournalLines(journalBeltLine(Date.now(), what));
+  void flushJournal();
+};
+
+/**
+ * « Reprendre la ceinture », après l'avoir laissée (injoignable, ou plus cherchée) : la ceinture de la session est
+ * redemandée, le message de la ceinture injoignable retiré, et la veille de la FC repart de zéro, comme au départ (rien
+ * avant la première mesure ; en pause manuelle, elle attend la reprise). En échec, le nouveau message remplace l'ancien.
+ * Le journal le dit (`'asked'`) : une reprise après une chute de la page la redemande de nouveau. Prise dans la file des
+ * commandes : un arrêt demandé pendant la prise l'attend, la ceinture ne peut pas être reprise après lui. Un
+ * « Arrêter de chercher » appuyé pendant la prise l'emporte : la ceinture prise ensuite est rendue aussitôt, sans tuile
+ * ni ligne au journal, et un échec ne ramène ni le message ni la proposition de réessayer.
+ */
+export const retakeRecordingBelt = exclusive(async (): Promise<void> => {
+  const asked = session.recordingBelt;
+  if (asked === null || !recordingNow() || state.beltRetrying) return;
+  const mine = ++beltAttempt;
+  releaseRecordingBelt();
+  journalBelt('asked');
+  setState({ beltRetrying: true, beltLost: false, error: withoutBeltError(withoutBeltLost(state.error)) });
+  session.beltError = null;
+  try {
+    await takeBelt(asked.belt, asked.maxAgeS);
+    if (beltAttempt !== mine) {
+      // Abandonnée pendant la prise : l'abandon tient.
+      releaseRecordingBelt();
+      setState({ heartRate: null });
+      return;
+    }
+    if (state.pausedReason === 'manual') applyBeltWatch(gpsWatchOnPause(watch.belt));
+    setState({ beltAside: null });
+  } catch (err) {
+    releaseRecordingBelt();
+    if (beltAttempt !== mine) return;
+    journalBelt('failed');
+    session.beltError = beltUnreachableError(err);
+    setState({ heartRate: null, beltAside: 'failed', error: joinMessages(state.error, session.beltError) });
+  } finally {
+    if (beltAttempt === mine) setState({ beltRetrying: false });
+  }
+});
+
+/**
+ * « Réessayer » pendant l'enregistrement : la ceinture tenue est cherchée tout de suite par le téléphone, sans attendre
+ * sa tentative suivante, puis ses essais ordinaires reprennent ; rien d'autre n'est touché. Une ceinture rendue
+ * (injoignable) ou que le téléphone ne demande plus est reprise (`retakeRecordingBelt`). Un appui pendant un essai est
+ * ignoré. L'appui et son résultat laissent chacun une ligne au journal.
+ */
+export const retryRecordingBelt = async (): Promise<void> => {
+  if (!recordingNow() || state.beltRetrying || session.recordingBelt === null) return;
+  const current = beltState();
+  if (session.dropBelt === null || current === 'off' || current === 'unsupported') {
+    await retakeRecordingBelt();
+    return;
+  }
+  const mine = ++beltAttempt;
+  journalBelt('retry');
+  setState({ beltRetrying: true });
+  let result: JournalBeltEvent;
+  try {
+    result = (await retryBelt()) ? 'found' : 'missed';
+  } catch {
+    result = 'failed';
+  }
+  // Abandonnée entre-temps : le résultat ne vaut plus, le journal finit sur l'abandon.
+  if (recordingNow() && beltAttempt === mine) journalBelt(result);
+  if (beltAttempt === mine) setState({ beltRetrying: false });
 };
 
 /** Suit dans l'état les mesures d'une ceinture tenue ; `release` la rend. */
@@ -190,17 +288,21 @@ export const releaseRecordingBelt = (): void => {
 };
 
 /**
- * « Arrêter de chercher », ceinture perdue ou jamais trouvée en route : l'enregistrement la rend et continue
- * sans cardio, tuile BPM et alerte de FC perdue retirées. Plus rien ne la recherche jusqu'à la fin de la sortie : le
- * greffon n'est plus demandé (fin de sa reprise seule), la pause ne la reprend pas, et une reprise après une chute de
- * la page ne la redemande pas, le journal le disant. Seul « Continuer l'enregistrement », après une application
- * tuée, la redemande, comme au départ.
+ * « Arrêter de chercher », ceinture perdue, jamais trouvée, sans mesure ou injoignable en route : l'enregistrement la
+ * rend et continue sans cardio, tuile BPM, alerte de FC perdue (minuteur désarmé, son compris) et message de la
+ * ceinture injoignable retirés. Plus rien ne la recherche : le greffon n'est plus demandé (fin de sa reprise seule),
+ * la pause ne la reprend pas, et une reprise après une chute de la page ne la redemande pas, le journal le disant.
+ * « Reprendre la ceinture » (`retakeRecordingBelt`) la redemande, comme « Continuer l'enregistrement » après une
+ * application tuée.
  */
 export const stopRecordingBeltSearch = (): void => {
-  if (session.dropBelt === null) return;
+  if (session.dropBelt === null && state.beltAside !== 'failed') return;
   if (state.status === 'idle' || state.status === 'stopping') return;
   releaseRecordingBelt();
-  queueJournalLines(journalBeltLine(Date.now(), 'stopped'));
-  void flushJournal();
-  setState({ heartRate: null, beltLost: false, error: withoutBeltLost(state.error) });
+  journalBelt('stopped');
+  // Un essai encore en cours ne rallume pas « nouvelle tentative… » à sa fin.
+  beltAttempt += 1;
+  const error = withoutBeltError(withoutBeltLost(state.error));
+  session.beltError = null;
+  setState({ heartRate: null, beltLost: false, beltAside: 'stopped', beltRetrying: false, error });
 };

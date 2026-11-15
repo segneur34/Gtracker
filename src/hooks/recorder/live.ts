@@ -159,5 +159,7 @@ export const resetSession = (init: { source: LocationSource | null; profile: Rec
   session.startedAtMs = init.startedAtMs;
   session.marks = [];
   session.sourceError = null;
+  session.recordingBelt = null;
+  session.beltError = null;
   startGpsWatchFor(init.profile);
 };

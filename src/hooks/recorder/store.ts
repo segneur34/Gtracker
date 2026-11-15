@@ -3,7 +3,8 @@ import { t } from '../../core/i18n';
 import type { SessionMark } from '../../core/sessionMarks';
 import type { RecordingProfile } from '../../core/sportProfiles';
 import type { SportType } from '../../core/types';
-import type { BeltState } from '../../platform/heartRate';
+import type { BeltState, HeartRateBelt } from '../../platform/heartRate';
+import type { BeltAside } from '../../recording/recordingRetry';
 import type { LocationFix, LocationSource, StopLocation } from '../../platform/location';
 import type { MotionCapture, MotionSetup } from '../../platform/motion';
 import { EMPTY_RECORDING_STATS, type PauseClock, type RecordingStats } from '../../recording/session';
@@ -95,6 +96,10 @@ export interface RecorderState {
   gpsLost: boolean;
   /** FC perdue : plus de mesure lisible d'une ceinture qui en donnait ; effacé à la mesure suivante. */
   beltLost: boolean;
+  /** Ceinture de la session laissée de côté : injoignable (`failed`) ou plus cherchée (`stopped`) ; `null` sinon. */
+  beltAside: BeltAside;
+  /** Vrai pendant un nouvel essai ou une reprise de la ceinture demandés par la page : « nouvelle tentative… ». */
+  beltRetrying: boolean;
   /**
    * Vrai pendant le `starting` d'une session relue du journal, positions déjà en mémoire : les guidages se rejouent
    * alors au lieu de repartir de zéro.
@@ -124,6 +129,8 @@ const INITIAL_STATE: RecorderState = {
   error: null,
   gpsLost: false,
   beltLost: false,
+  beltAside: null,
+  beltRetrying: false,
   resuming: false,
   landOnRecording: false,
 };
@@ -202,6 +209,13 @@ interface LiveSession {
   heartRateMaxAgeS: number | null;
   /** Rend la ceinture et se désabonne de ses mesures ; `null` sans ceinture. */
   dropBelt: (() => void) | null;
+  /**
+   * Ceinture demandée par la session et son écart toléré, gardés même quand elle est rendue (injoignable, plus
+   * cherchée) : « Réessayer » et « Reprendre la ceinture » la redemandent. `null` si la session n'en a pas.
+   */
+  recordingBelt: { belt: HeartRateBelt; maxAgeS: number } | null;
+  /** Message de la ceinture injoignable affiché dans l'alerte, retiré seul à la reprise ou à l'abandon ; `null` sinon. */
+  beltError: string | null;
   /** Dernière erreur signalée par la source (localisation coupée…), effacée de l'état à la position suivante. */
   sourceError: string | null;
 }
@@ -224,6 +238,8 @@ export const session: LiveSession = {
   marks: [],
   heartRateMaxAgeS: null,
   dropBelt: null,
+  recordingBelt: null,
+  beltError: null,
   sourceError: null,
 };
 

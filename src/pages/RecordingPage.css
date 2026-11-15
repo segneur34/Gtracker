@@ -118,14 +118,22 @@
   text-align: right;
 }
 
-/* « Arrêter de chercher » une ceinture perdue, sous la tuile BPM. */
+/* Boutons de secours de la ceinture (« Réessayer », « Arrêter de chercher », « Reprendre la ceinture »), sous la tuile BPM. */
 .rec-belt-stop {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   margin-bottom: var(--space-2);
   font-size: var(--text-s);
+}
+
+.rec-belt-stop__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: auto;
 }
 
 /* Matériel choisi à la fin de la session, avant « Analyser ». */

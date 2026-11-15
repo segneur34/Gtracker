@@ -145,6 +145,15 @@ describe('journal', () => {
     expect(parseJournal(asked).fixes).toHaveLength(2);
   });
 
+  it("les lignes d'un nouvel essai de la ceinture ne changent pas ce qu'une reprise redemande", () => {
+    const head = journalHeaderLine('kite', T0, undefined, { address: 'a', name: 'b' });
+    const stopped = head + journalBeltLine(T0 + 1000, 'stopped');
+    for (const what of ['retry', 'found', 'missed', 'failed'] as const) {
+      expect(parseJournal(head + journalBeltLine(T0 + 2000, what)).beltStopped).toBe(false);
+      expect(parseJournal(stopped + journalBeltLine(T0 + 2000, what)).beltStopped).toBe(true);
+    }
+  });
+
   it('retient le dernier changement d\'activité, sans rien perdre des positions ni des coupures', () => {
     const text = journalHeaderLine('wingfoil', T0, { id: 'wingfoil', name: 'Voile' })
       + journalFixLine(fixes[0])
