@@ -64,13 +64,13 @@ Invocation manuelle seulement, tapées au début ou à la fin d'une session.
 
 ## Mode chaîne
 
-La boucle entière (démarrage, FAIT, BLOQUÉ, ÉCHEC, arrêt, APK) est dans la commande `/chaine` (`.claude/skills/chaine/SKILL.md`), seule description qui fait foi, et la clôture dans `/clore`. Démarrage : `claude --model fable`, `/effort medium`, `/reprise`, puis `/chaine`.
+La boucle entière (démarrage, FAIT, BLOQUÉ, ÉCHEC, arrêt, APK) est dans la commande `/chaine` (`.claude/skills/chaine/SKILL.md` et ses fichiers voisins `parallele.md` et `incidents.md`), seule description qui fait foi, et la clôture dans `/clore`. Démarrage : `claude --model fable`, `/effort medium`, `/reprise`, puis `/chaine`.
 
 Fable 5.2 conduit le paquet, à `medium` ; `high` seulement si le paquet a un lot du noyau ou une question de produit ouverte. Il est retenu comme chef d'orchestre pour son jugement sur les questions (il tranche les mineures, ne pose que les majeures), pas pour du volume. Il ne lit que des rapports bornés (40 lignes pour `lot`, 20 pour `relecture`). Sa part du quota se mesure par `/usage` après le premier paquet.
 
 ## Réglages de l'utilisateur (hors dépôt)
 
-Dans ses réglages personnels : `model` vaut `fable` ; `CLAUDE_CODE_SUBAGENT_MODEL` vaut `sonnet` ; `modelSettings` force `high` sur Fable 5.2 et Opus 5.5, `medium` sur Sonnet 5.5. Ils ne se changent que sur demande. Le hook `.claude/hooks/garde-lot.mjs`, branché dans l'en-tête de l'agent `lot`, refuse `git commit`, `git push`, les commandes git qui défont ou déplacent un travail (stash, checkout, restore, clean, reset, switch, rebase, merge, worktree, tag, `branch -D`), l'édition d'un fichier par un script, l'écriture hors du dépôt, dans `docs/` hors de `docs/backlog/` et dans `.claude/`, toute modification de `package.json`, et l'écriture hors de la liste de fichiers du lot (« lot-fichiers.json », dans `.claude/`) quand elle existe.
+Dans ses réglages personnels : `model` vaut `fable` ; `CLAUDE_CODE_SUBAGENT_MODEL` vaut `sonnet` ; `modelSettings` force `high` sur Fable 5.2 et Opus 5.5, `medium` sur Sonnet 5.5. Ils ne se changent que sur demande. Le hook `.claude/hooks/garde-lot.mjs`, branché dans l'en-tête de l'agent `lot`, refuse `git commit`, `git push`, les commandes git qui défont ou déplacent un travail (stash, checkout, restore, clean, reset, switch, rebase, merge, worktree, tag, `branch -D`), l'édition d'un fichier par un script, l'écriture hors du dépôt, dans `docs/` hors de `docs/backlog/` (sauf un fichier que la liste du lot ouvre) et dans `.claude/`, toute modification de `package.json`, et l'écriture hors de la liste de fichiers du lot (« lot-fichiers.json », dans `.claude/`) quand elle existe.
 
 ## Ajuster le tableau
 

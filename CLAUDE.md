@@ -4,13 +4,13 @@ Application 100 % client (React 19, TypeScript, Vite 8, Recharts, Leaflet), sans
 
 Chaque information a une seule place :
 - `docs/ETAT_DU_PROJET.md` : pipeline, persistance, dette et limites connues, et **l'avancement du plan mobile (§12), tenu là seulement**. Le lire avant de toucher au noyau ou aux analyses voile.
-- `docs/DECISIONS.md` : les décisions de l'utilisateur propres à un domaine, en sections 1 à 12 (voile, analyses communes, sauts, surf, test de FC repos, enregistrement, planification, mémoire, Profil, Statistiques, Réglages, Sessions et ouverture, charte graphique) ; les transverses restent ici. Lire la section du domaine avant d'y toucher (table plus bas).
+- `docs/DECISIONS.md` : les décisions de l'utilisateur propres à un domaine, en sections 1 à 12 ; les transverses restent ici. Lire la section du domaine avant d'y toucher (table plus bas).
 - `docs/HISTORIQUE.md` : décisions et pièges, en points numérotés (« §10, point N ») ; le consulter par recherche sur le sujet, pas en entier.
 - `docs/INVENTAIRE.md` : carte des fichiers ; les signatures se lisent dans le code.
-- `docs/GLOSSAIRE.md` : les mots du code qui trompent (« course », « mark », calcul, support et activité, noms de la FC, seuils), en une page.
+- `docs/GLOSSAIRE.md` : les mots du code qui trompent (« course », « mark », calcul, support et activité, famille et traitement, noms de la FC, seuils), en une page.
 - `docs/MISE_EN_PAGE.md` : patron commun des pages d'analyse (structure, règles ordinateur et téléphone, pièces partagées). Le suivre pour toute page d'analyse, existante ou nouvelle.
 - `docs/BACKLOG.md` : le seul reste à faire : lots, idées, dette, essais au téléphone, questions ; `docs/backlog/` pour les détails ; `node outils/backlog.mjs` pour le tableau de bord.
-- `docs/MODELES.md` : quel modèle (Fable, Opus, Sonnet, Haiku) et quel effort pour quelle tâche, et les sous-agents de `.claude/agents/`.
+- `docs/MODELES.md` : quel modèle et quel effort pour quelle tâche, et les sous-agents de `.claude/agents/`.
 
 ## Commandes
 
@@ -20,7 +20,7 @@ node outils/verif.mjs --rapide   typecheck, lint, tests touchés (sans build)
 node outils/banc/passe.mjs       passage du banc, avant/après (options en tête du script)
 ```
 
-Les autres (serveur, typecheck seul, lint seul, un seul test, build) : `docs/DEVELOPPER.md`. Android (JDK 21) : procédure, signature et version au §12 de l'état ; clé hors dépôt, jamais régénérée ni versionnée ; version unique dans `package.json`, à augmenter avant chaque APK diffusé.
+Les autres (serveur, typecheck seul, un seul test, JDK d'Android…) : `docs/DEVELOPPER.md`. Android : procédure, signature et version au §12 de l'état ; clé hors dépôt, jamais régénérée ni versionnée ; version unique dans `package.json`, à augmenter avant chaque APK diffusé.
 
 Vérifications, toutes doivent passer :
 - pendant le travail, après une modification du code : typecheck, lint, tests touchés (`--rapide`) ;
@@ -64,15 +64,18 @@ Vérifications et banc se lancent depuis la conversation (sous-agents `banc` et 
 
 ## Où ajouter quoi
 
-- Nouveau calcul de support : son identifiant dans `SportType` (`core/types.ts`), une entrée de `SPORT_PROFILES` avec sa famille et tous ses seuils (`core/sportProfiles.ts`), sa couleur (`BASE_COLOR`, `core/activities.ts`) et son logo (`BASE_LOGO`, `core/activityLogos.ts`) ; le module, les onglets et les chiffres du direct viennent de sa famille, sauts, pumping et vagues des capacités de son profil. `core/sportProfiles.test.ts` vérifie qu'il est complet. Une activité (moth, paddle, SUP foil…) n'est jamais en dur : l'utilisateur la crée dans Réglages sur un calcul (`core/activities.ts`).
-- Famille et traitement : la famille range les activités (listes d'activités, Réglages, module d'analyse d'une session : `sportFamily`), le traitement dit comment elles se calculent et s'affichent (unités, chiffres du direct, onglets, module d'analyse : `sportTreatment`). Les deux valent aujourd'hui `'voile' | 'surf'`. À l'intérieur d'une famille, un comportement se lit dans les capacités du profil, jamais par un nom de calcul en dur (`=== 'kite'`) : `src/architecture.test.ts` le garde, hors des tables qui décrivent les calculs (`SPORT_TABLES`).
-- Réglage utilisateur : un champ de `StoredSettings` (`settings/activitySettings.ts`), rangé par identifiant d'activité (`PER_ACTIVITY_KEYS`), écrit par une règle de `SETTING_FIELDS`, lu par son `resolve*` et `settingsView`, montré dans `pages/SettingsPage.tsx` ; son défaut par `default*Of`, qui lit le pré-réglage (`settings/activityPresets.ts`, `presetOf`) puis le profil du calcul. Le magasin et `useAllSportSettings` sont dans `hooks/useSportSettings.ts`.
-- Page d'analyse : une seule par famille (règle 9) ; un calcul neuf n'en crée pas. Suivre `docs/MISE_EN_PAGE.md` ; ce qui devient commun aux deux modules va dans une pièce partagée (`components/`), pas dans une copie.
-- Section de module : une entrée dans `SAILING_TABS` ou `SURF_TABS` (`core/analysisTabs.ts`, défauts déduits par `tabDefaults`) ; si elle dépend d'une capacité du calcul, son filtre dans `analysisTabs`/`activityTabs` ; puis un bloc `{open.cle && ...}` dans un `ResizablePanel` d'`id` unique (l'`id` est la clé de la taille mémorisée : ne pas le renommer). Un onglet repris d'un autre module porte `generic` et sa pièce est partagée (`TopsPanel`). En voile : une seule barre d'onglets, dans la colonne de la carte.
+Recettes rares : quand le lot ajoute l'une de ces choses, lire son entrée dans `docs/DEVELOPPER.md`, « Où ajouter quoi » :
+- un nouveau calcul de support ;
+- un réglage utilisateur ;
+- une page d'analyse (une seule par famille, règle 9 ; un calcul neuf n'en crée pas) ;
+- une section de module (onglet) ;
+- une métrique de manœuvre ;
+- un calcul de glisse neuf (vol, vague, run de downwind…).
+
+Toujours :
+- Famille et traitement (`sportFamily`, `sportTreatment` : `docs/GLOSSAIRE.md`) : à l'intérieur d'une famille, un comportement se lit dans les capacités du profil, jamais par un nom de calcul en dur (`=== 'kite'`) : `src/architecture.test.ts` le garde, hors des tables qui décrivent les calculs (`SPORT_TABLES`).
 - Graphe relié à la carte, surbrillance sur la carte d'une analyse : `docs/MISE_EN_PAGE.md` (« Graphes reliés à la carte », « Une seule surbrillance »).
-- Métrique de manœuvre : `ManeuverLocation` (`sailing/maneuvers.ts`), puis `MANEUVER_METRICS` et `summarizeManeuvers` (`sailing/sailingAnalytics.ts`).
 - Donnée propre à une session (notes, vent saisi, seuil d'activité, allure imposée, foil, pumping, repères du bouton « Note », support et activité) : dans sa fiche (`library/record.ts`), écrite par `updateSessionRecord` (`hooks/sessionLibrary/sessionRecords.ts`) ; dans le module, par le brouillon (`useSessionDraft`, `library/sessionEdits.ts`) et « Enregistrer la session » ; jamais dans une clé de l'appareil. Une donnée recalculable depuis le GPX va dans `summary`, avec `SUMMARY_CALC_VERSION` augmenté si son calcul change.
-- Calcul de glisse neuf (vol, vague, run de downwind…) : pur, dans le dossier de sa famille (`sailing/` ou `surfing/`), seuils dans le profil (règle 3) ou son sous-profil (`surf`), en SI hors `sailing/` (règle 5), testé sur trace synthétique à 1 Hz et 5 Hz (règle 2) ; s'il change un chiffre du résumé, `SUMMARY_CALC_VERSION` augmente et `library/summaryFrozen.test.ts` est refigé en le disant.
 - Calcul pur : dans `core/`, `sailing/`, `surfing/`, `planning/`, `recording/` ou `library/`, avec son `*.test.ts` sur trace synthétique.
 - Texte visible : par `t` ou `tn` (pluriel, `core/i18n.ts`), `tRich` ou `tnRich` pour une phrase à balises (`components/tRich.ts`) ; la clé est le texte français, toujours un littéral ; une donnée enregistrée se traduit à l'affichage, jamais à l'écriture. Dictionnaires `src/locales/en.json` et `es.json`, sans clé manquante ; gardes `outils/i18n.mjs` et `src/i18nGuard.test.ts`.
 - Couleur, police, rayon, espacement : une variable de `src/theme/tokens.css`, jamais une valeur en dur dans un écran neuf. Composants communs dans `components/ui`, icônes dans `components/icons.tsx` (pas d'emoji). Les couleurs de données des graphes et de la carte restent en dur (attributs SVG). Styles en ligne : `outils/styles-en-ligne.json` fige leur nombre par fichier, qui ne fait que baisser, et un fichier neuf n'a aucun `style={{` (`src/theme/inlineStyles.test.ts`).
@@ -102,11 +105,11 @@ Décisions transverses (un « § » renvoie ici à une section de `DECISIONS.md`
 - Disposition des analyses, toutes (carte, onglets, « général » et « avancé », panneaux, graphes repliables, téléphone, aides « ? », surbrillance unique) : `docs/MISE_EN_PAGE.md` ; rien ne s'y déplace sans redemander. Ordre des onglets et liste de « général » par sport aux §1 et §4, onglets montrés choisis par activité (§11).
 - Couleur de trace : dégradé sur une échelle absolue (`core/speedGradient.ts`), en 64 nuances, sans paliers visibles, gris sous la borne basse ; une seule coloration d'une session, la même dans son analyse et sa vignette (`core/trackColor.ts`), la vitesse lissée du noyau, sans lissage de plus. Bornes effectives : celles de la trace (sa fiche, réglées dans l'onglet réglages de son analyse), sinon celles du support dans Réglages, sinon le pré-réglage de l'activité, la suggestion du kite en voile, ou celles du traitement (valeurs aux §1 et §4) ; la légende ne fait qu'afficher (`docs/MISE_EN_PAGE.md`).
 - Session : vent saisi, seuil, allure imposée, couleurs de la trace, repères et notes restent en brouillon jusqu'à « Enregistrer la session » (Annuler, avertissement en quittant). Le seuil est propre à chaque session, dans sa fiche, et prime sur celui du support. Le support se change immédiatement.
-- Activités : l'utilisateur crée les siennes dans Réglages, sur un calcul ; onze au départ, dont quatre visibles ; elles seules sont proposées partout, dans une liste dessinée par l'application, jamais le menu natif d'Android. Liste, œil, suppression et adresses : §11.
+- Activités : l'utilisateur crée les siennes dans Réglages, sur un calcul ; elles seules sont proposées partout, jamais en dur. Départ, liste, œil, suppression et adresses : §11.
 - Activité d'une session : celle de la trace suivie est proposée à l'enregistrement ; elle se change pendant l'enregistrement et dans l'onglet réglages de l'analyse, d'une famille à l'autre comprise (recalcul complet, la session change de module).
 - Pré-réglages : chaque activité de départ démarre sur les réglages du téléphone de l'utilisateur, sa référence en cas de doute (`settings/activityPresets.ts`) ; ils sont le « défaut » de Réglages, et une activité créée prend ceux de son calcul. Valeurs par sport aux §1 et §4.
 - Formats d'affichage : virgule décimale et durées espacées (« 12,4 km », « 1 h 24 ») partout, par `core/units.ts` (`formatDecimal`, `formatDuration`) ; saisie, fichiers et fiches inchangés.
 - Réglages d'affichage (unités de vitesse et de distance) choisis dans Réglages seulement, par activité (donc par support : bateau et wing peuvent différer), actifs partout ; distance en km par défaut, milles nautiques au choix. Les autres réglages par activité sont dans la section de leur domaine.
 - Charte graphique (§12) : tout passe par les variables de `theme/tokens.css` ; le vert vif est toujours en aplat sous du noir, jamais en texte ; la couleur d'une activité ne remplit jamais une grande surface et ne porte pas de texte ; ce qui est allumé l'est à l'encre, noire le jour, blanche la nuit.
-- Navigation : ouverture sur le Profil (`/profil`), une seule page Sessions (`/sessions`), barres dans l'ordre de `core/navigation.ts` ; le retour d'Android mène à la page au-dessus, pas dans l'historique, un brouillon demandant toujours confirmation. Détail : §11.
+- Navigation (ouverture sur le Profil, une seule page Sessions, ordre des barres, retour d'Android, brouillon à confirmer) : §11.
 - Reste à faire (`docs/BACKLOG.md`) : règles dans son en-tête ; ce que l'utilisateur lit ne porte aucun jargon.

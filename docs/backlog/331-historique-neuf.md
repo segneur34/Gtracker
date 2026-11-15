@@ -1,6 +1,6 @@
 # 331 · Documents remis à jour : ce qui reste
 
-Brief d'origine : `docs/backlog/319-revue-apres-fork.md`, section « Lot 331 · Documents remis à jour ». Cette fiche garde ce que les passes du 11/11 ont laissé.
+Brief d'origine : la fiche 319 (revue d'après fork du 11/11), section « Lot 331 · Documents remis à jour » ; elle est sortie du dépôt le 15/11 (copie dans `D:\gong tracker\atelier\backlog-clos\319-revue-apres-fork.md`), ce qui sert encore est recopié plus bas. Cette fiche garde ce que les passes du 11/11 ont laissé.
 
 ## Fait le 11/11
 
@@ -22,3 +22,10 @@ Brief d'origine : `docs/backlog/319-revue-apres-fork.md`, section « Lot 331 · 
 ## Reste
 
 - Second temps prévu par le brief, après les lots 326 et 339 : lignes « famille et traitement » de CLAUDE.md et d'ETAT.
+
+## Recopié de la fiche 319 (15/11)
+
+- Règle du lot : la documentation ne devance pas le code ; une phrase qui décrit ce que change un lot de code ne s'écrit qu'après ce lot.
+- Ligne du lot 326 dans le tableau « Temps 2 : après les lots de code » : `CLAUDE.md:78` (texte O1), `ETAT:42, :75` (numéros du 11/11). Le texte d'O1 est dans `D:\gong tracker\atelier\revue-1111\O1-familles-architecture.md`, section 3. Depuis le lot 409 (15/11), « famille et traitement » se lit à trois endroits : l'entrée « Famille et traitement » d'« Où ajouter quoi » dans `CLAUDE.md`, les lignes `sportFamily` et `sportTreatment` de `docs/GLOSSAIRE.md`, la puce « Famille et traitement » d'ETAT.
+- Question liée, tranchée par défaut le 11/11 (« défaut partout ») : fusion de `SportFamily` et de `Treatment`, par défaut fusionner (O1) ; elle change ces mêmes lignes. Réponse de l'utilisateur du 11/11 à la question 13 : le lot 326 ne part pas avant que l'idée 332 (activités « décompactées » sur l'accueil) soit décidée.
+- Ligne du lot 327 du même tableau (règle 13 de `CLAUDE.md`) : faite, la règle dit « deux familles seulement » et ses gardes.

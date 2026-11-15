@@ -21,7 +21,7 @@ Tu exécutes un lot dans le dépôt Gtracker, sous la conduite d'un orchestrateu
 
 ## Avant de coder
 
-1. `CLAUDE.md` est déjà chargé (règles d'architecture 1 à 14, « Où ajouter quoi ») : ne le relis pas. Lis la ou les sections de `docs/DECISIONS.md` que le brief cite ou que la table de `CLAUDE.md` associe aux fichiers touchés ; `docs/MISE_EN_PAGE.md` si une page d'analyse est concernée.
+1. `CLAUDE.md` est déjà chargé (règles d'architecture 1 à 14, « Où ajouter quoi ») : ne le relis pas. Lis la ou les sections de `docs/DECISIONS.md` que le brief cite ou que la table de `CLAUDE.md` associe aux fichiers touchés ; `docs/MISE_EN_PAGE.md` si une page d'analyse est concernée ; l'entrée de `docs/DEVELOPPER.md` (« Où ajouter quoi ») quand le lot ajoute un calcul de support, un réglage utilisateur, une section de module, une métrique de manœuvre, un calcul de glisse ou une page d'analyse.
 2. Lis le brief en entier et vérifie dans le code que chaque constat qu'il cite tient encore (des lots précédents ont pu le corriger).
 3. Si on te relance après un ÉCHEC, lis d'abord la section « Échec » du rapport précédent jointe à la demande : ce qui a cassé et ce qui a été essayé ; ne refais pas le même chemin. Si on te dit que l'arbre porte déjà un travail commencé (lot repris après une question), pars de `git diff`, ne le refais pas.
 
@@ -37,9 +37,9 @@ Tu exécutes un lot dans le dépôt Gtracker, sous la conduite d'un orchestrateu
 
 ## Interdits
 
-- Ne jamais `git commit`, `git push`, ni modifier `package.json` (la version est posée par l'orchestrateur). Un hook (`.claude/hooks/garde-lot.mjs`) refuse ces trois gestes, et aussi : les commandes git qui défont un travail (`stash`, `checkout`, `restore`, `clean`, `reset`, `switch`, `rebase`, `merge`, `worktree`, `tag`, `branch -D`), l'édition d'un fichier par un script (`sed -i`, `perl -i`, redirection ou `tee` vers un fichier du dépôt, `node -e` ou `python -c` qui écrit), toute écriture hors du dépôt (hors dossier temporaire et atelier), dans `.claude/`, dans `docs/` hors de `docs/backlog/`, et, quand l'orchestrateur a écrit `.claude/lot-fichiers.json`, hors des fichiers que cette liste autorise. Devant un refus, ne cherche pas un autre chemin : dis-le dans ton rapport.
+- Ne jamais `git commit`, `git push`, ni modifier `package.json` (la version est posée par l'orchestrateur). Un hook (`.claude/hooks/garde-lot.mjs`) refuse ces trois gestes, et aussi : les commandes git qui défont un travail (`stash`, `checkout`, `restore`, `clean`, `reset`, `switch`, `rebase`, `merge`, `worktree`, `tag`, `branch -D`), l'édition d'un fichier par un script (`sed -i`, `perl -i`, redirection ou `tee` vers un fichier du dépôt, `node -e` ou `python -c` qui écrit), toute écriture hors du dépôt (hors dossier temporaire et atelier), dans `.claude/`, dans `docs/` hors de `docs/backlog/` (sauf un fichier que la liste du lot ouvre), et, quand l'orchestrateur a écrit `.claude/lot-fichiers.json`, hors des fichiers que cette liste autorise. Devant un refus, ne cherche pas un autre chemin : dis-le dans ton rapport.
 - Ne jamais trancher une décision qui revient à l'utilisateur : une question « Décision n » du brief sans réponse donnée, un choix de disposition ou de libellé que `DECISIONS.md` ne couvre pas, un seuil ou un pré-réglage. Dans ce cas, fais tout ce qui n'en dépend pas, et pose la question dans le rapport.
-- Ne pas toucher à `docs/` (la passe de doc se fait après la validation de l'utilisateur), sauf le brief du lot dans `docs/backlog/`.
+- Ne pas toucher à `docs/` (la passe de doc se fait après la validation de l'utilisateur), sauf le brief du lot dans `docs/backlog/` et les fichiers de `docs/` que l'orchestrateur a ouverts dans `.claude/lot-fichiers.json` pour ce lot.
 - Ne pas élargir le lot : un constat voisin non cité se signale dans le rapport, il ne se corrige pas.
 
 ## Rapport (ton dernier message, en français, 40 lignes au plus)

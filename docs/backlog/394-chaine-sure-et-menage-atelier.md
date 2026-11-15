@@ -9,7 +9,7 @@ Revue globale du 15/11 (sept auditeurs, constats relus par l'orchestrateur). L'u
 ## Constats
 
 1. `.claude/skills/chaine/SKILL.md`, étape 6 (rapport ÉCHEC) : `git checkout -- src android outils` puis `git clean -fd -- src android outils`. Étape 5 (BLOQUÉ) : `git stash push -u`. Avec une autre session ouverte dans le même arbre (cas courant ici), ces commandes défont aussi son travail non commité.
-2. `docs/BACKLOG.md`, élément 326 : son détail est `docs/backlog/319-revue-apres-fork.md` (424 000 caractères, environ 120 000 jetons), et `.claude/agents/lot.md` dit de lire le brief en entier. La partie « Lot 326 » tient en une centaine de lignes (vers les lignes 1314 à 1426, à relever).
+2. `docs/BACKLOG.md`, élément 326 : son détail était la fiche 319 (`319-revue-apres-fork.md`, sortie du dépôt au lot 409, copie dans `D:\gong tracker\atelier\backlog-clos\` ; 424 000 caractères, environ 120 000 jetons), et `.claude/agents/lot.md` dit de lire le brief en entier. La partie « Lot 326 » tient en une centaine de lignes (vers les lignes 1314 à 1426, à relever).
 3. `.claude/agents/Plan.md` et `doc.md` disent « lis CLAUDE.md » alors qu'il est déjà chargé (`lot.md` et `relecture.md` le disent bien).
 4. `docs/MODELES.md` : ligne 33, « colonne du LISEZMOI du lot » alors que les briefs sont dans `docs/backlog/N-*.md` ; ligne 73, la liste de ce que refuse le crochet `garde-lot.mjs` est incomplète (il refuse aussi stash, checkout, restore, clean, reset : lot 354).
 5. `docs/BACKLOG.md`, premier paragraphe de Maintenant : environ 5 000 caractères de chronique des APK 0.00.66 à 0.00.86, que git et les tags gardent. Relu à chaque `/reprise`, `/chaine`, `/clore`.

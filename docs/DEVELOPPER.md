@@ -1,6 +1,6 @@
 # Construire Gtracker
 
-Une page pour qui reprend le dépôt : de quoi on a besoin, comment on vérifie, comment on sort une application web ou un APK. L'architecture se lit dans `docs/ETAT_DU_PROJET.md` (couches, pipeline, persistance), la carte des fichiers dans `docs/INVENTAIRE.md` et la disposition des pages d'analyse dans `docs/MISE_EN_PAGE.md`.
+Une page pour qui reprend le dépôt : de quoi on a besoin, comment on vérifie, comment on sort une application web ou un APK, où ajouter un calcul, un réglage ou un onglet. L'architecture se lit dans `docs/ETAT_DU_PROJET.md` (couches, pipeline, persistance), la carte des fichiers dans `docs/INVENTAIRE.md` et la disposition des pages d'analyse dans `docs/MISE_EN_PAGE.md`.
 
 ## Outils
 
@@ -48,3 +48,14 @@ npm run build                     tsc -b && vite build
 - **`appId`** (`io.github.segneur.gtracker`, dans `capacitor.config.ts` et `android/app/build.gradle`) : Android y voit une autre application, installée à côté de la première, sans ses données.
 - **La clé de signature** : Android refuse la mise à jour d'une application signée par une autre clé ; il faut la désinstaller, ce qui efface les données de l'application (réglages de l'appareil ; les sessions, dans le dossier mémoire hors de l'application, restent mais il faut le désigner de nouveau). Garder le `.jks` et ses mots de passe.
 - **`versionCode`** : il doit croître à chaque APK, sinon Android refuse la mise à jour. Il vaut majeure × 1 000 000 + mineure × 1 000 + correctif + 1 (0.00.00 → 1), le + 1 parce qu'Android exige un code d'au moins 1.
+
+## Où ajouter quoi
+
+Les recettes des ajouts les plus rares ; chemins relatifs à `src/`.
+
+- Nouveau calcul de support : son identifiant dans `SportType` (`core/types.ts`), une entrée de `SPORT_PROFILES` avec sa famille et tous ses seuils (`core/sportProfiles.ts`), sa couleur (`BASE_COLOR`, `core/activities.ts`) et son logo (`BASE_LOGO`, `core/activityLogos.ts`) ; le module, les onglets et les chiffres du direct viennent de sa famille, sauts, pumping et vagues des capacités de son profil. `core/sportProfiles.test.ts` vérifie qu'il est complet. Une activité (moth, paddle, SUP foil…) n'est jamais en dur : l'utilisateur la crée dans Réglages sur un calcul (`core/activities.ts`).
+- Réglage utilisateur : un champ de `StoredSettings` (`settings/activitySettings.ts`), rangé par identifiant d'activité (`PER_ACTIVITY_KEYS`), écrit par une règle de `SETTING_FIELDS`, lu par son `resolve*` et `settingsView`, montré dans `pages/SettingsPage.tsx` ; son défaut par `default*Of`, qui lit le pré-réglage (`settings/activityPresets.ts`, `presetOf`) puis le profil du calcul. Le magasin et `useAllSportSettings` sont dans `hooks/useSportSettings.ts`.
+- Page d'analyse : une seule par famille (`/voile/analyse`, `/surf/analyse`) ; un calcul neuf n'en crée pas. Suivre `docs/MISE_EN_PAGE.md` ; ce qui devient commun aux deux modules va dans une pièce partagée (`components/`), pas dans une copie.
+- Section de module : une entrée dans `SAILING_TABS` ou `SURF_TABS` (`core/analysisTabs.ts`, défauts déduits par `tabDefaults`) ; si elle dépend d'une capacité du calcul, son filtre dans `analysisTabs`/`activityTabs` ; puis un bloc `{open.cle && ...}` dans un `ResizablePanel` d'`id` unique (l'`id` est la clé de la taille mémorisée : ne pas le renommer). Un onglet repris d'un autre module porte `generic` et sa pièce est partagée (`TopsPanel`). En voile : une seule barre d'onglets, dans la colonne de la carte.
+- Métrique de manœuvre : `ManeuverLocation` (`sailing/maneuvers.ts`), puis `MANEUVER_METRICS` et `summarizeManeuvers` (`sailing/sailingAnalytics.ts`).
+- Calcul de glisse neuf (vol, vague, run de downwind…) : pur, dans le dossier de sa famille (`sailing/` ou `surfing/`), seuils dans le profil (`SPORT_PROFILES`, passés en paramètre, surchargeables) ou son sous-profil (`surf`), en unités SI hors de `sailing/` (qui travaille en nœuds sur `PointData`), testé sur trace synthétique à 1 Hz et 5 Hz (fenêtres en secondes : même résultat aux deux cadences) ; s'il change un chiffre du résumé, `SUMMARY_CALC_VERSION` augmente et `library/summaryFrozen.test.ts` est refigé en le disant.
