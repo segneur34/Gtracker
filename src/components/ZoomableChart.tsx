@@ -5,6 +5,7 @@ import {
 import { usePlotArea } from 'recharts';
 import { pinchRange, pxSelectionRange, zoomAtRange, type XRange } from '../core/chartZoom';
 import { CHART_TAP_ZOOM_FACTOR } from '../core/displayConfig';
+import { t } from '../core/i18n';
 import type { ChartZoom } from '../hooks/useChartZoom';
 import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { MapOverlayContext } from './mapOverlayContext';
@@ -247,11 +248,11 @@ function ZoomableChart({ zoom, showReset = true, onShowOnMap, onLeave, style, cl
       {selection && <div className="zoom-chart__selection" style={{ ...selection, '--zoom-selection': SPEED_COLOR } as CSSProperties} />}
       {onShowOnMap && (
         <Button size="s" className="zoom-chart__map" onClick={onShowOnMap}
-          aria-label={openMap ? 'Ouvrir la carte et les graphes' : 'Afficher sur la carte'}>{openMap ? '+carte' : 'Afficher'}</Button>
+          aria-label={openMap ? t('Ouvrir la carte et les graphes') : t('Afficher sur la carte')}>{openMap ? t('+carte') : t('Afficher')}</Button>
       )}
       {showReset && zoom.view && (
         <div className="zoom-chart__actions">
-          <Button size="s" className="zoom-chart__reset" onClick={zoom.reset}>Tout voir</Button>
+          <Button size="s" className="zoom-chart__reset" onClick={zoom.reset}>{t('Tout voir')}</Button>
         </div>
       )}
     </div>

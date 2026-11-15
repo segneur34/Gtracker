@@ -1,4 +1,5 @@
 import { SLOW_COLOR, gradientCss, type SpeedRangeMs } from '../core/speedGradient';
+import { t } from '../core/i18n';
 import { SPEED_UNIT_LABEL, formatSpeedValue, toDisplaySpeed, type SpeedUnit } from '../core/units';
 import './SpeedGradientLegend.css';
 
@@ -25,7 +26,7 @@ function SpeedGradientLegend({ unit, range, slowLabel }: SpeedGradientLegendProp
   const low = formatSpeedValue(toDisplaySpeed(range.minMs, unit), unit);
   const high = formatSpeedValue(toDisplaySpeed(range.maxMs, unit), unit);
   const label = SPEED_UNIT_LABEL[unit];
-  const description = `Couleur de la trace (gris : ${slowLabel}), du bleu au rouge de ${low} à ${high} ${label}`;
+  const description = t('Couleur de la trace (gris : {slow}), du bleu au rouge de {low} à {high} {unit}', { slow: slowLabel, low, high, unit: label });
 
   return (
     <div className="speed-legend" role="img" title={description} aria-label={description}>

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { t } from '../core/i18n';
 import { formatSessionDate } from '../core/units';
 import { HelpToggle } from './Help';
 import { IconChevronRight } from './icons';
@@ -31,7 +32,7 @@ function PanelTitle({ label, extra, open, onToggle, helpKey }: {
         {label}
       </span>
       {extra}
-      {helpKey && open && <HelpToggle helpKey={helpKey} label={typeof label === 'string' ? label : 'ce panneau'} size="s" />}
+      {helpKey && open && <HelpToggle helpKey={helpKey} label={typeof label === 'string' ? label : t('ce panneau')} size="s" />}
     </strong>
   );
 }

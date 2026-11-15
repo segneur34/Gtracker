@@ -1,4 +1,6 @@
 import { dayMonthTime } from '../core/calendar';
+import { t } from '../core/i18n';
+import { tRich } from '../components/tRich';
 import { useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { HelpText, HelpToggle } from '../components/Help';
@@ -41,13 +43,13 @@ function StoredResultRow({ result, onRemove }: { result: StoredRestingResult; on
         <span className="rest-history__name">{result.lowestBpm} bpm</span>
         <span className="rest-history__detail">
           {dateText(result.startedAtMs)}
-          {result.meanBpm !== null && ` · moyenne ${result.meanBpm} bpm`}
-          {incomplete && ` · mesures sur ${Math.round(result.coverage * 100)} % du temps`}
+          {result.meanBpm !== null && ` · ${t('moyenne {bpm} bpm', { bpm: result.meanBpm })}`}
+          {incomplete && ` · ${t('mesures sur {pct} % du temps', { pct: Math.round(result.coverage * 100) })}`}
         </span>
       </span>
       <span className="rest-history__actions">
-        <Button size="s" onClick={() => setOpen((o) => !o)}>{open ? 'Masquer' : 'Courbe'}</Button>
-        <Button size="s" variant="ghost" onClick={onRemove} aria-label={`Retirer le test du ${dateText(result.startedAtMs)}`}>Retirer</Button>
+        <Button size="s" onClick={() => setOpen((o) => !o)}>{open ? t('Masquer') : t('Courbe')}</Button>
+        <Button size="s" variant="ghost" onClick={onRemove} aria-label={t('Retirer le test du {date}', { date: dateText(result.startedAtMs) })}>{t('Retirer')}</Button>
       </span>
       {open && (
         <div className="rest-history__chart">
@@ -91,85 +93,83 @@ function RestingHrTestPage() {
 
   return (
     <div className="ui-page rest-page" style={{ '--help-accent': 'var(--rest-accent)' } as React.CSSProperties}>
-      <PageHeader title="FC repos" back={{ to: SETTINGS_PATH, label: 'Réglages' }}
-        subtitle={`Trois minutes immobile, la FC lue sur la ceinture, sans GPS : la moyenne de ${PROTOCOL.windowS} s la plus basse, après la première minute, est votre FC de repos.`} />
+      <PageHeader title={t('FC repos')} back={{ to: SETTINGS_PATH, label: t('Réglages') }}
+        subtitle={t('Trois minutes immobile, la FC lue sur la ceinture, sans GPS : la moyenne de {s} s la plus basse, après la première minute, est votre FC de repos.', { s: PROTOCOL.windowS })} />
 
       {native && !beltChosen && (
         <div className="ui-alert ui-alert--warning">
-          Aucune ceinture cardio choisie : choisissez-la dans <Link to={SETTINGS_PATH}>Réglages</Link>, bloc « Capteurs ».
+          {tRich('Aucune ceinture cardio choisie : choisissez-la dans <a>Réglages</a>, bloc « Capteurs ».', undefined, { a: (c) => <Link to={SETTINGS_PATH}>{c}</Link> })}
         </div>
       )}
       {error && <div className="ui-alert ui-alert--danger">{error}</div>}
 
       {phase === null && (
         <>
-          <Card heading={<>Déroulé<HelpToggle helpKey="repos:deroule" label="Déroulé" size="s" /></>}>
+          <Card heading={<>{t('Déroulé')}<HelpToggle helpKey="repos:deroule" label={t('Déroulé')} size="s" /></>}>
             <HelpText helpKey="repos:deroule" note>
-              Le téléphone reste allumé pendant le test ; aucun GPS ni enregistrement, rien ne peut le couper.
-              Si la ceinture lâche, le test va quand même à son terme, et dit la part du temps mesurée.
+              {t('Le téléphone reste allumé pendant le test ; aucun GPS ni enregistrement, rien ne peut le couper. Si la ceinture lâche, le test va quand même à son terme, et dit la part du temps mesurée.')}
             </HelpText>
             <ol className="rest-steps">
-              <li><strong>Installez-vous</strong>, allongé ou assis, au calme, depuis quelques minutes (le matin au réveil est idéal),
-                la ceinture posée et connectée.</li>
-              <li><strong>« Démarrer »</strong> : {PROTOCOL.leadInS} s pour vous poser, puis un bip court.</li>
-              <li><strong>{PROTOCOL.durationS / 60} min</strong> sans bouger ni parler, en respirant calmement. Un bip long à la fin.</li>
-              <li><strong>Résultat</strong> : la moyenne de {PROTOCOL.windowS} s la plus basse après les {PROTOCOL.settleS} premières secondes (le temps que le cœur se pose), avec la courbe.</li>
+              <li>{tRich('<strong>Installez-vous</strong>, allongé ou assis, au calme, depuis quelques minutes (le matin au réveil est idéal), la ceinture posée et connectée.')}</li>
+              <li>{tRich('<strong>« Démarrer »</strong> : {s} s pour vous poser, puis un bip court.', { s: PROTOCOL.leadInS })}</li>
+              <li>{tRich('<strong>{min} min</strong> sans bouger ni parler, en respirant calmement. Un bip long à la fin.', { min: PROTOCOL.durationS / 60 })}</li>
+              <li>{tRich('<strong>Résultat</strong> : la moyenne de {w} s la plus basse après les {settle} premières secondes (le temps que le cœur se pose), avec la courbe.', { w: PROTOCOL.windowS, settle: PROTOCOL.settleS })}</li>
             </ol>
           </Card>
-          <Card heading="Mesure">
+          <Card heading={t('Mesure')}>
             {native ? (
               <p className="rest-belt">
-                Ceinture : {beltChosen ? <>{beltChosen.name}, {BELT_STATE_LABEL[belt.state]}</> : 'aucune'}
+                {tRich('Ceinture : {belt}', { belt: beltChosen ? <>{beltChosen.name}, {BELT_STATE_LABEL[belt.state]}</> : t('aucune') })}
                 {beltReady && <strong className="rest-belt__bpm"> · {belt.bpm} bpm</strong>}
-                {belt.state === 'connected' && belt.bpm === null && ' · pas de contact avec la peau'}
+                {belt.state === 'connected' && belt.bpm === null && ` · ${t('pas de contact avec la peau')}`}
                 {belt.state === 'searching' && <> <BluetoothSettingsButton /></>}
               </p>
             ) : (
-              <p className="ui-hint">Pas de ceinture dans le navigateur : l'exemple joue une FC d'exemple, pour voir le déroulé et le résultat.</p>
+              <p className="ui-hint">{t('Pas de ceinture dans le navigateur : l\'exemple joue une FC d\'exemple, pour voir le déroulé et le résultat.')}</p>
             )}
             <div className="rest-buttons">
               {native ? (
                 <Button variant="primary" disabled={!beltReady} onClick={() => start(false)}>
                   <IconPlay size={18} />
-                  Démarrer
+                  {t('Démarrer')}
                 </Button>
               ) : (
                 <Button variant="primary" onClick={() => start(true)}>
                   <IconPlay size={18} />
-                  Essayer avec une FC d'exemple
+                  {t('Essayer avec une FC d\'exemple')}
                 </Button>
               )}
-              {native && !beltReady && <span className="ui-hint">« Démarrer » attend la FC de la ceinture.</span>}
+              {native && !beltReady && <span className="ui-hint">{t('« Démarrer » attend la FC de la ceinture.')}</span>}
             </div>
           </Card>
         </>
       )}
 
       {phase === 'preparation' && run && (
-        <Card heading="Installez-vous">
+        <Card heading={t('Installez-vous')}>
           <p className="rest-count" role="timer" aria-live="off">{remainingS} s</p>
-          <p className="ui-hint">Le bip court lance les {PROTOCOL.durationS / 60} minutes.{run.simulated && ' Exemple : FC simulée.'}</p>
-          <div className="rest-buttons rest-actions"><Button onClick={cancel}>Annuler</Button></div>
+          <p className="ui-hint">{t('Le bip court lance les {n} minutes.', { n: PROTOCOL.durationS / 60 })}{run.simulated && ` ${t('Exemple : FC simulée.')}`}</p>
+          <div className="rest-buttons rest-actions"><Button onClick={cancel}>{t('Annuler')}</Button></div>
         </Card>
       )}
 
       {phase === 'mesure' && run && (
-        <Card heading="Ne bougez pas">
+        <Card heading={t('Ne bougez pas')}>
           <div className="rest-live">
             <p className="rest-count" role="timer" aria-live="off">{formatMinSec(remainingS)}</p>
-            <p className="rest-live__bpm">{run.bpm !== null ? <><strong>{run.bpm}</strong> bpm</> : 'pas de mesure'}</p>
+            <p className="rest-live__bpm">{run.bpm !== null ? <><strong>{run.bpm}</strong> bpm</> : t('pas de mesure')}</p>
           </div>
           <RestingHrChart series={live} durationS={PROTOCOL.durationS} />
-          <p className="ui-hint">Un bip long annoncera la fin.{run.simulated && ' Exemple : FC simulée.'}</p>
-          <div className="rest-buttons rest-actions"><Button onClick={cancel}>Annuler</Button></div>
+          <p className="ui-hint">{t('Un bip long annoncera la fin.')}{run.simulated && ` ${t('Exemple : FC simulée.')}`}</p>
+          <div className="rest-buttons rest-actions"><Button onClick={cancel}>{t('Annuler')}</Button></div>
         </Card>
       )}
 
       {phase === 'fini' && run && result && (
-        <Card heading={<>Résultat{result.fromS !== null && result.toS !== null && <HelpToggle helpKey="repos:resultat" label="Résultat" size="s" />}</>}>
+        <Card heading={<>{t('Résultat')}{result.fromS !== null && result.toS !== null && <HelpToggle helpKey="repos:resultat" label={t('Résultat')} size="s" />}</>}>
           {result.fromS !== null && result.toS !== null && (
             <HelpText helpKey="repos:resultat" note>
-              Moyenne de {PROTOCOL.windowS} s la plus basse, de {formatMinSec(result.fromS)} à {formatMinSec(result.toS)}.
+              {t('Moyenne de {w} s la plus basse, de {from} à {to}.', { w: PROTOCOL.windowS, from: formatMinSec(result.fromS), to: formatMinSec(result.toS) })}
             </HelpText>
           )}
           {result.lowestBpm !== null && result.fromS !== null && result.toS !== null ? (
@@ -178,33 +178,33 @@ function RestingHrTestPage() {
               <RestingHrChart series={result.series} durationS={PROTOCOL.durationS}
                 lowest={{ fromS: result.fromS, toS: result.toS, bpm: result.lowestBpm }} />
               <p className="ui-hint">
-                Sur les {PROTOCOL.durationS / 60} minutes : moyenne {result.meanBpm} bpm, maximum {result.maxBpm} bpm.
-                {' '}Mesures sur {Math.round(result.coverage * 100)} % du temps.
+                {t('Sur les {n} minutes : moyenne {mean} bpm, maximum {max} bpm.', { n: PROTOCOL.durationS / 60, mean: result.meanBpm ?? '', max: result.maxBpm ?? '' })}
+                {' '}{t('Mesures sur {pct} % du temps.', { pct: Math.round(result.coverage * 100) })}
               </p>
               {!result.complete && (
                 <div className="ui-alert ui-alert--warning">
-                  Il manque des mesures (ceinture mal posée ou perdue) : ce résultat est moins sûr. À refaire.
+                  {t('Il manque des mesures (ceinture mal posée ou perdue) : ce résultat est moins sûr. À refaire.')}
                 </div>
               )}
             </>
           ) : (
-            <div className="ui-alert ui-alert--warning">Aucune mesure exploitable : vérifiez la ceinture (peau humide, bien serrée) et refaites le test.</div>
+            <div className="ui-alert ui-alert--warning">{t('Aucune mesure exploitable : vérifiez la ceinture (peau humide, bien serrée) et refaites le test.')}</div>
           )}
           <div className="rest-buttons rest-actions">
             {canRetain && (
               <Button variant="primary" disabled={retained} onClick={() => retainHr('hrRest', result.lowestBpm!, { kind: 'test', atMs: run.state.startMs })}>
-                {retained ? 'Retenue comme FC repos' : 'La retenir comme FC repos'}
+                {retained ? t('Retenue comme FC repos') : t('La retenir comme FC repos')}
               </Button>
             )}
-            <Button onClick={cancel}>Refaire</Button>
+            <Button onClick={cancel}>{t('Refaire')}</Button>
           </div>
-          {canRetain && !retained && profile.hrRest !== null && <p className="ui-hint">Votre FC repos actuelle : {profile.hrRest} bpm (Pratiquant, dans <Link to="/parametres">Réglages</Link>).</p>}
+          {canRetain && !retained && profile.hrRest !== null && <p className="ui-hint">{tRich('Votre FC repos actuelle : {bpm} bpm (Pratiquant, dans <a>Réglages</a>).', { bpm: profile.hrRest }, { a: (c) => <Link to="/parametres">{c}</Link> })}</p>}
         </Card>
       )}
 
       {results.length > 0 && phase === null && (
-        <Card heading={<>Vos tests<HelpToggle helpKey="repos:historique" label="Vos tests" size="s" /></>}>
-          <HelpText helpKey="repos:historique" note>Gardés sur cet appareil (les 60 derniers).</HelpText>
+        <Card heading={<>{t('Vos tests')}<HelpToggle helpKey="repos:historique" label={t('Vos tests')} size="s" /></>}>
+          <HelpText helpKey="repos:historique" note>{t('Gardés sur cet appareil (les 60 derniers).')}</HelpText>
           <ul className="rest-history">
             {results.map((r) => <StoredResultRow key={r.startedAtMs} result={r} onRemove={() => remove(r.startedAtMs)} />)}
           </ul>

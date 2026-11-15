@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { t } from '../core/i18n';
 import { useTutorials } from '../hooks/useTutorials';
 import { dayKey, todayLesson } from '../tutorials/tutorials';
 import { IconClose } from './icons';
@@ -36,17 +37,17 @@ function TutorialOfDay({ gate }: { gate: 'wait' | 'blocked' | 'free' }) {
   if (!lesson) return null;
 
   return (
-    <Card className="tutorial-card" aria-label="Leçon du jour">
+    <Card className="tutorial-card" aria-label={t('Leçon du jour')}>
       <div className="tutorial-card__head">
         <span className="tutorial-icon" aria-hidden="true"><LessonIcon icon={lesson.icon} size={18} /></span>
-        <h2 className="ui-card__title tutorial-card__title">Aujourd'hui : {lesson.title}</h2>
-        <button type="button" className="tutorial-card__close" aria-label="Fermer pour aujourd'hui" title="Fermer pour aujourd'hui"
+        <h2 className="ui-card__title tutorial-card__title">{t("Aujourd'hui : {title}", { title: lesson.title })}</h2>
+        <button type="button" className="tutorial-card__close" aria-label={t("Fermer pour aujourd'hui")} title={t("Fermer pour aujourd'hui")}
           onClick={() => dismiss(today)}>
           <IconClose size={18} />
         </button>
       </div>
       <p className="tutorial-card__hook">{lesson.hook}</p>
-      <Link to={`/tutoriels/${lesson.id}`} className="ui-btn ui-btn--primary ui-btn--s tutorial-card__read">Lire</Link>
+      <Link to={`/tutoriels/${lesson.id}`} className="ui-btn ui-btn--primary ui-btn--s tutorial-card__read">{t('Lire')}</Link>
     </Card>
   );
 }

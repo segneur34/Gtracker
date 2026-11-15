@@ -1,4 +1,5 @@
 import { errorMessage } from '../core/basics';
+import { t } from '../core/i18n';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { Activity } from '../core/activities';
 import type { SessionMark } from '../core/sessionMarks';
@@ -96,7 +97,7 @@ export { recoverInterruptedRecording };
  */
 
 /** Notifications refusées au départ d'un enregistrement : ajouté une fois à l'alerte. */
-const NOTIFICATIONS_OFF_WARNING = "Notifications refusées : rien ne s'affichera sur l'écran verrouillé pendant l'enregistrement (Réglages › Autorisations).";
+const NOTIFICATIONS_OFF_WARNING = t("Notifications refusées : rien ne s'affichera sur l'écran verrouillé pendant l'enregistrement (Réglages › Autorisations).");
 
 /** Au départ : des notifications refusées sont dites une fois, dans l'alerte de la page. */
 const warnIfNotificationsOff = async (): Promise<void> => {
@@ -111,8 +112,9 @@ const warnIfNotificationsOff = async (): Promise<void> => {
  * Capture là mais illisible : rien n'est effacé, la session reste en attente, et ceci le dit. Une capture
  * qui ne se lirait jamais bloquerait la session : d'où « Analyser sans les capteurs ».
  */
-const MOTION_UNREADABLE_MESSAGE = 'Les mesures des capteurs de cette session n\'ont pas pu être lues. La session reste en attente et rien n\'est effacé : '
-  + 'réessayez « Analyser », ou « Analyser sans les capteurs » pour la ranger sans sauts ni pumping, le fichier des mesures restant sur l\'appareil.';
+const MOTION_UNREADABLE_MESSAGE = t(
+  "Les mesures des capteurs de cette session n'ont pas pu être lues. La session reste en attente et rien n'est effacé : réessayez « Analyser », ou « Analyser sans les capteurs » pour la ranger sans sauts ni pumping, le fichier des mesures restant sur l'appareil.",
+);
 
 /**
  * Range la session en attente dans la bibliothèque, puis efface le journal et
@@ -145,7 +147,7 @@ const rangePendingSession = async (pending: PendingSession, withoutMotion: boole
     const foil = pending.activity ? effectiveFoil(pending.activity) : null;
     stored = await saveRecordedSession(pending.content, pending.sport, pending.activity?.id ?? null, motion, pending.marks, foil);
   } catch (err) {
-    setState({ error: `Enregistrement du GPX impossible : ${errorMessage(err, 'erreur inconnue')}. La session reste en attente.` });
+    setState({ error: t('Enregistrement du GPX impossible : {why}. La session reste en attente.', { why: errorMessage(err, t('erreur inconnue')) }) });
     return null;
   }
   // Le GPX est rangé : un ménage en échec ne remet pas la session en attente, il est dit. Un journal resté là est
@@ -155,7 +157,7 @@ const rangePendingSession = async (pending: PendingSession, withoutMotion: boole
     await recordingJournal.remove();
     if (pending.motion && !withoutMotion) await removeMotionCapture(pending.motion.path);
   } catch (err) {
-    cleanup = `Session rangée ; le journal d'enregistrement n'a pas pu être effacé (${errorMessage(err, 'erreur inconnue')}).`;
+    cleanup = t("Session rangée ; le journal d'enregistrement n'a pas pu être effacé ({why}).", { why: errorMessage(err, t('erreur inconnue')) });
   }
   const saved: SavedSession = { ...pending, fileName: stored.file ?? pending.fileName, libraryFile: stored.file, location: stored.location };
   setState({ pending: null, motionUnreadable: false, saved, resultOpened: false, error: joinMessages(kept, cleanup) });
@@ -223,7 +225,7 @@ export const discardPendingSession = async (): Promise<void> => {
     await recordingJournal.remove();
     if (pending.motion) await removeMotionCapture(pending.motion.path);
   } catch (err) {
-    setState({ error: `La session n'a pas pu être jetée : ${errorMessage(err, 'erreur inconnue')}.` });
+    setState({ error: t("La session n'a pas pu être jetée : {why}.", { why: errorMessage(err, t('erreur inconnue')) }) });
     return;
   }
   setState({ pending: null, motionUnreadable: false, error: null });
@@ -279,7 +281,7 @@ export const startRecording = exclusive(async (
     session.stopSource = null;
     stopGpsWatch();
     await recordingJournal.remove();
-    setState({ status: 'idle', error: `Démarrage impossible : ${errorMessage(err, 'erreur inconnue')}` });
+    setState({ status: 'idle', error: t('Démarrage impossible : {why}', { why: errorMessage(err, t('erreur inconnue')) }) });
     return;
   }
   if (options.motion) {
@@ -287,7 +289,7 @@ export const startRecording = exclusive(async (
       await startMotionCapture(session.startedAtMs, options.motion);
       setState({ measuringMotion: true, motionSetup: options.motion });
     } catch (err) {
-      setState({ error: `Mesure des capteurs impossible : ${errorMessage(err, 'erreur inconnue')}. L'enregistrement continue sans elle.` });
+      setState({ error: t("Mesure des capteurs impossible : {why}. L'enregistrement continue sans elle.", { why: errorMessage(err, t('erreur inconnue')) }) });
     }
   }
   if (options.heartRate) await takeBeltOrWarn(options.heartRate, getSportProfile(sport).heartRate.maxAgeS);
@@ -310,7 +312,7 @@ export const continuePendingSession = exclusive(async (source: LocationSource | 
   if (source === null) return;
   const backToPending = async (why: unknown): Promise<void> => {
     await abandonResume();
-    setState({ pending: before, error: `Reprise impossible : ${errorMessage(why, 'erreur inconnue')}. La session reste en attente.` });
+    setState({ pending: before, error: t('Reprise impossible : {why}. La session reste en attente.', { why: errorMessage(why, t('erreur inconnue')) }) });
   };
   let parsed: ParsedJournal;
   try {
@@ -318,7 +320,7 @@ export const continuePendingSession = exclusive(async (source: LocationSource | 
     if (text === null) throw new Error('journal introuvable');
     parsed = parseJournal(text);
   } catch (err) {
-    setState({ error: `Reprise impossible : ${errorMessage(err, 'erreur inconnue')}. La session reste en attente.` });
+    setState({ error: t('Reprise impossible : {why}. La session reste en attente.', { why: errorMessage(err, t('erreur inconnue')) }) });
     return;
   }
   try {
@@ -417,7 +419,7 @@ export const resumeRecording = exclusive(async (): Promise<void> => {
     const clock = state.pauseClock;
     if (clock?.frozenAtMs != null) queueJournalLines(journalPauseLine(clock.frozenAtMs, clock.frozenAtMs - clock.sinceMs));
     void flushJournal();
-    setState({ error: `Reprise impossible : ${errorMessage(err, 'erreur inconnue')}` });
+    setState({ error: t('Reprise impossible : {why}', { why: errorMessage(err, t('erreur inconnue')) }) });
   }
 });
 
@@ -481,14 +483,19 @@ export const togglePauseRecording = (): Promise<void> =>
  * même a échoué ; `capture` à `null` sans échec : plus rien ne tournait.
  */
 export const motionCaptureWarning = (capture: MotionCapture | null, failure: string | null): string | null => {
-  const lost = 'la session sera rangée sans les mesures des capteurs (sauts ou pumping).';
-  if (failure !== null) return `Capteurs : arrêt impossible (${failure}), ${lost}`;
-  if (capture === null) return `Capteurs : la mesure s'était arrêtée, ${lost}`;
+  if (failure !== null) {
+    return t('Capteurs : arrêt impossible ({why}), la session sera rangée sans les mesures des capteurs (sauts ou pumping).', { why: failure });
+  }
+  if (capture === null) {
+    return t("Capteurs : la mesure s'était arrêtée, la session sera rangée sans les mesures des capteurs (sauts ou pumping).");
+  }
   if (capture.error !== null) {
-    return `Capteurs : écriture interrompue (${capture.error}), leurs mesures sont incomplètes : sauts ou pumping peuvent manquer.`;
+    return t('Capteurs : écriture interrompue ({why}), leurs mesures sont incomplètes : sauts ou pumping peuvent manquer.', { why: capture.error });
   }
   // Capture reprise sans mesure depuis sa relance (session en pause, arrêt aussitôt) : celles d'avant la coupure restent.
-  if (capture.samples === 0 && capture.earlierMeasures !== true) return `Capteurs : aucune mesure reçue, ${lost}`;
+  if (capture.samples === 0 && capture.earlierMeasures !== true) {
+    return t('Capteurs : aucune mesure reçue, la session sera rangée sans les mesures des capteurs (sauts ou pumping).');
+  }
   return null;
 };
 
@@ -516,7 +523,7 @@ export const stopRecording = afterCurrent(async (): Promise<void> => {
   let motionFailure: string | null = null;
   const motion = measuringMotion
     ? await stopMotionCapture().catch((err: unknown) => {
-      motionFailure = errorMessage(err, 'erreur inconnue');
+      motionFailure = errorMessage(err, t('erreur inconnue'));
       return null;
     })
     : null;
@@ -548,7 +555,7 @@ export const stopRecording = afterCurrent(async (): Promise<void> => {
       motionSetup: null,
       heartRate: null,
       marks: [],
-      error: `Construction du GPX impossible : ${errorMessage(err, 'erreur inconnue')}. Le journal est gardé et sera repris au prochain démarrage.`,
+      error: t('Construction du GPX impossible : {why}. Le journal est gardé et sera repris au prochain démarrage.', { why: errorMessage(err, t('erreur inconnue')) }),
     });
   }
   session.fixes = [];

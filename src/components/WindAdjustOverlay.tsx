@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type PointerEvent } from 'react';
+import { t } from '../core/i18n';
 import { pointerWindDeg, windDegFromText, type PolarBin } from '../sailing/wind';
 import SpeedPolarChart from './SpeedPolarChart';
 import Button from './ui/Button';
@@ -93,35 +94,35 @@ function WindAdjustOverlay({ windDeg, autoWind, confidence, manual, onChange, on
   return (
     <div className="an-map-tool an-wind">
       <div className="an-wind__bar">
-        <strong className="an-wind__value num">Vent {shownDeg}°</strong>
+        <strong className="an-wind__value num">{t('Vent {deg}°', { deg: shownDeg })}</strong>
         <span className="an-wind__source">
-          {manual ? 'saisi' : 'calculé'}
-          {autoWind !== null && manual && ` · calculé ${autoWind}°`}
-          {confidence !== null && !manual && ` · confiance ${Math.round(confidence * 100)} %`}
+          {manual ? t('saisi') : t('calculé')}
+          {autoWind !== null && manual && ` · ${t('calculé {deg}°', { deg: autoWind })}`}
+          {confidence !== null && !manual && ` · ${t('confiance {percent} %', { percent: Math.round(confidence * 100) })}`}
         </span>
         <label className="an-wind__field">
-          <input type="number" min={0} max={359} className="ui-field ui-field--s num" aria-label="Vent en degrés"
+          <input type="number" min={0} max={359} className="ui-field ui-field--s num" aria-label={t('Vent en degrés')}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onBlur={commitText}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitText(); } }} />°
         </label>
-        <Button size="s" onClick={() => onChange((shownDeg + 180) % 360)}>Inverser</Button>
-        {manual && <Button size="s" onClick={() => onChange(null)} title="Revenir au vent calculé">Calculé</Button>}
-        <Button size="s" aria-pressed={polarShown} onClick={() => setPolarShown(!polarShown)}>Polaire</Button>
-        <Button size="s" variant="primary" onClick={onClose}>Terminé</Button>
+        <Button size="s" onClick={() => onChange((shownDeg + 180) % 360)}>{t('Inverser')}</Button>
+        {manual && <Button size="s" onClick={() => onChange(null)} title={t('Revenir au vent calculé')}>{t('Calculé')}</Button>}
+        <Button size="s" aria-pressed={polarShown} onClick={() => setPolarShown(!polarShown)}>{t('Polaire')}</Button>
+        <Button size="s" variant="primary" onClick={onClose}>{t('Terminé')}</Button>
       </div>
 
       <svg ref={dialRef} className="an-wind__dial" viewBox={`0 0 ${DIAL} ${DIAL}`} role="slider"
-        aria-label="Direction du vent" aria-valuemin={0} aria-valuemax={359} aria-valuenow={shownDeg}
+        aria-label={t('Direction du vent')} aria-valuemin={0} aria-valuemax={359} aria-valuenow={shownDeg}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => setDragDeg(null)}>
         <circle cx={C} cy={C} r={C - 2} fill="rgba(255,255,255,0.45)" stroke="#333" strokeWidth={2} />
-        {ticks.map((t) => {
-          const a = (t * Math.PI) / 180;
-          const inner = t % 90 === 0 ? C - 16 : C - 10;
-          return <line key={t} x1={C + inner * Math.sin(a)} y1={C - inner * Math.cos(a)} x2={C + (C - 3) * Math.sin(a)} y2={C - (C - 3) * Math.cos(a)} stroke="#333" strokeWidth={t % 90 === 0 ? 2 : 1} />;
+        {ticks.map((tick) => {
+          const a = (tick * Math.PI) / 180;
+          const inner = tick % 90 === 0 ? C - 16 : C - 10;
+          return <line key={tick} x1={C + inner * Math.sin(a)} y1={C - inner * Math.cos(a)} x2={C + (C - 3) * Math.sin(a)} y2={C - (C - 3) * Math.cos(a)} stroke="#333" strokeWidth={tick % 90 === 0 ? 2 : 1} />;
         })}
-        {(['N', 'E', 'S', 'O'] as const).map((l, i) => {
+        {[t('N', { ctx: 'point cardinal' }), t('E', { ctx: 'point cardinal' }), t('S', { ctx: 'point cardinal' }), t('O', { ctx: 'point cardinal' })].map((l, i) => {
           const a = (i * 90 * Math.PI) / 180;
           return <text key={l} x={C + (C - 26) * Math.sin(a)} y={C - (C - 26) * Math.cos(a) + 5} textAnchor="middle" fontSize={14} fontWeight="bold" fill="#333">{l}</text>;
         })}

@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { ReferenceArea, ReferenceLine } from 'recharts';
+import { t } from '../core/i18n';
 import { HEART_RATE_COLOR, HEART_ZONE_COLORS } from './heartRateColors';
 import type { ChartZoom } from '../hooks/useChartZoom';
 import type { ChartXSpec } from './chartAxes';
@@ -38,7 +39,7 @@ export default function HeartRateChart<R extends { index: number; hr: number | n
   /** Éléments de plus dans le graphe (traits des repères). */
   children?: ReactNode;
 }) {
-  const series: TrackSeries<R>[] = [{ kind: 'line', key: 'hr', name: 'FC', yAxisId: 'hr', color: HEART_RATE_COLOR, width: 2, activeDotR: 5 }];
+  const series: TrackSeries<R>[] = [{ kind: 'line', key: 'hr', name: t('FC'), yAxisId: 'hr', color: HEART_RATE_COLOR, width: 2, activeDotR: 5 }];
   return (
     <TrackChart rows={data} zoom={zoom} x={x} yAxes={HR_AXIS} series={series}
       margin={{ top: 5, right: thresholds ? 24 : 10, left: 0, bottom: 0 }}

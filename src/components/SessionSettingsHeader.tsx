@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { t } from '../core/i18n';
 import { HelpText } from './Help';
 import { PanelHeading } from './PanelTitle';
 
@@ -15,7 +16,7 @@ export default function SessionSettingsHeader({ helpKey, open, onToggle, childre
 }) {
   return (
     <>
-      <PanelHeading label="Réglages de la session" open={open} onToggle={onToggle} helpKey={helpKey} />
+      <PanelHeading label={t('Réglages de la session')} open={open} onToggle={onToggle} helpKey={helpKey} />
       <HelpText helpKey={helpKey} note>{children}</HelpText>
     </>
   );

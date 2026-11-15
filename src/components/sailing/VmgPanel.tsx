@@ -3,6 +3,7 @@
  * carte, et la courbe de VMG autour de zéro (près au-dessus, portant en dessous), seule à suivre le zoom.
  */
 import type { ReactNode } from 'react';
+import { t } from '../../core/i18n';
 import type { TopSegment } from '../../core/types';
 import type { ChartZoomSource } from '../../hooks/useChartZoom';
 import type { SailingChartRows } from '../../hooks/useSailingChartRows';
@@ -51,7 +52,7 @@ export default function VmgPanel({
       <div className="an-vmg-top__head">
         <strong>{title}</strong>
         <MapToggle
-          shown={selected === topKey} color="var(--voile)" ink="var(--on-ink)" labels={['Voir (Carte)', 'Masquer (Carte)']}
+          shown={selected === topKey} color="var(--voile)" ink="var(--on-ink)" labels={[t('Voir (Carte)'), t('Masquer (Carte)')]}
           onClick={() => onSelect(selected === topKey ? null : topKey)} />
       </div>
       <div className="an-vmg-top__ranks">
@@ -64,27 +65,26 @@ export default function VmgPanel({
 
   return (
     <ResizablePanel id="sailing.carte.vmg" style={PANEL_BLOCK_STYLE}>
-      <PanelHeading label="Analyse VMG" open={open} onToggle={onToggle} helpKey="voile:vmg" />
+      <PanelHeading label={t('Analyse VMG')} open={open} onToggle={onToggle} helpKey="voile:vmg" />
       <HelpText helpKey="voile:vmg" note>
-        La VMG est la vitesse utile vers le vent, moyennée sur {VMG_WINDOW_S} s : sur la courbe, au-dessus de zéro au près, en dessous au portant.
-        Les manœuvres, le temps de la rotation, sont écartées des chiffres (moyennes, max, tops) comme de la courbe, qui les franchit d'un trait droit. Un arrêt ou un passage sous le seuil d'activité y laisse un trou. {zoomText}
+        {t("La VMG est la vitesse utile vers le vent, moyennée sur {s} s : sur la courbe, au-dessus de zéro au près, en dessous au portant. Les manœuvres, le temps de la rotation, sont écartées des chiffres (moyennes, max, tops) comme de la courbe, qui les franchit d'un trait droit. Un arrêt ou un passage sous le seuil d'activité y laisse un trou. {zoomText}", { s: VMG_WINDOW_S, zoomText })}
       </HelpText>
       <table className="ui-table" style={{ textAlign: 'center' }}>
         <thead>
           <tr style={{ backgroundColor: 'var(--surface-sunken)', borderBottom: '1px solid var(--line-strong)' }}>
-            <th>Allure</th>
-            <th style={{ color: TACK_PORT_COLOR }}>Bâbord (Moy/Max)</th>
-            <th style={{ color: TACK_STARBOARD_COLOR }}>Tribord (Moy/Max)</th>
+            <th>{t('Allure')}</th>
+            <th style={{ color: TACK_PORT_COLOR }}>{t('Bâbord (Moy/Max)')}</th>
+            <th style={{ color: TACK_STARBOARD_COLOR }}>{t('Tribord (Moy/Max)')}</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td className="an-vmg-allure">Près</td>
+            <td className="an-vmg-allure">{t('Près')}</td>
             <td>{showKn(v.upPort.avg)} / <strong>{showKn(v.upPort.max)}</strong></td>
             <td>{showKn(v.upStbd.avg)} / <strong>{showKn(v.upStbd.max)}</strong></td>
           </tr>
           <tr>
-            <td className="an-vmg-allure">Portant</td>
+            <td className="an-vmg-allure">{t('Portant')}</td>
             <td>{showKn(v.downPort.avg)} / <strong>{showKn(v.downPort.max)}</strong></td>
             <td>{showKn(v.downStbd.avg)} / <strong>{showKn(v.downStbd.max)}</strong></td>
           </tr>
@@ -92,10 +92,10 @@ export default function VmgPanel({
       </table>
       <div className="an-vmg-tops">
         <div>
-          {renderTop3("Tops Près (10s)", "vmgUpwind", v.topsUpwind)}
+          {renderTop3(t('Tops Près (10s)'),"vmgUpwind", v.topsUpwind)}
         </div>
         <div>
-          {renderTop3("Tops Portant (10s)", "vmgDownwind", v.topsDownwind)}
+          {renderTop3(t('Tops Portant (10s)'),"vmgDownwind", v.topsDownwind)}
         </div>
       </div>
       {chartShown ? (
@@ -105,7 +105,7 @@ export default function VmgPanel({
             {(z) => (
               <>
                 <div className="chart-head" style={{ marginBottom: '10px' }}>
-                  <HoverReadout read={readers.readVmg(z)} label="VMG" color={VMG_COLOR} />
+                  <HoverReadout read={readers.readVmg(z)} label={t('VMG')} color={VMG_COLOR} />
                 </div>
                 <div style={{ flexGrow: 1, width: '100%', position: 'relative' }}>
                   <SailingVmgChart rows={rows} z={z} timeX={timeX} markLines={markLines} onShowOnMap={onShowOnMap} style={FILL_STYLE} />
@@ -116,7 +116,7 @@ export default function VmgPanel({
         </ResizablePanel>
       ) : (
         <p style={{ margin: '10px 0 0', color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>
-          Pas de courbe : aucun passage de {VMG_WINDOW_S} s au-dessus du seuil d'activité, hors des manœuvres.
+          {t("Pas de courbe : aucun passage de {s} s au-dessus du seuil d'activité, hors des manœuvres.", { s: VMG_WINDOW_S })}
         </p>
       )}
     </ResizablePanel>

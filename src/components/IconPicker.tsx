@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useHelpCollapsed } from './helpContext';
-import { LOGO_IDS, LOGO_LABEL, type LogoId } from '../core/activityLogos';
+import { t } from '../core/i18n';
+import { LOGO_IDS,LOGO_LABEL, type LogoId } from '../core/activityLogos';
 import { LogoGlyph } from './logos/ActivityLogo';
 import './IconPicker.css';
 import Button from './ui/Button';
@@ -29,7 +30,7 @@ function IconPicker({
           <LogoGlyph logo={value} size={20} />
         </span>
         <Button size="s" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {open ? 'Réduire' : 'Changer'}
+          {open ? t('Réduire') : t('Changer')}
         </Button>
       </div>
       {open && (

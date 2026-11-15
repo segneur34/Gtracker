@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from 'react';
 import { LOGO_IDS, LOGO_LABEL, type LogoId } from '../core/activityLogos';
+import { t } from '../core/i18n';
 import { AVATAR_PHOTO_PX, type AthleteAvatar } from '../library/athleteProfile';
 import { readPickedImage } from '../platform/files';
 import { IconChevronDown, IconChevronUp, IconImage, IconUser } from './icons';
@@ -61,7 +62,7 @@ export function AvatarPicker({ avatar, logoColor, onPick }: {
     try {
       onPick({ kind: 'photo', dataUrl: await readPickedImage(file, AVATAR_PHOTO_PX) });
     } catch {
-      setError('Cette image ne se lit pas : essayez une photo en JPEG ou PNG.');
+      setError(t('Cette image ne se lit pas : essayez une photo en JPEG ou PNG.'));
     } finally {
       setReading(false);
       if (input.current) input.current.value = '';
@@ -69,11 +70,11 @@ export function AvatarPicker({ avatar, logoColor, onPick }: {
   };
 
   return (
-    <div className="avatar-picker" role="group" aria-label="Photo de profil">
+    <div className="avatar-picker" role="group" aria-label={t('Photo de profil')}>
       <div className="avatar-picker__current">
         <span className="avatar-picker__preview"><ProfileAvatar avatar={avatar} logoColor={logoColor} /></span>
         <Button variant="secondary" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((o) => !o)}>
-          Changer l'image
+          {t("Changer l'image")}
           {open
             ? <IconChevronUp size={14} className="avatar-picker__chevron" aria-hidden="true" />
             : <IconChevronDown size={14} className="avatar-picker__chevron" aria-hidden="true" />}
@@ -92,12 +93,12 @@ export function AvatarPicker({ avatar, logoColor, onPick }: {
           </div>
           <div className="avatar-picker__actions">
             <label className={`ui-btn ui-btn--secondary avatar-picker__import${reading ? ' is-busy' : ''}`}>
-              <IconImage size={18} /> {reading ? 'Lecture…' : 'Importer une image'}
+              <IconImage size={18} /> {reading ? t('Lecture…') : t('Importer une image')}
               <input ref={input} type="file" accept="image/*" hidden disabled={reading}
                 onChange={(e) => void importImage(e.target.files?.[0])} />
             </label>
             {avatar && (
-              <Button variant="ghost" onClick={() => onPick(null)}>Retirer</Button>
+              <Button variant="ghost" onClick={() => onPick(null)}>{t('Retirer')}</Button>
             )}
           </div>
           {error && <p className="avatar-picker__error" role="alert">{error}</p>}

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { t } from '../core/i18n';
 import { HelpText, HelpToggle } from './Help';
+import { tRich } from './tRich';
 import Button from './ui/Button';
 import Dialog from './ui/Dialog';
 import { ATHLETE_NAME_MAX, type AthleteProfile } from '../library/athleteProfile';
@@ -76,20 +78,22 @@ function ProfilePrompt({ otherCardShown, onDecided }: { otherCardShown: boolean;
   );
 
   return (
-    <Dialog title="Votre profil" onClose={close} className="profile-prompt">
+    <Dialog title={t('Votre profil')} onClose={close} className="profile-prompt">
       <p className="profile-prompt__intro">
-        Pour la page Profil et la FC max estimée. Tout se change ensuite dans <Link to="/parametres" onClick={close}>Réglages</Link> › Pratiquant.
+        {tRich('Pour la page Profil et la FC max estimée. Tout se change ensuite dans <lien>Réglages</lien> › Pratiquant.', undefined, {
+          lien: (children) => <Link to="/parametres" onClick={close}>{children}</Link>,
+        })}
       </p>
       <label className="profile-prompt__row">
-        <span className="profile-prompt__label">Nom ou pseudo<HelpToggle helpKey="accueil-profil:nom" label="Nom ou pseudo" /></span>
+        <span className="profile-prompt__label">{t('Nom ou pseudo')}<HelpToggle helpKey="accueil-profil:nom" label={t('Nom ou pseudo')} /></span>
         <input type="text" className="ui-field ui-field--s profile-prompt__text" value={draft.name} maxLength={ATHLETE_NAME_MAX}
-          placeholder="ex. Tom" autoComplete="nickname" onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          placeholder={t('ex. Tom')} autoComplete="nickname" onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
       </label>
-      <HelpText helpKey="accueil-profil:nom">En titre de la page Profil et au pied des images partagées.</HelpText>
-      {field('birthYear', 'Année de naissance', '', 'ex. 1985', 'Pour la dépense au repos, et la FC max estimée quand elle n\'est pas saisie.')}
+      <HelpText helpKey="accueil-profil:nom">{t('En titre de la page Profil et au pied des images partagées.')}</HelpText>
+      {field('birthYear', t('Année de naissance'), '', t('ex. 1985'), t("Pour la dépense au repos, et la FC max estimée quand elle n'est pas saisie."))}
       <div className="profile-prompt__actions">
-        <Button variant="ghost" onClick={close}>Plus tard</Button>
-        <Button variant="primary" onClick={save}>Enregistrer</Button>
+        <Button variant="ghost" onClick={close}>{t('Plus tard')}</Button>
+        <Button variant="primary" onClick={save}>{t('Enregistrer')}</Button>
       </div>
     </Dialog>
   );

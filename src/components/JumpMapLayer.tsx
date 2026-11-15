@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { jumpTrackSpan, type SessionJump } from '../core/jumps';
+import { t } from '../core/i18n';
 import { formatTimeOfDay, formatDecimal } from '../core/units';
 import HighlightSpan from './HighlightSpan';
 import { HIGHLIGHT_PODIUM_COLORS, HIGHLIGHT_SHOWN_COLOR } from './highlightColors';
@@ -31,7 +32,9 @@ function JumpMapLayer({ track, jumps, shownJump, podiumShown }: {
           const start = track[span.start];
           return (
             <HighlightSpan key={`jump-${jump.takeoffMs}`} path={path} start={[start.lat, start.lon]} color={color}>
-              Saut de {formatTimeOfDay(jump.takeoffMs)} · {formatDecimal(jump.heightM, 2)} m · {formatDecimal(jump.flightS, 2)} s de vol
+              {t('Saut de {time} · {height} m · {flight} s de vol', {
+                time: formatTimeOfDay(jump.takeoffMs), height: formatDecimal(jump.heightM, 2), flight: formatDecimal(jump.flightS, 2),
+              })}
             </HighlightSpan>
           );
         })}

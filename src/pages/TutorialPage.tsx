@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
+import { t } from '../core/i18n';
 import LessonIcon from '../components/LessonIcon';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
@@ -31,19 +32,19 @@ function TutorialPage() {
 
   return (
     <div className="ui-page ui-page--backdrop">
-      <PageHeader title={lesson.title} back={{ to: '/tutoriels', label: 'Toutes les leçons' }}
-        subtitle={`Leçon ${at + 1} sur ${order.length}`} />
+      <PageHeader title={lesson.title} back={{ to: '/tutoriels', label: t('Toutes les leçons') }}
+        subtitle={t('Leçon {n} sur {total}', { n: at + 1, total: order.length })} />
       <Card className="tutorial-lesson">
         <div className="tutorial-lesson__head">
           <span className="tutorial-icon" aria-hidden="true"><LessonIcon icon={lesson.icon} size={18} /></span>
           <p className="tutorial-card__hook">{lesson.hook}</p>
         </div>
         {lesson.body.map((text) => <p key={text}>{text}</p>)}
-        <Link to={lesson.target} className="ui-btn ui-btn--primary tutorial-lesson__try">Essayer</Link>
+        <Link to={lesson.target} className="ui-btn ui-btn--primary tutorial-lesson__try">{t('Essayer')}</Link>
       </Card>
-      <nav className="tutorial-nav" aria-label="Leçons">
-        {previous ? <Link to={`/tutoriels/${previous.id}`} className="ui-btn ui-btn--ghost">Leçon précédente</Link> : <span />}
-        {next && <Link to={`/tutoriels/${next.id}`} className="ui-btn ui-btn--ghost">Leçon suivante</Link>}
+      <nav className="tutorial-nav" aria-label={t('Leçons')}>
+        {previous ? <Link to={`/tutoriels/${previous.id}`} className="ui-btn ui-btn--ghost">{t('Leçon précédente')}</Link> : <span />}
+        {next && <Link to={`/tutoriels/${next.id}`} className="ui-btn ui-btn--ghost">{t('Leçon suivante')}</Link>}
       </nav>
     </div>
   );

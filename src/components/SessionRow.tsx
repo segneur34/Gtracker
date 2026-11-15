@@ -1,5 +1,4 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { plural } from '../core/basics';
 import { weekdayDayMonthYear } from '../core/calendar';
 import type { Activity } from '../core/activities';
 import { sportFamily, sportTreatment, type SportFamily } from '../core/sportProfiles';
@@ -20,7 +19,7 @@ import SessionPreviewMap from './SessionPreviewMap';
 import SessionRenameField from './SessionRenameField';
 import Button from './ui/Button';
 import MoreMenu from './ui/MoreMenu';
-import { dateLocale } from '../core/i18n';
+import { dateLocale, t, tn } from '../core/i18n';
 import './SessionRow.css';
 
 /** Marge de la ligne à l'écran pour la file des lieux : aucune, seules les lignes vues comptent. */
@@ -36,18 +35,18 @@ const rowStats =(session: LibrarySession, activity: Activity | null): string[] =
   const stats = [formatDuration(summary.endMs - summary.startMs), formatDistanceAuto(summary.distanceM, distanceUnit)];
   if (activity === null) return stats;
   if (sportTreatment(activity.base) === 'voile') {
-    stats.push(`max ${formatSpeed(summary.maxSpeedMs, effectiveSpeedUnit(activity))}`);
-    if (summary.maneuverCount !== undefined) stats.push(plural(summary.maneuverCount, 'manœuvre'));
+    stats.push(t('max {speed}', { speed: formatSpeed(summary.maxSpeedMs, effectiveSpeedUnit(activity)) }));
+    if (summary.maneuverCount !== undefined) stats.push(tn(summary.maneuverCount, '{n} manœuvre', '{n} manœuvres'));
   } else if (sportTreatment(activity.base) === 'surf') {
     // Vagues, plus longue vague ; sur foil, le plus long vol.
-    if (summary.waveCount !== undefined) stats.push(`${summary.waveCount} vague${summary.waveCount > 1 ? 's' : ''}`);
-    if (summary.longestWaveM != null) stats.push(`plus longue ${Math.round(summary.longestWaveM)} m`);
-    if (summary.longestFlightS != null) stats.push(`vol ${formatShortDuration(summary.longestFlightS)}`);
+    if (summary.waveCount !== undefined) stats.push(tn(summary.waveCount, '{n} vague', '{n} vagues'));
+    if (summary.longestWaveM != null) stats.push(t('plus longue {m} m', { m: Math.round(summary.longestWaveM) }));
+    if (summary.longestFlightS != null) stats.push(t('vol {duration}', { duration: formatShortDuration(summary.longestFlightS) }));
   } else {
     if (summary.movingTimeS && summary.distanceM > 0) {
       stats.push(formatSpeed(summary.distanceM / summary.movingTimeS, effectiveSpeedUnit(activity)));
     }
-    if (summary.elevationGainM !== null) stats.push(`D+ ${Math.round(summary.elevationGainM)} m`);
+    if (summary.elevationGainM !== null) stats.push(t('D+ {m} m', { m: Math.round(summary.elevationGainM) }));
   }
   return stats;
 };
@@ -153,7 +152,7 @@ const SessionRow = memo(function SessionRow({
     onAskDelete(session.file);
   };
 
-  const activityLabel = activity ? activity.name : 'À classer';
+  const activityLabel = activity ? activity.name : t('À classer');
   const date = `${weekdayDayMonthYear(startMs)} · ${formatTime(startMs)}`;
   // Sous un nom donné, l'activité reste écrite à côté de la date ; le nom calculé la porte déjà.
   const named = customName(record) !== null;
@@ -174,11 +173,11 @@ const SessionRow = memo(function SessionRow({
         </button>
         <SessionPreviewMap session={session} activity={activity} family={family} folderLabel={folderLabel} onOpen={open} />
         {menu && !session.readOnly && (
-          <MoreMenu label="Plus d'actions sur la session">
-            {unclassified && <Button size="s" variant="ghost" onClick={startClassify}>Classer…</Button>}
-            <Button size="s" variant="ghost" onClick={startRename}>Renommer</Button>
-            <Button size="s" variant="ghost" onClick={startPlace}>Lieu</Button>
-            <Button size="s" variant="ghost" onClick={askDelete}>Supprimer</Button>
+          <MoreMenu label={t("Plus d'actions sur la session")}>
+            {unclassified && <Button size="s" variant="ghost" onClick={startClassify}>{t('Classer…')}</Button>}
+            <Button size="s" variant="ghost" onClick={startRename}>{t('Renommer')}</Button>
+            <Button size="s" variant="ghost" onClick={startPlace}>{t('Lieu')}</Button>
+            <Button size="s" variant="ghost" onClick={askDelete}>{t('Supprimer')}</Button>
           </MoreMenu>
         )}
       </div>
@@ -187,8 +186,8 @@ const SessionRow = memo(function SessionRow({
           activities={activities}
           value={null}
           heading={sheet === 'open'
-            ? { title: 'Quelle activité ?', hint: "Le fichier ne la dit pas : choisissez-la avant l'analyse. Elle reste dans la fiche de la session." }
-            : { title: 'Classer la session', hint: 'Le fichier ne dit pas son activité : choisissez-la. Elle reste dans la fiche de la session.' }}
+            ? { title: t('Quelle activité ?'), hint: t("Le fichier ne la dit pas : choisissez-la avant l'analyse. Elle reste dans la fiche de la session.") }
+            : { title: t('Classer la session'), hint: t('Le fichier ne dit pas son activité : choisissez-la. Elle reste dans la fiche de la session.') }}
           onChoose={classify}
           onClose={() => setSheet(null)} />
       )}
@@ -207,9 +206,9 @@ const SessionRow = memo(function SessionRow({
       )}
       {confirming && !session.readOnly && (
         <div className="lib-row__actions">
-          <span className="lib-row__confirm">Supprimer cette session de la mémoire ?</span>
-          <Button size="s" variant="danger" onClick={() => void removeSession(session.file)}>Confirmer</Button>
-          <Button size="s" variant="ghost" onClick={onCancelDelete}>Annuler</Button>
+          <span className="lib-row__confirm">{t('Supprimer cette session de la mémoire ?')}</span>
+          <Button size="s" variant="danger" onClick={() => void removeSession(session.file)}>{t('Confirmer')}</Button>
+          <Button size="s" variant="ghost" onClick={onCancelDelete}>{t('Annuler')}</Button>
         </div>
       )}
     </li>

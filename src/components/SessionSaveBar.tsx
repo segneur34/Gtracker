@@ -1,5 +1,7 @@
 import type { useSessionDraft } from '../hooks/useSessionDraft';
+import { t } from '../core/i18n';
 import Button from './ui/Button';
+import { tRich } from './tRich';
 
 interface SessionSaveBarProps {
   draft: ReturnType<typeof useSessionDraft>;
@@ -21,14 +23,14 @@ function SessionSaveBar({ draft, kept }: SessionSaveBarProps) {
     <div className={`ui-savebar${draft.dirty ? ' ui-savebar--dirty' : ''}`}>
       {draft.dirty ? (
         <>
-          <span><strong>Non enregistré</strong> : {draft.changedText}.</span>
+          <span>{tRich('<strong>Non enregistré</strong> : {changed}.', { changed: draft.changedText })}</span>
           <span className="ui-savebar__actions">
-            <Button onClick={draft.cancel}>Annuler</Button>
-            <Button variant="primary" onClick={draft.save}>Enregistrer la session</Button>
+            <Button onClick={draft.cancel}>{t('Annuler')}</Button>
+            <Button variant="primary" onClick={draft.save}>{t('Enregistrer la session')}</Button>
           </span>
         </>
       ) : (
-        <span>Session enregistrée : {kept}.</span>
+        <span>{t('Session enregistrée : {kept}.', { kept })}</span>
       )}
     </div>
   );

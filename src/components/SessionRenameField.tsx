@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { t } from '../core/i18n';
 import Button from './ui/Button';
 
 /**
@@ -23,16 +24,16 @@ export default function SessionRenameField({ value, onChange, onSave, onCancel, 
         value={value}
         autoFocus
         maxLength={80}
-        placeholder="Nom de la session"
-        aria-label="Nom de la session"
+        placeholder={t('Nom de la session')}
+        aria-label={t('Nom de la session')}
         style={style}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') onSave();
           else if (e.key === 'Escape') onCancel();
         }} />
-      <Button size="s" onClick={onSave}>Valider</Button>
-      <Button size="s" variant="ghost" onClick={onCancel}>Annuler</Button>
+      <Button size="s" onClick={onSave}>{t('Valider')}</Button>
+      <Button size="s" variant="ghost" onClick={onCancel}>{t('Annuler')}</Button>
     </>
   );
 }

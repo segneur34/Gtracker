@@ -1,5 +1,6 @@
 import type { ChangeEvent } from 'react';
 import { canImportSessions, importFiles, importFromFolder, useLibraryFields } from '../hooks/useSessionLibrary';
+import { t } from '../core/i18n';
 import { NO_FOLDER_IMPORT_MESSAGE } from '../platform/memoryFolder';
 import { isNativeApp } from '../platform/runtime';
 import { IconFile } from './icons';
@@ -20,7 +21,7 @@ function ImportButtons({ gpx = true }: { gpx?: boolean }) {
   const noFolder = library.status === 'unavailable' || library.status === 'needs-permission';
   // Un `label` porte le sélecteur de fichiers : il ne connaît pas `disabled`, d'où la classe.
   const labelClass = `ui-btn ui-btn--secondary${off ? ' ui-btn--off' : ''}`;
-  const folderText = !gpx && library.importing ? 'Import en cours…' : "Ajouter les sessions d'un dossier";
+  const folderText = !gpx && library.importing ? t('Import en cours…') : t("Ajouter les sessions d'un dossier");
 
   const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files ? [...event.target.files] : [];
@@ -34,7 +35,7 @@ function ImportButtons({ gpx = true }: { gpx?: boolean }) {
       {gpx && (
         <label className={labelClass}>
           <IconFile size={18} />
-          {library.importing ? 'Import en cours…' : 'Importer des GPX ou FIT'}
+          {library.importing ? t('Import en cours…') : t('Importer des GPX ou FIT')}
           {/* Sur le téléphone, sans filtre : le sélecteur d'Android attend des types de fichiers et risque de griser tout devant une liste d'extensions. */}
           <input type="file" accept={isNativeApp() ? undefined : '.gpx,.fit'} multiple hidden disabled={off} onChange={handleFiles} />
         </label>

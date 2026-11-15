@@ -1,3 +1,4 @@
+import { t } from '../core/i18n';
 import { plainError } from '../platform/errorText';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useBeltLive } from '../hooks/useBeltLive';
@@ -18,7 +19,7 @@ const HOLDER = 'reglages';
 /** Force du signal, en dBm, au-dessus de laquelle un appareil est dit « proche », puis « à portée » ; en dessous, « loin ». */
 const SIGNAL_NEAR_DBM = -60;
 const SIGNAL_IN_RANGE_DBM = -80;
-const signalLabel = (rssi: number): string => (rssi >= SIGNAL_NEAR_DBM ? 'proche' : rssi >= SIGNAL_IN_RANGE_DBM ? 'à portée' : 'loin');
+const signalLabel = (rssi: number): string => (rssi >= SIGNAL_NEAR_DBM ? t('proche') : rssi >= SIGNAL_IN_RANGE_DBM ? t('à portée') : t('loin'));
 
 /**
  * Bloc « Capteurs » de Réglages : les ceintures et montres retenues sur ce
@@ -61,7 +62,7 @@ function HeartRateBeltSettings() {
   }, []);
 
   if (!heartRateSupported()) {
-    return <p className="settings-block__intro">Sur l'application Android seulement.</p>;
+    return <p className="settings-block__intro">{t("Sur l'application Android seulement.")}</p>;
   }
 
   /** Relit la liste et l'appareil actif, après un changement. */
@@ -82,7 +83,7 @@ function HeartRateBeltSettings() {
         setBluetoothOff(false);
       }
     } catch (err) {
-      if (alive.current && searchGeneration.current === mine) setError(`Recherche impossible : ${plainError(err, 'erreur inconnue')}.`);
+      if (alive.current && searchGeneration.current === mine) setError(t('Recherche impossible : {error}.', { error: plainError(err, t('erreur inconnue')) }));
     } finally {
       if (alive.current && searchGeneration.current === mine) setScanning(false);
     }
@@ -127,7 +128,7 @@ function HeartRateBeltSettings() {
       setTesting(belt.address);
       setBluetoothOff(false);
     } catch (err) {
-      if (alive.current) setError(`Connexion impossible : ${plainError(err, 'erreur inconnue')}.`);
+      if (alive.current) setError(t('Connexion impossible : {error}.', { error: plainError(err, t('erreur inconnue')) }));
     }
   };
 
@@ -148,16 +149,16 @@ function HeartRateBeltSettings() {
   const searchMark = (belt: HeartRateBelt): string | null => {
     if (!found) return null;
     const mine = found.find((f) => f.address === belt.address);
-    if (mine) return `trouvée, ${signalLabel(mine.rssi)}`;
-    if (held === belt.address && state === 'connected') return "connectée, donc absente de la recherche : un appareil connecté ne s'annonce plus";
-    return 'pas trouvée : est-elle portée ?';
+    if (mine) return t('trouvée, {signal}', { signal: signalLabel(mine.rssi) });
+    if (held === belt.address && state === 'connected') return t("connectée, donc absente de la recherche : un appareil connecté ne s'annonce plus");
+    return t('pas trouvée : est-elle portée ?');
   };
 
   return (
     <>
-      <SettingRow label="Ceintures et montres" helpKey="capteurs:ceinture"
-        help="Ceinture ou montre qui diffuse sa fréquence cardiaque en Bluetooth Smart, sans appairage ni application de sa marque : portez-la, électrodes humidifiées, puis « Ajouter ». L'application s'en souvient de plusieurs et n'en lit qu'une à la fois, celle « utilisée au prochain départ » : « Utiliser » la change ici, « Changer » à la page Enregistrer. Elle est proposée à l'enregistrement des activités où « Ceinture cardio » est cochée.">
-        {belts.length === 0 && <span className="settings-sports__mark">aucune</span>}
+      <SettingRow label={t('Ceintures et montres')} helpKey="capteurs:ceinture"
+        help={t("Ceinture ou montre qui diffuse sa fréquence cardiaque en Bluetooth Smart, sans appairage ni application de sa marque : portez-la, électrodes humidifiées, puis « Ajouter ». L'application s'en souvient de plusieurs et n'en lit qu'une à la fois, celle « utilisée au prochain départ » : « Utiliser » la change ici, « Changer » à la page Enregistrer. Elle est proposée à l'enregistrement des activités où « Ceinture cardio » est cochée.")}>
+        {belts.length === 0 && <span className="settings-sports__mark">{t('aucune')}</span>}
       </SettingRow>
       {belts.map((b, i) => {
         const isActive = active?.address === b.address;
@@ -170,21 +171,21 @@ function HeartRateBeltSettings() {
               <span className="settings-row__label">{labels[i]}</span>
               <div className="settings-sports__pair">
                 {usedByRecording
-                  ? <span className="settings-sports__mark">utilisée par l'enregistrement</span>
-                  : isActive && <span className="settings-sports__mark">utilisée au prochain départ</span>}
+                  ? <span className="settings-sports__mark">{t("utilisée par l'enregistrement")}</span>
+                  : isActive && <span className="settings-sports__mark">{t('utilisée au prochain départ')}</span>}
                 {mark && <span className="settings-sports__mark" title={signal === undefined ? undefined : `${signal} dBm`}>{mark}</span>}
-                {!isActive && <Button size="s" disabled={busy} onClick={() => choose(b)}>Utiliser</Button>}
+                {!isActive && <Button size="s" disabled={busy} onClick={() => choose(b)}>{t('Utiliser')}</Button>}
                 <Button size="s" disabled={busy && testing !== b.address && held !== null && held !== b.address}
                   onClick={() => (testing === b.address ? stopTest() : void startTest(b))}>
-                  {testing === b.address ? "Arrêter l'essai" : 'Essayer'}
+                  {testing === b.address ? t("Arrêter l'essai") : t('Essayer')}
                 </Button>
-                <Button size="s" disabled={busy} onClick={() => forget(b)}>Oublier</Button>
+                <Button size="s" disabled={busy} onClick={() => forget(b)}>{t('Oublier')}</Button>
               </div>
             </div>
             {statusAddress === b.address && (
-              <SettingRow sub label="État" helpKey="capteurs:etat"
-                help="Connectée par l'essai ou par un enregistrement ; une recherche dit aussi si chaque appareil retenu est à portée.">
-                <BeltStatus state={state} bpm={live.bpm} offText={bluetoothOff ? 'Bluetooth éteint' : null} />
+              <SettingRow sub label={t('État')} helpKey="capteurs:etat"
+                help={t("Connectée par l'essai ou par un enregistrement ; une recherche dit aussi si chaque appareil retenu est à portée.")}>
+                <BeltStatus state={state} bpm={live.bpm} offText={bluetoothOff ? t('Bluetooth éteint') : null} />
               </SettingRow>
             )}
           </Fragment>
@@ -192,18 +193,18 @@ function HeartRateBeltSettings() {
       })}
       <div className="settings-row settings-row--sub">
         <div className="settings-sports__pair">
-          <Button size="s" disabled={scanning} onClick={() => void search()}>{scanning ? 'Recherche…' : 'Ajouter'}</Button>
-          {scanning && <Button size="s" onClick={cancelSearch}>Annuler</Button>}
+          <Button size="s" disabled={scanning} onClick={() => void search()}>{scanning ? t('Recherche…') : t('Ajouter')}</Button>
+          {scanning && <Button size="s" onClick={cancelSearch}>{t('Annuler')}</Button>}
         </div>
       </div>
       {found && (
         <div className="settings-row settings-row--sub">
-          <span className="settings-row__label">À ajouter</span>
+          <span className="settings-row__label">{t('À ajouter')}</span>
           <div className="settings-sports__pair">
             {others.length === 0
-              ? <span className="settings-sports__mark">aucun nouvel appareil : est-il porté, et le Bluetooth allumé ?</span>
+              ? <span className="settings-sports__mark">{t('aucun nouvel appareil : est-il porté, et le Bluetooth allumé ?')}</span>
               : others.map((f) => (
-                <Button size="s" key={f.address} title={`${f.rssi} dBm : l'ajouter`} onClick={() => add(f)}>
+                <Button size="s" key={f.address} title={t("{rssi} dBm : l'ajouter", { rssi: f.rssi })} onClick={() => add(f)}>
                   {f.name} · {signalLabel(f.rssi)}
                 </Button>
               ))}

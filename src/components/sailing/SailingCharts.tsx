@@ -6,6 +6,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { ReferenceLine } from 'recharts';
 import type { SailingTab } from '../../core/analysisTabs';
+import { t } from '../../core/i18n';
 import type { ChartZoom, ChartZoomSource } from '../../hooks/useChartZoom';
 import type { useAnalysisHeart } from '../../hooks/useAnalysisHeart';
 import type { SailingChartRows } from '../../hooks/useSailingChartRows';
@@ -119,13 +120,13 @@ export function SailingCompanionCharts({
             <>
               {folds.vitesse && (
                 <>
-                  <HoverReadout line read={readers.readSpeed(z)} label="Vitesse" color={SAILING_SPEED_COLOR} />
+                  <HoverReadout line read={readers.readSpeed(z)} label={t('Vitesse')} color={SAILING_SPEED_COLOR} />
                   <SailingSpeedChart rows={rows} z={z} timeX={timeX} markLines={markLines} onShowOnMap={() => onShowOnMap('graphiques')} style={COMPANION_CHART_STYLE} />
                 </>
               )}
               {heartChartShown && folds.fc && (
                 <>
-                  <HoverReadout line read={readers.readHeart(z)} label="FC" color={HEART_RATE_COLOR} />
+                  <HoverReadout line read={readers.readHeart(z)} label={t('FC')} color={HEART_RATE_COLOR} />
                   <SailingHeartChart rows={rows} z={z} timeX={timeX} zones={zones} showReset={!folds.vitesse} hrMarkLines={hrMarkLines}
                     onShowOnMap={() => onShowOnMap('graphiques')} style={COMPANION_CHART_STYLE} />
                 </>
@@ -139,7 +140,7 @@ export function SailingCompanionCharts({
         <ZoomView zoom={chartZoom}>
           {(z) => (
             <>
-              <HoverReadout line read={readers.windReadout(z)} label="Vent" color={WIND_COLOR} />
+              <HoverReadout line read={readers.windReadout(z)} label={t('Vent')} color={WIND_COLOR} />
               <SailingWindChart rows={rows} z={z} timeX={timeX} markLines={markLines} onShowOnMap={() => onShowOnMap('vent')} style={COMPANION_CHART_STYLE} />
             </>
           )}
@@ -150,7 +151,7 @@ export function SailingCompanionCharts({
         <ZoomView zoom={chartZoom}>
           {(z) => (
             <>
-              <HoverReadout line read={readers.readVmg(z)} label="VMG" color={VMG_COLOR} />
+              <HoverReadout line read={readers.readVmg(z)} label={t('VMG')} color={VMG_COLOR} />
               <SailingVmgChart rows={rows} z={z} timeX={timeX} markLines={markLines} onShowOnMap={() => onShowOnMap('vmg')} style={COMPANION_CHART_STYLE} />
             </>
           )}

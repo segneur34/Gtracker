@@ -4,16 +4,17 @@
  * de `platform/permissions.ts`, la version vue en dernier de l'appareil.
  */
 
+import { t } from '../core/i18n';
 import type { PermissionKey, PermissionState, PermissionsStatus } from '../core/domainTypes';
 
 export type { PermissionKey, PermissionState, PermissionsStatus };
 
 /** Nom de chaque autorisation, en clair. */
 export const PERMISSION_LABEL: Record<PermissionKey, string> = {
-  location: 'Position',
-  notifications: 'Notifications',
-  battery: 'Batterie sans restriction',
-  bluetooth: 'Bluetooth',
+  location: t('Position'),
+  notifications: t('Notifications'),
+  battery: t('Batterie sans restriction'),
+  bluetooth: t('Bluetooth'),
 };
 
 /** Position, notifications et batterie toujours ; le Bluetooth seulement si une ceinture est retenue. */

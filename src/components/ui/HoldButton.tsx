@@ -4,7 +4,7 @@ import { useLongPress } from '../../hooks/useLongPress';
 import { useTransientValue } from '../../hooks/useTransientValue';
 import Button from './Button';
 import HoldDial from './HoldDial';
-import { dateLocale } from '../../core/i18n';
+import { dateLocale, t } from '../../core/i18n';
 
 /** Carré rouge de l'arrêt, dans le grand cadran. */
 const STOP_ICON = <span className="ui-record-dot ui-record-dot--stop" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />;
@@ -18,7 +18,7 @@ const STOP_ICON = <span className="ui-record-dot ui-record-dot--stop" style={{ w
  */
 function HoldButton({
   onHold, getHoldMs, label, lead, dialTitle, color = 'var(--recording)', icon = STOP_ICON, disabled = false, size, style,
-  action = 'arrêter', ariaLabel, keepMenuOpen = false,
+  action = t('arrêter'),ariaLabel, keepMenuOpen = false,
 }: {
   onHold: () => void;
   /** Lue au rendu et à chaque appui : un réglage changé vaut au retour sur la page. */
@@ -60,10 +60,10 @@ function HoldButton({
       <Button variant="danger" size={size} className="ui-btn--hold" style={style} disabled={disabled} aria-label={ariaLabel}
         data-keep-open={keepMenuOpen ? '' : undefined} {...handlers} onClick={onClick}>
         {lead}
-        {hint ? `Maintenir ${holdS} s pour ${action}` : label}
+        {hint ? t('Maintenir {holdS} s pour {action}', { holdS, action }) : label}
       </Button>
       {pressingMs !== null && createPortal(
-        <HoldDial pressMs={pressingMs} color={color} icon={icon} title={dialTitle} hint="Maintenez le bouton" />,
+        <HoldDial pressMs={pressingMs} color={color} icon={icon} title={dialTitle} hint={t('Maintenez le bouton')} />,
         document.body
       )}
     </>

@@ -24,9 +24,9 @@ import SpeedGradientLegend from '../components/SpeedGradientLegend';
 import SessionThresholdField from '../components/SessionThresholdField';
 import { SessionColorRangeField } from '../components/SpeedRangeEditor';
 import TrackSpanLayer, { type TrackSpanShown } from '../components/TrackSpanLayer';
-import { pumpingHighlightSpans } from '../components/pumpingHighlight';
+import { PUMPING_OFF_NOTE, pumpingHighlightSpans } from '../components/pumpingHighlight';
 import { FlightsPanel, PumpingPanel, type FlightColumn } from '../components/FlightPumpingPanel';
-import { PUMPING_OFF_NOTE } from '../components/pumpingHighlight';
+import { t } from '../core/i18n';
 import { tdStyle, thStyle } from '../components/tableStyle';
 import TopsPanel, { TopsHighlight } from '../components/TopsPanel';
 import HeartRateChart from '../components/HeartRateChart';
@@ -111,21 +111,21 @@ const SENSORS_OFF: { status: PumpingStatus; error: string | null; recording: nul
 
 /** Couleurs de la répartition du temps (données, en dur) : glisse, rame, attente, sans signal. */
 const PHASE_COLORS: Record<SurfPhase, string> = { glisse: '#1e88e5', rame: '#8d6e63', attente: '#bdbdbd', trou: '#eceff1' };
-const PHASE_LABELS: Record<SurfPhase, string> = { glisse: 'sur la vague', rame: 'rame', attente: 'attente', trou: 'sans signal' };
+const PHASE_LABELS: Record<SurfPhase, string> = { glisse: t('sur la vague'), rame: t('rame'), attente: t('attente'), trou: t('sans signal') };
 /** Bandes des vagues et des vols sur le graphe de vitesse. */
 const WAVE_BAND_COLOR = '#1e88e5';
 const FLIGHT_BAND_COLOR = '#7e57c2';
 
 type WaveSort = 'ordre' | 'distance' | 'vitesse' | 'duree';
-const WAVE_SORT_LABEL: Record<WaveSort, string> = { ordre: 'Ordre', distance: 'Distance', vitesse: 'Vitesse', duree: 'Durée' };
+const WAVE_SORT_LABEL: Record<WaveSort, string> = { ordre: t('Ordre'), distance: t('Distance'), vitesse: t('Vitesse'), duree: t('Durée') };
 
 
 /** Colonnes des vols propres au surf : vagues du vol, temps de vol hors des vagues vu par le GPS (ce n'est pas du pumping). */
 const SURF_FLIGHT_PODIUM_COLUMNS: FlightColumn<SurfFlight>[] = [
-  { header: 'Vagues', cell: (f) => f.waveCount },
-  { header: 'Hors vague', cell: (f) => formatShortDuration(f.pumpS) },
+  { header: t('Vagues'), cell: (f) => f.waveCount },
+  { header: t('Hors vague'), cell: (f) => formatShortDuration(f.pumpS) },
 ];
-const SURF_FLIGHT_ALL_COLUMNS: FlightColumn<SurfFlight>[] = [{ header: 'Vagues', cell: (f) => f.waveCount }];
+const SURF_FLIGHT_ALL_COLUMNS: FlightColumn<SurfFlight>[] = [{ header: t('Vagues'), cell: (f) => f.waveCount }];
 
 /** Bouton « Voir » d'une ligne de tableau : montre ou masque son passage sur la carte. */
 const ShowButton = ({ shown, onClick, disabled }: { shown: boolean; onClick: () => void; disabled?: boolean }) => (
@@ -191,6 +191,14 @@ function SurfModule() {
   // et à celle de l'onglet « vagues », pour les virages du gyroscope.
   const sensors = useSessionPumping(shownFile, (pumping && (open.vols || open.pumping)) || open.vagues);
   const pumpDetection = surfProfile?.pump ?? null;
+  /** Seuils de l'aide des onglets « vagues » et « rame », lus ici en texte : un nombre tiré du profil, passé tel quel à `t`, fait renoncer le compilateur React à mémoïser le composant. */
+  const cadenceMin = String(pumpDetection?.cadenceMinPerMin ?? 0);
+  const cadenceMax = String(pumpDetection?.cadenceMaxPerMin ?? 0);
+  const minWaveS = String(surfProfile?.surf.minWaveS ?? 0);
+  const minWaveM = String(surfProfile?.surf.minWaveM ?? 0);
+  const minWaitS = String(surfProfile?.surf.minWaitS ?? 0);
+  const turnMinDeg = String(surfProfile?.surf.turnMinDeg ?? 0);
+  const gyroMinDeg = String(surfProfile?.surf.gyroTurns.minDeg ?? 0);
   /** Capteurs vus du pumping : rien tant que Pumping est décoché, même lus pour les virages de l'onglet « vagues ». */
   const pumpSensors = pumping ? sensors : SENSORS_OFF;
   /** Onglet « pumping » : sur foil, pour un calcul qui le mesure, si la session a ses capteurs ; Pumping décoché, il le dit. */
@@ -235,23 +243,25 @@ function SurfModule() {
   );
   const mapBounds = useMemo(() => trackBounds(track), [track]);
 
+  const wavePct = summary && summary.totalS > 0 ? formatDecimal((summary.waveS / summary.totalS) * 100, 1) : '0';
+  const flightPct = summary && summary.totalS > 0 ? formatDecimal((summary.flightS / summary.totalS) * 100, 1) : '0';
   /** Chiffres de l'onglet « général », proposés aussi pour l'image de partage. */
   const generalStats: ShareStat[] = summary ? [
-    { key: 'totalTime', label: 'Durée de la session', value: formatDuration(summary.totalS * 1000) },
-    { key: 'waveTime', label: `Sur la vague (${summary.totalS > 0 ? formatDecimal((summary.waveS / summary.totalS) * 100, 1) : '0'} %)`, value: formatShortDuration(summary.waveS) },
-    { key: 'waves', label: 'Vagues', value: `${summary.waveCount}${summary.wavesPerHour !== null && summary.waveCount > 0 ? ` (${formatDecimal(summary.wavesPerHour, 1)} / h)` : ''}` },
-    { key: 'averageWave', label: 'Distance moyenne', value: orDash(summary.avgWaveDistanceM, (m) => `${Math.round(m)} m`) },
-    { key: 'longestWave', label: 'Plus longue vague', value: orDash(summary.longestWaveM, (m) => `${Math.round(m)} m`) },
-    { key: 'maxSpeed', label: 'Vitesse max', value: orDash(summary.maxWaveSpeedMs, (v) => formatSpeed(v, speedUnit)) },
-    { key: 'waveSpeed', label: 'Moyenne sur la vague', value: orDash(summary.avgWaveSpeedMs, (v) => formatSpeed(v, speedUnit)) },
-    { key: 'paddleSpeed', label: 'Vitesse de rame', value: orDash(summary.paddleSpeedMs, (v) => formatSpeed(v, speedUnit)), title: 'Moyenne en mouvement, arrêts courts exclus' },
-    { key: 'return', label: 'Retour au pic (moyen)', value: orDash(summary.avgReturnS, formatShortDuration), title: "De la fin d'une vague à la première attente" },
+    { key: 'totalTime', label: t('Durée de la session'), value: formatDuration(summary.totalS * 1000) },
+    { key: 'waveTime', label: t('Sur la vague ({pct} %)', { pct: wavePct }), value: formatShortDuration(summary.waveS) },
+    { key: 'waves', label: t('Vagues'), value: `${summary.waveCount}${summary.wavesPerHour !== null && summary.waveCount > 0 ? ` (${formatDecimal(summary.wavesPerHour, 1)} / h)` : ''}` },
+    { key: 'averageWave', label: t('Distance moyenne'), value: orDash(summary.avgWaveDistanceM, (m) => `${Math.round(m)} m`) },
+    { key: 'longestWave', label: t('Plus longue vague'), value: orDash(summary.longestWaveM, (m) => `${Math.round(m)} m`) },
+    { key: 'maxSpeed', label: t('Vitesse max'), value: orDash(summary.maxWaveSpeedMs, (v) => formatSpeed(v, speedUnit)) },
+    { key: 'waveSpeed', label: t('Moyenne sur la vague'), value: orDash(summary.avgWaveSpeedMs, (v) => formatSpeed(v, speedUnit)) },
+    { key: 'paddleSpeed', label: t('Vitesse de rame'), value: orDash(summary.paddleSpeedMs, (v) => formatSpeed(v, speedUnit)), title: t('Moyenne en mouvement, arrêts courts exclus') },
+    { key: 'return', label: t('Retour au pic (moyen)'), value: orDash(summary.avgReturnS, formatShortDuration), title: t("De la fin d'une vague à la première attente") },
     ...(foil ? [
-      { key: 'longestFlight', label: 'Plus long vol', value: orDash(summary.longestFlightS, formatShortDuration) },
-      { key: 'flightTime', label: `Ratio de vol (${summary.totalS > 0 ? formatDecimal((summary.flightS / summary.totalS) * 100, 1) : '0'} %)`, value: formatShortDuration(summary.flightS) },
-      { key: 'wavesInFlight', label: 'Vagues en un vol', value: String(summary.maxWavesInFlight ?? '—'), title: 'Le plus de vagues reliées par un même vol' },
+      { key: 'longestFlight', label: t('Plus long vol'), value: orDash(summary.longestFlightS, formatShortDuration) },
+      { key: 'flightTime', label: t('Ratio de vol ({pct} %)', { pct: flightPct }), value: formatShortDuration(summary.flightS) },
+      { key: 'wavesInFlight', label: t('Vagues en un vol'), value: String(summary.maxWavesInFlight ?? '—'), title: t('Le plus de vagues reliées par un même vol') },
     ] : []),
-    { key: 'distance', label: 'Distance totale', value: formatDistance(totalDistanceM, distanceUnit) },
+    { key: 'distance', label: t('Distance totale'), value: formatDistance(totalDistanceM, distanceUnit) },
     ...heartRateShareStats(heart),
     // Appréciation, comme le résumé d'une fiche.
     ...shareExtraStats('surf', { rating: draft.edits.notes.rating }),
@@ -290,8 +300,8 @@ function SurfModule() {
   const speedCell = speedCellOf(speedUnit);
   /** Colonnes « Tous les vols » du GPS, sans pumping mesuré : temps et vitesse hors des vagues (unité de l'activité). */
   const surfFlightGpsColumns: FlightColumn<SurfFlight>[] = [
-    { header: 'Hors vague', cell: (f) => formatShortDuration(f.pumpS) },
-    { header: `Vitesse hors vague (${SPEED_UNIT_LABEL[speedUnit]})`, cell: (f) => speedCell(f.pumpSpeedMs) },
+    { header: t('Hors vague'), cell: (f) => formatShortDuration(f.pumpS) },
+    { header: t('Vitesse hors vague ({unit})', { unit: SPEED_UNIT_LABEL[speedUnit] }), cell: (f) => speedCell(f.pumpSpeedMs) },
   ];
 
   /** Point d'arrivée d'une remontée sur la carte : le pic (début de l'attente), sinon la glisse suivante. */
@@ -307,21 +317,23 @@ function SurfModule() {
       `${kind} ${s.n} · ${formatTimeOfDay(s.startMs)} · ${formatShortDuration(s.durationS)} · ${Math.round(s.distanceM)} m · max ${formatSpeed(s.maxSpeedMs, speedUnit)}`;
     if (waveShown === 'podium') {
       return [...waves].sort((a, b) => b.distanceM - a.distanceM).slice(0, 3)
-        .map((w, k) => ({ key: `vague-${w.n}`, start: w.start, end: w.end, color: HIGHLIGHT_PODIUM_COLORS[k], label: spanLabel('Vague', w) }));
+        .map((w, k) => ({ key: `vague-${w.n}`, start: w.start, end: w.end, color: HIGHLIGHT_PODIUM_COLORS[k], label: spanLabel(t('Vague'), w) }));
     }
     if (waveShown !== null) {
       const w = waves.find((x) => String(x.n) === waveShown);
-      return w ? [{ key: `vague-${w.n}`, start: w.start, end: w.end, color: HIGHLIGHT_SHOWN_COLOR, label: spanLabel('Vague', w) }] : [];
+      return w ? [{ key: `vague-${w.n}`, start: w.start, end: w.end, color: HIGHLIGHT_SHOWN_COLOR, label: spanLabel(t('Vague'), w) }] : [];
     }
     // Onglets « vols » et « pumping » : un vol, une série de coups, ou l'un des deux podiums (`PumpingHighlightKey`).
     const flightOrSeries = flightShown ?? pumpingShown;
-    if (flightOrSeries !== null) return pumpingHighlightSpans(flightOrSeries, flights, podiumFlights, pumpSeriesList, seriesPodium, (f) => spanLabel('Vol', f));
+    if (flightOrSeries !== null) return pumpingHighlightSpans(flightOrSeries, flights, podiumFlights, pumpSeriesList, seriesPodium, (f) => spanLabel(t('Vol'), f));
     if (returnShown !== null) {
       const r = returns.find((x) => String(x.after) === returnShown);
       if (!r) return [];
       const start = nearestIndexAtTime(track, r.startMs);
       // Sur foil, les remontées suivent les vols, numérotés comme eux.
-      const label = r.after === 0 ? 'Première sortie' : `Remontée après ${foil ? 'le vol' : 'la vague'} ${r.after}`;
+      const label = r.after === 0
+        ? t('Première sortie')
+        : foil ? t('Remontée après le vol {n}', { n: r.after }) : t('Remontée après la vague {n}', { n: r.after });
       return [{ key: `remontee-${r.after}`, start, end: returnEnd(r), color: HIGHLIGHT_SHOWN_COLOR, label: `${label} · ${formatTimeOfDay(r.startMs)}` }];
     }
     return [];
@@ -435,13 +447,13 @@ function SurfModule() {
                 <>
                   {speedShown && (
                     <>
-                      <HoverReadout line read={readSpeed(z)} label="Vitesse" color={SPEED_COLOR} />
+                      <HoverReadout line read={readSpeed(z)} label={t('Vitesse')} color={SPEED_COLOR} />
                       {speedChart(z, chartData, CHART_STYLE)}
                     </>
                   )}
                   {heart.present && graphFolds.open.fc && (
                     <>
-                      <HoverReadout line read={readHeart(z)} label="FC" color={HEART_RATE_COLOR} />
+                      <HoverReadout line read={readHeart(z)} label={t('FC')} color={HEART_RATE_COLOR} />
                       {heartChart(z, chartData, speedShown)}
                     </>
                   )}
@@ -469,19 +481,22 @@ function SurfModule() {
   );
 
   const unitLabel = SPEED_UNIT_LABEL[speedUnit];
-  const rideWord = foil ? 'vol' : 'vague';
+  const noWaveSpeed = formatSpeed(fromDisplaySpeed(foil ? waveThreshold : threshold, profile.thresholdUnit), speedUnit);
+  const speedSource = speedSourceText(gpx.hasDeviceSpeed, gpx.deviceSpeedUnit);
+  const hasCourse = track.some((p) => p.courseDeg !== undefined);
+  const rideWord = foil ? t('vol') : t('vague');
   const measuredReturns = returns.filter((r) => r.after > 0);
   const firstOut = returns.find((r) => r.after === 0) ?? null;
 
   return (
-    <AnalysisShell title="Analyse Surf" family="surf" backLabel="Sessions" file={gpx.fileName}
+    <AnalysisShell title={t('Analyse Surf')} family="surf" backLabel={t('Sessions')} file={gpx.fileName}
       share={{ segments: mapSegments, stats: generalStats }} error={sessionError} draft={draft} loadError={gpx.error}
       reading={reading}
       empty={!summary && !gpx.error && requestedFile === null}
       gearReminder={{
         activityId: activity.id, hasGearList, ready: shownFile !== null && draftRecord !== null,
         sessionHasGear: notesHaveGear(draft.edits.notes, gearFieldsFor(gearLabels)),
-        tabShown: sections.some((s) => s.key === 'notes'), tabLabel: 'matériel et notes',
+        tabShown: sections.some((s) => s.key === 'notes'), tabLabel: t('matériel et notes'),
         covered: mapExpanded, onAdd: () => reveal('notes'),
       }}
       map={{
@@ -497,24 +512,26 @@ function SurfModule() {
         bounds: mapBounds,
         layers: mapLayers,
         defaultHeight: 480,
-        legend: track.length === 0 ? null : <SpeedGradientLegend unit={speedUnit} range={range} slowLabel="rame et attente" />,
+        legend: track.length === 0 ? null : <SpeedGradientLegend unit={speedUnit} range={range} slowLabel={t('rame et attente')} />,
       }}
       tabs={summary && analysis && surfProfile ? {
         sections, open, onToggle: toggle, onCloseAll: closeAll, advanced, accent: ACCENT, activityColor: activity.color, panels: (
           <>
             {open.general && (
               <ResizablePanel id={panelId('general')} style={ANALYSIS_PANEL_STYLE}>
-                <PanelHeading label="Général" extra={<SessionDate track={gpx.track} />} open={open.general} onToggle={toggleOf('general')} />
+                <PanelHeading label={t('Général')} extra={<SessionDate track={gpx.track} />} open={open.general} onToggle={toggleOf('general')} />
                 <GeneralStats stats={overviewStats} />
                 {draft.edits.foil === null && (
                   <div className="ui-muted ui-text-xs ui-mt-8">
-                    {foil ? 'Sur foil' : 'Sans foil'}, supposé d'après l'activité : la session ne le dit pas. Il se règle dans l'onglet réglages.
+                    {foil
+                      ? t("Sur foil, supposé d'après l'activité : la session ne le dit pas. Il se règle dans l'onglet réglages.")
+                      : t("Sans foil, supposé d'après l'activité : la session ne le dit pas. Il se règle dans l'onglet réglages.")}
                   </div>
                 )}
                 {summary.totalS > 0 && (
                   <div className="ui-mt-12">
                     <div className="an-surf-bar"
-                      title="Répartition du temps de la session">
+                      title={t('Répartition du temps de la session')}>
                       {(Object.keys(PHASE_COLORS) as SurfPhase[]).map((phase) => {
                         const s = phase === 'glisse' ? summary.glisseS : phase === 'rame' ? summary.rameS : phase === 'attente' ? summary.attenteS : summary.trouS;
                         return s > 0 ? <span key={phase} style={{ width: `${(s / summary.totalS) * 100}%`, backgroundColor: PHASE_COLORS[phase] }} /> : null;
@@ -524,7 +541,7 @@ function SurfModule() {
                       {(Object.keys(PHASE_COLORS) as SurfPhase[]).map((phase) => {
                         const s = phase === 'glisse' ? summary.glisseS : phase === 'rame' ? summary.rameS : phase === 'attente' ? summary.attenteS : summary.trouS;
                         if (s <= 0) return null;
-                        const label = phase === 'glisse' && foil ? 'en vol' : PHASE_LABELS[phase];
+                        const label = phase === 'glisse' && foil ? t('en vol') : PHASE_LABELS[phase];
                         // Sans foil, la glisse est faite des vagues : son temps est déjà « Sur la vague » au-dessus,
                         // la légende ne le redit pas. Sur foil, « en vol » est une autre durée.
                         const repeated = phase === 'glisse' && !foil;
@@ -546,49 +563,51 @@ function SurfModule() {
             {open.vagues && (
               <ResizablePanel id={panelId('vagues')} style={ANALYSIS_PANEL_STYLE}>
                 <div className="ui-row-10 ui-center ui-wrap ui-mb-10">
-                  <PanelTitle label={`Vagues (${waves.length})`} open={open.vagues} onToggle={toggleOf('vagues')} helpKey="surf:vagues" />
+                  <PanelTitle label={t('Vagues ({n})', { n: waves.length })} open={open.vagues} onToggle={toggleOf('vagues')} helpKey="surf:vagues" />
                   <span className="ui-grow" />
                   {waves.length > 1 && (
                     <>
                       <label className="ui-text-xs ui-row-4 ui-center">
-                        Tri
-                        <SegmentedControl<WaveSort> label="Tri des vagues" accent={ACCENT} value={waveSort} onChange={setWaveSort}
+                        {t('Tri')}
+                        <SegmentedControl<WaveSort> label={t('Tri des vagues')} accent={ACCENT} value={waveSort} onChange={setWaveSort}
                           items={(Object.keys(WAVE_SORT_LABEL) as WaveSort[]).map((k) => ({ key: k, label: WAVE_SORT_LABEL[k] }))} />
                       </label>
                       <Button size="s" aria-pressed={waveShown === 'podium'} onClick={() => highlight.show('vagues', waveShown === 'podium' ? null : 'podium')}>
-                        {waveShown === 'podium' ? 'Masquer les 3 plus longues' : 'Les 3 plus longues'}
+                        {waveShown === 'podium' ? t('Masquer les 3 plus longues') : t('Les 3 plus longues')}
                       </Button>
                     </>
                   )}
                 </div>
                 <HelpText helpKey="surf:vagues" note>
                   {foil
-                    ? `Vague : un passage d'au moins ${surfProfile.surf.minWaveS} s au-dessus du seuil de vague en foil, pendant un vol.`
-                    : `Vague : au moins ${surfProfile.surf.minWaveS} s et ${surfProfile.surf.minWaveM} m au-dessus du seuil de vague.`}
+                    ? t("Vague : un passage d'au moins {s} s au-dessus du seuil de vague en foil, pendant un vol.", { s: minWaveS })
+                    : t('Vague : au moins {s} s et {m} m au-dessus du seuil de vague.', { s: minWaveS, m: minWaveM })}
                   {gyroTurns.size > 0
-                    ? <>{' '}Virages : comptés par le gyroscope du téléphone, chaque rotation du buste d'au moins {surfProfile.surf.gyroTurns.minDeg}°. * Vague sans capture : seuls les grands changements de direction (au moins {surfProfile.surf.turnMinDeg}°) vus par le GPS, valeur expérimentale.</>
-                    : <>{' '}* Virages : seuls les grands changements de direction (au moins {surfProfile.surf.turnMinDeg}°) se voient à une position par seconde ; un bottom turn ou un top turn bref peut échapper au GPS. Valeur expérimentale.</>}
+                    ? <>{' '}{t("Virages : comptés par le gyroscope du téléphone, chaque rotation du buste d'au moins {deg}°. * Vague sans capture : seuls les grands changements de direction (au moins {turn}°) vus par le GPS, valeur expérimentale.", { deg: gyroMinDeg, turn: turnMinDeg })}</>
+                    : <>{' '}{t('* Virages : seuls les grands changements de direction (au moins {turn}°) se voient à une position par seconde ; un bottom turn ou un top turn bref peut échapper au GPS. Valeur expérimentale.', { turn: turnMinDeg })}</>}
                 </HelpText>
                 {waves.length === 0 ? (
                   <div className="ui-muted">
-                    Aucune vague : rien n'a dépassé le seuil {foil ? 'de vague en foil' : 'de vague'} ({formatSpeed(fromDisplaySpeed(foil ? waveThreshold : threshold, profile.thresholdUnit), speedUnit)}) pendant {surfProfile.surf.minWaveS} s. Il se règle dans l'onglet réglages.
+                    {foil
+                      ? t("Aucune vague : rien n'a dépassé le seuil de vague en foil ({speed}) pendant {s} s. Il se règle dans l'onglet réglages.", { speed: noWaveSpeed, s: minWaveS })
+                      : t("Aucune vague : rien n'a dépassé le seuil de vague ({speed}) pendant {s} s. Il se règle dans l'onglet réglages.", { speed: noWaveSpeed, s: minWaveS })}
                   </div>
                 ) : (
                   <div className="ui-overflow-x">
                     <table className="ui-table">
                       <thead>
                         <tr className="ui-sunken">
-                          <th style={thStyle}>N°</th>
-                          <th style={thStyle}>Heure</th>
-                          <th style={thStyle}>Durée</th>
-                          <th style={thStyle}>Distance</th>
-                          <th style={thStyle}>Max ({unitLabel})</th>
-                          <th style={thStyle}>Moy.</th>
+                          <th style={thStyle}>{t('N°')}</th>
+                          <th style={thStyle}>{t('Heure')}</th>
+                          <th style={thStyle}>{t('Durée')}</th>
+                          <th style={thStyle}>{t('Distance')}</th>
+                          <th style={thStyle}>{t('Max ({unit})', { unit: unitLabel })}</th>
+                          <th style={thStyle}>{t('Moy.')}</th>
                           {gyroTurns.size > 0
-                            ? <th style={thStyle} title="Virages comptés par le gyroscope ; * : vague sans capture, grands changements de direction vus par le GPS">Virages</th>
-                            : <th style={thStyle} title="Grands changements de direction vus par le GPS">Virages*</th>}
-                          {foil && <th style={thStyle}>Vol</th>}
-                          <th style={thStyle}>Carte</th>
+                            ? <th style={thStyle} title={t('Virages comptés par le gyroscope ; * : vague sans capture, grands changements de direction vus par le GPS')}>{t('Virages')}</th>
+                            : <th style={thStyle} title={t('Grands changements de direction vus par le GPS')}>{t('Virages*')}</th>}
+                          {foil && <th style={thStyle}>{t('Vol')}</th>}
+                          <th style={thStyle}>{t('Carte')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -619,33 +638,35 @@ function SurfModule() {
 
             {open.rame && (
               <ResizablePanel id={panelId('rame')} style={ANALYSIS_PANEL_STYLE}>
-                <PanelHeading label="Rame et retour au pic" open={open.rame} onToggle={toggleOf('rame')} helpKey="surf:rame" />
+                <PanelHeading label={t('Rame et retour au pic')} open={open.rame} onToggle={toggleOf('rame')} helpKey="surf:rame" />
                 <HelpText helpKey="surf:rame" note>
-                  Retour au pic : de la fin {foil ? "d'un vol" : "d'une vague"} au début de la première attente (immobile au moins {surfProfile.surf.minWaitS} s) ; un arrêt plus court (canard, série) compte dans la rame.
-                  {' '}Remontée : distance à vol d'oiseau jusqu'au pic, divisée par ce temps. Rame : vitesse en mouvement.
+                  {foil
+                    ? t("Retour au pic : de la fin d'un vol au début de la première attente (immobile au moins {s} s) ; un arrêt plus court (canard, série) compte dans la rame.", { s: minWaitS })
+                    : t("Retour au pic : de la fin d'une vague au début de la première attente (immobile au moins {s} s) ; un arrêt plus court (canard, série) compte dans la rame.", { s: minWaitS })}
+                  {' '}{t("Remontée : distance à vol d'oiseau jusqu'au pic, divisée par ce temps. Rame : vitesse en mouvement.")}
                 </HelpText>
                 <div className="an-sheet__stats an-sheet__stats--always">
-                  <StatTile label="Vitesse de rame" value={orDash(summary.paddleSpeedMs, (v) => formatSpeed(v, speedUnit))} title="Moyenne en mouvement, arrêts courts exclus" />
-                  <StatTile label="Vitesse de remontée" value={orDash(summary.avgReturnSpeedMs, (v) => formatSpeed(v, speedUnit))} title="Distance à vol d'oiseau de la fin de la vague au pic, divisée par le temps du retour" />
-                  <StatTile label="Retour au pic (moyen)" value={orDash(summary.avgReturnS, formatShortDuration)} />
-                  <StatTile label="Meilleur retour" value={orDash(summary.bestReturnS, formatShortDuration)} />
-                  <StatTile label="Première sortie" value={orDash(summary.firstOutS, formatShortDuration)} title="Du premier mouvement à la première attente, marche sur la plage comprise" />
-                  <StatTile label={`${foil ? 'Vols' : 'Vagues'} enchaîné${foil ? 's' : 'es'}`} value={summary.chainedCount} title="Prise sans attente depuis la précédente : pas de retour au pic mesuré" />
-                  <StatTile label="Temps de rame" value={formatShortDuration(summary.rameS)} />
-                  <StatTile label="Temps d'attente" value={formatShortDuration(summary.attenteS)} />
+                  <StatTile label={t('Vitesse de rame')} value={orDash(summary.paddleSpeedMs, (v) => formatSpeed(v, speedUnit))} title={t('Moyenne en mouvement, arrêts courts exclus')} />
+                  <StatTile label={t('Vitesse de remontée')} value={orDash(summary.avgReturnSpeedMs, (v) => formatSpeed(v, speedUnit))} title={t("Distance à vol d'oiseau de la fin de la vague au pic, divisée par le temps du retour")} />
+                  <StatTile label={t('Retour au pic (moyen)')} value={orDash(summary.avgReturnS, formatShortDuration)} />
+                  <StatTile label={t('Meilleur retour')} value={orDash(summary.bestReturnS, formatShortDuration)} />
+                  <StatTile label={t('Première sortie')} value={orDash(summary.firstOutS, formatShortDuration)} title={t('Du premier mouvement à la première attente, marche sur la plage comprise')} />
+                  <StatTile label={foil ? t('Vols enchaînés') : t('Vagues enchaînées')} value={summary.chainedCount} title={t('Prise sans attente depuis la précédente : pas de retour au pic mesuré')} />
+                  <StatTile label={t('Temps de rame')} value={formatShortDuration(summary.rameS)} />
+                  <StatTile label={t("Temps d'attente")} value={formatShortDuration(summary.attenteS)} />
                 </div>
                 {(measuredReturns.length > 0 || firstOut) && (
                   <div className="ui-overflow-x ui-mt-10">
                     <table className="ui-table">
                       <thead>
                         <tr className="ui-sunken">
-                          <th style={thStyle}>Après</th>
-                          <th style={thStyle}>Retour</th>
-                          <th style={thStyle}>Distance</th>
-                          <th style={thStyle}>Remontée</th>
-                          <th style={thStyle}>Rame</th>
-                          <th style={thStyle}>Attente</th>
-                          <th style={thStyle}>Carte</th>
+                          <th style={thStyle}>{t('Après')}</th>
+                          <th style={thStyle}>{t('Retour')}</th>
+                          <th style={thStyle}>{t('Distance')}</th>
+                          <th style={thStyle}>{t('Remontée')}</th>
+                          <th style={thStyle}>{t('Rame')}</th>
+                          <th style={thStyle}>{t('Attente')}</th>
+                          <th style={thStyle}>{t('Carte')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -653,8 +674,8 @@ function SurfModule() {
                           const shown = returnShown === String(r.after);
                           return (
                             <tr key={r.after} className="ui-table__row">
-                              <td className="ui-cell-tight ui-cell--bold">{r.after === 0 ? 'départ' : `${rideWord} ${r.after}`}</td>
-                              <td style={tdStyle}>{r.returnS === null ? 'enchaîné' : formatShortDuration(r.returnS)}</td>
+                              <td className="ui-cell-tight ui-cell--bold">{r.after === 0 ? t('départ') : `${rideWord} ${r.after}`}</td>
+                              <td style={tdStyle}>{r.returnS === null ? t('enchaîné') : formatShortDuration(r.returnS)}</td>
                               <td style={tdStyle}>{r.straightM === null ? '—' : `${Math.round(r.straightM)} m`}</td>
                               <td style={tdStyle}>{orDash(r.returnSpeedMs, (v) => formatSpeed(v, speedUnit))}</td>
                               <td style={tdStyle}>{orDash(r.paddleSpeedMs, (v) => formatSpeed(v, speedUnit))}</td>
@@ -677,13 +698,14 @@ function SurfModule() {
                 <FlightsPanel
                   helpKey="surf:vols" open={open.vols} onToggle={toggleOf('vols')}
                   help={<>
-                    Vol : au-dessus du seuil de vol, d'une traite ; ses vagues sont ses passages au-dessus du seuil de vague en foil.
+                    {t("Vol : au-dessus du seuil de vol, d'une traite ; ses vagues sont ses passages au-dessus du seuil de vague en foil.")}
+                    {' '}
                     {flightPumping
-                      ? " Décollage : vitesse GPS quand les chocs de la planche sur l'eau cessent (expérimental) ; séries et temps pompé : ceux de l'onglet pumping."
-                      : " Hors vague : le temps du vol passé hors des vagues, vu par le GPS ; sans les capteurs, rien ne dit s'il est pompé."}
+                      ? t("Décollage : vitesse GPS quand les chocs de la planche sur l'eau cessent (expérimental) ; séries et temps pompé : ceux de l'onglet pumping.")
+                      : t("Hors vague : le temps du vol passé hors des vagues, vu par le GPS ; sans les capteurs, rien ne dit s'il est pompé.")}
                   </>}
                   flights={flights} podium={podiumFlights}
-                  extraFlightTiles={<StatTile label="Vagues en un vol" value={summary.maxWavesInFlight ?? '—'} />}
+                  extraFlightTiles={<StatTile label={t('Vagues en un vol')} value={summary.maxWavesInFlight ?? '—'} />}
                   pumping={flightPumping} pumpSummary={pumpSummary}
                   shown={flightShown} onShow={(key) => highlight.show('vols', key)} accent={ACCENT}
                   speedCell={speedCell} unitLabel={unitLabel}
@@ -699,12 +721,11 @@ function SurfModule() {
                 <PumpingPanel
                   helpKey="surf:pumping" open={open.pumping} onToggle={toggleOf('pumping')}
                   help={<>
-                    Pumping : en vol seulement (onglet vols), compté par séries de coups mesurées par les capteurs du téléphone ;
+                    {t('Pumping : en vol seulement (onglet vols), compté par séries de coups mesurées par les capteurs du téléphone ;')}
                     {pumpDetection
-                      ? <> une série ne compte que si ses coups suivent une cadence régulière, de {pumpDetection.cadenceMinPerMin} à {pumpDetection.cadenceMaxPerMin} coups
-                        par minute.</>
+                      ? <>{' '}{t('une série ne compte que si ses coups suivent une cadence régulière, de {min} à {max} coups par minute.', { min: cadenceMin, max: cadenceMax })}</>
                       : null}
-                    {' '}Cadence : coups par minute de la série ; vitesse : au début, puis à la fin de la série.
+                    {' '}{t('Cadence : coups par minute de la série ; vitesse : au début, puis à la fin de la série.')}
                   </>}
                   pumping={flightPumping} pumpSummary={pumpSummary} series={pumpSeriesList} seriesPodium={seriesPodium}
                   shown={pumpingShown} onShow={(key) => highlight.show('pumping', key)} accent={ACCENT}
@@ -736,24 +757,24 @@ function SurfModule() {
                     return (
                       <>
                         <div className="chart-head ui-mb-8 ui-pr-28">
-                          <PanelTitle label="Vitesse" open={open.graphiques} onToggle={toggleOf('graphiques')} helpKey="surf:graphiques" />
+                          <PanelTitle label={t('Vitesse')} open={open.graphiques} onToggle={toggleOf('graphiques')} helpKey="surf:graphiques" />
                           {!folds && <HoverReadout read={readSpeed(z)} />}
                         </div>
                         <HelpText helpKey="surf:graphiques" note>
-                          Le survol déplace le repère sur la carte.
-                          {folds ? ' Chaque graphe se replie par son nom.' : ''}
+                          {t('Le survol déplace le repère sur la carte.')}
+                          {folds ? ` ${t('Chaque graphe se replie par son nom.')}` : ''}
                           {` ${zoomHint(narrow)}`}
                         </HelpText>
                         {folds && (
-                          <GraphFoldHead label="Vitesse" color={SPEED_COLOR} open={graphFolds.open.vitesse} onToggle={() => graphFolds.toggle('vitesse')}
+                          <GraphFoldHead label={t('Vitesse')} color={SPEED_COLOR} open={graphFolds.open.vitesse} onToggle={() => graphFolds.toggle('vitesse')}
                             read={speedShown ? readSpeed(z) : undefined}
-                            title={graphFolds.open.vitesse ? 'Replier le graphe de vitesse' : 'Montrer le graphe de vitesse'} />
+                            title={graphFolds.open.vitesse ? t('Replier le graphe de vitesse') : t('Montrer le graphe de vitesse')} />
                         )}
                         {speedShown && speedChart(z, chartData, folds ? CHART_STYLE : FILL_STYLE)}
                         {folds && (
-                          <GraphFoldHead label="FC" color={HEART_RATE_COLOR} open={graphFolds.open.fc} onToggle={() => graphFolds.toggle('fc')}
+                          <GraphFoldHead label={t('FC')} color={HEART_RATE_COLOR} open={graphFolds.open.fc} onToggle={() => graphFolds.toggle('fc')}
                             read={hrShown ? readHeart(z) : undefined} style={{ marginTop: '8px' }}
-                            title={graphFolds.open.fc ? 'Replier le graphe de FC' : 'Montrer le graphe de FC'} />
+                            title={graphFolds.open.fc ? t('Replier le graphe de FC') : t('Montrer le graphe de FC')} />
                         )}
                         {hrShown && heartChart(z, chartData, speedShown)}
                       </>
@@ -761,7 +782,7 @@ function SurfModule() {
                   }}
                 </ZoomView>
                 <div className="ui-muted ui-text-xs ui-mt-6 ui-no-shrink">
-                  Bandes bleues : les vagues{foil ? ', violettes : les vols' : ''}.
+                  {foil ? t('Bandes bleues : les vagues, violettes : les vols.') : t('Bandes bleues : les vagues.')}
                 </div>
               </ResizablePanel>
               );
@@ -782,24 +803,24 @@ function SurfModule() {
             {open.reglages && (
               <ResizablePanel id={panelId('reglages')} style={ANALYSIS_PANEL_STYLE}>
                 <SessionSettingsHeader helpKey="surf:reglages" open={open.reglages} onToggle={toggleOf('reglages')}>
-                  Vitesse : {speedSourceText(gpx.hasDeviceSpeed, gpx.deviceSpeedUnit)}
-                  {' · '}Cap : {track.some((p) => p.courseDeg !== undefined) ? "fourni par l'appareil" : 'tiré des positions'}.
+                  {t('Vitesse : {source}', { source: speedSource })}
+                  {' · '}{t('Cap : {source}.', { source: hasCourse ? t("fourni par l'appareil") : t('tiré des positions') })}
                 </SessionSettingsHeader>
                 <div className="ui-row-18 ui-center ui-wrap">
                   <SessionActivityField activities={allActivities} activity={activity} families={sessionFile ? undefined : ['surf']}
                     onChange={(next) => changeSessionActivity(sessionFile, next)} />
                   <FoilPumpingFields
-                    foilTitle="Surf foil pour cette session, enregistré avec elle. Celui de l'activité se règle dans Réglages."
+                    foilTitle={t("Surf foil pour cette session, enregistré avec elle. Celui de l'activité se règle dans Réglages.")}
                     foil={foil} foilIsDefault={draft.edits.foil === null} onFoilChange={(next) => draft.update({ foil: next })}
                     showPumping={foil} pumping={pumping} pumpingIsDefault={draft.edits.pumping === null}
                     onPumpingChange={(next) => draft.update({ pumping: next === activityPumping ? null : next })} />
                 </div>
                 <div className="ui-stack-10 ui-mt-12">
                   <SessionThresholdField
-                    label={foil ? 'Seuil de vol' : 'Seuil de vague'}
+                    label={foil ? t('Seuil de vol') : t('Seuil de vague')}
                     title={foil
-                      ? 'Au-dessus, la planche vole. Seuil propre à cette session, enregistré avec elle. Sans lui, elle garde celui avec lequel elle a été calculée ; le changer dans Réglages recalcule les sessions de l\'activité.'
-                      : 'Au-dessus, la planche est sur la vague. Seuil propre à cette session, enregistré avec elle. Sans lui, elle garde celui avec lequel elle a été calculée ; le changer dans Réglages recalcule les sessions de l\'activité.'}
+                      ? t("Au-dessus, la planche vole. Seuil propre à cette session, enregistré avec elle. Sans lui, elle garde celui avec lequel elle a été calculée ; le changer dans Réglages recalcule les sessions de l'activité.")
+                      : t("Au-dessus, la planche est sur la vague. Seuil propre à cette session, enregistré avec elle. Sans lui, elle garde celui avec lequel elle a été calculée ; le changer dans Réglages recalcule les sessions de l'activité.")}
                     value={threshold}
                     defaultValue={sessionDefaultThreshold}
                     isOverridden={draft.edits.activeThreshold !== null}
@@ -810,8 +831,8 @@ function SurfModule() {
                     onChange={(next) => draft.update({ activeThreshold: next })} />
                   {foil && (
                     <SessionThresholdField
-                      label="Seuil de vague en foil"
-                      title="Pendant un vol, au-dessus : porté par une vague ; en dessous : pompé."
+                      label={t('Seuil de vague en foil')}
+                      title={t('Pendant un vol, au-dessus : porté par une vague ; en dessous : pompé.')}
                       value={waveThreshold}
                       defaultValue={surfProfile.surf.foilWaveThreshold}
                       isOverridden={draft.edits.waveThreshold !== null}

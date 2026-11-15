@@ -2,7 +2,7 @@
  * Conversions d'unités. Le noyau travaille en m/s, l'affichage se fait ici.
  */
 import { toFixedNumber } from './basics';
-import { currentLang, dateLocale, decimalSeparator } from './i18n';
+import { currentLang, dateLocale, decimalSeparator, t } from './i18n';
 
 export const MS_TO_KNOTS = 1.94384;
 export const MS_TO_KMH = 3.6;
@@ -85,7 +85,7 @@ export const speedFromText = (text: string, unit: SpeedUnit, thresholdUnit: Spee
 };
 
 export const SPEED_UNIT_LABEL: Record<SpeedUnit, string> = {
-  kn: 'nœuds',
+  kn: t('nœuds'),
   kmh: 'km/h',
   ms: 'm/s',
 };
@@ -97,12 +97,14 @@ export const SPEED_UNIT_LABEL: Record<SpeedUnit, string> = {
  */
 export const speedSourceText = (hasDeviceSpeed: boolean, deviceSpeedUnit: SpeedUnit | null | undefined): string =>
   hasDeviceSpeed
-    ? `fournie par l'appareil${deviceSpeedUnit && deviceSpeedUnit !== 'ms' ? `, lue en ${SPEED_UNIT_LABEL[deviceSpeedUnit]} et convertie` : ''}`
-    : 'dérivée des positions, filtrée';
+    ? deviceSpeedUnit && deviceSpeedUnit !== 'ms'
+      ? t("fournie par l'appareil, lue en {unit} et convertie", { unit: SPEED_UNIT_LABEL[deviceSpeedUnit] })
+      : t("fournie par l'appareil")
+    : t('dérivée des positions, filtrée');
 
 /** Symbole court, accolé à une valeur (« 12,4 nds »). */
 export const SPEED_UNIT_SYMBOL: Record<SpeedUnit, string> = {
-  kn: 'nds',
+  kn: t('nds'),
   kmh: 'km/h',
   ms: 'm/s',
 };
@@ -167,13 +169,13 @@ export const knotsToChartValue = (kn: number, unit: SpeedUnit): number => {
 export type DistanceUnit = 'km' | 'nm';
 
 export const DISTANCE_UNIT_LABEL: Record<DistanceUnit, string> = {
-  km: 'kilomètres',
-  nm: 'milles nautiques',
+  km: t('kilomètres'),
+  nm: t('milles nautiques'),
 };
 
 export const DISTANCE_UNIT_SYMBOL: Record<DistanceUnit, string> = {
   km: 'km',
-  nm: 'NM',
+  nm: t('NM'),
 };
 
 /** Longueur d'une unité de distance, en mètres. */

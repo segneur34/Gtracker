@@ -40,9 +40,10 @@ import NotesTab from '../components/NotesTab';
 import JumpsPanel from '../components/JumpsPanel';
 import JumpMapLayer from '../components/JumpMapLayer';
 import { FlightsPanel, PumpingPanel } from '../components/FlightPumpingPanel';
-import { PUMPING_OFF_NOTE } from '../components/pumpingHighlight';
+import { PUMPING_OFF_NOTE, pumpingHighlightSpans } from '../components/pumpingHighlight';
 import TrackSpanLayer from '../components/TrackSpanLayer';
-import { pumpingHighlightSpans } from '../components/pumpingHighlight';
+import { t } from '../core/i18n';
+import { tRich } from '../components/tRich';
 import { HIGHLIGHT_SPAN_OPACITY, podiumColor } from '../components/highlightColors';
 import { ANALYSIS_MAP_ANCHOR } from '../components/AnalysisMap';
 import { zoomHint } from '../components/zoomHint';
@@ -73,10 +74,10 @@ import VmgPanel from '../components/sailing/VmgPanel';
 import { SailingCompanionCharts } from '../components/sailing/SailingCharts';
 
 /** Champs du matériel en voile : l'aile ou la voile, plus le foil et le mât sur foil. */
-const SAILING_GEAR_FIELDS: GearField[] = [{ field: 'wing', label: 'Aile / voile', placeholder: 'ex. 5 m²' }];
+const SAILING_GEAR_FIELDS: GearField[] = [{ field: 'wing', label: t('Aile / voile'), placeholder: t('ex. 5 m²') }];
 const SAILING_GEAR_FIELDS_FOIL: GearField[] = [
-  { field: 'foil', label: 'Foil', placeholder: 'ex. 1100 cm²' },
-  { field: 'mast', label: 'Mât', placeholder: 'ex. 85 cm' },
+  { field: 'foil', label: t('Foil'), placeholder: t('ex. 1100 cm²') },
+  { field: 'mast', label: t('Mât'), placeholder: t('ex. 85 cm') },
   ...SAILING_GEAR_FIELDS,
 ];
 
@@ -206,8 +207,11 @@ function SailingModule() {
   const maneuverNotes = useCallback((loc: ManeuverLocation): string[] => {
     const notes: string[] = [];
     if (loc.tack) notes.push(`${TACK_LABELS[loc.tack].toLowerCase()} → ${TACK_LABELS[oppositeTack(loc.tack)].toLowerCase()}`);
-    if (loc.lostFlightS > 0) notes.push(`${foil ? 'vol perdu' : 'sous le seuil'} ${formatDecimal(loc.lostFlightS, 1)} s`);
-    if (loc.takeoff) notes.push('au décollage');
+    if (loc.lostFlightS > 0) {
+      const lost = formatDecimal(loc.lostFlightS, 1);
+      notes.push(foil ? t('vol perdu {s} s', { s: lost }) : t('sous le seuil {s} s', { s: lost }));
+    }
+    if (loc.takeoff) notes.push(t('au décollage'));
     return notes;
   }, [foil]);
   /** Pumping de la session (brouillon, puis fiche), sinon celui de l'activité ; sur foil seulement. */
@@ -331,9 +335,12 @@ function SailingModule() {
     [track, colorRange.minMs, colorRange.maxMs]
   );
   /** « Temps en vol » sur foil, « Temps actif » sinon : le libellé dit ce qu'il mesure. */
-  const activeTimeWord = foil ? 'Temps en vol' : 'Temps actif';
+  const activeTimeLabel = (): string => {
+    const vars = { threshold: showThreshold(activeThresholdKn), unit: speedSymbol };
+    return foil ? t('Temps en vol (≥{threshold} {unit})', vars) : t('Temps actif (≥{threshold} {unit})', vars);
+  };
   /** Sans seuil (bateau) : « Temps en mouvement », le temps de navigation déjà calculé (`stats.activeTime`, masque sans seuil). */
-  const movingTimeStat: ShareStat = { key: 'movingTime', label: 'Temps en mouvement', value: stats?.activeTime ?? '—' };
+  const movingTimeStat: ShareStat = { key: 'movingTime', label: t('Temps en mouvement'), value: stats?.activeTime ?? '—' };
   /**
    * Chiffres de l'onglet « général », proposés aussi pour l'image de partage. Sans seuil (bateau),
    * toute la session compte en navigation : ni distance, temps, ratio ni moyenne actifs.
@@ -341,16 +348,16 @@ function SailingModule() {
   /** FC moyenne, en fin des chiffres de « général » et du partage, si la session a de la FC. */
   const heartRateStat = heartRateShareStats(heart);
   const generalStats: ShareStat[] = stats ? [
-    { key: 'distance', label: 'Distance', value: formatDistance(stats.distanceM, distanceUnit) },
-    ...(hasActiveThreshold ? [{ key: 'activeDistance', label: 'Distance active', value: formatDistance(stats.activeDistanceM, distanceUnit) }] : []),
-    { key: 'totalTime', label: 'Temps total', value: stats.totalTime },
+    { key: 'distance', label: t('Distance'), value: formatDistance(stats.distanceM, distanceUnit) },
+    ...(hasActiveThreshold ? [{ key: 'activeDistance', label: t('Distance active'), value: formatDistance(stats.activeDistanceM, distanceUnit) }] : []),
+    { key: 'totalTime', label: t('Temps total'), value: stats.totalTime },
     ...(hasActiveThreshold ? [
-      { key: 'activeTime', label: `${activeTimeWord} (≥${showThreshold(activeThresholdKn)} ${speedSymbol})`, value: stats.activeTime },
+      { key: 'activeTime', label: activeTimeLabel(), value: stats.activeTime },
       { key: 'activeRatio', label: activeRatioLabel(profile, foil), value: `${commaDecimal(stats.activeRatio)}%` },
     ] : [movingTimeStat]),
-    { key: 'averageSpeed', label: 'Vitesse moyenne', value: formatSpeed(stats.avgSpeedMs, speedUnit) },
+    { key: 'averageSpeed', label: t('Vitesse moyenne'), value: formatSpeed(stats.avgSpeedMs, speedUnit) },
     ...(hasActiveThreshold ? [
-      { key: 'activeAverage', label: `Moyenne active (≥${showThreshold(activeThresholdKn)} ${speedSymbol})`, value: formatSpeed(stats.activeAvgSpeedMs, speedUnit) },
+      { key: 'activeAverage', label: t('Moyenne active (≥{threshold} {unit})', { threshold: showThreshold(activeThresholdKn), unit: speedSymbol }), value: formatSpeed(stats.activeAvgSpeedMs, speedUnit) },
     ] : []),
     ...heartRateStat,
     // Lignes ajoutées au partage, les mêmes que celles du résumé d'une fiche (`summaryShareStats`).
@@ -376,24 +383,23 @@ function SailingModule() {
    * « avancé ». Sur foil, la distance, le ratio et la moyenne sont ceux du vol ; sans seuil (bateau),
    * toute la session compte. L'image de partage garde la liste entière (`generalStats`).
    */
-  const activeWord = foil ? 'en vol' : 'active';
   const overviewStats: ShareStat[] = stats ? [
     ...(hasActiveThreshold ? [
-      { key: 'activeDistance', label: foil ? 'Distance en vol' : 'Distance active', value: formatDistance(stats.activeDistanceM, distanceUnit) },
-      { key: 'totalTime', label: 'Temps total', value: stats.totalTime },
-      { key: 'activeTime', label: `${activeTimeWord} (≥${showThreshold(activeThresholdKn)} ${speedSymbol})`, value: stats.activeTime },
+      { key: 'activeDistance', label: foil ? t('Distance en vol') : t('Distance active'), value: formatDistance(stats.activeDistanceM, distanceUnit) },
+      { key: 'totalTime', label: t('Temps total'), value: stats.totalTime },
+      { key: 'activeTime', label: activeTimeLabel(), value: stats.activeTime },
       { key: 'activeRatio', label: activeRatioLabel(profile, foil), value: `${commaDecimal(stats.activeRatio)}%` },
-      { key: 'activeAverage', label: `Moyenne ${activeWord}`, value: formatSpeed(stats.activeAvgSpeedMs, speedUnit) },
+      { key: 'activeAverage', label: foil ? t('Moyenne en vol') : t('Moyenne active'), value: formatSpeed(stats.activeAvgSpeedMs, speedUnit) },
     ] : [
-      { key: 'distance', label: 'Distance', value: formatDistance(stats.distanceM, distanceUnit) },
-      { key: 'totalTime', label: 'Temps total', value: stats.totalTime },
+      { key: 'distance', label: t('Distance'), value: formatDistance(stats.distanceM, distanceUnit) },
+      { key: 'totalTime', label: t('Temps total'), value: stats.totalTime },
       movingTimeStat,
-      { key: 'averageSpeed', label: 'Vitesse moyenne', value: formatSpeed(stats.avgSpeedMs, speedUnit) },
+      { key: 'averageSpeed', label: t('Vitesse moyenne'), value: formatSpeed(stats.avgSpeedMs, speedUnit) },
     ]),
     // Top 2 s en face de la moyenne ; le top 100 m reste dans « avancé › tops ».
-    { key: 'top2s', label: 'Top 2 s', value: topValue(stats.tops.t2s[0]) },
-    { key: 'tacks', label: 'Virements réussis', value: maneuverRate(maneuverSummary.tack) },
-    { key: 'jibes', label: 'Empannages réussis', value: maneuverRate(maneuverSummary.jibe) },
+    { key: 'top2s', label: t('Top 2 s'), value: topValue(stats.tops.t2s[0]) },
+    { key: 'tacks', label: t('Virements réussis'), value: maneuverRate(maneuverSummary.tack) },
+    { key: 'jibes', label: t('Empannages réussis'), value: maneuverRate(maneuverSummary.jibe) },
     ...heartRateStat,
   ] : [];
   /** Podiums montrables sur la carte : les tops de vitesse, puis ceux de VMG (près, portant), par clé de cible. */
@@ -422,7 +428,9 @@ function SailingModule() {
                 weight: 3
               }}>
               <Popup>
-                {MANEUVER_LABELS[loc.type]} {loc.success ? 'Réussi' : 'Raté'} - Vmin: {formatKnots(loc.vmin, speedUnit)} {SPEED_UNIT_SYMBOL[speedUnit]}
+                {loc.success
+                  ? t('{label} Réussi - Vmin: {v} {unit}', { label: MANEUVER_LABELS[loc.type], v: formatKnots(loc.vmin, speedUnit), unit: SPEED_UNIT_SYMBOL[speedUnit] })
+                  : t('{label} Raté - Vmin: {v} {unit}', { label: MANEUVER_LABELS[loc.type], v: formatKnots(loc.vmin, speedUnit), unit: SPEED_UNIT_SYMBOL[speedUnit] })}
                 {maneuverNotes(loc).map((note) => <span key={note}><br />{note}</span>)}
               </Popup>
             </CircleMarker>
@@ -435,7 +443,7 @@ function SailingModule() {
           if (top.path.length < 2) return null;
           return (
             <HighlightPath key={`maneuver-top-${selectedManeuverTop}-${idx}`} positions={top.path} color={podiumColor(idx)} opacity={HIGHLIGHT_SPAN_OPACITY}>
-              <Popup>{idx + 1}{idx === 0 ? 'er' : 'e'} · {formatTimeOfDay(top.timeMs)} · {top.label}</Popup>
+              <Popup>{idx === 0 ? t('{n}er', { n: 1 }) : t('{n}e', { n: idx + 1 })} · {formatTimeOfDay(top.timeMs)} · {top.label}</Popup>
             </HighlightPath>
           );
         })}
@@ -512,12 +520,12 @@ function SailingModule() {
    * Onglet ouvert sans rien à montrer : sans vent, les manœuvres, la VMG et le vent ne se calculent pas ;
    * l'onglet le dit, avec de quoi ouvrir « général » où on le saisit.
    */
-  const renderEmptyPanel = (key: 'manoeuvres' | 'vmg' | 'vent', label: string, what: string, otherwise: string) => (
+  const renderEmptyPanel = (key: 'manoeuvres' | 'vmg' | 'vent', label: string, unknownWind: string, otherwise: string) => (
     <EmptyTabPanel id={`sailing.carte.${key}.vide`} label={label} open={open[key]} onToggle={toggleOf(key)}
       action={windInputRequired && !windAdjust
-        ? <Button size="s" onClick={startWindAdjust}>Régler le vent</Button>
+        ? <Button size="s" onClick={startWindAdjust}>{t('Régler le vent')}</Button>
         : undefined}>
-      {windInputRequired ? `Vent inconnu : ${what} par rapport à lui. Réglez-le sur la carte.` : otherwise}
+      {windInputRequired ? unknownWind : otherwise}
     </EmptyTabPanel>
   );
 
@@ -537,7 +545,7 @@ function SailingModule() {
   );
 
   return (
-    <AnalysisShell title="Analyse voile" family="voile" backLabel="Sessions" file={requestedFile}
+    <AnalysisShell title={t('Analyse voile')} family="voile" backLabel={t('Sessions')} file={requestedFile}
       share={{ segments: mapSegments, stats: generalStats }} error={sessionError}
       // Barre visible pendant un brouillon seulement : rien ne s'affiche quand tout est enregistré.
       draft={loadedFromMemory ? draft : null}
@@ -552,12 +560,12 @@ function SailingModule() {
 
           {windInputRequired && (
             <div className="ui-alert ui-alert--warning" style={{ marginBottom: '10px' }}>
-              <strong>Vent non fiable.</strong> L'estimation automatique donne {autoWind}° avec un indice de confiance
-              de {windEstimate ? Math.round(windEstimate.confidence * 100) : 0}%, trop faible pour être utilisée.
-              C'est typique d'un aller simple ou d'un plan d'eau à courant. Réglez le vent sur la carte pour
-              débloquer les manœuvres, la VMG et la polaire.
+              {tRich(
+                "<strong>Vent non fiable.</strong> L'estimation automatique donne {wind}° avec un indice de confiance de {confidence}%, trop faible pour être utilisée. C'est typique d'un aller simple ou d'un plan d'eau à courant. Réglez le vent sur la carte pour débloquer les manœuvres, la VMG et la polaire.",
+                { wind: autoWind ?? '', confidence: windEstimate ? Math.round(windEstimate.confidence * 100) : 0 },
+              )}
               {!windAdjust && (
-                <Button size="s" onClick={startWindAdjust} style={{ marginLeft: '6px' }}>Régler le vent</Button>
+                <Button size="s" onClick={startWindAdjust} style={{ marginLeft: '6px' }}>{t('Régler le vent')}</Button>
               )}
             </div>
           )}
@@ -568,7 +576,7 @@ function SailingModule() {
       gearReminder={{
         activityId: activity.id, hasGearList, ready: loadedFromMemory && draftRecord !== null,
         sessionHasGear: notesHaveGear(edits.notes, foil ? SAILING_GEAR_FIELDS_FOIL : SAILING_GEAR_FIELDS),
-        tabShown: sailingPanels.some((p) => p.key === 'matos'), tabLabel: 'matos et conditions',
+        tabShown: sailingPanels.some((p) => p.key === 'matos'), tabLabel: t('matos et conditions'),
         covered: mapExpanded || windAdjust, onAdd: () => reveal('matos'),
       }}
       map={{
@@ -598,7 +606,7 @@ function SailingModule() {
         ) : undefined,
         legend: trackData.length > 0 ? (
           <SpeedGradientLegend unit={speedUnit} range={colorRange}
-            slowLabel={`sous ${Math.round(toDisplaySpeed(colorRange.minMs, speedUnit))} ${speedSymbol}`} />
+            slowLabel={t('sous {v} {unit}', { v: Math.round(toDisplaySpeed(colorRange.minMs, speedUnit)), unit: speedSymbol })} />
         ) : null,
       }}
       // Onglets sous la carte, et leurs panneaux deux par ligne sur ordinateur (`docs/MISE_EN_PAGE.md`).
@@ -607,24 +615,24 @@ function SailingModule() {
           <>
             {open.general && (
               <ResizablePanel id="sailing.general" style={PANEL_BLOCK_STYLE}>
-                <PanelHeading label="Général" extra={<SessionDate track={trackData} />} open={open.general} onToggle={toggleOf('general')} />
+                <PanelHeading label={t('Général')}extra={<SessionDate track={trackData} />} open={open.general} onToggle={toggleOf('general')} />
                 <GeneralStats stats={overviewStats} pairs={[['tacks', 'jibes']]} />
                 {/* Mini-boussole du vent ; « Régler » ouvre la grande sur la carte. */}
                 <div className="an-sheet__wind" style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
                   <WindCompass windAngle={currentWindValue ?? autoWind ?? 0} size={64} />
                   <div style={{ flex: '1 1 0', minWidth: 0 }}>
                     <strong style={{ display: 'block', fontSize: 'var(--text-m)' }}>
-                      {currentWindValue !== null ? `Vent ${Math.round(currentWindValue)}°` : 'Vent inconnu'}
+                      {currentWindValue !== null ? t('Vent {deg}°', { deg: Math.round(currentWindValue) }) : t('Vent inconnu')}
                     </strong>
                     <span style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>
                       {edits.windDeg !== null
-                        ? `saisi${autoWind !== null ? ` · calculé ${autoWind}°` : ''}`
+                        ? (autoWind !== null ? t('saisi · calculé {deg}°', { deg: autoWind }) : t('saisi'))
                         : windEstimate
-                          ? `calculé · confiance ${Math.round(windEstimate.confidence * 100)} %`
-                          : 'à régler sur la carte'}
+                          ? t('calculé · confiance {pct} %', { pct: Math.round(windEstimate.confidence * 100) })
+                          : t('à régler sur la carte')}
                     </span>
                   </div>
-                  <Button size="s" onClick={startWindAdjust} disabled={windAdjust}>Régler</Button>
+                  <Button size="s" onClick={startWindAdjust} disabled={windAdjust}>{t('Régler')}</Button>
                 </div>
                 <SessionMarksList view={marks} distanceUnit={distanceUnit} shownMs={shownMark} accent={FAMILY_ACCENT.voile}
                   onShow={(ms) => highlight.show('general', ms === null ? null : String(ms))} />
@@ -646,7 +654,9 @@ function SailingModule() {
                   notesOf={maneuverNotes} onMap={maneuversOnMap} selectedTop={highlight.shownIn('manoeuvres')}
                   onSelectTop={(key) => highlight.show('manoeuvres', key)} view={maneuversView} />
               )
-              : renderEmptyPanel('manoeuvres', 'Manœuvres', 'virements et empannages se reconnaissent', 'Aucune manœuvre reconnue sur cette session.'))}
+              : renderEmptyPanel('manoeuvres', t('Manœuvres'),
+                t('Vent inconnu : virements et empannages se reconnaissent par rapport à lui. Réglez-le sur la carte.'),
+                t('Aucune manœuvre reconnue sur cette session.')))}
 
             {open.graphiques && (
               <SailingGraphsPanel open={open.graphiques} onToggle={toggleOf('graphiques')} folds={graphFolds} heartChartShown={heartChartShown}
@@ -667,7 +677,9 @@ function SailingModule() {
                   rows={chartRows} readers={chartReaders} timeX={timeX} markLines={markLines} onShowOnMap={() => zoomOnMap.show('vmg')} zoomText={zoomText}
                   selected={highlight.shownIn('vmg')} onSelect={(key) => highlight.show('vmg', key)} />
               )
-              : renderEmptyPanel('vmg', 'Analyse VMG', 'la VMG se mesure', 'Pas de VMG mesurable sur cette session.'))}
+              : renderEmptyPanel('vmg', t('Analyse VMG'),
+                t('Vent inconnu : la VMG se mesure par rapport à lui. Réglez-le sur la carte.'),
+                t('Pas de VMG mesurable sur cette session.')))}
 
             {open.sauts && jumpsVisible && (
               <JumpsPanel
@@ -694,12 +706,11 @@ function SailingModule() {
                 <FlightsPanel
                   helpKey="voile:vols"
                   open={open.vols} onToggle={toggleOf('vols')}
-                  help={<>
-                    Vol : au-dessus du seuil d'activité ({showThreshold(activeThresholdKn)} {speedSymbol}), d'une traite, d'au moins {pumpDetection?.minFlightS ?? 0} s.
-                    {flightPumping
-                      ? " Décollage : vitesse GPS quand les chocs de la planche sur l'eau cessent (expérimental) ; séries et temps pompé : ceux de l'onglet pumping."
-                      : ''}
-                  </>}
+                  help={flightPumping
+                    ? t("Vol : au-dessus du seuil d'activité ({threshold} {unit}), d'une traite, d'au moins {s} s. Décollage : vitesse GPS quand les chocs de la planche sur l'eau cessent (expérimental) ; séries et temps pompé : ceux de l'onglet pumping.",
+                      { threshold: showThreshold(activeThresholdKn), unit: speedSymbol, s: pumpDetection?.minFlightS ?? 0 })
+                    : t("Vol : au-dessus du seuil d'activité ({threshold} {unit}), d'une traite, d'au moins {s} s.",
+                      { threshold: showThreshold(activeThresholdKn), unit: speedSymbol, s: pumpDetection?.minFlightS ?? 0 })}
                   flights={flights} podium={podiumFlights}
                   pumping={flightPumping} pumpSummary={pumpSummary}
                   shown={flightShown} onShow={(key) => highlight.show('vols', key)} accent={FAMILY_ACCENT.voile}
@@ -714,14 +725,10 @@ function SailingModule() {
                 <PumpingPanel
                   helpKey="voile:pumping"
                   open={open.pumping} onToggle={toggleOf('pumping')}
-                  help={<>
-                    Pumping : en vol seulement (onglet vols), compté par séries de coups mesurées par les capteurs du téléphone fixé sur la poitrine ;
-                    {pumpDetection
-                      ? <> une série ne compte que si ses coups suivent une cadence régulière, de {pumpDetection.cadenceMinPerMin} à {pumpDetection.cadenceMaxPerMin} coups
-                        par minute.</>
-                      : null}
-                    {' '}Cadence : coups par minute de la série ; vitesse : au début, puis à la fin de la série.
-                  </>}
+                  help={pumpDetection
+                    ? t('Pumping : en vol seulement (onglet vols), compté par séries de coups mesurées par les capteurs du téléphone fixé sur la poitrine ; une série ne compte que si ses coups suivent une cadence régulière, de {min} à {max} coups par minute. Cadence : coups par minute de la série ; vitesse : au début, puis à la fin de la série.',
+                      { min: pumpDetection.cadenceMinPerMin, max: pumpDetection.cadenceMaxPerMin })
+                    : t('Pumping : en vol seulement (onglet vols), compté par séries de coups mesurées par les capteurs du téléphone fixé sur la poitrine ; Cadence : coups par minute de la série ; vitesse : au début, puis à la fin de la série.')}
                   pumping={flightPumping} pumpSummary={pumpSummary} series={pumpSeriesList} seriesPodium={seriesPodium}
                   shown={pumpingShown} onShow={(key) => highlight.show('pumping', key)} accent={FAMILY_ACCENT.voile}
                   speedCell={speedCellOf(speedUnit)}
@@ -731,8 +738,9 @@ function SailingModule() {
               </ResizablePanel>
             )}
 
-            {open.vent && trackData.length > 0 && !windStats && renderEmptyPanel('vent', 'Variations du Vent', 'ses variations se lisent aux manœuvres, qui se classent',
-              'Il faut au moins deux manœuvres pour suivre le vent au fil de la session.')}
+            {open.vent && trackData.length > 0 && !windStats && renderEmptyPanel('vent', t('Variations du Vent'),
+              t('Vent inconnu : ses variations se lisent aux manœuvres, qui se classent par rapport à lui. Réglez-le sur la carte.'),
+              t('Il faut au moins deux manœuvres pour suivre le vent au fil de la session.'))}
             {open.vent && windStats && (
               <WindPanel windStats={windStats} open={open.vent} onToggle={toggleOf('vent')} chartZoom={chartZoom} rows={chartRows} readers={chartReaders}
                 timeX={timeX} markLines={markLines} onShowOnMap={() => zoomOnMap.show('vent')} zoomText={zoomText} />

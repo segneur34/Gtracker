@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Activity } from '../core/activities';
-import { sportFamily, type SportFamily } from '../core/sportProfiles';
+import { t } from '../core/i18n';
+import { sportFamily,type SportFamily } from '../core/sportProfiles';
 import { confirmLeave } from '../hooks/leaveGuard';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
 import { dismissIncomingNotice, librarySession, updateSessionRecord, useLibraryFields } from '../hooks/useSessionLibrary';
@@ -56,9 +57,9 @@ function NoticeRow({ id, text, file, route, trouble }: { id: string; text: strin
     <div className={`shell-notice${trouble ? ' shell-notice--trouble' : ''}`} role="status">
       <span className="shell-notice__text">{text}</span>
       <span className="shell-notice__actions">
-        {file !== null && <Button size="s" variant="primary" onClick={see}>Voir la session</Button>}
-        {route !== undefined && <Button size="s" variant="primary" onClick={seeRoute}>Voir l'itinéraire</Button>}
-        <Button size="s" variant="ghost" aria-label="Fermer" title="Fermer" onClick={() => dismissIncomingNotice(id)}>
+        {file !== null && <Button size="s" variant="primary" onClick={see}>{t('Voir la session')}</Button>}
+        {route !== undefined && <Button size="s" variant="primary" onClick={seeRoute}>{t("Voir l'itinéraire")}</Button>}
+        <Button size="s" variant="ghost" aria-label={t('Fermer')} title={t('Fermer')} onClick={() => dismissIncomingNotice(id)}>
           <IconClose size={16} />
         </Button>
       </span>
@@ -66,7 +67,7 @@ function NoticeRow({ id, text, file, route, trouble }: { id: string; text: strin
         <ActivitySheet
           activities={activities}
           value={null}
-          heading={{ title: 'Quelle activité ?', hint: "Le fichier ne la dit pas : choisissez-la avant l'analyse. Elle reste dans la fiche de la session." }}
+          heading={{ title: t('Quelle activité ?'), hint: t("Le fichier ne la dit pas : choisissez-la avant l'analyse. Elle reste dans la fiche de la session.") }}
           onChoose={classifyAndOpen}
           onClose={() => setAsking(false)} />
       )}

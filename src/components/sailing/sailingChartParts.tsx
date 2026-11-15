@@ -6,6 +6,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { DotItemDotProps } from 'recharts';
 import { normalizeDeg } from '../../core/angles';
+import { t } from '../../core/i18n';
 import { SPEED_UNIT_SYMBOL, commaDecimal, formatKnots, type SpeedUnit } from '../../core/units';
 import type { PointData } from '../../sailing/pointData';
 import type { VmgGraphPoint, WindGraphPoint, WindStats } from '../../sailing/sailingAnalytics';
@@ -59,7 +60,7 @@ const SAILING_TICK = { fill: 'var(--ink)', fontSize: 11, fontWeight: 700 };
 /** Axe de la vitesse : la largeur garde le tracé où le posaient la marge de −25 et l'axe de 60 px. */
 export const SPEED_AXES: TrackYAxis[] = [{ color: SAILING_SPEED_COLOR, domain: [0, 'auto'], width: 35, tick: SAILING_TICK }];
 export const SPEED_SERIES: TrackSeries<{ vitesse: number }>[] = [
-  { kind: 'line', key: 'vitesse', name: 'vitesse', color: SAILING_SPEED_COLOR, width: 2, activeDotR: 4 },
+  { kind: 'line', key: 'vitesse', name: t('vitesse'),color: SAILING_SPEED_COLOR, width: 2, activeDotR: 4 },
 ];
 /** Axe du vent, en degrés : la largeur garde le tracé où le posaient la marge de −20 et l'axe de 60 px. */
 export const WIND_AXES: TrackYAxis[] = [{
@@ -67,12 +68,12 @@ export const WIND_AXES: TrackYAxis[] = [{
   tickFormatter: (val: number) => `${normalizeDeg(Math.round(val))}°`,
 }];
 export const WIND_SERIES: TrackSeries<WindGraphPoint>[] = [
-  { kind: 'line', key: 'angle', name: 'angle', color: WIND_COLOR, width: 2, activeDotR: 6, dot: maneuverDot },
+  { kind: 'line', key: 'angle', name: t('angle'),color: WIND_COLOR, width: 2, activeDotR: 6, dot: maneuverDot },
 ];
 /** Axe de la VMG, de part et d'autre de zéro : le trait à 0 (`ifOverflow="extendDomain"`) le garde dans l'axe. */
 export const VMG_AXES: TrackYAxis[] = [{ color: VMG_COLOR, domain: ['auto', 'auto'], width: 40, tick: SAILING_TICK, tickFormatter: commaDecimal }];
 export const VMG_SERIES: TrackSeries<VmgGraphPoint>[] = [
-  { kind: 'line', key: 'vmg', name: 'VMG', color: VMG_COLOR, width: 2, activeDotR: 4, dot: vmgAloneDot },
+  { kind: 'line', key: 'vmg', name: t('VMG'),color: VMG_COLOR, width: 2, activeDotR: 4, dot: vmgAloneDot },
 ];
 
 interface SailingReadersInput {
@@ -107,7 +108,7 @@ export const sailingChartReaders = ({ trackData, timeChart, heart, windStats, vm
     if (!timeChart.readable(z, i)) return null;
     const vmg = vmgSeries[i] ?? null;
     return {
-      values: [{ text: vmg === null ? '—' : `${vmg < 0 ? 'portant' : 'près'} ${showKn(Math.abs(vmg))} ${speedSymbol}`, color: VMG_COLOR }],
+      values: [{ text: vmg === null ? '—' : (vmg < 0 ? t('portant {v} {unit}', { v: showKn(Math.abs(vmg)), unit: speedSymbol }) : t('près {v} {unit}', { v: showKn(Math.abs(vmg)), unit: speedSymbol })), color: VMG_COLOR }],
       at: readAt(i),
     };
   };

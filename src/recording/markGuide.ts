@@ -1,3 +1,4 @@
+import { t } from '../core/i18n';
 import { distanceToSegmentM } from '../core/geoPlane';
 import { haversineDistance, initialBearing } from '../core/geo';
 import type { SportFamily } from '../core/sportProfiles';
@@ -109,8 +110,8 @@ export const beepIntervalMs = (distanceM: number, settings: MarkGuideSettings): 
   const k = curve.findIndex((p) => p.distanceM >= distanceM);
   const a = curve[k - 1];
   const b = curve[k];
-  const t = (distanceM - a.distanceM) / (b.distanceM - a.distanceM);
-  return Math.round(a.intervalMs + t * (b.intervalMs - a.intervalMs));
+  const ratio = (distanceM - a.distanceM) / (b.distanceM - a.distanceM);
+  return Math.round(a.intervalMs + ratio * (b.intervalMs - a.intervalMs));
 };
 
 /** Sort d'une balise laissée derrière soi. */
@@ -315,4 +316,4 @@ export const courseMarks = (
 
 /** Nom d'une balise dans la carte de guidage : Départ, Balise 2…, Arrivée. */
 export const markName = (index: number, count: number): string =>
-  index === 0 ? 'Départ' : index === count - 1 ? 'Arrivée' : `Balise ${index + 1}`;
+  index === 0 ? t('Départ') : index === count - 1 ? t('Arrivée') : t('Balise {n}', { n: index + 1 });

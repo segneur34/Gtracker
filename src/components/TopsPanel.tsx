@@ -5,6 +5,7 @@ import HighlightPath from './HighlightPath';
 import { HIGHLIGHT_PODIUM_COLORS, PODIUM_RANKS, podiumColor } from './highlightColors';
 import type { TopSegment, TopTarget } from '../core/types';
 import { SPEED_UNIT_LABEL, type SpeedUnit } from '../core/units';
+import { t } from '../core/i18n';
 import MapToggle from './ui/MapToggle';
 
 interface Props {
@@ -30,24 +31,24 @@ interface Props {
 export default function TopsPanel({ targets, tops, unit, selected, onSelect, accent, open, onToggle }: Props) {
   return (
     <>
-      <PanelHeading label="Meilleurs segments" open={open} onToggle={onToggle} helpKey="analyse:tops" />
+      <PanelHeading label={t('Meilleurs segments')} open={open} onToggle={onToggle} helpKey="analyse:tops" />
       <HelpText helpKey="analyse:tops" note>
-        Vitesse moyenne du meilleur passage sur chaque durée ou distance, sans chevauchement, pauses comprises.
+        {t('Vitesse moyenne du meilleur passage sur chaque durée ou distance, sans chevauchement, pauses comprises.')}
       </HelpText>
       <table className="ui-table">
         <thead>
           <tr className="ui-sunken">
-            <th className="ui-cell ui-cell--left">Sur</th>
+            <th className="ui-cell ui-cell--left">{t('Sur')}</th>
             {PODIUM_RANKS.map((rank, idx) => (
               <th key={rank} style={{ padding: '0.4em 0.6em', color: HIGHLIGHT_PODIUM_COLORS[idx] }}>{rank} ({SPEED_UNIT_LABEL[unit]})</th>
             ))}
-            <th className="ui-cell">Carte</th>
+            <th className="ui-cell">{t('Carte')}</th>
           </tr>
         </thead>
         <tbody>
           {(['time', 'distance'] as const).map((kind) => (
             <Fragment key={kind}>
-              {targets.filter((t) => t.kind === kind).map((target) => {
+              {targets.filter((candidate) => candidate.kind === kind).map((target) => {
                 const values = tops[target.key] ?? [];
                 const reached = values.some((v) => v.path.length > 1);
                 const shown = selected === target.key;

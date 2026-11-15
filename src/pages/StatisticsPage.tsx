@@ -47,14 +47,14 @@ import {
   type StatsTotals, type ZoneBoundsOf,
   groupByActivity,
 } from '../library/stats';
-import StatsSelectionDialog, { GearChoiceRows, NO_GEAR_TEXT } from './StatisticsSelection';
+import StatsSelectionDialog, { GearChoiceRows } from './StatisticsSelection';
 import './analysisMobile.css';
 import './StatisticsPage.css';
-import { plural } from '../core/basics';
 import StatTile from '../components/ui/StatTile';
 import { CHART_GRID_PROPS, CHART_TICK, OTHERS_COLOR, chartTick, yAxisLabel } from '../components/chartStyle';
 import { STORAGE_KEYS } from '../core/appIdentity';
-import { dateLocale } from '../core/i18n';
+import { dateLocale, t, tn } from '../core/i18n';
+import { tRich } from '../components/tRich';
 
 /**
  * Statistiques : une vue d'ensemble, puis une famille, puis
@@ -79,13 +79,13 @@ import { dateLocale } from '../core/i18n';
 type StatsSection = 'general' | 'vitesse' | 'regularite' | 'records' | 'cardio';
 
 const STATS_SECTIONS: SectionDefinition<StatsSection>[] = [
-  { key: 'general', label: 'général' },
+  { key: 'general', label: t('général') },
   // Clé d'avant le choix de la donnée, gardée : elle porte l'état et la taille mémorisés du panneau.
-  { key: 'vitesse', label: 'graphique' },
-  { key: 'regularite', label: 'régularité' },
-  { key: 'records', label: 'records' },
+  { key: 'vitesse', label: t('graphique') },
+  { key: 'regularite', label: t('régularité') },
+  { key: 'records', label: t('records') },
   // Seulement quand une session de la période a de la FC ; les bpm se comparent d'une famille à l'autre.
-  { key: 'cardio', label: 'cardio' },
+  { key: 'cardio', label: t('cardio') },
 ];
 
 const STATS_SECTION_DEFAULTS: Record<StatsSection, boolean> = { general: true, vitesse: true, regularite: true, records: false, cardio: false };
@@ -116,17 +116,17 @@ const VIEW_KEY = 'affichage';
 const VIEW_DEFAULTS: StatsView = { famille: null, activite: null, periode: 'tout', donnee: null, materiel: null };
 const panelId = (name: string) => `${STORAGE_ID}.${name}`;
 /** Ce que disent les blocs de la page quand la période n'a aucune session. */
-const NO_SESSION_TEXT = 'Aucune session sur la période.';
+const NO_SESSION_TEXT = t('Aucune session sur la période.');
 const chartPanelStyle = { ...CARD_STYLE, ...HALF_PANEL_STYLE, display: 'flex', flexDirection: 'column', overflow: 'hidden' } as const;
 const noteStyle = { color: 'var(--muted)', fontSize: 'var(--text-xs)', marginTop: '8px' } as const;
 
 const RECORD_LABEL: Record<StatsRecordKind, string> = {
-  vitesse: 'Vitesse max',
-  distance: 'Distance',
-  duree: 'Durée',
-  manoeuvres: 'Manœuvres',
-  vague: 'Plus longue vague',
-  vol: 'Plus long vol',
+  vitesse: t('Vitesse max'),
+  distance: t('Distance'),
+  duree: t('Durée'),
+  manoeuvres: t('Manœuvres'),
+  vague: t('Plus longue vague'),
+  vol: t('Plus long vol'),
 };
 
 const isFamily = (value: unknown): value is SportFamily => SPORT_FAMILIES.some((f) => f === value);
@@ -160,7 +160,7 @@ const GroupRow = ({ color, name, totals, distanceUnit, onOpen }: {
       <span className="ui-swatch" style={{ background: color }} />
       <span className="stats-row__name">{name}</span>
       <span className="stats-row__meta num">
-        {plural(totals.sessions, 'session')} · {formatDuration(totals.durationS * 1000)} · {formatDistanceAuto(totals.distanceM, distanceUnit)}
+        {tn(totals.sessions, '{n} session', '{n} sessions')} · {formatDuration(totals.durationS * 1000)} · {formatDistanceAuto(totals.distanceM, distanceUnit)}
       </span>
       <IconChevronRight size={16} className="stats-row__chevron" />
     </button>
@@ -180,8 +180,8 @@ interface ChartRow extends MetricPoint {
  * (jibe) en rond, le virement (tack) en triangle. Une série sans entrée prend celle d'une série seule.
  */
 const SERIE_STYLE: Record<string, { shape: 'circle' | 'triangle'; dash: string; legend: string }> = {
-  empannages: { shape: 'circle', dash: '4 3', legend: 'empannage (jibe)' },
-  virements: { shape: 'triangle', dash: '1 3', legend: 'virement (tack)' },
+  empannages: { shape: 'circle', dash: '4 3', legend: t('empannage (jibe)') },
+  virements: { shape: 'triangle', dash: '1 3', legend: t('virement (tack)') },
 };
 /**
  * Trait gris fin autour des points et des barres à la couleur d'une activité : deux activités voisines s'y
@@ -479,7 +479,7 @@ function StatisticsPage() {
     const s = metric.key === 'reussite' ? inPeriod.find((x) => x.file === p.file) : undefined;
     const r = s?.maneuverResults;
     const detail = r
-      ? serieLabel === 'Virements' ? ` (${r.tackSuccess} / ${r.tackSuccess + r.tackFail})` : ` (${r.jibeSuccess} / ${r.jibeSuccess + r.jibeFail})`
+      ? serieLabel === t('Virements') ? ` (${r.tackSuccess} / ${r.tackSuccess + r.tackFail})` : ` (${r.jibeSuccess} / ${r.jibeSuccess + r.jibeFail})`
       : '';
     return `${twoSeries ? `${serieLabel.toLowerCase()} ` : ''}${metricText(p.value)}${detail}`;
   };
@@ -511,40 +511,40 @@ function StatisticsPage() {
     }
   };
 
-  const title = activity ? activity.name : family ? FAMILY_LABEL[family] : 'Toutes les activités';
+  const title = activity ? activity.name : family ? FAMILY_LABEL[family] : t('Toutes les activités');
   const periodLabel = STATS_PERIODS.find((p) => p.id === period)!.label;
   /** Matériel sur la page : seulement pour une activité qui a sa liste de matériel. */
   const gearShown = activity !== null && gearGroups !== null;
   /** Le choix en cours, dans la ligne « Sélection ». */
-  const choiceSummary = [family ? FAMILY_LABEL[family] : 'Toutes les familles', ...(activity ? [activity.name] : []), ...gearSelection.map(gearPickLabel), periodLabel === 'Tout' ? 'depuis le début' : periodLabel].join(' · ');
+  const choiceSummary = [family ? FAMILY_LABEL[family] : t('Toutes les familles'), ...(activity ? [activity.name] : []), ...gearSelection.map(gearPickLabel), periodLabel === t('Tout') ? t('depuis le début') : periodLabel].join(' · ');
   const empty = inPeriod.length === 0;
   const lastText = regular.weeksSinceLast === null ? '—'
-    : regular.weeksSinceLast === 0 ? 'cette semaine'
-    : regular.weeksSinceLast === 1 ? 'la semaine dernière'
-    : `il y a ${regular.weeksSinceLast} semaines`;
+    : regular.weeksSinceLast === 0 ? t('cette semaine')
+    : regular.weeksSinceLast === 1 ? t('la semaine dernière')
+    : t('il y a {n} semaines', { n: regular.weeksSinceLast });
 
   return (
     <div className="ui-page ui-page--wide ui-page--backdrop an-page stats-page">
-      <PageHeader title="Statistiques" subtitle={`${title} · ${periodLabel === 'Tout' ? 'depuis le début' : periodLabel}`} />
+      <PageHeader title={t('Statistiques')} subtitle={`${title} · ${periodLabel === t('Tout') ? t('depuis le début') : periodLabel}`} />
 
       <div className="stats-choice">
         <button type="button" className="stats-selection" aria-haspopup="dialog" onClick={() => setSelecting(true)}
-          title="Choisir la famille, l’activité, la période et le matériel">
+          title={t('Choisir la famille, l’activité, la période et le matériel')}>
           <span className="stats-selection__text">
-            <strong>Sélection</strong>
+            <strong>{t('Sélection')}</strong>
             <span className="stats-selection__summary">{choiceSummary}</span>
           </span>
           <span className="stats-selection__knob"><IconSliders size={20} /></span>
         </button>
-        {familyHidden && <p style={noteStyle}>Cette famille est cachée dans Réglages : elle n'apparaît ici que par son adresse.</p>}
+        {familyHidden && <p style={noteStyle}>{t("Cette famille est cachée dans Réglages : elle n'apparaît ici que par son adresse.")}</p>}
         {gearShown && (
           <div className="stats-choice__gear">
             <ChartFold open={gearFold.open.materiel} onToggle={() => gearFold.toggle('materiel')}
-              title={gearFold.open.materiel ? 'Replier le choix du matériel' : 'Choisir le matériel'}
+              title={gearFold.open.materiel ? t('Replier le choix du matériel') : t('Choisir le matériel')}
               style={GEAR_FOLD_STYLE}
-              label={<><strong>Matériel</strong>{gearSelection.length > 0 && <span className="stats-choice__summary">{gearSelection.map(gearPickLabel).join(' · ')}</span>}</>} />
+              label={<><strong>{t('Matériel')}</strong>{gearSelection.length > 0 && <span className="stats-choice__summary">{gearSelection.map(gearPickLabel).join(' · ')}</span>}</>} />
             {gearFold.open.materiel && (gearRows.length === 0
-              ? <p className="ui-hint">{NO_GEAR_TEXT}</p>
+              ? <p className="ui-hint">{t('Aucun matériel sur les sessions de cette période.')}</p>
               : <GearChoiceRows small rows={gearRows} selection={gearSelection} items={gearItems} onChange={(gear) => go({ materiel: gear })} />)}
           </div>
         )}
@@ -557,53 +557,63 @@ function StatisticsPage() {
       <MemoryStatus compact />
 
       {status === 'opening' ? (
-        <p className="ui-hint">Lecture de la mémoire…</p>
+        <p className="ui-hint">{t('Lecture de la mémoire…')}</p>
       ) : (
         <div className="stats-col">
           <SectionTabs sections={sections} open={open} onToggle={toggle} accent={tabAccent} />
           {scanning && (
-            <p className="ui-hint">Fiches en cours de calcul ({scanning.done} / {scanning.total}) : chiffres provisoires.</p>
+            <p className="ui-hint">{t('Fiches en cours de calcul ({done} / {total}) : chiffres provisoires.', { done: scanning.done, total: scanning.total })}</p>
           )}
           <div className="an-carte-panels stats-panels brush-panels" style={panelsBrush}>
             {open.general && (
               <ResizablePanel id={panelId('general')} style={ANALYSIS_PANEL_STYLE}>
-                <PanelHeading label="Général" open={open.general} onToggle={() => toggle('general')}
+                <PanelHeading label={t('Général')} open={open.general} onToggle={() => toggle('general')}
                     helpKey={family === 'voile' && totals.maneuverSessions < totals.sessions ? 'stats:general' : undefined} />
                 <HelpText helpKey="stats:general" note>
-                  Manœuvres comptées sur les {plural(totals.maneuverSessions, 'session')} déjà ouverte{totals.maneuverSessions > 1 ? 's' : ''} dans l'analyse
-                  ({totals.sessions - totals.maneuverSessions} jamais ouverte{totals.sessions - totals.maneuverSessions > 1 ? 's' : ''}).
+                  {tn(
+                    totals.maneuverSessions,
+                    "Manœuvres comptées sur les {n} session déjà ouverte dans l'analyse {never}",
+                    "Manœuvres comptées sur les {n} sessions déjà ouvertes dans l'analyse {never}",
+                    {
+                      never: tn(
+                        totals.sessions - totals.maneuverSessions,
+                        '({n} jamais ouverte).',
+                        '({n} jamais ouvertes).'
+                      ),
+                    }
+                  )}
                 </HelpText>
                 {empty ? (
                   <p className="ui-hint">{NO_SESSION_TEXT}</p>
                 ) : (
                   <>
                     <div className="an-sheet__stats an-sheet__stats--always">
-                      <StatTile label="Sessions" value={totals.sessions} />
-                      <StatTile label="Durée totale" value={formatDuration(totals.durationS * 1000)} title="Du premier au dernier point de chaque session" />
-                      {totals.movingTimeS > 0 && <StatTile label="Temps en action" value={formatDuration(totals.movingTimeS * 1000)} />}
-                      {family !== null && <StatTile label="Distance" value={formatDistanceAuto(totals.distanceM, distanceUnit)} />}
-                      {family !== null && totals.maxSpeedMs !== null && <StatTile label="Vitesse max" value={formatSpeed(totals.maxSpeedMs, speedUnit)} />}
+                      <StatTile label={t('Sessions')} value={totals.sessions} />
+                      <StatTile label={t('Durée totale')} value={formatDuration(totals.durationS * 1000)} title={t('Du premier au dernier point de chaque session')} />
+                      {totals.movingTimeS > 0 && <StatTile label={t('Temps en action')} value={formatDuration(totals.movingTimeS * 1000)} />}
+                      {family !== null && <StatTile label={t('Distance')} value={formatDistanceAuto(totals.distanceM, distanceUnit)} />}
+                      {family !== null && totals.maxSpeedMs !== null && <StatTile label={t('Vitesse max')} value={formatSpeed(totals.maxSpeedMs, speedUnit)} />}
                       {family === 'voile' && totals.maneuverSessions > 0 && (
                         <>
-                          <StatTile label="Manœuvres" value={totals.maneuvers} />
-                          <StatTile label="Manœuvres par session" value={formatDecimal(totals.maneuvers / totals.maneuverSessions)} />
+                          <StatTile label={t('Manœuvres')} value={totals.maneuvers} />
+                          <StatTile label={t('Manœuvres par session')} value={formatDecimal(totals.maneuvers / totals.maneuverSessions)} />
                         </>
                       )}
                       {family === 'surf' && totals.waveSessions > 0 && (
                         <>
-                          <StatTile label="Vagues" value={totals.waves} />
-                          <StatTile label="Vagues par session" value={formatDecimal(totals.waves / totals.waveSessions)} />
+                          <StatTile label={t('Vagues')} value={totals.waves} />
+                          <StatTile label={t('Vagues par session')} value={formatDecimal(totals.waves / totals.waveSessions)} />
                         </>
                       )}
-                      {family === 'surf' && totals.longestWaveM !== null && <StatTile label="Plus longue vague" value={`${Math.round(totals.longestWaveM)} m`} />}
-                      {family === 'surf' && totals.longestFlightS !== null && <StatTile label="Plus long vol" value={formatShortDuration(totals.longestFlightS)} />}
+                      {family === 'surf' && totals.longestWaveM !== null && <StatTile label={t('Plus longue vague')} value={`${Math.round(totals.longestWaveM)} m`} />}
+                      {family === 'surf' && totals.longestFlightS !== null && <StatTile label={t('Plus long vol')} value={formatShortDuration(totals.longestFlightS)} />}
                     </div>
                     {family === null && (
                       <ul className="stats-rows">
-                        {groupTotals(inPeriod, (s) => s.family, SPORT_FAMILIES).map(({ key, totals: t }) => {
+                        {groupTotals(inPeriod, (s) => s.family, SPORT_FAMILIES).map(({ key, totals: groupTotal }) => {
                           const unit = unitActivityOf(key);
                           return (
-                            <GroupRow key={key} color={FAMILY_ACCENT[key]} name={FAMILY_LABEL[key]} totals={t}
+                            <GroupRow key={key} color={FAMILY_ACCENT[key]} name={FAMILY_LABEL[key]} totals={groupTotal}
                               distanceUnit={unit ? effectiveDistanceUnit(unit) : 'km'} onOpen={() => go({ famille: key, activite: null })} />
                           );
                         })}
@@ -611,10 +621,10 @@ function StatisticsPage() {
                     )}
                     {family !== null && activity === null && (
                       <ul className="stats-rows">
-                        {groupTotals(inPeriod, (s) => s.activityId, activityOrder).map(({ key, totals: t }) => {
+                        {groupTotals(inPeriod, (s) => s.activityId, activityOrder).map(({ key, totals: groupTotal }) => {
                           const a = activityById.get(key);
                           return (
-                            <GroupRow key={key} color={activityColor(key)} name={activityName(key)} totals={t}
+                            <GroupRow key={key} color={activityColor(key)} name={activityName(key)} totals={groupTotal}
                               distanceUnit={a ? effectiveDistanceUnit(a) : distanceUnit} onOpen={() => go({ activite: key })} />
                           );
                         })}
@@ -628,15 +638,16 @@ function StatisticsPage() {
             {open.vitesse && (
               <ResizablePanel id={panelId('vitesse')} defaultHeight={380} minHeight={220} direction="vertical" style={chartPanelStyle}>
                 <div className="ui-mb-8 ui-pr-28">
-                  <PanelTitle label="Graphique" open={open.vitesse} onToggle={() => toggle('vitesse')} helpKey={chartFull === null ? undefined : 'stats:graphique'} />
+                  <PanelTitle label={t('Graphique')} open={open.vitesse} onToggle={() => toggle('vitesse')} helpKey={chartFull === null ? undefined : 'stats:graphique'} />
                 </div>
                 <HelpText helpKey="stats:graphique" note>
-                  Un point par session, à la couleur de son activité ;
-                  {metric.record ? ' en pointillé, le record établi jusque-là.' : ` en pointillé, la moyenne des ${TREND_SESSIONS} dernières sessions.`}
-                  {narrow ? ' Toucher un point pour le détail, écarter deux doigts pour zoomer.' : ' Cliquer un point pour le détail, tirer une zone pour zoomer.'}
+                  {t('Un point par session, à la couleur de son activité ; {dotted} {gesture}', {
+                    dotted: metric.record ? t('en pointillé, le record établi jusque-là.') : t('en pointillé, la moyenne des {n} dernières sessions.', { n: TREND_SESSIONS }),
+                    gesture: narrow ? t('Toucher un point pour le détail, écarter deux doigts pour zoomer.') : t('Cliquer un point pour le détail, tirer une zone pour zoomer.'),
+                  })}
                 </HelpText>
                 {metrics.length > 1 && (
-                  <Chips label="Donnée" items={metrics.map((m) => ({ key: m.key, label: m.label }))} value={metricKey} accent={tabAccent}
+                  <Chips label={t('Donnée')} items={metrics.map((m) => ({ key: m.key, label: m.label }))} value={metricKey} accent={tabAccent}
                     className="stats-metric-chips" onChoose={(key) => { rememberView({ donnee: key }); setPicked(null); }} />
                 )}
                 {chartFull === null ? (
@@ -644,14 +655,14 @@ function StatisticsPage() {
                 ) : (
                   <>
                     {(twoSeries || weekRows.length > 0) && (
-                      <div className="stats-legend" aria-label="Légende">
+                      <div className="stats-legend" aria-label={t('Légende')}>
                         {twoSeries && legendSeries.map((serie) => (
                           <span key={serie.key} className="stats-legend__item">
                             <SerieShape shape={serieStyle(serie.key).shape} /> {serieStyle(serie.key).legend || serie.label.toLowerCase()}
                           </span>
                         ))}
                         {weekRows.length > 0 && (
-                          <span className="stats-legend__item"><WeekLineShape /> heures par semaine</span>
+                          <span className="stats-legend__item"><WeekLineShape /> {t('heures par semaine')}</span>
                         )}
                       </div>
                     )}
@@ -679,7 +690,7 @@ function StatisticsPage() {
                                 const monday = new Date(row.weekStartMs).toLocaleDateString(dateLocale(), { day: '2-digit', month: '2-digit' });
                                 return (
                                   <div className="stats-tooltip">
-                                    <strong>Semaine du {monday}</strong>
+                                    <strong>{t('Semaine du {monday}', { monday })}</strong>
                                     <span>{formatDuration(row.durationS * 1000)}</span>
                                   </div>
                                 );
@@ -694,11 +705,11 @@ function StatisticsPage() {
                           {chartSeries.map((serie) => (
                             <Line key={`ligne-${serie.key}`} data={serie.rows} dataKey="lineY" type={metric.record ? 'stepAfter' : 'linear'}
                               stroke={OTHERS_COLOR} strokeDasharray={serieStyle(serie.key).dash} strokeWidth={1.5}
-                              dot={false} activeDot={false} isAnimationActive={false} name={metric.record ? 'Record' : 'Tendance'} />
+                              dot={false} activeDot={false} isAnimationActive={false} name={metric.record ? t('Record') : t('Tendance')} />
                           ))}
                           {weekRows.length > 0 && (
                             <Line key="heures-semaine" data={weekRows} dataKey="y" type="linear" stroke={WEEK_LINE_COLOR} strokeWidth={2}
-                              dot={false} activeDot={{ r: 3 }} isAnimationActive={false} name="Heures par semaine" />
+                              dot={false} activeDot={{ r: 3 }} isAnimationActive={false} name={t('Heures par semaine')} />
                           )}
                           {chartSeries.flatMap((serie) => serie.byActivity.map(([activityId, rows]) => (
                             <Scatter key={`${serie.key}-${activityId}`} data={rows} dataKey="y" fill={activityColor(activityId)} {...ACTIVITY_MARK_EDGE} isAnimationActive={false}
@@ -715,14 +726,18 @@ function StatisticsPage() {
                           <span className="stats-row__name">{dayMonthYear(pickedSession.startMs)}</span>
                           <span className="stats-row__meta num">
                             {pickedSession.name} · {pickedPoints.map(({ label, point }) => pointText(label, point)).join(' · ')}
-                            {pickedPoints.some(({ point }) => point.isRecord) ? ' · record' : ''}
+                            {pickedPoints.some(({ point }) => point.isRecord) ? ` · ${t('record')}` : ''}
                           </span>
-                          <span className="stats-row__open">Ouvrir</span>
+                          <span className="stats-row__open">{t('Ouvrir')}</span>
                           <IconChevronRight size={16} className="stats-row__chevron" />
                         </button>
                       ) : voileWithoutResults > 0 && (
                         <span style={noteStyle}>
-                          Réussite connue seulement des sessions déjà ouvertes dans l'analyse : {plural(voileWithoutResults, 'session')} à rouvrir.
+                          {tn(
+                            voileWithoutResults,
+                            "Réussite connue seulement des sessions déjà ouvertes dans l'analyse : {n} session à rouvrir.",
+                            "Réussite connue seulement des sessions déjà ouvertes dans l'analyse : {n} sessions à rouvrir."
+                          )}
                         </span>
                       )}
                     </div>
@@ -734,19 +749,19 @@ function StatisticsPage() {
             {open.regularite && (
               <ResizablePanel id={panelId('regularite')} defaultHeight={380} minHeight={220} direction="vertical" style={chartPanelStyle}>
                 <div className="ui-mb-10 ui-pr-28">
-                  <PanelTitle label="Régularité" open={open.regularite} onToggle={() => toggle('regularite')} helpKey={regular.weeks === 0 ? undefined : 'stats:regularite'} />
+                  <PanelTitle label={t('Régularité')} open={open.regularite} onToggle={() => toggle('regularite')} helpKey={regular.weeks === 0 ? undefined : 'stats:regularite'} />
                 </div>
-                <HelpText helpKey="stats:regularite" note>Sessions par {regular.barUnit}, empilées par activité.</HelpText>
+                <HelpText helpKey="stats:regularite" note>{t('Sessions par {unit}, empilées par activité.', { unit: regular.barUnit })}</HelpText>
                 {regular.weeks === 0 ? (
                   <p className="ui-hint">{NO_SESSION_TEXT}</p>
                 ) : (
                   <>
                     <div className="an-sheet__stats an-sheet__stats--always">
-                      <StatTile label="Sessions par semaine" value={formatDecimal(regular.perWeek)} title="En moyenne sur les semaines de la période" />
-                      <StatTile label="Semaines actives" value={`${regular.activeWeeks} / ${regular.weeks}`} />
-                      <StatTile label="Plus longue série" value={plural(regular.longestStreak, 'semaine')} title="Semaines actives consécutives sur la période" />
-                      <StatTile label="Série en cours" value={plural(regular.currentStreak, 'semaine')} title="Jusqu'à cette semaine, ou à la précédente si celle-ci est vide" />
-                      <StatTile label="Dernière session" value={lastText} />
+                      <StatTile label={t('Sessions par semaine')} value={formatDecimal(regular.perWeek)} title={t('En moyenne sur les semaines de la période')} />
+                      <StatTile label={t('Semaines actives')} value={`${regular.activeWeeks} / ${regular.weeks}`} />
+                      <StatTile label={t('Plus longue série')} value={tn(regular.longestStreak, '{n} semaine', '{n} semaines')} title={t('Semaines actives consécutives sur la période')} />
+                      <StatTile label={t('Série en cours')} value={tn(regular.currentStreak, '{n} semaine', '{n} semaines')} title={t("Jusqu'à cette semaine, ou à la précédente si celle-ci est vide")} />
+                      <StatTile label={t('Dernière session')} value={lastText} />
                     </div>
                     <div className="stats-chart-grow">
                       <ResponsiveContainer>
@@ -772,26 +787,26 @@ function StatisticsPage() {
 
             {open.cardio && hasCardio && (
               <ResizablePanel id={panelId('cardio')} style={ANALYSIS_PANEL_STYLE}>
-                <PanelHeading label="Cardio" open={open.cardio} onToggle={() => toggle('cardio')} helpKey={hrZones ? 'stats:cardio' : undefined} />
+                <PanelHeading label={t('Cardio')} open={open.cardio} onToggle={() => toggle('cardio')} helpKey={hrZones ? 'stats:cardio' : undefined} />
                 <HelpText helpKey="stats:cardio" note>
-                  Zones et charge recalculées avec les seuils de Réglages › Pratiquant, décalés pour l'activité de chaque session. Un point par session, à la couleur de son activité ; le toucher ouvre la session.
+                  {t("Zones et charge recalculées avec les seuils de Réglages › Pratiquant, décalés pour l'activité de chaque session. Un point par session, à la couleur de son activité ; le toucher ouvre la session.")}
                 </HelpText>
                 <div className="an-sheet__stats an-sheet__stats--always">
-                  <StatTile label="Sessions avec FC" value={`${cardio.sessions} / ${totals.sessions}`} />
-                  <StatTile label="Temps mesuré" value={formatDuration(cardio.coveredS * 1000)} />
-                  {cardio.avgBpm !== null && <StatTile label="FC moyenne" value={`${Math.round(cardio.avgBpm)} bpm`} title="Pondérée par le temps mesuré de chaque session" />}
-                  {cardio.maxBpm !== null && <StatTile label="FC max" value={`${cardio.maxBpm} bpm`} />}
-                  {cardio.load !== null && <StatTile label={<>Charge <HelpToggle helpKey="stats:charge" label="Qu'est-ce que la charge ?" /></>} value={Math.round(cardio.load)} />}
-                  {cardio.load !== null && regular.weeks > 0 && <StatTile label="Charge par semaine" value={Math.round(cardio.load / regular.weeks)} />}
+                  <StatTile label={t('Sessions avec FC')} value={`${cardio.sessions} / ${totals.sessions}`} />
+                  <StatTile label={t('Temps mesuré')} value={formatDuration(cardio.coveredS * 1000)} />
+                  {cardio.avgBpm !== null && <StatTile label={t('FC moyenne')} value={`${Math.round(cardio.avgBpm)} bpm`} title={t('Pondérée par le temps mesuré de chaque session')} />}
+                  {cardio.maxBpm !== null && <StatTile label={t('FC max')} value={`${cardio.maxBpm} bpm`} />}
+                  {cardio.load !== null && <StatTile label={tRich('Charge {help}', { help: <HelpToggle helpKey="stats:charge" label={t("Qu'est-ce que la charge ?")} /> })} value={Math.round(cardio.load)} />}
+                  {cardio.load !== null && regular.weeks > 0 && <StatTile label={t('Charge par semaine')} value={Math.round(cardio.load / regular.weeks)} />}
                 </div>
                 {hrZones && <CardioLoadHelpSlot bounds={hrZones.bounds} />}
 
                 {cardio.zoneTimesS && cardio.coveredS > 0 && (
                   <div className="ui-mt-10">
-                    <div className="stats-records__title">Temps par zone</div>
+                    <div className="stats-records__title">{t('Temps par zone')}</div>
                     <div className="stats-zone-bar">
                       {cardio.zoneTimesS.map((s, z) => s > 0 && (
-                        <div key={z} title={`${zoneLabel(z)} : ${formatShortDuration(s)}`} style={{ width: `${(s / cardio.coveredS) * 100}%`, backgroundColor: HEART_ZONE_COLORS[z] }} />
+                        <div key={z} title={t('{zone} : {time}', { zone: zoneLabel(z), time: formatShortDuration(s) })} style={{ width: `${(s / cardio.coveredS) * 100}%`, backgroundColor: HEART_ZONE_COLORS[z] }} />
                       ))}
                     </div>
                     <div className="stats-zone-legend">
@@ -807,7 +822,7 @@ function StatisticsPage() {
 
                 {loadBars.length > 0 && (
                   <div className="ui-mt-12">
-                    <div className="stats-records__title">Charge par {regular.barUnit}</div>
+                    <div className="stats-records__title">{t('Charge par {unit}', { unit: regular.barUnit })}</div>
                     <div className="ui-h-160">
                       <ResponsiveContainer>
                         <BarChart data={loadBars.map((b, i) => ({ i, load: Math.round(b.load) }))} accessibilityLayer={false} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
@@ -815,7 +830,7 @@ function StatisticsPage() {
                           <XAxis dataKey="i" tickFormatter={(i: number) => loadBars[i]?.label ?? ''} interval="preserveStartEnd" minTickGap={16} tick={CHART_TICK} />
                           <YAxis allowDecimals={false} width={36} tick={CHART_TICK} />
                           <Tooltip isAnimationActive={false} cursor={{ fill: 'var(--chart-cursor)' }}
-                            labelFormatter={(i) => loadBars[Number(i)]?.title ?? ''} formatter={(value) => [value, 'Charge']} contentStyle={{ fontSize: 'var(--text-xs)' }} />
+                            labelFormatter={(i) => loadBars[Number(i)]?.title ?? ''} formatter={(value) => [value, t('Charge')]} contentStyle={{ fontSize: 'var(--text-xs)' }} />
                           <Bar dataKey="load" fill={HEART_RATE_COLOR} isAnimationActive={false} />
                         </BarChart>
                       </ResponsiveContainer>
@@ -825,7 +840,7 @@ function StatisticsPage() {
 
                 {hrPoints.length > 0 && hrTicks && (
                   <div className="ui-mt-12">
-                    <div className="stats-records__title">FC moyenne par session</div>
+                    <div className="stats-records__title">{t('FC moyenne par session')}</div>
                     <div className="ui-h-160">
                       <ResponsiveContainer>
                         <ComposedChart accessibilityLayer={false} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
@@ -840,7 +855,7 @@ function StatisticsPage() {
                               return (
                                 <div className="stats-tooltip">
                                   <strong>{dayMonthYear(row.startMs)}</strong>
-                                  <span>{activityName(row.activityId)} · moy. {row.avgBpm} bpm · max {row.maxBpm} bpm</span>
+                                  <span>{activityName(row.activityId)} · {t('moy. {avg} bpm', { avg: row.avgBpm })} · {t('max {max} bpm', { max: row.maxBpm })}</span>
                                 </div>
                               );
                             }} />
@@ -855,13 +870,13 @@ function StatisticsPage() {
                   </div>
                 )}
 
-                {!hrZones && <p style={noteStyle}>Pour les zones et la charge, saisir la FC max ou l'année de naissance dans Réglages › Pratiquant.</p>}
+                {!hrZones && <p style={noteStyle}>{t("Pour les zones et la charge, saisir la FC max ou l'année de naissance dans Réglages › Pratiquant.")}</p>}
               </ResizablePanel>
             )}
 
             {open.records && family !== null && (
               <ResizablePanel id={panelId('records')} style={ANALYSIS_PANEL_STYLE}>
-                <PanelHeading label="Records" open={open.records} onToggle={() => toggle('records')} />
+                <PanelHeading label={t('Records')} open={open.records} onToggle={() => toggle('records')} />
                 {empty ? (
                   <p className="ui-hint">{NO_SESSION_TEXT}</p>
                 ) : (

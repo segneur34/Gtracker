@@ -1,4 +1,6 @@
 import { toFixedNumber } from '../core/basics';
+import { t } from '../core/i18n';
+import { tRich } from './tRich';
 import { memo, useMemo, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import BandShareTable from './BandShareTable';
@@ -95,7 +97,7 @@ function CardioCurve({ minutes, smoothed, zoom: source, zones, thresholds, zoneL
   };
   return (
     <>
-      <HoverReadout read={read} label="FC" color={HEART_RATE_COLOR} line />
+      <HoverReadout read={read} label={t('FC')} color={HEART_RATE_COLOR} line />
       <HeartRateChart data={rows} zoom={zoom} zones={zones} thresholds={thresholds} zoneLines={zoneLines} onShowOnMap={onShowOnMap}
         style={style} x={elapsedX()}>
         {children}
@@ -150,43 +152,43 @@ function HeartRatePanel({
 
   return (
     <>
-      <PanelHeading label="Cardio" open={open} onToggle={onToggle} helpKey="analyse:cardio" />
+      <PanelHeading label={t('Cardio')} open={open} onToggle={onToggle} helpKey="analyse:cardio" />
       <HelpText helpKey="analyse:cardio" note>
-        FC lissée sur {params.smoothS} s ; un trou de plus de {params.gapS} s (ceinture retirée, pause) n'est pas compté.
-        {' Le survol de la courbe déplace le repère sur la carte.'}
-        {zones && " Les traits noirs S1 et S2 de la courbe sont vos seuils aérobie et anaérobie."}
-        {zones && " « Voir » montre les passages d'une zone sur la carte, en violet."}
+        {t("FC lissée sur {smoothS} s ; un trou de plus de {gapS} s (ceinture retirée, pause) n'est pas compté.", { smoothS: params.smoothS, gapS: params.gapS })}
+        {' '}{t('Le survol de la courbe déplace le repère sur la carte.')}
+        {zones && <>{' '}{t('Les traits noirs S1 et S2 de la courbe sont vos seuils aérobie et anaérobie.')}</>}
+        {zones && <>{' '}{t("« Voir » montre les passages d'une zone sur la carte, en violet.")}</>}
       </HelpText>
       <div className="an-sheet__stats an-sheet__stats--always">
-        <StatTile label="FC moyenne" value={<>{Math.round(stats.avgBpm)} bpm</>} />
-        <StatTile label="FC max" value={<>{stats.maxBpm} bpm</>} />
+        <StatTile label={t('FC moyenne')} value={<>{Math.round(stats.avgBpm)} bpm</>} />
+        <StatTile label={t('FC max')} value={<>{stats.maxBpm} bpm</>} />
         {zones && (
           <StatTile label="S1 · S2" value={<>{zones.s1} · {zones.s2} bpm</>} />
         )}
         {zoneTimes && (
           <StatTile
-            label={<>Charge <HelpToggle helpKey="analyse:charge" label="Qu'est-ce que la charge ?" /></>}
+            label={<>{t('Charge')} <HelpToggle helpKey="analyse:charge" label={t("Qu'est-ce que la charge ?")} /></>}
             value={Math.round(edwardsLoad(zoneTimes, params.loadWeights))} />
         )}
-        <StatTile label="Temps mesuré" value={formatShortDuration(stats.coveredS)} />
+        <StatTile label={t('Temps mesuré')} value={formatShortDuration(stats.coveredS)} />
         {hrEnergy && energy?.kind === 'estimation' && (
           <StatTile
-            label={<>Énergie estimée <HelpToggle helpKey="analyse:energie-fc" label="Énergie estimée" /></>}
-            value={<>env. {hrEnergyKcal(energy.totalJ, hrEnergy.displayStepKcal)} kcal</>}
+            label={<>{t('Énergie estimée')} <HelpToggle helpKey="analyse:energie-fc" label={t('Énergie estimée')} /></>}
+            value={t('env. {kcal} kcal', { kcal: hrEnergyKcal(energy.totalJ, hrEnergy.displayStepKcal) })}
             detail={<>
-              dont env. {hrEnergyKcal(energy.restJ, hrEnergy.displayStepKcal)} kcal au repos
-              {!energy.extrapolated && <>, sur {formatShortDuration(energy.measuredS)} avec FC</>}
+              {t('dont env. {kcal} kcal au repos', { kcal: hrEnergyKcal(energy.restJ, hrEnergy.displayStepKcal) })}
+              {!energy.extrapolated && t(', sur {duration} avec FC', { duration: formatShortDuration(energy.measuredS) })}
             </>} />
         )}
       </div>
       {loadHelp?.open && zones && <CardioLoadHelp bounds={zones.bounds} weights={params.loadWeights} />}
       <HelpText helpKey="analyse:energie-fc" note>
-        Calculée à partir de votre rythme cardiaque, de votre poids, de votre âge et de votre sexe. C'est un ordre de grandeur,
-        pas une mesure : comptez 25 % d'écart, davantage par temps froid ou en position de rappel.
+        {t("Calculée à partir de votre rythme cardiaque, de votre poids, de votre âge et de votre sexe. C'est un ordre de grandeur, pas une mesure : comptez 25 % d'écart, davantage par temps froid ou en position de rappel.")}
       </HelpText>
       {energy?.kind === 'profil-incomplet' && (
         <p className="ui-muted ui-text-s ui-my-8">
-          Pour l'énergie estimée, renseignez votre poids et votre année de naissance dans <Link to="/parametres">Réglages › Pratiquant</Link>.
+          {tRich("Pour l'énergie estimée, renseignez votre poids et votre année de naissance dans <a>Réglages › Pratiquant</a>.", undefined,
+            { a: (children) => <Link to="/parametres">{children}</Link> })}
         </p>
       )}
 
@@ -194,10 +196,10 @@ function HeartRatePanel({
         <div className="ui-row-10 ui-center ui-wrap ui-my-8 ui-text-s">
           <span>
             {profileHrMax === null
-              ? `Aucune FC max dans Réglages › Pratiquant : celle de cette sortie est de ${stats.maxBpm} bpm.`
-              : `FC max de la sortie : ${stats.maxBpm} bpm, au-dessus de celle de Pratiquant (${profileHrMax}).`}
+              ? t('Aucune FC max dans Réglages › Pratiquant : celle de cette sortie est de {bpm} bpm.', { bpm: stats.maxBpm })
+              : t('FC max de la sortie : {bpm} bpm, au-dessus de celle de Pratiquant ({max}).', { bpm: stats.maxBpm, max: profileHrMax })}
           </span>
-          <Button size="s" onClick={() => onRetainHrMax(stats.maxBpm)}>La retenir</Button>
+          <Button size="s" onClick={() => onRetainHrMax(stats.maxBpm)}>{t('La retenir')}</Button>
         </div>
       )}
 
@@ -208,16 +210,17 @@ function HeartRatePanel({
 
       {zones && zoneTimes ? (
         <>
-          <BandShareTable head="Zone" detailHead="FC" shareWidth="30%" marginTop="10px"
+          <BandShareTable head={t('Zone')} detailHead={t('FC')} shareWidth="30%" marginTop="10px"
             rows={zoneTimes.map((timeS, zone) => ({ color: HEART_ZONE_COLORS[zone], label: zoneLabel(zone), detail: bandRangeLabel(zones.bounds, zone), timeS }))}
             selected={selectedZone} onSelect={onSelectZone} />
           <div className="ui-muted ui-text-xs ui-mt-6">
-            Zones calées sur {zonesOriginText(zones, athlete)}
+            {t('Zones calées sur {origin}', { origin: zonesOriginText(zones, athlete) })}
           </div>
         </>
       ) : (
         <p className="ui-muted ui-text-s ui-mt-10">
-          Pour les zones d'effort, saisir la FC max ou l'année de naissance dans <Link to="/parametres">Réglages</Link>, bloc « Pratiquant ».
+          {tRich("Pour les zones d'effort, saisir la FC max ou l'année de naissance dans <a>Réglages</a>, bloc « Pratiquant ».", undefined,
+            { a: (children) => <Link to="/parametres">{children}</Link> })}
         </p>
       )}
 

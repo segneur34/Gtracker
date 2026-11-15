@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { SPEED_UNIT_LABEL, fromDisplaySpeed, speedFromText, toDisplaySpeed, type SpeedUnit } from '../core/units';
+import { t } from '../core/i18n';
 import Button from './ui/Button';
 
 interface SessionThresholdFieldProps {
@@ -61,7 +62,7 @@ function SessionThresholdField({ label, title, value, defaultValue, isOverridden
   };
   return (
     <label className="ui-row-6 ui-center ui-wrap" title={title}>
-      <strong>{label} :</strong>
+      <strong>{t('{label} :', { label })}</strong>
       <input type="number" min={0} step={unit === 'ms' ? 0.1 : 0.5} value={text} aria-label={label}
         onChange={(e) => {
           setText(e.target.value);
@@ -76,8 +77,8 @@ function SessionThresholdField({ label, title, value, defaultValue, isOverridden
       {!isOverridden && hint && <span className="ui-muted ui-text-xs">({hint})</span>}
       {isOverridden && (
         <Button size="s" onClick={() => onChange(null)}
-          title={defaultValue === undefined ? 'Revenir au défaut' : `Revenir au défaut (${shown(defaultValue)} ${SPEED_UNIT_LABEL[unit]})`}>
-          Défaut
+          title={defaultValue === undefined ? t('Revenir au défaut') : t('Revenir au défaut ({value} {unit})', { value: shown(defaultValue), unit: SPEED_UNIT_LABEL[unit] })}>
+          {t('Défaut')}
         </Button>
       )}
       {!isOverridden && note && <span style={{ flexBasis: '100%', color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>{note}</span>}

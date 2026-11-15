@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { LogoId } from '../core/activityLogos';
-import { plural } from '../core/basics';
+import { t, tn } from '../core/i18n';
 import type { BrushFrameProps } from './brushFrame';
 import ActivityLogo from './logos/ActivityLogo';
 import './ProfileFavorites.css';
@@ -36,24 +36,24 @@ function ProfileFavorites({ cells, total, frame }: {
   frame: BrushFrameProps;
 }) {
   return (
-    <section className={`profile-favs ui-card-col ${frame.className}`} style={frame.style} aria-label="Activités favorites">
-      <h2 className="profile-card__title">Activités favorites</h2>
-      {cells.length === 0 && <p className="ui-hint profile-favs__empty">Aucune session rangée sur cette période.</p>}
+    <section className={`profile-favs ui-card-col ${frame.className}`} style={frame.style} aria-label={t('Activités favorites')}>
+      <h2 className="profile-card__title">{t('Activités favorites')}</h2>
+      {cells.length === 0 && <p className="ui-hint profile-favs__empty">{t('Aucune session rangée sur cette période.')}</p>}
       <ol className="profile-favs__row">
         {cells.map((c, i) => (
           <li key={c.key} className="profile-favs__cell">
-            <Link to={c.to} className="profile-favs__art profile-favs__link" aria-label={`Sessions de ${c.name}`}>
+            <Link to={c.to} className="profile-favs__art profile-favs__link" aria-label={t('Sessions de {nom}', { nom: c.name })}>
               <ActivityLogo logo={c.logo} color={c.color} size={FAVORITE_LOGO_PX[i] ?? FAVORITE_LOGO_PX[FAVORITE_LOGO_PX.length - 1]}
                 className={`profile-favs__logo profile-favs__logo--${Math.min(i, FAVORITE_LOGO_PX.length - 1) + 1}`} />
             </Link>
             <span className="profile-favs__name">{c.name}</span>
-            <span className="profile-favs__sessions num">{plural(c.sessions, 'session')}</span>
+            <span className="profile-favs__sessions num">{tn(c.sessions, '{n} session', '{n} sessions')}</span>
             <span className="profile-favs__distance num">{c.distance}</span>
           </li>
         ))}
         <li className="profile-favs__cell profile-favs__cell--total">
           <span className="profile-favs__art" />
-          <span className="ui-eyebrow profile-favs__name">Total</span>
+          <span className="ui-eyebrow profile-favs__name">{t('Total')}</span>
           <span className="profile-favs__sessions" aria-hidden="true">&nbsp;</span>
           <span className="profile-favs__distance num">{total}</span>
         </li>

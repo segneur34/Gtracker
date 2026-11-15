@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { pushBackLayer } from '../../platform/backButton';
+import { t } from '../../core/i18n';
 import './Dialog.css';
 
 /**
@@ -37,7 +38,7 @@ function Dialog({ title, onClose, className, children }: {
         onClick={(e) => e.stopPropagation()}>
         <div className="ui-dialog__head">
           <strong>{title}</strong>
-          <button type="button" className="ui-dialog__close" onClick={onClose} aria-label="Fermer">×</button>
+          <button type="button" className="ui-dialog__close" onClick={onClose} aria-label={t('Fermer')}>×</button>
         </div>
         {children}
       </div>

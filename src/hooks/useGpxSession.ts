@@ -1,4 +1,5 @@
 import { plainError } from '../platform/errorText';
+import { t } from '../core/i18n';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { kinematicsProfileOf, prepareRawTrack, type PreparedTrack } from '../core/prepareTrack';
 import type { KinematicsProfile } from '../core/sessionSpeed';
@@ -54,7 +55,7 @@ const NOTHING_SHOWN: ShownGpx = { from: null, fileName: null, error: null, prepa
 export const preparedState = (from: GpxSource, prepared: PreparedTrack): ShownGpx => ({
   from,
   fileName: from.fileName,
-  error: prepared.rawPoints.length < 2 ? 'Le fichier ne contient pas assez de points horodatés.' : null,
+  error: prepared.rawPoints.length < 2 ? t('Le fichier ne contient pas assez de points horodatés.') : null,
   prepared,
 });
 
@@ -62,7 +63,7 @@ export const preparedState = (from: GpxSource, prepared: PreparedTrack): ShownGp
 export const failedState = (from: GpxSource, err: unknown): ShownGpx => ({
   from,
   fileName: from.fileName,
-  error: plainError(err, 'Lecture du fichier impossible.'),
+  error: plainError(err, t('Lecture du fichier impossible.')),
   prepared: null,
 });
 

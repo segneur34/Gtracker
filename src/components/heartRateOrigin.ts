@@ -1,3 +1,4 @@
+import { t } from '../core/i18n';
 import { pad2 } from '../core/units';
 import type { HeartRateZones } from '../core/heartRate';
 import { athleteHrSource, type HrSource, type AthleteProfile } from '../library/athleteProfile';
@@ -9,17 +10,17 @@ import { athleteHrSource, type HrSource, type AthleteProfile } from '../library/
 
 /** « test du 24/10 », « séance du 20/10 », « saisie ». */
 export const hrSourceLabel = (source: HrSource): string => {
-  if (source.kind === 'saisie') return 'saisie';
-  const kind = source.kind === 'test' ? 'test' : 'séance';
+  if (source.kind === 'saisie') return t('saisie');
+  const kind = source.kind === 'test' ? t('test') : t('séance');
   if (source.atMs === null) return kind;
   const date = new Date(source.atMs);
-  return `${kind} du ${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}`;
+  return t('{kind} du {date}', { kind, date: `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}` });
 };
 
 /** Origine de la FC max retenue par les zones : estimée par l'âge, ou celle de Pratiquant. */
 const hrMaxOriginLabel = (zones: Pick<HeartRateZones, 'estimated'>, profile: AthleteProfile): string => {
   const source = athleteHrSource(profile, 'hrMax');
-  return zones.estimated || source === null ? "estimée par l'âge" : hrSourceLabel(source);
+  return zones.estimated || source === null ? t("estimée par l'âge") : hrSourceLabel(source);
 };
 
 /** Décalage signé, avec le vrai signe moins : « −7 », « +3 ». */
@@ -30,13 +31,15 @@ export const formatOffsetBpm = (offsetBpm: number): string => (offsetBpm < 0 ? `
  * (test du 25/10) et de la FC max 190 (saisie). »
  */
 export const zonesOriginText = (zones: HeartRateZones, profile: AthleteProfile): string => {
-  const offset = zones.offsetBpm !== 0 ? ` (${formatOffsetBpm(zones.offsetBpm)} pour cette activité)` : '';
-  const seuils = `S1 ${zones.s1} et S2 ${zones.s2} bpm${offset}`;
-  const hrMax = zones.hrMax === null ? '' : `FC max ${zones.hrMax} (${hrMaxOriginLabel(zones, profile)})`;
-  if (zones.method === 'saisis') return `${seuils}, saisis dans Réglages › Pratiquant.`;
+  const offset = zones.offsetBpm !== 0 ? ` ${t('({offset} pour cette activité)', { offset: formatOffsetBpm(zones.offsetBpm) })}` : '';
+  const seuils = `${t('S1 {s1} et S2 {s2} bpm', { s1: zones.s1, s2: zones.s2 })}${offset}`;
+  const hrMax = zones.hrMax === null ? '' : t('FC max {hrMax} ({origin})', { hrMax: zones.hrMax, origin: hrMaxOriginLabel(zones, profile) });
+  if (zones.method === 'saisis') return t('{seuils}, saisis dans Réglages › Pratiquant.', { seuils });
   if (zones.method === 'reserve') {
     const rest = athleteHrSource(profile, 'hrRest');
-    return `${seuils}, tirés de la FC repos ${profile.hrRest} (${rest ? hrSourceLabel(rest) : 'saisie'}) et de la ${hrMax}.`;
+    return t('{seuils}, tirés de la FC repos {hrRest} ({origin}) et de la {hrMax}.', {
+      seuils, hrRest: profile.hrRest ?? '', origin: rest ? hrSourceLabel(rest) : t('saisie'), hrMax,
+    });
   }
-  return `${seuils}, tirés de la ${hrMax}, sans FC repos.`;
+  return t('{seuils}, tirés de la {hrMax}, sans FC repos.', { seuils, hrMax });
 };

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { t } from '../core/i18n';
 import {
   EDITED_PART_LABEL,
   changedParts,
@@ -107,7 +108,7 @@ export const useSessionDraft = (file: string | null) => {
     () =>
       dirty && savable
         ? {
-            message: `Modifications non enregistrées sur cette session (${changedText}). Quitter sans les enregistrer ?`,
+            message: t('Modifications non enregistrées sur cette session ({changedText}). Quitter sans les enregistrer ?', { changedText }),
             discard: cancel,
           }
         : null,

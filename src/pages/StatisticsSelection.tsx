@@ -10,8 +10,7 @@ import {
   type GearFilterItem, type GearFilterRow, type GearSelection, type StatSession, type StatsChoice, type StatsPeriod,
 } from '../library/stats';
 
-/** Ce que dit le matériel quand aucune session de la période n'en porte. */
-export const NO_GEAR_TEXT = 'Aucun matériel sur les sessions de cette période.';
+import { t } from '../core/i18n';
 
 /**
  * Lignes du filtre « Matériel », une par groupe : son nom, puis « Tous » et ses pièces. `onChange` reçoit le
@@ -29,8 +28,8 @@ export function GearChoiceRows({ rows, selection, items, small, onChange }: {
       {rows.map((row) => (
         <div key={row.groupId} className="stats-gear">
           <span className="stats-gear__label">{row.groupName}</span>
-          <ChoiceButtons small={small} label={`Matériel : ${row.groupName}`}
-            items={[{ key: '', label: 'Tous' }, ...row.items.map((it) => ({ key: it.key, label: it.itemName }))]}
+          <ChoiceButtons small={small} label={t('Matériel : {group}', { group: row.groupName })}
+            items={[{ key: '', label: t('Tous') }, ...row.items.map((it) => ({ key: it.key, label: it.itemName }))]}
             value={selection.find((it) => it.groupId === row.groupId)?.key ?? ''}
             onChange={(key) => onChange(gearParamOf(withGearPick(selection, row.groupId, row.items.find((it) => it.key === key) ?? null, items)))} />
         </div>
@@ -64,7 +63,7 @@ function StatsSelectionDialog({ initial, all, activityById, nowMs, onApply, onCl
 
   // Les familles visibles, et celle ouverte par l'adresse.
   const familyItems: { key: SportFamily | 'tout'; label: string }[] = [
-    { key: 'tout', label: 'Tout' },
+    { key: 'tout', label: t('Tout') },
     ...SPORT_FAMILIES.filter((f) => families.includes(f) || f === initial.family).map((f) => ({ key: f, label: FAMILY_LABEL[f] })),
   ];
 
@@ -97,37 +96,37 @@ function StatsSelectionDialog({ initial, all, activityById, nowMs, onApply, onCl
   );
 
   return (
-    <Dialog title="Sélection" onClose={onClose} className="stats-selection-dialog">
+    <Dialog title={t('Sélection')} onClose={onClose} className="stats-selection-dialog">
       <div className="stats-selection__body">
         <section className="stats-selection__block">
-          <span className="ui-subtitle">Famille</span>
-          <ChoiceButtons label="Famille" columns={3} items={familyItems} value={draft.family ?? 'tout'}
+          <span className="ui-subtitle">{t('Famille')}</span>
+          <ChoiceButtons label={t('Famille')} columns={3} items={familyItems} value={draft.family ?? 'tout'}
             onChange={(key) => patch({ family: key === 'tout' ? null : key, activityId: null, gear: null })} />
         </section>
         {draftFamily !== null && activityItems.length > 0 && (
           <section className="stats-selection__block">
-            <span className="ui-subtitle">Activité</span>
-            <ChoiceButtons label="Activité" columns={2} items={[{ key: '', label: 'Toutes' }, ...activityItems]} value={draftActivity?.id ?? ''}
+            <span className="ui-subtitle">{t('Activité')}</span>
+            <ChoiceButtons label={t('Activité')} columns={2} items={[{ key: '', label: t('Toutes') }, ...activityItems]} value={draftActivity?.id ?? ''}
               onChange={(key) => patch({ activityId: key === '' ? null : key, gear: null })} />
           </section>
         )}
         <section className="stats-selection__block">
-          <span className="ui-subtitle">Période</span>
-          <ChoiceButtons label="Période" columns={3} items={STATS_PERIODS.map((p) => ({ key: p.id, label: p.label }))} value={draft.period}
+          <span className="ui-subtitle">{t('Période')}</span>
+          <ChoiceButtons label={t('Période')} columns={3} items={STATS_PERIODS.map((p) => ({ key: p.id, label: p.label }))} value={draft.period}
             onChange={(key: StatsPeriod) => patch({ period: key })} />
         </section>
         {draftActivity !== null && gearGroups !== null && (
           <section className="stats-selection__block">
-            <span className="ui-subtitle">Matériel</span>
+            <span className="ui-subtitle">{t('Matériel')}</span>
             {gearRows.length === 0
-              ? <p className="ui-hint">{NO_GEAR_TEXT}</p>
+              ? <p className="ui-hint">{t('Aucun matériel sur les sessions de cette période.')}</p>
               : <GearChoiceRows rows={gearRows} selection={gearSelection} items={gearItems} onChange={(gear) => patch({ gear })} />}
           </section>
         )}
       </div>
       <div className="stats-selection__foot">
-        <button type="button" className="ui-btn ui-btn--secondary" onClick={onClose}>Annuler</button>
-        <button type="button" className="ui-btn ui-btn--primary" onClick={() => onApply(normalizeStatsChoice(draft))}>Valider</button>
+        <button type="button" className="ui-btn ui-btn--secondary" onClick={onClose}>{t('Annuler')}</button>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => onApply(normalizeStatsChoice(draft))}>{t('Valider')}</button>
       </div>
     </Dialog>
   );

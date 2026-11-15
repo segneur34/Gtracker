@@ -1,4 +1,5 @@
 import { plainError } from '../platform/errorText';
+import { t } from '../core/i18n';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { FAMILY_ACCENT } from '../core/activities';
 import { pickShareStats, SHARE_IMAGE, type ShareStat } from '../core/shareImage';
@@ -98,7 +99,7 @@ function ShareDialog({ family, file, activityId, title, subtitle, fileName, segm
         });
       })
       .catch((err: unknown) => {
-        if (!cancelled) setFailure({ text: plainError(err, 'Image impossible à produire.'), key: drawKey });
+        if (!cancelled) setFailure({ text: plainError(err, t('Image impossible à produire.')), key: drawKey });
       });
     return () => {
       cancelled = true;
@@ -118,34 +119,34 @@ function ShareDialog({ family, file, activityId, title, subtitle, fileName, segm
     if (!image) return;
     setNote(null);
     try {
-      const outcome = await shareFile(image.blob, `${fileName}.png`, "Partager l'image");
-      if (outcome === 'downloaded') setNote({ text: 'Ce navigateur ne partage pas d\'image : elle est téléchargée.', error: false });
+      const outcome = await shareFile(image.blob, `${fileName}.png`, t("Partager l'image"));
+      if (outcome === 'downloaded') setNote({ text: t("Ce navigateur ne partage pas d'image : elle est téléchargée."), error: false });
     } catch (err) {
-      setNote({ text: `Partage impossible : ${plainError(err, 'erreur inconnue')}`, error: true });
+      setNote({ text: t('Partage impossible : {reason}', { reason: plainError(err, t('erreur inconnue')) }), error: true });
     }
   };
 
   return (
-    <Dialog title="Partager l'image" onClose={onClose} className="share-dialog">
+    <Dialog title={t("Partager l'image")} onClose={onClose} className="share-dialog">
 
       <div className="share-dialog__preview" aria-busy={drawing}>
         {image
-          ? <img src={image.url} alt="Aperçu de l'image partagée" style={{ opacity: drawing ? 0.5 : 1 }} />
-          : <span className="share-dialog__wait">Préparation de l'image…</span>}
+          ? <img src={image.url} alt={t("Aperçu de l'image partagée")} style={{ opacity: drawing ? 0.5 : 1 }} />
+          : <span className="share-dialog__wait">{t("Préparation de l'image…")}</span>}
       </div>
 
       {/* Sans trace, pas de fond de carte à choisir. */}
       {segments.length > 0 && (
         <label className="share-dialog__check">
           <input type="checkbox" checked={withMap} onChange={(e) => update({ ...choice, map: e.target.checked })} />
-          Fond de carte
+          {t('Fond de carte')}
         </label>
       )}
 
       {stats.length > 0 && (
         <div>
-          <div className="share-dialog__label">Chiffres sur l'image ({chosen.length} sur {SHARE_IMAGE.maxStats} au plus)</div>
-          <div className="ui-tabs ui-tabs--compact" role="group" aria-label="Chiffres sur l'image"
+          <div className="share-dialog__label">{t("Chiffres sur l'image ({count} sur {max} au plus)", { count: chosen.length, max: SHARE_IMAGE.maxStats })}</div>
+          <div className="ui-tabs ui-tabs--compact" role="group" aria-label={t("Chiffres sur l'image")}
             style={{ '--tab-accent': FAMILY_ACCENT[family] } as CSSProperties}>
             {stats.map((stat) => {
               const on = chosen.some((s) => s.key === stat.key);
@@ -164,10 +165,10 @@ function ShareDialog({ family, file, activityId, title, subtitle, fileName, segm
       {note && <div role="status" className={note.error ? 'ui-alert ui-alert--danger' : 'share-dialog__note'}>{note.text}</div>}
 
       <div className="share-dialog__actions">
-        <Button variant="ghost" onClick={onClose}>Fermer</Button>
+        <Button variant="ghost" onClick={onClose}>{t('Fermer')}</Button>
         <Button variant="primary" disabled={!image || image.key !== drawKey} onClick={() => void share()}>
           <IconShare size={18} />
-          Partager
+          {t('Partager')}
         </Button>
       </div>
     </Dialog>

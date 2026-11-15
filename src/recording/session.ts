@@ -1,4 +1,5 @@
 import { pad2 } from '../core/units';
+import { t } from '../core/i18n';
 import { formatLocalDate } from '../core/calendar';
 import { pointTimeMs } from '../core/kinematics';
 import type { RawTrackPoint, SportType } from '../core/types';
@@ -253,4 +254,4 @@ export const sessionTitle = (startMs: number, activityName: string): string => {
 };
 
 /** Message d'un arrêt sans rien à garder : moins de deux positions. */
-export const nothingToKeep = (): string => 'Moins de deux positions reçues : rien à enregistrer.';
+export const nothingToKeep = (): string => t('Moins de deux positions reçues : rien à enregistrer.');

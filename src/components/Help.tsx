@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { t } from '../core/i18n';
 import { HelpContext, SettingsScopeContext, useHelp } from './helpContext';
 import HelpButton from './ui/HelpButton';
 import './Help.css';
@@ -38,7 +39,7 @@ export function SettingsScope({ children }: { children: ReactNode }) {
 export function HelpToggle({ helpKey, label, size = 'xs' }: { helpKey: string; label: string; size?: 'xs' | 's' }) {
   const help = useHelp(helpKey);
   if (help === null) return null;
-  return <HelpButton size={size} open={help.open} onToggle={help.toggle} label={`Aide : ${label}`} />;
+  return <HelpButton size={size} open={help.open} onToggle={help.toggle} label={t('Aide : {label}', { label })} />;
 }
 
 /**

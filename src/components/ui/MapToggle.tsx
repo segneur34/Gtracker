@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { t } from '../../core/i18n';
 
 interface MapToggleProps {
   /** Vrai quand l'élément est montré sur la carte : la pastille prend alors la couleur de l'analyse. */
@@ -23,7 +24,7 @@ interface MapToggleProps {
  * l'élément est montré. Le style reste en ligne, pour passer devant les règles
  * de boutons des tableaux du téléphone.
  */
-function MapToggle({ shown, onClick, color, ink = 'var(--on-accent)', disabled, labels = ['Voir', 'Masquer'], title, style }: MapToggleProps) {
+function MapToggle({ shown, onClick, color, ink = 'var(--on-accent)', disabled, labels = [t('Voir'), t('Masquer')], title, style }: MapToggleProps) {
   return (
     <button
       type="button" disabled={disabled} title={title} onClick={onClick}

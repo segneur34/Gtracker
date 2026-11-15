@@ -1,3 +1,4 @@
+import { t } from '../core/i18n';
 import type { PatternTone } from '../platform/beeper';
 import { GUIDE_SIGNAL_TONES } from './signalTones';
 
@@ -42,7 +43,7 @@ export interface RestingHrProtocol {
 
 export const RESTING_HR_TEST: RestingHrProtocol = {
   id: 'fc-repos',
-  label: 'FC repos',
+  label: t('FC repos'),
   version: 2,
   leadInS: 10,
   durationS: 180,

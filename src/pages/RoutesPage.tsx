@@ -1,4 +1,5 @@
-import { plural } from '../core/basics';
+import { t, tn } from '../core/i18n';
+import { tRich } from '../components/tRich';
 import { useMemo, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import MemoryStatus from '../components/MemoryStatus';
@@ -75,9 +76,9 @@ function RoutesPage() {
       const saved = await importGpx(await readPickedFile(file), file.name);
       setFilter(null);
       setImported(saved.base);
-      setNote({ text: `« ${saved.record.name} » est rangé dans vos itinéraires.`, error: false });
+      setNote({ text: t('« {name} » est rangé dans vos itinéraires.', { name: saved.record.name }), error: false });
     } catch (err) {
-      setNote({ text: plainError(err, 'Import impossible.'), error: true });
+      setNote({ text: plainError(err, t('Import impossible.')), error: true });
     }
   };
 
@@ -85,10 +86,10 @@ function RoutesPage() {
     setNote(null);
     try {
       const { fileName, text } = await shareFileOf(saved);
-      const outcome = await shareFile(new Blob([text], { type: 'application/gpx+xml' }), fileName, "Partager l'itinéraire");
-      if (outcome === 'downloaded') setNote({ text: 'Ce navigateur ne partage pas de fichier : le GPX est téléchargé.', error: false });
+      const outcome = await shareFile(new Blob([text], { type: 'application/gpx+xml' }), fileName, t("Partager l'itinéraire"));
+      if (outcome === 'downloaded') setNote({ text: t('Ce navigateur ne partage pas de fichier : le GPX est téléchargé.'), error: false });
     } catch (err) {
-      setNote({ text: `Partage impossible : ${plainError(err, 'erreur inconnue')}`, error: true });
+      setNote({ text: t('Partage impossible : {reason}', { reason: plainError(err, t('erreur inconnue')) }), error: true });
     }
   };
 
@@ -98,9 +99,9 @@ function RoutesPage() {
     setNote(null);
     try {
       await remove(saved);
-      setNote({ text: `« ${saved.record.name} » est supprimé.`, error: false });
+      setNote({ text: t('« {name} » est supprimé.', { name: saved.record.name }), error: false });
     } catch (err) {
-      setNote({ text: `Suppression impossible : ${plainError(err, 'erreur inconnue')}`, error: true });
+      setNote({ text: t('Suppression impossible : {reason}', { reason: plainError(err, t('erreur inconnue')) }), error: true });
     }
   };
 
@@ -109,9 +110,9 @@ function RoutesPage() {
   return (
     <div className="ui-page" style={{ '--tab-accent': 'var(--neutral-accent)' } as React.CSSProperties}>
       <PageHeader
-        title="Itinéraires planifiés"
-        back={{ to: '/sessions', label: 'Sessions' }}
-        subtitle={loaded ? plural(routes.length, 'itinéraire') : undefined} />
+        title={t('Itinéraires planifiés')}
+        back={{ to: '/sessions', label: t('Sessions') }}
+        subtitle={loaded ? tn(routes.length, '{n} itinéraire', '{n} itinéraires') : undefined} />
 
       <MemoryStatus />
       {error && <div className="ui-alert ui-alert--danger">{error}</div>}
@@ -119,7 +120,7 @@ function RoutesPage() {
       <div className="ui-flex-between ui-wrap">
         {routes.length > 0 && (
           <label className="ui-row-s2 ui-center ui-text-m">
-            <span className="ui-eyebrow">Trier</span>
+            <span className="ui-eyebrow">{t('Trier')}</span>
             <select className="ui-field ui-field--s" value={sort} onChange={(e) => isRouteSort(e.target.value) && setSort(e.target.value)}>
               {ROUTE_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
@@ -129,13 +130,13 @@ function RoutesPage() {
           {canSave && (
             <label className="ui-btn ui-btn--secondary ui-btn--s">
               <IconFile size={16} />
-              Importer un itinéraire
+              {t('Importer un itinéraire')}
               {/* Sur le téléphone, pas de filtre : Android grise parfois les GPX. Le contenu est vérifié à la lecture. */}
               <input type="file" accept={isNativeApp() ? undefined : '.gpx'} hidden onChange={(e) => void importFile(e)} />
             </label>
           )}
           <Link to="/itineraires" className="ui-btn ui-btn--secondary ui-btn--s">
-            <IconRoute size={18} /> Planifier
+            <IconRoute size={18} /> {t('Planifier')}
           </Link>
         </span>
       </div>
@@ -152,22 +153,24 @@ function RoutesPage() {
           <RouteList routes={shown} activities={activities} currentBase={imported}
             actions={(saved) => confirmingDelete === saved.base ? (
               <span className="ui-row-s2 ui-wrap">
-                <Button size="s" variant="danger" onClick={() => void deleteRoute(saved)}>Supprimer définitivement</Button>
-                <Button size="s" variant="ghost" onClick={() => setConfirmingDelete(null)}>Garder</Button>
+                <Button size="s" variant="danger" onClick={() => void deleteRoute(saved)}>{t('Supprimer définitivement')}</Button>
+                <Button size="s" variant="ghost" onClick={() => setConfirmingDelete(null)}>{t('Garder')}</Button>
               </span>
             ) : (
-              <MoreMenu label="Plus d'actions sur l'itinéraire">
-                <Button size="s" variant="ghost" onClick={() => void share(saved)} aria-label={`Partager ${saved.record.name}`}>
-                  <IconShare size={18} /> Partager
+              <MoreMenu label={t("Plus d'actions sur l'itinéraire")}>
+                <Button size="s" variant="ghost" onClick={() => void share(saved)} aria-label={t('Partager {name}', { name: saved.record.name })}>
+                  <IconShare size={18} /> {t('Partager')}
                 </Button>
-                <Button size="s" variant="ghost" onClick={() => setConfirmingDelete(saved.base)} aria-label={`Supprimer ${saved.record.name}`}>
-                  Supprimer
+                <Button size="s" variant="ghost" onClick={() => setConfirmingDelete(saved.base)} aria-label={t('Supprimer {name}', { name: saved.record.name })}>
+                  {t('Supprimer')}
                 </Button>
               </MoreMenu>
             )} />
         ) : (
           <p className="ui-hint ui-hint--m">
-            Aucun itinéraire pour l'instant. <Link to="/itineraires">Planifiez-en un</Link> : il apparaîtra ici, prêt à suivre.
+            {tRich("Aucun itinéraire pour l'instant. <a>Planifiez-en un</a> : il apparaîtra ici, prêt à suivre.", undefined, {
+              a: (children) => <Link to="/itineraires">{children}</Link>,
+            })}
           </p>
         )}
       </Card>

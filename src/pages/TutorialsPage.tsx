@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { t, tn } from '../core/i18n';
 import LessonIcon from '../components/LessonIcon';
 import { IconCheck, IconChevronRight } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
@@ -15,9 +16,9 @@ function TutorialsPage() {
   const readCount = lessons.filter((l) => state.read.includes(l.id)).length;
   return (
     <div className="ui-page ui-page--backdrop">
-      <PageHeader title="Tutoriels" back={{ to: '/parametres', label: 'Réglages' }}
-        subtitle={`${readCount} ${readCount >= 2 ? 'lues' : 'lue'} sur ${lessons.length}`} />
-      <ol className="tutorial-list" aria-label="Leçons">
+      <PageHeader title={t('Tutoriels')} back={{ to: '/parametres', label: t('Réglages') }}
+        subtitle={tn(readCount, '{n} lue sur {total}', '{n} lues sur {total}', { total: lessons.length }, readCount >= 2)} />
+      <ol className="tutorial-list" aria-label={t('Leçons')}>
         {lessons.map((lesson) => {
           const read = state.read.includes(lesson.id);
           return (
@@ -28,7 +29,7 @@ function TutorialsPage() {
                   <span className="tutorial-row__title">{lesson.title}</span>
                   <span className="tutorial-row__hook">{lesson.hook}</span>
                 </span>
-                {read && <span className="tutorial-row__read" role="img" aria-label="lue"><IconCheck size={18} /></span>}
+                {read && <span className="tutorial-row__read" role="img" aria-label={t('lue')}><IconCheck size={18} /></span>}
                 <IconChevronRight size={14} className="tutorial-row__go" />
               </Link>
             </li>

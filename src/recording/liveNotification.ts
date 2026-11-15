@@ -1,4 +1,5 @@
 import { formatClock } from '../core/units';
+import { t } from '../core/i18n';
 import type { RecordingNotificationContent } from '../platform/notification';
 import { liveFieldLabel, liveFieldShortLabel, liveFieldValue, type LiveFieldContext, type LiveFieldKey } from './liveFields';
 
@@ -39,18 +40,18 @@ export const liveNotification = ({
   activityName, fields, context, paused, gpsLost, beltLost, startedAtMs,
 }: LiveNotificationInput): RecordingNotificationContent => {
   const titleParts = [activityName];
-  if (gpsLost) titleParts.push('GPS perdu');
-  if (beltLost) titleParts.push('FC perdue');
-  if (paused === 'manual') titleParts.push(`en pause ${formatClock(context.durationMs)}`);
-  else if (paused === 'auto') titleParts.push('pause auto');
+  if (gpsLost) titleParts.push(t('GPS perdu'));
+  if (beltLost) titleParts.push(t('FC perdue'));
+  if (paused === 'manual') titleParts.push(t('en pause {duree}', { duree: formatClock(context.durationMs) }));
+  else if (paused === 'auto') titleParts.push(t('pause auto'));
 
   const values = fields.map((key) => ({
     short: liveFieldShortLabel(key, context),
     label: liveFieldLabel(key, context),
     value: liveFieldValue(key, context),
   }));
-  const text = values.map((v) => `${v.short} ${v.value}`);
-  const lines = values.map((v) => `${v.label} : ${v.value}`);
+  const text = values.map((v) => t('{label} {value}', { label: v.short, value: v.value }));
+  const lines = values.map((v) => t('{label} : {value}', { label: v.label, value: v.value }));
 
   let chrono: RecordingNotificationContent['chrono'] = null;
   if (paused !== 'manual' && startedAtMs !== null) chrono = { baseMs: toSecond(startedAtMs) };

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { t } from '../core/i18n';
 import { findActivity, sessionActivity, type Activity } from '../core/activities';
 import { sessionFamily, sessionsPath } from '../core/parentPage';
 import { SPORT_FAMILIES } from '../core/sportProfiles';
@@ -55,9 +56,9 @@ function ProfileActivities() {
   return (
     <section className="profile-activities" aria-labelledby="profile-activities-title">
       <div className="profile-activities__head">
-        <h2 id="profile-activities-title" className="profile-activities__title">Vos activités</h2>
+        <h2 id="profile-activities-title" className="profile-activities__title">{t('Vos activités')}</h2>
         <Link to={sessionsPath(fromActivityId)} className="ui-btn ui-btn--secondary ui-btn--s">
-          Toutes les sessions <IconChevronRight size={16} />
+          {t('Toutes les sessions')} <IconChevronRight size={16} />
         </Link>
       </div>
       <ActivityBubbles total={everything.listed.length} choices={choices} selected={fromActivityId} onSelect={setFilterId} />
@@ -81,7 +82,7 @@ function ProfileActivities() {
       ) : (
         status === 'ready' && !scanning && (
           <p className="ui-hint ui-hint--m">
-            {selected ? `Aucune session ${ofActivity(selected.name)} pour l'instant.` : 'Aucune session pour l\'instant.'}
+            {selected ? t("Aucune session {de} pour l'instant.", { de: ofActivity(selected.name) }) : t("Aucune session pour l'instant.")}
           </p>
         )
       )}

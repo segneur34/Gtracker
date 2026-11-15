@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { isValidSpeedRange, type SpeedRangeMs } from '../core/speedGradient';
 import { SPEED_UNIT_LABEL, fromDisplaySpeed, speedFromText, toDisplaySpeed, type SpeedUnit } from '../core/units';
+import { t } from '../core/i18n';
 import Button from './ui/Button';
 
 /**
@@ -105,18 +106,18 @@ function SpeedRangeEditor({ unit, range, isOverridden, commit = 'input', onChang
 
   return (
     <label className="ui-row-6 ui-center ui-wrap">
-      <strong>Couleur de la trace :</strong>
-      de
+      <strong>{t('Couleur de la trace :')}</strong>
+      {t('de')}
       <input type="number" min={0} step={0.5} value={minText}
         onChange={handleBoundChange('min')} {...commitHandlers('min')}
         className="ui-field ui-field--s num ui-input-num" />
-      à
+      {t('à')}
       <input type="number" min={0} step={0.5} value={maxText}
         onChange={handleBoundChange('max')} {...commitHandlers('max')}
         className="ui-field ui-field--s num ui-input-num" />
       {unitLabel}
       {isOverridden && (
-        <Button size="s" onClick={() => onChange(null)}>Défaut</Button>
+        <Button size="s" onClick={() => onChange(null)}>{t('Défaut')}</Button>
       )}
     </label>
   );

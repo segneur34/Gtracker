@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { divIcon, type Marker as LeafletMarker } from 'leaflet';
 import { trackBounds } from '../core/displayConfig';
+import { t } from '../core/i18n';
 import MapContainer from './map/MapContainer';
 import Marker from './map/Marker';
 import Pane from './map/Pane';
@@ -248,7 +249,7 @@ function LiveMap({ segments, position, positionSegment = null, color, family, he
       {!following && (
         <Button variant="secondary" className="theme-light" onClick={() => setFollowing(true)}
           style={{ position: 'absolute', right: 'var(--space-3)', bottom: 'var(--space-3)', zIndex: 'var(--z-map-overlay)' }}>
-          Recentrer
+          {t('Recentrer')}
         </Button>
       )}
     </div>

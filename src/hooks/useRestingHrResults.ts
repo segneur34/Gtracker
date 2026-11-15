@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { errorMessage } from '../core/basics';
+import { t } from '../core/i18n';
 import { jsonStore } from '../platform/storage';
 import { MAX_STORED_RESTING_RESULTS, RESTING_HR_KEY, type StoredRestingResult } from '../library/restingHrStore';
 import { readDeviceRestingResults, saveRestingHrFile } from './restingHrFile';
@@ -30,7 +31,7 @@ export const useRestingHrResults = () => {
     // Le test est déjà gardé sur l'appareil : une panne d'écriture du dossier est dite, sans rien défaire.
     void currentMemoryFolder()
       .then((folder) => (folder ? saveRestingHrFile(folder, next) : undefined))
-      .catch((err: unknown) => reportStartupError(`Tests de FC repos non recopiés dans le dossier : ${errorMessage(err, 'erreur inconnue')}`));
+      .catch((err: unknown) => reportStartupError(t('Tests de FC repos non recopiés dans le dossier : {why}', { why: errorMessage(err, t('erreur inconnue')) })));
   }, []);
 
   /** Ajoute un test (relit la liste avant : un autre onglet a pu en ajouter). */

@@ -1,5 +1,7 @@
 import { roundBearingDeg } from '../core/angles';
 import { errorMessage } from '../core/basics';
+import { t, tn } from '../core/i18n';
+import { tRich } from '../components/tRich';
 import { Fragment, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ChangeEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import ActivitySelect from '../components/ActivitySelect';
@@ -103,6 +105,9 @@ interface ReplayTrack {
   fixes: LocationFix[];
 }
 
+/** Lien « Réglages » d'une phrase à balise `<a>`. */
+const settingsLink = (children: React.ReactNode) => <Link to="/parametres">{children}</Link>;
+
 const Stat = ({ label, value }: { label: string; value: string }) => (
   <div className="rec-stat">
     <span className="ui-muted ui-text-s">{label}</span>
@@ -116,10 +121,10 @@ const BpmTile = ({ belt }: { belt: { state: BeltState; bpm: number | null } }) =
   const measured = belt.state === 'connected' && belt.bpm !== null;
   const text = measured
     ? String(Math.round(belt.bpm as number))
-    : belt.state === 'connected' ? 'connectée, sans contact avec la peau' : BELT_STATE_LABEL[belt.state];
+    : belt.state === 'connected' ? t('connectée, sans contact avec la peau') : BELT_STATE_LABEL[belt.state];
   return (
     <div className="rec-bpm">
-      <span className="rec-bpm__label">BPM</span>
+      <span className="rec-bpm__label">{t('BPM')}</span>
       <span className={measured ? 'num rec-bpm__value' : 'rec-bpm__state'}>{text}</span>
     </div>
   );
@@ -132,18 +137,18 @@ const followStatItems = (activity: Activity, progress: FollowProgress | null, to
   const distanceUnit = effectiveDistanceUnit(activity);
   const total = formatDistance(totalM, distanceUnit, 1);
   return [
-    { label: 'Restant', value: progress ? formatDistance(progress.remainingM, distanceUnit) : '—' },
+    { label: t('Restant'), value: progress ? formatDistance(progress.remainingM, distanceUnit) : '—' },
     {
-      label: `Fait, sur ${total}`,
-      value: progress ? `${Math.round((100 * progress.progressM) / Math.max(1, progress.totalM))} %` : 'à rejoindre',
+      label: t('Fait, sur {total}', { total }),
+      value: progress ? `${Math.round((100 * progress.progressM) / Math.max(1, progress.totalM))} %` : t('à rejoindre'),
     },
   ];
 };
 
 /** Avancement d'un parcours de voile : distance restante par les balises, et balises validées. */
 const courseStatItems = (activity: Activity, view: MarkGuideView): { label: string; value: string }[] => [
-  { label: 'Restant', value: view.remainingM !== null ? formatDistance(view.remainingM, effectiveDistanceUnit(activity)) : '—' },
-  { label: 'Balises validées', value: `${view.outcomes.filter((o) => o === 'validated').length}/${view.marks.length}` },
+  { label: t('Restant'), value: view.remainingM !== null ? formatDistance(view.remainingM, effectiveDistanceUnit(activity)) : '—' },
+  { label: t('Balises validées'), value: `${view.outcomes.filter((o) => o === 'validated').length}/${view.marks.length}` },
 ];
 
 /**
@@ -153,24 +158,24 @@ const courseStatItems = (activity: Activity, view: MarkGuideView): { label: stri
 const MarkGuideCard = ({ view, activity }: { view: MarkGuideView; activity: Activity }) => {
   const count = view.marks.length;
   const aim = view.finished
-    ? 'Parcours fini'
+    ? t('Parcours fini')
     : view.distanceM === null || view.bearingDeg === null
-      ? 'en attente du GPS'
+      ? t('en attente du GPS')
       : `${formatShortDistance(view.distanceM, effectiveDistanceUnit(activity))} · ${roundBearingDeg(view.bearingDeg)}°`;
   return (
     <Card>
       <div className="rec-mark-row">
         <div className="rec-mark-text">
           <span className="ui-muted ui-text-s">
-            {view.finished ? `${count} balises` : `${markName(view.target, count)} · ${view.target + 1}/${count}`}
+            {view.finished ? tn(count, '{n} balise', '{n} balises', undefined, true) : `${markName(view.target, count)} · ${view.target + 1}/${count}`}
           </span>
           <span className="num rec-mark-aim">{aim}</span>
         </div>
         <div className="rec-mark-actions">
-          <Button onClick={skipMark} disabled={view.finished}>Passer</Button>
+          <Button onClick={skipMark} disabled={view.finished}>{t('Passer')}</Button>
           <Button variant={view.muted ? 'secondary' : 'ghost'} aria-pressed={!view.muted} onClick={() => setBeepsMuted(!view.muted)}
-            title={view.muted ? 'Remettre les bips et les vibrations' : 'Couper les bips et les vibrations'}>
-            {view.muted ? 'Bips coupés' : 'Bips'}
+            title={view.muted ? t('Remettre les bips et les vibrations') : t('Couper les bips et les vibrations')}>
+            {view.muted ? t('Bips coupés') : t('Bips')}
           </Button>
         </div>
       </div>
@@ -188,18 +193,18 @@ const liveStatItems = (activity: Activity, live: LiveStats, options: LiveStatsOp
   if (sportTreatment(activity.base) === 'voile') {
     return [
       ...options.topDurationsS.map((d, i) => ({
-        label: `Top ${d} s (${recentWindowLabel(options)})`,
+        label: t('Top {d} s ({window})', { d, window: recentWindowLabel(options) }),
         value: formatSpeed(live.recentTopsMs[i] ?? null, unit),
       })),
-      { label: 'Distance', value: formatDistance(live.distanceM, distanceUnit) },
+      { label: t('Distance'), value: formatDistance(live.distanceM, distanceUnit) },
     ];
   }
   // Surf.
   return [
-    { label: 'Vitesse', value: formatSpeed(live.currentSpeedMs, unit) },
+    { label: t('Vitesse'), value: formatSpeed(live.currentSpeedMs, unit) },
     // Sur toute la trace : pas la « Vitesse max » de l'analyse, celle d'une vague, que le direct ne détecte pas.
     { label: liveFieldLabel('max', { speedUnit: unit, distanceUnit, options }), value: formatSpeed(live.maxSpeedMs, unit) },
-    { label: 'Distance', value: formatDistance(live.distanceM, distanceUnit) },
+    { label: t('Distance'), value: formatDistance(live.distanceM, distanceUnit) },
   ];
 };
 
@@ -216,7 +221,7 @@ const formatLegDuration = (ms: number): string => {
 const LegCard = ({ title, leg, empty, activity }: { title: string; leg: LiveLeg | null; empty: string; activity: Activity }) => {
   const unit = effectiveSpeedUnit(activity);
   const detail = leg
-    ? `${leg.headingDeg === null ? 'cap —' : `cap ${roundBearingDeg(leg.headingDeg)}°`} · ${formatLegDuration(leg.endMs - leg.startMs)}`
+    ? `${leg.headingDeg === null ? t('cap —') : t('cap {deg}°', { deg: roundBearingDeg(leg.headingDeg) })} · ${formatLegDuration(leg.endMs - leg.startMs)}`
     : empty;
   return (
     <div className="ui-stack-2">
@@ -225,8 +230,8 @@ const LegCard = ({ title, leg, empty, activity }: { title: string; leg: LiveLeg 
         <span className="num ui-muted ui-text-s">{detail}</span>
       </div>
       <div className="rec-leg-grid">
-        <Stat label="Moyenne" value={formatSpeed(leg?.averageSpeedMs ?? null, unit)} />
-        <Stat label={`Max (${LIVE_LEG_DEFAULTS.topDurationS} s)`} value={formatSpeed(leg?.maxSpeedMs ?? null, unit)} />
+        <Stat label={t('Moyenne')} value={formatSpeed(leg?.averageSpeedMs ?? null, unit)} />
+        <Stat label={t('Max ({s} s)', { s: LIVE_LEG_DEFAULTS.topDurationS })} value={formatSpeed(leg?.maxSpeedMs ?? null, unit)} />
       </div>
     </div>
   );
@@ -278,8 +283,8 @@ function StopButton({ status }: { status: RecorderState['status'] }) {
   return (
     <HoldButton onHold={stop} getHoldMs={effectiveStopHoldMs} disabled={status === 'starting' || status === 'stopping'}
       size="l" style={{ flex: 1 }} lead={<span className="ui-record-dot ui-record-dot--stop" />}
-      dialTitle="Arrêter"
-      label={status === 'stopping' ? 'Enregistrement du fichier…' : 'Arrêter'} />
+      dialTitle={t('Arrêter')}
+      label={status === 'stopping' ? t('Enregistrement du fichier…') : t('Arrêter')} />
   );
 }
 
@@ -298,13 +303,13 @@ function NoteButton({ className }: { className?: string }) {
   const [feedback, setFeedback] = useTransientValue<string>(NOTE_FEEDBACK_MS);
   const note = () => {
     const added = addRecordingMark();
-    setFeedback(added ? `Note ${added.n} posée` : 'Pas encore de position : note impossible');
+    setFeedback(added ? t('Note {n} posée', { n: added.n }) : t('Pas encore de position : note impossible'));
     if (added) void buzz(NOTE_BUZZ_MS).catch(() => undefined);
   };
   return (
     <Button variant="secondary" size="l" block className={className ? `ui-btn--hold ${className}` : 'ui-btn--hold'} onClick={note} aria-live="polite">
       <IconFlag size={20} />
-      {feedback ?? 'Note'}
+      {feedback ?? t('Note')}
     </Button>
   );
 }
@@ -318,8 +323,8 @@ function OrientationLockButton() {
   const locked = useSyncExternalStore(subscribeOrientationLock, isOrientationLocked);
   return (
     <Button variant={locked ? 'primary' : 'secondary'} size="l" aria-pressed={locked} onClick={() => lockOrientation(!locked)}
-      aria-label={locked ? "Libérer l'orientation de l'écran" : "Figer l'écran dans son orientation"}
-      title={locked ? 'Orientation figée : toucher pour la libérer' : "Figer l'écran dans son orientation"}>
+      aria-label={locked ? t("Libérer l'orientation de l'écran") : t("Figer l'écran dans son orientation")}
+      title={locked ? t('Orientation figée : toucher pour la libérer') : t("Figer l'écran dans son orientation")}>
       <IconLock size={20} open={!locked} />
     </Button>
   );
@@ -413,7 +418,7 @@ function RecordingMap({ busy, followed, courseMarksOf, liveActivity, family, onR
         family={liveActivity ? activityFamily(liveActivity) : family}
         overlay={busy ? (
           <Button size="s" onClick={onReduce} className="rec-tool-shadow">
-            Réduire la carte
+            {t('Réduire la carte')}
           </Button>
         ) : undefined} />
     </div>
@@ -464,20 +469,20 @@ function RecordingFigures({ summaryShown, clockShown, liveActivity, followed, co
         }, options)} />
       )}
 
-      <Card heading="En cours">
+      <Card heading={t('En cours')}>
         {heartRate && <BpmTile belt={heartRate} />}
         {heartRate && (heartRate.state === 'searching' || heartRate.state === 'lost') && liveActivity && (
           // Ceinture perdue ou jamais trouvée : on peut renoncer à elle, l'enregistrement continue sans cardio.
           <div className="rec-belt-stop">
-            <span className="ui-muted">Sans elle, l'enregistrement continue, sans cardio.</span>
+            <span className="ui-muted">{t("Sans elle, l'enregistrement continue, sans cardio.")}</span>
             <Button size="s" onClick={() => {
               // Sans retour possible pendant la sortie : un appui par mégarde, en navigation, ne doit pas suffire.
-              if (window.confirm("Arrêter de chercher la ceinture ? L'enregistrement continue sans cardio jusqu'à la fin de la sortie.")) stopRecordingBeltSearch();
-            }}>Arrêter de chercher</Button>
+              if (window.confirm(t("Arrêter de chercher la ceinture ? L'enregistrement continue sans cardio jusqu'à la fin de la sortie."))) stopRecordingBeltSearch();
+            }}>{t('Arrêter de chercher')}</Button>
           </div>
         )}
         <div style={STAT_GRID}>
-          <Stat label="Durée" value={formatClock(durationMs)} />
+          <Stat label={t('Durée')} value={formatClock(durationMs)} />
           {liveActivity && followed && (courseMarksOf && markGuide.active
             ? courseStatItems(liveActivity, markGuide)
             : followStatItems(liveActivity, progress, followedLengthM)
@@ -486,9 +491,9 @@ function RecordingFigures({ summaryShown, clockShown, liveActivity, followed, co
         </div>
         {liveActivity && sportFamily(liveActivity.base) === 'voile' && (
           <div className="rec-grid-fit">
-            <LegCard title="Bord en cours" leg={live.stats.legs.current}
-              empty={live.stats.movingTimeMs > 0 ? 'en manœuvre' : 'pas encore'} activity={liveActivity} />
-            <LegCard title="Bord précédent" leg={live.stats.legs.previous} empty="pas encore" activity={liveActivity} />
+            <LegCard title={t('Bord en cours')} leg={live.stats.legs.current}
+              empty={live.stats.movingTimeMs > 0 ? t('en manœuvre') : t('pas encore')} activity={liveActivity} />
+            <LegCard title={t('Bord précédent')} leg={live.stats.legs.previous} empty={t('pas encore')} activity={liveActivity} />
           </div>
         )}
       </Card>
@@ -515,17 +520,17 @@ function RecordingGpsCard({ busy, deviceGps }: {
   const pointsDurationMs = recordingDurationMs(stats);
   const meanIntervalS = stats.pointCount > 1 ? pointsDurationMs / 1000 / (stats.pointCount - 1) : null;
   return (
-    <Card heading={busy ? undefined : 'Dernier enregistrement'}>
+    <Card heading={busy ? undefined : t('Dernier enregistrement')}>
       <details open={!busy}>
-        <summary className="ui-eyebrow rec-summary">GPS</summary>
+        <summary className="ui-eyebrow rec-summary">{t('GPS')}</summary>
         <div style={STAT_GRID}>
-          <Stat label="Durée" value={formatClock(pointsDurationMs)} />
-          <Stat label="Points" value={String(stats.pointCount)} />
-          <Stat label="Intervalle moyen" value={meanIntervalS === null ? '—' : `${formatDecimal(meanIntervalS, 1)} s`} />
-          <Stat label="Plus long trou" value={`${Math.round(stats.longestGapS)} s`} />
-          <Stat label="Précision" value={stats.lastAccuracyM === null ? '—' : `${Math.round(stats.lastAccuracyM)} m`} />
+          <Stat label={t('Durée')} value={formatClock(pointsDurationMs)} />
+          <Stat label={t('Points')} value={String(stats.pointCount)} />
+          <Stat label={t('Intervalle moyen')} value={meanIntervalS === null ? '—' : `${formatDecimal(meanIntervalS, 1)} s`} />
+          <Stat label={t('Plus long trou')} value={`${Math.round(stats.longestGapS)} s`} />
+          <Stat label={t('Précision')} value={stats.lastAccuracyM === null ? '—' : `${Math.round(stats.lastAccuracyM)} m`} />
           {busy && deviceGps && (
-            <Stat label="Satellites utilisés" value={satellites === null ? '—' : `${satellites.used} sur ${satellites.visible}`} />
+            <Stat label={t('Satellites utilisés')} value={satellites === null ? '—' : t('{used} sur {visible}', { used: satellites.used, visible: satellites.visible })} />
           )}
         </div>
       </details>
@@ -534,7 +539,7 @@ function RecordingGpsCard({ busy, deviceGps }: {
 }
 
 /** Ce qui est dit quand le matériel choisi à la fin n'a pas pu entrer dans la fiche de la session rangée. */
-const GEAR_NOT_WRITTEN = "Le matériel choisi n'a pas pu être écrit dans la fiche : choisissez-le de nouveau dans l'onglet « matériel et notes » de l'analyse.";
+const gearNotWrittenText = () => t("Le matériel choisi n'a pas pu être écrit dans la fiche : choisissez-le de nouveau dans l'onglet « matériel et notes » de l'analyse.");
 
 /**
  * Écrit le matériel choisi à la fin dans la fiche de la session rangée, sans
@@ -691,12 +696,12 @@ function RecordingScreen() {
     if (!file) return;
     try {
       const fixes = fixesFromRawPoints(parseGpx(await readPickedFile(file)).rawPoints);
-      if (fixes.length < 2) throw new Error('Le fichier ne contient pas assez de points horodatés.');
+      if (fixes.length < 2) throw new Error(t('Le fichier ne contient pas assez de points horodatés.'));
       setReplay({ fileName: file.name, fixes });
       setReplayError(null);
     } catch (err) {
       setReplay(null);
-      setReplayError(errorMessage(err, 'Lecture du fichier impossible.'));
+      setReplayError(errorMessage(err, t('Lecture du fichier impossible.')));
     }
   };
 
@@ -711,7 +716,7 @@ function RecordingScreen() {
     // Le matériel choisi va dans la fiche, comme le reste ; s'il n'y entre pas, il se refait dans l'onglet de l'analyse.
     const gearWritten = result && gear ? writeEndGear(result.libraryFile, gear) : true;
     setGearNotWritten(!gearWritten);
-    if (!gearWritten && result?.libraryFile) window.alert(GEAR_NOT_WRITTEN);
+    if (!gearWritten && result?.libraryFile) window.alert(gearNotWrittenText());
     // Session à classer (journal sans en-tête) : rangée sans activité, la carte « Session rangée » le dit, et elle se
     // classe depuis la bibliothèque.
     if (result?.libraryFile && result.sport !== null) {
@@ -722,7 +727,7 @@ function RecordingScreen() {
 
   /** « Jeter » du filet : un échec de l'effacement garde la session et s'affiche (`discardPendingSession` ne lève pas). */
   const handleDiscard = () => {
-    if (window.confirm('Jeter cette session ? Elle ne sera pas rangée dans la mémoire, et ne pourra pas être récupérée.')) {
+    if (window.confirm(t('Jeter cette session ? Elle ne sera pas rangée dans la mémoire, et ne pourra pas être récupérée.'))) {
       void discardPendingSession();
     }
   };
@@ -733,8 +738,8 @@ function RecordingScreen() {
     const treatment = liveActivity ? sportTreatment(liveActivity.base) : null;
     const pumpingToo = treatment === 'voile' && setup?.foil === true && liveActivity !== null && effectivePumping(liveActivity) === true;
     // Pumping seul en voile : les sauts n'ont pas été mesurés (case de Réglages ou de l'enregistrement décochée).
-    const surfWhat = measurePumping && measureTurns ? 'Pumping et virages' : measureTurns ? 'Virages' : 'Pumping';
-    return treatment === 'surf' ? surfWhat : pumpingToo ? (measureJumps ? 'Sauts et pumping' : 'Pumping') : 'Sauts';
+    const surfWhat = measurePumping && measureTurns ? t('Pumping et virages') : measureTurns ? t('Virages') : t('Pumping');
+    return treatment === 'surf' ? surfWhat : pumpingToo ? (measureJumps ? t('Sauts et pumping') : t('Pumping')) : t('Sauts');
   })();
 
   const handleStart = () => {
@@ -756,58 +761,60 @@ function RecordingScreen() {
 
   return (
     <div className={`ui-page rec-page${busy ? ' rec-page--busy' : ''}`}>
-      <PageHeader title="Enregistrer" subtitle="Une position par seconde, gardée brute : l'analyse se fait ensuite." />
+      <PageHeader title={t('Enregistrer')} subtitle={t("Une position par seconde, gardée brute : l'analyse se fait ensuite.")} />
 
       {!busy && !pending && <Card className="rec-options">
         <div className="rec-test-form">
           {/* Boutons glissants en cascade : la famille, puis ses activités. */}
           <div className="ui-stack-2">
-            <SegmentedControl fit label="Famille" items={families.map((f) => ({ key: f, label: FAMILY_LABEL[f] }))} value={family}
+            <SegmentedControl fit label={t('Famille')} items={families.map((f) => ({ key: f, label: FAMILY_LABEL[f] }))} value={family}
               accent={FAMILY_ACCENT[family]} onChange={pickFamily} />
             {familyActivities.length > 0 && (
-              <SegmentedControl label="Activité" value={chosenId ?? ''} accent={FAMILY_ACCENT[family]} onChange={setChosenId}
+              <SegmentedControl label={t('Activité')} value={chosenId ?? ''} accent={FAMILY_ACCENT[family]} onChange={setChosenId}
                 items={familyActivities.map((a) => ({ key: a.id, label: a.name, title: a.name }))} />
             )}
           </div>
           {familyActivities.length === 0 && (
             <div className="ui-alert ui-alert--warning">
-              Aucune activité {FAMILY_OF[family]} : ajoutez-en une dans <Link to="/parametres">Réglages</Link>.
+              {tRich('Aucune activité {of} : ajoutez-en une dans <a>Réglages</a>.', { of: FAMILY_OF[family] }, { a: settingsLink })}
             </div>
           )}
 
           {chosen && jumpSettings && native && (
-            <CaptureOption label="Mesurer les sauts" checked={measureJumps && motionCaps?.available === true} disabled={!motionCaps?.available}
+            <CaptureOption label={t('Mesurer les sauts')} checked={measureJumps && motionCaps?.available === true} disabled={!motionCaps?.available}
               onChange={setJumpPicked}
               note={<>
                 {motionCaps && !motionCaps.available
                   ? motionCaps.reason
-                  : `Téléphone fixé au corps : ${JUMP_PLACEMENT_LABEL[jumpSettings.placement].toLowerCase()}${effectiveFoil(chosen) ? ', sur foil' : ''} (Réglages).`}
+                  : effectiveFoil(chosen)
+                    ? t('Téléphone fixé au corps : {placement}, sur foil (Réglages).', { placement: JUMP_PLACEMENT_LABEL[jumpSettings.placement].toLowerCase() })
+                    : t('Téléphone fixé au corps : {placement} (Réglages).', { placement: JUMP_PLACEMENT_LABEL[jumpSettings.placement].toLowerCase() })}
                 {motionCaps?.available && motionCaps.accelMaxG !== null && motionCaps.accelMaxG < 8 &&
-                  ` L'accéléromètre plafonne à ${Math.round(motionCaps.accelMaxG)} g : les chocs à l'atterrissage seront écrêtés.`}
+                  ` ${t("L'accéléromètre plafonne à {g} g : les chocs à l'atterrissage seront écrêtés.", { g: Math.round(motionCaps.accelMaxG) })}`}
               </>} />
           )}
 
           {chosen && heartRateSetting !== null && native && (
-            <CaptureOption label="Ceinture cardio" checked={measureHeartRate} disabled={belt === null}
+            <CaptureOption label={t('Ceinture cardio')} checked={measureHeartRate} disabled={belt === null}
               onChange={setHeartRatePicked}
               note={belt === null
-                ? <>Aucune ceinture choisie : <Link to="/parametres">Réglages</Link>, bloc « Capteurs ».</>
+                ? tRich('Aucune ceinture choisie : <a>Réglages</a>, bloc « Capteurs ».', undefined, { a: settingsLink })
                 : <>
-                  {`${beltLabel}, portée et humidifiée : elle n'émet qu'au contact de la peau.`}
+                  {t("{label}, portée et humidifiée : elle n'émet qu'au contact de la peau.", { label: beltLabel })}
                   {retainedBelts.length >= 2 && (
-                    <>{' '}<Button size="s" onClick={() => setChoosingBelt(true)}>Changer</Button></>
+                    <>{' '}<Button size="s" onClick={() => setChoosingBelt(true)}>{t('Changer')}</Button></>
                   )}
                 </>}>
               {measureHeartRate && sourceChoice === 'device' && (
                 <span className="ui-text-s rec-indent">
                   <BeltStatus state={beltLive.state} bpm={beltLive.bpm}
-                    offText={beltWarmup.error ? `connexion impossible : ${beltWarmup.error}` : null}>
+                    offText={beltWarmup.error ? t('connexion impossible : {error}', { error: beltWarmup.error }) : null}>
                     {beltWarmup.error && (
-                      <Button size="s" onClick={beltWarmup.retry}>Réessayer</Button>
+                      <Button size="s" onClick={beltWarmup.retry}>{t('Réessayer')}</Button>
                     )}
                     {/* Ceinture encore cherchée : on peut y renoncer, comme en décochant la case. */}
                     {(beltLive.state === 'connecting' || beltLive.state === 'searching' || beltLive.state === 'lost') && (
-                      <Button size="s" onClick={() => setHeartRatePicked(false)}>Annuler la recherche</Button>
+                      <Button size="s" onClick={() => setHeartRatePicked(false)}>{t('Annuler la recherche')}</Button>
                     )}
                   </BeltStatus>
                 </span>
@@ -816,8 +823,8 @@ function RecordingScreen() {
           )}
           {choosingBelt && (
             // Appareil du prochain départ, parmi ceux retenus dans Réglages › Capteurs : liste dessinée, jamais le menu d'Android.
-            <ChoiceSheet label="Appareil cardio" onClose={() => setChoosingBelt(false)}>
-              <div className="activity-select__heading"><strong>Appareil cardio</strong></div>
+            <ChoiceSheet label={t('Appareil cardio')} onClose={() => setChoosingBelt(false)}>
+              <div className="activity-select__heading"><strong>{t('Appareil cardio')}</strong></div>
               {retainedBelts.map((b, i) => (
                 <ChoiceOption key={b.address} label={retainedLabels[i]} selected={b.address === retainedBelt?.address} onClick={() => pickBelt(b)} />
               ))}
@@ -825,44 +832,44 @@ function RecordingScreen() {
           )}
 
           {chosen && pumpingOffered && native && (
-            <CaptureOption label="Mesurer le pumping" checked={measurePumping && motionCaps?.available === true} disabled={!motionCaps?.available}
+            <CaptureOption label={t('Mesurer le pumping')} checked={measurePumping && motionCaps?.available === true} disabled={!motionCaps?.available}
               onChange={setPumpPicked}
               note={motionCaps && !motionCaps.available
                 ? motionCaps.reason
-                : 'Téléphone fixé sur la poitrine : fréquence de pumping, distance par coup et décollage de chaque vol (Réglages).'} />
+                : t('Téléphone fixé sur la poitrine : fréquence de pumping, distance par coup et décollage de chaque vol (Réglages).')} />
           )}
 
           {chosen && turnsOffered && native && (
-            <CaptureOption label="Mesurer les virages" checked={measureTurns && motionCaps?.available === true} disabled={!motionCaps?.available}
+            <CaptureOption label={t('Mesurer les virages')} checked={measureTurns && motionCaps?.available === true} disabled={!motionCaps?.available}
               onChange={setTurnsPicked}
               note={motionCaps && !motionCaps.available
                 ? motionCaps.reason
-                : 'Téléphone fixé sur la poitrine : virages de chaque vague, plus fins que ceux du GPS (Réglages).'} />
+                : t('Téléphone fixé sur la poitrine : virages de chaque vague, plus fins que ceux du GPS (Réglages).')} />
           )}
 
           {native ? (
-            <div><span className="ui-eyebrow">Source</span> <span className="ui-ml-8">GPS du téléphone</span></div>
+            <div><span className="ui-eyebrow">{t('Source')}</span> <span className="ui-ml-8">{t('GPS du téléphone')}</span></div>
           ) : (
             <div className="ui-stack-8">
-              <span className="ui-eyebrow">Source</span>
+              <span className="ui-eyebrow">{t('Source')}</span>
               <label>
                 <input type="radio" checked={sourceChoice === 'device'} disabled={busy}
-                  onChange={() => setSourceChoice('device')} /> GPS du navigateur
+                  onChange={() => setSourceChoice('device')} /> {t('GPS du navigateur')}
               </label>
               <label>
                 <input type="radio" checked={sourceChoice === 'replay'} disabled={busy}
-                  onChange={() => setSourceChoice('replay')} /> Rejeu d'un GPX, pour éprouver l'enregistrement
+                  onChange={() => setSourceChoice('replay')} /> {t("Rejeu d'un GPX, pour éprouver l'enregistrement")}
               </label>
               {sourceChoice === 'replay' && (
                 <div className="rec-replay-row">
                   <input type="file" accept=".gpx" disabled={busy} onChange={handleReplayFile} />
                   <label>
-                    Vitesse :{' '}
+                    {t('Vitesse :')}{' '}
                     <select value={replaySpeed} disabled={busy} onChange={(e) => setReplaySpeed(Number(e.target.value))} className="ui-field ui-field--s">
                       {REPLAY_SPEEDS.map((s) => <option key={s} value={s}>×{s}</option>)}
                     </select>
                   </label>
-                  {replay && <span className="ui-muted">{replay.fixes.length} points</span>}
+                  {replay && <span className="ui-muted">{tn(replay.fixes.length, '{n} point', '{n} points', undefined, true)}</span>}
                 </div>
               )}
               {replayError && <div className="ui-danger-text">{replayError}</div>}
@@ -876,13 +883,13 @@ function RecordingScreen() {
           {status === 'recording' && (
             <Button variant="secondary" size="l" className="ui-btn--hold ui-grow" onClick={() => void pauseRecording()}>
               <IconPause size={20} />
-              Pause
+              {t('Pause')}
             </Button>
           )}
           {manualPause && (
             <Button variant="record" size="l" className="ui-btn--hold ui-grow" onClick={() => void resumeRecording()}>
               <IconPlay size={20} />
-              Reprendre
+              {t('Reprendre')}
             </Button>
           )}
           <StopButton status={status} />
@@ -893,11 +900,11 @@ function RecordingScreen() {
         <div className="rec-actions ui-row-10 ui-wrap">
           <Button variant="record" size="l" className="rec-action-btn" onClick={handleStart} disabled={!canStart}>
             <span className="ui-record-dot" />
-            Démarrer
+            {t('Démarrer')}
           </Button>
           <Button variant="secondary" size="l" className="rec-action-btn" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
             <IconRoute size={20} />
-            Suivre une trace
+            {t('Suivre une trace')}
           </Button>
         </div>
       )}
@@ -916,7 +923,7 @@ function RecordingScreen() {
           {liveActivity && (
             // Changer d'activité en route, d'une famille à l'autre comprise : la session sera rangée sous la nouvelle.
             <label className="rec-status__activity">
-              <span className="ui-eyebrow">Activité</span>
+              <span className="ui-eyebrow">{t('Activité')}</span>
               <ActivitySelect
                 activities={activities}
                 value={liveActivity.id}
@@ -935,23 +942,27 @@ function RecordingScreen() {
         <div className="ui-alert ui-row-10 ui-center ui-wrap rec-follow">
           <IconRoute size={18} />
           <span className="ui-grow">
-            Trace suivie : <strong>{followed.name}</strong>{followed.source === 'session' ? ' (session)' : ''}
+            {followed.source === 'session'
+              ? tRich('Trace suivie : <strong>{name}</strong> (session)', { name: followed.name })
+              : tRich('Trace suivie : <strong>{name}</strong>', { name: followed.name })}
             {liveActivity && <> · {formatDistance(followedLengthM, effectiveDistanceUnit(liveActivity), 1)}</>}
           </span>
-          <Button size="s" variant="ghost" onClick={clearFollowedTrace}>Retirer</Button>
+          <Button size="s" variant="ghost" onClick={clearFollowedTrace}>{t('Retirer')}</Button>
         </div>
       )}
 
       {manualPause && (
         <div className="ui-alert ui-alert--warning">
-          {`En pause : rien n'est compté ; le GPS reste allumé pour la carte${measuringMotion ? ', la mesure des capteurs est suspendue' : ''}.`}
+          {measuringMotion
+            ? t("En pause : rien n'est compté ; le GPS reste allumé pour la carte, la mesure des capteurs est suspendue.")
+            : t("En pause : rien n'est compté ; le GPS reste allumé pour la carte.")}
         </div>
       )}
       {busy && measuringMotion && status !== 'paused' && (
-        <div className="ui-alert">{motionWhat} : les capteurs du téléphone mesurent.</div>
+        <div className="ui-alert">{t('{what} : les capteurs du téléphone mesurent.', { what: motionWhat })}</div>
       )}
       {autoPause && (
-        <div className="ui-alert ui-alert--warning">En pause automatique : aucun mouvement détecté. Reprend dès que vous bougez.</div>
+        <div className="ui-alert ui-alert--warning">{t('En pause automatique : aucun mouvement détecté. Reprend dès que vous bougez.')}</div>
       )}
 
       {error && !savedOpened && <div className="ui-alert ui-alert--danger">{error}</div>}
@@ -964,7 +975,7 @@ function RecordingScreen() {
       )}
 
       {/* Carte réduite : elle n'est plus dessinée, les vitesses prennent sa place ; tourné, elles sont à côté d'elle. */}
-      {mapReduced && <Button variant="secondary" block onClick={() => toggleShown('carte')}>Afficher la carte</Button>}
+      {mapReduced && <Button variant="secondary" block onClick={() => toggleShown('carte')}>{t('Afficher la carte')}</Button>}
       {busy && (
         <RecordingFigures summaryShown={summaryShown} clockShown={clockShown} liveActivity={liveActivity} followed={followed}
           courseMarksOf={courseMarksOf} followedLengthM={followedLengthM} />
@@ -973,46 +984,46 @@ function RecordingScreen() {
       <RecordingGpsCard busy={busy} deviceGps={native && sourceChoice === 'device'} />
 
       {pending && finishing && (
-        <p role="status" aria-live="polite" className="ui-muted">Rangement…</p>
+        <p role="status" aria-live="polite" className="ui-muted">{t('Rangement…')}</p>
       )}
 
       {pending && !finishing && (
         <Card heading={(
           <span className="ui-flex-between">
-            {pending.recovered ? 'Session interrompue récupérée' : 'Session terminée'}
+            {pending.recovered ? t('Session interrompue récupérée') : t('Session terminée')}
             {pending.activity && (
               <SavedSessionShare gpx={pending.content} activity={pending.activity} fileName={pending.fileName} libraryFile={null} />
             )}
           </span>
         )}>
           <p className="rec-saved-text">
-            {pending.activity?.name ?? 'À classer'}, {pending.pointCount} points.<br />
+            {tRich('{name}, {count} points.<br />', { name: pending.activity?.name ?? t('À classer'), count: pending.pointCount })}
             <span className="ui-muted ui-text-s">
-              Pas encore rangée dans la mémoire. Aucun nouvel enregistrement avant de l'analyser ou de la jeter.
+              {t("Pas encore rangée dans la mémoire. Aucun nouvel enregistrement avant de l'analyser ou de la jeter.")}
             </span>
           </p>
           <SessionEndGear activity={pending.activity} gear={endGear} onChange={setEndGear} />
           <div className="ui-row-10 ui-wrap">
             <Button variant="primary" onClick={() => void handleAnalyze()} disabled={analyzing}>
-              Analyser
+              {t('Analyser')}
             </Button>
             {motionUnreadable && (
               <Button onClick={() => void handleAnalyze(true)} disabled={analyzing}>
-                Analyser sans les capteurs
+                {t('Analyser sans les capteurs')}
               </Button>
             )}
             {pending.canContinue && (
               <Button variant="record" onClick={() => void continuePendingSession(deviceLocationSource())} disabled={analyzing}>
-                Continuer l'enregistrement
+                {t("Continuer l'enregistrement")}
               </Button>
             )}
             {canDownloadFiles() && (
               <Button onClick={() => downloadTextFile(pending.fileName, pending.content)}>
-                Télécharger le GPX
+                {t('Télécharger le GPX')}
               </Button>
             )}
             <Button variant="danger" onClick={handleDiscard} disabled={analyzing}>
-              Jeter
+              {t('Jeter')}
             </Button>
           </div>
         </Card>
@@ -1023,28 +1034,31 @@ function RecordingScreen() {
       {saved && !savedOpened && (
         <Card heading={(
           <span className="ui-flex-between">
-            Session rangée
+            {t('Session rangée')}
             {saved.activity && (
               <SavedSessionShare gpx={saved.content} activity={saved.activity} fileName={saved.fileName} libraryFile={saved.libraryFile} />
             )}
           </span>
         )}>
           <p className="rec-saved-text">
-            {savedRecord
-              ? sessionDisplayName(savedRecord, saved.activity?.name ?? 'À classer')
-              : saved.activity?.name ?? 'À classer'}, {saved.pointCount} points.<br />
-            <span className="ui-muted ui-text-s rec-break-all">Rangée dans : {saved.location}</span>
+            {tRich('{name}, {count} points.<br />', {
+              name: savedRecord
+                ? sessionDisplayName(savedRecord, saved.activity?.name ?? t('À classer'))
+                : saved.activity?.name ?? t('À classer'),
+              count: saved.pointCount,
+            })}
+            <span className="ui-muted ui-text-s rec-break-all">{t('Rangée dans : {location}', { location: saved.location })}</span>
             {gearNotWritten && (
               <>
                 <br />
-                <span className="ui-text-s">{GEAR_NOT_WRITTEN}</span>
+                <span className="ui-text-s">{gearNotWrittenText()}</span>
               </>
             )}
             {!saved.libraryFile && native && (
               <>
                 <br />
                 <span className="ui-muted ui-text-s">
-                  Pour l'analyser, choisissez le dossier mémoire (Réglages › Mémoire) : elle y sera rangée.
+                  {t("Pour l'analyser, choisissez le dossier mémoire (Réglages › Mémoire) : elle y sera rangée.")}
                 </span>
               </>
             )}
@@ -1053,16 +1067,16 @@ function RecordingScreen() {
             {/* Ouverture refusée pour garder un brouillon : elle se fait d'ici. */}
             {saved.libraryFile && saved.sport !== null && (
               <Button variant="primary" onClick={() => openSaved(saved.libraryFile!, saved.sport!)}>
-                Analyser
+                {t('Analyser')}
               </Button>
             )}
             {canDownloadFiles() && (
               <Button onClick={() => downloadTextFile(saved.fileName, saved.content)}>
-                Télécharger le GPX
+                {t('Télécharger le GPX')}
               </Button>
             )}
             <Button variant="ghost" onClick={dismissRecorderResult}>
-              Fermer
+              {t('Fermer')}
             </Button>
           </div>
         </Card>
@@ -1072,11 +1086,12 @@ function RecordingScreen() {
         <p className="rec-footnote">
           {missingPermissions.length > 0 && (
             <>
-              Pour un enregistrement écran éteint, il manque : {missingPermissions.map((key) => PERMISSION_LABEL[key].toLowerCase()).join(', ')}
-              {' '}(<Link to="/parametres">Réglages</Link>, bloc « Autorisations »).{' '}
+              {tRich('Pour un enregistrement écran éteint, il manque : {list} (<a>Réglages</a>, bloc « Autorisations »).', {
+                list: missingPermissions.map((key) => PERMISSION_LABEL[key].toLowerCase()).join(', '),
+              }, { a: settingsLink })}{' '}
             </>
           )}
-          Pendant l'enregistrement, ne pas balayer l'application hors des applications récentes.
+          {t("Pendant l'enregistrement, ne pas balayer l'application hors des applications récentes.")}
         </p>
       )}
     </div>

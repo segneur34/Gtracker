@@ -1,4 +1,5 @@
 import { plainError } from '../platform/errorText';
+import { t } from '../core/i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Activity } from '../core/activities';
@@ -69,9 +70,9 @@ export type GpxLoadOutcome = { text: string } | { error: string; retry: boolean 
 export const loadGpxOutcome = async (load: Promise<string | null>): Promise<GpxLoadOutcome> => {
   try {
     const text = await load;
-    return text === null ? { error: 'GPX introuvable dans la mémoire.', retry: false } : { text };
+    return text === null ? { error: t('GPX introuvable dans la mémoire.'), retry: false } : { text };
   } catch (err) {
-    return { error: plainError(err, 'GPX illisible.'), retry: true };
+    return { error: plainError(err, t('GPX illisible.')), retry: true };
   }
 };
 
@@ -162,7 +163,7 @@ export const useSessionFromUrl = (onLoad: (content: string, session: LibrarySess
       // La session relue en entier, plus récente que celle du dernier rendu.
       const current = librarySession(requested) ?? latest.current.session;
       if (!current) {
-        setReadError('GPX introuvable dans la mémoire.');
+        setReadError(t('GPX introuvable dans la mémoire.'));
         return;
       }
       setReadError(null);
@@ -184,7 +185,7 @@ export const useSessionFromUrl = (onLoad: (content: string, session: LibrarySess
   }, [partial, requested]);
 
   const missing = requested !== null && !known && settled;
-  const error = missing ? 'Cette session n\'est pas dans la mémoire.' : readError;
+  const error = missing ? t('Cette session n\'est pas dans la mémoire.') : readError;
   return {
     /** Session demandée par l'URL, connue ou non de la mémoire, `null` si aucune. */
     requested,

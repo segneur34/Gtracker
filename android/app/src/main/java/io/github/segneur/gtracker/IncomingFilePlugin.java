@@ -254,7 +254,7 @@ public class IncomingFilePlugin extends Plugin {
             Log.e(TAG, "Refus non gardé : " + refusal, e);
         }
         new Handler(Looper.getMainLooper()).post(() ->
-            Toast.makeText(context, "Gtracker n'a pas pu recevoir ce fichier.", Toast.LENGTH_LONG).show());
+            Toast.makeText(context, R.string.incoming_file_refused, Toast.LENGTH_LONG).show());
     }
 
     private static String entryName(String id, String state, String name) {

@@ -1,4 +1,6 @@
 import { roundTo, toFixedNumber } from '../core/basics';
+import { t, tn } from '../core/i18n';
+import { tRich } from './tRich';
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { ReferenceLine } from 'recharts';
 import { jumpCurveRows, jumpDoubtLabel, type JumpCurveRow, type SessionJump } from '../core/jumps';
@@ -41,9 +43,9 @@ const CURVE_Y: TrackYAxis[] = [{ color: 'var(--chart-axis)', domain: [0, 'auto']
 type JumpSort = 'hauteur' | 'vol' | 'longueur';
 
 const SORTS: { key: JumpSort; label: string }[] = [
-  { key: 'hauteur', label: 'Hauteur' },
-  { key: 'vol', label: "En l'air" },
-  { key: 'longueur', label: 'Longueur' },
+  { key: 'hauteur', label: t('Hauteur') },
+  { key: 'vol', label: t("En l'air") },
+  { key: 'longueur', label: t('Longueur') },
 ];
 
 const sortValue = (j: SessionJump, sort: JumpSort): number =>
@@ -81,9 +83,9 @@ const noteStyle: CSSProperties = { color: 'var(--muted)', fontSize: 'var(--text-
 
 const meters = (m: number) => `${formatDecimal(m, 2)} m`;
 const seconds = (s: number) => `${formatDecimal(s, 2)} s`;
-const rank = (k: number) => `${k + 1}${k === 0 ? 'er' : 'e'}`;
+const rank = (k: number) => (k === 0 ? t('1er') : k === 1 ? t('2e') : t('3e'));
 /** Raisons d'un doute, en clair, pour l'infobulle. */
-const doubtText = (jump: SessionJump) => `Mesure douteuse : ${jump.doubts.map((d) => jumpDoubtLabel(d, JUMP_DETECTION)).join(' ; ')}.`;
+const doubtText = (jump: SessionJump) => t('Mesure douteuse : {raisons}.', { raisons: jump.doubts.map((d) => jumpDoubtLabel(d, JUMP_DETECTION)).join(' ; ') });
 
 /**
  * Courbe d'un saut, ou de deux calés sur leur décollage : zoom
@@ -113,15 +115,15 @@ function JumpCurveChart({ first, second, numbers, trackIndexAt }: {
     onTrackHover(e);
   };
   const series: TrackSeries<JumpCurveRow>[] = jumps.map((_, k) => (
-    { kind: 'line', key: k === 0 ? 'premier' : 'second', name: k === 0 ? 'premier' : 'second', color: CURVE_COLORS[k], width: 2, activeDotR: 4, connectNulls: true }
+    { kind: 'line', key: k === 0 ? 'premier' : 'second', name: k === 0 ? t('premier') : t('second'), color: CURVE_COLORS[k], width: 2, activeDotR: 4, connectNulls: true }
   ));
   const read = (hovered: JumpCurveRow): Readout | null => (inChartView(zoom.view, hovered.t)
     ? {
       values: jumps.map((_, k) => {
         const h = k === 0 ? hovered.premier : hovered.second;
-        return { text: `n° ${numbers[k]} : ${h === null ? '—' : `${commaDecimal(roundTo(h, 2))} m`}`, color: CURVE_COLORS[k] };
+        return { text: t('n° {n} : {value}', { n: numbers[k], value: h === null ? '—' : `${commaDecimal(roundTo(h, 2))} m` }), color: CURVE_COLORS[k] };
       }),
-      at: `${commaDecimal(toFixedNumber(hovered.t, 2))} s depuis le décollage`,
+      at: t('{time} s depuis le décollage', { time: commaDecimal(toFixedNumber(hovered.t, 2)) }),
     }
     : null);
   return (
@@ -133,10 +135,10 @@ function JumpCurveChart({ first, second, numbers, trackIndexAt }: {
           clearTrackHover();
         }} style={{ height: `${CURVE_HEIGHT_PX}px` }}>
         <ReferenceLine y={0} stroke="var(--line-strong)" />
-        <ReferenceLine x={0} stroke="var(--muted)" strokeDasharray="4 3" label={{ value: 'décollage', fontSize: 11, position: 'insideTopLeft' }} />
+        <ReferenceLine x={0} stroke="var(--muted)" strokeDasharray="4 3" label={{ value: t('décollage'), fontSize: 11, position: 'insideTopLeft' }} />
         {jumps.map((j, k) => (
           <ReferenceLine key={j.takeoffMs} x={roundTo(j.flightS, 2)} stroke={CURVE_COLORS[k]} strokeDasharray="4 3"
-            label={k === 0 ? { value: 'atterrissage', fontSize: 11, position: 'insideTopRight' } : undefined} />
+            label={k === 0 ? { value: t('atterrissage'), fontSize: 11, position: 'insideTopRight' } : undefined} />
         ))}
       </TrackChart>
     </>
@@ -155,18 +157,23 @@ function JumpsPanel({
   const [curveSecond, setCurveSecond] = useState<number | null>(null);
   const heading = (label: string, helpKey?: string) => <PanelHeading label={label} open={open} onToggle={onToggle} helpKey={helpKey} padRight />;
   const hiddenNote = hiddenCount > 0
-    ? `${hiddenCount} ${hiddenCount > 1 ? 'autres sauts, plus bas' : 'autre saut, plus bas'} que ${meters(minHeightM)} ou pris sous ${thresholdLabel}, ${hiddenCount > 1 ? 'ne sont pas montrés' : "n'est pas montré"}.`
+    ? tn(
+      hiddenCount,
+      "{n} autre saut, plus bas que {height} ou pris sous {threshold}, n'est pas montré.",
+      '{n} autres sauts, plus bas que {height} ou pris sous {threshold}, ne sont pas montrés.',
+      { height: meters(minHeightM), threshold: thresholdLabel }
+    )
     : null;
 
   if (status !== 'ready' || jumps.length === 0) {
     const text = status === 'computing'
-      ? 'Calcul des sauts…'
+      ? t('Calcul des sauts…')
       : status === 'error'
-        ? `Sauts indisponibles : ${error ?? 'calcul impossible'}.`
-        : `Aucun saut d'au moins ${meters(minHeightM)} pris à ${thresholdLabel} ou plus.`;
+        ? t('Sauts indisponibles : {raison}.', { raison: error ?? t('calcul impossible') })
+        : t("Aucun saut d'au moins {height} pris à {threshold} ou plus.", { height: meters(minHeightM), threshold: thresholdLabel });
     return (
       <ResizablePanel id="sailing.sauts" style={ANALYSIS_PANEL_STYLE}>
-        {heading('Sauts')}
+        {heading(t('Sauts'))}
         <div className="ui-muted">{text}</div>
         {status === 'ready' && hiddenNote && <div style={noteStyle}>{hiddenNote}</div>}
       </ResizablePanel>
@@ -181,7 +188,7 @@ function JumpsPanel({
   const farthest = jumps.reduce<SessionJump | null>((a, b) => (b.lengthM !== null && (a === null || b.lengthM > (a.lengthM ?? 0)) ? b : a), null);
   const first = jumps.find((j) => j.takeoffMs === curveFirst) ?? highest;
   const second = jumps.find((j) => j.takeoffMs === curveSecond && j.takeoffMs !== first.takeoffMs) ?? null;
-  const jumpLabel = (j: SessionJump) => `n° ${order.get(j.takeoffMs)} · ${meters(j.heightM)} · ${formatTimeOfDay(j.takeoffMs)}`;
+  const jumpLabel = (j: SessionJump) => t('n° {n} · {height} · {time}', { n: order.get(j.takeoffMs), height: meters(j.heightM), time: formatTimeOfDay(j.takeoffMs) });
   const stat = (label: string, value: ReactNode, detail?: string) => <StatTile label={label} value={value} detail={detail} />;
   /** « Détail » : le saut sur la courbe, et la page descend jusqu'à elle. */
   const showDetail = (j: SessionJump) => {
@@ -192,27 +199,21 @@ function JumpsPanel({
 
   const jumpsPanel = (
     <ResizablePanel id="sailing.sauts" style={ANALYSIS_PANEL_STYLE}>
-      {heading('Sauts', 'analyse:sauts')}
+      {heading(t('Sauts'), 'analyse:sauts')}
       <HelpText helpKey="analyse:sauts" note>
-          Hauteur gagnée par le téléphone, donc par le buste, au-dessus de son niveau au décollage, mesurée par
-          l'accéléromètre et le gyroscope : ce n'est pas la hauteur de la planche au-dessus de l'eau. Précision attendue,
-          téléphone sur la poitrine : ±0,1 à 0,2 m sans foil, ±0,2 à 0,3 m sur foil ; davantage au bras. En l'air : du décollage
-          à l'atterrissage. Longueur : chemin parcouru pendant le saut, lu sur la trace ; vitesse : au décollage. « ≈ » marque
-          une mesure douteuse, dont la raison s'affiche au survol. « Voir » montre le saut sur la carte, « Détail » sur la
-          courbe. Sont montrés les sauts d'au moins {meters(minHeightM)} (Réglages, carte de l'activité) pris à {thresholdLabel}
-          ou plus (seuil d'activité de la session).
+        {t("Hauteur gagnée par le téléphone, donc par le buste, au-dessus de son niveau au décollage, mesurée par l'accéléromètre et le gyroscope : ce n'est pas la hauteur de la planche au-dessus de l'eau. Précision attendue, téléphone sur la poitrine : ±0,1 à 0,2 m sans foil, ±0,2 à 0,3 m sur foil ; davantage au bras. En l'air : du décollage à l'atterrissage. Longueur : chemin parcouru pendant le saut, lu sur la trace ; vitesse : au décollage. « ≈ » marque une mesure douteuse, dont la raison s'affiche au survol. « Voir » montre le saut sur la carte, « Détail » sur la courbe. Sont montrés les sauts d'au moins {height} (Réglages, carte de l'activité) pris à {threshold}ou plus (seuil d'activité de la session).", { height: meters(minHeightM), threshold: thresholdLabel })}
       </HelpText>
       <div className="an-sheet__stats an-sheet__stats--always">
-        {stat('Sauts', `${jumps.length}`)}
-        {stat('Plus haut', meters(highest.heightM), formatTimeOfDay(highest.takeoffMs))}
-        {stat('Plus long saut', seconds(longest.flightS), formatTimeOfDay(longest.takeoffMs))}
-        {farthest && farthest.lengthM !== null && stat('Plus long saut', formatShortDistance(farthest.lengthM, distanceUnit), formatTimeOfDay(farthest.takeoffMs))}
+        {stat(t('Sauts'), `${jumps.length}`)}
+        {stat(t('Plus haut'), meters(highest.heightM), formatTimeOfDay(highest.takeoffMs))}
+        {stat(t('Plus long saut'), seconds(longest.flightS), formatTimeOfDay(longest.takeoffMs))}
+        {farthest && farthest.lengthM !== null && stat(t('Plus long saut'), formatShortDistance(farthest.lengthM, distanceUnit), formatTimeOfDay(farthest.takeoffMs))}
       </div>
 
       <div className="ui-my-10">
         <div className="ui-row-15 ui-center">
-          <strong>Les plus hauts</strong>
-          <MapToggle shown={podiumShown} color={ACCENT} ink="var(--on-ink)" labels={['Voir (Carte)', 'Masquer (Carte)']} onClick={onTogglePodium} />
+          <strong>{t('Les plus hauts')}</strong>
+          <MapToggle shown={podiumShown} color={ACCENT} ink="var(--on-ink)" labels={[t('Voir (Carte)'), t('Masquer (Carte)')]} onClick={onTogglePodium} />
         </div>
         <ol className="an-jump-podium">
           {byHeight.slice(0, 3).map((j, k) => (
@@ -225,19 +226,19 @@ function JumpsPanel({
       </div>
 
       <div className="an-jump-sort">
-        <span className="ui-muted">Trier par</span>
-        <SegmentedControl label="Trier les sauts" items={SORTS} value={sort} onChange={setSort} accent={ACCENT} />
+        <span className="ui-muted">{t('Trier par')}</span>
+        <SegmentedControl label={t('Trier les sauts')}items={SORTS} value={sort} onChange={setSort} accent={ACCENT} />
       </div>
       <div className="ui-scroll-x">
         <table className="ui-table ui-table--cards an-jump-table">
           <thead>
             <tr className="ui-sunken">
-              <th className="ui-cell ui-cell--left" title="Numéro du saut dans la séance">N°</th>
-              <th style={cellStyle}>Heure</th>
-              <th style={cellStyle}>Hauteur</th>
-              <th style={cellStyle}>En l'air</th>
-              <th style={cellStyle}>Longueur</th>
-              <th style={cellStyle}>Vitesse</th>
+              <th className="ui-cell ui-cell--left" title={t('Numéro du saut dans la séance')}>{t('N°')}</th>
+              <th style={cellStyle}>{t('Heure')}</th>
+              <th style={cellStyle}>{t('Hauteur')}</th>
+              <th style={cellStyle}>{t("En l'air")}</th>
+              <th style={cellStyle}>{t('Longueur')}</th>
+              <th style={cellStyle}>{t('Vitesse')}</th>
               <th style={cellStyle} />
             </tr>
           </thead>
@@ -251,16 +252,16 @@ function JumpsPanel({
                   <td className="an-jump-num ui-cell ui-cell--left ui-cell--bold">{order.get(j.takeoffMs)}</td>
                   <td className="an-jump-time num" style={cellStyle}>{formatTimeOfDay(j.takeoffMs)}</td>
                   <td className="an-jump-height ui-cell ui-cell--center ui-cell--bold" title={doubtful ? doubtText(j) : undefined}>
-                    {doubtful && <span className="an-jump-doubt" aria-label="mesure douteuse">≈ </span>}
+                    {doubtful && <span className="an-jump-doubt" aria-label={t('mesure douteuse')}>≈ </span>}
                     {meters(j.heightM)}
                   </td>
-                  <td className="an-jump-flight" data-label="en l'air" style={cellStyle}>{seconds(j.flightS)}</td>
+                  <td className="an-jump-flight" data-label={t("en l'air")} style={cellStyle}>{seconds(j.flightS)}</td>
                   <td className="an-jump-length" style={cellStyle}>{j.lengthM === null ? '—' : formatShortDistance(j.lengthM, distanceUnit)}</td>
                   <td className="an-jump-speed" style={cellStyle}>{formatSpeed(j.speedMs, speedUnit)}</td>
                   <td className="an-jump-map" style={cellStyle}>
                     <span className="an-jump-actions">
                       <MapToggle shown={shown} color={HIGHLIGHT_SHOWN_COLOR} onClick={() => onShowJump(shown ? null : j.takeoffMs)} />
-                      <MapToggle shown={onCurve} color={CURVE_COLORS[0]} labels={['Détail', 'Détail']} onClick={() => showDetail(j)} />
+                      <MapToggle shown={onCurve} color={CURVE_COLORS[0]} labels={[t('Détail'), t('Détail')]} onClick={() => showDetail(j)} />
                     </span>
                   </td>
                 </tr>
@@ -277,7 +278,7 @@ function JumpsPanel({
   const shown = second ? [first, second] : [first];
   const select = (value: number | null, onChange: (v: number | null) => void, allowNone: boolean, exclude: number | null) => (
     <select className="ui-field ui-field--s" value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}>
-      {allowNone && <option value="">aucun</option>}
+      {allowNone && <option value="">{t('aucun')}</option>}
       {jumps.filter((j) => j.takeoffMs !== exclude).map((j) => (
         <option key={j.takeoffMs} value={j.takeoffMs}>{jumpLabel(j)}</option>
       ))}
@@ -288,21 +289,21 @@ function JumpsPanel({
       <div id={curveAnchorId} className="an-jump-compare">
         <label>
           <span className="an-jump-compare__dot" style={{ backgroundColor: CURVE_COLORS[0] }} />
-          Saut {select(first.takeoffMs, (v) => setCurveFirst(v), false, null)}
+          {tRich('Saut {sel}', { sel: select(first.takeoffMs, (v) => setCurveFirst(v), false, null) })}
         </label>
         <label>
           <span className="an-jump-compare__dot" style={{ backgroundColor: CURVE_COLORS[1] }} />
-          comparer avec {select(second?.takeoffMs ?? null, (v) => setCurveSecond(v), true, first.takeoffMs)}
+          {tRich('comparer avec {sel}', { sel: select(second?.takeoffMs ?? null, (v) => setCurveSecond(v), true, first.takeoffMs) })}
         </label>
-        <HelpToggle helpKey="analyse:sauts-courbe" label="Courbe des sauts" size="s" />
+        <HelpToggle helpKey="analyse:sauts-courbe" label={t('Courbe des sauts')} size="s" />
       </div>
       <HelpText helpKey="analyse:sauts-courbe" note>
-        Hauteur du téléphone au-dessus de son niveau au décollage. Les deux sauts comparés partent du même instant.
+        {t('Hauteur du téléphone au-dessus de son niveau au décollage. Les deux sauts comparés partent du même instant.')}
       </HelpText>
       <div className="ui-muted ui-mb-6">
         {shown.map((j, k) => (
           <span key={j.takeoffMs} style={{ marginRight: '14px', color: CURVE_COLORS[k] }}>
-            n° {order.get(j.takeoffMs)} : {meters(j.heightM)} · {seconds(j.flightS)} en l'air
+            {t("n° {n} : {height} · {flight} en l'air", { n: order.get(j.takeoffMs), height: meters(j.heightM), flight: seconds(j.flightS) })}
           </span>
         ))}
       </div>

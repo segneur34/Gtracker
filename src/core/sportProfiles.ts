@@ -5,6 +5,7 @@ import type { PumpDetection } from './pumping';
 import type { SpeedRangeMs } from './speedGradient';
 import type { SportType, TopTarget } from './types';
 import { DEFAULT_MAX_DETOUR_RATIO } from './kinematics';
+import { t } from './i18n';
 import { J_PER_KCAL, kmhToMs, knotsToMs, METERS_PER_DISTANCE_UNIT, type SpeedUnit } from './units';
 
 /**
@@ -311,7 +312,7 @@ const SAILING_PUMP_DETECTION: PumpDetection = {
 };
 
 /** Libellé du ratio de temps actif d'une session sur foil, quel que soit le calcul. */
-export const FOIL_RATIO_LABEL = 'Ratio de vol';
+export const FOIL_RATIO_LABEL = t('Ratio de vol');
 
 /**
  * Analyse d'une session de surf (`surfing/`) : vagues, rame,
@@ -470,7 +471,7 @@ export const SAILING_TOP_TARGETS = [
   { key: 'd100m', label: '100 m', value: 100, kind: 'distance' },
   { key: 'd500m', label: '500 m', value: 500, kind: 'distance' },
   { key: 'd1000m', label: '1000 m', value: 1000, kind: 'distance' },
-  { key: 'd1NM', label: '1 mille', value: METERS_PER_DISTANCE_UNIT.nm, kind: 'distance' },
+  { key: 'd1NM', label: t('1 mille'), value: METERS_PER_DISTANCE_UNIT.nm, kind: 'distance' },
 ] as const satisfies readonly TopTarget[];
 
 /** Clé d'une cible de tops de la voile (`t2s` … `d1NM`). */
@@ -566,7 +567,7 @@ const SURF_PROFILE: SportProfile = {
   // 20 m/s font 72 km/h, au-delà d'une grosse vague ordinaire.
   maxPlausibleSpeedMs: 20,
   defaultPolarMinSpeed: 0,
-  activeRatioLabel: 'Ratio sur la vague',
+  activeRatioLabel: t('Ratio sur la vague'),
   topTargets: SURF_TOP_TARGETS,
   recording: SURF_RECORDING,
   jumps: null,
@@ -588,7 +589,7 @@ export const SPORT_PROFILES: Record<SportType, SportProfile> = {
     label: 'Wingfoil',
     defaultActiveThreshold: 8,
     // Sans foil (case décochée), un wing se dit « en navigation » ; sur foil, « Ratio de vol ».
-    activeRatioLabel: 'Ratio de navigation',
+    activeRatioLabel: t('Ratio de navigation'),
     foilDefault: true,
     heartRate: heartRateOffset(-8),
     jumps: { defaultMinHeightM: 0.5, detection: JUMP_DETECTION },
@@ -598,7 +599,7 @@ export const SPORT_PROFILES: Record<SportType, SportProfile> = {
     id: 'windsurf',
     label: 'Planche à voile',
     defaultActiveThreshold: 10,
-    activeRatioLabel: 'Ratio de planing',
+    activeRatioLabel: t('Ratio de planing'),
     heartRate: heartRateOffset(-5),
     jumps: { defaultMinHeightM: 0.5, detection: JUMP_DETECTION },
   },
@@ -607,7 +608,7 @@ export const SPORT_PROFILES: Record<SportType, SportProfile> = {
     id: 'kite',
     label: 'Kitesurf',
     defaultActiveThreshold: 8,
-    activeRatioLabel: 'Ratio de navigation',
+    activeRatioLabel: t('Ratio de navigation'),
     heartRate: heartRateOffset(-8),
     jumps: { defaultMinHeightM: 1, detection: JUMP_DETECTION },
   },
@@ -623,7 +624,7 @@ export const SPORT_PROFILES: Record<SportType, SportProfile> = {
     speedRange: { minMs: knotsToMs(1), maxMs: knotsToMs(15) },
     speedRangeFollowsPace: false,
     recording: BOAT_RECORDING,
-    activeRatioLabel: 'Ratio de navigation',
+    activeRatioLabel: t('Ratio de navigation'),
     // Voile au rappel, comme la planche.
     heartRate: heartRateOffset(-5),
     jumps: null,

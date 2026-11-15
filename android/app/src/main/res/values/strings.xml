@@ -1,9 +1,15 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Gtracker</string>
-    <string name="title_activity_main">Gtracker</string>
-    <string name="package_name">io.github.segneur.gtracker</string>
-    <string name="custom_url_scheme">io.github.segneur.gtracker</string>
+    <string name="app_name" translatable="false">Gtracker</string>
+    <string name="title_activity_main" translatable="false">Gtracker</string>
+    <string name="package_name" translatable="false">io.github.segneur.gtracker</string>
+    <string name="custom_url_scheme" translatable="false">io.github.segneur.gtracker</string>
+    <!--
+        Textes que le téléphone montre lui-même, hors de la page : ils suivent la langue du téléphone, pas celle choisie
+        dans Réglages. Ce fichier porte l'anglais, langue de repli ; le français est dans values-fr, l'espagnol dans values-es.
+    -->
     <!-- Nom du canal de la notification de l'enregistrement (greffon @capgo/background-geolocation). -->
-    <string name="capacitor_background_geolocation_notification_channel_name">Enregistrement</string>
+    <string name="capacitor_background_geolocation_notification_channel_name">Recording</string>
+    <!-- Dit par le téléphone quand un fichier reçu d'une autre application n'a pas pu être gardé pour la page. -->
+    <string name="incoming_file_refused">Gtracker could not receive this file.</string>
 </resources>

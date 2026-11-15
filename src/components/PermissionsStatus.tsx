@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { t } from '../core/i18n';
 import { usePermissions } from '../hooks/usePermissions';
 import { savedBelt } from '../platform/heartRate';
 import {
@@ -26,17 +27,17 @@ import './StatusLine.css';
  */
 
 const WHY: Record<PermissionKey, string> = {
-  location: "Pour enregistrer la trace. « Pendant l'utilisation de l'application » suffit, écran éteint compris.",
-  notifications: "Pour la notification de l'enregistrement, lisible écran verrouillé.",
-  battery: "Pour qu'Android ne coupe pas l'enregistrement écran éteint : « Autoriser », ou « Aucune restriction ».",
-  bluetooth: 'Pour la ceinture cardio seulement.',
+  location: t("Pour enregistrer la trace. « Pendant l'utilisation de l'application » suffit, écran éteint compris."),
+  notifications: t("Pour la notification de l'enregistrement, lisible écran verrouillé."),
+  battery: t("Pour qu'Android ne coupe pas l'enregistrement écran éteint : « Autoriser », ou « Aucune restriction »."),
+  bluetooth: t('Pour la ceinture cardio seulement.'),
 };
 
 const STATE_TEXT: Record<PermissionState, string> = {
-  granted: 'accordée',
-  prompt: 'à accorder',
-  denied: 'refusée',
-  unavailable: 'sans objet',
+  granted: t('accordée'),
+  prompt: t('à accorder'),
+  denied: t('refusée'),
+  unavailable: t('sans objet'),
 };
 
 const STATE_COLOR: Record<PermissionState, string> = {
@@ -83,19 +84,19 @@ function PermissionRows({ keys, status, refresh }: { keys: PermissionKey[]; stat
           <PermissionRow key={key} helpKey={`autorisations:${key}`} label={PERMISSION_LABEL[key]} why={WHY[key]}>
             <span className="status-line">
               <span className="status-line__dot" style={{ backgroundColor: STATE_COLOR[state] }} />
-              <span>{key === 'battery' && state === 'denied' ? 'restreinte' : STATE_TEXT[state]}</span>
+              <span>{key === 'battery' && state === 'denied' ? t('restreinte') : STATE_TEXT[state]}</span>
             </span>
             {state !== 'granted' && state !== 'unavailable' && (
               <Button size="s" onClick={() => void ask(key, state, refresh)}>
-                {state === 'denied' && key !== 'battery' ? 'Ouvrir les réglages' : 'Autoriser'}
+                {state === 'denied' && key !== 'battery' ? t('Ouvrir les réglages') : t('Autoriser')}
               </Button>
             )}
           </PermissionRow>
         );
       })}
-      <PermissionRow helpKey="autorisations:demarrage" label="Démarrage automatique"
-        why="Sur Xiaomi, pour que l'enregistrement tienne en arrière-plan. Android ne dit pas s'il est activé : à vérifier soi-même.">
-        <Button size="s" onClick={() => void openAutostart().catch(() => undefined)}>Ouvrir</Button>
+      <PermissionRow helpKey="autorisations:demarrage" label={t('Démarrage automatique')}
+        why={t("Sur Xiaomi, pour que l'enregistrement tienne en arrière-plan. Android ne dit pas s'il est activé : à vérifier soi-même.")}>
+        <Button size="s" onClick={() => void openAutostart().catch(() => undefined)}>{t('Ouvrir')}</Button>
       </PermissionRow>
     </div>
   );
@@ -161,17 +162,17 @@ export function PermissionsPrompt({ onDecided }: { onDecided?: (shown: boolean) 
   const keys = requiredPermissions(beltSaved);
 
   return (
-    <Card heading="Autorisations">
+    <Card heading={t('Autorisations')}>
       <div className="ui-stack-3">
         <p className="permissions__intro">
           {missing.length === 0
-            ? 'Tout est accordé : Gtracker peut enregistrer écran éteint.'
-            : "Pour enregistrer écran éteint, sans coupure, Gtracker a besoin de ce qui suit. Chacune se règle aussi plus tard, dans Réglages › Autorisations."}
+            ? t('Tout est accordé : Gtracker peut enregistrer écran éteint.')
+            : t('Pour enregistrer écran éteint, sans coupure, Gtracker a besoin de ce qui suit. Chacune se règle aussi plus tard, dans Réglages › Autorisations.')}
         </p>
         <PermissionRows keys={keys} status={status} refresh={refresh} />
         <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-          {missing.length > 0 && <Button variant="primary" onClick={() => void askAll(keys, refresh)}>Tout autoriser</Button>}
-          <Button variant="ghost" onClick={close}>{missing.length === 0 ? 'Fermer' : 'Plus tard'}</Button>
+          {missing.length > 0 && <Button variant="primary" onClick={() => void askAll(keys, refresh)}>{t('Tout autoriser')}</Button>}
+          <Button variant="ghost" onClick={close}>{missing.length === 0 ? t('Fermer') : t('Plus tard')}</Button>
         </div>
       </div>
     </Card>
@@ -182,9 +183,9 @@ export function PermissionsPrompt({ onDecided }: { onDecided?: (shown: boolean) 
 export function PermissionsSettings() {
   const { status, refresh } = usePermissions();
   if (!isNativeApp()) {
-    return <p className="permissions__intro">Sur l'application Android seulement.</p>;
+    return <p className="permissions__intro">{t("Sur l'application Android seulement.")}</p>;
   }
-  if (status === null) return <p className="permissions__intro">Lecture des autorisations…</p>;
+  if (status === null) return <p className="permissions__intro">{t('Lecture des autorisations…')}</p>;
   const keys = requiredPermissions(true);
   const missing = missingPermissions(status, true);
   return (
@@ -192,7 +193,7 @@ export function PermissionsSettings() {
       <PermissionRows keys={keys} status={status} refresh={refresh} />
       {missing.length > 0 && (
         <div>
-          <Button variant="primary" onClick={() => void askAll(keys, refresh)}>Tout autoriser</Button>
+          <Button variant="primary" onClick={() => void askAll(keys, refresh)}>{t('Tout autoriser')}</Button>
         </div>
       )}
     </div>

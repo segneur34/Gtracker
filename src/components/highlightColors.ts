@@ -1,4 +1,5 @@
 import type { PathOptions } from 'leaflet';
+import { t } from '../core/i18n';
 
 /**
  * Couleurs des surbrillances sur la carte, communes aux analyses : tops,
@@ -10,7 +11,7 @@ import type { PathOptions } from 'leaflet';
 export const HIGHLIGHT_PODIUM_COLORS = ['#d32f2f', '#f57c00', '#388e3c'];
 
 /** Rang du podium dans les en-têtes de tableau, dans l'ordre des couleurs. */
-export const PODIUM_RANKS = ['1er', '2e', '3e'] as const;
+export const PODIUM_RANKS = [t('1er'), t('2e'), t('3e')] as const;
 
 /** Couleur de la marche `rank` (0 pour la première) ; au-delà de la troisième, celle de la troisième. */
 export const podiumColor = (rank: number): string => HIGHLIGHT_PODIUM_COLORS[rank] ?? HIGHLIGHT_PODIUM_COLORS[2];

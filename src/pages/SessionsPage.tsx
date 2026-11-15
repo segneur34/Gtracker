@@ -11,7 +11,8 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import MoreMenu from '../components/ui/MoreMenu';
 import SegmentedControl from '../components/ui/SegmentedControl';
-import { plural } from '../core/basics';
+import { t, tn } from '../core/i18n';
+import { tRich } from '../components/tRich';
 import { findActivity, sessionActivity, type Activity } from '../core/activities';
 import { STORAGE_KEYS } from '../core/appIdentity';
 import { sessionFamily } from '../core/parentPage';
@@ -48,7 +49,7 @@ import './SessionsPage.css';
 function OutdatedSummaries() {
   const { toUpdate } = useLibraryFields('toUpdate');
   if (toUpdate <= 0) return null;
-  return <p className="ui-hint ui-hint--m">{plural(toUpdate, 'session')} à mettre à jour</p>;
+  return <p className="ui-hint ui-hint--m">{tn(toUpdate, '{n} session à mettre à jour', '{n} sessions à mettre à jour')}</p>;
 }
 
 /** Tri choisi, propre à l'appareil. */
@@ -150,19 +151,20 @@ function SessionsPage() {
     <div className="ui-page sessions-page">
       <header className="sessions-head">
         <div className="sessions-head__line">
-          <h1 className="sessions-head__title">Sessions</h1>
+          <h1 className="sessions-head__title">{t('Sessions')}</h1>
           {/* Imports et mise à jour, de moindre usage : derrière « … », pour que la liste vienne tout de suite. */}
-          <MoreMenu label="Importer, mettre à jour">
+          <MoreMenu label={t('Importer, mettre à jour')}>
             {library.status === 'ready' && (
               <span className="ui-more__note">
-                Mémoire : {library.folderLabel ?? 'ce navigateur'}, {library.sessions.length} session{library.sessions.length > 1 ? 's' : ''} en tout
+                {tn(library.sessions.length, 'Mémoire : {folder}, {n} session en tout', 'Mémoire : {folder}, {n} sessions en tout',
+                  { folder: library.folderLabel ?? t('ce navigateur') })}
               </span>
             )}
             <ImportButtons />
             <RefreshLibraryButton />
             <Button aria-expanded={helpOpen} onClick={() => folderHelp?.toggle()}>
               <IconHelp size={18} />
-              À quoi sert « Ajouter les sessions d'un dossier » ?
+              {t("À quoi sert « Ajouter les sessions d'un dossier » ?")}
             </Button>
           </MoreMenu>
         </div>
@@ -170,11 +172,11 @@ function SessionsPage() {
           <p className="sessions-head__totals num">{totals}</p>
           <button type="button" className="ui-tab sessions-head__sort" aria-expanded={sortOpen}
             onClick={() => setSortOpen((open) => !open)}>
-            Tris {sortOpen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+            {t('Tris')} {sortOpen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
           </button>
         </div>
         {sortOpen && (
-          <SegmentedControl<SessionSort> label="Trier les sessions" className="sessions-head__choice"
+          <SegmentedControl<SessionSort> label={t('Trier les sessions')} className="sessions-head__choice"
             items={SESSION_SORTS} value={sort} onChange={setSort} />
         )}
       </header>
@@ -185,8 +187,8 @@ function SessionsPage() {
       {helpOpen && (
         <p className="ui-hint ui-hint--m">
           {native
-            ? "« Ajouter les sessions d'un dossier » reprend celles d'un dossier Gtracker copié depuis le PC ou un autre téléphone, notes comprises. On peut aussi copier les fichiers directement dans Documents › Gtracker › sessions : ils apparaissent avec « Mettre à jour », ou au lancement suivant. Un dossier qui contient plusieurs activités de montre (fichiers .fit) demande confirmation : si la montre est prêtée, copiez d'abord vos seuls fichiers dans un dossier, ou choisissez-les un par un avec « Importer des GPX ou FIT »."
-            : "« Ajouter les sessions d'un dossier » reprend celles d'un dossier Gtracker copié depuis le téléphone ou un autre PC, notes comprises. Chrome demande alors s'il faut importer les fichiers « sur ce site » : ils restent sur ce PC, Gtracker n'envoie rien sur internet. Le dossier mémoire de ce PC, lui, se choisit dans Réglages › Mémoire ; des fichiers copiés dedans pendant que Gtracker est ouvert apparaissent avec « Mettre à jour ». Un dossier qui contient plusieurs activités de montre (fichiers .fit) demande confirmation : si la montre est prêtée, copiez d'abord vos seuls fichiers dans un dossier du PC, ou choisissez-les un par un avec « Importer des GPX ou FIT »."}
+            ? t("« Ajouter les sessions d'un dossier » reprend celles d'un dossier Gtracker copié depuis le PC ou un autre téléphone, notes comprises. On peut aussi copier les fichiers directement dans Documents › Gtracker › sessions : ils apparaissent avec « Mettre à jour », ou au lancement suivant. Un dossier qui contient plusieurs activités de montre (fichiers .fit) demande confirmation : si la montre est prêtée, copiez d'abord vos seuls fichiers dans un dossier, ou choisissez-les un par un avec « Importer des GPX ou FIT ».")
+            : t("« Ajouter les sessions d'un dossier » reprend celles d'un dossier Gtracker copié depuis le téléphone ou un autre PC, notes comprises. Chrome demande alors s'il faut importer les fichiers « sur ce site » : ils restent sur ce PC, Gtracker n'envoie rien sur internet. Le dossier mémoire de ce PC, lui, se choisit dans Réglages › Mémoire ; des fichiers copiés dedans pendant que Gtracker est ouvert apparaissent avec « Mettre à jour ». Un dossier qui contient plusieurs activités de montre (fichiers .fit) demande confirmation : si la montre est prêtée, copiez d'abord vos seuls fichiers dans un dossier du PC, ou choisissez-les un par un avec « Importer des GPX ou FIT ».")}
         </p>
       )}
 
@@ -195,15 +197,18 @@ function SessionsPage() {
 
         {selected === null && everything.hidden > 0 && (
           <p className="ui-hint ui-hint--m">
-            Activités cachées : {plural(everything.hidden, 'session')} en moins dans la liste.
-            Elles se ré-affichent dans <Link to="/parametres">Réglages</Link>.
+            {everything.hidden > 1
+              ? tRich('Activités cachées : {n} sessions en moins dans la liste. Elles se ré-affichent dans <a>Réglages</a>.',
+                { n: everything.hidden }, { a: (children) => <Link to="/parametres">{children}</Link> })
+              : tRich('Activités cachées : {n} session en moins dans la liste. Elles se ré-affichent dans <a>Réglages</a>.',
+                { n: everything.hidden }, { a: (children) => <Link to="/parametres">{children}</Link> })}
           </p>
         )}
 
         {unclassified.length > 0 && (
-          <Card heading="À classer">
+          <Card heading={t('À classer')}>
             <p className="ui-hint ui-hint--m">
-              Traces dont l'activité n'est pas connue : choisissez-la pour les ranger en voile ou en surf. Ouvrir l'une d'elles la demande d'abord.
+              {t("Traces dont l'activité n'est pas connue : choisissez-la pour les ranger en voile ou en surf. Ouvrir l'une d'elles la demande d'abord.")}
             </p>
             <ul className="lib-list">{unclassified.map(row)}</ul>
           </Card>
@@ -215,8 +220,8 @@ function SessionsPage() {
           settled && (selected !== null || everything.hidden === 0) && (
             <p className="ui-hint ui-hint--m sessions-empty">
               {selected
-                ? `Aucune session ${ofActivity(selected.name)} pour l'instant.`
-                : 'Aucune session pour l\'instant. Enregistrez-en une, ou importez des GPX : ils sont rangés dans la mémoire et analysés ici.'}
+                ? t("Aucune session {activity} pour l'instant.", { activity: ofActivity(selected.name) })
+                : t("Aucune session pour l'instant. Enregistrez-en une, ou importez des GPX : ils sont rangés dans la mémoire et analysés ici.")}
             </p>
           )
         )}
@@ -224,10 +229,10 @@ function SessionsPage() {
 
       <div className="sessions-actions">
         <Link to="/itineraires" className="ui-btn ui-btn--primary">
-          <IconRoute size={18} /> Créer un parcours
+          <IconRoute size={18} /> {t('Créer un parcours')}
         </Link>
         <Link to="/itineraires/liste" className="ui-btn ui-btn--secondary">
-          <IconFlag size={18} /> Itinéraires{routesLoaded ? ` (${routes.length})` : ''}
+          <IconFlag size={18} /> {t('Itinéraires')}{routesLoaded ? ` (${routes.length})` : ''}
         </Link>
       </div>
     </div>

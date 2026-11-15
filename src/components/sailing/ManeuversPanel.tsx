@@ -5,6 +5,7 @@
  * par le module : rendues telles quelles quand l'onglet se ferme puis se rouvre, et lues par la carte.
  */
 import type { Dispatch, SetStateAction } from 'react';
+import { t, tn } from '../../core/i18n';
 import { formatDecimal, formatTimeOfDay } from '../../core/units';
 import { MANEUVER_LOST_FLIGHT_S } from '../../sailing/sailingConfig';
 import { MANEUVER_METRICS, TACK_LABELS, formatMetric, type ManeuverSummary, type windInputWarning } from '../../sailing/sailingAnalytics';
@@ -12,6 +13,7 @@ import type { ManeuverLocation, ManeuverStats } from '../../sailing/maneuvers';
 import PanelTitle from '../PanelTitle';
 import ResizablePanel from '../ResizablePanel';
 import { useHelp } from '../helpContext';
+import { tRich } from '../tRich';
 import { HIGHLIGHT_PODIUM_COLORS, PODIUM_RANKS } from '../highlightColors';
 import { CARD_STYLE, HALF_PANEL_STYLE } from '../styles';
 import Button from '../ui/Button';
@@ -79,32 +81,33 @@ export default function ManeuversPanel({
   return (
     <ResizablePanel id={view.details ? 'sailing.carte.manoeuvres.details' : 'sailing.carte.manoeuvres'} style={{ ...CARD_STYLE, ...(view.details ? { flex: '1 1 100%' } : HALF_PANEL_STYLE), padding: '12px 15px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
-        <PanelTitle label="Manœuvres" open={open} onToggle={onToggle} helpKey="voile:manoeuvres" />
-        <span style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>ratée si moins de {showThreshold(activeThresholdKn)} {speedSymbol} pendant au moins {MANEUVER_LOST_FLIGHT_S} s</span>
+        <PanelTitle label={t('Manœuvres')} open={open} onToggle={onToggle} helpKey="voile:manoeuvres" />
+        <span style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>{t('ratée si moins de {v} {unit} pendant au moins {s} s', { v: showThreshold(activeThresholdKn), unit: speedSymbol, s: MANEUVER_LOST_FLIGHT_S })}</span>
       </div>
 
       <div className="an-man-scroll">
       <table className="an-man-summary" style={{ borderCollapse: 'collapse', fontSize: 'var(--text-s)', backgroundColor: 'var(--surface)', border: '1px solid var(--line)', marginBottom: '10px' }}>
         <thead>
           <tr style={{ backgroundColor: 'var(--surface-sunken)' }}>
-            <th style={{ textAlign: 'left' }}>Type</th>
-            <th>Réussis</th>
-            <th>Ratés</th>
-            <th title="Vitesse minimale pendant la manœuvre, moyenne sur toutes les manœuvres">Vmin moy. ({speedSymbol})</th>
-            <th title="Meilleure vitesse minimale conservée sur une manœuvre">Vmin max ({speedSymbol})</th>
-            <th style={{ padding: '7px 10px' }}>Carte</th>
+            <th style={{ textAlign: 'left' }}>{t('Type')}</th>
+            <th>{t('Réussis')}</th>
+            <th>{t('Ratés')}</th>
+            <th title={t('Vitesse minimale pendant la manœuvre, moyenne sur toutes les manœuvres')}>{t('Vmin moy. ({unit})', { unit: speedSymbol })}</th>
+            <th title={t('Meilleure vitesse minimale conservée sur une manœuvre')}>{t('Vmin max ({unit})', { unit: speedSymbol })}</th>
+            <th style={{ padding: '7px 10px' }}>{t('Carte')}</th>
           </tr>
         </thead>
         <tbody>
           {([
-            ['Virements', maneuverSummary.tack, onMap.tack, () => onMap.toggle('tack'), undefined],
-            ['Empannages', maneuverSummary.jibe, onMap.jibe, () => onMap.toggle('jibe'), undefined],
+            [t('Virements'), maneuverSummary.tack, onMap.tack, () => onMap.toggle('tack'), undefined, t('Afficher les virements sur la carte')],
+            [t('Empannages'), maneuverSummary.jibe, onMap.jibe, () => onMap.toggle('jibe'), undefined, t('Afficher les empannages sur la carte')],
             // Virages vus en un seul pas de la trace : la ligne n'apparaît que s'il y en a.
             ...(maneuverSummary.undecided
-              ? [['Sens incertain', maneuverSummary.undecided, onMap.undecided, () => onMap.toggle('undecided'),
-                'Virage vu en un seul pas de la trace : on connaît le cap avant et après, pas le côté par lequel il est passé. Compté, ni virement ni empannage, et hors du vent.'] as const]
+              ? [[t('Sens incertain'), maneuverSummary.undecided, onMap.undecided, () => onMap.toggle('undecided'),
+                t('Virage vu en un seul pas de la trace : on connaît le cap avant et après, pas le côté par lequel il est passé. Compté, ni virement ni empannage, et hors du vent.'),
+                t('Afficher les manœuvres de sens incertain sur la carte')] as const]
               : []),
-          ] as const).map(([label, summary, shown, toggle, hint]) => (
+          ] as const).map(([label, summary, shown, toggle, hint, mapTitle]) => (
             <tr key={label} className="ui-table__row">
               <td style={{ fontWeight: 700 }} title={hint}>{label}</td>
               <td style={{ textAlign: 'center', color: 'var(--success)', fontWeight: 700, fontSize: 'var(--text-m)' }}>{summary?.success ?? 0}</td>
@@ -112,7 +115,7 @@ export default function ManeuversPanel({
               <td style={{ textAlign: 'center' }}>{summary ? showKn(summary.vminAvg) : '-'}</td>
               <td style={{ textAlign: 'center', fontWeight: 700 }}>{summary ? showKn(summary.vminMax) : '-'}</td>
               <td style={{ padding: '4px 10px', textAlign: 'center' }}>
-                <MapToggle shown={shown} color="var(--voile)" ink="var(--on-ink)" title={`Afficher les ${hint ? 'manœuvres de sens incertain' : label.toLowerCase()} sur la carte`} onClick={toggle}
+                <MapToggle shown={shown} color="var(--voile)" ink="var(--on-ink)" title={mapTitle} onClick={toggle}
                   style={{ padding: '3px 10px', border: 'none' }} />
               </td>
             </tr>
@@ -124,7 +127,9 @@ export default function ManeuversPanel({
       {/* Vent saisi loin du vent calculé fiable : les virages tombent en « sens incertain », on le dit. */}
       {windWarning && (
         <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--warning-soft)', borderLeft: '3px solid var(--warning-line)', borderRadius: 'var(--radius-s)', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
-          Le vent saisi ({formatDecimal(windWarning.manualDeg, 0)}°) écarte <strong>{windWarning.unclassified}</strong> virage{windWarning.unclassified > 1 ? 's' : ''}, ni virement ni empannage ; le vent calculé est à {formatDecimal(windWarning.autoDeg, 0)}°. Vérifier la direction.
+          {windWarning.unclassified > 1
+            ? tRich('Le vent saisi ({manual}°) écarte <strong>{n}</strong> virages, ni virement ni empannage ; le vent calculé est à {auto}°. Vérifier la direction.', { manual: formatDecimal(windWarning.manualDeg, 0), n: windWarning.unclassified, auto: formatDecimal(windWarning.autoDeg, 0) })
+            : tRich('Le vent saisi ({manual}°) écarte <strong>{n}</strong> virage, ni virement ni empannage ; le vent calculé est à {auto}°. Vérifier la direction.', { manual: formatDecimal(windWarning.manualDeg, 0), n: windWarning.unclassified, auto: formatDecimal(windWarning.autoDeg, 0) })}
         </p>
       )}
 
@@ -132,17 +137,17 @@ export default function ManeuversPanel({
       {(maneuverSummary.tack || maneuverSummary.jibe) && (
         <div className="an-man-scroll" style={{ marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
-            <strong className="ui-subtitle">Par amure</strong>
-            <SegmentedControl<'tack' | 'jibe'> label="Manœuvres par amure" accent="var(--voile)" value={view.tackType} onChange={view.setTackType}
-              items={[{ key: 'tack', label: 'Virements' }, { key: 'jibe', label: 'Empannages' }]} />
+            <strong className="ui-subtitle">{t('Par amure')}</strong>
+            <SegmentedControl<'tack' | 'jibe'> label={t('Manœuvres par amure')} accent="var(--voile)" value={view.tackType} onChange={view.setTackType}
+              items={[{ key: 'tack', label: t('Virements') }, { key: 'jibe', label: t('Empannages') }]} />
           </div>
           <table className="an-man-summary" style={{ borderCollapse: 'collapse', fontSize: 'var(--text-s)', backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--surface-sunken)' }}>
-                <th style={{ textAlign: 'left' }} title="Amure avant la manœuvre : d'où vient le vent">Amure</th>
-                <th title="Manœuvres réussies sur le total de cette amure">Réussis</th>
-                <th title="Vitesse minimale pendant la manœuvre, médiane sur cette amure">Vmin méd. ({speedSymbol})</th>
-                <th title="Vitesse minimale sur vitesse d'approche, médiane sur cette amure">Conservation</th>
+                <th style={{ textAlign: 'left' }} title={t("Amure avant la manœuvre : d'où vient le vent")}>{t('Amure')}</th>
+                <th title={t('Manœuvres réussies sur le total de cette amure')}>{t('Réussis')}</th>
+                <th title={t('Vitesse minimale pendant la manœuvre, médiane sur cette amure')}>{t('Vmin méd. ({unit})', { unit: speedSymbol })}</th>
+                <th title={t("Vitesse minimale sur vitesse d'approche, médiane sur cette amure")}>{t('Conservation')}</th>
               </tr>
             </thead>
             <tbody>
@@ -166,12 +171,10 @@ export default function ManeuversPanel({
 
       {maneuverHelpOpen && (<>
       <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--bg)', borderLeft: '3px solid var(--line-strong)', borderRadius: 'var(--radius-s)', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
-        <strong>Enregistrement :</strong> {pointCount} points, un toutes les {samplingS < 10 ? formatDecimal(samplingS, 1) : Math.round(samplingS)} s en médiane. Entrée de virage retenue au-dessus de {showKn(minEntrySpeedKn)} {speedSymbol}, d'après l'allure de la session.
+        {tRich("<strong>Enregistrement :</strong> {pointCount} points, un toutes les {s} s en médiane. Entrée de virage retenue au-dessus de {v} {unit}, d'après l'allure de la session.", { pointCount, s: samplingS < 10 ? formatDecimal(samplingS, 1) : Math.round(samplingS), v: showKn(minEntrySpeedKn), unit: speedSymbol })}
         {samplingS > 10 && (
           <>
-            {' '}Cadence économique : les manœuvres se lisent encore, mais leur qualité
-            (Vmin, relance) et les tops courts reposent sur des moyennes de plusieurs
-            dizaines de secondes.
+            {' '}{t('Cadence économique : les manœuvres se lisent encore, mais leur qualité (Vmin, relance) et les tops courts reposent sur des moyennes de plusieurs dizaines de secondes.')}
           </>
         )}
       </p>
@@ -184,68 +187,86 @@ export default function ManeuversPanel({
         m.rejected.noFlight > 0 ||
         m.rejected.fullTurn > 0) && (
         <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--bg)', borderLeft: '3px solid var(--line-strong)', borderRadius: 'var(--radius-s)', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
-          <strong>{m.locations.length} virage{m.locations.length > 1 ? 's' : ''} retenu{m.locations.length > 1 ? 's' : ''}</strong>, et d'autres écartés en chemin :
+          {m.locations.length > 1
+            ? tRich("<strong>{n} virages retenus</strong>, et d'autres écartés en chemin :", { n: m.locations.length })
+            : tRich("<strong>{n} virage retenu</strong>, et d'autres écartés en chemin :", { n: m.locations.length })}
           {m.rejected.noFlight > 0 && (
             <>
               <br />
-              <strong>{m.rejected.noFlight}</strong> demi-tour{m.rejected.noFlight > 1 ? 's' : ''} hors {foil ? 'vol' : 'navigation'} : entamé{m.rejected.noFlight > 1 ? 's' : ''} sous le seuil {foil ? 'de vol' : 'de navigation'}, ni réussi{m.rejected.noFlight > 1 ? 's' : ''} ni raté{m.rejected.noFlight > 1 ? 's' : ''}.
+              {foil
+                ? (m.rejected.noFlight > 1
+                  ? tRich('<strong>{n}</strong> demi-tours hors vol : entamés sous le seuil de vol, ni réussis ni ratés.', { n: m.rejected.noFlight })
+                  : tRich('<strong>{n}</strong> demi-tour hors vol : entamé sous le seuil de vol, ni réussi ni raté.', { n: m.rejected.noFlight }))
+                : (m.rejected.noFlight > 1
+                  ? tRich('<strong>{n}</strong> demi-tours hors navigation : entamés sous le seuil de navigation, ni réussis ni ratés.', { n: m.rejected.noFlight })
+                  : tRich('<strong>{n}</strong> demi-tour hors navigation : entamé sous le seuil de navigation, ni réussi ni raté.', { n: m.rejected.noFlight }))}
             </>
           )}
           {m.rejected.fullTurn > 0 && (
             <>
               <br />
-              <strong>{m.rejected.fullTurn}</strong> tour{m.rejected.fullTurn > 1 ? 's' : ''} complet{m.rejected.fullTurn > 1 ? 's' : ''}, non compté{m.rejected.fullTurn > 1 ? 's' : ''}.
+              {m.rejected.fullTurn > 1
+                ? tRich('<strong>{n}</strong> tours complets, non comptés.', { n: m.rejected.fullTurn })
+                : tRich('<strong>{n}</strong> tour complet, non compté.', { n: m.rejected.fullTurn })}
             </>
           )}
           {m.rejected.unclassified > 0 && (
             <>
               <br />
-              <strong>{m.rejected.unclassified}</strong> franc{m.rejected.unclassified > 1 ? 's' : ''} et net{m.rejected.unclassified > 1 ? 's' : ''}, mais sans changer d'amures ou ni face au vent ni au vent arrière : ce sont des abattées ou des remontées — ou le vent retenu est faux, ce qui range tous les demi-tours au travers.
+              {m.rejected.unclassified > 1
+                ? tRich("<strong>{n}</strong> francs et nets, mais sans changer d'amures ou ni face au vent ni au vent arrière : ce sont des abattées ou des remontées — ou le vent retenu est faux, ce qui range tous les demi-tours au travers.", { n: m.rejected.unclassified })
+                : tRich("<strong>{n}</strong> franc et net, mais sans changer d'amures ou ni face au vent ni au vent arrière : ce sont des abattées ou des remontées — ou le vent retenu est faux, ce qui range tous les demi-tours au travers.", { n: m.rejected.unclassified })}
             </>
           )}
           {m.rejected.slowEntry > 0 && (
             <>
               <br />
-              <strong>{m.rejected.slowEntry}</strong> entamé{m.rejected.slowEntry > 1 ? 's' : ''} trop lentement (moins de {showKn(minEntrySpeedKn)} {speedSymbol} à l'entrée).
+              {m.rejected.slowEntry > 1
+                ? tRich("<strong>{n}</strong> entamés trop lentement (moins de {v} {unit} à l'entrée).", { n: m.rejected.slowEntry, v: showKn(minEntrySpeedKn), unit: speedSymbol })
+                : tRich("<strong>{n}</strong> entamé trop lentement (moins de {v} {unit} à l'entrée).", { n: m.rejected.slowEntry, v: showKn(minEntrySpeedKn), unit: speedSymbol })}
             </>
           )}
           {m.rejected.incoherent > 0 && (
             <>
               <br />
-              <strong>{m.rejected.incoherent}</strong> dont le cap partait dans tous les sens : chute ou hésitation.
+              {tRich('<strong>{n}</strong> dont le cap partait dans tous les sens : chute ou hésitation.', { n: m.rejected.incoherent })}
             </>
           )}
           {m.rejected.still > 0 && (
             <>
               <br />
-              <strong>{m.rejected.still}</strong> lu{m.rejected.still > 1 ? 's' : ''} planche arrêtée, avant ou après le virage : à l'arrêt le cap n'est que du bruit de position.
+              {m.rejected.still > 1
+                ? tRich("<strong>{n}</strong> lus planche arrêtée, avant ou après le virage : à l'arrêt le cap n'est que du bruit de position.", { n: m.rejected.still })
+                : tRich("<strong>{n}</strong> lu planche arrêtée, avant ou après le virage : à l'arrêt le cap n'est que du bruit de position.", { n: m.rejected.still })}
             </>
           )}
           {m.rejected.tooShort > 0 && (
             <>
               <br />
-              <strong>{m.rejected.tooShort}</strong> sur place (moins de 10 m parcourus : à cette distance le cap n'est que du bruit de position) ou entamé{m.rejected.tooShort > 1 ? 's' : ''} dans les dernières secondes de la trace.
+              {m.rejected.tooShort > 1
+                ? tRich("<strong>{n}</strong> sur place (moins de 10 m parcourus : à cette distance le cap n'est que du bruit de position) ou entamés dans les dernières secondes de la trace.", { n: m.rejected.tooShort })
+                : tRich("<strong>{n}</strong> sur place (moins de 10 m parcourus : à cette distance le cap n'est que du bruit de position) ou entamé dans les dernières secondes de la trace.", { n: m.rejected.tooShort })}
             </>
           )}
         </p>
       )}
       {view.details && (
         <p style={{ margin: '0 0 10px', color: 'var(--muted)', fontSize: 'var(--text-xs)', lineHeight: 1.45 }}>
-          Survolez une ligne pour la définition, une case du podium pour l'heure de la manœuvre. Le podium retient la meilleure valeur : conservation la plus haute, relance la plus courte, cap (virements seulement) et distance les plus faibles, gain au vent le plus grand ; à égalité, la meilleure conservation.
+          {t("Survolez une ligne pour la définition, une case du podium pour l'heure de la manœuvre. Le podium retient la meilleure valeur : conservation la plus haute, relance la plus courte, cap (virements seulement) et distance les plus faibles, gain au vent le plus grand ; à égalité, la meilleure conservation.")}
         </p>
       )}
       </>)}
 
-      <SegmentedControl<'resume' | 'details'> label="Détails des manœuvres" accent="var(--voile)"
+      <SegmentedControl<'resume' | 'details'> label={t('Détails des manœuvres')} accent="var(--voile)"
         value={view.details ? 'details' : 'resume'} onChange={(key) => view.setDetails(key === 'details')}
-        items={[{ key: 'resume', label: 'Résumé' }, { key: 'details', label: 'Détails' }]} />
+        items={[{ key: 'resume', label: t('Résumé') }, { key: 'details', label: t('Détails') }]} />
 
       {view.details && (
       <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', marginTop: '12px' }}>
         {([
-          ['tack', 'Virements', 'virements', maneuverSummary.tack],
-          ['jibe', 'Empannages', 'empannages', maneuverSummary.jibe],
-        ] as const).map(([type, title, noun, summary]) => {
+          ['tack', t('Virements'), maneuverSummary.tack],
+          ['jibe', t('Empannages'), maneuverSummary.jibe],
+        ] as const).map(([type, title, summary]) => {
           const ofType = m.locations.filter((loc) => loc.type === type);
           const listOpen = view.listOpen[type];
           return (
@@ -254,13 +275,13 @@ export default function ManeuversPanel({
               <strong className="ui-subtitle">{title}</strong>
               {summary ? (
                 <span style={{ fontSize: 'var(--text-s)' }}>
-                  <span style={{ color: 'var(--success)', fontWeight: 700 }}>{summary.success} réussi{summary.success > 1 ? 's' : ''}</span>
+                  <span style={{ color: 'var(--success)', fontWeight: 700 }}>{tn(summary.success, '{n} réussi', '{n} réussis')}</span>
                   {' · '}
-                  <span style={{ color: 'var(--danger)' }}>{summary.fail} raté{summary.fail > 1 ? 's' : ''}</span>
-                  {' · Vmin moy. '}{showKn(summary.vminAvg)}{` ${speedSymbol}, max `}<strong>{showKn(summary.vminMax)}</strong>{` ${speedSymbol}`}
+                  <span style={{ color: 'var(--danger)' }}>{tn(summary.fail, '{n} raté', '{n} ratés')}</span>
+                  {' · '}{tRich('Vmin moy. {avg} {unit}, max <strong>{max}</strong> {unit}', { avg: showKn(summary.vminAvg), unit: speedSymbol, max: showKn(summary.vminMax) })}
                 </span>
               ) : (
-                <span style={{ color: 'var(--muted)', fontSize: 'var(--text-s)' }}>aucun</span>
+                <span style={{ color: 'var(--muted)', fontSize: 'var(--text-s)' }}>{t('aucun')}</span>
               )}
             </div>
 
@@ -268,8 +289,8 @@ export default function ManeuversPanel({
               <table className="an-man-podium" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-xs)' }}>
                 <thead>
                   <tr style={{ color: 'var(--muted)', borderBottom: '1px solid var(--line)' }}>
-                    <th style={{ textAlign: 'left', padding: '3px 4px', fontWeight: 'normal' }}>Métrique</th>
-                    <th style={{ padding: '3px 4px', fontWeight: 'normal' }}>Moyenne</th>
+                    <th style={{ textAlign: 'left', padding: '3px 4px', fontWeight: 'normal' }}>{t('Métrique')}</th>
+                    <th style={{ padding: '3px 4px', fontWeight: 'normal' }}>{t('Moyenne')}</th>
                     {PODIUM_RANKS.map((rank, idx) => (
                       <th key={rank} style={{ padding: '3px 4px', fontWeight: 'normal', color: HIGHLIGHT_PODIUM_COLORS[idx] }}>{rank}</th>
                     ))}
@@ -289,7 +310,7 @@ export default function ManeuversPanel({
                           {summary.averages[metric.key]}
                           {metric.key === 'relaunch' && summary.withoutRelaunch > 0 && (
                             <span style={{ display: 'block', fontWeight: 'normal', color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>
-                              {summary.withoutRelaunch} sans relance
+                              {t('{n} sans relance', { n: summary.withoutRelaunch })}
                             </span>
                           )}
                         </td>
@@ -300,7 +321,7 @@ export default function ManeuversPanel({
                         ))}
                         <td style={{ padding: '2px 4px', textAlign: 'right' }}>
                           <MapToggle
-                            shown={active} color="var(--voile)" ink="var(--on-ink)" labels={['Carte', 'Masquer']} disabled={tops.length === 0}
+                            shown={active} color="var(--voile)" ink="var(--on-ink)" labels={[t('Carte'), t('Masquer')]} disabled={tops.length === 0}
                             onClick={() => onSelectTop(active ? null : key)}
                             style={{ padding: '2px 7px', opacity: tops.length === 0 ? 0.5 : 1 }} />
                         </td>
@@ -313,7 +334,9 @@ export default function ManeuversPanel({
             {summary && ofType.length > 0 && (
               <Button size="s" style={{ marginTop: '8px' }} aria-expanded={listOpen}
                 onClick={() => view.setListOpen((prev) => ({ ...prev, [type]: !prev[type] }))}>
-                {listOpen ? `Replier les ${noun} ▲` : `Tous les ${noun} (${ofType.length}) ▼`}
+                {listOpen
+                  ? (type === 'tack' ? t('Replier les virements ▲') : t('Replier les empannages ▲'))
+                  : (type === 'tack' ? t('Tous les virements ({n}) ▼', { n: ofType.length }) : t('Tous les empannages ({n}) ▼', { n: ofType.length }))}
               </Button>
             )}
             {summary && listOpen && ofType.length > 0 && (
@@ -321,8 +344,8 @@ export default function ManeuversPanel({
                 {ofType.map((loc) => (
                   <li key={loc.timeMs}>
                     {formatTimeOfDay(loc.timeMs)}{' · '}
-                    <span style={{ color: loc.success ? 'var(--success)' : 'var(--danger)' }}>{loc.success ? 'réussi' : 'raté'}</span>
-                    {` · Vmin ${showKn(loc.vmin)} ${speedSymbol}`}
+                    <span style={{ color: loc.success ? 'var(--success)' : 'var(--danger)' }}>{loc.success ? t('réussi') : t('raté')}</span>
+                    {' · '}{t('Vmin {v} {unit}', { v: showKn(loc.vmin), unit: speedSymbol })}
                     {maneuverNotes(loc).map((note) => ` · ${note}`).join('')}
                   </li>
                 ))}

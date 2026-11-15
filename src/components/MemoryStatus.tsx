@@ -20,7 +20,7 @@ import { HelpText, HelpToggle } from './Help';
 import { useInSettings } from './helpContext';
 import Button from './ui/Button';
 import Card from './ui/Card';
-import { plural } from '../core/basics';
+import { t, tn } from '../core/i18n';
 import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
 
 /**
@@ -74,15 +74,15 @@ function MemoryStatus({
   const headline = (() => {
     switch (status) {
       case 'opening':
-        return 'Ouverture de la mémoire…';
+        return t('Ouverture de la mémoire…');
       case 'ready':
-        return `${plural(library.sessions.length, 'session')} · ${folderLabel ?? 'mémoire'}`;
+        return `${tn(library.sessions.length, '{n} session', '{n} sessions')} · ${folderLabel ?? t('mémoire')}`;
       case 'needs-permission':
         return native
-          ? `Android a retiré l'accès au ${folderLabel ?? 'dossier choisi'}.`
-          : `Le ${folderLabel ?? 'dossier choisi'} attend votre autorisation.`;
+          ? t("Android a retiré l'accès au {dossier}.", { dossier: folderLabel ?? t('dossier choisi') })
+          : t('Le {dossier} attend votre autorisation.', { dossier: folderLabel ?? t('dossier choisi') });
       default:
-        return library.reason ?? 'Aucune mémoire accessible.';
+        return library.reason ?? t('Aucune mémoire accessible.');
     }
   })();
 
@@ -103,7 +103,7 @@ function MemoryStatus({
   const alert = (library.message || library.error) && (
     <div className={`ui-alert ${library.error ? 'ui-alert--danger' : 'ui-alert--success'}`}>
       {library.error ?? library.message}{' '}
-      <Button size="s" variant="ghost" onClick={dismissLibraryMessage}>Fermer</Button>
+      <Button size="s" variant="ghost" onClick={dismissLibraryMessage}>{t('Fermer')}</Button>
     </div>
   );
 
@@ -122,9 +122,9 @@ function MemoryStatus({
   }
 
   const heading = collapse
-    ? <PanelTitle label="Mémoire" open={collapse.open} onToggle={collapse.onToggle}
-      extra={collapse.open ? <HelpToggle helpKey="memoire" label="Mémoire" size="s" /> : undefined} />
-    : detailed ? 'Mémoire' : undefined;
+    ? <PanelTitle label={t('Mémoire')} open={collapse.open} onToggle={collapse.onToggle}
+      extra={collapse.open ? <HelpToggle helpKey="memoire" label={t('Mémoire')} size="s" /> : undefined} />
+    : detailed ? t('Mémoire') : undefined;
 
   if (collapse && !collapse.open) {
     // Replié : le titre seul quand tout va bien ; ce qui demande une action reste montré.
@@ -144,22 +144,23 @@ function MemoryStatus({
     <Card heading={heading}>
       <div className="ui-stack-3">
         <HelpText helpKey="memoire">
-          Le dossier garde chaque session (sa trace GPX et sa fiche) et un fichier de réglages par appareil. Pour
-          sauvegarder ou changer d'appareil, copiez le dossier Gtracker entier : sur le téléphone, Stockage interne ›
-          Documents › Gtracker.
+          {t("Le dossier garde chaque session (sa trace GPX et sa fiche) et un fichier de réglages par appareil. Pour sauvegarder ou changer d'appareil, copiez le dossier Gtracker entier : sur le téléphone, Stockage interne › Documents › Gtracker.")}
         </HelpText>
         {statusLine}
 
         {creating && (
           <p style={mutedStyle}>
-            Lecture des traces sans fiche : {creating.done} / {creating.total}
+            {t('Lecture des traces sans fiche : {done} / {total}', { done: creating.done, total: creating.total })}
           </p>
         )}
 
         {library.pendingCount > 0 && (
           <p style={mutedStyle}>
-            {plural(library.pendingCount, 'session enregistrée')} en attente d'un dossier mémoire, gardée
-            {library.pendingCount > 1 ? 's' : ''} dans le dossier privé de l'application.
+            {tn(
+              library.pendingCount,
+              "{n} session enregistrée en attente d'un dossier mémoire, gardée dans le dossier privé de l'application.",
+              "{n} session enregistrées en attente d'un dossier mémoire, gardées dans le dossier privé de l'application."
+            )}
           </p>
         )}
 
@@ -168,21 +169,18 @@ function MemoryStatus({
             {inSettings ? (
               <>
                 <p style={mutedStyle}>
-                  Choisissez où garder vos sessions.
-                  <HelpToggle helpKey="memoire:choisir" label="Choisir le dossier" />
+                  {t('Choisissez où garder vos sessions.')}
+                  <HelpToggle helpKey="memoire:choisir" label={t('Choisir le dossier')} />
                 </p>
                 <HelpText helpKey="memoire:choisir">
-                  Dans le sélecteur : Documents, puis le dossier Gtracker (créez-le s'il n'existe pas), « Utiliser ce
-                  dossier », « Autoriser ».
+                  {t("Dans le sélecteur : Documents, puis le dossier Gtracker (créez-le s'il n'existe pas), « Utiliser ce dossier », « Autoriser ».")}
                 </HelpText>
               </>
             ) : <p style={mutedStyle}>
-              Gtracker garde vos sessions dans un dossier du téléphone, que vous pouvez copier sur le PC pour les
-              sauvegarder ou les retrouver. Dans le sélecteur qui va s'ouvrir : Documents, puis le dossier Gtracker
-              (créez-le s'il n'existe pas), « Utiliser ce dossier », et « Autoriser ».
+              {t("Gtracker garde vos sessions dans un dossier du téléphone, que vous pouvez copier sur le PC pour les sauvegarder ou les retrouver. Dans le sélecteur qui va s'ouvrir : Documents, puis le dossier Gtracker (créez-le s'il n'existe pas), « Utiliser ce dossier », et « Autoriser ».")}
             </p>}
             <div style={rowStyle}>
-              <Button variant="primary" onClick={() => void chooseFolder()}>Choisir le dossier</Button>
+              <Button variant="primary" onClick={() => void chooseFolder()}>{t('Choisir le dossier')}</Button>
             </div>
           </>
         )}
@@ -190,34 +188,35 @@ function MemoryStatus({
         {status === 'needs-permission' && (
           <div style={rowStyle}>
             <Button variant="primary" onClick={() => void reconnectFolder()}>
-              {native ? 'Choisir à nouveau le dossier' : 'Reconnecter le dossier'}
+              {native ? t('Choisir à nouveau le dossier') : t('Reconnecter le dossier')}
             </Button>
-            {detailed && !native && <Button onClick={() => void switchToBrowserMemory()}>Revenir à la mémoire du navigateur</Button>}
+            {detailed && !native && <Button onClick={() => void switchToBrowserMemory()}>{t('Revenir à la mémoire du navigateur')}</Button>}
           </div>
         )}
 
         {status === 'ready' && folderKind === 'browser' && !compact && inSettings && (
           <>
             <p style={mutedStyle}>
-              Emplacement : la mémoire de ce navigateur.
-              <HelpToggle helpKey="memoire:emplacement" label="Emplacement" />
+              {t('Emplacement : la mémoire de ce navigateur.')}
+              <HelpToggle helpKey="memoire:emplacement" label={t('Emplacement')} />
             </p>
             <HelpText helpKey="memoire:emplacement">
               {canChoose
-                ? "Invisible dans l'explorateur de fichiers. Choisissez un dossier (conseil : Documents › Gtracker) pour sauvegarder les sessions ou les passer au téléphone."
-                : "Invisible dans l'explorateur de fichiers. Pour un dossier du PC, ouvrez Gtracker dans Chrome ou Edge."}
+                ? t("Invisible dans l'explorateur de fichiers. Choisissez un dossier (conseil : Documents › Gtracker) pour sauvegarder les sessions ou les passer au téléphone.")
+                : t("Invisible dans l'explorateur de fichiers. Pour un dossier du PC, ouvrez Gtracker dans Chrome ou Edge.")}
             </HelpText>
             {!guaranteed && (
               <p style={mutedStyle}>
-                Ce navigateur ne garantit pas de garder cette mémoire : il peut la vider s'il manque de place.
+                {t("Ce navigateur ne garantit pas de garder cette mémoire : il peut la vider s'il manque de place.")}
+                {' '}
                 {canChoose
-                  ? " Choisissez un dossier pour que vos sessions restent à l'abri."
-                  : " Pour les garder à l'abri, ouvrez Gtracker dans Chrome ou Edge et choisissez un dossier."}
+                  ? t("Choisissez un dossier pour que vos sessions restent à l'abri.")
+                  : t("Pour les garder à l'abri, ouvrez Gtracker dans Chrome ou Edge et choisissez un dossier.")}
               </p>
             )}
             {canChoose && (
               <div style={rowStyle}>
-                <Button variant="primary" onClick={() => void chooseFolder()}>Choisir un dossier</Button>
+                <Button variant="primary" onClick={() => void chooseFolder()}>{t('Choisir un dossier')}</Button>
               </div>
             )}
           </>
@@ -226,16 +225,16 @@ function MemoryStatus({
         {status === 'ready' && folderKind === 'browser' && !compact && !inSettings && (
           <>
             <p style={mutedStyle}>
-              {detailed ? 'Emplacement : la mémoire interne de ce navigateur. ' : ''}
-              Les sessions sont gardées dans ce navigateur : aucun dossier sur le PC, l'explorateur de fichiers ne
-              les voit pas.
+              {detailed ? `${t('Emplacement : la mémoire interne de ce navigateur.')} ` : ''}
+              {t("Les sessions sont gardées dans ce navigateur : aucun dossier sur le PC, l'explorateur de fichiers ne les voit pas.")}
+              {' '}
               {canChoose
-                ? ' Choisissez un dossier pour les sauvegarder, les copier ou les passer au téléphone : elles y seront recopiées. Conseil : créez-le dans Documents, sous le nom Gtracker, dans la fenêtre qui va s\'ouvrir.'
-                : ' Pour les garder dans un dossier du PC, ouvrez Gtracker dans Chrome ou Edge.'}
+                ? t("Choisissez un dossier pour les sauvegarder, les copier ou les passer au téléphone : elles y seront recopiées. Conseil : créez-le dans Documents, sous le nom Gtracker, dans la fenêtre qui va s'ouvrir.")
+                : t('Pour les garder dans un dossier du PC, ouvrez Gtracker dans Chrome ou Edge.')}
             </p>
             {canChoose && (
               <div style={rowStyle}>
-                <Button variant="primary" onClick={() => void chooseFolder()}>Choisir un dossier</Button>
+                <Button variant="primary" onClick={() => void chooseFolder()}>{t('Choisir un dossier')}</Button>
               </div>
             )}
           </>
@@ -244,44 +243,56 @@ function MemoryStatus({
         {detailed && status === 'ready' && folderKind === 'picked' && (
           <>
             <p style={mutedStyle}>
-              Emplacement : {folderLabel}, sur ce PC.
-              <HelpToggle helpKey="memoire:emplacement" label="Emplacement" />
+              {t('Emplacement : {dossier}, sur ce PC.', { dossier: folderLabel ?? '' })}
+              <HelpToggle helpKey="memoire:emplacement" label={t('Emplacement')} />
             </p>
             <HelpText helpKey="memoire:emplacement">
-              Le navigateur ne donne que le nom du dossier : son chemin s'affiche dans la fenêtre de « Voir ou changer
-              le dossier ». Annuler n'y change rien.
+              {t("Le navigateur ne donne que le nom du dossier : son chemin s'affiche dans la fenêtre de « Voir ou changer le dossier ». Annuler n'y change rien.")}
             </HelpText>
             <div style={rowStyle}>
-              <Button onClick={() => void chooseFolder()}>Voir ou changer le dossier</Button>
-              <Button onClick={() => void switchToBrowserMemory()}>Revenir à la mémoire du navigateur</Button>
+              <Button onClick={() => void chooseFolder()}>{t('Voir ou changer le dossier')}</Button>
+              <Button onClick={() => void switchToBrowserMemory()}>{t('Revenir à la mémoire du navigateur')}</Button>
             </div>
           </>
         )}
 
         {detailed && status === 'ready' && folderKind === 'device' && (
           <>
-            <p style={mutedStyle}>Emplacement : {folderLabel}, dans le stockage interne du téléphone.</p>
+            <p style={mutedStyle}>{t('Emplacement : {dossier}, dans le stockage interne du téléphone.', { dossier: folderLabel ?? '' })}</p>
             <div style={rowStyle}>
-              <Button onClick={() => void chooseFolder()}>Changer de dossier</Button>
+              <Button onClick={() => void chooseFolder()}>{t('Changer de dossier')}</Button>
             </div>
           </>
         )}
 
         {library.duplicates.length > 0 && (
           <p style={mutedStyle}>
-            {plural(library.duplicates.length, 'fichier')} en double ignoré{library.duplicates.length > 1 ? 's' : ''} : même
-            trace sous un autre nom ({library.duplicates.join(', ')}).
+            {tn(
+              library.duplicates.length,
+              '{n} fichier en double ignoré : même trace sous un autre nom ({noms}).',
+              '{n} fichiers en double ignorés : même trace sous un autre nom ({noms}).',
+              { noms: library.duplicates.join(', ') }
+            )}
           </p>
         )}
         {library.unreadable.length > 0 && (
           <p style={mutedStyle}>
-            {plural(library.unreadable.length, 'GPX illisible')} dans le dossier : {library.unreadable.join(', ')}.
+            {tn(
+              library.unreadable.length,
+              '{n} GPX illisible dans le dossier : {noms}.',
+              '{n} GPX illisibles dans le dossier : {noms}.',
+              { noms: library.unreadable.join(', ') }
+            )}
           </p>
         )}
         {library.tooLarge.length > 0 && (
           <p style={mutedStyle}>
-            {plural(library.tooLarge.length, 'fichier')} de plus de {MAX_LISTED_FILE_BYTES / (1024 * 1024)} Mo laissé
-            {library.tooLarge.length > 1 ? 's' : ''} de côté, trop gros pour être lu{library.tooLarge.length > 1 ? 's' : ''} : {library.tooLarge.join(', ')}.
+            {tn(
+              library.tooLarge.length,
+              '{n} fichier de plus de {mo} Mo laissé de côté, trop gros pour être lu : {noms}.',
+              '{n} fichiers de plus de {mo} Mo laissés de côté, trop gros pour être lus : {noms}.',
+              { mo: MAX_LISTED_FILE_BYTES / (1024 * 1024), noms: library.tooLarge.join(', ') }
+            )}
           </p>
         )}
 
@@ -306,11 +317,10 @@ function PlaceSearchSetting() {
     <div className="ui-stack-3">
       <label className="ui-row-s2 ui-center">
         <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} />
-        <span>Chercher le lieu des sessions</span>
+        <span>{t('Chercher le lieu des sessions')}</span>
       </label>
       <p style={mutedStyle}>
-        Le lieu d'une session est cherché en ligne d'après son point de départ, arrondi à une centaine de mètres :
-        un départ de chez vous en dit le quartier. Case décochée, rien n'est envoyé et le nom d'une session est son activité seule.
+        {t("Le lieu d'une session est cherché en ligne d'après son point de départ, arrondi à une centaine de mètres : un départ de chez vous en dit le quartier. Case décochée, rien n'est envoyé et le nom d'une session est son activité seule.")}
       </p>
     </div>
   );

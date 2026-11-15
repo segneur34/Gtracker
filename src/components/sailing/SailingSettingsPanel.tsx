@@ -4,6 +4,7 @@
  * en brouillon jusqu'à « Enregistrer la session », sauf l'activité qui se change aussitôt.
  */
 import type { Activity } from '../../core/activities';
+import { t } from '../../core/i18n';
 import type { effectiveSpeedRange } from '../../core/trackColor';
 import type { SpeedUnit } from '../../core/units';
 import type { useAnalysisSession } from '../../hooks/useAnalysisSession';
@@ -65,7 +66,7 @@ export default function SailingSettingsPanel({
   return (
     <ResizablePanel id="sailing.reglages" style={PANEL_BLOCK_STYLE}>
       <SessionSettingsHeader helpKey="voile:reglages" open={open} onToggle={onToggle}>
-        Vitesse : {hasDeviceSpeed ? "Doppler de l'appareil" : 'dérivée des positions, filtrée'}.
+        {hasDeviceSpeed ? t("Vitesse : Doppler de l'appareil.") : t('Vitesse : dérivée des positions, filtrée.')}
       </SessionSettingsHeader>
       <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
         <SessionActivityField activities={activities} activity={activity} families={sessionFile ? undefined : ['voile']}
@@ -74,8 +75,8 @@ export default function SailingSettingsPanel({
         {hasActiveThreshold && (
           <div style={{ fontSize: 'var(--text-s)' }}>
             <SessionThresholdField
-              label="Seuil d'activité"
-              title="Seuil propre à cette session, enregistré avec elle. Sans lui, elle garde celui avec lequel elle a été calculée ; le changer dans Réglages recalcule les sessions de l'activité."
+              label={t("Seuil d'activité")}
+              title={t("Seuil propre à cette session, enregistré avec elle. Sans lui, elle garde celui avec lequel elle a été calculée ; le changer dans Réglages recalcule les sessions de l'activité.")}
               value={activeThresholdKn}
               defaultValue={defaultActiveThresholdKn}
               isOverridden={edits.activeThreshold !== null}
@@ -87,7 +88,7 @@ export default function SailingSettingsPanel({
         )}
 
         <FoilPumpingFields
-          foilTitle="Support sur foil pour cette session, enregistré avec elle. Celui de l'activité se règle dans Réglages."
+          foilTitle={t("Support sur foil pour cette session, enregistré avec elle. Celui de l'activité se règle dans Réglages.")}
           foil={foil} foilIsDefault={edits.foil === null} onFoilChange={(next) => draft.update({ foil: next })}
           showPumping={showPumping} pumping={pumping} pumpingIsDefault={edits.pumping === null}
           onPumpingChange={(next) => draft.update({ pumping: next === activityPumping ? null : next })} />
@@ -95,13 +96,13 @@ export default function SailingSettingsPanel({
         {hasTrack && (
           <div style={{ fontSize: 'var(--text-s)' }}>
             <SessionThresholdField
-              label="Allure de la session"
-              title="Vitesse de croisière de la session, dont dépendent les seuils de filtrage. Déduite de la trace ; imposée si elle la décrit mal, et alors enregistrée avec la session."
+              label={t('Allure de la session')}
+              title={t('Vitesse de croisière de la session, dont dépendent les seuils de filtrage. Déduite de la trace ; imposée si elle la décrit mal, et alors enregistrée avec la session.')}
               value={referenceSpeedMs}
               isOverridden={edits.referenceSpeedMs !== null}
               unit={speedUnit}
               thresholdUnit="ms"
-              hint="déduite de la trace"
+              hint={t('déduite de la trace')}
               commit="blur"
               onChange={(next) => draft.update({ referenceSpeedMs: next })} />
           </div>

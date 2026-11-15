@@ -38,7 +38,7 @@ import { TUTORIAL_OF_DAY_VISIBLE, tutorialCardGate } from '../tutorials/tutorial
 import { OTHERS_COLOR } from '../components/chartStyle';
 import './ProfilePage.css';
 import { STORAGE_KEYS } from '../core/appIdentity';
-import { dateLocale } from '../core/i18n';
+import { dateLocale, t, tn } from '../core/i18n';
 
 /**
  * Profil, la page où s'ouvre l'application : une période en un coup d'œil (`library/profile.ts`). En tête, une photo
@@ -156,8 +156,8 @@ function ProfilePage() {
   const nowMs = useNow();
   const { value: view, update: rememberView } = useStoredRecord<ProfileView>(VIEW_NAMESPACE, VIEW_KEY, VIEW_DEFAULTS);
   const period = profilePeriodOf(view.periode);
-  const periodLabel = period === 'tout' ? 'Tout' : `Année ${new Date(nowMs).getFullYear()}`;
-  const otherPeriodLabel = period === 'tout' ? `Année ${new Date(nowMs).getFullYear()}` : 'Tout';
+  const periodLabel = period === 'tout' ? t('Tout') : t('Année {year}', { year: new Date(nowMs).getFullYear() });
+  const otherPeriodLabel = period === 'tout' ? t('Année {year}', { year: new Date(nowMs).getFullYear() }) : t('Tout');
   const [active, setActive] = useState<string | null>(null);
   /** Activités regroupées dans « Autres », dépliées sous sa ligne : non retenu. */
   const [othersOpen, setOthersOpen] = useState(false);
@@ -199,7 +199,7 @@ function ProfilePage() {
       slices: [
         ...shares.slice(0, MAX_SLICES - 1).map(ofShare),
         {
-          key: OTHERS_KEY, label: `Autres (${rest.length})`, color: OTHERS_COLOR, activity: null,
+          key: OTHERS_KEY, label: t('Autres ({n})', { n: rest.length }), color: OTHERS_COLOR, activity: null,
           durationS: rest.reduce((n, s) => n + s.totals.durationS, 0), share: rest.reduce((n, s) => n + s.share, 0),
         },
       ],
@@ -269,19 +269,19 @@ function ProfilePage() {
         {/* La photo ronde, et dessous, dans son ovale au pinceau, le bouton de la période de toute la page. */}
         <div className="profile-head__side">
           <button type="button" className="profile-head__avatar" aria-expanded={picking}
-            aria-label="Photo de profil : ouvrir les réglages du Profil"
+            aria-label={t('Photo de profil : ouvrir les réglages du Profil')}
             onClick={() => setPicking(!picking)}>
             <ProfileAvatar avatar={avatar} logoColor={shownLogoColor} />
           </button>
-          <Button className="profile-periods" aria-label={`Période : ${periodLabel}. Toucher pour afficher : ${otherPeriodLabel}.`}
+          <Button className="profile-periods" aria-label={t('Période : {period}. Toucher pour afficher : {other}.', { period: periodLabel, other: otherPeriodLabel })}
             onClick={() => rememberView({ periode: period === 'tout' ? 'annee' : 'tout' })}>
-            {period === 'tout' ? 'Tout' : String(new Date(nowMs).getFullYear())}
+            {period === 'tout' ? t('Tout') : String(new Date(nowMs).getFullYear())}
           </Button>
         </div>
         <div className="profile-head__main">
           <div className="profile-head__text">
-            {name !== null && <span className="profile-head__hello">Bienvenue</span>}
-            <h1 className="profile-head__title">{name ?? 'Bienvenue'}</h1>
+            {name !== null && <span className="profile-head__hello">{t('Bienvenue')}</span>}
+            <h1 className="profile-head__title">{name ?? t('Bienvenue')}</h1>
           </div>
         </div>
         {PROFILE_PLANT_VISIBLE && (
@@ -309,19 +309,19 @@ function ProfilePage() {
       {!memoryNeedsAction && <MemoryStatus compact />}
 
       {status === 'opening' ? (
-        <p className="ui-hint">Lecture de la mémoire…</p>
+        <p className="ui-hint">{t('Lecture de la mémoire…')}</p>
       ) : (
         <>
-          {scanning && <p className="ui-hint">Fiches en cours de calcul ({scanning.done} / {scanning.total}) : chiffres provisoires.</p>}
+          {scanning && <p className="ui-hint">{t('Fiches en cours de calcul ({done} / {total}) : chiffres provisoires.', { done: scanning.done, total: scanning.total })}</p>}
 
           <ProfileFavorites cells={favoriteCells} total={distanceText(totals.distanceM, distanceUnit)} frame={frames.favs} />
 
           {slices.length > 0 && (
-            <section className={`profile-split ui-card-col ${frames.split.className}`} style={frames.split.style} aria-label="Répartition par activité">
-              <h2 className="profile-card__title">Répartition du temps</h2>
+            <section className={`profile-split ui-card-col ${frames.split.className}`} style={frames.split.style} aria-label={t('Répartition par activité')}>
+              <h2 className="profile-card__title">{t('Répartition du temps')}</h2>
               <div className="profile-split__body">
                 <div className="profile-donut">
-                  <svg viewBox="0 0 200 200" role="img" aria-label="Part de chaque activité dans le temps de la période">
+                  <svg viewBox="0 0 200 200" role="img" aria-label={t('Part de chaque activité dans le temps de la période')}>
                     {/* Bords gris de l'anneau, juste dehors : une part blanche se voit sur blanc, une noire sur noir. */}
                     {[RING_R - RING_W / 2 - 0.5, RING_R + RING_W / 2 + 0.5].map((r) => (
                       <circle key={r} cx="100" cy="100" r={r} fill="none" stroke="var(--line-strong)" strokeWidth={1} />
@@ -336,15 +336,15 @@ function ProfilePage() {
                     </g>
                   </svg>
                   <div className="profile-donut__center">
-                    <span className="profile-donut__label">{activeSlice ? activeSlice.label : 'Total'}</span>
+                    <span className="profile-donut__label">{activeSlice ? activeSlice.label : t('Total')}</span>
                     <span className="profile-donut__value num">{hoursText(activeSlice ? activeSlice.durationS : totals.durationS)}</span>
                     {activeSlice && <span className="profile-donut__label num">{percentText(activeSlice.share)}</span>}
                   </div>
                 </div>
                 <div className="profile-split__detail">
                   <button type="button" className="profile-fold" aria-expanded={open.detail} onClick={() => toggle('detail')}>
-                    <span className="profile-fold__label">Par activité</span>
-                    <span className="profile-fold__meta num">{slices.length} activité{slices.length > 1 ? 's' : ''}</span>
+                    <span className="profile-fold__label">{t('Par activité')}</span>
+                    <span className="profile-fold__meta num">{tn(slices.length, '{n} activité', '{n} activités')}</span>
                     <IconChevronRight size={16} className="profile-fold__chevron" style={{ transform: `rotate(${open.detail ? -90 : 90}deg)` }} />
                   </button>
                   {open.detail && (
