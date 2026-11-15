@@ -53,8 +53,9 @@ import { EMPTY_NOTES, type GearChoice } from '../library/notes';
 import { sessionDisplayName } from '../library/sessionName';
 import {
   addRecordingMark, analyzePendingSession, changeRecordingActivity, continuePendingSession, discardPendingSession, dismissRecorderResult,
-  finishingPendingSession, getLastFix, getLiveFixes, getLiveHeadingFixes, getLiveSegmentCount, markRecorderResultOpened, pauseRecording,
-  resumeRecording, retakeRecordingBelt, retryRecordingBelt, startRecording, stopRecording, stopRecordingBeltSearch, type RecorderState,
+  finishingPendingSession, getLastFix, getLiveFixes, getLiveHeadingFixes, getLiveSegmentCount, markRecorderResultOpened,
+  openRecordingLocationSettings, pauseRecording, resumeRecording, retakeRecordingBelt, retryRecordingBelt, retryRecordingGps, startRecording,
+  stopRecording, stopRecordingBeltSearch, type RecorderState,
   useLivePosition, useRecordingClock, useRecorderSelector,
 } from '../hooks/useRecorder';
 import { followedTraceLengthM, splitFollowedTrace, type FollowProgress, type FollowedTrace } from '../recording/followedTrace';
@@ -64,7 +65,7 @@ import {
   liveFieldLabel, liveFieldValue, type LiveFieldContext, type LiveFieldUnits,
 } from '../recording/liveFields';
 import { LIVE_LEG_DEFAULTS, type LiveLeg } from '../recording/liveLegs';
-import { beltRetryOffer, beltRetryUnderAlert, warmupRetryShown } from '../recording/recordingRetry';
+import { beltRetryOffer, beltRetryUnderAlert, gpsRetryOffer, warmupRetryShown } from '../recording/recordingRetry';
 import { courseMarks, markName, type LatLon, type MarkGuideView } from '../recording/markGuide';
 import { LIVE_STATS_DEFAULTS, type LiveStats, type LiveStatsOptions } from '../recording/liveStats';
 import { canDownloadFiles, downloadTextFile, readPickedFile } from '../platform/files';
@@ -111,8 +112,8 @@ const settingsLink = (children: React.ReactNode) => <Link to="/parametres">{chil
 
 /** Message d'une famille sans activité, une phrase entière par famille. */
 const NO_ACTIVITY_IN_FAMILY: Record<SportFamily, () => React.ReactNode> = {
-  voile: () => tRich('Aucune activité de voile : ajoutez-en une dans <a>Réglages</a>.', undefined, { a: settingsLink }),
-  surf: () => tRich('Aucune activité de surf : ajoutez-en une dans <a>Réglages</a>.', undefined, { a: settingsLink }),
+  voile: () => tRich('Aucune activité avec vent : ajoutez-en une dans <a>Réglages</a>.', undefined, { a: settingsLink }),
+  surf: () => tRich('Aucune activité sans vent : ajoutez-en une dans <a>Réglages</a>.', undefined, { a: settingsLink }),
 };
 
 const Stat = ({ label, value }: { label: string; value: string }) => (
@@ -455,9 +456,9 @@ function BeltRescue({ underAlert }: { underAlert: boolean }) {
   if (underAlert && !beltRetryUnderAlert(input)) return null;
   if (!offer.retry && !offer.stop && !offer.retake) return null;
   return (
-    <div className="rec-belt-stop">
+    <div className="rec-rescue">
       {!underAlert && offer.stop && <span className="ui-muted">{t("Sans elle, l'enregistrement continue, sans cardio.")}</span>}
-      <span className="rec-belt-stop__actions">
+      <span className="rec-rescue__actions">
         {offer.retry && (
           <Button size="s" disabled={retrying} onClick={() => void retryRecordingBelt()}>
             {retrying ? t('nouvelle tentative…') : t('Réessayer')}
@@ -468,6 +469,45 @@ function BeltRescue({ underAlert }: { underAlert: boolean }) {
           <Button size="s" disabled={retrying} onClick={() => void retakeRecordingBelt()}>
             {retrying ? t('nouvelle tentative…') : t('Reprendre la ceinture')}
           </Button>
+        )}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Boutons de secours du GPS pendant l'enregistrement (`gpsRetryOffer`) : « Réessayer » tant qu'aucune position n'est
+ * venue ou que le GPS est perdu, hors pause manuelle, « nouvelle tentative… » quelques secondes après l'appui ;
+ * « Activer la localisation » quand elle est coupée. `underAlert` : la rangée posée sous l'alerte rouge (GPS perdu,
+ * localisation coupée) ; sinon sous la ligne d'état, avec l'attente écrite. Aucun ne touche à la trace ni à la
+ * notification.
+ */
+function GpsRescue({ underAlert }: { underAlert: boolean }) {
+  const status = useRecorderSelector((s) => s.status);
+  const pausedReason = useRecorderSelector((s) => s.pausedReason);
+  const awaitingFix = useRecorderSelector((s) => s.awaitingFix);
+  const gpsLost = useRecorderSelector((s) => s.gpsLost);
+  const locationOff = useRecorderSelector((s) => s.locationOff);
+  const retrying = useRecorderSelector((s) => s.gpsRetrying);
+  const offer = gpsRetryOffer({
+    active: status === 'recording' || status === 'paused',
+    manualPause: isManualPause({ status, pausedReason }),
+    awaitingFix,
+    gpsLost,
+    locationOff,
+  });
+  if (offer.underAlert !== underAlert || (!offer.retry && !offer.openSettings)) return null;
+  return (
+    <div className="rec-rescue">
+      {offer.waiting && <span className="ui-muted">{t('en attente de la première position')}</span>}
+      <span className="rec-rescue__actions">
+        {offer.retry && (
+          <Button size="s" disabled={retrying} onClick={() => void retryRecordingGps()}>
+            {retrying ? t('nouvelle tentative…') : t('Réessayer')}
+          </Button>
+        )}
+        {offer.openSettings && (
+          <Button size="s" onClick={() => void openRecordingLocationSettings()}>{t('Activer la localisation')}</Button>
         )}
       </span>
     </div>
@@ -972,6 +1012,7 @@ function RecordingScreen() {
           )}
         </div>
       )}
+      {busy && <GpsRescue underAlert={false} />}
 
       {picking && !busy && !pending && <FollowTracePicker onClose={() => setPicking(false)} onPicked={proposeActivityOf} />}
 
@@ -1003,6 +1044,7 @@ function RecordingScreen() {
       )}
 
       {error && !savedOpened && <div className="ui-alert ui-alert--danger">{error}</div>}
+      {error && !savedOpened && busy && <GpsRescue underAlert />}
       {error && !savedOpened && busy && <BeltRescue underAlert />}
 
       {liveActivity && <MarkGuideSlot activity={liveActivity} />}

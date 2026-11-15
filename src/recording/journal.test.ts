@@ -3,7 +3,8 @@ import { BASE_COLOR, baseActivity, type Activity } from '../core/activities';
 import type { LocationFix } from '../platform/location';
 import { buildGpx } from './gpxWriter';
 import {
-  journalActivity, journalActivityLine, journalBeltLine, journalBreakLine, journalFixLine, journalHeaderLine, journalNoteLine, parseJournal,
+  journalActivity, journalActivityLine, journalBeltLine, journalBreakLine, journalFixLine, journalGpsLine, journalHeaderLine, journalNoteLine,
+  parseJournal,
 } from './journal';
 import { roundFix, splitIntoSegments } from './session';
 import { FILE_FORMATS } from '../core/appIdentity';
@@ -151,6 +152,15 @@ describe('journal', () => {
     for (const what of ['retry', 'found', 'missed', 'failed'] as const) {
       expect(parseJournal(head + journalBeltLine(T0 + 2000, what)).beltStopped).toBe(false);
       expect(parseJournal(stopped + journalBeltLine(T0 + 2000, what)).beltStopped).toBe(true);
+    }
+  });
+
+  it('les lignes du GPS (« Réessayer », « Activer la localisation ») ne changent que l’heure de la dernière ligne', () => {
+    const head = journalHeaderLine('kite', T0, undefined, { address: 'a', name: 'b' }) + journalFixLine(fixes[0]);
+    const before = parseJournal(head);
+    for (const what of ['retry', 'assisted', 'unassisted', 'settings'] as const) {
+      const read = parseJournal(head + journalGpsLine(T0 + 5000, what));
+      expect(read).toEqual({ ...before, lastLineMs: T0 + 5000 });
     }
   });
 

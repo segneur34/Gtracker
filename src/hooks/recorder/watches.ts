@@ -7,9 +7,12 @@ import {
 import {
   START_GPS_WATCH, beltWatchSettings, gpsWatchOnExpired, gpsWatchOnFix, gpsWatchOnPause, watchesGps, type GpsWatchState, type GpsWatchStep,
 } from '../../recording/gpsWatch';
+import { refreshGpsAssistance } from '../../platform/location';
 import { nativeErrorMessage } from '../../platform/nativeMessages';
+import { openLocationSettings } from '../../platform/permissions';
 import { readableBpm } from '../../recording/heartRate';
-import { journalBeltLine, type JournalBeltEvent } from '../../recording/journal';
+import { journalBeltLine, journalGpsLine, type JournalBeltEvent, type JournalGpsEvent } from '../../recording/journal';
+import { GPS_RETRY_FEEDBACK_MS } from '../../recording/recordingRetry';
 import { flushJournal, queueJournalLines } from './journalBuffer';
 import { exclusive, joinMessages, session, setState, state } from './store';
 
@@ -78,11 +81,47 @@ const onGpsWatchExpired = (): void => {
   applyGpsWatch(gpsWatchOnExpired(watch.gps, Date.now()));
 };
 
-/** Arrête la veille de l'enregistrement : minuteur désarmé, machine remise au départ. */
+/** Fin de « nouvelle tentative… » du GPS ; `null` hors de ce retour. */
+let gpsRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Arrête la veille de l'enregistrement : minuteur désarmé, machine remise au départ, « nouvelle tentative… » oublié. */
 export const stopGpsWatch = (): void => {
   if (watch.gpsOn) void disarmGpsWatch().catch(() => {});
   watch.gpsOn = false;
   watch.gps = START_GPS_WATCH;
+  if (gpsRetryTimer !== null) clearTimeout(gpsRetryTimer);
+  gpsRetryTimer = null;
+};
+
+/** Écrit une ligne du GPS au journal, tout de suite. */
+const journalGps = (what: JournalGpsEvent): void => {
+  queueJournalLines(journalGpsLine(Date.now(), what));
+  void flushJournal();
+};
+
+/**
+ * « Réessayer » du GPS pendant l'enregistrement : le téléphone recharge ses données d'aide au GPS
+ * (`refreshGpsAssistance`), rien d'autre n'est touché (service, trace, notification). « nouvelle tentative… » reste
+ * affiché `GPS_RETRY_FEEDBACK_MS`, même si la demande n'a rien pu envoyer (navigateur) : un retour visible à l'appui. Un
+ * appui pendant ce retour est ignoré. L'appui et son résultat laissent chacun une ligne au journal.
+ */
+export const retryRecordingGps = async (): Promise<void> => {
+  if (!recordingNow() || state.gpsRetrying) return;
+  journalGps('retry');
+  setState({ gpsRetrying: true });
+  gpsRetryTimer = setTimeout(() => {
+    gpsRetryTimer = null;
+    if (state.gpsRetrying) setState({ gpsRetrying: false });
+  }, GPS_RETRY_FEEDBACK_MS);
+  const sent = await refreshGpsAssistance();
+  if (recordingNow()) journalGps(sent ? 'assisted' : 'unassisted');
+};
+
+/** « Activer la localisation » : le réglage d'Android s'ouvre, l'enregistrement continue ; une ligne au journal. */
+export const openRecordingLocationSettings = async (): Promise<void> => {
+  if (!recordingNow()) return;
+  journalGps('settings');
+  await openLocationSettings().catch(() => undefined);
 };
 
 /**

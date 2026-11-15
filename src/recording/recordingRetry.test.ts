@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { beltRetryOffer, beltRetryUnderAlert, warmupRetryShown, type BeltRetryInput } from './recordingRetry';
+import {
+  beltRetryOffer, beltRetryUnderAlert, gpsRetryOffer, warmupRetryShown, type BeltRetryInput, type GpsRetryInput,
+} from './recordingRetry';
 import type { BeltState } from '../platform/heartRate';
 
 const input = (patch: Partial<BeltRetryInput>): BeltRetryInput => ({
@@ -54,6 +56,40 @@ describe('boutons de la ceinture pendant l’enregistrement', () => {
       expect(beltRetryOffer(input({ ...patch, active: false }))).toEqual(NONE);
       expect(beltRetryUnderAlert(input({ ...patch, active: false }))).toBe(false);
     }
+  });
+});
+
+describe('boutons du GPS pendant l’enregistrement', () => {
+  const gps = (patch: Partial<GpsRetryInput>): GpsRetryInput => ({
+    active: true, manualPause: false, awaitingFix: false, gpsLost: false, locationOff: false, ...patch,
+  });
+
+  it('positions reçues : rien', () => {
+    expect(gpsRetryOffer(gps({}))).toEqual({ retry: false, openSettings: false, underAlert: false, waiting: false });
+  });
+
+  it('aucune position depuis le départ : « Réessayer » sous la ligne d’état, avec l’attente écrite', () => {
+    expect(gpsRetryOffer(gps({ awaitingFix: true }))).toEqual({ retry: true, openSettings: false, underAlert: false, waiting: true });
+  });
+
+  it('GPS perdu : « Réessayer » sous l’alerte rouge', () => {
+    expect(gpsRetryOffer(gps({ gpsLost: true }))).toEqual({ retry: true, openSettings: false, underAlert: true, waiting: false });
+  });
+
+  it('localisation coupée : le réglage d’Android sous l’alerte, à la place de « Réessayer », pause manuelle comprise', () => {
+    const off = { retry: false, openSettings: true, underAlert: true, waiting: false };
+    expect(gpsRetryOffer(gps({ locationOff: true, awaitingFix: true }))).toEqual(off);
+    expect(gpsRetryOffer(gps({ locationOff: true, manualPause: true }))).toEqual(off);
+  });
+
+  it('pause manuelle : pas de « Réessayer », même GPS perdu ou sans position', () => {
+    expect(gpsRetryOffer(gps({ manualPause: true, gpsLost: true, awaitingFix: true })).retry).toBe(false);
+  });
+
+  it('hors enregistrement : rien', () => {
+    expect(gpsRetryOffer(gps({ active: false, awaitingFix: true, gpsLost: true, locationOff: true }))).toEqual({
+      retry: false, openSettings: false, underAlert: false, waiting: false,
+    });
   });
 });
 

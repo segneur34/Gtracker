@@ -21,6 +21,7 @@ interface PermissionsPlugin {
   requestUnrestrictedBattery(): Promise<void>;
   openAutostart(): Promise<void>;
   openAppSettings(): Promise<void>;
+  openLocationSettings(): Promise<void>;
 }
 
 const plugin = registerPlugin<PermissionsPlugin>('Permissions');
@@ -84,6 +85,11 @@ export const openAutostart = async (): Promise<void> => {
 /** Réglages de l'application : une autorisation refusée pour de bon s'y accorde. */
 export const openAppSettings = async (): Promise<void> => {
   if (isNativeApp()) await plugin.openAppSettings();
+};
+
+/** Réglage de la localisation d'Android : « Activer la localisation » d'Enregistrer, quand elle est coupée. Sans effet dans le navigateur. */
+export const openLocationSettings = async (): Promise<void> => {
+  if (isNativeApp()) await plugin.openLocationSettings();
 };
 
 /** Retour au premier plan (après un écran système, par exemple) ; rend le désabonnement. Sans effet dans le navigateur. */

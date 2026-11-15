@@ -22,7 +22,7 @@ const LAYERS = ['store', 'journalBuffer', 'watches', 'live', 'recovery'] as cons
 /** Valeurs exportées par le point d'entrée, les mêmes qu'avant le découpage (et deux types). */
 const ENTRY_VALUES = [
   'BELT_LOST_ERROR', 'GPS_LOST_ERROR', 'acknowledgeRecordingLanding', 'addRecordingMark', 'analyzePendingSession',
-  'changeRecordingActivity', 'continuePendingSession', 'discardPendingSession', 'dismissRecorderResult', 'finishPendingSession',
+  'changeRecordingActivity', 'continuePendingSession', 'openRecordingLocationSettings', 'retryRecordingGps', 'discardPendingSession', 'dismissRecorderResult', 'finishPendingSession',
   'finishingPendingSession', 'getLastFix', 'getLiveFixes', 'getLiveHeadingFixes', 'getLivePosition', 'getLiveSegmentCount',
   'getLiveSegments', 'getRecorderState', 'isRecordingActive', 'markRecorderResultOpened', 'motionCaptureWarning', 'pauseRecording',
   'recoverInterruptedRecording', 'resumeRecording', 'retakeRecordingBelt', 'retryRecordingBelt', 'startRecording', 'stopRecording', 'stopRecordingBeltSearch', 'subscribeToFixes',

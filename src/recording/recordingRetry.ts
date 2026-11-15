@@ -1,9 +1,9 @@
 import type { BeltState } from '../platform/heartRate';
 
 /**
- * Boutons de secours de la ceinture cardio sur la page Enregistrer : ce que la page propose selon l'état. Aucun ne
- * touche à la trace, au fichier des capteurs ni à la notification ; ils ne font que relancer, abandonner ou reprendre
- * la ceinture de la session.
+ * Boutons de secours de la ceinture cardio et du GPS sur la page Enregistrer : ce que la page propose selon l'état.
+ * Aucun ne touche à la trace, au fichier des capteurs ni à la notification ; ils ne font que relancer, abandonner ou
+ * reprendre la ceinture de la session, ou demander au téléphone de hâter sa position.
  */
 
 /**
@@ -62,3 +62,46 @@ export const beltRetryUnderAlert = (input: BeltRetryInput): boolean =>
  */
 export const warmupRetryShown = (state: BeltState, failed: boolean): boolean =>
   failed || state === 'connecting' || state === 'searching' || state === 'lost';
+
+/** Durée de « nouvelle tentative… » après un appui sur « Réessayer » du GPS, en millisecondes : un retour visible. */
+export const GPS_RETRY_FEEDBACK_MS = 5_000;
+
+export interface GpsRetryInput {
+  /** Vrai pendant l'enregistrement, en cours ou en pause (ni au démarrage, ni à l'arrêt). */
+  active: boolean;
+  /** Pause manuelle en cours : le GPS reste allumé pour la carte, rien n'attend de position. */
+  manualPause: boolean;
+  /** Aucune position reçue depuis le départ (ou depuis une reprise). */
+  awaitingFix: boolean;
+  /** Alerte « GPS perdu » en cours. */
+  gpsLost: boolean;
+  /** Localisation du téléphone coupée, dite par la source. */
+  locationOff: boolean;
+}
+
+export interface GpsRetryOffer {
+  /** « Réessayer » : le téléphone recharge ses données d'aide au GPS, sans rien arrêter. */
+  retry: boolean;
+  /** « Activer la localisation » : le réglage de la localisation d'Android. */
+  openSettings: boolean;
+  /** Boutons posés sous l'alerte rouge, qui dit déjà la panne ; sinon sous la ligne d'état. */
+  underAlert: boolean;
+  /** « en attente de la première position » écrit à côté, faute d'alerte qui le dise. */
+  waiting: boolean;
+}
+
+const NO_GPS_OFFER: GpsRetryOffer = { retry: false, openSettings: false, underAlert: false, waiting: false };
+
+/**
+ * Boutons du GPS pendant l'enregistrement. Localisation coupée : seulement le réglage d'Android, sous l'alerte qui le
+ * dit, pause manuelle comprise (rien ne viendra sans elle). Sinon, hors pause manuelle : « Réessayer » sous l'alerte
+ * « GPS perdu », ou sous la ligne d'état tant qu'aucune position n'est venue.
+ */
+export const gpsRetryOffer = (input: GpsRetryInput): GpsRetryOffer => {
+  if (!input.active) return NO_GPS_OFFER;
+  if (input.locationOff) return { retry: false, openSettings: true, underAlert: true, waiting: false };
+  if (input.manualPause) return NO_GPS_OFFER;
+  if (input.gpsLost) return { retry: true, openSettings: false, underAlert: true, waiting: false };
+  if (input.awaitingFix) return { retry: true, openSettings: false, underAlert: false, waiting: true };
+  return NO_GPS_OFFER;
+};

@@ -94,6 +94,12 @@ export interface RecorderState {
   error: string | null;
   /** GPS perdu : plus de position depuis le délai du profil ; effacé à la position suivante. */
   gpsLost: boolean;
+  /** Aucune position reçue depuis le départ, ou depuis la reprise d'un journal ; effacé à la première. */
+  awaitingFix: boolean;
+  /** Localisation du téléphone coupée, dite par la source ; effacé à la position suivante. */
+  locationOff: boolean;
+  /** Vrai quelques secondes après « Réessayer » du GPS : « nouvelle tentative… » (`GPS_RETRY_FEEDBACK_MS`). */
+  gpsRetrying: boolean;
   /** FC perdue : plus de mesure lisible d'une ceinture qui en donnait ; effacé à la mesure suivante. */
   beltLost: boolean;
   /** Ceinture de la session laissée de côté : injoignable (`failed`) ou plus cherchée (`stopped`) ; `null` sinon. */
@@ -128,6 +134,9 @@ const INITIAL_STATE: RecorderState = {
   resultOpened: false,
   error: null,
   gpsLost: false,
+  awaitingFix: false,
+  locationOff: false,
+  gpsRetrying: false,
   beltLost: false,
   beltAside: null,
   beltRetrying: false,

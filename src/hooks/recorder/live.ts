@@ -4,7 +4,7 @@ import type { SessionMark } from '../../core/sessionMarks';
 import type { RecordingProfile } from '../../core/sportProfiles';
 import { recordingJournal } from '../../platform/files';
 import { latestHeartRate } from '../../platform/heartRate';
-import type { LocationFix, LocationSource, LocationWatchOptions } from '../../platform/location';
+import type { LocationErrorCause, LocationFix, LocationSource, LocationWatchOptions } from '../../platform/location';
 import { removeMotionCapture, type MotionCapture } from '../../platform/motion';
 import { buildGpx } from '../../recording/gpxWriter';
 import { gpsWatchOnFix } from '../../recording/gpsWatch';
@@ -22,9 +22,10 @@ import { applyGpsWatch, startGpsWatchFor, watch } from './watches';
  * automatique, positions gardées et journal) et la construction du GPX à l'arrêt.
  */
 
-export const onSourceError = (message: string): void => {
+/** Échec dit par la source : son message remplace l'alerte, et la localisation coupée est retenue pour la page. */
+export const onSourceError = (message: string, cause?: LocationErrorCause): void => {
   session.sourceError = message;
-  setState({ error: message });
+  setState({ error: message, locationOff: cause === 'locationOff' });
 };
 
 /** Reprise d'une pause manuelle : le prochain point gardé ouvre un segment et ne compte pas la pause dans la durée. */
@@ -66,6 +67,8 @@ export const receiveFix = (received: LocationFix): void => {
   const recording = session.currentProfile;
   if (role === 'ignore' || recording === null) return;
   if (!isNewerFix(session.lastReceivedMs, received)) return;
+  // Une position est venue, pause manuelle comprise : plus d'attente, et la localisation est rallumée.
+  if (state.awaitingFix || state.locationOff) setState({ awaitingFix: false, locationOff: false });
   // Veille du GPS, hors pause manuelle : le minuteur est repoussé, ou l'alerte de perte s'efface (avant les abonnés :
   // le guidage des balises reprend son rythme à cette position).
   if (role === 'evaluate' && watch.gpsOn) applyGpsWatch(gpsWatchOnFix(watch.gps, Date.now(), recording));

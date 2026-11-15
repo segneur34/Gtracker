@@ -462,6 +462,54 @@ describe('prévenir quand ça rate', () => {
     expect(recorder.getRecorderState().gpsLost).toBe(false);
   });
 
+  it("« Réessayer » du GPS : attente jusqu'à la première position, retour visible 5 s, un appui à la fois, journal ; rien d'arrêté", async () => {
+    const source = fakeSource();
+    await recorder.startRecording(activity, source);
+    expect(recorder.getRecorderState().awaitingFix).toBe(true);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    await recorder.retryRecordingGps();
+    expect(recorder.getRecorderState().gpsRetrying).toBe(true);
+    // Un second appui pendant le retour : ignoré.
+    await recorder.retryRecordingGps();
+    vi.advanceTimersByTime(4_999);
+    expect(recorder.getRecorderState().gpsRetrying).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(recorder.getRecorderState().gpsRetrying).toBe(false);
+    vi.useRealTimers();
+    source.emit(0);
+    expect(recorder.getRecorderState().awaitingFix).toBe(false);
+    expect(source.starts).toBe(1);
+    expect(source.stops).toBe(0);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const lines = (journal.text ?? '').split('\n').filter((l) => l.startsWith('["gps"'));
+    // Navigateur : rien n'a pu partir vers le téléphone, le journal le dit.
+    expect(lines.map((l) => (JSON.parse(l) as unknown[])[2])).toEqual(['retry', 'unassisted']);
+  });
+
+  it('localisation coupée dite par la source : retenue pour la page, effacée avec son message à la première position', async () => {
+    let onFix: ((fix: LocationFix) => void) | null = null;
+    const source: LocationSource = {
+      label: 'Coupée',
+      start: async (_options, fix, onError) => {
+        onFix = fix;
+        onError('Localisation coupée.', 'locationOff');
+        return async () => undefined;
+      },
+    };
+    await recorder.startRecording(activity, source);
+    let state = recorder.getRecorderState();
+    expect(state.locationOff).toBe(true);
+    expect(state.error).toBe('Localisation coupée.');
+    await recorder.openRecordingLocationSettings();
+    onFix!({ timeMs: T0, lat: 43, lon: 3, speedMs: 3, accuracyM: 4 });
+    state = recorder.getRecorderState();
+    expect(state.locationOff).toBe(false);
+    expect(state.awaitingFix).toBe(false);
+    expect(state.error).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect((journal.text ?? '').split('\n').filter((l) => l.startsWith('["gps"')).map((l) => (JSON.parse(l) as unknown[])[2])).toEqual(['settings']);
+  });
+
   it('FC perdue après 1 min sans mesure lisible, une fois, sans rien armer avant la première mesure ni en pause', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(T0);

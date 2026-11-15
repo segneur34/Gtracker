@@ -16,8 +16,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 /**
  * Autorisations qui ne passent pas par une demande système ordinaire
  * (src/platform/permissions.ts) : la batterie « sans restriction » et le
- * démarrage automatique. La position et les notifications sont demandées par
- * le greffon du GPS, le Bluetooth par celui de la ceinture.
+ * démarrage automatique ; et le réglage de la localisation d'Android, coupée
+ * pendant un enregistrement. La position et les notifications sont demandées
+ * par le greffon du GPS, le Bluetooth par celui de la ceinture.
  *
  * Batterie : l'écran système « Autoriser l'application à toujours
  * s'exécuter en arrière-plan ? » (ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).
@@ -62,6 +63,13 @@ public class PermissionsPlugin extends Plugin {
         miui.setComponent(new ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"));
         if (start(miui) || start(appSettings())) call.resolve();
         else call.reject("Réglages de l'application introuvables");
+    }
+
+    /** Ouvre le réglage de la localisation d'Android : « Activer la localisation » d'Enregistrer, quand elle est coupée. */
+    @PluginMethod
+    public void openLocationSettings(PluginCall call) {
+        if (start(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))) call.resolve();
+        else call.reject("Réglage de la localisation introuvable");
     }
 
     /** Ouvre les réglages de l'application : une autorisation refusée s'y rend. */

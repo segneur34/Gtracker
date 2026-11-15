@@ -157,7 +157,7 @@ export const abandonResume = async (): Promise<void> => {
   setState({
     status: 'idle', resuming: false, sport: null, activity: null, sourceLabel: null, pausedReason: null, pauseClock: null,
     measuringMotion: false, motionSetup: null, heartRate: null, marks: [], stats: EMPTY_RECORDING_STATS, gpsLost: false, beltLost: false,
-    beltAside: null, beltRetrying: false,
+    beltAside: null, beltRetrying: false, awaitingFix: false, locationOff: false, gpsRetrying: false,
   });
 };
 
@@ -181,7 +181,7 @@ export const restoreFromJournal = (parsed: ParsedJournal, activity: Activity, so
   setState({
     status: 'starting', resuming: true, sport: activity.base, activity, sourceLabel: source?.label ?? null, pausedReason: null, pauseClock: null,
     measuringMotion: false, motionSetup: null, heartRate: null, marks: session.marks, stats, pending: null, motionUnreadable: false, saved: null, error: null, gpsLost: false, beltLost: false,
-    beltAside: null, beltRetrying: false,
+    beltAside: null, beltRetrying: false, awaitingFix: true, locationOff: false, gpsRetrying: false,
   });
 };
 
