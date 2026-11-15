@@ -1,10 +1,10 @@
 # Construire Gtracker
 
-Une page pour qui reprend le dépôt : de quoi on a besoin, comment on vérifie, comment on sort une application web ou un APK. Le détail de l'architecture est dans `CLAUDE.md` et `docs/ETAT_DU_PROJET.md`.
+Une page pour qui reprend le dépôt : de quoi on a besoin, comment on vérifie, comment on sort une application web ou un APK. L'architecture se lit dans `docs/ETAT_DU_PROJET.md` (couches, pipeline, persistance), la carte des fichiers dans `docs/INVENTAIRE.md` et la disposition des pages d'analyse dans `docs/MISE_EN_PAGE.md`.
 
 ## Outils
 
-- **Node 22.18 ou plus** (22.18+, 24 ou 26+) : Vitest 5 demande 22.12, et Capacitor lit `capacitor.config.ts` par le Node lui-même depuis TypeScript 7, ce que Node fait à partir de 22.18 (sous 22.12, `npx cap sync android` échoue : vu sur GitHub le 06/11) ; Node 23 et 25 sont refusés. `.nvmrc` donne la version de départ (26, celle du poste), `engines` de `package.json` la plage permise. Puis `npm ci`.
+- **Node 22.18 ou plus** (22.18+, 24 ou 26+) : Vitest 5 demande 22.12, et Capacitor lit `capacitor.config.ts` par le Node lui-même depuis TypeScript 7, ce que Node fait à partir de 22.18 (sous 22.12, `npx cap sync android` échoue) ; Node 23 et 25 sont refusés. `.nvmrc` donne la version de départ (26, celle du poste), `engines` de `package.json` la plage permise. Puis `npm ci`.
 - **JDK 21** pour Android, et pas un autre : Gradle 8.14.3 (`android/gradle/wrapper/gradle-wrapper.properties`) ne tourne pas sous le Java 25 des Android Studio récents. `android/gradle/gradle-daemon-jvm.properties` (`toolchainVersion=21`) le demande au démon Gradle ; `JAVA_HOME` doit tout de même pointer vers un JDK 21 pour lancer `gradlew`.
 - **SDK Android 36** (`compileSdkVersion` et `targetSdkVersion` dans `android/variables.gradle`), application installable dès Android 7 (`minSdkVersion` 24, WebView 111 au moins : `android.minWebViewVersion` de `capacitor.config.ts`, la cible de construction de Vite). Dire où est le SDK : `ANDROID_HOME`, ou `sdk.dir=…` dans `android/local.properties` (fichier de la machine, ignoré par git).
 

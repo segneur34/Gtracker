@@ -4,8 +4,8 @@ import type { RecordPatch } from '../library/record';
 import { librarySession, updateSessionRecord, useLibrarySession } from './useSessionLibrary';
 
 /**
- * « Recherche par trace, rangée dans la fiche » : revêtement (OpenStreetMap),
- * altitude du terrain (IGN), sauts (capteurs). Le résultat est cherché la
+ * « Recherche par trace, rangée dans la fiche » : aujourd'hui les sauts, lus
+ * dans les capteurs de la session. Le résultat est cherché la
  * première fois qu'on en a besoin, une seule fois par clé (la trace), gardé
  * le temps du lancement, et rangé dans la fiche (hors brouillon : ce n'est pas
  * une saisie) une seule fois par recherche, même si la trace est recalculée

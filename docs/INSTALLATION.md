@@ -18,7 +18,7 @@ L'icône Gtracker apparaît avec les autres applications.
 
 Gtracker range vos sessions dans un dossier ordinaire du téléphone. Chaque session y est un fichier GPX accompagné d'une petite fiche. Vous pouvez copier ce dossier sur un ordinateur pour le sauvegarder, ou pour retrouver vos sessions sur un autre appareil.
 
-1. Au premier lancement, l'accueil propose **Choisir le dossier**.
+1. Au premier lancement, la page d'ouverture, le Profil, propose **Choisir le dossier**.
 2. Dans la fenêtre d'Android qui s'ouvre, allez dans **Documents**. Créez-y un dossier **Gtracker** s'il n'existe pas, puis entrez dedans.
 3. Touchez **Utiliser ce dossier**, puis **Autoriser**.
 
@@ -28,10 +28,11 @@ Gtracker ne demande jamais l'accès à tous vos fichiers : il ne voit que ce dos
 
 Ces réglages évitent que le téléphone coupe le GPS quand l'écran s'éteint. **Sans eux, la trace s'interrompt au bout de quelques minutes.**
 
-**Au premier lancement**, une carte **Autorisations** apparaît sur l'accueil (elle est aussi dans Réglages). Elle liste ce qu'il faut accorder :
+**Au premier lancement**, une carte **Autorisations** apparaît en tête du Profil (elle est aussi dans Réglages). Elle liste ce qu'il faut accorder :
 
 - **Position** : choisissez **Lorsque vous utilisez l'appli**, et laissez **Position exacte** activée. Avec la position approximative, la trace est inutilisable.
-- **Notifications** : choisissez **Autoriser**. Pendant l'enregistrement, une notification reste affichée. C'est elle qui permet à Gtracker de continuer à enregistrer écran éteint.- **Batterie non optimisée** : voir plus bas.
+- **Notifications** : choisissez **Autoriser**. Pendant l'enregistrement, une notification reste affichée. C'est elle qui permet à Gtracker de continuer à enregistrer écran éteint.
+- **Batterie non optimisée** : voir plus bas.
 - **Bluetooth** : seulement si vous utilisez une ceinture cardio (voir plus bas).
 
 Si vous touchez **Plus tard**, la carte revient à la version suivante tant qu'il manque une autorisation.
@@ -52,7 +53,7 @@ Avant une vraie sortie, faites un essai de dix minutes en marchant, écran étei
 
 1. Touchez le bouton rond, choisissez l'activité (Wingfoil ou Surf conviennent pour l'essai), puis **Démarrer**.
 2. Éteignez l'écran et marchez dix minutes.
-3. Rallumez l'écran, tenez le bouton **Arrêter** appuyé 2 secondes (un simple appui ne l'arrête pas), puis touchez **Analyser**.
+3. Rallumez l'écran, tenez le bouton **Arrêter** appuyé 2 secondes (un simple appui ne l'arrête pas). La session est rangée et son analyse s'ouvre seule.
 
 Si la trace présente de longues lignes droites qui coupent les virages, le téléphone a coupé le GPS. Reprenez l'étape 3.
 

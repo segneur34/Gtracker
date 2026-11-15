@@ -220,7 +220,7 @@ function SurfModule() {
   // et à celle de l'onglet « vagues », pour les virages du gyroscope.
   const sensors = useSessionPumping(shownFile, (pumping && (open.vols || open.pumping)) || open.vagues);
   const pumpDetection = surfProfile?.pump ?? null;
-  /** Seuils de l'aide des onglets « vagues » et « rame », lus ici en texte : un nombre tiré du profil, passé tel quel à `t`, fait renoncer le compilateur React à mémoïser le composant. */
+  /** Seuils de l'aide des onglets « vagues » et « rame », mis en texte une fois ici, tels que les phrases d'aide (`t`) les insèrent. */
   const cadenceMin = String(pumpDetection?.cadenceMinPerMin ?? 0);
   const cadenceMax = String(pumpDetection?.cadenceMaxPerMin ?? 0);
   const minWaveS = String(surfProfile?.surf.minWaveS ?? 0);

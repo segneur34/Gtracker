@@ -2,13 +2,11 @@
 
 Analyse de sessions de voile (wingfoil, planche, kite, bateau) et de surf à partir de traces GPX, et enregistrement GPS sur le téléphone. Application 100 % client, sans backend à nous : les traces et les sessions ne partent jamais sur internet, mais l'application interroge des services publics (liste plus bas). Elle tourne dans le navigateur et, emballée par Capacitor, sur Android, avec enregistrement GPS natif, ceinture cardio Bluetooth et mémoire en dossier portable.
 
-Deux familles d'activités, chacune avec sa bibliothèque et sa page d'analyse (carte, graphes, meilleurs segments, notes) : **Voile** (wingfoil, planche, kite, bateau) et **Surf** (surf, surf foil). Autour : **Enregistrer**, **Planifier** (parcours de balises, export GPX), **Statistiques** (onglets général, graphique, régularité, records, cardio), **Profil** et **Réglages** (avec le test de FC repos).
+Deux familles d'activités, chacune avec sa page d'analyse (carte, graphes, meilleurs segments, notes) : **Avec vent** (wingfoil, planche, kite, bateau) et **Sans vent** (surf, surf foil). Toutes les sessions sont dans une seule liste, **Sessions**, filtrable par activité. Autour : **Enregistrer**, **Planifier** (parcours de balises en ligne droite, import et export GPX), **Statistiques** (onglets général, graphique, régularité, records, cardio), **Profil** et **Réglages** (avec le test de FC repos).
 
 ## Mémoire
 
 Les sessions vivent dans un dossier ordinaire, `Gtracker` : un GPX et une fiche JSON par session dans `sessions/`, et un fichier de réglages par appareil dans `reglages/`. On le copie pour sauvegarder ou pour passer du téléphone au PC. Sur Android, il se désigne une fois (en principe `Documents/Gtracker`) ; dans le navigateur, c'est la mémoire privée du navigateur ou un dossier choisi (Chrome, Edge).
-
-Planifier propose des types de voie : Sentier, Piste, Route, Grande route (serveur BRouter).
 
 ## Services appelés
 
@@ -16,13 +14,14 @@ Aucune clé, aucun compte, aucune télémétrie ; seuls ces services reçoivent 
 
 | Service | Quand | Ce qui part |
 |---|---|---|
-| Tuiles OpenStreetMap (`tile.openstreetmap.org`) | à chaque carte affichée en vue « plan », sauf tuile déjà gardée sur l'appareil | la position de la tuile (zoom, colonne, ligne), donc la zone regardée |
+| Tuiles OpenStreetMap (`tile.openstreetmap.org`) | à chaque carte, image de partage ou vignette de session en vue « plan », sauf tuile déjà gardée sur l'appareil | la position de la tuile (zoom, colonne, ligne), donc la zone regardée |
 | Tuiles Esri (`server.arcgisonline.com`) | carte en vue satellite | idem |
-| Photon (`photon.komoot.io`) | recherche d'un lieu dans Planifier | le texte tapé et le centre de la carte |
-| BRouter (`brouter.de`) | calcul d'un itinéraire dans Planifier | les points de passage, le profil de voies choisi (envoyé aussi une fois au serveur) |
-| IGN, Géoplateforme (`data.geopf.fr`) | altitude du terrain d'un GPX importé en planification, sans activité choisie | les coordonnées des points de la trace, par paquets |
+| Photon (`photon.komoot.io`), recherche inverse | pour nommer une session par son lieu : à la fin d'un enregistrement, à l'import, à l'ouverture d'une analyse et pour les sessions de la liste qui n'ont pas encore de lieu ; allumée d'office, se coupe dans Réglages › Mémoire | le point de départ de la session, et son point d'arrivée s'il est éloigné du départ, arrondis à trois décimales (une centaine de mètres), avec la langue (français ou anglais) et le rayon de recherche ; jamais la trace, l'heure ni le nom de la session |
+| Photon (`photon.komoot.io`), recherche par nom | recherche d'un lieu dans Planifier | le texte tapé et le centre de la carte |
 
-Ouvrir un GPX, l'analyser, enregistrer et lire les Statistiques n'appellent rien d'autre que les tuiles de la carte.
+Un lieu déjà appris sur l'appareil (corrigé par l'utilisateur) est repris sans interroger le service. Réglages permet aussi de remplacer l'adresse des tuiles du plan ou du satellite par celle d'un autre serveur : les tuiles sont alors demandées à cette adresse.
+
+Ouvrir un GPX, l'analyser, enregistrer et lire les Statistiques n'appellent rien d'autre que les tuiles de la carte et, sauf si on l'a coupée, la recherche du lieu des sessions. Aucun service de calcul d'itinéraire ni d'altitude n'est appelé.
 
 ## Commandes
 
