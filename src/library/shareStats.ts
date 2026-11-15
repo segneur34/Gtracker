@@ -1,6 +1,6 @@
 import { t } from '../core/i18n';
 import type { ShareStat } from '../core/shareImage';
-import { FOIL_RATIO_LABEL, type Treatment } from '../core/sportProfiles';
+import { FOIL_RATIO_LABEL, type SportFamily } from '../core/sportProfiles';
 import { commaDecimal, formatDistance, formatDuration, formatSessionDate, formatShortDuration, formatSpeed, type DistanceUnit, type SpeedUnit } from '../core/units';
 import { downloadBaseName } from './naming';
 import { RATINGS, WIND_LEVELS, type Rating, type WindLevel } from './notes';
@@ -13,7 +13,7 @@ import { customName, sessionDisplayName, sessionFileBaseName, type NamedRecord }
  * retenu pour l'activité vaut aux deux endroits. Voile : manœuvres réussies, part
  * du vol pompée (sur foil), vent ; partout : l'appréciation.
  */
-export const SHARE_EXTRA_KEYS: Record<Treatment, readonly string[]> = {
+export const SHARE_EXTRA_KEYS: Record<SportFamily, readonly string[]> = {
   voile: ['maneuverSuccess', 'pumpingShare', 'wind', 'rating'],
   surf: ['rating'],
 };
@@ -60,7 +60,7 @@ export const heartRateShareStats = (heart: { present: boolean; stats: { avgBpm: 
  * la part du vol pompée sur foil seulement. Une valeur absente vaut « — ».
  */
 export const shareExtraStats = (
-  treatment: Treatment,
+  family: SportFamily,
   extras: ShareExtras,
   options: { foil?: boolean } = {}
 ): ShareStat[] => {
@@ -73,7 +73,7 @@ export const shareExtraStats = (
     wind: { key: 'wind', label: t('Vent'), value: windShareValue(extras.windDeg, extras.windLevel) },
     rating: { key: 'rating', label: t('Appréciation'), value: ratingLabel(extras.rating) ?? DASH },
   };
-  return SHARE_EXTRA_KEYS[treatment].filter((key) => key !== 'pumpingShare' || foil).map((key) => rows[key]);
+  return SHARE_EXTRA_KEYS[family].filter((key) => key !== 'pumpingShare' || foil).map((key) => rows[key]);
 };
 
 /** Ratio de vol d'une voile sur foil : temps en vol sur temps en mouvement, en pour cent, comme « général » (`activeRatio`). */
@@ -94,7 +94,7 @@ const flightRatioValue = (movingS: number | null, inMotionS: number | undefined)
  */
 export const summaryShareStats = (
   summary: SessionSummary,
-  treatment: Treatment,
+  family: SportFamily,
   units: { speed: SpeedUnit; distance: DistanceUnit },
   withActiveThreshold = true,
   foil = false,
@@ -102,7 +102,7 @@ export const summaryShareStats = (
 ): ShareStat[] => {
   const results = summary.maneuverResults;
   const success = results ? results.tackSuccess + results.jibeSuccess : 0;
-  const extras = shareExtraStats(treatment, {
+  const extras = shareExtraStats(family, {
     maneuvers: results ? { success, total: success + results.tackFail + results.jibeFail } : null,
     pumpingShare: summary.pumpingShare,
     // Le vent saisi dans la fiche, sinon celui que l'analyse a retenu.
@@ -110,12 +110,12 @@ export const summaryShareStats = (
     windLevel: notes.windLevel,
     rating: notes.rating,
   }, { foil });
-  return [...summaryBaseStats(summary, treatment, units, withActiveThreshold, foil), ...extras];
+  return [...summaryBaseStats(summary, family, units, withActiveThreshold, foil), ...extras];
 };
 
 const summaryBaseStats = (
   summary: SessionSummary,
-  treatment: Treatment,
+  family: SportFamily,
   units: { speed: SpeedUnit; distance: DistanceUnit },
   withActiveThreshold: boolean,
   foil: boolean
@@ -127,7 +127,7 @@ const summaryBaseStats = (
   const speed = (ms: number | null) => (ms === null || !Number.isFinite(ms) ? '—' : formatSpeed(ms, units.speed));
   const per = (m: number | null, s: number | null) => (m === null || s === null || s <= 0 ? null : m / s);
 
-  if (treatment === 'voile') {
+  if (family === 'voile') {
     const active = new Set(['activeDistance', 'activeTime', 'activeRatio', 'activeAverage']);
     // Sans seuil (bateau), `movingTimeS` est le temps en mouvement (toute la navigation, pauses et trous immobiles ôtés).
     const movingTime = { key: 'movingTime', label: t('Temps en mouvement'), value: movingS === null ? '—' : formatDuration(movingS * 1000) };

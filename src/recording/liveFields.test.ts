@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LIVE_FIELDS, DEFAULT_NOTIFICATION_FIELDS, MAX_LIVE_FIELDS, MAX_NOTIFICATION_FIELDS, defaultLiveFieldsOf, defaultNotificationFieldsOf,
-  liveFieldLabel, liveFieldShortLabel, liveFieldValue, liveFieldsOfTreatment, recentWindowLabel, sanitizeLiveFields, type LiveFieldContext,
+  liveFieldLabel, liveFieldShortLabel, liveFieldValue, liveFieldsOfFamily, recentWindowLabel, sanitizeLiveFields, type LiveFieldContext,
   type LiveFieldKey, type LiveFieldUnits,
 } from './liveFields';
-import { SPORT_PROFILES, sportTreatment } from '../core/sportProfiles';
+import { SPORT_PROFILES, sportFamily } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import { EMPTY_LIVE_STATS, LIVE_STATS_DEFAULTS } from './liveStats';
 import type { DistanceUnit, SpeedUnit } from '../core/units';
-import type { Treatment } from '../core/sportProfiles';
+import type { SportFamily } from '../core/sportProfiles';
 
 const context = (patch: Partial<LiveFieldContext> = {}): LiveFieldContext => ({
   stats: EMPTY_LIVE_STATS,
@@ -25,31 +25,31 @@ const context = (patch: Partial<LiveFieldContext> = {}): LiveFieldContext => ({
   ...patch,
 });
 
-describe('liveFieldsOfTreatment', () => {
-  it('ne propose que les chiffres qui ont un sens pour le traitement', () => {
-    expect(liveFieldsOfTreatment('voile')).toContain('recentTopShort');
-    for (const treatment of ['voile', 'surf'] as const) {
-      expect(liveFieldsOfTreatment(treatment)).toEqual(expect.arrayContaining(['heartRate', 'averageHeartRate', 'heartRateZone']));
+describe('liveFieldsOfFamily', () => {
+  it('ne propose que les chiffres qui ont un sens pour la famille', () => {
+    expect(liveFieldsOfFamily('voile')).toContain('recentTopShort');
+    for (const family of ['voile', 'surf'] as const) {
+      expect(liveFieldsOfFamily(family)).toEqual(expect.arrayContaining(['heartRate', 'averageHeartRate', 'heartRateZone']));
     }
-    expect(liveFieldsOfTreatment('voile')).toContain('markDistance');
-    expect(liveFieldsOfTreatment('surf')).toEqual(expect.arrayContaining(['markDistance', 'markBearing']));
-    expect(liveFieldsOfTreatment('surf')).not.toContain('heading');
-    expect(liveFieldsOfTreatment('surf')).not.toContain('recentTopShort');
+    expect(liveFieldsOfFamily('voile')).toContain('markDistance');
+    expect(liveFieldsOfFamily('surf')).toEqual(expect.arrayContaining(['markDistance', 'markBearing']));
+    expect(liveFieldsOfFamily('surf')).not.toContain('heading');
+    expect(liveFieldsOfFamily('surf')).not.toContain('recentTopShort');
   });
 
-  it('propose les défauts de chaque traitement', () => {
-    for (const treatment of ['voile', 'surf'] as const) {
-      for (const key of DEFAULT_LIVE_FIELDS[treatment]) expect(liveFieldsOfTreatment(treatment)).toContain(key);
-      for (const key of DEFAULT_NOTIFICATION_FIELDS) expect(liveFieldsOfTreatment(treatment)).toContain(key);
+  it('propose les défauts de chaque famille', () => {
+    for (const family of ['voile', 'surf'] as const) {
+      for (const key of DEFAULT_LIVE_FIELDS[family]) expect(liveFieldsOfFamily(family)).toContain(key);
+      for (const key of DEFAULT_NOTIFICATION_FIELDS) expect(liveFieldsOfFamily(family)).toContain(key);
     }
     expect(DEFAULT_NOTIFICATION_FIELDS.length).toBeLessThanOrEqual(MAX_NOTIFICATION_FIELDS);
   });
 
-  it('propose les défauts de chaque calcul, permis par son traitement', () => {
+  it('propose les défauts de chaque calcul, permis par sa famille', () => {
     for (const sport of Object.keys(SPORT_PROFILES) as SportType[]) {
-      const treatment = sportTreatment(sport);
-      expect(sanitizeLiveFields(defaultLiveFieldsOf(sport), treatment)).toEqual(defaultLiveFieldsOf(sport));
-      expect(sanitizeLiveFields(defaultNotificationFieldsOf(sport), treatment, MAX_NOTIFICATION_FIELDS, 'notification'))
+      const family = sportFamily(sport);
+      expect(sanitizeLiveFields(defaultLiveFieldsOf(sport), family)).toEqual(defaultLiveFieldsOf(sport));
+      expect(sanitizeLiveFields(defaultNotificationFieldsOf(sport), family, MAX_NOTIFICATION_FIELDS, 'notification'))
         .toEqual(defaultNotificationFieldsOf(sport));
     }
   });
@@ -205,7 +205,7 @@ describe('libellés sur les options du direct', () => {
   };
 
 
-  const KEYS = Object.keys(DEFAULT_LIVE_FIELDS).flatMap((t) => liveFieldsOfTreatment(t as Treatment, 'notification'));
+  const KEYS = Object.keys(DEFAULT_LIVE_FIELDS).flatMap((t) => liveFieldsOfFamily(t as SportFamily, 'notification'));
   const UNITS: { speedUnit: SpeedUnit; distanceUnit: DistanceUnit }[] = [
     { speedUnit: 'kmh', distanceUnit: 'km' }, { speedUnit: 'kn', distanceUnit: 'nm' },
   ];

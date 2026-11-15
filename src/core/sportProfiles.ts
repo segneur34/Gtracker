@@ -371,6 +371,8 @@ export interface GyroTurnDetection extends AttitudeParams {
 
 export interface SportProfile {
   id: SportType;
+  /** Famille du calcul (`SportFamily`) : son rangement, son module d'analyse, ses onglets, unités et chiffres du direct. */
+  family: SportFamily;
   label: string;
   /** Unité d'affichage principale des vitesses. */
   speedUnit: SpeedUnit;
@@ -534,6 +536,7 @@ export const UNCLASSIFIED_PROFILE: Pick<SportProfile, 'elevation' | 'maxSpeedWin
 /** Réglages communs aux supports à voile, surchargés au cas par cas. */
 const SAILING_DEFAULTS = {
   ...COMMON_DEFAULTS,
+  family: 'voile' as SportFamily,
   // Gris sous 8 nœuds, rouge franc à partir de 28 ; en voile, la suggestion tirée de l'allure prime.
   speedRange: { minMs: knotsToMs(8), maxMs: knotsToMs(28) },
   speedRangeFollowsPace: true,
@@ -566,6 +569,7 @@ const heartRateOffset = (offsetBpm: number): HeartRateProfile => ({ ...HEART_RAT
 const SURF_PROFILE: SportProfile = {
   ...COMMON_DEFAULTS,
   id: 'surf',
+  family: 'surf',
   label: 'Surf',
   // 5 à 30 km/h : la rame, sous 5 km/h, reste grise ; la vague ressort en couleur.
   speedRange: { minMs: kmhToMs(5), maxMs: kmhToMs(30) },
@@ -646,9 +650,6 @@ export const SPORT_PROFILES: Record<SportType, SportProfile> = {
   surf: SURF_PROFILE,
 };
 
-/** Supports dont l'analyse repose sur le vent. */
-export const SAILING_SPORTS: SportType[] = ['wingfoil', 'windsurf', 'kite', 'bateau'];
-
 export const getSportProfile = (sport: SportType): SportProfile => SPORT_PROFILES[sport];
 
 /** Vrai si la valeur est l'identifiant d'un calcul de support (lecture d'une fiche, d'un journal, d'un nom de fichier). */
@@ -674,45 +675,24 @@ export const activeRatioLabel = (profile: SportProfile, foil: boolean): string =
   foil ? FOIL_RATIO_LABEL : profile.activeRatioLabel;
 
 /**
- * Traitement d'un calcul : la façon dont ses sessions se calculent et
- * s'affichent (unités, chiffres du direct, onglets, module d'analyse). À ne
- * pas confondre avec la famille, qui les range ; les deux portent les mêmes
- * noms depuis le retrait de la terre.
- */
-export type Treatment = 'voile' | 'surf';
-
-/**
- * Famille d'un calcul : où ses sessions se rangent (bibliothèque, accueil,
- * barre de navigation, listes d'activités, Réglages).
+ * Famille d'un calcul, écrite une fois dans son profil (`SportProfile.family`).
+ * Elle range ses sessions (listes d'activités, Réglages, rangée de logos) et
+ * choisit comment elles se calculent et s'affichent : module d'analyse et
+ * adresse, onglets, unités proposées, chiffres du direct, chiffres partagés.
  */
 export type SportFamily = 'voile' | 'surf';
 
 /** Les familles, dans l'ordre de l'interface. */
 export const SPORT_FAMILIES: SportFamily[] = ['voile', 'surf'];
 
-const SPORT_TREATMENT: Record<SportType, Treatment> = {
-  wingfoil: 'voile',
-  windsurf: 'voile',
-  kite: 'voile',
-  bateau: 'voile',
-  surf: 'surf',
-};
-
-const SPORT_FAMILY: Record<SportType, SportFamily> = {
-  wingfoil: 'voile',
-  windsurf: 'voile',
-  kite: 'voile',
-  bateau: 'voile',
-  surf: 'surf',
-};
-
-export const sportTreatment = (sport: SportType): Treatment => SPORT_TREATMENT[sport];
-
-export const sportFamily = (sport: SportType): SportFamily => SPORT_FAMILY[sport];
+export const sportFamily = (sport: SportType): SportFamily => SPORT_PROFILES[sport].family;
 
 /** Calculs d'une famille, dans l'ordre de `SPORT_PROFILES`. */
 export const familySports = (family: SportFamily): SportType[] =>
-  (Object.keys(SPORT_PROFILES) as SportType[]).filter((sport) => SPORT_FAMILY[sport] === family);
+  (Object.keys(SPORT_PROFILES) as SportType[]).filter((sport) => SPORT_PROFILES[sport].family === family);
+
+/** Supports dont l'analyse repose sur le vent : ceux de la voile. */
+export const SAILING_SPORTS: SportType[] = familySports('voile');
 
 /**
  * Détente basse d'un seuil plus petit que l'écart `exitOffset`, en fois le

@@ -4,7 +4,7 @@ import { parseGpx } from '../core/gpxParser';
 import { referenceSpeedMs as sessionReferenceSpeedMs } from '../core/sessionSpeed';
 import { buildCumulativeTrack } from '../core/sessionStats';
 import type { SpeedRangeMs } from '../core/speedGradient';
-import { getSportProfile, sportTreatment, type SportFamily } from '../core/sportProfiles';
+import { getSportProfile, sportFamily, type SportFamily } from '../core/sportProfiles';
 import { effectiveSpeedRange, trackColorSpeedsMs } from '../core/trackColor';
 import type { SportType } from '../core/types';
 import { msToKnots } from '../core/units';
@@ -41,12 +41,12 @@ export const sessionColorTrack = (
   const points = analysisTrack(rawPoints, sport, referenceMs);
   const bounds = trackBounds(points);
   if (points.length < 2 || bounds === null) return null;
-  const treatment = sportTreatment(sport ?? FAMILY_BASE[family]);
+  const sailing = sportFamily(sport ?? FAMILY_BASE[family]) === 'voile';
   const colorMs = trackColorSpeedsMs(points);
   return {
     points: points.map((p, i) => ({ lat: p.lat, lon: p.lon, colorMs: colorMs[i] })),
     bounds,
-    suggested: sport !== null && treatment === 'voile'
+    suggested: sport !== null && sailing
       ? suggestSpeedRangeMs(sport, msToKnots(referenceMs), points, buildCumulativeTrack(points))
       : null,
   };

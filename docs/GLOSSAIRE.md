@@ -17,8 +17,7 @@ Pour qui reprend le code sans connaître son histoire. Chaque entrée dit ce que
 | `SportType` | Identifiant d'un calcul (wingfoil, windsurf, kite, bateau, surf) ; porté par le champ `sport` des fiches. Sa configuration : `SPORT_PROFILES`. | `src/core/types.ts`, `src/core/sportProfiles.ts` |
 | `Activity` | Ce que l'utilisateur voit et crée (nom, couleur, icône) ; son `base` est le `SportType` sur lequel elle s'appuie ; `activityId` la désigne dans les fiches et les réglages. | `src/core/activities.ts` |
 | support, calcul | Dans l'interface, « support » et « calcul » disent le `SportType` ; « activité » dit `Activity`. Faux ami : `base` n'est pas une base de données ni un fond de carte (`MapBase`). | |
-| `sportFamily` | Range les activités et leurs sessions (page Sessions, listes d'activités, Réglages, module d'analyse d'une session) : `SportFamily`, identifiant `voile` ou `surf`. Son nom montré est « Avec vent » ou « Sans vent » (`FAMILY_LABEL`) : l'identifiant n'est pas ce que l'écran affiche, et « Surf » à l'écran est l'activité, pas la famille. | `src/core/sportProfiles.ts` |
-| `sportTreatment` | Dit comment on calcule et affiche (unités, chiffres du direct, onglets, module d'analyse). Vaut aussi voile ou surf aujourd'hui, mais ne se confond pas avec la famille : on les lit à deux endroits différents. | `src/core/sportProfiles.ts` |
+| `sportFamily` | Range les activités et leurs sessions (page Sessions, listes d'activités, Réglages, module d'analyse d'une session) et choisit aussi comment elles se calculent et s'affichent (unités, chiffres du direct, onglets) : `SportFamily`, identifiant `voile` ou `surf`, écrit une fois dans le profil du calcul (`SportProfile.family`). Son nom montré est « Avec vent » ou « Sans vent » (`FAMILY_LABEL`) : l'identifiant n'est pas ce que l'écran affiche, et « Surf » à l'écran est l'activité, pas la famille. | `src/core/sportProfiles.ts` |
 
 ## Fréquence cardiaque
 

@@ -514,7 +514,7 @@ export const useSportSettings = (family: SportFamily) => {
     distanceUnit,
     /** Bornes du dégradé réglées pour l'activité dans Réglages ou pré-réglées, ou `null` pour le défaut du module. */
     speedRange,
-    /** Bornes du dégradé à défaut de réglage, propres au traitement du calcul. */
+    /** Bornes du dégradé à défaut de réglage : celles du pré-réglage de l'activité, sinon de son calcul. */
     defaultSpeedRange: defaultSpeedRangeOf(activity),
     /** Intitulés des deux champs de matériel des notes (hors voile), réglés dans Réglages ou par défaut. */
     gearLabels,

@@ -64,7 +64,7 @@ export interface SailingSessionInput {
 interface SailingShown {
   analysis: SailingAnalysisShown;
   segments: ColoredSegment[];
-  /** Traitement et bornes effectives des traits (`colorKeyOf`). */
+  /** Bornes effectives des traits (`colorKeyOf`). */
   colorKey: string;
 }
 

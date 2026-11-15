@@ -1,11 +1,11 @@
 import {
-  FAMILY_BASE, activitiesOfFamily, activityFamily, activityTreatment, baseActivity, findActivity,
+  FAMILY_BASE, activitiesOfFamily, activityFamily, baseActivity, findActivity,
   readActivities, visibleFamilies, type Activity,
 } from '../core/activities';
 import { presetOf } from './activityPresets';
 import {
   SPORT_FAMILIES, defaultActiveThresholdOf, getSportProfile, hasActiveThreshold,
-  type RecordingProfile, type SportFamily, type Treatment,
+  type RecordingProfile, type SportFamily,
 } from '../core/sportProfiles';
 import { analysisTabs, isTabShown, sanitizeTabChoices, toggleTabChoice, type TabChoices } from '../core/analysisTabs';
 import { isValidSpeedRange, type SpeedRangeMs } from '../core/speedGradient';
@@ -28,11 +28,11 @@ import { sanitizeGearGroups, sanitizeGearLabels } from './gear';
  * dans `hooks/useSportSettings.ts`.
  */
 
-/** Unités d'affichage proposées selon le traitement du calcul. */
+/** Unités d'affichage proposées selon la famille du calcul. */
 const SAILING_UNITS: SpeedUnit[] = ['kn', 'kmh', 'ms'];
 const SURF_UNITS: SpeedUnit[] = ['kmh', 'kn', 'ms'];
 
-export const TREATMENT_UNITS: Record<Treatment, SpeedUnit[]> = { voile: SAILING_UNITS, surf: SURF_UNITS };
+export const FAMILY_UNITS: Record<SportFamily, SpeedUnit[]> = { voile: SAILING_UNITS, surf: SURF_UNITS };
 
 /**
  * Bornes de couleur d'une activité à défaut de réglage : celles de son pré-réglage
@@ -49,7 +49,7 @@ export const rangeFollowsPace = (activity: Activity): boolean =>
   getSportProfile(activity.base).speedRangeFollowsPace && presetOf(activity).speedRangeMs === undefined;
 
 export const thresholdFollowsPace = (activity: Activity): boolean =>
-  activityTreatment(activity) === 'voile' && presetOf(activity).threshold === undefined;
+  activityFamily(activity) === 'voile' && presetOf(activity).threshold === undefined;
 
 
 /** Seuil d'activité à défaut de réglage, dans l'unité du profil : celui du pré-réglage (0 : aucun), sinon celui du calcul. */
@@ -307,7 +307,7 @@ export const resolveDistanceUnit = (stored: StoredSettings, activity: Activity):
 
 
 const sanitizeNotificationFields = (value: unknown, activity: Activity): LiveFieldKey[] | null =>
-  sanitizeLiveFields(value, activityTreatment(activity), MAX_NOTIFICATION_FIELDS, 'notification');
+  sanitizeLiveFields(value, activityFamily(activity), MAX_NOTIFICATION_FIELDS, 'notification');
 
 /** Foil d'une activité sans réglage : celui de son pré-réglage (Windfoil, Kitefoil, Surf foil, Pumping), sinon le défaut du calcul. */
 export const defaultFoil = (activity: Activity): boolean =>
@@ -359,7 +359,7 @@ export const resolveRecordingProfile = (stored: StoredSettings, activity: Activi
 
 /** Chiffres en grand de l'enregistrement, carte réduite : ceux choisis, sinon ceux du calcul. */
 export const resolveLiveFields = (stored: StoredSettings, activity: Activity): LiveFieldKey[] =>
-  sanitizeLiveFields(stored.liveFields?.[activity.id], activityTreatment(activity)) ?? defaultLiveFieldsFor(activity);
+  sanitizeLiveFields(stored.liveFields?.[activity.id], activityFamily(activity)) ?? defaultLiveFieldsFor(activity);
 
 /** Chiffres de la notification de l'enregistrement : ceux choisis, sinon ceux du calcul. */
 export const resolveNotificationFields = (stored: StoredSettings, activity: Activity): LiveFieldKey[] =>
@@ -473,7 +473,7 @@ export const settingsView = (stored: StoredSettings, activity: Activity): SportS
   const threshold = isValidThreshold(stored.thresholds?.[id]) ? stored.thresholds?.[id] : undefined;
   const range = stored.speedRanges?.[id];
   const autoPauseOverride = isValidAutoPause(stored.autoPause?.[id]) ? stored.autoPause?.[id] : undefined;
-  const liveFields = sanitizeLiveFields(stored.liveFields?.[id], activityTreatment(activity));
+  const liveFields = sanitizeLiveFields(stored.liveFields?.[id], activityFamily(activity));
   const notificationFields = sanitizeNotificationFields(stored.notificationFields?.[id], activity);
   const markGuide = sanitizeMarkGuide(stored.markGuide?.[id]);
   return {
@@ -558,7 +558,7 @@ export const SETTING_FIELDS: Record<SettingField, SettingFieldRule> = {
   },
   liveFields: {
     key: 'liveFields',
-    normalize: (v, activity) => (!activity ? undefined : v === null ? null : sanitizeLiveFields(v, activityTreatment(activity)) ?? undefined),
+    normalize: (v, activity) => (!activity ? undefined : v === null ? null : sanitizeLiveFields(v, activityFamily(activity)) ?? undefined),
   },
   notificationFields: {
     key: 'notificationFields',

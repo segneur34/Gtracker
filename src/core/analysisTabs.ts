@@ -1,6 +1,6 @@
 import { isObject } from './basics';
 import { t } from './i18n';
-import { sportTreatment, type SportProfile, type Treatment } from './sportProfiles';
+import type { SportFamily, SportProfile } from './sportProfiles';
 
 /**
  * Onglets des analyses, par module, dans l'ordre de leur barre. Chaque
@@ -65,14 +65,15 @@ export const SURF_TABS: AnalysisTab<SurfTab>[] = [
   { key: 'reglages', label: t('réglages') },
 ];
 
-const TREATMENT_TABS: Record<Treatment, readonly AnalysisTab[]> = { voile: SAILING_TABS, surf: SURF_TABS };
+/** Onglets du module de chaque famille. */
+const MODULE_TABS: Record<SportFamily, readonly AnalysisTab[]> = { voile: SAILING_TABS, surf: SURF_TABS };
 
 /**
- * Onglets d'un calcul, proposés dans Réglages : « sauts » seulement s'il les mesure (ni bateau ni surf),
- * « pumping » de même (voile sur foil, pas le bateau).
+ * Onglets d'un calcul, ceux du module de sa famille, proposés dans Réglages : « sauts » seulement s'il les
+ * mesure (ni bateau ni surf), « pumping » de même (voile sur foil, pas le bateau).
  */
 export const analysisTabs = (profile: SportProfile): readonly AnalysisTab[] =>
-  TREATMENT_TABS[sportTreatment(profile.id)].filter((tab) => (tab.key !== 'sauts' || profile.jumps !== null)
+  MODULE_TABS[profile.family].filter((tab) => (tab.key !== 'sauts' || profile.jumps !== null)
     && (tab.key !== 'pumping' || profile.pump !== null));
 
 /**

@@ -22,7 +22,7 @@ import {
 } from '../core/activities';
 import { LIVE_TRACK_COLOR } from '../components/mapStyles';
 import {
-  sportFamily, sportTreatment, type SportFamily,
+  sportFamily, type SportFamily,
 } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import { formatClock, formatDistance, formatShortDistance, formatSpeed, formatDecimal } from '../core/units';
@@ -192,13 +192,13 @@ const MarkGuideCard = ({ view, activity }: { view: MarkGuideView; activity: Acti
 };
 
 /**
- * Statistiques en direct propres au traitement du calcul de l'activité.
+ * Statistiques en direct propres à la famille du calcul de l'activité.
  * Libellés tirés des options du calcul (`options`).
  */
 const liveStatItems = (activity: Activity, live: LiveStats, options: LiveStatsOptions): { label: string; value: string }[] => {
   const unit = effectiveSpeedUnit(activity);
   const distanceUnit = effectiveDistanceUnit(activity);
-  if (sportTreatment(activity.base) === 'voile') {
+  if (sportFamily(activity.base) === 'voile') {
     return [
       ...options.topDurationsS.map((d, i) => ({
         label: t('Top {d} s ({window})', { d, window: recentWindowLabel(options) }),
@@ -809,11 +809,11 @@ function RecordingScreen() {
   /** Ce que mesurent les capteurs pendant l'enregistrement : sauts (pumping et virages en surf, sauts et pumping en voile sur foil). */
   const motionWhat = (() => {
     const setup = motionSetup;
-    const treatment = liveActivity ? sportTreatment(liveActivity.base) : null;
-    const pumpingToo = treatment === 'voile' && setup?.foil === true && liveActivity !== null && effectivePumping(liveActivity) === true;
+    const family = liveActivity ? sportFamily(liveActivity.base) : null;
+    const pumpingToo = family === 'voile' && setup?.foil === true && liveActivity !== null && effectivePumping(liveActivity) === true;
     // Pumping seul en voile : les sauts n'ont pas été mesurés (case de Réglages ou de l'enregistrement décochée).
     const surfWhat = measurePumping && measureTurns ? t('Pumping et virages') : measureTurns ? t('Virages') : t('Pumping');
-    return treatment === 'surf' ? surfWhat : pumpingToo ? (measureJumps ? t('Sauts et pumping') : t('Pumping')) : t('Sauts');
+    return family === 'surf' ? surfWhat : pumpingToo ? (measureJumps ? t('Sauts et pumping') : t('Pumping')) : t('Sauts');
   })();
 
   const handleStart = () => {

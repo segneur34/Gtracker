@@ -1,11 +1,43 @@
 import { describe, expect, it } from 'vitest';
-import { ELEVATION_PRESETS, REFERENCE_HEART_RATE, SPORT_PROFILES, UNCLASSIFIED_PROFILE, isSportType } from './sportProfiles';
+import {
+  ELEVATION_PRESETS, REFERENCE_HEART_RATE, SAILING_SPORTS, SPORT_FAMILIES, SPORT_PROFILES, UNCLASSIFIED_PROFILE,
+  familySports, isSportType, sportFamily,
+} from './sportProfiles';
 import type { SportType } from './types';
 import { guessActivityLogo, isLogoId } from './activityLogos';
+import { ACTIVITY_PALETTE, BASE_COLOR, FAMILY_BASE } from './activities';
 
 describe('chaque calcul est complet', () => {
   it('a son logo, quand le nom de l’activité ne dit rien', () => {
     for (const sport of Object.keys(SPORT_PROFILES) as SportType[]) expect(isLogoId(guessActivityLogo('', sport)), sport).toBe(true);
+  });
+
+  for (const sport of Object.keys(SPORT_PROFILES) as SportType[]) {
+    const p = SPORT_PROFILES[sport];
+    it(`${sport} : identifiant, famille, couleur et sous-profils accordés`, () => {
+      expect(p.id).toBe(sport);
+      expect(SPORT_FAMILIES).toContain(p.family);
+      expect(sportFamily(sport)).toBe(p.family);
+      // Sa couleur de base est une couleur de la palette des activités.
+      expect(ACTIVITY_PALETTE.map((c) => c.light)).toContain(BASE_COLOR[sport]);
+      // Le module surf lit les vagues dans `surf` : tout calcul de la famille surf en a un, aucun autre.
+      expect(p.surf !== null).toBe(p.family === 'surf');
+      // `sailing/` lit les seuils en nœuds, `stillThreshold` compris.
+      if (p.family === 'voile') expect(p.thresholdUnit).toBe('kn');
+      expect(p.hrEnergy).not.toBeNull();
+    });
+  }
+
+  it('chaque famille a son calcul par défaut, rangé chez elle', () => {
+    for (const family of SPORT_FAMILIES) {
+      expect(familySports(family).length, family).toBeGreaterThan(0);
+      expect(sportFamily(FAMILY_BASE[family]), family).toBe(family);
+    }
+  });
+
+  it('les supports à voile se déduisent de la famille', () => {
+    expect(SAILING_SPORTS).toEqual(familySports('voile'));
+    expect(SAILING_SPORTS).not.toContain('surf');
   });
 });
 

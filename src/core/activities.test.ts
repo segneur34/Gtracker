@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   ACTIVITY_PALETTE, DEFAULT_ACTIVITIES, SURF_ACTIVITY, SURF_FOIL_ACTIVITY, activitiesOfFamily,
-  activityCounts, activityDisplayName, activityFamily, activityTreatment, baseActivity, findActivity, insertActivity, isActivityShown, isFamilyHidden,
+  activityCounts, activityDisplayName, activityFamily, baseActivity, findActivity, insertActivity, isActivityShown, isFamilyHidden,
   logoColor, newActivityId, nextActivityColor, paletteColorText, readActivities, sessionActivity, sportDisplayName,
   visibleActivities, visibleFamilies, withHidden, withPaletteColors, type Activity,
 } from './activities';
@@ -150,15 +150,13 @@ describe('reprise des couleurs de l’ancienne palette', () => {
   });
 });
 
-describe('famille et traitement', () => {
-  it('range le surf dans sa famille, traité à part', () => {
+describe('famille d\'une activité', () => {
+  it('range le surf dans sa famille', () => {
     expect(activityFamily(SURF_FOIL_ACTIVITY)).toBe('surf');
-    expect(activityTreatment(SURF_FOIL_ACTIVITY)).toBe('surf');
   });
 
-  it('confond famille et traitement pour la voile', () => {
+  it('range dans la voile une activité créée sur un calcul de voile, et le bateau', () => {
     expect(activityFamily(moth)).toBe('voile');
-    expect(activityTreatment(moth)).toBe('voile');
     expect(activityFamily(baseActivity('bateau'))).toBe('voile');
   });
 });

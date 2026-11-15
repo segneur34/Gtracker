@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from '
 import { brushColorFor } from '../core/brushColor';
 import { weekdayDayMonthYear } from '../core/calendar';
 import { activityDisplayName, type Activity } from '../core/activities';
-import { sportFamily, sportTreatment, type SportFamily } from '../core/sportProfiles';
+import { sportFamily, type SportFamily } from '../core/sportProfiles';
 import { formatDistanceAuto, formatDuration, formatShortDuration, formatSpeed } from '../core/units';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
 import { useLearnedPlaces } from '../hooks/learnedPlacesFile';
@@ -29,13 +29,13 @@ const ROW_PLACE_MARGIN = '0px';
 const formatTime = (ms: number): string =>
   new Date(ms).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
 
-/** Chiffres d'une ligne, selon le traitement de son calcul. */
+/** Chiffres d'une ligne, selon la famille de son calcul. */
 const rowStats =(session: LibrarySession, activity: Activity | null): string[] => {
   const { summary } = session.record;
   const distanceUnit = activity ? effectiveDistanceUnit(activity) : 'km';
   const stats = [formatDuration(summary.endMs - summary.startMs), formatDistanceAuto(summary.distanceM, distanceUnit)];
   if (activity === null) return stats;
-  if (sportTreatment(activity.base) === 'voile') {
+  if (sportFamily(activity.base) === 'voile') {
     stats.push(t('max {speed}', { speed: formatSpeed(summary.maxSpeedMs, effectiveSpeedUnit(activity)) }));
     if (summary.maneuverCount !== undefined) stats.push(tn(summary.maneuverCount, '{n} manœuvre', '{n} manœuvres'));
   } else {

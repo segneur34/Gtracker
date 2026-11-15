@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { Activity } from '../core/activities';
 import { errorMessage } from '../core/basics';
-import { defaultActiveThresholdOf, getSportProfile, sportTreatment } from '../core/sportProfiles';
+import { defaultActiveThresholdOf, getSportProfile } from '../core/sportProfiles';
 import { METERS_PER_DISTANCE_UNIT, msToKnots } from '../core/units';
 import type { LocationFix } from '../platform/location';
 import { createFollowCursor, type FollowCursor, type FollowProgress, type FollowedTrace } from '../recording/followedTrace';
@@ -122,7 +122,7 @@ const liveActiveThreshold = (activity: Activity, segments: LocationFix[][]): num
   if (!usesActiveAverage(profile)) return undefined;
   const own = effectiveThresholdOverride(activity);
   if (own !== undefined) return own;
-  if (sportTreatment(activity.base) === 'surf') return defaultActiveThresholdOf(profile, effectiveFoil(activity));
+  if (profile.surf !== null) return defaultActiveThresholdOf(profile, effectiveFoil(activity));
   if (reference === null || lastRunMs - reference.atMs >= REFERENCE_REFRESH_MS) {
     reference = { atMs: lastRunMs, ms: liveReferenceSpeedMs(segments, profile.maxGapS) };
   }

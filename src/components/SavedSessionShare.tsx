@@ -3,7 +3,7 @@ import { t } from '../core/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { FAMILY_LABEL, activityDisplayName, type Activity } from '../core/activities';
 import { shareableStats } from '../core/shareImage';
-import { getSportProfile, hasActiveThreshold, sportFamily, sportTreatment } from '../core/sportProfiles';
+import { getSportProfile, hasActiveThreshold, sportFamily } from '../core/sportProfiles';
 import { coloredSegments } from '../core/trackColor';
 import { librarySession, summarizeGpxText } from '../hooks/useSessionLibrary';
 import { activitySpeedRanges, effectiveDistanceUnit, effectiveFoil, effectiveSpeedUnit } from '../hooks/useSportSettings';
@@ -78,7 +78,7 @@ function SavedSessionShare({ gpx, activity, fileName, libraryFile }: SavedSessio
           subtitle: labels.subtitle,
           fileName: safeFileName(labels.baseName),
           // Appréciation et force du vent des notes, vent saisi de la fiche.
-          stats: shareableStats(summaryShareStats(summary, sportTreatment(sport), units, hasActiveThreshold(getSportProfile(sport)), foil, {
+          stats: shareableStats(summaryShareStats(summary, family, units, hasActiveThreshold(getSportProfile(sport)), foil, {
             rating: record?.notes?.rating ?? null, windLevel: record?.notes?.windLevel ?? null, windDeg: record?.analysis?.windDeg ?? null,
           })),
         },

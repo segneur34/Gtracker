@@ -1,7 +1,7 @@
 import { isObject } from './basics';
 import { t } from './i18n';
 import {
-  SPORT_FAMILIES, SPORT_PROFILES, isSportType, sportFamily, sportTreatment, type SportFamily, type Treatment,
+  SPORT_FAMILIES, SPORT_PROFILES, isSportType, sportFamily, type SportFamily,
 } from './sportProfiles';
 import type { SportType } from './types';
 import { activityLogo, storedLogo, type LogoId } from './activityLogos';
@@ -325,8 +325,6 @@ export const activityDisplayName = (a: Pick<Activity, 'id' | 'name'>): string =>
 };
 
 export const activityFamily = (activity: Activity): SportFamily => sportFamily(activity.base);
-
-export const activityTreatment = (activity: Activity): Treatment => sportTreatment(activity.base);
 
 export const activitiesOfFamily = (activities: Activity[], family: SportFamily): Activity[] =>
   activities.filter((a) => activityFamily(a) === family);

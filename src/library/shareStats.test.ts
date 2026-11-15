@@ -94,10 +94,10 @@ describe('lignes ajoutées du partage', () => {
   const tail = (stats: ReturnType<typeof summaryShareStats>, n: number) => stats.slice(-n).map((s) => s.key);
 
   it('mêmes clés, à la fin, dans le résumé et dans l’analyse ouverte (`shareExtraStats`)', () => {
-    for (const treatment of ['surf'] as const) {
-      const keys = SHARE_EXTRA_KEYS[treatment];
-      expect(tail(summaryShareStats(summary(), treatment, km), keys.length)).toEqual([...keys]);
-      expect(shareExtraStats(treatment, {}).map((s) => s.key)).toEqual([...keys]);
+    for (const family of ['surf'] as const) {
+      const keys = SHARE_EXTRA_KEYS[family];
+      expect(tail(summaryShareStats(summary(), family, km), keys.length)).toEqual([...keys]);
+      expect(shareExtraStats(family, {}).map((s) => s.key)).toEqual([...keys]);
     }
     expect(tail(summaryShareStats(summary(), 'voile', kn, true, true), 4)).toEqual([...SHARE_EXTRA_KEYS.voile]);
     // Hors foil, pas de pumping.

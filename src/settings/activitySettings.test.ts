@@ -4,7 +4,7 @@ import { analysisTabs, isTabShown, toggleTabChoice } from '../core/analysisTabs'
 import { getSportProfile, hasActiveThreshold } from '../core/sportProfiles';
 import { knotsToMs } from '../core/units';
 import {
-  PER_ACTIVITY_KEYS, TREATMENT_UNITS, defaultAutoPauseOf, defaultHeartRateOf,
+  PER_ACTIVITY_KEYS, FAMILY_UNITS, defaultAutoPauseOf, defaultHeartRateOf,
   defaultHrOffsetOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultSpeedRangeOf, defaultSpeedUnitOf,
   defaultThresholdOf, hiddenFamiliesOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, rangeFollowsPace, resetOverrides,
   resolveFoil, resolveJumps, resolvePumping, resolveRecordingProfile, resolveThresholdOverride, resolveTurns, defaultTurnsOf, withVisibility,
@@ -205,10 +205,10 @@ describe('décalage des seuils cardio', () => {
   });
 });
 
-describe('unités proposées par traitement', () => {
+describe('unités proposées par famille', () => {
   it('le surf propose les nœuds, le km/h restant en tête et par défaut', () => {
-    expect(TREATMENT_UNITS.surf).toContain('kn');
-    expect(TREATMENT_UNITS.surf[0]).toBe('kmh');
+    expect(FAMILY_UNITS.surf).toContain('kn');
+    expect(FAMILY_UNITS.surf[0]).toBe('kmh');
     expect(getSportProfile('surf').speedUnit).toBe('kmh');
   });
 });
@@ -220,7 +220,7 @@ describe('isActivityOverridden', () => {
   /** Une valeur réglée, autre que le défaut, pour chaque table rangée par activité. */
   const SAMPLES: Record<string, { activity: Activity; value: unknown }> = {
     thresholds: { activity: wing, value: 12 },
-    speedUnits: { activity: wing, value: TREATMENT_UNITS.voile.find((u) => u !== defaultSpeedUnitOf(wing)) },
+    speedUnits: { activity: wing, value: FAMILY_UNITS.voile.find((u) => u !== defaultSpeedUnitOf(wing)) },
     distanceUnits: { activity: wing, value: 'nm' },
     speedRanges: { activity: surf, value: { minMs: 1, maxMs: 5 } },
     autoPause: { activity: surf, value: { speedMs: 0.5, delayS: 10 } },
@@ -277,13 +277,13 @@ describe('isActivityOverridden', () => {
 describe('bornes de couleur par défaut, tenues par le profil du calcul', () => {
   const kmh = (v: number) => v / 3.6;
   const custom = (base: keyof typeof expected) => ({ id: `a-${base}`, name: base, base, color: '#000000' });
-  /** Valeurs d'avant leur déplacement dans le profil, gelées : les constantes de sport et la table du traitement qu'elles remplacent. */
+  /** Valeurs d'avant leur déplacement dans le profil, gelées : les constantes de sport et la table par famille qu'elles remplacent. */
   const expected = {
     wingfoil: [knotsToMs(8), knotsToMs(28)], windsurf: [knotsToMs(8), knotsToMs(28)], kite: [knotsToMs(8), knotsToMs(28)],
     bateau: [knotsToMs(1), knotsToMs(15)], surf: [kmh(5), kmh(30)],
   } as const;
 
-  it('chaque calcul a les siennes, celles du traitement de jadis', () => {
+  it('chaque calcul a les siennes, celles de la table par famille de jadis', () => {
     for (const [base, [minMs, maxMs]] of Object.entries(expected)) {
       const range = getSportProfile(base as keyof typeof expected).speedRange;
       expect(range.minMs, base).toBeCloseTo(minMs, 9);

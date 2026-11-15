@@ -6,8 +6,8 @@ import {
 } from '../core/activities';
 import {
   REFERENCE_HEART_RATE, SPORT_FAMILIES, SPORT_PROFILES, familySports, hasActiveThreshold,
-  sportFamily, sportTreatment,
-  type SportFamily, type SportProfile, type Treatment,
+  sportFamily,
+  type SportFamily, type SportProfile,
 } from '../core/sportProfiles';
 import { activityTabs, isTabShown, toggleTabChoice, type TabChoices } from '../core/analysisTabs';
 import type { SportType } from '../core/types';
@@ -37,14 +37,14 @@ import { playPattern, setBeepPitch, type PatternTone } from '../platform/beeper'
 import { BEEP_SOUNDS, beepSoundHz } from '../recording/beepSound';
 import { DEFAULT_GEAR_LABELS, MAX_GEAR_LABEL_LENGTH, sanitizeGearLabels } from '../settings/gear';
 import {
-  HR_OFFSET_RANGE, TREATMENT_UNITS, defaultAutoPauseOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultTabsOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, defaultSpeedRangeOf, defaultFoil, defaultHrOffsetOf, rangeFollowsPace, tabsAfterJumpsChange, thresholdFollowsPace, type SportSettingsView,
+  FAMILY_UNITS, HR_OFFSET_RANGE, defaultAutoPauseOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultTabsOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, defaultSpeedRangeOf, defaultFoil, defaultHrOffsetOf, rangeFollowsPace, tabsAfterJumpsChange, thresholdFollowsPace, type SportSettingsView,
 } from '../settings/activitySettings';
 import { useAllSportSettings } from '../hooks/useSportSettings';
 import { sameJson } from '../hooks/createStore';
 import type { GearGroup } from '../library/notes';
 import GearGroupsEditor from '../components/GearGroupsEditor';
 import {
-  MAX_LIVE_FIELDS, MAX_NOTIFICATION_FIELDS, liveFieldLabel, liveFieldsOfTreatment,
+  MAX_LIVE_FIELDS, MAX_NOTIFICATION_FIELDS, liveFieldLabel, liveFieldsOfFamily,
   type LiveFieldKey, type LiveFieldTarget, type LiveFieldUnits,
 } from '../recording/liveFields';
 import { LIVE_STATS_DEFAULTS, usesActiveAverage } from '../recording/liveStats';
@@ -283,14 +283,13 @@ const ActivityCard = memo(function ActivityCard({
   const id = activity.id;
   const p = SPORT_PROFILES[activity.base];
   const family = sportFamily(activity.base);
-  const treatment = sportTreatment(activity.base);
-  const sailing = treatment === 'voile';
+  const sailing = family === 'voile';
   /** Seuil d'activité réglable : pas en bateau, où toute la session compte en navigation. */
   const withThreshold = hasActiveThreshold(p);
   /** Nom du seuil, sous son titre : de vague ou de vol en surf. */
-  const thresholdLabel = treatment === 'surf' ? (s.foil ? t('Seuil de vol') : t('Seuil de vague')) : t("Seuil d'activité");
-  /** Unités de vitesse et de distance proposées à son traitement. */
-  const units = TREATMENT_UNITS[treatment];
+  const thresholdLabel = family === 'surf' ? (s.foil ? t('Seuil de vol') : t('Seuil de vague')) : t("Seuil d'activité");
+  /** Unités de vitesse et de distance proposées à sa famille. */
+  const units = FAMILY_UNITS[family];
   const renamingThis = renaming;
   /** Grisée : cachée elle-même, ou par sa famille. */
   const shownHidden = activity.hidden === true || familyHidden;
@@ -416,7 +415,7 @@ const ActivityCard = memo(function ActivityCard({
           </SettingsPart>
           <SettingsPart label={t('Onglet analyse')} open={openPart.analyse} onToggle={() => togglePart('analyse')}>
             {withThreshold && (
-            <SettingRow label={thresholdLabel} helpKey={`${id}:seuil`} help={thresholdHelp(treatment, s.foil === true)}>
+            <SettingRow label={thresholdLabel} helpKey={`${id}:seuil`} help={thresholdHelp(family, s.foil === true)}>
               <span className="ui-inline-row-6 ui-center">
                 <NumberField unit={SPEED_UNIT_LABEL[thresholdUnit]} step={thresholdUnit === 'ms' ? 0.1 : 0.5} min={0}
                   value={thresholdEmpty ? null : thresholdShown}
@@ -429,7 +428,7 @@ const ActivityCard = memo(function ActivityCard({
               </span>
             </SettingRow>
             )}
-            <SettingRow label={t('Foil')} helpKey={`${id}:foil`} help={treatment === 'surf'
+            <SettingRow label={t('Foil')} helpKey={`${id}:foil`} help={family === 'surf'
               ? t('Vols entre les vagues, ratio et seuil de vol. Chaque session peut avoir le sien.')
               : t('Ratio de vol, sauts, champs « Foil » et « Mât » du matériel. Chaque session peut avoir le sien.')}>
               <label className="settings-sports__pair">
@@ -439,7 +438,7 @@ const ActivityCard = memo(function ActivityCard({
               </label>
             </SettingRow>
             {s.foil && s.pumping !== null && (
-              <SettingRow label={t('Pumping')} helpKey={`${id}:pumping`} help={treatment === 'voile'
+              <SettingRow label={t('Pumping')} helpKey={`${id}:pumping`} help={family === 'voile'
                 ? t("Coups, fréquence et décollage de chaque vol, dans l'onglet « pumping » de l'analyse, téléphone fixé sur la poitrine : « Mesurer le pumping » est alors proposé dans Enregistrer, et la capture des capteurs est gardée entière (quelques Mo par heure). Chaque session peut avoir le sien.")
                 : t('Fréquence de pumping et décollage de chaque vol, téléphone fixé sur la poitrine : « Mesurer le pumping » est alors proposé dans Enregistrer.')}>
                 <label className="settings-sports__pair">
@@ -512,7 +511,7 @@ const ActivityCard = memo(function ActivityCard({
             </SettingRow>
             <FieldsSetting label={t("Carte réduite à l'enregistrement")} helpKey={`${id}:carte-reduite`}
               help={t('Les chiffres en grand quand la carte est réduite, de haut en bas.')}
-              treatment={treatment} units={fieldUnits} fields={s.liveFields} overridden={s.isLiveFieldsOverridden}
+              family={family} units={fieldUnits} fields={s.liveFields} overridden={s.isLiveFieldsOverridden}
               defaults={defaultLiveFieldsFor(activity)} max={MAX_LIVE_FIELDS}
               onChange={(fields) => setFor(id, 'liveFields', fields)} />
             {s.jumps !== null && (
@@ -533,7 +532,7 @@ const ActivityCard = memo(function ActivityCard({
               <h4 className="settings-part__subtitle">{t('Notification')}</h4>
               <FieldsSetting label={t('Chiffres de la notification')} helpKey={`${id}:notification`}
                 help={t("Deux chiffres au plus, lisibles écran verrouillé avec le nom de l'activité et la durée. Le téléphone doit montrer le contenu des notifications sur l'écran verrouillé.")}
-                target="notification" treatment={treatment} units={fieldUnits} fields={s.notificationFields} overridden={s.isNotificationFieldsOverridden}
+                target="notification" family={family} units={fieldUnits} fields={s.notificationFields} overridden={s.isNotificationFieldsOverridden}
                 defaults={defaultNotificationFieldsFor(activity)} max={MAX_NOTIFICATION_FIELDS}
                 onChange={(fields) => setFor(id, 'notificationFields', fields)} />
             </div>
@@ -861,8 +860,8 @@ function BlockTitle({ label, open, onToggle, helpKey, help }: {
 const UNIT_HELP = t('Utilisée partout pour cette activité : analyses, enregistrement, page Sessions.');
 
 /** Aide du seuil d'une activité, selon son calcul : en voile, en surf (vague ou vol). */
-const thresholdHelp = (treatment: Treatment, foil: boolean): string => {
-  if (treatment === 'surf') {
+const thresholdHelp = (family: SportFamily, foil: boolean): string => {
+  if (family === 'surf') {
     return foil
       ? t("Vitesse à laquelle votre aile décolle, de 10 à 15 km/h selon l'aile. Chaque session peut avoir le sien, dans son analyse.")
       : t('Vitesse au-dessus de laquelle la planche est sur la vague. Chaque session peut avoir le sien, dans son analyse.');
@@ -876,13 +875,13 @@ const thresholdHelp = (treatment: Treatment, foil: boolean): string => {
  * premier toujours rempli ; un chiffre déjà placé n'est pas proposé ailleurs.
  * La liste est rangée sans trou ; revenue au défaut, elle est effacée.
  */
-function FieldsSetting({ label, help, helpKey, target = 'live', treatment, units, fields, overridden, defaults, max, onChange }: {
+function FieldsSetting({ label, help, helpKey, target = 'live', family, units, fields, overridden, defaults, max, onChange }: {
   label: string;
   help: string;
   helpKey: string;
   /** Carte réduite (par défaut) ou notification, qui a ses chiffres à elle. */
   target?: LiveFieldTarget;
-  treatment: Treatment;
+  family: SportFamily;
   units: LiveFieldUnits;
   fields: LiveFieldKey[];
   overridden: boolean;
@@ -890,7 +889,7 @@ function FieldsSetting({ label, help, helpKey, target = 'live', treatment, units
   max: number;
   onChange: (fields: LiveFieldKey[] | null) => void;
 }) {
-  const options = liveFieldsOfTreatment(treatment, target);
+  const options = liveFieldsOfFamily(family, target);
   const slots = Array.from({ length: max }, (_, i) => fields[i] ?? null);
   const pick = (slot: number, key: LiveFieldKey | null) => {
     const next = slots.map((k, i) => (i === slot ? key : k)).filter((k): k is LiveFieldKey => k !== null);

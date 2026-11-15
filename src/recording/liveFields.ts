@@ -1,7 +1,7 @@
 import { roundBearingDeg } from '../core/angles';
 import { t } from '../core/i18n';
 import { bandIndex } from '../core/basics';
-import { sportTreatment, type Treatment } from '../core/sportProfiles';
+import { sportFamily, type SportFamily } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import {
   formatClock, formatDistance, formatShortDistance, formatSpeed, formatTimeOfDay, type DistanceUnit, type SpeedUnit,
@@ -11,7 +11,7 @@ import { LIVE_STATS_DEFAULTS, type LiveStats, type LiveStatsOptions } from './li
 /**
  * Chiffres en grand de l'enregistrement quand la carte est réduite, choisis
  * par activité dans Réglages : jusqu'à `MAX_LIVE_FIELDS`, parmi ceux qui ont
- * un sens pour son traitement. Un chiffre inconnu de ce catalogue est écarté
+ * un sens pour sa famille. Un chiffre inconnu de ce catalogue est écarté
  * à la lecture.
  * Ceux de la notification de l'enregistrement viennent du même catalogue,
  * choisis à part, `MAX_NOTIFICATION_FIELDS` au plus, avec en plus ceux qui
@@ -25,10 +25,10 @@ export type LiveFieldKey =
   | 'recentTopShort' | 'recentTopLong' | 'heading' | 'legAverage' | 'markDistance' | 'markBearing'
   | 'heartRate' | 'averageHeartRate' | 'heartRateZone';
 
-const ALL: Treatment[] = ['voile', 'surf'];
+const ALL: SportFamily[] = ['voile', 'surf'];
 
-/** Traitements où chaque chiffre a un sens ; l'ordre est celui des menus de Réglages. */
-const LIVE_FIELD_TREATMENTS: Record<LiveFieldKey, readonly Treatment[]> = {
+/** Familles où chaque chiffre a un sens ; l'ordre est celui des menus de Réglages. */
+const LIVE_FIELD_FAMILIES: Record<LiveFieldKey, readonly SportFamily[]> = {
   speed: ALL,
   average: ALL,
   max: ALL,
@@ -59,65 +59,65 @@ const NOTIFICATION_ONLY_FIELDS: readonly LiveFieldKey[] = [];
 /** Où un chiffre se lit : la carte réduite de l'enregistrement, ou la notification. */
 export type LiveFieldTarget = 'live' | 'notification';
 
-const allowedFor = (key: LiveFieldKey, treatment: Treatment, target: LiveFieldTarget): boolean =>
-  LIVE_FIELD_TREATMENTS[key].includes(treatment) && (target === 'notification' || !NOTIFICATION_ONLY_FIELDS.includes(key));
+const allowedFor = (key: LiveFieldKey, family: SportFamily, target: LiveFieldTarget): boolean =>
+  LIVE_FIELD_FAMILIES[key].includes(family) && (target === 'notification' || !NOTIFICATION_ONLY_FIELDS.includes(key));
 
-const LIVE_FIELD_KEYS = Object.keys(LIVE_FIELD_TREATMENTS) as LiveFieldKey[];
+const LIVE_FIELD_KEYS = Object.keys(LIVE_FIELD_FAMILIES) as LiveFieldKey[];
 
-/** Chiffres proposés pour un traitement, dans l'ordre des menus. */
-export const liveFieldsOfTreatment = (treatment: Treatment, target: LiveFieldTarget = 'live'): LiveFieldKey[] =>
-  LIVE_FIELD_KEYS.filter((key) => allowedFor(key, treatment, target));
+/** Chiffres proposés pour une famille, dans l'ordre des menus. */
+export const liveFieldsOfFamily = (family: SportFamily, target: LiveFieldTarget = 'live'): LiveFieldKey[] =>
+  LIVE_FIELD_KEYS.filter((key) => allowedFor(key, family, target));
 
 /** Nombre de lignes au plus. */
 export const MAX_LIVE_FIELDS = 4;
 
 /** Lignes à défaut de choix. */
-export const DEFAULT_LIVE_FIELDS: Record<Treatment, LiveFieldKey[]> = {
+export const DEFAULT_LIVE_FIELDS: Record<SportFamily, LiveFieldKey[]> = {
   voile: ['speed', 'average', 'max'],
   surf: ['speed', 'max', 'duration'],
 };
 
 /**
- * Lignes propres à un calcul, avant celles de son traitement : en bateau :
+ * Lignes propres à un calcul, avant celles de sa famille : en bateau :
  * vitesse, moyenne, distance et cap.
  */
 const SPORT_LIVE_FIELDS: Partial<Record<SportType, LiveFieldKey[]>> = {
   bateau: ['speed', 'average', 'distance', 'heading'],
 };
 
-/** Lignes d'un calcul à défaut de choix : les siennes, sinon celles de son traitement. */
+/** Lignes d'un calcul à défaut de choix : les siennes, sinon celles de sa famille. */
 export const defaultLiveFieldsOf = (sport: SportType): LiveFieldKey[] =>
-  SPORT_LIVE_FIELDS[sport] ?? DEFAULT_LIVE_FIELDS[sportTreatment(sport)];
+  SPORT_LIVE_FIELDS[sport] ?? DEFAULT_LIVE_FIELDS[sportFamily(sport)];
 
 /** Chiffres de la notification de l'enregistrement au plus : écran verrouillé, Android coupe la ligne au-delà de deux. */
 export const MAX_NOTIFICATION_FIELDS = 2;
 
-/** Chiffres de la notification à défaut de choix, les mêmes pour tous les traitements. */
+/** Chiffres de la notification à défaut de choix, les mêmes pour toutes les familles. */
 export const DEFAULT_NOTIFICATION_FIELDS: LiveFieldKey[] = ['speed', 'distance'];
 
-/** Chiffres de la notification propres à un calcul, avant ceux de son traitement ; aucun pour l'instant. */
+/** Chiffres de la notification propres à un calcul, avant ceux de sa famille ; aucun pour l'instant. */
 const SPORT_NOTIFICATION_FIELDS: Partial<Record<SportType, LiveFieldKey[]>> = {};
 
-/** Chiffres de la notification d'un calcul à défaut de choix : les siens, sinon ceux de son traitement. */
+/** Chiffres de la notification d'un calcul à défaut de choix : les siens, sinon ceux de sa famille. */
 export const defaultNotificationFieldsOf = (sport: SportType): LiveFieldKey[] =>
   SPORT_NOTIFICATION_FIELDS[sport] ?? DEFAULT_NOTIFICATION_FIELDS;
 
 const isLiveFieldKey = (value: unknown): value is LiveFieldKey =>
-  typeof value === 'string' && Object.prototype.hasOwnProperty.call(LIVE_FIELD_TREATMENTS, value);
+  typeof value === 'string' && Object.prototype.hasOwnProperty.call(LIVE_FIELD_FAMILIES, value);
 
 /**
- * Choix rangé, nettoyé : clés connues et permises pour le traitement et la
+ * Choix rangé, nettoyé : clés connues et permises pour la famille et la
  * cible, sans doublon, `max` au plus ; `null` s'il n'en reste aucune (le
  * défaut s'applique).
  */
 export const sanitizeLiveFields = (
-  value: unknown, treatment: Treatment, max = MAX_LIVE_FIELDS, target: LiveFieldTarget = 'live',
+  value: unknown, family: SportFamily, max = MAX_LIVE_FIELDS, target: LiveFieldTarget = 'live',
 ): LiveFieldKey[] | null => {
   if (!Array.isArray(value)) return null;
   const kept: LiveFieldKey[] = [];
   for (const key of value) {
     if (kept.length === max) break;
-    if (isLiveFieldKey(key) && allowedFor(key, treatment, target) && !kept.includes(key)) kept.push(key);
+    if (isLiveFieldKey(key) && allowedFor(key, family, target) && !kept.includes(key)) kept.push(key);
   }
   return kept.length > 0 ? kept : null;
 };

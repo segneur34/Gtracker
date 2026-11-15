@@ -218,7 +218,7 @@ const scanXml = (text: string, visitor: XmlVisitor): void => {
         malformed();
       }
     } else if (c === QUESTION) {
-      // Instruction de traitement ; `<?xml …?>`, la déclaration, en tête seulement.
+      // Instruction `<?cible …?>` ; `<?xml …?>`, la déclaration, en tête seulement.
       const end = text.indexOf('?>', lt + 2);
       if (end === -1) malformed();
       const targetEnd = nameEnd(text, lt + 2);

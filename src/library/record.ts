@@ -5,7 +5,7 @@ import { isMapBase, type MapBase } from '../core/mapBase';
 import { JUMP_DOUBTS, type JumpDoubt, type SessionJump } from '../core/jumps';
 import { readSessionMarks, type SessionMark } from '../core/sessionMarks';
 import { isValidSpeedRange, type SpeedRangeMs } from '../core/speedGradient';
-import { getSportProfile, sportTreatment } from '../core/sportProfiles';
+import { getSportProfile, sportFamily } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import { isSportType } from '../core/sportProfiles';
 
@@ -958,7 +958,7 @@ export interface RecordPatch {
  * Un changement d'activité ou de support efface le foil et le pumping de la
  * session (elle prend ceux de sa nouvelle activité). Un changement de support
  * efface le seuil propre à la session, exprimé dans
- * l'unité de l'ancien support ; un changement de traitement (voile ↔ surf)
+ * l'unité de l'ancien support ; un changement de famille (voile ↔ surf)
  * efface aussi ses bornes de couleur, pensées pour les vitesses de l'autre
  * sport. Le vent saisi, l'allure imposée (elle décrit la trace) et les notes
  * restent : sans effet en surf, ils reviennent si la session repasse en
@@ -1016,14 +1016,14 @@ export const applyRecordPatch = (record: SessionRecord, patch: RecordPatch): { r
   if (sportChanged) {
     const before = next.sport;
     const after = patch.sport ?? null;
-    const treatmentChanged = before !== null && after !== null && sportTreatment(before) !== sportTreatment(after);
+    const familyChanged = before !== null && after !== null && sportFamily(before) !== sportFamily(after);
     next = { ...next, sport: after };
     if (next.analysis) {
       const cleared = {
         ...next.analysis,
         activeThreshold: null,
         waveThreshold: null,
-        ...(treatmentChanged ? { speedRange: null } : {}),
+        ...(familyChanged ? { speedRange: null } : {}),
       };
       if (
         cleared.activeThreshold !== next.analysis.activeThreshold || cleared.speedRange !== next.analysis.speedRange
