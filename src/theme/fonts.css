@@ -2,9 +2,42 @@
  * Polices de l'application, chargées ici seulement : en changer, c'est ce
  * fichier et les variables --font et --font-title de `tokens.css`.
  * Inter pour les textes ; le logo est un SVG de GONG, sans police.
+ *
+ * Les quatre graisses latines de `@fontsource/inter`, recopiées de ses
+ * fichiers `latin-400.css` à `latin-700.css` (mêmes graisses, même
+ * `font-display`, aucune plage de caractères comme eux), en woff2 seul : le
+ * WebView d'Android et les navigateurs visés le lisent tous, et le repli
+ * en woff, jamais chargé, alourdissait le paquet.
  */
 
-@import '@fontsource/inter/latin-400.css';
-@import '@fontsource/inter/latin-500.css';
-@import '@fontsource/inter/latin-600.css';
-@import '@fontsource/inter/latin-700.css';
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/inter/files/inter-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('@fontsource/inter/files/inter-latin-500-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/inter/files/inter-latin-600-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fontsource/inter/files/inter-latin-700-normal.woff2') format('woff2');
+}

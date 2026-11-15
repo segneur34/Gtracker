@@ -3,7 +3,8 @@
  * vitesse haute, réglables et propres à chaque support. En dessous de la
  * borne basse, gris (déplacement lent ou non-vol en voile).
  * Au-dessus de la borne haute, rouge franc. Entre les deux, du bleu au rouge
- * en passant par le cyan, le vert, le jaune et l'orange.
+ * en passant par le cyan, le vert, le jaune et l'orange, en un nombre fixe de
+ * nuances sur la trace (`TRACK_COLOR_LEVELS`).
  *
  * Tout est en m/s, comme le reste du noyau ; la conversion vers l'unité
  * d'affichage n'intervient que dans la légende.
@@ -49,11 +50,31 @@ export const gradientColor = (t: number): string => {
   return `rgb(${last[0]}, ${last[1]}, ${last[2]})`;
 };
 
-/** Couleur d'une vitesse en m/s pour des bornes données. */
+/**
+ * Nombre de nuances de la trace entre les deux bornes, extrémités comprises :
+ * l'œil n'en distingue pas davantage sur un trait, et la carte dessine un
+ * tracé par couleur et par tranche (`pathsByColor`), si bien qu'une couleur
+ * par vitesse en multipliait les tracés. La légende reste un dégradé continu.
+ */
+export const TRACK_COLOR_LEVELS = 64;
+
+/** Les nuances de la trace, de la borne basse (rang 0) à la borne haute. */
+const TRACK_COLORS: readonly string[] = Array.from(
+  { length: TRACK_COLOR_LEVELS },
+  (_, level) => gradientColor(level / (TRACK_COLOR_LEVELS - 1))
+);
+
+/**
+ * Couleur d'une vitesse en m/s pour des bornes données : la nuance la plus
+ * proche parmi `TRACK_COLOR_LEVELS`, la borne basse et la borne haute gardant
+ * exactement leur couleur ; gris dessous, rouge au-dessus.
+ */
 export const speedGradientColor = (speedMs: number, minMs: number, maxMs: number): string => {
   if (!isFinite(speedMs) || speedMs < minMs) return SLOW_COLOR;
   if (maxMs <= minMs) return gradientColor(1);
-  return gradientColor((speedMs - minMs) / (maxMs - minMs));
+  const t = Math.min(1, (speedMs - minMs) / (maxMs - minMs));
+  // Bornes non finies (NaN) : le rouge, comme le dégradé continu le donnait.
+  return TRACK_COLORS[Math.round(t * (TRACK_COLOR_LEVELS - 1))] ?? TRACK_COLORS[TRACK_COLOR_LEVELS - 1];
 };
 
 /** Dégradé CSS de la légende, du bleu au rouge. */

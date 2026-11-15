@@ -5,7 +5,8 @@ import { PAINT_ORDER_TRANCHES, pathsByColor } from '../core/trackColor';
  * Trace colorée d'une carte en une seule couche Leaflet, dessinée sur un
  * canevas (`L.canvas`) : tous ses traits en une passe, un tracé par couleur
  * dans chacune des tranches de la trace prises dans l'ordre (`pathsByColor`,
- * couleur exacte de chaque trait, passage récent par-dessus), sous un liseré
+ * couleur de chaque trait parmi les nuances de `TRACK_COLOR_LEVELS`, passage
+ * récent par-dessus), sous un liseré
  * facultatif d'un seul tracé. Une couche par trait en faisait 54 000 pour 3 h
  * à 5 Hz, que le moteur canevas reparcourait à chaque déplacement et zoom.
  *

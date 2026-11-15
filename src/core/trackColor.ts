@@ -79,8 +79,10 @@ export interface ColorPaths {
 
 /**
  * Traits de la trace regroupés par couleur, pour les dessiner d'un seul tracé
- * par couleur (carte, image de partage) : la couleur exacte de chaque trait,
- * aucune teinte arrondie ; un trait de moins de deux points ne dessine rien et
+ * par couleur (carte, image de partage) : la couleur de chaque trait telle
+ * quelle, déjà prise parmi les `TRACK_COLOR_LEVELS` nuances du dégradé
+ * (`speedGradientColor`), ce qui borne le nombre de tracés par tranche ; un
+ * trait de moins de deux points ne dessine rien et
  * n'est pas repris. Chaque groupe donne le rang de ses traits dans `segments`.
  *
  * Le regroupement se fait dans chacune des `tranches` parts égales de la

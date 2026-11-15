@@ -12,9 +12,11 @@ import { isFiniteNumber } from '../core/basics';
 /**
  * Version du dessin des vignettes : à augmenter dès que l'image change
  * (`TRACK_PREVIEW`, fond de Leaflet, dégradé, ordre de peinture, réduction des
- * points) ; toutes les images gardées sont alors oubliées.
+ * points) ; aucune image gardée n'est alors plus montrée : chacune est
+ * redessinée à sa prochaine vue et remplace l'ancienne, dont le fichier est
+ * effacé, et celles qu'on ne revoit pas partent par la borne du magasin.
  */
-const PREVIEW_IMAGE_VERSION = 1;
+const PREVIEW_IMAGE_VERSION = 2;
 
 /** Version de l'index rangé : l'augmenter oublie toutes les images gardées. */
 export const PREVIEW_IMAGE_INDEX_VERSION = 1;
