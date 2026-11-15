@@ -62,8 +62,17 @@ describe('version', () => {
   it('augmente le troisième nombre, sur deux chiffres', () => {
     expect(versionSuivante('0.00.66')).toBe('0.00.67')
     expect(versionSuivante('0.00.09')).toBe('0.00.10')
-    expect(versionSuivante('0.00.99')).toBe('0.00.100')
+    expect(versionSuivante('0.01.09')).toBe('0.01.10')
+    expect(versionSuivante('0.01.98')).toBe('0.01.99')
     expect(() => versionSuivante('1.2')).toThrow(ErreurFinDeLot)
+  })
+
+  it('après .99, le nombre du milieu augmente et le dernier revient à 00 ; après 0.99.99, une erreur claire', () => {
+    expect(versionSuivante('0.00.99')).toBe('0.01.00')
+    expect(versionSuivante('0.01.99')).toBe('0.02.00')
+    expect(versionSuivante('0.09.99')).toBe('0.10.00')
+    expect(versionSuivante('0.98.99')).toBe('0.99.00')
+    expect(() => versionSuivante('0.99.99')).toThrow(/dernière de la série/)
   })
 
   it('ne bouge que pour un changement sous src/ ou android/', () => {
@@ -158,6 +167,41 @@ describe('appliquerFinDeLot', () => {
     expect(lignes[i + 1]).toBe('  - essai 19 : déjà là → oui')
     expect(lignes[i + 2]).toBe('  - essai 20 : ouvrir Réglages → le cadre est replié')
     expect(lireBacklog(res.texte, AUJOURDHUI).erreurs).toEqual([])
+  })
+
+  describe('lot qui porte déjà ses essais', () => {
+    const porteur = () => fichier({ lot: '- 12 · [outil] Ce lot · noté 13/11 · en cours (partie A)\n  - essai 18 : déjà là → oui\n  - essai 17 : aussi → oui' })
+      .replace('  - essai 19 : bouton rond → disque blanc.', '  - essai 16 : bouton rond → disque blanc.')
+
+    it('passe « à valider » sans --essais ni --lecture, ses essais restent tels quels', () => {
+      const res = appliquerFinDeLot(porteur(), { numero: 12, version: '0.00.67', aujourdhui: AUJOURDHUI })
+      expect(res.ligne).toBe('- 12 · [outil] Ce lot · noté 13/11 · à valider (commit en cours, version 0.00.67)')
+      expect(res.essais).toEqual([])
+      const lignes = res.texte.split('\n')
+      const i = lignes.findIndex((l) => l.startsWith('- 12 · '))
+      expect(lignes.slice(i + 1, i + 3)).toEqual(['  - essai 18 : déjà là → oui', '  - essai 17 : aussi → oui'])
+      expect(res.texte).toContain('Prochains numéros : élément 30, essai 20, question Q5.')
+      const r = lireBacklog(res.texte, AUJOURDHUI)
+      expect(r.erreurs).toEqual([])
+      expect(r.maintenant.find((e) => e.numero === 12).essais.map((e) => e.numero)).toEqual([18, 17])
+    })
+
+    it('avec --essais, les nouveaux s\'ajoutent après les existants', () => {
+      const res = appliquerFinDeLot(porteur(), { numero: 12, version: null, aujourdhui: AUJOURDHUI, essais: [essais[0]] })
+      const lignes = res.texte.split('\n')
+      const i = lignes.findIndex((l) => l.startsWith('- 12 · '))
+      expect(lignes.slice(i + 1, i + 4)).toEqual(['  - essai 18 : déjà là → oui', '  - essai 17 : aussi → oui', '  - essai 20 : ouvrir Réglages → le cadre est replié'])
+      expect(res.texte).toContain('essai 21, question Q5')
+    })
+
+    it('--lecture reste une erreur, et --en-cours laisse la ligne telle quelle', () => {
+      expect(() => appliquerFinDeLot(porteur(), { numero: 12, version: null, aujourdhui: AUJOURDHUI, lecture: true })).toThrow(/--lecture refusé : le lot 12 porte déjà 2 essais/)
+      expect(appliquerFinDeLot(porteur(), { numero: 12, version: null, aujourdhui: AUJOURDHUI, enCours: true }).texte).toBe(porteur())
+    })
+
+    it('sans essais posés, --lecture ou --en-cours restent exigés', () => {
+      expect(() => appliquerFinDeLot(fichier(), { numero: 12, version: null, aujourdhui: AUJOURDHUI })).toThrow(/sans --essais/)
+    })
   })
 
   it('sur lecture : état « à valider sur lecture », aucun essai, en-tête inchangé', () => {
@@ -311,6 +355,25 @@ describe('de bout en bout, dans un dépôt jetable', () => {
     expect(second.sortie[0]).toMatch(/pas « en cours »/)
     expect(git(racine, 'rev-parse', 'HEAD')).toBe(avant)
     expect(existsSync(join(racine, 'message.txt'))).toBe(true)
+  })
+
+  it('de bout en bout : un lot qui porte ses essais se commite sans --essais, et passe 0.01.99 à 0.02.00', () => {
+    const racine = depot()
+    writeFileSync(join(racine, 'docs', 'BACKLOG.md'), fichier({ lot: '- 12 · [outil] Ce lot · noté 13/11 · en cours\n  - essai 18 : déjà là → oui' }))
+    writeFileSync(join(racine, 'package.json'), '{\n  "name": "gtracker",\n  "version": "0.01.99"\n}\n')
+    writeFileSync(join(racine, 'package-lock.json'), '{\n  "name": "gtracker",\n  "version": "0.01.99",\n  "packages": {\n    "": {\n      "name": "gtracker",\n      "version": "0.01.99"\n    }\n  }\n}\n')
+    git(racine, 'add', '-A')
+    git(racine, 'commit', '-q', '-m', 'reprise')
+    writeFileSync(join(racine, 'src', 'a.ts'), 'export const a = 2\n')
+    const vrai = lancer(racine, ['12', '--message', join(racine, 'message.txt')])
+    expect(vrai.code).toBe(0)
+    expect(vrai.sortie[0]).toBe('Version : 0.01.99 → 0.02.00')
+    expect(vrai.sortie).toContain('Essais : aucun')
+    expect(readFileSync(join(racine, 'package.json'), 'utf8')).toContain('"version": "0.02.00"')
+    const texte = readFileSync(join(racine, 'docs', 'BACKLOG.md'), 'utf8')
+    expect(texte).toContain('à valider (commit en cours, version 0.02.00)')
+    expect(texte).toContain('  - essai 18 : déjà là → oui')
+    expect(lireBacklog(texte, AUJOURDHUI).erreurs).toEqual([])
   })
 
   it('un reste à faire qui sortirait mal formé arrête tout : fichiers intacts, pas de commit', () => {

@@ -12,12 +12,15 @@
 //   --essais <fichier>  un essai par ligne, « quoi → attendu » : numérotés à partir de « Prochains numéros »,
 //                       posés en sous-lignes de la ligne du lot ; l'en-tête est mis à jour
 //   --lecture           rien à essayer au téléphone : état « à valider sur lecture » (obligatoire sans --essais,
-//                       interdit avec)
+//                       interdit avec, et interdit si la ligne du lot porte déjà des sous-lignes d'essais)
+//                       Un lot qui porte déjà ses essais passe « à valider » sans --essais ni --lecture, ses essais
+//                       restant tels quels ; avec --essais, les nouveaux s'ajoutent après eux
 //   --en-cours          lot coupé en parties : l'état reste « en cours »
 //   --a-blanc           dit ce qui serait fait, n'écrit rien
 //
 // Version : si `git status` montre un changement sous `src/` ou `android/`, le troisième nombre de la version de
-// `package.json` (et de `package-lock.json`, s'il la porte) augmente de un, sur deux chiffres. Puis `git add -A` et
+// `package.json` (et de `package-lock.json`, s'il la porte) augmente de un, sur deux chiffres ; après `.99`, le nombre
+// du milieu augmente et le dernier revient à `00` (`0.01.99` → `0.02.00`), et `0.99.99` est refusée. Puis `git add -A` et
 // `git commit -F` sur tout l'arbre (ou sur la liste de `--fichiers`). La forme du reste à faire est contrôlée par `outils/backlog.mjs` avant toute
 // écriture : une erreur de forme arrête tout, rien n'est touché. Sans dépendance.
 
@@ -38,11 +41,23 @@ function jjmm(date) {
   return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
-/** `0.00.66` devient `0.00.67` : le troisième nombre augmente de un, sur deux chiffres au moins. */
+/**
+ * `0.00.66` devient `0.00.67` : le troisième nombre augmente de un, sur deux chiffres. Après `.99`, le nombre du
+ * milieu augmente et le dernier revient à `00` (`0.00.99` → `0.01.00`) ; après `0.99.99`, la série est finie : erreur
+ * plutôt qu'une version inventée (le code de version d'Android reste croissant jusque-là).
+ */
 export function versionSuivante(version) {
   const m = RE_VERSION.exec(version.trim())
   if (!m) throw new ErreurFinDeLot(`version illisible « ${version} » (trois nombres séparés par des points)`)
-  return `${m[1]}.${m[2]}.${String(Number(m[3]) + 1).padStart(2, '0')}`
+  const deux = (n) => String(n).padStart(2, '0')
+  let milieu = Number(m[2])
+  let dernier = Number(m[3]) + 1
+  if (dernier > 99) {
+    milieu += 1
+    dernier = 0
+  }
+  if (milieu > 99) throw new ErreurFinDeLot(`la version ${version} est la dernière de la série 0.MM.NN sur deux chiffres : choisir la suite à la main`)
+  return `${m[1]}.${deux(milieu)}.${deux(dernier)}`
 }
 
 /** Chemins d'une sortie de `git status --porcelain` (les deux côtés d'un renommage, guillemets retirés). */
@@ -137,7 +152,6 @@ export function appliquerFinDeLot(texte, opts) {
   const { numero, version = null, aujourdhui, lecture = false, enCours = false, essais = [] } = opts
   if (lecture && enCours) throw new ErreurFinDeLot('--lecture et --en-cours s\'excluent : un lot coupé en parties reste « en cours »')
   if (lecture && essais.length) throw new ErreurFinDeLot('--lecture et --essais s\'excluent : sur lecture, il n\'y a rien à essayer au téléphone')
-  if (!lecture && !enCours && !essais.length) throw new ErreurFinDeLot('sans --essais, il faut --lecture (rien à essayer) ou --en-cours (lot coupé en parties)')
 
   const r = lireBacklog(texte, aujourdhui)
   const element = r.maintenant.find((e) => e.numero === numero)
@@ -150,6 +164,11 @@ export function appliquerFinDeLot(texte, opts) {
   if (!/^en cours/.test(element.etat ?? '')) {
     throw new ErreurFinDeLot(`l'élément ${numero} n'est pas « en cours » (état : ${element.etat ?? 'aucun'})`)
   }
+  // Un lot qui porte déjà ses essais (repris après un premier commit, ou écrits à la main) passe « à valider » sans
+  // --essais ; sur lecture il n'a pas d'essais à porter.
+  const dejaEssais = element.essais.length > 0
+  if (lecture && dejaEssais) throw new ErreurFinDeLot(`--lecture refusé : le lot ${numero} porte déjà ${element.essais.length} essai${element.essais.length > 1 ? 's' : ''} au téléphone`)
+  if (!lecture && !enCours && !essais.length && !dejaEssais) throw new ErreurFinDeLot('sans --essais, il faut --lecture (rien à essayer) ou --en-cours (lot coupé en parties)')
   if (!r.prochains) throw new ErreurFinDeLot('« Prochains numéros » est introuvable dans l\'en-tête du reste à faire')
 
   const eol = texte.includes('\r\n') ? '\r\n' : '\n'
