@@ -83,6 +83,21 @@ export type MemoryAccess =
   /** Aucun dossier accessible : les sessions enregistrées attendent (`pendingFolder`). */
   | { state: 'unavailable'; reason: string };
 
+/** Libellé gardé d'un dossier choisi : `dossier « nom »`, le nom entre guillemets. */
+const PICKED_LABEL = /^dossier « (.*) »$/s;
+
+/**
+ * Libellé d'un dossier mémoire tel que l'écran le montre. Le libellé gardé (`label`, choix retenu du dossier) reste
+ * le français construit ici ; seules ses trois formes se traduisent, le nom d'un dossier choisi gardé tel quel. Un
+ * autre libellé ressort tel quel.
+ */
+export const memoryLabelText = (label: string): string => {
+  if (label === 'mémoire de ce navigateur') return t('mémoire de ce navigateur');
+  if (label === 'dossier privé de l\'application') return t('dossier privé de l\'application');
+  const picked = PICKED_LABEL.exec(label);
+  return picked ? t('dossier « {name} »', { name: picked[1] }) : label;
+};
+
 const splitPath = (path: string): string[] => path.split('/').filter((part) => part !== '');
 
 const isNotFound = (err: unknown): boolean =>

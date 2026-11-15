@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { weekdayDayMonthYear } from '../core/calendar';
-import type { Activity } from '../core/activities';
+import { activityDisplayName, type Activity } from '../core/activities';
 import { sportFamily, sportTreatment, type SportFamily } from '../core/sportProfiles';
 import { formatDistanceAuto, formatDuration, formatShortDuration, formatSpeed } from '../core/units';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
@@ -152,7 +152,7 @@ const SessionRow = memo(function SessionRow({
     onAskDelete(session.file);
   };
 
-  const activityLabel = activity ? activity.name : t('À classer');
+  const activityLabel = activity ? activityDisplayName(activity) : t('À classer');
   const date = `${weekdayDayMonthYear(startMs)} · ${formatTime(startMs)}`;
   // Sous un nom donné, l'activité reste écrite à côté de la date ; le nom calculé la porte déjà.
   const named = customName(record) !== null;

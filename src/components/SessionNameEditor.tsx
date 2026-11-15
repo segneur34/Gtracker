@@ -1,7 +1,7 @@
 import { plainError } from '../platform/errorText';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FAMILY_LABEL, sessionActivity } from '../core/activities';
+import { FAMILY_LABEL, activityDisplayName, sessionActivity } from '../core/activities';
 import { t } from '../core/i18n';
 import type { ShareStat } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
@@ -78,7 +78,9 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
   if (!session || file === null) return null;
 
   const { record } = session;
-  const activityName = sessionActivity(readStoredActivities(), record.activityId, record.sport)?.name ?? null;
+  const namedActivity = sessionActivity(readStoredActivities(), record.activityId, record.sport);
+  // Nom affiché (langue du moment) : il entre dans le nom du fichier et dans l'image de partage.
+  const activityName = namedActivity ? activityDisplayName(namedActivity) : null;
   /** Nom donné, `null` sans nom : le champ « Renommer » part vide, et l'effacer rend le nom calculé. */
   const name = customName(record);
   const shownName = sessionDisplayName(record, activityName);
@@ -190,7 +192,7 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
             </Button>
             {!session.readOnly && (
               <HoldButton onHold={() => void discard()} getHoldMs={discardHoldMs} label={t('Jeter')} lead={<IconTrash size={18} />}
-                dialTitle={t('Jeter')} icon={<IconTrash size={48} />} action={t('jeter')} keepMenuOpen
+                dialTitle={t('Jeter')} icon={<IconTrash size={48} />} action="jeter" keepMenuOpen
                 ariaLabel={t('Jeter la session : maintenir une seconde')} />
             )}
           </MoreMenu>

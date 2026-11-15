@@ -94,11 +94,11 @@ function ResetZone() {
           <div className="ui-row-s2 ui-wrap">
             <HoldButton onHold={() => void run('usine')} getHoldMs={resetHoldMs} label={t("Réglages d'usine")}
               lead={<IconUndo size={18} />} dialTitle={t("Réglages d'usine")} icon={<IconUndo size={48} />}
-              action={t("revenir aux réglages d'usine")} disabled={refusals.usine !== null || busy}
+              action="revenir aux réglages d'usine" disabled={refusals.usine !== null || busy}
               ariaLabel={t("Réglages d'usine : maintenir une seconde")} />
             <HoldButton onHold={() => void run('tout')} getHoldMs={resetHoldMs} label={t('Tout supprimer')}
               lead={<IconTrash size={18} />} dialTitle={t('Tout supprimer')} icon={<IconTrash size={48} />}
-              action={t('tout supprimer')} disabled={refusals.tout !== null || busy}
+              action="tout supprimer" disabled={refusals.tout !== null || busy}
               ariaLabel={t('Tout supprimer : maintenir une seconde')} />
           </div>
           {phrases.map((phrase) => <p key={phrase} className="ui-muted ui-text-s ui-m-0">{phrase}</p>)}

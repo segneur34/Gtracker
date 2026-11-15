@@ -1,14 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { t } from '../core/i18n';
-import { findActivity, sessionActivity, type Activity } from '../core/activities';
+import { activityDisplayName, findActivity, sessionActivity, type Activity } from '../core/activities';
 import { sessionFamily, sessionsPath } from '../core/parentPage';
 import { SPORT_FAMILIES } from '../core/sportProfiles';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { useVisibility } from '../hooks/useSportSettings';
 import type { LibrarySession } from '../library/record';
 import { sortSessions } from '../library/sessionSort';
-import { filterChoices, filterSessions, ofActivity } from '../library/sessionsList';
+import { emptyOfActivity, filterChoices, filterSessions } from '../library/sessionsList';
 import ActivityBubbles from './ActivityBubbles';
 import SessionRow from './SessionRow';
 import { IconChevronRight } from './icons';
@@ -82,7 +82,7 @@ function ProfileActivities() {
       ) : (
         status === 'ready' && !scanning && (
           <p className="ui-hint ui-hint--m">
-            {selected ? t("Aucune session {de} pour l'instant.", { de: ofActivity(selected.name) }) : t("Aucune session pour l'instant.")}
+            {selected ? emptyOfActivity(activityDisplayName(selected)) : t("Aucune session pour l'instant.")}
           </p>
         )
       )}

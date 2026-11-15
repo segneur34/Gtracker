@@ -9,7 +9,7 @@ import {
   useLibraryFields,
 } from '../hooks/useSessionLibrary';
 import { usePlaceSearch } from '../hooks/usePlaceSearch';
-import { READ_ONLY_MEMORY_MESSAGE, browserMemoryIsGuaranteed } from '../platform/memoryFolder';
+import { READ_ONLY_MEMORY_MESSAGE, browserMemoryIsGuaranteed, memoryLabelText } from '../platform/memoryFolder';
 import { isNativeApp } from '../platform/runtime';
 import ImportButtons from './ImportButtons';
 import PanelTitle from './PanelTitle';
@@ -58,6 +58,8 @@ function MemoryStatus({
     'status', 'folderKind', 'folderLabel', 'memoryReadOnly', 'reason', 'sessions', 'scanning', 'pendingCount', 'duplicates', 'unreadable', 'tooLarge', 'message', 'error', 'settingsOffer'
   );
   const { status, folderKind, folderLabel } = library;
+  /** Libellé du dossier tel qu'il se lit à l'écran, dans la langue du moment. */
+  const shownFolder = folderLabel === null ? null : memoryLabelText(folderLabel);
   const canChoose = canChooseMemoryFolder();
   const native = isNativeApp();
   /** Dans Réglages : explications sous des « ? ». */
@@ -76,11 +78,11 @@ function MemoryStatus({
       case 'opening':
         return t('Ouverture de la mémoire…');
       case 'ready':
-        return `${tn(library.sessions.length, '{n} session', '{n} sessions')} · ${folderLabel ?? t('mémoire')}`;
+        return `${tn(library.sessions.length, '{n} session', '{n} sessions')} · ${shownFolder ??t('mémoire')}`;
       case 'needs-permission':
         return native
-          ? t("Android a retiré l'accès au {dossier}.", { dossier: folderLabel ?? t('dossier choisi') })
-          : t('Le {dossier} attend votre autorisation.', { dossier: folderLabel ?? t('dossier choisi') });
+          ? t("Android a retiré l'accès au {dossier}.", { dossier: shownFolder ??t('dossier choisi') })
+          : t('Le {dossier} attend votre autorisation.', { dossier: shownFolder ??t('dossier choisi') });
       default:
         return library.reason ?? t('Aucune mémoire accessible.');
     }
@@ -159,7 +161,7 @@ function MemoryStatus({
             {tn(
               library.pendingCount,
               "{n} session enregistrée en attente d'un dossier mémoire, gardée dans le dossier privé de l'application.",
-              "{n} session enregistrées en attente d'un dossier mémoire, gardées dans le dossier privé de l'application."
+              "{n} sessions enregistrées en attente d'un dossier mémoire, gardées dans le dossier privé de l'application."
             )}
           </p>
         )}
@@ -243,7 +245,7 @@ function MemoryStatus({
         {detailed && status === 'ready' && folderKind === 'picked' && (
           <>
             <p style={mutedStyle}>
-              {t('Emplacement : {dossier}, sur ce PC.', { dossier: folderLabel ?? '' })}
+              {t('Emplacement : {dossier}, sur ce PC.', { dossier: shownFolder ??'' })}
               <HelpToggle helpKey="memoire:emplacement" label={t('Emplacement')} />
             </p>
             <HelpText helpKey="memoire:emplacement">
@@ -258,7 +260,7 @@ function MemoryStatus({
 
         {detailed && status === 'ready' && folderKind === 'device' && (
           <>
-            <p style={mutedStyle}>{t('Emplacement : {dossier}, dans le stockage interne du téléphone.', { dossier: folderLabel ?? '' })}</p>
+            <p style={mutedStyle}>{t('Emplacement : {dossier}, dans le stockage interne du téléphone.', { dossier: shownFolder ??'' })}</p>
             <div style={rowStyle}>
               <Button onClick={() => void chooseFolder()}>{t('Changer de dossier')}</Button>
             </div>

@@ -8,8 +8,8 @@ import { fitToGpx, isFitActivity, type FitConversion } from '../../library/fitTo
 import { isBlankGpxText, isFitFileName, isGpxFileName } from '../../library/record';
 import { unbundleSessionGpx } from '../../library/sessionBundle';
 import { readPickedBytes, readPickedFile } from '../../platform/files';
-import { pickFolderToImport, type ImportEntry } from '../../platform/memoryFolder';
-import { errorMessage } from '../../core/basics';
+import { memoryLabelText, pickFolderToImport, type ImportEntry } from '../../platform/memoryFolder';
+import { nativeErrorMessage } from '../../platform/nativeMessages';
 import { libraryState, reportError, setState, type LibraryState } from './store';
 import { hasSessionMotion, lib } from './memory';
 import { scheduleCacheUpdate } from './cache';
@@ -47,7 +47,7 @@ export const saveRecordedSession = async (
   if ((result.status === 'added' || result.status === 'duplicate') && result.file) lib.onSessionsAdded([result.file]);
   switch (result.status) {
     case 'added':
-      return { file: result.file, location: libraryState().folderLabel ?? t('mémoire') };
+      return { file: result.file, location: memoryLabelText(libraryState().folderLabel ?? t('mémoire')) };
     case 'duplicate':
       // Fiche de la session déjà rangée non relue ou en lecture seule : rien n'y est ajouté, l'enregistreur garde son journal.
       if (result.recordNotRead) throw new Error(t("session déjà dans la mémoire, mais sa fiche n'a pas pu être relue pour la compléter"));
@@ -100,6 +100,24 @@ const confirmWatchFolder = async (entries: ImportEntry[]): Promise<boolean> => {
   });
 };
 
+/** Fichier non rangé : son nom et la raison, gardés à part. */
+export interface FailedImport {
+  name: string;
+  reason: string;
+}
+
+/** Compte rendu de `importEntries` : celui de l'import, et chaque fichier non rangé, nom et raison à part (`failedFiles`). */
+export interface ImportOutcome extends ImportReport {
+  /** Les mêmes fichiers que `failed`, dans le même ordre ; `failed` en porte la ligne affichée. */
+  failedFiles: FailedImport[];
+}
+
+/** Porte au compte rendu un fichier non rangé : nom et raison à part, et la ligne qui les assemble pour l'affichage. */
+const noteFailure = (report: ImportOutcome, name: string, reason: string): void => {
+  report.failedFiles.push({ name, reason });
+  report.failed.push(t('{name} : {reason}', { name, reason }));
+};
+
 /** Porte au compte rendu ce que `addGpx` a fait d'un fichier. */
 const noteAddResult = (report: ImportReport, result: AddResult, name: string): void => {
   if (result.status === 'added' && result.file) report.added.push(result.file);
@@ -137,11 +155,11 @@ const noteAddResult = (report: ImportReport, result: AddResult, name: string): v
 export const importEntries = async (
   entries: ImportEntry[],
   { fromFolder = false, quiet = false }: { fromFolder?: boolean; quiet?: boolean } = {},
-): Promise<ImportReport> => {
+): Promise<ImportOutcome> => {
   setState({ importing: true });
-  const report: ImportReport = {
+  const report: ImportOutcome = {
     added: [], existing: [], duplicates: 0, invalid: [], ignored: [], notActivities: [], otherSports: [], unsaved: 0, failed: [], retryable: [],
-    motionAdded: 0, motionFailed: [], recordCompleted: 0, recordNotRead: 0, legacyRecordsIgnored: [],
+    motionAdded: 0, motionFailed: [], recordCompleted: 0, recordNotRead: 0, legacyRecordsIgnored: [], failedFiles: [],
   };
   try {
     await lib.opening;
@@ -161,7 +179,7 @@ export const importEntries = async (
       try {
         const text = await entry.readText();
         if (text === null) {
-          report.failed.push(`${entry.name} : illisible`);
+          noteFailure(report, entry.name, t('illisible'));
           continue;
         }
         // GPX vide : pas une session, ni illisible.
@@ -196,7 +214,7 @@ export const importEntries = async (
         // Une session qui a déjà ses capteurs n'a rien perdu.
         if (motionFailed && !motion && result.file && !hasSessionMotion(result.file)) report.motionFailed.push(entry.name);
       } catch (err) {
-        report.failed.push(`${entry.name} : ${errorMessage(err, t('erreur inconnue'))}`);
+        noteFailure(report, entry.name, nativeErrorMessage(err, t('erreur inconnue')));
         report.retryable.push(entry.name);
       }
     }
@@ -205,7 +223,7 @@ export const importEntries = async (
       try {
         const bytes = await entry.readBytes();
         if (bytes === null) {
-          report.failed.push(`${entry.name} : ${t('illisible')}`);
+          noteFailure(report, entry.name, t('illisible'));
           continue;
         }
         // Un fichier qui n'est pas un FIT ne le deviendra pas : refusé pour de bon, à la différence d'une écriture en échec.
@@ -213,15 +231,15 @@ export const importEntries = async (
         try {
           fit = fitToGpx(bytes);
         } catch (err) {
-          report.failed.push(`${entry.name} : ${errorMessage(err, t('fichier illisible'))}`);
+          noteFailure(report, entry.name, nativeErrorMessage(err, t('fichier illisible')));
           continue;
         }
         if (fit.kind === 'not-activity') report.notActivities.push(entry.name);
         else if (fit.kind === 'other-sport') report.otherSports.push(entry.name);
-        else if (fit.kind === 'refused') report.failed.push(`${entry.name} : ${fit.reason}`);
+        else if (fit.kind === 'refused') noteFailure(report, entry.name, fit.reason);
         else noteAddResult(report, await addGpx(fit.gpx, 'import', {}), entry.name);
       } catch (err) {
-        report.failed.push(`${entry.name} : ${errorMessage(err, t('erreur inconnue'))}`);
+        noteFailure(report, entry.name, nativeErrorMessage(err, t('erreur inconnue')));
         report.retryable.push(entry.name);
       }
     }
@@ -237,7 +255,7 @@ export const importEntries = async (
       reportError(`${describeImport(report)} ${tn(n, '{n} fichier non rangé ({list})', '{n} fichiers non rangés ({list})', { list: report.failed.join(' ; ') })}`);
     }
   } catch (err) {
-    if (!quiet) reportError(t('Import interrompu : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }));
+    if (!quiet) reportError(t('Import interrompu : {detail}', { detail: nativeErrorMessage(err, t('erreur inconnue')) }));
   } finally {
     setState({ importing: false });
   }
@@ -245,7 +263,7 @@ export const importEntries = async (
 };
 
 /** Importe des fichiers choisis dans le navigateur (`importEntries`), ou le contenu d'un dossier (chemin relatif posé par le navigateur). */
-export const importFiles = (files: File[]): Promise<ImportReport> =>
+export const importFiles = (files: File[]): Promise<ImportOutcome> =>
   importEntries(files.map(pickedEntry), { fromFolder: files.some((file) => file.webkitRelativePath !== '') });
 
 /**
@@ -254,13 +272,13 @@ export const importFiles = (files: File[]): Promise<ImportReport> =>
  * fiches et ses capteurs, lus un par un. L'import est annoncé dès le
  * sélecteur, boutons grisés. `null` si l'utilisateur renonce.
  */
-export const importFromFolder = async (): Promise<ImportReport | null> => {
+export const importFromFolder = async (): Promise<ImportOutcome | null> => {
   setState({ importing: true });
   let entries: ImportEntry[] | null;
   try {
     entries = await pickFolderToImport();
   } catch (err) {
-    setState({ importing: false, message: t('Lecture du dossier impossible : {detail}', { detail: errorMessage(err, String(err)) }) });
+    setState({ importing: false, message: t('Lecture du dossier impossible : {detail}', { detail: nativeErrorMessage(err, String(err)) }) });
     return null;
   }
   if (!entries) {

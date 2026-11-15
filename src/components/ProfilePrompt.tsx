@@ -93,7 +93,7 @@ function ProfilePrompt({ otherCardShown, onDecided }: { otherCardShown: boolean;
       {field('birthYear', t('Année de naissance'), '', t('ex. 1985'), t("Pour la dépense au repos, et la FC max estimée quand elle n'est pas saisie."))}
       <div className="profile-prompt__actions">
         <Button variant="ghost" onClick={close}>{t('Plus tard')}</Button>
-        <Button variant="primary" onClick={save}>{t('Enregistrer')}</Button>
+        <Button variant="primary" onClick={save}>{t('Enregistrer', { ctx: 'garder' })}</Button>
       </div>
     </Dialog>
   );

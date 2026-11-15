@@ -3,7 +3,7 @@ import { useState, type ChangeEvent } from 'react';
 import {
   adoptSettingsFile, dismissSettingsOffer, importSettingsFile, renameDevice, useLibraryFields, type SettingsFileInfo,
 } from '../hooks/useSessionLibrary';
-import { DEVICE_NAME_MAX } from '../library/settingsFile';
+import { DEVICE_NAME_MAX, deviceNameText } from '../library/settingsFile';
 import { HelpText, HelpToggle } from './Help';
 import Button from './ui/Button';
 import { t, tn } from '../core/i18n';
@@ -25,7 +25,7 @@ const mutedStyle = { margin: 0, color: 'var(--muted)', fontSize: 'var(--text-s)'
 
 /** « Reprendre », après confirmation : depuis la liste, le bandeau ou un import. Rend faux si l'on a renoncé. */
 const adopt = (file: SettingsFileInfo): boolean => {
-  const question = `${t('Reprendre les réglages de « {name} » ?', { name: file.name })}\n\n`
+  const question = `${t('Reprendre les réglages de « {name} » ?', { name: deviceNameText(file.name) })}\n\n`
     + t('Ils remplacent ceux de cet appareil : activités et leurs réglages, profil du pratiquant, séances du compteur.') + ' '
     + t("Une session dont l'activité n'existe pas dans ces réglages s'affichera sous le nom de son calcul.");
   if (!window.confirm(question)) return false;
@@ -39,7 +39,7 @@ export function SettingsOfferBanner() {
   if (!settingsOffer) return null;
   return (
     <div className="ui-alert ui-alert--warning ui-row-s2 ui-center ui-wrap">
-      <span className="set-files-grow">{tRich('Nouveau fichier de réglages : <strong>{name}</strong>.', { name: settingsOffer.name })}</span>
+      <span className="set-files-grow">{tRich('Nouveau fichier de réglages : <strong>{name}</strong>.', { name: deviceNameText(settingsOffer.name) })}</span>
       <Button size="s" onClick={() => adopt(settingsOffer)}>{t('Reprendre')}</Button>
       <Button size="s" variant="ghost" onClick={dismissSettingsOffer}>{t('Fermer')}</Button>
     </div>
@@ -71,7 +71,7 @@ function SettingsFiles() {
       return;
     }
     if (adopt(result.file)) setImportNote(null);
-    else setImportNote({ text: t('« {name} » est dans la liste : « Reprendre » quand vous voudrez.', { name: result.file.name }), failed: false });
+    else setImportNote({ text: t('« {name} » est dans la liste : « Reprendre » quand vous voudrez.', { name: deviceNameText(result.file.name) }), failed: false });
   };
 
   return (
@@ -86,7 +86,7 @@ function SettingsFiles() {
       </HelpText>
       <label className="ui-row-s2 ui-center ui-wrap ui-text-s">
         <span>{t('Nom de cet appareil')}<HelpToggle helpKey="memoire:appareil" label={t('Nom de cet appareil')} /></span>
-        <input value={draft ?? deviceName} maxLength={DEVICE_NAME_MAX} className="ui-field ui-field--s ui-w-180"
+        <input value={draft ?? deviceNameText(deviceName)} maxLength={DEVICE_NAME_MAX} className="ui-field ui-field--s ui-w-180"
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => void commit()}
           onKeyDown={(e) => {
@@ -100,7 +100,7 @@ function SettingsFiles() {
         {settingsFiles.map((file) => (
           <li key={file.fileName} className="set-files-row">
             <span className="ui-stack ui-min-w-0">
-              <strong className="ui-text-m">{file.name}</strong>
+              <strong className="ui-text-m">{deviceNameText(file.name)}</strong>
               <span className="num" style={mutedStyle}>
                 {tn(file.activityCount, '{n} activité', '{n} activités')} · {t('modifiés le {date}', { date: dayMonthYearTime(file.savedAt) })}
               </span>

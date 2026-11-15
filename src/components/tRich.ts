@@ -10,7 +10,7 @@
  * ou un élément ; `ctx` choisit l'entrée du dictionnaire comme pour `t`. Un « < » qui n'ouvre pas une balise reste du texte.
  */
 import { Fragment, createElement, type ReactNode } from 'react';
-import { t } from '../core/i18n';
+import { currentLang, t } from '../core/i18n';
 
 /** Rendu d'une balise : reçoit son contenu déjà rendu (`null` pour une balise auto-fermante, `<br/>`). */
 export type RichTag = (children: ReactNode) => ReactNode;
@@ -119,4 +119,21 @@ const renderParts = (parts: readonly RichPart[], vars: RichVars | undefined, tag
 export const tRich = (key: string, vars?: RichVars, tags: RichTags = {}): ReactNode => {
   const text = t(key, vars?.ctx === undefined ? undefined : { ctx: vars.ctx });
   return createElement(Fragment, null, ...renderParts(parseRich(text), vars, tags));
+};
+
+/**
+ * Phrase à balises accordée au nombre `n`, en deux phrases entières (chacune une clé). Même règle de choix que `tn` :
+ * en français, pluriel selon `frenchPlural` (par défaut `n > 1`) ; en anglais et en espagnol, pluriel si `n !== 1`.
+ * `{n}` vaut `n`, sauf si `vars.n` est donné.
+ */
+export const tnRich = (
+  n: number,
+  singular: string,
+  pluralText: string,
+  vars?: RichVars,
+  tags: RichTags = {},
+  frenchPlural: boolean = n > 1
+): ReactNode => {
+  const isPlural = currentLang() === 'fr' ? frenchPlural : n !== 1;
+  return tRich(isPlural ? pluralText : singular, { n, ...vars }, tags);
 };

@@ -1,5 +1,6 @@
 import { readActivities } from '../core/activities';
 import { isObject, parseJson, stringifyJson } from '../core/basics';
+import { t } from '../core/i18n';
 import { sanitizeAthleteProfile } from './athleteProfile';
 import { ROOT_GOAL } from './rootGrowth';
 import { STORAGE_KEYS, FILE_FORMATS } from '../core/appIdentity';
@@ -81,6 +82,34 @@ export const serializeSettingsFile = (file: SettingsFile): string => `${stringif
 // --- Appareils et noms de fichier ---
 
 export const DEVICE_NAME_MAX = 40;
+
+/**
+ * Noms donnés d'office à un appareil, en français : ce sont eux qui s'écrivent dans le réglage, dans `device.name` et
+ * dans le nom du fichier, quelle que soit la langue de l'écran.
+ */
+export const DEFAULT_DEVICE_NAMES = { phone: 'Téléphone', computer: 'PC' } as const;
+
+const originalDeviceNameText = (name: string): string | null => {
+  switch (name) {
+    case DEFAULT_DEVICE_NAMES.phone: return t('Téléphone', { ctx: 'appareil' });
+    case DEFAULT_DEVICE_NAMES.computer: return t('PC', { ctx: 'appareil' });
+    default: return null;
+  }
+};
+
+const NUMBERED_DEVICE_NAME = /^(.+) (\d+)$/;
+
+/**
+ * Nom d'appareil tel que l'écran le montre : un nom donné d'office se traduit, numéroté comme `freeDeviceName` le
+ * fait (« Téléphone 2 ») compris, un nom choisi ressort tel quel.
+ */
+export const deviceNameText = (name: string): string => {
+  const own = originalDeviceNameText(name);
+  if (own !== null) return own;
+  const numbered = NUMBERED_DEVICE_NAME.exec(name);
+  const base = numbered ? originalDeviceNameText(numbered[1]) : null;
+  return numbered && base !== null ? `${base} ${numbered[2]}` : name;
+};
 
 /** Nom d'appareil tel qu'on le garde : sans espaces en trop, 40 caractères au plus. */
 export const cleanDeviceName = (name: string): string => name.trim().replace(/\s+/g, ' ').slice(0, DEVICE_NAME_MAX).trim();

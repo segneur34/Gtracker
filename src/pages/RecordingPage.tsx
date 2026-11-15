@@ -1,7 +1,7 @@
 import { roundBearingDeg } from '../core/angles';
 import { errorMessage } from '../core/basics';
 import { t, tn } from '../core/i18n';
-import { tRich } from '../components/tRich';
+import { tRich, tnRich } from '../components/tRich';
 import { Fragment, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ChangeEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import ActivitySelect from '../components/ActivitySelect';
@@ -18,7 +18,7 @@ import SessionEndGear from '../components/SessionEndGear';
 import { IconFlag, IconLock, IconPause, IconPlay, IconRoute } from '../components/icons';
 import { parseGpx } from '../core/gpxParser';
 import {
-  FAMILY_ACCENT, FAMILY_LABEL, FAMILY_OF, activitiesOfFamily, activityFamily, type Activity,
+  FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityDisplayName, activityFamily, type Activity,
 } from '../core/activities';
 import { LIVE_TRACK_COLOR } from '../components/mapStyles';
 import {
@@ -107,6 +107,12 @@ interface ReplayTrack {
 
 /** Lien « Réglages » d'une phrase à balise `<a>`. */
 const settingsLink = (children: React.ReactNode) => <Link to="/parametres">{children}</Link>;
+
+/** Message d'une famille sans activité, une phrase entière par famille. */
+const NO_ACTIVITY_IN_FAMILY: Record<SportFamily, () => React.ReactNode> = {
+  voile: () => tRich('Aucune activité de voile : ajoutez-en une dans <a>Réglages</a>.', undefined, { a: settingsLink }),
+  surf: () => tRich('Aucune activité de surf : ajoutez-en une dans <a>Réglages</a>.', undefined, { a: settingsLink }),
+};
 
 const Stat = ({ label, value }: { label: string; value: string }) => (
   <div className="rec-stat">
@@ -771,12 +777,12 @@ function RecordingScreen() {
               accent={FAMILY_ACCENT[family]} onChange={pickFamily} />
             {familyActivities.length > 0 && (
               <SegmentedControl label={t('Activité')} value={chosenId ?? ''} accent={FAMILY_ACCENT[family]} onChange={setChosenId}
-                items={familyActivities.map((a) => ({ key: a.id, label: a.name, title: a.name }))} />
+                items={familyActivities.map((a) => ({ key: a.id, label: activityDisplayName(a), title: activityDisplayName(a) }))} />
             )}
           </div>
           {familyActivities.length === 0 && (
             <div className="ui-alert ui-alert--warning">
-              {tRich('Aucune activité {of} : ajoutez-en une dans <a>Réglages</a>.', { of: FAMILY_OF[family] }, { a: settingsLink })}
+              {NO_ACTIVITY_IN_FAMILY[family]()}
             </div>
           )}
 
@@ -997,7 +1003,7 @@ function RecordingScreen() {
           </span>
         )}>
           <p className="rec-saved-text">
-            {tRich('{name}, {count} points.<br />', { name: pending.activity?.name ?? t('À classer'), count: pending.pointCount })}
+            {tnRich(pending.pointCount, '{name}, {n} point.<br />', '{name}, {n} points.<br />', { name: pending.activity ? activityDisplayName(pending.activity) : t('À classer') }, {}, true)}
             <span className="ui-muted ui-text-s">
               {t("Pas encore rangée dans la mémoire. Aucun nouvel enregistrement avant de l'analyser ou de la jeter.")}
             </span>
@@ -1041,12 +1047,11 @@ function RecordingScreen() {
           </span>
         )}>
           <p className="rec-saved-text">
-            {tRich('{name}, {count} points.<br />', {
+            {tnRich(saved.pointCount, '{name}, {n} point.<br />', '{name}, {n} points.<br />', {
               name: savedRecord
-                ? sessionDisplayName(savedRecord, saved.activity?.name ?? t('À classer'))
-                : saved.activity?.name ?? t('À classer'),
-              count: saved.pointCount,
-            })}
+                ? sessionDisplayName(savedRecord, saved.activity ? activityDisplayName(saved.activity) : t('À classer'))
+                : saved.activity ? activityDisplayName(saved.activity) : t('À classer'),
+            }, {}, true)}
             <span className="ui-muted ui-text-s rec-break-all">{t('Rangée dans : {location}', { location: saved.location })}</span>
             {gearNotWritten && (
               <>

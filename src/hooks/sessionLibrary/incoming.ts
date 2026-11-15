@@ -1,12 +1,13 @@
 import { errorMessage } from '../../core/basics';
 import { t } from '../../core/i18n';
-import { describeImport, type ImportReport } from '../../library/importReport';
+import { describeImport } from '../../library/importReport';
 import { MAX_LISTED_FILE_BYTES } from '../../library/reconcile';
 import { incomingFiles, type IncomingFile, type IncomingFilesPort, type IncomingRefusal } from '../../platform/incomingFile';
 import { NO_FOLDER_IMPORT_MESSAGE, READ_ONLY_MEMORY_MESSAGE, type ImportEntry } from '../../platform/memoryFolder';
 import { libraryState, sentence, setState, subscribe, type IncomingNotice } from './store';
 import { lib } from './memory';
-import { canImportSessions, importEntries } from './importer';
+import { canImportSessions, importEntries, type ImportOutcome } from './importer';
+import { nativeErrorMessage } from '../../platform/nativeMessages';
 import { isGpxFileName } from '../../library/record';
 import { isRouteGpx } from '../../planning/routeImport';
 
@@ -34,7 +35,8 @@ type IncomingVerdict =
   | { kind: 'retry'; reason: string | null }
   | { kind: 'refused'; text: string };
 
-const reasonOf = (name: string, failed: string): string => (failed.startsWith(`${name} : `) ? failed.slice(name.length + 3) : failed);
+/** Raison du premier fichier non rangé, gardée à part de son nom par l'import. */
+const firstReason = (report: ImportOutcome): string | null => report.failedFiles[0]?.reason ?? null;
 
 const quoted = (name: string): string => t('« {name} »', { name });
 
@@ -48,11 +50,12 @@ const refusedForMemory = (name: string, readOnly: boolean): string =>
   });
 
 /** Ce que `importEntries` a fait d'un seul fichier. Rien dit : prudence, la copie reste. */
-const incomingVerdict = (report: ImportReport, name: string): IncomingVerdict => {
+const incomingVerdict = (report: ImportOutcome, name: string): IncomingVerdict => {
   if (report.added.length > 0) return { kind: 'added', file: report.added[0] };
   if (report.duplicates > 0) return { kind: 'duplicate', file: report.existing[0] ?? null };
-  if (report.retryable.length > 0) return { kind: 'retry', reason: report.failed.length > 0 ? reasonOf(name, report.failed[0]) : null };
-  if (report.failed.length > 0) return { kind: 'refused', text: t("{quoted} n'a pas été rangé : {reason}", { quoted: quoted(name), reason: sentence(reasonOf(name, report.failed[0])) }) };
+  const reason = firstReason(report);
+  if (report.retryable.length > 0) return { kind: 'retry', reason };
+  if (reason !== null) return { kind: 'refused', text: t("{quoted} n'a pas été rangé : {reason}", { quoted: quoted(name), reason: sentence(reason) }) };
   if (report.invalid.length > 0) return { kind: 'refused', text: t("{quoted} n'a pas été rangé : fichier illisible.", { quoted: quoted(name) }) };
   if (report.notActivities.length > 0) return { kind: 'refused', text: describeImport(report) };
   // Course, vélo, entraînement : refusé pour de bon, la copie est retirée.
@@ -139,7 +142,7 @@ const routeArrival = async (file: IncomingFile): Promise<'route' | Uint8Array | 
       id,
       text: t("{quoted} n'a pas pu être rangé dans les itinéraires ({detail}). Gtracker le garde et réessaiera au prochain lancement.", {
         quoted: quoted(name),
-        detail: errorMessage(err, t('erreur inconnue')),
+        detail: nativeErrorMessage(err, t('erreur inconnue')),
       }),
       file: null,
       trouble: true,

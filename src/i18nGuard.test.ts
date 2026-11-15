@@ -63,6 +63,24 @@ describe('garde des traductions : lecture des clés', () => {
     expect(refus(source)).toEqual(['t( : premier argument non littéral']);
   });
 
+  it('tnRich : les deux phrases (arguments 2 et 3), contexte lu à l’argument 4, balises dans la clé', () => {
+    const source = [
+      "const a = tnRich(n, '<b>{n}</b> point', '<b>{n}</b> points', { nom }, {}, true);",
+      "const b = tnRich(n, 'un <i>vol</i>', '{n} <i>vols</i>', { ctx: 'foil' });",
+    ].join('\n');
+    expect(cles(source)).toEqual(['<b>{n}</b> point', '<b>{n}</b> points', 'un <i>vol</i>' + CONTEXT_MARK + 'foil', '{n} <i>vols</i>' + CONTEXT_MARK + 'foil']);
+    expect(refus(source)).toEqual([]);
+    expect(outil.extraireCles(source, true).cles.map((c) => c.nom)).toEqual(['tnRich', 'tnRich', 'tnRich', 'tnRich']);
+  });
+
+  it('tnRich : refuse une phrase non littérale et un contexte non littéral', () => {
+    expect(refus("tnRich(n, un, 'b'); tnRich(n, 'a', 'b', { ctx }); tnRich(n, 'a', `b${x}`);")).toEqual([
+      'tnRich( : phrase non littéral',
+      'tnRich( : contexte non littéral',
+      'tnRich( : phrase non littéral',
+    ]);
+  });
+
   it('refuse une clé variable, concaténée ou à gabarit, et un contexte non littéral', () => {
     expect(refus("t(label); t('a' + b); t(`x${y}`); tn(n, one, 'b'); t('x', { ctx }); t('y', { ctx: c }); t();")).toEqual([
       't( : premier argument non littéral',
@@ -119,18 +137,31 @@ describe('garde des traductions : lecture des clés', () => {
 
 describe('garde des traductions : dictionnaires', () => {
   it('orpheline, variable ou balise fausse, mot interdit, manquante', () => {
-    const code = fiches(['{n} session', 'tn'], ['une session', 'tn'], ['Texte <b>{x}</b>', 'tRich'], ['Bonjour {nom}', 't'], ['Manquante', 't']);
+    const code = fiches(
+      ['{n} session', 'tn'],
+      ['une session', 'tn'],
+      ['Texte <b>{x}</b>', 'tRich'],
+      ['Bonjour {nom}', 't'],
+      ['Manquante', 't'],
+      ['un <b>vol</b>', 'tnRich'],
+      ['<b>{n}</b> vols', 'tnRich'],
+      ['un <i>saut</i>', 'tnRich']
+    );
     const r = outil.controlerDictionnaire(code, {
       '{n} session': '{n} session',
       'une session': '{n} session',
       'Texte <b>{x}</b>': 'Text {x}',
       'Bonjour {nom}': 'Hello {name}',
       Orpheline: 'Orphan',
+      'un <b>vol</b>': '<b>{n}</b> flight',
+      '<b>{n}</b> vols': '<b>{n}</b> flights',
+      'un <i>saut</i>': 'a jump',
     });
     expect(r.orphelines).toEqual(['Orpheline']);
-    expect(r.variables.map((v) => v.split(' : ')[0])).toEqual(['Texte <b>{x}</b>', 'Bonjour {nom}']);
+    // `{n}` est permis dans la traduction d'une phrase de `tnRich` comme de `tn` ; la balise de `saut` manque.
+    expect(r.variables.map((v) => v.split(' : ')[0])).toEqual(['Texte <b>{x}</b>', 'Bonjour {nom}', 'un <i>saut</i>']);
     expect(r.manquantes).toEqual(['Manquante']);
-    expect(r.traduites).toEqual(['{n} session', 'une session', 'Texte <b>{x}</b>', 'Bonjour {nom}']);
+    expect(r.traduites).toEqual(['{n} session', 'une session', 'Texte <b>{x}</b>', 'Bonjour {nom}', 'un <b>vol</b>', '<b>{n}</b> vols', 'un <i>saut</i>']);
     const mot = 'GPS ' + 'track' + 'er';
     expect(outil.controlerDictionnaire(fiches(['Traceur', 't']), { Traceur: mot }).interdits).toEqual([`Traceur : ${mot}`]);
     expect(outil.controlerDictionnaire(fiches(), []).forme.length).toBe(1);

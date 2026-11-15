@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { t } from '../core/i18n';
 import { BELT_STATE_LABEL, openBluetoothSettings, type BeltState } from '../platform/heartRate';
 import './StatusLine.css';
 import Button from './ui/Button';
@@ -27,7 +28,7 @@ function BeltStatus({ state, bpm, offText, children }: {
   children?: ReactNode;
 }) {
   const text = state === 'off' && offText ? offText
-    : state === 'connected' && bpm === null ? "connectée, en attente d'une mesure (contact avec la peau ?)"
+    : state === 'connected' && bpm === null ? t("connectée, en attente d'une mesure (contact avec la peau ?)")
       : BELT_STATE_LABEL[state];
   return (
     <span className="status-line">
@@ -45,7 +46,7 @@ export function BluetoothSettingsButton() {
   return (
     <Button size="s"
       onClick={() => void openBluetoothSettings().catch(() => undefined)}>
-      Réglages Bluetooth
+      {t('Réglages Bluetooth')}
     </Button>
   );
 }

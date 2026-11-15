@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
-import type { Activity } from '../core/activities';
+import { activityDisplayName, type Activity } from '../core/activities';
 import { activityLogo } from '../core/activityLogos';
 import { t } from '../core/i18n';
 import { useThemedShade } from '../hooks/useTheme';
@@ -47,7 +47,7 @@ function ActivityBubbles({ total, choices, selected, onSelect }: {
         <button key={activity.id} type="button" className="activity-bubble" aria-pressed={selected === activity.id}
           onClick={() => onSelect(activity.id)}>
           <ActivityLogo logo={activityLogo(activity)} color={shade(activity.color)} size={BUBBLE_LOGO_PX} className="activity-bubble__logo" />
-          <span className="activity-bubble__name">{activity.name}</span>
+          <span className="activity-bubble__name">{activityDisplayName(activity)}</span>
         </button>
       ))}
     </div>

@@ -137,6 +137,26 @@ describe('import de FIT', () => {
     expect(library.readLibraryState().error).toContain('faux.fit');
   });
 
+  it('un fichier non rangé garde son nom et sa raison à part, la ligne affichée suit la ponctuation de la langue', async () => {
+    const library = await openFresh();
+    const i18n = await import('../../core/i18n');
+    const failures = [entry('muet.fit', null), entry('faux.fit', '<gpx>pas un FIT</gpx>')];
+    const french = await library.importEntries(failures);
+    expect(french.failedFiles).toEqual([
+      { name: 'muet.fit', reason: 'illisible' },
+      { name: 'faux.fit', reason: "ce n'est pas un fichier FIT" },
+    ]);
+    expect(french.failed).toEqual(['muet.fit : illisible', "faux.fit : ce n'est pas un fichier FIT"]);
+    i18n.setLanguage('en', { '{name} : {reason}': '{name}: {reason}', illisible: 'unreadable' });
+    try {
+      const english = await library.importEntries([entry('muet.fit', null)]);
+      expect(english.failedFiles).toEqual([{ name: 'muet.fit', reason: 'unreadable' }]);
+      expect(english.failed).toEqual(['muet.fit: unreadable']);
+    } finally {
+      i18n.setLanguage('fr');
+    }
+  });
+
   it('un FIT qui n\'est pas une activité : ignoré parmi d\'autres, dit clairement s\'il est seul', async () => {
     const library = await openFresh();
     const mixed = await library.importEntries([entry('reglages.fit', fitAt(1, { fileType: 2 })), entry('bon.fit', fitAt(2))]);

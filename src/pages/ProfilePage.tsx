@@ -13,7 +13,7 @@ import { brushFrame } from '../components/brushFrame';
 import { brushColorFor } from '../core/brushColor';
 import { IconChevronRight } from '../components/icons';
 import Button from '../components/ui/Button';
-import { logoColor, type Activity } from '../core/activities';
+import { activityDisplayName, logoColor, type Activity } from '../core/activities';
 import { activityLogo, type LogoId } from '../core/activityLogos';
 import { DISTANCE_UNIT_SYMBOL, formatDecimal, formatDuration, toDisplayDistance, type DistanceUnit } from '../core/units';
 import { sessionsPath } from '../core/parentPage';
@@ -191,7 +191,7 @@ function ProfilePage() {
     const shares = activityShares(inPeriod, activityOrder).filter((s) => s.totals.durationS > 0);
     const ofShare = (s: (typeof shares)[number]): Slice => {
       const a = activityById.get(s.activityId) ?? null;
-      return { key: s.activityId, label: a?.name ?? s.activityId, color: a ? shown(a.color) : OTHERS_COLOR, durationS: s.totals.durationS, share: s.share, activity: a };
+      return { key: s.activityId, label: a ? activityDisplayName(a) : s.activityId, color: a ? shown(a.color) : OTHERS_COLOR, durationS: s.totals.durationS, share: s.share, activity: a };
     };
     if (shares.length <= MAX_SLICES) return { slices: shares.map(ofShare), others: [] };
     const rest = shares.slice(MAX_SLICES - 1);
@@ -231,7 +231,7 @@ function ProfilePage() {
     const a = activityById.get(f.activityId);
     if (!a) return [];
     return [{
-      key: a.id, name: a.name, logo: activityLogo(a), color: shown(a.color),
+      key: a.id, name: activityDisplayName(a), logo: activityLogo(a), color: shown(a.color),
       sessions: f.totals.sessions, distance: distanceText(f.totals.distanceM, effectiveDistanceUnit(a)),
       // Une activité cachée par l'œil de Réglages n'a pas de filtre dans Sessions : le lien y mène sans filtre.
       to: sessionsPath(isShown(a) ? a.id : null),

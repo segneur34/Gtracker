@@ -1,3 +1,4 @@
+import { activityDisplayName } from '../core/activities';
 import { clearRecordingNotification, updateRecordingNotification } from '../platform/notification';
 import { travelHeading } from '../recording/heading';
 import type { LiveFieldContext } from '../recording/liveFields';
@@ -86,7 +87,7 @@ const update = (force: boolean) => {
   };
   const paused = status === 'paused' ? recorder.pausedReason ?? 'auto' : null;
   const content = liveNotification({
-    activityName: activity.name,
+    activityName: activityDisplayName(activity),
     fields,
     context,
     paused,

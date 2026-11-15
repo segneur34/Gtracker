@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { RESTING_HR_PATH } from '../core/parentPage';
 import {
-  FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityFamily, isFamilyHidden, nextActivityColor, visibleActivities, visibleFamilies,
+  FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityDisplayName, activityFamily, isFamilyHidden, nextActivityColor, sportDisplayName, visibleActivities, visibleFamilies,
   type Activity,
 } from '../core/activities';
 import {
@@ -138,7 +138,7 @@ function AnalysisTabsSetting({ view, profile, onChange }: {
     <SettingRow label={t('Onglets')} helpKey={`${view.activity.id}:onglets`}
       help={t("Enfoncé : montré dans les analyses. Ceux venus d'un autre module (« tops ») sont cachés d'office ; sans « réglages », l'activité et le seuil d'une session ne se changent plus depuis son analyse.")}>
       <div className="settings-sports__pair">
-        <div className="ui-tabs ui-tabs--compact" role="group" aria-label={t('Onglets des analyses de {name}', { name: view.activity.name })}
+        <div className="ui-tabs ui-tabs--compact" role="group" aria-label={t('Onglets des analyses de {name}', { name: activityDisplayName(view.activity) })}
           style={{ '--tab-accent': FAMILY_ACCENT[activityFamily(view.activity)] } as CSSProperties}>
           {tabs.map((tab) => (
             <button key={tab.key} type="button" className="ui-tab" aria-pressed={isTabShown(tab, view.tabs)}
@@ -352,8 +352,8 @@ const ActivityCard = memo(function ActivityCard({
           }}>
           <IconChevronRight size={14} className="settings-activity__chevron" style={{ transform: isOpen ? 'rotate(90deg)' : undefined }} />
           {!renamingThis && <ActivityGlyph activity={activity} size={18} swatch className="settings-activity__icon" />}
-          {!renamingThis && <strong className="settings-activity__name">{activity.name}</strong>}
-          {!renamingThis && <span className="settings-sports__mark">{p.label}</span>}
+          {!renamingThis && <strong className="settings-activity__name">{activityDisplayName(activity)}</strong>}
+          {!renamingThis && <span className="settings-sports__mark">{sportDisplayName(activity.base)}</span>}
           {!isOpen && (
             <span className="settings-activity__summary">
               {summary}{overridden ? ` · ${t('modifié')}` : ''}
@@ -363,10 +363,10 @@ const ActivityCard = memo(function ActivityCard({
         {renamingThis && (
           <>
             <ActivityNameField activity={activity} onRename={(name) => updateActivity(id, { name })} onDone={() => setRenaming(null)} />
-            <span className="settings-sports__mark">{p.label}</span>
+            <span className="settings-sports__mark">{sportDisplayName(activity.base)}</span>
           </>
         )}
-        <MoreMenu label={t("Plus d'actions sur {name}", { name: activity.name })}>
+        <MoreMenu label={t("Plus d'actions sur {name}", { name: activityDisplayName(activity) })}>
           <Button onClick={() => {
             if (!isOpen) toggleActivity(id);
             setRenaming(id);
@@ -374,7 +374,7 @@ const ActivityCard = memo(function ActivityCard({
           <Button onClick={() => askRemove(activity)}>{t('Supprimer')}</Button>
           <Button disabled={!overridden} onClick={() => resetActivity(id)}>{t('Par défaut')}</Button>
         </MoreMenu>
-        <EyeButton name={activity.name} hidden={activity.hidden === true}
+        <EyeButton name={activityDisplayName(activity)} hidden={activity.hidden === true}
           disabled={!activity.hidden && !familyHidden && lastActivity}
           onToggle={() => setActivityHidden(id, !activity.hidden)} />
       </div>
@@ -383,11 +383,11 @@ const ActivityCard = memo(function ActivityCard({
           <SettingRow label={t('Couleur')} helpKey={`${id}:couleur`}
             help={t('Sa couleur dans les listes et les graphes, parmi les douze de la palette, communes à toutes les activités.')}>
             <ShadePicker value={activity.color} onChange={(color) => updateActivity(id, { color })}
-              label={t('Couleur de {name}', { name: activity.name })} />
+              label={t('Couleur de {name}', { name: activityDisplayName(activity) })} />
           </SettingRow>
           <SettingRow label={t('Icône')} helpKey={`${id}:icone`} help={t('Son icône dans les listes ; sans choix, elle suit le nom.')}>
             <IconPicker value={activityLogo(activity)} onChange={(icon) => updateActivity(id, { icon })}
-              label={t('Icône de {name}', { name: activity.name })} />
+              label={t('Icône de {name}', { name: activityDisplayName(activity) })} />
           </SettingRow>
           <SettingsPart label={t('Affichage')} open={openPart.affichage} onToggle={() => togglePart('affichage')}>
             <SettingRow label={t('Unité de vitesse')} helpKey={`${id}:unite-vitesse`} help={UNIT_HELP}>
@@ -604,7 +604,7 @@ function SettingsPage() {
     const pieces = groups?.reduce((n, g) => n + g.items.length, 0) ?? 0;
     if (groups && groups.length > 0
       && !window.confirm(t('Couper le matériel enregistré de « {name} » ? Sa liste ({groups}, {pieces}) est effacée ; les sessions gardent le matériel choisi.', {
-        name: a.name,
+        name: activityDisplayName(a),
         groups: tn(groups.length, '{n} groupe', '{n} groupes'),
         pieces: tn(pieces, '{n} pièce', '{n} pièces'),
       }))) {
@@ -614,7 +614,7 @@ function SettingsPage() {
   }, [setFor]);
 
   const askRemove = useCallback((a: Activity) => {
-    if (window.confirm(t("Supprimer l'activité « {name} » ? Ses sessions restent, rangées sous « {base} », et ses réglages sont effacés.", { name: a.name, base: SPORT_PROFILES[a.base].label }))) {
+    if (window.confirm(t("Supprimer l'activité « {name} » ? Ses sessions restent, rangées sous « {base} », et ses réglages sont effacés.", { name: activityDisplayName(a), base: sportDisplayName(a.base) }))) {
       removeActivity(a.id);
     }
   }, [removeActivity]);
@@ -705,7 +705,7 @@ function SettingsPage() {
                 const heading = (k === 0 || sportFamily(familyOrdered[k - 1].base) !== family) && (
                   <FamilyHeading family={family} hidden={familyHidden} disabled={!familyHidden && lastFamily}
                     open={openFamily[family] === true} onOpen={() => toggleFamily(family)}
-                    names={familyOrdered.filter((a) => sportFamily(a.base) === family).map((a) => a.name)}
+                    names={familyOrdered.filter((a) => sportFamily(a.base) === family).map(activityDisplayName)}
                     onToggle={() => setFamilyHidden(family, !familyHidden)} />
                 );
                 // Famille repliée : son en-tête seul, ses activités ne sont pas montées.
@@ -989,13 +989,16 @@ function ActivityNameField({
   onRename: (name: string) => void;
   onDone: () => void;
 }) {
-  const [draft, setDraft] = useState(activity.name);
+  // Le champ part du nom affiché (traduit pour un nom de départ) et le compare à lui : le rouvrir puis le quitter
+  // sans rien changer n'écrit rien.
+  const shownName = activityDisplayName(activity);
+  const [draft, setDraft] = useState(shownName);
   // Entrée et Échap ferment le champ eux-mêmes, sans attendre la perte du focus : la sortie qui suit ne refait rien.
   const closed = useRef(false);
   const close = (save: boolean) => {
     if (closed.current) return;
     closed.current = true;
-    if (save && draft.trim() !== '' && draft.trim() !== activity.name) onRename(draft);
+    if (save && draft.trim() !== '' && draft.trim() !== shownName) onRename(draft);
     onDone();
   };
   return (
@@ -1088,7 +1091,7 @@ function AddActivityForm({
         <label className="ui-inline-row-6 ui-center">
           <span className="ui-muted ui-text-xs">{t('calcul')}</span>
           <select value={base} onChange={(e) => setChosenBase(e.target.value as SportType)} className="ui-field ui-field--s">
-            {familySports(family).map((b) => <option key={b} value={b}>{SPORT_PROFILES[b].label}</option>)}
+            {familySports(family).map((b) => <option key={b} value={b}>{sportDisplayName(b)}</option>)}
           </select>
         </label>
       )}

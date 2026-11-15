@@ -1,10 +1,10 @@
-// Garde des traductions : les clés de `t(`, `tn(` et `tRich(` dans `src/`, contre les dictionnaires anglais et espagnol.
+// Garde des traductions : les clés de `t(`, `tn(`, `tRich(` et `tnRich(` dans `src/`, contre les dictionnaires anglais et espagnol.
 //
 //   node outils/i18n.mjs                  bilan : clés, et par langue traduites, manquantes, erreurs
 //   node outils/i18n.mjs --manquantes en  liste les clés sans traduction anglaise (ou es)
 //
 // Le texte français est la clé (`src/core/i18n.ts`). Une clé est toujours un littéral : un premier argument de `t(` ou
-// de `tRich(`, une des deux phrases de `tn(`, qui n'est pas une chaîne seule est refusé, comme un contexte (`ctx`) non
+// de `tRich(`, une des deux phrases de `tn(` ou de `tnRich(`, qui n'est pas une chaîne seule est refusé, comme un contexte (`ctx`) non
 // littéral. Une entrée de dictionnaire avec contexte s'écrit « texte||contexte » (`MARQUE_CONTEXTE`).
 //
 // Contrôles des dictionnaires (`src/locales/en.json`, `es.json`) : traduction orpheline (clé absente du code), variable
@@ -33,7 +33,10 @@ export const DOSSIER_DICTIONNAIRES = 'src/locales'
 export const cheminDictionnaire = (langue) => path.join(racine, DOSSIER_DICTIONNAIRES, `${langue}.json`)
 
 /** Fonctions dont l'argument est une clé. */
-const NOMS = new Set(['t', 'tn', 'tRich'])
+const NOMS = new Set(['t', 'tn', 'tRich', 'tnRich'])
+
+/** Celles qui accordent au nombre : le nombre, puis deux phrases (arguments 2 et 3), puis les variables (argument 4). */
+const ACCORDEES = new Set(['tn', 'tnRich'])
 
 /** Fichiers qui définissent ces fonctions : leurs appels internes portent une clé variable. */
 const DEFINITIONS = ['src/core/i18n.ts', 'src/components/tRich.ts']
@@ -357,10 +360,11 @@ export function extraireCles(texte, jsx) {
     if (avant && ((avant.type === 'punc' && avant.valeur === '.') || (avant.type === 'id' && avant.valeur === 'function'))) continue
     const ligne = ligneDe(j.pos)
     const { args } = argumentsDe(jetons, k + 1)
-    const phrases = j.valeur === 'tn' ? [args[1], args[2]] : [args[0]]
-    const variables = j.valeur === 'tn' ? args[3] : args[1]
+    const accorde = ACCORDEES.has(j.valeur)
+    const phrases = accorde ? [args[1], args[2]] : [args[0]]
+    const variables = accorde ? args[3] : args[1]
     if (!phrases.every(estLitteral)) {
-      refus.push({ ligne, raison: `${j.valeur}( : ${j.valeur === 'tn' ? 'phrase' : 'premier argument'} non littéral` })
+      refus.push({ ligne, raison: `${j.valeur}( : ${accorde ? 'phrase' : 'premier argument'} non littéral` })
       continue
     }
     const ctx = contexteDe(variables)
@@ -434,7 +438,8 @@ export function controlerDictionnaire(cles, dico) {
     // `tn` passe toujours `n` : une traduction peut l'écrire même si la phrase française ne l'écrit pas (« une session »).
     const attendues = variablesDe(francais)
     const trouvees = variablesDe(traduction)
-    const nPermis = cles.get(cle)?.noms.has('tn') && !attendues.includes('n')
+    const noms = cles.get(cle)?.noms
+    const nPermis = (noms?.has('tn') || noms?.has('tnRich')) && !attendues.includes('n')
     if (!memes(attendues, nPermis ? trouvees.filter((v) => v !== 'n') : trouvees)) r.variables.push(`${cle} : variables ${attendues.join(', ') || 'aucune'}, traduction ${trouvees.join(', ') || 'aucune'}`)
     if (!memes(balisesDe(francais), balisesDe(traduction))) r.variables.push(`${cle} : balises différentes`)
     if (MOT_INTERDIT.test(traduction)) r.interdits.push(`${cle} : ${traduction}`)

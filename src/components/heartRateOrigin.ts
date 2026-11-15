@@ -11,10 +11,11 @@ import { athleteHrSource, type HrSource, type AthleteProfile } from '../library/
 /** « test du 24/10 », « séance du 20/10 », « saisie ». */
 export const hrSourceLabel = (source: HrSource): string => {
   if (source.kind === 'saisie') return t('saisie');
-  const kind = source.kind === 'test' ? t('test') : t('séance');
-  if (source.atMs === null) return kind;
+  const isTest = source.kind === 'test';
+  if (source.atMs === null) return isTest ? t('test') : t('séance');
   const date = new Date(source.atMs);
-  return t('{kind} du {date}', { kind, date: `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}` });
+  const day = `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}`;
+  return isTest ? t('test du {date}', { date: day }) : t('séance du {date}', { date: day });
 };
 
 /** Origine de la FC max retenue par les zones : estimée par l'âge, ou celle de Pratiquant. */
@@ -31,15 +32,26 @@ export const formatOffsetBpm = (offsetBpm: number): string => (offsetBpm < 0 ? `
  * (test du 25/10) et de la FC max 190 (saisie). »
  */
 export const zonesOriginText = (zones: HeartRateZones, profile: AthleteProfile): string => {
-  const offset = zones.offsetBpm !== 0 ? ` ${t('({offset} pour cette activité)', { offset: formatOffsetBpm(zones.offsetBpm) })}` : '';
-  const seuils = `${t('S1 {s1} et S2 {s2} bpm', { s1: zones.s1, s2: zones.s2 })}${offset}`;
-  const hrMax = zones.hrMax === null ? '' : t('FC max {hrMax} ({origin})', { hrMax: zones.hrMax, origin: hrMaxOriginLabel(zones, profile) });
-  if (zones.method === 'saisis') return t('{seuils}, saisis dans Réglages › Pratiquant.', { seuils });
+  const shifted = zones.offsetBpm !== 0;
+  const offset = formatOffsetBpm(zones.offsetBpm);
+  const { s1, s2 } = zones;
+  // Une phrase entière par cas (décalage ou non, méthode) : seuls des nombres et des libellés d'origine complets y entrent.
+  if (zones.method === 'saisis') {
+    return shifted
+      ? t('S1 {s1} et S2 {s2} bpm ({offset} pour cette activité), saisis dans Réglages › Pratiquant.', { s1, s2, offset })
+      : t('S1 {s1} et S2 {s2} bpm, saisis dans Réglages › Pratiquant.', { s1, s2 });
+  }
+  // Sans FC max, aucune méthode autre que « saisis » ne donne de zones : le repli ne sert qu'au typage.
+  const hrMax = zones.hrMax ?? '';
+  const maxOrigin = hrMaxOriginLabel(zones, profile);
   if (zones.method === 'reserve') {
     const rest = athleteHrSource(profile, 'hrRest');
-    return t('{seuils}, tirés de la FC repos {hrRest} ({origin}) et de la {hrMax}.', {
-      seuils, hrRest: profile.hrRest ?? '', origin: rest ? hrSourceLabel(rest) : t('saisie'), hrMax,
-    });
+    const vars = { s1, s2, offset, hrRest: profile.hrRest ?? '', restOrigin: rest ? hrSourceLabel(rest) : t('saisie'), hrMax, maxOrigin };
+    return shifted
+      ? t('S1 {s1} et S2 {s2} bpm ({offset} pour cette activité), tirés de la FC repos {hrRest} ({restOrigin}) et de la FC max {hrMax} ({maxOrigin}).', vars)
+      : t('S1 {s1} et S2 {s2} bpm, tirés de la FC repos {hrRest} ({restOrigin}) et de la FC max {hrMax} ({maxOrigin}).', vars);
   }
-  return t('{seuils}, tirés de la {hrMax}, sans FC repos.', { seuils, hrMax });
+  return shifted
+    ? t('S1 {s1} et S2 {s2} bpm ({offset} pour cette activité), tirés de la FC max {hrMax} ({maxOrigin}), sans FC repos.', { s1, s2, offset, hrMax, maxOrigin })
+    : t('S1 {s1} et S2 {s2} bpm, tirés de la FC max {hrMax} ({maxOrigin}), sans FC repos.', { s1, s2, hrMax, maxOrigin });
 };

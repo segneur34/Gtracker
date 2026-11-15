@@ -12,8 +12,8 @@ import Card from '../components/ui/Card';
 import MoreMenu from '../components/ui/MoreMenu';
 import SegmentedControl from '../components/ui/SegmentedControl';
 import { t, tn } from '../core/i18n';
-import { tRich } from '../components/tRich';
-import { findActivity, sessionActivity, type Activity } from '../core/activities';
+import { tnRich } from '../components/tRich';
+import { activityDisplayName, findActivity, sessionActivity, type Activity } from '../core/activities';
 import { STORAGE_KEYS } from '../core/appIdentity';
 import { sessionFamily } from '../core/parentPage';
 import { SPORT_FAMILIES } from '../core/sportProfiles';
@@ -25,8 +25,9 @@ import { previewImageStore } from '../library/previewImageStore';
 import { previewStore } from '../library/previewStore';
 import type { LibrarySession } from '../library/record';
 import { SESSION_SORTS, SESSION_SORT_DEFAULT, isSessionSort, sortSessions, type SessionSort } from '../library/sessionSort';
-import { commonDistanceUnit, filterChoices, filterSessions, ofActivity, sessionsTotals, totalsLine } from '../library/sessionsList';
+import { commonDistanceUnit, emptyOfActivity, filterChoices, filterSessions, sessionsTotals, totalsLine } from '../library/sessionsList';
 import { shownRoutes } from '../planning/routeShown';
+import { memoryLabelText } from '../platform/memoryFolder';
 import { isNativeApp } from '../platform/runtime';
 import { jsonStore } from '../platform/storage';
 import './SessionsPage.css';
@@ -117,7 +118,7 @@ function SessionsPage() {
   );
   const totals = useMemo(() => {
     const units = listed.map((s) => activityOf(s)).filter((a): a is Activity => a !== null).map(effectiveDistanceUnit);
-    return totalsLine(sessionsTotals(listed), commonDistanceUnit(units), selected?.name ?? null);
+    return totalsLine(sessionsTotals(listed), commonDistanceUnit(units), selected ? activityDisplayName(selected) : null);
   }, [listed, activityOf, selected]);
 
   const [sort, setSortState] = useState<SessionSort>(readSort);
@@ -157,7 +158,7 @@ function SessionsPage() {
             {library.status === 'ready' && (
               <span className="ui-more__note">
                 {tn(library.sessions.length, 'Mémoire : {folder}, {n} session en tout', 'Mémoire : {folder}, {n} sessions en tout',
-                  { folder: library.folderLabel ?? t('ce navigateur') })}
+                  { folder: library.folderLabel === null ? t('ce navigateur') : memoryLabelText(library.folderLabel) })}
               </span>
             )}
             <ImportButtons />
@@ -197,11 +198,10 @@ function SessionsPage() {
 
         {selected === null && everything.hidden > 0 && (
           <p className="ui-hint ui-hint--m">
-            {everything.hidden > 1
-              ? tRich('Activités cachées : {n} sessions en moins dans la liste. Elles se ré-affichent dans <a>Réglages</a>.',
-                { n: everything.hidden }, { a: (children) => <Link to="/parametres">{children}</Link> })
-              : tRich('Activités cachées : {n} session en moins dans la liste. Elles se ré-affichent dans <a>Réglages</a>.',
-                { n: everything.hidden }, { a: (children) => <Link to="/parametres">{children}</Link> })}
+            {tnRich(everything.hidden,
+              'Activités cachées : {n} session en moins dans la liste. Elles se ré-affichent dans <a>Réglages</a>.',
+              'Activités cachées : {n} sessions en moins dans la liste. Elles se ré-affichent dans <a>Réglages</a>.',
+              undefined, { a: (children) => <Link to="/parametres">{children}</Link> })}
           </p>
         )}
 
@@ -220,7 +220,7 @@ function SessionsPage() {
           settled && (selected !== null || everything.hidden === 0) && (
             <p className="ui-hint ui-hint--m sessions-empty">
               {selected
-                ? t("Aucune session {activity} pour l'instant.", { activity: ofActivity(selected.name) })
+                ? emptyOfActivity(activityDisplayName(selected))
                 : t("Aucune session pour l'instant. Enregistrez-en une, ou importez des GPX : ils sont rangés dans la mémoire et analysés ici.")}
             </p>
           )

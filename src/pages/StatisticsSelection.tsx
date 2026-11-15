@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import Dialog from '../components/ui/Dialog';
 import ChoiceButtons from '../components/ui/ChoiceButtons';
-import { FAMILY_LABEL, activitiesOfFamily, activityFamily, type Activity } from '../core/activities';
+import { FAMILY_LABEL, activitiesOfFamily, activityDisplayName, activityFamily, type Activity } from '../core/activities';
 import { SPORT_FAMILIES, type SportFamily } from '../core/sportProfiles';
 import { useGearGroups, useVisibility } from '../hooks/useSportSettings';
 import { useThemedShade } from '../hooks/useTheme';
@@ -76,7 +76,7 @@ function StatsSelectionDialog({ initial, all, activityById, nowMs, onApply, onCl
     const listed = activitiesOfFamily(activities, draftFamily)
       .filter((a) => isShown(a) || familyHidden || withSessions.has(a.id) || a.id === initial.activityId);
     const extra = [...withSessions].filter((id) => !listed.some((a) => a.id === id)).map((id) => activityById.get(id)!);
-    return [...listed, ...extra].map((a) => ({ key: a.id, label: a.name, color: shade(a.color) }));
+    return [...listed, ...extra].map((a) => ({ key: a.id, label: activityDisplayName(a), color: shade(a.color) }));
   }, [draftFamily, families, all, activities, isShown, initial.activityId, activityById, shade]);
 
   const candidate = draft.activityId !== null ? activityById.get(draft.activityId) : undefined;

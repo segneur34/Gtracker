@@ -94,18 +94,18 @@ const totalDuration = (ms: number): string =>
   ms >= WHOLE_HOURS_FROM_MS ? `${Math.round(ms / 3600_000).toLocaleString(dateLocale())} h` : formatDuration(ms);
 
 /**
- * « de wingfoil », « d'optimist » : le nom de l'activité dans la phrase, sa majuscule retirée sauf pour un sigle
- * (« de SUP »).
+ * Le nom de l'activité dans une phrase (majuscule retirée sauf pour un sigle), et si « de » s'élide devant lui
+ * (« de wingfoil », « d'optimist », « de SUP ») : l'appelant choisit entre deux phrases entières.
  */
-export const ofActivity = (name: string): string => {
-  const { word, elided } = activityWord(name);
-  return elided ? t("d'{word}", { word }) : t('de {word}', { word });
-};
-
-/** Le nom de l'activité dans une phrase (majuscule retirée sauf pour un sigle), et si « de » s'élide devant lui. */
 const activityWord = (name: string): { word: string; elided: boolean } => {
   const word = /^\p{Lu}\p{Ll}/u.test(name) ? name[0].toLowerCase() + name.slice(1) : name;
   return { word, elided: /^[aeiouyàâéèêëîïôöûü]/i.test(word) };
+};
+
+/** Phrase d'une liste vide filtrée sur une activité : « Aucune session de wingfoil pour l'instant. », « … d'optimist … ». */
+export const emptyOfActivity = (activityName: string): string => {
+  const { word, elided } = activityWord(activityName);
+  return elided ? t("Aucune session d'{word} pour l'instant.", { word }) : t("Aucune session de {word} pour l'instant.", { word });
 };
 
 /**

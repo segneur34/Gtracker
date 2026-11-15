@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Activity } from '../core/activities';
+import { activityDisplayName, type Activity } from '../core/activities';
 import { sportFamily } from '../core/sportProfiles';
 import { formatDistance, formatDuration } from '../core/units';
 import type { BrushFrameProps } from './brushFrame';
@@ -121,7 +121,7 @@ function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: nu
                   <li key={s.file}>
                     <button type="button" onClick={() => openSession(s.file, sportFamily(activity.base))}>
                       <span className="ui-swatch" style={{ background: shown(activity.color) }} />
-                      <span className="actchart__name">{activity.name}</span>
+                      <span className="actchart__name">{activityDisplayName(activity)}</span>
                       <span className="actchart__meta num">
                         {weekly && `${new Date(s.startMs).toLocaleDateString(dateLocale(), { weekday: 'short', day: 'numeric' })} · `}
                         {formatTime(s.startMs)} · {formatDuration(s.durationS * 1000)} · {distanceText(s.distanceM, activity)}
@@ -153,7 +153,7 @@ function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: nu
               <li key={tot.activityId}>
                 <button type="button" onClick={() => navigate(sessionsPath(activity.id))}>
                   <span className="ui-swatch" style={{ background: shown(activity.color) }} />
-                  <span className="actchart__name">{activity.name}</span>
+                  <span className="actchart__name">{activityDisplayName(activity)}</span>
                   <span className="actchart__meta num">
                     {tn(tot.sessions, '{n} session', '{n} sessions', { n: tot.sessions })} · {formatDuration(tot.durationS * 1000)} · {distanceText(tot.distanceM, activity)}
                   </span>

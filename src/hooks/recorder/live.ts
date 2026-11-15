@@ -1,4 +1,4 @@
-import type { Activity } from '../../core/activities';
+import { activityDisplayName, type Activity } from '../../core/activities';
 import { t } from '../../core/i18n';
 import type { SessionMark } from '../../core/sessionMarks';
 import type { RecordingProfile } from '../../core/sportProfiles';
@@ -138,7 +138,7 @@ export const sourceOptions = (activity: Activity, recording: RecordingProfile): 
   intervalMs: recording.intervalMs,
   distanceFilterM: recording.distanceFilterM,
   notificationTitle: t('Gtracker enregistre'),
-  notificationText: t('Session {name} en cours', { name: activity.name }),
+  notificationText: t('Session {name} en cours', { name: activityDisplayName(activity) }),
 });
 
 /** Variables de la session qui démarre, ou qui reprend d'un journal relu, remises au départ. */

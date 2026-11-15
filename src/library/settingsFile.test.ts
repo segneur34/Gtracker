@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_ACTIVITIES } from '../core/activities';
+import { CONTEXT_MARK, setLanguage } from '../core/i18n';
 import { EMPTY_ATHLETE_PROFILE } from './athleteProfile';
 import {
+  DEFAULT_DEVICE_NAMES,
   SETTINGS_FORMAT,
   SETTINGS_VERSION,
   adoptedValues,
@@ -9,6 +11,7 @@ import {
   checkedValues,
   cleanDeviceName,
   deviceFileName,
+  deviceNameText,
   freeDeviceName,
   importedSettingsFileName,
   newestSettingsEntry,
@@ -268,5 +271,28 @@ describe('adoptedValues', () => {
 
   it("ne reprend pas un profil qui n'a pas la forme attendue", () => {
     expect(checkedValues({ [STORAGE_KEYS.athleteProfile]: 'abîmé', [STORAGE_KEYS.sportSettings]: {} })).toEqual({ [STORAGE_KEYS.sportSettings]: {} });
+  });
+});
+
+describe("nom d'appareil traduit à l'affichage seulement", () => {
+  afterEach(() => setLanguage('fr', {}));
+
+  it('en français, un nom ressort tel quel', () => {
+    expect(deviceNameText(DEFAULT_DEVICE_NAMES.phone)).toBe('Téléphone');
+    expect(deviceNameText(DEFAULT_DEVICE_NAMES.computer)).toBe('PC');
+    expect(deviceNameText('Téléphone de Léa')).toBe('Téléphone de Léa');
+  });
+
+  it("dans une autre langue, seul un nom donné d'office se traduit", () => {
+    setLanguage('en', { [`Téléphone${CONTEXT_MARK}appareil`]: 'Phone', [`PC${CONTEXT_MARK}appareil`]: 'Computer' });
+    expect(deviceNameText('Téléphone')).toBe('Phone');
+    expect(deviceNameText('PC')).toBe('Computer');
+    expect(deviceNameText('Téléphone 2')).toBe('Phone 2');
+    expect(deviceNameText('PC 13')).toBe('Computer 13');
+    expect(deviceNameText('Téléphone 2b')).toBe('Téléphone 2b');
+    expect(deviceNameText('Tablette 2')).toBe('Tablette 2');
+    expect(deviceNameText('Tablette')).toBe('Tablette');
+    // Le fichier reste nommé d'après le nom gardé, en français.
+    expect(deviceFileName(DEFAULT_DEVICE_NAMES.phone)).toBe('telephone.json');
   });
 });

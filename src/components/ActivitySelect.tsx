@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, type Activity } from '../core/activities';
+import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityDisplayName, type Activity } from '../core/activities';
 import { t } from '../core/i18n';
 import { SPORT_FAMILIES, type SportFamily } from '../core/sportProfiles';
 import { useVisibility } from '../hooks/useSportSettings';
@@ -79,7 +79,7 @@ export function ActivitySheet({ activities, value, families = SPORT_FAMILIES, la
             {items.map((a) => {
               const selected = a.id === value;
               return (
-                <ChoiceOption key={a.id} buttonRef={selected ? selectedRef : undefined} label={a.name} selected={selected}
+                <ChoiceOption key={a.id} buttonRef={selected ? selectedRef : undefined} label={activityDisplayName(a)} selected={selected}
                   onClick={() => onChoose(a)}
                   icon={<ActivityGlyph activity={a} size={20} swatch className="activity-select__icon" />} />
               );
@@ -128,12 +128,12 @@ function ActivitySelect({
         className={`${className} activity-select`}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={label ? t('{label} : {value}', { label, value: current?.name ?? placeholder ?? t('à choisir') }) : undefined}
+        aria-label={label ? t('{label} : {value}', { label, value: current ? activityDisplayName(current) : placeholder ?? t('à choisir') }) : undefined}
         disabled={disabled}
         onClick={() => setOpen(true)}>
         {current && <ActivityGlyph activity={current} size={18} swatch className="activity-select__icon" />}
         <span className={current ? 'activity-select__name' : 'activity-select__name activity-select__name--empty'}>
-          {current?.name ?? placeholder ?? t('Choisir…')}
+          {current ? activityDisplayName(current) : placeholder ?? t('Choisir…')}
         </span>
         <IconChevronRight size={14} className="activity-select__chevron" />
       </button>

@@ -6,7 +6,7 @@
  * les semaines ISO (`activityChart.ts`).
  */
 
-import type { Activity } from '../core/activities';
+import { activityDisplayName, type Activity } from '../core/activities';
 import { t } from '../core/i18n';
 import { ZONE_COUNT, edwardsLoad, histogramZoneTimes } from '../core/heartRate';
 import { sportFamily, sportTreatment, type SportFamily, type Treatment } from '../core/sportProfiles';
@@ -84,7 +84,7 @@ export const statSessionOf = (file: string, record: SessionRecord, activity: Act
   const { summary } = record;
   return {
     file,
-    name: sessionDisplayName(record, activity.name),
+    name: sessionDisplayName(record, activityDisplayName(activity)),
     startMs: summary.startMs,
     endMs: summary.endMs,
     distanceM: summary.distanceM,

@@ -1,7 +1,7 @@
 import { t } from '../../core/i18n';
 import { SETTINGS_DIR, settingsPath } from '../../library/folderLayout';
 import {
-  TRAVELLING_KEYS, adoptedValues, buildSettingsFile, cleanDeviceName, deviceFileName,
+  DEFAULT_DEVICE_NAMES, TRAVELLING_KEYS, adoptedValues, buildSettingsFile, cleanDeviceName, deviceFileName, deviceNameText,
   freeDeviceName, importedSettingsFileName, newestSettingsEntry, ownSettingsEntry, parseSettingsFile,
   serializeSettingsFile, settingsEntryKey, settingsEntryName, settingsFileInfo, settingsSignature,
   sortedSettingsFiles, unseenSettingsEntries, type SettingsEntry, type SettingsFileInfo,
@@ -109,11 +109,14 @@ const deviceId = (): string => {
   return id;
 };
 
-/** Nom de l'appareil : celui qu'on lui a donné, sinon « Téléphone » sur Android, « PC » dans le navigateur. */
+/**
+ * Nom de l'appareil : celui qu'on lui a donné, sinon « Téléphone » sur Android, « PC » dans le navigateur, en français
+ * (le nom gardé) ; l'écran le montre par `deviceNameText`.
+ */
 const deviceName = (): string => {
   const stored = jsonStore.read<string>(DEVICE_NAME_KEY);
   const name = typeof stored === 'string' ? cleanDeviceName(stored) : '';
-  return name !== '' ? name : isNativeApp() ? 'Téléphone' : 'PC';
+  return name !== '' ? name : isNativeApp() ? DEFAULT_DEVICE_NAMES.phone : DEFAULT_DEVICE_NAMES.computer;
 };
 
 /** Dernière lecture de `reglages/`, tenue à jour par les écritures de l'appareil. */
@@ -189,8 +192,8 @@ const writeOwnSettings = async (f: MemoryFolder, savedAt: number): Promise<void>
     const blocked = deviceFileName(wanted);
     setState({
       message: unreadable.has(blocked) && !settingsEntries.some((e) => e !== own && e.fileName.toLowerCase() === blocked)
-        ? t("Cet appareil s'appelle désormais « {name} » : le fichier de réglages {blocked} du dossier ne se lit pas, il est gardé tel quel.", { name, blocked })
-        : t("Cet appareil s'appelle désormais « {name} » : un autre appareil du dossier s'appelle déjà « {wanted} ».", { name, wanted }),
+        ? t("Cet appareil s'appelle désormais « {name} » : le fichier de réglages {blocked} du dossier ne se lit pas, il est gardé tel quel.", { name: deviceNameText(name), blocked })
+        : t("Cet appareil s'appelle désormais « {name} » : un autre appareil du dossier s'appelle déjà « {wanted} ».", { name: deviceNameText(name), wanted: deviceNameText(wanted) }),
     });
   }
   const fileName = deviceFileName(name);
@@ -284,7 +287,7 @@ const syncSettings = async (f: MemoryFolder): Promise<boolean> => {
       autoAdopted = true;
       changed = applySettingsValues(adoptedValues(newest.file.values, localTravellingValues()));
       savedAt = newest.file.savedAt;
-      if (newest !== own) setState({ message: t('Réglages repris de « {name} », le fichier le plus récent du dossier.', { name: settingsEntryName(newest) }) });
+      if (newest !== own) setState({ message: t('Réglages repris de « {name} », le fichier le plus récent du dossier.', { name: deviceNameText(settingsEntryName(newest)) }) });
     }
   }
   if (savedAt === null) savedAt = Date.now();
@@ -339,7 +342,7 @@ export const adoptSettingsFile = async (fileName: string): Promise<void> => {
     lastSignature = settingsSignature(localTravellingValues());
     await readSettingsEntries(f);
     await writeOwnSettings(f, now);
-    setState({ message: t('Réglages repris de « {name} ».', { name: settingsEntryName({ fileName, file }) }), settingsOffer: null });
+    setState({ message: t('Réglages repris de « {name} ».', { name: deviceNameText(settingsEntryName({ fileName, file })) }), settingsOffer: null });
     await applySettingsChange(true);
   } catch (err) {
     setState({ error: t('Reprise des réglages impossible : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
@@ -354,14 +357,16 @@ export const adoptSettingsFile = async (fileName: string): Promise<void> => {
 export const renameDevice = async (raw: string): Promise<string | null> => {
   const name = cleanDeviceName(raw);
   if (name === '') return t('Donnez un nom à cet appareil.');
-  if (name === deviceName()) return null;
+  // Le champ montre le nom traduit (« Phone ») : le quitter sans rien changer ne renomme pas l'appareil.
+  const current = deviceName();
+  if (name === current || name === deviceNameText(current)) return null;
   await lib.opening;
   const f = lib.folder;
   try {
     const { entries, unreadable } = f ? await readSettingsListing(f) : { entries: [], unreadable: [] };
     const own = ownSettingsEntry(entries, deviceId());
     const clash = entries.find((e) => e !== own && e.fileName.toLowerCase() === deviceFileName(name));
-    if (clash) return t('Le fichier {fileName} est déjà celui de « {name} » : choisissez un autre nom.', { fileName: clash.fileName, name: settingsEntryName(clash) });
+    if (clash) return t('Le fichier {fileName} est déjà celui de « {name} » : choisissez un autre nom.', { fileName: clash.fileName, name: deviceNameText(settingsEntryName(clash)) });
     const unreadableClash = unreadable.find((n) => n.toLowerCase() === deviceFileName(name));
     if (unreadableClash) return t('Le fichier {fileName} du dossier ne se lit pas et porte déjà ce nom : choisissez un autre nom.', { fileName: unreadableClash });
     jsonStore.write(DEVICE_NAME_KEY, name);

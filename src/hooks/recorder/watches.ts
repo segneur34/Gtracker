@@ -1,4 +1,3 @@
-import { errorMessage } from '../../core/basics';
 import { t } from '../../core/i18n';
 import type { RecordingProfile } from '../../core/sportProfiles';
 import { armBeltWatch, armGpsWatch, disarmBeltWatch, disarmGpsWatch, onBeltLost, onGpsLost } from '../../platform/beeper';
@@ -8,6 +7,7 @@ import {
 import {
   START_GPS_WATCH, beltWatchSettings, gpsWatchOnExpired, gpsWatchOnFix, watchesGps, type GpsWatchState, type GpsWatchStep,
 } from '../../recording/gpsWatch';
+import { nativeErrorMessage } from '../../platform/nativeMessages';
 import { readableBpm } from '../../recording/heartRate';
 import { journalBeltLine } from '../../recording/journal';
 import { flushJournal, queueJournalLines } from './journalBuffer';
@@ -141,7 +141,7 @@ export const takeBelt = async (belt: HeartRateBelt, maxAgeS: number): Promise<vo
 
 /** Alerte d'une ceinture qui ne répond pas, au départ comme à la reprise : l'enregistrement continue sans elle. */
 export const beltUnreachableError = (err: unknown): string =>
-  t("Ceinture cardio injoignable : {detail}. L'enregistrement continue sans elle.", { detail: errorMessage(err, t('erreur inconnue')) });
+  t("Ceinture cardio injoignable : {detail}. L'enregistrement continue sans elle.", { detail: nativeErrorMessage(err, t('erreur inconnue')) });
 
 /**
  * Prend la ceinture comme `takeBelt`, sans jamais lever : si elle ne répond pas, elle est rendue, la tuile BPM

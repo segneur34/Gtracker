@@ -24,7 +24,7 @@ import { IconChevronRight, IconFile, IconPencil, IconPencilOff, IconUndo } from 
 import { CARD_STYLE } from '../components/styles';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/ui/PageHeader';
-import { activityFamily, findActivity, type Activity } from '../core/activities';
+import { activityDisplayName, activityFamily, findActivity, type Activity } from '../core/activities';
 import { DEFAULT_MAP_CENTER, trackBounds } from '../core/displayConfig';
 import { parseGpxPath } from '../core/gpxParser';
 import { formatDistance, toDisplayDistance } from '../core/units';
@@ -593,7 +593,7 @@ function PlanningPage() {
     { key: 'parcours', label: t('parcours') },
     { key: 'trace', label: t('tracé') },
     { key: 'points', label: t('balises ({n})', { n: pointCount }) },
-    { key: 'ranger', label: t('enregistrer') },
+    { key: 'ranger', label: t('enregistrer', { ctx: 'garder' }) },
     { key: 'liste', label: t('mes itinéraires ({n})', { n: listedRoutes.length }) },
   ];
 
@@ -713,16 +713,16 @@ function PlanningPage() {
             helpKey={guide && activity ? 'plan:parcours' : undefined}>
             {guide && activity && (
               <HelpText helpKey="plan:parcours" note>
-                {tRich(
-                  'En navigation, chaque balise, départ compris, se valide à moins de {radius} m. Bips dès {start} m : {who} « Régler pour ce parcours » ouvre leur courbe : tirez un point pour le déplacer, touchez le graphe pour en ajouter un.',
-                  {
-                    radius: validationRadiusM(guide),
-                    start: beepStartM(guide),
-                    who: courseGuide
-                      ? t('propres à ce parcours.')
-                      : tRich('ceux de l\'activité {name}, réglés dans <a>Réglages</a>.', { name: activity.name }, { a: (c) => <Link to="/parametres">{c}</Link> }),
-                  }
-                )}
+                {courseGuide
+                  ? tRich(
+                    'En navigation, chaque balise, départ compris, se valide à moins de {radius} m. Bips dès {start} m : propres à ce parcours. « Régler pour ce parcours » ouvre leur courbe : tirez un point pour le déplacer, touchez le graphe pour en ajouter un.',
+                    { radius: validationRadiusM(guide), start: beepStartM(guide) }
+                  )
+                  : tRich(
+                    'En navigation, chaque balise, départ compris, se valide à moins de {radius} m. Bips dès {start} m : ceux de l\'activité {name}, réglés dans <a>Réglages</a>. « Régler pour ce parcours » ouvre leur courbe : tirez un point pour le déplacer, touchez le graphe pour en ajouter un.',
+                    { radius: validationRadiusM(guide), start: beepStartM(guide), name: activityDisplayName(activity) },
+                    { a: (c) => <Link to="/parametres">{c}</Link> }
+                  )}
               </HelpText>
             )}
             <div className="plan-stats">
@@ -755,7 +755,7 @@ function PlanningPage() {
                 </div>
                 {beepsOpen && activityGuide && (
                   <BeepCurveEditor value={guide} overridden={courseGuide !== null} fallback={activityGuide}
-                    resetLabel={t("Comme l'activité")} fallbackMark={t("ceux de l'activité {name}", { name: activity.name })}
+                    resetLabel={t("Comme l'activité")} fallbackMark={t("ceux de l'activité {name}", { name: activityDisplayName(activity) })}
                     approachMs={simulatedApproachMs(activityFamily(activity))} speedUnit={effectiveSpeedUnit(activity)}
                     onChange={setCourseGuide} />
                 )}
@@ -853,7 +853,7 @@ function PlanningPage() {
             )}
             <div className="plan-actions">
               <Button variant="primary" onClick={() => void handleSave()} disabled={!canSave || (current !== null && !dirty)}>
-                {saving ? t('Enregistrement…') : current ? t('Enregistrer les modifications') : t('Enregistrer')}
+                {saving ? t('Enregistrement…') : current ? t('Enregistrer les modifications') : t('Enregistrer', { ctx: 'garder' })}
               </Button>
               {current !== null && (
                 <Button variant="record" onClick={() => go(current)} disabled={dirty || !canGo}

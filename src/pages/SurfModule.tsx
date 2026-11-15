@@ -140,7 +140,7 @@ const MemoTrackChart = memo(TrackChart) as typeof TrackChart;
 const MemoHeartRateChart = memo(HeartRateChart) as typeof HeartRateChart;
 const CHART_STYLE = chartBox(CHART_HEIGHT_PX);
 const FILL_STYLE: CSSProperties = { width: '100%', flex: 1, minHeight: 0 };
-const SPEED_SERIES: TrackSeries<ChartRow>[] = [{ kind: 'line', key: 'speed', name: 'Vitesse', color: SPEED_COLOR, width: 1.5, activeDotR: 4 }];
+const SPEED_SERIES: TrackSeries<ChartRow>[] = [{ kind: 'line', key: 'speed', name: t('Vitesse'), color: SPEED_COLOR, width: 1.5, activeDotR: 4 }];
 
 interface ChartRow {
   index: number;
@@ -313,19 +313,30 @@ function SurfModule() {
     [track]
   );
   const shownSpans = useMemo((): TrackSpanShown[] => {
-    const spanLabel = (kind: string, s: SurfSpan) =>
-      `${kind} ${s.n} · ${formatTimeOfDay(s.startMs)} · ${formatShortDuration(s.durationS)} · ${Math.round(s.distanceM)} m · max ${formatSpeed(s.maxSpeedMs, speedUnit)}`;
+    /** Libellé d'un passage montré sur la carte : une phrase entière par genre de passage. */
+    const spanLabel = (kind: 'vague' | 'vol', s: SurfSpan) => {
+      const vars = {
+        n: s.n,
+        time: formatTimeOfDay(s.startMs),
+        duration: formatShortDuration(s.durationS),
+        distance: Math.round(s.distanceM),
+        speed: formatSpeed(s.maxSpeedMs, speedUnit),
+      };
+      return kind === 'vague'
+        ? t('Vague {n} · {time} · {duration} · {distance} m · max {speed}', vars)
+        : t('Vol {n} · {time} · {duration} · {distance} m · max {speed}', vars);
+    };
     if (waveShown === 'podium') {
       return [...waves].sort((a, b) => b.distanceM - a.distanceM).slice(0, 3)
-        .map((w, k) => ({ key: `vague-${w.n}`, start: w.start, end: w.end, color: HIGHLIGHT_PODIUM_COLORS[k], label: spanLabel(t('Vague'), w) }));
+        .map((w, k) => ({ key: `vague-${w.n}`, start: w.start, end: w.end, color: HIGHLIGHT_PODIUM_COLORS[k], label: spanLabel('vague', w) }));
     }
     if (waveShown !== null) {
       const w = waves.find((x) => String(x.n) === waveShown);
-      return w ? [{ key: `vague-${w.n}`, start: w.start, end: w.end, color: HIGHLIGHT_SHOWN_COLOR, label: spanLabel(t('Vague'), w) }] : [];
+      return w ? [{ key: `vague-${w.n}`, start: w.start, end: w.end, color: HIGHLIGHT_SHOWN_COLOR, label: spanLabel('vague', w) }] : [];
     }
     // Onglets « vols » et « pumping » : un vol, une série de coups, ou l'un des deux podiums (`PumpingHighlightKey`).
     const flightOrSeries = flightShown ?? pumpingShown;
-    if (flightOrSeries !== null) return pumpingHighlightSpans(flightOrSeries, flights, podiumFlights, pumpSeriesList, seriesPodium, (f) => spanLabel(t('Vol'), f));
+    if (flightOrSeries !== null) return pumpingHighlightSpans(flightOrSeries, flights, podiumFlights, pumpSeriesList, seriesPodium, (f) => spanLabel('vol', f));
     if (returnShown !== null) {
       const r = returns.find((x) => String(x.after) === returnShown);
       if (!r) return [];

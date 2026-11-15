@@ -207,6 +207,20 @@ describe('fichiers reçus d\'une autre application', () => {
     expect(notices()[0].trouble).toBe(true);
   });
 
+  it('autre langue : la raison se lit à part du nom, quelle que soit la ponctuation de la ligne du compte rendu', async () => {
+    const { notices, drain } = await launch();
+    const i18n = await import('../../core/i18n');
+    i18n.setLanguage('en', { '{name} : {reason}': '{name}: {reason}' });
+    try {
+      writeRefused = true;
+      receive('montre.fit', fitAt(1));
+      await drain();
+      expect(notices()[0].text).toBe('« montre.fit » n\'a pas pu être rangé (écriture refusée). Gtracker le garde et réessaiera au prochain lancement.');
+    } finally {
+      i18n.setLanguage('fr');
+    }
+  });
+
   it('échec d\'écriture : dit, copie gardée, pas de nouvel essai pendant ce lancement, rangée au suivant', async () => {
     writeRefused = true;
     const id = receive('montre.fit', fitAt(1));

@@ -126,6 +126,18 @@ Une étape P reçoit une liste de fichiers. Pour chacun : lire, envelopper chaqu
 
 ## Reprises après la pose (relevées par les paquets, à traiter en une étape à part)
 
+**Étape faite le 15/11.** Traités : contexte `garder` sur « Enregistrer », rangs par `PODIUM_RANKS`, `tnRich` (pluriel des phrases à balises, relevé par la garde), vrais pluriels « points » et « balises », fragments (`FAMILY_OF` supprimé, `ofActivity` devenu `emptyOfActivity`, `zoomHint`, `heartRateOrigin`, `HoldButton`, phrase des bips), comparaisons des Statistiques par identifiant, « sous Z1 », « · max » du surf, les deux fautes du français, noms par défaut traduits à l'affichage seulement (`activityDisplayName`, `sportDisplayName`, `paletteColorText`, `memoryLabelText`, `deviceNameText`, table locale des styles de poissons, `LOGO_LABEL`), `plainError` indépendant de la langue, messages des greffons Java traduits côté page (`platform/nativeMessages.ts`), nom et raison d'un fichier refusé gardés à part (`failedFiles`), `fluidite-compile.mjs --langue`.
+
+**Restent, à relire aux dictionnaires ou à trancher :**
+- `LISEZMOI.txt` du dossier mémoire : laissé en français, à trancher par l'utilisateur.
+- Repli « Session » de `library/fitToGpx.ts` : écrit dans le `<name>` du GPX, donnée gardée, laissé en français.
+- `plainError` : dans une autre langue que le français, un message technique anglais sans marque (« Unexpected token < in JSON ») s'affiche tel quel au lieu du texte générique ; une fonction d'`i18n.ts` qui reconnaît un texte du dictionnaire le réglerait.
+- `heartRateOrigin.ts` : `restOrigin` et `maxOrigin` sont des libellés entiers insérés entre parenthèses ; vérifier que la phrase tient en anglais et en espagnol.
+- Libellés passés en minuscules (`RecordingPage`), `TREND_SESSIONS` brut, message `window.confirm` de `SettingsFiles` en trois clés : laissés.
+- Choix par défaut à signaler à l'utilisateur : « Planche à voile » (nom de calcul d'une activité supprimée) se traduit ; une activité de départ renommée exactement « Bateau » se retraduit.
+
+La liste d'origine, gardée pour mémoire :
+
 - **Noms d'activités de départ et `LOGO_LABEL`** (`core/activities.ts:152-174`, `core/activityLogos.ts:22-33`) : traduits à l'affichage seulement, et seulement « Bateau » tant que le nom n'a pas été changé ; `activityLogos.test.ts` exige onze libellés distincts.
 - **Noms de couleur de la palette** (`core/activities.ts:67-78`) : clés de recherche, traduits à l'affichage (Réglages, choix de couleur).
 - **Styles de poissons** (`core/schoolBasics.ts:12-18`) : le fichier n'a droit à aucun import ; traduire à l'affichage dans `components/fishSchool/FishStylePicker.tsx`.

@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MARKER_FILE } from '../core/appIdentity';
+import { setLanguage } from '../core/i18n';
 import {
-  MISSING_FOLDER_MESSAGE, READ_ONLY_MEMORY_MESSAGE, fileErrorCode, folderImportPaths, isMemorySubfolder, readOnlyFolder, readableFolderError, shouldDescendIntoMemory,
+  MISSING_FOLDER_MESSAGE, READ_ONLY_MEMORY_MESSAGE, fileErrorCode, folderImportPaths, isMemorySubfolder, memoryLabelText, readOnlyFolder, readableFolderError, shouldDescendIntoMemory,
 } from './memoryFolder';
 import { createFakeFolder } from '../test/memoryFolder.fixture';
 
@@ -131,5 +132,27 @@ describe('readOnlyFolder', () => {
     await expect(folder.remove('a.txt')).rejects.toThrow(READ_ONLY_MEMORY_MESSAGE);
     expect(log).toEqual([]);
     expect(files.get('a.txt')).toBe('contenu');
+  });
+});
+
+describe('libellé du dossier mémoire traduit à l’affichage seulement', () => {
+  afterEach(() => setLanguage('fr', {}));
+
+  it('en français, chaque forme ressort telle quelle', () => {
+    for (const label of ['mémoire de ce navigateur', 'dossier privé de l\'application', 'dossier « Gtracker »', 'dossier « Documents/Gtracker »']) {
+      expect(memoryLabelText(label)).toBe(label);
+    }
+  });
+
+  it('dans une autre langue, les trois formes se traduisent, le nom du dossier gardé ; un autre libellé reste tel quel', () => {
+    setLanguage('en', {
+      'mémoire de ce navigateur': 'this browser storage',
+      'dossier privé de l\'application': 'app private folder',
+      'dossier « {name} »': 'folder “{name}”',
+    });
+    expect(memoryLabelText('mémoire de ce navigateur')).toBe('this browser storage');
+    expect(memoryLabelText('dossier privé de l\'application')).toBe('app private folder');
+    expect(memoryLabelText('dossier « Documents/Gtracker »')).toBe('folder “Documents/Gtracker”');
+    expect(memoryLabelText('carte SD')).toBe('carte SD');
   });
 });

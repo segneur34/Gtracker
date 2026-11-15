@@ -79,6 +79,28 @@ export const ACTIVITY_PALETTE: readonly PaletteColor[] = [
   { light: '#0e8f4f', dark: '#0e8f4f', name: 'Vert' },
 ];
 
+/**
+ * Nom d'une couleur de la palette tel que l'écran le montre. Le nom français (`name`, `darkName`) reste la clé de
+ * recherche (`paletteColor`) ; un nom inconnu ressort tel quel.
+ */
+export const paletteColorText = (name: string): string => {
+  switch (name) {
+    case 'Blanc': return t('Blanc', { ctx: 'couleur' });
+    case 'Océan': return t('Océan', { ctx: 'couleur' });
+    case 'Lagon': return t('Lagon', { ctx: 'couleur' });
+    case 'Bleu': return t('Bleu', { ctx: 'couleur' });
+    case 'Violet': return t('Violet', { ctx: 'couleur' });
+    case 'Orange': return t('Orange', { ctx: 'couleur' });
+    case 'Magenta': return t('Magenta', { ctx: 'couleur' });
+    case 'Bordeaux': return t('Bordeaux', { ctx: 'couleur' });
+    case 'Noir': return t('Noir', { ctx: 'couleur' });
+    case 'Jaune': return t('Jaune', { ctx: 'couleur' });
+    case 'Graphite': return t('Graphite', { ctx: 'couleur' });
+    case 'Vert': return t('Vert', { ctx: 'couleur' });
+    default: return name;
+  }
+};
+
 /** Couleur de la palette par son nom, pour les activités de départ et les calculs. */
 const paletteColor = (name: string): string => ACTIVITY_PALETTE.find((c) => c.name === name)!.light;
 
@@ -222,9 +244,6 @@ export const FAMILY_BASE: Record<SportFamily, SportType> = { voile: 'wingfoil', 
 /** Nom d'une famille, tel que l'interface l'affiche. */
 export const FAMILY_LABEL: Record<SportFamily, string> = { voile: t('Voile'), surf: t('Surf') };
 
-/** Tournure d'une famille dans « Aucune activité … », « Aucune session … » : « de voile », « de surf ». */
-export const FAMILY_OF: Record<SportFamily, string> = { voile: 'de voile', surf: 'de surf' };
-
 /** Couleur d'interface d'une famille (variable du thème). */
 export const FAMILY_ACCENT: Record<SportFamily, string> = { voile: 'var(--voile)', surf: 'var(--surf)' };
 
@@ -265,6 +284,45 @@ export const baseActivity = (sport: SportType): Activity => ({
   base: sport,
   color: BASE_COLOR[sport],
 });
+
+/**
+ * Nom d'origine (activité de départ, libellé de calcul) tel que l'écran le montre ; un autre nom ressort tel quel.
+ * Évalué à l'appel : la langue est celle du moment.
+ */
+const defaultNameText = (name: string): string => {
+  switch (name) {
+    case 'Wingfoil': return t('Wingfoil');
+    case 'Parawing': return t('Parawing');
+    case 'Windsurf': return t('Windsurf');
+    case 'Windfoil': return t('Windfoil');
+    case 'Kite': return t('Kite');
+    case 'Kitefoil': return t('Kitefoil');
+    case 'Bateau': return t('Bateau');
+    case 'Surf': return t('Surf');
+    case 'Paddle': return t('Paddle');
+    case 'Surf foil': return t('Surf foil');
+    case 'Pumping': return t('Pumping');
+    case 'Planche à voile': return t('Planche à voile');
+    case 'Kitesurf': return t('Kitesurf');
+    default: return name;
+  }
+};
+
+/** Libellé d'un calcul tel que l'écran le montre. */
+export const sportDisplayName = (sport: SportType): string => defaultNameText(SPORT_PROFILES[sport].label);
+
+/**
+ * Nom d'une activité tel que l'écran le montre. Le nom gardé (réglages, GPX, journal) reste le français d'origine :
+ * seul un nom d'origine se traduit, celui d'une activité de départ jamais renommée, ou le libellé du calcul d'une
+ * activité de base (`baseActivity`). Une activité renommée ou créée garde son nom, même s'il ressemble à un nom
+ * d'origine.
+ */
+export const activityDisplayName = (a: Pick<Activity, 'id' | 'name'>): string => {
+  const original =
+    DEFAULT_ACTIVITIES.some((d) => d.id === a.id && d.name === a.name) ||
+    (isSportType(a.id) && SPORT_PROFILES[a.id].label === a.name);
+  return original ? defaultNameText(a.name) : a.name;
+};
 
 export const activityFamily = (activity: Activity): SportFamily => sportFamily(activity.base);
 

@@ -40,3 +40,33 @@ describe('zonesOriginText', () => {
     expect(formatOffsetBpm(3)).toBe('+3');
   });
 });
+
+describe('phrases entières, un cas chacune', () => {
+  const athlete: AthleteProfile = {
+    ...EMPTY_ATHLETE_PROFILE,
+    hrMax: 190, hrMaxSource: { kind: 'seance', atMs: atDay(20, 10) },
+    hrRest: 50, hrRestSource: { kind: 'saisie', atMs: null },
+  };
+
+  it('origine sans date : le mot seul', () => {
+    expect(hrSourceLabel({ kind: 'test', atMs: null })).toBe('test');
+    expect(hrSourceLabel({ kind: 'seance', atMs: null })).toBe('séance');
+  });
+
+  it('FC repos et FC max sans décalage, séance et saisie', () => {
+    expect(zonesOriginText(heartRateZones(athlete, null, MODEL)!, athlete)).toBe(
+      'S1 148 et S2 169 bpm, tirés de la FC repos 50 (saisie) et de la FC max 190 (séance du 20/10).'
+    );
+  });
+
+  it('FC max seule avec décalage, et seuils saisis avec décalage', () => {
+    const maxOnly = { ...athlete, hrRest: null, hrRestSource: null };
+    expect(zonesOriginText(heartRateZones(maxOnly, null, MODEL, 4)!, maxOnly)).toBe(
+      'S1 152 et S2 173 bpm (+4 pour cette activité), tirés de la FC max 190 (séance du 20/10), sans FC repos.'
+    );
+    const entered = { ...athlete, hrThresholds: [150, 170] };
+    expect(zonesOriginText(heartRateZones(entered, null, MODEL, -5)!, entered)).toBe(
+      'S1 145 et S2 165 bpm (−5 pour cette activité), saisis dans Réglages › Pratiquant.'
+    );
+  });
+});

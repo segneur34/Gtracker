@@ -9,6 +9,23 @@ import { dateLocale, t } from '../../core/i18n';
 /** Carré rouge de l'arrêt, dans le grand cadran. */
 const STOP_ICON = <span className="ui-record-dot ui-record-dot--stop" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />;
 
+/** Gestes que le bouton rappelle ; l'identifiant n'est pas affiché, la phrase vient de `holdHint`. */
+export type HoldAction = 'arrêter' | 'jeter' | "revenir aux réglages d'usine" | 'tout supprimer';
+
+/** Rappel du geste, en phrase entière par geste (jamais un verbe collé à une phrase). */
+const holdHint = (action: HoldAction, holdS: string): string => {
+  switch (action) {
+    case 'jeter':
+      return t('Maintenir {holdS} s pour jeter', { holdS });
+    case "revenir aux réglages d'usine":
+      return t("Maintenir {holdS} s pour revenir aux réglages d'usine", { holdS });
+    case 'tout supprimer':
+      return t('Maintenir {holdS} s pour tout supprimer', { holdS });
+    default:
+      return t('Maintenir {holdS} s pour arrêter', { holdS });
+  }
+};
+
 /**
  * Bouton qu'on tient pour agir (arrêt de l'enregistrement, « Jeter » une
  * session depuis le menu « … » de son analyse) : tenu `getHoldMs()`, le grand
@@ -18,7 +35,7 @@ const STOP_ICON = <span className="ui-record-dot ui-record-dot--stop" style={{ w
  */
 function HoldButton({
   onHold, getHoldMs, label, lead, dialTitle, color = 'var(--recording)', icon = STOP_ICON, disabled = false, size, style,
-  action = t('arrêter'),ariaLabel, keepMenuOpen = false,
+  action = 'arrêter', ariaLabel, keepMenuOpen = false,
 }: {
   onHold: () => void;
   /** Lue au rendu et à chaque appui : un réglage changé vaut au retour sur la page. */
@@ -32,8 +49,8 @@ function HoldButton({
   disabled?: boolean;
   size?: 's' | 'm' | 'l';
   style?: CSSProperties;
-  /** Verbe du rappel du geste : « Maintenir 1 s pour <action> ». */
-  action?: string;
+  /** Geste rappelé après un appui court : choisit la phrase entière « Maintenir 1 s pour … » (`holdHint`). */
+  action?: HoldAction;
   /** Nom lu par les lecteurs d'écran, s'il doit dire le geste. */
   ariaLabel?: string;
   /** Bouton posé dans un menu « … » (`MoreMenu`) : un appui court ne le referme pas, le rappel s'y lit. */
@@ -60,7 +77,7 @@ function HoldButton({
       <Button variant="danger" size={size} className="ui-btn--hold" style={style} disabled={disabled} aria-label={ariaLabel}
         data-keep-open={keepMenuOpen ? '' : undefined} {...handlers} onClick={onClick}>
         {lead}
-        {hint ? t('Maintenir {holdS} s pour {action}', { holdS, action }) : label}
+        {hint ? holdHint(action, holdS) : label}
       </Button>
       {pressingMs !== null && createPortal(
         <HoldDial pressMs={pressingMs} color={color} icon={icon} title={dialTitle} hint={t('Maintenez le bouton')} />,

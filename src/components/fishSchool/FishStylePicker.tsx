@@ -21,6 +21,17 @@ const PREVIEW = [
   { shape: 2, x: 25, y: 21, angle: 3, size: 15 },
 ] as const;
 
+/** Nom montré de chaque style : celui de `SCHOOL_STYLES` (français, sans import), traduit à l'affichage. */
+const STYLE_NAME: Record<SchoolStyle, string> = {
+  P1: t('Alevin au trait'),
+  P2: t('Silhouette'),
+  P3: t('Pictogramme'),
+  P4: t('Deux arcs'),
+  P5: t('Couleur d’activité'),
+  P6: t('Pinceau'),
+  P7: t('Ajouré'),
+};
+
 interface Props {
   /** Style montré, `null` : banc caché (« Aucun »). */
   value: SchoolStyle | null;
@@ -34,7 +45,7 @@ function FishStylePicker({ value, onChange, activityColors }: Props) {
   const dark = useAppliedTheme().theme === 'dark';
   return (
     <div className="fish-style-picker" role="group" aria-label={t('Poisson du banc')}>
-      {SCHOOL_STYLES.map(({ id, name }) => (
+      {SCHOOL_STYLES.map(({ id }) => (
         <button key={id} type="button" className="fish-style-picker__choice" aria-pressed={id === value}
           data-style={id} onClick={() => onChange(id)}>
           <svg className="fish-style-picker__preview" viewBox="0 0 64 28" aria-hidden="true" focusable="false">
@@ -48,7 +59,7 @@ function FishStylePicker({ value, onChange, activityColors }: Props) {
               );
             })}
           </svg>
-          <span className="fish-style-picker__name">{name}</span>
+          <span className="fish-style-picker__name">{STYLE_NAME[id]}</span>
         </button>
       ))}
       {/* Huitième choix : ni banc ni eau, le Profil d'avant le banc. Aperçu vide, de la taille des autres. */}

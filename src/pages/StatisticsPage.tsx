@@ -17,7 +17,7 @@ import CardioLoadHelp from '../components/CardioLoadHelp';
 import { HEART_RATE_COLOR, HEART_ZONE_COLORS, zoneLabel } from '../components/heartRateColors';
 import { ANALYSIS_PANEL_STYLE, CARD_STYLE, HALF_PANEL_STYLE } from '../components/styles';
 import PageHeader from '../components/ui/PageHeader';
-import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityFamily, type Activity } from '../core/activities';
+import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityDisplayName, activityFamily, type Activity } from '../core/activities';
 import { REFERENCE_HEART_RATE, SPORT_FAMILIES, getSportProfile, type SportFamily } from '../core/sportProfiles';
 import {
   formatDistanceAuto, formatDecimal,
@@ -470,16 +470,16 @@ function StatisticsPage() {
   const chartTicks = zoom.shown ? dateTicks(zoom.shown.min, zoom.shown.max, narrow ? 4 : 6) : null;
   const pickedSession = picked ? inPeriod.find((s) => s.file === picked) ?? null : null;
   const pickedPoints = pickedSession
-    ? [...series].sort((a, b) => serieRank(a.key) - serieRank(b.key)).flatMap((serie) => serie.points.filter((p) => p.file === pickedSession.file).map((p) => ({ label: serie.label, point: p })))
+    ? [...series].sort((a, b) => serieRank(a.key) - serieRank(b.key)).flatMap((serie) => serie.points.filter((p) => p.file === pickedSession.file).map((p) => ({ key: serie.key, label: serie.label, point: p })))
     : [];
   const twoSeries = series.length > 1;
   const legendSeries = [...series].sort((a, b) => serieRank(a.key) - serieRank(b.key));
   /** Valeur d'une session pour une série, avec le détail des manœuvres. */
-  const pointText = (serieLabel: string, p: MetricPoint): string => {
+  const pointText = (serieKey: string, serieLabel: string, p: MetricPoint): string => {
     const s = metric.key === 'reussite' ? inPeriod.find((x) => x.file === p.file) : undefined;
     const r = s?.maneuverResults;
     const detail = r
-      ? serieLabel === t('Virements') ? ` (${r.tackSuccess} / ${r.tackSuccess + r.tackFail})` : ` (${r.jibeSuccess} / ${r.jibeSuccess + r.jibeFail})`
+      ? serieKey === 'virements' ? ` (${r.tackSuccess} / ${r.tackSuccess + r.tackFail})` : ` (${r.jibeSuccess} / ${r.jibeSuccess + r.jibeFail})`
       : '';
     return `${twoSeries ? `${serieLabel.toLowerCase()} ` : ''}${metricText(p.value)}${detail}`;
   };
@@ -495,7 +495,10 @@ function StatisticsPage() {
     return activityOrder.filter((id) => ids.has(id));
   }, [regular.bars, activityOrder]);
 
-  const activityName = (id: string) => activityById.get(id)?.name ?? id;
+  const activityName = (id: string) => {
+    const a = activityById.get(id);
+    return a ? activityDisplayName(a) : id;
+  };
   const shown = useThemedShade();
   const activityColor = (id: string) => shown(activityById.get(id)?.color ?? '#888');
 
@@ -511,12 +514,12 @@ function StatisticsPage() {
     }
   };
 
-  const title = activity ? activity.name : family ? FAMILY_LABEL[family] : t('Toutes les activités');
+  const title = activity ? activityDisplayName(activity) : family ? FAMILY_LABEL[family] : t('Toutes les activités');
   const periodLabel = STATS_PERIODS.find((p) => p.id === period)!.label;
   /** Matériel sur la page : seulement pour une activité qui a sa liste de matériel. */
   const gearShown = activity !== null && gearGroups !== null;
   /** Le choix en cours, dans la ligne « Sélection ». */
-  const choiceSummary = [family ? FAMILY_LABEL[family] : t('Toutes les familles'), ...(activity ? [activity.name] : []), ...gearSelection.map(gearPickLabel), periodLabel === t('Tout') ? t('depuis le début') : periodLabel].join(' · ');
+  const choiceSummary = [family ? FAMILY_LABEL[family] : t('Toutes les familles'), ...(activity ? [activityDisplayName(activity)] : []), ...gearSelection.map(gearPickLabel), period === 'tout' ? t('depuis le début') : periodLabel].join(' · ');
   const empty = inPeriod.length === 0;
   const lastText = regular.weeksSinceLast === null ? '—'
     : regular.weeksSinceLast === 0 ? t('cette semaine')
@@ -525,7 +528,7 @@ function StatisticsPage() {
 
   return (
     <div className="ui-page ui-page--wide ui-page--backdrop an-page stats-page">
-      <PageHeader title={t('Statistiques')} subtitle={`${title} · ${periodLabel === t('Tout') ? t('depuis le début') : periodLabel}`} />
+      <PageHeader title={t('Statistiques')} subtitle={`${title} · ${period === 'tout' ? t('depuis le début') : periodLabel}`} />
 
       <div className="stats-choice">
         <button type="button" className="stats-selection" aria-haspopup="dialog" onClick={() => setSelecting(true)}
@@ -698,7 +701,7 @@ function StatisticsPage() {
                               return (
                                 <div className="stats-tooltip">
                                   <strong>{dayMonthYear(row.startMs)}</strong>
-                                  <span>{activityName(row.activityId)} · {pointText(series.find((serie) => serie.key === row.serieKey)?.label ?? '', row)}</span>
+                                  <span>{activityName(row.activityId)} · {pointText(row.serieKey, series.find((serie) => serie.key === row.serieKey)?.label ?? '', row)}</span>
                                 </div>
                               );
                             }} />
@@ -725,7 +728,7 @@ function StatisticsPage() {
                           <span className="ui-swatch" style={{ background: activityColor(pickedSession.activityId) }} />
                           <span className="stats-row__name">{dayMonthYear(pickedSession.startMs)}</span>
                           <span className="stats-row__meta num">
-                            {pickedSession.name} · {pickedPoints.map(({ label, point }) => pointText(label, point)).join(' · ')}
+                            {pickedSession.name} · {pickedPoints.map(({ key, label, point }) => pointText(key, label, point)).join(' · ')}
                             {pickedPoints.some(({ point }) => point.isRecord) ? ` · ${t('record')}` : ''}
                           </span>
                           <span className="stats-row__open">{t('Ouvrir')}</span>

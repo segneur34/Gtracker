@@ -7,6 +7,7 @@ import type { SportType } from '../../core/types';
 import { disarmBeltWatch, disarmGpsWatch, getBeeper } from '../../platform/beeper';
 import { recordingJournal } from '../../platform/files';
 import { RECORDING_BELT_HOLDER, adoptBelt, releaseOrphanedBelt } from '../../platform/heartRate';
+import { nativeErrorMessage } from '../../platform/nativeMessages';
 import { adoptRunningService, deviceLocationSource, stopOrphanedDeviceLocation, type LocationSource } from '../../platform/location';
 import {
   continueMotionCapture, findMotionCapture, motionCapturePath, pauseMotionCapture, resumeMotionCapture, runningMotionCapture,
@@ -105,7 +106,7 @@ export const continueCapture = async (setup: MotionSetup, paused: boolean): Prom
     // Ce qui a été mesuré avant la coupure reste dans son fichier, retrouvé à l'arrêt ; sans fichier, rien ne l'a été.
     const kept = await findMotionCapture(session.startedAtMs).catch(() => null);
     const why = kept ? CAPTURE_NOT_RESUMED
-      : t("Mesure des capteurs impossible : {detail}. L'enregistrement continue sans elle.", { detail: errorMessage(err, t('erreur inconnue')) });
+      : t("Mesure des capteurs impossible : {detail}. L'enregistrement continue sans elle.", { detail: nativeErrorMessage(err, t('erreur inconnue')) });
     setState({ error: joinMessages(state.error, why) });
     return;
   }

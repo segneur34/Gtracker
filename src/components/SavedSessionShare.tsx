@@ -1,7 +1,7 @@
 import { plainError } from '../platform/errorText';
 import { t } from '../core/i18n';
 import { useState } from 'react';
-import { FAMILY_LABEL, type Activity } from '../core/activities';
+import { FAMILY_LABEL, activityDisplayName, type Activity } from '../core/activities';
 import { shareableStats } from '../core/shareImage';
 import { getSportProfile, hasActiveThreshold, sportFamily, sportTreatment } from '../core/sportProfiles';
 import { coloredSegments } from '../core/trackColor';
@@ -55,7 +55,7 @@ function SavedSessionShare({ gpx, activity, fileName, libraryFile }: SavedSessio
       const track = sessionColorTrack(gpx, sport, record?.analysis?.referenceSpeedMs ?? null, family);
       if (track === null || summary === null) throw new Error(t('trace trop courte.'));
       const range = track ? sessionSpeedRange(record ?? { analysis: null, sport }, activity ? activitySpeedRanges(activity) : null, family, track.suggested) : null;
-      const labels = shareLabels(record ?? null, activity.name, FAMILY_LABEL[family], summary.startMs, libraryFile ?? fileName);
+      const labels = shareLabels(record ?? null, activityDisplayName(activity), FAMILY_LABEL[family], summary.startMs, libraryFile ?? fileName);
       const units = { speed: effectiveSpeedUnit(activity), distance: effectiveDistanceUnit(activity) };
       // Foil de la session, sinon celui de l'activité : « Temps en vol » au lieu de « Temps actif ».
       const foil = sessionFoil(record, effectiveFoil(activity));

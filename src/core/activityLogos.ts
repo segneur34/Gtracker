@@ -1,4 +1,5 @@
 import type { Activity } from './activities';
+import { t } from './i18n';
 import { familySports, type SportFamily } from './sportProfiles';
 import type { SportType } from './types';
 
@@ -19,18 +20,19 @@ export const LOGO_IDS = [
 
 export type LogoId = (typeof LOGO_IDS)[number];
 
+/** Nom de chaque logo, montré seulement (choix du logo, photo du Profil) ; aucune logique ne le lit. */
 export const LOGO_LABEL: Readonly<Record<LogoId, string>> = {
-  wingfoil: 'Wingfoil',
-  parawing: 'Parawing',
-  windsurf: 'Windsurf',
-  windfoil: 'Windfoil',
-  kite: 'Kite',
-  kitefoil: 'Kitefoil',
-  bateau: 'Bateau',
-  surf: 'Surf',
-  paddle: 'Paddle',
-  'surf-foil': 'Surf foil',
-  pumping: 'Pumping',
+  wingfoil: t('Wingfoil'),
+  parawing: t('Parawing'),
+  windsurf: t('Windsurf'),
+  windfoil: t('Windfoil'),
+  kite: t('Kite'),
+  kitefoil: t('Kitefoil'),
+  bateau: t('Bateau'),
+  surf: t('Surf'),
+  paddle: t('Paddle'),
+  'surf-foil': t('Surf foil'),
+  pumping: t('Pumping'),
 };
 
 export const isLogoId = (value: unknown): value is LogoId =>

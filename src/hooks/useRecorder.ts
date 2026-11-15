@@ -6,6 +6,7 @@ import type { SessionMark } from '../core/sessionMarks';
 import { getSportProfile } from '../core/sportProfiles';
 import { effectiveFoil, effectiveHeartRate, effectiveRecordingProfile, rememberRecordActivity } from './useSportSettings';
 import { recordingJournal } from '../platform/files';
+import { nativeErrorMessage } from '../platform/nativeMessages';
 import { readPermissions } from '../platform/permissions';
 import {
   findMotionCapture, pauseMotionCapture, readMotionCapture, removeMotionCapture, resumeMotionCapture, startMotionCapture, stopMotionCapture,
@@ -289,7 +290,7 @@ export const startRecording = exclusive(async (
       await startMotionCapture(session.startedAtMs, options.motion);
       setState({ measuringMotion: true, motionSetup: options.motion });
     } catch (err) {
-      setState({ error: t("Mesure des capteurs impossible : {why}. L'enregistrement continue sans elle.", { why: errorMessage(err, t('erreur inconnue')) }) });
+      setState({ error: t("Mesure des capteurs impossible : {why}. L'enregistrement continue sans elle.", { why: nativeErrorMessage(err, t('erreur inconnue')) }) });
     }
   }
   if (options.heartRate) await takeBeltOrWarn(options.heartRate, getSportProfile(sport).heartRate.maxAgeS);

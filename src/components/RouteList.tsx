@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import type { Activity } from '../core/activities';
+import { activityDisplayName, type Activity } from '../core/activities';
 import { formatDistance } from '../core/units';
 import { useGoOnRoute } from '../hooks/useGoOnRoute';
 import type { SavedRoute } from '../hooks/useRouteLibrary';
@@ -52,7 +52,7 @@ function RouteList({ routes, activities, onOpen, currentBase = null, actions, go
               {activity
                 ? <ActivityGlyph activity={activity} size={14} className="route-list__icon" />
                 : <span className="route-list__dot" style={{ background: 'var(--faint)' }} />}
-              <span>{activity?.name ?? t('Sans activité')}</span>
+              <span>{activity ? activityDisplayName(activity) : t('Sans activité')}</span>
               <span className="num">
                 {' · '}
                 {formatDistance(distances.get(saved.base) ?? 0, activity ? effectiveDistanceUnit(activity) : 'km')}

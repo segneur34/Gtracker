@@ -1,4 +1,4 @@
-import { ACTIVITY_PALETTE } from '../core/activities';
+import { ACTIVITY_PALETTE, paletteColorText } from '../core/activities';
 import { useAppliedTheme } from '../hooks/useTheme';
 import './ShadePicker.css';
 
@@ -21,7 +21,7 @@ function ShadePicker({
   return (
     <div className="shade-picker" role="group" aria-label={label}>
       {ACTIVITY_PALETTE.map((c) => {
-        const name = dark ? c.darkName ?? c.name : c.name;
+        const name = paletteColorText(dark ? c.darkName ?? c.name : c.name);
         return (
           <button key={c.light} type="button" className="shade-picker__swatch" style={{ backgroundColor: dark ? c.dark : c.light }}
             aria-pressed={c.light === current} aria-label={name} title={name}

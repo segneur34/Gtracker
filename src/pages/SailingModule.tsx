@@ -44,7 +44,7 @@ import { PUMPING_OFF_NOTE, pumpingHighlightSpans } from '../components/pumpingHi
 import TrackSpanLayer from '../components/TrackSpanLayer';
 import { t } from '../core/i18n';
 import { tRich } from '../components/tRich';
-import { HIGHLIGHT_SPAN_OPACITY, podiumColor } from '../components/highlightColors';
+import { HIGHLIGHT_SPAN_OPACITY, PODIUM_RANKS, podiumColor } from '../components/highlightColors';
 import { ANALYSIS_MAP_ANCHOR } from '../components/AnalysisMap';
 import { zoomHint } from '../components/zoomHint';
 import EmptyTabPanel from '../components/EmptyTabPanel';
@@ -443,7 +443,7 @@ function SailingModule() {
           if (top.path.length < 2) return null;
           return (
             <HighlightPath key={`maneuver-top-${selectedManeuverTop}-${idx}`} positions={top.path} color={podiumColor(idx)} opacity={HIGHLIGHT_SPAN_OPACITY}>
-              <Popup>{idx === 0 ? t('{n}er', { n: 1 }) : t('{n}e', { n: idx + 1 })} · {formatTimeOfDay(top.timeMs)} · {top.label}</Popup>
+              <Popup>{PODIUM_RANKS[Math.min(idx, PODIUM_RANKS.length - 1)]} · {formatTimeOfDay(top.timeMs)} · {top.label}</Popup>
             </HighlightPath>
           );
         })}

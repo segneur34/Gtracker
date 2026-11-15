@@ -10,6 +10,7 @@ import {
   canChooseFolder, chooseMemoryFolder, FolderRefusedError, forgetChosenFolder, openMemoryFolder, readOnlyFolder,
   reconnectMemoryFolder, type MemoryFolder,
 } from '../../platform/memoryFolder';
+import { nativeErrorMessage } from '../../platform/nativeMessages';
 import { jsonStore, storageStartupFailure } from '../../platform/storage';
 import { errorMessage } from '../../core/basics';
 import { libraryState, reportError, setState } from './store';
@@ -244,7 +245,7 @@ export const chooseFolder = async (): Promise<void> => {
     // Dossier de l'ancienne application : refusé avant d'être gardé ni écrit, la mémoire en service reste en place.
     picked = await chooseMemoryFolder(legacyFolderCheck);
   } catch (err) {
-    setState({ error: err instanceof FolderRefusedError ? err.message : t('Dossier inaccessible : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
+    setState({ error: err instanceof FolderRefusedError ? err.message : t('Dossier inaccessible : {detail}', { detail: nativeErrorMessage(err, t('erreur inconnue')) }) });
     return;
   }
   if (!picked) return;

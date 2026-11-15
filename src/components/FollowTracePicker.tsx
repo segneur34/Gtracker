@@ -1,7 +1,7 @@
 import { plainError } from '../platform/errorText';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { sessionActivity } from '../core/activities';
+import { activityDisplayName, sessionActivity } from '../core/activities';
 import { parseGpx } from '../core/gpxParser';
 import { useRouteLibrary, type SavedRoute } from '../hooks/useRouteLibrary';
 import { followTrace } from '../hooks/useFollowedTrace';
@@ -155,14 +155,15 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
             )}
             <ul style={LIST_STYLE}>
               {filteredSessions.slice(0, shown).map(({ file, record, activity }) => {
-                const name = sessionDisplayName(record, activity?.name ?? null, record.title ?? file);
+                const activityName = activity ? activityDisplayName(activity) : null;
+                const name = sessionDisplayName(record, activityName, record.title ?? file);
                 return (
                   <li key={file}>
                     <button type="button" style={ROW_STYLE} disabled={loading !== null}
                       onClick={() => void pickSession(file, name, activity?.id ?? null)}>
                       <strong>{name}</strong>
                       <span style={DETAIL_STYLE}>
-                        {loading === file ? t('Lecture…') : [activity?.name, formatDate(record.summary.startMs)].filter(Boolean).join(' · ')}
+                        {loading === file ? t('Lecture…') : [activityName, formatDate(record.summary.startMs)].filter(Boolean).join(' · ')}
                       </span>
                     </button>
                   </li>

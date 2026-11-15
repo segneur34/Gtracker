@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   ACTIVITY_PALETTE, DEFAULT_ACTIVITIES, SURF_ACTIVITY, SURF_FOIL_ACTIVITY, activitiesOfFamily,
-  activityCounts, activityFamily, activityTreatment, baseActivity, findActivity, insertActivity, isActivityShown, isFamilyHidden,
-  logoColor, newActivityId, nextActivityColor, readActivities, sessionActivity,
+  activityCounts, activityDisplayName, activityFamily, activityTreatment, baseActivity, findActivity, insertActivity, isActivityShown, isFamilyHidden,
+  logoColor, newActivityId, nextActivityColor, paletteColorText, readActivities, sessionActivity, sportDisplayName,
   visibleActivities, visibleFamilies, withHidden, withPaletteColors, type Activity,
 } from './activities';
-import { SPORT_FAMILIES, usesMarkCourse } from './sportProfiles';
+import { CONTEXT_MARK, setLanguage, type Dictionary } from './i18n';
+import { SPORT_FAMILIES, SPORT_PROFILES, usesMarkCourse } from './sportProfiles';
+import type { SportType } from './types';
 
 const moth: Activity = { id: 'a-moth', name: 'Moth à foil', base: 'wingfoil', color: '#2e7d32' };
 const paddle: Activity = { id: 'a-paddle', name: 'Paddle', base: 'surf', color: '#e6c229' };
@@ -300,5 +302,49 @@ describe('usesMarkCourse', () => {
     expect(SPORT_FAMILIES).toEqual(['voile', 'surf']);
     expect(SPORT_FAMILIES.filter(usesMarkCourse)).toEqual(['voile', 'surf']);
     expect(usesMarkCourse(activityFamily(SURF_FOIL_ACTIVITY))).toBe(true);
+  });
+});
+
+describe("noms d'origine traduits à l'affichage seulement", () => {
+  const sports = Object.keys(SPORT_PROFILES) as SportType[];
+  const originalNames = [...DEFAULT_ACTIVITIES.map((a) => a.name), ...sports.map((s) => SPORT_PROFILES[s].label)];
+  const colorNames = ACTIVITY_PALETTE.flatMap((c) => (c.darkName ? [c.name, c.darkName] : [c.name]));
+  const english: Dictionary = {
+    ...Object.fromEntries(originalNames.map((name) => [name, `EN ${name}`])),
+    ...Object.fromEntries(colorNames.map((name) => [`${name}${CONTEXT_MARK}couleur`, `EN couleur ${name}`])),
+  };
+
+  afterEach(() => setLanguage('fr', {}));
+
+  it('en français, chaque nom ressort tel quel', () => {
+    for (const a of DEFAULT_ACTIVITIES) expect(activityDisplayName(a)).toBe(a.name);
+    for (const s of sports) {
+      expect(activityDisplayName(baseActivity(s))).toBe(SPORT_PROFILES[s].label);
+      expect(sportDisplayName(s)).toBe(SPORT_PROFILES[s].label);
+    }
+    for (const name of colorNames) expect(paletteColorText(name)).toBe(name);
+  });
+
+  it("dans une autre langue, toutes les activités de départ et tous les libellés de calcul se traduisent", () => {
+    setLanguage('en', english);
+    for (const a of DEFAULT_ACTIVITIES) expect(activityDisplayName(a)).toBe(`EN ${a.name}`);
+    for (const s of sports) {
+      expect(activityDisplayName(baseActivity(s))).toBe(`EN ${SPORT_PROFILES[s].label}`);
+      expect(sportDisplayName(s)).toBe(`EN ${SPORT_PROFILES[s].label}`);
+    }
+  });
+
+  it('une activité renommée ou créée garde son nom, même pareil à un nom d’origine', () => {
+    setLanguage('en', english);
+    expect(activityDisplayName({ id: 'bateau', name: 'Mon bateau' })).toBe('Mon bateau');
+    expect(activityDisplayName({ id: 'a-bateau', name: 'Bateau' })).toBe('Bateau');
+    expect(activityDisplayName({ id: 'wingfoil', name: 'Bateau' })).toBe('Bateau');
+  });
+
+  it('les douze couleurs et leurs noms de nuit se traduisent sous leur contexte ; un nom inconnu reste tel quel', () => {
+    setLanguage('en', english);
+    expect(new Set(ACTIVITY_PALETTE.map((c) => c.name)).size).toBe(12);
+    for (const name of colorNames) expect(paletteColorText(name)).toBe(`EN couleur ${name}`);
+    expect(paletteColorText('Turquoise')).toBe('Turquoise');
   });
 });

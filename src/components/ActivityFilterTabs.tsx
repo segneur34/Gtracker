@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { Activity } from '../core/activities';
+import { activityDisplayName, type Activity } from '../core/activities';
 import { t } from '../core/i18n';
 import ActivityGlyph from './logos/ActivityGlyph';
 
@@ -29,7 +29,7 @@ export default function ActivityFilterTabs({ total, counts, selected, onSelect, 
       {counts.map(({ activity, count }) => (
         <button key={activity.id} type="button" className="ui-tab" aria-pressed={selected === activity.id} onClick={() => onSelect(activity.id)}>
           <ActivityGlyph activity={activity} className="ui-tab__icon" />
-          {activity.name} ({count})
+          {activityDisplayName(activity)} ({count})
         </button>
       ))}
       {withoutCount > 0 && (

@@ -13,7 +13,7 @@ import type { ManeuverLocation, ManeuverStats } from '../../sailing/maneuvers';
 import PanelTitle from '../PanelTitle';
 import ResizablePanel from '../ResizablePanel';
 import { useHelp } from '../helpContext';
-import { tRich } from '../tRich';
+import { tRich, tnRich } from '../tRich';
 import { HIGHLIGHT_PODIUM_COLORS, PODIUM_RANKS } from '../highlightColors';
 import { CARD_STYLE, HALF_PANEL_STYLE } from '../styles';
 import Button from '../ui/Button';
@@ -127,9 +127,10 @@ export default function ManeuversPanel({
       {/* Vent saisi loin du vent calculé fiable : les virages tombent en « sens incertain », on le dit. */}
       {windWarning && (
         <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--warning-soft)', borderLeft: '3px solid var(--warning-line)', borderRadius: 'var(--radius-s)', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
-          {windWarning.unclassified > 1
-            ? tRich('Le vent saisi ({manual}°) écarte <strong>{n}</strong> virages, ni virement ni empannage ; le vent calculé est à {auto}°. Vérifier la direction.', { manual: formatDecimal(windWarning.manualDeg, 0), n: windWarning.unclassified, auto: formatDecimal(windWarning.autoDeg, 0) })
-            : tRich('Le vent saisi ({manual}°) écarte <strong>{n}</strong> virage, ni virement ni empannage ; le vent calculé est à {auto}°. Vérifier la direction.', { manual: formatDecimal(windWarning.manualDeg, 0), n: windWarning.unclassified, auto: formatDecimal(windWarning.autoDeg, 0) })}
+          {tnRich(windWarning.unclassified,
+            'Le vent saisi ({manual}°) écarte <strong>{n}</strong> virage, ni virement ni empannage ; le vent calculé est à {auto}°. Vérifier la direction.',
+            'Le vent saisi ({manual}°) écarte <strong>{n}</strong> virages, ni virement ni empannage ; le vent calculé est à {auto}°. Vérifier la direction.',
+            { manual: formatDecimal(windWarning.manualDeg, 0), auto: formatDecimal(windWarning.autoDeg, 0) })}
         </p>
       )}
 
@@ -171,7 +172,10 @@ export default function ManeuversPanel({
 
       {maneuverHelpOpen && (<>
       <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--bg)', borderLeft: '3px solid var(--line-strong)', borderRadius: 'var(--radius-s)', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
-        {tRich("<strong>Enregistrement :</strong> {pointCount} points, un toutes les {s} s en médiane. Entrée de virage retenue au-dessus de {v} {unit}, d'après l'allure de la session.", { pointCount, s: samplingS < 10 ? formatDecimal(samplingS, 1) : Math.round(samplingS), v: showKn(minEntrySpeedKn), unit: speedSymbol })}
+        {tnRich(pointCount,
+          "<strong>Enregistrement :</strong> {n} point, un toutes les {s} s en médiane. Entrée de virage retenue au-dessus de {v} {unit}, d'après l'allure de la session.",
+          "<strong>Enregistrement :</strong> {n} points, un toutes les {s} s en médiane. Entrée de virage retenue au-dessus de {v} {unit}, d'après l'allure de la session.",
+          { s: samplingS < 10 ? formatDecimal(samplingS, 1) : Math.round(samplingS), v: showKn(minEntrySpeedKn), unit: speedSymbol }, {}, true)}
         {samplingS > 10 && (
           <>
             {' '}{t('Cadence économique : les manœuvres se lisent encore, mais leur qualité (Vmin, relance) et les tops courts reposent sur des moyennes de plusieurs dizaines de secondes.')}
@@ -187,43 +191,42 @@ export default function ManeuversPanel({
         m.rejected.noFlight > 0 ||
         m.rejected.fullTurn > 0) && (
         <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--bg)', borderLeft: '3px solid var(--line-strong)', borderRadius: 'var(--radius-s)', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
-          {m.locations.length > 1
-            ? tRich("<strong>{n} virages retenus</strong>, et d'autres écartés en chemin :", { n: m.locations.length })
-            : tRich("<strong>{n} virage retenu</strong>, et d'autres écartés en chemin :", { n: m.locations.length })}
+          {tnRich(m.locations.length,
+            "<strong>{n} virage retenu</strong>, et d'autres écartés en chemin :",
+            "<strong>{n} virages retenus</strong>, et d'autres écartés en chemin :")}
           {m.rejected.noFlight > 0 && (
             <>
               <br />
               {foil
-                ? (m.rejected.noFlight > 1
-                  ? tRich('<strong>{n}</strong> demi-tours hors vol : entamés sous le seuil de vol, ni réussis ni ratés.', { n: m.rejected.noFlight })
-                  : tRich('<strong>{n}</strong> demi-tour hors vol : entamé sous le seuil de vol, ni réussi ni raté.', { n: m.rejected.noFlight }))
-                : (m.rejected.noFlight > 1
-                  ? tRich('<strong>{n}</strong> demi-tours hors navigation : entamés sous le seuil de navigation, ni réussis ni ratés.', { n: m.rejected.noFlight })
-                  : tRich('<strong>{n}</strong> demi-tour hors navigation : entamé sous le seuil de navigation, ni réussi ni raté.', { n: m.rejected.noFlight }))}
+                ? tnRich(m.rejected.noFlight,
+                  '<strong>{n}</strong> demi-tour hors vol : entamé sous le seuil de vol, ni réussi ni raté.',
+                  '<strong>{n}</strong> demi-tours hors vol : entamés sous le seuil de vol, ni réussis ni ratés.')
+                : tnRich(m.rejected.noFlight,
+                  '<strong>{n}</strong> demi-tour hors navigation : entamé sous le seuil de navigation, ni réussi ni raté.',
+                  '<strong>{n}</strong> demi-tours hors navigation : entamés sous le seuil de navigation, ni réussis ni ratés.')}
             </>
           )}
           {m.rejected.fullTurn > 0 && (
             <>
               <br />
-              {m.rejected.fullTurn > 1
-                ? tRich('<strong>{n}</strong> tours complets, non comptés.', { n: m.rejected.fullTurn })
-                : tRich('<strong>{n}</strong> tour complet, non compté.', { n: m.rejected.fullTurn })}
+              {tnRich(m.rejected.fullTurn, '<strong>{n}</strong> tour complet, non compté.', '<strong>{n}</strong> tours complets, non comptés.')}
             </>
           )}
           {m.rejected.unclassified > 0 && (
             <>
               <br />
-              {m.rejected.unclassified > 1
-                ? tRich("<strong>{n}</strong> francs et nets, mais sans changer d'amures ou ni face au vent ni au vent arrière : ce sont des abattées ou des remontées — ou le vent retenu est faux, ce qui range tous les demi-tours au travers.", { n: m.rejected.unclassified })
-                : tRich("<strong>{n}</strong> franc et net, mais sans changer d'amures ou ni face au vent ni au vent arrière : ce sont des abattées ou des remontées — ou le vent retenu est faux, ce qui range tous les demi-tours au travers.", { n: m.rejected.unclassified })}
+              {tnRich(m.rejected.unclassified,
+                "<strong>{n}</strong> franc et net, mais sans changer d'amures ou ni face au vent ni au vent arrière : ce sont des abattées ou des remontées — ou le vent retenu est faux, ce qui range tous les demi-tours au travers.",
+                "<strong>{n}</strong> francs et nets, mais sans changer d'amures ou ni face au vent ni au vent arrière : ce sont des abattées ou des remontées — ou le vent retenu est faux, ce qui range tous les demi-tours au travers.")}
             </>
           )}
           {m.rejected.slowEntry > 0 && (
             <>
               <br />
-              {m.rejected.slowEntry > 1
-                ? tRich("<strong>{n}</strong> entamés trop lentement (moins de {v} {unit} à l'entrée).", { n: m.rejected.slowEntry, v: showKn(minEntrySpeedKn), unit: speedSymbol })
-                : tRich("<strong>{n}</strong> entamé trop lentement (moins de {v} {unit} à l'entrée).", { n: m.rejected.slowEntry, v: showKn(minEntrySpeedKn), unit: speedSymbol })}
+              {tnRich(m.rejected.slowEntry,
+                "<strong>{n}</strong> entamé trop lentement (moins de {v} {unit} à l'entrée).",
+                "<strong>{n}</strong> entamés trop lentement (moins de {v} {unit} à l'entrée).",
+                { v: showKn(minEntrySpeedKn), unit: speedSymbol })}
             </>
           )}
           {m.rejected.incoherent > 0 && (
@@ -235,17 +238,17 @@ export default function ManeuversPanel({
           {m.rejected.still > 0 && (
             <>
               <br />
-              {m.rejected.still > 1
-                ? tRich("<strong>{n}</strong> lus planche arrêtée, avant ou après le virage : à l'arrêt le cap n'est que du bruit de position.", { n: m.rejected.still })
-                : tRich("<strong>{n}</strong> lu planche arrêtée, avant ou après le virage : à l'arrêt le cap n'est que du bruit de position.", { n: m.rejected.still })}
+              {tnRich(m.rejected.still,
+                "<strong>{n}</strong> lu planche arrêtée, avant ou après le virage : à l'arrêt le cap n'est que du bruit de position.",
+                "<strong>{n}</strong> lus planche arrêtée, avant ou après le virage : à l'arrêt le cap n'est que du bruit de position.")}
             </>
           )}
           {m.rejected.tooShort > 0 && (
             <>
               <br />
-              {m.rejected.tooShort > 1
-                ? tRich("<strong>{n}</strong> sur place (moins de 10 m parcourus : à cette distance le cap n'est que du bruit de position) ou entamés dans les dernières secondes de la trace.", { n: m.rejected.tooShort })
-                : tRich("<strong>{n}</strong> sur place (moins de 10 m parcourus : à cette distance le cap n'est que du bruit de position) ou entamé dans les dernières secondes de la trace.", { n: m.rejected.tooShort })}
+              {tnRich(m.rejected.tooShort,
+                "<strong>{n}</strong> sur place (moins de 10 m parcourus : à cette distance le cap n'est que du bruit de position) ou entamé dans les dernières secondes de la trace.",
+                "<strong>{n}</strong> sur place (moins de 10 m parcourus : à cette distance le cap n'est que du bruit de position) ou entamés dans les dernières secondes de la trace.")}
             </>
           )}
         </p>
