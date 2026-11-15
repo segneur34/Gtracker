@@ -46,6 +46,10 @@ Tranché par l'orchestrateur (mineur) : les noms de couleur de la palette se tra
 
 Un lot P trop gros pour un agent (budget de 90 appels) se coupe en parties sur des listes de fichiers ; la partie suivante part d'un agent neuf.
 
+**Avancement au 15/11.** Faits : S0, P1 à P8, G (écrit, pas encore validé par l'utilisateur), l'étape de reprise, A (à compiler avec la prochaine APK) et D. Reste : L, puis l'APK et ses essais.
+
+**D, fait le 15/11.** `src/locales/en.json` et `es.json` portent les 1 873 clés ; la garde est close (`TRADUCTION_CLOSE = true`) : une clé sans traduction fait désormais échouer `npm run verif`, toute phrase neuve se traduit donc dans le même lot. Procédé : huit parts traduites par rang (l'agent ne recopie jamais la clé), assemblées par script, puis une relecture d'ensemble par langue, en deux moitiés (142 corrections), qui accorde les termes entre les parts au glossaire. Termes accordés en plus du glossaire : graphe → chart / gráfico ; onglet → tab / pestaña ; « Reprendre » des réglages → Load / Cargar ; « Partir » → Go / Salir ; allure au sens du vent → point of sail / rumbo ; position → location / ubicación ; bpm → bpm / ppm ; boutons espagnols à l'infinitif, consignes au tutoiement. Une phrase du français corrigée à cette étape : le tutoriel du cardio disait le test de FC repos « dans le Profil », il s'ouvre depuis Réglages › Pratiquant. À faire trancher par l'utilisateur : « séances du compteur » (Réglages › Mémoire et un message d'erreur), que rien n'explique à l'écran, traduit mot à mot.
+
 ## S0 : le socle
 
 ### S0-A

@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url'
 const racine = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 /** Passe à `true` quand toutes les clés sont traduites : une clé sans traduction devient alors une erreur. */
-export const TRADUCTION_CLOSE = false
+export const TRADUCTION_CLOSE = true
 
 /** Marque entre texte et contexte, la même que `CONTEXT_MARK` de `src/core/i18n.ts`. */
 export const MARQUE_CONTEXTE = '||'
