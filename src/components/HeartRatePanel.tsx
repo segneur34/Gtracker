@@ -36,8 +36,8 @@ interface Props {
   minutes: readonly number[];
   heart: SessionHeartRate;
   params: HeartRateProfile;
-  /** Énergie estimée par la FC (voile et surf, `SportProfile.hrEnergy`) ; `null` : pas de tuile. */
-  hrEnergy: HrEnergyProfile | null;
+  /** Énergie estimée par la FC (`SportProfile.hrEnergy`). */
+  hrEnergy: HrEnergyProfile;
   /** Zones du pratiquant, `null` sans FC max ni âge. */
   zones: HeartRateZones | null;
   /** FC max saisie dans Pratiquant. */
@@ -142,7 +142,7 @@ function HeartRatePanel({
   const loadHelp = useHelp('analyse:charge');
   /** Âge à la date de la session ; poids et sexe du pratiquant. */
   const energy = useMemo(() => {
-    if (!hrEnergy || track.length === 0) return null;
+    if (track.length === 0) return null;
     const person = { weightKg: athlete.weightKg, age: athleteAge(athlete, track[0].timeMs), sex: athlete.sex, hrMax: athlete.hrMax };
     return estimateHrEnergy(track, smoothed, person, params, hrEnergy);
   }, [hrEnergy, track, smoothed, athlete, params]);
@@ -171,7 +171,7 @@ function HeartRatePanel({
             value={Math.round(edwardsLoad(zoneTimes, params.loadWeights))} />
         )}
         <StatTile label={t('Temps mesuré')} value={formatShortDuration(stats.coveredS)} />
-        {hrEnergy && energy?.kind === 'estimation' && (
+        {energy?.kind === 'estimation' && (
           <StatTile
             label={<>{t('Énergie estimée')} <HelpToggle helpKey="analyse:energie-fc" label={t('Énergie estimée')} /></>}
             value={t('env. {kcal} kcal', { kcal: hrEnergyKcal(energy.totalJ, hrEnergy.displayStepKcal) })}

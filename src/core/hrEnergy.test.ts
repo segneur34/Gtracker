@@ -4,7 +4,7 @@ import { activeDurationS, estimateHrEnergy, hrEnergyKcal, type HeartRateSessionP
 import { SPORT_PROFILES } from './sportProfiles';
 import { J_PER_KCAL } from './units';
 
-const ENERGY = SPORT_PROFILES.wingfoil.hrEnergy!;
+const ENERGY = SPORT_PROFILES.wingfoil.hrEnergy;
 const HEART = SPORT_PROFILES.wingfoil.heartRate;
 const MAN: HrEnergyAthlete = { weightKg: 75, age: 40, sex: 'm', hrMax: null };
 const WOMAN: HrEnergyAthlete = { weightKg: 65, age: 40, sex: 'f', hrMax: null };

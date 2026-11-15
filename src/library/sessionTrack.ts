@@ -42,7 +42,7 @@ export const sessionColorTrack = (
   const bounds = trackBounds(points);
   if (points.length < 2 || bounds === null) return null;
   const treatment = sportTreatment(sport ?? FAMILY_BASE[family]);
-  const colorMs = trackColorSpeedsMs(points, treatment);
+  const colorMs = trackColorSpeedsMs(points);
   return {
     points: points.map((p, i) => ({ lat: p.lat, lon: p.lon, colorMs: colorMs[i] })),
     bounds,

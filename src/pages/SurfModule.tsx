@@ -43,7 +43,7 @@ import Button from '../components/ui/Button';
 import { SURF_TABS, tabDefaults, type SurfTab } from '../core/analysisTabs';
 import { lastByRange, sampledIndicesKeeping, visibleIndexRange } from '../core/chartZoom';
 import { CHART_MAX_POINTS, trackBounds } from '../core/displayConfig';
-import { defaultActiveThresholdOf, sportTreatment } from '../core/sportProfiles';
+import { defaultActiveThresholdOf } from '../core/sportProfiles';
 import { nearestIndexAtTime } from '../core/search';
 import { computeAllTopSegments } from '../core/topSegments';
 import { effectiveSpeedRange } from '../core/trackColor';
@@ -187,13 +187,12 @@ function SurfModule() {
 
   /** Bornes du dégradé de couleur, en m/s : celles de la session, sinon de Réglages, sinon le défaut de l'activité. */
   const range = effectiveSpeedRange({ sessionRange: draft.edits.speedRange, activityRange: speedRange, suggested: null, fallback: defaultSpeedRange });
-  const treatment = sportTreatment(activity.base);
   /**
    * Vagues, vols, remontées et trace colorée, faits hors du fil de l'affichage (`useTrackAnalysis`) : la trace montrée
    * est toujours celle de l'analyse montrée ; pendant un recalcul (seuils, foil, couleurs), les derniers chiffres restent.
    */
   const surfSettings: SurfSessionSettings = { threshold, foil, waveThreshold: draft.edits.waveThreshold };
-  const surfColor: TrackColorOptions = { treatment, sessionRange: draft.edits.speedRange, activityRange: speedRange, fallback: defaultSpeedRange };
+  const surfColor: TrackColorOptions = { sessionRange: draft.edits.speedRange, activityRange: speedRange, fallback: defaultSpeedRange };
   const profileText = useMemo(() => JSON.stringify(profile), [profile]);
   const surfView = useTrackAnalysis(gpx.analysis, JSON.stringify([profileText, surfSettings, surfColor]), (source) =>
     runInWorker('analyzeSurf', source.from.text, {

@@ -6,7 +6,7 @@ import {
 } from '../core/activities';
 import {
   REFERENCE_HEART_RATE, SPORT_FAMILIES, SPORT_PROFILES, familySports, hasActiveThreshold,
-  sportFamily, sportTreatment, usesMarkCourse,
+  sportFamily, sportTreatment,
   type SportFamily, type SportProfile, type Treatment,
 } from '../core/sportProfiles';
 import { activityTabs, isTabShown, toggleTabChoice, type TabChoices } from '../core/analysisTabs';
@@ -429,17 +429,15 @@ const ActivityCard = memo(function ActivityCard({
               </span>
             </SettingRow>
             )}
-            {s.foil !== null && (
-              <SettingRow label={t('Foil')} helpKey={`${id}:foil`} help={treatment === 'surf'
-                ? t('Vols entre les vagues, ratio et seuil de vol. Chaque session peut avoir le sien.')
-                : t('Ratio de vol, sauts, champs « Foil » et « Mât » du matériel. Chaque session peut avoir le sien.')}>
-                <label className="settings-sports__pair">
-                  <input type="checkbox" checked={s.foil} onChange={(e) => setFor(id, 'foil', e.target.checked === defaultFoil(activity) ? null : e.target.checked)} />
-                  <span>{t('Support sur foil')}</span>
-                  {!s.isFoilOverridden && <span className="settings-sports__mark">{t('défaut')}</span>}
-                </label>
-              </SettingRow>
-            )}
+            <SettingRow label={t('Foil')} helpKey={`${id}:foil`} help={treatment === 'surf'
+              ? t('Vols entre les vagues, ratio et seuil de vol. Chaque session peut avoir le sien.')
+              : t('Ratio de vol, sauts, champs « Foil » et « Mât » du matériel. Chaque session peut avoir le sien.')}>
+              <label className="settings-sports__pair">
+                <input type="checkbox" checked={s.foil} onChange={(e) => setFor(id, 'foil', e.target.checked === defaultFoil(activity) ? null : e.target.checked)} />
+                <span>{t('Support sur foil')}</span>
+                {!s.isFoilOverridden && <span className="settings-sports__mark">{t('défaut')}</span>}
+              </label>
+            </SettingRow>
             {s.foil && s.pumping !== null && (
               <SettingRow label={t('Pumping')} helpKey={`${id}:pumping`} help={treatment === 'voile'
                 ? t("Coups, fréquence et décollage de chaque vol, dans l'onglet « pumping » de l'analyse, téléphone fixé sur la poitrine : « Mesurer le pumping » est alors proposé dans Enregistrer, et la capture des capteurs est gardée entière (quelques Mo par heure). Chaque session peut avoir le sien.")
@@ -540,16 +538,14 @@ const ActivityCard = memo(function ActivityCard({
                 onChange={(fields) => setFor(id, 'notificationFields', fields)} />
             </div>
           </SettingsPart>
-          {usesMarkCourse(family) && (
-            <SettingsPart label={t('Planification : balise sonore')} open={openPart.balises} onToggle={() => togglePart('balises')}>
-                <SettingRow label={t("Bips d'approche des balises")} helpKey={`${id}:bips`} helpFirst
-                  help={t("En navigation sur un parcours : bips de plus en plus rapprochés à l'approche de chaque balise, bip long à la validation. Tirez un point pour le déplacer, touchez le graphe pour en ajouter un.")}>
-                  <BeepCurveEditor value={s.markGuide} overridden={s.isMarkGuideOverridden} fallback={defaultMarkGuideOf(activity)}
-                    approachMs={simulatedApproachMs(family)} speedUnit={s.speedUnit}
-                    onChange={(guide) => setFor(id, 'markGuide', guide)} />
-                </SettingRow>
-            </SettingsPart>
-          )}
+          <SettingsPart label={t('Planification : balise sonore')} open={openPart.balises} onToggle={() => togglePart('balises')}>
+            <SettingRow label={t("Bips d'approche des balises")} helpKey={`${id}:bips`} helpFirst
+              help={t("En navigation sur un parcours : bips de plus en plus rapprochés à l'approche de chaque balise, bip long à la validation. Tirez un point pour le déplacer, touchez le graphe pour en ajouter un.")}>
+              <BeepCurveEditor value={s.markGuide} overridden={s.isMarkGuideOverridden} fallback={defaultMarkGuideOf(activity)}
+                approachMs={simulatedApproachMs(family)} speedUnit={s.speedUnit}
+                onChange={(guide) => setFor(id, 'markGuide', guide)} />
+            </SettingRow>
+          </SettingsPart>
         </div>
       )}
     </div>
@@ -871,10 +867,7 @@ const thresholdHelp = (treatment: Treatment, foil: boolean): string => {
       ? t("Vitesse à laquelle votre aile décolle, de 10 à 15 km/h selon l'aile. Chaque session peut avoir le sien, dans son analyse.")
       : t('Vitesse au-dessus de laquelle la planche est sur la vague. Chaque session peut avoir le sien, dans son analyse.');
   }
-  if (treatment === 'voile') {
-    return t("Vitesse qui sépare « en action » de « à l'arrêt » : temps actif, manœuvres réussies, VMG. Vide, il suit l'allure de chaque session (8 nd d'office en wing et en planche) ; celui d'une session, réglé dans son analyse, prime.");
-  }
-  return t("Sous cette vitesse, la session est comptée à l'arrêt. 0 : aucun seuil réglé ; les pauses de l'enregistrement et les arrêts complets sont ôtés d'office.");
+  return t("Vitesse qui sépare « en action » de « à l'arrêt » : temps actif, manœuvres réussies, VMG. Vide, il suit l'allure de chaque session (8 nd d'office en wing et en planche) ; celui d'une session, réglé dans son analyse, prime.");
 };
 
 /**

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { Activity } from '../core/activities';
 import { errorMessage } from '../core/basics';
-import { defaultActiveThresholdOf, getSportProfile, sportFamily, sportTreatment, usesMarkCourse } from '../core/sportProfiles';
+import { defaultActiveThresholdOf, getSportProfile, sportTreatment } from '../core/sportProfiles';
 import { METERS_PER_DISTANCE_UNIT, msToKnots } from '../core/units';
 import type { LocationFix } from '../platform/location';
 import { createFollowCursor, type FollowCursor, type FollowProgress, type FollowedTrace } from '../recording/followedTrace';
@@ -66,8 +66,8 @@ export const liveStatsOptionsFor = (activity: Activity): LiveStatsOptions => ({
 });
 
 /** Trace suivie dont l'avancement se compte le long d'elle : pas un parcours à balises (voile, surf). */
-const tracedAlong = (trace: FollowedTrace | null, activity: Activity): FollowedTrace | null =>
-  trace && !(trace.marks && usesMarkCourse(sportFamily(activity.base))) ? trace : null;
+const tracedAlong = (trace: FollowedTrace | null): FollowedTrace | null =>
+  trace && !trace.marks ? trace : null;
 
 let live: LiveRecording = EMPTY;
 /** Ce qui a servi au dernier calcul : rien de neuf, pas de recalcul. */
@@ -122,7 +122,7 @@ const liveActiveThreshold = (activity: Activity, segments: LocationFix[][]): num
   if (!usesActiveAverage(profile)) return undefined;
   const own = effectiveThresholdOverride(activity);
   if (own !== undefined) return own;
-  if (sportTreatment(activity.base) === 'surf') return defaultActiveThresholdOf(profile, effectiveFoil(activity) ?? false);
+  if (sportTreatment(activity.base) === 'surf') return defaultActiveThresholdOf(profile, effectiveFoil(activity));
   if (reference === null || lastRunMs - reference.atMs >= REFERENCE_REFRESH_MS) {
     reference = { atMs: lastRunMs, ms: liveReferenceSpeedMs(segments, profile.maxGapS) };
   }
@@ -146,7 +146,7 @@ const compute = () => {
   try {
     const options: LiveStatsOptions = { ...liveStatsOptionsFor(activity), activeThreshold: liveActiveThreshold(activity, segments) };
     const computed = computeLiveStats(segments, getSportProfile(activity.base), options, memory);
-    const along = tracedAlong(trace, activity);
+    const along = tracedAlong(trace);
     if (along && follow?.trace !== along) follow = { trace: along, cursor: createFollowCursor(along) };
     next = { segments, stats: computed, updatedMs: lastRunMs, progress: along ? follow!.cursor.progress(segments) : null };
   } catch (err) {

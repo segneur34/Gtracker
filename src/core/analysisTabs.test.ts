@@ -323,11 +323,4 @@ describe('tabDefaults : onglets ouverts à la première visite', () => {
     expect(tabDefaults(SAILING_TABS)).toEqual(SAILING_PANEL_DEFAULTS);
     expect(tabDefaults(SURF_TABS)).toEqual(SURF_SECTION_DEFAULTS);
   });
-
-  it("plusieurs listes : l'union de leurs onglets", () => {
-    const both = tabDefaults(SAILING_TABS, SURF_TABS);
-    expect(both.vagues).toBe(false);
-    expect(both.manoeuvres).toBe(false);
-    expect(both.general).toBe(true);
-  });
 });

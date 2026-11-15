@@ -134,7 +134,7 @@ export const useSailingSession = ({
    * accordée à la session, sinon le défaut : le calcul les ordonne (`effectiveSpeedRange`), comme la légende du module.
    */
   const color = useMemo(
-    (): TrackColorOptions => ({ treatment: 'voile', sessionRange: sessionSpeedRange, activityRange: speedRange, fallback: defaultSpeedRange }),
+    (): TrackColorOptions => ({ sessionRange: sessionSpeedRange, activityRange: speedRange, fallback: defaultSpeedRange }),
     [sessionSpeedRange, speedRange, defaultSpeedRange]
   );
   const profileText = useMemo(() => JSON.stringify(profile), [profile]);

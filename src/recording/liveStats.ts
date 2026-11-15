@@ -1,7 +1,7 @@
 import { resumeKinematics, type KinematicsRun } from '../core/kinematics';
 import { referenceSpeedMs } from '../core/sessionSpeed';
 import { buildCumulativeTrack, segmentDistanceM, thresholdMaskOptions } from '../core/sessionStats';
-import { SAILING_SPORTS, hasActiveThreshold, sportTreatment, type SportProfile } from '../core/sportProfiles';
+import { SAILING_SPORTS, hasActiveThreshold, type SportProfile } from '../core/sportProfiles';
 import { bestWindowSpeedMs } from '../core/topSegments';
 import type { RawTrackPoint, TrackPoint } from '../core/types';
 import type { LocationFix } from '../platform/location';
@@ -100,11 +100,8 @@ const toRawPoint = (fix: LocationFix): RawTrackPoint => {
   return { lat: fix.lat, lon: fix.lon, time, rawTimeMs: time.getTime(), ele: fix.altitudeM, speedMs: fix.speedMs };
 };
 
-/** Le direct donne la moyenne active en voile et en surf ; pas en bateau, sans seuil, ni dans les autres familles. */
-export const usesActiveAverage = (profile: SportProfile): boolean => {
-  const treatment = sportTreatment(profile.id);
-  return (treatment === 'voile' || treatment === 'surf') && hasActiveThreshold(profile);
-};
+/** Le direct donne la moyenne active des calculs à seuil d'activité ; pas du bateau, qui n'en a pas. */
+export const usesActiveAverage = (profile: SportProfile): boolean => hasActiveThreshold(profile);
 
 /**
  * Allure de la session en cours (`referenceSpeedMs`, celle de l'analyse), sur

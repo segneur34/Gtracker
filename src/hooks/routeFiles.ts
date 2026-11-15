@@ -1,6 +1,5 @@
-import { activityFamily, findActivity } from '../core/activities';
+import { findActivity } from '../core/activities';
 import { t } from '../core/i18n';
-import { usesMarkCourse } from '../core/sportProfiles';
 import { plainError } from '../platform/errorText';
 import { ROUTES_DIR, routePath } from '../library/folderLayout';
 import { guessSport } from '../library/naming';
@@ -36,7 +35,7 @@ export interface SavedRoute {
 /** Noms des points dans le GPX : numéros des balises (voile, surf), lettres ailleurs. */
 const gpxLabel = (activityId: string | null): ((index: number) => string) => {
   const activity = findActivity(readStoredActivities(), activityId);
-  return activity && usesMarkCourse(activityFamily(activity)) ? markLabel : waypointLabel;
+  return activity ? markLabel : waypointLabel;
 };
 
 const NO_FOLDER = t('Aucun dossier mémoire accessible : choisissez-le dans Réglages pour enregistrer vos itinéraires.');

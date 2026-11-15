@@ -316,10 +316,8 @@ export const defaultFoil = (activity: Activity): boolean =>
 /** Pumping d'une activité sans réglage : coché pour « Pumping » seulement. */
 export const defaultPumpingOf = (activity: Activity): boolean => presetOf(activity).pumping ?? false;
 
-/** Foil d'une activité : celui réglé, sinon son défaut ; `null` hors voile et surf. */
-export const resolveFoil = (stored: StoredSettings, activity: Activity): boolean | null => {
-  const treatment = activityTreatment(activity);
-  if (treatment !== 'voile' && treatment !== 'surf') return null;
+/** Foil d'une activité : celui réglé, sinon son défaut. */
+export const resolveFoil = (stored: StoredSettings, activity: Activity): boolean => {
   const foil = stored.foils?.[activity.id];
   return typeof foil === 'boolean' ? foil : defaultFoil(activity);
 };
@@ -375,9 +373,6 @@ export const resolveMarkGuide = (stored: StoredSettings, activity: Activity): Ma
 export const resolveTabChoices = (stored: StoredSettings, activity: Activity): TabChoices | null =>
   sanitizeTabChoices(stored.tabs?.[activity.id]) ?? defaultTabsOf(activity);
 
-/** Familles proposées en planification : toutes celles de cette version. */
-export const PLANNING_FAMILIES: readonly SportFamily[] = SPORT_FAMILIES;
-
 /** Réglages d'une activité tels que la page Réglages les présente. */
 export interface SportSettingsView {
   activity: Activity;
@@ -401,8 +396,8 @@ export interface SportSettingsView {
   /** Bips d'approche des balises (voile). */
   markGuide: MarkGuideSettings;
   isMarkGuideOverridden: boolean;
-  /** Support sur foil ; `null` hors voile et surf. */
-  foil: boolean | null;
+  /** Support sur foil. */
+  foil: boolean;
   isFoilOverridden: boolean;
   /** Pumping foil ; `null` si le calcul ne le mesure pas (bateau). */
   pumping: boolean | null;
@@ -487,7 +482,7 @@ export const settingsView = (stored: StoredSettings, activity: Activity): SportS
     isSpeedUnitOverridden: isKnownSpeedUnit(unit) && unit !== defaultSpeedUnitOf(activity),
     distanceUnit: resolveDistanceUnit(stored, activity),
     isDistanceUnitOverridden: isKnownDistanceUnit(distanceUnit),
-    activeThreshold: threshold ?? defaultThresholdOf(activity, resolveFoil(stored, activity) ?? false),
+    activeThreshold: threshold ?? defaultThresholdOf(activity, resolveFoil(stored, activity)),
     isThresholdOverridden: threshold !== undefined,
     speedRange: range && isValidSpeedRange(range) ? range : null,
     autoPause: autoPauseOverride ?? defaultAutoPauseOf(activity),
@@ -572,7 +567,7 @@ export const SETTING_FIELDS: Record<SettingField, SettingFieldRule> = {
   markGuide: { key: 'markGuide', normalize: sanitized(sanitizeMarkGuide) },
   foil: {
     key: 'foils',
-    normalize: (v, activity, stored) => (!activity || resolveFoil(stored, activity) === null ? undefined : booleanOrNull(v)),
+    normalize: (v, activity) => (!activity ? undefined : booleanOrNull(v)),
   },
   pumping: {
     key: 'pumping',

@@ -9,7 +9,7 @@
 import { activityDisplayName, type Activity } from '../core/activities';
 import { t } from '../core/i18n';
 import { ZONE_COUNT, edwardsLoad, histogramZoneTimes } from '../core/heartRate';
-import { sportFamily, sportTreatment, type SportFamily, type Treatment } from '../core/sportProfiles';
+import { sportFamily, type SportFamily } from '../core/sportProfiles';
 import { DAY_MS, addDays, addMonths, isoWeek, monthYearLong, monthYearShort, shortDate, stacksByActivity, startOfDay, startOfIsoWeek, startOfMonth } from '../core/calendar';
 import { CHART_PERIODS, chartPeriodBounds, type ChartRange } from './activityChart';
 import type { GearChoice, GearGroup } from './notes';
@@ -58,7 +58,6 @@ export interface StatSession {
   maxSpeedMs: number;
   activityId: string;
   family: SportFamily;
-  treatment: Treatment;
   /** Voile : manœuvres classées à la dernière analyse, `null` si la session n'a jamais été ouverte. */
   maneuverCount: number | null;
   /** Voile : leur réussite, `null` si la session n'a pas été ouverte depuis qu'elle est retenue. */
@@ -94,7 +93,6 @@ export const statSessionOf = (file: string, record: SessionRecord, activity: Act
     maxSpeedMs: summary.maxSpeedMs,
     activityId: activity.id,
     family: sportFamily(activity.base),
-    treatment: sportTreatment(activity.base),
     maneuverCount: summary.maneuverCount ?? null,
     maneuverResults: summary.maneuverResults ?? null,
     foil,

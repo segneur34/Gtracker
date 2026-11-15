@@ -11,7 +11,7 @@ type PanelProps = ComponentProps<typeof HeartRatePanel>;
  * pratiquant se lit dans `athlete`. `zone` est la zone montrée sur la carte et
  * son choix (`useHeartRateZoneHighlight`).
  * `hrEnergy` (`SportProfile.hrEnergy`) passe tel quel au panneau : la tuile
- * « Énergie estimée » en voile et en surf.
+ * « Énergie estimée ».
  */
 export default function CardioTab({ id, athlete, zone, ...panel }: Omit<PanelProps, 'profileHrMax' | 'selectedZone' | 'onSelectZone'> & {
   id: string;

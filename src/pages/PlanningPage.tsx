@@ -38,7 +38,6 @@ import { useRouteLibrary, type SavedRoute } from '../hooks/useRouteLibrary';
 import {
   effectiveDistanceUnit, effectiveMarkGuide, effectiveSpeedUnit, lastRecordActivity, useVisibility,
 } from '../hooks/useSportSettings';
-import { PLANNING_FAMILIES } from '../settings/activitySettings';
 import { ROUTES_DIR } from '../library/folderLayout';
 import { guessSport } from '../library/naming';
 import { shownRoutes } from '../planning/routeShown';
@@ -228,8 +227,7 @@ function PlanBlock({ id, label, open, onToggle, aside, helpKey, children }: {
 function PlanningPage() {
   // Une activité cachée dans Réglages n'est ni proposée (`ActivitySheet`) ni reprise.
   const { activities, isShown } = useVisibility();
-  // Le fractionné ne se planifie pas : ses activités ne sont ni proposées ni reprises.
-  const plannable = (a: Activity | null): a is Activity => a !== null && PLANNING_FAMILIES.includes(activityFamily(a)) && isShown(a);
+  const plannable = (a: Activity | null): a is Activity => a !== null && isShown(a);
   const [activityId, setActivityIdState] = useState<string | null>(
     () => [findActivity(activities, readPrefs().activityId), lastRecordActivity(), ...activities].find(plannable)?.id ?? null
   );
@@ -607,7 +605,7 @@ function PlanningPage() {
       <div className="plan-layout">
         <div className="plan-map-col">
           <div className="plan-toolbar">
-            <ActivitySelect activities={activities} value={activity?.id ?? null} label={t('Activité')} families={PLANNING_FAMILIES}
+            <ActivitySelect activities={activities} value={activity?.id ?? null} label={t('Activité')}
               onChange={(next) => setActivityId(next.id)} />
             <span className="plan-toolbar__note">{t('Balises reliées en ligne droite')}</span>
           </div>

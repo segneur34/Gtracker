@@ -49,7 +49,6 @@ export const statSession = (startMs: number, over: Partial<StatSession> = {}): S
   maxSpeedMs: 5,
   activityId: 'a-paddle',
   family: 'surf',
-  treatment: 'surf',
   maneuverCount: null,
   maneuverResults: null,
   foil: false,
@@ -64,12 +63,12 @@ export const statSession = (startMs: number, over: Partial<StatSession> = {}): S
 
 /** Session des statistiques d'essai en voile : un wingfoil d'une heure, 25 km, sans foil ni manœuvre. */
 export const sailStatSession = (startMs: number, over: Partial<StatSession> = {}): StatSession => statSession(startMs, {
-  distanceM: 25_000, movingDistanceM: 23_500, inMotionS: 3100, maxSpeedMs: 12.4, activityId: 'wingfoil', family: 'voile', treatment: 'voile', ...over,
+  distanceM: 25_000, movingDistanceM: 23_500, inMotionS: 3100, maxSpeedMs: 12.4, activityId: 'wingfoil', family: 'voile', ...over,
 });
 
 /** Session des statistiques d'essai en surf : une heure, 4 vagues, la plus longue de 80 m, sans foil. */
 export const surfStatSession = (startMs: number, over: Partial<StatSession> = {}): StatSession => statSession(startMs, {
-  distanceM: 3_000, movingDistanceM: 320, movingTimeS: 240, maxSpeedMs: 5, activityId: 'surf', family: 'surf', treatment: 'surf', waveCount: 4, longestWaveM: 80, ...over,
+  distanceM: 3_000, movingDistanceM: 320, movingTimeS: 240, maxSpeedMs: 5, activityId: 'surf', family: 'surf', waveCount: 4, longestWaveM: 80, ...over,
 });
 
 /**

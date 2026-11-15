@@ -38,16 +38,11 @@ const rowStats =(session: LibrarySession, activity: Activity | null): string[] =
   if (sportTreatment(activity.base) === 'voile') {
     stats.push(t('max {speed}', { speed: formatSpeed(summary.maxSpeedMs, effectiveSpeedUnit(activity)) }));
     if (summary.maneuverCount !== undefined) stats.push(tn(summary.maneuverCount, '{n} manœuvre', '{n} manœuvres'));
-  } else if (sportTreatment(activity.base) === 'surf') {
+  } else {
     // Vagues, plus longue vague ; sur foil, le plus long vol.
     if (summary.waveCount !== undefined) stats.push(tn(summary.waveCount, '{n} vague', '{n} vagues'));
     if (summary.longestWaveM != null) stats.push(t('plus longue {m} m', { m: Math.round(summary.longestWaveM) }));
     if (summary.longestFlightS != null) stats.push(t('vol {duration}', { duration: formatShortDuration(summary.longestFlightS) }));
-  } else {
-    if (summary.movingTimeS && summary.distanceM > 0) {
-      stats.push(formatSpeed(summary.distanceM / summary.movingTimeS, effectiveSpeedUnit(activity)));
-    }
-    if (summary.elevationGainM !== null) stats.push(t('D+ {m} m', { m: Math.round(summary.elevationGainM) }));
   }
   return stats;
 };

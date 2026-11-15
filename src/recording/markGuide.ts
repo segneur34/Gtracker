@@ -57,10 +57,10 @@ export const BEEP_CURVE_LIMITS = {
 } as const;
 
 /** Vitesse de l'approche simulée par « Écouter », en m/s : 15 nœuds en voile, 8 km/h (allure de paddle) en surf. */
-const SIMULATED_APPROACH_MS: Record<'voile' | 'surf', number> = { voile: knotsToMs(15), surf: kmhToMs(8) };
+const SIMULATED_APPROACH_MS: Record<SportFamily, number> = { voile: knotsToMs(15), surf: kmhToMs(8) };
 
-/** Vitesse de l'approche simulée pour une famille ; celle de la voile hors du surf. */
-export const simulatedApproachMs = (family: SportFamily): number => SIMULATED_APPROACH_MS[family === 'surf' ? 'surf' : 'voile'];
+/** Vitesse de l'approche simulée pour une famille. */
+export const simulatedApproachMs = (family: SportFamily): number => SIMULATED_APPROACH_MS[family];
 
 
 /**

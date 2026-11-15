@@ -144,10 +144,10 @@ describe('vent montré (`retainedWind`) pendant un recalcul', () => {
 
 describe('colorKeyOf', () => {
   it('bornes ordonnées comme le calcul : session, activité, suggestion, défaut ; sans couleurs, texte vide', () => {
-    const color = { treatment: 'voile' as const, sessionRange: null, activityRange: null, fallback: { minMs: 3, maxMs: 12 } };
+    const color = { sessionRange: null, activityRange: null, fallback: { minMs: 3, maxMs: 12 } };
     expect(colorKeyOf(null, null)).toBe('');
-    expect(colorKeyOf(color, { minMs: 4, maxMs: 10 })).toBe(JSON.stringify(['voile', 4, 10]));
-    expect(colorKeyOf({ ...color, sessionRange: { minMs: 5, maxMs: 9 } }, { minMs: 4, maxMs: 10 })).toBe(JSON.stringify(['voile', 5, 9]));
+    expect(colorKeyOf(color, { minMs: 4, maxMs: 10 })).toBe(JSON.stringify([4, 10]));
+    expect(colorKeyOf({ ...color, sessionRange: { minMs: 5, maxMs: 9 } }, { minMs: 4, maxMs: 10 })).toBe(JSON.stringify([5, 9]));
   });
 });
 

@@ -38,7 +38,7 @@ describe('statSessionOf', () => {
     } as unknown as SessionRecord;
     const activity: Activity = { id: 'a-paddle', name: 'Paddle', base: 'surf', color: '#847c6e' };
     const s = statSessionOf('a.json', record, activity);
-    expect(s).toMatchObject({ file: 'a.json', name: 'Piste', family: 'surf', treatment: 'surf', maneuverCount: null });
+    expect(s).toMatchObject({ file: 'a.json', name: 'Piste', family: 'surf', maneuverCount: null });
     expect(s).not.toHaveProperty('reps');
     // Fiche d'avant la version 5 : ni distance en action, ni temps de vol, ni réussite.
     expect(s).toMatchObject({ movingDistanceM: null, flightS: null, maneuverResults: null, foil: false });
@@ -51,7 +51,7 @@ describe('statsTotals', () => {
     const t = statsTotals([
       session(at(2026, 3, 1), { maxSpeedMs: 6 }),
       session(at(2026, 3, 2), { movingTimeS: null, distanceM: 5000 }),
-      session(at(2026, 3, 3), { maneuverCount: 12, family: 'voile', treatment: 'voile' }),
+      session(at(2026, 3, 3), { maneuverCount: 12, family: 'voile' }),
     ]);
     expect(t.sessions).toBe(3);
     expect(t.durationS).toBe(3 * 3600);
@@ -116,19 +116,19 @@ describe('metricSeries', () => {
   });
 
   it('% de vol : sur foil seulement en voile, le temps des vols en surf, borné à 100', () => {
-    const voile = { family: 'voile', treatment: 'voile' } as const;
+    const voile = { family: 'voile' } as const;
     const [serie] = metricSeries([
       session(at(2026, 3, 1), { ...voile, foil: true, movingTimeS: 1800 }),
       session(at(2026, 3, 2), { ...voile, foil: false, movingTimeS: 1800 }),
-      session(at(2026, 3, 3), { family: 'surf', treatment: 'surf', flightS: 900 }),
-      session(at(2026, 3, 4), { family: 'surf', treatment: 'surf', flightS: null }),
+      session(at(2026, 3, 3), { family: 'surf', flightS: 900 }),
+      session(at(2026, 3, 4), { family: 'surf', flightS: null }),
       session(at(2026, 3, 5), { ...voile, foil: true, movingTimeS: 99_999 }),
     ], statsMetric('vol'));
     expect(serie.points.map((p) => p.value)).toEqual([50, 25, 100]);
   });
 
   it('% de vol : sur le temps en mouvement quand la fiche le porte (version 12), sur la durée sinon', () => {
-    const voile = { family: 'voile', treatment: 'voile', foil: true } as const;
+    const voile = { family: 'voile', foil: true } as const;
     const [serie] = metricSeries([
       session(at(2026, 3, 1), { ...voile, movingTimeS: 1200, inMotionS: 2000 }),
       session(at(2026, 3, 2), { ...voile, movingTimeS: 1200, inMotionS: null }),
@@ -140,7 +140,7 @@ describe('metricSeries', () => {
   });
 
   it('% de manœuvres réussies : virements et empannages en deux séries', () => {
-    const voile = { family: 'voile', treatment: 'voile' } as const;
+    const voile = { family: 'voile' } as const;
     const series = metricSeries([
       session(at(2026, 3, 1), { ...voile, maneuverResults: { tackSuccess: 3, tackFail: 1, jibeSuccess: 0, jibeFail: 0 } }),
       session(at(2026, 3, 2), { ...voile, maneuverResults: { tackSuccess: 0, tackFail: 2, jibeSuccess: 1, jibeFail: 1 } }),
@@ -228,7 +228,7 @@ describe('regularity', () => {
   });
 
   it('passe aux barres par mois au-delà d’un an, depuis la première session', () => {
-    const sessions = [at(2024, 6, 10), at(2025, 2, 3), at(2026, 9, 21)].map((t) => session(t, { activityId: 'kite', family: 'voile', treatment: 'voile' }));
+    const sessions = [at(2024, 6, 10), at(2025, 2, 3), at(2026, 9, 21)].map((t) => session(t, { activityId: 'kite', family: 'voile' }));
     const r = regularity(sessions, statsPeriodBounds('tout', now), now, ['a-paddle', 'kite']);
     expect(r.barUnit).toBe('mois');
     // De juin 2024 à septembre 2026.
@@ -343,7 +343,7 @@ describe('cardio', () => {
   });
 
   it("prend les zones de chaque session, décalées pour son activité", () => {
-    const list = [session(at(2026, 10, 5), { heartRate: hr(150) }), session(at(2026, 10, 6), { heartRate: hr(150), activityId: 'kite', family: 'voile', treatment: 'voile' })];
+    const list = [session(at(2026, 10, 5), { heartRate: hr(150) }), session(at(2026, 10, 6), { heartRate: hr(150), activityId: 'kite', family: 'voile' })];
     // Zones du vélo plus hautes : ses 130 tombent en Z1, ses 170 restent en Z4.
     const t = cardioTotals(list, (s) => (s.activityId === 'kite' ? [125, 140, 160, 165, 185] : bounds), weights);
     expect(t.zoneTimesS).toEqual([0, 600, 600, 0, 1200, 0]);

@@ -90,14 +90,12 @@ export const activityTabs = (profile: SportProfile, options: { foil: boolean; ju
 
 /**
  * Onglets ouverts à la première visite d'un module : ceux de la première rangée
- * (`primary`), tous les autres fermés. Plusieurs listes pour un module dont les onglets
- * changent avec l'activité ; le résultat sert de défauts fixes à l'état des onglets (`initialTabsState`).
+ * (`primary`), tous les autres fermés ; le résultat sert de défauts fixes à l'état des
+ * onglets (`initialTabsState`).
  */
-export const tabDefaults = <K extends string>(...lists: readonly (readonly AnalysisTab<K>[])[]): Record<K, boolean> => {
+export const tabDefaults = <K extends string>(tabs: readonly AnalysisTab<K>[]): Record<K, boolean> => {
   const defaults = {} as Record<K, boolean>;
-  for (const list of lists) {
-    for (const tab of list) defaults[tab.key] = tab.primary === true;
-  }
+  for (const tab of tabs) defaults[tab.key] = tab.primary === true;
   return defaults;
 };
 

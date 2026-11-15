@@ -1,6 +1,6 @@
 import type { Dictionary } from '../core/i18n';
 import { kinematicsProfileOf, prepareTrack, type PrepareTrackOptions } from '../core/prepareTrack';
-import { defaultActiveThresholdOf, getSportProfile, sportTreatment, type SportProfile } from '../core/sportProfiles';
+import { defaultActiveThresholdOf, getSportProfile, type SportProfile } from '../core/sportProfiles';
 import { effectiveSpeedRange, trackColorSegments } from '../core/trackColor';
 import type { SportType } from '../core/types';
 import { msToKnots } from '../core/units';
@@ -26,7 +26,7 @@ export const prepareOptionsOf = (profile: SportProfile, fileName: string | null,
 
 /** Couleurs d'une analyse : bornes de la session et de l'activité, ou aucune, puis le défaut du calcul. */
 export const colorOptionsOf = (sport: SportType, over: Partial<TrackColorOptions> = {}): TrackColorOptions => ({
-  treatment: sportTreatment(sport), sessionRange: null, activityRange: null, fallback: getSportProfile(sport).speedRange, ...over,
+  sessionRange: null, activityRange: null, fallback: getSportProfile(sport).speedRange, ...over,
 });
 
 /** Seuil des calculs d'une session à voile, résolu comme le hook le résout, sans seuil de session ni d'activité par défaut. */
@@ -90,7 +90,7 @@ export const directSailing = (gpxText: string, o: AnalyzeSailingOptions) => {
       const colorRange = effectiveSpeedRange({
         sessionRange: o.color.sessionRange, activityRange: o.color.activityRange, suggested: suggestedSpeedRangeMs, fallback: o.color.fallback,
       });
-      return trackColorSegments(gpx.track, o.color.treatment, { minMs: colorRange.minMs, maxMs: colorRange.maxMs });
+      return trackColorSegments(gpx.track, { minMs: colorRange.minMs, maxMs: colorRange.maxMs });
     })()
     : [];
   return {
@@ -117,7 +117,7 @@ export const directSurf = (gpxText: string, o: AnalyzeSurfOptions) => {
   const segments = o.color
     ? (() => {
       const range = effectiveSpeedRange({ sessionRange: o.color.sessionRange, activityRange: o.color.activityRange, suggested: null, fallback: o.color.fallback });
-      return trackColorSegments(track, o.color.treatment, { minMs: range.minMs, maxMs: range.maxMs });
+      return trackColorSegments(track, { minMs: range.minMs, maxMs: range.maxMs });
     })()
     : [];
   return { analysis: result ? { analysis: result.analysis, summary: result.summary } : null, segments };

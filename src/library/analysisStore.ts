@@ -1,6 +1,6 @@
 import { prepareTrack, type PreparedTrack, type PrepareTrackOptions } from '../core/prepareTrack';
 import type { SpeedRangeMs } from '../core/speedGradient';
-import type { SportProfile, Treatment } from '../core/sportProfiles';
+import type { SportProfile } from '../core/sportProfiles';
 import { effectiveSpeedRange, trackColorSegments, type ColoredSegment } from '../core/trackColor';
 import type { SportType } from '../core/types';
 import { runSailingAnalysis, sailingAnalysisResult, type SailingAnalysisResult, type SailingAnalysisStages } from '../sailing/sailingSession';
@@ -19,9 +19,8 @@ import { runSurfSession, surfProfileOf, type SurfSessionResult, type SurfSession
  * résolu ici : la page passe un seuil déjà accordé à l'allure de la session (règle 4).
  */
 
-/** Ce que prennent les couleurs de la trace (`trackColorSegments`) : traitement et bornes, avant leur ordre de priorité. */
+/** Ce que prennent les couleurs de la trace (`trackColorSegments`) : les bornes, avant leur ordre de priorité. */
 export interface TrackColorOptions {
-  treatment: Treatment;
   /** Bornes de la session (brouillon, puis fiche) ; `null` : aucune. */
   sessionRange: SpeedRangeMs | null;
   /** Bornes de l'activité, réglées ou pré-réglées ; `null` : aucune. */
@@ -96,7 +95,6 @@ interface SurfMemory {
 }
 
 interface ColorMemory {
-  treatment: Treatment;
   minMs: number;
   maxMs: number;
   segments: ColoredSegment[];
@@ -159,10 +157,10 @@ export const createAnalysisStore = (): AnalysisStore => {
       sessionRange: color.sessionRange, activityRange: color.activityRange, suggested, fallback: color.fallback,
     });
     const kept = target.colors;
-    if (kept && kept.treatment === color.treatment && Object.is(kept.minMs, minMs) && Object.is(kept.maxMs, maxMs)) return kept.segments;
+    if (kept && Object.is(kept.minMs, minMs) && Object.is(kept.maxMs, maxMs)) return kept.segments;
     work.colors += 1;
-    const segments = trackColorSegments(target.track.track, color.treatment, { minMs, maxMs });
-    target.colors = { treatment: color.treatment, minMs, maxMs, segments };
+    const segments = trackColorSegments(target.track.track, { minMs, maxMs });
+    target.colors = { minMs, maxMs, segments };
     return segments;
   };
 

@@ -464,10 +464,8 @@ export interface SportProfile {
   jumps: JumpProfile | null;
   /** Ceinture cardio proposée à l'enregistrement et analyse de la FC, dans tous les sports. */
   heartRate: HeartRateProfile;
-  /**
-   * Énergie estimée par la FC, dans l'onglet « cardio » : voile et surf seulement.
-   */
-  hrEnergy: HrEnergyProfile | null;
+  /** Énergie estimée par la FC, dans l'onglet « cardio ». */
+  hrEnergy: HrEnergyProfile;
   /** Analyse des vagues ; `null` hors surf. */
   surf: SurfProfile | null;
   /**
@@ -711,13 +709,6 @@ const SPORT_FAMILY: Record<SportType, SportFamily> = {
 export const sportTreatment = (sport: SportType): Treatment => SPORT_TREATMENT[sport];
 
 export const sportFamily = (sport: SportType): SportFamily => SPORT_FAMILY[sport];
-
-/**
- * Famille qui navigue sur un parcours de balises (voile, surf) : itinéraire
- * de balises numérotées en ligne droite, validées dans l'ordre avec des bips
- * d'approche. Le vent, les bords et les manœuvres restent propres à la voile.
- */
-export const usesMarkCourse = (family: SportFamily): boolean => family === 'voile' || family === 'surf';
 
 /** Calculs d'une famille, dans l'ordre de `SPORT_PROFILES`. */
 export const familySports = (family: SportFamily): SportType[] =>

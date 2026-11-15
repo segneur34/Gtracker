@@ -6,7 +6,7 @@ import {
   visibleActivities, visibleFamilies, withHidden, withPaletteColors, type Activity,
 } from './activities';
 import { CONTEXT_MARK, setLanguage, type Dictionary } from './i18n';
-import { SPORT_FAMILIES, SPORT_PROFILES, usesMarkCourse } from './sportProfiles';
+import { SPORT_PROFILES } from './sportProfiles';
 import type { SportType } from './types';
 
 const moth: Activity = { id: 'a-moth', name: 'Moth à foil', base: 'wingfoil', color: '#2e7d32' };
@@ -305,14 +305,6 @@ describe('familles et activités cachées', () => {
     expect(isActivityShown(baseActivity('kite'), DEFAULT_ACTIVITIES, [])).toBe(true);
     expect(isActivityShown(baseActivity('kite'), DEFAULT_ACTIVITIES, ['voile'])).toBe(false);
     expect(isActivityShown(hiddenFoil, withFoilHidden, [])).toBe(false);
-  });
-});
-
-describe('usesMarkCourse', () => {
-  it('voile et surf naviguent sur un parcours de balises', () => {
-    expect(SPORT_FAMILIES).toEqual(['voile', 'surf']);
-    expect(SPORT_FAMILIES.filter(usesMarkCourse)).toEqual(['voile', 'surf']);
-    expect(usesMarkCourse(activityFamily(SURF_FOIL_ACTIVITY))).toBe(true);
   });
 });
 

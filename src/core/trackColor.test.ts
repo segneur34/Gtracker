@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TRACK_COLOR_SMOOTHING_S, coloredSegments, effectiveSpeedRange, pathsByColor, trackColorSegments, trackColorSpeedsMs } from './trackColor';
+import { coloredSegments, effectiveSpeedRange, pathsByColor, trackColorSegments, trackColorSpeedsMs } from './trackColor';
 import type { TrackPoint } from './types';
 import { mPerDegLon } from '../test/geo.fixture';
 
@@ -38,24 +38,17 @@ const colorAt = (track: TrackPoint[], speeds: number[], s: number): number => {
 };
 
 describe('trackColorSpeedsMs', () => {
-  it('garde en voile la vitesse lissée du noyau, sans moyenne de plus', () => {
+  it('garde la vitesse lissée du noyau, sans moyenne de plus : une accélération ou une vague de quelques secondes ne s\'efface pas', () => {
     const track = buildTrack([[30, 2], [3, 10], [30, 2]]);
-    expect(TRACK_COLOR_SMOOTHING_S.voile).toBe(0);
-    expect(trackColorSpeedsMs(track, 'voile')).toEqual(track.map((p) => p.smoothedSpeedMs));
-  });
-
-  it('garde en surf la vitesse lissée du noyau : une vague de quelques secondes ne s\'efface pas', () => {
-    const track = buildTrack([[30, 2], [3, 10], [30, 2]]);
-    expect(TRACK_COLOR_SMOOTHING_S.surf).toBe(0);
-    expect(trackColorSpeedsMs(track, 'surf')).toEqual(track.map((p) => p.smoothedSpeedMs));
+    expect(trackColorSpeedsMs(track)).toEqual(track.map((p) => p.smoothedSpeedMs));
   });
 
   it('donne la même couleur à 1 Hz et à 5 Hz', () => {
     const phases: [number, number][] = [[60, 2], [20, 6], [60, 3]];
     const slow = buildTrack(phases, 1);
     const fast = buildTrack(phases, 5);
-    const slowSpeeds = trackColorSpeedsMs(slow, 'surf');
-    const fastSpeeds = trackColorSpeedsMs(fast, 'surf');
+    const slowSpeeds = trackColorSpeedsMs(slow);
+    const fastSpeeds = trackColorSpeedsMs(fast);
     for (const s of [5, 55, 70, 85, 120]) {
       expect(colorAt(fast, fastSpeeds, s)).toBeCloseTo(colorAt(slow, slowSpeeds, s), 0);
     }
@@ -66,17 +59,17 @@ describe('trackColorSegments', () => {
   it('trace un trait par paire de points, à la couleur du point d\'arrivée', () => {
     const track = buildTrack([[10, 2], [10, 8]]);
     const range = { minMs: 1, maxMs: 9 };
-    const segments = trackColorSegments(track, 'voile', range);
+    const segments = trackColorSegments(track, range);
     expect(segments).toHaveLength(track.length - 1);
     expect(segments[0].positions).toEqual([[track[0].lat, track[0].lon], [track[1].lat, track[1].lon]]);
     // Même résultat que les traits faits à la main depuis les vitesses de couleur.
-    const speeds = trackColorSpeedsMs(track, 'voile');
+    const speeds = trackColorSpeedsMs(track);
     expect(segments).toEqual(coloredSegments(track.map((p, i) => ({ lat: p.lat, lon: p.lon, colorMs: speeds[i] })), range));
     expect(segments[0].color).not.toBe(segments[segments.length - 1].color);
   });
 
   it('ne trace rien sous deux points', () => {
-    expect(trackColorSegments(buildTrack([[0, 2]]), 'surf', { minMs: 1, maxMs: 4 })).toEqual([]);
+    expect(trackColorSegments(buildTrack([[0, 2]]), { minMs: 1, maxMs: 4 })).toEqual([]);
   });
 });
 
@@ -131,7 +124,7 @@ describe('pathsByColor', () => {
   it('ne perd aucun trait d\'une trace, à 1 Hz comme à 5 Hz', () => {
     const range = { minMs: 1, maxMs: 9 };
     for (const hz of [1, 5]) {
-      const segments = trackColorSegments(buildTrack([[60, 2], [20, 6], [60, 8]], hz), 'surf', range);
+      const segments = trackColorSegments(buildTrack([[60, 2], [20, 6], [60, 8]], hz), range);
       for (const tranches of [1, 8]) {
         const groups = pathsByColor(segments, tranches);
         const chunk = Math.ceil(segments.length / tranches);

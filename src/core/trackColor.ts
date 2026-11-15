@@ -1,6 +1,4 @@
-import { meanFilterByTime } from './speedFilter';
 import { speedGradientColor, type SpeedRangeMs } from './speedGradient';
-import type { Treatment } from './sportProfiles';
 import type { TrackPoint } from './types';
 
 /**
@@ -10,18 +8,11 @@ import type { TrackPoint } from './types';
  */
 
 /**
- * Lissage de la vitesse de couleur, en secondes, par traitement. En voile, la
- * vitesse lissée du noyau suffit, et une moyenne effacerait les accélérations
- * courtes ; en surf aussi, où une vague ne dure que quelques secondes.
+ * Vitesse de couleur de chaque point, en m/s : la vitesse lissée du noyau,
+ * sans moyenne de plus (une moyenne effacerait les accélérations courtes en
+ * voile, et une vague de surf ne dure que quelques secondes).
  */
-export const TRACK_COLOR_SMOOTHING_S: Record<Treatment, number> = { voile: 0, surf: 0 };
-
-/** Vitesse de couleur de chaque point, en m/s. */
-export const trackColorSpeedsMs = (track: readonly TrackPoint[], treatment: Treatment): number[] => {
-  const speeds = track.map((p) => p.smoothedSpeedMs);
-  const windowS = TRACK_COLOR_SMOOTHING_S[treatment];
-  return windowS > 0 ? meanFilterByTime(speeds, track.map((p) => p.timeMs), windowS) : speeds;
-};
+export const trackColorSpeedsMs = (track: readonly TrackPoint[]): number[] => track.map((p) => p.smoothedSpeedMs);
 
 /** Un trait de la trace : deux points consécutifs et leur couleur (`TrackSegmentsLayer`). */
 export interface ColoredSegment {
@@ -55,10 +46,9 @@ export const coloredSegments = (
 /** Traits de la trace colorée par la vitesse, comme l'analyse la dessine. */
 export const trackColorSegments = (
   track: readonly TrackPoint[],
-  treatment: Treatment,
   range: SpeedRangeMs
 ): ColoredSegment[] => {
-  const speeds = trackColorSpeedsMs(track, treatment);
+  const speeds = trackColorSpeedsMs(track);
   return coloredSegments(track.map((p, i) => ({ lat: p.lat, lon: p.lon, colorMs: speeds[i] })), range);
 };
 

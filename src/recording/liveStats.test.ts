@@ -55,7 +55,6 @@ const KMH_PROFILE: SportProfile = {
   maxPlausibleSpeedMs: 12,
   defaultPolarMinSpeed: 0,
   jumps: null,
-  hrEnergy: null,
   surf: null,
   pump: null,
 };
@@ -502,7 +501,7 @@ describe("computeLiveStats : moyenne active, comme l'analyse (voile, surf)", () 
     expect(computeLiveStats(segments, wing, withThreshold(8)).averageSpeedMs).toBe(computeLiveStats(segments, wing).averageSpeedMs);
   });
 
-  it('voile et surf seulement, et pas le bateau, sans seuil', () => {
+  it('tous les calculs à seuil, et pas le bateau, sans seuil', () => {
     expect(usesActiveAverage(wing)).toBe(true);
     expect(usesActiveAverage(SPORT_PROFILES.surf)).toBe(true);
     expect(usesActiveAverage(SPORT_PROFILES.bateau)).toBe(false);

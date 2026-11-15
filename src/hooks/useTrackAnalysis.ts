@@ -63,7 +63,7 @@ export const analysisView = <T>(
 };
 
 /**
- * Traitement et bornes effectives des traits colorés d'une analyse, en texte : les bornes ordonnées comme le calcul les
+ * Bornes effectives des traits colorés d'une analyse, en texte : les bornes ordonnées comme le calcul les
  * ordonne (`effectiveSpeedRange`), avec la suggestion de l'analyse reçue ; sans couleurs, un texte vide.
  */
 export const colorKeyOf = (color: TrackColorOptions | null, suggested: SpeedRangeMs | null): string => {
@@ -71,7 +71,7 @@ export const colorKeyOf = (color: TrackColorOptions | null, suggested: SpeedRang
   const { minMs, maxMs } = effectiveSpeedRange({
     sessionRange: color.sessionRange, activityRange: color.activityRange, suggested, fallback: color.fallback,
   });
-  return JSON.stringify([color.treatment, minMs, maxMs]);
+  return JSON.stringify([minMs, maxMs]);
 };
 
 /**

@@ -40,9 +40,9 @@ describe('liveFieldsOfTreatment', () => {
   it('propose les défauts de chaque traitement', () => {
     for (const treatment of ['voile', 'surf'] as const) {
       for (const key of DEFAULT_LIVE_FIELDS[treatment]) expect(liveFieldsOfTreatment(treatment)).toContain(key);
-      for (const key of DEFAULT_NOTIFICATION_FIELDS[treatment]) expect(liveFieldsOfTreatment(treatment)).toContain(key);
-      expect(DEFAULT_NOTIFICATION_FIELDS[treatment].length).toBeLessThanOrEqual(MAX_NOTIFICATION_FIELDS);
+      for (const key of DEFAULT_NOTIFICATION_FIELDS) expect(liveFieldsOfTreatment(treatment)).toContain(key);
     }
+    expect(DEFAULT_NOTIFICATION_FIELDS.length).toBeLessThanOrEqual(MAX_NOTIFICATION_FIELDS);
   });
 
   it('propose les défauts de chaque calcul, permis par son traitement', () => {

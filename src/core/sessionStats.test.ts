@@ -90,7 +90,6 @@ const KMH_PROFILE: SportProfile = {
   maxPlausibleSpeedMs: 12,
   defaultPolarMinSpeed: 0,
   jumps: null,
-  hrEnergy: null,
   surf: null,
   pump: null,
 };

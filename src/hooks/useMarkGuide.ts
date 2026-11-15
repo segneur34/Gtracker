@@ -1,7 +1,5 @@
 import { isManualPause, isRecordingSession } from '../recording/session';
 import { useSyncExternalStore } from 'react';
-import { activityFamily } from '../core/activities';
-import { usesMarkCourse } from '../core/sportProfiles';
 import { getBeeper } from '../platform/beeper';
 import type { LocationFix } from '../platform/location';
 import {
@@ -115,7 +113,7 @@ const sync = () => {
   const marks = trace?.marks;
   const recording = isRecordingSession(recorder);
   const activity = recorder.activity;
-  const guided = recording && activity !== null && usesMarkCourse(activityFamily(activity)) && marks !== undefined && marks.length > 0;
+  const guided = recording && activity !== null && marks !== undefined && marks.length > 0;
 
   if (!guided) {
     if (session) {

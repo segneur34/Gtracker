@@ -93,17 +93,14 @@ export const defaultLiveFieldsOf = (sport: SportType): LiveFieldKey[] =>
 export const MAX_NOTIFICATION_FIELDS = 2;
 
 /** Chiffres de la notification à défaut de choix, les mêmes pour tous les traitements. */
-export const DEFAULT_NOTIFICATION_FIELDS: Record<Treatment, LiveFieldKey[]> = {
-  voile: ['speed', 'distance'],
-  surf: ['speed', 'distance'],
-};
+export const DEFAULT_NOTIFICATION_FIELDS: LiveFieldKey[] = ['speed', 'distance'];
 
 /** Chiffres de la notification propres à un calcul, avant ceux de son traitement ; aucun pour l'instant. */
 const SPORT_NOTIFICATION_FIELDS: Partial<Record<SportType, LiveFieldKey[]>> = {};
 
 /** Chiffres de la notification d'un calcul à défaut de choix : les siens, sinon ceux de son traitement. */
 export const defaultNotificationFieldsOf = (sport: SportType): LiveFieldKey[] =>
-  SPORT_NOTIFICATION_FIELDS[sport] ?? DEFAULT_NOTIFICATION_FIELDS[sportTreatment(sport)];
+  SPORT_NOTIFICATION_FIELDS[sport] ?? DEFAULT_NOTIFICATION_FIELDS;
 
 const isLiveFieldKey = (value: unknown): value is LiveFieldKey =>
   typeof value === 'string' && Object.prototype.hasOwnProperty.call(LIVE_FIELD_TREATMENTS, value);

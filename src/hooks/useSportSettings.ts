@@ -247,8 +247,8 @@ export const effectiveNotificationFields = (activity: Activity): LiveFieldKey[] 
 /** Bips d'approche des balises d'un parcours : ceux réglés pour l'activité, sinon le défaut. */
 export const effectiveMarkGuide = (activity: Activity): MarkGuideSettings => resolveMarkGuide(readStoredSettings(), activity);
 
-/** Support sur foil d'une activité de voile ou de surf, `null` ailleurs. Utilisable hors composant. */
-export const effectiveFoil = (activity: Activity): boolean | null => resolveFoil(readStoredSettings(), activity);
+/** Support sur foil d'une activité. Utilisable hors composant. */
+export const effectiveFoil = (activity: Activity): boolean => resolveFoil(readStoredSettings(), activity);
 
 /** Pumping foil d'une activité de surf ou de voile (bateau excepté), `null` ailleurs. Utilisable hors composant. */
 export const effectivePumping = (activity: Activity): boolean | null => resolvePumping(readStoredSettings(), activity);
@@ -477,7 +477,7 @@ export const useSportSettings = (family: SportFamily) => {
   );
 
   /** Support sur foil de l'activité, réglé dans Réglages ; une session peut avoir le sien. */
-  const foil = resolveFoil(stored, activity) ?? false;
+  const foil = resolveFoil(stored, activity);
   /** Pumping foil de l'activité, réglé dans Réglages ; une session peut avoir le sien. */
   const pumping = resolvePumping(stored, activity) ?? false;
 

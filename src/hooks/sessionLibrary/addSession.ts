@@ -4,7 +4,7 @@ import { decodeImuHeader } from '../../core/imuFile';
 import { pruneImuFile } from '../../core/imuPrune';
 import { keepsWholeCaptureForPumping } from '../../core/pumping';
 import { pruneSurfImu } from '../../surfing/imuPrune';
-import { getSportProfile, sportTreatment } from '../../core/sportProfiles';
+import { getSportProfile } from '../../core/sportProfiles';
 import type { SportType } from '../../core/types';
 import { sessionPath } from '../../library/folderLayout';
 import { uniqueSessionFileName } from '../../library/naming';
@@ -104,12 +104,10 @@ const prunedMotion = async (
       const rides = surfRides(parseGpx(text).rawPoints, sport, summaryOptions(sport, analysis, activitySummarySettings(activityId)(sport)));
       return rides ? await pruneSurfImu(motion, rides, profile.pump.pruneMarginS, profile.pump.captureBreakS) : motion;
     }
-    if (sportTreatment(sport) === 'voile') {
-      const activity = activityOfSession(sport, activityId);
-      const foil = analysis?.foil ?? setup?.foil ?? false;
-      const pumping = analysis?.pumping ?? effectivePumping(activity) ?? false;
-      if (keepsWholeCaptureForPumping(profile.pump, foil, pumping)) return motion;
-    }
+    const activity = activityOfSession(sport, activityId);
+    const foil = analysis?.foil ?? setup?.foil ?? false;
+    const pumping = analysis?.pumping ?? effectivePumping(activity) ?? false;
+    if (keepsWholeCaptureForPumping(profile.pump, foil, pumping)) return motion;
     const detection = profile.jumps?.detection;
     return detection ? await pruneImuFile(motion, detection) : motion;
   } catch {

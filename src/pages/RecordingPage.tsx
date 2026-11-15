@@ -22,7 +22,7 @@ import {
 } from '../core/activities';
 import { LIVE_TRACK_COLOR } from '../components/mapStyles';
 import {
-  sportFamily, sportTreatment, usesMarkCourse, type SportFamily,
+  sportFamily, sportTreatment, type SportFamily,
 } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import { formatClock, formatDistance, formatShortDistance, formatSpeed, formatDecimal } from '../core/units';
@@ -761,8 +761,8 @@ function RecordingScreen() {
   // Écran allumé tant qu'un enregistrement tourne (pause comprise), sur cette page seulement.
   useScreenOnWhile(busy);
 
-  // Parcours de balises : la trace suivie a des balises et l'activité navigue sur un parcours (voile, surf). L'avancement se compte par balises.
-  const courseMarksOf = followed?.marks && liveActivity && usesMarkCourse(sportFamily(liveActivity.base)) ? followed.marks : null;
+  // Parcours de balises : la trace suivie a des balises. L'avancement se compte par balises.
+  const courseMarksOf = followed?.marks && liveActivity ? followed.marks : null;
   const followedLengthM = useMemo(() => (followed ? followedTraceLengthM(followed) : 0), [followed]);
 
   const handleReplayFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -824,10 +824,10 @@ function RecordingScreen() {
       : deviceLocationSource();
     const capture = motionCaps?.available === true && sourceChoice === 'device';
     const motion = capture && measureJumps && jumpSettings
-      ? { placement: jumpSettings.placement, foil: effectiveFoil(chosen) ?? false }
+      ? { placement: jumpSettings.placement, foil: effectiveFoil(chosen) }
       : capture && (measurePumping || measureTurns)
         // Pumping et virages : une seule capture, téléphone sur la poitrine.
-        ? { placement: 'poitrine' as const, foil: effectiveFoil(chosen) ?? false }
+        ? { placement: 'poitrine' as const, foil: effectiveFoil(chosen) }
         : null;
     const heartRate = native && sourceChoice === 'device' && measureHeartRate ? belt : null;
     void beltWarmup.handOver(() => startRecording(chosen, source, { motion, heartRate }));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ELEVATION_PRESETS, REFERENCE_HEART_RATE, SAILING_SPORTS, SPORT_PROFILES, UNCLASSIFIED_PROFILE, isSportType } from './sportProfiles';
+import { ELEVATION_PRESETS, REFERENCE_HEART_RATE, SPORT_PROFILES, UNCLASSIFIED_PROFILE, isSportType } from './sportProfiles';
 import type { SportType } from './types';
 import { guessActivityLogo, isLogoId } from './activityLogos';
 
@@ -26,15 +26,6 @@ describe('garde contre un enregistrement jamais repris', () => {
     for (const sport of Object.keys(SPORT_PROFILES) as SportType[]) {
       const { guardStillRadiusM, guardStillDelayS, guardMaxClosedS } = SPORT_PROFILES[sport].recording;
       expect([guardStillRadiusM, guardStillDelayS, guardMaxClosedS], sport).toEqual([200, 3600, 43200]);
-    }
-  });
-});
-
-describe('hrEnergy', () => {
-  it("n'est donné qu'en voile et en surf", () => {
-    for (const sport of Object.keys(SPORT_PROFILES) as SportType[]) {
-      const expected = SAILING_SPORTS.includes(sport) || sport === 'surf';
-      expect(SPORT_PROFILES[sport].hrEnergy !== null, sport).toBe(expected);
     }
   });
 });
