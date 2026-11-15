@@ -28,10 +28,11 @@ describe('shouldDescendIntoMemory', () => {
 });
 
 describe('isMemorySubfolder', () => {
-  it('refuse le dossier sessions ou itineraires d\'une mémoire', () => {
+  it('refuse le dossier sessions, itineraires ou journaux d\'une mémoire', () => {
     expect(isMemorySubfolder('sessions', new Set(['a.gpx', 'a.json']))).toBe(true);
     expect(isMemorySubfolder('Documents/Gtracker/Sessions', new Set())).toBe(true);
     expect(isMemorySubfolder('itineraires', new Set(['Boucle.json']))).toBe(true);
+    expect(isMemorySubfolder('journaux', new Set(['recording-journal-2026.jsonl']))).toBe(true);
   });
 
   it('accepte un dossier marqué comme mémoire, quel que soit son nom, et tout autre dossier', () => {

@@ -1,6 +1,13 @@
-import { addFixAfterManualPause, addFixToStats, EMPTY_RECORDING_STATS, type PauseClock, type RecordingStats } from './session';
+import type { Activity } from '../core/activities';
+import { marksWithin, type SessionMark } from '../core/sessionMarks';
+import type { LocationFix } from '../platform/location';
+import {
+  addFixAfterManualPause, addFixToStats, EMPTY_RECORDING_STATS, sessionFileName, sessionTitle, splitIntoSegments, type PauseClock,
+  type RecordingStats,
+} from './session';
 import type { RecoveryServices } from '../platform/recovery';
-import type { JournalPause, ParsedJournal } from './journal';
+import { buildGpx } from './gpxWriter';
+import { journalSessionActivity, type JournalPause, type ParsedJournal } from './journal';
 
 /**
  * Reprise d'un enregistrement interrompu, sans accès au téléphone.
@@ -96,4 +103,54 @@ export const continuedPause = (
   if (openPause) return { pause: null, autoPartMs: openPause.autoPartMs, resumeLine: true };
   if (resumedPause) return { pause: null, autoPartMs: resumedPause.autoPartMs, resumeLine: false };
   return { pause: { atMs: lastLineMs ?? nowMs, autoPartMs: 0 }, autoPartMs: 0, resumeLine: true };
+};
+
+/** GPX d'une session enregistrée, prêt à ranger. */
+export interface SessionGpx {
+  fileName: string;
+  content: string;
+  pointCount: number;
+}
+
+/**
+ * GPX de segments de positions, titré du nom de l'activité (« Session » sans activité, rangée « à classer ») ; `null`
+ * sous deux positions au total : aucune trace ne s'en tire.
+ */
+export const sessionGpx = (segments: LocationFix[][], activity: Activity | null): SessionGpx | null => {
+  const pointCount = segments.reduce((n, s) => n + s.length, 0);
+  if (pointCount < 2) return null;
+  const sport = activity?.base ?? null;
+  const startMs = segments.find((s) => s.length > 0)![0].timeMs;
+  return {
+    fileName: sessionFileName(startMs, sport),
+    content: buildGpx(segments, { name: sessionTitle(startMs, activity?.name ?? 'Session'), sport }),
+    pointCount,
+  };
+};
+
+/**
+ * Repères d'un journal relu, du démarrage à la fin : une note posée en pause manuelle, après la dernière position, est
+ * gardée. Le démarrage est le plus tôt de l'heure de l'en-tête (horloge du téléphone) et de la première position
+ * (heure du GPS) : une horloge du téléphone en avance n'écarte pas les repères du début.
+ */
+export const journalMarks = (parsed: Pick<ParsedJournal, 'header' | 'fixes' | 'marks'>): SessionMark[] => {
+  const fromMs = Math.min(parsed.header?.startedAtMs ?? Infinity, parsed.fixes[0]?.timeMs ?? Infinity);
+  return marksWithin(parsed.marks, Number.isFinite(fromMs) ? fromMs : 0, Infinity);
+};
+
+/** Session reconstruite d'un journal relu (`sessionFromJournal`). */
+export interface JournalSession extends SessionGpx {
+  /** `null` sans calcul lisible : rangée « à classer ». */
+  activity: Activity | null;
+  marks: SessionMark[];
+}
+
+/**
+ * Session d'un journal relu, comme la reprise au lancement la remet en attente : activité (`journalSessionActivity`),
+ * segments, repères et GPX ; `null` sous deux positions. `activities` : celles de l'utilisateur.
+ */
+export const sessionFromJournal = (parsed: ParsedJournal, activities: Activity[]): JournalSession | null => {
+  const activity = journalSessionActivity(parsed, activities);
+  const gpx = sessionGpx(splitIntoSegments(parsed.fixes, parsed.breaks), activity);
+  return gpx && { ...gpx, activity, marks: journalMarks(parsed) };
 };

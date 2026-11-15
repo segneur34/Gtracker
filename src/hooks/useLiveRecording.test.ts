@@ -19,6 +19,19 @@ vi.mock('./useRecorder', () => ({
   },
 }));
 
+/** Calcul du direct qui lève à la demande, comme une erreur du calcul sur une trace inattendue. */
+const failing = vi.hoisted(() => ({ on: false }));
+vi.mock('../recording/liveStats', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../recording/liveStats')>();
+  return {
+    ...original,
+    computeLiveStats: (...args: Parameters<typeof original.computeLiveStats>) => {
+      if (failing.on) throw new Error('calcul en panne');
+      return original.computeLiveStats(...args);
+    },
+  };
+});
+
 // Une page qui lit le direct : sans rendu, seul son abonnement compte ici.
 vi.mock('react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react')>()),
@@ -28,7 +41,24 @@ vi.mock('react', async (importOriginal) => ({
   },
 }));
 
-const { getLiveRecording, startLiveRecording, subscribeToLiveRecording, useLiveRecording } = await import('./useLiveRecording');
+/**
+ * Le direct, neuf à chaque test, avec un enregistrement vide : son rythme se lit sur l'instant du dernier calcul, et
+ * un test qui le laisserait plus tard que l'horloge du suivant y figerait les calculs (l'horloge ne recule jamais pour
+ * de vrai).
+ */
+let direct: typeof import('./useLiveRecording');
+beforeEach(async () => {
+  recorder.state.stats = { pointCount: 0 };
+  recorder.segments = [[]];
+  recorder.listeners = [];
+  failing.on = false;
+  vi.resetModules();
+  direct = await import('./useLiveRecording');
+});
+const getLiveRecording = () => direct.getLiveRecording();
+const startLiveRecording = () => direct.startLiveRecording();
+const subscribeToLiveRecording = (listener: () => void) => direct.subscribeToLiveRecording(listener);
+const useLiveRecording = () => direct.useLiveRecording();
 
 const T0 = Date.UTC(2026, 10, 4, 14, 0, 0);
 
@@ -69,5 +99,26 @@ describe('direct de l’enregistrement, écran éteint', () => {
     expect(vi.getTimerCount()).toBe(0);
     addFix(T0 + 120_000);
     expect(published).toBe(3);
+  });
+
+  it("une erreur du calcul ne remonte pas jusqu'à l'enregistreur et garde les derniers chiffres", async () => {
+    startLiveRecording();
+    addFix(T0 + 200_000);
+    const before = getLiveRecording();
+    const beforeStats = JSON.stringify(before.stats);
+    expect(before.updatedMs).toBe(T0 + 200_000);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    failing.on = true;
+    try {
+      expect(() => addFix(T0 + 300_000)).not.toThrow();
+      expect(getLiveRecording()).toBe(before);
+      expect(JSON.stringify(getLiveRecording().stats)).toBe(beforeStats);
+    } finally {
+      failing.on = false;
+      vi.mocked(console.warn).mockRestore();
+    }
+    addFix(T0 + 400_000);
+    expect(getLiveRecording().updatedMs).toBe(T0 + 400_000);
+    expect(JSON.stringify(getLiveRecording().stats)).not.toBe(beforeStats);
   });
 });

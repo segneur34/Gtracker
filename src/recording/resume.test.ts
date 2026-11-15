@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { journalBreakLine, journalFixLine, journalHeaderLine, journalPauseLine, journalResumeLine, journalStopLine, parseJournal } from './journal';
-import { NO_RECOVERY_SERVICES, continuedPause, rebuildRecordingStats, recoveryDecision, resumedPhase, type RecoveryFacts } from './resume';
-import { EMPTY_RECORDING_STATS, addFixAfterManualPause, addFixToStats, recordingDurationMs, displayedDurationMs, type RecordingStats } from './session';
+import { baseActivity } from '../core/activities';
+import {
+  journalActivityLine, journalBreakLine, journalFixLine, journalHeaderLine, journalNoteLine, journalPauseLine, journalResumeLine, journalStopLine,
+  parseJournal,
+} from './journal';
+import {
+  NO_RECOVERY_SERVICES, continuedPause, journalMarks, rebuildRecordingStats, recoveryDecision, resumedPhase, sessionFromJournal,
+  type RecoveryFacts,
+} from './resume';
+import {
+  EMPTY_RECORDING_STATS, addFixAfterManualPause, addFixToStats, recordingDurationMs, displayedDurationMs, sessionFileName, type RecordingStats,
+} from './session';
 
 const T0 = Date.UTC(2026, 10, 4, 9, 0, 0);
 const OFFER_S = 600;
@@ -183,5 +192,55 @@ describe('journal rouvert', () => {
 
   it('sans aucune ligne datée : âge inconnu', () => {
     expect(parseJournal('pas du json\n').lastLineMs).toBeNull();
+  });
+});
+
+describe('session reconstruite d’un journal relu', () => {
+  /** Journal de `seconds` secondes à `hz` positions par seconde, coupé au milieu, avec un repère au début. */
+  const journalAt = (hz: number, seconds = 60, header = journalHeaderLine('kite', T0, { id: 'a-kite', name: 'Kite' })): string => {
+    const lines = [header];
+    for (let i = 0; i < seconds * hz; i++) {
+      const timeMs = T0 + (i * 1000) / hz;
+      if (i === (seconds / 2) * hz) lines.push(journalBreakLine(timeMs));
+      lines.push(journalFixLine({ timeMs, lat: 43 + i * 1e-5, lon: 3, speedMs: 4, accuracyM: 3 }));
+      if (i === hz) lines.push(journalNoteLine({ timeMs, lat: 43, lon: 3, label: null }));
+    }
+    return lines.join('');
+  };
+
+  it.each([1, 5])('à %i Hz : toutes les positions, deux segments, le repère, le nom et le calcul de l’activité', (hz) => {
+    const session = sessionFromJournal(parseJournal(journalAt(hz)), [])!;
+    expect(session.pointCount).toBe(60 * hz);
+    expect(session.content.match(/<trkseg>/g)).toHaveLength(2);
+    expect(session.content.match(/<trkpt/g)).toHaveLength(60 * hz);
+    expect(session.fileName).toBe(sessionFileName(T0, 'kite'));
+    expect(session.content).toContain('Kite, ');
+    expect(session.activity?.base).toBe('kite');
+    expect(session.marks.map((m) => m.timeMs)).toEqual([T0 + 1000]);
+  });
+
+  it('une activité choisie en route prime sur celle du départ', () => {
+    const text = journalAt(1) + journalActivityLine('wingfoil', { id: 'a-wing', name: 'Wing' });
+    const session = sessionFromJournal(parseJournal(text), [{ ...baseActivity('wingfoil'), id: 'a-wing', name: 'Wing' }])!;
+    expect(session.activity?.id).toBe('a-wing');
+    expect(session.fileName).toBe(sessionFileName(T0, 'wingfoil'));
+  });
+
+  it('sans en-tête lisible : aucune activité devinée, rangée « à classer »', () => {
+    const session = sessionFromJournal(parseJournal(journalAt(1, 10, 'en-tête abîmé\n')), [])!;
+    expect(session.activity).toBeNull();
+    expect(session.pointCount).toBe(10);
+    expect(session.content).toContain('Session, ');
+  });
+
+  it('sous deux positions, ou illisible : aucune session', () => {
+    const header = journalHeaderLine('kite', T0);
+    expect(sessionFromJournal(parseJournal(header + journalFixLine({ timeMs: T0, lat: 43, lon: 3 })), [])).toBeNull();
+    expect(sessionFromJournal(parseJournal('\u0000\u0001 pas un journal'), [])).toBeNull();
+  });
+
+  it('horloge du téléphone en avance sur l’heure du GPS : les repères du début restent', () => {
+    const parsed = parseJournal(journalAt(1, 60, journalHeaderLine('kite', T0 + 5000)));
+    expect(journalMarks(parsed).map((m) => m.timeMs)).toEqual([T0 + 1000]);
   });
 });

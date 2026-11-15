@@ -6,12 +6,12 @@ import { recordingJournal } from '../../platform/files';
 import { latestHeartRate } from '../../platform/heartRate';
 import type { LocationErrorCause, LocationFix, LocationSource, LocationWatchOptions } from '../../platform/location';
 import { removeMotionCapture, type MotionCapture } from '../../platform/motion';
-import { buildGpx } from '../../recording/gpxWriter';
 import { gpsWatchOnFix } from '../../recording/gpsWatch';
 import { heartRateAt } from '../../recording/heartRate';
 import { journalBreakLine, journalFixLine, journalResumeLine } from '../../recording/journal';
+import { sessionGpx } from '../../recording/resume';
 import {
-  addFixAfterManualPause, addFixToStats, evaluateAutoPause, isNewerFix, receivedFixRole, roundFix, sessionFileName, sessionTitle,
+  addFixAfterManualPause, addFixToStats, evaluateAutoPause, isNewerFix, receivedFixRole, roundFix,
 } from '../../recording/session';
 import { flushJournal, journalFlushDue, queueJournalLines, resetJournalBuffer } from './journalBuffer';
 import { fixListeners, pausePositionListeners, session, setState, state, type PendingSession } from './store';
@@ -122,18 +122,13 @@ export const buildPendingSession = async (
   marks: SessionMark[],
   motion: MotionCapture | null
 ): Promise<PendingSession | null> => {
-  const sport = activity?.base ?? null;
-  const titleName = activity?.name ?? 'Session';
-  const pointCount = segments.reduce((n, s) => n + s.length, 0);
-  if (pointCount < 2) {
+  const gpx = sessionGpx(segments, activity);
+  if (gpx === null) {
     await recordingJournal.remove();
     if (motion) await removeMotionCapture(motion.path);
     return null;
   }
-  const startMs = segments.find((s) => s.length > 0)![0].timeMs;
-  const fileName = sessionFileName(startMs, sport);
-  const content = buildGpx(segments, { name: sessionTitle(startMs, titleName), sport });
-  return { fileName, content, sport, activity, pointCount, recovered, canContinue: false, marks, motion };
+  return { ...gpx, sport: activity?.base ?? null, activity, recovered, canContinue: false, marks, motion };
 };
 
 /** Options de démarrage d'une source, communes au premier démarrage et à une reprise manuelle. */

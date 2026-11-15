@@ -21,10 +21,14 @@ export { MARKER_FILE };
  *                        (`core/imuFile.ts`)
  *       itineraires/     une fiche JSON et son GPX par itinéraire planifié
  *                        (`planning/routeRecord.ts`)
+ *       journaux/        les journaux d'enregistrement restés illisibles, copiés
+ *                        tels quels pour l'utilisateur (`hooks/setAsideJournals.ts`)
  */
 
 export const SESSIONS_DIR = 'sessions';
 export const ROUTES_DIR = 'itineraires';
+/** Journaux d'enregistrement illisibles, rendus à l'utilisateur ; l'application ne les relit pas. */
+export const JOURNALS_DIR = 'journaux';
 export const SETTINGS_DIR = 'reglages';
 export const README_FILE = 'LISEZMOI.txt';
 /** Tests de FC repos, à la racine (`restingHrStore.ts`) : pas dans `reglages/`, dont chaque fichier est lu comme un réglage. */
@@ -76,6 +80,8 @@ export const readmeText = (): string =>
     '  reprend ceux des autres à l\'ouverture du dossier.',
     '- lieux.json : les lieux que vous avez corrigés, pour nommer les sessions',
     '  suivantes parties du même endroit. Partagés entre appareils comme fc-repos.json.',
+    `- ${JOURNALS_DIR}/ : n'existe que si un enregistrement interrompu n'a pas pu être`,
+    '  reconstruit : son journal y est copié tel quel, à garder ou à supprimer.',
     `- ${MARKER_FILE} : permet à l'application de reconnaître ce dossier.`,
     '',
     'Sauvegarder ou changer d\'appareil : copiez le dossier Gtracker entier.',

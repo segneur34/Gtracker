@@ -146,7 +146,11 @@ const INITIAL_STATE: RecorderState = {
 
 /** Liaison vivante : les parties la lisent à jour, seul `setState` la remplace. */
 export let state = INITIAL_STATE;
-const listeners = createListeners();
+/**
+ * Un abonné qui lève n'interrompt pas l'appelant : sans quoi l'arrêt resterait sur « stopping », GPS allumé, ou la
+ * position gardée sauterait l'écriture du journal.
+ */
+const listeners = createListeners({ safe: true });
 
 export const setState = (patch: Partial<RecorderState>): void => {
   state = { ...state, ...patch };

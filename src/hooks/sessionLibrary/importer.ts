@@ -28,7 +28,10 @@ import { addGpx, type AddResult } from './addSession';
  * avec ses capteurs et sa fiche (activité, foil, repères),
  * rangées avec elle dès qu'un dossier est là (`flushPending`). Une session
  * déjà dans la mémoire (fiche coupée par un arrêt de l'application) reçoit
- * de l'enregistrement ce qui manque à sa fiche (`completeRecord`).
+ * de l'enregistrement ce qui manque à sa fiche (`completeRecord`). `kept` : faux si la session
+ * n'a été rangée nulle part (ni mémoire ni attente), seulement rendue pour être téléchargée. Une
+ * session refusée pour son contenu lève une erreur marquée `refused: true` : un nouvel essai n'y
+ * changerait rien, contrairement à une écriture en échec.
  */
 export const saveRecordedSession = async (
   text: string,
@@ -37,7 +40,7 @@ export const saveRecordedSession = async (
   motion: Uint8Array | null = null,
   marks: SessionMark[] = [],
   foil: boolean | null = null
-): Promise<{ file: string | null; location: string }> => {
+): Promise<{ file: string | null; location: string; kept: boolean }> => {
   await lib.opening;
   const result = await addGpx(text, 'enregistrement', {
     // Calcul inconnu (journal sans en-tête) : rien de deviné, la session est rangée « à classer ».
@@ -47,18 +50,19 @@ export const saveRecordedSession = async (
   if ((result.status === 'added' || result.status === 'duplicate') && result.file) lib.onSessionsAdded([result.file]);
   switch (result.status) {
     case 'added':
-      return { file: result.file, location: memoryLabelText(libraryState().folderLabel ?? t('mémoire')) };
+      return { file: result.file, location: memoryLabelText(libraryState().folderLabel ?? t('mémoire')), kept: true };
     case 'duplicate':
       // Fiche de la session déjà rangée non relue ou en lecture seule : rien n'y est ajouté, l'enregistreur garde son journal.
       if (result.recordNotRead) throw new Error(t("session déjà dans la mémoire, mais sa fiche n'a pas pu être relue pour la compléter"));
       if (result.recordReadOnly) throw new Error(t('session déjà dans la mémoire, mais sa fiche y est en lecture seule (non lue, illisible ou plus récente)'));
-      return { file: result.file, location: t('déjà dans la mémoire') };
+      return { file: result.file, location: t('déjà dans la mémoire'), kept: true };
     case 'pending':
-      return { file: null, location: t("en attente d'un dossier mémoire (dossier privé de l'application)") };
+      return { file: null, location: t("en attente d'un dossier mémoire (dossier privé de l'application)"), kept: true };
     case 'unsaved':
-      return { file: null, location: t('non rangée, aucune mémoire accessible : à télécharger') };
+      return { file: null, location: t('non rangée, aucune mémoire accessible : à télécharger'), kept: false };
     default:
-      throw new Error(result.message ?? t('session illisible'));
+      // Refusée pour son contenu (trop peu de points horodatés…) : la retenter ne changera rien.
+      throw Object.assign(new Error(result.message ?? t('session illisible')), { refused: true });
   }
 };
 

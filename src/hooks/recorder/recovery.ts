@@ -1,7 +1,6 @@
 import { errorMessage } from '../../core/basics';
 import type { Activity } from '../../core/activities';
 import { t } from '../../core/i18n';
-import { marksWithin } from '../../core/sessionMarks';
 import { DEFAULT_RECORDING, getSportProfile } from '../../core/sportProfiles';
 import type { SportType } from '../../core/types';
 import { disarmBeltWatch, disarmGpsWatch, getBeeper } from '../../platform/beeper';
@@ -15,10 +14,11 @@ import {
 } from '../../platform/motion';
 import { readRecoveryServices, type RecoveryServices } from '../../platform/recovery';
 import { START_GPS_WATCH, beltWatchSettings, gpsWatchOnFix, gpsWatchOnPause } from '../../recording/gpsWatch';
-import { journalActivity, parseJournal, type ParsedJournal } from '../../recording/journal';
+import { journalSessionActivity, parseJournal, type ParsedJournal } from '../../recording/journal';
 import {
-  NO_RECOVERY_SERVICES, rebuildRecordingStats, recoveryDecision, resumedPhase, type RecoveryJournal,
+  NO_RECOVERY_SERVICES, journalMarks, rebuildRecordingStats, recoveryDecision, resumedPhase, type RecoveryJournal,
 } from '../../recording/resume';
+import { JOURNALS_DIR } from '../../library/folderLayout';
 import { EMPTY_RECORDING_STATS, splitIntoSegments } from '../../recording/session';
 import { effectiveRecordingProfile, readStoredActivities } from '../useSportSettings';
 import { dropJournalLines, queueJournalLines } from './journalBuffer';
@@ -48,13 +48,19 @@ type JournalRecovery = 'free' | 'setAside' | 'blocked';
 /**
  * Met de côté le journal d'une session interrompue qui ne se reprend pas,
  * sous un autre nom dans le dossier privé de l'application, et le dit : un
- * nouvel enregistrement peut démarrer sans l'écraser. `why` : ce qui n'a pas
- * marché, en clair.
+ * nouvel enregistrement peut démarrer sans l'écraser. Il est retenté au
+ * lancement suivant (`hooks/setAsideJournals.ts`), ou copié dans le dossier
+ * mémoire s'il reste illisible. `why` : ce qui n'a pas marché, en clair.
  */
 const setJournalAside = async (why: string): Promise<JournalRecovery> => {
   try {
     const name = await recordingJournal.setAside();
-    setState({ error: t('{why} : son journal est gardé de côté sur le téléphone ({name}), un nouvel enregistrement peut démarrer.', { why, name }) });
+    setState({
+      error: t(
+        "{why} : son journal est mis de côté ({name}), un nouvel enregistrement peut démarrer. Il sera repris au prochain lancement de l'application, ou rendu dans le dossier mémoire (sous-dossier {dir}) s'il reste illisible.",
+        { why, name, dir: JOURNALS_DIR },
+      ),
+    });
     return 'setAside';
   } catch (err) {
     setState({
@@ -67,11 +73,10 @@ const setJournalAside = async (why: string): Promise<JournalRecovery> => {
   }
 };
 
-/** Calcul et activité d'un journal relu : une activité choisie en cours de route prime sur celle du départ ; `null` sans calcul lisible. */
+/** Calcul et activité d'un journal relu (`journalSessionActivity`) ; `null` sans calcul lisible. */
 const journalSession = (parsed: ParsedJournal): { sport: SportType; activity: Activity } | null => {
-  const sport = parsed.activityChange?.sport ?? parsed.header?.sport ?? null;
-  if (sport === null) return null;
-  return { sport, activity: journalActivity(sport, parsed.activityChange?.activity ?? parsed.header?.activity, readStoredActivities()) };
+  const activity = journalSessionActivity(parsed, readStoredActivities());
+  return activity && { sport: activity.base, activity };
 };
 
 /** Ce que `recoveryDecision` lit d'un journal, et le délai de l'offre de « Continuer ». */
@@ -293,9 +298,7 @@ const recoverOnce = async (): Promise<JournalRecovery> => {
   const { header, fixes: list, breaks } = parsed;
   try {
     // Ni en-tête ni changement lisibles : aucun calcul deviné, la session sera rangée « à classer ».
-    // Repères : du démarrage à la fin ; une note posée en pause manuelle, après la dernière position, est gardée.
-    const fromMs = header?.startedAtMs ?? list[0]?.timeMs ?? 0;
-    const recoveredMarks = marksWithin(parsed.marks, fromMs, Infinity);
+    const recoveredMarks = journalMarks(parsed);
     const motion = header ? (orphan?.path.endsWith(`/${header.startedAtMs}.imu`) ? orphan : await findMotionCapture(header.startedAtMs)) : null;
     const pending = await buildPendingSession(session?.activity ?? null, splitIntoSegments(list, breaks), true, recoveredMarks, motion);
     // Services arrêtés à présent : seul l'âge du journal décide, reprise échouée comprise.

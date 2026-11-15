@@ -6,6 +6,7 @@ import { confirmLeave, installLeaveGuard } from './hooks/leaveGuard';
 import { startLiveRecording } from './hooks/useLiveRecording';
 import { startMarkGuide } from './hooks/useMarkGuide';
 import { startRecordingNotification } from './hooks/recordingNotification';
+import { retrySetAsideJournals } from './hooks/setAsideJournals';
 import { isRecordingActive, recoverInterruptedRecording, subscribeToRecorder } from './hooks/useRecorder';
 import { openLibrary, startIncomingFiles, startLibraryUi } from './hooks/useSessionLibrary';
 import { importRouteGpx } from './hooks/routeFiles';
@@ -28,6 +29,8 @@ const LIBRARY_OPEN_WAIT_MS = 1500;
 
 /** Thème suivi, mémoire ouverte (ou attendue un temps), puis premier rendu et services de fond. */
 export const startApp = async (): Promise<void> => {
+  // Un journal mis de côté après cet instant attend le lancement suivant (`retrySetAsideJournals`).
+  const launchedAtMs = Date.now();
   // Le stockage est chargé : le thème est reposé d'après son réglage, puis suivi.
   startTheme();
   resetOrientationLock();
@@ -51,6 +54,9 @@ export const startApp = async (): Promise<void> => {
   // Une fois l'enregistrement tranché : l'écran allumé d'une session close est rendu.
   const afterRecovery = () => {
     if (!isRecordingActive()) clearStaleScreenOn();
+    // Journaux mis de côté lors d'un lancement précédent : retentés, ou rendus dans le dossier mémoire ; jamais pendant
+    // un enregistrement. Celui que la reprise vient de mettre de côté attend le suivant, comme son message le dit.
+    void retrySetAsideJournals(isRecordingActive, launchedAtMs);
     // Fichiers reçus d'une autre application : rangés hors enregistrement, un enregistrement repris les fait attendre.
     // Un GPX d'itinéraire va dans les itinéraires.
     void startIncomingFiles(isRecordingActive, subscribeToRecorder, incomingFiles, importRouteGpx);

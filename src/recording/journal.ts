@@ -381,3 +381,12 @@ export const journalActivity = (sport: SportType, saved: { id: string; name: str
   const found = findActivity(activities, saved.id);
   return found && found.base === sport ? found : { id: saved.id, name: saved.name, base: sport, color: BASE_COLOR[sport] };
 };
+
+/**
+ * Activité de la session d'un journal relu (`journalActivity`) : une activité choisie en cours de route prime sur
+ * celle du départ ; `null` sans calcul lisible, la session sera rangée « à classer ».
+ */
+export const journalSessionActivity = (parsed: Pick<ParsedJournal, 'header' | 'activityChange'>, activities: Activity[]): Activity | null => {
+  const sport = parsed.activityChange?.sport ?? parsed.header?.sport ?? null;
+  return sport === null ? null : journalActivity(sport, parsed.activityChange?.activity ?? parsed.header?.activity, activities);
+};
