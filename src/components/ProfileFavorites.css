@@ -7,14 +7,6 @@
   --favs-logo-3: 44px;
 }
 
-/* Cadre peint : ce bloc garde des marges latérales plus étroites que les autres cartes (la rangée y tient à 320 px). */
-@supports (-webkit-mask-box-image: none) {
-  section.brush-frame.profile-favs {
-    padding-right: var(--brush-pad-x-tight);
-    padding-left: var(--brush-pad-x-tight);
-  }
-}
-
 .profile-favs__row {
   display: flex;
   align-items: flex-start;
@@ -109,7 +101,7 @@
 }
 
 /* Téléphone : cadre plus étroit, logos réduits (trois tailles décroissantes gardées), « sessions » qui passe à la
-   ligne plutôt que de déborder. À 320 px la rangée dispose de 246 px, pour quatre cases et trois intervalles de 8 px. */
+   ligne plutôt que de déborder. À 320 px la rangée dispose de 262 px, pour quatre cases et trois intervalles de 8 px. */
 @media (max-width: 599px) {
   .ui-card-col.profile-favs {
     --favs-logo-1: 60px;

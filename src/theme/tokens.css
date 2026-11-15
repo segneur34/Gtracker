@@ -62,23 +62,26 @@
   --space-5: 20px;
   --space-6: 24px;
 
-  /* Cadre peint du Profil (`components/BrushFrame.css`) : épaisseur du trait (la bordure du masque en vaut quatre fois
-     plus), marges intérieures qui le laissent libre, bloc des favoris plus étroit sur les côtés, écart entre cartes. */
-  --brush-trait: 12px;
-  --brush-pad-y: 38px;
-  /* Marges latérales : 24 px (20 px pour les favoris) à 320 px de large, qui montent avec l'écran jusqu'à 38 px (28 px)
-     dès 355 px (340 px). */
-  --brush-pad-x: clamp(24px, calc(24px + (100vw - 320px) * 0.4), 38px);
-  --brush-pad-x-tight: clamp(20px, calc(20px + (100vw - 320px) * 0.4), 28px);
+  /* Charte des traits au pinceau (`components/BrushFrame.css`), trois épaisseurs et rien d'autre, chaque cadre avec les
+     marges intérieures qui laissent libre son trait.
+     Grand cadre : cadres du Profil, panneaux des analyses et des Statistiques, fenêtre de sélection des Statistiques.
+     Marges latérales de 12 px à 320 px de large, qui montent avec l'écran jusqu'à 19 px dès 338 px. */
+  --brush-trait-grand: 6px;
+  --brush-pad-y-grand: 19px;
+  --brush-pad-x-grand: clamp(12px, calc(12px + (100vw - 320px) * 0.4), 19px);
+  /* Petit cadre : cadres de Réglages, lignes de Sessions. */
+  --brush-trait-petit: 3px;
+  --brush-pad-y-petit: 11px;
+  --brush-pad-x-petit: clamp(10px, calc(10px + (100vw - 320px) * 0.4), 12px);
+  /* Bouton : tous les ovales au pinceau (choix, bouton « Sélection », bouton de période du Profil), plus fin que le
+     petit cadre ; sans marge propre, le bouton garde sa taille. */
+  --brush-trait-bouton: 2px;
+  /* Trait et marges lus par un cadre peint (la bordure du masque vaut quatre fois le trait) : le grand cadre, qu'un
+     conteneur remplace par un autre niveau. Écart entre les cartes peintes du Profil. */
+  --brush-trait: var(--brush-trait-grand);
+  --brush-pad-y: var(--brush-pad-y-grand);
+  --brush-pad-x: var(--brush-pad-x-grand);
   --brush-gap: 30px;
-  /* Même cadre en trait fin (panneaux des analyses) : la moitié de l'épaisseur et des marges, au même rapport. */
-  --brush-trait-fine: 6px;
-  --brush-pad-y-fine: 19px;
-  --brush-pad-x-fine: clamp(12px, calc(12px + (100vw - 320px) * 0.4), 19px);
-  /* Même cadre en trait très fin (cadres de Réglages) : un quart de l'épaisseur du Profil, des marges qui restent petites. */
-  --brush-trait-hair: 3px;
-  --brush-pad-y-hair: 11px;
-  --brush-pad-x-hair: clamp(10px, calc(10px + (100vw - 320px) * 0.4), 12px);
 
   /* Pages d'analyse, sur ordinateur : largeur de la carte, centrée, la place de part et d'autre
      servant à faire défiler la page à la souris (`analysisMobile.css`). */

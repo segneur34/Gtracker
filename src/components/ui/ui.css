@@ -479,8 +479,9 @@
 .ui-choice {
   --brush: var(--ink);
   --oval-r: calc(var(--choice-h) / 2);
-  /* Milieu du trait de l'ovale, d'après son tracé : le remplissage du choix s'arrête sous le trait, sans déborder. */
-  --oval-inset: calc(var(--oval-r) * 0.14);
+  /* Milieu du trait de l'ovale (`--oval-edge`, `BrushFrame.css`) : le remplissage du choix s'arrête sous le trait, sans
+     déborder. */
+  --oval-inset: calc(var(--oval-edge) + var(--brush-trait-bouton) / 2);
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;

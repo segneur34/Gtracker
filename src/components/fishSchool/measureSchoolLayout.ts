@@ -33,7 +33,7 @@ export const SCHOOL_MEASURE: SchoolMeasureRules = {
   cornerInset: { x: 4, y: 6 },
   textMarginPx: 3,
   snapPx: 8,
-  defaultTraitPx: 12,
+  defaultTraitPx: 6,
   aboveZonePx: 100,
   frameMarginPx: 8,
 };

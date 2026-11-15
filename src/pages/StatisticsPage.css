@@ -126,7 +126,7 @@
    téléphone ; le corps défile, « Annuler » et « Valider » restent en bas. Comme les panneaux de la page, elle laisse
    voir le champ du fond sous le voile (`--field-veil`) : son propre dessin du champ (`::after`, sous le contenu), car
    derrière elle il n'y a que la page assombrie ; le voile est peint avec le champ, à l'opacité du champ, ce qui donne
-   le même mélange que sur la page. Son cadre est peint en trait fin (`.brush-frame`, `BrushFrame.css`). */
+   le même mélange que sur la page. Son cadre est peint en grand cadre (`.brush-frame`, `BrushFrame.css`). */
 .ui-dialog.stats-selection-dialog {
   /* Les marges du cadre peint comptent dans la taille : la fenêtre tient dans l'écran. */
   box-sizing: border-box;
@@ -189,7 +189,7 @@
 /* Cadre peint : les marges de la fenêtre laissent libre la bordure du trait, le corps défile en deçà. */
 @supports (-webkit-mask-box-image: none) {
   .ui-dialog.stats-selection-dialog {
-    padding: var(--brush-pad-y-fine) var(--brush-pad-x-fine);
+    padding: var(--brush-pad-y-grand) var(--brush-pad-x-grand);
   }
 
   .stats-selection-dialog .ui-dialog__head {
