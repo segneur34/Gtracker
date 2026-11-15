@@ -1,7 +1,7 @@
 import { plainError } from '../platform/errorText';
 import { t } from '../core/i18n';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { kinematicsProfileOf, prepareRawTrack, type PreparedTrack } from '../core/prepareTrack';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { kinematicsProfileOf, prepareRawTrack, type PreparedTrack, type PrepareTrackOptions } from '../core/prepareTrack';
 import type { KinematicsProfile } from '../core/sessionSpeed';
 import { runInWorker } from '../library/trackWorkerClient';
 
@@ -41,6 +41,30 @@ export interface ShownGpx {
   error: string | null;
   /** Trace préparée ; `null` : aucune (rien de lu, ou GPX illisible). */
   prepared: PreparedTrack | null;
+  /** Options de lecture qui ont donné `prepared` ; `null` sans trace. */
+  options: PrepareTrackOptions | null;
+}
+
+/**
+ * Trace d'où part l'analyse de la session ouverte (`useTrackAnalysis`) : sa source, sa trace préparée, les options
+ * exactes de sa lecture (l'analyse les redonne au calcul, qui reprend ainsi la trace gardée au lieu de la relire), et
+ * la clé sous laquelle le calcul la garde.
+ */
+export interface AnalysisSource {
+  from: GpxSource;
+  prepared: PreparedTrack;
+  prepare: PrepareTrackOptions;
+  key: string;
+}
+
+/** Ce que l'analyse lit de la lecture : la clé de sa mémoire, la trace affichée, et si elle répond à la demande courante. */
+export interface GpxAnalysisInput {
+  /** Clé de la session dans la mémoire du calcul, propre à la page. */
+  key: string;
+  /** Trace affichée ; `null` : aucune (rien de lu, autre fichier en lecture, GPX illisible). */
+  source: AnalysisSource | null;
+  /** Faux tant que la même source se relit (allure, support) : la trace affichée n'est pas encore celle demandée. */
+  settled: boolean;
 }
 
 interface GpxState {
@@ -49,14 +73,15 @@ interface GpxState {
   shown: ShownGpx;
 }
 
-const NOTHING_SHOWN: ShownGpx = { from: null, fileName: null, error: null, prepared: null };
+const NOTHING_SHOWN: ShownGpx = { from: null, fileName: null, error: null, prepared: null, options: null };
 
 /** Trace affichée une fois la source préparée ; moins de deux points horodatés : dit en clair. */
-export const preparedState = (from: GpxSource, prepared: PreparedTrack): ShownGpx => ({
+export const preparedState = (from: GpxSource, prepared: PreparedTrack, options: PrepareTrackOptions = {}): ShownGpx => ({
   from,
   fileName: from.fileName,
   error: prepared.pointCount < 2 ? t('Le fichier ne contient pas assez de points horodatés.') : null,
   prepared,
+  options,
 });
 
 /** GPX illisible : l'erreur dite en clair, pas de trace. */
@@ -65,10 +90,11 @@ export const failedState = (from: GpxSource, err: unknown): ShownGpx => ({
   fileName: from.fileName,
   error: plainError(err, t('Lecture du fichier impossible.')),
   prepared: null,
+  options: null,
 });
 
 /** Même fichier de la mémoire : une source relue sous le même nom (dossier rouvert) garde la trace affichée jusqu'au résultat. */
-const sameFile = (a: GpxSource, b: GpxSource): boolean => a === b || (a.fileName !== null && a.fileName === b.fileName);
+export const sameFile = (a: GpxSource, b: GpxSource): boolean => a === b || (a.fileName !== null && a.fileName === b.fileName);
 
 /**
  * Vrai quand un autre fichier que celui affiché se prépare : « Lecture de la
@@ -110,6 +136,9 @@ export const useGpxSession = (kinematicsOptions: GpxSessionOptions = {}) => {
     [profileId, medianWindowSeconds, maxDetourRatio, maxPlausibleSpeedMs, maxGapS]
   );
 
+  /** Clé de la session dans la mémoire du calcul : la trace lue y est gardée pour l'analyse qui suit (`useTrackAnalysis`). */
+  const analysisKey = useId();
+
   /**
    * Lecture et kinématique de la source, hors du fil de l'affichage. Le
    * résultat est posé d'un coup ; celui d'une demande dépassée (autre fichier,
@@ -118,9 +147,10 @@ export const useGpxSession = (kinematicsOptions: GpxSessionOptions = {}) => {
   useEffect(() => {
     if (source === null) return;
     let alive = true;
-    runInWorker('prepare', source.text, { fileName: source.fileName, profile: filters, referenceSpeedOverrideMs }).then(
+    const options: PrepareTrackOptions = { fileName: source.fileName, profile: filters, referenceSpeedOverrideMs };
+    runInWorker('prepare', source.text, { ...options, analysisKey }).then(
       (prepared) => {
-        if (alive) setState((s) => (s.source === source ? { source, shown: preparedState(source, prepared) } : s));
+        if (alive) setState((s) => (s.source === source ? { source, shown: preparedState(source, prepared, options) } : s));
       },
       (err: unknown) => {
         if (alive) setState((s) => (s.source === source ? { source, shown: failedState(source, err) } : s));
@@ -129,7 +159,20 @@ export const useGpxSession = (kinematicsOptions: GpxSessionOptions = {}) => {
     return () => {
       alive = false;
     };
-  }, [source, filters, referenceSpeedOverrideMs]);
+  }, [source, filters, referenceSpeedOverrideMs, analysisKey]);
+
+  /** Trace affichée, telle que l'analyse la lit ; même objet tant qu'elle ne change pas. */
+  const analysisSource = useMemo(
+    (): AnalysisSource | null =>
+      shown.from !== null && shown.prepared !== null && shown.options !== null
+        ? { from: shown.from, prepared: shown.prepared, prepare: shown.options, key: analysisKey }
+        : null,
+    [shown, analysisKey]
+  );
+  /** La trace affichée répond à la source et aux filtres demandés ; sans demande, rien n'attend. */
+  const settled = source === null
+    || (shown.from === source && (shown.options === null
+      || (shown.options.profile === filters && shown.options.referenceSpeedOverrideMs === referenceSpeedOverrideMs)));
 
   /** Trace vide, tant que rien n'est préparé : les mêmes valeurs qu'une trace sans point (allure imposée comprise). */
   const empty = useMemo(
@@ -165,5 +208,9 @@ export const useGpxSession = (kinematicsOptions: GpxSessionOptions = {}) => {
     /** Un autre fichier que celui affiché se prépare : « Lecture de la session… » (`useAnalysisSession`). */
     reading: gpxReading(state),
     loadGpxContent,
+    /** Ce que l'analyse de la session lit (`useTrackAnalysis`) : clé de sa mémoire, trace affichée, lecture à jour. */
+    analysis: { key: analysisKey, source: analysisSource, settled } satisfies GpxAnalysisInput,
+    /** Trace sans point : celle que montre une page dont l'analyse n'est pas encore arrivée. */
+    emptyPrepared: empty,
   };
 };

@@ -13,7 +13,7 @@ import type { WindStats } from '../sailing/sailingAnalytics';
 import { runSurfSession, surfProfileOf, type SurfSessionSettings } from '../surfing/surfSession';
 
 /**
- * Analyse d'une session telle que les modules la font sur le fil de l'affichage (`useGpxSession`, `useSailingSession`,
+ * Analyse d'une session telle que les modules la faisaient sur le fil de l'affichage (`useGpxSession`, `useSailingSession`,
  * `SailingModule`, `SurfModule`) : les mêmes fonctions, dans le même ordre, avec les mêmes arguments. C'est la
  * référence à laquelle les tâches d'analyse du calcul en arrière-plan sont comparées. Fichier de test seulement : le
  * code de l'application ne l'importe pas.

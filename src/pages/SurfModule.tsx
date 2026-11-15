@@ -46,7 +46,10 @@ import { CHART_MAX_POINTS, trackBounds } from '../core/displayConfig';
 import { defaultActiveThresholdOf, sportTreatment } from '../core/sportProfiles';
 import { nearestIndexAtTime } from '../core/search';
 import { computeAllTopSegments } from '../core/topSegments';
-import { effectiveSpeedRange, trackColorSegments } from '../core/trackColor';
+import { effectiveSpeedRange } from '../core/trackColor';
+import type { SurfAnalysisReply, TrackColorOptions } from '../library/analysisStore';
+import { runInWorker } from '../library/trackWorkerClient';
+import { colorKeyOf, useKeptSegments, useTrackAnalysis } from '../hooks/useTrackAnalysis';
 import {
   SPEED_UNIT_LABEL, speedSourceText, formatDistance, formatDuration, formatShortDuration, formatSpeed, formatSpeedValue, formatTimeOfDay,
   fromDisplaySpeed, toDisplaySpeed, formatDecimal, orDash, speedCellOf
@@ -65,7 +68,7 @@ import { useFlightPumping, useSessionPumping, type PumpingStatus } from '../hook
 import { useHasGearList, useSportSettings } from '../hooks/useSportSettings';
 import { notesHaveGear } from '../settings/gearReminder';
 import type { SurfFlight, SurfPhase, SurfReturn, SurfSpan, SurfWave } from '../surfing/surfAnalysis';
-import { effectiveWaveThreshold, runSurfSession, surfProfileOf } from '../surfing/surfSession';
+import { effectiveWaveThreshold, surfProfileOf, type SurfSessionSettings } from '../surfing/surfSession';
 import { gyroWaveTurns } from '../surfing/gyroTurns';
 import StatTile from '../components/ui/StatTile';
 import MapToggle from '../components/ui/MapToggle';
@@ -96,6 +99,11 @@ const SURF_SECTION_DEFAULTS = tabDefaults(SURF_TABS);
 /** Préfixe des identifiants mémorisés (tailles des panneaux, onglets ouverts) : ne pas le renommer. */
 const STORAGE_ID = 'surf';
 const panelId = (name: string) => `${STORAGE_ID}.${name}`;
+
+/** Ce que la page lit d'une analyse de surf : vagues et résumé, traits de la trace colorée, et leurs bornes (`colorKeyOf`). */
+type SurfShown = SurfAnalysisReply & { colorKey: string };
+/** Sans analyse reçue : ni vagues ni traits, comme une trace sans point. */
+const NO_SURF: SurfShown = { analysis: null, segments: [], colorKey: '' };
 
 /**
  * Graphes de l'onglet « graphiques » dépliés : avec la FC, chacun se replie à
@@ -177,15 +185,36 @@ function SurfModule() {
   const surfProfile = surfProfileOf(profile);
   const waveThreshold = surfProfile ? effectiveWaveThreshold(surfProfile.surf, draft.edits.waveThreshold) : 0;
 
+  /** Bornes du dégradé de couleur, en m/s : celles de la session, sinon de Réglages, sinon le défaut de l'activité. */
+  const range = effectiveSpeedRange({ sessionRange: draft.edits.speedRange, activityRange: speedRange, suggested: null, fallback: defaultSpeedRange });
+  const treatment = sportTreatment(activity.base);
+  /**
+   * Vagues, vols, remontées et trace colorée, faits hors du fil de l'affichage (`useTrackAnalysis`) : la trace montrée
+   * est toujours celle de l'analyse montrée ; pendant un recalcul (seuils, foil, couleurs), les derniers chiffres restent.
+   */
+  const surfSettings: SurfSessionSettings = { threshold, foil, waveThreshold: draft.edits.waveThreshold };
+  const surfColor: TrackColorOptions = { treatment, sessionRange: draft.edits.speedRange, activityRange: speedRange, fallback: defaultSpeedRange };
+  const profileText = useMemo(() => JSON.stringify(profile), [profile]);
+  const surfView = useTrackAnalysis(gpx.analysis, JSON.stringify([profileText, surfSettings, surfColor]), (source) =>
+    runInWorker('analyzeSurf', source.from.text, {
+      key: source.key, prepare: source.prepare, profile, settings: surfSettings, color: surfColor,
+    }).then((reply): SurfShown => ({ ...reply, colorKey: colorKeyOf(surfColor, null) })), requestedFile, sessionError !== null
+  );
+  /** Trace de l'analyse montrée ; sans analyse, une trace sans point. */
+  const base = surfView.pair?.source.prepared ?? gpx.emptyPrepared;
+  const surfShown = surfView.pair?.result ?? NO_SURF;
+  const result = surfShown.analysis;
+  const mapSegments: TrackSegment[] = useKeptSegments(surfShown.segments, base.track, surfShown.colorKey);
+
   // Onglets de l'activité, rangée « avancé », surbrillance unique de la carte, point survolé effacé à chaque session.
   const { open, toggle, toggleOf, reveal, closeAll, advanced, shown, highlight } = useAnalysisTabs({
-    tabs: SURF_TABS, defaults: SURF_SECTION_DEFAULTS, activity, sessionKey: gpx.sessionKey,
+    tabs: SURF_TABS, defaults: SURF_SECTION_DEFAULTS, activity, sessionKey: base.sessionKey,
   });
   /** L'activité a une liste de matériel : de quoi proposer le rappel qui suit un enregistrement (`GearReminder`). */
   const hasGearList = useHasGearList(activity);
   const graphFolds = useOpenSections(`${STORAGE_ID}.graphes`, GRAPH_FOLDS_DEFAULT);
   /** FC de la session (ceinture, montre) et zones du pratiquant : l'onglet « cardio » et sa courbe sous la vitesse. */
-  const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(gpx.track, profile.heartRate, hrOffsetBpm);
+  const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(base.track, profile.heartRate, hrOffsetBpm);
   // Pumping des vols, par les capteurs de la session : il suit les vols, donc le seuil du brouillon.
   // Capteurs lus à l'ouverture de l'onglet « vols » ou « pumping », Pumping coché, comme en voile : une capture entière pèse plusieurs Mo ;
   // et à celle de l'onglet « vagues », pour les virages du gyroscope.
@@ -210,18 +239,12 @@ function SurfModule() {
   const [waveSort, setWaveSort] = useState<WaveSort>('ordre');
   const narrow = useNarrowScreen();
 
-  const { track, cumulative } = gpx;
+  const { track, cumulative } = base;
   // Repères du bouton « Note » : fanions, liste de « Général », traits du graphe.
   const marks = useSessionMarks(draft, track, cumulative.cumDist);
   const shownMark = shownMarkOf(highlight);
   /** Zone cardiaque montrée sur la carte (onglet « cardio »). */
   const hrZone = useHeartRateZoneHighlight(highlight, open.cardio, heart, hrZones, track, profile.heartRate.gapS);
-  const result = useMemo(
-    () => (surfProfile && track.length > 1
-      ? runSurfSession(track, cumulative, surfProfile, { threshold, foil, waveThreshold: draft.edits.waveThreshold })
-      : null),
-    [surfProfile, track, cumulative, threshold, foil, draft.edits.waveThreshold]
-  );
   const summary = result?.summary ?? null;
   const analysis = result?.analysis ?? null;
   /** Meilleurs segments, calculés à l'ouverture de leur onglet. */
@@ -234,13 +257,6 @@ function SurfModule() {
   const topShown = highlight.shownIn('tops');
   const totalDistanceM = cumulative.cumDist[cumulative.cumDist.length - 1] ?? 0;
 
-  /** Bornes du dégradé de couleur, en m/s : celles de la session, sinon de Réglages, sinon le défaut de l'activité. */
-  const range = effectiveSpeedRange({ sessionRange: draft.edits.speedRange, activityRange: speedRange, suggested: null, fallback: defaultSpeedRange });
-  const treatment = sportTreatment(activity.base);
-  const mapSegments = useMemo(
-    (): TrackSegment[] => trackColorSegments(track, treatment, { minMs: range.minMs, maxMs: range.maxMs }),
-    [track, treatment, range.minMs, range.maxMs]
-  );
   const mapBounds = useMemo(() => trackBounds(track), [track]);
 
   const wavePct = summary && summary.totalS > 0 ? formatDecimal((summary.waveS / summary.totalS) * 100, 1) : '0';
@@ -359,7 +375,7 @@ function SurfModule() {
   }, [waves, waveSort]);
 
   // Graphe de vitesse au fil de la session, en heure du jour, zoomable.
-  const timeChart = useTimeChartAxis(track, gpx.sessionKey);
+  const timeChart = useTimeChartAxis(track, base.sessionKey);
   const { minutes: trackMinutes, zoom, cardioZoom } = timeChart;
   const speedSeries = useMemo(() => track.map((p) => p.smoothedSpeedMs), [track]);
   /**
@@ -493,17 +509,17 @@ function SurfModule() {
 
   const unitLabel = SPEED_UNIT_LABEL[speedUnit];
   const noWaveSpeed = formatSpeed(fromDisplaySpeed(foil ? waveThreshold : threshold, profile.thresholdUnit), speedUnit);
-  const speedSource = speedSourceText(gpx.hasDeviceSpeed, gpx.deviceSpeedUnit);
+  const speedSource = speedSourceText(base.hasDeviceSpeed, base.deviceSpeedUnit);
   const hasCourse = track.some((p) => p.courseDeg !== undefined);
   const rideWord = foil ? t('vol') : t('vague');
   const measuredReturns = returns.filter((r) => r.after > 0);
   const firstOut = returns.find((r) => r.after === 0) ?? null;
 
   return (
-    <AnalysisShell title={t('Analyse sans vent')} family="surf" backLabel={t('Sessions')} file={gpx.fileName}
+    <AnalysisShell title={t('Analyse sans vent')} family="surf" backLabel={t('Sessions')} file={requestedFile ?? gpx.fileName}
       share={{ segments: mapSegments, stats: generalStats }} error={sessionError} draft={draft} loadError={gpx.error}
-      reading={reading}
-      empty={!summary && !gpx.error && requestedFile === null}
+      reading={reading || surfView.reading}
+      empty={!summary && !gpx.error && requestedFile === null && !surfView.reading}
       gearReminder={{
         activityId: activity.id, hasGearList, ready: shownFile !== null && draftRecord !== null,
         sessionHasGear: notesHaveGear(draft.edits.notes, gearFieldsFor(gearLabels)),
@@ -519,7 +535,7 @@ function SurfModule() {
         },
         focus: zoomOnMap.focus,
         companion: companionCharts(zoomOnMap.companionPanel),
-        sessionKey: gpx.sessionKey,
+        sessionKey: base.sessionKey,
         bounds: mapBounds,
         layers: mapLayers,
         defaultHeight: 480,
@@ -530,7 +546,7 @@ function SurfModule() {
           <>
             {open.general && (
               <ResizablePanel id={panelId('general')} style={ANALYSIS_PANEL_STYLE}>
-                <PanelHeading label={t('Général')} extra={<SessionDate track={gpx.track} />} open={open.general} onToggle={toggleOf('general')} />
+                <PanelHeading label={t('Général')} extra={<SessionDate track={track} />} open={open.general} onToggle={toggleOf('general')} />
                 <GeneralStats stats={overviewStats} />
                 {draft.edits.foil === null && (
                   <div className="ui-muted ui-text-xs ui-mt-8">

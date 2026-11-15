@@ -36,9 +36,10 @@ import { buildWindTimeline, polarExcludedPoints, prepareWindPolar, speedPolar, t
 /**
  * Analyse d'une session à voile, hors React : la chaîne de `useSailingSession`
  * (seuils, statistiques, vols, vent, manœuvres, VMG, polaire), en fonction
- * pure. Le hook l'appelle par ses trois étapes, chacune sous son `useMemo`,
- * pour que bouger le seuil ne refasse pas ce qui n'en dépend pas, et changer
- * le vent saisi ne refasse ni les statistiques ni l'estimation :
+ * pure. Le calcul en arrière-plan l'enchaîne par ses trois étapes, chacune
+ * gardée à part (`library/analysisStore.ts`), pour que bouger le seuil ne
+ * refasse pas ce qui n'en dépend pas, et changer le vent saisi ne refasse ni
+ * les statistiques ni l'estimation :
  *
  * 1. `prepareSailingTrack` : ce qui ne dépend que de la trace et de son allure
  *    (vue en nœuds, tops, masque du ratio, bornes de couleur suggérées, seuils
@@ -185,6 +186,17 @@ export interface SailingWindAnalysis {
 }
 
 /**
+ * Vent global retenu : le vent saisi s'il y en a un, sinon l'estimation si elle est fiable, sinon `null`. La page le
+ * lit aussi pour montrer le vent tout de suite (`useSailingSession`, `shownWind`), sans attendre le recalcul : un vent
+ * saisi ne dépend pas de l'analyse, et l'estimation ne dépend que du seuil.
+ */
+export const retainedWind = (
+  /** Vent saisi, en degrés ; `null` : vent estimé. */
+  windDeg: number | null,
+  windEstimate: WindEstimate | null
+): number | null => (windDeg === null ? null : normalizeDeg(windDeg)) ?? (windEstimate && windEstimate.reliable ? windEstimate.direction : null);
+
+/**
  * Étape 3 : ce qui dépend du vent retenu. Sans vent saisi ni estimation
  * fiable, les analyses qui en dépendent sont suspendues plutôt que calculées
  * sur une direction fausse.
@@ -197,8 +209,7 @@ export const analyzeSailingWind = (
 ): SailingWindAnalysis => {
   const { trackData, detection } = prepared;
   const { windEstimate, computeThresholdKn, flightThresholdKn } = atThreshold;
-  const manualWindValue = windDeg === null ? null : normalizeDeg(windDeg);
-  const currentWindValue = manualWindValue ?? (windEstimate && windEstimate.reliable ? windEstimate.direction : null);
+  const currentWindValue = retainedWind(windDeg, windEstimate);
 
   let maneuverStats: ManeuverStats | null = null;
   if (detection && currentWindValue !== null) {
