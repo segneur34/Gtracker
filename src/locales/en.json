@@ -868,7 +868,6 @@
   "Session en attente {gpx} vide (écriture interrompue), effacée": "Pending session {gpx} empty (write interrupted), deleted",
   "Session en attente {gpx} incomplète (écriture interrompue), effacée": "Pending session {gpx} incomplete (write interrupted), deleted",
   "Session en attente {gpx} laissée en attente : sa fiche n'a pas pu être lue": "Pending session {gpx} left pending: its record couldn't be read",
-  "Session en attente {gpx} illisible ({detail}), effacée": "Pending session {gpx} unreadable ({detail}), deleted",
   "Lieux appris non recopiés dans le dossier : {detail}": "Learned places not copied to the folder: {detail}",
   "Changements de {file} non enregistrés. {warning}": "Changes to {file} not saved. {warning}",
   "{file} a aussi changé sur un autre appareil ({list}) : la saisie la plus récente est gardée": "{file} also changed on another device ({list}): the most recent entry is kept",

@@ -868,7 +868,6 @@
   "Session en attente {gpx} vide (écriture interrompue), effacée": "Sesión en espera {gpx} vacía (escritura interrumpida), eliminada",
   "Session en attente {gpx} incomplète (écriture interrompue), effacée": "Sesión en espera {gpx} incompleta (escritura interrumpida), eliminada",
   "Session en attente {gpx} laissée en attente : sa fiche n'a pas pu être lue": "Sesión en espera {gpx} dejada en espera: no se ha podido leer su ficha",
-  "Session en attente {gpx} illisible ({detail}), effacée": "Sesión en espera {gpx} ilegible ({detail}), eliminada",
   "Lieux appris non recopiés dans le dossier : {detail}": "Lugares aprendidos no copiados en la carpeta: {detail}",
   "Changements de {file} non enregistrés. {warning}": "Cambios de {file} sin guardar. {warning}",
   "{file} a aussi changé sur un autre appareil ({list}) : la saisie la plus récente est gardée": "{file} también ha cambiado en otro dispositivo ({list}): se conserva la entrada más reciente",

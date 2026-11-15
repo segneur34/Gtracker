@@ -4,7 +4,7 @@ import type { LocationFix } from '../platform/location';
 import { buildGpx } from './gpxWriter';
 import {
   journalActivity, journalActivityLine, journalBeltLine, journalBreakLine, journalFixLine, journalGpsLine, journalHeaderLine, journalNoteLine,
-  parseJournal,
+  journalPauseLine, journalResumeLine, parseJournal,
 } from './journal';
 import { roundFix, splitIntoSegments } from './session';
 import { FILE_FORMATS } from '../core/appIdentity';
@@ -205,6 +205,38 @@ describe('notes du journal', () => {
     expect(parsed.marks).toEqual([second, first]);
     expect(parsed.fixes).toHaveLength(3);
     expect(parsed.breaks).toEqual([]);
+  });
+
+  it('bloc rejoué après une écriture refaite : un seul repère, une seule coupure, à sa place', () => {
+    const block = journalNoteLine(first) + journalPauseLine(T0 + 1600) + journalResumeLine(T0 + 1800)
+      + journalBreakLine(fixes[2].timeMs) + journalFixLine(fixes[2]);
+    const head = journalHeaderLine('kite', T0 - 5000) + journalFixLine(fixes[0]) + journalFixLine(fixes[1]);
+    const later = { timeMs: T0 + 3000, lat: 43.12348, lon: 3.7654 };
+    const healthy = parseJournal(head + block + journalFixLine(later));
+    // Le tampon remet ses lignes en tête, précédées d'un saut de ligne, après une écriture qui n'a pas abouti.
+    const replayed = parseJournal(head + block + '\n' + block + journalFixLine(later));
+    expect(replayed.marks).toEqual([first]);
+    expect(replayed.breaks).toEqual([2]);
+    expect(replayed.manualBreaks).toEqual(healthy.manualBreaks);
+    expect(replayed.fixes).toEqual(healthy.fixes);
+    expect(replayed.openPause).toBeNull();
+    expect(replayed.resumedPause).toBeNull();
+    expect(splitIntoSegments(replayed.fixes, replayed.breaks)).toEqual(splitIntoSegments(healthy.fixes, healthy.breaks));
+  });
+
+  it('bloc rejoué en fin de journal : aucune pause laissée ouverte par la relecture', () => {
+    const block = journalPauseLine(T0 + 1600) + journalResumeLine(T0 + 1800) + journalBreakLine(fixes[2].timeMs) + journalFixLine(fixes[2]);
+    const head = journalHeaderLine('kite', T0 - 5000) + journalFixLine(fixes[0]) + journalFixLine(fixes[1]);
+    const replayed = parseJournal(head + block + '\n' + block);
+    expect(replayed.breaks).toEqual([2]);
+    expect(replayed.manualBreaks).toEqual([{ fixIndex: 2, autoPartMs: 0 }]);
+    expect(replayed.resumedPause).toBeNull();
+    expect(replayed.openPause).toBeNull();
+  });
+
+  it('deux repères à des instants différents restent deux', () => {
+    const text = journalOf(fixes) + journalNoteLine(first) + journalNoteLine({ ...first, timeMs: first.timeMs + 1 });
+    expect(parseJournal(text).marks).toHaveLength(2);
   });
 
   it('ignore une note abîmée, et rend une liste vide sans note', () => {

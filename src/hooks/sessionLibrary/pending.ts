@@ -83,9 +83,10 @@ const notCompleted = (result: AddResult): boolean => result.recordNotRead === tr
  * retiennent (`readPendingImu`). Mémoire en lecture seule : tout reste en
  * attente d'un dossier où ranger. Les temporaires d'une écriture
  * interrompue par un plantage (`planPendingTemps`) : un GPX complet est rangé
- * comme les autres, puis effacé ; un temporaire tronqué ou illisible est
- * effacé, et dit ; celui dont la cible est là, effacé sans rien dire, comme
- * une fiche restée sans GPX.
+ * comme les autres, puis effacé ; un temporaire vide ou tronqué est effacé,
+ * et dit ; un complet mais illisible reste en attente, et c'est dit, comme sous
+ * son vrai nom ; celui dont la cible est là, effacé sans rien dire, comme une
+ * fiche restée sans GPX.
  */
 export const flushPending = async (): Promise<void> => {
   const pending = pendingFolder();
@@ -188,7 +189,8 @@ export const flushPending = async (): Promise<void> => {
         await pending.remove(session.temp);
         if (fromTemp && session.imuTemp) await pending.remove(session.imuTemp);
       } else if (result.status === 'invalid') {
-        await drop(t('Session en attente {gpx} illisible ({detail}), effacée', { gpx: session.gpx, detail: result.message ?? t('GPX illisible') }));
+        // Comme sous son vrai nom : complète mais illisible, elle n'est pas effacée, et retentée à chaque ouverture.
+        reportError(t('Session en attente {name} illisible, laissée en attente : {detail}', { name: session.gpx, detail: result.message ?? t('GPX illisible') }));
       }
     } catch (err) {
       reportError(t('Session en attente {name} non rangée : {detail}', { name: session.gpx, detail: errorMessage(err, t('erreur inconnue')) }));

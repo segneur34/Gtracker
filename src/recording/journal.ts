@@ -275,6 +275,8 @@ export const parseJournal = (text: string): ParsedJournal => {
   const breaks: number[] = [];
   let activityChange: JournalActivity | null = null;
   const marks: SessionMark[] = [];
+  const markTimes = new Set<number>();
+  const breakTimes = new Set<number>();
   const manualBreaks: ManualBreak[] = [];
   let openPause: JournalPause | null = null;
   let resumedPause: JournalPause | null = null;
@@ -296,11 +298,15 @@ export const parseJournal = (text: string): ParsedJournal => {
     const breakAt = toBreakMarker(value) ? timedMarker(value, 'break') : null;
     if (breakAt !== null) {
       lastLineMs = breakAt;
+      // Une coupure porte l'heure de la position qui ouvre son segment : deux à la même heure, c'est une
+      // écriture refaite, dont la position a déjà été écartée ; la reprendre poserait la coupure plus loin.
+      const replayed = breakTimes.has(breakAt);
+      breakTimes.add(breakAt);
       const pause: JournalPause | null = resumedPause ?? openPause;
-      if (pause) manualBreaks.push({ fixIndex: fixes.length, autoPartMs: pause.autoPartMs });
+      if (pause && !replayed) manualBreaks.push({ fixIndex: fixes.length, autoPartMs: pause.autoPartMs });
       resumedPause = null;
       openPause = null;
-      if (fixes.length > 0) breaks.push(fixes.length);
+      if (fixes.length > 0 && !replayed) breaks.push(fixes.length);
       return;
     }
     const pauseAt = timedMarker(value, 'pause');
@@ -343,7 +349,9 @@ export const parseJournal = (text: string): ParsedJournal => {
     const note = toNoteMarker(value);
     if (note.marker) {
       if (note.mark) {
-        marks.push(note.mark);
+        // Un seul repère par instant : le même, relu deux fois, vient d'une écriture refaite.
+        if (!markTimes.has(note.mark.timeMs)) marks.push(note.mark);
+        markTimes.add(note.mark.timeMs);
         lastLineMs = note.mark.timeMs;
       }
       return;
