@@ -95,6 +95,7 @@ Dans `sailing/` aussi : `pointData.ts` (`PointData` et `trackToPointData`, vue e
 - `jumpSettings.ts` : réglages des sauts d'une activité (`JumpSettings`, emplacements `JUMP_PLACEMENTS` et leur précision, `sanitizeJumpSettings`, `defaultJumpSettings`).
 - `gpxWriter.ts` : `buildGpx`, GPX 1.1, un `<trkseg>` par segment, vitesse et cap du système en extension (le cap en mouvement seulement, point 97).
 - `liveStats.ts` : statistiques en direct par segment (`computeLiveStats`, `LIVE_STATS_DEFAULTS`), « Moyenne active » en voile et en surf calculée comme l'analyse (seuil de l'activité).
+- `liveSegment.ts` : apport d'un segment au direct (`computeSegmentParts`), cumuls gardés d'un calcul à l'autre jusqu'au dernier point figé de la cinématique, chiffres identiques au calcul entier.
 - `liveFields.ts` : chiffres de la carte réduite et de la notification, choisis par activité (`LiveFieldKey`, `liveFieldsOfTreatment`, `DEFAULT_LIVE_FIELDS`, `MAX_NOTIFICATION_FIELDS`, `DEFAULT_NOTIFICATION_FIELDS`, `sanitizeLiveFields`, points 171 et 179), libellés et valeurs formatés (`liveFieldLabel`, `liveFieldValue`).
 - `liveNotification.ts` : texte de la notification de l'enregistrement (§10, point 101 ; `liveNotification` : titre selon la pause et la phase du compteur, ligne repliée, lignes dépliées, chronomètre de durée ou de décompte ; `liveNotificationKey`).
 - `gpsWatch.ts` (+ test) : détection pure d'un GPS perdu (délai, un signal par perte, réarmement), hors pause manuelle (point 254) ; sert aussi à la FC perdue de la ceinture (`beltWatchSettings`, point 305).

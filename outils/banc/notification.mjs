@@ -133,7 +133,7 @@ check('chronomètre de durée', run.length > 0 && run.every((s) => s.text.includ
 // poser la sienne), premiers chiffres du direct. Ensuite, le rythme.
 const steady = run.filter((s) => / Vit\. \d/.test(s.text));
 const gaps = steady.slice(1).map((s, i) => s.atMs - steady[i].atMs);
-check('5 s au moins entre deux envois', gaps.length >= 1 && gaps.every((g) => g >= 4900), `${run.length} envois, écarts ${gaps.join(', ')} ms`);
+check('5 s au moins entre deux envois', gaps.length >= 1 && gaps.every((g) => g >= 4900), `${run.length} envois, écart le plus court ${gaps.length ? Math.min(...gaps) : 0} ms`);
 
 // 3. Pause manuelle, puis reprise.
 let mark = sent.length;

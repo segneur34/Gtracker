@@ -1,14 +1,12 @@
-import { heartRateStats, smoothHeartRate } from '../core/heartRate';
 import { resumeKinematics, type KinematicsRun } from '../core/kinematics';
 import { referenceSpeedMs } from '../core/sessionSpeed';
-import {
-  buildCumulativeTrack, computeActiveDistanceM, computeActiveTimeMs, segmentDistanceM, thresholdActivityMask,
-} from '../core/sessionStats';
-import { SAILING_SPORTS, hasActiveThreshold, sportTreatment, type HeartRateProfile, type SportProfile } from '../core/sportProfiles';
+import { buildCumulativeTrack, segmentDistanceM, thresholdMaskOptions } from '../core/sessionStats';
+import { SAILING_SPORTS, hasActiveThreshold, sportTreatment, type SportProfile } from '../core/sportProfiles';
 import { bestWindowSpeedMs } from '../core/topSegments';
-import type { CumulativeTrack, RawTrackPoint, TrackPoint } from '../core/types';
+import type { RawTrackPoint, TrackPoint } from '../core/types';
 import type { LocationFix } from '../platform/location';
-import { EMPTY_LIVE_LEGS, combineLiveLegs, splitLiveLegs, type LiveLegSplit, type LiveLegs } from './liveLegs';
+import { EMPTY_LIVE_LEGS, combineLiveLegs, type LiveLegs } from './liveLegs';
+import { computeSegmentParts, type SegmentMemory, type SegmentParts, type SegmentSettings } from './liveSegment';
 
 /**
  * Statistiques affichées pendant l'enregistrement, calculées sur la trace en
@@ -17,11 +15,12 @@ import { EMPTY_LIVE_LEGS, combineLiveLegs, splitLiveLegs, type LiveLegSplit, typ
  * franchit une pause. Tout en unités SI ; la page convertit.
  *
  * Avec une mémoire (`LiveStatsMemory`, tenue par `useLiveRecording`), un
- * segment fermé n'est calculé qu'une fois et le segment en cours reprend sa
- * cinématique là où elle en était (`resumeKinematics`) : le coût de chaque
- * recalcul ne croît plus avec la durée que par le reste du segment en cours
- * (FC, tops), bien plus léger. Le résultat est
- * celui du calcul sans mémoire (`liveStats.test.ts`).
+ * segment fermé n'est calculé qu'une fois ; le segment en cours reprend sa
+ * cinématique là où elle en était (`resumeKinematics`), et ses cumuls
+ * (distance, temps actif, FC, vitesse max, bords) là où ils étaient figés
+ * (`computeSegmentParts`) : un recalcul ne relit que les derniers points et
+ * la fenêtre récente des tops. Le résultat est celui du calcul sans mémoire
+ * (`liveStats.test.ts`).
  */
 
 export interface LiveStatsOptions {
@@ -101,15 +100,6 @@ const toRawPoint = (fix: LocationFix): RawTrackPoint => {
   return { lat: fix.lat, lon: fix.lon, time, rawTimeMs: time.getTime(), ele: fix.altitudeM, speedMs: fix.speedMs };
 };
 
-/** FC d'un segment, comme l'analyse : somme pondérée par le temps et temps couvert ; `null` sans FC. */
-const heartPart = (
-  segment: ReadonlyArray<Pick<LocationFix, 'timeMs' | 'heartRateBpm'>>, params: HeartRateProfile
-): { sum: number; coveredS: number } | null => {
-  const points = segment.map((fix) => ({ timeMs: fix.timeMs, hr: fix.heartRateBpm }));
-  const stats = heartRateStats(points, smoothHeartRate(points, params.smoothS, params.gapS), params.gapS);
-  return stats === null ? null : { sum: stats.avgBpm * stats.coveredS, coveredS: stats.coveredS };
-};
-
 /** Le direct donne la moyenne active en voile et en surf ; pas en bateau, sans seuil, ni dans les autres familles. */
 export const usesActiveAverage = (profile: SportProfile): boolean => {
   const treatment = sportTreatment(profile.id);
@@ -147,54 +137,57 @@ const lastDistanceSpeed = (tracks: TrackPoint[][], targetM: number): number | nu
   return null;
 };
 
+/** Premier point daté d'au moins `sinceMs`, dans une trace aux dates croissantes. */
+const firstAtOrAfter = (track: TrackPoint[], sinceMs: number): number => {
+  let lo = 0;
+  let hi = track.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (track[mid].timeMs < sinceMs) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+};
+
 /**
  * Meilleure vitesse sur `durationS`, parmi les points postérieurs à `sinceMs`.
  * Segment par segment : rien ne franchit une pause ; un segment fini avant
- * `sinceMs` n'est pas relu.
+ * `sinceMs` n'est pas relu, et les points récents se trouvent par dichotomie
+ * quand les dates sont croissantes.
  */
-const bestRecentTop = (tracks: TrackPoint[][], durationS: number, sinceMs: number): number | null => {
+const bestRecentTop = (parts: SegmentParts[], durationS: number, sinceMs: number): number | null => {
   let best: number | null = null;
-  for (const track of tracks) {
+  for (const { track, ordered } of parts) {
     if (track[track.length - 1].timeMs < sinceMs) continue;
-    const recent = track.filter((p) => p.timeMs >= sinceMs);
+    const recent = ordered ? track.slice(firstAtOrAfter(track, sinceMs)) : track.filter((p) => p.timeMs >= sinceMs);
     const value = bestWindowSpeedMs(recent, buildCumulativeTrack(recent), durationS);
     if (value !== null && (best === null || value > best)) best = value;
   }
   return best;
 };
 
-/** Ce qu'un segment apporte au direct ; calculé une fois pour un segment fermé. */
-interface SegmentParts {
-  /** Trace du segment ; vide sous deux positions. */
-  track: TrackPoint[];
-  cum: CumulativeTrack;
-  distanceM: number;
-  movingTimeMs: number;
-  /** Distance et temps en action, avec un seuil passé (`activeThreshold`). */
-  active: { distanceM: number; timeMs: number } | null;
-  heart: { sum: number; coveredS: number } | null;
-  /** Meilleure vitesse tenue `maxDurationS` ; `null` si la trace est trop courte. */
-  maxSpeedMs: number | null;
-  /** Bords, en voile seulement. */
-  legs: LiveLegSplit | null;
-}
-
 /** Un segment de l'enregistrement, tel que vu la dernière fois, et ce qui en a été calculé. */
 interface SegmentEntry {
   fixes: ReadonlyArray<LocationFix>;
   raw: RawTrackPoint[];
   run: KinematicsRun | null;
+  /** Trace du segment ; vide sous deux positions. */
+  track: TrackPoint[];
   parts: SegmentParts | null;
+  /** Cumuls gardés du segment en cours (`computeSegmentParts`). */
+  memory: SegmentMemory | null;
 }
 
 /** Mémoire du direct d'une session, à créer par `createLiveStatsMemory` et à passer à `computeLiveStats`. */
 export interface LiveStatsMemory {
-  /** Profil et réglages du dernier calcul : s'ils changent, tout est refait. */
+  /** Profil du dernier calcul : s'il change, tout est refait. */
   key: string;
+  /** Réglages du dernier calcul : s'ils changent, les statistiques sont refaites, la cinématique gardée. */
+  statsKey: string;
   entries: SegmentEntry[];
 }
 
-export const createLiveStatsMemory = (): LiveStatsMemory => ({ key: '', entries: [] });
+export const createLiveStatsMemory = (): LiveStatsMemory => ({ key: '', statsKey: '', entries: [] });
 
 /** Les positions déjà vues sont les mêmes objets, au début du segment. */
 const samePrefix = (seen: ReadonlyArray<LocationFix>, segment: ReadonlyArray<LocationFix>): boolean => {
@@ -210,10 +203,19 @@ export const computeLiveStats = (
   memory?: LiveStatsMemory
 ): LiveStats => {
   const mem = memory ?? createLiveStatsMemory();
-  const key = `${profile.id}|${JSON.stringify(options)}`;
+  // La cinématique ne dépend que du profil ; un réglage changé ne refait que les statistiques.
+  const key = profile.id;
+  const statsKey = JSON.stringify(options);
   if (mem.key !== key) {
     mem.key = key;
     mem.entries = [];
+  }
+  if (mem.statsKey !== statsKey) {
+    mem.statsKey = statsKey;
+    for (const entry of mem.entries) {
+      entry.parts = null;
+      entry.memory = null;
+    }
   }
   const kinematicsOptions = {
     medianWindowSeconds: profile.medianWindowSeconds,
@@ -224,45 +226,43 @@ export const computeLiveStats = (
   // Un segment déjà vu tel quel garde tout ; prolongé, il reprend sa cinématique ; autre, il repart de zéro.
   const entries: SegmentEntry[] = segments.map((segment, k) => {
     const seen = mem.entries[k];
-    const entry: SegmentEntry = seen && samePrefix(seen.fixes, segment) ? seen : { fixes: [], raw: [], run: null, parts: null };
+    const entry: SegmentEntry = seen && samePrefix(seen.fixes, segment)
+      ? seen
+      : { fixes: [], raw: [], run: null, track: [], parts: null, memory: null };
     if (entry.fixes.length !== segment.length) {
       for (let i = entry.raw.length; i < segment.length; i++) entry.raw.push(toRawPoint(segment[i]));
       entry.fixes = segment;
       entry.run = resumeKinematics(entry.raw, kinematicsOptions, entry.run);
+      entry.track = entry.run && entry.run.track.length >= 2 ? entry.run.track : [];
       entry.parts = null;
     }
     return entry;
   });
   mem.entries = entries;
 
-  const sailing = SAILING_SPORTS.includes(profile.id);
+  const settings: SegmentSettings = {
+    mask: options.activeThreshold === undefined ? null : thresholdMaskOptions(profile, options.activeThreshold),
+    maxDurationS: options.maxDurationS,
+    heartRate: profile.heartRate,
+    sailing: SAILING_SPORTS.includes(profile.id),
+  };
   for (const entry of entries) {
     if (entry.parts) continue;
-    const track = entry.run && entry.run.track.length >= 2 ? entry.run.track : [];
-    const cum = buildCumulativeTrack(track);
-    let distanceM = 0;
-    for (let i = 1; i < track.length; i++) distanceM += segmentDistanceM(track, i);
-    const mask = options.activeThreshold === undefined ? null : thresholdActivityMask(track, profile, options.activeThreshold);
-    entry.parts = {
-      track,
-      cum,
-      distanceM,
-      movingTimeMs: track.length >= 2 ? track[track.length - 1].timeMs - track[0].timeMs : 0,
-      active: mask === null ? null : { distanceM: computeActiveDistanceM(track, mask), timeMs: computeActiveTimeMs(track, mask) },
-      heart: heartPart(entry.fixes, profile.heartRate),
-      maxSpeedMs: bestWindowSpeedMs(track, cum, options.maxDurationS),
-      legs: sailing && track.length >= 2 ? splitLiveLegs(track) : null,
-    };
+    const { parts, memory: kept } = computeSegmentParts(entry.fixes, entry.track, entry.run?.frozenUpTo ?? 0, settings, entry.memory);
+    entry.parts = parts;
+    entry.memory = kept;
   }
-  // Un segment fermé ne reprend jamais : ses étapes intermédiaires et ses points bruts ne servent plus.
+  // Un segment fermé ne reprend jamais : ses étapes intermédiaires, ses points bruts et ses cumuls gardés ne servent plus.
   for (let k = 0; k < entries.length - 1; k++) {
     entries[k].run = null;
     entries[k].raw = [];
+    entries[k].memory = null;
   }
 
   const active = entries.map((e) => e.parts!).filter((p) => p.track.length >= 2);
   if (active.length === 0) return { ...EMPTY_LIVE_STATS, recentTopsMs: options.topDurationsS.map(() => null) };
   const tracks = active.map((p) => p.track);
+  const sailing = settings.sailing;
 
   let distanceM = 0;
   let movingTimeMs = 0;
@@ -299,7 +299,7 @@ export const computeLiveStats = (
     activeAverageSpeedMs: activeTimeMs > 0 ? activeDistanceM / (activeTimeMs / 1000) : null,
     lastDistanceSpeedMs: lastDistanceSpeed(tracks, options.lastDistanceM),
     recentDistanceSpeedMs: lastDistanceSpeed(tracks, options.recentDistanceM),
-    recentTopsMs: options.topDurationsS.map((d) => bestRecentTop(tracks, d, sinceMs)),
+    recentTopsMs: options.topDurationsS.map((d) => bestRecentTop(active, d, sinceMs)),
     maxSpeedMs,
     legs: sailing ? combineLiveLegs(active.map((p) => p.legs!)) : EMPTY_LIVE_LEGS,
     averageHeartRateBpm: heartCoveredS > 0 ? heartSum / heartCoveredS : null,

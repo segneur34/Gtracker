@@ -20,7 +20,7 @@ import { formatDuration, fromDisplaySpeed } from './units';
  * lue à la reprise ne dit rien du trou, sa distance est bornée par la corde du
  * pas (`gapDistanceM`, posé par `computeKinematics`).
  */
-export const segmentDistanceM = (track: TrackPoint[], i: number): number => {
+export const segmentDistanceM = (track: readonly TrackPoint[], i: number): number => {
   // Reprise après une pause : le pas couvre la pause, rien n'y est parcouru.
   if (i <= 0 || track[i].segmentStart) return 0;
   const gap = track[i].gapDistanceM;
@@ -30,17 +30,23 @@ export const segmentDistanceM = (track: TrackPoint[], i: number): number => {
 };
 
 /** Distance et temps cumulés le long de la trace. */
-export const buildCumulativeTrack = (track: TrackPoint[]): CumulativeTrack => {
-  const cumDist = [0];
-  const cumTime = [0];
+export const buildCumulativeTrack = (track: TrackPoint[]): CumulativeTrack => extendCumulativeTrack(track, { cumDist: [0], cumTime: [0] });
 
-  for (let i = 1; i < track.length; i++) {
-    const deltaS = (track[i].timeMs - track[i - 1].timeMs) / 1000;
+/**
+ * Prolonge sur place les cumuls de `track` : ceux des `cum.cumDist.length`
+ * premiers points (au moins un) sont gardés, les suivants calculés comme par
+ * `buildCumulativeTrack`, mêmes additions dans le même ordre. Rend `cum`.
+ */
+export const extendCumulativeTrack = (track: readonly TrackPoint[], cum: CumulativeTrack, from = cum.cumDist.length, offset = 0): CumulativeTrack => {
+  const { cumDist, cumTime } = cum;
+  cumDist.length = from;
+  cumTime.length = from;
+  for (let i = from; i < track.length - offset; i++) {
+    const deltaS = (track[offset + i].timeMs - track[offset + i - 1].timeMs) / 1000;
     cumTime.push(cumTime[i - 1] + deltaS);
-    cumDist.push(cumDist[i - 1] + segmentDistanceM(track, i));
+    cumDist.push(cumDist[i - 1] + segmentDistanceM(track, offset + i));
   }
-
-  return { cumDist, cumTime };
+  return cum;
 };
 
 /** Durée totale de la session, en millisecondes. */
@@ -87,39 +93,62 @@ export const computeActivityMask = (
   track: TrackPoint[],
   options: ActivityMaskOptions
 ): boolean[] => {
+  const mask = new Array<boolean>(track.length).fill(false);
+  const state = activityMaskStart(track, options);
+  for (let i = 0; i < track.length; i++) mask[i] = activityMaskStep(track, i, options, state);
+  return mask;
+};
+
+/** Où en est l'automate de `computeActivityMask` : état retenu et début de la confirmation en cours. */
+export interface ActivityMaskState {
+  active: boolean;
+  pendingSinceMs: number | null;
+}
+
+/**
+ * État de départ de l'automate : celui du premier point. Une trace qui
+ * commence en mouvement n'attend pas la confirmation pour compter ses
+ * premières secondes.
+ */
+export const activityMaskStart = (track: readonly TrackPoint[], options: ActivityMaskOptions): ActivityMaskState => ({
+  active: track.length > 0 && track[0].smoothedSpeedMs >= options.enterThresholdMs,
+  pendingSinceMs: null,
+});
+
+/**
+ * Un pas de l'automate de `computeActivityMask`, au point `i`, les points
+ * précédents déjà passés dans `state` (qui avance) : rend le masque du point.
+ * Il ne lit que les points `i - 1` et `i` : repris d'un état gardé, il donne
+ * le masque du calcul entier.
+ */
+export const activityMaskStep = (
+  track: readonly TrackPoint[],
+  i: number,
+  options: ActivityMaskOptions,
+  state: ActivityMaskState
+): boolean => {
   const minStateDurationS = options.minStateDurationS ?? 0;
   const gapMinSpeedMs = options.gapMinSpeedMs ?? options.exitThresholdMs;
-  const mask = new Array<boolean>(track.length).fill(false);
+  const speed = track[i].smoothedSpeedMs;
+  const candidate: boolean = state.active
+    ? speed >= options.exitThresholdMs
+    : speed >= options.enterThresholdMs;
 
-  // L'état de départ est celui du premier point : une trace qui commence en
-  // mouvement n'attend pas la confirmation pour compter ses premières secondes.
-  let active = track.length > 0 && track[0].smoothedSpeedMs >= options.enterThresholdMs;
-  let pendingSinceMs: number | null = null;
-
-  for (let i = 0; i < track.length; i++) {
-    const speed = track[i].smoothedSpeedMs;
-    const candidate: boolean = active
-      ? speed >= options.exitThresholdMs
-      : speed >= options.enterThresholdMs;
-
-    if (candidate !== active) {
-      if (pendingSinceMs === null) {
-        pendingSinceMs = track[i].timeMs;
-      }
-      if ((track[i].timeMs - pendingSinceMs) / 1000 >= minStateDurationS) {
-        active = candidate;
-        pendingSinceMs = null;
-      }
-    } else {
-      pendingSinceMs = null;
+  if (candidate !== state.active) {
+    if (state.pendingSinceMs === null) {
+      state.pendingSinceMs = track[i].timeMs;
     }
-
-    const gap = track[i].gapDistanceM;
-    const stillGap = gap !== undefined && i > 0 && gap / ((track[i].timeMs - track[i - 1].timeMs) / 1000) < gapMinSpeedMs;
-    mask[i] = active && !track[i].segmentStart && !stillGap;
+    if ((track[i].timeMs - state.pendingSinceMs) / 1000 >= minStateDurationS) {
+      state.active = candidate;
+      state.pendingSinceMs = null;
+    }
+  } else {
+    state.pendingSinceMs = null;
   }
 
-  return mask;
+  const gap = track[i].gapDistanceM;
+  const stillGap = gap !== undefined && i > 0 && gap / ((track[i].timeMs - track[i - 1].timeMs) / 1000) < gapMinSpeedMs;
+  return state.active && !track[i].segmentStart && !stillGap;
 };
 
 /**
@@ -131,23 +160,27 @@ export const computeActivityMask = (
  * trou de la trace n'est en action que si sa vitesse moyenne atteint la
  * détente basse.
  */
-export const thresholdActivityMask = (track: TrackPoint[], profile: SportProfile, threshold: number): boolean[] => {
+export const thresholdActivityMask = (track: TrackPoint[], profile: SportProfile, threshold: number): boolean[] =>
+  computeActivityMask(track, thresholdMaskOptions(profile, threshold));
+
+/** Réglages de l'automate de `thresholdActivityMask` à ce seuil, dans l'unité du profil. */
+export const thresholdMaskOptions = (profile: SportProfile, threshold: number): ActivityMaskOptions => {
   if (!hasActiveThreshold(profile)) {
-    return computeActivityMask(track, {
+    return {
       enterThresholdMs: 0,
       exitThresholdMs: 0,
       gapMinSpeedMs: fromDisplaySpeed(getActiveThresholds(profile, profile.stillThreshold).exit, profile.thresholdUnit),
-    });
+    };
   }
   const effective = threshold > 0 ? threshold : profile.stillThreshold;
   const { enter, exit } = getActiveThresholds(profile, effective);
   const exitThresholdMs = fromDisplaySpeed(exit, profile.thresholdUnit);
-  return computeActivityMask(track, {
+  return {
     enterThresholdMs: fromDisplaySpeed(enter, profile.thresholdUnit),
     exitThresholdMs,
     minStateDurationS: profile.minStateDurationS,
     gapMinSpeedMs: exitThresholdMs,
-  });
+  };
 };
 
 /**

@@ -346,15 +346,47 @@ export const meanFilterByTime = (
   windowSeconds: number
 ): number[] => {
   if (values.length === 0) return [];
-
-  const halfWindowMs = (windowSeconds * 1000) / 2;
   const out = new Array<number>(values.length);
-  let start = 0;
-  let end = 0;
-  // `sum` vaut en permanence la somme de values[start..end].
-  let sum = values[0];
+  meanFilterByTimeFrom(values, timesMs, windowSeconds, meanFilterStart(values), (i, value) => (out[i] = value));
+  return out;
+};
 
-  for (let i = 0; i < values.length; i++) {
+/**
+ * Où en est la moyenne mobile de `meanFilterByTime` : prochain point à
+ * lisser, bornes de sa fenêtre et somme courante (celle de
+ * `values[start..end]`).
+ */
+export interface MeanFilterState {
+  next: number;
+  start: number;
+  end: number;
+  sum: number;
+}
+
+/** État de départ de la moyenne mobile ; `values` non vide. */
+export const meanFilterStart = (values: readonly number[]): MeanFilterState => ({ next: 0, start: 0, end: 0, sum: values[0] });
+
+/**
+ * La moyenne mobile de `meanFilterByTime`, reprise à `from` sur une série qui
+ * ne fait que s'allonger : `visit` reçoit chaque valeur lissée de `from.next`
+ * à la fin, dans l'ordre, et dit si elle est close (sa fenêtre est fermée par
+ * le temps, une valeur ajoutée ne la changera plus). L'état rendu est celui
+ * qui suit la dernière valeur close : repris sur la série allongée, il refait
+ * les mêmes additions dans le même ordre, d'où des valeurs identiques.
+ */
+export const meanFilterByTimeFrom = (
+  values: readonly number[],
+  timesMs: readonly number[],
+  windowSeconds: number,
+  from: MeanFilterState,
+  visit: (i: number, value: number, settled: boolean) => void
+): MeanFilterState => {
+  const halfWindowMs = (windowSeconds * 1000) / 2;
+  let { start, end, sum } = from;
+  // État qui suit la dernière valeur close.
+  let { next: sNext, start: sStart, end: sEnd, sum: sSum } = from;
+
+  for (let i = from.next; i < values.length; i++) {
     while (end < i) {
       end++;
       sum += values[end];
@@ -368,8 +400,16 @@ export const meanFilterByTime = (
       sum += values[end];
     }
 
-    out[i] = sum / (end - start + 1);
+    // Arrêtée par le temps et non par la fin de la série : la fenêtre ne bougera plus.
+    const closed = end + 1 < values.length;
+    visit(i, sum / (end - start + 1), closed);
+    if (closed) {
+      sNext = i + 1;
+      sStart = start;
+      sEnd = end;
+      sSum = sum;
+    }
   }
 
-  return out;
+  return { next: sNext, start: sStart, end: sEnd, sum: sSum };
 };
