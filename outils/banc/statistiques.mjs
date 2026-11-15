@@ -159,13 +159,13 @@ check('« Sélection » : fenêtre fermée au départ, le choix en cours affich�
   && (await evaluate(`document.querySelector('button.stats-selection')?.getAttribute('aria-haspopup')`)) === 'dialog', await summary());
 check('plus de boutons glissants ni de repli « Sélection » sur la page', (await evaluate(`document.querySelectorAll('.stats-choice .ui-segmented, .stats-choice > button[data-chart-fold]').length`)) === 0);
 await openSelection();
-check('rangée des familles : Tout, Voile, Surf', (await chips('Famille')) === 'Tout, Voile, Surf', await chips('Famille'));
+check('rangée des familles : Tout, Avec vent, Sans vent', (await chips('Famille')) === 'Tout, Avec vent, Sans vent', await chips('Famille'));
 check('« Tout » choisi, pas de rangée d\'activités', (await pressed('Famille')) === 'Tout' && (await chips('Activité')) === '', `${await pressed('Famille')} ; ${await chips('Activité')}`);
 check('rangée des périodes, « Tout » choisi', (await chips('Période')) === 'Semaine, 30 jours, 6 mois, Année, Tout' && (await pressed('Période')) === 'Tout', await chips('Période'));
 // Annuler : rien ne change, ni l'adresse ni les chiffres.
-await pick('Famille', 'Voile');
+await pick('Famille', 'Avec vent');
 await pick('Période', '30 jours');
-check('brouillon : Voile choisi, rangée d\'activités, adresse inchangée', (await pressed('Famille')) === 'Voile' && (await chips('Activité'))?.startsWith('Toutes, ')
+check('brouillon : Voile choisi, rangée d\'activités, adresse inchangée', (await pressed('Famille')) === 'Avec vent' && (await chips('Activité'))?.startsWith('Toutes, ')
   && (await search()) === '/statistiques', `${await pressed('Famille')} ; ${await chips('Activité')} ; ${await search()}`);
 await evaluate(`${footButton('secondary')}.click()`);
 await waitFor(`!document.querySelector('[role="dialog"][aria-label="Sélection"]')`, { timeout: 3000, every: 50, label: 'fenêtre fermée (annuler)' });
@@ -184,13 +184,13 @@ check('onglets de la vue d\'ensemble', (await tabs()) === 'général, graphique,
 check('graphique de la vue d\'ensemble : la durée seule, sans pastilles', (await chips('Donnée')) === '' && (await points()) === 9 && (await yLabel()) === 'min',
   `${await chips('Donnée')} ; ${await points()} ; ${await yLabel()}`);
 const familyRows = await evaluate(`[...document.querySelectorAll('.stats-rows .stats-row__name')].map((e) => e.textContent).join(', ')`);
-check('une ligne par famille', familyRows === 'Voile, Surf', familyRows);
+check('une ligne par famille', familyRows === 'Avec vent, Sans vent', familyRows);
 check('pas de distance mêlée', (await stat('Distance')) === null);
 check('régularité', (await stat('Semaines actives')) !== null && (await evaluate(`!!document.querySelector('.recharts-bar')`)));
 await shoot('stats-ensemble');
 
 // 3. Descente.
-check('« Voile » choisi dans la fenêtre', await choose(['Famille', 'Voile']));
+check('« Voile » choisi dans la fenêtre', await choose(['Famille', 'Avec vent']));
 check('famille dans l\'adresse', (await search()) === '/statistiques?famille=voile', await search());
 check('Voile : 7 sessions', (await stat('Sessions')) === '7', await stat('Sessions'));
 check('onglets d\'une famille', (await tabs()) === 'général, graphique, régularité, records', await tabs());
@@ -207,7 +207,7 @@ await shoot('stats-voile');
 check('« 30 jours » choisi dans la fenêtre', await choose(['Période', '30 jours']));
 check('30 jours : 2 sessions', (await stat('Sessions')) === '2', await stat('Sessions'));
 check('période dans l\'adresse', (await search()) === '/statistiques?famille=voile&periode=trente', await search());
-check('le sous-titre porte le choix', (await evaluate(`document.querySelector('.ui-page-header')?.textContent`))?.includes('Voile · 30 jours'),
+check('le sous-titre porte le choix', (await evaluate(`document.querySelector('.ui-page-header')?.textContent`))?.includes('Avec vent · 30 jours'),
   await evaluate(`document.querySelector('.ui-page-header')?.textContent`));
 await evaluate('history.back()');
 await settle({ max: 1000 });
@@ -217,7 +217,7 @@ check('retour arrière : vue d\'ensemble', (await search()) === '/statistiques' 
 await go('/statistiques');
 const histBefore = await evaluate('history.length');
 await openSelection();
-await pick('Famille', 'Voile');
+await pick('Famille', 'Avec vent');
 await pick('Activité', 'Wingfoil');
 await pick('Période', '6 mois');
 await validate();
@@ -240,7 +240,7 @@ check('Kite : 2 sessions', (await stat('Sessions')) === '2' && (await search())?
 await choose(['Activité', 'Wingfoil']);
 check('Wingfoil : 5 sessions', (await stat('Sessions')) === '5', await stat('Sessions'));
 await openSelection();
-await pick('Famille', 'Surf');
+await pick('Famille', 'Sans vent');
 const surfActivites = await chips('Activité');
 await validate();
 check('activités du surf : Surf en tête', surfActivites?.startsWith('Toutes, Surf'), surfActivites);
@@ -272,7 +272,7 @@ check('fiches au résumé à jour, distance en action', fiches.length === SESSIO
   fiches.map((r) => `${r.summary.calcVersion}/${r.summary.movingDistanceM}`).join(' '));
 // Par la pastille de la famille, pour que l'affichage soit retenu (la dernière vue retenue est celle de la session ouverte).
 await go('/statistiques');
-await choose(['Famille', 'Voile']);
+await choose(['Famille', 'Avec vent']);
 await openTab('graphique');
 const voileChips = await chips('Donnée');
 check('données de la voile', voileChips === 'Vitesse max, Moyenne en action, Durée, Distance, % de vol', voileChips);
@@ -285,7 +285,7 @@ for (const [chip, label] of [['Moyenne en action', 'nœuds'], ['Durée', 'min'],
 await go('/statistiques', 3000);
 check('choix retenu après rechargement', (await search()) === '/statistiques?famille=voile' && (await pressed('Donnée')) === 'Distance',
   `${await search()} ; ${await pressed('Donnée')}`);
-await choose(['Famille', 'Surf']);
+await choose(['Famille', 'Sans vent']);
 check('surf : pas de distance de la voile, la vitesse max à sa place', (await pressed('Donnée')) === 'Distance' || (await pressed('Donnée')) === 'Vitesse max', await pressed('Donnée'));
 const surfChips = await chips('Donnée');
 check('données du surf (sans foil)', surfChips === 'Vitesse max, Moyenne en action, Durée, Distance, Vagues, Plus longue vague', surfChips);
@@ -294,7 +294,7 @@ await wait(500);
 check('surf, Vagues : 2 points', (await points()) === 2, String(await points()));
 await click('.stats-chips[aria-label="Donnée"] .ui-tab', 'Vitesse max');
 await wait(300);
-await choose(['Famille', 'Voile']);
+await choose(['Famille', 'Avec vent']);
 await click('.stats-chips[aria-label="Donnée"] .ui-tab', '% de vol');
 await wait(500);
 check('% de vol : le wingfoil seul (kite sans foil), axe en %', (await points()) === 5 && (await yLabel()) === '%', `${await points()} ; ${await yLabel()}`);
@@ -312,7 +312,7 @@ await evaluate(`(() => {
 await go('/statistiques');
 check('Surf caché : 7 sessions', (await stat('Sessions')) === '7', await stat('Sessions'));
 await openSelection();
-check('Surf absent de la rangée des familles', (await chips('Famille')) === 'Tout, Voile', await chips('Famille'));
+check('Surf absent de la rangée des familles', (await chips('Famille')) === 'Tout, Avec vent', await chips('Famille'));
 await evaluate(`${footButton('secondary')}.click()`);
 await waitFor(`!document.querySelector('[role="dialog"][aria-label="Sélection"]')`, { timeout: 3000, every: 50, label: 'fenêtre fermée' });
 await go('/statistiques?famille=surf');

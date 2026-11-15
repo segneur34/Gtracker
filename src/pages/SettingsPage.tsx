@@ -401,7 +401,7 @@ const ActivityCard = memo(function ActivityCard({
               </select>
             </SettingRow>
             <SettingRow label={t('Colorisation de la trace')} helpKey={`${id}:couleurs-trace`}
-              help={t("Grise sous la première vitesse, du bleu au rouge jusqu'à la seconde. Une trace peut avoir les siennes, dans son analyse ; en voile, sans valeur, elles suivent l'allure de la session.")}>
+              help={t("Grise sous la première vitesse, du bleu au rouge jusqu'à la seconde. Une trace peut avoir les siennes, dans son analyse ; pour une activité avec vent, sans valeur, elles suivent l'allure de la session.")}>
               <div className="settings-sports__pair">
                 <NumberField step={0.5} min={0}
                   value={rangeEmpty ? null : displayBound(shownRange.minMs)}
@@ -582,7 +582,7 @@ function SettingsPage() {
     setRenaming(null);
   };
   /**
-   * Activités rangées par famille (Voile, Surf), chacune dans l'ordre de
+   * Activités rangées par famille (avec vent, sans vent), chacune dans l'ordre de
    * la liste, les cachées en bas de leur famille.
    */
   const familyOrdered = SPORT_FAMILIES.flatMap((f) => {

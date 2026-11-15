@@ -81,7 +81,7 @@ export const LESSONS: readonly Lesson[] = [
     icon: 'activites',
     target: '/parametres',
     body: [
-      t('Dans Réglages › Activités, chaque famille (voile, surf) range ses activités. Seules celles-là sont proposées partout : à l\'enregistrement, dans les analyses et sur la page Sessions, où chacune a son logo.'),
+      t('Dans Réglages › Activités, chaque famille (avec vent, sans vent) range ses activités. Seules celles-là sont proposées partout : à l\'enregistrement, dans les analyses et sur la page Sessions, où chacune a son logo.'),
       t("Au bas du bloc, créez la vôtre : un nom, une couleur parmi les douze de la palette, et le calcul sur lequel elle repose (wingfoil, kite, surf…)."),
       t("L'œil cache une activité, ou une famille entière : elle disparaît partout, sessions comprises, sans rien effacer."),
       t('Chaque activité démarre sur des réglages tout faits ; « Par défaut », dans le menu « … » de sa carte, les lui rend.'),
@@ -132,7 +132,7 @@ export const LESSONS: readonly Lesson[] = [
     icon: 'notes',
     target: '/sessions',
     body: [
-      t("Dans chaque analyse, l'onglet « matériel et notes » (« matos et conditions » en voile), juste avant « réglages », garde votre appréciation de la séance et un commentaire."),
+      t("Dans chaque analyse, l'onglet « matériel et notes » (« matos et conditions » pour une activité avec vent), juste avant « réglages », garde votre appréciation de la séance et un commentaire."),
       t('Le matériel se choisit dans la liste de l\'activité, que vous créez dans Réglages (« Créer liste matériel ») ; une session sans matériel donné reste vide, rien n\'est repris d\'une autre.'),
       t("Rien n'est écrit avant « Enregistrer la session » : « Annuler » rend la session telle qu'elle était, et l'application prévient si vous quittez sans enregistrer."),
       t('Le matériel noté se retrouve dans les Statistiques, qui le croisent avec vos chiffres.'),
@@ -179,13 +179,13 @@ export const LESSONS: readonly Lesson[] = [
   },
   {
     id: 'voile',
-    title: t('La voile'),
+    title: t('Les activités avec vent'),
     hook: t("Le vent, les virements et empannages, et les balises d'un parcours."),
     families: ['voile'],
     icon: 'voile',
     target: '/sessions',
     body: [
-      t("Une session de voile s'analyse sans rien saisir : le vent est estimé d'après vos manœuvres et vos vitesses selon le cap."),
+      t("Une session avec vent s'analyse sans rien saisir : le vent est estimé d'après vos manœuvres et vos vitesses selon le cap."),
       t('Si vous le connaissez, saisissez-le (« Régler ») : tous les angles suivent.'),
       t("L'onglet « manœuvres » compte les virements et les empannages, réussis ou ratés, avec la vitesse gardée ; « vmg » montre ce que vous gagnez face au vent ou sous le vent."),
       t("Le seuil de vitesse sépare le temps en action du temps à l'arrêt ; il suit l'allure de la session, et se règle dans l'onglet « réglages »."),

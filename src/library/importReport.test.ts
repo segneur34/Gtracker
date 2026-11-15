@@ -47,14 +47,14 @@ describe("compte rendu d'un import", () => {
 
   it('compte les sessions de course, de vélo ou d’entraînement laissées de côté, sans les nommer', () => {
     expect(describeImport(report({ otherSports: ['course.fit'] }))).toBe(
-      "1 session de course, de vélo ou d'entraînement laissée de côté : Gtracker ne range que la voile et le surf.",
+      "1 session de course, de vélo ou d'entraînement laissée de côté : Gtracker ne range que les sessions avec ou sans vent.",
     );
     expect(describeImport(report({ added: ['a.gpx'], otherSports: ['c.fit', 'v.gpx', 'r.gpx'] }))).toBe(
-      "1 session ajoutée. 3 sessions de course, de vélo ou d'entraînement laissées de côté : Gtracker ne range que la voile et le surf.",
+      "1 session ajoutée. 3 sessions de course, de vélo ou d'entraînement laissées de côté : Gtracker ne range que les sessions avec ou sans vent.",
     );
     // Avec un FIT qui n'est pas une activité : il y a autre chose à dire que lui.
     expect(describeImport(report({ otherSports: ['c.fit'], notActivities: ['r.fit'] }))).toBe(
-      "1 session de course, de vélo ou d'entraînement laissée de côté : Gtracker ne range que la voile et le surf.",
+      "1 session de course, de vélo ou d'entraînement laissée de côté : Gtracker ne range que les sessions avec ou sans vent.",
     );
     expect(describeImport(report({ otherSports: ['c.fit'] }))).not.toContain('c.fit');
   });

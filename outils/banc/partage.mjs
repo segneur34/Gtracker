@@ -201,7 +201,7 @@ const replayPath = join(workDir, 'partage-rejeu.gpx');
 writeFileSync(replayPath, traceVoile({ debutMs: Date.now() - 1800 * 1000, nom: 'Rejeu', bords: 1 }));
 // Le choix de la voile posé à l'étape 3 est rangé sous « wingfoil », activité de la session importée et de l'enregistrement.
 await go('/enregistrer', 4000);
-console.log('famille :', await clickText('Voile', '[aria-label=Famille] button'));
+console.log('famille :', await clickText('Avec vent', '[aria-label=Famille] button'));
 await wait(300);
 await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click()`);
 await waitFor(`[...document.querySelectorAll('input[type=file]')].length > 0`, { timeout: 3000 });

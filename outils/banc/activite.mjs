@@ -93,7 +93,7 @@ await go('/enregistrer', 2500);
 await waitFor(`Boolean(document.querySelector('[aria-label=Famille] [aria-checked=true]'))`, { timeout: 5000, label: 'page Enregistrer' });
 const depart = await recordChoice();
 console.log('au départ :', JSON.stringify(depart));
-check('au départ : Voile, Wingfoil (la première activité de la voile)', depart.famille === 'Voile' && depart.activite === 'Wingfoil', JSON.stringify(depart));
+check('au départ : Voile, Wingfoil (la première activité de la voile)', depart.famille === 'Avec vent' && depart.activite === 'Wingfoil', JSON.stringify(depart));
 console.log('Suivre une trace :', await clickText('Suivre une trace'));
 await wait(800);
 const proposes = await evaluate(`document.querySelectorAll('ul li button').length`);

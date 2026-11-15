@@ -84,7 +84,7 @@ await shot('sessions-vide-mobile', 390, 844, true);
 
 step('2. Rejeu ×600, Arrêter, analyse ouverte seule');
 await go('/enregistrer');
-console.log('famille Voile :', await clickText('Voile', '[aria-label=Famille] button'));
+console.log('famille Voile :', await clickText('Avec vent', '[aria-label=Famille] button'));
 await wait(300);
 await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click(); 'ok'`);
 await wait(300);

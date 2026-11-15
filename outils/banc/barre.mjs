@@ -130,8 +130,8 @@ const stat =(label) => evaluate(`(() => {
 })()`);
 const search = () => evaluate('location.search');
 await go('/statistiques', 4000);
-await chip('Famille', 'Surf');
-await waitFor(async () => (await search()).includes('famille=surf') && (await evaluate(`document.querySelector('.stats-selection__summary')?.textContent.includes('Surf')`)), { timeout: 3000, every: 50, label: 'famille Surf dans l\'adresse et le résumé' });
+await chip('Famille', 'Sans vent');
+await waitFor(async () => (await search()).includes('famille=surf') && (await evaluate(`document.querySelector('.stats-selection__summary')?.textContent.includes('Sans vent')`)), { timeout: 3000, every: 50, label: 'famille Surf dans l\'adresse et le résumé' });
 await chip('Période', 'Année');
 await waitFor(async () => (await search()).includes('periode=annee'), { timeout: 3000, every: 50, label: 'période Année dans l\'adresse' });
 await settle({ max: 800 });
@@ -143,7 +143,7 @@ check('Surf sur « Année » : semaines comptées depuis la session de surf', we
 await go('/', 3000);
 await go('/statistiques', 4000);
 check('reprise sans paramètre : Surf, Année', (await search()) === '?famille=surf&periode=annee', await search());
-check('titre de Surf', (await evaluate(`document.querySelector('.ui-page-header')?.innerText ?? ''`)).includes('Surf'));
+check('titre de Surf', (await evaluate(`document.querySelector('.ui-page-header')?.innerText ?? ''`)).includes('Sans vent'));
 await go('/statistiques?famille=voile', 4000);
 check('une adresse avec paramètres l’emporte', (await search()) === '?famille=voile', await search());
 await chip('Famille', 'Tout');

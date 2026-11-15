@@ -208,7 +208,7 @@ const holdStop = async () => {
 
 const startReplay = async (track) => {
   await go('/enregistrer', 6000);
-  await clickText('Voile');
+  await clickText('Avec vent');
   await vwait(300);
   await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click(); 'ok'`);
   await vwait(300);

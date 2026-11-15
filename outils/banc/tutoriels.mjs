@@ -146,14 +146,14 @@ check("jour 3 : toujours pas de carte, aucun jour compté", (await card()) === n
 // 6. La voile cachée par son œil dans Réglages › Activités : sa leçon retirée de la liste.
 await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}'); s.settings = { ...s.settings, activites: true }; localStorage.setItem('${CLES.sections}', JSON.stringify(s)); })()`);
 await go('/parametres', 3000);
-const eye = `[...document.querySelectorAll('.settings-eye')].find((b) => (b.getAttribute('aria-label') ?? '').startsWith('Cacher Voile'))`;
+const eye = `[...document.querySelectorAll('.settings-eye')].find((b) => (b.getAttribute('aria-label') ?? '').startsWith('Cacher Avec vent'))`;
 await waitFor(`Boolean(${eye})`, { timeout: 3000, label: 'œil' });
 check('Réglages : l\'œil « Cacher Voile »', (await evaluate(`(() => { const b = ${eye}; if (!b) return false; b.click(); return true; })()`)) === true);
 await wait(300);
 await go('/tutoriels', 3000);
 await waitFor(`document.querySelectorAll('.tutorial-row').length > 0`, { timeout: 3000, label: 'liste' });
 const hidden = await rows();
-check('la voile cachée : douze leçons, sans « La voile »', hidden.length === 12 && !hidden.some((r) => r.title === 'La voile'), `${hidden.length} : ${hidden.map((r) => r.title).join(', ')}`);
+check('la voile cachée : douze leçons, sans « La voile »', hidden.length === 12 && !hidden.some((r) => r.title === 'Les activités avec vent'), `${hidden.length} : ${hidden.map((r) => r.title).join(', ')}`);
 check('… « 1 lue sur 12 »', (await subtitle()) === '1 lue sur 12', await subtitle());
 
 // 7. Téléphone.

@@ -560,7 +560,7 @@ describe('porte d\'import : ce que la bibliothèque range est au format de Gtrac
     expect(report.invalid).toEqual([]);
     expect(report.otherSports).toEqual(['course.gpx', 'velo.gpx', 'fractionne.gpx']);
     expect(library.readLibraryState().message)
-      .toBe("3 sessions de course, de vélo ou d'entraînement laissées de côté : Gtracker ne range que la voile et le surf.");
+      .toBe("3 sessions de course, de vélo ou d'entraînement laissées de côté : Gtracker ne range que les sessions avec ou sans vent.");
     expect([...files.keys()].filter((path) => path.startsWith('sessions/'))).toEqual([]);
   });
 

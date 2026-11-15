@@ -15,8 +15,8 @@ Réponses par défaut appliquées en attendant l'utilisateur : anglais britanniq
 | Bateau (activité et calcul) | Boat | Barco | seule activité de départ traduite |
 | Planche à voile (calcul) | Windsurf | Windsurf | |
 | Kitesurf (calcul) | Kitesurf | Kitesurf | |
-| Voile (famille) | Sailing | Vela | |
-| Surf (famille) | Surf | Surf | |
+| Avec vent (famille, ex-Voile) | Wind | Con viento | libellé court : tient dans le bouton glissant « Famille » |
+| Sans vent (famille, ex-Surf) | No wind | Sin viento | l'activité et le calcul « Surf » gardent leur nom |
 | Toutes les familles | All families | Todas las familias | |
 
 ## Navigation et pages

@@ -242,7 +242,7 @@ export const withPaletteColors = (activities: Activity[]): Activity[] => {
 export const FAMILY_BASE: Record<SportFamily, SportType> = { voile: 'wingfoil', surf: 'surf' };
 
 /** Nom d'une famille, tel que l'interface l'affiche. */
-export const FAMILY_LABEL: Record<SportFamily, string> = { voile: t('Voile'), surf: t('Surf') };
+export const FAMILY_LABEL: Record<SportFamily, string> = { voile: t('Avec vent'), surf: t('Sans vent') };
 
 /** Couleur d'interface d'une famille (variable du thème). */
 export const FAMILY_ACCENT: Record<SportFamily, string> = { voile: 'var(--voile)', surf: 'var(--surf)' };

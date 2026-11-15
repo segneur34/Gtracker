@@ -51,8 +51,8 @@ const otherSportsSentence = (n: number): string =>
   // Les sports écartés entrent par une variable : la phrase existe au singulier et au pluriel, leur liste une seule fois.
   tn(
     n,
-    '{n} session {sports} laissée de côté : Gtracker ne range que la voile et le surf.',
-    '{n} sessions {sports} laissées de côté : Gtracker ne range que la voile et le surf.',
+    '{n} session {sports} laissée de côté : Gtracker ne range que les sessions avec ou sans vent.',
+    '{n} sessions {sports} laissées de côté : Gtracker ne range que les sessions avec ou sans vent.',
     { sports: t("de course, de vélo ou d'entraînement") }
   );
 

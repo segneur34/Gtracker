@@ -786,8 +786,8 @@ if (MESURES.includes('analyser')) {
   await go('/enregistrer', 5000);
 
   const CAS = [
-    { nom: 'voile 1 h 1 Hz', famille: 'Voile', chemin: '/voile/analyse', secondes: 3600, gpx: (debutMs) => traceVoile({ hz: 1, secondes: 3600, debutMs, nom: 'Voile rejouée' }) },
-    { nom: 'surf 1 h 1 Hz', famille: 'Surf', chemin: '/surf/analyse', secondes: 3600, gpx: (debutMs) => traceLongue(1, 1, 'surf', { debutMs, nom: 'Surf rejoué' }) },
+    { nom: 'voile 1 h 1 Hz', famille: 'Avec vent', chemin: '/voile/analyse', secondes: 3600, gpx: (debutMs) => traceVoile({ hz: 1, secondes: 3600, debutMs, nom: 'Voile rejouée' }) },
+    { nom: 'surf 1 h 1 Hz', famille: 'Sans vent', chemin: '/surf/analyse', secondes: 3600, gpx: (debutMs) => traceLongue(1, 1, 'surf', { debutMs, nom: 'Surf rejoué' }) },
   ];
   const choose = (text) => evaluate(`(() => { const b = [...document.querySelectorAll('[role=radiogroup] button[role=radio]')].find((x) => x.textContent.trim() === ${JSON.stringify(text)}); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
   // Un GPX par prise, parti d'un autre jour : la même heure de départ serait un doublon.

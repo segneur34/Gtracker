@@ -233,7 +233,7 @@ await until(`${sessionsNow} === '1' && location.search.includes('g-foil%3Af-900'
 console.log('sélection :', await choiceText());
 check('Aile 5 m et Foil 900 : 1 session, croisée dans l\'adresse et le résumé', (await statSessions()) === '1'
   && (await address()) === '/statistiques?famille=voile&activite=wingfoil&materiel=g-aile%3Aa-5%2Cg-foil%3Af-900'
-  && (await choiceText()).includes('Voile · Wingfoil · Aile 5 m · Foil 900'), `${await statSessions()} ; ${await address()} ; ${await choiceText()}`);
+  && (await choiceText()).includes('Avec vent · Wingfoil · Aile 5 m · Foil 900'), `${await statSessions()} ; ${await address()} ; ${await choiceText()}`);
 await shoot('materiel-statistiques');
 await evaluate('history.back()');
 await until(`${sessionsNow} === '2' && !location.search.includes('g-foil')`, 'retour arrière');

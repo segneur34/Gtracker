@@ -165,7 +165,7 @@ describe('fichiers reçus d\'une autre application', () => {
   });
 
   it('FIT ou GPX de course ou de vélo : refus dit, copie retirée, rien de rangé', async () => {
-    const sentence = "1 session de course, de vélo ou d'entraînement laissée de côté : Gtracker ne range que la voile et le surf.";
+    const sentence = "1 session de course, de vélo ou d'entraînement laissée de côté : Gtracker ne range que les sessions avec ou sans vent.";
     const fit = receive('footing.fit', fitAt(1, undefined, 1));
     const gpx = receive('velo.gpx', gpxAt(2).replace('<trk>', '<trk><type>cycling</type>'));
     const { notices } = await launch();

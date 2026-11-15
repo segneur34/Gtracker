@@ -121,7 +121,7 @@ check('carte repliée : « · modifié »', voileSummary.includes('· modifié')
 const sailPath = join(workDir, 'notification-voile.gpx');
 nowTrace(sailPath, 'wingfoil');
 const s0 = sent.length;
-console.log('Démarrer :', await startReplay('Voile', sailPath, 10));
+console.log('Démarrer :', await startReplay('Avec vent', sailPath, 10));
 await wait(16000);
 // Le chargement de la page efface une notification restée d'un arrêt brutal : hors du compte.
 const run = sent.slice(s0).filter((s) => s.text !== 'effacée');
@@ -169,7 +169,7 @@ const fieldsWith = (from, to) => evaluate(`(() => {
 })()`);
 console.log('chiffres :', await fieldsWith('max', 'average'));
 const sAverage = sent.length;
-console.log('Démarrer (voile, moyenne) :', await startReplay('Voile', sailPath, 10));
+console.log('Démarrer (voile, moyenne) :', await startReplay('Avec vent', sailPath, 10));
 await wait(9000);
 const averages = sent.slice(sAverage).filter((s) => s.text !== 'effacée').map((s) => s.text);
 check('voile : « Moy. act. » dans la notification, jamais « Moy. » seul', averages.some((t) => t.includes(' · Moy. act. ')) && !averages.some((t) => /· Moy\. (?!act\.)/.test(t)),

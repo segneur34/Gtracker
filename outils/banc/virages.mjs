@@ -147,7 +147,7 @@ await shoot('virages-vagues');
 
 // --- 3. Enregistrer ---
 await go('/enregistrer', 3000);
-await clickText('Surf', '[aria-label=Famille] button');
+await clickText('Sans vent', '[aria-label=Famille] button');
 await wait(300);
 console.log('activité Surf :', await clickText('Surf', '[aria-label=Activité] button'));
 await wait(300);

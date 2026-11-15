@@ -96,7 +96,7 @@ const replayGpx = (family, speedMs, t0) => {
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 await go('/enregistrer', 4000);
 
-for (const [family, speedMs, graphTab] of [['Voile', 8, 'graphiques'], ['Surf', 4, 'graphiques']]) {
+for (const [family, speedMs, graphTab] of [['Avec vent', 8, 'graphiques'], ['Sans vent', 4, 'graphiques']]) {
   console.log(`\n=== ${family} ===`);
   await go('/enregistrer');
   console.log('famille :', await clickText(family, '[aria-label=Famille] button'));
@@ -167,7 +167,7 @@ for (const [family, speedMs, graphTab] of [['Voile', 8, 'graphiques'], ['Surf', 
   console.log('bulle du fanion 1 :', bulle);
   check(`${family} : la bulle du fanion 1 s'ouvre`, bulle.startsWith('ok') && !bulle.includes('(aucune bulle)'), bulle);
 
-  if (family !== 'Voile') continue;
+  if (family !== 'Avec vent') continue;
   // Nommer, supprimer, enregistrer.
   const analysis = await evaluate('location.pathname + location.search');
   console.log('nom :', await typeInto('Nom de la note 1', 'Saut'));

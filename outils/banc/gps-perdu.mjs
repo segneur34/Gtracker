@@ -67,7 +67,7 @@ await blockNetwork(['*://*.openstreetmap.org/*']);
 const path = join(workDir, 'gps-perdu.gpx');
 gapTrace(path);
 await go('/enregistrer');
-await clickText('Voile', '[aria-label=Famille] button');
+await clickText('Avec vent', '[aria-label=Famille] button');
 await wait(300);
 await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click(); 'ok'`);
 await wait(300);

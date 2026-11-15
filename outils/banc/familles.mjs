@@ -85,22 +85,22 @@ await openSettings();
 const labels = await evaluate(`${familyToggles}.map((b) => b.querySelector('.settings-activities__family-name')?.textContent.trim()).join(' | ')`);
 console.log('Familles :', labels);
 const familyCount = await evaluate(`${familyToggles}.length`);
-check(`en-têtes de famille : ${familyCount} (${labels})`, familyCount === 2 && labels === 'Voile | Surf', labels);
+check(`en-têtes de famille : ${familyCount} (${labels})`, familyCount === 2 && labels === 'Avec vent | Sans vent', labels);
 check('toutes fermées', (await evaluate(`${familyToggles}.every((b) => b.getAttribute('aria-expanded') === 'false')`)) === true);
 check('aucune carte d\'activité', (await cardCount()) === 0);
-console.log('Résumé de Voile fermée :', await evaluate(`${familyToggle('Voile')}?.querySelector('.settings-activities__family-summary')?.textContent`));
+console.log('Résumé de Voile fermée :', await evaluate(`${familyToggle('Avec vent')}?.querySelector('.settings-activities__family-summary')?.textContent`));
 await shoot('familles-fermees');
 
 // --- 3. Voile ouverte, son œil ---
-await evaluate(`${familyToggle('Voile')}?.click()`);
+await evaluate(`${familyToggle('Avec vent')}?.click()`);
 await wait(400);
 const voileCards = await cardCount();
-check(`Voile ouverte : ${voileCards} carte(s) (les sept activités de départ)`, voileCards === 7 && (await evaluate(`${familyToggle('Voile')}?.getAttribute('aria-expanded')`)) === 'true');
-const eye = `${familyToggle('Voile')}?.parentElement.querySelector('.settings-eye')`;
+check(`Voile ouverte : ${voileCards} carte(s) (les sept activités de départ)`, voileCards === 7 && (await evaluate(`${familyToggle('Avec vent')}?.getAttribute('aria-expanded')`)) === 'true');
+const eye = `${familyToggle('Avec vent')}?.parentElement.querySelector('.settings-eye')`;
 await evaluate(`${eye}?.click()`);
 await wait(400);
 check('l\'œil cache la famille sans la replier',
-  (await evaluate(`${familyToggle('Voile')}?.getAttribute('aria-expanded')`)) === 'true' &&
+  (await evaluate(`${familyToggle('Avec vent')}?.getAttribute('aria-expanded')`)) === 'true' &&
   (await evaluate(`${eye}?.getAttribute('aria-pressed')`)) === 'true' &&
   (await cardCount()) === voileCards);
 await evaluate(`${eye}?.click()`);
@@ -131,7 +131,7 @@ check('après une modification, « Par défaut » actif', (await menuState()) ==
 
 // --- 4. Après rechargement ---
 await openSettings();
-check('Voile toujours ouverte après rechargement', (await evaluate(`${familyToggle('Voile')}?.getAttribute('aria-expanded')`)) === 'true');
+check('Voile toujours ouverte après rechargement', (await evaluate(`${familyToggle('Avec vent')}?.getAttribute('aria-expanded')`)) === 'true');
 check('les autres toujours fermées', (await evaluate(`${familyToggles}.filter((b) => b.getAttribute('aria-expanded') === 'true').length`)) === 1);
 check(`mémorisé dans ${CLES.sections}`,(await evaluate(`JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}')['settings-families']?.voile`)) === true);
 
@@ -154,7 +154,7 @@ await evaluate(`(() => {
 await wait(200);
 await evaluate(`[...document.querySelectorAll('.settings-add button')].find((b) => b.textContent.trim() === 'Ajouter')?.click()`);
 await wait(600);
-check(`ajout (${added}) : famille Surf ouverte`, (await evaluate(`${familyToggle('Surf')}?.getAttribute('aria-expanded')`)) === 'true');
+check(`ajout (${added}) : famille Surf ouverte`, (await evaluate(`${familyToggle('Sans vent')}?.getAttribute('aria-expanded')`)) === 'true');
 check('carte de l\'activité ajoutée ouverte',
   (await evaluate(`[...document.querySelectorAll('.settings-activity__toggle[aria-expanded="true"] .settings-activity__name')].some((i) => i.textContent === 'Kayak de mer')`)) === true);
 await shoot('familles-ajout');

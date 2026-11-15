@@ -63,7 +63,7 @@ const snapshot = async () => {
   out.voile = await evaluate('document.querySelector(".shell-main").innerText');
   await go('/enregistrer');
   out.enregistrer = await evaluate('document.querySelector(".shell-main").innerText');
-  await click('[aria-label=Famille] button', 'Voile');
+  await click('[aria-label=Famille] button', 'Avec vent');
   await wait(300);
   out.enregistrerVoile = await evaluate(`[...document.querySelectorAll('.shell-main [aria-label=Activité] button')].map((o) => o.textContent).join(', ')`);
   return out;
@@ -93,7 +93,7 @@ check('le Profil (ouverture) compte la session de Wingfoil', before.profil.inclu
 
 // --- 2. Surf, puis Route, cachés ---
 await go('/parametres');
-check('œil « Cacher Surf »', await click('.settings-eye', 'Cacher Surf'));
+check('œil « Cacher Sans vent »', await click('.settings-eye', 'Cacher Sans vent'));
 await wait(300);
 check('œil « Cacher Wingfoil »', await click('.settings-eye', 'Cacher Wingfoil'));
 await wait(300);
@@ -111,7 +111,7 @@ check('barre du bas inchangée', hidden.barreBas === before.barreBas, hidden.bar
 check('Profil sans la session de Wingfoil cachée', /Activités favorites\s+Aucune session rangée/.test(hidden.profil) && /Total\s+0 km/.test(hidden.profil) && /\b0 session\b/.test(hidden.profil) && !hidden.profil.includes('Wingfoil'), hidden.profil.replace(/\s+/g, ' ').slice(0, 200));
 check('rangée de logos de Sessions sans Wingfoil, Surf ni Pumping (et avec, au départ)', hidden.ronds === 'Toutes*, Kite' && before.ronds.includes('Surf, Pumping'), hidden.ronds);
 check('Sessions : session retirée de la liste et signalée', hidden.voile.includes('Activités cachées : 1 session') && hidden.voile.includes('Aucune session'), hidden.voile.replace(/\s+/g, ' ').slice(0, 200));
-check("Enregistrer sans l'onglet Surf", !/\bSurf\b/.test(hidden.enregistrer));
+check("Enregistrer sans l'onglet Sans vent", !/Sans vent/.test(hidden.enregistrer));
 check('Enregistrer › Voile sans Wingfoil', hidden.enregistrerVoile === 'Kite', hidden.enregistrerVoile);
 // Une adresse s'ouvre toujours, même d'une activité ou d'une famille cachée : la liste montre alors ses sessions.
 await go('/sessions?activite=wingfoil', 4000);
@@ -126,12 +126,12 @@ check('/surf?activite=surf garde le filtre sur Sessions', (await evaluate('locat
 
 // --- 3. Dernière famille ---
 await go('/parametres');
-const lastDisabled = await evaluate(`[...document.querySelectorAll('.settings-eye')].find((b) => b.getAttribute('aria-label').startsWith('Voile'))?.disabled`);
-check('la Voile, dernière famille visible, ne se cache pas', lastDisabled === true);
+const lastDisabled = await evaluate(`[...document.querySelectorAll('.settings-eye')].find((b) => b.getAttribute('aria-label').startsWith('Avec vent'))?.disabled`);
+check('la famille Avec vent, dernière famille visible, ne se cache pas', lastDisabled === true);
 await shoot('cacher-derniere');
 
 // --- 4. Tout ré-affiché ---
-check('œil « Afficher Surf »', await click('.settings-eye', 'Afficher Surf'));
+check('œil « Afficher Sans vent »', await click('.settings-eye', 'Afficher Sans vent'));
 await wait(300);
 check('œil « Afficher Wingfoil »', await click('.settings-eye', 'Afficher Wingfoil'));
 await wait(300);

@@ -79,7 +79,7 @@ const path = join(workDir, 'rendus-voile.gpx');
 writeFileSync(path, traceVoile({ debutMs: Date.parse('2026-01-15T09:00:00Z'), nom: 'Rejeu', bords: 1, secondes: 401 }));
 
 await go('/enregistrer', 6000);
-console.log('famille Voile :', await clickText('Voile', '[aria-label=Famille] button'));
+console.log('famille Voile :', await clickText('Avec vent', '[aria-label=Famille] button'));
 await wait(300);
 console.log('activité :', await evaluate(`[...document.querySelectorAll('[aria-pressed="true"], [aria-checked="true"], [aria-selected="true"]')].map((b) => b.textContent.trim()).filter(Boolean).join(' | ')`));
 await evaluate(`[...document.querySelectorAll('input[type=radio]')][1].click(); 'ok'`);

@@ -100,7 +100,7 @@ await evaluate(`(() => {
 })()`);
 
 // 1. Wingfoil, liste présente.
-check('Wingfoil : la fin de l\'enregistrement ouvre l\'analyse', (await recordUntilAnalysis('Voile', 'choix', -30)) === 'ok');
+check('Wingfoil : la fin de l\'enregistrement ouvre l\'analyse', (await recordUntilAnalysis('Avec vent', 'choix', -30)) === 'ok');
 const firstAsk = await waitReminder(8000);
 check('Wingfoil : le rappel du matériel s\'ouvre à l\'analyse', firstAsk?.includes(REMINDER_TITLE) === true, firstAsk ?? '(absent)');
 check('Wingfoil : le rappel propose Oui et Non', /oui/i.test(firstAsk ?? '') && /non/i.test(firstAsk ?? ''), firstAsk ?? '(absent)');
@@ -132,7 +132,7 @@ check('Wingfoil : retrouvé après rechargement', shown === 'Aile 5 m', shown);
 check('Wingfoil : pas de rappel à la réouverture de la session', (await reminder()) === null, (await reminder()) ?? '');
 
 // 2. Wingfoil de nouveau : rien de repris. Le rappel revient (aucune fermeture comptée), « Non » en compte une.
-check('Wingfoil, session suivante : l\'analyse s\'ouvre', (await recordUntilAnalysis('Voile', 'vide', -10)) === 'ok');
+check('Wingfoil, session suivante : l\'analyse s\'ouvre', (await recordUntilAnalysis('Avec vent', 'vide', -10)) === 'ok');
 const secondAsk = await waitReminder(8000);
 check('Wingfoil, session suivante : le rappel s\'ouvre de nouveau', secondAsk?.includes(REMINDER_TITLE) === true, secondAsk ?? '(absent)');
 console.log('[vide] Non :', await clickText('Non', '[role="dialog"] button'));
@@ -146,18 +146,18 @@ const all = await allRecords();
 check('Wingfoil, session suivante : pas de matériel dans sa fiche', all.length === 2 && all.filter((r) => r.notes?.gear?.length).length === 1, JSON.stringify(all.map((r) => r.notes?.gear ?? null)));
 
 // 3. Wingfoil, troisième session : la croix compte la deuxième fermeture ; à la quatrième, plus de rappel.
-check('Wingfoil, troisième session : l\'analyse s\'ouvre', (await recordUntilAnalysis('Voile', 'croix', -70)) === 'ok');
+check('Wingfoil, troisième session : l\'analyse s\'ouvre', (await recordUntilAnalysis('Avec vent', 'croix', -70)) === 'ok');
 const thirdAsk = await waitReminder(8000);
 check('Wingfoil, troisième session : le rappel s\'ouvre encore (une seule fermeture)', thirdAsk?.includes(REMINDER_TITLE) === true, thirdAsk ?? '(absent)');
 await evaluate(`document.querySelector('[role="dialog"] button[aria-label="Fermer"]')?.click(); 'ok'`);
 await settle({ max: 800, label: 'rappel fermé par la croix' });
 check('Wingfoil, la croix : la fenêtre se ferme et une deuxième fermeture est comptée', (await reminder()) === null && (await closes()) === 2, `${await reminder()} · ${await closes()}`);
-check('Wingfoil, quatrième session : l\'analyse s\'ouvre', (await recordUntilAnalysis('Voile', 'fin', -90)) === 'ok');
+check('Wingfoil, quatrième session : l\'analyse s\'ouvre', (await recordUntilAnalysis('Avec vent', 'fin', -90)) === 'ok');
 await wait(3000);
 check('Wingfoil, après deux fermetures : plus de rappel', (await reminder()) === null, (await reminder()) ?? '');
 
 // 4. Surf, sans liste.
-check('Surf : l\'analyse s\'ouvre', (await recordUntilAnalysis('Surf', 'surf', -110)) === 'ok');
+check('Surf : l\'analyse s\'ouvre', (await recordUntilAnalysis('Sans vent', 'surf', -110)) === 'ok');
 await wait(2000);
 check('Surf, sans liste : pas de rappel', (await reminder()) === null, (await reminder()) ?? '');
 await waitFor(`[...document.querySelectorAll('.an-carte-col .ui-tab')].some((t) => /^mat/.test(t.textContent.trim()))`, { timeout: 10000, label: 'onglets avancés' });

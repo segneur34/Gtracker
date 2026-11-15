@@ -545,7 +545,7 @@ function SailingModule() {
   );
 
   return (
-    <AnalysisShell title={t('Analyse voile')} family="voile" backLabel={t('Sessions')} file={requestedFile}
+    <AnalysisShell title={t('Analyse avec vent')} family="voile" backLabel={t('Sessions')} file={requestedFile}
       share={{ segments: mapSegments, stats: generalStats }} error={sessionError}
       // Barre visible pendant un brouillon seulement : rien ne s'affiche quand tout est enregistré.
       draft={loadedFromMemory ? draft : null}

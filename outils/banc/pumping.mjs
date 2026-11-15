@@ -274,7 +274,7 @@ check('foil et pumping rangés dans la fiche', saved?.analysis?.foil === true &&
 
 // --- 4. Enregistrer ---
 await go('/enregistrer', 3000);
-await clickText('Surf', '[aria-label=Famille] button');
+await clickText('Sans vent', '[aria-label=Famille] button');
 await wait(300);
 // Activité : bouton glissant d'Enregistrer (23/10).
 console.log('activité Surf foil :', await clickText('Surf foil', '[aria-label=Activité] button'));
