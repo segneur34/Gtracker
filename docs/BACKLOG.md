@@ -1,6 +1,6 @@
 # Reste à faire
 
-Tenu par Claude ; l'utilisateur n'a jamais à l'ouvrir. `node outils/backlog.mjs` vérifie la forme et imprime le tableau de bord : aucun résumé fait à la main ne le remplace. Prochains numéros : élément 408, essai 280, question Q120.
+Tenu par Claude ; l'utilisateur n'a jamais à l'ouvrir. `node outils/backlog.mjs` vérifie la forme et imprime le tableau de bord : aucun résumé fait à la main ne le remplace. Prochains numéros : élément 408, essai 280, question Q121.
 - Une ligne par élément : `- N · [type] Titre · noté jj/mm · petit|gros · Modèle/effort · état · dépend de : … · détail : chemin` (champs sans objet omis, ordre gardé). N unique, dans la suite des lots, jamais réutilisé ; type `[bogue]`, `[idée]`, `[dette]` ou `[outil]` ; petit = un lot Sonnet ou Opus, une session ; gros = plusieurs lots, Fable, ou des données réelles ; détail dans `docs/backlog/N-titre.md` quand la ligne ne suffit pas.
 - Quatre zones, un élément dans une seule : **Maintenant** (en cours ou à valider ; 3 lots avec essais au téléphone au plus, un lot validé sur lecture ne compte pas ; première ligne : l'APK installée) ; **Ensuite** (prêts, liste numérotée, l'ordre est la priorité, 7 au plus) ; **Ça attend une occasion** (sous une condition écrite en gras, hors de toute limite) ; **Plus tard** (daté, une phrase avec le résultat attendu ; proposé à l'abandon à la revue après 90 jours).
 - Rangement à la mise au propre, posé en clair à l'utilisateur : un chiffre faux ou un usage cassé → tête d'Ensuite ; « vous en servirez-vous à votre prochaine sortie ? » oui → Ensuite, non → Plus tard ; petit et utile passe avant gros et utile.
@@ -75,5 +75,6 @@ APK 0.00.96 construite et installée le 15/11 par le câble (versionCode 97, `Gt
 
 - Q118 · lot 399 · Le fond de page en image se dessine deux à quatre fois plus vite que le dessin d'avant (ouverture, rotation du téléphone), mais il alourdit l'application d'environ 1 Mo (6,6 Mo contre 5,6 Mo), à l'inverse de l'allègement annoncé : le garder ? · par défaut : le garder, la fluidité au téléphone valant ce mégaoctet ; sinon le commit 585892e se défait seul et l'ancien dessin revient · posée le 15/11
 - Q119 · lot 400 · Depuis que l'analyse est calculée en arrière-plan, les anciens chiffres restent affichés un instant pendant un recalcul (seuil ou vent changé), sans aucune marque : faut-il les estomper pendant ce temps ? · par défaut : rien, comme aujourd'hui · posée le 15/11
+- Q120 · lot 403 · Le paquet de la revue du 15/11 est fait : remonter le lot 403 (l'enregistrement survit à la fermeture de l'application) en tête d'Ensuite, devant les points du fond sombre (406) et les scripts du banc (407) ? C'est le seul cas restant où la fin d'une sortie se perd ; gros lot, trois essais au téléphone (277 à 279) · par défaut : oui, il passe en tête à la prochaine session · posée le 15/11
 
 
