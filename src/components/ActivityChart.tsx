@@ -36,6 +36,10 @@ const STACK_MIN_H = 1;
 
 /** Blanc minimal, en pixels, entre deux étiquettes de l'axe. */
 const TICK_GAP_PX = 6;
+/** Blanc minimal quand l'axe est écrit en plus petit : il suit la taille des lettres. */
+const TIGHT_TICK_GAP_PX = 4;
+/** Classe de l'axe écrit en plus petit, quand ses étiquettes ne tiennent pas à la taille normale. */
+const TIGHT_AXIS_CLASS = 'actchart__axis--tight';
 
 /** Totaux par activité dépliés tant qu'on ne les a pas repliés. */
 const TOTALS_DEFAULT = { totaux: true };
@@ -69,24 +73,33 @@ function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: nu
     [chartSessions, period, nowMs, activities]
   );
 
-  // Étiquettes de l'axe : une étiquette qui toucherait la précédente (blanc inférieur à TICK_GAP_PX) est masquée,
-  // d'après les largeurs réellement mesurées, donc quelle que soit la langue ou la taille du texte.
+  // Étiquettes de l'axe : d'après les largeurs réellement mesurées, donc quelle que soit la langue ou la taille du
+  // texte. Si deux étiquettes se touchent à la taille normale, l'axe est écrit en plus petit pour les garder toutes ;
+  // celle qui toucherait encore la précédente est alors masquée.
   const axisRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const axis = axisRef.current;
     if (!axis) return;
     const fit = () => {
-      const ticks = Array.from(axis.children) as HTMLElement[];
+      const ticks = (Array.from(axis.children) as HTMLElement[]).filter((el) => el.textContent);
+      // Étiquettes qui toucheraient celle d'avant, à la taille en cours.
+      const crowded = (gap: number): HTMLElement[] => {
+        const out: HTMLElement[] = [];
+        let lastRight = -Infinity;
+        for (const el of ticks) {
+          const text = document.createRange();
+          text.selectNodeContents(el);
+          const box = text.getBoundingClientRect();
+          if (box.left < lastRight + gap) out.push(el);
+          else lastRight = box.right;
+        }
+        return out;
+      };
       for (const el of ticks) el.style.visibility = '';
-      let lastRight = -Infinity;
-      for (const el of ticks) {
-        if (!el.textContent) continue;
-        const text = document.createRange();
-        text.selectNodeContents(el);
-        const box = text.getBoundingClientRect();
-        if (box.left < lastRight + TICK_GAP_PX) { el.style.visibility = 'hidden'; continue; }
-        lastRight = box.right;
-      }
+      axis.classList.remove(TIGHT_AXIS_CLASS);
+      if (crowded(TICK_GAP_PX).length === 0) return;
+      axis.classList.add(TIGHT_AXIS_CLASS);
+      for (const el of crowded(TIGHT_TICK_GAP_PX)) el.style.visibility = 'hidden';
     };
     fit();
     const observer = new ResizeObserver(fit);

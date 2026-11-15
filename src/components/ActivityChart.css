@@ -73,6 +73,11 @@
   font-weight: 600;
 }
 
+/* Axe dont les étiquettes ne tiennent pas à la taille normale : écrit en plus petit, pour les garder toutes. */
+.actchart__axis--tight .actchart__tick {
+  font-size: var(--text-2xs);
+}
+
 .actchart__tick--center {
   text-align: center;
 }
