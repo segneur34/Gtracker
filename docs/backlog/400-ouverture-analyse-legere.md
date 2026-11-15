@@ -55,7 +55,7 @@ Tuiles de carte qui traversent le pont natif en texte, chiffres du direct incré
 
 ## Vérification
 
-`node outils/verif.mjs --rapide` pendant, `npm run verif` à chaque étape. Banc contre HEAD : `library`, `general`, `graphes`, `virages`, `manoeuvres-diagnostic`, `allure-session`, `brouillon-voile` (texte identique, aucun chiffre ne bouge). `fluidite-compile` avant et après chaque étape sur l'ouverture d'une session longue, durée dite avant de lancer ; les deux mesures vont dans le rapport, et la phrase périmée d'ETAT §11 (« le reste est le dessin », « 10 à 18 s », `DOMParser`) sera corrigée d'après elles au lot 401.
+`node outils/verif.mjs --rapide` pendant, `npm run verif` à chaque étape. Banc contre HEAD : `library`, `general`, `graphes`, `virages`, `allure-session`, `brouillon-voile` (texte identique, aucun chiffre ne bouge). `manoeuvres-diagnostic` n'est pas du registre du lanceur (sans navigateur) : `node outils/banc/manoeuvres-diagnostic.mjs <gpx>`, une fois avant et une fois après, sorties comparées à la main. `fluidite-compile` avant et après chaque étape sur l'ouverture d'une session longue, durée dite avant de lancer ; les deux mesures vont dans le rapport, et la phrase périmée d'ETAT §11 (« le reste est le dessin », « 10 à 18 s », `DOMParser`) sera corrigée d'après elles au lot 401.
 
 ## Mesures du 15/11 (`fluidite-compile`, version compilée, ordinateur)
 

@@ -89,7 +89,7 @@ await blockNetwork(['*://*.openstreetmap.org/*']);
 /** Trace de 30 s datée de `t0` (l'heure de la page), à `speedMs`, pour un rejeu ×1 (`traceDroite`, `lib/traces.mjs`). */
 const replayGpx = (family, speedMs, t0) => {
   const path = join(workDir, `notes-${family}.gpx`);
-  writeFileSync(path, traceDroite({ debutMs: t0, secondes: 30, vitesse: speedMs, type: family === 'Surf' ? 'surf' : 'wingfoil', nom: 'Rejeu', lat0: 43.55, lon0: 3.9 }));
+  writeFileSync(path, traceDroite({ debutMs: t0, secondes: 30, vitesse: speedMs, type: family === 'Sans vent' ? 'surf' : 'wingfoil', nom: 'Rejeu', lat0: 43.55, lon0: 3.9 }));
   return path;
 };
 
@@ -161,7 +161,7 @@ for (const [family, speedMs, graphTab] of [['Avec vent', 8, 'graphiques'], ['San
   const recs = await records();
   const rec = recs.map((r) => r.record).sort((a, b) => b.summary.startMs - a.summary.startMs)[0];
   diag(`notes ${family} : repères à ${rec?.marks?.map((m) => m.timeMs - rec.summary.startMs).join(', ')} ms du premier point ; Note cliquée à Démarrer + ${note1 - demarre} et + ${note2 - demarre} (page)`);
-  check(`${family} : deux repères dans la fiche, de la bonne famille`, rec?.marks?.length === 2 && rec?.sport === (family === 'Surf' ? 'surf' : 'wingfoil'), `${rec?.sport} ${rec?.marks?.length}`);
+  check(`${family} : deux repères dans la fiche, de la bonne famille`, rec?.marks?.length === 2 && rec?.sport === (family === 'Sans vent' ? 'surf' : 'wingfoil'), `${rec?.sport} ${rec?.marks?.length}`);
   console.log('fiche :', rec ? `${rec.sport}, ${rec.marks?.length ?? 0} repères (${rec.marks?.map((m) => `${new Date(m.timeMs).toISOString().slice(11, 19)} ${m.label}`).join(', ')})` : '(aucune)');
   const bulle = await flagPopup(1);
   console.log('bulle du fanion 1 :', bulle);

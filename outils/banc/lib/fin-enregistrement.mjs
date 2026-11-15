@@ -25,7 +25,7 @@ const SUR_ANALYSE = `/^\\/(voile|surf)\\/analyse$/.test(location.pathname) && ne
  * 'ok', ou la page où l'on est resté.
  */
 export const attendreAnalyse = async (evaluate, { timeout = 20000 } = {}) => {
-  const ok = await attendre(evaluate, `${SUR_ANALYSE} && Boolean(document.querySelector('button[aria-label="Plus d\\'actions sur la session"]'))`, timeout);
+  const ok = await attendre(evaluate, `${SUR_ANALYSE} && !document.body.innerText.includes('Lecture de la session') && Boolean(document.querySelector('button[aria-label="Plus d\\'actions sur la session"]'))`, timeout);
   return ok ? 'ok' : `restée sur ${await evaluate('location.pathname + location.search')}`;
 };
 

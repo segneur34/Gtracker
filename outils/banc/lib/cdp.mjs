@@ -60,6 +60,15 @@ const DIAG = process.env.BANC_DIAG !== '0';
 /** Ligne de diagnostic, sur stderr. */
 export const diag = (text) => { if (DIAG) process.stderr.write(`[banc] ${text}\n`); };
 
+/**
+ * Charge de la machine : le nombre de scripts de front lancés ensemble (`BANC_CHARGE`, posé par `passe.mjs` avec `-j`),
+ * 1 seul. Le plafond de `waitFor` est multiplié par elle : quatre Chrome et deux Vite sur le même processeur ralentissent
+ * chaque page, et un plafond réglé pour un script seul passerait pour un échec. Il n'allonge que l'attente d'une condition
+ * qui n'est pas vraie : rien ne change quand la machine est libre. Ni `settle` ni `go` ne sont multipliés : leur plafond est
+ * atteint à chaque appel sur une page jamais immobile (minuteurs, animations), et le multiplier ralentit tout un script.
+ */
+export const CHARGE = Math.max(1, Number(process.env.BANC_CHARGE) || 1);
+
 /** Vrai temps, en millisecondes. */
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Temps de la page : `ms / TEMPS` de vrai temps (horloge accélérée, lib/horloge.mjs). */
@@ -269,7 +278,8 @@ export const connect = async ({ port, base = BASE, width, height, shotDir, logEn
    * Évalue `expr` (expression de la page, ou fonction de Node, asynchrone ou non) jusqu'à une valeur vraie, tous
    * les `every` ms ; à l'échéance, rend la dernière valeur sans lever : le `check` du script dit l'échec.
    */
-  const waitFor = async (expr, { timeout = 5000, every = 100, label = '' } = {}) => {
+  const waitFor = async (expr, { timeout: plafond = 5000, every = 100, label = '' } = {}) => {
+    const timeout = plafond * CHARGE;
     const t0 = Date.now();
     let value;
     for (;;) {

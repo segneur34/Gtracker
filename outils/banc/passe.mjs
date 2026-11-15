@@ -361,16 +361,20 @@ const servir = (cote) => (enRoute[cote] ??= (async () => {
 let gpx = null;
 const duree = (ms) => { const s = Math.round(ms / 1000); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')}`; };
 
-async function executer(s, cote) {
+/** Un relevé qui porte un échec, un code de sortie, un délai dépassé ou une erreur. */
+const enEchec = (r) => Boolean(r) && r.statut !== 'absent' && (r.statut !== 'fini' || Boolean(r.echecs) || Boolean(r.code));
+
+async function executer(s, cote, rejeu = false) {
   const dossier = dossierReleves(cote);
   fs.mkdirSync(dossier, { recursive: true });
   const fichier = path.join(dossier, `${s.nom}.txt`);
   const meta = path.join(dossier, `${s.nom}.json`);
   const cle = cleReleve(cote, s);
-  const reutilisable = cote === 'avant' && !s.sansCache && !opts.sansCache;
+  const reutilisable = cote === 'avant' && !s.sansCache && !opts.sansCache && !rejeu;
   if (reutilisable && fs.existsSync(meta) && fs.existsSync(fichier)) {
     const m = JSON.parse(fs.readFileSync(meta, 'utf8'));
-    if (m.cle === cle && m.statut !== 'délai dépassé' && m.statut !== 'erreur') {
+    // Un relevé d'avant qui porte un échec n'est jamais réutilisé : il peut venir d'une machine chargée, il est refait.
+    if (m.cle === cle && !enEchec(m)) {
       console.error(`[${NOM_COTE[cote]}] ${s.nom} : relevé réutilisé`);
       return { ...m, fichier, reutilise: true };
     }
@@ -394,7 +398,7 @@ async function executer(s, cote) {
   }
   const valeurs = { '{port}': String(chrome.port), '{gpx}': gpx?.[0], '{gpx2}': gpx?.[1], '{dossierGpx}': opts.gpx, '{travail}': travail, '{captures}': captures };
   const args = s.args.filter((a) => a !== '{captures?}' || opts.captures).map((a) => (a === '{captures?}' ? captures : valeurs[a] ?? a));
-  const env = { ...process.env, ...(s.env ?? {}), BASE: serveur.base, MSYS_NO_PATHCONV: '1', TEMP: travail, TMP: travail, TMPDIR: travail };
+  const env = { ...process.env, ...(s.env ?? {}), BASE: serveur.base, MSYS_NO_PATHCONV: '1', BANC_CHARGE: String(s.solo ? 1 :Math.min(opts.j, aLancer.length) * cotes.length), TEMP: travail, TMP: travail, TMPDIR: travail };
   if (/process\.env\.DUMP|const DUMP/.test(source)) env.DUMP = path.join(depot, 'releve');
   if (opts.captures && /process\.env\.SHOT/.test(source)) env.SHOT = path.join(captures, `${s.nom}.png`);
   if (accelerable(cote, s)) env.TEMPS = opts.temps;
@@ -474,7 +478,7 @@ try {
 
     const ordinaires = aLancer.filter((l) => !l.script.solo);
     const solos = aLancer.filter((l) => l.script.solo);
-    const sur = (s, c) => executer(s, c).catch((e) => {
+    const sur = (s, c, rejeu = false) => executer(s, c, rejeu).catch((e) => {
       console.error(`[${NOM_COTE[c]}] ${s.nom} erreur : ${e.message}`);
       return { statut: 'erreur', detail: e.message, duree: 0, echecs: 0, erreurs: [], fichier: null };
     });
@@ -484,6 +488,22 @@ try {
       while (suivant < ordinaires.length) await parCote(ordinaires[suivant++]);
     }));
     for (const l of solos) { l.res = {}; for (const c of cotes) l.res[c] = await sur(l.script, c); }
+    // Rejeu seul : à plusieurs de front, un échec que l'autre côté n'a pas peut venir de la charge de la machine
+    // (pages plus lentes, plafonds atteints). Il est rejoué une fois, seul, avant d'être déclaré ; le tableau le dit.
+    // Un échec des deux côtés est une vraie différence avec l'application d'avant : pas de rejeu.
+    if (opts.j > 1) {
+      for (const l of ordinaires) {
+        for (const c of cotes) {
+          const autre = cotes.find((x) => x !== c);
+          if (!enEchec(l.res[c]) || (autre && enEchec(l.res[autre]))) continue;
+          console.error(`[${NOM_COTE[c]}] ${l.nom} : échec à plusieurs de front, rejeu seul…`);
+          const r = await sur(l.script, c, true);
+          r.rejeu = enEchec(r) ? 'rejoué seul : échec aussi' : 'rejoué seul : réussi';
+          console.error(`[${NOM_COTE[c]}] ${l.nom} ${r.rejeu}`);
+          l.res[c] = r;
+        }
+      }
+    }
   }
 } catch (e) {
   console.error(`Passage interrompu : ${e.stack ?? e.message}`);
@@ -494,6 +514,34 @@ try {
   if (opts.nettoyerAvant && racineAvant && fs.existsSync(racineAvant) && !jonction) {
     try { git(['worktree', 'remove', '--force', racineAvant]); } catch (e) { console.error(`worktree non retiré : ${e.message}`); }
   }
+  if (commitAvant) purgerAnciennesCopies();
+}
+
+/**
+ * Retire les copies « avant » des passages précédents (`avant-<commit>` du dossier de brouillon) qui ne sont pas celle du
+ * commit comparé : sans cela chaque commit d'avant laisse sa copie du dépôt dans le dossier temporaire, à jamais.
+ * Les copies d'un autre dossier de brouillon ne sont pas touchées. La jonction vers `node_modules` est retirée avant
+ * (`git worktree remove` la traverserait), sans suppression récursive.
+ */
+function purgerAnciennesCopies() {
+  let liste;
+  try { git(['worktree', 'prune']); liste = git(['worktree', 'list', '--porcelain']); } catch (e) { console.error(`copies d'avant non listées : ${e.message}`); return; }
+  const dans = `${posix(opts.brouillon).toLowerCase()}/`;
+  const garde = racineAvant ? posix(racineAvant).toLowerCase() : null;
+  let retirees = 0;
+  for (const ligne of liste.split('\n')) {
+    if (!ligne.startsWith('worktree ')) continue;
+    const dossier = ligne.slice('worktree '.length).trim();
+    const p = posix(dossier).toLowerCase();
+    if (!p.startsWith(dans) || !/\/avant-[0-9a-f]{7,}$/.test(p) || p === garde) continue;
+    const lien = path.join(dossier, 'node_modules');
+    try {
+      if (fs.existsSync(lien)) { try { fs.unlinkSync(lien); } catch { fs.rmdirSync(lien); } }
+      git(['worktree', 'remove', '--force', dossier]);
+      retirees++;
+    } catch (e) { console.error(`copie d'avant non retirée (${dossier}) : ${e.message}`); }
+  }
+  if (retirees) console.error(`copies d'avant retirées : ${retirees} (celle de ${commitAvant.slice(0, 7)} est gardée)`);
 }
 
 // --- Tableau ---
@@ -519,6 +567,8 @@ for (const l of lignes) {
   if (ap?.statut !== 'fini' || ap.echecs || ap.code || nouvelles.length) code = 1;
   let res = resultat(ap);
   if (av && resultat(av) !== res) res += ` (avant : ${resultat(av)})`;
+  if (ap?.rejeu) res += ` (${ap.rejeu})`;
+  if (av?.rejeu) res += ` (avant, ${av.rejeu})`;
   const consoleTxt = av ? `${ap?.erreurs?.length ?? 0}${nouvelles.length ? ` (${nouvelles.length} nouv.)` : ''}` : String(ap?.erreurs?.length ?? 0);
   tableau.push([l.nom, av ? (av.reutilise ? `réutilisé (${duree(av.duree)})` : duree(av.duree ?? 0)) : '', duree(ap?.duree ?? 0), res, consoleTxt, releve]);
 }

@@ -133,7 +133,7 @@ await go('/sessions', 4000);
 console.log('FIT de course :', await importFiles(autrePath, IMPORT_INPUT));
 await waitText('laissée de côté', 'autre sport');
 check('FIT d\'un autre sport : laissé de côté, la phrase dit ce que Gtracker range',
-  await bodyHas("1 session de course, de vélo ou d'entraînement laissée de côté : Gtracker ne range que la voile et le surf."));
+  await bodyHas("1 session de course, de vélo ou d'entraînement laissée de côté : Gtracker ne range que les sessions avec ou sans vent."));
 check('FIT d\'un autre sport : rien de rangé', (await sessionFiles()).length === 2);
 
 // --- 4. Pas une activité, seul ---

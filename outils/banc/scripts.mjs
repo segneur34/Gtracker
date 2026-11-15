@@ -26,6 +26,8 @@
 const ms = [/\d+(?:[.,]\d+)? ?ms\b/g, 'N ms'];
 // Heure murale d'un repère (heure de la page au moment de la note : jamais la même d'un passage à l'autre).
 const heure = [/\b\d{2}:\d{2}:\d{2}\b/g, 'HEURE'];
+// Nom d'un fichier de session rangé à l'arrêt (`2026-11-15_19-33-13_wingfoil.gpx`) : le masque commun ne le prend pas, le `_` qui suit n'étant pas une limite de mot.
+const nomDate = [/\b\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}(?=_)/g, 'DATE'];
 
 // Comptes de rendus de `rendus.mjs` (une ligne par composant suivi et par phase, commits, composants les plus rendus).
 const rendusMasques = [[/^([A-Z]\w+ +)\d+$/gm, '$1N'], [/ : \d+ commits ---/g, ' : N commits ---'], [/^autres : .*$/gm, 'autres : …']];
@@ -75,7 +77,7 @@ export const SCRIPTS = [
   { nom: 'materiel', args: ['{port}', '{captures?}'], pages: ['surf', 'reglages'] },
   { nom: 'materiel-fin', args: ['{port}', '{travail}', '{captures?}'], pages: ['enregistrer', 'voile', 'surf'], solo: true, accelerable: true },
   { nom: 'miseajour', args: ['{port}', '{travail}', '{captures?}'], pages: ['sessions', 'reglages'] },
-  { nom: 'notes', args: ['{port}', '{travail}', '{captures?}'], pages: ['enregistrer', 'voile', 'surf'], solo: true, accelerable: true, masques: [heure] },
+  { nom: 'notes', args: ['{port}', '{travail}', '{captures?}'], pages: ['enregistrer', 'voile', 'surf'], solo: true, accelerable: true, masques: [heure, nomDate] },
   { nom: 'notification', args: ['{port}', '{travail}'], pages: ['reglages', 'enregistrer'], solo: true },
   { nom: 'onglets', args: ['{port}', '{captures?}'], pages: ['surf', 'voile', 'reglages'] },
   // Fond de l'image de partage : les tuiles d'OpenStreetMap.

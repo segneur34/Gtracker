@@ -69,6 +69,8 @@ const menuItems = () => evaluate(`(() => {
   b.click();
   return [...document.querySelectorAll('.an-sheet__head .ui-more__panel button')].map((x) => x.textContent.trim());
 })()`);
+/** Première entrée du menu « … » hors « Lieu » (le champ du lieu ouvre le menu, « Partager l'image » vient juste après). */
+const premiereAction = (items) => items?.find((x) => x !== 'Lieu');
 const openShare = async () => {
   const items = await menuItems();
   await evaluate(`[...document.querySelectorAll('.an-sheet__head .ui-more__panel button')].find((x) => x.textContent.trim() === "Partager l'image")?.click()`);
@@ -109,7 +111,7 @@ const isPortrait = (size) => size?.[0] === 1080 && size?.[1] === 1920;
 for (const s of SESSIONS) {
   await go(paths[s.page], 7000);
   const items = await openShare();
-  check(`${s.page} : « Partager » en tête du menu « … »`, items?.[0] === "Partager l'image", JSON.stringify(items));
+  check(`${s.page} : « Partager » en tête du menu « … » (après « Lieu »)`, premiereAction(items) === "Partager l'image", JSON.stringify(items));
   check(`${s.page} : fenêtre ouverte`, Boolean(await evaluate(`document.querySelector('.share-dialog[role=dialog]') !== null`)));
   check(`${s.page} : aperçu dessiné`, await waitImage());
   // Relu une fois l'image prête.
@@ -216,7 +218,7 @@ const opened = await attendreAnalyse(evaluate);
 check("fin d'enregistrement : l'analyse s'ouvre seule", opened === 'ok', opened);
 await settle({ max: 3000, label: 'analyse' });
 const endMenu = await openShare();
-check("fin d'enregistrement : « Partager l'image » en tête du « … » de l'analyse", endMenu?.[0] === "Partager l'image", JSON.stringify(endMenu));
+check("fin d'enregistrement : « Partager l'image » en tête du « … » de l'analyse", premiereAction(endMenu) === "Partager l'image", JSON.stringify(endMenu));
 check("fin d'enregistrement : aperçu dessiné", await waitImage());
 check("fin d'enregistrement : image en hauteur de 1080 × 1920", isPortrait(await imageSize()), JSON.stringify(await imageSize()));
 c = await chips();

@@ -213,7 +213,7 @@ const autreFiche = JSON.stringify({ ...SESSIONS.wing.fiche, sport: AUTRE_SPORT }
 console.log('GPX + fiche :', await importer([{ nom: 'autre.gpx', texte: SESSIONS.wing.gpx }, { nom: 'autre.json', texte: autreFiche }]));
 const phraseC1 = await phrase();
 console.log(phraseC1);
-check('GPX + fiche d\'un autre sport : laissés de côté, la phrase dit ce que Gtracker range', phraseC1 === `1 session de course, de vélo ou d'entraînement laissée de côté : ${APP_NAME} ne range que la voile et le surf.`, phraseC1);
+check('GPX + fiche d\'un autre sport : laissés de côté, la phrase dit ce que Gtracker range', phraseC1 === `1 session de course, de vélo ou d'entraînement laissée de côté : ${APP_NAME} ne range que les sessions avec ou sans vent.`, phraseC1);
 await wait(500);
 check('… rien n\'est rangé', (await records()).length === 0 && Object.keys(await sessionsDir()).length === 0);
 await go('/sessions', 4000);
