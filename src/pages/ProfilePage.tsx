@@ -19,7 +19,6 @@ import { DISTANCE_UNIT_SYMBOL, formatDecimal, formatDuration, toDisplayDistance,
 import { sessionsPath } from '../core/parentPage';
 import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { useOpenSections } from '../hooks/useOpenSections';
-import { useProfileRoot } from '../hooks/useProfileRoot';
 import { useProfileSchool } from '../hooks/useProfileSchool';
 import { DEFAULT_SCHOOL_STYLE } from '../core/schoolBasics';
 import { athleteAvatar, athleteName, athleteSchoolHidden } from '../library/athleteProfile';
@@ -30,7 +29,6 @@ import { useAppliedTheme, useThemedShade } from '../hooks/useTheme';
 import { useNow } from '../hooks/useNow';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
-import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
 import { activityShares, favoriteActivities, favoriteActivity } from '../library/profile';
 import { profilePromptGate } from '../library/profilePrompt';
 import { inBounds, profilePeriodOf, statsPeriodBounds, statsTotals } from '../library/stats';
@@ -65,9 +63,6 @@ import { dateLocale, t, tn } from '../core/i18n';
  * diffusion de l'application hors d'une démonstration faite à GONG.
  */
 
-/** La racine, cachée pour l'instant (`PROFILE_PLANT_VISIBLE`) : son dessin n'est lu que si elle se montre. */
-const ProfileRoot = lazy(() => import('../components/ProfileRoot'));
-const RootSlot = lazy(() => import('../components/ProfileRoot').then((m) => ({ default: m.RootSlot })));
 /** « Vos activités », sur ordinateur seulement : ses lignes et leurs vignettes ne pèsent pas sur le téléphone. */
 const ProfileActivities = lazy(() => import('../components/ProfileActivities'));
 /** Le banc de poissons et son eau, sous le contenu : son calcul et ses dessins ne se chargent qu'avec lui. */
@@ -86,9 +81,6 @@ const VIEW_DEFAULTS: ProfileView = { periode: 'annee' };
 
 /** Détail par activité sous l'anneau : replié au départ, état retenu sur l'appareil. */
 const DETAIL_DEFAULT = { detail: false };
-
-/** Cadres que la racine entoure (`ProfileRoot`), dans l'ordre de la page. */
-const ROOT_CARDS = ['.profile-periods', '.profile-favs','.profile-split', '.actchart'];
 
 /** Au-delà, les plus petites parts se regroupent en « Autres » : un anneau ne se lit plus. */
 const MAX_SLICES = 6;
@@ -165,11 +157,6 @@ function ProfilePage() {
 
   // Sessions classées et visibles, avec les activités de base qu'elles emploient (nom et couleur).
   const { all, activityById } = useVisibleStatSessions();
-
-  // Racine : toutes les sessions, quelle que soit la période ; son détail s'ouvre sous le carré, non retenu.
-  const root = useProfileRoot(all, profile, nowMs);
-  const [rootOpen, setRootOpen] = useState(false);
-  const closeRoot = useCallback(() => setRootOpen(false), []);
 
   // Banc de poissons : toutes les sessions de la bibliothèque (ou le réglage d'essai), quelle que soit la période.
   const school = useProfileSchool(sessions, profile);
@@ -284,11 +271,6 @@ function ProfilePage() {
             <h1 className="profile-head__title">{name ?? t('Bienvenue')}</h1>
           </div>
         </div>
-        {PROFILE_PLANT_VISIBLE && (
-          <Suspense fallback={null}>
-            <RootSlot growth={root.growth} open={rootOpen} onToggle={() => setRootOpen(!rootOpen)} />
-          </Suspense>
-        )}
       </header>
       {picking && (
         <Suspense fallback={null}>
@@ -391,12 +373,6 @@ function ProfilePage() {
       )}
 
       {sessions.length > 0 && <ActivityChart key={period} period={period} nowMs={nowMs} frame={frames.chart} />}
-      {PROFILE_PLANT_VISIBLE && (
-        <Suspense fallback={null}>
-          <ProfileRoot growth={root.growth} goalMin={root.goalMin} cardSelectors={ROOT_CARDS}
-            ready={status === 'ready' && !scanning} open={rootOpen} onClose={closeRoot} />
-        </Suspense>
-      )}
     </div>
   );
 

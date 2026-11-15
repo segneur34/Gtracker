@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fishCount, schoolPlaces, type FrameCorner, type SchoolLayout } from './fishSchool';
 import { connectedWater, WATER_RULES, waterField, waterMaps, waterOutline } from './schoolWater';
-import type { Box } from './rootPath';
+import type { Box } from './gridDistance';
 
 const box = (x: number, y: number, w: number, h: number): Box => ({ x, y, r: x + w, b: y + h });
 const CORNERS: FrameCorner[] = ['hd', 'bd', 'bg', 'hg'];

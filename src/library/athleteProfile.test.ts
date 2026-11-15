@@ -67,31 +67,29 @@ describe('athleteHrSource', () => {
 });
 
 describe('sanitizeAthleteProfile (fichier de réglages repris)', () => {
-  const GOAL = { min: 15, max: 600 };
-
   it('garde les champs valides et vide ceux hors plage ou de travers', () => {
     const p = sanitizeAthleteProfile({
       name: '  Léa ', weightKg: 62, heightCm: 1000, birthYear: '1990', sex: 'f', hrMax: 188,
       hrMaxSource: { kind: 'test', atMs: 5 }, hrRest: 10, hrRestSource: { kind: 'test', atMs: 5 },
       hrThresholds: [150, 140], economyMlKgKm: 200, rootWeeklyGoalMin: 5, autre: true,
       schoolTrialSessions: 400, schoolStyle: 'P9', schoolHidden: 'oui',
-    }, GOAL);
+    });
     expect(p).toEqual({
       name: 'Léa', avatar: null, weightKg: 62, heightCm: null, birthYear: null, sex: 'f',
       hrMax: 188, hrMaxSource: { kind: 'test', atMs: 5 }, hrRest: null, hrRestSource: null,
-      hrThresholds: null, rootWeeklyGoalMin: null, schoolTrialSessions: null, schoolStyle: null, schoolHidden: false,
+      hrThresholds: null, schoolTrialSessions: null, schoolStyle: null, schoolHidden: false,
     });
   });
 
   it('un ancien profil qui porte les champs du poisson dans son bocal se relit sans eux, le reste intact', () => {
-    const p = sanitizeAthleteProfile({ name: 'Tom', hrMax: 190, fishStyle: 'G', fishPath: 'lesDeux', fishTrialLevel: 4 }, GOAL);
+    const p = sanitizeAthleteProfile({ name: 'Tom', hrMax: 190, fishStyle: 'G', fishPath: 'lesDeux', fishTrialLevel: 4 });
     expect(p).toEqual({ ...EMPTY_ATHLETE_PROFILE, name: 'Tom', hrMax: 190, hrMaxSource: { kind: 'saisie', atMs: null } });
     expect(Object.keys(p)).not.toContain('fishStyle');
   });
 
   it('nombre de sessions d’essai du banc : un entier de 0 à 300, sinon automatique', () => {
-    expect(sanitizeAthleteProfile({ schoolTrialSessions: 0 }, GOAL).schoolTrialSessions).toBe(0);
-    expect(sanitizeAthleteProfile({ schoolTrialSessions: 150 }, GOAL).schoolTrialSessions).toBe(150);
+    expect(sanitizeAthleteProfile({ schoolTrialSessions: 0 }).schoolTrialSessions).toBe(0);
+    expect(sanitizeAthleteProfile({ schoolTrialSessions: 150 }).schoolTrialSessions).toBe(150);
     expect(athleteSchoolTrialSessions({ schoolTrialSessions: 300 })).toBe(300);
     expect(athleteSchoolTrialSessions({ schoolTrialSessions: 301 })).toBeNull();
     expect(athleteSchoolTrialSessions({ schoolTrialSessions: -1 })).toBeNull();
@@ -101,34 +99,36 @@ describe('sanitizeAthleteProfile (fichier de réglages repris)', () => {
   });
 
   it('dessin des poissons du banc : un des sept styles, sinon le style par défaut (null)', () => {
-    expect(sanitizeAthleteProfile({ schoolStyle: 'P5' }, GOAL).schoolStyle).toBe('P5');
-    expect(sanitizeAthleteProfile({ schoolStyle: 'P1' }, GOAL).schoolStyle).toBe('P1');
-    expect(sanitizeAthleteProfile({ schoolStyle: 'P8' }, GOAL).schoolStyle).toBeNull();
-    expect(sanitizeAthleteProfile({ schoolStyle: 'p4' }, GOAL).schoolStyle).toBeNull();
-    expect(sanitizeAthleteProfile({ schoolStyle: 4 }, GOAL).schoolStyle).toBeNull();
+    expect(sanitizeAthleteProfile({ schoolStyle: 'P5' }).schoolStyle).toBe('P5');
+    expect(sanitizeAthleteProfile({ schoolStyle: 'P1' }).schoolStyle).toBe('P1');
+    expect(sanitizeAthleteProfile({ schoolStyle: 'P8' }).schoolStyle).toBeNull();
+    expect(sanitizeAthleteProfile({ schoolStyle: 'p4' }).schoolStyle).toBeNull();
+    expect(sanitizeAthleteProfile({ schoolStyle: 4 }).schoolStyle).toBeNull();
     expect(athleteSchoolStyle({ schoolStyle: 'P7' })).toBe('P7');
     expect(athleteSchoolStyle({ schoolStyle: { id: 'P4' } as unknown as 'P4' })).toBeNull();
     expect(athleteSchoolStyle(EMPTY_ATHLETE_PROFILE)).toBeNull();
   });
 
   it('banc caché (« Aucun ») : seul true le cache, un ancien profil sans le champ le montre', () => {
-    expect(sanitizeAthleteProfile({ schoolHidden: true, schoolStyle: 'P2' }, GOAL)).toMatchObject({ schoolHidden: true, schoolStyle: 'P2' });
-    expect(sanitizeAthleteProfile({ name: 'Tom', schoolStyle: 'P5' }, GOAL).schoolHidden).toBe(false);
-    expect(sanitizeAthleteProfile({ schoolHidden: 1 }, GOAL).schoolHidden).toBe(false);
+    expect(sanitizeAthleteProfile({ schoolHidden: true, schoolStyle: 'P2' })).toMatchObject({ schoolHidden: true, schoolStyle: 'P2' });
+    expect(sanitizeAthleteProfile({ name: 'Tom', schoolStyle: 'P5' }).schoolHidden).toBe(false);
+    expect(sanitizeAthleteProfile({ schoolHidden: 1 }).schoolHidden).toBe(false);
     expect(athleteSchoolHidden({ schoolHidden: 'true' as unknown as boolean })).toBe(false);
     expect(athleteSchoolHidden(EMPTY_ATHLETE_PROFILE)).toBe(false);
   });
 
   it('rend un profil vide pour ce qui n’est pas un objet', () => {
-    expect(sanitizeAthleteProfile('profil', GOAL)).toEqual(EMPTY_ATHLETE_PROFILE);
-    expect(sanitizeAthleteProfile(null, GOAL)).toEqual(EMPTY_ATHLETE_PROFILE);
-    expect(sanitizeAthleteProfile([1], GOAL)).toEqual(EMPTY_ATHLETE_PROFILE);
+    expect(sanitizeAthleteProfile('profil')).toEqual(EMPTY_ATHLETE_PROFILE);
+    expect(sanitizeAthleteProfile(null)).toEqual(EMPTY_ATHLETE_PROFILE);
+    expect(sanitizeAthleteProfile([1])).toEqual(EMPTY_ATHLETE_PROFILE);
   });
 
-  it('garde des seuils valides et un objectif dans sa plage', () => {
-    const p = sanitizeAthleteProfile({ hrThresholds: [140, 165], rootWeeklyGoalMin: 120 }, GOAL);
+  it('garde des seuils valides ; l’objectif de l’ancienne racine du Profil, lu sans erreur, n’est plus repris ni réécrit', () => {
+    const p = sanitizeAthleteProfile({ name: 'Tom', hrThresholds: [140, 165], rootWeeklyGoalMin: 120 });
     expect(p.hrThresholds).toEqual([140, 165]);
-    expect(p.rootWeeklyGoalMin).toBe(120);
+    expect(p).toEqual({ ...EMPTY_ATHLETE_PROFILE, name: 'Tom', hrThresholds: [140, 165] });
+    expect(Object.keys(p)).not.toContain('rootWeeklyGoalMin');
+    expect(JSON.stringify(p)).not.toContain('rootWeeklyGoalMin');
   });
 });
 

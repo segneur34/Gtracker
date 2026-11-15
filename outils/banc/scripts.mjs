@@ -86,10 +86,6 @@ export const SCRIPTS = [
   { nom: 'prereglages', args: ['{port}', '{captures?}'], pages: ['reglages', 'voile'] },
   { nom: 'profil', args: ['{port}', '{captures?}'], pages: ['profil', 'sessions'] },
   { nom: 'pumping', args: ['{port}', '{captures?}'], pages: ['surf', 'reglages'], dev: true },
-  { nom: 'racine-periodes', args: ['{port}', '{captures?}'], pages: ['profil'],
-    manuel: 'la plante du Profil est cachée (PROFILE_PLANT_VISIBLE = false) : le script lit son texte et ses dimensions ; à rejouer en remettant la constante à true' },
-  { nom: 'racine', args: ['{port}', '{captures?}'], pages: ['profil', 'reglages'],
-    manuel: 'la plante du Profil est cachée (PROFILE_PLANT_VISIBLE = false) : le script lit son texte et ses dimensions ; à rejouer en remettant la constante à true' },
   { nom: 'reduire', args: ['{port}', '{captures?}'], pages: ['reglages', 'profil'] },
   // Rendus de React pendant un enregistrement : un verdict par plafonds larges (les comptes varient de quelques unités d'un passage à l'autre) ; les comptes imprimés sont masqués.
   { nom: 'rendus', args: ['{port}', '{travail}'], pages: ['enregistrer'], solo: true, accelerable: true, masques: rendusMasques },

@@ -2,7 +2,7 @@ import { afterAll, vi } from 'vitest';
 
 /**
  * Mise en place des tests : le fuseau est fixé avant toute date, pour que les
- * tests construits à l'heure locale (`stats`, `rootGrowth`) prouvent quelque
+ * tests construits à l'heure locale (`stats`, `activityChart`) prouvent quelque
  * chose sur une machine réglée en UTC comme ailleurs.
  */
 // Les types de node ne sont pas chargés dans le projet de l'application : `process` s'atteint par globalThis.

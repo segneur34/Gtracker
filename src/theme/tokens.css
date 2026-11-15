@@ -187,23 +187,6 @@
   --photo-bg: #003e52;
   --photo-shade: rgba(0, 0, 0, 0.5);
   --photo-shade-top: rgba(0, 0, 0, 0.3);
-  /* Racine du Profil (`components/drawRoot.ts`, lues par le canevas) : racine vivante, radicelles
-     de la période, radicelle flétrie, partie sèche, pousse, sol, graine, fleur. */
-  --root-live: #4c8a43;
-  --root-edge: #2d5a29;
-  --root-fresh: #6fbf45;
-  --root-withered: #b9a487;
-  --root-dry: #d3cab9;
-  --root-dry-edge: #b0a691;
-  --root-sprout: #3f8a3a;
-  --root-soil: #9a8570;
-  --root-seed: #8a5a32;
-  --root-flower: #f2c94c;
-  --root-flower-edge: #c99a1a;
-  --root-flower-heart: #b8641d;
-  /* Papillon de la fleur, monarque orange, ses deux dernières étapes : aplat et bord épais. */
-  --root-butterfly: #ec7a1c;
-  --root-butterfly-edge: #3a2415;
   /* Enregistrer : vert vif au repos (sous du noir, `--on-record`), rouge pendant l'enregistrement (sans texte) ;
      `--stop` porte du texte blanc (bandeau d'enregistrement, « Arrêter », bouton de danger). Les mêmes dans tous
      les thèmes. */
@@ -292,17 +275,6 @@ html:root {
   --ink-2: #d4d4d4;
   --muted: #a8a8a8;
   --faint: #7d7d7d;
-
-  /* Sol et parties sèches plus foncés, fleur gardée. */
-  --root-live: #5a9a50;
-  --root-withered: #7d6c55;
-  --root-dry: #5e5649;
-  --root-dry-edge: #4a4338;
-  --root-sprout: #4f9a48;
-  --root-soil: #5a4b3e;
-  /* Papillon un cran plus clair, bord plus sombre ; le thème économe en hérite. */
-  --root-butterfly: #ff9a45;
-  --root-butterfly-edge: #21140b;
 
   --success: #5cb860;
   --success-soft: #16301a;

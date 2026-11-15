@@ -25,7 +25,7 @@ export const PHONE_LANDSCAPE_QUERY = '(orientation: landscape) and (max-height: 
 export const SCREEN_BREAKPOINTS = {
   /** Cases de la barre du bas sans libellé, icônes seules (`AppShell.css`). */
   iconTabs: '(max-width: 339.98px)',
-  /** Profil : anneau, légende et en-tête empilés (`ProfilePage.css`, `ProfileRoot.css`, `ProfileAvatar.css`). */
+  /** Profil : anneau, légende et en-tête empilés (`ProfilePage.css`, `ProfileAvatar.css`). */
   profileStacked: '(max-width: 599px)',
   /** Profil sur ordinateur : le Profil et « Vos activités » en deux colonnes (`ProfilePage.css`). */
   profileColumns: '(min-width: 1000px)',
@@ -33,6 +33,8 @@ export const SCREEN_BREAKPOINTS = {
   recordingNarrow: '(max-width: 699.98px)',
   /** Barre du haut resserrée sur un ordinateur étroit (`AppShell.css`). */
   topbarTight: '(max-width: 1199.98px)',
+  /** Écran plus étroit que 3/4, donc en portrait : le champ de traînées n'y charge que sa bande centrale (`AppShell.css`). */
+  fieldPortrait: '(max-aspect-ratio: 3/4)',
   /** Mouvement réduit demandé au système (case du bouton glissant, `ui.css` ; animation de la racine du Profil). */
   reducedMotion: '(prefers-reduced-motion: reduce)',
   /** Survol réservé aux pointeurs qui survolent : au toucher, un `:hover` reste collé au bouton. */

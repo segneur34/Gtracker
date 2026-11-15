@@ -1,5 +1,4 @@
-import type { Box } from './rootPath';
-import { contours, gridDistances, gridOver, MinHeap, readDistance, type DistanceGrid, type Loop } from './gridDistance';
+import { contours, gridDistances, gridOver, MinHeap, readDistance, type Box, type DistanceGrid, type Loop } from './gridDistance';
 import { frameWalls, SCHOOL_RULES, smoothNoise, type SchoolFish, type SchoolLayout, type SchoolRules } from './fishSchool';
 
 /**

@@ -1,4 +1,10 @@
-import type { Box } from './rootPath';
+/** Rectangle en pixels de la page : gauche, haut, droite, bas. */
+export interface Box {
+  x: number;
+  y: number;
+  r: number;
+  b: number;
+}
 
 /**
  * Distances sur une grille de pixels, pures : le plus court chemin d'un point de départ à chaque nœud, en contournant

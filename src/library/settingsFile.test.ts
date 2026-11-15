@@ -269,6 +269,13 @@ describe('adoptedValues', () => {
     expect(adoptedValues(theirs, {})).toEqual({ [STORAGE_KEYS.athleteProfile]: { me: { ...EMPTY_ATHLETE_PROFILE, hrMax: 190, hrMaxSource: { kind: 'saisie', atMs: null } } } });
   });
 
+  it("un fichier de réglages qui porte l'objectif de l'ancienne racine du Profil s'ouvre sans erreur, sans le reprendre", () => {
+    const theirs = { [STORAGE_KEYS.athleteProfile]: { me: { name: 'Tom', rootWeeklyGoalMin: 90 } } };
+    const adopted = adoptedValues(theirs, {}) as Record<string, { me: Record<string, unknown> }>;
+    expect(adopted[STORAGE_KEYS.athleteProfile].me).toEqual({ ...EMPTY_ATHLETE_PROFILE, name: 'Tom' });
+    expect('rootWeeklyGoalMin' in adopted[STORAGE_KEYS.athleteProfile].me).toBe(false);
+  });
+
   it("ne reprend pas un profil qui n'a pas la forme attendue", () => {
     expect(checkedValues({ [STORAGE_KEYS.athleteProfile]: 'abîmé', [STORAGE_KEYS.sportSettings]: {} })).toEqual({ [STORAGE_KEYS.sportSettings]: {} });
   });

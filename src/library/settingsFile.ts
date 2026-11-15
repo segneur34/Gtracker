@@ -2,7 +2,6 @@ import { readActivities } from '../core/activities';
 import { isObject, parseJson, stringifyJson } from '../core/basics';
 import { t } from '../core/i18n';
 import { sanitizeAthleteProfile } from './athleteProfile';
-import { ROOT_GOAL } from './rootGrowth';
 import { STORAGE_KEYS, FILE_FORMATS } from '../core/appIdentity';
 
 /**
@@ -268,7 +267,7 @@ export const checkedValues = (values: Record<string, unknown>): Record<string, u
   if (!(key in values)) return values;
   const { [key]: profiles, ...rest } = values;
   if (!isObject(profiles)) return rest;
-  return { ...rest, [key]: Object.fromEntries(Object.entries(profiles).map(([k, v]) => [k, sanitizeAthleteProfile(v, ROOT_GOAL)])) };
+  return { ...rest, [key]: Object.fromEntries(Object.entries(profiles).map(([k, v]) => [k, sanitizeAthleteProfile(v)])) };
 };
 
 /**

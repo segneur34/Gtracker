@@ -1,16 +1,14 @@
 import { inRange } from '../core/basics';
 import { ATHLETE_BOUNDS, athleteName, SCHOOL_TRIAL_BOUNDS, type AthleteNumberField, type AthleteProfile } from './athleteProfile';
-import { ROOT_GOAL } from './rootGrowth';
 
 /**
  * Règles du Profil liées à la mémoire et aux cartes d'ouverture, pures :
- * objectif de la racine, champs que le pop-up demande, et quand il s'ouvre.
+ * champs que le pop-up demande, et quand il s'ouvre.
  */
 
-/** Plages plausibles de chaque champ numérique du Profil, objectif de la racine et réglage d'essai du banc de poissons compris. */
+/** Plages plausibles de chaque champ numérique du Profil, réglage d'essai du banc de poissons compris. */
 const PROFILE_BOUNDS: Record<AthleteNumberField, [number, number]> = {
   ...ATHLETE_BOUNDS,
-  rootWeeklyGoalMin: [ROOT_GOAL.min, ROOT_GOAL.max],
   schoolTrialSessions: SCHOOL_TRIAL_BOUNDS,
 };
 
@@ -21,18 +19,6 @@ const INTEGER_FIELDS: ReadonlySet<AthleteNumberField> = new Set(['schoolTrialSes
 export const validProfileNumber = (field: AthleteNumberField, raw: unknown): boolean => {
   const [lo, hi] = PROFILE_BOUNDS[field];
   return inRange(raw, lo, hi) && (!INTEGER_FIELDS.has(field) || Number.isInteger(raw));
-};
-
-/**
- * Objectif par semaine de la racine du Profil, `ROOT_GOAL.defaultMin` à défaut ;
- * relu avec contrôle (fichier de réglages importé) : une valeur hors plage est
- * ignorée. Les anciens réglages de la racine (période, tour, recul, objectif
- * par période d'essai) sont sans effet.
- */
-export const athleteRootGoalMin = (profile: Partial<Pick<AthleteProfile, 'rootWeeklyGoalMin'>>): number => {
-  const raw: unknown = profile.rootWeeklyGoalMin;
-  const [lo, hi] = PROFILE_BOUNDS.rootWeeklyGoalMin;
-  return inRange(raw, lo, hi) ? raw : ROOT_GOAL.defaultMin;
 };
 
 /**

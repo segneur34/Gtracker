@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contours, distanceSlope, gridDistances, gridOver, readDistance } from './gridDistance';
-import type { Box } from './rootPath';
+import { contours, distanceSlope, gridDistances, gridOver, readDistance, type Box } from './gridDistance';
 
 const box = (x: number, y: number, w: number, h: number): Box => ({ x, y, r: x + w, b: y + h });
 const SPEC = gridOver(box(0, 0, 100, 100), 2);

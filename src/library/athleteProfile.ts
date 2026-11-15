@@ -8,7 +8,7 @@ import { SCHOOL_TRIAL_MAX, isSchoolStyle, type SchoolStyle } from '../core/schoo
  * Profil du pratiquant, pur : sa forme, ses champs relus avec
  * contrôle (fichier de réglages importé, ancien profil), son âge et ses zones
  * cardiaques. Le magasin et ses écritures restent dans `hooks/useAthleteProfile.ts`,
- * les règles du pop-up et de la racine dans `library/profile.ts`.
+ * les règles du pop-up dans `library/profilePrompt.ts`.
  */
 
 /**
@@ -56,8 +56,6 @@ export interface AthleteProfile {
   hrRestSource: HrSource | null;
   /** Seuils S1 et S2 saisis à la main (test en laboratoire), en bpm ; `null` : calculés. */
   hrThresholds: number[] | null;
-  /** Racine du Profil (`library/rootGrowth.ts`) : objectif par semaine, en minutes ; `null` : `ROOT_GOAL.defaultMin`. */
-  rootWeeklyGoalMin: number | null;
   /**
    * Banc de poissons du Profil (`core/fishSchool.ts`) : nombre de sessions imposé, entier de 0 à `SCHOOL_TRIAL_MAX`,
    * réglage d'essai provisoire ; `null` : le vrai compte des sessions.
@@ -81,7 +79,6 @@ export const EMPTY_ATHLETE_PROFILE: AthleteProfile = {
   hrRest: null,
   hrRestSource: null,
   hrThresholds: null,
-  rootWeeklyGoalMin: null,
   schoolTrialSessions: null,
   schoolStyle: null,
   schoolHidden: false,
@@ -92,7 +89,7 @@ export type AthleteNumberField = Exclude<keyof AthleteProfile,
   'name' | 'avatar' | 'sex' | 'hrThresholds' | 'hrMaxSource' | 'hrRestSource' | 'schoolStyle' | 'schoolHidden'>;
 
 /** Champs numériques du Profil dont la plage n'est pas dans `ATHLETE_BOUNDS` (`library/profilePrompt.ts`). */
-type ProfileOnlyNumberField = 'rootWeeklyGoalMin' | 'schoolTrialSessions';
+type ProfileOnlyNumberField = 'schoolTrialSessions';
 
 /** Plage du nombre de sessions imposé au banc de poissons (réglage d'essai). */
 export const SCHOOL_TRIAL_BOUNDS: [number, number] = [0, SCHOOL_TRIAL_MAX];
@@ -138,7 +135,7 @@ export const athleteSchoolHidden = (profile: Partial<Pick<AthleteProfile, 'schoo
   return raw === true;
 };
 
-/** Plages plausibles des champs numériques du pratiquant (celles de l'objectif de la racine et du réglage d'essai du banc : `library/profilePrompt.ts`). */
+/** Plages plausibles des champs numériques du pratiquant (celle du réglage d'essai du banc : `library/profilePrompt.ts`). */
 export const ATHLETE_BOUNDS: Record<Exclude<AthleteNumberField, ProfileOnlyNumberField>, [number, number]> = {
   weightKg: [20, 300],
   heightCm: [100, 250],
@@ -180,12 +177,12 @@ export const athleteHeartRateZones = (profile: AthleteProfile, heartRate: HeartR
 
 /**
  * Profil relu champ par champ (fichier de réglages d'un autre appareil, lot
- * 143) : un champ d'une forme inattendue ou hors de sa plage (`ATHLETE_BOUNDS`,
- * `rootGoal` pour l'objectif de la racine, `ROOT_GOAL` de `library/rootGrowth.ts`
- * passé par l'appelant) est remis à vide, jamais repris tel quel ; un champ
- * inconnu, celui d'une ancienne version compris, est écarté.
+ * 143) : un champ d'une forme inattendue ou hors de sa plage (`ATHLETE_BOUNDS`)
+ * est remis à vide, jamais repris tel quel ; un champ inconnu, celui d'une
+ * ancienne version compris (l'objectif de l'ancienne racine du Profil, par
+ * exemple), est écarté et n'est plus réécrit.
  */
-export const sanitizeAthleteProfile = (raw: unknown, rootGoal: { min: number; max: number }): AthleteProfile => {
+export const sanitizeAthleteProfile = (raw: unknown): AthleteProfile => {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { ...EMPTY_ATHLETE_PROFILE };
   const p = raw as Partial<Record<keyof AthleteProfile, unknown>>;
   const bounded = (field: Exclude<AthleteNumberField, ProfileOnlyNumberField>): number | null => {
@@ -209,7 +206,6 @@ export const sanitizeAthleteProfile = (raw: unknown, rootGoal: { min: number; ma
     hrRest,
     hrRestSource: athleteHrSource(forSource, 'hrRest'),
     hrThresholds: isValidThresholds(thresholds) ? thresholds : null,
-    rootWeeklyGoalMin: inRange(p.rootWeeklyGoalMin, rootGoal.min, rootGoal.max) ? p.rootWeeklyGoalMin : null,
     schoolTrialSessions: athleteSchoolTrialSessions({ schoolTrialSessions: p.schoolTrialSessions as number | null }),
     schoolStyle: athleteSchoolStyle({ schoolStyle: p.schoolStyle as SchoolStyle | null }),
     schoolHidden: athleteSchoolHidden({ schoolHidden: p.schoolHidden as boolean }),
@@ -221,8 +217,8 @@ export const sanitizeAthleteProfile = (raw: unknown, rootGoal: { min: number; ma
  * (il peut venir du fichier de réglages d'un autre appareil) : seul le nom reste
  * tel que tapé, espaces de fin compris, pour la frappe en cours dans son champ.
  */
-export const storedAthleteProfile = (raw: unknown, rootGoal: { min: number; max: number }): AthleteProfile => {
-  const profile = sanitizeAthleteProfile(raw, rootGoal);
+export const storedAthleteProfile = (raw: unknown): AthleteProfile => {
+  const profile = sanitizeAthleteProfile(raw);
   const name = (raw as { name?: unknown } | null)?.name;
   return typeof name === 'string' && profile.name !== null ? { ...profile, name: name.slice(0, ATHLETE_NAME_MAX) } : profile;
 };

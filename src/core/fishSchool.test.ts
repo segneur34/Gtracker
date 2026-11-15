@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
   brushCorner, brushDoor, createSchoolPlanner, fishCount, fishShape, fishSize, frameWalls, isSchoolStyle, schoolLayoutKey,
-  schoolPlaces, SCHOOL_RULES, SCHOOL_STYLES, sessionOfFish, type FrameCorner, type SchoolFish, type SchoolFrame, type SchoolLayout,
+  schoolPlaces, SCHOOL_RULES, SCHOOL_STYLES, seededRandom, sessionOfFish, type FrameCorner, type SchoolFish, type SchoolFrame, type SchoolLayout,
 } from './fishSchool';
 import { waterOutline } from './schoolWater';
-import type { Box } from './rootPath';
+import type { Box } from './gridDistance';
+
+describe('seededRandom', () => {
+  it('la même graine rend la même suite, dans [0, 1[ ; deux graines rendent deux suites', () => {
+    const a = seededRandom(42);
+    const b = seededRandom(42);
+    const suite = Array.from({ length: 20 }, () => a());
+    expect(suite).toEqual(Array.from({ length: 20 }, () => b()));
+    expect(suite.every((v) => v >= 0 && v < 1)).toBe(true);
+    expect(seededRandom(43)()).not.toBe(suite[0]);
+  });
+});
 
 const box = (x: number, y: number, w: number, h: number): Box => ({ x, y, r: x + w, b: y + h });
 const CORNERS: FrameCorner[] = ['hd', 'bd', 'bg', 'hg'];

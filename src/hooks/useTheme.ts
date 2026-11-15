@@ -60,7 +60,7 @@ export const startTheme = (): void => {
   });
 };
 
-/** Thème posé (clair ou sombre, économe ou non), suivi en direct : pour ce qui se dessine en JavaScript (racine du Profil). */
+/** Thème posé (clair ou sombre, économe ou non), suivi en direct : pour ce qui se dessine en JavaScript (couleurs d'activité, banc de poissons). */
 export const useAppliedTheme = (): AppliedTheme => useSyncExternalStore(listeners.subscribe, () => applied);
 
 /** Couleur d'activité à afficher selon le thème posé (`shadeForTheme`) ; la fiche garde la couleur claire. */

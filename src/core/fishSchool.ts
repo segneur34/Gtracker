@@ -1,6 +1,17 @@
-import { seededRandom, type Box } from './rootPath';
-import { distanceSlope, gridDistances, gridOver, readDistance, type DistanceGrid } from './gridDistance';
+import { distanceSlope, gridDistances, gridOver, readDistance, type Box, type DistanceGrid } from './gridDistance';
 import { SCHOOL_COUNT, type SchoolCount } from './schoolBasics';
+
+/** Hasard reproductible : la même graine rend toujours la même suite de nombres de [0, 1[. */
+export const seededRandom = (seed: number) => {
+  let a = seed;
+  return (): number => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
 
 export {
   DEFAULT_SCHOOL_STYLE, fishCount, isSchoolStyle, SCHOOL_COUNT, SCHOOL_STYLES, SCHOOL_TRIAL_MAX, sessionOfFish,

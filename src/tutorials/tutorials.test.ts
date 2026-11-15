@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
 import { LESSONS, type Lesson } from './lessons';
 import {
   EMPTY_TUTORIAL_STATE, TUTORIAL_DAYS_MAX, TUTORIAL_OF_DAY_VISIBLE, dayIndexOf, dayKey, dismissToday, lessonOfDay, markOpened, markRead,
@@ -20,8 +19,7 @@ describe('programme des tutoriels', () => {
     }
   });
 
-  it('plante du Profil cachée : aucune leçon ne la cite', () => {
-    expect(PROFILE_PLANT_VISIBLE).toBe(false);
+  it('la plante du Profil est retirée : aucune leçon ne la cite', () => {
     const texte = LESSONS.flatMap((l) => [l.title, l.hook, ...l.body]).join(' ').toLowerCase();
     expect(texte).not.toMatch(/racine|fleur|papillon|objectif par semaine/);
   });

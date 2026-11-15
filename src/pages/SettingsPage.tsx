@@ -28,8 +28,6 @@ import {
   athleteHeartRateZones, athleteHrSource, type AthleteNumberField, type AthleteProfile,
 } from '../library/athleteProfile';
 import { useAthleteProfile } from '../hooks/useAthleteProfile';
-import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
-import { ROOT_GOAL } from '../library/rootGrowth';
 import { zoneLabel } from '../components/heartRateColors';
 import { hrSourceLabel } from '../components/heartRateOrigin';
 import Button from '../components/ui/Button';
@@ -652,9 +650,7 @@ function SettingsPage() {
       <div className="set-cards brush-panels brush-panels--hair" style={brush}>
       <div style={cardStyle}>
         <BlockTitle label={t('Pratiquant')} open={open.pratiquant} onToggle={() => toggle('pratiquant')} helpKey="pratiquant"
-          help={PROFILE_PLANT_VISIBLE
-            ? t("Pour l'énergie estimée des analyses, les zones cardiaques de toutes les activités, et la racine du Profil. Tout est facultatif.")
-            : t("Pour l'énergie estimée des analyses, les zones cardiaques de toutes les activités. Tout est facultatif.")} />
+          help={t("Pour l'énergie estimée des analyses, les zones cardiaques de toutes les activités. Tout est facultatif.")} />
         {open.pratiquant && (
           <div className="settings-block__body">
             {/* Les réglages de l'écran Profil, les mêmes que dans la fenêtre de sa photo ronde. */}
@@ -680,14 +676,6 @@ function SettingsPage() {
               before={<Link to={RESTING_HR_PATH} className="ui-btn ui-btn--secondary ui-btn--s set-test-btn" aria-label={t('Test de FC repos')}>{t('Test')}</Link>}
               helpKey="pratiquant:fc-repos" help={t('Avec la FC max, les seuils se calculent sur la réserve cardiaque, plus juste. Le bouton Test la mesure avec la ceinture.')} />
             <HeartRateThresholdsField profile={profile} onChange={setThresholds} />
-            {PROFILE_PLANT_VISIBLE && (
-              <>
-                <p className="ui-eyebrow set-subhead">{t('Racine du Profil')}</p>
-                <NumberField label={t('Objectif par semaine')} unit="min" min={ROOT_GOAL.min} max={ROOT_GOAL.max} value={profile.rootWeeklyGoalMin} onCommit={profileField('rootWeeklyGoalMin')}
-                  placeholder={String(ROOT_GOAL.defaultMin)} helpKey="pratiquant:racine-objectif"
-                  help={t("Temps d'activité, toutes activités confondues, à faire du lundi au dimanche (de {min} min à {max} h) : la semaine tenue, la racine gagne une étape, et fait le tour du Profil en 26 semaines. Semaines manquées d'affilée : −3 étapes, puis −6, puis retour à la graine.", { min: ROOT_GOAL.min, max: ROOT_GOAL.max / 60 })} />
-              </>
-            )}
           </div>
         )}
       </div>

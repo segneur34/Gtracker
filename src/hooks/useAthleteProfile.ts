@@ -3,7 +3,6 @@ import type { Activity } from '../core/activities';
 import { isValidThresholds, type HeartRateZones } from '../core/heartRate';
 import { getSportProfile } from '../core/sportProfiles';
 import { validProfileNumber } from '../library/profilePrompt';
-import { ROOT_GOAL } from '../library/rootGrowth';
 import { isSchoolStyle, type SchoolStyle } from '../core/schoolBasics';
 import {
   EMPTY_ATHLETE_PROFILE, ATHLETE_NAME_MAX, athleteAge, athleteAvatar, athleteHeartRateZones, storedAthleteProfile,
@@ -25,7 +24,7 @@ const NAMESPACE = STORAGE_KEYS.athleteProfile;
 const KEY = 'me';
 
 /** Relecture contrôlée du profil rangé : il voyage par le fichier de réglages, d'où il peut revenir abîmé. */
-const readStored = (raw: unknown): AthleteProfile => storedAthleteProfile(raw, ROOT_GOAL);
+const readStored = (raw: unknown): AthleteProfile => storedAthleteProfile(raw);
 
 /** Profil du pratiquant, hors composant (statistiques du direct). */
 export const readAthleteProfile = (): AthleteProfile => readStoredRecord(NAMESPACE, KEY, EMPTY_ATHLETE_PROFILE, readStored);

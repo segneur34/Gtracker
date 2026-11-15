@@ -1,4 +1,4 @@
-import type { Box } from '../../core/rootPath';
+import type { Box } from '../../core/gridDistance';
 import { brushCorner, schoolLayoutKey, type SchoolFrame, type SchoolLayout } from '../../core/fishSchool';
 
 /**

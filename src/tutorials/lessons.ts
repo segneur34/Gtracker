@@ -1,5 +1,4 @@
 import type { SportFamily } from '../core/sportProfiles';
-import { PROFILE_PLANT_VISIBLE } from '../core/profilePlant';
 import { t } from '../core/i18n';
 
 /**
@@ -103,27 +102,16 @@ export const LESSONS: readonly Lesson[] = [
   {
     id: 'profil',
     title: t('Le Profil'),
-    hook: PROFILE_PLANT_VISIBLE
-      ? t('La racine qui pousse à chaque semaine tenue, et sa fleur.')
-      : t("La page où s'ouvre l'application : votre photo, vos chiffres et le temps par activité."),
+    hook: t("La page où s'ouvre l'application : votre photo, vos chiffres et le temps par activité."),
     icon: 'profil',
     target: '/profil',
-    body: PROFILE_PLANT_VISIBLE
-      ? [
-        t("L'application s'ouvre sur le Profil ; vos sessions sont juste à côté, dans « Sessions »."),
-        t('Le Profil résume vos activités sur la période choisie : vos trois activités favorites, la distance et le temps par activité.'),
-        t('Autour des cadres pousse une racine : elle gagne une étape à chaque semaine où vous tenez votre objectif, et fait le tour de la page en 26 semaines. Des semaines manquées la font reculer.'),
-        t("Au-dessus du sol, la pousse fleurit avec le temps de la semaine : un bouton, une fleur ouverte à l'objectif, épanouie à 4 fois l'objectif ; au-delà, un papillon arrive à côté d'elle, puis s'y pose."),
-        t('Touchez le carré à droite du pseudo : une bulle dit où vous en êtes et ce qu\'il reste à faire.'),
-        t("L'objectif par semaine se règle dans Réglages › Pratiquant (45 min au départ)."),
-      ]
-      : [
-        t("L'application s'ouvre sur le Profil. Vos sessions sont juste à côté : « Sessions », la case voisine de la barre du bas, ou le lien du haut sur ordinateur."),
-        t('Le Profil résume vos activités sur la période choisie : vos trois activités favorites, la distance et le temps par activité.'),
-        t('La photo ronde est vide au départ : touchez-la pour choisir un des logos d\'activité, ou une image de votre téléphone ; « Retirer » la vide de nouveau. Le pseudo se règle dans Réglages › Pratiquant.'),
-        t('Une seule période pour toute la page : semaine, 30 jours, 6 mois, année ou depuis le début.'),
-        t("Sur ordinateur, « Vos activités » se tient à droite avec vos cinq dernières sessions : touchez le logo d'une activité pour ne voir que les siennes ; « Toutes les sessions » ouvre la liste entière."),
-      ],
+    body: [
+      t("L'application s'ouvre sur le Profil. Vos sessions sont juste à côté : « Sessions », la case voisine de la barre du bas, ou le lien du haut sur ordinateur."),
+      t('Le Profil résume vos activités sur la période choisie : vos trois activités favorites, la distance et le temps par activité.'),
+      t('La photo ronde est vide au départ : touchez-la pour choisir un des logos d\'activité, ou une image de votre téléphone ; « Retirer » la vide de nouveau. Le pseudo se règle dans Réglages › Pratiquant.'),
+      t('Une seule période pour toute la page : semaine, 30 jours, 6 mois, année ou depuis le début.'),
+      t("Sur ordinateur, « Vos activités » se tient à droite avec vos cinq dernières sessions : touchez le logo d'une activité pour ne voir que les siennes ; « Toutes les sessions » ouvre la liste entière."),
+    ],
   },
   {
     id: 'notes',
