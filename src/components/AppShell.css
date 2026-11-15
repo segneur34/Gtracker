@@ -23,18 +23,32 @@
  * dans la WebView), qui couvre l'écran droit comme tourné et la fenêtre d'ordinateur, sans prendre les touchers. Un
  * contenu à fond plein (barres, cartes, vues en plein écran, enregistrement) le cache ; les cadres et les blocs de texte
  * le voilent (`--field-veil`, `tokens.css`). L'image est claire le jour, sombre la nuit ; Économe n'en met pas.
+ * Images WebP tirées telles quelles des SVG sources (`outils/champ/rendre.mjs`, qui dit pourquoi elles sont posées sur
+ * le fond de la page) : un SVG de dix-sept mille traits se redessinait à chaque démarrage, rotation et changement de thème.
  */
 .shell-field {
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: url('../assets/champ/champ-clair.svg') center / cover no-repeat;
+  background: url('../assets/champ/champ-clair.webp') center / cover no-repeat;
   opacity: var(--field-opacity);
 }
 
 :root[data-theme='dark'] .shell-field {
-  background-image: url('../assets/champ/champ-sombre.svg');
+  background-image: url('../assets/champ/champ-sombre.webp');
+}
+
+/* Écran plus étroit que 3/4, donc en portrait (`SCREEN_BREAKPOINTS.fieldPortrait`) : `cover` n'y montre que la bande
+   centrale de rapport 3/4, qui est toute l'image `-portrait`, au même cadrage ; les pixels jamais vus ne sont pas chargés. */
+@media (max-aspect-ratio: 3/4) {
+  .shell-field {
+    background-image: url('../assets/champ/champ-clair-portrait.webp');
+  }
+
+  :root[data-theme='dark'] .shell-field {
+    background-image: url('../assets/champ/champ-sombre-portrait.webp');
+  }
 }
 
 :root[data-eco] .shell-field,
