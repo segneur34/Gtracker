@@ -204,7 +204,7 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
           <ShareDialog
             family={share.family}
             file={file}
-            activityId={record.activityId ?? record.sport ?? share.family}
+            activityId={namedActivity?.id ?? record.sport ?? share.family}
             title={labels.title}
             subtitle={labels.subtitle}
             fileName={safeFileName(labels.baseName)}

@@ -65,12 +65,15 @@ export const noteSettingsGestures = (adopted = false): void => {
 };
 
 /**
- * Activité dont un geste s'applique à une session : la sienne, ou la première de son calcul sans activité
- * choisie ; `null` si son activité a été supprimée : elle ne suit plus aucun geste et garde ce qu'elle porte.
+ * Activité dont un geste s'applique à une session : celle sous laquelle elle est rangée (`sessionActivity` :
+ * la sienne, l'activité de départ de son calcul si la sienne a disparu, la première de son calcul sans
+ * activité choisie) ; `null` si aucune n'existe plus dans la liste : elle ne suit plus aucun geste et garde
+ * ce qu'elle porte.
  */
 const gestureActivityId = (sport: SportType, activityId: string | null | undefined): string | null => {
-  if (!activityId) return activityOfSession(sport, null).id;
-  return readStoredActivities().some((a) => a.id === activityId && a.base === sport) ? activityId : null;
+  const found = activityOfSession(sport, activityId);
+  if (!activityId) return found.id;
+  return readStoredActivities().some((a) => a.id === found.id) ? found.id : null;
 };
 
 /**

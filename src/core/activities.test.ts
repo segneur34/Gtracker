@@ -185,8 +185,18 @@ describe('sessionActivity', () => {
     expect(sessionActivity(activities, 'a-moth', 'wingfoil')).toBe(moth);
   });
 
-  it("une activité supprimée laisse la session sous le nom de son calcul", () => {
-    expect(sessionActivity(activities, 'a-supprimee', 'wingfoil')).toEqual(baseActivity('wingfoil'));
+  it("une activité supprimée rattache la session à l'activité de départ de son calcul, si elle existe", () => {
+    expect(sessionActivity(activities, 'a-supprimee', 'wingfoil')).toBe(voile);
+  });
+
+  it("une activité supprimée sans activité de départ laisse la session sous le nom de son calcul", () => {
+    expect(sessionActivity([moth, paddle], 'a-supprimee', 'wingfoil')).toEqual(baseActivity('wingfoil'));
+    expect(sessionActivity(activities, 'a-supprimee', 'kite')).toEqual(baseActivity('kite'));
+  });
+
+  it("une activité de départ recolorée donne sa couleur aux sessions d'une activité disparue", () => {
+    const violette = { ...voile, color: '#6236c9' };
+    expect(sessionActivity([violette, moth], 'a-wingfoil', 'wingfoil')?.color).toBe('#6236c9');
   });
 
   it("une fiche sans activité va à l'activité de même identifiant que son calcul, sinon à la première de ce calcul", () => {
@@ -200,7 +210,8 @@ describe('sessionActivity', () => {
   });
 
   it("n'accepte pas une activité d'un autre calcul", () => {
-    expect(sessionActivity(activities, 'a-paddle', 'wingfoil')).toEqual(baseActivity('wingfoil'));
+    expect(sessionActivity(activities, 'a-paddle', 'wingfoil')).toBe(voile);
+    expect(sessionActivity([moth, paddle], 'a-paddle', 'wingfoil')).toEqual(baseActivity('wingfoil'));
   });
 });
 

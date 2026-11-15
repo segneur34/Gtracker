@@ -373,11 +373,14 @@ export const findActivity = (activities: Activity[], id: string | null | undefin
 /**
  * Activité d'une session, d'après sa fiche.
  * - Elle en désigne une qui existe : celle-là.
- * - Elle en désigne une supprimée depuis : l'activité de base de son calcul
- *   (les sessions restent, sous le nom du calcul).
+ * - Elle en désigne une qui n'existe plus, ou d'un autre calcul que la session :
+ *   l'activité de départ de son calcul (celle dont l'identifiant est le calcul)
+ *   si elle existe encore, avec son nom, sa couleur et ses réglages ; sinon
+ *   l'activité de base (les sessions restent, sous le nom du calcul).
  * - Elle n'en désigne aucune (fiche d'avant les activités, import) : la
  *   première activité de son calcul, sinon l'activité de base.
  * - Sans calcul (session à classer) : `null`.
+ * Rien n'est réécrit dans la fiche : la règle joue à la lecture.
  */
 export const sessionActivity = (
   activities: Activity[],
@@ -387,7 +390,8 @@ export const sessionActivity = (
   if (sport === null) return null;
   if (activityId) {
     const chosen = activities.find((a) => a.id === activityId);
-    return chosen && chosen.base === sport ? chosen : baseActivity(sport);
+    if (chosen && chosen.base === sport) return chosen;
+    return activities.find((a) => a.id === sport) ?? baseActivity(sport);
   }
   return activities.find((a) => a.id === sport) ?? activities.find((a) => a.base === sport) ?? baseActivity(sport);
 };
