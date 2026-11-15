@@ -90,6 +90,21 @@ Essais 277 à 279 remis à plus tard (pluie, 15/11) : les parties suivantes se c
 - Partie C : étapes 3, 4 et 6 (`platform/`, enregistreur, retrait du greffon tiers).
 - Puis le banc, l'APK et les essais.
 
+### Partie B, livrée (Java seul, le greffon tiers encore en service)
+
+Classes : `RecordingService.java` (service, notification, veille et garde détachées), `FixLog.java` (journal natif `recording-fixes.jsonl`, dossier privé hors sauvegarde), `RecordingPlugin.java` (greffon `Recording`), `GpsLostWatch.java` et `ClosedGuard.java` (machines pures, JUnit). Le contrat de chaque méthode est en commentaire dans `RecordingPlugin.java`. Ce qui s'écarte du plan ou le précise, à savoir pour la partie C :
+
+- Localisation du téléphone coupée : `start` ne refuse plus, le service démarre et l'événement `error` (`LOCATION_DISABLED`) le dit une fois ; les positions arrivent seules quand elle est rendue. La boucle de relance toutes les 2 s de `platform/location.ts` n'a plus lieu d'être.
+- `currentPosition` écoute le GPS sans service ni notification, et reste possible pendant un enregistrement : le détenteur unique du service (`nativeHolder`) et le refus « Position suivie par l'enregistrement » peuvent partir.
+- La page est « là » quand elle écoute l'événement `fix` : elle doit s'y abonner avant `start`. Une recharge de la page retire ses écouteurs (Capacitor) : le service la tient pour absente jusqu'à ce qu'elle se rebranche.
+- `start` sur la session déjà en cours ne relance rien et ne démarre aucun service (possible hors du premier plan) : il ne fait que reprendre les textes.
+- Fin de fichier rendue par `readLog(afterMs)` : à partir de la dernière position qui précède la première position postérieure à `afterMs` (et non la dernière du fichier qui ne dépasse pas `afterMs`) : une position ancienne redonnée tard par le téléphone ferait sinon sauter des positions neuves. C'est exactement ce que `replayStart` relit.
+- Garde : une position dont l'incertitude dépasse le rayon ne déplace pas l'ancrage ; sans aucune position, le compte « sur place » court depuis la fermeture.
+- Relance du GPS muet : 60 s puis 10 s de coupure, constantes du service, celles du greffon tiers.
+- Manifeste : `uses-feature android.hardware.location.gps` repris du manifeste du greffon tiers, pour que rien ne change à son retrait.
+- Le canal de notification garde son identifiant et lit encore le texte `capacitor_background_geolocation_notification_channel_name` de `strings.xml` ; à renommer en partie C si on veut, avec `RecordingService.ensureChannel`.
+- `docs/INVENTAIRE.md` doit citer les cinq classes neuves, sans quoi `verif.mjs` signale la carte des fichiers.
+
 ### Non vérifié
 
 Le comportement de HyperOS au balayage avec un service au premier plan (essai 277, démarrage automatique et batterie « Aucune restriction » réglés) ; si l'ancien pont reste nécessaire sans le greffon ; le formulaire exact de la Play Console.

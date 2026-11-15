@@ -84,6 +84,14 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
+        <!-- Service de l'enregistrement (RecordingService) : au premier plan, de type position, démarré seulement par
+             l'application visible. stopWithTask="false" : balayer l'application hors des applications récentes ne l'arrête pas. -->
+        <service
+            android:name=".RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="location"
+            android:stopWithTask="false" />
+
         <!-- Marqueur `tools:node="remove"` : à la fusion des manifestes, il retire le récepteur du greffon GPS, qui ne restaure au démarrage que des zones de géorepérage, jamais créées ici. -->
         <receiver
             android:name="com.capgo.capacitor_background_geolocation.GeofenceBootReceiver"
@@ -95,11 +103,17 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Vibrations du guidage vers les balises (BeeperPlugin) : permission normale, sans demande. -->
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- Enregistrement : service GPS au premier plan (déclaré par son greffon), processeur éveillé, notification lisible
-         écran verrouillé (RecordingNotificationPlugin). -->
+    <!-- Enregistrement : position du GPS, demandée à l'utilisateur, service au premier plan de type position
+         (RecordingService), processeur éveillé, notification lisible écran verrouillé (RecordingNotificationPlugin).
+         Jamais la position « toujours » : le service ne démarre que depuis l'application visible. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- L'application ne sert à rien sans GPS : même exigence que celle du greffon de position d'avant. -->
+    <uses-feature android:name="android.hardware.location.gps" />
     <!-- « Réessayer » du GPS (GnssPlugin) : recharger les données d'aide au GPS, sans jamais les effacer ; permission
          normale, sans demande. -->
     <uses-permission android:name="android.permission.ACCESS_LOCATION_EXTRA_COMMANDS" />

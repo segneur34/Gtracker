@@ -63,6 +63,43 @@ describe('manifeste Android : retraits', () => {
   });
 });
 
+describe("manifeste Android : service de l'enregistrement", () => {
+  const service = tagWithName(MANIFEST, 'service', '.RecordingService') ?? '';
+
+  it('déclaré chez nous, fermé aux autres applications, de type position', () => {
+    expect(service).toContain('android:exported="false"');
+    expect(service).toContain('android:foregroundServiceType="location"');
+  });
+
+  it("balayer l'application hors des applications récentes ne l'arrête pas", () => {
+    expect(service).toContain('android:stopWithTask="false"');
+  });
+
+  it('la classe déclarée existe, est un service, et Android ne la relance jamais seul', () => {
+    const java = repoFile('android/app/src/main/java/io/github/segneur/gtracker/RecordingService.java');
+    expect(java).toContain('public class RecordingService extends Service');
+    expect(java).toContain('return START_NOT_STICKY;');
+    expect(java).not.toMatch(/return START_(STICKY|REDELIVER_INTENT);/);
+  });
+
+  it.each(['ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION', 'FOREGROUND_SERVICE', 'FOREGROUND_SERVICE_LOCATION'])(
+    'déclare %s sans compter sur le manifeste d\'un greffon',
+    (name) => {
+      const tag = tagWithName(MANIFEST, 'uses-permission', `android.permission.${name}`);
+      expect(tag).toBeDefined();
+      expect(tag).not.toContain('tools:node');
+    },
+  );
+
+  it('ne demande jamais la position « toujours » : le service ne démarre que depuis l\'application visible', () => {
+    expect(MANIFEST).not.toContain('ACCESS_BACKGROUND_LOCATION');
+  });
+
+  it('un seul service déclaré ici', () => {
+    expect(MANIFEST.match(/<service\b/g)).toHaveLength(1);
+  });
+});
+
 describe('manifeste Android : ce qui reste', () => {
   it.each(['FOREGROUND_SERVICE', 'WAKE_LOCK', 'POST_NOTIFICATIONS'])("garde %s : service GPS et notification de l'enregistrement", (name) => {
     expect(tagWithName(MANIFEST, 'uses-permission', `android.permission.${name}`)).toBeDefined();
