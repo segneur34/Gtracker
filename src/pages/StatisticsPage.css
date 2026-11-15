@@ -128,6 +128,8 @@
    derrière elle il n'y a que la page assombrie ; le voile est peint avec le champ, à l'opacité du champ, ce qui donne
    le même mélange que sur la page. Son cadre est peint en trait fin (`.brush-frame`, `BrushFrame.css`). */
 .ui-dialog.stats-selection-dialog {
+  /* Les marges du cadre peint comptent dans la taille : la fenêtre tient dans l'écran. */
+  box-sizing: border-box;
   position: relative;
   isolation: isolate;
   width: min(720px, 100%);
