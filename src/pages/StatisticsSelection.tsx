@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import Dialog from '../components/ui/Dialog';
 import ChoiceButtons from '../components/ui/ChoiceButtons';
+import { brushFrame } from '../components/brushFrame';
 import { FAMILY_LABEL, activitiesOfFamily, activityDisplayName, activityFamily, type Activity } from '../core/activities';
+import { brushColorFor } from '../core/brushColor';
 import { SPORT_FAMILIES, type SportFamily } from '../core/sportProfiles';
 import { useGearGroups, useVisibility } from '../hooks/useSportSettings';
-import { useThemedShade } from '../hooks/useTheme';
+import { useAppliedTheme, useThemedShade } from '../hooks/useTheme';
 import {
   STATS_PERIODS, gearFilterItems, gearFilterRows, gearParamOf, inBounds, normalizeStatsChoice, readGearParam, statsPeriodBounds, withGearPick,
   type GearFilterItem, type GearFilterRow, type GearSelection, type StatSession, type StatsChoice, type StatsPeriod,
@@ -40,7 +42,9 @@ export function GearChoiceRows({ rows, selection, items, small, onChange }: {
 
 /**
  * Fenêtre « Sélection » des Statistiques : famille, activité, période et matériel en gros boutons qui passent à
- * la ligne. Elle travaille sur un brouillon du choix en cours ; « Valider » le rend d'un coup (`onApply`), le
+ * la ligne, des ovales au pinceau, à la couleur de l'activité pour un choix d'activité. La fenêtre laisse voir le
+ * champ du fond sous son voile, dans un cadre peint à la couleur de l'activité du brouillon, sinon de celle du sport
+ * préféré (`favoriteBrush`, celle des panneaux de la page). Elle travaille sur un brouillon du choix en cours ; « Valider » le rend d'un coup (`onApply`), le
  * reste (Annuler, ×, le fond, Échap, le retour d'Android) ferme sans rien changer. Changer de famille ou
  * d'activité remet le matériel à « Tous » ; le matériel proposé est celui de l'activité du brouillon, porté par
  * ses sessions sur la période du brouillon.
@@ -48,16 +52,18 @@ export function GearChoiceRows({ rows, selection, items, small, onChange }: {
  * `all` : les sessions de la page (celles d'une famille cachée ouverte par son adresse comprises), `activityById`
  * leurs activités, celles de base sans activité créée comprises.
  */
-function StatsSelectionDialog({ initial, all, activityById, nowMs, onApply, onClose }: {
+function StatsSelectionDialog({ initial, all, activityById, nowMs, favoriteBrush, onApply, onClose }: {
   initial: StatsChoice;
   all: readonly StatSession[];
   activityById: ReadonlyMap<string, Activity>;
   nowMs: number;
+  favoriteBrush: CSSProperties;
   onApply: (choice: StatsChoice) => void;
   onClose: () => void;
 }) {
   const { activities, families, isShown } = useVisibility();
   const shade = useThemedShade();
+  const dark = useAppliedTheme().theme === 'dark';
   const [draft, setDraft] = useState<StatsChoice>(() => normalizeStatsChoice(initial));
   const patch = (next: Partial<StatsChoice>) => setDraft((d) => normalizeStatsChoice({ ...d, ...next }));
 
@@ -76,8 +82,8 @@ function StatsSelectionDialog({ initial, all, activityById, nowMs, onApply, onCl
     const listed = activitiesOfFamily(activities, draftFamily)
       .filter((a) => isShown(a) || familyHidden || withSessions.has(a.id) || a.id === initial.activityId);
     const extra = [...withSessions].filter((id) => !listed.some((a) => a.id === id)).map((id) => activityById.get(id)!);
-    return [...listed, ...extra].map((a) => ({ key: a.id, label: activityDisplayName(a), color: shade(a.color) }));
-  }, [draftFamily, families, all, activities, isShown, initial.activityId, activityById, shade]);
+    return [...listed, ...extra].map((a) => ({ key: a.id, label: activityDisplayName(a), color: shade(a.color), brush: brushColorFor(a.color, dark) }));
+  }, [draftFamily, families, all, activities, isShown, initial.activityId, activityById, shade, dark]);
 
   const candidate = draft.activityId !== null ? activityById.get(draft.activityId) : undefined;
   const draftActivity: Activity | null = candidate && draftFamily !== null && activityFamily(candidate) === draftFamily ? candidate : null;
@@ -95,8 +101,14 @@ function StatsSelectionDialog({ initial, all, activityById, nowMs, onApply, onCl
     [draftActivity, gearItems, all, bounds, gearSelection, gearKnown]
   );
 
+  const frameStyle = useMemo(
+    () => (draftActivity ? ({ '--brush': brushColorFor(draftActivity.color, dark) } as CSSProperties) : favoriteBrush),
+    [draftActivity, dark, favoriteBrush]
+  );
+
   return (
-    <Dialog title={t('Sélection')} onClose={onClose} className="stats-selection-dialog">
+    <Dialog title={t('Sélection')} onClose={onClose} className={`stats-selection-dialog ${brushFrame(0, 'var(--ink)').className}`}
+      style={frameStyle}>
       <div className="stats-selection__body">
         <section className="stats-selection__block">
           <span className="ui-subtitle">{t('Famille')}</span>

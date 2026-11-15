@@ -531,7 +531,7 @@ function StatisticsPage() {
       <PageHeader title={t('Statistiques')} subtitle={`${title} · ${period === 'tout' ? t('depuis le début') : periodLabel}`} />
 
       <div className="stats-choice">
-        <button type="button" className="stats-selection" aria-haspopup="dialog" onClick={() => setSelecting(true)}
+        <button type="button" className="stats-selection brush-oval" aria-haspopup="dialog" onClick={() => setSelecting(true)}
           title={t('Choisir la famille, l’activité, la période et le matériel')}>
           <span className="stats-selection__text">
             <strong>{t('Sélection')}</strong>
@@ -553,7 +553,7 @@ function StatisticsPage() {
         )}
       </div>
       {selecting && (
-        <StatsSelectionDialog initial={currentChoice} all={all} activityById={activityById} nowMs={nowMs}
+        <StatsSelectionDialog initial={currentChoice} all={all} activityById={activityById} nowMs={nowMs} favoriteBrush={favoriteBrush}
           onApply={applyChoice} onClose={() => setSelecting(false)} />
       )}
 

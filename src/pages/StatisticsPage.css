@@ -11,18 +11,22 @@
   gap: var(--space-2);
 }
 
-/* Ligne « Sélection » : une seule pilule à fond plein, sur toute la largeur, qui ouvre la fenêtre de choix ; le
-   choix en cours coupé s'il déborde, à droite un disque d'encre aux trois curseurs. */
+/* Ligne « Sélection » : un seul ovale au pinceau à l'encre (`.brush-oval`, `BrushFrame.css`), à fond plein, sur toute
+   la largeur, qui ouvre la fenêtre de choix ; le choix en cours coupé s'il déborde, à droite un disque d'encre aux
+   trois curseurs, écarté du bout arrondi du trait. */
 .stats-selection {
+  --selection-h: 48px;
+  --brush: var(--ink);
+  --oval-r: calc(var(--selection-h) / 2);
   box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  min-height: 48px;
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-pill);
+  min-height: var(--selection-h);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+  border: 0;
+  border-radius: var(--oval-r);
   background: var(--surface);
   color: var(--ink);
   font: inherit;
@@ -119,14 +123,37 @@
 }
 
 /* Fenêtre « Sélection » (`StatisticsSelection.tsx`) : grande au milieu sur ordinateur, presque tout l'écran sur
-   téléphone ; le corps défile, « Annuler » et « Valider » restent en bas. */
+   téléphone ; le corps défile, « Annuler » et « Valider » restent en bas. Comme les panneaux de la page, elle laisse
+   voir le champ du fond sous le voile (`--field-veil`) : son propre dessin du champ (`::after`, sous le contenu), car
+   derrière elle il n'y a que la page assombrie ; le voile est peint avec le champ, à l'opacité du champ, ce qui donne
+   le même mélange que sur la page. Son cadre est peint en trait fin (`.brush-frame`, `BrushFrame.css`). */
 .ui-dialog.stats-selection-dialog {
+  position: relative;
+  isolation: isolate;
   width: min(720px, 100%);
   height: min(75dvh, 100%);
   max-height: 100%;
   overflow: hidden;
   padding: 0;
   gap: 0;
+}
+
+.stats-selection-dialog::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(var(--field-veil), var(--field-veil)), url('../assets/champ/champ-clair.svg') center / cover no-repeat;
+  opacity: var(--field-opacity);
+}
+
+:root[data-theme='dark'] .stats-selection-dialog::after {
+  background-image: linear-gradient(var(--field-veil), var(--field-veil)), url('../assets/champ/champ-sombre.svg');
+}
+
+:root[data-eco] .stats-selection-dialog::after {
+  display: none;
 }
 
 .stats-selection-dialog .ui-dialog__head {
@@ -141,8 +168,39 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-6);
   padding: var(--space-4);
+}
+
+/* Dans la fenêtre, un choix non retenu n'est que son trait, posé sur le voile ; le nom d'un groupe de matériel aussi. */
+.stats-selection-dialog .ui-choice[aria-checked='false'],
+.stats-selection-dialog .stats-gear__label {
+  background: none;
+}
+
+@media (hover: hover) {
+  .stats-selection-dialog .ui-choice[aria-checked='false']:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* Cadre peint : les marges de la fenêtre laissent libre la bordure du trait, le corps défile en deçà. */
+@supports (-webkit-mask-box-image: none) {
+  .ui-dialog.stats-selection-dialog {
+    padding: var(--brush-pad-y-fine) var(--brush-pad-x-fine);
+  }
+
+  .stats-selection-dialog .ui-dialog__head {
+    padding: 0 var(--space-1) var(--space-2);
+  }
+
+  .stats-selection-dialog .stats-selection__body {
+    padding: var(--space-4) var(--space-1);
+  }
+
+  .stats-selection-dialog .stats-selection__foot {
+    padding: var(--space-3) var(--space-1) 0;
+  }
 }
 
 .stats-selection__block {

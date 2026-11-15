@@ -13,9 +13,51 @@
    `.brush-panels` se pose sur un conteneur dont tous les enfants directs sont des panneaux peints, en trait fin
    (`--brush-trait-fine`, `tokens.css`) : panneaux des analyses. Leur bordure et leurs marges viennent d'un style en ligne,
    que `!important` remplace. Un panneau redimensionné plus petit que son contenu défile : le trait défile avec lui.
-   `.brush-panels--hair`, avec `.brush-panels`, prend le trait très fin et ses marges (`--brush-trait-hair`, `tokens.css`). */
+   `.brush-panels--hair`, avec `.brush-panels`, prend le trait très fin et ses marges (`--brush-trait-hair`, `tokens.css`).
+
+   `.brush-frame` sur une fenêtre (`.ui-dialog`) : le trait fin des panneaux, sans le trait d'origine ; les marges sont
+   celles que la fenêtre se donne, qui doivent laisser libre la bordure du trait. */
+
+/* Ovale peint : le même tracé, coupé presque en son milieu (480 sur 1000) : chaque quart de cercle garde sa forme et
+   devient un bout arrondi de rayon `--oval-r`, seuls les traits droits du haut et du bas s'allongent, sans s'épaissir,
+   et les flancs ne sont jamais élargis : l'épaisseur reste régulière. Plus haut que deux rayons (libellé sur deux
+   lignes), l'ovale devient un rectangle aux bouts arrondis, de même trait. L'ouverture du trait tombe en bas à droite.
+   `.brush-oval` se pose sur l'élément ; l'ovale est son `::before`, centré, de taille `--oval-w` × `--oval-h` (tout
+   l'élément à défaut), de rayon `--oval-r` (une demi-cible tactile à défaut), à la couleur `--brush` (l'encre à
+   défaut). Sans prise en charge du masque en bordure, un ovale au trait fin. */
+.brush-oval {
+  position: relative;
+}
+
+.brush-oval::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  box-sizing: border-box;
+  width: var(--oval-w, 100%);
+  height: var(--oval-h, 100%);
+  border: var(--stroke) solid var(--brush, var(--ink));
+  border-radius: var(--radius-pill);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
 
 @supports (-webkit-mask-box-image: none) {
+  .brush-oval::before {
+    border: 0;
+    border-radius: 0;
+    background: var(--brush, var(--ink));
+    -webkit-mask-box-image: url('../assets/profil/trait-cadre-pinceau.svg') 480 / var(--oval-r, calc(var(--touch-target) / 2)) / 0 stretch;
+  }
+}
+
+@supports (-webkit-mask-box-image: none) {
+  .ui-dialog.brush-frame {
+    --brush-trait: var(--brush-trait-fine);
+    position: relative;
+    border: 0;
+  }
   section.brush-frame,
   .brush-frames > .ui-card {
     position: relative;
@@ -45,6 +87,7 @@
   }
 
   section.brush-frame::before,
+  .ui-dialog.brush-frame::before,
   .brush-frames > .ui-card::before,
   .brush-panels > *::before {
     content: '';

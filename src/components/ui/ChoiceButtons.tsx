@@ -1,21 +1,25 @@
-import { useRef, type KeyboardEvent } from 'react';
+import { useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import Swatch from './Swatch';
+import '../BrushFrame.css';
 
 export interface ChoiceButtonItem<K extends string> {
   key: K;
   label: string;
   /** Couleur d'activité : une pastille cernée devant le libellé. */
   color?: string;
+  /** Couleur du trait de l'ovale, déjà celle du thème (`brushColorFor`) ; l'encre à défaut. */
+  brush?: string;
   title?: string;
 }
 
 /**
  * Choix exclusif en gros boutons qui passent à la ligne, jamais en rangée qui
- * défile : chaque choix est une pilule à fond plein (le champ du fond ne passe
- * pas derrière), celui qui est choisi à l'encre. `columns` les range en
- * grille de colonnes égales, sinon ils se suivent. Taille normale à hauteur
- * de cible tactile (une fenêtre de choix), `small` pour un réglage posé sur
- * la page. Flèches du clavier d'un choix à l'autre.
+ * défile : chaque choix est un ovale au pinceau (`.brush-oval`,
+ * `BrushFrame.css`), à fond plein (le champ du fond ne passe pas derrière) ;
+ * celui qui est choisi est rempli d'encre, son trait gardé autour.
+ * `columns` les range en grille de colonnes égales, sinon ils se suivent.
+ * Taille normale à hauteur de cible tactile (une fenêtre de choix), `small`
+ * pour un réglage posé sur la page. Flèches du clavier d'un choix à l'autre.
  */
 function ChoiceButtons<K extends string>({ label, items, value, onChange, columns, small, className }: {
   /** Nom du choix, lu par les lecteurs d'écran. */
@@ -53,7 +57,8 @@ function ChoiceButtons<K extends string>({ label, items, value, onChange, column
         const focusable = checked || (i === 0 && !items.some((it) => it.key === value));
         return (
           <button key={item.key} type="button" role="radio" aria-checked={checked} tabIndex={focusable ? 0 : -1}
-            className="ui-choice" title={item.title} onClick={() => onChange(item.key)}>
+            className="ui-choice brush-oval" title={item.title} onClick={() => onChange(item.key)}
+            style={item.brush !== undefined ? ({ '--brush': item.brush } as CSSProperties) : undefined}>
             {item.color !== undefined && <Swatch color={item.color} round bordered />}
             <span className="ui-choice__label">{item.label}</span>
           </button>

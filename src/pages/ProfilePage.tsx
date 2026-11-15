@@ -273,7 +273,7 @@ function ProfilePage() {
             onClick={() => setPicking(!picking)}>
             <ProfileAvatar avatar={avatar} logoColor={shownLogoColor} />
           </button>
-          <Button className="profile-periods" aria-label={t('Période : {period}. Toucher pour afficher : {other}.', { period: periodLabel, other: otherPeriodLabel })}
+          <Button className="profile-periods brush-oval" aria-label={t('Période : {period}. Toucher pour afficher : {other}.', { period: periodLabel, other: otherPeriodLabel })}
             onClick={() => rememberView({ periode: period === 'tout' ? 'annee' : 'tout' })}>
             {period === 'tout' ? t('Tout') : String(new Date(nowMs).getFullYear())}
           </Button>
