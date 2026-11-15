@@ -20,3 +20,14 @@ Ce que l'équipe technique d'un acheteur relèverait, sans effet visible pour l'
 ## Choix d'architecture que la revue remet en cause, à garder en tête
 
 Deux systèmes d'unités (`sailing/` en nœuds, règle 5) ; le texte français comme clé de traduction ; les formats persistés en français (`reglages/`, `?activite=`) ; les tests sans isolation (`isolate: false`). Aucun n'est à changer sans plan dédié.
+
+## Relevé pendant le paquet 394 à 400 (15/11), à piocher ici
+
+- Page Sessions : les lignes hors écran ne sont pas allégées (`content-visibility`), parce que le retour à la position retenue se compte en pixels (`hooks/useRetainedScroll.ts`) et tomberait à côté dès que des lignes ont des hauteurs différentes ; il faudrait retenir la ligne affichée plutôt que des pixels.
+- `TrackPoint.time` (heure en texte de chaque point) traverse encore du calcul en arrière-plan à la page : aucun lecteur dans l'application, deux tests le relisent (`surfing/surfAnalysis.test.ts`, copie gelée de `core/prepareTrack.test.ts`).
+- `summarizeGpxText` (image de partage d'une session pas encore rangée) tourne encore sur le fil de l'affichage.
+- Le texte du GPX repart à chaque demande d'analyse (seuil, vent, couleurs) ; à n'envoyer que si la mémoire du calcul ne tient plus la session, si une mesure le montre coûteux. Un changement de bornes de couleur renvoie toute la demande.
+- « Tout supprimer » ne vide pas le sous-dossier `journaux` du dossier mémoire (journaux d'enregistrement rendus à l'utilisateur, lot 396) : à décider.
+- Un journal d'enregistrement que le téléphone n'arrive pas à lire reste dans le dossier privé, retenté à chaque lancement : rien ne permet de le copier vers le dossier mémoire sans le lire.
+- `docs/DECISIONS.md` §9, « Pas de carte Bravo avant les objectifs » : phrase laissée telle quelle au retrait de la plante ; l'objectif « par semaine » retiré en faisait peut-être partie, à relire avec l'utilisateur.
+- Deux calculs en arrière-plan (analyse, fond) : la mémoire de la trace est doublée tant qu'une analyse est ouverte ; à regarder sur un téléphone modeste.

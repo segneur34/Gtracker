@@ -56,3 +56,21 @@ Tuiles de carte qui traversent le pont natif en texte, chiffres du direct incré
 ## Vérification
 
 `node outils/verif.mjs --rapide` pendant, `npm run verif` à chaque étape. Banc contre HEAD : `library`, `general`, `graphes`, `virages`, `manoeuvres-diagnostic`, `allure-session`, `brouillon-voile` (texte identique, aucun chiffre ne bouge). `fluidite-compile` avant et après chaque étape sur l'ouverture d'une session longue, durée dite avant de lancer ; les deux mesures vont dans le rapport, et la phrase périmée d'ETAT §11 (« le reste est le dessin », « 10 à 18 s », `DOMParser`) sera corrigée d'après elles au lot 401.
+
+## Mesures du 15/11 (`fluidite-compile`, version compilée, ordinateur)
+
+Ouverture d'une session de voile d'une heure à 5 Hz depuis Sessions. Chaque ligne retient la plus haute de deux prises, sauf la dernière (médiane de six prises, étendue entre parenthèses).
+
+| Relevé | Trace affichée, vitesse normale | Trace affichée, processeur ralenti six fois | Plus longue tâche qui fige l'écran, ralenti six fois | Écran figé en tout, ralenti six fois |
+|---|---|---|---|---|
+| avant le lot 399 | 0,359 s | 1,640 s | 1,125 s | 1,356 s |
+| après le lot 399 | 0,353 s | 1,608 s | 1,027 s | 1,267 s |
+| après l'étape 1 | 0,326 s | 1,426 s | 1,028 s | 1,135 s |
+| après l'étape 2 | 0,349 s et 0,970 s | 1,051 s | 0,249 s | 0,497 s |
+| après l'étape 2, six prises | 0,361 s (0,321 à 0,417) | 0,901 s (0,834 à 0,943) | 0,220 s (0,168 à 0,271) | 0,449 s |
+
+- Ce que l'étape 2 gagne : l'écran ne se fige plus pendant le calcul. À vitesse normale, la plus longue tâche passe de 0,158 s à moins de 0,07 s (aucune tâche longue sur les six prises) ; processeur ralenti six fois, de 1,03 s à 0,22 s, et la trace s'affiche en 0,9 s au lieu de 1,4 s. À vitesse normale, l'attente elle-même ne raccourcit pas (0,36 s contre 0,33 s) : le calcul dure autant, il a changé de fil.
+- La prise à 0,970 s du relevé complet ne s'est pas reproduite sur six prises : accident de mesure.
+- Seuil d'activité changé (chiffres refaits, vitesse normale puis ralenti six fois) : 0,037 s et 0,283 s avant le lot 399, 0,051 s et 0,341 s après, 0,046 s et 0,430 s après l'étape 1, 0,055 s et 0,405 s après l'étape 2 ; plus longue tâche ralentie six fois : 0,366 s, 0,374 s, 0,466 s, 0,425 s. Inchangé au bruit près : le calcul est parti en arrière-plan, le redessin de la page reste le gros du temps.
+- Quitter une session 100 ms après l'avoir ouverte, zoom des graphes : inchangés.
+- Mise à jour des résumés de douze sessions au lancement, vitesse normale : 0,685 s, 0,680 s, 0,639 s, puis 1,199 s après l'étape 2. Contrôle fait dans la foulée : le code de l'étape 1, remesuré au même moment, donne 1,09 à 1,20 s sur quatre prises, celui de l'étape 2 0,70 à 1,20 s ; l'écart vient de l'état du poste à cette heure-là, pas du lot (le code des résumés n'a pas été touché). Ralenti six fois : 2,1 à 2,5 s partout. Démarrage : pareil dans les deux codes.

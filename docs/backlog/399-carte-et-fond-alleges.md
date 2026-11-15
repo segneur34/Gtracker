@@ -38,3 +38,12 @@ Trois agents successifs, un commit chacun :
 ## Vérification
 
 `npm run verif`. Banc contre HEAD : `carte-direct`, `carte-perf`, `library`, `partage`, `profil` (texte identique) ; `fluidite-compile` avant et après pour la carte (dire la durée avant de lancer : mémoire « mesures longues »). Aucun essai au téléphone demandé ; l'utilisateur verra la trace et le fond sur la prochaine APK.
+
+## Mesures du 15/11 (avant, après)
+
+- Tracés par dessin de la carte, trace d'une heure à 5 Hz (`carte-perf`, compteur de tracés du canevas) : 11 444, puis 1 948. Dix déplacements de la carte : 0,060 s de script, puis 0,017 s ; dix zooms : 0,307 s, puis 0,250 s (serveur de développement, ordinateur, script joué seul).
+- Police Inter dans le paquet : 221 304 octets, puis 96 744 (woff2 seul).
+- Fond de page dans le paquet : deux SVG, 674 ko bruts et 252 ko compressés, puis quatre WebP, 1 379 ko (non compressibles). APK entière : 5,56 Mo (0.00.86), puis 6,60 Mo (0.00.96), soit environ 1 Mo de plus tout compris. Dessin du fond à l'ouverture : 83 à 93 ms, puis environ 41 ms ; rotation aller-retour : 179 à 215 ms, puis environ 48 ms (navigateur sans fenêtre, écran de téléphone simulé ; le ralentissement du processeur ne touche pas ces fils de dessin). L'allègement de 700 ko annoncé par la fiche est démenti : question Q118.
+- Ouverture d'une session de voile d'une heure à 5 Hz, version compilée (`fluidite-compile`) : trace rendue en 0,359 s puis 0,353 s à vitesse normale, 1,640 s puis 1,608 s processeur ralenti six fois : inchangé au bruit près, cette mesure ne déplaçant pas la carte.
+- Écarté : l'allègement des lignes hors écran de la page Sessions (voir la fiche 404).
+- Remarque de l'utilisateur devant la planche : des points visibles à chaque changement de couleur sur le fond sombre ; ils sont dans le dessin d'origine (élément 406).
