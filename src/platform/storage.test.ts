@@ -183,6 +183,64 @@ describe('createJsonStore', () => {
   });
 });
 
+describe('createJsonStore, écriture à texte identique', () => {
+  /** Stockage en mémoire qui relève chaque `setItem`. */
+  const countingBackend = (initial: Record<string, string> = {}) => {
+    const backend = memoryBackend(initial);
+    const writes: string[] = [];
+    return { backend, writes, store: createJsonStore(() => ({ ...backend, setItem: (key, value) => { writes.push(key); backend.setItem(key, value); } })) };
+  };
+
+  it("n'écrit pas un texte déjà rangé, mais prévient les abonnés", () => {
+    const { writes, store } = countingBackend({ 'gtracker.cache': '{"a":1}' });
+    const heard: string[] = [];
+    store.subscribe((key) => heard.push(key));
+    store.write('gtracker.cache', { a: 1 });
+    expect(writes).toEqual([]);
+    expect(heard).toEqual(['gtracker.cache']);
+  });
+
+  it('écrit dès que le texte change, et une clé absente', () => {
+    const { backend, writes, store } = countingBackend({ 'gtracker.cache': '{"a":1}' });
+    store.write('gtracker.cache', { a: 2 });
+    store.write('gtracker.autre', { a: 1 });
+    store.write('gtracker.cache', { a: 2 });
+    expect(writes).toEqual(['gtracker.cache', 'gtracker.autre']);
+    expect(backend.data.get('gtracker.cache')).toBe('{"a":2}');
+  });
+
+  it('relit la valeur rangée à chaque écriture : changée par un autre écrivain, elle est réécrite', () => {
+    const { backend, writes, store } = countingBackend({ 'gtracker.cache': '{"a":1}' });
+    backend.data.set('gtracker.cache', '{"a":9}');
+    store.write('gtracker.cache', { a: 1 });
+    expect(writes).toEqual(['gtracker.cache']);
+    expect(backend.data.get('gtracker.cache')).toBe('{"a":1}');
+  });
+
+  it('retente une valeur refusée, même identique, et une valeur dont le refus est signalé plus tard', () => {
+    const { backend, writes, store } = countingBackend();
+    let refuse = true;
+    const guarded = createJsonStore(() => (refuse ? failingBackend : backend));
+    guarded.write('gtracker.cache', { a: 1 });
+    refuse = false;
+    guarded.write('gtracker.cache', { a: 1 });
+    expect(backend.data.get('gtracker.cache')).toBe('{"a":1}');
+    // Refus constaté après coup (Preferences natives) : la mémoire a la valeur, le stockage durable peut-être pas.
+    store.write('gtracker.x', { b: 1 });
+    store.reportFailure('gtracker.x');
+    store.write('gtracker.x', { b: 1 });
+    store.write('gtracker.x', { b: 1 });
+    expect(writes).toEqual(['gtracker.x', 'gtracker.x']);
+  });
+
+  it('écritures suspendues : rien, même à texte changé, comme avant', () => {
+    const { writes, store } = countingBackend({ 'gtracker.cache': '{"a":1}' });
+    store.suspendWrites();
+    store.write('gtracker.cache', { a: 2 });
+    expect(writes).toEqual([]);
+  });
+});
+
 describe('createJsonStore, lecture mise en cache (E-O3)', () => {
   it('rend le même objet tant que la valeur brute ne change pas, un neuf après une écriture', () => {
     const backend = memoryBackend({ 'gtracker.x': '{"a":{"b":1}}' });

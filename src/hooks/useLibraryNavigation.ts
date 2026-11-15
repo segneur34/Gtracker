@@ -111,8 +111,8 @@ export const sessionReading = ({ requested, ready, known, deliveredFor, error }:
 /**
  * Côté module : charge la session désignée par l'URL, une seule fois par
  * fichier, dès que la bibliothèque la connaît. Sa fiche est relue en entier
- * avant le GPX (`loadSessionGpx`) : altitude, voies et sauts rangés sont là
- * dès que la trace existe.
+ * pendant la lecture du GPX, qui n'est rendu qu'après elle (`loadSessionGpx`) :
+ * altitude, voies et sauts rangés sont là dès que la trace existe.
  *
  * Le chargement ne dépend que du nom du fichier. `onLoad` change d'identité à
  * chaque changement de réglage (`setSport`), et la fiche à chaque écriture

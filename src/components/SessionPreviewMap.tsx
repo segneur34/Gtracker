@@ -15,7 +15,8 @@ import { previewImageStore } from '../library/previewImageStore';
 import { previewStore } from '../library/previewStore';
 import { previewFingerprint, previewKey, roundPreviewPoints, type PreviewTrack } from '../library/previewTracks';
 import type { LibrarySession } from '../library/record';
-import { sessionColorTrack, sessionSpeedRange, type SessionColorTrack } from '../library/sessionTrack';
+import { sessionSpeedRange, type SessionColorTrack } from '../library/sessionTrack';
+import { runInWorker } from '../library/trackWorkerClient';
 import { drawTrackPreview, thinForPreview, trackPreviewView } from './drawTrackPreview';
 import './SessionPreviewMap.css';
 
@@ -119,20 +120,24 @@ function SessionPreviewMap({ session, activity, family, folderLabel, onOpen }: {
   /**
    * Trace de la vignette, gardée pour elle : celle gardée sur l'appareil si
    * elle est réduite à `minZoom` ou plus fin, sinon tirée du GPX comme
-   * l'analyse la calcule (points entiers, zoom `Infinity`) ; `null` si elle
-   * manque ou est illisible.
+   * l'analyse la calcule (points entiers, zoom `Infinity`), hors du fil de
+   * l'affichage (`colorTrack`, `runInWorker`) ; `null` si elle manque ou est
+   * illisible, ou si la demande est abandonnée (`signal` : ligne sortie de la
+   * vue, session changée) avant d'envoyer le calcul. Une trace rendue après
+   * l'abandon est gardée sous sa propre clé, et l'appelant ne la montre pas.
    */
-  const loadTrack = useCallback(async (minZoom: number): Promise<PreviewTrack | null> => {
+  const loadTrack = useCallback(async (minZoom: number, signal: AbortSignal): Promise<PreviewTrack | null> => {
     const kept = await previewStore.stored(storeKey, fingerprint);
     if (kept && kept.zoom >= minZoom) {
       rememberMeta(cacheKey, { bounds: kept.bounds, suggested: kept.suggested });
       rememberPoints(cacheKey, kept.points, kept.zoom);
       return kept;
     }
+    if (signal.aborted) return null;
     const gpx = await readSessionGpx(file);
-    if (gpx === null) return null;
+    if (gpx === null || signal.aborted) return null;
     try {
-      const track = sessionColorTrack(gpx, sport, referenceOverrideMs, family);
+      const track = await runInWorker('colorTrack', gpx, { sport, referenceOverrideMs, family });
       if (!track) return null;
       rememberMeta(cacheKey, { bounds: track.bounds, suggested: track.suggested });
       // Points entiers, réduits au premier dessin.
@@ -145,14 +150,14 @@ function SessionPreviewMap({ session, activity, family, folderLabel, onOpen }: {
 
   useEffect(() => {
     if (!near || meta) return undefined;
-    let cancelled = false;
+    const controller = new AbortController();
     // Emprise seule : toute trace gardée convient, quel que soit son zoom.
-    void loadTrack(0).then((track) => {
-      if (cancelled) return;
+    void loadTrack(0, controller.signal).then((track) => {
+      if (controller.signal.aborted) return;
       if (track) setLoaded({ key: cacheKey, meta: { bounds: track.bounds, suggested: track.suggested } });
       else setFailed(true);
     });
-    return () => { cancelled = true; };
+    return () => controller.abort();
   }, [near, meta, cacheKey, loadTrack]);
 
   const range = useMemo(
@@ -211,7 +216,7 @@ function SessionPreviewMap({ session, activity, family, folderLabel, onOpen }: {
       let stored = previewPoints.get(cacheKey);
       if (!stored || stored.zoom < view.zoom) {
         // Zoom de la trace rendue, pas `Infinity` d'office : celle gardée sur l'appareil est déjà réduite.
-        const track = await loadTrack(view.zoom);
+        const track = await loadTrack(view.zoom, controller.signal);
         stored = track ? { points: track.points, zoom: track.zoom } : undefined;
       }
       if (controller.signal.aborted) return;

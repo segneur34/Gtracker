@@ -6,7 +6,7 @@ import {
   type RecordPatch, type RecordUnreadable, type SessionRecord,
 } from '../../library/record';
 import { READ_ONLY_MEMORY_MESSAGE, type MemoryFolder } from '../../platform/memoryFolder';
-import { errorMessage } from '../../core/basics';
+import { afterBoth, errorMessage } from '../../core/basics';
 import { reportError, setState } from './store';
 import {
   cacheDirty, findSession, hasSessionMotion, hydrateSession, lastEdit, lib, publish, rememberUnreadable, removing,
@@ -48,14 +48,13 @@ export const loadFullSession = async (file: string): Promise<void> => {
 
 /**
  * GPX d'une session à ouvrir dans une analyse, `null` s'il n'est pas
- * lisible. Sa fiche est d'abord relue en entier (`loadFullSession`) : la trace
+ * lisible. Sa fiche est relue en entier (`loadFullSession`) pendant la
+ * lecture du GPX, et le GPX n'est rendu qu'une fois la fiche relue : la trace
  * n'existe qu'une fois l'altitude, les voies et les sauts rangés connus, et
- * l'analyse ne les redemande pas.
+ * l'analyse ne les redemande pas. Mêmes erreurs qu'en lisant l'un après
+ * l'autre, celle de la fiche d'abord (`afterBoth`).
  */
-export const loadSessionGpx = async (file: string): Promise<string | null> => {
-  await loadFullSession(file);
-  return readSessionGpx(file);
-};
+export const loadSessionGpx = (file: string): Promise<string | null> => afterBoth(loadFullSession(file), readSessionGpx(file));
 
 /**
  * GPX complet d'une session, pour « Télécharger la session » : le GPX tel que

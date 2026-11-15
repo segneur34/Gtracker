@@ -124,6 +124,17 @@ export const bandIndex = (value: number, bounds: readonly number[]): number => {
 /** « 1 session », « 3 sessions » : le compte suivi du mot, accordé. */
 export const plural = (n: number, word: string): string => `${n} ${word}${n > 1 ? 's' : ''}`;
 
+/**
+ * Deux attentes lancées ensemble, rendues comme si elles s'étaient suivies : la valeur de `second` une fois les deux
+ * réglées ; l'erreur de `first` si elle échoue, sinon celle de `second`.
+ */
+export const afterBoth = async <T>(first: Promise<unknown>, second: Promise<T>): Promise<T> => {
+  const [a, b] = await Promise.allSettled([first, second]);
+  if (a.status === 'rejected') throw a.reason;
+  if (b.status === 'rejected') throw b.reason;
+  return b.value;
+};
+
 /** Identifiant tiré au hasard, stable une fois rangé : `crypto.randomUUID`, sinon l'heure et un tirage. */
 export const newId = (): string =>
   typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'

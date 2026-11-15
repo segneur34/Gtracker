@@ -21,6 +21,34 @@ Deux étapes, chacune vérifiée et commitée à part. Aucun chiffre d'analyse n
 
 Attendu : une tâche d'analyse dans le calcul en arrière-plan, qui garde sur place l'objet préparé de la session ouverte (sa détection de manœuvres contient des fonctions et ne traverse pas un message) et recalcule sur demande pour un seuil ou un vent saisi ; mêmes fonctions, donc mêmes chiffres, avec le repli en ligne de `runTrackJob`. Côté page : pendant le calcul, les derniers chiffres restent affichés avec l'indication habituelle de chargement, une réponse périmée est écartée (drapeaux `alive`, comme pour `prepare`), quitter l'analyse abandonne le calcul. Un plan (agent `Plan`) avant de coder cette étape.
 
+## Étape 1, faite le 15/11 : ce qui en ressort
+
+- `TrackPoint.time` est gardé : deux tests le relisent (`surfing/surfAnalysis.test.ts`, copie gelée de `core/prepareTrack.test.ts`), aucun lecteur dans l'application ; le retirer demande de récrire ces tests, hors de ce lot.
+- La comparaison « pas d'écriture à texte identique » est dans `platform/storage.ts` : elle vaut pour tous les magasins.
+- Relecture : une analyse ouverte depuis Sessions attendait derrière les vignettes déjà demandées, le calcul en arrière-plan étant unique et servi dans l'ordre. Remède, repris du plan de l'étape 2 : deux files, donc deux calculs en arrière-plan, « analyse » (`prepare`, puis les tâches de l'étape 2) et « fond » (`summarize`, `colorTrack`).
+- Constat voisin laissé : `summarizeGpxText` (image de partage d'une session pas encore rangée) tourne encore sur le fil de l'affichage.
+
+## Plan de l'étape 2 (agent Plan, 15/11) et questions tranchées par l'orchestrateur
+
+Constats : `useSailingSession.ts` (93-132) enchaîne `prepareSailingTrack`, `analyzeSailingAtThreshold`, `analyzeSailingWind` et `sailingPolarGraph` sur le fil de l'affichage, seul le seuil étant différé (`useDeferredValue`, `thresholdPending`) ; `SailingModule.tsx` (vers 334) y ajoute `trackColorSegments` ; `SurfModule.tsx` (219-243) fait `runSurfSession` puis les couleurs sans aucun différé. Ne traversent pas un message : `PreparedSailingTrack.detection` (fonctions `turnAt`, `rotationOf`) et `WindStats.windAt` (fermeture, `sailingAnalytics.ts` vers 163).
+
+Architecture :
+1. Dans le calcul en arrière-plan, une mémoire d'une seule session (`src/library/analysisStore.ts`, pur) : clé donnée par la page, trace préparée, préparation voile gardée tant que calcul, allure et profil ne changent pas, dernier résultat au seuil gardé tant que le seuil ne change pas (un vent seul changé ne refait pas le calcul au seuil), dernières couleurs. Tâches `analyzeSailing`, `analyzeSurf`, `release` ; si la clé n'est pas en mémoire (calcul recréé, repli en ligne), la tâche refait `prepareTrack` elle-même : mêmes fonctions, mêmes arguments, mêmes chiffres.
+2. Reviennent à la page : statistiques, vols, vent estimé et retenu, manœuvres et leur résumé, VMG et sa série, statistiques de vent sans `windAt`, polaire, bornes de couleur suggérées, seuils de manœuvre, segments colorés. Restent dans le calcul : masque d'activité, détection, étape de la polaire. Clonage simple, pas de tableaux typés.
+3. Côté page : `trackData` refait par `trackToPointData` ; `windAt` rebâti par un `withWindAt` exporté de `sailingAnalytics.ts` (`calculateWindStats` garde ses échantillons et bâtit sa fermeture par la même fonction).
+4. La dernière demande gagne (`src/library/latestRunner.ts`, pur) : une demande en vol, la suivante remplace celle en attente, abandon en quittant, `release` vide la mémoire du calcul.
+5. Un hook `useTrackAnalysis(family, source, inputs)` rend la trace et son analyse ensemble, jamais l'analyse d'une session sur la trace d'une autre ; tant qu'une trace neuve n'a pas sa première analyse, « Lecture de la session… » reste affiché ; ensuite les anciens chiffres restent pendant un recalcul. Règle 4 : les seuils sont résolus dans le hook, le calcul reçoit un seuil déjà résolu.
+
+Tranché par l'orchestrateur :
+- deux calculs en arrière-plan (files « analyse » et « fond ») plutôt qu'une priorité dans un seul : plus simple, et l'ouverture d'une analyse n'attend plus ni les vignettes ni les résumés ;
+- pendant un recalcul, l'indication est celle que `thresholdPending` donne déjà aujourd'hui au changement de seuil, étendue au vent saisi et à la trace (`analysisPending`) ; aucune marque neuve, aucun texte neuf (le texte relevé par le banc reste identique) ; une marque plus visible serait une décision de l'utilisateur, signalée à l'arrêt du paquet ;
+- les écritures dans la fiche qui partent d'un résultat (`SailingModule.tsx`, vers 196 et 267) attendent la fin du recalcul : jamais un résultat périmé dans une fiche ;
+- les couleurs de la trace passent dans le calcul avec le reste ; si le branchement dépasse la taille d'un agent, version réduite sûre : la voile d'abord, puis le surf, puis les couleurs, l'arbre vert et commitable à chaque pas.
+
+Deux agents successifs : A, sans brancher la page (mémoire, tâches, coureur, `withWindAt`, tests de stricte égalité entre l'appel direct, le faux calcul en arrière-plan et le repli en ligne, à 1 Hz et 5 Hz ; clonage de chaque profil de `SPORT_PROFILES`) ; B, le branchement (`useGpxSession`, `useTrackAnalysis`, voile, surf, couleurs), puis banc et mesure.
+
+Risques à surveiller : un script du banc qui relève le texte juste après un changement de seuil ou de vent, avant la réponse ; le texte du GPX recopié à chaque demande (à n'envoyer que si la clé manque, si la mesure le montre coûteux) ; mémoire de la trace doublée tant que l'analyse est ouverte.
+
 ## Hors du lot
 
 Tuiles de carte qui traversent le pont natif en texte, chiffres du direct incrémentaux (lot 402), démarrage (721 ko avant le premier affichage, attente de la mémoire jusqu'à 1,5 s) : rangés à part.

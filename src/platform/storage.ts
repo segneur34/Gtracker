@@ -36,7 +36,9 @@ export interface JsonStore {
   read<T>(key: string): T | null;
   /**
    * Enregistre `value` sous `key`, sérialisée en JSON. Si le stockage refuse,
-   * la valeur vaut pour la session en cours et le refus est signalé.
+   * la valeur vaut pour la session en cours et le refus est signalé. Un texte
+   * identique à celui déjà rangé n'est pas réécrit ; les abonnés sont
+   * prévenus quand même.
    */
   write(key: string, value: unknown): void;
   /**
@@ -106,7 +108,15 @@ export const createJsonStore = (getBackend: () => StorageBackend): JsonStore => 
     parsedCache.set(key, { raw, value });
     return value as T;
   };
-  const reportFailure = (key: string): void => failureListeners.forEach((listener) => listener(key));
+  /**
+   * Clés dont un refus a été signalé, constaté plus tard compris (Preferences natives) : leur prochaine écriture
+   * part même à texte identique, le stockage durable n'ayant peut-être pas la valeur que la mémoire montre.
+   */
+  const retry = new Set<string>();
+  const reportFailure = (key: string): void => {
+    retry.add(key);
+    failureListeners.forEach((listener) => listener(key));
+  };
   let suspended = false;
   return {
     read: <T,>(key: string): T | null => {
@@ -122,8 +132,12 @@ export const createJsonStore = (getBackend: () => StorageBackend): JsonStore => 
       const raw = JSON.stringify(value);
       let refused = false;
       try {
-        getBackend().setItem(key, raw);
+        const backend = getBackend();
+        // Texte déjà rangé tel quel : rien à réécrire (sur le téléphone, une écriture traverse le pont natif). Une
+        // valeur refusée plus tôt est toujours retentée ; les abonnés sont prévenus dans les deux cas.
+        if (unsaved.has(key) || retry.has(key) || backend.getItem(key) !== raw) backend.setItem(key, raw);
         unsaved.delete(key);
+        retry.delete(key);
       } catch {
         unsaved.set(key, raw);
         refused = true;

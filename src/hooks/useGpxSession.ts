@@ -55,7 +55,7 @@ const NOTHING_SHOWN: ShownGpx = { from: null, fileName: null, error: null, prepa
 export const preparedState = (from: GpxSource, prepared: PreparedTrack): ShownGpx => ({
   from,
   fileName: from.fileName,
-  error: prepared.rawPoints.length < 2 ? t('Le fichier ne contient pas assez de points horodatés.') : null,
+  error: prepared.pointCount < 2 ? t('Le fichier ne contient pas assez de points horodatés.') : null,
   prepared,
 });
 
@@ -145,7 +145,8 @@ export const useGpxSession = (kinematicsOptions: GpxSessionOptions = {}) => {
   return {
     fileName: shown.fileName,
     trackName: prepared.trackName,
-    rawPoints: prepared.rawPoints,
+    /** Nombre de points du fichier, avant tout filtrage. */
+    pointCount: prepared.pointCount,
     /** Vrai si la vitesse vient de l'appareil (Doppler) et non des positions. */
     hasDeviceSpeed: prepared.hasDeviceSpeed,
     /** Message d'erreur de lecture, le cas échéant. */

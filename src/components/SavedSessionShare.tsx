@@ -1,6 +1,6 @@
 import { plainError } from '../platform/errorText';
 import { t } from '../core/i18n';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FAMILY_LABEL, activityDisplayName, type Activity } from '../core/activities';
 import { shareableStats } from '../core/shareImage';
 import { getSportProfile, hasActiveThreshold, sportFamily, sportTreatment } from '../core/sportProfiles';
@@ -11,7 +11,8 @@ import { shareLabels, summaryShareStats } from '../library/shareStats';
 import { sessionFoil } from '../library/summaryOptions';
 import { safeFileName } from '../platform/files';
 import { IconShare } from './icons';
-import { sessionColorTrack, sessionSpeedRange } from '../library/sessionTrack';
+import { sessionSpeedRange } from '../library/sessionTrack';
+import { runInWorker } from '../library/trackWorkerClient';
 import ShareDialog from './ShareDialog';
 import type { TrackSegment } from './TrackSegmentsLayer';
 import Button from './ui/Button';
@@ -36,23 +37,31 @@ interface SavedSessionShareProps {
  * Menu « … » des cartes de fin d'enregistrement (« Session terminée »,
  * « Session rangée ») : « Partager l'image » ouvre la même fenêtre que dans
  * l'analyse (`ShareDialog`), la trace colorée comme l'analyse la colorerait
- * (`sessionColorTrack`) et les chiffres du résumé (`summaryShareStats`) : celui
+ * (`sessionColorTrack`, calculée hors du fil de l'affichage) et les chiffres du résumé (`summaryShareStats`) : celui
  * de la fiche si la session est rangée, sinon calculé sur le GPX avec les
  * réglages de son activité.
  */
 function SavedSessionShare({ gpx, activity, fileName, libraryFile }: SavedSessionShareProps) {
   const [prepared, setPrepared] = useState<Prepared | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Demande en cours : la trace colorée arrive du worker, une réponse d'une demande dépassée (menu rouvert) ou
+   * arrivée après la disparition de la carte est jetée.
+   */
+  const request = useRef(0);
+  useEffect(() => () => { request.current = -1; }, []);
 
-  const open = () => {
+  const open = async () => {
     setError(null);
+    const id = ++request.current;
     try {
       const record = libraryFile === null ? undefined : librarySession(libraryFile)?.record;
       const sport = record?.sport ?? activity.base;
       const family = sportFamily(sport);
       // Hors de la mémoire : calculé avec les réglages de l'activité, comme la fiche le sera (E-B12).
       const summary = record?.summary ?? summarizeGpxText(gpx, sport, activity.id);
-      const track = sessionColorTrack(gpx, sport, record?.analysis?.referenceSpeedMs ?? null, family);
+      const track = await runInWorker('colorTrack', gpx, { sport, referenceOverrideMs: record?.analysis?.referenceSpeedMs ?? null, family });
+      if (request.current !== id) return;
       if (track === null || summary === null) throw new Error(t('trace trop courte.'));
       const range = track ? sessionSpeedRange(record ?? { analysis: null, sport }, activity ? activitySpeedRanges(activity) : null, family, track.suggested) : null;
       const labels = shareLabels(record ?? null, activityDisplayName(activity), FAMILY_LABEL[family], summary.startMs, libraryFile ?? fileName);
@@ -75,6 +84,7 @@ function SavedSessionShare({ gpx, activity, fileName, libraryFile }: SavedSessio
         },
       });
     } catch (err) {
+      if (request.current !== id) return;
       setError(t('Partage impossible : {reason}', { reason: plainError(err, t('erreur inconnue')) }));
     }
   };
@@ -82,7 +92,7 @@ function SavedSessionShare({ gpx, activity, fileName, libraryFile }: SavedSessio
   return (
     <>
       <MoreMenu label={t("Plus d'actions sur la session")}>
-        <Button onClick={open}>
+        <Button onClick={() => void open()}>
           <IconShare size={18} />
           {t("Partager l'image")}
         </Button>

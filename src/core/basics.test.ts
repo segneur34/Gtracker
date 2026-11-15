@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  bandIndex, clamp, errorMessage, finiteOr, inRange, isFiniteNumber, isObject, meanOf, median, medianOfSorted, parseJson, plural, roundTo,
+  afterBoth, bandIndex, clamp, errorMessage, finiteOr, inRange, isFiniteNumber, isObject, meanOf, median, medianOfSorted, parseJson, plural, roundTo,
   stringifyJson, toFixedNumber, upperMedianOfSorted,
 } from './basics';
 
@@ -192,5 +192,46 @@ describe('stringifyJson', () => {
       [[1, 2], [3, 4]], [[1, 'a']], [{ a: [1] }], [[], [1]], [-0, 0],
     ];
     for (const v of values) expect(JSON.parse(stringifyJson(v) ?? 'null')).toEqual(JSON.parse(JSON.stringify(v) ?? 'null'));
+  });
+});
+
+describe('afterBoth : deux attentes lancées ensemble, rendues comme si elles se suivaient', () => {
+  /** Promesse réglée à la main. */
+  const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    let reject!: (reason: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+  const flush = async (): Promise<void> => {
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+  };
+
+  it('la seconde court déjà pendant la première, sa valeur rendue une fois la première finie', async () => {
+    const first = deferred<void>();
+    const second = deferred<string>();
+    let result: string | null = null;
+    void afterBoth(first.promise, second.promise).then((v) => { result = v; });
+    second.resolve('gpx');
+    await flush();
+    expect(result).toBeNull();
+    first.resolve();
+    await flush();
+    expect(result).toBe('gpx');
+  });
+
+  it('l’erreur de la première d’abord, même si la seconde échoue aussi, et même plus tôt', async () => {
+    const first = deferred<void>();
+    const second = deferred<string>();
+    const both = afterBoth(first.promise, second.promise);
+    second.reject(new Error('GPX illisible'));
+    await flush();
+    first.reject(new Error('fiche'));
+    await expect(both).rejects.toThrow('fiche');
+  });
+
+  it('sinon l’erreur de la seconde, une fois la première finie', async () => {
+    await expect(afterBoth(Promise.resolve(), Promise.reject(new Error('GPX illisible')))).rejects.toThrow('GPX illisible');
+    await expect(afterBoth(Promise.resolve(), Promise.resolve(null))).resolves.toBeNull();
   });
 });

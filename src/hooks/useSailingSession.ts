@@ -191,6 +191,6 @@ export const useSailingSession = ({
     /** Seuils de manœuvre effectivement retenus, accordés à l'allure de la session. */
     maneuverThresholds,
     /** Nombre de points du fichier, avant tout filtrage. */
-    pointCount: gpx.rawPoints.length,
+    pointCount: gpx.pointCount,
   };
 };

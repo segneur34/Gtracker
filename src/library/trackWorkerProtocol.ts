@@ -1,17 +1,29 @@
 import { prepareTrack, type PreparedTrack, type PrepareTrackOptions } from '../core/prepareTrack';
+import type { SportFamily } from '../core/sportProfiles';
+import type { SportType } from '../core/types';
+import { sessionColorTrack, type SessionColorTrack } from './sessionTrack';
 import { summarizeGpx, type SummarizeGpxOptions } from './summarizeGpx';
 import type { AnalyzedGpx } from './summaryOptions';
 
 /**
  * Messages entre l'application et le worker des traces : lire un GPX et préparer sa trace pour
- * l'analyse (`prepare`), ou le résumer pour sa fiche (`summarize`). Le worker et le calcul en ligne passent par
- * le même aiguillage (`runTrackJob`) : mêmes chiffres par construction.
+ * l'analyse (`prepare`), le résumer pour sa fiche (`summarize`), ou tirer sa trace colorée pour une vignette ou une
+ * image partagée (`colorTrack`). Le worker et le calcul en ligne passent par le même aiguillage (`runTrackJob`) :
+ * mêmes chiffres par construction.
  */
+
+/** Ce que prend la trace colorée d'une session (`sessionColorTrack`) : son calcul, son allure imposée, sa famille. */
+export interface ColorTrackOptions {
+  sport: SportType | null;
+  referenceOverrideMs: number | null;
+  family: SportFamily;
+}
 
 /** Ce que prend et rend chaque calcul. */
 export interface TrackJobs {
   prepare: { options: PrepareTrackOptions; result: PreparedTrack };
   summarize: { options: SummarizeGpxOptions; result: AnalyzedGpx | null };
+  colorTrack: { options: ColorTrackOptions; result: SessionColorTrack | null };
 }
 
 export type TrackJobKind = keyof TrackJobs;
@@ -32,8 +44,12 @@ export type TrackResponse =
 
 /** Le calcul demandé, sur le fil où il est appelé. */
 export const runTrackJob = <K extends TrackJobKind>(kind: K, gpxText: string, options: TrackJobs[K]['options']): TrackJobs[K]['result'] => {
-  // Les deux branches rendent le type de leur calcul ; TypeScript ne relie pas `kind` au type rendu.
+  // Chaque branche rend le type de son calcul ; TypeScript ne relie pas `kind` au type rendu.
   if (kind === 'prepare') return prepareTrack(gpxText, options as PrepareTrackOptions) as TrackJobs[K]['result'];
+  if (kind === 'colorTrack') {
+    const { sport, referenceOverrideMs, family } = options as ColorTrackOptions;
+    return sessionColorTrack(gpxText, sport, referenceOverrideMs, family) as TrackJobs[K]['result'];
+  }
   return summarizeGpx(gpxText, options as SummarizeGpxOptions) as TrackJobs[K]['result'];
 };
 
