@@ -74,6 +74,7 @@ const usedDevice = (): void => {
   files.set('reglages/lea.json', settingsFile('lea', 'Léa', 500));
   files.set('sessions/2026-10-27_10-00-00_kite.gpx', gpxAt(0));
   files.set('sessions/2026-10-27_11-00-00_kite.gpx', gpxAt(30));
+  files.set('journaux/journal-1.jsonl', '{"t":1}');
   files.set('a-moi.txt', 'à moi');
   files.set('sessions/notes.txt', 'à moi aussi');
 };
@@ -137,6 +138,7 @@ describe('réglages d\'usine', () => {
     }
     expect(files.has('reglages/pc.json')).toBe(false);
     expect(files.has('reglages/lea.json')).toBe(true);
+    expect(files.has('journaux/journal-1.jsonl')).toBe(true);
     expect(files.has('sessions/2026-10-27_10-00-00_kite.gpx')).toBe(true);
     expect(files.has('sessions/2026-10-27_10-00-00_kite.json')).toBe(true);
     expect(log.filter((l) => l.startsWith('remove'))).toEqual(['remove reglages/pc.json']);
@@ -153,6 +155,7 @@ describe('tout supprimer', () => {
     expect(await library.eraseEverything((p) => progress.push(p.done))).toBeNull();
     expect(reloads).toEqual(['/']);
     expect([...files.keys()].sort()).toEqual(['a-moi.txt', 'sessions/notes.txt']);
+    expect([...files.keys()].some((p) => p.startsWith('journaux/'))).toBe(false);
     expect([...stored.keys()].sort()).toEqual(['autre.application', STORAGE_KEYS.memoryFolder]);
     expect(cleared.count).toBe(1);
     expect(log.filter((l) => l.startsWith('remove')).pop()).toBe('remove gtracker.json');

@@ -2,7 +2,7 @@ import { FORMAT_ID, STORAGE_KEYS } from '../core/appIdentity';
 import { t, tn } from '../core/i18n';
 import type { FolderEntry, MemoryFolder } from '../platform/memoryFolder';
 import {
-  LEARNED_PLACES_FILE, MARKER_FILE, README_FILE, RESTING_HR_FILE, ROUTES_DIR, SESSIONS_DIR, SETTINGS_DIR,
+  JOURNALS_DIR, LEARNED_PLACES_FILE, MARKER_FILE, README_FILE, RESTING_HR_FILE, ROUTES_DIR, SESSIONS_DIR, SETTINGS_DIR,
 } from './folderLayout';
 
 /**
@@ -99,6 +99,8 @@ const DIR_FILES: Readonly<Record<string, RegExp>> = {
   [SESSIONS_DIR]: /\.(gpx|json|imu)$/i,
   [ROUTES_DIR]: /\.(json|gpx)$/i,
   [SETTINGS_DIR]: /\.json$/i,
+  // Journaux d'enregistrement copiés tels quels : leur nom et leur extension viennent du journal d'origine.
+  [JOURNALS_DIR]: /./,
 };
 
 /** Suffixes d'une écriture interrompue : le fichier qu'elle remplaçait ou créait, puis ce suffixe. */
@@ -123,9 +125,11 @@ export const isAppMemoryFile = (dir: string, name: string): boolean => {
   return pattern !== undefined && pattern.test(base);
 };
 
-/** Contenu des quatre dossiers lus par la remise à zéro. */
+/** Contenu des dossiers lus par la remise à zéro. */
 export interface MemoryListings {
   root: readonly Pick<FolderEntry, 'name' | 'kind'>[];
+  /** `journaux/` : absent de la lecture, il n'y a rien à effacer. */
+  journals?: readonly Pick<FolderEntry, 'name' | 'kind'>[];
   sessions: readonly Pick<FolderEntry, 'name' | 'kind'>[];
   routes: readonly Pick<FolderEntry, 'name' | 'kind'>[];
   settings: readonly Pick<FolderEntry, 'name' | 'kind'>[];
@@ -149,7 +153,7 @@ const isGpx = (name: string): boolean => /\.gpx$/i.test(name);
  * Fichiers de l'application à effacer pour « Tout supprimer », dans l'ordre : les GPX des sessions d'abord (une
  * interruption laisse des sessions entières ou absentes, jamais une trace sans fiche qui se recrée), puis leurs
  * fiches et capteurs, les itinéraires, les fichiers de réglages, ceux de la racine, et le marqueur en dernier : tant
- * qu'il reste quelque chose, le dossier se reconnaît. Jamais un dossier : sur le téléphone, effacer un dossier
+ * qu'il reste quelque chose, le dossier se reconnaît. Les journaux gardés de côté (`journaux/`) partent en premier. Jamais un dossier : sur le téléphone, effacer un dossier
  * efface tout ce qu'il contient.
  */
 export const memoryResetTargets = (listings: MemoryListings): MemoryTargets => {
@@ -161,6 +165,7 @@ export const memoryResetTargets = (listings: MemoryListings): MemoryTargets => {
   const at = (dir: string) => (name: string): string => `${dir}/${name}`;
   return {
     paths: [
+      ...filesOf(JOURNALS_DIR, listings.journals ?? []).map(at(JOURNALS_DIR)),
       ...gpx.map(at(SESSIONS_DIR)),
       ...sessions.filter((n) => !isGpx(n)).map(at(SESSIONS_DIR)),
       ...routes.map(at(ROUTES_DIR)),
@@ -173,9 +178,10 @@ export const memoryResetTargets = (listings: MemoryListings): MemoryTargets => {
   };
 };
 
-/** Lit les quatre dossiers de la remise à zéro. */
+/** Lit les dossiers de la remise à zéro ; `journaux/`, facultatif, ne bloque pas s'il ne se lit pas. */
 export const readMemoryListings = async (folder: Pick<MemoryFolder, 'list'>): Promise<MemoryListings> => ({
   root: await folder.list(''),
+  journals: await folder.list(JOURNALS_DIR).catch(() => []),
   sessions: await folder.list(SESSIONS_DIR),
   routes: await folder.list(ROUTES_DIR),
   settings: await folder.list(SETTINGS_DIR),

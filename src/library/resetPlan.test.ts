@@ -86,11 +86,13 @@ describe('fichiers de l\'application dans le dossier mémoire', () => {
     sessions: [file('a.json'), file('a.gpx'), file('a.imu'), file('b.gpx'), file('notes.txt'), dir('sous'), dir('c.gpx')],
     routes: [file('r.json'), file('r.gpx'), file('lisez.txt')],
     settings: [file('pc.json'), file('autre.json'), file('lisez.txt')],
+    journals: [file('journal-1.jsonl'), dir('sous')],
   });
 
-  it('dans l\'ordre : GPX, fiches et capteurs, itinéraires, réglages, racine, marqueur en dernier ; jamais un dossier', () => {
+  it('dans l\'ordre : journaux, GPX, fiches et capteurs, itinéraires, réglages, racine, marqueur en dernier ; jamais un dossier', () => {
     const { paths, sessions, routes } = memoryResetTargets(listings());
     expect(paths).toEqual([
+      'journaux/journal-1.jsonl',
       'sessions/a.gpx', 'sessions/b.gpx', 'sessions/a.json', 'sessions/a.imu',
       'itineraires/r.json', 'itineraires/r.gpx', 'reglages/pc.json', 'reglages/autre.json',
       'LISEZMOI.txt', 'fc-repos.json', 'lieux.json', 'gtracker.json',
@@ -103,7 +105,7 @@ describe('fichiers de l\'application dans le dossier mémoire', () => {
     const files = new Map([
       ['gtracker.json', '{}'], ['LISEZMOI.txt', ''], ['a-moi.txt', 'à moi'], ['x.gpx', '<gpx/>'],
       ['sessions/a.gpx', ''], ['sessions/a.json', ''], ['sessions/notes.txt', ''], ['reglages/pc.json', ''],
-      ['reglages/lisez.txt', ''], ['photos/x.jpg', ''], ['itineraires/r.json', ''],
+      ['reglages/lisez.txt', ''], ['photos/x.jpg', ''], ['itineraires/r.json', ''], ['journaux/j.jsonl', ''],
     ]);
     const log: string[] = [];
     const progress: number[] = [];

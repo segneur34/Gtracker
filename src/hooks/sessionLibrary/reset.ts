@@ -84,7 +84,8 @@ export const factoryReset = async (): Promise<string | null> => {
  * navigateur aussi quand un dossier du PC est désigné : elle en garde une copie), puis les fichiers de l'appareil
  * hors du dossier, puis les clés de l'appareil ; l'application se recharge comme à sa première ouverture. Un échec
  * dans le dossier arrête tout, sans rien toucher d'autre : les écritures reprennent, la mémoire est relue, et le
- * compte rendu est rendu (et dit dans la carte de la mémoire). `onProgress` suit l'effacement du dossier.
+ * compte rendu est rendu (et dit dans la carte de la mémoire). `onProgress` suit l'effacement du dossier, journaux
+ * gardés de côté compris.
  */
 export const eraseEverything = async (onProgress: (progress: ResetProgress) => void = () => undefined): Promise<string | null> => {
   if (resetRunning) return RESET_RUNNING_REFUSAL;
