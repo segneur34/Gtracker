@@ -137,10 +137,25 @@ describe('greffon Recording : ce que la page appelle, le Java le porte', () => {
 
   it('mêmes événements : la page est « là » pour le service tant qu\'elle écoute les positions', () => {
     const events = [...new Set([...LOCATION_TS.matchAll(/recording\.addListener\('(\w+)'/g)].map((m) => m[1]))];
-    expect(events.sort()).toEqual(['error', 'fix']);
+    expect(events.sort()).toEqual(['error', 'fix', 'locationEnabled']);
     expect(captured(RECORDING_PLUGIN, /\bEVENT_FIX = "([^"]+)";/)).toBe('fix');
     expect(captured(RECORDING_PLUGIN, /\bEVENT_ERROR = "([^"]+)";/)).toBe('error');
+    expect(captured(RECORDING_PLUGIN, /\bEVENT_LOCATION_ENABLED = "([^"]+)";/)).toBe('locationEnabled');
     expect(between(RECORDING_PLUGIN, 'private void syncPage()', 'private void deliver(')).toContain('hasListeners(EVENT_FIX)');
+  });
+
+  it("localisation rendue : le service le dit à la page par son événement, sans charge, et une nouvelle coupure sera redite", () => {
+    const enabled = between(RECORDING_SERVICE, 'public void onProviderEnabled(', 'if (manager == null)');
+    expect(enabled).toContain('disabledTold = false;');
+    expect(enabled).toContain('target.onLocationEnabled();');
+    expect(between(RECORDING_PLUGIN, 'public void onLocationEnabled()', '@Override')).toContain('deliver(EVENT_LOCATION_ENABLED, new JSObject());');
+  });
+
+  it("la relance du GPS ne s'arme qu'à une position reçue : ni au départ ni après une relance", () => {
+    expect(between(RECORDING_SERVICE, 'private void begin(Settings next)', 'private void end()')).not.toContain('armRestart(');
+    expect(between(RECORDING_SERVICE, 'private final Runnable gpsRelisten', 'private final Runnable gpsSilent')).not.toContain('armRestart(');
+    expect(between(RECORDING_SERVICE, 'private void onLocation(', 'private boolean pause(')).toContain('armRestart(restart.onFix(now));');
+    expect(between(RECORDING_SERVICE, 'private final Runnable gpsSilent', 'private final BroadcastReceiver')).toContain('restart.onExpired(');
   });
 
   it('chaque code de refus que la page traduit est un code que le Java envoie', () => {

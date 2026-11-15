@@ -126,6 +126,12 @@ Limites connues : un trou au milieu du journal de la page (messages calés puis 
 
 `@capgo/background-geolocation` désinstallé, fichiers Capacitor d'Android régénérés ; licences refaites (la ligne du greffon et le groupe « Services Google Play » sortent, 69 composants natifs cités avant, 53 après) ; marqueurs du manifeste retirés avec le récepteur et `RECEIVE_BOOT_COMPLETED`, que plus aucune dépendance n'ajoute ; les lignes de documents relevées à la partie C sont accordées, DECISIONS §6 réécrit. Seul reste du mot : l'identifiant du canal de notification, gardé pour les réglages d'écran verrouillé.
 
+### Défauts corrigés le 15/11 après le premier essai au téléphone
+
+- Localisation rendue en cours d'enregistrement : le service le dit à la page (événement `locationEnabled`, sans charge), qui quitte l'alerte rouge pour l'attente de la première position, ou pour la suite normale si des positions étaient déjà venues ; une nouvelle coupure est redite.
+- La relance « GPS muet » coupait le GPS brut pendant qu'il cherchait sa première position (le moteur repartait de zéro, une à deux minutes perdues) : elle ne s'arme plus qu'à une position reçue (`GpsRestart.java`, testé en JUnit), jamais avant la première depuis le départ, le retour de la localisation ou une relance, jamais localisation coupée.
+- Cadence lente : le délai vaut au moins trois intervalles demandés, une écoute à déplacement minimal n'est jamais relancée, et une position plus espacée que le délai n'arme qu'une relance, jamais une boucle.
+
 ### État au 15/11
 
 Quatre parties commitées, vérification complète verte, relectures sans défaut confirmé, banc identique (`session-save-resume`, `gps-perdu`, `notification`, `carte-direct`, `apropos`). APK 0.01.00 construite et installée le 15/11 (version choisie par l'utilisateur après 0.00.99). Reste : les essais 277 à 279, puis la passe de documentation (ETAT §12, HISTORIQUE).

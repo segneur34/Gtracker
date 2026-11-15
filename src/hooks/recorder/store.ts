@@ -96,7 +96,7 @@ export interface RecorderState {
   gpsLost: boolean;
   /** Aucune position reçue depuis le départ, ou depuis la reprise d'un journal ; effacé à la première. */
   awaitingFix: boolean;
-  /** Localisation du téléphone coupée, dite par la source ; effacé à la position suivante. */
+  /** Localisation du téléphone coupée, dite par la source ; effacé à son retour, dit par la source, ou à la position suivante. */
   locationOff: boolean;
   /** Vrai quelques secondes après « Réessayer » du GPS : « nouvelle tentative… » (`GPS_RETRY_FEEDBACK_MS`). */
   gpsRetrying: boolean;

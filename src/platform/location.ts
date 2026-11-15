@@ -85,12 +85,15 @@ export interface LocationSource {
   /**
    * Démarre la réception : `onFix` à chaque position, `onError` quand la
    * source échoue (permission refusée, localisation coupée), avec sa cause
-   * quand la page en fait quelque chose. Rend la fonction d'arrêt.
+   * quand la page en fait quelque chose, et `onLocationOn` quand la
+   * localisation du téléphone, dite coupée, est rendue (service du téléphone
+   * seulement). Rend la fonction d'arrêt.
    */
   start(
     options: LocationWatchOptions,
     onFix: (fix: LocationFix) => void,
-    onError: (message: string, cause?: LocationErrorCause) => void
+    onError: (message: string, cause?: LocationErrorCause) => void,
+    onLocationOn?: () => void
   ): Promise<StopLocation>;
   /**
    * Service du téléphone seulement : lui dit la pause manuelle ouverte (`paused`) ou levée, à l'heure `atMs` de la
@@ -131,6 +134,8 @@ interface RecordingPlugin {
   requestPermissions(options: { permissions: ServicePermission[] }): Promise<ServicePermissions>;
   addListener(event: 'fix', listener: (fix: Partial<LocationFix>) => void): Promise<PluginListenerHandle>;
   addListener(event: 'error', listener: (error: ServiceError) => void): Promise<PluginListenerHandle>;
+  /** Sans charge : la localisation du téléphone est rendue, le GPS cherche sa position. */
+  addListener(event: 'locationEnabled', listener: () => void): Promise<PluginListenerHandle>;
 }
 
 const recording = registerPlugin<RecordingPlugin>('Recording');
@@ -184,13 +189,14 @@ const stopService = (): Promise<void> => {
 };
 
 /**
- * Écoute le service : ses positions et ses erreurs. La page est « là », pour lui, tant qu'elle écoute ses
- * positions : sans écoute, il affiche le texte de l'application fermée, veille seul sur le GPS et arme sa garde.
- * `stop` arrête le service puis retire l'écoute ; `unlisten` ne fait que la retirer.
+ * Écoute le service : ses positions, ses erreurs et le retour de la localisation. La page est « là », pour lui,
+ * tant qu'elle écoute ses positions : sans écoute, il affiche le texte de l'application fermée, veille seul sur le
+ * GPS et arme sa garde. `stop` arrête le service puis retire l'écoute ; `unlisten` ne fait que la retirer.
  */
 const listenToService = async (
   onFix: (fix: LocationFix) => void,
-  onError: (message: string, cause?: LocationErrorCause) => void
+  onError: (message: string, cause?: LocationErrorCause) => void,
+  onLocationOn?: () => void
 ): Promise<{ stop: StopLocation; unlisten: () => Promise<void> }> => {
   let stopped = false;
   let counted = false;
@@ -223,6 +229,14 @@ const listenToService = async (
         console.warn('Erreur du service non traitée', err);
       }
     }));
+    handles.push(await recording.addListener('locationEnabled', () => {
+      if (stopped) return;
+      try {
+        onLocationOn?.();
+      } catch (err) {
+        console.warn('Retour de la localisation non traité', err);
+      }
+    }));
   } catch (err) {
     await unlisten();
     throw err;
@@ -248,16 +262,16 @@ const listenToService = async (
 /**
  * GPS du téléphone, par le service de l'application : au premier plan, avec sa notification, il continue écran
  * éteint et application fermée. La page écoute d'abord, démarre ensuite : le service la sait là dès sa première
- * position. Localisation coupée au démarrage : le service démarre quand même et le dit (`locationOff`), les
- * positions arrivent seules dès qu'elle est rendue. Session déjà en cours : rien n'est relancé.
+ * position. Localisation coupée au démarrage : le service démarre quand même et le dit (`locationOff`), puis dit
+ * son retour (`onLocationOn`) ; les positions arrivent seules ensuite. Session déjà en cours : rien n'est relancé.
  */
 const nativeSource: LocationSource = {
   label: t('GPS du téléphone'),
-  start: async (options, onFix, onError) => {
+  start: async (options, onFix, onError, onLocationOn) => {
     const service = options.service;
     if (!service) throw new Error(LOCATION_UNAVAILABLE);
     await stopping;
-    const { stop, unlisten } = await listenToService(onFix, onError);
+    const { stop, unlisten } = await listenToService(onFix, onError, onLocationOn);
     try {
       await recording.start({
         ...service,
@@ -361,17 +375,18 @@ export const deviceLocationState = async (): Promise<DeviceLocationState> => {
 
 /**
  * Rebranche la page, rechargée ou rouverte, sur le service de position resté en route, sans jamais le relancer :
- * elle écoute de nouveau ses positions et ses erreurs, et le service la sait revenue. Ce qu'il a reçu entre-temps
+ * elle écoute de nouveau ses positions, ses erreurs et le retour de la localisation, et le service la sait revenue. Ce qu'il a reçu entre-temps
  * est dans son journal (`readLoggedFixes`). Rend l'arrêt, qui arrête le service. Lève dans le navigateur, où aucun
  * service ne survit à la page.
  */
 export const attachDeviceLocation = async (
   onFix: (fix: LocationFix) => void,
-  onError: (message: string, cause?: LocationErrorCause) => void
+  onError: (message: string, cause?: LocationErrorCause) => void,
+  onLocationOn?: () => void
 ): Promise<StopLocation> => {
   if (!isNativeApp()) throw new Error(LOCATION_UNAVAILABLE);
   await stopping;
-  return (await listenToService(onFix, onError)).stop;
+  return (await listenToService(onFix, onError, onLocationOn)).stop;
 };
 
 /**

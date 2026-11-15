@@ -26,7 +26,7 @@ const plugin = vi.hoisted(() => {
     positionRefusal: null as string | null,
     /** L'arrêt attend ceci avant de finir. */
     stopGate: null as Promise<void> | null,
-    listeners: { fix: new Set<Listener>(), error: new Set<Listener>() },
+    listeners: { fix: new Set<Listener>(), error: new Set<Listener>(), locationEnabled: new Set<Listener>() },
     state: async () => ({ running: fake.running, session: fake.running ? fake.session : null, paused: fake.paused }),
     start: async (options: Record<string, unknown>) => {
       fake.calls.push('start');
@@ -66,7 +66,7 @@ const plugin = vi.hoisted(() => {
     },
     checkPermissions: async () => ({ location: 'granted', notification: 'denied' }),
     requestPermissions: async () => ({ location: 'granted', notification: 'granted' }),
-    addListener: async (event: 'fix' | 'error', listener: Listener) => {
+    addListener: async (event: 'fix' | 'error' | 'locationEnabled', listener: Listener) => {
       fake.calls.push(`listen:${event}`);
       fake.listeners[event].add(listener);
       return {
@@ -77,6 +77,7 @@ const plugin = vi.hoisted(() => {
     },
     emit: (timeMs: number) => fake.listeners.fix.forEach((l) => l({ timeMs, lat: 43, lon: 3, accuracyM: 5, speedMs: 2.5 })),
     fail: (code: string) => fake.listeners.error.forEach((l) => l({ code, message: 'message du téléphone, jamais montré' })),
+    locationBack: () => fake.listeners.locationEnabled.forEach((l) => l({})),
   };
   return fake;
 });
@@ -146,6 +147,7 @@ describe('service de position du téléphone', () => {
     });
     plugin.listeners.fix.clear();
     plugin.listeners.error.clear();
+    plugin.listeners.locationEnabled.clear();
   });
   afterEach(() => {
     runtime.native = false;
@@ -154,7 +156,7 @@ describe('service de position du téléphone', () => {
   it('départ : la page écoute avant de démarrer, et donne au service la session, ses textes et ses délais', async () => {
     const received: LocationFix[] = [];
     const stop = await deviceLocationSource().start(NATIVE_OPTIONS, (f) => received.push(f), () => {});
-    expect(plugin.calls).toEqual(['listen:fix', 'listen:error', 'start']);
+    expect(plugin.calls).toEqual(['listen:fix', 'listen:error', 'listen:locationEnabled', 'start']);
     expect(plugin.started).toEqual({ ...SERVICE, intervalMs: 1000, distanceFilterM: 0, title: 'titre', text: 'texte' });
 
     plugin.emit(T0);
@@ -172,6 +174,7 @@ describe('service de position du téléphone', () => {
     expect(plugin.running).toBe(false);
     expect(plugin.listeners.fix.size).toBe(0);
     expect(plugin.listeners.error.size).toBe(0);
+    expect(plugin.listeners.locationEnabled.size).toBe(0);
     plugin.emit(T0);
     expect(received).toEqual([]);
   });
@@ -227,6 +230,26 @@ describe('service de position du téléphone', () => {
     expect(errors).toHaveLength(2);
   });
 
+  it('localisation rendue : dite à la page par son événement, sans erreur, et plus rien une fois arrêté', async () => {
+    const events: string[] = [];
+    const stop = await deviceLocationSource().start(
+      NATIVE_OPTIONS, () => {}, (_message, cause) => events.push(`erreur:${cause ?? ''}`), () => events.push('rendue')
+    );
+    plugin.fail('LOCATION_DISABLED');
+    plugin.locationBack();
+    expect(events).toEqual(['erreur:locationOff', 'rendue']);
+    // Un abonné en échec ne coupe pas l'écoute.
+    const failing = await attachDeviceLocation(() => {}, () => {}, () => {
+      throw new Error('abonné en échec');
+    });
+    expect(() => plugin.locationBack()).not.toThrow();
+    expect(events).toEqual(['erreur:locationOff', 'rendue', 'rendue']);
+    await stop();
+    await failing();
+    plugin.locationBack();
+    expect(events).toHaveLength(3);
+  });
+
   it('un abonné en échec ne coupe pas l\'écoute', async () => {
     const received: number[] = [];
     const stop = await deviceLocationSource().start(NATIVE_OPTIONS, (f) => {
@@ -274,7 +297,7 @@ describe('service de position du téléphone', () => {
     plugin.session = T0;
     const received: number[] = [];
     const stop = await attachDeviceLocation((f) => received.push(f.timeMs), () => {});
-    expect(plugin.calls).toEqual(['listen:fix', 'listen:error']);
+    expect(plugin.calls).toEqual(['listen:fix', 'listen:error', 'listen:locationEnabled']);
     plugin.emit(T0 + 1000);
     expect(received).toEqual([T0 + 1000]);
     // Écouté par la page : il n'est pas orphelin.

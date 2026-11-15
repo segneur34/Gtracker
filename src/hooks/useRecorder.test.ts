@@ -510,6 +510,65 @@ describe('prévenir quand ça rate', () => {
     expect((journal.text ?? '').split('\n').filter((l) => l.startsWith('["gps"')).map((l) => (JSON.parse(l) as unknown[])[2])).toEqual(['settings']);
   });
 
+  it("localisation rendue avant toute position : l'alerte part pour l'attente de la première ; coupée en route puis rendue, l'alerte va et vient", async () => {
+    let onFix: ((fix: LocationFix) => void) | null = null;
+    let onError: ((message: string, cause?: 'locationOff') => void) | null = null;
+    let onLocationOn: (() => void) | undefined;
+    const source: LocationSource = {
+      label: 'Coupée',
+      start: async (_options, fix, error, locationOn) => {
+        onFix = fix;
+        onError = error;
+        onLocationOn = locationOn;
+        error('Localisation coupée.', 'locationOff');
+        return async () => undefined;
+      },
+    };
+    await recorder.startRecording(activity, source);
+    let state = recorder.getRecorderState();
+    expect(state.locationOff).toBe(true);
+    expect(state.awaitingFix).toBe(true);
+    onLocationOn!();
+    state = recorder.getRecorderState();
+    expect(state.locationOff).toBe(false);
+    expect(state.awaitingFix).toBe(true);
+    expect(state.error).toBeNull();
+    onFix!({ timeMs: T0, lat: 43, lon: 3, speedMs: 3, accuracyM: 4 });
+    state = recorder.getRecorderState();
+    expect(state.locationOff).toBe(false);
+    expect(state.awaitingFix).toBe(false);
+    // Coupée en route, après des positions : alerte posée, puis levée à son retour, sans revenir à l'attente.
+    onError!('Localisation coupée.', 'locationOff');
+    expect(recorder.getRecorderState().locationOff).toBe(true);
+    onLocationOn!();
+    state = recorder.getRecorderState();
+    expect(state.locationOff).toBe(false);
+    expect(state.awaitingFix).toBe(false);
+    expect(state.error).toBeNull();
+    // Coupée en route, puis « GPS perdu » ajouté par la veille : au retour, le texte de la coupure part, « GPS perdu »
+    // reste jusqu'à la position suivante.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(T0 + 1_000);
+    onFix!({ timeMs: T0 + 1_000, lat: 43, lon: 3, speedMs: 3, accuracyM: 4 });
+    onError!('Localisation coupée.', 'locationOff');
+    vi.setSystemTime(T0 + 62_000);
+    gps.expire?.();
+    expect(recorder.getRecorderState().error).toBe(`Localisation coupée. ${recorder.GPS_LOST_ERROR}`);
+    onLocationOn!();
+    state = recorder.getRecorderState();
+    expect(state.locationOff).toBe(false);
+    expect(state.gpsLost).toBe(true);
+    expect(state.error).toBe(recorder.GPS_LOST_ERROR);
+    vi.setSystemTime(T0 + 63_000);
+    onFix!({ timeMs: T0 + 63_000, lat: 43, lon: 3, speedMs: 3, accuracyM: 4 });
+    expect(recorder.getRecorderState().error).toBeNull();
+    vi.useRealTimers();
+    // Rendue sans avoir été dite coupée : rien ne change, une autre erreur reste affichée.
+    onError!('Autre panne.');
+    onLocationOn!();
+    expect(recorder.getRecorderState().error).toBe('Autre panne.');
+  });
+
   it('FC perdue après 1 min sans mesure lisible, une fois, sans rien armer avant la première mesure ni en pause', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(T0);

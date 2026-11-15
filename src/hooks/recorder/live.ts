@@ -15,7 +15,7 @@ import {
 } from '../../recording/session';
 import { flushJournal, journalFlushDue, queueJournalLines, resetJournalBuffer } from './journalBuffer';
 import { fixListeners, pausePositionListeners, session, setState, state, type PendingSession } from './store';
-import { applyGpsWatch, startGpsWatchFor, watch } from './watches';
+import { applyGpsWatch, GPS_LOST_ERROR, startGpsWatchFor, watch, withoutGpsLost } from './watches';
 
 /**
  * Session en cours : sa remise au départ, la réception des positions de la source (veille du GPS, pause
@@ -26,6 +26,22 @@ import { applyGpsWatch, startGpsWatchFor, watch } from './watches';
 export const onSourceError = (message: string, cause?: LocationErrorCause): void => {
   session.sourceError = message;
   setState({ error: message, locationOff: cause === 'locationOff' });
+};
+
+/**
+ * Localisation du téléphone rendue, dite par la source : l'alerte rouge et son message s'effacent. Avant toute
+ * position, la page revient à l'attente ordinaire de la première (`awaitingFix`, gardé depuis le départ) ; après,
+ * la veille du GPS reprend son cours. Sans effet si la localisation n'était pas dite coupée.
+ */
+export const onSourceLocationOn = (): void => {
+  if (!state.locationOff) return;
+  // « GPS perdu », ajouté entre-temps par la veille, reste affiché : seule la position suivante le lève. Une autre
+  // alerte, venue après celle de la source, n'est pas touchée.
+  if (session.sourceError !== null && withoutGpsLost(state.error) === session.sourceError) {
+    setState({ error: state.gpsLost ? GPS_LOST_ERROR : null });
+  }
+  session.sourceError = null;
+  setState({ locationOff: false });
 };
 
 /**

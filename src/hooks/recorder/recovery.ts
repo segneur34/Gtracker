@@ -26,7 +26,7 @@ import { JOURNALS_DIR } from '../../library/folderLayout';
 import { EMPTY_RECORDING_STATS, isNewerFix, roundFix, splitIntoSegments, type RecordingStats } from '../../recording/session';
 import { effectiveRecordingProfile, readStoredActivities } from '../useSportSettings';
 import { dropJournalLines, flushJournal, queueJournalLines } from './journalBuffer';
-import { buildPendingSession, onSourceError, receiveFix, resetSession, tellSourcePaused } from './live';
+import { buildPendingSession, onSourceError, onSourceLocationOn, receiveFix, resetSession, tellSourcePaused } from './live';
 import {
   CAPTURE_NOT_RESUMED, SENSORS_PAUSE_ERROR, SENSORS_RESUME_ERROR, isBusy, isCommandRunning, joinMessages, runCommand, session, setState,
   state, type RecorderState,
@@ -352,7 +352,7 @@ const resumeSilently = async (text: string, read: ParsedJournal, activity: Activ
     session.stopSource = await attachDeviceLocation((fix) => {
       if (live) receiveFix(fix);
       else buffered.push(fix);
-    }, onSourceError);
+    }, onSourceError, onSourceLocationOn);
     // Le journal est relu tel qu'il est sur le disque, lignes de la ceinture comprises.
     await flushJournal();
     const textNow = (await recordingJournal.read()) ?? first.text;

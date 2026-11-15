@@ -34,7 +34,9 @@ import { flushJournal, queueJournalLines } from './recorder/journalBuffer';
 import {
   applyBeltWatch, applyGpsWatch, releaseRecordingBelt, stopBeltWatch, stopGpsWatch, takeBeltOrWarn, watch, withoutBeltLost, withoutGpsLost,
 } from './recorder/watches';
-import { buildPendingSession, markManualResume, onSourceError, receiveFix, resetSession, sourceOptions, tellSourcePaused } from './recorder/live';
+import {
+  buildPendingSession, markManualResume, onSourceError, onSourceLocationOn, receiveFix, resetSession, sourceOptions, tellSourcePaused,
+} from './recorder/live';
 import {
   abandonResume, catchUpJournal, continueCapture, markCaughtUp, recoverInterruptedRecording, restoreFromJournal, segmentsCaughtUpAtStop,
   watchResumedBelt,
@@ -293,7 +295,7 @@ export const startRecording = exclusive(async (
     // La ceinture et la capture du départ sont gardées dans l'en-tête : ce sont elles que « Continuer » et la reprise
     // seule redemandent.
     await recordingJournal.write(journalHeaderLine(sport, session.startedAtMs, activity, options.heartRate ?? null, options.motion ?? null));
-    session.stopSource = await source.start(sourceOptions(activity, profile), receiveFix, onSourceError);
+    session.stopSource = await source.start(sourceOptions(activity, profile), receiveFix, onSourceError, onSourceLocationOn);
     setState({ status: 'recording' });
   } catch (err) {
     session.stopSource = null;
@@ -363,7 +365,7 @@ export const continuePendingSession = exclusive(async (source: LocationSource | 
     if (belt && parsed.beltStopped) queueJournalLines(journalBeltLine(nowMs, 'asked'));
     await flushJournal();
     const heartRate = getSportProfile(activity.base).heartRate;
-    session.stopSource = await source.start(sourceOptions(activity, effectiveRecordingProfile(activity)), receiveFix, onSourceError);
+    session.stopSource = await source.start(sourceOptions(activity, effectiveRecordingProfile(activity)), receiveFix, onSourceError, onSourceLocationOn);
     if (lifted.resumeLine) await tellSourcePaused(false, nowMs);
     if (belt) {
       await takeBeltOrWarn(belt, heartRate.maxAgeS);
@@ -436,7 +438,7 @@ export const resumeRecording = exclusive(async (): Promise<void> => {
   try {
     const resumedAtMs = markManualResume();
     session.sourceError = null;
-    session.stopSource = await source.start(sourceOptions(activity, profile), receiveFix, onSourceError);
+    session.stopSource = await source.start(sourceOptions(activity, profile), receiveFix, onSourceError, onSourceLocationOn);
     await flushJournal();
     await tellSourcePaused(false, resumedAtMs);
     const sensorsFailed = state.measuringMotion && await resumeMotionCapture().then(() => false, () => true);

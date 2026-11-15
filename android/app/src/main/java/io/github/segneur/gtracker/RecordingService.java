@@ -64,7 +64,10 @@ public class RecordingService extends Service {
     /** Notification simple laissée par la garde après son arrêt. */
     static final int STOPPED_NOTIFICATION_ID = 28352;
 
-    /** GPS muet depuis ce délai : son écoute est relancée, après une courte coupure. */
+    /**
+     * GPS muet depuis ce délai, après avoir donné une position : son écoute est relancée, après une courte coupure.
+     * Jamais pendant la recherche d'une première position ni localisation coupée (GpsRestart).
+     */
     private static final long GPS_RESTART_AFTER_MS = 60_000L;
     private static final long GPS_RESTART_PAUSE_MS = 10_000L;
     /** Rythme auquel la garde est interrogée, page absente. */
@@ -82,6 +85,9 @@ public class RecordingService extends Service {
         void onFix(FixLog.Fix fix);
 
         void onError(String code, String message);
+
+        /** La localisation du téléphone est rendue : le GPS cherche sa position, une erreur LOCATION_DISABLED n'a plus lieu d'être. */
+        void onLocationEnabled();
     }
 
     /** Issue d'un départ demandé par le greffon. */
@@ -343,6 +349,7 @@ public class RecordingService extends Service {
     private boolean listening = false;
     private PowerManager.WakeLock wakeLock;
     private GpsLostWatch watch;
+    private GpsRestart restart;
     private ClosedGuard guard;
     private TonePlayer tones;
     private boolean logFailureTold = false;
@@ -354,14 +361,13 @@ public class RecordingService extends Service {
 
     private final Runnable guardTick = this::askGuard;
 
+    // Rien n'est réarmé ici : le GPS cherche de nouveau sa première position, la suivante armera la relance.
     private final Runnable gpsRelisten = () -> {
-        if (!active) return;
-        requestUpdates();
-        armRestart();
+        if (active) requestUpdates();
     };
 
     private final Runnable gpsSilent = () -> {
-        if (!active) return;
+        if (!active || restart == null || !restart.onExpired(SystemClock.elapsedRealtime())) return;
         Log.w(TAG, "GPS muet : écoute relancée");
         stopUpdates();
         worker.postDelayed(gpsRelisten, GPS_RESTART_PAUSE_MS);
@@ -471,11 +477,11 @@ public class RecordingService extends Service {
         // Une source qui n'envoie qu'après un déplacement se tait à l'arrêt, sans être perdue : pas de veille alors.
         watch = next.gpsLostDelayMs > 0 && next.distanceFilterM <= 0 ? new GpsLostWatch(next.gpsLostDelayMs, next.gpsLostRearmMs) : null;
         guard = new ClosedGuard(next.guardStillRadiusM, next.guardStillDelayMs, next.guardMaxClosedMs);
+        restart = new GpsRestart(GpsRestart.delayFor(GPS_RESTART_AFTER_MS, next.intervalMs, next.distanceFilterM));
         synchronized (STATE) {
             active = true;
         }
         requestUpdates();
-        armRestart();
         syncPage();
         finishStart(null, null);
     }
@@ -508,8 +514,8 @@ public class RecordingService extends Service {
 
     private void onLocation(Location location) {
         if (!active) return;
-        if (listening) armRestart();
         long now = SystemClock.elapsedRealtime();
+        if (listening) armRestart(restart.onFix(now));
         FixLog.Fix fix = toFix(location);
         String line = FixLog.fixLine(fix);
         if (line == null) return;
@@ -628,14 +634,24 @@ public class RecordingService extends Service {
                 @Override
                 public void onProviderDisabled(@NonNull String provider) {
                     // Localisation du téléphone coupée : dit une fois, les positions reviennent seules quand elle est rendue.
-                    if (!active || disabledTold) return;
+                    // Aucune relance tant qu'elle l'est : rien ne viendrait.
+                    if (!active) return;
+                    restart.onLocationDisabled();
+                    worker.removeCallbacks(gpsSilent);
+                    if (disabledTold) return;
                     disabledTold = true;
                     tellPage(ERROR_LOCATION_DISABLED, "Localisation du téléphone coupée");
                 }
 
                 @Override
                 public void onProviderEnabled(@NonNull String provider) {
+                    // Rendue : la page quitte l'alerte pour l'attente de la position, et une nouvelle coupure sera redite.
+                    if (!active) return;
                     disabledTold = false;
+                    restart.onLocationEnabled();
+                    worker.removeCallbacks(gpsSilent);
+                    Page target = page;
+                    if (target != null) target.onLocationEnabled();
                 }
             };
         }
@@ -666,9 +682,10 @@ public class RecordingService extends Service {
         }
     }
 
-    private void armRestart() {
+    /** Arme (ou repousse) la relance pour `delayMs` ; négatif, ne l'arme pas. */
+    private void armRestart(long delayMs) {
         worker.removeCallbacks(gpsSilent);
-        worker.postDelayed(gpsSilent, GPS_RESTART_AFTER_MS);
+        if (delayMs >= 0) worker.postDelayed(gpsSilent, delayMs);
     }
 
     // Sans échéance : le verrou dure ce que dure l'enregistrement, et il est toujours rendu par `end`.

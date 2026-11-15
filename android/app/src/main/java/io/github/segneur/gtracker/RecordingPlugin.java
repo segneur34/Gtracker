@@ -35,7 +35,8 @@ import org.json.JSONObject;
  *   pas reçues.
  * - `currentPosition` : une seule position, sans service ni notification, pour centrer une carte.
  * - `checkPermissions`, `requestPermissions` : position et notifications.
- * - Événements `fix` (une position, déjà écrite au journal) et `error` (`code`, `message`).
+ * - Événements `fix` (une position, déjà écrite au journal), `error` (`code`, `message`) et `locationEnabled` (sans
+ *   charge : la localisation du téléphone est rendue, le GPS cherche sa position).
  *
  * La page est « là » tant que ce greffon vit et qu'elle écoute `fix` ; le service le sait à chaque écouteur ajouté
  * ou retiré. Absente (application balayée, activité détruite, page en cours de recharge), il tient seul la veille
@@ -54,6 +55,7 @@ public class RecordingPlugin extends Plugin {
     static final String NOTIFICATION = "notification";
     private static final String EVENT_FIX = "fix";
     private static final String EVENT_ERROR = "error";
+    private static final String EVENT_LOCATION_ENABLED = "locationEnabled";
 
     private static final String ERROR_BAD_ARGUMENT = "BAD_ARGUMENT";
     private static final String ERROR_NOT_RUNNING = "NOT_RUNNING";
@@ -77,6 +79,11 @@ public class RecordingPlugin extends Plugin {
             data.put("code", code);
             data.put("message", message);
             deliver(EVENT_ERROR, data);
+        }
+
+        @Override
+        public void onLocationEnabled() {
+            deliver(EVENT_LOCATION_ENABLED, new JSObject());
         }
     };
 
@@ -147,7 +154,7 @@ public class RecordingPlugin extends Plugin {
      * Démarre l'enregistrement de `session`. Demande d'abord la position si elle n'est pas accordée (sauf
      * `requestPermissions: false`), puis les notifications dans la foulée. Rend l'état une fois le GPS demandé et
      * le journal ouvert. Localisation du téléphone coupée : le service démarre quand même, l'événement `error`
-     * (`LOCATION_DISABLED`) le dit, et les positions arrivent dès qu'elle est rendue.
+     * (`LOCATION_DISABLED`) le dit, `locationEnabled` dit son retour, et les positions arrivent ensuite.
      */
     @PluginMethod
     public void start(PluginCall call) {
