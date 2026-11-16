@@ -20,7 +20,9 @@ Voulu, décidé d'avance au lot 408 (« si rien ne s'affiche ou ne change : seul
 
 Aujourd'hui : sur la page Enregistrer, au repos, la rangée « Batterie restreinte : Android peut couper l'enregistrement, application fermée. » (`src/pages/RecordingPage.tsx`) est écrite en gris pâle, comme une note.
 
-Voulu : le texte à l'encre (variable du thème, aucune valeur en dur, aucun style en ligne neuf), lisible dehors ; rien d'autre ne bouge sur la page, le lot 416 redessinera les cadres. Lecture de Claude du « se voit pas bien » ; si l'utilisateur voulait dire autre chose (taille, place), il le dira à l'essai.
+Confirmé et précisé par l'utilisateur le 16/11 : « oui c'est ça, il le faudrait en rouge ou avec un cadre ».
+
+Voulu : la rangée devient un cadre d'alerte, celui que la page emploie déjà pour ses autres alertes (localisation coupée, ceinture déconnectée), avec la phrase et son bouton « Autoriser » dedans : on sait ce que le bouton relance, comme le lot 416 le demandera pour toutes les alertes. Choix de Claude entre les deux formes proposées : un texte rouge seul se lit moins bien dehors qu'un cadre, et la charte garde la couleur hors du texte quand elle le peut. Variables du thème, aucune valeur en dur, aucun style en ligne neuf ; le départ n'est jamais bloqué ; rien d'autre ne bouge sur la page, le lot 416 redessinera l'ensemble.
 
 ## Contraintes
 
