@@ -517,7 +517,8 @@ const gnss = registerPlugin<GnssPlugin>('Gnss');
 
 /**
  * « Réessayer » du GPS : demande au téléphone de recharger ses données d'aide (heure, orbites des satellites), qui
- * hâtent une position, sans arrêter le service, la trace ni la notification ; ces données ne sont jamais effacées.
+ * hâtent une position, sans arrêter le service, la trace ni la notification ; ces données ne sont jamais effacées. Tant
+ * qu'aucune position n'est arrivée depuis le départ, localisation allumée, le service refait aussi son inscription au GPS.
  * Vrai si le téléphone a pris la demande ; faux dans le navigateur, ou si elle n'a pas pu partir.
  */
 export const refreshGpsAssistance = async (): Promise<boolean> => {

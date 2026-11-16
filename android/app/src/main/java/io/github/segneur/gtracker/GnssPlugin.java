@@ -28,10 +28,13 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  *
  * « Réessayer » du GPS à l'enregistrement (refreshAssistance) : le téléphone
  * recharge ses données d'aide (heure, puis orbites des satellites), qui
- * hâtent une position. Le service GPS, la trace et la notification ne sont
- * pas touchés, et ces données ne sont jamais effacées (delete_aiding_data
- * ferait repartir le GPS de zéro). Permission normale
- * ACCESS_LOCATION_EXTRA_COMMANDS au manifeste, sans demande.
+ * hâtent une position. Ces données ne sont jamais effacées
+ * (delete_aiding_data ferait repartir le GPS de zéro). Permission normale
+ * ACCESS_LOCATION_EXTRA_COMMANDS au manifeste, sans demande. Tant qu'aucune
+ * position n'est arrivée depuis le départ, localisation allumée, le service
+ * d'enregistrement refait aussi son inscription au GPS
+ * (RecordingService.retryGps) ; la trace et la notification ne sont pas
+ * touchées.
  */
 @CapacitorPlugin(name = "Gnss")
 public class GnssPlugin extends Plugin {
@@ -82,7 +85,9 @@ public class GnssPlugin extends Plugin {
      * Demande au téléphone de recharger ses données d'aide au GPS : l'heure
      * (force_time_injection), puis les orbites prédites des satellites
      * (force_psds_injection depuis Android 11, force_xtra_injection avant).
-     * Rend { sent }, vrai si au moins une demande est partie ; jamais d'échec.
+     * Puis l'inscription du service d'enregistrement au GPS est refaite si elle
+     * n'a encore rien donné. Rend { sent }, vrai si au moins une demande de
+     * données d'aide est partie ; jamais d'échec.
      */
     @PluginMethod
     public void refreshAssistance(PluginCall call) {
@@ -97,6 +102,7 @@ public class GnssPlugin extends Plugin {
         } else {
             Log.w(TAG, "données d'aide : service de localisation absent");
         }
+        RecordingService.retryGps();
         JSObject ret = new JSObject();
         ret.put("sent", sent);
         call.resolve(ret);

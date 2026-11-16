@@ -145,7 +145,9 @@ describe('greffon Recording : ce que la page appelle, le Java le porte', () => {
   });
 
   it("localisation rendue : le service le dit à la page par son événement, sans charge, et une nouvelle coupure sera redite", () => {
-    const enabled = between(RECORDING_SERVICE, 'public void onProviderEnabled(', 'if (manager == null)');
+    expect(between(RECORDING_SERVICE, 'public void onProviderEnabled(', 'if (manager == null)')).toContain('onLocationBack();');
+    expect(between(RECORDING_SERVICE, 'private final BroadcastReceiver locationMode', 'public IBinder onBind(')).toContain('onLocationBack();');
+    const enabled = between(RECORDING_SERVICE, 'private void onLocationBack()', 'private void relisten(');
     expect(enabled).toContain('disabledTold = false;');
     expect(enabled).toContain('target.onLocationEnabled();');
     expect(between(RECORDING_PLUGIN, 'public void onLocationEnabled()', '@Override')).toContain('deliver(EVENT_LOCATION_ENABLED, new JSObject());');

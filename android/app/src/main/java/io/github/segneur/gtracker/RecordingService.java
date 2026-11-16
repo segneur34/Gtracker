@@ -27,6 +27,7 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.ServiceCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.location.LocationListenerCompat;
+import androidx.core.location.LocationManagerCompat;
 import java.io.File;
 import java.io.IOException;
 
@@ -266,6 +267,15 @@ public class RecordingService extends Service {
         if (service == null || !service.worker.post(() -> result.done(service.pause(paused, atMs)))) result.done(false);
     }
 
+    /**
+     * « Réessayer » du GPS : localisation allumée et aucune position depuis le départ, l'inscription au GPS est
+     * refaite (GpsResubscribe). Sans effet si rien ne tourne.
+     */
+    static void retryGps() {
+        RecordingService service = live;
+        if (service != null) service.worker.post(service::retryListen);
+    }
+
     /** La page est là (`next`) ou absente (`null`). */
     static void setPage(Page next) {
         changePage(next, null, false);
@@ -350,6 +360,7 @@ public class RecordingService extends Service {
     private PowerManager.WakeLock wakeLock;
     private GpsLostWatch watch;
     private GpsRestart restart;
+    private GpsResubscribe resubscribe;
     private ClosedGuard guard;
     private TonePlayer tones;
     private boolean logFailureTold = false;
@@ -387,6 +398,21 @@ public class RecordingService extends Service {
         }
     };
 
+    /**
+     * Localisation du téléphone allumée ou coupée, reçue sur le fil de l'enregistrement. Guettée ici et non par la
+     * seule inscription au GPS : faite localisation coupée, celle-ci peut rester inactive à son retour, sans position
+     * ni avis du fournisseur ; elle est alors refaite (GpsResubscribe).
+     */
+    private final BroadcastReceiver locationMode = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (!active || resubscribe == null) return;
+            if (!resubscribe.onLocationMode(locationEnabled())) return;
+            onLocationBack();
+            relisten("localisation rallumée");
+        }
+    };
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -400,6 +426,7 @@ public class RecordingService extends Service {
         worker = new Handler(thread.getLooper());
         ensureChannel(this);
         ContextCompat.registerReceiver(this, shutdown, new IntentFilter(Intent.ACTION_SHUTDOWN), ContextCompat.RECEIVER_NOT_EXPORTED);
+        ContextCompat.registerReceiver(this, locationMode, new IntentFilter(LocationManager.MODE_CHANGED_ACTION), null, worker, ContextCompat.RECEIVER_NOT_EXPORTED);
         live = this;
     }
 
@@ -442,6 +469,11 @@ public class RecordingService extends Service {
         } catch (RuntimeException ignored) {
             // Jamais enregistré : rien à retirer.
         }
+        try {
+            unregisterReceiver(locationMode);
+        } catch (RuntimeException ignored) {
+            // Jamais enregistré : rien à retirer.
+        }
         // Arrêté sans passer par `stop` : le GPS est rendu et le journal fermé avant que le fil ne s'arrête.
         worker.post(this::end);
         thread.quitSafely();
@@ -478,6 +510,7 @@ public class RecordingService extends Service {
         watch = next.gpsLostDelayMs > 0 && next.distanceFilterM <= 0 ? new GpsLostWatch(next.gpsLostDelayMs, next.gpsLostRearmMs) : null;
         guard = new ClosedGuard(next.guardStillRadiusM, next.guardStillDelayMs, next.guardMaxClosedMs);
         restart = new GpsRestart(GpsRestart.delayFor(GPS_RESTART_AFTER_MS, next.intervalMs, next.distanceFilterM));
+        resubscribe = new GpsResubscribe(locationEnabled());
         synchronized (STATE) {
             active = true;
         }
@@ -516,6 +549,7 @@ public class RecordingService extends Service {
         if (!active) return;
         long now = SystemClock.elapsedRealtime();
         if (listening) armRestart(restart.onFix(now));
+        resubscribe.onFix();
         FixLog.Fix fix = toFix(location);
         String line = FixLog.fixLine(fix);
         if (line == null) return;
@@ -633,8 +667,9 @@ public class RecordingService extends Service {
 
                 @Override
                 public void onProviderDisabled(@NonNull String provider) {
-                    // Localisation du téléphone coupée : dit une fois, les positions reviennent seules quand elle est rendue.
-                    // Aucune relance tant qu'elle l'est : rien ne viendrait.
+                    // Localisation du téléphone coupée : dit une fois. Aucune relance tant qu'elle l'est : rien ne viendrait.
+                    // Les positions ne reviennent pas toujours seules à son retour : le service le guette (locationMode)
+                    // et refait alors son inscription.
                     if (!active) return;
                     restart.onLocationDisabled();
                     worker.removeCallbacks(gpsSilent);
@@ -645,13 +680,7 @@ public class RecordingService extends Service {
 
                 @Override
                 public void onProviderEnabled(@NonNull String provider) {
-                    // Rendue : la page quitte l'alerte pour l'attente de la position, et une nouvelle coupure sera redite.
-                    if (!active) return;
-                    disabledTold = false;
-                    restart.onLocationEnabled();
-                    worker.removeCallbacks(gpsSilent);
-                    Page target = page;
-                    if (target != null) target.onLocationEnabled();
+                    if (active) onLocationBack();
                 }
             };
         }
@@ -670,6 +699,44 @@ public class RecordingService extends Service {
             Log.e(TAG, "GPS impossible à écouter", e);
             tellPage(ERROR_START_FAILED, "GPS du téléphone indisponible");
         }
+    }
+
+    /**
+     * Localisation rendue, dite par l'inscription au GPS ou guettée par le service : la page quitte l'alerte pour
+     * l'attente de la position, et une nouvelle coupure sera redite. Sans dommage si les deux avis arrivent.
+     */
+    private void onLocationBack() {
+        disabledTold = false;
+        restart.onLocationEnabled();
+        worker.removeCallbacks(gpsSilent);
+        Page target = page;
+        if (target != null) target.onLocationEnabled();
+    }
+
+    /** Retire puis refait l'inscription au GPS, sur ce fil : une inscription restée inactive repart, sans doublon. */
+    private void relisten(String reason) {
+        if (!active) return;
+        worker.removeCallbacks(gpsSilent);
+        worker.removeCallbacks(gpsRelisten);
+        Log.i(TAG, "Inscription au GPS refaite : " + reason);
+        stopUpdates();
+        requestUpdates();
+    }
+
+    /** « Réessayer » du GPS, sur ce fil : l'inscription est refaite, localisation allumée, sans position depuis le départ. */
+    private void retryListen() {
+        if (!active || resubscribe == null) return;
+        boolean on = locationEnabled();
+        if (resubscribe.onRetry(on)) {
+            // L'avis du retour de la localisation a pu ne jamais arriver : la page quitte ici aussi son alerte.
+            onLocationBack();
+            relisten("Réessayer");
+        } else Log.i(TAG, "Réessayer : inscription au GPS gardée (localisation " + (on ? "allumée, position déjà reçue" : "coupée") + ")");
+    }
+
+    private boolean locationEnabled() {
+        if (manager == null) manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        return manager != null && LocationManagerCompat.isLocationEnabled(manager);
     }
 
     private void stopUpdates() {

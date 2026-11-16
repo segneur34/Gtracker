@@ -101,7 +101,8 @@ const journalGps = (what: JournalGpsEvent): void => {
 
 /**
  * « Réessayer » du GPS pendant l'enregistrement : le téléphone recharge ses données d'aide au GPS
- * (`refreshGpsAssistance`), rien d'autre n'est touché (service, trace, notification). « nouvelle tentative… » reste
+ * (`refreshGpsAssistance`) et, sans position depuis le départ, le service refait son inscription au GPS ; service, trace
+ * et notification restent en place. « nouvelle tentative… » reste
  * affiché `GPS_RETRY_FEEDBACK_MS`, même si la demande n'a rien pu envoyer (navigateur) : un retour visible à l'appui. Un
  * appui pendant ce retour est ignoré. L'appui et son résultat laissent chacun une ligne au journal.
  */
