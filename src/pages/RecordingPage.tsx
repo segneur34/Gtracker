@@ -25,7 +25,7 @@ import {
   sportFamily, type SportFamily,
 } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
-import { formatClock, formatDistance, formatShortDistance, formatSpeed, formatDecimal } from '../core/units';
+import { formatClock, formatDistance, formatShortDistance, formatSpeed, formatDecimal, formatMeters } from '../core/units';
 import LiveMap from '../components/LiveMap';
 import { clearFollowedTrace, useFollowedTrace } from '../hooks/useFollowedTrace';
 import { useTransientValue } from '../hooks/useTransientValue';
@@ -390,9 +390,13 @@ function RecordingMap({ busy, followed, courseMarksOf, liveActivity, family, onR
   family: SportFamily;
   onReduce: () => void;
 }) {
-  // La carte suit chaque position gardée, et en pause manuelle chaque position reçue (le GPS reste allumé), avec son cap.
+  // La carte suit chaque position gardée, et en pause manuelle chaque position reçue (le GPS reste allumé), avec son cap ;
+  // pendant le calage du GPS au départ, la dernière position reçue, pas encore gardée.
   const livePosition = useLivePosition();
   const notes = useRecorderSelector((s) => s.marks);
+  // Incertitude de la position pendant le calage du GPS au départ : un cercle autour d'elle, effacé quand la trace commence.
+  // En pause manuelle, plus de cercle : l'incertitude n'y est plus relevée, son rayon serait périmé.
+  const settlingAccuracyM = useRecorderSelector((s) => (isManualPause(s) ? null : s.settlingAccuracyM));
   const live = useLiveRecording();
   const markGuide = useMarkGuide();
   /** Balises laissées derrière soi : toutes celles d'avant la visée. */
@@ -420,6 +424,7 @@ function RecordingMap({ busy, followed, courseMarksOf, liveActivity, family, onR
     <div className="rec-map">
       <LiveMap key={busy ? 'direct' : `apercu-${followed?.name}-${followed?.points.length}`}
         segments={busy ? live.segments : []} position={position} positionSegment={positionSegment} height="45vh"
+        accuracyM={busy ? settlingAccuracyM : null}
         guide={guide.remaining} guideDone={guide.done} travel={travel}
         marks={mapMarks} validationRadiusM={markGuide.active ? markGuide.validationRadiusM : undefined}
         notes={busy ? notes : undefined}
@@ -480,13 +485,15 @@ function BeltRescue({ underAlert }: { underAlert: boolean }) {
  * Boutons de secours du GPS pendant l'enregistrement (`gpsRetryOffer`) : « Réessayer » tant qu'aucune position n'est
  * venue ou que le GPS est perdu, hors pause manuelle, « nouvelle tentative… » quelques secondes après l'appui ;
  * « Activer la localisation » quand elle est coupée. `underAlert` : la rangée posée sous l'alerte rouge (GPS perdu,
- * localisation coupée) ; sinon sous la ligne d'état, avec l'attente écrite. Aucun ne touche à la trace ni à la
- * notification.
+ * localisation coupée) ; sinon sous la ligne d'état, avec l'attente écrite. Pendant le calage du GPS au départ, à la
+ * même place, « le GPS se cale » et l'incertitude de la dernière position, sans bouton. Aucun ne touche à la trace ni
+ * à la notification.
  */
 function GpsRescue({ underAlert }: { underAlert: boolean }) {
   const status = useRecorderSelector((s) => s.status);
   const pausedReason = useRecorderSelector((s) => s.pausedReason);
   const awaitingFix = useRecorderSelector((s) => s.awaitingFix);
+  const settlingAccuracyM = useRecorderSelector((s) => s.settlingAccuracyM);
   const gpsLost = useRecorderSelector((s) => s.gpsLost);
   const locationOff = useRecorderSelector((s) => s.locationOff);
   const retrying = useRecorderSelector((s) => s.gpsRetrying);
@@ -494,23 +501,29 @@ function GpsRescue({ underAlert }: { underAlert: boolean }) {
     active: status === 'recording' || status === 'paused',
     manualPause: isManualPause({ status, pausedReason }),
     awaitingFix,
+    settling: settlingAccuracyM !== null,
     gpsLost,
     locationOff,
   });
-  if (offer.underAlert !== underAlert || (!offer.retry && !offer.openSettings)) return null;
+  if (offer.underAlert !== underAlert || (!offer.retry && !offer.openSettings && !offer.settling)) return null;
   return (
     <div className="rec-rescue">
       {offer.waiting && <span className="ui-muted">{t('en attente de la première position')}</span>}
-      <span className="rec-rescue__actions">
-        {offer.retry && (
-          <Button size="s" disabled={retrying} onClick={() => void retryRecordingGps()}>
-            {retrying ? t('nouvelle tentative…') : t('Réessayer')}
-          </Button>
-        )}
-        {offer.openSettings && (
-          <Button size="s" onClick={() => void openRecordingLocationSettings()}>{t('Activer la localisation')}</Button>
-        )}
-      </span>
+      {offer.settling && settlingAccuracyM !== null && (
+        <span className="ui-muted">{t('le GPS se cale (± {distance})', { distance: formatMeters(settlingAccuracyM) })}</span>
+      )}
+      {(offer.retry || offer.openSettings) && (
+        <span className="rec-rescue__actions">
+          {offer.retry && (
+            <Button size="s" disabled={retrying} onClick={() => void retryRecordingGps()}>
+              {retrying ? t('nouvelle tentative…') : t('Réessayer')}
+            </Button>
+          )}
+          {offer.openSettings && (
+            <Button size="s" onClick={() => void openRecordingLocationSettings()}>{t('Activer la localisation')}</Button>
+          )}
+        </span>
+      )}
     </div>
   );
 }

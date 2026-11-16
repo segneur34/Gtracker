@@ -1168,6 +1168,7 @@
   "nouvelle tentative…": "trying again…",
   "Reprendre la ceinture": "Use strap again",
   "en attente de la première position": "waiting for the first location",
+  "le GPS se cale (± {distance})": "GPS settling (± {distance})",
   "Activer la localisation": "Turn on location",
   "Appareil cardio": "HR device",
   "Mesurer le pumping": "Measure pumping",
