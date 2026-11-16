@@ -140,7 +140,7 @@ Dans `sailing/` aussi : `pointData.ts` (`PointData` et `trackToPointData`, vue e
 - `learnedPlaces.ts` (+ test) : lieux appris gardés sur l'appareil (clé `gtracker.lieuxAppris`) et dans le fichier lieux.json du dossier : relecture tolérante, fusion entre appareils (le plus récent dans le rayon), texte du fichier ; un lieu appris renommé garde l'ancien nom (`replaces`).
 - `fitToGpx.ts` : conversion unique d'un FIT en texte GPX à l'import (`buildGpx`, lot 35) ; FC et vitesse gardées, une pause donne deux segments.
 - `folderLayout.ts` : noms des fichiers et sous-dossiers du dossier (`sessions/`, `itineraires/`, `reglages/`), marqueur, `LISEZMOI.txt`.
-- `resetPlan.ts` (+ test) : remise à zéro de Réglages › Mémoire, ce que chaque bouton efface : clés de l'appareil classées (`KEY_CLASSES`, exhaustif par le typage), `factoryKeyPlan` et `eraseKeyPlan`, fichiers de l'application dans le dossier mémoire (`isAppMemoryFile`, `memoryResetTargets` dans l'ordre, `eraseAppFiles` qui s'arrête au premier échec), textes de confirmation, de refus et d'interruption.
+- `resetPlan.ts` (+ test) : remise à zéro de Réglages › Mémoire, ce que chaque bouton efface : clés de l'appareil classées (`KEY_CLASSES`, exhaustif par le typage), `factoryKeyPlan` et `eraseKeyPlan`, fichiers de l'application dans le dossier mémoire (`isAppMemoryFile`, `memoryResetTargets` dans l'ordre, sous-dossier « journaux » compris, `eraseAppFiles` qui s'arrête au premier échec), textes de confirmation, de refus et d'interruption.
 
 ## `planning/` : itinéraires planifiés, logique pure (point 59)
 
