@@ -15,6 +15,8 @@ import { NATIVE_LOG_VERSION, parseNativeLog } from '../recording/nativeLog';
  * - Le greffon `Recording` a deux côtés : `RecordingPlugin.java` répond,
  *   `platform/location.ts` appelle, par les mêmes noms de méthodes,
  *   d'événements et de codes de refus.
+ * - Le greffon `Permissions` aussi : `PermissionsPlugin.java` répond,
+ *   `platform/permissions.ts` appelle et lit ses réponses par leurs noms.
  * - Le journal des positions a deux auteurs : `FixLog.java` l'écrit au
  *   téléphone, `recording/nativeLog.ts` le relit dans la page.
  * - La veille du GPS (`BeeperPlugin.java`) et la capture (`MotionPlugin.java`)
@@ -172,6 +174,31 @@ describe('greffon Recording : ce que la page appelle, le Java le porte', () => {
     const sent = between(RECORDING_PLUGIN, 'private static JSObject fixObject(', '// ---------- une seule position');
     for (const name of ['timeMs', 'lat', 'lon', 'accuracyM', 'altitudeM', 'speedMs', 'bearingDeg']) expect(sent, name).toContain(`data.put("${name}"`);
     for (const name of ['session', 'paused', 'atMs', 'afterMs', 'timeoutMs', 'permissions']) expect(RECORDING_PLUGIN, name).toContain(`"${name}"`);
+  });
+});
+
+describe('greffon Permissions : ce que la page appelle, le Java le porte', () => {
+  const PERMISSIONS_TS = fs.readFileSync(new URL('./permissions.ts', import.meta.url), 'utf8');
+  const PERMISSIONS_PLUGIN = appJava('PermissionsPlugin.java');
+
+  it('le greffon est déclaré sous le nom que la page enregistre', () => {
+    expect(MAIN_ACTIVITY).toContain('registerPlugin(PermissionsPlugin.class);');
+    expect(PERMISSIONS_PLUGIN).toContain('@CapacitorPlugin(name = "Permissions")');
+    expect(PERMISSIONS_TS).toContain("registerPlugin<PermissionsPlugin>('Permissions')");
+  });
+
+  it('chaque méthode appelée par la page est une méthode du greffon', () => {
+    const called = [...new Set([...PERMISSIONS_TS.matchAll(/\bplugin\.(\w+)\(/g)].map((m) => m[1]))];
+    expect(called.sort()).toEqual(['autostartStatus', 'batteryStatus', 'openAppSettings', 'openAutostart', 'openLocationSettings', 'requestUnrestrictedBattery']);
+    for (const name of called) expect(PERMISSIONS_PLUGIN, name).toMatch(new RegExp(`@PluginMethod\\s+public void ${name}\\(PluginCall call\\)`));
+  });
+
+  it('la batterie et le démarrage automatique répondent sous les noms que la page lit', () => {
+    expect(between(PERMISSIONS_PLUGIN, 'public void batteryStatus(', 'public void requestUnrestrictedBattery(')).toContain('ret.put("unrestricted"');
+    const autostart = between(PERMISSIONS_PLUGIN, 'public void autostartStatus(', 'private Integer readAutostartOp(');
+    for (const name of ['manufacturer', 'brand', 'mode']) expect(autostart, name).toContain(`ret.put("${name}"`);
+    const modes = between(PERMISSIONS_PLUGIN, 'static String autostartMode(', 'public void openAutostart(');
+    for (const mode of ['granted', 'denied', 'unknown']) expect(modes, mode).toContain(`"${mode}"`);
   });
 });
 

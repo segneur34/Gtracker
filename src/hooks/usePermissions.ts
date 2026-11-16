@@ -1,25 +1,30 @@
 import { useCallback, useEffect, useState } from 'react';
-import { savedBelt } from '../platform/heartRate';
-import { onAppResume, readPermissions } from '../platform/permissions';
-import { missingPermissions, type PermissionKey, type PermissionsStatus } from '../recording/permissionsPrompt';
+import { onAppResume, readAutostart, readPermissions } from '../platform/permissions';
+import { autostartState, type AutostartState, type PermissionsStatus } from '../recording/permissionsPrompt';
 
-/** État des autorisations du téléphone, relu au retour au premier plan (après un écran système) ; `null` tant qu'il n'est pas lu. */
-export function usePermissions(): { status: PermissionsStatus | null; refresh: () => Promise<PermissionsStatus> } {
+/**
+ * État des autorisations du téléphone et du démarrage automatique (`null` hors de Xiaomi), relus au retour au
+ * premier plan (après un écran système) ; `status` vaut `null` tant qu'il n'est pas lu.
+ */
+export function usePermissions(): {
+  status: PermissionsStatus | null;
+  autostart: AutostartState | null;
+  refresh: () => Promise<PermissionsStatus>;
+} {
   const [status, setStatus] = useState<PermissionsStatus | null>(null);
-  const refresh = useCallback(async () => {
-    const next = await readPermissions();
+  const [autostart, setAutostart] = useState<AutostartState | null>(null);
+  const apply = useCallback((next: PermissionsStatus, raw: Awaited<ReturnType<typeof readAutostart>>) => {
     setStatus(next);
+    setAutostart(autostartState(raw));
     return next;
   }, []);
+  const refresh = useCallback(async () => {
+    const [next, raw] = await Promise.all([readPermissions(), readAutostart()]);
+    return apply(next, raw);
+  }, [apply]);
   useEffect(() => {
-    void readPermissions().then(setStatus);
+    void Promise.all([readPermissions(), readAutostart()]).then(([next, raw]) => apply(next, raw));
     return onAppResume(() => void refresh());
-  }, [refresh]);
-  return { status, refresh };
-}
-
-/** Autorisations requises qui manquent (page Enregistrer) ; vide dans le navigateur ou tant qu'elles ne sont pas lues. */
-export function useMissingPermissions(): PermissionKey[] {
-  const { status } = usePermissions();
-  return status ? missingPermissions(status, savedBelt() !== null) : [];
+  }, [apply, refresh]);
+  return { status, autostart, refresh };
 }

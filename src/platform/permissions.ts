@@ -20,9 +20,18 @@ import { STORAGE_KEYS } from '../core/appIdentity';
 interface PermissionsPlugin {
   batteryStatus(): Promise<{ unrestricted: boolean }>;
   requestUnrestrictedBattery(): Promise<void>;
+  autostartStatus(): Promise<AutostartReading>;
   openAutostart(): Promise<void>;
   openAppSettings(): Promise<void>;
   openLocationSettings(): Promise<void>;
+}
+
+/** Marque du téléphone (`Build.MANUFACTURER`, `Build.BRAND`) et état brut du démarrage automatique de MIUI. */
+export interface AutostartReading {
+  manufacturer: string;
+  brand: string;
+  /** `granted`, `denied` ou `unknown` (lecture impossible ou valeur inconnue). */
+  mode: string;
 }
 
 const plugin = registerPlugin<PermissionsPlugin>('Permissions');
@@ -71,6 +80,12 @@ export const requestPermission = async (key: PermissionKey): Promise<void> => {
   }
 };
 
+/** Marque du téléphone et état du démarrage automatique, sans rien demander ; `null` dans le navigateur ou si la lecture échoue. */
+export const readAutostart = async (): Promise<AutostartReading | null> => {
+  if (!isNativeApp()) return null;
+  return plugin.autostartStatus().catch(() => null);
+};
+
 /** Écran du démarrage automatique (MIUI, HyperOS), sinon les réglages de l'application. */
 export const openAutostart = async (): Promise<void> => {
   if (isNativeApp()) await plugin.openAutostart();
@@ -100,6 +115,26 @@ export const onAppResume = (listener: () => void): (() => void) => {
     removed = true;
     remove?.();
   };
+};
+
+/**
+ * Attend le prochain retour au premier plan, une seule fois : vrai s'il vient dans `timeoutMs`, faux sinon (et
+ * aussitôt dans le navigateur). Sert à enchaîner deux écrans système sans les ouvrir l'un sur l'autre.
+ */
+export const waitForAppResume = (timeoutMs: number): Promise<boolean> => {
+  if (!isNativeApp()) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    let stop: () => void = () => {};
+    const timer = setTimeout(() => {
+      stop();
+      resolve(false);
+    }, timeoutMs);
+    stop = onAppResume(() => {
+      clearTimeout(timer);
+      stop();
+      resolve(true);
+    });
+  });
 };
 
 // --- Version vue en dernier ---

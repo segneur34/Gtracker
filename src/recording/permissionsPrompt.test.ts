@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { missingPermissions, requiredPermissions, shouldPromptPermissions, type PermissionsStatus } from './permissionsPrompt';
+import {
+  autostartState, batteryRestricted, isXiaomiDevice, missingPermissions, requiredPermissions, shouldPromptPermissions,
+  type PermissionsStatus,
+} from './permissionsPrompt';
 
 const ALL_GRANTED: PermissionsStatus = { location: 'granted', notifications: 'granted', battery: 'granted', bluetooth: 'granted' };
 const FRESH: PermissionsStatus = { location: 'prompt', notifications: 'prompt', battery: 'denied', bluetooth: 'prompt' };
@@ -44,5 +47,39 @@ describe('carte montrée d\'office', () => {
 
   it('jamais dans le navigateur', () => {
     expect(shouldPromptPermissions({ ...base, seenVersion: null, status: BROWSER, beltSaved: true })).toBe(false);
+  });
+});
+
+describe('démarrage automatique de Xiaomi', () => {
+  it('reconnaît Xiaomi, Redmi et POCO, au fabricant ou à la marque, casse ignorée', () => {
+    expect(isXiaomiDevice({ manufacturer: 'Xiaomi', brand: 'Redmi' })).toBe(true);
+    expect(isXiaomiDevice({ manufacturer: 'XIAOMI', brand: '' })).toBe(true);
+    expect(isXiaomiDevice({ manufacturer: '', brand: 'POCO' })).toBe(true);
+    expect(isXiaomiDevice({ manufacturer: 'unknown', brand: 'redmi ' })).toBe(true);
+    expect(isXiaomiDevice({ manufacturer: 'samsung', brand: 'samsung' })).toBe(false);
+    expect(isXiaomiDevice({ manufacturer: 'Google', brand: 'google' })).toBe(false);
+  });
+
+  it('pas de ligne hors de Xiaomi ni sans lecture', () => {
+    expect(autostartState(null)).toBeNull();
+    expect(autostartState({ manufacturer: 'samsung', brand: 'samsung', mode: 'granted' })).toBeNull();
+  });
+
+  it("sur un Xiaomi, l'état seulement s'il est lu, inconnu sinon", () => {
+    const xiaomi = { manufacturer: 'Xiaomi', brand: 'Redmi' };
+    expect(autostartState({ ...xiaomi, mode: 'granted' })).toBe('granted');
+    expect(autostartState({ ...xiaomi, mode: 'denied' })).toBe('denied');
+    expect(autostartState({ ...xiaomi, mode: 'unknown' })).toBe('unknown');
+    expect(autostartState({ ...xiaomi, mode: 'autre' })).toBe('unknown');
+  });
+});
+
+describe('batterie restreinte', () => {
+  it('seulement si elle est lue refusée', () => {
+    expect(batteryRestricted(null)).toBe(false);
+    expect(batteryRestricted(FRESH)).toBe(true);
+    expect(batteryRestricted(ALL_GRANTED)).toBe(false);
+    expect(batteryRestricted({ ...ALL_GRANTED, battery: 'prompt' })).toBe(false);
+    expect(batteryRestricted(BROWSER)).toBe(false);
   });
 });

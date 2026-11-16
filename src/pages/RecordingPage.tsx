@@ -33,7 +33,7 @@ import { liveStatsOptionsFor, useLiveRecording } from '../hooks/useLiveRecording
 import { useBeltLive } from '../hooks/useBeltLive';
 import { useBeltWarmup } from '../hooks/useBeltWarmup';
 import { useSatellites } from '../hooks/useSatellites';
-import { useMissingPermissions } from '../hooks/usePermissions';
+import { usePermissions } from '../hooks/usePermissions';
 import { setBeepsMuted, skipMark, useMarkGuide } from '../hooks/useMarkGuide';
 import { usePerActivityChoice } from '../hooks/usePerActivityChoice';
 import { useOpenSections } from '../hooks/useOpenSections';
@@ -46,7 +46,8 @@ import { getMotionCapabilities, type MotionCapabilities } from '../platform/moti
 import { beltLabels } from '../platform/beltList';
 import { BELT_STATE_LABEL, chooseSavedBelt, savedBelt, savedBelts, type BeltState, type HeartRateBelt } from '../platform/heartRate';
 import { JUMP_PLACEMENT_LABEL } from '../recording/jumpSettings';
-import { PERMISSION_LABEL } from '../recording/permissionsPrompt';
+import { PERMISSION_LABEL, batteryRestricted, missingPermissions as missingOf } from '../recording/permissionsPrompt';
+import { requestPermission } from '../platform/permissions';
 import { useOpenSession } from '../hooks/useLibraryNavigation';
 import { librarySession, updateSessionRecord, useLibrarySession } from '../hooks/useSessionLibrary';
 import { EMPTY_NOTES, type GearChoice } from '../library/notes';
@@ -729,7 +730,11 @@ function RecordingScreen() {
   // Ceinture cochée : connectée dès maintenant, avant le départ, pour voir qu'elle répond.
   const beltWarmup = useBeltWarmup(belt, native && sourceChoice === 'device' && measureHeartRate && !busy && pending === null);
   const beltLive = useBeltLive();
-  const missingPermissions = useMissingPermissions();
+  const { status: permissions } = usePermissions();
+  // Batterie restreinte : dite par sa rangée et son bouton au repos, donc retirée de la note de bas de page.
+  const batteryRowShown = native && !busy && !pending && batteryRestricted(permissions);
+  const missingPermissions = (permissions ? missingOf(permissions, savedBelt() !== null) : [])
+    .filter((key) => !(batteryRowShown && key === 'battery'));
   const analyzing = useRecorderSelector((s) => s.analyzing);
   // Rangement seul à l'arrêt, ou celui d'« Analyser », en cours ou sur le point de partir : « Rangement… » au lieu de la carte.
   const finishing = useRecorderSelector(finishingPendingSession);
@@ -983,6 +988,15 @@ function RecordingScreen() {
             <IconRoute size={20} />
             {t('Suivre une trace')}
           </Button>
+        </div>
+      )}
+      {batteryRowShown && (
+        // Prévient sans jamais empêcher le départ : l'état se relit au retour de l'écran d'Android.
+        <div className="rec-rescue">
+          <span className="ui-muted">{t("Batterie restreinte : Android peut couper l'enregistrement, application fermée.")}</span>
+          <span className="rec-rescue__actions">
+            <Button size="s" onClick={() => void requestPermission('battery').catch(() => undefined)}>{t('Autoriser')}</Button>
+          </span>
         </div>
       )}
 

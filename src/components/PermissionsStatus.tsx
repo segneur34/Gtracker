@@ -4,11 +4,12 @@ import { usePermissions } from '../hooks/usePermissions';
 import { savedBelt } from '../platform/heartRate';
 import {
   markPermissionsSeen, openAppSettings, openAutostart, permissionsSeenVersion, readPermissions, requestPermission,
+  waitForAppResume,
 } from '../platform/permissions';
 import { isNativeApp } from '../platform/runtime';
 import {
   PERMISSION_LABEL, missingPermissions, requiredPermissions, shouldPromptPermissions,
-  type PermissionKey, type PermissionState, type PermissionsStatus as Status,
+  type AutostartState, type PermissionKey, type PermissionState, type PermissionsStatus as Status,
 } from '../recording/permissionsPrompt';
 import { HelpToggle } from './Help';
 import { useHelp } from './helpContext';
@@ -19,8 +20,8 @@ import './StatusLine.css';
 
 /**
  * Autorisations du téléphone dont l'enregistrement a besoin : une ligne par
- * autorisation (pourquoi, état, bouton), plus le démarrage automatique de
- * Xiaomi, sans état lisible. En tête du Profil, où s'ouvre l'application (`PermissionsPrompt`), au
+ * autorisation (pourquoi, état, bouton), plus le démarrage automatique sur un
+ * Xiaomi seulement, avec son état quand le téléphone le dit. En tête du Profil, où s'ouvre l'application (`PermissionsPrompt`), au
  * premier lancement et après une mise à jour s'il en manque une ; dans
  * Réglages, bloc « Autorisations » (`PermissionsSettings`). Rien dans le
  * navigateur. Les états sont relus au retour d'un écran système.
@@ -75,17 +76,39 @@ function PermissionRow({ helpKey, label, why, children }: { helpKey: string; lab
   );
 }
 
-function PermissionRows({ keys, status, refresh }: { keys: PermissionKey[]; status: Status; refresh: () => Promise<Status> }) {
+/** Pastille et mot de l'état d'une ligne. */
+function StateLine({ color, text }: { color: string | undefined; text: string }) {
+  return (
+    <span className="status-line">
+      <span className="status-line__dot" style={{ backgroundColor: color }} />
+      <span>{text}</span>
+    </span>
+  );
+}
+
+/** État du démarrage automatique, montré seulement quand le téléphone l'a dit. */
+const AUTOSTART_TEXT: Partial<Record<AutostartState, string>> = { granted: t('activé'), denied: t('désactivé') };
+const AUTOSTART_COLOR: Partial<Record<AutostartState, string>> = { granted: STATE_COLOR.granted, denied: STATE_COLOR.denied };
+
+/**
+ * Attente du retour de l'écran de la batterie avant d'ouvrir celui du démarrage automatique : passé ce délai, on
+ * n'ouvre pas un second écran par-dessus un utilisateur parti ailleurs.
+ */
+const BATTERY_RETURN_TIMEOUT_MS = 60_000;
+
+function PermissionRows({ keys, status, autostart, refresh }: {
+  keys: PermissionKey[];
+  status: Status;
+  autostart: AutostartState | null;
+  refresh: () => Promise<Status>;
+}) {
   return (
     <div className="permissions">
       {keys.map((key) => {
         const state = status[key];
         return (
           <PermissionRow key={key} helpKey={`autorisations:${key}`} label={PERMISSION_LABEL[key]} why={WHY[key]}>
-            <span className="status-line">
-              <span className="status-line__dot" style={{ backgroundColor: STATE_COLOR[state] }} />
-              <span>{key === 'battery' && state === 'denied' ? t('restreinte') : STATE_TEXT[state]}</span>
-            </span>
+            <StateLine color={STATE_COLOR[state]} text={key === 'battery' && state === 'denied' ? t('restreinte') : STATE_TEXT[state]} />
             {state !== 'granted' && state !== 'unavailable' && (
               <Button size="s" onClick={() => void ask(key, state, refresh)}>
                 {state === 'denied' && key !== 'battery' ? t('Ouvrir les réglages') : t('Autoriser')}
@@ -94,19 +117,37 @@ function PermissionRows({ keys, status, refresh }: { keys: PermissionKey[]; stat
           </PermissionRow>
         );
       })}
-      <PermissionRow helpKey="autorisations:demarrage" label={t('Démarrage automatique')}
-        why={t("Sur Xiaomi, pour que l'enregistrement tienne en arrière-plan. Android ne dit pas s'il est activé : à vérifier soi-même.")}>
-        <Button size="s" onClick={() => void openAutostart().catch(() => undefined)}>{t('Ouvrir')}</Button>
-      </PermissionRow>
+      {autostart !== null && (
+        <PermissionRow helpKey="autorisations:demarrage" label={t('Démarrage automatique')}
+          why={t("Pour que l'enregistrement continue, application fermée.")}>
+          {AUTOSTART_TEXT[autostart] && <StateLine color={AUTOSTART_COLOR[autostart]} text={AUTOSTART_TEXT[autostart]} />}
+          <Button size="s" onClick={() => void openAutostart().catch(() => undefined)}>{t('Ouvrir')}</Button>
+        </PermissionRow>
+      )}
     </div>
   );
 }
 
 /**
  * Demande toutes celles qui manquent, dans l'ordre : les demandes système
- * d'abord, puis l'écran de la batterie, qui quitte l'application.
+ * d'abord, puis l'écran de la batterie, qui quitte l'application ; sur un
+ * Xiaomi dont le démarrage automatique n'est pas lu activé, son écran en
+ * dernier, une fois revenu de celui de la batterie.
  */
-const askAll = async (keys: PermissionKey[], refresh: () => Promise<Status>): Promise<void> => {
+const askAll = async (keys: PermissionKey[], autostart: AutostartState | null, refresh: () => Promise<Status>): Promise<void> => {
+  // Un second appui pendant que la suite se déroule ne la relance pas : un seul écran de chaque à refermer.
+  if (askingAll) return;
+  askingAll = true;
+  try {
+    await askEach(keys, autostart, refresh);
+  } finally {
+    askingAll = false;
+  }
+};
+
+let askingAll = false;
+
+const askEach = async (keys: PermissionKey[], autostart: AutostartState | null, refresh: () => Promise<Status>): Promise<void> => {
   let status = await refresh();
   for (const key of keys) {
     if (key === 'battery' || status[key] !== 'prompt') continue;
@@ -117,7 +158,21 @@ const askAll = async (keys: PermissionKey[], refresh: () => Promise<Status>): Pr
     }
     status = await refresh();
   }
-  if (keys.includes('battery') && status.battery !== 'granted') await ask('battery', status.battery, refresh);
+  let back: Promise<boolean> = Promise.resolve(true);
+  if (keys.includes('battery') && status.battery !== 'granted') {
+    try {
+      await requestPermission('battery');
+      // Écouté dès l'écran ouvert, pour ne pas manquer un retour rapide.
+      back = waitForAppResume(BATTERY_RETURN_TIMEOUT_MS);
+    } catch {
+      // Écran absent : l'état relu le dira, et rien n'attend son retour.
+    }
+    await refresh();
+  }
+  if (autostart === null || autostart === 'granted') return;
+  // Écran de la batterie laissé ouvert trop longtemps : on s'arrête là plutôt que d'en ouvrir un autre.
+  if (!(await back)) return;
+  await openAutostart().catch(() => undefined);
 };
 
 /**
@@ -125,7 +180,7 @@ const askAll = async (keys: PermissionKey[], refresh: () => Promise<Status>): Pr
  * `onDecided` apprend une fois, après la lecture des autorisations, si la carte paraît (le pop-up du profil attend alors).
  */
 export function PermissionsPrompt({ onDecided }: { onDecided?: (shown: boolean) => void }) {
-  const { status, refresh } = usePermissions();
+  const { status, autostart, refresh } = usePermissions();
   const [dismissed, setDismissed] = useState(false);
   const beltSaved = savedBelt() !== null;
   const [shown, setShown] = useState<boolean | null>(null);
@@ -169,9 +224,9 @@ export function PermissionsPrompt({ onDecided }: { onDecided?: (shown: boolean) 
             ? t('Tout est accordé : Gtracker peut enregistrer écran éteint.')
             : t('Pour enregistrer écran éteint, sans coupure, Gtracker a besoin de ce qui suit. Chacune se règle aussi plus tard, dans Réglages › Autorisations.')}
         </p>
-        <PermissionRows keys={keys} status={status} refresh={refresh} />
+        <PermissionRows keys={keys} status={status} autostart={autostart} refresh={refresh} />
         <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-          {missing.length > 0 && <Button variant="primary" onClick={() => void askAll(keys, refresh)}>{t('Tout autoriser')}</Button>}
+          {missing.length > 0 && <Button variant="primary" onClick={() => void askAll(keys, autostart, refresh)}>{t('Tout autoriser')}</Button>}
           <Button variant="ghost" onClick={close}>{missing.length === 0 ? t('Fermer') : t('Plus tard')}</Button>
         </div>
       </div>
@@ -181,7 +236,7 @@ export function PermissionsPrompt({ onDecided }: { onDecided?: (shown: boolean) 
 
 /** Bloc « Autorisations » de Réglages : toutes les lignes, Bluetooth compris. */
 export function PermissionsSettings() {
-  const { status, refresh } = usePermissions();
+  const { status, autostart, refresh } = usePermissions();
   if (!isNativeApp()) {
     return <p className="permissions__intro">{t("Sur l'application Android seulement.")}</p>;
   }
@@ -190,10 +245,10 @@ export function PermissionsSettings() {
   const missing = missingPermissions(status, true);
   return (
     <div className="ui-stack-3">
-      <PermissionRows keys={keys} status={status} refresh={refresh} />
+      <PermissionRows keys={keys} status={status} autostart={autostart} refresh={refresh} />
       {missing.length > 0 && (
         <div>
-          <Button variant="primary" onClick={() => void askAll(keys, refresh)}>{t('Tout autoriser')}</Button>
+          <Button variant="primary" onClick={() => void askAll(keys, autostart, refresh)}>{t('Tout autoriser')}</Button>
         </div>
       )}
     </div>
