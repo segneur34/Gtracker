@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { baseActivity } from '../core/activities';
 import { FILE_FORMATS, STORAGE_KEYS } from '../core/appIdentity';
 import type { LocationFix, LocationSource, StopLocation } from '../platform/location';
+import { SETTLE_MAX_WAIT_S } from '../recording/gpsSettle';
 import { parseJournal } from '../recording/journal';
 import { EMPTY_RECORDING_STATS, addFixAfterManualPause, addFixToStats, displayedDurationMs, type RecordingStats } from '../recording/session';
 
@@ -256,7 +257,7 @@ const reload = async () => {
   return recorder;
 };
 
-const fixAt = (s: number, speedMs = 3): LocationFix => ({ timeMs: T0 + round(s * 1000), lat: 43 + s * 1e-5, lon: 3, speedMs, accuracyM: 4 });
+const fixAt = (s: number, speedMs = 3, accuracyM = 4): LocationFix => ({ timeMs: T0 + round(s * 1000), lat: 43 + s * 1e-5, lon: 3, speedMs, accuracyM });
 
 /** Source simulée, relevant ses démarrages. */
 const fakeSource = () => {
@@ -271,7 +272,7 @@ const fakeSource = () => {
         onFix = null;
       };
     },
-    emit: (s: number, speedMs = 3) => onFix?.(fixAt(s, speedMs)),
+    emit: (s: number, speedMs = 3, accuracyM = 4) => onFix?.(fixAt(s, speedMs, accuracyM)),
   };
   return source satisfies LocationSource & object;
 };
@@ -292,15 +293,15 @@ const run = (emit: (s: number) => void, from: number, to: number, hz: number) =>
 };
 
 /** Une position telle que le service l'écrit dans son journal : brute, sans fréquence cardiaque. */
-const nativeFix = (s: number, speedMs = 3): string => {
-  const fix = fixAt(s, speedMs);
+const nativeFix = (s: number, speedMs = 3, accuracyM = 4): string => {
+  const fix = fixAt(s, speedMs, accuracyM);
   return `[${fix.timeMs},${fix.lat},${fix.lon},${fix.accuracyM},null,${fix.speedMs},null]\n`;
 };
 
 /** Les positions du service de `from` à `to` secondes, à `hz` Hz. */
-const nativeFixes = (from: number, to: number, hz: number, speedMs = 3): string => {
+const nativeFixes = (from: number, to: number, hz: number, speedMs = 3, accuracyM = 4): string => {
   let lines = '';
-  for (let k = Math.round(from * hz); k <= Math.round(to * hz); k++) lines += nativeFix(k / hz, speedMs);
+  for (let k = Math.round(from * hz); k <= Math.round(to * hz); k++) lines += nativeFix(k / hz, speedMs, accuracyM);
   return lines;
 };
 
@@ -1465,6 +1466,53 @@ describe.each([[1], [5]])('journal du service : ce que la page n\'a pas reçu es
     expect(strictlyIncreasing(liveTimes(fresh))).toBe(true);
     // Le journal du service n'est effacé qu'une fois la session rangée.
     expect(gpsService.logClears).toBe(0);
+  });
+
+  /** Départ dont le GPS se cale : la page reçoit les positions larges (30 m) jusqu'à `toS`, puis tombe. */
+  const settlingUntil = async (toS: number) => {
+    const source = serviceSource();
+    await recorder.startRecording(activity, source);
+    run((s) => source.emit(s, 3, 30), 0, toS, hz);
+    await settle();
+    expect(recorder.getRecorderState().settlingAccuracyM).toBe(30);
+    expect(recorder.getLiveFixes()).toHaveLength(0);
+  };
+
+  it('fermée pendant le calage du GPS, calé depuis : la trace rattrapée part de la première position calée', async () => {
+    await settlingUntil(2);
+    gpsService.log = nativeLog(nativeFixes(0, 3 - 1 / hz, hz, 3, 30), nativeFixes(3, 20, hz));
+    services.gps = true;
+    vi.setSystemTime(T0 + 20_000);
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+
+    const state = fresh.getRecorderState();
+    expect(state.status).toBe('recording');
+    expect(state.settlingAccuracyM).toBeNull();
+    expect(state.stats.firstMs).toBe(T0 + 3000);
+    expect(parseJournal(journal.text!).fixes.map((f) => f.timeMs)[0]).toBe(T0 + 3000);
+    expect(fresh.getLiveFixes()).toHaveLength(17 * hz + 1);
+    // Calée : une position large ensuite est gardée.
+    vi.setSystemTime(T0 + 21_000);
+    gpsService.onFix!(fixAt(21, 3, 50));
+    expect(fresh.getLiveFixes().at(-1)?.timeMs).toBe(T0 + 21_000);
+  });
+
+  it('fermée et rouverte pendant le calage : le délai court toujours depuis la première position du service', async () => {
+    await settlingUntil(1);
+    gpsService.log = nativeLog(nativeFixes(0, 4, hz, 3, 30));
+    services.gps = true;
+    vi.setSystemTime(T0 + 4_000);
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(fresh.getRecorderState().status).toBe('recording');
+    expect(fresh.getLiveFixes()).toHaveLength(0);
+
+    run((s) => gpsService.onFix!(fixAt(s, 3, 30)), 4 + 1 / hz, 12, hz);
+    await settle();
+    expect(fresh.getRecorderState().settlingAccuracyM).toBeNull();
+    expect(fresh.getLiveFixes()[0].timeMs).toBe(T0 + SETTLE_MAX_WAIT_S * 1000);
+    expect(fresh.getRecorderState().stats.firstMs).toBe(T0 + SETTLE_MAX_WAIT_S * 1000);
   });
 
   it('une position arrivée pendant la lecture du journal du service : ni perdue ni doublée', async () => {

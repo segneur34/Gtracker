@@ -98,6 +98,11 @@ export interface RecorderState {
   awaitingFix: boolean;
   /** Localisation du téléphone coupée, dite par la source ; effacé à son retour, dit par la source, ou à la position suivante. */
   locationOff: boolean;
+  /**
+   * Le GPS se cale (`recording/gpsSettle.ts`) : incertitude, en mètres, de la dernière position reçue, que la trace ne
+   * garde pas encore ; `null` hors calage (avant toute position, une fois la trace commencée, au repos).
+   */
+  settlingAccuracyM: number | null;
   /** Vrai quelques secondes après « Réessayer » du GPS : « nouvelle tentative… » (`GPS_RETRY_FEEDBACK_MS`). */
   gpsRetrying: boolean;
   /** FC perdue : plus de mesure lisible d'une ceinture qui en donnait ; effacé à la mesure suivante. */
@@ -136,6 +141,7 @@ const INITIAL_STATE: RecorderState = {
   gpsLost: false,
   awaitingFix: false,
   locationOff: false,
+  settlingAccuracyM: null,
   gpsRetrying: false,
   beltLost: false,
   beltAside: null,
@@ -214,6 +220,12 @@ interface LiveSession {
   resumedSession: boolean;
   /** Positions reçues pendant la pause manuelle en cours, pour la carte seule : jamais gardées. */
   pauseFixes: LocationFix[];
+  /** Le GPS s'est calé : une position a été jugée calée, le calage ne joue plus (`judgeSettle`). */
+  settled: boolean;
+  /** Pendant le calage, heure de la première position vue, `null` avant elle ou hors calage. */
+  settleFirstMs: number | null;
+  /** Dernière position reçue pendant le calage, pour la carte seule : jamais gardée ; `null` hors calage. */
+  settlingFix: LocationFix | null;
   /** Instant du démarrage, à l'horloge : le nom de la capture des capteurs et le début des repères d'une session reprise. */
   startedAtMs: number;
   /** Repères posés pendant l'enregistrement, dans l'ordre. */
@@ -247,6 +259,9 @@ export const session: LiveSession = {
   manualBreakAutoPartMs: null,
   resumedSession: false,
   pauseFixes: [],
+  settled: false,
+  settleFirstMs: null,
+  settlingFix: null,
   startedAtMs: 0,
   marks: [],
   heartRateMaxAgeS: null,

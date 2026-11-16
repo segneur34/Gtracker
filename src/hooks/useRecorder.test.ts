@@ -210,7 +210,7 @@ const fakeSource = () => {
         source.stops += 1;
       };
     },
-    emit: (s: number, speedMs = 3) => onFix?.({ timeMs: T0 + s * 1000, lat: 43 + s * 1e-5, lon: 3, speedMs, accuracyM: 4 }),
+    emit: (s: number, speedMs = 3, accuracyM = 4) => onFix?.({ timeMs: T0 + s * 1000, lat: 43 + s * 1e-5, lon: 3, speedMs, accuracyM }),
   };
   return source satisfies LocationSource & object;
 };
@@ -252,6 +252,37 @@ describe('enregistreur', () => {
     expect(source.starts).toBe(1);
     expect(journal.headers).toBe(1);
     expect(recorder.getRecorderState().status).toBe('recording');
+  });
+
+  it('GPS qui se cale au départ : rien de gardé ni de compté avant la première position calée, que la carte montre', async () => {
+    const source = fakeSource();
+    await recorder.startRecording(activity, source);
+    const seenByOthers: number[] = [];
+    const offFixes = recorder.subscribeToFixes((f) => seenByOthers.push(f.timeMs));
+    source.emit(0, 12, 30);
+    source.emit(1, 8, 20);
+    let state = recorder.getRecorderState();
+    expect(state.settlingAccuracyM).toBe(20);
+    expect(state.awaitingFix).toBe(false);
+    expect(state.stats.pointCount).toBe(0);
+    expect(recorder.getLiveFixes()).toHaveLength(0);
+    expect(recorder.getLivePosition()?.timeMs).toBe(T0 + 1000);
+    // Un repère posé pendant le calage prend la dernière position reçue.
+    expect(recorder.addRecordingMark()?.mark.lat).toBe(43 + 1e-5);
+
+    source.emit(2, 3, 8);
+    source.emit(3, 3, 40);
+    offFixes();
+    state = recorder.getRecorderState();
+    expect(state.settlingAccuracyM).toBeNull();
+    // Calé à 2 s : la position large qui suit est gardée, le calage ne joue plus.
+    expect(recorder.getLiveFixes().map((f) => f.timeMs)).toEqual([T0 + 2000, T0 + 3000]);
+    expect(state.stats.firstMs).toBe(T0 + 2000);
+    expect(recorder.getLivePosition()?.timeMs).toBe(T0 + 3000);
+    expect(seenByOthers).toEqual([T0, T0 + 1000, T0 + 2000, T0 + 3000]);
+    await recorder.stopRecording();
+    expect(parseJournal(journal.text!).fixes.map((f) => f.timeMs)).toEqual([T0 + 2000, T0 + 3000]);
+    expect(recorder.getRecorderState().settlingAccuracyM).toBeNull();
   });
 
   it("deux « Reprendre » sans attendre : la source, restée allumée pendant la pause, n'est ni arrêtée ni relancée", async () => {

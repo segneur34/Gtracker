@@ -287,8 +287,8 @@ export const startRecording = exclusive(async (
   setState({
     status: 'starting', sport, activity, sourceLabel: source.label, pausedReason: null, pauseClock: null,
     measuringMotion: false, motionSetup: null, heartRate: null, marks: session.marks, stats: EMPTY_RECORDING_STATS,
-    saved: null, error: recoveryNotice, gpsLost: false, awaitingFix: true, locationOff: false, gpsRetrying: false, beltLost: false,
-    beltAside: null, beltRetrying: false,
+    saved: null, error: recoveryNotice, gpsLost: false, awaitingFix: true, locationOff: false, settlingAccuracyM: null, gpsRetrying: false,
+    beltLost: false, beltAside: null, beltRetrying: false,
   });
 
   try {
@@ -542,7 +542,7 @@ export const stopRecording = afterCurrent(async (): Promise<void> => {
   stopBeltWatch();
   // Les alertes de perte du GPS et de la FC ne survivent pas à l'enregistrement.
   setState({
-    status: 'stopping', gpsLost: false, awaitingFix: false, locationOff: false, gpsRetrying: false, beltLost: false, beltAside: null,
+    status: 'stopping', gpsLost: false, awaitingFix: false, locationOff: false, settlingAccuracyM: null, gpsRetrying: false, beltLost: false, beltAside: null,
     beltRetrying: false, error: withoutBeltLost(withoutGpsLost(state.error)),
   });
   // Écrit avant de couper le GPS : une chute d'ici la fin ne propose ni reprise ni « Continuer ».
@@ -614,8 +614,12 @@ export const getLiveFixes = (): ReadonlyArray<LocationFix> => (isBusy() ? sessio
 /** Dernière position gardée de l'enregistrement en cours. */
 export const getLastFix = (): LocationFix | null => (isBusy() && session.fixes.length > 0 ? session.fixes[session.fixes.length - 1] : null);
 
-/** Position de la carte du direct : la dernière gardée, ou en pause manuelle la dernière reçue (`shownLiveFix`). */
-export const getLivePosition = (): LocationFix | null => (isBusy() ? shownLiveFix(session.fixes[session.fixes.length - 1] ?? null, session.pauseFixes) : null);
+/**
+ * Position de la carte du direct : la dernière gardée, ou en pause manuelle la dernière reçue (`shownLiveFix`) ;
+ * pendant le calage du GPS, la dernière reçue, que la trace ne garde pas encore.
+ */
+export const getLivePosition = (): LocationFix | null =>
+  (isBusy() ? shownLiveFix(session.fixes[session.fixes.length - 1] ?? session.settlingFix, session.pauseFixes) : null);
 
 const subscribeToLivePosition = (listener: () => void): (() => void) => {
   const fromState = subscribe(listener);

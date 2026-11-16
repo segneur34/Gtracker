@@ -8,6 +8,7 @@ import {
 import {
   NATIVE_LOG_VERSION, catchUpFromNativeLog, parseNativeLog, withCaughtUpLines, type CatchUpPhase, type CatchUpSettings,
 } from './nativeLog';
+import { judgeSettle } from './gpsSettle';
 import { rebuildRecordingStats } from './resume';
 import { evaluateAutoPause, isNewerFix, recordingDurationMs, roundFix, splitIntoSegments } from './session';
 
@@ -103,11 +104,19 @@ const livePage = (settings: CatchUpSettings) => {
   let pendingBreak = false;
   let manualBreakAutoPartMs: number | null = null;
   let lastReceivedMs: number | null = null;
+  let settled = false;
+  let settleFirstMs: number | null = null;
   const receive = (received: LocationFix): void => {
     if (!isNewerFix(lastReceivedMs, received)) return;
     const fix = roundFix(received);
     lastReceivedMs = fix.timeMs;
     if (manualPause) return;
+    if (!settled) {
+      const verdict = judgeSettle(settleFirstMs, fix);
+      settleFirstMs = verdict.settled ? null : verdict.firstSeenMs;
+      if (!verdict.settled) return;
+      settled = true;
+    }
     const judged = evaluateAutoPause(autoPausedSinceMs !== null, belowSinceMs, fix, auto);
     belowSinceMs = judged.belowSinceMs;
     if (judged.event === 'pause') {
@@ -141,7 +150,7 @@ const livePage = (settings: CatchUpSettings) => {
         lines.push(journalResumeLine(step.atMs));
       }
     },
-    phase: (): CatchUpPhase => ({ manualPause, autoPausedSinceMs, belowSinceMs, pendingBreak, manualBreakAutoPartMs, lastReceivedMs }),
+    phase: (): CatchUpPhase => ({ manualPause, autoPausedSinceMs, belowSinceMs, pendingBreak, manualBreakAutoPartMs, lastReceivedMs, settleFirstMs }),
   };
 };
 
@@ -267,6 +276,33 @@ describe.each([1, 5])('rattrapage à %i Hz', (hz) => {
       expect(again.lines, `rejoué, coupé après ${kept} lignes`).toEqual([]);
       expect(again.phase, `rejoué, coupé après ${kept} lignes`).toEqual(result.phase);
     }
+  });
+
+  it('GPS qui se cale au départ, application fermée : la trace part de la première position calée, comme en direct', () => {
+    // Incertitude de 30 m les trois premières secondes, puis celle de `rawFix`, sous le seuil du calage.
+    const settling = (steps: Step[]): Step[] =>
+      steps.map((step) => (step.kind === 'fix' && step.fix.timeMs < at(3) ? { kind: 'fix', fix: { ...step.fix, accuracyM: 30 } } : step));
+    const steps = settling(trace(hz).run(20, SAILING).steps);
+    const live = liveSession(steps);
+    expect(parseJournal(live.text).fixes[0].timeMs).toBe(at(3));
+    expect(live.phase.settleFirstMs).toBeNull();
+    const log = nativeLog(steps);
+    for (let kept = 1; kept <= live.lines.length; kept++) {
+      const text = live.lines.slice(0, kept).join('');
+      const result = catchUpFromNativeLog(parseJournal(text), log, SETTINGS);
+      const merged = parseJournal(withCaughtUpLines(text, result.lines));
+      expect(sessionOf(merged), `coupé après ${kept} lignes`).toEqual(sessionOf(parseJournal(live.text)));
+      expect(result.phase, `coupé après ${kept} lignes`).toEqual(live.phase);
+    }
+
+    // Fermée avant la fin du calage : rien de gardé, et la première position vue est rendue pour la suite en direct.
+    const early = settling(trace(hz).run(2, SAILING).steps);
+    const header = liveSession([]).text;
+    const still = caughtUp(header, early);
+    expect(still.result.lines).toEqual([]);
+    expect(still.result.phase.settleFirstMs).toBe(at(0));
+    expect(still.result.phase).toEqual(liveSession(early).phase);
+    expect(still.result.caughtUpToMs).toBe(at(2 - 1 / hz));
   });
 
   it('les positions rattrapées sont arrondies comme en direct, et ne portent pas de fréquence cardiaque', () => {
@@ -403,7 +439,7 @@ describe.each([1, 5])('rattrapage à %i Hz', (hz) => {
     const journal = parseJournal(cutBefore(liveSession(steps).lines, 10));
     const asToday = {
       matched: false, lines: [], keptCount: 0, caughtUpToMs: null, guardStop: null,
-      phase: { manualPause: null, autoPausedSinceMs: null, belowSinceMs: null, pendingBreak: true, manualBreakAutoPartMs: null, lastReceivedMs: at(10 - 1 / hz) },
+      phase: { manualPause: null, autoPausedSinceMs: null, belowSinceMs: null, pendingBreak: true, manualBreakAutoPartMs: null, lastReceivedMs: at(10 - 1 / hz), settleFirstMs: null },
     };
     expect(catchUpFromNativeLog(journal, null, SETTINGS)).toEqual(asToday);
     expect(catchUpFromNativeLog(journal, parseNativeLog('illisible'), SETTINGS)).toEqual(asToday);

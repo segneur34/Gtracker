@@ -7,6 +7,7 @@ import { latestHeartRate } from '../../platform/heartRate';
 import { clearLoggedFixes, type LocationErrorCause, type LocationFix, type LocationSource, type LocationWatchOptions } from '../../platform/location';
 import { removeMotionCapture, type MotionCapture } from '../../platform/motion';
 import { gpsWatchOnFix, watchesGps } from '../../recording/gpsWatch';
+import { judgeSettle } from '../../recording/gpsSettle';
 import { heartRateAt } from '../../recording/heartRate';
 import { journalBreakLine, journalFixLine, journalResumeLine } from '../../recording/journal';
 import { sessionGpx } from '../../recording/resume';
@@ -95,6 +96,31 @@ const keepPoint = (fix: LocationFix, journalFlushS: number): void => {
   }
 };
 
+/**
+ * Calage du GPS au départ (`judgeSettle`), tant qu'aucune position n'est gardée : vrai si la position n'est pas encore
+ * calée. Elle ne sert alors qu'à la carte du direct (`settlingFix`), comme une position de pause manuelle : ni journal
+ * de la page, ni statistiques, ni pause automatique. La première jugée calée clôt le calage pour la session.
+ */
+const stillSettling = (fix: LocationFix): boolean => {
+  if (session.settled) return false;
+  if (session.fixes.length > 0) {
+    session.settled = true;
+    return false;
+  }
+  const verdict = judgeSettle(session.settleFirstMs, fix);
+  if (!verdict.settled) {
+    session.settleFirstMs = verdict.firstSeenMs;
+    session.settlingFix = fix;
+    setState({ settlingAccuracyM: fix.accuracyM ?? null });
+    return true;
+  }
+  session.settled = true;
+  session.settleFirstMs = null;
+  session.settlingFix = null;
+  if (state.settlingAccuracyM !== null) setState({ settlingAccuracyM: null });
+  return false;
+};
+
 /** Reçoit une position de la source. Le réglage est relu à chaque fois : l'activité peut changer en route. */
 export const receiveFix = (received: LocationFix): void => {
   const role = receivedFixRole(state);
@@ -125,6 +151,7 @@ export const receiveFix = (received: LocationFix): void => {
     return;
   }
   fixListeners.notify(fix);
+  if (stillSettling(fix)) return;
 
   const auto = evaluateAutoPause(state.status === 'paused', session.belowSinceMs, fix, {
     speedMs: recording.autoPauseSpeedMs,
@@ -206,6 +233,9 @@ export const resetSession = (init: { source: LocationSource | null; profile: Rec
   session.manualBreakAutoPartMs = null;
   session.resumedSession = false;
   session.pauseFixes = [];
+  session.settled = false;
+  session.settleFirstMs = null;
+  session.settlingFix = null;
   session.startedAtMs = init.startedAtMs;
   session.marks = [];
   session.sourceError = null;

@@ -5,6 +5,7 @@ import type { LocationFix } from '../platform/location';
 import {
   journalBreakLine, journalFixLine, journalPauseLine, journalResumeLine, journalStopLine, type JournalPause, type ParsedJournal,
 } from './journal';
+import { judgeSettle } from './gpsSettle';
 import { resumedPhase } from './resume';
 import { evaluateAutoPause, isNewerFix, roundFix } from './session';
 
@@ -139,6 +140,11 @@ export interface CatchUpPhase {
   manualBreakAutoPartMs: number | null;
   /** Heure de la dernière position connue, gardée ou non : une position reçue ensuite doit lui être postérieure. */
   lastReceivedMs: number | null;
+  /**
+   * Le GPS se calait encore à la dernière position rejouée (`judgeSettle`) : l'heure de la première position vue, à
+   * reprendre par la réception en direct ; `null` dès qu'une position est gardée, ou sans position jugée.
+   */
+  settleFirstMs: number | null;
 }
 
 export interface NativeCatchUp {
@@ -170,6 +176,7 @@ const withoutNativeLog = (journal: CatchUpJournal): NativeCatchUp => {
       pendingBreak: phase.pendingBreak,
       manualBreakAutoPartMs: phase.manualBreakAutoPartMs,
       lastReceivedMs: lastFixMs(journal),
+      settleFirstMs: null,
     },
   };
 };
@@ -260,6 +267,10 @@ export const catchUpFromNativeLog = (journal: CatchUpJournal, log: NativeLog | n
   let lastReceivedMs = lastMs;
   // Rien ne prouve encore que le service tournait à la dernière position du journal : l'écart jusqu'à la suivante en jugera.
   let unprovenFromMs = anchored ? null : lastMs;
+  // Calage du GPS au départ, comme en direct, tant que le journal de la page n'a aucune position : ancré sur la
+  // première position du service jugée, il ne joue plus après la première calée.
+  let settling = lastMs === null;
+  let settleFirstMs: number | null = null;
 
   for (let i = from; i < entries.length && guardStop === null; i++) {
     const entry = entries[i];
@@ -296,6 +307,12 @@ export const catchUpFromNativeLog = (journal: CatchUpJournal, log: NativeLog | n
       // « Arrêter » déjà au journal : ce que le service a encore reçu ensuite n'est pas de la session.
       if (journal.stoppedAtMs !== null && fix.timeMs > journal.stoppedAtMs) continue;
       if (manualPause) continue;
+      if (settling) {
+        const verdict = judgeSettle(settleFirstMs, fix);
+        settleFirstMs = verdict.settled ? null : verdict.firstSeenMs;
+        if (!verdict.settled) continue;
+        settling = false;
+      }
       const judged = evaluateAutoPause(autoPausedSinceMs !== null, belowSinceMs, fix, auto);
       belowSinceMs = judged.belowSinceMs;
       if (judged.event === 'pause') {
@@ -321,7 +338,7 @@ export const catchUpFromNativeLog = (journal: CatchUpJournal, log: NativeLog | n
 
   return {
     matched: true, lines, keptCount, caughtUpToMs, guardStop,
-    phase: { manualPause, autoPausedSinceMs, belowSinceMs, pendingBreak, manualBreakAutoPartMs, lastReceivedMs },
+    phase: { manualPause, autoPausedSinceMs, belowSinceMs, pendingBreak, manualBreakAutoPartMs, lastReceivedMs, settleFirstMs },
   };
 };
 
