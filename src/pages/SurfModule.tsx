@@ -620,7 +620,7 @@ function SurfModule() {
                   </div>
                 ) : (
                   <div className="ui-overflow-x">
-                    <table className="ui-table">
+                    <table className={`ui-table an-man-podium an-man-podium--waves${foil ? ' an-man-podium--waves-foil' : ''}`}>
                       <thead>
                         <tr className="ui-sunken">
                           <th style={thStyle}>{t('N°')}</th>
@@ -642,13 +642,13 @@ function SurfModule() {
                           return (
                             <tr key={w.n} className="ui-table__row">
                               <td className="ui-cell-tight ui-cell--bold">{w.n}</td>
-                              <td style={tdStyle}>{formatTimeOfDay(w.startMs).slice(0, 5)}</td>
-                              <td style={tdStyle}>{formatShortDuration(w.durationS)}</td>
-                              <td className="ui-cell-tight ui-cell--bold">{Math.round(w.distanceM)} m</td>
-                              <td style={tdStyle}>{formatSpeedValue(toDisplaySpeed(w.maxSpeedMs, speedUnit), speedUnit)}</td>
-                              <td style={tdStyle}>{formatSpeedValue(toDisplaySpeed(w.avgSpeedMs, speedUnit), speedUnit)}</td>
-                              <td style={tdStyle}>{gyroTurns.get(w) ?? (gyroTurns.size > 0 ? `${w.turns}*` : w.turns)}</td>
-                              {foil && <td style={tdStyle}>{w.flight ?? '—'}</td>}
+                              <td style={tdStyle} data-label={t('Heure')}>{formatTimeOfDay(w.startMs).slice(0, 5)}</td>
+                              <td style={tdStyle} data-label={t('Durée')}>{formatShortDuration(w.durationS)}</td>
+                              <td className="ui-cell-tight ui-cell--bold" data-label={t('Distance')}>{Math.round(w.distanceM)} m</td>
+                              <td style={tdStyle} data-label={t('Max ({unit})', { unit: unitLabel })}>{formatSpeedValue(toDisplaySpeed(w.maxSpeedMs, speedUnit), speedUnit)}</td>
+                              <td style={tdStyle} data-label={t('Moy.')}>{formatSpeedValue(toDisplaySpeed(w.avgSpeedMs, speedUnit), speedUnit)}</td>
+                              <td style={tdStyle} data-label={gyroTurns.size > 0 ? t('Virages') : t('Virages*')}>{gyroTurns.get(w) ?? (gyroTurns.size > 0 ? `${w.turns}*` : w.turns)}</td>
+                              {foil && <td style={tdStyle} data-label={t('Vol')}>{w.flight ?? '—'}</td>}
                               <td style={tdStyle}>
                                 <ShowButton shown={shown} onClick={() => highlight.show('vagues', shown ? null : String(w.n))} />
                               </td>

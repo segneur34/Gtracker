@@ -556,6 +556,33 @@
     padding-bottom: 0 !important;
     font-weight: 600;
   }
+
+  /* Vagues du surf : même dessin que les podiums (numéro sur sa propre ligne), mais chaque
+     valeur porte son intitulé au-dessus (`data-label`), sur deux lignes de quatre : sept colonnes
+     serrées rogneraient les intitulés. */
+  .an-man-podium--waves thead {
+    display: none;
+  }
+
+  .an-man-podium--waves tbody tr {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: var(--space-1);
+  }
+
+  .an-man-podium--waves td {
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+    min-width: 0;
+  }
+
+  .an-man-podium--waves td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: var(--text-xs);
+    font-weight: normal;
+    white-space: nowrap;
+  }
 }
 
 /* Téléphone tourné : la carte s'ouvre en plein écran en tournant (`AnalysisMap`) ;

@@ -14,14 +14,14 @@ Des cadres plus rapprochés et une page moins vide, sur téléphone et sur ordin
 
 Valeurs retenues : voir « Variante retenue » plus bas, écrite par l'orchestrateur après la planche (`D:\gong tracker\atelier\planche-429-430\`). L'utilisateur peut en changer après coup : l'espace entre cadres doit tenir dans une variable (ou deux : téléphone, ordinateur), pas dans des valeurs éparses.
 
-## Variante retenue (planche du 17/11, ouverte chez l'utilisateur, qui peut en changer)
+## Variante retenue (planche du 17/11, vue par l'utilisateur)
 
 Relevé de la planche (mêmes valeurs sur téléphone et sur ordinateur, sauf mention) :
 - Profil, entre les cadres : `.ui-page.profile { gap: var(--brush-gap) }` (`ProfilePage.css`, vers l. 162), `--brush-gap: 30px` (`tokens.css`, vers l. 84), lue par le Profil seul. Bas de page : `.profile-body { gap: var(--space-5) }` (20 px) ; sur ordinateur dès 1000 px, `.profile-body--columns` à `calc(var(--space-6) + var(--space-2))` (32 px entre colonnes).
 - Analyses : `.an-carte-col { gap: var(--space-3) }` (12 px, onglets puis panneaux), `.an-carte-panels { gap: 20px }` (en dur, entre panneaux), `.an-sheet { margin-bottom: var(--space-2) }`, et un style en ligne de `AnalysisShell` (`margin-top: 10px` de la rangée de la carte). Les panneaux ont `flex: 1 1 calc(50% - 10px)` (`HALF_PANEL_STYLE`, `src/components/styles.ts`), qui suppose un espace de 20 px : à accorder à la nouvelle valeur.
 - `.an-carte-panels` est aussi lue par la page Statistiques.
 
-Variante « Serré », retenue (environ deux tiers de l'espace actuel) : Profil `--brush-gap` 20 px, `.profile-body` 14 px, `.profile-body--columns` 20 px ; analyses `.an-carte-col` 8 px, `.an-carte-panels` 14 px. Écartée : « Très serré » (moitié : 15, 10, 16, 6, 10 px), où les traits de pinceau arrivent presque l'un sur l'autre sur téléphone.
+**Variante « Très serré », choisie par l'utilisateur le 17/11 devant la planche (« cadre très serré »)**, environ la moitié de l'espace actuel : Profil `--brush-gap` 15 px, `.profile-body` 10 px, `.profile-body--columns` 16 px ; analyses `.an-carte-col` 6 px, `.an-carte-panels` 10 px. Écartée : « Serré » (deux tiers : 20, 14, 20, 8, 14 px), que Claude proposait. À surveiller au rendu : sur téléphone, les traits de pinceau de deux cadres voisins ne doivent pas se toucher ; s'ils se touchent, le dire dans le rapport sans changer les valeurs.
 
 Mise en œuvre : les espaces tiennent dans des variables de `tokens.css` (celle du Profil existe, `--brush-gap` ; une pour l'espace entre panneaux d'analyse, qui remplace le `20px` en dur), reprises partout où la valeur était écrite, demi-largeur des panneaux comprise. **Statistiques ne change pas** (la demande ne la cite pas) : elle garde ses 20 px, par sa propre règle ou une variable à elle, et le rapport le dit pour que l'utilisateur puisse la faire suivre.
 
