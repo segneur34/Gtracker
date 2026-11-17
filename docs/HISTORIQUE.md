@@ -401,3 +401,19 @@ Ce fichier est le §10 de `docs/ETAT_DU_PROJET.md`. C'est le journal de Gtracker
     - **Décision** : les scripts « notes », « partage », « import-session » et « import-fit » sont accordés à l'application ; le lanceur allonge les plafonds d'attente selon le nombre de scripts de front, rejoue seul un script en échec d'un seul côté en le disant, ne garde pas en cache un relevé d'avant en échec et retire les copies « avant » des commits qui ne sont plus comparés.
     - **Pourquoi** : des échecs « avant comme après » venaient d'une application qui avait changé sans eux, et de faux échecs de plafonds trop courts sous charge ; ils masquaient les vrais écarts.
     - **Piège** : un script qui échoue des deux côtés ne prouve rien ; l'accorder avant de le croire. Le script « library » n'a pas été rejoué.
+413. Autorisations sur Xiaomi (lots 408 et 419 ; demande du 15/11 ; essai 283 réussi et 282 raté le 16/11 sur l'APK 0.01.11, 281 et 285 réussis le 17/11 sur l'APK 0.01.19).
+    - **Décision** : la ligne « Démarrage automatique » n'existe que sur Xiaomi, Redmi et POCO, avec sa phrase et son bouton « Ouvrir », sans état ; « Tout autoriser » finit par son écran, une seule fois par appareil (`gtracker.autostartOpened`), après la batterie ; sur Enregistrer, une batterie restreinte s'annonce dans le cadre d'alerte rouge, avec « Autoriser », sans jamais bloquer le départ. La décision « démarrage automatique en simple lien » est récrite (`DECISIONS.md` §8).
+    - **Pourquoi** : que le téléphone ne coupe pas un enregistrement application fermée, sans chercher le bon réglage.
+    - **Piège** : l'opération propre à Xiaomi ne dit pas l'état réel du démarrage automatique (« désactivé » alors qu'il était activé, essai 282) : ne pas la réintroduire.
+414. Le lien « Réglages » de la ceinture arrive sur le bloc « Capteurs » (lot 420 ; note du 13/11 ; essai 286 réussi le 17/11).
+    - **Décision** : Réglages s'ouvre sur un bloc désigné par l'adresse (`?bloc=capteurs`), sans état global ; le retour d'Android ramène alors à Enregistrer (`core/parentPage.ts`) ; par la barre, Réglages garde ses blocs et son retour au Profil.
+    - **Pourquoi** : sans ceinture enregistrée, le lien ouvrait Réglages en haut et il fallait chercher « Ajouter ».
+    - **Piège** : remarque de l'utilisateur, non faite : « Aucune ceinture choisie » devrait être en rouge (reste à faire 433).
+415. Le tableau des vagues tient dans l'écran du téléphone (lot 422 ; note du 16/11 ; essai 287 réussi le 17/11).
+    - **Décision** : sur téléphone droit, chaque vague prend le dessin des manœuvres de la voile (numéro, deux lignes de quatre valeurs sous leur intitulé, « Voir »), en-tête masqué ; rien ne change sur ordinateur.
+    - **Pourquoi** : le cadre des vagues dépassait largement de l'écran ; sept colonnes sous un seul en-tête rognaient les intitulés.
+    - **Piège** : l'utilisateur juge « ok mais en 2 lignes c'est moche » : le dessin sera repris (reste à faire 434, planche d'abord), il n'est pas définitif.
+416. Des cadres plus rapprochés sur le Profil et dans les analyses (lot 430 ; note du 17/11 ; essai 289 réussi le 17/11).
+    - **Décision** : « très serré » choisi sur planche de deux variantes, environ la moitié de l'espace d'avant : Profil 15 px entre cadres, 10 px en bas de page, 16 px entre colonnes ; analyses 6 px entre carte, onglets et premier cadre, 10 px entre deux cadres. Les espaces sont des variables du thème.
+    - **Pourquoi** : « effet vide » entre les cadres.
+    - **Piège** : Statistiques partageait la règle des analyses ; elle garde ses 20 px par `--stats-panel-gap`, que l'utilisateur n'a pas encore tranché.
