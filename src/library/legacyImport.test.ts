@@ -11,7 +11,9 @@ import {
 import { createFakeFolder } from '../test/memoryFolder.fixture';
 import { importRecordChoice } from './importEntry';
 import { isIgnoredLegacyRecord, parseImportedRecord, upgradeImportedImu } from './legacyImport';
-import { RECORD_FORMAT, applyRecordPatch, parseRecord, parseRecordWithRaw, serializeRecord, type SessionRecord } from './record';
+import {
+  RECORD_FORMAT, SUMMARY_CALC_VERSION, applyRecordPatch, parseRecord, parseRecordWithRaw, serializeRecord, type SessionRecord,
+} from './record';
 import { bundleSessionGpx, unbundleSessionGpx } from './sessionBundle';
 
 /**
@@ -277,8 +279,9 @@ describe('porte d\'import : la bibliothèque range les sessions de l\'ancienne a
       expect(got.record.analysis).toEqual(original.analysis);
       expect(got.record.jumps).toEqual(original.jumps);
       expect(got.record.activityId).toBe(original.activityId);
-      expect(got.record.summary).toEqual(original.summary);
-      expect(got.record.summary.calcVersion).toBe(18);
+      // Le jeu porte un résumé de la version 18 du calcul : plus ancien que le calcul courant, il est refait à l'import, aux mêmes chiffres.
+      expect(original.summary.calcVersion).toBe(18);
+      expect(got.record.summary).toEqual({ ...original.summary, calcVersion: SUMMARY_CALC_VERSION });
       // La fiche rangée sur le disque dit la même chose que la bibliothèque.
       expect(got.onDisk).toEqual(got.record);
       expect(got.onDisk?.format).toBe(RECORD_FORMAT);
@@ -319,7 +322,7 @@ describe('porte d\'import : la bibliothèque range les sessions de l\'ancienne a
       expect(got.gpx).toBe(expected.gpx);
       expect(got.record.sport).toBe(expected.sport);
       expect(got.record.name).toBeNull();
-      expect(got.record.summary.calcVersion).toBe(18);
+      expect(got.record.summary.calcVersion).toBe(SUMMARY_CALC_VERSION);
       expect(got.record.summary).toMatchObject({
         startMs: original.summary.startMs, endMs: original.summary.endMs, pointCount: original.summary.pointCount,
         distanceM: original.summary.distanceM,

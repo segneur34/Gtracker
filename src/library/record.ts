@@ -80,10 +80,14 @@ export const RECORD_VERSION = 1;
  * lecteur GPX écarte un point à la date illisible ou qui recule (tops, temps
  * actif) ; le point qui suit un trou prend le cap du pas suivant (vent).
  *
+ * 19 (17 novembre 2026) : en surf, le début d'une vague ou d'un vol remonte à
+ * la détente basse du masque tant que la vitesse monte : vagues plus longues,
+ * vagues molles comptées, temps de vol un peu plus long.
+ *
  * Les versions sautées (6, 10, 11, 17 et 18) ne changeaient aucun chiffre de la
  * voile ni du surf ; le numéro est gardé.
  */
-export const SUMMARY_CALC_VERSION = 18;
+export const SUMMARY_CALC_VERSION = 19;
 
 export type SessionSource = 'enregistrement' | 'import';
 

@@ -80,6 +80,14 @@ Critère corrigé par la mesure :
 - Le recul teste la vitesse du pas qu'il ajoute (son point d'arrivée), comme `activeRuns`, et non celle du point d'avant ; sinon il perd un pas et le pas de 6 s sans Doppler n'est jamais repris.
 - La rame plate entre les deux bornes (planche à pagaie à 8 km/h) ne doit pas être avalée : le recul s'arrête au début de la rampe.
 
+### Dit par l'utilisateur le 17/11, pendant le lot
+
+- « Quand j'ai abaissé la vitesse de "planning" ça a mieux marché, donc ça doit être une piste de réflexion si on veut pas créer des faux positifs » : baisser le seuil avance le début mais fait entrer de la rame ; la correction ne touche donc pas au seuil.
+- « J'aime bien la technique proposée : valider une vague et remonter au début. »
+- Une vague molle très brève, écartée aujourd'hui, peut revenir une fois son début compté, et c'est là qu'un faux positif pourrait naître : « je pense que c'est acceptable comme défaut ».
+- Sur la mise en vitesse sous la borne basse, laissée hors de la vague : « oui ça peut être indiqué comme départ peut-être ». Elle reste donc hors de la vague ; la montrer comme le « départ » de chaque vague, « avec une couleur différente », est une idée à part, rangée en élément 432. Précisé aussitôt : « sur cette couleur on peut aller presque jusqu'à la vitesse 0, en restant dans la même vague évidemment » : le départ remonte toute la mise en vitesse de la vague, jusqu'au point où elle commence à accélérer, même presque à l'arrêt ; il appartient à sa vague, ne mord jamais sur la précédente, et une rame à allure constante avant l'accélération n'en fait pas partie (sur sa session de paddle : vague 1, de 1,7 à 6,3 km/h en 9 s ; vague 2, de 4,2 à 6,2 km/h en 5 s, après une rame à 3,9 km/h).
+- Sessions réelles prises sur son téléphone, hors dépôt (`D:\memoire Tracker\essais\423-vagues-1611\`) : Paddle du 16/11 à 15 h 32 (seuil de la session baissé à 6 km/h, 2 vagues, max 12,9 km/h) et Paddle foil du 16/11 à 14 h 26 (« j'ai même jamais été proche de décoller » : simple contrôle, ne garantit rien contre les faux positifs).
+
 ### Tranché par l'orchestrateur
 
 - La fonction reste dans `surfing/`, la voile n'est pas concernée ; le recul se fait avant `keptRuns`.

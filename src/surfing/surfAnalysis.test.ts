@@ -5,10 +5,11 @@ import { SPORT_PROFILES, defaultActiveThresholdOf, getActiveThresholds } from '.
 import type { RawTrackPoint, TrackPoint } from '../core/types';
 import { fromDisplaySpeed } from '../core/units';
 import { summarizeSession } from '../library/summary';
-import { analyzeSurf, summarizeSurf, type SurfParams } from './surfAnalysis';
+import { analyzeSurf, riseStartOf, summarizeSurf, type RiseOptions, type SurfParams } from './surfAnalysis';
 import { countDirectionChanges } from './gpsTurns';
 import { runSurfSession, surfProfileOf } from './surfSession';
 import { M_PER_DEG_LAT } from '../test/geo.fixture';
+import { seededRandom } from '../core/fishSchool';
 
 /**
  * Session de surf synthétique : une suite de phases à vitesse et cap
@@ -36,6 +37,9 @@ interface Phase {
 interface BuildOptions {
   doppler?: boolean;
   dropBetweenS?: [number, number];
+  /** Bruit de la vitesse de l'appareil : tiré uniformément dans ± `noiseMs`, à la graine `seed`. */
+  noiseMs?: number;
+  seed?: number;
 }
 
 const T0 = Date.UTC(2026, 9, 10, 9, 0, 0);
@@ -43,15 +47,18 @@ const T0 = Date.UTC(2026, 9, 10, 9, 0, 0);
 const buildSurfSession = (phases: Phase[], cadenceS = 1, options: BuildOptions = {}): TrackPoint[] => {
   const doppler = options.doppler ?? true;
   const drop = options.dropBetweenS;
+  const noise = options.noiseMs ?? 0;
+  const random = seededRandom(options.seed ?? 1);
   const raw: RawTrackPoint[] = [];
   let lat = 43.4;
   let lon = 3.6;
   let t = 0;
   const push = (speed: number, heading: number) => {
     if (drop && t > drop[0] + 1e-9 && t < drop[1] - 1e-9) return;
+    const measured = noise > 0 ? Math.max(0, speed + (random() * 2 - 1) * noise) : speed;
     raw.push({
       lat, lon, time: new Date(T0 + t * 1000),
-      ...(doppler ? { speedMs: speed, ...(speed > 0 ? { courseDeg: heading } : {}) } : {}),
+      ...(doppler ? { speedMs: measured, ...(speed > 0 ? { courseDeg: heading } : {}) } : {}),
     });
   };
   push(0, 0);
@@ -78,11 +85,21 @@ const buildSurfSession = (phases: Phase[], cadenceS = 1, options: BuildOptions =
 };
 
 const surf = SPORT_PROFILES.surf.surf!;
+
+/** Détente basse du masque au seuil donné, en km/h, en m/s. */
+const exitMsAt = (thresholdKmh: number): number => fromDisplaySpeed(getActiveThresholds(SPORT_PROFILES.surf, thresholdKmh).exit, 'kmh');
+
 const params: SurfParams = {
   ...surf, maxGapS: SPORT_PROFILES.surf.maxGapS, maxSpeedWindowS: SPORT_PROFILES.surf.maxSpeedWindowS,
   // Un seul plancher d'arrêt : celui du profil, 2 km/h.
   stillMs: fromDisplaySpeed(SPORT_PROFILES.surf.stillThreshold, 'kmh'),
+  rideExitMs: exitMsAt(SPORT_PROFILES.surf.defaultActiveThreshold),
+  waveExitMs: null,
 };
+
+/** Réglages de l'analyse sans foil, ou sur foil (détentes basses du vol et des vagues). */
+const paramsOf = (foil: boolean): SurfParams =>
+  foil ? { ...params, rideExitMs: exitMsAt(surf.foilActiveThreshold), waveExitMs: exitMsAt(surf.foilWaveThreshold) } : params;
 
 /** Masque au seuil donné, en km/h, avec l'hystérésis du profil. */
 const maskAt = (track: TrackPoint[], thresholdKmh: number): boolean[] => {
@@ -98,7 +115,7 @@ const analyze = (track: TrackPoint[], foil = false) => {
   const cum = buildCumulativeTrack(track);
   const rideMask = maskAt(track, foil ? surf.foilActiveThreshold : SPORT_PROFILES.surf.defaultActiveThreshold);
   const waveMask = foil ? maskAt(track, surf.foilWaveThreshold) : null;
-  const analysis = analyzeSurf(track, cum, rideMask, waveMask, params);
+  const analysis = analyzeSurf(track, cum, rideMask, waveMask, paramsOf(foil));
   return { analysis, summary: summarizeSurf(track, cum, analysis, params.stillMs) };
 };
 
@@ -434,15 +451,19 @@ const boundsOf = (ride: SoftRide) =>
 
 interface SoftMeasure {
   kept: boolean;
-  /** Rogné au début, en secondes : en tout, puis (a) entre les deux détentes, (b) sous la détente basse, (c) le reste (échantillonnage, lissage). */
+  /**
+   * Rogné au début, en secondes, depuis le début vrai de la rampe : en tout ;
+   * puis, de la mise en vitesse, (a) la part entre les deux détentes, (b) la part
+   * sous la détente basse.
+   */
   startCutS: number;
   a: number;
   b: number;
-  c: number;
+  /** Début de la vague moins l'instant vrai où la vitesse atteint la détente basse, en secondes. */
+  fromLowS: number;
   startCutM: number;
   aM: number;
   bM: number;
-  cM: number;
   /** Rogné à la fin, du retour vrai sous la détente basse : positif, la fin est coupée. */
   endCutS: number;
   endCutM: number;
@@ -485,8 +506,8 @@ const measureSoftRide = (ride: SoftRide, cadenceS: number, options: BuildOptions
   };
   return {
     kept: found !== undefined,
-    startCutS: tStart - rampAtS, a: tHigh - tLow, b: tLow - rampAtS, c: tStart - tHigh,
-    startCutM, aM, bM, cM: startCutM - aM - bM,
+    startCutS: tStart - rampAtS, a: tHigh - tLow, b: tLow - rampAtS, fromLowS: tStart - tLow,
+    startCutM, aM, bM,
     endCutS: tExit - tEnd, endCutM: trueDistanceM(phases, tEnd, tExit),
     turns: countDirectionChanges(track, span.start, span.end, params.turnMinDeg),
     turnsFromLow: countDirectionChanges(track, pointAtOrBefore(tLow), span.end, params.turnMinDeg),
@@ -561,17 +582,19 @@ const cadenceOf = (ride: SoftRide, cadence: SoftCadence, doppler: boolean): [num
   cadence === '5 Hz' ? [0.2, { doppler }] : [1, cadence === '1 Hz' ? { doppler } : { ...sparseRamp(ride), doppler }];
 
 /**
- * Secondes rognées au début de chaque cas, mesurées sur le calcul d'aujourd'hui :
- * avec Doppler à 1 Hz, 5 Hz et pas de 6 s, puis sans Doppler aux mêmes cadences.
+ * Secondes rognées au début de chaque cas, depuis le début vrai de la rampe :
+ * avec Doppler à 1 Hz, 5 Hz et pas de 6 s, puis sans Doppler aux mêmes
+ * cadences. Sans le recul du début, la vague molle en perdait 7 à chaque
+ * cadence sans Doppler, la planche à pagaie 5 à 6, le vol 4 à 5.
  */
 const SOFT_START_CUT_S: Record<string, [number, number, number, number, number, number]> = {
-  molle: [7, 7, 1, 7, 7, 7],
-  lente12s: [10, 10.4, 10, 11, 10.6, 11],
-  breve2s: [7, 7.4, 1, 7, 7.4, 7],
-  pagaie: [5, 5.6, 1, 6, 5.8, 1],
-  cap: [7, 7, 1, 7, 7, 7],
-  foilVol: [4, 4.8, 1, 5, 5, 1],
-  foilVague: [4, 4.2, 0, 4, 4.2, 0],
+  molle: [3, 3.2, 1, 3, 3.4, 1],
+  lente12s: [4, 4.8, 3, 5, 5, 3],
+  breve2s: [3, 3.4, 1, 4, 3.6, 1],
+  pagaie: [1, 1.2, 1, 1, 1.2, 1],
+  cap: [3, 3.2, 1, 3, 3.4, 1],
+  foilVol: [2, 2.2, 1, 2, 2.4, 1],
+  foilVague: [1, 1.4, 0, 1, 1.4, 0],
 };
 
 /**
@@ -590,14 +613,15 @@ const SOFT_SPLIT_S: Record<string, [number, number]> = {
 };
 
 /**
- * Départ des vagues molles. Ces attentes décrivent le défaut mesuré sur le
- * calcul d'aujourd'hui, et changeront avec sa correction : une vague commence
- * au franchissement de la détente haute du masque (seuil + 1 km/h) et ne finit
- * qu'au retour sous la détente basse (seuil − 2 km/h). Toute la mise en vitesse
- * est donc rognée au début, de plusieurs secondes, et rien à la fin. Le lissage
- * n'y ajoute pas de retard (médiane centrée sur une rampe monotone) : l'écart
- * qui reste, d'un pas au plus, vient de l'échantillonnage. Un long pas qui
- * finit au-dessus de la détente haute est compté en entier.
+ * Départ des vagues molles. Le masque entre en glisse à sa détente haute
+ * (seuil + 1 km/h) et n'en sort qu'à sa détente basse (seuil − 2 km/h) ; le
+ * début d'une glisse remonte ensuite à la détente basse tant que la vitesse
+ * monte (`riseStartOf`). La part (a) de la mise en vitesse, entre les deux
+ * détentes, est donc dans la vague, comme la même plage de vitesse l'est à la
+ * fin ; la part (b), sous la détente basse, reste de la rame de départ. La fin
+ * ne bouge pas. Le lissage n'ajoute aucun retard (médiane centrée sur une rampe
+ * monotone). Un long pas dont le point d'arrivée dépasse la détente basse est
+ * compté en entier, avec ou sans Doppler.
  */
 describe('départ des vagues molles', () => {
   const cadences: SoftCadence[] = ['1 Hz', '5 Hz', 'pas de 6 s'];
@@ -612,7 +636,7 @@ describe('départ des vagues molles', () => {
 
     for (const doppler of [true, false]) {
       cadences.forEach((cadence, k) => {
-        it(`${name}, ${cadence}, ${doppler ? 'avec' : 'sans'} Doppler : début rogné, fin entière`, () => {
+        it(`${name}, ${cadence}, ${doppler ? 'avec' : 'sans'} Doppler : début à la détente basse, fin entière`, () => {
           const [cadenceS, options] = cadenceOf(ride, cadence, doppler);
           const m = measureSoftRide(ride, cadenceS, options);
           expect(m.startCutS).toBeCloseTo(SOFT_START_CUT_S[name][k + (doppler ? 0 : 3)], 1);
@@ -625,39 +649,43 @@ describe('départ des vagues molles', () => {
     }
   }
 
-  it('aux cadences régulières, le reste (c) tient dans un pas : le lissage ne retarde pas le départ', () => {
+  it('aux cadences régulières, le début tombe à la détente basse à un pas près, sur la rampe de la planche à pagaie sans avaler la rame plate', () => {
     for (const [name, ride] of Object.entries(SOFT_CASES)) {
       for (const doppler of [true, false]) {
         for (const cadenceS of [1, 0.2]) {
           const m = measureSoftRide(ride, cadenceS, { doppler });
-          expect(Math.abs(m.c), name).toBeLessThanOrEqual(cadenceS + 1e-6);
+          if (name === 'pagaie') {
+            // Rame plate au-dessus de la détente basse : le recul s'arrête au début de la rampe, moins de 5 % de gain en 4 s près.
+            expect(m.startCutS, name).toBeGreaterThanOrEqual(0);
+            expect(m.startCutS, name).toBeLessThanOrEqual(1.2 + 1e-6);
+          } else expect(Math.abs(m.fromLowS), name).toBeLessThanOrEqual(cadenceS + 1e-6);
         }
       }
     }
   });
 
-  it('vague molle à 1 Hz : 7 s et 14 m rognés au début, (a) en fait 8,8 m et (b) 5,2 m', () => {
+  it('vague molle à 1 Hz : (a) rendue à la vague, (b) reste de la rame de départ', () => {
     const m = measureSoftRide(SOFT_CASES.molle, 1);
     expect(m.kept).toBe(true);
-    expect(m.startCutM).toBeCloseTo(13.9, 0);
     expect(m.aM).toBeCloseTo(8.75, 1);
     expect(m.bM).toBeCloseTo(5.2, 1);
-    expect(m.durationS).toBeCloseTo(9, 1);
+    // 3 s et 4,6 m rognés au début (7 s et 13,9 m sans le recul) : moins que (b), le pas qui franchit la détente basse étant compté.
+    expect(m.startCutS).toBeCloseTo(3, 1);
+    expect(m.startCutM).toBeCloseTo(4.6, 1);
+    expect(m.startCutM).toBeLessThan(m.bM);
+    expect(m.durationS).toBeCloseTo(13, 1);
   });
 
-  it('une vague qui ne passe 10 km/h que 2 s est écartée, sauf quand un long pas la rallonge avec Doppler', () => {
+  it('une vague qui ne passe 10 km/h que 2 s est comptée, à toute cadence, avec ou sans Doppler', () => {
     const ride = SOFT_CASES.breve2s;
     for (const doppler of [true, false]) {
-      for (const cadenceS of [1, 0.2]) {
-        const m = measureSoftRide(ride, cadenceS, { doppler });
-        expect(m.kept).toBe(false);
-        // Écartée par la distance : le passage du masque fait moins de `minWaveM`.
-        expect(m.durationS).toBeGreaterThanOrEqual(params.minWaveS);
-        expect(m.distanceM).toBeLessThan(params.minWaveM);
+      for (const cadence of cadences) {
+        const [cadenceS, options] = cadenceOf(ride, cadence, doppler);
+        const m = measureSoftRide(ride, cadenceS, options);
+        expect(m.kept).toBe(true);
+        expect(m.distanceM).toBeGreaterThanOrEqual(params.minWaveM);
       }
     }
-    expect(measureSoftRide(ride, 1, sparseRamp(ride)).kept).toBe(true);
-    expect(measureSoftRide(ride, 1, { ...sparseRamp(ride), doppler: false }).kept).toBe(false);
   });
 
   it('un demi-tour au début de la rampe, sous la détente basse, n\'est pas dans la vague', () => {
@@ -666,9 +694,85 @@ describe('départ des vagues molles', () => {
       const [cadenceS, options] = cadenceOf(ride, cadence, true);
       const m = measureSoftRide(ride, cadenceS, options);
       expect(m.turns).toBe(0);
-      // Un début remonté à la détente basse ne le compterait pas ; remonté au début de la rampe, si.
+      // Le début remonté à la détente basse ne le compte pas ; remonté au début de la rampe, il le compterait.
       expect(m.turnsFromLow).toBe(0);
       expect(m.turnsFromRamp).toBe(1);
     }
   });
+
+  it('le recul du début n\'ajoute aucun virage GPS, dans aucun cas', () => {
+    for (const [name, ride] of Object.entries(SOFT_CASES)) {
+      for (const doppler of [true, false]) {
+        for (const cadence of cadences) {
+          const [cadenceS, options] = cadenceOf(ride, cadence, doppler);
+          expect(measureSoftRide(ride, cadenceS, options).turns, name).toBe(0);
+        }
+      }
+    }
+  });
+});
+
+/**
+ * Début du passage mesuré d'un cas, en secondes depuis le début vrai de sa
+ * rampe, avec ces constantes du recul ; `null` si aucun passage n'est gardé.
+ */
+const softCutS = (ride: SoftRide, cadenceS: number, options: BuildOptions = {}, rise: RiseOptions = {}): number | null => {
+  const track = buildSurfSession(ride.phases, cadenceS, options);
+  const cum = buildCumulativeTrack(track);
+  const rideMask = maskAt(track, ride.foil ? surf.foilActiveThreshold : SPORT_PROFILES.surf.defaultActiveThreshold);
+  const waveMask = ride.foil ? maskAt(track, surf.foilWaveThreshold) : null;
+  const a = analyzeSurf(track, cum, rideMask, waveMask, { ...paramsOf(ride.foil), ...rise });
+  const spans = ride.kind === 'vol' ? a.flights : a.waves;
+  const tEnd = ride.rampAtS + ride.rampS + 20;
+  const f = spans.find((w) => (w.startMs - T0) / 1000 < tEnd && (w.endMs - T0) / 1000 > ride.rampAtS);
+  return f ? (f.startMs - T0) / 1000 - ride.rampAtS : null;
+};
+
+/** Point de la trace à cet instant, en secondes depuis le premier point. */
+const indexAtS = (track: TrackPoint[], s: number): number => track.findIndex((p) => Math.abs((p.timeMs - T0) / 1000 - s) < 1e-6);
+
+describe('recul du début d\'une glisse : bruit, constantes et bornes', () => {
+  it('vitesse bruitée (± 0,15 m/s, trente graines), à 1 Hz et 5 Hz : début à la détente basse, rame plate de la planche à pagaie gardée', () => {
+    for (const name of ['molle', 'lente12s', 'pagaie', 'foilVol', 'foilVague']) {
+      const ride = SOFT_CASES[name];
+      const [, b] = SOFT_SPLIT_S[name];
+      for (let seed = 1; seed <= 30; seed++) {
+        for (const cadenceS of [1, 0.2]) {
+          const cut = softCutS(ride, cadenceS, { noiseMs: 0.15, seed });
+          const label = `${name}, graine ${seed}, ${cadenceS} s`;
+          expect(cut, label).not.toBeNull();
+          if (name === 'pagaie') {
+            // Une seconde de rame plate avalée au pire, jamais plus.
+            expect(cut!, label).toBeGreaterThanOrEqual(-1);
+            expect(cut!, label).toBeLessThanOrEqual(3);
+          } else expect(Math.abs(cut! - b), label).toBeLessThanOrEqual(2);
+        }
+      }
+    }
+  });
+
+  for (const cadenceS of [1, 0.2]) {
+    it(`à ${1 / cadenceS} Hz, les constantes passent en option : sans montée admise, le début d'avant ; recul plafonné en secondes ; fenêtre courte`, () => {
+      const molle = SOFT_CASES.molle;
+      expect(softCutS(molle, cadenceS, {}, { riseMaxRatio: 0 })).toBeCloseTo(7, 1);
+      expect(softCutS(molle, cadenceS, {}, { maxRiseS: 2 })).toBeCloseTo(5, 1);
+      // Sur la rampe lente de la planche à pagaie, une seconde ne gagne pas 5 % : le recul s'arrête aussitôt.
+      expect(softCutS(SOFT_CASES.pagaie, cadenceS, {}, { riseWindowS: 1 })).toBeGreaterThanOrEqual(5);
+    });
+
+    it(`à ${1 / cadenceS} Hz, riseStartOf ne part jamais avant le point plancher, ni à travers une reprise de pause ou un trou`, () => {
+      const track = buildSurfSession(SOFT_CASES.molle.phases, cadenceS);
+      const run = activeRuns(track, maskAt(track, SPORT_PROFILES.surf.defaultActiveThreshold))[0];
+      const low = params.rideExitMs;
+      // Détente basse atteinte à 53,3 s : le pas qui la franchit est compté.
+      expect(riseStartOf(track, run.start, 0, low, params)).toBe(indexAtS(track, cadenceS === 1 ? 53 : 53.2));
+      expect(riseStartOf(track, run.start, indexAtS(track, 55), low, params)).toBe(indexAtS(track, 55));
+      const paused = track.map((p, k) => (k === indexAtS(track, 55) ? { ...p, segmentStart: true as const } : p));
+      expect(riseStartOf(paused, run.start, 0, low, params)).toBe(indexAtS(track, 55));
+      // Aucun point de 44 à 56 s : un trou de 12 s, plus long que `maxGapS`.
+      const holed = buildSurfSession(SOFT_CASES.molle.phases, cadenceS, { dropBetweenS: [44, 56] });
+      const holedRun = activeRuns(holed, maskAt(holed, SPORT_PROFILES.surf.defaultActiveThreshold))[0];
+      expect(riseStartOf(holed, holedRun.start, 0, low, params)).toBe(indexAtS(holed, 56));
+    });
+  }
 });
