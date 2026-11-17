@@ -90,12 +90,13 @@
   align-items: center;
   justify-content: center;
   min-width: 32px;
-  min-height: 32px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--muted);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--ink);
   cursor: pointer;
 }
 
