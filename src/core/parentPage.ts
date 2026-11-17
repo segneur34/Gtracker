@@ -9,6 +9,15 @@ export const PROFILE_PATH = '/profil';
 /** Réglages, où s'ouvre le test de FC repos et où il revient. */
 export const SETTINGS_PATH = '/parametres';
 
+/** Page Enregistrer (`RECORD_PATH` de `navigation.ts`, qui importe ce module). */
+const RECORD_ROUTE = '/enregistrer';
+
+/** Réglages ouverts sur le bloc « Capteurs » (`?bloc=capteurs`), où se trouve le bouton « Ajouter » d'une ceinture. */
+export const SETTINGS_SENSORS_PATH = `${SETTINGS_PATH}?bloc=capteurs`;
+
+/** Bloc de Réglages désigné par l'adresse (`?bloc=`), `null` s'il n'y en a pas : les blocs gardent alors leur état. */
+export const settingsBlockFromSearch = (search: string): string | null => new URLSearchParams(search).get('bloc');
+
 /** Page du test de FC repos, ouverte depuis Réglages (Pratiquant, à gauche de la FC de repos). */
 export const RESTING_HR_PATH = '/profil/fc-repos';
 
@@ -31,6 +40,8 @@ export const PLAN_PATH = '/itineraires';
 export const parentPage = (pathname: string, search: string): string | null => {
   const path = pathname.replace(/\/+$/, '') || '/';
   if (path === '/' || path === PROFILE_PATH) return null;
+  // Réglages ouverts par le lien de la page Enregistrer (`?bloc=capteurs`) : retour à Enregistrer.
+  if (path === SETTINGS_PATH && settingsBlockFromSearch(search) === 'capteurs') return RECORD_ROUTE;
   if (path === SESSIONS_PATH) return PROFILE_PATH;
   const parts = path.split('/').filter(Boolean);
   if (parts.length === 2 && parts[1] === 'analyse' && isFamily(parts[0])) {

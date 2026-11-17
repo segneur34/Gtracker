@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { PROFILE_PATH, SESSIONS_PATH, analysisPath, parentPage, sessionFamily, sessionsPath } from './parentPage';
+import { PROFILE_PATH, SESSIONS_PATH, SETTINGS_SENSORS_PATH, analysisPath, parentPage, sessionFamily, sessionsPath, settingsBlockFromSearch } from './parentPage';
+
+describe('settingsBlockFromSearch', () => {
+  it("lit le bloc désigné par l'adresse de Réglages, rien sans paramètre", () => {
+    expect(settingsBlockFromSearch(SETTINGS_SENSORS_PATH.slice(SETTINGS_SENSORS_PATH.indexOf('?')))).toBe('capteurs');
+    expect(settingsBlockFromSearch('')).toBeNull();
+    expect(settingsBlockFromSearch('?activite=x')).toBeNull();
+  });
+  it('Réglages ouverts par le lien de la ceinture renvoient à Enregistrer, sinon au Profil', () => {
+    expect(parentPage('/parametres', '?bloc=capteurs')).toBe('/enregistrer');
+    expect(parentPage('/parametres', '')).toBe(PROFILE_PATH);
+  });
+});
 
 describe('parentPage', () => {
   it("Profil : rien au-dessus, ni à l'adresse /, qui y mène ; le retour quitte l'application", () => {

@@ -4,6 +4,7 @@ import { t, tn } from '../core/i18n';
 import { tRich, tnRich } from '../components/tRich';
 import { Fragment, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ChangeEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { SETTINGS_SENSORS_PATH } from '../core/parentPage';
 import ActivitySelect from '../components/ActivitySelect';
 import BeltStatus from '../components/BeltStatus';
 import Button from '../components/ui/Button';
@@ -890,7 +891,7 @@ function RecordingScreen() {
             <CaptureOption label={t('Ceinture cardio')} checked={measureHeartRate} disabled={belt === null}
               onChange={setHeartRatePicked}
               note={belt === null
-                ? tRich('Aucune ceinture choisie : <a>Réglages</a>, bloc « Capteurs ».', undefined, { a: settingsLink })
+                ? tRich('Aucune ceinture choisie : <a>Réglages</a>, bloc « Capteurs ».', undefined, { a: (children) => <Link to={SETTINGS_SENSORS_PATH}>{children}</Link> })
                 : <>
                   {t("{label}, portée et humidifiée : elle n'émet qu'au contact de la peau.", { label: beltLabel })}
                   {retainedBelts.length >= 2 && (

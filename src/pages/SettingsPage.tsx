@@ -1,5 +1,5 @@
-import { Fragment, memo, useCallback, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { RESTING_HR_PATH } from '../core/parentPage';
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { RESTING_HR_PATH, settingsBlockFromSearch } from '../core/parentPage';
 import {
   FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityDisplayName, activityFamily, isFamilyHidden, nextActivityColor, sportDisplayName, visibleActivities, visibleFamilies,
   type Activity,
@@ -19,7 +19,7 @@ import { useFavoriteBrush } from '../hooks/useFavoriteBrush';
 import '../components/BrushFrame.css';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useTutorials } from '../hooks/useTutorials';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useTileCache } from '../hooks/useTileCache';
 import { isTileTemplate, type MapBase } from '../core/mapBase';
 import { useThemeSettings } from '../hooks/useTheme';
@@ -560,7 +560,17 @@ function SettingsPage() {
     stopHoldMs, setStopHoldMs, beepSound, setBeepSound, hiddenFamilies, setActivityHidden, setFamilyHidden,
   } = useAllSportSettings();
   const { profile, setNumber, setSex, setThresholds, age } = useAthleteProfile();
-  const { open, toggle, closeAll: closeBlocks } = useOpenSections<SettingsBlock>('settings', SETTINGS_BLOCK_DEFAULTS);
+  const { open, toggle, set: setBlocks, closeAll: closeBlocks } = useOpenSections<SettingsBlock>('settings', SETTINGS_BLOCK_DEFAULTS);
+  /** Arrivée par `?bloc=capteurs` (lien de la page Enregistrer) : le bloc s'ouvre et vient à l'écran, une fois. */
+  const sensorsRef = useRef<HTMLDivElement>(null);
+  const { search } = useLocation();
+  const wantsSensors = settingsBlockFromSearch(search) === 'capteurs';
+  useEffect(() => {
+    if (!wantsSensors) return;
+    setBlocks({ capteurs: true });
+    const id = window.setTimeout(() => sensorsRef.current?.scrollIntoView({ block: 'start' }), 0);
+    return () => window.clearTimeout(id);
+  }, [wantsSensors, setBlocks]);
   const { open: openActivity, toggle: toggleActivity, closeAll: closeActivities } = useOpenSections<string>('settings-activities', NO_ACTIVITY_OPEN);
   const { open: openPart, toggle: togglePart, closeAll: closeParts } = useOpenSections<ActivityPartKey>('settings-activity-parts', ACTIVITY_PART_DEFAULTS);
   const { open: openFamily, toggle: toggleFamily, closeAll: closeFamilies } = useOpenSections<SportFamily>('settings-families', FAMILY_OPEN_DEFAULTS);
@@ -708,7 +718,7 @@ function SettingsPage() {
         )}
       </div>
 
-      <div style={cardStyle}>
+      <div style={cardStyle} ref={sensorsRef}>
         <PanelTitle label={t('Capteurs')} open={open.capteurs} onToggle={() => toggle('capteurs')} />
         {open.capteurs && <div className="settings-block__body"><HeartRateBeltSettings /></div>}
       </div>
