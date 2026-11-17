@@ -278,6 +278,8 @@
   "Hauteur gagnée par le téléphone, donc par le buste, au-dessus de son niveau au décollage, mesurée par l'accéléromètre et le gyroscope : ce n'est pas la hauteur de la planche au-dessus de l'eau. Précision attendue, téléphone sur la poitrine : ±0,1 à 0,2 m sans foil, ±0,2 à 0,3 m sur foil ; davantage au bras. En l'air : du décollage à l'atterrissage. Longueur : chemin parcouru pendant le saut, lu sur la trace ; vitesse : au décollage. « ≈ » marque une mesure douteuse, dont la raison s'affiche au survol. « Voir » montre le saut sur la carte, « Détail » sur la courbe. Sont montrés les sauts d'au moins {height} (Réglages, carte de l'activité) pris à {threshold} ou plus (seuil d'activité de la session).": "Height gained by the phone, so by the torso, above its level at take-off, measured by the accelerometer and the gyroscope: this is not the height of the board above the water. Expected accuracy, phone on the chest: ±0.1 to 0.2 m without a foil, ±0.2 to 0.3 m on a foil; more on the arm. Airtime: from take-off to landing. Length: distance covered during the jump, read from the track; speed: at take-off. “≈” marks a doubtful measurement, whose reason shows on hover. “View” shows the jump on the map, “Detail” on the curve. Jumps shown are those of at least {height} (Settings, activity card) made at {threshold} or more (the session's activity threshold).",
   "Plus haut": "Highest",
   "Plus long saut": "Longest jump",
+  "Plus haut saut": "Highest jump",
+  "Cadence de pumping": "Pumping cadence",
   "Les plus hauts": "Highest",
   "Voir (Carte)": "View (Map)",
   "Masquer (Carte)": "Hide (Map)",

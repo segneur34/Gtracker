@@ -20,11 +20,12 @@ describe('presetOf', () => {
     expect(presetOf({ id: 'a-paddle', base: 'surf' }).turns).toBeUndefined();
   });
 
-  it("foil coché d'office pour Windfoil, Kitefoil, Surf foil et Pumping, pumping pour Pumping seul", () => {
+  it("foil coché d'office pour Windfoil, Kitefoil, Surf foil et Pumping, pumping pour toute activité du surf", () => {
     const byId = (id: string) => DEFAULT_ACTIVITIES.find((a) => a.id === id)!;
     for (const id of ['a-windfoil', 'a-kitefoil', 'a-surf-foil', 'a-pumping']) expect(presetOf(byId(id)).foil, id).toBe(true);
     for (const id of ['windsurf', 'kite', 'surf', 'a-paddle', 'bateau', 'a-parawing']) expect(presetOf(byId(id)).foil, id).toBeUndefined();
-    expect(DEFAULT_ACTIVITIES.filter((a) => presetOf(a).pumping).map((a) => a.id)).toEqual(['a-pumping']);
+    expect(DEFAULT_ACTIVITIES.filter((a) => presetOf(a).pumping).map((a) => a.id)).toEqual(['surf', 'a-paddle', 'a-surf-foil', 'a-pumping']);
+    expect(presetOf({ id: 'a-paddle-foil', base: 'surf' }).pumping).toBe(true);
     // Chacun garde le pré-réglage de son calcul : 8 nœuds pour Windfoil, sauts à 1 m pour Kitefoil.
     expect(presetOf(byId('a-windfoil')).threshold).toBe(8);
     expect(presetOf(byId('a-kitefoil')).jumps?.minHeightM).toBe(1);
@@ -32,10 +33,10 @@ describe('presetOf', () => {
   });
 
   it('un calcul sans pré-réglage rend un objet vide, toujours le même', () => {
-    const a = presetOf({ id: 'a-surf-2', base: 'surf' });
+    const a = presetOf({ id: 'a-bateau-2', base: 'bateau' });
     expect(a).toEqual({});
-    expect(presetOf({ id: 'autre', base: 'surf' })).toBe(a);
-    expect(presetOf({ id: 'a-bateau', base: 'bateau' })).toBe(a);
+    expect(presetOf({ id: 'autre', base: 'bateau' })).toBe(a);
+    expect(presetOf({ id: 'a-surf-2', base: 'surf' })).toEqual({ pumping: true });
   });
 
   it("sauts mesurés d'office en voile (wing, planche, kite), pas ailleurs", () => {

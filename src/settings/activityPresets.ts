@@ -26,7 +26,7 @@ export interface ActivityPreset {
   turns?: boolean;
   /** Foil coché d'office, à la place du défaut du calcul (activités de départ « foil »). */
   foil?: boolean;
-  /** Mesure du pumping cochée d'office (activité de départ « Pumping »). */
+  /** Mesure du pumping cochée d'office (calcul surf : sans effet tant que le foil n'est pas coché). */
   pumping?: boolean;
   heartRate?: boolean;
   /** Onglets des analyses montrés ou cachés à l'écart de ceux du module. */
@@ -54,6 +54,8 @@ const BASE_PRESETS: Partial<Record<SportType, ActivityPreset>> = {
   windsurf: WING,
   // Sauts mesurés d'office en voile, à la hauteur du calcul ; le reste du kite suit son calcul.
   kite: { jumps: { enabled: true, placement: 'poitrine', minHeightM: 1 } },
+  // Pumping mesuré d'office en surf, sur foil seulement : surf foil, paddle foil, Pumping.
+  surf: { pumping: true },
 };
 
 /**
@@ -62,10 +64,10 @@ const BASE_PRESETS: Partial<Record<SportType, ActivityPreset>> = {
  */
 const ACTIVITY_PRESETS: Partial<Record<string, ActivityPreset>> = {
   // Virages mesurés d'office en surf ; le paddle, le kayak, le downwind, créés sur le même calcul, non.
-  surf: { turns: true },
-  'a-surf-foil': { turns: true, foil: true },
-  // Pumping : un surf foil dont la mesure du pumping est cochée d'office.
-  'a-pumping': { turns: true, foil: true, pumping: true },
+  surf: { ...BASE_PRESETS.surf, turns: true },
+  'a-surf-foil': { ...BASE_PRESETS.surf, turns: true, foil: true },
+  // Pumping : un surf foil, au pumping coché d'office comme toute activité du surf.
+  'a-pumping': { ...BASE_PRESETS.surf, turns: true, foil: true },
   // Foil coché d'office sur la planche et le kite ; le reste suit le calcul (wingfoil : foil par son profil).
   'a-windfoil': { ...WING, foil: true },
   'a-kitefoil': { ...BASE_PRESETS.kite, foil: true },

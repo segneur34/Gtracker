@@ -120,8 +120,10 @@ describe("foil et pumping d'office des activités de départ", () => {
     expect(on).toEqual(['wingfoil', 'a-parawing', 'a-windfoil', 'a-kitefoil', 'a-surf-foil', 'a-pumping']);
   });
 
-  it('pumping coché pour Pumping seul ; bateau : sans objet', () => {
-    expect(DEFAULT_ACTIVITIES.filter((a) => resolvePumping({}, a)).map((a) => a.id)).toEqual(['a-pumping']);
+  it('pumping coché pour les activités du surf (montré sur foil seulement) ; bateau : sans objet', () => {
+    expect(DEFAULT_ACTIVITIES.filter((a) => resolvePumping({}, a)).map((a) => a.id)).toEqual(['surf', 'a-paddle', 'a-surf-foil', 'a-pumping']);
+    // Une case déjà rangée garde son choix.
+    expect(resolvePumping({ pumping: { 'a-surf-foil': false } } as StoredSettings, byId('a-surf-foil'))).toBe(false);
     expect(resolvePumping({}, byId('bateau'))).toBeNull();
   });
 

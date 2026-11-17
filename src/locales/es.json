@@ -278,6 +278,8 @@
   "Hauteur gagnée par le téléphone, donc par le buste, au-dessus de son niveau au décollage, mesurée par l'accéléromètre et le gyroscope : ce n'est pas la hauteur de la planche au-dessus de l'eau. Précision attendue, téléphone sur la poitrine : ±0,1 à 0,2 m sans foil, ±0,2 à 0,3 m sur foil ; davantage au bras. En l'air : du décollage à l'atterrissage. Longueur : chemin parcouru pendant le saut, lu sur la trace ; vitesse : au décollage. « ≈ » marque une mesure douteuse, dont la raison s'affiche au survol. « Voir » montre le saut sur la carte, « Détail » sur la courbe. Sont montrés les sauts d'au moins {height} (Réglages, carte de l'activité) pris à {threshold} ou plus (seuil d'activité de la session).": "Altura ganada por el móvil, es decir por el torso, por encima de su nivel en el despegue, medida por el acelerómetro y el giroscopio: no es la altura de la tabla sobre el agua. Precisión esperada, con el móvil en el pecho: ±0,1 a 0,2 m sin foil, ±0,2 a 0,3 m con foil; más en el brazo. En el aire: del despegue al aterrizaje. Longitud: distancia recorrida durante el salto, leída en el track; velocidad: en el despegue. «≈» marca una medición dudosa, cuya razón se muestra al pasar el cursor por encima. «Ver» muestra el salto en el mapa, «Detalle» en la curva. Se muestran los saltos de al menos {height} (Ajustes, tarjeta de la actividad) hechos a {threshold} o más (umbral de actividad de la sesión).",
   "Plus haut": "Más alto",
   "Plus long saut": "Salto más largo",
+  "Plus haut saut": "Salto más alto",
+  "Cadence de pumping": "Cadencia de pumping",
   "Les plus hauts": "Los más altos",
   "Voir (Carte)": "Ver (Mapa)",
   "Masquer (Carte)": "Ocultar (Mapa)",

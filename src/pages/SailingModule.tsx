@@ -9,7 +9,7 @@ import { useAnalysisSession } from '../hooks/useAnalysisSession';
 import { useAnalysisTabs } from '../hooks/useAnalysisTabs';
 import { useSailingSession } from '../hooks/useSailingSession';
 import { updateSessionRecord } from '../hooks/useSessionLibrary';
-import { heartRateShareStats, shareExtraStats } from '../library/shareStats';
+import { heartRateShareStats, jumpTiles, pumpingTiles, shareExtraStats } from '../library/shareStats';
 import { effectiveHrOffset, useHasGearList, useSportSettings } from '../hooks/useSportSettings';
 import { notesHaveGear } from '../settings/gearReminder';
 import { useShownJumps } from '../hooks/useSessionJumps';
@@ -91,6 +91,8 @@ const SAILING_GEAR_FIELDS_FOIL: GearField[] = [
  */
 
 const SAILING_PANEL_DEFAULTS = tabDefaults(SAILING_TABS);
+/** Tuiles de « général » gardées côte à côte : virements et empannages, les deux des sauts, les deux du pumping. */
+const GENERAL_PAIRS: ReadonlyArray<readonly [string, string]> = [['tacks', 'jibes'], ['jumps', 'highestJump'], ['pumpCadence', 'pumpShare']];
 
 function SailingModule() {
   /** Réglages de l'activité de voile, lus une fois ici et passés à `useSailingSession`. */
@@ -245,7 +247,12 @@ function SailingModule() {
   const graphFolds = useOpenSections('sailing-graphes', SAILING_GRAPH_FOLDS_DEFAULT);
   // Pumping des vols, par les capteurs de la session : il suit les vols, donc le seuil du brouillon.
   // Capteurs lus à l'ouverture de l'onglet « vols » ou « pumping », Pumping coché : une capture entière pèse plusieurs Mo.
-  const pumpSensors = useSessionPumping(loadedFromMemory ? sessionFile : null, pumping && (open.vols || open.pumping));
+  // Lus aussi avec « général », pour ses tuiles de pumping, si l'activité montre l'onglet « pumping » : après le premier
+  // affichage (lecture asynchrone), les tuiles arrivant quand le calcul est prêt.
+  const pumpingTabChosen = useMemo(() => shown((p) => p.key === 'pumping').length > 0, [shown]);
+  const pumpSensors = useSessionPumping(
+    loadedFromMemory ? sessionFile : null, pumping && (open.vols || open.pumping || (open.general && pumpingTabChosen))
+  );
   /** Onglet « vols » : sur foil, pour un calcul qui mesure le pumping ; les vols viennent du GPS. */
   const flightsVisible = foil && profile.pump !== null;
   const flightsOpen = open.vols && flightsVisible;
@@ -377,6 +384,15 @@ function SailingModule() {
   };
   const topValue = (top: TopSegment | undefined): string => (top && top.val !== '-' ? `${showKn(top.val)} ${speedSymbol}` : '—');
   /**
+   * Sauts et pumping dans « général », si l'activité montre leur onglet et que la session porte la donnée :
+   * sauts calculés, pumping coché et mesuré sur au moins un vol. Décocher l'onglet retire ses tuiles.
+   */
+  const panelShown = (key: string): boolean => sailingPanels.some((p) => p.key === key);
+  const sportTiles: ShareStat[] = [
+    ...(panelShown('sauts') && jumps.status === 'ready' ? jumpTiles(jumps.jumps) : []),
+    ...(pumping && panelShown('pumping') ? pumpingTiles(pumpSummary) : []),
+  ];
+  /**
    * Chiffres de l'onglet « général » : l'essentiel de la session, le détail restant dans
    * « avancé ». Sur foil, la distance, le ratio et la moyenne sont ceux du vol ; sans seuil (bateau),
    * toute la session compte. L'image de partage garde la liste entière (`generalStats`).
@@ -398,6 +414,7 @@ function SailingModule() {
     { key: 'top2s', label: t('Top 2 s'), value: topValue(stats.tops.t2s[0]) },
     { key: 'tacks', label: t('Virements réussis'), value: maneuverRate(maneuverSummary.tack) },
     { key: 'jibes', label: t('Empannages réussis'), value: maneuverRate(maneuverSummary.jibe) },
+    ...sportTiles,
     ...heartRateStat,
   ] : [];
   /** Podiums montrables sur la carte : les tops de vitesse, puis ceux de VMG (près, portant), par clé de cible. */
@@ -614,7 +631,7 @@ function SailingModule() {
             {open.general && (
               <ResizablePanel id="sailing.general" style={PANEL_BLOCK_STYLE}>
                 <PanelHeading label={t('Général')}extra={<SessionDate track={trackData} />} open={open.general} onToggle={toggleOf('general')} />
-                <GeneralStats stats={overviewStats} pairs={[['tacks', 'jibes']]} />
+                <GeneralStats stats={overviewStats} pairs={GENERAL_PAIRS} />
                 {/* Mini-boussole du vent ; « Régler » ouvre la grande sur la carte. */}
                 <div className="an-sheet__wind" style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
                   <WindCompass windAngle={shownWind ?? autoWind ?? 0} size={64} />

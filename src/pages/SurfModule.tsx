@@ -77,7 +77,7 @@ import { SPEED_COLOR } from '../components/chartStyle';
 import AnalysisShell from '../components/AnalysisShell';
 import ZoomView from '../components/ZoomView';
 import type { ChartZoom } from '../hooks/useChartZoom';
-import { heartRateShareStats, shareExtraStats } from '../library/shareStats';
+import { heartRateShareStats, pumpingTiles, shareExtraStats } from '../library/shareStats';
 
 /**
  * Analyse d'une session de surf, selon le patron commun
@@ -95,6 +95,8 @@ import { heartRateShareStats, shareExtraStats } from '../library/shareStats';
  */
 
 const SURF_SECTION_DEFAULTS = tabDefaults(SURF_TABS);
+/** Tuiles de « général » gardées côte à côte : les deux du pumping. */
+const GENERAL_PAIRS: ReadonlyArray<readonly [string, string]> = [['pumpCadence', 'pumpShare']];
 
 /** Préfixe des identifiants mémorisés (tailles des panneaux, onglets ouverts) : ne pas le renommer. */
 const STORAGE_ID = 'surf';
@@ -216,8 +218,13 @@ function SurfModule() {
   const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(base.track, profile.heartRate, hrOffsetBpm);
   // Pumping des vols, par les capteurs de la session : il suit les vols, donc le seuil du brouillon.
   // Capteurs lus à l'ouverture de l'onglet « vols » ou « pumping », Pumping coché, comme en voile : une capture entière pèse plusieurs Mo ;
-  // et à celle de l'onglet « vagues », pour les virages du gyroscope.
-  const sensors = useSessionPumping(shownFile, (pumping && (open.vols || open.pumping)) || open.vagues);
+  // et à celle de l'onglet « vagues », pour les virages du gyroscope. Lus aussi avec « général », pour ses tuiles
+  // de pumping, si l'activité montre l'onglet « pumping » : après le premier affichage (lecture asynchrone), les tuiles
+  // arrivant quand le calcul est prêt.
+  const pumpingTabChosen = useMemo(() => shown((s) => s.key === 'pumping').length > 0, [shown]);
+  const sensors = useSessionPumping(
+    shownFile, (pumping && (open.vols || open.pumping || (open.general && pumpingTabChosen))) || open.vagues
+  );
   const pumpDetection = surfProfile?.pump ?? null;
   /** Seuils de l'aide des onglets « vagues » et « rame », mis en texte une fois ici, tels que les phrases d'aide (`t`) les insèrent. */
   const cadenceMin = String(pumpDetection?.cadenceMinPerMin ?? 0);
@@ -286,8 +293,9 @@ function SurfModule() {
    * Chiffres de l'onglet « général » : l'essentiel, le détail restant dans « avancé ».
    * L'image de partage garde la liste entière (`generalStats`).
    */
-  const overviewKeys = ['totalTime', 'waves', 'waveTime', 'longestWave', 'maxSpeed', ...(foil ? ['flightTime', 'longestFlight'] : []), 'heartRate'];
-  const overviewStats = overviewKeys.flatMap((key) => generalStats.filter((stat) => stat.key === key));
+  const overviewKeys = [
+    'totalTime', 'waves', 'waveTime', 'longestWave', 'maxSpeed', ...(foil ? ['flightTime', 'longestFlight', 'pumpCadence', 'pumpShare'] : []), 'heartRate',
+  ];
 
   // Une seule surbrillance : une vague (son numéro) ou le podium, un vol, une remontée.
   const waveShown = highlight.shownIn('vagues');
@@ -312,6 +320,12 @@ function SurfModule() {
   const {
     byFlight: flightPumping, summary: pumpSummary, podium: podiumFlights, series: pumpSeriesList, seriesPodium,
   } = useFlightPumping(pumpSensors.recording, pumpDetection, track, cumulative, flights);
+  /**
+   * Tuiles de pumping de « général » (hors image de partage), si l'activité montre l'onglet « pumping »,
+   * Pumping coché et mesuré sur au moins un vol : décocher l'onglet les retire.
+   */
+  const pumpTiles = pumping && sections.some((s) => s.key === 'pumping') ? pumpingTiles(pumpSummary) : [];
+  const overviewStats = overviewKeys.flatMap((key) => [...generalStats, ...pumpTiles].filter((stat) => stat.key === key));
   const speedCell = speedCellOf(speedUnit);
   /** Colonnes « Tous les vols » du GPS, sans pumping mesuré : temps et vitesse hors des vagues (unité de l'activité). */
   const surfFlightGpsColumns: FlightColumn<SurfFlight>[] = [
@@ -546,7 +560,7 @@ function SurfModule() {
             {open.general && (
               <ResizablePanel id={panelId('general')} style={ANALYSIS_PANEL_STYLE}>
                 <PanelHeading label={t('Général')} extra={<SessionDate track={track} />} open={open.general} onToggle={toggleOf('general')} />
-                <GeneralStats stats={overviewStats} />
+                <GeneralStats stats={overviewStats} pairs={GENERAL_PAIRS} />
                 {draft.edits.foil === null && (
                   <div className="ui-muted ui-text-xs ui-mt-8">
                     {foil

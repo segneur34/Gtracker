@@ -3,7 +3,42 @@ import { shareableStats } from '../core/shareImage';
 import { SAILING_SPORTS, getSportProfile, hasActiveThreshold } from '../core/sportProfiles';
 import type { SessionSummary } from './record';
 import { formatSessionDate } from '../core/units';
-import { SHARE_EXTRA_KEYS, heartRateShareStats, shareExtraStats, shareLabels, summaryShareStats } from './shareStats';
+import { SHARE_EXTRA_KEYS, heartRateShareStats, jumpTiles, pumpingTiles, shareExtraStats, shareLabels, summaryShareStats } from './shareStats';
+
+describe('jumpTiles', () => {
+  it('sauts inconnus : aucune tuile', () => {
+    expect(jumpTiles(null)).toEqual([]);
+  });
+
+  it('aucun saut : « 0 » et « — »', () => {
+    expect(jumpTiles([]).map((s) => [s.key, s.label, s.value])).toEqual([
+      ['jumps', 'Sauts', '0'],
+      ['highestJump', 'Plus haut saut', '—'],
+    ]);
+  });
+
+  it('nombre de sauts et plus haut, à deux décimales et virgule', () => {
+    expect(jumpTiles([{ heightM: 0.8 }, { heightM: 1.456 }, { heightM: 1.2 }]).map((s) => s.value)).toEqual(['3', '1,46 m']);
+  });
+});
+
+describe('pumpingTiles', () => {
+  it('sans résumé ou sans vol mesuré : aucune tuile', () => {
+    expect(pumpingTiles(null)).toEqual([]);
+    expect(pumpingTiles({ strokesPerMin: 80, pumpShare: 0.3, measured: 0 })).toEqual([]);
+  });
+
+  it('cadence arrondie, part du vol en pourcent', () => {
+    expect(pumpingTiles({ strokesPerMin: 87.6, pumpShare: 0.234, measured: 2 }).map((s) => [s.key, s.label, s.value])).toEqual([
+      ['pumpCadence', 'Cadence de pumping', '88 /min'],
+      ['pumpShare', 'Part du vol pompée', '23 %'],
+    ]);
+  });
+
+  it('cadence sans coup : « — »', () => {
+    expect(pumpingTiles({ strokesPerMin: null, pumpShare: 0, measured: 1 }).map((s) => s.value)).toEqual(['—', '0 %']);
+  });
+});
 
 describe('heartRateShareStats', () => {
   it('donne la FC moyenne arrondie quand la session a de la FC', () => {

@@ -313,7 +313,7 @@ const sanitizeNotificationFields = (value: unknown, activity: Activity): LiveFie
 export const defaultFoil = (activity: Activity): boolean =>
   presetOf(activity).foil ?? getSportProfile(activity.base).foilDefault;
 
-/** Pumping d'une activité sans réglage : coché pour « Pumping » seulement. */
+/** Pumping d'une activité sans réglage : celui de son pré-réglage (coché en surf, montré sur foil seulement), sinon non. */
 export const defaultPumpingOf = (activity: Activity): boolean => presetOf(activity).pumping ?? false;
 
 /** Foil d'une activité : celui réglé, sinon son défaut. */
