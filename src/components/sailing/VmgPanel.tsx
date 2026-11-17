@@ -83,7 +83,7 @@ export default function VmgPanel({
             <td>{showKn(v.upPort.avg)} / <strong>{showKn(v.upPort.max)}</strong></td>
             <td>{showKn(v.upStbd.avg)} / <strong>{showKn(v.upStbd.max)}</strong></td>
           </tr>
-          <tr>
+          <tr className="ui-table__row">
             <td className="an-vmg-allure">{t('Portant')}</td>
             <td>{showKn(v.downPort.avg)} / <strong>{showKn(v.downPort.max)}</strong></td>
             <td>{showKn(v.downStbd.avg)} / <strong>{showKn(v.downStbd.max)}</strong></td>

@@ -76,6 +76,9 @@
   /* Bouton : tous les ovales au pinceau (choix, bouton « Sélection », bouton de période du Profil), plus fin que le
      petit cadre ; sans marge propre, le bouton garde sa taille. */
   --brush-trait-bouton: 2px;
+  /* Trait simple (sans pinceau) : un pixel à l'encre, noir le jour et blanc la nuit. Il sépare les sous-sections de
+     Réglages et les lignes des tableaux des analyses ; à employer comme `border-top: var(--trait-encre)`. */
+  --trait-encre: 1px solid var(--ink);
   /* Trait et marges lus par un cadre peint (la bordure du masque vaut quatre fois le trait) : le grand cadre, qu'un
      conteneur remplace par un autre niveau. Écart entre les cartes peintes du Profil. */
   --brush-trait: var(--brush-trait-grand);

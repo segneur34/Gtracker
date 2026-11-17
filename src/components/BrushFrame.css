@@ -108,6 +108,35 @@
     transform: scale(var(--brush-fx, 1), var(--brush-fy, 1));
   }
 
+  /* Trait fin au pinceau, horizontal, entre deux lignes d'une liste : le masque des cadres, réduit à l'épaisseur de
+     bouton, dont on ne garde que l'arête du haut (moitié haute de la boîte). Il déborde de chaque côté de plus
+     que la largeur d'un coin du masque, et le `clip-path` rogne ce débord : il ne reste que la partie droite de
+     l'arête, sur la largeur de la ligne, sans rien couper de la liste. Une ligne le prend par `.brush-rule`, ou par ces règles. */
+  .brush-rule,
+  .settings-activities .settings-activity + .settings-activity,
+  .settings-activities .settings-activity + .settings-activities__family,
+  .settings-activities .settings-activities__family + .settings-activities__family {
+    --rule-bleed: calc(6 * var(--brush-trait-bouton));
+    position: relative;
+    border-top: 0;
+  }
+
+  .brush-rule::before,
+  .settings-activities .settings-activity + .settings-activity::before,
+  .settings-activities .settings-activity + .settings-activities__family::before,
+  .settings-activities .settings-activities__family + .settings-activities__family::before {
+    content: '';
+    position: absolute;
+    left: calc(-1 * var(--rule-bleed));
+    right: calc(-1 * var(--rule-bleed));
+    top: -2px;
+    height: calc(8 * var(--brush-trait-bouton));
+    pointer-events: none;
+    background: var(--brush, var(--ink));
+    -webkit-mask-box-image: url('../assets/profil/trait-cadre-pinceau.svg') 350 / calc(4 * var(--brush-trait-bouton)) / 0 stretch;
+    clip-path: inset(0 var(--rule-bleed) 50% var(--rule-bleed));
+  }
+
   /* Ouvertures : bas droite (le trait tel quel), bas gauche, haut gauche, haut droite. */
   .brush-frame--bg,
   .brush-frame--hg {

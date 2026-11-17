@@ -612,11 +612,11 @@
   }
 
   .an-man-podium--waves thead tr {
-    border-bottom: 1px solid var(--ink);
+    border-bottom: var(--trait-encre);
   }
 
   .an-man-podium--waves tbody tr {
-    border-top: 1px solid var(--ink);
+    border-top: var(--trait-encre);
   }
 
   .an-man-podium--waves thead th,

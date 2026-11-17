@@ -27,8 +27,10 @@
   background-color: var(--field-veil);
 }
 
+/* Entre deux lignes de la liste : un trait fin au pinceau (`.brush-rule`, `BrushFrame.css`), qui reprend ce trait
+   simple quand le navigateur ne sait pas peindre au pinceau. */
 .settings-activity + .settings-activity {
-  border-top: 1px solid var(--line-soft);
+  border-top: var(--trait-encre);
 }
 
 /* Activités rangées par famille : son nom en tête, un trait marqué entre deux familles.
@@ -48,7 +50,7 @@
 
 .settings-activity + .settings-activities__family,
 .settings-activities__family + .settings-activities__family {
-  border-top: 1px solid var(--line-strong);
+  border-top: var(--trait-encre);
 }
 
 /* Bandeau d'une famille : tout le bandeau ouvre et referme, l'œil à part. */
@@ -196,7 +198,7 @@
 
 /* Partie repliable (`SettingsPart`) : un titre qui l'ouvre, ses lignes en retrait. */
 .settings-part {
-  border-top: 1px solid var(--line-soft);
+  border-top: var(--trait-encre);
 }
 
 .settings-part__toggle {

@@ -301,13 +301,13 @@ export default function ManeuversPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {MANEUVER_METRICS.map((metric) => {
+                  {MANEUVER_METRICS.map((metric, rowIdx) => {
                     const key = `${type}:${metric.key}`;
                     const active = selectedManeuverTop === key;
                     const tops = summary.tops[metric.key];
                     const ranked = metric.ranked.includes(type);
                     return (
-                      <tr key={metric.key} title={metric.hint} style={{ borderBottom: '1px solid var(--line-soft)', backgroundColor: active ? 'var(--voile-soft)' : 'transparent' }}>
+                      <tr key={metric.key} title={metric.hint} style={{ borderTop: rowIdx > 0 ? 'var(--trait-encre)' : undefined, backgroundColor: active ? 'var(--voile-soft)' : 'transparent' }}>
                         <td style={{ padding: '4px', textAlign: 'left' }}>{metric.label}</td>
                         <td style={{ padding: '4px', textAlign: 'center', fontWeight: 700 }}>
                           {summary.averages[metric.key]}

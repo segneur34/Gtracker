@@ -797,9 +797,9 @@
   border: 1px solid var(--line);
 }
 
-/* Une ligne du corps : un trait fin au-dessus ; grisée quand sa valeur est nulle. */
+/* Une ligne du corps : le trait simple de l'encre au-dessus ; grisée quand sa valeur est nulle. */
 .ui-table__row {
-  border-top: 1px solid var(--line-soft);
+  border-top: var(--trait-encre);
 }
 
 .ui-table__row--empty {
