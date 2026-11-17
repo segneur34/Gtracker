@@ -59,6 +59,8 @@ const T_MORNING = Date.UTC(2026, 9, 10, 7, 0, 0);
 const T_FOIL = Date.UTC(2026, 9, 9, 15, 0, 0);
 const PADDLE = [[1800, 2.2], [20, 2.4]];
 const T_PADDLE = Date.UTC(2026, 9, 8, 15, 0, 0);
+const SOFT = [[60, 0], [58, 1.2], [2, 1.7], [2, 2.1], [2, 2.5], [2, 2.9], [6, 3], [60, 1]];
+const T_SOFT = Date.UTC(2026, 9, 7, 15, 0, 0);
 
 // --- Protocole (lib/cdp.mjs) ---
 const { send, evaluate, go, settle, waitFor, wait, blockNetwork, importGpx, records, shoot, check, finish, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
@@ -271,6 +273,25 @@ await go(`/surf/analyse?session=${encodeURIComponent(paddle?.gpx ?? '')}`, 5000)
 await openTab('général');
 await wait(300);
 check('rame sans vague : « — » sur la page', (await panel('Général')).includes('Vitesse max / —'), (await panel('Général')).slice(0, 400));
+
+// 5 bis. Vague molle : montée en marches de 2 s, le début remonte jusqu'à la borne basse du seuil (9 km/h : sortie sous 7 km/h = 1,94 m/s).
+await go('/sessions');
+console.log('import molle :', await importGpx(buildGpx('Molle', T_SOFT, SOFT), 'molle.gpx'));
+const soft = await waitFor(() => recordAt(T_SOFT), { timeout: 6000, label: 'fiche molle' });
+await settle({ max: 2000, label: 'import molle' });
+await go(`/surf/analyse?session=${encodeURIComponent(soft?.gpx ?? '')}`, 5000);
+await openTab('vagues');
+await wait(500);
+const vaguesMolle = await panel('Vagues');
+console.log('vague molle :', vaguesMolle);
+// Par construction (SOFT) : rame à 1,2 m/s jusqu'à t = 118 s ; 1,7 m/s en 119-120 s ; la montée franchit la borne basse (2,1 m/s ≥ 1,94)
+// en t = 121 s ; 2,1, 2,5, 2,9 m/s (2 s chacun) puis 3,0 m/s (6 s) : la vague compte 12 points (121 à 132 s), puis retour à 1 m/s.
+const rangMolle = vaguesMolle.match(/(^|\/ )1\t(\d\d):(\d\d)\t(\d+) s\t/);
+const heure = (ms) => new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+check('vague molle : une vague comptée', soft?.summary?.waveCount === 1 && rangMolle !== null, `${soft?.summary?.waveCount} / ${vaguesMolle.slice(0, 200)}`);
+check('vague molle : durée 12 s à une seconde près (montée depuis la borne basse comprise)', rangMolle !== null && Math.abs(Number(rangMolle[4]) - 12) <= 1, rangMolle?.[4]);
+check('vague molle : début à la montée (2,1 m/s), pas dans la rame à 1,2 m/s',
+  rangMolle !== null && `${rangMolle[2]}:${rangMolle[3]}` === heure(T_SOFT + 121_000), `${rangMolle?.[2]}:${rangMolle?.[3]} attendu ${heure(T_SOFT + 121_000)}`);
 
 // 6. Téléphone.
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
