@@ -10,12 +10,12 @@ export const CARD_STYLE = {
 
 /**
  * Place d'un panneau d'onglet dans une page d'analyse, sur ordinateur : deux
- * par ligne (`.an-carte-panels`, 20 px entre deux), un seul quand la moitié
- * de la ligne n'atteint plus 420 px. Sur téléphone, `ResizablePanel` le met
- * en pleine largeur.
+ * par ligne (`.an-carte-panels`, dont la variable `--panel-gap` donne l'espace
+ * entre deux), un seul quand la moitié de la ligne n'atteint plus 420 px. Sur
+ * téléphone, `ResizablePanel` le met en pleine largeur.
  */
 export const HALF_PANEL_STYLE = {
-  flex: '1 1 calc(50% - 10px)',
+  flex: '1 1 calc(50% - var(--panel-gap, var(--analysis-panel-gap)) / 2)',
   minWidth: 'min(100%, 420px)',
   // Marge intérieure comprise dans la demi-ligne, pour un simple bloc comme pour un `ResizablePanel`.
   boxSizing: 'border-box',

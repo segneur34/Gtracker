@@ -81,7 +81,15 @@
   --brush-trait: var(--brush-trait-grand);
   --brush-pad-y: var(--brush-pad-y-grand);
   --brush-pad-x: var(--brush-pad-x-grand);
-  --brush-gap: 30px;
+  --brush-gap: 15px;
+  /* Cadres plus rapprochés : Profil (cartes en haut, bas de page, colonnes du bas sur ordinateur). */
+  --profile-body-gap: 10px;
+  --profile-columns-gap: 16px;
+  /* Analyses : entre la carte, les onglets et les panneaux ; entre deux panneaux. La page Statistiques garde son
+     écart d'avant. */
+  --analysis-col-gap: 6px;
+  --analysis-panel-gap: 10px;
+  --stats-panel-gap: 20px;
 
   /* Pages d'analyse, sur ordinateur : largeur de la carte, centrée, la place de part et d'autre
      servant à faire défiler la page à la souris (`analysisMobile.css`). */

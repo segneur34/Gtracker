@@ -80,7 +80,7 @@
 .an-carte-col {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--analysis-col-gap);
 }
 
 /* Flèche qui cache la barre d'onglets, en fin de rangée, et bouton fin qui la ramène
@@ -161,12 +161,18 @@
   cursor: pointer;
 }
 
-/* Case « Zones » de l'onglet cardio, au-dessus de la courbe. */
+/* Panneaux d'un onglet. `--panel-gap` est lue aussi par la demi-largeur d'un panneau (`HALF_PANEL_STYLE`) ; les
+   Statistiques gardent leur écart propre. */
 .an-carte-panels {
+  --panel-gap: var(--analysis-panel-gap);
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 20px;
+  gap: var(--panel-gap);
+}
+
+.an-carte-panels.stats-panels {
+  --panel-gap: var(--stats-panel-gap);
 }
 
 /* Outil posé sur la carte d'une analyse (`AnalysisMap`, prop `overlay`) : transparent aux gestes,
