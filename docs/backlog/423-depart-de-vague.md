@@ -64,6 +64,22 @@ Dans l'analyse de cette session, onglet réglages : baisser le seuil de vague de
 - Fichiers : `src/surfing/surfAnalysis.ts` (fonction pure `riseStartOf`, appliquée aux glisses et aux vagues d'un vol) ; `SurfParams` reçoit `rideExitMs`, `waveExitMs` (m/s, de `thresholdMaskOptions(...).exitThresholdMs` dans `surfSession.ts`) et `maxRiseS` (constante nommée par défaut) ; `src/library/record.ts` : `SUMMARY_CALC_VERSION` de 18 à 19, `src/library/summaryFrozen.test.ts` refigé en le disant.
 - Tests : les traces en paliers existantes ne bougent pas (neutralité) ; les attentes de la partie A s'inversent ; `src/recording/liveStats.test.ts` (vers l. 441) reste sous 1 %.
 
+### Résultat de la mesure (partie A, 17/11) : il corrige la partie B ci-dessus
+
+Mesuré sur sept cas, à 1 Hz, 5 Hz et avec un pas de 6 s, avec et sans Doppler (bloc « départ des vagues molles » de `src/surfing/surfAnalysis.test.ts`, qui fige le comportement d'aujourd'hui) :
+- Vague molle (1,2 → 3 m/s en 8 s) : 7 s et 13,9 m rognés au début sur environ 18 s, la vague comptée fait 9 s ; rien n'est rogné à la fin (moins de 0,4 s, moins de 1 m), dans tous les cas.
+- (a), la part entre borne basse et borne haute (l'asymétrie) : environ 53 % du rognage en secondes et 63 % en mètres (3,7 s sur 7 pour la vague molle ; 100 % sur planche à pagaie ; 65 % pour la vague sur foil). (b), la part sous la borne basse : 3,3 s sur 7 pour la vague molle. (c), le lissage : nul à un pas près, la médiane centrée ne retarde pas une rampe.
+- Une vague qui ne dépasse la borne haute que 2 s est écartée aujourd'hui (≈ 4 s, ≈ 11 m, sous les 15 m) ; elle revient si son début remonte (≈ 8 s, ≈ 19 m).
+- Pas de 6 s en pleine rampe : avec Doppler il est compté en entier dès que son point d'arrivée passe la borne haute ; sans Doppler sa vitesse moyenne reste dessous et il est perdu.
+- Remonter jusqu'à la borne basse n'ajoute aucun virage GPS ; remonter jusqu'au début de la rampe en ajouterait un.
+
+Tranché par l'orchestrateur : la correction rend (a) seulement, le début compté comme la fin, à la borne basse ; c'est ce que dit la plainte (« la fin de mes surfs il est compté en surf mais pas les débuts »). (b), la mise en vitesse sous la borne basse, reste de la rame de départ : à faire dire par l'utilisateur à l'essai sur sa session du 16/11, sans bloquer.
+
+Critère corrigé par la mesure :
+- Pas de comparaison d'un point au suivant (`RISE_TOLERANCE_RATIO` point à point dépend de la cadence : à 5 Hz une rampe gagne moins de 2 % par pas et le recul s'arrête aussitôt). « La vitesse monte encore » se juge sur une fenêtre en secondes (pente ou rapport entre la vitesse d'un instant et celle d'une fenêtre plus tard), même résultat à 1 Hz, 5 Hz et cadence variable.
+- Le recul teste la vitesse du pas qu'il ajoute (son point d'arrivée), comme `activeRuns`, et non celle du point d'avant ; sinon il perd un pas et le pas de 6 s sans Doppler n'est jamais repris.
+- La rame plate entre les deux bornes (planche à pagaie à 8 km/h) ne doit pas être avalée : le recul s'arrête au début de la rampe.
+
 ### Tranché par l'orchestrateur
 
 - La fonction reste dans `surfing/`, la voile n'est pas concernée ; le recul se fait avant `keptRuns`.
