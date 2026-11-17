@@ -353,12 +353,14 @@ const useScreenOnWhile = (on: boolean): void => {
  * Case d'une mesure proposée au départ (sauts, ceinture, pumping) et
  * son explication dessous ; `children` après elle (état de la ceinture).
  */
-function CaptureOption({ label, checked, disabled, onChange, note, children }: {
+function CaptureOption({ label, checked, disabled, onChange, note, noteAlert, children }: {
   label: string;
   checked: boolean;
   disabled: boolean;
   onChange: (checked: boolean) => void;
   note: React.ReactNode;
+  /** La note s'affiche dans un cadre d'alerte rouge (état qui empêche la mesure). */
+  noteAlert?: boolean;
   children?: React.ReactNode;
 }) {
   return (
@@ -367,7 +369,9 @@ function CaptureOption({ label, checked, disabled, onChange, note, children }: {
         <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
         <span>{label}</span>
       </label>
-      <span className="ui-muted ui-text-s rec-indent">{note}</span>
+      {noteAlert
+        ? <div className="ui-alert ui-alert--danger rec-alert-link">{note}</div>
+        : <span className="ui-muted ui-text-s rec-indent">{note}</span>}
       {children}
     </div>
   );
@@ -889,7 +893,7 @@ function RecordingScreen() {
 
           {chosen && heartRateSetting !== null && native && (
             <CaptureOption label={t('Ceinture cardio')} checked={measureHeartRate} disabled={belt === null}
-              onChange={setHeartRatePicked}
+              onChange={setHeartRatePicked} noteAlert={belt === null}
               note={belt === null
                 ? tRich('Aucune ceinture choisie : <a>Réglages</a>, bloc « Capteurs ».', undefined, { a: (children) => <Link to={SETTINGS_SENSORS_PATH}>{children}</Link> })
                 : <>

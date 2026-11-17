@@ -175,6 +175,12 @@
   margin-left: 26px;
 }
 
+/* Lien dans une alerte rouge : à l'encre de l'alerte, souligné, pour rester lisible sur son fond. */
+.rec-alert-link a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .rec-leg-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
