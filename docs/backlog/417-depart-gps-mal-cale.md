@@ -74,3 +74,7 @@ Tranché par l'orchestrateur sur les questions du plan :
 ## Résultat attendu
 
 Plus aucun pic de vitesse au départ d'un enregistrement, vitesse maximale et distance justes, et l'attente du calage se voit à l'écran.
+
+## Tel que noté, 16/11 à 18 h 19 (même sujet)
+
+« Quand on allume le GPS après un long moment sans pause, même si on bouge pas, le GPS met un temps à se caler, à vue de nez cinq secondes. Normalement on est censé avoir la zone qui se restreint progressivement et qui nous pose. Je ne vois pas la zone, mais le GPS se déplace alors qu'il n'y a pas de raison qu'il se déplace. » À regarder à l'essai 284 : la position bouge-t-elle immobile pendant le calage, et le cercle est-il visible ?

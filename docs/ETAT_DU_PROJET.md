@@ -274,6 +274,7 @@ Gtracker/
 | `gtracker.tileCache` | `hooks/useTileCache.ts` | `{ capMb? }`, plafond des cartes gardées (500 Mo par défaut), propre à l'appareil |
 | `gtracker.tileUrls` | `platform/tileCache.ts` | `Partial<Record<MapBase, string>>`, adresse des tuiles de chaque fond quand l'utilisateur ne veut pas celle d'origine (point 309), relue à chaque demande ; propre à l'appareil |
 | `gtracker.theme` | `theme/theme.ts`, `hooks/useTheme.ts` | `{ choice: 'clair' \| 'sombre' \| 'auto'; eco }`, Auto au départ (point 181) ; propre à l'appareil, hors du fichier de réglages ; lu de façon synchrone avant `initStorage` puis reposé, sans flash |
+| `gtracker.langue` | `main.tsx`, `core/i18n.ts`, `pages/SettingsPage` (Affichage) | `'fr' \| 'en' \| 'es'`, choisie dans Réglages ; à défaut la langue de l'appareil si elle est connue, sinon l'anglais ; propre à l'appareil, hors du fichier de réglages et du dossier mémoire ; lue avant tout module à textes, le choix recharge la page (point 411) |
 
 `StoredSettings` contient :
 - la liste des activités ; une activité cachée porte `hidden: true`, une famille cachée est dans `hiddenFamilies` (point 100 : ni proposées ni listées, sessions comprises ; une famille sans activité visible est cachée ; `useVisibility` en donne la vue) ;
@@ -304,6 +305,7 @@ Les autres constantes vivent, nommées et commentées, là où elles servent :
 | Sauts | bloc `jumps` des profils de voile dans `core/sportProfiles.ts` (hauteur minimale par défaut, `JUMP_DETECTION` : grille, verticale, poussée, atterrissage, durées, plancher rangé, élagage, marques « ≈ »), `JUMPS_CALC_VERSION` de `core/jumps.ts`, format du `.imu` dans `core/imuFile.ts` |
 | Pumping | bloc `pump` du profil dans `core/sportProfiles.ts` (`SportProfile.pump`, point 186 : `PUMP_DETECTION` du surf ; `SAILING_PUMP_DETECTION` en voile sur foil, copie du surf avec des vols de 10 s au moins, `minFlightS` ; `null` en bateau et hors voile et surf), élagage du surf dans `surfing/imuPrune.ts` |
 | Surf | bloc `surf` du profil dans `core/sportProfiles.ts` (immobilité, attente, vague minimale, rame de départ, trou, seuils de vol et de vague en foil, virages GPS), couleurs de trace par défaut dans `speedRange` du profil |
+| Langue | français, anglais (britannique), espagnol (d'Espagne) : le texte français du code est la clé de `t`, `tn` et `tRich` (`core/i18n.ts`) ; traductions dans `src/locales/en.json` et `es.json`, sans clé manquante, gardées par `outils/i18n.mjs` et `src/i18nGuard.test.ts` ; noms gardés comme données (activités de départ, calculs, couleurs) traduits à l'affichage seulement ; banc : `langues.mjs` (point 411) |
 | Affichage | `core/displayConfig.ts` ; mise en page des analyses sur ordinateur : `--analysis-map-width` de `theme/tokens.css` et `HALF_PANEL_STYLE` de `components/styles.ts` (point 86) |
 
 ## 8. Tests
