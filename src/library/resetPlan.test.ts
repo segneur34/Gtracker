@@ -42,7 +42,7 @@ describe('clés de l\'appareil', () => {
     for (const key of [
       STORAGE_KEYS.athleteProfile, STORAGE_KEYS.restingHr, STORAGE_KEYS.lieuxAppris, STORAGE_KEYS.deviceId,
       STORAGE_KEYS.deviceName, STORAGE_KEYS.summaryGestures, STORAGE_KEYS.followedTrace, STORAGE_KEYS.libraryCache,
-      STORAGE_KEYS.permissionsSeenVersion,
+      STORAGE_KEYS.permissionsSeenVersion, STORAGE_KEYS.autostartOpened,
     ]) {
       expect(touched).not.toContain(key);
     }

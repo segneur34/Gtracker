@@ -1005,11 +1005,9 @@ function RecordingScreen() {
       )}
       {batteryRowShown && (
         // Prévient sans jamais empêcher le départ : l'état se relit au retour de l'écran d'Android.
-        <div className="rec-rescue">
-          <span className="ui-muted">{t("Batterie restreinte : Android peut couper l'enregistrement, application fermée.")}</span>
-          <span className="rec-rescue__actions">
-            <Button size="s" onClick={() => void requestPermission('battery').catch(() => undefined)}>{t('Autoriser')}</Button>
-          </span>
+        <div className="ui-alert ui-alert--danger ui-row-10 ui-center ui-wrap">
+          <span className="ui-grow">{t("Batterie restreinte : Android peut couper l'enregistrement, application fermée.")}</span>
+          <Button size="s" onClick={() => void requestPermission('battery').catch(() => undefined)}>{t('Autoriser')}</Button>
         </div>
       )}
 

@@ -20,18 +20,16 @@ import { STORAGE_KEYS } from '../core/appIdentity';
 interface PermissionsPlugin {
   batteryStatus(): Promise<{ unrestricted: boolean }>;
   requestUnrestrictedBattery(): Promise<void>;
-  autostartStatus(): Promise<AutostartReading>;
+  deviceBrand(): Promise<DeviceBrand>;
   openAutostart(): Promise<void>;
   openAppSettings(): Promise<void>;
   openLocationSettings(): Promise<void>;
 }
 
-/** Marque du téléphone (`Build.MANUFACTURER`, `Build.BRAND`) et état brut du démarrage automatique de MIUI. */
-export interface AutostartReading {
+/** Marque du téléphone (`Build.MANUFACTURER`, `Build.BRAND`). */
+export interface DeviceBrand {
   manufacturer: string;
   brand: string;
-  /** `granted`, `denied` ou `unknown` (lecture impossible ou valeur inconnue). */
-  mode: string;
 }
 
 const plugin = registerPlugin<PermissionsPlugin>('Permissions');
@@ -80,11 +78,19 @@ export const requestPermission = async (key: PermissionKey): Promise<void> => {
   }
 };
 
-/** Marque du téléphone et état du démarrage automatique, sans rien demander ; `null` dans le navigateur ou si la lecture échoue. */
-export const readAutostart = async (): Promise<AutostartReading | null> => {
+/** Marque du téléphone, sans rien demander ; `null` dans le navigateur ou si la lecture échoue. */
+export const readDeviceBrand = async (): Promise<DeviceBrand | null> => {
   if (!isNativeApp()) return null;
-  return plugin.autostartStatus().catch(() => null);
+  return plugin.deviceBrand().catch(() => null);
 };
+
+const AUTOSTART_OPENED_KEY = STORAGE_KEYS.autostartOpened;
+
+/** Vrai si « Tout autoriser » a déjà ouvert l'écran du démarrage automatique sur cet appareil. */
+export const autostartOpenedBefore = (): boolean => jsonStore.read<unknown>(AUTOSTART_OPENED_KEY) === true;
+
+/** Retient que l'écran du démarrage automatique a été ouvert par « Tout autoriser » : il ne l'ouvrira plus. */
+export const markAutostartOpened = (): void => jsonStore.write(AUTOSTART_OPENED_KEY, true);
 
 /** Écran du démarrage automatique (MIUI, HyperOS), sinon les réglages de l'application. */
 export const openAutostart = async (): Promise<void> => {

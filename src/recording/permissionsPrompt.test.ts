@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  autostartState, batteryRestricted, isXiaomiDevice, missingPermissions, requiredPermissions, shouldPromptPermissions,
+  batteryRestricted, isXiaomiDevice, missingPermissions, requiredPermissions, shouldPromptPermissions, showsAutostart,
   type PermissionsStatus,
 } from './permissionsPrompt';
 
@@ -60,17 +60,10 @@ describe('démarrage automatique de Xiaomi', () => {
     expect(isXiaomiDevice({ manufacturer: 'Google', brand: 'google' })).toBe(false);
   });
 
-  it('pas de ligne hors de Xiaomi ni sans lecture', () => {
-    expect(autostartState(null)).toBeNull();
-    expect(autostartState({ manufacturer: 'samsung', brand: 'samsung', mode: 'granted' })).toBeNull();
-  });
-
-  it("sur un Xiaomi, l'état seulement s'il est lu, inconnu sinon", () => {
-    const xiaomi = { manufacturer: 'Xiaomi', brand: 'Redmi' };
-    expect(autostartState({ ...xiaomi, mode: 'granted' })).toBe('granted');
-    expect(autostartState({ ...xiaomi, mode: 'denied' })).toBe('denied');
-    expect(autostartState({ ...xiaomi, mode: 'unknown' })).toBe('unknown');
-    expect(autostartState({ ...xiaomi, mode: 'autre' })).toBe('unknown');
+  it('la ligne ne se montre que sur un Xiaomi, jamais sans lecture de la marque', () => {
+    expect(showsAutostart(null)).toBe(false);
+    expect(showsAutostart({ manufacturer: 'samsung', brand: 'samsung' })).toBe(false);
+    expect(showsAutostart({ manufacturer: 'Xiaomi', brand: 'Redmi' })).toBe(true);
   });
 });
 

@@ -49,6 +49,7 @@ export const KEY_CLASSES: Record<keyof typeof STORAGE_KEYS, KeyClass> = {
   heartRateBelts: 'reglage',
   memoryFolder: 'dossier',
   permissionsSeenVersion: 'donnee',
+  autostartOpened: 'donnee',
   tileCache: 'reglage',
   tileUrls: 'reglage',
   rechercheLieu: 'reglage',

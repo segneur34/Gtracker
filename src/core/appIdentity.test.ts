@@ -58,6 +58,7 @@ describe('noms techniques de l\'application', () => {
       heartRateBelts: 'gtracker.heartRateBelts',
       memoryFolder: 'gtracker.memoryFolder',
       permissionsSeenVersion: 'gtracker.permissionsSeenVersion',
+      autostartOpened: 'gtracker.autostartOpened',
       tileCache: 'gtracker.tileCache',
       tileUrls: 'gtracker.tileUrls',
       rechercheLieu: 'gtracker.rechercheLieu',

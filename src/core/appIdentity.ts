@@ -80,6 +80,7 @@ export const STORAGE_KEYS = {
   heartRateBelts: `${FORMAT_ID}.heartRateBelts` as const,
   memoryFolder: `${FORMAT_ID}.memoryFolder` as const,
   permissionsSeenVersion: `${FORMAT_ID}.permissionsSeenVersion` as const,
+  autostartOpened: `${FORMAT_ID}.autostartOpened` as const,
   tileCache: `${FORMAT_ID}.tileCache` as const,
   tileUrls: `${FORMAT_ID}.tileUrls` as const,
   rechercheLieu: `${FORMAT_ID}.rechercheLieu` as const,

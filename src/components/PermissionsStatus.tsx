@@ -3,13 +3,13 @@ import { t } from '../core/i18n';
 import { usePermissions } from '../hooks/usePermissions';
 import { savedBelt } from '../platform/heartRate';
 import {
-  markPermissionsSeen, openAppSettings, openAutostart, permissionsSeenVersion, readPermissions, requestPermission,
-  waitForAppResume,
+  autostartOpenedBefore, markAutostartOpened, markPermissionsSeen, openAppSettings, openAutostart, permissionsSeenVersion,
+  readPermissions, requestPermission, waitForAppResume,
 } from '../platform/permissions';
 import { isNativeApp } from '../platform/runtime';
 import {
   PERMISSION_LABEL, missingPermissions, requiredPermissions, shouldPromptPermissions,
-  type AutostartState, type PermissionKey, type PermissionState, type PermissionsStatus as Status,
+  type PermissionKey, type PermissionState, type PermissionsStatus as Status,
 } from '../recording/permissionsPrompt';
 import { HelpToggle } from './Help';
 import { useHelp } from './helpContext';
@@ -21,7 +21,7 @@ import './StatusLine.css';
 /**
  * Autorisations du téléphone dont l'enregistrement a besoin : une ligne par
  * autorisation (pourquoi, état, bouton), plus le démarrage automatique sur un
- * Xiaomi seulement, avec son état quand le téléphone le dit. En tête du Profil, où s'ouvre l'application (`PermissionsPrompt`), au
+ * Xiaomi seulement, sans état (le téléphone ne le dit pas de façon fiable). En tête du Profil, où s'ouvre l'application (`PermissionsPrompt`), au
  * premier lancement et après une mise à jour s'il en manque une ; dans
  * Réglages, bloc « Autorisations » (`PermissionsSettings`). Rien dans le
  * navigateur. Les états sont relus au retour d'un écran système.
@@ -86,10 +86,6 @@ function StateLine({ color, text }: { color: string | undefined; text: string })
   );
 }
 
-/** État du démarrage automatique, montré seulement quand le téléphone l'a dit. */
-const AUTOSTART_TEXT: Partial<Record<AutostartState, string>> = { granted: t('activé'), denied: t('désactivé') };
-const AUTOSTART_COLOR: Partial<Record<AutostartState, string>> = { granted: STATE_COLOR.granted, denied: STATE_COLOR.denied };
-
 /**
  * Attente du retour de l'écran de la batterie avant d'ouvrir celui du démarrage automatique : passé ce délai, on
  * n'ouvre pas un second écran par-dessus un utilisateur parti ailleurs.
@@ -99,7 +95,7 @@ const BATTERY_RETURN_TIMEOUT_MS = 60_000;
 function PermissionRows({ keys, status, autostart, refresh }: {
   keys: PermissionKey[];
   status: Status;
-  autostart: AutostartState | null;
+  autostart: boolean;
   refresh: () => Promise<Status>;
 }) {
   return (
@@ -117,10 +113,9 @@ function PermissionRows({ keys, status, autostart, refresh }: {
           </PermissionRow>
         );
       })}
-      {autostart !== null && (
+      {autostart && (
         <PermissionRow helpKey="autorisations:demarrage" label={t('Démarrage automatique')}
           why={t("Pour que l'enregistrement continue, application fermée.")}>
-          {AUTOSTART_TEXT[autostart] && <StateLine color={AUTOSTART_COLOR[autostart]} text={AUTOSTART_TEXT[autostart]} />}
           <Button size="s" onClick={() => void openAutostart().catch(() => undefined)}>{t('Ouvrir')}</Button>
         </PermissionRow>
       )}
@@ -131,10 +126,10 @@ function PermissionRows({ keys, status, autostart, refresh }: {
 /**
  * Demande toutes celles qui manquent, dans l'ordre : les demandes système
  * d'abord, puis l'écran de la batterie, qui quitte l'application ; sur un
- * Xiaomi dont le démarrage automatique n'est pas lu activé, son écran en
- * dernier, une fois revenu de celui de la batterie.
+ * Xiaomi, son écran du démarrage automatique en dernier, une fois revenu de
+ * celui de la batterie, la première fois seulement sur cet appareil.
  */
-const askAll = async (keys: PermissionKey[], autostart: AutostartState | null, refresh: () => Promise<Status>): Promise<void> => {
+const askAll = async (keys: PermissionKey[], autostart: boolean, refresh: () => Promise<Status>): Promise<void> => {
   // Un second appui pendant que la suite se déroule ne la relance pas : un seul écran de chaque à refermer.
   if (askingAll) return;
   askingAll = true;
@@ -147,7 +142,7 @@ const askAll = async (keys: PermissionKey[], autostart: AutostartState | null, r
 
 let askingAll = false;
 
-const askEach = async (keys: PermissionKey[], autostart: AutostartState | null, refresh: () => Promise<Status>): Promise<void> => {
+const askEach = async (keys: PermissionKey[], autostart: boolean, refresh: () => Promise<Status>): Promise<void> => {
   let status = await refresh();
   for (const key of keys) {
     if (key === 'battery' || status[key] !== 'prompt') continue;
@@ -169,9 +164,11 @@ const askEach = async (keys: PermissionKey[], autostart: AutostartState | null, 
     }
     await refresh();
   }
-  if (autostart === null || autostart === 'granted') return;
+  // Son état ne se lit pas : une seule ouverture par appareil, le bouton de la ligne permet d'y revenir.
+  if (!autostart || autostartOpenedBefore()) return;
   // Écran de la batterie laissé ouvert trop longtemps : on s'arrête là plutôt que d'en ouvrir un autre.
   if (!(await back)) return;
+  markAutostartOpened();
   await openAutostart().catch(() => undefined);
 };
 

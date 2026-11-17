@@ -189,16 +189,14 @@ describe('greffon Permissions : ce que la page appelle, le Java le porte', () =>
 
   it('chaque méthode appelée par la page est une méthode du greffon', () => {
     const called = [...new Set([...PERMISSIONS_TS.matchAll(/\bplugin\.(\w+)\(/g)].map((m) => m[1]))];
-    expect(called.sort()).toEqual(['autostartStatus', 'batteryStatus', 'openAppSettings', 'openAutostart', 'openLocationSettings', 'requestUnrestrictedBattery']);
+    expect(called.sort()).toEqual(['batteryStatus', 'deviceBrand', 'openAppSettings', 'openAutostart', 'openLocationSettings', 'requestUnrestrictedBattery']);
     for (const name of called) expect(PERMISSIONS_PLUGIN, name).toMatch(new RegExp(`@PluginMethod\\s+public void ${name}\\(PluginCall call\\)`));
   });
 
-  it('la batterie et le démarrage automatique répondent sous les noms que la page lit', () => {
+  it('la batterie et la marque répondent sous les noms que la page lit', () => {
     expect(between(PERMISSIONS_PLUGIN, 'public void batteryStatus(', 'public void requestUnrestrictedBattery(')).toContain('ret.put("unrestricted"');
-    const autostart = between(PERMISSIONS_PLUGIN, 'public void autostartStatus(', 'private Integer readAutostartOp(');
-    for (const name of ['manufacturer', 'brand', 'mode']) expect(autostart, name).toContain(`ret.put("${name}"`);
-    const modes = between(PERMISSIONS_PLUGIN, 'static String autostartMode(', 'public void openAutostart(');
-    for (const mode of ['granted', 'denied', 'unknown']) expect(modes, mode).toContain(`"${mode}"`);
+    const device = between(PERMISSIONS_PLUGIN, 'public void deviceBrand(', 'public void openAutostart(');
+    for (const name of ['manufacturer', 'brand']) expect(device, name).toContain(`ret.put("${name}"`);
   });
 });
 

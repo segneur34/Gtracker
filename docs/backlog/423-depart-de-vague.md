@@ -40,3 +40,37 @@ Dans l'analyse de cette session, onglet réglages : baisser le seuil de vague de
 - Noyau du surf : DECISIONS §4 à relire avant tout (« Vague : au-dessus du seuil de vague »), la phrase sera amendée à la passe de documentation.
 - Les chiffres des sessions déjà rangées changent : le numéro de version du résumé augmente, les sessions se recalculent.
 - Aucun GPX réel dans le dépôt : la validation se fait par l'utilisateur, sur cette session.
+
+## Plan (agent Plan, 17/11), lu et tranché par l'orchestrateur
+
+### Ce que fait le code
+
+- Le début d'une glisse est fixé par `activeRuns` (`src/core/sessionStats.ts`, vers l. 241) sur le masque de `thresholdMaskOptions` (l. 167-184), qui lit `getActiveThresholds` (`src/core/sportProfiles.ts`, vers l. 709). Masques posés dans `src/surfing/surfSession.ts` (l. 38-39), découpage dans `analyzeSurf` (`src/surfing/surfAnalysis.ts`, l. 221, et l. 236 pour les vagues d'un vol).
+- **Cause probable du constat** : l'hystérésis du surf est asymétrique (`SURF_PROFILE` : entrée à seuil + 1, sortie à seuil − 2). Au seuil de 9 km/h, une vague commence à 10 km/h et ne finit que sous 7 km/h : la montée de 7 à 10 km/h reste en rame, la descente de 10 à 7 km/h est en vague. Pareil sur foil (vol de 11 à 8 km/h, vague de 19 à 16 km/h).
+- Dépendent du début : `spanOf` (durée, distance, moyenne, max), `takeoffOf` (rame de départ), `countDirectionChanges` (virages GPS), `stepPhases` (temps de glisse et de rame), `returnOf`, `waveS` et `pumpS` d'un vol, `src/library/summary.ts` (l. 119-130 : temps en mouvement, nombre de vagues, plus longue vague, vitesse max, donc Statistiques ; `surfRides` l. 74), `src/surfing/gyroTurns.ts` (l. 87), `measureFlightPumping` (`src/hooks/useSessionPumping.ts`, l. 77). Le direct de l'enregistrement compte au masque et ne change pas.
+
+### Partie A : la mesure, avant toute correction (un agent, un commit)
+
+- Dans `src/surfing/surfAnalysis.test.ts` : le générateur `buildSurfSession` reçoit une phase en rampe (champ `to?`, cap compris) et une option « sans Doppler » (vitesse tirée des positions).
+- Vague molle : rame à 1,2 m/s pendant 30 s, rampe de 1,2 à 3,0 m/s en 8 s, plateau à 3,0 m/s 6 s, retour de 3,0 à 1,0 m/s en 4 s, puis rame et attente. Variantes : mise en vitesse en 12 s ; vague qui ne dépasse 10 km/h que 2 s (écartée aujourd'hui) ; rame de planche à pagaie plate à 8 km/h, entre les deux bornes ; changement de cap au début de la rampe ; sur foil, rampe de 1,5 à 4 m/s pour le vol puis vague de 4 à 5,8 m/s. Chaque cas à 1 Hz, 5 Hz et cadence variable (un pas de 6 s en pleine rampe).
+- La mesure sépare, en secondes : (a) la part perdue entre borne basse et borne haute (l'asymétrie) ; (b) la part perdue sous la borne basse ; (c) le décalage du lissage, avec et sans Doppler ; (d) les vagues molles écartées ; (e) les virages en plus si le départ remonte.
+- Le test fige le constat (bloc « départ des vagues molles » : secondes rognées au début, ≈ 0 à la fin). Le rapport donne le tableau des mesures. Si (a) fait l'essentiel, la partie B s'applique telle quelle ; si (b) domine, s'arrêter et le dire : c'est une question pour l'utilisateur (qu'appelle-t-il le début de la vague).
+
+### Partie B : la correction (un agent neuf, un commit)
+
+- Remonter le début d'une glisse retenue tant que : la vitesse lissée reste au-dessus de la borne basse de son masque (symétrie avec la fin, rien de neuf à régler) ; elle monte encore (en remontant le temps, arrêt dès qu'elle cesse de baisser, à une tolérance en rapport près, `RISE_TOLERANCE_RATIO` ≈ 0,98, ce qui protège la rame plate) ; la durée remontée ne dépasse pas `MAX_RISE_S` (≈ 10 s). Valeurs à caler sur la variante planche à pagaie et sur une variante bruitée (bruit à graine).
+- Bornes dures : jamais avant la fin de la glisse précédente, ni avant le début du vol pour une vague sur foil, ni à travers un trou de trace (`maxGapS`, `segmentStart`). La fin n'est pas touchée.
+- Ordre : `activeRuns`, recul du début, puis filtre `keptRuns` (les vagues molles reviennent).
+- Fichiers : `src/surfing/surfAnalysis.ts` (fonction pure `riseStartOf`, appliquée aux glisses et aux vagues d'un vol) ; `SurfParams` reçoit `rideExitMs`, `waveExitMs` (m/s, de `thresholdMaskOptions(...).exitThresholdMs` dans `surfSession.ts`) et `maxRiseS` (constante nommée par défaut) ; `src/library/record.ts` : `SUMMARY_CALC_VERSION` de 18 à 19, `src/library/summaryFrozen.test.ts` refigé en le disant.
+- Tests : les traces en paliers existantes ne bougent pas (neutralité) ; les attentes de la partie A s'inversent ; `src/recording/liveStats.test.ts` (vers l. 441) reste sous 1 %.
+
+### Tranché par l'orchestrateur
+
+- La fonction reste dans `surfing/`, la voile n'est pas concernée ; le recul se fait avant `keptRuns`.
+- Sur foil, les vols remontent aussi, par symétrie (même hystérésis) : le temps de vol s'allonge un peu ; dit à l'utilisateur dans le compte rendu et vérifié à l'essai.
+- Un virage GPS de plus au départ : mesuré en (e), traité au lot 424, pas ici.
+
+### Banc et essais
+
+- Scripts : `surf` (neutre par construction), `virages`, `pumping`, `general`, `statistiques`, `library`, `zoom-carte`, `graphes` ; `surf.mjs` complété d'une vague molle en marches de 2 s (1,2 / 1,7 / 2,1 / 2,5 / 2,9 m/s), durée vérifiée dans l'onglet vagues (partie à part, sur Sonnet).
+- Essais au téléphone : rouvrir la session du 16/11 et regarder les débuts de vague ; une session de paddle surf, pour vérifier que la rame n'est pas avalée.

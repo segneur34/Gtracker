@@ -1,29 +1,30 @@
 import { useCallback, useEffect, useState } from 'react';
-import { onAppResume, readAutostart, readPermissions } from '../platform/permissions';
-import { autostartState, type AutostartState, type PermissionsStatus } from '../recording/permissionsPrompt';
+import { onAppResume, readDeviceBrand, readPermissions } from '../platform/permissions';
+import { showsAutostart, type PermissionsStatus } from '../recording/permissionsPrompt';
 
 /**
- * État des autorisations du téléphone et du démarrage automatique (`null` hors de Xiaomi), relus au retour au
- * premier plan (après un écran système) ; `status` vaut `null` tant qu'il n'est pas lu.
+ * État des autorisations du téléphone, relu au retour au premier plan (après un écran système), et présence de la
+ * ligne du démarrage automatique (`autostart`, vrai sur un Xiaomi seulement) ; `status` vaut `null` tant qu'il n'est
+ * pas lu.
  */
 export function usePermissions(): {
   status: PermissionsStatus | null;
-  autostart: AutostartState | null;
+  autostart: boolean;
   refresh: () => Promise<PermissionsStatus>;
 } {
   const [status, setStatus] = useState<PermissionsStatus | null>(null);
-  const [autostart, setAutostart] = useState<AutostartState | null>(null);
-  const apply = useCallback((next: PermissionsStatus, raw: Awaited<ReturnType<typeof readAutostart>>) => {
+  const [autostart, setAutostart] = useState(false);
+  const apply = useCallback((next: PermissionsStatus, device: Awaited<ReturnType<typeof readDeviceBrand>>) => {
     setStatus(next);
-    setAutostart(autostartState(raw));
+    setAutostart(showsAutostart(device));
     return next;
   }, []);
   const refresh = useCallback(async () => {
-    const [next, raw] = await Promise.all([readPermissions(), readAutostart()]);
-    return apply(next, raw);
+    const [next, device] = await Promise.all([readPermissions(), readDeviceBrand()]);
+    return apply(next, device);
   }, [apply]);
   useEffect(() => {
-    void Promise.all([readPermissions(), readAutostart()]).then(([next, raw]) => apply(next, raw));
+    void Promise.all([readPermissions(), readDeviceBrand()]).then(([next, device]) => apply(next, device));
     return onAppResume(() => void refresh());
   }, [apply, refresh]);
   return { status, autostart, refresh };

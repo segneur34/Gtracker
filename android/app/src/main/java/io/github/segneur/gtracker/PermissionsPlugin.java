@@ -1,16 +1,13 @@
 package io.github.segneur.gtracker;
 
 import android.annotation.SuppressLint;
-import android.app.AppOpsManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
-import android.os.Process;
 import android.provider.Settings;
-import java.lang.reflect.Method;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -31,10 +28,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  *
  * Démarrage automatique : propre à MIUI et HyperOS, sans interface standard.
  * On ouvre leur écran s'il existe, sinon les réglages de l'application. Son
- * état se tente par l'opération interne de MIUI (AUTOSTART_OP), lue par
- * réflexion : une valeur qu'on ne sait pas lire est rendue « unknown », jamais
- * devinée. La marque du téléphone part avec, pour que la page cache la ligne
- * hors de Xiaomi.
+ * état ne se lit pas (la lecture annonçait « désactivé » à tort) ; la marque
+ * du téléphone suffit à la page pour cacher la ligne hors de Xiaomi.
  */
 @CapacitorPlugin(name = "Permissions")
 public class PermissionsPlugin extends Plugin {
@@ -63,41 +58,13 @@ public class PermissionsPlugin extends Plugin {
         call.resolve();
     }
 
-    /** Opération interne de MIUI et HyperOS qui porte le démarrage automatique ; absente d'Android standard. */
-    private static final int AUTOSTART_OP = 10008;
-
-    /**
-     * Marque du téléphone et état du démarrage automatique : « granted », « denied » ou « unknown » (lecture
-     * refusée, opération absente ou valeur inconnue). Ne demande rien.
-     */
+    /** Marque du téléphone : la page ne montre la ligne du démarrage automatique que sur un Xiaomi. */
     @PluginMethod
-    public void autostartStatus(PluginCall call) {
+    public void deviceBrand(PluginCall call) {
         JSObject ret = new JSObject();
         ret.put("manufacturer", Build.MANUFACTURER == null ? "" : Build.MANUFACTURER);
         ret.put("brand", Build.BRAND == null ? "" : Build.BRAND);
-        ret.put("mode", autostartMode(readAutostartOp()));
         call.resolve(ret);
-    }
-
-    /** Valeur de l'opération du démarrage automatique, ou null si elle ne se lit pas. */
-    private Integer readAutostartOp() {
-        try {
-            AppOpsManager ops = (AppOpsManager) getContext().getSystemService(Context.APP_OPS_SERVICE);
-            if (ops == null) return null;
-            Method check = AppOpsManager.class.getMethod("checkOpNoThrow", int.class, int.class, String.class);
-            Object mode = check.invoke(ops, AUTOSTART_OP, Process.myUid(), getContext().getPackageName());
-            return mode instanceof Integer ? (Integer) mode : null;
-        } catch (Throwable e) {
-            return null;
-        }
-    }
-
-    /** 0 (permis) : accordé ; 1 (ignoré) : refusé ; tout le reste : inconnu. */
-    static String autostartMode(Integer op) {
-        if (op == null) return "unknown";
-        if (op == AppOpsManager.MODE_ALLOWED) return "granted";
-        if (op == AppOpsManager.MODE_IGNORED) return "denied";
-        return "unknown";
     }
 
     /** Ouvre l'écran du démarrage automatique de MIUI / HyperOS, sinon les réglages de l'application. */

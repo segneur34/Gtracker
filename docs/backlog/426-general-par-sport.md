@@ -35,3 +35,39 @@ Sessions de kite ou de wing avec sauts, session de surf foil avec pumping : « g
 ## Essai au téléphone
 
 Un essai : une session de wing avec sauts et une de surf foil → « général » montre les tuiles de sauts et de pumping, et les décocher dans Réglages les retire.
+
+## Plan (agent Plan, 17/11), lu et tranché par l'orchestrateur : il prime sur ce qui précède là où il le corrige
+
+### Ce que la fiche supposait à tort
+
+- Aucune tuile de « général » ne se décoche aujourd'hui : seuls les onglets se cochent (`src/core/analysisTabs.ts`, `isTabShown`, `activityTabs`).
+- « Paddle foil » n'est pas une activité de départ ; Paddle (`a-paddle`) est sans foil et sans pré-réglage.
+- Le chiffre de pumping n'est pas disponible à l'ouverture : la capture (plusieurs Mo) n'est lue qu'à l'ouverture des onglets « vols » ou « pumping » (`SailingModule` vers l. 248, `SurfModule` vers l. 220) ; `summary` ne porte que `pumpingShare`, en voile, après ouverture de ces onglets.
+
+### Composition actuelle
+
+- Voile, `src/pages/SailingModule.tsx` : `overviewStats` (l. 384-402), rendu par `<GeneralStats stats={overviewStats} pairs={[['tacks','jibes']]} />` (l. 617) ; l'image de partage a sa propre liste, `generalStats` (l. 348).
+- Surf, `src/pages/SurfModule.tsx` : `overviewKeys` (l. 289) choisit dans `generalStats` (l. 264) ; rendu l. 549.
+- Pré-réglages (`src/settings/activityPresets.ts`) : sauts cochés pour wingfoil (l. 48), Windsurf et Windfoil, Kite et Kitefoil (l. 56) ; pumping coché pour `a-pumping` seul (l. 68). Défaut du pumping lu par `defaultPumpingOf` et `resolvePumping` (`src/settings/activitySettings.ts`, l. 317-329) : seul l'écart au défaut est rangé.
+- Chiffres : sauts par `useShownJumps` (déjà appelé à l'ouverture, `jumps.jumps`, `heightM`, `jumps.visible`, `status === 'ready'` ; formats de `JumpsPanel.tsx`) ; pumping par `useFlightPumping(...).summary` (`strokesPerMin`, `pumpShare` ; libellés de `FlightPumpingPanel.tsx`).
+
+### Tranché par l'orchestrateur (17/11)
+
+- **Lecture de la capture** : elle est lue aussi quand « général » est ouvert, sur une session à foil dont le pumping est coché (`|| open.general` dans la condition de `useSessionPumping`), sans retarder le premier affichage de la page : la tuile arrive quand le calcul est prêt. Rien n'est copié dans la fiche de la session, `summary` ne change pas. Un essai au téléphone sur une longue session dira si l'ouverture reste fluide.
+- **Décocher** : une tuile part quand on décoche l'onglet correspondant (sauts, pumping) dans la ligne « Onglets » de l'activité. Aucun réglage neuf.
+- **Paddle foil** : `pumping: true` sur la base `surf` de `BASE_PRESETS`, sans effet tant que le foil n'est pas coché ; Surf foil (`a-surf-foil`) l'a donc aussi. Une activité dont la case est déjà rangée garde son choix.
+- Session avec capture et aucun saut : « Sauts 0 » et « Plus haut saut — ». Sauts en cours de calcul : pas de tuile. L'image de partage ne change pas. Libellés : « Sauts », « Plus haut saut », « Cadence de pumping », « Part du vol pompée » (reprendre les clés existantes quand elles existent).
+
+### Étapes
+
+1. Pré-réglages : `pumping: true` sur la base surf ; suivre `activityPresets.test.ts` (vers l. 27) et `activitySettings.test.ts` (vers l. 124).
+2. Fonction pure neuve, par exemple `src/core/generalSportStats.ts` : `jumpTiles(jumps)` et `pumpingTiles(summary)` rendent des `ShareStat[]`, vides sans donnée ; son test (liste vide sans capture, « — » si cadence nulle, arrondis, virgule par `formatDecimal`).
+3. Voile : tuiles insérées dans `overviewStats` après `jibes` et avant la FC, qui reste la dernière ; paires `['jumps','highestJump']` et `['pumpCadence','pumpShare']`. Sauts : `jumpsVisible`, `status === 'ready'` et onglet « sauts » montré. Pumping : `pumpingVisible`, pumping coché, `pumpSummary.measured > 0`.
+4. Surf : même ajout, clés dans `overviewKeys` après les vols.
+5. Textes par `t`, trois langues ; aucun style en ligne neuf ; aucune comparaison à un nom de calcul (capacités `profile.jumps`, `profile.pump`, foil, onglet montré).
+
+### Banc (partie à part, sur Sonnet)
+
+- `outils/banc/pumping.mjs` casse à son étape 1 (l. 141-144 : le clic décocherait la case maintenant cochée d'office) : vérifier « cochée d'office », puis lire dans « général » la cadence et la part du vol pompée.
+- `sauts.mjs` : la session wing avec capture montre « Sauts » et « Plus haut saut » dans « général ».
+- À rejouer : `general` (la wing sans capture garde exactement son texte), `prereglages`, `onglets`. Seuls changent le résumé de la carte Surf foil (« pumping ») et les tuiles neuves. `outils/banc/SCRIPTS.md` suit.
