@@ -5,7 +5,7 @@ import type { ActiveRun } from '../core/sessionStats';
 import { SPORT_PROFILES } from '../core/sportProfiles';
 import type { RawTrackPoint, TrackPoint } from '../core/types';
 import { M_PER_DEG_LAT } from '../test/geo.fixture';
-import { WAVE_SENSE_MIN_R, enteredWaveSense, estimateWaveSense, isAgainstWaveSense, type WaveSense } from './waveSense';
+import { SENSE_LINE_MIN_DEPARTURES, WAVE_SENSE_MIN_R, alignedWaveSense, enteredWaveSense, estimateWaveSense, isAgainstWaveSense, type WaveSense } from './waveSense';
 
 const T0 = Date.UTC(2026, 9, 10, 9, 0, 0);
 
@@ -132,6 +132,35 @@ describe('enteredWaveSense', () => {
     expect(enteredWaveSense(200)).toEqual({ directionDeg: 200, R: 1, samples: 0, reliable: true, source: 'saisi' });
     expect(enteredWaveSense(-90).directionDeg).toBe(270);
     expect(enteredWaveSense(450).directionDeg).toBe(90);
+  });
+});
+
+describe('alignedWaveSense', () => {
+  // Départs sur une ligne est-ouest, tous les 40 m.
+  const { track } = build([{ s: 120, speed: 1, heading: 90 }], 1);
+  const departures = [0, 40, 80, 120];
+  const measured = (directionDeg: number, R = 0.9): WaveSense => ({ directionDeg, R, samples: 5, reliable: true, source: 'estime' });
+
+  it('ramène un sens en biais sur la perpendiculaire à la ligne, de son côté, sans toucher au reste', () => {
+    expect(alignedWaveSense(track, departures, measured(210))!.directionDeg).toBeCloseTo(180, 6);
+    expect(alignedWaveSense(track, departures, measured(150))!.directionDeg).toBeCloseTo(180, 6);
+    expect(alignedWaveSense(track, departures, measured(330))!.directionDeg).toBeCloseTo(0, 6);
+    expect({ ...alignedWaveSense(track, departures, measured(210))!, directionDeg: 0 }).toEqual({ ...measured(210), directionDeg: 0 });
+  });
+
+  it('laisse un sens trop proche de la ligne, saisi, trop peu concentré, absent, ou si on le demande', () => {
+    expect(alignedWaveSense(track, departures, measured(240))).toEqual(measured(240));
+    expect(alignedWaveSense(track, departures, enteredWaveSense(210))).toEqual(enteredWaveSense(210));
+    expect(alignedWaveSense(track, departures, measured(210, WAVE_SENSE_MIN_R - 0.01))).toEqual(measured(210, WAVE_SENSE_MIN_R - 0.01));
+    expect(alignedWaveSense(track, departures, null)).toBeNull();
+    expect(alignedWaveSense(track, departures, measured(210), { waveSenseOnLine: false })).toEqual(measured(210));
+  });
+
+  it('demande trois départs : deux font toujours une ligne, sans rien prouver', () => {
+    expect(SENSE_LINE_MIN_DEPARTURES).toBe(3);
+    expect(alignedWaveSense(track, [0, 120], measured(210))).toEqual(measured(210));
+    expect(alignedWaveSense(track, [0, 60, 120], measured(210))!.directionDeg).toBeCloseTo(180, 6);
+    expect(alignedWaveSense(track, [0, 120], measured(210), { senseLineMinDepartures: 2 })!.directionDeg).toBeCloseTo(180, 6);
   });
 });
 

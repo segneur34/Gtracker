@@ -2,6 +2,7 @@ import { angleDiff, circularMean, normalizeDeg, toDeg } from '../core/angles';
 import { planeProjection } from '../core/geo';
 import type { ActiveRun } from '../core/sessionStats';
 import type { TrackPoint } from '../core/types';
+import { beachLineAxisDeg, type PeakZoneOptions } from './peakZone';
 
 /**
  * Sens des vagues d'une session de surf : le cap vers lequel elles déferlent,
@@ -15,6 +16,16 @@ import type { TrackPoint } from '../core/types';
  * lui. Chaque déplacement pèse sa longueur en mètres : une vague courte ou
  * lente compte moins, sans être écartée. La corde de toute la vague, trop
  * latérale, n'est pas retenue.
+ *
+ * Des vagues toutes prises en biais du même côté, ou plus de gauches que de
+ * droites, tirent la moyenne de côté. Quand au moins
+ * `SENSE_LINE_MIN_DEPARTURES` départs dessinent une ligne le long de la plage,
+ * la garde de la zone du pic (étalée d'au moins `ZONE_LINE_MIN_M`, à
+ * `ZONE_MAX_TILT_DEG` au plus de la perpendiculaire au sens) la reconnaît, et
+ * le sens estimé devient la perpendiculaire à cette
+ * ligne, du côté du sens mesuré (`alignedWaveSense`). La garde se juge sur le
+ * sens mesuré, celui qui oriente la zone ; `R`, le nombre de mesures et
+ * `reliable` restent ceux des mesures. Un sens saisi n'est jamais recalé.
  *
  * Sur foil, une remontée faite en vol, pompée assez vite pour passer le seuil
  * de vague, va contre ce sens : `isAgainstWaveSense` la reconnaît.
@@ -46,7 +57,18 @@ export interface WaveSenseOptions {
   waveSenseMinWaves?: number;
   waveSenseMinR?: number;
   waveAgainstDeg?: number;
+  /** Recaler le sens estimé sur la ligne des départs (`alignedWaveSense`) ; vrai par défaut, faux pour retrouver le sens mesuré seul. */
+  waveSenseOnLine?: boolean;
+  senseLineMinDepartures?: number;
 }
+
+/**
+ * Nombre minimal de départs gardés (ceux de la zone du pic, sans ceux de
+ * l'intérieur) pour recaler le sens sur leur ligne : deux points font toujours
+ * une ligne parfaite sans rien prouver, et un seul segment de 30 m tournerait
+ * le sens de 45°. La zone, elle, suit la ligne dès deux départs.
+ */
+export const SENSE_LINE_MIN_DEPARTURES = 3;
 
 export interface WaveSense {
   /** Cap vers lequel les vagues déferlent, en degrés depuis le nord, de 0 à 360. */
@@ -109,6 +131,28 @@ export const estimateWaveSense = (
   const { mean, R } = circularMean(measures.map((d) => d.bearingDeg), measures.map((d) => d.lengthM));
   const reliable = measures.length >= (opts.waveSenseMinWaves ?? WAVE_SENSE_MIN_WAVES) && R >= (opts.waveSenseMinR ?? WAVE_SENSE_MIN_R);
   return { directionDeg: mean, R, samples: measures.length, reliable, source: 'estime' };
+};
+
+/**
+ * Sens estimé `sense` recalé sur la ligne des départs `departures` (points de
+ * la trace, ceux de la zone du pic) : quand la zone orientée par lui suivrait
+ * cette ligne (`beachLineAxisDeg`), il devient sa perpendiculaire, du côté où
+ * il pointe (produit scalaire positif avec lui). Rendu tel quel : `null`, un
+ * sens saisi, un sens trop peu concentré pour orienter la zone (`R` sous
+ * `waveSenseMinR`), moins de `senseLineMinDepartures` départs gardés, des
+ * départs groupés ou une ligne trop proche du sens.
+ * Seule la direction change.
+ */
+export const alignedWaveSense = (
+  track: readonly TrackPoint[], departures: readonly number[], sense: WaveSense | null, opts: WaveSenseOptions & PeakZoneOptions = {}
+): WaveSense | null => {
+  if (sense === null || sense.source === 'saisi' || opts.waveSenseOnLine === false) return sense;
+  if (sense.R < (opts.waveSenseMinR ?? WAVE_SENSE_MIN_R)) return sense;
+  const axisDeg = beachLineAxisDeg(track, departures, sense, opts, opts.senseLineMinDepartures ?? SENSE_LINE_MIN_DEPARTURES);
+  if (axisDeg === null) return sense;
+  const across = normalizeDeg(axisDeg + 90);
+  // La garde tient la ligne à 45° au plus de la perpendiculaire au sens : le côté n'est jamais douteux.
+  return { ...sense, directionDeg: Math.abs(angleDiff(across, sense.directionDeg)) <= 90 ? across : normalizeDeg(across + 180) };
 };
 
 /**

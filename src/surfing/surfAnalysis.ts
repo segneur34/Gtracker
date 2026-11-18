@@ -7,7 +7,7 @@ import type { SportProfile, SurfProfile } from '../core/sportProfiles';
 import type { CumulativeTrack, TrackPoint } from '../core/types';
 import { countDirectionChanges } from './gpsTurns';
 import { buildPeakZone, isInZone, zoneEntry, type PeakZone, type PeakZoneOptions } from './peakZone';
-import { WAVE_SENSE_MIN_R, enteredWaveSense, estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOptions } from './waveSense';
+import { WAVE_SENSE_MIN_R, alignedWaveSense, enteredWaveSense, estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOptions } from './waveSense';
 
 /**
  * Analyse d'une session de surf, en SI, sur la trace du noyau.
@@ -46,8 +46,10 @@ import { WAVE_SENSE_MIN_R, enteredWaveSense, estimateWaveSense, isAgainstWaveSen
  * une erreur y coûterait des vagues. La zone du pic le reçoit dès la première
  * mesure, s'il est assez concentré (`waveSenseMinR`) : il l'oriente en travers
  * des vagues et dit de quel côté est la plage, sans rien retirer au décompte.
- * Un sens saisi pour la session (`waveDirectionDeg`) remplace l'estimé : il
- * est fiable, et sert aux deux.
+ * Quand les départs dessinent une ligne le long de la plage, le sens estimé se
+ * recale sur sa perpendiculaire (`alignedWaveSense`) ; la zone reste orientée
+ * par le sens mesuré. Un sens saisi pour la session (`waveDirectionDeg`)
+ * remplace l'estimé : il est fiable, et sert aux deux.
  */
 
 /** Durée maximale du recul du début d'une glisse, en secondes : une mise en vitesse entre les deux détentes en dure quelques-unes. */
@@ -340,7 +342,11 @@ export const analyzeSurf = (
     ));
   // Sens des vagues : celui saisi pour la session, sinon estimé ; sans foil, sur toutes les vagues ; sur foil, sur la
   // vague qui lance chaque vol (les remontées pompées tireraient la moyenne vers zéro).
-  const estimatedWaveSense = estimateWaveSense(track, candidates === null ? rides : candidates.flatMap((c) => c.slice(0, 1)), p);
+  // Le sens estimé se recale sur la ligne des départs de toutes les glisses (décollages des vols sur foil), celle de la
+  // zone du pic, quand elle suit la plage ; la garde se juge sur le sens mesuré, qui oriente la zone.
+  const departures = rides.map((r) => r.start);
+  const measuredWaveSense = estimateWaveSense(track, candidates === null ? rides : candidates.flatMap((c) => c.slice(0, 1)), p);
+  const estimatedWaveSense = alignedWaveSense(track, departures, measuredWaveSense, p);
   const waveSense = p.waveDirectionDeg != null ? enteredWaveSense(p.waveDirectionDeg) : estimatedWaveSense;
 
   const waves: SurfWave[] = [];
@@ -380,9 +386,11 @@ export const analyzeSurf = (
   }
 
   // Zone du pic : les départs de toutes les glisses, décollages des vols sur foil, orientée par le sens des vagues
-  // dès qu'il est utilisable (une mesure suffit), fiable ou non.
-  const zoneSense = waveSense !== null && waveSense.R >= (p.waveSenseMinR ?? WAVE_SENSE_MIN_R) ? waveSense : null;
-  const peakZone = buildPeakZone(track, rides.map((r) => r.start), zoneSense, p);
+  // dès qu'il est utilisable (une mesure suffit), fiable ou non : le saisi, sinon le mesuré, jamais le recalé (la zone
+  // ne répond pas au sens qu'elle a recalé).
+  const zoneSource = p.waveDirectionDeg != null ? waveSense : measuredWaveSense;
+  const zoneSense = zoneSource !== null && zoneSource.R >= (p.waveSenseMinR ?? WAVE_SENSE_MIN_R) ? zoneSource : null;
+  const peakZone = buildPeakZone(track, departures, zoneSense, p);
   const returns: SurfReturn[] = [];
   // Première sortie : du premier coup de rame à la première entrée dans la zone, avant la première glisse.
   // Partie de la zone même (enregistrement lancé au pic), elle n'a pas de sens.

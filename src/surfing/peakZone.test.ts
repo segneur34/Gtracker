@@ -3,7 +3,7 @@ import { planeProjection } from '../core/geo';
 import { computeKinematics } from '../core/kinematics';
 import { SPORT_PROFILES } from '../core/sportProfiles';
 import type { LatLon, RawTrackPoint, TrackPoint } from '../core/types';
-import { ZONE_BEACH_MARGIN_M, ZONE_INSIDE_M, ZONE_MARGIN_M, ZONE_MAX_TILT_DEG, ZONE_MIN_ASPECT, buildPeakZone, isInZone, peakZoneOutline, zoneEntry, type PeakZone } from './peakZone';
+import { ZONE_BEACH_MARGIN_M, ZONE_INSIDE_M, ZONE_MARGIN_M, ZONE_MAX_TILT_DEG, ZONE_MIN_ASPECT, beachLineAxisDeg, buildPeakZone, departureLine, isInZone, peakZoneOutline, zoneEntry, type PeakZone } from './peakZone';
 import type { WaveSense } from './waveSense';
 
 const T0 = Date.UTC(2026, 9, 10, 9, 0, 0);
@@ -191,6 +191,43 @@ describe('buildPeakZone', () => {
       expect(isInZone(zone, local.from({ x: q.x * 0.99, y: q.y * 0.99 }))).toBe(true);
       expect(isInZone(zone, local.from({ x: q.x * 1.01, y: q.y * 1.01 }))).toBe(false);
     }
+  });
+});
+
+describe('departureLine', () => {
+  it('l\'axe principal des départs et leur étendue le long de lui', () => {
+    // Quatre départs sur une droite au 60°, de −30 à 30 m de l'origine le long d'elle.
+    const at = (d: number) => ({ x: d * Math.sin(Math.PI / 3), y: d * Math.cos(Math.PI / 3) });
+    const line = departureLine([at(-30), at(-5), at(10), at(30)])!;
+    expect(line.axisDeg).toBeCloseTo(60, 6);
+    expect(line.extentM).toBeCloseTo(60, 6);
+  });
+
+  it('ni ligne sous deux départs, ni pour des départs confondus', () => {
+    expect(departureLine([{ x: 3, y: 4 }])).toBeNull();
+    expect(departureLine([{ x: 3, y: 4 }, { x: 3, y: 4 }])).toBeNull();
+  });
+});
+
+describe('beachLineAxisDeg', () => {
+  // Départs étalés d'est en ouest sur 90 m.
+  const { track, departures } = departuresAt([{ x: -45, y: 2 }, { x: -15, y: -3 }, { x: 15, y: 3 }, { x: 45, y: -2 }]);
+
+  it('l\'axe de la ligne quand la zone la suit, le même que celui de la zone', () => {
+    const zone = buildPeakZone(track, departures, senseTo(220))!;
+    expect(zone.orientation).toBe('ligne');
+    expect(beachLineAxisDeg(track, departures, senseTo(220))).toBe(zone.majorAxisDeg);
+    // Nombre minimal de départs gardés, deux par défaut, comme la zone.
+    expect(beachLineAxisDeg(track, departures, senseTo(220), {}, 4)).toBe(zone.majorAxisDeg);
+    expect(beachLineAxisDeg(track, departures, senseTo(220), {}, 5)).toBeNull();
+  });
+
+  it('rien quand la zone suit la perpendiculaire au sens : ligne trop proche du sens, départs groupés, aucun départ', () => {
+    expect(buildPeakZone(track, departures, senseTo(230))!.orientation).toBe('vagues');
+    expect(beachLineAxisDeg(track, departures, senseTo(230))).toBeNull();
+    expect(beachLineAxisDeg(track, departures, senseTo(230), { zoneMaxTiltDeg: 60 })).not.toBeNull();
+    expect(beachLineAxisDeg(track, departures, SOUTH, { zoneLineMinM: 100 })).toBeNull();
+    expect(beachLineAxisDeg(track, [], SOUTH)).toBeNull();
   });
 });
 

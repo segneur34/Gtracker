@@ -17,7 +17,10 @@ import type { WaveSense } from './waveSense';
  * unique, ou ligne trop proche du sens des vagues : la perpendiculaire au
  * sens. Sans sens, la ligne des départs, sans borne ; sans ligne non plus,
  * l'est-ouest. Jamais un cercle : le grand axe vaut au moins
- * `ZONE_MIN_ASPECT` fois le petit.
+ * `ZONE_MIN_ASPECT` fois le petit. La même garde recale le sens estimé sur la
+ * ligne des départs, à partir de trois départs gardés et non de deux
+ * (`beachLineAxisDeg`, `alignedWaveSense`) ; la zone, elle,
+ * reste orientée par le sens brut, pour que l'un ne réponde pas à l'autre.
  *
  * Zone mince : le grand demi-axe est la demi-étendue des départs le long de
  * l'axe, plus la marge ; le petit, leur demi-étendue de part et d'autre, plus
@@ -133,7 +136,7 @@ const axesOf = (majorAxisDeg: number): { major: PlanePoint; minor: PlanePoint } 
 const dot = (a: PlanePoint, b: PlanePoint): number => a.x * b.x + a.y * b.y;
 
 /** Cap de l'axe principal d'un nuage de points, de 0 à 180 ; `null` s'il n'en a pas (points confondus ou nuage rond). */
-const principalAxisDeg = (points: PlanePoint[]): number | null => {
+const principalAxisDeg = (points: readonly PlanePoint[]): number | null => {
   const mx = points.reduce((s, q) => s + q.x, 0) / points.length;
   const my = points.reduce((s, q) => s + q.y, 0) / points.length;
   let sxx = 0;
@@ -160,6 +163,78 @@ const axisGapDeg = (a: number, b: number): number => {
 /** Axe de la zone sans sens des vagues ni ligne des départs (un seul départ, ou des départs confondus) : l'est-ouest, par convention. */
 const EAST_WEST_DEG = 90;
 
+/** Ligne des départs : le cap de leur axe principal, de 0 à 180, et leur étendue le long de lui, en mètres. */
+export interface DepartureLine {
+  axisDeg: number;
+  extentM: number;
+}
+
+/**
+ * Ligne d'un nuage de départs, positions dans un plan local en mètres : leur
+ * axe principal et leur étendue le long de lui. `null` sous deux départs, ou
+ * sans axe (départs confondus, ou nuage rond).
+ */
+export const departureLine = (points: readonly PlanePoint[]): DepartureLine | null => {
+  const axisDeg = points.length >= 2 ? principalAxisDeg(points) : null;
+  if (axisDeg === null) return null;
+  const along = points.map((q) => dot(q, axesOf(axisDeg).major));
+  return { axisDeg, extentM: Math.max(...along) - Math.min(...along) };
+};
+
+/** Cap de la perpendiculaire au sens des vagues, de 0 à 180 : la plage, faute de mieux. */
+const acrossDeg = (sense: WaveSense): number => normalizeDeg(sense.directionDeg + 90) % 180;
+
+/**
+ * La ligne des départs suit-elle la plage ? Étalée d'au moins `zoneLineMinM`,
+ * à `zoneMaxTiltDeg` au plus de la perpendiculaire au sens des vagues.
+ */
+const followsBeach = (line: DepartureLine | null, sense: WaveSense, opts: PeakZoneOptions): line is DepartureLine =>
+  line !== null && line.extentM >= (opts.zoneLineMinM ?? ZONE_LINE_MIN_M)
+  && axisGapDeg(line.axisDeg, acrossDeg(sense)) <= (opts.zoneMaxTiltDeg ?? ZONE_MAX_TILT_DEG);
+
+/**
+ * Départs projetés dans le plan centré sur leur moyenne, le vecteur vers la
+ * plage (le long du sens des vagues, `null` sans sens), et les départs qui
+ * font la zone, en rangs de `departures` : sans ceux de l'intérieur quand la
+ * plage est connue.
+ */
+const zoneDepartures = (
+  track: readonly TrackPoint[], departures: readonly number[], sense: WaveSense | null, opts: PeakZoneOptions
+) => {
+  const origin = {
+    lat: departures.reduce((s, i) => s + track[i].lat, 0) / departures.length,
+    lon: departures.reduce((s, i) => s + track[i].lon, 0) / departures.length,
+  };
+  const proj = planeProjection(origin.lat, origin);
+  const points = departures.map((i) => proj.to(track[i]));
+  const toBeach = sense === null ? null : { x: Math.sin(toRad(sense.directionDeg)), y: Math.cos(toRad(sense.directionDeg)) };
+  let kept = departures.map((_, k) => k);
+  if (toBeach !== null) {
+    const along = points.map((q) => dot(q, toBeach));
+    const mid = median(along);
+    const insideM = opts.zoneInsideM ?? ZONE_INSIDE_M;
+    kept = kept.filter((k) => along[k] - mid <= insideM);
+  }
+  return { proj, points, toBeach, kept };
+};
+
+/**
+ * Axe de la ligne des départs quand la zone orientée par `sense` la suit
+ * (orientation `ligne`) : mêmes départs gardés, même garde que
+ * `buildPeakZone`. `null` sinon : sans départ, départs groupés, ligne trop
+ * proche du sens des vagues, ou moins de `minDepartures` départs gardés (deux,
+ * comme pour la zone, par défaut).
+ */
+export const beachLineAxisDeg = (
+  track: readonly TrackPoint[], departures: readonly number[], sense: WaveSense, opts: PeakZoneOptions = {}, minDepartures = 2
+): number | null => {
+  if (departures.length === 0) return null;
+  const { points, kept } = zoneDepartures(track, departures, sense, opts);
+  if (kept.length < minDepartures) return null;
+  const line = departureLine(kept.map((k) => points[k]));
+  return followsBeach(line, sense, opts) ? line.axisDeg : null;
+};
+
 /**
  * Zone du pic, faite des départs `departures` (points de la trace), orientée
  * par le sens des vagues `sense` quand il est utilisable (au moins une mesure
@@ -170,42 +245,22 @@ export const buildPeakZone = (
 ): PeakZone | null => {
   if (departures.length === 0) return null;
   const marginM = opts.zoneMarginM ?? ZONE_MARGIN_M;
-  const origin = {
-    lat: departures.reduce((s, i) => s + track[i].lat, 0) / departures.length,
-    lon: departures.reduce((s, i) => s + track[i].lon, 0) / departures.length,
-  };
-  const proj = planeProjection(origin.lat, origin);
-  const points = departures.map((i) => proj.to(track[i]));
-
-  // Vers la plage, le long du sens des vagues ; sans sens, la plage n'est pas connue.
-  const toBeach = sense === null ? null : { x: Math.sin(toRad(sense.directionDeg)), y: Math.cos(toRad(sense.directionDeg)) };
-  let kept = departures.map((_, k) => k);
-  if (toBeach !== null) {
-    const along = points.map((q) => dot(q, toBeach));
-    const mid = median(along);
-    const insideM = opts.zoneInsideM ?? ZONE_INSIDE_M;
-    kept = kept.filter((k) => along[k] - mid <= insideM);
-  }
+  // Vers la plage, le long du sens des vagues ; sans sens, la plage n'est pas connue, et aucun départ n'est écarté.
+  const { proj, points, toBeach, kept } = zoneDepartures(track, departures, sense, opts);
   const keptPoints = kept.map((k) => points[k]);
 
-  // La ligne des départs gardés : leur axe principal, s'ils s'étalent assez le long de lui.
-  const lineDeg = keptPoints.length >= 2 ? principalAxisDeg(keptPoints) : null;
-  const lineExtentM = lineDeg === null ? 0 : (() => {
-    const along = keptPoints.map((q) => dot(q, axesOf(lineDeg).major));
-    return Math.max(...along) - Math.min(...along);
-  })();
+  // La ligne des départs gardés : leur axe principal, suivi s'ils s'étalent assez le long de lui.
+  const line = departureLine(keptPoints);
 
   let orientation: PeakZoneOrientation;
   let majorAxisDeg: number;
   if (sense !== null) {
-    const across = normalizeDeg(sense.directionDeg + 90) % 180;
-    const isLine = lineDeg !== null && lineExtentM >= (opts.zoneLineMinM ?? ZONE_LINE_MIN_M)
-      && axisGapDeg(lineDeg, across) <= (opts.zoneMaxTiltDeg ?? ZONE_MAX_TILT_DEG);
+    const isLine = followsBeach(line, sense, opts);
     orientation = isLine ? 'ligne' : 'vagues';
-    majorAxisDeg = isLine ? lineDeg : across;
+    majorAxisDeg = isLine ? line.axisDeg : acrossDeg(sense);
   } else {
     orientation = 'departs';
-    majorAxisDeg = lineDeg ?? EAST_WEST_DEG;
+    majorAxisDeg = line?.axisDeg ?? EAST_WEST_DEG;
   }
 
   const { major, minor } = axesOf(majorAxisDeg);

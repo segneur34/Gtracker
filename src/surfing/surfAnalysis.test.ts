@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { angleDiff } from '../core/angles';
 import { computeKinematics } from '../core/kinematics';
 import { activeRuns, buildCumulativeTrack, computeActivityMask, thresholdActivityMask } from '../core/sessionStats';
 import { SPORT_PROFILES, defaultActiveThresholdOf, getActiveThresholds } from '../core/sportProfiles';
@@ -357,7 +358,12 @@ describe('analyzeSurf, sens des vagues et remontées pompées sur foil', () => {
       const after = analyzeWith(FIVE, cadenceS);
       expect(before.waveSense!.reliable).toBe(false);
       expect(before.waves).toHaveLength(10);
-      expect(Math.abs(after.waveSense!.directionDeg - 180)).toBeLessThan(10);
+      // Mesuré, le sens est le sud ; recalé, il est la perpendiculaire à la ligne des décollages (voir plus bas) : chaque
+      // vol avance de 80 m vers l'est et de 30 m vers le nord, une ligne au 69°, d'où un sens vers le 159°, du côté du
+      // sud (la cinquième vague, au 190°, tourne un peu la ligne : 161°).
+      const measured = analyzeWith(FIVE, cadenceS, { waveSenseOnLine: false });
+      expect(Math.abs(measured.waveSense!.directionDeg - 180)).toBeLessThan(10);
+      expect(Math.abs(after.waveSense!.directionDeg - 161)).toBeLessThan(3);
       expect(after.waveSense!.samples).toBe(5);
 
       expect(after.flights.map((f) => f.waveCount)).toEqual([1, 1, 1, 1, 2]);
@@ -379,6 +385,10 @@ describe('analyzeSurf, sens des vagues et remontées pompées sur foil', () => {
       // Chaque vol avance de 80 m vers l'est et d'une trentaine vers le nord : les décollages dessinent une ligne à une
       // vingtaine de degrés de la perpendiculaire au sens (le sud), en deçà de la borne.
       expect(after.peakZone!.orientation).toBe('ligne');
+      expect(Math.abs(angleDiff(after.waveSense!.directionDeg, after.peakZone!.majorAxisDeg + 90))).toBeLessThan(1e-6);
+      // Recalé ou non, les mêmes vagues : les remontées, au 0°, restent à plus de 120° du sens.
+      expect(after.waves).toEqual(measured.waves);
+      expect(after.peakZone).toEqual(measured.peakZone);
     });
   }
 
@@ -938,6 +948,8 @@ describe('analyzeSurf, zone du pic et retour au pic', () => {
       expect(zone.semiMajorM).toBeGreaterThan(zone.semiMinorM);
       expect(zone.departures).toEqual(analysis.waves.slice(0, 4).map((w) => w.start));
       expect(zone.insideDepartures).toEqual([analysis.waves[4].start]);
+      // Départs groupés : rien n'est recalé, la zone et les retours sont ceux du sens mesuré.
+      expect(analysis).toEqual(analyze(buildSurfSession(PEAK, cadenceS), false, { waveSenseOnLine: false }).analysis);
 
       // Les départs, à 20 m l'un de l'autre le long de la plage, sont groupés : la zone suit la perpendiculaire au sens,
       // 5 m au sud de leur ligne au milieu, un peu moins à leur aplomb, où elle se resserre (10 m du centre sur un grand
@@ -1044,7 +1056,10 @@ describe('analyzeSurf, zone du pic : peu de vagues, jamais ronde', () => {
       const sense = analysis.waveSense!;
       expect(sense.reliable).toBe(false);
       expect(sense.samples).toBe(2);
+      // Le sens est celui des deux vagues, au 354,5° : deux départs ne suffisent pas à le recaler sur leur ligne, que la
+      // zone suit pourtant ; rien ne change avec ou sans recalage.
       expect(axisGap(sense.directionDeg, 354.5)).toBeLessThan(3);
+      expect(analysis).toEqual(analyze(track, false, { waveSenseOnLine: false }).analysis);
       const zone = analysis.peakZone!;
       expect(zone.orientation).toBe('ligne');
       expect(axisGap(zone.majorAxisDeg, 98)).toBeLessThan(5);
@@ -1095,4 +1110,125 @@ describe('analyzeSurf, zone du pic : peu de vagues, jamais ronde', () => {
       expect(entered.phases).toEqual(estimated.phases);
     });
   }
+});
+
+describe('analyzeSurf, sens des vagues recalé sur la ligne des départs', () => {
+  /**
+   * Une vague au cap `heading`, rame de départ comprise (5 s à 1,6 m/s puis 12 s à 5 m/s au même cap, 68 m), la rame
+   * qui ramène au départ suivant, `stepM` plus à l'est le long de la plage (vers le nord, puis vers l'est ou l'ouest),
+   * puis l'attente, qui dérive de 3 m vers le nord (retirés de la rame) : tous les départs sont sur une ligne est-ouest.
+   */
+  const waveThenBack = (heading: number, stepM: number): Phase[] => {
+    const rad = (heading * Math.PI) / 180;
+    const northM = -68 * Math.cos(rad) - 3;
+    const eastM = stepM - 68 * Math.sin(rad);
+    return [
+      { s: 5, speed: 1.6, heading }, { s: 12, speed: 5, heading },
+      { s: northM, speed: 1, heading: 0 }, { s: Math.abs(eastM), speed: 1, heading: eastM >= 0 ? 90 : 270 },
+      { s: 30, speed: 0.1 },
+    ];
+  };
+  /** Sortie vers le large (le nord), attente, puis une vague par cap, les départs espacés de `stepM` le long de la plage. */
+  const along = (headings: number[], stepM = 40): Phase[] => [
+    { s: 30, speed: 0 }, { s: 100, speed: 1 }, { s: 30, speed: 0.1 }, ...headings.flatMap((h) => waveThenBack(h, stepM)),
+  ];
+  const run = (phases: Phase[], cadenceS: number, opts: Partial<SurfParams> = {}) =>
+    analyze(buildSurfSession(phases, cadenceS), false, opts).analysis;
+  const MEASURED = { waveSenseOnLine: false };
+  const gap = (a: number, b: number): number => Math.abs(angleDiff(a, b));
+
+  for (const cadenceS of [1, 0.2, 4]) {
+    it(`vagues toutes prises à 30° du sens, du même côté : le sens revient sur la perpendiculaire aux départs (pas de ${cadenceS} s)`, () => {
+      const lefts = along([210, 210, 210, 210]);
+      const aligned = run(lefts, cadenceS);
+      const measured = run(lefts, cadenceS, MEASURED);
+      expect(aligned.waves).toHaveLength(4);
+      expect(gap(measured.waveSense!.directionDeg, 210)).toBeLessThan(2);
+      // Départs au 90°, à 30° de la perpendiculaire au sens mesuré (120°) : la zone les suit, le sens devient le sud.
+      expect(aligned.peakZone!.orientation).toBe('ligne');
+      expect(gap(aligned.waveSense!.directionDeg, 180)).toBeLessThan(2);
+      expect(aligned.estimatedWaveSense).toEqual(aligned.waveSense);
+      // Seule la direction change : concentration, mesures et fiabilité restent celles des mesures.
+      expect({ ...aligned.waveSense!, directionDeg: 0 }).toEqual({ ...measured.waveSense!, directionDeg: 0 });
+      // La zone, orientée par le sens mesuré, ne bouge pas ; les vagues et les retours non plus.
+      expect(aligned.peakZone).toEqual(measured.peakZone);
+      expect(aligned.returns).toEqual(measured.returns);
+      expect(aligned.waves).toEqual(measured.waves);
+    });
+
+    it(`vagues à 60° du sens : la ligne des départs s'écarte au-delà de la borne, le sens reste le mesuré (pas de ${cadenceS} s)`, () => {
+      const lefts = along([240, 240, 240, 240]);
+      const analysis = run(lefts, cadenceS);
+      expect(analysis.peakZone!.orientation).toBe('vagues');
+      expect(gap(analysis.waveSense!.directionDeg, 240)).toBeLessThan(2);
+      expect(analysis).toEqual(run(lefts, cadenceS, MEASURED));
+    });
+
+    it(`gauches et droites mêlées, plus de gauches : le sens tiré vers elles revient sur la perpendiculaire (pas de ${cadenceS} s)`, () => {
+      // Trois gauches au 230° et une droite au 150° : moyenne au 212,7°, R de 0,83.
+      const mixed = along([230, 150, 230, 230]);
+      const aligned = run(mixed, cadenceS);
+      const measured = run(mixed, cadenceS, MEASURED);
+      expect(gap(measured.waveSense!.directionDeg, 212.7)).toBeLessThan(3);
+      expect(measured.waveSense!.R).toBeCloseTo(0.83, 1);
+      expect(gap(aligned.waveSense!.directionDeg, 180)).toBeLessThan(2);
+      expect(aligned.peakZone).toEqual(measured.peakZone);
+    });
+
+    it(`départs groupés le long de la plage (15 m) : aucune ligne, le sens reste le mesuré (pas de ${cadenceS} s)`, () => {
+      const grouped = along([210, 210, 210, 210], 5);
+      const analysis = run(grouped, cadenceS);
+      expect(analysis.peakZone!.orientation).toBe('vagues');
+      expect(gap(analysis.waveSense!.directionDeg, 210)).toBeLessThan(2);
+      expect(analysis).toEqual(run(grouped, cadenceS, MEASURED));
+    });
+  }
+
+  for (const cadenceS of [1, 0.2, 4]) {
+    it(`deux départs à 40 m le long de la plage ne recalent pas le sens, trois le recalent ; la zone ne bouge pas (pas de ${cadenceS} s)`, () => {
+      const two = run(along([210, 210]), cadenceS);
+      const twoMeasured = run(along([210, 210]), cadenceS, MEASURED);
+      expect(two.peakZone!.orientation).toBe('ligne');
+      expect(gap(two.waveSense!.directionDeg, 210)).toBeLessThan(2);
+      expect(two).toEqual(twoMeasured);
+      // Deux départs suffisent si on le demande.
+      expect(gap(run(along([210, 210]), cadenceS, { senseLineMinDepartures: 2 }).waveSense!.directionDeg, 180)).toBeLessThan(2);
+      const three = run(along([210, 210, 210]), cadenceS);
+      const threeMeasured = run(along([210, 210, 210]), cadenceS, MEASURED);
+      expect(gap(three.waveSense!.directionDeg, 180)).toBeLessThan(2);
+      expect(three.peakZone).toEqual(threeMeasured.peakZone);
+      expect(three.returns).toEqual(threeMeasured.returns);
+    });
+  }
+
+  it('les mêmes sens recalés à 1 Hz, à 5 Hz et à 4 s', () => {
+    const of = (cadenceS: number) => run(along([230, 150, 230, 230]), cadenceS).waveSense!.directionDeg;
+    expect(gap(of(0.2), of(1))).toBeLessThan(1);
+    expect(gap(of(4), of(1))).toBeLessThan(1);
+  });
+
+  it('un sens saisi n\'est jamais recalé ; le sens estimé rappelé à côté l\'est', () => {
+    const lefts = along([210, 210, 210, 210]);
+    const entered = run(lefts, 1, { waveDirectionDeg: 250 });
+    expect(entered.waveSense).toEqual({ directionDeg: 250, R: 1, samples: 0, reliable: true, source: 'saisi' });
+    expect(entered.estimatedWaveSense).toEqual(run(lefts, 1).waveSense);
+    expect(gap(entered.estimatedWaveSense!.directionDeg, 180)).toBeLessThan(2);
+    // La zone suit le sens saisi, comme avant.
+    expect(entered.peakZone).toEqual(run(lefts, 1, { waveDirectionDeg: 250, ...MEASURED }).peakZone);
+  });
+
+  it('sans sens utilisable (trop peu concentré pour orienter la zone), rien n\'est recalé', () => {
+    const mixed = along([230, 150, 230, 230]);
+    const loose = run(mixed, 1, { waveSenseMinR: 0.9 });
+    expect(loose.peakZone!.orientation).toBe('departs');
+    expect(gap(loose.waveSense!.directionDeg, 212.7)).toBeLessThan(3);
+    expect(loose).toEqual(run(mixed, 1, { waveSenseMinR: 0.9, ...MEASURED }));
+  });
+
+  it('la matinée et ses départs étalés vers le large : ni la zone ni le sens ne bougent', () => {
+    for (const cadenceS of [1, 0.2, 4]) {
+      const analysis = run(MORNING, cadenceS);
+      expect(analysis).toEqual(run(MORNING, cadenceS, MEASURED));
+    }
+  });
 });

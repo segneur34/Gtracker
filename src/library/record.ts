@@ -88,10 +88,15 @@ export const RECORD_VERSION = 1;
  * vague qui va contre le sens des vagues (une remontée pompée) n'est plus une
  * vague : nombre de vagues et plus longue vague peuvent baisser.
  *
+ * 21 (18 novembre 2026) : en surf, le sens des vagues estimé se recale sur la
+ * ligne des départs quand ils la dessinent le long de la plage ; sur foil, un
+ * passage proche de la borne de la remontée pompée peut changer de camp, et
+ * nombre de vagues, plus longue vague et vitesse max avec lui.
+ *
  * Les versions sautées (6, 10, 11, 17 et 18) ne changeaient aucun chiffre de la
  * voile ni du surf ; le numéro est gardé.
  */
-export const SUMMARY_CALC_VERSION = 20;
+export const SUMMARY_CALC_VERSION = 21;
 
 export type SessionSource = 'enregistrement' | 'import';
 
