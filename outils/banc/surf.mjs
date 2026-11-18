@@ -215,14 +215,34 @@ contient('sens des vagues : « Sens des vagues : » avec un cap, « calculé » 
 const sensCalcule = Number(sensAvant.match(/(\d+)°/)?.[1]);
 check('sens des vagues : « Régler » ouvre la boussole sur la carte', (await boutonSens('.an-carte-panels', 'Régler')) && (await settle({ max: 1200 }), await evaluate(`Boolean(document.querySelector('.an-map-panel .an-wind__dial'))`)));
 console.log('boussole :', await sensBar());
-const cadran = await evaluate(`(() => { const r = document.querySelector('.an-map-panel .an-wind__dial').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width }; })()`);
 await shoot('surf-sens-boussole');
-await mouse('mousePressed', cadran.x, cadran.y - cadran.w * 0.35);
-await mouse('mouseMoved', cadran.x + cadran.w * 0.25, cadran.y - cadran.w * 0.25);
-await mouse('mouseMoved', cadran.x + cadran.w * 0.35, cadran.y);
-await wait(200);
-check('sens des vagues : la flèche suit le pointeur (« Vagues 90° »)', (await sensText()) === 'Vagues 90°', await sensText());
-await mouse('mouseReleased', cadran.x + cadran.w * 0.35, cadran.y);
+// La poignée elle-même : centre, rayon du cercle et recouvrement avec le bandeau et la barre « Non enregistré ».
+const poignee = (zone) => evaluate(`(() => {
+  const z = document.querySelector(${JSON.stringify(zone)});
+  const box = (e) => { if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; };
+  const h = box(z.querySelector('.an-wind__handle')), c = box(z.querySelector('.an-wind__dial circle'));
+  const hx = (h.l + h.r) / 2, hy = (h.t + h.b) / 2, cx = (c.l + c.r) / 2, cy = (c.t + c.b) / 2, R = (c.r - c.l) / 2;
+  const bandeau = box(z.querySelector('.an-wind__bar')), save = box(document.querySelector('.ui-savebar'));
+  const plein = (b) => b !== null && b.r > b.l && b.b > b.t;
+  return { hx, hy, cx, cy, R, dist: Math.hypot(hx - cx, hy - cy), h, bandeau, save, valide: R > 50 && plein(h) && plein(bandeau) };
+})()`);
+const sePose = (a, b) => a && b && a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+const pleine = (b) => b !== null && b.r > b.l && b.b > b.t;
+/** Tire la poignée jusqu'à l'angle donné (degrés), sur le cercle, par trois positions. */
+const tirer = async (zone, deg) => {
+  const p = await poignee(zone);
+  const pt = (d) => [p.cx + p.R * Math.sin((d * Math.PI) / 180), p.cy - p.R * Math.cos((d * Math.PI) / 180)];
+  await mouse('mousePressed', p.hx, p.hy);
+  await mouse('mouseMoved', ...pt(deg / 2));
+  await mouse('mouseMoved', ...pt(deg));
+  await wait(200);
+  return pt(deg);
+};
+const p0 = await poignee('.an-map-panel');
+check('sens des vagues : la poignée est sur le cercle (centre à ± 4 px du rayon)', p0.valide && Math.abs(p0.dist - p0.R) <= 4, JSON.stringify({ dist: p0.dist, R: p0.R }));
+const fin = await tirer('.an-map-panel', 90);
+check('sens des vagues : la flèche suit la poignée (« Vagues 90° »)', (await sensText()) === 'Vagues 90°', await sensText());
+await mouse('mouseReleased', ...fin);
 await settle({ max: 1500 });
 const sens90 = await ligneSens();
 console.log('sens des vagues, tiré à 90° :', sens90, '|', await sensBar());
@@ -402,6 +422,17 @@ const cadre = await evaluate(`(() => { const box = (s) => { const r = document.q
 console.log('boussole (390) :', JSON.stringify(cadre), await evaluate(`document.querySelector('.an-map-overlay .an-wind__bar')?.innerText.replace(/\\n+/g, ' ')`));
 const dansEcran = (c) => c.r > c.l && c.b > c.t && c.l >= 0 && c.r <= 390 && c.t >= 0 && c.b <= 844;
 check('390 px, sens des vagues : la boussole est entière dans l’écran', dansEcran(cadre.cadran) && dansEcran(cadre.bandeau) && cadre.bandeau.b <= cadre.cadran.t, JSON.stringify(cadre));
+// Brouillon en attente (poignée tirée), puis poignée à 0° : sous le bandeau et sous la barre « Non enregistré ».
+const fin90 = await tirer('.an-map-overlay', 90);
+await mouse('mouseReleased', ...fin90);
+await settle({ max: 1200 });
+const fin00 = await tirer('.an-map-overlay', 0);
+const p390 = await poignee('.an-map-overlay');
+check('390 px, sens des vagues : la poignée est sur le cercle', p390.valide && Math.abs(p390.dist - p390.R) <= 4, JSON.stringify({ dist: p390.dist, R: p390.R }));
+check('390 px, sens des vagues : poignée à 0° sous le bandeau du réglage, sans recouvrement', p390.valide && !sePose(p390.h, p390.bandeau) && p390.h.t >= p390.bandeau.b - 1, JSON.stringify({ h: p390.h, bandeau: p390.bandeau }));
+check('390 px, sens des vagues : poignée à 0° sans recouvrir la barre « Non enregistré »', pleine(p390.save) && !sePose(p390.h, p390.save), JSON.stringify({ h: p390.h, save: p390.save }));
+await mouse('mouseReleased', ...fin00);
+await settle({ max: 800 });
 await shoot('surf-sens-390');
 console.log('fermer la carte :', await evaluate(`(() => { const b = document.querySelector('.an-map-overlay__close'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
 await wait(600);
