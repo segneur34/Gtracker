@@ -4,6 +4,8 @@
 //         [--sans-reseau] [--gpx <dossier>] [--brouillon <dossier>] [--temps k] [--captures] [--garder]
 //         [--sans-cache] [--nettoyer-avant] [--chrome <premier port>] [--port <port Vite>] (l'avant sur le port suivant)
 //         [--langue fr|en|es] (langue de Chrome, donc de l'application sans réglage : français par défaut)
+//         [--exe <Gtracker.exe>] (le programme Windows contre Chrome sur le même `dist/` : « avant » est Chrome sur
+//         `vite preview`, « après » une instance du programme par script, sur un profil à part ; sans --avant)
 // Mode d'emploi : LISEZMOI.md, section « Lanceur ». Registre des scripts : scripts.mjs. Node 22 ou plus, sans dépendance.
 // Le passage courant (sans nom) ne comprend plus `tailles` : le jouer par son nom ou `--pages` quand le lot touche la mise en page, le thème ou Réglages.
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
@@ -42,7 +44,7 @@ const LANGUES = { fr: 'fr-FR', en: 'en-GB', es: 'es-ES' };
 // --- Options ---
 const opts = { noms: [], pages: null, tous: false, avant: null, parCote: false, j: 4, sansReseau: false, gpx: null,
   brouillon: path.join(os.tmpdir(), DOSSIER_BANC), temps: null, captures: false, garder: false, sansCache: false, nettoyerAvant: false, chrome: 9480, port: PORT_APRES,
-  langue: 'fr' };
+  langue: 'fr', exe: null };
 {
   const a = process.argv.slice(2);
   const valeur = (i, nom) => { if (a[i + 1] === undefined) sortie(2, `${nom} attend une valeur`); return a[i + 1]; };
@@ -64,6 +66,7 @@ const opts = { noms: [], pages: null, tous: false, avant: null, parCote: false, 
     else if (x === '--chrome') opts.chrome = Number(valeur(i++, x));
     else if (x === '--port') opts.port = Number(valeur(i++, x));
     else if (x === '--langue') opts.langue = valeur(i++, x);
+    else if (x === '--exe') opts.exe = path.resolve(valeur(i++, x));
     else if (x === '--aide' || x === '-h') { console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 7).join('\n')); process.exit(0); }
     else if (x.startsWith('-')) sortie(2, `option inconnue : ${x}`);
     else opts.noms.push(x.replace(/\.mjs$/, ''));
@@ -71,7 +74,27 @@ const opts = { noms: [], pages: null, tous: false, avant: null, parCote: false, 
   if (opts.parCote && !opts.avant) sortie(2, '--scripts-par-cote demande --avant <commit>');
   if (opts.pages) for (const p of opts.pages) if (!PAGES.includes(p)) sortie(2, `page inconnue : ${p} (${PAGES.join(', ')})`);
   if (!LANGUES[opts.langue]) sortie(2, `langue inconnue : ${opts.langue} (${Object.keys(LANGUES).join(', ')})`);
+  if (opts.exe && (opts.avant || opts.parCote)) sortie(2, '--exe compare le programme à Chrome : pas de --avant ni de --scripts-par-cote');
+  if (opts.exe && !fs.existsSync(opts.exe)) sortie(2, `programme introuvable : ${opts.exe} (le fabriquer : npm run exe)`);
 }
+
+// --- Programme Windows (--exe) : l'adresse sous laquelle il sert l'application, lue dans sa source ---
+// L'application du programme est celle de `resources/dist` à côté de lui : c'est aussi ce que sert la référence (Chrome),
+// pour que seule la coquille change entre les deux côtés.
+const ORIGINE_EXE = opts.exe
+  ? `https://${/HOTE\s*=\s*'([^']+)'/.exec(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'bureau', 'origine.ts'), 'utf8'))?.[1] ?? 'gtracker.localhost'}`
+  : null;
+const DIST_EXE = opts.exe ? path.join(path.dirname(opts.exe), 'resources', 'dist') : null;
+// Scripts que le programme ne sait pas jouer : captures d'écran des pages (`shots`), onglet en contexte isolé, et ceux
+// qui importent `/src/` dans la page (`dev` : l'application du programme est le build de production, sans sources).
+const sansExe = (s, banc) => {
+  if (s.nom === 'shots') return 'captures d\'écran';
+  if (s.dev) return 'importe /src/ : build de production';
+  const f = path.join(banc, `${s.nom}.mjs`);
+  const source = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
+  if (/from\s+'\.\/lib\/(tuiles|lieux)\.mjs'/.test(source)) return 'fausses réponses par Fetch : le protocole de débogage ne voit pas les requêtes de la page';
+  return /isolated\s*:\s*true|BANC_CONTEXTE/.test(source) ? 'contexte isolé' : null;
+};
 
 function sortie(code, message) { console.error(message); process.exit(code); }
 
@@ -125,6 +148,7 @@ if (opts.noms.length) {
   for (const s of choisis) lignes.push({ nom: s.nom, script: s });
 }
 if (opts.sansReseau) for (const l of lignes) if (l.script?.reseau) { l.note = 'écarté (réseau)'; delete l.script; }
+if (opts.exe) for (const l of lignes) { const raison = l.script && sansExe(l.script, BANC); if (raison) { l.note = `écarté (programme : ${raison})`; delete l.script; } }
 const aLancer = lignes.filter((l) => l.script);
 
 // --- Git ---
@@ -132,10 +156,11 @@ const git = (args, cwd = DEPOT) => execFileSync('git', args, { cwd, encoding: 'u
 const commitApres = git(['rev-parse', 'HEAD']);
 const modifie = git(['status', '--porcelain']).split('\n').filter((l) => l && !/^.. "?(outils\/banc\/|\.vitest\/)/.test(l)).length > 0;
 const commitAvant = opts.avant ? git(['rev-parse', `${opts.avant}^{commit}`]) : null;
-const cotes = opts.avant ? ['avant', 'apres'] : ['apres'];
-const NOM_COTE = { avant: 'avant', apres: 'après' };
+const cotes = opts.avant || opts.exe ? ['avant', 'apres'] : ['apres'];
+// Avec --exe, « avant » est la référence (Chrome) et « après » le programme.
+const NOM_COTE = opts.exe ? { avant: 'Chrome', apres: '.exe' } : { avant: 'avant', apres: 'après' };
 const racineAvant = commitAvant ? path.join(opts.brouillon, `avant-${commitAvant.slice(0, 7)}`) : null;
-const RACINE = { apres: DEPOT, avant: racineAvant };
+const RACINE = { apres: DEPOT, avant: opts.exe ? DEPOT : racineAvant };
 const bancDe = (cote) => (cote === 'avant' && opts.parCote ? path.join(racineAvant, 'outils', 'banc') : BANC);
 
 // --- Processus suivis, nettoyage ---
@@ -224,6 +249,71 @@ async function fermerChrome({ port, child }) {
   await fin(child);
   portsPris.delete(port);
 }
+
+// --- Programme Windows : une instance par script, sur un profil à part, en mode d'essai de la coquille ---
+// `GTRACKER_BANC=1` (fenêtre cachée, port de débogage accepté, journal sur la sortie) et `GTRACKER_PROFIL` (jamais la
+// mémoire du vrai programme). `GTRACKER_BANC_QUITTER` et `GTRACKER_DIST` passent tels quels s'ils sont posés.
+async function ouvrirExe(profil) {
+  fs.rmSync(profil, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+  fs.mkdirSync(profil, { recursive: true });
+  const port = await prendrePort();
+  const env = { ...process.env, GTRACKER_BANC: '1', GTRACKER_PROFIL: profil };
+  for (const cle of Object.keys(env)) if (cle.toUpperCase() === 'ELECTRON_RUN_AS_NODE') delete env[cle];
+  // Échelle 1 et barres de défilement cachées : les conditions de Chrome sans fenêtre. Sans elles, l'écran du poste (125 %)
+  // donne des bordures de 0,8 px et une barre de 15 px qui décale les centres mesurés (relevés « différents » sans que
+  // la coquille y soit pour rien).
+  const child = lancer(opts.exe, [`--remote-debugging-port=${port}`, `--lang=${LANGUES[opts.langue]}`, '--force-device-scale-factor=1', '--hide-scrollbars'], { stdio: ['ignore', 'pipe', 'pipe'], env });
+  const journal = [];
+  const lire = (d) => { for (const l of String(d).split(/\r?\n/)) if (l.trim()) journal.push(l.trim()); };
+  child.stdout.on('data', lire);
+  child.stderr.on('data', lire);
+  const limite = Date.now() + 30000;
+  while (Date.now() < limite) {
+    if (child.exitCode !== null) break;
+    try {
+      const page = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find((c) => c.type === 'page' && c.webSocketDebuggerUrl);
+      if (page) return { port, child, ws: page.webSocketDebuggerUrl, journal };
+    } catch { /* pas encore */ }
+    await pause(200);
+  }
+  tuer(child);
+  portsPris.delete(port);
+  throw new Error(`le programme ne répond pas sur ${port}${journal.length ? ` (${journal.slice(-3).join(' | ')})` : ''}`);
+}
+async function fermerExe({ port, child }) {
+  tuer(child);
+  await fin(child);
+  portsPris.delete(port);
+}
+const ouvrir = (cote, profil) => (opts.exe && cote === 'apres' ? ouvrirExe(profil) : ouvrirChrome(profil));
+const fermer = (cote, hote) => (opts.exe && cote === 'apres' ? fermerExe(hote) : fermerChrome(hote));
+
+/**
+ * Second observateur de la page du programme (le script a le sien) : violations de la politique de contenu, requêtes
+ * qu'elle bloque et autres erreurs du journal du navigateur, que `connect` n'écoute pas. Les requêtes que le script bloque
+ * lui-même (`Network.setBlockedURLs`) et les échecs réseau ordinaires ne comptent pas.
+ */
+async function surveiller(wsUrl) {
+  const ws = new WebSocket(wsUrl);
+  await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
+  const notes = [];
+  const adresses = new Map();
+  let id = 0;
+  const envoyer = (method, params = {}) => ws.send(JSON.stringify({ id: ++id, method, params }));
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    const p = m.params;
+    if (m.method === 'Log.entryAdded' && ['error', 'warning'].includes(p.entry.level) && p.entry.source !== 'network') {
+      notes.push(`${/Content Security Policy|Refused to/i.test(p.entry.text) ? 'CSP' : 'journal'} : ${p.entry.source} ${p.entry.level} : ${p.entry.text.split('\n')[0].slice(0, 200)}`);
+    } else if (m.method === 'Network.requestWillBeSent') adresses.set(p.requestId, p.request.url);
+    else if (m.method === 'Network.loadingFailed' && p.blockedReason && p.blockedReason !== 'inspector') {
+      notes.push(`CSP : requête bloquée (${p.blockedReason}) : ${(adresses.get(p.requestId) ?? '?').slice(0, 150)}`);
+    }
+  };
+  envoyer('Log.enable');
+  envoyer('Network.enable');
+  return { notes, close: () => { try { ws.close(); } catch { /* déjà fermé */ } } };
+}
 async function cdp(wsUrl) {
   const ws = new WebSocket(wsUrl);
   await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
@@ -271,6 +361,26 @@ async function demarrerServeur(cote) {
   tuer(child);
   throw new Error(`serveur ${NOM_COTE[cote]} non prêt (journal : ${path.join(B.vite, `${cote}.log`)})`);
 }
+// Référence du mode --exe : l'application que le programme emporte (`resources/dist`), servie par `vite preview` (déjà
+// construite : rien à compiler, le préchauffage ne sert qu'à relire les polices).
+async function demarrerApercu() {
+  const port = opts.port;
+  if (!(await libre(port))) throw new Error(`port ${port} déjà pris (un serveur du banc resté en route ? netstat -ano | grep ${port})`);
+  if (!fs.existsSync(path.join(DIST_EXE, 'index.html'))) throw new Error(`application absente du programme : ${DIST_EXE}`);
+  const journal = fs.createWriteStream(path.join(B.vite, 'apercu.log'));
+  const child = lancer(process.execPath, [path.join(MODULES, 'vite', 'bin', 'vite.js'), 'preview', '--outDir', DIST_EXE, '--port', String(port), '--strictPort',
+    '--host', '127.0.0.1'], { cwd: DEPOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, BROWSER: 'none' } });
+  child.stdout.pipe(journal);
+  child.stderr.pipe(journal);
+  const limite = Date.now() + 30000;
+  while (Date.now() < limite) {
+    if (child.exitCode !== null) break;
+    try { const r = await fetch(`http://127.0.0.1:${port}/`); if (r.ok) return { port, child, base: `http://127.0.0.1:${port}` }; } catch { /* pas encore */ }
+    await pause(300);
+  }
+  tuer(child);
+  throw new Error(`vite preview non prêt (journal : ${path.join(B.vite, 'apercu.log')})`);
+}
 async function prechauffer(cote, serveur) {
   const chrome = await ouvrirChrome(path.join(B.profils, `prechauffe-${cote}`));
   try {
@@ -310,7 +420,7 @@ function empreinteScript(banc, nom) {
   for (const f of fichiers) { h.update(posix(path.relative(banc, f))); h.update(fs.existsSync(f) ? fs.readFileSync(f) : ''); }
   return h.digest('hex');
 }
-const dossierReleves = (cote) => path.join(B.releves, cote === 'avant' ? commitAvant.slice(0, 7) : `${commitApres.slice(0, 7)}${modifie ? '-modifie' : '-apres'}`);
+const dossierReleves = (cote) => path.join(B.releves, opts.exe ? (cote === 'avant' ? 'exe-chrome' : 'exe-programme') : cote === 'avant' ? commitAvant.slice(0, 7) : `${commitApres.slice(0, 7)}${modifie ? '-modifie' : '-apres'}`);
 // Lit-il `TEMPS` ? Côté avant avec `--scripts-par-cote`, c'est le registre de ce commit qui le dit (un script
 // d'origine lancé sous horloge accélérée ne prouverait rien) ; sans registre à ce commit, aucun ne l'est.
 const registresAvant = new Map();
@@ -342,6 +452,8 @@ function normaliser(texte, chemins, masques = []) {
     for (const v of [...variantes].sort((a, b) => b.length - a.length)) t = t.replace(new RegExp(echapper(v), 'gi'), nom);
   }
   t = t.replace(/(127\.0\.0\.1|localhost|\[::1\]):\d+/g, 'HOTE');
+  // L'adresse du programme (https, sans port) se lit comme celle de Chrome (http, avec port) une fois masquée.
+  if (ORIGINE_EXE) t = t.split(ORIGINE_EXE).join('http://HOTE').split(ORIGINE_EXE.slice('https://'.length)).join('HOTE');
   for (const [re, par] of [...MASQUES_COMMUNS, ...masques]) t = t.replace(re, par);
   return t;
 }
@@ -353,7 +465,9 @@ const serveurs = {};
 const enRoute = {};
 // Un serveur par côté, démarré et préchauffé à la première demande (l'avant seulement si un relevé lui manque).
 const servir = (cote) => (enRoute[cote] ??= (async () => {
-  const s = await demarrerServeur(cote);
+  // Mode --exe : le programme sert lui-même l'application (rien à démarrer) ; la référence est `vite preview`.
+  if (opts.exe && cote === 'apres') return (serveurs[cote] = { port: null, base: ORIGINE_EXE });
+  const s = opts.exe ? await demarrerApercu() : await demarrerServeur(cote);
   await prechauffer(cote, s);
   serveurs[cote] = s;
   return s;
@@ -370,7 +484,7 @@ async function executer(s, cote, rejeu = false) {
   const fichier = path.join(dossier, `${s.nom}.txt`);
   const meta = path.join(dossier, `${s.nom}.json`);
   const cle = cleReleve(cote, s);
-  const reutilisable = cote === 'avant' && !s.sansCache && !opts.sansCache && !rejeu;
+  const reutilisable = cote === 'avant' && !opts.exe && !s.sansCache && !opts.sansCache && !rejeu;
   if (reutilisable && fs.existsSync(meta) && fs.existsSync(fichier)) {
     const m = JSON.parse(fs.readFileSync(meta, 'utf8'));
     // Un relevé d'avant qui porte un échec n'est jamais réutilisé : il peut venir d'une machine chargée, il est refait.
@@ -391,7 +505,12 @@ async function executer(s, cote, rejeu = false) {
   const serveur = await servir(cote);
   const t0 = Date.now();
   let chrome;
-  try { chrome = await ouvrirChrome(path.join(B.profils, id)); } catch (e) {
+  let veille = null;
+  try {
+    chrome = await ouvrir(cote, path.join(B.profils, id));
+    if (chrome.ws) veille = await surveiller(chrome.ws);
+  } catch (e) {
+    if (chrome) await fermer(cote, chrome);
     const r = { statut: 'erreur', detail: e.message, duree: Date.now() - t0, echecs: 0, erreurs: [], fichier: null };
     console.error(`[${NOM_COTE[cote]}] ${s.nom} erreur : ${e.message}`);
     return r;
@@ -402,6 +521,7 @@ async function executer(s, cote, rejeu = false) {
   if (/process\.env\.DUMP|const DUMP/.test(source)) env.DUMP = path.join(depot, 'releve');
   if (opts.captures && /process\.env\.SHOT/.test(source)) env.SHOT = path.join(captures, `${s.nom}.png`);
   if (accelerable(cote, s)) env.TEMPS = opts.temps;
+  if (chrome.ws) env.BANC_WS = chrome.ws;
   const child = lancer(process.execPath, [script, ...args], { cwd: travail, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -411,7 +531,8 @@ async function executer(s, cote, rejeu = false) {
   const minuterie = setTimeout(() => { depasse = true; tuer(child); }, (s.delaiMin ?? 10) * 60000);
   const code = await fin(child);
   clearTimeout(minuterie);
-  await fermerChrome(chrome);
+  veille?.close();
+  await fermer(cote, chrome);
   const ms = Date.now() - t0;
   const chemins = [[travail, 'TRAVAIL'], [depot, 'TRAVAIL-DUMP'], [captures, 'CAPTURES'], [path.join(B.profils, id), 'PROFIL'],
     [RACINE[cote], 'DEPOT'], [DEPOT, 'DEPOT'], [opts.brouillon, 'BROUILLON']];
@@ -433,9 +554,14 @@ async function executer(s, cote, rejeu = false) {
     cle, statut: depasse ? 'délai dépassé' : 'fini', code, duree: ms, date: new Date().toISOString(),
     echecs: lignesSortie.filter((l) => ECHEC.test(l)).length, erreurs: lignesSortie.filter((l) => ERREUR.test(l)).map((l) => l.trim()),
   };
+  // Côté programme : violations de la politique de contenu et journal de la coquille (autorisations, liens, fermeture).
+  if (chrome.ws) {
+    r.programme = [...new Set(veille?.notes ?? []), ...chrome.journal.filter((l) => !/^\[Gtracker\] prêt/.test(l)).map((l) => `coquille : ${l.replace(/^\[Gtracker\] /, '')}`)];
+    fs.writeFileSync(path.join(dossier, `${s.nom}.programme.txt`), `${r.programme.join('\n')}\n`);
+  }
   fs.writeFileSync(meta, JSON.stringify(r, null, 1));
   if (!opts.garder) for (const d of [travail, depot, path.join(B.profils, id)]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
-  const etat = r.statut !== 'fini' ? r.statut : r.echecs ? `${r.echecs} échec(s)` : code ? `code ${code}` : 'ok';
+  const etat = (r.statut !== 'fini' ? r.statut : r.echecs ? `${r.echecs} échec(s)` : code ? `code ${code}` : 'ok') + (r.programme?.length ? ` (${r.programme.length} note(s) du programme)` : '');
   console.error(`[${NOM_COTE[cote]}] ${s.nom} ${etat} ${duree(ms)}`);
   return { ...r, fichier };
 }
@@ -457,11 +583,11 @@ try {
       jonction = nm;
     }
     // L'avant ne se sert que si un de ses relevés manque.
-    const avantUtile = commitAvant && aLancer.some(({ script: s }) => {
+    const avantUtile = opts.exe || (commitAvant && aLancer.some(({ script: s }) => {
       if (s.sansCache || opts.sansCache) return true;
       const d = dossierReleves('avant');
       try { return JSON.parse(fs.readFileSync(path.join(d, `${s.nom}.json`), 'utf8')).cle !== cleReleve('avant', s); } catch { return true; }
-    });
+    }));
     const aServir = cotes.filter((c) => c === 'apres' || avantUtile);
     const fabrique = (async () => {
       const g1 = path.join(B.travail, 'voile.gpx');
@@ -474,7 +600,7 @@ try {
       await servir(c);
     })]);
     miseEnRoute = Date.now() - debut;
-    console.error(`mise en route : ${duree(miseEnRoute)} (${aServir.map((c) => `${NOM_COTE[c]} sur ${serveurs[c].port}`).join(', ')})`);
+    console.error(`mise en route : ${duree(miseEnRoute)} (${aServir.map((c) => `${NOM_COTE[c]} sur ${serveurs[c].port ?? serveurs[c].base}`).join(', ')})`);
 
     const ordinaires = aLancer.filter((l) => !l.script.solo);
     const solos = aLancer.filter((l) => l.script.solo);
@@ -552,7 +678,7 @@ const resultat = (r) => {
   if (r.statut !== 'fini') return r.statut;
   return r.echecs ? `${r.echecs} échec${r.echecs > 1 ? 's' : ''}` : r.code ? `code ${r.code}` : 'ok';
 };
-const tableau = [['script', 'durée avant', 'durée après', 'résultat', 'console', 'relevé']];
+const tableau = [['script', `durée ${NOM_COTE.avant}`, `durée ${NOM_COTE.apres}`, 'résultat', 'console', 'relevé']];
 const ecarts = [];
 for (const l of lignes) {
   if (!l.res) { tableau.push([l.nom, '', '', l.note ?? '—', '', '']); if (l.erreur) code = 1; continue; }
@@ -566,9 +692,10 @@ for (const l of lignes) {
   const nouvelles = (ap?.erreurs ?? []).filter((e) => !(av?.erreurs ?? []).includes(e));
   if (ap?.statut !== 'fini' || ap.echecs || ap.code || nouvelles.length) code = 1;
   let res = resultat(ap);
-  if (av && resultat(av) !== res) res += ` (avant : ${resultat(av)})`;
+  if (av && resultat(av) !== res) res += ` (${NOM_COTE.avant} : ${resultat(av)})`;
   if (ap?.rejeu) res += ` (${ap.rejeu})`;
-  if (av?.rejeu) res += ` (avant, ${av.rejeu})`;
+  if (av?.rejeu) res += ` (${NOM_COTE.avant}, ${av.rejeu})`;
+  if (ap?.programme?.some((n) => n.startsWith('CSP'))) code = 1;
   const consoleTxt = av ? `${ap?.erreurs?.length ?? 0}${nouvelles.length ? ` (${nouvelles.length} nouv.)` : ''}` : String(ap?.erreurs?.length ?? 0);
   tableau.push([l.nom, av ? (av.reutilise ? `réutilisé (${duree(av.duree)})` : duree(av.duree ?? 0)) : '', duree(ap?.duree ?? 0), res, consoleTxt, releve]);
 }
@@ -588,6 +715,10 @@ for (const l of ecarts) {
 for (const l of lignes) {
   const nouvelles = (l.res?.apres?.erreurs ?? []).filter((e) => !(l.res?.avant?.erreurs ?? []).includes(e));
   if (nouvelles.length) console.log(`\n${l.nom} : console${l.res.avant ? ' (nouvelles)' : ''}\n  ${[...new Set(nouvelles)].slice(0, 10).join('\n  ')}`);
+}
+for (const l of lignes) {
+  const notes = l.res?.apres?.programme ?? [];
+  if (notes.length) console.log(`\n${l.nom} : programme\n  ${[...new Set(notes)].slice(0, 10).join('\n  ')}`);
 }
 const avantReutilise = lignes.some((l) => l.res?.avant?.reutilise);
 console.log(`\npassage : ${duree(Date.now() - debut)}, dont mise en route ${duree(miseEnRoute)}${avantReutilise ? ' ; avant : relevé réutilisé' : ''}`);

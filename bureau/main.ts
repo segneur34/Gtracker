@@ -1,15 +1,22 @@
 // Coquille Windows de Gtracker : l'application de `dist/` dans une fenêtre, servie sous `https://gtracker.localhost`
 // (voir `origine.ts`), avec la mémoire du navigateur intégré dans le profil de la coquille.
 //
-// Mode d'essai, pour le banc seulement (`GTRACKER_BANC=1`) : fenêtre cachée de 1400 × 1000, rendu jamais ralenti,
-// port de débogage accepté, autorisations et fermetures journalisées sur la sortie, question de fermeture répondue
-// seule (`GTRACKER_BANC_QUITTER=non` pour rester sur la page). Hors de ce mode, un port de débogage fait quitter.
+// Mode d'essai, pour le banc seulement (`GTRACKER_BANC=1`) : fenêtre cachée dont la page fait 1382 × 904 (celle de
+// Chrome sans fenêtre), rendu jamais ralenti, port de débogage accepté, aucun accès au réseau réel (les autres hôtes
+// sont refusés et journalisés), autorisations et fermetures journalisées sur la sortie, question de fermeture
+// répondue seule (`GTRACKER_BANC_QUITTER=non` pour rester sur la page). Hors de ce mode, un port de débogage fait quitter.
+//
+// Fenêtre cachée et demande de fermeture de Windows : après un rechargement de la page, Chromium ajoute au processus
+// une seconde fenêtre cachée sans titre, et la demande de fermeture (`taskkill` sans `/F`) part vers elle et non vers
+// celle de l'application, qui reste ouverte. Une fenêtre montrée la reçoit toujours : le banc qui essaie la fermeture
+// après un rechargement montre la sienne (`GTRACKER_BANC_MONTRER`), transparente pour ne rien afficher sur l'écran.
 //
 // Variables lues :
 //   GTRACKER_PROFIL         dossier du profil (mémoire, réglages de la fenêtre) au lieu de `%APPDATA%\Gtracker`
 //   GTRACKER_DIST           dossier de l'application à servir au lieu de celui du programme
 //   GTRACKER_BANC           mode d'essai (« 1 »)
 //   GTRACKER_BANC_QUITTER   réponse du mode d'essai à la question de fermeture : « oui » (défaut) ou « non »
+//   GTRACKER_BANC_MONTRER   fenêtre du mode d'essai montrée sans prendre la main : « 1 », ou « transparente »
 
 import { BrowserWindow, Menu, app, dialog, net, protocol, screen, session, shell } from 'electron'
 import type { Rectangle, WebContents } from 'electron'
@@ -21,12 +28,20 @@ import { CSP, reponseA } from './protocole'
 
 const BANC = process.env.GTRACKER_BANC === '1'
 const QUITTER_EN_ESSAI = (process.env.GTRACKER_BANC_QUITTER ?? 'oui') !== 'non'
+const MONTRER_EN_ESSAI = ['1', 'transparente'].includes(process.env.GTRACKER_BANC_MONTRER ?? '')
+const TRANSPARENTE_EN_ESSAI = process.env.GTRACKER_BANC_MONTRER === 'transparente'
 
 /** Fond de la fenêtre avant le premier dessin de la page : celui du thème clair, pour éviter un éclair d'une autre couleur. */
 const FOND = '#ffffff'
 
-/** Taille de la fenêtre au premier lancement, et toujours en mode d'essai (celle des relevés du banc). */
+/** Taille de la fenêtre au premier lancement. */
 const TAILLE_DEFAUT = { width: 1400, height: 1000 }
+
+/**
+ * Taille de la page, toujours, en mode d'essai : celle que voit Chrome sans fenêtre lancé avec `--window-size=1400,1000`
+ * (cadre et barre d'outils retirés), pour que la mise en page des relevés du banc soit la même des deux côtés.
+ */
+const TAILLE_ESSAI = { width: 1382, height: 904 }
 
 /** Autorisations accordées à la page ; toute autre demande est refusée. */
 const AUTORISATIONS = new Set(['fullscreen', 'clipboard-sanitized-write', 'fileSystem', 'persistent-storage'])
@@ -89,6 +104,13 @@ async function servir(requete: Request): Promise<Response> {
 function brancherProtocole(): void {
   protocol.handle('https', (requete) => {
     if (new URL(requete.url).host === HOTE) return servir(requete)
+    // Mode d'essai : aucun accès au réseau réel. Les requêtes de cette page passent ici et non par le réseau du
+    // navigateur : l'interception du protocole de débogage (`Fetch`) ne les voit pas, un script du banc qui compte sur
+    // de fausses réponses les verrait partir pour de bon.
+    if (BANC) {
+      journal(`réseau refusé : ${new URL(requete.url).host}`)
+      return Response.error()
+    }
     // Tout autre hôte (tuiles, recherche de lieux) repart sur le réseau, sans repasser par ce gestionnaire.
     return net.fetch(requete, { bypassCustomProtocolHandlers: true })
   })
@@ -111,7 +133,7 @@ function visible(cadre: Rectangle): boolean {
 }
 
 function lireFenetre(): Fenetre {
-  const defaut: Fenetre = { ...TAILLE_DEFAUT, agrandie: false }
+  const defaut: Fenetre = { ...(BANC ? TAILLE_ESSAI : TAILLE_DEFAUT), agrandie: false }
   if (BANC || !existsSync(cheminFenetre())) return defaut
   try {
     const lu = JSON.parse(readFileSync(cheminFenetre(), 'utf8')) as Partial<Fenetre>
@@ -227,6 +249,7 @@ function ouvrirFenetre(): void {
     ...(retenue.x !== undefined ? { x: retenue.x, y: retenue.y } : {}),
     width: retenue.width,
     height: retenue.height,
+    useContentSize: BANC,
     minWidth: 360,
     minHeight: 480,
     show: false,
@@ -255,8 +278,16 @@ function ouvrirFenetre(): void {
     })
     fenetre.on('close', () => retenirFenetre(fenetre))
   }
+  if (BANC && MONTRER_EN_ESSAI) {
+    fenetre.once('ready-to-show', () => {
+      if (TRANSPARENTE_EN_ESSAI) fenetre.setOpacity(0)
+      fenetre.showInactive()
+    })
+  }
   fenetre.webContents.on('render-process-gone', (_e, details) => journal(`page arrêtée : ${details.reason}`))
+  fenetre.on('close', () => journal('fermeture demandée'))
   fenetre.on('closed', () => {
+    journal('fenêtre fermée')
     fenetrePrincipale = null
   })
   void fenetre.loadURL(ADRESSE_ACCUEIL)
