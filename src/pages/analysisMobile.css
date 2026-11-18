@@ -249,6 +249,10 @@
   user-select: none;
 }
 
+.an-wind__handle {
+  cursor: grab;
+}
+
 .an-wind__dial:active {
   cursor: grabbing;
 }

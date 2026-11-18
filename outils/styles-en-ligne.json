@@ -48,7 +48,6 @@
   "src/components/ui/SegmentedControl.tsx": 1,
   "src/components/ui/ShareBar.tsx": 3,
   "src/components/ui/Swatch.tsx": 1,
-  "src/components/WindAdjustOverlay.tsx": 1,
   "src/components/WindCompass.tsx": 3,
   "src/components/ZoomableChart.tsx": 1,
   "src/pages/PlanningPage.tsx": 3,
@@ -57,7 +56,7 @@
   "src/pages/RestingHrTestPage.tsx": 1,
   "src/pages/RoutesPage.tsx": 1,
   "src/pages/SailingModule.tsx": 7,
-  "src/pages/SettingsPage.tsx": 6,
-  "src/pages/StatisticsPage.tsx": 10,
+  "src/pages/SettingsPage.tsx": 5,
+  "src/pages/StatisticsPage.tsx": 9,
   "src/pages/SurfModule.tsx": 3
 }

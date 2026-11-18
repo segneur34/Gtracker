@@ -71,6 +71,9 @@ import { notesHaveGear } from '../settings/gearReminder';
 import type { SurfFlight, SurfPhase, SurfReturn, SurfSpan, SurfWave } from '../surfing/surfAnalysis';
 import { effectiveWaveThreshold, surfProfileOf, type SurfSessionSettings } from '../surfing/surfSession';
 import { gyroWaveTurns } from '../surfing/gyroTurns';
+import WaveSenseField from '../components/surf/WaveSenseField';
+import WaveSenseOverlay from '../components/surf/WaveSenseOverlay';
+import { WAVE_SENSE_MIN_R } from '../surfing/waveSense';
 import StatTile from '../components/ui/StatTile';
 import MapToggle from '../components/ui/MapToggle';
 import SegmentedControl from '../components/ui/SegmentedControl';
@@ -433,6 +436,20 @@ function SurfModule() {
     mapExpanded,
     openMap: () => setMapExpanded(true),
   });
+  /** Réglage du sens des vagues ouvert sur la carte. */
+  const [waveAdjust, setWaveAdjust] = useState(false);
+  /** Ouvre le réglage : carte en plein écran sur téléphone, ramenée à l'écran sinon. */
+  const startWaveAdjust = () => {
+    setWaveAdjust(true);
+    if (narrow) setMapExpanded(true);
+    else zoomOnMap.scrollToMap();
+  };
+  const endWaveAdjust = () => {
+    setWaveAdjust(false);
+    setMapExpanded(false);
+    // Le plein écran se ferme ici sans passer par `onExpandedChange`.
+    zoomOnMap.closeCompanion();
+  };
   const { show: showZoomOnMap } = zoomOnMap;
   const { retainSessionHrMax, showCardioOnMap } = useCardioShortcuts(track, retainHr, showZoomOnMap);
   const showGraphsOnMap = useCallback(() => showZoomOnMap('graphiques'), [showZoomOnMap]);
@@ -525,6 +542,13 @@ function SurfModule() {
   const noWaveSpeed = formatSpeed(fromDisplaySpeed(foil ? waveThreshold : threshold, profile.thresholdUnit), speedUnit);
   const speedSource = speedSourceText(base.hasDeviceSpeed, base.deviceSpeedUnit);
   const hasCourse = track.some((p) => p.courseDeg !== undefined);
+  const waveSense = analysis?.waveSense ?? null;
+  const waveManual = waveSense?.source === 'saisi';
+  const waveReliable = waveSense?.reliable ?? false;
+  /** Sens montré : le saisi, ou le calculé quand ses mesures vont assez dans le même sens ; sinon rien. */
+  const shownWaveDeg = waveSense !== null && (waveManual || waveSense.R >= WAVE_SENSE_MIN_R)
+    ? Math.round(waveSense.directionDeg) % 360
+    : null;
   const rideWord = foil ? t('vol') : t('vague');
   const measuredReturns = returns.filter((r) => r.after > 0);
   const firstOut = returns.find((r) => r.after === 0) ?? null;
@@ -538,7 +562,7 @@ function SurfModule() {
         activityId: activity.id, hasGearList, ready: shownFile !== null && draftRecord !== null,
         sessionHasGear: notesHaveGear(draft.edits.notes, gearFieldsFor(gearLabels)),
         tabShown: sections.some((s) => s.key === 'notes'), tabLabel: t('matériel et notes'),
-        covered: mapExpanded, onAdd: () => reveal('notes'),
+        covered: mapExpanded || waveAdjust, onAdd: () => reveal('notes'),
       }}
       map={{
         panelId: panelId('carte'),
@@ -546,7 +570,13 @@ function SurfModule() {
         onExpandedChange: (next) => {
           setMapExpanded(next);
           if (!next) zoomOnMap.closeCompanion();
+          // Fermer la carte agrandie termine le réglage commencé dedans.
+          if (!next) setWaveAdjust(false);
         },
+        overlay: waveAdjust && track.length > 0 ? (
+          <WaveSenseOverlay directionDeg={shownWaveDeg} manual={waveManual} reliable={waveReliable}
+            onChange={(deg) => draft.update({ waveDirectionDeg: deg })} onClose={endWaveAdjust} />
+        ) : undefined,
         focus: zoomOnMap.focus,
         companion: companionCharts(zoomOnMap.companionPanel),
         sessionKey: base.sessionKey,
@@ -893,6 +923,8 @@ function SurfModule() {
                       thresholdUnit={profile.thresholdUnit}
                       onChange={(next) => draft.update({ waveThreshold: next })} />
                   )}
+                  <WaveSenseField directionDeg={shownWaveDeg} manual={waveManual} reliable={waveReliable}
+                    adjusting={waveAdjust} onAdjust={startWaveAdjust} />
                   {track.length > 0 && (
                     <SessionColorRangeField unit={speedUnit} range={range} isOverridden={draft.edits.speedRange !== null}
                       onChange={(next) => draft.update({ speedRange: next })} />
