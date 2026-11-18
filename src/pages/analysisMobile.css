@@ -333,6 +333,19 @@
   display: none;
 }
 
+/* Mini-boussole du sens des vagues, dans l'onglet « général » du surf. */
+.an-sheet__wave {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-top: var(--space-3);
+}
+
+.an-sheet__wave-text {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 @media (max-width: 767.98px), (max-height: 499.98px) and (pointer: coarse) {
   .an-page {
     display: flex;

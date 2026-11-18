@@ -74,7 +74,8 @@ import { effectiveWaveThreshold, surfProfileOf, type SurfSessionSettings } from 
 import { gyroWaveTurns } from '../surfing/gyroTurns';
 import WaveSenseField from '../components/surf/WaveSenseField';
 import WaveSenseOverlay from '../components/surf/WaveSenseOverlay';
-import { waveSenseView } from '../components/surf/waveSenseView';
+import { waveSenseOrigin, waveSenseView } from '../components/surf/waveSenseView';
+import WindCompass from '../components/WindCompass';
 import StatTile from '../components/ui/StatTile';
 import MapToggle from '../components/ui/MapToggle';
 import SegmentedControl from '../components/ui/SegmentedControl';
@@ -593,6 +594,21 @@ function SurfModule() {
               <ResizablePanel id={panelId('general')} style={ANALYSIS_PANEL_STYLE}>
                 <PanelHeading label={t('Général')} extra={<SessionDate track={track} />} open={open.general} onToggle={toggleOf('general')} />
                 <GeneralStats stats={overviewStats} pairs={GENERAL_PAIRS} />
+                {/* Mini-boussole du sens des vagues ; « Régler » ouvre la grande sur la carte. */}
+                {track.length > 0 && (
+                  <div className="an-sheet__wave">
+                    <WindCompass windAngle={shownWaveDeg ?? 0} size={64} waves />
+                    <div className="an-sheet__wave-text">
+                      <strong className="ui-block ui-text-m">
+                        {shownWaveDeg !== null ? t('Vagues {deg}°', { deg: shownWaveDeg }) : t('Sens des vagues non estimé')}
+                      </strong>
+                      {shownWaveDeg !== null && (
+                        <span className="ui-muted ui-text-xs">{waveSenseOrigin({ manual: waveManual, reliable: waveReliable, autoDeg: autoWaveDeg })}</span>
+                      )}
+                    </div>
+                    <Button size="s" onClick={startWaveAdjust} disabled={waveAdjust}>{t('Régler')}</Button>
+                  </div>
+                )}
                 {draft.edits.foil === null && (
                   <div className="ui-muted ui-text-xs ui-mt-8">
                     {foil

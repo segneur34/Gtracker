@@ -1,6 +1,7 @@
 import { t } from '../../core/i18n';
 import { HelpText, HelpToggle } from '../Help';
 import Button from '../ui/Button';
+import { waveSenseOrigin } from './waveSenseView';
 
 interface WaveSenseFieldProps {
   /** Cap vers lequel vont les vagues, en degrés ; `null` quand il n'est ni saisi ni estimé assez nettement. */
@@ -21,9 +22,7 @@ interface WaveSenseFieldProps {
  * vient, et « Régler » qui ouvre la boussole sur la carte.
  */
 function WaveSenseField({ directionDeg, autoDeg, manual, reliable, adjusting, onAdjust }: WaveSenseFieldProps) {
-  const origin = manual
-    ? (autoDeg !== null ? `${t('saisi')} · ${t('calculé {deg}°', { deg: autoDeg })}` : t('saisi'))
-    : reliable ? t('calculé') : t('calculé · peu sûr');
+  const origin = waveSenseOrigin({ manual, reliable, autoDeg });
   return (
     <div>
       <div className="ui-row-6 ui-center ui-wrap">

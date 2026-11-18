@@ -5,8 +5,10 @@ import { t } from '../core/i18n';
  * Boussole du vent : la flèche rouge part du côté d'où vient le vent et pointe
  * vers le centre. Petite dans l'onglet « général » de la voile, à côté du
  * bouton « Régler » qui ouvre la grande sur la carte (`WindAdjustOverlay`).
+ * Avec `waves`, la même boussole montre le sens des vagues du surf : la flèche,
+ * à l'encre, part du centre et pointe vers où vont les vagues.
  */
-function WindCompass({ windAngle, size = 120 }: { windAngle: number; size?: number }) {
+function WindCompass({ windAngle, size = 120, waves = false }: { windAngle: number; size?: number; waves?: boolean }) {
   const center = size / 2;
   const small = size < 90;
   const label = (text: string, style: CSSProperties) => (
@@ -18,9 +20,18 @@ function WindCompass({ windAngle, size = 120 }: { windAngle: number; size?: numb
       {label(small ? t('S', { ctx: 'point cardinal' }) : t('S(180°)'), { bottom: 2, left: '50%', transform: 'translateX(-50%)' })}
       {label(small ? t('E', { ctx: 'point cardinal' }) : t('E(90°)'), { right: 3, top: '50%', transform: 'translateY(-50%)' })}
       {label(small ? t('O', { ctx: 'point cardinal' }) : t('O(270°)'), { left: 3, top: '50%', transform: 'translateY(-50%)' })}
-      <svg width={size} height={size} style={{ position: 'absolute', transform: `rotate(${windAngle}deg)`, transition: 'transform 0.3s ease' }}>
-        <line x1={center} y1={size * 0.2} x2={center} y2={center} stroke="red" strokeWidth={small ? 2 : 3} />
-        <polygon points={`${center - 5},${center - 10} ${center + 5},${center - 10} ${center},${center + 2}`} fill="red" />
+      <svg width={size} height={size} style={{ position: 'absolute', color: 'var(--ink)', transform: `rotate(${windAngle}deg)`, transition: 'transform 0.3s ease' }}>
+        {waves ? (
+          <>
+            <line x1={center} y1={center} x2={center} y2={size * 0.2} stroke="currentColor" strokeWidth={small ? 2 : 3} />
+            <polygon points={`${center - 5},${size * 0.2 + 10} ${center + 5},${size * 0.2 + 10} ${center},${size * 0.2 - 2}`} fill="currentColor" />
+          </>
+        ) : (
+          <>
+            <line x1={center} y1={size * 0.2} x2={center} y2={center} stroke="red" strokeWidth={small ? 2 : 3} />
+            <polygon points={`${center - 5},${center - 10} ${center + 5},${center - 10} ${center},${center + 2}`} fill="red" />
+          </>
+        )}
       </svg>
     </div>
   );

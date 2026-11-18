@@ -1,3 +1,4 @@
+import { t } from '../../core/i18n';
 import { WAVE_SENSE_MIN_R, type WaveSense } from '../../surfing/waveSense';
 
 export interface WaveSenseView {
@@ -11,7 +12,13 @@ export interface WaveSenseView {
   autoDeg: number | null;
 }
 
-const wholeDeg = (deg: number): number => Math.round(deg) % 360;
+/** Mention qui dit d'où vient le sens des vagues montré : la ligne des réglages et le bloc du « général » la partagent. */
+export const waveSenseOrigin = ({ manual, reliable, autoDeg }: Pick<WaveSenseView, 'manual' | 'reliable' | 'autoDeg'>): string => {
+  if (manual) return autoDeg !== null ? `${t('saisi')} · ${t('calculé {deg}°', { deg: autoDeg })}` : t('saisi');
+  return reliable ? t('calculé') : t('calculé · peu sûr');
+};
+
+const wholeDeg =(deg: number): number => Math.round(deg) % 360;
 
 /**
  * Ce que la boussole et la ligne des réglages montrent du sens des vagues.

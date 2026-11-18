@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { WaveSense } from '../../surfing/waveSense';
-import { waveSenseView } from './waveSenseView';
+import { waveSenseOrigin, waveSenseView } from './waveSenseView';
+
+describe('waveSenseOrigin : la mention des deux endroits', () => {
+  it('dit calculé, peu sûr, saisi, ou saisi avec le calculé rappelé', () => {
+    expect(waveSenseOrigin({ manual: false, reliable: true, autoDeg: null })).toBe('calculé');
+    expect(waveSenseOrigin({ manual: false, reliable: false, autoDeg: null })).toBe('calculé · peu sûr');
+    expect(waveSenseOrigin({ manual: true, reliable: true, autoDeg: null })).toBe('saisi');
+    expect(waveSenseOrigin({ manual: true, reliable: true, autoDeg: 182 })).toBe('saisi · calculé 182°');
+  });
+});
 
 const estimated = (directionDeg: number, R: number, reliable: boolean): WaveSense => ({ directionDeg, R, samples: 5, reliable, source: 'estime' });
 

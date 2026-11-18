@@ -64,6 +64,16 @@ Mineures tranchées : sens gardé d'une activité à l'autre du surf, effacé au
 
 Essai au téléphone, un seul : sur le Paddle du 16/11, régler le sens au doigt en plein écran, la flèche suit et le retour change, enregistrer, rouvrir.
 
+## Retours de l'utilisateur sur l'APK 0.01.33 (18/11), ajoutés au lot
+
+Tel que dit : « Il faut mettre le sens des vagues sur l'onglet général et le bouton pour le régler là-bas aussi. À la limite, on peut laisser un deuxième bouton ici. Ensuite, le cadre non enregistré se met de base en plein milieu. Il est déplaçable, mais c'est relou, il faudrait qu'il soit de base juste en dessous du cadre avec l'angle des vagues, le fait de le calculer tout seul, etc. Ensuite, actuellement, le rond est sur la flèche, qu'on est censé déplacer pour mettre le sens des vagues. Donc je pense qu'il faudrait, je sais pas comment faire, le rond à l'extérieur du cercle avec nord, sud, est, ouest, comme ça on verrait mieux la flèche. Et je pense que c'est valable aussi pour le vent d'ailleurs. »
+
+**Partie F, « général » du surf (Sonnet/medium)** : le sens des vagues dans l'onglet « général » de l'analyse surf, avec son bouton « Régler », sur le modèle du vent dans le « général » de la voile (`SailingModule.tsx`, bloc `an-sheet__wind` : petite boussole de 64 px, « Vent 245° », « saisi · calculé N° », « Régler »). Pour les vagues : petite boussole dont la flèche part du centre et pointe où vont les vagues, à l'encre ; « Vagues 183° » ou « Sens des vagues non estimé » ; la même mention que la ligne des réglages (« calculé », « calculé · peu sûr », « saisi · calculé N° ») ; « Régler » ouvre la même boussole sur la carte. La ligne de l'onglet réglages reste, avec son bouton (« on peut laisser un deuxième bouton ici »). Décision de l'utilisateur sur le contenu de « général » du surf : DECISIONS §4 à compléter à la passe de documentation.
+
+**Partie G, le cadre « Non enregistré » pendant le réglage** : à reproduire d'abord sur une copie compilée à 390 px (boussole ouverte en plein écran, flèche tirée) pour voir où la barre du brouillon (`SessionSaveBar`, `ui-savebar--dirty`, collante en haut de page) se pose et pourquoi l'utilisateur la dit « déplaçable » ; voulu : d'office juste sous le bandeau de la boussole (angle, « Inverser », « Calculé », « Terminé »), en voile comme en surf.
+
+**Partie H, la poignée hors du cercle** : le rond que l'on tire cache la flèche ; le mettre à l'extérieur du cercle (N, S, E, O), pour le vent de la voile comme pour les vagues. Dessin sur planche d'abord (l'utilisateur : « je sais pas comment faire »). Change le rendu de la boussole de la voile, donc son instantané et le script `general.mjs` du banc.
+
 ## Dépend de
 
 Le 439 : il dit sur données réelles pourquoi le sens automatique échoue, et ce lot en part.
