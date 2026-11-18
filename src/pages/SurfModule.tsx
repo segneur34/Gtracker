@@ -24,6 +24,7 @@ import SpeedGradientLegend from '../components/SpeedGradientLegend';
 import SessionThresholdField from '../components/SessionThresholdField';
 import { SessionColorRangeField } from '../components/SpeedRangeEditor';
 import PeakZoneLayer from '../components/PeakZoneLayer';
+import WaveSenseLayer from '../components/WaveSenseLayer';
 import TrackSpanLayer,{ type TrackSpanShown } from '../components/TrackSpanLayer';
 import { PUMPING_OFF_NOTE, pumpingHighlightSpans } from '../components/pumpingHighlight';
 import { FlightsPanel, PumpingPanel, type FlightColumn } from '../components/FlightPumpingPanel';
@@ -527,10 +528,17 @@ function SurfModule() {
     }
   };
 
+  /** Sens saisi lu dans le brouillon (à jour tout de suite) ; seul l'estimé vient de l'analyse, qui retarde pendant un recalcul. */
+  const { shownDeg: shownWaveDeg, manual: waveManual, reliable: waveReliable, autoDeg: autoWaveDeg } =
+    waveSenseView(draft.edits.waveDirectionDeg, analysis?.estimatedWaveSense ?? null);
+  /** La zone du pic et le sens des vagues se montrent avec l'onglet rame, et pendant le réglage du sens à la boussole. */
+  const shownPeakZone = open.rame || waveAdjust ? analysis?.peakZone ?? null : null;
+
   const mapLayers = (
     <AnalysisBaseLayers family="surf" file={sessionFile} track={track} zonePaths={hrZone.paths} zonePathsKey={hrZone.selectedZone}
       zoomPath={zoomOnMap.path} marks={marks.located} shownMark={shownMark}>
-      <PeakZoneLayer zone={open.rame ? analysis?.peakZone ?? null : null} />
+      <PeakZoneLayer zone={shownPeakZone} />
+      <WaveSenseLayer zone={shownPeakZone} directionDeg={shownWaveDeg} />
       <TrackSegmentsLayer segments={mapSegments} weight={5} family={'surf'} />
       <TrackArrows track={track} />
       <TrackSpanLayer track={track} spans={shownSpans} />
@@ -542,9 +550,6 @@ function SurfModule() {
   const noWaveSpeed = formatSpeed(fromDisplaySpeed(foil ? waveThreshold : threshold, profile.thresholdUnit), speedUnit);
   const speedSource = speedSourceText(base.hasDeviceSpeed, base.deviceSpeedUnit);
   const hasCourse = track.some((p) => p.courseDeg !== undefined);
-  /** Sens saisi lu dans le brouillon (à jour tout de suite) ; seul l'estimé vient de l'analyse, qui retarde pendant un recalcul. */
-  const { shownDeg: shownWaveDeg, manual: waveManual, reliable: waveReliable, autoDeg: autoWaveDeg } =
-    waveSenseView(draft.edits.waveDirectionDeg, analysis?.estimatedWaveSense ?? null);
   const rideWord = foil ? t('vol') : t('vague');
   const measuredReturns = returns.filter((r) => r.after > 0);
   const firstOut = returns.find((r) => r.after === 0) ?? null;

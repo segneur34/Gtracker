@@ -24,7 +24,7 @@ Le sens des vagues est seulement estimé (`src/surfing/waveSense.ts`, lot 436 A)
 - **Saisie** : la boussole de la voile. Un bouton « Régler » ouvre la même grande boussole translucide que pour le vent (`WindAdjustOverlay`), posée sur la carte : flèche tirée au doigt, angle saisi, « Inverser », « Calculé » pour revenir à l'automatique.
 - **Convention** : la flèche montre **où vont les vagues** (vers la plage), pas d'où vient la houle. C'est le `directionDeg` du calcul ; à l'inverse du vent, qui se dit d'où il vient.
 - **Mémoire** : le sens saisi est **propre à la session**, dans sa fiche, par le brouillon et « Enregistrer la session » ; rien par lieu.
-- **Dessin du sens sur la carte** : planche hors dépôt (`D:\gong tracker\atelier\planche-440\`), choix de l'utilisateur à venir.
+- **Dessin du sens sur la carte** : planche hors dépôt (`D:\gong tracker\atelier\planche-440\`, valeurs dans `variantes.md` à côté). Premier choix : « mélange entre B et C, une seule ligne suffit » ; puis, sur les deux lectures dessinées, **F** (« F je dirais », 18/11) : une seule ligne de vague au large de la zone du pic, parallèle à son grand axe, et la flèche de B, qui part du centre de la zone et pointe vers la plage. Encre noire de jour comme de nuit (la carte reste claire la nuit).
 
 ## Ce que le 439 a appris (pour l'orientation automatique)
 
