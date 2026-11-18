@@ -7,6 +7,7 @@ import { clearDeviceFiles } from '../../platform/appReset';
 import { t } from '../../core/i18n';
 import { plainError } from '../../platform/errorText';
 import { browserMemoryCopy, isFolderDesignated, type MemoryFolder } from '../../platform/memoryFolder';
+import { isDesktopApp } from '../../platform/runtime';
 import {
   jsonStore, removeStoredKeys, resumeWrites, settleStoredWrites, storedKeys, suspendWrites,
 } from '../../platform/storage';
@@ -81,7 +82,8 @@ export const factoryReset = async (): Promise<string | null> => {
 
 /**
  * « Tout supprimer » : la mémoire s'arrête, puis le dossier perd les fichiers de l'application (la mémoire du
- * navigateur aussi quand un dossier du PC est désigné : elle en garde une copie), puis les fichiers de l'appareil
+ * navigateur aussi quand un dossier du PC est désigné, ou dans le programme Windows : elle en garde une copie, ou les
+ * essais d'avant le dossier du disque), puis les fichiers de l'appareil
  * hors du dossier, puis les clés de l'appareil ; l'application se recharge comme à sa première ouverture. Un échec
  * dans le dossier arrête tout, sans rien toucher d'autre : les écritures reprennent, la mémoire est relue, et le
  * compte rendu est rendu (et dit dans la carte de la mémoire). `onProgress` suit l'effacement du dossier, journaux
@@ -100,7 +102,8 @@ export const eraseEverything = async (onProgress: (progress: ResetProgress) => v
   stopSettingsWrites();
   suspendWrites();
   const folder = stopForReset();
-  const copy = folder?.kind === 'picked' ? await browserMemoryCopy() : null;
+  // Dossier du PC choisi, ou programme Windows (dossier retenu ou non) : la mémoire du navigateur, gardée à part, part aussi.
+  const copy = folder?.kind === 'picked' || isDesktopApp() ? await browserMemoryCopy() : null;
   const folders = [folder, copy].filter((f): f is MemoryFolder => f !== null);
   for (const f of folders) {
     const result = await eraseAppFiles(f, (done, total) => onProgress({ done, total }));

@@ -158,7 +158,9 @@ Dans `sailing/` aussi : `pointData.ts` (`PointData` et `trackToPointData`, vue e
 
 ## `platform/` : seul accès au stockage, aux fichiers, à la position, au son, au vibreur, aux capteurs et à la notification (règle 12)
 
-- `runtime.ts` : `isNativeApp`.
+- `runtime.ts` : `isNativeApp`, `isDesktopApp`, `appShell`.
+- `desktopBridge.ts` : le pont du programme Windows (`desktopBridge()`, `null` ailleurs ; seul fichier qui lit `window.gtrackerBureau`), `sendCloseQuestionTexts`.
+- `diskMemory.ts` : le dossier mémoire du programme Windows, un vrai dossier du disque lu et écrit par le pont (`createDiskFolder`).
 - `storage.ts` : `jsonStore` (synchrone ; `subscribeKey` pour s'abonner à une seule clé ; cache `{raw, parsed}` par clé : même objet tant que le texte ne change pas, gelé en développement ; valeur refusée gardée en mémoire et signalée, `subscribeFailure`), `initStorage` (Preferences natives chargées en mémoire au démarrage).
 - `files.ts` : `filesystem()` (chargement unique du greffon de fichiers, pour `memoryFolder.ts` et `tileCache.ts` aussi), `recordingJournal` (dossier privé), `downloadTextFile`, `saveToDownloads` (dossier Téléchargements, par `DownloadsPlugin` sur le téléphone), `safeFileName`, `readPickedFile`, `readPickedImage` (photo du Profil recadrée au carré et réduite, point 138).
 - `compass.ts` : `watchCompassHeading`, boussole par `deviceorientationabsolute` (rien sur ordinateur).

@@ -15,6 +15,8 @@ import { startBeepSound } from './hooks/useSportSettings';
 import { startTheme } from './hooks/useTheme';
 import { installBackButton } from './platform/backButton';
 import { clearStaleScreenOn, resetOrientationLock } from './platform/screen';
+import { sendCloseQuestionTexts } from './platform/desktopBridge';
+import { t } from './core/i18n';
 
 /**
  * Démarrage de l'application, chargé par l'amorçage (`main.tsx`) une fois le stockage en mémoire et la langue posée :
@@ -34,6 +36,14 @@ export const startApp = async (): Promise<void> => {
   // Le stockage est chargé : le thème est reposé d'après son réglage, puis suivi.
   startTheme();
   resetOrientationLock();
+  // Programme Windows : sa question de fermeture, quand un brouillon attend, dans la langue de l'interface. La langue
+  // ne change qu'au rechargement de la page, qui repasse ici.
+  sendCloseQuestionTexts({
+    question: t('Quitter sans enregistrer ?'),
+    detail: t('Les modifications de la session ouverte ne sont pas enregistrées.'),
+    quitter: t('Quitter'),
+    rester: t('Rester'),
+  });
   // La mémoire aussi, si possible : les réglages repris de son dossier `reglages/` sont alors en place.
   await Promise.race([openLibrary(), new Promise((resolve) => setTimeout(resolve, LIBRARY_OPEN_WAIT_MS))]);
   ReactDOM.createRoot(document.getElementById('root')!).render(

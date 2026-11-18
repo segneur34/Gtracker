@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
  * hors la porte d'import et ses essais (`NAMED_FILES`). Les noms techniques viennent de
  * `core/appIdentity.ts`, les libellés disent « Gtracker ».
  *
- * Lit les fichiers texte de `src/`, `android/app/src/`, `outils/` et `public/`, plus quelques fichiers de la racine,
+ * Lit les fichiers texte de `src/`, `android/app/src/`, `outils/`, `public/` et `bureau/` (sans ses dépendances ni ses
+ * sorties), plus quelques fichiers de la racine,
  * parmi ceux que git suit ou s'apprête à suivre (les dossiers de construction, ignorés, n'en font pas partie). Refuse
  * le mot sous toutes ses casses sauf quand il suit un « g » (Gtracker, gtracker), et l'expression « application
  * complète ». Les fichiers de `src/` qui importent la porte d'import sont gardés par `architecture.test.ts`.
@@ -24,7 +25,9 @@ const childProcess = (await import(/* @vite-ignore */ 'node:child_process' as st
 const ROOT = new URL('../', import.meta.url);
 
 /** Dossiers lus en entier, et fichiers isolés. */
-const FOLDERS = ['src/', 'android/app/src/', 'outils/', 'public/'];
+const FOLDERS = ['src/', 'android/app/src/', 'outils/', 'public/', 'bureau/'];
+/** Sous-dossiers jamais lus : dépendances, compilation et programme fabriqué du programme Windows. */
+const SKIPPED_FOLDERS = ['bureau/node_modules/', 'bureau/dist/', 'bureau/sortie/'];
 const FILES = ['capacitor.config.ts', 'index.html', 'android/app/build.gradle', 'android/.gitignore'];
 const TEXT_EXTENSIONS = /\.(ts|tsx|css|mjs|cjs|js|java|xml|json|md|bat|html|svg|gradle)$/;
 
@@ -60,6 +63,7 @@ const trackedFiles = (): string[] => {
   return listed
     .split('\0')
     .filter((file) => file !== '')
+    .filter((file) => !SKIPPED_FOLDERS.some((folder) => file.startsWith(folder)))
     .filter((file) => FILES.includes(file) || (FOLDERS.some((folder) => file.startsWith(folder)) && TEXT_EXTENSIONS.test(file)));
 };
 
@@ -86,7 +90,8 @@ describe('garde du nom : plus de « tracker » hors de la porte d\'import', () =
 
   it('lit bien les dossiers visés', () => {
     expect(files.length).toBeGreaterThan(300);
-    for (const folder of ['src/', 'android/app/src/', 'outils/', 'public/']) expect(files.some((f) => f.startsWith(folder)), folder).toBe(true);
+    for (const folder of FOLDERS) expect(files.some((f) => f.startsWith(folder)), folder).toBe(true);
+    expect(files.filter((f) => SKIPPED_FOLDERS.some((folder) => f.startsWith(folder)))).toEqual([]);
     for (const file of FILES) expect(files, file).toContain(file);
   });
 

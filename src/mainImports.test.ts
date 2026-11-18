@@ -68,6 +68,7 @@ describe('amorçage : main.tsx ne charge aucun texte avant la langue', () => {
       'core/i18n.ts',
       'hooks/themePaint.ts',
       'platform/darkScheme.ts',
+      'platform/desktopBridge.ts',
       'platform/language.ts',
       'platform/runtime.ts',
       'platform/storage.ts',

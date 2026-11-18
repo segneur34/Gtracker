@@ -1860,5 +1860,20 @@
   "Une image de votre session, ou son fichier GPX.": "Una imagen de tu sesión, o su archivo GPX.",
   "Dans une analyse, le « … » à côté du nom de la session propose « Partager l'image » : une image carrée de la trace et des chiffres que vous choisissez, avec ou sans fond de carte.": "En un análisis, el «…» junto al nombre de la sesión ofrece «Compartir la imagen»: una imagen cuadrada del track y de las cifras que elijas, con o sin mapa de fondo.",
   "Vos choix de chiffres sont retenus par activité.": "Tus cifras elegidas se recuerdan por actividad.",
-  "« Télécharger la session » range son fichier GPX dans Téléchargements : il s'ouvre dans les autres applications, et Gtracker le relit tout entier, notes comprises.": "«Descargar la sesión» guarda su archivo GPX en Descargas: se abre en otras aplicaciones, y Gtracker lo vuelve a leer entero, con las notas incluidas."
+  "« Télécharger la session » range son fichier GPX dans Téléchargements : il s'ouvre dans les autres applications, et Gtracker le relit tout entier, notes comprises.": "«Descargar la sesión» guarda su archivo GPX en Descargas: se abre en otras aplicaciones, y Gtracker lo vuelve a leer entero, con las notas incluidas.",
+  "Dossier mémoire de Gtracker": "Carpeta de almacenamiento de Gtracker",
+  "Le dossier {dossier} est introuvable : déplacé, renommé ou sur un disque débranché. Rien n'est recréé à sa place.": "No se encuentra la carpeta {dossier}: movida, renombrada o en un disco desconectado. No se vuelve a crear nada en su lugar.",
+  "Le réglage du programme qui retient le dossier mémoire ne se lit pas : {detail}": "No se puede leer el ajuste del programa que recuerda la carpeta de almacenamiento: {detail}",
+  "Le dossier {dossier} ne se lit pas : {detail}": "No se puede leer la carpeta {dossier}: {detail}",
+  "Ce dossier est dans OneDrive, qui peut gêner l'enregistrement des fichiers : un dossier hors de OneDrive est plus sûr.": "Esta carpeta está en OneDrive, que puede estorbar al guardar los archivos: una carpeta fuera de OneDrive es más segura.",
+  "Gtracker garde vos sessions dans un dossier de ce PC, que vous pouvez copier pour les sauvegarder ou les passer au téléphone. Rien n'y est écrit avant « Utiliser ce dossier ».": "Gtracker guarda tus sesiones en una carpeta de este PC, que puedes copiar para hacer una copia de seguridad o pasarlas al teléfono. No se escribe nada en ella antes de «Usar esta carpeta».",
+  "Dossier proposé : {dossier}": "Carpeta propuesta: {dossier}",
+  "Vos Documents sont dans OneDrive, qui peut gêner l'enregistrement des fichiers : le dossier proposé est hors de OneDrive.": "Tus Documentos están en OneDrive, que puede estorbar al guardar los archivos: la carpeta propuesta está fuera de OneDrive.",
+  "Utiliser ce dossier": "Usar esta carpeta",
+  "Choisir un autre dossier": "Elegir otra carpeta",
+  "Pour sauvegarder vos sessions ou les passer au téléphone, copiez ce dossier entier. Changer de dossier ne déplace rien : la mémoire devient celle du dossier choisi.": "Para hacer una copia de seguridad de tus sesiones o pasarlas al teléfono, copia esta carpeta entera. Cambiar de carpeta no mueve nada: el almacenamiento pasa a ser el de la carpeta elegida.",
+  "Quitter sans enregistrer ?": "¿Salir sin guardar?",
+  "Les modifications de la session ouverte ne sont pas enregistrées.": "Los cambios de la sesión abierta no están guardados.",
+  "Quitter": "Salir",
+  "Rester": "Quedarse"
 }

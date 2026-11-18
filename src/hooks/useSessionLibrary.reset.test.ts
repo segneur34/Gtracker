@@ -19,6 +19,8 @@ let failingRemove: string | null = null;
 const cleared = vi.hoisted(() => ({ count: 0 }));
 /** Dossier désigné qui ne s'ouvre pas (`openLibrary` en « unavailable ») quand `closed` est vrai. */
 const designation = vi.hoisted(() => ({ closed: false }));
+/** Programme Windows (`desktop`) sans dossier retenu (`none`), et la mémoire du navigateur qu'il garde à part. */
+const shell = vi.hoisted(() => ({ desktop: false, none: false, browserCopy: null as MemoryFolder | null }));
 const reloads: string[] = [];
 
 const folder: MemoryFolder = createFakeFolder(files, log, {
@@ -43,11 +45,16 @@ const mockPlatform = (): void => {
     ...(await importOriginal<typeof import('../platform/memoryFolder')>()),
     openMemoryFolder: async () => {
       if (designation.closed) throw new Error('dossier introuvable');
+      if (shell.none) return { state: 'unavailable', reason: 'Aucun dossier mémoire choisi.' };
       return { state: 'ready', folder };
     },
     pendingFolder: () => null,
-    browserMemoryCopy: async () => null,
-    isFolderDesignated: async () => true,
+    browserMemoryCopy: async () => shell.browserCopy,
+    isFolderDesignated: async () => !shell.none,
+  }));
+  vi.doMock('../platform/runtime', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('../platform/runtime')>()),
+    isDesktopApp: () => shell.desktop,
   }));
   vi.doMock('../platform/appReset', () => ({ clearDeviceFiles: async () => void (cleared.count += 1) }));
 };
@@ -100,6 +107,9 @@ beforeEach(() => {
   failingRemove = null;
   cleared.count = 0;
   designation.closed = false;
+  shell.desktop = false;
+  shell.none = false;
+  shell.browserCopy = null;
   vi.stubGlobal('localStorage', {
     getItem: (k: string) => stored.get(k) ?? null,
     setItem: (k: string, v: string) => void stored.set(k, v),
@@ -160,6 +170,22 @@ describe('tout supprimer', () => {
     expect(cleared.count).toBe(1);
     expect(log.filter((l) => l.startsWith('remove')).pop()).toBe('remove gtracker.json');
     expect(progress.length).toBeGreaterThan(0);
+  });
+
+  it('sans dossier retenu, la mémoire du navigateur part dans le programme Windows, jamais dans le navigateur', async () => {
+    for (const desktop of [false, true]) {
+      const browserFiles = new Map([['gtracker.json', '{"format":"gtracker-memoire","version":1}'], ['sessions/2026-10-27_10-00-00_kite.gpx', gpxAt(0)]]);
+      shell.desktop = desktop;
+      shell.none = true;
+      shell.browserCopy = createFakeFolder(browserFiles, []);
+      // Sans `window` au chargement des modules, comme dans les autres essais de ce fichier.
+      vi.stubGlobal('window', undefined);
+      const library = await openFresh();
+      expect(library.readLibraryState().status).toBe('unavailable');
+      stubWindow();
+      expect(await library.eraseEverything()).toBeNull();
+      expect([...browserFiles.keys()].length, desktop ? 'programme Windows' : 'navigateur').toBe(desktop ? 0 : 2);
+    }
   });
 
   it('refusé quand le dossier désigné n\'a pas pu s\'ouvrir : rien n\'est touché', async () => {

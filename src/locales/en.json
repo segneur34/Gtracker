@@ -1860,5 +1860,20 @@
   "Une image de votre session, ou son fichier GPX.": "An image of your session, or its GPX file.",
   "Dans une analyse, le « … » à côté du nom de la session propose « Partager l'image » : une image carrée de la trace et des chiffres que vous choisissez, avec ou sans fond de carte.": "In an analysis, the “…” next to the session name offers “Share image”: a square image of the track and the figures you choose, with or without a map background.",
   "Vos choix de chiffres sont retenus par activité.": "Your choice of figures is remembered per activity.",
-  "« Télécharger la session » range son fichier GPX dans Téléchargements : il s'ouvre dans les autres applications, et Gtracker le relit tout entier, notes comprises.": "“Download session” puts its GPX file in Downloads: it opens in other apps, and Gtracker reads it back in full, notes included."
+  "« Télécharger la session » range son fichier GPX dans Téléchargements : il s'ouvre dans les autres applications, et Gtracker le relit tout entier, notes comprises.": "“Download session” puts its GPX file in Downloads: it opens in other apps, and Gtracker reads it back in full, notes included.",
+  "Dossier mémoire de Gtracker": "Gtracker storage folder",
+  "Le dossier {dossier} est introuvable : déplacé, renommé ou sur un disque débranché. Rien n'est recréé à sa place.": "The folder {dossier} cannot be found: moved, renamed or on an unplugged drive. Nothing is recreated in its place.",
+  "Le réglage du programme qui retient le dossier mémoire ne se lit pas : {detail}": "The program setting that remembers the storage folder cannot be read: {detail}",
+  "Le dossier {dossier} ne se lit pas : {detail}": "The folder {dossier} cannot be read: {detail}",
+  "Ce dossier est dans OneDrive, qui peut gêner l'enregistrement des fichiers : un dossier hors de OneDrive est plus sûr.": "This folder is in OneDrive, which can interfere with saving files: a folder outside OneDrive is safer.",
+  "Gtracker garde vos sessions dans un dossier de ce PC, que vous pouvez copier pour les sauvegarder ou les passer au téléphone. Rien n'y est écrit avant « Utiliser ce dossier ».": "Gtracker keeps your sessions in a folder on this PC, which you can copy to back them up or move them to the phone. Nothing is written there before “Use this folder”.",
+  "Dossier proposé : {dossier}": "Suggested folder: {dossier}",
+  "Vos Documents sont dans OneDrive, qui peut gêner l'enregistrement des fichiers : le dossier proposé est hors de OneDrive.": "Your Documents are in OneDrive, which can interfere with saving files: the suggested folder is outside OneDrive.",
+  "Utiliser ce dossier": "Use this folder",
+  "Choisir un autre dossier": "Choose another folder",
+  "Pour sauvegarder vos sessions ou les passer au téléphone, copiez ce dossier entier. Changer de dossier ne déplace rien : la mémoire devient celle du dossier choisi.": "To back up your sessions or move them to the phone, copy this whole folder. Changing folder moves nothing: the storage becomes that of the chosen folder.",
+  "Quitter sans enregistrer ?": "Quit without saving?",
+  "Les modifications de la session ouverte ne sont pas enregistrées.": "The changes to the open session are not saved.",
+  "Quitter": "Quit",
+  "Rester": "Stay"
 }

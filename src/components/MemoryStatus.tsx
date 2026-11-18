@@ -9,8 +9,8 @@ import {
   useLibraryFields,
 } from '../hooks/useSessionLibrary';
 import { usePlaceSearch } from '../hooks/usePlaceSearch';
-import { READ_ONLY_MEMORY_MESSAGE, browserMemoryIsGuaranteed, memoryLabelText } from '../platform/memoryFolder';
-import { isNativeApp } from '../platform/runtime';
+import { READ_ONLY_MEMORY_MESSAGE, browserMemoryIsGuaranteed, desktopMemoryPlace, memoryLabelText } from '../platform/memoryFolder';
+import { isDesktopApp, isNativeApp } from '../platform/runtime';
 import ImportButtons from './ImportButtons';
 import PanelTitle from './PanelTitle';
 import RefreshLibraryButton from './RefreshLibraryButton';
@@ -62,6 +62,12 @@ function MemoryStatus({
   const shownFolder = folderLabel === null ? null : memoryLabelText(folderLabel);
   const canChoose = canChooseMemoryFolder();
   const native = isNativeApp();
+  /** Programme Windows : dossier du disque, proposé au premier lancement, jamais la mémoire du navigateur. */
+  const desktop = isDesktopApp();
+  /** État du dossier du programme Windows, posé avant chaque changement d'état de la mémoire. */
+  const place = desktopMemoryPlace();
+  const proposal = place?.state === 'none' ? place.proposal : null;
+  const inOneDrive = t("Ce dossier est dans OneDrive, qui peut gêner l'enregistrement des fichiers : un dossier hors de OneDrive est plus sûr.");
   /** Dans Réglages : explications sous des « ? ». */
   const inSettings = useInSettings();
   /** Le navigateur a-t-il promis de garder sa mémoire ? Seul le refus se dit (Réglages, mémoire du navigateur). */
@@ -80,6 +86,14 @@ function MemoryStatus({
       case 'ready':
         return `${tn(library.sessions.length, '{n} session', '{n} sessions')} · ${shownFolder ??t('mémoire')}`;
       case 'needs-permission':
+        if (place?.state === 'missing') {
+          return t("Le dossier {dossier} est introuvable : déplacé, renommé ou sur un disque débranché. Rien n'est recréé à sa place.", { dossier: place.path });
+        }
+        if (place?.state === 'unreadable') {
+          return place.path === null
+            ? t('Le réglage du programme qui retient le dossier mémoire ne se lit pas : {detail}', { detail: place.detail })
+            : t('Le dossier {dossier} ne se lit pas : {detail}', { dossier: place.path, detail: place.detail });
+        }
         return native
           ? t("Android a retiré l'accès au {dossier}.", { dossier: shownFolder ??t('dossier choisi') })
           : t('Le {dossier} attend votre autorisation.', { dossier: shownFolder ??t('dossier choisi') });
@@ -187,7 +201,36 @@ function MemoryStatus({
           </>
         )}
 
-        {status === 'needs-permission' && (
+        {status === 'unavailable' && desktop && (
+          <>
+            <p style={mutedStyle}>
+              {t("Gtracker garde vos sessions dans un dossier de ce PC, que vous pouvez copier pour les sauvegarder ou les passer au téléphone. Rien n'y est écrit avant « Utiliser ce dossier ».")}
+            </p>
+            {proposal && <p style={mutedStyle}>{t('Dossier proposé : {dossier}', { dossier: proposal.chemin })}</p>}
+            {proposal?.documentsOneDrive && (
+              <p style={mutedStyle}>
+                {t("Vos Documents sont dans OneDrive, qui peut gêner l'enregistrement des fichiers : le dossier proposé est hors de OneDrive.")}
+              </p>
+            )}
+            {proposal?.oneDrive && <p style={mutedStyle}>{inOneDrive}</p>}
+            <div style={rowStyle}>
+              {proposal && <Button variant="primary" onClick={() => void chooseFolder('proposed')}>{t('Utiliser ce dossier')}</Button>}
+              <Button variant={proposal ? 'secondary' : 'primary'} onClick={() => void chooseFolder('documents')}>{t('Choisir un autre dossier')}</Button>
+            </div>
+          </>
+        )}
+
+        {status === 'needs-permission' && desktop && (
+          <div style={rowStyle}>
+            <Button variant="primary" onClick={() => void reconnectFolder()}>{t('Réessayer')}</Button>
+            {/* Réglage du programme illisible : aucun dossier ne peut être retenu tant qu'il ne se lit pas. */}
+            {!(place?.state === 'unreadable' && place.path === null) && (
+              <Button onClick={() => void chooseFolder('documents')}>{t('Choisir un autre dossier')}</Button>
+            )}
+          </div>
+        )}
+
+        {status === 'needs-permission' && !desktop && (
           <div style={rowStyle}>
             <Button variant="primary" onClick={() => void reconnectFolder()}>
               {native ? t('Choisir à nouveau le dossier') : t('Reconnecter le dossier')}
@@ -254,6 +297,22 @@ function MemoryStatus({
             <div style={rowStyle}>
               <Button onClick={() => void chooseFolder()}>{t('Voir ou changer le dossier')}</Button>
               <Button onClick={() => void switchToBrowserMemory()}>{t('Revenir à la mémoire du navigateur')}</Button>
+            </div>
+          </>
+        )}
+
+        {detailed && status === 'ready' && folderKind === 'disk' && (
+          <>
+            <p style={mutedStyle}>
+              {t('Emplacement : {dossier}, sur ce PC.', { dossier: shownFolder ??'' })}
+              <HelpToggle helpKey="memoire:emplacement" label={t('Emplacement')} />
+            </p>
+            <HelpText helpKey="memoire:emplacement">
+              {t("Pour sauvegarder vos sessions ou les passer au téléphone, copiez ce dossier entier. Changer de dossier ne déplace rien : la mémoire devient celle du dossier choisi.")}
+            </HelpText>
+            {place?.state === 'ready' && place.oneDrive && <p style={mutedStyle}>{inOneDrive}</p>}
+            <div style={rowStyle}>
+              <Button onClick={() => void chooseFolder()}>{t('Changer de dossier')}</Button>
             </div>
           </>
         )}
