@@ -65,3 +65,31 @@ Par `t`, avec `en.json` et `es.json` : la phrase d'explication de la carte, « D
 - Dossier introuvable au lancement : jamais recréé (un disque débranché ne doit pas donner une mémoire vide à part).
 - La mémoire du navigateur du .exe d'essai du 445 est ignorée : aucune vraie session n'y a été rangée.
 - Variables d'essai réservées à `GTRACKER_BANC` ; nom `coquille.json` ; forcer sur le disque avant le renommage ; pas de plafond de taille ; « Ouvrir dans l'Explorateur » renvoyé au 451 ; « Revenir à la mémoire du navigateur » masqué à l'ordinateur ; un rejeu de GPX avant le choix du dossier est refusé avec la phrase existante.
+
+## Contrat du pont (partie A)
+
+`window.gtrackerBureau` (gelé) : `version` (texte), `memoire` (ci-dessous), `textes({question, detail, quitter, rester})` (quatre textes non vides, 500 caractères au plus ; sinon refusé et la coquille garde les siens). Chaque fonction rend une promesse de `{ok:true, valeur}` ou `{ok:false, code, message}` et ne rejette jamais pour une erreur du disque. Codes : `NOT_FOUND`, `PERMISSION`, `NO_SPACE`, `UNKNOWN` (chemin refusé et message mal formé compris) ; `message` est une phrase française technique, à passer par `plainError` d'après le code.
+
+Gestion (`memoire.`) :
+- `ouvrir()` → `{etat:'aucun'}` | `{etat:'pret'|'introuvable', chemin, oneDrive}` | `{etat:'illisible', chemin, oneDrive, code, detail}`. Relit `coquille.json` : absent, ou JSON abîmé, donne `aucun` (la copie abîmée est mise de côté sous `coquille-abimee-<date>.json` au prochain `adopter`, jamais écrasée) ; BOM toléré ; fichier tenu par un autre programme relu après quelques essais, puis `illisible` avec **`chemin: null`** (dossier retenu inconnu) : la page ne doit alors rien proposer à neuf (pas de « Dossier proposé ») mais dire que le réglage ne se lit pas et offrir « Réessayer » ; `adopter` et `oublier` y sont refusés tant qu'il ne se lit pas. Ne crée rien.
+- `proposer()` → `{chemin, oneDrive, documentsOneDrive}` ; pose ce dossier comme candidat (il peut ne pas exister : le candidat absent se lit vide).
+- `choisir({titre?, documents?})` → `null` (renoncement, candidat d'avant gardé) | `{chemin, nom, noms[], oneDrive}` ; pose le candidat. Une seule fenêtre à la fois : un appel pendant qu'elle est ouverte reçoit la même réponse. La fenêtre part du dossier retenu, ou de Documents si `documents: true` ou rien de retenu. `noms` sans les temporaires.
+- `adopter({descendre?})` → `{chemin, oneDrive}` : retient le candidat (ou `candidat\Gtracker` si `descendre`), crée ce seul dossier s'il manque (parent absent : `NOT_FOUND`), écrit `coquille.json`, vide le candidat. Sans candidat : `NOT_FOUND`.
+- `oublier()` → `null` : plus rien de retenu, le dossier n'est pas touché.
+
+Fichiers, `{racine:'memoire'|'candidat', chemin}`, chemin relatif en `/` (les règles du §2 ; `''` seulement pour `lister`) :
+- `lister` → `[{name, kind:'file'|'directory', size, mtimeMs}]` (forme `FolderEntry`) ; sous-dossier absent : `[]` ; racine retenue absente : `NOT_FOUND`. Répare les temporaires (pas dans le candidat, où ils sont seulement tus).
+- `lireTexte` → texte (UTF-8, BOM retiré) | `null` ; `lireOctets` → `Uint8Array` | `null` ; `stat` → `{size, mtimeMs}` | `null` (dossier : `null`).
+- `ecrireTexte({…, texte})`, `ecrireOctets({…, octets: Uint8Array})`, `effacer` → `null`. Sous-dossiers créés, jamais la racine (absente : `NOT_FOUND`). Effacer retire aussi les temporaires du fichier ; un absent : rien ; un dossier : refusé. Sur `candidat` : `PERMISSION`.
+- Aucun dossier retenu (racine `memoire`) ou aucun candidat : `NOT_FOUND`.
+
+Faux pont de test : `creerMemoire(options)` de `bureau/memoire.ts` a exactement les méthodes et réponses de `gtrackerBureau.memoire` (même logique que le .exe, sur de vrais dossiers temporaires) :
+
+```ts
+const tmp = await mkdtemp(path.join(tmpdir(), 'gtk-'))   // profil, documents, maison dedans
+let choix: string | null = null                          // réponse de la « fenêtre de Windows »
+const memoire = creerMemoire({ profil, documents, maison, env: {}, choisirDossier: async () => choix })
+vi.stubGlobal('window', { gtrackerBureau: { version: '0.0.0', memoire, textes: async () => ({ ok: true, valeur: null }) } })
+```
+
+`env` porte les variables OneDrive pour essayer l'avertissement (`{ OneDrive: documents }`). Typage : `bureau/*.ts` emploie les types de Node, absents du projet de `src/` ; un test de `src/` ne peut pas l'importer par un `import` littéral (même `import type`) sans casser le typecheck : déclarer le type du pont dans `desktopBridge.ts` et charger `bureau/memoire.ts` par un `import()` dont le chemin est une variable, typé par ce type.

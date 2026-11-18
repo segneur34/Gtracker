@@ -17,13 +17,20 @@
 //   GTRACKER_BANC           mode d'essai (« 1 »)
 //   GTRACKER_BANC_QUITTER   réponse du mode d'essai à la question de fermeture : « oui » (défaut) ou « non »
 //   GTRACKER_BANC_MONTRER   fenêtre du mode d'essai montrée sans prendre la main : « 1 », ou « transparente »
+//   GTRACKER_MEMOIRE, GTRACKER_DOCUMENTS, GTRACKER_BANC_DOSSIER : en mode d'essai seulement, voir `memoire.ts`
+//
+// Le dossier mémoire (un vrai dossier du disque) est lu et écrit ici, la page y passant par les canaux `memoire:*`
+// du pont (`preload.ts`, `memoire.ts`) ; seule la page de la fenêtre principale y a accès (`expediteurAdmis`).
 
-import { BrowserWindow, Menu, app, dialog, net, protocol, screen, session, shell } from 'electron'
-import type { Rectangle, WebContents } from 'electron'
+import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol, screen, session, shell } from 'electron'
+import type { OpenDialogOptions, Rectangle, WebContents } from 'electron'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { creerMemoire, gestionnairesMemoire, optionsDepuisEnvironnement } from './memoire'
 import { ADRESSE_ACCUEIL, HOTE, estDeLApplication } from './origine'
+import { TEXTES_FERMETURE, brancherCanaux, echec, expediteurAdmis, lireTextesFermeture, reussite, uneALaFois } from './pont'
+import type { TextesFermeture } from './pont'
 import { CSP, reponseA } from './protocole'
 
 const BANC = process.env.GTRACKER_BANC === '1'
@@ -220,24 +227,77 @@ function raccourcis(fenetre: BrowserWindow): void {
 
 // ---------- fermeture avec un brouillon ----------
 // La page retient la fermeture (`beforeunload`) quand un brouillon n'est pas enregistré ; sans cette question,
-// la croix de la fenêtre semblerait ne rien faire.
+// la croix de la fenêtre semblerait ne rien faire. Ses textes sont ceux que la page a passés dans sa langue
+// (`coquille:textes`), en français tant qu'elle n'a rien passé.
+let textesFermeture: TextesFermeture = TEXTES_FERMETURE
+
 function questionDeFermeture(fenetre: BrowserWindow): void {
   fenetre.webContents.on('will-prevent-unload', (evenement) => {
     const quitter = BANC
       ? QUITTER_EN_ESSAI
       : dialog.showMessageBoxSync(fenetre, {
           type: 'question',
-          buttons: ['Quitter', 'Rester'],
+          buttons: [textesFermeture.quitter, textesFermeture.rester],
           defaultId: 1,
           cancelId: 1,
           noLink: true,
           title: 'Gtracker',
-          message: 'Quitter sans enregistrer ?',
-          detail: 'Les modifications de la session ouverte ne sont pas enregistrées.',
+          message: textesFermeture.question,
+          detail: textesFermeture.detail,
         }) === 0
     journal(`fermeture retenue par la page : ${quitter ? 'quitter' : 'rester'}`)
     if (quitter) evenement.preventDefault()
   })
+}
+
+// ---------- le pont : dossier mémoire et textes ----------
+/** Dossier de Windows, ou son repli sous le dossier de l'utilisateur s'il n'est pas défini. */
+function dossierWindows(nom: 'documents' | 'home'): string {
+  try {
+    return app.getPath(nom)
+  } catch {
+    return nom === 'documents' ? path.join(app.getPath('home'), 'Documents') : app.getPath('home')
+  }
+}
+
+/**
+ * Fenêtre de choix d'un dossier de Windows, ouverte par le processus principal : la page ne voit jamais que la
+ * réponse. Une seule à la fois : un appel pendant qu'elle est ouverte reçoit la même réponse.
+ */
+const choisirParFenetre = uneALaFois(async ({ titre, depart }: { titre: string; depart: string }): Promise<string | null> => {
+  const options: OpenDialogOptions = {
+    title: titre,
+    defaultPath: depart,
+    properties: ['openDirectory', 'createDirectory', 'dontAddToRecent'],
+  }
+  const fenetre = fenetrePrincipale
+  const { canceled, filePaths } = fenetre ? await dialog.showOpenDialog(fenetre, options) : await dialog.showOpenDialog(options)
+  return canceled || filePaths.length === 0 ? null : filePaths[0]
+})
+
+function brancherPont(): void {
+  const memoire = creerMemoire(
+    optionsDepuisEnvironnement(
+      process.env,
+      { profil: app.getPath('userData'), documents: dossierWindows('documents'), maison: dossierWindows('home') },
+      choisirParFenetre,
+      journal,
+    ),
+  )
+  brancherCanaux(
+    ipcMain,
+    (evenement) => expediteurAdmis(evenement, fenetrePrincipale?.webContents ?? null),
+    {
+      ...gestionnairesMemoire(memoire),
+      'coquille:textes': async (argument) => {
+        const textes = lireTextesFermeture(argument)
+        if (!textes) return echec('UNKNOWN', 'Textes de la question de fermeture incomplets.')
+        textesFermeture = textes
+        return reussite(null)
+      },
+    },
+    journal,
+  )
 }
 
 // ---------- fenêtre ----------
@@ -312,6 +372,7 @@ function demarrer(): void {
     s.setUserAgent(`${s.getUserAgent()} Gtracker/${VERSION} (+https://github.com/segneur34)`)
     gererAutorisations()
     brancherProtocole()
+    brancherPont()
     journal(`prêt : ${ADRESSE_ACCUEIL}, application ${DIST}, profil ${app.getPath('userData')}`)
     ouvrirFenetre()
   })
