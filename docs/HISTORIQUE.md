@@ -433,3 +433,7 @@ Ce fichier est le §10 de `docs/ETAT_DU_PROJET.md`. C'est le journal de Gtracker
     - **Décision** : variante A de la planche : rond de 32 px, fond de page opaque, bord et flèche à l'encre, le même sur ordinateur et téléphone ; une seule règle, variables du thème.
     - **Pourquoi** : la pastille transparente laissait passer le fond de page, bord et flèche presque invisibles sur la carte.
     - **Piège** : essai fait à l'intérieur ; le rendu en plein soleil n'a pas été éprouvé.
+421. Le tableau des remontées du surf, une remontée par ligne sur téléphone (lot 435 ; suite du point 418 ; validé sur lecture le 18/11 sur l'APK 0.01.27).
+    - **Décision** : le tableau des remontées de l'onglet rame reprend le dessin du tableau des vagues, sans nouvelle planche : un seul en-tête aux intitulés courts, l'unité dite une fois au-dessus, trait à l'encre entre deux lignes, « Voir » au bout ; la ligne « départ » et le mot « enchaîné » restent. Rien ne change sur ordinateur.
+    - **Pourquoi** : le tableau dépassait de l'écran du téléphone et se faisait glisser au doigt (note du 17/11) ; réutiliser les classes des vagues évite toute règle de style neuve.
+    - **Piège** : à 320 px sans foil, le tableau défile de 2 px dans son panneau sans élargir la page, comme celui des vagues.
