@@ -1232,3 +1232,102 @@ describe('analyzeSurf, sens des vagues recalé sur la ligne des départs', () =>
     }
   });
 });
+
+describe('virages d\'une vague : les règles sont appliquées par l\'analyse', () => {
+  /** Aucune règle : le compte brut des rotations. */
+  const RAW: Partial<SurfParams> = { turnCourseMinSpeedMs: 0, turnMinRideAfterS: 0, turnSettleS: 0 };
+  const CASES = [1, 0.2].flatMap((cadenceS) => [true, false].map((doppler) => ({ cadenceS, doppler })));
+
+  /**
+   * Une vague de surf : deux virages de 90° en pleine glisse, puis la sortie,
+   * en travers (90° en 2 s) pendant que la vitesse tombe. La rotation de sortie
+   * s'achève à 58 s, la vitesse passe sous 2 m/s moins d'une seconde après.
+   */
+  const WAVE: Phase[] = [
+    { s: 20, speed: 0.1 },
+    { s: 10, speed: 1.2 },
+    { s: 4, speed: 1.2, to: 4.5 },
+    { s: 6, speed: 4.5 },
+    { s: 2, speed: 4.5, heading: 0, headingTo: 90 },
+    { s: 6, speed: 4.5, heading: 90 },
+    { s: 2, speed: 4.5, heading: 90, headingTo: 0 },
+    { s: 6, speed: 4.5 },
+    { s: 2, speed: 4.5, to: 3.5, heading: 0, headingTo: 90 },
+    { s: 1, speed: 3.5, to: 1, heading: 90 },
+    { s: 10, speed: 1, heading: 90 },
+    { s: 20, speed: 0.1, heading: 90 },
+  ];
+
+  it.each(CASES)('deux virages puis la sortie de vague : 2, pas 3 (pas de $cadenceS s, Doppler $doppler)', ({ cadenceS, doppler }) => {
+    const track = buildSurfSession(WAVE, cadenceS, { doppler });
+    const { waves } = analyze(track).analysis;
+    expect(waves).toHaveLength(1);
+    expect(waves[0].turns).toBe(2);
+    // Sans les règles, la sortie comptait pour un virage.
+    expect(analyze(track, false, RAW).analysis.waves[0].turns).toBe(3);
+    // Fin de glisse : après la rotation de sortie, avant ou à la fin de la vague.
+    const rideEndS = (waves[0].turnRideEndMs - T0) / 1000;
+    expect(rideEndS).toBeGreaterThan(57.5);
+    expect(rideEndS).toBeLessThan(60);
+    expect(waves[0].turnRideEndMs).toBeLessThanOrEqual(waves[0].endMs);
+    // Le chemin de la page et du résumé donne le même compte.
+    const session = runSurfSession(track, buildCumulativeTrack(track), softProfile, {
+      threshold: SPORT_PROFILES.surf.defaultActiveThreshold, foil: false, waveThreshold: null, waveDirectionDeg: null,
+    });
+    expect(session.analysis.waves.map((w) => w.turns)).toEqual([2]);
+  });
+
+  it.each(CASES)('la glisse minimale après le virage se règle : à 0 s, la sortie compte (pas de $cadenceS s, Doppler $doppler)', ({ cadenceS, doppler }) => {
+    const track = buildSurfSession(WAVE, cadenceS, { doppler });
+    expect(analyze(track, false, { turnMinRideAfterS: 0 }).analysis.waves[0].turns).toBe(3);
+  });
+
+  /** La même vague sans ses deux virages : une ligne droite, puis la sortie en travers. */
+  const STRAIGHT: Phase[] = [...WAVE.slice(0, 3), { s: 20, speed: 4.5 }, ...WAVE.slice(8)];
+
+  it.each(CASES)('ligne droite puis sortie en travers : aucun virage (pas de $cadenceS s, Doppler $doppler)', ({ cadenceS, doppler }) => {
+    const track = buildSurfSession(STRAIGHT, cadenceS, { doppler });
+    const { waves } = analyze(track).analysis;
+    expect(waves.map((w) => w.turns)).toEqual([0]);
+    expect(analyze(track, false, RAW).analysis.waves[0].turns).toBe(1);
+  });
+
+  it('un point toutes les 4 s : au plus un virage sur la vague sans virage, sans erreur', () => {
+    for (const doppler of [true, false]) {
+      const { waves } = analyze(buildSurfSession(STRAIGHT, 4, { doppler })).analysis;
+      for (const w of waves) expect(w.turns).toBeLessThanOrEqual(1);
+      for (const w of analyze(buildSurfSession(WAVE, 4, { doppler })).analysis.waves) expect(w.turns).toBeLessThanOrEqual(3);
+    }
+  });
+
+  /**
+   * Sur foil : un vol, une vague à 25 km/h avec deux virages de 90°, puis on se
+   * dégage (120° en 2 s) et la vitesse tombe à celle du pumping : la vague finit
+   * là, en vol, et sa fin de glisse est sa fin.
+   */
+  const FOIL_WAVE: Phase[] = [
+    { s: 20, speed: 0.1 },
+    { s: 8, speed: 1.2 },
+    { s: 4, speed: 1.2, to: 7 },
+    { s: 6, speed: 7 },
+    { s: 2, speed: 7, heading: 0, headingTo: 90 },
+    { s: 6, speed: 7, heading: 90 },
+    { s: 2, speed: 7, heading: 90, headingTo: 0 },
+    { s: 6, speed: 7 },
+    { s: 2, speed: 7, to: 6, heading: 0, headingTo: 120 },
+    { s: 1, speed: 6, to: 3.6, heading: 120 },
+    { s: 15, speed: 3.6, heading: 120 },
+    { s: 3, speed: 3.6, to: 0.1, heading: 120 },
+    { s: 20, speed: 0.1, heading: 120 },
+  ];
+
+  it.each(CASES)('sur foil, deux virages dans la vague puis se dégager pour pomper : 2 (pas de $cadenceS s, Doppler $doppler)', ({ cadenceS, doppler }) => {
+    const track = buildSurfSession(FOIL_WAVE, cadenceS, { doppler });
+    const { waves, flights } = analyze(track, true).analysis;
+    expect(flights).toHaveLength(1);
+    expect(waves).toHaveLength(1);
+    expect(waves[0].turns).toBe(2);
+    expect(waves[0].turnRideEndMs).toBe(waves[0].endMs);
+    expect(analyze(track, true, RAW).analysis.waves[0].turns).toBe(3);
+  });
+});

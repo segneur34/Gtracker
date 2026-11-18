@@ -71,6 +71,7 @@ import { useHasGearList, useSportSettings } from '../hooks/useSportSettings';
 import { notesHaveGear } from '../settings/gearReminder';
 import type { SurfFlight, SurfPhase, SurfReturn, SurfSpan, SurfWave } from '../surfing/surfAnalysis';
 import { effectiveWaveThreshold, surfProfileOf, type SurfSessionSettings } from '../surfing/surfSession';
+import { surfTurnRules } from '../surfing/gpsTurns';
 import { gyroWaveTurns } from '../surfing/gyroTurns';
 import WaveSenseField from '../components/surf/WaveSenseField';
 import WaveSenseOverlay from '../components/surf/WaveSenseOverlay';
@@ -317,7 +318,8 @@ function SurfModule() {
   const gyroTurns = useMemo(() => {
     const byWave = new Map<SurfWave, number>();
     if (!sensors.recording || !surfProfile) return byWave;
-    const counts = gyroWaveTurns(sensors.recording, surfProfile.surf.gyroTurns, waves);
+    // Mêmes règles qu'au GPS : un virage ne compte que suivi d'assez de glisse (la fin de glisse est dans la vague).
+    const counts = gyroWaveTurns(sensors.recording, surfProfile.surf.gyroTurns, waves, surfTurnRules());
     waves.forEach((w, i) => {
       const n = counts[i];
       if (n !== null) byWave.set(w, n);

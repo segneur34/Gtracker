@@ -5,7 +5,7 @@ import { activeRuns, spanOfRun, type ActiveRun } from '../core/sessionStats';
 import { bestWindowSpeedMs } from '../core/topSegments';
 import type { SportProfile, SurfProfile } from '../core/sportProfiles';
 import type { CumulativeTrack, TrackPoint } from '../core/types';
-import { countDirectionChanges } from './gpsTurns';
+import { countDirectionChanges, rideEndMsOf, surfTurnRules, type TurnRules } from './gpsTurns';
 import { buildPeakZone, isInZone, zoneEntry, type PeakZone, type PeakZoneOptions } from './peakZone';
 import { WAVE_SENSE_MIN_R, alignedWaveSense, enteredWaveSense, estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOptions } from './waveSense';
 
@@ -88,10 +88,11 @@ export interface RiseOptions {
  * glisse finit ; le début d'une glisse remonte jusqu'à elles (`riseStartOf`).
  * `waveDirectionDeg` : sens des vagues saisi pour la session, cap vers lequel
  * elles vont, en degrés ; absent ou `null`, le sens est estimé sur la trace.
+ * Les règles des virages (`TurnRules`) valent leurs constantes, sauf surcharge.
  */
 export type SurfParams = Pick<
   SurfProfile, 'minWaitS' | 'minWaveS' | 'minWaveM' | 'takeoffSearchS' | 'turnMinDeg'
-> & Pick<SportProfile, 'maxGapS' | 'maxSpeedWindowS'> & RiseOptions & WaveSenseOptions & PeakZoneOptions & {
+> & Pick<SportProfile, 'maxGapS' | 'maxSpeedWindowS'> & RiseOptions & WaveSenseOptions & PeakZoneOptions & TurnRules & {
   stillMs: number;
   rideExitMs: number;
   waveExitMs: number | null;
@@ -117,6 +118,13 @@ export interface SurfWave extends SurfSpan {
   takeoffSpeedMs: number | null;
   /** Grands changements de direction vus par le GPS (`gpsTurns.ts`). */
   turns: number;
+  /**
+   * Fin de glisse pour les virages, en ms : le dernier instant de la vague
+   * au-dessus du plancher de lecture du cap ; sur foil, la fin de la vague,
+   * qui s'achève en vol. Un virage ne compte que suivi d'assez de glisse
+   * jusqu'à elle, au GPS comme au gyroscope (`gyroTurns.ts`).
+   */
+  turnRideEndMs: number;
   /** Numéro du vol qui la porte, sur foil ; `null` sans foil. */
   flight: number | null;
 }
@@ -349,13 +357,20 @@ export const analyzeSurf = (
   const estimatedWaveSense = alignedWaveSense(track, departures, measuredWaveSense, p);
   const waveSense = p.waveDirectionDeg != null ? enteredWaveSense(p.waveDirectionDeg) : estimatedWaveSense;
 
+  // Virages d'une vague, avec sa fin de glisse : un changement de direction ne compte que suivi d'assez de glisse.
+  const turnRules = surfTurnRules(p);
+  const turnsOf = (w: ActiveRun, turnRideEndMs: number): Pick<SurfWave, 'turns' | 'turnRideEndMs'> => ({
+    turns: countDirectionChanges(track, w.start, w.end, p.turnMinDeg, { ...turnRules, rideEndMs: turnRideEndMs, maxGapS: p.maxGapS }),
+    turnRideEndMs,
+  });
+
   const waves: SurfWave[] = [];
   const flights: SurfFlight[] = [];
   if (candidates === null) {
     rides.forEach((r, k) => {
       waves.push({
         ...spanOf(track, cum, k + 1, r, p.maxSpeedWindowS), ...takeoffOf(track, cum, phases, r.start, p),
-        turns: countDirectionChanges(track, r.start, r.end, p.turnMinDeg), flight: null,
+        ...turnsOf(r, rideEndMsOf(track, r.start, r.end, turnRules.turnCourseMinSpeedMs, p.maxGapS)), flight: null,
       });
     });
   } else {
@@ -372,7 +387,8 @@ export const analyzeSurf = (
         waveDistanceM += span.distanceM;
         waves.push({
           ...span, takeoffS: null, takeoffSpeedMs: null,
-          turns: countDirectionChanges(track, w.start, w.end, p.turnMinDeg), flight: k + 1,
+          // Sur foil, la vague finit en vol, bien au-dessus du plancher : sa fin de glisse est sa fin.
+          ...turnsOf(w, track[w.end].timeMs), flight: k + 1,
         });
       }
       const span = spanOf(track, cum, k + 1, r, p.maxSpeedWindowS);
