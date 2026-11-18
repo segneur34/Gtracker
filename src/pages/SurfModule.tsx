@@ -23,7 +23,8 @@ import type { ShareStat } from '../core/shareImage';
 import SpeedGradientLegend from '../components/SpeedGradientLegend';
 import SessionThresholdField from '../components/SessionThresholdField';
 import { SessionColorRangeField } from '../components/SpeedRangeEditor';
-import TrackSpanLayer, { type TrackSpanShown } from '../components/TrackSpanLayer';
+import PeakZoneLayer from '../components/PeakZoneLayer';
+import TrackSpanLayer,{ type TrackSpanShown } from '../components/TrackSpanLayer';
 import { PUMPING_OFF_NOTE, pumpingHighlightSpans } from '../components/pumpingHighlight';
 import { FlightsPanel, PumpingPanel, type FlightColumn } from '../components/FlightPumpingPanel';
 import { t } from '../core/i18n';
@@ -510,6 +511,7 @@ function SurfModule() {
   const mapLayers = (
     <AnalysisBaseLayers family="surf" file={sessionFile} track={track} zonePaths={hrZone.paths} zonePathsKey={hrZone.selectedZone}
       zoomPath={zoomOnMap.path} marks={marks.located} shownMark={shownMark}>
+      <PeakZoneLayer zone={open.rame ? analysis?.peakZone ?? null : null} />
       <TrackSegmentsLayer segments={mapSegments} weight={5} family={'surf'} />
       <TrackArrows track={track} />
       <TrackSpanLayer track={track} spans={shownSpans} />
