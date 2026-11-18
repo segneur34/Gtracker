@@ -398,6 +398,9 @@ describe('analyzeSurf, sens des vagues et remontées pompées sur foil', () => {
       expect(estimated.waves).toHaveLength(4);
       const entered = analyzeWith(two, cadenceS, { waveDirectionDeg: 180 });
       expect(entered.waveSense).toEqual({ directionDeg: 180, R: 1, samples: 0, reliable: true, source: 'saisi' });
+      // Le sens estimé reste rendu à côté du saisi ; sans saisie, les deux sont égaux.
+      expect(entered.estimatedWaveSense).toEqual(estimated.waveSense);
+      expect(estimated.estimatedWaveSense).toEqual(estimated.waveSense);
       expect(entered.flights.map((f) => f.waveCount)).toEqual([1, 1]);
       expect(entered.waves.map((w) => w.flight)).toEqual([1, 2]);
       expect(entered.flights.map((f) => f.durationS)).toEqual(estimated.flights.map((f) => f.durationS));

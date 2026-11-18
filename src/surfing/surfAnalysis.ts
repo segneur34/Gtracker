@@ -163,6 +163,8 @@ export interface SurfAnalysis {
   returns: SurfReturn[];
   /** Sens des vagues de la session ; `null` sans aucune mesure ; `reliable` dit s'il est assez solide pour écarter des remontées. */
   waveSense: WaveSense | null;
+  /** Sens estimé sur la session, toujours calculé, même quand un sens saisi remplace le retenu ; égal à `waveSense` sans saisie. */
+  estimatedWaveSense: WaveSense | null;
   /** Zone du pic de la session ; `null` sans glisse. */
   peakZone: PeakZone | null;
 }
@@ -324,7 +326,7 @@ const returnOf = (
 export const analyzeSurf = (
   track: TrackPoint[], cum: CumulativeTrack, rideMask: boolean[], waveMask: boolean[] | null, p: SurfParams
 ): SurfAnalysis => {
-  if (track.length < 2) return { phases: track.map(() => 'trou'), waves: [], flights: [], returns: [], waveSense: null, peakZone: null };
+  if (track.length < 2) return { phases: track.map(() => 'trou'), waves: [], flights: [], returns: [], waveSense: null, estimatedWaveSense: null, peakZone: null };
   // Début remonté avant le filtre de durée et de distance : une vague molle, rognée de sa mise en vitesse, était écartée.
   const rides = keptRuns(track, cum, risenRuns(track, activeRuns(track, rideMask), 0, p.rideExitMs, p), p);
   const phases = stepPhases(track, rides, p);
@@ -338,9 +340,8 @@ export const analyzeSurf = (
     ));
   // Sens des vagues : celui saisi pour la session, sinon estimé ; sans foil, sur toutes les vagues ; sur foil, sur la
   // vague qui lance chaque vol (les remontées pompées tireraient la moyenne vers zéro).
-  const waveSense = p.waveDirectionDeg != null
-    ? enteredWaveSense(p.waveDirectionDeg)
-    : estimateWaveSense(track, candidates === null ? rides : candidates.flatMap((c) => c.slice(0, 1)), p);
+  const estimatedWaveSense = estimateWaveSense(track, candidates === null ? rides : candidates.flatMap((c) => c.slice(0, 1)), p);
+  const waveSense = p.waveDirectionDeg != null ? enteredWaveSense(p.waveDirectionDeg) : estimatedWaveSense;
 
   const waves: SurfWave[] = [];
   const flights: SurfFlight[] = [];
@@ -395,7 +396,7 @@ export const analyzeSurf = (
   for (let k = 0; k + 1 < rides.length; k++) {
     returns.push(returnOf(track, cum, phases, p, peakZone, k + 1, rides[k].end, rides[k + 1].start, rides[k].end));
   }
-  return { phases, waves, flights, returns, waveSense, peakZone };
+  return { phases, waves, flights, returns, waveSense, estimatedWaveSense, peakZone };
 };
 
 /** Chiffres d'une session, en SI ; `null` quand ils n'ont pas de sens (aucune vague, aucun retour). */

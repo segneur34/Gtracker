@@ -5,6 +5,8 @@ import Button from '../ui/Button';
 interface WaveSenseFieldProps {
   /** Cap vers lequel vont les vagues, en degrés ; `null` quand il n'est ni saisi ni estimé assez nettement. */
   directionDeg: number | null;
+  /** Sens calculé, rappelé quand un sens saisi le remplace ; `null` sans calcul exploitable. */
+  autoDeg: number | null;
   /** Vrai quand le sens est saisi pour la session. */
   manual: boolean;
   /** Vrai quand le sens calculé est jugé sûr. */
@@ -18,8 +20,10 @@ interface WaveSenseFieldProps {
  * Ligne « Sens des vagues » de l'onglet réglages du surf : le cap, d'où il
  * vient, et « Régler » qui ouvre la boussole sur la carte.
  */
-function WaveSenseField({ directionDeg, manual, reliable, adjusting, onAdjust }: WaveSenseFieldProps) {
-  const origin = manual ? t('saisi') : reliable ? t('calculé') : t('calculé · peu sûr');
+function WaveSenseField({ directionDeg, autoDeg, manual, reliable, adjusting, onAdjust }: WaveSenseFieldProps) {
+  const origin = manual
+    ? (autoDeg !== null ? `${t('saisi')} · ${t('calculé {deg}°', { deg: autoDeg })}` : t('saisi'))
+    : reliable ? t('calculé') : t('calculé · peu sûr');
   return (
     <div>
       <div className="ui-row-6 ui-center ui-wrap">

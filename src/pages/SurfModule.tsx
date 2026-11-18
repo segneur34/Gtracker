@@ -549,6 +549,11 @@ function SurfModule() {
   const shownWaveDeg = waveSense !== null && (waveManual || waveSense.R >= WAVE_SENSE_MIN_R)
     ? Math.round(waveSense.directionDeg) % 360
     : null;
+  /** Sens calculé, rappelé à côté d'un sens saisi quand ses mesures vont assez dans le même sens. */
+  const estimated = analysis?.estimatedWaveSense ?? null;
+  const autoWaveDeg = waveManual && estimated !== null && estimated.R >= WAVE_SENSE_MIN_R
+    ? Math.round(estimated.directionDeg) % 360
+    : null;
   const rideWord = foil ? t('vol') : t('vague');
   const measuredReturns = returns.filter((r) => r.after > 0);
   const firstOut = returns.find((r) => r.after === 0) ?? null;
@@ -574,7 +579,7 @@ function SurfModule() {
           if (!next) setWaveAdjust(false);
         },
         overlay: waveAdjust && track.length > 0 ? (
-          <WaveSenseOverlay directionDeg={shownWaveDeg} manual={waveManual} reliable={waveReliable}
+          <WaveSenseOverlay directionDeg={shownWaveDeg} autoDeg={autoWaveDeg} manual={waveManual} reliable={waveReliable}
             onChange={(deg) => draft.update({ waveDirectionDeg: deg })} onClose={endWaveAdjust} />
         ) : undefined,
         focus: zoomOnMap.focus,
@@ -923,7 +928,7 @@ function SurfModule() {
                       thresholdUnit={profile.thresholdUnit}
                       onChange={(next) => draft.update({ waveThreshold: next })} />
                   )}
-                  <WaveSenseField directionDeg={shownWaveDeg} manual={waveManual} reliable={waveReliable}
+                  <WaveSenseField directionDeg={shownWaveDeg} autoDeg={autoWaveDeg} manual={waveManual} reliable={waveReliable}
                     adjusting={waveAdjust} onAdjust={startWaveAdjust} />
                   {track.length > 0 && (
                     <SessionColorRangeField unit={speedUnit} range={range} isOverridden={draft.edits.speedRange !== null}
