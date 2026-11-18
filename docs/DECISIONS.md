@@ -143,7 +143,8 @@ Nom montré de cette famille : §11 ; son identifiant reste `surf`, et « Surf �
   - onglets général, graphique, régularité, records et cardio (si une session de la période a de la FC : charge, temps par zone, FC par session) ; pas de records dans la vue d'ensemble, où les unités se mêlent ;
   - graphique : un point par session, la donnée choisie par des pastilles et retenue : vitesse max (record en pointillé), moyenne en action, durée, distance ; % de vol (foil, voile et surf) et % de manœuvres réussies en voile ; vagues, plus longue vague et plus long vol en surf ; la durée seule dans la vue d'ensemble ; tendance en pointillé hors vitesse max ; en durée, pour toute sélection, une ligne pleine grise des heures totales de chaque semaine (lundi au dimanche, zéro sans session, point au milieu de la semaine, 28/10, fiche 24), axe en heures dès qu'une session ou une semaine atteint 2 h ;
   - matériel croisé (05/11, refait le 14/11) : un groupe de boutons par groupe de matériel de l'activité, dans la fenêtre et aussi sur la page, sous un bouton « Matériel » replié au départ et à l'état retenu, en petits boutons appliqués tout de suite (« comme ça on peut basculer d'un matériel à l'autre » ; essai 257 réussi) ; ce bloc n'apparaît pas sans activité choisie ou sans liste de matériel ; une pièce choisie dans la fenêtre attend « Valider » ; une session compte si elle porte chaque pièce choisie ; changer de famille ou d'activité remet le matériel à « Tous » ;
-  - tout tiré du résumé des fiches, sessions cachées et à classer écartées.
+  - tout tiré du résumé des fiches, sessions cachées et à classer écartées ;
+  - espaces entre cadres (18/11, réponse à Q128) : Statistiques garde les siens (20 px) et ne suit pas l'espacement « très serré » du Profil et des analyses.
 - À venir, à décider avec l'utilisateur : d'autres onglets.
 
 ## 11. Réglages, Sessions et ouverture
