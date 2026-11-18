@@ -61,3 +61,38 @@ La zone se dessine sur la carte de l'analyse surf, dans l'onglet rame (et quand 
 
 - Une session de surf (ou de paddle surf) : onglet rame → le retour au pic de chaque vague est le temps pour revenir dans la zone du pic, la zone se voit sur la carte, oblongue et en travers des vagues, et tous les départs sont dedans ; dire si les temps collent à ce qui a été vécu.
 - Une session de surf foil ou de paddle foil avec des remontées en vol → les remontées pompées ne sont plus comptées comme des vagues.
+
+## Plan du 18/11 (agent Plan, Opus high), parties A et B
+
+### A : sens des vagues (Opus high, environ cinq points)
+
+- Fichier neuf `src/surfing/waveSense.ts` et son test : `estimateWaveSense(track, starts, opts?)` rend `{ directionDeg, R, samples }` ou `null` (`R` : longueur moyenne de `circularMean`, `core/angles.ts`).
+- Une mesure par glisse, sur sa première vague (sans foil, toutes les vagues ; sur foil, la vague qui lance le vol) : le déplacement sur les `WAVE_SENSE_WINDOW_S` = 5 s qui suivent le début remonté (lot 423), positions interpolées dans le temps (un seul long pas suffit). Moyenne vectorielle, chaque déplacement pesant sa longueur en mètres : pondération, aucun filtre. Écartés : la corde départ → fin (trop latérale), toutes les vagues sur foil (les remontées pompées tirent la moyenne vers zéro), le contrôle par les remontées (rame sinueuse).
+- Sens non estimable sous `WAVE_SENSE_MIN_WAVES` = 4 mesures ou `R` < `WAVE_SENSE_MIN_R` = 0,5 : `null`, rien n'est écarté, comme aujourd'hui.
+- Sur foil, dans `analyzeSurf`, en deux passes (vagues candidates de tous les vols, puis le sens, puis le filtre) : une vague dont la corde s'écarte du sens de plus de `WAVE_AGAINST_DEG` = 120° devient du temps pompé ; `waveS`, `pumpS`, `waveCount` recalculés, vagues renumérotées. Constantes nommées dans `waveSense.ts`, surchargeables par options pour les tests, rien dans `SPORT_PROFILES`.
+- Exposé : `SurfAnalysis.waveSense`. `SUMMARY_CALC_VERSION` de 19 à 20 (`library/record.ts`), `summaryFrozen.test.ts` refigé (sa trace de foil n'a qu'un vol en ligne droite : seul `calcVersion` change, à dire dans le commit).
+- Tests : gauches et droites mêlées à ±50° autour de 180° (sens à ±5°) ; 1 Hz, 5 Hz et pas de 4 s ; foil à cinq vols, vague vers 180° puis remontée pompée vers 0° au-dessus du seuil (sortie des vagues, comptée pompée) ; vague en biais à 100° gardée ; trois vagues ou dispersion large : `null`, chiffres d'aujourd'hui.
+
+### B : zone du pic (Opus high, six points)
+
+- Fichier neuf `src/surfing/peakZone.ts` et son test : `buildPeakZone(track, departures, sense, opts?)`, `zoneEntry(track, zone, from, to)`, `isInZone`, `peakZoneOutline(zone, n)` (pour la partie C).
+- Départs : les débuts de glisse remontés (`rides[k].start`), le décollage sur foil.
+- Ellipse dans le plan local (`planeProjection`, `core/geo.ts`), petit axe le long du sens des vagues, grand axe en travers ; demi-axes tirés de la boîte des départs dans le repère tourné, agrandis pour contenir chaque départ, plus `ZONE_MARGIN_M` = 15 m, grand axe porté à au moins `ZONE_MIN_ASPECT` = 1,5 fois le petit (ne fait que grandir).
+- Une zone pour toute la session (défaut du brief, gardé : une zone qui grandit donnerait de petites zones et des retours longs en début de session).
+- Sans sens estimé : axe principal des départs (au moins trois), sinon un cercle ; mode exposé (`orientation`). Sans départ : pas de zone, retour `null`.
+- Entrée calculée sur le segment (racine de la quadratique de l'ellipse, un long pas qui traverse la zone compte), instant et position interpolés ; pas d'interpolation à travers un trou de trace.
+- `returnOf` réécrit : retour = entrée − fin de glisse, `straightM` jusqu'au point d'entrée, champ neuf `SurfReturn.entryMs` ; première sortie : du premier coup de rame à la première entrée ; attente, rame et `waitS` inchangés ; `summarizeSurf` et le résumé de la bibliothèque inchangés.
+- `SurfModule` : `returnEnd` lit `entryMs` (corrige aussi la première sortie, qui partait de `track[0]`), quatre textes d'aide réécrits (« première attente », « prise sans attente »), dictionnaires.
+- Exposé pour C : `SurfAnalysis.peakZone` (centre, demi-axes en m, cap du grand axe, orientation, départs) et `peakZoneOutline`.
+
+### Questions mineures tranchées par l'orchestrateur le 18/11
+
+- Glisse finie déjà dans la zone (pompé jusqu'au pic sur foil) : retour de 0 s, compté, vitesse de remontée `null`.
+- Départs sur foil : les décollages des vols, pas les vagues reprises en plein vol.
+- Constantes : 5 s, 4 mesures, R 0,5, 120°, 15 m, 1,5 ; à ajuster sur données réelles.
+- Pas d'entrée interpolée à travers un trou de trace.
+
+### Questions majeures répondues par l'utilisateur le 18/11
+
+- Vague de l'intérieur : hors zone. Un départ à plus de `ZONE_INSIDE_M` (environ 40 m, constante nommée) vers la plage de la médiane des départs, le long du sens des vagues, n'entre pas dans la construction de la zone ; le retour qui précède cette vague, sans entrée dans la zone, est « enchaîné » et sort de la moyenne. Sans sens estimé, l'axe de repli (axe principal des départs) ne sait pas où est la plage : aucun départ n'est écarté.
+- Une seule zone pour toute la session ; le pic qui glisse avec la marée l'élargit, limite connue à écrire dans ETAT.

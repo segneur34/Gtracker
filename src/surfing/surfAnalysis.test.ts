@@ -289,6 +289,86 @@ describe('analyzeSurf, sur foil', () => {
     const back = analysis.returns.find((r) => r.after === 1)!;
     expect(back.returnS).toBeCloseTo(40, -1);
   });
+
+  it('deux vols ne disent pas le sens des vagues : rien n\'est écarté', () => {
+    expect(analysis.waveSense).toBeNull();
+  });
+});
+
+describe('analyzeSurf, sens des vagues et remontées pompées sur foil', () => {
+  /**
+   * Un vol : sa vague vers le sud (la plage), du pompage, un second passage
+   * au-dessus du seuil de vague au cap `second`, du pompage, puis le posé.
+   */
+  const flight = (waveHeading: number, second: number): Phase[] => [
+    { s: 40, speed: 0.8 },
+    { s: 30, speed: 0.1 },
+    { s: 5, speed: 2, heading: 180 },
+    { s: 12, speed: 6.5, heading: waveHeading },
+    { s: 10, speed: 4, heading: 90 },
+    { s: 12, speed: 6.5, heading: second },
+    { s: 10, speed: 4, heading: 90 },
+  ];
+  /** Cinq vols : les quatre premiers remontent vers le large en pompant (cap 0), le cinquième prend une vague en biais (cap 100). */
+  const FIVE: Phase[] = [
+    ...flight(200, 0), ...flight(160, 0), ...flight(200, 0), ...flight(160, 0), ...flight(190, 100),
+    { s: 40, speed: 0.8 },
+  ];
+  /** Sens jamais estimé : les chiffres d'avant. */
+  const NO_SENSE = { waveSenseMinWaves: Number.POSITIVE_INFINITY };
+
+  const analyzeWith = (phases: Phase[], cadenceS: number, opts = {}) => {
+    const track = buildSurfSession(phases, cadenceS);
+    const cum = buildCumulativeTrack(track);
+    const rideMask = maskAt(track, surf.foilActiveThreshold);
+    const waveMask = maskAt(track, surf.foilWaveThreshold);
+    return analyzeSurf(track, cum, rideMask, waveMask, { ...paramsOf(true), ...opts });
+  };
+
+  for (const cadenceS of [1, 0.2]) {
+    it(`sort les remontées pompées des vagues et les compte pompées, vague en biais gardée (pas de ${cadenceS} s)`, () => {
+      const before = analyzeWith(FIVE, cadenceS, NO_SENSE);
+      const after = analyzeWith(FIVE, cadenceS);
+      expect(before.waveSense).toBeNull();
+      expect(before.waves).toHaveLength(10);
+      expect(Math.abs(after.waveSense!.directionDeg - 180)).toBeLessThan(10);
+      expect(after.waveSense!.samples).toBe(5);
+
+      expect(after.flights.map((f) => f.waveCount)).toEqual([1, 1, 1, 1, 2]);
+      expect(after.waves.map((w) => w.flight)).toEqual([1, 2, 3, 4, 5, 5]);
+      expect(after.waves.map((w) => w.n)).toEqual([1, 2, 3, 4, 5, 6]);
+      // La remontée reste dans le vol : sa durée passe du temps des vagues au temps pompé.
+      after.flights.forEach((f, k) => {
+        const b = before.flights[k];
+        expect(f.durationS).toBe(b.durationS);
+        expect(f.waveS + f.pumpS).toBeCloseTo(f.durationS, 6);
+        if (k < 4) expect(f.pumpS - b.pumpS).toBeCloseTo(b.waveS - f.waveS, 6);
+        if (k < 4) expect(b.waveS - f.waveS).toBeGreaterThan(10);
+      });
+      expect(after.flights[4]).toEqual(before.flights[4]);
+      expect(after.phases).toEqual(before.phases);
+      expect(after.returns).toEqual(before.returns);
+    });
+  }
+
+  it('sans sens estimable (trois vols), rien n\'est écarté', () => {
+    const three: Phase[] = [...flight(200, 0), ...flight(160, 0), ...flight(200, 0), { s: 40, speed: 0.8 }];
+    const after = analyzeWith(three, 1);
+    expect(after.waveSense).toBeNull();
+    expect(after).toEqual(analyzeWith(three, 1, NO_SENSE));
+    expect(after.waves).toHaveLength(6);
+  });
+
+  it('sans foil, le sens se mesure sur les vagues sans en écarter aucune', () => {
+    expect(analyze(buildSurfSession(MORNING)).analysis.waveSense).toBeNull();
+    const wave = (heading: number): Phase[] => [
+      { s: 40, speed: 1 }, { s: 30, speed: 0.1 }, { s: 5, speed: 1.6, heading }, { s: 12, speed: 5, heading },
+    ];
+    const six = [200, 160, 200, 160, 190, 0].flatMap(wave);
+    const { analysis } = analyze(buildSurfSession([...six, { s: 40, speed: 1 }]));
+    expect(Math.abs(analysis.waveSense!.directionDeg - 180)).toBeLessThan(10);
+    expect(analysis.waves).toHaveLength(6);
+  });
 });
 
 describe('runSurfSession et résumé de la bibliothèque', () => {

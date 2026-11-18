@@ -6,6 +6,7 @@ import { bestWindowSpeedMs } from '../core/topSegments';
 import type { SportProfile, SurfProfile } from '../core/sportProfiles';
 import type { CumulativeTrack, TrackPoint } from '../core/types';
 import { countDirectionChanges } from './gpsTurns';
+import { estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOptions } from './waveSense';
 
 /**
  * Analyse d'une session de surf, en SI, sur la trace du noyau.
@@ -32,6 +33,11 @@ import { countDirectionChanges } from './gpsTurns';
  * relier plusieurs vagues en pompant entre elles. Les vagues d'un vol sont ses
  * passages au-dessus du seuil de vague en foil (`waveMask`) ; le reste du vol
  * est pompé. Sans foil, les glisses sont les vagues.
+ *
+ * Le sens des vagues (`waveSense.ts`) s'estime sur la première vague de chaque
+ * glisse. Sur foil, une vague candidate qui va contre lui est une remontée
+ * pompée vers le large : elle sort des vagues et reste dans le vol, comptée
+ * pompée. Sans sens estimable, rien n'est écarté.
  */
 
 /** Durée maximale du recul du début d'une glisse, en secondes : une mise en vitesse entre les deux détentes en dure quelques-unes. */
@@ -71,7 +77,7 @@ export interface RiseOptions {
  */
 export type SurfParams = Pick<
   SurfProfile, 'minWaitS' | 'minWaveS' | 'minWaveM' | 'takeoffSearchS' | 'turnMinDeg'
-> & Pick<SportProfile, 'maxGapS' | 'maxSpeedWindowS'> & RiseOptions & {
+> & Pick<SportProfile, 'maxGapS' | 'maxSpeedWindowS'> & RiseOptions & WaveSenseOptions & {
   stillMs: number;
   rideExitMs: number;
   waveExitMs: number | null;
@@ -140,6 +146,8 @@ export interface SurfAnalysis {
   flights: SurfFlight[];
   /** Première sortie (si elle a une attente), puis une remontée après chaque glisse sauf la dernière. */
   returns: SurfReturn[];
+  /** Sens des vagues de la session ; `null` s'il n'est pas estimable. */
+  waveSense: WaveSense | null;
 }
 
 const stepS = (track: TrackPoint[], i: number): number => (track[i].timeMs - track[i - 1].timeMs) / 1000;
@@ -302,14 +310,24 @@ const returnOf = (
 export const analyzeSurf = (
   track: TrackPoint[], cum: CumulativeTrack, rideMask: boolean[], waveMask: boolean[] | null, p: SurfParams
 ): SurfAnalysis => {
-  if (track.length < 2) return { phases: track.map(() => 'trou'), waves: [], flights: [], returns: [] };
+  if (track.length < 2) return { phases: track.map(() => 'trou'), waves: [], flights: [], returns: [], waveSense: null };
   // Début remonté avant le filtre de durée et de distance : une vague molle, rognée de sa mise en vitesse, était écartée.
   const rides = keptRuns(track, cum, risenRuns(track, activeRuns(track, rideMask), 0, p.rideExitMs, p), p);
   const phases = stepPhases(track, rides, p);
 
+  // Sur foil, vagues candidates de chaque vol : les suites du masque de vague entre ses bornes, sans reparcourir la trace.
+  // Leur début remonte comme celui des vols, à la détente basse des vagues, jamais avant le début du vol.
+  const candidates = waveMask === null
+    ? null
+    : rides.map((r) => keptRuns(
+      track, cum, risenRuns(track, activeRuns(track, waveMask, r.start + 1, r.end), r.start, p.waveExitMs ?? p.rideExitMs, p), p
+    ));
+  // Sens des vagues : sans foil, toutes les vagues ; sur foil, la vague qui lance chaque vol (les remontées pompées tireraient la moyenne vers zéro).
+  const waveSense = estimateWaveSense(track, candidates === null ? rides : candidates.flatMap((c) => c.slice(0, 1)), p);
+
   const waves: SurfWave[] = [];
   const flights: SurfFlight[] = [];
-  if (waveMask === null) {
+  if (candidates === null) {
     rides.forEach((r, k) => {
       waves.push({
         ...spanOf(track, cum, k + 1, r, p.maxSpeedWindowS), ...takeoffOf(track, cum, phases, r.start, p),
@@ -318,11 +336,10 @@ export const analyzeSurf = (
     });
   } else {
     rides.forEach((r, k) => {
-      // Vagues du vol : les suites du masque de vague entre ses bornes, sans reparcourir la trace.
-      // Leur début remonte comme celui des vols, à la détente basse des vagues, jamais avant le début du vol.
-      const flightWaves = keptRuns(
-        track, cum, risenRuns(track, activeRuns(track, waveMask, r.start + 1, r.end), r.start, p.waveExitMs ?? p.rideExitMs, p), p
-      );
+      // Une candidate qui va contre le sens des vagues est une remontée pompée : elle reste dans le vol, comptée pompée.
+      const flightWaves = waveSense === null
+        ? candidates[k]
+        : candidates[k].filter((w) => !isAgainstWaveSense(track, w, waveSense, p));
       let waveS = 0;
       let waveDistanceM = 0;
       for (const w of flightWaves) {
@@ -356,7 +373,7 @@ export const analyzeSurf = (
   for (let k = 0; k + 1 < rides.length; k++) {
     returns.push(returnOf(track, cum, phases, p, k + 1, rides[k].end, rides[k + 1].start, rides[k].end));
   }
-  return { phases, waves, flights, returns };
+  return { phases, waves, flights, returns, waveSense };
 };
 
 /** Chiffres d'une session, en SI ; `null` quand ils n'ont pas de sens (aucune vague, aucun retour). */

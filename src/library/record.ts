@@ -84,10 +84,14 @@ export const RECORD_VERSION = 1;
  * la détente basse du masque tant que la vitesse monte : vagues plus longues,
  * vagues molles comptées, temps de vol un peu plus long.
  *
+ * 20 (18 novembre 2026) : en surf sur foil, un passage au-dessus du seuil de
+ * vague qui va contre le sens des vagues (une remontée pompée) n'est plus une
+ * vague : nombre de vagues et plus longue vague peuvent baisser.
+ *
  * Les versions sautées (6, 10, 11, 17 et 18) ne changeaient aucun chiffre de la
  * voile ni du surf ; le numéro est gardé.
  */
-export const SUMMARY_CALC_VERSION = 19;
+export const SUMMARY_CALC_VERSION = 20;
 
 export type SessionSource = 'enregistrement' | 'import';
 
