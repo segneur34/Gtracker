@@ -699,17 +699,19 @@ function SurfModule() {
                   <StatTile label={t("Temps d'attente")} value={formatShortDuration(summary.attenteS)} />
                 </div>
                 {(measuredReturns.length > 0 || firstOut) && (
+                  <>
+                  <div className="an-wave-unit ui-mt-10">{t('Remontée et rame en {unit}', { unit: unitLabel })}</div>
                   <div className="ui-overflow-x ui-mt-10">
-                    <table className="ui-table">
+                    <table className="ui-table an-man-podium an-man-podium--waves">
                       <thead>
                         <tr className="ui-sunken">
                           <th style={thStyle}>{t('Après')}</th>
                           <th style={thStyle}>{t('Retour')}</th>
-                          <th style={thStyle}>{t('Distance')}</th>
-                          <th style={thStyle}>{t('Remontée')}</th>
+                          <th style={thStyle}><span className="an-wave-long">{t('Distance')}</span><span className="an-wave-short">{t('Dist.')}</span></th>
+                          <th style={thStyle}><span className="an-wave-long">{t('Remontée')}</span><span className="an-wave-short">{t('Rem.')}</span></th>
                           <th style={thStyle}>{t('Rame')}</th>
-                          <th style={thStyle}>{t('Attente')}</th>
-                          <th style={thStyle}>{t('Carte')}</th>
+                          <th style={thStyle}><span className="an-wave-long">{t('Attente')}</span><span className="an-wave-short">{t('Att.')}</span></th>
+                          <th style={thStyle}><span className="an-wave-long">{t('Carte')}</span></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -720,8 +722,8 @@ function SurfModule() {
                               <td className="ui-cell-tight ui-cell--bold">{r.after === 0 ? t('départ') : `${rideWord} ${r.after}`}</td>
                               <td style={tdStyle}>{r.returnS === null ? t('enchaîné') : formatShortDuration(r.returnS)}</td>
                               <td style={tdStyle}>{r.straightM === null ? '—' : `${Math.round(r.straightM)} m`}</td>
-                              <td style={tdStyle}>{orDash(r.returnSpeedMs, (v) => formatSpeed(v, speedUnit))}</td>
-                              <td style={tdStyle}>{orDash(r.paddleSpeedMs, (v) => formatSpeed(v, speedUnit))}</td>
+                              <td style={tdStyle}><span className="an-wave-long">{orDash(r.returnSpeedMs, (v) => formatSpeed(v, speedUnit))}</span><span className="an-wave-short">{speedCellOf(speedUnit)(r.returnSpeedMs)}</span></td>
+                              <td style={tdStyle}><span className="an-wave-long">{orDash(r.paddleSpeedMs, (v) => formatSpeed(v, speedUnit))}</span><span className="an-wave-short">{speedCellOf(speedUnit)(r.paddleSpeedMs)}</span></td>
                               <td style={tdStyle}>{formatShortDuration(r.waitS)}</td>
                               <td style={tdStyle}>
                                 <ShowButton shown={shown} onClick={() => highlight.show('rame', shown ? null : String(r.after))} />
@@ -732,6 +734,7 @@ function SurfModule() {
                       </tbody>
                     </table>
                   </div>
+                  </>
                 )}
               </ResizablePanel>
             )}
