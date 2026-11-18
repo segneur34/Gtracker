@@ -14,6 +14,8 @@
     "verif": "node outils/verif.mjs",
     "test:watch": "vitest",
     "preview": "vite preview",
+    "bureau": "node outils/bureau.mjs",
+    "exe": "node outils/bureau.mjs --exe",
     "backlog": "node outils/backlog.mjs"
   },
   "dependencies": {

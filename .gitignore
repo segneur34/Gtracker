@@ -32,6 +32,9 @@ dist-ssr
 # Liste des fichiers du lot en cours, écrite par l'orchestrateur (crochet de l'agent lot)
 .claude/lot-fichiers.json
 
+# Programme Windows : dossier fabriqué et profil d'essai (bureau/dist et bureau/node_modules sont déjà couverts)
+bureau/sortie/
+
 # Secrets, couverture, sorties de signature
 .claude/settings.local.json
 .env
