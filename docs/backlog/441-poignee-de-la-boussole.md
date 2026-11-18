@@ -21,7 +21,7 @@
 - **P4** : P1 avec un rond plus gros (rayon 16), plus facile à attraper au doigt.
 Le `viewBox` passe de 200 à 256 (272 pour P4) pour que rien ne soit rogné ; le cercle garde sa taille à l'écran, le dessin passe de 260 à 333 px (354 pour P4) et tient dans 390 px. Les images sont un dessin retouché dans la page, pas le code : le tirage de la poignée n'y a pas été essayé.
 
-**Choix de l'utilisateur attendu : question Q133** (par défaut P1).
+**Choix de l'utilisateur, le 18/11 au soir : P2**, le rond à cheval sur le cercle (images revues, planche rouverte). Valeurs de la planche pour P2 (`variantes.md`) : disque #d32f2f de rayon 11, liseré blanc de 3, centre sur le trait du cercle (à 98 du centre) ; flèche des vagues raccourcie pour ne pas passer sous le disque (pointe à 72, base à 56) ; flèche du vent de 80 à 12 ; `viewBox` `-28 -28 256 256`, élément de 333 px, le cercle restant à 260 px.
 
 ## Voulu
 
@@ -30,9 +30,9 @@ Le `viewBox` passe de 200 à 256 (272 pour P4) pour que rien ne soit rogné ; le
 - Le rendu de la voile change : l'instantané de `src/components/WindAdjustOverlay.test.tsx` est mis à jour en connaissance de cause (dire ce qui change), et `outils/banc/general.mjs` et `surf.mjs`, qui tirent la poignée à une position calculée, sont adaptés (partie à part).
 - Rendu relevé sur une copie compilée à 390 px, vent et vagues, bandeau sur une et deux rangées, avec la barre du brouillon.
 
-## Vu au passage, à trancher avec ce lot ou à part (élément 443)
+## Joint à ce lot : l'élément 443
 
-En voile sur téléphone, le bas de la polaire du réglage du vent passe sous la barre de navigation.
+En voile sur téléphone, pendant le réglage du vent en plein écran, le bas de la polaire passe sous la barre de navigation (vu le 18/11 sur une copie compilée à 390 × 844 : la polaire va de 660 à 820 px, la barre de navigation commence vers 780 px ; non vérifié sur le téléphone, ni daté). Mêmes fichiers que la poignée (la boussole et sa mise en page sur téléphone), et le dessin agrandi déplace ce qui est dessous : à relever d'abord à 390 px, avant et après la poignée, puis à corriger si le défaut est confirmé ; voulu : la polaire entière au-dessus de la barre de navigation.
 
 ## Essai au téléphone
 

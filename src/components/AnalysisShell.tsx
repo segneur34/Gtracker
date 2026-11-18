@@ -9,6 +9,7 @@ import { shareableStats } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
 import { sessionsPath } from '../core/parentPage';
 import { useScrollToTopOnMount } from '../hooks/useRetainedScroll';
+import { useNarrowScreen } from '../hooks/useNarrowScreen';
 import { useAppliedTheme } from '../hooks/useTheme';
 import { dismissRecorderResult, useRecorderSelector } from '../hooks/useRecorder';
 import type { useSessionDraft } from '../hooks/useSessionDraft';
@@ -117,7 +118,9 @@ function AnalysisShell<K extends string>({
     [activityColor, dark]
   );
   // Carte agrandie en plein écran : la barre du brouillon passe dans la carte (une seule barre à l'écran).
-  const saveBarInMap = map?.expanded === true;
+  // En disposition large la vue agrandie est masquée : la barre reste alors dans la page.
+  const narrow = useNarrowScreen();
+  const saveBarInMap = map?.expanded === true && narrow;
   return (
     <div className="an-page ui-p-20">
       <div className="an-sheet">

@@ -6,9 +6,10 @@ import { t } from '../core/i18n';
  * vers le centre. Petite dans l'onglet « général » de la voile, à côté du
  * bouton « Régler » qui ouvre la grande sur la carte (`WindAdjustOverlay`).
  * Avec `waves`, la même boussole montre le sens des vagues du surf : la flèche,
- * à l'encre, part du centre et pointe vers où vont les vagues.
+ * à l'encre, part du centre et pointe vers où vont les vagues. Un angle `null`
+ * (sens non estimé) laisse le cadran sans flèche.
  */
-function WindCompass({ windAngle, size = 120, waves = false }: { windAngle: number; size?: number; waves?: boolean }) {
+function WindCompass({ windAngle, size = 120, waves = false }: { windAngle: number | null; size?: number; waves?: boolean }) {
   const center = size / 2;
   const small = size < 90;
   const label = (text: string, style: CSSProperties) => (
@@ -20,7 +21,7 @@ function WindCompass({ windAngle, size = 120, waves = false }: { windAngle: numb
       {label(small ? t('S', { ctx: 'point cardinal' }) : t('S(180°)'), { bottom: 2, left: '50%', transform: 'translateX(-50%)' })}
       {label(small ? t('E', { ctx: 'point cardinal' }) : t('E(90°)'), { right: 3, top: '50%', transform: 'translateY(-50%)' })}
       {label(small ? t('O', { ctx: 'point cardinal' }) : t('O(270°)'), { left: 3, top: '50%', transform: 'translateY(-50%)' })}
-      <svg width={size} height={size} style={{ position: 'absolute', color: 'var(--ink)', transform: `rotate(${windAngle}deg)`, transition: 'transform 0.3s ease' }}>
+      {windAngle !== null && <svg width={size} height={size} style={{ position: 'absolute', color: 'var(--ink)', transform: `rotate(${windAngle}deg)`, transition: 'transform 0.3s ease' }}>
         {waves ? (
           <>
             <line x1={center} y1={center} x2={center} y2={size * 0.2} stroke="currentColor" strokeWidth={small ? 2 : 3} />
@@ -32,7 +33,7 @@ function WindCompass({ windAngle, size = 120, waves = false }: { windAngle: numb
             <polygon points={`${center - 5},${center - 10} ${center + 5},${center - 10} ${center},${center + 2}`} fill="red" />
           </>
         )}
-      </svg>
+      </svg>}
     </div>
   );
 }

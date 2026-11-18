@@ -597,7 +597,7 @@ function SurfModule() {
                 {/* Mini-boussole du sens des vagues ; « Régler » ouvre la grande sur la carte. */}
                 {track.length > 0 && (
                   <div className="an-sheet__wave">
-                    <WindCompass windAngle={shownWaveDeg ?? 0} size={64} waves />
+                    <WindCompass windAngle={shownWaveDeg ?? null} size={64} waves />
                     <div className="an-sheet__wave-text">
                       <strong className="ui-block ui-text-m">
                         {shownWaveDeg !== null ? t('Vagues {deg}°', { deg: shownWaveDeg }) : t('Sens des vagues non estimé')}
