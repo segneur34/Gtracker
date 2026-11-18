@@ -570,9 +570,10 @@
     font-weight: 600;
   }
 
-  /* Vagues du surf : une vague par ligne, en tableau natif (la grille des podiums est annulée), l'en-tête
-     court une seule fois, l'unité dite au-dessus ; un trait d'un pixel à l'encre sous l'en-tête et entre
-     les vagues, sans cadre ni fond. */
+  /* Vagues et remontées du surf : un petit cadre fin à l'encre par ligne. Le titre (numéro et heure, ou
+     « Après la vague 3 ») et « Voir » à droite sur la première rangée ; dessous, les valeurs en colonnes
+     égales, chacune avec son petit intitulé (`data-label`) au-dessus. Plus d'en-tête : l'unité est dite
+     une fois au-dessus. */
   .an-wave-long {
     display: none;
   }
@@ -589,55 +590,82 @@
     font-size: var(--text-xs);
   }
 
-  /* Le texte et l'espace entre colonnes se resserrent avec la largeur de l'écran : 13 px et 3 px à 390 px
-     de large, 12 px (le plancher) et environ 1 px à 360 px. */
+  /* Nombre de valeurs par cadre (hors titre et « Voir ») : cinq, six avec la colonne du vol. */
   .an-man-podium--waves {
+    --an-cadre-n: 5;
+    display: block;
+    width: 100%;
     border: 0;
     background: none;
     font-size: clamp(12px, 3.4vw, var(--text-s));
   }
 
+  .an-man-podium--waves-foil {
+    --an-cadre-n: 6;
+  }
+
+  /* Remontées : « enchaîné » (Retour) et « 1 min 00 » (Att.) sont plus longs que les autres valeurs, donc
+     leurs colonnes sont plus larges, les mêmes d'un cadre à l'autre. */
+  .an-man-podium--waves.an-man-podium--rame tbody tr {
+    grid-template-columns: 1.5fr 1fr 0.9fr 0.9fr 1.4fr;
+    column-gap: var(--space-1);
+  }
+
   .an-man-podium--waves thead {
-    display: table-header-group;
+    display: none;
   }
 
   .an-man-podium--waves tbody {
-    display: table-row-group;
-  }
-
-  .an-man-podium--waves thead tr,
-  .an-man-podium--waves tbody tr {
-    display: table-row;
-    background: none;
-  }
-
-  .an-man-podium--waves thead tr {
-    border-bottom: var(--trait-encre);
+    display: grid;
+    gap: var(--space-2);
   }
 
   .an-man-podium--waves tbody tr {
-    border-top: var(--trait-encre);
+    display: grid;
+    grid-template-columns: repeat(var(--an-cadre-n), minmax(0, 1fr));
+    column-gap: 2px;
+    row-gap: 6px;
+    align-items: center;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--ink);
+    border-radius: var(--radius-m);
+    background: var(--surface);
   }
 
-  .an-man-podium--waves thead th,
-  .an-man-podium--waves thead th:first-child,
-  .an-man-podium--waves tbody td,
-  .an-man-podium--waves tbody td:first-child {
-    display: table-cell;
-    padding: 4px clamp(1px, calc((100vw - 340px) * 0.06), 3px) !important;
-    text-align: center;
+  .an-man-podium--waves tbody td {
+    display: block;
+    grid-column: auto;
+    min-width: 0;
+    padding: 0 !important;
+    text-align: left !important;
     white-space: nowrap;
     font-weight: normal;
     color: inherit;
   }
 
-  .an-man-podium--waves thead th {
+  .an-man-podium--waves tbody td[data-label]::before {
+    display: block;
+    content: attr(data-label);
     color: var(--muted);
     font-size: var(--text-xs);
+    font-weight: 400;
   }
 
-  .an-man-podium--waves tbody td:first-child {
+  .an-man-podium--waves tbody td.an-cadre__titre {
+    grid-column: 1 / -2;
+    font-size: var(--text-m);
     font-weight: 700;
+  }
+
+  .an-man-podium--waves tbody td.an-cadre__voir {
+    grid-column: -2 / -1;
+    grid-row: 1;
+    justify-self: end;
+    text-align: right !important;
+  }
+
+  .an-man-podium--waves tbody td.an-cadre__cache {
+    display: none;
   }
 }
 

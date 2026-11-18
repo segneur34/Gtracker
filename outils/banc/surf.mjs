@@ -154,7 +154,7 @@ for (const [n, s, m, v] of [[1, 12, 60, '18,0'], [2, 20, 120, '21,6'], [3, 8, 36
   contient(`matinée, vague ${n} : ${s} s, ${m} m, ${v} km/h`, vagues, new RegExp(`(^|/ )${n}\\t\\d\\d:\\d\\d\\t${s} s\\t${m} m\\t${v}\\t`));
 }
 console.log('Voir la vague 2 :', await evaluate(`(() => {
-  const row = [...document.querySelectorAll('.an-carte-panels tr')].find((r) => r.cells[0]?.textContent === '2');
+  const row = [...document.querySelectorAll('.an-carte-panels tr')].find((r) => r.cells[0]?.innerText.trim() === '2');
   const b = row?.querySelector('button'); if (!b) return 'absent'; b.click(); return 'ok';
 })()`));
 await wait(500);
@@ -170,7 +170,7 @@ console.log('tri par distance :', await evaluate(`(() => {
   return 'ok';
 })()`));
 await wait(300);
-const ordre = await evaluate(`[...document.querySelectorAll('.an-carte-panels tbody tr')].map((r) => r.cells[0].textContent + ':' + r.cells[3].textContent).join(' ')`);
+const ordre = await evaluate(`[...document.querySelectorAll('.an-carte-panels tbody tr')].map((r) => r.cells[0].innerText.trim() + ':' + r.cells[3].textContent).join(' ')`);
 console.log('ordre :', ordre);
 check('matinée, tri par distance : 2, 1, 3', ordre === '2:120 m 1:60 m 3:36 m', ordre);
 console.log('rame :', await openTab('rame'));

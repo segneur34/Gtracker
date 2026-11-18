@@ -656,15 +656,18 @@ function SurfModule() {
                           const shown = waveShown === String(w.n);
                           return (
                             <tr key={w.n} className="ui-table__row">
-                              <td className="ui-cell-tight ui-cell--bold">{w.n}</td>
-                              <td style={tdStyle}>{formatTimeOfDay(w.startMs).slice(0, 5)}</td>
-                              <td style={tdStyle}>{formatShortDuration(w.durationS)}</td>
-                              <td className="ui-cell-tight ui-cell--bold">{Math.round(w.distanceM)} m</td>
-                              <td style={tdStyle}>{formatSpeedValue(toDisplaySpeed(w.maxSpeedMs, speedUnit), speedUnit)}</td>
-                              <td style={tdStyle}>{formatSpeedValue(toDisplaySpeed(w.avgSpeedMs, speedUnit), speedUnit)}</td>
-                              <td style={tdStyle}>{gyroTurns.get(w) ?? (gyroTurns.size > 0 ? `${w.turns}*` : w.turns)}</td>
-                              {foil && <td style={tdStyle}>{w.flight ?? '—'}</td>}
-                              <td style={tdStyle}>
+                              <td className="ui-cell-tight ui-cell--bold an-cadre__titre">
+                                <span className="an-wave-long">{w.n}</span>
+                                <span className="an-wave-short">{t('Vague {n} · {time}', { n: w.n, time: formatTimeOfDay(w.startMs).slice(0, 5) })}</span>
+                              </td>
+                              <td style={tdStyle} className="an-cadre__cache">{formatTimeOfDay(w.startMs).slice(0, 5)}</td>
+                              <td style={tdStyle} data-label={t('Durée')}>{formatShortDuration(w.durationS)}</td>
+                              <td className="ui-cell-tight ui-cell--bold" data-label={t('Dist.')}>{Math.round(w.distanceM)} m</td>
+                              <td style={tdStyle} data-label={t('Max')}>{formatSpeedValue(toDisplaySpeed(w.maxSpeedMs, speedUnit), speedUnit)}</td>
+                              <td style={tdStyle} data-label={t('Moy.')}>{formatSpeedValue(toDisplaySpeed(w.avgSpeedMs, speedUnit), speedUnit)}</td>
+                              <td style={tdStyle} data-label={gyroTurns.size > 0 ? t('Vir.') : t('Vir.*')}>{gyroTurns.get(w) ?? (gyroTurns.size > 0 ? `${w.turns}*` : w.turns)}</td>
+                              {foil && <td style={tdStyle} data-label={t('Vol')}>{w.flight ?? '—'}</td>}
+                              <td style={tdStyle} className="an-cadre__voir">
                                 <ShowButton shown={shown} onClick={() => highlight.show('vagues', shown ? null : String(w.n))} />
                               </td>
                             </tr>
@@ -701,7 +704,7 @@ function SurfModule() {
                   <>
                   <div className="an-wave-unit ui-mt-10">{t('Remontée et rame en {unit}', { unit: unitLabel })}</div>
                   <div className="ui-overflow-x ui-mt-10">
-                    <table className="ui-table an-man-podium an-man-podium--waves">
+                    <table className="ui-table an-man-podium an-man-podium--waves an-man-podium--rame">
                       <thead>
                         <tr className="ui-sunken">
                           <th style={thStyle}>{t('Après')}</th>
@@ -718,13 +721,16 @@ function SurfModule() {
                           const shown = returnShown === String(r.after);
                           return (
                             <tr key={r.after} className="ui-table__row">
-                              <td className="ui-cell-tight ui-cell--bold">{r.after === 0 ? t('départ') : `${rideWord} ${r.after}`}</td>
-                              <td style={tdStyle}>{r.returnS === null ? t('enchaîné') : formatShortDuration(r.returnS)}</td>
-                              <td style={tdStyle}>{r.straightM === null ? '—' : `${Math.round(r.straightM)} m`}</td>
-                              <td style={tdStyle}><span className="an-wave-long">{orDash(r.returnSpeedMs, (v) => formatSpeed(v, speedUnit))}</span><span className="an-wave-short">{speedCellOf(speedUnit)(r.returnSpeedMs)}</span></td>
-                              <td style={tdStyle}><span className="an-wave-long">{orDash(r.paddleSpeedMs, (v) => formatSpeed(v, speedUnit))}</span><span className="an-wave-short">{speedCellOf(speedUnit)(r.paddleSpeedMs)}</span></td>
-                              <td style={tdStyle}>{formatShortDuration(r.waitS)}</td>
-                              <td style={tdStyle}>
+                              <td className="ui-cell-tight ui-cell--bold an-cadre__titre">
+                                <span className="an-wave-long">{r.after === 0 ? t('départ') : `${rideWord} ${r.after}`}</span>
+                                <span className="an-wave-short">{r.after === 0 ? t('Départ') : (foil ? t('Après le vol {n}', { n: r.after }) : t('Après la vague {n}', { n: r.after }))}</span>
+                              </td>
+                              <td style={tdStyle} data-label={t('Retour')}>{r.returnS === null ? t('enchaîné') : formatShortDuration(r.returnS)}</td>
+                              <td style={tdStyle} data-label={t('Dist.')}>{r.straightM === null ? '—' : `${Math.round(r.straightM)} m`}</td>
+                              <td style={tdStyle} data-label={t('Rem.')}><span className="an-wave-long">{orDash(r.returnSpeedMs, (v) => formatSpeed(v, speedUnit))}</span><span className="an-wave-short">{speedCellOf(speedUnit)(r.returnSpeedMs)}</span></td>
+                              <td style={tdStyle} data-label={t('Rame')}><span className="an-wave-long">{orDash(r.paddleSpeedMs, (v) => formatSpeed(v, speedUnit))}</span><span className="an-wave-short">{speedCellOf(speedUnit)(r.paddleSpeedMs)}</span></td>
+                              <td style={tdStyle} data-label={t('Att.')}>{formatShortDuration(r.waitS)}</td>
+                              <td style={tdStyle} className="an-cadre__voir">
                                 <ShowButton shown={shown} onClick={() => highlight.show('rame', shown ? null : String(r.after))} />
                               </td>
                             </tr>
