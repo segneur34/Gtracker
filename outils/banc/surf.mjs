@@ -397,9 +397,11 @@ console.log('sens des vagues (390) :', await ligneSens());
 console.log('Régler (390) :', await boutonSens('.an-carte-panels', 'Régler'));
 await settle({ max: 1500 });
 check('390 px, sens des vagues : « Régler » ouvre la carte en plein écran avec la boussole', await evaluate(`Boolean(document.querySelector('.an-map-overlay .an-wind__dial'))`));
-const cadre = await evaluate(`(() => { const r = document.querySelector('.an-map-overlay .an-wind').getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; })()`);
+// Le cadran et le bandeau, mesurés eux-mêmes : leur conteneur n'a pas de boîte dans la carte agrandie (`display: contents`).
+const cadre = await evaluate(`(() => { const box = (s) => { const r = document.querySelector(s).getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom) }; }; return { cadran: box('.an-map-overlay .an-wind__dial'), bandeau: box('.an-map-overlay .an-wind__bar') }; })()`);
 console.log('boussole (390) :', JSON.stringify(cadre), await evaluate(`document.querySelector('.an-map-overlay .an-wind__bar')?.innerText.replace(/\\n+/g, ' ')`));
-check('390 px, sens des vagues : la boussole est entière dans l’écran', cadre.l >= 0 && cadre.r <= 390 && cadre.t >= 0 && cadre.b <= 844, JSON.stringify(cadre));
+const dansEcran = (c) => c.r > c.l && c.b > c.t && c.l >= 0 && c.r <= 390 && c.t >= 0 && c.b <= 844;
+check('390 px, sens des vagues : la boussole est entière dans l’écran', dansEcran(cadre.cadran) && dansEcran(cadre.bandeau) && cadre.bandeau.b <= cadre.cadran.t, JSON.stringify(cadre));
 await shoot('surf-sens-390');
 console.log('fermer la carte :', await evaluate(`(() => { const b = document.querySelector('.an-map-overlay__close'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
 await wait(600);
