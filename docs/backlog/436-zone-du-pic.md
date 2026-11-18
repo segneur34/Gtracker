@@ -102,3 +102,7 @@ La zone se dessine sur la carte de l'analyse surf, dans l'onglet rame (et quand 
 - Marge vérifiée par un disque de 15 m autour de chaque départ (sur 32 directions), qui ne fait qu'agrandir l'ellipse : avec la seule marge ajoutée aux axes, un départ au bout du grand axe en gardait moins.
 - Première sortie qui part déjà de la zone (enregistrement lancé au pic) : non mesurée, « — », la sortie n'ayant pas été enregistrée.
 - Sur une session de moins de quatre vagues, le sens n'est pas connu : la zone suit l'axe des départs et n'écarte aucune vague de l'intérieur (banc : la vague 3 de la matinée n'est plus « enchaînée »).
+
+### Planche de la partie C (18/11, hors dépôt)
+
+`D:\gong tracker\atelier\planche-436\index.html`, valeurs exactes dans `variantes.md` à côté : A trait noir plein 2,5 px sans remplissage ; B tirets noirs `7 6` de 2 px, intérieur grisé à 8 % (recommandée : noir comme le reste, les tirets ne se confondent pas avec la trace, l'intérieur se voit sans la cacher) ; C trait violet plein et teinte à 14 %, un rond à chaque départ ; D petits points noirs sur liseré blanc, un anneau à chaque départ. Constat : la carte reste claire la nuit (`tokens.css` donne la palette claire à `.leaflet-container`), donc l'encre de la zone y reste noire de nuit, comme les autres tracés de la carte. Outils : `planche-436\outils\` (l'objet carte se retrouve par les fibres de React depuis `.leaflet-container`).
