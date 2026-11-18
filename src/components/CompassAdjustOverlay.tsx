@@ -6,10 +6,14 @@ import Button from './ui/Button';
 /** Côté du dessin de la grande boussole, en unités de son `viewBox`. */
 const DIAL = 200;
 const C = DIAL / 2;
-/** Rayon du cercle où se tient la poignée de la flèche. */
-const HANDLE_R = 78;
-/** Rayon de la pointe de la flèche des vagues, qui part du centre et finit au bord. */
-const OUTWARD_TIP_R = 94;
+/** Marge du dessin autour du cadran, pour que la poignée à cheval sur le cercle ne soit pas rognée. */
+const MARGIN = 28;
+/** Rayon de la poignée de la flèche : son centre est sur le trait du cercle, le doigt ne cache pas la flèche. */
+const HANDLE_R = 98;
+/** Rayon de la pointe de la flèche des vagues, qui part du centre et s'arrête avant la poignée. */
+const OUTWARD_TIP_R = 72;
+/** Rayon où la flèche du vent commence, avant la poignée. */
+const INWARD_START_R = 80;
 
 export interface CompassAdjustTexts {
   /** Titre en gras du bandeau, à partir de l'angle montré (« Vent 245° »). */
@@ -112,7 +116,8 @@ function CompassAdjustOverlay({ value, autoValue, canReset, onChange, onClose, a
   const ticks = Array.from({ length: 12 }, (_, i) => i * 30);
   /** Du bord vers le centre (vent) : trait de la poignée à 12 du centre, pointe au centre. Du centre vers le bord : l'inverse. */
   const outward = arrow === 'versBord';
-  const lineEndR = outward ? 0 : 12;
+  const lineStartR = outward ? 0 : INWARD_START_R;
+  const lineEndR = outward ? OUTWARD_TIP_R - 16 : 12;
   const tipR = outward ? OUTWARD_TIP_R : 0;
   const baseR = outward ? OUTWARD_TIP_R - 16 : 16;
   const point = (r: number, side: number) => `${C + r * sin + side * cos},${C - r * cos + side * sin}`;
@@ -138,7 +143,7 @@ function CompassAdjustOverlay({ value, autoValue, canReset, onChange, onClose, a
         <Button size="s" variant="primary" onClick={onClose}>{t('Terminé')}</Button>
       </div>
 
-      <svg ref={dialRef} className="an-wind__dial" viewBox={`0 0 ${DIAL} ${DIAL}`} role="slider"
+      <svg ref={dialRef} className="an-wind__dial" viewBox={`${-MARGIN} ${-MARGIN} ${DIAL + 2 * MARGIN} ${DIAL + 2 * MARGIN}`} role="slider"
         aria-label={texts.dial} aria-valuemin={0} aria-valuemax={359} aria-valuenow={shownDeg}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => setDragDeg(null)}>
         <circle cx={C} cy={C} r={C - 2} fill="rgba(255,255,255,0.45)" stroke="#333" strokeWidth={2} />
@@ -151,8 +156,8 @@ function CompassAdjustOverlay({ value, autoValue, canReset, onChange, onClose, a
           const a = (i * 90 * Math.PI) / 180;
           return <text key={l} x={C + (C - 26) * Math.sin(a)} y={C - (C - 26) * Math.cos(a) + 5} textAnchor="middle" fontSize={14} fontWeight="bold" fill="#333">{l}</text>;
         })}
-        {/* Flèche ; la poignée au bord se tire. */}
-        <line x1={hx} y1={hy} x2={C + lineEndR * sin} y2={C - lineEndR * cos} stroke="#d32f2f" strokeWidth={4} strokeLinecap="round" />
+        {/* Flèche ; la poignée à cheval sur le cercle se tire. */}
+        <line x1={C + lineStartR * sin} y1={C - lineStartR * cos} x2={C + lineEndR * sin} y2={C - lineEndR * cos} stroke="#d32f2f" strokeWidth={4} strokeLinecap="round" />
         <polygon fill="#d32f2f" points={arrowHead} />
         <circle cx={hx} cy={hy} r={11} fill="#d32f2f" stroke="#fff" strokeWidth={3} className="an-wind__handle" />
       </svg>

@@ -240,7 +240,8 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: min(260px, 70%, 62vh);
+  /* Le dessin déborde le cadran de 28 sur 200 de chaque côté (la poignée) : le cadran garde sa taille. */
+  width: calc(min(260px, 70%, 62vh) * 1.28);
   aspect-ratio: 1;
   transform: translate(-50%, -40%);
   touch-action: none;
@@ -546,9 +547,11 @@
     padding: var(--space-2);
   }
 
+  /* La vue agrandie couvre tout l'écran, barre de navigation comprise : la polaire se pose au-dessus d'elle. */
   .an-wind__polar {
     width: 160px;
     height: 160px;
+    bottom: calc(var(--tabbar-h) + var(--inset-bottom) + var(--space-3));
   }
 
   /* Colonne d'onglets de la carte (voile) : jamais plus large que l'écran, même quand un panneau
