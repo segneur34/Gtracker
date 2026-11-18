@@ -417,3 +417,19 @@ Ce fichier est le §10 de `docs/ETAT_DU_PROJET.md`. C'est le journal de Gtracker
     - **Décision** : « très serré » choisi sur planche de deux variantes, environ la moitié de l'espace d'avant : Profil 15 px entre cadres, 10 px en bas de page, 16 px entre colonnes ; analyses 6 px entre carte, onglets et premier cadre, 10 px entre deux cadres. Les espaces sont des variables du thème.
     - **Pourquoi** : « effet vide » entre les cadres.
     - **Piège** : Statistiques partageait la règle des analyses ; elle garde ses 20 px par `--stats-panel-gap`, que l'utilisateur n'a pas encore tranché.
+417. « Aucune ceinture choisie » dans le cadre d'alerte rouge (lot 433 ; remarque du 17/11 au point 414 ; essai 294 réussi le 18/11 sur l'APK 0.01.22).
+    - **Décision** : sur Enregistrer, la phrase et son lien « Réglages » entrent dans le même cadre rouge que l'avertissement de batterie ; la case « Ceinture cardio » reste grisée, les autres explications sous les cases ne changent pas.
+    - **Pourquoi** : un blocage doit se voir comme les autres alertes de la page.
+    - **Piège** : aucun script du banc n'atteint ce message (téléphone seulement, sans ceinture choisie) : seul l'essai au téléphone le prouve.
+418. Le tableau des vagues du surf, une vague par ligne sur téléphone (lot 434 ; reprend le point 415 ; essai 295 « ok » le 18/11 sur l'APK 0.01.22).
+    - **Décision** : variante A de la planche du 17/11 au soir : un seul en-tête aux intitulés courts, l'unité dite une fois au-dessus, valeurs en colonnes, numéro en gras, « Voir » au bout, un trait à l'encre entre deux vagues, sans fond ni cadre. Le tableau redevient natif ; texte à 13 px à 390, 12 px à 360 ; rien ne change sur ordinateur.
+    - **Pourquoi** : le dessin du point 415 (deux lignes par vague) tenait dans l'écran mais « c'est moche ».
+    - **Piège** : l'utilisateur absent, Claude a pris la variante par défaut ; l'essai l'a confirmée. Pas de sous-grille CSS (vieille vue web). À 320 px avec foil, le tableau défile dans son panneau au lieu d'élargir la page.
+419. Traits de séparation (lot 428 ; note du 17/11 ; essais 296 et 297 « ok » le 18/11 sur l'APK 0.01.22).
+    - **Décision** : un trait simple d'un pixel à l'encre, variable du thème (noir le jour, blanc la nuit), entre les sous-sections de Réglages et entre deux lignes de tous les tableaux des analyses, téléphone comme ordinateur ; entre deux activités de la liste de Réglages, un trait fin au pinceau (pièce réutilisable de `BrushFrame.css`).
+    - **Pourquoi** : distinguer d'un coup d'œil sous-sections et lignes, au même trait partout.
+    - **Piège** : le trait au pinceau est le masque des cadres, dont on ne garde que l'arête du haut, sans rien couper de la liste. L'extension à tous les tableaux était ajoutée par Claude, l'utilisateur absent ; l'essai 297 l'a confirmée.
+420. Bouton de repli des onglets sous la carte, plein et net (lot 429 ; note du 17/11 ; essai 288 réussi le 18/11, de jour et de nuit, à l'intérieur).
+    - **Décision** : variante A de la planche : rond de 32 px, fond de page opaque, bord et flèche à l'encre, le même sur ordinateur et téléphone ; une seule règle, variables du thème.
+    - **Pourquoi** : la pastille transparente laissait passer le fond de page, bord et flèche presque invisibles sur la carte.
+    - **Piège** : essai fait à l'intérieur ; le rendu en plein soleil n'a pas été éprouvé.
