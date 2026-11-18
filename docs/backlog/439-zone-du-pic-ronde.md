@@ -90,6 +90,19 @@ Constat du plan : l'interface ne lit nulle part `PeakZoneOrientation` (seuls les
 
 À la passe de documentation, après validation : `docs/DECISIONS.md` §4, `docs/ETAT_DU_PROJET.md` (surf, zone du pic), `docs/INVENTAIRE.md` (`waveSense`, `peakZone`).
 
+## Résultat sur la session réelle, après les parties A et B (18/11, `releve-apres.txt`, hors dépôt)
+
+Paddle du 16/11 à 15 h 32, recalculé par le code du lot :
+- seuil de la session, 6 km/h : zone « ligne », grand axe à 98°, 153 × 20 m (cercle de 77 m de rayon avant) ; les deux vagues finissent hors de la zone ; retour après la vague 1 de **55 s** (0 s avant) ; première sortie 6 min 20 ;
+- seuil par défaut, 9 km/h : zone 156 × 20 m, retour de 47 s ;
+- seuil de 5 km/h, 4 vagues dont deux très molles : zone 152 × 72 m (les départs s'écartent de 17 m de leur ligne), retours de 53 s, 30 s et 0 s.
+
+Tranché par l'orchestrateur :
+- la borne de 45° autour de la perpendiculaire au sens est gardée : des vagues toutes prises en biais du même côté à plus de 45° calent la zone sur la perpendiculaire à ce sens faussé, pas sur la plage ; le sens saisi à la main du 440 y répondra ;
+- relecture, un seul défaut, de commentaire : sur la perpendiculaire au sens (départs groupés ou étalés vers le large), le décalage des départs le long du sens épaissit la zone ; c'est voulu, la zone contient tous les départs gardés (« s'agrandit pour faire rentrer tous les départs »), et l'en-tête de `peakZone.ts` le dit maintenant.
+
+Banc (partie C) : `surf.mjs`, matinée, retours de 54 s et 11 s devenus 27 s et 29 s, passage seul réussi, console vide. Écart relevé et non élucidé : le test unitaire du même scénario donne 15,6 s pour le premier retour, là où le banc et le test s'accordaient avant le lot (54 s et 55 s). Cause supposée par l'orchestrateur, non vérifiée : dans le test, le troisième départ est à 39 m vers la plage, à 1 m du seuil des départs de l'intérieur (40 m) ; la trace du banc, relue du GPX et lissée, peut le faire passer de l'autre côté, ce qui amincit la zone. À vérifier si un chiffre de retour paraît faux sur une session réelle.
+
 ## Voulu
 
 - Une zone **oblongue** dans tous les cas où il y a des départs (jamais un cercle à l'écran), son grand axe le long de la ligne de déferlement (en travers du sens des vagues), à la place réelle du pic.

@@ -6,6 +6,7 @@ import type { RawTrackPoint, TrackPoint } from '../core/types';
 import { fromDisplaySpeed } from '../core/units';
 import { summarizeSession } from '../library/summary';
 import { analyzeSurf, riseStartOf, summarizeSurf, type RiseOptions, type SurfParams } from './surfAnalysis';
+import { isInZone } from './peakZone';
 import { countDirectionChanges } from './gpsTurns';
 import { runSurfSession, surfProfileOf } from './surfSession';
 import { M_PER_DEG_LAT } from '../test/geo.fixture';
@@ -121,8 +122,11 @@ const analyze = (track: TrackPoint[], foil = false, opts: Partial<SurfParams> = 
 
 /**
  * Une matinée : plage, marche, sortie avec deux canards, attente, trois
- * vagues ; la troisième prise en remontant, sans attente. Trois vagues ne
- * disent pas le sens des vagues : la zone du pic suit l'axe de leurs départs.
+ * vagues ; la troisième prise en remontant, sans attente. Trois vagues ne font
+ * pas un sens fiable, mais il oriente la zone du pic. Les départs (positions
+ * approchées, x vers l'est, y vers le nord depuis le premier point) : (0, 188),
+ * (−20, 230) et (20, 150). Ils s'étalent surtout le long du sens, 81 m, et
+ * moins de 30 m le long de la plage : la zone suit la perpendiculaire au sens.
  */
 const MORNING: Phase[] = [
   { s: 60, speed: 0 },
@@ -169,28 +173,31 @@ describe('analyzeSurf, sans foil', () => {
     expect(b.takeoffS).toBeLessThanOrEqual(params.takeoffSearchS);
   });
 
-  it('mesure le retour au pic jusqu\'à l\'entrée dans la zone ; sans sens des vagues, aucune vague n\'est de l\'intérieur', () => {
-    expect(analysis.waveSense?.reliable ?? false).toBe(false);
-    expect(analysis.peakZone!.orientation).toBe('departs');
+  it('mesure le retour au pic jusqu\'à l\'entrée dans la zone ; la troisième vague, à 39 m vers la plage, n\'est pas de l\'intérieur', () => {
+    expect(analysis.waveSense!.reliable).toBe(false);
+    expect(analysis.peakZone!.orientation).toBe('vagues');
     expect(analysis.peakZone!.insideDepartures).toEqual([]);
-    // 100 s de rame vers le large à 1 m/s jusqu'à l'attente : la zone, étirée sur les départs, est atteinte avant.
+    // La zone court de 5 m au sud du départ le plus proche de la plage (y ≈ 145) à 15 m au nord du plus au large, et se
+    // resserre vers ses bouts : à x ≈ −20, où finit la première vague (y ≈ 132), son bord sud est vers y ≈ 147.
+    // 15 m de rame vers le large à 1 m/s, bien avant l'attente, 100 m plus loin.
     const afterFirst = analysis.returns.find((r) => r.after === 1)!;
-    expect(afterFirst.returnS).toBeCloseTo(55, -1);
+    expect(afterFirst.returnS).toBeCloseTo(15, -1);
     expect(afterFirst.entryMs).toBeCloseTo(afterFirst.startMs + afterFirst.returnS! * 1000, 3);
     expect(afterFirst.straightM).toBeCloseTo(afterFirst.returnS!, 0);
     expect(afterFirst.returnSpeedMs).toBeCloseTo(1, 3);
     expect(afterFirst.paddleSpeedMs).toBeCloseTo(1, 1);
-    // La troisième vague part dans la zone : la remontée qui la précède y entre, elle n'est plus enchaînée.
+    // La troisième vague part dans la zone : la remontée qui la précède y entre, elle n'est pas enchaînée. La deuxième
+    // finit vers (20, 118) : 29 m de rame jusqu'au bord, de l'autre côté de la zone.
     const afterSecond = analysis.returns.find((r) => r.after === 2)!;
-    expect(afterSecond.returnS!).toBeGreaterThan(0);
-    expect(afterSecond.returnS!).toBeLessThan(40);
+    expect(afterSecond.returnS).toBeCloseTo(29, -1);
     expect(summary.chainedCount).toBe(0);
     expect(summary.avgReturnS).toBeCloseTo((afterFirst.returnS! + afterSecond.returnS!) / 2, 6);
   });
 
   it('compte la première sortie jusqu\'à la zone, marche comprise, sans s\'arrêter aux canards', () => {
-    // Du premier pas (60 s) à l'entrée dans la zone, plus tôt que la première attente (188 s de marche et de rame).
-    expect(summary.firstOutS).toBeCloseTo(142, -1);
+    // Du premier pas (60 s) au bord sud de la zone, sur x = 0 vers y ≈ 145 : 72 m de marche en 60 s, puis 50 m de rame,
+    // 4 s de canard et 23 m, soit 137 s ; plus tôt que la première attente (188 s de marche et de rame).
+    expect(summary.firstOutS).toBeCloseTo(137, -1);
     expect(summary.firstOutS!).toBeLessThan(60 + 120 + 8);
   });
 
@@ -299,8 +306,10 @@ describe('analyzeSurf, sur foil', () => {
   });
 
   it('mesure la remontée entre deux vols, jusqu\'à la zone des deux décollages', () => {
-    // Deux départs : la zone est un cercle qui les contient, le posé du premier vol est à quelques mètres de son bord.
-    expect(analysis.peakZone!.orientation).toBe('cercle');
+    // Deux décollages, 77 m l'un de l'autre, surtout le long du sens des vagues (200°, tiré des deux vols) : leur ligne
+    // s'écarte de la perpendiculaire au sens au-delà de la borne, la zone suit la perpendiculaire. Le posé du premier
+    // vol est à quelques mètres de son bord.
+    expect(analysis.peakZone!.orientation).toBe('vagues');
     const back = analysis.returns.find((r) => r.after === 1)!;
     expect(back.returnS!).toBeGreaterThan(0);
     expect(back.returnS!).toBeLessThan(40);
@@ -367,7 +376,9 @@ describe('analyzeSurf, sens des vagues et remontées pompées sur foil', () => {
       // Rame et attente inchangées ; le retour, et la première sortie, suivent la zone, que le sens oriente.
       const paddling = (rs: typeof after.returns) => rs.filter((r) => r.after > 0).map(({ after: n, startMs, endMs, paddleS, paddleDistanceM, waitS }) => ({ n, startMs, endMs, paddleS, paddleDistanceM, waitS }));
       expect(paddling(after.returns)).toEqual(paddling(before.returns));
-      expect(after.peakZone!.orientation).toBe('vagues');
+      // Chaque vol avance de 80 m vers l'est et d'une trentaine vers le nord : les décollages dessinent une ligne à une
+      // vingtaine de degrés de la perpendiculaire au sens (le sud), en deçà de la borne.
+      expect(after.peakZone!.orientation).toBe('ligne');
     });
   }
 
@@ -906,12 +917,15 @@ describe('analyzeSurf, zone du pic et retour au pic', () => {
       expect(zone.departures).toEqual(analysis.waves.slice(0, 4).map((w) => w.start));
       expect(zone.insideDepartures).toEqual([analysis.waves[4].start]);
 
-      // Rame à 1 m/s : la zone est atteinte avant le pic, une vingtaine de mètres avant l'attente.
+      // Les départs, à 20 m l'un de l'autre le long de la plage, sont groupés : la zone suit la perpendiculaire au sens,
+      // 5 m au sud de leur ligne au milieu, un peu moins à leur aplomb, où elle se resserre (10 m du centre sur un grand
+      // demi-axe de 25 m). Chaque vague finit 56 m au sud de cette ligne : 51 m de rame à 1 m/s, une dizaine de mètres
+      // avant l'attente.
       const measured = analysis.returns.filter((r) => r.after > 0 && r.returnS !== null);
       expect(measured.map((r) => r.after)).toEqual([1, 2, 3]);
       for (const r of measured) {
-        expect(r.returnS!).toBeGreaterThan(30);
-        expect(r.returnS!).toBeLessThan(50);
+        expect(r.returnS!).toBeGreaterThan(45);
+        expect(r.returnS!).toBeLessThan(56);
         expect(r.entryMs).toBeCloseTo(r.startMs + r.returnS! * 1000, 3);
         expect(r.returnSpeedMs).toBeCloseTo(1, 2);
         // L'attente reste l'immobilité, mesurée à part.
@@ -946,8 +960,8 @@ describe('analyzeSurf, zone du pic et retour au pic', () => {
   });
 
   it('une glisse finie dans la zone : retour nul, compté, sans vitesse de remontée', () => {
-    // Une marge de 70 m : chaque vague finit dans la zone, la vague de l'intérieur aussi.
-    const { analysis, summary } = analyze(buildSurfSession(PEAK), false, { zoneMarginM: 70 });
+    // Une marge de 70 m, côté plage compris : chaque vague finit dans la zone, la vague de l'intérieur aussi.
+    const { analysis, summary } = analyze(buildSurfSession(PEAK), false, { zoneMarginM: 70, zoneBeachMarginM: 70 });
     const after = analysis.returns.filter((r) => r.after > 0);
     expect(after).toHaveLength(4);
     for (const r of after) {
@@ -971,5 +985,73 @@ describe('analyzeSurf, zone du pic et retour au pic', () => {
     expect(still.analysis.peakZone).toBeNull();
     expect(still.analysis.returns).toEqual([]);
     expect(still.summary.firstOutS).toBeNull();
+  });
+});
+
+describe('analyzeSurf, zone du pic : peu de vagues, jamais ronde', () => {
+  /** Écart entre deux caps d'axe, modulo 180°, de 0 à 90. */
+  const axisGap = (a: number, b: number): number => {
+    const d = (((a - b) % 180) + 180) % 180;
+    return Math.min(d, 180 - d);
+  };
+  /** Ici la plage est au nord : les vagues déferlent au cap 354°, le large est au 174°, la plage court vers le 84°. */
+  const SEA = 174;
+  /**
+   * Deux vagues courtes parties loin l'une de l'autre le long de la plage. Sortie vers le large, attente, rame de
+   * départ (8 m) et vague au 354° (43 m) ; retour vers le large à 0,9 m/s, 73 m, jusqu'à 30 m au large du premier
+   * départ, attente (3 m) ; 121,5 m le long de la plage, au 84° ; attente (3 m), rame de départ et vague au 355°
+   * (52 m) ; retour vers le large au-delà des départs, attente. Le second départ est à 121,5 m du premier le long de
+   * la plage et 28 m plus au large (43 − 73 − 3 − 3 + 8 = −28) : leur ligne court au 97°, à 13° de la
+   * perpendiculaire au sens.
+   */
+  const TWO_SHORT: Phase[] = [
+    { s: 30, speed: 0 }, { s: 100, speed: 1, heading: SEA }, { s: 40, speed: 0.1, heading: SEA },
+    { s: 5, speed: 1.6, heading: 354 }, { s: 10, speed: 4.3, heading: 354 },
+    { s: 81, speed: 0.9, heading: SEA }, { s: 30, speed: 0.1, heading: SEA },
+    { s: 135, speed: 0.9, heading: 84 }, { s: 30, speed: 0.1, heading: SEA },
+    { s: 5, speed: 1.6, heading: 355 }, { s: 12, speed: 4.3, heading: 355 },
+    { s: 100, speed: 0.9, heading: SEA }, { s: 30, speed: 0.1, heading: SEA },
+  ];
+
+  for (const cadenceS of [1, 0.2, 4]) {
+    it(`deux vagues courtes : la zone suit la ligne des départs, la fin de la vague en sort, le retour se mesure (pas de ${cadenceS} s)`, () => {
+      const track = buildSurfSession(TWO_SHORT, cadenceS);
+      const { analysis } = analyze(track);
+      expect(analysis.waves).toHaveLength(2);
+      // Deux mesures ne font pas un sens fiable : il oriente la zone sans écarter aucune vague.
+      const sense = analysis.waveSense!;
+      expect(sense.reliable).toBe(false);
+      expect(sense.samples).toBe(2);
+      expect(axisGap(sense.directionDeg, 354.5)).toBeLessThan(3);
+      const zone = analysis.peakZone!;
+      expect(zone.orientation).toBe('ligne');
+      expect(axisGap(zone.majorAxisDeg, 98)).toBeLessThan(5);
+      expect(zone.semiMajorM).toBeGreaterThan(3 * zone.semiMinorM);
+      expect(isInZone(zone, track[analysis.waves[0].end])).toBe(false);
+      // La vague finit à 42 m de la ligne des départs, vers la plage (43 m au 354°, à 13° de la perpendiculaire à la
+      // ligne) ; la zone n'en déborde, à son bout ouest où elle se resserre, que d'un mètre : 41 m de rame à 0,9 m/s
+      // au 174°, environ 46 s.
+      const back = analysis.returns.find((r) => r.after === 1)!;
+      expect(back.returnS!).toBeGreaterThan(30);
+      expect(back.returnS!).toBeLessThan(75);
+    });
+  }
+
+  it('une seule vague : son sens oriente la zone, oblongue en travers, jamais ronde', () => {
+    const ONE: Phase[] = [
+      { s: 30, speed: 0 }, { s: 100, speed: 1 }, { s: 30, speed: 0.1 },
+      { s: 5, speed: 1.6, heading: 180 }, { s: 12, speed: 5, heading: 190 }, { s: 40, speed: 1 },
+    ];
+    const { analysis } = analyze(buildSurfSession(ONE));
+    expect(analysis.waves).toHaveLength(1);
+    expect(analysis.waveSense!.samples).toBe(1);
+    expect(analysis.waveSense!.reliable).toBe(false);
+    const zone = analysis.peakZone!;
+    expect(zone.orientation).toBe('vagues');
+    expect(axisGap(zone.majorAxisDeg, analysis.waveSense!.directionDeg + 90)).toBeLessThan(1e-6);
+    expect(axisGap(zone.majorAxisDeg, 90)).toBeLessThan(15);
+    // Un départ : 15 m vers le large et 5 m vers la plage font un petit demi-axe de 10 m, le grand 1,5 fois plus long.
+    expect(zone.semiMinorM).toBeCloseTo(10, 6);
+    expect(zone.semiMajorM).toBeCloseTo(15, 6);
   });
 });

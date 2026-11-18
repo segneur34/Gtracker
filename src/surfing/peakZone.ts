@@ -5,22 +5,36 @@ import type { LatLon, TrackPoint } from '../core/types';
 import type { WaveSense } from './waveSense';
 
 /**
- * Zone du pic d'une session de surf : une ellipse qui contient les départs des
- * glisses (début remonté d'une vague, décollage d'un vol sur foil), une seule
- * pour toute la session. Pur, en SI.
+ * Zone du pic d'une session de surf : une ellipse mince qui contient les
+ * départs des glisses (début remonté d'une vague, décollage d'un vol sur foil),
+ * une seule pour toute la session, allongée le long de la plage. Pur, en SI.
  *
- * Son grand axe court en travers du sens des vagues, le long de la ligne de
- * déferlement où le pic s'étale ; son petit axe suit le sens des vagues. Les
- * demi-axes partent de la boîte des départs dans ce repère, plus une marge, le
- * grand axe vaut au moins `ZONE_MIN_ASPECT` fois le petit, puis l'ellipse
- * grandit jusqu'à garder la marge autour de chaque départ : la zone ne fait que
- * grandir.
+ * Le pic s'étale le long de la ligne de déferlement et n'est jamais deux fois
+ * au même endroit : le grand axe suit la ligne des départs quand ils s'étalent
+ * d'au moins `ZONE_LINE_MIN_M`, tant qu'elle ne s'écarte pas de plus de
+ * `ZONE_MAX_TILT_DEG` de la perpendiculaire au sens des vagues (des vagues
+ * surfées en biais faussent le sens, pas la ligne). Départs groupés, départ
+ * unique, ou ligne trop proche du sens des vagues : la perpendiculaire au
+ * sens. Sans sens, la ligne des départs, sans borne ; sans ligne non plus,
+ * l'est-ouest. Jamais un cercle : le grand axe vaut au moins
+ * `ZONE_MIN_ASPECT` fois le petit.
+ *
+ * Zone mince : le grand demi-axe est la demi-étendue des départs le long de
+ * l'axe, plus la marge ; le petit, leur demi-étendue de part et d'autre, plus
+ * la marge. Sur la ligne des départs, leur décalage le long du sens des vagues
+ * ne l'épaissit donc pas. Sur la perpendiculaire au sens (départs groupés, ou
+ * étalés vers le large plutôt que le long de la plage), il l'épaissit : la zone
+ * contient tous les départs gardés, et seuls ceux de l'intérieur en sortent.
+ * Avec un sens, la marge n'est que de `ZONE_BEACH_MARGIN_M` côté plage : une
+ * vague courte finit vite hors de la zone, et le retour au pic se mesure. Le
+ * centre se décale alors vers le large ; la forme reste une ellipse. Un départ
+ * resté dehors (au bout du grand axe, où l'ellipse se resserre) fait grandir le
+ * petit axe seul, juste assez.
  *
  * Un départ loin vers la plage (une vague de l'intérieur, reprise en chemin)
  * n'entre pas dans la zone : il est à plus de `ZONE_INSIDE_M` de la médiane des
- * départs, le long du sens des vagues. Sans sens estimé, l'axe de la zone est
- * l'axe principal des départs (trois au moins), sinon la zone est un cercle ;
- * la plage n'est alors pas connue, et aucun départ n'est écarté.
+ * départs, le long du sens des vagues ; il est écarté avant le calcul de l'axe.
+ * Sans sens, la plage n'est pas connue, et aucun départ n'est écarté.
  *
  * Le retour au pic se mesure jusqu'à l'entrée dans la zone (`zoneEntry`),
  * calculée sur le segment entre deux points : un long pas qui traverse le bord
@@ -30,10 +44,19 @@ import type { WaveSense } from './waveSense';
 /**
  * Marge ajoutée aux demi-axes, en mètres : une zone d'un seul départ n'est pas
  * un point, et un départ au bord n'est pas hors zone pour le bruit du GPS.
+ * Côté plage, avec un sens des vagues, elle est réduite (`ZONE_BEACH_MARGIN_M`).
  */
 export const ZONE_MARGIN_M = 15;
 
-/** Rapport minimal du grand axe au petit : la zone reste oblongue, en travers des vagues. */
+/**
+ * Marge côté plage, en mètres, quand le sens des vagues dit où est la plage :
+ * le surfeur attend au large des points où il prend la vague, et une vague
+ * courte finit à quelques dizaines de mètres de son départ. Une marge pleine
+ * avalerait sa fin, et le retour au pic serait nul.
+ */
+export const ZONE_BEACH_MARGIN_M = 5;
+
+/** Rapport minimal du grand axe au petit : la zone reste oblongue, jamais ronde. */
 export const ZONE_MIN_ASPECT = 1.5;
 
 /**
@@ -43,21 +66,49 @@ export const ZONE_MIN_ASPECT = 1.5;
  */
 export const ZONE_INSIDE_M = 40;
 
+/**
+ * Étendue des départs le long de leur axe principal, en mètres, à partir de
+ * laquelle ils dessinent une ligne : en deçà, ils sont groupés, et leur axe
+ * ne dit rien de la plage.
+ */
+export const ZONE_LINE_MIN_M = 30;
+
+/**
+ * Écart maximal, en degrés, entre la ligne des départs et la perpendiculaire
+ * au sens des vagues : au-delà, les départs s'étalent le long du sens (vers le
+ * large et vers la plage) plutôt que le long de la plage, et la zone suit la
+ * perpendiculaire au sens.
+ */
+export const ZONE_MAX_TILT_DEG = 45;
+
+/**
+ * Jeu, en mètres, laissé au départ qui fait grandir le petit axe : posé
+ * exactement sur le bord, il pourrait en sortir à l'arrondi de la projection.
+ */
+const EDGE_SLACK_M = 0.1;
+
 /** Constantes de la zone du pic, surchargeables pour les tests. */
 export interface PeakZoneOptions {
   zoneMarginM?: number;
+  zoneBeachMarginM?: number;
   zoneMinAspect?: number;
   zoneInsideM?: number;
+  zoneLineMinM?: number;
+  zoneMaxTiltDeg?: number;
 }
 
-/** D'où vient l'axe de la zone : le sens des vagues, l'axe principal des départs, ou aucun (un cercle). */
-export type PeakZoneOrientation = 'vagues' | 'departs' | 'cercle';
+/**
+ * D'où vient l'axe de la zone : la ligne des départs, bornée par le sens des
+ * vagues (`ligne`) ; la perpendiculaire au sens (`vagues`) ; sans sens, la
+ * ligne des départs, ou l'est-ouest faute de ligne (`departs`).
+ */
+export type PeakZoneOrientation = 'ligne' | 'vagues' | 'departs';
 
 export interface PeakZone {
   center: LatLon;
-  /** Demi-grand axe, en mètres, en travers des vagues. */
+  /** Demi-grand axe, en mètres, le long de la plage. */
   semiMajorM: number;
-  /** Demi-petit axe, en mètres, le long du sens des vagues. */
+  /** Demi-petit axe, en mètres, en travers du grand. */
   semiMinorM: number;
   /** Cap du grand axe, en degrés depuis le nord, de 0 à 180. */
   majorAxisDeg: number;
@@ -100,15 +151,19 @@ const principalAxisDeg = (points: PlanePoint[]): number | null => {
   return normalizeDeg(90 - toDeg(alpha)) % 180;
 };
 
-/**
- * Directions où se vérifie la marge autour de chaque départ : le disque de la
- * marge, approché par ce nombre de points, l'est à 0,5 % de son rayon près.
- */
-const MARGIN_DIRECTIONS = 32;
+/** Écart entre deux caps d'axe, modulo 180°, de 0 à 90. */
+const axisGapDeg = (a: number, b: number): number => {
+  const d = (((a - b) % 180) + 180) % 180;
+  return Math.min(d, 180 - d);
+};
+
+/** Axe de la zone sans sens des vagues ni ligne des départs (un seul départ, ou des départs confondus) : l'est-ouest, par convention. */
+const EAST_WEST_DEG = 90;
 
 /**
  * Zone du pic, faite des départs `departures` (points de la trace), orientée
- * par le sens des vagues `sense` s'il est estimé. `null` sans départ.
+ * par le sens des vagues `sense` quand il est utilisable (au moins une mesure
+ * assez concentrée : c'est à l'appelant d'en juger). `null` sans départ.
  */
 export const buildPeakZone = (
   track: readonly TrackPoint[], departures: readonly number[], sense: WaveSense | null, opts: PeakZoneOptions = {}
@@ -122,56 +177,64 @@ export const buildPeakZone = (
   const proj = planeProjection(origin.lat, origin);
   const points = departures.map((i) => proj.to(track[i]));
 
-  let orientation: PeakZoneOrientation;
-  let majorAxisDeg = 0;
+  // Vers la plage, le long du sens des vagues ; sans sens, la plage n'est pas connue.
+  const toBeach = sense === null ? null : { x: Math.sin(toRad(sense.directionDeg)), y: Math.cos(toRad(sense.directionDeg)) };
   let kept = departures.map((_, k) => k);
-  if (sense !== null) {
-    orientation = 'vagues';
-    majorAxisDeg = normalizeDeg(sense.directionDeg + 90) % 180;
-    // Position de chaque départ le long du sens des vagues, croissante vers la plage.
-    const toBeach = { x: Math.sin(toRad(sense.directionDeg)), y: Math.cos(toRad(sense.directionDeg)) };
+  if (toBeach !== null) {
     const along = points.map((q) => dot(q, toBeach));
     const mid = median(along);
     const insideM = opts.zoneInsideM ?? ZONE_INSIDE_M;
     kept = kept.filter((k) => along[k] - mid <= insideM);
+  }
+  const keptPoints = kept.map((k) => points[k]);
+
+  // La ligne des départs gardés : leur axe principal, s'ils s'étalent assez le long de lui.
+  const lineDeg = keptPoints.length >= 2 ? principalAxisDeg(keptPoints) : null;
+  const lineExtentM = lineDeg === null ? 0 : (() => {
+    const along = keptPoints.map((q) => dot(q, axesOf(lineDeg).major));
+    return Math.max(...along) - Math.min(...along);
+  })();
+
+  let orientation: PeakZoneOrientation;
+  let majorAxisDeg: number;
+  if (sense !== null) {
+    const across = normalizeDeg(sense.directionDeg + 90) % 180;
+    const isLine = lineDeg !== null && lineExtentM >= (opts.zoneLineMinM ?? ZONE_LINE_MIN_M)
+      && axisGapDeg(lineDeg, across) <= (opts.zoneMaxTiltDeg ?? ZONE_MAX_TILT_DEG);
+    orientation = isLine ? 'ligne' : 'vagues';
+    majorAxisDeg = isLine ? lineDeg : across;
   } else {
-    const axis = departures.length >= 3 ? principalAxisDeg(points) : null;
-    orientation = axis === null ? 'cercle' : 'departs';
-    majorAxisDeg = axis ?? 0;
+    orientation = 'departs';
+    majorAxisDeg = lineDeg ?? EAST_WEST_DEG;
   }
 
   const { major, minor } = axesOf(majorAxisDeg);
-  const s = kept.map((k) => dot(points[k], major));
-  const a = kept.map((k) => dot(points[k], minor));
+  const s = keptPoints.map((q) => dot(q, major));
+  const a = keptPoints.map((q) => dot(q, minor));
   const sMid = (Math.min(...s) + Math.max(...s)) / 2;
   const aMid = (Math.min(...a) + Math.max(...a)) / 2;
   const sHalf = (Math.max(...s) - Math.min(...s)) / 2;
   const aHalf = (Math.max(...a) - Math.min(...a)) / 2;
 
-  let semiMajorM: number;
-  let semiMinorM: number;
-  if (orientation === 'cercle') {
-    semiMajorM = Math.max(...kept.map((_, j) => Math.hypot(s[j] - sMid, a[j] - aMid))) + marginM;
-    semiMinorM = semiMajorM;
-  } else {
-    // La boîte des départs et la marge, puis l'allongement minimal.
-    semiMinorM = aHalf + marginM;
-    semiMajorM = Math.max(sHalf + marginM, (opts.zoneMinAspect ?? ZONE_MIN_ASPECT) * semiMinorM);
-    // Le disque de la marge autour de chaque départ tient dans la zone : là où l'ellipse se resserre (au bout du
-    // grand axe, dans les coins de la boîte), elle grandit d'un même facteur sur ses deux axes.
-    let k = 1;
-    for (let j = 0; j < kept.length; j++) {
-      for (let d = 0; d < MARGIN_DIRECTIONS; d++) {
-        const angle = (2 * Math.PI * d) / MARGIN_DIRECTIONS;
-        const ds = s[j] - sMid + marginM * Math.cos(angle);
-        const da = a[j] - aMid + marginM * Math.sin(angle);
-        k = Math.max(k, Math.hypot(ds / semiMajorM, da / semiMinorM));
-      }
-    }
-    semiMajorM *= k;
-    semiMinorM *= k;
+  // Marges de part et d'autre du grand axe : la pleine vers le large, la réduite vers la plage quand elle est connue.
+  // Le côté plage du petit axe : le signe de sa projection sur le sens des vagues (l'axe n'en est jamais perpendiculaire).
+  const beachMarginM = toBeach === null ? marginM : opts.zoneBeachMarginM ?? ZONE_BEACH_MARGIN_M;
+  const beachSign = toBeach === null ? 1 : Math.sign(dot(minor, toBeach)) || 1;
+  const aCenter = aMid - (beachSign * (marginM - beachMarginM)) / 2;
+  let semiMinorM = aHalf + (marginM + beachMarginM) / 2;
+  const minAspect = opts.zoneMinAspect ?? ZONE_MIN_ASPECT;
+  let semiMajorM = Math.max(sHalf + marginM, minAspect * semiMinorM);
+  // Là où l'ellipse se resserre (au bout du grand axe, dans les coins de la boîte des départs), un départ peut rester
+  // dehors : le petit axe seul grandit, juste assez pour le reprendre.
+  for (let j = 0; j < kept.length; j++) {
+    const ds = s[j] - sMid;
+    const da = a[j] - aCenter;
+    const room = 1 - (ds / semiMajorM) ** 2;
+    if (room > 0 && (da / semiMinorM) ** 2 > room) semiMinorM = Math.abs(da) / Math.sqrt(room) + EDGE_SLACK_M;
   }
-  const center = proj.from({ x: sMid * major.x + aMid * minor.x, y: sMid * major.y + aMid * minor.y });
+  // L'allongement minimal tient encore : la zone n'est jamais ronde.
+  semiMajorM = Math.max(semiMajorM, minAspect * semiMinorM);
+  const center = proj.from({ x: sMid * major.x + aCenter * minor.x, y: sMid * major.y + aCenter * minor.y });
   return {
     center, semiMajorM, semiMinorM, majorAxisDeg, orientation,
     departures: kept.map((k) => departures[k]),

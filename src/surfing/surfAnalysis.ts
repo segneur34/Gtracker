@@ -7,7 +7,7 @@ import type { SportProfile, SurfProfile } from '../core/sportProfiles';
 import type { CumulativeTrack, TrackPoint } from '../core/types';
 import { countDirectionChanges } from './gpsTurns';
 import { buildPeakZone, isInZone, zoneEntry, type PeakZone, type PeakZoneOptions } from './peakZone';
-import { estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOptions } from './waveSense';
+import { WAVE_SENSE_MIN_R, estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOptions } from './waveSense';
 
 /**
  * Analyse d'une session de surf, en SI, sur la trace du noyau.
@@ -25,8 +25,9 @@ import { estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOp
  *   interpolé (règle 10) : il borne la phase en cours.
  *
  * Entre deux glisses, une remontée. Le retour au pic va de la fin de la
- * glisse à l'entrée dans la zone du pic (`peakZone.ts`), celle des départs de
- * toute la session ; une glisse finie dans la zone a un retour nul. Une glisse
+ * glisse à l'entrée dans la zone du pic (`peakZone.ts`), une ellipse mince le
+ * long de la plage, faite des départs de toute la session ; une glisse finie
+ * dans la zone a un retour nul. Une glisse
  * prise sans être rentrée dans la zone (une vague de l'intérieur) est
  * « enchaînée », et sa remontée n'entre pas dans la moyenne du retour. Avant la
  * première glisse, la première sortie va du premier coup de rame à la première
@@ -41,8 +42,10 @@ import { estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOp
  * Le sens des vagues (`waveSense.ts`) s'estime sur la première vague de chaque
  * glisse. Sur foil, une vague candidate qui va contre lui est une remontée
  * pompée vers le large : elle sort des vagues et reste dans le vol, comptée
- * pompée. Tant que le sens n'est pas fiable (`reliable`), rien n'est écarté, et
- * la zone du pic ne le reçoit pas.
+ * pompée. Tant que le sens n'est pas fiable (`reliable`), rien n'est écarté :
+ * une erreur y coûterait des vagues. La zone du pic le reçoit dès la première
+ * mesure, s'il est assez concentré (`waveSenseMinR`) : il l'oriente en travers
+ * des vagues et dit de quel côté est la plage, sans rien retirer au décompte.
  */
 
 /** Durée maximale du recul du début d'une glisse, en secondes : une mise en vitesse entre les deux détentes en dure quelques-unes. */
@@ -367,8 +370,10 @@ export const analyzeSurf = (
     });
   }
 
-  // Zone du pic : les départs de toutes les glisses, décollages des vols sur foil.
-  const peakZone = buildPeakZone(track, rides.map((r) => r.start), waveSense?.reliable ? waveSense : null, p);
+  // Zone du pic : les départs de toutes les glisses, décollages des vols sur foil, orientée par le sens des vagues
+  // dès qu'il est utilisable (une mesure suffit), fiable ou non.
+  const zoneSense = waveSense !== null && waveSense.R >= (p.waveSenseMinR ?? WAVE_SENSE_MIN_R) ? waveSense : null;
+  const peakZone = buildPeakZone(track, rides.map((r) => r.start), zoneSense, p);
   const returns: SurfReturn[] = [];
   // Première sortie : du premier coup de rame à la première entrée dans la zone, avant la première glisse.
   // Partie de la zone même (enregistrement lancé au pic), elle n'a pas de sens.

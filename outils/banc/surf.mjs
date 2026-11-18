@@ -177,12 +177,12 @@ console.log('rame :', await openTab('rame'));
 await wait(500);
 const rame = await panel('Rame');
 console.log('panneau :', rame);
-// Retour au pic : jusqu'à l'entrée dans la zone du pic. Trois vagues ne disent pas le sens des vagues : la zone suit
-// l'axe des trois départs, étirée du large vers la plage, et n'en écarte aucun. Après la vague 1, 100 s de rame à
-// 1 m/s jusqu'à l'attente : la zone est atteinte vers 54 s, 54 m. La vague 3 part dans la zone, 40 s après la 2 :
-// la remontée qui la précède y entre vers 11 s, 11 m, et n'est plus enchaînée.
-contient('matinée, retour au pic après la vague 1 : 54 s, 54 m', rame, /vague 1\t5[345] s\t5[345] m\t/);
-contient('matinée, retour au pic après la vague 2 : 11 s, 11 m', rame, /vague 2\t1[012] s\t1[012] m\t/);
+// Retour au pic : jusqu'à l'entrée dans la zone du pic. Le sens des vagues oriente la zone dès la première vague :
+// mince, le long de la ligne des départs, 5 m de marge côté plage (le sens n'est seulement pas jugé fiable avec trois
+// vagues, il n'écarte donc aucune remontée pompée). Après la vague 1, rame à 1 m/s : la zone est atteinte vers 27 s,
+// 27 m ; la vague 3 part dans la zone, la remontée qui la précède y entre vers 29 s, 29 m, sans être enchaînée.
+contient('matinée, retour au pic après la vague 1 : 27 s, 27 m', rame, /vague 1\t2[678] s\t2[678] m\t/);
+contient('matinée, retour au pic après la vague 2 : 29 s, 29 m', rame, /vague 2\t(?:29|30) s\t(?:29|30) m\t/);
 contient('matinée, « Vagues enchaînées 0 »', rame, 'Vagues enchaînées / 0 ');
 console.log('fermer vagues :', await tab('vagues'), '| surbrillance restante :', await evaluate(`document.querySelectorAll('.leaflet-overlay-pane path[stroke="#d32f2f"]').length`));
 console.log('graphiques :', await openTab('graphiques'));
