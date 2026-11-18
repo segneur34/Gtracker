@@ -51,7 +51,7 @@ export const sailingRequest = (
 export const surfRequest = (key: string, sport: SportType, over: Partial<Omit<AnalyzeSurfOptions, 'key'>> = {}): AnalyzeSurfOptions => {
   const profile = getSportProfile(sport);
   const foil = over.settings?.foil ?? false;
-  const settings: SurfSessionSettings = { threshold: defaultActiveThresholdOf(profile, foil), foil, waveThreshold: null, ...over.settings };
+  const settings: SurfSessionSettings = { threshold: defaultActiveThresholdOf(profile, foil), foil, waveThreshold: null, waveDirectionDeg: null, ...over.settings };
   return { key, prepare: prepareOptionsOf(profile, `${key}.gpx`), profile, color: colorOptionsOf(sport), ...over, settings };
 };
 
@@ -112,8 +112,10 @@ export const directSailing = (gpxText: string, o: AnalyzeSailingOptions) => {
 export const directSurf = (gpxText: string, o: AnalyzeSurfOptions) => {
   const { track, cumulative } = prepareTrack(gpxText, o.prepare);
   const surfProfile = surfProfileOf(o.profile);
-  const { threshold, foil, waveThreshold } = o.settings;
-  const result = surfProfile && track.length > 1 ? runSurfSession(track, cumulative, surfProfile, { threshold, foil, waveThreshold }) : null;
+  const { threshold, foil, waveThreshold, waveDirectionDeg } = o.settings;
+  const result = surfProfile && track.length > 1
+    ? runSurfSession(track, cumulative, surfProfile, { threshold, foil, waveThreshold, waveDirectionDeg })
+    : null;
   const segments = o.color
     ? (() => {
       const range = effectiveSpeedRange({ sessionRange: o.color.sessionRange, activityRange: o.color.activityRange, suggested: null, fallback: o.color.fallback });

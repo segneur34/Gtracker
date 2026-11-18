@@ -57,7 +57,13 @@ export interface WaveSense {
   samples: number;
   /** Vrai quand les mesures sont assez nombreuses et assez concentrées pour écarter des remontées pompées : au moins `waveSenseMinWaves` mesures et `R` d'au moins `waveSenseMinR`. */
   reliable: boolean;
+  /** `saisi` : donné par l'utilisateur pour la session (`R` à 1, aucune mesure, fiable) ; `estime` : tiré de la trace. */
+  source: 'saisi' | 'estime';
 }
+
+/** Sens des vagues saisi pour la session, cap vers lequel elles vont : il vaut un sens mesuré sans doute. */
+export const enteredWaveSense = (directionDeg: number): WaveSense =>
+  ({ directionDeg: normalizeDeg(directionDeg), R: 1, samples: 0, reliable: true, source: 'saisi' });
 
 interface Displacement {
   bearingDeg: number;
@@ -102,7 +108,7 @@ export const estimateWaveSense = (
   if (measures.length === 0) return null;
   const { mean, R } = circularMean(measures.map((d) => d.bearingDeg), measures.map((d) => d.lengthM));
   const reliable = measures.length >= (opts.waveSenseMinWaves ?? WAVE_SENSE_MIN_WAVES) && R >= (opts.waveSenseMinR ?? WAVE_SENSE_MIN_R);
-  return { directionDeg: mean, R, samples: measures.length, reliable };
+  return { directionDeg: mean, R, samples: measures.length, reliable, source: 'estime' };
 };
 
 /**

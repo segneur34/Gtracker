@@ -120,7 +120,8 @@ const prepareSignature = ({ fileName, profile, referenceSpeedOverrideMs }: Prepa
   ]);
 
 const sameSurfSettings = (a: SurfSessionSettings, b: SurfSessionSettings): boolean =>
-  Object.is(a.threshold, b.threshold) && a.foil === b.foil && Object.is(a.waveThreshold, b.waveThreshold);
+  Object.is(a.threshold, b.threshold) && a.foil === b.foil && Object.is(a.waveThreshold, b.waveThreshold)
+  && Object.is(a.waveDirectionDeg, b.waveDirectionDeg);
 
 export interface AnalysisStore {
   /** Garde la trace que la tâche `prepare` vient de lire, sous la clé de la page : elle remplace toute la mémoire. */
@@ -200,7 +201,9 @@ export const createAnalysisStore = (): AnalysisStore => {
       const surfProfile = surfProfileOf(profile);
       const { track, cumulative } = target.track;
       const result = surfProfile && track.length > 1
-        ? runSurfSession(track, cumulative, surfProfile, { threshold: settings.threshold, foil: settings.foil, waveThreshold: settings.waveThreshold })
+        ? runSurfSession(track, cumulative, surfProfile, {
+          threshold: settings.threshold, foil: settings.foil, waveThreshold: settings.waveThreshold, waveDirectionDeg: settings.waveDirectionDeg,
+        })
         : null;
       kept = { sig, settings: { ...settings }, result: result ? { analysis: result.analysis, summary: result.summary } : null };
       target.surf = kept;

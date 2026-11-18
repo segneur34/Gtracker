@@ -18,7 +18,7 @@ import {
  * Ce que l'utilisateur change sur une session dans le module d'analyse : les
  * réglages d'analyse de la fiche (`ANALYSIS_FIELDS` : vent saisi, seuil
  * d'activité, allure imposée, couleurs de la trace, foil, pumping, seuil de
- * vague en foil), notes, repères du bouton « Note » (nommés ou supprimés). Les
+ * vague en foil, sens des vagues), notes, repères du bouton « Note » (nommés ou supprimés). Les
  * changements restent en brouillon jusqu'à « Enregistrer la session », qui les
  * écrit dans la fiche.
  */
@@ -82,6 +82,7 @@ export const EDITED_PART_LABEL: Record<EditedPart, string> = {
   foil: t('foil'),
   pumping: t('pumping'),
   vague: t('seuil de vague'),
+  sensVagues: t('sens des vagues'),
   notes: t('notes'),
   reperes: t('repères'),
 };

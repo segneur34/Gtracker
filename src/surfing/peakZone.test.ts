@@ -37,7 +37,7 @@ const departuresAt = (positions: { x: number; y: number }[]) => {
   };
 };
 
-const senseTo = (directionDeg: number): WaveSense => ({ directionDeg, R: 0.9, samples: 6, reliable: true });
+const senseTo = (directionDeg: number): WaveSense => ({ directionDeg, R: 0.9, samples: 6, reliable: true, source: 'estime' });
 /** Les vagues déferlent vers le sud, la plage. */
 const SOUTH = senseTo(180);
 
@@ -98,7 +98,7 @@ describe('buildPeakZone', () => {
   it('gauches et droites mêlées : le sens, faussé et peu concentré, ne détourne pas la zone de la plage', () => {
     // Trois gauches à 230° et une droite à 130°, à 50° de part et d'autre du sud : leur moyenne vectorielle tire le sens
     // de 31° vers l'ouest, R de 0,75. Les départs s'étalent le long de la plage (est-ouest) sur 95 m.
-    const mixed: WaveSense = { directionDeg: 211, R: 0.75, samples: 4, reliable: true };
+    const mixed: WaveSense = { directionDeg: 211, R: 0.75, samples: 4, reliable: true, source: 'estime' };
     const { track, departures } = departuresAt([{ x: -50, y: 3 }, { x: -20, y: -4 }, { x: 15, y: 5 }, { x: 45, y: -2 }]);
     const zone = buildPeakZone(track, departures, mixed)!;
     expect(zone.orientation).toBe('ligne');

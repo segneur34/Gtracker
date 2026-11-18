@@ -33,7 +33,7 @@ const session = (cadenceS: number, second = false) => {
     }
   }
   const track = computeKinematics(raw, { medianWindowSeconds: profile.medianWindowSeconds, maxSpeedMs: profile.maxPlausibleSpeedMs });
-  return runSurfSession(track, buildCumulativeTrack(track), profile, { threshold: profile.defaultActiveThreshold, foil: false, waveThreshold: null }).analysis.waves;
+  return runSurfSession(track, buildCumulativeTrack(track), profile, { threshold: profile.defaultActiveThreshold, foil: false, waveThreshold: null, waveDirectionDeg: null }).analysis.waves;
 };
 
 /** Cap du buste (rad) : des virages `[instant de début (s), angle (°), vitesse (°/s)]`, en plus d'une dérive en °/s. */

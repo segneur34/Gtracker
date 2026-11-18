@@ -7,7 +7,7 @@ import type { SportProfile, SurfProfile } from '../core/sportProfiles';
 import type { CumulativeTrack, TrackPoint } from '../core/types';
 import { countDirectionChanges } from './gpsTurns';
 import { buildPeakZone, isInZone, zoneEntry, type PeakZone, type PeakZoneOptions } from './peakZone';
-import { WAVE_SENSE_MIN_R, estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOptions } from './waveSense';
+import { WAVE_SENSE_MIN_R, enteredWaveSense, estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOptions } from './waveSense';
 
 /**
  * Analyse d'une session de surf, en SI, sur la trace du noyau.
@@ -46,6 +46,8 @@ import { WAVE_SENSE_MIN_R, estimateWaveSense, isAgainstWaveSense, type WaveSense
  * une erreur y coûterait des vagues. La zone du pic le reçoit dès la première
  * mesure, s'il est assez concentré (`waveSenseMinR`) : il l'oriente en travers
  * des vagues et dit de quel côté est la plage, sans rien retirer au décompte.
+ * Un sens saisi pour la session (`waveDirectionDeg`) remplace l'estimé : il
+ * est fiable, et sert aux deux.
  */
 
 /** Durée maximale du recul du début d'une glisse, en secondes : une mise en vitesse entre les deux détentes en dure quelques-unes. */
@@ -82,6 +84,8 @@ export interface RiseOptions {
  * `rideExitMs` et `waveExitMs` : détentes basses, en m/s, du masque de la
  * glisse et de celui des vagues sur foil (`null` sans foil), celles où une
  * glisse finit ; le début d'une glisse remonte jusqu'à elles (`riseStartOf`).
+ * `waveDirectionDeg` : sens des vagues saisi pour la session, cap vers lequel
+ * elles vont, en degrés ; absent ou `null`, le sens est estimé sur la trace.
  */
 export type SurfParams = Pick<
   SurfProfile, 'minWaitS' | 'minWaveS' | 'minWaveM' | 'takeoffSearchS' | 'turnMinDeg'
@@ -89,6 +93,7 @@ export type SurfParams = Pick<
   stillMs: number;
   rideExitMs: number;
   waveExitMs: number | null;
+  waveDirectionDeg?: number | null;
 };
 
 /** Ce que fait le pratiquant sur un pas. */
@@ -331,8 +336,11 @@ export const analyzeSurf = (
     : rides.map((r) => keptRuns(
       track, cum, risenRuns(track, activeRuns(track, waveMask, r.start + 1, r.end), r.start, p.waveExitMs ?? p.rideExitMs, p), p
     ));
-  // Sens des vagues : sans foil, toutes les vagues ; sur foil, la vague qui lance chaque vol (les remontées pompées tireraient la moyenne vers zéro).
-  const waveSense = estimateWaveSense(track, candidates === null ? rides : candidates.flatMap((c) => c.slice(0, 1)), p);
+  // Sens des vagues : celui saisi pour la session, sinon estimé ; sans foil, sur toutes les vagues ; sur foil, sur la
+  // vague qui lance chaque vol (les remontées pompées tireraient la moyenne vers zéro).
+  const waveSense = p.waveDirectionDeg != null
+    ? enteredWaveSense(p.waveDirectionDeg)
+    : estimateWaveSense(track, candidates === null ? rides : candidates.flatMap((c) => c.slice(0, 1)), p);
 
   const waves: SurfWave[] = [];
   const flights: SurfFlight[] = [];

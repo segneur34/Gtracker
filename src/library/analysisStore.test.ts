@@ -108,9 +108,10 @@ describe('analyse de surf : la tâche rend ce que la page calcule', () => {
         const store = createAnalysisStore();
         const cases: [string, ReturnType<typeof surfRequest>][] = [
           [SURF[hz], surfRequest('s', sport)],
-          [SURF[hz], surfRequest('s', sport, { settings: { threshold: 9, foil: false, waveThreshold: null } })],
-          [FOIL[hz], surfRequest('f', sport, { settings: { threshold: 12, foil: true, waveThreshold: null } })],
-          [FOIL[hz], surfRequest('f', sport, { settings: { threshold: 12, foil: true, waveThreshold: 18 }, color: null })],
+          [SURF[hz], surfRequest('s', sport, { settings: { threshold: 9, foil: false, waveThreshold: null, waveDirectionDeg: null } })],
+          [FOIL[hz], surfRequest('f', sport, { settings: { threshold: 12, foil: true, waveThreshold: null, waveDirectionDeg: null } })],
+          [FOIL[hz], surfRequest('f', sport, { settings: { threshold: 12, foil: true, waveThreshold: 18, waveDirectionDeg: null }, color: null })],
+          [FOIL[hz], surfRequest('f', sport, { settings: { threshold: 12, foil: true, waveThreshold: null, waveDirectionDeg: 90 } })],
         ];
         for (const [text, request] of cases) {
           const reply = cloned(store.analyzeSurf(text, cloned(request)));
@@ -187,7 +188,7 @@ describe('ce qui traverse un message', () => {
         thresholdKn: 0, prepare: prepareOptionsOf(getSportProfile(sport), null, knotsToMs(9)),
         color: colorOptionsOf(sport, { activityRange: { minMs: 1, maxMs: 12 } }),
       })),
-      ...SURF_SPORTS.map((sport) => surfRequest('s', sport, { settings: { threshold: 10, foil: true, waveThreshold: 16 } })),
+      ...SURF_SPORTS.map((sport) => surfRequest('s', sport, { settings: { threshold: 10, foil: true, waveThreshold: 16, waveDirectionDeg: 200 } })),
     ];
     for (const request of requests) {
       expect(functionPaths(request)).toEqual([]);
@@ -280,5 +281,11 @@ describe('mémoire : ne refait que ce qui a changé', () => {
     const lower = { ...recolored, settings: { ...recolored.settings, threshold: 6 } };
     expectSame(store.analyzeSurf(SURF[1], lower), directSurf(SURF[1], lower));
     expect(store.work).toMatchObject({ prepareTrack: 1, surf: 2, colors: 2 });
+    // Le sens des vagues saisi refait l'analyse, pas la lecture de la trace.
+    const oriented = { ...lower, settings: { ...lower.settings, waveDirectionDeg: 270 } };
+    expectSame(store.analyzeSurf(SURF[1], oriented), directSurf(SURF[1], oriented));
+    expect(store.work).toMatchObject({ prepareTrack: 1, surf: 3, colors: 2 });
+    store.analyzeSurf(SURF[1], cloned(oriented));
+    expect(store.work).toMatchObject({ surf: 3 });
   });
 });

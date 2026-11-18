@@ -254,7 +254,7 @@ describe('vitesse max du surf : celle de la page, une vague', () => {
     const profile = getSportProfile('surf');
     const track = analysisTrack(raw, 'surf');
     return runSurfSession(track, buildCumulativeTrack(track), surfProfileOf(profile)!, {
-      threshold: defaultActiveThresholdOf(profile, foil), foil, waveThreshold: null,
+      threshold: defaultActiveThresholdOf(profile, foil), foil, waveThreshold: null, waveDirectionDeg: null,
     }).summary.maxWaveSpeedMs;
   };
   const session: [number, number][] = [[60, 0.2], [6, 1.6], [12, 5], [80, 1], [60, 0.2], [6, 1.6], [12, 4], [80, 1], [60, 0.2]];

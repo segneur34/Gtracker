@@ -5,7 +5,7 @@ import type { ActiveRun } from '../core/sessionStats';
 import { SPORT_PROFILES } from '../core/sportProfiles';
 import type { RawTrackPoint, TrackPoint } from '../core/types';
 import { M_PER_DEG_LAT } from '../test/geo.fixture';
-import { WAVE_SENSE_MIN_R, estimateWaveSense, isAgainstWaveSense, type WaveSense } from './waveSense';
+import { WAVE_SENSE_MIN_R, enteredWaveSense, estimateWaveSense, isAgainstWaveSense, type WaveSense } from './waveSense';
 
 const T0 = Date.UTC(2026, 9, 10, 9, 0, 0);
 
@@ -120,10 +120,23 @@ describe('estimateWaveSense', () => {
     const { track } = build(session(MIXED.slice(0, 1)), 1);
     expect(estimateWaveSense(track, [])).toBeNull();
   });
+
+  it('dit qu\'il est estimé', () => {
+    const { track, waves } = build(session(MIXED), 1);
+    expect(estimateWaveSense(track, waves)!.source).toBe('estime');
+  });
+});
+
+describe('enteredWaveSense', () => {
+  it('un sens saisi est fiable, sans mesure, ramené dans le tour', () => {
+    expect(enteredWaveSense(200)).toEqual({ directionDeg: 200, R: 1, samples: 0, reliable: true, source: 'saisi' });
+    expect(enteredWaveSense(-90).directionDeg).toBe(270);
+    expect(enteredWaveSense(450).directionDeg).toBe(90);
+  });
 });
 
 describe('isAgainstWaveSense', () => {
-  const sense: WaveSense = { directionDeg: 180, R: 1, samples: 4, reliable: true };
+  const sense: WaveSense = { directionDeg: 180, R: 1, samples: 4, reliable: true, source: 'estime' };
   const { track, waves } = build(session([{ heading: 0 }, { heading: 100 }, { heading: 260 }, { heading: 180 }]), 1);
 
   it('reconnaît un passage vers le large, et garde une vague prise en biais', () => {

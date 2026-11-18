@@ -194,7 +194,9 @@ function SurfModule() {
    * Vagues, vols, remontées et trace colorée, faits hors du fil de l'affichage (`useTrackAnalysis`) : la trace montrée
    * est toujours celle de l'analyse montrée ; pendant un recalcul (seuils, foil, couleurs), les derniers chiffres restent.
    */
-  const surfSettings: SurfSessionSettings = { threshold, foil, waveThreshold: draft.edits.waveThreshold };
+  const surfSettings: SurfSessionSettings = {
+    threshold, foil, waveThreshold: draft.edits.waveThreshold, waveDirectionDeg: draft.edits.waveDirectionDeg,
+  };
   const surfColor: TrackColorOptions = { sessionRange: draft.edits.speedRange, activityRange: speedRange, fallback: defaultSpeedRange };
   const profileText = useMemo(() => JSON.stringify(profile), [profile]);
   const surfView = useTrackAnalysis(gpx.analysis, JSON.stringify([profileText, surfSettings, surfColor]), (source) =>

@@ -136,7 +136,7 @@ describe('calcul asynchrone : la session relue quand le résumé revient', () =>
 
   const analysis = (patch: Partial<SessionAnalysis>): SessionAnalysis => ({
     windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null,
-    pumping: null, waveThreshold: null, savedAt: 1, ...patch,
+    pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 1, ...patch,
   });
 
   it('nom changé pendant le calcul : gardé, avec le résumé, sans recalcul', async () => {

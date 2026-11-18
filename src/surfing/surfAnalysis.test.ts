@@ -390,6 +390,25 @@ describe('analyzeSurf, sens des vagues et remontées pompées sur foil', () => {
     expect(after.waves).toHaveLength(6);
   });
 
+  for (const cadenceS of [1, 0.2]) {
+    it(`un sens saisi écarte les remontées pompées dès deux vols (pas de ${cadenceS} s)`, () => {
+      const two: Phase[] = [...flight(200, 0), ...flight(160, 0), { s: 40, speed: 0.8 }];
+      const estimated = analyzeWith(two, cadenceS);
+      expect(estimated.waveSense!.reliable).toBe(false);
+      expect(estimated.waves).toHaveLength(4);
+      const entered = analyzeWith(two, cadenceS, { waveDirectionDeg: 180 });
+      expect(entered.waveSense).toEqual({ directionDeg: 180, R: 1, samples: 0, reliable: true, source: 'saisi' });
+      expect(entered.flights.map((f) => f.waveCount)).toEqual([1, 1]);
+      expect(entered.waves.map((w) => w.flight)).toEqual([1, 2]);
+      expect(entered.flights.map((f) => f.durationS)).toEqual(estimated.flights.map((f) => f.durationS));
+      expect(entered.phases).toEqual(estimated.phases);
+    });
+  }
+
+  it('un sens saisi à `null` laisse les chiffres de l\'estimé', () => {
+    expect(analyzeWith(FIVE, 1, { waveDirectionDeg: null })).toEqual(analyzeWith(FIVE, 1));
+  });
+
   it('sans foil, le sens se mesure sur les vagues sans en écarter aucune', () => {
     expect(analyze(buildSurfSession(MORNING)).analysis.waveSense?.reliable ?? false).toBe(false);
     const wave = (heading: number): Phase[] => [
@@ -415,10 +434,10 @@ describe('runSurfSession et résumé de la bibliothèque', () => {
   it('donne les mêmes vagues que le découpage, seuil de vague en foil imposé compris', () => {
     const track = buildSurfSession(MORNING);
     const cum = buildCumulativeTrack(track);
-    const run = runSurfSession(track, cum, profile, { threshold: SPORT_PROFILES.surf.defaultActiveThreshold, foil: false, waveThreshold: null });
+    const run = runSurfSession(track, cum, profile, { threshold: SPORT_PROFILES.surf.defaultActiveThreshold, foil: false, waveThreshold: null, waveDirectionDeg: null });
     expect(run.summary).toEqual(analyze(track).summary);
     // Sur foil, un seuil de vague au-dessus de toutes les vitesses : des vols, aucune vague.
-    const high = runSurfSession(track, cum, profile, { threshold: surf.foilActiveThreshold, foil: true, waveThreshold: 40 });
+    const high = runSurfSession(track, cum, profile, { threshold: surf.foilActiveThreshold, foil: true, waveThreshold: 40, waveDirectionDeg: null });
     expect(high.summary.waveCount).toBe(0);
     expect(high.summary.flightCount).toBeGreaterThan(0);
   });
@@ -488,7 +507,7 @@ describe('vitesse max des vagues, plancher d’arrêt unique, pause manuelle', (
 
   it('seuil à 0 : le masque tombe au plancher d’arrêt du profil, comme thresholdActivityMask', () => {
     const track = buildSurfSession(MORNING);
-    const run = runSurfSession(track, buildCumulativeTrack(track), profile, { threshold: 0, foil: false, waveThreshold: null });
+    const run = runSurfSession(track, buildCumulativeTrack(track), profile, { threshold: 0, foil: false, waveThreshold: null, waveDirectionDeg: null });
     expect(run.rideMask).toEqual(thresholdActivityMask(track, SPORT_PROFILES.surf, 0));
     expect(run.rideMask.some((m) => m)).toBe(true);
     expect(run.rideMask.every((m) => m)).toBe(false);
@@ -594,7 +613,7 @@ const measureSoftRide = (ride: SoftRide, cadenceS: number, options: BuildOptions
   const track = buildSurfSession(phases, cadenceS, options);
   const cum = buildCumulativeTrack(track);
   const threshold = ride.foil ? surf.foilActiveThreshold : SPORT_PROFILES.surf.defaultActiveThreshold;
-  const run = runSurfSession(track, cum, softProfile, { threshold, foil: ride.foil, waveThreshold: null });
+  const run = runSurfSession(track, cum, softProfile, { threshold, foil: ride.foil, waveThreshold: null, waveDirectionDeg: null });
   const tLow = firstTimeS(phases, rampAtS, (v) => v >= low);
   const tHigh = firstTimeS(phases, tLow, (v) => v >= high);
   const tExit = firstTimeS(phases, tHigh, (v) => v < low);
@@ -1054,4 +1073,23 @@ describe('analyzeSurf, zone du pic : peu de vagues, jamais ronde', () => {
     expect(zone.semiMinorM).toBeCloseTo(10, 6);
     expect(zone.semiMajorM).toBeCloseTo(15, 6);
   });
+
+  for (const cadenceS of [1, 0.2]) {
+    it(`un sens saisi tourne la zone d'une seule vague, en travers de lui (pas de ${cadenceS} s)`, () => {
+      const ONE: Phase[] = [
+        { s: 30, speed: 0 }, { s: 100, speed: 1 }, { s: 30, speed: 0.1 },
+        { s: 5, speed: 1.6, heading: 180 }, { s: 12, speed: 5, heading: 190 }, { s: 40, speed: 1 },
+      ];
+      const track = buildSurfSession(ONE, cadenceS);
+      const estimated = analyze(track).analysis;
+      const entered = analyze(track, false, { waveDirectionDeg: 135 }).analysis;
+      expect(entered.waveSense).toEqual({ directionDeg: 135, R: 1, samples: 0, reliable: true, source: 'saisi' });
+      expect(entered.peakZone!.orientation).toBe('vagues');
+      expect(axisGap(entered.peakZone!.majorAxisDeg, 45)).toBeLessThan(1e-6);
+      expect(axisGap(estimated.peakZone!.majorAxisDeg, 45)).toBeGreaterThan(30);
+      // Le sens ne change que la zone : vagues et phases restent celles de l'estimé.
+      expect(entered.waves).toEqual(estimated.waves);
+      expect(entered.phases).toEqual(estimated.phases);
+    });
+  }
 });

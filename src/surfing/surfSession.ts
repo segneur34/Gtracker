@@ -17,6 +17,8 @@ export interface SurfSessionSettings {
   foil: boolean;
   /** Seuil de vague sur foil ; `null` : celui du profil. Ignoré sans foil. */
   waveThreshold: number | null;
+  /** Sens des vagues saisi, cap vers lequel elles vont, en degrés ; `null` : estimé sur la trace. */
+  waveDirectionDeg: number | null;
 }
 
 export interface SurfSessionResult {
@@ -45,6 +47,7 @@ export const runSurfSession = (
   const analysis = analyzeSurf(track, cum, rideMask, waveMask, {
     ...profile.surf, maxGapS: profile.maxGapS, maxSpeedWindowS: profile.maxSpeedWindowS, stillMs,
     rideExitMs: rideOptions.exitThresholdMs, waveExitMs: waveOptions?.exitThresholdMs ?? null,
+    waveDirectionDeg: settings.waveDirectionDeg,
   });
   return { rideMask, analysis, summary: summarizeSurf(track, cum, analysis, stillMs) };
 };

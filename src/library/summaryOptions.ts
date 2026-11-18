@@ -67,8 +67,8 @@ export const sessionFoil = (
  * Réglages qui changent le résumé : ceux de l'activité de la session, et ceux
  * de la session (`analysis`, dans sa fiche). Le seuil de la session prime sur
  * celui de l'activité ; l'allure imposée n'existe que pour une session, et
- * qu'en voile. En surf, le foil de la session (sinon de son activité) et son
- * seuil de vague en foil.
+ * qu'en voile. En surf, le foil de la session (sinon de son activité), son
+ * seuil de vague en foil et son sens des vagues saisi.
  */
 export const summaryOptions = (
   sport: SportType | null,
@@ -83,12 +83,14 @@ export const summaryOptions = (
     // Surf : le foil de la session, sinon celui de son activité ; son seuil de vague en foil.
     foil: analysis?.foil ?? activity.foil ?? undefined,
     waveThreshold: analysis?.waveThreshold ?? undefined,
+    waveDirectionDeg: getSportProfile(sport).surf ? analysis?.waveDirectionDeg ?? undefined : undefined,
   };
 };
 
 /**
- * Empreinte des réglages qui changent le résumé, gardée dans le résumé (`SessionSummary.optionsKey`) : seuil, allure imposée, foil en surf (ailleurs il ne change pas le résumé) et seuil de
- * vague.
+ * Empreinte des réglages qui changent le résumé, gardée dans le résumé (`SessionSummary.optionsKey`) : seuil, allure imposée, foil en surf (ailleurs il ne change pas le résumé),
+ * seuil de vague, et le sens des vagues saisi, ajouté seulement s'il l'est : l'empreinte d'une session
+ * sans sens saisi reste celle d'avant ce réglage.
  */
 export const summaryOptionsKey = (sport: SportType, options: SummaryOptions): string =>
   JSON.stringify([
@@ -96,6 +98,7 @@ export const summaryOptionsKey = (sport: SportType, options: SummaryOptions): st
     options.referenceSpeedOverrideMs ?? null,
     getSportProfile(sport).surf ? options.foil ?? false : null,
     options.waveThreshold ?? null,
+    ...(options.waveDirectionDeg === undefined ? [] : [options.waveDirectionDeg]),
   ]);
 
 /**

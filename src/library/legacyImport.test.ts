@@ -148,6 +148,10 @@ describe('jeu d\'essai de la porte d\'import : le paquet de session', () => {
       const lines = expected.record.replace('"format": "tracker-session"', `"format": "${RECORD_FORMAT}"`).split('\n');
       const kept = lines.filter((line) => !/^ {4}"(effortThresholdMs|bikeWeightKg|loadKg)": null,$/.test(line));
       expect(kept).toHaveLength(lines.length - 3);
+      // Le sens des vagues, venu après ce paquet, s'ajoute nul à la fin des réglages d'analyse.
+      const waveLine = kept.findIndex((line) => line.startsWith('    "waveThreshold": '));
+      const savedAt = kept.findIndex((line, i) => i > waveLine && /^ {4}"savedAt": \d+$/.test(line));
+      kept.splice(savedAt, 1, `${kept[savedAt]},`, '    "waveDirectionDeg": null');
       expect(serializeRecord(recordOf(kind))).toBe(kept.join('\n'));
     });
   }
@@ -156,7 +160,7 @@ describe('jeu d\'essai de la porte d\'import : le paquet de session', () => {
     const record = recordOf('wing');
     expect(record.analysis).toEqual({
       windDeg: 300, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: true, pumping: true,
-      waveThreshold: null, savedAt: 1780310700000,
+      waveThreshold: null, savedAt: 1780310700000, waveDirectionDeg: null,
     });
     expect(record.notes).toMatchObject({
       foil: 'Axis 1050', mast: 'Mât 85', wing: 'Aile 5 m', windLevel: 'moyen', waterState: 'clapot', rating: 4,

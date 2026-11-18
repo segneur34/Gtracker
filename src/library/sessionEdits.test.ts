@@ -24,7 +24,7 @@ describe('savedEdits', () => {
   it("reprend le vent, le seuil, l'allure, les couleurs et les notes de la fiche", () => {
     const r = record({
       notes: notes({ comment: 'Belle session', rating: 4 }),
-      analysis: { windDeg: 300, activeThreshold: 7, referenceSpeedMs: 2.5, speedRange: { minMs: 3, maxMs: 12 }, foil: null, pumping: null, waveThreshold: null, savedAt: START_MS },
+      analysis: { windDeg: 300, activeThreshold: 7, referenceSpeedMs: 2.5, speedRange: { minMs: 3, maxMs: 12 }, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: START_MS },
     });
     const saved = savedEdits(r);
     expect(saved.windDeg).toBe(300);
@@ -41,7 +41,7 @@ describe('savedEdits', () => {
   });
 
   it('rend les valeurs par défaut sans fiche', () => {
-    expect(savedEdits(null)).toEqual({ notes: EMPTY_NOTES, windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, marks: [] });
+    expect(savedEdits(null)).toEqual({ notes: EMPTY_NOTES, windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, marks: [] });
   });
 });
 
@@ -60,12 +60,25 @@ describe('changedParts', () => {
   it("nomme chaque partie changée, dans l'ordre de l'écran", () => {
     expect(changedParts(saved, {
       notes: { ...saved.notes, rating: 5 }, windDeg: 90, activeThreshold: 6, referenceSpeedMs: 2, speedRange: { minMs: 1, maxMs: 5 },
-      foil: true, pumping: true, waveThreshold: 20, marks: [],
-    })).toEqual(['vent', 'seuil', 'allure', 'couleurs', 'foil', 'pumping', 'vague', 'notes']);
+      foil: true, pumping: true, waveThreshold: 20, waveDirectionDeg: 200, marks: [],
+    })).toEqual(['vent', 'seuil', 'allure', 'couleurs', 'foil', 'pumping', 'vague', 'sensVagues', 'notes']);
+  });
+
+  it('range le sens des vagues de la session, ramené dans le tour, et le relit ; effacé, il revient à null', () => {
+    const r = record({ sport: 'surf', analysis: { windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 0 } });
+    const before = savedEdits(r);
+    expect(before.waveDirectionDeg).toBeNull();
+    expect(changedParts(before, { ...before, waveDirectionDeg: -10 })).toEqual(['sensVagues']);
+    const patch = editsPatch(r, before, { ...before, waveDirectionDeg: -10 }, START_MS + 3);
+    expect(patch.analysis).toMatchObject({ waveDirectionDeg: 350, savedAt: START_MS + 3 });
+    const saved = savedEdits({ ...r, analysis: patch.analysis! });
+    expect(saved.waveDirectionDeg).toBe(350);
+    const cleared = editsPatch({ ...r, analysis: patch.analysis! }, saved, { ...saved, waveDirectionDeg: null }, START_MS + 4);
+    expect(cleared.analysis).toMatchObject({ waveDirectionDeg: null, savedAt: START_MS + 4 });
   });
 
   it('range le foil de la session, et le relit', () => {
-    const r = record({ analysis: { windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, savedAt: 0 } });
+    const r = record({ analysis: { windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 0 } });
     const before = savedEdits(r);
     expect(changedParts(before, { ...before, foil: false })).toEqual(['foil']);
     const patch = editsPatch(r, before, { ...before, foil: false }, START_MS + 3);
@@ -74,7 +87,7 @@ describe('changedParts', () => {
   });
 
   it('range le pumping de la session, et le relit', () => {
-    const r = record({ analysis: { windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: true, pumping: null, waveThreshold: null, savedAt: 0 } });
+    const r = record({ analysis: { windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: true, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 0 } });
     const before = savedEdits(r);
     expect(changedParts(before, { ...before, pumping: true })).toEqual(['pumping']);
     const patch = editsPatch(r, before, { ...before, pumping: true }, START_MS + 4);
@@ -95,7 +108,7 @@ describe('editsPatch', () => {
     const r = record({ notes: notes({ comment: 'avant' }) });
     const saved = savedEdits(r);
     expect(editsPatch(r, saved, { ...saved, windDeg: -90 }, START_MS + 5)).toEqual({
-      analysis: { windDeg: 270, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, savedAt: START_MS + 5 },
+      analysis: { windDeg: 270, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: START_MS + 5 },
     });
     expect(editsPatch(r, saved, { ...saved, notes: { ...saved.notes, comment: 'après' } }, START_MS + 6)).toEqual({
       notes: { ...EMPTY_NOTES, comment: 'après', savedAt: START_MS + 6 },
@@ -103,10 +116,10 @@ describe('editsPatch', () => {
   });
 
   it("écrit l'allure imposée seule, le vent et le seuil de la fiche intacts", () => {
-    const r = record({ analysis: { windDeg: 45, activeThreshold: 3, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, savedAt: 0 } });
+    const r = record({ analysis: { windDeg: 45, activeThreshold: 3, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 0 } });
     const saved = savedEdits(r);
     expect(editsPatch(r, saved, { ...saved, referenceSpeedMs: 2.2 }, START_MS + 7)).toEqual({
-      analysis: { windDeg: 45, activeThreshold: 3, referenceSpeedMs: 2.2, speedRange: null, foil: null, pumping: null, waveThreshold: null, savedAt: START_MS + 7 },
+      analysis: { windDeg: 45, activeThreshold: 3, referenceSpeedMs: 2.2, speedRange: null, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: START_MS + 7 },
     });
   });
 
@@ -114,14 +127,14 @@ describe('editsPatch', () => {
     const r = record();
     const saved = savedEdits(r);
     expect(editsPatch(r, saved, { ...saved, speedRange: { minMs: 2, maxMs: 9 } }, START_MS + 8)).toEqual({
-      analysis: { windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: { minMs: 2, maxMs: 9 }, foil: null, pumping: null, waveThreshold: null, savedAt: START_MS + 8 },
+      analysis: { windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: { minMs: 2, maxMs: 9 }, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: START_MS + 8 },
     });
   });
 
   it('garde les champs inconnus des notes et des réglages', () => {
     const r = record({
       notes: { ...notes(), futur: 1 } as StoredSessionNotes,
-      analysis: { windDeg: 10, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, savedAt: 0, futur: 2 } as SessionRecord['analysis'],
+      analysis: { windDeg: 10, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 0, futur: 2 } as SessionRecord['analysis'],
     });
     const saved = savedEdits(r);
     const patch = editsPatch(r, saved, { ...saved, activeThreshold: 6, notes: { ...saved.notes, rating: 3 } }, 9);
@@ -163,7 +176,7 @@ describe('repères dans le brouillon', () => {
 });
 
 describe('rebaseDraft (E-B3)', () => {
-  const analysis = { windDeg: null, activeThreshold: 15, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, savedAt: 0 };
+  const analysis = { windDeg: null, activeThreshold: 15, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 0 };
   const before = savedEdits(record({ analysis }));
   // Brouillon : un commentaire saisi, le seuil hérité de la fiche.
   const draft = { ...before, notes: { ...before.notes, comment: 'Rafales' } };
@@ -271,6 +284,7 @@ const oldSavedEdits = (r: SessionRecord | null): SessionEdits => ({
   foil: r?.analysis?.foil ?? null,
   pumping: r?.analysis?.pumping ?? null,
   waveThreshold: r?.analysis?.waveThreshold ?? null,
+  waveDirectionDeg: r?.analysis?.waveDirectionDeg ?? null,
   marks: r?.marks ?? OLD_NO_MARKS,
 });
 const oldSameRange = (a: SpeedRangeMs | null, b: SpeedRangeMs | null): boolean =>
@@ -289,6 +303,7 @@ const oldChangedParts = (saved: SessionEdits, edits: SessionEdits): EditedPart[]
   if (saved.foil !== edits.foil) parts.push('foil');
   if (saved.pumping !== edits.pumping) parts.push('pumping');
   if (saved.waveThreshold !== edits.waveThreshold) parts.push('vague');
+  if (saved.waveDirectionDeg !== edits.waveDirectionDeg) parts.push('sensVagues');
   if (!oldSameNotes(saved.notes, edits.notes)) parts.push('notes');
   if (!oldSameMarks(saved.marks, edits.marks)) parts.push('reperes');
   return parts;
@@ -301,6 +316,7 @@ const OLD_SAME: { [K in Exclude<keyof SessionEdits, 'notes'>]: (a: SessionEdits[
   foil: (a, b) => a === b,
   pumping: (a, b) => a === b,
   waveThreshold: (a, b) => a === b,
+  waveDirectionDeg: (a, b) => a === b,
   marks: oldSameMarks,
 };
 const oldRebaseDraft = (prevSaved: SessionEdits, nextSaved: SessionEdits, draft: SessionEdits): SessionEdits => {
@@ -338,6 +354,7 @@ const oldEditsPatch = (r: SessionRecord, saved: SessionEdits, edits: SessionEdit
       foil: edits.foil,
       pumping: edits.pumping,
       waveThreshold: edits.waveThreshold,
+      waveDirectionDeg: edits.waveDirectionDeg === null ? null : normalizeDeg(edits.waveDirectionDeg),
       savedAt: now,
     };
   }
@@ -372,11 +389,12 @@ describe('brouillon tiré de la table des réglages, comme avant', () => {
     { ...saved, foil: !saved.foil },
     { ...saved, pumping: saved.pumping === null ? true : null },
     { ...saved, waveThreshold: 11 },
+    { ...saved, waveDirectionDeg: 400 },
     { ...saved, notes: { ...saved.notes, comment: 'neuf' } },
     { ...saved, marks: [{ timeMs: 5, lat: null, lon: null, label: '  a  ' }] },
     {
       notes: { ...saved.notes, rating: 2 }, windDeg: -30, activeThreshold: 1, referenceSpeedMs: 2, speedRange: { minMs: 0, maxMs: 4 },
-      foil: false, pumping: false, waveThreshold: 4, marks: [],
+      foil: false, pumping: false, waveThreshold: 4, waveDirectionDeg: -15, marks: [],
     },
   ];
 

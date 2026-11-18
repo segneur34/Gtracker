@@ -266,6 +266,13 @@ export interface SessionAnalysis {
    * un vol est porté par une vague ; `null` : celui du profil. Absent des fiches plus anciennes.
    */
   waveThreshold: number | null;
+  /**
+   * Sens des vagues saisi (surf) : cap vers lequel elles vont, vers la plage, en
+   * degrés dans [0, 360) ; `null` : le sens estimé sur la trace. Il décrit le
+   * lieu : gardé d'une activité de surf à l'autre, effacé quand la session change
+   * de famille. Absent des fiches plus anciennes.
+   */
+  waveDirectionDeg: number | null;
   savedAt: number;
 }
 
@@ -446,7 +453,7 @@ export type AnalysisKey = Exclude<keyof SessionAnalysis, 'savedAt'>;
 export type AnalysisValues = Pick<SessionAnalysis, AnalysisKey>;
 
 /** Partie de l'écran où se saisit un réglage d'analyse, celle qu'annonce le brouillon (`library/sessionEdits.ts`). */
-export type AnalysisPart = 'vent' | 'seuil' | 'allure' | 'couleurs' | 'foil' | 'pumping' | 'vague';
+export type AnalysisPart = 'vent' | 'seuil' | 'allure' | 'couleurs' | 'foil' | 'pumping' | 'vague' | 'sensVagues';
 
 /**
  * Un réglage d'analyse : sa partie à l'écran ; sa lecture depuis le JSON de
@@ -478,6 +485,11 @@ export const ANALYSIS_FIELDS: { readonly [K in AnalysisKey]: AnalysisField<K> } 
   foil: { part: 'foil', read: (raw) => (typeof raw === 'boolean' ? raw : null) },
   pumping: { part: 'pumping', read: (raw) => (typeof raw === 'boolean' ? raw : null) },
   waveThreshold: { part: 'vague', read: (raw) => (isFiniteNumber(raw) && raw > 0 ? raw : null) },
+  waveDirectionDeg: {
+    part: 'sensVagues',
+    read: (raw) => (isFiniteNumber(raw) ? normalizeDeg(raw) : null),
+    write: (value) => (value === null ? null : normalizeDeg(value)),
+  },
 };
 
 /** Les clés de `ANALYSIS_FIELDS`, dans leur ordre. */
@@ -998,9 +1010,10 @@ export const applyRecordPatch = (record: SessionRecord, patch: RecordPatch): { r
   }
   const thresholdBefore = next.analysis?.activeThreshold ?? null;
   const referenceBefore = next.analysis?.referenceSpeedMs ?? null;
-  // En surf, le foil et le seuil de vague changent les vagues du résumé.
+  // En surf, le foil, le seuil de vague et le sens des vagues changent les vagues du résumé.
   const foilBefore = next.analysis?.foil ?? null;
   const waveBefore = next.analysis?.waveThreshold ?? null;
+  const waveDirectionBefore = next.analysis?.waveDirectionDeg ?? null;
   if (patch.analysis !== undefined) {
     // Seuil ou foil propres changés sur une ancienne fiche : ce qu'elle portait est figé d'abord (`carriedSettings`).
     if ((patch.analysis?.activeThreshold ?? null) !== thresholdBefore || (patch.analysis?.foil ?? null) !== foilBefore) next = withCarriedSettingsFixed(next);
@@ -1027,15 +1040,17 @@ export const applyRecordPatch = (record: SessionRecord, patch: RecordPatch): { r
     const familyChanged = before !== null && after !== null && sportFamily(before) !== sportFamily(after);
     next = { ...next, sport: after };
     if (next.analysis) {
+      // Le sens des vagues décrit le lieu : il reste d'une activité de surf à l'autre, pas dans une autre famille.
       const cleared = {
         ...next.analysis,
         activeThreshold: null,
         waveThreshold: null,
-        ...(familyChanged ? { speedRange: null } : {}),
+        ...(familyChanged ? { speedRange: null, waveDirectionDeg: null } : {}),
       };
       if (
         cleared.activeThreshold !== next.analysis.activeThreshold || cleared.speedRange !== next.analysis.speedRange
         || cleared.waveThreshold !== (next.analysis.waveThreshold ?? null)
+        || (cleared.waveDirectionDeg ?? null) !== (next.analysis.waveDirectionDeg ?? null)
       ) {
         next = { ...next, analysis: cleared };
       }
@@ -1052,6 +1067,7 @@ export const applyRecordPatch = (record: SessionRecord, patch: RecordPatch): { r
     (next.analysis?.activeThreshold ?? null) !== thresholdBefore ||
     (next.analysis?.referenceSpeedMs ?? null) !== referenceBefore ||
     (next.analysis?.foil ?? null) !== foilBefore ||
-    (next.analysis?.waveThreshold ?? null) !== waveBefore;
+    (next.analysis?.waveThreshold ?? null) !== waveBefore ||
+    (next.analysis?.waveDirectionDeg ?? null) !== waveDirectionBefore;
   return { record: next, resummarize: sportChanged || activityChanged || analysisChanged };
 };

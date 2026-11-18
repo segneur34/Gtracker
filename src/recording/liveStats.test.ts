@@ -447,7 +447,7 @@ describe("computeLiveStats : moyenne active, comme l'analyse (voile, surf)", () 
     const live = computeLiveStats(segments, surf, withThreshold(9)).activeAverageSpeedMs!;
     expect(Math.abs(live / analysisAverage(segments, surf, 9) - 1)).toBeLessThan(0.001);
     const track = analysisTrackOf(segments, surf);
-    const { summary } = runSurfSession(track, buildCumulativeTrack(track), surfProfileOf(surf)!, { threshold: 9, foil: false, waveThreshold: null });
+    const { summary } = runSurfSession(track, buildCumulativeTrack(track), surfProfileOf(surf)!, { threshold: 9, foil: false, waveThreshold: null, waveDirectionDeg: null });
     expect(summary.waveCount).toBeGreaterThan(0);
     expect(Math.abs(live / (summary.glisseDistanceM / summary.glisseS) - 1)).toBeLessThan(0.01);
   });

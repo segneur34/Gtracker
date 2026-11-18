@@ -155,8 +155,20 @@ describe('parseRecord et serializeRecord', () => {
 
 describe("réglages d'analyse de la fiche", () => {
   it("sont relus à l'identique", () => {
-    const r = record({ analysis: { windDeg: 315, activeThreshold: 6.5, referenceSpeedMs: 2.3, speedRange: { minMs: 2, maxMs: 8 }, foil: null, pumping: null, waveThreshold: null, savedAt: START_MS + 20 } });
+    const r = record({ analysis: { windDeg: 315, activeThreshold: 6.5, referenceSpeedMs: 2.3, speedRange: { minMs: 2, maxMs: 8 }, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: 200, savedAt: START_MS + 20 } });
     expect(parseRecord(serializeRecord(r))?.analysis).toEqual(r.analysis);
+  });
+
+  it('donnent un sens des vagues ramené dans le tour, nul dans une fiche écrite avant lui ou mal formé', () => {
+    const before = { ...record(), analysis: { windDeg: 90, activeThreshold: 4, referenceSpeedMs: null, speedRange: null, savedAt: START_MS } };
+    expect(parseRecord(JSON.stringify(before))?.analysis?.waveDirectionDeg).toBeNull();
+    const read = (waveDirectionDeg: unknown) =>
+      parseRecord(JSON.stringify({ ...before, analysis: { ...before.analysis, waveDirectionDeg } }))?.analysis?.waveDirectionDeg;
+    expect(read(354)).toBe(354);
+    expect(read(-90)).toBe(270);
+    expect(read(720)).toBe(0);
+    expect(read('sud')).toBeNull();
+    expect(read(Infinity)).toBeNull();
   });
 
   it('valent `null` dans une fiche écrite avant eux', () => {
@@ -197,11 +209,11 @@ describe("réglages d'analyse de la fiche", () => {
   it('ramènent le vent dans [0, 360) et écartent les valeurs mal formées', () => {
     const raw = { ...record(), analysis: { windDeg: -45, activeThreshold: -2, referenceSpeedMs: 0, futur: true } };
     expect(parseRecord(JSON.stringify(raw))?.analysis).toEqual({
-      windDeg: 315, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, savedAt: 0, futur: true,
+      windDeg: 315, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 0, futur: true,
     });
     const texte = { ...record(), analysis: { windDeg: 'nord', activeThreshold: '8', referenceSpeedMs: '3' } };
     expect(parseRecord(JSON.stringify(texte))?.analysis).toEqual({
-      windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, savedAt: 0,
+      windDeg: null, activeThreshold: null, referenceSpeedMs: null, speedRange: null, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 0,
     });
     const negative = { ...record(), analysis: { windDeg: null, activeThreshold: null, referenceSpeedMs: -1.5 } };
     expect(parseRecord(JSON.stringify(negative))?.analysis?.referenceSpeedMs).toBeNull();
@@ -403,7 +415,7 @@ describe('dedupeSessions', () => {
 });
 
 describe('applyRecordPatch', () => {
-  const analysis: SessionAnalysis = { windDeg: 20, activeThreshold: 9, referenceSpeedMs: 7, speedRange: { minMs: 4, maxMs: 14 }, foil: null, pumping: null, waveThreshold: null, savedAt: 1 };
+  const analysis: SessionAnalysis = { windDeg: 20, activeThreshold: 9, referenceSpeedMs: 7, speedRange: { minMs: 4, maxMs: 14 }, foil: null, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 1 };
   const withAnalysis = record({ analysis, notes: { ...record().notes, comment: 'Belle session', savedAt: 2 } as SessionRecord['notes'] });
 
   it('rend la fiche telle quelle si rien ne change', () => {
@@ -441,6 +453,16 @@ describe('applyRecordPatch', () => {
     expect(resummarize).toBe(true);
     // Retour en voile : le vent et l'allure sont toujours là.
     expect(applyRecordPatch(next, { sport: 'wingfoil' }).record.analysis?.windDeg).toBe(20);
+  });
+
+  it("le sens des vagues saisi reste d'une activité de surf à l'autre, s'efface dans une autre famille, et se résume", () => {
+    const surfing = record({ sport: 'surf', activityId: 'surf', analysis: { ...analysis, waveDirectionDeg: 200 } });
+    expect(applyRecordPatch(surfing, { activityId: 'a-surf-foil' }).record.analysis?.waveDirectionDeg).toBe(200);
+    expect(applyRecordPatch(surfing, { sport: 'wingfoil', activityId: 'wingfoil' }).record.analysis?.waveDirectionDeg).toBeNull();
+    // Saisi, changé ou effacé : le résumé se refait ; le même : rien.
+    expect(applyRecordPatch(withAnalysis, { analysis: { ...analysis, waveDirectionDeg: 10 } }).resummarize).toBe(true);
+    expect(applyRecordPatch(surfing, { analysis: { ...analysis, waveDirectionDeg: null } }).resummarize).toBe(true);
+    expect(applyRecordPatch(surfing, { analysis: { ...analysis, waveDirectionDeg: 200 } }).resummarize).toBe(false);
   });
 
   it('classer une session sans support ne touche pas à ses réglages', () => {
@@ -658,7 +680,7 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
   };
   const analysis: SessionAnalysis = {
     windDeg: 40, activeThreshold: 8, referenceSpeedMs: null, speedRange: null, foil: true,
-    pumping: null, waveThreshold: null, savedAt: 5,
+    pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 5,
   };
   const valid = record({
     name: 'Sortie', analysis, mapBase: 'satellite', jumps,
@@ -743,6 +765,7 @@ const oldReadAnalysis = (raw: unknown): SessionAnalysis | null => {
     foil: typeof raw.foil === 'boolean' ? raw.foil : null,
     pumping: typeof raw.pumping === 'boolean' ? raw.pumping : null,
     waveThreshold: isFiniteNumber(raw.waveThreshold) && raw.waveThreshold > 0 ? raw.waveThreshold : null,
+    waveDirectionDeg: isFiniteNumber(raw.waveDirectionDeg) ? normalizeDeg(raw.waveDirectionDeg) : null,
     savedAt: isFiniteNumber(raw.savedAt) ? raw.savedAt : 0,
   };
 };
@@ -820,7 +843,7 @@ describe('fiches compactes, une par famille', () => {
 
 describe('réglages portés par le résumé', () => {
   const analysis = (activeThreshold: number | null, foil: boolean | null = null) =>
-    ({ windDeg: null, activeThreshold, referenceSpeedMs: null, speedRange: null, foil, pumping: null, waveThreshold: null, savedAt: 1 });
+    ({ windDeg: null, activeThreshold, referenceSpeedMs: null, speedRange: null, foil, pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 1 });
 
   it('le champ prime, composant absent : inconnu', () => {
     expect(carriedSettings(sessionRecord({}, { activitySettings: { threshold: 8 }, optionsKey: '[9,null,null,null]' }))).toEqual({ threshold: 8 });
@@ -906,8 +929,10 @@ describe('fiche de Gtracker rangée avec ses lignes d\'analyse d\'origine', () =
    * ceux de la fiche du jeu d'essai de la porte) : ils sont des champs inconnus, gardés tels quels.
    */
   const raw = JSON.parse(LEGACY_WING_RECORD) as Record<string, unknown>;
-  const stored = `${stringifyJson({ ...raw, format: RECORD_FORMAT })}\n`;
-  const unclassified = `${stringifyJson({ ...raw, format: RECORD_FORMAT, sport: null })}\n`;
+  // Rangée par cette version : ses réglages portent le sens des vagues, venu après la fiche du jeu d'essai.
+  const analysis = { ...(raw.analysis as Record<string, unknown>), waveDirectionDeg: null };
+  const stored = `${stringifyJson({ ...raw, format: RECORD_FORMAT, analysis })}\n`;
+  const unclassified = `${stringifyJson({ ...raw, format: RECORD_FORMAT, sport: null, analysis })}\n`;
   const retired = (text: string): string[] => {
     const analysis = (JSON.parse(text) as { analysis: Record<string, unknown> }).analysis;
     return Object.keys(analysis).filter((key) => key !== 'savedAt' && !(ANALYSIS_KEYS as string[]).includes(key));
