@@ -96,3 +96,9 @@ La zone se dessine sur la carte de l'analyse surf, dans l'onglet rame (et quand 
 
 - Vague de l'intérieur : hors zone. Un départ à plus de `ZONE_INSIDE_M` (environ 40 m, constante nommée) vers la plage de la médiane des départs, le long du sens des vagues, n'entre pas dans la construction de la zone ; le retour qui précède cette vague, sans entrée dans la zone, est « enchaîné » et sort de la moyenne. Sans sens estimé, l'axe de repli (axe principal des départs) ne sait pas où est la plage : aucun départ n'est écarté.
 - Une seule zone pour toute la session ; le pic qui glisse avec la marée l'élargit, limite connue à écrire dans ETAT.
+
+### Partie B, écarts au plan acceptés par l'orchestrateur le 18/11
+
+- Marge vérifiée par un disque de 15 m autour de chaque départ (sur 32 directions), qui ne fait qu'agrandir l'ellipse : avec la seule marge ajoutée aux axes, un départ au bout du grand axe en gardait moins.
+- Première sortie qui part déjà de la zone (enregistrement lancé au pic) : non mesurée, « — », la sortie n'ayant pas été enregistrée.
+- Sur une session de moins de quatre vagues, le sens n'est pas connu : la zone suit l'axe des départs et n'écarte aucune vague de l'intérieur (banc : la vague 3 de la matinée n'est plus « enchaînée »).

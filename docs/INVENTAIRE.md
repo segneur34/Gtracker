@@ -79,6 +79,7 @@ Dans `sailing/` aussi : `pointData.ts` (`PointData` et `trackToPointData`, vue e
 
 - `surfAnalysis.ts` : découpage d'une session (`analyzeSurf` : phases glisse, rame, attente, trou ; vagues, vols sur foil, rame de départ, remontées et retour au pic), `summarizeSurf`.
 - `waveSense.ts` : sens des vagues de la session (`estimateWaveSense`, moyenne vectorielle des premières secondes de chaque glisse, pondérée par la longueur) et `isAgainstWaveSense`, qui écarte sur foil une remontée pompée prise pour une vague.
+- `peakZone.ts` : zone du pic de la session, une ellipse en travers du sens des vagues qui contient les départs, ceux de l'intérieur écartés (`buildPeakZone`), entrée dans la zone calculée sur le segment (`zoneEntry`, `isInZone`), contour pour la carte (`peakZoneOutline`) ; le retour au pic de `analyzeSurf` va jusqu'à cette entrée.
 - `surfSession.ts` : `runSurfSession`, masques aux seuils de la session puis découpage, commun à la page et au résumé de la liste ; `effectiveWaveThreshold`, `surfProfileOf`.
 - `gyroTurns.ts` : virages d'une vague par le gyroscope (lot 40) : cap du buste autour de la verticale (`yawRate` de `core/imuVertical.ts`), retournements par `directionChanges` de `gpsTurns.ts`, rotation soutenue (60° en 2 s au plus, `SurfProfile.gyroTurns`) ; `gyroWaveTurns` rend `null` pour une vague hors capture ; `waveTurnTrace` pour le diagnostic du banc.
 - `gpsTurns.ts` : grands changements de direction d'une vague vus par le GPS (`countDirectionChanges`), expérimental.

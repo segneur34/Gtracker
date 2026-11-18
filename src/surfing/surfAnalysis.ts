@@ -6,6 +6,7 @@ import { bestWindowSpeedMs } from '../core/topSegments';
 import type { SportProfile, SurfProfile } from '../core/sportProfiles';
 import type { CumulativeTrack, TrackPoint } from '../core/types';
 import { countDirectionChanges } from './gpsTurns';
+import { buildPeakZone, isInZone, zoneEntry, type PeakZone, type PeakZoneOptions } from './peakZone';
 import { estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOptions } from './waveSense';
 
 /**
@@ -24,10 +25,13 @@ import { estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOp
  *   interpolé (règle 10) : il borne la phase en cours.
  *
  * Entre deux glisses, une remontée. Le retour au pic va de la fin de la
- * glisse au début de la première attente ; une glisse prise sans attente est
+ * glisse à l'entrée dans la zone du pic (`peakZone.ts`), celle des départs de
+ * toute la session ; une glisse finie dans la zone a un retour nul. Une glisse
+ * prise sans être rentrée dans la zone (une vague de l'intérieur) est
  * « enchaînée », et sa remontée n'entre pas dans la moyenne du retour. Avant la
  * première glisse, la première sortie va du premier coup de rame à la première
- * attente : la marche sur la plage y est comprise.
+ * entrée dans la zone : la marche sur la plage y est comprise. L'attente reste
+ * l'immobilité, mesurée à part.
  *
  * Sur foil, les glisses sont des vols : une suite au seuil de vol, qui peut
  * relier plusieurs vagues en pompant entre elles. Les vagues d'un vol sont ses
@@ -77,7 +81,7 @@ export interface RiseOptions {
  */
 export type SurfParams = Pick<
   SurfProfile, 'minWaitS' | 'minWaveS' | 'minWaveM' | 'takeoffSearchS' | 'turnMinDeg'
-> & Pick<SportProfile, 'maxGapS' | 'maxSpeedWindowS'> & RiseOptions & WaveSenseOptions & {
+> & Pick<SportProfile, 'maxGapS' | 'maxSpeedWindowS'> & RiseOptions & WaveSenseOptions & PeakZoneOptions & {
   stillMs: number;
   rideExitMs: number;
   waveExitMs: number | null;
@@ -124,11 +128,13 @@ export interface SurfReturn {
   startMs: number;
   /** Début de la glisse suivante, sinon fin de la session. */
   endMs: number;
-  /** Retour au pic : jusqu'au début de la première attente, en secondes ; `null` sans attente (glisse enchaînée). */
+  /** Retour au pic : jusqu'à l'entrée dans la zone du pic, en secondes ; `null` sans entrée (glisse enchaînée). */
   returnS: number | null;
-  /** Distance à vol d'oiseau de la fin de la glisse au pic. */
+  /** Instant de l'entrée dans la zone ; `null` sans entrée. */
+  entryMs: number | null;
+  /** Distance à vol d'oiseau de la fin de la glisse au point d'entrée dans la zone. */
   straightM: number | null;
-  /** Vitesse de remontée : `straightM` ÷ `returnS`. */
+  /** Vitesse de remontée : `straightM` ÷ `returnS` ; `null` pour un retour nul (glisse finie dans la zone). */
   returnSpeedMs: number | null;
   /** Rame en mouvement (arrêts courts exclus), sur toute la remontée. */
   paddleS: number;
@@ -144,10 +150,12 @@ export interface SurfAnalysis {
   waves: SurfWave[];
   /** Vols, sur foil ; vide sans foil. */
   flights: SurfFlight[];
-  /** Première sortie (si elle a une attente), puis une remontée après chaque glisse sauf la dernière. */
+  /** Première sortie (si elle entre dans la zone du pic), puis une remontée après chaque glisse sauf la dernière. */
   returns: SurfReturn[];
   /** Sens des vagues de la session ; `null` s'il n'est pas estimable. */
   waveSense: WaveSense | null;
+  /** Zone du pic de la session ; `null` sans glisse. */
+  peakZone: PeakZone | null;
 }
 
 const stepS = (track: TrackPoint[], i: number): number => (track[i].timeMs - track[i - 1].timeMs) / 1000;
@@ -269,33 +277,30 @@ const isPaddling = (track: TrackPoint[], phases: SurfPhase[], i: number, stillMs
 
 /**
  * Remontée des pas `from + 1` à `to`, partie du point `from` ; le retour au
- * pic se mesure du point `origin` à la première attente qui le suit.
+ * pic se mesure du point `origin` à l'entrée dans la zone qui le suit, au plus
+ * tard au point `to`.
  */
 const returnOf = (
-  track: TrackPoint[], cum: CumulativeTrack, phases: SurfPhase[], p: SurfParams,
+  track: TrackPoint[], cum: CumulativeTrack, phases: SurfPhase[], p: SurfParams, zone: PeakZone | null,
   after: number, from: number, to: number, origin: number
 ): SurfReturn => {
   let paddleS = 0;
   let paddleDistanceM = 0;
   let waitS = 0;
-  let firstWait = -1;
   for (let i = from + 1; i <= to; i++) {
     const dt = stepS(track, i);
-    if (phases[i] === 'attente') {
-      waitS += dt;
-      if (firstWait < 0 && i - 1 >= origin) firstWait = i - 1;
-    } else if (isPaddling(track, phases, i, p.stillMs)) {
+    if (phases[i] === 'attente') waitS += dt;
+    else if (isPaddling(track, phases, i, p.stillMs)) {
       paddleS += dt;
       paddleDistanceM += cum.cumDist[i] - cum.cumDist[i - 1];
     }
   }
-  const returnS = firstWait >= 0 ? (track[firstWait].timeMs - track[origin].timeMs) / 1000 : null;
-  const straightM = returnS === null
-    ? null
-    : haversineDistance(track[origin].lat, track[origin].lon, track[firstWait].lat, track[firstWait].lon);
+  const entry = zone === null ? null : zoneEntry(track, zone, origin, to, p.maxGapS);
+  const returnS = entry === null ? null : (entry.timeMs - track[origin].timeMs) / 1000;
+  const straightM = entry === null ? null : haversineDistance(track[origin].lat, track[origin].lon, entry.lat, entry.lon);
   return {
     after, startMs: track[from].timeMs, endMs: track[to].timeMs,
-    returnS, straightM, returnSpeedMs: returnS && straightM !== null ? straightM / returnS : null,
+    returnS, entryMs: entry?.timeMs ?? null, straightM, returnSpeedMs: returnS && straightM !== null ? straightM / returnS : null,
     paddleS, paddleDistanceM, paddleSpeedMs: paddleS > 0 ? paddleDistanceM / paddleS : null, waitS,
   };
 };
@@ -310,7 +315,7 @@ const returnOf = (
 export const analyzeSurf = (
   track: TrackPoint[], cum: CumulativeTrack, rideMask: boolean[], waveMask: boolean[] | null, p: SurfParams
 ): SurfAnalysis => {
-  if (track.length < 2) return { phases: track.map(() => 'trou'), waves: [], flights: [], returns: [], waveSense: null };
+  if (track.length < 2) return { phases: track.map(() => 'trou'), waves: [], flights: [], returns: [], waveSense: null, peakZone: null };
   // Début remonté avant le filtre de durée et de distance : une vague molle, rognée de sa mise en vitesse, était écartée.
   const rides = keptRuns(track, cum, risenRuns(track, activeRuns(track, rideMask), 0, p.rideExitMs, p), p);
   const phases = stepPhases(track, rides, p);
@@ -361,19 +366,22 @@ export const analyzeSurf = (
     });
   }
 
+  // Zone du pic : les départs de toutes les glisses, décollages des vols sur foil.
+  const peakZone = buildPeakZone(track, rides.map((r) => r.start), waveSense, p);
   const returns: SurfReturn[] = [];
-  // Première sortie : du premier coup de rame à la première attente, avant la première glisse.
+  // Première sortie : du premier coup de rame à la première entrée dans la zone, avant la première glisse.
+  // Partie de la zone même (enregistrement lancé au pic), elle n'a pas de sens.
   const firstRideStart = rides.length > 0 ? rides[0].start : track.length - 1;
   let firstMove = -1;
   for (let i = 1; i <= firstRideStart && firstMove < 0; i++) if (isPaddling(track, phases, i, p.stillMs)) firstMove = i - 1;
-  if (firstMove >= 0) {
-    const out = returnOf(track, cum, phases, p, 0, 0, firstRideStart, firstMove);
+  if (firstMove >= 0 && peakZone !== null && !isInZone(peakZone, track[firstMove])) {
+    const out = returnOf(track, cum, phases, p, peakZone, 0, 0, firstRideStart, firstMove);
     if (out.returnS !== null) returns.push(out);
   }
   for (let k = 0; k + 1 < rides.length; k++) {
-    returns.push(returnOf(track, cum, phases, p, k + 1, rides[k].end, rides[k + 1].start, rides[k].end));
+    returns.push(returnOf(track, cum, phases, p, peakZone, k + 1, rides[k].end, rides[k + 1].start, rides[k].end));
   }
-  return { phases, waves, flights, returns, waveSense };
+  return { phases, waves, flights, returns, waveSense, peakZone };
 };
 
 /** Chiffres d'une session, en SI ; `null` quand ils n'ont pas de sens (aucune vague, aucun retour). */
@@ -397,11 +405,11 @@ export interface SurfSummary {
   maxWaveSpeedMs: number | null;
   /** Rame en mouvement sur toute la session, arrêts courts exclus. */
   paddleSpeedMs: number | null;
-  /** Retour au pic, sur les remontées qui ont une attente (première sortie exclue). */
+  /** Retour au pic, sur les remontées qui entrent dans la zone du pic (première sortie exclue). */
   avgReturnS: number | null;
   bestReturnS: number | null;
   avgReturnSpeedMs: number | null;
-  /** Glisses prises sans attente depuis la précédente. */
+  /** Glisses prises sans être rentré dans la zone du pic depuis la précédente. */
   chainedCount: number;
   firstOutS: number | null;
   flightCount: number;

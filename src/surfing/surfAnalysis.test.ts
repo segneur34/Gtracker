@@ -111,17 +111,18 @@ const maskAt = (track: TrackPoint[], thresholdKmh: number): boolean[] => {
   });
 };
 
-const analyze = (track: TrackPoint[], foil = false) => {
+const analyze = (track: TrackPoint[], foil = false, opts: Partial<SurfParams> = {}) => {
   const cum = buildCumulativeTrack(track);
   const rideMask = maskAt(track, foil ? surf.foilActiveThreshold : SPORT_PROFILES.surf.defaultActiveThreshold);
   const waveMask = foil ? maskAt(track, surf.foilWaveThreshold) : null;
-  const analysis = analyzeSurf(track, cum, rideMask, waveMask, paramsOf(foil));
+  const analysis = analyzeSurf(track, cum, rideMask, waveMask, { ...paramsOf(foil), ...opts });
   return { analysis, summary: summarizeSurf(track, cum, analysis, params.stillMs) };
 };
 
 /**
  * Une matinée : plage, marche, sortie avec deux canards, attente, trois
- * vagues ; la troisième prise en remontant, sans attente.
+ * vagues ; la troisième prise en remontant, sans attente. Trois vagues ne
+ * disent pas le sens des vagues : la zone du pic suit l'axe de leurs départs.
  */
 const MORNING: Phase[] = [
   { s: 60, speed: 0 },
@@ -168,18 +169,29 @@ describe('analyzeSurf, sans foil', () => {
     expect(b.takeoffS).toBeLessThanOrEqual(params.takeoffSearchS);
   });
 
-  it('mesure le retour au pic, et compte la vague enchaînée à part', () => {
+  it('mesure le retour au pic jusqu\'à l\'entrée dans la zone ; sans sens des vagues, aucune vague n\'est de l\'intérieur', () => {
+    expect(analysis.waveSense).toBeNull();
+    expect(analysis.peakZone!.orientation).toBe('departs');
+    expect(analysis.peakZone!.insideDepartures).toEqual([]);
+    // 100 s de rame vers le large à 1 m/s jusqu'à l'attente : la zone, étirée sur les départs, est atteinte avant.
     const afterFirst = analysis.returns.find((r) => r.after === 1)!;
-    expect(afterFirst.returnS).toBeCloseTo(100, -1);
-    expect(afterFirst.straightM).toBeCloseTo(100, -1);
+    expect(afterFirst.returnS).toBeCloseTo(55, -1);
+    expect(afterFirst.entryMs).toBeCloseTo(afterFirst.startMs + afterFirst.returnS! * 1000, 3);
+    expect(afterFirst.straightM).toBeCloseTo(afterFirst.returnS!, 0);
+    expect(afterFirst.returnSpeedMs).toBeCloseTo(1, 3);
     expect(afterFirst.paddleSpeedMs).toBeCloseTo(1, 1);
-    expect(analysis.returns.find((r) => r.after === 2)!.returnS).toBeNull();
-    expect(summary.chainedCount).toBe(1);
-    expect(summary.avgReturnS).toBeCloseTo(afterFirst.returnS!, 6);
+    // La troisième vague part dans la zone : la remontée qui la précède y entre, elle n'est plus enchaînée.
+    const afterSecond = analysis.returns.find((r) => r.after === 2)!;
+    expect(afterSecond.returnS!).toBeGreaterThan(0);
+    expect(afterSecond.returnS!).toBeLessThan(40);
+    expect(summary.chainedCount).toBe(0);
+    expect(summary.avgReturnS).toBeCloseTo((afterFirst.returnS! + afterSecond.returnS!) / 2, 6);
   });
 
-  it('compte la première sortie, marche comprise, sans s\'arrêter aux canards', () => {
-    expect(summary.firstOutS).toBeCloseTo(60 + 120 + 8, -1);
+  it('compte la première sortie jusqu\'à la zone, marche comprise, sans s\'arrêter aux canards', () => {
+    // Du premier pas (60 s) à l'entrée dans la zone, plus tôt que la première attente (188 s de marche et de rame).
+    expect(summary.firstOutS).toBeCloseTo(142, -1);
+    expect(summary.firstOutS!).toBeLessThan(60 + 120 + 8);
   });
 
   it('répartit le temps entre glisse, rame et attente', () => {
@@ -197,8 +209,9 @@ describe('analyzeSurf, cadence', () => {
     const fast = analyze(buildSurfSession(MORNING, 0.2)).summary;
     expect(fast.waveCount).toBe(slow.waveCount);
     expect(fast.waveDistanceM).toBeCloseTo(slow.waveDistanceM, -1);
-    expect(fast.avgReturnS!).toBeCloseTo(slow.avgReturnS!, -0.5);
-    expect(fast.firstOutS!).toBeCloseTo(slow.firstOutS!, -0.5);
+    // Le départ d'une vague tombe à un pas près de la cadence la plus lente, et le bord de la zone du pic le suit.
+    expect(Math.abs(fast.avgReturnS! - slow.avgReturnS!)).toBeLessThan(2.5);
+    expect(Math.abs(fast.firstOutS! - slow.firstOutS!)).toBeLessThan(2.5);
   });
 
   it('garde une vague compressée en trois points (cadence de 4 s)', () => {
@@ -285,9 +298,13 @@ describe('analyzeSurf, sur foil', () => {
     expect(summary.waveCount).toBe(4);
   });
 
-  it('mesure la remontée entre deux vols', () => {
+  it('mesure la remontée entre deux vols, jusqu\'à la zone des deux décollages', () => {
+    // Deux départs : la zone est un cercle qui les contient, le posé du premier vol est à quelques mètres de son bord.
+    expect(analysis.peakZone!.orientation).toBe('cercle');
     const back = analysis.returns.find((r) => r.after === 1)!;
-    expect(back.returnS).toBeCloseTo(40, -1);
+    expect(back.returnS!).toBeGreaterThan(0);
+    expect(back.returnS!).toBeLessThan(40);
+    expect(back.returnSpeedMs).toBeCloseTo(0.8, 2);
   });
 
   it('deux vols ne disent pas le sens des vagues : rien n\'est écarté', () => {
@@ -347,7 +364,10 @@ describe('analyzeSurf, sens des vagues et remontées pompées sur foil', () => {
       });
       expect(after.flights[4]).toEqual(before.flights[4]);
       expect(after.phases).toEqual(before.phases);
-      expect(after.returns).toEqual(before.returns);
+      // Rame et attente inchangées ; le retour, et la première sortie, suivent la zone, que le sens oriente.
+      const paddling = (rs: typeof after.returns) => rs.filter((r) => r.after > 0).map(({ after: n, startMs, endMs, paddleS, paddleDistanceM, waitS }) => ({ n, startMs, endMs, paddleS, paddleDistanceM, waitS }));
+      expect(paddling(after.returns)).toEqual(paddling(before.returns));
+      expect(after.peakZone!.orientation).toBe('vagues');
     });
   }
 
@@ -855,4 +875,101 @@ describe('recul du début d\'une glisse : bruit, constantes et bornes', () => {
       expect(riseStartOf(holed, holedRun.start, 0, low, params)).toBe(indexAtS(holed, 56));
     });
   }
+});
+
+describe('analyzeSurf, zone du pic et retour au pic', () => {
+  /** Une vague : la rame de départ vers la plage (le sud), puis la glisse au cap donné, gauche ou droite. */
+  const ride = (heading: number): Phase[] => [{ s: 5, speed: 1.6, heading: 180 }, { s: 12, speed: 5, heading }];
+  /** Après une vague, la rame vers le large qui ramène au pic (61 m à 1 m/s), puis l'attente. */
+  const backToPeak: Phase[] = [{ s: 61, speed: 1 }, { s: 30, speed: 0.1 }];
+  /**
+   * Une session au pic : 100 m de rame depuis la plage, quatre vagues, gauches
+   * et droites, chacune suivie du retour au pic ; puis, après 10 m de rame
+   * seulement, une vague de l'intérieur, environ 55 m vers la plage.
+   */
+  const PEAK: Phase[] = [
+    { s: 30, speed: 0 }, { s: 100, speed: 1 }, { s: 30, speed: 0.1 }, ...ride(200),
+    ...backToPeak, ...ride(160), ...backToPeak, ...ride(200), ...backToPeak, ...ride(160),
+    { s: 10, speed: 1 }, ...ride(200),
+    { s: 40, speed: 1 }, { s: 30, speed: 0.1 },
+  ];
+
+  for (const cadenceS of [1, 0.2, 4]) {
+    it(`zone en travers des vagues, vague de l'intérieur écartée ; retour jusqu'à l'entrée dans la zone (pas de ${cadenceS} s)`, () => {
+      const { analysis, summary } = analyze(buildSurfSession(PEAK, cadenceS));
+      const zone = analysis.peakZone!;
+      expect(analysis.waves).toHaveLength(5);
+      expect(Math.abs(analysis.waveSense!.directionDeg - 180)).toBeLessThan(10);
+      expect(zone.orientation).toBe('vagues');
+      expect(Math.abs(zone.majorAxisDeg - 90)).toBeLessThan(10);
+      expect(zone.semiMajorM).toBeGreaterThan(zone.semiMinorM);
+      expect(zone.departures).toEqual(analysis.waves.slice(0, 4).map((w) => w.start));
+      expect(zone.insideDepartures).toEqual([analysis.waves[4].start]);
+
+      // Rame à 1 m/s : la zone est atteinte avant le pic, une vingtaine de mètres avant l'attente.
+      const measured = analysis.returns.filter((r) => r.after > 0 && r.returnS !== null);
+      expect(measured.map((r) => r.after)).toEqual([1, 2, 3]);
+      for (const r of measured) {
+        expect(r.returnS!).toBeGreaterThan(30);
+        expect(r.returnS!).toBeLessThan(50);
+        expect(r.entryMs).toBeCloseTo(r.startMs + r.returnS! * 1000, 3);
+        expect(r.returnSpeedMs).toBeCloseTo(1, 2);
+        // L'attente reste l'immobilité, mesurée à part.
+        expect(r.waitS).toBeCloseTo(30, 0);
+      }
+      // La vague de l'intérieur, prise sans être rentré dans la zone : enchaînée, hors de la moyenne.
+      const chained = analysis.returns.find((r) => r.after === 4)!;
+      expect(chained.returnS).toBeNull();
+      expect(chained.entryMs).toBeNull();
+      expect(chained.straightM).toBeNull();
+      expect(summary.chainedCount).toBe(1);
+      expect(summary.avgReturnS).toBeCloseTo(measured.reduce((s, r) => s + r.returnS!, 0) / 3, 6);
+
+      // Première sortie : du premier coup de rame (30 s) à l'entrée dans la zone, avant les 100 m jusqu'au pic.
+      const first = analysis.returns[0];
+      expect(first.after).toBe(0);
+      expect(summary.firstOutS!).toBeGreaterThan(70);
+      expect(summary.firstOutS!).toBeLessThan(100);
+      const firstMoveS = (first.entryMs! - summary.firstOutS! * 1000 - T0) / 1000;
+      expect(Math.abs(firstMoveS - 30)).toBeLessThanOrEqual(cadenceS);
+    });
+  }
+
+  it('les mêmes retours à 1 Hz, à 5 Hz et à 4 s', () => {
+    const slow = analyze(buildSurfSession(PEAK, 1)).summary;
+    for (const cadenceS of [0.2, 4]) {
+      const other = analyze(buildSurfSession(PEAK, cadenceS)).summary;
+      expect(other.chainedCount).toBe(slow.chainedCount);
+      expect(Math.abs(other.avgReturnS! - slow.avgReturnS!)).toBeLessThan(2.5);
+      expect(Math.abs(other.firstOutS! - slow.firstOutS!)).toBeLessThan(2.5);
+    }
+  });
+
+  it('une glisse finie dans la zone : retour nul, compté, sans vitesse de remontée', () => {
+    // Une marge de 70 m : chaque vague finit dans la zone, la vague de l'intérieur aussi.
+    const { analysis, summary } = analyze(buildSurfSession(PEAK), false, { zoneMarginM: 70 });
+    const after = analysis.returns.filter((r) => r.after > 0);
+    expect(after).toHaveLength(4);
+    for (const r of after) {
+      expect(r.returnS).toBe(0);
+      expect(r.straightM).toBe(0);
+      expect(r.returnSpeedMs).toBeNull();
+    }
+    expect(summary.avgReturnS).toBe(0);
+    expect(summary.bestReturnS).toBe(0);
+    expect(summary.chainedCount).toBe(0);
+  });
+
+  it('partie de la zone même, la première sortie n\'est pas mesurée ; sans glisse, ni zone ni retour', () => {
+    const atPeak: Phase[] = [{ s: 30, speed: 0 }, { s: 5, speed: 1 }, { s: 30, speed: 0.1 }, ...PEAK.slice(3)];
+    const started = analyze(buildSurfSession(atPeak));
+    expect(started.analysis.peakZone).not.toBeNull();
+    expect(started.analysis.returns[0].after).toBe(1);
+    expect(started.summary.firstOutS).toBeNull();
+
+    const still = analyze(buildSurfSession([{ s: 30, speed: 0 }, { s: 100, speed: 1 }, { s: 60, speed: 0.1 }]));
+    expect(still.analysis.peakZone).toBeNull();
+    expect(still.analysis.returns).toEqual([]);
+    expect(still.summary.firstOutS).toBeNull();
+  });
 });

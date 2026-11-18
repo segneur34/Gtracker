@@ -277,7 +277,7 @@ function SurfModule() {
     { key: 'maxSpeed', label: t('Vitesse max'), value: orDash(summary.maxWaveSpeedMs, (v) => formatSpeed(v, speedUnit)) },
     { key: 'waveSpeed', label: t('Moyenne sur la vague'), value: orDash(summary.avgWaveSpeedMs, (v) => formatSpeed(v, speedUnit)) },
     { key: 'paddleSpeed', label: t('Vitesse de rame'), value: orDash(summary.paddleSpeedMs, (v) => formatSpeed(v, speedUnit)), title: t('Moyenne en mouvement, arrêts courts exclus') },
-    { key: 'return', label: t('Retour au pic (moyen)'), value: orDash(summary.avgReturnS, formatShortDuration), title: t("De la fin d'une vague à la première attente") },
+    { key: 'return', label: t('Retour au pic (moyen)'), value: orDash(summary.avgReturnS, formatShortDuration), title: t("De la fin d'une vague à l'entrée dans la zone du pic") },
     ...(foil ? [
       { key: 'longestFlight', label: t('Plus long vol'), value: orDash(summary.longestFlightS, formatShortDuration) },
       { key: 'flightTime', label: t('Ratio de vol ({pct} %)', { pct: flightPct }), value: formatShortDuration(summary.flightS) },
@@ -333,12 +333,9 @@ function SurfModule() {
     { header: t('Vitesse hors vague ({unit})', { unit: SPEED_UNIT_LABEL[speedUnit] }), cell: (f) => speedCell(f.pumpSpeedMs) },
   ];
 
-  /** Point d'arrivée d'une remontée sur la carte : le pic (début de l'attente), sinon la glisse suivante. */
+  /** Point d'arrivée d'une remontée sur la carte : l'entrée dans la zone du pic, sinon la glisse suivante. */
   const returnEnd = useCallback(
-    (r: SurfReturn): number => {
-      const targetMs = r.returnS !== null ? r.startMs + r.returnS * 1000 : r.endMs;
-      return nearestIndexAtTime(track, targetMs);
-    },
+    (r: SurfReturn): number => nearestIndexAtTime(track, r.entryMs ?? r.endMs),
     [track]
   );
   const shownSpans = useMemo((): TrackSpanShown[] => {
@@ -684,17 +681,17 @@ function SurfModule() {
                 <PanelHeading label={t('Rame et retour au pic')} open={open.rame} onToggle={toggleOf('rame')} helpKey="surf:rame" />
                 <HelpText helpKey="surf:rame" note>
                   {foil
-                    ? t("Retour au pic : de la fin d'un vol au début de la première attente (immobile au moins {s} s) ; un arrêt plus court (canard, série) compte dans la rame.", { s: minWaitS })
-                    : t("Retour au pic : de la fin d'une vague au début de la première attente (immobile au moins {s} s) ; un arrêt plus court (canard, série) compte dans la rame.", { s: minWaitS })}
-                  {' '}{t("Remontée : distance à vol d'oiseau jusqu'au pic, divisée par ce temps. Rame : vitesse en mouvement.")}
+                    ? t("Retour au pic : de la fin d'un vol à l'entrée dans la zone du pic, l'endroit d'où partent les vols, allongé en travers des vagues. Un vol pris sans être revenu dans cette zone est enchaîné. Attente : immobile au moins {s} s ; un arrêt plus court (canard, série) compte dans la rame.", { s: minWaitS })
+                    : t("Retour au pic : de la fin d'une vague à l'entrée dans la zone du pic, l'endroit d'où partent les vagues, allongé en travers des vagues. Une vague prise sans être revenu dans cette zone (une vague de l'intérieur) est enchaînée. Attente : immobile au moins {s} s ; un arrêt plus court (canard, série) compte dans la rame.", { s: minWaitS })}
+                  {' '}{t("Remontée : distance à vol d'oiseau jusqu'à l'entrée dans la zone, divisée par ce temps. Rame : vitesse en mouvement.")}
                 </HelpText>
                 <div className="an-sheet__stats an-sheet__stats--always">
                   <StatTile label={t('Vitesse de rame')} value={orDash(summary.paddleSpeedMs, (v) => formatSpeed(v, speedUnit))} title={t('Moyenne en mouvement, arrêts courts exclus')} />
-                  <StatTile label={t('Vitesse de remontée')} value={orDash(summary.avgReturnSpeedMs, (v) => formatSpeed(v, speedUnit))} title={t("Distance à vol d'oiseau de la fin de la vague au pic, divisée par le temps du retour")} />
+                  <StatTile label={t('Vitesse de remontée')} value={orDash(summary.avgReturnSpeedMs, (v) => formatSpeed(v, speedUnit))} title={t("Distance à vol d'oiseau de la fin de la vague à l'entrée dans la zone du pic, divisée par le temps du retour")} />
                   <StatTile label={t('Retour au pic (moyen)')} value={orDash(summary.avgReturnS, formatShortDuration)} />
                   <StatTile label={t('Meilleur retour')} value={orDash(summary.bestReturnS, formatShortDuration)} />
-                  <StatTile label={t('Première sortie')} value={orDash(summary.firstOutS, formatShortDuration)} title={t('Du premier mouvement à la première attente, marche sur la plage comprise')} />
-                  <StatTile label={foil ? t('Vols enchaînés') : t('Vagues enchaînées')} value={summary.chainedCount} title={t('Prise sans attente depuis la précédente : pas de retour au pic mesuré')} />
+                  <StatTile label={t('Première sortie')} value={orDash(summary.firstOutS, formatShortDuration)} title={t("Du premier mouvement à l'entrée dans la zone du pic, marche sur la plage comprise")} />
+                  <StatTile label={foil ? t('Vols enchaînés') : t('Vagues enchaînées')} value={summary.chainedCount} title={t("Prise sans être revenu dans la zone du pic depuis la précédente : pas de retour mesuré")} />
                   <StatTile label={t('Temps de rame')} value={formatShortDuration(summary.rameS)} />
                   <StatTile label={t("Temps d'attente")} value={formatShortDuration(summary.attenteS)} />
                 </div>

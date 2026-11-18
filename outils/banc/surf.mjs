@@ -5,7 +5,7 @@
 //  1. les activités du surf dans la rangée de logos de la page Sessions, la barre du haut (Profil, Sessions, Planifier,
 //     Statistiques, Réglages), et leurs deux cartes dans Réglages (« Seuil de vague », « Seuil de vol » pour Surf foil,
 //     ni pente ni terrain) ;
-//  2. une matinée (trois vagues, la troisième enchaînée) : la ligne de la page Sessions, puis l'analyse, onglets
+//  2. une matinée (trois vagues, la troisième prise en remontant) : la ligne de la page Sessions, puis l'analyse, onglets
 //     général, vagues (tableau, tri, « Voir », podium), rame (retours, première sortie), graphiques ;
 //  3. les réglages de la session : seuil de vague imposé (une vague en moins), enregistré dans la fiche, relu après
 //     rechargement, puis « Défaut » et « Annuler » ;
@@ -177,10 +177,13 @@ console.log('rame :', await openTab('rame'));
 await wait(500);
 const rame = await panel('Rame');
 console.log('panneau :', rame);
-// Après la vague 1 : 100 s de rame à 1 m/s jusqu'au pic ; la vague 3 part 40 s après la 2, sans attente : enchaînée.
-contient('matinée, retour au pic après la vague 1 : 1 min 40, 100 m', rame, /vague 1\t1 min 40\t100 m\t/);
-contient('matinée, vague 3 enchaînée après la 2', rame, /vague 2\tenchaîné\t/);
-contient('matinée, « Vagues enchaînées 1 »', rame, 'Vagues enchaînées / 1 ');
+// Retour au pic : jusqu'à l'entrée dans la zone du pic. Trois vagues ne disent pas le sens des vagues : la zone suit
+// l'axe des trois départs, étirée du large vers la plage, et n'en écarte aucun. Après la vague 1, 100 s de rame à
+// 1 m/s jusqu'à l'attente : la zone est atteinte vers 54 s, 54 m. La vague 3 part dans la zone, 40 s après la 2 :
+// la remontée qui la précède y entre vers 11 s, 11 m, et n'est plus enchaînée.
+contient('matinée, retour au pic après la vague 1 : 54 s, 54 m', rame, /vague 1\t5[345] s\t5[345] m\t/);
+contient('matinée, retour au pic après la vague 2 : 11 s, 11 m', rame, /vague 2\t1[012] s\t1[012] m\t/);
+contient('matinée, « Vagues enchaînées 0 »', rame, 'Vagues enchaînées / 0 ');
 console.log('fermer vagues :', await tab('vagues'), '| surbrillance restante :', await evaluate(`document.querySelectorAll('.leaflet-overlay-pane path[stroke="#d32f2f"]').length`));
 console.log('graphiques :', await openTab('graphiques'));
 await settle({ max: 800 });
