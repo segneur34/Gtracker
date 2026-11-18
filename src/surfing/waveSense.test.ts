@@ -108,17 +108,22 @@ describe('estimateWaveSense', () => {
     expect(sense.samples).toBe(4);
   });
 
-  it('ne s\'estime pas sur trois vagues, ni sur des vagues parties dans tous les sens', () => {
+  it('n\'est pas fiable sur trois vagues, ni sur des vagues parties dans tous les sens, et reste rendu', () => {
     const three = build(session(MIXED.slice(0, 3)), 1);
-    expect(estimateWaveSense(three.track, three.waves)).toBeNull();
-    expect(estimateWaveSense(three.track, three.waves, { waveSenseMinWaves: 3 })).not.toBeNull();
+    expect(estimateWaveSense(three.track, three.waves)!.reliable).toBe(false);
+    expect(estimateWaveSense(three.track, three.waves, { waveSenseMinWaves: 3 })!.reliable).toBe(true);
     const spread = build(session([{ heading: 0 }, { heading: 90 }, { heading: 180 }, { heading: 270 }]), 1);
-    expect(estimateWaveSense(spread.track, spread.waves)).toBeNull();
+    expect(estimateWaveSense(spread.track, spread.waves)!.reliable).toBe(false);
+  });
+
+  it('ne rend rien sans aucune mesure', () => {
+    const { track } = build(session(MIXED.slice(0, 1)), 1);
+    expect(estimateWaveSense(track, [])).toBeNull();
   });
 });
 
 describe('isAgainstWaveSense', () => {
-  const sense: WaveSense = { directionDeg: 180, R: 1, samples: 4 };
+  const sense: WaveSense = { directionDeg: 180, R: 1, samples: 4, reliable: true };
   const { track, waves } = build(session([{ heading: 0 }, { heading: 100 }, { heading: 260 }, { heading: 180 }]), 1);
 
   it('reconnaît un passage vers le large, et garde une vague prise en biais', () => {

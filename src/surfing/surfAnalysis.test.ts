@@ -170,7 +170,7 @@ describe('analyzeSurf, sans foil', () => {
   });
 
   it('mesure le retour au pic jusqu\'à l\'entrée dans la zone ; sans sens des vagues, aucune vague n\'est de l\'intérieur', () => {
-    expect(analysis.waveSense).toBeNull();
+    expect(analysis.waveSense?.reliable ?? false).toBe(false);
     expect(analysis.peakZone!.orientation).toBe('departs');
     expect(analysis.peakZone!.insideDepartures).toEqual([]);
     // 100 s de rame vers le large à 1 m/s jusqu'à l'attente : la zone, étirée sur les départs, est atteinte avant.
@@ -308,7 +308,7 @@ describe('analyzeSurf, sur foil', () => {
   });
 
   it('deux vols ne disent pas le sens des vagues : rien n\'est écarté', () => {
-    expect(analysis.waveSense).toBeNull();
+    expect(analysis.waveSense?.reliable ?? false).toBe(false);
   });
 });
 
@@ -346,7 +346,7 @@ describe('analyzeSurf, sens des vagues et remontées pompées sur foil', () => {
     it(`sort les remontées pompées des vagues et les compte pompées, vague en biais gardée (pas de ${cadenceS} s)`, () => {
       const before = analyzeWith(FIVE, cadenceS, NO_SENSE);
       const after = analyzeWith(FIVE, cadenceS);
-      expect(before.waveSense).toBeNull();
+      expect(before.waveSense!.reliable).toBe(false);
       expect(before.waves).toHaveLength(10);
       expect(Math.abs(after.waveSense!.directionDeg - 180)).toBeLessThan(10);
       expect(after.waveSense!.samples).toBe(5);
@@ -374,13 +374,13 @@ describe('analyzeSurf, sens des vagues et remontées pompées sur foil', () => {
   it('sans sens estimable (trois vols), rien n\'est écarté', () => {
     const three: Phase[] = [...flight(200, 0), ...flight(160, 0), ...flight(200, 0), { s: 40, speed: 0.8 }];
     const after = analyzeWith(three, 1);
-    expect(after.waveSense).toBeNull();
+    expect(after.waveSense!.reliable).toBe(false);
     expect(after).toEqual(analyzeWith(three, 1, NO_SENSE));
     expect(after.waves).toHaveLength(6);
   });
 
   it('sans foil, le sens se mesure sur les vagues sans en écarter aucune', () => {
-    expect(analyze(buildSurfSession(MORNING)).analysis.waveSense).toBeNull();
+    expect(analyze(buildSurfSession(MORNING)).analysis.waveSense?.reliable ?? false).toBe(false);
     const wave = (heading: number): Phase[] => [
       { s: 40, speed: 1 }, { s: 30, speed: 0.1 }, { s: 5, speed: 1.6, heading }, { s: 12, speed: 5, heading },
     ];

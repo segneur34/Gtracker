@@ -23,12 +23,12 @@ import type { TrackPoint } from '../core/types';
 /** Fenêtre de la mesure, en secondes depuis le début de la glisse : la descente, avant que la vague ne tourne le long de la ligne de déferlement. */
 export const WAVE_SENSE_WINDOW_S = 5;
 
-/** Nombre de mesures sous lequel le sens n'est pas estimé : trois vagues ne disent pas où va la houle. */
+/** Nombre de mesures sous lequel le sens n'est pas jugé fiable : trois vagues ne disent pas où va la houle. */
 export const WAVE_SENSE_MIN_WAVES = 4;
 
 /**
  * Longueur moyenne du vecteur (`R` de `circularMean`) sous laquelle le sens
- * n'est pas estimé : des vagues parties dans tous les sens. Des gauches et des
+ * n'est pas jugé fiable : des vagues parties dans tous les sens. Des gauches et des
  * droites à 50° de part et d'autre du sens donnent environ 0,64.
  */
 export const WAVE_SENSE_MIN_R = 0.5;
@@ -55,6 +55,8 @@ export interface WaveSense {
   R: number;
   /** Nombre de glisses mesurées. */
   samples: number;
+  /** Vrai quand les mesures sont assez nombreuses et assez concentrées pour écarter des remontées pompées : au moins `waveSenseMinWaves` mesures et `R` d'au moins `waveSenseMinR`. */
+  reliable: boolean;
 }
 
 interface Displacement {
@@ -88,18 +90,19 @@ const earlyDisplacement = (track: readonly TrackPoint[], run: ActiveRun, windowS
 
 /**
  * Sens des vagues tiré des glisses `rides` (sans foil, les vagues ; sur foil,
- * la vague qui lance chaque vol). `null` quand il n'est pas estimable : moins
- * de `waveSenseMinWaves` mesures, ou `R` sous `waveSenseMinR`.
+ * la vague qui lance chaque vol). `null` seulement sans aucune mesure ; sinon
+ * le sens est rendu, avec `reliable` à faux quand il y a moins de
+ * `waveSenseMinWaves` mesures ou que `R` est sous `waveSenseMinR`.
  */
 export const estimateWaveSense = (
   track: readonly TrackPoint[], rides: readonly ActiveRun[], opts: WaveSenseOptions = {}
 ): WaveSense | null => {
   const windowS = opts.waveSenseWindowS ?? WAVE_SENSE_WINDOW_S;
   const measures = rides.map((r) => earlyDisplacement(track, r, windowS)).filter((d) => d.lengthM > 0);
-  if (measures.length < (opts.waveSenseMinWaves ?? WAVE_SENSE_MIN_WAVES)) return null;
+  if (measures.length === 0) return null;
   const { mean, R } = circularMean(measures.map((d) => d.bearingDeg), measures.map((d) => d.lengthM));
-  if (R < (opts.waveSenseMinR ?? WAVE_SENSE_MIN_R)) return null;
-  return { directionDeg: mean, R, samples: measures.length };
+  const reliable = measures.length >= (opts.waveSenseMinWaves ?? WAVE_SENSE_MIN_WAVES) && R >= (opts.waveSenseMinR ?? WAVE_SENSE_MIN_R);
+  return { directionDeg: mean, R, samples: measures.length, reliable };
 };
 
 /**

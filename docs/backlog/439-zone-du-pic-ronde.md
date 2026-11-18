@@ -33,6 +33,63 @@ Avant tout code, sur les sessions où l'essai 298 a été fait :
 - demander à l'utilisateur, en clair, ce qu'il a vécu (où était le pic, sens des vagues par rapport à la plage, temps de retour approximatifs) ;
 - dire laquelle des pistes explique l'écart, puis seulement corriger.
 
+## Relevé du 18/11 sur les sessions réelles (premier geste fait)
+
+Sessions tirées du téléphone par adb, hors dépôt (`D:\memoire Tracker\essais\439-zone-du-pic\`, relevés `releve.txt` et `releve-bis.txt` à côté). Le téléphone n'a que trois sessions de surf ; une seule a des vagues.
+
+- **Sup foil du 14/10** et **Paddle foil du 16/11 à 14 h 26** : aucune vague à aucun seuil essayé, donc ni sens ni zone. Rien à en tirer pour ce lot, ni pour l'essai 299.
+- **Paddle du 16/11 à 15 h 32** (Akila LGM, seuil de la session 6 km/h) : 2 vagues, vers le nord (caps 354° et 355°), de 43 m et 52 m, parties à 125 m l'une de l'autre le long de la plage.
+  - Sens : `null` (2 mesures, il en faut 4). Zone : **cercle de 77 m de rayon** (2 départs, il en faut 3 pour un axe) : la piste 2, pas la piste 1.
+  - Retour après la vague 1 : **0 s**. La vague finit à 41 m de son départ, encore dans le cercle. Dans la trace, il remonte pourtant pendant 1 min 30 environ jusqu'à l'endroit où il attend.
+  - Zone oblongue simulée avec le sens des deux vagues (354,5°) : 97 × 38 m, et le retour reste à **0 s**. Les deux départs sont décalés de 28 m le long du sens des vagues, la marge de 15 m s'y ajoute, et la fin de la vague 1 (27 m vers la plage) reste dedans.
+  - Où il attend : 30 à 45 m **au large** des points de départ (le départ compté est l'instant où la vitesse passe le seuil, après la rame de départ). La zone faite des seuls départs est donc décalée vers la plage par rapport à l'endroit où il attend.
+  - Avec un seuil à 5 km/h, 4 vagues : sens 20° (R 0,97), zone « vagues » de 98 × 49 m, retours de 36 s, 0 s et 0 s.
+
+Ce que cela dit :
+1. Sous 4 vagues il n'y a pas de sens, sous 3 pas d'axe : une petite session donne toujours un cercle. Le sens doit s'estimer dès la première vague.
+2. Même oblongue, la zone est trop épaisse et mal placée pour des vagues courtes : faite des points où la vague est prise, élargie de 15 m, elle contient la fin de la vague.
+3. Pistes 1 (sens faux de 90°) et 4 non vues ici : une seule session, deux vagues droites. À rejuger sur une session de surf à gauches et droites, qui manque.
+
+### Réponses de l'utilisateur (18/11)
+
+1. C'est bien cette session (Paddle du 16/11 à 15 h 32) qu'il a regardée ; pas d'autre session à vagues.
+2. Retour après la vague 1 : « un peu moins » que 1 min 30, « mais ça ressemble à ça ». Cible : de l'ordre de 45 s à 1 min 15, jamais 0 s.
+3. Le pic est l'endroit **où on prend la vague**, « et du coup juste en dessous de là où on attend, plus ou moins » (il précise qu'il n'est pas surfeur). La zone reste donc faite des départs, pas des attentes.
+4. Une seule zone : « d'où la forme oblongue, le pic est parallèle à la plage et jamais au même endroit ». La zone s'allonge le long de la plage pour couvrir tous les départs.
+5. Limite de trois lots en attente levée pour le paquet 439, 440, 424.
+
+### Direction retenue par Claude (à confronter au plan)
+
+- **Jamais de cercle** dès qu'il y a une glisse : le sens des vagues s'estime dès la première (la contrainte de 4 mesures tombe pour orienter la zone ; elle peut rester pour écarter les remontées pompées sur foil, où une erreur coûte plus cher : au plan de le dire).
+- **Axe de la zone = la ligne des départs** quand ils s'étalent (ici cap 98°, 125 m), bornée autour de la perpendiculaire au sens des vagues ; sinon (un seul départ, ou départs groupés) la perpendiculaire au sens. La ligne des départs dit mieux « parallèle à la plage » que la perpendiculaire aux vagues, qui se surfent souvent en biais.
+- **Zone mince** : son épaisseur ne vient que de la marge et de l'écart des départs à leur ligne, pas de leur décalage le long du sens des vagues. Sur la session réelle, avec l'axe à 98° : environ 100 × 20 m, la fin de la vague 1 est à 40 m de l'axe, donc dehors, et le retour redevient mesurable.
+- Critère d'acceptation sur la session réelle (hors dépôt, relevé à la main) : zone oblongue le long de la plage, retour après la vague 1 entre 30 s et 1 min 30. Dans le dépôt : une trace synthétique qui reproduit cette session (2 vagues courtes vers le nord, départs à 125 m l'un de l'autre et décalés de 28 m, attente 30 à 45 m au large).
+
+## Plan retenu (18/11, agent `Plan`, tranché par l'orchestrateur)
+
+Constat du plan : l'interface ne lit nulle part `PeakZoneOrientation` (seuls les tests) ; le `summary` de la bibliothèque ne contient aucun retour : `SUMMARY_CALC_VERSION` ne bouge pas, à condition que le nombre de vagues sur foil ne change pas.
+
+**Partie A, neutre (Sonnet/medium)** : `src/surfing/waveSense.ts`, `surfAnalysis.ts` et leurs tests.
+- `estimateWaveSense` ne rend `null` que sans aucune mesure ; sinon `{ directionDeg, R, samples, reliable }`, `reliable = samples >= WAVE_SENSE_MIN_WAVES && R >= WAVE_SENSE_MIN_R` (les deux constantes restent).
+- `isAgainstWaveSense` n'est appelé dans `analyzeSurf` que si le sens est fiable : le compte des vagues sur foil ne change pas.
+- Dans cette partie, `buildPeakZone` ne reçoit encore que le sens fiable (sinon `null`) : aucun chiffre ne change. Seuls les attendus `toBeNull` du sens deviennent `reliable === false`.
+- En-têtes de `waveSense.ts` et de `surfAnalysis.ts` mis à jour.
+
+**Partie B, la géométrie (Opus/high)** : `src/surfing/peakZone.ts` et son test, `surfAnalysis.ts` (le sens utilisable passe à la zone) et son test.
+- Sens utilisable pour la zone : au moins une mesure et `R >= WAVE_SENSE_MIN_R` (une seule vague : R = 1).
+- Règle des départs de l'intérieur (`ZONE_INSIDE_M`) : gardée, seulement avec un sens utilisable, appliquée avant le calcul de l'axe.
+- Axe : l'axe principal des départs gardés (dès 2 points) quand leur étendue le long de cet axe atteint `ZONE_LINE_MIN_M` = 30 m, borné à `ZONE_MAX_TILT_DEG` = 45° de la perpendiculaire au sens (au-delà : la perpendiculaire). Départs groupés ou départ unique : la perpendiculaire au sens, avec l'allongement `ZONE_MIN_ASPECT`. Sans sens utilisable : la ligne des départs, sans borne ; ni sens ni ligne (un départ, points confondus) : ellipse d'allongement minimal sur un axe conventionnel est-ouest. **Jamais de cercle.**
+- Zone mince : grand demi-axe = demi-étendue le long de la ligne + marge ; petit demi-axe = demi-étendue de part et d'autre de la ligne + marge. Le gonflement `k` sur les deux axes est retiré : si un départ sort de l'ellipse, seul le petit axe grandit, juste assez.
+- Marge côté plage réduite, tranchée par l'orchestrateur sur la session réelle : 15 m côté large, `ZONE_BEACH_MARGIN_M` = 5 m côté plage (centre décalé vers le large), seulement quand le sens est utilisable ; sans sens, 15 m des deux côtés. Mesuré sur le Paddle du 16/11 (zones posées à la main, `releve-ter.txt`) : au seuil de 6 km/h, retour après la vague 1 de 45 s en symétrique et 55 s avec 5 m côté plage, tous deux dans la cible ; au seuil de 5 km/h (4 vagues), 52 s, 0 s, 0 s en symétrique contre 69 s, 33 s, 0 s avec 5 m : la marge réduite avale moins de fins de vague.
+- `PeakZoneOrientation` devient `'ligne' | 'vagues' | 'departs'` (ligne bornée par le sens, perpendiculaire au sens, ligne sans sens).
+- Constantes nommées et commentées, dans `PeakZoneOptions` : `zoneLineMinM`, `zoneMaxTiltDeg`, `zoneBeachMarginM`.
+- Tests : le cas qui reproduit la session réelle, à 1 Hz, 5 Hz et un pas de 4 s (2 vagues au cap 354° de 43 et 52 m, départs à 122 m l'un de l'autre vers l'est et décalés de 28 m le long du sens, retour vers le large jusqu'à 35 m au-delà des départs à 0,9 m/s ; attendus : `'ligne'`, axe 98° ± 5, fin de la vague 1 hors zone, retour après la vague 1 entre 30 et 75 s, `waveSense.reliable` faux) ; gauches et droites mêlées (axe à moins de 15° de la plage) ; une seule vague (ellipse en travers, jamais ronde) ; vagues toutes en biais du même côté, sens faussé de 50° (axe à moins de 10° de la plage) ; les attendus existants recalibrés, chacun justifié par la construction de sa trace.
+- Prêt pour le 440 : une seule variable `waveSense` dans `analyzeSurf`, qui sert à la zone et aux remontées pompées ; un sens saisi s'y écrira `{ directionDeg, R: 1, samples: 0, reliable: true }`.
+
+**Partie C, le banc (Sonnet/medium)** : `outils/banc/surf.mjs` (matinée, l.180-186 : commentaire « trois vagues ne disent pas le sens » et valeurs 54 s / 11 s à reprendre des tests de la matinée), passage noté dans `outils/banc/SCRIPTS.md`.
+
+À la passe de documentation, après validation : `docs/DECISIONS.md` §4, `docs/ETAT_DU_PROJET.md` (surf, zone du pic), `docs/INVENTAIRE.md` (`waveSense`, `peakZone`).
+
 ## Voulu
 
 - Une zone **oblongue** dans tous les cas où il y a des départs (jamais un cercle à l'écran), son grand axe le long de la ligne de déferlement (en travers du sens des vagues), à la place réelle du pic.

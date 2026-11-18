@@ -37,7 +37,7 @@ const departuresAt = (positions: { x: number; y: number }[]) => {
   };
 };
 
-const senseTo = (directionDeg: number): WaveSense => ({ directionDeg, R: 0.9, samples: 6 });
+const senseTo = (directionDeg: number): WaveSense => ({ directionDeg, R: 0.9, samples: 6, reliable: true });
 /** Les vagues déferlent vers le sud, la plage. */
 const SOUTH = senseTo(180);
 

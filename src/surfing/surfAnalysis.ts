@@ -41,7 +41,8 @@ import { estimateWaveSense, isAgainstWaveSense, type WaveSense, type WaveSenseOp
  * Le sens des vagues (`waveSense.ts`) s'estime sur la première vague de chaque
  * glisse. Sur foil, une vague candidate qui va contre lui est une remontée
  * pompée vers le large : elle sort des vagues et reste dans le vol, comptée
- * pompée. Sans sens estimable, rien n'est écarté.
+ * pompée. Tant que le sens n'est pas fiable (`reliable`), rien n'est écarté, et
+ * la zone du pic ne le reçoit pas.
  */
 
 /** Durée maximale du recul du début d'une glisse, en secondes : une mise en vitesse entre les deux détentes en dure quelques-unes. */
@@ -152,7 +153,7 @@ export interface SurfAnalysis {
   flights: SurfFlight[];
   /** Première sortie (si elle entre dans la zone du pic), puis une remontée après chaque glisse sauf la dernière. */
   returns: SurfReturn[];
-  /** Sens des vagues de la session ; `null` s'il n'est pas estimable. */
+  /** Sens des vagues de la session ; `null` sans aucune mesure ; `reliable` dit s'il est assez solide pour écarter des remontées. */
   waveSense: WaveSense | null;
   /** Zone du pic de la session ; `null` sans glisse. */
   peakZone: PeakZone | null;
@@ -342,7 +343,7 @@ export const analyzeSurf = (
   } else {
     rides.forEach((r, k) => {
       // Une candidate qui va contre le sens des vagues est une remontée pompée : elle reste dans le vol, comptée pompée.
-      const flightWaves = waveSense === null
+      const flightWaves = waveSense === null || !waveSense.reliable
         ? candidates[k]
         : candidates[k].filter((w) => !isAgainstWaveSense(track, w, waveSense, p));
       let waveS = 0;
@@ -367,7 +368,7 @@ export const analyzeSurf = (
   }
 
   // Zone du pic : les départs de toutes les glisses, décollages des vols sur foil.
-  const peakZone = buildPeakZone(track, rides.map((r) => r.start), waveSense, p);
+  const peakZone = buildPeakZone(track, rides.map((r) => r.start), waveSense?.reliable ? waveSense : null, p);
   const returns: SurfReturn[] = [];
   // Première sortie : du premier coup de rame à la première entrée dans la zone, avant la première glisse.
   // Partie de la zone même (enregistrement lancé au pic), elle n'a pas de sens.
