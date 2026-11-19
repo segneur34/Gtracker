@@ -5,6 +5,8 @@ import { GONG_LOGO_HEIGHT, GONG_LOGO_PATH, GONG_LOGO_WIDTH } from './gongLogoPat
 import { lightToken } from '../theme/lightToken';
 import { t } from '../core/i18n';
 import { loadMapTile, tileImage } from '../platform/mapTiles';
+import type { RouteShareContent } from '../planning/routeShareImage';
+import { drawNorthArrow, NORTH_ARROW_ROOM_PX, routeOverlay } from './drawRouteOverlay';
 import { strokeColoredTrack } from './drawTrackPreview';
 import type { TrackSegment } from './TrackSegmentsLayer';
 
@@ -14,7 +16,9 @@ import type { TrackSegment } from './TrackSegmentsLayer';
  * remplit l'image ; en haut, sur un voile blanc bordé de la couleur de la
  * famille, le titre, l'activité et la date ; en bas, les chiffres retenus dans
  * un cartouche blanc, puis le pied. Le cadrage et la mise en page se calculent
- * dans `core/shareImage.ts`.
+ * dans `core/shareImage.ts`. Celle d'un itinéraire est la même, son parcours
+ * (`course`) dessiné à la place de la trace, par-dessus le voile, avec la rose
+ * du nord à droite du titre (`drawRouteOverlay.ts`).
  */
 
 export interface ShareImageContent {
@@ -32,6 +36,8 @@ export interface ShareImageContent {
   base: MapBase;
   /** Nom ou pseudo du pratiquant, à droite du pied ; `null` : rien. */
   author: string | null;
+  /** Parcours d'un itinéraire, dessiné et cadré à la place des tranches de trace. */
+  course?: RouteShareContent;
 }
 
 /** Tuile du fond prête à dessiner, `null` si elle manque. */
@@ -156,7 +162,9 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
   // Carte sur toute l'image ; sans fond (fond décoché), un aplat.
   ctx.fillStyle = token('--surface-sunken', '#fbfbfb');
   ctx.fillRect(0, 0, widthPx, heightPx);
-  const track = drawTrack(ctx, content, count);
+  const line = token('--line-strong', '#cfcfcf');
+  const course = content.course;
+  const track = course ? routeOverlay(ctx, course, count, { font: family, ink, line }) : drawTrack(ctx, content, count);
   if (content.withMap && track.view) {
     const placed = viewTiles(track.view);
     const images = await Promise.all(placed.map((p) => tileImage(p.tile)));
@@ -166,7 +174,8 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
       if (image) ctx.drawImage(image, p.x, p.y, p.sizePx + 1, p.sizePx + 1);
     });
   }
-  track.draw();
+  // Un parcours se dessine après le titre : ses pastilles ne passent pas sous le voile.
+  if (!course) track.draw();
   // Sans fond de carte, pas de mention non plus.
   if (content.withMap && track.view) {
     // Mention qu'exigent les conditions d'usage des tuiles du fond, au ras du bas, sous le cartouche.
@@ -187,12 +196,18 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
   ctx.fillRect(0, 0, widthPx, veilPx);
   ctx.fillStyle = content.accent;
   ctx.fillRect(0, 0, edgePx, veilPx);
+  // Un itinéraire laisse la place de la rose du nord à droite du titre.
+  const headerWidth = widthPx - 2 * margin - (course ? NORTH_ARROW_ROOM_PX : 0);
   ctx.fillStyle = ink;
   ctx.font = `700 58px ${family}`;
-  ctx.fillText(fitText(ctx, content.title, widthPx - 2 * margin), margin, titleBaselinePx);
+  ctx.fillText(fitText(ctx, content.title, headerWidth), margin, titleBaselinePx);
   ctx.fillStyle = muted;
   ctx.font = `400 32px ${family}`;
-  ctx.fillText(fitText(ctx, content.subtitle, widthPx - 2 * margin), margin, subtitleBaselinePx);
+  ctx.fillText(fitText(ctx, content.subtitle, headerWidth), margin, subtitleBaselinePx);
+  if (course) {
+    track.draw();
+    drawNorthArrow(ctx, { font: family, ink, line });
+  }
 
   // Cartouche des chiffres ; sans chiffre, un voile sous le pied seul.
   const cardH = cardHeight(count);
@@ -222,7 +237,7 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
       ctx.fillStyle = ink;
       drawFitted(ctx, stat.value, x, y + statValueBaselinePx, columnPx - 24, { weight: 700, maxPx: 50, minPx: 32, family });
     });
-    ctx.fillStyle = token('--line-strong', '#cfcfcf');
+    ctx.fillStyle = line;
     ctx.fillRect(statsMarginXPx, cardY + cardH - ruleFromBottomPx, widthPx - 2 * statsMarginXPx, 2);
   } else {
     const foot = ctx.createLinearGradient(0, heightPx - footerVeilPx, 0, heightPx);

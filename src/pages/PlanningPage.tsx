@@ -19,6 +19,7 @@ import { useHelp } from '../components/helpContext';
 import PanelTitle from '../components/PanelTitle';
 import ResizablePanel from '../components/ResizablePanel';
 import RouteList from '../components/RouteList';
+import RouteImageShare from '../components/RouteImageShare';
 import SectionTabs, { type SectionDefinition } from '../components/SectionTabs';
 import { IconChevronRight, IconDownload, IconFile, IconPencil, IconPencilOff, IconShare, IconTrash, IconUndo } from '../components/icons';
 import { shareRouteGpx } from '../components/routeShare';
@@ -50,6 +51,7 @@ import {
   EMPTY_ROUTE, courseLegs, isLooped, routeFromTrack, routePoints, routeTotals, waypointDistances,
   type PlannedRoute, type RoutePoint, type Waypoint,
 } from '../planning/route';
+import { END_COLOR, ROUTE_COLOR, START_COLOR } from '../planning/routeColors';
 import { buildRouteGpx, markLabel } from '../planning/routeGpx';
 import { recordToRoute, routeMarkGuide } from '../planning/routeRecord';
 import { beepStartM, simulatedApproachMs, validationRadiusM, type MarkGuideSettings } from '../recording/markGuide';
@@ -108,12 +110,6 @@ const AUTO_LOCATE_MIN_ZOOM = 14;
 const readPrefs = (): PlanningPrefs => jsonStore.read<PlanningPrefs>(PREFS_KEY) ?? {};
 const writePrefs = (patch: PlanningPrefs): void => jsonStore.write(PREFS_KEY, { ...readPrefs(), ...patch });
 
-/**
- * Tracé et points intermédiaires toujours en bleu, celui de la voile, quelle
- * que soit l'activité : une activité verte ou rouge se confondrait avec le
- * départ ou l'arrivée.
- */
-const ROUTE_COLOR = '#1565c0';
 /** Épaisseur du tracé. */
 const ROUTE_WEIGHT = 5;
 /** Liseré blanc sous le tracé, sur le fond satellite, le même que celui des analyses. */
@@ -148,9 +144,6 @@ const latLngOf = (w: Waypoint): [number, number] => {
   }
   return position;
 };
-/** Départ en vert, arrivée en rouge sombre (distinct du rouge des tronçons en échec). */
-const START_COLOR = '#2e7d32';
-const END_COLOR = '#b71c1c';
 /** Sur une boucle, un seul repère au départ, qui est aussi l'arrivée : moitié vert, moitié rouge. */
 const LOOP_FILL = `linear-gradient(90deg, ${START_COLOR} 50%, ${END_COLOR} 50%)`;
 
@@ -278,6 +271,8 @@ function PlanningPage() {
    * lui, et tombe à la fermeture du menu ou dès qu'un autre itinéraire, ou aucun, est ouvert.
    */
   const [confirmingMenuDelete, setConfirmingMenuDelete] = useState<string | null>(null);
+  /** Itinéraire dont l'image de partage est ouverte (« Partager l'image » du menu « … »). */
+  const [sharingImage, setSharingImage] = useState<SavedRoute | null>(null);
   /** Échec du chargement d'un GPX, montré dans le bloc Tracé. */
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -875,6 +870,10 @@ function PlanningPage() {
                   <input id={NAME_FIELD_ID} className="ui-field" value={name} placeholder={defaultName()} onChange={(e) => setName(e.target.value)} />
                   {showMenu && (
                     <MoreMenu label={t("Plus d'actions sur l'itinéraire")} onClose={() => setConfirmingMenuDelete(null)}>
+                      <Button onClick={() => setSharingImage(current)} disabled={shareBlocked}>
+                        <IconShare size={18} />
+                        {t("Partager l'image")}
+                      </Button>
                       <Button onClick={() => void shareCurrent()} disabled={shareBlocked}>
                         <IconShare size={18} />
                         {t('Partager le GPX')}
@@ -920,6 +919,7 @@ function PlanningPage() {
               {(current !== null || route.waypoints.length > 0) && <Button variant="ghost" onClick={startNew}>{t('Nouvel itinéraire')}</Button>}
             </div>
             {message && <p className="plan-note">{message}</p>}
+            {sharingImage && <RouteImageShare saved={sharingImage} activities={activities} onClose={() => setSharingImage(null)} />}
           </PlanBlock>
 
           <PlanBlock id="planning.liste" label={t('Mes itinéraires ({n})', { n: listedRoutes.length })} open={open.liste} onToggle={() => toggle('liste')}>

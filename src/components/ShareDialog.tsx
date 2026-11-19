@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { FAMILY_ACCENT } from '../core/activities';
 import { pickShareStats, SHARE_IMAGE, type ShareStat } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
+import type { RouteShareContent } from '../planning/routeShareImage';
 import { useMapBase } from '../hooks/useMapBase';
 import { readAthleteProfile } from '../hooks/useAthleteProfile';
 import { athleteName } from '../library/athleteProfile';
@@ -48,6 +49,14 @@ interface ShareDialogProps {
   segments: ReadonlyArray<TrackSegment>;
   /** Chiffres de la synthèse de la session, parmi lesquels l'utilisateur choisit. */
   stats: ReadonlyArray<ShareStat>;
+  /** Chiffres fixes : tous sur l'image, sans choix à faire. */
+  fixedStats?: boolean;
+  /** Parcours d'un itinéraire, dessiné à la place de la trace. */
+  course?: RouteShareContent;
+  /** Couleur du liseré ; sans elle, celle de la famille. */
+  accent?: string;
+  /** Texte de l'image, porté par l'aperçu ; sans lui, une phrase générique. */
+  description?: string;
   onClose: () => void;
 }
 
@@ -55,9 +64,12 @@ interface ShareDialogProps {
  * Fenêtre « Partager l'image » : l'aperçu de l'image (trace, fond de
  * carte, chiffres), les chiffres à y mettre et le fond, retenus par activité
  * sur l'appareil (six chiffres au plus), et le bouton qui ouvre le menu de partage du téléphone
- * (`platform/share.ts`). Ouverte depuis le « … » de l'analyse et des cartes de fin d'enregistrement.
+ * (`platform/share.ts`). Ouverte depuis le « … » de l'analyse et des cartes de fin d'enregistrement ;
+ * celle d'un itinéraire (`RouteImageShare`) montre son parcours et ses chiffres fixes, seul le fond se choisit.
  */
-function ShareDialog({ family, file, activityId, title, subtitle, fileName, segments, stats, onClose }: ShareDialogProps) {
+function ShareDialog({
+  family, file, activityId, title, subtitle, fileName, segments, stats, fixedStats, course, accent, description, onClose,
+}: ShareDialogProps) {
   const [choice, setChoice] = useState<ShareChoice>(() => readChoice(activityId));
   /** Nom ou pseudo de Réglages, au pied de l'image. */
   const [author] = useState(() => athleteName(readAthleteProfile()));
@@ -70,7 +82,7 @@ function ShareDialog({ family, file, activityId, title, subtitle, fileName, segm
   const [base] = useMapBase(family, file);
   const tileImage = useMemo(() => createTileImageLoader(base), [base]);
   const withMap = choice.map ?? true;
-  const chosen = pickShareStats(stats, choice.stats ?? null);
+  const chosen = fixedStats ? stats.slice(0, SHARE_IMAGE.maxStats) : pickShareStats(stats, choice.stats ?? null);
   /** Ce que l'image montre, en texte : un rendu de l'analyse (survol d'un graphe) ne la redessine pas. */
   const drawKey = JSON.stringify([chosen, withMap, base]);
   const drawing = image?.key !== drawKey && failure?.key !== drawKey;
@@ -88,9 +100,9 @@ function ShareDialog({ family, file, activityId, title, subtitle, fileName, segm
   useEffect(() => {
     let cancelled = false;
     // Couleur de la famille dans la palette claire : l'image reste claire en thème sombre.
-    const accent = lightToken(`--${family}`, '#000000');
+    const edge = accent ?? lightToken(`--${family}`, '#000000');
     const [shown, map] = JSON.parse(drawKey) as [ShareStat[], boolean];
-    drawShareImage({ title, subtitle, accent, segments, stats: shown, withMap: map, base, author }, tileImage)
+    drawShareImage({ title, subtitle, accent: edge, segments, stats: shown, withMap: map, base, author, course }, tileImage)
       .then((blob) => {
         if (cancelled) return;
         setImage((previous) => {
@@ -104,7 +116,7 @@ function ShareDialog({ family, file, activityId, title, subtitle, fileName, segm
     return () => {
       cancelled = true;
     };
-  }, [family, title, subtitle, segments, drawKey, tileImage, base, author]);
+  }, [family, title, subtitle, segments, drawKey, tileImage, base, author, course, accent]);
 
   /** Aperçu libéré à la fermeture. */
   const imageRef = useRef(image);
@@ -131,19 +143,19 @@ function ShareDialog({ family, file, activityId, title, subtitle, fileName, segm
 
       <div className="share-dialog__preview" aria-busy={drawing}>
         {image
-          ? <img src={image.url} alt={t("Aperçu de l'image partagée")} style={{ opacity: drawing ? 0.5 : 1 }} />
+          ? <img src={image.url} alt={description ?? t("Aperçu de l'image partagée")} style={{ opacity: drawing ? 0.5 : 1 }} />
           : <span className="share-dialog__wait">{t("Préparation de l'image…")}</span>}
       </div>
 
-      {/* Sans trace, pas de fond de carte à choisir. */}
-      {segments.length > 0 && (
+      {/* Sans trace ni parcours, pas de fond de carte à choisir. */}
+      {(segments.length > 0 || course !== undefined) && (
         <label className="share-dialog__check">
           <input type="checkbox" checked={withMap} onChange={(e) => update({ ...choice, map: e.target.checked })} />
           {t('Fond de carte')}
         </label>
       )}
 
-      {stats.length > 0 && (
+      {!fixedStats && stats.length > 0 && (
         <div>
           <div className="share-dialog__label">{t("Chiffres sur l'image ({count} sur {max} au plus)", { count: chosen.length, max: SHARE_IMAGE.maxStats })}</div>
           <div className="ui-tabs ui-tabs--compact" role="group" aria-label={t("Chiffres sur l'image")}

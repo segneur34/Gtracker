@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import MemoryStatus from '../components/MemoryStatus';
 import ActivityFilterTabs from '../components/ActivityFilterTabs';
 import RouteList from '../components/RouteList';
+import RouteImageShare from '../components/RouteImageShare';
 import { shareRouteGpx } from '../components/routeShare';
 import { IconFile, IconRoute, IconShare } from '../components/icons';
 import Button from '../components/ui/Button';
@@ -30,7 +31,8 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  *
  * Lot 194 : « Partager le GPX » envoie le GPX d'un itinéraire, sa fiche en extension,
  * vers une autre application ; « Importer un itinéraire » range celui d'un GPX
- * choisi dans les fichiers, souligné dans la liste.
+ * choisi dans les fichiers, souligné dans la liste. « Partager l'image » ouvre
+ * l'image de partage de l'itinéraire (`RouteImageShare`).
  */
 
 const PREFS_KEY = STORAGE_KEYS.routeList;
@@ -47,6 +49,8 @@ function RoutesPage() {
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
   const [imported, setImported] = useState<string | null>(null);
+  /** Itinéraire dont l'image de partage est ouverte. */
+  const [sharingImage, setSharingImage] = useState<SavedRoute | null>(null);
   const { activities, isShown } = useVisibility();
   const routes = useMemo(() => shownRoutes(allRoutes, activities, isShown), [allRoutes, activities, isShown]);
   const [sort, setSortState] = useState<RouteSort>(readSort);
@@ -152,6 +156,10 @@ function RoutesPage() {
               </span>
             ) : (
               <MoreMenu label={t("Plus d'actions sur l'itinéraire")}>
+                <Button size="s" variant="ghost" onClick={() => setSharingImage(saved)}
+                  aria-label={t("Partager l'image de {name}", { name: saved.record.name })}>
+                  <IconShare size={18} /> {t("Partager l'image")}
+                </Button>
                 <Button size="s" variant="ghost" onClick={() => void share(saved)} aria-label={t('Partager {name}', { name: saved.record.name })}>
                   <IconShare size={18} /> {t('Partager le GPX')}
                 </Button>
@@ -168,6 +176,7 @@ function RoutesPage() {
           </p>
         )}
       </Card>
+      {sharingImage && <RouteImageShare saved={sharingImage} activities={activities} onClose={() => setSharingImage(null)} />}
     </div>
   );
 }
