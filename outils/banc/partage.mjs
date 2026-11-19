@@ -14,7 +14,12 @@
 //  4. à 390×844 : la fenêtre tient dans l'écran, sans débordement de la page ;
 //  5. fin d'enregistrement, à 390×844 : rejeu ×600 d'une trace de voile, Arrêter ; l'analyse s'ouvre seule, puis « … » ›
 //     « Partager l'image » de l'analyse : aperçu en 1080 × 1920, chiffres du résumé, choix de la voile repris (clé de
-//     l'activité enregistrée, la même que celle de la session importée : Wingfoil).
+//     l'activité enregistrée, la même que celle de la session importée : Wingfoil) ;
+//  6. itinéraire : un parcours de trois balises posé et enregistré dans Planifier (écran d'ordinateur) ; « Partager l'image »
+//     depuis le « … » du nom : 1080 × 1920, aucune case de chiffres (« Fond de carte » seule), `alt` relevé en entier
+//     (nom, activité, trois chiffres, bords), partage simulé d'un PNG nommé d'après l'itinéraire, fond décoché ; puis la même
+//     chose depuis le « … » d'une ligne de la liste des itinéraires ; aucune erreur de console. Images gardées dans le dossier
+//     des captures : `partage-itineraire.png`, `partage-itineraire-sans-fond.png`.
 // La taille du PNG transmis au partage n'est pas relevée : le fond de l'image est fait des tuiles d'OpenStreetMap, lues
 // en direct, et sa taille change d'un passage à l'autre (tuiles plus ou moins nettes ou toutes arrivées) ; le script ne
 // contrôle que « plus de 10 000 octets ».
@@ -32,7 +37,7 @@ if (!port || !workDir) {
 }
 
 // --- Protocole (lib/cdp.mjs) ---
-const { send, evaluate, go, settle, waitFor, wait, blockNetwork, importGpx, importFiles, records, clickText, shoot, close, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
+const { send, evaluate, go, settle, waitFor, wait, blockNetwork, importGpx, importFiles, records, clickText, shoot, close, logs, mouse } = await connect({ port, width: 1400, height: 1000, shotDir });
 
 let failures = 0;
 const check = (what, ok, detail = '') => { console.log(`${ok ? 'ok   ' : 'ÉCHEC'} ${what}${detail ? ` (${detail})` : ''}`); if (!ok) failures++; };
@@ -228,6 +233,111 @@ check("fin d'enregistrement : choix de la voile repris (même activité)", c.fil
   && !(await evaluate(`document.querySelector('.share-dialog__check input').checked`)));
 await saveImage('partage-enregistrement');
 await shoot('partage-enregistrement-fenetre');
+await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+await wait(300);
+
+// --- 6. Itinéraire : l'image d'un parcours de trois balises, depuis Planifier puis depuis la liste ---
+// Même fenêtre que la session, sans choix de chiffres : le fond de carte seul se règle. Écran d'ordinateur.
+await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
+const logsAvantItineraire = logs.length;
+const NOM_ITINERAIRE = 'Parcours banc';
+const clickExact = (text, scope = 'button') => evaluate(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(scope)})].find((x) => x.textContent.trim() === ${JSON.stringify(text)} && !x.disabled); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
+const tapMap = async (fx, fy) => {
+  const r = await evaluate(`(() => { const b = document.querySelector('.plan-map .leaflet-container').getBoundingClientRect(); return [b.left, b.top, b.width, b.height]; })()`);
+  await mouse('mousePressed', r[0] + r[2] * fx, r[1] + r[3] * fy);
+  await mouse('mouseReleased', r[0] + r[2] * fx, r[1] + r[3] * fy);
+  await wait(300);
+};
+const planStat = (nom) => evaluate(`[...document.querySelectorAll('.plan-stat')].find((s) => s.querySelector('span')?.textContent === ${JSON.stringify(nom)})?.querySelector('strong')?.textContent ?? null`);
+/** « Partager l'image » : le partage du navigateur est simulé, le fichier transmis est relevé. */
+const simulerPartage = () => evaluate(`(() => {
+  window.__partage = null;
+  navigator.canShare = () => true;
+  navigator.share = async (data) => { window.__partage = { name: data.files[0].name, type: data.files[0].type, size: data.files[0].size }; };
+  return 'ok';
+})()`);
+const partagerImage = async () => {
+  await simulerPartage();
+  await evaluate(`[...document.querySelectorAll('.share-dialog__actions button')].find((b) => b.textContent.trim() === 'Partager').click()`);
+  await wait(500);
+  return evaluate('window.__partage');
+};
+const imageAlt = () => evaluate(`document.querySelector('.share-dialog__preview img')?.getAttribute('alt') ?? null`);
+const echap = async () => {
+  await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+  await wait(300);
+};
+const dialogueItineraire = async (etiquette) => {
+  check(`itinéraire, ${etiquette} : fenêtre ouverte, aperçu dessiné`, Boolean(await evaluate(`document.querySelector('.share-dialog[role=dialog]') !== null`)) && await waitImage());
+  check(`itinéraire, ${etiquette} : image en hauteur de 1080 × 1920`, isPortrait(await imageSize()), JSON.stringify(await imageSize()));
+  const cases = await evaluate(`JSON.stringify({ pastilles: document.querySelectorAll('.share-dialog .ui-tab').length, cases: [...document.querySelectorAll('.share-dialog__check')].map((x) => x.textContent.trim()), choix: document.querySelectorAll('.share-dialog__label').length })`);
+  check(`itinéraire, ${etiquette} : pas de cases de chiffres, la seule case « Fond de carte »`, JSON.parse(cases).pastilles === 0 && JSON.parse(cases).choix === 0 && JSON.stringify(JSON.parse(cases).cases) === '["Fond de carte"]', cases);
+};
+
+await go('/itineraires', 3000);
+await evaluate(`localStorage.setItem('${CLES.planning}', JSON.stringify({ activityId: 'wingfoil' }));
+  localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { parcours: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
+await go('/itineraires', 3000);
+await waitFor(`Boolean(document.querySelector('.plan-map .leaflet-container'))`, { timeout: 5000, every: 100, label: 'carte de Planifier' });
+await tapMap(0.3, 0.3);
+await tapMap(0.6, 0.35);
+await tapMap(0.55, 0.7);
+console.log('balises posées :', await planStat('Balises'), '| distance :', await planStat('Distance'));
+await evaluate(`(() => { const i = document.querySelector('.plan-form input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ${JSON.stringify(NOM_ITINERAIRE)}); i.dispatchEvent(new Event('input', { bubbles: true })); return 'ok'; })()`);
+console.log('Enregistrer :', await clickExact('Enregistrer'));
+const rangeMsg = await waitFor(`[...document.querySelectorAll('.plan-note')].map((x) => x.textContent).find((t) => t.startsWith('Enregistré')) ?? null`, { timeout: 6000, every: 150, label: 'itinéraire enregistré' });
+check('itinéraire de trois balises enregistré', typeof rangeMsg === 'string' && rangeMsg.startsWith('Enregistré'), String(rangeMsg));
+const distancePage = await planStat('Distance');
+check('trois balises posées, sans boucle', (await planStat('Balises')) === '3', String(await planStat('Balises')));
+
+// Depuis le « … » du nom, dans Planifier.
+await evaluate(`(() => { const b = document.querySelector('.plan-form .ui-more__button'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); return 'ok'; })()`);
+await wait(300);
+const entreesPlan = await evaluate(`JSON.stringify([...document.querySelectorAll('.plan-form .ui-more__panel button')].map((x) => x.textContent.trim()))`);
+console.log('« … » de l\'itinéraire :', entreesPlan);
+check('itinéraire : « Partager l\'image » est la première entrée du « … » du nom', JSON.parse(entreesPlan)[0] === "Partager l'image", entreesPlan);
+console.log('Partager l\'image :', await evaluate(`(() => { const b = [...document.querySelectorAll('.plan-form .ui-more__panel button')].find((x) => x.textContent.trim() === "Partager l'image"); if (!b || b.disabled) return 'absent'; b.click(); return 'ok'; })()`));
+await dialogueItineraire('depuis Planifier');
+const altPlan = await imageAlt();
+console.log('alt :', altPlan);
+// L'image décrit le parcours : trois balises, distances et caps de ses deux bords, le total de la page.
+const altRe = new RegExp(`^Image de l'itinéraire « ${NOM_ITINERAIRE} », Wingfoil · itinéraire : Distance ([\\d,]+ km), Balises 3, Plus long bord ([\\d,]+ km)\\. Bords : 1 → 2 : ([\\d,]+ km) · (\\d+)° ; 2 → 3 : ([\\d,]+ km) · (\\d+)°\\.$`);
+const altM = altRe.exec(altPlan ?? '');
+check('itinéraire : l\'alt décrit le nom, l\'activité, les trois chiffres et les deux bords', Boolean(altM), String(altPlan));
+check('itinéraire : la distance de l\'alt est celle de Planifier', altM?.[1] === distancePage, `${altM?.[1]} / ${distancePage}`);
+check('itinéraire : le plus long bord est l\'un des deux bords', altM !== null && (altM[2] === altM[3] || altM[2] === altM[5]), String(altPlan));
+await saveImage('partage-itineraire');
+await shoot('partage-itineraire-fenetre');
+const png = await partagerImage();
+console.log('partagé :', JSON.stringify({ name: png?.name, type: png?.type }));
+check('itinéraire : un PNG nommé d\'après l\'itinéraire est transmis au partage', png?.type === 'image/png' && png?.name === `${NOM_ITINERAIRE}.png` && png.size > 10_000, JSON.stringify({ name: png?.name, type: png?.type }));
+// Sans fond de carte (la case se décoche), l'image change.
+await evaluate(`document.querySelector('.share-dialog__check input').click()`);
+await waitImage();
+check('itinéraire : case « Fond de carte » décochée, image toujours en 1080 × 1920', isPortrait(await imageSize()) && !(await evaluate(`document.querySelector('.share-dialog__check input').checked`)), JSON.stringify(await imageSize()));
+await saveImage('partage-itineraire-sans-fond');
+await evaluate(`document.querySelector('.share-dialog__check input').click()`);
+await waitImage();
+await echap();
+check('itinéraire : Échap ferme la fenêtre', await evaluate(`document.querySelector('.share-dialog') === null`));
+
+// Depuis le « … » d'une ligne de la liste des itinéraires.
+await go('/itineraires/liste', 3000);
+await waitFor(`document.querySelectorAll('.route-list__item .ui-more__button').length > 0`, { timeout: 6000, every: 150, label: 'liste des itinéraires' });
+console.log('« … » de la ligne :', await evaluate(`(() => { const b = document.querySelector('.route-list__item .ui-more__button'); b.click(); return 'ok'; })()`));
+await wait(300);
+const entreesListe = await evaluate(`JSON.stringify([...document.querySelectorAll('.route-list__item .ui-more__panel button')].map((x) => ({ texte: x.textContent.trim(), nom: x.getAttribute('aria-label') })))`);
+console.log('entrées de la ligne :', entreesListe);
+check('liste : la première entrée du « … » est « Partager l\'image », de nom « Partager l\'image de Parcours banc »',
+  JSON.parse(entreesListe)[0]?.texte === "Partager l'image" && JSON.parse(entreesListe)[0]?.nom === `Partager l'image de ${NOM_ITINERAIRE}`, entreesListe);
+await evaluate(`(() => { const b = [...document.querySelectorAll('.route-list__item .ui-more__panel button')].find((x) => x.getAttribute('aria-label') === ${JSON.stringify(`Partager l'image de ${NOM_ITINERAIRE}`)}); if (b) b.click(); return 'ok'; })()`);
+await dialogueItineraire('depuis la liste');
+const altListe = await imageAlt();
+check('liste : l\'alt est le même que depuis Planifier', altListe === altPlan, String(altListe));
+const pngListe = await partagerImage();
+check('liste : un PNG nommé d\'après l\'itinéraire est transmis au partage', pngListe?.type === 'image/png' && pngListe?.name === `${NOM_ITINERAIRE}.png` && pngListe.size > 10_000, JSON.stringify({ name: pngListe?.name, type: pngListe?.type }));
+await echap();
+check('itinéraire : aucune erreur de console', logs.length === logsAvantItineraire, logs.slice(logsAvantItineraire).slice(0, 3).join(' | '));
 
 console.log('\n--- console (erreurs, avertissements) ---');
 logs.forEach((l) => console.log(l));

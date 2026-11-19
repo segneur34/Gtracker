@@ -9,7 +9,11 @@
 //  3. « Charger un GPX » : refus du fichier qui n'en est pas un, route `<rte>` (départ et arrivée), boucle, trace sans
 //     heure (activité devinée de son `<type>`, nom repris du fichier) ;
 //  4. une balise insérée sur la trace importée (distance inchangée), l'arrivée déplacée, « Précédent », « Inverser » ;
-//  5. « Enregistrer » (fiche et GPX rangés), rechargement, réouverture depuis la liste : verrouillé, mêmes balises.
+//  5. « Enregistrer » (fiche et GPX rangés), rechargement, réouverture depuis la liste : verrouillé, mêmes balises ;
+//  6. le menu « … » du nom sur l'itinéraire rouvert : ses entrées, le bloc sans « Exporter le GPX » ni « Supprimer
+//     l'itinéraire », « Partager le GPX » (partage du navigateur simulé, puis sans partage), nom modifié (partages grisés
+//     et leur ligne), « Supprimer » d'un clic court, tenu une seconde, « Garder », menu fermé puis rouvert, « Supprimer
+//     définitivement » (mémoire vidée, le bloc redevient « Enregistrer l'itinéraire »).
 // Verdicts par `check` ; fin par « Tout passe. » ou le nombre d'échecs, code 0 ou 1.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -217,6 +221,149 @@ await log('rouvert');
 const rouvert = await state();
 check('rouvert : trois balises, même distance, même nom, activité Kite', rouvert.title === 'Balises (3)' && rouvert.distance === distanceRangee && rouvert.name === 'Sortie banc' && rouvert.activity?.includes('Kite') === true, JSON.stringify(rouvert));
 check('rouvert : verrouillé (bouton « Modifier l\'itinéraire »)', (await lockLabel()) === "Modifier l'itinéraire", await lockLabel());
+
+// 6. Le menu « … » du nom, sur l'itinéraire rangé et rouvert : entrées, partage du GPX, itinéraire modifié, suppression tenue.
+const setName = (valeur) => evaluate(`(() => { const i = document.querySelector('.plan-form input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ${JSON.stringify(valeur)}); i.dispatchEvent(new Event('input', { bubbles: true })); return 'ok'; })()`);
+/** Ouvre (`ouvert` vrai) ou ferme le « … » du nom, par son bouton. */
+const planMenu = async (ouvert) => {
+  const r = await evaluate(`(() => { const b = document.querySelector('.plan-form .ui-more__button'); if (!b) return 'absent'; if ((b.getAttribute('aria-expanded') === 'true') !== ${ouvert}) b.click(); return 'ok'; })()`);
+  await wait(300);
+  return r;
+};
+/** Ce que le « … » du nom montre : ouvert ou non, entrées (texte, grisée, entrée tenue), ligne de note. */
+const planMenuEtat = async () => JSON.parse(await evaluate(`(() => {
+  const p = document.querySelector('.plan-form .ui-more__panel');
+  if (!p) return JSON.stringify(null);
+  return JSON.stringify({
+    ouvert: !p.hidden,
+    entrees: [...p.querySelectorAll('button')].map((b) => ({ texte: b.textContent.trim(), grise: b.disabled, tenue: b.classList.contains('ui-btn--hold'), nom: b.getAttribute('aria-label') })),
+    note: p.querySelector('.ui-more__note')?.textContent.trim() ?? null,
+  });
+})()`));
+const textes = (m) => (m?.entrees ?? []).map((e) => e.texte);
+const tenu = (m) => (m?.entrees ?? []).find((e) => e.tenue);
+const fichiersItineraires = () => evaluate(`(async () => {
+  try {
+    const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('itineraires');
+    const noms = [];
+    for await (const [nom] of d.entries()) noms.push(nom);
+    return noms.sort().join(',');
+  } catch (e) { return 'dossier absent'; }
+})()`);
+/** Appui tenu une seconde sur le bouton « Supprimer » du « … » (le délai est de 1 s), sans clic ensuite. */
+const tenirSupprimer = async () => {
+  const bas = await evaluate(`(() => { const b = document.querySelector('.plan-form .ui-more__panel .ui-btn--hold'); if (!b) return 'absent'; window.__tenu = b; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
+  if (bas !== 'ok') return bas;
+  await wait(1300);
+  await evaluate(`(() => { const b = window.__tenu; b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
+  await wait(300);
+  return 'ok';
+};
+
+console.log('--- menu « … » du nom ---');
+console.log('menu ouvert :', await planMenu(true));
+const m1 = await planMenuEtat();
+console.log('entrées :', JSON.stringify(textes(m1)), '| note :', m1?.note);
+check('« … » de l\'itinéraire rangé : « Partager l\'image », « Partager le GPX », « Exporter le GPX », « Supprimer » dans cet ordre',
+  textes(m1).join(' ; ') === 'Partager l\'image ; Partager le GPX ; Exporter le GPX ; Supprimer', JSON.stringify(textes(m1)));
+check('itinéraire rangé et inchangé : aucune entrée grisée, aucune ligne de note',
+  m1.entrees.every((e) => !e.grise) && m1.note === null, JSON.stringify(m1));
+check('« Supprimer » est l\'entrée à tenir, de nom « Supprimer l\'itinéraire : maintenir une seconde »',
+  tenu(m1)?.texte === 'Supprimer' && tenu(m1)?.nom === 'Supprimer l\'itinéraire : maintenir une seconde', JSON.stringify(tenu(m1)));
+const boutonsBloc = await evaluate(`JSON.stringify([...document.querySelectorAll('.plan-actions button, .plan-actions label')].map((b) => b.textContent.trim()))`);
+console.log('boutons des blocs :', boutonsBloc);
+check('le bloc n\'a plus « Exporter le GPX » ni « Supprimer l\'itinéraire », « Nouvel itinéraire » y reste',
+  !/Exporter le GPX|Supprimer l'itinéraire/.test(boutonsBloc) && JSON.parse(boutonsBloc).includes('Nouvel itinéraire') && boutonsBloc.includes('Enregistrer les modifications'), boutonsBloc);
+console.log('menu fermé :', await planMenu(false));
+
+// « Partager le GPX » : partage du navigateur simulé, fichier relevé ; puis sans partage, téléchargement et message.
+await evaluate(`(() => {
+  window.__partage = null;
+  navigator.canShare = () => true;
+  navigator.share = async (data) => { window.__partage = { name: data.files[0].name, type: data.files[0].type, size: data.files[0].size, title: data.title }; };
+  return 'ok';
+})()`);
+await planMenu(true);
+console.log('Partager le GPX :', await evaluate(`(() => { const b = [...document.querySelectorAll('.plan-form .ui-more__panel button')].find((x) => x.textContent.trim() === 'Partager le GPX'); if (!b || b.disabled) return 'absent'; b.click(); return 'ok'; })()`));
+await wait(600);
+const gpxPartage = await evaluate('window.__partage');
+console.log('partagé :', JSON.stringify({ name: gpxPartage?.name, type: gpxPartage?.type, title: gpxPartage?.title }));
+check('« Partager le GPX » : le fichier « Sortie banc.gpx » est transmis au partage', gpxPartage?.name === 'Sortie banc.gpx' && gpxPartage?.type === 'application/gpx+xml' && gpxPartage.size > 100, JSON.stringify(gpxPartage));
+check('un partage abouti ne dit rien, et le menu se referme', (await evaluate(`[...document.querySelectorAll('.plan-note')].map((x) => x.textContent).filter((t) => /GPX|Partage/.test(t)).length`)) === 0 && !(await planMenuEtat()).ouvert);
+await evaluate(`navigator.canShare = () => false`);
+await planMenu(true);
+await evaluate(`[...document.querySelectorAll('.plan-form .ui-more__panel button')].find((x) => x.textContent.trim() === 'Partager le GPX')?.click()`);
+await wait(600);
+const noteSansPartage = await evaluate(`[...document.querySelectorAll('.plan-note')].map((x) => x.textContent).find((t) => t.includes('GPX')) ?? null`);
+console.log('sans partage :', noteSansPartage);
+check('sans partage du navigateur, le GPX est téléchargé et le message le dit', noteSansPartage === 'Ce navigateur ne partage pas de fichier : le GPX est téléchargé.', String(noteSansPartage));
+
+// Nom modifié : l'itinéraire n'est plus celui qui est rangé, les deux partages sont grisés.
+console.log('nom modifié :', await setName('Sortie banc modifiée'));
+await wait(300);
+await planMenu(true);
+const m2 = await planMenuEtat();
+console.log('modifié, entrées :', JSON.stringify(m2.entrees.map((e) => `${e.texte}${e.grise ? ' (grisée)' : ''}`)), '| note :', m2.note);
+const grises = m2.entrees.filter((e) => e.grise).map((e) => e.texte);
+check('itinéraire modifié : « Partager l\'image » et « Partager le GPX » grisés, « Exporter le GPX » et « Supprimer » restent actifs',
+  grises.join(' ; ') === 'Partager l\'image ; Partager le GPX', JSON.stringify(grises));
+check('itinéraire modifié : la ligne « Enregistrez d\'abord les modifications »', m2.note === 'Enregistrez d\'abord les modifications', String(m2.note));
+await planMenu(false);
+console.log('nom rétabli :', await setName('Sortie banc'));
+await wait(300);
+await planMenu(true);
+const m3 = await planMenuEtat();
+check('nom rétabli : partages dégrisés, plus de ligne de note', m3.entrees.every((e) => !e.grise) && m3.note === null, JSON.stringify(m3));
+
+// « Supprimer » : un clic court ne fait rien d'autre que rappeler le geste.
+console.log('clic court :', await evaluate(`(() => { const b = document.querySelector('.plan-form .ui-more__panel .ui-btn--hold'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
+await wait(300);
+const m4 = await planMenuEtat();
+console.log('après le clic court :', JSON.stringify(textes(m4)));
+check('« Supprimer » d\'un clic court : le menu reste ouvert, le geste est rappelé, rien n\'est supprimé',
+  m4.ouvert && tenu(m4)?.texte === 'Maintenir 1 s pour supprimer' && !textes(m4).includes('Supprimer définitivement') && (await fichiersItineraires()) === 'Sortie banc.gpx,Sortie banc.json',
+  `${JSON.stringify(textes(m4))} ${await fichiersItineraires()}`);
+// Le rappel tombe au bout de 3 s ; le bouton est retrouvé tel qu'avant avant d'être tenu.
+await waitFor(`document.querySelector('.plan-form .ui-more__panel .ui-btn--hold')?.textContent.trim() === 'Supprimer'`, { timeout: 5000, every: 200, label: 'rappel effacé' });
+
+// Tenu une seconde : la confirmation prend la place du bouton, dans le menu resté ouvert.
+console.log('appui tenu :', await tenirSupprimer());
+const m5 = await planMenuEtat();
+console.log('après l\'appui tenu :', JSON.stringify(textes(m5)));
+check('« Supprimer » tenu une seconde : « Supprimer définitivement » et « Garder » dans le menu resté ouvert, rien de supprimé encore',
+  m5.ouvert && textes(m5).slice(-2).join(' ; ') === 'Supprimer définitivement ; Garder' && !tenu(m5) && (await fichiersItineraires()) === 'Sortie banc.gpx,Sortie banc.json', JSON.stringify(textes(m5)));
+/** Clique l'entrée du « … » du nom dont le texte est `texte` ; « absent » sinon. */
+const cliquerEntree = (texte) => evaluate(`(() => { const b = [...document.querySelectorAll('.plan-form .ui-more__panel button')].find((x) => x.textContent.trim() === ${JSON.stringify(texte)}); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
+console.log('Garder :', await cliquerEntree('Garder'));
+await wait(400);
+const apresGarder = await state();
+check('« Garder » : l\'itinéraire est toujours là (ouvert, verrouillé, rangé), le menu est fermé',
+  apresGarder.name === 'Sortie banc' && apresGarder.title === 'Balises (3)' && !(await planMenuEtat()).ouvert && (await fichiersItineraires()) === 'Sortie banc.gpx,Sortie banc.json', JSON.stringify(apresGarder));
+await planMenu(true);
+const m6 = await planMenuEtat();
+check('menu rouvert après « Garder » : le bouton à tenir est revenu', tenu(m6)?.texte === 'Supprimer' && !textes(m6).includes('Supprimer définitivement'), JSON.stringify(textes(m6)));
+
+// La confirmation tombe si le menu se ferme.
+console.log('appui tenu :', await tenirSupprimer());
+check('confirmation de nouveau demandée', textes(await planMenuEtat()).includes('Supprimer définitivement'));
+console.log('menu fermé :', await planMenu(false));
+await planMenu(true);
+const m7 = await planMenuEtat();
+check('menu fermé puis rouvert : la confirmation est tombée, le bouton à tenir est revenu', tenu(m7)?.texte === 'Supprimer' && !textes(m7).includes('Supprimer définitivement') && !textes(m7).includes('Garder'), JSON.stringify(textes(m7)));
+
+// Tenu puis « Supprimer définitivement » : fiche et GPX effacés de la mémoire, le bloc redevient « Enregistrer l'itinéraire ».
+console.log('appui tenu :', await tenirSupprimer());
+console.log('Supprimer définitivement :', await cliquerEntree('Supprimer définitivement'));
+await waitFor(async () => (await fichiersItineraires()) === '', { timeout: 5000, every: 200, label: 'itinéraire supprimé' });
+await settle({ max: 1500 });
+const apresSuppression = await fichiersItineraires();
+console.log('mémoire des itinéraires :', JSON.stringify(apresSuppression));
+check('« Supprimer définitivement » : la fiche et le GPX ne sont plus dans la mémoire', apresSuppression === '', apresSuppression);
+const titreBloc = await evaluate(`[...document.querySelectorAll('.plan-block__head *')].map((x) => x.children.length === 0 ? x.textContent.trim() : '').filter((x) => x === 'Enregistrer l\\'itinéraire' || x === 'Itinéraire enregistré').join(' | ')`);
+console.log('bloc :', titreBloc);
+check('le bloc redevient « Enregistrer l\'itinéraire »', titreBloc === 'Enregistrer l\'itinéraire', titreBloc);
+const listeApres = await evaluate(`[...document.querySelectorAll('.route-list__open')].map((x) => x.textContent.trim()).join(' | ')`);
+check('l\'itinéraire a quitté la liste « Mes itinéraires »', !listeApres.includes('Sortie banc'), listeApres);
 if (process.env.DUMP) writeFileSync(process.env.DUMP, await evaluate('document.body.innerText'));
 
 console.log('--- confirmations ---');
