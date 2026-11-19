@@ -505,3 +505,6 @@ Ce fichier est le §10 de `docs/ETAT_DU_PROJET.md`. C'est le journal de Gtracker
 439. Planifier : la carte moins haute sur téléphone droit (lot 459 ; validé le 19/11, essai 312 « oui c'est bon pour la carte »).
     - **Décision** : la carte prend 45 % de la hauteur de l'écran au lieu de 58 %, pour laisser sous elle une bande de page que le pouce saisit ; ordinateur et téléphone tourné inchangés.
     - **Pourquoi** : la carte était « trop longue », il fallait aller attraper le haut de l'image ou les côtés pour descendre. Piège : sur écran étroit, une hauteur déjà réglée à la poignée n'est pas appliquée, donc la nouvelle valeur se voit sans rien faire.
+440. Enregistrer : la page s'appelle « Enregistrement… » pendant un enregistrement (lot 456 ; validé le 19/11, « 456 ok »).
+    - **Décision** : le titre change dès le départ, pause manuelle ou automatique comprise, et redevient « Enregistrer » à l'arrêt ; une session en attente garde « Enregistrer ».
+    - **Pourquoi** : note de l'utilisateur du 19/11. Piège : la clé « Enregistrement… » existait déjà, traduite « Saving… » pour l'enregistrement d'un itinéraire ; le titre a sa propre clé à contexte (« Recording… », « Grabando… »).

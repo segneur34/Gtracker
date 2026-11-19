@@ -12,7 +12,9 @@ Modèle | Réflexion : Opus | high
 - `src/pages/RoutesPage.tsx` (liste) : « Partager » (le GPX, fiche comprise, `shareFile`) et « Supprimer » par ligne.
 - Une session a un menu « … » (`src/components/SessionNameEditor.tsx` : « Partager l'image », « Partager la trace », « Jeter ») et une image de partage (`src/components/ShareDialog.tsx`). Un itinéraire n'a pas d'image de partage : elle est à créer.
 
-## Maquette : à choisir par l'utilisateur avant tout code (question Q136)
+## Maquette : choisie par l'utilisateur le 19/11
+
+Réponse à la question Q136 : pour le menu, « B » de la planche, le « … » à droite du champ du nom (M2 ci-dessous, `iti-M2.jpg`) ; pour l'image de partage, « B » de la planche, les bords annotés (S2 ci-dessous, `partage-S2.jpg`). Il n'a rien dit du reste : les défauts annoncés valent, « Nouvel itinéraire » reste un bouton du bloc, le liseré de l'image est à la couleur de l'activité de l'itinéraire, le nom du pratiquant figure en bas comme pour une session. Les autres variantes restent décrites pour mémoire.
 
 Planche : `D:\gong tracker\atelier\planche-458-460\planche.html` (images `iti-0.jpg`, `iti-M1.jpg`, `iti-M2.jpg`, `partage-S1.jpg` à `partage-S3.jpg`).
 - Place du « … » : M1, à droite du titre du bloc « Itinéraire enregistré » ; M2, à droite du champ du nom. Dans les deux, « Exporter le GPX » et « Supprimer l'itinéraire » quittent le bloc pour le menu.

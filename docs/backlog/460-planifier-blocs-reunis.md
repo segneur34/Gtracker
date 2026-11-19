@@ -12,7 +12,9 @@ Tranché le 19/11 (la page n'a pas de bloc « réglages ») : « balises sonores
 
 `src/pages/PlanningPage.tsx` (tableau `sections` et blocs `PlanBlock`, vers les lignes 588 à 900), `src/pages/PlanningPage.css`. Cinq blocs, dans cet ordre : « parcours » (distance, nombre de balises, plus long bord, liste des bords avec distance et cap, puis « Régler pour ce parcours » des bips), « tracé » (Précédent, Inverser, Boucler, Charger un GPX, Tout effacer), « balises (n) » (liste des points, monter, descendre), « enregistrer », « mes itinéraires (n) ».
 
-## Maquette : à choisir par l'utilisateur avant tout code (question Q135)
+## Maquette : choisie par l'utilisateur le 19/11, variante C
+
+Réponse à la question Q135 : « la C ». Il n'a rien dit des icônes : le défaut annoncé vaut, « Charger un GPX » et « Tout effacer » gardent leur texte. Les trois variantes restent décrites ci-dessous pour mémoire ; seule la C est à coder, d'après `plan-C.jpg`.
 
 Planche : `D:\gong tracker\atelier\planche-458-460\planche.html` (images dans `images\` : `plan-aujourdhui.jpg`, `plan-A.jpg`, `plan-B.jpg`, `plan-C.jpg`), captures de la vraie page à 390 px de large, parcours de cinq balises. Colonne sous la carte : 1 484 px aujourd'hui, tous blocs ouverts.
 - A : une ligne de chiffres (« 7,75 km · 5 balises · plus long bord 2,46 km »), cinq icônes d'action en une rangée, bord et cap écrits sous chaque balise, monter, descendre et retirer en icônes. Gain : 530 px.
