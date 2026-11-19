@@ -123,11 +123,15 @@ const tabLink = (d: NavDestination, pathname: string) => {
   );
 };
 
-const topLink = (d: NavDestination, pathname: string) => (
-  <NavLink key={d.to} to={d.to} className={linkClass('shell-toplink', d, pathname)}>
-    {d.label}
-  </NavLink>
-);
+const topLink = (d: NavDestination, pathname: string) => {
+  const Icon = NAV_ICON[d.id];
+  return (
+    <NavLink key={d.to} to={d.to} className={linkClass('shell-toplink', d, pathname)}>
+      <Icon size={18} />
+      {d.label}
+    </NavLink>
+  );
+};
 
 function AppShell() {
   const status = useRecorderStatus();
