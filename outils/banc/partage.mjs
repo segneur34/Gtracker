@@ -248,7 +248,10 @@ const tapMap = async (fx, fy) => {
   await mouse('mouseReleased', r[0] + r[2] * fx, r[1] + r[3] * fy);
   await wait(300);
 };
-const planStat = (nom) => evaluate(`[...document.querySelectorAll('.plan-stat')].find((s) => s.querySelector('span')?.textContent === ${JSON.stringify(nom)})?.querySelector('strong')?.textContent ?? null`);
+// Bande de chiffres du bloc « Tracé et balises » : la distance, puis « N balises » (le nombre seul est rendu).
+const planStat = (nom) => evaluate(nom === 'Distance'
+  ? `document.querySelector('.plan-figures__distance')?.textContent ?? null`
+  : `document.querySelector('.plan-figures__item')?.textContent.match(/^\\d+/)?.[0] ?? null`);
 /** « Partager l'image » : le partage du navigateur est simulé, le fichier transmis est relevé. */
 const simulerPartage = () => evaluate(`(() => {
   window.__partage = null;
@@ -276,7 +279,7 @@ const dialogueItineraire = async (etiquette) => {
 
 await go('/itineraires', 3000);
 await evaluate(`localStorage.setItem('${CLES.planning}', JSON.stringify({ activityId: 'wingfoil' }));
-  localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { parcours: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
+  localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { balises: true, ranger: true, liste: true, parcours: true } })); 'ok'`);
 await go('/itineraires', 3000);
 await waitFor(`Boolean(document.querySelector('.plan-map .leaflet-container'))`, { timeout: 5000, every: 100, label: 'carte de Planifier' });
 await tapMap(0.3, 0.3);

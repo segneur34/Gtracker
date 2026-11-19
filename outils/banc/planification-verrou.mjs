@@ -69,7 +69,7 @@ const movedTogether = (a, b) => {
 // Rangée « avancé » des analyses ouverte d'office (`lib/onglets.mjs`, 05/11).
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await go('/itineraires', 3000);
-await evaluate(`localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { profil: true, parcours: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
+await evaluate(`localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { balises: true, ranger: true, liste: true, parcours: true } })); 'ok'`);
 await go('/itineraires', 3000);
 await ready();
 console.log('activité Wingfoil :', await chooseWingfoil());

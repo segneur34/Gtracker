@@ -1,7 +1,7 @@
 // Banc de test : parcours de voile et bips d'approche des balises (§10, point 77).
 // Usage : node balises.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf. Le script :
-//  1. pose un parcours en Wingfoil sur la page Itinéraires (numéros, pas de type de voie, bloc « Parcours »),
+//  1. pose un parcours en Wingfoil sur la page Itinéraires (numéros, pas de type de voie, bloc « Tracé et balises »),
 //     le boucle, règle des bips propres au parcours (validation tirée plus loin), l'enregistre (fiche avec
 //     ses bips, GPX à balises numérotées) et « Partir » (trace suivie avec ses balises et ses bips) ;
 //  2. remplace la trace suivie par un parcours synthétique de trois balises (départ, 300 m au nord, puis
@@ -124,7 +124,7 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, devi
 await send('Page.navigate', { url: `${BASE}/itineraires` });
 await wait(3000);
 // Tous les onglets ouverts (seul le premier l'est par défaut), lus au chargement de la page.
-await evaluate(`localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { profil: true, parcours: true, trace: true, points: true, ranger: true, liste: true } })); 'ok'`);
+await evaluate(`localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { balises: true, ranger: true, liste: true, parcours: true } })); 'ok'`);
 await send('Page.navigate', { url: `${BASE}/itineraires` });
 await wait(3000);
 console.log('activité Wingfoil :', await chooseOption('Wingfoil'));
@@ -136,9 +136,11 @@ const planState = () => evaluate(`JSON.stringify({
   repères: [...document.querySelectorAll('.plan-marker__dot')].map((x) => x.textContent),
   typesDeVoie: document.querySelectorAll('.plan-modes').length,
   blocs: [...document.querySelectorAll('.plan-block__head')].map((x) => x.textContent.trim()),
-  chiffres: [...document.querySelectorAll('.plan-stat')].map((x) => x.innerText.replace(/\\n/g, ' ')),
-  bords: [...document.querySelectorAll('.plan-course__leg')].map((x) => x.innerText.replace(/\\n/g, ' ')),
-  liste: [...document.querySelectorAll('.plan-point__text strong')].map((x) => x.textContent),
+  chiffres: [...document.querySelectorAll('.plan-figures > *')].map((x) => x.innerText.replace(/\\n/g, ' ')),
+  // Le bord qui mène à chaque balise : « 1 → 2 », sa distance et son cap, reconstruits des lignes de la liste.
+  bords: [...document.querySelectorAll('.plan-points > .plan-point')].slice(1).map((x, i, l) => (i === 0 ? document.querySelector('.plan-points > .plan-point .plan-point__dot').textContent : l[i - 1].querySelector('.plan-point__dot').textContent)
+    + ' → ' + x.querySelector('.plan-point__dot').textContent + ' ' + x.querySelector('.plan-point__leg').textContent + ' ' + x.querySelector('.plan-point__bearing').textContent),
+  liste: [...document.querySelectorAll('.plan-point__name')].map((x) => x.textContent),
   sélecteursDeVoie: document.querySelectorAll('.plan-points select').length,
 })`);
 const trois = await planState();
@@ -150,7 +152,7 @@ const boucle = await planState();
 console.log('boucle :', boucle);
 {
   const b = JSON.parse(boucle ?? '{}');
-  check('« Boucler » : 4 balises, dont le bord 3 → 1', (b.blocs ?? []).includes('Balises (4)') && (b.bords ?? []).some((x) => x.startsWith('3 → 1')), boucle);
+  check('« Boucler » : 4 balises, dont le bord 3 → 1', (b.blocs ?? []).includes('Tracé et balises (4)') && (b.bords ?? []).some((x) => x.startsWith('3 → 1')), boucle);
 }
 console.log('note :', await evaluate(`[...document.querySelectorAll('.plan-note')].map((x) => x.textContent).find((t) => t.includes('se valide')) ?? null`));
 await shoot('balises-planification');

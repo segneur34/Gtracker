@@ -134,7 +134,7 @@ console.log('Régler pour ce parcours :', await evaluate(`(() => {
 await wait(500);
 const routes = await evaluate(`document.body.innerText`);
 const routeHelp = await evaluate(`(() => {
-  const b = ${helps}.find((x) => x.getAttribute('aria-label') === 'Aide : Parcours');
+  const b = ${helps}.find((x) => x.getAttribute('aria-label') === 'Aide : Balises sonores');
   if (!b) return null;
   b.click();
   return true;
@@ -142,7 +142,7 @@ const routeHelp = await evaluate(`(() => {
 await wait(300);
 const routesOpen = await evaluate(`document.body.innerText`);
 // Depuis le lot 3 du 24/10, les aides valent partout : le mode d'emploi des bips d'un parcours passe sous le « ? » du bloc.
-check("Itinéraires : le mode d'emploi des bips sous le « ? » du bloc Parcours",
+check("Itinéraires : le mode d'emploi des bips sous le « ? » du bloc Balises sonores",
   !/tirez un point/i.test(routes) && routeHelp === true && /tirez un point/i.test(routesOpen), routeHelp);
 
 console.log(`\n${failures === 0 ? 'Tout est passé.' : `${failures} échec(s).`}`);

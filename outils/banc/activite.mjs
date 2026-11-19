@@ -73,7 +73,7 @@ const fichesDe = async () => (await records()).map((r) => r.record ?? r);
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 await go('/itineraires', 3000);
 await evaluate(`localStorage.setItem('${CLES.planning}', JSON.stringify({ activityId: 'kite' }));
-  localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { parcours: true, trace: true, points: true, ranger: true, liste: true }, 'sailing-onglets': { reglages: true }, surf: { reglages: true } })); 'ok'`);
+  localStorage.setItem('${CLES.sections}', JSON.stringify({ planning: { balises: true, ranger: true, liste: true, parcours: true }, 'sailing-onglets': { reglages: true }, surf: { reglages: true } })); 'ok'`);
 
 // 1. Un itinéraire de Kite, rangé ; le suivre propose son activité.
 await go('/itineraires', 3000);
