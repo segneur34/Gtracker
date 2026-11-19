@@ -25,7 +25,7 @@ const PLANIFIER: NavDestination = { id: 'planifier', to: PLAN_PATH, label: t('Pl
 const STATISTIQUES: NavDestination = { id: 'statistiques', to: '/statistiques', label: t('Statistiques') };
 const REGLAGES: NavDestination = { id: 'reglages', to: '/parametres', label: t('Réglages') };
 
-/** Barre du bas et rail : deux cases, le bouton rond, deux cases. Planifier s'ouvre depuis Sessions. */
+/** Barre du bas et rail : deux cases, le bouton rond, deux cases. Planifier s'ouvre depuis la liste des itinéraires, que Sessions ouvre par « Itinéraires ». */
 export const TAB_BAR: { before: readonly NavDestination[]; after: readonly NavDestination[] } = {
   before: [PROFIL, SESSIONS],
   after: [STATISTIQUES, REGLAGES],

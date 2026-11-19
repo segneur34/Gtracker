@@ -146,10 +146,10 @@ export const LESSONS: readonly Lesson[] = [
     icon: 'itineraires',
     target: '/itineraires',
     body: [
-      t("En bas de la page Sessions, « Créer un parcours » ouvre la planification (sur ordinateur, « Planifier » dans la barre du haut) : touchez la carte pour poser les balises, reliées en ligne droite. La recherche trouve un port, une plage ou un spot."),
+      t("Sur la page Sessions, « Itinéraires », à côté de « Tris », ouvre la liste des itinéraires, où « Planifier » crée un parcours (sur ordinateur, « Planifier » est aussi dans la barre du haut) : touchez la carte pour poser les balises, reliées en ligne droite. La recherche trouve un port, une plage ou un spot."),
       t("Le parcours donne la distance et le cap de chaque bord ; « Boucler » ajoute un dernier bord qui ramène au départ."),
       t("Un GPX venu d'ailleurs se charge tel quel comme itinéraire, et un parcours s'exporte en GPX."),
-      t("Enregistré, l'itinéraire se retrouve sous « Itinéraires », juste à côté ; « Partir » ouvre l'enregistrement, où « Suivre une trace » le propose avec son activité."),
+      t("Enregistré, l'itinéraire se retrouve dans « Itinéraires », sur la page Sessions ; « Partir » ouvre l'enregistrement, où « Suivre une trace » le propose avec son activité."),
     ],
   },
   {

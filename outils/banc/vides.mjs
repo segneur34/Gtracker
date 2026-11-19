@@ -5,8 +5,8 @@
 //  2. voile : « manœuvres », « vmg » et « vent » ouverts disent « Vent inconnu », avec « Régler le vent », qui ouvre
 //     la boussole sur la carte (22/10 ; « Ouvrir l'onglet général » avant) ;
 //  3. surf : la légende de la répartition ne redit pas le pourcentage « sur la vague » ; la rame garde le sien ;
-//  4. à 360×800 : « / » mène au Profil ; la page Sessions sans lien Profil ni Statistiques, avec « Créer un parcours » et
-//     « Itinéraires (0) » en bas ; barre du bas Profil · Sessions · rond · Statistiques · Réglages, sans débordement ;
+//  4. à 360×800 : « / » mène au Profil ; la page Sessions sans lien Profil ni Statistiques, avec « Itinéraires (0) » à côté de
+//     « Tris » (plus rien en bas de la liste) ; barre du bas Profil · Sessions · rond · Statistiques · Réglages, sans débordement ;
 //     Réglages, carte Wingfoil ouverte : le nom en texte, qui replie la carte, « Renommer » à droite, sur la
 //     ligne du nom ; Échap n'enregistre rien, Entrée renomme, le nom est relu ; rien ne déborde.
 import { CLES, connect } from './lib/cdp.mjs';
@@ -100,9 +100,10 @@ await send('Emulation.setDeviceMetricsOverride', { width: 360, height: 800, devi
 await go('/', 3000);
 check('ouverture : « / » mène au Profil', (await evaluate('location.pathname')) === '/profil', await evaluate('location.pathname'));
 await go('/sessions', 3000);
-const sessionActions = await evaluate(`[...document.querySelectorAll('.sessions-actions a')].map((a) => a.textContent.trim() + ' > ' + a.getAttribute('href')).join(' | ')`);
+const sessionActions = await evaluate(`[...document.querySelectorAll('.sessions-head__pills a')].map((a) => a.textContent.trim() + ' > ' + a.getAttribute('href')).join(' | ')`);
+const sessionsBottom = await evaluate(`document.querySelectorAll('.sessions-actions').length`);
 check('Sessions : ni lien Profil ni lien Statistiques dans la page', !(await evaluate(`[...document.querySelectorAll('.shell-main a')].some((a) => /^(Profil|Statistiques)$/.test(a.textContent.trim()))`)), sessionActions);
-check('Sessions : « Créer un parcours » et « Itinéraires (0) » en bas', sessionActions === 'Créer un parcours > /itineraires | Itinéraires (0) > /itineraires/liste', sessionActions);
+check('Sessions : « Itinéraires (0) » à côté de « Tris », plus rien en bas de la liste', sessionActions === 'Itinéraires (0) > /itineraires/liste' && sessionsBottom === 0, sessionActions + ' / bas : ' + sessionsBottom);
 const bar = await evaluate(`[...document.querySelectorAll('.shell-tabbar .shell-tab')].map((t) => t.textContent.trim()).join(' | ')`);
 check('barre du bas : Profil, Sessions, Statistiques, Réglages', bar === 'Profil | Sessions | Statistiques | Réglages', bar);
 check('360 px : Sessions sans débordement', (await overflow()) <= 0);

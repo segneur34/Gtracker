@@ -70,8 +70,8 @@ import { tRich } from '../components/tRich';
  * avec son GPX.
  *
  * Rien ne se calcule : seule la recherche de lieu demande du réseau. On y
- * arrive depuis la page Sessions (« Créer un parcours ») et, sur ordinateur, depuis « Planifier » dans la barre
- * du haut ; `?itineraire=<base>` ouvre un itinéraire rangé (liste des itinéraires).
+ * arrive depuis « Planifier » de la liste des itinéraires (que la page Sessions ouvre par « Itinéraires ») et, sur
+ * ordinateur, depuis « Planifier » dans la barre du haut ; `?itineraire=<base>` ouvre un itinéraire rangé (liste des itinéraires).
  *
  * Le crayon, sur la carte, verrouille l'itinéraire : verrouillé, la carte ne fait
  * que se déplacer et se zoomer (ni point posé, ni point déplacé ou touché, ni

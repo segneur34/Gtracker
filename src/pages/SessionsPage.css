@@ -5,7 +5,7 @@
   gap: var(--space-3);
 }
 
-/* Titre et « … », puis la ligne des totaux et « Tris ». */
+/* Titre et « … », puis la ligne des totaux, « Itinéraires » et « Tris ». */
 .sessions-head {
   display: flex;
   flex-direction: column;
@@ -39,13 +39,28 @@
   font-size: var(--text-xs);
 }
 
-.ui-tab.sessions-head__sort {
+/* Totaux à gauche, « Itinéraires » et « Tris » à droite ; si la ligne est trop courte (320 px, téléphone tourné),
+   les deux pastilles passent sous les totaux, alignées à droite. */
+.sessions-head__line--totals {
+  flex-wrap: wrap;
+}
+
+.sessions-head__pills {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.ui-tab.sessions-head__pill {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   gap: var(--space-1);
   min-height: 28px;
   padding: 0 var(--space-3);
+  text-decoration: none;
 }
 
 .sessions-head__choice {
@@ -63,23 +78,4 @@
 .sessions-empty {
   border-top: 1px solid var(--line);
   padding-top: var(--space-3);
-}
-
-/* « Créer un parcours » et « Itinéraires » l'un sous l'autre sur téléphone droit ; côte à côte sur ordinateur
-   (`WIDE_QUERY`) et sur téléphone tourné (`PHONE_LANDSCAPE_QUERY`), où la largeur le permet et la hauteur manque. */
-.sessions-actions {
-  display: grid;
-  gap: var(--space-2);
-}
-
-@media (min-width: 768px) and (min-height: 500px), (min-width: 768px) and (pointer: fine), (min-width: 768px) and (pointer: none) {
-  .sessions-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (orientation: landscape) and (max-height: 499.98px) and (pointer: coarse) {
-  .sessions-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }

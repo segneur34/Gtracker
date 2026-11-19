@@ -125,7 +125,7 @@ function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicke
 
         {tab === 'route' && status === 'ready' && library.loaded && (routes.length === 0 ? (
           <p className="ui-muted ui-m-0">
-            {t('Aucun itinéraire enregistré : planifiez-en un depuis la page Sessions (« Créer un parcours »).')}
+            {t('Aucun itinéraire enregistré : planifiez-en un depuis la page Sessions (« Itinéraires », à côté de « Tris », puis « Planifier »).')}
           </p>
         ) : (
           <ul style={LIST_STYLE}>

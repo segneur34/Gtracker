@@ -49,7 +49,7 @@ export const parentPage = (pathname: string, search: string): string | null => {
   }
   // Le test de FC repos : Réglages, où est son entrée.
   if (path === RESTING_HR_PATH) return SETTINGS_PATH;
-  // Planifier et la liste des itinéraires : Sessions, où sont « Créer un parcours » et « Itinéraires ».
+  // Planifier et la liste des itinéraires : Sessions, où « Itinéraires » mène à la liste, d'où « Planifier » crée un parcours.
   if (path === PLAN_PATH || path.startsWith(`${PLAN_PATH}/`)) return SESSIONS_PATH;
   // Tutoriels : une leçon remonte à la liste, d'où qu'on l'ait ouverte, la liste à Réglages.
   if (parts[0] === 'tutoriels') return parts.length > 1 ? '/tutoriels' : SETTINGS_PATH;

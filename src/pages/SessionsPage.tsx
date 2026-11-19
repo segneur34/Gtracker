@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import ActivityBubbles from '../components/ActivityBubbles';
 import { useHelp } from '../components/helpContext';
-import { IconChevronDown, IconChevronUp, IconFlag, IconHelp, IconRoute } from '../components/icons';
+import { IconChevronDown, IconChevronUp, IconFlag, IconHelp } from '../components/icons';
 import ImportButtons from '../components/ImportButtons';
 import MemoryStatus from '../components/MemoryStatus';
 import RefreshLibraryButton from '../components/RefreshLibraryButton';
@@ -35,9 +35,9 @@ import './SessionsPage.css';
 /**
  * Page Sessions : toutes les sessions de la mémoire, voile et surf ensemble. En tête, le titre et son « … » (imports,
  * mise à jour) ; la ligne des totaux
- * de la liste et « Tris » ; la rangée des activités visibles, en logos, qui filtre la liste (`?activite=<id>`, gardé
- * dans l'adresse pour le retour d'une analyse) ; les sessions à classer ; la liste ; puis « Créer un parcours » et les
- * itinéraires planifiés.
+ * de la liste, avec « Itinéraires (n) » (la liste des itinéraires, d'où « Planifier » crée un parcours) et « Tris » ;
+ * la rangée des activités visibles, en logos, qui filtre la liste (`?activite=<id>`, gardé
+ * dans l'adresse pour le retour d'une analyse) ; les sessions à classer ; la liste.
  *
  * Les sessions d'une activité cachée dans Réglages ne sont pas dans « Toutes », une ligne dit combien ; son adresse
  * (`?activite=` d'une activité cachée) les montre.
@@ -170,12 +170,17 @@ function SessionsPage() {
             </Button>
           </MoreMenu>
         </div>
-        <div className="sessions-head__line">
+        <div className="sessions-head__line sessions-head__line--totals">
           <p className="sessions-head__totals num">{totals}</p>
-          <button type="button" className="ui-tab sessions-head__sort" aria-expanded={sortOpen}
-            onClick={() => setSortOpen((open) => !open)}>
-            {t('Tris')} {sortOpen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
-          </button>
+          <div className="sessions-head__pills">
+            <Link to="/itineraires/liste" className="ui-tab sessions-head__pill">
+              <IconFlag size={14} /> {t('Itinéraires')}{routesLoaded ? ` (${routes.length})` : ''}
+            </Link>
+            <button type="button" className="ui-tab sessions-head__pill" aria-expanded={sortOpen}
+              onClick={() => setSortOpen((open) => !open)}>
+              {t('Tris')} {sortOpen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+            </button>
+          </div>
         </div>
         {sortOpen && (
           <SegmentedControl<SessionSort> label={t('Trier les sessions')} className="sessions-head__choice"
@@ -226,15 +231,6 @@ function SessionsPage() {
             </p>
           )
         )}
-      </div>
-
-      <div className="sessions-actions">
-        <Link to="/itineraires" className="ui-btn ui-btn--primary">
-          <IconRoute size={18} /> {t('Créer un parcours')}
-        </Link>
-        <Link to="/itineraires/liste" className="ui-btn ui-btn--secondary">
-          <IconFlag size={18} /> {t('Itinéraires')}{routesLoaded ? ` (${routes.length})` : ''}
-        </Link>
       </div>
     </div>
   );

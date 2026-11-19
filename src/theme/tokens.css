@@ -188,7 +188,7 @@
   /* Fond d'un choix ou d'une ligne allumés (`SessionNotesPanel`, `ManeuversPanel`). */
   --voile-soft: var(--surface-sunken);
   --surf-soft: var(--surface-sunken);
-  /* Boutons de planification de l'accueil, et liseré de « Créer un parcours ». */
+  /* Aplat à l'encre de la photo ronde du Profil (`ProfileAvatar`), et liseré d'un bouton plein à l'encre. */
   --home-action: var(--ink);
   --home-action-edge: var(--ink);
   /* Onglet allumé hors famille (Statistiques sans famille, Itinéraires). */
