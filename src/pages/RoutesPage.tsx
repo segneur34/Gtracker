@@ -136,7 +136,7 @@ function RoutesPage() {
             </label>
           )}
           <Link to="/itineraires" className="ui-btn ui-btn--primary ui-btn--m">
-            <IconRoute size={24} /> {t('Planifier')}
+            <IconRoute size={20} /> {t('Planifier')}
           </Link>
         </span>
       </div>
