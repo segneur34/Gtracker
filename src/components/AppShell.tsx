@@ -16,6 +16,7 @@ import HoldDial from './ui/HoldDial';
 import GongLogo from './GongLogo';
 import ImportQuestion from './ImportQuestion';
 import IncomingFileNotice from './IncomingFileNotice';
+import PhoneRecoverButton from './PhoneRecoverButton';
 
 /**
  * Cadre de toutes les pages : navigation et bandeau d'enregistrement.
@@ -27,7 +28,8 @@ import IncomingFileNotice from './IncomingFileNotice';
  * bouton rond est vert vif au repos et en pause, rouge pendant un
  * enregistrement. En haut, le lien allumé est à l'encre, souligné.
  * Sur ordinateur, toutes les destinations dans une barre en haut (Profil, Sessions, Planifier, Statistiques,
- * Réglages), puis le bouton vert « Enregistrer ». L'ordre des deux barres vient de `core/navigation.ts`. Le logo
+ * Réglages), puis le bouton vert « Enregistrer », précédé de « Récupérer » dans le programme Windows qui lit le
+ * téléphone branché (`PhoneRecoverButton`). L'ordre des deux barres vient de `core/navigation.ts`. Le logo
  * mène au Profil. Le choix se fait en CSS (`AppShell.css`), sans lecture de la
  * taille d'écran en JavaScript.
  *
@@ -188,6 +190,7 @@ function AppShell() {
           {TOP_LINKS.map((d) => topLink(d, pathname))}
         </nav>
         <div className="shell-topactions">
+          <PhoneRecoverButton />
           <NavLink to={RECORD_PATH} className={`shell-toprecord${busy ? ' shell-toprecord--busy' : ''}`}>
             <span className={`ui-record-dot${busy ? ' ui-record-dot--stop' : ''}`} />
             {busy ? <RecordingClock /> : t('Enregistrer')}

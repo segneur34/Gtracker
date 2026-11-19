@@ -90,9 +90,42 @@ export interface CloseQuestionTexts {
   rester: string;
 }
 
+/** État du téléphone branché par câble, lu par la coquille. */
+export type DesktopPhoneState =
+  /** Un téléphone prêt à être lu ; `nom` est son modèle. */
+  | { etat: 'pret'; nom: string }
+  /** Rien de branché, ou rien de vu. */
+  | { etat: 'absent' }
+  /** Le téléphone attend que l'utilisateur accepte cet ordinateur. */
+  | { etat: 'autorisation' }
+  /** Le téléphone est vu mais ne répond pas. */
+  | { etat: 'horsLigne' }
+  /** L'outil du débogage USB n'est pas sur le poste ; `dossier` est l'endroit où le poser. */
+  | { etat: 'adbIntrouvable'; dossier: string }
+  /** Un autre programme tient la liaison avec le téléphone. */
+  | { etat: 'occupe' };
+
+/** Fichier du téléphone : chemin relatif à `Documents/Gtracker` (racine ou `sessions/`), taille en octets, date. */
+export interface DesktopPhoneFile {
+  chemin: string;
+  taille: number;
+  dateMs: number;
+}
+
+/** Le dossier `Documents/Gtracker` du téléphone branché, en lecture seule. */
+export interface DesktopPhoneBridge {
+  etat(): Promise<BridgeAnswer<DesktopPhoneState>>;
+  /** `NOT_FOUND` si le dossier est absent du téléphone ; `UNKNOWN` si le téléphone n'est pas prêt ou s'est perdu. */
+  lister(): Promise<BridgeAnswer<DesktopPhoneFile[]>>;
+  /** Octets d'un fichier rendu par le dernier `lister` seulement ; `UNKNOWN` pour tout échec. */
+  lireOctets(argument: { chemin: string }): Promise<BridgeAnswer<Uint8Array>>;
+}
+
 export interface DesktopBridge {
   version: string;
   memoire: DesktopMemoryBridge;
+  /** Absent d'une coquille plus ancienne, qui ne lit pas le téléphone. */
+  telephone?: DesktopPhoneBridge;
   textes(texts: CloseQuestionTexts): Promise<BridgeAnswer<null>>;
 }
 
