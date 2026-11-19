@@ -32,6 +32,7 @@ import { ADRESSE_ACCUEIL, HOTE, estDeLApplication } from './origine'
 import { TEXTES_FERMETURE, brancherCanaux, echec, expediteurAdmis, lireTextesFermeture, reussite, uneALaFois } from './pont'
 import type { TextesFermeture } from './pont'
 import { CSP, reponseA } from './protocole'
+import { STATUT_REFUS, entetesSortants, estUnRefus } from './sortant'
 
 const BANC = process.env.GTRACKER_BANC === '1'
 const QUITTER_EN_ESSAI = (process.env.GTRACKER_BANC_QUITTER ?? 'oui') !== 'non'
@@ -118,9 +119,26 @@ function brancherProtocole(): void {
       journal(`réseau refusé : ${new URL(requete.url).host}`)
       return Response.error()
     }
-    // Tout autre hôte (tuiles, recherche de lieux) repart sur le réseau, sans repasser par ce gestionnaire.
-    return net.fetch(requete, { bypassCustomProtocolHandlers: true })
+    return relayer(requete)
   })
+}
+
+/**
+ * Tout autre hôte (tuiles, recherche de lieux) repart sur le réseau, sans repasser par le gestionnaire du protocole,
+ * sous le nom du programme (`sortant.ts`). Un refus servi en statut 200 (OpenStreetMap) est rendu en échec, sans image :
+ * la page ne le garde pas et ne l'affiche pas comme une tuile.
+ */
+async function relayer(requete: Request): Promise<Response> {
+  const sansCorps = requete.method === 'GET' || requete.method === 'HEAD'
+  const reponse = await net.fetch(requete.url, {
+    method: requete.method,
+    headers: entetesSortants(requete.headers, VERSION),
+    ...(sansCorps ? {} : { body: requete.body, duplex: 'half' }),
+    bypassCustomProtocolHandlers: true,
+  })
+  if (!estUnRefus(reponse.headers)) return reponse
+  journal(`refus du serveur : ${new URL(requete.url).host}`)
+  return new Response(null, { status: STATUT_REFUS })
 }
 
 // ---------- fenêtre retenue ----------
@@ -368,8 +386,6 @@ function demarrer(): void {
 
   void app.whenReady().then(() => {
     Menu.setApplicationMenu(null)
-    const s = session.defaultSession
-    s.setUserAgent(`${s.getUserAgent()} Gtracker/${VERSION} (+https://github.com/segneur34)`)
     gererAutorisations()
     brancherProtocole()
     brancherPont()
