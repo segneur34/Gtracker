@@ -39,6 +39,8 @@ export const SCREEN_BREAKPOINTS = {
   reducedMotion: '(prefers-reduced-motion: reduce)',
   /** Survol réservé aux pointeurs qui survolent : au toucher, un `:hover` reste collé au bouton. */
   hover: '(hover: hover)',
+  /** Souris : survol et pointeur précis ; flèches et glissement de la rangée des activités (`ActivityBubbles.css`). */
+  mouse: '(hover: hover) and (pointer: fine)',
 } as const;
 
 /** Vrai tant que la requête répond, suivi en direct quand l'écran change de taille ou tourne. */
