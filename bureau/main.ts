@@ -18,16 +18,23 @@
 //   GTRACKER_BANC_QUITTER   réponse du mode d'essai à la question de fermeture : « oui » (défaut) ou « non »
 //   GTRACKER_BANC_MONTRER   fenêtre du mode d'essai montrée sans prendre la main : « 1 », ou « transparente »
 //   GTRACKER_MEMOIRE, GTRACKER_DOCUMENTS, GTRACKER_BANC_DOSSIER : en mode d'essai seulement, voir `memoire.ts`
+//   GTRACKER_BANC_TELEPHONE, GTRACKER_BANC_TELEPHONE_ETAT, GTRACKER_BANC_TELEPHONE_COUPURE : en mode d'essai
+//                           seulement, voir `telephone.ts` ; le mode d'essai ne lance jamais le vrai adb
 //
 // Le dossier mémoire (un vrai dossier du disque) est lu et écrit ici, la page y passant par les canaux `memoire:*`
 // du pont (`preload.ts`, `memoire.ts`) ; seule la page de la fenêtre principale y a accès (`expediteurAdmis`).
+// Le dossier `Documents/Gtracker` du téléphone branché est lu ici aussi, en lecture seule, par les canaux
+// `telephone:*` (`telephone.ts`, et `adb.ts` pour le débogage USB).
 
 import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol, screen, session, shell } from 'electron'
 import type { OpenDialogOptions, Rectangle, WebContents } from 'electron'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { dossierAdb, dossierAdbConseille } from './adb'
 import { creerMemoire, gestionnairesMemoire, optionsDepuisEnvironnement } from './memoire'
+import type { DossierDistant } from './telephone'
+import { DOSSIER_LECTURES, dossierLocal, essaiTelephoneDepuisEnvironnement, gestionnairesTelephone, viderLectures } from './telephone'
 import { ADRESSE_ACCUEIL, HOTE, estDeLApplication } from './origine'
 import { TEXTES_FERMETURE, brancherCanaux, echec, expediteurAdmis, lireTextesFermeture, reussite, uneALaFois } from './pont'
 import type { TextesFermeture } from './pont'
@@ -293,20 +300,34 @@ const choisirParFenetre = uneALaFois(async ({ titre, depart }: { titre: string; 
   return canceled || filePaths.length === 0 ? null : filePaths[0]
 })
 
+/**
+ * Le téléphone : en mode d'essai, le dossier local des variables d'essai (jamais le vrai téléphone) ; sinon le débogage
+ * USB, par l'adb trouvé sur le poste.
+ */
+function creerTelephone(profil: string): DossierDistant {
+  const essai = essaiTelephoneDepuisEnvironnement(process.env, dossierAdbConseille(profil), journal)
+  if (essai) return dossierLocal(essai.stockage, essai)
+  return dossierAdb({ env: process.env, profil, programme: path.dirname(process.execPath), journal })
+}
+
 function brancherPont(): void {
+  const profil = app.getPath('userData')
   const memoire = creerMemoire(
-    optionsDepuisEnvironnement(
-      process.env,
-      { profil: app.getPath('userData'), documents: dossierWindows('documents'), maison: dossierWindows('home') },
-      choisirParFenetre,
-      journal,
-    ),
+    optionsDepuisEnvironnement(process.env, { profil, documents: dossierWindows('documents'), maison: dossierWindows('home') }, choisirParFenetre, journal),
   )
+  // Les lectures du téléphone passent par un dossier du profil, vidé au démarrage de ce qu'une coupure y aurait laissé.
+  const lectures = path.join(profil, DOSSIER_LECTURES)
+  void viderLectures(lectures)
+  const memoireRetenue = async (): Promise<string | null> => {
+    const ouverture = await memoire.ouvrir()
+    return ouverture.ok && ouverture.valeur.etat !== 'aucun' ? ouverture.valeur.chemin : null
+  }
   brancherCanaux(
     ipcMain,
     (evenement) => expediteurAdmis(evenement, fenetrePrincipale?.webContents ?? null),
     {
       ...gestionnairesMemoire(memoire),
+      ...gestionnairesTelephone(creerTelephone(profil), lectures, { memoire: memoireRetenue }),
       'coquille:textes': async (argument) => {
         const textes = lireTextesFermeture(argument)
         if (!textes) return echec('UNKNOWN', 'Textes de la question de fermeture incomplets.')

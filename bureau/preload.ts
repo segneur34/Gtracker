@@ -36,11 +36,22 @@ const memoire = Object.freeze({
   effacer: avec('memoire:effacer'),
 })
 
+/**
+ * Le dossier `Documents/Gtracker` du téléphone branché, en lecture seule (noms gardés égaux à ceux de `telephone.ts`
+ * par un test) : `etat()`, `lister()`, et `lireOctets({ chemin })` d'un fichier du dernier listage seulement.
+ */
+const telephone = Object.freeze({
+  etat: sans('telephone:etat'),
+  lister: sans('telephone:lister'),
+  lireOctets: avec('telephone:lireOctets'),
+})
+
 contextBridge.exposeInMainWorld(
   'gtrackerBureau',
   Object.freeze({
     version: versionPassee(),
     memoire,
+    telephone,
     /** Textes traduits de la question de fermeture : `{ question, detail, quitter, rester }`. */
     textes: avec('coquille:textes'),
   }),
