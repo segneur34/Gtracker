@@ -190,7 +190,42 @@
   margin-top: var(--space-3);
 }
 
-/* Liste des points, dans l'ordre du parcours. */
+/* Bloc « Tracé et balises » : chiffres, actions, puis la liste des balises. */
+.plan-trace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.plan-trace .plan-note {
+  margin: 0;
+}
+
+/* Bande de chiffres : la distance en grand, puis le nombre de balises et le plus long bord. */
+.plan-figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
+.plan-figures__distance {
+  font-size: var(--text-l);
+  white-space: nowrap;
+}
+
+.plan-figures__item {
+  color: var(--muted);
+  font-size: var(--text-s);
+  white-space: nowrap;
+}
+
+.plan-figures__item strong {
+  color: var(--ink);
+}
+
+/* Liste des balises, dans l'ordre du parcours : une ligne chacune, le bord qui y mène à droite. */
 .plan-points {
   list-style: none;
   margin: 0;
@@ -201,28 +236,23 @@
 
 .plan-point {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-2);
-  padding: var(--space-2) var(--space-1);
-  border-top: 1px solid var(--line-soft);
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-1);
   border-radius: var(--radius-s);
-}
-
-.plan-point:first-child {
-  border-top: 0;
 }
 
 .plan-point--selected {
   background: var(--surface-sunken);
 }
 
+/* Pastille, nom, distance du bord, cap. */
 .plan-point__main {
-  flex: 1 1 11em;
-  min-width: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto 3.5em;
   align-items: center;
   gap: var(--space-2);
+  width: 100%;
   padding: 0;
   border: 0;
   background: transparent;
@@ -230,6 +260,19 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.plan-point__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-point__leg,
+.plan-point__bearing {
+  text-align: right;
+  white-space: nowrap;
 }
 
 .plan-point__dot {
@@ -245,25 +288,15 @@
   font-weight: 700;
 }
 
-.plan-point__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.plan-point__text span {
-  color: var(--muted);
-  font-size: var(--text-s);
-}
-
+/* Actions de la balise touchée, dépliées sous sa ligne. */
 .plan-point__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-1);
-  margin-left: auto;
+  gap: var(--space-2);
 }
 
-.plan-point__move {
+.plan-point__remove {
   padding-left: var(--space-2);
   padding-right: var(--space-2);
 }
@@ -282,54 +315,7 @@
   gap: var(--space-2);
 }
 
-/*
- * Chiffres du bloc Parcours, en tête du bloc : trois.
- */
-.plan-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-
-.plan-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-m);
-  background: var(--bg);
-}
-
-.plan-stat span {
-  color: var(--muted);
-  font-size: var(--text-s);
-}
-
-.plan-stat strong {
-  font-size: var(--text-l);
-  white-space: nowrap;
-}
-
-/* Bords d'un parcours de voile : balises, distance, cap. */
-.plan-course {
-  list-style: none;
-  margin: var(--space-3) 0 0;
-  padding: 0;
-}
-
-.plan-course__leg {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 4em;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-1);
-  border-top: 1px solid var(--line-soft);
-}
-
-.plan-course__leg span:not(:first-child) {
-  text-align: right;
-}
-
-/* Bips d'approche du parcours : ceux de l'activité, ou réglés pour lui. */
+/* Bips d'approche du parcours (bloc « Balises sonores ») : ceux de l'activité, ou réglés pour lui. */
 .plan-beeps {
   margin-top: var(--space-3);
   display: flex;
@@ -400,7 +386,7 @@
 }
 
 @media (min-width: 768px) and (min-height: 500px), (min-width: 768px) and (pointer: fine), (min-width: 768px) and (pointer: none) {
-  .plan-stat strong {
+  .plan-figures__distance {
     font-size: var(--text-xl);
   }
 

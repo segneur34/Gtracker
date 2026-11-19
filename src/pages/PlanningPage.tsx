@@ -21,7 +21,9 @@ import ResizablePanel from '../components/ResizablePanel';
 import RouteList from '../components/RouteList';
 import RouteImageShare from '../components/RouteImageShare';
 import SectionTabs, { type SectionDefinition } from '../components/SectionTabs';
-import { IconChevronRight, IconDownload, IconFile, IconPencil, IconPencilOff, IconShare, IconTrash, IconUndo } from '../components/icons';
+import {
+  IconChevronDown, IconChevronUp, IconClose, IconDownload, IconFile, IconPencil, IconPencilOff, IconShare, IconTrash, IconUndo,
+} from '../components/icons';
 import { shareRouteGpx } from '../components/routeShare';
 import { CARD_STYLE } from '../components/styles';
 import Button from '../components/ui/Button';
@@ -48,7 +50,7 @@ import { shownRoutes } from '../planning/routeShown';
 import { isAbortError } from '../planning/fetchJson';
 import { searchPlaces, type Place } from '../planning/geocoding';
 import {
-  EMPTY_ROUTE, courseLegs, isLooped, routeFromTrack, routePoints, routeTotals, waypointDistances,
+  EMPTY_ROUTE, courseLegs, isLooped, routeFromTrack, routePoints, routeTotals,
   type PlannedRoute, type RoutePoint, type Waypoint,
 } from '../planning/route';
 import { END_COLOR, ROUTE_COLOR, START_COLOR } from '../planning/routeColors';
@@ -60,7 +62,7 @@ import { currentPosition, locationPermissionGranted } from '../platform/location
 import { isNativeApp } from '../platform/runtime';
 import { jsonStore } from '../platform/storage';
 import { STORAGE_KEYS } from '../core/appIdentity';
-import { dateLocale, t } from '../core/i18n';
+import { dateLocale, t, tn } from '../core/i18n';
 import { tRich } from '../components/tRich';
 
 /**
@@ -70,7 +72,7 @@ import { tRich } from '../components/tRich';
  * (Réglages), ou ceux propres au parcours, rangés dans sa fiche. Un GPX
  * téléchargé ailleurs se charge tel quel (`routeFromTrack`). L'activité se
  * choisit au-dessus de la carte ; dessous, des onglets ouvrent les blocs
- * (parcours, tracé, balises, enregistrer, mes itinéraires), comme dans les
+ * (tracé et balises, enregistrer, mes itinéraires, balises sonores), comme dans les
  * analyses. Le parcours s'enregistre dans `itineraires/` du dossier mémoire,
  * avec son GPX.
  *
@@ -187,17 +189,19 @@ const sameGuide = (a: MarkGuideSettings | null, b: MarkGuideSettings | null): bo
 const noop = () => {};
 
 /**
- * Onglets sous la carte. `ranger` : « enregistrer » ; clés gardées pour l'état
- * mémorisé. Seul le premier est ouvert au départ, comme dans les analyses.
+ * Onglets sous la carte. `balises` : « tracé et balises » ; `ranger` : « enregistrer » ;
+ * `parcours` : « balises sonores » ; clés gardées pour l'état mémorisé. Le tracé et
+ * les bips sont ouverts au départ. Le bloc réuni a sa propre clé, ouverte par défaut :
+ * il n'hérite pas de l'état fermé gardé pour les anciens blocs `trace` (boutons seuls)
+ * et `points`, qui peuvent rester dans la mémoire sans effet.
  */
-type PlanningSection = 'parcours' | 'trace' | 'points' | 'ranger' | 'liste';
+type PlanningSection = 'balises' | 'ranger' | 'liste' | 'parcours';
 
 const PLANNING_SECTION_DEFAULTS: Record<PlanningSection, boolean> = {
-  parcours: true,
-  trace: false,
-  points: false,
+  balises: true,
   ranger: false,
   liste: false,
+  parcours: true,
 };
 
 /**
@@ -273,7 +277,7 @@ function PlanningPage() {
   const [confirmingMenuDelete, setConfirmingMenuDelete] = useState<string | null>(null);
   /** Itinéraire dont l'image de partage est ouverte (« Partager l'image » du menu « … »). */
   const [sharingImage, setSharingImage] = useState<SavedRoute | null>(null);
-  /** Échec du chargement d'un GPX, montré dans le bloc Tracé. */
+  /** Échec du chargement d'un GPX, montré sous la carte. */
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Recherche d'un lieu.
@@ -282,8 +286,9 @@ function PlanningPage() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<Place | null>(null);
-  // Le retour d'Android ferme la fiche du point ou le lieu proposé avant de quitter la page.
-  const selectedOpen = selected !== null;
+  // Le retour d'Android ferme la fiche du point ou le lieu proposé avant de quitter la page ; un indice qui ne
+  // désigne plus aucune balise n'ouvre rien.
+  const selectedOpen = selected !== null && route.waypoints[selected] !== undefined;
   const candidateOpen = candidate !== null;
   useEffect(() => (selectedOpen ? pushBackLayer(() => setSelected(null)) : undefined), [selectedOpen]);
   useEffect(() => (candidateOpen ? pushBackLayer(() => setCandidate(null)) : undefined), [candidateOpen]);
@@ -301,7 +306,6 @@ function PlanningPage() {
   };
 
   const totals = useMemo(() => routeTotals(route), [route]);
-  const distances = useMemo(() => waypointDistances(route), [route]);
   const looped = isLooped(route);
   /** Nom des balises : 1, 2, 3… */
   const label = markLabel;
@@ -338,6 +342,23 @@ function PlanningPage() {
     }
     if (locked) return;
     planner.add(w);
+  };
+
+  /**
+   * « Précédent », « Inverser » et « Boucler » changent l'ordre ou le nombre des balises d'un coup : la balise
+   * touchée n'est plus à son indice, sa ligne se replie et son bandeau se ferme.
+   */
+  const undo = () => {
+    planner.undo();
+    setSelected(null);
+  };
+  const reverse = () => {
+    planner.reverse();
+    setSelected(null);
+  };
+  const closeLoop = () => {
+    planner.closeLoop();
+    setSelected(null);
   };
 
   /** Le verrouillage ferme le bandeau d'un point ou d'un lieu proposé : plus rien à modifier sur la carte. */
@@ -611,14 +632,15 @@ function PlanningPage() {
 
   const canSave = library.canSave && route.waypoints.length >= 2 && !saving && !current?.readOnly;
 
-  /** Onglets sous la carte : le parcours, ses balises, l'enregistrement et la liste. */
+  /** Onglets sous la carte : le tracé et ses balises, l'enregistrement, la liste, puis les bips s'il y en a. */
   const pointCount = route.waypoints.length;
+  /** Balises du parcours, sans le retour au départ d'une boucle. */
+  const markCount = pointCount - (looped ? 1 : 0);
   const sections: SectionDefinition<PlanningSection>[] = [
-    { key: 'parcours', label: t('parcours') },
-    { key: 'trace', label: t('tracé') },
-    { key: 'points', label: t('balises ({n})', { n: pointCount }) },
+    { key: 'balises', label: t('tracé et balises ({n})', { n: pointCount }) },
     { key: 'ranger', label: t('enregistrer', { ctx: 'garder' }) },
     { key: 'liste', label: t('mes itinéraires ({n})', { n: listedRoutes.length }) },
+    ...(guide && activity ? [{ key: 'parcours' as const, label: t('balises sonores') }] : []),
   ];
 
   return (
@@ -696,7 +718,7 @@ function PlanningPage() {
               <Button size="s" onClick={() => void locate()} disabled={locating}>
                 {locating ? t('Recherche…') : t('Ma position')}
               </Button>
-              <Button size="s" onClick={planner.undo} disabled={!planner.canUndo} aria-label={t('Précédent : défaire la dernière modification')}>
+              <Button size="s" onClick={undo} disabled={!planner.canUndo} aria-label={t('Précédent : défaire la dernière modification')}>
                 <IconUndo size={16} />
                 {t('Précédent')}
               </Button>
@@ -727,74 +749,20 @@ function PlanningPage() {
               </div>
             )}
           </ResizablePanel>
-          {/* Hors des onglets : l'échec du chargement se voit même onglet Tracé fermé. */}
+          {/* Hors des onglets : l'échec du chargement se voit même bloc « Tracé et balises » fermé. */}
           {loadError && <div className="ui-alert ui-alert--warning">{loadError}</div>}
         </div>
 
         <div className="plan-panel">
           <SectionTabs sections={sections} open={open} onToggle={toggle} />
-          <PlanBlock id="planning.parcours" label={t('Parcours')} open={open.parcours} onToggle={() => toggle('parcours')}
-            helpKey={guide && activity ? 'plan:parcours' : undefined}>
-            {guide && activity && (
-              <HelpText helpKey="plan:parcours" note>
-                {courseGuide
-                  ? tRich(
-                    'En navigation, chaque balise, départ compris, se valide à moins de {radius} m. Bips dès {start} m : propres à ce parcours. « Régler pour ce parcours » ouvre leur courbe : tirez un point pour le déplacer, touchez le graphe pour en ajouter un.',
-                    { radius: validationRadiusM(guide), start: beepStartM(guide) }
-                  )
-                  : tRich(
-                    'En navigation, chaque balise, départ compris, se valide à moins de {radius} m. Bips dès {start} m : ceux de l\'activité {name}, réglés dans <a>Réglages</a>. « Régler pour ce parcours » ouvre leur courbe : tirez un point pour le déplacer, touchez le graphe pour en ajouter un.',
-                    { radius: validationRadiusM(guide), start: beepStartM(guide), name: activityDisplayName(activity) },
-                    { a: (c) => <Link to="/parametres">{c}</Link> }
-                  )}
-              </HelpText>
-            )}
-            <div className="plan-stats">
-              <div className="plan-stat"><span>{t('Distance')}</span><strong className="num">{formatDistance(totals.distanceM, distanceUnit, toDisplayDistance(totals.distanceM, distanceUnit) >= 100 ? 1 : 2)}</strong></div>
-              <div className="plan-stat"><span>{t('Balises')}</span><strong className="num">{route.waypoints.length - (looped ? 1 : 0)}</strong></div>
-              <div className="plan-stat">
-                <span>{t('Plus long bord')}</span>
-                <strong className="num">{legs.length > 0 ? formatDistance(Math.max(...legs.map((l) => l.distanceM)), distanceUnit) : '—'}</strong>
-              </div>
-            </div>
-            {legs.length > 0 ? (
-              <ol className="plan-course">
-                {legs.map((leg, i) => (
-                  <li key={i} className="plan-course__leg">
-                    <span>{pointLabel(i)} → {pointLabel(i + 1)}</span>
-                    <span className="num">{formatDistance(leg.distanceM, distanceUnit)}</span>
-                    <span className="num">{roundBearingDeg(leg.bearingDeg)}°</span>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="plan-note">{t('Touchez la carte pour poser le départ, puis les balises.')}</p>
-            )}
-            {guide && activity && (
-              <div className="plan-beeps">
-                <div className="plan-beeps__head">
-                  <Button size="s" onClick={() => setBeepsOpen((o) => !o)} aria-expanded={beepsOpen}>
-                    {beepsOpen ? t('Fermer') : t('Régler pour ce parcours')}
-                  </Button>
-                </div>
-                {beepsOpen && activityGuide && (
-                  <BeepCurveEditor value={guide} overridden={courseGuide !== null} fallback={activityGuide}
-                    resetLabel={t("Comme l'activité")} fallbackMark={t("ceux de l'activité {name}", { name: activityDisplayName(activity) })}
-                    approachMs={simulatedApproachMs(activityFamily(activity))} speedUnit={effectiveSpeedUnit(activity)}
-                    onChange={setCourseGuide} />
-                )}
-              </div>
-            )}
-          </PlanBlock>
-
-          <PlanBlock id="planning.trace" label={t('Tracé')} open={open.trace} onToggle={() => toggle('trace')} helpKey="plan:trace">
+          <PlanBlock id="planning.balises" label={t('Tracé et balises ({n})', { n: pointCount })} open={open.balises} onToggle={() => toggle('balises')} helpKey="plan:trace">
             {helpOpen && (
               <ul className="plan-help">
                 <li>{t('Touchez la carte pour poser les balises : 1, puis 2, puis 3… Le départ est en vert, l\'arrivée en rouge.')}</li>
                 <li>{t('Les balises sont reliées en ligne droite : sur l\'eau, pas de chemin à suivre.')}</li>
                 <li>{t('Touchez le parcours pour insérer une balise entre deux autres ; faites glisser une balise pour la déplacer.')}</li>
                 <li>{t('Touchez une balise pour la retirer ; touchez la 1 pour boucler, retour au départ.')}</li>
-                <li>{t('« Précédent », sur la carte, défait la dernière modification. La liste des balises permet aussi de changer leur ordre.')}</li>
+                <li>{t('« Précédent » défait la dernière modification. Touchez une balise de la liste pour la monter, la descendre ou la retirer.')}</li>
                 <li>{t('Le crayon, sur la carte, verrouille le parcours pour la déplacer sans poser de balise ; un parcours rangé s\'ouvre verrouillé, le crayon le rend modifiable.')}</li>
                 <li>
                   {t('En navigation (« Partir »), chaque balise, départ compris, se valide en passant près d\'elle, avec des bips de plus en plus rapides à l\'approche ; « Passer » saute une balise. Distances, rythme et vibration se règlent dans Réglages.')}
@@ -802,60 +770,76 @@ function PlanningPage() {
                 <li>{t('« Charger un GPX » reprend telle quelle une trace téléchargée ailleurs ; touchez-la pour y poser des balises.')}</li>
               </ul>
             )}
-            <div className="plan-actions">
-              <Button size="s" onClick={planner.undo} disabled={!planner.canUndo}>
-                <IconUndo size={16} />
-                {t('Précédent')}
-              </Button>
-              <Button size="s" onClick={planner.reverse} disabled={route.waypoints.length < 2}>{t('Inverser')}</Button>
-              <Button size="s" onClick={planner.closeLoop} disabled={route.waypoints.length < 2 || looped}>{t('Boucler')}</Button>
-              <label className="ui-btn ui-btn--secondary ui-btn--s">
-                <IconFile size={16} />
-                {t('Charger un GPX')}
-                {/* Sur le téléphone, pas de filtre : Android grise parfois les GPX. Le contenu est vérifié à la lecture. */}
-                <input type="file" accept={isNativeApp() ? undefined : '.gpx'} hidden onChange={(e) => void loadGpx(e)} />
-              </label>
-              <Button size="s" variant="ghost" onClick={() => { planner.clear(); setSelected(null); setLocked(false); }} disabled={route.waypoints.length === 0}>{t('Tout effacer')}</Button>
-            </div>
-          </PlanBlock>
-
-          <PlanBlock id="planning.points" label={t('Balises ({n})', { n: route.waypoints.length })} open={open.points} onToggle={() => toggle('points')}>
-            {route.waypoints.length === 0 ? (
-              <p className="plan-note">{t('Aucun point : touchez la carte pour poser le départ.')}</p>
-            ) : (
-              <ol className="plan-points">
-                {route.waypoints.map((_, i) => {
-                  const last = route.waypoints.length - 1;
-                  return (
-                    <li key={i} className={selected === i ? 'plan-point plan-point--selected' : 'plan-point'}>
-                      <button type="button" className="plan-point__main" onClick={() => selectPoint(i)}>
-                        <span className="plan-point__dot" style={{ background: pointFill(i) }}>{pointLabel(i)}</span>
-                        <span className="plan-point__text">
-                          <strong>{i === 0 ? t('Départ') : i === last ? (looped ? t('Arrivée, retour au départ') : t('Arrivée')) : pointName(i)}</strong>
-                          <span className="num">
-                            {i === 0
-                              ? formatDistance(0, distanceUnit)
-                              : t('{total} · tronçon {leg}', { total: formatDistance(distances[i].cumulativeM, distanceUnit), leg: formatDistance(distances[i].legM, distanceUnit) })}
+            <div className="plan-trace">
+              <div className="plan-figures">
+                <strong className="plan-figures__distance num">
+                  {formatDistance(totals.distanceM, distanceUnit, toDisplayDistance(totals.distanceM, distanceUnit) >= 100 ? 1 : 2)}
+                </strong>
+                <span className="plan-figures__item num">{tn(markCount, '{n} balise', '{n} balises')}</span>
+                <span className="plan-figures__item">
+                  {t('bord max')}{' '}
+                  <strong className="num">{legs.length > 0 ? formatDistance(Math.max(...legs.map((l) => l.distanceM)), distanceUnit) : '—'}</strong>
+                </span>
+              </div>
+              <div className="plan-actions">
+                <Button size="s" onClick={undo} disabled={!planner.canUndo}
+                  aria-label={t('Précédent : défaire la dernière modification')} title={t('Précédent : défaire la dernière modification')}>
+                  <IconUndo size={16} />
+                </Button>
+                <Button size="s" onClick={reverse} disabled={route.waypoints.length < 2}>{t('Inverser')}</Button>
+                <Button size="s" onClick={closeLoop} disabled={route.waypoints.length < 2 || looped}>{t('Boucler')}</Button>
+                <label className="ui-btn ui-btn--secondary ui-btn--s">
+                  <IconFile size={16} />
+                  {t('Charger un GPX')}
+                  {/* Sur le téléphone, pas de filtre : Android grise parfois les GPX. Le contenu est vérifié à la lecture. */}
+                  <input type="file" accept={isNativeApp() ? undefined : '.gpx'} hidden onChange={(e) => void loadGpx(e)} />
+                </label>
+                <Button size="s" variant="ghost" onClick={() => { planner.clear(); setSelected(null); setLocked(false); }} disabled={route.waypoints.length === 0}>{t('Tout effacer')}</Button>
+              </div>
+              {route.waypoints.length === 0 ? (
+                <p className="plan-note">{t('Aucun point : touchez la carte pour poser le départ.')}</p>
+              ) : (
+                <ol className="plan-points">
+                  {route.waypoints.map((_, i) => {
+                    const last = route.waypoints.length - 1;
+                    const touched = selected === i;
+                    // Le bord qui mène à la balise : aucun pour le départ.
+                    const leg = i > 0 ? legs[i - 1] : undefined;
+                    return (
+                      <li key={i} className={touched ? 'plan-point plan-point--selected' : 'plan-point'}>
+                        <button type="button" className="plan-point__main" aria-expanded={touched}
+                          onClick={() => (touched ? setSelected(null) : selectPoint(i))}>
+                          <span className="plan-point__dot" style={{ background: pointFill(i) }}>{pointLabel(i)}</span>
+                          <strong className="plan-point__name">
+                            {i === 0 ? t('Départ') : i === last ? (looped ? t('Arrivée, retour au départ') : t('Arrivée')) : pointName(i)}
+                          </strong>
+                          <span className="plan-point__leg num">{leg ? formatDistance(leg.distanceM, distanceUnit) : '—'}</span>
+                          <span className="plan-point__bearing num">{leg ? `${roundBearingDeg(leg.bearingDeg)}°` : ''}</span>
+                        </button>
+                        {touched && (
+                          <span className="plan-point__actions">
+                            <Button size="s" aria-label={t('Monter : {name}', { name: pointName(i) })}
+                              disabled={i === 0} onClick={() => { planner.reorder(i, i - 1); setSelected(i - 1); }}>
+                              <IconChevronUp size={16} />
+                              {t('Monter')}
+                            </Button>
+                            <Button size="s" aria-label={t('Descendre : {name}', { name: pointName(i) })}
+                              disabled={i === last} onClick={() => { planner.reorder(i, i + 1); setSelected(i + 1); }}>
+                              <IconChevronDown size={16} />
+                              {t('Descendre')}
+                            </Button>
+                            <Button size="s" className="plan-point__remove" aria-label={t('Retirer : {name}', { name: pointName(i) })}
+                              title={t('Retirer')} onClick={() => { planner.remove(i); setSelected(null); }}>
+                              <IconClose size={16} />
+                            </Button>
                           </span>
-                        </span>
-                      </button>
-                      <span className="plan-point__actions">
-                        <Button size="s" variant="ghost" className="plan-point__move" aria-label={t('Monter : {name}', { name: pointName(i) })}
-                          disabled={i === 0} onClick={() => { planner.reorder(i, i - 1); setSelected(null); }}>
-                          <IconChevronRight size={16} style={{ transform: 'rotate(-90deg)' }} />
-                        </Button>
-                        <Button size="s" variant="ghost" className="plan-point__move" aria-label={t('Descendre : {name}', { name: pointName(i) })}
-                          disabled={i === last}
-                          onClick={() => { planner.reorder(i, i + 1); setSelected(null); }}>
-                          <IconChevronRight size={16} style={{ transform: 'rotate(90deg)' }} />
-                        </Button>
-                        <Button size="s" variant="ghost" onClick={() => { planner.remove(i); setSelected(null); }}>{t('Retirer')}</Button>
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </div>
           </PlanBlock>
 
           <PlanBlock id="planning.ranger" label={current ? t('Itinéraire enregistré') : t('Enregistrer l\'itinéraire')} open={open.ranger} onToggle={() => toggle('ranger')}
@@ -943,6 +927,36 @@ function PlanningPage() {
                 ))} />
             )}
           </PlanBlock>
+
+          {guide && activity && (
+            <PlanBlock id="planning.bips" label={t('Balises sonores')} open={open.parcours} onToggle={() => toggle('parcours')} helpKey="plan:parcours">
+              <HelpText helpKey="plan:parcours" note>
+                {courseGuide
+                  ? tRich(
+                    'En navigation, chaque balise, départ compris, se valide à moins de {radius} m. Bips dès {start} m : propres à ce parcours. « Régler pour ce parcours » ouvre leur courbe : tirez un point pour le déplacer, touchez le graphe pour en ajouter un.',
+                    { radius: validationRadiusM(guide), start: beepStartM(guide) }
+                  )
+                  : tRich(
+                    'En navigation, chaque balise, départ compris, se valide à moins de {radius} m. Bips dès {start} m : ceux de l\'activité {name}, réglés dans <a>Réglages</a>. « Régler pour ce parcours » ouvre leur courbe : tirez un point pour le déplacer, touchez le graphe pour en ajouter un.',
+                    { radius: validationRadiusM(guide), start: beepStartM(guide), name: activityDisplayName(activity) },
+                    { a: (c) => <Link to="/parametres">{c}</Link> }
+                  )}
+              </HelpText>
+              <div className="plan-beeps">
+                <div className="plan-beeps__head">
+                  <Button size="s" onClick={() => setBeepsOpen((o) => !o)} aria-expanded={beepsOpen}>
+                    {beepsOpen ? t('Fermer') : t('Régler pour ce parcours')}
+                  </Button>
+                </div>
+                {beepsOpen && activityGuide && (
+                  <BeepCurveEditor value={guide} overridden={courseGuide !== null} fallback={activityGuide}
+                    resetLabel={t("Comme l'activité")} fallbackMark={t("ceux de l'activité {name}", { name: activityDisplayName(activity) })}
+                    approachMs={simulatedApproachMs(activityFamily(activity))} speedUnit={effectiveSpeedUnit(activity)}
+                    onChange={setCourseGuide} />
+                )}
+              </div>
+            </PlanBlock>
+          )}
         </div>
       </div>
     </div>
