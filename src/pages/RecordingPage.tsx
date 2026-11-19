@@ -858,7 +858,7 @@ function RecordingScreen() {
 
   return (
     <div className={`ui-page rec-page${busy ? ' rec-page--busy' : ''}`}>
-      <PageHeader title={t('Enregistrer')} subtitle={t("Une position par seconde, gardée brute : l'analyse se fait ensuite.")} />
+      <PageHeader title={busy ? t('Enregistrement…', { ctx: 'direct' }) :t('Enregistrer')} subtitle={t("Une position par seconde, gardée brute : l'analyse se fait ensuite.")} />
 
       {!busy && !pending && <Card className="rec-options">
         <div className="rec-test-form">
