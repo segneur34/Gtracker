@@ -132,7 +132,7 @@ const phraseA = await phrase();
 console.log(phraseA);
 check('deux sessions ajoutées, aucune refusée', /^2 sessions ajoutées\./.test(phraseA), phraseA);
 const faits = await fiches(2);
-console.log('fiches :', faits.map((r) => `${r.sport}/${r.name}`).join(' | '));
+console.log('fiches :', faits.map((r) => `${r.sport}/${r.name}`).sort().join(' | '));
 for (const [clef, s] of Object.entries(SESSIONS)) {
   const r = faits.find((x) => x.sport === s.sport);
   const voulue = s.fiche;

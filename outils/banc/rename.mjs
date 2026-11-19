@@ -3,7 +3,7 @@
 // l'analyse et relu dans la liste. Sans nom donné, ligne et en-tête portent le nom calculé (l'activité seule : le
 // service de lieux est bloqué au banc, `lieu.mjs` le simule). Profil Chrome neuf.
 // Usage : node rename.mjs <port> <gpx de voile, produit par make-gpx.mjs>
-import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
+import { connect, DOSSIER_MEMOIRE, pourMemoire } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { actionLigne, lignes } from './lib/sessions.mjs';
 
@@ -13,7 +13,7 @@ const [port, gpx] = process.argv.slice(2);
 const lib = await connect({ port });
 const { send, settle, waitFor, wait, importFiles, logs, check, finish } = lib;
 const evaluate = async (expression) => {
-  const res = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+  const res = await send('Runtime.evaluate', { expression: pourMemoire(expression), returnByValue: true, awaitPromise: true });
   if (res.result?.exceptionDetails) return `ERREUR: ${res.result.exceptionDetails.exception?.description?.split('\n')[0]}`;
   return res.result?.result?.value;
 };
