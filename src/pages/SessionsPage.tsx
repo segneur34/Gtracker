@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import ActivityBubbles from '../components/ActivityBubbles';
 import { useHelp } from '../components/helpContext';
-import { IconChevronDown, IconChevronUp, IconFlag, IconHelp } from '../components/icons';
+import { IconChevronDown, IconChevronUp, IconHelp, IconRoute } from '../components/icons';
 import ImportButtons from '../components/ImportButtons';
 import MemoryStatus from '../components/MemoryStatus';
 import RefreshLibraryButton from '../components/RefreshLibraryButton';
@@ -18,7 +18,6 @@ import { STORAGE_KEYS } from '../core/appIdentity';
 import { sessionFamily } from '../core/parentPage';
 import { SPORT_FAMILIES } from '../core/sportProfiles';
 import { useRetainedScroll } from '../hooks/useRetainedScroll';
-import { useRouteLibrary } from '../hooks/useRouteLibrary';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
 import { previewImageStore } from '../library/previewImageStore';
@@ -26,7 +25,6 @@ import { previewStore } from '../library/previewStore';
 import type { LibrarySession } from '../library/record';
 import { SESSION_SORTS, SESSION_SORT_DEFAULT, isSessionSort, sortSessions, type SessionSort } from '../library/sessionSort';
 import { commonDistanceUnit, emptyOfActivity, filterChoices, filterSessions, sessionsTotals, totalsLine } from '../library/sessionsList';
-import { shownRoutes } from '../planning/routeShown';
 import { memoryLabelText } from '../platform/memoryFolder';
 import { isNativeApp } from '../platform/runtime';
 import { jsonStore } from '../platform/storage';
@@ -35,7 +33,7 @@ import './SessionsPage.css';
 /**
  * Page Sessions : toutes les sessions de la mémoire, voile et surf ensemble. En tête, le titre et son « … » (imports,
  * mise à jour) ; la ligne des totaux
- * de la liste, avec « Itinéraires (n) » (la liste des itinéraires, d'où « Planifier » crée un parcours) et « Tris » ;
+ * de la liste, avec « Planification » (la liste des itinéraires, d'où « Planifier » crée un parcours) et « Tris » ;
  * la rangée des activités visibles, en logos, qui filtre la liste (`?activite=<id>`, gardé
  * dans l'adresse pour le retour d'une analyse) ; les sessions à classer ; la liste.
  *
@@ -81,8 +79,6 @@ function SessionsPage() {
   }, [complete, library.folderLabel, library.sessions]);
 
   const { activities, isShown, shownActivities } = useVisibility();
-  const { routes: allRoutes, loaded: routesLoaded } = useRouteLibrary();
-  const routes = useMemo(() => shownRoutes(allRoutes, activities, isShown), [allRoutes, activities, isShown]);
   const [params, setParams] = useSearchParams();
   // Le filtre d'activité vit dans l'adresse : il survit à une analyse ouverte puis fermée.
   const filterId = params.get('activite');
@@ -174,7 +170,7 @@ function SessionsPage() {
           <p className="sessions-head__totals num">{totals}</p>
           <div className="sessions-head__pills">
             <Link to="/itineraires/liste" className="ui-tab sessions-head__pill">
-              <IconFlag size={14} /> {t('Itinéraires')}{routesLoaded ? ` (${routes.length})` : ''}
+              <IconRoute size={14} /> {t('Planification')}
             </Link>
             <button type="button" className="ui-tab sessions-head__pill" aria-expanded={sortOpen}
               onClick={() => setSortOpen((open) => !open)}>

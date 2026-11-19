@@ -114,7 +114,7 @@ function RoutesPage() {
         back={{ to: '/sessions', label: t('Sessions') }}
         subtitle={loaded ? tn(routes.length, '{n} itinéraire', '{n} itinéraires') : undefined} />
 
-      <MemoryStatus />
+      <MemoryStatus compact />
       {error && <div className="ui-alert ui-alert--danger">{error}</div>}
 
       <div className="ui-flex-between ui-wrap">
@@ -135,8 +135,8 @@ function RoutesPage() {
               <input type="file" accept={isNativeApp() ? undefined : '.gpx'} hidden onChange={(e) => void importFile(e)} />
             </label>
           )}
-          <Link to="/itineraires" className="ui-btn ui-btn--secondary ui-btn--s">
-            <IconRoute size={18} /> {t('Planifier')}
+          <Link to="/itineraires" className="ui-btn ui-btn--primary ui-btn--m">
+            <IconRoute size={24} /> {t('Planifier')}
           </Link>
         </span>
       </div>

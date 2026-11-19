@@ -231,6 +231,13 @@
   font-size: var(--text-s);
 }
 
+/* Une fois et demie un petit bouton : 45 px de haut, texte de 1,5 × --text-s. */
+.ui-btn--m {
+  min-height: 45px;
+  padding: 0 var(--space-4);
+  font-size: calc(var(--text-s) * 1.5);
+}
+
 .ui-btn--block {
   display: flex;
   width: 100%;
