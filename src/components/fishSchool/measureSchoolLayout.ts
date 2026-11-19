@@ -1,8 +1,9 @@
 import type { Box } from '../../core/gridDistance';
-import { brushCorner, schoolLayoutKey, type SchoolFrame, type SchoolLayout } from '../../core/fishSchool';
+import { brushCorner, schoolCorner, schoolLayoutKey, type SchoolFrame, type SchoolLayout } from '../../core/fishSchool';
 
 /**
- * Lecture de la page du Profil pour le banc de poissons : la zone sous la photo d'en-tête, l'angle d'où le banc entre,
+ * Lecture de la page du Profil pour le banc de poissons : la zone sous la photo d'en-tête, l'angle d'où le banc entre
+ * (haut droit sur téléphone, haut gauche de la colonne du Profil sur ordinateur : `schoolCorner`),
  * les cadres peints (boîte, angle ouvert, trait), ce que le banc ne touche jamais (photo ronde, bouton de période,
  * textes, chiffres, dessins, boutons) et les cadres dont le voile est repeint sous le banc. Tout en px relatifs à la
  * zone, origine en haut à gauche ; le calcul (`core/fishSchool.ts`) ne lit jamais la page.
@@ -16,7 +17,7 @@ const VEILED_SELECTOR = '.profile-favs, .profile-split, .actchart';
 const SOLID_SELECTOR = 'svg, canvas, img, button, input, select, textarea, [role="img"]';
 
 export interface SchoolMeasureRules {
-  /** Angle de départ : rentré de tant de px du bord droit et du haut de la zone. */
+  /** Angle de départ : rentré de tant de px de son bord (droit sur téléphone, gauche sur ordinateur) et du haut. */
   cornerInset: { x: number; y: number };
   /** Textes, dessins et obstacles rigides gonflés de tant de px, puis arrondis vers l'extérieur au multiple de `snapPx`. */
   textMarginPx: number;
@@ -25,7 +26,7 @@ export interface SchoolMeasureRules {
   defaultTraitPx: number;
   /** « Vos activités » (ordinateur) monte de tant de px au-dessus de la zone : plus que le débord de l'eau (`WATER_RULES.marginPx`). */
   aboveZonePx: number;
-  /** Écart laissé entre l'angle de départ et « Vos activités » quand elle borde la colonne du Profil, en px. */
+  /** Sur ordinateur, l'angle de départ est dans la marge à gauche de la colonne du Profil, à tant de px de son bord. */
   frameMarginPx: number;
 }
 
@@ -108,17 +109,19 @@ export const measureSchoolLayout = (page: HTMLElement, rules: SchoolMeasureRules
   // n'y entrent, et l'eau la contourne par le même chemin que le banc au lieu de passer dessous ou au-dessus.
   const activities = page.querySelector('.profile-activities');
   const columnBox = boxOf(column.getBoundingClientRect());
-  let right = zone.w;
+  let activitiesBox: Box | null = null;
   if (activities && hasArea(activities.getBoundingClientRect())) {
-    const box = boxOf(activities.getBoundingClientRect());
-    frames.push({ box: { ...box, y: Math.min(box.y, -rules.aboveZonePx) }, corner: null, trait: rules.defaultTraitPx });
-    // À côté de la colonne du Profil (deux colonnes) : le banc naît en haut à droite de celle-ci, contre « Vos activités ».
-    if (box.x >= columnBox.r) right = Math.min(box.x - rules.frameMarginPx, zone.w);
+    activitiesBox = boxOf(activities.getBoundingClientRect());
+    frames.push({ box: { ...activitiesBox, y: Math.min(activitiesBox.y, -rules.aboveZonePx) }, corner: null, trait: rules.defaultTraitPx });
   }
+  // Bas de la photo ronde et de son bouton de période, tels que le banc les évite : l'angle de l'ordinateur naît dessous.
+  const side = column.querySelector('.profile-head__side') ?? column.querySelector('.profile-head');
+  const sideRect = side?.getBoundingClientRect();
+  const headBottom = sideRect && hasArea(sideRect) ? snapped(sideRect).b : 0;
 
   const layout: SchoolLayout = {
     zone,
-    corner: { x: right - rules.cornerInset.x, y: rules.cornerInset.y },
+    corner: schoolCorner(zone.w, columnBox, activitiesBox, headBottom, { inset: rules.cornerInset, marginPx: rules.frameMarginPx }),
     rigid,
     frames,
     texts,

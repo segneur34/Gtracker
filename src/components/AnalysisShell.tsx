@@ -17,6 +17,7 @@ import AnalysisMap, { ANALYSIS_MAP_ANCHOR, type AnalysisMapProps } from './Analy
 import CollapsibleSectionTabs from './CollapsibleSectionTabs';
 import GearReminder, { type GearReminderProps } from './GearReminder';
 import type { SectionDefinition } from './SectionTabs';
+import { usePanelPacking } from './panelPacking';
 import SessionNameEditor from './SessionNameEditor';
 import SessionSaveBar from './SessionSaveBar';
 import { tRich } from './tRich';
@@ -117,6 +118,8 @@ function AnalysisShell<K extends string>({
     () => ({ '--brush': activityColor ? brushColorFor(activityColor, dark) : 'var(--ink)' }) as CSSProperties,
     [activityColor, dark]
   );
+  // Dans chaque colonne de panneaux, chacun suit le précédent sans le vide laissé par un voisin plus haut.
+  const panelsRef = usePanelPacking();
   // Carte agrandie en plein écran : la barre du brouillon passe dans la carte (une seule barre à l'écran).
   // En disposition large la vue agrandie est masquée : la barre reste alors dans la page.
   const narrow = useNarrowScreen();
@@ -164,7 +167,7 @@ function AnalysisShell<K extends string>({
         <div className="an-carte-col" style={map ? undefined : { marginTop: '10px' }}>
           <CollapsibleSectionTabs sections={tabs.sections} open={tabs.open} onToggle={tabs.onToggle} onCloseAll={tabs.onCloseAll}
             advancedOpen={tabs.advanced.open} onToggleAdvanced={tabs.advanced.toggle} accent={tabs.accent} />
-          <div className="an-carte-panels brush-panels" style={panelsStyle}>
+          <div ref={panelsRef} className="an-carte-panels brush-panels" style={panelsStyle}>
             {tabs.panels}
           </div>
         </div>

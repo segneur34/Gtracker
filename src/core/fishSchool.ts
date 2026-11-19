@@ -54,6 +54,27 @@ export interface SchoolLayout {
   texts: Box[];
 }
 
+/** Angle de départ : rentré de `inset` px de son bord ; `marginPx`, écart laissé contre la colonne voisine. */
+export interface SchoolCornerRules {
+  inset: { x: number; y: number };
+  marginPx: number;
+}
+
+/**
+ * Angle d'où entrent le banc et l'eau, en px de la zone (origine en haut à gauche, sous la photo d'en-tête). Téléphone,
+ * ou « Vos activités » sous le Profil (`activities` nul ou plus bas) : en haut à droite de la zone. Ordinateur, « Vos
+ * activités » à côté de la colonne du Profil : en haut à gauche de cette colonne, juste sous la photo ronde et son
+ * bouton de période (`headBottom`, bas de l'en-tête de la colonne), contre son bord gauche, dans la marge qui la borde.
+ * Le reste du calcul ne suppose aucun côté : places, caps et eau se lisent tous depuis cet angle.
+ */
+export const schoolCorner = (
+  zoneW: number, column: Box, activities: Box | null, headBottom: number, rules: SchoolCornerRules,
+): { x: number; y: number } => {
+  const besideProfile = activities !== null && activities.x >= column.r;
+  if (!besideProfile) return { x: zoneW - rules.inset.x, y: rules.inset.y };
+  return { x: Math.max(0, column.x - rules.marginPx) + rules.inset.x, y: headBottom + rules.inset.y };
+};
+
 /** Un poisson placé : centre, longueur (px), cap en degrés (0 : vers la droite, sens horaire), forme, dans un cadre. */
 export interface SchoolFish {
   x: number;

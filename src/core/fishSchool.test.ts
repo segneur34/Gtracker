@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  brushCorner, brushDoor, createSchoolPlanner, fishCount, fishShape, fishSize, frameWalls, isSchoolStyle, schoolLayoutKey,
+  brushCorner, brushDoor, createSchoolPlanner, fishCount, fishShape, fishSize, frameWalls, isSchoolStyle, schoolCorner, schoolLayoutKey,
   schoolPlaces, SCHOOL_RULES, SCHOOL_STYLES, seededRandom, sessionOfFish, type FrameCorner, type SchoolFish, type SchoolFrame, type SchoolLayout,
 } from './fishSchool';
 import { waterOutline } from './schoolWater';
@@ -65,6 +65,41 @@ const DESKTOP: SchoolLayout = {
 DESKTOP.texts = DESKTOP.frames.flatMap((f) => textsOf(f.box));
 /** Petite page vite pleine : les marges saturent, le banc passe dans les cadres. */
 const SMALL = column(390, [200, 220]);
+
+/** La même page vue dans un miroir : l'angle de départ passe à gauche, les ouvertures des cadres changent de côté. */
+const MIRROR: Record<FrameCorner, FrameCorner> = { hg: 'hd', hd: 'hg', bg: 'bd', bd: 'bg' };
+const mirrored = (l: SchoolLayout): SchoolLayout => {
+  const flip = (b: Box): Box => ({ x: l.zone.w - b.r, y: b.y, r: l.zone.w - b.x, b: b.b });
+  return {
+    zone: l.zone,
+    corner: { x: l.zone.w - l.corner.x, y: l.corner.y },
+    rigid: l.rigid.map(flip),
+    frames: l.frames.map((f) => ({ ...f, box: flip(f.box), corner: f.corner && MIRROR[f.corner] })),
+    texts: l.texts.map(flip),
+  };
+};
+const PHONE_LEFT = mirrored(PHONE);
+const SMALL_LEFT = mirrored(SMALL);
+
+/**
+ * Ordinateur, deux colonnes : la colonne du Profil de 40 à 570 px, « Vos activités » à côté, fermée et montée au-dessus
+ * de la zone ; la photo ronde et son bouton de période jusqu'à 104 px. L'angle naît en haut à gauche, sous eux.
+ */
+const DESKTOP_COLUMN = box(40, -34, 530, 1080);
+const DESKTOP_ACTIVITIES = box(610, 24, 530, 1000);
+const DESKTOP_LEFT: SchoolLayout = {
+  zone: { w: 1180, h: 1100 },
+  corner: schoolCorner(1180, DESKTOP_COLUMN, DESKTOP_ACTIVITIES, 104, { inset: { x: 4, y: 6 }, marginPx: 8 }),
+  rigid: [box(32, 0, 64, 104), box(136, 38, 200, 52)],
+  frames: [
+    { box: box(40, 128, 530, 220), corner: 'hd', trait: 12 },
+    { box: box(40, 372, 530, 380), corner: 'bd', trait: 12 },
+    { box: box(40, 776, 530, 300), corner: 'bg', trait: 12 },
+    { box: { ...DESKTOP_ACTIVITIES, y: -100 }, corner: null, trait: 6 },
+  ],
+  texts: [],
+};
+DESKTOP_LEFT.texts = DESKTOP_LEFT.frames.slice(0, 3).flatMap((f) => textsOf(f.box));
 
 /** Rectangle orienté d'un poisson, de demi-côtés `hl` et `hw` en part de sa longueur, contre un rectangle droit (axes séparateurs). */
 const fishTouchesBox = (f: SchoolFish, b: Box, hl: number, hw: number): boolean => {
@@ -185,8 +220,8 @@ describe('ouverture d’un cadre peint', () => {
 });
 
 describe('schoolPlaces', () => {
-  it('une session de plus ajoute ses poissons sans bouger les autres (390, 320 et 1 180 px)', () => {
-    for (const layout of [PHONE, NARROW, DESKTOP]) {
+  it('une session de plus ajoute ses poissons sans bouger les autres (390, 320 et 1 180 px, angle à droite ou à gauche)', () => {
+    for (const layout of [PHONE, NARROW, DESKTOP, PHONE_LEFT, DESKTOP_LEFT]) {
       for (const sessions of [1, 15, 30, 50]) {
         const before = schoolPlaces(layout, fishCount(sessions));
         const after = schoolPlaces(layout, fishCount(sessions + 1));
@@ -203,18 +238,37 @@ describe('schoolPlaces', () => {
     expect(planner.places(90)).toEqual(schoolPlaces(PHONE, 90));
   });
 
-  it('les premiers poissons partent de l’angle et en sortent', () => {
-    const fish = schoolPlaces(PHONE, 6);
-    for (const f of fish) {
-      expect(Math.hypot(f.x - PHONE.corner.x, f.y - PHONE.corner.y)).toBeLessThan(70);
-      // Le cap s'écarte de l'angle : vers la gauche ou le bas.
-      const a = (f.angle * Math.PI) / 180;
-      expect(Math.cos(a) * (f.x - PHONE.corner.x) + Math.sin(a) * (f.y - PHONE.corner.y)).toBeGreaterThan(0);
+  it('les premiers poissons partent de l’angle et en sortent, à droite comme à gauche', () => {
+    for (const layout of [PHONE, PHONE_LEFT, DESKTOP_LEFT]) {
+      const fish = schoolPlaces(layout, 6);
+      expect(fish).toHaveLength(6);
+      for (const f of fish) {
+        expect(Math.hypot(f.x - layout.corner.x, f.y - layout.corner.y)).toBeLessThan(70);
+        // Le cap s'écarte de l'angle : vers l'intérieur de la page ou le bas.
+        const a = (f.angle * Math.PI) / 180;
+        expect(Math.cos(a) * (f.x - layout.corner.x) + Math.sin(a) * (f.y - layout.corner.y)).toBeGreaterThan(0);
+      }
     }
   });
 
+  it('angle à gauche : le banc pousse vers la droite, têtes comprises, comme son miroir pousse vers la gauche', () => {
+    const right = schoolPlaces(PHONE, 90);
+    const left = schoolPlaces(PHONE_LEFT, 90);
+    const meanX = (fish: SchoolFish[]) => fish.reduce((s, f) => s + f.x, 0) / fish.length;
+    const meanUx = (fish: SchoolFish[]) => fish.reduce((s, f) => s + Math.cos((f.angle * Math.PI) / 180), 0) / fish.length;
+    expect(meanX(right)).toBeGreaterThan(PHONE.zone.w / 2);
+    expect(meanX(left)).toBeLessThan(PHONE.zone.w / 2);
+    expect(meanUx(right)).toBeLessThan(0);
+    expect(meanUx(left)).toBeGreaterThan(0);
+    // Ordinateur : le banc reste dans la colonne du Profil et sa marge, jamais dans « Vos activités ».
+    const desk = schoolPlaces(DESKTOP_LEFT, 120);
+    expect(desk).toHaveLength(120);
+    expect(desk.every((f) => f.x < DESKTOP_ACTIVITIES.x)).toBe(true);
+    expect(meanUx(desk)).toBeGreaterThan(0);
+  });
+
   it('aucun poisson sur un texte, un obstacle ou un autre poisson, ni hors de la zone', () => {
-    for (const layout of [PHONE, NARROW, SMALL]) {
+    for (const layout of [PHONE, NARROW, SMALL, PHONE_LEFT, DESKTOP_LEFT]) {
       const fish = schoolPlaces(layout, 400);
       for (const f of fish) {
         for (const t of [...layout.texts, ...layout.rigid]) expect(fishTouchesBox(f, t, 0.55, 0.3)).toBe(false);
@@ -234,7 +288,7 @@ describe('schoolPlaces', () => {
     }
   });
 
-  it('les cadres ne s’ouvrent qu’une fois les marges pleines, par leur ouverture', () => {
+  it.each([['droite', SMALL], ['gauche', SMALL_LEFT]])('les cadres ne s’ouvrent qu’une fois les marges pleines, par leur ouverture (angle à %s)', (_side, SMALL) => {
     const fish = schoolPlaces(SMALL, 500);
     const first = fish.findIndex((f) => f.phase === 2);
     expect(first).toBeGreaterThan(0);
@@ -260,6 +314,31 @@ describe('schoolPlaces', () => {
     const fish = schoolPlaces(mixed, 600);
     expect(fish.some((f) => inside(mixed.frames[0].box, f.x, f.y))).toBe(false);
     expect(fish.some((f) => inside(mixed.frames[1].box, f.x, f.y))).toBe(true);
+  });
+});
+
+describe('schoolCorner', () => {
+  const rules = { inset: { x: 4, y: 6 }, marginPx: 8 };
+  it('téléphone, ou « Vos activités » sous le Profil : en haut à droite de la zone', () => {
+    expect(schoolCorner(390, box(0, -34, 390, 1500), null, 104, rules)).toEqual({ x: 386, y: 6 });
+    expect(schoolCorner(900, box(70, -34, 760, 1200), box(70, 1200, 760, 400), 104, rules)).toEqual({ x: 896, y: 6 });
+  });
+
+  it('ordinateur, « Vos activités » à côté : en haut à gauche de la colonne, sous la photo ronde et son bouton', () => {
+    expect(DESKTOP_LEFT.corner).toEqual({ x: 36, y: 110 });
+    expect(schoolCorner(1180, box(4, -34, 560, 1080), DESKTOP_ACTIVITIES, 96, rules)).toEqual({ x: 4, y: 102 });
+  });
+});
+
+describe('eau, angle à gauche', () => {
+  it('l’eau part de l’angle de gauche et longe le banc', () => {
+    for (const layout of [PHONE_LEFT, DESKTOP_LEFT]) {
+      const water = waterOutline(layout, schoolPlaces(layout, 60));
+      expect(water.edge).not.toBe('');
+      const xs = [...water.edge.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0])).filter((_, i) => i % 2 === 0);
+      expect(Math.min(...xs)).toBeLessThan(layout.corner.x + 10);
+      expect(Math.max(...xs)).toBeLessThan(layout.zone.w * 0.75);
+    }
   });
 });
 
