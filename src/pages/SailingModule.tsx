@@ -228,7 +228,7 @@ function SailingModule() {
   const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(track, profile.heartRate, effectiveHrOffset(activity));
   // Onglets de l'activité, rangée « avancé », point survolé effacé à chaque session ; une seule surbrillance
   // sur la carte, effacée quand son onglet se ferme (`useMapHighlight`).
-  const { open, toggle, toggleOf, reveal, closeAll, advanced, shown, highlight } = useAnalysisTabs({
+  const { open, toggle, toggleOf, reveal, closeAll, openAll, advanced, shown, highlight } = useAnalysisTabs({
     tabs: SAILING_TABS, defaults: SAILING_PANEL_DEFAULTS, activity, sessionKey,
   });
   /** L'activité a une liste de matériel : de quoi proposer le rappel qui suit un enregistrement (`GearReminder`). */
@@ -626,7 +626,7 @@ function SailingModule() {
       }}
       // Onglets sous la carte, et leurs panneaux deux par ligne sur ordinateur (`docs/MISE_EN_PAGE.md`).
       tabs={stats ? {
-        sections: sailingPanels, open, onToggle: toggle, onCloseAll: closeAll, advanced, activityColor: activity.color, panels: (
+        sections: sailingPanels, open, onToggle: toggle, onCloseAll: closeAll, onOpenAll: openAll, advanced, activityColor: activity.color, panels: (
           <>
             {open.general && (
               <ResizablePanel id="sailing.general" style={PANEL_BLOCK_STYLE}>

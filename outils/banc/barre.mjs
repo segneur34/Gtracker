@@ -65,8 +65,8 @@ const bar = () => evaluate(`(() => {
     reveal: Boolean(col?.querySelector('.an-tabs-reveal')),
     revealHeight: col?.querySelector('.an-tabs-reveal')?.getBoundingClientRect().height ?? 0,
     panels: document.querySelectorAll('.an-carte-panels > *').length,
-    // La flèche est en fin de rangée, suivie seulement du bouton « tout fermer » (05/11).
-    arrowLast: (() => { const a = col?.querySelector('.an-tabs-hide'); return Boolean(a) && a.nextElementSibling?.classList.contains('an-tabs-close-all') && a.nextElementSibling.nextElementSibling === null; })(),
+    // La flèche est en fin de rangée, suivie seulement du bouton « tout ouvrir » ou « tout fermer » (05/11).
+    arrowLast: (() => { const a = col?.querySelector('.an-tabs-hide'); return Boolean(a) && (a.nextElementSibling?.classList.contains('an-tabs-close-all') || a.nextElementSibling?.classList.contains('an-tabs-open-all')) && a.nextElementSibling.nextElementSibling === null; })(),
   };
 })()`);
 const click = (selector) => evaluate(`(() => { const b = document.querySelector(${JSON.stringify(selector)}); if (!b) return 'absent'; b.click(); return 'ok'; })()`);

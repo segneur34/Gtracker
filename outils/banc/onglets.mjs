@@ -214,6 +214,14 @@ await settle({ max: 1000 });
 check('« tout fermer » : plus aucun onglet ouvert', (await pressedTabs()) === '', await pressedTabs());
 check('« tout fermer » : aucun panneau', (await evaluate(`document.querySelectorAll('.an-carte-panels > *').length`)) === 0);
 check(`« tout fermer » : « avancé » inchangé (${advancedBefore})`, (await advancedState()) === advancedBefore);
+// « tout ouvrir » : sans onglet ouvert, le bouton le propose ; il ouvre tous les onglets montrés, déplie « avancé », puis redevient « tout fermer ».
+const bulkLabel = () => evaluate(`document.querySelector('.an-tabs-open-all, .an-tabs-close-all')?.textContent.trim() ?? '(absent)'`);
+check('« tout ouvrir » proposé quand rien n\'est ouvert', (await bulkLabel()) === 'tout ouvrir', await bulkLabel());
+console.log('tout ouvrir :', await evaluate(`(() => { const b = document.querySelector('.an-tabs-open-all'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
+await settle({ max: 1000 });
+check('« tout ouvrir » : « avancé » déplié', (await advancedState()) === 'true', await advancedState());
+check('« tout ouvrir » : tous les onglets montrés ouverts', (await evaluate(`(() => { const b = [...document.querySelectorAll('.an-tabs [aria-pressed]')]; return b.length > 0 && b.every((x) => x.getAttribute('aria-pressed') === 'true'); })()`)) === true, await pressedTabs());
+check('« tout ouvrir » : le bouton redit « tout fermer »', (await bulkLabel()) === 'tout fermer', await bulkLabel());
 // Réouverture de la même session sans le banc qui rejoue les onglets : « général » seul, « avancé » fermé (05/11).
 await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: ongletsId });
 await go(paths.wingfoil, 6000);

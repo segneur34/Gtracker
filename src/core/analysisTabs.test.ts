@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SAILING_TABS, SURF_TABS, activityTabs, analysisTabs, closeAllTabs, generalOpenAfterAdvanced, initialTabsState, isTabShown, maskAdvancedTabs, maskHiddenTabs, revealTab, sanitizeTabChoices, shownTabs, tabDefaults, tabsStateFor, toggleTabChoice,
+  SAILING_TABS, SURF_TABS, activityTabs, analysisTabs, closeAllTabs, generalOpenAfterAdvanced, initialTabsState, isTabShown, maskAdvancedTabs, openAllTabs, tabsBulkAction, maskHiddenTabs, revealTab, sanitizeTabChoices, shownTabs, tabDefaults, tabsStateFor, toggleTabChoice,
   type TabChoices,
 } from './analysisTabs';
 import { SPORT_PROFILES } from './sportProfiles';
@@ -306,6 +306,32 @@ describe('closeAllTabs : « tout fermer »', () => {
     const closed = closeAllTabs(open);
     expect(Object.keys(closed)).toEqual(Object.keys(open));
     expect(Object.values(closed).every((v) => v === false)).toBe(true);
+  });
+});
+
+describe('« tout ouvrir » et « tout fermer » : le bouton et l\'ouverture', () => {
+  const keys = SAILING_TABS.map((tab) => tab.key);
+  it('propose « tout ouvrir » sous deux onglets ouverts, « tout fermer » à partir de deux', () => {
+    const closed = closeAllTabs(tabDefaults(SAILING_TABS));
+    expect(tabsBulkAction(closed, keys)).toBe('openAll');
+    expect(tabsBulkAction({ ...closed, general: true }, keys)).toBe('openAll');
+    expect(tabsBulkAction({ ...closed, general: true, tops: true }, keys)).toBe('closeAll');
+  });
+  it('ne compte que les onglets montrés', () => {
+    const open = { ...closeAllTabs(tabDefaults(SAILING_TABS)), general: true, tops: true };
+    expect(tabsBulkAction(open, ['general', 'manoeuvres'])).toBe('openAll');
+  });
+  it('ouvre les onglets montrés, déplie « avancé », laisse fermés ceux qui ne sont pas montrés', () => {
+    const state = initialTabsState(tabDefaults(SAILING_TABS), 'a|1');
+    const shownKeys = keys.filter((key) => key !== 'cardio');
+    const next = openAllTabs(state, SAILING_TABS, shownKeys);
+    expect(next.advanced).toBe(true);
+    expect(next.open.cardio).toBe(false);
+    expect(shownKeys.every((key) => next.open[key])).toBe(true);
+  });
+  it('ne déplie pas « avancé » quand aucun onglet montré n\'en fait partie', () => {
+    const state = initialTabsState(tabDefaults(SAILING_TABS), 'a|1');
+    expect(openAllTabs(state, SAILING_TABS, ['general']).advanced).toBe(false);
   });
 });
 

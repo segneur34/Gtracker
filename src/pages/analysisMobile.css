@@ -140,7 +140,22 @@
   cursor: pointer;
 }
 
-.an-tabs-close-all::first-letter {
+/* « tout ouvrir », au même endroit : aplat vert vif sous du texte noir, comme « Enregistrer ». */
+.an-tabs-open-all {
+  display: inline-block;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--record);
+  border-radius: var(--radius-pill);
+  background: var(--record);
+  color: var(--on-record);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.an-tabs-close-all::first-letter,
+.an-tabs-open-all::first-letter {
   text-transform: uppercase;
 }
 

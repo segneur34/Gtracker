@@ -235,6 +235,29 @@ export const revealTab = <K extends string>(state: AnalysisTabsState<K>, tabs: r
   return { ...state, advanced: inAdvanced ? true : state.advanced, open };
 };
 
+/** Nombre d'onglets ouverts, parmi les clés montrées, à partir duquel la barre propose « tout fermer » plutôt que « tout ouvrir ». */
+export const CLOSE_ALL_MIN_OPEN = 2;
+
+/** Bouton de la barre : « tout fermer » à partir de deux onglets ouverts parmi ceux montrés, « tout ouvrir » sinon. */
+export const tabsBulkAction = <K extends string>(open: Record<K, boolean>, shownKeys: readonly K[]): 'openAll' | 'closeAll' =>
+  shownKeys.filter((key) => open[key]).length >= CLOSE_ALL_MIN_OPEN ? 'closeAll' : 'openAll';
+
+/**
+ * « tout ouvrir » : chaque onglet montré s'ouvre, « général » compris, et la rangée « avancé » se déplie si
+ * un onglet montré en fait partie. Les onglets absents de `shownKeys` gardent leur état. Rend l'état reçu
+ * tel quel quand rien ne change.
+ */
+export const openAllTabs = <K extends string>(
+  state: AnalysisTabsState<K>,
+  tabs: readonly AnalysisTab<K>[],
+  shownKeys: readonly K[]
+): AnalysisTabsState<K> => {
+  const open = { ...state.open };
+  for (const key of shownKeys) open[key] = true;
+  const hasAdvanced = tabs.some((tab) => tab.primary !== true && shownKeys.includes(tab.key));
+  return { ...state, advanced: state.advanced || hasAdvanced, open };
+};
+
 /** « tout fermer » : chaque onglet fermé, « général » compris ; « avancé » ne change pas. */
 export const closeAllTabs = <K extends string>(open: Record<K, boolean>): Record<K, boolean> =>
   Object.fromEntries(Object.keys(open).map((key) => [key, false])) as Record<K, boolean>;

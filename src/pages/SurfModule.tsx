@@ -217,7 +217,7 @@ function SurfModule() {
   const mapSegments: TrackSegment[] = useKeptSegments(surfShown.segments, base.track, surfShown.colorKey);
 
   // Onglets de l'activité, rangée « avancé », surbrillance unique de la carte, point survolé effacé à chaque session.
-  const { open, toggle, toggleOf, reveal, closeAll, advanced, shown, highlight } = useAnalysisTabs({
+  const { open, toggle, toggleOf, reveal, closeAll, openAll, advanced, shown, highlight } = useAnalysisTabs({
     tabs: SURF_TABS, defaults: SURF_SECTION_DEFAULTS, activity, sessionKey: base.sessionKey,
   });
   /** L'activité a une liste de matériel : de quoi proposer le rappel qui suit un enregistrement (`GearReminder`). */
@@ -590,7 +590,7 @@ function SurfModule() {
         legend: track.length === 0 ? null : <SpeedGradientLegend unit={speedUnit} range={range} slowLabel={t('rame et attente')} />,
       }}
       tabs={summary && analysis && surfProfile ? {
-        sections, open, onToggle: toggle, onCloseAll: closeAll, advanced, accent: ACCENT, activityColor: activity.color, panels: (
+        sections, open, onToggle: toggle, onCloseAll: closeAll, onOpenAll: openAll, advanced, accent: ACCENT, activityColor: activity.color, panels: (
           <>
             {open.general && (
               <ResizablePanel id={panelId('general')} style={ANALYSIS_PANEL_STYLE}>
