@@ -502,3 +502,6 @@ Ce fichier est le §10 de `docs/ETAT_DU_PROJET.md`. C'est le journal de Gtracker
 438. Ordinateur : une petite icône à gauche de chaque nom de la barre du haut (lot 464 ; validé le 19/11, essai 314 « j'aime beaucoup »).
     - **Décision** : l'icône est celle du lien dans la barre du bas du téléphone, en 18 px, à la couleur du lien, décorative ; « Enregistrer » et la barre du bas ne changent pas.
     - **Pourquoi** : demande de l'utilisateur (engrenage pour Réglages, barres pour Statistiques). Limite : la barre gagne environ 130 px ; sa tenue sur une ligne à 1000 px dans les trois langues repose sur l'œil, non mesurée.
+439. Planifier : la carte moins haute sur téléphone droit (lot 459 ; validé le 19/11, essai 312 « oui c'est bon pour la carte »).
+    - **Décision** : la carte prend 45 % de la hauteur de l'écran au lieu de 58 %, pour laisser sous elle une bande de page que le pouce saisit ; ordinateur et téléphone tourné inchangés.
+    - **Pourquoi** : la carte était « trop longue », il fallait aller attraper le haut de l'image ou les côtés pour descendre. Piège : sur écran étroit, une hauteur déjà réglée à la poignée n'est pas appliquée, donc la nouvelle valeur se voit sans rien faire.
