@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import MemoryStatus from '../components/MemoryStatus';
 import ActivityFilterTabs from '../components/ActivityFilterTabs';
 import RouteList from '../components/RouteList';
+import { shareRouteGpx } from '../components/routeShare';
 import { IconFile, IconRoute, IconShare } from '../components/icons';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -17,7 +18,6 @@ import { ROUTE_SORTS, isRouteSort, routeActivity, routeDistanceM, shownRoutes, s
 import { plainError } from '../platform/errorText';
 import { readPickedFile } from '../platform/files';
 import { isNativeApp } from '../platform/runtime';
-import { shareFile } from '../platform/share';
 import { jsonStore } from '../platform/storage';
 import { STORAGE_KEYS } from '../core/appIdentity';
 
@@ -28,7 +28,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * ouvre l'itinéraire, ou part dessus (« Partir »). Ceux d'une activité
  * cachée dans Réglages n'y sont pas.
  *
- * Lot 194 : « Partager » envoie le GPX d'un itinéraire, sa fiche en extension,
+ * Lot 194 : « Partager le GPX » envoie le GPX d'un itinéraire, sa fiche en extension,
  * vers une autre application ; « Importer un itinéraire » range celui d'un GPX
  * choisi dans les fichiers, souligné dans la liste.
  */
@@ -43,7 +43,7 @@ const readSort = (): RouteSort => {
 };
 
 function RoutesPage() {
-  const { routes: allRoutes, loaded, error, canSave, importGpx, shareFileOf, remove } = useRouteLibrary();
+  const { routes: allRoutes, loaded, error, canSave, importGpx, remove } = useRouteLibrary();
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
   const [imported, setImported] = useState<string | null>(null);
@@ -84,13 +84,7 @@ function RoutesPage() {
 
   const share = async (saved: SavedRoute) => {
     setNote(null);
-    try {
-      const { fileName, text } = await shareFileOf(saved);
-      const outcome = await shareFile(new Blob([text], { type: 'application/gpx+xml' }), fileName, t("Partager l'itinéraire"));
-      if (outcome === 'downloaded') setNote({ text: t('Ce navigateur ne partage pas de fichier : le GPX est téléchargé.'), error: false });
-    } catch (err) {
-      setNote({ text: t('Partage impossible : {reason}', { reason: plainError(err, t('erreur inconnue')) }), error: true });
-    }
+    setNote(await shareRouteGpx(saved));
   };
 
   /** Supprime l'itinéraire confirmé ; un échec est dit. */
@@ -159,7 +153,7 @@ function RoutesPage() {
             ) : (
               <MoreMenu label={t("Plus d'actions sur l'itinéraire")}>
                 <Button size="s" variant="ghost" onClick={() => void share(saved)} aria-label={t('Partager {name}', { name: saved.record.name })}>
-                  <IconShare size={18} /> {t('Partager')}
+                  <IconShare size={18} /> {t('Partager le GPX')}
                 </Button>
                 <Button size="s" variant="ghost" onClick={() => setConfirmingDelete(saved.base)} aria-label={t('Supprimer {name}', { name: saved.record.name })}>
                   {t('Supprimer')}

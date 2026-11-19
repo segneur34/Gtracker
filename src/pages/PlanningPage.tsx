@@ -20,9 +20,12 @@ import PanelTitle from '../components/PanelTitle';
 import ResizablePanel from '../components/ResizablePanel';
 import RouteList from '../components/RouteList';
 import SectionTabs, { type SectionDefinition } from '../components/SectionTabs';
-import { IconChevronRight, IconFile, IconPencil, IconPencilOff, IconUndo } from '../components/icons';
+import { IconChevronRight, IconDownload, IconFile, IconPencil, IconPencilOff, IconShare, IconTrash, IconUndo } from '../components/icons';
+import { shareRouteGpx } from '../components/routeShare';
 import { CARD_STYLE } from '../components/styles';
 import Button from '../components/ui/Button';
+import HoldButton from '../components/ui/HoldButton';
+import MoreMenu from '../components/ui/MoreMenu';
 import PageHeader from '../components/ui/PageHeader';
 import { activityDisplayName, activityFamily, findActivity, type Activity } from '../core/activities';
 import { DEFAULT_MAP_CENTER, trackBounds } from '../core/displayConfig';
@@ -85,6 +88,13 @@ import { tRich } from '../components/tRich';
  * vue de la carte. Un ancien `mode` ou `loop` (planificateur routier, retiré) y reste, ignoré.
  */
 const PREFS_KEY = STORAGE_KEYS.planning;
+
+/** Champ du nom de l'itinéraire, que son intitulé désigne : le menu « … » est posé à côté, hors de l'intitulé. */
+const NAME_FIELD_ID = 'plan-nom';
+
+/** Durée de l'appui sur « Supprimer » du menu de l'itinéraire : une seconde, comme « Jeter » d'une session. */
+const ROUTE_DELETE_HOLD_MS = 1000;
+const routeDeleteHoldMs = (): number => ROUTE_DELETE_HOLD_MS;
 
 interface PlanningPrefs {
   activityId?: string;
@@ -263,6 +273,11 @@ function PlanningPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  /**
+   * Itinéraire (`base`) dont « Supprimer » a été tenu dans le menu « … » : la confirmation n'y remplace l'entrée que pour
+   * lui, et tombe à la fermeture du menu ou dès qu'un autre itinéraire, ou aucun, est ouvert.
+   */
+  const [confirmingMenuDelete, setConfirmingMenuDelete] = useState<string | null>(null);
   /** Échec du chargement d'un GPX, montré dans le bloc Tracé. */
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -463,6 +478,7 @@ function PlanningPage() {
     setCourseGuide(routeMarkGuide(saved.record));
     setLocked(true);
     setCurrent(saved);
+    setConfirmingMenuDelete(null);
     setSavedRoute(opened);
     setName(saved.record.name);
     if (known) setActivityId(known.id);
@@ -476,6 +492,7 @@ function PlanningPage() {
     planner.replace(EMPTY_ROUTE);
     setLocked(false);
     setCurrent(null);
+    setConfirmingMenuDelete(null);
     setSavedRoute(EMPTY_ROUTE);
     setName('');
     setCourseGuide(null);
@@ -507,6 +524,7 @@ function PlanningPage() {
       planner.replace(loaded);
       setLocked(false);
       setCurrent(null);
+      setConfirmingMenuDelete(null);
       setSavedRoute(EMPTY_ROUTE);
       setCourseGuide(null);
       setName(parsed.name ?? file.name.replace(/\.gpx$/i, ''));
@@ -524,6 +542,7 @@ function PlanningPage() {
   /** Supprime un itinéraire enregistré ; celui qui est ouvert laisse la place à une carte vide. */
   const deleteSaved = async (saved: SavedRoute) => {
     setConfirmingDelete(null);
+    setConfirmingMenuDelete(null);
     try {
       await library.remove(saved);
       if (current?.base === saved.base) {
@@ -544,6 +563,18 @@ function PlanningPage() {
   const exportGpx = () => {
     const fileName = `${current?.base ?? safeFileName(name.trim() || defaultName())}.gpx`;
     downloadTextFile(fileName, buildRouteGpx(route, name.trim() || defaultName(), label));
+  };
+
+  /**
+   * Menu « … » du nom : il se montre sur un itinéraire rangé, ou sur ordinateur dès qu'un tracé peut s'exporter.
+   * Le partage porte le GPX rangé : un itinéraire modifié ou jamais rangé doit d'abord être enregistré, comme pour « Partir ».
+   */
+  const showMenu = current !== null || (canDownloadFiles() && route.waypoints.length >= 2);
+  const shareBlocked = current === null || dirty;
+  const shareCurrent = async () => {
+    if (!current) return;
+    setMessage(null);
+    setMessage((await shareRouteGpx(current))?.text ?? null);
   };
 
   // Itinéraire demandé par l'adresse : ouvert une fois la liste lue et la carte prête, puis l'adresse est
@@ -838,10 +869,37 @@ function PlanningPage() {
               {t('Le GPX est enregistré avec l\'itinéraire, dans le dossier Gtracker/{dir}, pour l\'emporter dans une autre application.', { dir: ROUTES_DIR })}
             </HelpText>
             <div className="plan-form">
-              <label className="plan-form__field">
-                <span className="ui-eyebrow">{t('Nom')}</span>
-                <input className="ui-field" value={name} placeholder={defaultName()} onChange={(e) => setName(e.target.value)} />
-              </label>
+              <div className="plan-form__field">
+                <label className="ui-eyebrow" htmlFor={NAME_FIELD_ID}>{t('Nom')}</label>
+                <span className="plan-form__name">
+                  <input id={NAME_FIELD_ID} className="ui-field" value={name} placeholder={defaultName()} onChange={(e) => setName(e.target.value)} />
+                  {showMenu && (
+                    <MoreMenu label={t("Plus d'actions sur l'itinéraire")} onClose={() => setConfirmingMenuDelete(null)}>
+                      <Button onClick={() => void shareCurrent()} disabled={shareBlocked}>
+                        <IconShare size={18} />
+                        {t('Partager le GPX')}
+                      </Button>
+                      {shareBlocked && <span className="ui-more__note">{t("Enregistrez d'abord les modifications")}</span>}
+                      {canDownloadFiles() && (
+                        <Button onClick={exportGpx} disabled={route.waypoints.length < 2}>
+                          <IconDownload size={18} />
+                          {t('Exporter le GPX')}
+                        </Button>
+                      )}
+                      {current !== null && (confirmingMenuDelete === current.base ? (
+                        <>
+                          <Button variant="danger" onClick={() => void deleteSaved(current)}>{t('Supprimer définitivement')}</Button>
+                          <Button variant="ghost" onClick={() => setConfirmingMenuDelete(null)}>{t('Garder')}</Button>
+                        </>
+                      ) : (
+                        <HoldButton onHold={() => setConfirmingMenuDelete(current.base)} getHoldMs={routeDeleteHoldMs} label={t('Supprimer')}
+                          lead={<IconTrash size={18} />} dialTitle={t('Supprimer')} icon={<IconTrash size={48} />} action="supprimer" keepMenuOpen
+                          ariaLabel={t("Supprimer l'itinéraire : maintenir une seconde")} />
+                      ))}
+                    </MoreMenu>
+                  )}
+                </span>
+              </div>
             </div>
             {!library.canSave && (
               <div className="ui-alert ui-alert--warning">{t('Aucun dossier mémoire : choisissez-le dans Réglages pour enregistrer vos itinéraires.')}</div>
@@ -859,18 +917,7 @@ function PlanningPage() {
                   {t('Partir')}
                 </Button>
               )}
-              {canDownloadFiles() && (
-                <Button onClick={exportGpx} disabled={route.waypoints.length < 2}>{t('Exporter le GPX')}</Button>
-              )}
               {(current !== null || route.waypoints.length > 0) && <Button variant="ghost" onClick={startNew}>{t('Nouvel itinéraire')}</Button>}
-              {current !== null && (confirmingDelete === current.base ? (
-                <>
-                  <Button variant="danger" onClick={() => void deleteSaved(current)}>{t('Supprimer définitivement')}</Button>
-                  <Button variant="ghost" onClick={() => setConfirmingDelete(null)}>{t('Garder')}</Button>
-                </>
-              ) : (
-                <Button variant="danger" onClick={() => setConfirmingDelete(current.base)}>{t('Supprimer l\'itinéraire')}</Button>
-              ))}
             </div>
             {message && <p className="plan-note">{message}</p>}
           </PlanBlock>

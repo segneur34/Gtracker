@@ -10,13 +10,15 @@ import { dateLocale, t } from '../../core/i18n';
 const STOP_ICON = <span className="ui-record-dot ui-record-dot--stop" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />;
 
 /** Gestes que le bouton rappelle ; l'identifiant n'est pas affiché, la phrase vient de `holdHint`. */
-export type HoldAction = 'arrêter' | 'jeter' | "revenir aux réglages d'usine" | 'tout supprimer';
+export type HoldAction = 'arrêter' | 'jeter' | 'supprimer' | "revenir aux réglages d'usine" | 'tout supprimer';
 
 /** Rappel du geste, en phrase entière par geste (jamais un verbe collé à une phrase). */
 const holdHint = (action: HoldAction, holdS: string): string => {
   switch (action) {
     case 'jeter':
       return t('Maintenir {holdS} s pour jeter', { holdS });
+    case 'supprimer':
+      return t('Maintenir {holdS} s pour supprimer', { holdS });
     case "revenir aux réglages d'usine":
       return t("Maintenir {holdS} s pour revenir aux réglages d'usine", { holdS });
     case 'tout supprimer':

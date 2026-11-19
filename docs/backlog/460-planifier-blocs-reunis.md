@@ -44,3 +44,40 @@ Sous-question des variantes A et C : « Charger un GPX » et « Tout effacer » 
 ## Essai au téléphone
 
 Planifier, téléphone droit : poser cinq balises, les réordonner, en retirer une ; dire si le bloc réuni convient.
+
+## Plan (agent Plan, 19/11, relu par l'orchestrateur)
+
+Deux parties, deux agents, deux commits : A, la page ; B, les scripts du banc (Sonnet).
+
+### Partie A : la page
+
+Fichiers : `src/pages/PlanningPage.tsx`, `src/pages/PlanningPage.css`, `src/locales/en.json`, `src/locales/es.json`, `src/tutorials/lessons.ts` (une phrase), `outils/styles-en-ligne.json` (à figer).
+
+Identifiants et état retenu :
+- le bloc réuni garde la clé `trace`, l'id `planning.trace` et l'aide `plan:trace` ; « balises sonores » garde la clé `parcours`, l'id `planning.parcours` et l'aide `plan:parcours` ;
+- la clé `points` sort de `PlanningSection` et des défauts ; son état retenu reste inerte dans la mémoire, sans migration ; la taille `planning.points` devient orpheline, sans effet ;
+- défauts : `trace: true`, `parcours: true`.
+
+Pièces à réutiliser : `PlanBlock`, `SectionTabs`, `HelpText`, `useHelp('plan:trace')`, `courseLegs` (la ligne `i` montre `legs[i-1]`, distance et `roundBearingDeg`, « — » pour le départ), `routeTotals`, `formatDistance`, `pointLabel`, `pointName`, `pointFill`, `selectPoint`, `planner.reorder` / `remove` / `undo` / `reverse` / `closeLoop` / `clear`, `tn(n, '{n} balise', '{n} balises')`, icônes `IconUndo`, `IconFile`, `IconChevronUp`, `IconChevronDown`, `IconClose` (les chevrons remplacent `IconChevronRight` tourné en style en ligne), `Button size="s"`, classes `plan-actions` et `plan-note`, `BeepCurveEditor`.
+
+Étapes :
+1. `PlanningSection = 'trace' | 'ranger' | 'liste' | 'parcours'` ; `sections` dans l'ordre tracé et balises ({n}), enregistrer, mes itinéraires ({n}), balises sonores ; `n` reste `route.waypoints.length` ; la pastille « balises sonores » n'est montrée que si le bloc a un contenu (`guide && activity`).
+2. Bloc réuni, titre « Tracé et balises ({n}) », aide `plan:trace` : la liste d'aide actuelle, où la phrase sur l'ordre des balises devient « touchez une balise de la liste pour la monter, la descendre ou la retirer » ; la bande de chiffres (distance, nombre de balises sans le retour d'une boucle, « bord max ») ; la rangée d'actions (Précédent en icône seule avec son aria-label existant et le même texte en `title`, Inverser, Boucler, « Charger un GPX » icône et texte, « Tout effacer » en texte) ; la liste `ol.plan-points`, une ligne par balise (pastille, nom, bord et cap à droite) ; la ligne touchée se déplie (Monter, Descendre, Retirer avec aria-label « Retirer : {name} »), la retoucher la replie ; après Monter ou Descendre, la sélection suit la balise déplacée ; liste vide : la note existante.
+3. Bloc « Balises sonores », dernier, rendu seulement si `guide && activity` : l'aide `plan:parcours` et les bips, rien d'autre. Les anciens blocs « Tracé » et « Balises (n) » disparaissent.
+4. Le bloc `planning.ranger` n'est pas touché.
+5. CSS par les variables de `tokens.css` ; règles mortes retirées (`.plan-stats`, `.plan-stat`, `.plan-course`, l'ancien `.plan-point__text`) ; seul style en ligne restant : le fond de la pastille.
+6. Textes, trois langues : clés neuves pour les titres, « bord max », « Monter », « Descendre », « Retirer : {name} » si absentes, la ligne d'aide ; clés orphelines retirées après recherche dans tout `src/` ; la leçon dit « Tracé et balises » au lieu de « Le parcours ».
+7. `node outils/styles-en-ligne.mjs --figer`, `node outils/i18n.mjs`, `node outils/verif.mjs --rapide`.
+
+Le verrou de la carte ne change pas (DECISIONS §7) : liste, « Précédent » et actions restent actives carte verrouillée. Aucun test unitaire neuf : pas de calcul neuf ; la preuve vient du banc.
+
+### Partie B : les scripts du banc
+
+- `outils/banc/planning.mjs` : titre du bloc `/^Tracé et balises \(\d+\)$/`, chiffres lus dans la nouvelle bande, bords reconstruits depuis les lignes de balises, objet `sections` sans `points`.
+- `outils/banc/balises.mjs` : bloc « Tracé et balises (4) », chiffres, bords et liste aux nouvelles classes, `sections` sans `points`.
+- `outils/banc/reglages-aide.mjs` : « Aide : Parcours » devient « Aide : Balises sonores ».
+- `outils/banc/planification-verrou.mjs`, `outils/banc/activite.mjs` : `points` retiré de `sections`.
+- `outils/banc/SCRIPTS.md` : la ligne de `balises.mjs`.
+- `langues.mjs`, `tailles.mjs`, `satellite.mjs` : rien à changer, leurs relevés de la page changent, ce qui est attendu.
+
+Vérification : `planning`, `balises`, `planification-verrou`, `activite`, `reglages-aide`, puis `tailles` à 390 px (colonne de 1 484 px aujourd'hui, gain attendu d'environ 550 px).
