@@ -73,6 +73,8 @@ interface JumpsPanelProps {
   onTogglePodium: () => void;
   /** Point de trace le plus proche d'un instant : relie la courbe à la carte. */
   trackIndexAt: (ms: number) => number;
+  /** Ancre du panneau, où défile la page quand une tuile de « général » l'ouvre (`tabAnchorId`). */
+  anchorId?: string;
 }
 
 /** Couleur des boutons choisis : celle de la voile. */
@@ -147,7 +149,7 @@ function JumpCurveChart({ first, second, numbers, trackIndexAt }: {
 
 function JumpsPanel({
   status, error, jumps, hiddenCount, minHeightM, thresholdLabel, speedUnit, distanceUnit, open, onToggle,
-  shownJump, onShowJump, podiumShown, onTogglePodium, trackIndexAt,
+  shownJump, onShowJump, podiumShown, onTogglePodium, trackIndexAt, anchorId,
 }: JumpsPanelProps) {
   /** Ancre de la courbe, pour « Détail ». */
   const curveAnchorId = 'sailing-jump-curve';
@@ -172,7 +174,7 @@ function JumpsPanel({
         ? t('Sauts indisponibles : {raison}.', { raison: error ?? t('calcul impossible') })
         : t("Aucun saut d'au moins {height} pris à {threshold} ou plus.", { height: meters(minHeightM), threshold: thresholdLabel });
     return (
-      <ResizablePanel id="sailing.sauts" style={ANALYSIS_PANEL_STYLE}>
+      <ResizablePanel id="sailing.sauts" anchorId={anchorId} style={ANALYSIS_PANEL_STYLE}>
         {heading(t('Sauts'))}
         <div className="ui-muted">{text}</div>
         {status === 'ready' && hiddenNote && <div style={noteStyle}>{hiddenNote}</div>}
@@ -198,7 +200,7 @@ function JumpsPanel({
   };
 
   const jumpsPanel = (
-    <ResizablePanel id="sailing.sauts" style={ANALYSIS_PANEL_STYLE}>
+    <ResizablePanel id="sailing.sauts" anchorId={anchorId} style={ANALYSIS_PANEL_STYLE}>
       {heading(t('Sauts'), 'analyse:sauts')}
       <HelpText helpKey="analyse:sauts" note>
         {t("Hauteur gagnée par le téléphone, donc par le buste, au-dessus de son niveau au décollage, mesurée par l'accéléromètre et le gyroscope : ce n'est pas la hauteur de la planche au-dessus de l'eau. Précision attendue, téléphone sur la poitrine : ±0,1 à 0,2 m sans foil, ±0,2 à 0,3 m sur foil ; davantage au bras. En l'air : du décollage à l'atterrissage. Longueur : chemin parcouru pendant le saut, lu sur la trace ; vitesse : au décollage. « ≈ » marque une mesure douteuse, dont la raison s'affiche au survol. « Voir » montre le saut sur la carte, « Détail » sur la courbe. Sont montrés les sauts d'au moins {height} (Réglages, carte de l'activité) pris à {threshold} ou plus (seuil d'activité de la session).", { height: meters(minHeightM), threshold: thresholdLabel })}

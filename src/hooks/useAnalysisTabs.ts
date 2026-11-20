@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Activity } from '../core/activities';
 import {
-  closeAllTabs, generalOpenAfterAdvanced, initialTabsState, maskAdvancedTabs, maskHiddenTabs, openAllTabs, revealTab, shownTabs, tabsStateFor,
+  closeAllTabs, generalOpenAfterAdvanced, initialTabsState, maskAdvancedTabs, maskHiddenTabs, openAllTabs, panelNeedsScroll, revealTab, shownTabs,
+  tabAnchorId, tabsStateFor,
   type AnalysisTab, type AnalysisTabsState,
 } from '../core/analysisTabs';
 import { useResetChartHover } from './useChartHover';
@@ -82,5 +83,50 @@ export const useAnalysisTabs = <K extends string>({ tabs, defaults, activity, se
     [tabs, tabChoices]
   );
 
-  return { open, toggle, toggleOf, set, reveal, closeAll, openAll, tabChoices, advanced, shown, highlight };
+  /** Panneau où défiler après l'ouverture par une tuile : un objet neuf à chaque toucher, onglet déjà ouvert compris. */
+  const [scrollTarget, setScrollTarget] = useState<{ key: K } | null>(null);
+  /**
+   * Tuile de « général » touchée : son onglet s'ouvre en plus de « général » (« avancé » se déplie s'il y est
+   * rangé, `revealTab` avec `keepPrimary`), puis la page défile jusqu'à son panneau s'il n'est pas à l'écran.
+   */
+  const openFromGeneral = useCallback((key: K) => {
+    change((s) => revealTab(s, tabs, key, { keepPrimary: true }));
+    setScrollTarget({ key });
+  }, [change, tabs]);
+  useEffect(() => {
+    if (scrollTarget === null) return undefined;
+    // Deux images plus tard : le panneau est monté, et les panneaux d'ordinateur ont été remontés à leur place
+    // (`usePanelPacking`, après un `ResizeObserver`) ; un défilement plus tôt viserait l'ancienne position.
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => scrollToTabPanel(scrollTarget.key));
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, [scrollTarget]);
+
+  return { open, toggle, toggleOf, set, reveal, openFromGeneral, closeAll, openAll, tabChoices, advanced, shown, highlight };
+};
+
+/** Barre « Non enregistré » d'une session en brouillon, collée en haut de la page (`SessionSaveBar`). */
+const STUCK_SAVE_BAR_SELECTOR = '.ui-savebar--dirty';
+/** Barre d'onglets du téléphone, collée en bas (`AppShell.css`) ; cachée sur ordinateur, de hauteur nulle. */
+const STUCK_TAB_BAR_SELECTOR = '.shell-tabbar';
+
+/**
+ * Amène le haut du panneau de l'onglet sous ce qui colle en haut : sa marge de défilement (barre du haut et
+ * bandeaux, `analysisMobile.css`) et la barre « Non enregistré » quand elle est là ; rien s'il est déjà à l'écran,
+ * au-dessus de la barre d'onglets du bas.
+ */
+const scrollToTabPanel = (key: string): void => {
+  const panel = document.getElementById(tabAnchorId(key));
+  if (!panel) return;
+  const saveBar = document.querySelector<HTMLElement>(STUCK_SAVE_BAR_SELECTOR);
+  const topInset = (parseFloat(getComputedStyle(panel).scrollMarginTop) || 0) + (saveBar?.offsetHeight ?? 0);
+  const bottomInset = document.querySelector<HTMLElement>(STUCK_TAB_BAR_SELECTOR)?.offsetHeight ?? 0;
+  const { top } = panel.getBoundingClientRect();
+  if (!panelNeedsScroll(top, topInset, window.innerHeight, bottomInset)) return;
+  window.scrollBy({ top: top - topInset, behavior: 'smooth' });
 };

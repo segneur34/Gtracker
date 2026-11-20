@@ -48,6 +48,59 @@
   font-size: var(--text-l);
 }
 
+/* Tuile de « général » qui ouvre son onglet (`StatTile`, `onClick`) : un bouton sans habit de bouton, à la même
+   place que le bloc ; seul un petit chevron à l'encre atténuée, au bout du libellé, la signale. */
+.an-sheet__stat--link {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-s);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.an-sheet__stat--link:active {
+  opacity: 0.6;
+}
+
+.an-sheet__stat--link:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Chevron hors du flux du texte : un point d'accroche de largeur nulle juste après le dernier mot (il tient toujours
+   sur la ligne), et le chevron posé dessus en absolu, centré sur la ligne. Un libellé qui remplit sa ligne garde sa
+   hauteur : le chevron déborde alors dans l'écart de la grille ou la marge du panneau (16 et 15 px, plus que ses
+   4 + 10 px). */
+.an-sheet__stat-chevron {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 1em;
+  vertical-align: middle;
+  color: var(--muted);
+}
+
+.an-sheet__stat-chevron svg {
+  position: absolute;
+  top: 50%;
+  left: var(--space-1);
+  transform: translateY(-50%);
+}
+
+/* Panneau d'un onglet ouvert par une tuile de « général » (`tabAnchorId`) : la page s'arrête sous les bandeaux
+   d'un enregistrement en cours ; la barre « Non enregistré », de hauteur variable, est comptée à part
+   (`useAnalysisTabs`). */
+[id^='an-onglet-'] {
+  scroll-margin-top: calc(var(--shell-top) + var(--space-2));
+}
+
 .an-map-overlay {
   display: none;
 }
@@ -335,6 +388,11 @@
     width: var(--analysis-map-width);
     /* Ramenée à l'écran (« +carte »), elle s'arrête sous la barre du haut, qui colle. */
     scroll-margin-top: calc(var(--topbar-h) + var(--space-2));
+  }
+
+  /* De même pour le panneau d'un onglet ouvert par une tuile, sous la barre du haut et les bandeaux. */
+  [id^='an-onglet-'] {
+    scroll-margin-top: calc(var(--topbar-h) + var(--shell-top) + var(--space-2));
   }
 }
 

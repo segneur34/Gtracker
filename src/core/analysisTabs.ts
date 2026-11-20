@@ -232,18 +232,95 @@ export const tabsStateFor = <K extends string>(state: AnalysisTabsState<K>, defa
 
 /**
  * Onglet ouvert depuis ailleurs que la barre (« Oui » du rappel du matériel) : la rangée « avancé » s'ouvre s'il en
- * fait partie, ce qui ferme « général » comme le fait sa pastille, et l'onglet s'ouvre. Rend l'état reçu tel quel
- * quand l'onglet est déjà ouvert sans rien à déplier.
+ * fait partie, ce qui ferme « général » comme le fait sa pastille, et l'onglet s'ouvre. `keepPrimary` (tuile de
+ * « général ») laisse les onglets de la première rangée comme ils sont : l'onglet s'ouvre en plus. Rend l'état reçu
+ * tel quel quand l'onglet est déjà ouvert sans rien à déplier.
  */
-export const revealTab = <K extends string>(state: AnalysisTabsState<K>, tabs: readonly AnalysisTab<K>[], key: K): AnalysisTabsState<K> => {
+export const revealTab = <K extends string>(
+  state: AnalysisTabsState<K>,
+  tabs: readonly AnalysisTab<K>[],
+  key: K,
+  options: { keepPrimary?: boolean } = {}
+): AnalysisTabsState<K> => {
   const inAdvanced = tabs.find((tab) => tab.key === key)?.primary !== true;
   if (state.open[key] && (!inAdvanced || state.advanced)) return state;
   const open: Record<K, boolean> = { ...state.open, [key]: true };
-  if (inAdvanced && !state.advanced) {
+  if (inAdvanced && !state.advanced && options.keepPrimary !== true) {
     for (const tab of tabs) if (tab.primary === true) open[tab.key] = generalOpenAfterAdvanced(true);
   }
   return { ...state, advanced: inAdvanced ? true : state.advanced, open };
 };
+
+/**
+ * Onglet que chaque tuile de « général » ouvre, par clé de chiffre (`ShareStat.key`) et par famille. Une tuile
+ * absente n'en a pas (distances, temps, moyennes) : elle reste un simple bloc. Jamais « général » lui-même.
+ */
+const SAILING_TILE_TABS: Readonly<Record<string, SailingTab>> = {
+  top2s: 'tops',
+  tacks: 'manoeuvres',
+  jibes: 'manoeuvres',
+  jumps: 'sauts',
+  highestJump: 'sauts',
+  pumpCadence: 'pumping',
+  pumpShare: 'pumping',
+  heartRate: 'cardio',
+};
+
+const SURF_TILE_TABS: Readonly<Record<string, SurfTab>> = {
+  waves: 'vagues',
+  waveTime: 'vagues',
+  longestWave: 'vagues',
+  maxSpeed: 'vagues',
+  flightTime: 'vols',
+  longestFlight: 'vols',
+  pumpCadence: 'pumping',
+  pumpShare: 'pumping',
+  heartRate: 'cardio',
+};
+
+export const TILE_TABS: Record<SportFamily, Readonly<Record<string, string>>> = { voile: SAILING_TILE_TABS, surf: SURF_TILE_TABS };
+
+/**
+ * Tuiles nommées « en vol » quand la session est sur foil (« Distance en vol », « Temps en vol ») : elles ouvrent
+ * l'onglet du détail des vols, même si leurs chiffres viennent du seuil de vitesse. En surf, les tuiles de vol
+ * ont leur propre clé, déjà dans `SURF_TILE_TABS`.
+ */
+export const FLIGHT_TILE_TABS: Partial<Record<SportFamily, Readonly<Record<string, string>>>> = {
+  voile: { activeDistance: 'vols', activeTime: 'vols' } satisfies Record<string, SailingTab>,
+};
+
+/**
+ * Onglet qu'ouvre la tuile `statKey` de « général », pris parmi les onglets montrés pour la session (`shown`,
+ * liste déjà filtrée par l'activité et les données) ; `null` si la tuile n'en a pas ou que son onglet n'est
+ * pas montré. `inFlight` : session sur foil, ses tuiles actives sont celles du vol (`FLIGHT_TILE_TABS`).
+ */
+export const tileTab = <K extends string>(
+  family: SportFamily,
+  statKey: string,
+  shown: readonly AnalysisTab<K>[],
+  options: { inFlight?: boolean } = {}
+): AnalysisTab<K> | null => {
+  const flight = options.inFlight === true ? FLIGHT_TILE_TABS[family] : undefined;
+  const own = TILE_TABS[family];
+  const target = flight && Object.hasOwn(flight, statKey) ? flight[statKey] : Object.hasOwn(own, statKey) ? own[statKey] : null;
+  if (target === null) return null;
+  return shown.find((tab) => tab.key === target && tab.primary !== true) ?? null;
+};
+
+/** Ancre HTML du panneau d'un onglet (`ResizablePanel`, `anchorId`), où défile la page quand une tuile l'ouvre. */
+export const tabAnchorId = (key: string): string => `an-onglet-${key}`;
+
+/** Hauteur du haut d'un panneau qui doit paraître pour le dire à l'écran : son titre et une ligne. */
+export const PANEL_HEAD_VISIBLE_PX = 80;
+
+/**
+ * La page doit-elle défiler jusqu'au panneau ouvert ? Non si son haut est déjà à l'écran, sous ce qui colle en
+ * haut (`topInset` : barre du haut, bandeaux, barre « Non enregistré ») et au moins `PANEL_HEAD_VISIBLE_PX` au-dessus
+ * de ce qui colle en bas (`bottomInset` : barre d'onglets du téléphone, 0 sur ordinateur) ; oui s'il est caché
+ * dessous ou passé au-dessus.
+ */
+export const panelNeedsScroll = (top: number, topInset: number, viewportH: number, bottomInset = 0): boolean =>
+  top < topInset || top > viewportH - bottomInset - PANEL_HEAD_VISIBLE_PX;
 
 /** Nombre d'onglets ouverts, parmi les clés montrées, à partir duquel la barre propose « tout fermer » plutôt que « tout ouvrir ». */
 export const CLOSE_ALL_MIN_OPEN = 2;

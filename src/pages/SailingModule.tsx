@@ -19,7 +19,7 @@ import { useAnalysisHeart, useCardioShortcuts, useHeartRateZoneHighlight } from 
 import { useOpenSections } from '../hooks/useOpenSections';
 import { useZoomOnMap } from '../hooks/useZoomOnMap';
 import { trackBounds } from '../core/displayConfig';
-import { SAILING_TABS, tabDefaults } from '../core/analysisTabs';
+import { SAILING_TABS, tabAnchorId, tabDefaults, tileTab } from '../core/analysisTabs';
 import { nearestIndexAtTime } from '../core/search';
 import { useTimeChartAxis } from '../hooks/useTimeChartAxis';
 import { useSailingChartRows } from '../hooks/useSailingChartRows';
@@ -54,7 +54,7 @@ import HighlightPath from '../components/HighlightPath';
 import type { GearField } from '../components/gearFields';
 import { ANALYSIS_PANEL_STYLE, PANEL_BLOCK_STYLE } from '../components/styles';
 import { PanelHeading, SessionDate } from '../components/PanelTitle';
-import GeneralStats from '../components/GeneralStats';
+import GeneralStats, { type TileLink } from '../components/GeneralStats';
 import WindCompass from '../components/WindCompass';
 import WindAdjustOverlay from '../components/WindAdjustOverlay';
 import type { ShareStat } from '../core/shareImage';
@@ -228,7 +228,7 @@ function SailingModule() {
   const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(track, profile.heartRate, effectiveHrOffset(activity));
   // Onglets de l'activité, rangée « avancé », point survolé effacé à chaque session ; une seule surbrillance
   // sur la carte et les cases cumulables des onglets, effacées quand leur onglet se ferme (`useMapHighlight`).
-  const { open, toggle, toggleOf, reveal, closeAll, openAll, advanced, shown, highlight } = useAnalysisTabs({
+  const { open, toggle, toggleOf, reveal, openFromGeneral, closeAll, openAll, advanced, shown, highlight } = useAnalysisTabs({
     tabs: SAILING_TABS, defaults: SAILING_PANEL_DEFAULTS, activity, sessionKey,
   });
   /** L'activité a une liste de matériel : de quoi proposer le rappel qui suit un enregistrement (`GearReminder`). */
@@ -414,6 +414,14 @@ function SailingModule() {
     ...sportTiles,
     ...heartRateStat,
   ] : [];
+  /**
+   * Onglet qu'ouvre une tuile de « général », pris parmi ceux montrés pour la session ; sur foil, distance et temps
+   * « en vol » ouvrent les vols (`tileTab`).
+   */
+  const tileLink = (statKey: string): TileLink | null => {
+    const tab = tileTab('voile', statKey, sailingPanels, { inFlight: foil });
+    return tab ? { tabLabel: tab.label, onOpen: () => openFromGeneral(tab.key) } : null;
+  };
   /** Podiums montrables sur la carte : les tops de vitesse, puis ceux de VMG (près, portant), par clé de cible. */
   const mapTops = useMemo(
     () => ({ ...stats?.tops, ...(vmgStats ? { vmgUpwind: vmgStats.topsUpwind, vmgDownwind: vmgStats.topsDownwind } : {}) }),
@@ -533,7 +541,7 @@ function SailingModule() {
    * l'onglet le dit, avec de quoi ouvrir « général » où on le saisit.
    */
   const renderEmptyPanel = (key: 'manoeuvres' | 'vmg' | 'vent', label: string, unknownWind: string, otherwise: string) => (
-    <EmptyTabPanel id={`sailing.carte.${key}.vide`} label={label} open={open[key]} onToggle={toggleOf(key)}
+    <EmptyTabPanel id={`sailing.carte.${key}.vide`} anchorId={tabAnchorId(key)} label={label} open={open[key]} onToggle={toggleOf(key)}
       action={windInputRequired && !windAdjust
         ? <Button size="s" onClick={startWindAdjust}>{t('Régler le vent')}</Button>
         : undefined}>
@@ -628,7 +636,7 @@ function SailingModule() {
             {open.general && (
               <ResizablePanel id="sailing.general" style={PANEL_BLOCK_STYLE}>
                 <PanelHeading label={t('Général')}extra={<SessionDate track={trackData} />} open={open.general} onToggle={toggleOf('general')} />
-                <GeneralStats stats={overviewStats} pairs={GENERAL_PAIRS} />
+                <GeneralStats stats={overviewStats} pairs={GENERAL_PAIRS} linkOf={tileLink} />
                 {/* Mini-boussole du vent ; « Régler » ouvre la grande sur la carte. */}
                 <div className="an-sheet__wind" style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
                   <WindCompass windAngle={shownWind ?? autoWind ?? 0} size={64} />
@@ -652,7 +660,7 @@ function SailingModule() {
             )}
 
             {open.tops && (
-              <ResizablePanel id="sailing.tops" style={PANEL_BLOCK_STYLE}>
+              <ResizablePanel id="sailing.tops" anchorId={tabAnchorId('tops')} style={PANEL_BLOCK_STYLE}>
                 <TopsPanel targets={profile.topTargets} tops={stats.tops} unit={speedUnit} selected={highlight.shownIn('tops')}
                   onSelect={(key) => highlight.show('tops', key)} accent={FAMILY_ACCENT.voile} open={open.tops} onToggle={toggleOf('tops')} />
               </ResizablePanel>
@@ -664,7 +672,7 @@ function SailingModule() {
                   showKn={showKn} showThreshold={showThreshold} speedSymbol={speedSymbol} activeThresholdKn={activeThresholdKn} foil={foil}
                   windWarning={windWarning} samplingS={samplingS} pointCount={pointCount} minEntrySpeedKn={maneuverThresholds.minEntrySpeedKn}
                   notesOf={maneuverNotes} onMap={maneuversOnMap} selectedTop={highlight.shownIn('manoeuvres')}
-                  onSelectTop={(key) => highlight.show('manoeuvres', key)} view={maneuversView} />
+                  onSelectTop={(key) => highlight.show('manoeuvres', key)} view={maneuversView} anchorId={tabAnchorId('manoeuvres')} />
               )
               : renderEmptyPanel('manoeuvres', t('Manœuvres'),
                 t('Vent inconnu : virements et empannages se reconnaissent par rapport à lui. Réglez-le sur la carte.'),
@@ -677,7 +685,7 @@ function SailingModule() {
             )}
 
             {open.cardio && heart.present && (
-              <CardioTab id="sailing.cardio" track={track} minutes={trackMinutes} heart={heart} params={profile.heartRate} hrEnergy={profile.hrEnergy} zones={hrZones} athlete={athlete}
+              <CardioTab id="sailing.cardio" anchorId={tabAnchorId('cardio')} track={track} minutes={trackMinutes} heart={heart} params={profile.heartRate} hrEnergy={profile.hrEnergy} zones={hrZones} athlete={athlete}
                 onRetainHrMax={retainSessionHrMax} zone={hrZone}
                 zoom={cardioZoom} onShowOnMap={showCardioOnMap}
                 open={open.cardio} onToggle={toggleOf('cardio')} />
@@ -710,11 +718,12 @@ function SailingModule() {
                 podiumShown={jumps.podiumShown}
                 onTogglePodium={jumps.togglePodium}
                 trackIndexAt={trackIndexAt}
+                anchorId={tabAnchorId('sauts')}
               />
             )}
 
             {flightsOpen && (
-              <ResizablePanel id="sailing.vols" style={ANALYSIS_PANEL_STYLE}>
+              <ResizablePanel id="sailing.vols" anchorId={tabAnchorId('vols')} style={ANALYSIS_PANEL_STYLE}>
                 <FlightsPanel
                   helpKey="voile:vols"
                   open={open.vols} onToggle={toggleOf('vols')}
@@ -733,7 +742,7 @@ function SailingModule() {
             )}
 
             {pumpingOpen && (
-              <ResizablePanel id="sailing.pumping" style={ANALYSIS_PANEL_STYLE}>
+              <ResizablePanel id="sailing.pumping" anchorId={tabAnchorId('pumping')} style={ANALYSIS_PANEL_STYLE}>
                 <PumpingPanel
                   helpKey="voile:pumping"
                   open={open.pumping} onToggle={toggleOf('pumping')}

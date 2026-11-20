@@ -18,7 +18,7 @@ import { HelpText } from '../components/Help';
 import PanelTitle, { PanelHeading, SessionDate } from '../components/PanelTitle';
 import ResizablePanel from '../components/ResizablePanel';
 import { gearFieldsFor } from '../components/gearFields';
-import GeneralStats from '../components/GeneralStats';
+import GeneralStats, { type TileLink } from '../components/GeneralStats';
 import type { ShareStat } from '../core/shareImage';
 import SpeedGradientLegend from '../components/SpeedGradientLegend';
 import SessionThresholdField from '../components/SessionThresholdField';
@@ -42,7 +42,7 @@ import { zoomHint } from '../components/zoomHint';
 import { HIGHLIGHT_PODIUM_COLORS, HIGHLIGHT_SHOWN_COLOR } from '../components/highlightColors';
 import { ANALYSIS_PANEL_STYLE, PANEL_BLOCK_STYLE } from '../components/styles';
 import Button from '../components/ui/Button';
-import { SURF_TABS, tabDefaults, type SurfTab } from '../core/analysisTabs';
+import { SURF_TABS, tabAnchorId, tabDefaults, tileTab, type SurfTab } from '../core/analysisTabs';
 import { lastByRange, sampledIndicesKeeping, visibleIndexRange } from '../core/chartZoom';
 import { CHART_MAX_POINTS, trackBounds } from '../core/displayConfig';
 import { defaultActiveThresholdOf } from '../core/sportProfiles';
@@ -217,7 +217,7 @@ function SurfModule() {
   const mapSegments: TrackSegment[] = useKeptSegments(surfShown.segments, base.track, surfShown.colorKey);
 
   // Onglets de l'activité, rangée « avancé », surbrillance unique de la carte, point survolé effacé à chaque session.
-  const { open, toggle, toggleOf, reveal, closeAll, openAll, advanced, shown, highlight } = useAnalysisTabs({
+  const { open, toggle, toggleOf, reveal, openFromGeneral, closeAll, openAll, advanced, shown, highlight } = useAnalysisTabs({
     tabs: SURF_TABS, defaults: SURF_SECTION_DEFAULTS, activity, sessionKey: base.sessionKey,
   });
   /** L'activité a une liste de matériel : de quoi proposer le rappel qui suit un enregistrement (`GearReminder`). */
@@ -336,6 +336,11 @@ function SurfModule() {
    */
   const pumpTiles = pumping && sections.some((s) => s.key === 'pumping') ? pumpingTiles(pumpSummary) : [];
   const overviewStats = overviewKeys.flatMap((key) => [...generalStats, ...pumpTiles].filter((stat) => stat.key === key));
+  /** Onglet qu'ouvre une tuile de « général », pris parmi ceux montrés pour la session (`tileTab`). */
+  const tileLink = (statKey: string): TileLink | null => {
+    const tab = tileTab('surf', statKey, sections);
+    return tab ? { tabLabel: tab.label, onOpen: () => openFromGeneral(tab.key) } : null;
+  };
   const speedCell = speedCellOf(speedUnit);
   /** Colonnes « Tous les vols » du GPS, sans pumping mesuré : temps et vitesse hors des vagues (unité de l'activité). */
   const surfFlightGpsColumns: FlightColumn<SurfFlight>[] = [
@@ -595,7 +600,7 @@ function SurfModule() {
             {open.general && (
               <ResizablePanel id={panelId('general')} style={ANALYSIS_PANEL_STYLE}>
                 <PanelHeading label={t('Général')} extra={<SessionDate track={track} />} open={open.general} onToggle={toggleOf('general')} />
-                <GeneralStats stats={overviewStats} pairs={GENERAL_PAIRS} />
+                <GeneralStats stats={overviewStats} pairs={GENERAL_PAIRS} linkOf={tileLink} />
                 {/* Mini-boussole du sens des vagues ; « Régler » ouvre la grande sur la carte. */}
                 {track.length > 0 && (
                   <div className="an-sheet__wave">
@@ -651,7 +656,7 @@ function SurfModule() {
             )}
 
             {open.vagues && (
-              <ResizablePanel id={panelId('vagues')} style={ANALYSIS_PANEL_STYLE}>
+              <ResizablePanel id={panelId('vagues')} anchorId={tabAnchorId('vagues')} style={ANALYSIS_PANEL_STYLE}>
                 <div className="ui-row-10 ui-center ui-wrap ui-mb-10">
                   <PanelTitle label={t('Vagues ({n})', { n: waves.length })} open={open.vagues} onToggle={toggleOf('vagues')} helpKey="surf:vagues" />
                   <span className="ui-grow" />
@@ -796,7 +801,7 @@ function SurfModule() {
             )}
 
             {open.vols && foil && (
-              <ResizablePanel id={panelId('vols')} style={ANALYSIS_PANEL_STYLE}>
+              <ResizablePanel id={panelId('vols')} anchorId={tabAnchorId('vols')} style={ANALYSIS_PANEL_STYLE}>
                 <FlightsPanel
                   helpKey="surf:vols" open={open.vols} onToggle={toggleOf('vols')}
                   help={<>
@@ -819,7 +824,7 @@ function SurfModule() {
             )}
 
             {open.pumping && pumpingVisible && (
-              <ResizablePanel id={panelId('pumping')} style={ANALYSIS_PANEL_STYLE}>
+              <ResizablePanel id={panelId('pumping')} anchorId={tabAnchorId('pumping')} style={ANALYSIS_PANEL_STYLE}>
                 <PumpingPanel
                   helpKey="surf:pumping" open={open.pumping} onToggle={toggleOf('pumping')}
                   help={<>
@@ -891,7 +896,7 @@ function SurfModule() {
             })()}
 
             {open.cardio && heart.present && (
-              <CardioTab id={panelId('cardio')} track={track} minutes={trackMinutes} heart={heart} params={profile.heartRate} hrEnergy={profile.hrEnergy} zones={hrZones} athlete={athlete}
+              <CardioTab id={panelId('cardio')} anchorId={tabAnchorId('cardio')} track={track} minutes={trackMinutes} heart={heart} params={profile.heartRate} hrEnergy={profile.hrEnergy} zones={hrZones} athlete={athlete}
                 onRetainHrMax={retainSessionHrMax} zone={hrZone}
                 zoom={cardioZoom} onShowOnMap={showCardioOnMap}
                 open={open.cardio} onToggle={toggleOf('cardio')} />

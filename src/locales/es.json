@@ -32,6 +32,7 @@
   "sans activité ({withoutCount})": "sin actividad ({withoutCount})",
   "Activité": "Actividad",
   "{label} : {value}": "{label}: {value}",
+  "{label} : {value}. Ouvrir l'onglet {tab}": "{label}: {value}. Abrir la pestaña {tab}",
   "à choisir": "por elegir",
   "Choisir…": "Elegir…",
   "Fermer la carte": "Cerrar el mapa",

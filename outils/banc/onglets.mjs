@@ -239,6 +239,16 @@ await go(paths.kite, 7000);
 const kiteTabs = await tabLabels();
 console.log('\nkite, onglets :', kiteTabs);
 check('kite : « tops » caché par le choix de l\'activité, « vmg » toujours là', !/tops/.test(kiteTabs) && /vmg/.test(kiteTabs), kiteTabs);
+// Une tuile dont l'onglet est caché par l'activité reste un simple bloc ; celle dont l'onglet est montré est un bouton.
+const tuileDe = (label) => evaluate(`(() => {
+  const l = [...document.querySelectorAll('.an-sheet__stat-label')].find((x) => x.textContent.trim().toLowerCase() === ${JSON.stringify(label.toLowerCase())});
+  const s = l?.closest('.an-sheet__stat');
+  return s ? s.tagName + (s.classList.contains('an-sheet__stat--link') ? ' lien' : '') : null;
+})()`);
+const tuileTops = await tuileDe('Top 2 s');
+check('kite : la tuile « Top 2 s » (onglet « tops » caché) n\'est pas un bouton', tuileTops !== null && !tuileTops.startsWith('BUTTON'), String(tuileTops));
+const tuileVirements = await tuileDe('Virements réussis');
+check('kite : la tuile « Virements réussis » (« manœuvres » montré) est un bouton', tuileVirements === 'BUTTON lien', String(tuileVirements));
 
 // --- 5. Téléphone ---
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });

@@ -32,6 +32,7 @@
   "sans activité ({withoutCount})": "no activity ({withoutCount})",
   "Activité": "Activity",
   "{label} : {value}": "{label}: {value}",
+  "{label} : {value}. Ouvrir l'onglet {tab}": "{label}: {value}. Open the {tab} tab",
   "à choisir": "not chosen",
   "Choisir…": "Choose…",
   "Fermer la carte": "Close map",
