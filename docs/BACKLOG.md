@@ -1,6 +1,6 @@
 # Reste à faire
 
-Tenu par Claude ; l'utilisateur n'a jamais à l'ouvrir. `node outils/backlog.mjs` vérifie la forme et imprime le tableau de bord : aucun résumé fait à la main ne le remplace. Prochains numéros : élément 468, essai 321, question Q139.
+Tenu par Claude ; l'utilisateur n'a jamais à l'ouvrir. `node outils/backlog.mjs` vérifie la forme et imprime le tableau de bord : aucun résumé fait à la main ne le remplace. Prochains numéros : élément 468, essai 321, question Q140.
 - Une ligne par élément : `- N · [type] Titre · noté jj/mm · petit|gros · Modèle/effort · état · dépend de : … · détail : chemin` (champs sans objet omis, ordre gardé). N unique, dans la suite des lots, jamais réutilisé ; type `[bogue]`, `[idée]`, `[dette]` ou `[outil]` ; petit = un lot Sonnet ou Opus, une session ; gros = plusieurs lots, Fable, ou des données réelles ; détail dans `docs/backlog/N-titre.md` quand la ligne ne suffit pas.
 - Quatre zones, un élément dans une seule : **Maintenant** (en cours ou à valider ; 3 lots avec essais au téléphone au plus, un lot validé sur lecture ne compte pas ; première ligne : l'APK installée) ; **Ensuite** (prêts, liste numérotée, l'ordre est la priorité, 7 au plus) ; **Ça attend une occasion** (sous une condition écrite en gras, hors de toute limite) ; **Plus tard** (daté, une phrase avec le résultat attendu ; proposé à l'abandon à la revue après 90 jours).
 - Rangement à la mise au propre, posé en clair à l'utilisateur : un chiffre faux ou un usage cassé → tête d'Ensuite ; « vous en servirez-vous à votre prochaine sortie ? » oui → Ensuite, non → Plus tard ; petit et utile passe avant gros et utile.
@@ -70,5 +70,6 @@ APK 0.01.54 installée le 20/11 par le câble par-dessus la 0.01.50 (versionCode
 
 
 
+- Q139 · lot 466 · Sur ordinateur, le lien « Planifier » de la barre du haut mène maintenant à la liste des itinéraires : doit-il s'appeler « Planification », comme la pastille de Sessions ? · par défaut : il garde le nom « Planifier » · posée le 20/11
 - Q137 · lot 462 · Sur grand écran, les panneaux d'une analyse peuvent-ils changer de colonne pour que les deux colonnes finissent à peu près à la même hauteur (votre remarque de l'essai 309 : « il y a plus de truc en colonne gauche »), ou chaque panneau garde-t-il sa colonne ? · par défaut : chacun garde sa colonne, rien ne change · posée le 19/11
 - Q123 · lot 417 · Faut-il aussi écarter un départ mal calé à l'analyse des sessions déjà rangées ou venues d'un fichier, ce qui changerait des chiffres existants (trait de départ, vitesse maximale, distance) ? · par défaut : non, seuls les nouveaux enregistrements attendent le calage, les sessions existantes ne bougent pas · posée le 16/11
