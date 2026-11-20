@@ -38,6 +38,8 @@ export const FILE_FORMATS = {
   itineraire: `${FORMAT_ID}-itineraire` as const,
   /** Lieux appris, à la racine du dossier mémoire (`library/learnedPlaces.ts`). */
   lieux: `${FORMAT_ID}-lieux` as const,
+  /** Index de la corbeille du programme Windows (`library/trash.ts`). */
+  corbeille: `${FORMAT_ID}-corbeille` as const,
 };
 
 /** Blocs du GPX : préfixe des éléments et espace de noms, sans domaine ni dépôt. */

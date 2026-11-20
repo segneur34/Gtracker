@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FAMILY_LABEL, activityDisplayName, sessionActivity } from '../core/activities';
 import { t } from '../core/i18n';
+import { sessionDiscardQuestion } from '../library/trash';
+import { useDeletesToTrash } from '../hooks/useTrash';
 import type { ShareStat } from '../core/shareImage';
 import type { SportFamily } from '../core/sportProfiles';
 import { dropLeaveWarning, hasLeaveWarning } from '../hooks/leaveGuard';
@@ -40,10 +42,6 @@ const DOWNLOAD_NOTE_MS = 4000;
 const DISCARD_HOLD_MS = 1000;
 const discardHoldMs = (): number => DISCARD_HOLD_MS;
 
-/** Question posée après l'appui tenu sur « Jeter » ; `drafted` : un brouillon de la session serait perdu. */
-const discardQuestion = (drafted: boolean): string => drafted
-  ? t('Jeter cette session ? Elle sera supprimée de la mémoire, avec sa fiche et ses capteurs, et ne pourra pas être récupérée. Les modifications non enregistrées seront perdues.')
-  : t('Jeter cette session ? Elle sera supprimée de la mémoire, avec sa fiche et ses capteurs, et ne pourra pas être récupérée.');
 
 /**
  * Nom montré d'une session de la mémoire (`sessionDisplayName`), en tête de son analyse, son bouton
@@ -59,6 +57,7 @@ const discardQuestion = (drafted: boolean): string => drafted
  */
 function SessionNameEditor({ file, share, back }: { file: string | null; share?: SessionShare; back: string }) {
   const navigate = useNavigate();
+  const toTrash = useDeletesToTrash();
   /** Session jetée : supprimée quand l'analyse quitte l'écran, pas avant. */
   const discarded = useRef<string | null>(null);
   useEffect(() => () => {
@@ -133,7 +132,7 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
    * session supprimée une fois l'analyse démontée (`removeSession`) : elle ne s'y dit jamais introuvable.
    */
   const discard = async () => {
-    if (!window.confirm(discardQuestion(hasLeaveWarning()))) return;
+    if (!window.confirm(sessionDiscardQuestion(toTrash, hasLeaveWarning()))) return;
     await dropLeaveWarning();
     discarded.current = file;
     navigate(back, { replace: true });

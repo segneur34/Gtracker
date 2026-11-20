@@ -200,6 +200,7 @@ describe('dossier choisi', () => {
     expect(await m.ecrireTexte({ racine: 'candidat', chemin: 'Gtracker/a.json', texte: '{}' })).toMatchObject({ ok: false, code: 'PERMISSION' })
     expect(await m.ecrireOctets({ racine: 'candidat', chemin: 'a.imu', octets: new Uint8Array(2) })).toMatchObject({ ok: false, code: 'PERMISSION' })
     expect(await m.effacer({ racine: 'candidat', chemin: 'notes.txt.gtracker-new' })).toMatchObject({ ok: false })
+    expect(await m.effacerDossier({ racine: 'candidat', chemin: 'Gtracker/sessions' })).toMatchObject({ ok: false, code: 'PERMISSION' })
     expect(await contenu(choisi)).toEqual(['Gtracker', 'notes.txt.gtracker-new'])
     expect(await contenu(path.join(choisi, 'Gtracker'))).toEqual(['gtracker.json', 'sessions'])
     expect(await contenu(profil)).toEqual([])

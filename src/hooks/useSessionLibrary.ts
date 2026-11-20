@@ -60,6 +60,9 @@ export {
   startLibraryUi, switchToBrowserMemory,
 } from './sessionLibrary/lifecycle';
 export { countErasable, eraseEverything, factoryReset } from './sessionLibrary/reset';
+export { stashRoute, trashStore } from './sessionLibrary/trash';
+export type { TrashState } from './sessionLibrary/trash';
+export { deleteFromTrash, emptyWholeTrash, restoreFromTrash } from './sessionLibrary/trashRestore';
 export type { ResetProgress } from './sessionLibrary/reset';
 export type { SettingsFileInfo } from '../library/settingsFile';
 

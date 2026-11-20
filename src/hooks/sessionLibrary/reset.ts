@@ -44,7 +44,7 @@ export const countErasable = async (): Promise<EraseCounts> => {
   if (!f) return counts;
   try {
     const targets = memoryResetTargets(await readMemoryListings(f));
-    return { ...counts, sessions: targets.sessions, routes: targets.routes };
+    return { ...counts, sessions: targets.sessions, routes: targets.routes, trash: targets.trash };
   } catch {
     return counts;
   }

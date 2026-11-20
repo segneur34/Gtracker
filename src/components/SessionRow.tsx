@@ -21,6 +21,8 @@ import SessionRenameField from './SessionRenameField';
 import Button from './ui/Button';
 import MoreMenu from './ui/MoreMenu';
 import { dateLocale, t, tn } from '../core/i18n';
+import { sessionDeleteQuestion } from '../library/trash';
+import { useDeletesToTrash } from '../hooks/useTrash';
 import './SessionRow.css';
 
 /** Marge de la ligne à l'écran pour la file des lieux : aucune, seules les lignes vues comptent. */
@@ -79,6 +81,7 @@ const SessionRow = memo(function SessionRow({
   brushed?: boolean;
 }) {
   const openSession = useOpenSession();
+  const toTrash = useDeletesToTrash();
   const shade = useThemedShade();
   const dark = useAppliedTheme().theme === 'dark';
   const brushStyle = useMemo(
@@ -209,7 +212,7 @@ const SessionRow = memo(function SessionRow({
       )}
       {confirming && !session.readOnly && (
         <div className="lib-row__actions">
-          <span className="lib-row__confirm">{t('Supprimer cette session de la mémoire ?')}</span>
+          <span className="lib-row__confirm">{sessionDeleteQuestion(toTrash)}</span>
           <Button size="s" variant="danger" onClick={() => void removeSession(session.file)}>{t('Confirmer')}</Button>
           <Button size="s" variant="ghost" onClick={onCancelDelete}>{t('Annuler')}</Button>
         </div>

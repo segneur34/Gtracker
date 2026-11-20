@@ -1,0 +1,154 @@
+import { describe, expect, it } from 'vitest';
+import {
+  TRASH_KEEP_MS, deletesToTrash, expiredTrashEntries, routeDeleteButton, sessionDeleteQuestion, sessionDiscardQuestion, isTrashDirName, orphanTrashDirs, parseTrashIndex, reusableRouteEntry, reusableTrashEntry,
+  routeRestorePlan, serializeTrashIndex, sessionRestorePlan, sessionTrashEntries, sortedTrashEntries, trashCounts, trashDirName,
+  trashSummaryText, withoutTrashEntries, type TrashEntry,
+} from './trash';
+
+const NOW = Date.UTC(2026, 10, 20, 12);
+
+const session = (dir: string, startMs: number, deletedAtMs = NOW, main = 'a.gpx'): TrashEntry => ({
+  dir, kind: 'session', startMs, routeBase: null, createdAt: null, name: 'Wing · Carnon', deletedAtMs, origin: 'ordinateur', reason: 'supprimee',
+  main, files: [{ name: main, size: 120 }, { name: main.replace('.gpx', '.json'), size: 30 }, { name: main.replace('.gpx', '.imu'), size: 900 }],
+});
+
+const route = (dir: string, base: string): TrashEntry => ({
+  dir, kind: 'itineraire', startMs: null, routeBase: base, createdAt: '2026-11-01T10:00:00.000Z', name: 'Tour du lac', deletedAtMs: NOW,
+  origin: 'ordinateur', reason: 'supprimee', main: `${base}.json`, files: [{ name: `${base}.json`, size: 40 }, { name: `${base}.gpx`, size: 400 }],
+});
+
+describe('index de la corbeille', () => {
+  it('absent, illisible, d\'une version plus récente, ou relu tel qu\'écrit', () => {
+    expect(parseTrashIndex(null)).toEqual({ state: 'absent', entries: [] });
+    expect(parseTrashIndex('{abîmé').state).toBe('unreadable');
+    expect(parseTrashIndex('{"format":"autre","version":1,"entries":[]}').state).toBe('unreadable');
+    expect(parseTrashIndex('{"format":"gtracker-corbeille","version":2,"entries":[]}').state).toBe('newer');
+    const entries = [session(`${NOW}-100`, 100), route(`${NOW}-Tour du lac`, 'Tour du lac')];
+    expect(parseTrashIndex(serializeTrashIndex(entries))).toEqual({ state: 'ok', entries });
+  });
+
+  it('une seule entrée illisible rend tout l\'index illisible : rien n\'est réécrit ni purgé', () => {
+    const text = serializeTrashIndex([session(`${NOW}-100`, 100)]).replace('"main": "a.gpx"', '"main": 3');
+    expect(parseTrashIndex(text).state).toBe('unreadable');
+    // Un sous-dossier qui n'a pas la forme de ceux de la corbeille non plus.
+    expect(parseTrashIndex(serializeTrashIndex([session('1-100', 100)])).state).toBe('unreadable');
+  });
+});
+
+describe('sous-dossiers', () => {
+  it('instant puis identité, sans caractère refusé, suffixé s\'il est déjà pris, sans égard à la casse', () => {
+    expect(trashDirName(NOW, '1763500000000', [])).toBe(`${NOW}-1763500000000`);
+    expect(trashDirName(NOW, 'Tour: du lac?', [])).toBe(`${NOW}-Tour_ du lac_`);
+    expect(trashDirName(NOW, 'Lac.', [])).toBe(`${NOW}-Lac`);
+    expect(trashDirName(NOW, 'Lac', [`${NOW}-LAC`, `${NOW}-lac-2`])).toBe(`${NOW}-Lac-3`);
+    expect(trashDirName(NOW, '', [])).toBe(`${NOW}-sans-nom`);
+  });
+
+  it('seuls les noms à la forme exacte de la corbeille sont les siens', () => {
+    for (const name of [`${NOW}-Lac`, `${NOW}-Lac-3`, `${NOW}-1763500000000`, `${NOW}-Tour_ du lac_`, trashDirName(NOW, ' Tour: du  lac. ', [])]) {
+      expect(isTrashDirName(name), name).toBe(true);
+    }
+    for (const name of ['photos', '2024-vacances', '1-100', `${NOW}`, `${NOW}-`, `${NOW}-a  b`, `${NOW}-lac.`, `${NOW}- lac`, `${NOW}-a:b`, `1${NOW}-lac`]) {
+      expect(isTrashDirName(name), name).toBe(false);
+    }
+  });
+
+  it('restes : les sous-dossiers de la corbeille absents de l\'index, jamais un dossier posé à la main', () => {
+    const listing = [
+      { name: `${NOW}-100`, kind: 'directory' as const }, { name: `${NOW}-200`, kind: 'directory' as const },
+      { name: 'photos', kind: 'directory' as const }, { name: '2024-vacances', kind: 'directory' as const },
+      { name: 'corbeille.json', kind: 'file' as const },
+    ];
+    expect(orphanTrashDirs([session(`${NOW}-100`, 100)], listing)).toEqual([`${NOW}-200`]);
+  });
+});
+
+describe('purge', () => {
+  it('plus de 30 jours exactement ; une date dans le futur n\'est jamais purgée', () => {
+    const entries = [
+      session('a', 1, NOW - TRASH_KEEP_MS), session('b', 2, NOW - TRASH_KEEP_MS - 1), session('c', 3, NOW + 86_400_000), session('d', 4, NOW),
+    ];
+    expect(expiredTrashEntries(entries, NOW).map((e) => e.dir)).toEqual(['b']);
+    expect(withoutTrashEntries(entries, ['B', 'c']).map((e) => e.dir)).toEqual(['a', 'd']);
+  });
+});
+
+describe('reprise et identité', () => {
+  it('une entrée déjà faite pour la même trace est reprise ; une autre taille ou un autre GPX non', () => {
+    const entries = [session('1-100', 100)];
+    expect(reusableTrashEntry(entries, 100, 'a.gpx', 120)?.dir).toBe('1-100');
+    expect(reusableTrashEntry(entries, 100, 'a.gpx', 121)).toBeNull();
+    expect(reusableTrashEntry(entries, 100, 'b.gpx', 120)).toBeNull();
+    expect(reusableTrashEntry(entries, 101, 'a.gpx', 120)).toBeNull();
+    const routes = [route('1-lac', 'lac')];
+    expect(reusableRouteEntry(routes, 'LAC', '2026-11-01T10:00:00.000Z', 40)?.dir).toBe('1-lac');
+    expect(reusableRouteEntry(routes, 'lac', '2026-11-02T10:00:00.000Z', 40)).toBeNull();
+    expect(sessionTrashEntries([...entries, session('2-100', 100), session('3-7', 7)], 100).map((e) => e.dir)).toEqual(['1-100', '2-100']);
+  });
+
+  it('les plus récemment supprimées d\'abord', () => {
+    expect(sortedTrashEntries([session('a', 1, 10), session('b', 2, 30), session('c', 3, 20)]).map((e) => e.dir)).toEqual(['b', 'c', 'a']);
+  });
+});
+
+describe('restauration', () => {
+  it('session : capteurs, fiche, GPX en dernier, sous un nom libre', () => {
+    const entry = session('1-100', 100, NOW, '2026-11-20_10-00-00_wing.gpx');
+    expect(sessionRestorePlan(entry, ['autre.gpx'])).toEqual({
+      gpx: '2026-11-20_10-00-00_wing.gpx',
+      copies: [
+        { from: 'corbeille/1-100/2026-11-20_10-00-00_wing.imu', to: 'sessions/2026-11-20_10-00-00_wing.imu' },
+        { from: 'corbeille/1-100/2026-11-20_10-00-00_wing.json', to: 'sessions/2026-11-20_10-00-00_wing.json' },
+        { from: 'corbeille/1-100/2026-11-20_10-00-00_wing.gpx', to: 'sessions/2026-11-20_10-00-00_wing.gpx' },
+      ],
+    });
+    // Une fiche restée seule sous ce nom le rend pris : le GPX revient sous un autre.
+    const taken = sessionRestorePlan(entry, ['2026-11-20_10-00-00_wing.json']);
+    expect(taken.gpx).toBe('2026-11-20_10-00-00_wing-2.gpx');
+    expect(taken.copies.map((c) => c.to)).toEqual([
+      'sessions/2026-11-20_10-00-00_wing-2.imu', 'sessions/2026-11-20_10-00-00_wing-2.json', 'sessions/2026-11-20_10-00-00_wing-2.gpx',
+    ]);
+  });
+
+  it('seule la session de l\'entrée revient, pas une copie en double rangée avec elle ; capteurs absents : sautés', () => {
+    const entry: TrashEntry = { ...session('1-100', 100), files: [{ name: 'a.gpx', size: 1 }, { name: 'a.json', size: 1 }, { name: 'a-2.gpx', size: 1 }] };
+    expect(sessionRestorePlan(entry, []).copies.map((c) => c.to)).toEqual(['sessions/a.json', 'sessions/a.gpx']);
+  });
+
+  it('itinéraire : GPX puis fiche, sous une base libre', () => {
+    expect(routeRestorePlan(route('1-lac', 'lac'), ['lac.json', 'lac.gpx'])).toEqual({
+      base: 'lac-2',
+      copies: [
+        { from: 'corbeille/1-lac/lac.gpx', to: 'itineraires/lac-2.gpx' },
+        { from: 'corbeille/1-lac/lac.json', to: 'itineraires/lac-2.json' },
+      ],
+    });
+  });
+});
+
+describe('confirmations', () => {
+  it('la corbeille n\'est promise que pour le dossier du disque en écriture ; mémoire du navigateur du programme Windows : suppression définitive', () => {
+    expect(deletesToTrash('disk', false)).toBe(true);
+    for (const [kind, readOnly] of [['browser', false], ['disk', true], ['picked', false], ['device', false], [null, false]] as const) {
+      expect(deletesToTrash(kind, readOnly), `${kind} ${readOnly}`).toBe(false);
+    }
+    const browser = deletesToTrash('browser', false);
+    expect(sessionDeleteQuestion(browser)).toBe('Supprimer cette session de la mémoire ?');
+    expect(sessionDiscardQuestion(browser, false)).toContain('ne pourra pas être récupérée');
+    expect(routeDeleteButton(browser, 'Supprimer définitivement')).toBe('Supprimer définitivement');
+    expect(sessionDeleteQuestion(true)).toContain('corbeille');
+    expect(sessionDiscardQuestion(true, true)).toContain('30 jours');
+    expect(routeDeleteButton(true, 'Supprimer')).toBe('Mettre à la corbeille (30 jours)');
+  });
+});
+
+describe('ligne de Réglages › Mémoire', () => {
+  it('rien pour une corbeille vide ; sessions, itinéraires, ou les deux', () => {
+    expect(trashSummaryText({ sessions: 0, routes: 0 })).toBeNull();
+    expect(trashSummaryText({ sessions: 1, routes: 0 })).toBe('Corbeille : 1 session, gardée 30 jours');
+    expect(trashSummaryText({ sessions: 4, routes: 0 })).toBe('Corbeille : 4 sessions, gardées 30 jours');
+    expect(trashSummaryText({ sessions: 0, routes: 2 })).toBe('Corbeille : 2 itinéraires, gardés 30 jours');
+    expect(trashSummaryText({ sessions: 3, routes: 1 })).toBe('Corbeille : 3 sessions et 1 itinéraire, gardés 30 jours');
+    expect(trashCounts([session('a', 1), session('b', 2), route('c', 'c')])).toEqual({ sessions: 2, routes: 1 });
+  });
+});

@@ -10,7 +10,7 @@ import { dateLocale, t } from '../../core/i18n';
 const STOP_ICON = <span className="ui-record-dot ui-record-dot--stop" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />;
 
 /** Gestes que le bouton rappelle ; l'identifiant n'est pas affiché, la phrase vient de `holdHint`. */
-export type HoldAction = 'arrêter' | 'jeter' | 'supprimer' | "revenir aux réglages d'usine" | 'tout supprimer';
+export type HoldAction = 'arrêter' | 'jeter' | 'supprimer' | "revenir aux réglages d'usine" | 'tout supprimer' | 'vider la corbeille';
 
 /** Rappel du geste, en phrase entière par geste (jamais un verbe collé à une phrase). */
 const holdHint = (action: HoldAction, holdS: string): string => {
@@ -23,6 +23,8 @@ const holdHint = (action: HoldAction, holdS: string): string => {
       return t("Maintenir {holdS} s pour revenir aux réglages d'usine", { holdS });
     case 'tout supprimer':
       return t('Maintenir {holdS} s pour tout supprimer', { holdS });
+    case 'vider la corbeille':
+      return t('Maintenir {holdS} s pour vider la corbeille', { holdS });
     default:
       return t('Maintenir {holdS} s pour arrêter', { holdS });
   }

@@ -101,6 +101,29 @@ describe('fichiers de l\'application dans le dossier mémoire', () => {
     expect(routes).toBe(1);
   });
 
+  it('corbeille du programme Windows : son index d\'abord, puis les fichiers de ses entrées ; rien d\'étranger', () => {
+    const { paths, trash } = memoryResetTargets({
+      ...listings(),
+      trash: {
+        root: [file('corbeille.json'), file('a-moi.txt'), dir('1763600000000-1763500000000'), dir('photos')],
+        dirs: {
+          '1763600000000-1763500000000': [file('a.gpx'), file('a.json'), file('a.imu'), file('notes.txt'), dir('sous')],
+          '1763600000001-vide': [],
+          photos: [file('x.gpx')],
+        },
+      },
+    });
+    expect(paths.slice(0, 5)).toEqual([
+      'corbeille/corbeille.json',
+      'corbeille/1763600000000-1763500000000/a.gpx', 'corbeille/1763600000000-1763500000000/a.json',
+      'corbeille/1763600000000-1763500000000/a.imu',
+      'journaux/journal-1.jsonl',
+    ]);
+    expect(paths.some((p) => p.includes('photos') || p.includes('notes.txt') || p.includes('a-moi'))).toBe(false);
+    expect(trash).toBe(1);
+    expect(memoryResetTargets(listings()).trash).toBe(0);
+  });
+
   it('efface les fichiers de l\'application d\'un dossier, et laisse les autres', async () => {
     const files = new Map([
       ['gtracker.json', '{}'], ['LISEZMOI.txt', ''], ['a-moi.txt', 'à moi'], ['x.gpx', '<gpx/>'],

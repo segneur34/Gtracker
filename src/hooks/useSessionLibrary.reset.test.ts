@@ -159,7 +159,7 @@ describe('tout supprimer', () => {
   it('compte les sessions, puis ne laisse que les fichiers étrangers et le dossier désigné', async () => {
     usedDevice();
     const library = await openFresh();
-    expect(await library.countErasable()).toEqual({ sessions: 2, pending: 0, routes: 0 });
+    expect(await library.countErasable()).toEqual({ sessions: 2, pending: 0, routes: 0, trash: 0 });
     stubWindow();
     const progress: number[] = [];
     expect(await library.eraseEverything((p) => progress.push(p.done))).toBeNull();

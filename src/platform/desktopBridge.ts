@@ -80,6 +80,8 @@ export interface DesktopMemoryBridge {
   ecrireTexte(argument: DesktopFileTarget & { texte: string }): Promise<BridgeAnswer<null>>;
   ecrireOctets(argument: DesktopFileTarget & { octets: Uint8Array }): Promise<BridgeAnswer<null>>;
   effacer(argument: DesktopFileTarget): Promise<BridgeAnswer<null>>;
+  /** Efface un sous-dossier vide ; refusé s'il contient encore quelque chose. Absent d'une coquille plus ancienne. */
+  effacerDossier?(argument: DesktopFileTarget): Promise<BridgeAnswer<null>>;
 }
 
 /** Textes de la question posée à la fermeture du programme quand un brouillon attend. */

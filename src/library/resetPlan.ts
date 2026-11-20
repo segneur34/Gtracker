@@ -4,6 +4,7 @@ import type { FolderEntry, MemoryFolder } from '../platform/memoryFolder';
 import {
   JOURNALS_DIR, LEARNED_PLACES_FILE, MARKER_FILE, README_FILE, RESTING_HR_FILE, ROUTES_DIR, SESSIONS_DIR, SETTINGS_DIR,
 } from './folderLayout';
+import { TRASH_DIR, TRASH_INDEX_FILE, isTrashDirName } from './trash';
 
 /**
  * Remise à zéro (Réglages › Mémoire) : ce que chacun des deux boutons efface, sans rien effacer ici.
@@ -128,6 +129,11 @@ export const isAppMemoryFile = (dir: string, name: string): boolean => {
 
 /** Contenu des dossiers lus par la remise à zéro. */
 export interface MemoryListings {
+  /**
+   * Corbeille du programme Windows (`trash.ts`) : son dossier, et chacun de ses sous-dossiers d'entrée par son nom.
+   * Absente ailleurs.
+   */
+  trash?: { root: readonly Pick<FolderEntry, 'name' | 'kind'>[]; dirs: Readonly<Record<string, readonly Pick<FolderEntry, 'name' | 'kind'>[]>> };
   root: readonly Pick<FolderEntry, 'name' | 'kind'>[];
   /** `journaux/` : absent de la lecture, il n'y a rien à effacer. */
   journals?: readonly Pick<FolderEntry, 'name' | 'kind'>[];
@@ -143,7 +149,23 @@ export interface MemoryTargets {
   sessions: number;
   /** Fiches d'itinéraire de `itineraires/`. */
   routes: number;
+  /** Sous-dossiers de la corbeille qui ont encore des fichiers : ses entrées. */
+  trash: number;
 }
+
+/** Fichiers d'une entrée de la corbeille : ceux d'une session ou d'un itinéraire. */
+const TRASH_FILES = /\.(gpx|json|imu)$/i;
+
+/** Fichiers de la corbeille, l'index d'abord : une coupure laisse des sous-dossiers hors de l'index, effacés à la purge. */
+const trashPaths = (trash: MemoryListings['trash']): { paths: string[]; entries: number } => {
+  if (!trash) return { paths: [], entries: 0 };
+  const index = trash.root.filter((e) => e.kind === 'file' && withoutTempSuffix(e.name).toLowerCase() === TRASH_INDEX_FILE).map((e) => `${TRASH_DIR}/${e.name}`);
+  const dirs = Object.entries(trash.dirs)
+    .filter(([dir]) => isTrashDirName(dir))
+    .map(([dir, entries]) => entries.filter((e) => e.kind === 'file' && TRASH_FILES.test(withoutTempSuffix(e.name))).map((e) => `${TRASH_DIR}/${dir}/${e.name}`))
+    .filter((paths) => paths.length > 0);
+  return { paths: [...index, ...dirs.flat()], entries: dirs.length };
+};
 
 const filesOf = (dir: string, entries: MemoryListings['root']): string[] =>
   entries.filter((e) => e.kind === 'file' && isAppMemoryFile(dir, e.name)).map((e) => e.name);
@@ -154,7 +176,8 @@ const isGpx = (name: string): boolean => /\.gpx$/i.test(name);
  * Fichiers de l'application à effacer pour « Tout supprimer », dans l'ordre : les GPX des sessions d'abord (une
  * interruption laisse des sessions entières ou absentes, jamais une trace sans fiche qui se recrée), puis leurs
  * fiches et capteurs, les itinéraires, les fichiers de réglages, ceux de la racine, et le marqueur en dernier : tant
- * qu'il reste quelque chose, le dossier se reconnaît. Les journaux gardés de côté (`journaux/`) partent en premier. Jamais un dossier : sur le téléphone, effacer un dossier
+ * qu'il reste quelque chose, le dossier se reconnaît. La corbeille du programme Windows (son index, puis les fichiers
+ * de ses entrées) et les journaux gardés de côté (`journaux/`) partent en premier. Jamais un dossier : sur le téléphone, effacer un dossier
  * efface tout ce qu'il contient.
  */
 export const memoryResetTargets = (listings: MemoryListings): MemoryTargets => {
@@ -164,8 +187,10 @@ export const memoryResetTargets = (listings: MemoryListings): MemoryTargets => {
   const root = filesOf('', listings.root);
   const isMarker = (name: string): boolean => withoutTempSuffix(name).toLowerCase() === MARKER_FILE.toLowerCase();
   const at = (dir: string) => (name: string): string => `${dir}/${name}`;
+  const trash = trashPaths(listings.trash);
   return {
     paths: [
+      ...trash.paths,
       ...filesOf(JOURNALS_DIR, listings.journals ?? []).map(at(JOURNALS_DIR)),
       ...gpx.map(at(SESSIONS_DIR)),
       ...sessions.filter((n) => !isGpx(n)).map(at(SESSIONS_DIR)),
@@ -176,11 +201,31 @@ export const memoryResetTargets = (listings: MemoryListings): MemoryTargets => {
     ],
     sessions: gpx.length,
     routes: routes.filter((n) => /\.json$/i.test(n)).length,
+    trash: trash.entries,
   };
 };
 
-/** Lit les dossiers de la remise à zéro ; `journaux/`, facultatif, ne bloque pas s'il ne se lit pas. */
-export const readMemoryListings = async (folder: Pick<MemoryFolder, 'list'>): Promise<MemoryListings> => ({
+/** Corbeille lue pour la remise à zéro (dossier du disque seulement) ; illisible ou absente, rien à effacer. */
+const readTrashListings = async (folder: Pick<MemoryFolder, 'list' | 'kind'>): Promise<MemoryListings['trash']> => {
+  if (folder.kind !== 'disk') return undefined;
+  try {
+    const root = await folder.list(TRASH_DIR);
+    const dirs: Record<string, readonly Pick<FolderEntry, 'name' | 'kind'>[]> = {};
+    for (const e of root) {
+      if (e.kind === 'directory' && isTrashDirName(e.name)) dirs[e.name] = await folder.list(`${TRASH_DIR}/${e.name}`);
+    }
+    return { root, dirs };
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Lit les dossiers de la remise à zéro ; `journaux/`, facultatif, ne bloque pas s'il ne se lit pas, ni la corbeille
+ * du programme Windows.
+ */
+export const readMemoryListings = async (folder: Pick<MemoryFolder, 'list' | 'kind'>): Promise<MemoryListings> => ({
+  trash: await readTrashListings(folder),
   root: await folder.list(''),
   journals: await folder.list(JOURNALS_DIR).catch(() => []),
   sessions: await folder.list(SESSIONS_DIR),
@@ -200,7 +245,7 @@ export interface EraseResult {
  * sans rien tenter d'autre. `onProgress` reçoit le nombre de fichiers effacés et leur total.
  */
 export const eraseAppFiles = async (
-  folder: Pick<MemoryFolder, 'list' | 'remove'>,
+  folder: Pick<MemoryFolder, 'list' | 'remove' | 'kind'>,
   onProgress: (done: number, total: number) => void = () => undefined,
 ): Promise<EraseResult> => {
   let listings: MemoryListings;
@@ -239,6 +284,8 @@ export interface EraseCounts {
   /** Sessions enregistrées qui attendent un dossier, dans le dossier privé du téléphone. */
   pending: number;
   routes: number;
+  /** Entrées de la corbeille du programme Windows ; absent ailleurs. */
+  trash?: number;
 }
 
 /** Question posée après l'appui tenu. */
@@ -256,6 +303,7 @@ export const resetConfirmText = (kind: ResetKind, counts: EraseCounts): string =
   const items = [
     sessions,
     counts.routes > 0 ? tn(counts.routes, '{n} itinéraire', '{n} itinéraires') : null,
+    (counts.trash ?? 0) > 0 ? tn(counts.trash ?? 0, '{n} élément de la corbeille', '{n} éléments de la corbeille') : null,
     t('le profil'), t('les tests de FC repos'), t('les lieux corrigés'), t('les réglages'), t('les cartes gardées'),
   ].filter((item): item is string => item !== null);
   return `${t('Tout supprimer ? Seront effacés définitivement : {others} et {last}.', { others: items.slice(0, -1).join(', '), last: items[items.length - 1] })} `

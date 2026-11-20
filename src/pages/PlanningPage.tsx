@@ -61,6 +61,8 @@ import { jsonStore } from '../platform/storage';
 import { STORAGE_KEYS } from '../core/appIdentity';
 import { ROUTES_LIST_PATH } from '../core/parentPage';
 import { dateLocale, t, tn } from '../core/i18n';
+import { routeDeleteButton } from '../library/trash';
+import { useDeletesToTrash } from '../hooks/useTrash';
 import { tRich } from '../components/tRich';
 
 /**
@@ -251,6 +253,7 @@ function PlanningPage() {
   const planner = usePlannedRoute();
   const { route } = planner;
   const library = useRouteLibrary();
+  const toTrash = useDeletesToTrash();
   /** « Mes itinéraires » : sans ceux d'une activité cachée. */
   const listedRoutes = useMemo(() => shownRoutes(library.routes, activities, isShown), [library.routes, activities, isShown]);
   const { go, canGo } = useGoOnRoute();
@@ -625,7 +628,7 @@ function PlanningPage() {
             )}
             {current !== null && (confirmingMenuDelete === current.base ? (
               <>
-                <Button variant="danger" onClick={() => void deleteSaved(current)}>{t('Supprimer définitivement')}</Button>
+                <Button variant="danger" onClick={() => void deleteSaved(current)}>{routeDeleteButton(toTrash, t('Supprimer définitivement'))}</Button>
                 <Button variant="ghost" onClick={() => setConfirmingMenuDelete(null)}>{t('Garder')}</Button>
               </>
             ) : (
@@ -866,7 +869,7 @@ function PlanningPage() {
                 go={false}
                 actions={(saved) => (confirmingDelete === saved.base ? (
                   <span className="plan-saved__confirm">
-                    <Button size="s" variant="danger" onClick={() => void deleteSaved(saved)}>{t('Supprimer')}</Button>
+                    <Button size="s" variant="danger" onClick={() => void deleteSaved(saved)}>{routeDeleteButton(toTrash, t('Supprimer'))}</Button>
                     <Button size="s" variant="ghost" onClick={() => setConfirmingDelete(null)}>{t('Garder')}</Button>
                   </span>
                 ) : (

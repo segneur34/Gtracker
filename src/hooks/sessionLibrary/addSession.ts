@@ -29,6 +29,7 @@ import {
 } from './memory';
 import { activityOfSession, activitySummarySettings, newRecord, recordFor, sessionSummarySettings } from './summarySettings';
 import { noteRecordEdits, resummarize, scheduleRecordWrite, writeRecordFile } from './recordWrites';
+import { forgetReturnedSession } from './trash';
 
 /**
  * Entrée d'une session dans la mémoire : son GPX, sa fiche et ses capteurs, ou ce qui manque à une
@@ -235,5 +236,7 @@ export const addGpx = async (text: string, source: SessionSource, options: AddOp
   if (motion) lib.knownNames.add(imuFileName(gpx));
   rememberUnreadable(f, gpx, options.record && !kept ? options.unreadable : undefined);
   replaceSession({ file: gpx, record, readOnly: kept !== undefined, warning: kept?.warning ?? null });
+  // Revenue dans la mémoire : son entrée de corbeille (programme Windows) part, pour ne pas la montrer deux fois.
+  void forgetReturnedSession(startMs);
   return { status: 'added', file: gpx };
 };

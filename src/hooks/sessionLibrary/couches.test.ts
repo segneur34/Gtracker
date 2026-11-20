@@ -18,21 +18,22 @@ const SRC = new URL('../../', import.meta.url);
 
 /** Les couches, de la plus basse à la plus haute. */
 const LAYERS = [
-  'store', 'memory', 'summarySettings', 'recordWrites', 'cache', 'scan', 'summaryQueue', 'deviceSettings',
+  'store', 'memory', 'summarySettings', 'recordWrites', 'cache', 'scan', 'summaryQueue', 'deviceSettings', 'trash',
   'addSession', 'pending', 'importer', 'incoming', 'phoneRecovery', 'sessionRecords', 'placeQueue', 'lifecycle', 'reset',
+  'trashRestore',
 ] as const;
 
 /** Valeurs exportées par le point d'entrée, les mêmes qu'avant le découpage (et cinq types). */
 const ENTRY_VALUES = [
   'adoptSettingsFile', 'answerImportQuestion', 'canChooseMemoryFolder', 'canImportSessions', 'chooseFolder', 'correctSessionPlace', 'countErasable', 'currentMemoryFolder', 'dismissIncomingNotice', 'dismissLibraryMessage',
-  'dismissSettingsOffer', 'eraseEverything', 'factoryReset', 'findLibrarySession', 'hasSessionMotion', 'importEntries', 'importFiles', 'importFromFolder',
+  'dismissSettingsOffer', 'eraseEverything', 'factoryReset', 'stashRoute', 'trashStore', 'deleteFromTrash', 'emptyWholeTrash', 'restoreFromTrash', 'findLibrarySession', 'hasSessionMotion', 'importEntries', 'importFiles', 'importFromFolder',
   'importSettingsFile', 'librarySession', 'loadFullSession', 'loadSessionGpx', 'openLibrary', 'queueOutdatedRefresh',
   'queueSessionPlace', 'readLibraryState', 'readSessionExport', 'readSessionGpx', 'readSessionMotion', 'reconnectFolder', 'recoverFromPhone', 'refreshLibrary', 'reloadAfterWrites',
   'removeSession', 'renameDevice', 'reportStartupError', 'saveRecordedSession', 'startIncomingFiles', 'startLibraryUi',
   'summarizeGpxText', 'switchToBrowserMemory', 'updateSessionRecord', 'useLibraryFields', 'useLibrarySelector',
   'useLibrarySession', 'usePhoneRecovery',
 ];
-const ENTRY_TYPES = ['AddResult', 'AddStatus', 'LibraryState', 'LibraryStatus', 'PhoneRecoveryStep', 'ResetProgress', 'SettingsFileInfo'];
+const ENTRY_TYPES = ['AddResult', 'AddStatus', 'LibraryState', 'LibraryStatus', 'PhoneRecoveryStep', 'ResetProgress', 'SettingsFileInfo', 'TrashState'];
 
 const isCode = (name: string): boolean => /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) && !/\.fixture\.ts$/.test(name);
 

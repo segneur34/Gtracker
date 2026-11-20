@@ -12,10 +12,13 @@ import {
   cacheDirty, findSession, hasSessionMotion, hydrateSession, lastEdit, lib, publish, rememberUnreadable, removing,
   replaceSession, unreadableOf, unwritten,
 } from './memory';
-import { cancelRecordWrite, noteRecordEdits, recordEdits, resummarize, scheduleRecordWrite } from './recordWrites';
+import {
+  cancelRecordWrite, noteRecordEdits, recordEdits, recordTimers, resummarize, scheduleRecordWrite, writeRecordNow,
+} from './recordWrites';
 import { scheduleCacheUpdate } from './cache';
 import type { AddOptions } from './addSession';
 import { sessionDraftStore } from '../sessionDraftStore';
+import { stashSession, trashFolderOf } from './trash';
 
 /**
  * Une session de la mémoire : son GPX, sa fiche entière, ses capteurs, le changement de sa fiche et sa
@@ -120,7 +123,8 @@ export const updateSessionRecords = (patches: readonly { file: string; patch: Re
  * Supprime une session : son GPX, sa fiche et ses capteurs, ainsi que les copies de la même
  * trace sous un autre nom, qui sans cela prendraient sa place dans la liste. Elles quittent
  * la liste avant les suppressions sur le disque, et restent dans `removing` jusqu'à la fin :
- * un recalcul de fond qui les traite ne les y remet pas.
+ * un recalcul de fond qui les traite ne les y remet pas. Dans le programme Windows, tout cela est d'abord recopié
+ * dans la corbeille (`stashSession`), qui le garde 30 jours.
  */
 export const removeSession = async (file: string): Promise<void> => {
   const f = lib.folder;
@@ -131,6 +135,23 @@ export const removeSession = async (file: string): Promise<void> => {
     return;
   }
   const files = lib.all.filter((s) => s.record.summary.startMs === session.record.summary.startMs).map((s) => s.file);
+  // Programme Windows : une copie part d'abord à la corbeille ; si elle échoue, rien n'est retiré.
+  const trash = trashFolderOf(f);
+  if (trash) {
+    const ordered = [file, ...files.filter((name) => name !== file)];
+    const paths = ordered.flatMap((name) => [sessionPath(name), sessionPath(recordFileName(name)), sessionPath(imuFileName(name))]);
+    // Une saisie pas encore écrite part avec la session : la corbeille garde la fiche telle qu'on la voyait.
+    for (const name of ordered) {
+      if (recordTimers.has(name) || unwritten.has(name)) await writeRecordNow(name);
+    }
+    try {
+      await stashSession(trash, session, paths, sessionPath(file));
+    } catch (err) {
+      setState({ error: t('Suppression impossible : {reason}', { reason: errorMessage(err, t('erreur inconnue')) }) });
+      return;
+    }
+    if (lib.folder !== f) return;
+  }
   for (const name of files) {
     removing.add(name);
     cancelRecordWrite(name);
