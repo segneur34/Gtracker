@@ -47,12 +47,34 @@ const telephone = Object.freeze({
   lireOctets: avec('telephone:lireOctets'),
 })
 
+/**
+ * Le sans-fil du PC (noms gardés égaux à ceux de `sansFil.ts` par un test) : `etat()`, `activer({ actif })`,
+ * `ouvrirAppairage()`, `telephones()`, `retirer({ id })`, et `surArrivee(rappel)`, appelé avec `{ id, nom, nouveau }`
+ * quand un téléphone se présente, qui rend la fonction de désabonnement.
+ */
+const sansFil = Object.freeze({
+  etat: sans('sansfil:etat'),
+  activer: avec('sansfil:activer'),
+  ouvrirAppairage: sans('sansfil:ouvrirAppairage'),
+  telephones: sans('sansfil:telephones'),
+  retirer: avec('sansfil:retirer'),
+  surArrivee: (rappel: (avis: unknown) => void) => {
+    // L'événement d'Electron ne passe pas à la page : seulement l'avis.
+    const ecouteur = (_evenement: unknown, avis: unknown) => rappel(avis)
+    ipcRenderer.on('sansfil:arrive', ecouteur)
+    return () => {
+      ipcRenderer.removeListener('sansfil:arrive', ecouteur)
+    }
+  },
+})
+
 contextBridge.exposeInMainWorld(
   'gtrackerBureau',
   Object.freeze({
     version: versionPassee(),
     memoire,
     telephone,
+    sansFil,
     /** Textes traduits de la question de fermeture : `{ question, detail, quitter, rester }`. */
     textes: avec('coquille:textes'),
   }),

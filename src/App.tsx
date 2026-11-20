@@ -5,6 +5,7 @@ import { sportFamily } from './core/sportProfiles';
 import AppShell from './components/AppShell';
 import { DevThrow } from './components/ErrorBoundary';
 import { confirmLeave } from './hooks/leaveGuard';
+import { useComputerLinkLauncher } from './hooks/useComputerLink';
 import {
   acknowledgeRecordingLanding, finishPendingSession, markRecorderResultOpened, useRecorderSelector,
 } from './hooks/useRecorder';
@@ -136,10 +137,20 @@ function FinishRecording() {
   return null;
 }
 
+/**
+ * Liaison sans fil avec l'ordinateur : tentée seule à l'ouverture et à chaque retour au premier plan, sans rien
+ * afficher hors de Réglages › Mémoire (`useComputerLinkLauncher`).
+ */
+function ComputerLinkLauncher() {
+  useComputerLinkLauncher();
+  return null;
+}
+
 function App() {
   useEffect(preloadPages, []);
   return (
     <Router>
+      <ComputerLinkLauncher />
       <LandOnRecording />
       <FinishRecording />
       <Routes>

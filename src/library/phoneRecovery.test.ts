@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ImportReport } from './importReport';
-import { choosePhoneFiles, describePhoneRecovery } from './phoneRecovery';
+import { choosePhoneFiles, describeArrivalRecovery, describePhoneRecovery, type PhoneRecoveryOutcome } from './phoneRecovery';
 
 /** Choix des fichiers du téléphone à lire : une session déjà sur le PC n'est pas lue, tout le reste passe à l'import. */
 
@@ -92,5 +92,60 @@ describe('describePhoneRecovery', () => {
   it('rien sur le téléphone : une phrase qui le dit', () => {
     const text = describePhoneRecovery({ kind: 'done', phone: 'Xiaomi', report: report(), sessionsOnPhone: 0, unplugged: false });
     expect(text.paragraphs[0]).toContain('Aucune session');
+  });
+
+  it('téléphone absent, sans-fil à l\'écoute : d\'abord ouvrir Gtracker sur le même réseau, le câble en second', () => {
+    const text = describePhoneRecovery({ kind: 'phone', state: 'absent', wireless: 'listening' });
+    expect(text.paragraphs[0]).toContain('Ouvrez Gtracker sur votre téléphone');
+    expect(text.paragraphs[0]).toContain('même réseau');
+    expect(text.paragraphs[0]).toContain('partage de connexion');
+    expect(text.paragraphs[1]).toContain('câble USB');
+    expect(text.retry).toBe(true);
+  });
+
+  it('téléphone absent, sans-fil éteint : le câble, puis de quoi allumer le sans-fil', () => {
+    const text = describePhoneRecovery({ kind: 'phone', state: 'absent', wireless: 'off' });
+    expect(text.paragraphs[0]).toContain('câble USB');
+    expect(text.paragraphs[2]).toContain('sans-fil');
+    expect(describePhoneRecovery({ kind: 'phone', state: 'absent' }).paragraphs).toHaveLength(2);
+  });
+
+  it('liaison coupée par le Wi-Fi : rouvrir Gtracker sur le téléphone, pas rebrancher', () => {
+    const text = describePhoneRecovery({ kind: 'done', phone: 'Pixel', report: report({ added: ['a.gpx'] }), sessionsOnPhone: 2, unplugged: true, channel: 'sansFil' });
+    expect(text.paragraphs[0]).toContain('liaison');
+    expect(text.paragraphs[2]).toContain('Rouvrez Gtracker');
+    const failed = describePhoneRecovery({ kind: 'error', detail: 'délai.', channel: 'sansFil' });
+    expect(failed.paragraphs[0]).toContain('Gtracker est ouvert sur le téléphone');
+    expect(describePhoneRecovery({ kind: 'error', detail: 'délai.', channel: 'cable' }).paragraphs[0]).toContain('le câble');
+  });
+});
+
+describe('describeArrivalRecovery', () => {
+  const done = (patch: Partial<Extract<PhoneRecoveryOutcome, { kind: 'done' }>> = {}): PhoneRecoveryOutcome => ({
+    kind: 'done', phone: 'Pixel', report: report(), sessionsOnPhone: 3, unplugged: false, channel: 'sansFil', ...patch,
+  });
+
+  it('sessions ajoutées, ou toutes déjà là, ou rien à récupérer : une phrase au nom du téléphone', () => {
+    expect(describeArrivalRecovery(done({ report: report({ added: ['a.gpx', 'b.gpx'] }) }), 'Pixel')).toBe('Téléphone Pixel relié : 2 sessions ajoutées.');
+    expect(describeArrivalRecovery(done({ report: report({ added: ['a.gpx'] }) }), 'Pixel')).toBe('Téléphone Pixel relié : 1 session ajoutée.');
+    expect(describeArrivalRecovery(done({ report: report({ duplicates: 3 }) }), 'Pixel')).toBe('Téléphone Pixel relié : toutes ses sessions sont déjà là.');
+    expect(describeArrivalRecovery(done({ sessionsOnPhone: 0 }), 'Pixel')).toBe('Téléphone Pixel relié : aucune session à récupérer.');
+  });
+
+  it('fichier non rangé ou liaison coupée : dit, avec « Récupérer » pour finir', () => {
+    expect(describeArrivalRecovery(done({ report: report({ added: ['a.gpx'], failed: ['b.gpx : délai'] }) }), 'Pixel'))
+      .toBe("Téléphone Pixel relié : 1 session ajoutée. 1 fichier n'a pas pu être rangé : cliquez sur « Récupérer » pour réessayer.");
+    expect(describeArrivalRecovery(done({ unplugged: true }), 'Pixel')).toContain('« Récupérer »');
+  });
+
+  it('téléphone reparti, import déjà en cours, outil du câble manquant : rien à dire', () => {
+    expect(describeArrivalRecovery({ kind: 'phone', state: 'absent' }, 'Pixel')).toBeNull();
+    expect(describeArrivalRecovery({ kind: 'busy' }, 'Pixel')).toBeNull();
+    expect(describeArrivalRecovery({ kind: 'tool-missing', folder: 'C:\\x' }, 'Pixel')).toBeNull();
+  });
+
+  it('mémoire fermée ou panne : la raison, en une phrase', () => {
+    expect(describeArrivalRecovery({ kind: 'memory', text: 'Pas de dossier.' }, 'Pixel')).toBe('Pas de dossier.');
+    expect(describeArrivalRecovery({ kind: 'error', detail: 'délai dépassé.' }, 'Pixel')).toBe('Téléphone Pixel relié, mais ses sessions n\'ont pas pu être lues (délai dépassé).');
   });
 });

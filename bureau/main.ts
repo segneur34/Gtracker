@@ -20,19 +20,24 @@
 //   GTRACKER_MEMOIRE, GTRACKER_DOCUMENTS, GTRACKER_BANC_DOSSIER : en mode d'essai seulement, voir `memoire.ts`
 //   GTRACKER_BANC_TELEPHONE, GTRACKER_BANC_TELEPHONE_ETAT, GTRACKER_BANC_TELEPHONE_COUPURE : en mode d'essai
 //                           seulement, voir `telephone.ts` ; le mode d'essai ne lance jamais le vrai adb
+//   GTRACKER_BANC_SANSFIL_ACTIF, _PORT, _SONDE, _FENETRE_MS, _PROFIL : en mode d'essai seulement, voir `sansFil.ts` ;
+//                           le serveur sans fil d'essai n'écoute que sur 127.0.0.1
 //
 // Le dossier mémoire (un vrai dossier du disque) est lu et écrit ici, la page y passant par les canaux `memoire:*`
 // du pont (`preload.ts`, `memoire.ts`) ; seule la page de la fenêtre principale y a accès (`expediteurAdmis`).
-// Le dossier `Documents/Gtracker` du téléphone branché est lu ici aussi, en lecture seule, par les canaux
-// `telephone:*` (`telephone.ts`, et `adb.ts` pour le débogage USB).
+// Le dossier `Documents/Gtracker` du téléphone est lu ici aussi, en lecture seule, par les canaux `telephone:*`
+// (`telephone.ts`) : par le Wi-Fi si un téléphone y est relié (`sansFil.ts`, réglé par les canaux `sansfil:*`),
+// sinon par le câble (`adb.ts`, le débogage USB).
 
-import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol, screen, session, shell } from 'electron'
+import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol, safeStorage, screen, session, shell } from 'electron'
 import type { OpenDialogOptions, Rectangle, WebContents } from 'electron'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { dossierAdb, dossierAdbConseille } from './adb'
 import { creerMemoire, gestionnairesMemoire, optionsDepuisEnvironnement } from './memoire'
+import type { Chiffreur } from './sansFil'
+import { AVIS_ARRIVEE, DOSSIER_SANS_FIL, ServeurSansFil, dossierSansFilPuisCable, essaiSansFilDepuisEnvironnement, gestionnairesSansFil, stockageDossier } from './sansFil'
 import type { DossierDistant } from './telephone'
 import { DOSSIER_LECTURES, dossierLocal, essaiTelephoneDepuisEnvironnement, gestionnairesTelephone, viderLectures } from './telephone'
 import { ADRESSE_ACCUEIL, HOTE, estDeLApplication } from './origine'
@@ -300,14 +305,43 @@ const choisirParFenetre = uneALaFois(async ({ titre, depart }: { titre: string; 
   return canceled || filePaths.length === 0 ? null : filePaths[0]
 })
 
+/** Chiffrement du système (DPAPI sous Windows) pour la clé du certificat du sans-fil. */
+const chiffreurSysteme: Chiffreur = {
+  disponible: () => safeStorage.isAsyncEncryptionAvailable(),
+  chiffrer: (texte) => safeStorage.encryptStringAsync(texte),
+  dechiffrer: async (octets) => (await safeStorage.decryptStringAsync(Buffer.from(octets))).result,
+}
+
 /**
- * Le téléphone : en mode d'essai, le dossier local des variables d'essai (jamais le vrai téléphone) ; sinon le débogage
- * USB, par l'adb trouvé sur le poste.
+ * Le serveur sans fil, secrets dans le profil (ou le dossier d'essai), jamais dans la mémoire. Il ne se met à l'écoute
+ * que si l'utilisateur l'a activé ; l'arrivée d'un téléphone est annoncée à la page (`AVIS_ARRIVEE`).
  */
-function creerTelephone(profil: string): DossierDistant {
+function creerSansFil(profil: string): ServeurSansFil {
+  const essai = essaiSansFilDepuisEnvironnement(process.env, journal)
+  const { dossier, actif, ...reglagesEssai } = essai ?? { dossier: null, actif: false }
+  const serveur = new ServeurSansFil({
+    stockage: stockageDossier(dossier ?? path.join(profil, DOSSIER_SANS_FIL)),
+    chiffreur: chiffreurSysteme,
+    journal,
+    surArrivee: (avis) => {
+      const fenetre = fenetrePrincipale
+      if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(AVIS_ARRIVEE, avis)
+    },
+    ...reglagesEssai,
+  })
+  void (actif ? serveur.activer(true) : serveur.demarrer()).catch((e: unknown) => journal(`sans-fil : ${e instanceof Error ? e.message : String(e)}`))
+  app.on('will-quit', () => void serveur.arreter())
+  return serveur
+}
+
+/**
+ * Le téléphone : par le Wi-Fi s'il y est relié, sinon par le câble ; en mode d'essai, le câble est le dossier local des
+ * variables d'essai (jamais le vrai téléphone), sinon le débogage USB, par l'adb trouvé sur le poste.
+ */
+function creerTelephone(profil: string, sansFil: ServeurSansFil): DossierDistant {
   const essai = essaiTelephoneDepuisEnvironnement(process.env, dossierAdbConseille(profil), journal)
-  if (essai) return dossierLocal(essai.stockage, essai)
-  return dossierAdb({ env: process.env, profil, programme: path.dirname(process.execPath), journal })
+  const cable = essai ? dossierLocal(essai.stockage, essai) : dossierAdb({ env: process.env, profil, programme: path.dirname(process.execPath), journal })
+  return dossierSansFilPuisCable(sansFil.dossierSansFil(), cable)
 }
 
 function brancherPont(): void {
@@ -322,12 +356,14 @@ function brancherPont(): void {
     const ouverture = await memoire.ouvrir()
     return ouverture.ok && ouverture.valeur.etat !== 'aucun' ? ouverture.valeur.chemin : null
   }
+  const sansFil = creerSansFil(profil)
   brancherCanaux(
     ipcMain,
     (evenement) => expediteurAdmis(evenement, fenetrePrincipale?.webContents ?? null),
     {
       ...gestionnairesMemoire(memoire),
-      ...gestionnairesTelephone(creerTelephone(profil), lectures, { memoire: memoireRetenue }),
+      ...gestionnairesTelephone(creerTelephone(profil, sansFil), lectures, { memoire: memoireRetenue }),
+      ...gestionnairesSansFil(sansFil),
       'coquille:textes': async (argument) => {
         const textes = lireTextesFermeture(argument)
         if (!textes) return echec('UNKNOWN', 'Textes de la question de fermeture incomplets.')

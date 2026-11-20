@@ -22,6 +22,9 @@ let phoneGone: boolean;
 
 const answer = <T,>(valeur: T) => Promise.resolve({ ok: true as const, valeur });
 
+/** Le sans-fil du PC tel que la coquille le dit ; `null` : une coquille qui n'en a pas. */
+let wireless: { actif: boolean; ecoute: boolean } | null;
+
 const plugPhone = (): void => {
   const telephone = {
     etat: () => answer(phoneGone ? { etat: 'absent' } : { etat: 'pret', nom: 'Xiaomi' }),
@@ -33,7 +36,12 @@ const plugPhone = (): void => {
       return answer(new TextEncoder().encode(phoneFiles.get(chemin) ?? ''));
     },
   };
-  vi.stubGlobal('window', { gtrackerBureau: { version: '0.0.0', memoire: { ouvrir: async () => null }, textes: async () => null, telephone } });
+  const sansFil = wireless && {
+    etat: () => answer({ ...wireless, port: 48217, adresses: ['192.168.1.20'], pareFeu: 'inconnu', erreur: null, appairage: null, relies: [] }),
+    activer: () => answer(null), ouvrirAppairage: () => answer(null), telephones: () => answer([]), retirer: () => answer(false),
+    surArrivee: () => () => undefined,
+  };
+  vi.stubGlobal('window', { gtrackerBureau: { version: '0.0.0', memoire: { ouvrir: async () => null }, textes: async () => null, telephone, ...(sansFil ? { sansFil } : {}) } });
 };
 
 const openFresh = async () => {
@@ -74,6 +82,7 @@ beforeEach(() => {
   phoneReads = [];
   cutAfter = null;
   phoneGone = false;
+  wireless = null;
   stopTimers = trackTestTimers();
 });
 afterEach(() => {
@@ -125,5 +134,59 @@ describe('récupérer les sessions du téléphone', () => {
     expect(outcome).toEqual({ kind: 'phone', state: 'absent' });
     expect(pcGpx()).toEqual([]);
     expect(phoneReads).toEqual([]);
+  });
+
+  it('téléphone absent : l\'issue dit si le sans-fil attend un téléphone, est éteint ou n\'existe pas', async () => {
+    phoneGone = true;
+    wireless = { actif: true, ecoute: true };
+    const { recovery } = await openFresh();
+    expect((await recover(recovery)).outcome).toEqual({ kind: 'phone', state: 'absent', wireless: 'listening' });
+    wireless = { actif: false, ecoute: false };
+    plugPhone();
+    expect((await recover(recovery)).outcome).toEqual({ kind: 'phone', state: 'absent', wireless: 'off' });
+    wireless = { actif: true, ecoute: false };
+    plugPhone();
+    expect((await recover(recovery)).outcome).toEqual({ kind: 'phone', state: 'absent' });
+  });
+});
+
+describe('récupération à l\'arrivée d\'un téléphone relié', () => {
+  it('range seule les sessions neuves et dit le résultat par une ligne', async () => {
+    const { recovery } = await openFresh();
+    await recovery.recoverOnArrival('Pixel');
+    expect(pcGpx()).toHaveLength(3);
+    expect(recovery.arrivalNote()?.text).toBe('Téléphone Pixel relié : 3 sessions ajoutées.');
+    // Le téléphone range ses sessions sous les mêmes noms que le PC : au retour, rien à relire.
+    phoneFiles = new Map(pcGpx().map((p) => [p, files.get(p)!]));
+    phoneReads = [];
+    await recovery.recoverOnArrival('Pixel');
+    expect(recovery.arrivalNote()?.text).toBe('Téléphone Pixel relié : toutes ses sessions sont déjà là.');
+    expect(phoneReads).toEqual([]);
+    expect(pcGpx()).toHaveLength(3);
+    recovery.clearArrivalNote();
+    expect(recovery.arrivalNote()).toBeNull();
+  });
+
+  it('une arrivée pendant une récupération attend sa fin, et les arrivées suivantes se joignent à elle', async () => {
+    const { recovery } = await openFresh();
+    const manual = recovery.recoverFromPhone();
+    const first = recovery.recoverOnArrival('Pixel');
+    const second = recovery.recoverOnArrival('Pixel');
+    expect(second).toBe(first);
+    await manual;
+    // La récupération manuelle ne laisse aucune ligne d'arrivée ; la suivante n'a pas encore commencé.
+    expect(recovery.arrivalNote()).toBeNull();
+    await first;
+    expect(pcGpx()).toHaveLength(3);
+    expect(recovery.arrivalNote()?.text).toContain('Téléphone Pixel relié');
+    expect(recovery.phoneRecoveryStep().step).toBe('over');
+  });
+
+  it('téléphone reparti entre l\'arrivée et la lecture : aucune ligne', async () => {
+    phoneGone = true;
+    const { recovery } = await openFresh();
+    await recovery.recoverOnArrival('Pixel');
+    expect(recovery.arrivalNote()).toBeNull();
+    expect(pcGpx()).toEqual([]);
   });
 });

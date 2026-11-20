@@ -224,9 +224,11 @@ describe('lireMessage', () => {
 
 describe('blocsDeLecture', () => {
   it('découpe un fichier en blocs de 1 Mio, le dernier plus court', () => {
-    expect(blocsDeLecture(0)).toEqual([])
-    expect(blocsDeLecture(TAILLE_BLOC)).toEqual([{ debut: 0, longueur: TAILLE_BLOC }])
-    expect(blocsDeLecture(2 * TAILLE_BLOC + 5)).toEqual([
+    expect([...blocsDeLecture(0)]).toEqual([])
+    expect([...blocsDeLecture(TAILLE_BLOC)]).toEqual([{ debut: 0, longueur: TAILLE_BLOC }])
+    // Produits un à un : une taille démesurée ne construit rien d'avance.
+    expect(blocsDeLecture(9e15).next().value).toEqual({ debut: 0, longueur: TAILLE_BLOC })
+    expect([...blocsDeLecture(2 * TAILLE_BLOC + 5)]).toEqual([
       { debut: 0, longueur: TAILLE_BLOC },
       { debut: TAILLE_BLOC, longueur: TAILLE_BLOC },
       { debut: 2 * TAILLE_BLOC, longueur: 5 },

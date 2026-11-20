@@ -503,6 +503,16 @@ const readDeviceChoice = (): DeviceFolderChoice | null => {
     : null;
 };
 
+/**
+ * Le dossier désigné sur le téléphone, adresse et sous-dossier (`base`, vide quand c'est le dossier mémoire lui-même),
+ * tel que la liaison sans fil avec l'ordinateur le lit ; `null` hors du téléphone ou sans dossier désigné.
+ */
+export const deviceFolderLocation = (): { uri: string; base: string } | null => {
+  if (!isNativeApp()) return null;
+  const choice = readDeviceChoice();
+  return choice === null ? null : { uri: choice.uri, base: choice.base };
+};
+
 const openDeviceFolder = async (): Promise<MemoryAccess> => {
   const choice = readDeviceChoice();
   if (!choice) return { state: 'unavailable', reason: t('Aucun dossier mémoire choisi.') };

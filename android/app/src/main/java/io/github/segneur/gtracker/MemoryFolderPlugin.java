@@ -20,11 +20,9 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.ByteArrayOutputStream;
-import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -68,17 +66,7 @@ public class MemoryFolderPlugin extends Plugin {
      * coupure fait reprendre par `list`, alors qu'un fichier neuf interrompu est seulement effacé.
      */
     private static final String NEW_SUFFIX = ".gtracker-new";
-    /** Fournisseur du stockage du téléphone, dont l'identifiant d'un document est son chemin. */
-    private static final String EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents";
     private static final String LOG_TAG = "MemoryFolder";
-
-    private static final String[] CHILD_COLUMNS = {
-        Document.COLUMN_DOCUMENT_ID,
-        Document.COLUMN_DISPLAY_NAME,
-        Document.COLUMN_MIME_TYPE,
-        Document.COLUMN_SIZE,
-        Document.COLUMN_LAST_MODIFIED,
-    };
 
     // --- Choix du dossier ---
 
@@ -142,7 +130,7 @@ public class MemoryFolderPlugin extends Plugin {
         }
         if (granted) {
             try {
-                granted = exists(tree, DocumentsContract.getTreeDocumentId(tree));
+                granted = memory().exists(tree, DocumentsContract.getTreeDocumentId(tree));
             } catch (Exception e) {
                 granted = false;
             }
@@ -162,22 +150,10 @@ public class MemoryFolderPlugin extends Plugin {
         try {
             String dirId = resolve(tree, call.getString("path", ""), false);
             if (dirId != null) {
-                List<Child> children = new ArrayList<>();
-                Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(tree, dirId);
-                try (Cursor c = resolver().query(childrenUri, CHILD_COLUMNS, null, null, null)) {
-                    while (c != null && c.moveToNext()) {
-                        children.add(new Child(
-                            c.getString(0),
-                            c.getString(1),
-                            Document.MIME_TYPE_DIR.equals(c.getString(2)),
-                            c.isNull(3) ? 0 : c.getLong(3),
-                            c.isNull(4) ? 0 : c.getLong(4)
-                        ));
-                    }
-                }
+                List<MemoryTree.Child> children = memory().children(tree, dirId);
                 Set<String> names = new HashSet<>();
-                for (Child child : children) names.add(child.name);
-                for (Child child : children) {
+                for (MemoryTree.Child child : children) names.add(child.name);
+                for (MemoryTree.Child child : children) {
                     if (!child.isDir && child.name.endsWith(NEW_SUFFIX) && child.name.length() > NEW_SUFFIX.length()) {
                         // Création interrompue avant son renommage : perdue, puis refaite (fiche depuis le GPX).
                         deleteQuietly(DocumentsContract.buildDocumentUriUsingTree(tree, child.id));
@@ -317,7 +293,7 @@ public class MemoryFolderPlugin extends Plugin {
             String parentPath = slash < 0 ? "" : path.substring(0, slash);
             String name = path.substring(slash + 1);
             String parentId = resolve(tree, parentPath, true);
-            String id = findChild(tree, parentId, name);
+            String id = memory().findChild(tree, parentId, name);
             if (id != null) {
                 replace(tree, parentId, name, DocumentsContract.buildDocumentUriUsingTree(tree, id), data, path);
             } else {
@@ -339,7 +315,7 @@ public class MemoryFolderPlugin extends Plugin {
      */
     private void replace(Uri tree, String parentId, String name, Uri target, byte[] data, String path) throws Exception {
         String tempName = name + TEMP_SUFFIX;
-        String tempId = findChild(tree, parentId, tempName);
+        String tempId = memory().findChild(tree, parentId, tempName);
         Uri temp = tempId != null ? DocumentsContract.buildDocumentUriUsingTree(tree, tempId) : create(tree, parentId, tempName, path);
         writeTo(temp, data, path);
         if (!supportsRename(temp)) {
@@ -370,7 +346,7 @@ public class MemoryFolderPlugin extends Plugin {
      */
     private void createNew(Uri tree, String parentId, String name, byte[] data, String path) throws Exception {
         String newName = name + NEW_SUFFIX;
-        String leftover = findChild(tree, parentId, newName);
+        String leftover = memory().findChild(tree, parentId, newName);
         if (leftover != null) DocumentsContract.deleteDocument(resolver(), DocumentsContract.buildDocumentUriUsingTree(tree, leftover));
         Uri temp = create(tree, parentId, newName, path);
         if (!supportsRename(temp)) {
@@ -413,7 +389,7 @@ public class MemoryFolderPlugin extends Plugin {
      * temporaire, complet, reprend son nom. Rend le nom sous lequel le montrer,
      * `null` s'il ne doit pas l'être.
      */
-    private String finishInterruptedReplace(Uri tree, Child temp, Set<String> names) {
+    private String finishInterruptedReplace(Uri tree, MemoryTree.Child temp, Set<String> names) {
         String original = temp.name.substring(0, temp.name.length() - TEMP_SUFFIX.length());
         Uri doc = DocumentsContract.buildDocumentUriUsingTree(tree, temp.id);
         try {
@@ -458,24 +434,7 @@ public class MemoryFolderPlugin extends Plugin {
         }
     }
 
-    /** Un enfant d'un dossier, tel que le fournisseur le décrit. */
-    private static final class Child {
-        final String id;
-        final String name;
-        final boolean isDir;
-        final long size;
-        final long mtimeMs;
-
-        Child(String id, String name, boolean isDir, long size, long mtimeMs) {
-            this.id = id;
-            this.name = name;
-            this.isDir = isDir;
-            this.size = size;
-            this.mtimeMs = mtimeMs;
-        }
-    }
-
-    private static JSObject entryOf(String name, Child child) {
+    private static JSObject entryOf(String name, MemoryTree.Child child) {
         JSObject entry = new JSObject();
         entry.put("name", name);
         entry.put("kind", child.isDir ? "directory" : "file");
@@ -506,32 +465,18 @@ public class MemoryFolderPlugin extends Plugin {
      */
     private void rejectCoded(PluginCall call, String phrase, Throwable e) {
         Log.w(LOG_TAG, phrase, e);
-        call.reject(phrase + " : " + e.getMessage(), errorCode(e));
-    }
-
-    /**
-     * Ce qui s'est passé, d'après l'erreur et ses causes : `TOO_LARGE` (mémoire
-     * manquante), `PERMISSION`, `NO_SPACE`, `NOT_FOUND`, sinon `UNKNOWN`. Un accès
-     * refusé arrive souvent en `FileNotFoundException` (« EACCES ») : il passe donc
-     * avant `NOT_FOUND`, retenu seulement si aucune cause n'en dit plus.
-     */
-    private static String errorCode(Throwable e) {
-        boolean notFound = false;
-        for (Throwable t = e; t != null; t = t.getCause()) {
-            if (t instanceof OutOfMemoryError) return "TOO_LARGE";
-            if (t instanceof SecurityException) return "PERMISSION";
-            String message = String.valueOf(t.getMessage());
-            if (message.contains("EACCES") || message.contains("EPERM")) return "PERMISSION";
-            if (message.contains("ENOSPC") || message.contains("No space left")) return "NO_SPACE";
-            if (t instanceof FileNotFoundException || message.contains("Missing file") || message.contains("FileNotFoundException")) notFound = true;
-        }
-        return notFound ? "NOT_FOUND" : "UNKNOWN";
+        call.reject(phrase + " : " + e.getMessage(), MemoryTree.errorCode(e));
     }
 
     // --- Chemins ---
 
     private ContentResolver resolver() {
         return getContext().getContentResolver();
+    }
+
+    /** Lecture de l'arbre, commune avec la liaison à l'ordinateur. */
+    private MemoryTree memory() {
+        return new MemoryTree(resolver());
     }
 
     private Uri treeOf(PluginCall call) {
@@ -551,7 +496,7 @@ public class MemoryFolderPlugin extends Plugin {
         String id = DocumentsContract.getTreeDocumentId(tree);
         for (String part : path.split("/")) {
             if (part.isEmpty()) continue;
-            String child = findChild(tree, id, part);
+            String child = memory().findChild(tree, id, part);
             if (child == null) {
                 if (!create) return null;
                 Uri created = DocumentsContract.createDocument(
@@ -566,54 +511,6 @@ public class MemoryFolderPlugin extends Plugin {
             id = child;
         }
         return id;
-    }
-
-    /**
-     * Enfant d'un dossier, par son nom. Sur le stockage du téléphone,
-     * l'identifiant d'un document est son chemin (« primary:Documents/Gtracker/sessions ») :
-     * on le construit et on vérifie qu'il existe, une requête au lieu de lire
-     * tout le dossier. Chez ce fournisseur, un document absent l'est vraiment :
-     * pas de relecture du dossier (le temporaire d'une réécriture est presque
-     * toujours absent, et `sessions/` compte des centaines de fichiers). Pour
-     * un autre fournisseur, ou une autre erreur, repli sur la recherche par nom.
-     */
-    private String findChild(Uri tree, String parentId, String name) {
-        String guess = parentId.endsWith(":") ? parentId + name : parentId + "/" + name;
-        boolean pathIds = EXTERNAL_STORAGE_AUTHORITY.equals(tree.getAuthority());
-        try {
-            String found = displayName(tree, guess);
-            if (name.equals(found)) return guess;
-            if (pathIds && found == null) return null;
-        } catch (IllegalArgumentException e) {
-            // Le fournisseur du stockage dit ainsi « aucun document à ce chemin ».
-            if (pathIds) return null;
-        } catch (Exception e) {
-            // Fournisseur aux identifiants opaques, ou erreur passagère : recherche par nom.
-        }
-        Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId);
-        try (Cursor c = resolver().query(children, CHILD_COLUMNS, null, null, null)) {
-            while (c != null && c.moveToNext()) {
-                if (name.equals(c.getString(1))) return c.getString(0);
-            }
-        } catch (Exception e) {
-            return null;
-        }
-        return null;
-    }
-
-    private String displayName(Uri tree, String id) {
-        Uri uri = DocumentsContract.buildDocumentUriUsingTree(tree, id);
-        try (Cursor c = resolver().query(uri, new String[] { Document.COLUMN_DISPLAY_NAME }, null, null, null)) {
-            return c != null && c.moveToFirst() ? c.getString(0) : null;
-        }
-    }
-
-    private boolean exists(Uri tree, String id) {
-        try {
-            return displayName(tree, id) != null;
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     /**

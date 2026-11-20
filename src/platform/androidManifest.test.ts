@@ -171,6 +171,34 @@ describe('manifeste Android : fichiers reçus d\'une autre application', () => {
   });
 });
 
+describe('manifeste Android : liaison sans fil avec le programme Windows', () => {
+  const PLUGIN = repoFile('android/app/src/main/java/io/github/segneur/gtracker/ComputerLinkPlugin.java');
+
+  it('lit l’état des réseaux, sans compter sur le manifeste d’un greffon', () => {
+    const tag = tagWithName(MANIFEST, 'uses-permission', 'android.permission.ACCESS_NETWORK_STATE');
+    expect(tag).toBeDefined();
+    expect(tag).not.toContain('tools:node');
+  });
+
+  it("accès au réseau local déclaré pour toutes les versions, et demandé seulement à partir d'Android 17 (API 37)", () => {
+    const tag = tagWithName(MANIFEST, 'uses-permission', 'android.permission.ACCESS_LOCAL_NETWORK');
+    expect(tag).toBeDefined();
+    expect(tag).not.toContain('maxSdkVersion');
+    expect(PLUGIN).toContain('LOCAL_NETWORK_SDK = 37;');
+    expect(PLUGIN).toMatch(/Build\.VERSION\.SDK_INT >= LOCAL_NETWORK_SDK && getPermissionState\(LOCAL_NETWORK\)/);
+  });
+
+  it('aucun trafic en clair autorisé', () => {
+    expect(MANIFEST).not.toContain('usesCleartextTraffic="true"');
+    expect(MANIFEST).not.toContain('networkSecurityConfig');
+  });
+
+  it("ni service ni tâche de fond : la liaison se ferme quand l'application quitte l'écran", () => {
+    expect(PLUGIN).not.toMatch(/startService|startForegroundService|WorkManager|JobScheduler|AlarmManager/);
+    expect(PLUGIN).toMatch(/protected void handleOnStop\(\) \{[\s\S]*?stopAll\(\);/);
+  });
+});
+
 describe('logo et icône', () => {
   const background = withoutComments(repoFile('android/app/src/main/res/values/ic_launcher_background.xml'));
 

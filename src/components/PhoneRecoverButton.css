@@ -17,6 +17,24 @@
   }
 }
 
+/* Ligne discrète de l'arrivée d'un téléphone relié : à l'encre atténuée, sur une seule ligne, coupée plutôt que de
+   pousser les boutons (la phrase entière est dans l'infobulle). */
+.phone-recover__arrival {
+  max-width: 22em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--text-s);
+}
+
+@media (max-width: 1199.98px) {
+  .phone-recover__arrival {
+    max-width: 12em;
+    font-size: var(--text-xs);
+  }
+}
+
 .phone-recover__body {
   display: flex;
   flex-direction: column;

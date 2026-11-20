@@ -92,10 +92,13 @@ export interface CloseQuestionTexts {
   rester: string;
 }
 
-/** État du téléphone branché par câble, lu par la coquille. */
+/** Par où le téléphone est lu : le Wi-Fi (`sansFil`) ou le câble. */
+export type DesktopPhoneChannel = 'sansFil' | 'cable';
+
+/** État du téléphone, par le Wi-Fi ou par le câble, lu par la coquille. */
 export type DesktopPhoneState =
-  /** Un téléphone prêt à être lu ; `nom` est son modèle. */
-  | { etat: 'pret'; nom: string }
+  /** Un téléphone prêt à être lu ; `nom` est son modèle ; `canal` : par où, absent d'une coquille plus ancienne (le câble). */
+  | { etat: 'pret'; nom: string; canal?: DesktopPhoneChannel }
   /** Rien de branché, ou rien de vu. */
   | { etat: 'absent' }
   /** Le téléphone attend que l'utilisateur accepte cet ordinateur. */
@@ -123,11 +126,80 @@ export interface DesktopPhoneBridge {
   lireOctets(argument: { chemin: string }): Promise<BridgeAnswer<Uint8Array>>;
 }
 
+/**
+ * Ce que l'essai du pare-feu de Windows a trouvé. `ouvert` n'est pas une certitude (Windows ne filtre pas le trafic
+ * du PC vers lui-même) : seul `bloque` s'affirme.
+ */
+export type DesktopFirewall = 'ouvert' | 'bloque' | 'inconnu';
+
+/** Fenêtre de liaison d'un téléphone, ouverte pour 2 minutes ou jusqu'à la liaison. */
+export interface DesktopWirelessPairing {
+  /** Adresse du PC sur le réseau, à taper sur le téléphone si celui-ci ne le trouve pas seul. */
+  adresse: string;
+  port: number;
+  /** Code de 6 chiffres. */
+  code: string;
+  /** Heure de fermeture (horloge du PC), en millisecondes depuis 1970. */
+  expireA: number;
+  /** Millisecondes avant la fermeture, au moment de la réponse. */
+  restantMs: number;
+}
+
+/** État du sans-fil du PC. */
+export interface DesktopWirelessState {
+  /** Choisi par l'utilisateur, retenu d'un lancement à l'autre. */
+  actif: boolean;
+  /** Vrai si le PC attend un téléphone sur au moins une adresse. */
+  ecoute: boolean;
+  port: number | null;
+  adresses: string[];
+  pareFeu: DesktopFirewall;
+  /** Pourquoi le PC n'écoute pas alors que le sans-fil est activé ; phrase de la coquille, en français. */
+  erreur: string | null;
+  appairage: DesktopWirelessPairing | null;
+  /** Téléphones reliés en ce moment. */
+  relies: { id: string; nom: string }[];
+}
+
+/** Un téléphone relié au PC (par le code), et s'il l'est en ce moment. */
+export interface DesktopWirelessPhone {
+  id: string;
+  nom: string;
+  /** Heure de la première liaison, en millisecondes depuis 1970. */
+  ajouteLe: number;
+  /** Dernière fois vu après la première liaison ; `null` s'il n'est pas revenu. */
+  vuLe: number | null;
+  relie: boolean;
+}
+
+/** Avis d'un téléphone qui se présente ; `nouveau` s'il vient d'être relié par le code. */
+export interface DesktopWirelessArrival {
+  id: string;
+  nom: string;
+  nouveau: boolean;
+}
+
+/** Le sans-fil du PC : écoute, fenêtre de liaison, téléphones reliés. */
+export interface DesktopWirelessBridge {
+  etat(): Promise<BridgeAnswer<DesktopWirelessState>>;
+  /** Allume ou éteint ; rend l'état qui suit. */
+  activer(argument: { actif: boolean }): Promise<BridgeAnswer<DesktopWirelessState>>;
+  /** Refusée si le sans-fil est éteint ou sans réseau. */
+  ouvrirAppairage(): Promise<BridgeAnswer<DesktopWirelessPairing>>;
+  telephones(): Promise<BridgeAnswer<DesktopWirelessPhone[]>>;
+  /** Vrai si le téléphone était relié. */
+  retirer(argument: { id: string }): Promise<BridgeAnswer<boolean>>;
+  /** Le rappel reçoit l'avis de chaque arrivée ; rend la fonction qui se désabonne. */
+  surArrivee(rappel: (avis: unknown) => void): () => void;
+}
+
 export interface DesktopBridge {
   version: string;
   memoire: DesktopMemoryBridge;
   /** Absent d'une coquille plus ancienne, qui ne lit pas le téléphone. */
   telephone?: DesktopPhoneBridge;
+  /** Absent d'une coquille plus ancienne, qui ne lit le téléphone que par le câble. */
+  sansFil?: DesktopWirelessBridge;
   textes(texts: CloseQuestionTexts): Promise<BridgeAnswer<null>>;
 }
 

@@ -57,6 +57,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ShareFilePlugin.class);
         registerPlugin(IncomingFilePlugin.class);
         registerPlugin(RecordingPlugin.class);
+        registerPlugin(ComputerLinkPlugin.class);
         // Sans écouteur qui réponde vrai, Android tue tout le processus avec le moteur de rendu, service de position compris.
         bridgeBuilder.addWebViewListener(new WebViewListener() {
             @Override

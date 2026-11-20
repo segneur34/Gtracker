@@ -121,4 +121,9 @@
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
     <!-- Carte « Autorisations » (PermissionsPlugin) : l'écran système qui lève l'optimisation de la batterie. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Liaison sans fil avec le programme Windows (ComputerLinkPlugin) : lire les réseaux du téléphone pour écarter
+         le réseau mobile ; l'accès au réseau local n'est demandé qu'à partir d'Android 17 (API 37), une version plus
+         ancienne ignore cette permission. La liaison passe par TLS : aucun trafic en clair n'est autorisé. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 </manifest>

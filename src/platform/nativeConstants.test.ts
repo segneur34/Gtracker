@@ -335,4 +335,115 @@ describe('noms techniques du Java', () => {
   it('préférences des bips', () => {
     expect(captured(appJava('TonePlayer.java'), /\bPREFS = "([^"]+)";/)).toBe(`${FORMAT_ID}.sons`);
   });
+
+  it('préférences de la liaison avec l’ordinateur', () => {
+    expect(captured(appJava('ComputerLinkPlugin.java'), /\bPREFS = "([^"]+)";/)).toBe(`${FORMAT_ID}.ordinateur`);
+  });
+});
+
+/**
+ * La liaison sans fil a deux côtés écrits dans deux langages : `bureau/trames.ts`, `appairage.ts` et `sonde.ts` côté
+ * PC, `ComputerLinkProtocol.java` côté téléphone. Leurs jeux d'essai communs (`bureau/sansFil.vecteurs.json`)
+ * éprouvent les octets ; ici, les constantes que les jeux d'essai ne couvrent pas, relues dans les deux sources.
+ */
+describe('liaison sans fil : mêmes constantes au PC et au téléphone', () => {
+  const PROTOCOL = appJava('ComputerLinkProtocol.java');
+  const PLUGIN = appJava('ComputerLinkPlugin.java');
+  const bureau = (name: string): string => fs.readFileSync(new URL(`../../bureau/${name}`, import.meta.url), 'utf8');
+  const TRAMES = bureau('trames.ts');
+  const APPAIRAGE = bureau('appairage.ts');
+  const SONDE = bureau('sonde.ts');
+  const DISQUE = bureau('disque.ts');
+  /** Un entier écrit `48_217` ou `48217`. */
+  const int = (text: string): number => Number(text.replace(/_/g, ''));
+  const tsConst = (source: string, name: string): number => int(captured(source, new RegExp(`\\bexport const ${name} = ([\\d_]+)\\b`)));
+  const javaConst = (name: string): number => int(captured(PROTOCOL, new RegExp(`\\bstatic final (?:int|long) ${name} = ([\\d_]+)L?;`)));
+
+  it('version du protocole, ports, taille de bloc, identifiant, noms et messages', () => {
+    expect(javaConst('PROTOCOL_VERSION')).toBe(tsConst(TRAMES, 'PROTOCOLE_SANS_FIL'));
+    expect(javaConst('PORT')).toBe(tsConst(TRAMES, 'PORT_SANS_FIL'));
+    expect(javaConst('PROBE_PORT')).toBe(tsConst(SONDE, 'PORT_SONDE'));
+    expect(javaConst('BLOCK_SIZE')).toBe(tsConst(TRAMES, 'TAILLE_BLOC'));
+    expect(javaConst('PREFIX_SIZE')).toBe(tsConst(TRAMES, 'TAILLE_PREFIXE'));
+    expect(javaConst('ID_MAX')).toBe(tsConst(TRAMES, 'ID_MAX'));
+    expect(javaConst('NAME_MAX')).toBe(tsConst(TRAMES, 'NOM_MAX'));
+    expect(javaConst('MESSAGE_MAX')).toBe(tsConst(TRAMES, 'MESSAGE_MAX'));
+    expect(javaConst('CODE_DIGITS')).toBe(tsConst(APPAIRAGE, 'CHIFFRES_CODE'));
+    expect(javaConst('PC_NAME_MAX_BYTES')).toBe(tsConst(SONDE, 'NOM_PC_MAX_OCTETS'));
+  });
+
+  it("limites des trames : celles d'une liaison reconnue et celles de l'accueil", () => {
+    const limits = (source: string, name: string): string[] =>
+      captured(source, new RegExp(`\\b${name}\\b[^=]*= (?:Object\\.freeze\\(\\{ enTete: |new Limits\\()([^)}]+)`)).split(/,\s*(?:corps:\s*)?/).map((v) => v.trim());
+    const ts = limits(TRAMES, 'LIMITES');
+    const java = limits(PROTOCOL, 'LIMITS');
+    expect(int(java[0])).toBe(int(ts[0]));
+    expect(java[1]).toBe('BLOCK_SIZE');
+    expect(ts[1]).toBe('TAILLE_BLOC');
+    expect(limits(PROTOCOL, 'WELCOME_LIMITS').map(int)).toEqual(limits(TRAMES, 'LIMITES_ACCUEIL').map(int));
+  });
+
+  it("étiquettes des preuves d'appairage et suffixes des écritures en cours", () => {
+    expect(captured(PROTOCOL, /\bPHONE_LABEL = "([^"]+)";/)).toBe(captured(APPAIRAGE, /\bETIQUETTE_TELEPHONE = '([^']+)'/));
+    expect(captured(PROTOCOL, /\bPC_LABEL = "([^"]+)";/)).toBe(captured(APPAIRAGE, /\bETIQUETTE_PC = '([^']+)'/));
+    expect(captured(PROTOCOL, /\bTEMP_SUFFIX = "([^"]+)";/)).toBe(captured(DISQUE, /\bSUFFIXE_REMPLACEMENT = '([^']+)'/));
+    expect(captured(PROTOCOL, /\bNEW_SUFFIX = "([^"]+)";/)).toBe(captured(DISQUE, /\bSUFFIXE_NEUF = '([^']+)'/));
+    const memory = appJava('MemoryFolderPlugin.java');
+    expect(captured(PROTOCOL, /\bTEMP_SUFFIX = "([^"]+)";/)).toBe(captured(memory, /\bTEMP_SUFFIX = "([^"]+)";/));
+    expect(captured(PROTOCOL, /\bNEW_SUFFIX = "([^"]+)";/)).toBe(captured(memory, /\bNEW_SUFFIX = "([^"]+)";/));
+  });
+
+  it('le test Java relit les jeux d’essai du PC dans le dépôt, sans copie', () => {
+    const test = fs.readFileSync(new URL('../../android/app/src/test/java/io/github/segneur/gtracker/ComputerLinkProtocolTest.java', import.meta.url), 'utf8');
+    expect(test).toContain('"bureau/sansFil.vecteurs.json"');
+    expect(fs.existsSync(new URL('../../bureau/sansFil.vecteurs.json', import.meta.url))).toBe(true);
+  });
+
+  it('le greffon est déclaré sous son nom, et son événement porte le nom attendu', () => {
+    expect(MAIN_ACTIVITY).toContain('registerPlugin(ComputerLinkPlugin.class);');
+    expect(PLUGIN).toMatch(/@CapacitorPlugin\(\s*name = "ComputerLink",/);
+    expect(captured(PLUGIN, /\bEVENT_STATUS = "([^"]+)";/)).toBe('status');
+    for (const name of ['status', 'pair', 'connect', 'forget']) expect(PLUGIN, name).toMatch(new RegExp(`@PluginMethod\\s+public void ${name}\\(PluginCall call\\)`));
+  });
+
+  it('le jeton et l’empreinte ne partent jamais vers la page', () => {
+    const status = between(PLUGIN, 'private JSObject statusObject()', 'private void notifyStatus()');
+    expect(status).not.toMatch(/KEY_TOKEN, null|KEY_FINGERPRINT|"jeton"|"empreinte"|"token"/);
+  });
+});
+
+/** La page (`computerLink.ts`) et le greffon `ComputerLinkPlugin.java` se parlent par des noms : les mêmes des deux côtés. */
+describe('liaison sans fil : ce que la page appelle et lit, le greffon le porte', () => {
+  const LINK_TS = fs.readFileSync(new URL('./computerLink.ts', import.meta.url), 'utf8');
+  const PLUGIN = appJava('ComputerLinkPlugin.java');
+  /** Valeurs d'une liste de chaînes TypeScript, `'a', 'b'` ou `'a' | 'b'`. */
+  const quoted = (text: string): string[] => [...text.matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1]);
+  const javaValues = (prefix: string): string[] =>
+    [...PLUGIN.matchAll(new RegExp(`\\bstatic final String ${prefix}_\\w+ = "([^"]+)";`, 'g'))].map((m) => m[1]);
+
+  it('la page enregistre le greffon sous son nom et n\'appelle que ses méthodes', () => {
+    expect(LINK_TS).toContain("registerPlugin<ComputerLinkPlugin>('ComputerLink')");
+    const called = [...new Set([...LINK_TS.matchAll(/\bplugin\.(\w+)\(/g)].map((m) => m[1]))];
+    expect(called.sort()).toEqual(['addListener', 'connect', 'forget', 'pair', 'status']);
+    for (const name of called.filter((n) => n !== 'addListener')) expect(PLUGIN, name).toMatch(new RegExp(`@PluginMethod\\s+public void ${name}\\(PluginCall call\\)`));
+    expect(LINK_TS).toContain("addListener('status'");
+  });
+
+  it('états et raisons d\'échec : ceux du greffon, ni plus ni moins', () => {
+    expect(quoted(captured(LINK_TS, /const STATES[^=]*= \[([^\]]+)\]/)).sort()).toEqual(javaValues('STATE').sort());
+    expect(quoted(captured(LINK_TS, /const ERRORS[^=]*= \[([^\]]+)\]/)).sort()).toEqual(javaValues('ERROR').sort());
+  });
+
+  it('les champs de l\'état et les codes de refus sont ceux que la page lit', () => {
+    const status = between(PLUGIN, 'private JSObject statusObject()', 'private void notifyStatus()');
+    for (const field of ['state', 'error', 'paired', 'computerName', 'address', 'lastSentMs', 'sentFiles', 'onLocalNetwork']) {
+      expect(status, field).toContain(`"${field}"`);
+      expect(LINK_TS, field).toContain(`o.${field}`);
+    }
+    for (const reject of ['BAD_CODE', 'BAD_ADDRESS']) {
+      expect(PLUGIN, reject).toMatch(new RegExp(`\\bREJECT_${reject} = "${reject}";`));
+      expect(LINK_TS, reject).toContain(`'${reject}'`);
+    }
+    for (const option of ['code', 'address', 'folder']) expect(PLUGIN, option).toContain(`call.getString("${option}"`);
+  });
 });

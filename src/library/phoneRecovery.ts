@@ -67,8 +67,12 @@ export const choosePhoneFiles = (phone: readonly SizedFile[], pcSessions: readon
 
 /** Issue d'une récupération, ou pourquoi elle n'a pas pu se faire. */
 export type PhoneRecoveryOutcome =
-  /** Le téléphone n'est pas prêt : rien de branché, autorisation à donner, sans réponse, liaison tenue par un autre programme. */
-  | { kind: 'phone'; state: 'absent' | 'autorisation' | 'horsLigne' | 'occupe' }
+  /**
+   * Le téléphone n'est pas prêt : rien de branché ni de relié, autorisation à donner, sans réponse, liaison tenue par
+   * un autre programme. `wireless` : le sans-fil du PC attend un téléphone (`listening`) ou est éteint (`off`) ; absent
+   * d'un programme qui ne le propose pas.
+   */
+  | { kind: 'phone'; state: 'absent' | 'autorisation' | 'horsLigne' | 'occupe'; wireless?: 'listening' | 'off' }
   /** L'outil de Google qui lit le téléphone manque ; `folder` : où le poser. */
   | { kind: 'tool-missing'; folder: string }
   /** Pas de dossier `Documents/Gtracker` sur le téléphone `phone`. */
@@ -78,12 +82,16 @@ export type PhoneRecoveryOutcome =
   /** Un autre import tourne. */
   | { kind: 'busy' }
   /** Panne imprévue ; `detail` : sa phrase. */
-  | { kind: 'error'; detail: string }
+  | { kind: 'error'; detail: string; channel?: PhoneRecoveryChannel }
   /**
-   * Import fait, en entier ou jusqu'au débranchement (`unplugged`). `report` compte aussi, parmi les déjà présentes,
-   * les sessions laissées sans être lues ; `sessionsOnPhone` : GPX et FIT trouvés sur le téléphone.
+   * Import fait, en entier ou jusqu'au débranchement ou à la coupure de la liaison (`unplugged`). `report` compte aussi,
+   * parmi les déjà présentes, les sessions laissées sans être lues ; `sessionsOnPhone` : GPX et FIT trouvés sur le
+   * téléphone ; `channel` : par où il a été lu.
    */
-  | { kind: 'done'; phone: string; report: ImportReport; sessionsOnPhone: number; unplugged: boolean };
+  | { kind: 'done'; phone: string; report: ImportReport; sessionsOnPhone: number; unplugged: boolean; channel?: PhoneRecoveryChannel };
+
+/** Par où le téléphone est lu : le Wi-Fi (`sansFil`) ou le câble. */
+export type PhoneRecoveryChannel = 'sansFil' | 'cable';
 
 /** Ce que la fenêtre montre d'une issue : ses phrases, un dossier à recopier, et s'il faut proposer « Réessayer ». */
 export interface PhoneRecoveryText {
@@ -100,11 +108,22 @@ export const describePhoneRecovery = (outcome: PhoneRecoveryOutcome): PhoneRecov
   switch (outcome.kind) {
     case 'phone':
       switch (outcome.state) {
-        case 'absent':
+        case 'absent': {
+          const usbHelp = t('La première fois, il faut aussi activer le « Débogage USB » du téléphone : ouvrez Paramètres, puis À propos du téléphone, et touchez sept fois « Version » pour afficher les options pour développeurs. Ouvrez-les, activez « Débogage USB », puis revenez ici.');
+          // Sans câble d'abord quand le PC attend un téléphone ; le câble reste toujours proposé en second.
+          if (outcome.wireless === 'listening') {
+            return say([
+              t("Aucun téléphone ne se présente. Ouvrez Gtracker sur votre téléphone, relié au même réseau que cet ordinateur (la même box Wi-Fi, ou un partage de connexion entre le téléphone et l'ordinateur ; pas un réseau « invité »), puis cliquez sur « Réessayer »."),
+              t("À défaut, branchez votre téléphone à l'ordinateur par un câble USB, puis cliquez sur « Réessayer »."),
+              usbHelp,
+            ]);
+          }
           return say([
             t("Aucun téléphone n'est vu. Branchez votre téléphone à l'ordinateur par un câble USB, puis cliquez sur « Réessayer »."),
-            t('La première fois, il faut aussi activer le « Débogage USB » du téléphone : ouvrez Paramètres, puis À propos du téléphone, et touchez sept fois « Version » pour afficher les options pour développeurs. Ouvrez-les, activez « Débogage USB », puis revenez ici.'),
+            usbHelp,
+            ...(outcome.wireless === 'off' ? [t('Sans câble : allumez le sans-fil dans Réglages, Mémoire, puis reliez votre téléphone.')] : []),
           ]);
+        }
         case 'autorisation':
           return say([
             t("Regardez l'écran du téléphone : une fenêtre demande « Autoriser le débogage USB ? ». Cochez « Toujours autoriser cet ordinateur », touchez « Autoriser », puis cliquez ici sur « Réessayer »."),
@@ -126,11 +145,23 @@ export const describePhoneRecovery = (outcome: PhoneRecoveryOutcome): PhoneRecov
       return say([outcome.text], false);
     case 'busy':
       return say([t("Un import de sessions est déjà en cours. Attendez qu'il finisse, puis cliquez sur « Réessayer ».")]);
-    case 'error':
-      return say([t("Le téléphone n'a pas pu être lu ({detail}). Vérifiez le câble, puis cliquez sur « Réessayer ».", { detail: outcome.detail.replace(/\.\s*$/, '') })]);
+    case 'error': {
+      const detail = outcome.detail.replace(/\.\s*$/, '');
+      if (outcome.channel === 'sansFil') {
+        return say([t("Le téléphone n'a pas pu être lu ({detail}). Vérifiez que Gtracker est ouvert sur le téléphone, puis cliquez sur « Réessayer ».", { detail })]);
+      }
+      return say([t("Le téléphone n'a pas pu être lu ({detail}). Vérifiez le câble, puis cliquez sur « Réessayer ».", { detail })]);
+    }
     case 'done': {
       const { report } = outcome;
       if (outcome.unplugged) {
+        if (outcome.channel === 'sansFil') {
+          return say([
+            t("La liaison avec le téléphone a été coupée pendant la récupération. Les sessions déjà rangées restent sur le PC, entières : aucune n'est rangée à moitié."),
+            describeImport(report),
+            t('Rouvrez Gtracker sur le téléphone, puis cliquez sur « Réessayer » : seules les sessions qui manquent seront récupérées.'),
+          ]);
+        }
         return say([
           t("Le téléphone a été débranché pendant la récupération. Les sessions déjà rangées restent sur le PC, entières : aucune n'est rangée à moitié."),
           describeImport(report),
@@ -146,6 +177,39 @@ export const describePhoneRecovery = (outcome: PhoneRecoveryOutcome): PhoneRecov
         describeImport(report),
         `${tn(n, '{n} fichier non rangé ({list})', '{n} fichiers non rangés ({list})', { list: report.failed.join(' ; ') })}.`,
       ], report.retryable.length > 0);
+    }
+  }
+};
+
+/**
+ * La ligne discrète que dit le PC quand un téléphone relié se présente et que ses sessions neuves sont rangées toutes
+ * seules : une phrase, ou `null` quand il n'y a rien d'utile à dire (le téléphone est reparti, un autre import tourne,
+ * l'outil du câble manque). `phone` : le nom que le téléphone a donné.
+ */
+export const describeArrivalRecovery = (outcome: PhoneRecoveryOutcome, phone: string): string | null => {
+  switch (outcome.kind) {
+    case 'phone':
+    case 'tool-missing':
+    case 'busy':
+      return null;
+    case 'no-phone-folder':
+      return t("Téléphone {phone} relié, mais il n'a pas de dossier mémoire à lire.", { phone });
+    case 'memory':
+      return outcome.text;
+    case 'error':
+      return t("Téléphone {phone} relié, mais ses sessions n'ont pas pu être lues ({detail}).", { phone, detail: outcome.detail.replace(/\.\s*$/, '') });
+    case 'done': {
+      if (outcome.unplugged) {
+        return t("La liaison avec le téléphone {phone} a été coupée en route : cliquez sur « Récupérer » pour finir.", { phone });
+      }
+      if (outcome.sessionsOnPhone === 0) return t('Téléphone {phone} relié : aucune session à récupérer.', { phone });
+      const added = outcome.report.added.length;
+      const first = added > 0
+        ? tn(added, 'Téléphone {phone} relié : {n} session ajoutée.', 'Téléphone {phone} relié : {n} sessions ajoutées.', { phone })
+        : t('Téléphone {phone} relié : toutes ses sessions sont déjà là.', { phone });
+      const failed = outcome.report.failed.length;
+      if (failed === 0) return first;
+      return `${first} ${tn(failed, "{n} fichier n'a pas pu être rangé : cliquez sur « Récupérer » pour réessayer.", "{n} fichiers n'ont pas pu être rangés : cliquez sur « Récupérer » pour réessayer.")}`;
     }
   }
 };

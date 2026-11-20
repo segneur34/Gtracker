@@ -401,9 +401,10 @@ export function lireMessage(trame: Trame): Message {
   }
 }
 
-/** Les commandes `lire` d'un fichier entier, sans `id` : blocs de `TAILLE_BLOC` octets, le dernier plus court ; aucun pour un fichier vide. */
-export function blocsDeLecture(taille: number): { debut: number; longueur: number }[] {
-  const blocs: { debut: number; longueur: number }[] = []
-  for (let debut = 0; debut < taille; debut += TAILLE_BLOC) blocs.push({ debut, longueur: Math.min(TAILLE_BLOC, taille - debut) })
-  return blocs
+/**
+ * Les commandes `lire` d'un fichier entier, sans `id`, produites une à une au fil de la lecture (jamais toutes d'avance) :
+ * blocs de `TAILLE_BLOC` octets, le dernier plus court ; aucun pour un fichier vide.
+ */
+export function* blocsDeLecture(taille: number): Generator<{ debut: number; longueur: number }> {
+  for (let debut = 0; debut < taille; debut += TAILLE_BLOC) yield { debut, longueur: Math.min(TAILLE_BLOC, taille - debut) }
 }

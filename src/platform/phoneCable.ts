@@ -1,16 +1,23 @@
 import { t } from '../core/i18n';
-import { desktopBridge, type DesktopPhoneBridge, type DesktopPhoneState } from './desktopBridge';
+import { desktopBridge, type DesktopPhoneBridge, type DesktopPhoneChannel, type DesktopPhoneState } from './desktopBridge';
 import { bridgeValue } from './diskMemory';
 import type { ImportEntry } from './memoryFolder';
 import { isDesktopApp } from './runtime';
 
 /**
- * Le téléphone branché par câble au programme Windows : son état, le contenu de son dossier `Documents/Gtracker`
- * (racine et `sessions/`), et ses fichiers à importer, lus un par un au moment de les ranger. Lecture seule : rien
- * n'est jamais écrit sur le téléphone. Ailleurs (navigateur, téléphone, coquille plus ancienne), rien de cela n'existe.
+ * Le téléphone lu par le programme Windows, par le Wi-Fi s'il y est relié (`wirelessPhone.ts`), sinon par le câble :
+ * son état (qui dit son canal), le contenu de son dossier `Documents/Gtracker` (racine et `sessions/`), et ses fichiers
+ * à importer, lus un par un au moment de les ranger. Lecture seule : rien n'est jamais écrit sur le téléphone. Ailleurs
+ * (navigateur, téléphone, coquille plus ancienne), rien de cela n'existe.
  */
 
 export type PhoneState = DesktopPhoneState;
+
+/** Par où le téléphone est lu : le Wi-Fi (`sansFil`) ou le câble. */
+export type PhoneChannel = DesktopPhoneChannel;
+
+/** Canal d'un téléphone prêt ; une coquille qui ne le dit pas lit par le câble. */
+export const phoneChannel = (state: Extract<PhoneState, { etat: 'pret' }>): PhoneChannel => state.canal ?? 'cable';
 
 /** Fichier du téléphone : chemin relatif à `Documents/Gtracker`, séparé par `/` ; taille en octets. */
 export interface PhoneFile {

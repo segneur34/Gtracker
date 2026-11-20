@@ -25,10 +25,13 @@ import { ErreurDisque, SUFFIXE_REMPLACEMENT, avecEssais, codeDe, segmentAdmis } 
 import type { Gestionnaire } from './pont'
 import { enReponse } from './pont'
 
+/** Canal par lequel un téléphone prêt est lu : le Wi-Fi (`sansFil.ts`) ou le câble. */
+export type CanalTelephone = 'sansFil' | 'cable'
+
 /** État du téléphone, tel que la page le lit. */
 export type EtatTelephone =
-  /** Un téléphone prêt à être lu ; `nom` est son modèle, pour le message. */
-  | { etat: 'pret'; nom: string }
+  /** Un téléphone prêt à être lu ; `nom` est son modèle, pour le message ; `canal`, quand plusieurs canaux servent. */
+  | { etat: 'pret'; nom: string; canal?: CanalTelephone }
   /** Rien de branché, ou rien de vu. */
   | { etat: 'absent' }
   /** Le téléphone attend que l'utilisateur accepte cet ordinateur. */
@@ -226,7 +229,7 @@ export type OptionsGestionnaires = {
 }
 
 /** Une action à la fois, dans l'ordre des appels : le téléphone ne reçoit jamais deux commandes ensemble. */
-function enSerie(): <T>(action: () => Promise<T>) => Promise<T> {
+export function enSerie(): <T>(action: () => Promise<T>) => Promise<T> {
   let queue: Promise<unknown> = Promise.resolve()
   return <T>(action: () => Promise<T>) => {
     const suite = queue.then(action, action)

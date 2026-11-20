@@ -48,8 +48,8 @@ export { adoptSettingsFile, importSettingsFile, reloadAfterWrites, renameDevice 
 export type { AddResult, AddStatus } from './sessionLibrary/addSession';
 export { answerImportQuestion, canImportSessions, importEntries, importFiles, importFromFolder, saveRecordedSession } from './sessionLibrary/importer';
 export { startIncomingFiles } from './sessionLibrary/incoming';
-export { recoverFromPhone, usePhoneRecovery } from './sessionLibrary/phoneRecovery';
-export type { PhoneRecoveryStep } from './sessionLibrary/phoneRecovery';
+export { clearArrivalNote, recoverFromPhone, recoverOnArrival, useArrivalNote, usePhoneRecovery } from './sessionLibrary/phoneRecovery';
+export type { ArrivalNote, PhoneRecoveryStep } from './sessionLibrary/phoneRecovery';
 export {
   loadFullSession, loadSessionGpx, readSessionExport, readSessionGpx, readSessionMotion, removeSession,
   updateSessionRecord,

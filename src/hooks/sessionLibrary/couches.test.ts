@@ -25,7 +25,7 @@ const LAYERS = [
 
 /** Valeurs exportées par le point d'entrée, les mêmes qu'avant le découpage (et cinq types). */
 const ENTRY_VALUES = [
-  'adoptSettingsFile', 'answerImportQuestion', 'canChooseMemoryFolder', 'canImportSessions', 'chooseFolder', 'correctSessionPlace', 'countErasable', 'currentMemoryFolder', 'dismissIncomingNotice', 'dismissLibraryMessage',
+  'adoptSettingsFile', 'answerImportQuestion', 'clearArrivalNote', 'recoverOnArrival', 'useArrivalNote', 'canChooseMemoryFolder', 'canImportSessions', 'chooseFolder', 'correctSessionPlace', 'countErasable', 'currentMemoryFolder', 'dismissIncomingNotice', 'dismissLibraryMessage',
   'dismissSettingsOffer', 'eraseEverything', 'factoryReset', 'stashRoute', 'trashStore', 'deleteFromTrash', 'emptyWholeTrash', 'restoreFromTrash', 'findLibrarySession', 'hasSessionMotion', 'importEntries', 'importFiles', 'importFromFolder',
   'importSettingsFile', 'librarySession', 'loadFullSession', 'loadSessionGpx', 'openLibrary', 'queueOutdatedRefresh',
   'queueSessionPlace', 'readLibraryState', 'readSessionExport', 'readSessionGpx', 'readSessionMotion', 'reconnectFolder', 'recoverFromPhone', 'refreshLibrary', 'reloadAfterWrites',
@@ -33,7 +33,7 @@ const ENTRY_VALUES = [
   'summarizeGpxText', 'switchToBrowserMemory', 'updateSessionRecord', 'useLibraryFields', 'useLibrarySelector',
   'useLibrarySession', 'usePhoneRecovery',
 ];
-const ENTRY_TYPES = ['AddResult', 'AddStatus', 'LibraryState', 'LibraryStatus', 'PhoneRecoveryStep', 'ResetProgress', 'SettingsFileInfo', 'TrashState'];
+const ENTRY_TYPES = ['AddResult', 'AddStatus', 'ArrivalNote', 'LibraryState', 'LibraryStatus', 'PhoneRecoveryStep', 'ResetProgress', 'SettingsFileInfo', 'TrashState'];
 
 const isCode = (name: string): boolean => /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) && !/\.fixture\.ts$/.test(name);
 

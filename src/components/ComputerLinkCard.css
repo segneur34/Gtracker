@@ -1,0 +1,33 @@
+/* Ordinateur relié sans câble (`ComputerLinkCard.tsx`), dans Réglages › Mémoire, application du téléphone : titre, état,
+   champs du code et de l'adresse. Encre sur fond clair, jamais de vert vif en texte (charte). */
+
+.computer-link__title {
+  font-family: var(--font-title);
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-spacing);
+  text-transform: var(--title-case);
+}
+
+.computer-link__status,
+.computer-link__note,
+.computer-link__problem {
+  overflow-wrap: anywhere;
+}
+
+.computer-link__label {
+  color: var(--muted);
+  font-size: var(--text-s);
+}
+
+/* Le code, en grand et espacé : six chiffres tapés d'après l'écran de l'ordinateur. */
+.computer-link__code {
+  width: 9em;
+  max-width: 100%;
+  font-size: var(--text-xl);
+  letter-spacing: 0.12em;
+}
+
+.computer-link__address {
+  width: 100%;
+  max-width: 16em;
+}

@@ -6,6 +6,7 @@ import { ORIGINE } from './origine'
 import type { EvenementPont, Gestionnaire } from './pont'
 import { TEXTES_FERMETURE, brancherCanaux, enReponse, expediteurAdmis, lireTextesFermeture, reussite, uneALaFois } from './pont'
 import { ErreurDisque } from './disque'
+import { AVIS_ARRIVEE, CANAUX_SANS_FIL } from './sansFil'
 import { CANAUX_TELEPHONE, gestionnairesTelephone } from './telephone'
 
 const page = { nom: 'contenu de la fenêtre principale' }
@@ -122,6 +123,12 @@ describe('preload', () => {
     expect(telephone).toEqual([...CANAUX_TELEPHONE])
     for (const nom of CANAUX_TELEPHONE) expect(source).toMatch(new RegExp(`\\b${nom}: (sans|avec)\\('telephone:${nom}'\\)`))
     expect(source).toMatch(/^\s+telephone,$/m)
+    const sansFil = [...source.matchAll(/'sansfil:([A-Za-z]+)'/g)].map((m) => m[1]).filter((nom) => `sansfil:${nom}` !== AVIS_ARRIVEE)
+    expect(sansFil).toEqual([...CANAUX_SANS_FIL])
+    for (const nom of CANAUX_SANS_FIL) expect(source).toMatch(new RegExp(`\\b${nom}: (sans|avec)\\('sansfil:${nom}'\\)`))
+    expect(source).toMatch(/^\s+sansFil,$/m)
+    expect(source).toContain(`ipcRenderer.on('${AVIS_ARRIVEE}', ecouteur)`)
+    expect(source).toContain(`ipcRenderer.removeListener('${AVIS_ARRIVEE}', ecouteur)`)
     expect(source).toContain("textes: avec('coquille:textes')")
     expect(source).not.toMatch(/exposeInMainWorld\([^)]*ipcRenderer/)
     expect(source).not.toMatch(/from '\.\//)
