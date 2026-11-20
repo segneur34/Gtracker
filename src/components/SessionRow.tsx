@@ -183,7 +183,7 @@ const SessionRow = memo(function SessionRow({
             {unclassified && <Button size="s" variant="ghost" onClick={startClassify}>{t('Classer…')}</Button>}
             <Button size="s" variant="ghost" onClick={startRename}>{t('Renommer')}</Button>
             <Button size="s" variant="ghost" onClick={startPlace}>{t('Renommer le lieu')}</Button>
-            <Button size="s" variant="ghost" onClick={askDelete}>{t('Supprimer')}</Button>
+            <Button size="s" variant="danger" onClick={askDelete}>{t('Supprimer')}</Button>
           </MoreMenu>
         )}
       </div>

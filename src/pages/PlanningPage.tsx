@@ -873,7 +873,7 @@ function PlanningPage() {
                     <Button size="s" variant="ghost" onClick={() => setConfirmingDelete(null)}>{t('Garder')}</Button>
                   </span>
                 ) : (
-                  <Button size="s" variant="ghost" onClick={() => setConfirmingDelete(saved.base)} aria-label={t('Supprimer {name}', { name: saved.record.name })}>{t('Supprimer')}</Button>
+                  <Button size="s" variant="ghost" className="ui-danger-text" onClick={() => setConfirmingDelete(saved.base)} aria-label={t('Supprimer {name}', { name: saved.record.name })}>{t('Supprimer')}</Button>
                 ))} />
             )}
           </PlanBlock>

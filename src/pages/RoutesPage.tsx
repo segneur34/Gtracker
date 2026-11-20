@@ -166,7 +166,7 @@ function RoutesPage() {
                 <Button size="s" variant="ghost" onClick={() => void share(saved)} aria-label={t('Partager {name}', { name: saved.record.name })}>
                   <IconShare size={18} /> {t('Partager le GPX')}
                 </Button>
-                <Button size="s" variant="ghost" onClick={() => setConfirmingDelete(saved.base)} aria-label={t('Supprimer {name}', { name: saved.record.name })}>
+                <Button size="s" variant="danger" onClick={() => setConfirmingDelete(saved.base)} aria-label={t('Supprimer {name}', { name: saved.record.name })}>
                   {t('Supprimer')}
                 </Button>
               </MoreMenu>

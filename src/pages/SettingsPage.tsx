@@ -368,7 +368,7 @@ const ActivityCard = memo(function ActivityCard({
             if (!isOpen) toggleActivity(id);
             setRenaming(id);
           }}>{t('Renommer')}</Button>
-          <Button onClick={() => askRemove(activity)}>{t('Supprimer')}</Button>
+          <Button variant="danger" onClick={() => askRemove(activity)}>{t('Supprimer')}</Button>
           <Button disabled={!overridden} onClick={() => resetActivity(id)}>{t('Par défaut')}</Button>
         </MoreMenu>
         <EyeButton name={activityDisplayName(activity)} hidden={activity.hidden === true}
