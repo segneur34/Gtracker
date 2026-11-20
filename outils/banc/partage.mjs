@@ -74,8 +74,8 @@ const menuItems = () => evaluate(`(() => {
   b.click();
   return [...document.querySelectorAll('.an-sheet__head .ui-more__panel button')].map((x) => x.textContent.trim());
 })()`);
-/** Première entrée du menu « … » hors « Lieu » (le champ du lieu ouvre le menu, « Partager l'image » vient juste après). */
-const premiereAction = (items) => items?.find((x) => x !== 'Lieu');
+/** Première entrée du menu « … » hors « Renommer le lieu » (le champ du lieu ouvre le menu, « Partager l'image » vient juste après). */
+const premiereAction = (items) => items?.find((x) => x !== 'Renommer le lieu');
 const openShare = async () => {
   const items = await menuItems();
   await evaluate(`[...document.querySelectorAll('.an-sheet__head .ui-more__panel button')].find((x) => x.textContent.trim() === "Partager l'image")?.click()`);

@@ -690,7 +690,7 @@
   flex-shrink: 0;
 }
 
-/* Une action qui détruit (« Jeter ») garde sa couleur dans le menu. */
+/* Une action qui détruit (« Supprimer ») garde sa couleur dans le menu. */
 .ui-more__panel .ui-btn--danger {
   color: var(--danger);
 }

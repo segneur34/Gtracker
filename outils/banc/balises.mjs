@@ -260,7 +260,7 @@ console.log(beeps.map((b, k) => {
 }
 console.log('Arrêter :', await holdStop());
 // Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
-console.log('Jeter :', await analyseOuvertePuisJetee(evaluate));
+console.log('Supprimer :', await analyseOuvertePuisJetee(evaluate));
 await wait(1000);
 
 // 3. Rejeu ×10, bips propres au parcours (validation à 280 m) : « Passer » puis « Bips » coupés.
@@ -291,7 +291,7 @@ console.log('fin :', await guideCard(), '; bips après la coupure :', apresCoupu
   '; avant :', beeps.filter((b) => b.at <= mutedAt).map((b) => b.text.split(' ')[1]).join(', '));
 check('bips coupés : aucun son ensuite', apresCoupure === 0, apresCoupure);
 await holdStop();
-console.log('Jeter :', await analyseOuvertePuisJetee(evaluate));
+console.log('Supprimer :', await analyseOuvertePuisJetee(evaluate));
 await wait(1000);
 
 // 4. Réglages : éditeur de la courbe.

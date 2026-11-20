@@ -178,6 +178,6 @@ export const findMotionCapture = async (startedAtMs: number): Promise<MotionCapt
 export const readMotionCapture = (path: string): Promise<Uint8Array | null> =>
   isNativeApp() ? readPrivateBytes(path) : Promise.resolve(null);
 
-/** Efface une capture du dossier privé, une fois rangée ou jetée. */
+/** Efface une capture du dossier privé, une fois rangée ou supprimée. */
 export const removeMotionCapture = (path: string): Promise<void> =>
   isNativeApp() ? removePrivateFile(path) : Promise.resolve();

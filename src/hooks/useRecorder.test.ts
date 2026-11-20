@@ -215,7 +215,7 @@ const fakeSource = () => {
   return source satisfies LocationSource & object;
 };
 
-/** Ramène l'enregistreur au repos, session jetée. */
+/** Ramène l'enregistreur au repos, session supprimée. */
 const reset = async () => {
   journal.removeFails = false;
   await recorder.stopRecording();
@@ -1074,7 +1074,7 @@ describe('capture à « Analyser »', () => {
     expect(library.motions).toEqual([null]);
   });
 
-  it('« Jeter » après l\'échec : la capture est effacée, l\'avertissement retombe', async () => {
+  it('« Supprimer » après l\'échec : la capture est effacée, l\'avertissement retombe', async () => {
     await stopped();
     sensors.read = unreadable;
     await recorder.analyzePendingSession();
@@ -1131,7 +1131,7 @@ describe('rangement en cours, état du module', () => {
     expect(library.motions).toHaveLength(1);
   });
 
-  it('« Jeter » pendant le rangement ne fait rien : ni journal effacé, ni session retirée', async () => {
+  it('« Supprimer » pendant le rangement ne fait rien : ni journal effacé, ni session retirée', async () => {
     const open = await held();
     const run = recorder.analyzePendingSession();
     const pending = recorder.getRecorderState().pending;
@@ -1168,7 +1168,7 @@ describe('rangement en cours, état du module', () => {
     expect(journal.text).toBeNull();
   });
 
-  it('« Jeter » après un échec reprend son effet', async () => {
+  it('« Supprimer » après un échec reprend son effet', async () => {
     const open = await held();
     library.fails = true;
     const failed = recorder.analyzePendingSession();
@@ -1186,7 +1186,7 @@ describe('rangement en cours, état du module', () => {
   });
 });
 
-describe('fin d\'enregistrement : rangement seul, ménage et « Jeter » en échec', () => {
+describe('fin d\'enregistrement : rangement seul, ménage et « Supprimer » en échec', () => {
   /** Session arrêtée, en attente, sans capteurs. */
   const stopped = async (): Promise<void> => {
     const source = fakeSource();
@@ -1219,16 +1219,16 @@ describe('fin d\'enregistrement : rangement seul, ménage et « Jeter » en éch
     expect(state.error).toBe('Enregistrement du GPX impossible : écriture refusée. La session reste en attente.');
   });
 
-  it('« Jeter » dont l\'effacement échoue : la session reste en attente, c\'est dit, sans promesse rejetée', async () => {
+  it('« Supprimer » dont l\'effacement échoue : la session reste en attente, c\'est dit, sans promesse rejetée', async () => {
     await stopped();
     const pending = recorder.getRecorderState().pending;
     journal.removeFails = true;
     await expect(recorder.discardPendingSession()).resolves.toBeUndefined();
     const state = recorder.getRecorderState();
     expect(state.pending).toBe(pending);
-    expect(state.error).toBe("La session n'a pas pu être jetée : effacement refusé.");
+    expect(state.error).toBe("La session n'a pas pu être supprimée : effacement refusé.");
     expect(journal.text).not.toBeNull();
-    // Un nouvel essai qui réussit la jette.
+    // Un nouvel essai qui réussit la supprime.
     journal.removeFails = false;
     await recorder.discardPendingSession();
     expect(recorder.getRecorderState().pending).toBeNull();
@@ -1329,7 +1329,7 @@ describe('aller-retour du journal', () => {
     const kept = journal.text;
     expect(kept).not.toBeNull();
 
-    // Coupure : la session est jetée (journal effacé), le journal remis tel quel, puis repris au lancement.
+    // Coupure : la session est supprimée (journal effacé), le journal remis tel quel, puis repris au lancement.
     await recorder.discardPendingSession();
     journal.text = kept;
     await recorder.recoverInterruptedRecording();

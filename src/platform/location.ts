@@ -402,7 +402,7 @@ export const readLoggedFixes = async (afterMs: number | null): Promise<string | 
 
 /**
  * Efface le journal des positions du service, et la notification laissée par sa garde : à appeler une fois la
- * session rangée ou jetée. Un échec n'est que consigné : le départ suivant remplace ce fichier. Sans effet dans le
+ * session rangée ou supprimée. Un échec n'est que consigné : le départ suivant remplace ce fichier. Sans effet dans le
  * navigateur.
  */
 export const clearLoggedFixes = async (): Promise<void> => {

@@ -68,7 +68,7 @@ const openZone = async () => {
 /** Texte de la zone « Remise à zéro », de son titre à la fin de la carte. */
 const zoneText = () => evaluate(`(() => { const t = [...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Remise à zéro'); return t ? t.parentElement.innerText.replace(/\\n+/g, ' / ') : '(absente)'; })()`);
 
-/** Tient le bouton `label` une seconde (appui, 1,1 s de page, relâcher, clic), comme « Jeter ». */
+/** Tient le bouton `label` une seconde (appui, 1,1 s de page, relâcher, clic), comme « Supprimer ». */
 const hold = async (label) => {
   const down = await evaluate(`(() => {
     const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === ${JSON.stringify(label)});

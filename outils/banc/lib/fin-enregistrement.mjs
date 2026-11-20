@@ -1,10 +1,10 @@
 // Banc de test : fin d'un enregistrement (lot 313). À l'arrêt, la session se range seule et son analyse s'ouvre ;
-// « Jeter » est la dernière entrée du menu « … » de l'analyse, tenue une seconde puis confirmée, et ramène à la
+// « Supprimer » est la dernière entrée du menu « … » de l'analyse, tenue une seconde puis confirmée, et ramène à la
 // bibliothèque de la famille. Ces aides prennent l'`evaluate` d'une connexion (`connect`, lib/cdp.mjs) et rendent
 // 'ok' ou ce qui a manqué, sans lever : le `check` ou le `console.log` du script le dit.
 import { vwait, wait } from './cdp.mjs';
 
-/** Durée tenue sur « Jeter », en temps de la page : la seconde de l'application, et une marge. */
+/** Durée tenue sur « Supprimer », en temps de la page : la seconde de l'application, et une marge. */
 const TENUE_MS = 1100;
 
 /** Attend que `expr` (expression de la page) soit vraie, jusqu'à `timeout` ms de vrai temps ; rend sa dernière valeur. */
@@ -30,7 +30,7 @@ export const attendreAnalyse = async (evaluate, { timeout = 20000 } = {}) => {
 };
 
 /**
- * Sur l'analyse ouverte : « … », puis « Jeter » tenu (appui, 1,1 s de page, relâcher), la confirmation acceptée
+ * Sur l'analyse ouverte : « … », puis « Supprimer » tenu (appui, 1,1 s de page, relâcher), la confirmation acceptée
  * d'office (`window.confirm` remplacé ; ses questions dans `window.__questionsJeter`). 'ok' quand la page a quitté
  * l'analyse pour la bibliothèque.
  */
@@ -46,8 +46,8 @@ export const jeterDepuisAnalyse = async (evaluate, { timeout = 8000 } = {}) => {
   const down = await evaluate(`(() => {
     window.__questionsJeter = [];
     window.confirm = (m) => { window.__questionsJeter.push(String(m)); return true; };
-    const b = [...document.querySelectorAll('.ui-more__panel button')].find((x) => x.textContent.trim() === 'Jeter');
-    if (!b) return 'Jeter absent';
+    const b = [...document.querySelectorAll('.ui-more__panel button')].find((x) => x.textContent.trim() === 'Supprimer');
+    if (!b) return 'Supprimer absent';
     window.__jeter = b;
     b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' }));
     return 'ok';

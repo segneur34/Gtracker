@@ -43,7 +43,7 @@ export const LESSONS: readonly Lesson[] = [
       t("Choisissez d'abord l'activité : la liste ne propose que les vôtres, celles de Réglages. Elle se change encore pendant la sortie."),
       t("« Démarrer » lance le GPS. L'écran peut s'éteindre, l'enregistrement continue ; un appui long de deux secondes sur le bouton rond met en pause, puis relance."),
       t("Pour finir, tenez « Arrêter » appuyé deux secondes : l'appui long évite un arrêt par mégarde. Ces deux durées se règlent dans Réglages › Enregistrement."),
-      t("À l'arrêt, la session est rangée dans la mémoire et son analyse s'ouvre. Pour la jeter : « … » à côté de son nom, puis « Jeter », tenu une seconde et confirmé."),
+      t("À l'arrêt, la session est rangée dans la mémoire et son analyse s'ouvre. Pour la supprimer : « … » à côté de son nom, puis « Supprimer », tenu une seconde et confirmé."),
     ],
   },
   {

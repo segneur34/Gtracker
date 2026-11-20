@@ -314,7 +314,7 @@ export const resetConfirmText = (kind: ResetKind, counts: EraseCounts): string =
 export interface ResetContext {
   /** Enregistrement en cours (démarrage et arrêt compris). */
   recording: boolean;
-  /** Session arrêtée qui attend d'être rangée ou jetée. */
+  /** Session arrêtée qui attend d'être rangée ou supprimée. */
   pendingSession: boolean;
   memoryStatus: 'opening' | 'ready' | 'needs-permission' | 'unavailable';
   readOnly: boolean;

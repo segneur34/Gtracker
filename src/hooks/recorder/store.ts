@@ -20,7 +20,7 @@ export type RecorderStatus = 'idle' | 'starting' | 'recording' | 'paused' | 'sto
 
 /**
  * Session terminée, pas encore rangée : elle se range seule (`finishPendingSession`), sauf une session reprise
- * qui peut continuer ; après un rangement en échec, l'utilisateur l'analyse (nouvel essai) ou la jette.
+ * qui peut continuer ; après un rangement en échec, l'utilisateur l'analyse (nouvel essai) ou la supprime.
  */
 export interface PendingSession {
   fileName: string;

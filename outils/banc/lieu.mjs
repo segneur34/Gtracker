@@ -10,9 +10,9 @@
 //  4. renommer puis effacer le nom : le nom donné prime, l'effacer rend le nom calculé ;
 //  5. changer d'activité (Kite) : le nom suit, le lieu reste, sans requête ;
 //  6. case de Réglages › Mémoire décochée : une seconde session importée n'envoie rien et garde l'activité seule ;
-//  7. « Lieu » du « … » de la ligne : le lieu corrigé (`utilisateur`) prime, il est appris (clé de l'appareil et
+//  7. « Renommer le lieu » du « … » de la ligne : le lieu corrigé (`utilisateur`) prime, il est appris (clé de l'appareil et
 //     `lieux.json` du dossier), et la seconde session, partie du même endroit, le prend (`appris`) sans requête ;
-//  8. « Lieu » du « … » de l'en-tête de l'analyse : corriger de nouveau au même endroit remplace le lieu appris (un seul
+//  8. « Renommer le lieu » du « … » de l'en-tête de l'analyse : corriger de nouveau au même endroit remplace le lieu appris (un seul
 //     lieu appris, qui retient l'ancien nom), la seconde session, de même nom, suit ;
 //  9. recherche rallumée, une troisième session partie du même endroit et finie à près de 3 km : départ appris, une
 //     seule requête, pour l'arrivée, et la ligne « Wingfoil · Départ → Arrivée » ;
@@ -209,11 +209,11 @@ const typeIn = async (selector, value, key) => {
   await evaluate(`document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true })), 'ok'`);
 };
 
-step('7. « Lieu » depuis la liste, puis la seconde session au même départ');
+step('7. « Renommer le lieu » depuis la liste, puis la seconde session au même départ');
 lieux.reset();
 await go('/sessions');
 await listReady();
-console.log('Lieu :', await actionLigne(evaluate, wait, 'Kite', 'Lieu'));
+console.log('Lieu :', await actionLigne(evaluate, wait, 'Kite', 'Renommer le lieu'));
 console.log('champ :', await evaluate(`document.querySelector('.lib-row__place')?.value ?? 'absent'`));
 check('le champ du lieu part du lieu de la fiche', (await evaluate(`document.querySelector('.lib-row__place')?.value ?? 'absent'`)) === 'Plage du Petit Travers');
 await typeIn('.lib-row__place', 'Les Roquilles', 'Enter');
@@ -233,13 +233,13 @@ check('le lieu appris retient l\'ancien nom, sur l\'appareil et dans lieux.json'
 check('la seconde session prend le lieu appris, sans requête (recherche coupée)', (await fiches())[1].place?.source === 'appris'
   && (await rows()).includes('Wingfoil · Les Roquilles') && lieux.count() === 0, `${await rows()} ; ${lieux.count()} requête(s)`);
 
-step('8. « Lieu » depuis l\'analyse : corriger de nouveau au même endroit');
+step('8. « Renommer le lieu » depuis l\'analyse : corriger de nouveau au même endroit');
 await ouvrirLigne(evaluate, 'Kite');
 await waitFor(`location.pathname.includes('/analyse')`, { timeout: 6000, label: 'analyse ouverte' });
 await settle({ max: 6000, label: 'analyse' });
 console.log('« … » :', await evaluate(`(() => { const m = document.querySelector('button[aria-label="Plus d\\'actions sur la session"]'); if (!m) return 'absent'; m.click(); return 'ok'; })()`));
 await wait(150);
-console.log('Lieu :', await evaluate(`(() => { const b = [...document.querySelectorAll('.ui-more__panel button')].find((x) => x.textContent.trim() === 'Lieu'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
+console.log('Lieu :', await evaluate(`(() => { const b = [...document.querySelectorAll('.ui-more__panel button')].find((x) => x.textContent.trim() === 'Renommer le lieu'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
 await wait(150);
 const champ = 'input[aria-label="Lieu de la session"]';
 check('le champ du lieu s\'ouvre dans l\'en-tête', (await evaluate(`document.querySelector('${champ}')?.value ?? 'absent'`)) === 'Les Roquilles');
@@ -310,7 +310,7 @@ check('deux wingfoil sous « Plage de Test », une voisine « Plage de Tést »,
   && (await neuves()).filter((f) => f.name === 'Ma sortie' && f.place?.name === 'Plage de Test').length === 1, await resume());
 
 lieux.reset();
-console.log('Lieu :', await actionLigne(evaluate, wait, 'Wingfoil · Plage de Test', 'Lieu'));
+console.log('Lieu :', await actionLigne(evaluate, wait, 'Wingfoil · Plage de Test', 'Renommer le lieu'));
 await typeIn('.lib-row__place', 'Plage Corrigée', 'Enter');
 await waitFor(async () => (await neuves()).filter((f) => f.place?.name === 'Plage Corrigée').length === 3, { timeout: 4000, label: 'voisines renommées' });
 await settle({ max: 1500, label: 'lieu' });
@@ -350,7 +350,7 @@ check('le nom saisi est gardé après rechargement', (await rows()).includes('Ma
   && (await neuves()).some((f) => f.name === 'Ma sortie'), await rows());
 
 // Vider un lieu ne vide pas les autres.
-console.log('Lieu :', await actionLigne(evaluate, wait, 'Wingfoil · Plage Corrigée', 'Lieu'));
+console.log('Lieu :', await actionLigne(evaluate, wait, 'Wingfoil · Plage Corrigée', 'Renommer le lieu'));
 await typeIn('.lib-row__place', '', 'Enter');
 await waitFor(async () => (await neuves()).filter((f) => f.place?.name === 'Plage Corrigée').length < 3, { timeout: 3000, label: 'lieu vidé' });
 await settle({ max: 1500, label: 'lieu vidé' });

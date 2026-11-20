@@ -13,7 +13,7 @@ import { tRich } from './tRich';
 
 /**
  * Zone « Remise à zéro », au bas de la carte Mémoire de Réglages, repliée au départ : « Réglages d'usine » et
- * « Tout supprimer », chacun tenu une seconde puis confirmé (comme « Jeter » une session), refusés avec une phrase
+ * « Tout supprimer », chacun tenu une seconde puis confirmé (comme « Supprimer » une session), refusés avec une phrase
  * pendant un enregistrement (`resetRefusal`). Pendant l'effacement, une fenêtre qu'on ne ferme pas en dit
  * l'avancée ; l'application se recharge ensuite d'elle-même. Une remise à zéro interrompue est dite dans la carte
  * de la mémoire.

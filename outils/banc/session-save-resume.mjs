@@ -3,7 +3,7 @@
 // `lib/traces.mjs` (wingfoil), y enregistre un seuil de 15 nœuds, puis change l'activité de la session dans l'onglet
 // réglages (Wingfoil vers Kite : recalcul complet) ; ensuite son seuil est enregistré à 4 et 12 nœuds, et le résumé de
 // la fiche doit suivre. Pour finir (lot 313), un brouillon ouvert, la session est jetée depuis le menu « … » de son
-// analyse (« Jeter » tenu une seconde, confirmé) : retour à la page Sessions, session absente de la mémoire.
+// analyse (« Supprimer » tenu une seconde, confirmé) : retour à la page Sessions, session absente de la mémoire.
 // Usage : node session-save-resume.mjs <port>
 import { connect } from './lib/cdp.mjs';
 import { jeterDepuisAnalyse } from './lib/fin-enregistrement.mjs';
@@ -110,7 +110,7 @@ for (const seuil of ['4', '12']) {
   check(`le résumé de la fiche suit le seuil de ${seuil} nds`, now.movingTimeS !== JSON.parse(before).movingTimeS, `${JSON.parse(before).movingTimeS} → ${now.movingTimeS}`);
 }
 
-step('« Jeter » depuis l\'analyse, un brouillon ouvert (lot 313) : page Sessions, session absente');
+step('« Supprimer » depuis l\'analyse, un brouillon ouvert (lot 313) : page Sessions, session absente');
 // L'analyse est rouverte.
 // La page Sessions, puis l'analyse : l'entrée sous l'analyse est la page Sessions, comme sur le téléphone.
 await go('/sessions', 3000);
@@ -135,7 +135,7 @@ await evaluate(`(() => {
   return 'ok';
 })()`);
 const thrown = await jeterDepuisAnalyse(evaluate);
-check('« Jeter » tenu puis confirmé', thrown === 'ok', thrown);
+check('« Supprimer » tenu puis confirmé', thrown === 'ok', thrown);
 const questions = await evaluate('window.__questionsJeter ?? []');
 check('une seule question, qui dit le brouillon perdu', questions.length === 1 && questions[0].includes('modifications non enregistrées'), JSON.stringify(questions));
 check('retour à la page Sessions', (await evaluate('location.pathname')) === '/sessions', await evaluate('location.pathname + location.search'));

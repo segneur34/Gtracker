@@ -221,7 +221,7 @@ export const IconDownload = ({ size = 20, ...props }: IconProps) => (
   </svg>
 );
 
-/** Corbeille : jeter une session. */
+/** Corbeille : supprimer une session. */
 export const IconTrash = ({ size = 20, ...props }: IconProps) => (
   <svg {...strokeProps(size)} {...props}>
     <path d="M4 7h16M9 7V4.5h6V7" />

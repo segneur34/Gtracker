@@ -48,7 +48,7 @@ function MoreMenu({ label, children, onClose }: MoreMenuProps) {
         hidden={!open}
         onClick={(e) => {
           const target = e.target as HTMLElement;
-          // Une entrée tenue (« Jeter ») garde le menu ouvert après un appui court : elle y rappelle le geste.
+          // Une entrée tenue (« Supprimer ») garde le menu ouvert après un appui court : elle y rappelle le geste.
           if (target.closest('[data-keep-open]')) return;
           // Fermé au tour suivant : un `label` doit d'abord ouvrir son sélecteur de fichiers.
           if (target.closest('button, label')) setTimeout(close, 0);

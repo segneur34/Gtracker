@@ -10,13 +10,11 @@ import { dateLocale, t } from '../../core/i18n';
 const STOP_ICON = <span className="ui-record-dot ui-record-dot--stop" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />;
 
 /** Gestes que le bouton rappelle ; l'identifiant n'est pas affiché, la phrase vient de `holdHint`. */
-export type HoldAction = 'arrêter' | 'jeter' | 'supprimer' | "revenir aux réglages d'usine" | 'tout supprimer' | 'vider la corbeille';
+export type HoldAction = 'arrêter' | 'supprimer' | "revenir aux réglages d'usine" | 'tout supprimer' | 'vider la corbeille';
 
 /** Rappel du geste, en phrase entière par geste (jamais un verbe collé à une phrase). */
 const holdHint = (action: HoldAction, holdS: string): string => {
   switch (action) {
-    case 'jeter':
-      return t('Maintenir {holdS} s pour jeter', { holdS });
     case 'supprimer':
       return t('Maintenir {holdS} s pour supprimer', { holdS });
     case "revenir aux réglages d'usine":
@@ -31,7 +29,7 @@ const holdHint = (action: HoldAction, holdS: string): string => {
 };
 
 /**
- * Bouton qu'on tient pour agir (arrêt de l'enregistrement, « Jeter » une
+ * Bouton qu'on tient pour agir (arrêt de l'enregistrement, « Supprimer » une
  * session depuis le menu « … » de son analyse) : tenu `getHoldMs()`, le grand
  * cadran sous le doigt ; un appui court rappelle le geste quelques secondes
  * (« Maintenir 2 s pour arrêter »). À 0, un simple appui agit. Le cadran est

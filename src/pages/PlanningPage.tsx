@@ -97,7 +97,7 @@ const PREFS_KEY = STORAGE_KEYS.planning;
 /** Champ du nom de l'itinéraire, que son intitulé désigne : le menu « … » est posé à côté, hors de l'intitulé. */
 const NAME_FIELD_ID = 'plan-nom';
 
-/** Durée de l'appui sur « Supprimer » du menu de l'itinéraire : une seconde, comme « Jeter » d'une session. */
+/** Durée de l'appui sur « Supprimer » du menu de l'itinéraire : une seconde, comme « Supprimer » d'une session. */
 const ROUTE_DELETE_HOLD_MS = 1000;
 const routeDeleteHoldMs = (): number => ROUTE_DELETE_HOLD_MS;
 

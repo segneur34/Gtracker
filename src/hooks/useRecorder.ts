@@ -72,12 +72,12 @@ export { recoverInterruptedRecording };
  * un `<trkseg>` par segment continu (`splitIntoSegments`), et la session
  * passe en attente (`pending`), puis se range seule dans la bibliothèque
  * (`finishPendingSession`, appelé par l'application, qui ouvre ensuite son
- * analyse) ; on la jette depuis l'analyse. Si le rangement échoue,
- * elle reste en attente : « Analyser » réessaie, « Jeter » l'abandonne. Tant
+ * analyse) ; on la supprime depuis l'analyse. Si le rangement échoue,
+ * elle reste en attente : « Analyser » réessaie, « Supprimer » l'abandonne. Tant
  * qu'elle attend, le journal est gardé : après un arrêt brutal ou une
  * fermeture, la session est reconstruite depuis lui au démarrage suivant, et
  * attend de nouveau. Le journal n'est effacé qu'une fois le GPX écrit, ou la
- * session jetée.
+ * session supprimée.
  *
  * Deux pauses : manuelle (rien n'est gardé, la source GPS reste allumée pour
  * la carte du direct, reprise explicite) et automatique (immobilité
@@ -221,7 +221,7 @@ export const finishingPendingSession = (s: RecorderState): boolean =>
 /**
  * Fin d'un enregistrement : range seule la session en attente, sans attendre « Analyser », une seule fois
  * par session ; en échec, elle reste en attente avec son message, et la carte de la page Enregistrer sert de filet
- * (« Analyser » pour réessayer, « Jeter »). Rien pendant un rangement déjà lancé, ni pour une session reprise après
+ * (« Analyser » pour réessayer, « Supprimer »). Rien pendant un rangement déjà lancé, ni pour une session reprise après
  * une coupure qui peut encore continuer (`canContinue` : la carte garde « Continuer l'enregistrement »). Les
  * avertissements de l'arrêt (capteurs…) restent affichés, pour l'analyse ouverte. Rend la session rangée, ou `null`.
  */
@@ -233,7 +233,7 @@ export const finishPendingSession = (): Promise<SavedSession | null> => {
 };
 
 /**
- * « Jeter » de la carte de la session en attente : l'abandonne et efface son journal et sa capture ; sans effet
+ * « Supprimer » de la carte de la session en attente : l'abandonne et efface son journal et sa capture ; sans effet
  * pendant son rangement. Un effacement en échec garde la session en attente, et le dit.
  */
 export const discardPendingSession = async (): Promise<void> => {
@@ -244,7 +244,7 @@ export const discardPendingSession = async (): Promise<void> => {
     await clearLoggedFixes();
     if (pending.motion) await removeMotionCapture(pending.motion.path);
   } catch (err) {
-    setState({ error: t("La session n'a pas pu être jetée : {why}.", { why: errorMessage(err, t('erreur inconnue')) }) });
+    setState({ error: t("La session n'a pas pu être supprimée : {why}.", { why: errorMessage(err, t('erreur inconnue')) }) });
     return;
   }
   setState({ pending: null, motionUnreadable: false, error: null });
@@ -275,7 +275,7 @@ export const startRecording = exclusive(async (
   const recovery = await recoverInterruptedRecording();
   // La session d'un journal a repris seule : pas de second départ.
   if (isBusy()) return;
-  // Le journal d'une session en attente serait écrasé : elle doit être rangée ou jetée d'abord.
+  // Le journal d'une session en attente serait écrasé : elle doit être rangée ou supprimée d'abord.
   if (state.pending) return;
   // Journal illisible resté en place : pas de départ, qui l'écraserait ; le message est déjà posé.
   if (recovery === 'blocked') return;

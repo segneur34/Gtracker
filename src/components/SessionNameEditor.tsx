@@ -38,27 +38,27 @@ interface SessionShare {
 /** Durée d'affichage du compte rendu d'un téléchargement. */
 const DOWNLOAD_NOTE_MS = 4000;
 
-/** Durée de l'appui sur « Jeter » : une seconde, puis la confirmation. */
+/** Durée de l'appui sur « Supprimer » : une seconde, puis la confirmation. */
 const DISCARD_HOLD_MS = 1000;
 const discardHoldMs = (): number => DISCARD_HOLD_MS;
 
 
 /**
  * Nom montré d'une session de la mémoire (`sessionDisplayName`), en tête de son analyse, son bouton
- * « Renommer » et son menu « … » (« Lieu », qui corrige le lieu seul, `correctSessionPlace` ; « Partager l'image », qui ouvre `ShareDialog` avec
+ * « Renommer » et son menu « … » (« Renommer le lieu », qui corrige le lieu seul, `correctSessionPlace` ; « Partager l'image », qui ouvre `ShareDialog` avec
  * ce que l'analyse passe dans `share` ; « Télécharger la session », dans
  * Téléchargements : un GPX complet, fiche et capteurs compris, que « Importer
- * des GPX » range tout entier sur un autre appareil ; « Jeter », en dernier,
+ * des GPX » range tout entier sur un autre appareil ; « Supprimer », en dernier,
  * tenu une seconde puis confirmé, qui supprime la session et mène à `back`,
  * la bibliothèque, où un échec de la suppression est dit). Le nom est écrit dans la fiche dès sa validation, comme un
  * changement de support (la bibliothèque offre le même renommage). Rien pour
- * un GPX ouvert hors de la mémoire ; ni renommage ni « Jeter » pour une fiche en
+ * un GPX ouvert hors de la mémoire ; ni renommage ni « Supprimer » pour une fiche en
  * lecture seule, qui se télécharge quand même.
  */
 function SessionNameEditor({ file, share, back }: { file: string | null; share?: SessionShare; back: string }) {
   const navigate = useNavigate();
   const toTrash = useDeletesToTrash();
-  /** Session jetée : supprimée quand l'analyse quitte l'écran, pas avant. */
+  /** Session à supprimer : supprimée quand l'analyse quitte l'écran, pas avant. */
   const discarded = useRef<string | null>(null);
   useEffect(() => () => {
     const gone = discarded.current;
@@ -127,7 +127,7 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
   };
 
   /**
-   * « Jeter », après l'appui tenu : confirmé, le brouillon de la session est abandonné sans autre question (sa garde
+   * « Supprimer », après l'appui tenu : confirmé, le brouillon de la session est abandonné sans autre question (sa garde
    * de l'historique retirée d'abord), la page remplacée par la bibliothèque (le retour n'y ramène pas), puis la
    * session supprimée une fois l'analyse démontée (`removeSession`) : elle ne s'y dit jamais introuvable.
    */
@@ -172,7 +172,7 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
             {!session.readOnly && (
               <Button onClick={() => setPlaceDraft(placeDraftOf(record.place))}>
                 <IconPin size={18} />
-                {t('Lieu')}
+                {t('Renommer le lieu')}
               </Button>
             )}
             {share && (
@@ -190,9 +190,9 @@ function SessionNameEditor({ file, share, back }: { file: string | null; share?:
               {t('Télécharger la session')}
             </Button>
             {!session.readOnly && (
-              <HoldButton onHold={() => void discard()} getHoldMs={discardHoldMs} label={t('Jeter')} lead={<IconTrash size={18} />}
-                dialTitle={t('Jeter')} icon={<IconTrash size={48} />} action="jeter" keepMenuOpen
-                ariaLabel={t('Jeter la session : maintenir une seconde')} />
+              <HoldButton onHold={() => void discard()} getHoldMs={discardHoldMs} label={t('Supprimer')} lead={<IconTrash size={18} />}
+                dialTitle={t('Supprimer')} icon={<IconTrash size={48} />} action="supprimer" keepMenuOpen
+                ariaLabel={t('Supprimer la session : maintenir une seconde')} />
             )}
           </MoreMenu>
         </span>

@@ -38,7 +38,7 @@ const GUARD_RELEASE_MAX_MS = 1000;
 
 /**
  * Abandonne le brouillon en attente sans rien redemander, quand l'utilisateur
- * vient de confirmer un geste qui le perd (« Jeter » une session).
+ * vient de confirmer un geste qui le perd (« Supprimer » une session).
  * Dans le navigateur, l'entrée « garde » de l'historique est retirée d'abord :
  * la promesse est tenue quand la page est revenue sur sa propre entrée, que
  * l'appelant peut alors remplacer (`navigate(…, { replace: true })`) sans que

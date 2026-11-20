@@ -82,9 +82,9 @@ import './RecordingPage.css';
  * Enregistrement d'une session : support, démarrer, arrêter, et ce qu'il faut
  * pour juger en direct que l'enregistrement tient (points, durée, plus long
  * trou, précision). À l'arrêt, la session se range seule dans la mémoire et
- * son analyse s'ouvre (`FinishRecording`, `App.tsx`) ; on la jette
+ * son analyse s'ouvre (`FinishRecording`, `App.tsx`) ; on la supprime
  * depuis l'analyse. La carte de la session en attente ne reste que comme
- * filet : rangement en échec (« Analyser » réessaie, « Jeter » l'abandonne),
+ * filet : rangement en échec (« Analyser » réessaie, « Supprimer » l'abandonne),
  * ou session reprise après une coupure qui peut encore continuer. La carte
  * « Session rangée » ne reste que pour une session hors de la mémoire ou à
  * classer. L'onglet « Enregistrer » de la barre de navigation.
@@ -822,9 +822,9 @@ function RecordingScreen() {
     }
   };
 
-  /** « Jeter » du filet : un échec de l'effacement garde la session et s'affiche (`discardPendingSession` ne lève pas). */
+  /** « Supprimer » du filet : un échec de l'effacement garde la session et s'affiche (`discardPendingSession` ne lève pas). */
   const handleDiscard = () => {
-    if (window.confirm(t('Jeter cette session ? Elle ne sera pas rangée dans la mémoire, et ne pourra pas être récupérée.'))) {
+    if (window.confirm(t('Supprimer cette session ? Elle ne sera pas rangée dans la mémoire, et ne pourra pas être récupérée.'))) {
       void discardPendingSession();
     }
   };
@@ -1109,7 +1109,7 @@ function RecordingScreen() {
           <p className="rec-saved-text">
             {tnRich(pending.pointCount, '{name}, {n} point.<br />', '{name}, {n} points.<br />', { name: pending.activity ? activityDisplayName(pending.activity) : t('À classer') }, {}, true)}
             <span className="ui-muted ui-text-s">
-              {t("Pas encore rangée dans la mémoire. Aucun nouvel enregistrement avant de l'analyser ou de la jeter.")}
+              {t("Pas encore rangée dans la mémoire. Aucun nouvel enregistrement avant de l'analyser ou de la supprimer.")}
             </span>
           </p>
           <SessionEndGear activity={pending.activity} gear={endGear} onChange={setEndGear} />
@@ -1133,7 +1133,7 @@ function RecordingScreen() {
               </Button>
             )}
             <Button variant="danger" onClick={handleDiscard} disabled={analyzing}>
-              {t('Jeter')}
+              {t('Supprimer')}
             </Button>
           </div>
         </Card>

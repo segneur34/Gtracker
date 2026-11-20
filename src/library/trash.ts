@@ -265,18 +265,18 @@ export const sessionDeleteQuestion = (toTrash: boolean): string =>
     : t('Supprimer cette session de la mémoire ?');
 
 /**
- * Question posée après l'appui tenu sur « Jeter » ; `toTrash` : le dossier ouvert a une corbeille ; `drafted` : un
+ * Question posée après l'appui tenu sur « Supprimer » ; `toTrash` : le dossier ouvert a une corbeille ; `drafted` : un
  * brouillon de la session serait perdu.
  */
 export const sessionDiscardQuestion = (toTrash: boolean, drafted: boolean): string => {
   if (!toTrash) {
     return drafted
-      ? t('Jeter cette session ? Elle sera supprimée de la mémoire, avec sa fiche et ses capteurs, et ne pourra pas être récupérée. Les modifications non enregistrées seront perdues.')
-      : t('Jeter cette session ? Elle sera supprimée de la mémoire, avec sa fiche et ses capteurs, et ne pourra pas être récupérée.');
+      ? t('Supprimer cette session ? Elle sera supprimée de la mémoire, avec sa fiche et ses capteurs, et ne pourra pas être récupérée. Les modifications non enregistrées seront perdues.')
+      : t('Supprimer cette session ? Elle sera supprimée de la mémoire, avec sa fiche et ses capteurs, et ne pourra pas être récupérée.');
   }
   return drafted
-    ? t('Jeter cette session ? Elle part à la corbeille de cet ordinateur, avec sa fiche et ses capteurs, et y reste {days} jours (Réglages › Mémoire). Les modifications non enregistrées seront perdues.', { days: TRASH_KEEP_DAYS })
-    : t('Jeter cette session ? Elle part à la corbeille de cet ordinateur, avec sa fiche et ses capteurs, et y reste {days} jours (Réglages › Mémoire).', { days: TRASH_KEEP_DAYS });
+    ? t('Supprimer cette session ? Elle part à la corbeille de cet ordinateur, avec sa fiche et ses capteurs, et y reste {days} jours (Réglages › Mémoire). Les modifications non enregistrées seront perdues.', { days: TRASH_KEEP_DAYS })
+    : t('Supprimer cette session ? Elle part à la corbeille de cet ordinateur, avec sa fiche et ses capteurs, et y reste {days} jours (Réglages › Mémoire).', { days: TRASH_KEEP_DAYS });
 };
 
 /** Combien la corbeille garde de sessions et d'itinéraires. */

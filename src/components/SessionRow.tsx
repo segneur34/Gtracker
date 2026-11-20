@@ -55,7 +55,7 @@ type Sheet = 'open' | 'classify' | null;
 /**
  * Ligne d'une session de la page Sessions : la pastille et le nom de l'activité avec la date, le nom montré de la
  * session en gras (`sessionDisplayName` : le nom donné, sinon l'activité et le lieu), ses chiffres, le commentaire et l'avertissement en petites
- * lignes, la vignette de la trace à droite, puis un « … » : Classer (session à classer), Renommer, Lieu (corrige le
+ * lignes, la vignette de la trace à droite, puis un « … » : Classer (session à classer), Renommer, Renommer le lieu (corrige le
  * lieu seul, `correctSessionPlace`), Supprimer (avec
  * confirmation), sauf avec `menu` faux (dernières sessions du Profil). Mémorisée, rappels stables : un balayage de la
  * mémoire ne redessine que les lignes dont la fiche change.
@@ -182,7 +182,7 @@ const SessionRow = memo(function SessionRow({
           <MoreMenu label={t("Plus d'actions sur la session")}>
             {unclassified && <Button size="s" variant="ghost" onClick={startClassify}>{t('Classer…')}</Button>}
             <Button size="s" variant="ghost" onClick={startRename}>{t('Renommer')}</Button>
-            <Button size="s" variant="ghost" onClick={startPlace}>{t('Lieu')}</Button>
+            <Button size="s" variant="ghost" onClick={startPlace}>{t('Renommer le lieu')}</Button>
             <Button size="s" variant="ghost" onClick={askDelete}>{t('Supprimer')}</Button>
           </MoreMenu>
         )}
