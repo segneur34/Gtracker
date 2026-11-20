@@ -1,0 +1,118 @@
+{
+  "description": "Jeux d'essai de la liaison sans fil entre le programme Windows et le téléphone, relus tels quels par les tests du PC et ceux du téléphone. Les formats sont décrits en tête de bureau/trames.ts (trames et messages), bureau/appairage.ts (preuves et jeton) et bureau/sonde.ts (découverte UDP). Tous les octets sont en hexadécimal minuscule.",
+  "lecture": {
+    "trames": "Décoder octetsHex donne une trame dont l'en-tête, relu en JSON, vaut enTete (comparer les valeurs, pas l'ordre des champs) et dont le corps vaut corpsHex. Encoder enTete et corpsHex redonne octetsHex quand l'en-tête est écrit dans l'ordre des champs donné, sans espace (JSON.stringify).",
+    "tramesInvalides": "Décoder octetsHex, avec les limites d'une liaison où le téléphone s'est présenté (en-tête 8 388 608 octets, corps 1 048 576), échoue avec erreur ; TRONQUEE seulement quand le flux s'arrête là. Une marque d'ordre d'octets (EF BB BF) en tête de l'en-tête le rend illisible.",
+    "appairage": "preuveTelephone et preuvePc calculées pour code, empreinte, nonceTelephone et noncePc.",
+    "jetons": "hachageHex est le SHA-256 des 32 octets de jetonHex.",
+    "sondes": "Encoder une question ou une réponse redonne octetsHex, et le décodage rend ses champs ; chaque paquet de etrangers est refusé comme question et comme réponse."
+  },
+  "trames": [
+    {
+      "nom": "ping",
+      "enTete": { "type": "ping", "id": 1 },
+      "corpsHex": "",
+      "octetsHex": "00000016000000007b2274797065223a2270696e67222c226964223a317d"
+    },
+    {
+      "nom": "lire, deuxième bloc",
+      "enTete": { "type": "lire", "id": 7, "chemin": "sessions/2026-11-20.gpx", "debut": 1048576, "longueur": 1048576 },
+      "corpsHex": "",
+      "octetsHex": "0000005c000000007b2274797065223a226c697265222c226964223a372c226368656d696e223a2273657373696f6e732f323032362d31312d32302e677078222c226465627574223a313034383537362c226c6f6e6775657572223a313034383537367d"
+    },
+    {
+      "nom": "bloc de 5 octets",
+      "enTete": { "type": "bloc", "id": 7, "debut": 0, "longueur": 5 },
+      "corpsHex": "68656c6c6f",
+      "octetsHex": "0000002d000000057b2274797065223a22626c6f63222c226964223a372c226465627574223a302c226c6f6e6775657572223a357d68656c6c6f"
+    },
+    {
+      "nom": "liste, chemin accentué",
+      "enTete": { "type": "liste", "id": 2, "fichiers": [{ "chemin": "sessions/été.gpx", "taille": 1234, "dateMs": 1790000000000 }] },
+      "corpsHex": "",
+      "octetsHex": "00000069000000007b2274797065223a226c69737465222c226964223a322c226669636869657273223a5b7b226368656d696e223a2273657373696f6e732fc3a974c3a92e677078222c227461696c6c65223a313233342c22646174654d73223a313739303030303030303030307d5d7d"
+    },
+    {
+      "nom": "appairer",
+      "enTete": { "type": "appairer", "version": 1, "nom": "Pixel 8", "nonceTelephone": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" },
+      "corpsHex": "",
+      "octetsHex": "00000083000000007b2274797065223a226170706169726572222c2276657273696f6e223a312c226e6f6d223a22506978656c2038222c226e6f6e636554656c6570686f6e65223a2230303031303230333034303530363037303830393061306230633064306530663130313131323133313431353136313731383139316131623163316431653166227d"
+    },
+    {
+      "nom": "refus",
+      "enTete": { "type": "refus", "raison": "code" },
+      "corpsHex": "",
+      "octetsHex": "00000020000000007b2274797065223a227265667573222c22726169736f6e223a22636f6465227d"
+    }
+  ],
+  "tramesInvalides": [
+    { "nom": "en-tête de longueur nulle", "octetsHex": "0000000000000000", "erreur": "EN_TETE_VIDE" },
+    { "nom": "en-tête de 8 Mio + 1", "octetsHex": "0080000100000000", "erreur": "EN_TETE_TROP_LONG" },
+    { "nom": "corps de 1 Mio + 1", "octetsHex": "0000000f00100001", "erreur": "CORPS_TROP_LONG" },
+    { "nom": "requête HTTP", "octetsHex": "474554202f20485454502f312e310d0a", "erreur": "EN_TETE_TROP_LONG" },
+    { "nom": "ping amputé de son dernier octet", "octetsHex": "00000016000000007b2274797065223a2270696e67222c226964223a31", "erreur": "TRONQUEE" },
+    { "nom": "en-tête qui est un tableau", "octetsHex": "00000003000000005b315d", "erreur": "EN_TETE_ILLISIBLE" },
+    { "nom": "en-tête qui n'est pas de l'UTF-8", "octetsHex": "0000000400000000ff222222", "erreur": "EN_TETE_ILLISIBLE" },
+    { "nom": "en-tête sans type", "octetsHex": "00000008000000007b226964223a317d", "erreur": "EN_TETE_ILLISIBLE" },
+    { "nom": "en-tête précédé d'une marque d'ordre d'octets", "octetsHex": "0000001900000000efbbbf7b2274797065223a2270696e67222c226964223a317d", "erreur": "EN_TETE_ILLISIBLE" }
+  ],
+  "appairage": [
+    {
+      "code": "042917",
+      "empreinteHex": "794b52b389eb92d0301942216091a202ca1589ec7278e58715ab7f73a7226859",
+      "nonceTelephoneHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "noncePcHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "preuveTelephoneHex": "1712f7c67962110819d76fd43f71222d12ea6380b5cfbbf3722c2aae63ebc135",
+      "preuvePcHex": "789723f4760de247607cd93e05931caffe9e67388e29550904c55a9fe571c7df"
+    },
+    {
+      "code": "999999",
+      "empreinteHex": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+      "nonceTelephoneHex": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+      "noncePcHex": "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f",
+      "preuveTelephoneHex": "7f7840f8a5ef269945f566e1c7f93432a8223a7453307d76291dee8942aabed6",
+      "preuvePcHex": "a243c31a38adafff96f504a3c042e66fe827e88b6a4324d06d1a15d35565c197"
+    }
+  ],
+  "jetons": [
+    {
+      "jetonHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "hachageHex": "630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd"
+    },
+    {
+      "jetonHex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "hachageHex": "af9613760f72635fbdb44a5a0a63c39f12af30f950a6ee5c971be188e89c4051"
+    }
+  ],
+  "sondes": {
+    "questions": [
+      { "nonceHex": "000102030405060708090a0b0c0d0e0f", "octetsHex": "4754524b0101000102030405060708090a0b0c0d0e0f" }
+    ],
+    "reponses": [
+      {
+        "nonceHex": "000102030405060708090a0b0c0d0e0f",
+        "port": 48217,
+        "identifiantHex": "101112131415161718191a1b1c1d1e1f",
+        "nom": "Bureau d’Élise",
+        "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc59101112131415161718191a1b1c1d1e1f114275726561752064e28099c3896c697365"
+      },
+      {
+        "nonceHex": "000102030405060708090a0b0c0d0e0f",
+        "port": 48218,
+        "identifiantHex": "101112131415161718191a1b1c1d1e1f",
+        "nom": "",
+        "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc5a101112131415161718191a1b1c1d1e1f00"
+      }
+    ],
+    "etrangers": [
+      { "nom": "autre signature", "octetsHex": "475452410101000102030405060708090a0b0c0d0e0f" },
+      { "nom": "autre version", "octetsHex": "4754524b0201000102030405060708090a0b0c0d0e0f" },
+      { "nom": "question amputée", "octetsHex": "4754524b0101000102030405060708090a0b0c0d0e" },
+      { "nom": "question allongée", "octetsHex": "4754524b0101000102030405060708090a0b0c0d0e0f00" },
+      { "nom": "réponse au port nul", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0f0000101112131415161718191a1b1c1d1e1f025043" },
+      { "nom": "réponse dont le nom est plus court qu'annoncé", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc59101112131415161718191a1b1c1d1e1f0250" },
+      { "nom": "réponse au nom qui n'est pas de l'UTF-8", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc59101112131415161718191a1b1c1d1e1f02c328" },
+      { "nom": "réponse au nom de 65 octets", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc59101112131415161718191a1b1c1d1e1f417878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878" }
+    ]
+  }
+}

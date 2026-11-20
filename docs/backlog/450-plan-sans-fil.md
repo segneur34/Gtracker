@@ -33,7 +33,15 @@ Le Wi-Fi devient un second canal derrière le « dossier distant » du lot 447 (
 
 **P6 · Banc** (Sonnet high, après P2 et P3). `outils/banc/exe-sansfil.mjs`, hors registre comme `memoire-disque.mjs` : vrai programme en mode d'essai avec `fauxTelephone` ; code lu sur la page, appairage, « 3 ajoutées » puis « 3 déjà là », mauvais code, fenêtre expirée, téléphone retiré puis refusé, coupure en plein transfert. `exe-recuperer.mjs` (le câble marche toujours) et `memoire-disque.mjs` (aucun secret dans le dossier mémoire) s'étendent ; `SCRIPTS.md` à jour.
 
-Ordre : P1, puis P2 et P4 ensemble ; P3 et P5 attendent les réponses ; P6 après P3.
+Ordre : P1, puis P2 et P4 ensemble ; P3 après P2, P5 après P4 ; P6 après P3.
+
+## P1 livré le 20/11 (ce que P2 et P4 doivent savoir)
+
+- Le format exact (ordre des octets, encodages, entrées du HMAC, forme du registre) est décrit en tête de `bureau/trames.ts`, `appairage.ts`, `certificat.ts` et `sonde.ts` ; les jeux d'essai communs aux deux côtés sont dans `bureau/sansFil.vecteurs.json`, trames invalides comprises (dont l'en-tête précédé d'une marque d'ordre d'octets, refusé).
+- Messages : `appairer`, `bonjour`, `defi`, `preuve`, `appaire`, `bienvenue`, `refus` ; commandes `lister`, `lire`, `ping` (avec `id`) ; réponses `liste`, `bloc` (octets dans le corps), `pong`, `erreur`. Constantes : `PROTOCOLE_SANS_FIL` 1, `PORT_SANS_FIL` 48217, `PORT_SONDE` 48218, bloc de 1 Mio.
+- `new DecodeurTrames()` part avec `LIMITES_ACCUEIL` (en-tête 16 Kio, corps 0) : les limites larges (`LIMITES`) se posent explicitement une fois le téléphone reconnu (`bienvenue` ou `appaire`).
+- Appairage : nonces de 32 octets, HMAC-SHA256 dont la clé est le code ; le téléphone prouve le premier ; une tentative ne se conclut qu'une fois ; un succès ou trois échecs ferment la fenêtre, de même que la onzième tentative commencée (`TENTATIVES_MAX`). Jeton de 32 octets, le PC n'en garde que le SHA-256.
+- Certificat ECDSA P-256 auto-signé ; sonde : l'adresse du PC n'est pas dans la réponse, le téléphone prend l'adresse source du paquet ; seules les plages privées RFC 1918 sont admises.
 
 ## Questions posées à l'utilisateur le 20/11, et sa réponse
 
