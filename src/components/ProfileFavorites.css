@@ -100,6 +100,125 @@
   margin: 0;
 }
 
+/* Spot préféré : une languette posée à cheval sur le bord haut du cadre, en haut à droite, qui ne le fait pas grandir.
+   Elle partage la ligne du titre et prend la place qu'il laisse. Son bas est tenu à `--favs-spot-in` sous la première
+   ligne du titre (`--favs-spot-bottom`, mesuré du haut de la ligne), au-dessus de la rangée des activités, qui commence
+   un écart plus bas ; un nom ou un intitulé sur deux lignes la fait dépasser davantage vers le haut, et un titre passé
+   à la ligne ne la fait pas descendre. Sa marge basse très négative lui donne une hauteur nulle dans la ligne : elle ne
+   pousse rien. Son contour
+   est le coup de pinceau des cadres, au petit trait et à la couleur du cadre (`--brush`, hérité) ; dessous, un aplat du
+   fond de page coupe net le trait du cadre et cache le fond dessiné. Le cadre descend de quoi loger une languette à
+   deux lignes, pour qu'elle ne touche pas ce qui est au-dessus. */
+.profile-favs--spot {
+  --favs-spot-in: 10px;
+  /* Une ligne du titre (`--text-l` en hauteur de ligne normale), puis l'écart voulu. */
+  --favs-spot-bottom: calc(var(--text-l) * 1.2 + var(--favs-spot-in));
+  margin-top: calc(var(--space-6) + var(--space-2));
+}
+
+.profile-favs__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Le titre garde sa largeur (la moindre réduction le passerait à la ligne) tant qu'il laisse à la languette de quoi
+   loger son intitulé ; plus long, il passe à la ligne. Sans languette, le titre reste tel qu'il était. */
+.profile-favs--spot .profile-favs__head > .profile-card__title {
+  flex: 0 0 auto;
+  max-width: calc(100% - 9.5rem);
+}
+
+.profile-spot {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  top: var(--favs-spot-bottom);
+  gap: 1px;
+  transform: translateY(-100%);
+  box-sizing: border-box;
+  max-width: min(55%, 15rem);
+  margin: 0 var(--space-1) -200px auto;
+  padding: 9px var(--space-3) 10px;
+  border: 1px solid var(--brush, var(--ink));
+  border-radius: var(--radius-s);
+  color: var(--ink);
+}
+
+.profile-spot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--bg);
+  pointer-events: none;
+}
+
+.profile-spot__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.profile-spot__eyebrow svg {
+  flex: none;
+}
+
+/* Le nom tel que les sessions le portent : deux lignes au plus, puis des points de suspension. */
+.profile-spot__name {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  font-size: var(--text-m);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.profile-spot__sessions {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+@supports (-webkit-mask-box-image: none) {
+  .profile-spot {
+    border: 0;
+    border-radius: 0;
+  }
+
+  /* L'aplat rentré du trait, aux coins arrondis comme ceux du coup de pinceau : rien ne dépasse du contour. */
+  .profile-spot::after {
+    inset: var(--brush-trait-petit);
+    border-radius: calc(3 * var(--brush-trait-petit));
+  }
+
+  /* Ouverture en haut à gauche, à l'opposé de celle du cadre. */
+  .profile-spot::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: var(--brush, var(--ink));
+    -webkit-mask-box-image: url('../assets/profil/trait-cadre-pinceau.svg') 350 / calc(4 * var(--brush-trait-petit)) / 0 stretch;
+    transform: scale(-1, -1);
+  }
+}
+
 /* Téléphone : cadre plus étroit, logos réduits (trois tailles décroissantes gardées), « sessions » qui passe à la
    ligne plutôt que de déborder. À 320 px la rangée dispose de 262 px, pour quatre cases et trois intervalles de 8 px. */
 @media (max-width: 599px) {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { activityShares, favoriteActivities, favoriteActivity } from './profile';
-import { statSession } from '../test/record.fixture';
+import type { Activity } from '../core/activities';
+import { activityShares, favoriteActivities, favoriteActivity, favoriteSpot } from './profile';
+import { statSessionOf } from './stats';
+import { sessionRecord, statSession } from '../test/record.fixture';
 
 // Dates construites à l'heure locale : les tests ne dépendent pas du fuseau de la machine.
 const at = (y: number, m: number, d: number, h = 12, min = 0) => new Date(y, m - 1, d, h, min).getTime();
@@ -114,5 +116,59 @@ describe('favoriteActivities', () => {
       session(at(2026, 3, 2), { activityId: 'kite', family: 'voile', endMs: at(2026, 3, 2) + 3 * HOUR }),
     ];
     expect(favoriteActivities(list, order)[0].activityId).toBe(favoriteActivity(list, order));
+  });
+});
+
+describe('favoriteSpot', () => {
+  it('prend le lieu qui revient le plus, avec son nombre de sessions', () => {
+    expect(favoriteSpot([
+      session(at(2026, 3, 1), { placeName: 'Carnon' }),
+      session(at(2026, 3, 2), { placeName: 'Palavas' }),
+      session(at(2026, 3, 3), { placeName: 'Carnon' }),
+      session(at(2026, 3, 4), { placeName: 'Palavas-les-Flots' }),
+    ])).toEqual({ name: 'Carnon', sessions: 2 });
+  });
+
+  it('compte par nom exact : accents et casse séparent deux lieux', () => {
+    expect(favoriteSpot([
+      session(at(2026, 3, 1), { placeName: 'Étang de Thau' }),
+      session(at(2026, 3, 2), { placeName: 'Etang de Thau' }),
+      session(at(2026, 3, 3), { placeName: 'étang de Thau' }),
+      session(at(2026, 3, 4), { placeName: 'Etang de Thau' }),
+    ])).toEqual({ name: 'Etang de Thau', sessions: 2 });
+  });
+
+  it('à égalité, prend le lieu de la session la plus récente, dans quelque ordre que viennent les sessions', () => {
+    const list = [
+      session(at(2026, 3, 5), { placeName: 'Carnon' }),
+      session(at(2026, 3, 1), { placeName: 'Palavas' }),
+      session(at(2026, 3, 9), { placeName: 'Palavas' }),
+      session(at(2026, 3, 2), { placeName: 'Carnon' }),
+    ];
+    expect(favoriteSpot(list)).toEqual({ name: 'Palavas', sessions: 2 });
+    expect(favoriteSpot([...list].reverse())).toEqual({ name: 'Palavas', sessions: 2 });
+  });
+
+  it('ignore les sessions sans lieu ou au nom vide', () => {
+    expect(favoriteSpot([
+      session(at(2026, 3, 1)),
+      session(at(2026, 3, 2)),
+      session(at(2026, 3, 3), { placeName: '  ' }),
+      session(at(2026, 3, 4), { placeName: 'Carnon' }),
+    ])).toEqual({ name: 'Carnon', sessions: 1 });
+  });
+
+  it('est nul quand aucune session n’a de lieu, ou sans session', () => {
+    expect(favoriteSpot([session(at(2026, 3, 1)), session(at(2026, 3, 2), { placeName: '' })])).toBeNull();
+    expect(favoriteSpot([])).toBeNull();
+  });
+});
+
+describe('statSessionOf et le lieu', () => {
+  it('porte le nom du lieu de départ, pas celui de l’arrivée', () => {
+    const record = sessionRecord({ place: { name: 'Carnon', source: 'carte', lat: 43.5, lon: 3.9, arrival: { name: 'Palavas', source: 'carte', lat: 43.52, lon: 3.93 } } });
+    const activity: Activity = { id: 'a-paddle', name: 'Paddle', base: 'surf', color: '#847c6e' };
+    expect(statSessionOf('a.json', record, activity).placeName).toBe('Carnon');
+    expect(statSessionOf('a.json', sessionRecord(), activity).placeName).toBeNull();
   });
 });

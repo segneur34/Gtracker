@@ -73,6 +73,8 @@ export interface StatSession {
   heartRate: SummaryHeartRate | null;
   /** Matériel enregistré choisi dans les notes (saisi, pas calculé : hors du résumé), `null` sans choix. */
   gear: readonly GearChoice[] | null;
+  /** Nom du lieu de départ tel que la fiche le porte (`place.name`), `null` sans lieu connu. */
+  placeName: string | null;
 }
 
 /**
@@ -102,6 +104,7 @@ export const statSessionOf = (file: string, record: SessionRecord, activity: Act
     flightS: summary.flightS ?? null,
     heartRate: summary.heartRate ?? null,
     gear: record.notes?.gear ?? null,
+    placeName: record.place?.name ?? null,
   };
 };
 

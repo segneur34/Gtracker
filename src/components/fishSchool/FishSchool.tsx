@@ -49,6 +49,12 @@ const plannerFor = (measured: MeasuredSchool) => {
   return entry;
 };
 
+/**
+ * Blocs dont la taille change sans celle de la colonne, à mesurer de nouveau quand elle change : « Vos activités »
+ * (ordinateur) et la languette du spot préféré (`ProfileFavorites`).
+ */
+const WATCHED_SELECTORS = ['.profile-activities', '.profile-spot'] as const;
+
 /** Le calcul quand le navigateur est libre (au plus tard une demi-seconde après), sinon au tour suivant. */
 const IDLE_TIMEOUT_MS = 500;
 const whenIdle = (run: () => void): (() => void) => {
@@ -68,7 +74,8 @@ function FishSchool({ sessions, colors, style, ready, onShown }: Props) {
   const [drawn, setDrawn] = useState<Drawn | null>(null);
 
   // Mesure : dès que la page est prête une première fois, polices chargées, puis à chaque changement de taille de la page,
-  // de sa colonne ou de « Vos activités » (ordinateur, chargée à part, qui change de hauteur seule) ; toujours, même
+  // de sa colonne, de « Vos activités » (ordinateur, chargée à part, qui change de hauteur seule) ou de la languette du
+  // spot préféré ; toujours, même
   // pendant une nouvelle lecture de la bibliothèque, pour que les voiles repeints suivent les cadres.
   const [armed, setArmed] = useState(ready);
   if (ready && !armed) setArmed(true);
@@ -92,21 +99,27 @@ function FishSchool({ sessions, colors, style, ready, onShown }: Props) {
     observer.observe(page);
     const column = page.querySelector('.ui-page.profile');
     if (column) observer.observe(column);
-    // « Vos activités » arrive après la page : un regard sur les seuls enfants du corps de la page, pour l'observer dès
-    // qu'elle paraît (une nouvelle mesure ne change pas ces enfants : pas de boucle).
-    let activities: Element | null = null;
-    const watchActivities = () => {
-      const next = page.querySelector('.profile-activities');
-      if (next === activities) return;
-      if (activities) observer.unobserve(activities);
-      activities = next;
-      if (activities) observer.observe(activities);
-      schedule();
+    // Ce qui change de taille sans changer celle de la colonne, observé dès qu'il paraît : « Vos activités », qui arrive
+    // après la page (un regard sur les seuls enfants du corps de la page), et la languette du spot préféré, qu'un nom
+    // sur deux lignes fait monter (un regard sur la colonne). Une nouvelle mesure ne touche ni à l'une ni à l'autre,
+    // le dessin du banc étant hors de la colonne : pas de boucle.
+    const watched = new Map<string, Element | null>();
+    const watch = () => {
+      for (const selector of WATCHED_SELECTORS) {
+        const previous = watched.get(selector) ?? null;
+        const next = page.querySelector(selector);
+        if (next === previous) continue;
+        if (previous) observer.unobserve(previous);
+        if (next) observer.observe(next);
+        watched.set(selector, next);
+        schedule();
+      }
     };
-    watchActivities();
+    watch();
     const body = page.querySelector('.profile-body');
-    const arrivals = new MutationObserver(watchActivities);
+    const arrivals = new MutationObserver(watch);
     if (body) arrivals.observe(body, { childList: true });
+    if (column) arrivals.observe(column, { childList: true, subtree: true });
     return () => {
       alive = false;
       cancelAnimationFrame(frame);

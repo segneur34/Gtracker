@@ -56,3 +56,34 @@ export const favoriteActivities = (sessions: readonly StatSession[], activityOrd
       || (lastStart.get(b.activityId) ?? 0) - (lastStart.get(a.activityId) ?? 0))
     .slice(0, count);
 };
+
+/** Spot préféré de la période : le nom du lieu de départ et ses sessions. */
+export interface FavoriteSpot {
+  name: string;
+  sessions: number;
+}
+
+/**
+ * Spot préféré : le lieu de départ qui revient le plus parmi les sessions, compté par son nom exact (accents et casse
+ * comptent, comme le renommage d'un lieu) ; à égalité, celui de la session la plus récente. Une session sans lieu, ou
+ * au nom vide, ne compte pas ; `null` quand aucune n'a de lieu.
+ */
+export const favoriteSpot = (sessions: readonly StatSession[]): FavoriteSpot | null => {
+  const spots = new Map<string, { sessions: number; lastStartMs: number }>();
+  for (const s of sessions) {
+    const name = s.placeName;
+    if (!name || !name.trim()) continue;
+    const spot = spots.get(name);
+    if (spot) {
+      spot.sessions += 1;
+      spot.lastStartMs = Math.max(spot.lastStartMs, s.startMs);
+    } else spots.set(name, { sessions: 1, lastStartMs: s.startMs });
+  }
+  let best: (FavoriteSpot & { lastStartMs: number }) | null = null;
+  for (const [name, spot] of spots) {
+    if (!best || spot.sessions > best.sessions || (spot.sessions === best.sessions && spot.lastStartMs > best.lastStartMs)) {
+      best = { name, ...spot };
+    }
+  }
+  return best ? { name: best.name, sessions: best.sessions } : null;
+};

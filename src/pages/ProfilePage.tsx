@@ -29,7 +29,7 @@ import { useAppliedTheme, useThemedShade } from '../hooks/useTheme';
 import { useNow } from '../hooks/useNow';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
-import { activityShares, favoriteActivities, favoriteActivity } from '../library/profile';
+import { activityShares, favoriteActivities, favoriteActivity, favoriteSpot } from '../library/profile';
 import { profilePromptGate } from '../library/profilePrompt';
 import { inBounds, profilePeriodOf, statsPeriodBounds, statsTotals } from '../library/stats';
 import { TUTORIAL_OF_DAY_VISIBLE, tutorialCardGate } from '../tutorials/tutorials';
@@ -224,6 +224,8 @@ function ProfilePage() {
       to: sessionsPath(isShown(a) ? a.id : null),
     }];
   }), [inPeriod, activityOrder, activityById, shown, isShown]);
+  // Le spot préféré : le lieu de départ qui revient le plus dans les mêmes sessions que les activités favorites.
+  const spot = useMemo(() => favoriteSpot(inPeriod), [inPeriod]);
   // Coup de pinceau des cadres : la couleur de la première favorite de la période (l'encre sans session), vue du thème.
   const dark = useAppliedTheme().theme === 'dark';
   const brushColor = useMemo(() => {
@@ -296,7 +298,7 @@ function ProfilePage() {
         <>
           {scanning && <p className="ui-hint">{t('Fiches en cours de calcul ({done} / {total}) : chiffres provisoires.', { done: scanning.done, total: scanning.total })}</p>}
 
-          <ProfileFavorites cells={favoriteCells} total={distanceText(totals.distanceM, distanceUnit)} frame={frames.favs} />
+          <ProfileFavorites cells={favoriteCells} total={distanceText(totals.distanceM, distanceUnit)} frame={frames.favs} spot={spot} />
 
           {slices.length > 0 && (
             <section className={`profile-split ui-card-col ${frames.split.className}`} style={frames.split.style} aria-label={t('Répartition par activité')}>

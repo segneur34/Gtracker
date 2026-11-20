@@ -13,8 +13,11 @@ import { brushCorner, schoolCorner, schoolLayoutKey, type SchoolFrame, type Scho
 const FRAME_SELECTOR = ':scope > :is(.ui-card, .ui-card-col), :scope > .brush-frames > :is(.ui-card, .ui-card-col)';
 /** Cadres au voile de la page, rendus transparents sous le banc et repeints dans son dessin (`ProfilePage.css`). */
 const VEILED_SELECTOR = '.profile-favs, .profile-split, .actchart';
-/** Ce qui compte pour un dessin ou un chiffre en plus des textes : on n'y pose aucun poisson. */
-const SOLID_SELECTOR = 'svg, canvas, img, button, input, select, textarea, [role="img"]';
+/**
+ * Ce qui compte pour un dessin ou un chiffre en plus des textes : on n'y pose aucun poisson. La languette du spot
+ * préféré compte en entier : son aplat cacherait un poisson posé entre ses textes et son contour.
+ */
+const SOLID_SELECTOR = 'svg, canvas, img, button, input, select, textarea, [role="img"], .profile-spot';
 
 export interface SchoolMeasureRules {
   /** Angle de départ : rentré de tant de px de son bord (droit sur téléphone, gauche sur ordinateur) et du haut. */
