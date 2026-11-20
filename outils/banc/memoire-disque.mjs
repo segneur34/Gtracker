@@ -407,6 +407,7 @@ try {
     check('g1 : l\'index corbeille.json a une seule entrée (format et version posés)', Boolean(idx1) && idx1.entries.length === 1 && typeof idx1.format === 'string' && idx1.version === 1, JSON.stringify(idx1));
     check('g1 : l\'entrée est une session de l\'ordinateur, supprimée à l\'instant', e1?.kind === 'session' && e1?.origin === 'ordinateur' && e1?.reason === 'supprimee' && Math.abs(Date.now() - e1.deletedAtMs) < 120000, JSON.stringify(e1));
     check('g1 : l\'entrée dit le sous-dossier, le GPX principal et l\'instant de départ de la session', e1?.dir === dossiers1[0] && e1?.main === retiree && STARTS.includes(e1?.startMs) && dossiers1[0].endsWith(`-${e1?.startMs}`), JSON.stringify(e1));
+    check('g1 : l\'entrée porte le nom de la session (son activité), pas celui de son fichier, même importée sans activité', typeof e1?.name === 'string' && e1.name.length > 0 && !/\.gpx$/i.test(e1.name) && !e1.name.includes(retiree.replace(/\.gpx$/i, '')), JSON.stringify(e1?.name));
     const dedans = existsSync(join(corbeille, dossiers1[0] ?? '-')) ? readdirSync(join(corbeille, dossiers1[0])).sort() : [];
     check('g1 : le sous-dossier porte le GPX et la fiche sous leurs noms d\'origine', JSON.stringify(dedans) === JSON.stringify([ficheRetiree, retiree].sort()), dedans.join(','));
     check('g1 : l\'index dit les tailles des fichiers recopiés', (e1?.files ?? []).length === dedans.length && (e1?.files ?? []).every((f) => existsSync(join(corbeille, dossiers1[0], f.name)) && statSync(join(corbeille, dossiers1[0], f.name)).size === f.size), JSON.stringify(e1?.files));
@@ -425,6 +426,7 @@ try {
     console.log(`  liste dépliée : ${JSON.stringify(liste)}`);
     check('la liste dépliée montre la session (nom, date, « session supprimée le … »), « Restaurer » et « Supprimer définitivement »',
       liste?.length === 1 && /session supprimée le/.test(liste[0]) && /restaurer/i.test(liste[0]) && /supprimer définitivement/i.test(liste[0]), JSON.stringify(liste));
+    check('la liste dépliée montre le nom de la session, pas celui de son fichier', liste?.length === 1 && !liste[0].includes(retiree.replace(/\.gpx$/i, '')), JSON.stringify(liste));
     const videDispo = await b.evaluate(`[...document.querySelectorAll('button.ui-btn--hold')].some((x) => x.textContent.trim() === 'Vider la corbeille')`);
     check('« Vider la corbeille » est offert', videDispo === true);
     check('clic « Restaurer »', (await b.clickText('Restaurer')) === 'ok');

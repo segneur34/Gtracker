@@ -1,4 +1,4 @@
-import { activityDisplayName, findActivity } from '../../core/activities';
+import { activityDisplayName, sessionActivity } from '../../core/activities';
 import { errorMessage } from '../../core/basics';
 import { t } from '../../core/i18n';
 import { sessionDisplayName } from '../../library/sessionName';
@@ -68,9 +68,12 @@ export const startTrash = async (opened: MemoryFolder): Promise<void> => {
   if (f === lib.folder) await reloadTrash();
 };
 
-/** Nom montré d'une session au moment où elle part à la corbeille. */
+/**
+ * Nom montré d'une session au moment où elle part à la corbeille, le même que dans la liste des sessions : une
+ * session sans activité inscrite (importée) prend celle de son calcul (`sessionActivity`).
+ */
 const shownName = (session: LibrarySession): string => {
-  const activity = findActivity(readStoredActivities(), session.record.activityId);
+  const activity = sessionActivity(readStoredActivities(), session.record.activityId, session.record.sport);
   return sessionDisplayName(session.record, activity ? activityDisplayName(activity) : null, session.file);
 };
 
