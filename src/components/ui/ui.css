@@ -340,6 +340,10 @@
   gap: var(--space-1);
   min-height: 28px;
   padding: 0 var(--space-3);
+  /* Un lien compte son trait en plus de la hauteur minimale, un bouton non : sans cela, il dépasse « Tris » de deux pixels. */
+  box-sizing: border-box;
+  /* Dans une rangée de boutons plus hauts (liste des itinéraires), elle garde sa taille au lieu d'être étirée. */
+  align-self: center;
   background: var(--ink);
   border-color: var(--ink);
   color: var(--on-ink);

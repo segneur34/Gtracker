@@ -364,7 +364,7 @@ const lienRetour = await evaluate(`(() => { const a = document.querySelector('.u
 console.log('lien retour :', JSON.stringify(lienRetour));
 check('Planifier : le lien « ← » mène à la liste des itinéraires (« Itinéraires planifiés »)', lienRetour?.href === '/itineraires/liste' && lienRetour.texte === 'Itinéraires planifiés', JSON.stringify(lienRetour));
 check('Planifier, itinéraire ouvert : le « … » est dans l\'en-tête (à droite du titre), plus dans le bloc du nom',
-  (await evaluate(`document.querySelector('.ui-page-header__row .ui-more__button') !== null && document.querySelector('.ui-page-header .ui-more__button') === null`)) === true);
+  (await evaluate(`document.querySelector('.ui-page-header__row .ui-more__button') !== null && document.querySelector('.plan-form .ui-more__button') === null`)) === true);
 console.log('retour (Planifier, itinéraire ouvert) :', await back());
 check('retour depuis Planifier, itinéraire ouvert : la liste des itinéraires', (await cheminEst('/itineraires/liste')) === true, await chemin());
 await waitFor(`Boolean(document.querySelector('a.ui-tab--action[href="/itineraires"]'))`, { timeout: 5000, label: 'pastille Planifier' });
@@ -396,7 +396,8 @@ const ouvrirDeLaListe = async () => {
   await settle({ max: 800 });
 };
 await ouvrirDeLaListe();
-check('un itinéraire ouvert depuis la liste : Planifier, adresse de l\'itinéraire', (await chemin()) === '/itineraires' && /^\?itineraire=/.test(await evaluate('location.search')), `${await chemin()} ${await evaluate('location.search')}`);
+// Planifier retire `?itineraire=` de l'adresse une fois l'itinéraire chargé (remplacement, sans entrée d'historique).
+check('un itinéraire ouvert depuis la liste : Planifier, adresse nettoyée', (await chemin()) === '/itineraires' && (await evaluate('location.search')) === '',`${await chemin()} ${await evaluate('location.search')}`);
 console.log('retour (itinéraire ouvert depuis la liste) :', await back());
 check('retour depuis l\'itinéraire ouvert depuis la liste : la liste', (await cheminEst('/itineraires/liste')) === true, await chemin());
 await ouvrirDeLaListe();
