@@ -8,8 +8,8 @@
 //  3. voile : le « ? » des manœuvres, puis celui du vent, qui referme le premier ;
 //  4. Statistiques : rien d'ouvert, la note du graphique sous son « ? » ; passer par Profil et revenir, par la barre,
 //     referme l'aide (une aide ne survit pas à un changement de page) ;
-//  5. barre du haut à 1400 et 1000 px (800 px relevé pour information) : Profil, Sessions, Planifier (vers les
-//     itinéraires), Statistiques, Réglages, le logo qui mène au Profil, chaque lien sur une ligne ; l'application
+//  5. barre du haut à 1400 et 1000 px (800 px relevé pour information) : Profil, Sessions, Planifier (vers la
+//     liste des itinéraires, allumé aussi sur Planifier), Statistiques, Réglages, le logo qui mène au Profil, chaque lien sur une ligne ; l'application
 //     s'ouvre sur le Profil ; au téléphone, barre du bas Profil, Sessions, Statistiques, Réglages, et pas de pop-up
 //     du profil.
 import { connect } from './lib/cdp.mjs';
@@ -136,7 +136,17 @@ check("changer de page referme l'aide", (await evaluate('location.pathname')) ==
 const topLinks = () => evaluate(`[...document.querySelectorAll('.shell-toplinks a')].map((a) => a.textContent.trim())`);
 check('ordinateur : plus de lien « Accueil » en haut', !(await topLinks()).includes('Accueil'), (await topLinks()).join(', '));
 check('ordinateur : barre du haut Profil, Sessions, Planifier, Statistiques, Réglages', (await topLinks()).join(', ') === 'Profil, Sessions, Planifier, Statistiques, Réglages', (await topLinks()).join(', '));
-check('ordinateur : « Planifier » mène aux itinéraires, plus de bouton « Itinéraires » à part', (await evaluate(`[...document.querySelectorAll('.shell-toplinks a')].find((a) => a.textContent.trim() === 'Planifier')?.getAttribute('href')`)) === '/itineraires' && (await evaluate(`document.querySelector('.shell-topplan') === null`)));
+check('ordinateur : « Planifier » mène à la liste des itinéraires, plus de bouton « Itinéraires » à part', (await evaluate(`[...document.querySelectorAll('.shell-toplinks a')].find((a) => a.textContent.trim() === 'Planifier')?.getAttribute('href')`)) === '/itineraires/liste' && (await evaluate(`document.querySelector('.shell-topplan') === null`)));
+// « Planifier » est allumé sur la liste des itinéraires (sa page) et sur Planifier lui-même (qui s'ouvre depuis la liste).
+const allume = () => evaluate(`[...document.querySelectorAll('.shell-toplinks a.active')].map((a) => a.textContent.trim()).join(', ')`);
+console.log('vers la liste des itinéraires :', await nav('/itineraires/liste'));
+await settle({ max: 1500 });
+check('ordinateur : « Planifier » de la barre ouvre /itineraires/liste, seul allumé', (await evaluate('location.pathname')) === '/itineraires/liste' && (await allume()) === 'Planifier', `${await evaluate('location.pathname')} | ${await allume()}`);
+await evaluate(`document.querySelector('a.ui-tab--action[href="/itineraires"]')?.click()`);
+await settle({ max: 1500 });
+check('ordinateur : sur Planifier (/itineraires), « Planifier » de la barre reste seul allumé', (await evaluate('location.pathname')) === '/itineraires' && (await allume()) === 'Planifier', `${await evaluate('location.pathname')} | ${await allume()}`);
+console.log('retour aux Statistiques :', await nav('/statistiques'));
+await settle({ max: 1500 });
 check('ordinateur : le logo mène au Profil', (await evaluate(`document.querySelector('.shell-brand')?.getAttribute('href')`)) === '/profil', await evaluate(`document.querySelector('.shell-brand')?.getAttribute('href')`));
 for (const width of [1400, 1000, 800]) {
   await send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false });

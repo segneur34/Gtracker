@@ -14,7 +14,7 @@
 //  c. trois sessions (dont une avec sa fiche et un nom à espace et accent) et des fichiers hors sessions/ : « 3 sessions
 //     ajoutées », GPX et fiches rangés sans temporaire, rien de reglages/, itineraires/ ni lieux.json, trois lignes dans
 //     la liste de la page Sessions ;
-//  d. second clic : « 0 sessions ajoutées, 3 déjà présentes », le disque inchangé (noms, tailles, dates) ;
+//  d. second clic : « 0 session ajoutée, 3 déjà présentes », le disque inchangé (noms, tailles, dates) ;
 //  e. une quatrième session sur le téléphone : seule celle-là est ajoutée ;
 //  f. coupure en route, deux fois (entre un GPX et sa fiche, puis plus loin) : message de débranchement, sessions rangées
 //     entières, aucune moitié ni temporaire ; relancé sans coupure, ce qui manquait est rangé ;
@@ -345,7 +345,7 @@ try {
 
       // d
       r = await recuperer(b, 'd');
-      check('d. le compte rendu dit « 0 sessions ajoutées, 3 déjà présentes. »', JSON.stringify(r?.paragraphes) === JSON.stringify(['0 sessions ajoutées, 3 déjà présentes.']), JSON.stringify(r?.paragraphes));
+      check('d. le compte rendu dit « 0 session ajoutée, 3 déjà présentes. »', JSON.stringify(r?.paragraphes) === JSON.stringify(['0 session ajoutée, 3 déjà présentes.']), JSON.stringify(r?.paragraphes));
       await b.wait(1500);
       check('d. le disque n\'a pas changé (noms, tailles, dates de sessions/)', empreinte(join(M.memoire, 'sessions')) === empreinteC, `\n${empreinteC}\n--\n${empreinte(join(M.memoire, 'sessions'))}`);
       telephoneIntact('d', tel, avant);

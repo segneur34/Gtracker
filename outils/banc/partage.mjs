@@ -16,7 +16,7 @@
 //     « Partager l'image » de l'analyse : aperçu en 1080 × 1920, chiffres du résumé, choix de la voile repris (clé de
 //     l'activité enregistrée, la même que celle de la session importée : Wingfoil) ;
 //  6. itinéraire : un parcours de trois balises posé et enregistré dans Planifier (écran d'ordinateur) ; « Partager l'image »
-//     depuis le « … » du nom : 1080 × 1920, aucune case de chiffres (« Fond de carte » seule), `alt` relevé en entier
+//     depuis le « … » de l'en-tête de la page (à droite du titre, plus dans le bloc du nom) : 1080 × 1920, aucune case de chiffres (« Fond de carte » seule), `alt` relevé en entier
 //     (nom, activité, trois chiffres, bords), partage simulé d'un PNG nommé d'après l'itinéraire, fond décoché ; puis la même
 //     chose depuis le « … » d'une ligne de la liste des itinéraires ; aucune erreur de console. Images gardées dans le dossier
 //     des captures : `partage-itineraire.png`, `partage-itineraire-sans-fond.png`.
@@ -293,13 +293,14 @@ check('itinéraire de trois balises enregistré', typeof rangeMsg === 'string' &
 const distancePage = await planStat('Distance');
 check('trois balises posées, sans boucle', (await planStat('Balises')) === '3', String(await planStat('Balises')));
 
-// Depuis le « … » du nom, dans Planifier.
-await evaluate(`(() => { const b = document.querySelector('.plan-form .ui-more__button'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); return 'ok'; })()`);
+// Depuis le « … » de l'en-tête de la page, à droite du titre, dans Planifier.
+await evaluate(`(() => { const b = document.querySelector('.ui-page-header .ui-more__button'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); return 'ok'; })()`);
 await wait(300);
-const entreesPlan = await evaluate(`JSON.stringify([...document.querySelectorAll('.plan-form .ui-more__panel button')].map((x) => x.textContent.trim()))`);
+const entreesPlan = await evaluate(`JSON.stringify([...document.querySelectorAll('.ui-page-header .ui-more__panel button')].map((x) => x.textContent.trim()))`);
 console.log('« … » de l\'itinéraire :', entreesPlan);
-check('itinéraire : « Partager l\'image » est la première entrée du « … » du nom', JSON.parse(entreesPlan)[0] === "Partager l'image", entreesPlan);
-console.log('Partager l\'image :', await evaluate(`(() => { const b = [...document.querySelectorAll('.plan-form .ui-more__panel button')].find((x) => x.textContent.trim() === "Partager l'image"); if (!b || b.disabled) return 'absent'; b.click(); return 'ok'; })()`));
+check('itinéraire : le « … » est dans l\'en-tête, plus dans le bloc du nom', (await evaluate(`document.querySelector('.plan-form .ui-more__button') === null && document.querySelector('.ui-page-header .ui-more__button') !== null`)) === true);
+check('itinéraire : « Partager l\'image » est la première entrée du « … » de l\'en-tête', JSON.parse(entreesPlan)[0] === "Partager l'image", entreesPlan);
+console.log('Partager l\'image :', await evaluate(`(() => { const b = [...document.querySelectorAll('.ui-page-header .ui-more__panel button')].find((x) => x.textContent.trim() === "Partager l'image"); if (!b || b.disabled) return 'absent'; b.click(); return 'ok'; })()`));
 await dialogueItineraire('depuis Planifier');
 const altPlan = await imageAlt();
 console.log('alt :', altPlan);

@@ -2,26 +2,29 @@
 // Usage : node planning.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Le bloc « Tracé et balises (n) » réunit la bande de chiffres, les actions et la liste des balises.
 // La page ne calcule plus rien : les balises se relient en ligne droite, plus de mode, de type de voie ni de revêtement.
-// Le script fabrique lui-même ses quatre GPX dans le dossier de travail (une trace sans heure, avec altitude et
-// `<type>kite</type>` ; une route `<rte>` ; une boucle ; un fichier qui n'est pas un GPX), et vérifie, sur un profil neuf,
-// en Wingfoil, tous les onglets ouverts :
+// Le script vérifie, sur un profil neuf, en Wingfoil, tous les onglets ouverts (le dossier de travail ne sert plus :
+// aucun GPX n'est chargé dans Planifier) :
 //  1. trois balises posées, « Précédent », « Boucler » (le bord 3 → 1), « Tout effacer » ;
 //  2. le bandeau d'une balise : « Retirer », puis « Boucler ici » sur la balise 1 ;
 //  2b. le bloc « Tracé et balises » (quatre balises) : ordre des blocs et des pastilles (« Balises sonores » en dernier),
 //     bande de chiffres et lignes de balises (bord et cap), une seule ligne dépliée à la fois, Monter et Descendre (la
 //     ligne dépliée suit la balise), Retirer, « Inverser », « Précédent » (icône du bloc) et « Boucler » qui replient, « Tout effacer » ;
-//  3. « Charger un GPX » : refus du fichier qui n'en est pas un, route `<rte>` (départ et arrivée), boucle, trace sans
-//     heure (activité devinée de son `<type>`, nom repris du fichier) ;
-//  4. une balise insérée sur la trace importée (distance inchangée), l'arrivée déplacée, « Précédent », « Inverser » ;
-//  5. « Enregistrer » (fiche et GPX rangés), rechargement, réouverture depuis la liste : verrouillé, mêmes balises ;
-//  6. le menu « … » du nom sur l'itinéraire rouvert : ses entrées, le bloc sans « Exporter le GPX » ni « Supprimer
-//     l'itinéraire », « Partager le GPX » (partage du navigateur simulé, puis sans partage), nom modifié (partages grisés
+//  3. « Charger un GPX » n'existe plus dans Planifier (ni bouton, ni champ de fichier, ni phrase d'aide) ;
+//  4. deux balises posées, une balise insérée sur le tracé (distance inchangée), l'arrivée déplacée, « Précédent »,
+//     « Inverser » ;
+//  5. activité Kite choisie, « Enregistrer » (fiche et GPX rangés), rechargement, réouverture depuis la liste : verrouillé,
+//     mêmes balises ;
+//  5b. le retour : le lien « ← » et la touche retour d'Android (`gtrackerBack`) ramènent de Planifier, itinéraire ouvert,
+//     à la liste des itinéraires, puis à Sessions ; la pastille « Planification » de Sessions et « Planifier » de la liste
+//     (classe `ui-tab--action`, pleine à l'encre) ont la même hauteur que « Tris » ; de la liste, « Planifier » ouvre
+//     Planifier, d'où le retour revient à la liste ;
+//  6. le menu « … » de l'itinéraire rouvert, dans l'en-tête de la page à droite du titre (et plus dans le bloc du nom) :
+//     ses entrées, le bloc sans « Exporter le GPX » ni « Supprimer l'itinéraire », « Partager le GPX » (partage du navigateur simulé, puis sans partage), nom modifié (partages grisés
 //     et leur ligne), « Supprimer » d'un clic court, tenu une seconde, « Garder », menu fermé puis rouvert, « Supprimer
 //     définitivement » (mémoire vidée, le bloc redevient « Enregistrer l'itinéraire »).
 // Verdicts par `check` ; fin par « Tout passe. » ou le nombre d'échecs, code 0 ou 1.
 import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
+import { CLES, connect, DOSSIER_MEMOIRE, POIGNEE_RETOUR } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -30,30 +33,8 @@ if (!port || !workDir) {
   process.exit(1);
 }
 
-// --- Les quatre GPX, autour de Sète : mètres vers l'est et vers le nord à partir d'une origine ---
-const R = 6371000;
-const O = { lat: 43.4, lon: 3.7 };
-const at = (east, north) => ({
-  lat: O.lat + (north / R) * (180 / Math.PI),
-  lon: O.lon + (east / (R * Math.cos((O.lat * Math.PI) / 180))) * (180 / Math.PI),
-});
-const gpxDe = (corps) => `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc" xmlns="http://www.topografix.com/GPX/1/1">${corps}</gpx>\n`;
-const trkpt = (e, n, ele) => `<trkpt lat="${at(e, n).lat.toFixed(7)}" lon="${at(e, n).lon.toFixed(7)}"><ele>${ele}</ele></trkpt>`;
-const dossier = (nom) => join(workDir, nom);
-// Trace sans heure : 800 m vers l'est puis 400 m vers le nord, avec altitude et un type de calcul.
-writeFileSync(dossier('sans-heure.gpx'), gpxDe(`<trk><name>Trace sans heure</name><type>kite</type><trkseg>${
-  [[0, 0], [200, 0], [400, 0], [600, 0], [800, 0], [800, 200], [800, 400]].map(([e, n], i) => trkpt(e, n, 5 + i)).join('')}</trkseg></trk>`));
-// Route : des `<rtept>` seulement.
-writeFileSync(dossier('route-rte.gpx'), gpxDe(`<rte><name>Route des balises</name>${
-  [[0, 0], [300, 300], [700, 300]].map(([e, n]) => `<rtept lat="${at(e, n).lat.toFixed(7)}" lon="${at(e, n).lon.toFixed(7)}"/>`).join('')}</rte>`));
-// Boucle : un carré de 400 m qui revient à 10 m de son départ.
-writeFileSync(dossier('boucle.gpx'), gpxDe(`<trk><name>Boucle carrée</name><type>wingfoil</type><trkseg>${
-  [[0, 0], [400, 0], [400, 400], [0, 400], [0, 10]].map(([e, n]) => trkpt(e, n, 3)).join('')}</trkseg></trk>`));
-// Un fichier qui n'a ni point de trace ni point de route.
-writeFileSync(dossier('pas-un-gpx.gpx'), gpxDe('<metadata><name>Rien</name></metadata>'));
-
 // --- Protocole (lib/cdp.mjs) ---
-const { send, evaluate, go: goRaw, settle, waitFor, wait, importFiles, mouse, onMessage, logs, check, finish, shoot } = await connect({ port, shotDir });
+const { send, evaluate, go: goRaw, settle, waitFor, wait, mouse, onMessage, logs, check, finish, shoot } = await connect({ port, shotDir });
 /** Navigation, puis attente du premier rendu de l'application : sous charge, `settle` seul peut rendre la main avant. */
 const go = async (path, max) => {
   const ms = await goRaw(path, max);
@@ -65,7 +46,6 @@ const dialogs = [];
 onMessage((msg) => { if (msg.method === 'Page.javascriptDialogOpening') dialogs.push(msg.params.message); });
 /** Bouton dont le texte est exactement `text` (hors désactivés) ; « absent » sinon. */
 const clickText = (text, scope = 'button') => evaluate(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(scope)})].find((x) => x.textContent.trim() === ${JSON.stringify(text)} && !x.disabled); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
-const setFile = (selector, path) => importFiles(path, selector);
 const clickAt = async (x, y) => { await mouse('mousePressed', x, y); await mouse('mouseReleased', x, y); await wait(300); };
 /** Toucher de la carte, à la fraction (fx, fy) de son cadre. */
 const tapMap = async (fx, fy) => {
@@ -280,30 +260,23 @@ ls = await lignes();
 const videListe = await evaluate(`document.querySelector('.plan-trace .plan-note')?.textContent ?? null`);
 check('« Tout effacer » : plus de ligne, la note « Aucun point » reprend la place', ls.length === 0 && /^Aucun point/.test(String(videListe)), String(videListe));
 
-// 3. « Charger un GPX » : un fichier qui n'en est pas un, une route, une boucle, une trace sans heure.
-const charge = async (nom) => { await setFile('.plan-actions input[type=file]', dossier(nom)); await settle({ max: 800 }); };
-await charge('pas-un-gpx.gpx');
-await log('pas un GPX');
-const refus = await state();
-check('un fichier sans trace est refusé avec son motif, rien de chargé', refus.alert.includes('ne contient pas de trace') && refus.title === 'Tracé et balises (0)', JSON.stringify(refus));
-await charge('route-rte.gpx');
-await log('route <rte>');
-const route = await state();
-check('une route `<rte>` : départ et arrivée seuls, nom du fichier, plus d\'alerte', route.title === 'Tracé et balises (2)' && route.name === 'Route des balises' && route.alert === '', JSON.stringify(route));
-// 300 m à l'est et 300 m au nord (424 m), puis 400 m à l'est : 824 m de route entre ses trois points.
-check('une route `<rte>` : la longueur de ses trois points, 0,82 km', route.distance === '0,82 km', route.distance);
-await charge('boucle.gpx');
-await log('boucle');
-const lue = await state();
-check('une trace qui revient près de son départ : boucle de trois balises (chiffre 2), nom repris', lue.title === 'Tracé et balises (3)' && lue.balises === '2' && lue.name === 'Boucle carrée', JSON.stringify(lue));
-await charge('sans-heure.gpx');
-await log('trace sans heure');
-const sansHeure = await state();
-check('une trace sans heure : deux balises, nom repris, activité devinée de son type (Kite)',
-  sansHeure.title === 'Tracé et balises (2)' && sansHeure.name === 'Trace sans heure' && sansHeure.activity?.includes('Kite') === true, JSON.stringify(sansHeure));
-await shoot('planning-trace');
+// 3. « Charger un GPX » a quitté Planifier : ni bouton, ni champ de fichier, ni phrase d'aide ; un GPX entre par
+// « Importer un itinéraire » de la liste des itinéraires, seul chemin.
+const sansCharger = JSON.parse(await evaluate(`JSON.stringify({
+  champs: document.querySelectorAll('.plan-page input[type=file]').length,
+  boutons: [...document.querySelectorAll('.plan-page button, .plan-page label')].filter((x) => /Charger un GPX/.test(x.textContent)).length,
+  texte: /Charger un GPX/.test(document.body.textContent),
+})`));
+console.log('Charger un GPX :', JSON.stringify(sansCharger));
+check('Planifier : plus de « Charger un GPX » (ni bouton, ni champ de fichier, ni phrase d\'aide)', sansCharger.champs === 0 && sansCharger.boutons === 0 && sansCharger.texte === false, JSON.stringify(sansCharger));
 
-// 4. Une balise insérée sur la trace, l'arrivée déplacée, « Précédent », « Inverser ».
+// 4. Une balise insérée sur le tracé, l'arrivée déplacée, « Précédent », « Inverser » : deux balises posées à la main.
+await tapMap(0.3, 0.5);
+await tapMap(0.7, 0.5);
+await log('deux balises');
+const deuxPosees = await state();
+check('deux balises posées : « Tracé et balises (2) », un seul bord', deuxPosees.title === 'Tracé et balises (2)' && deuxPosees.bords.length === 1 && deuxPosees.alert === '', JSON.stringify(deuxPosees));
+await shoot('planning-trace');
 const avantInsertion = (await state()).distance;
 const mid = await evaluate(`(() => {
   const path = [...document.querySelectorAll('.plan-map path.leaflet-interactive')].find((p) => p.getAttribute('stroke-width') === '24');
@@ -311,11 +284,11 @@ const mid = await evaluate(`(() => {
   const p = path.getPointAtLength(path.getTotalLength() * 0.5).matrixTransform(path.getScreenCTM());
   return [p.x, p.y];
 })()`);
-check('la trace importée porte un tronçon à toucher', mid !== null, 'aucun tracé de 24 px');
+check('le tracé porte un tronçon à toucher', mid !== null, 'aucun tracé de 24 px');
 if (mid) await clickAt(mid[0], mid[1]);
 await log('balise insérée');
 const insere = await state();
-check('une balise posée sur la trace : « Tracé et balises (3) », distance inchangée', insere.title === 'Tracé et balises (3)' && insere.distance === avantInsertion, `${avantInsertion} -> ${insere.distance}`);
+check('une balise posée sur le tracé : « Tracé et balises (3) », distance inchangée', insere.title === 'Tracé et balises (3)' && insere.distance === avantInsertion, `${avantInsertion} -> ${insere.distance}`);
 const avantGlisser = await markers();
 const fin = avantGlisser.at(-1);
 await mouse('mousePressed', fin[0], fin[1]);
@@ -335,7 +308,23 @@ check('« Inverser » : le départ passe à l\'arrivée', JSON.stringify(inverse
 console.log('Inverser :', await clickText('Inverser'));
 check('« Inverser » deux fois : les balises reviennent', JSON.stringify(await markers()) === JSON.stringify(avantInverser), JSON.stringify(await markers()));
 
-// 5. Enregistrer, recharger, rouvrir.
+// 5. Activité Kite, enregistrer, recharger, rouvrir.
+const chooseActivity = (text) => evaluate(`(async () => {
+  const radio = [...document.querySelectorAll('[aria-label=Activité] button[role=radio]')].find((b) => b.textContent.trim() === ${JSON.stringify(text)});
+  if (radio) { radio.click(); return 'ok'; }
+  for (const button of document.querySelectorAll('button.activity-select:not(:disabled)')) {
+    button.click();
+    await new Promise((r) => setTimeout(r, 150));
+    const item = [...document.querySelectorAll('.activity-select__option')].find((o) => o.textContent.trim() === ${JSON.stringify(text)});
+    if (item) { item.click(); return 'ok'; }
+    document.querySelector('.activity-select__backdrop')?.click();
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  return 'absent';
+})()`);
+console.log('activité Kite :', await chooseActivity('Kite'));
+await wait(300);
+check('activité Kite choisie, les balises restent', (await state()).activity?.includes('Kite') === true && (await state()).title === 'Tracé et balises (3)', JSON.stringify(await state()));
 const distanceRangee = (await state()).distance;
 await evaluate(`(() => { const i = document.querySelector('.plan-form input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'Sortie banc'); i.dispatchEvent(new Event('input', { bubbles: true })); return 'ok'; })()`);
 console.log('Enregistrer :', await clickText('Enregistrer'));
@@ -364,17 +353,66 @@ const rouvert = await state();
 check('rouvert : trois balises, même distance, même nom, activité Kite', rouvert.title === 'Tracé et balises (3)' && rouvert.distance === distanceRangee && rouvert.name === 'Sortie banc' && rouvert.activity?.includes('Kite') === true, JSON.stringify(rouvert));
 check('rouvert : verrouillé (bouton « Modifier l\'itinéraire »)', (await lockLabel()) === "Modifier l'itinéraire", await lockLabel());
 
-// 6. Le menu « … » du nom, sur l'itinéraire rangé et rouvert : entrées, partage du GPX, itinéraire modifié, suppression tenue.
+// 5b. Le retour. Itinéraire ouvert, le « ← » de l'en-tête et la touche retour d'Android ramènent à la liste des itinéraires,
+// la liste à Sessions ; « Planification » de Sessions et « Planifier » de la liste sont des pastilles d'action de la
+// hauteur de « Tris ».
+const back = () => evaluate(`window.${POIGNEE_RETOUR} ? window.${POIGNEE_RETOUR}() : 'absent'`);
+const chemin = () => evaluate('location.pathname');
+const cheminEst = (p) => waitFor(`location.pathname === ${JSON.stringify(p)}`, { timeout: 5000, every: 100, label: p });
+const pastille = (selecteur) => evaluate(`(() => { const a = document.querySelector(${JSON.stringify(selecteur)}); if (!a) return null; const s = getComputedStyle(a); return { texte: a.textContent.trim(), classes: a.className, h: Math.round(a.getBoundingClientRect().height * 10) / 10, fond: s.backgroundColor, couleur: s.color }; })()`);
+const lienRetour = await evaluate(`(() => { const a = document.querySelector('.ui-page-header .ui-back'); return a ? { href: a.getAttribute('href'), texte: a.textContent.trim() } : null; })()`);
+console.log('lien retour :', JSON.stringify(lienRetour));
+check('Planifier : le lien « ← » mène à la liste des itinéraires (« Itinéraires planifiés »)', lienRetour?.href === '/itineraires/liste' && lienRetour.texte === 'Itinéraires planifiés', JSON.stringify(lienRetour));
+check('Planifier, itinéraire ouvert : le « … » est dans l\'en-tête (à droite du titre), plus dans le bloc du nom',
+  (await evaluate(`document.querySelector('.ui-page-header__row .ui-more__button') !== null && document.querySelector('.ui-page-header .ui-more__button') === null`)) === true);
+console.log('retour (Planifier, itinéraire ouvert) :', await back());
+check('retour depuis Planifier, itinéraire ouvert : la liste des itinéraires', (await cheminEst('/itineraires/liste')) === true, await chemin());
+await waitFor(`Boolean(document.querySelector('a.ui-tab--action[href="/itineraires"]'))`, { timeout: 5000, label: 'pastille Planifier' });
+const planifierListe = await pastille('a.ui-tab--action[href="/itineraires"]');
+console.log('« Planifier » de la liste :', JSON.stringify(planifierListe));
+check('la liste : « Planifier » est une pastille d\'action (`ui-tab ui-tab--action`), pleine à l\'encre', planifierListe?.texte === 'Planifier' && /\bui-tab\b/.test(planifierListe.classes) && /\bui-tab--action\b/.test(planifierListe.classes) && planifierListe.fond !== 'rgba(0, 0, 0, 0)', JSON.stringify(planifierListe));
+console.log('retour (liste) :', await back());
+check('retour depuis la liste des itinéraires : Sessions', (await cheminEst('/sessions')) === true, await chemin());
+await waitFor(`Boolean(document.querySelector('.sessions-head__pills a'))`, { timeout: 5000, label: 'pastilles de Sessions' });
+const planification = await pastille('.sessions-head__pills a');
+const tris = await pastille('.sessions-head__pills button');
+console.log('« Planification » :', JSON.stringify(planification), '| « Tris » :', JSON.stringify(tris));
+check('Sessions : « Planification » est une pastille d\'action (`ui-tab--action`), « Tris » non', planification?.texte === 'Planification' && /\bui-tab--action\b/.test(planification.classes) && tris?.texte === 'Tris' && !/\bui-tab--action\b/.test(tris.classes) && planification.fond !== tris.fond, JSON.stringify([planification, tris]));
+check('« Planification » (Sessions), « Planifier » (liste) et « Tris » ont la même hauteur, même couleur de fond et de texte pour les deux pastilles d\'action',
+  planification?.h === tris?.h && planification?.h === planifierListe?.h && planification?.fond === planifierListe?.fond && planification?.couleur === planifierListe?.couleur, JSON.stringify([planification?.h, tris?.h, planifierListe?.h]));
+console.log('Planification :', await evaluate(`(() => { const a = document.querySelector('.sessions-head__pills a'); if (!a) return 'absent'; a.click(); return 'ok'; })()`));
+check('« Planification » ouvre la liste des itinéraires', (await cheminEst('/itineraires/liste')) === true, await chemin());
+await waitFor(`Boolean(document.querySelector('a.ui-tab--action[href="/itineraires"]'))`, { timeout: 5000, label: 'pastille Planifier' });
+console.log('Planifier (liste) :', await evaluate(`document.querySelector('a.ui-tab--action[href="/itineraires"]').click() ?? 'ok'`));
+check('« Planifier » de la liste ouvre Planifier', (await cheminEst('/itineraires')) === true, await chemin());
+await waitFor(`Boolean(document.querySelector('.plan-map .leaflet-container'))`, { timeout: 5000, label: 'carte de Planifier' });
+console.log('retour (Planifier, parcours neuf) :', await back());
+check('retour depuis Planifier : la liste des itinéraires, non Sessions', (await cheminEst('/itineraires/liste')) === true, await chemin());
+// Un itinéraire ouvert depuis la liste : le retour ramène à la liste, puis on le rouvre pour le menu « … ».
+const ouvrirDeLaListe = async () => {
+  await waitFor(`[...document.querySelectorAll('.route-list__open')].some((x) => x.textContent.includes('Sortie banc'))`, { timeout: 5000, label: 'itinéraire dans la liste' });
+  await evaluate(`[...document.querySelectorAll('.route-list__open')].find((x) => x.textContent.includes('Sortie banc')).click()`);
+  await waitFor(async () => /^Tracé et balises \((?!0\))\d+\)$/.test((await state()).title ?? ''), { timeout: 5000, label: 'balises rouvertes' });
+  await settle({ max: 800 });
+};
+await ouvrirDeLaListe();
+check('un itinéraire ouvert depuis la liste : Planifier, adresse de l\'itinéraire', (await chemin()) === '/itineraires' && /^\?itineraire=/.test(await evaluate('location.search')), `${await chemin()} ${await evaluate('location.search')}`);
+console.log('retour (itinéraire ouvert depuis la liste) :', await back());
+check('retour depuis l\'itinéraire ouvert depuis la liste : la liste', (await cheminEst('/itineraires/liste')) === true, await chemin());
+await ouvrirDeLaListe();
+check('itinéraire rouvert depuis la liste : trois balises, même nom, verrouillé', (await state()).title === 'Tracé et balises (3)' && (await state()).name === 'Sortie banc' && (await lockLabel()) === "Modifier l'itinéraire", JSON.stringify(await state()));
+
+// 6. Le menu « … » de l'en-tête, sur l'itinéraire rangé et rouvert : entrées, partage du GPX, itinéraire modifié, suppression tenue.
 const setName = (valeur) => evaluate(`(() => { const i = document.querySelector('.plan-form input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ${JSON.stringify(valeur)}); i.dispatchEvent(new Event('input', { bubbles: true })); return 'ok'; })()`);
-/** Ouvre (`ouvert` vrai) ou ferme le « … » du nom, par son bouton. */
+/** Ouvre (`ouvert` vrai) ou ferme le « … » de l'en-tête, par son bouton. */
 const planMenu = async (ouvert) => {
-  const r = await evaluate(`(() => { const b = document.querySelector('.plan-form .ui-more__button'); if (!b) return 'absent'; if ((b.getAttribute('aria-expanded') === 'true') !== ${ouvert}) b.click(); return 'ok'; })()`);
+  const r = await evaluate(`(() => { const b = document.querySelector('.ui-page-header .ui-more__button'); if (!b) return 'absent'; if ((b.getAttribute('aria-expanded') === 'true') !== ${ouvert}) b.click(); return 'ok'; })()`);
   await wait(300);
   return r;
 };
-/** Ce que le « … » du nom montre : ouvert ou non, entrées (texte, grisée, entrée tenue), ligne de note. */
+/** Ce que le « … » de l'en-tête montre : ouvert ou non, entrées (texte, grisée, entrée tenue), ligne de note. */
 const planMenuEtat = async () => JSON.parse(await evaluate(`(() => {
-  const p = document.querySelector('.plan-form .ui-more__panel');
+  const p = document.querySelector('.ui-page-header .ui-more__panel');
   if (!p) return JSON.stringify(null);
   return JSON.stringify({
     ouvert: !p.hidden,
@@ -394,7 +432,7 @@ const fichiersItineraires = () => evaluate(`(async () => {
 })()`);
 /** Appui tenu une seconde sur le bouton « Supprimer » du « … » (le délai est de 1 s), sans clic ensuite. */
 const tenirSupprimer = async () => {
-  const bas = await evaluate(`(() => { const b = document.querySelector('.plan-form .ui-more__panel .ui-btn--hold'); if (!b) return 'absent'; window.__tenu = b; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
+  const bas = await evaluate(`(() => { const b = document.querySelector('.ui-page-header .ui-more__panel .ui-btn--hold'); if (!b) return 'absent'; window.__tenu = b; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
   if (bas !== 'ok') return bas;
   await wait(1300);
   await evaluate(`(() => { const b = window.__tenu; b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); return 'ok'; })()`);
@@ -402,7 +440,7 @@ const tenirSupprimer = async () => {
   return 'ok';
 };
 
-console.log('--- menu « … » du nom ---');
+console.log('--- menu « … » de l\'en-tête ---');
 console.log('menu ouvert :', await planMenu(true));
 const m1 = await planMenuEtat();
 console.log('entrées :', JSON.stringify(textes(m1)), '| note :', m1?.note);
@@ -426,7 +464,7 @@ await evaluate(`(() => {
   return 'ok';
 })()`);
 await planMenu(true);
-console.log('Partager le GPX :', await evaluate(`(() => { const b = [...document.querySelectorAll('.plan-form .ui-more__panel button')].find((x) => x.textContent.trim() === 'Partager le GPX'); if (!b || b.disabled) return 'absent'; b.click(); return 'ok'; })()`));
+console.log('Partager le GPX :', await evaluate(`(() => { const b = [...document.querySelectorAll('.ui-page-header .ui-more__panel button')].find((x) => x.textContent.trim() === 'Partager le GPX'); if (!b || b.disabled) return 'absent'; b.click(); return 'ok'; })()`));
 await wait(600);
 const gpxPartage = await evaluate('window.__partage');
 console.log('partagé :', JSON.stringify({ name: gpxPartage?.name, type: gpxPartage?.type, title: gpxPartage?.title }));
@@ -434,7 +472,7 @@ check('« Partager le GPX » : le fichier « Sortie banc.gpx » est transmis au 
 check('un partage abouti ne dit rien, et le menu se referme', (await evaluate(`[...document.querySelectorAll('.plan-note')].map((x) => x.textContent).filter((t) => /GPX|Partage/.test(t)).length`)) === 0 && !(await planMenuEtat()).ouvert);
 await evaluate(`navigator.canShare = () => false`);
 await planMenu(true);
-await evaluate(`[...document.querySelectorAll('.plan-form .ui-more__panel button')].find((x) => x.textContent.trim() === 'Partager le GPX')?.click()`);
+await evaluate(`[...document.querySelectorAll('.ui-page-header .ui-more__panel button')].find((x) => x.textContent.trim() === 'Partager le GPX')?.click()`);
 await wait(600);
 const noteSansPartage = await evaluate(`[...document.querySelectorAll('.plan-note')].map((x) => x.textContent).find((t) => t.includes('GPX')) ?? null`);
 console.log('sans partage :', noteSansPartage);
@@ -458,7 +496,7 @@ const m3 = await planMenuEtat();
 check('nom rétabli : partages dégrisés, plus de ligne de note', m3.entrees.every((e) => !e.grise) && m3.note === null, JSON.stringify(m3));
 
 // « Supprimer » : un clic court ne fait rien d'autre que rappeler le geste.
-console.log('clic court :', await evaluate(`(() => { const b = document.querySelector('.plan-form .ui-more__panel .ui-btn--hold'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
+console.log('clic court :', await evaluate(`(() => { const b = document.querySelector('.ui-page-header .ui-more__panel .ui-btn--hold'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
 await wait(300);
 const m4 = await planMenuEtat();
 console.log('après le clic court :', JSON.stringify(textes(m4)));
@@ -466,7 +504,7 @@ check('« Supprimer » d\'un clic court : le menu reste ouvert, le geste est rap
   m4.ouvert && tenu(m4)?.texte === 'Maintenir 1 s pour supprimer' && !textes(m4).includes('Supprimer définitivement') && (await fichiersItineraires()) === 'Sortie banc.gpx,Sortie banc.json',
   `${JSON.stringify(textes(m4))} ${await fichiersItineraires()}`);
 // Le rappel tombe au bout de 3 s ; le bouton est retrouvé tel qu'avant avant d'être tenu.
-await waitFor(`document.querySelector('.plan-form .ui-more__panel .ui-btn--hold')?.textContent.trim() === 'Supprimer'`, { timeout: 5000, every: 200, label: 'rappel effacé' });
+await waitFor(`document.querySelector('.ui-page-header .ui-more__panel .ui-btn--hold')?.textContent.trim() === 'Supprimer'`, { timeout: 5000, every: 200, label: 'rappel effacé' });
 
 // Tenu une seconde : la confirmation prend la place du bouton, dans le menu resté ouvert.
 console.log('appui tenu :', await tenirSupprimer());
@@ -474,8 +512,8 @@ const m5 = await planMenuEtat();
 console.log('après l\'appui tenu :', JSON.stringify(textes(m5)));
 check('« Supprimer » tenu une seconde : « Supprimer définitivement » et « Garder » dans le menu resté ouvert, rien de supprimé encore',
   m5.ouvert && textes(m5).slice(-2).join(' ; ') === 'Supprimer définitivement ; Garder' && !tenu(m5) && (await fichiersItineraires()) === 'Sortie banc.gpx,Sortie banc.json', JSON.stringify(textes(m5)));
-/** Clique l'entrée du « … » du nom dont le texte est `texte` ; « absent » sinon. */
-const cliquerEntree = (texte) => evaluate(`(() => { const b = [...document.querySelectorAll('.plan-form .ui-more__panel button')].find((x) => x.textContent.trim() === ${JSON.stringify(texte)}); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
+/** Clique l'entrée du « … » de l'en-tête dont le texte est `texte` ; « absent » sinon. */
+const cliquerEntree = (texte) => evaluate(`(() => { const b = [...document.querySelectorAll('.ui-page-header .ui-more__panel button')].find((x) => x.textContent.trim() === ${JSON.stringify(texte)}); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
 console.log('Garder :', await cliquerEntree('Garder'));
 await wait(400);
 const apresGarder = await state();

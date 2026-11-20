@@ -301,7 +301,7 @@ await viderMemoire();
 console.log('préfixe non déclaré :', await importer([{ nom: 'autre-prefixe.gpx', texte: autrePrefixe }]));
 const phraseE4 = await phrase();
 console.log(phraseE4);
-check('préfixe non déclaré : fichier illisible, rien n\'est rangé', /^0 sessions ajoutées, 1 illisible \(autre-prefixe\.gpx\)\.$/.test(phraseE4) && (await records()).length === 0, phraseE4);
+check('préfixe non déclaré : fichier illisible, rien n\'est rangé', /^0 session ajoutée, 1 illisible \(autre-prefixe\.gpx\)\.$/.test(phraseE4) && (await records()).length === 0, phraseE4);
 
 // =====================================================================================================================
 // f. Le dossier mémoire de l'ancienne application, choisi comme mémoire

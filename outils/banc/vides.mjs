@@ -6,7 +6,7 @@
 //     la boussole sur la carte (22/10 ; « Ouvrir l'onglet général » avant) ;
 //  3. surf : la légende de la répartition ne redit pas le pourcentage « sur la vague » ; la rame garde le sien ;
 //  4. à 360×800 : « / » mène au Profil ; la page Sessions sans lien Profil ni Statistiques, avec « Planification » à côté de
-//     « Tris » (plus rien en bas de la liste) ; barre du bas Profil · Sessions · rond · Statistiques · Réglages, sans débordement ;
+//     « Tris » (pastille pleine à l'encre, de la même hauteur ; plus rien en bas de la liste) ; barre du bas Profil · Sessions · rond · Statistiques · Réglages, sans débordement ;
 //     Réglages, carte Wingfoil ouverte : le nom en texte, qui replie la carte, « Renommer » à droite, sur la
 //     ligne du nom ; Échap n'enregistre rien, Entrée renomme, le nom est relu ; rien ne déborde.
 import { CLES, connect } from './lib/cdp.mjs';
@@ -104,6 +104,17 @@ const sessionActions = await evaluate(`[...document.querySelectorAll('.sessions-
 const sessionsBottom = await evaluate(`document.querySelectorAll('.sessions-actions').length`);
 check('Sessions : ni lien Profil ni lien Statistiques dans la page', !(await evaluate(`[...document.querySelectorAll('.shell-main a')].some((a) => /^(Profil|Statistiques)$/.test(a.textContent.trim()))`)), sessionActions);
 check('Sessions : « Planification » à côté de « Tris », plus rien en bas de la liste', sessionActions === 'Planification > /itineraires/liste' && sessionsBottom === 0, sessionActions + ' / bas : ' + sessionsBottom);
+// « Planification » : pastille d'action pleine à l'encre (`ui-tab--action`), de la hauteur de « Tris » (même rangée).
+const pastilles = JSON.parse(await evaluate(`JSON.stringify([...document.querySelectorAll('.sessions-head__pill')].map((p) => ({
+  texte: p.textContent.trim(), action: p.classList.contains('ui-tab--action'), h: Math.round(p.getBoundingClientRect().height * 10) / 10,
+  fond: getComputedStyle(p).backgroundColor, texteCouleur: getComputedStyle(p).color,
+})))`));
+console.log('pastilles de Sessions :', JSON.stringify(pastilles));
+const planification = pastilles.find((p) => p.texte === 'Planification');
+const tris = pastilles.find((p) => p.texte === 'Tris');
+check('Sessions : « Planification » prend la classe d\'action, pleine à l\'encre, « Tris » reste une pastille ordinaire',
+  planification?.action === true && tris?.action === false && planification.fond !== tris.fond && planification.fond !== 'rgba(0, 0, 0, 0)', JSON.stringify(pastilles));
+check('Sessions : « Planification » et « Tris » ont la même hauteur', planification !== undefined && tris !== undefined && planification.h === tris.h, JSON.stringify(pastilles.map((p) => [p.texte, p.h])));
 const bar = await evaluate(`[...document.querySelectorAll('.shell-tabbar .shell-tab')].map((t) => t.textContent.trim()).join(' | ')`);
 check('barre du bas : Profil, Sessions, Statistiques, Réglages', bar === 'Profil | Sessions | Statistiques | Réglages', bar);
 check('360 px : Sessions sans débordement', (await overflow()) <= 0);

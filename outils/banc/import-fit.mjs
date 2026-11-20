@@ -115,7 +115,7 @@ await shoot('import-fit-analyse');
 await go('/sessions', 4000);
 console.log('réimport :', await importFiles(coursePath, IMPORT_INPUT));
 await waitText('1 déjà présente', 'déjà présente');
-check('réimport : « déjà présente »', await bodyHas('0 sessions ajoutées, 1 déjà présente'));
+check('réimport : « déjà présente »', await bodyHas('0 session ajoutée, 1 déjà présente'));
 check('réimport : rien de plus dans la mémoire', (await sessionFiles()).length === 2);
 
 // --- 3. Refusés, avec leur raison ---
