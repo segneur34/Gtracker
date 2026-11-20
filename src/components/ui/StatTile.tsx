@@ -9,15 +9,17 @@ interface StatTileProps {
   title?: string;
   /** Tuile qui se touche (onglet de « général ») : la racine devient un bouton, un chevron au bout du libellé. */
   onClick?: () => void;
-  /** Nom du bouton lu par l'accessibilité, avec `onClick` : chiffre et onglet ouvert. */
+  /** Nom du bouton lu par l'accessibilité, avec `onClick` : chiffre et ce que fait le toucher. */
   ariaLabel?: string;
+  /** Avec `onClick` : l'onglet de la tuile est ouvert (`aria-expanded`), le toucher le refermera. */
+  expanded?: boolean;
 }
 
 /**
  * Tuile de chiffre d'une analyse : libellé grisé, valeur, détail. Posée dans une grille `an-sheet__stats`.
  * Avec `onClick`, un bouton à la même place que le bloc (grille et paires gardées).
  */
-function StatTile({ label, value, detail, title, onClick, ariaLabel }: StatTileProps) {
+function StatTile({ label, value, detail, title, onClick, ariaLabel, expanded }: StatTileProps) {
   const body = (
     <>
       <span className="an-sheet__stat-label">
@@ -34,7 +36,8 @@ function StatTile({ label, value, detail, title, onClick, ariaLabel }: StatTileP
   );
   if (onClick) {
     return (
-      <button type="button" className="an-sheet__stat an-sheet__stat--link" title={title} aria-label={ariaLabel} onClick={onClick}>
+      <button type="button" className="an-sheet__stat an-sheet__stat--link" title={title} aria-label={ariaLabel}
+        aria-expanded={expanded ?? false} onClick={onClick}>
         {body}
       </button>
     );

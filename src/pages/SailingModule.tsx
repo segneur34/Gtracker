@@ -228,7 +228,7 @@ function SailingModule() {
   const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(track, profile.heartRate, effectiveHrOffset(activity));
   // Onglets de l'activité, rangée « avancé », point survolé effacé à chaque session ; une seule surbrillance
   // sur la carte et les cases cumulables des onglets, effacées quand leur onglet se ferme (`useMapHighlight`).
-  const { open, toggle, toggleOf, reveal, openFromGeneral, closeAll, openAll, advanced, shown, highlight } = useAnalysisTabs({
+  const { open, toggle, toggleOf, reveal, toggleFromGeneral, closeAll, openAll, advanced, shown, highlight } = useAnalysisTabs({
     tabs: SAILING_TABS, defaults: SAILING_PANEL_DEFAULTS, activity, sessionKey,
   });
   /** L'activité a une liste de matériel : de quoi proposer le rappel qui suit un enregistrement (`GearReminder`). */
@@ -415,12 +415,12 @@ function SailingModule() {
     ...heartRateStat,
   ] : [];
   /**
-   * Onglet qu'ouvre une tuile de « général », pris parmi ceux montrés pour la session ; sur foil, distance et temps
-   * « en vol » ouvrent les vols (`tileTab`).
+   * Onglet qu'ouvre puis referme une tuile de « général », pris parmi ceux montrés pour la session ; sur foil,
+   * distance et temps « en vol » ouvrent les vols (`tileTab`).
    */
   const tileLink = (statKey: string): TileLink | null => {
     const tab = tileTab('voile', statKey, sailingPanels, { inFlight: foil });
-    return tab ? { tabLabel: tab.label, onOpen: () => openFromGeneral(tab.key) } : null;
+    return tab ? { tabLabel: tab.label, open: open[tab.key], onToggle: () => toggleFromGeneral(tab.key) } : null;
   };
   /** Podiums montrables sur la carte : les tops de vitesse, puis ceux de VMG (près, portant), par clé de cible. */
   const mapTops = useMemo(

@@ -294,6 +294,23 @@ check('tuile : voile, le panneau #an-onglet-manoeuvres est là', cadreM !== null
 check('tuile : voile, « avancé » est déplié', await advancedOpen());
 check('tuile : voile, « général » reste ouvert', (await panel('Général')) !== '(absent)');
 check('tuile : voile, le haut du panneau manœuvres est dans la fenêtre', cadreM !== null && cadreM.top >= 0 && cadreM.top < cadreM.h, JSON.stringify(cadreM));
+// Second toucher : l'onglet se referme, « avancé » et « général » restent, la page ne bouge pas.
+const etatTuile = (label) => evaluate(`(() => {
+  const l = [...document.querySelectorAll('.an-sheet__stat-label')].find((x) => x.textContent.trim() === ${JSON.stringify(label)});
+  const s = l?.closest('button.an-sheet__stat--link');
+  return s ? { expanded: s.getAttribute('aria-expanded'), aria: s.getAttribute('aria-label') } : null;
+})()`);
+const ouvert = await etatTuile('Virements réussis');
+check('tuile : voile, après le premier toucher aria-expanded="true" et libellé « Fermer l\'onglet manœuvres »', ouvert?.expanded === 'true' && /Fermer l.onglet manœuvres/.test(ouvert.aria ?? ''), JSON.stringify(ouvert));
+const scrollAvant = await evaluate(`Math.round(scrollY)`);
+check('tuile : voile, le second toucher trouve son bouton', await clickTuile('Virements réussis'));
+await settle({ max: 1500 });
+const ferme = await etatTuile('Virements réussis');
+check('tuile : voile, second toucher : plus de #an-onglet-manoeuvres', (await cadreOnglet('manoeuvres')) === null);
+check('tuile : voile, second toucher : « avancé » toujours déplié', await advancedOpen());
+check('tuile : voile, second toucher : « général » toujours ouvert', (await panel('Général')) !== '(absent)');
+check('tuile : voile, second toucher : scrollY inchangé', Math.round(await evaluate(`scrollY`)) === scrollAvant, `${scrollAvant} -> ${await evaluate('scrollY')}`);
+check('tuile : voile, second toucher : aria-expanded="false"', ferme?.expanded === 'false', JSON.stringify(ferme));
 
 await go(paths.surf, 6000);
 const vagues = await tuile('Vagues');

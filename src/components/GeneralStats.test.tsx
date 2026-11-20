@@ -8,13 +8,13 @@ const STATS = [
   { key: 'jibes', label: 'Empannages réussis', value: '9 / 10 (90 %)' },
 ];
 const PAIRS = [['tacks', 'jibes']] as const;
-const linkOf = (key: string): TileLink | null => (key === 'tacks' || key === 'jibes' ? { tabLabel: 'manœuvres', onOpen: () => {} } : null);
+const linkOf = (key: string): TileLink | null => (key === 'tacks' || key === 'jibes' ? { tabLabel: 'manœuvres', open: false, onToggle: () => {} } : null);
 
 describe('GeneralStats : une tuile reliée à son onglet', () => {
   const html = renderToStaticMarkup(<GeneralStats stats={STATS} pairs={PAIRS} linkOf={linkOf} />);
 
   it('tuile reliée : un bouton nommé par son chiffre et son onglet, un chevron au bout du libellé', () => {
-    expect(html).toContain('<button type="button" class="an-sheet__stat an-sheet__stat--link" aria-label="Virements réussis : 12 / 14 (86 %). Ouvrir l&#x27;onglet manœuvres"');
+    expect(html).toContain('<button type="button" class="an-sheet__stat an-sheet__stat--link" aria-label="Virements réussis : 12 / 14 (86 %). Ouvrir l&#x27;onglet manœuvres" aria-expanded="false"');
     expect(html.match(/an-sheet__stat--link/g)).toHaveLength(2);
     expect(html.match(/an-sheet__stat-chevron/g)).toHaveLength(2);
     expect(html).toMatch(/<span class="an-sheet__stat-label">Virements réussis<span class="an-sheet__stat-chevron"><svg[^>]*aria-hidden="true"/);
@@ -26,6 +26,13 @@ describe('GeneralStats : une tuile reliée à son onglet', () => {
 
   it('paires gardées : les deux boutons dans le même bloc de deux colonnes', () => {
     expect(html).toMatch(/<div class="an-sheet__stat-pair"><button[^>]*Virements[^]*<\/button><button[^>]*Empannages[^]*<\/button><\/div>/);
+  });
+
+  it('onglet ouvert : le bouton le dit (`aria-expanded`) et son nom annonce la fermeture', () => {
+    const opened = renderToStaticMarkup(<GeneralStats stats={STATS} pairs={PAIRS}
+      linkOf={(key) => { const link = linkOf(key); return link && { ...link, open: true }; }} />);
+    expect(opened).toContain('aria-label="Virements réussis : 12 / 14 (86 %). Fermer l&#x27;onglet manœuvres" aria-expanded="true"');
+    expect(opened).not.toContain('Ouvrir l&#x27;onglet');
   });
 
   it('sans `linkOf` : rien ne change, aucun bouton', () => {

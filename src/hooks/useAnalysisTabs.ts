@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Activity } from '../core/activities';
 import {
   closeAllTabs, generalOpenAfterAdvanced, initialTabsState, maskAdvancedTabs, maskHiddenTabs, openAllTabs, panelNeedsScroll, revealTab, shownTabs,
-  tabAnchorId, tabsStateFor,
+  tabAnchorId, tabsStateFor, toggleTabFromTile,
   type AnalysisTab, type AnalysisTabsState,
 } from '../core/analysisTabs';
 import { useResetChartHover } from './useChartHover';
@@ -83,16 +83,18 @@ export const useAnalysisTabs = <K extends string>({ tabs, defaults, activity, se
     [tabs, tabChoices]
   );
 
-  /** Panneau où défiler après l'ouverture par une tuile : un objet neuf à chaque toucher, onglet déjà ouvert compris. */
+  /** Panneau où défiler après l'ouverture par une tuile : un objet neuf à chaque ouverture. */
   const [scrollTarget, setScrollTarget] = useState<{ key: K } | null>(null);
   /**
-   * Tuile de « général » touchée : son onglet s'ouvre en plus de « général » (« avancé » se déplie s'il y est
-   * rangé, `revealTab` avec `keepPrimary`), puis la page défile jusqu'à son panneau s'il n'est pas à l'écran.
+   * Tuile de « général » touchée (`toggleTabFromTile`) : son onglet fermé s'ouvre en plus de « général »
+   * (« avancé » se déplie s'il y est rangé), puis la page défile jusqu'à son panneau s'il n'est pas à l'écran ;
+   * ouvert, il se referme, seul, sans défiler (ce qu'il montrait sur la carte s'efface, `useMapHighlight`).
    */
-  const openFromGeneral = useCallback((key: K) => {
-    change((s) => revealTab(s, tabs, key, { keepPrimary: true }));
-    setScrollTarget({ key });
-  }, [change, tabs]);
+  const toggleFromGeneral = useCallback((key: K) => {
+    const opening = !open[key];
+    change((s) => toggleTabFromTile(s, tabs, key));
+    if (opening) setScrollTarget({ key });
+  }, [change, tabs, open]);
   useEffect(() => {
     if (scrollTarget === null) return undefined;
     // Deux images plus tard : le panneau est monté, et les panneaux d'ordinateur ont été remontés à leur place
@@ -107,7 +109,7 @@ export const useAnalysisTabs = <K extends string>({ tabs, defaults, activity, se
     };
   }, [scrollTarget]);
 
-  return { open, toggle, toggleOf, set, reveal, openFromGeneral, closeAll, openAll, tabChoices, advanced, shown, highlight };
+  return { open, toggle, toggleOf, set, reveal, toggleFromGeneral, closeAll, openAll, tabChoices, advanced, shown, highlight };
 };
 
 /** Barre « Non enregistré » d'une session en brouillon, collée en haut de la page (`SessionSaveBar`). */

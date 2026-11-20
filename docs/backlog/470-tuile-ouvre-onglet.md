@@ -38,6 +38,19 @@ Demande : `node outils/backlog.mjs --ligne 470`. Plan de l'agent `Plan` du 20/11
 
 `passe.mjs` avant/après : texte relevé identique. À compléter : `general.mjs` (voile : « Virements réussis » ouvre manœuvres et « avancé », « général » reste ouvert, la page défile ; « Temps total » n'est pas un bouton ; surf : « Vagues » ouvre vagues ; de même à 390×844, brouillon ouvert, pour la barre collée) ; `onglets.mjs` (onglet caché par l'activité : tuile sans bouton). Entrées de `SCRIPTS.md` à jour.
 
+## Retouche (473)
+
+Demande de l'utilisateur après l'essai au téléphone : un second toucher referme, et la zone qui se touche se voit (« un léger décalage de couleur »).
+
+- Second toucher : `toggleTabFromTile` (`core/analysisTabs.ts`, avec `isTabOpenOnScreen`) ; onglet fermé (ou replié par « avancé » fermé), il s'ouvre comme avant (`revealTab`, `keepPrimary`) et la page défile ; ouvert, il se referme seul, sans défiler, « général » et « avancé » restent comme ils sont (la carte s'efface par `useMapHighlight`). `useAnalysisTabs` : `openFromGeneral` devient `toggleFromGeneral`. Le bouton porte `aria-expanded` et deux noms : « … Ouvrir l'onglet {tab} » et « … Fermer l'onglet {tab} » (clé neuve en anglais et espagnol).
+- Teinte : `::before` de `.an-sheet__stat--link` (`pages/analysisMobile.css`), fond `var(--surface-hover)` (clair et sombre, aucune variable neuve), rayon `--radius-s`, débord de 6 px sur les côtés et 4 px en haut et en bas : libellés et valeurs alignés avec la tuile voisine, hauteurs inchangées, 4 px entre deux tuiles teintées voisines. Pressé : opacité 0,6 ; clavier : anneau `--ring-ink` sur la teinte. Chevron gardé.
+- Relu sur captures (wingfoil, 390 × 844 et 1280, clair et sombre) : aucun libellé à la ligne, positions des libellés identiques d'une colonne à l'autre.
+- Banc, `general.mjs` à compléter : après le premier toucher, `aria-expanded="true"` et nom « Fermer l'onglet manœuvres » ; second toucher sur « Virements réussis » : plus de `#an-onglet-manoeuvres`, « avancé » toujours déplié, « général » ouvert, page non défilée. Les contrôles actuels passent sans changement.
+
 ## Passe de doc (après validation)
+
+Phrase de la retouche 473, qui remplace celle ci-dessous : « Une tuile de « général » dont l'onglet est montré pour la session se touche : elle a un fond à peine teinté (`--surface-hover`, débordant de la tuile sans en décaler le texte) et un petit chevron à l'encre atténuée au bout du libellé ; le premier toucher ouvre son onglet en plus de « général » (« avancé » se déplie s'il y est rangé) et la page défile jusqu'à son panneau s'il n'est pas déjà à l'écran ; un second toucher referme l'onglet, seul, sans défiler ; une tuile sans onglet, ou dont l'onglet est caché par l'activité, reste un simple bloc, sans teinte (table `TILE_TABS`, `core/analysisTabs.ts`). »
+
+Phrase d'origine (lot 470, remplacée) :
 
 `docs/MISE_EN_PAGE.md`, sous-point « général » de la Structure : « Une tuile de « général » dont l'onglet est montré pour la session se touche : elle ouvre cet onglet en plus de « général » (« avancé » se déplie s'il y est rangé) et la page défile jusqu'à son panneau s'il n'est pas déjà à l'écran ; un petit chevron à l'encre atténuée, au bout du libellé, le signale ; une tuile sans onglet, ou dont l'onglet est caché par l'activité, reste un simple bloc (table `TILE_TABS`, `core/analysisTabs.ts`). »

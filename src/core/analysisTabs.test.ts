@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  FLIGHT_TILE_TABS, PANEL_HEAD_VISIBLE_PX, SAILING_TABS, SURF_TABS, TILE_TABS, activityTabs, panelNeedsScroll, tabAnchorId, tileTab, analysisTabs, closeAllTabs, generalOpenAfterAdvanced, initialTabsState, isTabShown, keepOpenTabEntries, maskAdvancedTabs, openAllTabs, tabsBulkAction, maskHiddenTabs, revealTab, sanitizeTabChoices, shownTabs, tabDefaults, tabsStateFor, toggleTabChoice,
+  FLIGHT_TILE_TABS, PANEL_HEAD_VISIBLE_PX, SAILING_TABS, SURF_TABS, TILE_TABS, activityTabs, panelNeedsScroll, tabAnchorId, tileTab, analysisTabs, closeAllTabs, generalOpenAfterAdvanced, initialTabsState, isTabOpenOnScreen, isTabShown, keepOpenTabEntries, maskAdvancedTabs, openAllTabs, tabsBulkAction, maskHiddenTabs, revealTab, sanitizeTabChoices, shownTabs, tabDefaults, tabsStateFor, toggleTabChoice, toggleTabFromTile,
   type TabChoices,
 } from './analysisTabs';
 import { SPORT_PROFILES } from './sportProfiles';
@@ -313,6 +313,41 @@ describe('« avancé » et « général »', () => {
   it('depuis une tuile, l\'onglet déjà ouvert : l\'état est rendu tel quel', () => {
     const state = { key: 'a|1', open: { ...tabDefaults(SAILING_TABS), cardio: true }, advanced: true };
     expect(revealTab(state, SAILING_TABS, 'cardio', { keepPrimary: true })).toBe(state);
+  });
+});
+
+describe('toggleTabFromTile : la tuile ouvre puis referme son onglet', () => {
+  const openKeys = (open: Record<string, boolean>) => Object.entries(open).filter(([, v]) => v).map(([k]) => k);
+
+  it('fermé : il s\'ouvre en plus de « général », « avancé » se déplie (comme `keepPrimary`)', () => {
+    const start = initialTabsState(tabDefaults(SAILING_TABS), 'a|1');
+    const next = toggleTabFromTile(start, SAILING_TABS, 'manoeuvres');
+    expect(next).toEqual(revealTab(start, SAILING_TABS, 'manoeuvres', { keepPrimary: true }));
+    expect(next.advanced).toBe(true);
+    expect(openKeys(next.open)).toEqual(['general', 'manoeuvres']);
+  });
+
+  it('ouvert : il se referme seul, « général », les autres onglets et « avancé » restent', () => {
+    const state = { key: 'a|1', open: { ...tabDefaults(SAILING_TABS), tops: true, manoeuvres: true }, advanced: true };
+    const next = toggleTabFromTile(state, SAILING_TABS, 'manoeuvres');
+    expect(openKeys(next.open)).toEqual(['general', 'tops']);
+    expect(next.advanced).toBe(true);
+    const surf = toggleTabFromTile({ key: 'a|1', open: { ...tabDefaults(SURF_TABS), vagues: true }, advanced: true }, SURF_TABS, 'vagues');
+    expect(openKeys(surf.open)).toEqual(['general']);
+    expect(surf.advanced).toBe(true);
+  });
+
+  it('deux touchers rendent l\'état de départ, « avancé » mis à part', () => {
+    const start = { key: 'a|1', open: tabDefaults(SAILING_TABS), advanced: true };
+    expect(toggleTabFromTile(toggleTabFromTile(start, SAILING_TABS, 'sauts'), SAILING_TABS, 'sauts')).toEqual(start);
+  });
+
+  it('ouvert dans l\'état mais replié par « avancé » fermé : la tuile le montre, elle ne le ferme pas', () => {
+    const state = { key: 'a|1', open: { ...tabDefaults(SAILING_TABS), cardio: true }, advanced: false };
+    expect(isTabOpenOnScreen(state, SAILING_TABS, 'cardio')).toBe(false);
+    const next = toggleTabFromTile(state, SAILING_TABS, 'cardio');
+    expect(next.advanced).toBe(true);
+    expect(openKeys(next.open)).toEqual(['general', 'cardio']);
   });
 });
 

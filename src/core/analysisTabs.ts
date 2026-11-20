@@ -252,6 +252,22 @@ export const revealTab = <K extends string>(
 };
 
 /**
+ * L'onglet est-il ouvert à l'écran ? Ouvert dans l'état, et, s'il est rangé dans « avancé », la rangée dépliée
+ * (refermée, elle replie ses onglets sans les oublier, `maskAdvancedTabs`).
+ */
+export const isTabOpenOnScreen = <K extends string>(state: AnalysisTabsState<K>, tabs: readonly AnalysisTab<K>[], key: K): boolean =>
+  state.open[key] === true && (tabs.find((tab) => tab.key === key)?.primary === true || state.advanced);
+
+/**
+ * Tuile de « général » touchée : son onglet fermé s'ouvre en plus de « général » (`revealTab` avec `keepPrimary`) ;
+ * ouvert à l'écran, il se referme, seul : « général » et « avancé » restent comme ils sont.
+ */
+export const toggleTabFromTile = <K extends string>(state: AnalysisTabsState<K>, tabs: readonly AnalysisTab<K>[], key: K): AnalysisTabsState<K> =>
+  isTabOpenOnScreen(state, tabs, key)
+    ? { ...state, open: { ...state.open, [key]: false } }
+    : revealTab(state, tabs, key, { keepPrimary: true });
+
+/**
  * Onglet que chaque tuile de « général » ouvre, par clé de chiffre (`ShareStat.key`) et par famille. Une tuile
  * absente n'en a pas (distances, temps, moyennes) : elle reste un simple bloc. Jamais « général » lui-même.
  */

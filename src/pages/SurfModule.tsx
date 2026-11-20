@@ -217,7 +217,7 @@ function SurfModule() {
   const mapSegments: TrackSegment[] = useKeptSegments(surfShown.segments, base.track, surfShown.colorKey);
 
   // Onglets de l'activité, rangée « avancé », surbrillance unique de la carte, point survolé effacé à chaque session.
-  const { open, toggle, toggleOf, reveal, openFromGeneral, closeAll, openAll, advanced, shown, highlight } = useAnalysisTabs({
+  const { open, toggle, toggleOf, reveal, toggleFromGeneral, closeAll, openAll, advanced, shown, highlight } = useAnalysisTabs({
     tabs: SURF_TABS, defaults: SURF_SECTION_DEFAULTS, activity, sessionKey: base.sessionKey,
   });
   /** L'activité a une liste de matériel : de quoi proposer le rappel qui suit un enregistrement (`GearReminder`). */
@@ -336,10 +336,10 @@ function SurfModule() {
    */
   const pumpTiles = pumping && sections.some((s) => s.key === 'pumping') ? pumpingTiles(pumpSummary) : [];
   const overviewStats = overviewKeys.flatMap((key) => [...generalStats, ...pumpTiles].filter((stat) => stat.key === key));
-  /** Onglet qu'ouvre une tuile de « général », pris parmi ceux montrés pour la session (`tileTab`). */
+  /** Onglet qu'ouvre puis referme une tuile de « général », pris parmi ceux montrés pour la session (`tileTab`). */
   const tileLink = (statKey: string): TileLink | null => {
     const tab = tileTab('surf', statKey, sections);
-    return tab ? { tabLabel: tab.label, onOpen: () => openFromGeneral(tab.key) } : null;
+    return tab ? { tabLabel: tab.label, open: open[tab.key], onToggle: () => toggleFromGeneral(tab.key) } : null;
   };
   const speedCell = speedCellOf(speedUnit);
   /** Colonnes « Tous les vols » du GPS, sans pumping mesuré : temps et vitesse hors des vagues (unité de l'activité). */
