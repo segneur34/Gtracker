@@ -227,7 +227,7 @@ function SailingModule() {
   /** FC de la session (ceinture, montre) et zones du pratiquant : l'onglet « cardio » et sa courbe dans « graphiques ». */
   const { athlete, retainHr, heart, hrZones } = useAnalysisHeart(track, profile.heartRate, effectiveHrOffset(activity));
   // Onglets de l'activité, rangée « avancé », point survolé effacé à chaque session ; une seule surbrillance
-  // sur la carte, effacée quand son onglet se ferme (`useMapHighlight`).
+  // sur la carte et les cases cumulables des onglets, effacées quand leur onglet se ferme (`useMapHighlight`).
   const { open, toggle, toggleOf, reveal, closeAll, openAll, advanced, shown, highlight } = useAnalysisTabs({
     tabs: SAILING_TABS, defaults: SAILING_PANEL_DEFAULTS, activity, sessionKey,
   });
@@ -301,26 +301,23 @@ function SailingModule() {
     sessionRange: edits.speedRange, activityRange: speedRange, suggested: suggestedSpeedRangeMs, fallback: settings.defaultSpeedRange,
   });
 
-  const [showTacksOnMap, setShowTacksOnMap] = useState<boolean>(false);
-  const [showJibesOnMap, setShowJibesOnMap] = useState<boolean>(false);
-  const [showUndecidedOnMap, setShowUndecidedOnMap] = useState<boolean>(false);
+  // Cases « Carte » de l'onglet « manœuvres », cumulables : éteintes quand il se ferme, jamais ramenées (`useMapHighlight`).
+  const showTacksOnMap = highlight.toggled('manoeuvres', 'tack');
+  const showJibesOnMap = highlight.toggled('manoeuvres', 'jibe');
+  const showUndecidedOnMap = highlight.toggled('manoeuvres', 'undecided');
   const [showManeuverDetails, setShowManeuverDetails] = useState<boolean>(false);
   /** Liste de toutes les manœuvres d'un type, sous « Détails » : repliée d'office, non mémorisée. */
   const [allManeuversOpen, setAllManeuversOpen] = useState<Record<'tack' | 'jibe', boolean>>({ tack: false, jibe: false });
   /** Genre montré dans le tableau par amure : virements ou empannages. */
   const [tackTableType, setTackTableType] = useState<'tack' | 'jibe'>('tack');
-  /** Vues et cases de la carte de l'onglet « manœuvres », tenues ici : la carte les lit, et l'onglet rouvert les retrouve. */
+  /** Vues de l'onglet « manœuvres », tenues ici : elles ne dessinent rien sur la carte, et l'onglet rouvert les retrouve. */
   const maneuversView: ManeuversView = {
     details: showManeuverDetails, setDetails: setShowManeuverDetails, tackType: tackTableType, setTackType: setTackTableType,
     listOpen: allManeuversOpen, setListOpen: setAllManeuversOpen,
   };
   const maneuversOnMap: ManeuversOnMap = {
     tack: showTacksOnMap, jibe: showJibesOnMap, undecided: showUndecidedOnMap,
-    toggle: (type) => {
-      if (type === 'tack') setShowTacksOnMap(!showTacksOnMap);
-      else if (type === 'jibe') setShowJibesOnMap(!showJibesOnMap);
-      else setShowUndecidedOnMap(!showUndecidedOnMap);
-    },
+    toggle: (type) => highlight.toggle('manoeuvres', type),
   };
   /** Réglage du vent sur la carte, ouvert par « Régler » ; sur téléphone, dans la carte en plein écran. */
   const [windAdjust, setWindAdjust] = useState(false);

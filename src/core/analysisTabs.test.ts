@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SAILING_TABS, SURF_TABS, activityTabs, analysisTabs, closeAllTabs, generalOpenAfterAdvanced, initialTabsState, isTabShown, maskAdvancedTabs, openAllTabs, tabsBulkAction, maskHiddenTabs, revealTab, sanitizeTabChoices, shownTabs, tabDefaults, tabsStateFor, toggleTabChoice,
+  SAILING_TABS, SURF_TABS, activityTabs, analysisTabs, closeAllTabs, generalOpenAfterAdvanced, initialTabsState, isTabShown, keepOpenTabEntries, maskAdvancedTabs, openAllTabs, tabsBulkAction, maskHiddenTabs, revealTab, sanitizeTabChoices, shownTabs, tabDefaults, tabsStateFor, toggleTabChoice,
   type TabChoices,
 } from './analysisTabs';
 import { SPORT_PROFILES } from './sportProfiles';
@@ -233,6 +233,29 @@ describe('maskAdvancedTabs', () => {
     expect(maskAdvancedTabs(open, SURF_TABS, true)).toBe(open);
     const onlyGeneral = { ...open, vagues: false, tops: false };
     expect(maskAdvancedTabs(onlyGeneral, SURF_TABS, false)).toBe(onlyGeneral);
+  });
+});
+
+describe('keepOpenTabEntries : la carte ne garde que ce que demandent les onglets ouverts', () => {
+  const open = { ...tabDefaults(SAILING_TABS), manoeuvres: true, tops: true };
+  const entries = [
+    { panel: 'manoeuvres' as const, key: 'tack' },
+    { panel: 'tops' as const, key: 'top10s' },
+    { panel: 'manoeuvres' as const, key: 'jibe' },
+  ];
+
+  it('rien de fermé : la même liste, sans copie', () => {
+    expect(keepOpenTabEntries(entries, open)).toBe(entries);
+  });
+
+  it('un onglet fermé : ses entrées partent, les autres restent dans leur ordre', () => {
+    expect(keepOpenTabEntries(entries, { ...open, manoeuvres: false })).toEqual([{ panel: 'tops', key: 'top10s' }]);
+    expect(keepOpenTabEntries(entries, closeAllTabs(open))).toEqual([]);
+  });
+
+  it('liste vide : rendue telle quelle', () => {
+    const empty: { panel: 'tops'; key: string }[] = [];
+    expect(keepOpenTabEntries(empty, closeAllTabs(open))).toBe(empty);
   });
 });
 

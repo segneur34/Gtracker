@@ -192,6 +192,16 @@ export const maskAdvancedTabs = <K extends string>(
   return masked ?? open;
 };
 
+/**
+ * Ce qu'un onglet fait montrer sur la carte (surbrillance, case cumulable),
+ * réduit à ses onglets ouverts : celles d'un onglet fermé partent, et rien ne
+ * les ramène à sa réouverture. Rend la liste reçue telle quelle quand rien ne change.
+ */
+export const keepOpenTabEntries = <K extends string, E extends { panel: K }>(
+  entries: readonly E[],
+  open: Readonly<Record<K, boolean>>
+): readonly E[] => (entries.every((entry) => open[entry.panel]) ? entries : entries.filter((entry) => open[entry.panel]));
+
 /** « général » après un toucher sur « avancé » : l'ouvrir ferme « général », le refermer le rouvre. */
 export const generalOpenAfterAdvanced = (advancedOpen: boolean): boolean => !advancedOpen;
 
