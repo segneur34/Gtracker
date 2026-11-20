@@ -133,8 +133,8 @@ function RoutesPage() {
               <input type="file" accept={isNativeApp() ? undefined : '.gpx'} hidden onChange={(e) => void importFile(e)} />
             </label>
           )}
-          <Link to="/itineraires" className="ui-btn ui-btn--primary ui-btn--m">
-            <IconRoute size={20} /> {t('Planifier')}
+          <Link to="/itineraires" className="ui-tab ui-tab--action">
+            <IconRoute size={14} /> {t('Planifier')}
           </Link>
         </span>
       </div>

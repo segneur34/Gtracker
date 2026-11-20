@@ -331,6 +331,21 @@
   color: var(--on-ink);
 }
 
+/* Pastille d'action : l'allure pleine à l'encre du bouton principal, à la petite taille des pastilles de Sessions
+   (« Planification » de Sessions, « Planifier » de la liste des itinéraires). */
+.ui-tab.ui-tab--action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+  text-decoration: none;
+}
+
 /* Rangée resserrée, sans trait dessous : dans une ligne de réglage ou un encart sur la carte. */
 .ui-tabs--compact {
   gap: var(--space-1);

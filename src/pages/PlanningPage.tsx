@@ -1,7 +1,7 @@
 import { roundBearingDeg } from '../core/angles';
 import { pushBackLayer } from '../platform/backButton';
 import { plainError } from '../platform/errorText';
-import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import L from 'leaflet';
 import MapContainer from '../components/map/MapContainer';
 import Marker from '../components/map/Marker';
@@ -22,7 +22,7 @@ import RouteList from '../components/RouteList';
 import RouteImageShare from '../components/RouteImageShare';
 import SectionTabs, { type SectionDefinition } from '../components/SectionTabs';
 import {
-  IconChevronDown, IconChevronUp, IconClose, IconDownload, IconFile, IconPencil, IconPencilOff, IconShare, IconTrash, IconUndo,
+  IconChevronDown, IconChevronUp, IconClose, IconDownload, IconPencil, IconPencilOff, IconShare, IconTrash, IconUndo,
 } from '../components/icons';
 import { shareRouteGpx } from '../components/routeShare';
 import { CARD_STYLE } from '../components/styles';
@@ -32,7 +32,6 @@ import MoreMenu from '../components/ui/MoreMenu';
 import PageHeader from '../components/ui/PageHeader';
 import { activityDisplayName, activityFamily, findActivity, type Activity } from '../core/activities';
 import { DEFAULT_MAP_CENTER, trackBounds } from '../core/displayConfig';
-import { parseGpxPath } from '../core/gpxParser';
 import { formatDistance, toDisplayDistance } from '../core/units';
 import { useLeaveWarning } from '../hooks/leaveGuard';
 import { useGoOnRoute } from '../hooks/useGoOnRoute';
@@ -45,23 +44,22 @@ import {
   effectiveDistanceUnit, effectiveMarkGuide, effectiveSpeedUnit, lastRecordActivity, useVisibility,
 } from '../hooks/useSportSettings';
 import { ROUTES_DIR } from '../library/folderLayout';
-import { guessSport } from '../library/naming';
 import { shownRoutes } from '../planning/routeShown';
 import { isAbortError } from '../planning/fetchJson';
 import { searchPlaces, type Place } from '../planning/geocoding';
 import {
-  EMPTY_ROUTE, courseLegs, isLooped, routeFromTrack, routePoints, routeTotals,
+  EMPTY_ROUTE, courseLegs, isLooped, routePoints, routeTotals,
   type PlannedRoute, type RoutePoint, type Waypoint,
 } from '../planning/route';
 import { END_COLOR, ROUTE_COLOR, START_COLOR } from '../planning/routeColors';
 import { buildRouteGpx, markLabel } from '../planning/routeGpx';
 import { recordToRoute, routeMarkGuide } from '../planning/routeRecord';
 import { beepStartM, simulatedApproachMs, validationRadiusM, type MarkGuideSettings } from '../recording/markGuide';
-import { canDownloadFiles, downloadTextFile, readPickedFile, safeFileName } from '../platform/files';
+import { canDownloadFiles, downloadTextFile, safeFileName } from '../platform/files';
 import { currentPosition, locationPermissionGranted } from '../platform/location';
-import { isNativeApp } from '../platform/runtime';
 import { jsonStore } from '../platform/storage';
 import { STORAGE_KEYS } from '../core/appIdentity';
+import { ROUTES_LIST_PATH } from '../core/parentPage';
 import { dateLocale, t, tn } from '../core/i18n';
 import { tRich } from '../components/tRich';
 
@@ -70,15 +68,16 @@ import { tRich } from '../components/tRich';
  * reliées en ligne droite, que l'enregistrement fait valider une à une, avec
  * des bips d'approche (`recording/markGuide.ts`) : ceux de l'activité
  * (Réglages), ou ceux propres au parcours, rangés dans sa fiche. Un GPX
- * téléchargé ailleurs se charge tel quel (`routeFromTrack`). L'activité se
- * choisit au-dessus de la carte ; dessous, des onglets ouvrent les blocs
+ * téléchargé ailleurs entre par « Importer un itinéraire » de la liste, puis
+ * s'ouvre ici. L'activité se choisit au-dessus de la carte ; dessous, des onglets ouvrent les blocs
  * (tracé et balises, enregistrer, mes itinéraires, balises sonores), comme dans les
  * analyses. Le parcours s'enregistre dans `itineraires/` du dossier mémoire,
  * avec son GPX.
  *
  * Rien ne se calcule : seule la recherche de lieu demande du réseau. On y
- * arrive depuis « Planifier » de la liste des itinéraires (que la page Sessions ouvre par « Itinéraires ») et, sur
- * ordinateur, depuis « Planifier » dans la barre du haut ; `?itineraire=<base>` ouvre un itinéraire rangé (liste des itinéraires).
+ * arrive depuis « Planifier » de la liste des itinéraires (que la pastille « Planification » de Sessions et, sur
+ * ordinateur, « Planifier » de la barre du haut ouvrent), où ramènent le retour et le lien « ← » ;
+ * `?itineraire=<base>` ouvre un itinéraire rangé (liste des itinéraires).
  *
  * Le crayon, sur la carte, verrouille l'itinéraire : verrouillé, la carte ne fait
  * que se déplacer et se zoomer (ni point posé, ni point déplacé ou touché, ni
@@ -277,8 +276,6 @@ function PlanningPage() {
   const [confirmingMenuDelete, setConfirmingMenuDelete] = useState<string | null>(null);
   /** Itinéraire dont l'image de partage est ouverte (« Partager l'image » du menu « … »). */
   const [sharingImage, setSharingImage] = useState<SavedRoute | null>(null);
-  /** Échec du chargement d'un GPX, montré sous la carte. */
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Recherche d'un lieu.
   const [query, setQuery] = useState('');
@@ -516,45 +513,6 @@ function PlanningPage() {
     setMessage(null);
   };
 
-  /**
-   * Charge un GPX téléchargé ailleurs : sa trace devient un nouvel itinéraire,
-   * gardée telle quelle entre le départ et l'arrivée (`routeFromTrack`), à
-   * enregistrer pour la suivre pendant un enregistrement. L'activité est devinée du
-   * type de la trace s'il en porte un.
-   */
-  const loadGpx = async (event: ChangeEvent<HTMLInputElement>) => {
-    const input = event.target;
-    const file = input.files?.[0];
-    // Vidé, le champ accepte de recharger le même fichier.
-    input.value = '';
-    if (!file) return;
-    setLoadError(null);
-    try {
-      const parsed = parseGpxPath(await readPickedFile(file));
-      const loaded = routeFromTrack(parsed.points);
-      if (!loaded) throw new Error(t('{name} ne contient pas de trace : aucun point de trace ou de route.', { name: file.name }));
-      if (!confirmDiscard()) return;
-      // Activité devinée parmi celles qui se planifient (ni cachée).
-      const sport = guessSport(parsed.trackType);
-      const guessed = sport ? activities.find((a) => a.base === sport && plannable(a)) : undefined;
-      planner.replace(loaded);
-      setLocked(false);
-      setCurrent(null);
-      setConfirmingMenuDelete(null);
-      setSavedRoute(EMPTY_ROUTE);
-      setCourseGuide(null);
-      setName(parsed.name ?? file.name.replace(/\.gpx$/i, ''));
-      if (guessed) setActivityId(guessed.id);
-      setSelected(null);
-      setCandidate(null);
-      setResults(null);
-      setMessage(null);
-      fitTo(loaded);
-    } catch (err) {
-      setLoadError(plainError(err, t('Lecture du fichier impossible.')));
-    }
-  };
-
   /** Supprime un itinéraire enregistré ; celui qui est ouvert laisse la place à une carte vide. */
   const deleteSaved = async (saved: SavedRoute) => {
     setConfirmingDelete(null);
@@ -582,7 +540,7 @@ function PlanningPage() {
   };
 
   /**
-   * Menu « … » du nom : il se montre sur un itinéraire rangé, ou sur ordinateur dès qu'un tracé peut s'exporter.
+   * Menu « … » de l'itinéraire, en haut de la page à droite du titre : il se montre sur un itinéraire rangé, ou sur ordinateur dès qu'un tracé peut s'exporter.
    * Le partage porte le GPX rangé : un itinéraire modifié ou jamais rangé doit d'abord être enregistré, comme pour « Partir ».
    */
   const showMenu = current !== null || (canDownloadFiles() && route.waypoints.length >= 2);
@@ -647,7 +605,36 @@ function PlanningPage() {
     <div className="ui-page ui-page--wide plan-page">
       <PageHeader
         title={t('Itinéraires')}
-        back={{ to: '/sessions', label: t('Sessions') }}
+        back={{ to: ROUTES_LIST_PATH, label: t('Itinéraires planifiés') }}
+        aside={showMenu ? (
+          <MoreMenu label={t("Plus d'actions sur l'itinéraire")} onClose={() => setConfirmingMenuDelete(null)}>
+            <Button onClick={() => setSharingImage(current)} disabled={shareBlocked}>
+              <IconShare size={18} />
+              {t("Partager l'image")}
+            </Button>
+            <Button onClick={() => void shareCurrent()} disabled={shareBlocked}>
+              <IconShare size={18} />
+              {t('Partager le GPX')}
+            </Button>
+            {shareBlocked && <span className="ui-more__note">{t("Enregistrez d'abord les modifications")}</span>}
+            {canDownloadFiles() && (
+              <Button onClick={exportGpx} disabled={route.waypoints.length < 2}>
+                <IconDownload size={18} />
+                {t('Exporter le GPX')}
+              </Button>
+            )}
+            {current !== null && (confirmingMenuDelete === current.base ? (
+              <>
+                <Button variant="danger" onClick={() => void deleteSaved(current)}>{t('Supprimer définitivement')}</Button>
+                <Button variant="ghost" onClick={() => setConfirmingMenuDelete(null)}>{t('Garder')}</Button>
+              </>
+            ) : (
+              <HoldButton onHold={() => setConfirmingMenuDelete(current.base)} getHoldMs={routeDeleteHoldMs} label={t('Supprimer')}
+                lead={<IconTrash size={18} />} dialTitle={t('Supprimer')} icon={<IconTrash size={48} />} action="supprimer" keepMenuOpen
+                ariaLabel={t("Supprimer l'itinéraire : maintenir une seconde")} />
+            ))}
+          </MoreMenu>
+        ) : undefined}
         subtitle={t('Posez les balises sur la carte : le parcours les relie en ligne droite.')} />
 
       <div className="plan-layout">
@@ -749,8 +736,6 @@ function PlanningPage() {
               </div>
             )}
           </ResizablePanel>
-          {/* Hors des onglets : l'échec du chargement se voit même bloc « Tracé et balises » fermé. */}
-          {loadError && <div className="ui-alert ui-alert--warning">{loadError}</div>}
         </div>
 
         <div className="plan-panel">
@@ -767,7 +752,6 @@ function PlanningPage() {
                 <li>
                   {t('En navigation (« Partir »), chaque balise, départ compris, se valide en passant près d\'elle, avec des bips de plus en plus rapides à l\'approche ; « Passer » saute une balise. Distances, rythme et vibration se règlent dans Réglages.')}
                 </li>
-                <li>{t('« Charger un GPX » reprend telle quelle une trace téléchargée ailleurs ; touchez-la pour y poser des balises.')}</li>
               </ul>
             )}
             <div className="plan-trace">
@@ -788,12 +772,6 @@ function PlanningPage() {
                 </Button>
                 <Button size="s" onClick={reverse} disabled={route.waypoints.length < 2}>{t('Inverser')}</Button>
                 <Button size="s" onClick={closeLoop} disabled={route.waypoints.length < 2 || looped}>{t('Boucler')}</Button>
-                <label className="ui-btn ui-btn--secondary ui-btn--s">
-                  <IconFile size={16} />
-                  {t('Charger un GPX')}
-                  {/* Sur le téléphone, pas de filtre : Android grise parfois les GPX. Le contenu est vérifié à la lecture. */}
-                  <input type="file" accept={isNativeApp() ? undefined : '.gpx'} hidden onChange={(e) => void loadGpx(e)} />
-                </label>
                 <Button size="s" variant="ghost" onClick={() => { planner.clear(); setSelected(null); setLocked(false); }} disabled={route.waypoints.length === 0}>{t('Tout effacer')}</Button>
               </div>
               {route.waypoints.length === 0 ? (
@@ -850,38 +828,7 @@ function PlanningPage() {
             <div className="plan-form">
               <div className="plan-form__field">
                 <label className="ui-eyebrow" htmlFor={NAME_FIELD_ID}>{t('Nom')}</label>
-                <span className="plan-form__name">
-                  <input id={NAME_FIELD_ID} className="ui-field" value={name} placeholder={defaultName()} onChange={(e) => setName(e.target.value)} />
-                  {showMenu && (
-                    <MoreMenu label={t("Plus d'actions sur l'itinéraire")} onClose={() => setConfirmingMenuDelete(null)}>
-                      <Button onClick={() => setSharingImage(current)} disabled={shareBlocked}>
-                        <IconShare size={18} />
-                        {t("Partager l'image")}
-                      </Button>
-                      <Button onClick={() => void shareCurrent()} disabled={shareBlocked}>
-                        <IconShare size={18} />
-                        {t('Partager le GPX')}
-                      </Button>
-                      {shareBlocked && <span className="ui-more__note">{t("Enregistrez d'abord les modifications")}</span>}
-                      {canDownloadFiles() && (
-                        <Button onClick={exportGpx} disabled={route.waypoints.length < 2}>
-                          <IconDownload size={18} />
-                          {t('Exporter le GPX')}
-                        </Button>
-                      )}
-                      {current !== null && (confirmingMenuDelete === current.base ? (
-                        <>
-                          <Button variant="danger" onClick={() => void deleteSaved(current)}>{t('Supprimer définitivement')}</Button>
-                          <Button variant="ghost" onClick={() => setConfirmingMenuDelete(null)}>{t('Garder')}</Button>
-                        </>
-                      ) : (
-                        <HoldButton onHold={() => setConfirmingMenuDelete(current.base)} getHoldMs={routeDeleteHoldMs} label={t('Supprimer')}
-                          lead={<IconTrash size={18} />} dialTitle={t('Supprimer')} icon={<IconTrash size={48} />} action="supprimer" keepMenuOpen
-                          ariaLabel={t("Supprimer l'itinéraire : maintenir une seconde")} />
-                      ))}
-                    </MoreMenu>
-                  )}
-                </span>
+                <input id={NAME_FIELD_ID} className="ui-field" value={name} placeholder={defaultName()} onChange={(e) => setName(e.target.value)} />
               </div>
             </div>
             {!library.canSave && (

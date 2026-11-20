@@ -66,7 +66,7 @@ export const describeImport = (report: ImportReport): string => {
       : t("Ce fichier de montre n'est pas une activité (réglages, parcours…) : rien n'a été importé.");
   }
   const parts: string[] = [];
-  parts.push(tn(report.added.length, '{n} session ajoutée', '{n} sessions ajoutées', undefined, report.added.length !== 1));
+  parts.push(tn(report.added.length, '{n} session ajoutée', '{n} sessions ajoutées'));
   if (report.duplicates > 0) parts.push(tn(report.duplicates, '{n} déjà présente', '{n} déjà présentes'));
   if (report.motionAdded > 0) {
     parts.push(tn(report.motionAdded, 'capteurs ajoutés à {n} session déjà présente', 'capteurs ajoutés à {n} sessions déjà présentes'));

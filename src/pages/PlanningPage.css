@@ -4,6 +4,11 @@
  * droite (même rupture à 768 px que la navigation).
  */
 
+/* Le menu « … » de l'itinéraire, à droite du titre, centré sur sa ligne. */
+.plan-page .ui-page-header__row {
+  align-items: center;
+}
+
 .plan-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -346,18 +351,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-}
-
-/* Le champ du nom et, à sa droite, le menu « … » de l'itinéraire. */
-.plan-form__name {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.plan-form__name .ui-field {
-  flex: 1 1 auto;
-  min-width: 0;
 }
 
 .plan-note {

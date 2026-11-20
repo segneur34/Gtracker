@@ -24,14 +24,20 @@ export const RESTING_HR_PATH = '/profil/fc-repos';
 /** Page Sessions : la liste de toutes les sessions, filtrable par activité (`?activite=`). */
 export const SESSIONS_PATH = '/sessions';
 
-/** Planification d'un parcours, et la liste des itinéraires (`/itineraires/liste`), dont l'entrée est sur Sessions. */
+/** Planification d'un parcours (Planifier), ouverte depuis la liste des itinéraires, où elle revient. */
 export const PLAN_PATH = '/itineraires';
+
+/**
+ * Liste des itinéraires planifiés, d'où partent un itinéraire rangé et « Planifier » ; son entrée est la pastille
+ * « Planification » de Sessions et, sur ordinateur, « Planifier » de la barre du haut.
+ */
+export const ROUTES_LIST_PATH = `${PLAN_PATH}/liste`;
 
 /**
  * Page au-dessus d'une adresse, où renvoie la touche retour d'Android (et le
  * geste du bord de l'écran) : l'analyse d'une session renvoie à la page
- * Sessions, filtre d'activité compris, comme le lien « ← » de son en-tête ; la planification et la liste des
- * itinéraires aussi, où est leur entrée sur téléphone ; Sessions au Profil ; le test de FC repos à Réglages, dont
+ * Sessions, filtre d'activité compris, comme le lien « ← » de son en-tête ; Planifier, itinéraire ouvert compris, à la
+ * liste des itinéraires, d'où il part ; la liste à Sessions, où est son entrée sur téléphone ; Sessions au Profil ; le test de FC repos à Réglages, dont
  * l'entrée est dans Pratiquant ; une leçon des tutoriels à leur liste, et celle-ci à Réglages ; les
  * Statistiques remontent d'un cran (activité, famille, vue d'ensemble), la
  * période gardée, puis au Profil ; toute autre page renvoie au Profil. `null` sur le Profil, et à `/`, qui y mène :
@@ -49,8 +55,10 @@ export const parentPage = (pathname: string, search: string): string | null => {
   }
   // Le test de FC repos : Réglages, où est son entrée.
   if (path === RESTING_HR_PATH) return SETTINGS_PATH;
-  // Planifier et la liste des itinéraires : Sessions, où « Itinéraires » mène à la liste, d'où « Planifier » crée un parcours.
-  if (path === PLAN_PATH || path.startsWith(`${PLAN_PATH}/`)) return SESSIONS_PATH;
+  // Planifier remonte à la liste des itinéraires, où l'on choisit un itinéraire rangé ou « Planifier » ; la liste à
+  // Sessions, où « Planification » y mène.
+  if (path === PLAN_PATH) return ROUTES_LIST_PATH;
+  if (path.startsWith(`${PLAN_PATH}/`)) return SESSIONS_PATH;
   // Tutoriels : une leçon remonte à la liste, d'où qu'on l'ait ouverte, la liste à Réglages.
   if (parts[0] === 'tutoriels') return parts.length > 1 ? '/tutoriels' : SETTINGS_PATH;
   if (path === '/statistiques') {

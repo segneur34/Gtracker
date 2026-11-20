@@ -1,5 +1,5 @@
 import { t } from './i18n';
-import { PLAN_PATH, PROFILE_PATH, SESSIONS_PATH } from './parentPage';
+import { PLAN_PATH, PROFILE_PATH, ROUTES_LIST_PATH, SESSIONS_PATH } from './parentPage';
 
 /**
  * Destinations des barres de navigation, dans leur ordre : la barre du bas du téléphone (le rail à gauche sur
@@ -21,11 +21,12 @@ export const RECORD_PATH = '/enregistrer';
 
 const PROFIL: NavDestination = { id: 'profil', to: PROFILE_PATH, label: t('Profil') };
 const SESSIONS: NavDestination = { id: 'sessions', to: SESSIONS_PATH, label: t('Sessions') };
-const PLANIFIER: NavDestination = { id: 'planifier', to: PLAN_PATH, label: t('Planifier') };
+/** Ouvre la liste des itinéraires planifiés, d'où partent un itinéraire rangé et « Planifier », pas un parcours neuf. */
+const PLANIFIER: NavDestination = { id: 'planifier', to: ROUTES_LIST_PATH, label: t('Planifier') };
 const STATISTIQUES: NavDestination = { id: 'statistiques', to: '/statistiques', label: t('Statistiques') };
 const REGLAGES: NavDestination = { id: 'reglages', to: '/parametres', label: t('Réglages') };
 
-/** Barre du bas et rail : deux cases, le bouton rond, deux cases. Planifier s'ouvre depuis la liste des itinéraires, que Sessions ouvre par « Itinéraires ». */
+/** Barre du bas et rail : deux cases, le bouton rond, deux cases. Planifier s'ouvre depuis la liste des itinéraires, que Sessions ouvre par « Planification ». */
 export const TAB_BAR: { before: readonly NavDestination[]; after: readonly NavDestination[] } = {
   before: [PROFIL, SESSIONS],
   after: [STATISTIQUES, REGLAGES],
@@ -36,7 +37,8 @@ export const TOP_LINKS: readonly NavDestination[] = [PROFIL, SESSIONS, PLANIFIER
 
 /**
  * Case allumée hors de sa propre page (et de celles sous son adresse) : Sessions sur l'analyse d'une session, ouverte
- * depuis sa liste.
+ * depuis sa liste ; Planifier, qui mène à la liste des itinéraires, sur la page Planifier elle-même.
  */
 export const alsoActiveOn = (id: NavId, pathname: string): boolean =>
-  id === 'sessions' && /^\/(?:voile|surf)\/analyse\/?$/.test(pathname);
+  (id === 'sessions' && /^\/(?:voile|surf)\/analyse\/?$/.test(pathname))
+  || (id === 'planifier' && pathname.replace(/\/+$/, '') === PLAN_PATH);

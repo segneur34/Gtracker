@@ -169,7 +169,7 @@ function SessionsPage() {
         <div className="sessions-head__line sessions-head__line--totals">
           <p className="sessions-head__totals num">{totals}</p>
           <div className="sessions-head__pills">
-            <Link to="/itineraires/liste" className="ui-tab sessions-head__pill">
+            <Link to="/itineraires/liste" className="ui-tab ui-tab--action sessions-head__pill">
               <IconRoute size={14} /> {t('Planification')}
             </Link>
             <button type="button" className="ui-tab sessions-head__pill" aria-expanded={sortOpen}

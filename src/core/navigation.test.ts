@@ -10,7 +10,14 @@ describe('barres de navigation', () => {
 
   it('barre du haut : Profil, Sessions, Planifier, Statistiques, Réglages', () => {
     expect(TOP_LINKS.map((d) => d.label)).toEqual(['Profil', 'Sessions', 'Planifier', 'Statistiques', 'Réglages']);
-    expect(TOP_LINKS.map((d) => d.to)).toEqual(['/profil', '/sessions', '/itineraires', '/statistiques', '/parametres']);
+    expect(TOP_LINKS.map((d) => d.to)).toEqual(['/profil', '/sessions', '/itineraires/liste', '/statistiques', '/parametres']);
+  });
+
+  it('Planifier mène à la liste des itinéraires et reste allumée sur la page Planifier', () => {
+    expect(alsoActiveOn('planifier', '/itineraires')).toBe(true);
+    expect(alsoActiveOn('planifier', '/itineraires/')).toBe(true);
+    expect(alsoActiveOn('planifier', '/itineraires-autre')).toBe(false);
+    expect(alsoActiveOn('sessions', '/itineraires')).toBe(false);
   });
 
   it('les cases du bas sont des liens du haut, aux mêmes adresses', () => {

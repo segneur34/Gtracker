@@ -26,10 +26,12 @@ describe('parentPage', () => {
     expect(parentPage('/sessions/', '?activite=kite')).toBe('/profil');
   });
 
-  it('Planifier et la liste des itinéraires remontent à Sessions, où est leur entrée', () => {
-    expect(parentPage('/itineraires', '')).toBe('/sessions');
-    expect(parentPage('/itineraires', '?itineraire=x')).toBe('/sessions');
+  it('Planifier remonte à la liste des itinéraires, itinéraire ouvert compris ; la liste à Sessions', () => {
+    expect(parentPage('/itineraires', '')).toBe('/itineraires/liste');
+    expect(parentPage('/itineraires/', '')).toBe('/itineraires/liste');
+    expect(parentPage('/itineraires', '?itineraire=x')).toBe('/itineraires/liste');
     expect(parentPage('/itineraires/liste', '')).toBe('/sessions');
+    expect(parentPage('/itineraires/liste/', '')).toBe('/sessions');
     expect(parentPage('/itineraires-autre', '')).toBe('/profil');
   });
 

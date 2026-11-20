@@ -11,7 +11,7 @@ describe("compte rendu d'un import", () => {
     expect(describeImport(report({ notActivities: ['r.fit'] }))).toBe("Ce fichier de montre n'est pas une activité (réglages, parcours…) : rien n'a été importé.");
     expect(describeImport(report({ notActivities: ['r.fit', 's.fit'] }))).toBe("Ces 2 fichiers de montre ne sont pas des activités (réglages, parcours…) : rien n'a été importé.");
     expect(describeImport(report({ notActivities: ['r.fit'], added: ['a.gpx'] }))).toBe('1 session ajoutée.');
-    expect(describeImport(report({ notActivities: ['r.fit'], duplicates: 1 }))).toBe('0 sessions ajoutées, 1 déjà présente.');
+    expect(describeImport(report({ notActivities: ['r.fit'], duplicates: 1 }))).toBe('0 session ajoutée, 1 déjà présente.');
   });
 
   it('dit à part les capteurs illisibles, session gardée sans eux', () => {
@@ -21,9 +21,10 @@ describe("compte rendu d'un import", () => {
       .toContain('capteurs illisibles pour 2 sessions (a.gpx, b.gpx), gardées sans eux');
   });
 
-  it('dit les sessions ajoutées, au singulier comme au pluriel', () => {
+  it('dit les sessions ajoutées, au singulier à 0 et 1 comme le veut le français, au pluriel au-delà', () => {
     expect(describeImport(report({ added: ['a.gpx'] }))).toBe('1 session ajoutée.');
-    expect(describeImport(report())).toBe('0 sessions ajoutées.');
+    expect(describeImport(report())).toBe('0 session ajoutée.');
+    expect(describeImport(report({ added: ['a.gpx', 'b.gpx'] }))).toBe('2 sessions ajoutées.');
   });
 
   it('ajoute les déjà présentes, complétées, illisibles et non rangées, dans cet ordre', () => {
@@ -38,10 +39,10 @@ describe("compte rendu d'un import", () => {
 
   it('dit les déjà présentes dont la fiche n’a pas pu être relue, non complétées', () => {
     expect(describeImport(report({ duplicates: 1, recordNotRead: 1 }))).toBe(
-      '0 sessions ajoutées, 1 déjà présente, fiche non relue pour 1 session déjà présente : non complétée.',
+      '0 session ajoutée, 1 déjà présente, fiche non relue pour 1 session déjà présente : non complétée.',
     );
     expect(describeImport(report({ duplicates: 2, recordNotRead: 2 }))).toBe(
-      '0 sessions ajoutées, 2 déjà présentes, fiche non relue pour 2 sessions déjà présentes : non complétées.',
+      '0 session ajoutée, 2 déjà présentes, fiche non relue pour 2 sessions déjà présentes : non complétées.',
     );
   });
 

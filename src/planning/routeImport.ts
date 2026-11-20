@@ -59,8 +59,8 @@ export interface RouteImportOptions {
  * de deux points). Un GPX de Gtracker rend sa fiche telle quelle (points de
  * passage ou balises, mode de chaque tronçon, activité, bips d'approche),
  * renommée si son nom est déjà pris. Un autre GPX devient une trace gardée
- * telle quelle (`routeFromTrack`), comme « Charger un GPX » de la
- * planification, nommée d'après le fichier s'il ne porte pas de nom.
+ * telle quelle (`routeFromTrack`), nommée d'après le fichier s'il ne porte
+ * pas de nom.
  */
 export const importedRouteRecord = (text: string, fileName: string, options: RouteImportOptions): RouteRecord | null => {
   const { nowIso, takenNames, activityFor } = options;

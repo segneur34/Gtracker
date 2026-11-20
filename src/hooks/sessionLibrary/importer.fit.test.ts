@@ -96,7 +96,7 @@ describe('import de FIT', () => {
     expect(again.duplicates).toBe(1);
     expect(again.existing).toEqual(first.added);
     expect(files.get(`sessions/${first.added[0]}`)).toBe(before);
-    expect(library.readLibraryState().message).toBe('0 sessions ajoutées, 1 déjà présente.');
+    expect(library.readLibraryState().message).toBe('0 session ajoutée, 1 déjà présente.');
   });
 
   it('GPX de la même sortie : les GPX passent d\'abord, le FIT compte « déjà présente », dans les deux sens', async () => {

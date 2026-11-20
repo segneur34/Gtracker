@@ -92,7 +92,7 @@ describe('récupérer les sessions du téléphone', () => {
     phoneFiles = new Map(pcGpx().map((p) => [p, files.get(p)!]));
     phoneReads = [];
     const second = await recover(recovery);
-    expect(second.text.paragraphs).toEqual(['0 sessions ajoutées, 3 déjà présentes.']);
+    expect(second.text.paragraphs).toEqual(['0 session ajoutée, 3 déjà présentes.']);
     expect(phoneReads).toEqual([]);
     expect(pcGpx()).toHaveLength(3);
   });
@@ -102,7 +102,7 @@ describe('récupérer les sessions du téléphone', () => {
     await recover(recovery);
     phoneReads = [];
     const again = await recover(recovery);
-    expect(again.text.paragraphs).toEqual(['0 sessions ajoutées, 3 déjà présentes.']);
+    expect(again.text.paragraphs).toEqual(['0 session ajoutée, 3 déjà présentes.']);
     expect(pcGpx()).toHaveLength(3);
   });
 
