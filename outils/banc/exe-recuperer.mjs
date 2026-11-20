@@ -19,12 +19,16 @@
 //  f. coupure en route, deux fois (entre un GPX et sa fiche, puis plus loin) : message de débranchement, sessions rangées
 //     entières, aucune moitié ni temporaire ; relancé sans coupure, ce qui manquait est rangé ;
 //  g. dans tous les cas, le téléphone factice est intact (mêmes fichiers, tailles et dates qu'au départ) et la console
-//     de la page sans erreur.
+//     de la page sans erreur ;
+//  h. corbeille : une session récupérée puis supprimée depuis sa ligne de Sessions (elle part à la corbeille du PC,
+//     index à une entrée), toujours sur le téléphone : « Récupérer » la ramène (« 1 session ajoutée, 2 déjà présentes. »)
+//     et elle quitte la corbeille (index sans son entrée, aucun sous-dossier).
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { connect } from './lib/cdp.mjs';
+import { actionLigne } from './lib/sessions.mjs';
 import { traceDroite } from './lib/traces.mjs';
 
 const [exe, portArg] = process.argv.slice(2);
@@ -409,6 +413,59 @@ try {
     });
     verifierMemoire(`${quoi}, reprise`, M.memoire, DEPART);
     telephoneIntact(`${quoi}, reprise`, tel, avant);
+  }
+
+  // ---------- h. corbeille puis « Récupérer » ----------
+  console.log('\n== h. Une session mise à la corbeille sur le PC, présente sur le téléphone : « Récupérer » la ramène et elle quitte la corbeille');
+  {
+    const M = memoireNeuve('h');
+    const tel = fabriquerTelephone('h-tel', DEPART, modele.fiche);
+    const avant = empreinte(tel);
+    const corbeille = join(M.memoire, 'corbeille');
+    const indexH = () => { try { return JSON.parse(readFileSync(join(corbeille, 'corbeille.json'), 'utf8').replace(/^﻿/, '')); } catch { return null; } };
+    const dossiersH = () => (existsSync(corbeille) ? readdirSync(corbeille, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name) : []);
+    await avecProgramme(M.profil, M.memoire, { GTRACKER_BANC_TELEPHONE: tel }, 'h', async (b) => {
+      await b.go('/sessions', 5000);
+      await b.settle({ max: 2000 });
+      let r = await recuperer(b, 'h1');
+      check('h1. le compte rendu dit « 3 sessions ajoutées. »', JSON.stringify(r?.paragraphes) === JSON.stringify(['3 sessions ajoutées.']), JSON.stringify(r?.paragraphes));
+      await b.wait(2000);
+      verifierMemoire('h1', M.memoire, DEPART);
+      check('h1. aucune corbeille sur le disque avant la suppression', !existsSync(corbeille), (arbre(corbeille) ?? []).join(','));
+      await fermerFenetre(b);
+
+      // Suppression de la première ligne de la page Sessions : elle part à la corbeille de l'ordinateur.
+      await pageSessions(b);
+      const avantGpx = gpxsDe(M.memoire);
+      check('h2. « … » puis « Supprimer » de la première ligne', (await actionLigne(b.evaluate, b.wait, 'Wingfoil', 'Supprimer')) === 'ok');
+      await b.waitFor(`Boolean(document.querySelector('.lib-row__confirm'))`, { timeout: 4000, label: 'confirmation' });
+      const phrase = await b.evaluate(`document.querySelector('.lib-row__confirm').textContent.trim()`);
+      console.log(`  confirmation : « ${phrase} »`);
+      check('h2. la confirmation dit la corbeille et 30 jours', /corbeille/i.test(phrase) && /30 jours/.test(phrase), phrase);
+      check('h2. « Confirmer »', (await b.clickText('Confirmer')) === 'ok');
+      await b.waitFor(() => gpxsDe(M.memoire).length === 2 && indexH()?.entries?.length === 1, { timeout: 10000, label: 'session mise à la corbeille' });
+      await b.wait(800);
+      const partie = avantGpx.find((n) => !gpxsDe(M.memoire).includes(n));
+      const e = indexH()?.entries?.[0];
+      console.log(`  corbeille : ${(arbre(corbeille) ?? []).join(' ; ')}`);
+      check('h2. le GPX et la fiche ont quitté sessions/ pour la corbeille (une entrée, un sous-dossier)', Boolean(partie) && !fichesDe(M.memoire).includes(partie.replace(/\.gpx$/, '.json')) && e?.main === partie && dossiersH().length === 1 && dossiersH()[0] === e?.dir, `${partie} ${JSON.stringify(e)}`);
+      await pageSessions(b);
+      check('h2. la page Sessions montre deux lignes', lignesSessions(await texte(b)) === 2);
+
+      // « Récupérer » : le téléphone a toujours la session.
+      r = await recuperer(b, 'h3');
+      check('h3. le compte rendu dit « 1 session ajoutée, 2 déjà présentes. »', JSON.stringify(r?.paragraphes) === JSON.stringify(['1 session ajoutée, 2 déjà présentes.']), JSON.stringify(r?.paragraphes));
+      await b.wait(2000);
+      verifierMemoire('h3', M.memoire, DEPART);
+      check('h3. la session récupérée est revenue sous son nom (GPX et fiche)', gpxsDe(M.memoire).includes(partie) && fichesDe(M.memoire).includes(partie.replace(/\.gpx$/, '.json')), sessionsDe(M.memoire).join(' | '));
+      await b.waitFor(() => indexH()?.entries?.length === 0, { timeout: 8000, label: 'corbeille sans l\'entrée' });
+      console.log(`  corbeille après « Récupérer » : ${(arbre(corbeille) ?? []).join(' ; ') || '(vide)'}`);
+      check('h3. la corbeille ne porte plus son entrée (index sans entrée, aucun sous-dossier)', indexH()?.entries?.length === 0 && dossiersH().length === 0, `${JSON.stringify(indexH())} ${dossiersH().join(',')}`);
+      telephoneIntact('h3', tel, avant);
+      await fermerFenetre(b);
+      const listeH = await pageSessions(b);
+      check('h3. la page Sessions montre trois lignes', lignesSessions(listeH) === 3, `${lignesSessions(listeH)}`);
+    });
   }
 } catch (e) {
   check(`script interrompu : ${e.stack ?? e.message}`, false);
