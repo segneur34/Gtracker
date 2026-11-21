@@ -44,7 +44,7 @@ export { dismissIncomingNotice, dismissLibraryMessage, dismissSettingsOffer, rea
 export { hasSessionMotion } from './sessionLibrary/memory';
 export { summarizeGpxText } from './sessionLibrary/summarySettings';
 export { queueOutdatedRefresh } from './sessionLibrary/summaryQueue';
-export { adoptSettingsFile, importSettingsFile, reloadAfterWrites, renameDevice } from './sessionLibrary/deviceSettings';
+export { adoptSettingsFile, adoptSettingsGear, importSettingsFile, reloadAfterWrites, renameDevice, settingsFileValues } from './sessionLibrary/deviceSettings';
 export type { AddResult, AddStatus } from './sessionLibrary/addSession';
 export { answerImportQuestion, canImportSessions, importEntries, importFiles, importFromFolder, saveRecordedSession } from './sessionLibrary/importer';
 export { startIncomingFiles } from './sessionLibrary/incoming';

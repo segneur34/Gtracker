@@ -1,9 +1,15 @@
 import { dayMonthYearTime } from '../core/calendar';
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore, type ChangeEvent } from 'react';
+import { STORAGE_KEYS } from '../core/appIdentity';
 import {
-  adoptSettingsFile, dismissSettingsOffer, importSettingsFile, renameDevice, useLibraryFields, type SettingsFileInfo,
+  adoptSettingsFile, adoptSettingsGear, dismissSettingsOffer, importSettingsFile, renameDevice, settingsFileValues,
+  useLibraryFields, type SettingsFileInfo,
 } from '../hooks/useSessionLibrary';
-import { DEVICE_NAME_MAX, deviceNameText } from '../library/settingsFile';
+import { readStoredSettings, subscribeStoredSettings } from '../hooks/useSportSettings';
+import { gearAdoptQuestion } from '../library/gearCompareView';
+import { DEVICE_NAME_MAX, adoptedGearChanges, deviceNameText, gearListsDiffer } from '../library/settingsFile';
+import { isDesktopApp, isNativeApp } from '../platform/runtime';
+import GearCompareDialog from './GearCompareDialog';
 import { HelpText, HelpToggle } from './Help';
 import Button from './ui/Button';
 import { t, tn } from '../core/i18n';
@@ -12,7 +18,8 @@ import { tRich } from './tRich';
 /**
  * Réglages par appareil, dans Réglages › Mémoire : le nom de
  * cet appareil, qui nomme son fichier dans `reglages/`, et la liste des
- * fichiers du dossier, avec « Reprendre » sur ceux des autres appareils.
+ * fichiers du dossier, avec « Reprendre » sur ceux des autres appareils, et
+ * « Reprendre le matériel » quand leur liste de matériel diffère de celle-ci.
  * « Importer un fichier de réglages » range un fichier choisi à la main, puis
  * propose de le reprendre : seul moyen là où l'on ne peut rien déposer dans
  * la mémoire (celle du navigateur, sous Firefox). `SettingsOfferBanner` propose, une fois, celui d'un autre appareil apparu
@@ -46,6 +53,23 @@ export function SettingsOfferBanner() {
   );
 }
 
+/** « Reprendre », et « Reprendre le matériel » si la liste de matériel de ce fichier diffère de celle de cet appareil. */
+function OtherFileActions({ file, theirs, mine, onAdoptGear }: {
+  file: SettingsFileInfo;
+  theirs: Record<string, unknown> | null;
+  mine: Record<string, unknown>;
+  onAdoptGear: (file: SettingsFileInfo, theirs: Record<string, unknown>) => void;
+}) {
+  return (
+    <span className="ui-row-s2 ui-wrap">
+      {theirs && gearListsDiffer(theirs, mine) && (
+        <Button size="s" onClick={() => onAdoptGear(file, theirs)}>{t('Reprendre le matériel')}</Button>
+      )}
+      <Button size="s" onClick={() => adopt(file)}>{t('Reprendre')}</Button>
+    </span>
+  );
+}
+
 function SettingsFiles() {
   const { deviceName, settingsFiles, folderKind } = useLibraryFields('deviceName', 'settingsFiles', 'folderKind');
   /** Nom en cours de saisie ; `null` : celui de l'appareil. */
@@ -53,6 +77,31 @@ function SettingsFiles() {
   const [refusal, setRefusal] = useState<string | null>(null);
   /** Compte rendu du dernier import d'un fichier de réglages. */
   const [importNote, setImportNote] = useState<{ text: string; failed: boolean } | null>(null);
+  const [comparing, setComparing] = useState(false);
+  /** « Comparer le matériel » : programme Windows, quand le dossier porte le fichier de réglages d'un autre appareil. */
+  const canCompareGear = isDesktopApp() && settingsFiles.some((f) => !f.own);
+
+  // Valeurs des fichiers des autres appareils, relues à chaque nouvelle version, pour « Reprendre le matériel ».
+  const [otherValues, setOtherValues] = useState<Record<string, Record<string, unknown> | null>>({});
+  const othersKey = settingsFiles.filter((f) => !f.own).map((f) => `${f.savedAt}\t${f.fileName}`).join('\n');
+  useEffect(() => {
+    if (othersKey === '') return;
+    let current = true;
+    const names = othersKey.split('\n').map((line) => line.slice(line.indexOf('\t') + 1));
+    void Promise.all(names.map(async (name) => [name, await settingsFileValues(name)] as const)).then((pairs) => {
+      if (current) setOtherValues(Object.fromEntries(pairs));
+    });
+    return () => { current = false; };
+  }, [othersKey]);
+  // Réglages de cet appareil, suivis : une liste reprise ou modifiée refait aussitôt la comparaison.
+  const stored = useSyncExternalStore(subscribeStoredSettings, readStoredSettings);
+  const mine = useMemo(() => ({ [STORAGE_KEYS.sportSettings]: stored }), [stored]);
+
+  /** « Reprendre le matériel », après la question qui dit ce qui change. */
+  const adoptGear = (file: SettingsFileInfo, theirs: Record<string, unknown>) => {
+    if (!window.confirm(gearAdoptQuestion(deviceNameText(file.name), adoptedGearChanges(theirs, mine), isNativeApp()))) return;
+    void adoptSettingsGear(file.fileName);
+  };
 
   const commit = async () => {
     if (draft === null) return;
@@ -107,16 +156,18 @@ function SettingsFiles() {
             </span>
             {file.own
               ? <span style={{ ...mutedStyle, fontWeight: 600 }}>{t('cet appareil')}</span>
-              : <Button size="s" onClick={() => adopt(file)}>{t('Reprendre')}</Button>}
+              : <OtherFileActions file={file} theirs={otherValues[file.fileName] ?? null} mine={mine} onAdoptGear={adoptGear} />}
           </li>
         ))}
       </ul>
-      <div>
+      <div className="ui-row-s2 ui-wrap">
         <label className="ui-btn ui-btn--secondary ui-btn--s">
           {t('Importer un fichier de réglages')}
           <input type="file" accept=".json,application/json" hidden onChange={(e) => void handleImport(e)} />
         </label>
+        {canCompareGear && <Button size="s" onClick={() => setComparing(true)}>{t('Comparer le matériel')}</Button>}
       </div>
+      {comparing && <GearCompareDialog onClose={() => setComparing(false)} />}
       {importNote && <p style={{ ...mutedStyle, color: importNote.failed ? 'var(--danger)' : 'var(--muted)' }}>{importNote.text}</p>}
     </div>
   );

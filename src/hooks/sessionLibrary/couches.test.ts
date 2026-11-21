@@ -25,11 +25,11 @@ const LAYERS = [
 
 /** Valeurs exportées par le point d'entrée, les mêmes qu'avant le découpage (et cinq types). */
 const ENTRY_VALUES = [
-  'adoptSettingsFile', 'answerImportQuestion', 'canChooseMemoryFolder', 'canImportSessions', 'chooseFolder', 'correctSessionPlace', 'countErasable', 'currentMemoryFolder', 'dismissIncomingNotice', 'dismissLibraryMessage',
+  'adoptSettingsFile', 'adoptSettingsGear', 'answerImportQuestion', 'canChooseMemoryFolder', 'canImportSessions', 'chooseFolder', 'correctSessionPlace', 'countErasable', 'currentMemoryFolder', 'dismissIncomingNotice', 'dismissLibraryMessage',
   'dismissSettingsOffer', 'eraseEverything', 'factoryReset', 'stashRoute', 'trashStore', 'deleteFromTrash', 'emptyWholeTrash', 'restoreFromTrash', 'findLibrarySession', 'hasSessionMotion', 'importEntries', 'importFiles', 'importFromFolder',
   'importSettingsFile', 'librarySession', 'loadFullSession', 'loadSessionGpx', 'openLibrary', 'queueOutdatedRefresh',
   'queueSessionPlace', 'readLibraryState', 'readSessionExport', 'readSessionGpx', 'readSessionMotion', 'reconnectFolder', 'refreshLibrary', 'reloadAfterWrites',
-  'removeSession', 'renameDevice', 'reportStartupError', 'saveRecordedSession', 'startIncomingFiles', 'startLibraryUi',
+  'removeSession', 'renameDevice', 'reportStartupError', 'saveRecordedSession', 'settingsFileValues', 'startIncomingFiles', 'startLibraryUi',
   'summarizeGpxText', 'switchToBrowserMemory', 'updateSessionRecord', 'useLibraryFields', 'useLibrarySelector',
   'useLibrarySession',
   'answerPhoneSyncQuestion', 'clearPhoneArrivalNote', 'notePhoneArrival', 'phoneSyncStep', 'synchronizeWithPhone', 'usePhoneArrivalNote', 'usePhoneSync',

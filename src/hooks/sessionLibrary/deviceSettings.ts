@@ -1,7 +1,7 @@
 import { t } from '../../core/i18n';
 import { SETTINGS_DIR, settingsPath } from '../../library/folderLayout';
 import {
-  DEFAULT_DEVICE_NAMES, TRAVELLING_KEYS, adoptedValues, buildSettingsFile, cleanDeviceName, deviceFileName, deviceNameText,
+  DEFAULT_DEVICE_NAMES, TRAVELLING_KEYS, adoptedGearValues, adoptedValues, buildSettingsFile, cleanDeviceName, deviceFileName, deviceNameText,
   freeDeviceName, importedSettingsFileName, newestSettingsEntry, ownSettingsEntry, parseSettingsFile,
   serializeSettingsFile, settingsEntryKey, settingsEntryName, settingsFileInfo, settingsSignature,
   sortedSettingsFiles, unseenSettingsEntries, type SettingsEntry, type SettingsFileInfo,
@@ -346,6 +346,52 @@ export const adoptSettingsFile = async (fileName: string): Promise<void> => {
     await applySettingsChange(true);
   } catch (err) {
     setState({ error: t('Reprise des réglages impossible : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
+  }
+};
+
+/**
+ * « Reprendre le matériel » du fichier de réglages d'un autre appareil (Réglages › Mémoire) : la liste de
+ * matériel de chaque activité connue des deux côtés remplace celle de cet appareil (`adoptedGearValues`), tout le
+ * reste est gardé. Le fichier de l'appareil est récrit ; la page ne se recharge pas : les écrans lisent les réglages
+ * par `useSyncExternalStore` et suivent tout de suite. Aucune fiche de session n'est réécrite.
+ */
+export const adoptSettingsGear = async (fileName: string): Promise<void> => {
+  await lib.opening;
+  const f = lib.folder;
+  if (!f) return;
+  try {
+    const file = parseSettingsFile(await f.readText(settingsPath(fileName)));
+    if (!file) {
+      setState({ error: t('Fichier de réglages illisible : {fileName}.', { fileName }) });
+      return;
+    }
+    if (settingsTimer !== null) clearTimeout(settingsTimer);
+    settingsTimer = null;
+    applySettingsValues(adoptedGearValues(file.values, localTravellingValues()));
+    const now = Date.now();
+    jsonStore.write(SETTINGS_SAVED_AT_KEY, now);
+    lastSignature = settingsSignature(localTravellingValues());
+    await readSettingsEntries(f);
+    await writeOwnSettings(f, now);
+    setState({ message: t('Matériel repris de « {name} ».', { name: deviceNameText(settingsEntryName({ fileName, file })) }) });
+  } catch (err) {
+    setState({ error: t('Reprise du matériel impossible : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
+  }
+};
+
+/**
+ * Valeurs du fichier de réglages `fileName` du dossier, relues à l'instant, sans rien reprendre (la fenêtre
+ * « Matériel des deux appareils » y lit la liste d'un autre appareil) ; `null` sans dossier, fichier absent ou
+ * illisible.
+ */
+export const settingsFileValues = async (fileName: string): Promise<Record<string, unknown> | null> => {
+  await lib.opening;
+  const f = lib.folder;
+  if (!f) return null;
+  try {
+    return parseSettingsFile(await f.readText(settingsPath(fileName)))?.values ?? null;
+  } catch {
+    return null;
   }
 };
 

@@ -6,6 +6,7 @@ import {
   DEFAULT_DEVICE_NAMES,
   SETTINGS_FORMAT,
   SETTINGS_VERSION,
+  adoptedGearChanges,
   adoptedGearValues,
   adoptedValues,
   buildSettingsFile,
@@ -30,6 +31,7 @@ import {
   type SettingsEntry,
 } from './settingsFile';
 import { STORAGE_KEYS } from '../core/appIdentity';
+import { gearAdoptQuestion } from './gearCompareView';
 
 const values = { [STORAGE_KEYS.sportSettings]: { thresholds: { wingfoil: 9 } } };
 
@@ -316,6 +318,20 @@ describe('matériel seul', () => {
     expect(gearListsDiffer(pc, adoptedGearValues(pc, phone))).toBe(false);
     // Une activité de l'ordinateur seul ne compte pas : elle se reprend avec tous les réglages.
     expect(gearListsDiffer({ [STORAGE_KEYS.sportSettings]: { activities: activities(['a-moth', 'Moth']), gearGroups: pc[STORAGE_KEYS.sportSettings].gearGroups } }, phone)).toBe(false);
+  });
+
+  it("n'offre rien quand les listes sont les mêmes, au nom près", () => {
+    expect(gearListsDiffer(phone, phone)).toBe(false);
+    const same = { [STORAGE_KEYS.sportSettings]: { activities: activities(['x', 'Wingfoil']), gearGroups: { x: [{ id: 'z', name: ' ailes ', items: [{ id: 'y', name: 'slick 4' }, { id: 'w', name: 'UNIT 4' }] }] } } };
+    expect(gearListsDiffer(same, phone)).toBe(false);
+  });
+
+  it('dit ce que la reprise change, dans la question de « Reprendre le matériel »', () => {
+    const changes = adoptedGearChanges(pc, phone);
+    expect(gearAdoptQuestion('PC', changes, true)).toBe(
+      'Le matériel de « PC » remplace celui de ce téléphone pour wingfoil : + Echo 6 ; − Unit 4 ; Slick 4 réuni à Duotone Slick 4. Les sessions gardent leur matériel.'
+    );
+    expect(gearAdoptQuestion('Téléphone', changes, false)).toContain('celui de cet ordinateur pour wingfoil');
   });
 
   it('rend tel quel un appareil quand rien ne se reprend', () => {

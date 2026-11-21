@@ -388,6 +388,53 @@ describe('fichiers de réglages illisibles et profil relu', () => {
     expect(files.get('reglages/atelier.json')).toBe('pas du JSON');
   });
 
+  it("relit les valeurs du fichier d'un autre appareil sans les reprendre ; absent ou illisible, rien", async () => {
+    const { buildSettingsFile, serializeSettingsFile } = await import('../library/settingsFile');
+    const sport = { gearGroups: { wingfoil: [{ id: 'ailes', name: 'Ailes', items: [{ id: 'u5', name: 'Unit 5' }] }] } };
+    files.set('reglages/pc.json', '{ abîmé');
+    const library = await openFresh();
+    await settle(library);
+    files.set('reglages/telephone.json', serializeSettingsFile(buildSettingsFile(
+      { [STORAGE_KEYS.sportSettings]: sport }, 1000, null, { id: 'tel', name: 'Téléphone' },
+    )));
+    const { jsonStore } = await import('../platform/storage');
+    const before = JSON.stringify(jsonStore.read<unknown>(STORAGE_KEYS.sportSettings));
+    expect((await library.settingsFileValues('telephone.json'))?.[STORAGE_KEYS.sportSettings]).toEqual(sport);
+    expect(JSON.stringify(jsonStore.read<unknown>(STORAGE_KEYS.sportSettings))).toBe(before);
+    expect(await library.settingsFileValues('pc.json')).toBeNull();
+    expect(await library.settingsFileValues('absent.json')).toBeNull();
+  });
+
+  it("« Reprendre le matériel » ne change que les listes des activités communes, et récrit le fichier de l'appareil", async () => {
+    const { buildSettingsFile, serializeSettingsFile } = await import('../library/settingsFile');
+    const wing = { id: 'wingfoil', name: 'Wingfoil', base: 'wingfoil', color: '#004aad' };
+    const kite = { id: 'kite', name: 'Kite', base: 'kite', color: '#d32f2f' };
+    const moth = { id: 'moth', name: 'Moth', base: 'wingfoil', color: '#2e7d32' };
+    const theirGear = [{ id: 'g', name: 'Ailes', items: [{ id: 'e6', name: 'Echo 6' }] }];
+    const library = await openFresh();
+    await settle(library);
+    const { jsonStore } = await import('../platform/storage');
+    const mineBefore = {
+      activities: [wing, kite], thresholds: { wingfoil: 7 },
+      gearGroups: { wingfoil: [{ id: 'g', name: 'Ailes', items: [{ id: 'u4', name: 'Unit 4' }] }], kite: [{ id: 'k', name: 'Kites', items: [] }] },
+    };
+    jsonStore.write(STORAGE_KEYS.sportSettings, mineBefore);
+    const profileBefore = JSON.stringify(jsonStore.read(STORAGE_KEYS.athleteProfile));
+    files.set('reglages/autre.json', serializeSettingsFile(buildSettingsFile({
+      [STORAGE_KEYS.sportSettings]: { activities: [wing, moth], thresholds: { wingfoil: 12 }, gearGroups: { wingfoil: theirGear, moth: theirGear } },
+      [STORAGE_KEYS.athleteProfile]: { me: { name: 'Autre' } },
+    }, 1000, null, { id: 'autre', name: 'Autre' })));
+    log.length = 0;
+    await library.adoptSettingsGear('autre.json');
+    const after = jsonStore.read<Record<string, unknown>>(STORAGE_KEYS.sportSettings);
+    expect(after).toEqual({ ...mineBefore, gearGroups: { ...mineBefore.gearGroups, wingfoil: theirGear } });
+    expect(JSON.stringify(jsonStore.read(STORAGE_KEYS.athleteProfile))).toBe(profileBefore);
+    expect(log).toContain('write reglages/pc.json');
+    expect(log.filter((l) => l.startsWith('write sessions/'))).toEqual([]);
+    expect(JSON.parse(files.get('reglages/pc.json')!).values[STORAGE_KEYS.sportSettings].gearGroups.wingfoil).toEqual(theirGear);
+    expect(library.readLibraryState().message).toContain('Matériel repris de « Autre »');
+  });
+
   it('reprend le profil du pratiquant champ par champ : une valeur hors plage ou de travers reste vide', async () => {
     const { buildSettingsFile, serializeSettingsFile } = await import('../library/settingsFile');
     files.set('reglages/autre.json', serializeSettingsFile(buildSettingsFile(

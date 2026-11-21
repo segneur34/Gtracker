@@ -38,7 +38,17 @@ describe('gearLooksAlike', () => {
     expect(gearLooksAlike('Mat 7', 'Max 7')).toBe(false);
   });
 
+  it("ne prend pas pour une faute de frappe la lettre d'écart d'une taille ou d'un repère", () => {
+    expect(gearLooksAlike('Voile S', 'Voile M')).toBe(false);
+    expect(gearLooksAlike('Kite A', 'Kite B')).toBe(false);
+    expect(gearLooksAlike('Aile L', 'Aile R')).toBe(false);
+    expect(gearLooksAlike('Planche A', 'Planche B')).toBe(false);
+    expect(gearLooksAlike('Voile XL', 'Voile XS')).toBe(false);
+    expect(gearLooksAlike('Duotone Slick', 'Duotne Slick')).toBe(true);
+  });
+
   it('ne rapproche jamais deux noms aux nombres différents', () => {
+    expect(gearLooksAlike('Unit 5 6', 'Unit 6 5')).toBe(false);
     expect(gearLooksAlike('Unit 5', 'Unit 6')).toBe(false);
     expect(gearLooksAlike('Unit 5.5', 'Unit 55')).toBe(false);
     expect(gearLooksAlike('Slick', 'Slick 4')).toBe(false);
@@ -190,6 +200,19 @@ describe('phoneGearChanges', () => {
     expect(changes.added.map((x) => x.itemName)).toEqual(['Duotone Slick 4', 'Echo 6', 'Glide 1085']);
     expect(changes.removed.map((x) => x.itemName)).toEqual(['Slick 4', 'Unit 4']);
     expect(phoneGearChanges(compareGear([list('w', 'W', pcWing)], [list('w', 'W', pcWing)]))).toEqual({ activities: [], added: [], removed: [], merged: [] });
+  });
+
+  it("n'annonce pas en ajout une pièce que le téléphone a déjà, sous une ligne réunie de plus", () => {
+    const pc: GearGroup[] = [{ id: 'A', name: 'Ailes', merged: [{ id: 'P2', name: 'Wings' }], items: [{ id: 'u5', name: 'Unit 5' }] }];
+    const phone: GearGroup[] = [
+      { id: 'P1', name: 'Ailes', items: [{ id: 't5', name: 'Unit 5' }] },
+      { id: 'P2', name: 'Wings', items: [{ id: 't5p', name: 'Unit 5 pro' }] },
+    ];
+    const comparisons = compareGear([list('w', 'W', pc)], [list('w', 'W', phone)]);
+    expect(comparisons[0].lines.map((l) => [l.kind, l.phone?.id])).toEqual([['same', 'P1'], ['merged', 'P2']]);
+    const changes = phoneGearChanges(comparisons);
+    expect(changes.added).toEqual([]);
+    expect(changes.removed.map((x) => x.itemName)).toEqual(['Unit 5 pro']);
   });
 
   it('compte une ligne vide pour elle-même', () => {

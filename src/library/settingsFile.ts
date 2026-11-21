@@ -2,7 +2,7 @@ import { readActivities } from '../core/activities';
 import { isObject, parseJson, stringifyJson } from '../core/basics';
 import { t } from '../core/i18n';
 import { sanitizeAthleteProfile } from './athleteProfile';
-import { activityGearLists, compareGear, isAdoptableGear } from './gearCompare';
+import { activityGearLists, compareGear, isAdoptableGear, phoneGearChanges, type PhoneGearChanges } from './gearCompare';
 import { STORAGE_KEYS, FILE_FORMATS } from '../core/appIdentity';
 
 /**
@@ -315,3 +315,7 @@ export const adoptedGearValues = (theirs: Record<string, unknown>, mine: Record<
  */
 export const gearListsDiffer = (theirs: Record<string, unknown>, mine: Record<string, unknown>): boolean =>
   gearComparison(theirs, mine).some((c) => isAdoptableGear(c) && !c.equal);
+
+/** Ajouts, retraits et réunions que « Reprendre le matériel » de `theirs` ferait sur cet appareil (`mine`). */
+export const adoptedGearChanges = (theirs: Record<string, unknown>, mine: Record<string, unknown>): PhoneGearChanges =>
+  phoneGearChanges(gearComparison(theirs, mine));

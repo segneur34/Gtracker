@@ -1,0 +1,90 @@
+/* « Matériel des deux appareils » (`GearCompareDialog.tsx`) : plus large que la fenêtre commune, pour ses quatre
+   colonnes (état, ordinateur, autre appareil, geste). */
+
+.ui-dialog.gear-compare {
+  width: min(820px, 100%);
+}
+
+.gear-compare__text {
+  margin: 0;
+}
+
+.gear-compare__muted {
+  color: var(--muted);
+  font-size: var(--text-s);
+}
+
+.gear-compare__choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Tableau : défile de côté plutôt que de déborder de la fenêtre. */
+.gear-compare__scroll {
+  overflow-x: auto;
+}
+
+.gear-compare__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-s);
+}
+
+.gear-compare__table th,
+.gear-compare__table td {
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+  vertical-align: top;
+}
+
+/* Tête de chaque ligne de matériel : son nom en capitales, puis les noms des deux appareils, sur un trait. */
+.gear-compare__line th,
+.gear-compare__line td {
+  padding-top: var(--space-3);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gear-compare__line .gear-compare__line-name {
+  display: block;
+  color: var(--ink);
+}
+
+.gear-compare__line .gear-compare__note {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+
+.gear-compare__kind {
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+
+/* Geste à droite ; sa remarque passe dessous. */
+.gear-compare__table .gear-compare__act {
+  text-align: right;
+}
+
+.gear-compare__note {
+  display: block;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.gear-compare__summary {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.gear-compare__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

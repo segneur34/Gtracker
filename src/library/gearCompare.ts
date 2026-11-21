@@ -20,13 +20,35 @@ const MIN_CONTAINED_LENGTH = 3;
 /** Longueur, sans espaces ni ponctuation, à partir de laquelle une lettre d'écart passe pour une faute de frappe. */
 const MIN_TYPO_LENGTH = 5;
 
-/** Nombres d'un nom, la virgule lue comme un point, triés : « Unit 5,5 » donne `5.5`. */
+/**
+ * Longueur au plus d'un mot qui sert de taille ou de repère (« S », « XL », « A ») : une lettre d'écart sur un tel
+ * mot sépare deux pièces (« Voile S » et « Voile M »), elle n'est pas une faute de frappe.
+ */
+const SIZE_WORD_MAX_LENGTH = 2;
+
+/** Nombres d'un nom, la virgule lue comme un point, dans leur ordre : « Unit 5,5 » donne `5.5`. */
 const numbersOf = (name: string): string =>
-  (gearNameKey(name).match(/\d+(?:\.\d+)?/g) ?? []).map(Number).sort((a, b) => a - b).join(' ');
+  (gearNameKey(name).match(/\d+(?:\.\d+)?/g) ?? []).map(Number).join(' ');
+
+/** Nom sans accents, en minuscules. */
+const plainName = (name: string): string => gearNameKey(name).normalize('NFD').replace(/\p{M}/gu, '');
 
 /** Nom sans accents, sans espaces ni ponctuation, en minuscules. */
-const compactName = (name: string): string =>
-  gearNameKey(name).normalize('NFD').replace(/\p{M}/gu, '').replace(/[^\p{L}\p{N}]+/gu, '');
+const compactName = (name: string): string => plainName(name).replace(/[^\p{L}\p{N}]+/gu, '');
+
+/** Mots d'un nom, sans accents ni ponctuation. */
+const wordsOf = (name: string): string[] => plainName(name).split(/[^\p{L}\p{N}]+/u).filter((w) => w !== '');
+
+/** Mots où deux noms diffèrent, une fois retirés les mots communs du début et de la fin. */
+const differingWords = (a: string, b: string): string[] => {
+  const x = wordsOf(a);
+  const y = wordsOf(b);
+  let start = 0;
+  while (start < x.length && start < y.length && x[start] === y[start]) start++;
+  let end = 0;
+  while (end < x.length - start && end < y.length - start && x[x.length - 1 - end] === y[y.length - 1 - end]) end++;
+  return [...x.slice(start, x.length - end), ...y.slice(start, y.length - end)];
+};
 
 /** Une lettre d'écart au plus : une ajoutée, retirée, changée, ou deux voisines échangées. */
 const oneEditApart = (a: string, b: string): boolean => {
@@ -46,8 +68,9 @@ const oneEditApart = (a: string, b: string): boolean => {
 /**
  * Deux noms qui désignent peut-être la même pièce : égaux sans accents, espaces
  * ni ponctuation, ou l'un contenu dans l'autre (à partir de 3 caractères), ou
- * une seule lettre d'écart (à partir de 5). Jamais si leurs nombres diffèrent :
- * « Unit 5 » et « Unit 6 » restent deux pièces.
+ * une seule lettre d'écart (à partir de 5), sauf sur un mot de taille
+ * (« Voile S » et « Voile M »). Jamais si leurs nombres diffèrent, dans
+ * l'ordre : « Unit 5 » et « Unit 6 » restent deux pièces.
  */
 export const gearLooksAlike = (a: string, b: string): boolean => {
   if (numbersOf(a) !== numbersOf(b)) return false;
@@ -57,7 +80,8 @@ export const gearLooksAlike = (a: string, b: string): boolean => {
   if (x === y) return true;
   const [short, long] = x.length <= y.length ? [x, y] : [y, x];
   if (short.length >= MIN_CONTAINED_LENGTH && long.includes(short)) return true;
-  return short.length >= MIN_TYPO_LENGTH && oneEditApart(x, y);
+  return short.length >= MIN_TYPO_LENGTH && oneEditApart(x, y)
+    && differingWords(a, b).every((w) => w.length > SIZE_WORD_MAX_LENGTH);
 };
 
 // --- Listes des deux appareils ---
@@ -366,7 +390,10 @@ const lineEntries = (activity: GearActivityRef, group: GearGroup): GearChange[] 
  * (`isAdoptableGear`). Une ligne d'un seul côté compte pour toutes ses pièces ;
  * deux lignes ou deux pièces qui se ressemblent sans être réunies comptent pour
  * un retrait et un ajout (les fiches de celle du téléphone deviendraient hors
- * liste) ; une ligne ou une pièce réunie compte pour une réunion.
+ * liste) ; une ligne ou une pièce réunie compte pour une réunion. Une pièce de
+ * l'ordinateur que le téléphone a déjà (même nom ou réunie, sous une autre
+ * rangée) ou déjà comptée n'est pas un ajout : une ligne du téléphone réunie à
+ * une ligne de l'ordinateur qui a déjà sa rangée la compare de nouveau.
  */
 export const phoneGearChanges = (comparisons: readonly GearActivityComparison[]): PhoneGearChanges => {
   const out: PhoneGearChanges = { activities: [], added: [], removed: [], merged: [] };
@@ -374,13 +401,22 @@ export const phoneGearChanges = (comparisons: readonly GearActivityComparison[])
     if (!isAdoptableGear(c)) continue;
     const activity = c.phone.activity;
     const before = out.added.length + out.removed.length + out.merged.length;
+    const counted = new Set<string>();
+    for (const line of c.lines) {
+      if (line.pc && line.phone && line.kind !== 'alike') {
+        for (const row of line.rows) if (row.pc && row.phone && (row.kind === 'same' || row.kind === 'merged')) counted.add(row.pc.id);
+      }
+    }
     for (const line of c.lines) {
       if (line.kind === 'pcOnly' || line.kind === 'alike') out.added.push(...lineEntries(activity, line.pc as GearGroup));
       if (line.kind === 'phoneOnly' || line.kind === 'alike') out.removed.push(...lineEntries(activity, line.phone as GearGroup));
       if (!line.pc || !line.phone || line.kind === 'alike') continue;
       if (line.kind === 'merged') out.merged.push({ activity, groupName: null, from: line.phone.name, to: line.pc.name });
       for (const row of line.rows) {
-        if (row.pc && (row.kind === 'pcOnly' || row.kind === 'alike')) out.added.push({ activity, groupName: line.pc.name, itemName: row.pc.name });
+        if (row.pc && (row.kind === 'pcOnly' || row.kind === 'alike') && !counted.has(row.pc.id)) {
+          counted.add(row.pc.id);
+          out.added.push({ activity, groupName: line.pc.name, itemName: row.pc.name });
+        }
         if (row.phone && (row.kind === 'phoneOnly' || row.kind === 'alike')) out.removed.push({ activity, groupName: line.phone.name, itemName: row.phone.name });
         if (row.kind === 'merged' && row.pc && row.phone) out.merged.push({ activity, groupName: line.pc.name, from: row.phone.name, to: row.pc.name });
       }
