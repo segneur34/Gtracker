@@ -8,7 +8,8 @@
 // la fiche d'une session est celle que le programme écrit lui-même ; le disque se lit par Node : c'est lui qui prouve.
 // `BANC_CAPTURES=<dossier>` (facultatif) y dépose deux captures JPEG de la fenêtre : le compte rendu et l'état « absent ».
 // Cas :
-//  a. chaque état imposé (absent, autorisation, horsLigne, adbIntrouvable, occupe) : texte du message en entier,
+//  a. chaque état imposé (absent, autorisation, horsLigne, adbIntrouvable, occupe) : texte du message en entier (pour
+//     « absent », sans-fil éteint : la phrase « Sans câble : allumez le sans-fil… » ferme le message),
 //     « Réessayer » offert, dossier donné pour adbIntrouvable, rien de rangé dans la mémoire ;
 //  b. téléphone sans dossier Documents/Gtracker : le message du dossier absent ;
 //  c. trois sessions (dont une avec sa fiche et un nom à espace et accent) et des fichiers hors sessions/ : « 3 sessions
@@ -249,6 +250,8 @@ const ETATS = {
     paragraphes: [
       "Aucun téléphone n'est vu. Branchez votre téléphone à l'ordinateur par un câble USB, puis cliquez sur « Réessayer ».",
       'La première fois, il faut aussi activer le « Débogage USB » du téléphone : ouvrez Paramètres, puis À propos du téléphone, et touchez sept fois « Version » pour afficher les options pour développeurs. Ouvrez-les, activez « Débogage USB », puis revenez ici.',
+      // Sans-fil éteint (il l'est tant que rien ne l'allume) : la phrase qui invite à l'allumer vient en dernier.
+      'Sans câble : allumez le sans-fil dans Réglages, Mémoire, puis reliez votre téléphone.',
     ],
   },
   autorisation: {
