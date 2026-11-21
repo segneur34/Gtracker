@@ -80,6 +80,12 @@ const FILE_VERSION = 1;
 export const restingHrFileText = (results: readonly StoredRestingResult[]): string =>
   `${stringifyJson({ format: FILE_FORMAT, version: FILE_VERSION, results })}\n`;
 
+/** Vrai si le fichier a été écrit par une version plus récente que celle-ci (son numéro de version est plus grand). */
+export const isNewerRestingHrFile = (text: string | null): boolean => {
+  const file = text === null ? undefined : parseJson(text);
+  return isObject(file) && isFiniteNumber(file.version) && file.version > FILE_VERSION;
+};
+
 /**
  * Relecture tolérante du fichier : `[]` s'il est absent (`text` nul), les tests bien formés sinon, `null` s'il ne
  * se lit pas (abîmé, d'un autre format) : l'appelant n'écrit alors rien par-dessus.

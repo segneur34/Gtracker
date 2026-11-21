@@ -18,6 +18,7 @@ vi.mock('./deviceSettings', () => ({
   flushWrites: async () => {
     if (doubles.flushFails) throw new Error('écriture impossible');
   },
+  deviceId: () => 'appareil-ordinateur',
 }));
 vi.mock('./importer', () => ({
   canImportSessions: (s: { status: string; memoryReadOnly: boolean }) => s.status === 'ready' && !s.memoryReadOnly,

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { STORAGE_KEYS } from '../../core/appIdentity';
 import { sessionPath } from '../../library/folderLayout';
+import { learnedPlacesFileText } from '../../library/learnedPlaces';
+import type { LearnedPlace } from '../../library/places';
+import { restingHrFileText, type StoredRestingResult } from '../../library/restingHrStore';
+import { buildSettingsFile, serializeSettingsFile } from '../../library/settingsFile';
 import { imuFileName, recordFileName, type StoredSessionNotes } from '../../library/record';
 import { parseSyncBase, readMarkerId, syncBasePath } from '../../library/syncBase';
 import { TRASH_INDEX_PATH, parseTrashIndex, sessionRestorePlan, sessionTrashEntries, shownTrashEntries, type TrashEntry } from '../../library/trash';
@@ -395,6 +400,148 @@ describe('exécutant de la synchronisation', () => {
     const resumed = await run(pair);
     expect(resumed).toMatchObject({ interrupted: true, complete: true });
     expect(pair.computer.text(SYNC_RUNNING_PATH)).toBeNull();
+  });
+});
+
+const PC_ID = 'appareil-ordinateur';
+const TEL_ID = 'appareil-telephone';
+
+/** Texte d'un fichier de réglages écrit par l'appareil `id` à l'instant `savedAt`. */
+const settingsText = (id: string, name: string, savedAt: number): string =>
+  serializeSettingsFile(buildSettingsFile({ [STORAGE_KEYS.sportSettings]: { activities: [] } }, savedAt, null, { id, name }));
+
+const resting = (startedAtMs: number): StoredRestingResult => ({
+  startedAtMs, version: 1, lowestBpm: 48, fromS: 60, toS: 120, meanBpm: 52, maxBpm: 60, coverage: 1, series: [50, 49, 48],
+});
+const place = (name: string, lat: number, savedAt: number): LearnedPlace => ({ name, lat, lon: 3.9, savedAt });
+
+/**
+ * Une paire avec, de chaque côté, le fichier de réglages de l'appareil et une vieille copie de celui de l'autre (le
+ * téléphone a changé ses réglages depuis), un fichier du même nom écrit par deux tablettes différentes, et des tests
+ * de FC repos et des lieux appris que l'autre n'a pas.
+ */
+const extrasPair = (cable = true): Pair => {
+  const pair = pairOf(cable);
+  putBoth(pair, 0);
+  pair.computer.put('reglages/PC.json', settingsText(PC_ID, 'PC', 100));
+  pair.computer.put('reglages/Téléphone.json', settingsText(TEL_ID, 'Téléphone', 200));
+  pair.phone.put('reglages/Téléphone.json', settingsText(TEL_ID, 'Téléphone', 300));
+  pair.computer.put('reglages/Tablette.json', settingsText('tablette-une', 'Tablette', 50));
+  pair.phone.put('reglages/Tablette.json', settingsText('tablette-deux', 'Tablette', 60));
+  pair.computer.put('fc-repos.json', restingHrFileText([resting(3), resting(1)]));
+  pair.phone.put('fc-repos.json', restingHrFileText([resting(2), resting(1)]));
+  pair.computer.put('lieux.json', learnedPlacesFileText([place('Carnon', 43.5, 20)]));
+  pair.phone.put('lieux.json', learnedPlacesFileText([place('Palavas', 43.6, 10)]));
+  return pair;
+};
+
+const EXTRA_PATHS = ['reglages/PC.json', 'reglages/Téléphone.json', 'reglages/Tablette.json', 'fc-repos.json', 'lieux.json'];
+
+/** Texte de chaque fichier transporté, tel que l'application de chaque côté le lirait. */
+const extrasOf = async (pair: Pair): Promise<(string | null)[]> => {
+  const texts: (string | null)[] = [];
+  for (const folder of [pair.computer, pair.phone]) {
+    await folder.list('');
+    for (const path of EXTRA_PATHS) texts.push(await folder.readText(path));
+  }
+  return texts;
+};
+
+describe('fichiers de réglages, FC repos et lieux', () => {
+  it('réglages recopiés sans jamais être adoptés, même nom d’un autre appareil laissé, FC repos et lieux fondus des deux côtés', async () => {
+    const pair = extrasPair();
+    const tablettes = [pair.computer.text('reglages/Tablette.json'), pair.phone.text('reglages/Tablette.json')];
+    const outcome = await run(pair, { computerDeviceId: PC_ID });
+    expect(outcome.complete).toBe(true);
+    expect(pair.phone.text('reglages/PC.json')).toBe(pair.computer.text('reglages/PC.json'));
+    expect(pair.computer.text('reglages/Téléphone.json')).toBe(settingsText(TEL_ID, 'Téléphone', 300));
+    expect([pair.computer.text('reglages/Tablette.json'), pair.phone.text('reglages/Tablette.json')]).toEqual(tablettes);
+    expect(outcome.extras.left).toEqual([{ kind: 'settings', path: 'reglages/Tablette.json', side: null, reason: 'otherDevice' }]);
+    const union = restingHrFileText([resting(3), resting(2), resting(1)]);
+    const places = learnedPlacesFileText([place('Carnon', 43.5, 20), place('Palavas', 43.6, 10)]);
+    for (const folder of [pair.computer, pair.phone]) {
+      expect(folder.text('fc-repos.json')).toBe(union);
+      expect(folder.text('lieux.json')).toBe(places);
+    }
+    expect(outcome.extras.done.map((op) => [op.kind, op.to, op.added]).sort()).toEqual([
+      ['places', 'computer', 1], ['places', 'phone', 1], ['restingHr', 'computer', 1], ['restingHr', 'phone', 1],
+      ['settings', 'computer', 0], ['settings', 'phone', 0],
+    ]);
+    // Rien de plus à faire, et rien n'est écrit sur le téléphone.
+    const steps = pair.phone.steps();
+    const again = await run(pair, { computerDeviceId: PC_ID });
+    expect(again.extras.done).toEqual([]);
+    expect(pair.phone.steps()).toBe(steps);
+  });
+
+  it('un fichier illisible ou d’une version plus récente n’est ni réécrit ni fondu, et c’est dit', async () => {
+    const pair = pairOf();
+    const pcResting = restingHrFileText([resting(3)]);
+    const futurePlaces = `${JSON.stringify({ format: 'gtracker-lieux', version: 9, places: [place('Sète', 43.4, 5)] })}\n`;
+    pair.computer.put('fc-repos.json', pcResting);
+    pair.phone.put('fc-repos.json', '{abîmé');
+    pair.computer.put('lieux.json', learnedPlacesFileText([place('Carnon', 43.5, 20)]));
+    pair.phone.put('lieux.json', futurePlaces);
+    pair.phone.put('reglages/Abîmé.json', 'pas du json');
+    const outcome = await run(pair);
+    expect(pair.computer.text('fc-repos.json')).toBe(pcResting);
+    expect(pair.phone.text('fc-repos.json')).toBe('{abîmé');
+    expect(pair.phone.text('lieux.json')).toBe(futurePlaces);
+    expect(pair.computer.text('reglages/Abîmé.json')).toBeNull();
+    expect(outcome.extras.done).toEqual([]);
+    expect(outcome.extras.left.map((l) => [l.kind, l.side, l.reason])).toEqual([
+      ['settings', 'phone', 'unreadable'], ['restingHr', 'phone', 'unreadable'], ['places', 'phone', 'newer'],
+    ]);
+  });
+
+  it('téléphone qu’on ne peut pas écrire : seul l’ordinateur reçoit, le reste attend', async () => {
+    const pair = extrasPair();
+    const steps = pair.phone.steps();
+    const half = await run(pair, { computerDeviceId: PC_ID, phoneWritable: false });
+    expect(pair.phone.steps()).toBe(steps);
+    expect(pair.computer.text('reglages/Téléphone.json')).toBe(settingsText(TEL_ID, 'Téléphone', 300));
+    expect(half.extras.withheld.map((op) => [op.kind, op.to]).sort()).toEqual([['places', 'phone'], ['restingHr', 'phone'], ['settings', 'phone']]);
+    expect(half.complete).toBe(false);
+  });
+
+  it.each(['phone', 'computer'] as const)('coupure du côté %s après chaque opération, puis reprise : rien de perdu, rien en double', async (side) => {
+    const reference = extrasPair();
+    expect((await run(reference, { computerDeviceId: PC_ID })).complete).toBe(true);
+    const expected = await extrasOf(reference);
+    const initial = await extrasOf(extrasPair());
+    let cuts = 0;
+    for (let n = 0; n < 200; n++) {
+      const pair = extrasPair();
+      pair[side].cutAfter(n);
+      const outcome = await run(pair, { computerDeviceId: PC_ID });
+      pair[side].cutAfter(null);
+      if (outcome.linkLost === null && outcome.error === null && outcome.failed.length === 0 && outcome.extras.left.every((l) => l.reason !== 'failed')) break;
+      cuts += 1;
+      // Chaque fichier est, des deux côtés, tel qu'avant ou tel qu'attendu : jamais perdu ni à moitié écrit.
+      (await extrasOf(pair)).forEach((text, i) => expect([initial[i], expected[i]], `coupure après ${n}, fichier ${i}`).toContain(text));
+      await run(pair, { computerDeviceId: PC_ID });
+      const final = await run(pair, { computerDeviceId: PC_ID });
+      expect(final.complete, `coupure après ${n}`).toBe(true);
+      expect(final.extras.done, `coupure après ${n}`).toEqual([]);
+      expect(await extrasOf(pair), `coupure après ${n}`).toEqual(expected);
+    }
+    expect(cuts).toBeGreaterThan(3);
+  });
+
+  it('activité inconnue de l’appareil qui reçoit la session : signalée de son côté', async () => {
+    const pair = pairOf();
+    putSyncSession(pair.phone, at(1), { record: { activityId: 'a-moth' } });
+    putSyncSession(pair.phone, at(2), { record: { activityId: 'wingfoil' } });
+    putSyncSession(pair.computer, at(3), { record: { activityId: 'a-bateau-pc' } });
+    const outcome = await run(pair, { knownActivities: { computer: ['wingfoil'], phone: ['wingfoil', 'a-moth'] } });
+    expect(outcome.unknownActivities).toEqual([
+      { side: 'computer', startMs: at(1), activityId: 'a-moth' },
+      { side: 'phone', startMs: at(3), activityId: 'a-bateau-pc' },
+    ]);
+    // Sans liste pour un côté, il n'est pas vérifié.
+    const unchecked = pairOf();
+    putSyncSession(unchecked.phone, at(1), { record: { activityId: 'a-moth' } });
+    expect((await run(unchecked)).unknownActivities).toEqual([]);
   });
 });
 

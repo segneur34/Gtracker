@@ -1,6 +1,6 @@
 import { MARKER_FILE } from '../../core/appIdentity';
 import { errorMessage, newId, stringifyJson } from '../../core/basics';
-import { SESSIONS_DIR, sessionPath } from '../../library/folderLayout';
+import { LEARNED_PLACES_FILE, RESTING_HR_FILE, SESSIONS_DIR, SETTINGS_DIR, sessionPath, settingsPath } from '../../library/folderLayout';
 import { isCompleteGpxText } from '../../library/pendingTemps';
 import type { SessionRecord } from '../../library/record';
 import {
@@ -13,12 +13,14 @@ import {
   type SyncAncestors, type SyncFirstReason, type SyncHeldChoice, type SyncItem, type SyncListing, type SyncOp, type SyncPlan,
   type SyncTargetNames, type SyncTrashed,
 } from '../../library/syncPlan';
+import { planSyncExtras, unknownSyncActivity, type SyncExtraLeft, type SyncExtraOp, type SyncNamedText } from '../../library/syncExtras';
 import { inspectSyncRecord, mergeSyncRecords } from '../../library/syncRecordMerge';
 import { deletesToTrash, isWritableTrash, sessionTrashEntries, trashFilePath, type TrashEntry, type TrashOrigin } from '../../library/trash';
 import { addFilesToTrashEntry, readTrashIndex, rewriteTrashText, stashFilesInTrash } from '../../library/trashFolder';
 import { sessionDisplayName } from '../../library/sessionName';
 import type { FileStat, MemoryFolder } from '../../platform/memoryFolder';
-import { flushWrites } from './deviceSettings';
+import { readStoredActivities } from '../useSportSettings';
+import { deviceId, flushWrites } from './deviceSettings';
 import { canImportSessions } from './importer';
 import { refreshLibrary } from './lifecycle';
 import { lib } from './memory';
@@ -42,6 +44,8 @@ import { holdTrashDuring, recordShownName, reloadTrash, trashFolderOf } from './
  *   synchronisation a été coupée.
  * - Une session dont l'état a changé depuis le listage est laissée ; une erreur sur l'ordinateur arrête cette session ;
  *   une erreur du dossier distant (câble débranché) arrête tout.
+ * - Après les sessions, les fichiers de réglages, les tests de FC repos et les lieux appris suivent leur propre plan
+ *   (`library/syncExtras.ts`) : recopiés ou fondus, jamais supprimés, jamais adoptés.
  */
 
 /** Témoin d'une synchronisation en cours : présent au départ suivant, la précédente a été coupée. */
@@ -93,8 +97,35 @@ export interface SyncOutcome {
   linkLost: string | null;
   /** Texte d'une autre erreur qui a tout arrêté avant ou après les sessions ; `null` sinon. */
   error: string | null;
-  /** Vrai si tout le plan a été fait, sans restriction ni session laissée : la base porte la date de cette fin. */
+  /** Fichiers de réglages, tests de FC repos et lieux appris. */
+  extras: SyncExtrasOutcome;
+  /**
+   * Sessions reçues par un appareil qui ne connaît pas leur activité (`SyncOptions.knownActivities`) : de quoi lui
+   * conseiller de reprendre les réglages de l'autre.
+   */
+  unknownActivities: SyncUnknownActivity[];
+  /**
+   * Vrai si tout le plan a été fait, sans restriction ni session laissée, et sans fichier de réglages, de FC repos ou
+   * de lieux arrêté par une erreur ou changé pendant la synchronisation : la base porte la date de cette fin.
+   */
   complete: boolean;
+}
+
+/** Ce qu'est devenu chaque fichier de réglages, de FC repos et de lieux. */
+export interface SyncExtrasOutcome {
+  /** Écritures faites : fichier de réglages recopié, ou fonte écrite d'un côté. */
+  done: SyncExtraOp[];
+  /** Fichiers laissés, et pourquoi (règles du plan, changé depuis sa lecture, erreur sur l'ordinateur). */
+  left: SyncExtraLeft[];
+  /** Écritures vers un téléphone qu'on ne peut pas écrire : elles restent à faire. */
+  withheld: SyncExtraOp[];
+}
+
+export interface SyncUnknownActivity {
+  /** L'appareil qui a reçu la fiche, et qui ne connaît pas son activité. */
+  side: SyncSideName;
+  startMs: number;
+  activityId: string;
 }
 
 export interface SyncOptions {
@@ -115,11 +146,19 @@ export interface SyncOptions {
   shownName?: (record: SessionRecord | null, gpx: string) => string;
   /** Sessions traitées sur leur total. */
   onProgress?: (done: number, total: number) => void;
+  /**
+   * Identifiant de l'ordinateur, celui de son fichier de réglages : ce fichier fait foi, il n'est jamais remplacé sur
+   * l'ordinateur par une copie venue du téléphone. Absent : seule la règle des dates protège les fichiers propres.
+   */
+  computerDeviceId?: string | null;
+  /** Identifiants des activités de chaque appareil ; un côté absent n'est pas vérifié. */
+  knownActivities?: Partial<Record<SyncSideName, readonly string[]>>;
 }
 
 const emptyOutcome = (refusal: SyncStop | null): SyncOutcome => ({
   refusal, interrupted: false, first: null, plan: null, deletions: 'made', withheldDeletions: [], phoneWritable: false,
   done: [], skipped: [], failed: [], keptFromPhone: [],
+  extras: { done: [], left: [], withheld: [] }, unknownActivities: [],
   linkLost: null, error: null, complete: false,
 });
 
@@ -163,6 +202,56 @@ const mainOf = (files: readonly SyncStamp[]): string =>
   files.find((f) => /\.gpx$/i.test(f.name))?.name ?? (files[0]?.name ?? '').replace(/\.(json|imu)$/i, '.gpx');
 
 const defaultShownName = (record: SessionRecord | null, gpx: string): string => (record ? sessionDisplayName(record, null, gpx) : gpx);
+
+const parentDir = (path: string): string => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
+
+/**
+ * Fichiers de réglages, tests de FC repos et lieux appris : lus des deux côtés, puis écrits selon leur plan
+ * (`planSyncExtras`), chacun seulement s'il est encore tel qu'il a été lu, et jamais vers un côté qu'on ne peut pas
+ * écrire. Rien n'est supprimé. Une erreur du téléphone arrête tout (liaison perdue) ; une erreur de l'ordinateur en
+ * écrivant laisse ce fichier et passe au suivant. Aucun n'entre dans le garde-fou des suppressions.
+ */
+const syncExtraFiles = async (
+  folders: Record<SyncSideName, MemoryFolder>, scope: Record<SyncSideName, boolean>, computerDeviceId: string | null, outcome: SyncOutcome,
+): Promise<void> => {
+  const settingsOf = async (folder: MemoryFolder): Promise<SyncNamedText[]> => {
+    const files: SyncNamedText[] = [];
+    for (const entry of await folder.list(SETTINGS_DIR)) {
+      if (entry.kind !== 'file' || !/\.json$/i.test(entry.name)) continue;
+      files.push({ name: entry.name, text: await folder.readText(settingsPath(entry.name)) });
+    }
+    return files;
+  };
+  const rootOf = async (path: string): Promise<Record<SyncSideName, string | null>> =>
+    ({ computer: await folders.computer.readText(path), phone: await folders.phone.readText(path) });
+  const plan = planSyncExtras({
+    settings: { computer: await settingsOf(folders.computer), phone: await settingsOf(folders.phone) },
+    restingHr: await rootOf(RESTING_HR_FILE),
+    places: await rootOf(LEARNED_PLACES_FILE),
+    computerDeviceId,
+  });
+  outcome.extras.left.push(...plan.left);
+  for (const op of plan.ops) {
+    if (!scope[op.to]) {
+      outcome.extras.withheld.push(op);
+      continue;
+    }
+    const folder = folders[op.to];
+    try {
+      // Relu juste avant d'écrire : le câble ne voit un fichier que par son dernier listage.
+      await folder.list(parentDir(op.path));
+      if ((await folder.readText(op.path)) !== op.replaces) {
+        outcome.extras.left.push({ kind: op.kind, path: op.path, side: op.to, reason: 'changed' });
+        continue;
+      }
+      await folder.writeText(op.path, op.text);
+      outcome.extras.done.push(op);
+    } catch (err) {
+      if (err instanceof SyncLinkError) throw err;
+      outcome.extras.left.push({ kind: op.kind, path: op.path, side: op.to, reason: 'failed' });
+    }
+  }
+};
 
 /**
  * Synchronise les sessions de `computer` (le dossier mémoire de l'ordinateur, qui doit avoir une corbeille) et de
@@ -359,6 +448,14 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       if (merged.computer !== null) await rewriteTrashText(computer, target.entry.dir, target.json.name, merged.computer);
     };
 
+    /** Activités inconnues des fiches écrites pour la session en cours, retenues si toute la session est faite. */
+    let receivedActivities: SyncUnknownActivity[] = [];
+    const noteActivity = (side: SyncSideName, startMs: number, recordText: string): void => {
+      const known = options.knownActivities?.[side];
+      const activityId = known ? unknownSyncActivity(recordText, known) : null;
+      if (activityId !== null) receivedActivities.push({ side, startMs, activityId });
+    };
+
     const execute = async (op: SyncOp, item: SyncItem): Promise<void> => {
       switch (op.kind) {
         case 'copy': {
@@ -371,6 +468,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
           if (op.source.record && op.target.record) {
             const record = op.recordText === null ? await bytesOf(from, op.source.record.name) : encode(op.recordText);
             await writeNew(op.to, op.target.record, record);
+            noteActivity(op.to, item.startMs, decode(record));
           }
           await writeNew(op.to, op.target.gpx, gpx);
           return;
@@ -378,12 +476,15 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
         case 'writeRecord':
           await expect(op.on, op.file);
           await write(op.on, op.file.name, encode(op.text));
+          noteActivity(op.on, item.startMs, op.text);
           return;
         case 'copyRecord': {
           const from = otherSyncSide(op.to);
           await expect(from, op.source);
           await expect(op.to, op.file);
-          await write(op.to, op.file.name, await bytesOf(from, op.source.name));
+          const record = await bytesOf(from, op.source.name);
+          await write(op.to, op.file.name, record);
+          noteActivity(op.to, item.startMs, decode(record));
           return;
         }
         case 'copyImu': {
@@ -423,6 +524,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     const total = plan.items.length;
     for (const [index, item] of plan.items.entries()) {
       options.onProgress?.(index, total);
+      receivedActivities = [];
       try {
         for (const op of item.ops) await execute(op, item);
         if (item.base.kind === 'forget') {
@@ -442,6 +544,9 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
           await saveBase();
         }
         outcome.done.push(item);
+        for (const note of receivedActivities) {
+          if (!outcome.unknownActivities.some((u) => u.side === note.side && u.startMs === note.startMs)) outcome.unknownActivities.push(note);
+        }
       } catch (err) {
         if (err instanceof SyncLinkError) throw err;
         if (err instanceof StaleError) outcome.skipped.push(item);
@@ -449,7 +554,9 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       }
     }
     options.onProgress?.(total, total);
-    outcome.complete = scope.phone && outcome.deletions === 'made' && outcome.skipped.length === 0 && outcome.failed.length === 0;
+    await syncExtraFiles(folders, scope, options.computerDeviceId ?? null, outcome);
+    const extrasStopped = outcome.extras.left.some((l) => l.reason === 'changed' || l.reason === 'failed');
+    outcome.complete = scope.phone && outcome.deletions === 'made' && outcome.skipped.length === 0 && outcome.failed.length === 0 && !extrasStopped;
     if (outcome.complete) {
       const trashed = new Set(trashedOf(await trashNow()).map((e) => e.startMs));
       base = withSyncDone(base, now(), trashed);
@@ -495,7 +602,13 @@ export const synchronizePhone = async (phone: MemoryFolder, options: SyncLockOpt
       await settle(lib.scanPass);
       const folder = trashFolderOf(lib.folder);
       if (!folder) return emptyOutcome('noTrash');
-      return executeSync(folder, phone, { shownName: (record, gpx) => (record ? recordShownName(record, gpx) : gpx), ...options });
+      return executeSync(folder, phone, {
+        shownName: (record, gpx) => (record ? recordShownName(record, gpx) : gpx),
+        computerDeviceId: deviceId(),
+        // Le téléphone n'est pas vérifié : son fichier de réglages ne se distingue pas sûrement des copies des autres.
+        knownActivities: { computer: readStoredActivities().map((a) => a.id) },
+        ...options,
+      });
     });
   } catch (err) {
     return { ...emptyOutcome(null), error: errorMessage(err, String(err)) };
