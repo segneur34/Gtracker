@@ -6,8 +6,10 @@ import {
   DEFAULT_DEVICE_NAMES,
   SETTINGS_FORMAT,
   SETTINGS_VERSION,
+  adoptedGearValues,
   adoptedValues,
   buildSettingsFile,
+  gearListsDiffer,
   checkedValues,
   cleanDeviceName,
   deviceFileName,
@@ -278,6 +280,53 @@ describe('adoptedValues', () => {
 
   it("ne reprend pas un profil qui n'a pas la forme attendue", () => {
     expect(checkedValues({ [STORAGE_KEYS.athleteProfile]: 'abîmé', [STORAGE_KEYS.sportSettings]: {} })).toEqual({ [STORAGE_KEYS.sportSettings]: {} });
+  });
+});
+
+describe('matériel seul', () => {
+  const activities = (...list: [string, string][]) => list.map(([id, name]) => ({ id, name, base: 'wingfoil', color: '#004aad' }));
+  const wingPc = [{ id: 'g', name: 'Ailes', items: [{ id: 'a', name: 'Duotone Slick 4', merged: [{ id: 't4', name: 'Slick 4' }] }, { id: 'e', name: 'Echo 6' }] }];
+  const wingPhone = [{ id: 'tg', name: 'Ailes', items: [{ id: 't4', name: 'Slick 4' }, { id: 'u4', name: 'Unit 4' }] }];
+  const pc = {
+    [STORAGE_KEYS.sportSettings]: {
+      activities: activities(['a-wing', 'Wingfoil'], ['a-moth', 'Moth'], ['a-surf', 'Surf']),
+      gearGroups: { 'a-wing': wingPc, 'a-moth': [{ id: 'm', name: 'Coque', items: [] }] },
+      thresholds: { 'a-wing': 12 },
+    },
+  };
+  const phone = {
+    [STORAGE_KEYS.sportSettings]: {
+      activities: activities(['t-wing', 'wingfoil'], ['a-surf', 'Surf']),
+      gearGroups: { 't-wing': wingPhone, 'a-surf': [{ id: 's', name: 'Planche', items: [] }] },
+      thresholds: { 't-wing': 9 },
+      recordActivity: 't-wing',
+    },
+    [STORAGE_KEYS.athleteProfile]: { me: { weightKg: 70 } },
+  };
+
+  it("remplace la liste des seules activités connues des deux côtés, sous l'identifiant de cet appareil", () => {
+    expect(adoptedGearValues(pc, phone)).toEqual({
+      ...phone,
+      [STORAGE_KEYS.sportSettings]: { ...phone[STORAGE_KEYS.sportSettings], gearGroups: { 't-wing': wingPc, 'a-surf': [{ id: 's', name: 'Planche', items: [] }] } },
+    });
+  });
+
+  it('dit si les listes diffèrent, et plus après la reprise', () => {
+    expect(gearListsDiffer(pc, phone)).toBe(true);
+    expect(gearListsDiffer(pc, adoptedGearValues(pc, phone))).toBe(false);
+    // Une activité de l'ordinateur seul ne compte pas : elle se reprend avec tous les réglages.
+    expect(gearListsDiffer({ [STORAGE_KEYS.sportSettings]: { activities: activities(['a-moth', 'Moth']), gearGroups: pc[STORAGE_KEYS.sportSettings].gearGroups } }, phone)).toBe(false);
+  });
+
+  it('rend tel quel un appareil quand rien ne se reprend', () => {
+    expect(adoptedGearValues({}, phone)).toBe(phone);
+  });
+
+  it('garde les réunis dans un fichier écrit puis relu, sans changer de version', () => {
+    const written = parseSettingsFile(serializeSettingsFile(buildSettingsFile(pc, 1)));
+    expect(written?.version).toBe(SETTINGS_VERSION);
+    const sport = written === null ? null : written.values[STORAGE_KEYS.sportSettings] as { gearGroups: Record<string, unknown> };
+    expect(sport?.gearGroups['a-wing']).toEqual(wingPc);
   });
 });
 

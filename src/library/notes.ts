@@ -12,10 +12,22 @@ export type WindLevel = 'tres-faible' | 'faible' | 'moyen' | 'fort' | 'tres-fort
 export type WaterState = 'plat' | 'clapot' | 'vagues';
 export type Rating = 1 | 2 | 3 | 4 | 5;
 
+/**
+ * Pièce ou groupe réuni à un autre : l'identifiant et le nom qu'il portait. Les
+ * fiches qui les ont recopiés ne sont pas réécrites ; le rapprochement
+ * (`library/gearMatch.ts`) les range sous celui qui les a reçus.
+ */
+export interface GearMergedRef {
+  id: string;
+  name: string;
+}
+
 /** Pièce du matériel enregistré d'une activité (Réglages, `gearGroups`). */
 export interface GearItem {
   id: string;
   name: string;
+  /** Pièces réunies à celle-ci ; absent s'il n'y en a aucune. */
+  merged?: GearMergedRef[];
 }
 
 /** Groupe du matériel enregistré (« Voile », « Aile avant », « Mât »…), avec ses pièces ; une liste par activité. */
@@ -23,6 +35,8 @@ export interface GearGroup {
   id: string;
   name: string;
   items: GearItem[];
+  /** Groupes réunis à celui-ci ; absent s'il n'y en a aucun. */
+  merged?: GearMergedRef[];
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { GearGroup, GearItem } from '../library/notes';
-import { sameGearName } from '../library/gearMatch';
+import { MAX_GEAR_NAME_LENGTH, cleanGearMerged, cleanGearName, sameGearName, sanitizeGearGroups } from '../library/gearMatch';
 import { newId } from '../core/basics';
 import { t } from '../core/i18n';
 import type { StoredSettings } from './activitySettings';
@@ -12,7 +12,7 @@ import type { StoredSettings } from './activitySettings';
 
 /** Intitulés des champs de matériel des notes à défaut de réglage. */
 export const DEFAULT_GEAR_LABELS: [string, string] = [t('Matériel 1'), t('Matériel 2')];
-export const MAX_GEAR_LABEL_LENGTH = 30;
+export const MAX_GEAR_LABEL_LENGTH = MAX_GEAR_NAME_LENGTH;
 
 /** Intitulés de matériel rognés et tronqués ; `null` s'ils sont mal formés ou tous deux vides (intitulés par défaut). */
 export const sanitizeGearLabels = (value: unknown): [string, string] | null => {
@@ -27,41 +27,11 @@ export const resolveGearLabels = (stored: StoredSettings, id: string): [string, 
   return [own?.[0] || DEFAULT_GEAR_LABELS[0], own?.[1] || DEFAULT_GEAR_LABELS[1]];
 };
 
-/** Nom d'un groupe ou d'une pièce : rogné, tronqué ; vide s'il n'est pas un texte. */
-export const cleanGearName = (value: unknown): string =>
-  typeof value === 'string' ? value.trim().slice(0, MAX_GEAR_LABEL_LENGTH) : '';
-
-/** Même nom, aux espaces et à la casse près : la comparaison du rapprochement des fiches (`library/gearMatch.ts`). */
-export { sameGearName };
-
 /**
- * Matériel enregistré relu : noms rognés et tronqués, groupes et pièces sans
- * identifiant ou sans nom écartés, identifiants en double écartés, ceux qui
- * restent gardés tels quels ; `null` s'il n'est pas une liste (option coupée).
- * Une liste vide est gardée : l'option est cochée, rien n'est encore créé.
+ * Nom d'un groupe ou d'une pièce, comparaison des noms et matériel enregistré relu : écrits dans
+ * `library/gearMatch.ts`, que les fichiers de réglages lisent aussi.
  */
-export const sanitizeGearGroups = (value: unknown): GearGroup[] | null => {
-  if (!Array.isArray(value)) return null;
-  const seen = new Set<string>();
-  const fresh = (id: unknown): id is string => {
-    if (typeof id !== 'string' || id === '' || seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  };
-  return value.flatMap((group): GearGroup[] => {
-    if (typeof group !== 'object' || group === null) return [];
-    const { id, name, items } = group as { id?: unknown; name?: unknown; items?: unknown };
-    const groupName = cleanGearName(name);
-    if (groupName === '' || !fresh(id)) return [];
-    const kept = (Array.isArray(items) ? items : []).flatMap((item): GearItem[] => {
-      if (typeof item !== 'object' || item === null) return [];
-      const itemName = cleanGearName((item as { name?: unknown }).name);
-      const itemId = (item as { id?: unknown }).id;
-      return itemName !== '' && fresh(itemId) ? [{ id: itemId, name: itemName }] : [];
-    });
-    return [{ id, name: groupName, items: kept }];
-  });
-};
+export { cleanGearName, cleanGearMerged, sameGearName, sanitizeGearGroups };
 
 /**
  * Liste avec une pièce de plus dans un groupe ; une pièce du même nom déjà

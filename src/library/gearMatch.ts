@@ -1,12 +1,13 @@
-import type { GearChoice, GearGroup, GearItem } from './notes';
+import type { GearChoice, GearGroup, GearItem, GearMergedRef } from './notes';
 
 /**
- * Rapprochement d'un choix de matériel d'une fiche avec le matériel enregistré
- * de l'activité, pur. Un choix recopie l'identifiant et le nom de sa ligne
+ * Matériel enregistré d'une activité relu et nettoyé, et rapprochement d'un
+ * choix de matériel d'une fiche avec lui, purs. Un choix recopie l'identifiant et le nom de sa ligne
  * (groupe) et de son article : une ligne supprimée puis recréée, l'ancien
  * catalogue d'une activité refaite ou celui d'une autre activité portent
  * d'autres identifiants sous les mêmes noms. Le rapprochement se fait donc par
- * identifiant d'abord, puis par nom ; la fiche n'est jamais réécrite ici.
+ * identifiant d'abord, puis par nom ; une pièce ou une ligne réunie à une autre
+ * (`merged`) se range sous celle qui l'a reçue. La fiche n'est jamais réécrite ici.
  */
 
 /**
@@ -20,26 +21,108 @@ export const gearNameKey = (name: string): string =>
 /** Même nom, à la casse, aux espaces et à la virgule décimale près. */
 export const sameGearName = (a: string, b: string): boolean => gearNameKey(a) === gearNameKey(b);
 
+// --- Liste relue : celle du magasin comme celle d'un fichier de réglages d'un autre appareil ---
+
+/** Longueur d'un nom de groupe ou de pièce. */
+export const MAX_GEAR_NAME_LENGTH = 30;
+
+/** Nom d'un groupe ou d'une pièce : rogné, tronqué ; vide s'il n'est pas un texte. */
+export const cleanGearName = (value: unknown): string =>
+  typeof value === 'string' ? value.trim().slice(0, MAX_GEAR_NAME_LENGTH) : '';
+
+/**
+ * Pièces ou groupes réunis relus (`merged`) : noms rognés et tronqués, entrées
+ * sans identifiant ou sans nom écartées, comme celle qui porte l'identifiant de
+ * leur hôte (`ownerId`, déjà retrouvé par lui) et les identifiants en double
+ * (la première gardée). `undefined` s'il ne reste rien : le champ est omis.
+ */
+export const cleanGearMerged = (value: unknown, ownerId: string): GearMergedRef[] | undefined => {
+  if (!Array.isArray(value)) return undefined;
+  const seen = new Set<string>([ownerId]);
+  const refs = value.flatMap((ref): GearMergedRef[] => {
+    if (typeof ref !== 'object' || ref === null) return [];
+    const { id, name } = ref as { id?: unknown; name?: unknown };
+    const clean = cleanGearName(name);
+    if (typeof id !== 'string' || id === '' || clean === '' || seen.has(id)) return [];
+    seen.add(id);
+    return [{ id, name: clean }];
+  });
+  return refs.length > 0 ? refs : undefined;
+};
+
+/** Objet avec ses réunis (`merged`), le champ omis s'il n'y en a aucun. */
+export const withMergedRefs = <T extends object>(base: T, merged: GearMergedRef[] | undefined): T & { merged?: GearMergedRef[] } =>
+  merged ? { ...base, merged } : base;
+
+/**
+ * Matériel enregistré relu : noms rognés et tronqués, groupes et pièces sans
+ * identifiant ou sans nom écartés, identifiants en double écartés, ceux qui
+ * restent gardés tels quels, avec leurs réunis nettoyés (`cleanGearMerged`) ;
+ * `null` s'il n'est pas une liste (option coupée). Une liste vide est gardée :
+ * l'option est cochée, rien n'est encore créé.
+ */
+export const sanitizeGearGroups = (value: unknown): GearGroup[] | null => {
+  if (!Array.isArray(value)) return null;
+  const seen = new Set<string>();
+  const fresh = (id: unknown): id is string => {
+    if (typeof id !== 'string' || id === '' || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  };
+  return value.flatMap((group): GearGroup[] => {
+    if (typeof group !== 'object' || group === null) return [];
+    const { id, name, items, merged } = group as { id?: unknown; name?: unknown; items?: unknown; merged?: unknown };
+    const groupName = cleanGearName(name);
+    if (groupName === '' || !fresh(id)) return [];
+    const kept = (Array.isArray(items) ? items : []).flatMap((item): GearItem[] => {
+      if (typeof item !== 'object' || item === null) return [];
+      const raw = item as { id?: unknown; name?: unknown; merged?: unknown };
+      const itemName = cleanGearName(raw.name);
+      const itemId = raw.id;
+      return itemName !== '' && fresh(itemId) ? [withMergedRefs({ id: itemId, name: itemName }, cleanGearMerged(raw.merged, itemId))] : [];
+    });
+    return [withMergedRefs({ id, name: groupName, items: kept }, cleanGearMerged(merged, id))];
+  });
+};
+
+// --- Rapprochement d'un choix ---
+
 /** Ligne et article du catalogue où se range un choix ; `null` : introuvable. */
 export interface GearMatch {
   group: GearGroup | null;
   item: GearItem | null;
 }
 
+/** Ligne ou article qui a reçu, en le réunissant, celui d'identifiant `id`. */
+const mergedById = (entry: GearGroup | GearItem, id: string): boolean => entry.merged?.some((ref) => ref.id === id) ?? false;
+
+/** Ligne ou article qui a reçu, en le réunissant, un autre du nom `name`. */
+const mergedByName = (entry: GearGroup | GearItem, name: string): boolean => entry.merged?.some((ref) => sameGearName(ref.name, name)) ?? false;
+
 /**
  * Ligne et article d'un choix. L'article se cherche d'abord par son identifiant
  * dans tout le catalogue : un identifiant connu prime toujours (il garde un
- * renommage fait dans Réglages) et donne sa ligne. Sinon la ligne se cherche par
- * identifiant, puis par nom (la première du même nom), et l'article par son nom
- * dans cette ligne ; un article absent reste `null` (hors liste).
+ * renommage fait dans Réglages) et donne sa ligne ; puis parmi les identifiants
+ * réunis (`merged`) à un article. Sinon la ligne se cherche par identifiant,
+ * parmi les identifiants réunis, par nom (la première du même nom), puis parmi
+ * les noms réunis ; et l'article par son nom dans cette ligne, puis parmi ses
+ * noms réunis. Un article absent reste `null` (hors liste).
  */
 export const matchGearChoice = (choice: GearChoice, groups: readonly GearGroup[]): GearMatch => {
-  for (const group of groups) {
-    const item = group.items.find((it) => it.id === choice.itemId);
-    if (item) return { group, item };
+  for (const pick of [(it: GearItem) => it.id === choice.itemId, (it: GearItem) => mergedById(it, choice.itemId)]) {
+    for (const group of groups) {
+      const item = group.items.find(pick);
+      if (item) return { group, item };
+    }
   }
-  const group = groups.find((g) => g.id === choice.groupId) ?? groups.find((g) => sameGearName(g.name, choice.groupName)) ?? null;
-  const item = group?.items.find((it) => sameGearName(it.name, choice.itemName)) ?? null;
+  const group = groups.find((g) => g.id === choice.groupId)
+    ?? groups.find((g) => mergedById(g, choice.groupId))
+    ?? groups.find((g) => sameGearName(g.name, choice.groupName))
+    ?? groups.find((g) => mergedByName(g, choice.groupName))
+    ?? null;
+  const item = group?.items.find((it) => sameGearName(it.name, choice.itemName))
+    ?? group?.items.find((it) => mergedByName(it, choice.itemName))
+    ?? null;
   return { group, item };
 };
 

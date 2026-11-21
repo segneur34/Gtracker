@@ -44,6 +44,21 @@ describe('matériel enregistré', () => {
     ])).toEqual([wing, mast, { id: 'g-sans', name: 'Sans pièces', items: [] }]);
   });
 
+  it('garde les pièces et les groupes réunis, nettoyés et sans doublon', () => {
+    expect(sanitizeGearGroups([{
+      id: 'g-aile', name: 'Aile',
+      merged: [{ id: 'tel-ailes', name: ' Ailes ' }, { id: 'g-aile', name: 'Soi-même' }, { id: 'tel-ailes', name: 'Doublon' }, { id: '', name: 'Sans id' }, { id: 'x', name: ' ' }, 'non'],
+      items: [
+        { id: 'i-5', name: 'Duotone 5', merged: [{ id: 'tel-5', name: 'Slick 5' }, { id: 'tel-5', name: 'Doublon' }] },
+        { id: 'i-6', name: 'Duotone 6', merged: [] },
+        { id: 'i-7', name: 'Duotone 7', merged: 'non' },
+      ],
+    }])).toEqual([{
+      id: 'g-aile', name: 'Aile', merged: [{ id: 'tel-ailes', name: 'Ailes' }],
+      items: [{ id: 'i-5', name: 'Duotone 5', merged: [{ id: 'tel-5', name: 'Slick 5' }] }, { id: 'i-6', name: 'Duotone 6' }, { id: 'i-7', name: 'Duotone 7' }],
+    }]);
+  });
+
   it('garde une liste vide (option cochée) et rend null hors liste (option coupée)', () => {
     expect(sanitizeGearGroups([])).toEqual([]);
     expect(sanitizeGearGroups(undefined)).toBeNull();

@@ -2,6 +2,7 @@ import { readActivities } from '../core/activities';
 import { isObject, parseJson, stringifyJson } from '../core/basics';
 import { t } from '../core/i18n';
 import { sanitizeAthleteProfile } from './athleteProfile';
+import { activityGearLists, compareGear, isAdoptableGear } from './gearCompare';
 import { STORAGE_KEYS, FILE_FORMATS } from '../core/appIdentity';
 
 /**
@@ -283,3 +284,34 @@ export const adoptedValues = (raw: Record<string, unknown>, mine: Record<string,
   if (isObject(mySport)) for (const key of REMEMBERED_CHOICES) if (key in mySport) settings[key] = mySport[key];
   return { ...theirs, [STORAGE_KEYS.sportSettings]: settings };
 };
+
+// --- Matériel seul ---
+
+/** Matériel des deux fichiers comparé : celui de l'autre appareil à reprendre (`theirs`), celui de cet appareil (`mine`). */
+const gearComparison = (theirs: Record<string, unknown>, mine: Record<string, unknown>) =>
+  compareGear(activityGearLists(theirs[STORAGE_KEYS.sportSettings]), activityGearLists(mine[STORAGE_KEYS.sportSettings]));
+
+/**
+ * Valeurs de cet appareil (`mine`) avec le matériel enregistré d'un autre
+ * (`theirs`, valeurs de son fichier) : la liste de chaque activité connue des
+ * deux côtés (rapprochées par identifiant puis par nom), si l'autre en a une,
+ * remplace la sienne, rangée sous l'identifiant de l'activité de cet appareil ;
+ * tout le reste est gardé. Les fiches de session ne sont pas touchées.
+ */
+export const adoptedGearValues = (theirs: Record<string, unknown>, mine: Record<string, unknown>): Record<string, unknown> => {
+  const adoptable = gearComparison(theirs, mine).filter(isAdoptableGear);
+  if (adoptable.length === 0) return mine;
+  const mySport = isObject(mine[STORAGE_KEYS.sportSettings]) ? mine[STORAGE_KEYS.sportSettings] as Record<string, unknown> : {};
+  const gearGroups: Record<string, unknown> = isObject(mySport.gearGroups) ? { ...mySport.gearGroups } : {};
+  for (const c of adoptable) gearGroups[c.phone.activity.id] = c.pc.groups;
+  return { ...mine, [STORAGE_KEYS.sportSettings]: { ...mySport, gearGroups } };
+};
+
+/**
+ * Le matériel d'un autre appareil (`theirs`) diffère de celui de cet appareil
+ * (`mine`) pour une activité que « Reprendre le matériel » prendrait
+ * (`adoptedGearValues`) : une ligne ou une pièce qui n'a pas son homonyme de
+ * l'autre côté.
+ */
+export const gearListsDiffer = (theirs: Record<string, unknown>, mine: Record<string, unknown>): boolean =>
+  gearComparison(theirs, mine).some((c) => isAdoptableGear(c) && !c.equal);

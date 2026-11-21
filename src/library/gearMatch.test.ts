@@ -58,6 +58,41 @@ describe('matchGearChoice', () => {
   it('ne trouve rien pour une ligne inconnue sans homonyme', () => {
     expect(matchGearChoice(choice('old-p', 'Planche', 'old-95', 'Fanatic 95'), wing)).toEqual({ group: null, item: null });
   });
+
+  describe('pièces et lignes réunies', () => {
+    // « Slick 4 » du téléphone réuni à « Duotone Slick 4 », la ligne « Ailes » du téléphone à « Voile ».
+    const merged: GearGroup[] = [
+      {
+        id: 'g-voile', name: 'Voile', merged: [{ id: 'tel-ailes', name: 'Ailes' }],
+        items: [{ id: 'v-4', name: 'Duotone Slick 4', merged: [{ id: 'tel-4', name: 'Slick 4' }] }, { id: 'v-45', name: 'Reedin 4.5' }],
+      },
+      { id: 'g-foil', name: 'Foil', items: [{ id: 'f-725', name: 'Duotone glide 725' }] },
+    ];
+
+    it("retrouve un article réuni par son ancien identifiant, sous n'importe quelle ligne recopiée", () => {
+      expect(matchGearChoice(choice('tel-ailes', 'Ailes', 'tel-4', 'Slick 4'), merged)).toEqual({ group: merged[0], item: merged[0].items[0] });
+      expect(matchGearChoice(choice('autre', 'Planche', 'tel-4', 'Autre nom'), merged).item).toBe(merged[0].items[0]);
+    });
+
+    it('retrouve un article réuni par son ancien nom, dans sa ligne', () => {
+      expect(matchGearChoice(choice('g-voile', 'Voile', 'inconnu', ' slick 4 '), merged).item).toBe(merged[0].items[0]);
+      // Ancien nom réuni dans une autre ligne : pas retenu.
+      expect(matchGearChoice(choice('g-foil', 'Foil', 'inconnu', 'Slick 4'), merged)).toEqual({ group: merged[1], item: null });
+    });
+
+    it('retrouve une ligne réunie par son ancien identifiant, puis par son ancien nom', () => {
+      expect(matchGearChoice(choice('tel-ailes', 'Autre', 'inconnu', 'Reedin 4.5'), merged)).toEqual({ group: merged[0], item: merged[0].items[1] });
+      expect(matchGearChoice(choice('inconnu', 'ailes', 'inconnu', 'Reedin 4,5'), merged)).toEqual({ group: merged[0], item: merged[0].items[1] });
+    });
+
+    it("un identifiant de la liste prime sur un identifiant réuni, un nom de la liste sur un nom réuni", () => {
+      const both: GearGroup[] = [
+        { id: 'g', name: 'Voile', items: [{ id: 'a', name: 'Slick 4', merged: [{ id: 'b', name: 'Unit 5' }] }, { id: 'b', name: 'Unit 5' }] },
+      ];
+      expect(matchGearChoice(choice('g', 'Voile', 'b', 'Unit 5'), both).item).toBe(both[0].items[1]);
+      expect(matchGearChoice(choice('g', 'Voile', 'inconnu', 'Unit 5'), both).item).toBe(both[0].items[1]);
+    });
+  });
 });
 
 describe('effectiveGear', () => {

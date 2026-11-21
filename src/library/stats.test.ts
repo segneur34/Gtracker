@@ -432,6 +432,23 @@ describe('filtre par matériel', () => {
   it('écarte une session sans matériel', () => {
     expect(matchesGear(session(at(2026, 10, 6)), item('i-5'), groups)).toBe(false);
   });
+
+  it("compte sous la pièce gardée les sessions d'une pièce réunie, sans la montrer hors liste", () => {
+    const merged: GearGroup[] = [
+      { ...groups[0], items: [{ id: 'i-5', name: 'Duotone 5', merged: [{ id: 'tel-5', name: 'Slick 5' }] }, groups[0].items[1]] },
+      groups[1],
+    ];
+    const sessions = [
+      session(at(2026, 10, 7), { gear: [choice('tel-aile', 'Aile', 'tel-5', 'Slick 5')] }),
+      session(at(2026, 10, 8), { gear: [choice('g-aile', 'Aile', 'ancien', 'slick 5')] }),
+    ];
+    const filter = gearFilterItems(merged, sessions);
+    expect(filter.some((it) => it.unlisted)).toBe(false);
+    const kept = filter.find((it) => it.key === 'i-5')!;
+    expect(sessions.every((s) => matchesGear(s, kept, merged))).toBe(true);
+    // Sans la réunion, les mêmes sessions sont hors liste.
+    expect(gearFilterItems(groups, sessions).filter((it) => it.unlisted).map((it) => it.itemName)).toEqual(['Slick 5']);
+  });
 });
 
 describe('matériel croisé', () => {
