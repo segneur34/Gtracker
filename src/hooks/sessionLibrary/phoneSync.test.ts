@@ -109,10 +109,11 @@ describe('bouton « Synchroniser »', () => {
     await sync.synchronizeWithPhone();
     expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard' } });
     await sync.answerPhoneSyncQuestion('confirmDeletions');
-    expect(calls[1].confirmDeletions).toBe(true);
+    // Chaque réponse emporte la liste que sa question a montrée.
+    expect(calls[1]).toMatchObject({ confirmDeletions: true, confirmedDeletions: [{ startMs: 1, side: 'phone' }] });
     expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'inTrash' } });
     await sync.answerPhoneSyncQuestion('removeHeld');
-    expect(calls[2]).toMatchObject({ heldOnPhone: 'remove', confirmDeletions: false });
+    expect(calls[2]).toMatchObject({ heldOnPhone: 'remove', heldToRemove: [1], confirmDeletions: false, confirmedDeletions: undefined });
     expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard' } });
     await sync.answerPhoneSyncQuestion('confirmDeletions');
     expect(calls[3]).toMatchObject({ heldOnPhone: 'remove', confirmDeletions: true });

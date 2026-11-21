@@ -61,9 +61,20 @@ export interface SyncOptions {
   withoutDeletions?: boolean;
   /** L'utilisateur a confirmé les suppressions que le garde-fou retenait. */
   confirmDeletions?: boolean;
+  /**
+   * Les suppressions que la confirmation a montrées (session et côté d'où elle part). Donnée, la confirmation ne vaut
+   * que si le plan du moment n'en fait pas d'autre : sinon rien n'est supprimé, et le garde-fou repose sa question.
+   */
+  confirmedDeletions?: readonly SyncDeletionKey[];
   /** Où est le dossier sur le téléphone ; un autre chemin que celui de la base en fait une paire neuve. */
   phonePath?: string | null;
   heldOnPhone?: SyncHeldChoice;
+  /**
+   * Avec `heldOnPhone: 'remove'`, les sessions de la corbeille encore sur le téléphone que l'utilisateur a vues et
+   * accepté de retirer (`startMs`). Donnée, si une autre attend d'être retirée, aucune ne l'est : elles restent
+   * laissées, et la question revient avec la liste du moment.
+   */
+  heldToRemove?: readonly number[];
   /** Horloge de l'ordinateur (corbeille, base). */
   now?: () => number;
   /** Identifiant neuf d'un dossier, écrit dans son marqueur. */
@@ -113,6 +124,23 @@ const filesOfOp = (op: SyncOp): number => {
 /** Opérations d'une session qui écrivent ou retirent quelque chose sur le téléphone. */
 const phoneOpsOf = (item: SyncItem | undefined): number =>
   item?.ops.filter((op) => op.kind === 'removeFromPhone' || ('to' in op && op.to === 'phone') || ('on' in op && op.on === 'phone')).length ?? 0;
+
+/** Une suppression : la session (`startMs`) et le côté d'où elle part (`computer` : mise à la corbeille). */
+export interface SyncDeletionKey {
+  startMs: number;
+  side: SyncSideName;
+}
+
+const sameDeletion = (a: SyncDeletionKey, b: SyncDeletionKey): boolean => a.startMs === b.startMs && a.side === b.side;
+
+/**
+ * Les suppressions que font ces sessions, une par session, du côté où elle s'applique : la règle de la liste que
+ * montre le garde-fou (`describeSyncQuestion`), supprimée sur le téléphone, elle part de l'ordinateur, sinon du
+ * téléphone.
+ */
+const deletionKeysOf = (items: readonly SyncItem[]): SyncDeletionKey[] =>
+  items.filter((item) => item.ops.some((op) => op.kind === 'trash' || op.kind === 'removeFromPhone'))
+    .map((item) => ({ startMs: item.startMs, side: item.case === 'deletedOnPhone' ? 'computer' : 'phone' }));
 
 /** Une opération à laquelle l'exécutant renonce : l'état du moment n'est pas celui du plan. */
 class StaleError extends Error {}
@@ -281,14 +309,22 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     const trashNow = async (): Promise<TrashEntry[]> => (await readTrashIndex(computer)).entries;
     const trashedOf = (entries: readonly TrashEntry[]): SyncTrashed[] =>
       entries.flatMap((e) => (e.kind !== 'itineraire' && e.startMs !== null ? [{ startMs: e.startMs, files: e.files }] : []));
-    let plan = planSync({
-      pair, computer: await sideOf('computer'), phone: await sideOf('phone'), ancestors, trash: trashedOf(await trashNow()), heldOnPhone: options.heldOnPhone,
-    });
+    const input = { pair, computer: await sideOf('computer'), phone: await sideOf('phone'), ancestors, trash: trashedOf(await trashNow()) };
+    let plan = planSync({ ...input, heldOnPhone: options.heldOnPhone });
+    if (options.heldOnPhone === 'remove' && options.heldToRemove) {
+      // Retirer seulement les sessions montrées : une autre apparue depuis la question les fait toutes laisser.
+      const shown = new Set(options.heldToRemove);
+      const heldNow = planSync({ ...input, heldOnPhone: 'leave' });
+      if (heldNow.items.some((item) => item.left === 'inTrash' && !shown.has(item.startMs))) plan = heldNow;
+    }
     const full = plan;
     // Le garde-fou ne compte que les suppressions que cette passe peut faire : un téléphone qu'on ne peut pas écrire
     // ne perd rien, et ses retraits ne retiennent pas les mises à la corbeille de l'ordinateur.
     const possible = restrictSyncPlan(full, { ...scope, deletions: true });
-    outcome.deletions = !scope.deletions ? 'excluded' : possible.guard.tripped && !options.confirmDeletions ? 'awaitingConfirmation' : 'made';
+    const confirmed = options.confirmDeletions === true
+      && (!options.confirmedDeletions || deletionKeysOf(possible.items).every((key) => options.confirmedDeletions?.some((c) => sameDeletion(c, key))));
+    const unconfirmedShown = options.confirmDeletions === true && !confirmed;
+    outcome.deletions = !scope.deletions ? 'excluded' : (possible.guard.tripped || unconfirmedShown) && !confirmed ? 'awaitingConfirmation' : 'made';
     plan = restrictSyncPlan(full, { ...scope, deletions: outcome.deletions === 'made' });
     outcome.plan = plan;
     const deletionsOf = (item: SyncItem | undefined): number => item?.ops.filter((op) => op.kind === 'trash' || op.kind === 'removeFromPhone').length ?? 0;

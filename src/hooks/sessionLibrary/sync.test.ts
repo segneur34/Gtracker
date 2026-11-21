@@ -489,6 +489,43 @@ describe('ce que la couche du bouton reçoit', () => {
     expect(describeSync(second).paragraphs).toContain("1 session supprimée sur l'ordinateur : retirée du téléphone.");
   });
 
+  it('« Retirer du téléphone » ne retire que les sessions montrées : une autre apparue depuis les fait toutes laisser', async () => {
+    const pair = pairOf();
+    for (let k = 0; k < 10; k++) putBoth(pair, k);
+    await trashOnComputer(pair, 2);
+    expect(describeSyncQuestion(await run(pair))?.sessions.map((s) => s.startMs)).toEqual([at(2)]);
+    // Depuis la question, une autre session de la corbeille de l'ordinateur se trouve sur le téléphone.
+    putSyncSession(pair.computer, at(12));
+    putSyncSession(pair.phone, at(12));
+    await trashOnComputer(pair, 12);
+    const stale = await run(pair, { heldOnPhone: 'remove', heldToRemove: [at(2)] });
+    expect(await syncSessionFiles(pair.phone)).toContain(fileOf(2));
+    expect(await syncSessionFiles(pair.phone)).toContain(fileOf(12));
+    expect(describeSyncQuestion(stale)?.sessions.map((s) => s.startMs)).toEqual([at(2), at(12)]);
+    await run(pair, { heldOnPhone: 'remove', heldToRemove: [at(2), at(12)] });
+    expect(await syncSessionFiles(pair.phone)).not.toContain(fileOf(2));
+    expect(await syncSessionFiles(pair.phone)).not.toContain(fileOf(12));
+  });
+
+  it('la confirmation du garde-fou ne vaut que pour les suppressions montrées : une de plus, rien n’est supprimé et la question revient', async () => {
+    const pair = await syncedPair(20);
+    for (let k = 0; k < 8; k++) deleteSyncSession(pair.phone, fileOf(k));
+    const shown = describeSyncQuestion(await run(pair));
+    expect(shown).toMatchObject({ kind: 'guard', count: 8 });
+    const keys = (shown?.sessions ?? []).map((s) => ({ startMs: s.startMs, side: s.side }));
+    // La fenêtre attend ; une session de plus est supprimée sur le téléphone avant la réponse.
+    deleteSyncSession(pair.phone, fileOf(8));
+    const stale = await run(pair, { confirmDeletions: true, confirmedDeletions: keys });
+    expect(stale.deletions).toBe('awaitingConfirmation');
+    expect(await syncSessionFiles(pair.computer)).toHaveLength(20);
+    expect(describeSyncQuestion(stale)).toMatchObject({ kind: 'guard', count: 9 });
+    // Les mêmes, ou moins que ce qui a été montré : elle part.
+    const all = [...keys, { startMs: at(8), side: 'computer' as const }, { startMs: at(9), side: 'computer' as const }];
+    const made = await run(pair, { confirmDeletions: true, confirmedDeletions: all });
+    expect(made.deletions).toBe('made');
+    expect(await syncSessionFiles(pair.computer)).toHaveLength(11);
+  });
+
   it('téléphone qu’on ne peut pas écrire : pas de question sur la corbeille, ce qui l’attend est dit', async () => {
     const pair = pairOf();
     for (let k = 0; k < 5; k++) putBoth(pair, k);
