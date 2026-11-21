@@ -17,8 +17,9 @@ import { MEMORY_FORMAT, MEMORY_VERSION, readMarkerVersion } from './folderLayout
  * d'un appareil porte ce qui lui est propre (son résumé, le nom de son GPX, sa date d'entrée).
  *
  * Les dossiers se reconnaissent à un identifiant tiré au hasard, écrit dans leur marqueur (champ `id`) : l'application
- * ne lit du marqueur que son format et sa version, et ne le réécrit que s'il manque. Un dossier remis à zéro revient
- * donc sans identifiant, et rien ne se déduit de lui. Ce module ne lit ni n'écrit aucun fichier.
+ * ne lit du marqueur que son format, sa version et l'instant de la dernière synchronisation (`synchro`), et ne le
+ * réécrit que s'il manque. Un dossier remis à zéro revient donc sans identifiant, et rien ne se déduit de lui. Ce
+ * module ne lit ni n'écrit aucun fichier.
  */
 
 export const SYNC_DIR = 'synchro';
@@ -118,6 +119,28 @@ export const readMarkerId = (text: string | null): string | null => {
 export const markerTextWithId = (text: string | null, id: string): string | null => {
   const marker = readMarker(text);
   return marker ? `${stringifyJson({ ...marker, id })}\n` : null;
+};
+
+/**
+ * Instant de la dernière synchronisation qui a changé ce dossier, écrit par l'ordinateur dans le marqueur du téléphone
+ * (champ `synchro`, horloge de l'ordinateur) ; `null` sans marqueur ou sans cet instant. Le téléphone ne compare que
+ * deux lectures entre elles : un instant qui change dit que ses sessions ont changé sous lui.
+ */
+export const readMarkerSync = (text: string | null): number | null => {
+  const synchro = readMarker(text)?.synchro;
+  return isFiniteNumber(synchro) ? synchro : null;
+};
+
+/**
+ * Texte du marqueur avec l'instant d'une synchronisation, tout le reste gardé tel quel, toujours différent de celui
+ * qu'il portait (deux synchronisations de la même milliseconde se distinguent encore). `null` si le texte n'est pas
+ * un marqueur, ou s'il est d'une version plus récente : un tel marqueur n'est jamais réécrit.
+ */
+export const markerTextWithSync = (text: string | null, atMs: number): string | null => {
+  const marker = readMarker(text);
+  if (!marker || readMarkerVersion(text) > MEMORY_VERSION) return null;
+  const synchro = atMs === readMarkerSync(text) ? atMs + 1 : atMs;
+  return `${stringifyJson({ ...marker, synchro })}\n`;
 };
 
 /** Pourquoi deux dossiers ne se synchronisent pas, avant tout listage. */

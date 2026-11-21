@@ -17,18 +17,25 @@
 //     par son jeton : « toutes ses sessions sont déjà là », disque inchangé ; « Récupérer » par le Wi-Fi avec une
 //     quatrième session ; aucun secret (jeton, clé, certificat) dans le dossier mémoire, ni dans la page ; « Retirer » :
 //     la liaison se ferme et le jeton est refusé ;
+//     (depuis que plus rien n'arrive seul : l'arrivée du téléphone ne dit que « Téléphone relié : touchez « Synchroniser »
+//     pour mettre les deux appareils à jour. » et ne range rien ; « Synchroniser » par le Wi-Fi copie les sessions vers
+//     l'ordinateur et laisse le téléphone intact : ni copie de sécurité, ni identifiant posé, rien à la corbeille ; la
+//     quatrième session passe par « Synchroniser » aussi) ;
 //  2. fenêtre expirée (`GTRACKER_BANC_SANSFIL_FENETRE_MS` court) : le décompte arrive à 0:00, la page le dit, le bon code
-//     est refusé, rien n'est rangé ;
-//  3. coupure en plein transfert (le faux téléphone coupe au milieu du gros fichier) : le compte rendu le dit, rien n'est
-//     écrit à moitié (chaque session rangée est entière, aucun temporaire), la liaison suivante range ce qui manquait.
+//     est refusé, rien n'est rangé ; dans la fenêtre neuve, l'arrivée ne range rien, « Synchroniser » copie les deux sessions ;
+//  3. coupure en plein transfert (le faux téléphone coupe au milieu du gros fichier) : « Synchroniser » le dit (liaison
+//     coupée pendant la synchronisation, « Réessayer »), rien n'est écrit à moitié (chaque session rangée est entière,
+//     aucun temporaire), le téléphone se représente par son jeton et « Réessayer » range ce qui manquait.
+// Les sessions du faux téléphone (GPX et fiche) sont écrites d'abord par le programme lui-même, dans une mémoire de
+// préparation, puis copiées : une session sans fiche est « laissée pour la prochaine fois ».
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connect } from './lib/cdp.mjs';
+import { connect, FORMATS } from './lib/cdp.mjs';
 import { traceDroite } from './lib/traces.mjs';
 
 const [exe, portArg] = process.argv.slice(2);
@@ -142,17 +149,41 @@ const SESSIONS = [
 ];
 const QUATRIEME = { jour: 4, heure: 10, secondes: 300 };
 const nomFichier = (s) => `${debutNom(s.jour, s.heure)}_wingfoil.gpx`;
+/** GPX et fiche de chaque session, écrits par le programme dans une mémoire neuve (nom du GPX → chemins) : ce sont ceux d'une vraie session. */
+let MODELES = new Map();
+async function fabriquerModeles() {
+  const profil = dossier('prep-profil');
+  const memoire = dossier('prep-memoire');
+  const toutes = [...SESSIONS, QUATRIEME];
+  await avecProgramme(profil, memoire, {}, 'préparation', async (b) => {
+    await b.go('/sessions', 5000);
+    for (const [k, s] of toutes.entries()) {
+      const gpx = traceDroite({ debutMs: Date.UTC(2026, 9, s.jour, s.heure, 0, 0), secondes: s.secondes, vitesse: 4, type: 'wingfoil', nom: 'wingfoil' });
+      check(`préparation : import de la session ${k + 1}`, (await b.importGpx(gpx, `modele-${k + 1}.gpx`)) === 'ok');
+      await b.waitFor(() => gpxsDe(memoire).length >= k + 1 && fichesDe(memoire).length >= k + 1, { timeout: 30000, label: `GPX et fiche ${k + 1}` });
+      await b.settle({ max: 1500 });
+    }
+    await b.wait(1500);
+  });
+  check(`préparation : ${toutes.length} sessions entières sortent du programme`, gpxsDe(memoire).length === toutes.length && fichesDe(memoire).length === toutes.length, `${gpxsDe(memoire).length} GPX, ${fichesDe(memoire).length} fiches`);
+  MODELES = new Map(gpxsDe(memoire).map((nom) => [nom, { gpx: join(memoire, 'sessions', nom), fiche: join(memoire, 'sessions', nom.replace(/\.gpx$/, '.json')) }]));
+}
+/** Pose une session sur le faux téléphone : le GPX et sa fiche, comme l'application du téléphone les range. */
 function poserSession(telephone, s) {
   const sessions = join(telephone, 'sessions');
   mkdirSync(sessions, { recursive: true });
-  const f = join(sessions, nomFichier(s));
-  writeFileSync(f, traceDroite({ debutMs: Date.UTC(2026, 9, s.jour, s.heure, 0, 0), secondes: s.secondes, vitesse: 4, type: 'wingfoil', nom: 'wingfoil' }));
+  const modele = MODELES.get(nomFichier(s));
   const d = new Date(Date.UTC(2026, 9, s.jour, 12, 0, 0));
-  utimesSync(f, d, d);
+  for (const [source, ext] of [[modele.gpx, '.gpx'], [modele.fiche, '.json']]) {
+    const f = join(sessions, nomFichier(s).replace(/\.gpx$/, ext));
+    copyFileSync(source, f);
+    utimesSync(f, d, d);
+  }
 }
-/** Dossier qui joue `Documents/Gtracker` du téléphone : trois sessions et un fichier de la racine à ne pas copier. */
+/** Dossier qui joue `Documents/Gtracker` du téléphone : son marqueur, trois sessions et un fichier de la racine à ne pas copier. */
 function fabriquerTelephone(nom, sessions = SESSIONS) {
   const racine = dossier(nom);
+  writeFileSync(join(racine, 'gtracker.json'), `${JSON.stringify({ format: FORMATS.memoire, version: 1 })}\n`);
   writeFileSync(join(racine, 'lieux.json'), `{"marque":"${MARQUE}"}`);
   for (const s of sessions) poserSession(racine, s);
   return racine;
@@ -207,12 +238,15 @@ const carte = (b) => b.evaluate(`(() => {
   };
 })()`);
 const secondes = (decompte) => { const m = /^(\d+):(\d\d)$/.exec(decompte ?? ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
-const note = (b) => b.evaluate(`document.querySelector('.phone-recover__arrival')?.textContent.trim() ?? null`);
+const note = (b) => b.evaluate(`document.querySelector('.phone-sync__arrival')?.textContent.trim() ?? null`);
 /** Attend la ligne d'arrivée qui répond à `motif` ; la rend (ou null). */
 async function attendreNote(b, motif, quoi, timeout = 20000) {
-  await b.waitFor(`/${motif.source}/.test(document.querySelector('.phone-recover__arrival')?.textContent ?? '')`, { timeout, label: quoi });
+  await b.waitFor(`/${motif.source}/.test(document.querySelector('.phone-sync__arrival')?.textContent ?? '')`, { timeout, label: quoi });
   return note(b);
 }
+/** La ligne que dit la page quand un téléphone relié se présente : plus rien ne se copie seul. */
+const LIGNE_ARRIVEE = 'Téléphone relié : touchez « Synchroniser » pour mettre les deux appareils à jour.';
+const MOTIF_ARRIVEE = /Téléphone relié : touchez « Synchroniser »/;
 /** Capture JPEG du bloc du sans-fil (marge de 16 px). */
 async function capturer(b, nom) {
   if (!CAPTURES) return;
@@ -228,20 +262,38 @@ async function capturer(b, nom) {
 const tenter = async (fn) => { try { return { liaison: await fn() }; } catch (e) { return { refus: e?.raison ?? null, erreur: e?.message ?? String(e) }; } };
 /** Adresse et port lus sur la page (« 127.0.0.1:12345 »). */
 const adresseDe = (c) => { const m = /^(\d+\.\d+\.\d+\.\d+):(\d+)$/.exec(c?.adresse ?? ''); return m ? { hote: m[1], port: Number(m[2]) } : null; };
-/** « Récupérer » (barre du haut) : attend l'issue et rend les phrases de la fenêtre. */
-async function recuperer(b) {
-  check('« Récupérer » : clic', (await b.click('.shell-topactions .phone-recover')) === 'ok');
-  await b.waitFor(`(() => { const p = document.querySelector('[role=dialog].phone-recover__dialog .phone-recover__body'); return Boolean(p) && p.textContent.trim() !== '' && !/Recherche du téléphone|Lecture du téléphone/.test(p.textContent); })()`, { timeout: 20000, label: 'issue de « Récupérer »' });
+/** Phrases d'une synchronisation qui n'est pas finie. */
+const EN_COURS = /Recherche du téléphone…|Comparaison des deux appareils…|Copie de sécurité des deux appareils…|Synchronisation avec le téléphone .* par le (câble|Wi-Fi)…|\d+ fichiers? sur \d+/;
+/** Les phrases et les boutons de la fenêtre « Synchroniser » ; `null` sans fenêtre. */
+const fenetre = (b) => b.evaluate(`(() => {
+  const d = document.querySelector('[role=dialog].phone-sync__dialog');
+  if (!d) return null;
+  return { phrases: [...d.querySelectorAll('.phone-sync__body p')].map((x) => x.textContent.trim()), boutons: [...d.querySelectorAll('.phone-sync__actions button')].map((x) => x.textContent.trim()), dossier: d.querySelector('code.phone-sync__folder')?.textContent.trim() ?? null };
+})()`);
+/** Attend l'issue de la synchronisation en cours (compte rendu ou question) ; rend la fenêtre. */
+async function attendreIssue(b, quoi) {
+  await b.waitFor(`(() => { const p = document.querySelector('[role=dialog].phone-sync__dialog .phone-sync__body'); return Boolean(p) && p.textContent.trim() !== '' && ${EN_COURS.toString()}.test(p.textContent) === false; })()`, { timeout: 40000, label: `issue de ${quoi}` });
   await b.wait(300);
-  const phrases = await b.evaluate(`[...document.querySelectorAll('[role=dialog].phone-recover__dialog .phone-recover__body p')].map((x) => x.textContent.trim())`);
-  console.log(`  « Récupérer » dit : ${JSON.stringify(phrases)}`);
-  return phrases;
+  const f = await fenetre(b);
+  console.log(`  « Synchroniser » (${quoi}) dit : ${JSON.stringify(f?.phrases)} ; boutons : ${(f?.boutons ?? []).join(' / ')}`);
+  return f;
 }
-const fermerFenetre = async (b) => { await b.evaluate(`[...document.querySelectorAll('.phone-recover__actions button')].find((x) => x.textContent.trim() === 'Fermer')?.click()`); await b.wait(300); };
+/** « Synchroniser » (barre du haut) : attend l'issue et rend la fenêtre. */
+async function synchroniser(b, quoi) {
+  check(`« Synchroniser » (${quoi}) : clic`, (await b.click('.shell-topactions .phone-sync')) === 'ok');
+  await b.wait(200);
+  return attendreIssue(b, quoi);
+}
+const fermerFenetre = async (b) => { await b.evaluate(`[...document.querySelectorAll('.phone-sync__actions button')].find((x) => x.textContent.trim() === 'Fermer')?.click()`); await b.wait(300); };
+/** Ce que la synchronisation par le Wi-Fi ne fait pas : pas de copie de sécurité, pas d'identifiant posé sur le téléphone, rien écrit sur lui. */
+const copiesDe = (profil) => { const d = join(profil, 'Documents-essai', 'Gtracker-copies'); return existsSync(d) ? readdirSync(d) : []; };
 
 try {
+  console.log('\n== Préparation : quatre sessions (dont une de plus de 2 Mio) écrites par le programme');
+  await fabriquerModeles();
+
   // ---------- 1. principal ----------
-  console.log('\n== 1. Principal : activation, fenêtre, mauvais codes, appairage, 3 sessions, déjà là, Récupérer, secrets, Retirer');
+  console.log('\n== 1. Principal : activation, fenêtre, mauvais codes, appairage, arrivée sans copie, Synchroniser, déjà là, secrets, Retirer');
   {
     const profil = dossier('p1-profil');
     const memoire = dossier('p1-memoire');
@@ -333,14 +385,26 @@ try {
       check('1e. la liste porte « Téléphone d\'essai » relié en ce moment', c.telephones.length === 1 && /Téléphone d'essai/.test(c.telephones[0]) && /relié en ce moment/.test(c.telephones[0]), JSON.stringify(c.telephones));
       check('1e. l\'aide « Aucun téléphone ne se présente ? » a disparu', c.aide === null, c.aide);
 
-      // -- arrivée : les sessions sont rangées seules
-      const n1 = await attendreNote(b, /sessions? ajoutées?/, 'ligne d\'arrivée');
+      // -- arrivée : une ligne, plus rien ne se copie seul
+      const n1 = await attendreNote(b, MOTIF_ARRIVEE, 'ligne d\'arrivée');
       console.log(`  ligne d'arrivée : « ${n1} »`);
-      check('1f. la ligne d\'arrivée dit « Téléphone Téléphone d\'essai relié : 3 sessions ajoutées. »', n1 === "Téléphone Téléphone d'essai relié : 3 sessions ajoutées.", n1);
+      check(`1f. la ligne d'arrivée dit « ${LIGNE_ARRIVEE} »`, n1 === LIGNE_ARRIVEE, n1);
+      await b.wait(3000);
+      check('1f. l\'arrivée ne range rien : sessions/ vide, ni base de synchronisation, ni corbeille, ni copie de sécurité', sessionsDe(memoire).length === 0 && !existsSync(join(memoire, 'synchro')) && !existsSync(join(memoire, 'corbeille')) && copiesDe(profil).length === 0, (arbre(memoire) ?? []).join(','));
+      telephoneIntact('1f, avant « Synchroniser »', tel, avantTel);
+      await capturer(b, 'sansfil-3-telephone-relie');
+
+      // -- « Synchroniser » par le Wi-Fi : les sessions du téléphone viennent sur l'ordinateur, le téléphone reste intact
+      const f1 = await synchroniser(b, '1f');
+      check('1f. « 3 sessions copiées vers l\'ordinateur. »', (f1?.phrases ?? []).includes("3 sessions copiées vers l'ordinateur."), JSON.stringify(f1?.phrases));
+      check('1f. aucune phrase ne dit que le téléphone a été écrit (« Mettre à jour »)', !(f1?.phrases ?? []).some((l) => /Mettre à jour/.test(l)), JSON.stringify(f1?.phrases));
+      check('1f. ce qui attend le câble est dit', (f1?.phrases ?? []).some((l) => /attend(ent)? le câble ou la mise à jour du téléphone/.test(l)), JSON.stringify(f1?.phrases));
       await b.wait(2500); // réécritures différées des fiches
       verifierRangees('1f', memoire, tel, SESSIONS);
       telephoneIntact('1f', tel, avantTel);
-      await capturer(b, 'sansfil-3-telephone-relie');
+      check('1f. pas de copie de sécurité (le téléphone n\'est pas écrit), pas d\'identifiant posé sur le téléphone', copiesDe(profil).length === 0 && !('id' in (JSON.parse(readFileSync(join(tel, 'gtracker.json'), 'utf8')) ?? {})), copiesDe(profil).join(','));
+      check('1f. rien n\'est allé à la corbeille', !existsSync(join(memoire, 'corbeille')) || !(arbre(join(memoire, 'corbeille')) ?? []).some((c) => c !== 'corbeille.json'));
+      await fermerFenetre(b);
       const apresPremier = empreinte(join(memoire, 'sessions'));
 
       // -- secrets : le jeton n'est ni dans la mémoire, ni dans la page, ni en clair dans le profil
@@ -369,9 +433,9 @@ try {
       faux = new FauxTelephone({ dossier: tel, memoire: cote, delaiMs: 8000 });
       const retour = await tenter(() => faux.connecter(ad.hote, ad.port));
       check('1h. le téléphone se présente par son jeton, sans code', Boolean(retour.liaison), JSON.stringify(retour));
-      const n2 = await attendreNote(b, /toutes ses sessions sont déjà là/, 'seconde arrivée');
+      const n2 = await attendreNote(b, MOTIF_ARRIVEE, 'seconde arrivée');
       console.log(`  ligne d'arrivée : « ${n2} »`);
-      check('1h. la ligne d\'arrivée dit « Téléphone Téléphone d\'essai relié : toutes ses sessions sont déjà là. »', n2 === "Téléphone Téléphone d'essai relié : toutes ses sessions sont déjà là.", n2);
+      check(`1h. la ligne d'arrivée redit « ${LIGNE_ARRIVEE} »`, n2 === LIGNE_ARRIVEE, n2);
       await b.wait(1500);
       check('1h. le disque n\'a pas changé (noms, tailles, dates de sessions/)', empreinte(join(memoire, 'sessions')) === apresPremier, `\n${apresPremier}\n--\n${empreinte(join(memoire, 'sessions'))}`);
       telephoneIntact('1h', tel, avantTel);
@@ -382,8 +446,8 @@ try {
       // -- « Récupérer » par le Wi-Fi, avec une quatrième session sur le téléphone
       poserSession(tel, QUATRIEME);
       const avantTel2 = empreinte(tel);
-      const phrases = await recuperer(b);
-      check('1i. « Récupérer » par le Wi-Fi dit « 1 session ajoutée, 3 déjà présentes. »', JSON.stringify(phrases) === JSON.stringify(['1 session ajoutée, 3 déjà présentes.']), JSON.stringify(phrases));
+      const f2 = await synchroniser(b, '1i');
+      check('1i. « Synchroniser » par le Wi-Fi dit « 1 session copiée vers l\'ordinateur. »', (f2?.phrases ?? []).includes("1 session copiée vers l'ordinateur."), JSON.stringify(f2?.phrases));
       await b.wait(2500);
       verifierRangees('1i', memoire, tel, [...SESSIONS, QUATRIEME]);
       telephoneIntact('1i', tel, avantTel2);
@@ -452,9 +516,13 @@ try {
       const t2 = new FauxTelephone({ dossier: tel, delaiMs: 8000 });
       const r2 = await tenter(() => t2.appairer(ad2.hote, ad2.port, c2.code));
       check('2d. dans la fenêtre neuve, le bon code appaire', Boolean(r2.liaison), JSON.stringify(r2));
-      await attendreNote(b, /sessions? ajoutées?/, 'arrivée');
+      const n2d = await attendreNote(b, MOTIF_ARRIVEE, 'arrivée');
+      check(`2d. l'arrivée ne dit que « ${LIGNE_ARRIVEE} » et ne range rien`, n2d === LIGNE_ARRIVEE && (await b.wait(2000), sessionsDe(memoire).length === 0), `${n2d} / ${sessionsDe(memoire).join(',')}`);
+      const f2d = await synchroniser(b, '2d');
+      check('2d. « Synchroniser » : « 2 sessions copiées vers l\'ordinateur. »', (f2d?.phrases ?? []).includes("2 sessions copiées vers l'ordinateur."), JSON.stringify(f2d?.phrases));
       await b.wait(2500);
       verifierRangees('2d', memoire, tel, SESSIONS.slice(0, 2));
+      await fermerFenetre(b);
       telephoneIntact('2d', tel, avantTel);
       r2.liaison?.fermer?.();
     });
@@ -479,9 +547,12 @@ try {
       const coupeur = new FauxTelephone({ dossier: tel, coupureApresBlocs: 3, delaiMs: 8000 });
       const r = await tenter(() => coupeur.appairer(ad.hote, ad.port, c.code));
       check('3a. le téléphone qui coupe s\'appaire', Boolean(r.liaison), JSON.stringify(r));
-      const n = await attendreNote(b, /coupée en route|n'ont pas pu être lues|ont pas pu être/, 'coupure dite', 30000);
-      console.log(`  ligne d'arrivée : « ${n} »`);
-      check('3b. la ligne dit que la liaison a été coupée en route et invite à « Récupérer »', /La liaison avec le téléphone Téléphone d'essai a été coupée en route : cliquez sur « Récupérer » pour finir\./.test(n ?? ''), n);
+      const n = await attendreNote(b, MOTIF_ARRIVEE, 'arrivée');
+      check(`3a. l'arrivée ne dit que « ${LIGNE_ARRIVEE} »`, n === LIGNE_ARRIVEE, n);
+      await b.wait(1500);
+      check('3a. rien n\'est rangé avant « Synchroniser »', sessionsDe(memoire).length === 0 && coupeur.blocsEnvoyes === 0, `${sessionsDe(memoire).join(',')} / ${coupeur.blocsEnvoyes} blocs`);
+      const fc = await synchroniser(b, '3b');
+      check('3b. la fenêtre dit que la liaison a été coupée pendant la synchronisation et offre « Réessayer »', (fc?.phrases ?? []).some((l) => /^La liaison avec le téléphone a été coupée pendant la synchronisation\. Ce qui est fait est gardé : rouvrez Gtracker sur le téléphone, puis cliquez sur « Réessayer » pour finir\.$/.test(l)) && (fc?.boutons ?? []).join('/') === 'Réessayer/Fermer', JSON.stringify(fc));
       console.log(`  blocs envoyés avant la coupure : ${coupeur.blocsEnvoyes} (commandes reçues : ${coupeur.commandesRecues})`);
       check('3b. la coupure est tombée au milieu du gros fichier (trois blocs envoyés)', coupeur.blocsEnvoyes === 3, String(coupeur.blocsEnvoyes));
       await b.wait(2500);
@@ -509,10 +580,14 @@ try {
       const retour = await tenter(() => complet.connecter(ad.hote, ad.port));
       check('3d. le téléphone se représente par son jeton', Boolean(retour.liaison), JSON.stringify(retour));
       const manquantes = 3 - rangees.length;
-      const attendu = new RegExp(`${manquantes} sessions? ajoutées?`);
-      const n2 = await attendreNote(b, attendu, 'reprise', 40000);
+      const n2 = await attendreNote(b, MOTIF_ARRIVEE, 'reprise', 40000);
       console.log(`  ligne d'arrivée : « ${n2} »`);
-      check(`3d. la ligne dit « ${manquantes} session${manquantes > 1 ? 's' : ''} ajoutée${manquantes > 1 ? 's' : ''} »`, new RegExp(`Téléphone Téléphone d'essai relié : ${manquantes} sessions? ajoutées?\\.`).test(n2 ?? ''), n2);
+      check(`3d. la ligne d'arrivée redit « ${LIGNE_ARRIVEE} » (rien ne se copie seul)`, n2 === LIGNE_ARRIVEE, n2);
+      check('3d. « Réessayer » dans la fenêtre toujours ouverte', (await b.clickText('Réessayer', '.phone-sync__actions button')) === 'ok');
+      await b.wait(200);
+      const fr = await attendreIssue(b, '3d');
+      const dit = manquantes > 1 ? `${manquantes} sessions copiées vers l'ordinateur.` : `${manquantes} session copiée vers l'ordinateur.`;
+      check(`3d. le compte rendu dit « ${dit} »`, (fr?.phrases ?? []).includes(dit), JSON.stringify(fr?.phrases));
       await b.wait(2500);
       verifierRangees('3d', memoire, tel, SESSIONS);
       telephoneIntact('3d', tel, avantTel);

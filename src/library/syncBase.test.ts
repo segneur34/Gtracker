@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { MEMORY_VERSION, markerText } from './folderLayout';
 import {
-  SYNC_BASE_FORMAT, SYNC_BASE_VERSION, emptySyncBase, isSyncId, markerTextWithId, parseSyncBase, readMarkerId, serializeSyncBase,
+  SYNC_BASE_FORMAT, SYNC_BASE_VERSION, emptySyncBase, isSyncId, markerTextWithId, markerTextWithSync, parseSyncBase, readMarkerId,
+  readMarkerSync, serializeSyncBase,
   syncAncestorPath, syncBaseLine, syncBasePath, syncRefusal, withSyncDone, withSyncHeld, withSyncLine, withoutSyncLine,
   type SyncBaseSession, type SyncFiles,
 } from './syncBase';
@@ -32,6 +33,26 @@ describe('identifiant du dossier dans son marqueur', () => {
     expect(markerTextWithId(null, 'abcdef-123456')).toBeNull();
     expect(markerTextWithId('{"format":"autre","version":1}', 'abcdef-123456')).toBeNull();
     expect(markerTextWithId('pas du json', 'abcdef-123456')).toBeNull();
+  });
+
+  it('l’instant d’une synchronisation s’ajoute sans rien retirer, et change toujours', () => {
+    const before = JSON.stringify({ format: 'gtracker-memoire', version: 1, id: 'abcdef-123456', futur: [1, 2] });
+    expect(readMarkerSync(before)).toBeNull();
+    const text = markerTextWithSync(before, 5000);
+    expect(JSON.parse(text as string)).toEqual({ format: 'gtracker-memoire', version: 1, id: 'abcdef-123456', futur: [1, 2], synchro: 5000 });
+    expect(readMarkerSync(text)).toBe(5000);
+    expect(readMarkerId(text)).toBe('abcdef-123456');
+    // Même milliseconde qu'à la synchronisation précédente : l'instant change quand même.
+    expect(readMarkerSync(markerTextWithSync(text, 5000))).toBe(5001);
+    expect(readMarkerSync(markerTextWithSync(text, 9000))).toBe(9000);
+  });
+
+  it('un marqueur d’une version plus récente, ou qui n’en est pas un, ne reçoit pas d’instant', () => {
+    expect(markerTextWithSync(JSON.stringify({ format: 'gtracker-memoire', version: MEMORY_VERSION + 1, id: 'abcdef-123456' }), 5000)).toBeNull();
+    expect(markerTextWithSync(null, 5000)).toBeNull();
+    expect(markerTextWithSync('{"format":"autre","version":1}', 5000)).toBeNull();
+    expect(readMarkerSync('{"format":"autre","version":1,"synchro":5}')).toBeNull();
+    expect(readMarkerSync(JSON.stringify({ format: 'gtracker-memoire', version: 1, synchro: 'hier' }))).toBeNull();
   });
 
   it('un identifiant qui ne peut pas nommer un fichier est tenu pour absent', () => {

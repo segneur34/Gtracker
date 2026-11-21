@@ -421,7 +421,7 @@ try {
     check('g1 : le GPX a quitté sessions/ (un seul reste)', Boolean(retiree) && !gpxs(memG).includes(retiree), `${retiree} ${gpxs(memG).join(',')}`);
     check('g1 : sa fiche a quitté sessions/ aussi', Boolean(ficheRetiree) && !fiches(memG).includes(ficheRetiree), `${ficheRetiree} ${fiches(memG).join(',')}`);
     check('g1 : corbeille/ porte un seul sous-dossier « <13 chiffres>-… »', dossiers1.length === 1 && /^\d{13}-/.test(dossiers1[0]), dossiers1.join(','));
-    check('g1 : l\'index corbeille.json a une seule entrée (format et version posés)', Boolean(idx1) && idx1.entries.length === 1 && typeof idx1.format === 'string' && idx1.version === 1, JSON.stringify(idx1));
+    check('g1 : l\'index corbeille.json a une seule entrée (format et version posés)', Boolean(idx1) && idx1.entries.length === 1 && typeof idx1.format === 'string' && idx1.version === 2, JSON.stringify(idx1));
     check('g1 : l\'entrée est une session de l\'ordinateur, supprimée à l\'instant', e1?.kind === 'session' && e1?.origin === 'ordinateur' && e1?.reason === 'supprimee' && Math.abs(Date.now() - e1.deletedAtMs) < 120000, JSON.stringify(e1));
     check('g1 : l\'entrée dit le sous-dossier, le GPX principal et l\'instant de départ de la session', e1?.dir === dossiers1[0] && e1?.main === retiree && STARTS.includes(e1?.startMs) && dossiers1[0].endsWith(`-${e1?.startMs}`), JSON.stringify(e1));
     check('g1 : l\'entrée porte le nom de la session (son activité), pas celui de son fichier, même importée sans activité', typeof e1?.name === 'string' && e1.name.length > 0 && !/\.gpx$/i.test(e1.name) && !e1.name.includes(retiree.replace(/\.gpx$/i, '')), JSON.stringify(e1?.name));

@@ -64,7 +64,18 @@ describe('compte rendu de la synchronisation', () => {
   it('par le sans-fil : ce qui attend le câble est compté, rien n’est dit du téléphone mis à jour', () => {
     const waiting = [item('newOnComputer', [OPS.toPhone]), item('deletedOnComputer', [OPS.remove])];
     const text = describeSync(outcomeOf([item('newOnPhone', [OPS.toComputer])], { phoneWritable: false, complete: false, withheldForPhone: waiting }), 'sansFil');
-    expect(text.paragraphs).toEqual(["1 session copiée vers l'ordinateur.", '2 changements attendent le câble ou la mise à jour du téléphone.']);
+    expect(text.paragraphs).toEqual([
+      "Sans câble, le téléphone n'est pas modifié : seules ses sessions sont copiées vers l'ordinateur.",
+      "1 session copiée vers l'ordinateur.", '2 changements attendent le câble ou la mise à jour du téléphone.',
+    ]);
+  });
+
+  it('par le sans-fil, le téléphone sans identifiant n’est pas « la première synchronisation » à chaque passe', () => {
+    const text = describeSync(outcomeOf([], { phoneWritable: false, first: 'noBase' }), 'sansFil');
+    expect(text.paragraphs).toEqual([
+      "Sans câble, le téléphone n'est pas modifié : seules ses sessions sont copiées vers l'ordinateur.",
+      'Les deux appareils sont à jour.',
+    ]);
   });
 
   it('liaison perdue, échec et session changée en route : dits, « Réessayer » proposé', () => {

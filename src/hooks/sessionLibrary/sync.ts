@@ -4,7 +4,7 @@ import { LEARNED_PLACES_FILE, RESTING_HR_FILE, SESSIONS_DIR, SETTINGS_DIR, sessi
 import { isCompleteGpxText } from '../../library/pendingTemps';
 import type { SessionRecord } from '../../library/record';
 import {
-  SYNC_DIR, SYNC_SIDES, emptySyncBase, markerTextWithId, otherSyncSide, parseSyncBase, readMarkerId, serializeSyncBase,
+  SYNC_DIR, SYNC_SIDES, emptySyncBase, markerTextWithId, markerTextWithSync, otherSyncSide, parseSyncBase, readMarkerId, serializeSyncBase,
   syncAncestorPath, syncBaseLine, syncBasePath, syncRefusal, withSyncDone, withSyncHeld, withSyncLine, withoutSyncLine,
   type SyncBase, type SyncFiles, type SyncSideName, type SyncStamp,
 } from '../../library/syncBase';
@@ -47,6 +47,8 @@ import { holdTrashDuring, recordShownName, reloadTrash, trashFolderOf } from './
  *   une erreur du dossier distant (câble débranché) arrête tout.
  * - Après les sessions, les fichiers de réglages, les tests de FC repos et les lieux appris suivent leur propre plan
  *   (`library/syncExtras.ts`) : recopiés ou fondus, jamais supprimés, jamais adoptés.
+ * - À la fin, si un fichier du téléphone a été écrit ou retiré, l'instant de la synchronisation est posé dans son
+ *   marqueur : l'application du téléphone le relit au retour au premier plan et relit alors sa mémoire.
  */
 
 /** Témoin d'une synchronisation en cours : présent au départ suivant, la précédente a été coupée. */
@@ -124,6 +126,18 @@ const filesOfOp = (op: SyncOp): number => {
 /** Opérations d'une session qui écrivent ou retirent quelque chose sur le téléphone. */
 const phoneOpsOf = (item: SyncItem | undefined): number =>
   item?.ops.filter((op) => op.kind === 'removeFromPhone' || ('to' in op && op.to === 'phone') || ('on' in op && op.on === 'phone')).length ?? 0;
+
+/** Dossier de la copie de sécurité que garde le témoin d'une synchronisation coupée, s'il couvre ce téléphone. */
+const witnessSafetyCopy = (text: string | null, phone: string): string | null => {
+  try {
+    const witness: unknown = text === null ? null : JSON.parse(text);
+    if (typeof witness !== 'object' || witness === null) return null;
+    const { safetyCopy, phone: covered } = witness as { safetyCopy?: unknown; phone?: unknown };
+    return typeof safetyCopy === 'string' && covered === phone ? safetyCopy : null;
+  } catch {
+    return null;
+  }
+};
 
 /** Une suppression : la session (`startMs`) et le côté d'où elle part (`computer` : mise à la corbeille). */
 export interface SyncDeletionKey {
@@ -246,6 +260,22 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
   const scope = { computer: true, phone: options.phoneWritable ?? remote.readOnly !== true, deletions: options.withoutDeletions !== true };
   const outcome = emptyOutcome(null);
   outcome.phoneWritable = scope.phone;
+  /** Vrai dès qu'un fichier de sessions du téléphone a été écrit ou retiré. */
+  let phoneChanged = false;
+  /**
+   * Le téléphone qui a changé l'apprend par l'instant posé dans son marqueur (`markerTextWithSync`), relu au retour
+   * de l'application au premier plan. Écriture de plus, jamais un échec de la synchronisation : sans elle, le compte
+   * rendu dit toujours de toucher « Mettre à jour ».
+   */
+  const notifyPhone = async (): Promise<void> => {
+    if (!phoneChanged && !outcome.extras.done.some((op) => op.to === 'phone')) return;
+    try {
+      const text = markerTextWithSync(await remote.readText(MARKER_FILE), now());
+      if (text !== null) await remote.writeText(MARKER_FILE, text);
+    } catch {
+      // Téléphone injoignable à cet instant : la ligne du compte rendu suffit.
+    }
+  };
   try {
     if (!deletesToTrash(computer.kind, computer.readOnly === true)) return emptyOutcome('noTrash');
     const markers = { computer: await computer.readText(MARKER_FILE), phone: await phone.readText(MARKER_FILE) };
@@ -258,15 +288,23 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     if (read.state === 'newer') return emptyOutcome('newerBase');
     const pair = syncPair(ids.computer, ids.phone, options.phonePath ?? null, read.state === 'ok' ? read.base : null);
     outcome.first = pair.first;
+    const running = await computer.readText(SYNC_RUNNING_PATH);
+    outcome.interrupted = running !== null;
+    // La copie de sécurité d'une première rencontre coupée en route n'est pas refaite : le témoin la garde, avec le
+    // téléphone qu'elle couvre (son identifiant, ou son marqueur tant qu'il n'en a pas).
+    const phoneKey = (): string => ids.phone ?? `marqueur:${markers.phone ?? ''}`;
+    const writeWitness = (startedAtMs: number): Promise<void> => computer.writeText(SYNC_RUNNING_PATH,
+      `${stringifyJson({ startedAtMs, ...(outcome.safetyCopy ? { safetyCopy: outcome.safetyCopy, phone: phoneKey() } : {}) })}\n`);
     if (pair.first !== null && scope.phone && options.beforeWrites) {
+      const earlier = witnessSafetyCopy(running, phoneKey());
       try {
-        outcome.safetyCopy = await options.beforeWrites(pair.first);
+        outcome.safetyCopy = earlier ?? await options.beforeWrites(pair.first);
       } catch (err) {
-        return { ...emptyOutcome('safetyCopy'), first: pair.first, error: errorMessage(err, String(err)) };
+        return { ...emptyOutcome('safetyCopy'), first: pair.first, interrupted: false, error: errorMessage(err, String(err)) };
       }
     }
-    outcome.interrupted = (await computer.stat(SYNC_RUNNING_PATH)) !== null;
-    await computer.writeText(SYNC_RUNNING_PATH, `${stringifyJson({ startedAtMs: now() })}\n`);
+    const startedAtMs = now();
+    await writeWitness(startedAtMs);
     for (const side of SYNC_SIDES) {
       if (!pair.newId[side] || !scope[side]) continue;
       const id = (options.newFolderId ?? newId)();
@@ -274,6 +312,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       if (text === null) continue;
       await folders[side].writeText(MARKER_FILE, text);
       ids[side] = id;
+      if (side === 'phone' && outcome.safetyCopy) await writeWitness(startedAtMs);
     }
 
     const listings: Record<SyncSideName, SyncListing> = {
@@ -349,6 +388,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       return bytes;
     };
     const write = async (side: SyncSideName, name: string, bytes: Uint8Array): Promise<void> => {
+      if (side === 'phone') phoneChanged = true;
       await folders[side].writeBytes(sessionPath(name), bytes);
       const at = await folders[side].stat(sessionPath(name));
       if (at) expected[side].set(name, at);
@@ -361,6 +401,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       await write(side, name, bytes);
     };
     const remove = async (side: SyncSideName, name: string): Promise<void> => {
+      if (side === 'phone') phoneChanged = true;
       await folders[side].remove(sessionPath(name));
       expected[side].delete(name);
     };
@@ -406,9 +447,10 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
 
     /**
      * Vrai si la corbeille, relue sur le disque au moment du retrait, tient encore ce que le plan a compté : un GPX et
-     * des capteurs de la même taille que ceux du téléphone, et une fiche (`withRecord`). Elle a pu être vidée depuis.
+     * des capteurs de la même taille que ceux du téléphone, et une fiche : présente (`present`), de la même taille aussi
+     * (`same`), ou sans exigence (`any`). Elle a pu être vidée depuis.
      */
-    const trashStillHolds = async (startMs: number, files: readonly SyncStamp[], withRecord: boolean): Promise<boolean> => {
+    const trashStillHolds = async (startMs: number, files: readonly SyncStamp[], record: 'any' | 'present' | 'same'): Promise<boolean> => {
       const held: { name: string; size: number }[] = [];
       for (const entry of (await trashNow()).filter((e) => e.startMs === startMs && e.kind !== 'itineraire')) {
         for (const f of entry.files) {
@@ -418,7 +460,9 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       for (const file of files) {
         const ext = /\.[^.]+$/.exec(file.name)?.[0].toLowerCase() ?? '';
         const same = (f: { name: string }): boolean => f.name.toLowerCase().endsWith(ext);
-        const ok = ext === '.json' ? !withRecord || held.some(same) : held.some((f) => same(f) && f.size === file.size);
+        const ok = ext === '.json' && record !== 'same'
+          ? record === 'any' || held.some(same)
+          : held.some((f) => same(f) && f.size === file.size);
         if (!ok) return false;
       }
       return true;
@@ -513,8 +557,10 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
           await phone.list(SESSIONS_DIR);
           for (const file of op.files) await expect('phone', file);
           // Le plan a compté sur la corbeille telle qu'il l'a lue : relue maintenant, elle doit tenir encore la copie.
-          const held = op.keep !== 'all' && (await trashStillHolds(item.startMs, op.files, op.keep === 'none'));
-          if (op.keep === 'all' || !held) await keepFromPhone(item.startMs, op.files);
+          // Tout garder : rien à ranger si la corbeille tient déjà ces mêmes fichiers (une session supprimée sur
+          // l'ordinateur avant toute synchronisation), sinon la copie du téléphone y entre à part.
+          const held = await trashStillHolds(item.startMs, op.files, op.keep === 'all' ? 'same' : op.keep === 'none' ? 'present' : 'any');
+          if (!held) await keepFromPhone(item.startMs, op.files);
           else if (op.keep === 'record') await keepPhoneRecord(item, op);
           for (const file of op.files) await remove('phone', file.name);
         }
@@ -571,11 +617,15 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       base = withSyncDone(base, now(), trashed);
       await saveBase();
     }
+    await notifyPhone();
     await computer.remove(SYNC_RUNNING_PATH);
     return outcome;
   } catch (err) {
     const detail = errorMessage(err, String(err));
-    return err instanceof SyncLinkError ? { ...outcome, linkLost: detail, complete: false } : { ...outcome, error: detail, complete: false };
+    if (err instanceof SyncLinkError) return { ...outcome, linkLost: detail, complete: false };
+    // Arrêtée par une erreur de l'ordinateur : ce qui a déjà changé sur le téléphone s'y voit quand même.
+    await notifyPhone();
+    return { ...outcome, error: detail, complete: false };
   }
 };
 

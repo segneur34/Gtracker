@@ -155,7 +155,12 @@ export const describeSync = (outcome: SyncOutcome, channel: PhoneLinkChannel = '
   let retry = false;
 
   if (outcome.interrupted) lines.push(t("La synchronisation précédente avait été coupée : elle a repris là où elle s'était arrêtée."));
-  if (outcome.first !== null) lines.push(t("Première synchronisation avec ce téléphone : rien n'a été supprimé."));
+  // Un téléphone qu'on ne peut pas écrire ne reçoit pas d'identifiant : chaque passe serait « la première ». Une
+  // phrase stable dit à la place ce que fait le sans-fil ; le nombre de ce qui attend vient plus bas.
+  const header = outcome.phoneWritable
+    ? outcome.first !== null ? t("Première synchronisation avec ce téléphone : rien n'a été supprimé.") : null
+    : t("Sans câble, le téléphone n'est pas modifié : seules ses sessions sont copiées vers l'ordinateur.");
+  if (header !== null) lines.push(header);
 
   const toPhone = done.filter((i) => hasOp(i, (op) => op.kind === 'copy' && op.to === 'phone')).length;
   const toComputer = done.filter((i) => hasOp(i, (op) => op.kind === 'copy' && op.to === 'computer')).length;
@@ -253,7 +258,7 @@ export const describeSync = (outcome: SyncOutcome, channel: PhoneLinkChannel = '
 
   const phoneWritten = done.some((i) => hasOp(i, writesPhone)) || outcome.extras.done.some((op) => op.to === 'phone');
   if (phoneWritten) lines.push(t('Sur le téléphone, touchez « Mettre à jour » pour voir les changements.'));
-  const said = lines.length > (outcome.first !== null ? 1 : 0) + (outcome.interrupted ? 1 : 0);
+  const said = lines.length > (header !== null ? 1 : 0) + (outcome.interrupted ? 1 : 0);
   if (!said && !retry) lines.push(t('Les deux appareils sont à jour.'));
   if (outcome.safetyCopy !== null) lines.push(t('Copie de sécurité des deux appareils, faite avant la première synchronisation :'));
   return say(lines, retry, outcome.safetyCopy);

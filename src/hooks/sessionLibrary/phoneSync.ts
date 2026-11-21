@@ -146,7 +146,8 @@ const synchronize = async (options: RunOptions): Promise<PhoneSyncResult> => {
         return phoneSafetyCopy();
       },
       onPlanned: (_plan, reason) => {
-        first = reason !== null;
+        // Sans écriture du téléphone, il n'a pas d'identifiant et chaque passe serait « la première » : rien à annoncer.
+        first = reason !== null && lock.phoneWritable === true;
         progress.set({ step: 'copying', phone, channel: link, done: 0, total: 0, first });
       },
       onProgress: (done, total) => progress.set({ step: 'copying', phone, channel: link, done, total, first }),
