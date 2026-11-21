@@ -22,9 +22,13 @@
 //     ses entrées, le bloc sans « Exporter le GPX » ni « Supprimer l'itinéraire », « Partager le GPX » (partage du navigateur simulé, puis sans partage), nom modifié (partages grisés
 //     et leur ligne), « Supprimer » d'un clic court, tenu une seconde, « Garder », menu fermé puis rouvert, « Supprimer
 //     définitivement » (mémoire vidée, le bloc redevient « Enregistrer l'itinéraire »).
+//  7. le nom composé d'un itinéraire sans nom saisi : sans réseau « Aller du JJ/MM » et « Boucle du JJ/MM » (grisé du champ,
+//     liste, nom du fichier) ; avec le service de lieux simulé « Aller de A à B le JJ/MM » et « Boucle à A le JJ/MM »
+//     (à l'ouverture dans Planifier et après le rangement) ; un nom saisi reste.
 // Verdicts par `check` ; fin par « Tout passe. » ou le nombre d'échecs, code 0 ou 1.
 import { writeFileSync } from 'node:fs';
 import { CLES, connect, DOSSIER_MEMOIRE, POIGNEE_RETOUR } from './lib/cdp.mjs';
+import { autour, fakePlaces } from './lib/lieux.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -34,7 +38,8 @@ if (!port || !workDir) {
 }
 
 // --- Protocole (lib/cdp.mjs) ---
-const { send, evaluate, go: goRaw, settle, waitFor, wait, mouse, onMessage, logs, check, finish, shoot } = await connect({ port, shotDir });
+const b = await connect({ port, shotDir });
+const { send, evaluate, go: goRaw, settle, waitFor, wait, mouse, onMessage, logs, check, finish, shoot } = b;
 /** Navigation, puis attente du premier rendu de l'application : sous charge, `settle` seul peut rendre la main avant. */
 const go = async (path, max) => {
   const ms = await goRaw(path, max);
@@ -546,6 +551,124 @@ check('le bloc redevient « Enregistrer l\'itinéraire »', titreBloc === 'Enreg
 const listeApres = await evaluate(`[...document.querySelectorAll('.route-list__open')].map((x) => x.textContent.trim()).join(' | ')`);
 check('l\'itinéraire a quitté la liste « Mes itinéraires »', !listeApres.includes('Sortie banc'), listeApres);
 if (process.env.DUMP) writeFileSync(process.env.DUMP, await evaluate('document.body.innerText'));
+
+// 7. Le nom composé d'un itinéraire sans nom saisi. D'abord sans réseau (le service de lieux est bloqué d'office) :
+// « Aller du JJ/MM », « Boucle du JJ/MM », en grisé dans le champ, dans la liste et dans le nom du fichier (la barre de
+// la date y devient une espace) ; puis avec le service de lieux simulé : le lieu est cherché à l'ouverture dans Planifier
+// et après le rangement, « Aller de A à B le JJ/MM », « Boucle à A le JJ/MM » ; un nom saisi ne change pas.
+console.log('--- nom composé ---');
+const jour = await evaluate(`new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })`);
+const jourFichier = jour.replace('/', ' ');
+const fiches = async () => JSON.parse(await evaluate(`(async () => {
+  let d;
+  try { d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('itineraires'); } catch { return '[]'; }
+  const out = [];
+  for await (const [n, h] of d.entries()) if (n.endsWith('.json')) {
+    const r = JSON.parse(await (await h.getFile()).text());
+    out.push({ base: n.replace(/\\.json$/, ''), name: r.name, place: r.place ?? null, waypoints: r.waypoints ?? [] });
+  }
+  return JSON.stringify(out.sort((x, y) => (x.base < y.base ? -1 : 1)));
+})()`));
+const listeNoms = async () => JSON.parse(await evaluate(`JSON.stringify([...document.querySelectorAll('.route-list__open')].map((x) => x.textContent.trim()))`));
+const placeholder = () => evaluate(`document.querySelector('.plan-form input')?.placeholder ?? null`);
+const messageRangement = () => evaluate(`[...document.querySelectorAll('.plan-note')].map((x) => x.textContent).find((t) => t.startsWith('Enregistré')) ?? null`);
+const repartir = async () => {
+  await go('/itineraires', 3000);
+  await clickText('Tout effacer');
+  await wait(300);
+};
+const ouvrirNom = async (extrait) => {
+  await go('/itineraires/liste', 3000);
+  await waitFor(`[...document.querySelectorAll('.route-list__open')].some((x) => x.textContent.includes(${JSON.stringify(extrait)}))`, { timeout: 5000, label: `liste : ${extrait}` });
+  await evaluate(`[...document.querySelectorAll('.route-list__open')].find((x) => x.textContent.includes(${JSON.stringify(extrait)})).click()`);
+  await waitFor(async () => /^Tracé et balises \((?!0\))\d+\)$/.test((await state()).title ?? ''), { timeout: 5000, label: 'balises rouvertes' });
+  await settle({ max: 800 });
+};
+
+// 7a. Sans réseau : un aller, puis une boucle, sans nom saisi.
+await repartir();
+await tapMap(0.2, 0.2);
+await tapMap(0.8, 0.7);
+const allerNeuf = await state();
+check('un aller sans nom : le champ Nom est vide, son grisé est « Aller du JJ/MM »',
+  allerNeuf.name === '' && (await placeholder()) === `Aller du ${jour}`, `${allerNeuf.name} | ${await placeholder()}`);
+const distanceAller = Number.parseFloat(String(allerNeuf.distance).replace(',', '.'));
+check('l\'aller des essais fait plus de 2 km (l\'arrivée compte comme un autre lieu)', distanceAller > 2, String(allerNeuf.distance));
+console.log('Enregistrer (aller sans nom) :', await clickText('Enregistrer'));
+await settle({ max: 1500 });
+const msgAller = await messageRangement();
+console.log('message :', msgAller);
+check('aller rangé sans nom : le message cite « Aller du JJ MM » (la barre devient une espace)', msgAller?.startsWith(`Enregistré dans itineraires/Aller du ${jourFichier}`) === true, String(msgAller));
+const apresAller = await fiches();
+check('la fiche garde un nom vide et le fichier s\'appelle « Aller du JJ MM »', apresAller.length === 1 && apresAller[0].name === '' && apresAller[0].base === `Aller du ${jourFichier}`, JSON.stringify(apresAller.map((f) => [f.base, f.name])));
+check('le champ Nom reste vide après le rangement', (await state()).name === '', String((await state()).name));
+check('la liste « Mes itinéraires » montre « Aller du JJ/MM » (sans lieu, hors ligne)', (await listeNoms()).some((n) => n.includes(`Aller du ${jour}`)), JSON.stringify(await listeNoms()));
+console.log('Nouvel itinéraire :', await clickText('Nouvel itinéraire'));
+await wait(400);
+await tapMap(0.3, 0.3);
+await tapMap(0.6, 0.35);
+await tapMap(0.55, 0.7);
+console.log('Boucler :', await clickText('Boucler'));
+check('une boucle sans nom : le grisé est « Boucle du JJ/MM »', (await state()).name === '' && (await placeholder()) === `Boucle du ${jour}`, `${(await state()).name} | ${await placeholder()}`);
+console.log('Enregistrer (boucle sans nom) :', await clickText('Enregistrer'));
+await settle({ max: 1500 });
+const apresBoucle = await fiches();
+check('boucle rangée sans nom : fichier « Boucle du JJ MM », nom vide', apresBoucle.some((f) => f.base === `Boucle du ${jourFichier}` && f.name === ''), JSON.stringify(apresBoucle.map((f) => [f.base, f.name])));
+check('la liste montre « Boucle du JJ/MM » et « Aller du JJ/MM »', (await listeNoms()).some((n) => n.includes(`Boucle du ${jour}`)) && (await listeNoms()).some((n) => n.includes(`Aller du ${jour}`)), JSON.stringify(await listeNoms()));
+
+// 7b. Avec le service de lieux simulé : à l'ouverture dans Planifier, le lieu du départ et celui de l'arrivée sont cherchés.
+const lieux = await fakePlaces(b);
+const fichesAvant = await fiches();
+const aller = fichesAvant.find((f) => f.base === `Aller du ${jourFichier}`);
+const seuil = (aller.waypoints[0].lat + aller.waypoints[aller.waypoints.length - 1].lat) / 2;
+const lieuDe = (lat) => (lat >= seuil ? 'Port Nord' : 'Port Sud');
+lieux.setAnswer((url) => autour(lieuDe(Number(new URL(url).searchParams.get('lat'))))(url));
+lieux.reset();
+await ouvrirNom(`Aller du ${jour}`);
+const departAller = lieuDe(aller.waypoints[0].lat);
+const arriveeAller = lieuDe(aller.waypoints[aller.waypoints.length - 1].lat);
+await waitFor(async () => (await fiches()).find((f) => f.base === `Aller du ${jourFichier}`)?.place?.arrival != null, { timeout: 8000, every: 200, label: 'lieu de l\'aller rangé' });
+console.log('requêtes de lieux (aller) :', lieux.count());
+check('les deux lieux sont différents dans l\'essai (départ au nord, arrivée au sud)', departAller !== arriveeAller, `${departAller} / ${arriveeAller}`);
+const nomAller = `Aller de ${departAller} à ${arriveeAller} le ${jour}`;
+await go('/itineraires/liste', 3000);
+await waitFor(`[...document.querySelectorAll('.route-list__open')].some((x) => x.textContent.includes(${JSON.stringify(nomAller)}))`, { timeout: 5000, label: 'nom composé de l\'aller' });
+check('l\'aller ouvert dans Planifier : la liste le nomme « Aller de A à B le JJ/MM »', (await listeNoms()).some((n) => n.includes(nomAller)), JSON.stringify(await listeNoms()));
+check('le fichier garde son nom du premier rangement, la fiche un nom vide', (await fiches()).some((f) => f.base === `Aller du ${jourFichier}` && f.name === ''), JSON.stringify((await fiches()).map((f) => [f.base, f.name])));
+await ouvrirNom(nomAller);
+check('l\'aller rouvert : le grisé du champ Nom est le nom composé, le champ reste vide', (await state()).name === '' && (await placeholder()) === nomAller, `${(await state()).name} | ${await placeholder()}`);
+// La boucle : un seul lieu, celui du départ.
+const boucleFiche = (await fiches()).find((f) => f.base === `Boucle du ${jourFichier}`);
+const nomBoucle = `Boucle à ${lieuDe(boucleFiche.waypoints[0].lat)} le ${jour}`;
+await ouvrirNom(`Boucle du ${jour}`);
+await go('/itineraires/liste', 3000);
+await waitFor(`[...document.querySelectorAll('.route-list__open')].some((x) => x.textContent.includes(${JSON.stringify(nomBoucle)}))`, { timeout: 8000, label: 'nom composé de la boucle' });
+check('la boucle ouverte dans Planifier : « Boucle à A le JJ/MM », sans arrivée', (await listeNoms()).some((n) => n.includes(nomBoucle)), JSON.stringify(await listeNoms()));
+// Un itinéraire neuf, rangé avec le service de lieux : le lieu est cherché après le rangement.
+await repartir();
+await tapMap(0.25, 0.25);
+await tapMap(0.55, 0.3);
+await tapMap(0.5, 0.65);
+console.log('Boucler :', await clickText('Boucler'));
+lieux.reset();
+console.log('Enregistrer (boucle, lieux simulés) :', await clickText('Enregistrer'));
+await settle({ max: 1500 });
+const neuve = (await fiches()).filter((f) => !fichesAvant.some((g) => g.base === f.base));
+const nomNeuve = `Boucle à ${neuve[0] ? lieuDe(neuve[0].waypoints[0].lat) : '?'} le ${jour}`;
+await waitFor(async () => (await fiches()).some((f) => !fichesAvant.some((g) => g.base === f.base) && f.place), { timeout: 8000, every: 200, label: 'lieu rangé après le rangement' });
+check('une boucle neuve sans nom : le lieu est cherché après le rangement, la liste la nomme « Boucle à A le JJ/MM »',
+  (await listeNoms()).filter((n) => n.includes(nomNeuve)).length >= 1 && lieux.count() >= 1, `${nomNeuve} | ${JSON.stringify(await listeNoms())} | ${lieux.count()} requête(s)`);
+// Un nom saisi prime, même avec le service de lieux.
+await repartir();
+await tapMap(0.2, 0.25);
+await tapMap(0.75, 0.7);
+await setName('Sortie nommée');
+await clickText('Enregistrer');
+await settle({ max: 1500 });
+await wait(1500);
+const nommee = (await fiches()).find((f) => f.base === 'Sortie nommée');
+check('un nom saisi reste : fichier et fiche « Sortie nommée », aucun lieu rangé', nommee?.name === 'Sortie nommée' && nommee.place === null, JSON.stringify(nommee));
+check('la liste montre « Sortie nommée », jamais un nom composé pour elle', (await listeNoms()).some((n) => n.includes('Sortie nommée')) && !(await listeNoms()).some((n) => n.includes('Sortie nommée') && /Aller (de|du)/.test(n)), JSON.stringify(await listeNoms()));
 
 console.log('--- confirmations ---');
 dialogs.forEach((d) => console.log(d));
