@@ -3,6 +3,7 @@ import { formatSessionDate } from '../core/units';
 import type { SyncOutcome } from './syncOutcome';
 import type { SyncItem, SyncLeftReason, SyncOp } from './syncPlan';
 import type { SyncSideName } from './syncBase';
+import type { RouteSyncItem, RouteSyncOp } from './syncRoutes';
 
 /**
  * Ce que la fenêtre « Synchroniser » du programme Windows dit d'une synchronisation avec le téléphone : l'état d'un
@@ -116,6 +117,59 @@ const hasOp = (item: SyncItem, test: (op: SyncOp) => boolean): boolean => item.o
 const writesPhone = (op: SyncOp): boolean =>
   op.kind === 'removeFromPhone' || ('to' in op && op.to === 'phone') || ('on' in op && op.on === 'phone');
 
+const hasRouteOp = (item: RouteSyncItem, test: (op: RouteSyncOp) => boolean): boolean => item.ops.some(test);
+
+const routeWritesPhone = (op: RouteSyncOp): boolean => op.kind === 'removeFromPhone' || (op.kind === 'copy' && op.to === 'phone');
+
+/** Lignes du compte rendu sur les itinéraires ; `retry` : vrai si l'une dit quelque chose qui reste à finir. */
+const routeLines = (outcome: SyncOutcome): { lines: string[]; retry: boolean } => {
+  const { routes } = outcome;
+  const lines: string[] = [];
+  if (routes.waiting) lines.push(t('Les itinéraires attendent le câble ou la mise à jour du téléphone.'));
+  const done = routes.done;
+  const copiedTo = (side: SyncSideName): number =>
+    done.filter((i) => (i.case === 'newOnComputer' || i.case === 'newOnPhone' || i.revived) && hasRouteOp(i, (op) => op.kind === 'copy' && op.to === side)).length;
+  const toPhone = copiedTo('phone');
+  const toComputer = copiedTo('computer');
+  if (toPhone > 0 && toComputer > 0) {
+    lines.push(`${tn(toPhone, '{n} itinéraire copié vers le téléphone', '{n} itinéraires copiés vers le téléphone')}, ${tn(toComputer, "{n} vers l'ordinateur", "{n} vers l'ordinateur")}.`);
+  } else if (toPhone > 0) {
+    lines.push(tn(toPhone, '{n} itinéraire copié vers le téléphone.', '{n} itinéraires copiés vers le téléphone.'));
+  } else if (toComputer > 0) {
+    lines.push(tn(toComputer, "{n} itinéraire copié vers l'ordinateur.", "{n} itinéraires copiés vers l'ordinateur."));
+  }
+  const modified = done.filter((i) => (i.case === 'followed' || i.case === 'firstMeeting') && !i.conflict && hasRouteOp(i, (op) => op.kind === 'copy')).length;
+  if (modified > 0) lines.push(tn(modified, '{n} itinéraire modifié recopié.', '{n} itinéraires modifiés recopiés.'));
+  const trashed = done.filter((i) => i.case === 'deletedOnPhone' && hasRouteOp(i, (op) => op.kind === 'trash')).length;
+  if (trashed > 0) {
+    lines.push(tn(trashed, "{n} itinéraire supprimé sur le téléphone : mis dans la corbeille de l'ordinateur (30 jours).", "{n} itinéraires supprimés sur le téléphone : mis dans la corbeille de l'ordinateur (30 jours)."));
+  }
+  const removed = done.filter((i) => i.case === 'deletedOnComputer' && hasRouteOp(i, (op) => op.kind === 'removeFromPhone')).length;
+  if (removed > 0) lines.push(tn(removed, "{n} itinéraire supprimé sur l'ordinateur : retiré du téléphone.", "{n} itinéraires supprimés sur l'ordinateur : retirés du téléphone."));
+  const conflicts = done.filter((i) => i.conflict && hasRouteOp(i, (op) => op.kind === 'copy')).length;
+  if (conflicts > 0) {
+    lines.push(tn(conflicts, "{n} itinéraire modifié sur les deux appareils : la version la plus récente est gardée, l'autre est dans la corbeille de l'ordinateur (30 jours).", "{n} itinéraires modifiés sur les deux appareils : la version la plus récente est gardée, l'autre est dans la corbeille de l'ordinateur (30 jours)."));
+  }
+  const items = routes.plan?.items ?? [];
+  const untouched = items.filter((i) => i.left === 'unreadable' || i.left === 'newer').length
+    + (routes.plan?.aside.filter((a) => a.reason === 'unreadable').length ?? 0);
+  if (untouched > 0) {
+    lines.push(tn(untouched, "{n} itinéraire laissé tel quel : illisible, ou d'une version plus récente de Gtracker.", "{n} itinéraires laissés tels quels : illisibles, ou d'une version plus récente de Gtracker."));
+  }
+  const inTrash = items.filter((i) => i.left === 'inTrash').length;
+  if (inTrash > 0) {
+    lines.push(tn(inTrash, "{n} itinéraire de la corbeille de l'ordinateur est encore sur le téléphone : laissé sur le téléphone.", "{n} itinéraires de la corbeille de l'ordinateur sont encore sur le téléphone : laissés sur le téléphone."));
+  }
+  if (routes.skipped.length > 0) {
+    lines.push(tn(routes.skipped.length, '{n} itinéraire laissé pour la prochaine fois : il a changé pendant la synchronisation.', '{n} itinéraires laissés pour la prochaine fois : ils ont changé pendant la synchronisation.'));
+  }
+  if (routes.failed.length > 0) {
+    const list = [...new Set(routes.failed.map((f) => f.detail.replace(/\.\s*$/, '')))].join(' ; ');
+    lines.push(tn(routes.failed.length, "{n} itinéraire n'a pas pu être écrit sur l'ordinateur ({list}).", "{n} itinéraires n'ont pas pu être écrits sur l'ordinateur ({list}).", { list }));
+  }
+  return { lines, retry: routes.skipped.length > 0 || routes.failed.length > 0 };
+};
+
 /** Raisons d'une session qui n'est pas finie de ranger sur son appareil. */
 const UNFINISHED: readonly SyncLeftReason[] = ['noRecord', 'unreadableRecord', 'emptyGpx', 'unfinishedGpx'];
 
@@ -217,6 +271,10 @@ export const describeSync = (outcome: SyncOutcome, channel: PhoneLinkChannel = '
     lines.push(tn(unknown, "{n} session d'une activité que l'ordinateur ne connaît pas : reprenez les réglages du téléphone (Réglages, Mémoire).", "{n} sessions d'une activité que l'ordinateur ne connaît pas : reprenez les réglages du téléphone (Réglages, Mémoire)."));
   }
 
+  const forRoutes = routeLines(outcome);
+  lines.push(...forRoutes.lines);
+  if (forRoutes.retry) retry = true;
+
   const settingsCopied = outcome.extras.done.filter((op) => op.kind === 'settings').length;
   if (settingsCopied > 0) lines.push(tn(settingsCopied, '{n} fichier de réglages recopié.', '{n} fichiers de réglages recopiés.'));
   const otherDevice = outcome.extras.left.filter((l) => l.reason === 'otherDevice');
@@ -235,10 +293,11 @@ export const describeSync = (outcome: SyncOutcome, channel: PhoneLinkChannel = '
     lines.push(tn(extrasStopped, "{n} fichier de réglages, de FC repos ou de lieux n'a pas pu être recopié : il le sera à la prochaine synchronisation.", "{n} fichiers de réglages, de FC repos ou de lieux n'ont pas pu être recopiés : ils le seront à la prochaine synchronisation."));
   }
 
-  if (outcome.deletions !== 'made' && outcome.withheldDeletions.length > 0) {
-    lines.push(tn(outcome.withheldDeletions.length, '{n} suppression laissée pour une prochaine synchronisation.', '{n} suppressions laissées pour une prochaine synchronisation.'));
+  const withheld = outcome.withheldDeletions.length + outcome.routes.withheldDeletions.length;
+  if (outcome.deletions !== 'made' && withheld > 0) {
+    lines.push(tn(withheld, '{n} suppression laissée pour une prochaine synchronisation.', '{n} suppressions laissées pour une prochaine synchronisation.'));
   }
-  const waiting = outcome.phoneWritable ? 0 : outcome.withheldForPhone.length + outcome.extras.withheld.length;
+  const waiting = outcome.phoneWritable ? 0 : outcome.withheldForPhone.length + outcome.routes.withheldForPhone.length + outcome.extras.withheld.length;
   if (waiting > 0) lines.push(tn(waiting, '{n} changement attend le câble ou la mise à jour du téléphone.', '{n} changements attendent le câble ou la mise à jour du téléphone.'));
 
   if (outcome.failed.length > 0) {
@@ -256,7 +315,8 @@ export const describeSync = (outcome: SyncOutcome, channel: PhoneLinkChannel = '
     lines.push(t("La synchronisation s'est arrêtée ({detail}). Ce qui est fait est gardé : cliquez sur « Réessayer » pour finir.", { detail: outcome.error.replace(/\.\s*$/, '') }));
   }
 
-  const phoneWritten = done.some((i) => hasOp(i, writesPhone)) || outcome.extras.done.some((op) => op.to === 'phone');
+  const phoneWritten = done.some((i) => hasOp(i, writesPhone)) || outcome.routes.done.some((i) => hasRouteOp(i, routeWritesPhone))
+    || outcome.extras.done.some((op) => op.to === 'phone');
   if (phoneWritten) lines.push(t('Sur le téléphone, touchez « Mettre à jour » pour voir les changements.'));
   const said = lines.length > (header !== null ? 1 : 0) + (outcome.interrupted ? 1 : 0);
   if (!said && !retry) lines.push(t('Les deux appareils sont à jour.'));
@@ -297,14 +357,52 @@ export interface SyncQuestionSession {
  */
 export interface SyncQuestion {
   kind: 'guard' | 'inTrash';
+  /** Sessions et itinéraires nommés. */
   count: number;
   text: string;
   sessions: SyncQuestionSession[];
+  routes: SyncQuestionRoute[];
+}
+
+/** Un itinéraire nommé dans une question : son identité, l'appareil dont il serait retiré, et le nom de ses fichiers. */
+export interface SyncQuestionRoute {
+  id: string;
+  side: SyncSideName;
+  label: string;
 }
 
 const questionSession = (item: SyncItem, side: SyncSideName): SyncQuestionSession => ({
   startMs: item.startMs, side, file: item.files[side] ?? item.files[side === 'phone' ? 'computer' : 'phone'] ?? '', label: formatSessionDate(item.startMs),
 });
+
+const questionRoute = (item: RouteSyncItem, side: SyncSideName): SyncQuestionRoute => ({
+  id: item.id, side, label: item.files[side] ?? item.files[side === 'phone' ? 'computer' : 'phone'] ?? item.id,
+});
+
+/** « 3 sessions et 2 itinéraires », pour une phrase qui nomme les deux. */
+const sessionsAndRoutes = (sessions: number, routes: number): { sessions: string; routes: string } => ({
+  sessions: tn(sessions, '{n} session', '{n} sessions'), routes: tn(routes, '{n} itinéraire', '{n} itinéraires'),
+});
+
+/** Texte du résumé qui déplie la liste du garde-fou. */
+export const syncQuestionListLabel = (question: SyncQuestion): string => {
+  const [s, r] = [question.sessions.length, question.routes.length];
+  if (r === 0) return tn(s, 'Voir la session', 'Voir les {n} sessions');
+  if (s === 0) return tn(r, "Voir l'itinéraire", 'Voir les {n} itinéraires');
+  return t('Voir les {n} sessions et itinéraires', { n: s + r });
+};
+
+/** Texte du bouton qui confirme les suppressions du garde-fou. */
+export const syncQuestionConfirmLabel = (question: SyncQuestion): string => {
+  const [s, r] = [question.sessions.length, question.routes.length];
+  if (r === 0) return tn(s, 'Supprimer cette session', 'Supprimer ces {n} sessions');
+  if (s === 0) return tn(r, 'Supprimer cet itinéraire', 'Supprimer ces {n} itinéraires');
+  return t('Supprimer ces {n} sessions et itinéraires', { n: s + r });
+};
+
+/** Texte du bouton qui laisse sur le téléphone ce que tient la corbeille de l'ordinateur. */
+export const syncQuestionLeaveLabel = (question: SyncQuestion): string =>
+  question.count === 1 && question.routes.length === 1 ? t('Le laisser') : tn(question.count, 'La laisser', 'Les laisser');
 
 /**
  * La question qu'appelle une synchronisation, ou `null`. Le garde-fou d'abord ; les sessions de la corbeille encore sur
@@ -314,20 +412,33 @@ const questionSession = (item: SyncItem, side: SyncSideName): SyncQuestionSessio
  */
 export const describeSyncQuestion = (outcome: SyncOutcome): SyncQuestion | null => {
   if (outcome.refusal !== null) return null;
-  if (outcome.deletions === 'awaitingConfirmation' && outcome.withheldDeletions.length > 0) {
-    const count = outcome.withheldDeletions.length;
+  const withheldRoutes = outcome.routes.withheldDeletions;
+  if (outcome.deletions === 'awaitingConfirmation' && outcome.withheldDeletions.length + withheldRoutes.length > 0) {
+    const [s, r] = [outcome.withheldDeletions.length, withheldRoutes.length];
+    const text = r === 0
+      ? tn(s, "Cette synchronisation retirerait {n} session. Rien n'est encore supprimé.", "Cette synchronisation retirerait {n} sessions. Rien n'est encore supprimé.")
+      : s === 0
+        ? tn(r, "Cette synchronisation retirerait {n} itinéraire. Rien n'est encore supprimé.", "Cette synchronisation retirerait {n} itinéraires. Rien n'est encore supprimé.")
+        : t("Cette synchronisation retirerait {sessions} et {routes}. Rien n'est encore supprimé.", sessionsAndRoutes(s, r));
     return {
-      kind: 'guard', count,
-      text: tn(count, "Cette synchronisation retirerait {n} session. Rien n'est encore supprimé.", "Cette synchronisation retirerait {n} sessions. Rien n'est encore supprimé."),
+      kind: 'guard', count: s + r, text,
       sessions: outcome.withheldDeletions.map((item) => questionSession(item, item.case === 'deletedOnPhone' ? 'computer' : 'phone')),
+      routes: withheldRoutes.map((item) => questionRoute(item, item.case === 'deletedOnPhone' ? 'computer' : 'phone')),
     };
   }
   if (!outcome.phoneWritable || outcome.deletions !== 'made' || outcome.linkLost !== null || outcome.error !== null) return null;
   const held = (outcome.plan?.items ?? []).filter((i) => i.left === 'inTrash');
-  if (held.length === 0) return null;
+  const heldRoutes = (outcome.routes.plan?.items ?? []).filter((i) => i.left === 'inTrash');
+  if (held.length + heldRoutes.length === 0) return null;
+  const [s, r] = [held.length, heldRoutes.length];
+  const text = r === 0
+    ? tn(s, "{n} session supprimée sur l'ordinateur est encore sur le téléphone. La retirer du téléphone ? Elle reste 30 jours dans la corbeille de l'ordinateur.", "{n} sessions supprimées sur l'ordinateur sont encore sur le téléphone. Les retirer du téléphone ? Elles restent 30 jours dans la corbeille de l'ordinateur.")
+    : s === 0
+      ? tn(r, "{n} itinéraire supprimé sur l'ordinateur est encore sur le téléphone. Le retirer du téléphone ? Il reste 30 jours dans la corbeille de l'ordinateur.", "{n} itinéraires supprimés sur l'ordinateur sont encore sur le téléphone. Les retirer du téléphone ? Ils restent 30 jours dans la corbeille de l'ordinateur.")
+      : t("{sessions} et {routes} supprimés sur l'ordinateur sont encore sur le téléphone. Les retirer du téléphone ? Ils restent 30 jours dans la corbeille de l'ordinateur.", sessionsAndRoutes(s, r));
   return {
-    kind: 'inTrash', count: held.length,
-    text: tn(held.length, "{n} session supprimée sur l'ordinateur est encore sur le téléphone. La retirer du téléphone ? Elle reste 30 jours dans la corbeille de l'ordinateur.", "{n} sessions supprimées sur l'ordinateur sont encore sur le téléphone. Les retirer du téléphone ? Elles restent 30 jours dans la corbeille de l'ordinateur."),
+    kind: 'inTrash', count: s + r, text,
     sessions: held.map((item) => questionSession(item, 'phone')),
+    routes: heldRoutes.map((item) => questionRoute(item, 'phone')),
   };
 };

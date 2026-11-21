@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { emptySyncOutcome, type SyncOutcome } from './syncOutcome';
 import type { SyncCase, SyncItem, SyncOp, SyncPlan } from './syncPlan';
-import { describePhoneState, describePhoneSync, describeSync, describeSyncQuestion, syncProgressText } from './syncReport';
+import {
+  describePhoneState, describePhoneSync, describeSync, describeSyncQuestion, syncProgressText, syncQuestionConfirmLabel, syncQuestionLeaveLabel,
+  syncQuestionListLabel, type SyncQuestion,
+} from './syncReport';
+import type { RouteSyncItem, RouteSyncOp } from './syncRoutes';
 
 const T0 = Date.UTC(2026, 10, 1, 10, 0, 0);
 const stamp = (name: string) => ({ name, size: 10, mtimeMs: 0 });
@@ -120,5 +124,68 @@ describe('questions de la synchronisation', () => {
     expect(describeSyncQuestion(outcomeOf(held, { deletions: 'excluded' }))).toBeNull();
     expect(describeSyncQuestion(outcomeOf(held, { linkLost: 'perdu' }))).toBeNull();
     expect(describeSyncQuestion(emptySyncOutcome('busy'))).toBeNull();
+  });
+});
+
+describe('compte rendu et questions des itinéraires', () => {
+  const listed = { base: 'tour', json: stamp('tour.json'), gpx: stamp('tour.gpx') };
+  const noGuard = { tripped: false, toTrash: 0, fromPhone: 0, count: { computer: 0, phone: 0 } };
+  const route = (kind: SyncCase, ops: RouteSyncOp[], patch: Partial<RouteSyncItem> = {}): RouteSyncItem => ({
+    id: `id-${++next}`, createdAt: null, case: kind, files: { computer: 'tour', phone: 'tour' }, ops, base: { kind: 'keep' }, left: null,
+    conflict: false, revived: false, ...patch,
+  });
+  const copyTo = (to: 'computer' | 'phone'): RouteSyncOp => ({ kind: 'copy', to, source: listed, base: 'tour', replaces: { json: null, gpx: null } });
+  const routesOf = (items: RouteSyncItem[], patch: Partial<SyncOutcome['routes']> = {}): Partial<SyncOutcome> => ({
+    routes: { ...emptySyncOutcome(null).routes, plan: { items, aside: [], guard: noGuard }, done: items, ...patch },
+  });
+
+  it('une ligne par cas, et « Mettre à jour » quand le téléphone a reçu un itinéraire', () => {
+    const items = [
+      route('newOnComputer', [copyTo('phone')]), route('newOnComputer', [copyTo('phone')]), route('newOnPhone', [copyTo('computer')]),
+      route('followed', [copyTo('phone')]),
+      route('deletedOnPhone', [{ kind: 'trash', files: listed, absent: 'tour.json' }]),
+      route('deletedOnComputer', [{ kind: 'removeFromPhone', files: listed, absent: 'tour.json', keep: false }]),
+      route('followed', [{ kind: 'loserToTrash', side: 'phone', files: listed }, copyTo('phone')], { conflict: true }),
+    ];
+    expect(describeSync(outcomeOf([], routesOf(items))).paragraphs).toEqual([
+      "2 itinéraires copiés vers le téléphone, 1 vers l'ordinateur.",
+      '1 itinéraire modifié recopié.',
+      "1 itinéraire supprimé sur le téléphone : mis dans la corbeille de l'ordinateur (30 jours).",
+      "1 itinéraire supprimé sur l'ordinateur : retiré du téléphone.",
+      "1 itinéraire modifié sur les deux appareils : la version la plus récente est gardée, l'autre est dans la corbeille de l'ordinateur (30 jours).",
+      'Sur le téléphone, touchez « Mettre à jour » pour voir les changements.',
+    ]);
+  });
+
+  it('laissés tels quels, attente du câble, changés en route', () => {
+    const left = [route('followed', [], { left: 'newer' }), route('newOnPhone', [], { left: 'unreadable' })];
+    const plan = { items: left, aside: [{ side: 'phone' as const, base: 'x', reason: 'unreadable' as const }], guard: noGuard };
+    const said = describeSync(outcomeOf([], routesOf([], { waiting: true, skipped: [route('followed', [])], plan })));
+    expect(said.paragraphs).toEqual([
+      'Les itinéraires attendent le câble ou la mise à jour du téléphone.',
+      "3 itinéraires laissés tels quels : illisibles, ou d'une version plus récente de Gtracker.",
+      '1 itinéraire laissé pour la prochaine fois : il a changé pendant la synchronisation.',
+    ]);
+    expect(said.retry).toBe(true);
+  });
+
+  it('corbeille encore sur le téléphone : sessions et itinéraires dans une seule question', () => {
+    const held = route('newOnPhone', [], { left: 'inTrash', files: { computer: null, phone: 'tour' } });
+    const onlyRoute = describeSyncQuestion(outcomeOf([], routesOf([held], { done: [] })));
+    expect(onlyRoute).toMatchObject({ kind: 'inTrash', count: 1, routes: [{ id: held.id, side: 'phone', label: 'tour' }] });
+    expect(syncQuestionLeaveLabel(onlyRoute as SyncQuestion)).toBe('Le laisser');
+    const both = describeSyncQuestion(outcomeOf([item('deletedOnComputer', [], { left: 'inTrash' })], routesOf([held], { done: [] })));
+    expect(both?.text).toBe("1 session et 1 itinéraire supprimés sur l'ordinateur sont encore sur le téléphone. Les retirer du téléphone ? Ils restent 30 jours dans la corbeille de l'ordinateur.");
+    expect(syncQuestionLeaveLabel(both as SyncQuestion)).toBe('Les laisser');
+  });
+
+  it('garde-fou : les deux familles comptées dans la phrase, la liste et le bouton', () => {
+    const removals = Array.from({ length: 3 }, () => route('deletedOnComputer', []));
+    const sessions = Array.from({ length: 14 }, () => item('deletedOnPhone', []));
+    const question = describeSyncQuestion(outcomeOf([], { deletions: 'awaitingConfirmation', withheldDeletions: sessions, ...routesOf([], { withheldDeletions: removals }) })) as SyncQuestion;
+    expect(question.text).toBe("Cette synchronisation retirerait 14 sessions et 3 itinéraires. Rien n'est encore supprimé.");
+    expect(question.count).toBe(17);
+    expect(syncQuestionListLabel(question)).toBe('Voir les 17 sessions et itinéraires');
+    expect(syncQuestionConfirmLabel(question)).toBe('Supprimer ces 17 sessions et itinéraires');
   });
 });

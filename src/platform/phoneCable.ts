@@ -6,8 +6,8 @@ import { isDesktopApp } from './runtime';
 
 /**
  * Le téléphone lu par le programme Windows, par le Wi-Fi s'il y est relié (`wirelessPhone.ts`), sinon par le câble :
- * son état (qui dit son canal et s'il sait écrire), le contenu de son dossier `Documents/Gtracker` (racine,
- * `sessions/`, et `reglages/` par le câble), ses fichiers à importer, lus un par un au moment de les ranger, et ce
+ * son état (qui dit son canal, s'il sait écrire et s'il liste les itinéraires), le contenu de son dossier
+ * `Documents/Gtracker` (racine, `sessions/`, et `itineraires/` et `reglages/` par le câble), ses fichiers à importer, lus un par un au moment de les ranger, et ce
  * dossier sous la forme de tout dossier mémoire (`phoneMemoryFolder`), qui écrit et efface par le câble seulement.
  * Ailleurs (navigateur, téléphone, coquille plus ancienne), rien de cela n'existe.
  */
@@ -48,8 +48,8 @@ const requirePhone = (): DesktopPhoneBridge => {
 export const phoneState = (): Promise<PhoneState> => bridgeValue(requirePhone().etat());
 
 /**
- * Fichiers de la racine et de `sessions/` du dossier `Documents/Gtracker` du téléphone ; `null` si ce dossier n'y est
- * pas. Lève si le téléphone n'est pas prêt ou s'est perdu en route.
+ * Fichiers de la racine et des sous-dossiers que le canal liste du dossier `Documents/Gtracker` du téléphone ; `null`
+ * si ce dossier n'y est pas. Lève si le téléphone n'est pas prêt ou s'est perdu en route.
  */
 export const listPhoneFiles = async (): Promise<PhoneFile[] | null> => {
   const answer = await requirePhone().lister();
@@ -65,6 +65,13 @@ export const phoneCanWrite = (state: PhoneState): boolean => {
   const phone = phoneBridge();
   return state.etat === 'pret' && state.ecriture === true && typeof phone?.ecrireOctets === 'function' && typeof phone.effacer === 'function';
 };
+
+/**
+ * Vrai si le téléphone prêt est lu par un canal qui liste aussi `itineraires/` (le câble d'une coquille qui le dit) ;
+ * faux par le sans-fil et pour une coquille plus ancienne, dont le listage muet ferait croire les itinéraires
+ * supprimés du téléphone : la synchronisation n'y touche alors pas.
+ */
+export const phoneListsRoutes = (state: PhoneState): boolean => state.etat === 'pret' && state.itineraires === true;
 
 /**
  * Copie de sécurité des deux dossiers (la mémoire du PC et celle du téléphone), faite par la coquille avant la première

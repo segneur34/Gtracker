@@ -356,10 +356,21 @@ export const planRouteSync = (input: RouteSyncInput): RouteSyncPlan => {
   const keepOf = (id: string, copy: Seen): boolean =>
     copy.text === null || !trash.some((entry) => entry.id === id && entry.text === copy.text);
 
-  /** Supprimé sur l'ordinateur : toutes les fiches du téléphone de cet itinéraire en sont retirées. */
+  /**
+   * Fiches d'un côté que vise une suppression : celle que la ligne suit (même nom de fiche), jamais une autre fiche
+   * de même identité, qui peut être un autre itinéraire (GPX exporté puis réimporté, qui garde la date de création) ;
+   * sans ligne, la seule fiche retenue pour cette identité. Les autres restent, laissées comme doublons.
+   */
+  const followedCopies = (side: SyncSideName, id: string, line: SyncBaseRoute | null): Seen[] => {
+    const routes = side === 'computer' ? computer : phone;
+    if (!line) return routes.kept.has(id) ? [routes.kept.get(id) as Seen] : [];
+    return (routes.copies.get(id) ?? []).filter((copy) => copy.files.json.name === line[side].json.name);
+  };
+
+  /** Supprimé sur l'ordinateur : la fiche du téléphone que la ligne suit en est retirée. */
   const removedFromPhone = (id: string, line: SyncBaseRoute | null): RouteSyncItem => ({
     ...itemOf(id, 'deletedOnComputer', null, phone.kept.get(id) ?? null),
-    ops: (phone.copies.get(id) ?? []).map((copy): RouteSyncOp =>
+    ops: followedCopies('phone', id, line).map((copy): RouteSyncOp =>
       ({ kind: 'removeFromPhone', files: copy.files, absent: line?.computer.json.name ?? null, keep: keepOf(id, copy) })),
     base: { kind: 'forget' },
   });
@@ -417,17 +428,27 @@ export const planRouteSync = (input: RouteSyncInput): RouteSyncPlan => {
     if (gone === 'computer') return removedFromPhone(id, line);
     return {
       ...item,
-      ops: (computer.copies.get(id) ?? []).map((copy): RouteSyncOp => ({ kind: 'trash', files: copy.files, absent: line.phone.json.name })),
+      ops: followedCopies('computer', id, line).map((copy): RouteSyncOp => ({ kind: 'trash', files: copy.files, absent: line.phone.json.name })),
       base: { kind: 'forget' },
     };
   };
 
   const identities = new Set([...computer.kept.keys(), ...phone.kept.keys(), ...(base?.routes.map((r) => r.id) ?? []), ...(base?.heldRoutes ?? [])]);
   const items: RouteSyncItem[] = [];
+  const unfollowed: RouteSyncPlan['aside'] = [];
   for (const id of [...identities].sort()) {
-    const o = computer.kept.get(id) ?? null;
-    const t = phone.kept.get(id) ?? null;
     const line = syncRouteBaseLine(base, id);
+    // Suivi, un itinéraire n'est présent d'un côté que par la fiche que la ligne nomme : une autre fiche de même
+    // identité est un autre itinéraire, laissé comme doublon, jamais recopié par-dessus ni supprimé à sa place.
+    const presentOn = (side: SyncSideName): Seen | null => {
+      const kept = (side === 'computer' ? computer : phone).kept.get(id) ?? null;
+      if (!line || !kept) return kept;
+      const followed = followedCopies(side, id, line)[0] ?? null;
+      if (!followed) unfollowed.push({ side, base: kept.files.base, reason: 'duplicate' });
+      return followed;
+    };
+    const o = presentOn('computer');
+    const t = presentOn('phone');
     const item = o && t ? both(id, o, t, line)
       : !line ? (o ? fresh(id, 'computer', o) : t ? fresh(id, 'phone', t) : { ...itemOf(id, 'deletedOnBoth', null, null), base: { kind: 'forget' } as const })
         : o ? deletedOn(id, 'phone', o, line)
@@ -437,6 +458,7 @@ export const planRouteSync = (input: RouteSyncInput): RouteSyncPlan => {
   }
 
   const aside = SYNC_SIDES.flatMap((side) => [
+    ...unfollowed.filter((a) => a.side === side),
     ...(side === 'computer' ? computer : phone).duplicates.map((s) => ({ side, base: s.files.base, reason: 'duplicate' as const })),
     ...seen[side].filter((s) => s.id === null).map((s) => ({ side, base: s.files.base, reason: 'unreadable' as const })),
   ]);

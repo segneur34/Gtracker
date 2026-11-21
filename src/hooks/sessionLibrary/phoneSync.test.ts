@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptySyncOutcome, type SyncOutcome } from '../../library/syncOutcome';
 import type { SyncItem } from '../../library/syncPlan';
+import type { RouteSyncItem } from '../../library/syncRoutes';
 import type { SyncLockOptions } from './sync';
 
 /**
@@ -8,7 +9,7 @@ import type { SyncLockOptions } from './sync';
  * ligne de l'arrivée. Le téléphone et la synchronisation elle-même sont simulés (l'exécutant a ses propres tests).
  */
 
-type State = { etat: 'pret'; nom: string; canal: 'cable' | 'sansFil'; ecriture: boolean } | { etat: 'absent' };
+type State = { etat: 'pret'; nom: string; canal: 'cable' | 'sansFil'; ecriture: boolean; itineraires?: boolean } | { etat: 'absent' };
 
 let state: State;
 let calls: SyncLockOptions[];
@@ -26,6 +27,7 @@ const load = async () => {
     phoneChannel: (s: { canal?: string }) => s.canal ?? 'cable',
     listPhoneFiles: async () => [],
     phoneCanWrite: (s: State) => s.etat === 'pret' && s.ecriture,
+    phoneListsRoutes: (s: State) => s.etat === 'pret' && s.itineraires === true,
     phoneMemoryFolder: (label: string) => ({ label }),
     phoneSafetyCopy: async () => 'C:\\copies\\x',
   }));
@@ -42,7 +44,7 @@ const load = async () => {
 };
 
 beforeEach(() => {
-  state = { etat: 'pret', nom: 'Xiaomi', canal: 'cable', ecriture: true };
+  state = { etat: 'pret', nom: 'Xiaomi', canal: 'cable', ecriture: true, itineraires: true };
   calls = [];
   outcomes = [];
 });
@@ -56,7 +58,7 @@ describe('bouton « Synchroniser »', () => {
     steps.push(sync.phoneSyncStep().step);
     await done;
     expect(steps).toEqual(['searching']);
-    expect(calls[0]).toMatchObject({ phoneWritable: true, phonePath: 'Documents/Gtracker', recording });
+    expect(calls[0]).toMatchObject({ phoneWritable: true, phonePath: 'Documents/Gtracker', recording, phoneRoutes: true });
     expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced', phone: 'Xiaomi', channel: 'cable' } });
     // Les rappels publient leur étape : copie de sécurité, puis avancement d'une première synchronisation.
     expect(await calls[0].beforeWrites?.('noBase')).toBe('C:\\copies\\x');
@@ -71,6 +73,8 @@ describe('bouton « Synchroniser »', () => {
     const sync = await load();
     await sync.synchronizeWithPhone();
     expect(calls[0].phoneWritable).toBe(false);
+    // Le sans-fil ne liste pas les itinéraires : ils ne sont pas touchés.
+    expect(calls[0].phoneRoutes).toBe(false);
     expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced', channel: 'sansFil' } });
   });
 
@@ -118,6 +122,26 @@ describe('bouton « Synchroniser »', () => {
     await sync.answerPhoneSyncQuestion('confirmDeletions');
     expect(calls[3]).toMatchObject({ heldOnPhone: 'remove', confirmDeletions: true });
     expect(sync.phoneSyncStep().step).toBe('over');
+  });
+
+  it('les itinéraires entrent dans les mêmes questions, et chaque réponse emporte ceux qu’elle a montrés', async () => {
+    const route: RouteSyncItem = {
+      id: '2026-11-01T10:00:00.000Z', createdAt: '2026-11-01T10:00:00.000Z', case: 'deletedOnComputer', files: { computer: null, phone: 'tour' },
+      ops: [], base: { kind: 'hold' }, left: 'inTrash', conflict: false, revived: false,
+    };
+    const routes = (patch: Partial<SyncOutcome['routes']>): SyncOutcome['routes'] => ({ ...emptySyncOutcome(null).routes, ...patch });
+    outcomes = [
+      { ...emptySyncOutcome(null), phoneWritable: true, deletions: 'awaitingConfirmation', withheldDeletions: [held], routes: routes({ withheldDeletions: [route] }) },
+      { ...emptySyncOutcome(null), phoneWritable: true, routes: routes({ plan: { items: [route], aside: [] } as never }) },
+    ];
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard', count: 2, text: "Cette synchronisation retirerait 1 session et 1 itinéraire. Rien n'est encore supprimé." } });
+    await sync.answerPhoneSyncQuestion('confirmDeletions');
+    expect(calls[1]).toMatchObject({ confirmedDeletions: [{ startMs: 1, side: 'phone' }], confirmedRouteDeletions: [{ id: route.id, side: 'phone' }] });
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'inTrash', count: 1 } });
+    await sync.answerPhoneSyncQuestion('removeHeld');
+    expect(calls[2]).toMatchObject({ heldOnPhone: 'remove', heldToRemove: [], heldRoutesToRemove: [route.id], confirmedRouteDeletions: undefined });
   });
 
   it('« Annuler » ou « Les laisser » : rien n’est relancé, le compte rendu de ce qui est fait s’affiche', async () => {

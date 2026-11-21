@@ -55,8 +55,8 @@ describe('lecture des sorties d’adb', () => {
 
   it('donne l’état : premier prêt, sinon autorisation, sinon hors ligne, sinon absent', () => {
     const a = (serie: string, etat: string, modele: string | null = null) => ({ serie, etat, modele })
-    expect(etatDesAppareils([a('x', 'unauthorized'), a('y', 'device', 'Pixel 8')])).toEqual({ etat: { etat: 'pret', nom: 'Pixel 8' }, serie: 'y' })
-    expect(etatDesAppareils([a('y', 'device')])).toEqual({ etat: { etat: 'pret', nom: 'y' }, serie: 'y' })
+    expect(etatDesAppareils([a('x', 'unauthorized'), a('y', 'device', 'Pixel 8')])).toEqual({ etat: { etat: 'pret', nom: 'Pixel 8', itineraires: true }, serie: 'y' })
+    expect(etatDesAppareils([a('y', 'device')])).toEqual({ etat: { etat: 'pret', nom: 'y', itineraires: true }, serie: 'y' })
     expect(etatDesAppareils([a('z', 'offline'), a('x', 'unauthorized')]).etat).toEqual({ etat: 'autorisation' })
     expect(etatDesAppareils([a('z', 'offline')]).etat).toEqual({ etat: 'horsLigne' })
     expect(etatDesAppareils([]).etat).toEqual({ etat: 'absent' })
@@ -76,7 +76,7 @@ describe('lecture des sorties d’adb', () => {
     expect(lireReponseVersion('OKAY0004002900')).toEqual({ etat: 'etranger' })
   })
 
-  it('lit le listage : préfixe retiré, espaces et accents gardés, dossiers et chemins refusés écartés', () => {
+  it('lit le listage : préfixe retiré, espaces et accents gardés, itinéraires gardés, dossiers et chemins refusés écartés', () => {
     const r = '/sdcard/Documents/Gtracker'
     const sortie = [
       `81b0 1234 1763495253 ${r}/sessions/Sortie du 18 novembre é.gpx`,
@@ -91,6 +91,7 @@ describe('lecture des sorties d’adb', () => {
     ].join('\n')
     expect(lireListage(sortie)).toEqual([
       { chemin: 'gtracker.json', taille: 20, dateMs: 1763495000000 },
+      { chemin: 'itineraires/tour.gpx', taille: 5, dateMs: 1763495000000 },
       { chemin: 'sessions/Sortie du 18 novembre é.gpx', taille: 1234, dateMs: 1763495253000 },
     ])
   })
@@ -244,7 +245,7 @@ describe('dossier du téléphone par adb', () => {
 
   it('se joint au serveur de même version et lit l’appareil prêt', async () => {
     const f = faux(ADB_OK, NOTRE_SERVEUR)
-    expect(await f.t.etat()).toEqual({ etat: 'pret', nom: 'Redmi Note' })
+    expect(await f.t.etat()).toEqual({ etat: 'pret', nom: 'Redmi Note', itineraires: true })
     expect(f.appels.map((a) => a.args)).toEqual([['version'], ['devices', '-l']])
     expect(f.appels.map((a) => a.delai)).toEqual([DELAIS.court, DELAIS.court])
     expect(f.sondes).toEqual([{ hote: '127.0.0.1', port: 5037 }])
@@ -297,7 +298,7 @@ describe('dossier du téléphone par adb', () => {
 
   it('lance son serveur s’il n’y en a aucun', async () => {
     const f = faux(ADB_OK, { etat: 'aucun' })
-    expect(await f.t.etat()).toEqual({ etat: 'pret', nom: 'Redmi Note' })
+    expect(await f.t.etat()).toEqual({ etat: 'pret', nom: 'Redmi Note', itineraires: true })
     expect(f.verbes()).toEqual(['version', 'start-server', 'devices'])
     expect(f.appels[1].delai).toBe(DELAIS.demarrage)
   })
@@ -758,7 +759,7 @@ describe('écriture d’un fichier sur le téléphone', () => {
     await f.t.lister()
     // Téléphone A débranché, B branché, un état demandé entre-temps : le listage de A est oublié.
     appareils = 'List of devices attached\nSERIE2 device usb:1 model:Autre transport_id:2\n'
-    expect(await f.t.etat()).toEqual({ etat: 'pret', nom: 'Autre' })
+    expect(await f.t.etat()).toEqual({ etat: 'pret', nom: 'Autre', itineraires: true })
     await expect(f.t.ecrire!('sessions/a.gpx', LOCAL, 5)).rejects.toThrow("n'a pas été listé")
     await expect(f.t.effacer!('sessions/a.gpx')).rejects.toThrow("n'a pas été listé")
     expect(auTelephone(f)).toEqual([])
@@ -872,6 +873,7 @@ describe('effacement d’un fichier du téléphone', () => {
       NOTRE_SERVEUR,
     )
     expect(await f.t.lister()).toEqual([
+      { chemin: 'itineraires/tour.json', taille: 2, dateMs: 1763495000000 },
       { chemin: 'reglages/pc.json', taille: 2, dateMs: 1763495000000 },
       { chemin: 'sessions/a.json', taille: 3, dateMs: 1763495000000 },
       { chemin: 'sessions/b.gpx', taille: 4, dateMs: 1763495000000 },

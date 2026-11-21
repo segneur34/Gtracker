@@ -1,6 +1,7 @@
 import type { SyncRefusal, SyncSideName } from './syncBase';
 import type { SyncExtraLeft, SyncExtraOp } from './syncExtras';
 import type { SyncFirstReason, SyncItem, SyncPlan } from './syncPlan';
+import type { RouteSyncItem, RouteSyncPlan } from './syncRoutes';
 
 /**
  * Ce qu'a fait une synchronisation des sessions entre l'ordinateur et le téléphone, tel que l'exécutant le rend
@@ -29,6 +30,27 @@ export interface SyncExtrasOutcome {
   left: SyncExtraLeft[];
   /** Écritures vers un téléphone qu'on ne peut pas écrire : elles restent à faire. */
   withheld: SyncExtraOp[];
+}
+
+/** Ce qu'est devenu chaque itinéraire (`itineraires/`), sur le modèle des sessions. */
+export interface SyncRoutesOutcome {
+  /**
+   * Vrai si les itinéraires n'ont pas été touchés parce que le téléphone ne liste pas `itineraires/` (par le sans-fil,
+   * ou coquille plus ancienne) : ils attendent le câble ou la mise à jour.
+   */
+  waiting: boolean;
+  /** Le plan des itinéraires exécuté, restrictions comprises ; `null` s'il n'a pas été fait. */
+  plan: RouteSyncPlan | null;
+  /** Itinéraires dont une suppression que cette passe pouvait faire ne l'a pas été (écartée, ou à confirmer). */
+  withheldDeletions: RouteSyncItem[];
+  /** Itinéraires dont une écriture ou un retrait sur le téléphone attend un téléphone qu'on peut écrire. */
+  withheldForPhone: RouteSyncItem[];
+  /** Itinéraires dont toutes les opérations ont été faites. */
+  done: RouteSyncItem[];
+  /** Laissés pour la fois suivante : un fichier n'était plus celui du plan. */
+  skipped: RouteSyncItem[];
+  /** Arrêtés par une erreur sur l'ordinateur, avec son texte. */
+  failed: { item: RouteSyncItem; detail: string }[];
 }
 
 export interface SyncUnknownActivity {
@@ -82,13 +104,15 @@ export interface SyncOutcome {
   error: string | null;
   /** Fichiers de réglages, tests de FC repos et lieux appris. */
   extras: SyncExtrasOutcome;
+  /** Itinéraires. */
+  routes: SyncRoutesOutcome;
   /**
    * Sessions reçues par un appareil qui ne connaît pas leur activité (`SyncOptions.knownActivities`) : de quoi lui
    * conseiller de reprendre les réglages de l'autre.
    */
   unknownActivities: SyncUnknownActivity[];
   /**
-   * Vrai si tout le plan a été fait, sans restriction ni session laissée, et sans fichier de réglages, de FC repos ou
+   * Vrai si tout le plan a été fait, sans restriction ni session ou itinéraire laissé, et sans fichier de réglages, de FC repos ou
    * de lieux arrêté par une erreur ou changé pendant la synchronisation : la base porte la date de cette fin.
    */
   complete: boolean;
@@ -99,5 +123,6 @@ export const emptySyncOutcome = (refusal: SyncStop | null): SyncOutcome => ({
   refusal, interrupted: false, first: null, safetyCopy: null, plan: null, deletions: 'made', withheldDeletions: [], withheldForPhone: [],
   phoneWritable: false, done: [], skipped: [], failed: [], keptFromPhone: [],
   extras: { done: [], left: [], withheld: [] }, unknownActivities: [],
+  routes: { waiting: false, plan: null, withheldDeletions: [], withheldForPhone: [], done: [], skipped: [], failed: [] },
   linkLost: null, error: null, complete: false,
 });

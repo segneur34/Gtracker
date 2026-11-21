@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
-import { t, tn } from '../core/i18n';
+import { t } from '../core/i18n';
 import { isRecordingActive } from '../hooks/useRecorder';
 import {
   answerPhoneSyncQuestion, clearPhoneArrivalNote, notePhoneArrival, phoneSyncStep, synchronizeWithPhone, usePhoneArrivalNote,
   usePhoneSync, type PhoneSyncAnswer, type PhoneSyncStep,
 } from '../hooks/useSessionLibrary';
-import { describePhoneSync, firstSyncText, syncProgressText, syncStepText, type SyncQuestion } from '../library/syncReport';
+import { routeStore } from '../hooks/routeFiles';
+import {
+  describePhoneSync, firstSyncText, syncProgressText, syncQuestionConfirmLabel, syncQuestionLeaveLabel, syncQuestionListLabel, syncStepText,
+  type SyncQuestion,
+} from '../library/syncReport';
 import { phoneCableAvailable } from '../platform/phoneCable';
 import { onWirelessArrival } from '../platform/wirelessPhone';
 import Button from './ui/Button';
@@ -34,6 +38,13 @@ function PhoneSyncButton() {
   const note = usePhoneArrivalNote();
 
   useEffect(() => onWirelessArrival(() => notePhoneArrival()), []);
+
+  // La synchronisation a pu changer les itinéraires de l'ordinateur : leur liste est relue à son issue, question
+  // comprise (les itinéraires sont faits avant qu'elle soit posée).
+  const ended = step.step === 'over' || step.step === 'question';
+  useEffect(() => {
+    if (ended) routeStore.reload();
+  }, [ended]);
 
   useEffect(() => {
     if (note === null) return;
@@ -100,7 +111,10 @@ function StepView({ step, onClose }: { step: PhoneSyncStep; onClose: () => void 
   );
 }
 
-/** Les sessions nommées par une question : date et heure de départ, et pour le garde-fou ce qui leur arriverait. */
+/**
+ * Les sessions et itinéraires nommés par une question : date et heure de départ d'une session, nom des fichiers d'un
+ * itinéraire, et pour le garde-fou ce qui leur arriverait.
+ */
 function SessionList({ question }: { question: SyncQuestion }) {
   return (
     <ul className="phone-sync__sessions num">
@@ -113,25 +127,33 @@ function SessionList({ question }: { question: SyncQuestion }) {
               : t('{date} : retirée du téléphone', { date: s.label })}
         </li>
       ))}
+      {question.routes.map((r) => (
+        <li key={`itineraire-${r.side}-${r.id}`}>
+          {question.kind === 'inTrash'
+            ? r.label
+            : r.side === 'computer'
+              ? t("{name} : mis dans la corbeille de l'ordinateur", { name: r.label })
+              : t('{name} : retiré du téléphone', { name: r.label })}
+        </li>
+      ))}
     </ul>
   );
 }
 
 function QuestionView({ question }: { question: SyncQuestion }) {
-  const n = question.count;
   if (question.kind === 'guard') {
     return (
       <>
         <div className="phone-sync__body">
           <p>{question.text}</p>
           <details className="phone-sync__details">
-            <summary>{tn(n, 'Voir la session', 'Voir les {n} sessions')}</summary>
+            <summary>{syncQuestionListLabel(question)}</summary>
             <SessionList question={question} />
           </details>
         </div>
         <div className="phone-sync__actions">
           <Button variant="secondary" onClick={answer('cancel')}>{t('Annuler')}</Button>
-          <Button variant="danger" onClick={answer('confirmDeletions')}>{tn(n, 'Supprimer cette session', 'Supprimer ces {n} sessions')}</Button>
+          <Button variant="danger" onClick={answer('confirmDeletions')}>{syncQuestionConfirmLabel(question)}</Button>
           <Button variant="primary" onClick={answer('withoutDeletions')}>{t('Synchroniser sans rien supprimer')}</Button>
         </div>
       </>
@@ -144,7 +166,7 @@ function QuestionView({ question }: { question: SyncQuestion }) {
         <SessionList question={question} />
       </div>
       <div className="phone-sync__actions">
-        <Button variant="secondary" onClick={answer('leave')}>{tn(n, 'La laisser', 'Les laisser')}</Button>
+        <Button variant="secondary" onClick={answer('leave')}>{syncQuestionLeaveLabel(question)}</Button>
         <Button variant="danger" onClick={answer('removeHeld')}>{t('Retirer du téléphone')}</Button>
       </div>
     </>

@@ -20,7 +20,7 @@ const SRC = new URL('../../', import.meta.url);
 const LAYERS = [
   'store', 'memory', 'summarySettings', 'recordWrites', 'cache', 'scan', 'summaryQueue', 'deviceSettings', 'trash',
   'addSession', 'pending', 'importer', 'incoming', 'sessionRecords', 'placeQueue', 'lifecycle', 'reset',
-  'trashRestore', 'sync', 'phoneSync',
+  'trashRestore', 'syncRouteFiles', 'sync', 'phoneSync',
 ] as const;
 
 /** Valeurs exportées par le point d'entrée, les mêmes qu'avant le découpage (et cinq types). */

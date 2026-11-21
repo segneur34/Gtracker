@@ -38,9 +38,11 @@ export type CanalTelephone = 'sansFil' | 'cable'
 export type EtatTelephone =
   /**
    * Un téléphone prêt à être lu ; `nom` est son modèle, pour le message ; `canal`, quand plusieurs canaux servent ;
-   * `ecriture`, quand on sait si ce canal écrit sur le téléphone.
+   * `ecriture`, quand on sait si ce canal écrit sur le téléphone ; `itineraires`, vrai si ce canal liste aussi
+   * `itineraires/` (le câble) : sans lui, la page ne touche pas aux itinéraires, qu'un listage muet ferait croire
+   * supprimés.
    */
-  | { etat: 'pret'; nom: string; canal?: CanalTelephone; ecriture?: boolean }
+  | { etat: 'pret'; nom: string; canal?: CanalTelephone; ecriture?: boolean; itineraires?: boolean }
   /** Rien de branché, ou rien de vu. */
   | { etat: 'absent' }
   /** Le téléphone attend que l'utilisateur accepte cet ordinateur. */
@@ -131,9 +133,9 @@ export function cheminAdmis(chemin: string): boolean {
 }
 
 /** Sous-dossiers dont le câble liste les fichiers, en plus de la racine. */
-export const DOSSIERS_DU_CABLE: readonly string[] = [DOSSIER_SESSIONS, DOSSIER_REGLAGES]
+export const DOSSIERS_DU_CABLE: readonly string[] = [DOSSIER_SESSIONS, DOSSIER_ITINERAIRES, DOSSIER_REGLAGES]
 
-/** Vrai pour un chemin relatif que le câble liste et lit : ceux du sans-fil, plus les fichiers de `reglages/`. */
+/** Vrai pour un chemin relatif que le câble liste et lit : ceux du sans-fil, plus les fichiers de `itineraires/` et de `reglages/`. */
 export function cheminDuCable(chemin: string): boolean {
   const segments = chemin.split('/')
   if (segments.length === 2 && !DOSSIERS_DU_CABLE.includes(segments[0])) return false
@@ -265,7 +267,7 @@ export type OptionsDossierLocal = {
 
 /**
  * Un dossier local qui joue la mémoire partagée du téléphone (`stockage`, son `/sdcard`) : le dossier lu est
- * `stockage/Documents/Gtracker`. Il liste comme le câble (racine, `sessions/`, `reglages/`, provisoires vus comme le
+ * `stockage/Documents/Gtracker`. Il liste comme le câble (racine, `sessions/`, `itineraires/`, `reglages/`, provisoires vus comme le
  * téléphone les voit), et écrit et efface comme lui : nom provisoire, taille relue, renommage. Stockage absent :
  * téléphone absent. Une installation copie l'APK sous `stockage/applications-installees/`, ou rend le refus imposé.
  */
@@ -282,7 +284,7 @@ export function dossierLocal(stockage: string | null, options: OptionsDossierLoc
     if (options.etatImpose) return options.etatImpose
     if (stockage === null) return { etat: 'absent' }
     try {
-      return (await stat(stockage)).isDirectory() ? { etat: 'pret', nom: NOM_TELEPHONE_ESSAI } : { etat: 'absent' }
+      return (await stat(stockage)).isDirectory() ? { etat: 'pret', nom: NOM_TELEPHONE_ESSAI, itineraires: true } : { etat: 'absent' }
     } catch {
       return { etat: 'absent' }
     }
@@ -671,7 +673,7 @@ export function essaiTelephoneDepuisEnvironnement(
   const stockage = env.GTRACKER_BANC_TELEPHONE?.trim() ? path.resolve(env.GTRACKER_BANC_TELEPHONE) : null
   const nom = env.GTRACKER_BANC_TELEPHONE_ETAT?.trim() ?? ''
   let etatImpose: EtatTelephone | null = null
-  if (nom === 'pret') etatImpose = { etat: 'pret', nom: NOM_TELEPHONE_ESSAI }
+  if (nom === 'pret') etatImpose = { etat: 'pret', nom: NOM_TELEPHONE_ESSAI, itineraires: true }
   else if (nom === 'adbIntrouvable') etatImpose = { etat: 'adbIntrouvable', dossier: dossierAdb }
   else if (nom === 'absent' || nom === 'autorisation' || nom === 'horsLigne' || nom === 'occupe') etatImpose = { etat: nom }
   else if (nom !== '') journal(`état du téléphone d'essai inconnu, ignoré : ${nom}`)

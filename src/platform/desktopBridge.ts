@@ -99,9 +99,10 @@ export type DesktopPhoneChannel = 'sansFil' | 'cable';
 export type DesktopPhoneState =
   /**
    * Un téléphone prêt à être lu ; `nom` est son modèle ; `canal` : par où, absent d'une coquille plus ancienne (le
-   * câble) ; `ecriture` : vrai si ce canal sait aussi écrire et effacer, absent d'une coquille qui ne le sait pas.
+   * câble) ; `ecriture` : vrai si ce canal sait aussi écrire et effacer, absent d'une coquille qui ne le sait pas ;
+   * `itineraires` : vrai si ce canal liste aussi `itineraires/`, absent d'une coquille qui ne le liste pas.
    */
-  | { etat: 'pret'; nom: string; canal?: DesktopPhoneChannel; ecriture?: boolean }
+  | { etat: 'pret'; nom: string; canal?: DesktopPhoneChannel; ecriture?: boolean; itineraires?: boolean }
   /** Rien de branché, ou rien de vu. */
   | { etat: 'absent' }
   /** Le téléphone attend que l'utilisateur accepte cet ordinateur. */

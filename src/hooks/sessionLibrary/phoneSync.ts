@@ -6,10 +6,12 @@ import {
   describeSyncQuestion, phoneArrivalText, type PhoneLinkChannel, type PhoneNotReady, type PhoneSyncResult, type SyncQuestion,
 } from '../../library/syncReport';
 import { nativeErrorMessage } from '../../platform/nativeMessages';
-import { listPhoneFiles, phoneCanWrite, phoneChannel, phoneMemoryFolder, phoneSafetyCopy, phoneState, type PhoneState } from '../../platform/phoneCable';
+import {
+  listPhoneFiles, phoneCanWrite, phoneChannel, phoneListsRoutes, phoneMemoryFolder, phoneSafetyCopy, phoneState, type PhoneState,
+} from '../../platform/phoneCable';
 import { wirelessAvailable, wirelessState } from '../../platform/wirelessPhone';
 import { createStore } from '../createStore';
-import { synchronizePhone, type SyncDeletionKey, type SyncLockOptions } from './sync';
+import { synchronizePhone, type SyncDeletionKey, type SyncLockOptions, type SyncRouteDeletionKey } from './sync';
 
 /**
  * « Synchroniser », dans le programme Windows : la couche du bouton, sous la fenêtre. Elle cherche le téléphone (relié
@@ -83,9 +85,13 @@ interface RunOptions {
   confirmDeletions?: boolean;
   /** Les suppressions que la question du garde-fou a montrées, seules couvertes par sa confirmation. */
   confirmedDeletions?: SyncDeletionKey[];
+  /** Les suppressions d'itinéraires que la même question a montrées. */
+  confirmedRouteDeletions?: SyncRouteDeletionKey[];
   heldOnPhone?: SyncHeldChoice;
   /** Les sessions de la corbeille que la question a montrées, seules à retirer du téléphone. */
   heldToRemove?: number[];
+  /** Les itinéraires de la corbeille que la même question a montrés (leurs identités). */
+  heldRoutesToRemove?: string[];
 }
 
 /** Les choix de la synchronisation en cours ou de la dernière, repris par une relance. */
@@ -139,8 +145,12 @@ const synchronize = async (options: RunOptions): Promise<PhoneSyncResult> => {
       withoutDeletions: options.withoutDeletions,
       confirmDeletions: options.confirmDeletions,
       confirmedDeletions: options.confirmedDeletions,
+      confirmedRouteDeletions: options.confirmedRouteDeletions,
       heldOnPhone: options.heldOnPhone,
       heldToRemove: options.heldToRemove,
+      heldRoutesToRemove: options.heldRoutesToRemove,
+      // Sans listage d'`itineraires/` (sans-fil, coquille plus ancienne), les itinéraires ne sont pas touchés.
+      phoneRoutes: phoneListsRoutes(state),
       beforeWrites: () => {
         progress.set({ step: 'safetyCopy', phone, channel: link });
         return phoneSafetyCopy();
@@ -193,19 +203,21 @@ export const answerPhoneSyncQuestion = (answer: PhoneSyncAnswer): Promise<void> 
   if (step.step !== 'question' || running) return running ?? Promise.resolve();
   switch (answer) {
     case 'withoutDeletions':
-      return launch({ ...current, withoutDeletions: true, confirmDeletions: false, confirmedDeletions: undefined });
+      return launch({ ...current, withoutDeletions: true, confirmDeletions: false, confirmedDeletions: undefined, confirmedRouteDeletions: undefined });
     // Une réponse ne vaut que pour les sessions que sa question a montrées : l'exécutant reçoit leur liste, et si le
     // plan du moment en touche une autre, il ne supprime rien et la question revient.
     case 'confirmDeletions':
       return launch({
         ...current, confirmDeletions: true, withoutDeletions: false,
         confirmedDeletions: step.question.sessions.map((s) => ({ startMs: s.startMs, side: s.side })),
+        confirmedRouteDeletions: step.question.routes.map((r) => ({ id: r.id, side: r.side })),
       });
     case 'removeHeld':
       // Des retraits qui dépassent le garde-fou rouvrent sa fenêtre : une confirmation donnée avant ne les couvre pas.
       return launch({
         ...current, heldOnPhone: 'remove', heldToRemove: step.question.sessions.map((s) => s.startMs),
-        confirmDeletions: false, confirmedDeletions: undefined,
+        heldRoutesToRemove: step.question.routes.map((r) => r.id),
+        confirmDeletions: false, confirmedDeletions: undefined, confirmedRouteDeletions: undefined,
       });
     default:
       progress.set({ step: 'over', result: step.result });

@@ -104,10 +104,12 @@ describe('liste blanche des écritures', () => {
     for (const autre of [3, null, undefined, ['sessions/a.gpx'], { chemin: 'sessions/a.gpx' }]) expect(cheminEcrivable(autre)).toBe(false)
   })
 
-  it('le câble liste aussi reglages/, le sans-fil non', () => {
+  it('le câble liste aussi reglages/ et itineraires/, le sans-fil non', () => {
     expect(cheminDuCable('reglages/pc.json')).toBe(true)
     expect(cheminAdmis('reglages/pc.json')).toBe(false)
-    expect(cheminDuCable('itineraires/a.gpx')).toBe(false)
+    expect(cheminDuCable('itineraires/a.gpx')).toBe(true)
+    expect(cheminAdmis('itineraires/a.gpx')).toBe(false)
+    expect(cheminDuCable('itineraires/sous/a.gpx')).toBe(false)
     expect(cheminDuCable('sessions/a.gpx')).toBe(true)
   })
 })
@@ -139,14 +141,15 @@ describe('provisoires vus comme le téléphone', () => {
 })
 
 describe('dossier local', () => {
-  it('liste la racine et sessions/ avec taille et date à la seconde, NOT_FOUND sans Documents/Gtracker', async () => {
+  it('liste la racine, sessions/ et itineraires/ avec taille et date à la seconde, NOT_FOUND sans Documents/Gtracker', async () => {
     await poser('gtracker.json', '{}')
     await poser('sessions/sortie é.gpx', '<gpx/>')
     await poser('itineraires/tour.gpx', '<gpx/>')
     const t = dossierLocal(stockage)
-    expect(await t.etat()).toEqual({ etat: 'pret', nom: NOM_TELEPHONE_ESSAI })
+    expect(await t.etat()).toEqual({ etat: 'pret', nom: NOM_TELEPHONE_ESSAI, itineraires: true })
     expect(await t.lister()).toEqual([
       { chemin: 'gtracker.json', taille: 2, dateMs: DATE.getTime() },
+      { chemin: 'itineraires/tour.gpx', taille: 6, dateMs: DATE.getTime() },
       { chemin: 'sessions/sortie é.gpx', taille: 6, dateMs: DATE.getTime() },
     ])
     await rm(path.join(stockage, 'Documents'), { recursive: true })
@@ -370,7 +373,7 @@ describe('canaux du téléphone', () => {
     await poser('gtracker.json', '{"v":1}')
     const avant = await empreinte(stockage)
     const c = canaux(dossierLocal(stockage))
-    expect(valeur(await c.etat())).toEqual({ etat: 'pret', nom: NOM_TELEPHONE_ESSAI })
+    expect(valeur(await c.etat())).toEqual({ etat: 'pret', nom: NOM_TELEPHONE_ESSAI, itineraires: true })
     const liste = valeur(await c.lister())
     expect(liste.map((f) => f.chemin)).toEqual(['gtracker.json', 'sessions/sortie du matin é.gpx'])
     const octets = valeur(await c.lire({ chemin: 'sessions/sortie du matin é.gpx' }))

@@ -112,38 +112,59 @@ export const stashInTrash = (f: TrashFolder, request: TrashRequest, nowMs: numbe
     return entry;
   });
 
-/** Fichiers d'une session à ranger tels quels, lus ailleurs (la synchronisation : de l'ordinateur ou du téléphone). */
-export interface TrashBytesRequest {
-  startMs: number;
+/**
+ * Fichiers à ranger tels quels, lus ailleurs (la synchronisation : de l'ordinateur ou du téléphone) : ceux d'une
+ * session (par défaut), ses restes, ou ceux d'un itinéraire (`itineraire` : sa fiche et son GPX).
+ */
+export type TrashBytesRequest = {
   name: string;
   origin: TrashOrigin;
-  /** Nom du GPX de la session ; il peut manquer parmi `files` (restes d'une suppression coupée : fiche, capteurs). */
+  /**
+   * Session : nom de son GPX ; il peut manquer parmi `files` (restes d'une suppression coupée : fiche, capteurs).
+   * Itinéraire : nom de sa fiche.
+   */
   main: string;
-  /** Les fichiers, dans l'ordre de leur retrait (GPX d'abord), sous leurs noms d'origine. */
+  /** Les fichiers, dans l'ordre de leur retrait (GPX d'abord pour une session, fiche d'abord pour un itinéraire), sous leurs noms d'origine. */
   files: { name: string; bytes: Uint8Array }[];
+} & (
   /** `restes` : fiche ou capteurs sans leur GPX, jamais montrés comme une session ; par défaut `session`. */
-  kind?: 'session' | 'restes';
-}
+  | { kind?: 'session' | 'restes'; startMs: number }
+  /** Itinéraire : base de ses noms de fichiers, et création (`null` : fiche sans date, reconnue à sa base). */
+  | { kind: 'itineraire'; routeBase: string; createdAt: string | null }
+);
+
+/** Entrée qui tient déjà ces fichiers d'un itinéraire, de même base, même création et même origine (reprise après une coupure). */
+const reusableRouteBytesEntry = (
+  entries: readonly TrashEntry[], request: Extract<TrashBytesRequest, { kind: 'itineraire' }>, files: readonly TrashFile[],
+): TrashEntry | null =>
+  entries.find((e) => e.kind === 'itineraire' && e.origin === request.origin && e.createdAt === request.createdAt
+    && e.routeBase?.toLowerCase() === request.routeBase.toLowerCase() && e.main.toLowerCase() === request.main.toLowerCase()
+    && files.every((file) => e.files.some((g) => g.name.toLowerCase() === file.name.toLowerCase() && g.size === file.size))) ?? null;
 
 /**
- * Range dans une entrée neuve de la corbeille des fichiers déjà lus : capteurs, fiche, puis GPX en dernier, puis
- * l'entrée de l'index. Une entrée de même identité, même origine, même GPX, qui tient déjà chacun de ces fichiers à
- * la même taille (reprise après une coupure) est rendue sans rien recopier. Lève sans rien changer si l'index ne se
- * lit pas.
+ * Range dans une entrée neuve de la corbeille des fichiers déjà lus, dans l'ordre inverse de leur retrait (pour une
+ * session : capteurs, fiche, puis GPX en dernier), puis l'entrée de l'index. Une entrée de même identité, même
+ * origine, même fichier principal, qui tient déjà chacun de ces fichiers à la même taille (reprise après une coupure)
+ * est rendue sans rien recopier. Lève sans rien changer si l'index ne se lit pas.
  */
 export const stashFilesInTrash = (f: TrashFolder, request: TrashBytesRequest, nowMs: number): Promise<TrashEntry> =>
   inTrashQueue(async () => {
     const index = await readTrashIndex(f);
     if (!isWritableTrash(index)) throw new Error(TRASH_LOCKED_MESSAGE);
-    const kind = request.kind ?? 'session';
     const sizes = request.files.map((file) => ({ name: file.name, size: file.bytes.byteLength }));
-    const reused = reusableTrashEntry(index.entries, request.startMs, request.main, sizes, request.origin, kind);
+    const route = request.kind === 'itineraire' ? request : null;
+    const session = request.kind === 'itineraire' ? null : request;
+    const reused = route
+      ? reusableRouteBytesEntry(index.entries, route, sizes)
+      : reusableTrashEntry(index.entries, session?.startMs ?? NaN, request.main, sizes, request.origin, session?.kind ?? 'session');
     if (reused) return reused;
     const listed = await f.list(TRASH_DIR);
-    const dir = trashDirName(nowMs, String(request.startMs), [...listed.map((e) => e.name), ...index.entries.map((e) => e.dir)]);
+    const identity = route ? route.routeBase : String(session?.startMs);
+    const dir = trashDirName(nowMs, identity, [...listed.map((e) => e.name), ...index.entries.map((e) => e.dir)]);
     for (const file of [...request.files].reverse()) await f.writeBytes(trashFilePath(dir, file.name), file.bytes);
     const entry: TrashEntry = {
-      dir, kind, startMs: request.startMs, routeBase: null, createdAt: null, name: request.name, deletedAtMs: nowMs,
+      dir, kind: route ? 'itineraire' : session?.kind ?? 'session', startMs: session ? session.startMs : null,
+      routeBase: route ? route.routeBase : null, createdAt: route ? route.createdAt : null, name: request.name, deletedAtMs: nowMs,
       origin: request.origin, reason: 'supprimee', main: request.main, files: sizes,
     };
     await writeIndex(f, [...index.entries, entry]);

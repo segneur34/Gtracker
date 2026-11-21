@@ -399,6 +399,30 @@ describe('ce qui est laissé tel quel', () => {
     expect((await run(pair)).items).toEqual([]);
   });
 
+  it('GPX exporté puis réimporté (même date de création, autre itinéraire) : la suppression de l’original ne l’emporte pas', async () => {
+    const pair = await syncedPair(1);
+    putRoute(pair.computer, 'importe', iso(0), iso(4), { lat: 46 });
+    putRoute(pair.phone, 'importe tel', iso(0), iso(5), { lat: 47 });
+    dropRoute(pair.phone, 'r0');
+    const plan = await run(pair);
+    expect(itemOf(plan, iso(0))).toMatchObject({ case: 'deletedOnPhone', ops: [{ kind: 'trash', files: { base: 'r0' } }] });
+    expect(plan.aside).toEqual([{ side: 'computer', base: 'importe', reason: 'duplicate' }, { side: 'phone', base: 'importe tel', reason: 'duplicate' }]);
+    expect(pair.trash.map((e) => e.base)).toEqual(['r0']);
+    expect(await routesOf(pair.computer)).toEqual(['importe']);
+    expect(await routesOf(pair.phone)).toEqual(['importe tel']);
+
+    const other = await syncedPair(1);
+    putRoute(other.phone, 'importe', iso(0), iso(4), { lat: 46 });
+    trashRoute(other, 'r0');
+    const removal = await run(other);
+    expect(itemOf(removal, iso(0))).toMatchObject({ case: 'deletedOnComputer', ops: [{ kind: 'removeFromPhone', files: { base: 'r0' } }] });
+    expect(await routesOf(other.phone)).toEqual(['importe']);
+    // Seul de son identité, il voyage ensuite comme un itinéraire neuf, sans rien retirer.
+    const next = await run(other);
+    expect(deletions(next)).toEqual([]);
+    expect(await routesOf(other.computer)).toEqual(['importe']);
+  });
+
   it('base déjà prise de l’autre côté par un autre itinéraire : la copie en prend une libre ; un GPX seul de la même copie est repris', async () => {
     const pair = pairOf();
     putRoute(pair.computer, 'Tour', iso(0), iso(0));

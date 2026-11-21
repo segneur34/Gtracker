@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DesktopPhoneBridge } from './desktopBridge';
-import { listPhoneFiles, phoneCableAvailable, phoneCanWrite, phoneImportEntries, phoneMemoryFolder, phoneState } from './phoneCable';
+import { listPhoneFiles, phoneCableAvailable, phoneCanWrite, phoneImportEntries, phoneListsRoutes, phoneMemoryFolder, phoneState } from './phoneCable';
 
 /**
  * Le téléphone branché, vu de la page : le pont est le vrai code de la coquille (`bureau/telephone.ts`), sur un
@@ -85,7 +85,9 @@ describe('téléphone branché par câble', () => {
 
   it('état du téléphone, prêt ou imposé', async () => {
     plug();
-    expect(await phoneState()).toEqual({ etat: 'pret', nom: "Téléphone d'essai" });
+    expect(await phoneState()).toEqual({ etat: 'pret', nom: "Téléphone d'essai", itineraires: true });
+    expect(phoneListsRoutes(await phoneState())).toBe(true);
+    expect(phoneListsRoutes({ etat: 'pret', nom: 'x', canal: 'sansFil' })).toBe(false);
     plug({ etatImpose: { etat: 'adbIntrouvable', dossier: 'C:\\profil\\platform-tools' } });
     expect(await phoneState()).toEqual({ etat: 'adbIntrouvable', dossier: 'C:\\profil\\platform-tools' });
   });

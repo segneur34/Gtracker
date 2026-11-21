@@ -19,6 +19,7 @@ import { inspectSyncRecord, mergeSyncRecords } from '../../library/syncRecordMer
 import { deletesToTrash, isWritableTrash, sessionTrashEntries, trashFilePath, type TrashEntry, type TrashOrigin } from '../../library/trash';
 import { addFilesToTrashEntry, readTrashIndex, rewriteTrashText, stashFilesInTrash } from '../../library/trashFolder';
 import { sessionDisplayName } from '../../library/sessionName';
+import { planRouteSync, restrictRouteSyncPlan, type RouteSyncPlan } from '../../library/syncRoutes';
 import type { FileStat, MemoryFolder } from '../../platform/memoryFolder';
 import { readStoredActivities } from '../useSportSettings';
 import { deviceId, flushWrites } from './deviceSettings';
@@ -26,6 +27,10 @@ import { canImportSessions } from './importer';
 import { refreshLibrary } from './lifecycle';
 import { lib } from './memory';
 import { libraryState, setState } from './store';
+import {
+  executeRoutePlan, readRouteSyncInput, routeDeletionKeysOf, routeOpWritesPhone, routePlanFiles, routeRemovalsOf, trashedRouteIds,
+  type SyncRouteDeletionKey,
+} from './syncRouteFiles';
 import { holdTrashDuring, recordShownName, reloadTrash, trashFolderOf } from './trash';
 
 /**
@@ -45,7 +50,10 @@ import { holdTrashDuring, recordShownName, reloadTrash, trashFolderOf } from './
  *   synchronisation a été coupée.
  * - Une session dont l'état a changé depuis le listage est laissée ; une erreur sur l'ordinateur arrête cette session ;
  *   une erreur du dossier distant (câble débranché) arrête tout.
- * - Après les sessions, les fichiers de réglages, les tests de FC repos et les lieux appris suivent leur propre plan
+ * - Après les sessions, les itinéraires suivent leur propre plan (`library/syncRoutes.ts`, `syncRouteFiles.ts`), fait
+ *   au départ avec celui des sessions : un seul garde-fou, une seule confirmation. Ils ne sont touchés que si le
+ *   téléphone liste `itineraires/` (`phoneRoutes`).
+ * - Puis les fichiers de réglages, les tests de FC repos et les lieux appris suivent leur propre plan
  *   (`library/syncExtras.ts`) : recopiés ou fondus, jamais supprimés, jamais adoptés.
  * - À la fin, si un fichier du téléphone a été écrit ou retiré, l'instant de la synchronisation est posé dans son
  *   marqueur : l'application du téléphone le relit au retour au premier plan et relit alors sa mémoire.
@@ -54,7 +62,8 @@ import { holdTrashDuring, recordShownName, reloadTrash, trashFolderOf } from './
 /** Témoin d'une synchronisation en cours : présent au départ suivant, la précédente a été coupée. */
 export const SYNC_RUNNING_PATH = `${SYNC_DIR}/en-cours.json`;
 
-export type { SyncExtrasOutcome, SyncFailure, SyncOutcome, SyncStop, SyncUnknownActivity } from '../../library/syncOutcome';
+export type { SyncExtrasOutcome, SyncFailure, SyncOutcome, SyncRoutesOutcome, SyncStop, SyncUnknownActivity } from '../../library/syncOutcome';
+export type { SyncRouteDeletionKey } from './syncRouteFiles';
 
 export interface SyncOptions {
   /** Faux : le dossier distant se lit sans s'écrire, seule la moitié de l'ordinateur est faite. Par défaut : s'il n'est pas en lecture seule. */
@@ -77,6 +86,20 @@ export interface SyncOptions {
    * laissées, et la question revient avec la liste du moment.
    */
   heldToRemove?: readonly number[];
+  /**
+   * Vrai : le téléphone liste `itineraires/`, les itinéraires se synchronisent. Faux : ils ne sont pas touchés du tout
+   * (un listage muet les ferait croire supprimés), et le compte rendu dit qu'ils attendent le câble ou la mise à jour.
+   * Absent : ils ne sont pas touchés, sans rien en dire.
+   */
+  phoneRoutes?: boolean;
+  /**
+   * Les suppressions d'itinéraires que la confirmation a montrées. Comme `confirmedDeletions` : donnée, la
+   * confirmation ne vaut que si le plan du moment n'en fait pas d'autre ; absente alors que `confirmedDeletions` est
+   * donnée, elle vaut une liste vide.
+   */
+  confirmedRouteDeletions?: readonly SyncRouteDeletionKey[];
+  /** Comme `heldToRemove`, pour les itinéraires de la corbeille encore sur le téléphone (leurs identités). */
+  heldRoutesToRemove?: readonly string[];
   /** Horloge de l'ordinateur (corbeille, base). */
   now?: () => number;
   /** Identifiant neuf d'un dossier, écrit dans son marqueur. */
@@ -274,7 +297,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
   const scope = { computer: true, phone: options.phoneWritable ?? remote.readOnly !== true, deletions: options.withoutDeletions !== true };
   const outcome = emptyOutcome(null);
   outcome.phoneWritable = scope.phone;
-  /** Vrai dès qu'un fichier de sessions du téléphone a été écrit ou retiré. */
+  /** Vrai dès qu'un fichier de sessions ou d'itinéraires du téléphone a été écrit ou retiré. */
   let phoneChanged = false;
   /**
    * Le téléphone qui a changé l'apprend par l'instant posé dans son marqueur (`markerTextWithSync`), relu au retour
@@ -379,18 +402,38 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       if (heldNow.items.some((item) => item.left === 'inTrash' && !shown.has(item.startMs))) plan = heldNow;
     }
     const full = plan;
+    // Itinéraires : leur plan est fait maintenant, pour que le garde-fou et sa confirmation les comptent avec les
+    // sessions ; ils ne sont exécutés qu'après elles. Rien ne les touche (ni lecture ni écriture) sans `phoneRoutes`.
+    outcome.routes.waiting = options.phoneRoutes === false;
+    const routeInput = options.phoneRoutes === true ? await readRouteSyncInput(folders, pair.base) : null;
+    let routeFull: RouteSyncPlan | null = routeInput ? planRouteSync({ ...routeInput, heldOnPhone: options.heldOnPhone }) : null;
+    if (routeInput && options.heldOnPhone === 'remove' && options.heldRoutesToRemove) {
+      const shown = new Set(options.heldRoutesToRemove);
+      const heldNow = planRouteSync({ ...routeInput, heldOnPhone: 'leave' });
+      if (heldNow.items.some((item) => item.left === 'inTrash' && !shown.has(item.id))) routeFull = heldNow;
+    }
     // Le garde-fou ne compte que les suppressions que cette passe peut faire : un téléphone qu'on ne peut pas écrire
     // ne perd rien, et ses retraits ne retiennent pas les mises à la corbeille de l'ordinateur.
     const possible = restrictSyncPlan(full, { ...scope, deletions: true });
+    const routePossible = routeFull ? restrictRouteSyncPlan(routeFull, { ...scope, deletions: true }) : null;
+    const routeShown = options.confirmedRouteDeletions ?? (options.confirmedDeletions ? [] : undefined);
     const confirmed = options.confirmDeletions === true
-      && (!options.confirmedDeletions || deletionKeysOf(possible.items).every((key) => options.confirmedDeletions?.some((c) => sameDeletion(c, key))));
+      && (!options.confirmedDeletions || deletionKeysOf(possible.items).every((key) => options.confirmedDeletions?.some((c) => sameDeletion(c, key))))
+      && (!routeShown || routeDeletionKeysOf(routePossible?.items ?? []).every((key) => routeShown.some((c) => c.id === key.id && c.side === key.side)));
     const unconfirmedShown = options.confirmDeletions === true && !confirmed;
-    outcome.deletions = !scope.deletions ? 'excluded' : (possible.guard.tripped || unconfirmedShown) && !confirmed ? 'awaitingConfirmation' : 'made';
+    const tripped = possible.guard.tripped || routePossible?.guard.tripped === true;
+    outcome.deletions = !scope.deletions ? 'excluded' : (tripped || unconfirmedShown) && !confirmed ? 'awaitingConfirmation' : 'made';
     plan = restrictSyncPlan(full, { ...scope, deletions: outcome.deletions === 'made' });
     outcome.plan = plan;
     const deletionsOf = (item: SyncItem | undefined): number => item?.ops.filter((op) => op.kind === 'trash' || op.kind === 'removeFromPhone').length ?? 0;
     outcome.withheldDeletions = possible.items.filter((item) => deletionsOf(item) > deletionsOf(plan.items.find((i) => i.startMs === item.startMs)));
     if (!scope.phone) outcome.withheldForPhone = full.items.filter((item) => phoneOpsOf(item) > 0);
+    const routePlan = routeFull ? restrictRouteSyncPlan(routeFull, { ...scope, deletions: outcome.deletions === 'made' }) : null;
+    if (routeFull && routePossible && routePlan) {
+      outcome.routes.plan = routePlan;
+      outcome.routes.withheldDeletions = routePossible.items.filter((item) => routeRemovalsOf(item) > routeRemovalsOf(routePlan.items.find((i) => i.id === item.id)));
+      if (!scope.phone) outcome.routes.withheldForPhone = routeFull.items.filter((item) => item.ops.some(routeOpWritesPhone));
+    }
     options.onPlanned?.(plan, pair.first);
 
     let base: SyncBase = pair.base ?? emptySyncBase(ids.computer ?? '', ids.phone ?? '', options.phonePath ?? null);
@@ -608,7 +651,8 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     };
 
     const filesOfItem = (item: SyncItem): number => item.ops.reduce((sum, op) => sum + filesOfOp(op), 0);
-    const total = plan.items.reduce((sum, item) => sum + filesOfItem(item), 0);
+    const sessionFiles = plan.items.reduce((sum, item) => sum + filesOfItem(item), 0);
+    const total = sessionFiles + (routePlan ? routePlanFiles(routePlan) : 0);
     let before = 0;
     options.onProgress?.(0, total);
     for (const item of plan.items) {
@@ -648,13 +692,37 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
         if (before > reached) options.onProgress?.(before, total);
       }
     }
+    if (routeInput && routePlan) {
+      let reachedRoutes = sessionFiles;
+      options.onProgress?.(reachedRoutes, total);
+      await executeRoutePlan(routePlan, routeInput, {
+        folders,
+        isLinkError: (err) => err instanceof SyncLinkError,
+        now,
+        base: () => base,
+        setBase: async (next) => {
+          base = next;
+          await saveBase();
+        },
+        onPhoneChange: () => {
+          phoneChanged = true;
+        },
+        onFiles: (files) => {
+          reachedRoutes += files;
+          options.onProgress?.(reachedRoutes, total);
+        },
+      }, outcome.routes);
+    }
     options.onProgress?.(total, total);
     await syncExtraFiles(folders, scope, options.computerDeviceId ?? null, outcome);
     const extrasStopped = outcome.extras.left.some((l) => l.reason === 'changed' || l.reason === 'failed');
-    outcome.complete = scope.phone && outcome.deletions === 'made' && outcome.skipped.length === 0 && outcome.failed.length === 0 && !extrasStopped;
+    const routesStopped = outcome.routes.skipped.length > 0 || outcome.routes.failed.length > 0;
+    outcome.complete = scope.phone && outcome.deletions === 'made' && outcome.skipped.length === 0 && outcome.failed.length === 0
+      && !extrasStopped && !routesStopped;
     if (outcome.complete) {
-      const trashed = new Set(trashedOf(await trashNow()).map((e) => e.startMs));
-      base = withSyncDone(base, now(), trashed);
+      const entries = await trashNow();
+      const trashed = new Set(trashedOf(entries).map((e) => e.startMs));
+      base = withSyncDone(base, now(), trashed, routePlan ? trashedRouteIds(entries) : undefined);
       await saveBase();
     }
     await notifyPhone();

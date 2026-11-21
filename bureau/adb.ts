@@ -73,8 +73,8 @@ export const COMMANDE_LISTAGE = `find ${RACINE_DISTANTE} -maxdepth 2 -type f -ex
 /** Repli si `find … -exec … +` manque sur le téléphone : le dossier existe-t-il ? */
 export const COMMANDE_RACINE = `stat -c '%f' ${RACINE_DISTANTE}`
 
-/** Repli, suite : `stat` sur les fichiers de la racine, de `sessions/` et de `reglages/` (le mode écarte les dossiers). */
-export const COMMANDE_LISTAGE_REPLI = `stat -c '%f %s %Y %n' ${RACINE_DISTANTE}/* ${RACINE_DISTANTE}/sessions/* ${RACINE_DISTANTE}/reglages/*`
+/** Repli, suite : `stat` sur les fichiers de la racine, de `sessions/`, d'`itineraires/` et de `reglages/` (le mode écarte les dossiers). */
+export const COMMANDE_LISTAGE_REPLI = `stat -c '%f %s %Y %n' ${RACINE_DISTANTE}/* ${RACINE_DISTANTE}/sessions/* ${RACINE_DISTANTE}/itineraires/* ${RACINE_DISTANTE}/reglages/*`
 
 /**
  * Un texte cité pour le shell du téléphone (`adb shell` recolle ses arguments en une seule ligne de commande) : entre
@@ -124,7 +124,7 @@ export function lireAppareils(sortie: string): Appareil[] {
 /** État d'après les appareils : le premier prêt, sinon une autorisation à accepter, sinon hors ligne, sinon absent. */
 export function etatDesAppareils(appareils: Appareil[]): { etat: EtatTelephone; serie: string | null } {
   const pret = appareils.find((a) => a.etat === 'device')
-  if (pret) return { etat: { etat: 'pret', nom: pret.modele ?? pret.serie }, serie: pret.serie }
+  if (pret) return { etat: { etat: 'pret', nom: pret.modele ?? pret.serie, itineraires: true }, serie: pret.serie }
   if (appareils.some((a) => a.etat === 'unauthorized')) return { etat: { etat: 'autorisation' }, serie: null }
   if (appareils.some((a) => a.etat === 'offline')) return { etat: { etat: 'horsLigne' }, serie: null }
   return { etat: { etat: 'absent' }, serie: null }
@@ -165,7 +165,7 @@ const MASQUE_TYPE = 0xf000
 /**
  * Fichiers d'un listage `stat -c '%f %s %Y %n'`, tels que le téléphone les voit (`commeLeTelephone` : provisoires
  * cachés, ou montrés sous leur nom), avec leur nom réel : préfixe `RACINE_DISTANTE/` retiré, fichiers ordinaires de la
- * racine, de `sessions/` et de `reglages/` seulement, chemins refusés écartés (`cheminDuCable`). Une ligne illisible
+ * racine, de `sessions/`, d'`itineraires/` et de `reglages/` seulement, chemins refusés écartés (`cheminDuCable`). Une ligne illisible
  * est sautée.
  */
 export function lireListageVu(sortie: string, racine = RACINE_DISTANTE): FichierVu[] {
