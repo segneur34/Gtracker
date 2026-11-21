@@ -208,3 +208,23 @@ describe('tampon d’une fiche', () => {
     expect(sameStamp({ size: 10, mtimeMs: 0 }, { size: 10, mtimeMs: 0 })).toBe(false);
   });
 });
+
+describe('deux appareils, deux horloges : aucune date ne départage', () => {
+  const read = sessionRecord({ notes: notes({ comment: 'lu' }) });
+  const mine = { ...read, notes: notes({ comment: 'ici', savedAt: 150 }) };
+  const disk = { ...read, notes: notes({ comment: 'là-bas', conditions: 'là-bas', savedAt: 300 }) };
+
+  it('même champ de notes changé des deux côtés : par défaut le plus récent, avec la date la plus récente', () => {
+    const { record, conflicts } = mergeChangedRecord(disk, mine, editsOf(read, mine));
+    expect(record.notes).toEqual(notes({ comment: 'là-bas', conditions: 'là-bas', savedAt: 300 }));
+    expect(conflicts).toEqual(['notes.comment']);
+  });
+
+  it('sans comparer les horloges : la mémoire l’emporte, et le bloc du disque garde sa date', () => {
+    const { record, conflicts } = mergeChangedRecord(disk, mine, editsOf(read, mine), { datedByClock: false });
+    expect(record.notes).toEqual(notes({ comment: 'ici', conditions: 'là-bas', savedAt: 300 }));
+    expect(conflicts).toEqual(['notes.comment']);
+    const older = { ...disk, notes: notes({ comment: 'là-bas', savedAt: 50 }) };
+    expect(mergeChangedRecord(older, mine, editsOf(read, mine), { datedByClock: false }).record.notes?.savedAt).toBe(50);
+  });
+});

@@ -25,6 +25,7 @@ describe('noms techniques de l\'application', () => {
       itineraire: 'gtracker-itineraire',
       lieux: 'gtracker-lieux',
       corbeille: 'gtracker-corbeille',
+      synchro: 'gtracker-synchro',
     });
     expect(XML).toEqual({
       session: { prefix: 'gtracker', ns: 'urn:gtracker:session' },

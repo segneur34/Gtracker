@@ -40,6 +40,8 @@ export const FILE_FORMATS = {
   lieux: `${FORMAT_ID}-lieux` as const,
   /** Index de la corbeille du programme Windows (`library/trash.ts`). */
   corbeille: `${FORMAT_ID}-corbeille` as const,
+  /** Base de la synchronisation avec un téléphone, gardée par l'ordinateur (`library/syncBase.ts`). */
+  synchro: `${FORMAT_ID}-synchro` as const,
 };
 
 /** Blocs du GPX : préfixe des éléments et espace de noms, sans domaine ni dépôt. */

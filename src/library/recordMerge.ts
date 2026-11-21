@@ -89,9 +89,14 @@ const mergedSummary = (disk: SessionSummary | null, mine: SessionSummary, edits:
   return out as unknown as SessionSummary;
 };
 
-/** Bloc daté fondu, et les champs changés des deux côtés. Sur un champ changé des deux côtés, le bloc au `savedAt` le plus récent l'emporte. */
+/**
+ * Bloc daté fondu, et les champs changés des deux côtés. Sur un champ changé des deux côtés, le bloc au `savedAt` le
+ * plus récent l'emporte. `byDate` faux (deux appareils, deux horloges) : aucune date ne départage, `mine` l'emporte,
+ * et le bloc du disque garde sa date ; un bloc que le disque n'avait pas y arrive sans date (0), jamais avec celle
+ * de l'autre appareil.
+ */
 const mergedBlock = (
-  block: DatedBlock, disk: RecordWithoutSummary, mine: SessionRecord, edits: RecordEdits, conflicts: string[]
+  block: DatedBlock, disk: RecordWithoutSummary, mine: SessionRecord, edits: RecordEdits, conflicts: string[], byDate: boolean
 ): unknown => {
   const paths = [...edits.keys()].filter((path) => path === block || path.startsWith(`${block}.`));
   const fromDisk = disk[block];
@@ -103,7 +108,7 @@ const mergedBlock = (
   for (const path of paths) {
     const inConflict = !sameJson(valueAt(disk, path), edits.get(path)) && !sameJson(valueAt(disk, path), valueAt(mine, path));
     if (inConflict) conflicts.push(path);
-    if (inConflict && diskAt > mineAt) continue;
+    if (inConflict && byDate && diskAt > mineAt) continue;
     if (path === block) out = fromMine ? { ...loose(fromMine) } : null;
     else if (!out) out = fromMine ? { ...loose(fromMine) } : null;
     else {
@@ -113,7 +118,7 @@ const mergedBlock = (
       else out[field] = value;
     }
   }
-  return out ? { ...out, savedAt: Math.max(diskAt, mineAt) } : null;
+  return out ? { ...out, savedAt: byDate ? Math.max(diskAt, mineAt) : diskAt } : null;
 };
 
 /** Rang d'un lieu à la fonte : corrigé par l'utilisateur, puis appris, puis trouvé sur la carte, puis aucun. */
@@ -164,8 +169,13 @@ export interface MergedRecord {
  * notes et en réglages, le bloc au `savedAt` le plus récent ; ailleurs (nom, repères), la mémoire. Résumé :
  * `mergedSummary`. Si les réglages du disque ont changé, l'empreinte rend la session à refaire
  * (`isSummaryOutdated`), comme pour une allure changée ici.
+ * `datedByClock` faux : `disk` et `mine` viennent de deux appareils, dont les horloges ne se comparent pas ; en notes
+ * et en réglages aussi, un champ changé des deux côtés est alors celui de `mine`, et le bloc de `disk` garde sa date
+ * (0 s'il n'en avait pas : la date de `mine` ne passe jamais).
  */
-export const mergeChangedRecord = (disk: RecordWithoutSummary, mine: SessionRecord, edits: RecordEdits): MergedRecord => {
+export const mergeChangedRecord = (
+  disk: RecordWithoutSummary, mine: SessionRecord, edits: RecordEdits, { datedByClock = true }: { datedByClock?: boolean } = {},
+): MergedRecord => {
   const conflicts: string[] = [];
   const out: Loose = { ...disk, gpx: mine.gpx };
   const fromMine = loose(mine);
@@ -183,7 +193,7 @@ export const mergeChangedRecord = (disk: RecordWithoutSummary, mine: SessionReco
     if (fromMine[path] === undefined) delete out[path];
     else out[path] = fromMine[path];
   }
-  for (const block of DATED_BLOCKS) out[block] = mergedBlock(block, disk, mine, edits, conflicts);
+  for (const block of DATED_BLOCKS) out[block] = mergedBlock(block, disk, mine, edits, conflicts, datedByClock);
   out.summary = mergedSummary(disk.summary, mine.summary, edits);
   return { record: out as unknown as SessionRecord, conflicts: conflicts.filter(isSaisie) };
 };
