@@ -285,11 +285,14 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       pair, computer: await sideOf('computer'), phone: await sideOf('phone'), ancestors, trash: trashedOf(await trashNow()), heldOnPhone: options.heldOnPhone,
     });
     const full = plan;
-    outcome.deletions = !scope.deletions ? 'excluded' : plan.guard.tripped && !options.confirmDeletions ? 'awaitingConfirmation' : 'made';
+    // Le garde-fou ne compte que les suppressions que cette passe peut faire : un téléphone qu'on ne peut pas écrire
+    // ne perd rien, et ses retraits ne retiennent pas les mises à la corbeille de l'ordinateur.
+    const possible = restrictSyncPlan(full, { ...scope, deletions: true });
+    outcome.deletions = !scope.deletions ? 'excluded' : possible.guard.tripped && !options.confirmDeletions ? 'awaitingConfirmation' : 'made';
     plan = restrictSyncPlan(full, { ...scope, deletions: outcome.deletions === 'made' });
     outcome.plan = plan;
     const deletionsOf = (item: SyncItem | undefined): number => item?.ops.filter((op) => op.kind === 'trash' || op.kind === 'removeFromPhone').length ?? 0;
-    outcome.withheldDeletions = full.items.filter((item) => deletionsOf(item) > deletionsOf(plan.items.find((i) => i.startMs === item.startMs)));
+    outcome.withheldDeletions = possible.items.filter((item) => deletionsOf(item) > deletionsOf(plan.items.find((i) => i.startMs === item.startMs)));
     if (!scope.phone) outcome.withheldForPhone = full.items.filter((item) => phoneOpsOf(item) > 0);
     options.onPlanned?.(plan, pair.first);
 

@@ -300,6 +300,25 @@ describe('exécutant de la synchronisation', () => {
     expect(await syncSessionFiles(pair.phone)).toEqual(await syncSessionFiles(pair.computer));
   });
 
+  it('téléphone qu’on ne peut pas écrire : le garde-fou ignore les retraits du téléphone, les mises à la corbeille se font', async () => {
+    const pair = await syncedPair(20);
+    for (let k = 0; k < 12; k++) await trashOnComputer(pair, k);
+    deleteSyncSession(pair.phone, fileOf(15));
+    const steps = pair.phone.steps();
+    const half = await run(pair, { phoneWritable: false });
+    expect(half).toMatchObject({ deletions: 'made', withheldDeletions: [] });
+    expect(describeSyncQuestion(half)).toBeNull();
+    expect(pair.phone.steps()).toBe(steps);
+    expect(await syncSessionFiles(pair.computer)).not.toContain(fileOf(15));
+    expect(trashOf(pair).some((e) => e.startMs === at(15))).toBe(true);
+    expect(half.withheldForPhone).toHaveLength(12);
+    expect(describeSync(half).paragraphs).toContain('12 changements attendent le câble ou la mise à jour du téléphone.');
+    // Par le câble, les douze retraits du téléphone dépassent le garde-fou.
+    const whole = await run(pair);
+    expect(whole).toMatchObject({ deletions: 'awaitingConfirmation' });
+    expect(whole.withheldDeletions).toHaveLength(12);
+  });
+
   it('téléphone qu’on ne peut pas écrire : rien n’y est écrit ni retiré, la base reste juste, la synchronisation entière finit le travail', async () => {
     const pair = await syncedPair(8);
     putSyncSession(pair.computer, at(10));
@@ -313,7 +332,8 @@ describe('exécutant de la synchronisation', () => {
     expect(pair.phone.steps()).toBe(steps);
     expect(await syncSessionFiles(pair.computer)).toContain(fileOf(11));
     expect(readSyncRecord(pair.computer, fileOf(3))?.name).toBe('Du téléphone');
-    expect(half.withheldDeletions.map((i) => i.startMs)).toEqual([at(5)]);
+    expect(half.withheldDeletions).toEqual([]);
+    expect(half.withheldForPhone.map((i) => i.startMs)).toContain(at(5));
     const lines = baseOf(pair)?.sessions.map((s) => s.startMs);
     expect(lines).toContain(at(11));
     expect(lines).toContain(at(5));

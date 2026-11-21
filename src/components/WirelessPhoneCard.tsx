@@ -8,8 +8,8 @@ import './WirelessPhoneCard.css';
  * Le téléphone sans câble, dans Réglages › Mémoire, programme Windows seulement (rien dans le navigateur ni sur le
  * téléphone) : la case qui allume le sans-fil (éteint par défaut, avec la phrase qui prévient que Windows va demander
  * l'autorisation), son état, « Relier un téléphone » (adresse, code et temps restant en grand, jusqu'à la liaison ou
- * l'échéance de 2 minutes), et la liste des téléphones reliés avec « Retirer ». Les sessions, elles, sont rangées par
- * « Récupérer » (`PhoneRecoverButton`), à l'arrivée du téléphone ou au clic.
+ * l'échéance de 2 minutes), et la liste des téléphones reliés avec « Retirer ». Les sessions, elles, ne passent que
+ * par « Synchroniser » (`PhoneSyncButton`), au clic : l'arrivée d'un téléphone ne fait qu'y inviter.
  */
 function WirelessPhoneCard() {
   const view = useWirelessPhones();
@@ -24,12 +24,12 @@ function WirelessPhoneCard() {
     <div className="ui-stack-3 wireless-card">
       <strong className="wireless-card__title">{t('Téléphone sans câble')}</strong>
       <p className="ui-muted ui-text-s ui-m-0">
-        {t("Gtracker range les sessions de votre téléphone sur cet ordinateur dès que vous l'ouvrez sur le téléphone, relié au même réseau que l'ordinateur : la même box Wi-Fi, ou un partage de connexion entre les deux. Le câble reste possible.")}
+        {t("Gtracker relie votre téléphone à cet ordinateur dès que vous l'ouvrez sur le téléphone, relié au même réseau que l'ordinateur : la même box Wi-Fi, ou un partage de connexion entre les deux. Cliquez ensuite sur « Synchroniser », en haut : sans câble, les sessions du téléphone viennent sur l'ordinateur, et ce qui doit aller sur le téléphone attend le câble.")}
       </p>
       <label className="ui-row-s2 ui-center">
         <input type="checkbox" className="wireless-card__toggle" checked={active} disabled={busy || state === null}
           onChange={(e) => void view.setActive(e.target.checked)} />
-        <span>{t('Recevoir les sessions du téléphone sans câble')}</span>
+        <span>{t('Relier le téléphone sans câble')}</span>
       </label>
       {state !== null && !active && (
         <p className="ui-muted ui-text-s ui-m-0">

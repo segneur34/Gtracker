@@ -1,7 +1,7 @@
-/* « Récupérer » (`PhoneRecoverButton.tsx`), dans la barre du haut du programme Windows : bouton secondaire, contour et
+/* « Synchroniser » (`PhoneSyncButton.tsx`), dans la barre du haut du programme Windows : bouton secondaire, contour et
    texte à l'encre, à la hauteur et dans la casse de son voisin « Enregistrer ». */
 
-.phone-recover.ui-btn {
+.phone-sync.ui-btn {
   min-height: 38px;
   padding: 0 var(--space-4);
   font-size: var(--text-m);
@@ -11,7 +11,7 @@
 
 /* Ordinateur étroit : resserré comme « Enregistrer ». */
 @media (max-width: 1199.98px) {
-  .phone-recover.ui-btn {
+  .phone-sync.ui-btn {
     padding: 0 var(--space-3);
     font-size: var(--text-s);
   }
@@ -19,7 +19,7 @@
 
 /* Ligne discrète de l'arrivée d'un téléphone relié : à l'encre atténuée, sur une seule ligne, coupée plutôt que de
    pousser les boutons (la phrase entière est dans l'infobulle). */
-.phone-recover__arrival {
+.phone-sync__arrival {
   max-width: 22em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -29,28 +29,28 @@
 }
 
 @media (max-width: 1199.98px) {
-  .phone-recover__arrival {
+  .phone-sync__arrival {
     max-width: 12em;
     font-size: var(--text-xs);
   }
 }
 
-.phone-recover__body {
+.phone-sync__body {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
 
-.phone-recover__body p {
+.phone-sync__body p {
   margin: 0;
 }
 
-.phone-recover__count {
+.phone-sync__count {
   color: var(--muted);
 }
 
 /* Dossier à recopier : à part, sélectionnable, coupé n'importe où plutôt que de déborder. */
-.phone-recover__folder {
+.phone-sync__folder {
   display: block;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line-strong);
@@ -60,7 +60,25 @@
   user-select: all;
 }
 
-.phone-recover__actions {
+.phone-sync__details summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+/* Sessions nommées par une question : une par ligne, défilantes au-delà d'une dizaine. */
+.phone-sync__sessions {
+  max-height: 14em;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface-sunken);
+  font-size: var(--text-s);
+}
+
+.phone-sync__actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;

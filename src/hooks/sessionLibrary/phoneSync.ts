@@ -177,7 +177,8 @@ export const synchronizeWithPhone = (options: { recording?: () => boolean } = {}
 
 /**
  * Répond à la question posée (étape `question`) : relance la synchronisation avec ce que la réponse permet, en gardant
- * les choix déjà faits (« Retirer du téléphone » puis le garde-fou confirmé retire encore ces sessions), ou s'en tient à
+ * les choix déjà faits (« Retirer du téléphone » puis le garde-fou confirmé retire encore ces sessions ; une
+ * confirmation donnée avant « Retirer du téléphone » ne couvre pas ces retraits), ou s'en tient à
  * ce qui est fait et montre son compte rendu. Sans effet hors de l'étape `question`.
  */
 export const answerPhoneSyncQuestion = (answer: PhoneSyncAnswer): Promise<void> => {
@@ -189,7 +190,9 @@ export const answerPhoneSyncQuestion = (answer: PhoneSyncAnswer): Promise<void> 
     case 'confirmDeletions':
       return launch({ ...current, confirmDeletions: true, withoutDeletions: false });
     case 'removeHeld':
-      return launch({ ...current, heldOnPhone: 'remove' });
+      // Une confirmation du garde-fou ne vaut que pour les suppressions qu'il a montrées : des retraits qui le
+      // dépassent rouvrent sa fenêtre.
+      return launch({ ...current, heldOnPhone: 'remove', confirmDeletions: false });
     default:
       progress.set({ step: 'over', result: step.result });
       return Promise.resolve();

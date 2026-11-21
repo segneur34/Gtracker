@@ -19,23 +19,23 @@ const SRC = new URL('../../', import.meta.url);
 /** Les couches, de la plus basse à la plus haute. */
 const LAYERS = [
   'store', 'memory', 'summarySettings', 'recordWrites', 'cache', 'scan', 'summaryQueue', 'deviceSettings', 'trash',
-  'addSession', 'pending', 'importer', 'incoming', 'phoneRecovery', 'sessionRecords', 'placeQueue', 'lifecycle', 'reset',
+  'addSession', 'pending', 'importer', 'incoming', 'sessionRecords', 'placeQueue', 'lifecycle', 'reset',
   'trashRestore', 'sync', 'phoneSync',
 ] as const;
 
 /** Valeurs exportées par le point d'entrée, les mêmes qu'avant le découpage (et cinq types). */
 const ENTRY_VALUES = [
-  'adoptSettingsFile', 'answerImportQuestion', 'clearArrivalNote', 'recoverOnArrival', 'useArrivalNote', 'canChooseMemoryFolder', 'canImportSessions', 'chooseFolder', 'correctSessionPlace', 'countErasable', 'currentMemoryFolder', 'dismissIncomingNotice', 'dismissLibraryMessage',
+  'adoptSettingsFile', 'answerImportQuestion', 'canChooseMemoryFolder', 'canImportSessions', 'chooseFolder', 'correctSessionPlace', 'countErasable', 'currentMemoryFolder', 'dismissIncomingNotice', 'dismissLibraryMessage',
   'dismissSettingsOffer', 'eraseEverything', 'factoryReset', 'stashRoute', 'trashStore', 'deleteFromTrash', 'emptyWholeTrash', 'restoreFromTrash', 'findLibrarySession', 'hasSessionMotion', 'importEntries', 'importFiles', 'importFromFolder',
   'importSettingsFile', 'librarySession', 'loadFullSession', 'loadSessionGpx', 'openLibrary', 'queueOutdatedRefresh',
-  'queueSessionPlace', 'readLibraryState', 'readSessionExport', 'readSessionGpx', 'readSessionMotion', 'reconnectFolder', 'recoverFromPhone', 'refreshLibrary', 'reloadAfterWrites',
+  'queueSessionPlace', 'readLibraryState', 'readSessionExport', 'readSessionGpx', 'readSessionMotion', 'reconnectFolder', 'refreshLibrary', 'reloadAfterWrites',
   'removeSession', 'renameDevice', 'reportStartupError', 'saveRecordedSession', 'startIncomingFiles', 'startLibraryUi',
   'summarizeGpxText', 'switchToBrowserMemory', 'updateSessionRecord', 'useLibraryFields', 'useLibrarySelector',
-  'useLibrarySession', 'usePhoneRecovery',
+  'useLibrarySession',
   'answerPhoneSyncQuestion', 'clearPhoneArrivalNote', 'notePhoneArrival', 'phoneSyncStep', 'synchronizeWithPhone', 'usePhoneArrivalNote', 'usePhoneSync',
 ];
 const ENTRY_TYPES = [
-  'AddResult', 'AddStatus', 'ArrivalNote', 'LibraryState', 'LibraryStatus', 'PhoneArrivalNote', 'PhoneRecoveryStep', 'PhoneSyncAnswer', 'PhoneSyncStep',
+  'AddResult', 'AddStatus', 'LibraryState', 'LibraryStatus', 'PhoneArrivalNote', 'PhoneSyncAnswer', 'PhoneSyncStep',
   'ResetProgress', 'SettingsFileInfo', 'TrashState',
 ];
 

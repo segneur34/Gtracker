@@ -56,8 +56,9 @@ export interface SyncOutcome {
    */
   deletions: 'made' | 'excluded' | 'awaitingConfirmation';
   /**
-   * Sessions dont une suppression n'a pas été faite parce qu'elle n'était pas permise : écartée, en attente de
-   * confirmation, ou retrait d'un téléphone qu'on ne peut pas écrire (`phoneWritable`). Elles restent à faire.
+   * Sessions dont une suppression que cette passe pouvait faire ne l'a pas été : écartée (« sans rien supprimer ») ou
+   * en attente de confirmation. Elles restent à faire. Le retrait d'un téléphone qu'on ne peut pas écrire n'y est pas :
+   * il attend le câble (`withheldForPhone`), et le garde-fou ne le compte pas.
    */
   withheldDeletions: SyncItem[];
   /**

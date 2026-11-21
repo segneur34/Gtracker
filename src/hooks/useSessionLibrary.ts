@@ -36,7 +36,7 @@ import { findSession, sessionOfFile } from './sessionLibrary/memory';
  * chacune n'importe que les précédentes (`couches.test.ts`) : `store`,
  * `memory`, `summarySettings`, `recordWrites`, `cache`, `scan`,
  * `summaryQueue`, `deviceSettings`, `addSession`, `pending`, `importer`, `incoming`,
- * `phoneRecovery`, `sessionRecords`, `placeQueue`, `lifecycle`, `reset`.
+ * `sessionRecords`, `placeQueue`, `lifecycle`, `reset`, `trashRestore`, `sync`, `phoneSync`.
  */
 
 export type { LibraryState, LibraryStatus } from './sessionLibrary/store';
@@ -48,8 +48,6 @@ export { adoptSettingsFile, importSettingsFile, reloadAfterWrites, renameDevice 
 export type { AddResult, AddStatus } from './sessionLibrary/addSession';
 export { answerImportQuestion, canImportSessions, importEntries, importFiles, importFromFolder, saveRecordedSession } from './sessionLibrary/importer';
 export { startIncomingFiles } from './sessionLibrary/incoming';
-export { clearArrivalNote, recoverFromPhone, recoverOnArrival, useArrivalNote, usePhoneRecovery } from './sessionLibrary/phoneRecovery';
-export type { ArrivalNote, PhoneRecoveryStep } from './sessionLibrary/phoneRecovery';
 export {
   loadFullSession, loadSessionGpx, readSessionExport, readSessionGpx, readSessionMotion, removeSession,
   updateSessionRecord,

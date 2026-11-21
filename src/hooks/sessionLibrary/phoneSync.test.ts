@@ -98,6 +98,27 @@ describe('bouton « Synchroniser »', () => {
     expect(sync.phoneSyncStep().step).toBe('over');
   });
 
+  it('garde-fou puis corbeille : la confirmation donnée ne couvre pas « Retirer du téléphone », qui rouvre le garde-fou', async () => {
+    const guarded = { ...emptySyncOutcome(null), phoneWritable: true, deletions: 'awaitingConfirmation' as const, withheldDeletions: [held] };
+    outcomes = [
+      guarded,
+      { ...emptySyncOutcome(null), phoneWritable: true, plan: { items: [held] } as never, done: [held] },
+      guarded,
+    ];
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard' } });
+    await sync.answerPhoneSyncQuestion('confirmDeletions');
+    expect(calls[1].confirmDeletions).toBe(true);
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'inTrash' } });
+    await sync.answerPhoneSyncQuestion('removeHeld');
+    expect(calls[2]).toMatchObject({ heldOnPhone: 'remove', confirmDeletions: false });
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard' } });
+    await sync.answerPhoneSyncQuestion('confirmDeletions');
+    expect(calls[3]).toMatchObject({ heldOnPhone: 'remove', confirmDeletions: true });
+    expect(sync.phoneSyncStep().step).toBe('over');
+  });
+
   it('« Annuler » ou « Les laisser » : rien n’est relancé, le compte rendu de ce qui est fait s’affiche', async () => {
     outcomes = [{ ...emptySyncOutcome(null), phoneWritable: true, plan: { items: [held] } as never, done: [held] }];
     const sync = await load();

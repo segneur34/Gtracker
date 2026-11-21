@@ -16,7 +16,8 @@ import type { MemoryKind } from '../platform/memoryFolder';
  *
  * Une session ou un itinéraire supprimé sur l'ordinateur y passe au lieu d'être effacé, et y reste
  * `TRASH_KEEP_DAYS` jours, comptés depuis son entrée dans la corbeille. La corbeille est hors de la mémoire : ni le
- * balayage, ni l'import, ni « Récupérer » ne la lisent ; ses sessions ne comptent nulle part. Le téléphone et le
+ * balayage ni l'import ne la lisent (la synchronisation avec le téléphone la consulte seulement) ; ses sessions ne
+ * comptent nulle part. Le téléphone et le
  * navigateur n'en ont pas.
  */
 
