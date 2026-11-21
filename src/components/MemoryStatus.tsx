@@ -17,6 +17,7 @@ import RefreshLibraryButton from './RefreshLibraryButton';
 import ResetZone from './ResetZone';
 import TrashZone from './TrashZone';
 import WirelessPhoneCard from './WirelessPhoneCard';
+import PhoneAppCard from './PhoneAppCard';
 import ComputerLinkCard from './ComputerLinkCard';
 import SettingsFiles, { SettingsOfferBanner } from './SettingsFiles';
 import { HelpText, HelpToggle } from './Help';
@@ -366,6 +367,7 @@ function MemoryStatus({
 
         {alert}
         {detailed && <WirelessPhoneCard />}
+        {detailed && <PhoneAppCard />}
         {detailed && <ComputerLinkCard />}
         {detailed && status === 'ready' && folderKind === 'disk' && <TrashZone />}
         {detailed && <ResetZone />}

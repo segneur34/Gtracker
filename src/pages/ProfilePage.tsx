@@ -5,6 +5,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import GongLogo from '../components/GongLogo';
 import MemoryStatus from '../components/MemoryStatus';
 import { PermissionsPrompt } from '../components/PermissionsStatus';
+import { PhoneAppOffer } from '../components/PhoneAppCard';
 import { ProfileAvatar } from '../components/ProfileAvatar';
 import ProfilePrompt from '../components/ProfilePrompt';
 import TutorialOfDay from '../components/TutorialOfDay';
@@ -289,6 +290,8 @@ function ProfilePage() {
       </div>
       {/* Puis le profil, s'il manque un champ, une fois par lancement ; jamais par-dessus ces deux cartes. */}
       {gate.mount && <ProfilePrompt otherCardShown={gate.otherCardShown} onDecided={setProfileShown} />}
+      {/* Programme Windows : l'application du téléphone qu'il emporte, proposée une fois par version, mémoire choisie. */}
+      {!memoryNeedsAction && status === 'ready' && <PhoneAppOffer />}
 
       {!memoryNeedsAction && <MemoryStatus compact />}
 

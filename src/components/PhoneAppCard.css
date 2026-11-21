@@ -1,0 +1,21 @@
+/* Application du téléphone (`PhoneAppCard.tsx`) : la carte de Réglages › Mémoire et la fenêtre de première ouverture
+   du Profil. Encre sur fond clair, jamais de vert vif en texte (charte). */
+
+.phone-app__title {
+  font-family: var(--font-title);
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-spacing);
+  text-transform: var(--title-case);
+}
+
+/* Le chemin d'une APK enregistrée peut être long : il passe à la ligne n'importe où. */
+.phone-app__outcome {
+  overflow-wrap: anywhere;
+}
+
+.phone-app-offer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

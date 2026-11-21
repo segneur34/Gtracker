@@ -217,6 +217,39 @@ export interface DesktopWirelessBridge {
   surArrivee(rappel: (avis: unknown) => void): () => void;
 }
 
+/** L'application du téléphone embarquée : version du programme, présence de l'APK, déjà proposée pour cette version. */
+export interface DesktopAppState {
+  version: string;
+  disponible: boolean;
+  proposee: boolean;
+}
+
+/** Pourquoi le téléphone a refusé l'installation ; `autre` porte le message d'Android dans `detail`. */
+export type DesktopAppRefusal = 'versionPlusRecente' | 'signature' | 'usbCoupee' | 'memoirePleine' | 'autre';
+
+/**
+ * Issue d'une installation par le câble : installée sur le téléphone `nom` (son modèle), refusée par le téléphone
+ * (`detail` : le message d'Android), ou rien d'envoyé, le téléphone n'étant pas prêt (son état).
+ */
+export type DesktopAppInstall =
+  | { etat: 'installee'; nom: string }
+  | { etat: 'refusee'; raison: DesktopAppRefusal; detail: string }
+  | Exclude<DesktopPhoneState, { etat: 'pret' }>;
+
+/** L'APK de la même version que le programme, rangée dans ses ressources. */
+export interface DesktopAppBridge {
+  etat(): Promise<BridgeAnswer<DesktopAppState>>;
+  /**
+   * Fenêtre « Enregistrer sous » (titre facultatif), puis copie de l'APK ; rend le chemin absolu écrit, `null` si
+   * l'utilisateur renonce ; `NOT_FOUND` si le programme n'a pas l'APK.
+   */
+  enregistrer(argument?: { titre?: string }): Promise<BridgeAnswer<string | null>>;
+  /** Installation par le câble ; `NOT_FOUND` sans APK, `UNKNOWN` pour un délai dépassé ou une panne. */
+  installer(): Promise<BridgeAnswer<DesktopAppInstall>>;
+  /** Retient que l'application a été proposée pour cette version. */
+  marquerProposee(): Promise<BridgeAnswer<null>>;
+}
+
 export interface DesktopBridge {
   version: string;
   memoire: DesktopMemoryBridge;
@@ -224,6 +257,8 @@ export interface DesktopBridge {
   telephone?: DesktopPhoneBridge;
   /** Absent d'une coquille plus ancienne, qui ne lit le téléphone que par le câble. */
   sansFil?: DesktopWirelessBridge;
+  /** Absent d'une coquille plus ancienne, ou qui n'emporte pas l'application du téléphone. */
+  application?: DesktopAppBridge;
   textes(texts: CloseQuestionTexts): Promise<BridgeAnswer<null>>;
 }
 
