@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { FolderEntry } from '../platform/memoryFolder';
 import { TRASH_INDEX_PATH, TRASH_KEEP_MS, parseTrashIndex, sessionRestorePlan, type TrashEntry } from './trash';
 import {
-  TRASH_LOCKED_MESSAGE, copyFromTrash, dropTrashEntries, emptyTrash, purgeTrash, readTrashIndex, stashInTrash, type TrashFolder,
-  type TrashRequest,
+  TRASH_LOCKED_MESSAGE, addFilesToTrashEntry, copyFromTrash, dropTrashEntries, emptyTrash, purgeTrash, readTrashIndex, stashFilesInTrash,
+  stashInTrash, type TrashBytesRequest, type TrashFolder, type TrashRequest,
 } from './trashFolder';
 
 const NOW = Date.UTC(2026, 10, 20, 12);
@@ -129,6 +129,78 @@ describe('mettre à la corbeille', () => {
     }, NOW);
     expect(disk.log.slice(0, 2)).toEqual([`write corbeille/${NOW}-lac/lac.gpx`, `write corbeille/${NOW}-lac/lac.json`]);
     expect(entry).toMatchObject({ kind: 'itineraire', startMs: null, routeBase: 'lac', main: 'lac.json' });
+  });
+
+  it('session supprimée deux fois, fiche changée à taille égale : la seconde version entre dans une entrée neuve', async () => {
+    const disk = diskFolder(sessionFiles());
+    const first = await stashInTrash(disk.folder, request(), NOW);
+    disk.files.set(GPX.replace('.gpx', '.json'), encoder.encode('{"fiche":2}'));
+    const second = await stashInTrash(disk.folder, request(), NOW + 60_000);
+    expect(second?.dir).not.toBe(first?.dir);
+    expect(disk.text(`corbeille/${second?.dir}/2026-11-20_10-00-00_wing.json`)).toBe('{"fiche":2}');
+    expect(disk.text(`corbeille/${first?.dir}/2026-11-20_10-00-00_wing.json`)).toBe('{"fiche":1}');
+    expect(await entriesOf(disk.folder)).toHaveLength(2);
+  });
+});
+
+describe('ranger des fichiers déjà lus (synchronisation)', () => {
+  const routeRequest = (json: string): TrashBytesRequest => ({
+    kind: 'itineraire', routeBase: 'lac', createdAt: '2026-11-01T10:00:00.000Z', origin: 'ordinateur', main: 'lac.json',
+    name: 'Tour du lac', files: [{ name: 'lac.json', bytes: encoder.encode(json) }, { name: 'lac.gpx', bytes: encoder.encode('<gpx/>') }],
+  });
+  const phoneSession = (record: string): TrashBytesRequest => ({
+    startMs: 1763632800000, origin: 'telephone', main: '2026-11-20_10-00-00_wing.gpx', name: 'Wing · Carnon',
+    files: [
+      { name: '2026-11-20_10-00-00_wing.gpx', bytes: encoder.encode('<gpx>trace</gpx>') },
+      { name: '2026-11-20_10-00-00_wing.json', bytes: encoder.encode(record) },
+    ],
+  });
+
+  it('itinéraire : deux versions perdantes successives de même taille font deux entrées, chacune retrouvée', async () => {
+    const disk = diskFolder();
+    const first = await stashFilesInTrash(disk.folder, routeRequest('{"lat":43.51}'), NOW);
+    const second = await stashFilesInTrash(disk.folder, routeRequest('{"lat":43.52}'), NOW + 60_000);
+    expect(second.dir).not.toBe(first.dir);
+    expect(disk.text(`corbeille/${first.dir}/lac.json`)).toBe('{"lat":43.51}');
+    expect(disk.text(`corbeille/${second.dir}/lac.json`)).toBe('{"lat":43.52}');
+    expect(await entriesOf(disk.folder)).toHaveLength(2);
+  });
+
+  it('itinéraire : reprise après une coupure avec la même version, une seule entrée, rien de recopié', async () => {
+    const disk = diskFolder();
+    const first = await stashFilesInTrash(disk.folder, routeRequest('{"lat":43.51}'), NOW);
+    disk.log.length = 0;
+    expect(await stashFilesInTrash(disk.folder, routeRequest('{"lat":43.51}'), NOW + 60_000)).toEqual(first);
+    expect(disk.log).toEqual([]);
+    expect(await entriesOf(disk.folder)).toHaveLength(1);
+  });
+
+  it('itinéraire : copie rangée illisible, au moindre doute une entrée neuve', async () => {
+    const disk = diskFolder();
+    const first = await stashFilesInTrash(disk.folder, routeRequest('{"lat":43.51}'), NOW);
+    const folder: TrashFolder = { ...disk.folder, readBytes: async (path) => (path.startsWith('corbeille/') ? Promise.reject(new Error('câble coupé')) : disk.folder.readBytes(path)) };
+    const second = await stashFilesInTrash(folder, routeRequest('{"lat":43.51}'), NOW + 60_000);
+    expect(second.dir).not.toBe(first.dir);
+    expect(await entriesOf(disk.folder)).toHaveLength(2);
+  });
+
+  it('session du téléphone : fiche changée à taille égale, deux entrées ; même version reprise, une seule', async () => {
+    const disk = diskFolder();
+    const first = await stashFilesInTrash(disk.folder, phoneSession('{"note":"a"}'), NOW);
+    const second = await stashFilesInTrash(disk.folder, phoneSession('{"note":"b"}'), NOW + 60_000);
+    expect(second.dir).not.toBe(first.dir);
+    expect(disk.text(`corbeille/${second.dir}/2026-11-20_10-00-00_wing.json`)).toBe('{"note":"b"}');
+    expect(await stashFilesInTrash(disk.folder, phoneSession('{"note":"b"}'), NOW + 120_000)).toEqual(second);
+    expect(await entriesOf(disk.folder)).toHaveLength(2);
+  });
+
+  it('restes ajoutés à une entrée : une fiche de même taille mais d\'un autre contenu n\'est pas tenue pour gardée', async () => {
+    const disk = diskFolder();
+    const host = await stashFilesInTrash(disk.folder, phoneSession('{"note":"a"}'), NOW);
+    const record = '2026-11-20_10-00-00_wing.json';
+    expect(await addFilesToTrashEntry(disk.folder, host.dir, [{ name: record, bytes: encoder.encode('{"note":"b"}') }])).toBe(false);
+    expect(disk.text(`corbeille/${host.dir}/${record}`)).toBe('{"note":"a"}');
+    expect(await addFilesToTrashEntry(disk.folder, host.dir, [{ name: record, bytes: encoder.encode('{"note":"a"}') }])).toBe(true);
   });
 });
 

@@ -35,6 +35,35 @@ const writeIndex = (f: TrashFolder, entries: readonly TrashEntry[]): Promise<voi
 
 const baseName = (path: string): string => path.slice(path.lastIndexOf('/') + 1);
 
+const sameBytes = (a: Uint8Array, b: Uint8Array): boolean => {
+  if (a.byteLength !== b.byteLength) return false;
+  for (let k = 0; k < a.byteLength; k++) if (a[k] !== b[k]) return false;
+  return true;
+};
+
+/**
+ * Première des entrées `candidates` qui tient chacun de ces fichiers à l'identique, octet pour octet. La taille ne
+ * suffit pas : un itinéraire ou une fiche de session a plusieurs versions sous la même identité, et une version
+ * différente de même taille, tenue pour déjà rangée, serait perdue. Une lecture en échec vaut une différence.
+ */
+const entryHoldingSameBytes = async (
+  f: TrashFolder, candidates: readonly TrashEntry[], files: readonly { name: string; bytes: Uint8Array }[],
+): Promise<TrashEntry | null> => {
+  for (const entry of candidates) {
+    let same = true;
+    for (const file of files) {
+      const kept = entry.files.find((g) => g.name.toLowerCase() === file.name.toLowerCase());
+      const theirs = kept ? await f.readBytes(trashFilePath(entry.dir, kept.name)).catch(() => null) : null;
+      if (!theirs || !sameBytes(theirs, file.bytes)) {
+        same = false;
+        break;
+      }
+    }
+    if (same) return entry;
+  }
+  return null;
+};
+
 /** Efface les fichiers d'un sous-dossier de la corbeille, puis le sous-dossier s'il le sait. */
 const eraseTrashDir = async (f: TrashFolder, dir: string): Promise<void> => {
   for (const e of await f.list(`${TRASH_DIR}/${dir}`)) {
@@ -63,7 +92,8 @@ export interface TrashRequest {
  * Range dans la corbeille une copie des fichiers de `request` : recopiés dans l'ordre inverse de leur retrait (pour
  * une session : capteurs, fiche, GPX en dernier), puis l'entrée écrite dans l'index. Les originaux ne sont pas
  * retirés ici : l'appelant les retire ensuite, comme il le faisait sans corbeille. Une entrée déjà faite pour la même
- * session (suppression coupée après l'index) est reprise sans rien recopier. Fichier absent : sauté. Lève sans rien
+ * session ou le même itinéraire (suppression coupée après l'index), qui tient ces fichiers à l'identique, octet pour
+ * octet, est reprise sans rien recopier. Fichier absent : sauté. Lève sans rien
  * changer si l'index ne se lit pas (`TRASH_LOCKED_MESSAGE`) ; une copie coupée laisse un sous-dossier hors de l'index,
  * effacé à la purge suivante.
  */
@@ -74,27 +104,21 @@ export const stashInTrash = (f: TrashFolder, request: TrashRequest, nowMs: numbe
     const mainStat = await f.stat(request.main);
     if (mainStat === null) return null;
     const mainName = baseName(request.main);
-    const present: TrashFile[] = [];
-    if (request.kind === 'session') {
-      for (const path of request.paths) {
-        const stat = await f.stat(path);
-        if (stat) present.push({ name: baseName(path), size: stat.size });
-      }
+    const read: { name: string; bytes: Uint8Array }[] = [];
+    for (const path of request.paths) {
+      const bytes = await f.readBytes(path);
+      if (bytes !== null) read.push({ name: baseName(path), bytes });
     }
-    const reused = request.kind === 'session'
-      ? reusableTrashEntry(index.entries, request.startMs ?? NaN, mainName, present)
-      : reusableRouteEntry(index.entries, request.routeBase ?? '', request.createdAt ?? '', mainStat.size);
+    const files: TrashFile[] = read.map((file) => ({ name: file.name, size: file.bytes.byteLength }));
+    const candidates = index.entries.filter((e) => (request.kind === 'session'
+      ? reusableTrashEntry([e], request.startMs ?? NaN, mainName, files)
+      : reusableRouteEntry([e], request.routeBase ?? '', request.createdAt ?? '', mainStat.size)) !== null);
+    const reused = await entryHoldingSameBytes(f, candidates, read);
     if (reused) return reused;
     const listed = await f.list(TRASH_DIR);
     const identity = request.kind === 'session' ? String(request.startMs) : request.routeBase ?? mainName;
     const dir = trashDirName(nowMs, identity, [...listed.map((e) => e.name), ...index.entries.map((e) => e.dir)]);
-    const files: TrashFile[] = [];
-    for (const path of [...request.paths].reverse()) {
-      const bytes = await f.readBytes(path);
-      if (bytes === null) continue;
-      await f.writeBytes(trashFilePath(dir, baseName(path)), bytes);
-      files.unshift({ name: baseName(path), size: bytes.byteLength });
-    }
+    for (const file of [...read].reverse()) await f.writeBytes(trashFilePath(dir, file.name), file.bytes);
     const entry: TrashEntry = {
       dir,
       kind: request.kind,
@@ -133,19 +157,20 @@ export type TrashBytesRequest = {
   | { kind: 'itineraire'; routeBase: string; createdAt: string | null }
 );
 
-/** Entrée qui tient déjà ces fichiers d'un itinéraire, de même base, même création et même origine (reprise après une coupure). */
-const reusableRouteBytesEntry = (
-  entries: readonly TrashEntry[], request: Extract<TrashBytesRequest, { kind: 'itineraire' }>, files: readonly TrashFile[],
-): TrashEntry | null =>
-  entries.find((e) => e.kind === 'itineraire' && e.origin === request.origin && e.createdAt === request.createdAt
+/** Vrai si `e` peut tenir ces fichiers d'un itinéraire : même base, même création, même origine, mêmes tailles. */
+const routeBytesCandidate = (
+  e: TrashEntry, request: Extract<TrashBytesRequest, { kind: 'itineraire' }>, files: readonly TrashFile[],
+): boolean =>
+  e.kind === 'itineraire' && e.origin === request.origin && e.createdAt === request.createdAt
     && e.routeBase?.toLowerCase() === request.routeBase.toLowerCase() && e.main.toLowerCase() === request.main.toLowerCase()
-    && files.every((file) => e.files.some((g) => g.name.toLowerCase() === file.name.toLowerCase() && g.size === file.size))) ?? null;
+    && files.every((file) => e.files.some((g) => g.name.toLowerCase() === file.name.toLowerCase() && g.size === file.size));
 
 /**
  * Range dans une entrée neuve de la corbeille des fichiers déjà lus, dans l'ordre inverse de leur retrait (pour une
  * session : capteurs, fiche, puis GPX en dernier), puis l'entrée de l'index. Une entrée de même identité, même
- * origine, même fichier principal, qui tient déjà chacun de ces fichiers à la même taille (reprise après une coupure)
- * est rendue sans rien recopier. Lève sans rien changer si l'index ne se lit pas.
+ * origine, même fichier principal, qui tient déjà chacun de ces fichiers à l'identique, octet pour octet (reprise
+ * après une coupure), est rendue sans rien recopier ; une autre version de même taille entre dans une entrée neuve.
+ * Lève sans rien changer si l'index ne se lit pas.
  */
 export const stashFilesInTrash = (f: TrashFolder, request: TrashBytesRequest, nowMs: number): Promise<TrashEntry> =>
   inTrashQueue(async () => {
@@ -154,9 +179,10 @@ export const stashFilesInTrash = (f: TrashFolder, request: TrashBytesRequest, no
     const sizes = request.files.map((file) => ({ name: file.name, size: file.bytes.byteLength }));
     const route = request.kind === 'itineraire' ? request : null;
     const session = request.kind === 'itineraire' ? null : request;
-    const reused = route
-      ? reusableRouteBytesEntry(index.entries, route, sizes)
-      : reusableTrashEntry(index.entries, session?.startMs ?? NaN, request.main, sizes, request.origin, session?.kind ?? 'session');
+    const candidates = index.entries.filter((e) => (route
+      ? routeBytesCandidate(e, route, sizes)
+      : reusableTrashEntry([e], session?.startMs ?? NaN, request.main, sizes, request.origin, session?.kind ?? 'session') !== null));
+    const reused = await entryHoldingSameBytes(f, candidates, request.files);
     if (reused) return reused;
     const listed = await f.list(TRASH_DIR);
     const identity = route ? route.routeBase : String(session?.startMs);
@@ -173,8 +199,9 @@ export const stashFilesInTrash = (f: TrashFolder, request: TrashBytesRequest, no
 
 /**
  * Ajoute des fichiers à une entrée existante (les restes d'une session, rangés avec elle), sans rien y écraser : un
- * fichier déjà là à la même taille est tenu pour gardé ; déjà là à une autre taille, rien n'est ajouté et la réponse
- * est `false`, pour que l'appelant les range ailleurs. Lève si l'index ne se lit pas. Les fichiers ajoutés sont
+ * fichier déjà là à l'identique, octet pour octet, est tenu pour gardé ; déjà là avec un autre contenu (même de même
+ * taille) ou illisible, rien n'est ajouté et la réponse est `false`, pour que l'appelant les range ailleurs. Lève si
+ * l'index ne se lit pas. Les fichiers ajoutés sont
  * écrits avant l'index : une coupure laisse au pire un fichier hors de l'index, effacé avec l'entrée.
  */
 export const addFilesToTrashEntry = (f: TrashFolder, dir: string, files: readonly { name: string; bytes: Uint8Array }[]): Promise<boolean> =>
@@ -186,7 +213,10 @@ export const addFilesToTrashEntry = (f: TrashFolder, dir: string, files: readonl
     const added: TrashFile[] = [];
     for (const file of files) {
       const at = await f.stat(trashFilePath(dir, file.name));
-      if (at && at.size !== file.bytes.byteLength) return false;
+      if (at) {
+        const theirs = at.size === file.bytes.byteLength ? await f.readBytes(trashFilePath(dir, file.name)).catch(() => null) : null;
+        if (!theirs || !sameBytes(theirs, file.bytes)) return false;
+      }
       const listed = entry.files.some((e) => e.name.toLowerCase() === file.name.toLowerCase());
       if (!at || !listed) added.push({ name: file.name, size: file.bytes.byteLength });
     }
