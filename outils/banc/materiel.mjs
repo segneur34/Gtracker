@@ -15,7 +15,7 @@
 //     croisement en ET (Aile 5 m : 2 sessions, Aile 5 m et Foil 900 : 1), adresse `materiel=groupe:piece,…`, résumé de
 //     « Sélection », retour arrière d'un cran, ancienne adresse à une pièce relue dans son groupe ; sans liste (Surf),
 //     « Matériel » grisé.
-import { CLES, connect } from './lib/cdp.mjs';
+import { CLES, DOSSIER_MEMOIRE, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { traceSurf, traceVoile } from './lib/traces.mjs';
 
@@ -279,6 +279,75 @@ await evaluate(`${gearFold}?.click()`);
 await until(`${gearFold}?.getAttribute('aria-expanded') !== null && document.documentElement.scrollWidth > 0`, 'bascule du repli');
 check('320 px : rien ne déborde, chevrons visibles', await evaluate(`document.documentElement.scrollWidth <= window.innerWidth && [...document.querySelectorAll('.stats-choice__gear button[data-chart-fold]')].every((b) => { const c = b.querySelector('svg')?.getBoundingClientRect(); return !!c && c.right <= window.innerWidth + 1; })`));
 await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
+
+// --- 6. Ancienne ligne « Foil » et article hors liste (une fiche dont le catalogue a changé) ---
+// Une fiche écrite sur une ligne « Foil » que la liste de l'appareil ne connaît plus (autre identifiant, même nom) avec un
+// article qui n'y est plus : une seule ligne « Foil » dans l'onglet, l'article proposé « (hors liste) » aux Statistiques,
+// puis un article de la liste choisi sur cette ligne remplace l'ancien choix. Placé après les autres : la session s'ajoute
+// aux décomptes ci-dessus.
+{
+  const startIso = '2026-10-08T08:00:00Z';
+  const start = Date.parse(startIso);
+  const ancien = { groupId: 'g-foil-ancien', groupName: 'Foil', itemId: 'f-ancien', itemName: 'Glide v1 1085' };
+  await go('/voile', 3000);
+  console.log('\nimport wingfoil 2026-10-08 :', await importGpx(voileGpx(start), 'wingfoil-2026-10-08.gpx'));
+  await waitFor(async () => (await records())?.find((r) => r.summary?.startMs === start), { timeout: 4000, label: 'fiche' });
+  await settle({ max: 2000, label: 'import' });
+  const rec = (await records()).find((r) => r.summary?.startMs === start);
+  const jsonName = rec.gpx.replace(/\.gpx$/, '.json');
+  const written = await evaluate(`(async () => {
+    const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('${DOSSIER_MEMOIRE}')).getDirectoryHandle('sessions');
+    const fiche = JSON.parse(await (await (await dir.getFileHandle(${JSON.stringify(jsonName)})).getFile()).text());
+    fiche.notes = { ...(fiche.notes ?? {}), gear: [${JSON.stringify(ancien)}], savedAt: Date.now() };
+    const w = await (await dir.getFileHandle(${JSON.stringify(jsonName)}, { create: true })).createWritable();
+    await w.write(JSON.stringify(fiche)); await w.close();
+    return 'ok';
+  })()`);
+  console.log('fiche à l\'ancienne ligne :', written);
+  const gearOf = async () => (await records()).find((r) => r.summary?.startMs === start)?.notes?.gear ?? [];
+  const path = `/voile/analyse?session=${encodeURIComponent(rec.gpx)}`;
+  await go(path, 6000);
+  await tabsReady();
+  await openTab('matos et conditions'); await settle({ max: 800, label: 'onglet matériel' });
+  const lines = () => evaluate(`[...document.querySelectorAll('.gear-picker')].map((p) => p.querySelector('.gear-picker__label')?.textContent.trim() + ' : ' + p.querySelector('.gear-picker__button .activity-select__name')?.textContent.trim()).join(' | ')`);
+  console.log('lignes du matériel :', await lines());
+  check('ancienne ligne « Foil » : une seule ligne « Foil », l\'ancien article choisi dessus',
+    (await lines()) === 'Aile : Aucun | Foil : Glide v1 1085 | Mât : Aucun', await lines());
+  await shoot('materiel-hors-liste-analyse');
+
+  // Statistiques : l'article est proposé « (hors liste) » et compte la session.
+  await go('/statistiques?famille=voile&activite=wingfoil', 4000);
+  await until(`Boolean(${gearFold})`, 'bloc matériel');
+  if ((await evaluate(`${gearFold}?.getAttribute('aria-expanded')`)) !== 'true') { await evaluate(`${gearFold}?.click()`); await folded('true'); }
+  console.log('lignes du matériel :', await gearRows());
+  check('Statistiques : « Glide v1 1085 (hors liste) » proposé dans la ligne Foil',
+    (await gearRows()).includes('Foil : [Tous], Foil 900, Foil 1200, Glide v1 1085 (hors liste)'), await gearRows());
+  console.log('Glide v1 1085 (hors liste) :', await pickGear('Foil', 'Glide v1 1085 (hors liste)'));
+  await until(`${sessionsNow} === '1' && location.search.includes('materiel=')`, 'article hors liste appliqué');
+  check('l\'article hors liste choisi compte la session du 08/10 : 1 session', (await statSessions()) === '1', `${await statSessions()} ; ${await address()}`);
+  await shoot('materiel-hors-liste-statistiques');
+
+  // Un article de la liste choisi sur la ligne remplace l'ancien choix.
+  await go(path, 6000);
+  await tabsReady();
+  await openTab('matos et conditions'); await settle({ max: 800, label: 'onglet matériel' });
+  await evaluate(`document.querySelector('[data-testid="gear-picker-g-foil"]')?.click()`);
+  await wait(300);
+  console.log('Foil 900 :', await clickText('Foil 900', '[data-testid="gear-sheet"] button'));
+  await wait(300);
+  console.log('Enregistrer la session :', await clickText('Enregistrer la session'));
+  await waitFor(async () => (await gearOf()).some((g) => g.itemName === 'Foil 900'), { timeout: 3000, label: 'fiche écrite' });
+  await settle({ max: 1500, label: 'enregistrement' });
+  const gear = await gearOf();
+  console.log('fiche :', JSON.stringify(gear));
+  check('fiche : un seul choix « Foil », celui de la liste', gear.length === 1 && gear[0].groupName === 'Foil' && gear[0].itemId === 'f-900', JSON.stringify(gear));
+  await go('/statistiques?famille=voile&activite=wingfoil', 4000);
+  await until(`Boolean(${gearFold})`, 'bloc matériel');
+  if ((await evaluate(`${gearFold}?.getAttribute('aria-expanded')`)) !== 'true') { await evaluate(`${gearFold}?.click()`); await folded('true'); }
+  console.log('lignes du matériel :', await gearRows());
+  check('Statistiques : l\'article « (hors liste) » n\'est plus proposé',
+    (await gearRows()).includes('Foil : [Tous], Foil 900, Foil 1200') && !(await gearRows()).includes('hors liste'), await gearRows());
+}
 
 console.log('\n--- console (erreurs, avertissements) ---');
 logs.forEach((l) => console.log(l));

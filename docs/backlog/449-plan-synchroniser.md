@@ -140,7 +140,14 @@ Mineures, tranchées par l'orchestrateur le 21/11 :
 - `TRASH_VERSION` augmente pour la nouvelle origine.
 - Le drapeau « enregistrement en cours » du greffon se décide au 449-c.
 
-Majeures, posées à l'utilisateur le 21/11 (réponses à écrire ici) :
+Réponses de l'utilisateur, le 21/11 :
+- Question 1 (matériel) : ni l'un ni l'autre tels quels. Il veut une fenêtre sur le PC qui met côte à côte le matériel du téléphone et celui de l'ordinateur, pour valider lui-même qu'il n'y a pas de doublon (« une virgule, un espace ou une majuscule ») et y supprimer ou synchroniser : c'est l'élément 478, avec sa maquette. D'ici là, chaque appareil garde sa liste, rapprochée par nom (lot 477, noms comparés sans majuscules, espaces doublés ni virgule décimale), et le 449 recopie les fichiers de réglages (P5).
+- Question 2 (arrivée par le sans-fil) : « on attend le bouton synchroniser », à faire préciser ; et « une sauvegarde de 30 jours sur le téléphone », qui contredit la règle validée (corbeille sur l'ordinateur, le téléphone supprime pour de bon) : redemandé le 21/11.
+- Question 3 (copie de sécurité) : oui, d'office (« ça vaut le coup de faire des sauvegardes »).
+- Essai 330 : Windows a posé sa question de pare-feu ; après le code tapé, aucun message ; l'utilisateur suppose les deux reliés et attend une session neuve pour le voir.
+- Essai critique d'avant P2 : autorisé le 21/11, téléphone branché ; résultat plus bas.
+
+Majeures, posées à l'utilisateur le 21/11 :
 1. Catalogue du matériel et activités : chaque appareil garde les siens, rapprochés par nom, « Reprendre » pour tout aligner (recommandé par le plan : plus simple, sans APK) ; ou la synchronisation les fond d'office par nom, en ajout seulement (renommages et suppressions non suivis, APK, exception au « jamais pris de lui-même »).
 2. Arrivée du téléphone par le sans-fil : le plan recommande de ne plus rien copier d'office (« Téléphone relié : touchez « Synchroniser » pour mettre les deux appareils à jour. »). Variante de l'orchestrateur : l'arrivée continue de copier seule les sessions que le PC n'a jamais vues (la base le sait), sans jamais ramener une session supprimée sur le PC ; suppressions et écritures vers le téléphone attendent « Synchroniser ». Troisième choix : « Synchroniser » se lance seul à l'arrivée, garde-fou compris.
 3. Copie de sécurité : le programme copie les deux dossiers d'office à la première synchronisation d'un téléphone, dans `Documents\Gtracker-copies\<date>\`, une seule fois par téléphone (recommandé) ; ou rien dans le produit, la copie d'avant le premier essai étant faite à la main par Claude.
