@@ -12,7 +12,12 @@
 //   (`RegistreTelephones`) ; refusé, il reçoit `refus` et la liaison se ferme ;
 // - reconnu, la liaison passe aux limites larges et s'inverse : c'est le PC qui commande (`lister`, `lire` par
 //   blocs de 1 Mio, `ping` toutes les 15 secondes), le téléphone qui répond ; une commande sans réponse ferme la
-//   liaison. Le dernier téléphone arrivé est celui que lit `dossierSansFil()`.
+//   liaison. Le dernier téléphone arrivé est celui que lit `dossierSansFil()` ;
+// - un téléphone qui annonce la capacité « ecriture » (`CAPACITE_ECRITURE`) est listé en entier (racine, `sessions/`,
+//   `itineraires/`, `reglages/`) et reçoit aussi `ecrire` par blocs de 1 Mio, `valider` et `effacer` ; un téléphone
+//   plus ancien n'en reçoit jamais, son état prêt dit `ecriture: false` et `itineraires: false`. Un téléphone qui
+//   enregistre une session (champ `enregistre` de `pong`) refuse d'écrire : l'état prêt dit alors `ecriture: false`
+//   et `enregistrement: true`.
 //
 // Secrets, dans le dossier `sansfil` du profil (`%APPDATA%\Gtracker`), jamais dans le dossier mémoire :
 //   reglages.json     { "version": 1, "actif": true, "identifiantPc": "<16 octets en hexadécimal>" }
@@ -32,7 +37,7 @@
 import type { AddressInfo, Socket } from 'node:net'
 import { randomBytes } from 'node:crypto'
 import dgram from 'node:dgram'
-import { mkdir, open, readFile, unlink, utimes } from 'node:fs/promises'
+import { mkdir, open, readFile, stat, unlink, utimes } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import tls from 'node:tls'
@@ -44,9 +49,37 @@ import type { Gestionnaire } from './pont'
 import { enReponse } from './pont'
 import { decoderQuestion, encoderReponse, adressesPrivees, memeReseau, nomPcPourSonde, PORT_SONDE } from './sonde'
 import type { DossierDistant, EtatTelephone, FichierTelephone } from './telephone'
-import { enSerie, pasPret } from './telephone'
-import type { Commande, CommandeLire, CommandeLister, CommandePing, Limites, Message, MessageBonjour, MessageAppairer, RaisonRefus, ReponseTelephone } from './trames'
-import { DecodeurTrames, ID_MAX, LIMITES, LIMITES_ACCUEIL, PROTOCOLE_SANS_FIL, PORT_SANS_FIL, blocsDeLecture, encoderMessage, lireMessage } from './trames'
+import { cheminAdmis, cheminEcrivable, cheminRefuse, enSerie, fichiersAdmis, pasPret } from './telephone'
+import type {
+  Capacite,
+  Commande,
+  CommandeEcrire,
+  CommandeEffacer,
+  CommandeLire,
+  CommandeLister,
+  CommandePing,
+  CommandeValider,
+  Limites,
+  Message,
+  MessageBonjour,
+  MessageAppairer,
+  RaisonRefus,
+  ReponseTelephone,
+} from './trames'
+import {
+  CAPACITE_ECRITURE,
+  DecodeurTrames,
+  ID_MAX,
+  LIMITES,
+  LIMITES_ACCUEIL,
+  PROTOCOLE_SANS_FIL,
+  PORT_SANS_FIL,
+  blocsDEcriture,
+  blocsDeLecture,
+  capacitesDe,
+  encoderMessage,
+  lireMessage,
+} from './trames'
 
 /** Dossier des secrets du sans-fil, dans le profil du programme. */
 export const DOSSIER_SANS_FIL = 'sansfil'
@@ -151,7 +184,13 @@ function reglagesLus(octets: Uint8Array | null): { actif: boolean; identifiantPc
 // ---------- la liaison : des messages sur une socket ----------
 
 /** Une commande du PC avant que la liaison lui donne son `id`. */
-export type CommandeSansId = Omit<CommandeLister, 'id'> | Omit<CommandeLire, 'id'> | Omit<CommandePing, 'id'>
+export type CommandeSansId =
+  | Omit<CommandeLister, 'id'>
+  | Omit<CommandeLire, 'id'>
+  | Omit<CommandePing, 'id'>
+  | Omit<CommandeEcrire, 'id'>
+  | Omit<CommandeValider, 'id'>
+  | Omit<CommandeEffacer, 'id'>
 
 /** Ce que la liaison demande de sa socket (`tls.TLSSocket`). */
 type SocketLiaison = tls.TLSSocket
@@ -338,7 +377,7 @@ class Commandes {
   }
 
   private recevoir(m: Message): void {
-    if (m.type !== 'liste' && m.type !== 'bloc' && m.type !== 'pong' && m.type !== 'erreur') {
+    if (m.type !== 'liste' && m.type !== 'bloc' && m.type !== 'pong' && m.type !== 'ecrit' && m.type !== 'fait' && m.type !== 'erreur') {
       this.liaison.fermer(`message inattendu du téléphone (« ${m.type} »).`)
       return
     }
@@ -391,6 +430,36 @@ async function lireParBlocs(commandes: Commandes, fichier: FichierTelephone, fic
   }
   const date = new Date(fichier.dateMs)
   await utimes(fichierLocal, date, date)
+}
+
+/**
+ * Copie `fichierLocal`, de `taille` octets, vers `chemin` du téléphone : blocs `ecrire` dans l'ordre (le téléphone les
+ * pose sous un nom provisoire), puis `valider`, qui met le provisoire à la place de `chemin` et rend le fichier tel
+ * qu'il est désormais sur le téléphone. Un fichier local d'une autre taille que `taille` est refusé avant toute
+ * commande ; un fichier qui change pendant la lecture fait échouer l'écriture, et le téléphone n'a rien validé.
+ */
+async function ecrireParBlocs(commandes: Commandes, chemin: string, fichierLocal: string, taille: number, delaiMs: number): Promise<FichierTelephone> {
+  if (!Number.isSafeInteger(taille) || taille < 0 || taille > TAILLE_FICHIER_MAX) {
+    throw new ErreurDisque('UNKNOWN', `Fichier « ${chemin} » trop gros pour le téléphone : ${taille} octets, ${TAILLE_FICHIER_MAX} au plus.`)
+  }
+  const reelle = (await stat(fichierLocal)).size
+  if (reelle !== taille) throw new ErreurDisque('UNKNOWN', `Écriture de « ${chemin} » refusée : ${reelle} octets à envoyer au lieu des ${taille} annoncés.`)
+  const poignee = await open(fichierLocal, 'r')
+  try {
+    for (const bloc of blocsDEcriture(taille)) {
+      const octets = Buffer.alloc(bloc.longueur)
+      const { bytesRead } = await poignee.read(octets, 0, bloc.longueur, bloc.debut)
+      if (bytesRead !== bloc.longueur) throw new ErreurDisque('UNKNOWN', `Écriture de « ${chemin} » interrompue : le fichier à envoyer a changé de taille.`)
+      reponseAttendue(await commandes.envoyer({ type: 'ecrire', chemin, debut: bloc.debut, taille, octets }, delaiMs), 'fait')
+    }
+  } finally {
+    await poignee.close()
+  }
+  const ecrit = reponseAttendue(await commandes.envoyer({ type: 'valider', chemin, taille }, delaiMs), 'ecrit')
+  if (ecrit.chemin !== chemin || ecrit.taille !== taille) {
+    throw new ErreurDisque('UNKNOWN', `Écriture de « ${chemin} » mal confirmée par le téléphone : « ${ecrit.chemin} », ${ecrit.taille} octets sur ${taille}.`)
+  }
+  return { chemin, taille, dateMs: ecrit.dateMs }
 }
 
 // ---------- le serveur ----------
@@ -476,7 +545,11 @@ export function nomDuPc(): string {
 }
 
 type Certificat = { cert: string; cle: string; empreinte: Uint8Array }
-type Relie = TelephoneRelie & { liaison: Liaison; commandes: Commandes }
+/** Un téléphone reconnu, avec les capacités qu'il a annoncées en se présentant. */
+type Relie = TelephoneRelie & { liaison: Liaison; commandes: Commandes; capacites: readonly Capacite[] }
+
+/** Vrai pour un téléphone qui liste tout et sait écrire. */
+const ecrivain = (r: Relie) => r.capacites.includes(CAPACITE_ECRITURE)
 
 /**
  * Essai d'auto-connexion : le PC se joint lui-même sur son adresse et vérifie que c'est bien son certificat qui
@@ -634,29 +707,66 @@ export class ServeurSansFil {
     return this.sonde ? this.sonde.address().port : null
   }
 
-  /** Le dossier mémoire du dernier téléphone relié, en lecture seule ; absent tant qu'aucun téléphone n'est relié. */
+  /**
+   * Le dossier mémoire du dernier téléphone relié ; absent tant qu'aucun téléphone n'est relié. L'état prêt dit si ce
+   * téléphone écrit en ce moment (`ecriture`) et s'il liste les itinéraires ; pour un téléphone qui sait écrire, un
+   * `ping` relu à chaque demande dit s'il enregistre une session (`enregistrement`, et alors `ecriture: false`). Lire,
+   * écrire et effacer ne vont qu'au téléphone du dernier listage ; écrire et effacer sont refusés sans rien lui envoyer
+   * s'il n'a pas annoncé la capacité « ecriture ».
+   */
   dossierSansFil(): DossierDistant {
-    /** Le téléphone du dernier listage : les lectures ne vont qu'à lui. */
+    /** Le téléphone du dernier listage : les lectures et écritures ne vont qu'à lui. */
     let liste: Relie | null = null
     const courant = (): Relie | null => {
       let dernier: Relie | null = null
       for (const r of this.relies.values()) dernier = r
       return dernier
     }
+    const etatDe = async (r: Relie): Promise<EtatTelephone> => {
+      if (!ecrivain(r)) return { etat: 'pret', nom: r.nom, canal: 'sansFil', ecriture: false, itineraires: false }
+      const pong = reponseAttendue(await r.commandes.envoyer({ type: 'ping' }, this.delais.ping), 'pong')
+      const enregistrement = pong.enregistre === true
+      return { etat: 'pret', nom: r.nom, canal: 'sansFil', ecriture: !enregistrement, itineraires: true, enregistrement }
+    }
+    const telephoneListe = (): Relie => {
+      if (!liste || liste.liaison.fermee) throw new ErreurDisque('UNKNOWN', "Le téléphone n'est plus relié depuis le listage.")
+      return liste
+    }
+    /** Le téléphone du dernier listage, pour une écriture ou un effacement de `chemin` ; lève sans rien lui envoyer. */
+    const ecrivainListe = (chemin: string): Relie => {
+      if (!cheminEcrivable(chemin)) throw cheminRefuse(chemin)
+      const r = telephoneListe()
+      if (!ecrivain(r)) throw new ErreurDisque('UNKNOWN', "Ce téléphone ne sait pas écrire par le Wi-Fi : son application est plus ancienne que ce programme.")
+      return r
+    }
     return {
       etat: async (): Promise<EtatTelephone> => {
-        const r = courant()
-        return r ? { etat: 'pret', nom: r.nom, canal: 'sansFil' } : { etat: 'absent' }
+        // Un téléphone parti pendant le `ping` laisse la place au précédent, s'il en reste un relié.
+        for (;;) {
+          const r = courant()
+          if (!r) return { etat: 'absent' }
+          try {
+            return await etatDe(r)
+          } catch {
+            // Réponse fausse à un `ping` d'une liaison restée ouverte : prêt, mais pas pour écrire.
+            if (!r.liaison.fermee) return { etat: 'pret', nom: r.nom, canal: 'sansFil', ecriture: false, itineraires: true }
+          }
+        }
       },
       lister: async () => {
         const r = courant()
         liste = r
         if (!r) throw pasPret('absent')
-        return reponseAttendue(await r.commandes.envoyer({ type: 'lister' }, this.delais.commande), 'liste').fichiers
+        const fichiers = reponseAttendue(await r.commandes.envoyer({ type: 'lister' }, this.delais.commande), 'liste').fichiers
+        // Un téléphone sans la capacité ne liste que la racine et `sessions/` : rien d'autre n'est pris pour sien.
+        return ecrivain(r) ? fichiers : fichiersAdmis(fichiers, cheminAdmis)
       },
       lire: async (fichier, fichierLocal) => {
-        if (!liste || liste.liaison.fermee) throw new ErreurDisque('UNKNOWN', "Le téléphone n'est plus relié depuis le listage.")
-        await lireParBlocs(liste.commandes, fichier, fichierLocal, this.delais.commande)
+        await lireParBlocs(telephoneListe().commandes, fichier, fichierLocal, this.delais.commande)
+      },
+      ecrire: async (chemin, fichierLocal, taille) => ecrireParBlocs(ecrivainListe(chemin).commandes, chemin, fichierLocal, taille, this.delais.commande),
+      effacer: async (chemin) => {
+        reponseAttendue(await ecrivainListe(chemin).commandes.envoyer({ type: 'effacer', chemin }, this.delais.commande), 'fait')
       },
     }
   }
@@ -951,7 +1061,7 @@ export class ServeurSansFil {
     await this.sauverRegistre()
     if (!this.admissibleApresAttente(liaison, telephone.id)) return
     liaison.envoyer({ type: 'appaire', preuve: enHex(conclusion.preuvePc), jeton: enHex(conclusion.jeton), identifiantPc: this.identifiantPc, nomPc: this.nomPc })
-    this.reconnaitre(liaison, telephone, true)
+    this.reconnaitre(liaison, telephone, true, capacitesDe(m))
   }
 
   private async bonjour(liaison: Liaison, m: MessageBonjour): Promise<void> {
@@ -965,7 +1075,7 @@ export class ServeurSansFil {
     await this.sauverRegistre()
     if (!this.admissibleApresAttente(liaison, telephone.id)) return
     liaison.envoyer({ type: 'bienvenue', identifiantPc: this.identifiantPc, nomPc: this.nomPc })
-    this.reconnaitre(liaison, telephone, false)
+    this.reconnaitre(liaison, telephone, false, capacitesDe(m))
   }
 
   /**
@@ -986,10 +1096,10 @@ export class ServeurSansFil {
     return true
   }
 
-  private reconnaitre(liaison: Liaison, telephone: TelephoneVisible, nouveau: boolean): void {
+  private reconnaitre(liaison: Liaison, telephone: TelephoneVisible, nouveau: boolean, capacites: readonly Capacite[]): void {
     this.inconnues.delete(liaison)
     liaison.elargir()
-    const relie: Relie = { id: telephone.id, nom: telephone.nom, liaison, commandes: new Commandes(liaison) }
+    const relie: Relie = { id: telephone.id, nom: telephone.nom, liaison, commandes: new Commandes(liaison), capacites }
     this.relies.get(telephone.id)?.liaison.fermer('remplacée par une liaison plus récente du même téléphone.')
     this.relies.delete(telephone.id)
     this.relies.set(telephone.id, relie)
@@ -1054,33 +1164,48 @@ function fermerServeur(serveur: tls.Server): Promise<void> {
 /**
  * Un seul dossier distant pour la page : le téléphone relié par le Wi-Fi s'il y en a un, sinon celui du câble. Le
  * canal est choisi au listage, et les lectures, écritures et effacements qui suivent passent par le même ; l'état prêt
- * dit son canal et s'il sait écrire. Un canal qui ne sait pas écrire (le sans-fil, aujourd'hui) refuse l'écriture et
- * l'effacement, sans jamais les passer à l'autre canal.
+ * dit son canal et s'il écrit. Ce que dit `ecriture` dans l'état du canal fait foi (le sans-fil le dit selon le
+ * téléphone, qui peut être ancien ou en train d'enregistrer) ; un canal qui ne le dit pas écrit s'il en a les méthodes.
+ * Un canal qui n'écrit pas, d'après son état relu au listage, refuse l'écriture et l'effacement, sans jamais les
+ * passer à l'autre canal.
  */
 export function dossierSansFilPuisCable(sansFil: DossierDistant, cable: DossierDistant): DossierDistant {
   let choisi: DossierDistant = cable
-  const ecrit = (d: DossierDistant) => typeof d.ecrire === 'function' && typeof d.effacer === 'function'
-  const refus = () => new ErreurDisque('UNKNOWN', 'Ce canal ne sait pas écrire sur le téléphone.')
+  /** Ce que l'état du canal choisi disait au listage : il écrit, ou la raison de son refus. */
+  let ecritureChoisie: true | ErreurDisque = new ErreurDisque('UNKNOWN', "Le téléphone n'a pas été listé.")
+  const parMethodes = (d: DossierDistant) => typeof d.ecrire === 'function' && typeof d.effacer === 'function'
+  const ecritureDe = (d: DossierDistant, e: EtatTelephone & { etat: 'pret' }) => e.ecriture ?? parMethodes(d)
+  const refusCanal = () => new ErreurDisque('UNKNOWN', 'Ce canal ne sait pas écrire sur le téléphone.')
+  const refusEnregistrement = () => new ErreurDisque('PERMISSION', 'Le téléphone enregistre une session : rien ne lui est écrit pour le moment.')
   return {
     async etat() {
       const e = await sansFil.etat()
-      if (e.etat === 'pret') return { ...e, ecriture: ecrit(sansFil) }
+      if (e.etat === 'pret') return { ...e, canal: 'sansFil', ecriture: ecritureDe(sansFil, e) }
       const c = await cable.etat()
-      return c.etat === 'pret' ? { ...c, canal: 'cable', ecriture: ecrit(cable) } : c
+      return c.etat === 'pret' ? { ...c, canal: 'cable', ecriture: ecritureDe(cable, c) } : c
     },
     async lister() {
-      choisi = (await sansFil.etat()).etat === 'pret' ? sansFil : cable
+      const e = await sansFil.etat()
+      if (e.etat === 'pret') {
+        choisi = sansFil
+        ecritureChoisie = ecritureDe(sansFil, e) || (e.enregistrement ? refusEnregistrement() : refusCanal())
+      } else {
+        choisi = cable
+        ecritureChoisie = parMethodes(cable) || refusCanal()
+      }
       return choisi.lister()
     },
     lire(fichier, fichierLocal) {
       return choisi.lire(fichier, fichierLocal)
     },
     async ecrire(chemin, fichierLocal, taille) {
-      if (!choisi.ecrire) throw refus()
+      if (ecritureChoisie !== true) throw ecritureChoisie
+      if (!choisi.ecrire) throw refusCanal()
       return choisi.ecrire(chemin, fichierLocal, taille)
     },
     async effacer(chemin) {
-      if (!choisi.effacer) throw refus()
+      if (ecritureChoisie !== true) throw ecritureChoisie
+      if (!choisi.effacer) throw refusCanal()
       return choisi.effacer(chemin)
     },
   }

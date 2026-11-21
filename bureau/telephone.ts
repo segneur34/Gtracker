@@ -2,7 +2,7 @@
 // commune à tous les canaux (le débogage USB dans `adb.ts`, le Wi-Fi dans `sansFil.ts`), sa mise en œuvre « dossier
 // local » pour les tests et le banc, et les gestionnaires des canaux `telephone:*` du pont. Sans Electron.
 //
-// Lecture, et écriture pour les canaux qui la savent (le câble) : un fichier écrit l'est sous un nom provisoire, puis
+// Lecture, et écriture pour les canaux qui la savent (le câble, le sans-fil d'un téléphone à jour) : un fichier écrit l'est sous un nom provisoire, puis
 // renommé, comme le fait l'application du téléphone (`nomProvisoire`) ; un fichier effacé l'est seul, jamais un
 // dossier, un motif ou une liste.
 //
@@ -39,10 +39,11 @@ export type EtatTelephone =
   /**
    * Un téléphone prêt à être lu ; `nom` est son modèle, pour le message ; `canal`, quand plusieurs canaux servent ;
    * `ecriture`, quand on sait si ce canal écrit sur le téléphone ; `itineraires`, vrai si ce canal liste aussi
-   * `itineraires/` (le câble) : sans lui, la page ne touche pas aux itinéraires, qu'un listage muet ferait croire
-   * supprimés.
+   * `itineraires/` (le câble, le sans-fil d'un téléphone à jour) : sans lui, la page ne touche pas aux itinéraires,
+   * qu'un listage muet ferait croire supprimés ; `enregistrement`, quand le canal sait le dire (le sans-fil d'un
+   * téléphone à jour) : vrai si le téléphone enregistre une session, et refuse alors d'être modifié (`ecriture` faux).
    */
-  | { etat: 'pret'; nom: string; canal?: CanalTelephone; ecriture?: boolean; itineraires?: boolean }
+  | { etat: 'pret'; nom: string; canal?: CanalTelephone; ecriture?: boolean; itineraires?: boolean; enregistrement?: boolean }
   /** Rien de branché, ou rien de vu. */
   | { etat: 'absent' }
   /** Le téléphone attend que l'utilisateur accepte cet ordinateur. */
@@ -121,7 +122,7 @@ export const DOSSIER_ITINERAIRES = 'itineraires'
 export const DOSSIER_REGLAGES = 'reglages'
 
 /**
- * Vrai pour un chemin relatif que le sans-fil liste et lit (même règle que le greffon du téléphone) : un fichier de la
+ * Vrai pour un chemin relatif que liste un téléphone sans la capacité « ecriture » du sans-fil : un fichier de la
  * racine ou de `sessions/`, chaque segment admis sur le disque du PC (`segmentAdmis` : ni vide, ni `.` ou `..`, ni
  * caractère interdit par Windows, ni nom provisoire), puisque c'est là qu'il sera rangé.
  */
@@ -135,7 +136,10 @@ export function cheminAdmis(chemin: string): boolean {
 /** Sous-dossiers dont le câble liste les fichiers, en plus de la racine. */
 export const DOSSIERS_DU_CABLE: readonly string[] = [DOSSIER_SESSIONS, DOSSIER_ITINERAIRES, DOSSIER_REGLAGES]
 
-/** Vrai pour un chemin relatif que le câble liste et lit : ceux du sans-fil, plus les fichiers de `itineraires/` et de `reglages/`. */
+/**
+ * Vrai pour un chemin relatif que le câble et le sans-fil listent et lisent (règle de `lire` et `liste` dans
+ * `trames.ts`) : ceux de `cheminAdmis`, plus les fichiers de `itineraires/` et de `reglages/`.
+ */
 export function cheminDuCable(chemin: string): boolean {
   const segments = chemin.split('/')
   if (segments.length === 2 && !DOSSIERS_DU_CABLE.includes(segments[0])) return false

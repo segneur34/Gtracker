@@ -6,6 +6,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import tls from 'node:tls'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { enHex } from './appairage'
+import { fabriquerCertificat } from './certificat'
+import { estTemporaire } from './disque'
 import { FauxTelephone, RefusPc, sonder } from './fauxTelephone'
 import type { Reponse } from './pont'
 import type { AvisArrivee, Chiffreur, OptionsSansFil } from './sansFil'
@@ -14,6 +17,7 @@ import {
   FICHIER_CLE,
   FICHIER_REGLAGES,
   FICHIER_TELEPHONES,
+  Liaison,
   ServeurSansFil,
   dossierSansFilPuisCable,
   essaiSansFilDepuisEnvironnement,
@@ -106,7 +110,7 @@ beforeEach(async () => {
   await mkdir(path.join(telephone, 'sessions'), { recursive: true })
   await writeFile(path.join(telephone, 'index.json'), '{"sessions":[]}')
   await writeFile(path.join(telephone, 'sessions', 'a.gpx'), '<gpx/>')
-  await writeFile(path.join(telephone, 'sessions', 'b.gpx.gtracker-tmp'), 'en cours')
+  await writeFile(path.join(telephone, 'sessions', 'b.gpx.gtracker-new'), 'en cours')
 })
 
 afterEach(async () => {
@@ -171,7 +175,7 @@ describe('serveur sans fil', () => {
     expect(registre).not.toContain(f.memoire!.jeton)
 
     const dossier = s.dossierSansFil()
-    expect(await dossier.etat()).toEqual({ etat: 'pret', nom: "Téléphone d'essai", canal: 'sansFil' })
+    expect(await dossier.etat()).toEqual({ etat: 'pret', nom: "Téléphone d'essai", canal: 'sansFil', ecriture: true, itineraires: true, enregistrement: false })
     const canaux = gestionnairesTelephone(dossier, lectures)
     const liste = (await canaux['telephone:lister'](undefined)) as Reponse<{ chemin: string; taille: number }[]>
     expect(liste.ok && liste.valeur.map((x) => [x.chemin, x.taille])).toEqual([['index.json', 15], ['sessions/a.gpx', 6]])
@@ -442,17 +446,225 @@ describe('le Wi-Fi d’abord, sinon le câble', () => {
     await writeFile(local, 'x')
     expect(await dossier.ecrire!('sessions/b.gpx', local, 1)).toMatchObject({ chemin: 'sessions/b.gpx', taille: 1 })
 
-    const { liaison } = await appairer(s)
-    expect(await dossier.etat()).toMatchObject({ etat: 'pret', canal: 'sansFil', ecriture: false })
+    // Un téléphone ancien relié par le Wi-Fi : lu, jamais écrit, et jamais de repli sur le câble.
+    const ancien = await appairer(s, faux({ ancien: true }))
+    expect(await dossier.etat()).toMatchObject({ etat: 'pret', canal: 'sansFil', ecriture: false, itineraires: false })
     expect((await dossier.lister()).map((x) => x.chemin)).toEqual(['index.json', 'sessions/a.gpx'])
-    // Le canal choisi au listage ne sait pas écrire : refus, jamais de repli sur le câble.
     await expect(dossier.ecrire!('sessions/c.gpx', local, 1)).rejects.toThrow('ne sait pas écrire')
     await expect(dossier.effacer!('sessions/b.gpx')).rejects.toThrow('ne sait pas écrire')
     expect(existsSync(path.join(stockageCable, 'Documents', 'Gtracker', 'sessions', 'b.gpx'))).toBe(true)
+    expect(existsSync(path.join(stockageCable, 'Documents', 'Gtracker', 'sessions', 'c.gpx'))).toBe(false)
+    ancien.liaison.fermer()
+    await quand(async () => (await dossier.etat()).canal === 'cable')
+
+    // Un téléphone à jour : écritures et effacements vont à lui, le câble n'est pas touché.
+    const { liaison } = await appairer(s)
+    expect(await dossier.etat()).toMatchObject({ etat: 'pret', canal: 'sansFil', ecriture: true, itineraires: true, enregistrement: false })
+    expect((await dossier.lister()).map((x) => x.chemin)).toEqual(['index.json', 'sessions/a.gpx'])
+    expect(await dossier.ecrire!('sessions/c.gpx', local, 1)).toMatchObject({ chemin: 'sessions/c.gpx', taille: 1 })
+    await dossier.effacer!('sessions/a.gpx')
+    expect(existsSync(path.join(telephone, 'sessions', 'c.gpx'))).toBe(true)
+    expect(existsSync(path.join(telephone, 'sessions', 'a.gpx'))).toBe(false)
+    expect(existsSync(path.join(stockageCable, 'Documents', 'Gtracker', 'sessions', 'c.gpx'))).toBe(false)
 
     liaison.fermer()
     await quand(async () => (await dossier.etat()).canal === 'cable')
     expect(await dossierSansFilPuisCable(s.dossierSansFil(), dossierLocal(null)).etat()).toEqual({ etat: 'absent' })
+  })
+})
+
+/** Le dossier sans fil d'un serveur activé, relié à un faux téléphone, listé par les canaux de la page. */
+async function relieEtListe(options: Partial<ConstructorParameters<typeof FauxTelephone>[0]> = {}) {
+  const s = serveur()
+  await s.activer(true)
+  const { f, liaison } = await appairer(s, faux(options))
+  const dossier = s.dossierSansFil()
+  const canaux = gestionnairesTelephone(dossier, lectures)
+  const liste = (await canaux['telephone:lister'](undefined)) as Reponse<{ chemin: string }[]>
+  if (!liste.ok) throw new Error('listage manqué')
+  return { s, f, liaison, dossier, canaux, chemins: liste.valeur.map((x) => x.chemin) }
+}
+
+/** Provisoires présents dans `sessions/` du téléphone. */
+const provisoires = async () => (await readdir(path.join(telephone, 'sessions'))).filter(estTemporaire)
+
+const texte = (s: string) => new TextEncoder().encode(s)
+
+/** Un fichier local à envoyer. */
+async function aEnvoyer(contenu: string): Promise<string> {
+  const local = path.join(tmp, 'envoi')
+  await writeFile(local, contenu)
+  return local
+}
+
+describe('écriture sans fil', () => {
+  it('écrit un fichier neuf, en remplace un, en efface un, sans laisser de provisoire', async () => {
+    const { dossier, canaux } = await relieEtListe()
+    expect(await dossier.etat()).toEqual({ etat: 'pret', nom: "Téléphone d'essai", canal: 'sansFil', ecriture: true, itineraires: true, enregistrement: false })
+    expect(await canaux['telephone:ecrireOctets']({ chemin: 'sessions/neuf.gpx', octets: texte('<gpx>neuf</gpx>') })).toMatchObject({
+      ok: true,
+      valeur: { chemin: 'sessions/neuf.gpx', taille: 15 },
+    })
+    expect(await readFile(path.join(telephone, 'sessions', 'neuf.gpx'), 'utf8')).toBe('<gpx>neuf</gpx>')
+    expect(await canaux['telephone:ecrireOctets']({ chemin: 'sessions/a.gpx', octets: texte('<gpx>remplacé</gpx>') })).toMatchObject({ ok: true })
+    expect(await readFile(path.join(telephone, 'sessions', 'a.gpx'), 'utf8')).toBe('<gpx>remplacé</gpx>')
+    expect(await canaux['telephone:ecrireOctets']({ chemin: 'itineraires/r.json', octets: texte('{}') })).toMatchObject({ ok: true })
+    expect(await canaux['telephone:effacer']({ chemin: 'sessions/neuf.gpx' })).toEqual({ ok: true, valeur: null })
+    expect(existsSync(path.join(telephone, 'sessions', 'neuf.gpx'))).toBe(false)
+    expect(await provisoires()).toEqual([])
+    expect(await readdir(lectures)).toEqual([])
+    const relu = (await canaux['telephone:lister'](undefined)) as Reponse<{ chemin: string; taille: number }[]>
+    expect(relu.ok && relu.valeur.map((x) => [x.chemin, x.taille])).toEqual([
+      ['index.json', 15],
+      ['itineraires/r.json', 2],
+      ['sessions/a.gpx', 20],
+    ])
+  })
+
+  it('termine au listage les échanges interrompus, comme le téléphone', async () => {
+    await writeFile(path.join(telephone, 'sessions', 'c.gpx.gtracker-tmp'), 'complet')
+    await writeFile(path.join(telephone, 'sessions', 'a.gpx.gtracker-tmp'), 'à moitié')
+    await mkdir(path.join(telephone, 'reglages'))
+    await writeFile(path.join(telephone, 'reglages', 'pc.json'), '{}')
+    const { chemins } = await relieEtListe()
+    expect(chemins).toEqual(['index.json', 'reglages/pc.json', 'sessions/a.gpx', 'sessions/c.gpx'])
+    expect(await readFile(path.join(telephone, 'sessions', 'a.gpx'), 'utf8')).toBe('<gpx/>')
+    expect(await readFile(path.join(telephone, 'sessions', 'c.gpx'), 'utf8')).toBe('complet')
+    expect(await provisoires()).toEqual([])
+  })
+
+  it('écrit un gros fichier par blocs, à l’octet près, et un fichier vide', async () => {
+    const gros = randomBytes(2 * TAILLE_BLOC + 12_345)
+    const { f, canaux } = await relieEtListe()
+    expect(await canaux['telephone:ecrireOctets']({ chemin: 'sessions/capteurs.bin', octets: gros })).toMatchObject({ ok: true, valeur: { taille: gros.length } })
+    expect((await readFile(path.join(telephone, 'sessions', 'capteurs.bin'))).equals(gros)).toBe(true)
+    expect(f.blocsEcrits).toBe(3)
+    expect(await canaux['telephone:ecrireOctets']({ chemin: 'reglages/vide.json', octets: new Uint8Array(0) })).toMatchObject({ ok: true, valeur: { taille: 0 } })
+    expect(await readFile(path.join(telephone, 'reglages', 'vide.json'), 'utf8')).toBe('')
+    expect(f.blocsEcrits).toBe(4)
+    expect(await provisoires()).toEqual([])
+  })
+
+  it('refuse un chemin hors de la liste blanche et une taille fausse sans rien envoyer', async () => {
+    const { f, dossier } = await relieEtListe()
+    const local = await aEnvoyer('x')
+    const avant = f.commandesRecues
+    await expect(dossier.ecrire!('index.json', local, 1)).rejects.toMatchObject({ code: 'PERMISSION' })
+    await expect(dossier.ecrire!('sessions/../x.gpx', local, 1)).rejects.toMatchObject({ code: 'PERMISSION' })
+    await expect(dossier.effacer!('autre/x.gpx')).rejects.toMatchObject({ code: 'PERMISSION' })
+    await expect(dossier.ecrire!('sessions/x.gpx', local, 5)).rejects.toThrow(/annoncés/)
+    expect(f.commandesRecues).toBe(avant)
+    expect(existsSync(path.join(telephone, 'sessions', 'x.gpx'))).toBe(false)
+  })
+
+  it('une coupure en pleine écriture laisse l’original intact et aucun provisoire', async () => {
+    const { canaux, liaison, dossier } = await relieEtListe({ coupureApresEcritures: 1 })
+    const ecrit = await canaux['telephone:ecrireOctets']({ chemin: 'sessions/a.gpx', octets: randomBytes(3 * TAILLE_BLOC) })
+    expect(ecrit).toMatchObject({ ok: false, code: 'UNKNOWN' })
+    await liaison.fermee
+    expect(await readFile(path.join(telephone, 'sessions', 'a.gpx'), 'utf8')).toBe('<gpx/>')
+    expect(await provisoires()).toEqual([])
+    expect(await readdir(lectures)).toEqual([])
+    await quand(async () => (await dossier.etat()).etat === 'absent')
+  })
+
+  it('un téléphone ancien est lu sans rien recevoir d’autre que des lectures', async () => {
+    await mkdir(path.join(telephone, 'itineraires'))
+    await writeFile(path.join(telephone, 'itineraires', 'r.json'), '{}')
+    const { f, liaison, dossier, chemins } = await relieEtListe({ ancien: true })
+    expect(chemins).toEqual(['index.json', 'sessions/a.gpx'])
+    expect(await dossier.etat()).toEqual({ etat: 'pret', nom: "Téléphone d'essai", canal: 'sansFil', ecriture: false, itineraires: false })
+    const local = await aEnvoyer('x')
+    const avant = f.commandesRecues
+    await expect(dossier.ecrire!('sessions/c.gpx', local, 1)).rejects.toThrow('ne sait pas écrire')
+    await expect(dossier.effacer!('sessions/a.gpx')).rejects.toThrow('ne sait pas écrire')
+    expect(f.commandesRecues).toBe(avant)
+    expect(liaison.liaison.fermee).toBe(false)
+    // Rien n'a été touché dans son dossier, pas même le provisoire resté là.
+    expect(await provisoires()).toEqual(['b.gpx.gtracker-new'])
+  })
+
+  it('un téléphone qui enregistre refuse d’être modifié, et le PC ne lui envoie rien', async () => {
+    const { s, f, dossier, canaux } = await relieEtListe({ enregistre: true })
+    expect(await dossier.etat()).toEqual({ etat: 'pret', nom: "Téléphone d'essai", canal: 'sansFil', ecriture: false, itineraires: true, enregistrement: true })
+    // Même commandé, le téléphone refuse.
+    expect(await canaux['telephone:ecrireOctets']({ chemin: 'sessions/c.gpx', octets: texte('x') })).toMatchObject({ ok: false, code: 'PERMISSION' })
+    expect(await canaux['telephone:effacer']({ chemin: 'sessions/a.gpx' })).toMatchObject({ ok: false, code: 'PERMISSION' })
+    expect(existsSync(path.join(telephone, 'sessions', 'a.gpx'))).toBe(true)
+    expect(existsSync(path.join(telephone, 'sessions', 'c.gpx'))).toBe(false)
+    expect(await provisoires()).toEqual([])
+    // Par le dossier de la page, le refus vient de l'état relu au listage, sans commande d'écriture.
+    const mixte = dossierSansFilPuisCable(s.dossierSansFil(), dossierLocal(null))
+    await mixte.lister()
+    const avant = f.commandesRecues
+    await expect(mixte.ecrire!('sessions/c.gpx', await aEnvoyer('x'), 1)).rejects.toMatchObject({ code: 'PERMISSION', message: expect.stringMatching(/enregistre/) })
+    await expect(mixte.effacer!('sessions/a.gpx')).rejects.toMatchObject({ code: 'PERMISSION' })
+    expect(f.commandesRecues).toBe(avant)
+    f.enregistre = false
+    expect(await dossier.etat()).toMatchObject({ ecriture: true, enregistrement: false })
+  })
+
+  it('refuse une confirmation fausse du téléphone', async () => {
+    const falsifier = (c: Commande): Message | undefined => (c.type === 'valider' ? { type: 'ecrit', id: c.id, chemin: c.chemin, taille: c.taille + 1, dateMs: 0 } : undefined)
+    const { canaux } = await relieEtListe({ falsifier })
+    expect(await canaux['telephone:ecrireOctets']({ chemin: 'sessions/c.gpx', octets: texte('x') })).toMatchObject({ ok: false, message: expect.stringMatching(/mal confirmée/) })
+  })
+})
+
+/**
+ * Un PC hostile : un serveur TLS qui reconnaît le faux téléphone par son jeton, puis lui envoie les trames voulues
+ * et lit ses réponses une à une.
+ */
+async function pcHostile() {
+  const c = fabriquerCertificat()
+  const serveurTls = tls.createServer({ cert: c.certificat, key: c.cle })
+  const arrivee = new Promise<Liaison>((resoudre) => serveurTls.once('secureConnection', (socket) => resoudre(new Liaison(socket))))
+  await new Promise<void>((fin) => serveurTls.listen(0, '127.0.0.1', () => fin()))
+  const port = (serveurTls.address() as net.AddressInfo).port
+  const identifiantPc = '0'.repeat(32)
+  const f = faux({ memoire: { jeton: 'a'.repeat(64), empreinte: enHex(c.empreinte), identifiantPc, nomPc: 'PC hostile', adresse: '127.0.0.1', port } })
+  const connexion = f.connecter()
+  const liaison = await arrivee
+  expect(await liaison.prochain(5_000)).toMatchObject({ type: 'bonjour', capacites: ['ecriture'] })
+  liaison.envoyer({ type: 'bienvenue', identifiantPc, nomPc: 'PC hostile' })
+  liaison.elargir()
+  const cote = await connexion
+  const commander = (commande: Commande) => {
+    liaison.envoyer(commande)
+    return liaison.prochain(5_000)
+  }
+  const fermer = () => {
+    liaison.fermer()
+    serveurTls.close()
+  }
+  return { f, cote, commander, fermer }
+}
+
+describe('le faux téléphone, comme le greffon', () => {
+  it('refuse une taille fausse et un bloc hors d’ordre, et efface le provisoire à la coupure', async () => {
+    const { cote, commander, fermer } = await pcHostile()
+    try {
+      const fait = (id: number) => ({ type: 'fait', id })
+      // Trois octets écrits sur cinq annoncés : `valider` échoue, le provisoire est effacé.
+      expect(await commander({ type: 'ecrire', id: 1, chemin: 'sessions/a.gpx', debut: 0, taille: 5, octets: texte('abc') })).toEqual(fait(1))
+      expect(await provisoires()).toEqual(['a.gpx.gtracker-tmp', 'b.gpx.gtracker-new'])
+      expect(await commander({ type: 'valider', id: 2, chemin: 'sessions/a.gpx', taille: 5 })).toMatchObject({ type: 'erreur', id: 2 })
+      // Un bloc qui ne commence pas où le précédent finit.
+      expect(await commander({ type: 'ecrire', id: 3, chemin: 'sessions/a.gpx', debut: 0, taille: 6, octets: texte('abc') })).toEqual(fait(3))
+      expect(await commander({ type: 'ecrire', id: 4, chemin: 'sessions/a.gpx', debut: 4, taille: 6, octets: texte('ef') })).toMatchObject({ type: 'erreur', id: 4 })
+      expect(await commander({ type: 'valider', id: 5, chemin: 'sessions/a.gpx', taille: 6 })).toMatchObject({ type: 'erreur', id: 5 })
+      expect(await readFile(path.join(telephone, 'sessions', 'a.gpx'), 'utf8')).toBe('<gpx/>')
+      // Une écriture en cours : le listage l'épargne et ne la montre pas, la coupure l'efface.
+      expect(await commander({ type: 'ecrire', id: 6, chemin: 'sessions/neuf.gpx', debut: 0, taille: 6, octets: texte('abc') })).toEqual(fait(6))
+      const liste = await commander({ type: 'lister', id: 7 })
+      expect(liste.type === 'liste' && liste.fichiers.map((x) => x.chemin)).toEqual(['index.json', 'sessions/a.gpx'])
+      expect(await provisoires()).toEqual(['neuf.gpx.gtracker-new'])
+    } finally {
+      fermer()
+    }
+    await cote.fermee
+    expect(await provisoires()).toEqual([])
+    expect(existsSync(path.join(telephone, 'sessions', 'neuf.gpx'))).toBe(false)
   })
 })
 

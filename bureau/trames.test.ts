@@ -2,22 +2,32 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ErreurDisque, codeDe } from './disque'
+import { cheminDuCable, cheminEcrivable } from './telephone'
 import type { EnTete, Message, RaisonTrame, Trame } from './trames'
 import {
+  CAPACITES,
+  CAPACITE_ECRITURE,
   DecodeurTrames,
   ErreurTrame,
   LIMITES,
   LIMITES_ACCUEIL,
+  PROTOCOLE_SANS_FIL,
   TAILLE_BLOC,
+  blocsDEcriture,
   blocsDeLecture,
+  capacitesDe,
   encoderMessage,
   encoderTrame,
   lireMessage,
 } from './trames'
 
+type Emetteur = 'pc' | 'telephone'
 type Vecteurs = {
-  trames: { nom: string; enTete: EnTete; corpsHex: string; octetsHex: string }[]
+  trames: { nom: string; emetteur: Emetteur; enTete: EnTete; corpsHex: string; octetsHex: string }[]
   tramesInvalides: { nom: string; octetsHex: string; erreur: RaisonTrame }[]
+  messagesInvalides: { nom: string; emetteur: Emetteur; octetsHex: string; erreur: RaisonTrame }[]
+  cheminsLecture: { admis: string[]; refuses: string[] }
+  cheminsEcriture: { admis: string[]; refuses: string[] }
 }
 const vecteurs = JSON.parse(readFileSync(path.join(__dirname, 'sansFil.vecteurs.json'), 'utf8')) as Vecteurs
 
@@ -51,7 +61,19 @@ const exemples: Message[] = [
   { type: 'bloc', id: 3, debut: TAILLE_BLOC, octets: Uint8Array.from([1, 2, 3, 0, 255]) },
   { type: 'pong', id: 5 },
   { type: 'erreur', id: 4, code: 'NOT_FOUND', message: 'Fichier disparu.' },
+  { type: 'appairer', version: 1, nom: 'Pixel 8', nonceTelephone: nonce, capacites: ['ecriture'] },
+  { type: 'bonjour', version: 1, nom: 'Pixel 8', jeton: 'cd'.repeat(32), capacites: [] },
+  { type: 'ecrire', id: 6, chemin: 'itineraires/tour du lac.json', debut: TAILLE_BLOC, taille: TAILLE_BLOC + 3, octets: Uint8Array.from([0, 1, 255]) },
+  { type: 'ecrire', id: 7, chemin: 'reglages/pixel.json', debut: 0, taille: 0, octets: new Uint8Array(0) },
+  { type: 'valider', id: 8, chemin: 'gtracker.json', taille: 12 },
+  { type: 'effacer', id: 9, chemin: 'sessions/a.gpx' },
+  { type: 'ecrit', id: 8, chemin: 'gtracker.json', taille: 12, dateMs: 1_795_000_000_000 },
+  { type: 'fait', id: 9 },
+  { type: 'pong', id: 10, enregistre: true },
 ]
+
+/** Les octets d'un message en hexadécimal, pour comparer un bloc lu ou écrit. */
+const comparable = (m: Message) => ('octets' in m ? { ...m, octets: hex(m.octets) } : m)
 
 function decoderTout(octets: Uint8Array, taillesMorceaux: (i: number) => number): Trame[] {
   const d = new DecodeurTrames(LIMITES)
@@ -70,13 +92,16 @@ describe('trames', () => {
     for (const m of exemples) {
       const trames = new DecodeurTrames(LIMITES).pousser(encoderMessage(m))
       expect(trames).toHaveLength(1)
-      const lu = lireMessage(trames[0])
-      if (m.type === 'bloc' && lu.type === 'bloc') {
-        expect({ ...lu, octets: hex(lu.octets) }).toEqual({ ...m, octets: hex(m.octets) })
-      } else {
-        expect(lu).toEqual(m)
-      }
+      expect(comparable(lireMessage(trames[0])), m.type).toStrictEqual(comparable(m))
     }
+  })
+
+  it('porte les octets d’un ecrire dans le corps, sans les recopier dans l’en-tête', () => {
+    const octets = Uint8Array.from([60, 103, 112, 120, 62])
+    const [trame] = new DecodeurTrames(LIMITES).pousser(encoderMessage({ type: 'ecrire', id: 1, chemin: 'sessions/a.gpx', debut: 0, taille: 5, octets }))
+    expect(trame.enTete).toEqual({ type: 'ecrire', id: 1, chemin: 'sessions/a.gpx', debut: 0, taille: 5 })
+    expect(hex(trame.corps)).toBe(hex(octets))
+    expect(raison(() => encoderMessage({ type: 'ecrire', id: 1, chemin: 'sessions/a.gpx', debut: 0, taille: 1, octets: new Uint8Array(1) }, LIMITES_ACCUEIL))).toBe('CORPS_TROP_LONG')
   })
 
   it('rend les mêmes trames quel que soit le morcellement du flux', () => {
@@ -162,7 +187,7 @@ describe('lireMessage', () => {
   const lire = (enTete: EnTete, corps = new Uint8Array(0)) => raison(() => lireMessage({ enTete, corps }))
 
   it('refuse un type inconnu et un message mal formé', () => {
-    expect(lire({ type: 'ecrire', id: 1 })).toBe('MESSAGE_INCONNU')
+    expect(lire({ type: 'renommer', id: 1 })).toBe('MESSAGE_INCONNU')
     expect(lire({ type: 'ping' })).toBe('MESSAGE_INVALIDE')
     expect(lire({ type: 'ping', id: -1 })).toBe('MESSAGE_INVALIDE')
     expect(lire({ type: 'ping', id: 1.5 })).toBe('MESSAGE_INVALIDE')
@@ -178,7 +203,7 @@ describe('lireMessage', () => {
 
   it('ne lit qu’un fichier admis, par bloc de 1 Mio au plus', () => {
     const base = { type: 'lire', id: 1, debut: 0, longueur: 10 }
-    expect(lire({ ...base, chemin: 'sessions/a.gpx' })).toBeNull()
+    for (const chemin of ['sessions/a.gpx', 'index.json', 'itineraires/r.json', 'reglages/pixel.json']) expect(lire({ ...base, chemin })).toBeNull()
     for (const chemin of ['../a.gpx', 'sessions/../a.gpx', 'autre/a.gpx', '/a.gpx', 'sessions/a/b.gpx', 'a.gtracker-tmp', 'sessions\\a.gpx', '']) {
       expect(lire({ ...base, chemin })).toBe('MESSAGE_INVALIDE')
     }
@@ -203,13 +228,81 @@ describe('lireMessage', () => {
           { chemin: '../vol.gpx', taille: 1, dateMs: 0 },
           { chemin: 'a.json', taille: -1, dateMs: 0 },
           { chemin: 'a.gpx', taille: 1, dateMs: 0, autre: true },
+          { chemin: 'reglages/pixel.json', taille: 3, dateMs: 0 },
+          { chemin: 'itineraires/r.json', taille: 4, dateMs: 0 },
+          { chemin: 'autre/x.json', taille: 5, dateMs: 0 },
+          { chemin: 'itineraires/r.json.gtracker-new', taille: 6, dateMs: 0 },
         ],
       },
       corps: new Uint8Array(0),
     })
-    expect(lu).toEqual({ type: 'liste', id: 1, fichiers: [{ chemin: 'a.gpx', taille: 1, dateMs: 0 }, { chemin: 'sessions/b.gpx', taille: 2, dateMs: 0 }] })
+    expect(lu).toEqual({
+      type: 'liste',
+      id: 1,
+      fichiers: [
+        { chemin: 'a.gpx', taille: 1, dateMs: 0 },
+        { chemin: 'itineraires/r.json', taille: 4, dateMs: 0 },
+        { chemin: 'reglages/pixel.json', taille: 3, dateMs: 0 },
+        { chemin: 'sessions/b.gpx', taille: 2, dateMs: 0 },
+      ],
+    })
     expect(lire({ type: 'liste', id: 1, fichiers: [{ chemin: 'a.gpx', taille: '1', dateMs: 0 }] })).toBe('MESSAGE_INVALIDE')
     expect(lire({ type: 'liste', id: 1, fichiers: {} })).toBe('MESSAGE_INVALIDE')
+  })
+
+  it('lit les capacités du téléphone : connues seulement, sans doublon, absentes chez un téléphone ancien', () => {
+    const bonjour = { type: 'bonjour', version: PROTOCOLE_SANS_FIL, nom: 'Pixel 8', jeton: 'cd'.repeat(32) }
+    const lu = (capacites: unknown) => lireMessage({ enTete: { ...bonjour, capacites }, corps: new Uint8Array(0) })
+    const ancien = lireMessage({ enTete: bonjour, corps: new Uint8Array(0) })
+    expect(ancien).not.toHaveProperty('capacites')
+    expect(ancien.type === 'bonjour' && capacitesDe(ancien)).toEqual([])
+    expect(lu(['futur', 'ecriture', 'ecriture'])).toMatchObject({ capacites: ['ecriture'] })
+    expect(lu(['futur'])).toMatchObject({ capacites: [] })
+    const neuf = lu([CAPACITE_ECRITURE])
+    expect(neuf.type === 'bonjour' && capacitesDe(neuf)).toEqual([...CAPACITES])
+    expect(lireMessage({ enTete: { type: 'appairer', version: 1, nom: 'Pixel', nonceTelephone: nonce, capacites: ['ecriture'] }, corps: new Uint8Array(0) })).toMatchObject({ capacites: ['ecriture'] })
+    for (const faux of ['ecriture', [1], [null], {}, null]) {
+      expect(raison(() => lu(faux)), JSON.stringify(faux)).toBe('MESSAGE_INVALIDE')
+    }
+  })
+
+  it('n’accepte une écriture que dans la liste blanche, bloc dans la taille annoncée', () => {
+    const ecrire = (champs: Record<string, unknown>, corps = new Uint8Array(1)) => lire({ type: 'ecrire', id: 1, chemin: 'sessions/a.gpx', debut: 0, taille: 1, ...champs }, corps)
+    expect(ecrire({})).toBeNull()
+    expect(ecrire({ debut: 4, taille: 5 })).toBeNull()
+    expect(ecrire({ taille: 0 }, new Uint8Array(0))).toBeNull()
+    expect(ecrire({ taille: TAILLE_BLOC }, new Uint8Array(TAILLE_BLOC))).toBeNull()
+    for (const chemin of ['gtracker.json', 'fc-repos.json', 'lieux.json', 'itineraires/r.json', 'reglages/pixel.json']) expect(ecrire({ chemin })).toBeNull()
+    for (const chemin of ['index.json', 'autre/a.gpx', 'sessions', 'sessions/a/b.gpx', 'sessions/a.gpx.gtracker-tmp', '../gtracker.json', 7]) {
+      expect(ecrire({ chemin }), String(chemin)).toBe('MESSAGE_INVALIDE')
+    }
+    expect(ecrire({ debut: -1 })).toBe('MESSAGE_INVALIDE')
+    expect(ecrire({ taille: -1 })).toBe('MESSAGE_INVALIDE')
+    expect(ecrire({ taille: 0.5 })).toBe('MESSAGE_INVALIDE')
+    expect(ecrire({ taille: 2 }, new Uint8Array(3))).toBe('MESSAGE_INVALIDE')
+    expect(ecrire({ debut: 1, taille: 1 })).toBe('MESSAGE_INVALIDE')
+    expect(ecrire({ taille: 3 }, new Uint8Array(0))).toBe('MESSAGE_INVALIDE')
+    expect(ecrire({ debut: 1, taille: 0 }, new Uint8Array(0))).toBe('MESSAGE_INVALIDE')
+
+    expect(lire({ type: 'valider', id: 1, chemin: 'lieux.json', taille: 0 })).toBeNull()
+    expect(lire({ type: 'valider', id: 1, chemin: 'lieux.json', taille: 0 }, new Uint8Array(1))).toBe('MESSAGE_INVALIDE')
+    expect(lire({ type: 'valider', id: 1, chemin: 'index.json', taille: 0 })).toBe('MESSAGE_INVALIDE')
+    expect(lire({ type: 'valider', id: 1, chemin: 'lieux.json' })).toBe('MESSAGE_INVALIDE')
+    expect(lire({ type: 'effacer', id: 1, chemin: 'itineraires/r.json' })).toBeNull()
+    expect(lire({ type: 'effacer', id: 1, chemin: 'itineraires' })).toBe('MESSAGE_INVALIDE')
+    expect(lire({ type: 'effacer', id: 1, chemin: 'index.json' })).toBe('MESSAGE_INVALIDE')
+  })
+
+  it('lit les réponses d’écriture et l’état d’enregistrement du téléphone', () => {
+    expect(lire({ type: 'ecrit', id: 1, chemin: 'sessions/a.gpx', taille: 3, dateMs: 0 })).toBeNull()
+    expect(lire({ type: 'ecrit', id: 1, chemin: 'index.json', taille: 3, dateMs: 0 })).toBe('MESSAGE_INVALIDE')
+    expect(lire({ type: 'ecrit', id: 1, chemin: 'sessions/a.gpx', taille: 3, dateMs: -1 })).toBe('MESSAGE_INVALIDE')
+    expect(lire({ type: 'ecrit', id: 1, chemin: 'sessions/a.gpx', dateMs: 0 })).toBe('MESSAGE_INVALIDE')
+    expect(lire({ type: 'fait', id: 1 })).toBeNull()
+    expect(lire({ type: 'fait' })).toBe('MESSAGE_INVALIDE')
+    expect(lireMessage({ enTete: { type: 'pong', id: 1, enregistre: false }, corps: new Uint8Array(0) })).toStrictEqual({ type: 'pong', id: 1, enregistre: false })
+    expect(lireMessage({ enTete: { type: 'pong', id: 1 }, corps: new Uint8Array(0) })).toStrictEqual({ type: 'pong', id: 1 })
+    expect(lire({ type: 'pong', id: 1, enregistre: 1 })).toBe('MESSAGE_INVALIDE')
   })
 
   it('ramène un code d’erreur inconnu à UNKNOWN et coupe un message trop long', () => {
@@ -236,6 +329,28 @@ describe('blocsDeLecture', () => {
   })
 })
 
+describe('blocsDEcriture', () => {
+  it('écrit un fichier vide par un seul bloc vide, les autres comme on les lit', () => {
+    expect([...blocsDEcriture(0)]).toEqual([{ debut: 0, longueur: 0 }])
+    expect([...blocsDEcriture(5)]).toEqual([{ debut: 0, longueur: 5 }])
+    expect([...blocsDEcriture(TAILLE_BLOC + 1)]).toEqual([...blocsDeLecture(TAILLE_BLOC + 1)])
+    expect(blocsDEcriture(9e15).next().value).toEqual({ debut: 0, longueur: TAILLE_BLOC })
+  })
+
+  it('donne des commandes ecrire que le téléphone accepte, chacune où finit la précédente', () => {
+    for (const taille of [0, 1, TAILLE_BLOC, 2 * TAILLE_BLOC + 7]) {
+      let attendu = 0
+      for (const { debut, longueur } of blocsDEcriture(taille)) {
+        expect(debut).toBe(attendu)
+        const trame = new DecodeurTrames(LIMITES).pousser(encoderMessage({ type: 'ecrire', id: 1, chemin: 'sessions/a.gpx', debut, taille, octets: new Uint8Array(longueur) }))
+        expect(() => lireMessage(trame[0])).not.toThrow()
+        attendu = debut + longueur
+      }
+      expect(attendu).toBe(taille)
+    }
+  })
+})
+
 describe('jeux d’essai partagés avec le téléphone', () => {
   it('décode et réencode chaque trame', () => {
     expect(vecteurs.trames.length).toBeGreaterThan(0)
@@ -255,5 +370,35 @@ describe('jeux d’essai partagés avec le téléphone', () => {
       const d = new DecodeurTrames(LIMITES)
       expect(raison(() => (d.pousser(deHex(v.octetsHex)), d.fin())), v.nom).toBe(v.erreur)
     }
+  })
+
+  it('couvre chaque message de la liaison, dans le sens où il circule', () => {
+    const types = new Set(vecteurs.trames.map((v) => `${v.emetteur}:${v.enTete.type}`))
+    for (const attendu of ['pc:ecrire', 'pc:valider', 'pc:effacer', 'pc:lire', 'pc:ping', 'telephone:ecrit', 'telephone:fait', 'telephone:pong', 'telephone:liste', 'telephone:bonjour', 'telephone:appairer']) {
+      expect(types, attendu).toContain(attendu)
+    }
+    expect(vecteurs.trames.some((v) => v.enTete.type === 'ecrire' && v.corpsHex !== '')).toBe(true)
+    expect(vecteurs.trames.some((v) => Array.isArray(v.enTete.capacites) && v.enTete.capacites.includes(CAPACITE_ECRITURE))).toBe(true)
+  })
+
+  it('lit chaque trame d’un message invalide, puis refuse son message avec l’erreur attendue', () => {
+    expect(vecteurs.messagesInvalides.length).toBeGreaterThan(0)
+    for (const v of vecteurs.messagesInvalides) {
+      const d = new DecodeurTrames(LIMITES)
+      const trames = d.pousser(deHex(v.octetsHex))
+      d.fin()
+      expect(trames, v.nom).toHaveLength(1)
+      expect(raison(() => lireMessage(trames[0])), v.nom).toBe(v.erreur)
+    }
+  })
+
+  it('suit les règles de chemin de la coquille, en lecture comme en écriture', () => {
+    for (const c of vecteurs.cheminsLecture.admis) expect(cheminDuCable(c), JSON.stringify(c)).toBe(true)
+    for (const c of vecteurs.cheminsLecture.refuses) expect(cheminDuCable(c), JSON.stringify(c)).toBe(false)
+    for (const c of vecteurs.cheminsEcriture.admis) expect(cheminEcrivable(c), JSON.stringify(c)).toBe(true)
+    for (const c of vecteurs.cheminsEcriture.refuses) expect(cheminEcrivable(c), JSON.stringify(c)).toBe(false)
+    const longueurs = (l: string[]) => Math.max(...l.map((c) => c.length))
+    expect(longueurs(vecteurs.cheminsEcriture.admis)).toBe(512)
+    expect(longueurs(vecteurs.cheminsEcriture.refuses)).toBe(513)
   })
 })

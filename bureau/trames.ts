@@ -2,7 +2,14 @@
 // messages, et forme de chaque message. Calcul pur, sans réseau : la socket TLS qui porte ces trames est ailleurs.
 //
 // Le PC écoute, le téléphone se connecte par TLS et se présente (appairage par code, ou jeton déjà reçu) ; ensuite
-// le PC envoie les commandes (`lister`, `lire`, `ping`) et le téléphone y répond. Rien n'écrit sur le téléphone.
+// le PC envoie les commandes (`lister`, `lire`, `ping`, et pour un téléphone qui annonce la capacité « ecriture » :
+// `ecrire`, `valider`, `effacer`) et le téléphone y répond.
+//
+// Compatibilité : la version du protocole reste 1 ; ce qu'un téléphone sait de plus s'annonce dans le champ facultatif
+// `capacites` de `appairer` et `bonjour`. Un PC n'envoie jamais à un téléphone une commande dont il n'a pas annoncé
+// la capacité (un téléphone plus ancien ferme la liaison sur un `type` inconnu). La capacité « ecriture » vaut à la
+// fois listage complet (racine, `sessions/`, `itineraires/`, `reglages/`) et écriture, jamais l'une sans l'autre :
+// écrire sans lister `reglages/` ferait recopier une copie ancienne par-dessus le fichier de réglages du téléphone.
 //
 // ---------- Format d'une trame (à reproduire tel quel côté téléphone) ----------
 //
@@ -10,12 +17,13 @@
 //   octets 4 à 7   longueur M du corps, même codage
 //   N octets       l'en-tête : un objet JSON encodé en UTF-8, sans marque d'ordre d'octets ; il porte toujours un
 //                  champ `type` (texte non vide) ; des champs inconnus sont ignorés, l'ordre des champs est libre
-//   M octets       le corps, octets bruts ; vide (M = 0) pour tous les messages sauf `bloc`
+//   M octets       le corps, octets bruts ; vide (M = 0) pour tous les messages sauf `bloc` et `ecrire`
 //
 // Limites, vérifiées dès les 8 premiers octets, avant de rien attendre de plus :
 //   1 ≤ N ≤ 8 388 608 (8 Mio, de quoi lister des milliers de sessions) ; 16 384 tant que le téléphone ne s'est pas
 //   présenté (`LIMITES_ACCUEIL`) ;
-//   0 ≤ M ≤ 1 048 576 (1 Mio, la taille d'un bloc de lecture) ; 0 tant que le téléphone ne s'est pas présenté.
+//   0 ≤ M ≤ 1 048 576 (1 Mio, la taille d'un bloc de lecture ou d'écriture) ; 0 tant que le téléphone ne s'est pas
+//   présenté.
 // Une trame hors limites, un en-tête qui n'est pas de l'UTF-8 valide ou pas un objet JSON à `type` texte, ou un flux
 // qui s'arrête au milieu d'une trame, sont des erreurs de la liaison : on la ferme.
 //
@@ -27,8 +35,12 @@
 // est un texte de 1 à 100 caractères sans caractère de contrôle.
 //
 // Accueil, téléphone vers PC (premier message de la liaison) :
-//   appairer   { version, nom, nonceTelephone }         demande d'appairage par le code affiché sur le PC
-//   bonjour    { version, nom, jeton }                  téléphone déjà appairé, il présente son jeton
+//   appairer   { version, nom, nonceTelephone, capacites? }   demande d'appairage par le code affiché sur le PC
+//   bonjour    { version, nom, jeton, capacites? }      téléphone déjà appairé, il présente son jeton
+//   capacites, facultatif : tableau de textes, ce que le téléphone sait faire en plus du protocole de base ; seule
+//   connue, « ecriture » (`CAPACITES`) ; un texte inconnu est ignoré, un doublon compte une fois ; absent, le
+//   téléphone ne sait que lire (`lister` limité à la racine et à `sessions/`). Un `capacites` qui n'est pas un tableau
+//   de textes rend le message invalide.
 // Appairage (description des preuves : `appairage.ts`) :
 //   defi       { noncePc }                              PC vers téléphone, réponse à `appairer`
 //   preuve     { preuve }                               téléphone vers PC : preuve du téléphone
@@ -37,31 +49,68 @@
 //   refus      { raison }                               PC vers téléphone, puis le PC ferme la liaison ;
 //                                                       raison : code, fenetre, nonce, jeton ou version
 // Commandes, PC vers téléphone, chacune avec un `id` (entier de 0 à 2 147 483 647) que la réponse reprend :
-//   lister     { id }                                   fichiers de la racine et de `sessions/` du dossier mémoire
-//   lire       { id, chemin, debut, longueur }          octets [debut, debut + longueur) d'un fichier listé ;
-//                                                       1 ≤ longueur ≤ 1 048 576
+//   lister     { id }                                   fichiers du dossier mémoire : racine et `sessions/` ; avec la
+//                                                       capacité « ecriture », aussi `itineraires/` et `reglages/`
+//   lire       { id, chemin, debut, longueur }          octets [debut, debut + longueur) d'un fichier listé
+//                                                       (`cheminDuCable`) ; 1 ≤ longueur ≤ 1 048 576
 //   ping       { id }                                   la liaison vit-elle encore
+// Commandes d'écriture, seulement vers un téléphone qui a annoncé « ecriture » ; `chemin` admis par `cheminEcrivable`
+// (fichier posé dans `sessions/`, `itineraires/` ou `reglages/`, ou `gtracker.json`, `fc-repos.json`, `lieux.json`) :
+//   ecrire     { id, chemin, debut, taille } + corps    un bloc du fichier `chemin`, de `taille` octets en tout, aux
+//                                                       octets [debut, debut + M) ; seule commande à corps ;
+//                                                       debut + M ≤ taille ; M ≥ 1, sauf pour un fichier vide
+//                                                       (taille 0 : un seul `ecrire`, debut 0, corps vide). Blocs dans
+//                                                       l'ordre : le premier (debut 0) ouvre le fichier provisoire,
+//                                                       chacun commence où le précédent finit. Réponse : `fait`
+//   valider    { id, chemin, taille }                   fin de l'écriture : le téléphone relit la taille du provisoire,
+//                                                       qui doit valoir `taille`, puis le met à la place de `chemin`.
+//                                                       Réponse : `ecrit`
+//   effacer    { id, chemin }                           efface le seul fichier `chemin` ; sans effet s'il n'existe
+//                                                       pas. Réponse : `fait`
+// Règles du téléphone pour l'écriture : une seule écriture à la fois par liaison ; le provisoire est
+// `chemin.gtracker-new` si `chemin` n'existe pas, `chemin.gtracker-tmp` s'il existe (`nomProvisoire`), jamais
+// montré dans `liste` ; un `ecrire` de debut 0 abandonne l'écriture non validée en cours (provisoire effacé) ; un bloc
+// hors d'ordre, un `chemin` ou une `taille` qui changent en route, un `valider` sans écriture en cours ou de taille
+// fausse répondent `erreur` et effacent le provisoire, l'original intact ; la liaison coupée efface le provisoire. Un
+// téléphone qui enregistre une session répond `erreur` de code PERMISSION à `ecrire` et à `effacer`.
 // Réponses, téléphone vers PC :
 //   liste      { id, fichiers: [{ chemin, taille, dateMs }] }   chemin relatif, `/` comme séparateur, un fichier de
-//                                                       la racine ou de `sessions/` (règles de `cheminAdmis`)
+//                                                       la racine, de `sessions/`, `itineraires/` ou `reglages/`
+//                                                       (règles de `cheminDuCable`) ; les autres sont écartés
 //   bloc       { id, debut, longueur } + corps          les octets lus ; `longueur` égale la taille du corps, plus
 //                                                       courte que demandée seulement à la fin du fichier
-//   pong       { id }
+//   pong       { id, enregistre? }                      enregistre, booléen facultatif : vrai quand le téléphone
+//                                                       enregistre une session (il refuse alors d'écrire)
+//   ecrit      { id, chemin, taille, dateMs }           réponse à `valider` : le fichier tel qu'il est désormais sur le
+//                                                       téléphone (`dateMs` entier positif ou nul)
+//   fait       { id }                                   réponse à `ecrire` et à `effacer`
 //   erreur     { id, code, message }                    code : NOT_FOUND, PERMISSION, NO_SPACE ou UNKNOWN ;
-//                                                       message : phrase en clair, 500 caractères au plus
+//                                                       message : phrase en clair, 500 caractères au plus ; réponse
+//                                                       possible à toute commande
 
 import { ErreurDisque } from './disque'
 import type { CodeErreur } from './disque'
 import type { FichierTelephone } from './telephone'
-import { cheminAdmis, fichiersAdmis } from './telephone'
+import { cheminDuCable, cheminEcrivable, fichiersAdmis } from './telephone'
 
-/** Version du protocole, portée par `appairer` et `bonjour`. */
+/**
+ * Version du protocole, portée par `appairer` et `bonjour`. Elle reste à 1 : un PC refuse toute autre version, si
+ * bien que la changer couperait un téléphone à jour d'un programme ancien, et inversement ; ce qui s'ajoute passe par
+ * `capacites`.
+ */
 export const PROTOCOLE_SANS_FIL = 1
+
+/** Capacité d'un téléphone qui liste aussi `itineraires/` et `reglages/`, et reçoit `ecrire`, `valider` et `effacer`. */
+export const CAPACITE_ECRITURE = 'ecriture'
+
+/** Capacités connues de ce protocole, dans l'ordre où `lireMessage` les rend. */
+export const CAPACITES = [CAPACITE_ECRITURE] as const
+export type Capacite = (typeof CAPACITES)[number]
 
 /** Port TCP où le PC écoute d'abord. */
 export const PORT_SANS_FIL = 48217
 
-/** Taille d'un bloc de lecture : une commande `lire` ne demande jamais plus. */
+/** Taille d'un bloc de lecture ou d'écriture : une commande `lire` ne demande jamais plus, un `ecrire` n'en porte jamais plus. */
 export const TAILLE_BLOC = 1_048_576
 
 /** Taille des deux longueurs qui ouvrent chaque trame. */
@@ -252,10 +301,13 @@ export class DecodeurTrames {
 
 // ---------- messages ----------
 
-/** Demande d'appairage du téléphone. */
-export type MessageAppairer = { type: 'appairer'; version: number; nom: string; nonceTelephone: string }
-/** Téléphone déjà appairé qui présente son jeton. */
-export type MessageBonjour = { type: 'bonjour'; version: number; nom: string; jeton: string }
+/**
+ * Demande d'appairage du téléphone ; `capacites`, absent d'un téléphone qui ne sait que lire, ne garde à la lecture
+ * que les capacités connues, sans doublon, dans l'ordre de `CAPACITES`.
+ */
+export type MessageAppairer = { type: 'appairer'; version: number; nom: string; nonceTelephone: string; capacites?: Capacite[] }
+/** Téléphone déjà appairé qui présente son jeton ; `capacites` comme pour `appairer`. */
+export type MessageBonjour = { type: 'bonjour'; version: number; nom: string; jeton: string; capacites?: Capacite[] }
 export type MessageDefi = { type: 'defi'; noncePc: string }
 export type MessagePreuve = { type: 'preuve'; preuve: string }
 export type MessageAppaire = { type: 'appaire'; preuve: string; jeton: string; identifiantPc: string; nomPc: string }
@@ -265,16 +317,28 @@ export type MessageRefus = { type: 'refus'; raison: RaisonRefus }
 export type CommandeLister = { type: 'lister'; id: number }
 export type CommandeLire = { type: 'lire'; id: number; chemin: string; debut: number; longueur: number }
 export type CommandePing = { type: 'ping'; id: number }
+/** Un bloc d'un fichier à écrire, de `taille` octets en tout ; `octets` est le corps de la trame. */
+export type CommandeEcrire = { type: 'ecrire'; id: number; chemin: string; debut: number; taille: number; octets: Uint8Array }
+/** Fin d'une écriture : le provisoire, de `taille` octets, prend la place de `chemin`. */
+export type CommandeValider = { type: 'valider'; id: number; chemin: string; taille: number }
+export type CommandeEffacer = { type: 'effacer'; id: number; chemin: string }
+/** Commandes qui modifient le téléphone, envoyées seulement à un téléphone qui a annoncé `CAPACITE_ECRITURE`. */
+export type CommandeEcriture = CommandeEcrire | CommandeValider | CommandeEffacer
 /** Commandes du PC. */
-export type Commande = CommandeLister | CommandeLire | CommandePing
+export type Commande = CommandeLister | CommandeLire | CommandePing | CommandeEcriture
 
 export type ReponseListe = { type: 'liste'; id: number; fichiers: FichierTelephone[] }
 /** Octets lus ; `longueur` de l'en-tête est la taille de `octets`, posée à l'encodage. */
 export type ReponseBloc = { type: 'bloc'; id: number; debut: number; octets: Uint8Array }
-export type ReponsePong = { type: 'pong'; id: number }
+/** `enregistre`, absent d'un téléphone qui ne le dit pas : vrai quand il enregistre une session et refuse d'écrire. */
+export type ReponsePong = { type: 'pong'; id: number; enregistre?: boolean }
+/** Réponse à `valider` : le fichier tel qu'il est désormais sur le téléphone. */
+export type ReponseEcrit = { type: 'ecrit'; id: number } & FichierTelephone
+/** Réponse à `ecrire` et à `effacer`. */
+export type ReponseFait = { type: 'fait'; id: number }
 export type ReponseErreur = { type: 'erreur'; id: number; code: CodeErreur; message: string }
 /** Réponses du téléphone. */
-export type ReponseTelephone = ReponseListe | ReponseBloc | ReponsePong | ReponseErreur
+export type ReponseTelephone = ReponseListe | ReponseBloc | ReponsePong | ReponseEcrit | ReponseFait | ReponseErreur
 
 /** Messages de l'accueil et de l'appairage. */
 export type MessageAccueil = MessageAppairer | MessageBonjour | MessageDefi | MessagePreuve | MessageAppaire | MessageBienvenue | MessageRefus
@@ -288,7 +352,16 @@ export function encoderMessage(message: Message, limites: Limites = LIMITES): Ui
     const { octets, ...reste } = message
     return encoderTrame({ ...reste, longueur: octets.length }, octets, limites)
   }
+  if (message.type === 'ecrire') {
+    const { octets, ...reste } = message
+    return encoderTrame(reste, octets, limites)
+  }
   return encoderTrame(message, undefined, limites)
+}
+
+/** Les capacités annoncées par le téléphone, vides s'il n'en annonce aucune. */
+export function capacitesDe(m: MessageAppairer | MessageBonjour): readonly Capacite[] {
+  return m.capacites ?? []
 }
 
 /** Vrai pour un nom d'appareil : 1 à `NOM_MAX` caractères, sans caractère de contrôle (C0, effacement, C1). */
@@ -323,12 +396,27 @@ function lecteur(enTete: EnTete) {
     if (typeof v !== 'string' || !nomAdmis(v)) throw invalide(type, champ)
     return v
   }
+  const chemin = (admis: (chemin: string) => boolean): string => {
+    const v = enTete.chemin
+    if (typeof v !== 'string' || !admis(v)) throw invalide(type, 'chemin')
+    return v
+  }
+  /** Les capacités connues, sans doublon, dans l'ordre de `CAPACITES` ; rien si le champ est absent. */
+  const capacites = (): { capacites?: Capacite[] } => {
+    const v = enTete.capacites
+    if (v === undefined) return {}
+    if (!Array.isArray(v) || v.some((c) => typeof c !== 'string')) throw invalide(type, 'capacites')
+    return { capacites: CAPACITES.filter((c) => v.includes(c)) }
+  }
   return {
     id: () => entier('id', 0, ID_MAX),
     version: () => entier('version', 0, ID_MAX),
+    position: (champ: string) => entier(champ, 0, Number.MAX_SAFE_INTEGER),
     entier,
     hex,
     nom,
+    chemin,
+    capacites,
   }
 }
 
@@ -342,19 +430,20 @@ function fichierBrut(v: unknown): FichierTelephone | null {
 
 /**
  * Le message porté par une trame, champs vérifiés. Lève `MESSAGE_INCONNU` sur un `type` inconnu, `MESSAGE_INVALIDE`
- * sur un champ manquant, mal typé ou hors bornes. Dans une `liste`, les fichiers dont le chemin, la taille ou la date
- * ne sont pas admis sont écartés, comme ceux du câble (`fichiersAdmis`) ; la liste rendue est triée par chemin.
+ * sur un champ manquant, mal typé ou hors bornes. Dans une `liste`, les fichiers dont le chemin (`cheminDuCable`), la
+ * taille ou la date ne sont pas admis sont écartés, comme ceux du câble (`fichiersAdmis`) ; la liste rendue est triée
+ * par chemin. Les commandes d'écriture et `ecrit` ne portent qu'un chemin de `cheminEcrivable`.
  */
 export function lireMessage(trame: Trame): Message {
   const { enTete, corps } = trame
   const l = lecteur(enTete)
   const type = enTete.type
-  if (type !== 'bloc' && corps.length > 0) throw invalide(type, 'corps')
+  if (type !== 'bloc' && type !== 'ecrire' && corps.length > 0) throw invalide(type, 'corps')
   switch (type) {
     case 'appairer':
-      return { type, version: l.version(), nom: l.nom('nom'), nonceTelephone: l.hex('nonceTelephone', 32) }
+      return { type, version: l.version(), nom: l.nom('nom'), nonceTelephone: l.hex('nonceTelephone', 32), ...l.capacites() }
     case 'bonjour':
-      return { type, version: l.version(), nom: l.nom('nom'), jeton: l.hex('jeton', 32) }
+      return { type, version: l.version(), nom: l.nom('nom'), jeton: l.hex('jeton', 32), ...l.capacites() }
     case 'defi':
       return { type, noncePc: l.hex('noncePc', 32) }
     case 'preuve':
@@ -371,26 +460,44 @@ export function lireMessage(trame: Trame): Message {
     case 'lister':
     case 'ping':
       return { type, id: l.id() }
-    case 'lire': {
-      const chemin = enTete.chemin
-      if (typeof chemin !== 'string' || !cheminAdmis(chemin)) throw invalide(type, 'chemin')
-      return { type, id: l.id(), chemin, debut: l.entier('debut', 0, Number.MAX_SAFE_INTEGER), longueur: l.entier('longueur', 1, TAILLE_BLOC) }
+    case 'lire':
+      return { type, id: l.id(), chemin: l.chemin(cheminDuCable), debut: l.position('debut'), longueur: l.entier('longueur', 1, TAILLE_BLOC) }
+    case 'ecrire': {
+      const id = l.id()
+      const chemin = l.chemin(cheminEcrivable)
+      const debut = l.position('debut')
+      const taille = l.position('taille')
+      // Un corps vide n'est admis que pour un fichier vide ; aucun bloc ne déborde la taille annoncée.
+      if ((corps.length === 0 && taille !== 0) || debut + corps.length > taille) throw invalide(type, 'corps')
+      return { type, id, chemin, debut, taille, octets: corps }
     }
+    case 'valider':
+      return { type, id: l.id(), chemin: l.chemin(cheminEcrivable), taille: l.position('taille') }
+    case 'effacer':
+      return { type, id: l.id(), chemin: l.chemin(cheminEcrivable) }
     case 'liste': {
       const fichiers = enTete.fichiers
       if (!Array.isArray(fichiers)) throw invalide(type, 'fichiers')
       const bruts = fichiers.map(fichierBrut)
       if (bruts.some((f) => f === null)) throw invalide(type, 'fichiers')
-      return { type, id: l.id(), fichiers: fichiersAdmis(bruts as FichierTelephone[]) }
+      return { type, id: l.id(), fichiers: fichiersAdmis(bruts as FichierTelephone[], cheminDuCable) }
     }
+    case 'ecrit':
+      return { type, id: l.id(), chemin: l.chemin(cheminEcrivable), taille: l.position('taille'), dateMs: l.position('dateMs') }
+    case 'fait':
+      return { type, id: l.id() }
     case 'bloc': {
       const id = l.id()
-      const debut = l.entier('debut', 0, Number.MAX_SAFE_INTEGER)
+      const debut = l.position('debut')
       if (l.entier('longueur', 0, TAILLE_BLOC) !== corps.length) throw invalide(type, 'longueur')
       return { type, id, debut, octets: corps }
     }
-    case 'pong':
-      return { type, id: l.id() }
+    case 'pong': {
+      const id = l.id()
+      const enregistre = enTete.enregistre
+      if (enregistre !== undefined && typeof enregistre !== 'boolean') throw invalide(type, 'enregistre')
+      return enregistre === undefined ? { type, id } : { type, id, enregistre }
+    }
     case 'erreur': {
       const code = (CODES_ERREUR as readonly unknown[]).includes(enTete.code) ? (enTete.code as CodeErreur) : 'UNKNOWN'
       const message = typeof enTete.message === 'string' ? enTete.message.slice(0, MESSAGE_MAX) : ''
@@ -407,4 +514,13 @@ export function lireMessage(trame: Trame): Message {
  */
 export function* blocsDeLecture(taille: number): Generator<{ debut: number; longueur: number }> {
   for (let debut = 0; debut < taille; debut += TAILLE_BLOC) yield { debut, longueur: Math.min(TAILLE_BLOC, taille - debut) }
+}
+
+/**
+ * Les blocs des commandes `ecrire` d'un fichier entier, produits un à un : ceux de `blocsDeLecture`, sauf pour un
+ * fichier vide, qui s'écrit par un seul bloc vide (le téléphone ouvre le provisoire au bloc de début 0).
+ */
+export function* blocsDEcriture(taille: number): Generator<{ debut: number; longueur: number }> {
+  if (taille === 0) yield { debut: 0, longueur: 0 }
+  else yield* blocsDeLecture(taille)
 }
