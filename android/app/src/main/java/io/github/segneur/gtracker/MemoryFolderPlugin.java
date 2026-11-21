@@ -21,11 +21,7 @@ import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import org.json.JSONObject;
 
 /**
@@ -43,11 +39,13 @@ import org.json.JSONObject;
  * l'interface.
  *
  * Un fichier existant n'est jamais réécrit sur place : le nouveau contenu va
- * d'abord à côté (« nom.gtracker-tmp »), puis prend sa place (`replace`). Une
- * coupure en plein échange est reprise à la lecture suivante du dossier
- * (`list`) : une fiche n'est jamais laissée à moitié écrite. Un fichier neuf
- * est écrit de même sous « nom.gtracker-new », puis renommé (`createNew`) ; un
- * « .gtracker-new » resté seul, création interrompue, est effacé par `list`.
+ * d'abord à côté (« nom.gtracker-tmp »), puis prend sa place (`replace` de
+ * MemoryWriter). Une coupure en plein échange est reprise à la lecture suivante
+ * du dossier (`list`) : une fiche n'est jamais laissée à moitié écrite. Un
+ * fichier neuf est écrit de même sous « nom.gtracker-new », puis renommé
+ * (`createNew`) ; un « .gtracker-new » resté seul, création interrompue, est
+ * effacé par `list`. Un provisoire que la liaison avec l'ordinateur tient
+ * ouvert n'est ni effacé ni renommé (`MemoryWriter.settle`).
  *
  * Un fichier absent n'est pas une erreur (`text` ou `data` nul, `exists` faux).
  * Une erreur est rejetée avec un code (`rejectCoded`), qui dit à la couche web
@@ -56,16 +54,6 @@ import org.json.JSONObject;
 @CapacitorPlugin(name = "MemoryFolder")
 public class MemoryFolderPlugin extends Plugin {
 
-    /** Type des fichiers créés : Android n'ajoute alors aucune extension au nom demandé. */
-    private static final String FILE_MIME = "application/octet-stream";
-
-    /** Suffixe du fichier écrit à côté de celui qu'il remplace, le temps de l'échange. */
-    private static final String TEMP_SUFFIX = ".gtracker-tmp";
-    /**
-     * Suffixe d'un fichier neuf, le temps de l'écrire : distinct de TEMP_SUFFIX, qu'une
-     * coupure fait reprendre par `list`, alors qu'un fichier neuf interrompu est seulement effacé.
-     */
-    private static final String NEW_SUFFIX = ".gtracker-new";
     private static final String LOG_TAG = "MemoryFolder";
 
     // --- Choix du dossier ---
@@ -150,21 +138,8 @@ public class MemoryFolderPlugin extends Plugin {
         try {
             String dirId = resolve(tree, call.getString("path", ""), false);
             if (dirId != null) {
-                List<MemoryTree.Child> children = memory().children(tree, dirId);
-                Set<String> names = new HashSet<>();
-                for (MemoryTree.Child child : children) names.add(child.name);
-                for (MemoryTree.Child child : children) {
-                    if (!child.isDir && child.name.endsWith(NEW_SUFFIX) && child.name.length() > NEW_SUFFIX.length()) {
-                        // Création interrompue avant son renommage : perdue, puis refaite (fiche depuis le GPX).
-                        deleteQuietly(DocumentsContract.buildDocumentUriUsingTree(tree, child.id));
-                        continue;
-                    }
-                    if (!child.isDir && child.name.endsWith(TEMP_SUFFIX) && child.name.length() > TEMP_SUFFIX.length()) {
-                        String original = finishInterruptedReplace(tree, child, names);
-                        if (original != null) entries.put(entryOf(original, child));
-                        continue;
-                    }
-                    entries.put(entryOf(child.name, child));
+                for (MemoryWriter.Shown shown : writer().settle(tree, memory().children(tree, dirId))) {
+                    entries.put(entryOf(shown.name, shown.child));
                 }
             }
         } catch (Exception e) {
@@ -294,144 +269,17 @@ public class MemoryFolderPlugin extends Plugin {
             String name = path.substring(slash + 1);
             String parentId = resolve(tree, parentPath, true);
             String id = memory().findChild(tree, parentId, name);
+            MemoryWriter writer = writer();
             if (id != null) {
-                replace(tree, parentId, name, DocumentsContract.buildDocumentUriUsingTree(tree, id), data, path);
+                writer.replace(tree, parentId, name, DocumentsContract.buildDocumentUriUsingTree(tree, id), data, path);
             } else {
-                createNew(tree, parentId, name, data, path);
+                writer.createNew(tree, parentId, name, data, path);
             }
         } catch (Exception e) {
             rejectCoded(call, "Écriture impossible", e);
             return;
         }
         call.resolve();
-    }
-
-    /**
-     * Remplace un fichier existant sans jamais le laisser à moitié écrit : le
-     * contenu va d'abord dans « nom.gtracker-tmp », puis l'ancien fichier est
-     * retiré et le nouveau prend son nom. Si l'application est tuée entre deux
-     * étapes, `list` termine l'échange. Un fournisseur qui ne sait pas renommer
-     * reçoit l'écriture en place, comme avant.
-     */
-    private void replace(Uri tree, String parentId, String name, Uri target, byte[] data, String path) throws Exception {
-        String tempName = name + TEMP_SUFFIX;
-        String tempId = memory().findChild(tree, parentId, tempName);
-        Uri temp = tempId != null ? DocumentsContract.buildDocumentUriUsingTree(tree, tempId) : create(tree, parentId, tempName, path);
-        writeTo(temp, data, path);
-        if (!supportsRename(temp)) {
-            writeTo(target, data, path);
-            DocumentsContract.deleteDocument(resolver(), temp);
-            return;
-        }
-        DocumentsContract.deleteDocument(resolver(), target);
-        Uri renamed;
-        try {
-            renamed = DocumentsContract.renameDocument(resolver(), temp, name);
-        } catch (Exception e) {
-            renamed = null;
-        }
-        if (renamed == null) {
-            // Renommage refusé malgré l'annonce du fournisseur : le contenu est écrit sous son nom.
-            writeTo(create(tree, parentId, name, path), data, path);
-            DocumentsContract.deleteDocument(resolver(), temp);
-        }
-    }
-
-    /**
-     * Crée un fichier sans jamais le laisser à moitié écrit sous son nom : le
-     * contenu va d'abord dans « nom.gtracker-new », qui prend ensuite le nom
-     * demandé. Si l'application est tuée avant, `list` efface le fichier neuf
-     * resté seul. Un fournisseur qui ne sait pas renommer reçoit l'écriture en
-     * place, comme `replace`.
-     */
-    private void createNew(Uri tree, String parentId, String name, byte[] data, String path) throws Exception {
-        String newName = name + NEW_SUFFIX;
-        String leftover = memory().findChild(tree, parentId, newName);
-        if (leftover != null) DocumentsContract.deleteDocument(resolver(), DocumentsContract.buildDocumentUriUsingTree(tree, leftover));
-        Uri temp = create(tree, parentId, newName, path);
-        if (!supportsRename(temp)) {
-            DocumentsContract.deleteDocument(resolver(), temp);
-            writeTo(create(tree, parentId, name, path), data, path);
-            return;
-        }
-        try {
-            writeTo(temp, data, path);
-        } catch (Exception e) {
-            deleteQuietly(temp);
-            throw e;
-        }
-        Uri renamed;
-        try {
-            renamed = DocumentsContract.renameDocument(resolver(), temp, name);
-        } catch (Exception e) {
-            renamed = null;
-        }
-        if (renamed == null) {
-            // Renommage refusé malgré l'annonce du fournisseur : le contenu est écrit sous son nom.
-            writeTo(create(tree, parentId, name, path), data, path);
-            DocumentsContract.deleteDocument(resolver(), temp);
-        }
-    }
-
-    /** Efface un document sans lever : un échec le laisse pour la prochaine lecture du dossier. */
-    private void deleteQuietly(Uri doc) {
-        try {
-            DocumentsContract.deleteDocument(resolver(), doc);
-        } catch (Exception e) {
-            // Laissé tel quel : il sera effacé à la prochaine lecture.
-        }
-    }
-
-    /**
-     * Fichier temporaire trouvé dans un dossier : un échange interrompu. À côté
-     * de l'original, l'ancien contenu est intact et le temporaire, peut-être
-     * incomplet, est retiré ; seul, l'original avait déjà été retiré et le
-     * temporaire, complet, reprend son nom. Rend le nom sous lequel le montrer,
-     * `null` s'il ne doit pas l'être.
-     */
-    private String finishInterruptedReplace(Uri tree, MemoryTree.Child temp, Set<String> names) {
-        String original = temp.name.substring(0, temp.name.length() - TEMP_SUFFIX.length());
-        Uri doc = DocumentsContract.buildDocumentUriUsingTree(tree, temp.id);
-        try {
-            if (names.contains(original)) {
-                DocumentsContract.deleteDocument(resolver(), doc);
-                return null;
-            }
-            if (DocumentsContract.renameDocument(resolver(), doc, original) == null) return null;
-            names.add(original);
-            return original;
-        } catch (Exception e) {
-            // Laissé tel quel : rien n'est perdu, l'échange sera repris à la prochaine lecture.
-            return null;
-        }
-    }
-
-    private Uri create(Uri tree, String parentId, String name, String path) throws Exception {
-        Uri created = DocumentsContract.createDocument(
-            resolver(),
-            DocumentsContract.buildDocumentUriUsingTree(tree, parentId),
-            FILE_MIME,
-            name
-        );
-        if (created == null) throw new Exception("création refusée pour " + path);
-        return created;
-    }
-
-    private void writeTo(Uri doc, byte[] data, String path) throws Exception {
-        // « wt » : le fichier est tronqué avant l'écriture, sans quoi un contenu plus
-        // court que le précédent en garderait la fin.
-        try (OutputStream out = resolver().openOutputStream(doc, "wt")) {
-            if (out == null) throw new Exception("écriture refusée pour " + path);
-            out.write(data);
-        }
-    }
-
-    private boolean supportsRename(Uri doc) {
-        try (Cursor c = resolver().query(doc, new String[] { Document.COLUMN_FLAGS }, null, null, null)) {
-            return c != null && c.moveToFirst() && (c.getInt(0) & Document.FLAG_SUPPORTS_RENAME) != 0;
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     private static JSObject entryOf(String name, MemoryTree.Child child) {
@@ -479,6 +327,11 @@ public class MemoryFolderPlugin extends Plugin {
         return new MemoryTree(resolver());
     }
 
+    /** Écriture dans l'arbre, commune avec la liaison à l'ordinateur. */
+    private MemoryWriter writer() {
+        return new MemoryWriter(resolver());
+    }
+
     private Uri treeOf(PluginCall call) {
         String uri = call.getString("uri");
         if (uri == null || uri.isEmpty()) {
@@ -493,24 +346,7 @@ public class MemoryFolderPlugin extends Plugin {
      * `create`, les dossiers manquants sont créés.
      */
     private String resolve(Uri tree, String path, boolean create) throws Exception {
-        String id = DocumentsContract.getTreeDocumentId(tree);
-        for (String part : path.split("/")) {
-            if (part.isEmpty()) continue;
-            String child = memory().findChild(tree, id, part);
-            if (child == null) {
-                if (!create) return null;
-                Uri created = DocumentsContract.createDocument(
-                    resolver(),
-                    DocumentsContract.buildDocumentUriUsingTree(tree, id),
-                    Document.MIME_TYPE_DIR,
-                    part
-                );
-                if (created == null) throw new Exception("création du dossier " + part + " refusée");
-                child = DocumentsContract.getDocumentId(created);
-            }
-            id = child;
-        }
-        return id;
+        return writer().resolve(tree, path, create);
     }
 
     /**

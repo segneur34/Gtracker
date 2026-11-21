@@ -100,9 +100,11 @@ export type DesktopPhoneState =
   /**
    * Un téléphone prêt à être lu ; `nom` est son modèle ; `canal` : par où, absent d'une coquille plus ancienne (le
    * câble) ; `ecriture` : vrai si ce canal sait aussi écrire et effacer, absent d'une coquille qui ne le sait pas ;
-   * `itineraires` : vrai si ce canal liste aussi `itineraires/`, absent d'une coquille qui ne le liste pas.
+   * `itineraires` : vrai si ce canal liste aussi `itineraires/`, absent d'une coquille qui ne le liste pas ;
+   * `enregistrement` : vrai si le téléphone enregistre une session (il refuse alors d'être écrit : `ecriture` est faux),
+   * absent d'une coquille ou d'un téléphone qui ne le disent pas.
    */
-  | { etat: 'pret'; nom: string; canal?: DesktopPhoneChannel; ecriture?: boolean; itineraires?: boolean }
+  | { etat: 'pret'; nom: string; canal?: DesktopPhoneChannel; ecriture?: boolean; itineraires?: boolean; enregistrement?: boolean }
   /** Rien de branché, ou rien de vu. */
   | { etat: 'absent' }
   /** Le téléphone attend que l'utilisateur accepte cet ordinateur. */

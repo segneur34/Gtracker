@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -31,8 +32,13 @@ import javax.crypto.spec.SecretKeySpec;
  *   clés nues ni de virgule finale), son écriture est celle de JSON.stringify (ordre des champs gardé, sans espace) ;
  * - les nombres JSON sont des doubles, comme en JavaScript : un entier y est exact jusqu'à 2^53 - 1.
  *
- * Le téléphone ne reçoit que de petits messages sans corps (défi, réponses de l'accueil, commandes) : il lit tout le
- * flux du PC avec les limites de l'accueil, et n'envoie de corps que dans `bloc`.
+ * Le téléphone ne reçoit que de petits en-têtes (défi, réponses de l'accueil, commandes) : il lit le flux du PC avec
+ * les limites de l'accueil, puis, une fois relié, avec un corps d'un bloc au plus (`COMMAND_LIMITS`), le seul corps
+ * reçu étant celui de `ecrire`. Il n'envoie de corps que dans `bloc`.
+ *
+ * Écriture : le téléphone annonce la capacité « ecriture » (`CAPABILITIES`) ; il liste alors aussi `itineraires/` et
+ * `reglages/`, et reçoit `ecrire`, `valider` et `effacer`, bornés à la liste blanche `writeAllowed`. L'ordre des blocs
+ * d'une écriture est tenu par `WriteSession`.
  */
 final class ComputerLinkProtocol {
 
@@ -63,10 +69,29 @@ final class ComputerLinkProtocol {
     static final Limits LIMITS = new Limits(8_388_608, BLOCK_SIZE);
     /** Limites de l'accueil : en-tête court, aucun corps. */
     static final Limits WELCOME_LIMITS = new Limits(16_384, 0);
+    /**
+     * Limites des commandes du PC une fois relié : l'en-tête court de l'accueil (une commande porte au plus un chemin
+     * de 512 caractères), et le corps d'un bloc d'écriture.
+     */
+    static final Limits COMMAND_LIMITS = new Limits(WELCOME_LIMITS.header, BLOCK_SIZE);
 
-    /** Sous-dossier du dossier mémoire dont les fichiers sont listés, en plus de ceux de la racine. */
+    /** Capacité annoncée dans `appairer` et `bonjour` : listage des quatre dossiers et écriture, jamais l'un sans l'autre. */
+    static final String CAPABILITY_WRITE = "ecriture";
+    /** Capacités annoncées par le téléphone, dans l'ordre où elles partent. */
+    static final List<String> CAPABILITIES = Collections.unmodifiableList(Arrays.asList(CAPABILITY_WRITE));
+
+    /** Sous-dossiers du dossier mémoire dont les fichiers sont listés et lus, en plus de ceux de la racine. */
     static final String SESSIONS_DIR = "sessions";
-    /** Suffixes des écritures en cours du dossier mémoire (MemoryFolderPlugin) : jamais listés ni lus. */
+    static final String ITINERARIES_DIR = "itineraires";
+    static final String SETTINGS_DIR = "reglages";
+    static final List<String> LISTED_DIRS = Collections.unmodifiableList(Arrays.asList(SESSIONS_DIR, ITINERARIES_DIR, SETTINGS_DIR));
+
+    /** Liste blanche des écritures et effacements, la même que `cheminEcrivable` (bureau/telephone.ts). */
+    static final List<String> WRITABLE_DIRS = Collections.unmodifiableList(Arrays.asList(SESSIONS_DIR, ITINERARIES_DIR, SETTINGS_DIR));
+    static final List<String> WRITABLE_ROOT_FILES = Collections.unmodifiableList(Arrays.asList("gtracker.json", "fc-repos.json", "lieux.json"));
+    /** Longueur au-delà de laquelle un chemin à écrire est refusé sans examen, en caractères. */
+    static final int WRITE_PATH_MAX = 512;
+    /** Suffixes des écritures en cours du dossier mémoire (MemoryTree) : jamais listés, lus ni écrits par le PC. */
     static final String TEMP_SUFFIX = ".gtracker-tmp";
     static final String NEW_SUFFIX = ".gtracker-new";
 
@@ -289,6 +314,10 @@ final class ComputerLinkProtocol {
         String path;
         long start;
         int length;
+        /** Taille totale du fichier, pour `ecrire` et `valider`. */
+        long size;
+        /** Octets du bloc de `ecrire`. */
+        byte[] body;
         byte[] noncePc;
         byte[] proof;
         byte[] token;
@@ -328,10 +357,17 @@ final class ComputerLinkProtocol {
         return (String) v;
     }
 
+    private static String pathField(Map<String, Object> header, boolean write) throws FrameException {
+        Object v = header.get("chemin");
+        if (!(v instanceof String) || !(write ? writeAllowed((String) v) : pathAllowed((String) v))) throw invalid((String) header.get("type"), "chemin");
+        return (String) v;
+    }
+
     /**
      * Le message du PC porté par une trame, champs vérifiés comme le fait le PC (`lireMessage`). Lève
      * `MESSAGE_INCONNU` sur un `type` que le PC n'envoie pas au téléphone, `MESSAGE_INVALIDE` sur un champ manquant,
-     * mal typé ou hors bornes, et sur un corps : aucun message du PC n'en porte.
+     * mal typé ou hors bornes, et sur un corps ailleurs que dans `ecrire`. Le corps d'un `ecrire` n'est vide que pour
+     * un fichier vide et ne déborde jamais la taille annoncée.
      */
     static Incoming readMessage(Frame frame) throws FrameException {
         Map<String, Object> h = frame.header;
@@ -345,11 +381,14 @@ final class ComputerLinkProtocol {
             case "lister":
             case "lire":
             case "ping":
+            case "ecrire":
+            case "valider":
+            case "effacer":
                 break;
             default:
                 throw new FrameException(UNKNOWN_MESSAGE, "Message inconnu : « " + (type.length() > 40 ? type.substring(0, 40) : type) + " ».");
         }
-        if (frame.body.length > 0) throw invalid(type, "corps");
+        if (frame.body.length > 0 && !"ecrire".equals(type)) throw invalid(type, "corps");
         switch (type) {
             case "defi":
                 m.noncePc = hexField(h, "noncePc", 32);
@@ -372,15 +411,32 @@ final class ComputerLinkProtocol {
                 m.reason = (String) raison;
                 break;
             }
-            case "lire": {
-                Object chemin = h.get("chemin");
-                if (!(chemin instanceof String) || !pathAllowed((String) chemin)) throw invalid(type, "chemin");
-                m.path = (String) chemin;
+            case "lire":
+                m.path = pathField(h, false);
                 m.id = integer(h, "id", 0, ID_MAX);
                 m.start = integer(h, "debut", 0, MAX_SAFE_INTEGER);
                 m.length = (int) integer(h, "longueur", 1, BLOCK_SIZE);
                 break;
+            case "ecrire": {
+                m.id = integer(h, "id", 0, ID_MAX);
+                m.path = pathField(h, true);
+                m.start = integer(h, "debut", 0, MAX_SAFE_INTEGER);
+                m.size = integer(h, "taille", 0, MAX_SAFE_INTEGER);
+                int n = frame.body.length;
+                if ((n == 0 && m.size != 0) || m.start + n > m.size) throw invalid(type, "corps");
+                m.body = frame.body;
+                m.length = n;
+                break;
             }
+            case "valider":
+                m.id = integer(h, "id", 0, ID_MAX);
+                m.path = pathField(h, true);
+                m.size = integer(h, "taille", 0, MAX_SAFE_INTEGER);
+                break;
+            case "effacer":
+                m.id = integer(h, "id", 0, ID_MAX);
+                m.path = pathField(h, true);
+                break;
             default:
                 m.id = integer(h, "id", 0, ID_MAX);
                 break;
@@ -396,21 +452,23 @@ final class ComputerLinkProtocol {
         return h;
     }
 
-    /** Demande d'appairage par le code affiché sur le PC. */
+    /** Demande d'appairage par le code affiché sur le PC, capacités en dernier champ. */
     static byte[] encodePair(String name, byte[] nonceTelephone) throws FrameException {
         Map<String, Object> h = header("appairer");
         h.put("version", (long) PROTOCOL_VERSION);
         h.put("nom", name);
         h.put("nonceTelephone", toHex(nonceTelephone));
+        h.put("capacites", new ArrayList<Object>(CAPABILITIES));
         return encodeFrame(h, new byte[0], LIMITS);
     }
 
-    /** Téléphone déjà appairé qui présente son jeton. */
+    /** Téléphone déjà appairé qui présente son jeton, capacités en dernier champ. */
     static byte[] encodeHello(String name, byte[] token) throws FrameException {
         Map<String, Object> h = header("bonjour");
         h.put("version", (long) PROTOCOL_VERSION);
         h.put("nom", name);
         h.put("jeton", toHex(token));
+        h.put("capacites", new ArrayList<Object>(CAPABILITIES));
         return encodeFrame(h, new byte[0], LIMITS);
     }
 
@@ -447,9 +505,28 @@ final class ComputerLinkProtocol {
         return encodeFrame(h, body, LIMITS);
     }
 
-    static byte[] encodePong(long id) throws FrameException {
+    /** Réponse à `ping` ; `recording` vrai quand le téléphone enregistre une session et refuse donc d'écrire. */
+    static byte[] encodePong(long id, boolean recording) throws FrameException {
         Map<String, Object> h = header("pong");
         h.put("id", id);
+        h.put("enregistre", recording);
+        return encodeFrame(h, new byte[0], LIMITS);
+    }
+
+    /** Réponse à `ecrire` et à `effacer`. */
+    static byte[] encodeDone(long id) throws FrameException {
+        Map<String, Object> h = header("fait");
+        h.put("id", id);
+        return encodeFrame(h, new byte[0], LIMITS);
+    }
+
+    /** Réponse à `valider` : le fichier tel qu'il est désormais sur le téléphone. */
+    static byte[] encodeWritten(long id, String path, long size, long dateMs) throws FrameException {
+        Map<String, Object> h = header("ecrit");
+        h.put("id", id);
+        h.put("chemin", path);
+        h.put("taille", size);
+        h.put("dateMs", Math.max(0, dateMs));
         return encodeFrame(h, new byte[0], LIMITS);
     }
 
@@ -514,16 +591,83 @@ final class ComputerLinkProtocol {
     }
 
     /**
-     * Vrai pour un chemin que le PC peut demander : un fichier de la racine du dossier mémoire ou de `sessions/`,
-     * séparé par `/`, chaque segment admis ; mêmes refus que `cheminAdmis` (bureau/telephone.ts). Rien hors du
-     * dossier : ni `..`, ni chemin absolu, ni sous-dossier autre que `sessions`.
+     * Vrai pour un chemin que le PC peut lire et que `liste` peut porter : un fichier de la racine du dossier mémoire
+     * ou de l'un des `LISTED_DIRS`, séparé par `/`, chaque segment admis ; mêmes refus que `cheminDuCable`
+     * (bureau/telephone.ts). Rien hors du dossier : ni `..`, ni chemin absolu, ni autre sous-dossier.
      */
     static boolean pathAllowed(String path) {
         String[] segments = path.split("/", -1);
-        if (segments.length == 2 && !segments[0].equals(SESSIONS_DIR)) return false;
+        if (segments.length == 2 && !LISTED_DIRS.contains(segments[0])) return false;
         if (segments.length != 1 && segments.length != 2) return false;
         for (String s : segments) if (!segmentAllowed(s)) return false;
         return true;
+    }
+
+    /**
+     * Vrai pour un chemin que le PC peut écrire ou effacer, mêmes règles que `cheminEcrivable` (bureau/telephone.ts) :
+     * 1 à 512 caractères, un fichier posé directement dans l'un des `WRITABLE_DIRS` (nom admis par `segmentAllowed`),
+     * ou l'un des `WRITABLE_ROOT_FILES`, en casse exacte. Tout le reste est refusé.
+     */
+    static boolean writeAllowed(String path) {
+        if (path == null || path.isEmpty() || path.length() > WRITE_PATH_MAX) return false;
+        String[] segments = path.split("/", -1);
+        if (segments.length == 1) return WRITABLE_ROOT_FILES.contains(path);
+        return segments.length == 2 && WRITABLE_DIRS.contains(segments[0]) && segmentAllowed(segments[1]);
+    }
+
+    /** Nom provisoire d'une écriture : `nom.gtracker-tmp` pour remplacer un fichier qui existe, `nom.gtracker-new` sinon. */
+    static String provisionalName(String name, boolean replacing) {
+        return name + (replacing ? TEMP_SUFFIX : NEW_SUFFIX);
+    }
+
+    /**
+     * Une écriture en cours sur la liaison : le fichier visé, sa taille annoncée, ce qui est déjà écrit, et s'il
+     * remplace un fichier existant. Le premier bloc (debut 0) en ouvre une, en abandonnant celle d'avant ; chaque
+     * bloc suivant doit viser le même chemin, annoncer la même taille et commencer où le précédent finit ; `valider`
+     * n'est admis qu'une fois tous les octets reçus. Calcul pur : les fichiers sont ailleurs (MemoryWriter).
+     */
+    static final class WriteSession {
+        final String path;
+        final long size;
+        final boolean replacing;
+        private long written;
+
+        WriteSession(String path, long size, boolean replacing) {
+            this.path = path;
+            this.size = size;
+            this.replacing = replacing;
+        }
+
+        /** Octets reçus jusqu'ici. */
+        long written() {
+            return written;
+        }
+
+        /** Vrai pour un bloc qui ouvre une écriture : celle d'avant, non validée, est alors abandonnée. */
+        static boolean opens(long start) {
+            return start == 0;
+        }
+
+        /** Vrai si un bloc de `length` octets à `start`, d'un fichier `path` de `size` octets, continue cette écriture. */
+        boolean continues(String path, long start, long size, int length) {
+            return this.path.equals(path) && this.size == size && start == written && start + length <= size;
+        }
+
+        /** Note un bloc reçu, déjà admis par `continues` ou ouvrant l'écriture. */
+        void wrote(int length) {
+            if (length < 0 || written + length > size) throw new IllegalArgumentException("Bloc au-delà de la taille annoncée.");
+            written += length;
+        }
+
+        /** Vrai si `valider` peut mettre le fichier en place : même chemin, même taille, tous les octets reçus. */
+        boolean completes(String path, long size) {
+            return this.path.equals(path) && this.size == size && written == size;
+        }
+
+        /** Suffixe du provisoire : remplacement ou création. */
+        String suffix() {
+            return replacing ? TEMP_SUFFIX : NEW_SUFFIX;
+        }
     }
 
     /** Segments au plus du sous-dossier où est la mémoire (la page n'en donne qu'un, « Gtracker »). */

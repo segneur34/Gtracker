@@ -327,7 +327,7 @@ describe('fichiers reçus d\'une autre application', () => {
  */
 describe('noms techniques du Java', () => {
   it('fichiers temporaires du dossier mémoire', () => {
-    const memory = appJava('MemoryFolderPlugin.java');
+    const memory = appJava('MemoryTree.java');
     expect(captured(memory, /\bTEMP_SUFFIX = "([^"]+)";/)).toBe(`.${FORMAT_ID}-tmp`);
     expect(captured(memory, /\bNEW_SUFFIX = "([^"]+)";/)).toBe(`.${FORMAT_ID}-new`);
   });
@@ -388,9 +388,34 @@ describe('liaison sans fil : mêmes constantes au PC et au téléphone', () => {
     expect(captured(PROTOCOL, /\bPC_LABEL = "([^"]+)";/)).toBe(captured(APPAIRAGE, /\bETIQUETTE_PC = '([^']+)'/));
     expect(captured(PROTOCOL, /\bTEMP_SUFFIX = "([^"]+)";/)).toBe(captured(DISQUE, /\bSUFFIXE_REMPLACEMENT = '([^']+)'/));
     expect(captured(PROTOCOL, /\bNEW_SUFFIX = "([^"]+)";/)).toBe(captured(DISQUE, /\bSUFFIXE_NEUF = '([^']+)'/));
-    const memory = appJava('MemoryFolderPlugin.java');
+    const memory = appJava('MemoryTree.java');
     expect(captured(PROTOCOL, /\bTEMP_SUFFIX = "([^"]+)";/)).toBe(captured(memory, /\bTEMP_SUFFIX = "([^"]+)";/));
     expect(captured(PROTOCOL, /\bNEW_SUFFIX = "([^"]+)";/)).toBe(captured(memory, /\bNEW_SUFFIX = "([^"]+)";/));
+  });
+
+  it("même capacité d'écriture, annoncée par le téléphone et lue par le PC", () => {
+    expect(captured(PROTOCOL, /\bCAPABILITY_WRITE = "([^"]+)";/)).toBe(captured(TRAMES, /\bexport const CAPACITE_ECRITURE = '([^']+)'/));
+    expect(captured(PROTOCOL, /\bCAPABILITIES = [^;]*Arrays\.asList\(([^)]*)\)/).trim()).toBe('CAPABILITY_WRITE');
+    expect(captured(TRAMES, /\bexport const CAPACITES = \[([^\]]*)\]/).trim()).toBe('CAPACITE_ECRITURE');
+  });
+
+  it("même liste blanche des écritures, et mêmes dossiers listés, des deux côtés", () => {
+    const TELEPHONE = bureau('telephone.ts');
+    /** Valeurs d'une liste dont chaque élément est un texte ou le nom d'une constante texte du même source. */
+    const values = (items: string, constant: (name: string) => string): string[] =>
+      items.split(',').map((item) => item.trim()).filter(Boolean).map((item) => {
+        const literal = /^["']([^"']*)["']$/.exec(item);
+        return literal ? literal[1] : constant(item);
+      });
+    const javaList = (name: string): string[] =>
+      values(captured(PROTOCOL, new RegExp(`\\b${name} = [^;]*Arrays\\.asList\\(([^)]*)\\)`)), (n) => captured(PROTOCOL, new RegExp(`\\bstatic final String ${n} = "([^"]+)";`)));
+    const tsList = (name: string): string[] =>
+      values(captured(TELEPHONE, new RegExp(`\\bexport const ${name}: readonly string\\[\\] = \\[([^\\]]*)\\]`)), (n) => captured(TELEPHONE, new RegExp(`\\bexport const ${n} = '([^']+)'`)));
+    expect(javaList('WRITABLE_DIRS')).toEqual(tsList('DOSSIERS_ECRIVABLES'));
+    expect(javaList('WRITABLE_ROOT_FILES')).toEqual(tsList('FICHIERS_RACINE_ECRIVABLES'));
+    expect(javaList('LISTED_DIRS')).toEqual(tsList('DOSSIERS_DU_CABLE'));
+    expect(javaList('WRITABLE_DIRS')).toEqual(['sessions', 'itineraires', 'reglages']);
+    expect(javaConst('WRITE_PATH_MAX')).toBe(int(captured(TELEPHONE, /\bconst LONGUEUR_ECRITURE_MAX = ([\d_]+)\b/)));
   });
 
   it('le test Java relit les jeux d’essai du PC dans le dépôt, sans copie', () => {

@@ -9,7 +9,9 @@ import type { SyncLockOptions } from './sync';
  * ligne de l'arrivée. Le téléphone et la synchronisation elle-même sont simulés (l'exécutant a ses propres tests).
  */
 
-type State = { etat: 'pret'; nom: string; canal: 'cable' | 'sansFil'; ecriture: boolean; itineraires?: boolean } | { etat: 'absent' };
+type State =
+  | { etat: 'pret'; nom: string; canal: 'cable' | 'sansFil'; ecriture: boolean; itineraires?: boolean; enregistrement?: boolean }
+  | { etat: 'absent' };
 
 let state: State;
 let calls: SyncLockOptions[];
@@ -28,6 +30,7 @@ const load = async () => {
     listPhoneFiles: async () => [],
     phoneCanWrite: (s: State) => s.etat === 'pret' && s.ecriture,
     phoneListsRoutes: (s: State) => s.etat === 'pret' && s.itineraires === true,
+    phoneIsRecording: (s: State) => s.etat === 'pret' && s.enregistrement === true,
     phoneMemoryFolder: (label: string) => ({ label }),
     phoneSafetyCopy: async () => 'C:\\copies\\x',
   }));
@@ -68,14 +71,29 @@ describe('bouton « Synchroniser »', () => {
     expect(sync.phoneSyncStep()).toEqual({ step: 'copying', phone: 'Xiaomi', channel: 'cable', done: 12, total: 50, first: true });
   });
 
-  it('par le sans-fil : le téléphone n’est pas écrit', async () => {
+  it('par le sans-fil, téléphone ancien : le téléphone n’est pas écrit, les itinéraires ne sont pas touchés', async () => {
     state = { etat: 'pret', nom: 'Xiaomi', canal: 'sansFil', ecriture: false };
     const sync = await load();
     await sync.synchronizeWithPhone();
-    expect(calls[0].phoneWritable).toBe(false);
-    // Le sans-fil ne liste pas les itinéraires : ils ne sont pas touchés.
-    expect(calls[0].phoneRoutes).toBe(false);
+    expect(calls[0]).toMatchObject({ phoneWritable: false, phoneRoutes: false, phoneRecording: false });
     expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced', channel: 'sansFil' } });
+  });
+
+  it('par le sans-fil, téléphone à jour : écrit, itinéraires compris, copie de sécurité comprise', async () => {
+    state = { etat: 'pret', nom: 'Xiaomi', canal: 'sansFil', ecriture: true, itineraires: true, enregistrement: false };
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    expect(calls[0]).toMatchObject({ phoneWritable: true, phoneRoutes: true, phoneRecording: false });
+    expect(await calls[0].beforeWrites?.('noBase')).toBe('C:\\copies\\x');
+    calls[0].onPlanned?.({} as never, 'noBase');
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'copying', channel: 'sansFil', first: true });
+  });
+
+  it('par le sans-fil, téléphone qui enregistre : pas écrit, itinéraires listés, le compte rendu le sait', async () => {
+    state = { etat: 'pret', nom: 'Xiaomi', canal: 'sansFil', ecriture: false, itineraires: true, enregistrement: true };
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    expect(calls[0]).toMatchObject({ phoneWritable: false, phoneRoutes: true, phoneRecording: true });
   });
 
   it('téléphone absent : l’issue le dit, sans synchroniser', async () => {

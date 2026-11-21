@@ -8,19 +8,115 @@ import android.provider.DocumentsContract.Document;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Lecture de l'arbre du dossier mémoire désigné par le sélecteur d'Android (accès SAF), commune au dossier mémoire
- * (MemoryFolderPlugin, qui seul y écrit) et à la liaison avec l'ordinateur (ComputerLinkPlugin, qui ne fait que lire).
- * Rien ici n'écrit, ne renomme ni n'efface.
+ * (MemoryFolderPlugin) et à la liaison avec l'ordinateur (ComputerLinkPlugin), qui y écrivent tous deux par
+ * MemoryWriter. Rien ici n'écrit, ne renomme ni n'efface : on y trouve aussi les noms des provisoires et ce que la
+ * lecture d'un dossier fait de chacun (`fate`), et les provisoires en cours d'écriture, qu'elle épargne.
  *
  * Les chemins sont relatifs au dossier choisi (« sessions/x.json »), séparés par `/`.
  */
 final class MemoryTree {
 
+    /** Suffixe du fichier écrit à côté de celui qu'il remplace, le temps de l'échange. */
+    static final String TEMP_SUFFIX = ".gtracker-tmp";
+    /**
+     * Suffixe d'un fichier neuf, le temps de l'écrire : distinct de TEMP_SUFFIX, qu'une
+     * coupure fait reprendre par la lecture du dossier, alors qu'un fichier neuf interrompu est seulement effacé.
+     */
+    static final String NEW_SUFFIX = ".gtracker-new";
+
     /** Fournisseur du stockage du téléphone, dont l'identifiant d'un document est son chemin. */
     private static final String EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents";
+
+    // ---------- provisoires en cours d'écriture ----------
+
+    /**
+     * Provisoires qu'une écriture tient en ce moment (celles de la page, d'un bloc, et celles de la liaison avec
+     * l'ordinateur, bloc par bloc), comptés par nom : la lecture d'un dossier ne les efface ni ne les renomme, et
+     * deux écritures du même nom ne se libèrent pas l'une l'autre. Par nom seul, sans le dossier : un homonyme resté
+     * d'une coupure dans un autre dossier n'est alors effacé qu'à la lecture suivante, sans autre effet.
+     */
+    private static final Map<String, Integer> WRITING = new HashMap<>();
+
+    /** Note une écriture de plus sous ce nom de provisoire ; chaque appel est suivi d'un `stopWriting`. */
+    static void startWriting(String provisionalName) {
+        synchronized (WRITING) {
+            WRITING.merge(provisionalName, 1, Integer::sum);
+        }
+    }
+
+    /** Note une écriture sous ce nom, sauf si une autre le tient déjà : faux alors, et rien n'est noté. */
+    static boolean tryStartWriting(String provisionalName) {
+        synchronized (WRITING) {
+            if (WRITING.containsKey(provisionalName)) return false;
+            WRITING.put(provisionalName, 1);
+            return true;
+        }
+    }
+
+    /** Fin d'une écriture notée par `startWriting` ou `tryStartWriting`. */
+    static void stopWriting(String provisionalName) {
+        synchronized (WRITING) {
+            Integer n = WRITING.get(provisionalName);
+            if (n == null) return;
+            if (n <= 1) WRITING.remove(provisionalName);
+            else WRITING.put(provisionalName, n - 1);
+        }
+    }
+
+    static boolean writing(String provisionalName) {
+        synchronized (WRITING) {
+            return WRITING.containsKey(provisionalName);
+        }
+    }
+
+    /** Ce que la lecture d'un dossier fait de l'un de ses enfants. */
+    enum Fate {
+        /** Montré sous son nom. */
+        SHOW,
+        /** Création interrompue avant son renommage (« nom.gtracker-new ») : effacé, puis refait. */
+        DELETE_NEW,
+        /** Remplacement interrompu, l'original intact à côté : le provisoire, peut-être incomplet, est effacé. */
+        DELETE_TEMP,
+        /** Remplacement interrompu après le retrait de l'original : le provisoire, complet, reprend son nom. */
+        RESTORE_TEMP,
+        /** Provisoire en cours d'écriture : caché, sans y toucher. */
+        HIDE,
+        /** Remplacement en cours dont l'original vient d'être retiré : montré sous le nom de l'original, sans y toucher. */
+        SHOW_AS_ORIGINAL,
+    }
+
+    /** Vrai pour un nom de provisoire : le suffixe, précédé d'au moins un caractère. */
+    private static boolean hasSuffix(String name, String suffix) {
+        return name.endsWith(suffix) && name.length() > suffix.length();
+    }
+
+    /** Nom de l'original d'un « nom.gtracker-tmp ». */
+    static String originalOf(String tempName) {
+        return tempName.substring(0, tempName.length() - TEMP_SUFFIX.length());
+    }
+
+    /**
+     * Sort d'un enfant à la lecture de son dossier : `names` sont les noms présents dans le dossier (l'original d'un
+     * provisoire y est-il ?), `writing` dit si le provisoire est tenu ouvert par une écriture (`writing(name)`).
+     * Suffixes en casse exacte ; un dossier est toujours montré.
+     */
+    static Fate fate(String name, boolean isDir, Set<String> names, boolean writing) {
+        if (isDir) return Fate.SHOW;
+        if (hasSuffix(name, NEW_SUFFIX)) return writing ? Fate.HIDE : Fate.DELETE_NEW;
+        if (hasSuffix(name, TEMP_SUFFIX)) {
+            boolean original = names.contains(originalOf(name));
+            if (writing) return original ? Fate.HIDE : Fate.SHOW_AS_ORIGINAL;
+            return original ? Fate.DELETE_TEMP : Fate.RESTORE_TEMP;
+        }
+        return Fate.SHOW;
+    }
 
     private static final String[] CHILD_COLUMNS = {
         Document.COLUMN_DOCUMENT_ID,
@@ -104,6 +200,21 @@ final class MemoryTree {
         try (Cursor c = resolver.query(DocumentsContract.buildDocumentUriUsingTree(tree, id), columns, null, null, null)) {
             if (c == null || !c.moveToFirst() || Document.MIME_TYPE_DIR.equals(c.getString(0)) || c.isNull(1)) return -1;
             return c.getLong(1);
+        }
+    }
+
+    /** Le document d'identifiant donné, décrit comme un enfant de son dossier ; `null` s'il n'existe plus. */
+    Child describe(Uri tree, String id) {
+        try (Cursor c = resolver.query(DocumentsContract.buildDocumentUriUsingTree(tree, id), CHILD_COLUMNS, null, null, null)) {
+            if (c == null || !c.moveToFirst()) return null;
+            return new Child(
+                c.getString(0),
+                c.getString(1),
+                Document.MIME_TYPE_DIR.equals(c.getString(2)),
+                c.isNull(3) ? 0 : c.getLong(3),
+                c.isNull(4) ? 0 : c.getLong(4),
+                !c.isNull(3)
+            );
         }
     }
 

@@ -210,9 +210,11 @@ export const describeSync = (outcome: SyncOutcome, channel: PhoneLinkChannel = '
 
   if (outcome.interrupted) lines.push(t("La synchronisation précédente avait été coupée : elle a repris là où elle s'était arrêtée."));
   // Un téléphone qu'on ne peut pas écrire ne reçoit pas d'identifiant : chaque passe serait « la première ». Une
-  // phrase stable dit à la place ce que fait le sans-fil ; le nombre de ce qui attend vient plus bas.
+  // phrase stable dit à la place ce que fait le sans-fil d'un ancien téléphone ; le nombre de ce qui attend vient
+  // plus bas. Un téléphone qui enregistre a sa propre phrase, plus bas aussi.
   const header = outcome.phoneWritable
     ? outcome.first !== null ? t("Première synchronisation avec ce téléphone : rien n'a été supprimé.") : null
+    : outcome.phoneRecording ? null
     : t("Sans câble, le téléphone n'est pas modifié : seules ses sessions sont copiées vers l'ordinateur.");
   if (header !== null) lines.push(header);
 
@@ -297,7 +299,8 @@ export const describeSync = (outcome: SyncOutcome, channel: PhoneLinkChannel = '
   if (outcome.deletions !== 'made' && withheld > 0) {
     lines.push(tn(withheld, '{n} suppression laissée pour une prochaine synchronisation.', '{n} suppressions laissées pour une prochaine synchronisation.'));
   }
-  const waiting = outcome.phoneWritable ? 0 : outcome.withheldForPhone.length + outcome.routes.withheldForPhone.length + outcome.extras.withheld.length;
+  const waiting = outcome.phoneWritable || outcome.phoneRecording ? 0 : outcome.withheldForPhone.length + outcome.routes.withheldForPhone.length + outcome.extras.withheld.length;
+  if (outcome.phoneRecording) lines.push(t("Le téléphone enregistre une session : il n'a pas été modifié cette fois."));
   if (waiting > 0) lines.push(tn(waiting, '{n} changement attend le câble ou la mise à jour du téléphone.', '{n} changements attendent le câble ou la mise à jour du téléphone.'));
 
   if (outcome.failed.length > 0) {

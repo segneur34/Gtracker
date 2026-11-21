@@ -35,8 +35,8 @@ export interface SyncExtrasOutcome {
 /** Ce qu'est devenu chaque itinéraire (`itineraires/`), sur le modèle des sessions. */
 export interface SyncRoutesOutcome {
   /**
-   * Vrai si les itinéraires n'ont pas été touchés parce que le téléphone ne liste pas `itineraires/` (par le sans-fil,
-   * ou coquille plus ancienne) : ils attendent le câble ou la mise à jour.
+   * Vrai si les itinéraires n'ont pas été touchés parce que le téléphone ne liste pas `itineraires/` (téléphone ou
+   * coquille plus anciens) : ils attendent le câble ou la mise à jour.
    */
   waiting: boolean;
   /** Le plan des itinéraires exécuté, restrictions comprises ; `null` s'il n'a pas été fait. */
@@ -85,11 +85,14 @@ export interface SyncOutcome {
   withheldDeletions: SyncItem[];
   /**
    * Sessions dont une écriture ou un retrait sur le téléphone n'a pas été fait parce que le téléphone ne s'écrivait
-   * pas (par le sans-fil) : elles attendent le câble. Prises dans le plan entier, avant restriction.
+   * pas (ancien téléphone par le sans-fil, ou téléphone qui enregistre) : elles attendent. Prises dans le plan entier,
+   * avant restriction.
    */
   withheldForPhone: SyncItem[];
   /** Vrai si le téléphone a pu être écrit ; faux : seule la moitié de l'ordinateur a été faite. */
   phoneWritable: boolean;
+  /** Vrai si le téléphone enregistrait une session : il n'a pas été modifié cette fois (`phoneWritable` est alors faux). */
+  phoneRecording: boolean;
   /** Sessions dont toutes les opérations ont été faites. */
   done: SyncItem[];
   /** Sessions laissées pour la fois suivante : un fichier n'était plus celui du plan. */
@@ -121,7 +124,7 @@ export interface SyncOutcome {
 /** Résultat d'une synchronisation qui n'a rien fait, pour la raison `refusal` (`null` : point de départ de l'exécutant). */
 export const emptySyncOutcome = (refusal: SyncStop | null): SyncOutcome => ({
   refusal, interrupted: false, first: null, safetyCopy: null, plan: null, deletions: 'made', withheldDeletions: [], withheldForPhone: [],
-  phoneWritable: false, done: [], skipped: [], failed: [], keptFromPhone: [],
+  phoneWritable: false, phoneRecording: false, done: [], skipped: [], failed: [], keptFromPhone: [],
   extras: { done: [], left: [], withheld: [] }, unknownActivities: [],
   routes: { waiting: false, plan: null, withheldDeletions: [], withheldForPhone: [], done: [], skipped: [], failed: [] },
   linkLost: null, error: null, complete: false,

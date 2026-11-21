@@ -7,7 +7,7 @@ import {
 } from '../../library/syncReport';
 import { nativeErrorMessage } from '../../platform/nativeMessages';
 import {
-  listPhoneFiles, phoneCanWrite, phoneChannel, phoneListsRoutes, phoneMemoryFolder, phoneSafetyCopy, phoneState, type PhoneState,
+  listPhoneFiles, phoneCanWrite, phoneChannel, phoneIsRecording, phoneListsRoutes, phoneMemoryFolder, phoneSafetyCopy, phoneState, type PhoneState,
 } from '../../platform/phoneCable';
 import { wirelessAvailable, wirelessState } from '../../platform/wirelessPhone';
 import { createStore } from '../createStore';
@@ -19,8 +19,9 @@ import { synchronizePhone, type SyncDeletionKey, type SyncLockOptions, type Sync
  * synchronisation des deux appareils (`synchronizePhone`), dont elle publie les étapes hors des composants
  * (`usePhoneSync`) : la fenêtre peut être fermée et rouverte pendant la synchronisation, qui continue.
  *
- * - Le téléphone n'est écrit que si son canal le sait (`phoneCanWrite` : le câble) ; par le sans-fil seul, la
- *   synchronisation ne fait que la moitié de l'ordinateur, et dit ce qui attend le câble.
+ * - Le téléphone n'est écrit que si son canal le sait (`phoneCanWrite` : le câble, ou le Wi-Fi d'un téléphone à jour
+ *   qui n'enregistre pas) ; sinon la synchronisation ne fait que la moitié de l'ordinateur, et dit ce qui attend le
+ *   câble ou la mise à jour du téléphone, ou que le téléphone enregistre (`phoneIsRecording`).
  * - À la première synchronisation d'un téléphone qu'on peut écrire, la coquille copie d'abord les deux dossiers
  *   (`phoneSafetyCopy`) ; si la copie échoue, rien n'est fait.
  * - Une question (garde-fou des suppressions, sessions de la corbeille encore sur le téléphone) arrête sur l'étape
@@ -140,6 +141,7 @@ const synchronize = async (options: RunOptions): Promise<PhoneSyncResult> => {
     let first = false;
     const lock: SyncLockOptions = {
       phoneWritable: phoneCanWrite(state),
+      phoneRecording: phoneIsRecording(state),
       phonePath: PHONE_FOLDER_PATH,
       recording: options.recording,
       withoutDeletions: options.withoutDeletions,
@@ -149,7 +151,7 @@ const synchronize = async (options: RunOptions): Promise<PhoneSyncResult> => {
       heldOnPhone: options.heldOnPhone,
       heldToRemove: options.heldToRemove,
       heldRoutesToRemove: options.heldRoutesToRemove,
-      // Sans listage d'`itineraires/` (sans-fil, coquille plus ancienne), les itinéraires ne sont pas touchés.
+      // Sans listage d'`itineraires/` (téléphone ou coquille plus anciens), les itinéraires ne sont pas touchés.
       phoneRoutes: phoneListsRoutes(state),
       beforeWrites: () => {
         progress.set({ step: 'safetyCopy', phone, channel: link });

@@ -68,6 +68,8 @@ export type { SyncRouteDeletionKey } from './syncRouteFiles';
 export interface SyncOptions {
   /** Faux : le dossier distant se lit sans s'écrire, seule la moitié de l'ordinateur est faite. Par défaut : s'il n'est pas en lecture seule. */
   phoneWritable?: boolean;
+  /** Vrai : le téléphone enregistre une session, d'où `phoneWritable: false` ; le compte rendu le dit à la place de ce qui attend. */
+  phoneRecording?: boolean;
   /** « Synchroniser sans rien supprimer ». */
   withoutDeletions?: boolean;
   /** L'utilisateur a confirmé les suppressions que le garde-fou retenait. */
@@ -297,6 +299,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
   const scope = { computer: true, phone: options.phoneWritable ?? remote.readOnly !== true, deletions: options.withoutDeletions !== true };
   const outcome = emptyOutcome(null);
   outcome.phoneWritable = scope.phone;
+  outcome.phoneRecording = !scope.phone && options.phoneRecording === true;
   /** Vrai dès qu'un fichier de sessions ou d'itinéraires du téléphone a été écrit ou retiré. */
   let phoneChanged = false;
   /**

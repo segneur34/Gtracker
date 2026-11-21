@@ -116,6 +116,9 @@ function PairedPanel({ view, status, headline, sent, blocked, attempting }: Pane
     <div className="ui-stack-3">
       {headline !== null && <p className="ui-m-0 computer-link__status" role="status">{headline}</p>}
       {sent !== null && <p className="ui-muted ui-text-s ui-m-0">{sent}</p>}
+      <p className="ui-muted ui-text-s ui-m-0">
+        {t("L'ordinateur relié peut copier et retirer des sessions quand vous touchez « Synchroniser » sur l'ordinateur.")}
+      </p>
       {showAddress && (
         <>
           <p className="ui-muted ui-text-s ui-m-0">{t("Gtracker n'a pas trouvé l'ordinateur tout seul. Tapez l'adresse qu'il affiche :")}</p>

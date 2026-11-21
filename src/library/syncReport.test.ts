@@ -74,6 +74,26 @@ describe('compte rendu de la synchronisation', () => {
     ]);
   });
 
+  it('par le sans-fil, téléphone à jour : plus aucune ligne d’attente, comme par le câble', () => {
+    const text = describeSync(outcomeOf([item('newOnComputer', [OPS.toPhone]), item('newOnPhone', [OPS.toComputer])]), 'sansFil');
+    expect(text.paragraphs).toEqual([
+      "1 session copiée vers le téléphone, 1 vers l'ordinateur.", 'Sur le téléphone, touchez « Mettre à jour » pour voir les changements.',
+    ]);
+    expect(text.paragraphs.join(' ')).not.toMatch(/câble|attend/);
+  });
+
+  it('par le sans-fil, le téléphone qui enregistre : sa phrase à la place de l’attente, la moitié de l’ordinateur est faite', () => {
+    const waiting = [item('newOnComputer', [OPS.toPhone]), item('deletedOnComputer', [OPS.remove])];
+    const outcome = outcomeOf([item('newOnPhone', [OPS.toComputer])], { phoneWritable: false, phoneRecording: true, complete: false, withheldForPhone: waiting });
+    expect(describeSync(outcome, 'sansFil').paragraphs).toEqual([
+      "1 session copiée vers l'ordinateur.", "Le téléphone enregistre une session : il n'a pas été modifié cette fois.",
+    ]);
+    // Rien à copier : la phrase est dite quand même, et pas « à jour ».
+    expect(describeSync(outcomeOf([], { phoneWritable: false, phoneRecording: true }), 'sansFil').paragraphs).toEqual([
+      "Le téléphone enregistre une session : il n'a pas été modifié cette fois.",
+    ]);
+  });
+
   it('par le sans-fil, le téléphone sans identifiant n’est pas « la première synchronisation » à chaque passe', () => {
     const text = describeSync(outcomeOf([], { phoneWritable: false, first: 'noBase' }), 'sansFil');
     expect(text.paragraphs).toEqual([

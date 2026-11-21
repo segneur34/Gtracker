@@ -6,9 +6,9 @@ import { isDesktopApp } from './runtime';
 
 /**
  * Le téléphone lu par le programme Windows, par le Wi-Fi s'il y est relié (`wirelessPhone.ts`), sinon par le câble :
- * son état (qui dit son canal, s'il sait écrire et s'il liste les itinéraires), le contenu de son dossier
- * `Documents/Gtracker` (racine, `sessions/`, et `itineraires/` et `reglages/` par le câble), ses fichiers à importer, lus un par un au moment de les ranger, et ce
- * dossier sous la forme de tout dossier mémoire (`phoneMemoryFolder`), qui écrit et efface par le câble seulement.
+ * son état (qui dit son canal, s'il sait écrire, s'il liste les itinéraires et s'il enregistre), le contenu de son dossier
+ * `Documents/Gtracker` (racine, `sessions/`, et `itineraires/` et `reglages/` quand le canal les liste), ses fichiers à importer, lus un par un au moment de les ranger, et ce
+ * dossier sous la forme de tout dossier mémoire (`phoneMemoryFolder`), qui écrit et efface quand le canal le sait.
  * Ailleurs (navigateur, téléphone, coquille plus ancienne), rien de cela n'existe.
  */
 
@@ -58,8 +58,8 @@ export const listPhoneFiles = async (): Promise<PhoneFile[] | null> => {
 };
 
 /**
- * Vrai si le téléphone prêt est lu par un canal qui sait écrire et effacer (le câble), et que la coquille en a les
- * canaux ; faux ailleurs, et pour une coquille plus ancienne.
+ * Vrai si le téléphone prêt est lu par un canal qui sait écrire et effacer (le câble, ou le Wi-Fi d'un téléphone à
+ * jour qui n'enregistre pas), et que la coquille en a les canaux ; faux ailleurs, et pour une coquille plus ancienne.
  */
 export const phoneCanWrite = (state: PhoneState): boolean => {
   const phone = phoneBridge();
@@ -67,11 +67,17 @@ export const phoneCanWrite = (state: PhoneState): boolean => {
 };
 
 /**
- * Vrai si le téléphone prêt est lu par un canal qui liste aussi `itineraires/` (le câble d'une coquille qui le dit) ;
- * faux par le sans-fil et pour une coquille plus ancienne, dont le listage muet ferait croire les itinéraires
- * supprimés du téléphone : la synchronisation n'y touche alors pas.
+ * Vrai si le téléphone prêt est lu par un canal qui liste aussi `itineraires/` (le câble d'une coquille qui le dit, le
+ * Wi-Fi d'un téléphone à jour) ; faux pour un téléphone ou une coquille plus anciens, dont le listage muet ferait croire
+ * les itinéraires supprimés du téléphone : la synchronisation n'y touche alors pas.
  */
 export const phoneListsRoutes = (state: PhoneState): boolean => state.etat === 'pret' && state.itineraires === true;
+
+/**
+ * Vrai si le téléphone prêt enregistre une session : il n'est pas écrit pendant ce temps, et le compte rendu le dit.
+ * Faux quand l'état ne le dit pas (câble, téléphone ou coquille plus anciens).
+ */
+export const phoneIsRecording = (state: PhoneState): boolean => state.etat === 'pret' && state.enregistrement === true;
 
 /**
  * Copie de sécurité des deux dossiers (la mémoire du PC et celle du téléphone), faite par la coquille avant la première
@@ -102,7 +108,7 @@ const exactBytes = (bytes: Uint8Array): Uint8Array =>
  * - `writeBytes` et `writeText` écrivent par la coquille (nom provisoire, taille relue, renommage) et tiennent le
  *   listage à jour, date du téléphone comprise ; `remove` efface un seul fichier, sans effet s'il n'est pas au listage.
  * La coquille n'admet l'écriture et l'effacement que dans sa liste blanche (`sessions/`, `itineraires/`, `reglages/`,
- * `gtracker.json`, `fc-repos.json`, `lieux.json`) et par le câble : ailleurs, ces appels lèvent.
+ * `gtracker.json`, `fc-repos.json`, `lieux.json`) et sur un canal qui sait écrire : ailleurs, ces appels lèvent.
  */
 export const phoneMemoryFolder = (label: string): MemoryFolder => {
   const phone = requirePhone();

@@ -63,3 +63,9 @@ Ordre : A, puis B et C (indépendants), puis D, puis `npm run exe` et E, puis l'
 2. Pendant un enregistrement, ou l'écran éteint en pleine copie : rien d'écrit à moitié, la synchronisation suivante finit.
 
 Ni le banc ni les tests ne voient l'écriture SAF réelle, la garde de `RecordingService`, la course avec « Mettre à jour », ni une vraie APK ancienne.
+
+## Limites connues après la relecture du greffon (21/11), à verser dans la relecture de sécurité d'avant la vente
+
+- Chez un fournisseur de stockage sans renommage (rare : le stockage ordinaire du téléphone sait renommer), un remplacement venu de l'ordinateur dont la recopie échoue peut laisser le fichier absent du téléphone, son contenu complet restant sous un nom provisoire que la lecture ne sait pas remettre ; si le retrait de la copie partielle échoue aussi, un fichier tronqué reste sous le vrai nom.
+- Si l'application réécrit un fichier pendant que l'ordinateur écrit le même, elle reprend le provisoire de l'ordinateur (cas rare, comportement de l'application non modifié).
+- Un ordinateur relié peut effacer sur le téléphone : la force du code d'appairage (6 chiffres) est à revoir.

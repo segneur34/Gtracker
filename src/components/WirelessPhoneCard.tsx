@@ -24,7 +24,7 @@ function WirelessPhoneCard() {
     <div className="ui-stack-3 wireless-card">
       <strong className="wireless-card__title">{t('Téléphone sans câble')}</strong>
       <p className="ui-muted ui-text-s ui-m-0">
-        {t("Gtracker relie votre téléphone à cet ordinateur dès que vous l'ouvrez sur le téléphone, relié au même réseau que l'ordinateur : la même box Wi-Fi, ou un partage de connexion entre les deux. Cliquez ensuite sur « Synchroniser », en haut : sans câble, les sessions du téléphone viennent sur l'ordinateur, et ce qui doit aller sur le téléphone attend le câble.")}
+        {t("Gtracker relie votre téléphone à cet ordinateur dès que vous l'ouvrez sur le téléphone, relié au même réseau que l'ordinateur : la même box Wi-Fi, ou un partage de connexion entre les deux. Cliquez ensuite sur « Synchroniser », en haut : les sessions et les itinéraires se copient dans les deux sens, sans câble, si le téléphone a la dernière version de Gtracker ; sinon, ce qui doit aller sur le téléphone attend le câble.")}
       </p>
       <label className="ui-row-s2 ui-center">
         <input type="checkbox" className="wireless-card__toggle" checked={active} disabled={busy || state === null}

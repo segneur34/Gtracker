@@ -16,6 +16,7 @@ import io.github.segneur.gtracker.ComputerLinkProtocol.Incoming;
 import io.github.segneur.gtracker.ComputerLinkProtocol.Json;
 import io.github.segneur.gtracker.ComputerLinkProtocol.ProbeAnswer;
 import io.github.segneur.gtracker.ComputerLinkProtocol.RemoteFile;
+import io.github.segneur.gtracker.ComputerLinkProtocol.WriteSession;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -239,10 +240,149 @@ public class ComputerLinkProtocolTest {
 
     @Test
     public void messagesDuTelephoneEcritsCommeLeFaitLePc() throws Exception {
-        assertArrayEquals(vectorFrame("appairer"), ComputerLinkProtocol.encodePair("Pixel 8", hex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")));
+        assertArrayEquals(vectorFrame("appairer avec capacités"), ComputerLinkProtocol.encodePair("Pixel 8", hex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")));
         assertArrayEquals(vectorFrame("bloc de 5 octets"), ComputerLinkProtocol.encodeBlock(7, 0, "hello-et-plus".getBytes(StandardCharsets.UTF_8), 5));
         List<RemoteFile> files = Arrays.asList(new RemoteFile("sessions/été.gpx", 1234, 1790000000000L));
         assertArrayEquals(vectorFrame("liste, chemin accentué"), ComputerLinkProtocol.encodeList(2, files));
+        List<RemoteFile> four = Arrays.asList(
+            new RemoteFile("sessions/2026-11-21 wing.gpx", 11, 1795000003000L),
+            new RemoteFile("reglages/pixel-8.json", 512, 1795000002000L),
+            new RemoteFile("autre/x.json", 1, 1),
+            new RemoteFile("gtracker.json", 120, 1795000000000L),
+            new RemoteFile("itineraires/tour du lac.json.gtracker-new", 3, 1),
+            new RemoteFile("itineraires/tour du lac.json", 2048, 1795000001000L)
+        );
+        assertArrayEquals(vectorFrame("liste des quatre dossiers"), ComputerLinkProtocol.encodeList(3, four));
+        assertArrayEquals(vectorFrame("pong, téléphone qui enregistre"), ComputerLinkProtocol.encodePong(5, true));
+        assertArrayEquals(vectorFrame("pong, téléphone libre"), ComputerLinkProtocol.encodePong(6, false));
+        assertArrayEquals(vectorFrame("fait"), ComputerLinkProtocol.encodeDone(10));
+        assertArrayEquals(vectorFrame("ecrit"), ComputerLinkProtocol.encodeWritten(13, "sessions/2026-11-21 wing.gpx", 11, 1795000004000L));
+    }
+
+    @Test
+    public void bonjourAnnonceLaCapaciteDEcritureEnDernierChamp() throws Exception {
+        String token = "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf";
+        Map<String, Object> expected = new LinkedHashMap<>(map(Json.parse(new String(Arrays.copyOfRange(vectorFrame("bonjour sans capacité"), 8, vectorFrame("bonjour sans capacité").length), StandardCharsets.UTF_8))));
+        expected.put("capacites", Arrays.asList((Object) "ecriture"));
+        assertArrayEquals(ComputerLinkProtocol.encodeFrame(expected, new byte[0], ComputerLinkProtocol.LIMITS), ComputerLinkProtocol.encodeHello("Pixel 8", hex(token)));
+        assertEquals(Arrays.asList("ecriture"), ComputerLinkProtocol.CAPABILITIES);
+    }
+
+    // ---------- commandes d'écriture ----------
+
+    @Test
+    public void chaqueCommandeDuPcDesJeuxDEssaiEstLueSansErreur() throws Exception {
+        int seen = 0;
+        for (Object o : list(vectors.get("trames"))) {
+            Map<String, Object> v = map(o);
+            if (!"pc".equals(v.get("emetteur"))) continue;
+            Incoming m = ComputerLinkProtocol.readMessage(decodeAll(hex(v.get("octetsHex")), ComputerLinkProtocol.COMMAND_LIMITS).get(0));
+            assertEquals((String) v.get("nom"), map(v.get("enTete")).get("type"), m.type);
+            seen++;
+        }
+        assertTrue(seen >= 8);
+    }
+
+    @Test
+    public void messagesInvalidesDuPcRefusesAvecLaRaisonDuPc() throws Exception {
+        int seen = 0;
+        for (Object o : list(vectors.get("messagesInvalides"))) {
+            Map<String, Object> v = map(o);
+            if (!"pc".equals(v.get("emetteur"))) continue;
+            List<Frame> frames = decodeAll(hex(v.get("octetsHex")), ComputerLinkProtocol.LIMITS);
+            assertEquals((String) v.get("nom"), 1, frames.size());
+            String reason = null;
+            try {
+                ComputerLinkProtocol.readMessage(frames.get(0));
+            } catch (FrameException e) {
+                reason = e.reason;
+            }
+            assertEquals((String) v.get("nom"), v.get("erreur"), reason);
+            seen++;
+        }
+        assertTrue(seen >= 15);
+    }
+
+    @Test
+    public void ecrireValiderEtEffacerLus() throws Exception {
+        Incoming last = ComputerLinkProtocol.readMessage(decodeAll(vectorFrame("ecrire, dernier bloc"), ComputerLinkProtocol.COMMAND_LIMITS).get(0));
+        assertEquals("ecrire", last.type);
+        assertEquals(11, last.id);
+        assertEquals("sessions/2026-11-21 wing.gpx", last.path);
+        assertEquals(5, last.start);
+        assertEquals(11, last.size);
+        assertEquals(6, last.length);
+        assertArrayEquals("</gpx>".getBytes(StandardCharsets.UTF_8), last.body);
+        Incoming empty = ComputerLinkProtocol.readMessage(decodeAll(vectorFrame("ecrire, fichier vide"), ComputerLinkProtocol.COMMAND_LIMITS).get(0));
+        assertEquals(0, empty.size);
+        assertEquals(0, empty.body.length);
+        Incoming valider = ComputerLinkProtocol.readMessage(decodeAll(vectorFrame("valider"), ComputerLinkProtocol.COMMAND_LIMITS).get(0));
+        assertEquals(13, valider.id);
+        assertEquals(11, valider.size);
+        Incoming effacer = ComputerLinkProtocol.readMessage(decodeAll(vectorFrame("effacer"), ComputerLinkProtocol.COMMAND_LIMITS).get(0));
+        assertEquals("itineraires/tour du lac.json", effacer.path);
+    }
+
+    @Test
+    public void unBlocDEcritureDUnMioPasseUneFoisReliePasALAccueil() throws Exception {
+        Map<String, Object> h = new LinkedHashMap<>();
+        h.put("type", "ecrire");
+        h.put("id", 1L);
+        h.put("chemin", "sessions/a.gpx");
+        h.put("debut", 0L);
+        h.put("taille", (long) ComputerLinkProtocol.BLOCK_SIZE);
+        byte[] frame = ComputerLinkProtocol.encodeFrame(h, new byte[ComputerLinkProtocol.BLOCK_SIZE], ComputerLinkProtocol.LIMITS);
+        assertEquals(ComputerLinkProtocol.BLOCK_SIZE, ComputerLinkProtocol.readMessage(decodeAll(frame, ComputerLinkProtocol.COMMAND_LIMITS).get(0)).length);
+        try {
+            decodeAll(frame, ComputerLinkProtocol.WELCOME_LIMITS);
+            fail();
+        } catch (FrameException e) {
+            assertEquals(ComputerLinkProtocol.BODY_TOO_LONG, e.reason);
+        }
+    }
+
+    @Test
+    public void cheminsDeLectureEtDEcritureCommeLePc() {
+        Map<String, Object> lecture = map(vectors.get("cheminsLecture"));
+        for (Object p : list(lecture.get("admis"))) assertTrue((String) p, ComputerLinkProtocol.pathAllowed((String) p));
+        for (Object p : list(lecture.get("refuses"))) assertFalse((String) p, ComputerLinkProtocol.pathAllowed((String) p));
+        Map<String, Object> ecriture = map(vectors.get("cheminsEcriture"));
+        for (Object p : list(ecriture.get("admis"))) assertTrue((String) p, ComputerLinkProtocol.writeAllowed((String) p));
+        for (Object p : list(ecriture.get("refuses"))) assertFalse((String) p, ComputerLinkProtocol.writeAllowed((String) p));
+        assertFalse(ComputerLinkProtocol.writeAllowed(null));
+    }
+
+    @Test
+    public void ecritureDansLOrdreDesBlocs() {
+        WriteSession w = new WriteSession("sessions/a.gpx", 11, false);
+        assertTrue(WriteSession.opens(0));
+        assertFalse(WriteSession.opens(5));
+        assertEquals(ComputerLinkProtocol.NEW_SUFFIX, w.suffix());
+        w.wrote(5);
+        assertFalse("pas encore complète", w.completes("sessions/a.gpx", 11));
+        assertTrue(w.continues("sessions/a.gpx", 5, 11, 6));
+        assertFalse("bloc en avance", w.continues("sessions/a.gpx", 6, 11, 5));
+        assertFalse("bloc rejoué", w.continues("sessions/a.gpx", 0, 11, 5));
+        assertFalse("autre chemin", w.continues("sessions/b.gpx", 5, 11, 6));
+        assertFalse("taille changée en route", w.continues("sessions/a.gpx", 5, 12, 6));
+        assertFalse("déborde la taille", w.continues("sessions/a.gpx", 5, 11, 7));
+        w.wrote(6);
+        assertEquals(11, w.written());
+        assertTrue(w.completes("sessions/a.gpx", 11));
+        assertFalse("taille fausse à la validation", w.completes("sessions/a.gpx", 12));
+        assertFalse("autre chemin à la validation", w.completes("sessions/b.gpx", 11));
+        try {
+            w.wrote(1);
+            fail();
+        } catch (IllegalArgumentException e) {
+            // attendu : rien au-delà de la taille annoncée
+        }
+        WriteSession empty = new WriteSession("reglages/pixel-8.json", 0, true);
+        assertEquals(ComputerLinkProtocol.TEMP_SUFFIX, empty.suffix());
+        empty.wrote(0);
+        assertTrue(empty.completes("reglages/pixel-8.json", 0));
+        assertEquals("a.gpx.gtracker-tmp", ComputerLinkProtocol.provisionalName("a.gpx", true));
+        assertEquals("a.gpx.gtracker-new", ComputerLinkProtocol.provisionalName("a.gpx", false));
     }
 
     // ---------- messages reçus du PC ----------
@@ -275,7 +415,9 @@ public class ComputerLinkProtocolTest {
         String unk = ComputerLinkProtocol.UNKNOWN_MESSAGE;
         assertEquals(unk, readReason("{\"type\":\"liste\",\"id\":1,\"fichiers\":[]}", new byte[0]));
         assertEquals(unk, readReason("{\"type\":\"bloc\",\"id\":1,\"debut\":0,\"longueur\":0}", new byte[0]));
-        assertEquals(unk, readReason("{\"type\":\"ecrire\",\"id\":1}", new byte[0]));
+        assertEquals(unk, readReason("{\"type\":\"renommer\",\"id\":1}", new byte[0]));
+        assertEquals(inv, readReason("{\"type\":\"ecrire\",\"id\":1}", new byte[0]));
+        assertEquals(inv, readReason("{\"type\":\"effacer\",\"id\":1,\"chemin\":\"sessions/a.gpx\"}", new byte[] { 1 }));
         assertEquals(inv, readReason("{\"type\":\"ping\",\"id\":1}", new byte[] { 1 }));
         assertEquals(inv, readReason("{\"type\":\"ping\"}", new byte[0]));
         assertEquals(inv, readReason("{\"type\":\"ping\",\"id\":\"1\"}", new byte[0]));
@@ -320,7 +462,7 @@ public class ComputerLinkProtocolTest {
 
     @Test
     public void cheminsAdmis() {
-        for (String ok : new String[] { "a.gpx", "sessions/2026-11-20.gpx", "sessions/été.json", "index.json", "sessions/x.imu" }) {
+        for (String ok : new String[] { "a.gpx", "sessions/2026-11-20.gpx", "sessions/été.json", "index.json", "sessions/x.imu", "itineraires/a.json", "reglages/b.json" }) {
             assertTrue(ok, ComputerLinkProtocol.pathAllowed(ok));
         }
         for (String no : new String[] { "sessions/a/b", "x/a.gpx", "..", ".", "a/", "/a", "a//b", "nul", "Com1.json", "lpt¹.txt", "a ", "a?b", "a\u0001b", "a\u007fb", "x.gtracker-tmp", "sessions/x.Gtracker-New" }) {
@@ -382,9 +524,10 @@ public class ComputerLinkProtocolTest {
         assertEquals(500, ((String) frame.header.get("message")).length());
         assertEquals(4.0, frame.header.get("id"));
         assertEquals("NOT_FOUND", decodeAll(ComputerLinkProtocol.encodeError(1, "NOT_FOUND", "absent"), ComputerLinkProtocol.LIMITS).get(0).header.get("code"));
-        Frame pong = decodeAll(ComputerLinkProtocol.encodePong(9), ComputerLinkProtocol.LIMITS).get(0);
+        Frame pong = decodeAll(ComputerLinkProtocol.encodePong(9, false), ComputerLinkProtocol.LIMITS).get(0);
         assertEquals("pong", pong.type());
         assertEquals(9.0, pong.header.get("id"));
+        assertEquals(Boolean.FALSE, pong.header.get("enregistre"));
     }
 
     // ---------- appairage ----------

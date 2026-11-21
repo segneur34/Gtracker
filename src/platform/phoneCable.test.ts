@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DesktopPhoneBridge } from './desktopBridge';
-import { listPhoneFiles, phoneCableAvailable, phoneCanWrite, phoneImportEntries, phoneListsRoutes, phoneMemoryFolder, phoneState } from './phoneCable';
+import { listPhoneFiles, phoneCableAvailable, phoneCanWrite, phoneImportEntries, phoneIsRecording, phoneListsRoutes, phoneMemoryFolder, phoneState } from './phoneCable';
 
 /**
  * Le téléphone branché, vu de la page : le pont est le vrai code de la coquille (`bureau/telephone.ts`), sur un
@@ -135,10 +135,19 @@ describe('téléphone branché par câble', () => {
     plug();
     expect(phoneCanWrite({ etat: 'pret', nom: 'x', canal: 'cable', ecriture: true })).toBe(true);
     expect(phoneCanWrite({ etat: 'pret', nom: 'x', canal: 'sansFil', ecriture: false })).toBe(false);
+    // Un téléphone à jour, relié par le Wi-Fi, s'écrit comme par le câble.
+    expect(phoneCanWrite({ etat: 'pret', nom: 'x', canal: 'sansFil', ecriture: true, itineraires: true, enregistrement: false })).toBe(true);
     expect(phoneCanWrite({ etat: 'pret', nom: 'x' })).toBe(false);
     expect(phoneCanWrite({ etat: 'absent' })).toBe(false);
     plug({ lectureSeule: true });
     expect(phoneCanWrite({ etat: 'pret', nom: 'x', canal: 'cable', ecriture: true })).toBe(false);
+  });
+
+  it('enregistrement : lu dans l’état prêt seulement, faux quand l’état ne le dit pas', () => {
+    expect(phoneIsRecording({ etat: 'pret', nom: 'x', canal: 'sansFil', ecriture: false, itineraires: true, enregistrement: true })).toBe(true);
+    expect(phoneIsRecording({ etat: 'pret', nom: 'x', canal: 'sansFil', ecriture: true, itineraires: true, enregistrement: false })).toBe(false);
+    expect(phoneIsRecording({ etat: 'pret', nom: 'x', canal: 'sansFil', ecriture: false })).toBe(false);
+    expect(phoneIsRecording({ etat: 'absent' })).toBe(false);
   });
 
   it('dossier mémoire du téléphone : liste, lit, écrit, remplace et efface par la coquille', async () => {
