@@ -18,6 +18,8 @@ Ce que les données disent (dossier mémoire du PC, 20 sessions) :
 - Les sessions du 13/11 (deux) et du 20/11 pointent sur ces identifiants.
 - Les sessions du 01/11, du 02/11 et du 09/11 pointent sur d'autres lignes « Voile » et « Foil », d'un catalogue qui n'existe plus (il était rangé sous l'activité `a-wingfoil`, disparue quand les activités de départ ont été refaites), avec d'anciens articles : « Gong plus 6.5 », « Reedin 4.5 », « Glide v1 1085 ».
 
+Le téléphone, relu le même jour par le câble (réglages et 21 fiches de `Documents/Gtracker`), dit exactement la même chose : même catalogue, mêmes identifiants, mêmes trois sessions sur l'ancien catalogue. Les deux appareils ne divergent donc pas.
+
 Donc : ces trois sessions montrent quatre lignes (les deux du catalogue, vides, et les deux anciennes, de même nom), et les Statistiques ne les comptent pas avec le matériel d'aujourd'hui quand l'article a changé de nom (« Gong plus 6.5 » contre « Gong puls 6.5 », « Glide v1 1085 » contre « Duotone glide 1085 ») ; seule « Reedin 4.5 », de même nom, est retrouvée. Le même défaut attend tout utilisateur qui change l'activité d'une session (l'autre activité a son propre catalogue, souvent aux mêmes noms de lignes) ou qui supprime puis recrée une ligne.
 
 ## À faire (à préciser par le plan)
