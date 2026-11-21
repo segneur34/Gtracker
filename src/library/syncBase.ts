@@ -16,10 +16,17 @@ import { MEMORY_FORMAT, MEMORY_VERSION, readMarkerVersion } from './folderLayout
  * fiches gardées sont les ancêtres de la fusion à trois (`syncRecordMerge.ts`) : une par côté, parce que la fiche
  * d'un appareil porte ce qui lui est propre (son résumé, le nom de son GPX, sa date d'entrée).
  *
+ * Les itinéraires ont leurs lignes à part (`routes`, `removedRoutes`, `heldRoutes`), sans fiche gardée : une ligne
+ * n'est posée que lorsque les deux côtés tiennent la même fiche, et un itinéraire se recopie entier (`syncRoutes.ts`).
+ * Une version qui ne connaît pas ces champs les ignore ; si elle réécrit la base, la synchronisation suivante est une
+ * première rencontre pour les itinéraires, d'où rien ne se supprime. Les champs inconnus de cette version sont gardés
+ * à la réécriture (`unknownFields`).
+ *
  * Les dossiers se reconnaissent à un identifiant tiré au hasard, écrit dans leur marqueur (champ `id`) : l'application
  * ne lit du marqueur que son format, sa version et l'instant de la dernière synchronisation (`synchro`), et ne le
- * réécrit que s'il manque. Un dossier remis à zéro revient donc sans identifiant, et rien ne se déduit de lui. Ce
- * module ne lit ni n'écrit aucun fichier.
+ * réécrit que s'il manque. « Tout supprimer » retire l'identifiant avant tout autre effacement (`markerTextWithoutId`) :
+ * un dossier remis à zéro, même à moitié, revient donc sans identifiant, et rien ne se déduit de lui. Ce module ne
+ * lit ni n'écrit aucun fichier.
  */
 
 export const SYNC_DIR = 'synchro';
@@ -54,6 +61,22 @@ export interface SyncBaseSession {
   phone: SyncFiles;
 }
 
+/** Les fichiers d'un itinéraire d'un côté, et la date de rangement que porte sa fiche (`RouteRecord.updatedAt`). */
+export interface SyncRouteFiles {
+  json: SyncStamp;
+  /** Le GPX exporté à côté de la fiche ; `null` s'il manque. */
+  gpx: SyncStamp | null;
+  updatedAt: string;
+}
+
+/** Un itinéraire présent des deux côtés, avec la même fiche, à la fin de sa dernière synchronisation. */
+export interface SyncBaseRoute {
+  /** Identité de l'itinéraire (`syncRouteId`) : sa date de création, sinon la base de ses noms. */
+  id: string;
+  computer: SyncRouteFiles;
+  phone: SyncRouteFiles;
+}
+
 export interface SyncBase {
   /** Identifiant du dossier de l'ordinateur à qui cette base appartient : un autre dossier en fait une paire neuve. */
   computerId: string;
@@ -76,6 +99,14 @@ export interface SyncBase {
    * restent laissées, et dites.
    */
   held: number[];
+  /** Itinéraires présents des deux côtés, par identité. */
+  routes: SyncBaseRoute[];
+  /** Comme `removed`, pour les itinéraires dont la synchronisation a mené la suppression au bout. */
+  removedRoutes: string[];
+  /** Comme `held`, pour les itinéraires du téléphone laissés où ils sont. */
+  heldRoutes: string[];
+  /** Champs que cette version ne connaît pas, lus dans la base et réécrits tels quels. */
+  unknownFields?: Record<string, unknown>;
 }
 
 /**
@@ -122,6 +153,20 @@ export const markerTextWithId = (text: string | null, id: string): string | null
 };
 
 /**
+ * Texte du marqueur sans son identifiant, tout le reste gardé tel quel : le dossier redevient inconnu de tous les
+ * appareils, et sa synchronisation suivante est une première rencontre, d'où rien ne se supprime. `null` si le texte
+ * n'est pas un marqueur, s'il ne porte pas de champ `id` (rien à réécrire), ou s'il est d'une version plus récente :
+ * un tel marqueur n'est jamais réécrit, et aucune synchronisation ne touche son dossier (`syncRefusal`).
+ */
+export const markerTextWithoutId = (text: string | null): string | null => {
+  const marker = readMarker(text);
+  if (!marker || !('id' in marker) || readMarkerVersion(text) > MEMORY_VERSION) return null;
+  const rest: Record<string, unknown> = { ...marker };
+  delete rest.id;
+  return `${stringifyJson(rest)}\n`;
+};
+
+/**
  * Instant de la dernière synchronisation qui a changé ce dossier, écrit par l'ordinateur dans le marqueur du téléphone
  * (champ `synchro`, horloge de l'ordinateur) ; `null` sans marqueur ou sans cet instant. Le téléphone ne compare que
  * deux lectures entre elles : un instant qui change dit que ses sessions ont changé sous lui.
@@ -159,7 +204,7 @@ export const syncRefusal = (computerMarker: string | null, phoneMarker: string |
 };
 
 export const emptySyncBase = (computerId: string, phoneId: string, phonePath: string | null): SyncBase =>
-  ({ computerId, phoneId, phonePath, syncedAtMs: null, sessions: [], removed: [], held: [] });
+  ({ computerId, phoneId, phonePath, syncedAtMs: null, sessions: [], removed: [], held: [], routes: [], removedRoutes: [], heldRoutes: [] });
 
 const parseStamp = (v: unknown): SyncStamp | null =>
   isObject(v) && typeof v.name === 'string' && v.name !== '' && isFiniteNumber(v.size) && isFiniteNumber(v.mtimeMs)
@@ -184,6 +229,26 @@ const parseSession = (v: unknown): SyncBaseSession | null => {
   return computer && phone ? { startMs: v.startMs, computer, phone } : null;
 };
 
+const parseRouteFiles = (v: unknown): SyncRouteFiles | null => {
+  if (!isObject(v) || typeof v.updatedAt !== 'string') return null;
+  const json = parseStamp(v.json);
+  const gpx = parseOptionalStamp(v.gpx);
+  return json && gpx !== undefined ? { json, gpx, updatedAt: v.updatedAt } : null;
+};
+
+const parseRouteLine = (v: unknown): SyncBaseRoute | null => {
+  if (!isObject(v) || typeof v.id !== 'string' || v.id === '') return null;
+  const computer = parseRouteFiles(v.computer);
+  const phone = parseRouteFiles(v.phone);
+  return computer && phone ? { id: v.id, computer, phone } : null;
+};
+
+/** Champs de la base que cette version lit ; les autres sont gardés tels quels (`SyncBase.unknownFields`). */
+const KNOWN_BASE_FIELDS = new Set([
+  'format', 'version', 'computerId', 'phoneId', 'phonePath', 'syncedAtMs', 'sessions', 'removed', 'held', 'routes', 'removedRoutes', 'heldRoutes',
+  'unknownFields',
+]);
+
 /**
  * Base lue dans son texte (`null` : fichier absent). Lecture tolérante : une ligne mal formée, ou en double, est
  * écartée seule, et sa session redevient une première rencontre, d'où rien ne se supprime. L'en-tête, lui, doit se
@@ -207,6 +272,19 @@ export const parseSyncBase = (text: string | null): SyncBaseRead => {
     [...new Set((Array.isArray(list) ? list : []).filter((v): v is number => isFiniteNumber(v) && !seen.has(v) && !without.has(v)))];
   const held = starts(value.held, new Set());
   const removed = starts(value.removed, new Set(held));
+  const routeIds = new Set<string>();
+  const routes = (Array.isArray(value.routes) ? value.routes : []).flatMap((line): SyncBaseRoute[] => {
+    const route = parseRouteLine(line);
+    if (!route || routeIds.has(route.id)) return [];
+    routeIds.add(route.id);
+    return [route];
+  });
+  /** Liste d'identités d'itinéraires sans ligne ; mal formée ou absente : vide. */
+  const ids = (list: unknown, without: ReadonlySet<string>): string[] =>
+    [...new Set((Array.isArray(list) ? list : []).filter((v): v is string => typeof v === 'string' && v !== '' && !routeIds.has(v) && !without.has(v)))];
+  const heldRoutes = ids(value.heldRoutes, new Set());
+  const removedRoutes = ids(value.removedRoutes, new Set(heldRoutes));
+  const unknown = Object.entries(value).filter(([key]) => !KNOWN_BASE_FIELDS.has(key));
   return {
     state: 'ok',
     base: {
@@ -217,12 +295,18 @@ export const parseSyncBase = (text: string | null): SyncBaseRead => {
       sessions,
       removed,
       held,
+      routes,
+      removedRoutes,
+      heldRoutes,
+      ...(unknown.length > 0 ? { unknownFields: Object.fromEntries(unknown) } : {}),
     },
   };
 };
 
-export const serializeSyncBase = (base: SyncBase): string =>
-  `${stringifyJson({ format: SYNC_BASE_FORMAT, version: SYNC_BASE_VERSION, ...base })}\n`;
+export const serializeSyncBase = (base: SyncBase): string => {
+  const { unknownFields, ...known } = base;
+  return `${stringifyJson({ ...unknownFields, format: SYNC_BASE_FORMAT, version: SYNC_BASE_VERSION, ...known })}\n`;
+};
 
 export const syncBaseLine = (base: SyncBase | null, startMs: number): SyncBaseSession | null =>
   base?.sessions.find((s) => s.startMs === startMs) ?? null;
@@ -255,10 +339,42 @@ export const withSyncHeld = (base: SyncBase, startMs: number): SyncBase => ({
 
 /**
  * La base à la fin d'une synchronisation menée au bout : sa date, et les suppressions retenues réduites à celles
- * que la corbeille de l'ordinateur tient encore (`trashed`, leurs identités) ; les autres ne servent plus.
+ * que la corbeille de l'ordinateur tient encore (`trashed`, leurs identités) ; les autres ne servent plus. De même
+ * pour les itinéraires (`trashedRoutes`, leurs identités, `syncRouteId`) ; sans cette liste (itinéraires non
+ * synchronisés cette fois), leurs suppressions retenues restent telles quelles.
  */
-export const withSyncDone = (base: SyncBase, nowMs: number, trashed: ReadonlySet<number>): SyncBase => ({
+export const withSyncDone = (base: SyncBase, nowMs: number, trashed: ReadonlySet<number>, trashedRoutes?: ReadonlySet<string>): SyncBase => ({
   ...base,
   syncedAtMs: nowMs,
   removed: base.removed.filter((startMs) => trashed.has(startMs)),
+  removedRoutes: trashedRoutes ? base.removedRoutes.filter((id) => trashedRoutes.has(id)) : base.removedRoutes,
+});
+
+/** Ligne de la base d'un itinéraire, par son identité. */
+export const syncRouteBaseLine = (base: SyncBase | null, id: string): SyncBaseRoute | null =>
+  base?.routes.find((r) => r.id === id) ?? null;
+
+const withId = (list: readonly string[], id: string): string[] => (list.includes(id) ? [...list] : [...list, id].sort());
+
+/** La base avec cette ligne d'itinéraire, à la place de celle de la même identité : il est de nouveau des deux côtés. */
+export const withRouteLine = (base: SyncBase, line: SyncBaseRoute): SyncBase => ({
+  ...base,
+  routes: [...base.routes.filter((r) => r.id !== line.id), line].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+  removedRoutes: base.removedRoutes.filter((id) => id !== line.id),
+  heldRoutes: base.heldRoutes.filter((id) => id !== line.id),
+});
+
+/** La base sans la ligne d'un itinéraire qui n'est plus d'aucun côté, sa suppression retenue (`removedRoutes`). */
+export const withoutRouteLine = (base: SyncBase, id: string): SyncBase => ({
+  ...base,
+  routes: base.routes.filter((r) => r.id !== id),
+  removedRoutes: withId(base.removedRoutes, id),
+  heldRoutes: base.heldRoutes.filter((held) => held !== id),
+});
+
+/** La base qui se souvient d'un itinéraire du téléphone laissé où il est (`heldRoutes`). */
+export const withRouteHeld = (base: SyncBase, id: string): SyncBase => ({
+  ...base,
+  removedRoutes: base.removedRoutes.filter((removed) => removed !== id),
+  heldRoutes: withId(base.heldRoutes, id),
 });

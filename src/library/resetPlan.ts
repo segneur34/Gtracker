@@ -5,7 +5,7 @@ import {
   JOURNALS_DIR, LEARNED_PLACES_FILE, MARKER_FILE, README_FILE, RESTING_HR_FILE, ROUTES_DIR, SESSIONS_DIR, SETTINGS_DIR,
 } from './folderLayout';
 import { TRASH_DIR, TRASH_INDEX_FILE, isTrashDirName } from './trash';
-import { SYNC_DIR, isSyncId } from './syncBase';
+import { SYNC_DIR, isSyncId, markerTextWithoutId } from './syncBase';
 
 /**
  * Remise à zéro (Réglages › Mémoire) : ce que chacun des deux boutons efface, sans rien effacer ici.
@@ -288,15 +288,20 @@ export interface EraseResult {
 
 /**
  * Efface du dossier les fichiers de l'application (`memoryResetTargets`), un par un, et s'arrête au premier échec,
- * sans rien tenter d'autre. `onProgress` reçoit le nombre de fichiers effacés et leur total.
+ * sans rien tenter d'autre. Avant le premier effacement, le marqueur perd son identifiant de synchronisation
+ * (`markerTextWithoutId`) : un dossier vidé exprès, même coupé au milieu, n'est plus celui que l'autre appareil
+ * connaît, et la synchronisation suivante, une première rencontre, ne supprime rien chez lui et lui rend ses sessions.
+ * Si cette réécriture échoue, rien n'est effacé. `onProgress` reçoit le nombre de fichiers effacés et leur total.
  */
 export const eraseAppFiles = async (
-  folder: Pick<MemoryFolder, 'list' | 'remove' | 'kind'>,
+  folder: Pick<MemoryFolder, 'list' | 'remove' | 'kind' | 'readText' | 'writeText'>,
   onProgress: (done: number, total: number) => void = () => undefined,
 ): Promise<EraseResult> => {
   let listings: MemoryListings;
   try {
     listings = await readMemoryListings(folder);
+    const withoutId = markerTextWithoutId(await folder.readText(MARKER_FILE));
+    if (withoutId !== null) await folder.writeText(MARKER_FILE, withoutId);
   } catch (error) {
     return { sessionsDone: 0, sessionsTotal: 0, error };
   }

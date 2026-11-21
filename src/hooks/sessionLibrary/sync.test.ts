@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { STORAGE_KEYS } from '../../core/appIdentity';
-import { MEMORY_VERSION, sessionPath } from '../../library/folderLayout';
+import { MEMORY_VERSION, markerText, sessionPath } from '../../library/folderLayout';
+import { eraseAppFiles } from '../../library/resetPlan';
 import { learnedPlacesFileText } from '../../library/learnedPlaces';
 import type { LearnedPlace } from '../../library/places';
 import { restingHrFileText, type StoredRestingResult } from '../../library/restingHrStore';
 import { buildSettingsFile, serializeSettingsFile } from '../../library/settingsFile';
-import { imuFileName, recordFileName, type StoredSessionNotes } from '../../library/record';
+import { imuFileName, recordFileName, type SessionRecord, type StoredSessionNotes } from '../../library/record';
 import { parseSyncBase, readMarkerId, readMarkerSync, syncBasePath } from '../../library/syncBase';
 import { describeSync, describeSyncQuestion } from '../../library/syncReport';
 import { TRASH_INDEX_PATH, parseTrashIndex, sessionRestorePlan, sessionTrashEntries, shownTrashEntries, type TrashEntry } from '../../library/trash';
 import { copyFromTrash, dropTrashEntries, emptyTrash, stashInTrash } from '../../library/trashFolder';
 import type { MemoryFolder } from '../../platform/memoryFolder';
 import {
-  SyncCutError, deleteSyncSession, editSyncRecord, putSyncSession, readSyncRecord, syncGpxName, syncMemoryFolder, syncSessionFiles,
+  SyncCutError, deleteSyncSession, editSyncRecord, hasSyncFiles, putSyncSession, readSyncRecord, syncGpxName, syncMemoryFolder, syncSessionFiles,
   type SyncFolder,
 } from '../../test/syncFolder.fixture';
 import { SYNC_RUNNING_PATH, executeSync, type SyncOptions, type SyncOutcome } from './sync';
@@ -463,6 +464,40 @@ describe('ce que la couche du bouton reçoit', () => {
     }
   });
 
+  it('coupure après la copie de sécurité : la copie n’est reprise que si elle est récente, sur une horloge avancée ou reculée aussi', async () => {
+    const cases: [string, number, number][] = [['une demi-heure plus tard', HOUR / 2, 1], ['deux heures plus tard', 2 * HOUR, 2], ['des mois plus tard', 90 * 24 * HOUR, 2], ['horloge reculée de deux heures', -2 * HOUR, 2]];
+    for (const [label, shift, expectedCopies] of cases) {
+      const pair = pairOf();
+      putSyncSession(pair.computer, at(0));
+      putSyncSession(pair.phone, at(1));
+      let copies = 0;
+      const beforeWrites = async (): Promise<string> => `copies/${++copies}`;
+      pair.phone.cutAfter(1);
+      expect((await run(pair, { beforeWrites })).linkLost, label).not.toBeNull();
+      pair.phone.cutAfter(null);
+      const resumed = await run(pair, { beforeWrites, now: () => NOW + shift });
+      expect(resumed, label).toMatchObject({ interrupted: true, complete: true, safetyCopy: `copies/${expectedCopies}` });
+      expect(copies, label).toBe(expectedCopies);
+    }
+  });
+
+  it('coupure après la copie de sécurité : un témoin sans l’instant de la copie (ancienne forme) la fait refaire', async () => {
+    const pair = pairOf();
+    putSyncSession(pair.computer, at(0));
+    putSyncSession(pair.phone, at(1));
+    let copies = 0;
+    const beforeWrites = async (): Promise<string> => `copies/${++copies}`;
+    pair.phone.cutAfter(1);
+    expect((await run(pair, { beforeWrites })).linkLost).not.toBeNull();
+    pair.phone.cutAfter(null);
+    const witness = JSON.parse(pair.computer.text(SYNC_RUNNING_PATH) as string) as Record<string, unknown>;
+    expect(witness.safetyCopyAtMs).toBe(NOW);
+    delete witness.safetyCopyAtMs;
+    pair.computer.put(SYNC_RUNNING_PATH, JSON.stringify(witness));
+    expect(await run(pair, { beforeWrites })).toMatchObject({ interrupted: true, complete: true, safetyCopy: 'copies/2' });
+    expect(copies).toBe(2);
+  });
+
   it('copie de sécurité en échec : refus, rien n’est écrit d’aucun côté', async () => {
     const pair = pairOf();
     putSyncSession(pair.computer, at(0));
@@ -520,6 +555,25 @@ describe('ce que la couche du bouton reçoit', () => {
     const origins = (k: number): string[] => trashOf(pair).filter((e) => e.startMs === at(k)).map((e) => e.origin).sort();
     expect(origins(2)).toEqual(['ordinateur']);
     expect(origins(3)).toEqual(['ordinateur', 'telephone']);
+  });
+
+  it('keep « all » : une fiche du téléphone de même longueur que celle de la corbeille mais au contenu changé est rangée à part, pas perdue', async () => {
+    const pair = pairOf();
+    for (let k = 0; k < 10; k++) putBoth(pair, k);
+    const rename = (name: string) => (r: SessionRecord): SessionRecord => ({ ...r, name });
+    editSyncRecord(pair.computer, fileOf(3), rename('Version A'));
+    editSyncRecord(pair.phone, fileOf(3), rename('Version A'));
+    await trashOnComputer(pair, 3);
+    await run(pair);
+    // Sur le téléphone, la fiche change sans changer de longueur : « A » devient « B ».
+    editSyncRecord(pair.phone, fileOf(3), rename('Version B'));
+    const outcome = await run(pair, { heldOnPhone: 'remove' });
+    expect(outcome.done.find((i) => i.startMs === at(3))?.ops).toMatchObject([{ kind: 'removeFromPhone', keep: 'all' }]);
+    expect(await syncSessionFiles(pair.phone)).not.toContain(fileOf(3));
+    const entries = sessionTrashEntries(trashOf(pair), at(3));
+    expect(entries.map((e) => e.origin).sort()).toEqual(['ordinateur', 'telephone']);
+    const names = entries.map((e) => JSON.parse(pair.computer.text(`corbeille/${e.dir}/${recordFileName(e.main)}`) ?? '{}').name).sort();
+    expect(names).toEqual(['Version A', 'Version B']);
   });
 
   it('« Retirer du téléphone » ne retire que les sessions montrées : une autre apparue depuis les fait toutes laisser', async () => {
@@ -868,5 +922,78 @@ describe('le téléphone l’apprend par l’instant posé dans son marqueur', (
     expect((await run(pair)).refusal).toBe('phoneNewer');
     expect(pair.phone.text(MARKER)).toBe(future);
     expect(await syncSessionFiles(pair.phone)).toEqual([]);
+  });
+});
+
+describe('« Tout supprimer » ne vide jamais l’autre appareil', () => {
+  const MARKER = 'gtracker.json';
+  const COUNT = 4;
+  const all = (): string[] => Array.from({ length: COUNT }, (_, k) => fileOf(k));
+
+  /** Paire synchronisée ; le téléphone vu par sa propre application, où se fait son « Tout supprimer ». */
+  const syncedPlainPair = async (): Promise<Pair> => {
+    const pair = pairOf(false);
+    for (let k = 0; k < COUNT; k++) putBoth(pair, k);
+    expect((await run(pair)).complete).toBe(true);
+    return pair;
+  };
+
+  /** Réouverture de l'application après la remise à zéro : le marqueur, s'il manque, est recréé sans identifiant. */
+  const reopen = async (folder: SyncFolder): Promise<void> => {
+    if ((await folder.readText(MARKER)) === null) folder.put(MARKER, markerText());
+  };
+
+  /**
+   * Synchronisation suivante, suppressions confirmées d'avance : rien ne part pourtant de l'appareil resté plein
+   * (rien dans la corbeille de l'ordinateur), et chacun finit avec toutes les sessions.
+   */
+  const syncAfterReset = async (pair: Pair, label: string): Promise<SyncOutcome> => {
+    const outcome = await run(pair, { confirmDeletions: true });
+    expect(outcome.complete, label).toBe(true);
+    expect(trashOf(pair), label).toEqual([]);
+    expect(await syncSessionFiles(pair.computer), label).toEqual(all());
+    expect(await syncSessionFiles(pair.phone), label).toEqual(all());
+    return outcome;
+  };
+
+  it('téléphone vidé : première rencontre, l’ordinateur garde tout et le lui rend', async () => {
+    const pair = await syncedPlainPair();
+    expect((await eraseAppFiles(pair.phone)).error).toBeNull();
+    expect(await syncSessionFiles(pair.phone)).toEqual([]);
+    await reopen(pair.phone);
+    expect((await syncAfterReset(pair, 'vidé')).first).toBe('noPhoneId');
+  });
+
+  it('ordinateur vidé : sa base part avec lui, le téléphone garde son identifiant et toutes ses sessions, et les lui rend', async () => {
+    const pair = await syncedPlainPair();
+    const phoneId = readMarkerId(pair.phone.text(MARKER));
+    expect((await eraseAppFiles(pair.computer)).error).toBeNull();
+    expect(hasSyncFiles(pair.computer)).toBe(false);
+    await reopen(pair.computer);
+    expect((await syncAfterReset(pair, 'vidé')).first).toBe('noComputerId');
+    expect(readMarkerId(pair.phone.text(MARKER))).toBe(phoneId);
+  });
+
+  it.each(['phone', 'computer'] as const)('vidage du côté %s coupé après chaque opération : l’autre côté ne perd rien', async (side) => {
+    let cuts = 0;
+    for (let n = 0; n < 100; n++) {
+      const pair = await syncedPlainPair();
+      const folder = pair[side];
+      const id = readMarkerId(folder.text(MARKER));
+      folder.cutAfter(n);
+      const result = await eraseAppFiles(folder);
+      folder.cutAfter(null);
+      if (result.error === null) break;
+      cuts += 1;
+      const label = `coupure après ${n}`;
+      // L'identifiant part avant tout le reste : tant qu'il est là, rien n'a été effacé.
+      if (readMarkerId(await folder.readText(MARKER)) === id) {
+        expect(await syncSessionFiles(folder), label).toEqual(all());
+        expect(folder.paths().some((p) => p.startsWith('synchro/')), label).toBe(side === 'computer');
+      }
+      await reopen(folder);
+      await syncAfterReset(pair, label);
+    }
+    expect(cuts).toBeGreaterThan(COUNT);
   });
 });

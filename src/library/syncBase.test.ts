@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { MEMORY_VERSION, markerText } from './folderLayout';
 import {
-  SYNC_BASE_FORMAT, SYNC_BASE_VERSION, emptySyncBase, isSyncId, markerTextWithId, markerTextWithSync, parseSyncBase, readMarkerId,
+  SYNC_BASE_FORMAT, SYNC_BASE_VERSION, emptySyncBase, isSyncId, markerTextWithId, markerTextWithSync, markerTextWithoutId, parseSyncBase, readMarkerId,
   readMarkerSync, serializeSyncBase,
-  syncAncestorPath, syncBaseLine, syncBasePath, syncRefusal, withSyncDone, withSyncHeld, withSyncLine, withoutSyncLine,
-  type SyncBaseSession, type SyncFiles,
+  syncAncestorPath, syncBaseLine, syncBasePath, syncRefusal, syncRouteBaseLine, withRouteHeld, withRouteLine, withSyncDone, withSyncHeld, withSyncLine,
+  withoutRouteLine, withoutSyncLine,
+  type SyncBaseRoute, type SyncBaseSession, type SyncFiles,
 } from './syncBase';
 
 const files = (name: string, mtimeMs = 1000): SyncFiles => ({
@@ -53,6 +54,18 @@ describe('identifiant du dossier dans son marqueur', () => {
     expect(markerTextWithSync('{"format":"autre","version":1}', 5000)).toBeNull();
     expect(readMarkerSync('{"format":"autre","version":1,"synchro":5}')).toBeNull();
     expect(readMarkerSync(JSON.stringify({ format: 'gtracker-memoire', version: 1, synchro: 'hier' }))).toBeNull();
+  });
+
+  it('l’identifiant se retire sans rien retirer d’autre ; rien à réécrire sans identifiant, ni d’une version plus récente', () => {
+    const text = markerTextWithoutId(JSON.stringify({ format: 'gtracker-memoire', version: 1, id: 'abcdef-123456', synchro: 7, futur: [1] }));
+    expect(JSON.parse(text as string)).toEqual({ format: 'gtracker-memoire', version: 1, synchro: 7, futur: [1] });
+    expect(readMarkerId(text)).toBeNull();
+    // Un identifiant mal formé part aussi.
+    expect(readMarkerId(markerTextWithoutId(JSON.stringify({ format: 'gtracker-memoire', version: 1, id: '../ailleurs' })))).toBeNull();
+    expect(markerTextWithoutId(markerText())).toBeNull();
+    expect(markerTextWithoutId(JSON.stringify({ format: 'gtracker-memoire', version: MEMORY_VERSION + 1, id: 'abcdef-123456' }))).toBeNull();
+    expect(markerTextWithoutId(null)).toBeNull();
+    expect(markerTextWithoutId('{"format":"autre","version":1,"id":"abcdef-123456"}')).toBeNull();
   });
 
   it('un identifiant qui ne peut pas nommer un fichier est tenu pour absent', () => {
@@ -164,5 +177,66 @@ describe('lignes de la base', () => {
     expect(syncBasePath('telephone-0001')).toBe('synchro/telephone-0001.json');
     expect(syncAncestorPath('telephone-0001', 1234, 'computer')).toBe('synchro/telephone-0001/fiches/1234-ordinateur.json');
     expect(syncAncestorPath('telephone-0001', 1234, 'phone')).toBe('synchro/telephone-0001/fiches/1234-telephone.json');
+  });
+});
+
+describe('itinéraires dans la base', () => {
+  const route = (id: string, updatedAt = '2026-11-02T10:00:00.000Z'): SyncBaseRoute => ({
+    id,
+    computer: { json: { name: `${id}.json`, size: 300, mtimeMs: 7 }, gpx: { name: `${id}.gpx`, size: 900, mtimeMs: 8 }, updatedAt },
+    phone: { json: { name: `${id}.json`, size: 300, mtimeMs: 70 }, gpx: null, updatedAt },
+  });
+
+  it('se relisent tels qu’écrits ; une base sans ces champs se lit, sans aucun itinéraire', () => {
+    const written = { ...base(), routes: [route('a'), route('b')], removedRoutes: ['c'], heldRoutes: ['d'] };
+    expect(parseSyncBase(serializeSyncBase(written))).toEqual({ state: 'ok', base: written });
+    const raw = JSON.parse(serializeSyncBase(base()));
+    delete raw.routes;
+    delete raw.removedRoutes;
+    delete raw.heldRoutes;
+    const read = parseSyncBase(JSON.stringify(raw));
+    expect(read.state === 'ok' && read.base).toMatchObject({ routes: [], removedRoutes: [], heldRoutes: [] });
+  });
+
+  it('une ligne mal formée ou en double est écartée seule ; une identité en ligne n’est ni retenue ni laissée', () => {
+    const raw = JSON.parse(serializeSyncBase({ ...base(), routes: [route('a')] }));
+    raw.routes = [raw.routes[0], { id: 'b', computer: { json: { name: 'b.json' } }, phone: null }, raw.routes[0], { ...raw.routes[0], id: '' }, 5];
+    raw.heldRoutes = ['a', 'h', 'h', 3];
+    raw.removedRoutes = ['a', 'h', 'r'];
+    const read = parseSyncBase(JSON.stringify(raw));
+    expect(read.state === 'ok' && read.base).toMatchObject({ heldRoutes: ['h'], removedRoutes: ['r'] });
+    expect(read.state === 'ok' && read.base.routes.map((r) => r.id)).toEqual(['a']);
+  });
+
+  it('les champs inconnus de cette version sont gardés à la réécriture', () => {
+    const raw = { ...JSON.parse(serializeSyncBase(base())), avenir: { a: 1 }, notes: [1, 2] };
+    const read = parseSyncBase(JSON.stringify(raw));
+    expect(read.state === 'ok' && read.base.unknownFields).toEqual({ avenir: { a: 1 }, notes: [1, 2] });
+    const again = read.state === 'ok' ? JSON.parse(serializeSyncBase(read.base)) : null;
+    expect(again).toMatchObject({ format: SYNC_BASE_FORMAT, version: SYNC_BASE_VERSION, avenir: { a: 1 }, notes: [1, 2] });
+    expect(again).not.toHaveProperty('unknownFields');
+    expect(parseSyncBase(serializeSyncBase(base()))).toEqual({ state: 'ok', base: base() });
+  });
+
+  it('poser, oublier et retenir un itinéraire', () => {
+    const start = { ...base(), removedRoutes: ['b', 'z'], heldRoutes: ['c'] };
+    const set = withRouteLine(withRouteLine(start, route('b')), route('a'));
+    expect(set.routes.map((r) => r.id)).toEqual(['a', 'b']);
+    expect(set).toMatchObject({ removedRoutes: ['z'], heldRoutes: ['c'] });
+    expect(syncRouteBaseLine(withRouteLine(set, route('a', 'autre')), 'a')?.computer.updatedAt).toBe('autre');
+    expect(syncRouteBaseLine(null, 'a')).toBeNull();
+    const forgotten = withoutRouteLine(withoutRouteLine(set, 'a'), 'a');
+    expect(forgotten).toMatchObject({ removedRoutes: ['a', 'z'] });
+    expect(forgotten.routes.map((r) => r.id)).toEqual(['b']);
+    const held = withRouteHeld(withRouteHeld(forgotten, 'a'), 'a');
+    expect(held).toMatchObject({ removedRoutes: ['z'], heldRoutes: ['a', 'c'] });
+    expect(withRouteLine(held, route('c')).heldRoutes).toEqual(['a']);
+    expect(withoutRouteLine(held, 'c')).toMatchObject({ heldRoutes: ['a'], removedRoutes: ['c', 'z'] });
+  });
+
+  it('en fin de synchronisation, les suppressions d’itinéraires retenues se réduisent à la corbeille, si on la donne', () => {
+    const start = { ...base(), removedRoutes: ['a', 'b'], heldRoutes: ['h'] };
+    expect(withSyncDone(start, 1, new Set(), new Set(['b']))).toMatchObject({ removedRoutes: ['b'], heldRoutes: ['h'] });
+    expect(withSyncDone(start, 1, new Set()).removedRoutes).toEqual(['a', 'b']);
   });
 });

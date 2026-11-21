@@ -5,6 +5,8 @@ import {
   KEY_CLASSES, RECORDING_REFUSAL, eraseAppFiles, eraseKeyPlan, factoryKeyPlan, isAppMemoryFile, memoryResetTargets,
   ownSettingsFiles, resetConfirmText, resetInterruptedText, resetRefusal, type MemoryListings, type ResetContext,
 } from './resetPlan';
+import { markerText } from './folderLayout';
+import { markerTextWithId, readMarkerId } from './syncBase';
 
 const file = (name: string) => ({ name, kind: 'file' as const });
 const dir = (name: string) => ({ name, kind: 'directory' as const });
@@ -175,6 +177,32 @@ describe('fichiers de l\'application dans le dossier mémoire', () => {
     expect(String(result.error)).toContain('accès retiré');
     expect(log).toEqual(['remove sessions/a.gpx']);
     expect(files.has('reglages/pc.json') && files.has('gtracker.json') && files.has('sessions/a.json')).toBe(true);
+  });
+
+  it('le marqueur perd d\'abord son identifiant de synchronisation, le reste de son contenu gardé', async () => {
+    const files = new Map([['gtracker.json', markerTextWithId(markerText(), 'dossier-0001') as string], ['sessions/a.gpx', ''], ['sessions/a.json', '']]);
+    const log: string[] = [];
+    // Coupé au premier effacement : seul le marqueur a changé.
+    const folder = createFakeFolder(files, log, { remove: async () => { throw new Error('coupé'); } });
+    const result = await eraseAppFiles(folder);
+    expect(result.error).not.toBeNull();
+    expect(log).toEqual(['write gtracker.json']);
+    expect(readMarkerId(files.get('gtracker.json') ?? null)).toBeNull();
+    expect(JSON.parse(files.get('gtracker.json') as string)).toEqual(JSON.parse(markerText()));
+    expect(files.has('sessions/a.gpx')).toBe(true);
+  });
+
+  it('un marqueur qui ne se réécrit pas : rien n\'est effacé ; un marqueur sans identifiant n\'est pas réécrit', async () => {
+    const files = new Map([['gtracker.json', markerTextWithId(markerText(), 'dossier-0001') as string], ['sessions/a.gpx', '']]);
+    const log: string[] = [];
+    const refused = createFakeFolder(files, log, { writeText: async () => { throw new Error('lecture seule'); } });
+    expect(String((await eraseAppFiles(refused)).error)).toContain('lecture seule');
+    expect(log).toEqual([]);
+    expect(readMarkerId(files.get('gtracker.json') ?? null)).toBe('dossier-0001');
+    const plain = new Map([['gtracker.json', markerText()], ['sessions/a.gpx', '']]);
+    const plainLog: string[] = [];
+    expect((await eraseAppFiles(createFakeFolder(plain, plainLog))).error).toBeNull();
+    expect(plainLog).toEqual(['remove sessions/a.gpx', 'remove gtracker.json']);
   });
 
   it('un dossier illisible n\'efface rien', async () => {

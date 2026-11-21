@@ -127,13 +127,27 @@ const filesOfOp = (op: SyncOp): number => {
 const phoneOpsOf = (item: SyncItem | undefined): number =>
   item?.ops.filter((op) => op.kind === 'removeFromPhone' || ('to' in op && op.to === 'phone') || ('on' in op && op.on === 'phone')).length ?? 0;
 
-/** Dossier de la copie de sécurité que garde le témoin d'une synchronisation coupée, s'il couvre ce téléphone. */
-const witnessSafetyCopy = (text: string | null, phone: string): string | null => {
+/**
+ * Âge au plus d'une copie de sécurité que la reprise d'une première rencontre coupée réutilise : au-delà, les dossiers
+ * ont pu changer depuis (une reprise des mois plus tard), la copie qu'elle garderait ne couvrirait plus l'état
+ * d'avant les écritures, et une copie neuve est faite.
+ */
+const SAFETY_COPY_MAX_AGE_MS = 3_600_000;
+
+/**
+ * Dossier de la copie de sécurité que garde le témoin d'une synchronisation coupée, avec l'instant où elle a été
+ * faite, s'il couvre ce téléphone et n'est pas périmé (`SAFETY_COPY_MAX_AGE_MS`). Un instant dans le futur (horloge
+ * reculée) ou absent du témoin (témoin d'une version qui ne l'écrivait pas) la fait tenir pour périmée : une copie
+ * neuve est faite.
+ */
+const witnessSafetyCopy = (text: string | null, phone: string, nowMs: number): { path: string; atMs: number } | null => {
   try {
     const witness: unknown = text === null ? null : JSON.parse(text);
     if (typeof witness !== 'object' || witness === null) return null;
-    const { safetyCopy, phone: covered } = witness as { safetyCopy?: unknown; phone?: unknown };
-    return typeof safetyCopy === 'string' && covered === phone ? safetyCopy : null;
+    const { safetyCopy, phone: covered, safetyCopyAtMs: atMs } = witness as { safetyCopy?: unknown; phone?: unknown; safetyCopyAtMs?: unknown };
+    if (typeof safetyCopy !== 'string' || covered !== phone || typeof atMs !== 'number' || !Number.isFinite(atMs)) return null;
+    const age = nowMs - atMs;
+    return age >= 0 && age <= SAFETY_COPY_MAX_AGE_MS ? { path: safetyCopy, atMs } : null;
   } catch {
     return null;
   }
@@ -293,12 +307,20 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     // La copie de sécurité d'une première rencontre coupée en route n'est pas refaite : le témoin la garde, avec le
     // téléphone qu'elle couvre (son identifiant, ou son marqueur tant qu'il n'en a pas).
     const phoneKey = (): string => ids.phone ?? `marqueur:${markers.phone ?? ''}`;
+    /** Instant où la copie de sécurité a été faite, gardé d'une reprise à l'autre pour la périmer. */
+    let safetyCopyAtMs = now();
     const writeWitness = (startedAtMs: number): Promise<void> => computer.writeText(SYNC_RUNNING_PATH,
-      `${stringifyJson({ startedAtMs, ...(outcome.safetyCopy ? { safetyCopy: outcome.safetyCopy, phone: phoneKey() } : {}) })}\n`);
+      `${stringifyJson({ startedAtMs, ...(outcome.safetyCopy ? { safetyCopy: outcome.safetyCopy, safetyCopyAtMs, phone: phoneKey() } : {}) })}\n`);
     if (pair.first !== null && scope.phone && options.beforeWrites) {
-      const earlier = witnessSafetyCopy(running, phoneKey());
+      const earlier = witnessSafetyCopy(running, phoneKey(), now());
       try {
-        outcome.safetyCopy = earlier ?? await options.beforeWrites(pair.first);
+        if (earlier) {
+          outcome.safetyCopy = earlier.path;
+          safetyCopyAtMs = earlier.atMs;
+        } else {
+          outcome.safetyCopy = await options.beforeWrites(pair.first);
+          safetyCopyAtMs = now();
+        }
       } catch (err) {
         return { ...emptyOutcome('safetyCopy'), first: pair.first, interrupted: false, error: errorMessage(err, String(err)) };
       }
@@ -445,24 +467,42 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       if (!outcome.keptFromPhone.includes(startMs)) outcome.keptFromPhone.push(startMs);
     };
 
+    /** Fiche du téléphone et fiche de la corbeille identiques octet pour octet ; une lecture en échec ou un fichier absent : non. */
+    const sameRecordContent = async (file: SyncStamp, candidates: readonly { dir: string; name: string }[]): Promise<boolean> => {
+      try {
+        const mine = await phone.readBytes(sessionPath(file.name));
+        if (!mine) return false;
+        for (const c of candidates) {
+          const theirs = await computer.readBytes(trashFilePath(c.dir, c.name));
+          if (theirs && theirs.byteLength === mine.byteLength && theirs.every((byte, k) => byte === mine[k])) return true;
+        }
+      } catch {
+        return false;
+      }
+      return false;
+    };
+
     /**
      * Vrai si la corbeille, relue sur le disque au moment du retrait, tient encore ce que le plan a compté : un GPX et
-     * des capteurs de la même taille que ceux du téléphone, et une fiche : présente (`present`), de la même taille aussi
-     * (`same`), ou sans exigence (`any`). Elle a pu être vidée depuis.
+     * des capteurs de la même taille que ceux du téléphone (la taille seule : les relire en entier coûte cher et le GPX
+     * du plan est déjà vérifié), et une fiche : présente (`present`), sans exigence (`any`), ou identique au contenu
+     * (`same`) : une note ou un vent changés sans changer la longueur du texte ne passent pas pour tenus. Elle a pu
+     * être vidée depuis.
      */
     const trashStillHolds = async (startMs: number, files: readonly SyncStamp[], record: 'any' | 'present' | 'same'): Promise<boolean> => {
-      const held: { name: string; size: number }[] = [];
+      const held: { dir: string; name: string; size: number }[] = [];
       for (const entry of (await trashNow()).filter((e) => e.startMs === startMs && e.kind !== 'itineraire')) {
         for (const f of entry.files) {
-          if ((await computer.stat(trashFilePath(entry.dir, f.name)))?.size === f.size) held.push(f);
+          if ((await computer.stat(trashFilePath(entry.dir, f.name)))?.size === f.size) held.push({ dir: entry.dir, name: f.name, size: f.size });
         }
       }
       for (const file of files) {
         const ext = /\.[^.]+$/.exec(file.name)?.[0].toLowerCase() ?? '';
         const same = (f: { name: string }): boolean => f.name.toLowerCase().endsWith(ext);
+        const sameSize = held.filter((f) => same(f) && f.size === file.size);
         const ok = ext === '.json' && record !== 'same'
           ? record === 'any' || held.some(same)
-          : held.some((f) => same(f) && f.size === file.size);
+          : ext === '.json' ? await sameRecordContent(file, sameSize) : sameSize.length > 0;
         if (!ok) return false;
       }
       return true;
