@@ -29,6 +29,9 @@
 // Dans chaque compte rendu de « Synchroniser » (`attendreIssue`), relevé phrase par phrase pendant la copie et à la fin : la
 // première phrase est « Sans câble, le téléphone n'est pas modifié : seules ses sessions sont copiées vers l'ordinateur. »
 // (après la ligne de reprise d'une synchronisation coupée, s'il y en a une) et aucune phrase « Première synchronisation… ».
+// Cas 1, itinéraires : un itinéraire sur le faux téléphone et un dans la mémoire de l'ordinateur ; par le Wi-Fi, le compte
+// rendu dit « Les itinéraires attendent le câble ou la mise à jour du téléphone. », rien n'en est copié ni supprimé, et ceux
+// des deux côtés (fiches, GPX, tailles, dates) sont intacts après chaque « Synchroniser » et après « Retirer ».
 // Les sessions du faux téléphone (GPX et fiche) sont écrites d'abord par le programme lui-même, dans une mémoire de
 // préparation, puis copiées : une session sans fiche est « laissée pour la prochaine fois ».
 import { spawn, spawnSync } from 'node:child_process';
@@ -294,6 +297,17 @@ async function attendreIssue(b, quoi) {
   check(`« Synchroniser » (${quoi}) : aucune phrase « Première synchronisation… », ni en route ni à la fin`, ![...vues].some((p) => /Première synchronisation/.test(p)), JSON.stringify([...vues]));
   return f;
 }
+/** Un itinéraire (fiche au format de `planning/routeRecord.ts`, et son GPX) dans `racine/itineraires`, à une date connue. */
+function posterItineraire(racine, nom, creation) {
+  mkdirSync(join(racine, 'itineraires'), { recursive: true });
+  const fiche = { format: FORMATS.memoire.replace(/-memoire$/, '-itineraire'), version: 4, name: nom, activityId: null, createdAt: creation, updatedAt: creation, waypoints: [{ lat: 43.5, lon: 3.9 }, { lat: 43.51, lon: 3.92 }], legs: [{ mode: 'straight', points: [[43.5, 3.9], [43.51, 3.92]] }] };
+  const date = new Date(Date.UTC(2026, 8, 5, 12, 0, 0));
+  for (const [ext, contenu] of [['json', `${JSON.stringify(fiche)}\n`], ['gpx', `<gpx version="1.1" creator="banc"><rte><name>${nom}</name></rte></gpx>\n`]]) {
+    const f = join(racine, 'itineraires', `${nom}.${ext}`);
+    writeFileSync(f, contenu);
+    utimesSync(f, date, date);
+  }
+}
 /** Première phrase du compte rendu d'une synchronisation par le Wi-Fi. */
 const PHRASE_SANS_CABLE = "Sans câble, le téléphone n'est pas modifié : seules ses sessions sont copiées vers l'ordinateur.";
 /** « Synchroniser » (barre du haut) : attend l'issue et rend la fenêtre. */
@@ -316,8 +330,13 @@ try {
     const profil = dossier('p1-profil');
     const memoire = dossier('p1-memoire');
     const tel = fabriquerTelephone('p1-tel');
+    // Un itinéraire de chaque côté : par le Wi-Fi, la synchronisation les laisse tels quels (ils attendent le câble).
+    posterItineraire(tel, 'Itin telephone', '2026-09-02T08:00:00.000Z');
+    posterItineraire(memoire, 'Itin ordinateur', '2026-09-01T08:00:00.000Z');
     const avantTel = empreinte(tel);
-    const gros = join(tel, 'sessions', nomFichier(SESSIONS[2]));
+    const itinerairesPc = () => empreinte(join(memoire, 'itineraires'));
+    const avantItinerairesPc = itinerairesPc();
+    const gros =join(tel, 'sessions', nomFichier(SESSIONS[2]));
     console.log(`  téléphone factice : ${(arbre(tel) ?? []).join(', ')} ; plus gros fichier : ${statSync(gros).size} octets`);
     check('le gros fichier de session dépasse 2 Mio (au moins trois blocs)', statSync(gros).size > 2 * 1024 * 1024, String(statSync(gros).size));
     const secretsProfil = () => arbre(join(profil, 'sansfil')) ?? [];
@@ -416,7 +435,9 @@ try {
       const f1 = await synchroniser(b, '1f');
       check('1f. « 3 sessions copiées vers l\'ordinateur. »', (f1?.phrases ?? []).includes("3 sessions copiées vers l'ordinateur."), JSON.stringify(f1?.phrases));
       check('1f. aucune phrase ne dit que le téléphone a été écrit (« Mettre à jour »)', !(f1?.phrases ?? []).some((l) => /Mettre à jour/.test(l)), JSON.stringify(f1?.phrases));
-      check('1f. ce qui attend le câble est dit', (f1?.phrases ?? []).some((l) => /attend(ent)? le câble ou la mise à jour du téléphone/.test(l)), JSON.stringify(f1?.phrases));
+      check('1f. ce qui attend le câble est dit : « Les itinéraires attendent le câble ou la mise à jour du téléphone. »', (f1?.phrases ?? []).includes('Les itinéraires attendent le câble ou la mise à jour du téléphone.'), JSON.stringify(f1?.phrases));
+      check('1f. aucune phrase ne parle d\'itinéraires copiés, supprimés ou modifiés', !(f1?.phrases ?? []).some((l) => /itinéraires? (copiés?|supprimés?|modifiés?|laissés?|retirés?)/.test(l)), JSON.stringify(f1?.phrases));
+      check('1f. les itinéraires de l\'ordinateur sont intacts (fiche, GPX, tailles, dates) et celui du téléphone n\'y est pas venu', itinerairesPc() === avantItinerairesPc && (arbre(join(memoire, 'itineraires')) ?? []).every((c) => /^Itin ordinateur\./.test(c)), `${avantItinerairesPc} / ${itinerairesPc()}`);
       await b.wait(2500); // réécritures différées des fiches
       verifierRangees('1f', memoire, tel, SESSIONS);
       telephoneIntact('1f', tel, avantTel);
@@ -486,6 +507,7 @@ try {
       check('1j. le téléphone retiré est refusé (raison « jeton »)', refuse.refus === 'jeton', JSON.stringify(refuse));
       await b.wait(1500);
       check('1j. le disque n\'a pas changé après le retrait', empreinte(join(memoire, 'sessions')) === rangeesAvantRetrait);
+      check('1j. les itinéraires de l\'ordinateur sont toujours intacts, après toutes les synchronisations', itinerairesPc() === avantItinerairesPc, `${avantItinerairesPc} / ${itinerairesPc()}`);
       // Le registre du profil ne garde plus le téléphone.
       const registre = readFileSync(join(profil, 'sansfil', 'telephones.json'), 'utf8');
       check('1j. le registre du profil ne garde plus le hachage du jeton', !registre.includes(condense.toString('hex')) && !registre.includes(condense.toString('base64')), registre.slice(0, 200));

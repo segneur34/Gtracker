@@ -39,8 +39,16 @@
 //     gardée), juste après elle (12 : coupure précoce, la reprise ne refait pas de copie, un seul dossier daté, et le compte
 //     rendu le redonne), puis en pleine synchronisation, deux fois ; relancé sans coupure, le tout est fini, rien n'est rangé
 //     à moitié, aucun temporaire des deux côtés ;
+//  r. itinéraires (fiches de `planning/routeRecord.ts` dans `itineraires/`, des deux côtés) : première synchronisation (trois
+//     copiés vers le téléphone, deux vers l'ordinateur, un commun, rien de supprimé, la copie de sécurité garde l'état d'avant),
+//     second clic, modifié sur le téléphone puis sur l'ordinateur (« 1 itinéraire modifié recopié. », octets identiques),
+//     supprimé sur le téléphone (corbeille de l'ordinateur), supprimé sur l'ordinateur par la page Itinéraires (retiré du
+//     téléphone) puis par Node sans corbeille (copie du téléphone rangée à part, origine « telephone »), modifié des deux côtés
+//     (le plus récent gagne, l'autre à la corbeille) ; le GPX seul du téléphone (sans fiche) et ses lieux ne bougent jamais ;
+//  rg. garde-fou commun : une session et quatre itinéraires supprimés sur le téléphone, une seule fenêtre (« … retirerait
+//     1 session et 4 itinéraires. »), ses trois boutons, chacun joué ;
 //  j. dans tous les cas, la console de la page sans erreur.
-// `BANC_CAS=c,g,m,i` (facultatif) ne joue que ces cas (a, b, c pour c à f, g, h, m, k, i) ; sans lui, tous.
+// `BANC_CAS=c,g,m,i` (facultatif) ne joue que ces cas (a, b, c pour c à f, g, h, m, k, r, rg, i) ; sans lui, tous.
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -290,8 +298,72 @@ function retirer(racine, ks) {
  * Ce que le téléphone porte hors des sessions, du marqueur et du fichier de réglages de l'ordinateur (`reglages/pc.json`,
  * recopié sur le téléphone par la synchronisation, jamais adopté) : lieux et itinéraires ne changent pas.
  */
-const horsSessions = (racine) => empreinte(racine, (c) => !c.startsWith('sessions/') && c !== 'gtracker.json' && c !== 'reglages/pc.json' && c !== 'reglages/');
+const horsSessions = (racine) => empreinte(racine, (c) => !c.startsWith('sessions/') && c !== 'gtracker.json' && c !== 'gtracker.json.gtracker-tmp' && c !== 'reglages/pc.json' && c !== 'reglages/');
 const gardeHorsSessions = (quoi, racine, avant) => check(`${quoi} : le téléphone garde, intacts, ses lieux et ses itinéraires (fichiers, tailles et dates)`, horsSessions(racine) === avant, `\n--- avant ---\n${avant}\n--- après ---\n${horsSessions(racine)}`);
+
+// ---------- les itinéraires : fiches écrites au format de `planning/routeRecord.ts` ----------
+const FORMAT_ITINERAIRE = FORMATS.memoire.replace(/-memoire$/, '-itineraire');
+const ITINERAIRES = Object.fromEntries(['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf', 'hotel'].map((cle, k) => [cle, { cle, nom: `Itin ${cle}`, creation: `2026-09-0${k + 1}T08:00:00.000Z`, decalage: k * 0.01 }]));
+/** Fiche d'un itinéraire comme `serializeRouteRecord` l'écrit : une ligne de JSON, sans indentation, fin de ligne. `note` : champ inconnu, gardé à la réécriture, qui fait varier le contenu. */
+const ficheItineraire = (def, note, maj) => `${JSON.stringify({
+  format: FORMAT_ITINERAIRE, version: 4, name: def.nom, activityId: null, createdAt: def.creation, updatedAt: maj,
+  waypoints: [{ lat: 43.5 + def.decalage, lon: 3.9 }, { lat: 43.51 + def.decalage, lon: 3.92 }],
+  legs: [{ mode: 'straight', points: [[43.5 + def.decalage, 3.9], [43.51 + def.decalage, 3.92]] }],
+  noteBanc: note,
+})}\n`;
+const gpxItineraire = (def, note) => `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="banc"><metadata><name>${def.nom}</name><desc>${note}</desc></metadata><rte><name>${def.nom}</name><rtept lat="${43.5 + def.decalage}" lon="3.9"/><rtept lat="${43.51 + def.decalage}" lon="3.92"/></rte></gpx>\n`;
+/** Pose (ou remplace) la fiche et le GPX d'un itinéraire dans `racine/itineraires`, à une date de modification connue. */
+function poserItineraire(racine, cle, { note = 'v1', maj = null, jour = 5 } = {}) {
+  const def = ITINERAIRES[cle];
+  mkdirSync(join(racine, 'itineraires'), { recursive: true });
+  const json = join(racine, 'itineraires', `${def.nom}.json`);
+  const gpx = join(racine, 'itineraires', `${def.nom}.gpx`);
+  writeFileSync(json, ficheItineraire(def, note, maj ?? def.creation));
+  writeFileSync(gpx, gpxItineraire(def, note));
+  dater(json, jour);
+  dater(gpx, jour);
+}
+/** Retire la fiche puis le GPX d'un itinéraire, comme le fait l'application qui supprime. */
+function retirerItineraire(racine, cle) {
+  for (const ext of ['json', 'gpx']) { const f = join(racine, 'itineraires', `${ITINERAIRES[cle].nom}.${ext}`); if (existsSync(f)) unlinkSync(f); }
+}
+const fichiersItineraire = (cles) => cles.flatMap((cle) => [`${ITINERAIRES[cle].nom}.json`, `${ITINERAIRES[cle].nom}.gpx`]);
+/** Noms des fichiers de `racine/itineraires`. */
+const itinerairesDe = (racine) => (existsSync(join(racine, 'itineraires')) ? readdirSync(join(racine, 'itineraires')).sort() : []);
+const ITI_PC_AVANT = fichiersItineraire(['alpha', 'bravo', 'charlie', 'delta']);
+const ITI_TEL_AVANT = [...fichiersItineraire(['echo', 'foxtrot', 'charlie']), 'parcours-telephone.gpx'];
+const ORPHELIN = 'parcours-telephone.gpx';
+/** L'ordinateur porte exactement les itinéraires `cles`, le téléphone les mêmes et son GPX seul ; fiches et GPX identiques à l'octet ; aucun temporaire. */
+function memesItineraires(quoi, memoire, tel, cles) {
+  const attendus = fichiersItineraire(cles);
+  check(`${quoi} : l'ordinateur porte ${cles.length} itinéraires, fiche et GPX chacun`, memes(itinerairesDe(memoire), attendus), itinerairesDe(memoire).join(' | '));
+  check(`${quoi} : le téléphone porte les mêmes (et son GPX seul)`, memes(itinerairesDe(racineTel(tel)), [...attendus, ORPHELIN]), itinerairesDe(racineTel(tel)).join(' | '));
+  const differents = attendus.filter((n) => existsSync(join(memoire, 'itineraires', n)) && existsSync(join(racineTel(tel), 'itineraires', n)) && !readFileSync(join(memoire, 'itineraires', n)).equals(readFileSync(join(racineTel(tel), 'itineraires', n))));
+  check(`${quoi} : fiches et GPX identiques des deux côtés, octet pour octet`, differents.length === 0, differents.join(','));
+  check(`${quoi} : aucun temporaire dans itineraires/ (ordinateur, téléphone)`, temporaires(memoire).length === 0 && temporaires(racineTel(tel)).length === 0, `${temporaires(memoire)} ${temporaires(racineTel(tel))}`);
+}
+/** Supprime un itinéraire depuis la page Itinéraires (« … » de sa ligne, « Supprimer », « Mettre à la corbeille (30 jours) »). */
+async function supprimerItineraireDeLaListe(b, nom, quoi) {
+  await b.go('/itineraires/liste', 5000);
+  await b.waitFor(`document.body.innerText.includes(${JSON.stringify(nom)})`, { timeout: 8000, label: 'ligne de l\'itinéraire' });
+  await b.settle({ max: 1500 });
+  const menu = await b.evaluate(`(() => {
+    const sel = ${JSON.stringify('button[aria-label="Plus d\'actions sur l\'itinéraire"]')};
+    // La ligne : le plus petit élément qui porte le nom et un seul « … ».
+    const lignes = [...document.body.querySelectorAll('*')].filter((e) => e.querySelectorAll(sel).length === 1 && e.textContent.includes(${JSON.stringify(nom)}));
+    const ligne = lignes.at(-1);
+    if (!ligne) return 'menu absent : ' + document.body.innerText.slice(0, 500);
+    ligne.querySelector(sel).click();
+    return 'ok';
+  })()`);
+  check(`${quoi} : « … » de la ligne « ${nom} »`, menu === 'ok', menu);
+  await b.wait(150);
+  // Seul le menu ouvert compte : le panneau de chaque ligne est dans la page, fermé ou non.
+  const sup = await b.evaluate(`(() => { const x = [...document.querySelectorAll('.ui-more__panel button')].filter((y) => y.getBoundingClientRect().width > 0).find((y) => y.textContent.trim().startsWith('Supprimer')); if (!x) return 'absent'; x.click(); return 'ok'; })()`);
+  check(`${quoi} : « Supprimer » du menu`, sup === 'ok', sup);
+  await b.waitFor(`[...document.querySelectorAll('button')].some((x) => x.textContent.trim() === 'Garder')`, { timeout: 4000, label: 'confirmation' });
+  check(`${quoi} : « Mettre à la corbeille (30 jours) »`, (await b.clickText('Mettre à la corbeille (30 jours)')) === 'ok');
+}
 
 /** Corbeille de l'ordinateur sur le disque : index, sous-dossiers, entrées. */
 const corbeilleDe = (memoire) => {
@@ -455,7 +527,8 @@ try {
         check('c. la copie de l\'ordinateur porte ses cinq sessions d\'avant (GPX et fiches), pas celles du téléphone', memes(sessionsDe(join(copie, 'ordinateur')), avantPcSessions), sessionsDe(join(copie, 'ordinateur')).join(' | '));
         check('c. la copie du téléphone porte ses quatre sessions d\'avant, pas celles de l\'ordinateur', memes(sessionsDe(join(copie, 'telephone')), avantTelSessions), sessionsDe(join(copie, 'telephone')).join(' | '));
         check('c. les marqueurs copiés sont ceux d\'avant (sans identifiant)', readFileSync(join(copie, 'telephone', 'gtracker.json'), 'utf8') === avantMarqueur && readFileSync(join(copie, 'ordinateur', 'gtracker.json'), 'utf8') === avantMarqueurPc);
-        check('c. la copie du téléphone porte aussi ses lieux (ce que le téléphone liste), et pas ses itinéraires', existsSync(join(copie, 'telephone', 'lieux.json')) && !existsSync(join(copie, 'telephone', 'itineraires')));
+        // Le câble liste maintenant `itineraires/` : la copie du téléphone en garde l'état d'avant, le GPX seul compris.
+        check('c. la copie du téléphone porte aussi ses lieux et son dossier d\'itinéraires (ce que le téléphone liste), octet pour octet', existsSync(join(copie, 'telephone', 'lieux.json')) && existsSync(join(copie, 'telephone', 'itineraires', 'parcours-telephone.gpx')) && readFileSync(join(copie, 'telephone', 'itineraires', 'parcours-telephone.gpx')).equals(readFileSync(join(racine, 'itineraires', 'parcours-telephone.gpx'))), (arbre(join(copie, 'telephone')) ?? []).filter((c) => !c.startsWith('telephone/sessions')).join(','));
         check('c. la copie ne porte aucun temporaire', temporaires(copie).length === 0, temporaires(copie).join(','));
       }
       // Identifiants, base.
@@ -859,6 +932,214 @@ for (const [nom, nbCorbeille, ks0, fichesChangees = false] of [['g1', 2, TOUTES_
     });
   }
 
+  // ---------- r. itinéraires ----------
+  console.log('\n== r. Itinéraires : première synchronisation, modifié d\'un côté, supprimé de chaque côté, modifié des deux côtés');
+  if (veut('r')) {
+    const SESSIONS_R = [0, 1, 2];
+    const profil = dossier('r-profil');
+    const memoire = fabriquerMemoire('r', SESSIONS_R);
+    const tel = fabriquerTelephone('r-tel', SESSIONS_R);
+    const racine = racineTel(tel);
+    // Départ : trois itinéraires de l'ordinateur seul (alpha, bravo, delta), deux du téléphone seul (echo, foxtrot), un commun (charlie).
+    for (const cle of ['alpha', 'bravo', 'delta', 'charlie']) poserItineraire(memoire, cle);
+    for (const cle of ['echo', 'foxtrot', 'charlie']) poserItineraire(racine, cle);
+    const orphelinAvant = empreinte(racine, (c) => c === 'itineraires/parcours-telephone.gpx');
+    const lieuxAvant = empreinte(racine, (c) => c === 'lieux.json');
+    /** Le GPX seul du téléphone et ses lieux n'ont pas bougé ; rien du téléphone ne vient dans la mémoire. */
+    const horsItineraires = (quoi) => {
+      check(`${quoi} : le GPX seul du téléphone (sans fiche) et ses lieux sont intacts, et il n'est pas copié sur l'ordinateur`, empreinte(racine, (c) => c === 'itineraires/parcours-telephone.gpx') === orphelinAvant && empreinte(racine, (c) => c === 'lieux.json') === lieuxAvant && !existsSync(join(memoire, 'itineraires', 'parcours-telephone.gpx')) && contient(memoire, MARQUE).length === 0, contient(memoire, MARQUE).join(','));
+    };
+    await avecProgramme(profil, memoire, { GTRACKER_BANC_TELEPHONE: tel }, 'r', async (b) => {
+      await b.go('/sessions', 5000);
+      await b.settle({ max: 2000 });
+
+      // r1 : première synchronisation, chacun reçoit ce qui lui manque, rien n'est supprimé
+      let r = await synchroniser(b, 'r1');
+      await capturer(b, 'synchroniser-itineraires');
+      check('r1. « Première synchronisation… rien n\'a été supprimé. »', contientLigne(r, "Première synchronisation avec ce téléphone : rien n'a été supprimé."), JSON.stringify(r.paragraphes));
+      check('r1. « 3 itinéraires copiés vers le téléphone, 2 vers l\'ordinateur. »', contientLigne(r, "3 itinéraires copiés vers le téléphone, 2 vers l'ordinateur."), JSON.stringify(r.paragraphes));
+      check('r1. aucune ligne de suppression ni de corbeille', !(r.paragraphes ?? []).some((l) => /supprim|corbeille/i.test(l) && !/rien n'a été supprimé/.test(l)), JSON.stringify(r.paragraphes));
+      check('r1. aucune ligne « attendent le câble » ni « laissé tel quel »', !(r.paragraphes ?? []).some((l) => /attendent le câble|laissés? tels? quels?/.test(l)), JSON.stringify(r.paragraphes));
+      await b.wait(2000);
+      memesItineraires('r1', memoire, tel, ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot']);
+      memesSessions('r1', memoire, tel, SESSIONS_R);
+      horsItineraires('r1');
+      const copies1 = copiesDe(profil);
+      check('r1. une seule copie de sécurité', copies1.length === 1, copies1.join(','));
+      if (copies1.length === 1) {
+        const copie = join(profil, 'Documents-essai', 'Gtracker-copies', copies1[0]);
+        console.log(`  copie de sécurité (hors sessions) : ${(arbre(copie) ?? []).filter((c) => !/\/sessions\//.test(c)).join(' ; ')}`);
+        check('r1. la copie de sécurité garde l\'état d\'avant des itinéraires des deux appareils (fiche et GPX)', memes(itinerairesDe(join(copie, 'ordinateur')), ITI_PC_AVANT) && memes(itinerairesDe(join(copie, 'telephone')), ITI_TEL_AVANT), `${itinerairesDe(join(copie, 'ordinateur')).join(',')} / ${itinerairesDe(join(copie, 'telephone')).join(',')}`);
+      }
+      check('r1. rien n\'est allé à la corbeille', corbeilleDe(memoire).entries.length === 0, JSON.stringify(corbeilleDe(memoire).index));
+      await fermerFenetre(b);
+
+      // r2 : second clic
+      const empreintePc = empreinte(memoire, (c) => c.startsWith('itineraires/'));
+      const empreinteTel = empreinte(racine, (c) => c.startsWith('itineraires/'));
+      r = await synchroniser(b, 'r2');
+      check('r2. « Les deux appareils sont à jour. » (et rien d\'autre)', JSON.stringify(r.paragraphes) === JSON.stringify(['Les deux appareils sont à jour.']), JSON.stringify(r.paragraphes));
+      await b.wait(1500);
+      check('r2. les itinéraires des deux appareils n\'ont pas changé (noms, tailles, dates)', empreinte(memoire, (c) => c.startsWith('itineraires/')) === empreintePc && empreinte(racine, (c) => c.startsWith('itineraires/')) === empreinteTel);
+      await fermerFenetre(b);
+
+      // r3 : alpha modifié sur le téléphone
+      poserItineraire(racine, 'alpha', { note: 'v2-telephone', maj: '2026-09-10T10:00:00.000Z', jour: 20 });
+      r = await synchroniser(b, 'r3');
+      check('r3. « 1 itinéraire modifié recopié. »', contientLigne(r, '1 itinéraire modifié recopié.'), JSON.stringify(r.paragraphes));
+      check('r3. aucune copie, aucune suppression, aucune corbeille', !(r.paragraphes ?? []).some((l) => /copié vers|supprim|corbeille/.test(l)), JSON.stringify(r.paragraphes));
+      await b.wait(1500);
+      memesItineraires('r3', memoire, tel, ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot']);
+      check('r3. la fiche de l\'ordinateur est celle du téléphone (nouvelle date, note v2-telephone)', lireJson(join(memoire, 'itineraires', 'Itin alpha.json'))?.noteBanc === 'v2-telephone' && lireJson(join(memoire, 'itineraires', 'Itin alpha.json'))?.updatedAt === '2026-09-10T10:00:00.000Z');
+      check('r3. rien à la corbeille', corbeilleDe(memoire).entries.length === 0);
+      await fermerFenetre(b);
+
+      // r4 : bravo modifié sur l'ordinateur
+      poserItineraire(memoire, 'bravo', { note: 'v2-ordinateur', maj: '2026-09-11T10:00:00.000Z', jour: 21 });
+      r = await synchroniser(b, 'r4');
+      check('r4. « 1 itinéraire modifié recopié. »', contientLigne(r, '1 itinéraire modifié recopié.'), JSON.stringify(r.paragraphes));
+      check('r4. « Mettre à jour » : le téléphone a été écrit', contientLigne(r, 'Sur le téléphone, touchez « Mettre à jour » pour voir les changements.'), JSON.stringify(r.paragraphes));
+      await b.wait(1500);
+      memesItineraires('r4', memoire, tel, ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot']);
+      check('r4. la fiche du téléphone est celle de l\'ordinateur (note v2-ordinateur)', lireJson(join(racine, 'itineraires', 'Itin bravo.json'))?.noteBanc === 'v2-ordinateur');
+      await fermerFenetre(b);
+
+      // r5 : delta supprimé sur le téléphone
+      retirerItineraire(racine, 'delta');
+      r = await synchroniser(b, 'r5');
+      check('r5. « 1 itinéraire supprimé sur le téléphone : mis dans la corbeille de l\'ordinateur (30 jours). »', contientLigne(r, "1 itinéraire supprimé sur le téléphone : mis dans la corbeille de l'ordinateur (30 jours)."), JSON.stringify(r.paragraphes));
+      await b.wait(1500);
+      memesItineraires('r5', memoire, tel, ['alpha', 'bravo', 'charlie', 'echo', 'foxtrot']);
+      let cb = corbeilleDe(memoire);
+      let e = cb.entries.find((x) => x.kind === 'itineraire' && x.routeBase === 'Itin delta');
+      console.log(`  corbeille : ${(arbre(cb.dir) ?? []).join(' ; ')}`);
+      check('r5. la corbeille tient delta : entrée « itineraire », origine « ordinateur », sa création, fiche et GPX octet pour octet', cb.index?.version === 2 && cb.entries.length === 1 && Boolean(e) && e.origin === 'ordinateur' && e.createdAt === ITINERAIRES.delta.creation && memes(readdirSync(join(cb.dir, e.dir)), ['Itin delta.json', 'Itin delta.gpx']), JSON.stringify(cb.entries));
+      check('r5. l\'index dit sa raison : supprimé', e?.reason === 'supprimee', JSON.stringify(e));
+      await fermerFenetre(b);
+
+      // r6 : echo supprimé sur l'ordinateur, depuis la page Itinéraires (la corbeille tient la copie)
+      await supprimerItineraireDeLaListe(b, 'Itin echo', 'r6');
+      await b.waitFor(() => !itinerairesDe(memoire).some((n) => n.startsWith('Itin echo')) && corbeilleDe(memoire).entries.length === 2, { timeout: 10000, label: 'itinéraire mis à la corbeille' });
+      await b.wait(800);
+      r = await synchroniser(b, 'r6');
+      check('r6. « 1 itinéraire supprimé sur l\'ordinateur : retiré du téléphone. »', contientLigne(r, "1 itinéraire supprimé sur l'ordinateur : retiré du téléphone."), JSON.stringify(r.paragraphes));
+      await b.wait(1500);
+      memesItineraires('r6', memoire, tel, ['alpha', 'bravo', 'charlie', 'foxtrot']);
+      cb = corbeilleDe(memoire);
+      check('r6. la corbeille garde echo une fois (origine « ordinateur », fichiers identiques sur le téléphone : pas de doublon), delta aussi', cb.entries.length === 2 && cb.entries.every((x) => x.origin === 'ordinateur' && x.kind === 'itineraire') && cb.entries.some((x) => x.routeBase === 'Itin echo'), JSON.stringify(cb.entries.map((x) => [x.origin, x.routeBase])));
+      await fermerFenetre(b);
+    });
+    // foxtrot retiré de l'ordinateur par Node, sans corbeille (comme une corbeille vidée à la main) : la copie du téléphone est rangée à part.
+    await avecProgramme(profil, memoire, { GTRACKER_BANC_TELEPHONE: tel }, 'r7', async (b) => {
+      await b.go('/sessions', 5000);
+      await b.settle({ max: 2000 });
+      retirerItineraire(memoire, 'foxtrot');
+      const octetsTel = readFileSync(join(racine, 'itineraires', 'Itin foxtrot.gpx'));
+      let r = await synchroniser(b, 'r7');
+      check('r7. « 1 itinéraire supprimé sur l\'ordinateur : retiré du téléphone. »', contientLigne(r, "1 itinéraire supprimé sur l'ordinateur : retiré du téléphone."), JSON.stringify(r.paragraphes));
+      await b.wait(1500);
+      memesItineraires('r7', memoire, tel, ['alpha', 'bravo', 'charlie']);
+      const cb = corbeilleDe(memoire);
+      const e = cb.entries.find((x) => x.routeBase === 'Itin foxtrot');
+      console.log(`  corbeille : ${(arbre(cb.dir) ?? []).join(' ; ')}`);
+      check('r7. la corbeille porte foxtrot, copie du téléphone rangée avant le retrait (origine « telephone »), son GPX octet pour octet', cb.entries.length === 3 && e?.origin === 'telephone' && e?.kind === 'itineraire' && existsSync(join(cb.dir, e.dir, 'Itin foxtrot.gpx')) && readFileSync(join(cb.dir, e.dir, 'Itin foxtrot.gpx')).equals(octetsTel), JSON.stringify(cb.entries.map((x) => [x.origin, x.routeBase])));
+      await fermerFenetre(b);
+
+      // r8 : charlie modifié des deux côtés, la version du téléphone est la plus récente
+      poserItineraire(memoire, 'charlie', { note: 'v2-ordinateur', maj: '2026-09-12T09:00:00.000Z', jour: 22 });
+      poserItineraire(racine, 'charlie', { note: 'v2-telephone', maj: '2026-09-12T11:00:00.000Z', jour: 23 });
+      const perdante = readFileSync(join(memoire, 'itineraires', 'Itin charlie.json'));
+      r = await synchroniser(b, 'r8');
+      check('r8. « 1 itinéraire modifié sur les deux appareils : la version la plus récente est gardée, l\'autre est dans la corbeille de l\'ordinateur (30 jours). »', contientLigne(r, "1 itinéraire modifié sur les deux appareils : la version la plus récente est gardée, l'autre est dans la corbeille de l'ordinateur (30 jours)."), JSON.stringify(r.paragraphes));
+      check('r8. pas de ligne « modifié recopié » en plus', !contientLigne(r, '1 itinéraire modifié recopié.'), JSON.stringify(r.paragraphes));
+      await b.wait(1500);
+      memesItineraires('r8', memoire, tel, ['alpha', 'bravo', 'charlie']);
+      check('r8. la plus récente (téléphone, v2-telephone) est des deux côtés', lireJson(join(memoire, 'itineraires', 'Itin charlie.json'))?.noteBanc === 'v2-telephone' && lireJson(join(racine, 'itineraires', 'Itin charlie.json'))?.noteBanc === 'v2-telephone');
+      const cb2 = corbeilleDe(memoire);
+      const perdue = cb2.entries.find((x) => x.routeBase === 'Itin charlie');
+      check('r8. la version perdante (celle de l\'ordinateur, v2-ordinateur) est à la corbeille, origine « ordinateur », octet pour octet', cb2.entries.length === 4 && perdue?.origin === 'ordinateur' && perdue?.kind === 'itineraire' && existsSync(join(cb2.dir, perdue.dir, 'Itin charlie.json')) && readFileSync(join(cb2.dir, perdue.dir, 'Itin charlie.json')).equals(perdante), JSON.stringify(cb2.entries.map((x) => [x.origin, x.routeBase])));
+      await fermerFenetre(b);
+
+      // r9 : tout est à jour, les sessions n'ont jamais bougé
+      r = await synchroniser(b, 'r9');
+      check('r9. « Les deux appareils sont à jour. » (et rien d\'autre)', JSON.stringify(r.paragraphes) === JSON.stringify(['Les deux appareils sont à jour.']), JSON.stringify(r.paragraphes));
+      memesSessions('r9', memoire, tel, SESSIONS_R);
+      horsItineraires('r9');
+      check('r9. toujours une seule copie de sécurité', copiesDe(profil).length === 1, copiesDe(profil).join(','));
+      await fermerFenetre(b);
+    });
+  }
+
+  // ---------- rg. garde-fou commun aux sessions et aux itinéraires ----------
+  console.log('\n== rg. Garde-fou : des sessions et des itinéraires supprimés sur le téléphone, une seule fenêtre');
+  if (veut('rg')) {
+    const SESSIONS_G = [0, 1, 2];
+    const CLES = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf', 'hotel'];
+    const profil = dossier('rg-profil');
+    const memoire = fabriquerMemoire('rg', SESSIONS_G);
+    const tel = fabriquerTelephone('rg-tel', SESSIONS_G);
+    const racine = racineTel(tel);
+    for (const cle of CLES) { poserItineraire(memoire, cle); poserItineraire(racine, cle); }
+    await avecProgramme(profil, memoire, { GTRACKER_BANC_TELEPHONE: tel }, 'rg', async (b) => {
+      await b.go('/sessions', 5000);
+      await b.settle({ max: 2000 });
+      let r = await synchroniser(b, 'rg1, première synchronisation');
+      check('rg1. rien à copier : les deux appareils portaient les mêmes itinéraires et les mêmes sessions', !(r.paragraphes ?? []).some((l) => /copiés? vers/.test(l)), JSON.stringify(r.paragraphes));
+      await b.wait(1500);
+      memesItineraires('rg1', memoire, tel, CLES);
+      await fermerFenetre(b);
+
+      // Une session et quatre itinéraires supprimés sur le téléphone : plus du quart des deux.
+      retirer(racine, [0]);
+      for (const cle of ['alpha', 'bravo', 'charlie', 'delta']) retirerItineraire(racine, cle);
+      const avantPcItineraires = empreinte(memoire, (c) => c.startsWith('itineraires/'));
+      const avantPcSessions = empreinte(join(memoire, 'sessions'));
+      const avantTel = empreinte(racine, (c) => c.startsWith('itineraires/') || c.startsWith('sessions/'));
+      const TEXTE = "Cette synchronisation retirerait 1 session et 4 itinéraires. Rien n'est encore supprimé.";
+      const verifierQuestion = (quoi, rr) => {
+        check(`${quoi} : « ${TEXTE} »`, JSON.stringify(rr.paragraphes) === JSON.stringify([TEXTE]), JSON.stringify(rr.paragraphes));
+        check(`${quoi} : « Voir les 5 sessions et itinéraires » et cinq lignes dans la liste`, rr.resume === 'Voir les 5 sessions et itinéraires' && (rr.liste ?? []).length === 5, `${rr.resume} / ${(rr.liste ?? []).length}`);
+        check(`${quoi} : chaque ligne dit « mise dans la corbeille de l'ordinateur » ou « mis dans… »`, (rr.liste ?? []).every((l) => /mis(e)? dans la corbeille de l'ordinateur/.test(l)), JSON.stringify(rr.liste));
+        check(`${quoi} : les trois boutons « Annuler », « Supprimer ces 5 sessions et itinéraires », « Synchroniser sans rien supprimer »`, memes(rr.boutons ?? [], ['Annuler', 'Supprimer ces 5 sessions et itinéraires', 'Synchroniser sans rien supprimer']), (rr.boutons ?? []).join('/'));
+      };
+      const rienNaBouge = (quoi) => {
+        check(`${quoi} : rien n'est supprimé (ordinateur : 3 sessions et 8 itinéraires, corbeille vide)`, empreinte(memoire, (c) => c.startsWith('itineraires/')) === avantPcItineraires && empreinte(join(memoire, 'sessions')) === avantPcSessions && corbeilleDe(memoire).entries.length === 0, JSON.stringify(corbeilleDe(memoire).index));
+        check(`${quoi} : le téléphone n'a pas changé`, empreinte(racine, (c) => c.startsWith('itineraires/') || c.startsWith('sessions/')) === avantTel);
+      };
+      r = await synchroniser(b, 'rg2, première question');
+      verifierQuestion('rg2', r);
+      console.log(`  liste : ${JSON.stringify(r.liste)}`);
+      await capturer(b, 'synchroniser-garde-fou-itineraires');
+      r = await repondre(b, 'rg2, « Annuler »', 'Annuler');
+      console.log(`  après « Annuler » : ${JSON.stringify(r.paragraphes)}`);
+      await b.wait(800);
+      rienNaBouge('rg2, après « Annuler »');
+      await fermerFenetre(b);
+
+      r = await synchroniser(b, 'rg3, seconde question');
+      verifierQuestion('rg3', r);
+      r = await repondre(b, 'rg3, « Synchroniser sans rien supprimer »', 'Synchroniser sans rien supprimer');
+      console.log(`  après « Synchroniser sans rien supprimer » : ${JSON.stringify(r.paragraphes)}`);
+      check('rg3. le compte rendu dit les cinq suppressions laissées pour la prochaine fois', (r.paragraphes ?? []).includes('5 suppressions laissées pour une prochaine synchronisation.'), JSON.stringify(r.paragraphes));
+      await b.wait(800);
+      rienNaBouge('rg3, après « Synchroniser sans rien supprimer »');
+      await fermerFenetre(b);
+
+      r = await synchroniser(b, 'rg4, troisième question');
+      verifierQuestion('rg4', r);
+      r = await repondre(b, 'rg4, « Supprimer ces 5 sessions et itinéraires »', 'Supprimer ces 5 sessions et itinéraires');
+      check('rg4. « 1 session supprimée sur le téléphone : mise dans la corbeille de l\'ordinateur (30 jours). »', contientLigne(r, "1 session supprimée sur le téléphone : mise dans la corbeille de l'ordinateur (30 jours)."), JSON.stringify(r.paragraphes));
+      check('rg4. « 4 itinéraires supprimés sur le téléphone : mis dans la corbeille de l\'ordinateur (30 jours). »', contientLigne(r, "4 itinéraires supprimés sur le téléphone : mis dans la corbeille de l'ordinateur (30 jours)."), JSON.stringify(r.paragraphes));
+      await b.wait(2000);
+      memesItineraires('rg4', memoire, tel, ['echo', 'foxtrot', 'golf', 'hotel']);
+      memesSessions('rg4', memoire, tel, [1, 2]);
+      const cb = corbeilleDe(memoire);
+      check('rg4. la corbeille porte une session et quatre itinéraires, tous d\'origine « ordinateur », chacun avec sa fiche et son GPX', cb.entries.length === 5 && cb.entries.filter((x) => x.kind === 'itineraire').length === 4 && cb.entries.filter((x) => x.kind === 'session').length === 1 && cb.entries.every((x) => x.origin === 'ordinateur' && existsSync(join(cb.dir, x.dir, x.main)) && (x.files ?? []).length === 2), JSON.stringify(cb.entries.map((x) => [x.kind, x.origin, x.main])));
+      check('rg4. une seule copie de sécurité en tout', copiesDe(profil).length === 1, copiesDe(profil).join(','));
+      await fermerFenetre(b);
+    });
+  }
+
   // ---------- i. coupure ----------
   console.log('\n== i. Téléphone débranché en route, puis reprise');
   const PHONE_I = [0, 1, 2, 3];
@@ -869,7 +1150,11 @@ for (const [nom, nbCorbeille, ks0, fichesChangees = false] of [['g1', 2, TOUTES_
   /** Dossier de la copie de sécurité que dit le compte rendu de la reprise, par coupure. */
   const reprises = new Map();
   // 12 tombe juste après la copie de sécurité, avant que rien soit copié : la coupure la plus précoce de la synchronisation.
-  for (const coupure of [4, 12, 24, 30]) {
+  // Le câble liste `itineraires/` : le GPX seul du téléphone ajoute une opération à la copie de sécurité, qui finit après 11
+  // opérations ; la coupure précoce (12) tombe donc sur l'écriture du marqueur, dont le provisoire reste sur le téléphone
+  // (il l'écarte, `horsSessions` ne le compte pas) et que la reprise efface.
+  const PRECOCE = Number(process.env.BANC_COUPURE_PRECOCE ?? 12);
+  for (const coupure of [4, PRECOCE, 24, 30]) {
     if (!veut('i')) break;
     const dansCopie = coupure < 10;
     const quoi = `i (coupure après ${coupure} opérations${dansCopie ? ', dans la copie de sécurité' : ''})`;
@@ -928,7 +1213,7 @@ for (const [nom, nbCorbeille, ks0, fichesChangees = false] of [['g1', 2, TOUTES_
     }
     const dossierReprise = reprises.get(coupure) ?? null;
     const dossierCopie = datees.length === 1 ? join(profil, 'Documents-essai', 'Gtracker-copies', datees[0]) : null;
-    if (coupure === 12) {
+    if (coupure === PRECOCE) {
       // Coupure précoce : rien n'est encore copié, la reprise refait toute la synchronisation sans nouvelle copie et la dit.
       check(`${quoi}, reprise : le compte rendu redonne le dossier de la copie de sécurité déjà faite`, dossierCopie !== null && dossierReprise?.toLowerCase() === dossierCopie.toLowerCase(), `${dossierReprise} / ${datees.join(',')}`);
     } else if (!dansCopie) {
