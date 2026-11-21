@@ -290,10 +290,19 @@ function StatisticsPage() {
       ? activityById.get(activityParam)!
       : null;
 
-  // Matériel : les pièces de l'activité choisie (Réglages), et celles de l'adresse, une par groupe, qui en sont.
+  const ofActivity = useMemo(
+    () => all.filter((s) => (family === null || s.family === family) && (activity === null || s.activityId === activity.id)),
+    [all, family, activity]
+  );
+
+  // Matériel : les pièces de l'activité choisie (Réglages), et celles hors liste que portent ses sessions, toutes
+  // périodes ; puis celles de l'adresse, une par groupe, qui en sont.
   const gearGroups = useGearGroups(activity);
-  const gearItems = useMemo(() => gearFilterItems(gearGroups ?? []), [gearGroups]);
-  const gearKnown = useMemo(() => new Set(gearItems.map((it) => it.key)), [gearItems]);
+  const gearItems = useMemo(
+    () => gearFilterItems(gearGroups ?? [], activity !== null && gearGroups !== null ? ofActivity : []),
+    [gearGroups, activity, ofActivity]
+  );
+  const gearCatalog = useMemo(() => gearGroups ?? [], [gearGroups]);
   const gearParam = params.get('materiel');
   const gearSelection = useMemo(() => readGearParam(gearParam, gearItems), [gearParam, gearItems]);
 
@@ -341,19 +350,15 @@ function StatisticsPage() {
     setSelecting(false);
   };
 
-  const ofActivity = useMemo(
-    () => all.filter((s) => (family === null || s.family === family) && (activity === null || s.activityId === activity.id)),
-    [all, family, activity]
-  );
   const scoped = useMemo(
-    () => (gearSelection.length === 0 ? ofActivity : ofActivity.filter((s) => matchesGearSelection(s, gearSelection, gearKnown))),
-    [ofActivity, gearSelection, gearKnown]
+    () => (gearSelection.length === 0 ? ofActivity : ofActivity.filter((s) => matchesGearSelection(s, gearSelection, gearCatalog))),
+    [ofActivity, gearSelection, gearCatalog]
   );
   const bounds = useMemo(() => statsPeriodBounds(period, nowMs), [period, nowMs]);
   // Lignes du matériel : les groupes dont une session de l'activité sur la période porte une pièce.
   const gearRows = useMemo(
-    () => (activity === null ? [] : gearFilterRows(gearItems, ofActivity.filter((s) => inBounds(s.startMs, bounds)), gearSelection, gearKnown)),
-    [activity, gearItems, ofActivity, bounds, gearSelection, gearKnown]
+    () => (activity === null ? [] : gearFilterRows(gearItems, ofActivity.filter((s) => inBounds(s.startMs, bounds)), gearSelection, gearCatalog)),
+    [activity, gearItems, ofActivity, bounds, gearSelection, gearCatalog]
   );
   const inPeriod = useMemo(() => scoped.filter((s) => inBounds(s.startMs, bounds)), [scoped, bounds]);
   const totals = useMemo(() => statsTotals(inPeriod), [inPeriod]);

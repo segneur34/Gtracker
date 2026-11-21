@@ -37,3 +37,32 @@ Faut-il, dans Réglages, un geste « ces anciennes sessions de l'article X compt
 ## Lien avec le lot 449
 
 La synchronisation dans les deux sens devra transporter le catalogue du matériel, ou au moins rapprocher par nom : sinon deux appareils qui créent chacun leurs lignes retombent dans ce défaut. À dire dans le plan du 449.
+
+## Plan (agent Plan, 21/11) et questions tranchées
+
+Partie A (Opus/high) : code et tests. Partie B (Sonnet) : un cas de plus au script du banc `materiel.mjs`.
+
+Le rapprochement vit dans un seul fichier pur, `src/library/gearMatch.ts` (neuf, avec son test) ; pas dans `settings/gear.ts`, que `library/` ne peut pas importer (`src/architecture.test.ts`).
+- `sameGearName` y est déplacée ; `settings/gear.ts` l'importe et la ré-exporte (`GearPicker`, `withGearItem` inchangés).
+- `matchGearChoice(choice, groups)` rend `{ group, item }` : la ligne par `groupId`, sinon la première ligne de même nom ; l'article par `itemId` dans tout le catalogue (un identifiant connu prime toujours, ce qui garde un renommage fait dans Réglages), sinon l'article de même nom dans la ligne trouvée.
+- `effectiveGear(gear, groups)` : un choix par ligne trouvée, le dernier de la fiche gagne ; les choix sans ligne sont regroupés par nom de ligne, le dernier gagne aussi.
+- `withLineChoice(gear, groups, groupId, choice)` : retire tout choix qui se rattache à cette ligne (identifiant ou nom), pose le nouveau (rien pour « Aucun »), trié dans l'ordre des lignes ; remplace `withChoice`.
+- `src/library/stats.ts` perd son `gearKey` en double et passe par ces fonctions.
+
+« Le dernier gagne » : pas à la relecture de la fiche (`readGear` de `library/record.ts` n'a pas le catalogue, et son test garde les doublons : rien n'y change) ; à l'affichage de l'analyse et au décompte des Statistiques par `effectiveGear` ; à l'écriture du brouillon par `withLineChoice`. Aucune réécriture en masse.
+
+Fichiers :
+1. `src/components/SessionNotesPanel.tsx` : `shownGroups` parcourt `effectiveGear` ; un choix rattaché se montre sur la ligne du catalogue, seuls les choix sans ligne de même nom gardent une ligne à part. Chaque ligne reçoit un choix recalé pour l'affichage seulement (`groupId` de la ligne ; `itemId` et `itemName` de l'article retrouvé, sinon ceux de la fiche) : `GearPicker` reste inchangé, il montre déjà un article hors catalogue comme option choisie sous son nom. `onChoose` appelle `withLineChoice`.
+2. `src/library/stats.ts` : `matchesGear(session, item, groups)` par `effectiveGear` et `matchGearChoice` (le paramètre `knownIds` disparaît : suivre dans `matchesGearSelection` et `gearFilterRows`). `gearFilterItems(groups, sessions)` ajoute les articles portés par les sessions de l'activité que le catalogue ne connaît pas : dans leur ligne si elle existe, sinon dans une ligne à leur nom ; clés stables pour le paramètre `materiel` de l'adresse : `nom:<nom en minuscules>`.
+3. `src/pages/StatisticsPage.tsx` et `src/pages/StatisticsSelection.tsx` : passer `groups` et les sessions de l'activité, retirer `gearKnown`.
+4. `src/components/SessionEndGear.tsx` : passe à `withLineChoice`, sans changement visible.
+5. `src/locales/en.json`, `es.json` : la clé neuve.
+
+Tranché par l'orchestrateur :
+- Un article qui n'est plus au catalogue s'affiche dans le filtre des Statistiques (et dans le résumé de « Sélection ») sous son nom suivi de « (hors liste) » : `t('{name} (hors liste)', { name })`. « Hors liste » couvre aussi un article saisi pour une seule session.
+- Les articles hors liste du filtre sont pris sur toutes les périodes de l'activité, pour que l'adresse reste lisible quand la période change.
+- Pas de geste de fusion dans Réglages (défaut de la fiche). Conséquence dite à l'utilisateur : « Gong plus 6.5 » et « Glide v1 1085 » restent des articles à part, « (hors liste) », tant qu'il n'a pas rechoisi l'article sur ses trois sessions.
+
+Tests (`src/library/gearMatch.test.ts`, `src/library/stats.test.ts`, ceux de `matchesGear` et `gearFilterRows` adaptés à la signature) : ligne inconnue de même nom rattachée ; article de même nom retrouvé ; article renommé qui reste hors liste ; activité changée (catalogue d'une autre activité aux mêmes noms) ; deux choix « Foil », le dernier gagne à l'affichage et au décompte, `withLineChoice` les remplace par un seul et « Aucun » les retire tous ; identifiant connu mais nom changé, rattaché par identifiant ; article hors liste proposé au filtre avec sa clé stable, relue par `readGearParam`.
+
+Banc : `outils/banc/materiel.mjs` et `outils/banc/statistiques.mjs`, avant et après, texte identique sur des sessions propres (passés par l'orchestrateur). Partie B : dans `materiel.mjs`, une fiche écrite avec une ancienne ligne « Foil » et un article hors liste → une seule ligne « Foil » dans l'onglet, l'article proposé au filtre avec « (hors liste) ».

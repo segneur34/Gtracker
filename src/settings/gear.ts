@@ -1,4 +1,5 @@
 import type { GearGroup, GearItem } from '../library/notes';
+import { sameGearName } from '../library/gearMatch';
 import { newId } from '../core/basics';
 import { t } from '../core/i18n';
 import type { StoredSettings } from './activitySettings';
@@ -30,8 +31,8 @@ export const resolveGearLabels = (stored: StoredSettings, id: string): [string, 
 export const cleanGearName = (value: unknown): string =>
   typeof value === 'string' ? value.trim().slice(0, MAX_GEAR_LABEL_LENGTH) : '';
 
-/** Même nom, aux espaces et à la casse près. */
-export const sameGearName = (a: string, b: string): boolean => a.trim().toLocaleLowerCase('fr') === b.trim().toLocaleLowerCase('fr');
+/** Même nom, aux espaces et à la casse près : la comparaison du rapprochement des fiches (`library/gearMatch.ts`). */
+export { sameGearName };
 
 /**
  * Matériel enregistré relu : noms rognés et tronqués, groupes et pièces sans

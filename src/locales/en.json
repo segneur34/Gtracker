@@ -185,6 +185,7 @@
   "Ajouter une ligne": "Add a row",
   "{group} : {name}": "{group}: {name}",
   "{group} : aucun": "{group}: none",
+  "{name} (hors liste)": "{name} (not listed)",
   "Aucun": "None",
   "Nom de la pièce": "Item name",
   "Nouvelle pièce de {group}": "New {group} item",

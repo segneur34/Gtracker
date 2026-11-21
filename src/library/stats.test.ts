@@ -4,7 +4,7 @@ import type { SessionRecord } from './record';
 import {
   averageMovingSpeedMs, cardioLoadBars, cardioTotals, dateTicks, groupTotals, heartRatePoints, metricSeries, metricsOf, recordKindsOf, regularity,
   inBounds, sessionLoad, statSessionOf, statsMetric, statsPeriodBounds, statsTotals, topSessions, weeklyDurations, type StatSession,
-  profilePeriodOf, gearFilterItems, matchesGear, groupByActivity, readGearParam, gearParamOf, withGearPick, matchesGearSelection, gearFilterRows, gearPickLabel,
+  profilePeriodOf, gearFilterItems, matchesGear, groupByActivity, readGearParam, gearParamOf, withGearPick, matchesGearSelection, gearFilterRows, gearPickLabel, gearItemName,
   normalizeStatsChoice, statsChoiceChange, type StatsChoice,
 } from './stats';
 import type { GearGroup } from './notes';
@@ -385,7 +385,6 @@ describe('filtre par matériel', () => {
     { id: 'g-mat', name: 'Mât', items: [{ id: 'm-85', name: ' 85 ' }, { id: 'm-75', name: '75 cm' }] },
   ];
   const items = gearFilterItems(groups);
-  const knownIds = new Set(items.map((it) => it.key));
   const item = (key: string) => items.find((it) => it.key === key)!;
   const choice = (groupId: string, groupName: string, itemId: string, itemName: string) => ({ groupId, groupName, itemId, itemName });
 
@@ -408,30 +407,30 @@ describe('filtre par matériel', () => {
 
   it("retrouve une pièce par son identifiant, même renommée depuis", () => {
     const s = session(at(2026, 10, 1), { gear: [choice('g-aile', 'Aile', 'i-5', 'Duotone 5 m²')] });
-    expect(matchesGear(s, item('i-5'), knownIds)).toBe(true);
-    expect(matchesGear(s, item('m-75'), knownIds)).toBe(false);
+    expect(matchesGear(s, item('i-5'), groups)).toBe(true);
+    expect(matchesGear(s, item('m-75'), groups)).toBe(false);
   });
 
   it('retrouve par son nom une pièce retirée de la liste, dans le même groupe seulement', () => {
     // Pièce retirée puis recréée : son ancien identifiant n'est plus dans la liste.
     const removed = session(at(2026, 10, 2), { gear: [choice('g-mat', 'Mât', 'ancien', '75 CM ')] });
-    expect(matchesGear(removed, item('m-75'), knownIds)).toBe(true);
+    expect(matchesGear(removed, item('m-75'), groups)).toBe(true);
     // Groupe recréé lui aussi : retrouvé par son nom.
     const regrouped = session(at(2026, 10, 3), { gear: [choice('g-ancien', 'mât', 'ancien', '75 cm')] });
-    expect(matchesGear(regrouped, item('m-75'), knownIds)).toBe(true);
+    expect(matchesGear(regrouped, item('m-75'), groups)).toBe(true);
     // Même nom dans un autre groupe : pas retenu.
     const otherGroup = session(at(2026, 10, 4), { gear: [choice('g-aile', 'Aile', 'ancien', '85')] });
-    expect(matchesGear(otherGroup, item('m-85'), knownIds)).toBe(false);
-    expect(matchesGear(otherGroup, item('i-85'), knownIds)).toBe(true);
+    expect(matchesGear(otherGroup, item('m-85'), groups)).toBe(false);
+    expect(matchesGear(otherGroup, item('i-85'), groups)).toBe(true);
   });
 
   it("ne retrouve pas par le nom une pièce encore dans la liste sous un autre identifiant", () => {
     const s = session(at(2026, 10, 5), { gear: [choice('g-aile', 'Aile', 'i-85', '85')] });
-    expect(matchesGear(s, item('m-85'), knownIds)).toBe(false);
+    expect(matchesGear(s, item('m-85'), groups)).toBe(false);
   });
 
   it('écarte une session sans matériel', () => {
-    expect(matchesGear(session(at(2026, 10, 6)), item('i-5'), knownIds)).toBe(false);
+    expect(matchesGear(session(at(2026, 10, 6)), item('i-5'), groups)).toBe(false);
   });
 });
 
@@ -443,7 +442,6 @@ describe('matériel croisé', () => {
     { id: 'g-mat', name: 'Mât', items: [{ id: 'm-85', name: '85' }] },
   ];
   const items = gearFilterItems(groups);
-  const knownIds = new Set(items.map((it) => it.key));
   const item = (key: string) => items.find((it) => it.key === key)!;
   const choice = (groupId: string, groupName: string, itemId: string, itemName: string) => ({ groupId, groupName, itemId, itemName });
   const s700x5 = session(at(2026, 10, 1), { gear: [choice('g-foil', 'Foil', 'f-700', '700'), choice('g-aile', 'Aile', 'a-5', '5 m²')] });
@@ -490,7 +488,7 @@ describe('matériel croisé', () => {
 
   it('croise en ET : une session compte si elle porte chaque pièce choisie', () => {
     const all = [s700x5, s700x6, s1000x5, sansMateriel];
-    const keep = (param: string) => all.filter((s) => matchesGearSelection(s, readGearParam(param, items), knownIds));
+    const keep = (param: string) => all.filter((s) => matchesGearSelection(s, readGearParam(param, items), groups));
     expect(keep('g-foil:f-700,g-aile:a-5')).toEqual([s700x5]);
     expect(keep('g-foil:f-1000')).toEqual([s1000x5]);
     expect(keep('g-aile:a-5')).toEqual([s700x5, s1000x5]);
@@ -500,21 +498,80 @@ describe('matériel croisé', () => {
   it('rapproche par son nom une pièce inconnue de la liste, dans son groupe', () => {
     // Pièce gardée pour la session seule, sous un identifiant hors de la liste, au nom d'une pièce de la liste.
     const renamed = session(at(2026, 10, 5), { gear: [choice('g-foil', 'Foil', 'ailleurs', ' 700 '), choice('g-aile', 'aile', 'autre', '5 M²')] });
-    expect(matchesGearSelection(renamed, readGearParam('g-foil:f-700,g-aile:a-5', items), knownIds)).toBe(true);
-    expect(matchesGearSelection(renamed, readGearParam('g-aile:a-6', items), knownIds)).toBe(false);
+    expect(matchesGearSelection(renamed, readGearParam('g-foil:f-700,g-aile:a-5', items), groups)).toBe(true);
+    expect(matchesGearSelection(renamed, readGearParam('g-aile:a-6', items), groups)).toBe(false);
   });
 
   it("une ligne par groupe dont une session porte une pièce, ou dont une pièce est choisie ; pas de groupe sans pièce", () => {
-    const rows = gearFilterRows(items, [s700x5, s700x6, sansMateriel], [], knownIds);
+    const rows = gearFilterRows(items, [s700x5, s700x6, sansMateriel], [], groups);
     expect(rows.map((r) => [r.groupName, r.items.map((it) => it.itemName)])).toEqual([['Foil', ['700', '1000']], ['Aile', ['5 m²', '6 m²']]]);
-    expect(gearFilterRows(items, [sansMateriel], [], knownIds)).toEqual([]);
-    expect(gearFilterRows(items, [sansMateriel], [item('m-85')], knownIds).map((r) => r.groupId)).toEqual(['g-mat']);
+    expect(gearFilterRows(items, [sansMateriel], [], groups)).toEqual([]);
+    expect(gearFilterRows(items, [sansMateriel], [item('m-85')], groups).map((r) => r.groupId)).toEqual(['g-mat']);
   });
 
   it('résume une pièce choisie avec son groupe, sans le répéter', () => {
     expect(readGearParam('g-foil:f-700,g-aile:a-5', items).map(gearPickLabel).join(' · ')).toBe('Foil 700 · Aile 5 m²');
     const named = gearFilterItems([{ id: 'g', name: 'Foil', items: [{ id: 'p', name: 'foil 700' }] }]);
     expect(gearPickLabel(named[0])).toBe('foil 700');
+  });
+});
+
+describe('matériel hors liste et fiches d’un ancien catalogue', () => {
+  const groups: GearGroup[] = [
+    { id: 'g-voile', name: 'Voile', items: [{ id: 'v-65', name: 'Gong puls 6.5' }, { id: 'v-45', name: 'Reedin 4.5' }] },
+    { id: 'g-foil', name: 'Foil', items: [{ id: 'f-1085', name: 'Duotone glide 1085' }] },
+  ];
+  const choice = (groupId: string, groupName: string, itemId: string, itemName: string) => ({ groupId, groupName, itemId, itemName });
+  // Fiches de l'ancien catalogue : autres identifiants, mêmes noms de lignes.
+  const ancienne = session(at(2026, 10, 1), { gear: [choice('old-voile', 'Voile', 'old-65', 'Gong plus 6.5'), choice('old-foil', 'Foil', 'old-1085', 'Glide v1 1085')] });
+  const reedin = session(at(2026, 10, 2), { gear: [choice('old-voile', 'Voile', 'old-45', 'Reedin 4.5')] });
+  const planche = session(at(2026, 10, 3), { gear: [choice('old-p', 'Planche', 'old-95', 'Fanatic 95')] });
+  const actuelle = session(at(2026, 10, 13), { gear: [choice('g-voile', 'Voile', 'v-65', 'Gong puls 6.5'), choice('g-foil', 'Foil', 'f-1085', 'Duotone glide 1085')] });
+  // Deux choix « Foil » dans une même fiche : le dernier gagne.
+  const deuxFoils = session(at(2026, 10, 9), { gear: [choice('old-foil', 'Foil', 'old-1085', 'Glide v1 1085'), choice('g-foil', 'Foil', 'f-1085', 'Duotone glide 1085')] });
+  const all = [ancienne, reedin, planche, actuelle, deuxFoils];
+  const items = gearFilterItems(groups, all);
+  const item = (key: string) => items.find((it) => it.key === key)!;
+
+  it('propose les pièces hors liste dans leur groupe, puis les groupes inconnus à leur nom', () => {
+    expect(items.map((it) => [it.groupId, it.key, it.label])).toEqual([
+      ['g-voile', 'v-65', 'Gong puls 6.5'],
+      ['g-voile', 'v-45', 'Reedin 4.5'],
+      ['g-voile', 'nom:gong plus 6.5', 'Gong plus 6.5 (hors liste)'],
+      ['g-foil', 'f-1085', 'Duotone glide 1085'],
+      ['g-foil', 'nom:glide v1 1085', 'Glide v1 1085 (hors liste)'],
+      ['nom:planche', 'nom:fanatic 95', 'Fanatic 95 (hors liste)'],
+    ]);
+    expect(gearItemName(item('nom:glide v1 1085'))).toBe('Glide v1 1085 (hors liste)');
+    expect(gearItemName(item('f-1085'))).toBe('Duotone glide 1085');
+  });
+
+  it("retrouve la pièce de même nom d'une fiche de l'ancien catalogue ; une pièce renommée reste hors liste", () => {
+    expect(matchesGear(reedin, item('v-45'), groups)).toBe(true);
+    expect(matchesGear(ancienne, item('v-65'), groups)).toBe(false);
+    expect(matchesGear(ancienne, item('nom:gong plus 6.5'), groups)).toBe(true);
+    expect(matchesGear(actuelle, item('nom:gong plus 6.5'), groups)).toBe(false);
+    expect(matchesGear(planche, item('nom:fanatic 95'), groups)).toBe(true);
+  });
+
+  it('compte le dernier choix d’un groupe porté deux fois', () => {
+    expect(matchesGear(deuxFoils, item('f-1085'), groups)).toBe(true);
+    expect(matchesGear(deuxFoils, item('nom:glide v1 1085'), groups)).toBe(false);
+    expect(all.filter((s) => matchesGearSelection(s, [item('f-1085')], groups))).toEqual([actuelle, deuxFoils]);
+  });
+
+  it("relit dans l'adresse la clé stable d'une pièce hors liste", () => {
+    const param = gearParamOf([item('nom:gong plus 6.5'), item('nom:fanatic 95')]);
+    expect(param).toBe('g-voile:nom%3Agong%20plus%206.5,nom%3Aplanche:nom%3Afanatic%2095');
+    expect(readGearParam(param, items)).toEqual([item('nom:gong plus 6.5'), item('nom:fanatic 95')]);
+    // Même clé quand les pièces sont recalculées sur d'autres sessions qui la portent.
+    expect(readGearParam(param, gearFilterItems(groups, [ancienne, planche])).map((it) => it.key)).toEqual(['nom:gong plus 6.5', 'nom:fanatic 95']);
+  });
+
+  it('montre les groupes hors liste au filtre et résume la pièce avec « (hors liste) »', () => {
+    expect(gearFilterRows(items, [planche], [], groups).map((r) => r.groupName)).toEqual(['Planche']);
+    expect(gearPickLabel(item('nom:gong plus 6.5'))).toBe('Voile Gong plus 6.5 (hors liste)');
+    expect(gearFilterItems(groups)).toHaveLength(3);
   });
 });
 

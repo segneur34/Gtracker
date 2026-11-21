@@ -2,6 +2,7 @@ import type { Activity } from '../core/activities';
 import { t } from '../core/i18n';
 import { addGearItem, useGearGroups } from '../hooks/useSportSettings';
 import type { GearChoice } from '../library/notes';
+import { withLineChoice } from '../library/gearMatch';
 import GearPicker from './GearPicker';
 
 interface Props {
@@ -22,13 +23,7 @@ interface Props {
 export default function SessionEndGear({ activity, gear, onChange }: Props) {
   const groups = useGearGroups(activity);
   if (!activity || !groups || groups.length === 0) return null;
-  const choose = (groupId: string, choice: GearChoice | null) => {
-    const next = groups.flatMap((group): GearChoice[] => {
-      const kept = group.id === groupId ? choice : gear?.find((c) => c.groupId === group.id) ?? null;
-      return kept ? [kept] : [];
-    });
-    onChange(next.length > 0 ? next : null);
-  };
+  const choose = (groupId: string, choice: GearChoice | null) => onChange(withLineChoice(gear, groups, groupId, choice));
   return (
     <div className="rec-end-gear" data-testid="rec-end-gear">
       <strong className="ui-subtitle rec-end-gear__title">{t('Matériel')}</strong>

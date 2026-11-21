@@ -2,6 +2,7 @@ import { t } from '../core/i18n';
 import type { SportFamily } from '../core/sportProfiles';
 import { addGearItem } from '../hooks/useSportSettings';
 import type { GearGroup } from '../library/notes';
+import { effectiveGear, withLineChoice } from '../library/gearMatch';
 import type { EditedPart } from '../library/sessionEdits';
 import { RATINGS, WATER_STATES, WIND_LEVELS, type GearChoice, type SailingSessionNotes } from '../library/notes';
 import GearPicker from './GearPicker';
@@ -38,25 +39,27 @@ interface Props {
  * en ligne), qui garde son identifiant.
  */
 /**
- * Groupes montrés : ceux de la liste, puis ceux d'un choix dont le groupe a
- * disparu, sans pièce, pour que le choix reste lisible et puisse être retiré.
+ * Groupes montrés : ceux de la liste, chacun avec le choix de la fiche qui s'y
+ * range (par identifiant ou par nom, `effectiveGear`), puis ceux d'un choix sans
+ * groupe du même nom, sans pièce, pour que le choix reste lisible et puisse être
+ * retiré. Le choix d'un groupe de la liste est recalé pour l'affichage seulement :
+ * l'identifiant du groupe, et la pièce retrouvée, sinon celle de la fiche.
  */
-const shownGroups = (groups: readonly GearGroup[], gear: readonly GearChoice[] | null): { group: GearGroup; listed: boolean }[] => [
-  ...groups.map((group) => ({ group, listed: true })),
-  ...(gear ?? []).filter((c) => !groups.some((g) => g.id === c.groupId))
-    .map((c) => ({ group: { id: c.groupId, name: c.groupName, items: [] }, listed: false })),
-];
-
-/** Matériel avec ce choix pour ce groupe, dans l'ordre des groupes ; `null` s'il ne reste rien. */
-const withChoice = (
-  gear: readonly GearChoice[] | null, groups: readonly GearGroup[], groupId: string, choice: GearChoice | null
-): GearChoice[] | null => {
-  const rank = (c: GearChoice) => {
-    const k = groups.findIndex((g) => g.id === c.groupId);
-    return k < 0 ? groups.length : k;
-  };
-  const next = [...(gear ?? []).filter((c) => c.groupId !== groupId), ...(choice ? [choice] : [])].sort((a, b) => rank(a) - rank(b));
-  return next.length > 0 ? next : null;
+const shownGroups = (
+  groups: readonly GearGroup[], gear: readonly GearChoice[] | null
+): { group: GearGroup; listed: boolean; choice: GearChoice | null }[] => {
+  const effective = effectiveGear(gear, groups);
+  return [
+    ...groups.map((group) => {
+      const found = effective.find((e) => e.group === group);
+      const choice = found
+        ? { groupId: group.id, groupName: group.name, itemId: found.item?.id ?? found.choice.itemId, itemName: found.item?.name ?? found.choice.itemName }
+        : null;
+      return { group, listed: true, choice };
+    }),
+    ...effective.filter((e) => e.group === null)
+      .map(({ choice }) => ({ group: { id: choice.groupId, name: choice.groupName, items: [] }, listed: false, choice })),
+  ];
 };
 
 export default function SessionNotesPanel({ notes, setNotes, family, gearFields, gearGroups, activityId, conditions, draft, open, onToggle }: Props) {
@@ -75,9 +78,9 @@ export default function SessionNotesPanel({ notes, setNotes, family, gearFields,
             <HelpText helpKey="analyse:materiel" note>
               {t("Une pièce par groupe, prise dans le matériel de l'activité (Réglages). « Ajouter à la liste » l'y range tout de suite, même si la session n'est pas enregistrée ensuite ; « Pour cette session » la garde pour elle seule.")}
             </HelpText>
-            {shownGroups(gearGroups, notes.gear).map(({ group, listed }) => (
-              <GearPicker key={group.id} group={group} choice={notes.gear?.find((c) => c.groupId === group.id) ?? null}
-                onChoose={(choice) => setNotes({ gear: withChoice(notes.gear, gearGroups, group.id, choice) })}
+            {shownGroups(gearGroups, notes.gear).map(({ group, listed, choice: shown }) => (
+              <GearPicker key={group.id} group={group} choice={shown}
+                onChoose={(choice) => setNotes({ gear: withLineChoice(notes.gear, gearGroups, group.id, choice) })}
                 onAddToList={listed ? (name) => addGearItem(activityId, group.id, name) : undefined} />
             ))}
             {/* Texte saisi avant le matériel enregistré : montré tel quel, il reste dans la fiche. */}

@@ -8,7 +8,7 @@ import { SPORT_FAMILIES, type SportFamily } from '../core/sportProfiles';
 import { useGearGroups, useVisibility } from '../hooks/useSportSettings';
 import { useAppliedTheme, useThemedShade } from '../hooks/useTheme';
 import {
-  STATS_PERIODS, gearFilterItems, gearFilterRows, gearParamOf, inBounds, normalizeStatsChoice, readGearParam, statsPeriodBounds, withGearPick,
+  STATS_PERIODS, gearFilterItems, gearFilterRows, gearItemName, gearParamOf, inBounds, normalizeStatsChoice, readGearParam, statsPeriodBounds, withGearPick,
   type GearFilterItem, type GearFilterRow, type GearSelection, type StatSession, type StatsChoice, type StatsPeriod,
 } from '../library/stats';
 
@@ -31,7 +31,7 @@ export function GearChoiceRows({ rows, selection, items, small, onChange }: {
         <div key={row.groupId} className="stats-gear">
           <span className="stats-gear__label">{row.groupName}</span>
           <ChoiceButtons small={small} label={t('Matériel : {group}', { group: row.groupName })}
-            items={[{ key: '', label: t('Tous') }, ...row.items.map((it) => ({ key: it.key, label: it.itemName }))]}
+            items={[{ key: '', label: t('Tous') }, ...row.items.map((it) => ({ key: it.key, label: gearItemName(it) }))]}
             value={selection.find((it) => it.groupId === row.groupId)?.key ?? ''}
             onChange={(key) => onChange(gearParamOf(withGearPick(selection, row.groupId, row.items.find((it) => it.key === key) ?? null, items)))} />
         </div>
@@ -90,15 +90,20 @@ function StatsSelectionDialog({ initial, all, activityById, nowMs, favoriteBrush
 
   // Matériel de l'activité du brouillon, sur sa période.
   const gearGroups = useGearGroups(draftActivity);
-  const gearItems = useMemo(() => gearFilterItems(gearGroups ?? []), [gearGroups]);
-  const gearKnown = useMemo(() => new Set(gearItems.map((it) => it.key)), [gearItems]);
+  // Les pièces hors liste sont prises sur toutes les périodes de l'activité, comme sur la page.
+  const ofDraftActivity = useMemo(
+    () => (draftActivity === null ? [] : all.filter((s) => s.activityId === draftActivity.id)),
+    [draftActivity, all]
+  );
+  const gearCatalog = useMemo(() => gearGroups ?? [], [gearGroups]);
+  const gearItems = useMemo(() => gearFilterItems(gearCatalog, gearGroups !== null ? ofDraftActivity : []), [gearCatalog, gearGroups, ofDraftActivity]);
   const gearSelection = useMemo(() => readGearParam(draft.gear, gearItems), [draft.gear, gearItems]);
   const bounds = useMemo(() => statsPeriodBounds(draft.period, nowMs), [draft.period, nowMs]);
   const gearRows = useMemo(
     () => (draftActivity === null ? [] : gearFilterRows(
-      gearItems, all.filter((s) => s.activityId === draftActivity.id && inBounds(s.startMs, bounds)), gearSelection, gearKnown
+      gearItems, ofDraftActivity.filter((s) => inBounds(s.startMs, bounds)), gearSelection, gearCatalog
     )),
-    [draftActivity, gearItems, all, bounds, gearSelection, gearKnown]
+    [draftActivity, gearItems, ofDraftActivity, bounds, gearSelection, gearCatalog]
   );
 
   const frameStyle = useMemo(

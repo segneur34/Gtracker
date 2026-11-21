@@ -12,6 +12,7 @@ import { ZONE_COUNT, edwardsLoad, histogramZoneTimes } from '../core/heartRate';
 import { sportFamily, type SportFamily } from '../core/sportProfiles';
 import { DAY_MS, addDays, addMonths, isoWeek, monthYearLong, monthYearShort, shortDate, stacksByActivity, startOfDay, startOfIsoWeek, startOfMonth } from '../core/calendar';
 import { CHART_PERIODS, chartPeriodBounds, type ChartRange } from './activityChart';
+import { effectiveGear, gearNameKey } from './gearMatch';
 import type { GearChoice, GearGroup } from './notes';
 import type { ManeuverResults, SessionRecord, SummaryHeartRate } from './record';
 import { sessionDisplayName } from './sessionName';
@@ -110,50 +111,77 @@ export const statSessionOf = (file: string, record: SessionRecord, activity: Act
 
 /** Pièce proposée par le filtre « Matériel » de Statistiques. */
 export interface GearFilterItem {
-  /** Identifiant de la pièce, clé du choix (adresse et mémoire). */
+  /**
+   * Clé du choix (adresse et mémoire) : l'identifiant de la pièce de la liste ; `nom:` et son nom en minuscules
+   * pour une pièce hors liste, que les sessions portent sans que la liste la connaisse.
+   */
   key: string;
   label: string;
+  /** Identifiant du groupe de la liste ; `nom:` et son nom en minuscules pour un groupe qu'elle ne connaît pas. */
   groupId: string;
   groupName: string;
   itemName: string;
+  /** Pièce que la liste ne connaît pas : retirée, renommée sous un autre identifiant, ou gardée pour une session. */
+  unlisted: boolean;
 }
 
-const gearKey = (name: string): string => name.trim().toLocaleLowerCase('fr');
+/** Clé stable d'un nom hors liste (pièce ou groupe), lisible dans l'adresse quelle que soit la période. */
+const nameKey = (name: string): string => `nom:${gearNameKey(name)}`;
+
+/** Nom d'une pièce dans le filtre et le résumé : suivi de « (hors liste) » quand la liste ne la connaît pas. */
+export const gearItemName = (item: GearFilterItem): string =>
+  item.unlisted ? t('{name} (hors liste)', { name: item.itemName }) : item.itemName;
 
 /**
- * Pièces du filtre « Matériel » : toutes celles des groupes de l'activité,
- * dans leur ordre ; le nom seul, préfixé du groupe (« Mât · 85 ») quand une
- * pièce d'un autre groupe porte le même nom (aux espaces et à la casse près).
+ * Pièces du filtre « Matériel » : toutes celles des groupes de l'activité, dans leur ordre, chacune suivie des pièces
+ * hors liste que portent les `sessions` de l'activité (toutes périodes : l'adresse reste lisible quand la période
+ * change) dans ce groupe, puis les groupes hors liste, à leur nom. Le nom seul, préfixé du groupe (« Mât · 85 »)
+ * quand une pièce d'un autre groupe porte le même nom (aux espaces et à la casse près).
  */
-export const gearFilterItems = (groups: readonly GearGroup[]): GearFilterItem[] => {
-  const groupsOf = new Map<string, Set<string>>();
-  for (const group of groups) {
-    for (const item of group.items) {
-      const key = gearKey(item.name);
-      groupsOf.set(key, (groupsOf.get(key) ?? new Set()).add(group.id));
+export const gearFilterItems = (groups: readonly GearGroup[], sessions: readonly StatSession[] = []): GearFilterItem[] => {
+  const lines = groups.map((group) => ({
+    id: group.id, name: group.name,
+    items: group.items.map((item) => ({ key: item.id, name: item.name, unlisted: false })),
+  }));
+  for (const session of sessions) {
+    for (const { choice, group, item } of effectiveGear(session.gear, groups)) {
+      if (item) continue;
+      const groupId = group ? group.id : nameKey(choice.groupName);
+      let line = lines.find((l) => l.id === groupId);
+      if (!line) {
+        line = { id: groupId, name: choice.groupName, items: [] };
+        lines.push(line);
+      }
+      const key = nameKey(choice.itemName);
+      if (!line.items.some((it) => it.key === key)) line.items.push({ key, name: choice.itemName, unlisted: true });
     }
   }
-  return groups.flatMap((group) => group.items.map((item) => ({
-    key: item.id,
-    label: (groupsOf.get(gearKey(item.name))?.size ?? 0) > 1 ? `${group.name} · ${item.name}` : item.name,
-    groupId: group.id,
-    groupName: group.name,
-    itemName: item.name,
-  })));
+  const groupsOf = new Map<string, Set<string>>();
+  for (const line of lines) {
+    for (const item of line.items) {
+      const key = gearNameKey(item.name);
+      groupsOf.set(key, (groupsOf.get(key) ?? new Set()).add(line.id));
+    }
+  }
+  return lines.flatMap((line) => line.items.map((item) => {
+    const entry: GearFilterItem = { key: item.key, label: '', groupId: line.id, groupName: line.name, itemName: item.name, unlisted: item.unlisted };
+    const name = gearItemName(entry);
+    return { ...entry, label: (groupsOf.get(gearNameKey(item.name))?.size ?? 0) > 1 ? `${line.name} · ${name}` : name };
+  }));
 };
 
 /**
- * Session qui porte la pièce `item` : par son identifiant ; sinon par son nom,
- * dans le même groupe (par identifiant ou par nom), pour un choix dont la
- * pièce n'est plus dans la liste (`knownIds` : identifiants de la liste),
- * retirée puis recréée, ou gardée pour une session seule.
+ * Session qui porte la pièce `item`, d'après son choix retenu pour chaque groupe (`effectiveGear` : rangé par
+ * identifiant, sinon par nom de groupe et de pièce, le dernier d'un groupe gagne). Une pièce de la liste est
+ * retrouvée par son identifiant, ou par son nom dans son groupe ; une pièce hors liste par son nom, dans son groupe.
  */
-export const matchesGear = (session: StatSession, item: GearFilterItem, knownIds: ReadonlySet<string>): boolean =>
-  (session.gear ?? []).some((c) =>
-    c.itemId === item.key
-    || (!knownIds.has(c.itemId)
-      && gearKey(c.itemName) === gearKey(item.itemName)
-      && (c.groupId === item.groupId || gearKey(c.groupName) === gearKey(item.groupName))));
+export const matchesGear = (session: StatSession, item: GearFilterItem, groups: readonly GearGroup[]): boolean =>
+  effectiveGear(session.gear, groups).some(({ choice, group, item: found }) => {
+    if (!item.unlisted) return found?.id === item.key;
+    if (found) return false;
+    const groupId = group ? group.id : nameKey(choice.groupName);
+    return groupId === item.groupId && nameKey(choice.itemName) === item.key;
+  });
 
 // --- Matériel croisé : une pièce au plus par groupe, une session compte si elle les porte toutes ---
 
@@ -200,8 +228,8 @@ export const withGearPick = (
 };
 
 /** Session qui porte chaque pièce choisie (un ET entre les groupes) ; sans pièce choisie, toutes comptent. */
-export const matchesGearSelection = (session: StatSession, selection: GearSelection, knownIds: ReadonlySet<string>): boolean =>
-  selection.every((item) => matchesGear(session, item, knownIds));
+export const matchesGearSelection = (session: StatSession, selection: GearSelection, groups: readonly GearGroup[]): boolean =>
+  selection.every((item) => matchesGear(session, item, groups));
 
 /** Une ligne du filtre « Matériel » : un groupe de l'activité et ses pièces. */
 export interface GearFilterRow {
@@ -215,7 +243,7 @@ export interface GearFilterRow {
  * dont une des `sessions` (l'activité sur la période) porte une pièce, ou dont une pièce est choisie.
  */
 export const gearFilterRows = (
-  items: readonly GearFilterItem[], sessions: readonly StatSession[], selection: GearSelection, knownIds: ReadonlySet<string>
+  items: readonly GearFilterItem[], sessions: readonly StatSession[], selection: GearSelection, groups: readonly GearGroup[]
 ): GearFilterRow[] => {
   const rows: GearFilterRow[] = [];
   for (const item of items) {
@@ -224,14 +252,18 @@ export const gearFilterRows = (
     else rows.push({ groupId: item.groupId, groupName: item.groupName, items: [item] });
   }
   return rows.filter((row) => selection.some((it) => it.groupId === row.groupId)
-    || sessions.some((s) => row.items.some((it) => matchesGear(s, it, knownIds))));
+    || sessions.some((s) => row.items.some((it) => matchesGear(s, it, groups))));
 };
 
-/** Pièce choisie en clair, dans le résumé de « Sélection » : « Foil 700 » ; le nom seul s'il commence par celui du groupe. */
+/**
+ * Pièce choisie en clair, dans le résumé de « Sélection » : « Foil 700 » ; le nom seul s'il commence par celui du
+ * groupe ; suivi de « (hors liste) » pour une pièce que la liste ne connaît pas.
+ */
 export const gearPickLabel = (item: GearFilterItem): string => {
   const name = item.itemName.trim();
   const group = item.groupName.trim();
-  return group === '' || gearKey(name).startsWith(gearKey(group)) ? name : `${group} ${name}`;
+  const shown = gearItemName({ ...item, itemName: name });
+  return group === '' || gearNameKey(name).startsWith(gearNameKey(group)) ? shown : `${group} ${shown}`;
 };
 
 /** Choix de Statistiques, tel que l'adresse le porte ; `null` : « Tout », « Toutes », « Tous ». */

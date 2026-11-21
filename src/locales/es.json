@@ -185,6 +185,7 @@
   "Ajouter une ligne": "Añadir una fila",
   "{group} : {name}": "{group}: {name}",
   "{group} : aucun": "{group}: ninguno",
+  "{name} (hors liste)": "{name} (fuera de la lista)",
   "Aucun": "Ninguno",
   "Nom de la pièce": "Nombre del elemento",
   "Nouvelle pièce de {group}": "Nuevo elemento de {group}",
