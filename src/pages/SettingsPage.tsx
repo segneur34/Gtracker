@@ -55,6 +55,7 @@ import { CARD_STYLE } from '../components/styles';
 import { FAMILY_ICON } from '../components/familyIcons';
 import { IconChevronRight, IconEye, IconEyeOff } from '../components/icons';
 import MemoryStatus from '../components/MemoryStatus';
+import { TRASH_ZONE_ID } from '../library/trash';
 import { PermissionsSettings } from '../components/PermissionsStatus';
 import PanelTitle from '../components/PanelTitle';
 import AboutSettings from '../components/AboutSettings';
@@ -571,6 +572,21 @@ function SettingsPage() {
     const id = window.setTimeout(() => sensorsRef.current?.scrollIntoView({ block: 'start' }), 0);
     return () => window.clearTimeout(id);
   }, [wantsSensors, setBlocks]);
+  /** Arrivée par `?bloc=corbeille` (menu « … » de Sessions) : Mémoire s'ouvre et la zone de la corbeille vient à l'écran. */
+  const wantsTrash = settingsBlockFromSearch(search) === 'corbeille';
+  useEffect(() => {
+    if (!wantsTrash) return;
+    setBlocks({ memoire: true });
+    // La zone n'est montée qu'une fois la mémoire lue : on la guette un court moment.
+    let tries = 0;
+    const id = window.setInterval(() => {
+      const zone = document.getElementById(TRASH_ZONE_ID);
+      tries += 1;
+      if (zone) zone.scrollIntoView({ block: 'center' });
+      if (zone || tries >= 20) window.clearInterval(id);
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [wantsTrash, setBlocks]);
   const { open: openActivity, toggle: toggleActivity, closeAll: closeActivities } = useOpenSections<string>('settings-activities', NO_ACTIVITY_OPEN);
   const { open: openPart, toggle: togglePart, closeAll: closeParts } = useOpenSections<ActivityPartKey>('settings-activity-parts', ACTIVITY_PART_DEFAULTS);
   const { open: openFamily, toggle: toggleFamily, closeAll: closeFamilies } = useOpenSections<SportFamily>('settings-families', FAMILY_OPEN_DEFAULTS);

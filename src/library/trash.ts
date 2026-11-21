@@ -285,6 +285,9 @@ export const trashCounts = (entries: readonly TrashEntry[]): { sessions: number;
   routes: entries.filter((e) => e.kind === 'itineraire').length,
 });
 
+/** Repère de la zone de la corbeille dans Réglages › Mémoire, où mène le menu « … » de Sessions. */
+export const TRASH_ZONE_ID = 'zone-corbeille';
+
 /** Ligne de Réglages › Mémoire : « Corbeille : 4 sessions, gardées 30 jours » ; `null` si elle est vide. */
 export const trashSummaryText = ({ sessions, routes }: { sessions: number; routes: number }): string | null => {
   if (sessions + routes === 0) return null;

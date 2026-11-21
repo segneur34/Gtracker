@@ -15,6 +15,9 @@ const RECORD_ROUTE = '/enregistrer';
 /** Réglages ouverts sur le bloc « Capteurs » (`?bloc=capteurs`), où se trouve le bouton « Ajouter » d'une ceinture. */
 export const SETTINGS_SENSORS_PATH = `${SETTINGS_PATH}?bloc=capteurs`;
 
+/** Réglages ouverts sur la corbeille (`?bloc=corbeille`) : la carte Mémoire dépliée, la page défilée jusqu'à elle. */
+export const SETTINGS_TRASH_PATH = `${SETTINGS_PATH}?bloc=corbeille`;
+
 /** Bloc de Réglages désigné par l'adresse (`?bloc=`), `null` s'il n'y en a pas : les blocs gardent alors leur état. */
 export const settingsBlockFromSearch = (search: string): string | null => new URLSearchParams(search).get('bloc');
 
@@ -48,6 +51,8 @@ export const parentPage = (pathname: string, search: string): string | null => {
   if (path === '/' || path === PROFILE_PATH) return null;
   // Réglages ouverts par le lien de la page Enregistrer (`?bloc=capteurs`) : retour à Enregistrer.
   if (path === SETTINGS_PATH && settingsBlockFromSearch(search) === 'capteurs') return RECORD_ROUTE;
+  // Réglages ouverts par « Corbeille » du menu de Sessions : retour à Sessions.
+  if (path === SETTINGS_PATH && settingsBlockFromSearch(search) === 'corbeille') return SESSIONS_PATH;
   if (path === SESSIONS_PATH) return PROFILE_PATH;
   const parts = path.split('/').filter(Boolean);
   if (parts.length === 2 && parts[1] === 'analyse' && isFamily(parts[0])) {

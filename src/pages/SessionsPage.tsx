@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import ActivityBubbles from '../components/ActivityBubbles';
 import { useHelp } from '../components/helpContext';
-import { IconChevronDown, IconChevronUp, IconHelp, IconRoute } from '../components/icons';
+import { IconChevronDown, IconChevronUp, IconHelp, IconRoute, IconTrash } from '../components/icons';
 import ImportButtons from '../components/ImportButtons';
 import MemoryStatus from '../components/MemoryStatus';
 import RefreshLibraryButton from '../components/RefreshLibraryButton';
@@ -15,7 +15,7 @@ import { t, tn } from '../core/i18n';
 import { tnRich } from '../components/tRich';
 import { activityDisplayName, findActivity, sessionActivity, type Activity } from '../core/activities';
 import { STORAGE_KEYS } from '../core/appIdentity';
-import { sessionFamily } from '../core/parentPage';
+import { SETTINGS_TRASH_PATH, sessionFamily } from '../core/parentPage';
 import { SPORT_FAMILIES } from '../core/sportProfiles';
 import { useRetainedScroll } from '../hooks/useRetainedScroll';
 import { useLibraryFields } from '../hooks/useSessionLibrary';
@@ -66,7 +66,10 @@ const rowFamily = (session: LibrarySession) => sessionFamily(session, SPORT_FAMI
 
 function SessionsPage() {
   // Les champs lus seulement : ni le compteur du balayage ni les messages ne redessinent la liste.
-  const library = useLibraryFields('sessions', 'status', 'scanning', 'folderLabel');
+  const library = useLibraryFields('sessions', 'status', 'scanning', 'folderLabel', 'folderKind');
+  const navigate = useNavigate();
+  // La même condition que la zone de la corbeille dans Réglages › Mémoire : le dossier du disque, lu.
+  const hasTrash = library.status === 'ready' && library.folderKind === 'disk';
   // Une fois par lancement, la mémoire complète : les vignettes gardées des sessions qu'elle ne porte plus sont oubliées.
   // Vide, elle n'oublie rien (dossier mémoire mal ouvert) : la borne du magasin finit par les écarter.
   const complete = library.status === 'ready' && library.scanning === null && library.sessions.length > 0;
@@ -164,6 +167,12 @@ function SessionsPage() {
               <IconHelp size={18} />
               {t("À quoi sert « Ajouter les sessions d'un dossier » ?")}
             </Button>
+            {hasTrash && (
+              <Button onClick={() => navigate(SETTINGS_TRASH_PATH)}>
+                <IconTrash size={18} />
+                {t('Corbeille')}
+              </Button>
+            )}
           </MoreMenu>
         </div>
         <div className="sessions-head__line sessions-head__line--totals">

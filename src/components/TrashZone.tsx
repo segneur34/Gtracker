@@ -3,7 +3,7 @@ import { dayMonthYear } from '../core/calendar';
 import { errorMessage } from '../core/basics';
 import { t } from '../core/i18n';
 import { formatSessionDate } from '../core/units';
-import { sortedTrashEntries, trashCounts, trashSummaryText, type TrashEntry } from '../library/trash';
+import { TRASH_ZONE_ID, sortedTrashEntries, trashCounts, trashSummaryText, type TrashEntry } from '../library/trash';
 import { deleteTrashEntry, emptyTrash, restoreTrashEntry, useTrash } from '../hooks/useTrash';
 import { IconTrash, IconUndo } from './icons';
 import PanelTitle from './PanelTitle';
@@ -12,7 +12,7 @@ import HoldButton from './ui/HoldButton';
 
 /**
  * Corbeille du programme Windows, dans Réglages › Mémoire : une ligne « Corbeille : n sessions, gardées 30 jours »,
- * seulement quand elle n'est pas vide, qui se déplie sur la liste (nom, date de la session, date de suppression) ;
+ * (« Corbeille vide. » quand elle l'est, pour que l'arrivée depuis Sessions ne tombe pas sur rien) qui se déplie sur la liste (nom, date de la session, date de suppression) ;
  * pour chaque entrée « Restaurer » et « Supprimer définitivement », et « Vider la corbeille ». Les deux gestes qui
  * effacent se tiennent une seconde puis se confirment, comme « Tout supprimer ». Rien hors du programme Windows :
  * la corbeille y est toujours vide.
@@ -40,7 +40,6 @@ function TrashZone() {
   const busyRef = useRef(false);
 
   const summary = trashSummaryText(trashCounts(entries));
-  if (summary === null && error === null && note === null) return null;
 
   const run = async (action: () => Promise<string | null>) => {
     if (busyRef.current) return;
@@ -73,7 +72,8 @@ function TrashZone() {
   });
 
   return (
-    <div className="ui-stack-3">
+    <div className="ui-stack-3" id={TRASH_ZONE_ID}>
+      {summary === null && error === null && note === null && <p className="ui-muted ui-text-s ui-m-0">{t('Corbeille vide.')}</p>}
       {summary !== null && <PanelTitle label={summary} open={open} onToggle={() => setOpen((o) => !o)} />}
       {open && summary !== null && (
         <>

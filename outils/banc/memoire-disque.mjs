@@ -387,6 +387,19 @@ try {
     check('avant toute suppression : deux GPX, deux fiches, aucun dossier corbeille/ sur le disque', gpxs(memG).length === 2 && fiches(memG).length === 2 && !existsSync(corbeille), JSON.stringify(arbre(memG)));
     await ouvrirMemoire(b);
     check('Réglages › Mémoire : pas de ligne « Corbeille » tant qu\'elle est vide', (await ligneCorbeille(b)) === null, String(await ligneCorbeille(b)));
+    check('Réglages › Mémoire : la zone dit « Corbeille vide. » quand elle est vide', await b.evaluate(`document.getElementById('zone-corbeille')?.textContent.trim() === 'Corbeille vide.'`) === true);
+    // -- Le menu « … » de Sessions porte « Corbeille » ; son appui arrive sur Réglages, Mémoire dépliée, zone à l'écran.
+    await pageSessions(b);
+    await b.evaluate(`document.querySelector('button.ui-more__button[aria-label="Importer, mettre à jour"]')?.click()`);
+    await b.wait(300);
+    const menuTexte = await b.evaluate(`[...document.querySelectorAll('.ui-more__panel button')].map((x) => x.textContent.trim()).join(' | ')`);
+    check('Sessions : le menu « … » porte « Corbeille » en dernier', /Corbeille$/.test(menuTexte), menuTexte);
+    check('Sessions : appui sur « Corbeille »', (await b.clickText('Corbeille')) === 'ok');
+    await b.waitFor(`location.pathname === '/parametres' && location.search === '?bloc=corbeille'`, { timeout: 5000, label: 'arrivée sur Réglages' });
+    await b.waitFor(`Boolean(document.getElementById('zone-corbeille'))`, { timeout: 8000, label: 'zone de la corbeille' });
+    await b.wait(600);
+    const zoneVue = await b.evaluate(`(() => { const r = document.getElementById('zone-corbeille').getBoundingClientRect(); return r.bottom > 0 && r.top < window.innerHeight; })()`);
+    check('Réglages : la carte Mémoire est dépliée et la zone de la corbeille est à l\'écran', zoneVue === true);
 
     // -- Première suppression, depuis la ligne.
     const avantGpx = gpxs(memG);
