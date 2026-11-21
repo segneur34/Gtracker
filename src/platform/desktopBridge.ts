@@ -97,8 +97,11 @@ export type DesktopPhoneChannel = 'sansFil' | 'cable';
 
 /** État du téléphone, par le Wi-Fi ou par le câble, lu par la coquille. */
 export type DesktopPhoneState =
-  /** Un téléphone prêt à être lu ; `nom` est son modèle ; `canal` : par où, absent d'une coquille plus ancienne (le câble). */
-  | { etat: 'pret'; nom: string; canal?: DesktopPhoneChannel }
+  /**
+   * Un téléphone prêt à être lu ; `nom` est son modèle ; `canal` : par où, absent d'une coquille plus ancienne (le
+   * câble) ; `ecriture` : vrai si ce canal sait aussi écrire et effacer, absent d'une coquille qui ne le sait pas.
+   */
+  | { etat: 'pret'; nom: string; canal?: DesktopPhoneChannel; ecriture?: boolean }
   /** Rien de branché, ou rien de vu. */
   | { etat: 'absent' }
   /** Le téléphone attend que l'utilisateur accepte cet ordinateur. */
@@ -110,20 +113,35 @@ export type DesktopPhoneState =
   /** Un autre programme tient la liaison avec le téléphone. */
   | { etat: 'occupe' };
 
-/** Fichier du téléphone : chemin relatif à `Documents/Gtracker` (racine ou `sessions/`), taille en octets, date. */
+/**
+ * Fichier du téléphone : chemin relatif à `Documents/Gtracker` (racine, `sessions/`, et `reglages/` pour le câble),
+ * taille en octets, date à la seconde.
+ */
 export interface DesktopPhoneFile {
   chemin: string;
   taille: number;
   dateMs: number;
 }
 
-/** Le dossier `Documents/Gtracker` du téléphone branché, en lecture seule. */
+/** Le dossier `Documents/Gtracker` du téléphone branché. */
 export interface DesktopPhoneBridge {
   etat(): Promise<BridgeAnswer<DesktopPhoneState>>;
   /** `NOT_FOUND` si le dossier est absent du téléphone ; `UNKNOWN` si le téléphone n'est pas prêt ou s'est perdu. */
   lister(): Promise<BridgeAnswer<DesktopPhoneFile[]>>;
   /** Octets d'un fichier rendu par le dernier `lister` seulement ; `UNKNOWN` pour tout échec. */
   lireOctets(argument: { chemin: string }): Promise<BridgeAnswer<Uint8Array>>;
+  /**
+   * Écrit un fichier après un `lister` réussi, sous son nom provisoire puis renommé, et rend le fichier tel qu'il est
+   * sur le téléphone. La coquille n'admet qu'un fichier posé dans `sessions/`, `itineraires/` ou `reglages/`, ou
+   * `gtracker.json`, `fc-repos.json` et `lieux.json` à la racine : tout autre chemin reçoit `PERMISSION`. Absent
+   * d'une coquille plus ancienne.
+   */
+  ecrireOctets?(argument: { chemin: string; octets: Uint8Array }): Promise<BridgeAnswer<DesktopPhoneFile>>;
+  /**
+   * Efface un seul fichier, de la même liste blanche, rendu par le dernier `lister` ou écrit depuis. Absent d'une
+   * coquille plus ancienne.
+   */
+  effacer?(argument: { chemin: string }): Promise<BridgeAnswer<null>>;
 }
 
 /**

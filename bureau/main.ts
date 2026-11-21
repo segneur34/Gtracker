@@ -25,9 +25,10 @@
 //
 // Le dossier mémoire (un vrai dossier du disque) est lu et écrit ici, la page y passant par les canaux `memoire:*`
 // du pont (`preload.ts`, `memoire.ts`) ; seule la page de la fenêtre principale y a accès (`expediteurAdmis`).
-// Le dossier `Documents/Gtracker` du téléphone est lu ici aussi, en lecture seule, par les canaux `telephone:*`
-// (`telephone.ts`) : par le Wi-Fi si un téléphone y est relié (`sansFil.ts`, réglé par les canaux `sansfil:*`),
-// sinon par le câble (`adb.ts`, le débogage USB).
+// Le dossier `Documents/Gtracker` du téléphone est lu ici aussi par les canaux `telephone:*` (`telephone.ts`) : par
+// le Wi-Fi si un téléphone y est relié (`sansFil.ts`, réglé par les canaux `sansfil:*`, en lecture seule), sinon par
+// le câble (`adb.ts`, le débogage USB), qui sait aussi écrire et effacer un fichier de la liste blanche
+// (`cheminEcrivable`, vérifiée par les gestionnaires avant toute commande).
 
 import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol, safeStorage, screen, session, shell } from 'electron'
 import type { OpenDialogOptions, Rectangle, WebContents } from 'electron'
@@ -349,7 +350,8 @@ function brancherPont(): void {
   const memoire = creerMemoire(
     optionsDepuisEnvironnement(process.env, { profil, documents: dossierWindows('documents'), maison: dossierWindows('home') }, choisirParFenetre, journal),
   )
-  // Les lectures du téléphone passent par un dossier du profil, vidé au démarrage de ce qu'une coupure y aurait laissé.
+  // Les lectures et écritures du téléphone passent par un dossier du profil, vidé au démarrage de ce qu'une coupure y
+  // aurait laissé.
   const lectures = path.join(profil, DOSSIER_LECTURES)
   void viderLectures(lectures)
   const memoireRetenue = async (): Promise<string | null> => {

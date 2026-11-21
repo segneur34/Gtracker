@@ -1,14 +1,15 @@
 import { t } from '../core/i18n';
-import { desktopBridge, type DesktopPhoneBridge, type DesktopPhoneChannel, type DesktopPhoneState } from './desktopBridge';
+import { desktopBridge, type DesktopPhoneBridge, type DesktopPhoneChannel, type DesktopPhoneFile, type DesktopPhoneState } from './desktopBridge';
 import { bridgeValue } from './diskMemory';
-import type { ImportEntry } from './memoryFolder';
+import type { FolderEntry, ImportEntry, MemoryFolder } from './memoryFolder';
 import { isDesktopApp } from './runtime';
 
 /**
  * Le téléphone lu par le programme Windows, par le Wi-Fi s'il y est relié (`wirelessPhone.ts`), sinon par le câble :
- * son état (qui dit son canal), le contenu de son dossier `Documents/Gtracker` (racine et `sessions/`), et ses fichiers
- * à importer, lus un par un au moment de les ranger. Lecture seule : rien n'est jamais écrit sur le téléphone. Ailleurs
- * (navigateur, téléphone, coquille plus ancienne), rien de cela n'existe.
+ * son état (qui dit son canal et s'il sait écrire), le contenu de son dossier `Documents/Gtracker` (racine,
+ * `sessions/`, et `reglages/` par le câble), ses fichiers à importer, lus un par un au moment de les ranger, et ce
+ * dossier sous la forme de tout dossier mémoire (`phoneMemoryFolder`), qui écrit et efface par le câble seulement.
+ * Ailleurs (navigateur, téléphone, coquille plus ancienne), rien de cela n'existe.
  */
 
 export type PhoneState = DesktopPhoneState;
@@ -54,6 +55,108 @@ export const listPhoneFiles = async (): Promise<PhoneFile[] | null> => {
   const answer = await requirePhone().lister();
   if (!answer.ok && answer.code === 'NOT_FOUND') return null;
   return (await bridgeValue(Promise.resolve(answer))).map((f) => ({ path: f.chemin, size: f.taille }));
+};
+
+/**
+ * Vrai si le téléphone prêt est lu par un canal qui sait écrire et effacer (le câble), et que la coquille en a les
+ * canaux ; faux ailleurs, et pour une coquille plus ancienne.
+ */
+export const phoneCanWrite = (state: PhoneState): boolean => {
+  const phone = phoneBridge();
+  return state.etat === 'pret' && state.ecriture === true && typeof phone?.ecrireOctets === 'function' && typeof phone.effacer === 'function';
+};
+
+/** Chemin relatif sans barre en trop (`/sessions/` comme `sessions`). */
+const cleanPath = (path: string): string => path.split('/').filter((part) => part !== '').join('/');
+
+/** Octets à envoyer : la vue seule, jamais le reste du tampon qui la porte. */
+const exactBytes = (bytes: Uint8Array): Uint8Array =>
+  bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ? bytes : bytes.slice();
+
+/**
+ * Le dossier `Documents/Gtracker` du téléphone branché, sous la forme de tout dossier mémoire (sorte `phone`), pour le
+ * comparer au dossier du PC et y recopier des fichiers. Il tient le dernier listage du téléphone :
+ * - `list` relit le téléphone à chaque appel (les dossiers se déduisent des fichiers : un dossier vide n'apparaît pas) ;
+ * - `readBytes`, `readText` et `stat` répondent d'après ce listage, fait au premier besoin : `null` pour un fichier
+ *   qu'il ne porte pas ;
+ * - `writeBytes` et `writeText` écrivent par la coquille (nom provisoire, taille relue, renommage) et tiennent le
+ *   listage à jour, date du téléphone comprise ; `remove` efface un seul fichier, sans effet s'il n'est pas au listage.
+ * La coquille n'admet l'écriture et l'effacement que dans sa liste blanche (`sessions/`, `itineraires/`, `reglages/`,
+ * `gtracker.json`, `fc-repos.json`, `lieux.json`) et par le câble : ailleurs, ces appels lèvent.
+ */
+export const phoneMemoryFolder = (label: string): MemoryFolder => {
+  const phone = requirePhone();
+  let listed: Map<string, DesktopPhoneFile> | null = null;
+
+  const refresh = async (): Promise<Map<string, DesktopPhoneFile>> => {
+    listed = null;
+    const answer = await phone.lister();
+    const files = !answer.ok && answer.code === 'NOT_FOUND' ? [] : await bridgeValue(Promise.resolve(answer));
+    const fresh = new Map(files.map((f) => [f.chemin, f]));
+    listed = fresh;
+    return fresh;
+  };
+  const current = (): Promise<Map<string, DesktopPhoneFile>> => (listed ? Promise.resolve(listed) : refresh());
+
+  const writer = () => {
+    const { ecrireOctets, effacer } = phone;
+    if (typeof ecrireOctets !== 'function' || typeof effacer !== 'function') {
+      throw Object.assign(new Error('Coquille sans écriture sur le téléphone.'), { code: 'UNKNOWN' });
+    }
+    return { ecrireOctets: ecrireOctets.bind(phone), effacer: effacer.bind(phone) };
+  };
+
+  const readBytes = async (path: string): Promise<Uint8Array | null> => {
+    const chemin = cleanPath(path);
+    if (!(await current()).has(chemin)) return null;
+    return bridgeValue(phone.lireOctets({ chemin }));
+  };
+
+  const writeBytes = async (path: string, bytes: Uint8Array): Promise<void> => {
+    const chemin = cleanPath(path);
+    const { ecrireOctets } = writer();
+    const files = await current();
+    const written = await bridgeValue(ecrireOctets({ chemin, octets: exactBytes(bytes) }));
+    files.set(chemin, written);
+  };
+
+  return {
+    kind: 'phone',
+    label,
+    list: async (dir) => {
+      const prefix = cleanPath(dir) === '' ? '' : `${cleanPath(dir)}/`;
+      const entries: FolderEntry[] = [];
+      const dirs = new Set<string>();
+      for (const f of (await refresh()).values()) {
+        if (!f.chemin.startsWith(prefix)) continue;
+        const rest = f.chemin.slice(prefix.length);
+        const cut = rest.indexOf('/');
+        if (cut < 0) entries.push({ name: rest, kind: 'file', size: f.taille, mtimeMs: f.dateMs });
+        else dirs.add(rest.slice(0, cut));
+      }
+      for (const name of dirs) entries.push({ name, kind: 'directory', size: 0, mtimeMs: 0 });
+      return entries;
+    },
+    readBytes,
+    readText: async (path) => {
+      const bytes = await readBytes(path);
+      return bytes === null ? null : new TextDecoder().decode(bytes);
+    },
+    stat: async (path) => {
+      const f = (await current()).get(cleanPath(path));
+      return f ? { size: f.taille, mtimeMs: f.dateMs } : null;
+    },
+    writeBytes,
+    writeText: (path, text) => writeBytes(path, new TextEncoder().encode(text)),
+    remove: async (path) => {
+      const chemin = cleanPath(path);
+      const { effacer } = writer();
+      const files = await current();
+      if (!files.has(chemin)) return;
+      await bridgeValue(effacer({ chemin }));
+      files.delete(chemin);
+    },
+  };
 };
 
 /** Erreur d'une lecture après que le téléphone a été débranché. */

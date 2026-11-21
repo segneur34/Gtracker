@@ -38,13 +38,16 @@ const memoire = Object.freeze({
 })
 
 /**
- * Le dossier `Documents/Gtracker` du téléphone branché, en lecture seule (noms gardés égaux à ceux de `telephone.ts`
- * par un test) : `etat()`, `lister()`, et `lireOctets({ chemin })` d'un fichier du dernier listage seulement.
+ * Le dossier `Documents/Gtracker` du téléphone branché (noms gardés égaux à ceux de `telephone.ts` par un test) :
+ * `etat()`, `lister()`, `lireOctets({ chemin })` d'un fichier du dernier listage seulement, et, après un listage,
+ * `ecrireOctets({ chemin, octets })` et `effacer({ chemin })` dans la liste blanche que la coquille vérifie.
  */
 const telephone = Object.freeze({
   etat: sans('telephone:etat'),
   lister: sans('telephone:lister'),
   lireOctets: avec('telephone:lireOctets'),
+  ecrireOctets: avec('telephone:ecrireOctets'),
+  effacer: avec('telephone:effacer'),
 })
 
 /**

@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import net from 'node:net'
 import { tmpdir } from 'node:os'
@@ -435,12 +436,19 @@ describe('le Wi-Fi d’abord, sinon le câble', () => {
     await mkdir(path.join(stockageCable, 'Documents', 'Gtracker'), { recursive: true })
     await writeFile(path.join(stockageCable, 'Documents', 'Gtracker', 'cable.json'), '{}')
     const dossier = dossierSansFilPuisCable(s.dossierSansFil(), dossierLocal(stockageCable))
-    expect(await dossier.etat()).toMatchObject({ etat: 'pret', canal: 'cable' })
+    expect(await dossier.etat()).toMatchObject({ etat: 'pret', canal: 'cable', ecriture: true })
     expect((await dossier.lister()).map((x) => x.chemin)).toEqual(['cable.json'])
+    const local = path.join(tmp, 'envoi')
+    await writeFile(local, 'x')
+    expect(await dossier.ecrire!('sessions/b.gpx', local, 1)).toMatchObject({ chemin: 'sessions/b.gpx', taille: 1 })
 
     const { liaison } = await appairer(s)
-    expect(await dossier.etat()).toMatchObject({ etat: 'pret', canal: 'sansFil' })
+    expect(await dossier.etat()).toMatchObject({ etat: 'pret', canal: 'sansFil', ecriture: false })
     expect((await dossier.lister()).map((x) => x.chemin)).toEqual(['index.json', 'sessions/a.gpx'])
+    // Le canal choisi au listage ne sait pas écrire : refus, jamais de repli sur le câble.
+    await expect(dossier.ecrire!('sessions/c.gpx', local, 1)).rejects.toThrow('ne sait pas écrire')
+    await expect(dossier.effacer!('sessions/b.gpx')).rejects.toThrow('ne sait pas écrire')
+    expect(existsSync(path.join(stockageCable, 'Documents', 'Gtracker', 'sessions', 'b.gpx'))).toBe(true)
 
     liaison.fermer()
     await quand(async () => (await dossier.etat()).canal === 'cable')

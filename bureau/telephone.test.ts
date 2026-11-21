@@ -1,17 +1,22 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { Reponse } from './pont'
 import type { DossierDistant, FichierTelephone } from './telephone'
+import { phoneVisibleNames, tempNameFor } from '../src/library/remoteTemps'
 import {
   CANAUX_TELEPHONE,
   NOM_TELEPHONE_ESSAI,
   cheminAdmis,
+  cheminDuCable,
+  cheminEcrivable,
+  commeLeTelephone,
   dossierLocal,
   essaiTelephoneDepuisEnvironnement,
   fichiersAdmis,
   gestionnairesTelephone,
+  nomProvisoire,
   viderLectures,
 } from './telephone'
 
@@ -81,6 +86,58 @@ describe('chemins admis', () => {
   })
 })
 
+describe('liste blanche des écritures', () => {
+  it('admet les fichiers posés dans sessions/, itineraires/ et reglages/, et trois fichiers de la racine', () => {
+    for (const chemin of ['sessions/sortie du 18 novembre é.gpx', "sessions/l'eau $x `id`; y.json", 'sessions/a.imu', 'itineraires/tour.gpx', 'reglages/pc-1.json', 'gtracker.json', 'fc-repos.json', 'lieux.json']) {
+      expect(cheminEcrivable(chemin), chemin).toBe(true)
+    }
+  })
+
+  it('refuse tout le reste', () => {
+    for (const chemin of [
+      '', 'LISEZMOI.txt', 'autre.json', 'Gtracker.json', 'gtracker.json/', '/gtracker.json', '../gtracker.json', 'sessions', 'sessions/', 'sessions/.', 'sessions/..',
+      'sessions//a', 'sessions/a/b.gpx', 'journaux/a.json', 'en-attente/a.gpx', 'Sessions/a.gpx', 'sessions/a\nb', 'sessions/a\u0001b', 'sessions/a.gpx.gtracker-tmp',
+      'sessions/a.gpx.gtracker-new', 'sessions/a\\b', 'sessions/C:a', 'sessions/a.', 'sessions/con.json', `sessions/${'x'.repeat(520)}`,
+    ]) {
+      expect(cheminEcrivable(chemin), JSON.stringify(chemin)).toBe(false)
+    }
+    for (const autre of [3, null, undefined, ['sessions/a.gpx'], { chemin: 'sessions/a.gpx' }]) expect(cheminEcrivable(autre)).toBe(false)
+  })
+
+  it('le câble liste aussi reglages/, le sans-fil non', () => {
+    expect(cheminDuCable('reglages/pc.json')).toBe(true)
+    expect(cheminAdmis('reglages/pc.json')).toBe(false)
+    expect(cheminDuCable('itineraires/a.gpx')).toBe(false)
+    expect(cheminDuCable('sessions/a.gpx')).toBe(true)
+  })
+})
+
+describe('provisoires vus comme le téléphone', () => {
+  const f = (chemin: string, taille = 1): FichierTelephone => ({ chemin, taille, dateMs: 0 })
+
+  it('cache les créations et remplacements interrompus, montre sous son nom un remplacement seul', () => {
+    expect(commeLeTelephone([f('sessions/a.gpx'), f('sessions/a.gpx.gtracker-tmp', 2), f('sessions/b.json.gtracker-tmp', 3), f('sessions/c.gpx.gtracker-new'), f('x.json.gtracker-tmp', 4)])).toEqual([
+      { chemin: 'sessions/a.gpx', taille: 1, dateMs: 0, reel: 'sessions/a.gpx' },
+      { chemin: 'sessions/b.json', taille: 3, dateMs: 0, reel: 'sessions/b.json.gtracker-tmp' },
+      { chemin: 'x.json', taille: 4, dateMs: 0, reel: 'x.json.gtracker-tmp' },
+    ])
+  })
+
+  it('suit la règle de l’application, dossier par dossier (src/library/remoteTemps.ts)', () => {
+    const cas = [
+      ['a', 'a.gtracker-tmp'], ['a.gtracker-tmp'], ['a.gtracker-new'], ['a.gtracker-new', 'a.gtracker-tmp'], ['A.GTRACKER-TMP', 'A'],
+      ['.gtracker-tmp', '.gtracker-new', 'b'], ['a.gtracker-tmp.gtracker-tmp', 'a.gtracker-tmp'], ['x.json', 'y.gpx.gtracker-tmp', 'y.gpx.gtracker-new'],
+    ]
+    for (const noms of cas) {
+      for (const dossier of ['', 'sessions/']) {
+        const vus = commeLeTelephone(noms.map((n) => f(dossier + n))).map((v) => ({ name: v.chemin.slice(dossier.length), actual: v.reel.slice(dossier.length) }))
+        expect(vus, noms.join(',')).toEqual(phoneVisibleNames(noms))
+      }
+    }
+    for (const existe of [false, true]) expect(nomProvisoire('sessions/a.gpx', existe)).toBe(tempNameFor('sessions/a.gpx', existe))
+  })
+})
+
 describe('dossier local', () => {
   it('liste la racine et sessions/ avec taille et date à la seconde, NOT_FOUND sans Documents/Gtracker', async () => {
     await poser('gtracker.json', '{}')
@@ -105,6 +162,106 @@ describe('dossier local', () => {
   })
 })
 
+/** Un fichier local à écrire sur le téléphone d'essai. */
+async function aEcrire(contenu: string): Promise<string> {
+  const local = path.join(tmp, `envoi-${Math.random().toString(36).slice(2)}`)
+  await writeFile(local, contenu, 'utf8')
+  return local
+}
+
+/** Noms du dossier `sessions/` du téléphone d'essai. */
+const sessionsDuTelephone = async () => (await readdir(path.join(gtracker, 'sessions'))).sort()
+
+describe('dossier local qui écrit et efface', () => {
+  it('écrit un fichier neuf, puis le remplace, sans provisoire restant', async () => {
+    const t = dossierLocal(stockage)
+    await t.lister()
+    const ecrit = await t.ecrire!("sessions/sortie d'été.gpx", await aEcrire('<gpx/>'), 6)
+    expect(ecrit).toMatchObject({ chemin: "sessions/sortie d'été.gpx", taille: 6 })
+    expect(ecrit.dateMs % 1000).toBe(0)
+    await t.ecrire!("sessions/sortie d'été.gpx", await aEcrire('<gpx>2</gpx>'), 12)
+    expect(await readFile(path.join(gtracker, 'sessions', "sortie d'été.gpx"), 'utf8')).toBe('<gpx>2</gpx>')
+    expect(await sessionsDuTelephone()).toEqual(["sortie d'été.gpx"])
+    await t.ecrire!('reglages/pc.json', await aEcrire('{}'), 2)
+    expect((await t.lister()).map((x) => x.chemin)).toEqual(['reglages/pc.json', "sessions/sortie d'été.gpx"])
+  })
+
+  it('taille fausse : le provisoire est retiré, l’original intact', async () => {
+    await poser('sessions/a.json', 'ancien')
+    const t = dossierLocal(stockage)
+    await expect(t.ecrire!('sessions/a.json', await aEcrire('nouveau'), 99)).rejects.toThrow('7 octets sur 99')
+    expect(await readFile(path.join(gtracker, 'sessions', 'a.json'), 'utf8')).toBe('ancien')
+    expect(await sessionsDuTelephone()).toEqual(['a.json'])
+  })
+
+  it('efface un seul fichier, sans effet s’il n’existe pas, jamais un dossier', async () => {
+    await poser('sessions/a.gpx', 'a')
+    await poser('sessions/b.gpx', 'b')
+    const t = dossierLocal(stockage)
+    await t.effacer!('sessions/a.gpx')
+    await t.effacer!('sessions/a.gpx')
+    expect(await sessionsDuTelephone()).toEqual(['b.gpx'])
+    await mkdir(path.join(gtracker, 'reglages', 'sous.json'), { recursive: true })
+    await expect(t.effacer!('reglages/sous.json')).rejects.toThrow("n'est pas un fichier")
+  })
+
+  it('lit et efface sous son vrai nom un remplacement interrompu que le téléphone montre', async () => {
+    await poser('sessions/a.json.gtracker-tmp', 'complet')
+    await poser('sessions/b.gpx.gtracker-new', 'moi')
+    const t = dossierLocal(stockage)
+    expect(await t.lister()).toEqual([{ chemin: 'sessions/a.json', taille: 7, dateMs: DATE.getTime() }])
+    const local = path.join(tmp, 'lu')
+    await t.lire({ chemin: 'sessions/a.json', taille: 7, dateMs: DATE.getTime() }, local)
+    expect(await readFile(local, 'utf8')).toBe('complet')
+    await t.effacer!('sessions/a.json')
+    expect(await sessionsDuTelephone()).toEqual(['b.gpx.gtracker-new'])
+  })
+
+  it('efface l’original et son remplacement interrompu caché : rien ne revient au listage suivant', async () => {
+    await poser('sessions/x.gpx', 'original')
+    await poser('sessions/x.gpx.gtracker-tmp', 'reprendrait sa place')
+    await poser('sessions/y.gpx', 'y')
+    const t = dossierLocal(stockage)
+    expect((await t.lister()).map((x) => x.chemin)).toEqual(['sessions/x.gpx', 'sessions/y.gpx'])
+    await t.effacer!('sessions/x.gpx')
+    expect(await sessionsDuTelephone()).toEqual(['y.gpx'])
+    expect((await dossierLocal(stockage).lister()).map((x) => x.chemin)).toEqual(['sessions/y.gpx'])
+  })
+
+  it('un remplacement seul renommé depuis le listage est bien effacé, sans faux succès', async () => {
+    await poser('sessions/a.json.gtracker-tmp', 'complet')
+    const t = dossierLocal(stockage)
+    expect((await t.lister()).map((x) => x.chemin)).toEqual(['sessions/a.json'])
+    // L'application du téléphone achève le remplacement entre le listage et l'effacement.
+    await rename(path.join(gtracker, 'sessions', 'a.json.gtracker-tmp'), path.join(gtracker, 'sessions', 'a.json'))
+    await t.effacer!('sessions/a.json')
+    expect(await sessionsDuTelephone()).toEqual([])
+  })
+
+  it('refuse un chemin hors de la liste blanche, sans rien toucher', async () => {
+    await poser('sessions/a.gpx', 'a')
+    const avant = await empreinte(stockage)
+    const t = dossierLocal(stockage)
+    for (const chemin of ['../../secret.txt', 'LISEZMOI.txt', 'sessions/sous/a.gpx', 'journaux/a.json', 'sessions/a.gpx.gtracker-tmp']) {
+      await expect(t.ecrire!(chemin, await aEcrire('x'), 1)).rejects.toMatchObject({ code: 'PERMISSION' })
+      await expect(t.effacer!(chemin)).rejects.toMatchObject({ code: 'PERMISSION' })
+    }
+    expect(await empreinte(stockage)).toEqual(avant)
+  })
+
+  it('coupé pendant une écriture : provisoire à moitié écrit, que le téléphone ne montre pas', async () => {
+    await poser('sessions/a.json', 'ancien')
+    const t = dossierLocal(stockage, { coupureApres: 1 })
+    await t.ecrire!('sessions/b.gpx', await aEcrire('bbbb'), 4)
+    await expect(t.ecrire!('sessions/a.json', await aEcrire('nouveau!'), 8)).rejects.toThrow('débranché')
+    expect(await t.etat()).toEqual({ etat: 'absent' })
+    expect(await sessionsDuTelephone()).toEqual(['a.json', 'a.json.gtracker-tmp', 'b.gpx'])
+    expect(await readFile(path.join(gtracker, 'sessions', 'a.json.gtracker-tmp'), 'utf8')).toBe('nouv')
+    const revu = dossierLocal(stockage)
+    expect((await revu.lister()).map((x) => [x.chemin, x.taille])).toEqual([['sessions/a.json', 6], ['sessions/b.gpx', 4]])
+  })
+})
+
 describe('canaux du téléphone', () => {
   function canaux(t: DossierDistant, memoire: string | null = null) {
     const g = gestionnairesTelephone(t, lectures, { memoire: async () => memoire })
@@ -112,10 +269,99 @@ describe('canaux du téléphone', () => {
       etat: () => g['telephone:etat'](undefined),
       lister: () => g['telephone:lister'](undefined) as Promise<Reponse<FichierTelephone[]>>,
       lire: (argument: unknown) => g['telephone:lireOctets'](argument) as Promise<Reponse<Uint8Array>>,
+      ecrire: (argument: unknown) => g['telephone:ecrireOctets'](argument) as Promise<Reponse<FichierTelephone>>,
+      effacer: (argument: unknown) => g['telephone:effacer'](argument) as Promise<Reponse<null>>,
     }
   }
 
-  it('servent exactement les trois canaux', () => {
+  const octets = (texte: string) => new TextEncoder().encode(texte)
+
+  it('écrivent après un listage, rendent le fichier écrit, le relisent, et ne laissent aucun temporaire', async () => {
+    const c = canaux(dossierLocal(stockage))
+    expect(await c.ecrire({ chemin: 'sessions/a.gpx', octets: octets('<gpx/>') })).toMatchObject({ ok: false, message: "Le téléphone n'a pas été listé." })
+    valeur(await c.lister())
+    const ecrit = valeur(await c.ecrire({ chemin: 'sessions/a.gpx', octets: octets('<gpx/>') }))
+    expect(ecrit).toMatchObject({ chemin: 'sessions/a.gpx', taille: 6 })
+    expect(Buffer.from(valeur(await c.lire({ chemin: 'sessions/a.gpx' }))).toString('utf8')).toBe('<gpx/>')
+    expect(await readdir(lectures)).toEqual([])
+    expect(await sessionsDuTelephone()).toEqual(['a.gpx'])
+  })
+
+  it('refusent tout chemin hors de la liste blanche, avant de toucher au téléphone', async () => {
+    await poser('sessions/a.gpx', 'a')
+    await poser('LISEZMOI.txt', 'lire')
+    const avant = await empreinte(stockage)
+    const appels: string[] = []
+    const espion: DossierDistant = {
+      ...dossierLocal(stockage),
+      ecrire: async (chemin) => (appels.push(`ecrire ${chemin}`), { chemin, taille: 0, dateMs: 0 }),
+      effacer: async (chemin) => void appels.push(`effacer ${chemin}`),
+    }
+    const c = canaux(espion)
+    valeur(await c.lister())
+    for (const chemin of ['LISEZMOI.txt', '../../secret.txt', '/sdcard/Documents/Gtracker/sessions/a.gpx', 'sessions/sous/a.gpx', 'journaux/x.json', 'sessions/a.gpx.gtracker-new', 'sessions/a\nb.gpx', '']) {
+      expect(await c.ecrire({ chemin, octets: octets('x') }), chemin).toMatchObject({ ok: false, code: 'PERMISSION' })
+      expect(await c.effacer({ chemin }), chemin).toMatchObject({ ok: false, code: 'PERMISSION' })
+    }
+    expect(await c.ecrire({ chemin: 'sessions/b.gpx', octets: 'texte' })).toMatchObject({ ok: false, code: 'UNKNOWN' })
+    expect(await c.ecrire({ chemin: 3, octets: octets('x') })).toMatchObject({ ok: false, code: 'UNKNOWN' })
+    expect(await c.effacer('sessions/a.gpx')).toMatchObject({ ok: false, code: 'UNKNOWN' })
+    expect(appels).toEqual([])
+    expect(await empreinte(stockage)).toEqual(avant)
+  })
+
+  it('n’effacent qu’un fichier du dernier listage ou écrit depuis', async () => {
+    await poser('sessions/a.gpx', 'a')
+    const c = canaux(dossierLocal(stockage))
+    valeur(await c.lister())
+    await poser('sessions/b.gpx', 'b')
+    expect(await c.effacer({ chemin: 'sessions/b.gpx' })).toMatchObject({ ok: false, code: 'UNKNOWN' })
+    valeur(await c.ecrire({ chemin: 'sessions/c.gpx', octets: octets('c') }))
+    valeur(await c.effacer({ chemin: 'sessions/a.gpx' }))
+    valeur(await c.effacer({ chemin: 'sessions/c.gpx' }))
+    expect(await sessionsDuTelephone()).toEqual(['b.gpx'])
+    expect(await c.lire({ chemin: 'sessions/a.gpx' })).toMatchObject({ ok: false })
+  })
+
+  it('oublient le listage quand le téléphone n’est plus prêt : ni écriture ni effacement sans nouveau listage', async () => {
+    await poser('sessions/a.gpx', 'a')
+    let present = true
+    const appels: string[] = []
+    const local = dossierLocal(stockage)
+    const changeant: DossierDistant = {
+      ...local,
+      etat: async () => (present ? local.etat() : { etat: 'absent' }),
+      ecrire: async (chemin, f, taille) => (appels.push(`ecrire ${chemin}`), local.ecrire!(chemin, f, taille)),
+      effacer: async (chemin) => (appels.push(`effacer ${chemin}`), local.effacer!(chemin)),
+    }
+    const c = canaux(changeant)
+    valeur(await c.lister())
+    present = false
+    expect(valeur(await c.etat())).toEqual({ etat: 'absent' })
+    present = true
+    expect(await c.effacer({ chemin: 'sessions/a.gpx' })).toMatchObject({ ok: false, message: "Le téléphone n'a pas été listé." })
+    expect(await c.ecrire({ chemin: 'sessions/b.gpx', octets: octets('b') })).toMatchObject({ ok: false, message: "Le téléphone n'a pas été listé." })
+    expect(appels).toEqual([])
+    expect(await sessionsDuTelephone()).toEqual(['a.gpx'])
+  })
+
+  it('refusent d’écrire par un canal qui ne le sait pas', async () => {
+    const lecteur: DossierDistant = { etat: async () => ({ etat: 'pret', nom: 'x' }), lister: async () => [{ chemin: 'sessions/a.gpx', taille: 1, dateMs: 0 }], lire: async () => undefined }
+    const c = canaux(lecteur)
+    valeur(await c.lister())
+    expect(await c.ecrire({ chemin: 'sessions/a.gpx', octets: octets('x') })).toMatchObject({ ok: false, message: 'Ce canal ne sait pas écrire sur le téléphone.' })
+    expect(await c.effacer({ chemin: 'sessions/a.gpx' })).toMatchObject({ ok: false, message: 'Ce canal ne sait pas effacer sur le téléphone.' })
+  })
+
+  it('refusent d’écrire si le dossier temporaire est dans la mémoire', async () => {
+    const c = canaux(dossierLocal(stockage), path.join(tmp, 'memoire'))
+    valeur(await c.lister())
+    const dans = canaux(dossierLocal(stockage), lectures)
+    expect(await dans.ecrire({ chemin: 'sessions/a.gpx', octets: octets('x') })).toMatchObject({ ok: false })
+    expect(valeur(await c.ecrire({ chemin: 'sessions/a.gpx', octets: octets('x') })).taille).toBe(1)
+  })
+
+  it('servent exactement les cinq canaux', () => {
     expect(Object.keys(gestionnairesTelephone(dossierLocal(null), lectures))).toEqual(CANAUX_TELEPHONE.map((n) => `telephone:${n}`))
   })
 

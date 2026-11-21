@@ -11,7 +11,13 @@ import {
   DELAIS,
   cheminsAdb,
   chercherAdb,
+  citerShell,
+  commandeEffacer,
+  commandeRenommer,
+  commandeStat,
   delaiLecture,
+  echecDuShell,
+  lireStat,
   dossierAdb,
   etatDesAppareils,
   lireAppareils,
@@ -432,15 +438,24 @@ describe('lecture seule et liaison respectée', () => {
     expect(new Set(vues.map((a) => (a[0] === '-s' ? a[2] : a[0])))).toEqual(permis)
   })
 
-  it('n’a dans son code aucune commande qui écrit sur le téléphone ou arrête le serveur', () => {
+  it('n’a dans son code que les commandes d’écriture voulues, jamais l’arrêt du serveur', () => {
     for (const fichier of ['adb.ts', 'telephone.ts']) {
       const source = readFileSync(path.join(__dirname, fichier), 'utf8')
       expect(source).not.toMatch(/kill-server/)
-      expect(source).not.toMatch(/['"`](push|rm|mv|mkdir|install|uninstall|reboot|root|remount|sideload|disable-verity)['"`\s]/)
+      expect(source).not.toMatch(/['"`](mkdir|cp|install|uninstall|reboot|root|remount|sideload|disable-verity)['"`\s]/)
+      expect(source).not.toMatch(/\brm -r|\brm -fr|\brm -rf|\bfind\b[^`\n]*-delete/)
+      expect(source).not.toMatch(/['"`]\.tmp['"`]/)
       expect(source).not.toMatch(/\bshell:\s*true/)
       expect(source).not.toMatch(/(?<![.\w])(exec|spawn|execSync|spawnSync|execFileSync)\(/)
     }
     const adb = readFileSync(path.join(__dirname, 'adb.ts'), 'utf8')
+    // Écriture : un seul `push`, un seul `mv`, un seul `rm -f`, chacun sur des noms cités.
+    expect([...adb.matchAll(/'push'/g)]).toHaveLength(1)
+    expect([...adb.matchAll(/`mv \$\{/g)]).toHaveLength(1)
+    expect([...adb.matchAll(/`rm -f \$\{/g)]).toHaveLength(1)
+    expect([...adb.matchAll(/`(stat|mv|rm)\b[^`]*\$\{(?!citerShell\(|RACINE_DISTANTE\})/g)]).toEqual([])
+    expect(adb).toContain('`mv ${citerShell(provisoire)} ${citerShell(distant)}`')
+    expect(adb).toContain('`rm -f ${citerShell(distant)}`')
     expect(adb).toContain("import { execFile } from 'node:child_process'")
     // Trois lancements seulement : `version` (qui ne parle pas au serveur), `start-server` juste après la sonde, et le
     // passage unique `parLeServeur`, sonde comprise ; une commande de plus ne peut passer que par lui.
@@ -454,3 +469,355 @@ describe('lecture seule et liaison respectée', () => {
     }
   })
 })
+
+// ---------- citation pour le shell du téléphone ----------
+
+/**
+ * Relit un texte comme le shell POSIX du téléphone le ferait d'un mot cité : citations entre apostrophes, où tout est
+ * pris tel quel, et `\'` entre elles. Lève sur tout caractère hors citation : il serait interprété.
+ */
+function relireCommeLeShell(cite: string): string {
+  let texte = ''
+  let i = 0
+  while (i < cite.length) {
+    if (cite[i] === "'") {
+      const fin = cite.indexOf("'", i + 1)
+      if (fin < 0) throw new Error('citation non fermée')
+      texte += cite.slice(i + 1, fin)
+      i = fin + 1
+    } else if (cite[i] === '\\' && cite[i + 1] === "'") {
+      texte += "'"
+      i += 2
+    } else {
+      throw new Error(`caractère hors citation : ${JSON.stringify(cite[i])}`)
+    }
+  }
+  return texte
+}
+
+describe('citerShell', () => {
+  it('cite entre apostrophes, rien n’étant interprété : espaces, accents, $, accent grave, ;, retour à la ligne', () => {
+    expect(citerShell('a b.gpx')).toBe("'a b.gpx'")
+    expect(citerShell('sortie é ç.gpx')).toBe("'sortie é ç.gpx'")
+    expect(citerShell('$HOME `id` ; rm -rf / && x | y > z')).toBe("'$HOME `id` ; rm -rf / && x | y > z'")
+    expect(citerShell('a\nb')).toBe("'a\nb'")
+    expect(citerShell('a\\b')).toBe("'a\\b'")
+    expect(citerShell('')).toBe("''")
+  })
+
+  it('ferme, échappe et rouvre la citation autour d’une apostrophe', () => {
+    expect(citerShell("l'eau")).toBe(`'l'\\''eau'`)
+    expect(citerShell("''")).toBe(`''\\'''\\'''`)
+  })
+
+  it('se relit à l’identique, sans aucun caractère hors citation', () => {
+    for (const nom of ["/sdcard/Documents/Gtracker/sessions/l'eau $x `id`; rm -rf y.gpx", "'", "a'b'c", 'é\n\t$(id)', '"guillemets"', '*?[a]']) {
+      expect(relireCommeLeShell(citerShell(nom))).toBe(nom)
+    }
+  })
+
+  it('refuse un caractère nul', () => {
+    expect(() => citerShell('a\0b')).toThrow('caractère nul')
+  })
+})
+
+// ---------- écriture et effacement, sur un faux adb ----------
+
+const R = '/sdcard/Documents/Gtracker'
+const LOCAL = 'C:\\profil\\telephone-lecture\\1.gtracker-tmp'
+const ABSENT = (distant: string): Partial<Sortie> => ({ code: 1, stderr: `stat: ${distant}: No such file or directory` })
+
+/** Les commandes passées au téléphone, sans les sondes ni `version` et `devices`. */
+const auTelephone = (f: ReturnType<typeof faux>) =>
+  f.suite.filter((c) => c !== 'sonde' && c !== 'version' && c !== 'devices' && c !== 'start-server' && c !== `shell:${COMMANDE_LISTAGE}`)
+
+/** Réponses de `stat` : ces fichiers n'existent pas sur le téléphone. */
+const absents = (...distants: string[]): Reponses => Object.fromEntries(distants.map((d) => [`shell:${commandeStat(d)}`, ABSENT(d)]))
+
+/** Chaque argument passé à adb : jamais l'arrêt du serveur, jamais un nom en `.tmp`. */
+function sansArretNiTmp(f: ReturnType<typeof faux>): void {
+  for (const { args } of f.appels) {
+    expect(args).not.toContain('kill-server')
+    for (const a of args) expect(a).not.toMatch(/(?<!\.gtracker-)tmp\b/)
+  }
+}
+
+describe('écriture d’un fichier sur le téléphone', () => {
+  it('écrit un fichier neuf : stat, push vers .gtracker-new, stat du provisoire, mv', async () => {
+    const distant = `${R}/sessions/sortie d'été.gpx`
+    const provisoire = `${distant}.gtracker-new`
+    const f = faux(
+      {
+        ...ADB_OK,
+        [`shell:${commandeStat(distant)}`]: ABSENT(distant),
+        [`shell:${commandeStat(provisoire)}`]: { stdout: '81b0 5 1763495000\n' },
+      },
+      NOTRE_SERVEUR,
+    )
+    await f.t.lister()
+    expect(await f.t.ecrire!("sessions/sortie d'été.gpx", LOCAL, 5)).toEqual({ chemin: "sessions/sortie d'été.gpx", taille: 5, dateMs: 1763495000000 })
+    expect(auTelephone(f)).toEqual([`shell:${commandeStat(distant)}`, 'push', `shell:${commandeStat(provisoire)}`, `shell:${commandeRenommer(provisoire, distant)}`])
+    const envoi = f.appels.find((a) => a.args[2] === 'push')!
+    expect(envoi.args).toEqual(['-s', 'SERIE1', 'push', LOCAL, provisoire])
+    expect(envoi.delai).toBe(delaiLecture(5))
+    expect(commandeRenommer(provisoire, distant)).toBe(`mv '${R}/sessions/sortie d'\\''été.gpx.gtracker-new' '${R}/sessions/sortie d'\\''été.gpx'`)
+    sansArretNiTmp(f)
+  })
+
+  it('remplace un fichier qui existe par .gtracker-tmp', async () => {
+    const distant = `${R}/sessions/a.json`
+    const provisoire = `${distant}.gtracker-tmp`
+    const f = faux(
+      {
+        ...ADB_OK,
+        [`shell:${commandeStat(distant)}`]: { stdout: '81b0 3 1763400000\n' },
+        [`shell:${commandeStat(provisoire)}`]: { stdout: '81b0 7 1763495001\n' },
+      },
+      NOTRE_SERVEUR,
+    )
+    await f.t.lister()
+    expect(await f.t.ecrire!('sessions/a.json', LOCAL, 7)).toEqual({ chemin: 'sessions/a.json', taille: 7, dateMs: 1763495001000 })
+    expect(auTelephone(f)).toEqual([`shell:${commandeStat(distant)}`, 'push', `shell:${commandeStat(provisoire)}`, `shell:${commandeRenommer(provisoire, distant)}`])
+    sansArretNiTmp(f)
+  })
+
+  it('taille fausse : le provisoire est retiré, l’erreur remonte, le fichier d’arrivée n’est pas touché', async () => {
+    const distant = `${R}/sessions/a.gpx`
+    const provisoire = `${distant}.gtracker-new`
+    const f = faux({ ...ADB_OK, [`shell:${commandeStat(distant)}`]: ABSENT(distant), [`shell:${commandeStat(provisoire)}`]: { stdout: '81b0 4 1763495000\n' } }, NOTRE_SERVEUR)
+    await f.t.lister()
+    await expect(f.t.ecrire!('sessions/a.gpx', LOCAL, 5)).rejects.toThrow('4 octets sur 5')
+    expect(auTelephone(f)).toEqual([`shell:${commandeStat(distant)}`, 'push', `shell:${commandeStat(provisoire)}`, `shell:${commandeEffacer(provisoire)}`])
+    sansArretNiTmp(f)
+  })
+
+  it('push en échec ou trop long : provisoire retiré, ni stat ni mv', async () => {
+    const distant = `${R}/reglages/pc.json`
+    const provisoire = `${distant}.gtracker-new`
+    for (const push of [{ code: 1, stderr: 'adb: error: failed to copy' }, { code: -1, delaiDepasse: true }] as Partial<Sortie>[]) {
+      const f = faux({ ...ADB_OK, [`shell:${commandeStat(distant)}`]: ABSENT(distant), push }, NOTRE_SERVEUR)
+      await f.t.lister()
+      await expect(f.t.ecrire!('reglages/pc.json', LOCAL, 5)).rejects.toMatchObject({ code: 'UNKNOWN' })
+      expect(auTelephone(f)).toEqual([`shell:${commandeStat(distant)}`, 'push', `shell:${commandeEffacer(provisoire)}`])
+    }
+  })
+
+  it('mv en échec : le provisoire est retiré, l’original reste', async () => {
+    const distant = `${R}/gtracker.json`
+    const provisoire = `${distant}.gtracker-tmp`
+    const f = faux(
+      {
+        ...ADB_OK,
+        [`shell:${commandeStat(distant)}`]: { stdout: '81b0 2 1763400000\n' },
+        [`shell:${commandeStat(provisoire)}`]: { stdout: '81b0 5 1763495000\n' },
+        [`shell:${commandeRenommer(provisoire, distant)}`]: { code: 1, stderr: 'mv: Permission denied' },
+      },
+      NOTRE_SERVEUR,
+    )
+    await f.t.lister()
+    await expect(f.t.ecrire!('gtracker.json', LOCAL, 5)).rejects.toThrow('Permission denied')
+    expect(auTelephone(f).slice(-2)).toEqual([`shell:${commandeRenommer(provisoire, distant)}`, `shell:${commandeEffacer(provisoire)}`])
+    // Un téléphone ancien rend 0 même en échec : le message suffit à le voir.
+    expect(echecDuShell({ code: 0, stderr: 'mv: Permission denied\n' })).toBe(true)
+    expect(echecDuShell({ code: 0, stderr: '' })).toBe(false)
+  })
+
+  it('refuse d’écrire sur un dossier, sans rien envoyer', async () => {
+    const distant = `${R}/sessions/x.gpx`
+    const f = faux({ ...ADB_OK, [`shell:${commandeStat(distant)}`]: { stdout: '41f9 3452 1763400000\n' } }, NOTRE_SERVEUR)
+    await f.t.lister()
+    await expect(f.t.ecrire!('sessions/x.gpx', LOCAL, 5)).rejects.toThrow("n'est pas un fichier")
+    expect(auTelephone(f)).toEqual([`shell:${commandeStat(distant)}`])
+  })
+
+  it('ne lance rien si la liaison est prise par un autre ou si le téléphone n’a pas été vu', async () => {
+    const f = faux(ADB_OK, NOTRE_SERVEUR)
+    await expect(f.t.ecrire!('sessions/a.gpx', LOCAL, 5)).rejects.toThrow("n'a pas été listé")
+    await expect(f.t.effacer!('sessions/a.gpx')).rejects.toThrow("n'a pas été listé")
+    expect(f.appels).toEqual([])
+    // Sondes 1 et 2 : notre serveur (appareils, listage) ; à partir de la 3, un autre.
+    const pris = faux(ADB_OK, (n) => (n <= 2 ? NOTRE_SERVEUR : { etat: 'version', version: 40 }))
+    await pris.t.lister()
+    await expect(pris.t.ecrire!('sessions/a.gpx', LOCAL, 5)).rejects.toThrow('occupe')
+    expect(auTelephone(pris)).toEqual([])
+  })
+
+  it('ne vise que l’appareil du dernier listage : un autre branché depuis ne reçoit aucune écriture', async () => {
+    let appareils = LISTE_PRET
+    const f = faux({ ...ADB_OK, devices: () => ({ stdout: appareils }) }, NOTRE_SERVEUR)
+    await f.t.lister()
+    // Téléphone A débranché, B branché, un état demandé entre-temps : le listage de A est oublié.
+    appareils = 'List of devices attached\nSERIE2 device usb:1 model:Autre transport_id:2\n'
+    expect(await f.t.etat()).toEqual({ etat: 'pret', nom: 'Autre' })
+    await expect(f.t.ecrire!('sessions/a.gpx', LOCAL, 5)).rejects.toThrow("n'a pas été listé")
+    await expect(f.t.effacer!('sessions/a.gpx')).rejects.toThrow("n'a pas été listé")
+    expect(auTelephone(f)).toEqual([])
+    // Relisté, B devient la cible, et lui seul.
+    const g = faux({ ...ADB_OK, devices: () => ({ stdout: appareils }), ...absents(`${R}/sessions/a.gpx`, `${R}/sessions/a.gpx.gtracker-tmp`) }, NOTRE_SERVEUR)
+    await g.t.lister()
+    appareils = LISTE_PRET
+    await g.t.etat()
+    await expect(g.t.effacer!('sessions/a.gpx')).rejects.toThrow("n'a pas été listé")
+    expect(auTelephone(g)).toEqual([])
+  })
+
+  it('sans état demandé entre-temps, vise la série du listage par -s, jamais celle d’un autre', async () => {
+    const f = faux({ ...ADB_OK, ...absents(`${R}/sessions/a.gpx`, `${R}/sessions/a.gpx.gtracker-tmp`) }, NOTRE_SERVEUR)
+    await f.t.lister()
+    await f.t.effacer!('sessions/a.gpx')
+    for (const { args } of f.appels.filter((a) => a.args[0] === '-s')) expect(args[1]).toBe('SERIE1')
+  })
+
+  it('un état en panne oublie aussi le listage', async () => {
+    let panne = false
+    const f = faux({ ...ADB_OK, devices: () => (panne ? { code: 1, stderr: 'cannot connect' } : { stdout: LISTE_PRET }) }, NOTRE_SERVEUR)
+    await f.t.lister()
+    panne = true
+    await expect(f.t.etat()).rejects.toThrow('cannot connect')
+    panne = false
+    await expect(f.t.effacer!('sessions/a.gpx')).rejects.toThrow("n'a pas été listé")
+  })
+
+  it('lit la sortie de stat', () => {
+    expect(lireStat('81b0 12 1763495000\n')).toEqual({ mode: 0x81b0, taille: 12, dateMs: 1763495000000 })
+    expect(lireStat('81b0 12 1763495000\r\n')).toEqual({ mode: 0x81b0, taille: 12, dateMs: 1763495000000 })
+    expect(lireStat('stat: x: No such file or directory')).toBeNull()
+  })
+})
+
+describe('effacement d’un fichier du téléphone', () => {
+  it('efface le provisoire caché puis l’original, un rm -f par fichier, noms cités, puis relit les deux', async () => {
+    const nom = "sessions/l'eau $x `id`; y.gpx"
+    const distant = `${R}/${nom}`
+    const provisoire = `${distant}.gtracker-tmp`
+    const f = faux({ ...ADB_OK, ...absents(distant, provisoire) }, NOTRE_SERVEUR)
+    await f.t.lister()
+    await f.t.effacer!(nom)
+    expect(auTelephone(f)).toEqual([
+      `shell:${commandeEffacer(provisoire)}`,
+      `shell:${commandeEffacer(distant)}`,
+      `shell:${commandeStat(distant)}`,
+      `shell:${commandeStat(provisoire)}`,
+    ])
+    const rm = f.appels.filter((a) => a.args[3]?.startsWith('rm '))
+    expect(rm.map((a) => a.args)).toEqual([
+      ['-s', 'SERIE1', 'shell', `rm -f '${R}/sessions/l'\\''eau $x \`id\`; y.gpx.gtracker-tmp'`],
+      ['-s', 'SERIE1', 'shell', `rm -f '${R}/sessions/l'\\''eau $x \`id\`; y.gpx'`],
+    ])
+    sansArretNiTmp(f)
+  })
+
+  it('original et remplacement interrompu caché : les deux partent, le provisoire d’abord, rien ne revient au listage suivant', async () => {
+    const distant = `${R}/sessions/x.gpx`
+    const provisoire = `${distant}.gtracker-tmp`
+    let efface = false
+    const listage = () => ({ stdout: efface ? '' : `81b0 4 1763495000 ${distant}\n81b0 9 1763495000 ${provisoire}\n` })
+    const f = faux({ ...ADB_OK, [`shell:${COMMANDE_LISTAGE}`]: listage, ...absents(distant, provisoire) }, NOTRE_SERVEUR)
+    expect((await f.t.lister()).map((x) => x.chemin)).toEqual(['sessions/x.gpx'])
+    await f.t.effacer!('sessions/x.gpx')
+    efface = true
+    expect(auTelephone(f).slice(0, 2)).toEqual([`shell:${commandeEffacer(provisoire)}`, `shell:${commandeEffacer(distant)}`])
+    expect(await f.t.lister()).toEqual([])
+  })
+
+  it('coupé entre les deux rm : l’original reste, aucun provisoire seul', async () => {
+    const distant = `${R}/sessions/x.gpx`
+    const provisoire = `${distant}.gtracker-tmp`
+    const f = faux({ ...ADB_OK, [`shell:${commandeEffacer(distant)}`]: { code: 1, stderr: "adb: error: device 'SERIE1' not found" } }, NOTRE_SERVEUR)
+    await f.t.lister()
+    await expect(f.t.effacer!('sessions/x.gpx')).rejects.toThrow('ne répond plus')
+    expect(auTelephone(f)).toEqual([`shell:${commandeEffacer(provisoire)}`, `shell:${commandeEffacer(distant)}`])
+  })
+
+  it('pas de faux succès : un fichier encore là après les rm (renommé ou recréé depuis le listage) rend une erreur', async () => {
+    const distant = `${R}/sessions/a.json`
+    const provisoire = `${distant}.gtracker-tmp`
+    const f = faux(
+      { ...ADB_OK, [`shell:${COMMANDE_LISTAGE}`]: { stdout: `81b0 3 1763495000 ${provisoire}\n` }, [`shell:${commandeStat(distant)}`]: { stdout: '81b0 3 1763495002\n' }, ...absents(provisoire) },
+      NOTRE_SERVEUR,
+    )
+    expect((await f.t.lister()).map((x) => x.chemin)).toEqual(['sessions/a.json'])
+    await expect(f.t.effacer!('sessions/a.json')).rejects.toThrow('listez-le de nouveau')
+    // Aucune nouvelle tentative : deux rm, puis la relecture.
+    expect(auTelephone(f).filter((c) => c.startsWith('shell:rm'))).toHaveLength(2)
+  })
+
+  it('fait remonter un refus du téléphone (dossier, autorisation)', async () => {
+    const f = faux({ ...ADB_OK, [`shell:${commandeEffacer(`${R}/sessions/a.gpx`)}`]: { code: 1, stderr: 'rm: a.gpx: is a directory' } }, NOTRE_SERVEUR)
+    await f.t.lister()
+    await expect(f.t.effacer!('sessions/a.gpx')).rejects.toThrow('is a directory')
+  })
+
+  it('efface et lit sous son vrai nom un fichier que le téléphone montre depuis son remplacement interrompu', async () => {
+    const listage = [
+      `81b0 3 1763495000 ${R}/sessions/a.json.gtracker-tmp`,
+      `81b0 4 1763495000 ${R}/sessions/b.gpx`,
+      `81b0 9 1763495000 ${R}/sessions/b.gpx.gtracker-tmp`,
+      `81b0 1 1763495000 ${R}/sessions/c.gpx.gtracker-new`,
+      `81b0 2 1763495000 ${R}/reglages/pc.json`,
+      `81b0 2 1763495000 ${R}/itineraires/tour.json`,
+    ].join('\n')
+    const f = faux(
+      { ...ADB_OK, [`shell:${COMMANDE_LISTAGE}`]: { stdout: listage }, ...absents(...['a.json', 'a.json.gtracker-tmp', 'b.gpx', 'b.gpx.gtracker-tmp'].map((n) => `${R}/sessions/${n}`)) },
+      NOTRE_SERVEUR,
+    )
+    expect(await f.t.lister()).toEqual([
+      { chemin: 'reglages/pc.json', taille: 2, dateMs: 1763495000000 },
+      { chemin: 'sessions/a.json', taille: 3, dateMs: 1763495000000 },
+      { chemin: 'sessions/b.gpx', taille: 4, dateMs: 1763495000000 },
+    ])
+    await f.t.lire({ chemin: 'sessions/a.json', taille: 3, dateMs: 0 }, LOCAL)
+    expect(f.appels.at(-1)!.args).toEqual(['-s', 'SERIE1', 'pull', '-a', `${R}/sessions/a.json.gtracker-tmp`, LOCAL])
+    await f.t.effacer!('sessions/a.json')
+    await f.t.effacer!('sessions/b.gpx')
+    expect(auTelephone(f).filter((c) => c.startsWith('shell:rm'))).toEqual(
+      ['a.json.gtracker-tmp', 'a.json', 'b.gpx.gtracker-tmp', 'b.gpx'].map((n) => `shell:${commandeEffacer(`${R}/sessions/${n}`)}`),
+    )
+  })
+})
+
+describe('liste blanche, appliquée avant toute commande', () => {
+  it('refuse un à un les chemins hors liste, pour écrire comme pour effacer, sans rien lancer', async () => {
+    const f = faux(ADB_OK, NOTRE_SERVEUR)
+    await f.t.lister()
+    const avant = f.appels.length
+    for (const chemin of REFUSES) {
+      await expect(f.t.ecrire!(chemin, LOCAL, 1), chemin).rejects.toMatchObject({ code: 'PERMISSION' })
+      await expect(f.t.effacer!(chemin), chemin).rejects.toMatchObject({ code: 'PERMISSION' })
+    }
+    expect(f.appels.length).toBe(avant)
+  })
+})
+
+/** Chemins refusés à l'écriture et à l'effacement. */
+const REFUSES = [
+  '',
+  '/sdcard/Documents/Gtracker/sessions/a.gpx',
+  '/a.gpx',
+  'C:\\a.gpx',
+  '../a.gpx',
+  'sessions/../gtracker.json',
+  'sessions/..',
+  'sessions/.',
+  'sessions/',
+  'sessions',
+  'sessions//a.gpx',
+  'sessions/sous/a.gpx',
+  'journaux/a.json',
+  'en-attente/a.gpx',
+  'autre.json',
+  'LISEZMOI.txt',
+  'GTRACKER.JSON',
+  'gtracker.json/x',
+  'sessions/a\nb.gpx',
+  'sessions/a\rb.gpx',
+  'sessions/a\0b.gpx',
+  'sessions/a\u007fb.gpx',
+  'sessions/a.gpx.gtracker-tmp',
+  'sessions/a.gpx.gtracker-new',
+  'sessions/a\\b.gpx',
+  'sessions/a:b.gpx',
+  'sessions/a.gpx ',
+  'sessions/nul.gpx',
+  `sessions/${'a'.repeat(600)}.gpx`,
+]

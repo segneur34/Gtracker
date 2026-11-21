@@ -7,6 +7,7 @@ import type { EvenementPont, Gestionnaire } from './pont'
 import { TEXTES_FERMETURE, brancherCanaux, enReponse, expediteurAdmis, lireTextesFermeture, reussite, uneALaFois } from './pont'
 import { ErreurDisque } from './disque'
 import { AVIS_ARRIVEE, CANAUX_SANS_FIL } from './sansFil'
+import type { DossierDistant } from './telephone'
 import { CANAUX_TELEPHONE, gestionnairesTelephone } from './telephone'
 
 const page = { nom: 'contenu de la fenêtre principale' }
@@ -105,6 +106,31 @@ describe('textes de la question de fermeture', () => {
     expect(lireTextesFermeture({ ...anglais, detail: 'x'.repeat(600) })).toBeNull()
     expect(lireTextesFermeture('Quit')).toBeNull()
     expect(TEXTES_FERMETURE.question).toBe('Quitter sans enregistrer ?')
+  })
+})
+
+describe('écriture sur le téléphone par le pont', () => {
+  it('refuse dans la coquille tout chemin hors de la liste blanche, sans atteindre le téléphone', async () => {
+    const recus: string[] = []
+    const telephone: DossierDistant = {
+      etat: async () => ({ etat: 'pret', nom: 'x' }),
+      lister: async () => [{ chemin: 'sessions/a.gpx', taille: 1, dateMs: 0 }],
+      lire: async () => undefined,
+      ecrire: async (chemin) => (recus.push(`ecrire ${chemin}`), { chemin, taille: 1, dateMs: 0 }),
+      effacer: async (chemin) => void recus.push(`effacer ${chemin}`),
+    }
+    const servis = new Map<string, (e: EvenementPont, ...args: unknown[]) => Promise<unknown>>()
+    brancherCanaux({ handle: (canal, rappel) => servis.set(canal, rappel) }, () => true, gestionnairesTelephone(telephone, path.join(__dirname, 'sortie', 'essai-pont')))
+    const evenement: EvenementPont = { sender: page, senderFrame: tete }
+    const appeler = (canal: string, argument: unknown) => servis.get(`telephone:${canal}`)!(evenement, argument)
+    expect(await appeler('lister', undefined)).toMatchObject({ ok: true })
+    for (const chemin of ['../gtracker.json', '/sdcard/Documents/Gtracker/lieux.json', 'sessions/sous/a.gpx', 'journaux/a.json', 'LISEZMOI.txt', 'sessions/a.gpx.gtracker-tmp', 'sessions/a\nb']) {
+      expect(await appeler('ecrireOctets', { chemin, octets: new Uint8Array([1]) }), chemin).toMatchObject({ ok: false, code: 'PERMISSION' })
+      expect(await appeler('effacer', { chemin }), chemin).toMatchObject({ ok: false, code: 'PERMISSION' })
+    }
+    expect(recus).toEqual([])
+    expect(await appeler('effacer', { chemin: 'sessions/a.gpx' })).toEqual({ ok: true, valeur: null })
+    expect(recus).toEqual(['effacer sessions/a.gpx'])
   })
 })
 

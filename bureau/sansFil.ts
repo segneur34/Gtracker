@@ -1053,16 +1053,20 @@ function fermerServeur(serveur: tls.Server): Promise<void> {
 
 /**
  * Un seul dossier distant pour la page : le téléphone relié par le Wi-Fi s'il y en a un, sinon celui du câble. Le
- * canal est choisi au listage, et les lectures qui suivent passent par le même ; l'état prêt dit son canal.
+ * canal est choisi au listage, et les lectures, écritures et effacements qui suivent passent par le même ; l'état prêt
+ * dit son canal et s'il sait écrire. Un canal qui ne sait pas écrire (le sans-fil, aujourd'hui) refuse l'écriture et
+ * l'effacement, sans jamais les passer à l'autre canal.
  */
 export function dossierSansFilPuisCable(sansFil: DossierDistant, cable: DossierDistant): DossierDistant {
   let choisi: DossierDistant = cable
+  const ecrit = (d: DossierDistant) => typeof d.ecrire === 'function' && typeof d.effacer === 'function'
+  const refus = () => new ErreurDisque('UNKNOWN', 'Ce canal ne sait pas écrire sur le téléphone.')
   return {
     async etat() {
       const e = await sansFil.etat()
-      if (e.etat === 'pret') return e
+      if (e.etat === 'pret') return { ...e, ecriture: ecrit(sansFil) }
       const c = await cable.etat()
-      return c.etat === 'pret' ? { ...c, canal: 'cable' } : c
+      return c.etat === 'pret' ? { ...c, canal: 'cable', ecriture: ecrit(cable) } : c
     },
     async lister() {
       choisi = (await sansFil.etat()).etat === 'pret' ? sansFil : cable
@@ -1070,6 +1074,14 @@ export function dossierSansFilPuisCable(sansFil: DossierDistant, cable: DossierD
     },
     lire(fichier, fichierLocal) {
       return choisi.lire(fichier, fichierLocal)
+    },
+    async ecrire(chemin, fichierLocal, taille) {
+      if (!choisi.ecrire) throw refus()
+      return choisi.ecrire(chemin, fichierLocal, taille)
+    },
+    async effacer(chemin) {
+      if (!choisi.effacer) throw refus()
+      return choisi.effacer(chemin)
     },
   }
 }

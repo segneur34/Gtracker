@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DesktopPhoneBridge } from './desktopBridge';
-import { listPhoneFiles, phoneCableAvailable, phoneImportEntries, phoneState } from './phoneCable';
+import { listPhoneFiles, phoneCableAvailable, phoneCanWrite, phoneImportEntries, phoneMemoryFolder, phoneState } from './phoneCable';
 
 /**
  * Le téléphone branché, vu de la page : le pont est le vrai code de la coquille (`bureau/telephone.ts`), sur un
@@ -14,6 +14,8 @@ interface NodeFs {
   mkdir(dir: string, options?: { recursive?: boolean }): Promise<unknown>;
   rm(target: string, options: { recursive: boolean; force: boolean }): Promise<void>;
   writeFile(file: string, data: string | Uint8Array): Promise<void>;
+  readFile(file: string, encoding: 'utf8'): Promise<string>;
+  readdir(dir: string): Promise<string[]>;
 }
 const fs = (await import(/* @vite-ignore */ 'node:fs/promises' as string)) as NodeFs;
 const { join } = (await import(/* @vite-ignore */ 'node:path' as string)) as { join(...parts: string[]): string };
@@ -41,7 +43,7 @@ const write = async (path: string, text: string): Promise<void> => {
 };
 
 /** Le programme Windows avec un téléphone branché, joué par `stockage`. */
-const plug = (options: { etatImpose?: EtatImpose | null; coupureApres?: number | null } = {}): void => {
+const plug = (options: { etatImpose?: EtatImpose | null; coupureApres?: number | null; lectureSeule?: boolean } = {}): void => {
   const g = shell.gestionnairesTelephone(shell.dossierLocal(stockage, options), join(tmp, 'lecture'));
   const telephone = {
     etat: () => g['telephone:etat'](undefined),
@@ -50,6 +52,10 @@ const plug = (options: { etatImpose?: EtatImpose | null; coupureApres?: number |
       reads.push(argument.chemin);
       return g['telephone:lireOctets'](argument);
     },
+    ...(options.lectureSeule ? {} : {
+      ecrireOctets: (argument: { chemin: string; octets: Uint8Array }) => g['telephone:ecrireOctets'](argument),
+      effacer: (argument: { chemin: string }) => g['telephone:effacer'](argument),
+    }),
   } as unknown as DesktopPhoneBridge;
   vi.stubGlobal('window', {
     gtrackerBureau: { version: '0.0.0', memoire: { ouvrir: async () => ({ ok: true, valeur: { etat: 'aucun' } }) }, textes: async () => ({ ok: true, valeur: null }), telephone },
@@ -121,6 +127,50 @@ describe('téléphone branché par câble', () => {
     const asked = reads.length;
     await expect(entries[2].readText()).rejects.toThrow('téléphone débranché');
     expect(reads.length).toBe(asked);
+  });
+
+  it('écriture : seulement pour un téléphone prêt dont le canal écrit, dans une coquille qui en a les canaux', () => {
+    plug();
+    expect(phoneCanWrite({ etat: 'pret', nom: 'x', canal: 'cable', ecriture: true })).toBe(true);
+    expect(phoneCanWrite({ etat: 'pret', nom: 'x', canal: 'sansFil', ecriture: false })).toBe(false);
+    expect(phoneCanWrite({ etat: 'pret', nom: 'x' })).toBe(false);
+    expect(phoneCanWrite({ etat: 'absent' })).toBe(false);
+    plug({ lectureSeule: true });
+    expect(phoneCanWrite({ etat: 'pret', nom: 'x', canal: 'cable', ecriture: true })).toBe(false);
+  });
+
+  it('dossier mémoire du téléphone : liste, lit, écrit, remplace et efface par la coquille', async () => {
+    await write('gtracker.json', '{"v":1}');
+    await write('sessions/a.gpx', '<gpx/>');
+    await write('reglages/tel.json', '{}');
+    plug();
+    const phone = phoneMemoryFolder('Téléphone');
+    expect(phone.kind).toBe('phone');
+    expect((await phone.list('')).map((e) => [e.name, e.kind])).toEqual([['gtracker.json', 'file'], ['reglages', 'directory'], ['sessions', 'directory']]);
+    expect((await phone.list('sessions')).map((e) => [e.name, e.size])).toEqual([['a.gpx', 6]]);
+    expect(await phone.readText('sessions/a.gpx')).toBe('<gpx/>');
+    expect(await phone.readText('sessions/absent.gpx')).toBeNull();
+    expect(await phone.stat('sessions/absent.gpx')).toBeNull();
+    await phone.writeText("sessions/b d'été.json", '{"n":1}');
+    expect(await phone.stat("sessions/b d'été.json")).toMatchObject({ size: 7 });
+    expect(await phone.readText("sessions/b d'été.json")).toBe('{"n":1}');
+    await phone.writeBytes('sessions/a.gpx', new TextEncoder().encode('<gpx>2</gpx>'));
+    await phone.remove('sessions/absent.gpx');
+    await phone.remove("sessions/b d'été.json");
+    const dossier = join(stockage, 'Documents', 'Gtracker', 'sessions');
+    expect(await fs.readdir(dossier)).toEqual(['a.gpx']);
+    expect(await fs.readFile(join(dossier, 'a.gpx'), 'utf8')).toBe('<gpx>2</gpx>');
+  });
+
+  it('dossier mémoire du téléphone : la coquille refuse un chemin hors de sa liste blanche', async () => {
+    await write('LISEZMOI.txt', 'à lire');
+    plug();
+    const phone = phoneMemoryFolder('Téléphone');
+    await expect(phone.writeText('journaux/a.json', '{}')).rejects.toMatchObject({ code: 'PERMISSION' });
+    await expect(phone.remove('LISEZMOI.txt')).rejects.toMatchObject({ code: 'PERMISSION' });
+    expect(await fs.readFile(join(stockage, 'Documents', 'Gtracker', 'LISEZMOI.txt'), 'utf8')).toBe('à lire');
+    plug({ lectureSeule: true });
+    await expect(phoneMemoryFolder('Téléphone').writeText('sessions/a.json', '{}')).rejects.toMatchObject({ code: 'UNKNOWN' });
   });
 
   it('une lecture en échec, téléphone toujours prêt : son erreur, sans débranchement', async () => {
