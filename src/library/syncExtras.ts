@@ -23,11 +23,14 @@ import { SYNC_SIDES, otherSyncSide, type SyncSideName } from './syncBase';
  *   un fichier du même appareil au moins aussi récent (appareil renommé : l'ancien nom ne revient pas ; renommé sans
  *   autre changement, à même date, aucun des deux noms ne voyage avant le changement suivant de ses réglages).
  * - Même nom des deux côtés, appareils différents : rien n'est écrasé, c'est dit.
- * - Même nom, même appareil, contenus différents : le fichier propre de l'ordinateur (identifiant connu) fait foi ;
- *   sinon la copie au plus grand `savedAt` remplace l'autre. Les deux dates viennent de l'horloge du même appareil,
- *   celui qui a écrit le fichier : seul lui le réécrit à chaque changement de ses réglages. Comparer elles deux,
- *   ce n'est pas comparer les horloges de l'ordinateur et du téléphone. Ainsi le fichier propre du téléphone, le
- *   plus récent de sa lignée, n'est jamais remplacé par une copie plus ancienne. Même date : laissé, c'est dit.
+ * - Même nom, même appareil, contenus différents : aucune date ne désigne le gagnant. Le fichier d'un appareil n'est
+ *   écrit que par cet appareil, la copie de l'autre côté ne fait que le suivre : le fichier propre de l'ordinateur
+ *   remplace la copie du téléphone ; celui de tout autre appareil, la copie du téléphone remplace celle de
+ *   l'ordinateur. La date d'un fichier peut reculer (téléphone neuf qui a repris la date d'un fichier de
+ *   l'ordinateur, horloge du téléphone remise en arrière) : la comparer laisserait une copie ancienne de
+ *   l'ordinateur écraser le fichier propre du téléphone.
+ * - Même nom sans pouvoir dire quel appareil a écrit les deux copies (aucune ne porte d'identifiant d'appareil, ou
+ *   l'identifiant de l'ordinateur est inconnu) : on ne conclut pas au même appareil, rien n'est écrasé, c'est dit.
  * - Un fichier qui ne se lit pas n'est ni recopié ni écrasé ; un fichier d'une version plus récente n'est jamais
  *   écrasé (il peut être recopié là où il manque : rien n'est réécrit).
  *
@@ -50,7 +53,7 @@ export interface SyncExtrasInput {
   restingHr: Record<SyncSideName, string | null>;
   /** Texte de `lieux.json` de chaque côté, `null` s'il manque. */
   places: Record<SyncSideName, string | null>;
-  /** Identifiant de l'ordinateur (`device.id` de son fichier de réglages) ; inconnu : seule la règle des dates joue. */
+  /** Identifiant de l'ordinateur (`device.id` de son fichier de réglages) ; inconnu : aucun fichier de même nom des deux côtés n'est remplacé. */
   computerDeviceId?: string | null;
   placeRules?: PlaceRules;
 }
@@ -75,10 +78,11 @@ export interface SyncExtraOp {
 /**
  * Pourquoi un fichier est laissé : même nom et autre appareil (`otherDevice`), illisible (`unreadable`), d'une
  * version plus récente (`newer`), portant l'identifiant de l'appareil qui le recevrait (`ownFile`), déjà là sous un
- * autre nom dans une version au moins aussi récente (`outdated`), même appareil et même date avec des contenus
- * différents (`sameDate`). L'exécutant y ajoute : changé depuis sa lecture (`changed`), erreur en l'écrivant (`failed`).
+ * autre nom dans une version au moins aussi récente (`outdated`), même nom sans qu'on puisse dire quel appareil a
+ * écrit les deux copies (`unknownDevice`). L'exécutant y ajoute : changé depuis sa lecture (`changed`), erreur en
+ * l'écrivant (`failed`).
  */
-export type SyncExtraLeftReason = 'otherDevice' | 'unreadable' | 'newer' | 'ownFile' | 'outdated' | 'sameDate' | 'changed' | 'failed';
+export type SyncExtraLeftReason = 'otherDevice' | 'unreadable' | 'newer' | 'ownFile' | 'outdated' | 'unknownDevice' | 'changed' | 'failed';
 
 export interface SyncExtraLeft {
   kind: SyncExtraKind;
@@ -133,16 +137,22 @@ const planSettings = (input: SyncExtrasInput, plan: SyncExtrasPlan): void => {
         leave(settingsPath(c.name), !c.file && !p.file ? null : !c.file ? 'computer' : 'phone', 'unreadable');
         continue;
       }
-      if (deviceOf(c.file) !== deviceOf(p.file)) {
+      const device = deviceOf(c.file);
+      const phoneDevice = deviceOf(p.file);
+      if (device === null && phoneDevice === null) {
+        leave(settingsPath(c.name), null, 'unknownDevice');
+        continue;
+      }
+      if (device !== phoneDevice) {
         leave(settingsPath(c.name), null, 'otherDevice');
         continue;
       }
-      const winner: SyncSideName | null = own !== null && deviceOf(c.file) === own ? 'computer'
-        : c.file.savedAt > p.file.savedAt ? 'computer' : p.file.savedAt > c.file.savedAt ? 'phone' : null;
-      if (winner === null) {
-        leave(settingsPath(c.name), null, 'sameDate');
+      // Sans l'identifiant de l'ordinateur, ce fichier peut être le sien comme celui du téléphone : aucun ne suit l'autre.
+      if (own === null) {
+        leave(settingsPath(c.name), null, 'unknownDevice');
         continue;
       }
+      const winner: SyncSideName = device === own ? 'computer' : 'phone';
       const loser = otherSyncSide(winner);
       const target = copies[loser] as SettingsCopy;
       if ((target.file as SettingsFile).version > SETTINGS_VERSION) {

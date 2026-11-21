@@ -41,14 +41,47 @@ describe('fichiers de réglages', () => {
     expect(plan.left).toEqual([]);
   });
 
-  it('changé chez son propriétaire : la copie au plus grand savedAt du même appareil remplace l’autre, dans les deux sens', () => {
+  it('changé chez son propriétaire : la copie de l’ordinateur suit celle du téléphone', () => {
     const old = settings(TEL, 'Téléphone', 200);
     const fresh = settings(TEL, 'Téléphone', 300, ['wingfoil', 'a-moth']);
     const toComputer = planSyncExtras(input({ settings: { computer: [{ name: 'Telephone.json', text: old }], phone: [{ name: 'Telephone.json', text: fresh }] } }));
     expect(toComputer.ops).toEqual([{ kind: 'settings', to: 'computer', path: 'reglages/Telephone.json', text: fresh, replaces: old, added: 0 }]);
-    // Une copie plus ancienne posée à la main sur l'ordinateur ne remplace jamais le fichier du téléphone : c'est l'inverse.
-    const back = planSyncExtras(input({ settings: { computer: [{ name: 'Telephone.json', text: fresh }], phone: [{ name: 'Telephone.json', text: old }] } }));
-    expect(back.ops.map((op) => [op.to, op.text])).toEqual([['phone', fresh]]);
+    expect(toComputer.left).toEqual([]);
+  });
+
+  it('date du fichier du téléphone qui a reculé : la copie de l’ordinateur, plus datée, ne l’écrase jamais', () => {
+    // Téléphone neuf qui a repris la date d'un fichier de l'ordinateur, ou horloge du téléphone remise en arrière.
+    const computerCopy = settings(TEL, 'Téléphone', 500);
+    const phoneOwn = settings(TEL, 'Téléphone', 100, ['wingfoil', 'a-moth']);
+    const plan = planSyncExtras(input({ settings: { computer: [{ name: 'Telephone.json', text: computerCopy }], phone: [{ name: 'Telephone.json', text: phoneOwn }] } }));
+    expect(plan.ops).toEqual([{ kind: 'settings', to: 'computer', path: 'reglages/Telephone.json', text: phoneOwn, replaces: computerCopy, added: 0 }]);
+    expect(plan.left).toEqual([]);
+    // Même date, contenus différents : la copie du téléphone fait foi de même.
+    const sameDate = settings(TEL, 'Téléphone', 500, ['kite']);
+    const same = planSyncExtras(input({ settings: { computer: [{ name: 'Telephone.json', text: computerCopy }], phone: [{ name: 'Telephone.json', text: sameDate }] } }));
+    expect(same.ops.map((op) => [op.to, op.text])).toEqual([['computer', sameDate]]);
+    // Le fichier propre de l'ordinateur, lui, n'est jamais écrit par le téléphone, même daté d'avant sa copie.
+    const pcOwn = settings(PC, 'PC', 100);
+    const pcCopy = settings(PC, 'PC', 500, ['kite']);
+    const back = planSyncExtras(input({ settings: { computer: [{ name: 'PC.json', text: pcOwn }], phone: [{ name: 'PC.json', text: pcCopy }] } }));
+    expect(back.ops.map((op) => [op.to, op.text])).toEqual([['phone', pcOwn]]);
+  });
+
+  it('même nom sans identifiant d’appareil : pas pris pour le même appareil, rien n’est écrasé, c’est dit', () => {
+    const older = settings(null, 'PC', 100);
+    const newer = settings(null, 'PC', 900, ['kite']);
+    for (const [computer, phone] of [[older, newer], [newer, older]] as const) {
+      const plan = planSyncExtras(input({ settings: { computer: [{ name: 'PC.json', text: computer }], phone: [{ name: 'PC.json', text: phone }] } }));
+      expect(plan.ops).toEqual([]);
+      expect(plan.left).toEqual([{ kind: 'settings', path: 'reglages/PC.json', side: null, reason: 'unknownDevice' }]);
+    }
+    // Identifiant de l'ordinateur inconnu : le fichier peut être le sien comme celui du téléphone, aucun ne remplace l'autre.
+    const unknownPc = planSyncExtras(input({
+      computerDeviceId: null,
+      settings: { computer: [{ name: 'T.json', text: settings(TEL, 'T', 100) }], phone: [{ name: 'T.json', text: settings(TEL, 'T', 200, ['kite']) }] },
+    }));
+    expect(unknownPc.ops).toEqual([]);
+    expect(unknownPc.left.map((l) => [l.path, l.side, l.reason])).toEqual([['reglages/T.json', null, 'unknownDevice']]);
   });
 
   it('le fichier propre de l’ordinateur fait foi : jamais remplacé sur l’ordinateur, jamais recopié sur lui', () => {
@@ -85,7 +118,7 @@ describe('fichiers de réglages', () => {
     expect(same.left.map((l) => [l.path, l.reason])).toEqual([['reglages/Ancien.json', 'outdated'], ['reglages/Nouveau.json', 'outdated']]);
   });
 
-  it('illisible : ni recopié, ni écrasé ; d’une version plus récente : jamais écrasé ; même date : laissé', () => {
+  it('illisible : ni recopié, ni écrasé ; d’une version plus récente : jamais écrasé', () => {
     const good = settings(TEL, 'Téléphone', 200);
     const unreadable = planSyncExtras(input({ settings: { computer: [{ name: 'Abîmé.json', text: '{abîmé' }, { name: 'T.json', text: '{' }], phone: [{ name: 'T.json', text: good }] } }));
     expect(unreadable.ops).toEqual([]);
@@ -98,9 +131,6 @@ describe('fichiers de réglages', () => {
     expect(newer.left.map((l) => [l.side, l.reason])).toEqual([['computer', 'newer']]);
     // Là où il manque, il est recopié tel quel : rien n'est réécrit.
     expect(planSyncExtras(input({ settings: { computer: [{ name: 'T.json', text: future }], phone: [] } })).ops.map((op) => op.to)).toEqual(['phone']);
-    const sameDate = planSyncExtras(input({ settings: { computer: [{ name: 'T.json', text: good }], phone: [{ name: 'T.json', text: settings(TEL, 'Téléphone', 200, ['kite']) }] } }));
-    expect(sameDate.ops).toEqual([]);
-    expect(sameDate.left.map((l) => l.reason)).toEqual(['sameDate']);
   });
 
   it('les mêmes fichiers des deux côtés : rien à faire', () => {
