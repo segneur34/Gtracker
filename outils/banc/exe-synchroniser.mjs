@@ -22,14 +22,25 @@
 //     ses fichiers dans le sous-dossier de l'entrée ;
 //  f. une session supprimée sur l'ordinateur : retirée du téléphone, restée à la corbeille de l'ordinateur ; puis restaurée
 //     par Réglages › Mémoire, elle revient sur le téléphone à la synchronisation suivante ;
+//     (c : le marqueur du téléphone porte aussi un champ `synchro`, un instant, les autres champs gardés ; d : inchangé quand
+//     rien n'a changé sur le téléphone ; f : plus récent après un retrait) ;
 //  g. sessions déjà à la corbeille de l'ordinateur et encore sur le téléphone à la première synchronisation : la question
 //     de la corbeille, « Les laisser » (rien ne bouge, la question revient) puis « Retirer du téléphone » ; une seule session :
-//     « La laisser » au singulier ;
+//     « La laisser » au singulier ; la corbeille ne tient qu'une entrée (origine « ordinateur ») par session retirée quand
+//     ses fichiers sont identiques sur le téléphone (« Corbeille : 2 sessions » pour 2 retirées), deux entrées quand la fiche
+//     a changé sur le téléphone (g4) ;
 //  h. garde-fou : onze sessions supprimées sur le téléphone, la question et ses trois boutons (« Annuler »,
 //     « Synchroniser sans rien supprimer », « Supprimer ces 11 sessions »), chacun joué ;
-//  i. coupure : dans la copie de sécurité (rien n'est synchronisé), puis en pleine synchronisation, deux fois ; relancé sans
-//     coupure, le tout est fini, rien n'est rangé à moitié, aucun temporaire des deux côtés ;
+//  m. une confirmation ne vaut que pour les sessions montrées : question sur 10 sessions, puis une onzième supprimée sur le
+//     téléphone, soit fenêtre fermée par la croix et rouverte (m1 : elle redit la question en attente, sur 10), soit fenêtre
+//     laissée ouverte (m2) ; la confirmation cliquée sur la liste périmée ramène la question sur 11, rien n'est supprimé sur
+//     la foi de l'ancienne liste, puis « Supprimer ces 11 sessions » met onze entrées à la corbeille ;
+//  i. coupure : dans la copie de sécurité (rien n'est synchronisé ; la reprise en fait une nouvelle, l'incomplète est
+//     gardée), juste après elle (12 : coupure précoce, la reprise ne refait pas de copie, un seul dossier daté, et le compte
+//     rendu le redonne), puis en pleine synchronisation, deux fois ; relancé sans coupure, le tout est fini, rien n'est rangé
+//     à moitié, aucun temporaire des deux côtés ;
 //  j. dans tous les cas, la console de la page sans erreur.
+// `BANC_CAS=c,g,m,i` (facultatif) ne joue que ces cas (a, b, c pour c à f, g, h, m, k, i) ; sans lui, tous.
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -47,6 +58,9 @@ const PORT = Number(portArg ?? 9497);
 const ORIGINE = 'https://gtracker.localhost';
 const CAPTURES = process.env.BANC_CAPTURES || null;
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+/** `BANC_CAS=g,i` (facultatif) : ne joue que ces cas (a, b, c pour c à f, g, h, k, i) ; sans lui, tous. */
+const CAS = process.env.BANC_CAS ? process.env.BANC_CAS.split(',').map((c) => c.trim()) : null;
+const veut = (cas) => CAS === null || CAS.includes(cas);
 const vivant = (pid) => spawnSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH'], { encoding: 'utf8', windowsHide: true }).stdout.includes(` ${pid} `);
 const disparu = async (pid, ms) => { for (let t = 0; t < ms; t += 200) { if (!vivant(pid)) return true; await pause(200); } return !vivant(pid); };
 
@@ -350,6 +364,7 @@ try {
   // ---------- a. états imposés ----------
   console.log('\n== a. Chaque état imposé : message, « Réessayer », rien de rangé ni de copié');
   for (const [etat, attendu] of Object.entries(ETATS)) {
+    if (!veut('a')) break;
     const profil = dossier(`a-${etat}-profil`);
     const memoire = fabriquerMemoire(`a-${etat}`, [4, 5]);
     const tel = fabriquerTelephone(`a-${etat}-tel`, [0, 1]);
@@ -377,7 +392,7 @@ try {
 
   // ---------- b. dossier absent ----------
   console.log('\n== b. Téléphone sans dossier Documents/Gtracker');
-  {
+  if (veut('b')) {
     const profil = dossier('b-profil');
     const memoire = fabriquerMemoire('b', [4]);
     const tel = dossier('b-tel');
@@ -397,7 +412,7 @@ try {
 
   // ---------- c, d, e, f. première synchronisation puis suppressions ----------
   console.log('\n== c, d, e, f. Première synchronisation, second clic, suppression sur le téléphone, suppression sur l\'ordinateur, restauration');
-  {
+  if (veut('c')) {
     const PHONE = [0, 1, 2, 3];
     const PC = [3, 4, 5, 6, 7];
     const TOUT = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -448,6 +463,9 @@ try {
       const idPc = lireJson(join(memoire, 'gtracker.json'))?.id;
       check('c. les deux marqueurs portent un identifiant, différent', typeof idTel === 'string' && typeof idPc === 'string' && idTel !== idPc, `${idTel} / ${idPc}`);
       check('c. le marqueur du téléphone garde son format et sa version', lireJson(join(racine, 'gtracker.json'))?.format === FORMATS.memoire && lireJson(join(racine, 'gtracker.json'))?.version === 1);
+      const marqueurTel = lireJson(join(racine, 'gtracker.json'));
+      check('c. le marqueur du téléphone porte un champ « synchro » (un instant, celui de la fin de la synchronisation), format, version et identifiant gardés', typeof marqueurTel?.synchro === 'number' && Math.abs(Date.now() - marqueurTel.synchro) < 5 * 60000 && Object.keys(marqueurTel).sort().join(',') === 'format,id,synchro,version', JSON.stringify(marqueurTel));
+      const synchroC = marqueurTel?.synchro;
       const synchro = existsSync(join(memoire, 'synchro')) ? readdirSync(join(memoire, 'synchro')) : [];
       console.log(`  synchro/ : ${synchro.join(', ')}`);
       check('c. la base de la paire est écrite (synchro/<identifiant du téléphone>.json), sans témoin d\'interruption', synchro.includes(`${idTel}.json`) && !synchro.includes('en-cours.json'), synchro.join(','));
@@ -467,6 +485,7 @@ try {
       check('d. les sessions du téléphone n\'ont pas changé (noms, tailles, dates)', empreinte(join(racine, 'sessions')) === empreinteTel);
       gardeHorsSessions('d', racine, avantHors);
       check('d. pas de seconde copie de sécurité', copiesDe(profil).length === 1, copiesDe(profil).join(','));
+      check('d. rien n\'a changé sur le téléphone : son champ « synchro » est celui du cas c', lireJson(join(racine, 'gtracker.json'))?.synchro === synchroC, `${synchroC} / ${lireJson(join(racine, 'gtracker.json'))?.synchro}`);
       await fermerFenetre(b);
 
       // e : supprimée sur le téléphone
@@ -508,6 +527,8 @@ try {
       r = await synchroniser(b, 'f');
       check('f. « 1 session supprimée sur l\'ordinateur : retirée du téléphone. »', contientLigne(r, "1 session supprimée sur l'ordinateur : retirée du téléphone."), JSON.stringify(r.paragraphes));
       check('f. « Mettre à jour » : le téléphone a été écrit', contientLigne(r, 'Sur le téléphone, touchez « Mettre à jour » pour voir les changements.'), JSON.stringify(r.paragraphes));
+      const marqueurF = lireJson(join(racine, 'gtracker.json'));
+      check('f. le téléphone a changé : son champ « synchro » est plus récent que celui du cas c, ses autres champs sont gardés', typeof marqueurF?.synchro === 'number' && marqueurF.synchro > synchroC && marqueurF.format === FORMATS.memoire && marqueurF.version === 1 && typeof marqueurF.id === 'string', JSON.stringify(marqueurF));
       await b.wait(1500);
       const TOUT_F = TOUT_E.filter((k) => k !== SUPPRIMEE_PC);
       memesSessions('f', memoire, tel, TOUT_F);
@@ -563,7 +584,9 @@ try {
   // Douze sessions des deux côtés : retirer une ou deux d'entre elles ne dépasse pas le garde-fou. Avec trois sessions
   // seulement (g3), retirer la seule supprimée en dépasse le quart : la fenêtre du garde-fou s'ouvre en plus.
   const TOUTES_G = Array.from({ length: NOMBRE }, (_, k) => k);
-  for (const [nom, nbCorbeille, ks0] of [['g1', 2, TOUTES_G], ['g2', 1, TOUTES_G], ['g3', 1, [0, 1, 2]]]) {
+  // g4 : la fiche de la session supprimée a changé sur le téléphone : la corbeille garde aussi sa copie (deux entrées).
+for (const [nom, nbCorbeille, ks0, fichesChangees = false] of [['g1', 2, TOUTES_G], ['g2', 1, TOUTES_G], ['g3', 1, [0, 1, 2]], ['g4', 1, TOUTES_G, true]]) {
+    if (!veut('g')) break;
     const profil = dossier(`${nom}-profil`);
     const memoire = fabriquerMemoire(nom, ks0);
     const tel = fabriquerTelephone(`${nom}-tel`, ks0);
@@ -584,6 +607,14 @@ try {
       const retirees = avantGpx.filter((n) => !gpxsDe(memoire).includes(n));
       const ks = retirees.map((n) => MODELES.findIndex((m) => `${m.nom}.gpx` === n));
       const restantes = ks0.filter((k) => !ks.includes(k));
+      if (fichesChangees) {
+        // La fiche de la session retirée change sur le téléphone après la suppression sur l'ordinateur.
+        for (const n of retirees) {
+          const fiche = join(racine, 'sessions', n.replace(/\.gpx$/, '.json'));
+          writeFileSync(fiche, `${JSON.stringify({ ...lireJson(fiche), noteBanc: 'changée sur le téléphone' }, null, 2)}\n`);
+          dater(fiche, 20);
+        }
+      }
       check(`${nom} : ${nbCorbeille} session(s) à la corbeille de l'ordinateur, origine « ordinateur », encore sur le téléphone`, corbeilleDe(memoire).entries.length === nbCorbeille && corbeilleDe(memoire).entries.every((e) => e.origin === 'ordinateur') && retirees.every((n) => existsSync(join(racine, 'sessions', n))), retirees.join(','));
 
       // première passe : la question
@@ -624,15 +655,21 @@ try {
       await b.wait(1500);
       memesSessions(`${nom} (retirées)`, memoire, tel, restantes);
       const cb = corbeilleDe(memoire);
-      // Sans ligne de base (supprimée sur l'ordinateur avant toute synchronisation), la copie du téléphone est rangée à
-      // part avant son retrait : une entrée « telephone » s'ajoute à chaque entrée « ordinateur ».
-      check(`${nom} : la corbeille garde les ${nbCorbeille} entrée(s) de l'ordinateur et ajoute ${nbCorbeille} copie(s) du téléphone, chacune avec GPX et fiche`, cb.entries.length === 2 * nbCorbeille
-        && cb.entries.filter((e) => e.origin === 'ordinateur').length === nbCorbeille && cb.entries.filter((e) => e.origin === 'telephone').length === nbCorbeille
-        && cb.entries.every((e) => existsSync(join(cb.dir, e.dir, e.main)) && existsSync(join(cb.dir, e.dir, e.main.replace(/\.gpx$/, '.json'))) && retirees.includes(e.main)), JSON.stringify(cb.entries.map((e) => [e.origin, e.main])));
-      await b.go('/parametres?bloc=corbeille', 5000);
+      // Sans ligne de base (supprimée sur l'ordinateur avant toute synchronisation), la copie du téléphone n'est rangée à
+      // part que si elle diffère de celle que la corbeille tient déjà (fiche changée sur le téléphone) : sinon une seule
+      // entrée, d'origine « ordinateur », par session retirée.
+      const attendues = fichesChangees ? 2 * nbCorbeille : nbCorbeille;
+      check(`${nom} : la corbeille garde ${fichesChangees ? `${nbCorbeille} entrée(s) de l'ordinateur et ajoute ${nbCorbeille} copie(s) du téléphone (fiche changée sur le téléphone)` : `${nbCorbeille} seule(s) entrée(s), d'origine « ordinateur » (fichiers identiques : pas de doublon)`}, chacune avec GPX et fiche`, cb.entries.length === attendues
+        && cb.entries.filter((e) => e.origin === 'ordinateur').length === nbCorbeille && cb.entries.filter((e) => e.origin === 'telephone').length === (fichesChangees ? nbCorbeille : 0)
+        && cb.entries.every((e) => existsSync(join(cb.dir, e.dir, e.main)) && existsSync(join(cb.dir, e.dir, e.main.replace(/\.gpx$/, '.json'))) && retirees.includes(e.main)), JSON.stringify(cb.entries.map((e) => [e.origin, e.main])));      await b.go('/parametres?bloc=corbeille', 5000);
       await b.waitFor(`Boolean(document.getElementById('zone-corbeille'))`, { timeout: 8000, label: 'zone de la corbeille' });
       await b.wait(600);
-      console.log(`  ${nom} : zone de la corbeille de Réglages › Mémoire : ${JSON.stringify(await b.evaluate(`document.getElementById('zone-corbeille').innerText.replace(/\\n+/g, ' / ')`))}`);
+      const zone = await b.evaluate(`document.getElementById('zone-corbeille').innerText.replace(/\\n+/g, ' / ')`);
+      console.log(`  ${nom} : zone de la corbeille de Réglages › Mémoire : ${JSON.stringify(zone)}`);
+      // La liste compte les entrées de la corbeille : une par session retirée, deux quand la copie du téléphone a été rangée à part.
+      const nbEntrees = attendues;
+      const compte = nbEntrees > 1 ? `${nbEntrees} sessions` : `${nbEntrees} session`;
+      check(`${nom} : la corbeille de Réglages › Mémoire dit « Corbeille : ${compte} » (${fichesChangees ? 'deux entrées par session : fiche changée' : 'une par session retirée'})`, new RegExp(`Corbeille : ${compte}(?! \\d)`).test(zone), zone);
       gardeHorsSessions(nom, racine, avantHors);
       check(`${nom} : une seule copie de sécurité en tout`, copiesDe(profil).length === 1, copiesDe(profil).join(','));
       await fermerFenetre(b);
@@ -641,7 +678,7 @@ try {
 
   // ---------- h. garde-fou ----------
   console.log('\n== h. Garde-fou : onze sessions supprimées sur le téléphone');
-  {
+  if (veut('h')) {
     const TOUTES = Array.from({ length: NOMBRE }, (_, k) => k);
     const profil = dossier('h-profil');
     const memoire = fabriquerMemoire('h', []);
@@ -708,9 +745,74 @@ try {
     });
   }
 
+  // ---------- m. une confirmation ne vaut que pour les sessions montrées ----------
+  console.log('\n== m. Garde-fou : la liste change entre la question et le clic (fenêtre fermée puis rouverte, ou laissée ouverte)');
+  for (const variante of ['m1', 'm2']) {
+    if (!veut('m')) break;
+    const TOUTES = Array.from({ length: NOMBRE }, (_, k) => k);
+    const profil = dossier(`${variante}-profil`);
+    const memoire = fabriquerMemoire(variante, []);
+    const tel = fabriquerTelephone(`${variante}-tel`, TOUTES);
+    const racine = racineTel(tel);
+    const question = (n) => `Cette synchronisation retirerait ${n} sessions. Rien n'est encore supprimé.`;
+    await avecProgramme(profil, memoire, { GTRACKER_BANC_TELEPHONE: tel }, variante, async (b) => {
+      await b.go('/sessions', 5000);
+      await b.settle({ max: 2000 });
+      let r = await synchroniser(b, `${variante}, première synchronisation`);
+      check(`${variante}. « 12 sessions copiées vers l'ordinateur. »`, contientLigne(r, "12 sessions copiées vers l'ordinateur."), JSON.stringify(r.paragraphes));
+      await b.wait(2000);
+      await fermerFenetre(b);
+      // Dix sessions supprimées sur le téléphone : la question du garde-fou porte sur dix.
+      retirer(racine, TOUTES.slice(0, 10));
+      r = await synchroniser(b, `${variante}, question sur dix`);
+      check(`${variante}. la question porte sur 10 sessions`, JSON.stringify(r.paragraphes) === JSON.stringify([question(10)]) && (r.liste ?? []).length === 10 && (r.boutons ?? []).includes('Supprimer ces 10 sessions'), JSON.stringify([r.paragraphes, r.liste?.length, r.boutons]));
+      if (variante === 'm1') {
+        // Fenêtre fermée par la croix, une session de plus supprimée, fenêtre rouverte : la question est à jour.
+        check('m1. la croix de la fenêtre', (await b.click(`document.querySelector('[role=dialog].phone-sync__dialog .ui-dialog__close')`)) === 'ok');
+        await b.wait(400);
+        check('m1. la fenêtre est fermée', (await releve(b)) === null);
+        check('m1. rien n\'est supprimé (corbeille vide, douze sessions sur l\'ordinateur)', gpxsDe(memoire).length === 12 && corbeilleDe(memoire).entries.length === 0, `${gpxsDe(memoire).length} ${JSON.stringify(corbeilleDe(memoire).index)}`);
+        retirer(racine, [10]);
+        r = await synchroniser(b, 'm1, rouverte');
+        // La fenêtre rouverte montre la question restée en attente (10 sessions) sans refaire la comparaison : noté tel quel.
+        const rouverte = /retirerait (\d+) sessions/.exec(r.paragraphes?.[0] ?? '')?.[1] ?? null;
+        console.log(`  fenêtre rouverte : la question porte sur ${rouverte} sessions (le téléphone en a retiré 11)`);
+        check('m1. rouverte, la question est celle de 10 ou de 11 sessions (jamais autre chose)', rouverte === '10' || rouverte === '11', JSON.stringify(r.paragraphes));
+        if (rouverte === '10') {
+          // Confirmation d'une liste périmée : la question revient avec la liste à jour, rien n'est supprimé.
+          check('m1. clic « Supprimer ces 10 sessions » (liste périmée)', (await b.clickText('Supprimer ces 10 sessions', '.phone-sync__actions button')) === 'ok');
+          await b.waitFor(`/retirerait 11 sessions/.test(document.querySelector('[role=dialog].phone-sync__dialog .phone-sync__body')?.textContent ?? '')`, { timeout: 40000, label: 'question à jour' });
+          await b.wait(300);
+          r = await releve(b);
+          check('m1. la question revient sur 11 sessions (la liste à jour), avec « Supprimer ces 11 sessions »', JSON.stringify(r.paragraphes) === JSON.stringify([question(11)]) && (r.liste ?? []).length === 11 && (r.boutons ?? []).includes('Supprimer ces 11 sessions'), JSON.stringify([r.paragraphes, r.liste?.length, r.boutons]));
+          await b.wait(800);
+          check('m1. aucune session n\'a été supprimée sur la foi de l\'ancienne liste (corbeille vide, douze sessions sur l\'ordinateur)', gpxsDe(memoire).length === 12 && corbeilleDe(memoire).entries.length === 0, `${gpxsDe(memoire).length} ${JSON.stringify(corbeilleDe(memoire).index)}`);
+        }
+        r = await repondre(b, 'm1, « Supprimer ces 11 sessions »', 'Supprimer ces 11 sessions');
+        check('m1. « 11 sessions supprimées sur le téléphone : mises dans la corbeille de l\'ordinateur (30 jours). »', contientLigne(r, "11 sessions supprimées sur le téléphone : mises dans la corbeille de l'ordinateur (30 jours)."), JSON.stringify(r.paragraphes));
+      } else {
+        // Fenêtre laissée ouverte, une session de plus supprimée, clic sur la confirmation de dix : la question revient.
+        retirer(racine, [10]);
+        check('m2. clic « Supprimer ces 10 sessions » alors que la liste a changé', (await b.clickText('Supprimer ces 10 sessions', '.phone-sync__actions button')) === 'ok');
+        await b.waitFor(`/retirerait 11 sessions/.test(document.querySelector('[role=dialog].phone-sync__dialog .phone-sync__body')?.textContent ?? '')`, { timeout: 40000, label: 'question à jour' });
+        await b.wait(300);
+        r = await releve(b);
+        console.log(`  après le clic : ${JSON.stringify(r.paragraphes)} ; boutons : ${(r.boutons ?? []).join(' / ')}`);
+        check('m2. la question revient, sur 11 sessions (la liste à jour), avec « Supprimer ces 11 sessions »', JSON.stringify(r.paragraphes) === JSON.stringify([question(11)]) && (r.liste ?? []).length === 11 && (r.boutons ?? []).includes('Supprimer ces 11 sessions'), JSON.stringify([r.paragraphes, r.liste?.length, r.boutons]));
+        await b.wait(800);
+        check('m2. aucune session n\'a été supprimée sur la foi de l\'ancienne liste (corbeille vide, douze sessions sur l\'ordinateur)', gpxsDe(memoire).length === 12 && corbeilleDe(memoire).entries.length === 0, `${gpxsDe(memoire).length} ${JSON.stringify(corbeilleDe(memoire).index)}`);
+        r = await repondre(b, 'm2, « Supprimer ces 11 sessions »', 'Supprimer ces 11 sessions');
+        check('m2. « 11 sessions supprimées sur le téléphone : mises dans la corbeille de l\'ordinateur (30 jours). »', contientLigne(r, "11 sessions supprimées sur le téléphone : mises dans la corbeille de l'ordinateur (30 jours)."), JSON.stringify(r.paragraphes));
+      }
+      await b.wait(2000);
+      check(`${variante}. la corbeille porte onze entrées, une session reste des deux côtés`, corbeilleDe(memoire).entries.length === 11 && gpxsDe(memoire).length === 1 && gpxsDe(racine).length === 1, `${corbeilleDe(memoire).entries.length} ${gpxsDe(memoire).length} ${gpxsDe(racine).length}`);
+      await fermerFenetre(b);
+    });
+  }
+
   // ---------- k. copie du téléphone rangée à part ----------
   console.log('\n== k. Session supprimée sur l\'ordinateur dont la corbeille ne tient plus la copie : celle du téléphone est rangée à part (origine « telephone »)');
-  {
+  if (veut('k')) {
     const TOUTES = Array.from({ length: NOMBRE }, (_, k) => k);
     const profil = dossier('k-profil');
     const memoire = fabriquerMemoire('k', TOUTES);
@@ -764,7 +866,11 @@ try {
   const TOUT_I = [0, 1, 2, 3, 4, 5, 6, 7];
   // 4 tombe dans la copie de sécurité (le téléphone liste dix fichiers) ; 24 dans les copies vers l'ordinateur ; 30 dans les
   // écritures vers le téléphone (une fiche reste sous son nom provisoire, que le téléphone écarte) ; au-delà de 35 la synchronisation finit.
-  for (const coupure of [4, 24, 30]) {
+  /** Dossier de la copie de sécurité que dit le compte rendu de la reprise, par coupure. */
+  const reprises = new Map();
+  // 12 tombe juste après la copie de sécurité, avant que rien soit copié : la coupure la plus précoce de la synchronisation.
+  for (const coupure of [4, 12, 24, 30]) {
+    if (!veut('i')) break;
     const dansCopie = coupure < 10;
     const quoi = `i (coupure après ${coupure} opérations${dansCopie ? ', dans la copie de sécurité' : ''})`;
     const profil = dossier(`i${coupure}-profil`);
@@ -805,6 +911,7 @@ try {
       const r = await synchroniser(b, `${quoi}, reprise`);
       check(`${quoi}, reprise : le compte rendu ne parle d'aucun arrêt (pas de « Réessayer »)`, (r.boutons ?? []).join('/') === 'Fermer', (r.boutons ?? []).join('/'));
       check(`${quoi}, reprise : aucune suppression, aucune question`, !(r.paragraphes ?? []).some((l) => /supprim.*(corbeille|retir)/.test(l)) && (r.paragraphes ?? []).length > 0, JSON.stringify(r.paragraphes));
+      reprises.set(coupure, r.dossier ?? null);
       const reprise = (r.paragraphes ?? []).includes("La synchronisation précédente avait été coupée : elle a repris là où elle s'était arrêtée.");
       console.log(`  la fenêtre dit-elle que la synchronisation précédente avait été coupée ? ${reprise ? 'oui' : 'non'}`);
       await b.wait(2000);
@@ -813,6 +920,21 @@ try {
     check(`${quoi}, reprise : rien n'est allé à la corbeille`, corbeilleDe(memoire).entries.length === 0, JSON.stringify(corbeilleDe(memoire).index));
     check(`${quoi}, reprise : la base de la paire est là, sans témoin d'interruption`, existsSync(join(memoire, 'synchro')) && !existsSync(join(memoire, 'synchro', 'en-cours.json')), (arbre(join(memoire, 'synchro')) ?? []).join(','));
     console.log(`  copies de sécurité après la reprise : ${copiesDe(profil).join(' ; ')}`);
+    const datees = copiesDe(profil).filter((c) => !/incomplète$/.test(c));
+    if (dansCopie) {
+      check(`${quoi}, reprise : une copie de sécurité entière est faite (la précédente restant « incomplète »)`, datees.length === 1 && copiesDe(profil).length === 2, copiesDe(profil).join(' ; '));
+    } else {
+      check(`${quoi}, reprise : la reprise ne refait pas de copie de sécurité (un seul dossier daté)`, datees.length === 1 && copiesDe(profil).length === 1, copiesDe(profil).join(' ; '));
+    }
+    const dossierReprise = reprises.get(coupure) ?? null;
+    const dossierCopie = datees.length === 1 ? join(profil, 'Documents-essai', 'Gtracker-copies', datees[0]) : null;
+    if (coupure === 12) {
+      // Coupure précoce : rien n'est encore copié, la reprise refait toute la synchronisation sans nouvelle copie et la dit.
+      check(`${quoi}, reprise : le compte rendu redonne le dossier de la copie de sécurité déjà faite`, dossierCopie !== null && dossierReprise?.toLowerCase() === dossierCopie.toLowerCase(), `${dossierReprise} / ${datees.join(',')}`);
+    } else if (!dansCopie) {
+      // Plus tard dans la synchronisation (copies déjà commencées), la reprise ne redonne pas le dossier : noté, sans verdict.
+      console.log(`  la reprise redonne-t-elle le dossier de la copie de sécurité ? ${dossierReprise === null ? 'non' : 'oui'}`);
+    }
     gardeHorsSessions(`${quoi}, reprise`, racine, avantHors);
   }
 } catch (e) {

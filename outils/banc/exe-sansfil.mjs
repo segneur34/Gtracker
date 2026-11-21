@@ -26,6 +26,9 @@
 //  3. coupure en plein transfert (le faux téléphone coupe au milieu du gros fichier) : « Synchroniser » le dit (liaison
 //     coupée pendant la synchronisation, « Réessayer »), rien n'est écrit à moitié (chaque session rangée est entière,
 //     aucun temporaire), le téléphone se représente par son jeton et « Réessayer » range ce qui manquait.
+// Dans chaque compte rendu de « Synchroniser » (`attendreIssue`), relevé phrase par phrase pendant la copie et à la fin : la
+// première phrase est « Sans câble, le téléphone n'est pas modifié : seules ses sessions sont copiées vers l'ordinateur. »
+// (après la ligne de reprise d'une synchronisation coupée, s'il y en a une) et aucune phrase « Première synchronisation… ».
 // Les sessions du faux téléphone (GPX et fiche) sont écrites d'abord par le programme lui-même, dans une mémoire de
 // préparation, puis copiées : une session sans fiche est « laissée pour la prochaine fois ».
 import { spawn, spawnSync } from 'node:child_process';
@@ -272,12 +275,27 @@ const fenetre = (b) => b.evaluate(`(() => {
 })()`);
 /** Attend l'issue de la synchronisation en cours (compte rendu ou question) ; rend la fenêtre. */
 async function attendreIssue(b, quoi) {
-  await b.waitFor(`(() => { const p = document.querySelector('[role=dialog].phone-sync__dialog .phone-sync__body'); return Boolean(p) && p.textContent.trim() !== '' && ${EN_COURS.toString()}.test(p.textContent) === false; })()`, { timeout: 40000, label: `issue de ${quoi}` });
+  // Toutes les phrases vues en route (la copie en cours comprise) : aucune ne parle de « Première synchronisation ».
+  const vues = new Set();
+  const fin = Date.now() + 40000;
+  while (Date.now() < fin) {
+    const g = await fenetre(b);
+    for (const p of g?.phrases ?? []) vues.add(p);
+    if (g && g.phrases.length > 0 && !EN_COURS.test(g.phrases.join('\n'))) break;
+    await b.wait(25);
+  }
   await b.wait(300);
   const f = await fenetre(b);
+  for (const p of f?.phrases ?? []) vues.add(p);
   console.log(`  « Synchroniser » (${quoi}) dit : ${JSON.stringify(f?.phrases)} ; boutons : ${(f?.boutons ?? []).join(' / ')}`);
+  check(`« Synchroniser » (${quoi}) : l'issue est arrivée`, Boolean(f) && f.phrases.length > 0 && !EN_COURS.test(f.phrases.join('\n')), JSON.stringify(f?.phrases));
+  const i = (f?.phrases ?? []).indexOf(PHRASE_SANS_CABLE);
+  check(`« Synchroniser » (${quoi}) : le compte rendu commence par « ${PHRASE_SANS_CABLE} » (après la ligne de reprise, s'il y en a une)`, i === 0 || (i === 1 && /La synchronisation précédente avait été coupée/.test(f.phrases[0])), JSON.stringify(f?.phrases));
+  check(`« Synchroniser » (${quoi}) : aucune phrase « Première synchronisation… », ni en route ni à la fin`, ![...vues].some((p) => /Première synchronisation/.test(p)), JSON.stringify([...vues]));
   return f;
 }
+/** Première phrase du compte rendu d'une synchronisation par le Wi-Fi. */
+const PHRASE_SANS_CABLE = "Sans câble, le téléphone n'est pas modifié : seules ses sessions sont copiées vers l'ordinateur.";
 /** « Synchroniser » (barre du haut) : attend l'issue et rend la fenêtre. */
 async function synchroniser(b, quoi) {
   check(`« Synchroniser » (${quoi}) : clic`, (await b.click('.shell-topactions .phone-sync')) === 'ok');
