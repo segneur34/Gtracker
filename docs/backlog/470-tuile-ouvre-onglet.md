@@ -47,6 +47,18 @@ Demande de l'utilisateur après l'essai au téléphone : un second toucher refer
 - Relu sur captures (wingfoil, 390 × 844 et 1280, clair et sombre) : aucun libellé à la ligne, positions des libellés identiques d'une colonne à l'autre.
 - Banc, `general.mjs` à compléter : après le premier toucher, `aria-expanded="true"` et nom « Fermer l'onglet manœuvres » ; second toucher sur « Virements réussis » : plus de `#an-onglet-manoeuvres`, « avancé » toujours déplié, « général » ouvert, page non défilée. Les contrôles actuels passent sans changement.
 
+## Suite (474)
+
+Modèle | Réflexion : Sonnet | medium.
+
+Demande de l'utilisateur à l'essai 326 (21/11) : « il faudrait rajouter 2-3 boutons en plus, moyenne en vol et ratio de vol doivent renvoyer vers vol. Et temps total, ramène vers vol également. »
+
+- Sur une session de voile sur foil (`inFlight`), les tuiles `totalTime`, `activeRatio` et `activeAverage` ouvrent et referment l'onglet `vols`, comme `activeDistance` et `activeTime` : trois clés de plus dans `FLIGHT_TILE_TABS.voile` (`core/analysisTabs.ts`), commentaires de la table et de `tileLink` (`pages/SailingModule.tsx`) mis à jour. Rien d'autre ne change : sans foil ces tuiles restent de simples blocs, le surf n'est pas touché.
+- Tests de `core/analysisTabs.test.ts` à compléter (les cinq clés sur foil, aucune sans foil, onglet vols caché : null).
+- Banc : `outils/banc/general.mjs` contrôle aujourd'hui que « Temps total » n'est pas un bouton ; à adapter à la règle neuve selon la session du script (sur foil : bouton qui ouvre vols ; sans foil : simple bloc), et ajouter « Moyenne en vol » et « Ratio de vol » qui ouvrent puis referment vols ; `outils/banc/onglets.mjs` et `SCRIPTS.md` si leurs contrôles ou leurs entrées en parlent.
+
+Fait (21/11) : code, tests et `general.mjs` adaptés ; `onglets.mjs` et `SCRIPTS.md` n'en parlent pas. Phrase de doc : sur foil, les cinq tuiles du bloc du vol (distance, temps total, temps, ratio, moyenne en vol) ouvrent « vols ».
+
 ## Passe de doc (après validation)
 
 Phrase de la retouche 473, qui remplace celle ci-dessous : « Une tuile de « général » dont l'onglet est montré pour la session se touche : elle a un fond à peine teinté (`--surface-hover`, débordant de la tuile sans en décaler le texte) et un petit chevron à l'encre atténuée au bout du libellé ; le premier toucher ouvre son onglet en plus de « général » (« avancé » se déplie s'il y est rangé) et la page défile jusqu'à son panneau s'il n'est pas déjà à l'écran ; un second toucher referme l'onglet, seul, sans défiler ; une tuile sans onglet, ou dont l'onglet est caché par l'activité, reste un simple bloc, sans teinte (table `TILE_TABS`, `core/analysisTabs.ts`). »

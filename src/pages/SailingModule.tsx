@@ -416,7 +416,7 @@ function SailingModule() {
   ] : [];
   /**
    * Onglet qu'ouvre puis referme une tuile de « général », pris parmi ceux montrés pour la session ; sur foil,
-   * distance et temps « en vol » ouvrent les vols (`tileTab`).
+   * les cinq tuiles du bloc du vol (distance, temps total, temps, ratio, moyenne) ouvrent les vols (`tileTab`).
    */
   const tileLink = (statKey: string): TileLink | null => {
     const tab = tileTab('voile', statKey, sailingPanels, { inFlight: foil });

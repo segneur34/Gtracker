@@ -297,12 +297,14 @@ const SURF_TILE_TABS: Readonly<Record<string, SurfTab>> = {
 export const TILE_TABS: Record<SportFamily, Readonly<Record<string, string>>> = { voile: SAILING_TILE_TABS, surf: SURF_TILE_TABS };
 
 /**
- * Tuiles nommées « en vol » quand la session est sur foil (« Distance en vol », « Temps en vol ») : elles ouvrent
- * l'onglet du détail des vols, même si leurs chiffres viennent du seuil de vitesse. En surf, les tuiles de vol
- * ont leur propre clé, déjà dans `SURF_TILE_TABS`.
+ * Tuiles du bloc du vol quand la session est sur foil (« Distance en vol », « Temps total », « Temps en vol »,
+ * « Ratio de vol », « Moyenne en vol ») : elles ouvrent l'onglet du détail des vols, même si leurs chiffres
+ * viennent du seuil de vitesse. En surf, les tuiles de vol ont leur propre clé, déjà dans `SURF_TILE_TABS`.
  */
 export const FLIGHT_TILE_TABS: Partial<Record<SportFamily, Readonly<Record<string, string>>>> = {
-  voile: { activeDistance: 'vols', activeTime: 'vols' } satisfies Record<string, SailingTab>,
+  voile: {
+    activeDistance: 'vols', totalTime: 'vols', activeTime: 'vols', activeRatio: 'vols', activeAverage: 'vols',
+  } satisfies Record<string, SailingTab>,
 };
 
 /**

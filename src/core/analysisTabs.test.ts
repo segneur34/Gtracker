@@ -363,7 +363,9 @@ describe('tileTab : la tuile de « général » et son onglet', () => {
       waves: 'vagues', waveTime: 'vagues', longestWave: 'vagues', maxSpeed: 'vagues', flightTime: 'vols', longestFlight: 'vols',
       pumpCadence: 'pumping', pumpShare: 'pumping', heartRate: 'cardio',
     });
-    expect(FLIGHT_TILE_TABS).toEqual({ voile: { activeDistance: 'vols', activeTime: 'vols' } });
+    expect(FLIGHT_TILE_TABS).toEqual({
+      voile: { activeDistance: 'vols', totalTime: 'vols', activeTime: 'vols', activeRatio: 'vols', activeAverage: 'vols' },
+    });
   });
 
   it('chaque cible est un onglet de son module, jamais « général »', () => {
@@ -394,11 +396,11 @@ describe('tileTab : la tuile de « général » et son onglet', () => {
     expect(tileTab('surf', 'tacks', SURF_TABS)).toBeNull();
   });
 
-  it('« en vol » sur foil : distance et temps ouvrent « vols » s\'il est montré ; sans foil, rien', () => {
-    expect(tileTab('voile', 'activeDistance', SAILING_TABS, { inFlight: true })?.key).toBe('vols');
-    expect(tileTab('voile', 'activeTime', SAILING_TABS, { inFlight: true })?.key).toBe('vols');
-    expect(tileTab('voile', 'activeAverage', SAILING_TABS, { inFlight: true })).toBeNull();
-    expect(tileTab('voile', 'activeDistance', SAILING_TABS)).toBeNull();
+  it('sur foil : les cinq tuiles du bloc du vol ouvrent « vols » s\'il est montré ; sans foil, rien', () => {
+    for (const key of ['activeDistance', 'totalTime', 'activeTime', 'activeRatio', 'activeAverage']) {
+      expect(tileTab('voile', key, SAILING_TABS, { inFlight: true })?.key, key).toBe('vols');
+      expect(tileTab('voile', key, SAILING_TABS), key).toBeNull();
+    }
     expect(tileTab('voile', 'activeTime', SAILING_TABS.filter((t) => t.key !== 'vols'), { inFlight: true })).toBeNull();
     expect(tileTab('surf', 'activeTime', SURF_TABS, { inFlight: true })).toBeNull();
   });

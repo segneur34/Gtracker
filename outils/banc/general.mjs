@@ -259,9 +259,13 @@ await wait(500);
 check('390 px : « Terminé » ferme la carte agrandie', !(await evaluate(`Boolean(document.querySelector('.an-map-overlay'))`)));
 
 // --- 6. Une tuile de « général » ouvre son onglet (après le dernier relevé de texte) ---
-/** Tuile (bouton ou bloc) dont le libellé est exactement `label` : balise, et classe de lien. */
+/**
+ * Tuile (bouton ou bloc) dont le libellé est `label`, ou `label` suivi d'une parenthèse (« Temps en vol (≥9 kn) »
+ * porte son seuil) : balise, et classe de lien.
+ */
 const tuile = (label) => evaluate(`(() => {
-  const l = [...document.querySelectorAll('.an-sheet__stat-label')].find((x) => x.textContent.trim() === ${JSON.stringify(label)});
+  const voulu = ${JSON.stringify(label)};
+  const l = [...document.querySelectorAll('.an-sheet__stat-label')].find((x) => { const s = x.textContent.trim(); return s === voulu || s.startsWith(voulu + ' ('); });
   const s = l?.closest('.an-sheet__stat');
   return s ? { tag: s.tagName, lien: s.classList.contains('an-sheet__stat--link'), aria: s.getAttribute('aria-label') } : null;
 })()`);
@@ -285,7 +289,12 @@ await go(paths.voile, 7000);
 const virements = await tuile('Virements réussis');
 const tempsTotal = await tuile('Temps total');
 check('tuile : voile, « Virements réussis » est un bouton relié', virements?.tag === 'BUTTON' && virements.lien && /Ouvrir l.onglet manœuvres/.test(virements.aria ?? ''), JSON.stringify(virements));
-check('tuile : voile, « Temps total » n\'est pas un bouton', tempsTotal !== null && tempsTotal.tag !== 'BUTTON' && !tempsTotal.lien, JSON.stringify(tempsTotal));
+// Session sur foil : les cinq tuiles du bloc du vol ouvrent l'onglet vols.
+check('tuile : voile sur foil, « Temps total » est un bouton relié aux vols', tempsTotal?.tag === 'BUTTON' && tempsTotal.lien && /Ouvrir l.onglet vols/.test(tempsTotal.aria ?? ''), JSON.stringify(tempsTotal));
+for (const label of ['Distance en vol', 'Temps en vol', 'Ratio de vol', 'Moyenne en vol']) {
+  const t = await tuile(label);
+  check(`tuile : voile sur foil, « ${label} » est un bouton relié aux vols`, t?.tag === 'BUTTON' && t.lien && /Ouvrir l.onglet vols/.test(t.aria ?? ''), JSON.stringify(t));
+}
 check('tuile : avant le toucher, ni panneau manœuvres ni « avancé » déplié', (await cadreOnglet('manoeuvres')) === null && !(await advancedOpen()));
 check('tuile : le clic sur « Virements réussis » trouve son bouton', await clickTuile('Virements réussis'));
 await settle({ max: 1500 });
