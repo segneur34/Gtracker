@@ -18,8 +18,8 @@ import './FishSchool.css';
  */
 
 interface Props {
-  /** Nombre de sessions du banc (toutes celles de la bibliothèque, ou le réglage d'essai). */
-  sessions: number;
+  /** Poissons de chaque session du banc, de la plus ancienne à la plus récente (toutes celles de la bibliothèque, ou le réglage d'essai). */
+  fishPerSession: readonly number[];
   /** Couleur d'activité de chaque session, de la plus ancienne à la plus récente ; `null` : l'encre. */
   colors: readonly (string | null)[];
   style: SchoolStyle;
@@ -68,7 +68,7 @@ const whenIdle = (run: () => void): (() => void) => {
 
 const n1 = (v: number): string => v.toFixed(1);
 
-function FishSchool({ sessions, colors, style, ready, onShown }: Props) {
+function FishSchool({ fishPerSession, colors, style, ready, onShown }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [measured, setMeasured] = useState<MeasuredSchool | null>(null);
   const [drawn, setDrawn] = useState<Drawn | null>(null);
@@ -129,7 +129,7 @@ function FishSchool({ sessions, colors, style, ready, onShown }: Props) {
   }, [armed]);
 
   // Calcul des places et de l'eau, au repos du navigateur ; l'ancien dessin reste jusqu'au nouveau.
-  const total = fishCount(sessions);
+  const total = fishCount(fishPerSession);
   useEffect(() => {
     if (!measured) return;
     return whenIdle(() => {
@@ -169,7 +169,7 @@ function FishSchool({ sessions, colors, style, ready, onShown }: Props) {
             </>
           )}
           {drawn.fish.map((f, i) => {
-            const session = sessionOfFish(i);
+            const session = sessionOfFish(i, fishPerSession);
             const color = colors.length > 0 ? colors[session % colors.length] : null;
             return (
               <use key={i} href={`#${fishSymbolId(style, f.shape)}`}

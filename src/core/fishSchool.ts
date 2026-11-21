@@ -1,5 +1,4 @@
 import { distanceSlope, gridDistances, gridOver, readDistance, type Box, type DistanceGrid } from './gridDistance';
-import { SCHOOL_COUNT, type SchoolCount } from './schoolBasics';
 
 /** Hasard reproductible : la même graine rend toujours la même suite de nombres de [0, 1[. */
 export const seededRandom = (seed: number) => {
@@ -14,12 +13,12 @@ export const seededRandom = (seed: number) => {
 };
 
 export {
-  DEFAULT_SCHOOL_STYLE, fishCount, isSchoolStyle, SCHOOL_COUNT, SCHOOL_STYLES, SCHOOL_TRIAL_MAX, sessionOfFish,
-  type SchoolCount, type SchoolStyle,
+  DEFAULT_SCHOOL_STYLE, fishCount, fishForDuration, isSchoolStyle, SCHOOL_FISH_MAX, SCHOOL_STYLES, SCHOOL_TRIAL_MAX, sessionOfFish,
+  type SchoolStyle,
 } from './schoolBasics';
 
 /**
- * Le banc de poissons du Profil, pur : combien de poissons pour un nombre de sessions, et la place, la taille, la forme
+ * Le banc de poissons du Profil, pur : combien de poissons pour des sessions (selon leur durée), et la place, la taille, la forme
  * et l'orientation de chacun sur la page. La page arrive mesurée (`SchoolLayout` : zone, angle de départ, obstacles
  * rigides, cadres et leurs ouvertures, textes des cadres) ; le dessin est l'affaire du composant.
  *
@@ -87,7 +86,7 @@ export interface SchoolFish {
   phase: 1 | 2;
 }
 
-export interface SchoolRules extends SchoolCount {
+export interface SchoolRules {
   /** Pas de la grille des distances, en px. */
   gridPx: number;
   /** Longueur des poissons : tirage gaussien autour de `base`, écart `spread`, borné de `min` à `max`, au demi-pixel. */
@@ -122,7 +121,6 @@ export interface SchoolRules extends SchoolCount {
 }
 
 export const SCHOOL_RULES: SchoolRules = {
-  ...SCHOOL_COUNT,
   gridPx: 4,
   size: { base: 13, spread: 1.5, min: 10, max: 16 },
   shapes: 8,

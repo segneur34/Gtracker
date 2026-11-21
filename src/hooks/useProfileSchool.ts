@@ -4,12 +4,15 @@ import { athleteSchoolTrialSessions, type AthleteProfile } from '../library/athl
 import type { LibrarySession } from '../library/record';
 import { useVisibility } from './useSportSettings';
 import { brushColorFor } from '../core/brushColor';
+import { fishForDuration } from '../core/schoolBasics';
 import { useAppliedTheme } from './useTheme';
 
 /** Ce que la couche du banc de poissons du Profil reçoit : son nombre de sessions et la couleur de chacune. */
 export interface ProfileSchool {
-  /** Toutes les sessions de la bibliothèque, quelle que soit la période, ou le nombre imposé par le réglage d'essai. */
+  /** Nombre de sessions du banc : toutes celles de la bibliothèque, quelle que soit la période, ou le nombre imposé par le réglage d'essai. */
   sessions: number;
+  /** Poissons de chaque session (de la plus ancienne à la plus récente), selon sa durée : 1 à 3. */
+  fish: readonly number[];
   /**
    * Couleur d'activité de chaque session, vue du thème comme le pinceau des cadres (`brushColorFor` : éclaircie la nuit,
    * l'encre si elle se confond avec le fond), de la plus ancienne à la plus récente : la session de chaque poisson suit
@@ -33,5 +36,16 @@ export const useProfileSchool = (
       }),
     [sessions, activities, dark],
   );
-  return { sessions: athleteSchoolTrialSessions(profile) ?? sessions.length, colors };
+  // Poissons de chaque session d'après sa durée totale, dans le même ordre que les couleurs ; le réglage d'essai donne
+  // des sessions de durée inconnue, un poisson chacune.
+  const trial = athleteSchoolTrialSessions(profile);
+  const fish = useMemo(
+    () => trial !== null
+      ? Array.from({ length: trial }, () => fishForDuration(null))
+      : [...sessions]
+        .sort((a, b) => a.record.summary.startMs - b.record.summary.startMs)
+        .map((s) => fishForDuration((s.record.summary.endMs - s.record.summary.startMs) / 1000)),
+    [sessions, trial],
+  );
+  return { sessions: fish.length, fish, colors };
 };

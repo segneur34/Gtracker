@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { fishCount, schoolPlaces, type FrameCorner, type SchoolLayout } from './fishSchool';
+import { schoolPlaces, type FrameCorner, type SchoolLayout } from './fishSchool';
+
+/** Poissons pour un nombre de sessions, de la taille des bancs de longues sessions : trois jusqu'à 30, deux jusqu'à 40, puis un. */
+const fishCount = (n: number): number => 3 * Math.min(n, 30) + 2 * Math.max(0, Math.min(n, 40) - 30) + Math.max(0, n - 40);
 import { connectedWater, WATER_RULES, waterField, waterMaps, waterOutline } from './schoolWater';
 import type { Box } from './gridDistance';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  brushCorner, brushDoor, createSchoolPlanner, fishCount, fishShape, fishSize, frameWalls, isSchoolStyle, schoolCorner, schoolLayoutKey,
+  brushCorner, brushDoor, createSchoolPlanner, fishCount, fishForDuration, fishShape, fishSize, frameWalls, isSchoolStyle, schoolCorner, schoolLayoutKey,
   schoolPlaces, SCHOOL_RULES, SCHOOL_STYLES, seededRandom, sessionOfFish, type FrameCorner, type SchoolFish, type SchoolFrame, type SchoolLayout,
 } from './fishSchool';
 import { waterOutline } from './schoolWater';
@@ -148,17 +148,30 @@ const fishOverlap = (p: SchoolFish, q: SchoolFish): boolean => {
 
 const inside = (b: Box, x: number, y: number): boolean => x > b.x && x < b.r && y > b.y && y < b.b;
 
-describe('fishCount et sessionOfFish', () => {
-  it('trois par session jusqu’à 30, deux jusqu’à 40, puis un', () => {
-    expect([0, 1, 30, 31, 40, 41, 50, 100].map((n) => fishCount(n))).toEqual([0, 3, 90, 92, 110, 111, 120, 170]);
+/** Poissons pour `n` sessions de trois poissons chacune : de quoi remplir un banc, sans dépendre de la durée. */
+const threeEach = (n: number): number => fishCount(Array.from({ length: n }, () => 3));
+
+describe('fishForDuration, fishCount et sessionOfFish', () => {
+  it('un poisson dès la première minute, un de plus par heure pleine, trois au plus', () => {
+    const h = 3600;
+    expect([60, 1800, h - 1].map(fishForDuration)).toEqual([1, 1, 1]);
+    expect([h, h + 1, 2 * h - 1].map(fishForDuration)).toEqual([2, 2, 2]);
+    expect([2 * h, 3 * h, 10 * h].map(fishForDuration)).toEqual([3, 3, 3]);
+  });
+
+  it('une session de moins d’une minute ou sans durée connue donne un poisson', () => {
+    expect([30, 0.5, 0, -5, null, Number.NaN].map(fishForDuration)).toEqual([1, 1, 1, 1, 1, 1]);
+  });
+
+  it('les poissons de plusieurs sessions s’additionnent', () => {
+    expect(fishCount([])).toBe(0);
+    expect(fishCount([1, 2, 3, 1])).toBe(7);
   });
 
   it('chaque poisson porte sa session, inverse du compte', () => {
-    expect([0, 2, 3, 89, 90, 91, 92, 109, 110, 169].map((i) => sessionOfFish(i))).toEqual([0, 0, 1, 29, 30, 30, 31, 39, 40, 99]);
-    for (let n = 0; n <= 120; n++) {
-      expect(sessionOfFish(fishCount(n))).toBe(n);
-      if (n > 0) expect(sessionOfFish(fishCount(n) - 1)).toBe(n - 1);
-    }
+    const per = [1, 3, 2, 1];
+    expect(Array.from({ length: fishCount(per) }, (_, i) => sessionOfFish(i, per))).toEqual([0, 1, 1, 1, 2, 2, 3]);
+    expect(sessionOfFish(fishCount(per), per)).toBe(per.length);
   });
 });
 
@@ -223,9 +236,9 @@ describe('schoolPlaces', () => {
   it('une session de plus ajoute ses poissons sans bouger les autres (390, 320 et 1 180 px, angle à droite ou à gauche)', () => {
     for (const layout of [PHONE, NARROW, DESKTOP, PHONE_LEFT, DESKTOP_LEFT]) {
       for (const sessions of [1, 15, 30, 50]) {
-        const before = schoolPlaces(layout, fishCount(sessions));
-        const after = schoolPlaces(layout, fishCount(sessions + 1));
-        expect(before).toHaveLength(fishCount(sessions));
+        const before = schoolPlaces(layout, threeEach(sessions));
+        const after = schoolPlaces(layout, threeEach(sessions + 1));
+        expect(before).toHaveLength(threeEach(sessions));
         expect(after.slice(0, before.length)).toEqual(before);
       }
     }

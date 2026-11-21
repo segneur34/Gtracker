@@ -493,8 +493,8 @@ await setAthlete({ name: null });
 
 // 8. Le banc de poissons du Profil, par le réglage d'essai « Nombre de sessions du banc » (posé dans le profil du
 // pratiquant, `schoolTrialSessions`) : nombre de poissons, eau, aucun poisson sur un texte, places stables, choix du dessin.
-/** Poissons attendus : trois par session jusqu'à 30, deux de la 31e à la 40e, puis un. */
-const fishExpected = (n) => 3 * Math.min(n, 30) + 2 * Math.max(0, Math.min(n, 40) - 30) + Math.max(0, n - 40);
+/** Poissons attendus : le réglage d'essai donne des sessions sans durée connue, un poisson chacune. */
+const fishExpected = (n) => n;
 const SCHOOL_COUNTS = [0, 1, 15, 30, 31, 50, 100];
 const sizeOf = (width) => ({ width, height: width === 390 ? 844 : 640, deviceScaleFactor: 2, mobile: true });
 /** Ouvre le Profil avec ce compte d'essai et ce dessin (`null` : le choix par défaut) ; rend le relevé de la couche. */
@@ -568,11 +568,11 @@ for (const width of [390, 320]) {
   }
   const a = byCount[30].transforms;
   const b = byCount[31].transforms;
-  check(`banc ${width} px : les places de 30 sessions sont le début de celles de 31`, a.length === 90 && b.length === 92 && a.every((t, i) => t === b[i]),
+  check(`banc ${width} px : les places de 30 sessions sont le début de celles de 31`, a.length === 30 && b.length === 31 && a.every((t, i) => t === b[i]),
     `${a.length} / ${b.length}`);
   const p5 = await openSchool(30, 'P5');
   check(`banc ${width} px : de P4 à P5, mêmes places, seuls les dessins changent`,
-    p5.transforms.length === 90 && p5.transforms.every((t, i) => t === a[i]) && p5.hrefs.every((h) => h.startsWith('#fz-P5-')) && byCount[30].hrefs.every((h) => h.startsWith('#fz-P4-')),
+    p5.transforms.length === 30 && p5.transforms.every((t, i) => t === a[i]) && p5.hrefs.every((h) => h.startsWith('#fz-P5-')) && byCount[30].hrefs.every((h) => h.startsWith('#fz-P4-')),
     `${p5.hrefs[0]} / ${byCount[30].hrefs[0]}`);
 }
 
@@ -598,8 +598,8 @@ await evaluate(`document.querySelector('.fish-style-picker [data-style="P5"]').c
 await wait(300);
 check('réglages : un clic sur P5 l\'enfonce', (await pickerState()) === 'P1 P2 P3 P4 P5* P6 P7 aucun', await pickerState());
 await go('/profil');
-await waitFor(`document.querySelector('.fish-school')?.getAttribute('data-fish') === '90'`, { timeout: 15000, every: 100, label: 'banc de 30 sessions' });
-check('le Profil rouvert montre les dessins P5', await evaluate(`(() => { const u = [...document.querySelectorAll('.fish-school > use')]; return u.length === 90 && u.every((x) => x.getAttribute('href').startsWith('#fz-P5-')); })()`));
+await waitFor(`document.querySelector('.fish-school')?.getAttribute('data-fish') === '30'`, { timeout: 15000, every: 100, label: 'banc de 30 sessions' });
+check('le Profil rouvert montre les dessins P5', await evaluate(`(() => { const u = [...document.querySelectorAll('.fish-school > use')]; return u.length === 30 &&u.every((x) => x.getAttribute('href').startsWith('#fz-P5-')); })()`));
 await go('/parametres');
 await waitFor(`document.querySelectorAll('.fish-style-picker [data-style]').length === 8`, { timeout: 8000, every: 100, label: 'choix du dessin' });
 check('le choix de P5 tient au rechargement', (await pickerState()) === 'P1 P2 P3 P4 P5* P6 P7 aucun', await pickerState());
@@ -619,8 +619,8 @@ await shoot('reglages-pratiquant-aucun');
 await evaluate(`document.querySelector('.fish-style-picker [data-style="P2"]').click()`);
 await wait(300);
 await go('/profil');
-await waitFor(`document.querySelector('.fish-school')?.getAttribute('data-fish') === '90'`, { timeout: 15000, every: 100, label: 'banc remontré' });
-check('un poisson choisi dans Réglages remontre le banc, dans son dessin', await evaluate(`(() => { const u = [...document.querySelectorAll('.fish-school > use')]; return u.length === 90 && u.every((x) => x.getAttribute('href').startsWith('#fz-P2-')) && !!document.querySelector('.fish-school__water'); })()`));
+await waitFor(`document.querySelector('.fish-school')?.getAttribute('data-fish') === '30'`, { timeout: 15000, every: 100, label: 'banc remontré' });
+check('un poisson choisi dans Réglages remontre le banc, dans son dessin', await evaluate(`(() => { const u = [...document.querySelectorAll('.fish-school > use')]; return u.length === 30 &&u.every((x) => x.getAttribute('href').startsWith('#fz-P2-')) && !!document.querySelector('.fish-school__water'); })()`));
 await openWindow();
 await waitFor(`document.querySelectorAll('.profile-settings-window .fish-style-picker [data-style]').length === 8`, { timeout: 8000, every: 100, label: 'choix du poisson' });
 await evaluate(`document.querySelector('.profile-settings-window .fish-style-picker [data-style="aucun"]').click()`);
@@ -628,7 +628,7 @@ await wait(600);
 check('« Aucun » depuis la fenêtre : le banc et l\'eau partent aussitôt', JSON.stringify(await schoolHere()) === '{"couche":false,"eau":false,"voile":false}', JSON.stringify(await schoolHere()));
 await shoot('profil-fenetre-aucun');
 await evaluate(`document.querySelector('.profile-settings-window .fish-style-picker [data-style="P4"]').click()`);
-await waitFor(`document.querySelector('.fish-school')?.getAttribute('data-fish') === '90'`, { timeout: 15000, every: 100, label: 'banc remontré depuis la fenêtre' });
+await waitFor(`document.querySelector('.fish-school')?.getAttribute('data-fish') === '30'`, { timeout: 15000, every: 100, label: 'banc remontré depuis la fenêtre' });
 check('un poisson choisi dans la fenêtre remontre le banc et l\'eau', JSON.stringify(await schoolHere()) === '{"couche":true,"eau":true,"voile":true}', JSON.stringify(await schoolHere()));
 await evaluate(`document.querySelector('.profile-settings-window__close').click()`);
 await setAthlete({ schoolStyle: null, schoolHidden: false });
@@ -638,7 +638,7 @@ await send('Emulation.setCPUThrottlingRate', { rate: 4 });
 const slow = await openSchool(100);
 await send('Emulation.setCPUThrottlingRate', { rate: 1 });
 console.log(`temps de calcul du banc (processeur ralenti ×4, 100 sessions, 390 px) : ${slow.ms} ms`);
-check('banc : calcul à 100 sessions sous processeur ralenti ×4 en moins de 600 ms', slow.fish === 170 && slow.ms >= 0 && slow.ms < 600);
+check('banc : calcul à 100 sessions sous processeur ralenti ×4 en moins de 600 ms', slow.fish === 100 &&slow.ms >= 0 && slow.ms < 600);
 await setAthlete({ schoolTrialSessions: null, schoolStyle: null });
 
 // Ce script ne relève que les erreurs de console, pas les avertissements.
