@@ -31,7 +31,7 @@ import { useNow } from '../hooks/useNow';
 import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings';
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
 import { activityShares, favoriteActivities, favoriteActivity, favoriteSpot } from '../library/profile';
-import { profilePromptGate } from '../library/profilePrompt';
+import { phoneAppOfferGate, profilePromptGate } from '../library/profilePrompt';
 import { inBounds, profilePeriodOf, statsPeriodBounds, statsTotals } from '../library/stats';
 import { TUTORIAL_OF_DAY_VISIBLE, tutorialCardGate } from '../tutorials/tutorials';
 import { OTHERS_COLOR } from '../components/chartStyle';
@@ -290,8 +290,9 @@ function ProfilePage() {
       </div>
       {/* Puis le profil, s'il manque un champ, une fois par lancement ; jamais par-dessus ces deux cartes. */}
       {gate.mount && <ProfilePrompt otherCardShown={gate.otherCardShown} onDecided={setProfileShown} />}
-      {/* Programme Windows : l'application du téléphone qu'il emporte, proposée une fois par version, mémoire choisie. */}
-      {!memoryNeedsAction && status === 'ready' && <PhoneAppOffer />}
+      {/* Programme Windows : l'application du téléphone qu'il emporte, proposée une fois par version, après toutes les
+          autres cartes d'ouverture et jamais par-dessus l'une d'elles. */}
+      {phoneAppOfferGate({ memoryNeedsAction, memoryReady: status === 'ready', permissionsShown, profileShown }) && <PhoneAppOffer />}
 
       {!memoryNeedsAction && <MemoryStatus compact />}
 

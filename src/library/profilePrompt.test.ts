@@ -1,6 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_ATHLETE_PROFILE } from './athleteProfile';
-import { PROFILE_PROMPT_FIELDS, missingProfileFields, profilePromptGate, shouldPromptProfile } from './profilePrompt';
+import { PROFILE_PROMPT_FIELDS, missingProfileFields, phoneAppOfferGate, profilePromptGate, shouldPromptProfile } from './profilePrompt';
+
+describe("phoneAppOfferGate : l'application du téléphone après toutes les cartes d'ouverture", () => {
+  const free = { memoryNeedsAction: false, memoryReady: true, permissionsShown: false, profileShown: false };
+
+  it('est posée quand la mémoire est prête et que rien ne paraît', () => {
+    expect(phoneAppOfferGate(free)).toBe(true);
+  });
+
+  it('attend la mémoire, la lecture des autorisations et la décision du pop-up du profil', () => {
+    expect(phoneAppOfferGate({ ...free, memoryReady: false })).toBe(false);
+    expect(phoneAppOfferGate({ ...free, memoryNeedsAction: true })).toBe(false);
+    expect(phoneAppOfferGate({ ...free, permissionsShown: null })).toBe(false);
+    expect(phoneAppOfferGate({ ...free, profileShown: null })).toBe(false);
+  });
+
+  it("ne s'ouvre jamais par-dessus la carte des autorisations ni le pop-up du profil", () => {
+    expect(phoneAppOfferGate({ ...free, permissionsShown: true })).toBe(false);
+    expect(phoneAppOfferGate({ ...free, profileShown: true })).toBe(false);
+  });
+});
 
 describe('missingProfileFields', () => {
   const full = { ...EMPTY_ATHLETE_PROFILE, name: 'Tom', birthYear: 1985, sex: 'm' as const, weightKg: 72, heightCm: 178 };

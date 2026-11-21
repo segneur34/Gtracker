@@ -55,6 +55,19 @@ export const shouldPromptProfile = ({ native, missing, askedThisLaunch, otherCar
  * n'est posé qu'une fois les deux décidées (`permissionsShown` : `null` tant que les
  * autorisations ne sont pas lues) ; `otherCardShown` : l'une d'elles est à l'écran.
  */
+/**
+ * La fenêtre de l'application du téléphone (programme Windows) passe après toutes les autres cartes d'ouverture :
+ * posée seulement quand la mémoire est prête et que les autorisations et le pop-up du profil ont décidé de ne pas
+ * paraître (`false`, ni `null` en attente ni `true`). Si l'un d'eux s'est ouvert, elle attend le lancement suivant :
+ * jamais deux fenêtres ouvertes d'elles-mêmes l'une sur l'autre.
+ */
+export const phoneAppOfferGate = ({ memoryNeedsAction, memoryReady, permissionsShown, profileShown }: {
+  memoryNeedsAction: boolean;
+  memoryReady: boolean;
+  permissionsShown: boolean | null;
+  profileShown: boolean | null;
+}): boolean => !memoryNeedsAction && memoryReady && permissionsShown === false && profileShown === false;
+
 export const profilePromptGate = ({ memoryNeedsAction, memoryReady, permissionsShown }: {
   memoryNeedsAction: boolean;
   memoryReady: boolean;
