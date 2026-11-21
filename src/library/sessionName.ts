@@ -20,16 +20,25 @@ export type NamedRecord = Pick<SessionRecord, 'name'> & { place?: SessionPlace }
 export const ARRIVAL_SEPARATOR = ' → ';
 
 /**
+ * Nom du lieu d'arrivée, seulement s'il porte un autre nom que le départ (sans tenir compte de la casse) ;
+ * `null` sinon, ou sans arrivée nommée.
+ */
+export const distinctArrival = (place: SessionPlace | null | undefined): string | null => {
+  const arrival = place?.arrival?.name?.trim() || null;
+  if (arrival === null) return null;
+  const departure = place?.name?.trim() || null;
+  return departure !== null && arrival.toLocaleLowerCase('fr') === departure.toLocaleLowerCase('fr') ? null : arrival;
+};
+
+/**
  * Nom du lieu de la session, `null` s'il n'est pas connu (pas encore cherché, rien trouvé, ou vidé) :
  * « Départ → Arrivée » quand l'arrivée, loin du départ, porte un autre nom ; sinon le départ seul.
  */
 export const placeLabel = (place: SessionPlace | null | undefined): string | null => {
   const departure = place?.name?.trim() || null;
   if (departure === null) return null;
-  const arrival = place?.arrival?.name?.trim() || null;
-  return arrival !== null && arrival.toLocaleLowerCase('fr') !== departure.toLocaleLowerCase('fr')
-    ? `${departure}${ARRIVAL_SEPARATOR}${arrival}`
-    : departure;
+  const arrival = distinctArrival(place);
+  return arrival !== null ? `${departure}${ARRIVAL_SEPARATOR}${arrival}` : departure;
 };
 
 /** Nom donné par l'utilisateur, rogné, `null` sans nom. */

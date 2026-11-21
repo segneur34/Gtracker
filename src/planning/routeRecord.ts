@@ -2,7 +2,6 @@ import { sanitizeMarkGuide, type MarkGuideSettings } from '../recording/markGuid
 import { DEFAULT_ROUTE_MODE, newLeg, readRouteMode, type PlannedRoute, type RouteLeg, type RouteMode, type RoutePoint, type Waypoint } from './route';
 import { isFiniteNumber, isObject, parseJson } from '../core/basics';
 import { FILE_FORMATS } from '../core/appIdentity';
-import { t } from '../core/i18n';
 
 /**
  * Fiche d'un itinéraire : le fichier JSON rangé dans `itineraires/` du
@@ -41,6 +40,7 @@ interface StoredLeg {
 export interface RouteRecord {
   format: typeof ROUTE_FORMAT;
   version: number;
+  /** Nom saisi par l'utilisateur ; vide : le nom se compose à l'affichage (`routeDisplayName`, `library/routeName.ts`). */
   name: string;
   /** Activité choisie pour l'itinéraire (unités d'affichage, terrain) ; `null` : aucune. */
   activityId: string | null;
@@ -54,6 +54,11 @@ export interface RouteRecord {
    * ceux de l'activité. À relire par `routeMarkGuide`.
    */
   markGuide?: unknown;
+  /**
+   * Lieu du départ et de l'arrivée, trouvé comme celui d'une session tant que le nom est vide ; gardé à la
+   * réécriture. À relire par `routePlace` (`library/routeName.ts`), qui écarte un lieu mal formé.
+   */
+  place?: unknown;
   [unknown: string]: unknown;
 }
 
@@ -134,7 +139,7 @@ export const parseRouteRecord = (text: string): RouteRecord | null => {
     ...raw,
     format: ROUTE_FORMAT,
     version: raw.version,
-    name: typeof raw.name === 'string' && raw.name.trim() !== '' ? raw.name.trim() : t('Itinéraire'),
+    name: typeof raw.name === 'string' ? raw.name.trim() : '',
     activityId: typeof raw.activityId === 'string' && raw.activityId !== '' ? raw.activityId : null,
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,

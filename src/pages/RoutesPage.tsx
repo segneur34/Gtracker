@@ -20,6 +20,7 @@ import { plainError } from '../platform/errorText';
 import { readPickedFile } from '../platform/files';
 import { isNativeApp } from '../platform/runtime';
 import { routeDeleteButton } from '../library/trash';
+import { routeDisplayName } from '../library/routeName';
 import { useDeletesToTrash } from '../hooks/useTrash';
 import { jsonStore } from '../platform/storage';
 import { STORAGE_KEYS } from '../core/appIdentity';
@@ -70,7 +71,7 @@ function RoutesPage() {
     const filtered = filter === null
       ? routes
       : routes.filter((r) => (routeActivity(r, activities)?.id ?? WITHOUT_ACTIVITY) === filter);
-    return sortRoutes(filtered, sort, (r) => distances.get(r.base) ?? 0);
+    return sortRoutes(filtered, sort, (r) => distances.get(r.base) ?? 0, (r) => routeDisplayName(r.record));
   }, [routes, activities, filter, sort, distances]);
   /** Range l'itinéraire du GPX choisi ; le champ est vidé pour accepter de reprendre le même fichier. */
   const importFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -83,7 +84,7 @@ function RoutesPage() {
       const saved = await importGpx(await readPickedFile(file), file.name);
       setFilter(null);
       setImported(saved.base);
-      setNote({ text: t('« {name} » est rangé dans vos itinéraires.', { name: saved.record.name }), error: false });
+      setNote({ text: t('« {name} » est rangé dans vos itinéraires.', { name: routeDisplayName(saved.record) }), error: false });
     } catch (err) {
       setNote({ text: plainError(err, t('Import impossible.')), error: true });
     }
@@ -100,7 +101,7 @@ function RoutesPage() {
     setNote(null);
     try {
       await remove(saved);
-      setNote({ text: t('« {name} » est supprimé.', { name: saved.record.name }), error: false });
+      setNote({ text: t('« {name} » est supprimé.', { name: routeDisplayName(saved.record) }), error: false });
     } catch (err) {
       setNote({ text: t('Suppression impossible : {reason}', { reason: plainError(err, t('erreur inconnue')) }), error: true });
     }
@@ -160,13 +161,13 @@ function RoutesPage() {
             ) : (
               <MoreMenu label={t("Plus d'actions sur l'itinéraire")}>
                 <Button size="s" variant="ghost" onClick={() => setSharingImage(saved)}
-                  aria-label={t("Partager l'image de {name}", { name: saved.record.name })}>
+                  aria-label={t("Partager l'image de {name}", { name: routeDisplayName(saved.record) })}>
                   <IconShare size={18} /> {t("Partager l'image")}
                 </Button>
-                <Button size="s" variant="ghost" onClick={() => void share(saved)} aria-label={t('Partager {name}', { name: saved.record.name })}>
+                <Button size="s" variant="ghost" onClick={() => void share(saved)} aria-label={t('Partager {name}', { name: routeDisplayName(saved.record) })}>
                   <IconShare size={18} /> {t('Partager le GPX')}
                 </Button>
-                <Button size="s" variant="danger" onClick={() => setConfirmingDelete(saved.base)} aria-label={t('Supprimer {name}', { name: saved.record.name })}>
+                <Button size="s" variant="danger" onClick={() => setConfirmingDelete(saved.base)} aria-label={t('Supprimer {name}', { name: routeDisplayName(saved.record) })}>
                   {t('Supprimer')}
                 </Button>
               </MoreMenu>

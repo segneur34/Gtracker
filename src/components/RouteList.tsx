@@ -4,6 +4,7 @@ import { activityDisplayName, type Activity } from '../core/activities';
 import { formatDistance } from '../core/units';
 import { useGoOnRoute } from '../hooks/useGoOnRoute';
 import type { SavedRoute } from '../hooks/useRouteLibrary';
+import { routeDisplayName } from '../library/routeName';
 import { effectiveDistanceUnit } from '../hooks/useSportSettings';
 import { routeActivity, routeDistanceM } from '../planning/routeList';
 import ActivityGlyph from './logos/ActivityGlyph';
@@ -47,7 +48,7 @@ function RouteList({ routes, activities, onOpen, currentBase = null, actions, go
         const activity = routeActivity(saved, activities);
         const body = (
           <>
-            <strong>{saved.record.name}</strong>
+            <strong>{routeDisplayName(saved.record)}</strong>
             <span className="route-list__meta">
               {activity
                 ? <ActivityGlyph activity={activity} size={14} className="route-list__icon" />
@@ -71,7 +72,7 @@ function RouteList({ routes, activities, onOpen, currentBase = null, actions, go
             )}
             {withGo && (
               <Button size="s" variant="record" disabled={!canGo} onClick={() => go(saved)}
-                title={canGo ? undefined : t('Un enregistrement est en cours')} aria-label={t('Partir sur {name}', { name: saved.record.name })}>
+                title={canGo ? undefined : t('Un enregistrement est en cours')} aria-label={t('Partir sur {name}', { name: routeDisplayName(saved.record) })}>
                 {t('Partir')}
               </Button>
             )}

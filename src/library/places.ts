@@ -368,6 +368,18 @@ export const choosePlace = (features: readonly PhotonFeature[], start: LatLon, r
   return null;
 };
 
+/**
+ * Lieu d'un point d'après les objets que la recherche a rendus autour de lui (`choosePlace`) ; un nom de la carte
+ * que l'utilisateur a renommé alentour (`learnedReplacing`) prend le nom qu'il lui a donné.
+ */
+export const spotFromSearch = (
+  features: readonly PhotonFeature[], point: LatLon, learned: readonly LearnedPlace[], rules: PlaceRules
+): PlaceSpot => {
+  const name = choosePlace(features, point, rules);
+  const renamed = learnedReplacing(name, point, learned, rules);
+  return renamed ? learnedSpot(renamed, point) : { name, source: 'carte', ...roundedPoint(point) };
+};
+
 /** Lieu à ranger dans la fiche après une recherche autour de `start` : le nom choisi, la position arrondie envoyée. */
 export const foundPlace = (name: string | null, start: LatLon): SessionPlace => ({ name, source: 'carte', ...roundedPoint(start) });
 

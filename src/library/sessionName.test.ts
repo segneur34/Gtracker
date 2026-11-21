@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionPlace } from './places';
-import { placeLabel, sessionDisplayName, sessionFileBaseName } from './sessionName';
+import { distinctArrival, placeLabel, sessionDisplayName, sessionFileBaseName } from './sessionName';
 
 const carte: SessionPlace = { name: 'Carnon-Plage', source: 'carte', lat: 43.548, lon: 3.98 };
 const startMs = new Date(2026, 9, 10, 14, 0).getTime();
@@ -55,6 +55,14 @@ describe('« Départ → Arrivée »', () => {
 
   it('le nom donné prime toujours', () => {
     expect(sessionDisplayName({ name: 'Convoyage', place: { ...carte, arrival: arrival('Palavas') } }, 'Bateau')).toBe('Convoyage');
+  });
+
+  it('distinctArrival : l\'arrivée seule, si elle porte un autre nom que le départ', () => {
+    expect(distinctArrival({ ...carte, arrival: arrival('Palavas-les-Flots') })).toBe('Palavas-les-Flots');
+    expect(distinctArrival({ ...carte, arrival: arrival('CARNON-PLAGE') })).toBeNull();
+    expect(distinctArrival({ ...carte, arrival: arrival(null) })).toBeNull();
+    expect(distinctArrival({ ...carte, arrival: null })).toBeNull();
+    expect(distinctArrival(undefined)).toBeNull();
   });
 });
 

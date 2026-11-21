@@ -2,12 +2,12 @@ import { errorMessage } from '../../core/basics';
 import { t } from '../../core/i18n';
 import type { LatLon } from '../../core/types';
 import {
-  PLACE_RULES, choosePlace, correctedPlace, isElsewhere, isPlaceToFind, learnedAfterCorrection, learnedReplacing, learnedSpot,
-  nearestLearnedPlace, placeRenames, renamedPlace, trackEnds, type LearnedPlace, type PlaceRules, type PlaceSpot,
+  PLACE_RULES, correctedPlace, isElsewhere, isPlaceToFind, learnedAfterCorrection, learnedSpot,
+  nearestLearnedPlace, placeRenames, renamedPlace, spotFromSearch, trackEnds, type LearnedPlace, type PlaceRules, type PlaceSpot,
   type SessionPlace, type TrackEnds,
 } from '../../library/places';
 import { sameJson } from '../../library/record';
-import { reversePlaces, roundedPoint, type PhotonFeature } from '../../planning/geocoding';
+import { reversePlaces, type PhotonFeature } from '../../planning/geocoding';
 import { readDeviceLearnedPlaces, saveLearnedPlacesFile, writeDeviceLearnedPlaces } from '../learnedPlacesFile';
 import { isPlaceSearchOn } from '../usePlaceSearch';
 import { findSession, lib, writableFolder } from './memory';
@@ -144,10 +144,7 @@ export const createPlaceQueue = (deps: PlaceQueueDeps): PlaceQueue => {
       return 'suspend';
     }
     if (!deps.enabled()) return null;
-    const name = choosePlace(features, point, deps.rules);
-    // Un nom de la carte que l'utilisateur a renommé alentour prend le nom qu'il lui a donné.
-    const renamed = learnedReplacing(name, point, learned(), deps.rules);
-    return renamed ? learnedSpot(renamed, point) : { name, source: 'carte', ...roundedPoint(point) };
+    return spotFromSearch(features, point, learned(), deps.rules);
   };
 
   /** Écrit `place` si la session n'a pas changé depuis `before` (même début, même lieu). */

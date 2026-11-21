@@ -3,7 +3,7 @@ import { parsePhotonFeatures } from '../planning/geocoding';
 import {
   PLACE_RULES, choosePlace, correctedPlace, firstTrackPoint, foundPlace, isElsewhere, isPlaceToFind, isUsablePlaceName,
   lastTrackPoint, learnPlace, learnedAfterCorrection, learnedReplacing, learnedSpot, nearestLearnedPlace, placeDraftOf,
-  placeRenames, placesToLearn, readSessionPlace, renamedLearnedPlaces, renamedPlace, trackEnds,
+  placeRenames, placesToLearn, readSessionPlace, renamedLearnedPlaces, renamedPlace, spotFromSearch, trackEnds,
   type LearnedPlace, type PlaceSource, type PlaceSpot, type SessionPlace,
 } from './places';
 
@@ -67,6 +67,19 @@ describe('choosePlace', () => {
     );
     expect(choose(at(499), rules)).toBe('Baie de l\'Aygade');
     expect(choose(at(501), rules)).toBe('Hyères');
+  });
+});
+
+describe('spotFromSearch', () => {
+  const json = response({ at: north(80), props: { osm_key: 'place', osm_value: 'village', name: 'Carnon-Plage' } });
+
+  it('le nom choisi sur la carte, au point arrondi', () => {
+    expect(spotFromSearch(parsePhotonFeatures(json), START, [], PLACE_RULES)).toEqual({ name: 'Carnon-Plage', source: 'carte', lat: 43.54, lon: 3.95 });
+  });
+
+  it('un nom de la carte renommé alentour prend le nom appris', () => {
+    const learned: LearnedPlace[] = [{ name: 'Le Grand Travers', lat: START.lat, lon: START.lon, savedAt: 1, replaces: ['Carnon-Plage'] }];
+    expect(spotFromSearch(parsePhotonFeatures(json), START, learned, PLACE_RULES)).toEqual({ name: 'Le Grand Travers', source: 'appris', lat: 43.54, lon: 3.95 });
   });
 });
 

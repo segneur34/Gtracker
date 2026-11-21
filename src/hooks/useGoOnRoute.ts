@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { followedTraceFromRoute } from '../recording/followedTrace';
+import { routeDisplayName } from '../library/routeName';
 import { followTrace } from './useFollowedTrace';
 import { useRecorderStatus } from './useRecorder';
 import type { SavedRoute } from './useRouteLibrary';
@@ -15,7 +16,7 @@ export const useGoOnRoute = () => {
   const navigate = useNavigate();
   const idle = useRecorderStatus() === 'idle';
   const go = (saved: SavedRoute): boolean => {
-    const trace = followedTraceFromRoute(saved.record);
+    const trace = followedTraceFromRoute(saved.record, routeDisplayName(saved.record));
     if (!trace || !idle) return false;
     followTrace(trace);
     navigate('/enregistrer');

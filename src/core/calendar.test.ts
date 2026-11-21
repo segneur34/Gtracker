@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DAY_MS, addDays, addMonths, dayMonthTime, dayMonthYear, dayMonthYearTime, formatLocalDate, monthYearLong, monthYearShort, shortDate, stacksByActivity,
+  DAY_MS, addDays, addMonths, dayMonthNumeric, dayMonthTime, dayMonthYear, dayMonthYearTime, formatLocalDate, monthYearLong, monthYearShort, shortDate, stacksByActivity,
   startOfDay, startOfMonth, weekdayDayMonthYear,
 } from './calendar';
 
@@ -38,6 +38,11 @@ describe('calendar', () => {
         expect(dayMonthTime(when)).toBe(d.toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }));
       }
     }
+  });
+
+  it('jour et mois en chiffres : « 20/11 »', () => {
+    expect(dayMonthNumeric(new Date(2026, 10, 20, 9, 30))).toBe('20/11');
+    expect(dayMonthNumeric(new Date(2026, 0, 3).getTime())).toBe('03/01');
   });
 
   it('une date invalide donne « Invalid Date », comme avant', () => {

@@ -81,6 +81,14 @@ describe('fiche d\'un itinéraire importé', () => {
     expect(recordToRoute(record!)).toEqual(recordToRoute(courseRecord));
   });
 
+  it('GPX de Gtracker sans nom saisi : son nom montré devient son nom, non doublé', () => {
+    const unnamed = { ...courseRecord, name: '' };
+    const gpx = buildRouteGpx(course, 'Boucle du 01/11', markLabel, unnamed);
+    const displayName = (r: { name: string }) => r.name || 'Boucle du 01/11';
+    expect(importedRouteRecord(gpx, 'x.gpx', { ...options(['Boucle du 01/11']), displayName })?.name).toBe('Boucle du 01/11 (2)');
+    expect(importedRouteRecord(sharedGpx, 'x.gpx', { ...options(), displayName })?.name).toBe(courseRecord.name);
+  });
+
   it('autre GPX : la trace gardée telle quelle, nommée par le fichier, activité devinée', () => {
     const record = importedRouteRecord(ROUTE_ONLY, 'komoot.gpx', { ...options(), activityFor: (type) => (type === undefined ? 'surf' : null) });
     expect(record?.name).toBe('Tour du lac');

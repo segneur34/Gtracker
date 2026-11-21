@@ -60,7 +60,9 @@ import { currentPosition, locationPermissionGranted } from '../platform/location
 import { jsonStore } from '../platform/storage';
 import { STORAGE_KEYS } from '../core/appIdentity';
 import { ROUTES_LIST_PATH } from '../core/parentPage';
-import { dateLocale, t, tn } from '../core/i18n';
+import { t, tn } from '../core/i18n';
+import { routeDisplayName } from '../library/routeName';
+import { findRoutePlace } from '../hooks/routePlace';
 import { routeDeleteButton } from '../library/trash';
 import { useDeletesToTrash } from '../hooks/useTrash';
 import { tRich } from '../components/tRich';
@@ -181,8 +183,6 @@ function MapEvents({ onTap, onTakeOver }: { onTap: (w: Waypoint) => void; onTake
   });
   return null;
 }
-
-const defaultName = (): string => `Itinéraire du ${new Date().toLocaleDateString(dateLocale())}`;
 
 const sameGuide = (a: MarkGuideSettings | null, b: MarkGuideSettings | null): boolean => JSON.stringify(a) === JSON.stringify(b);
 
@@ -329,6 +329,10 @@ function PlanningPage() {
       || !sameGuide(courseGuide, routeMarkGuide(current.record))
     : route.waypoints.length > 0 || courseGuide !== null;
   useLeaveWarning(dirty ? { message: t('L\'itinéraire en cours n\'est pas enregistré. Quitter quand même ?'), discard: noop } : null);
+  /** Nom composé du tracé en cours (genre, lieu de l'itinéraire rangé, jour de création), montré tant qu'aucun nom n'est saisi. */
+  const composedName = routeDisplayName({
+    name: '', place: current?.record.place, waypoints: route.waypoints, createdAt: current?.record.createdAt ?? new Date().toISOString(),
+  });
 
   // --- Carte ---
 
@@ -467,15 +471,27 @@ function PlanningPage() {
 
   // --- Enregistrement ---
 
+  /**
+   * Cherche en tâche de fond le lieu d'un itinéraire sans nom saisi (`findRoutePlace`) ; l'itinéraire ouvert prend
+   * la fiche complétée s'il n'a pas été rangé de nouveau entre-temps.
+   */
+  const locatePlace = (saved: SavedRoute) => {
+    void findRoutePlace(saved).then((found) => {
+      if (found) setCurrent((c) => (c?.base === found.base && c.record.updatedAt === found.record.updatedAt ? found : c));
+    });
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setMessage(null);
     try {
-      const finalName = name.trim() || defaultName();
+      // Sans nom saisi, la fiche garde un nom vide : le nom se compose à l'affichage.
+      const finalName = name.trim();
       const saved = await library.save(route, { name: finalName, activityId: activity?.id ?? null, markGuide: courseGuide }, current ?? undefined);
       setCurrent(saved);
       setSavedRoute(route);
       setName(finalName);
+      locatePlace(saved);
       setMessage(t('Enregistré dans {dir}/{base}.json, avec son GPX.', { dir: ROUTES_DIR, base: saved.base }));
     } catch (err) {
       setMessage(plainError(err, t('Enregistrement impossible.')));
@@ -501,6 +517,7 @@ function PlanningPage() {
     setSelected(null);
     setMessage(null);
     fitTo(opened);
+    locatePlace(saved);
   };
 
   const startNew = () => {
@@ -538,8 +555,9 @@ function PlanningPage() {
   };
 
   const exportGpx = () => {
-    const fileName = `${current?.base ?? safeFileName(name.trim() || defaultName())}.gpx`;
-    downloadTextFile(fileName, buildRouteGpx(route, name.trim() || defaultName(), label));
+    const shown = name.trim() || composedName;
+    const fileName = `${current?.base ?? safeFileName(shown)}.gpx`;
+    downloadTextFile(fileName, buildRouteGpx(route, shown, label));
   };
 
   /**
@@ -831,7 +849,7 @@ function PlanningPage() {
             <div className="plan-form">
               <div className="plan-form__field">
                 <label className="ui-eyebrow" htmlFor={NAME_FIELD_ID}>{t('Nom')}</label>
-                <input id={NAME_FIELD_ID} className="ui-field" value={name} placeholder={defaultName()} onChange={(e) => setName(e.target.value)} />
+                <input id={NAME_FIELD_ID} className="ui-field" value={name} placeholder={composedName} onChange={(e) => setName(e.target.value)} />
               </div>
             </div>
             {!library.canSave && (
@@ -873,7 +891,7 @@ function PlanningPage() {
                     <Button size="s" variant="ghost" onClick={() => setConfirmingDelete(null)}>{t('Garder')}</Button>
                   </span>
                 ) : (
-                  <Button size="s" variant="ghost" className="ui-danger-text" onClick={() => setConfirmingDelete(saved.base)} aria-label={t('Supprimer {name}', { name: saved.record.name })}>{t('Supprimer')}</Button>
+                  <Button size="s" variant="ghost" className="ui-danger-text" onClick={() => setConfirmingDelete(saved.base)} aria-label={t('Supprimer {name}', { name: routeDisplayName(saved.record) })}>{t('Supprimer')}</Button>
                 ))} />
             )}
           </PlanBlock>

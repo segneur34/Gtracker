@@ -28,7 +28,7 @@ describe('trace suivie', () => {
   it('suit un itinéraire : trace importée à la suite, puis la ligne droite', () => {
     const mid = { lat: 43.605, lon: 3.801 };
     const route = addWaypoint(routeFromTrack([A, mid, B])!, C);
-    const trace = followedTraceFromRoute(routeToRecord(route, META));
+    const trace = followedTraceFromRoute(routeToRecord(route, META), META.name);
     // L'activité de l'itinéraire suit la trace : elle sera proposée pour l'enregistrement.
     expect(trace).toEqual({ name: 'Tour du Pic', source: 'route', activityId: META.activityId, points: [A, mid, B, C], marks: [A, B, C] });
   });
@@ -36,8 +36,8 @@ describe('trace suivie', () => {
   it('garde les bips propres à l\'itinéraire, et aucun quand il n\'en a pas', () => {
     const route = [A, B, C].reduce((r, p) => addWaypoint(r, p), EMPTY_ROUTE);
     const guide = { curve: [{ distanceM: 30, intervalMs: 200 }, { distanceM: 120, intervalMs: 1500 }], vibrate: true };
-    expect(followedTraceFromRoute(routeToRecord(route, { ...META, markGuide: guide }))?.markGuide).toEqual(guide);
-    expect(followedTraceFromRoute(routeToRecord(route, META))).not.toHaveProperty('markGuide');
+    expect(followedTraceFromRoute(routeToRecord(route, { ...META, markGuide: guide }), META.name)?.markGuide).toEqual(guide);
+    expect(followedTraceFromRoute(routeToRecord(route, META), META.name)).not.toHaveProperty('markGuide');
   });
 
   it('garde les balises exploitables, et aucune pour une session', () => {

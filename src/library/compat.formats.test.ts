@@ -21,9 +21,10 @@ describe('itinéraire, compatibilité', () => {
     expect(isWritableRouteRecord(r)).toBe(false);
     expect(isWritableRouteRecord(parseRouteRecord(route())!)).toBe(true);
   });
-  it('(b) point mal typé : fiche entière ignorée ; nom vide : « Itinéraire »', () => {
+  it('(b) point mal typé : fiche entière ignorée ; nom vide ou absent : gardé vide (nom composé à l\'affichage)', () => {
     expect(parseRouteRecord(route({ waypoints: [{ lat: '43', lon: 3 }, { lat: 43.1, lon: 3.1 }] }))).toBeNull();
-    expect(parseRouteRecord(route({ name: '' }))?.name).toBe('Itinéraire');
+    expect(parseRouteRecord(route({ name: '' }))?.name).toBe('');
+    expect(parseRouteRecord(route({ name: 12 }))?.name).toBe('');
   });
   it('(c) __proto__ sans pollution ; champ inconnu de tronçon perdu à la réécriture', () => {
     const r = parseRouteRecord(route().replace('"name"', '"__proto__":{"pollue":true},"name"'))!;

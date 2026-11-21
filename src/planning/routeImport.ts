@@ -52,20 +52,25 @@ export interface RouteImportOptions {
   takenNames: Iterable<string>;
   /** Activité devinée du type de la trace (`<trk><type>`), pour un GPX sans fiche ; `null` : aucune. */
   activityFor: (trackType: string | undefined) => string | null;
+  /**
+   * Nom montré d'une fiche reçue, figé en nom saisi à l'import : sans nom saisi, le nom composé sous lequel elle
+   * a été partagée. Absent : le nom de la fiche.
+   */
+  displayName?: (record: RouteRecord) => string;
 }
 
 /**
  * Fiche d'un itinéraire tirée d'un GPX, `null` s'il n'en contient pas (moins
  * de deux points). Un GPX de Gtracker rend sa fiche telle quelle (points de
  * passage ou balises, mode de chaque tronçon, activité, bips d'approche),
- * renommée si son nom est déjà pris. Un autre GPX devient une trace gardée
+ * sous son nom montré (`displayName`), renommée si ce nom est déjà pris. Un autre GPX devient une trace gardée
  * telle quelle (`routeFromTrack`), nommée d'après le fichier s'il ne porte
  * pas de nom.
  */
 export const importedRouteRecord = (text: string, fileName: string, options: RouteImportOptions): RouteRecord | null => {
-  const { nowIso, takenNames, activityFor } = options;
+  const { nowIso, takenNames, activityFor, displayName = (r: RouteRecord) => r.name } = options;
   const embedded = embeddedRouteRecord(text);
-  if (embedded) return { ...embedded, name: uniqueRouteName(embedded.name, takenNames), updatedAt: nowIso };
+  if (embedded) return { ...embedded, name: uniqueRouteName(displayName(embedded), takenNames), updatedAt: nowIso };
   let parsed: ReturnType<typeof parseGpxPath>;
   try {
     parsed = parseGpxPath(text);

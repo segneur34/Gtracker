@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { activityDisplayName, activityFamily, isLostOnBackground, shadeForTheme, type Activity } from '../core/activities';
 import { t } from '../core/i18n';
 import type { SavedRoute } from '../hooks/routeFiles';
+import { routeDisplayName } from '../library/routeName';
 import { effectiveDistanceUnit } from '../hooks/useSportSettings';
 import { recordToRoute } from '../planning/routeRecord';
 import { routeImageDescription, routeShareContent, routeShareStats } from '../planning/routeShareImage';
@@ -38,7 +39,7 @@ function RouteImageShare({ saved, activities, onClose }: RouteImageShareProps) {
     const route = recordToRoute(saved.record);
     const course = routeShareContent(route, unit);
     const stats = routeShareStats(route, unit);
-    const title = saved.record.name;
+    const title = routeDisplayName(saved.record);
     const subtitle = activity ? t('{activity} · itinéraire', { activity: activityDisplayName(activity) }) : t('Itinéraire');
     // Palette claire : l'image reste claire en thème sombre.
     const shade = activity ? shadeForTheme(activity.color, false) : null;

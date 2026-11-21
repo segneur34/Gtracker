@@ -35,6 +35,14 @@ describe('fiche d\'itinéraire', () => {
     expect(record.legs.every((leg) => leg.points.every((p) => p.length === 2))).toBe(true);
   });
 
+  it('nom vide gardé vide, lieu gardé à la relecture et à la réécriture', () => {
+    const place = { name: 'Carnon-Plage', source: 'carte', lat: 43.6, lon: 3.8, arrival: null };
+    const record = parseRouteRecord(serializeRouteRecord({ ...routeToRecord(sample(), { ...META, name: '' }), place }))!;
+    expect(record.name).toBe('');
+    expect(record.place).toEqual(place);
+    expect(routeToRecord(sample(), { ...META, name: '', updatedAt: '2026-09-26T08:00:00.000Z' }, record).place).toEqual(place);
+  });
+
   it('garde les champs inconnus et ne réécrit pas une fiche d\'une version future', () => {
     const text = JSON.stringify({ ...routeToRecord(sample(), META), version: ROUTE_VERSION + 1, couleur: 'rouge' });
     const record = parseRouteRecord(text)!;

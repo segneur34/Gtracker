@@ -3,6 +3,8 @@ import { t } from '../core/i18n';
 import { plainError } from '../platform/errorText';
 import { ROUTES_DIR, routePath } from '../library/folderLayout';
 import { guessSport } from '../library/naming';
+import type { SessionPlace } from '../library/places';
+import { routeDisplayName, routeRecordWithPlace } from '../library/routeName';
 import type { PlannedRoute } from '../planning/route';
 import type { MarkGuideSettings } from '../recording/markGuide';
 import { buildRouteGpx, markLabel, waypointLabel } from '../planning/routeGpx';
@@ -66,7 +68,7 @@ export const routeStore = createLoadedListStore(listRoutes, (err) => plainError(
 
 /** GPX rangé d'une fiche, et partagé : le tracé pour les autres applications, la fiche en extension pour Gtracker. */
 const routeGpxOf = (route: PlannedRoute, record: RouteRecord): string =>
-  buildRouteGpx(route, record.name, gpxLabel(record.activityId), record);
+  buildRouteGpx(route, routeDisplayName(record), gpxLabel(record.activityId), record);
 
 /** Écrit le GPX puis la fiche sous `base`, et fait relire la liste. */
 const writeRoute = async (base: string, route: PlannedRoute, record: RouteRecord): Promise<SavedRoute> => {
@@ -79,7 +81,9 @@ const writeRoute = async (base: string, route: PlannedRoute, record: RouteRecord
 
 /**
  * Range un itinéraire : sous ses fichiers s'il en a (`existing`), sinon sous
- * un nouveau nom. Rend l'itinéraire rangé.
+ * un nouveau nom, tiré du nom montré à ce premier rangement (le nom saisi, ou
+ * le nom composé, `routeDisplayName`). `meta.name` vide : pas de nom saisi.
+ * Rend l'itinéraire rangé.
  */
 export const saveRoute = async (
   route: PlannedRoute,
@@ -88,14 +92,31 @@ export const saveRoute = async (
 ): Promise<SavedRoute> => {
   if (existing?.readOnly) throw new Error(t("Cet itinéraire vient d'une version plus récente de l'application : rangez-le sous un autre nom."));
   const folder = await requireFolder();
-  const base = existing?.base ?? routeFileBase(meta.name, (await folder.list(ROUTES_DIR)).map((e) => e.name));
   const now = new Date().toISOString();
   const record = routeToRecord(
     route,
     { ...meta, createdAt: existing?.record.createdAt ?? now, updatedAt: now },
     existing?.record
   );
+  const base = existing?.base ?? routeFileBase(routeDisplayName(record), (await folder.list(ROUTES_DIR)).map((e) => e.name));
   return writeRoute(base, route, record);
+};
+
+/**
+ * Range le lieu trouvé d'un itinéraire dans sa fiche relue, seulement si elle n'a pas été rangée de nouveau
+ * depuis `expectedUpdatedAt` et n'a toujours pas de nom saisi (`routeRecordWithPlace`). Seule la fiche est
+ * réécrite : le GPX garde le nom écrit à son rangement. Rend l'itinéraire mis à jour, `null` si rien n'est écrit.
+ */
+export const saveRoutePlace = async (base: string, place: SessionPlace, expectedUpdatedAt: string): Promise<SavedRoute | null> => {
+  const folder = await currentMemoryFolder();
+  if (!folder) return null;
+  const text = await folder.readText(routePath(`${base}.json`));
+  const stored = text === null ? null : parseRouteRecord(text);
+  const record = stored && routeRecordWithPlace(stored, place, expectedUpdatedAt);
+  if (!record) return null;
+  await folder.writeText(routePath(`${base}.json`), serializeRouteRecord(record));
+  routeStore.reload();
+  return { base, record, readOnly: false };
 };
 
 /**
@@ -105,7 +126,7 @@ export const saveRoute = async (
 export const removeRoute = async (saved: SavedRoute): Promise<void> => {
   const folder = await requireFolder();
   const paths = [routePath(`${saved.base}.json`), routePath(`${saved.base}.gpx`)];
-  await stashRoute(folder, { base: saved.base, name: saved.record.name, createdAt: saved.record.createdAt }, paths, paths[0]);
+  await stashRoute(folder, { base: saved.base, name: routeDisplayName(saved.record), createdAt: saved.record.createdAt }, paths, paths[0]);
   for (const path of paths) await folder.remove(path);
   routeStore.reload();
 };
@@ -126,11 +147,12 @@ export const importRouteGpx = async (text: string, fileName: string): Promise<Sa
   const taken = await listRoutes();
   const record = importedRouteRecord(text, fileName, {
     nowIso: new Date().toISOString(),
-    takenNames: taken.map((r) => r.record.name),
+    takenNames: taken.map((r) => routeDisplayName(r.record)),
     activityFor,
+    displayName: routeDisplayName,
   });
   if (!record) throw new Error(t("{fileName} ne contient pas d'itinéraire : aucun point de trace ou de route.", { fileName }));
-  const base = routeFileBase(record.name, (await folder.list(ROUTES_DIR)).map((e) => e.name));
+  const base = routeFileBase(routeDisplayName(record), (await folder.list(ROUTES_DIR)).map((e) => e.name));
   if (!isWritableRouteRecord(record)) {
     // Fiche d'une version plus récente : rangée telle quelle, jamais réécrite (son GPX est celui reçu).
     await folder.writeText(routePath(`${base}.gpx`), text);
