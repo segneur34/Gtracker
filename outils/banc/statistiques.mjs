@@ -146,7 +146,7 @@ await settle({ max: 2000, label: 'import' });
 // 1. Accès.
 await go('/');
 check("ouverture : « / » mène au Profil", (await search()) === '/profil', await search());
-check('lien dans la barre du haut, entre Planifier et Réglages', (await evaluate(`document.querySelector('.shell-toplinks')?.textContent`)) === 'ProfilSessionsPlanifierStatistiquesRéglages');
+check('lien dans la barre du haut, entre Planification et Réglages', (await evaluate(`document.querySelector('.shell-toplinks')?.textContent`)) === 'ProfilSessionsPlanificationStatistiquesRéglages');
 check('plus de lien « Statistiques » dans le Profil (demande du 19/10)', !(await evaluate(`[...document.querySelectorAll('.shell-main a')].some((a) => a.textContent.trim().startsWith('Statistiques'))`)));
 check('lien de la barre du haut', await click('.shell-toplinks a', 'Statistiques'));
 await settle({ max: 1500 });

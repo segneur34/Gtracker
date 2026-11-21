@@ -87,7 +87,7 @@ console.log('\n--- départ ---');
 for (const [k, v] of Object.entries(before)) console.log(`${k} : ${String(v).replace(/\s+/g, ' ').slice(0, 220)}`);
 check('la session est sous Wingfoil', before.voile.includes('Wingfoil'), before.voile.replace(/\s+/g, ' ').slice(0, 160));
 check('barre du bas : Profil, Sessions, Statistiques, Réglages', before.barreBas === 'Profil | Sessions | Statistiques | Réglages', before.barreBas);
-check('barre du haut : Profil, Sessions, Planifier, Statistiques, Réglages', before.barreHaut === 'ProfilSessionsPlanifierStatistiquesRéglages', before.barreHaut);
+check('barre du haut : Profil, Sessions, Planification, Statistiques, Réglages', before.barreHaut === 'ProfilSessionsPlanificationStatistiquesRéglages', before.barreHaut);
 check('rangée de logos : Toutes, Wingfoil, Kite, Surf, Pumping, « Toutes » enfoncé', before.ronds === 'Toutes*, Wingfoil, Kite, Surf, Pumping', before.ronds);
 check('le Profil (ouverture) compte la session de Wingfoil', before.profil.includes('Wingfoil') && !before.profil.includes('Aucune session rangée'), before.profil.replace(/\s+/g, ' ').slice(0, 200));
 

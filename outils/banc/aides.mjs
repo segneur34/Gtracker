@@ -135,7 +135,7 @@ check("changer de page referme l'aide", (await evaluate('location.pathname')) ==
 // --- 5. Barre du haut ---
 const topLinks = () => evaluate(`[...document.querySelectorAll('.shell-toplinks a')].map((a) => a.textContent.trim())`);
 check('ordinateur : plus de lien « Accueil » en haut', !(await topLinks()).includes('Accueil'), (await topLinks()).join(', '));
-check('ordinateur : barre du haut Profil, Sessions, Planifier, Statistiques, Réglages', (await topLinks()).join(', ') === 'Profil, Sessions, Planifier, Statistiques, Réglages', (await topLinks()).join(', '));
+check('ordinateur : barre du haut Profil, Sessions, Planification, Statistiques, Réglages', (await topLinks()).join(', ') === 'Profil, Sessions, Planification, Statistiques, Réglages', (await topLinks()).join(', '));
 check('ordinateur : « Planification » mène à la liste des itinéraires, plus de bouton « Itinéraires » à part', (await evaluate(`[...document.querySelectorAll('.shell-toplinks a')].find((a) => a.textContent.trim() === 'Planification')?.getAttribute('href')`)) === '/itineraires/liste' && (await evaluate(`document.querySelector('.shell-topplan') === null`)));
 // « Planifier » est allumé sur la liste des itinéraires (sa page) et sur Planifier lui-même (qui s'ouvre depuis la liste).
 const allume = () => evaluate(`[...document.querySelectorAll('.shell-toplinks a.active')].map((a) => a.textContent.trim()).join(', ')`);
