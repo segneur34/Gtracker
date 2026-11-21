@@ -66,6 +66,19 @@ export const phoneCanWrite = (state: PhoneState): boolean => {
   return state.etat === 'pret' && state.ecriture === true && typeof phone?.ecrireOctets === 'function' && typeof phone.effacer === 'function';
 };
 
+/**
+ * Copie de sécurité des deux dossiers (la mémoire du PC et celle du téléphone), faite par la coquille avant la première
+ * synchronisation d'un téléphone ; rend le chemin de la copie. Lève, avec la phrase à montrer, si elle n'a pas pu se
+ * faire ou si la coquille ne la sait pas (plus ancienne) : la synchronisation est alors refusée.
+ */
+export const phoneSafetyCopy = async (): Promise<string> => {
+  const phone = requirePhone();
+  if (typeof phone.copieSecurite !== 'function') {
+    throw Object.assign(new Error(t('ce programme est trop ancien pour faire la copie de sécurité ; installez sa dernière version')), { code: 'UNKNOWN' });
+  }
+  return bridgeValue(phone.copieSecurite());
+};
+
 /** Chemin relatif sans barre en trop (`/sessions/` comme `sessions`). */
 const cleanPath = (path: string): string => path.split('/').filter((part) => part !== '').join('/');
 

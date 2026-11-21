@@ -36,6 +36,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { dossierAdb, dossierAdbConseille } from './adb'
+import { DOSSIER_COPIES } from './copieSecurite'
 import { creerMemoire, gestionnairesMemoire, optionsDepuisEnvironnement } from './memoire'
 import type { Chiffreur } from './sansFil'
 import { AVIS_ARRIVEE, DOSSIER_SANS_FIL, ServeurSansFil, dossierSansFilPuisCable, essaiSansFilDepuisEnvironnement, gestionnairesSansFil, stockageDossier } from './sansFil'
@@ -347,9 +348,10 @@ function creerTelephone(profil: string, sansFil: ServeurSansFil): DossierDistant
 
 function brancherPont(): void {
   const profil = app.getPath('userData')
-  const memoire = creerMemoire(
-    optionsDepuisEnvironnement(process.env, { profil, documents: dossierWindows('documents'), maison: dossierWindows('home') }, choisirParFenetre, journal),
-  )
+  const optionsMemoire = optionsDepuisEnvironnement(process.env, { profil, documents: dossierWindows('documents'), maison: dossierWindows('home') }, choisirParFenetre, journal)
+  const memoire = creerMemoire(optionsMemoire)
+  // Les copies de sécurité d'avant une première synchronisation : sous Documents (celui d'essai sous le banc).
+  const copies = path.join(optionsMemoire.documents, DOSSIER_COPIES)
   // Les lectures et écritures du téléphone passent par un dossier du profil, vidé au démarrage de ce qu'une coupure y
   // aurait laissé.
   const lectures = path.join(profil, DOSSIER_LECTURES)
@@ -364,7 +366,7 @@ function brancherPont(): void {
     (evenement) => expediteurAdmis(evenement, fenetrePrincipale?.webContents ?? null),
     {
       ...gestionnairesMemoire(memoire),
-      ...gestionnairesTelephone(creerTelephone(profil, sansFil), lectures, { memoire: memoireRetenue }),
+      ...gestionnairesTelephone(creerTelephone(profil, sansFil), lectures, { memoire: memoireRetenue, copies }),
       ...gestionnairesSansFil(sansFil),
       'coquille:textes': async (argument) => {
         const textes = lireTextesFermeture(argument)

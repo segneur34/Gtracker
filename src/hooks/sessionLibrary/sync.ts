@@ -6,14 +6,15 @@ import type { SessionRecord } from '../../library/record';
 import {
   SYNC_DIR, SYNC_SIDES, emptySyncBase, markerTextWithId, otherSyncSide, parseSyncBase, readMarkerId, serializeSyncBase,
   syncAncestorPath, syncBaseLine, syncBasePath, syncRefusal, withSyncDone, withSyncHeld, withSyncLine, withoutSyncLine,
-  type SyncBase, type SyncFiles, type SyncRefusal, type SyncSideName, type SyncStamp,
+  type SyncBase, type SyncFiles, type SyncSideName, type SyncStamp,
 } from '../../library/syncBase';
+import { emptySyncOutcome, type SyncOutcome, type SyncUnknownActivity } from '../../library/syncOutcome';
 import {
   planSync, restrictSyncPlan, syncListing, syncPair, syncRecordsToRead, syncSide,
   type SyncAncestors, type SyncFirstReason, type SyncHeldChoice, type SyncItem, type SyncListing, type SyncOp, type SyncPlan,
   type SyncTargetNames, type SyncTrashed,
 } from '../../library/syncPlan';
-import { planSyncExtras, unknownSyncActivity, type SyncExtraLeft, type SyncExtraOp, type SyncNamedText } from '../../library/syncExtras';
+import { planSyncExtras, unknownSyncActivity, type SyncNamedText } from '../../library/syncExtras';
 import { inspectSyncRecord, mergeSyncRecords } from '../../library/syncRecordMerge';
 import { deletesToTrash, isWritableTrash, sessionTrashEntries, trashFilePath, type TrashEntry, type TrashOrigin } from '../../library/trash';
 import { addFilesToTrashEntry, readTrashIndex, rewriteTrashText, stashFilesInTrash } from '../../library/trashFolder';
@@ -51,82 +52,7 @@ import { holdTrashDuring, recordShownName, reloadTrash, trashFolderOf } from './
 /** Témoin d'une synchronisation en cours : présent au départ suivant, la précédente a été coupée. */
 export const SYNC_RUNNING_PATH = `${SYNC_DIR}/en-cours.json`;
 
-/**
- * Pourquoi rien n'a été fait : refus des marqueurs, base d'une version plus récente, mémoire de l'ordinateur sans
- * corbeille (`noTrash`) ou dont la corbeille ne se lit pas (`trashLocked`), mémoire non prête (`memory`), import ou
- * synchronisation déjà en cours (`busy`).
- */
-export type SyncStop = SyncRefusal | 'newerBase' | 'noTrash' | 'trashLocked' | 'memory' | 'busy';
-
-export interface SyncFailure {
-  item: SyncItem;
-  detail: string;
-}
-
-/** Ce qu'a fait une synchronisation, pour son compte rendu. */
-export interface SyncOutcome {
-  /** Rien n'a été fait, et pourquoi ; `null` : la synchronisation a eu lieu (même coupée). */
-  refusal: SyncStop | null;
-  /** Vrai si la précédente avait été coupée (témoin trouvé au départ). */
-  interrupted: boolean;
-  /** Première rencontre des deux dossiers, et pourquoi : rien n'a été supprimé. */
-  first: SyncFirstReason | null;
-  /** Le plan exécuté, restrictions comprises ; `null` si rien n'a été fait. */
-  plan: SyncPlan | null;
-  /**
-   * Sort des suppressions du plan : `made`, permises (faites, sauf session laissée) ; `excluded`, écartées à la demande
-   * (« sans rien supprimer ») ; `awaitingConfirmation`, retenues par le garde-fou, à confirmer (`confirmDeletions`).
-   */
-  deletions: 'made' | 'excluded' | 'awaitingConfirmation';
-  /**
-   * Sessions dont une suppression n'a pas été faite parce qu'elle n'était pas permise : écartée, en attente de
-   * confirmation, ou retrait d'un téléphone qu'on ne peut pas écrire (`phoneWritable`). Elles restent à faire.
-   */
-  withheldDeletions: SyncItem[];
-  /** Vrai si le téléphone a pu être écrit ; faux : seule la moitié de l'ordinateur a été faite. */
-  phoneWritable: boolean;
-  /** Sessions dont toutes les opérations ont été faites. */
-  done: SyncItem[];
-  /** Sessions laissées pour la fois suivante : un fichier n'était plus celui du plan. */
-  skipped: SyncItem[];
-  /** Sessions arrêtées par une erreur sur l'ordinateur, avec son texte. */
-  failed: SyncFailure[];
-  /** Identités dont une copie du téléphone a été rangée à la corbeille avant d'en être retirée. */
-  keptFromPhone: number[];
-  /** Texte de l'erreur du dossier distant qui a tout arrêté (liaison perdue) ; `null` sinon. */
-  linkLost: string | null;
-  /** Texte d'une autre erreur qui a tout arrêté avant ou après les sessions ; `null` sinon. */
-  error: string | null;
-  /** Fichiers de réglages, tests de FC repos et lieux appris. */
-  extras: SyncExtrasOutcome;
-  /**
-   * Sessions reçues par un appareil qui ne connaît pas leur activité (`SyncOptions.knownActivities`) : de quoi lui
-   * conseiller de reprendre les réglages de l'autre.
-   */
-  unknownActivities: SyncUnknownActivity[];
-  /**
-   * Vrai si tout le plan a été fait, sans restriction ni session laissée, et sans fichier de réglages, de FC repos ou
-   * de lieux arrêté par une erreur ou changé pendant la synchronisation : la base porte la date de cette fin.
-   */
-  complete: boolean;
-}
-
-/** Ce qu'est devenu chaque fichier de réglages, de FC repos et de lieux. */
-export interface SyncExtrasOutcome {
-  /** Écritures faites : fichier de réglages recopié, ou fonte écrite d'un côté. */
-  done: SyncExtraOp[];
-  /** Fichiers laissés, et pourquoi (règles du plan, changé depuis sa lecture, erreur sur l'ordinateur). */
-  left: SyncExtraLeft[];
-  /** Écritures vers un téléphone qu'on ne peut pas écrire : elles restent à faire. */
-  withheld: SyncExtraOp[];
-}
-
-export interface SyncUnknownActivity {
-  /** L'appareil qui a reçu la fiche, et qui ne connaît pas son activité. */
-  side: SyncSideName;
-  startMs: number;
-  activityId: string;
-}
+export type { SyncExtrasOutcome, SyncFailure, SyncOutcome, SyncStop, SyncUnknownActivity } from '../../library/syncOutcome';
 
 export interface SyncOptions {
   /** Faux : le dossier distant se lit sans s'écrire, seule la moitié de l'ordinateur est faite. Par défaut : s'il n'est pas en lecture seule. */
@@ -144,8 +70,22 @@ export interface SyncOptions {
   newFolderId?: () => string;
   /** Nom montré dans la corbeille d'une session qui y entre. */
   shownName?: (record: SessionRecord | null, gpx: string) => string;
-  /** Sessions traitées sur leur total. */
+  /**
+   * Fichiers de sessions traités sur leur total (« 12 fichiers sur 50 ») : chaque fichier copié, réécrit, mis à la
+   * corbeille ou retiré compte une fois ; une session laissée en route compte comme faite.
+   */
   onProgress?: (done: number, total: number) => void;
+  /**
+   * Appelée à la première rencontre d'un téléphone qu'on peut écrire, avant la moindre écriture (témoin, marqueurs) :
+   * la copie de sécurité des deux dossiers. Rend où la copie est rangée. Si elle lève, rien n'est fait : refus
+   * `safetyCopy`, sa raison dans `error`.
+   */
+  beforeWrites?: (first: SyncFirstReason) => Promise<string | null>;
+  /**
+   * Appelée une fois le plan fait et réduit à ce qui est permis, avant la première opération : de quoi dire « Première
+   * synchronisation… » avant toute copie.
+   */
+  onPlanned?: (plan: SyncPlan, first: SyncFirstReason | null) => void;
   /**
    * Identifiant de l'ordinateur, celui de son fichier de réglages : ce fichier fait foi, il n'est jamais remplacé sur
    * l'ordinateur par une copie venue du téléphone. Absent : seule la règle des dates protège les fichiers propres.
@@ -155,12 +95,24 @@ export interface SyncOptions {
   knownActivities?: Partial<Record<SyncSideName, readonly string[]>>;
 }
 
-const emptyOutcome = (refusal: SyncStop | null): SyncOutcome => ({
-  refusal, interrupted: false, first: null, plan: null, deletions: 'made', withheldDeletions: [], phoneWritable: false,
-  done: [], skipped: [], failed: [], keptFromPhone: [],
-  extras: { done: [], left: [], withheld: [] }, unknownActivities: [],
-  linkLost: null, error: null, complete: false,
-});
+const emptyOutcome = emptySyncOutcome;
+
+/** Fichiers de sessions que touche une opération, pour l'avancement. */
+const filesOfOp = (op: SyncOp): number => {
+  switch (op.kind) {
+    case 'copy':
+      return 1 + (op.source.record && op.target.record ? 1 : 0) + (op.source.imu && op.target.imu ? 1 : 0);
+    case 'trash':
+    case 'removeFromPhone':
+      return op.files.length;
+    default:
+      return 1;
+  }
+};
+
+/** Opérations d'une session qui écrivent ou retirent quelque chose sur le téléphone. */
+const phoneOpsOf = (item: SyncItem | undefined): number =>
+  item?.ops.filter((op) => op.kind === 'removeFromPhone' || ('to' in op && op.to === 'phone') || ('on' in op && op.on === 'phone')).length ?? 0;
 
 /** Une opération à laquelle l'exécutant renonce : l'état du moment n'est pas celui du plan. */
 class StaleError extends Error {}
@@ -278,6 +230,13 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     if (read.state === 'newer') return emptyOutcome('newerBase');
     const pair = syncPair(ids.computer, ids.phone, options.phonePath ?? null, read.state === 'ok' ? read.base : null);
     outcome.first = pair.first;
+    if (pair.first !== null && scope.phone && options.beforeWrites) {
+      try {
+        outcome.safetyCopy = await options.beforeWrites(pair.first);
+      } catch (err) {
+        return { ...emptyOutcome('safetyCopy'), first: pair.first, error: errorMessage(err, String(err)) };
+      }
+    }
     outcome.interrupted = (await computer.stat(SYNC_RUNNING_PATH)) !== null;
     await computer.writeText(SYNC_RUNNING_PATH, `${stringifyJson({ startedAtMs: now() })}\n`);
     for (const side of SYNC_SIDES) {
@@ -331,6 +290,8 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     outcome.plan = plan;
     const deletionsOf = (item: SyncItem | undefined): number => item?.ops.filter((op) => op.kind === 'trash' || op.kind === 'removeFromPhone').length ?? 0;
     outcome.withheldDeletions = full.items.filter((item) => deletionsOf(item) > deletionsOf(plan.items.find((i) => i.startMs === item.startMs)));
+    if (!scope.phone) outcome.withheldForPhone = full.items.filter((item) => phoneOpsOf(item) > 0);
+    options.onPlanned?.(plan, pair.first);
 
     let base: SyncBase = pair.base ?? emptySyncBase(ids.computer ?? '', ids.phone ?? '', options.phonePath ?? null);
     const saveBase = async (): Promise<void> => {
@@ -521,12 +482,20 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       }
     };
 
-    const total = plan.items.length;
-    for (const [index, item] of plan.items.entries()) {
-      options.onProgress?.(index, total);
+    const filesOfItem = (item: SyncItem): number => item.ops.reduce((sum, op) => sum + filesOfOp(op), 0);
+    const total = plan.items.reduce((sum, item) => sum + filesOfItem(item), 0);
+    let before = 0;
+    options.onProgress?.(0, total);
+    for (const item of plan.items) {
       receivedActivities = [];
+      let reached = before;
+      before += filesOfItem(item);
       try {
-        for (const op of item.ops) await execute(op, item);
+        for (const op of item.ops) {
+          await execute(op, item);
+          reached += filesOfOp(op);
+          options.onProgress?.(reached, total);
+        }
         if (item.base.kind === 'forget') {
           base = withoutSyncLine(base, item.startMs);
           await saveBase();
@@ -551,6 +520,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
         if (err instanceof SyncLinkError) throw err;
         if (err instanceof StaleError) outcome.skipped.push(item);
         else outcome.failed.push({ item, detail: errorMessage(err, String(err)) });
+        if (before > reached) options.onProgress?.(before, total);
       }
     }
     options.onProgress?.(total, total);

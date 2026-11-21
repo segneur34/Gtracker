@@ -142,6 +142,12 @@ export interface DesktopPhoneBridge {
    * coquille plus ancienne.
    */
   effacer?(argument: { chemin: string }): Promise<BridgeAnswer<null>>;
+  /**
+   * Copie de sécurité d'avant une première synchronisation : le dossier mémoire retenu et ce que liste le téléphone,
+   * copiés sous `<Documents>\Gtracker-copies\<date et heure>\`. Rend le chemin absolu de la copie, à montrer. Absent
+   * d'une coquille plus ancienne.
+   */
+  copieSecurite?(): Promise<BridgeAnswer<string>>;
 }
 
 /**

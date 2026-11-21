@@ -206,3 +206,35 @@ Session dans la corbeille de l'ordinateur et encore sur le téléphone, sans lig
 - `fc-repos.json`, `lieux.json` : fondus (ordinateur d'abord), écrits du côté où le résultat diffère ; illisible ou plus récent d'un côté (`isNewerRestingHrFile`, neuf), rien d'écrit d'aucun côté.
 - Chaque écriture n'a lieu que si le fichier est encore tel que lu (sinon `changed`) ; vers un téléphone qu'on ne peut pas écrire : `extras.withheld`.
 - `SyncOutcome.extras` (`done`, `left` avec raison, `withheld`) et `unknownActivities` (côté, `startMs`, identifiant), relevé sur toute fiche écrite d'un côté dont `knownActivities` est donné. `synchronizePhone` passe la liste de l'ordinateur (`readStoredActivities`) et `deviceId()` (exporté) ; le téléphone n'est pas vérifié. `complete` est faux si un de ces fichiers a échoué ou changé.
+
+## P4 : plan retenu le 21/11 (agent Plan, relu par l'orchestrateur)
+
+Trois parties, un commit chacune. Aucune question majeure.
+
+Contraintes du code :
+- `library/` ne peut pas importer `hooks/` : `SyncOutcome` et ses types (`SyncStop`, `SyncFailure`, `SyncExtrasOutcome`, `SyncUnknownActivity`) passent dans `src/library/syncOutcome.ts`, que `sync.ts` réexporte.
+- La garde i18n refuse clés manquantes et clés orphelines : chaque partie met à jour `en.json` et `es.json` pour ses propres textes.
+- La vérification contrôle la carte d'INVENTAIRE et les fichiers cités dans les documents : toute partie qui crée, supprime ou renomme un fichier corrige `docs/INVENTAIRE.md` (et `docs/ETAT_DU_PROJET.md` s'il cite le fichier) dans le même commit.
+
+**4A (Opus high) : le pur, l'exécutant, la copie de sécurité.**
+1. `src/library/syncOutcome.ts` : les types déplacés.
+2. `src/hooks/sessionLibrary/sync.ts` : option `beforeWrites(first)`, appelée après `syncPair` et avant le témoin et les marqueurs, seulement à la première rencontre d'un téléphone qui s'écrit ; si elle lève, refus `safetyCopy` (nouveau `SyncStop`) ; option `onPlanned(plan)` après `restrictSyncPlan` (la phrase « Première synchronisation… » s'affiche avant toute copie) ; `onProgress` compte des fichiers (« 12 fichiers sur 50 »). Tests sur `src/test/syncFolder.fixture.ts`.
+3. Session dans la corbeille de l'ordinateur et encore sur le téléphone : ni moteur ni exécutant ne changent, `SYNC_HELD_ON_PHONE` reste `'leave'`. Une première passe les laisse (`left: 'inTrash'`, `base.held`) ; si le téléphone s'écrit et qu'il y en a, la fenêtre pose la question ; « Retirer du téléphone » relance `synchronizePhone` avec `heldOnPhone: 'remove'` ; « Les laisser » : rien, la question revient à la synchronisation suivante. Tests : les deux passes enchaînées ; téléphone qui ne s'écrit pas, sans question.
+4. `src/library/syncReport.ts` et son test : `describeSync(outcome)` rend les lignes du §4, la ligne des activités inconnues, « Sur le téléphone, touchez « Mettre à jour »… » dès qu'une écriture a visé le téléphone, et dit refus, coupure, liaison perdue, échecs, conflits, et pour le sans-fil « N changements attendent le câble » ; `describeSyncQuestion` donne le garde-fou (nombre, liste) et la liste des sessions de la corbeille. Les phrases de l'état du téléphone y sont déplacées de `library/phoneRecovery.ts`, mêmes clés.
+5. Copie de sécurité : `bureau/copieSecurite.ts` et son test ; dossier mémoire dans `ordinateur\`, ce que liste le téléphone dans `telephone\`, sous `<Documents>\Gtracker-copies\<AAAA-MM-JJ HH-MM-SS>\` (`GTRACKER_DOCUMENTS` sous le banc) ; canal `telephone:copieSecurite` (`CANAUX_TELEPHONE`, `main.ts`, `preload.ts`, `pont.test.ts`) ; `copieSecurite?` dans `DesktopPhoneBridge` et `phoneSafetyCopy()` dans `src/platform/phoneCable.ts`. Pas de copie quand le téléphone ne s'écrit pas ; copie en échec ou coquille trop ancienne : synchronisation refusée avec un message.
+6. `src/hooks/sessionLibrary/phoneSync.ts` et son test, la couche du bouton : étapes publiées (recherche, comparaison, avancement, question, fin) ; `phoneMemoryFolder(state.nom)` puis `synchronizePhone` avec `phoneWritable: phoneCanWrite(state)` toujours passé, `beforeWrites: phoneSafetyCopy`, `recording` reçu de l'appelant ; relance avec `confirmDeletions`, `withoutDeletions` ou `heldOnPhone` ; à l'arrivée d'un téléphone par le sans-fil, seulement la ligne « Téléphone relié : touchez « Synchroniser »… ». Exports dans `useSessionLibrary.ts`, listes de `couches.test.ts`.
+   - Par le sans-fil seul, « Synchroniser » fait la moitié de l'ordinateur : sessions neuves du téléphone copiées vers l'ordinateur ; si une synchronisation par câble a déjà donné son identifiant au téléphone, ses suppressions vont à la corbeille de l'ordinateur ; rien n'est écrit ni retiré sur le téléphone, et ce qui l'attend est dit ; une session de la corbeille n'est jamais ramenée.
+
+**4B (Opus high) : l'interface.**
+- `src/components/PhoneSyncButton.tsx` et `.css` (variables du thème, aucun `style={{`), sur le modèle de `PhoneRecoverButton` : étapes, phrase de première synchronisation, compte rendu ; garde-fou (« Synchroniser sans rien supprimer » principal, « Supprimer ces N sessions » danger, « Annuler », liste dépliable) ; question de la corbeille (liste, « Retirer du téléphone », « Les laisser ») ; ligne de l'arrivée ; « Réessayer ».
+- `AppShell.tsx` : même place, avant « Enregistrer ».
+- Supprimés : `PhoneRecoverButton.tsx` et `.css`, `hooks/sessionLibrary/phoneRecovery.ts`, `library/phoneRecovery.ts` et leurs tests.
+- `WirelessPhoneCard.tsx` : la phrase « range les sessions… dès que vous l'ouvrez » et la case « Recevoir les sessions… » à reformuler (plus rien n'arrive seul).
+- `en.json`, `es.json` ; INVENTAIRE et ETAT.
+
+**4C (Sonnet) : le banc.**
+- `outils/banc/exe-recuperer.mjs` devient `exe-synchroniser.mjs` (`GTRACKER_BANC_TELEPHONE`, en écriture) : première synchronisation et copie de sécurité sous `GTRACKER_DOCUMENTS` ; suppression de chaque côté, corbeille d'origine `telephone` ; corbeille et téléphone, les deux boutons ; garde-fou à 11 ; coupure puis reprise ; les états du téléphone.
+- `exe-sansfil.mjs` : l'arrivée ne range plus rien, seulement la ligne ; « Synchroniser » par le sans-fil laisse le téléphone intact.
+- `memoire-disque.mjs`, cas de la corbeille : index en version 2, champ `origin`. `SCRIPTS.md`, INVENTAIRE.
+
+Mineures tranchées : deux copies de sécurité le même jour, le dossier porte l'heure ; si « Retirer du téléphone » dépasse le garde-fou, sa fenêtre s'ouvre en plus ; les textes hors §4 s'écrivent dans le style du §4.

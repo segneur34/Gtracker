@@ -7,6 +7,7 @@ import { restingHrFileText, type StoredRestingResult } from '../../library/resti
 import { buildSettingsFile, serializeSettingsFile } from '../../library/settingsFile';
 import { imuFileName, recordFileName, type StoredSessionNotes } from '../../library/record';
 import { parseSyncBase, readMarkerId, syncBasePath } from '../../library/syncBase';
+import { describeSync, describeSyncQuestion } from '../../library/syncReport';
 import { TRASH_INDEX_PATH, parseTrashIndex, sessionRestorePlan, sessionTrashEntries, shownTrashEntries, type TrashEntry } from '../../library/trash';
 import { copyFromTrash, dropTrashEntries, emptyTrash, stashInTrash } from '../../library/trashFolder';
 import type { MemoryFolder } from '../../platform/memoryFolder';
@@ -400,6 +401,83 @@ describe('exécutant de la synchronisation', () => {
     const resumed = await run(pair);
     expect(resumed).toMatchObject({ interrupted: true, complete: true });
     expect(pair.computer.text(SYNC_RUNNING_PATH)).toBeNull();
+  });
+});
+
+describe('ce que la couche du bouton reçoit', () => {
+  it('copie de sécurité : appelée à la première rencontre d’un téléphone qu’on écrit, avant toute écriture, et seulement là', async () => {
+    const pair = pairOf();
+    putSyncSession(pair.phone, at(1));
+    const calls: string[] = [];
+    const outcome = await run(pair, {
+      beforeWrites: async (first) => {
+        calls.push(`copie ${first} ${pair.computer.text(SYNC_RUNNING_PATH) === null && readMarkerId(pair.phone.text('gtracker.json')) === null}`);
+        return 'C:\\Documents\\Gtracker-copies\\2026-11-21 12-00-00';
+      },
+    });
+    expect(calls).toEqual(['copie noComputerId true']);
+    expect(outcome).toMatchObject({ complete: true, safetyCopy: 'C:\\Documents\\Gtracker-copies\\2026-11-21 12-00-00' });
+    // Paire suivie : plus de copie.
+    expect((await run(pair, { beforeWrites: async () => (calls.push('encore'), null) })).safetyCopy).toBeNull();
+    expect(calls).toHaveLength(1);
+    // Téléphone qu'on ne peut pas écrire : pas de copie, même à une première rencontre.
+    const lone = pairOf();
+    putSyncSession(lone.phone, at(1));
+    await run(lone, { phoneWritable: false, beforeWrites: async () => (calls.push('sans écriture'), null) });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('copie de sécurité en échec : refus, rien n’est écrit d’aucun côté', async () => {
+    const pair = pairOf();
+    putSyncSession(pair.computer, at(0));
+    putSyncSession(pair.phone, at(1));
+    const outcome = await run(pair, { beforeWrites: async () => Promise.reject(new Error('disque plein')) });
+    expect(outcome).toMatchObject({ refusal: 'safetyCopy', error: 'disque plein', first: 'noComputerId', complete: false });
+    expect(pair.phone.steps()).toBe(0);
+    expect(pair.computer.text(SYNC_RUNNING_PATH)).toBeNull();
+    expect(readMarkerId(pair.computer.text('gtracker.json'))).toBeNull();
+    expect(await syncSessionFiles(pair.computer)).toEqual([fileOf(0)]);
+  });
+
+  it('le plan est annoncé avant la première copie ; l’avancement compte les fichiers jusqu’au total', async () => {
+    const pair = pairOf();
+    putSyncSession(pair.computer, at(0), { imuBytes: 40 });
+    putSyncSession(pair.phone, at(1));
+    const seen: string[] = [];
+    await run(pair, {
+      onPlanned: (plan, first) => seen.push(`plan ${plan.items.length} ${first} ${pair.phone.text(sessionPath(fileOf(0))) === null ? 'rien de copié' : 'déjà copié'}`),
+      onProgress: (done, total) => seen.push(`${done}/${total}`),
+    });
+    // GPX, fiche et capteurs vers le téléphone ; GPX et fiche vers l'ordinateur.
+    expect(seen).toEqual(['plan 2 noComputerId rien de copié', '0/5', '3/5', '5/5', '5/5']);
+  });
+
+  it('session de la corbeille encore sur le téléphone : la première passe la laisse et la question se pose ; « Retirer du téléphone » la retire', async () => {
+    const pair = pairOf();
+    for (let k = 0; k < 5; k++) putBoth(pair, k);
+    await trashOnComputer(pair, 2);
+    const first = await run(pair);
+    const question = describeSyncQuestion(first);
+    expect(question).toMatchObject({ kind: 'inTrash', count: 1, sessions: [{ startMs: at(2), side: 'phone', file: fileOf(2) }] });
+    // « Les laisser » : rien ne change, la question revient.
+    expect(describeSyncQuestion(await run(pair))?.kind).toBe('inTrash');
+    const second = await run(pair, { heldOnPhone: 'remove' });
+    expect(second.done.find((i) => i.startMs === at(2))?.case).toBe('deletedOnComputer');
+    expect(await syncSessionFiles(pair.phone)).not.toContain(fileOf(2));
+    expect(trashOf(pair).some((e) => e.startMs === at(2))).toBe(true);
+    expect(describeSyncQuestion(second)).toBeNull();
+    expect(describeSync(second).paragraphs).toContain("1 session supprimée sur l'ordinateur : retirée du téléphone.");
+  });
+
+  it('téléphone qu’on ne peut pas écrire : pas de question sur la corbeille, ce qui l’attend est dit', async () => {
+    const pair = pairOf();
+    for (let k = 0; k < 5; k++) putBoth(pair, k);
+    await trashOnComputer(pair, 2);
+    putSyncSession(pair.computer, at(7));
+    const half = await run(pair, { phoneWritable: false });
+    expect(describeSyncQuestion(half)).toBeNull();
+    expect(half.withheldForPhone.map((i) => i.startMs)).toEqual([at(7)]);
+    expect(describeSync(half, 'sansFil').paragraphs).toContain('1 changement attend le câble ou la mise à jour du téléphone.');
   });
 });
 

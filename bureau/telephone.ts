@@ -25,6 +25,7 @@
 
 import { copyFile, mkdir, open, readFile, readdir, rename, stat, unlink, utimes, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { copieSecurite } from './copieSecurite'
 import { ErreurDisque, SUFFIXE_NEUF, SUFFIXE_REMPLACEMENT, avecEssais, codeDe, segmentAdmis } from './disque'
 import { estOctets } from './memoire'
 import type { Gestionnaire } from './pont'
@@ -382,7 +383,7 @@ export function dossierLocal(stockage: string | null, options: OptionsDossierLoc
 // ---------- les canaux de la page ----------
 
 /** Canaux servis ; le pont de la page (`preload.ts`) porte les mêmes noms. */
-export const CANAUX_TELEPHONE = ['etat', 'lister', 'lireOctets', 'ecrireOctets', 'effacer'] as const
+export const CANAUX_TELEPHONE = ['etat', 'lister', 'lireOctets', 'ecrireOctets', 'effacer', 'copieSecurite'] as const
 
 /** Nom du dossier temporaire des lectures et des écritures, dans le profil du programme. */
 export const DOSSIER_LECTURES = 'telephone-lecture'
@@ -428,6 +429,8 @@ function estSous(dedans: string, dossier: string): boolean {
 export type OptionsGestionnaires = {
   /** Dossier mémoire retenu, `null` s'il n'y en a pas : le dossier temporaire ne doit jamais s'y trouver. */
   memoire?: () => Promise<string | null>
+  /** Dossier des copies de sécurité (`<Documents>\Gtracker-copies`) ; absent, `telephone:copieSecurite` refuse. */
+  copies?: string
 }
 
 /** Une action à la fois, dans l'ordre des appels : le téléphone ne reçoit jamais deux commandes ensemble. */
@@ -454,7 +457,9 @@ function champs(argument: unknown): Record<string, unknown> {
  *   effacé, réussite ou échec ;
  * - `telephone:ecrireOctets({ chemin, octets })` écrit un fichier de la liste blanche (`cheminEcrivable`) après un
  *   listage réussi, et rend le `FichierTelephone` écrit ; le fichier temporaire est effacé, réussite ou échec ;
- * - `telephone:effacer({ chemin })` efface un fichier de la liste blanche, vu au dernier listage ou écrit depuis.
+ * - `telephone:effacer({ chemin })` efface un fichier de la liste blanche, vu au dernier listage ou écrit depuis ;
+ * - `telephone:copieSecurite()` copie le dossier mémoire retenu et ce que liste le téléphone dans un dossier neuf des
+ *   copies de sécurité (`copieSecurite.ts`), et rend son chemin absolu ; le dernier listage n'en change pas.
  * Un chemin hors de la liste blanche est refusé (`PERMISSION`) avant toute commande au téléphone.
  */
 export function gestionnairesTelephone(dossier: DossierDistant, dossierTemp: string, options: OptionsGestionnaires = {}): Record<string, Gestionnaire> {
@@ -578,6 +583,16 @@ export function gestionnairesTelephone(dossier: DossierDistant, dossierTemp: str
           await dossier.effacer(chemin)
           dernier.delete(chemin)
           return null
+        }),
+      ),
+
+    'telephone:copieSecurite': () =>
+      enReponse(() =>
+        serie(async (): Promise<string> => {
+          const memoire = options.memoire ? await options.memoire() : null
+          if (memoire === null) throw new ErreurDisque('UNKNOWN', 'Aucun dossier mémoire retenu : pas de copie de sécurité.')
+          if (!options.copies) throw new ErreurDisque('UNKNOWN', 'Ce programme ne sait pas où ranger les copies de sécurité.')
+          return copieSecurite({ memoire, telephone: dossier, copies: options.copies })
         }),
       ),
   }

@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { CANAUX_MEMOIRE } from './memoire'
@@ -8,7 +10,7 @@ import { TEXTES_FERMETURE, brancherCanaux, enReponse, expediteurAdmis, lireTexte
 import { ErreurDisque } from './disque'
 import { AVIS_ARRIVEE, CANAUX_SANS_FIL } from './sansFil'
 import type { DossierDistant } from './telephone'
-import { CANAUX_TELEPHONE, gestionnairesTelephone } from './telephone'
+import { CANAUX_TELEPHONE, dossierLocal, gestionnairesTelephone } from './telephone'
 
 const page = { nom: 'contenu de la fenêtre principale' }
 const tete = { url: `${ORIGINE}/sessions`, parent: null }
@@ -131,6 +133,30 @@ describe('écriture sur le téléphone par le pont', () => {
     expect(recus).toEqual([])
     expect(await appeler('effacer', { chemin: 'sessions/a.gpx' })).toEqual({ ok: true, valeur: null })
     expect(recus).toEqual(['effacer sessions/a.gpx'])
+  })
+})
+
+describe('copie de sécurité par le pont', () => {
+  it('refuse sans dossier mémoire retenu ou sans dossier des copies, puis copie les deux dossiers et rend son chemin', async () => {
+    const tmp = await mkdtemp(path.join(tmpdir(), 'gtk-pont-copie-'))
+    try {
+      const memoire = path.join(tmp, 'Gtracker')
+      await mkdir(path.join(memoire, 'sessions'), { recursive: true })
+      await writeFile(path.join(memoire, 'sessions', 'a.gpx'), 'trace')
+      await mkdir(path.join(tmp, 'telephone', 'Documents', 'Gtracker'), { recursive: true })
+      const servir = (options: Parameters<typeof gestionnairesTelephone>[2]) => {
+        const servis = new Map<string, (e: EvenementPont, ...args: unknown[]) => Promise<unknown>>()
+        brancherCanaux({ handle: (canal, rappel) => servis.set(canal, rappel) }, () => true, gestionnairesTelephone(dossierLocal(path.join(tmp, 'telephone')), path.join(tmp, 'lectures'), options))
+        return servis.get('telephone:copieSecurite')!({ sender: page, senderFrame: tete })
+      }
+      expect(await servir({ memoire: async () => null, copies: path.join(tmp, 'copies') })).toMatchObject({ ok: false })
+      expect(await servir({ memoire: async () => memoire })).toMatchObject({ ok: false })
+      const reponse = (await servir({ memoire: async () => memoire, copies: path.join(tmp, 'copies') })) as { ok: true; valeur: string }
+      expect(reponse.ok).toBe(true)
+      expect(await readFile(path.join(reponse.valeur, 'ordinateur', 'sessions', 'a.gpx'), 'utf8')).toBe('trace')
+    } finally {
+      await rm(tmp, { recursive: true, force: true })
+    }
   })
 })
 
