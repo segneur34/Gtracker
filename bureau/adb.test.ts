@@ -21,6 +21,8 @@ import {
   dossierAdb,
   etatDesAppareils,
   lireAppareils,
+  liaisonPerdue,
+  lireInstallation,
   lireListage,
   lireReponseVersion,
   lireVersionAdb,
@@ -439,10 +441,12 @@ describe('lecture seule et liaison respectée', () => {
   })
 
   it('n’a dans son code que les commandes d’écriture voulues, jamais l’arrêt du serveur', () => {
-    for (const fichier of ['adb.ts', 'telephone.ts']) {
+    for (const fichier of ['adb.ts', 'telephone.ts', 'applicationTelephone.ts']) {
       const source = readFileSync(path.join(__dirname, fichier), 'utf8')
       expect(source).not.toMatch(/kill-server/)
-      expect(source).not.toMatch(/['"`](mkdir|cp|install|uninstall|reboot|root|remount|sideload|disable-verity)['"`\s]/)
+      expect(source).not.toMatch(/['"`](mkdir|cp|uninstall|reboot|root|remount|sideload|disable-verity|install-multiple|-d)['"`\s]/)
+      // L'installation : une seule commande, dans adb.ts, en mise à jour (« -r »), jamais avec « -d ».
+      expect([...source.matchAll(/['"`]install['"`\s]/g)]).toHaveLength(fichier === 'adb.ts' ? 1 : 0)
       expect(source).not.toMatch(/\brm -r|\brm -fr|\brm -rf|\bfind\b[^`\n]*-delete/)
       expect(source).not.toMatch(/['"`]\.tmp['"`]/)
       expect(source).not.toMatch(/\bshell:\s*true/)
@@ -456,6 +460,7 @@ describe('lecture seule et liaison respectée', () => {
     expect([...adb.matchAll(/`(stat|mv|rm)\b[^`]*\$\{(?!citerShell\(|RACINE_DISTANTE\})/g)]).toEqual([])
     expect(adb).toContain('`mv ${citerShell(provisoire)} ${citerShell(distant)}`')
     expect(adb).toContain('`rm -f ${citerShell(distant)}`')
+    expect(adb).toContain("parLeServeur(o, ['-s', s, 'install', '-r', apk], DELAIS.installation)")
     expect(adb).toContain("import { execFile } from 'node:child_process'")
     // Trois lancements seulement : `version` (qui ne parle pas au serveur), `start-server` juste après la sonde, et le
     // passage unique `parLeServeur`, sonde comprise ; une commande de plus ne peut passer que par lui.
@@ -467,6 +472,111 @@ describe('lecture seule et liaison respectée', () => {
     for (const texte of [COMMANDE_LISTAGE, COMMANDE_RACINE, COMMANDE_LISTAGE_REPLI]) {
       expect(texte).not.toMatch(/\b(rm|mv|cp|mkdir|touch|chmod|chown|dd|tee)\b|>|;|&&|\|/)
     }
+  })
+})
+
+// ---------- installation de l'application ----------
+
+describe('lecture d’une installation', () => {
+  it('lit une réussite, avec ou sans retours chariot', () => {
+    expect(lireInstallation('Performing Streamed Install\nSuccess\n')).toEqual({ etat: 'installee' })
+    expect(lireInstallation('Performing Streamed Install\r\nSuccess\r\n\n')).toEqual({ etat: 'installee' })
+  })
+
+  it('range les refus du téléphone sous leur raison, le message d’Android en détail', () => {
+    const cas: [string, string][] = [
+      [
+        'Performing Streamed Install\nadb: failed to install C:\\a\\Gtracker-0.01.40.apk: Failure [INSTALL_FAILED_VERSION_DOWNGRADE: Downgrade detected: Update version code 140 is older than current 141]\n',
+        'versionPlusRecente',
+      ],
+      [
+        'adb: failed to install x.apk: Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Package fr.gtracker signatures do not match previously installed version; ignoring!]\n',
+        'signature',
+      ],
+      ['Failure [INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES]\n', 'signature'],
+      ['adb: failed to install x.apk: Failure [INSTALL_FAILED_USER_RESTRICTED: Install canceled by user]\n', 'usbCoupee'],
+      ['adb: failed to install x.apk: Failure [INSTALL_FAILED_INSUFFICIENT_STORAGE]\n', 'memoirePleine'],
+      ['adb: error: failed to copy \'x.apk\' to \'/data/local/tmp/x.apk\': remote No space left on device\n', 'memoirePleine'],
+      ['adb: failed to install x.apk: Failure [INSTALL_FAILED_ABORTED: User rejected permissions]\n', 'autre'],
+    ]
+    for (const [sortie, raison] of cas) expect(lireInstallation(sortie), sortie).toMatchObject({ etat: 'refusee', raison })
+    expect(lireInstallation(cas[0][0])).toEqual({
+      etat: 'refusee',
+      raison: 'versionPlusRecente',
+      detail: 'INSTALL_FAILED_VERSION_DOWNGRADE: Downgrade detected: Update version code 140 is older than current 141',
+    })
+    expect(lireInstallation('Success\nFailure [INSTALL_FAILED_INSUFFICIENT_STORAGE]')).toMatchObject({ etat: 'refusee' })
+  })
+
+  it('refuse sans « Success », le détail étant la première ligne, borné', () => {
+    expect(lireInstallation('\n  adb: failed to install x.apk: \n')).toEqual({ etat: 'refusee', raison: 'autre', detail: 'adb: failed to install x.apk:' })
+    expect(lireInstallation('')).toEqual({ etat: 'refusee', raison: 'autre', detail: '' })
+    expect((lireInstallation(`Failure [INSTALL_FAILED_X ${'y'.repeat(500)}]`) as { detail: string }).detail).toHaveLength(300)
+  })
+
+  it('reconnaît un téléphone perdu en route', () => {
+    expect(liaisonPerdue("adb: device 'SERIE1' not found\n")).toBe(true)
+    expect(liaisonPerdue('error: device offline\n')).toBe(true)
+    expect(liaisonPerdue('adb: error: no devices/emulators found\n')).toBe(true)
+    expect(liaisonPerdue('adb: failed to install x.apk: Failure [INSTALL_FAILED_ABORTED]\n')).toBe(false)
+    expect(liaisonPerdue("adb: error: failed to copy 'x.apk' to '/data/local/tmp/x.apk': remote No space left on device\n")).toBe(false)
+    expect(liaisonPerdue('adb: error: cannot open file\n')).toBe(false)
+  })
+})
+
+describe('installation par adb', () => {
+  const APK = 'C:\\Programmes\\Gtracker\\resources\\Gtracker-0.01.40.apk'
+
+  it('installe sur l’appareil prêt, en mise à jour, sans retour en arrière, par le serveur sondé', async () => {
+    const f = faux({ ...ADB_OK, install: { stdout: 'Performing Streamed Install\r\nSuccess\r\n' } }, NOTRE_SERVEUR)
+    expect(await f.t.installer!(APK)).toEqual({ etat: 'installee', nom: 'Redmi Note' })
+    expect(f.appels.map((a) => a.args)).toEqual([['version'], ['devices', '-l'], ['-s', 'SERIE1', 'install', '-r', APK]])
+    expect(f.appels.at(-1)!.delai).toBe(DELAIS.installation)
+    expect(DELAIS.installation).toBe(120_000)
+    expect(f.suite).toEqual(['version', 'sonde', 'devices', 'sonde', 'install'])
+    expect(f.appels.flatMap((a) => a.args)).not.toContain('-d')
+  })
+
+  it('rend l’état sans rien envoyer quand le téléphone n’est pas prêt, ou l’outil absent', async () => {
+    for (const [ligne, etat] of [['X unauthorized usb:1', 'autorisation'], ['X offline usb:1', 'horsLigne'], ['', 'absent']]) {
+      const f = faux({ ...ADB_OK, devices: { stdout: `List of devices attached\n${ligne}\n` } }, NOTRE_SERVEUR)
+      expect(await f.t.installer!(APK)).toEqual({ etat })
+      expect(f.verbes()).not.toContain('install')
+    }
+    const sans = dossierAdb({ env: {}, profil: PROFIL, programme: 'C:\\programme', lanceur: async () => ({ code: 0, stdout: '', stderr: '', delaiDepasse: false }), existe: () => false })
+    expect(await sans.installer!(APK)).toEqual({ etat: 'adbIntrouvable', dossier: 'C:\\profil\\platform-tools' })
+  })
+
+  it('ne touche pas au serveur d’un autre programme, même s’il le prend juste avant l’envoi', async () => {
+    const autre = faux(ADB_OK, { etat: 'version', version: 39 })
+    expect(await autre.t.installer!(APK)).toEqual({ etat: 'occupe' })
+    expect(autre.verbes()).toEqual(['version'])
+    const pris = faux(ADB_OK, (numero) => (numero === 1 ? NOTRE_SERVEUR : { etat: 'etranger' }))
+    expect(await pris.t.installer!(APK)).toEqual({ etat: 'occupe' })
+    expect(pris.verbes()).toEqual(['version', 'devices'])
+  })
+
+  it('rend le refus du téléphone, un téléphone perdu en route, et lève sur un délai dépassé', async () => {
+    const refus = faux({ ...ADB_OK, install: { code: 1, stderr: 'adb: failed to install x.apk: Failure [INSTALL_FAILED_USER_RESTRICTED: Install canceled by user]\n' } }, NOTRE_SERVEUR)
+    expect(await refus.t.installer!(APK)).toEqual({ etat: 'refusee', raison: 'usbCoupee', detail: 'INSTALL_FAILED_USER_RESTRICTED: Install canceled by user' })
+    const ancien = faux({ ...ADB_OK, install: { code: 0, stdout: 'Failure [INSTALL_FAILED_VERSION_DOWNGRADE]\n' } }, NOTRE_SERVEUR)
+    expect(await ancien.t.installer!(APK)).toMatchObject({ etat: 'refusee', raison: 'versionPlusRecente' })
+    const perdu = faux({ ...ADB_OK, install: { code: 1, stderr: "adb: device 'SERIE1' not found\n" } }, NOTRE_SERVEUR)
+    expect(await perdu.t.installer!(APK)).toEqual({ etat: 'horsLigne' })
+    const plein = faux({ ...ADB_OK, install: { code: 1, stderr: "adb: error: failed to copy 'x.apk' to '/data/local/tmp/x.apk': remote No space left on device\n" } }, NOTRE_SERVEUR)
+    expect(await plein.t.installer!(APK)).toEqual({
+      etat: 'refusee',
+      raison: 'memoirePleine',
+      detail: "adb: error: failed to copy 'x.apk' to '/data/local/tmp/x.apk': remote No space left on device",
+    })
+    const autreErreur = faux({ ...ADB_OK, install: { code: 1, stderr: "adb: error: cannot open 'x.apk': Permission denied\n" } }, NOTRE_SERVEUR)
+    expect(await autreErreur.t.installer!(APK)).toEqual({ etat: 'refusee', raison: 'autre', detail: "adb: error: cannot open 'x.apk': Permission denied" })
+    const horsLigne = faux({ ...ADB_OK, install: { code: 1, stderr: 'adb: error: device offline\n' } }, NOTRE_SERVEUR)
+    expect(await horsLigne.t.installer!(APK)).toEqual({ etat: 'horsLigne' })
+    const aucun = faux({ ...ADB_OK, install: { code: 1, stderr: 'adb: error: no devices/emulators found\n' } }, NOTRE_SERVEUR)
+    expect(await aucun.t.installer!(APK)).toEqual({ etat: 'horsLigne' })
+    const long = faux({ ...ADB_OK, install: { code: -1, delaiDepasse: true } }, NOTRE_SERVEUR)
+    await expect(long.t.installer!(APK)).rejects.toThrow('délai dépassé')
   })
 })
 

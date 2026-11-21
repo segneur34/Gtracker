@@ -73,6 +73,18 @@ const sansFil = Object.freeze({
   },
 })
 
+/**
+ * L'application du téléphone embarquée (noms gardés égaux à ceux de `applicationTelephone.ts` par un test) : `etat()`
+ * (`{ version, disponible, proposee }`), `enregistrer({ titre })`, qui ouvre la fenêtre « Enregistrer sous » et rend le
+ * chemin écrit ou `null`, `installer()` par le câble, et `marquerProposee()` pour cette version.
+ */
+const application = Object.freeze({
+  etat: sans('application:etat'),
+  enregistrer: avec('application:enregistrer'),
+  installer: sans('application:installer'),
+  marquerProposee: sans('application:marquerProposee'),
+})
+
 contextBridge.exposeInMainWorld(
   'gtrackerBureau',
   Object.freeze({
@@ -80,6 +92,7 @@ contextBridge.exposeInMainWorld(
     memoire,
     telephone,
     sansFil,
+    application,
     /** Textes traduits de la question de fermeture : `{ question, detail, quitter, rester }`. */
     textes: avec('coquille:textes'),
   }),

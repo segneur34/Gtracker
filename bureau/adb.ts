@@ -2,8 +2,9 @@
 // livré avec le programme), lancé par un tableau d'arguments, sans shell de Windows ni chaîne de commande. Sans Electron.
 //
 // Commandes lancées, et elles seules : `version`, `start-server`, `devices -l`, `pull -a` et `push` (chemins en
-// arguments, par le protocole de synchronisation d'adb, sans shell), et `shell` avec l'un des textes fixes du listage
-// ou l'une des trois commandes à un fichier : `stat -c`, `mv` et `rm -f`. Le shell du téléphone recolle la commande :
+// arguments, par le protocole de synchronisation d'adb, sans shell), « install -r » de l'APK de l'application (en mise
+// à jour, jamais avec « -d », qui permettrait de revenir à une version plus ancienne), et `shell` avec l'un des textes
+// fixes du listage ou l'une des trois commandes à un fichier : `stat -c`, `mv` et `rm -f`. Le shell du téléphone recolle la commande :
 // chaque nom y passe entre apostrophes (`citerShell`), et il n'y passe que des chemins de la liste blanche
 // (`cheminEcrivable`) ou leur nom provisoire.
 //
@@ -28,7 +29,7 @@ import { statSync } from 'node:fs'
 import { connect } from 'node:net'
 import path from 'node:path'
 import { ErreurDisque, estTemporaire } from './disque'
-import type { DossierDistant, EtatTelephone, FichierTelephone, FichierVu } from './telephone'
+import type { DossierDistant, EtatTelephone, FichierTelephone, FichierVu, RaisonRefus, ResultatInstallation } from './telephone'
 import { cheminDuCable, cheminEcrivable, cheminRefuse, commeLeTelephone, fichiersAdmis, nomProvisoire, pasPret, resteApresEffacement, sansReel } from './telephone'
 
 /** Dossier du téléphone lu, dans sa mémoire partagée. */
@@ -56,6 +57,8 @@ export const DELAIS = Object.freeze({
   parMo: 1_000,
   /** La sonde du serveur. */
   sonde: 1_000,
+  /** L'installation de l'application : l'envoi de l'APK, puis son installation par le téléphone. */
+  installation: 120_000,
 })
 
 /** Taille maximale de ce qu'une commande peut écrire sur sa sortie (un listage de quelques milliers de fichiers). */
@@ -202,6 +205,48 @@ export function echecDuShell(sortie: { code: number; stderr: string }): boolean 
 /** Vrai si le mode lu par `stat -c %f` est celui d'un fichier ordinaire. */
 export function estFichierOrdinaire(mode: number): boolean {
   return (mode & MASQUE_TYPE) === MODE_FICHIER
+}
+
+/** Ce que dit la sortie d'une installation : réussie, ou refusée par le téléphone, avec sa raison et le message d'Android. */
+export type LectureInstallation = { etat: 'installee' } | { etat: 'refusee'; raison: RaisonRefus; detail: string }
+
+/** Codes d'échec d'Android rangés sous leur raison ; un code qui n'y est pas donne « autre ». */
+const CODES_REFUS: readonly (readonly [RegExp, RaisonRefus])[] = [
+  [/INSTALL_FAILED_VERSION_DOWNGRADE/, 'versionPlusRecente'],
+  [/INSTALL_FAILED_UPDATE_INCOMPATIBLE|INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES|INSTALL_FAILED_SHARED_USER_INCOMPATIBLE/, 'signature'],
+  [/INSTALL_FAILED_USER_RESTRICTED/, 'usbCoupee'],
+  [/INSTALL_FAILED_INSUFFICIENT_STORAGE|No space left on device/i, 'memoirePleine'],
+]
+
+/** Longueur maximale du détail d'un refus. */
+const DETAIL_MAX = 300
+
+/** Le code d'échec d'Android d'une sortie d'installation (« INSTALL_FAILED_… : message »), `null` s'il n'y en a pas. */
+function codeAndroid(texte: string): string | null {
+  return /Failure \[([^\]\n]+)\]/.exec(texte)?.[1] ?? /\b(INSTALL_(?:PARSE_)?FAILED_[A-Z_]+[^\n]*)/.exec(texte)?.[1] ?? null
+}
+
+/**
+ * Issue d'une installation lue dans la sortie d'adb (sortie et erreurs mises bout à bout) : « Success » seul sur sa
+ * ligne et aucun code d'échec, installée ; sinon refusée, la raison d'après le code d'Android, le détail étant ce
+ * code et son message, ou à défaut la première ligne non vide. Un téléphone ancien rend toujours 0 : le code de sortie
+ * n'est pas lu.
+ */
+export function lireInstallation(sortie: string): LectureInstallation {
+  const texte = sortie.replace(/\r/g, '')
+  const code = codeAndroid(texte)
+  if (code === null && /^Success$/m.test(texte)) return { etat: 'installee' }
+  const detail = (code ?? texte.split('\n').find((l) => l.trim() !== '') ?? '').trim().slice(0, DETAIL_MAX)
+  const raison = CODES_REFUS.find(([motif]) => motif.test(texte))?.[1] ?? 'autre'
+  return { etat: 'refusee', raison, detail }
+}
+
+/**
+ * Vrai si la sortie dit que le téléphone a disparu ou ne répond plus en cours de commande ; une autre erreur d'adb
+ * (copie de l'APK impossible, mémoire pleine) n'en est pas une.
+ */
+export function liaisonPerdue(texte: string): boolean {
+  return /\bdevice (?:'[^'\n]*' )?(?:not found|offline)\b|no devices\/emulators found/i.test(texte)
 }
 
 /** Vrai si la sortie dit qu'un chemin n'existe pas sur le téléphone. */
@@ -408,8 +453,8 @@ export function dossierAdb(options: OptionsAdb): DossierDistant {
   }
 
   /**
-   * Seul passage des commandes qui parlent au serveur (`devices`, `shell`, `pull`, et `start-server` qu'il lance
-   * lui-même) : le serveur visé est sondé juste avant chacune. Pas de serveur sur ce poste : le nôtre est lancé.
+   * Seul passage des commandes qui parlent au serveur (`devices`, `shell`, `pull`, `push`, l'installation, et
+   * `start-server` qu'il lance lui-même) : le serveur visé est sondé juste avant chacune. Pas de serveur sur ce poste : le nôtre est lancé.
    * Un serveur d'une autre version, une réponse étrangère ou un serveur que la sonde ne sait pas viser : `null`, et
    * rien n'est lancé. Les commandes héritent de l'environnement, donc visent le même serveur que la sonde.
    */
@@ -614,6 +659,30 @@ export function dossierAdb(options: OptionsAdb): DossierDistant {
       for (const cible of [distant, provisoire]) {
         if ((await statDistant(o, s, cible)) !== null) throw resteApresEffacement(chemin)
       }
+    },
+
+    // L'appareil prêt à l'instant reçoit l'APK, le chemin passant en argument (adb l'envoie lui-même, sans shell) ;
+    // « -r » remplace l'application en gardant ses données, et l'absence de « -d » laisse le téléphone refuser une
+    // version plus ancienne que la sienne.
+    async installer(apk): Promise<ResultatInstallation> {
+      const e = await etat()
+      const o = outil
+      const s = serie
+      if (e.etat !== 'pret') return e
+      if (o === null || s === null) return { etat: 'absent' }
+      const sortie = await parLeServeur(o, ['-s', s, 'install', '-r', apk], DELAIS.installation)
+      if (sortie === null) return { etat: 'occupe' }
+      if (sortie.delaiDepasse) throw new ErreurDisque('UNKNOWN', "L'installation ne s'est pas terminée à temps (délai dépassé).")
+      const texte = `${sortie.stdout}\n${sortie.stderr}`
+      const lu = lireInstallation(texte)
+      if (lu.etat === 'installee') {
+        journal(`application installée sur ${e.nom}`)
+        return { etat: 'installee', nom: e.nom }
+      }
+      // Téléphone perdu en route : seulement si rien d'autre n'explique l'échec (ni code d'Android, ni raison connue).
+      if (lu.raison === 'autre' && codeAndroid(texte.replace(/\r/g, '')) === null && liaisonPerdue(texte)) return { etat: 'horsLigne' }
+      journal(`installation refusée : ${lu.detail}`)
+      return lu
     },
   }
 }

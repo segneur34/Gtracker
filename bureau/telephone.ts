@@ -58,6 +58,26 @@ export const ETATS_TELEPHONE = ['pret', 'absent', 'autorisation', 'horsLigne', '
 /** Un fichier du téléphone : chemin relatif à `Documents/Gtracker`, taille en octets, date de modification à la seconde. */
 export type FichierTelephone = { chemin: string; taille: number; dateMs: number }
 
+/**
+ * Raison d'un refus d'installation par le téléphone : une version plus récente y est déjà, l'application installée n'a
+ * pas la même signature, l'installation par USB est coupée dans les options pour les développeurs, mémoire pleine, ou
+ * autre chose (le code d'Android est alors dans le détail).
+ */
+export type RaisonRefus = 'versionPlusRecente' | 'signature' | 'usbCoupee' | 'memoirePleine' | 'autre'
+
+/** Valeurs de `RaisonRefus`, dans l'ordre du type. */
+export const RAISONS_REFUS = ['versionPlusRecente', 'signature', 'usbCoupee', 'memoirePleine', 'autre'] as const satisfies readonly RaisonRefus[]
+
+/**
+ * Issue d'une installation de l'application par le câble : installée sur le téléphone `nom` (son modèle) ; refusée
+ * par le téléphone, `detail` portant le message d'Android ; ou rien n'a été envoyé, le téléphone n'étant pas prêt
+ * (son état, comme `EtatTelephone`).
+ */
+export type ResultatInstallation =
+  | { etat: 'installee'; nom: string }
+  | { etat: 'refusee'; raison: RaisonRefus; detail: string }
+  | Exclude<EtatTelephone, { etat: 'pret' }>
+
 /** Le dossier `Documents/Gtracker` d'un téléphone. */
 export interface DossierDistant {
   /** État du téléphone ; lève seulement sur une panne imprévue de l'outil. */
@@ -82,6 +102,11 @@ export interface DossierDistant {
   ecrire?(chemin: string, fichierLocal: string, taille: number): Promise<FichierTelephone>
   /** Efface le seul fichier `chemin`, admis par `cheminEcrivable` ; sans effet s'il n'existe pas. Absent d'un canal qui ne sait pas écrire. */
   effacer?(chemin: string): Promise<void>
+  /**
+   * Installe l'APK `apk` (chemin absolu sur le PC) sur le téléphone prêt, en mise à jour, jamais en retour à une
+   * version plus ancienne. Lève seulement sur une panne imprévue. Absent d'un canal qui ne sait pas installer.
+   */
+  installer?(apk: string): Promise<ResultatInstallation>
 }
 
 /** Sous-dossier des sessions, listé par tous les canaux. */
@@ -226,18 +251,23 @@ export function pasPret(etat: EtatTelephone['etat']): ErreurDisque {
 /** Nom du téléphone d'essai. */
 export const NOM_TELEPHONE_ESSAI = "Téléphone d'essai"
 
+/** Dossier du téléphone d'essai (sous son stockage) où une APK « installée » est copiée. */
+export const DOSSIER_INSTALLATIONS_ESSAI = 'applications-installees'
+
 export type OptionsDossierLocal = {
   /** État imposé, à la place de celui que donne le dossier. */
   etatImpose?: EtatTelephone | null
   /** Téléphone débranché après ce nombre d'opérations réussies (lectures, écritures, effacements). */
   coupureApres?: number | null
+  /** Refus imposé à toute installation, au lieu de la copie de l'APK. */
+  refusInstallation?: RaisonRefus | null
 }
 
 /**
  * Un dossier local qui joue la mémoire partagée du téléphone (`stockage`, son `/sdcard`) : le dossier lu est
  * `stockage/Documents/Gtracker`. Il liste comme le câble (racine, `sessions/`, `reglages/`, provisoires vus comme le
  * téléphone les voit), et écrit et efface comme lui : nom provisoire, taille relue, renommage. Stockage absent :
- * téléphone absent.
+ * téléphone absent. Une installation copie l'APK sous `stockage/applications-installees/`, ou rend le refus imposé.
  */
 export function dossierLocal(stockage: string | null, options: OptionsDossierLocal = {}): DossierDistant {
   const racine = stockage === null ? null : path.join(path.resolve(stockage), 'Documents', 'Gtracker')
@@ -377,6 +407,18 @@ export function dossierLocal(stockage: string | null, options: OptionsDossierLoc
         if (await stat(fichier).then(() => true, () => false)) throw resteApresEffacement(chemin)
       }
     },
+
+    async installer(apk) {
+      const e = await etat()
+      if (e.etat !== 'pret') return e
+      if (stockage === null) return { etat: 'absent' }
+      const refus = options.refusInstallation ?? null
+      if (refus !== null) return { etat: 'refusee', raison: refus, detail: `Refus d'essai : ${refus}` }
+      const dossier = path.join(path.resolve(stockage), DOSSIER_INSTALLATIONS_ESSAI)
+      await mkdir(dossier, { recursive: true })
+      await copyFile(apk, path.join(dossier, path.basename(apk)))
+      return { etat: 'installee', nom: e.nom }
+    },
   }
 }
 
@@ -431,10 +473,18 @@ export type OptionsGestionnaires = {
   memoire?: () => Promise<string | null>
   /** Dossier des copies de sécurité (`<Documents>\Gtracker-copies`) ; absent, `telephone:copieSecurite` refuse. */
   copies?: string
+  /**
+   * File des commandes au téléphone, partagée avec les autres canaux qui lui parlent (l'installation de l'application) ;
+   * absente, une file propre à ces gestionnaires.
+   */
+  serie?: FileTelephone
 }
 
+/** File qui fait passer les actions une à une, dans l'ordre des appels (`enSerie`). */
+export type FileTelephone = <T>(action: () => Promise<T>) => Promise<T>
+
 /** Une action à la fois, dans l'ordre des appels : le téléphone ne reçoit jamais deux commandes ensemble. */
-export function enSerie(): <T>(action: () => Promise<T>) => Promise<T> {
+export function enSerie(): FileTelephone {
   let queue: Promise<unknown> = Promise.resolve()
   return <T>(action: () => Promise<T>) => {
     const suite = queue.then(action, action)
@@ -463,7 +513,7 @@ function champs(argument: unknown): Record<string, unknown> {
  * Un chemin hors de la liste blanche est refusé (`PERMISSION`) avant toute commande au téléphone.
  */
 export function gestionnairesTelephone(dossier: DossierDistant, dossierTemp: string, options: OptionsGestionnaires = {}): Record<string, Gestionnaire> {
-  const serie = enSerie()
+  const serie = options.serie ?? enSerie()
   /** Fichiers du dernier listage réussi, par chemin, suivis des écritures et effacements ; vide après un listage en échec. */
   let dernier = new Map<string, FichierTelephone>()
   /** Vrai après un listage réussi : le canal est choisi, le téléphone est connu. */

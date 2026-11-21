@@ -22,6 +22,12 @@
 //                           seulement, voir `telephone.ts` ; le mode d'essai ne lance jamais le vrai adb
 //   GTRACKER_BANC_SANSFIL_ACTIF, _PORT, _SONDE, _FENETRE_MS, _PROFIL : en mode d'essai seulement, voir `sansFil.ts` ;
 //                           le serveur sans fil d'essai n'écoute que sur 127.0.0.1
+//   GTRACKER_APK, GTRACKER_BANC_APK_DESTINATION, GTRACKER_BANC_APPLICATION_REFUS : en mode d'essai seulement, voir
+//                           `applicationTelephone.ts` ; le mode d'essai n'ouvre jamais la fenêtre « Enregistrer sous »
+//
+// L'application du téléphone embarquée (`resources\Gtracker-<version>.apk`) s'enregistre sur le disque ou s'installe
+// par le câble par les canaux `application:*` (`applicationTelephone.ts`), l'installation passant dans la même file
+// que les autres commandes au téléphone.
 //
 // Le dossier mémoire (un vrai dossier du disque) est lu et écrit ici, la page y passant par les canaux `memoire:*`
 // du pont (`preload.ts`, `memoire.ts`) ; seule la page de la fenêtre principale y a accès (`expediteurAdmis`).
@@ -31,17 +37,19 @@
 // (`cheminEcrivable`, vérifiée par les gestionnaires avant toute commande).
 
 import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol, safeStorage, screen, session, shell } from 'electron'
-import type { OpenDialogOptions, Rectangle, WebContents } from 'electron'
+import type { OpenDialogOptions, Rectangle, SaveDialogOptions, WebContents } from 'electron'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { dossierAdb, dossierAdbConseille } from './adb'
+import type { EssaiApplication } from './applicationTelephone'
+import { cheminApk, essaiApplicationDepuisEnvironnement, gestionnairesApplication } from './applicationTelephone'
 import { DOSSIER_COPIES } from './copieSecurite'
 import { creerMemoire, gestionnairesMemoire, optionsDepuisEnvironnement } from './memoire'
 import type { Chiffreur } from './sansFil'
 import { AVIS_ARRIVEE, DOSSIER_SANS_FIL, ServeurSansFil, dossierSansFilPuisCable, essaiSansFilDepuisEnvironnement, gestionnairesSansFil, stockageDossier } from './sansFil'
 import type { DossierDistant } from './telephone'
-import { DOSSIER_LECTURES, dossierLocal, essaiTelephoneDepuisEnvironnement, gestionnairesTelephone, viderLectures } from './telephone'
+import { DOSSIER_LECTURES, dossierLocal, enSerie, essaiTelephoneDepuisEnvironnement, gestionnairesTelephone, viderLectures } from './telephone'
 import { ADRESSE_ACCUEIL, HOTE, estDeLApplication } from './origine'
 import { TEXTES_FERMETURE, brancherCanaux, echec, expediteurAdmis, lireTextesFermeture, reussite, uneALaFois } from './pont'
 import type { TextesFermeture } from './pont'
@@ -338,12 +346,37 @@ function creerSansFil(profil: string): ServeurSansFil {
 
 /**
  * Le téléphone : par le Wi-Fi s'il y est relié, sinon par le câble ; en mode d'essai, le câble est le dossier local des
- * variables d'essai (jamais le vrai téléphone), sinon le débogage USB, par l'adb trouvé sur le poste.
+ * variables d'essai (jamais le vrai téléphone), sinon le débogage USB, par l'adb trouvé sur le poste. Le câble seul est
+ * rendu à part : l'application ne s'installe que par lui.
  */
-function creerTelephone(profil: string, sansFil: ServeurSansFil): DossierDistant {
+function creerTelephone(profil: string, sansFil: ServeurSansFil, essaiApplication: EssaiApplication | null): { telephone: DossierDistant; cable: DossierDistant } {
   const essai = essaiTelephoneDepuisEnvironnement(process.env, dossierAdbConseille(profil), journal)
-  const cable = essai ? dossierLocal(essai.stockage, essai) : dossierAdb({ env: process.env, profil, programme: path.dirname(process.execPath), journal })
-  return dossierSansFilPuisCable(sansFil.dossierSansFil(), cable)
+  const cable = essai
+    ? dossierLocal(essai.stockage, { ...essai, refusInstallation: essaiApplication?.refus ?? null })
+    : dossierAdb({ env: process.env, profil, programme: path.dirname(process.execPath), journal })
+  return { telephone: dossierSansFilPuisCable(sansFil.dossierSansFil(), cable), cable }
+}
+
+/** Dossier proposé par la fenêtre « Enregistrer sous » : Téléchargements, sinon Documents. */
+function dossierTelechargements(): string {
+  try {
+    return app.getPath('downloads')
+  } catch {
+    return dossierWindows('documents')
+  }
+}
+
+/** Fenêtre « Enregistrer sous » de Windows pour l'APK, ouverte par le processus principal : la page ne voit que la réponse. */
+async function choisirDestinationApk({ titre, nom }: { titre: string; nom: string }): Promise<string | null> {
+  const options: SaveDialogOptions = {
+    title: titre,
+    defaultPath: path.join(dossierTelechargements(), nom),
+    filters: [{ name: 'APK', extensions: ['apk'] }],
+    properties: ['showOverwriteConfirmation', 'dontAddToRecent'],
+  }
+  const fenetre = fenetrePrincipale
+  const { canceled, filePath } = fenetre ? await dialog.showSaveDialog(fenetre, options) : await dialog.showSaveDialog(options)
+  return canceled || !filePath ? null : filePath
 }
 
 function brancherPont(): void {
@@ -361,12 +394,32 @@ function brancherPont(): void {
     return ouverture.ok && ouverture.valeur.etat !== 'aucun' ? ouverture.valeur.chemin : null
   }
   const sansFil = creerSansFil(profil)
+  const essaiApplication = essaiApplicationDepuisEnvironnement(process.env, journal)
+  const { telephone, cable } = creerTelephone(profil, sansFil, essaiApplication)
+  // Une seule file pour tout ce qui parle au téléphone : listages, lectures, écritures et installation de l'application.
+  const serie = enSerie()
+  const apk = cheminApk({
+    version: VERSION,
+    emballe: app.isPackaged,
+    ressources: process.resourcesPath,
+    depot: path.join(__dirname, '..', '..'),
+    essai: essaiApplication?.apk ?? null,
+  })
   brancherCanaux(
     ipcMain,
     (evenement) => expediteurAdmis(evenement, fenetrePrincipale?.webContents ?? null),
     {
       ...gestionnairesMemoire(memoire),
-      ...gestionnairesTelephone(creerTelephone(profil, sansFil), lectures, { memoire: memoireRetenue, copies }),
+      ...gestionnairesTelephone(telephone, lectures, { memoire: memoireRetenue, copies, serie }),
+      ...gestionnairesApplication({
+        version: VERSION,
+        apk,
+        profil,
+        choisirDestination: essaiApplication?.choisirDestination ?? choisirDestinationApk,
+        cable,
+        serie,
+        journal,
+      }),
       ...gestionnairesSansFil(sansFil),
       'coquille:textes': async (argument) => {
         const textes = lireTextesFermeture(argument)

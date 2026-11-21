@@ -10,7 +10,8 @@ import { TEXTES_FERMETURE, brancherCanaux, enReponse, expediteurAdmis, lireTexte
 import { ErreurDisque } from './disque'
 import { AVIS_ARRIVEE, CANAUX_SANS_FIL } from './sansFil'
 import type { DossierDistant } from './telephone'
-import { CANAUX_TELEPHONE, dossierLocal, gestionnairesTelephone } from './telephone'
+import { CANAUX_TELEPHONE, dossierLocal, enSerie, gestionnairesTelephone } from './telephone'
+import { CANAUX_APPLICATION, gestionnairesApplication } from './applicationTelephone'
 
 const page = { nom: 'contenu de la fenêtre principale' }
 const tete = { url: `${ORIGINE}/sessions`, parent: null }
@@ -166,6 +167,12 @@ describe('preload', () => {
     expect(servis).toEqual(CANAUX_TELEPHONE.map((nom) => `telephone:${nom}`))
   })
 
+  it('nomme les canaux de l’application comme ses gestionnaires', () => {
+    const cable: DossierDistant = { etat: async () => ({ etat: 'absent' }), lister: async () => [], lire: async () => undefined }
+    const servis = Object.keys(gestionnairesApplication({ version: '0.01.40', apk: 'x.apk', profil: '.', choisirDestination: async () => null, cable, serie: enSerie() }))
+    expect(servis).toEqual(CANAUX_APPLICATION.map((nom) => `application:${nom}`))
+  })
+
   it('expose exactement les canaux servis par la mémoire et le téléphone, une fonction chacun, sans ipcRenderer tel quel', () => {
     const source = readFileSync(path.join(__dirname, 'preload.ts'), 'utf8')
     const canaux = [...source.matchAll(/'memoire:([A-Za-z]+)'/g)].map((m) => m[1])
@@ -181,6 +188,10 @@ describe('preload', () => {
     expect(source).toMatch(/^\s+sansFil,$/m)
     expect(source).toContain(`ipcRenderer.on('${AVIS_ARRIVEE}', ecouteur)`)
     expect(source).toContain(`ipcRenderer.removeListener('${AVIS_ARRIVEE}', ecouteur)`)
+    const application = [...source.matchAll(/'application:([A-Za-z]+)'/g)].map((m) => m[1])
+    expect(application).toEqual([...CANAUX_APPLICATION])
+    for (const nom of CANAUX_APPLICATION) expect(source).toMatch(new RegExp(`\\b${nom}: (sans|avec)\\('application:${nom}'\\)`))
+    expect(source).toMatch(/^\s+application,$/m)
     expect(source).toContain("textes: avec('coquille:textes')")
     expect(source).not.toMatch(/exposeInMainWorld\([^)]*ipcRenderer/)
     expect(source).not.toMatch(/from '\.\//)
