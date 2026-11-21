@@ -47,12 +47,21 @@ export class ComputerLinkRefused extends Error {
   }
 }
 
+/**
+ * Le dossier mémoire que l'ordinateur lira : `folder`, l'adresse du dossier désigné ; `base`, le sous-dossier où est la
+ * mémoire (« Gtracker »), absent ou vide quand c'est le dossier désigné lui-même.
+ */
+interface LinkFolderOptions {
+  folder: string | null;
+  base?: string;
+}
+
 export interface ComputerLinkPort {
   status(): Promise<ComputerLinkStatus>;
   /** Appaire à l'ordinateur dont `code` est affiché (6 chiffres) ; sans `address`, il est cherché sur le réseau. */
-  pair(options: { code: string; address?: string; folder: string | null }): Promise<ComputerLinkStatus>;
-  /** Relie à l'ordinateur appairé ; sans effet si c'est déjà fait. `folder` : le dossier mémoire qu'il lira. */
-  connect(options: { address?: string; folder: string | null }): Promise<ComputerLinkStatus>;
+  pair(options: { code: string; address?: string } & LinkFolderOptions): Promise<ComputerLinkStatus>;
+  /** Relie à l'ordinateur appairé ; sans effet si c'est déjà fait, sinon que le dossier mémoire lu change. */
+  connect(options: { address?: string } & LinkFolderOptions): Promise<ComputerLinkStatus>;
   /** Ferme la liaison et oublie l'ordinateur. */
   forget(): Promise<ComputerLinkStatus>;
   /** Appelé à chaque changement d'état ; rend le désabonnement. */
@@ -61,8 +70,8 @@ export interface ComputerLinkPort {
 
 interface ComputerLinkPlugin {
   status(): Promise<unknown>;
-  pair(options: { code: string; address?: string; folder?: string }): Promise<unknown>;
-  connect(options: { address?: string; folder?: string }): Promise<unknown>;
+  pair(options: { code: string; address?: string; folder?: string; base?: string }): Promise<unknown>;
+  connect(options: { address?: string; folder?: string; base?: string }): Promise<unknown>;
   forget(): Promise<unknown>;
   addListener(event: 'status', listener: (status: unknown) => void): Promise<PluginListenerHandle>;
 }
@@ -116,10 +125,14 @@ const call = async (request: Promise<unknown>): Promise<ComputerLinkStatus> => {
   }
 };
 
+/** Le dossier tel que le greffon le reçoit : rien sans dossier, et pas de sous-dossier vide (comportement d'avant le sous-dossier). */
+const folderFields = ({ folder, base }: LinkFolderOptions): { folder?: string; base?: string } =>
+  (folder ? { folder, ...(base ? { base } : {}) } : {});
+
 const port: ComputerLinkPort = {
   status: () => call(plugin.status()),
-  pair: ({ code, address, folder }) => call(plugin.pair({ code, ...(address ? { address } : {}), ...(folder ? { folder } : {}) })),
-  connect: ({ address, folder }) => call(plugin.connect({ ...(address ? { address } : {}), ...(folder ? { folder } : {}) })),
+  pair: ({ code, address, ...where }) => call(plugin.pair({ code, ...(address ? { address } : {}), ...folderFields(where) })),
+  connect: ({ address, ...where }) => call(plugin.connect({ ...(address ? { address } : {}), ...folderFields(where) })),
   forget: () => call(plugin.forget()),
   onStatus: (listener) => {
     let removed = false;
@@ -140,14 +153,11 @@ export const computerLink = (): ComputerLinkPort | null => (isNativeApp() ? port
 
 /** Le dossier mémoire désigné tel que la liaison le lit : `ok` avec son adresse, ou la raison de son absence. */
 export type LinkFolder =
-  | { state: 'ok'; uri: string }
+  /** `base` : le sous-dossier du dossier désigné où est la mémoire (« Gtracker »), vide si c'est lui-même. */
+  | { state: 'ok'; uri: string; base: string }
   /** Aucun dossier désigné, ou dossier mémoire qui n'est pas celui d'un téléphone. */
-  | { state: 'none' }
-  /** Le dossier désigné contient le dossier Gtracker sans l'être : le greffon lit la racine du dossier désigné. */
-  | { state: 'subfolder' };
+  | { state: 'none' };
 
 /** `location` : le dossier désigné (`uri`) et le sous-dossier où est la mémoire (`base`, vide si c'est lui-même). */
-export const linkFolderOf = (location: { uri: string; base: string } | null): LinkFolder => {
-  if (location === null || location.uri === '') return { state: 'none' };
-  return location.base === '' ? { state: 'ok', uri: location.uri } : { state: 'subfolder' };
-};
+export const linkFolderOf = (location: { uri: string; base: string } | null): LinkFolder =>
+  (location === null || location.uri === '' ? { state: 'none' } : { state: 'ok', uri: location.uri, base: location.base });

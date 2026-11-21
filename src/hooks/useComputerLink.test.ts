@@ -51,7 +51,14 @@ describe('autoConnect : la liaison tentée toute seule', () => {
     const { port, calls } = makePort(STATUS);
     fake.port = port;
     await autoConnect('content://arbre');
-    expect(calls).toEqual([{ method: 'status' }, { method: 'connect', options: { folder: 'content://arbre' } }]);
+    expect(calls).toEqual([{ method: 'status' }, { method: 'connect', options: { folder: 'content://arbre', base: '' } }]);
+  });
+
+  it('mémoire dans un sous-dossier du dossier désigné : le sous-dossier part avec le dossier', async () => {
+    const { port, calls } = makePort(STATUS);
+    fake.port = port;
+    await autoConnect('content://documents', 'Gtracker');
+    expect(calls).toEqual([{ method: 'status' }, { method: 'connect', options: { folder: 'content://documents', base: 'Gtracker' } }]);
   });
 
   it('jamais pendant un enregistrement : le greffon n\'est même pas interrogé', async () => {

@@ -526,6 +526,28 @@ final class ComputerLinkProtocol {
         return true;
     }
 
+    /** Segments au plus du sous-dossier où est la mémoire (la page n'en donne qu'un, « Gtracker »). */
+    static final int BASE_SEGMENTS_MAX = 8;
+
+    /**
+     * Vrai pour le sous-dossier du dossier désigné où est la mémoire, donné par la page (`base` de
+     * `platform/memoryFolder.ts`) : vide ou absent (le dossier désigné est la mémoire elle-même), sinon des segments
+     * admis séparés par `/`. Rien hors de l'arbre : ni `..` ni `.`, ni barre en tête ou en fin, ni segment vide, ni
+     * chemin absolu (le deux-points de `C:` ou de `content:` et la barre oblique inverse sont refusés par segment).
+     */
+    static boolean baseAllowed(String base) {
+        if (base == null || base.isEmpty()) return true;
+        String[] segments = base.split("/", -1);
+        if (segments.length > BASE_SEGMENTS_MAX) return false;
+        for (String s : segments) if (!segmentAllowed(s)) return false;
+        return true;
+    }
+
+    /** Chemin depuis la racine de l'arbre d'un fichier du dossier mémoire : `path` sous `base` quand il y en a un. */
+    static String inBase(String base, String path) {
+        return base == null || base.isEmpty() ? path : base + "/" + path;
+    }
+
     /** Un fichier du dossier mémoire : chemin relatif, taille en octets, date de modification en millisecondes. */
     static final class RemoteFile {
         final String path;

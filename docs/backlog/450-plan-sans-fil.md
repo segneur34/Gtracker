@@ -65,6 +65,12 @@ Ordre : P1, puis P2 et P4 ensemble ; P3 après P2, P5 après P4 ; P6 après P3.
 4. **Textes à faire relire par l'utilisateur** : bloc du PC (« Téléphone sans câble », « Recevoir les sessions du téléphone sans câble », « Relier un téléphone », « Téléphones reliés », « Retirer ») et bloc du téléphone (« Ordinateur », « Relier », « Chercher l'ordinateur », « Oublier cet ordinateur », et les phrases d'état et d'échec de `src/library/computerLink.ts`).
 5. **Essais au téléphone, après 1 et 2** : ceux de la section « Essais au téléphone », en commençant par le partage de connexion dans les deux sens (l'utilisateur n'a pas de box), puis le câble toujours possible.
 
+## Point 1 livré le 21/11 (ce que la page et le banc doivent savoir)
+
+- `pair` et `connect` prennent `base` en plus de `folder` : le sous-dossier du dossier désigné où est la mémoire (`base` de `deviceFolderLocation()`, « Gtracker »). Absent ou vide, rien ne change : le greffon lit la racine de l'arbre, comme avant (cas du téléphone de l'utilisateur, arbre `primary:Documents/Gtracker`). La page ne l'envoie qu'avec `folder` et jamais vide (`folderFields`).
+- Côté Java, `MemoryTree.baseDir` résout le sous-dossier (racine de l'arbre sans `base`) ; `lister` part de là, `lire` cherche `base/chemin` depuis la racine (`ComputerLinkProtocol.inBase`). Sous-dossier absent : `lister` rend l'erreur `NOT_FOUND`. Un `base` qui sortirait de l'arbre (`..`, `.`, barre en tête ou en fin, segment vide, deux-points, barre inverse, plus de 8 segments : `ComputerLinkProtocol.baseAllowed`, mêmes refus de segment que `pathAllowed`) fait refuser l'appel (`BAD_BASE`), que la page laisse passer comme une panne ordinaire (aucun texte neuf).
+- La coupure de la page est retirée : `LinkFolder` n'a plus d'état `subfolder`, le bloc « Ordinateur » relie aussi quand la mémoire est dans `Gtracker` sous le dossier désigné, et sa phrase « désignez le dossier Gtracker lui-même » a disparu (dictionnaires compris). Tests : `ComputerLinkProtocolTest` (`sousDossierDeLaMemoire`, `cheminSousLeSousDossier`), `MemoryTreeTest` (neuf), `src/platform/computerLink.test.ts`, `src/hooks/useComputerLink.test.ts`.
+
 ## Questions posées à l'utilisateur le 20/11, et sa réponse
 
 Réponse du 20/11 au soir, pour les trois : « j'ai pas d'avis, le plus simple je dirais et surtout le plus robuste ». L'orchestrateur retient donc les recommandations, qui sont les plus simples :

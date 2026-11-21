@@ -9,7 +9,6 @@ import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Build;
 import android.os.SystemClock;
-import android.provider.DocumentsContract;
 import android.util.Log;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -79,8 +78,10 @@ import org.json.JSONObject;
  *   un fil pour les fermetures. Aucun service, aucune tâche de fond : la liaison se ferme quand l'application n'est
  *   plus à l'écran, et la page la rouvre au retour.
  *
- * Pour la page : `status()`, `pair({ code, address?, folder? })`, `connect({ address?, folder? })`, `forget()`, qui
- * rendent toutes l'état (`statusObject`), et l'événement `status`, du même contenu, à chaque changement.
+ * Pour la page : `status()`, `pair({ code, address?, folder?, base? })`, `connect({ address?, folder?, base? })`,
+ * `forget()`, qui rendent toutes l'état (`statusObject`), et l'événement `status`, du même contenu, à chaque
+ * changement. `folder` est l'adresse SAF du dossier désigné, `base` le sous-dossier où est la mémoire (« Gtracker »),
+ * absent ou vide quand c'est le dossier désigné lui-même.
  */
 @CapacitorPlugin(
     name = "ComputerLink",
@@ -131,6 +132,7 @@ public class ComputerLinkPlugin extends Plugin {
     /** Codes de refus d'un appel mal formé. */
     static final String REJECT_BAD_CODE = "BAD_CODE";
     static final String REJECT_BAD_ADDRESS = "BAD_ADDRESS";
+    static final String REJECT_BAD_BASE = "BAD_BASE";
 
     /** Attente de la dernière adresse connue : si le PC y est, il répond en quelques millisecondes. */
     private static final int LAST_ADDRESS_TIMEOUT_MS = 1_000;
@@ -175,7 +177,7 @@ public class ComputerLinkPlugin extends Plugin {
             call.reject("Code d'appairage mal formé : 6 chiffres attendus.", REJECT_BAD_CODE);
             return;
         }
-        if (!addressValid(call)) return;
+        if (!addressValid(call) || !baseValid(call)) return;
         if (needsLocalNetworkPermission()) {
             requestPermissionForAlias(LOCAL_NETWORK, call, "pairAfterPermission");
             return;
@@ -195,7 +197,7 @@ public class ComputerLinkPlugin extends Plugin {
     /** Relie le téléphone au PC appairé ; sans effet s'il l'est déjà. Rend l'état une fois la tentative finie. */
     @PluginMethod
     public void connect(PluginCall call) {
-        if (!addressValid(call)) return;
+        if (!addressValid(call) || !baseValid(call)) return;
         if (needsLocalNetworkPermission()) {
             requestPermissionForAlias(LOCAL_NETWORK, call, "connectAfterPermission");
             return;
@@ -271,23 +273,31 @@ public class ComputerLinkPlugin extends Plugin {
     private void startPair(PluginCall call) {
         final String code = call.getString("code", "");
         final String address = blankToNull(call.getString("address"));
-        final String folder = blankToNull(call.getString("folder"));
+        final MemoryRoot root = rootOf(call);
         final int gen;
         synchronized (this) {
             stopAll();
             gen = generation;
         }
-        worker.execute(() -> call.resolve(guarded(gen, () -> pairNow(gen, code, address, folder))));
+        worker.execute(() -> call.resolve(guarded(gen, () -> pairNow(gen, code, address, root))));
     }
 
     private void startConnect(PluginCall call) {
         final String address = blankToNull(call.getString("address"));
-        final String folder = blankToNull(call.getString("folder"));
+        final MemoryRoot root = rootOf(call);
         final int gen;
         synchronized (this) {
             gen = generation;
         }
-        worker.execute(() -> call.resolve(guarded(gen, () -> connectNow(gen, address, folder))));
+        worker.execute(() -> call.resolve(guarded(gen, () -> connectNow(gen, address, root))));
+    }
+
+    /** Le dossier mémoire donné par l'appel ; `null` sans `folder`. `base` a passé `baseValid`. */
+    private static MemoryRoot rootOf(PluginCall call) {
+        String folder = blankToNull(call.getString("folder"));
+        if (folder == null) return null;
+        String base = call.getString("base");
+        return new MemoryRoot(folder, base == null || base.isEmpty() ? null : base);
     }
 
     private interface Attempt {
@@ -305,7 +315,7 @@ public class ComputerLinkPlugin extends Plugin {
         return statusObject();
     }
 
-    private void pairNow(int gen, String code, String address, String folder) throws IOException {
+    private void pairNow(int gen, String code, String address, MemoryRoot root) throws IOException {
         List<LocalLink> links = localLinks();
         if (links.isEmpty()) {
             finish(gen, STATE_NOT_FOUND, ERROR_NO_LOCAL_NETWORK);
@@ -364,7 +374,7 @@ public class ComputerLinkPlugin extends Plugin {
                     .putString(KEY_ADDRESS, target.endpoint.toString())
                     .commit();
             }
-            kept = startServing(gen, c, folder);
+            kept = startServing(gen, c, root);
         } catch (FrameException e) {
             Log.w(TAG, "appairage : message illisible", e);
             finish(gen, null, ERROR_PROTOCOL);
@@ -376,10 +386,10 @@ public class ComputerLinkPlugin extends Plugin {
         }
     }
 
-    private void connectNow(int gen, String address, String folder) throws IOException {
+    private void connectNow(int gen, String address, MemoryRoot root) throws IOException {
         synchronized (this) {
             if (link != null) {
-                if (folder != null) link.folder = folder;
+                if (root != null) link.root = root;
                 return;
             }
         }
@@ -443,7 +453,7 @@ public class ComputerLinkPlugin extends Plugin {
                     .putString(KEY_ADDRESS, c.endpoint.toString())
                     .commit();
             }
-            kept = startServing(gen, c, folder);
+            kept = startServing(gen, c, root);
         } catch (FrameException e) {
             Log.w(TAG, "accueil : message illisible", e);
             finish(gen, null, ERROR_PROTOCOL);
@@ -505,10 +515,10 @@ public class ComputerLinkPlugin extends Plugin {
     }
 
     /** La liaison est établie : un fil à elle répond aux commandes du PC. Faux si une fermeture voulue est passée. */
-    private boolean startServing(int gen, Connection c, String folder) {
+    private boolean startServing(int gen, Connection c, MemoryRoot root) {
         synchronized (this) {
             if (gen != generation) return false;
-            c.folder = folder;
+            c.root = root;
             link = c;
             sentFiles = 0;
             state = STATE_LINKED;
@@ -566,14 +576,16 @@ public class ComputerLinkPlugin extends Plugin {
 
     /** Réponse à `lister` : fichiers de la racine et de `sessions/`, sans dossier ni écriture en cours. */
     private byte[] listFiles(Connection c, long id) throws FrameException {
-        String folder = c.folder;
-        if (folder == null) return ComputerLinkProtocol.encodeError(id, ComputerLinkProtocol.ERROR_NOT_FOUND, "Aucun dossier mémoire désigné sur le téléphone.");
+        MemoryRoot root = c.root;
+        if (root == null) return ComputerLinkProtocol.encodeError(id, ComputerLinkProtocol.ERROR_NOT_FOUND, "Aucun dossier mémoire désigné sur le téléphone.");
         try {
-            Uri tree = Uri.parse(folder);
+            Uri tree = Uri.parse(root.folder);
             MemoryTree memory = new MemoryTree(getContext().getContentResolver());
+            String rootId = memory.baseDir(tree, root.base);
+            if (rootId == null) return ComputerLinkProtocol.encodeError(id, ComputerLinkProtocol.ERROR_NOT_FOUND, "Dossier mémoire introuvable sur le téléphone : " + root.base);
             List<RemoteFile> files = new ArrayList<>();
             String sessionsId = null;
-            for (MemoryTree.Child child : memory.children(tree, DocumentsContract.getTreeDocumentId(tree))) {
+            for (MemoryTree.Child child : memory.children(tree, rootId)) {
                 if (child.isDir) {
                     if (ComputerLinkProtocol.SESSIONS_DIR.equals(child.name)) sessionsId = child.id;
                 } else if (child.sizeKnown) {
@@ -596,13 +608,14 @@ public class ComputerLinkPlugin extends Plugin {
 
     /** Réponse à `lire` : les octets demandés, plus courts seulement à la fin du fichier. */
     private byte[] readBlock(Connection c, Incoming m) throws FrameException {
-        String folder = c.folder;
-        if (folder == null) return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_NOT_FOUND, "Aucun dossier mémoire désigné sur le téléphone.");
+        MemoryRoot root = c.root;
+        if (root == null) return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_NOT_FOUND, "Aucun dossier mémoire désigné sur le téléphone.");
         try {
-            Uri tree = Uri.parse(folder);
+            Uri tree = Uri.parse(root.folder);
             MemoryTree memory = new MemoryTree(getContext().getContentResolver());
-            // Le chemin a passé `pathAllowed` : il ne désigne qu'un fichier de la racine ou de `sessions/`, cherché par son nom.
-            String docId = memory.resolveExisting(tree, m.path);
+            // Le chemin a passé `pathAllowed` et le sous-dossier `baseAllowed` : il ne désigne qu'un fichier de la
+            // racine du dossier mémoire ou de son `sessions/`, cherché nom par nom depuis la racine de l'arbre.
+            String docId = memory.resolveExisting(tree, ComputerLinkProtocol.inBase(root.base, m.path));
             long size = docId == null ? -1 : memory.fileSize(tree, docId);
             if (size < 0) return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_NOT_FOUND, "Fichier absent : " + m.path);
             int wanted = (int) Math.max(0, Math.min(m.length, size - m.start));
@@ -954,6 +967,20 @@ public class ComputerLinkPlugin extends Plugin {
         }
     }
 
+    /**
+     * Le dossier mémoire que lit la liaison, posé d'un bloc : l'arbre désigné (adresse SAF) et le sous-dossier où est
+     * la mémoire, `null` quand c'est l'arbre lui-même.
+     */
+    private static final class MemoryRoot {
+        final String folder;
+        final String base;
+
+        MemoryRoot(String folder, String base) {
+            this.folder = folder;
+            this.base = base;
+        }
+    }
+
     /** Une liaison TLS avec le PC : flux, décodeur aux limites de l'accueil (le PC n'envoie jamais de corps). */
     private static final class Connection {
         final SSLSocket socket;
@@ -965,7 +992,7 @@ public class ComputerLinkPlugin extends Plugin {
         final ArrayDeque<Frame> frames = new ArrayDeque<>();
         final byte[] buffer = new byte[READ_BUFFER];
         /** Dossier mémoire lu pour les commandes ; donné par la page. */
-        volatile String folder;
+        volatile MemoryRoot root;
         /** Vrai une fois fermée exprès : l'erreur de lecture qui suit n'en est pas une. */
         volatile boolean closed;
 
@@ -1099,6 +1126,15 @@ public class ComputerLinkPlugin extends Plugin {
         String address = blankToNull(call.getString("address"));
         if (address != null && ComputerLinkProtocol.parseEndpoint(address) == null) {
             call.reject("Adresse refusée : une adresse du réseau local est attendue (192.168.x.x, 10.x.x.x ou 172.16 à 31.x.x).", REJECT_BAD_ADDRESS);
+            return false;
+        }
+        return true;
+    }
+
+    /** Refuse l'appel si le sous-dossier donné sortirait du dossier désigné (`ComputerLinkProtocol.baseAllowed`). */
+    private boolean baseValid(PluginCall call) {
+        if (!ComputerLinkProtocol.baseAllowed(call.getString("base"))) {
+            call.reject("Sous-dossier du dossier mémoire refusé : un nom de dossier relatif est attendu.", REJECT_BAD_BASE);
             return false;
         }
         return true;

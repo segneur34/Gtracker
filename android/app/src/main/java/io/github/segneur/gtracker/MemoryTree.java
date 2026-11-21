@@ -87,6 +87,17 @@ final class MemoryTree {
         return id;
     }
 
+    /**
+     * Identifiant du dossier mémoire dans l'arbre : la racine de l'arbre sans `base`, sinon son sous-dossier `base`
+     * (« Gtracker » quand l'utilisateur a désigné le dossier qui le contient). `null` si ce sous-dossier n'existe pas,
+     * ou si `base` sortirait de l'arbre (`ComputerLinkProtocol.baseAllowed`) : rien n'est alors cherché.
+     */
+    String baseDir(Uri tree, String base) {
+        if (base == null || base.isEmpty()) return DocumentsContract.getTreeDocumentId(tree);
+        if (!ComputerLinkProtocol.baseAllowed(base)) return null;
+        return resolveExisting(tree, base);
+    }
+
     /** Taille du fichier d'identifiant donné, -1 si c'est un dossier, s'il n'existe plus ou si sa taille est inconnue. */
     long fileSize(Uri tree, String id) {
         String[] columns = { Document.COLUMN_MIME_TYPE, Document.COLUMN_SIZE };

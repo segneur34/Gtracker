@@ -32,16 +32,17 @@ const tracked = async <T,>(job: () => Promise<T>): Promise<T> => {
 /**
  * Relie le téléphone à l'ordinateur connu si la règle (`shouldAutoConnect`) le permet : l'état est relu au dernier
  * moment, le réseau ayant pu changer depuis. Sans effet hors du téléphone, avec une tentative déjà en cours et pendant
- * un enregistrement. Une panne se note en console seulement : la page n'en dit rien hors de Réglages.
+ * un enregistrement. Une panne se note en console seulement : la page n'en dit rien hors de Réglages. `folder` : le
+ * dossier désigné ; `base` : le sous-dossier où est la mémoire, vide si c'est lui-même.
  */
-export const autoConnect = async (folder: string): Promise<void> => {
+export const autoConnect = async (folder: string, base = ''): Promise<void> => {
   const link = computerLink();
   if (link === null || running > 0 || isRecordingActive()) return;
   await tracked(async () => {
     try {
       const status = await link.status();
       if (!shouldAutoConnect({ status, hasFolder: true, recording: isRecordingActive() })) return;
-      await link.connect({ folder });
+      await link.connect({ folder, base });
     } catch (err) {
       console.warn('Liaison avec l\'ordinateur : tentative automatique en échec', err);
     }
@@ -62,11 +63,12 @@ export const useLinkFolder = (): LinkFolder => {
 export function useComputerLinkLauncher(): void {
   const folder = useLinkFolder();
   const uri = folder.state === 'ok' ? folder.uri : null;
+  const base = folder.state === 'ok' ? folder.base : '';
   useEffect(() => {
     if (uri === null) return;
-    void autoConnect(uri);
-    return onAppResume(() => void autoConnect(uri));
-  }, [uri]);
+    void autoConnect(uri, base);
+    return onAppResume(() => void autoConnect(uri, base));
+  }, [uri, base]);
 }
 
 /** Relecture du temps écoulé depuis le dernier envoi (« il y a 2 min »). */
@@ -158,17 +160,18 @@ export function useComputerLink(): ComputerLinkView {
   }, []);
 
   const uri = folder.state === 'ok' ? folder.uri : null;
+  const base = folder.state === 'ok' ? folder.base : '';
   const ready = link !== null && uri !== null && !recording;
 
   const pair = useCallback(async (code: string, address: string) => {
     if (!ready) return;
-    await act(() => link.pair({ code, address: address.trim() || undefined, folder: uri }));
-  }, [act, link, ready, uri]);
+    await act(() => link.pair({ code, address: address.trim() || undefined, folder: uri, base }));
+  }, [act, link, ready, uri, base]);
 
   const search = useCallback(async (address: string) => {
     if (!ready) return;
-    await act(() => link.connect({ address: address.trim() || undefined, folder: uri }));
-  }, [act, link, ready, uri]);
+    await act(() => link.connect({ address: address.trim() || undefined, folder: uri, base }));
+  }, [act, link, ready, uri, base]);
 
   const forget = useCallback(async () => {
     if (link === null) return;

@@ -92,16 +92,30 @@ describe('appels du greffon', () => {
     expect(fake.state.calls).toEqual([{ method: 'status', options: undefined }]);
   });
 
-  it('pair et connect ne passent que ce qui est donné : ni adresse vide, ni dossier absent', async () => {
+  it('pair et connect ne passent que ce qui est donné : ni adresse vide, ni dossier absent, ni sous-dossier vide', async () => {
     const link = computerLink()!;
     await link.pair({ code: '123456', address: '', folder: null });
     await link.pair({ code: '123456', address: '192.168.1.20:48217', folder: 'content://arbre' });
     await link.connect({ folder: 'content://arbre' });
     await link.connect({ address: undefined, folder: null });
+    await link.connect({ folder: 'content://arbre', base: '' });
     expect(fake.state.calls.map((c) => c.options)).toEqual([
       { code: '123456' },
       { code: '123456', address: '192.168.1.20:48217', folder: 'content://arbre' },
       { folder: 'content://arbre' },
+      {},
+      { folder: 'content://arbre' },
+    ]);
+  });
+
+  it('le sous-dossier où est la mémoire accompagne le dossier, jamais seul', async () => {
+    const link = computerLink()!;
+    await link.pair({ code: '123456', folder: 'content://documents', base: 'Gtracker' });
+    await link.connect({ folder: 'content://documents', base: 'Gtracker' });
+    await link.connect({ folder: null, base: 'Gtracker' });
+    expect(fake.state.calls.map((c) => c.options)).toEqual([
+      { code: '123456', folder: 'content://documents', base: 'Gtracker' },
+      { folder: 'content://documents', base: 'Gtracker' },
       {},
     ]);
   });
@@ -155,8 +169,8 @@ describe('événement status', () => {
 });
 
 describe('linkFolderOf : le dossier que l\'ordinateur lira', () => {
-  it('dossier mémoire désigné : son adresse', () => {
-    expect(linkFolderOf({ uri: 'content://arbre', base: '' })).toEqual({ state: 'ok', uri: 'content://arbre' });
+  it('dossier mémoire désigné : son adresse, sans sous-dossier', () => {
+    expect(linkFolderOf({ uri: 'content://arbre', base: '' })).toEqual({ state: 'ok', uri: 'content://arbre', base: '' });
   });
 
   it('aucun dossier : rien', () => {
@@ -164,7 +178,7 @@ describe('linkFolderOf : le dossier que l\'ordinateur lira', () => {
     expect(linkFolderOf({ uri: '', base: '' })).toEqual({ state: 'none' });
   });
 
-  it('dossier qui contient Gtracker : le greffon lirait la racine du mauvais dossier, rien n\'est donné', () => {
-    expect(linkFolderOf({ uri: 'content://arbre', base: 'Gtracker' })).toEqual({ state: 'subfolder' });
+  it('dossier qui contient Gtracker : son adresse et le sous-dossier, que le greffon lira', () => {
+    expect(linkFolderOf({ uri: 'content://arbre', base: 'Gtracker' })).toEqual({ state: 'ok', uri: 'content://arbre', base: 'Gtracker' });
   });
 });

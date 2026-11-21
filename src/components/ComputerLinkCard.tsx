@@ -30,9 +30,7 @@ function ComputerLinkCard() {
       <strong className="computer-link__title">{t('Ordinateur')}</strong>
       {!folderOk && (
         <p className="ui-muted ui-text-s ui-m-0 computer-link__note">
-          {view.folder.state === 'subfolder'
-            ? t("Le dossier désigné contient le dossier Gtracker sans l'être : désignez le dossier Gtracker lui-même, avec « Changer de dossier », pour relier un ordinateur.")
-            : t("Sans dossier mémoire accessible (plus haut), la liaison avec l'ordinateur ne se fait pas : il y lit vos sessions.")}
+          {t("Sans dossier mémoire accessible (plus haut), la liaison avec l'ordinateur ne se fait pas : il y lit vos sessions.")}
         </p>
       )}
       {view.recording && (

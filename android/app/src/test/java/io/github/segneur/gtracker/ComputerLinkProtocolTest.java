@@ -331,6 +331,31 @@ public class ComputerLinkProtocolTest {
     }
 
     @Test
+    public void sousDossierDeLaMemoire() {
+        // Absent ou vide : le dossier désigné est la mémoire elle-même, comme avant le sous-dossier.
+        assertTrue(ComputerLinkProtocol.baseAllowed(null));
+        assertTrue(ComputerLinkProtocol.baseAllowed(""));
+        for (String ok : new String[] { "Gtracker", "Mes documents/Gtracker", "été", "a/b/c/d/e/f/g/h" }) {
+            assertTrue(ok, ComputerLinkProtocol.baseAllowed(ok));
+        }
+        for (String no : new String[] {
+            "..", ".", "../Gtracker", "Gtracker/..", "Gtracker/../..", "a/./b", "/Gtracker", "Gtracker/", "a//b", "/",
+            "C:\\Gtracker", "C:/Gtracker", "\\\\serveur\\partage", "content://autre/arbre", "Gtracker\\..", "a\u0000b",
+            "Gtracker.gtracker-tmp", "nul", "a/b/c/d/e/f/g/h/i",
+        }) {
+            assertFalse(no, ComputerLinkProtocol.baseAllowed(no));
+        }
+    }
+
+    @Test
+    public void cheminSousLeSousDossier() {
+        assertEquals("sessions/a.json", ComputerLinkProtocol.inBase(null, "sessions/a.json"));
+        assertEquals("index.json", ComputerLinkProtocol.inBase("", "index.json"));
+        assertEquals("Gtracker/sessions/a.json", ComputerLinkProtocol.inBase("Gtracker", "sessions/a.json"));
+        assertEquals("Mes documents/Gtracker/index.json", ComputerLinkProtocol.inBase("Mes documents/Gtracker", "index.json"));
+    }
+
+    @Test
     public void fichiersListesTriesSansDoublonNiTemporaire() {
         List<RemoteFile> files = Arrays.asList(
             new RemoteFile("sessions/b.gpx", 10, 1),
