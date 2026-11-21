@@ -110,10 +110,18 @@
    fond de page coupe net le trait du cadre et cache le fond dessiné. Le cadre descend de quoi loger une languette à
    deux lignes, pour qu'elle ne touche pas ce qui est au-dessus. */
 .profile-favs--spot {
-  --favs-spot-in: 10px;
+  /* Descente de la languette sous sa place d'origine (bas à 10 px sous la première ligne du titre) : la rangée des
+     activités descend d'autant, pour garder son écart avec la languette, et la marge haute baisse d'autant, pour que
+     la languette garde sa distance à ce qui est au-dessus. */
+  --favs-spot-drop: 10px;
+  --favs-spot-in: calc(10px + var(--favs-spot-drop));
   /* Une ligne du titre (`--text-l` en hauteur de ligne normale), puis l'écart voulu. */
   --favs-spot-bottom: calc(var(--text-l) * 1.2 + var(--favs-spot-in));
-  margin-top: calc(var(--space-6) + var(--space-2));
+  margin-top: calc(var(--space-6) + var(--space-2) - var(--favs-spot-drop));
+}
+
+.profile-favs--spot .profile-favs__row {
+  margin-top: var(--favs-spot-drop);
 }
 
 .profile-favs__head {
