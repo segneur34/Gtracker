@@ -145,7 +145,7 @@ Réponses de l'utilisateur, le 21/11 :
 - Question 2 (arrivée par le sans-fil) : « on attend le bouton synchroniser », à faire préciser ; et « une sauvegarde de 30 jours sur le téléphone », qui contredit la règle validée (corbeille sur l'ordinateur, le téléphone supprime pour de bon) : redemandé le 21/11.
 - Question 3 (copie de sécurité) : oui, d'office (« ça vaut le coup de faire des sauvegardes »).
 - Essai 330 : Windows a posé sa question de pare-feu ; après le code tapé, aucun message ; l'utilisateur suppose les deux reliés et attend une session neuve pour le voir.
-- Essai critique d'avant P2 : autorisé le 21/11, téléphone branché ; résultat plus bas.
+- Essai critique d'avant P2 : fait le 21/11, téléphone branché, réussi. Une session synthétique poussée par adb (`push` vers `nom.gpx.gtracker-new`, taille relue par `stat`, `shell mv`) a été lue par l'application à « Mettre à jour », qui a créé sa fiche ; la fiche, réécrite par adb (`push` vers `nom.json.gtracker-tmp`, `stat`, `mv`), a ensuite été réécrite par l'application, puis l'utilisateur a supprimé la session dans l'application (« c bon ») : les deux fichiers ont disparu, aucun temporaire ne reste, le dossier a retrouvé ses 55 fichiers. Le téléphone lit, modifie et efface donc un fichier écrit par le compte `shell` : l'écriture par câble de P2 tient telle que le plan la décrit.
 
 Majeures, posées à l'utilisateur le 21/11 :
 1. Catalogue du matériel et activités : chaque appareil garde les siens, rapprochés par nom, « Reprendre » pour tout aligner (recommandé par le plan : plus simple, sans APK) ; ou la synchronisation les fond d'office par nom, en ajout seulement (renommages et suppressions non suivis, APK, exception au « jamais pris de lui-même »).
