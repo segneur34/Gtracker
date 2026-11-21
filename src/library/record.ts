@@ -93,10 +93,15 @@ export const RECORD_VERSION = 1;
  * passage proche de la borne de la remontée pompée peut changer de camp, et
  * nombre de vagues, plus longue vague et vitesse max avec lui.
  *
+ * 22 (21 novembre 2026) : en surf sans foil, une vague compte son départ, la
+ * mise en vitesse depuis presque l'arrêt qui précède son début compté : plus
+ * longue vague et temps de glisse s'allongent ; le nombre de vagues et la
+ * vitesse max ne changent pas.
+ *
  * Les versions sautées (6, 10, 11, 17 et 18) ne changeaient aucun chiffre de la
  * voile ni du surf ; le numéro est gardé.
  */
-export const SUMMARY_CALC_VERSION = 21;
+export const SUMMARY_CALC_VERSION = 22;
 
 export type SessionSource = 'enregistrement' | 'import';
 

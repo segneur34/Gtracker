@@ -6,7 +6,7 @@ import { SPORT_PROFILES, defaultActiveThresholdOf, getActiveThresholds } from '.
 import type { RawTrackPoint, TrackPoint } from '../core/types';
 import { fromDisplaySpeed } from '../core/units';
 import { summarizeSession } from '../library/summary';
-import { analyzeSurf, riseStartOf, summarizeSurf, type RiseOptions, type SurfParams } from './surfAnalysis';
+import { DEPART_MAX_S, analyzeSurf, departStartOf, riseStartOf, summarizeSurf, type RiseOptions, type SurfParams } from './surfAnalysis';
 import { isInZone } from './peakZone';
 import { countDirectionChanges } from './gpsTurns';
 import { runSurfSession, surfProfileOf } from './surfSession';
@@ -225,7 +225,12 @@ describe('analyzeSurf, cadence', () => {
   it('garde une vague compressée en trois points (cadence de 4 s)', () => {
     const sparse = analyze(buildSurfSession(MORNING, 4));
     expect(sparse.analysis.waves).toHaveLength(3);
-    expect(sparse.summary.longestWaveM).toBeCloseTo(120, -1);
+    // À 4 s, la rame de 5 s qui précède la deuxième vague tient en un seul pas, de l'attente (0,1 m/s) à 1,5 m/s : une
+    // montée jugée sur son point d'arrivée, donc le départ de la vague, 7,5 m de plus que sa partie comptée.
+    const b = sparse.analysis.waves[1];
+    expect(b.departS).toBeCloseTo(5, 6);
+    expect(b.distanceM).toBeCloseTo(127.5, 0);
+    expect(sparse.summary.longestWaveM).toBe(b.distanceM);
   });
 
   it('ne compte pas un trou de la trace (téléphone sous l\'eau) comme de la glisse', () => {
@@ -631,7 +636,10 @@ const measureSoftRide = (ride: SoftRide, cadenceS: number, options: BuildOptions
   const tHigh = firstTimeS(phases, tLow, (v) => v >= high);
   const tExit = firstTimeS(phases, tHigh, (v) => v < low);
   const tOf = (i: number) => (track[i].timeMs - T0) / 1000;
-  const spans = ride.kind === 'vol' ? run.analysis.flights : run.analysis.waves;
+  // Le début compté d'une vague, sans son départ : le recul jusqu'à la détente basse se mesure seul.
+  const spans = ride.kind === 'vol'
+    ? run.analysis.flights
+    : run.analysis.waves.map((w) => ({ ...w, start: w.rideStart, startMs: w.rideStartMs }));
   const found = spans.find((w) => (w.startMs - T0) / 1000 < tExit && (w.endMs - T0) / 1000 > rampAtS);
   // Vague écartée : le passage du masque, avant le filtre de durée et de distance.
   const masked = activeRuns(track, run.rideMask).find((r) => tOf(r.start) < tExit && tOf(r.end) > rampAtS);
@@ -865,7 +873,7 @@ const softCutS = (ride: SoftRide, cadenceS: number, options: BuildOptions = {}, 
   const rideMask = maskAt(track, ride.foil ? surf.foilActiveThreshold : SPORT_PROFILES.surf.defaultActiveThreshold);
   const waveMask = ride.foil ? maskAt(track, surf.foilWaveThreshold) : null;
   const a = analyzeSurf(track, cum, rideMask, waveMask, { ...paramsOf(ride.foil), ...rise });
-  const spans = ride.kind === 'vol' ? a.flights : a.waves;
+  const spans = ride.kind === 'vol' ? a.flights : a.waves.map((w) => ({ ...w, startMs: w.rideStartMs }));
   const tEnd = ride.rampAtS + ride.rampS + 20;
   const f = spans.find((w) => (w.startMs - T0) / 1000 < tEnd && (w.endMs - T0) / 1000 > ride.rampAtS);
   return f ? (f.startMs - T0) / 1000 - ride.rampAtS : null;
@@ -920,6 +928,191 @@ describe('recul du début d\'une glisse : bruit, constantes et bornes', () => {
   }
 });
 
+/**
+ * Une vague et son départ : attente, rame à `paddle` m/s (par défaut 1 km/h,
+ * sous le plancher d'arrêt), puis la rampe de `from` à 4 m/s en `rampS`
+ * secondes, à partir de 50 s ; plateau, retour, rame et attente.
+ */
+const departWave = (o: { paddle?: number; rampS?: number } = {}): Phase[] => {
+  const from = o.paddle ?? 1 / 3.6;
+  return [
+    { s: 20, speed: 0.1 },
+    { s: 30, speed: from },
+    { s: o.rampS ?? 10, speed: from, to: 4, heading: 180 },
+    { s: 8, speed: 4, heading: 180 },
+    { s: 4, speed: 4, to: 1, heading: 180 },
+    { s: 40, speed: 1 },
+    { s: 30, speed: 0.1 },
+  ];
+};
+const DEPART_AT_S = 50;
+const secondsOf = (ms: number): number => (ms - T0) / 1000;
+
+describe('départ des vagues : la mise en vitesse depuis presque l\'arrêt, comptée dans la vague', () => {
+  it('depuis 1 km/h, le départ remonte au début de la rampe : même vague à 1 Hz, à 5 Hz et avec un pas de 6 s', () => {
+    const cases: [string, number, BuildOptions][] = [['1 Hz', 1, {}], ['5 Hz', 0.2, {}], ['pas de 6 s', 1, { dropBetweenS: [50, 56] }]];
+    const waves = cases.map(([label, cadenceS, options]) => {
+      const { analysis } = analyze(buildSurfSession(departWave(), cadenceS, options));
+      expect(analysis.waves, label).toHaveLength(1);
+      return analysis.waves[0];
+    });
+    const [slow] = waves;
+    waves.forEach((w, k) => {
+      const label = cases[k][0];
+      // Le départ part du dernier point sous le plancher d'arrêt, au début de la rampe, à un pas près.
+      expect(secondsOf(w.startMs), label).toBeGreaterThanOrEqual(DEPART_AT_S - 1e-6);
+      expect(secondsOf(w.startMs), label).toBeLessThanOrEqual(DEPART_AT_S + 1);
+      expect(w.departS, label).toBeCloseTo(secondsOf(w.rideStartMs) - secondsOf(w.startMs), 6);
+      expect(w.durationS, label).toBeCloseTo(slow.durationS, -0.5);
+      // Le long pas garde la distance de sa vitesse retenue, celle du noyau (règle 6) : seules les cadences régulières la comparent.
+      if (k < 2) expect(Math.abs(w.distanceM - slow.distanceM), label).toBeLessThan(1);
+    });
+    // Aux cadences régulières, le départ dure le temps de passer de 2 km/h à la détente basse (7 km/h), environ 4 s.
+    expect(waves[0].departS).toBeGreaterThanOrEqual(3);
+    expect(waves[1].departS).toBeGreaterThanOrEqual(3);
+  });
+
+  it('une rame plate à 4 km/h avant la rampe n\'est pas avalée, même bruitée (± 0,15 m/s, trente graines), à 1 Hz et 5 Hz', () => {
+    const phases = departWave({ paddle: 4 / 3.6, rampS: 8 });
+    for (const cadenceS of [1, 0.2]) {
+      const clean = analyze(buildSurfSession(phases, cadenceS)).analysis.waves[0];
+      expect(secondsOf(clean.startMs)).toBeGreaterThanOrEqual(DEPART_AT_S - 1e-6);
+      expect(secondsOf(clean.startMs)).toBeLessThanOrEqual(DEPART_AT_S + 1);
+      for (let seed = 1; seed <= 30; seed++) {
+        const label = `graine ${seed}, ${cadenceS} s`;
+        const { analysis } = analyze(buildSurfSession(phases, cadenceS, { noiseMs: 0.15, seed }));
+        expect(analysis.waves, label).toHaveLength(1);
+        const w = analysis.waves[0];
+        expect(secondsOf(w.startMs), label).toBeGreaterThanOrEqual(DEPART_AT_S - 1);
+        expect(secondsOf(w.startMs), label).toBeLessThanOrEqual(secondsOf(w.rideStartMs));
+      }
+    }
+  });
+
+  for (const cadenceS of [1, 0.2]) {
+    it(`à ${1 / cadenceS} Hz, le départ dure au plus ${DEPART_MAX_S} s, surchargeable`, () => {
+      // Rampe lente de 1 km/h à 4 m/s en 46 s : 0,32 m/s gagnés en 4 s, 17 s du plancher d'arrêt à la détente basse.
+      const track = buildSurfSession(departWave({ rampS: 46 }), cadenceS);
+      const w = analyze(track).analysis.waves[0];
+      expect(w.departS).toBeLessThanOrEqual(DEPART_MAX_S + 1e-6);
+      expect(w.departS).toBeGreaterThan(DEPART_MAX_S - 1);
+      const short = analyze(track, false, { maxDepartS: 5 }).analysis.waves[0];
+      expect(short.departS).toBeLessThanOrEqual(5 + 1e-6);
+      expect(short.departS).toBeGreaterThan(4);
+      // Un gain minimal plus haut que celui de la rampe en 4 s : aucun départ.
+      expect(analyze(track, false, { departMinGainMs: 1 }).analysis.waves[0].departS).toBe(0);
+    });
+
+    it(`à ${1 / cadenceS} Hz, le départ ne passe ni la fin de la vague d'avant, ni une reprise de pause, ni un trou`, () => {
+      const track = buildSurfSession(departWave(), cadenceS);
+      const w = analyze(track).analysis.waves[0];
+      expect(departStartOf(track, w.rideStart, 0, params)).toBe(w.start);
+      expect(departStartOf(track, w.rideStart, indexAtS(track, 51), params)).toBe(indexAtS(track, 51));
+      const paused = track.map((p, k) => (k === indexAtS(track, 51) ? { ...p, segmentStart: true as const } : p));
+      expect(departStartOf(paused, w.rideStart, 0, params)).toBe(indexAtS(track, 51));
+      // Aucun point de 40 à 51 s : un trou de 11 s, plus long que `maxGapS`.
+      const holed = buildSurfSession(departWave(), cadenceS, { dropBetweenS: [40, 51] });
+      const hw = analyze(holed).analysis.waves[0];
+      expect(hw.start).toBe(indexAtS(holed, 51));
+    });
+  }
+
+  it('la vague compte son départ : durée, distance et moyenne ; vitesse max, nombre de vagues, sens et zone inchangés', () => {
+    const phases = [...departWave(), ...departWave().slice(1)];
+    for (const cadenceS of [1, 0.2]) {
+      const track = buildSurfSession(phases, cadenceS);
+      const withDepart = analyze(track);
+      const without = analyze(track, false, { maxDepartS: 0 });
+      const { analysis, summary } = withDepart;
+      expect(analysis.waves).toHaveLength(2);
+      expect(summary.waveCount).toBe(without.summary.waveCount);
+      expect(summary.maxWaveSpeedMs).toBe(without.summary.maxWaveSpeedMs);
+      expect(analysis.waveSense).toEqual(without.analysis.waveSense);
+      expect(analysis.peakZone).toEqual(without.analysis.peakZone);
+      analysis.waves.forEach((w, k) => {
+        const base = without.analysis.waves[k];
+        expect(base.departS).toBe(0);
+        expect(w.departS).toBeGreaterThan(2);
+        expect(w.rideStart).toBe(base.start);
+        expect(w.rideStartMs).toBe(base.startMs);
+        expect(w.durationS).toBeCloseTo(base.durationS + w.departS, 6);
+        expect(w.distanceM).toBeGreaterThan(base.distanceM);
+        expect(w.avgSpeedMs).toBeCloseTo(w.distanceM / w.durationS, 6);
+        expect(w.avgSpeedMs).toBeLessThan(base.avgSpeedMs);
+        expect(w.maxSpeedMs).toBe(base.maxSpeedMs);
+        expect(w.turns).toBe(base.turns);
+        // Les pas du départ sont de la glisse.
+        for (let i = w.start + 1; i <= w.rideStart; i++) expect(analysis.phases[i]).toBe('glisse');
+      });
+      expect(summary.glisseS).toBeCloseTo(summary.waveS, 6);
+      expect(summary.waveS).toBeCloseTo(without.summary.waveS + analysis.waves[0].departS + analysis.waves[1].departS, 6);
+      expect(summary.longestWaveM).toBe(Math.max(...analysis.waves.map((w) => w.distanceM)));
+      // La remontée s'arrête au début du départ de la vague suivante.
+      const back = analysis.returns.find((r) => r.after === 1)!;
+      expect(back.endMs).toBe(analysis.waves[1].startMs);
+    }
+  });
+
+  it('une entrée dans la zone du pic pendant le départ compte encore : retour au pic et première sortie inchangés', () => {
+    // Chaque vague part d'un départ lent, 15 s et une vingtaine de mètres vers la plage, depuis le nord de la zone ; la
+    // remontée contourne la zone par l'ouest, puis revient au-dessus d'elle : on n'y entre que pendant le départ.
+    const wave: Phase[] = [
+      { s: 46, speed: 1 / 3.6, to: 4, heading: 180 },
+      { s: 10, speed: 4, heading: 225 },
+      { s: 4, speed: 4, to: 1, heading: 225 },
+    ];
+    const cycle: Phase[] = [
+      ...wave,
+      { s: 30, speed: 1, heading: 270 },
+      { s: 134, speed: 1, heading: 0 },
+      { s: 65.4, speed: 1, heading: 90 },
+      { s: 30, speed: 0 },
+    ];
+    const phases: Phase[] = [
+      { s: 30, speed: 0 },
+      { s: 70, speed: 1, heading: 90 }, { s: 150, speed: 1, heading: 0 }, { s: 70, speed: 1, heading: 270 },
+      { s: 30, speed: 0 },
+      ...cycle, ...cycle, ...cycle, ...wave,
+      { s: 30, speed: 1 }, { s: 20, speed: 0 },
+    ];
+    for (const cadenceS of [1, 0.2]) {
+      const track = buildSurfSession(phases, cadenceS);
+      const withDepart = analyze(track);
+      const without = analyze(track, false, { maxDepartS: 0 });
+      expect(withDepart.analysis.waves).toHaveLength(4);
+      for (const w of withDepart.analysis.waves) expect(w.departS).toBeGreaterThan(10);
+      const measured = withDepart.analysis.returns.filter((r) => r.after > 0);
+      expect(measured).toHaveLength(3);
+      for (const r of measured) {
+        const base = without.analysis.returns.find((b) => b.after === r.after)!;
+        expect(r.returnS).not.toBeNull();
+        expect(r.returnS!).toBeCloseTo(base.returnS!, 6);
+        // L'entrée tombe bien dans le départ, après la fin de la remontée.
+        expect(r.entryMs!).toBeGreaterThan(r.endMs);
+      }
+      expect(withDepart.summary.chainedCount).toBe(0);
+      expect(withDepart.summary.avgReturnS).toBeCloseTo(without.summary.avgReturnS!, 6);
+      expect(withDepart.summary.firstOutS).not.toBeNull();
+      expect(withDepart.summary.firstOutS!).toBeCloseTo(without.summary.firstOutS!, 6);
+      const firstOut = withDepart.analysis.returns.find((r) => r.after === 0)!;
+      expect(firstOut.entryMs!).toBeGreaterThan(firstOut.endMs);
+    }
+  });
+
+  it('sur foil, aucun départ : vagues et vols inchangés', () => {
+    for (const phases of [MORNING, SOFT_CASES.foilVague.phases, departWave()]) {
+      const track = buildSurfSession(phases);
+      const { analysis } = analyze(track, true);
+      expect(analysis).toEqual(analyze(track, true, { maxDepartS: 0 }).analysis);
+      for (const w of analysis.waves) {
+        expect(w.departS).toBe(0);
+        expect(w.rideStart).toBe(w.start);
+        expect(w.rideStartMs).toBe(w.startMs);
+      }
+    }
+  });
+});
+
 describe('analyzeSurf, zone du pic et retour au pic', () => {
   /** Une vague : la rame de départ vers la plage (le sud), puis la glisse au cap donné, gauche ou droite. */
   const ride = (heading: number): Phase[] => [{ s: 5, speed: 1.6, heading: 180 }, { s: 12, speed: 5, heading }];
@@ -946,8 +1139,9 @@ describe('analyzeSurf, zone du pic et retour au pic', () => {
       expect(zone.orientation).toBe('vagues');
       expect(Math.abs(zone.majorAxisDeg - 90)).toBeLessThan(10);
       expect(zone.semiMajorM).toBeGreaterThan(zone.semiMinorM);
-      expect(zone.departures).toEqual(analysis.waves.slice(0, 4).map((w) => w.start));
-      expect(zone.insideDepartures).toEqual([analysis.waves[4].start]);
+      // Les départs de la zone sont les débuts comptés : à 4 s, le seul pas de l'arrêt à la rame est le départ de la vague.
+      expect(zone.departures).toEqual(analysis.waves.slice(0, 4).map((w) => w.rideStart));
+      expect(zone.insideDepartures).toEqual([analysis.waves[4].rideStart]);
       // Départs groupés : rien n'est recalé, la zone et les retours sont ceux du sens mesuré.
       expect(analysis).toEqual(analyze(buildSurfSession(PEAK, cadenceS), false, { waveSenseOnLine: false }).analysis);
 

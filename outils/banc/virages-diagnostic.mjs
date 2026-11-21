@@ -143,11 +143,11 @@ const detail = (trace) => {
 /** Changements de direction du GPS d'une vague : heure (et depuis le début de la vague), fin de rotation, glisse restante, compté ou non. */
 const gpsDetail = (w) => {
   if (!flags.detail) return;
-  const turns = gpsTurnsOf(track, w.start, w.end, profile.surf.turnMinDeg, { ...rules, rideEndMs: w.turnRideEndMs, maxGapS: profile.maxGapS });
+  const turns = gpsTurnsOf(track, w.rideStart, w.end, profile.surf.turnMinDeg, { ...rules, rideEndMs: w.turnRideEndMs, maxGapS: profile.maxGapS });
   if (turns.length === 0) console.log('      GPS : aucun changement de direction de plus de ' + profile.surf.turnMinDeg + '°');
   for (const c of turns) {
-    console.log(`      GPS ${hhmmss(c.atMs)} (+${r1((c.atMs - w.startMs) / 1000)} s)  ${c.direction > 0 ? 'cap croissant' : 'cap décroissant'}, rotation de ${r1((c.fromMs - w.startMs) / 1000)} s`
-      + ` à ${r1((c.endMs - w.startMs) / 1000)} s, glisse restante ${r1(c.rideAfterS)} s : ${c.counted ? 'compté' : `écarté (glisse trop courte, moins de ${TURN_MIN_RIDE_AFTER_S} s)`}`);
+    console.log(`      GPS ${hhmmss(c.atMs)} (+${r1((c.atMs - w.rideStartMs) / 1000)} s)  ${c.direction > 0 ? 'cap croissant' : 'cap décroissant'}, rotation de ${r1((c.fromMs - w.rideStartMs) / 1000)} s`
+      + ` à ${r1((c.endMs - w.rideStartMs) / 1000)} s, glisse restante ${r1(c.rideAfterS)} s : ${c.counted ? 'compté' : `écarté (glisse trop courte, moins de ${TURN_MIN_RIDE_AFTER_S} s)`}`);
   }
 };
 
@@ -157,7 +157,8 @@ if (waves.length > 0) console.log('  n°  heure     durée  distance  GPS  gyros
 let gyroTotal = 0;
 let gpsTotal = 0;
 for (const w of waves) {
-  const { trace, counted, text } = describe(w);
+  // Les virages se lisent depuis le début compté de la vague, sans son départ, comme dans l'analyse.
+  const { trace, counted, text } = describe({ startMs: w.rideStartMs, endMs: w.endMs, turnRideEndMs: w.turnRideEndMs });
   gpsTotal += w.turns;
   if (trace) gyroTotal += counted;
   console.log(`  ${String(w.n).padStart(3)} ${hhmmss(w.startMs)}  ${r0(w.durationS).padStart(4)} s  ${r0(w.distanceM).padStart(5)} m  ${String(w.turns).padStart(3)}  ${text}`);
