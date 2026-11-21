@@ -1,5 +1,9 @@
 // Banc de test : le bouton « Synchroniser » du programme Windows, face à un faux téléphone (un dossier local qui s'écrit).
-// Usage : node exe-synchroniser.mjs <Gtracker.exe> [<port de débogage>]
+// Usage : node exe-synchroniser.mjs <Gtracker.exe> [<port de débogage>] [--sansfil]
+// `--sansfil` rejoue les cas c (qui couvre c, d, e, f), r et rg avec les mêmes contrôles, mais le téléphone est le faux
+// téléphone de la liaison sans câble (`bureau/fauxTelephone.ts`, à jour : il écrit et efface), relié au programme par le
+// Wi-Fi (127.0.0.1, port fixe, code lu sur la page) au lieu du dossier-téléphone du câble : le même moteur de synchronisation
+// sert les deux canaux. Les cas a, b, g, h, m, k et i parlent du câble (états de adb, coupure par opérations) et ne se rejouent pas.
 // Hors registre (`scripts.mjs`) : le script lance lui-même le programme, en mode d'essai de la coquille (`GTRACKER_BANC=1`),
 // sur des dossiers temporaires du dossier temporaire du système : jamais le vrai Documents, jamais le profil du vrai
 // programme, jamais un vrai téléphone (en mode d'essai le vrai adb n'est jamais lancé). Le téléphone factice est un dossier
@@ -51,23 +55,31 @@
 // `BANC_CAS=c,g,m,i` (facultatif) ne joue que ces cas (a, b, c pour c à f, g, h, m, k, r, rg, i) ; sans lui, tous.
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { connect, FORMATS } from './lib/cdp.mjs';
 import { actionLigne } from './lib/sessions.mjs';
 import { traceDroite } from './lib/traces.mjs';
 
-const [exe, portArg] = process.argv.slice(2);
+const [exe, portArg] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 if (!exe) {
-  console.error('Usage : node exe-synchroniser.mjs <Gtracker.exe> [<port>]');
+  console.error('Usage : node exe-synchroniser.mjs <Gtracker.exe> [<port>] [--sansfil]');
   process.exit(1);
 }
 const PORT = Number(portArg ?? 9497);
+/** `--sansfil` : le téléphone des cas c, r et rg est le faux téléphone de la liaison sans câble, au lieu du dossier-téléphone du câble. */
+const SANSFIL = process.argv.includes('--sansfil');
+/** Port TCP fixe du serveur sans-fil du programme en mode `--sansfil` : le même téléphone se représente par son jeton à chaque lancement. */
+const PORT_SANSFIL = PORT + 200;
+const require = createRequire(import.meta.url);
+const { FauxTelephone } = SANSFIL ? require(fileURLToPath(new URL('../../bureau/dist/fauxTelephone.js', import.meta.url))) : { FauxTelephone: null };
 const ORIGINE = 'https://gtracker.localhost';
 const CAPTURES = process.env.BANC_CAPTURES || null;
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 /** `BANC_CAS=g,i` (facultatif) : ne joue que ces cas (a, b, c pour c à f, g, h, k, i) ; sans lui, tous. */
-const CAS = process.env.BANC_CAS ? process.env.BANC_CAS.split(',').map((c) => c.trim()) : null;
+const CAS = process.env.BANC_CAS ? process.env.BANC_CAS.split(',').map((c) => c.trim()) : SANSFIL ? ['c', 'r', 'rg'] : null;
 const veut = (cas) => CAS === null || CAS.includes(cas);
 const vivant = (pid) => spawnSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH'], { encoding: 'utf8', windowsHide: true }).stdout.includes(` ${pid} `);
 const disparu = async (pid, ms) => { for (let t = 0; t < ms; t += 200) { if (!vivant(pid)) return true; await pause(200); } return !vivant(pid); };
@@ -136,11 +148,51 @@ async function fermer(p) {
   }
   await pause(500);
 }
-/** Lance, joue `essai`, ferme toujours (même sur erreur). Vérifie la console de la page à la fin. */
+/** Le faux téléphone de chaque profil (jeton gardé d'un lancement à l'autre) et sa liaison en cours, en mode `--sansfil`. */
+const fauxParProfil = new Map();
+/**
+ * Relie le faux téléphone à l'instance : première fois, par le code lu sur la page (Réglages › Mémoire, « Relier un
+ * téléphone ») ; ensuite, par son jeton, sur le port fixe du serveur. `stockage` : le dossier qui joue le `/sdcard` du câble ;
+ * le faux téléphone joue son `Documents/Gtracker`.
+ */
+async function relierFaux(b, profil, stockage) {
+  const connu = fauxParProfil.get(profil);
+  if (connu) {
+    for (let k = 0; ; k++) {
+      try { connu.liaison = await connu.faux.connecter('127.0.0.1', PORT_SANSFIL); break; } catch (e) { if (k >= 20) throw e; await pause(500); }
+    }
+    return;
+  }
+  const faux = new FauxTelephone({ dossier: racineTel(stockage), delaiMs: 20000 });
+  await b.go('/parametres', 5000);
+  await b.waitFor(`[...document.querySelectorAll('[role=button]')].some((x) => x.textContent.trim() === 'Mémoire')`, { timeout: 8000, label: 'carte Mémoire' });
+  if (!(await b.evaluate(`Boolean(document.querySelector('.wireless-card'))`))) {
+    await b.click(`[...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Mémoire')`);
+  }
+  await b.waitFor(`/Gtracker attend votre téléphone/.test(document.querySelector('.wireless-card__status')?.textContent ?? '')`, { timeout: 10000, label: 'écoute du sans-fil' });
+  check('sans-fil : « Relier un téléphone »', (await b.clickText('Relier un téléphone', '.wireless-card button')) === 'ok');
+  await b.waitFor(`/^\\d{6}$/.test(document.querySelector('.wireless-card__code')?.textContent.trim() ?? '')`, { timeout: 8000, label: 'code' });
+  const code = await b.evaluate(`document.querySelector('.wireless-card__code').textContent.trim()`);
+  const liaison = await faux.appairer('127.0.0.1', PORT_SANSFIL, code);
+  await b.waitFor(`/relié en ce moment/.test(document.querySelector('.wireless-card')?.innerText ?? '')`, { timeout: 8000, label: 'téléphone relié' });
+  fauxParProfil.set(profil, { faux, liaison });
+}
+/**
+ * Lance, joue `essai`, ferme toujours (même sur erreur). Vérifie la console de la page à la fin. En mode `--sansfil`, un
+ * lancement qui reçoit `GTRACKER_BANC_TELEPHONE` (sans état ni coupure imposés) joue ce dossier par le faux téléphone du
+ * Wi-Fi, que l'on relie d'abord, au lieu de par le câble.
+ */
 async function avecProgramme(profil, memoire, env, quoi, essai) {
   let p = null;
+  const sansFil = SANSFIL && Boolean(env.GTRACKER_BANC_TELEPHONE) && !env.GTRACKER_BANC_TELEPHONE_ETAT && !env.GTRACKER_BANC_TELEPHONE_COUPURE;
   try {
-    p = await lancer(profil, memoire, env);
+    let pour = env;
+    if (sansFil) {
+      const { GTRACKER_BANC_TELEPHONE: _cable, ...reste } = env;
+      pour = { ...reste, GTRACKER_BANC_SANSFIL_ACTIF: '1', GTRACKER_BANC_SANSFIL_PORT: String(PORT_SANSFIL) };
+    }
+    p = await lancer(profil, memoire, pour);
+    if (sansFil) await relierFaux(p.b, profil, env.GTRACKER_BANC_TELEPHONE);
     const r = await essai(p.b, p);
     check(`${quoi} : console de la page sans erreur`, p.b.logs.length === 0, p.b.logs.join(' | '));
     return r;
@@ -148,6 +200,7 @@ async function avecProgramme(profil, memoire, env, quoi, essai) {
     check(`${quoi} : essai interrompu : ${e.stack ?? e.message}`, false);
     return null;
   } finally {
+    if (sansFil) fauxParProfil.get(profil)?.liaison?.fermer?.();
     if (p) await fermer(p);
   }
 }
