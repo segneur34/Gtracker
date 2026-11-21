@@ -9,7 +9,7 @@ describe('barres de navigation', () => {
   });
 
   it('barre du haut : Profil, Sessions, Planifier, Statistiques, Réglages', () => {
-    expect(TOP_LINKS.map((d) => d.label)).toEqual(['Profil', 'Sessions', 'Planifier', 'Statistiques', 'Réglages']);
+    expect(TOP_LINKS.map((d) => d.label)).toEqual(['Profil', 'Sessions', 'Planification', 'Statistiques', 'Réglages']);
     expect(TOP_LINKS.map((d) => d.to)).toEqual(['/profil', '/sessions', '/itineraires/liste', '/statistiques', '/parametres']);
   });
 

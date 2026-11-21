@@ -22,7 +22,7 @@ export const RECORD_PATH = '/enregistrer';
 const PROFIL: NavDestination = { id: 'profil', to: PROFILE_PATH, label: t('Profil') };
 const SESSIONS: NavDestination = { id: 'sessions', to: SESSIONS_PATH, label: t('Sessions') };
 /** Ouvre la liste des itinéraires planifiés, d'où partent un itinéraire rangé et « Planifier », pas un parcours neuf. */
-const PLANIFIER: NavDestination = { id: 'planifier', to: ROUTES_LIST_PATH, label: t('Planifier') };
+const PLANIFIER: NavDestination = { id: 'planifier', to: ROUTES_LIST_PATH, label: t('Planification') };
 const STATISTIQUES: NavDestination = { id: 'statistiques', to: '/statistiques', label: t('Statistiques') };
 const REGLAGES: NavDestination = { id: 'reglages', to: '/parametres', label: t('Réglages') };
 

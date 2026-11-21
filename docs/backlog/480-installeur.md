@@ -15,7 +15,7 @@ Plan de l'agent Plan du 21/11, relu par l'orchestrateur. Demande et réponses de
 - Mise à jour : relancer un installeur plus récent par-dessus (à prouver à l'étape A).
 - APK : `android/app/build/outputs/apk/release/Gtracker-<version>.apk`, version lue dans `package.json`, jamais une APK de débogage ; rangée en ressource (`resources\Gtracker-<version>.apk`). Absente ou d'une autre version : la construction s'arrête et dit la commande à lancer. `--sans-apk` pour les essais seulement : la carte dit alors que l'application est absente.
 - Pas de signature (élément 452) : l'avertissement « éditeur inconnu » de Windows est accepté pour l'instant.
-- `adb` n'est pas embarqué tant que le juriste n'a pas parlé (élément 452) : tranché par l'orchestrateur le 21/11 au plus prudent, question posée à l'utilisateur (Q143).
+- `adb` n'est pas embarqué tant que le juriste n'a pas parlé (élément 452) : tranché par l'orchestrateur le 21/11 au plus prudent, question posée à l'utilisateur (Q143) ; réponse du 21/11 : sans avis, et pas de juriste sous la main : `adb` reste hors de l'installeur, le sujet suit l'élément 452.
 - Mineures tranchées : installation en un clic sans choix du dossier ; la fenêtre de première ouverture revient à chaque nouvelle version, « Plus tard » la cache jusqu'à la suivante ; pas d'association de fichiers .gpx dans ce lot ; le message « signature différente » ne conseille pas de désinstaller l'application.
 
 ## Parties (un commit chacune)
