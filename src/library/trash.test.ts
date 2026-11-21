@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   TRASH_KEEP_MS, deletesToTrash, expiredTrashEntries, routeDeleteButton, sessionDeleteQuestion, sessionDiscardQuestion, isTrashDirName, orphanTrashDirs, parseTrashIndex, reusableRouteEntry, reusableTrashEntry,
   routeRestorePlan, serializeTrashIndex, sessionRestorePlan, sessionTrashEntries, sortedTrashEntries, trashCounts, trashDirName,
-  trashSummaryText, withoutTrashEntries, type TrashEntry,
+  shownTrashEntries, trashSummaryText, withoutTrashEntries, type TrashEntry,
 } from './trash';
 
 const NOW = Date.UTC(2026, 10, 20, 12);
@@ -22,9 +22,20 @@ describe('index de la corbeille', () => {
     expect(parseTrashIndex(null)).toEqual({ state: 'absent', entries: [] });
     expect(parseTrashIndex('{abîmé').state).toBe('unreadable');
     expect(parseTrashIndex('{"format":"autre","version":1,"entries":[]}').state).toBe('unreadable');
-    expect(parseTrashIndex('{"format":"gtracker-corbeille","version":2,"entries":[]}').state).toBe('newer');
-    const entries = [session(`${NOW}-100`, 100), route(`${NOW}-Tour du lac`, 'Tour du lac')];
+    expect(parseTrashIndex('{"format":"gtracker-corbeille","version":3,"entries":[]}').state).toBe('newer');
+    const leftovers = { ...session(`${NOW}-100-3`, 100), kind: 'restes' as const };
+    const entries = [session(`${NOW}-100`, 100), route(`${NOW}-Tour du lac`, 'Tour du lac'), { ...session(`${NOW}-100-2`, 100), origin: 'telephone' as const }, leftovers];
     expect(parseTrashIndex(serializeTrashIndex(entries))).toEqual({ state: 'ok', entries });
+    // Les restes d'une session ne sont ni montrés ni comptés.
+    expect(shownTrashEntries(entries)).toEqual(entries.slice(0, 3));
+    expect(trashCounts(entries)).toEqual({ sessions: 2, routes: 1 });
+    expect(serializeTrashIndex([])).toContain('"version": 2');
+  });
+
+  it('un index de la version 1, d\'avant l\'origine « telephone », se lit toujours ; une origine inconnue non', () => {
+    const v1 = serializeTrashIndex([session(`${NOW}-100`, 100)]).replace('"version": 2', '"version": 1');
+    expect(parseTrashIndex(v1)).toEqual({ state: 'ok', entries: [session(`${NOW}-100`, 100)] });
+    expect(parseTrashIndex(v1.replace('"origin": "ordinateur"', '"origin": "tablette"')).state).toBe('unreadable');
   });
 
   it('une seule entrée illisible rend tout l\'index illisible : rien n\'est réécrit ni purgé', () => {
@@ -74,12 +85,17 @@ describe('purge', () => {
 });
 
 describe('reprise et identité', () => {
-  it('une entrée déjà faite pour la même trace est reprise ; une autre taille ou un autre GPX non', () => {
+  it('une entrée déjà faite pour les mêmes fichiers est reprise ; une autre taille, un autre GPX ou une autre origine non', () => {
     const entries = [session('1-100', 100)];
-    expect(reusableTrashEntry(entries, 100, 'a.gpx', 120)?.dir).toBe('1-100');
-    expect(reusableTrashEntry(entries, 100, 'a.gpx', 121)).toBeNull();
-    expect(reusableTrashEntry(entries, 100, 'b.gpx', 120)).toBeNull();
-    expect(reusableTrashEntry(entries, 101, 'a.gpx', 120)).toBeNull();
+    const gpx = { name: 'a.gpx', size: 120 };
+    expect(reusableTrashEntry(entries, 100, 'a.gpx', [gpx])?.dir).toBe('1-100');
+    expect(reusableTrashEntry(entries, 100, 'A.GPX', [gpx, { name: 'a.json', size: 30 }, { name: 'a.imu', size: 900 }])?.dir).toBe('1-100');
+    expect(reusableTrashEntry(entries, 100, 'a.gpx', [{ name: 'a.gpx', size: 121 }])).toBeNull();
+    expect(reusableTrashEntry(entries, 100, 'b.gpx', [{ name: 'b.gpx', size: 120 }])).toBeNull();
+    expect(reusableTrashEntry(entries, 101, 'a.gpx', [gpx])).toBeNull();
+    // Fiche saisie depuis l'entrée : sa taille a changé, elle doit être gardée de nouveau.
+    expect(reusableTrashEntry(entries, 100, 'a.gpx', [gpx, { name: 'a.json', size: 31 }])).toBeNull();
+    expect(reusableTrashEntry(entries, 100, 'a.gpx', [gpx], 'telephone')).toBeNull();
     const routes = [route('1-lac', 'lac')];
     expect(reusableRouteEntry(routes, 'LAC', '2026-11-01T10:00:00.000Z', 40)?.dir).toBe('1-lac');
     expect(reusableRouteEntry(routes, 'lac', '2026-11-02T10:00:00.000Z', 40)).toBeNull();

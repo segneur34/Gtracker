@@ -2,7 +2,7 @@ import type { MemoryFolder } from '../platform/memoryFolder';
 import {
   TRASH_DIR, TRASH_INDEX_PATH, expiredTrashEntries, isTrashDirName, isWritableTrash, orphanTrashDirs, parseTrashIndex,
   reusableRouteEntry, reusableTrashEntry, serializeTrashIndex, trashDirName, trashFilePath, withoutTrashEntries,
-  type TrashCopy, type TrashEntry, type TrashFile, type TrashIndex, type TrashKind,
+  type TrashCopy, type TrashEntry, type TrashFile, type TrashIndex, type TrashKind, type TrashOrigin,
 } from './trash';
 import { t } from '../core/i18n';
 
@@ -45,7 +45,7 @@ const eraseTrashDir = async (f: TrashFolder, dir: string): Promise<void> => {
 
 /** Ce qu'on met à la corbeille. */
 export interface TrashRequest {
-  kind: TrashKind;
+  kind: Exclude<TrashKind, 'restes'>;
   /** Fichiers, chemins depuis la racine, dans l'ordre où on les retire de la mémoire (GPX d'abord pour une session). */
   paths: string[];
   /** Le fichier qui fait l'entrée (GPX de la session, fiche de l'itinéraire) ; parmi `paths`. */
@@ -74,8 +74,15 @@ export const stashInTrash = (f: TrashFolder, request: TrashRequest, nowMs: numbe
     const mainStat = await f.stat(request.main);
     if (mainStat === null) return null;
     const mainName = baseName(request.main);
+    const present: TrashFile[] = [];
+    if (request.kind === 'session') {
+      for (const path of request.paths) {
+        const stat = await f.stat(path);
+        if (stat) present.push({ name: baseName(path), size: stat.size });
+      }
+    }
     const reused = request.kind === 'session'
-      ? reusableTrashEntry(index.entries, request.startMs ?? NaN, mainName, mainStat.size)
+      ? reusableTrashEntry(index.entries, request.startMs ?? NaN, mainName, present)
       : reusableRouteEntry(index.entries, request.routeBase ?? '', request.createdAt ?? '', mainStat.size);
     if (reused) return reused;
     const listed = await f.list(TRASH_DIR);
@@ -103,6 +110,90 @@ export const stashInTrash = (f: TrashFolder, request: TrashRequest, nowMs: numbe
     };
     await writeIndex(f, [...index.entries, entry]);
     return entry;
+  });
+
+/** Fichiers d'une session à ranger tels quels, lus ailleurs (la synchronisation : de l'ordinateur ou du téléphone). */
+export interface TrashBytesRequest {
+  startMs: number;
+  name: string;
+  origin: TrashOrigin;
+  /** Nom du GPX de la session ; il peut manquer parmi `files` (restes d'une suppression coupée : fiche, capteurs). */
+  main: string;
+  /** Les fichiers, dans l'ordre de leur retrait (GPX d'abord), sous leurs noms d'origine. */
+  files: { name: string; bytes: Uint8Array }[];
+  /** `restes` : fiche ou capteurs sans leur GPX, jamais montrés comme une session ; par défaut `session`. */
+  kind?: 'session' | 'restes';
+}
+
+/**
+ * Range dans une entrée neuve de la corbeille des fichiers déjà lus : capteurs, fiche, puis GPX en dernier, puis
+ * l'entrée de l'index. Une entrée de même identité, même origine, même GPX, qui tient déjà chacun de ces fichiers à
+ * la même taille (reprise après une coupure) est rendue sans rien recopier. Lève sans rien changer si l'index ne se
+ * lit pas.
+ */
+export const stashFilesInTrash = (f: TrashFolder, request: TrashBytesRequest, nowMs: number): Promise<TrashEntry> =>
+  inTrashQueue(async () => {
+    const index = await readTrashIndex(f);
+    if (!isWritableTrash(index)) throw new Error(TRASH_LOCKED_MESSAGE);
+    const kind = request.kind ?? 'session';
+    const sizes = request.files.map((file) => ({ name: file.name, size: file.bytes.byteLength }));
+    const reused = reusableTrashEntry(index.entries, request.startMs, request.main, sizes, request.origin, kind);
+    if (reused) return reused;
+    const listed = await f.list(TRASH_DIR);
+    const dir = trashDirName(nowMs, String(request.startMs), [...listed.map((e) => e.name), ...index.entries.map((e) => e.dir)]);
+    for (const file of [...request.files].reverse()) await f.writeBytes(trashFilePath(dir, file.name), file.bytes);
+    const entry: TrashEntry = {
+      dir, kind, startMs: request.startMs, routeBase: null, createdAt: null, name: request.name, deletedAtMs: nowMs,
+      origin: request.origin, reason: 'supprimee', main: request.main, files: sizes,
+    };
+    await writeIndex(f, [...index.entries, entry]);
+    return entry;
+  });
+
+/**
+ * Ajoute des fichiers à une entrée existante (les restes d'une session, rangés avec elle), sans rien y écraser : un
+ * fichier déjà là à la même taille est tenu pour gardé ; déjà là à une autre taille, rien n'est ajouté et la réponse
+ * est `false`, pour que l'appelant les range ailleurs. Lève si l'index ne se lit pas. Les fichiers ajoutés sont
+ * écrits avant l'index : une coupure laisse au pire un fichier hors de l'index, effacé avec l'entrée.
+ */
+export const addFilesToTrashEntry = (f: TrashFolder, dir: string, files: readonly { name: string; bytes: Uint8Array }[]): Promise<boolean> =>
+  inTrashQueue(async () => {
+    const index = await readTrashIndex(f);
+    if (!isWritableTrash(index)) throw new Error(TRASH_LOCKED_MESSAGE);
+    const entry = index.entries.find((e) => e.dir === dir);
+    if (!entry) return false;
+    const added: TrashFile[] = [];
+    for (const file of files) {
+      const at = await f.stat(trashFilePath(dir, file.name));
+      if (at && at.size !== file.bytes.byteLength) return false;
+      const listed = entry.files.some((e) => e.name.toLowerCase() === file.name.toLowerCase());
+      if (!at || !listed) added.push({ name: file.name, size: file.bytes.byteLength });
+    }
+    for (const file of files) {
+      if (!(await f.stat(trashFilePath(dir, file.name)))) await f.writeBytes(trashFilePath(dir, file.name), file.bytes);
+    }
+    if (added.length === 0) return true;
+    const known = new Set(entry.files.map((e) => e.name.toLowerCase()));
+    const merged = [...entry.files, ...added.filter((a) => !known.has(a.name.toLowerCase()))];
+    await writeIndex(f, index.entries.map((e) => (e === entry ? { ...e, files: merged } : e)));
+    return true;
+  });
+
+/**
+ * Réécrit un fichier texte d'une entrée (une fiche de la corbeille dans laquelle on a fondu ce que le téléphone y
+ * ajoutait), puis sa taille dans l'index. Lève si l'index ne se lit pas ou si l'entrée n'y est plus ; une coupure
+ * entre les deux laisse l'ancienne taille dans l'index, sans autre effet.
+ */
+export const rewriteTrashText = (f: TrashFolder, dir: string, name: string, text: string): Promise<void> =>
+  inTrashQueue(async () => {
+    const index = await readTrashIndex(f);
+    if (!isWritableTrash(index)) throw new Error(TRASH_LOCKED_MESSAGE);
+    const entry = index.entries.find((e) => e.dir === dir);
+    if (!entry) throw new Error(t('{file} manque dans la corbeille.', { file: `${dir}/${name}` }));
+    const bytes = new TextEncoder().encode(text);
+    await f.writeBytes(trashFilePath(dir, name), bytes);
+    const files = entry.files.map((file) => (file.name === name ? { ...file, size: bytes.byteLength } : file));
+    await writeIndex(f, index.entries.map((e) => (e === entry ? { ...e, files } : e)));
   });
 
 /**

@@ -5,6 +5,7 @@ import {
   JOURNALS_DIR, LEARNED_PLACES_FILE, MARKER_FILE, README_FILE, RESTING_HR_FILE, ROUTES_DIR, SESSIONS_DIR, SETTINGS_DIR,
 } from './folderLayout';
 import { TRASH_DIR, TRASH_INDEX_FILE, isTrashDirName } from './trash';
+import { SYNC_DIR, isSyncId } from './syncBase';
 
 /**
  * Remise à zéro (Réglages › Mémoire) : ce que chacun des deux boutons efface, sans rien effacer ici.
@@ -134,6 +135,11 @@ export interface MemoryListings {
    * Absente ailleurs.
    */
   trash?: { root: readonly Pick<FolderEntry, 'name' | 'kind'>[]; dirs: Readonly<Record<string, readonly Pick<FolderEntry, 'name' | 'kind'>[]>> };
+  /**
+   * Synchronisation avec les téléphones (`syncBase.ts`) : `synchro/`, et les fiches gardées de chaque téléphone
+   * (`synchro/<id>/fiches/`), par identifiant. Absente si le dossier n'en a pas.
+   */
+  sync?: { root: readonly Pick<FolderEntry, 'name' | 'kind'>[]; fiches: Readonly<Record<string, readonly Pick<FolderEntry, 'name' | 'kind'>[]>> };
   root: readonly Pick<FolderEntry, 'name' | 'kind'>[];
   /** `journaux/` : absent de la lecture, il n'y a rien à effacer. */
   journals?: readonly Pick<FolderEntry, 'name' | 'kind'>[];
@@ -167,6 +173,32 @@ const trashPaths = (trash: MemoryListings['trash']): { paths: string[]; entries:
   return { paths: [...index, ...dirs.flat()], entries: dirs.length };
 };
 
+/** Base d'un téléphone (`<id>.json`) et témoin d'une synchronisation en cours, à la racine de `synchro/`. */
+const SYNC_ROOT_FILE = /^(?:([A-Za-z0-9][A-Za-z0-9_-]{7,63})|en-cours)\.json$/;
+/** Fiche gardée d'un côté (`syncAncestorPath`). */
+const SYNC_ANCESTOR_FILE = /^\d+-(?:ordinateur|telephone)\.json$/;
+
+/**
+ * Fichiers de la synchronisation : les bases des téléphones d'abord, puis le témoin et les fiches gardées. Sans base,
+ * la synchronisation suivante est une première rencontre, d'où rien ne se supprime : une remise à zéro coupée après
+ * les bases ne peut plus faire prendre les sessions déjà effacées pour des suppressions à reporter sur le téléphone.
+ */
+const syncPaths = (sync: MemoryListings['sync']): string[] => {
+  if (!sync) return [];
+  const rootFiles = sync.root.filter((e) => e.kind === 'file' && SYNC_ROOT_FILE.test(withoutTempSuffix(e.name))).map((e) => e.name);
+  const isBase = (name: string): boolean => withoutTempSuffix(name).toLowerCase() !== 'en-cours.json';
+  const fiches = Object.entries(sync.fiches)
+    .filter(([id]) => isSyncId(id))
+    .flatMap(([id, entries]) => entries
+      .filter((e) => e.kind === 'file' && SYNC_ANCESTOR_FILE.test(withoutTempSuffix(e.name)))
+      .map((e) => `${SYNC_DIR}/${id}/fiches/${e.name}`));
+  return [
+    ...rootFiles.filter(isBase).map((n) => `${SYNC_DIR}/${n}`),
+    ...rootFiles.filter((n) => !isBase(n)).map((n) => `${SYNC_DIR}/${n}`),
+    ...fiches,
+  ];
+};
+
 const filesOf = (dir: string, entries: MemoryListings['root']): string[] =>
   entries.filter((e) => e.kind === 'file' && isAppMemoryFile(dir, e.name)).map((e) => e.name);
 
@@ -176,9 +208,10 @@ const isGpx = (name: string): boolean => /\.gpx$/i.test(name);
  * Fichiers de l'application à effacer pour « Tout supprimer », dans l'ordre : les GPX des sessions d'abord (une
  * interruption laisse des sessions entières ou absentes, jamais une trace sans fiche qui se recrée), puis leurs
  * fiches et capteurs, les itinéraires, les fichiers de réglages, ceux de la racine, et le marqueur en dernier : tant
- * qu'il reste quelque chose, le dossier se reconnaît. La corbeille du programme Windows (son index, puis les fichiers
- * de ses entrées) et les journaux gardés de côté (`journaux/`) partent en premier. Jamais un dossier : sur le téléphone, effacer un dossier
- * efface tout ce qu'il contient.
+ * qu'il reste quelque chose, le dossier se reconnaît. Les bases de la synchronisation (`synchro/`) partent avant tout :
+ * un dossier vidé, même à moitié, ne vide jamais le téléphone. Puis la corbeille du programme Windows (son index,
+ * puis les fichiers de ses entrées) et les journaux gardés de côté (`journaux/`). Jamais un dossier : sur le
+ * téléphone, effacer un dossier efface tout ce qu'il contient.
  */
 export const memoryResetTargets = (listings: MemoryListings): MemoryTargets => {
   const sessions = filesOf(SESSIONS_DIR, listings.sessions);
@@ -190,6 +223,7 @@ export const memoryResetTargets = (listings: MemoryListings): MemoryTargets => {
   const trash = trashPaths(listings.trash);
   return {
     paths: [
+      ...syncPaths(listings.sync),
       ...trash.paths,
       ...filesOf(JOURNALS_DIR, listings.journals ?? []).map(at(JOURNALS_DIR)),
       ...gpx.map(at(SESSIONS_DIR)),
@@ -220,11 +254,23 @@ const readTrashListings = async (folder: Pick<MemoryFolder, 'list' | 'kind'>): P
   }
 };
 
+/** `synchro/` lu pour la remise à zéro, quelle que soit la sorte du dossier (une copie peut l'avoir emporté). */
+const readSyncListings = async (folder: Pick<MemoryFolder, 'list'>): Promise<MemoryListings['sync']> => {
+  const root = await folder.list(SYNC_DIR);
+  const fiches: Record<string, readonly Pick<FolderEntry, 'name' | 'kind'>[]> = {};
+  for (const e of root) {
+    if (e.kind === 'directory' && isSyncId(e.name)) fiches[e.name] = await folder.list(`${SYNC_DIR}/${e.name}/fiches`);
+  }
+  return { root, fiches };
+};
+
 /**
  * Lit les dossiers de la remise à zéro ; `journaux/`, facultatif, ne bloque pas s'il ne se lit pas, ni la corbeille
- * du programme Windows.
+ * du programme Windows. `synchro/` doit se lire : une base laissée en place ferait prendre les sessions effacées pour
+ * des suppressions à reporter sur le téléphone.
  */
 export const readMemoryListings = async (folder: Pick<MemoryFolder, 'list' | 'kind'>): Promise<MemoryListings> => ({
+  sync: await readSyncListings(folder),
   trash: await readTrashListings(folder),
   root: await folder.list(''),
   journals: await folder.list(JOURNALS_DIR).catch(() => []),

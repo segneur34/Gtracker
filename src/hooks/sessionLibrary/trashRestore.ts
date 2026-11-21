@@ -9,7 +9,7 @@ import type { MemoryFolder } from '../../platform/memoryFolder';
 import { addGpx, type AddOptions } from './addSession';
 import { refreshLibrary } from './lifecycle';
 import { findSessionAt, lib } from './memory';
-import { reloadTrash, trashFolderOf, trashStore } from './trash';
+import { reloadTrash, trashFolderOf, trashReleased, trashStore } from './trash';
 
 /**
  * Gestes de Réglages › Mémoire sur la corbeille du programme Windows : restaurer une entrée, la supprimer
@@ -18,6 +18,8 @@ import { reloadTrash, trashFolderOf, trashStore } from './trash';
 
 const openTrash = async (): Promise<MemoryFolder> => {
   await lib.opening;
+  // Une synchronisation compte sur ce que tient la corbeille : le geste attend sa fin.
+  await trashReleased();
   const f = trashFolderOf(lib.folder);
   if (!f) throw new Error(t("La corbeille n'est pas ouverte : le dossier mémoire ne répond pas."));
   return f;
@@ -65,7 +67,8 @@ export const restoreFromTrash = async (entry: TrashEntry): Promise<string> => {
     if (startMs === null) throw new Error(t('Entrée de corbeille sans instant de départ.'));
     // Première lecture du dossier en cours : la session n'est peut-être pas encore publiée.
     if (!findSessionAt(startMs) && lib.scanCompletion) await lib.scanCompletion.then(() => undefined, () => undefined);
-    const dirs = [entry.dir, ...sessionTrashEntries(trashStore.get().entries, startMs).map((e) => e.dir)];
+    // Les entrées de l'autre origine restent : la copie du téléphone rangée à part peut tenir une autre version.
+    const dirs = [entry.dir, ...sessionTrashEntries(trashStore.get().entries, startMs).filter((e) => e.origin === entry.origin).map((e) => e.dir)];
     if (findSessionAt(startMs)) {
       const message = await completeFromTrash(f, entry);
       await dropTrashEntries(f, dirs);

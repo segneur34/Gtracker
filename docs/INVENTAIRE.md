@@ -236,6 +236,7 @@ Dans `sailing/` aussi : `pointData.ts` (`PointData` et `trackToPointData`, vue e
 - `useComputerLink.ts` (+ test) : la liaison sans fil du téléphone : `useComputerLinkLauncher` (monté dans `App`, la tente seule à l'ouverture et au retour au premier plan, jamais pendant un enregistrement) et `useComputerLink` (état et gestes du bloc de Réglages › Mémoire).
 - `useWirelessPhones.ts` : état du sans-fil du PC, téléphones reliés et fenêtre de liaison pour le bloc de Réglages › Mémoire (relecture périodique, gestes).
 - `sessionLibrary/trash.ts` : corbeille côté mémoire (magasin, purge à l'ouverture, mise à la corbeille d'une session ou d'un itinéraire, oubli d'une session revenue).
+- `sessionLibrary/sync.ts` (+ test) : exécutant de la synchronisation des sessions avec un téléphone : exécute le plan de `library/syncPlan.ts` entre le dossier de l'ordinateur et un dossier distant (`executeSync`, sans état de l'application), opération par opération, base réécrite après chaque session, témoin d'une synchronisation coupée, copie du téléphone rangée à la corbeille avant un retrait ; `synchronizePhone` y ajoute le verrou de la mémoire et la relecture finale.
 - `sessionLibrary/trashRestore.ts` : « Restaurer », « Supprimer définitivement » et « Vider la corbeille ».
 - `useTrash.ts` : la corbeille pour Réglages.
 - `sessionAsset.ts` (+ test) : `createSessionAssetCache` et `useSessionAsset` (`useSyncExternalStore`), la recherche par session sur un seul mécanisme : une promesse par clé, résultat rangé une seule fois dans la fiche (point 208) ; utilisée par les sauts.

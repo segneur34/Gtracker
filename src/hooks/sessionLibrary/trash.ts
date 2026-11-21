@@ -2,7 +2,7 @@ import { activityDisplayName, sessionActivity } from '../../core/activities';
 import { errorMessage } from '../../core/basics';
 import { t } from '../../core/i18n';
 import { sessionDisplayName } from '../../library/sessionName';
-import { deletesToTrash, sessionTrashEntries, type TrashEntry } from '../../library/trash';
+import { deletesToTrash, sessionTrashEntries, shownTrashEntries, type TrashEntry } from '../../library/trash';
 import { dropTrashEntries, purgeTrash, readTrashIndex, stashInTrash, type TrashRequest } from '../../library/trashFolder';
 import type { LibrarySession } from '../../library/record';
 import type { MemoryFolder } from '../../platform/memoryFolder';
@@ -34,7 +34,22 @@ const lockedText = (state: string): string | null =>
     : state === 'newer' ? t("La corbeille vient d'une version plus récente de Gtracker : mettez l'application à jour pour l'ouvrir.")
       : null;
 
-/** Relit l'index de la corbeille du dossier ouvert ; vide hors du programme Windows. */
+let trashGate: Promise<void> = Promise.resolve();
+
+/**
+ * Tient la corbeille pendant `action` (une synchronisation, qui compte sur ce qu'elle tient pour retirer une session
+ * du téléphone) : « Restaurer », « Supprimer définitivement », « Vider la corbeille » et la purge attendent sa fin.
+ */
+export const holdTrashDuring = <T,>(action: () => Promise<T>): Promise<T> => {
+  const running = action();
+  trashGate = running.then(() => undefined, () => undefined);
+  return running;
+};
+
+/** Attend qu'aucune synchronisation ne tienne la corbeille. */
+export const trashReleased = (): Promise<void> => trashGate;
+
+/** Relit l'index de la corbeille du dossier ouvert ; vide hors du programme Windows. Les restes d'une session n'y sont pas montrés. */
 export const reloadTrash = async (): Promise<void> => {
   const f = trashFolderOf(lib.folder);
   if (!f) {
@@ -44,7 +59,7 @@ export const reloadTrash = async (): Promise<void> => {
   try {
     const index = await readTrashIndex(f);
     if (f !== lib.folder) return;
-    trashStore.set({ entries: index.entries, error: lockedText(index.state) });
+    trashStore.set({ entries: shownTrashEntries(index.entries), error: lockedText(index.state) });
   } catch (err) {
     trashStore.set({ entries: [], error: t('Corbeille non relue : {detail}', { detail: errorMessage(err, t('erreur inconnue')) }) });
   }
@@ -61,6 +76,7 @@ export const startTrash = async (opened: MemoryFolder): Promise<void> => {
     return;
   }
   try {
+    await trashReleased();
     await purgeTrash(f, Date.now());
   } catch {
     // Purge reprise au lancement suivant ; la corbeille se lit quand même.
@@ -72,10 +88,12 @@ export const startTrash = async (opened: MemoryFolder): Promise<void> => {
  * Nom montré d'une session au moment où elle part à la corbeille, le même que dans la liste des sessions : une
  * session sans activité inscrite (importée) prend celle de son calcul (`sessionActivity`).
  */
-const shownName = (session: LibrarySession): string => {
-  const activity = sessionActivity(readStoredActivities(), session.record.activityId, session.record.sport);
-  return sessionDisplayName(session.record, activity ? activityDisplayName(activity) : null, session.file);
+export const recordShownName = (record: LibrarySession['record'], file: string): string => {
+  const activity = sessionActivity(readStoredActivities(), record.activityId, record.sport);
+  return sessionDisplayName(record, activity ? activityDisplayName(activity) : null, file);
 };
+
+const shownName = (session: LibrarySession): string => recordShownName(session.record, session.file);
 
 /**
  * Met à la corbeille une copie d'une session (`paths` : ses fichiers et ceux de ses copies en double, dans l'ordre
@@ -103,13 +121,15 @@ export const stashRoute = async (
 };
 
 /**
- * Une session entrée dans la mémoire (import, restauration) : ses entrées de corbeille partent, pour qu'elle ne soit
- * pas montrée deux fois. Sans effet si la corbeille n'en a pas ; un échec est tu (l'entrée reste, sans gêne).
+ * Une session entrée dans la mémoire (import, restauration) : ses entrées de corbeille venues de l'ordinateur
+ * partent, pour qu'elle ne soit pas montrée deux fois. Une copie du téléphone, rangée à part par la synchronisation,
+ * reste : elle peut tenir une autre version que celle qui revient. Sans effet si la corbeille n'en a pas ; un échec
+ * est tu (l'entrée reste, sans gêne).
  */
 export const forgetReturnedSession = async (startMs: number): Promise<void> => {
   const f = trashFolderOf(lib.folder);
   if (!f) return;
-  const dirs = sessionTrashEntries(trashStore.get().entries, startMs).map((e) => e.dir);
+  const dirs = sessionTrashEntries(trashStore.get().entries, startMs).filter((e) => e.origin === 'ordinateur').map((e) => e.dir);
   if (dirs.length === 0) return;
   try {
     await dropTrashEntries(f, dirs);

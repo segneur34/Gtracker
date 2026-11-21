@@ -50,10 +50,17 @@ interface Stored {
  * renommage, l'original retiré entre les deux) et montre ses fichiers comme l'application du téléphone les verrait
  * après une coupure : un `.gtracker-tmp` seul sous le nom de son fichier, les autres temporaires cachés.
  * `clockMs` : son horloge de départ, propre à chaque appareil.
+ * `cable` : il répond comme le téléphone vu par le câble (`phoneMemoryFolder`) : `stat` et la lecture d'après le
+ * dernier listage, refait par `list` (ou au premier besoin) et tenu à jour par ses propres écritures, jamais par ce
+ * que l'appareil change de lui-même (`put`, `drop`) ; `remove` d'un fichier absent de ce listage ne fait rien.
  */
-export const createSyncFolder = ({ phone = false, clockMs = 1_800_000_000_000 }: { phone?: boolean; clockMs?: number } = {}): SyncFolder => {
+export const createSyncFolder = (
+  { phone = false, clockMs = 1_800_000_000_000, cable = false }: { phone?: boolean; clockMs?: number; cable?: boolean } = {},
+): SyncFolder => {
   const files = new Map<string, Stored>();
   const lagging = new Set<string>();
+  /** Le dernier listage du câble : nom vu, et taille et date à ce moment-là. */
+  let listed: Map<string, { size: number; mtimeMs: number }> | null = null;
   let clock = clockMs;
   let remaining: number | null = null;
   let done = 0;
@@ -73,7 +80,24 @@ export const createSyncFolder = ({ phone = false, clockMs = 1_800_000_000_000 }:
     files.has(path) ? path : phone && files.has(path + REPLACE_SUFFIX) ? path + REPLACE_SUFFIX : null;
   /** Les chemins tels que l'application de l'appareil les voit, chacun avec celui qu'il porte vraiment. */
   const visible = (): VisibleName[] => (phone ? phoneVisibleNames([...files.keys()]) : [...files.keys()].map((path) => ({ name: path, actual: path })));
+  const relist = (): Map<string, { size: number; mtimeMs: number }> => {
+    listed = new Map(visible().filter(({ name }) => !lagging.has(name)).map(({ name, actual }) => {
+      const file = files.get(actual) as Stored;
+      return [name, { size: file.bytes.length, mtimeMs: file.mtimeMs }];
+    }));
+    return listed;
+  };
+  /** Au câble, un chemin que le dernier listage ne porte pas est absent. */
+  const unlisted = (path: string): boolean => cable && !(listed ?? relist()).has(path);
+  const noteWritten = (path: string): void => {
+    const at = resolve(path);
+    if (cable && listed && at) listed.set(path, { size: (files.get(at) as Stored).bytes.length, mtimeMs: (files.get(at) as Stored).mtimeMs });
+  };
   const writeBytes = async (path: string, bytes: Uint8Array): Promise<void> => {
+    await writeRaw(path, bytes);
+    noteWritten(path);
+  };
+  const writeRaw = async (path: string, bytes: Uint8Array): Promise<void> => {
     if (!phone) return step(() => store(path, bytes));
     const replaced = files.has(path);
     const temp = tempNameFor(path, replaced);
@@ -89,6 +113,7 @@ export const createSyncFolder = ({ phone = false, clockMs = 1_800_000_000_000 }:
     kind: phone ? 'device' : 'disk',
     label: phone ? 'Téléphone' : 'Ordinateur',
     list: async (dir) => {
+      if (cable) relist();
       const prefix = dir === '' ? '' : `${dir}/`;
       const entries = new Map<string, FolderEntry>();
       for (const { name, actual } of visible()) {
@@ -102,14 +127,15 @@ export const createSyncFolder = ({ phone = false, clockMs = 1_800_000_000_000 }:
       return [...entries.values()];
     },
     readText: async (path) => {
-      const at = resolve(path);
+      const at = unlisted(path) ? null : resolve(path);
       return at === null ? null : new TextDecoder().decode((files.get(at) as Stored).bytes);
     },
     readBytes: async (path) => {
-      const at = resolve(path);
+      const at = unlisted(path) ? null : resolve(path);
       return at === null ? null : (files.get(at) as Stored).bytes;
     },
     stat: async (path) => {
+      if (cable) return (listed ?? relist()).get(path) ?? null;
       const at = resolve(path);
       const file = at === null ? null : (files.get(at) as Stored);
       return file ? { size: file.bytes.length, mtimeMs: file.mtimeMs } : null;
@@ -117,8 +143,10 @@ export const createSyncFolder = ({ phone = false, clockMs = 1_800_000_000_000 }:
     writeText: (path, text) => writeBytes(path, encode(text)),
     writeBytes,
     remove: async (path) => {
+      if (unlisted(path)) return;
       const at = resolve(path);
       if (at !== null) step(() => files.delete(at));
+      listed?.delete(path);
     },
     put: (path, content) => store(path, encode(content)),
     drop: (path) => void files.delete(path),
@@ -139,7 +167,7 @@ export const createSyncFolder = ({ phone = false, clockMs = 1_800_000_000_000 }:
 };
 
 /** Dossier mémoire vide, reconnu par son marqueur ; `id` : l'identifiant qu'une synchronisation passée y a laissé. */
-export const syncMemoryFolder = (options: { phone?: boolean; clockMs?: number; id?: string } = {}): SyncFolder => {
+export const syncMemoryFolder = (options: { phone?: boolean; clockMs?: number; id?: string; cable?: boolean } = {}): SyncFolder => {
   const folder = createSyncFolder(options);
   folder.put(MARKER_FILE, options.id ? (markerTextWithId(markerText(), options.id) as string) : markerText());
   return folder;

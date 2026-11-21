@@ -24,16 +24,27 @@ export const TRASH_DIR = 'corbeille';
 export const TRASH_INDEX_FILE = 'corbeille.json';
 export const TRASH_INDEX_PATH = `${TRASH_DIR}/${TRASH_INDEX_FILE}`;
 export const TRASH_FORMAT = FILE_FORMATS.corbeille;
-export const TRASH_VERSION = 1;
+/** 2 : l'origine « telephone » s'ajoute ; un index de la version 1 se lit toujours, et se réécrit en 2. */
+export const TRASH_VERSION = 2;
 
 /** Durée de garde d'une entrée, en jours (demande de l'utilisateur : « au moins 30 jours »). */
 export const TRASH_KEEP_DAYS = 30;
 const DAY_MS = 86_400_000;
 export const TRASH_KEEP_MS = TRASH_KEEP_DAYS * DAY_MS;
 
-export type TrashKind = 'session' | 'itineraire';
-/** Où la suppression a été faite. Seul l'ordinateur pour l'instant ; le téléphone viendra avec la synchronisation. */
-export type TrashOrigin = 'ordinateur';
+/**
+ * `restes` : fiche ou capteurs d'une session sans leur GPX (restes d'une suppression coupée), que la synchronisation
+ * a dû retirer et qu'aucune entrée de la même session ne pouvait recevoir sans rien écraser. Ce n'est pas une
+ * session : ni montrée, ni restaurée, ni comptée ; gardée le temps de la corbeille, puis purgée.
+ */
+export type TrashKind = 'session' | 'itineraire' | 'restes';
+/**
+ * D'où viennent les fichiers de l'entrée : `ordinateur`, sa mémoire (suppression faite ici, ou copie de l'ordinateur
+ * d'une session supprimée sur le téléphone) ; `telephone`, une copie du téléphone que la synchronisation y a rangée
+ * avant de la retirer du téléphone, parce que la corbeille ne la tenait pas à l'identique. Les deux restent dans
+ * des entrées distinctes : deux traces du même instant peuvent porter le même nom.
+ */
+export type TrashOrigin = 'ordinateur' | 'telephone';
 /** Pourquoi l'entrée est là. */
 export type TrashReason = 'supprimee';
 
@@ -84,11 +95,11 @@ const parseFile = (v: unknown): TrashFile | null =>
 const parseEntry = (v: unknown): TrashEntry | null => {
   if (!isObject(v)) return null;
   const { dir, kind, startMs, routeBase, createdAt, name, deletedAtMs, origin, reason, main, files } = v;
-  if (!isString(dir) || !isTrashDirName(dir) || (kind !== 'session' && kind !== 'itineraire')) return null;
+  if (!isString(dir) || !isTrashDirName(dir) || (kind !== 'session' && kind !== 'itineraire' && kind !== 'restes')) return null;
   if (!(startMs === null || isFiniteNumber(startMs)) || !isString(name) || !isFiniteNumber(deletedAtMs)) return null;
   const base = stringOrNull(routeBase);
   const created = stringOrNull(createdAt);
-  if (base === undefined || created === undefined || origin !== 'ordinateur' || reason !== 'supprimee') return null;
+  if (base === undefined || created === undefined || (origin !== 'ordinateur' && origin !== 'telephone') || reason !== 'supprimee') return null;
   if (!isString(main) || !Array.isArray(files)) return null;
   const parsed = files.map(parseFile);
   if (parsed.some((f) => f === null)) return null;
@@ -175,17 +186,24 @@ export const orphanTrashDirs = (entries: readonly TrashEntry[], listing: readonl
 
 /**
  * Entrée déjà faite pour la même session, à reprendre au lieu d'en créer une seconde : une suppression coupée après
- * l'écriture de l'entrée a laissé la session des deux côtés, et on la supprime de nouveau. Même identité, et le GPX
- * de l'entrée a la taille de celui de la mémoire (`gpxSize`) : c'est la même trace.
+ * l'écriture de l'entrée a laissé la session des deux côtés, et on la supprime de nouveau. Même identité, même
+ * origine, même fichier principal (`mainName`), et chacun des fichiers à ranger (`files`) y est déjà, sous le même
+ * nom et à la même taille : sinon la copie du moment (une fiche saisie depuis) serait retirée sans avoir été gardée.
  */
-export const reusableTrashEntry = (entries: readonly TrashEntry[], startMs: number, gpxName: string, gpxSize: number): TrashEntry | null =>
-  entries.find((e) => e.kind === 'session' && e.startMs === startMs && e.main.toLowerCase() === gpxName.toLowerCase()
-    && e.files.some((f) => f.name === e.main && f.size === gpxSize)) ?? null;
+export const reusableTrashEntry = (
+  entries: readonly TrashEntry[], startMs: number, mainName: string, files: readonly TrashFile[], origin: TrashOrigin = 'ordinateur',
+  kind: 'session' | 'restes' = 'session',
+): TrashEntry | null =>
+  entries.find((e) => e.kind === kind && e.startMs === startMs && e.origin === origin && e.main.toLowerCase() === mainName.toLowerCase()
+    && files.every((file) => e.files.some((f) => f.name.toLowerCase() === file.name.toLowerCase() && f.size === file.size))) ?? null;
 
 /** Même chose pour un itinéraire : même base, même création, fiche de même taille. */
 export const reusableRouteEntry = (entries: readonly TrashEntry[], base: string, createdAt: string, recordSize: number): TrashEntry | null =>
   entries.find((e) => e.kind === 'itineraire' && e.routeBase?.toLowerCase() === base.toLowerCase() && e.createdAt === createdAt
     && e.files.some((f) => f.name === e.main && f.size === recordSize)) ?? null;
+
+/** Entrées que la corbeille montre et sait restaurer : toutes, sauf les restes d'une session (`TrashKind`). */
+export const shownTrashEntries = (entries: readonly TrashEntry[]): TrashEntry[] => entries.filter((e) => e.kind !== 'restes');
 
 /** Entrées d'une session, par son identité. */
 export const sessionTrashEntries = (entries: readonly TrashEntry[], startMs: number): TrashEntry[] =>

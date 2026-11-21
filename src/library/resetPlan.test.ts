@@ -124,6 +124,26 @@ describe('fichiers de l\'application dans le dossier mémoire', () => {
     expect(memoryResetTargets(listings()).trash).toBe(0);
   });
 
+  it('synchronisation : les bases des téléphones avant tout, puis le témoin et les fiches gardées ; rien d\'étranger', () => {
+    const { paths } = memoryResetTargets({
+      ...listings(),
+      trash: { root: [file('corbeille.json')], dirs: {} },
+      sync: {
+        root: [file('en-cours.json'), file('telephone-0001.json'), file('a-moi.txt'), file('court.json'), dir('telephone-0001'), dir('photos')],
+        fiches: {
+          'telephone-0001': [file('1763500000000-ordinateur.json'), file('1763500000000-telephone.json'), file('notes.json'), dir('sous')],
+          photos: [file('1-ordinateur.json')],
+        },
+      },
+    });
+    expect(paths.slice(0, 5)).toEqual([
+      'synchro/telephone-0001.json', 'synchro/en-cours.json',
+      'synchro/telephone-0001/fiches/1763500000000-ordinateur.json', 'synchro/telephone-0001/fiches/1763500000000-telephone.json',
+      'corbeille/corbeille.json',
+    ]);
+    expect(paths.some((p) => p.includes('a-moi') || p.includes('court') || p.includes('notes') || p.includes('photos'))).toBe(false);
+  });
+
   it('efface les fichiers de l\'application d\'un dossier, et laisse les autres', async () => {
     const files = new Map([
       ['gtracker.json', '{}'], ['LISEZMOI.txt', ''], ['a-moi.txt', 'à moi'], ['x.gpx', '<gpx/>'],
