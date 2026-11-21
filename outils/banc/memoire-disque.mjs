@@ -17,7 +17,10 @@
 //     « Restaurer » (session revenue, corbeille vide) ; les deux de nouveau à la corbeille, l'une vieillie à 31 jours
 //     programme fermé : relancé, elle et son sous-dossier disparaissent, l'autre et un dossier posé à la main restent ;
 //     un itinéraire supprimé (« Mettre à la corbeille (30 jours) ») ; « Supprimer définitivement » et « Vider la
-//     corbeille » tenus puis confirmés.
+//     corbeille » tenus puis confirmés ; la zone dit « Corbeille vide. » quand elle l'est, le menu « … » de Sessions
+//     porte « Corbeille » en dernier et son appui ouvre Réglages › Mémoire sur la zone (`?bloc=corbeille`) ; le
+//     sans-fil est allumé pendant tout le cas, et le dossier mémoire ne porte aucun de ses secrets (certificat, clé
+//     chiffrée, registre des téléphones : dans le profil).
 import { spawn, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -369,7 +372,7 @@ try {
   // Premier lancement : mémoire adoptée, deux sessions importées, une mise à la corbeille, restaurée, puis les deux mises à la corbeille.
   let premierNom = '';
   let octetsPremier = null;
-  await avecProgramme(G.profil, { GTRACKER_DOCUMENTS: G.documents }, async (b) => {
+  await avecProgramme(G.profil, { GTRACKER_DOCUMENTS: G.documents, GTRACKER_BANC_SANSFIL_ACTIF: '1' }, async (b) => {
     b.onMessage((m) => { if (m.method === 'Page.javascriptDialogOpening') questionsG.push(m.params.message); });
     await b.go('/profil', 5000);
     await attendre(b, /Dossier proposé/, 'carte');
@@ -392,7 +395,8 @@ try {
     await pageSessions(b);
     await b.evaluate(`document.querySelector('button.ui-more__button[aria-label="Importer, mettre à jour"]')?.click()`);
     await b.wait(300);
-    const menuTexte = await b.evaluate(`[...document.querySelectorAll('.ui-more__panel button')].map((x) => x.textContent.trim()).join(' | ')`);
+    // Le menu du titre seulement : les lignes de sessions portent chacune le leur dans la page.
+    const menuTexte = await b.evaluate(`[...document.querySelector('button.ui-more__button[aria-label="Importer, mettre à jour"]').closest('.ui-more').querySelectorAll('.ui-more__panel button')].map((x) => x.textContent.trim()).join(' | ')`);
     check('Sessions : le menu « … » porte « Corbeille » en dernier', /Corbeille$/.test(menuTexte), menuTexte);
     check('Sessions : appui sur « Corbeille »', (await b.clickText('Corbeille')) === 'ok');
     await b.waitFor(`location.pathname === '/parametres' && location.search === '?bloc=corbeille'`, { timeout: 5000, label: 'arrivée sur Réglages' });
@@ -488,7 +492,7 @@ try {
   }
 
   // Second lancement : la purge de l'ouverture ; puis un itinéraire, la suppression définitive d'une entrée, le vidage.
-  await avecProgramme(G.profil, { GTRACKER_DOCUMENTS: G.documents }, async (b) => {
+  await avecProgramme(G.profil, { GTRACKER_DOCUMENTS: G.documents, GTRACKER_BANC_SANSFIL_ACTIF: '1' }, async (b) => {
     b.onMessage((m) => { if (m.method === 'Page.javascriptDialogOpening') questionsG.push(m.params.message); });
     await b.go('/profil', 5000);
     await attendre(b, /session/, 'mémoire prête');
@@ -562,6 +566,17 @@ try {
     check('console de la page sans erreur (second lancement)', b.logs.length === 0, b.logs.join(' | '));
   });
   check('aucun temporaire dans la mémoire en fin de cas', temporaires(memG).length === 0, temporaires(memG).join(','));
+
+  // Le sans-fil était allumé pendant tout ce cas : ses secrets (certificat, clé chiffrée, registre des téléphones) sont
+  // dans le profil, jamais dans le dossier mémoire (qui, lui, peut être synchronisé ou copié ailleurs).
+  const secretsProfil = arbre(join(G.profil, 'sansfil')) ?? [];
+  console.log(`secrets du sans-fil (profil) : ${secretsProfil.join(', ') || '(aucun)'}`);
+  check('sans-fil : le profil porte son dossier de secrets (certificat.pem, cle.bin)', secretsProfil.includes('certificat.pem') && secretsProfil.includes('cle.bin'), secretsProfil.join(','));
+  const arbreMem = arbre(memG) ?? [];
+  const nomsSecrets = arbreMem.filter((c) => /sansfil|certificat\.pem|cle\.bin|telephones\.json/i.test(c));
+  check('sans-fil : aucun dossier ni fichier de secrets du sans-fil dans le dossier mémoire', nomsSecrets.length === 0, nomsSecrets.join(','));
+  const marquesSecretes = arbreMem.filter((c) => !c.endsWith('/')).filter((c) => /-----BEGIN [A-Z ]*(PRIVATE KEY|CERTIFICATE)-----/.test(readFileSync(join(memG, c), 'latin1')));
+  check('sans-fil : aucune clé ni certificat (PEM) dans un fichier du dossier mémoire', marquesSecretes.length === 0, marquesSecretes.join(','));
 } catch (e) {
   check(`script interrompu : ${e.stack ?? e.message}`, false);
 } finally {
