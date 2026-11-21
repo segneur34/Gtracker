@@ -16,6 +16,7 @@
     "preview": "vite preview",
     "bureau": "node outils/bureau.mjs",
     "exe": "node outils/bureau.mjs --exe",
+    "installeur": "node outils/bureau.mjs --installeur",
     "backlog": "node outils/backlog.mjs"
   },
   "dependencies": {
