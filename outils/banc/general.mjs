@@ -344,6 +344,9 @@ check('tuile : 390 px, le brouillon est ouvert (barre « Non enregistré »)', (
 check('tuile : 390 px, le clic sur « Virements réussis » trouve son bouton', await clickTuile('Virements réussis'));
 await settle({ max: 1500 });
 await wait(600);
+// Le défilement vers le panneau est animé : attendu jusqu'à ce que son haut soit passé au-dessus de la barre d'onglets
+// (sans quoi une page lente, comme celle du programme Windows, est lue avant la fin du mouvement).
+await waitFor(async () => { const c = await cadreOnglet('manoeuvres'); return c !== null && c.tabbar !== null && c.top < c.tabbar.t; }, { timeout: 3000, every: 150, label: 'défilement vers le panneau' });
 const cadreT = await cadreOnglet('manoeuvres');
 console.log('tuile, 390 px :', JSON.stringify(cadreT));
 check('tuile : 390 px, le panneau manœuvres est là', cadreT !== null);

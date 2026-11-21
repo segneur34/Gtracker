@@ -27,7 +27,7 @@
 //     tous deux retenus au rechargement ; « Retirer » rend l'avatar vide ; le nom tapé passe en titre ;
 //  8. le banc de poissons (compte, eau, textes, places, dessin) ; dans Réglages › Pratiquant les mêmes quatre réglages ;
 //     « Aucun » cache le banc et l'eau, un poisson les remontre, depuis Réglages puis depuis la fenêtre du Profil.
-import { CLES, connect } from './lib/cdp.mjs';
+import { CLES, connect, POIGNEE_RETOUR } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { traceSurf } from './lib/traces.mjs';
 
@@ -437,7 +437,12 @@ await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Es
 await wait(300);
 check('Échap ferme la fenêtre', !(await evaluate(`!!document.querySelector('.profile-settings-window')`)));
 await openWindow();
-await evaluate(`window.gtrackerBack?.()`);
+// Le retour d'Android (`gtrackerBack`) n'existe que sur le serveur de développement ; la version construite n'a que Échap.
+if (await evaluate(`typeof window.${POIGNEE_RETOUR} === 'function'`)) await evaluate(`window.${POIGNEE_RETOUR}()`);
+else {
+  console.log('retour d\'Android : poignée absente de la version construite, Échap à la place');
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+}
 await wait(300);
 check('le retour ferme la fenêtre, sans quitter le Profil', !(await evaluate(`!!document.querySelector('.profile-settings-window')`)) && (await search()) === '/profil', await search());
 await openWindow();

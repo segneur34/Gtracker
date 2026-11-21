@@ -773,7 +773,7 @@ try {
     const orphelinAvant = empreinte(tel, (c) => c === `itineraires/${ORPHELIN}`);
     await avecProgramme(profil, memoire, { GTRACKER_BANC_SANSFIL_ACTIF: '1' }, '4', async (b) => {
       const faux = new FauxTelephone({ dossier: tel, delaiMs: 15000 });
-      const { ad, liaison } = await relier(b, faux);
+      const { liaison } = await relier(b, faux);
       const bloc = (await carte(b)).texte.replace(/\s+/g, ' ');
       console.log(`  bloc, téléphone relié : ${JSON.stringify(bloc)}`);
       check('4a. le bloc du programme dit que sessions et itinéraires se copient dans les deux sens, sans câble, si le téléphone est à jour, et que sinon le câble attend', bloc.includes('les sessions et les itinéraires se copient dans les deux sens, sans câble, si le téléphone a la dernière version de Gtracker ; sinon, ce qui doit aller sur le téléphone attend le câble.'), bloc);

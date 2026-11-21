@@ -71,7 +71,15 @@ const sessionsAt = async (dayMs) => {
 const days = async () => ((await stored())?.days ?? []).length;
 const rows = () => evaluate(`[...document.querySelectorAll('.tutorial-row')].map((r) => ({ title: r.querySelector('.tutorial-row__title')?.textContent, read: !!r.querySelector('.tutorial-row__read') }))`);
 const subtitle = () => evaluate(`document.querySelector('.ui-page-header__subtitle')?.textContent ?? null`);
-const back = () => evaluate(`window.${POIGNEE_RETOUR} ? window.${POIGNEE_RETOUR}() : 'absent'`);
+// La poignée du retour d'Android n'existe que sur le serveur de développement ; la version construite n'a que le retour
+// du navigateur, qui remonte ici d'une page de la même façon (on arrive de la liste, puis de Réglages).
+let retourNote = false;
+const back = async () => {
+  if (await evaluate(`typeof window.${POIGNEE_RETOUR} === 'function'`)) return evaluate(`window.${POIGNEE_RETOUR}()`);
+  if (!retourNote) { console.log('retour d\'Android : poignée absente de la version construite, retour du navigateur à la place'); retourNote = true; }
+  await evaluate('history.back()');
+  return 'page';
+};
 const overflow = () => evaluate('document.documentElement.scrollWidth > window.innerWidth');
 
 // 1. La pause de la leçon du jour : ni carte sur le Profil ni sur Sessions, aucun jour compté.

@@ -224,8 +224,12 @@ async function ouvrirChrome(profil) {
   // Sans bac à sable seulement en root (conteneur Linux), où Chrome refuse de démarrer avec.
   const sansBac = process.getuid?.() === 0 ? ['--no-sandbox'] : [];
   const langue = LANGUES[opts.langue];
+  // Chrome sans fenêtre garde sa barre de défilement (15 px de moins à la page : 1367 de large contre 1382) ; le programme
+  // est lancé sans barre (`ouvrirExe`). Comparé au programme, Chrome la cache aussi : sans cela la carte de Planifier est
+  // plus étroite de 9 px et les mêmes clics donnent 6,51 km au lieu de 6,55. Hors comparaison, rien ne change.
+  const sansBarre = opts.exe ? ['--hide-scrollbars'] : [];
   const child = lancer(CHROME, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profil}`,
-    '--window-size=1400,1000', '--no-first-run', '--no-default-browser-check', `--lang=${langue}`, `--accept-lang=${langue}`, ...sansBac, 'about:blank'], { stdio: 'ignore' });
+    '--window-size=1400,1000', '--no-first-run', '--no-default-browser-check', `--lang=${langue}`, `--accept-lang=${langue}`, ...sansBarre, ...sansBac, 'about:blank'], { stdio: 'ignore' });
   const limite = Date.now() + 30000;
   while (Date.now() < limite) {
     if (child.exitCode !== null) break;
@@ -262,7 +266,11 @@ async function ouvrirExe(profil) {
   fs.rmSync(memoire, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
   fs.mkdirSync(memoire, { recursive: true });
   const port = await prendrePort();
-  const env = { ...process.env, GTRACKER_BANC: '1', GTRACKER_PROFIL: profil, GTRACKER_MEMOIRE: memoire };
+  // La réponse de la fenêtre « Choisir un autre dossier » : un dossier retenu d'avance, que le script qui en a besoin crée
+  // lui-même (rien ici : sans le script, il n'existe pas). Chrome n'a pas cette fenêtre.
+  const autre = `${profil}-autre`;
+  fs.rmSync(autre, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+  const env = { ...process.env, GTRACKER_BANC: '1', GTRACKER_PROFIL: profil, GTRACKER_MEMOIRE: memoire, GTRACKER_BANC_DOSSIER: autre };
   for (const cle of Object.keys(env)) if (cle.toUpperCase() === 'ELECTRON_RUN_AS_NODE') delete env[cle];
   // Échelle 1 et barres de défilement cachées : les conditions de Chrome sans fenêtre. Sans elles, l'écran du poste (125 %)
   // donne des bordures de 0,8 px et une barre de 15 px qui décale les centres mesurés (relevés « différents » sans que
@@ -277,7 +285,7 @@ async function ouvrirExe(profil) {
     if (child.exitCode !== null) break;
     try {
       const page = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find((c) => c.type === 'page' && c.webSocketDebuggerUrl);
-      if (page) return { port, child, ws: page.webSocketDebuggerUrl, journal, memoire };
+      if (page) return { port, child, ws: page.webSocketDebuggerUrl, journal, memoire, autre };
     } catch { /* pas encore */ }
     await pause(200);
   }
@@ -527,8 +535,8 @@ async function executer(s, cote, rejeu = false) {
   if (opts.captures && /process\.env\.SHOT/.test(source)) env.SHOT = path.join(captures, `${s.nom}.png`);
   if (accelerable(cote, s)) env.TEMPS = opts.temps;
   if (chrome.ws) env.BANC_WS = chrome.ws;
-  if (chrome.memoire) env.GTRACKER_MEMOIRE = chrome.memoire;
-  else delete env.GTRACKER_MEMOIRE; // côté Chrome : la mémoire est l'OPFS, `records()` la lit par la page
+  if (chrome.memoire) { env.GTRACKER_MEMOIRE = chrome.memoire; env.GTRACKER_BANC_DOSSIER = chrome.autre; }
+  else { delete env.GTRACKER_MEMOIRE; delete env.GTRACKER_BANC_DOSSIER; } // côté Chrome : la mémoire est l'OPFS, `records()` la lit par la page
   const child = lancer(process.execPath, [script, ...args], { cwd: travail, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -542,7 +550,7 @@ async function executer(s, cote, rejeu = false) {
   await fermer(cote, chrome);
   const ms = Date.now() - t0;
   // Le dossier mémoire du programme (un chemin complet, montré dans la carte Mémoire) passe avant celui du profil, dont il porte le préfixe.
-  const chemins = [[travail, 'TRAVAIL'], [depot, 'TRAVAIL-DUMP'], [captures, 'CAPTURES'], [`${path.join(B.profils, id)}-memoire`, 'MEMOIRE'], [path.join(B.profils, id), 'PROFIL'],
+  const chemins = [[travail, 'TRAVAIL'], [depot, 'TRAVAIL-DUMP'], [captures, 'CAPTURES'], [`${path.join(B.profils, id)}-memoire`, 'MEMOIRE'], [`${path.join(B.profils, id)}-autre`, 'AUTRE'], [path.join(B.profils, id), 'PROFIL'],
     [RACINE[cote], 'DEPOT'], [DEPOT, 'DEPOT'], [opts.brouillon, 'BROUILLON']];
   if (opts.gpx) chemins.push([opts.gpx, 'GPX']);
   const sortieNorm = normaliser(out, chemins, s.masques);
@@ -568,7 +576,7 @@ async function executer(s, cote, rejeu = false) {
     fs.writeFileSync(path.join(dossier, `${s.nom}.programme.txt`), `${r.programme.join('\n')}\n`);
   }
   fs.writeFileSync(meta, JSON.stringify(r, null, 1));
-  if (!opts.garder) for (const d of [travail, depot, path.join(B.profils, id), `${path.join(B.profils, id)}-memoire`]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+  if (!opts.garder) for (const d of [travail, depot, path.join(B.profils, id), `${path.join(B.profils, id)}-memoire`, `${path.join(B.profils, id)}-autre`]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
   const etat = (r.statut !== 'fini' ? r.statut : r.echecs ? `${r.echecs} échec(s)` : code ? `code ${code}` : 'ok') + (r.programme?.length ? ` (${r.programme.length} note(s) du programme)` : '');
   console.error(`[${NOM_COTE[cote]}] ${s.nom} ${etat} ${duree(ms)}`);
   return { ...r, fichier };

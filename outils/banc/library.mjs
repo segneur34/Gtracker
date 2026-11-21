@@ -170,8 +170,12 @@ check('classée en kite : trois lignes, Wingfoil, Kite et Surf, plus de « À cl
 
 step('6. Supprimer la session de surf');
 console.log('« … » de la ligne, Supprimer :', await actionLigne(evaluate, wait, 'Surf', 'Supprimer'));
-await waitFor(`/Supprimer cette session de la mémoire/.test(document.body.innerText)`, { timeout: 3000, label: 'confirmation' });
-check('la confirmation « Supprimer cette session de la mémoire ? » sous la ligne, rien d\'effacé avant', /Supprimer cette session de la mémoire \?/.test(await evaluate('document.body.innerText')) && (await records()).some((r) => r.sport === 'surf'));
+// Dans le programme Windows la mémoire est un dossier du disque, qui a une corbeille de 30 jours : la question le dit et la
+// session n'est plus dans `sessions/` mais dans `corbeille/`. Dans un navigateur, elle est effacée.
+const versCorbeille = (await evaluate('Boolean(window.gtrackerBureau)')) === true;
+const question = versCorbeille ? 'Mettre cette session à la corbeille ?' : 'Supprimer cette session de la mémoire ?';
+await waitFor(`document.body.innerText.includes(${JSON.stringify(question)})`, { timeout: 3000, label: 'confirmation' });
+check('la confirmation de la suppression sous la ligne, rien d\'effacé avant', (await evaluate('document.body.innerText')).includes(question) && (await records()).some((r) => r.sport === 'surf'));
 console.log('Confirmer :', await clickText('Confirmer'));
 await settle({ max: 1500 });
 await waitFor(async () => !(await records()).some((r) => r.sport === 'surf'), { timeout: 4000, label: 'fiche effacée' });
@@ -181,7 +185,7 @@ console.log('rond Surf :', await choisirActivite(evaluate, 'Surf'));
 await settle({ max: 1500 });
 console.log(await lines(/Aucune session/));
 check('filtrée sur Surf : « Aucune session de surf »', /Aucune session de surf pour l'instant/.test(await evaluate('document.body.innerText')) && (await rowsNow()).length === 0, await lines(/Aucune/));
-check('la fiche et la trace de surf sont effacées de la mémoire', !(await records()).some((r) => r.sport === 'surf') && !Object.keys(JSON.parse(await opfsTree())).some((k) => k.includes('_surf.')));
+check('la fiche et la trace de surf ne sont plus parmi les sessions de la mémoire', !(await records()).some((r) => r.sport === 'surf') && !Object.keys(JSON.parse(await opfsTree())).some((k) => k.startsWith('sessions/') && k.includes('_surf.')));
 
 step('7. Réglages : une unité changée, fichier de l\'appareil (reglages/<appareil>.json)');
 await evaluate(`(() => { const s = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}'); s.settings = { ...s.settings, activites: true }; s['settings-families'] = { ...s['settings-families'], voile: true }; localStorage.setItem('${CLES.sections}', JSON.stringify(s)); return 'ok'; })()`);

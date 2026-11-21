@@ -5,7 +5,7 @@
 // les deux GPX : make-gpx.mjs sans décalage, puis avec un décalage d'une heure.
 // Depuis le 28/10, le champ « Allure de la session » est dans l'onglet « réglages » de l'analyse voile
 // (panneau « Réglages de la session ») : le script ouvre cet onglet avant de le lire.
-import { connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
+import { connect, DOSSIER_MEMOIRE, pourMemoire } from './lib/cdp.mjs';
 import { attendreAnalyse } from './lib/fin-enregistrement.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
@@ -16,7 +16,8 @@ const { send, go: libGo, settle, waitFor, wait, importFiles, onMessage, close, l
 onMessage((msg) => { if (msg.method === 'Page.javascriptDialogOpening') dialogs.push(msg.params.message); });
 // Ici une exception de la page rend un texte « ERREUR: … » au lieu de `undefined`.
 const evaluate = async (expression) => {
-  const res = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+  // `pourMemoire` : la lecture de la mémoire ci-dessous passe par le dossier du disque dans le programme Windows.
+  const res = await send('Runtime.evaluate', { expression: pourMemoire(expression), returnByValue: true, awaitPromise: true });
   if (res.result?.exceptionDetails) return `ERREUR: ${res.result.exceptionDetails.exception?.description?.split('\n')[0]}`;
   return res.result?.result?.value;
 };

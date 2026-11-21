@@ -14,8 +14,12 @@
 //  d. une fiche de l'ancien format posée directement dans sessions/ : relue en lecture seule, jamais réécrite ;
 //  e. une fiche de l'ancienne application d'une version plus récente (trace seule rangée), un paquet d'aujourd'hui à fiche
 //     plus récente (fiche rangée au caractère près, lecture seule), un paquet d'un autre espace de noms (GPX seul) ;
-//  f. le dossier mémoire de l'ancienne application choisi comme mémoire : refusé, la mémoire en service reste en place.
+//  f. le dossier mémoire de l'ancienne application choisi comme mémoire : refusé, la mémoire en service reste en place
+//     (dans le navigateur par `showDirectoryPicker`, dans le programme Windows par la fenêtre du système, qui répond par
+//     `GTRACKER_BANC_DOSSIER`).
 import './charge-ts.mjs';
+import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { CLES, connect, DOSSIER_MEMOIRE } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { lignes } from './lib/sessions.mjs';
@@ -140,8 +144,9 @@ for (const [clef, s] of Object.entries(SESSIONS)) {
     JSON.stringify({ format: r?.format, activityId: r?.activityId }));
   check(`${clef} : nom, commentaire et deux repères de l'ancienne fiche`, r?.name === voulue.name && r?.notes?.comment === voulue.notes?.comment
     && JSON.stringify(r?.marks) === JSON.stringify(voulue.marks) && r.marks.length === 2, JSON.stringify({ name: r?.name, comment: r?.notes?.comment, marks: r?.marks?.length }));
-  // Les champs de l'analyse que l'application d'aujourd'hui lit sont repris tels quels (ceux qu'elle ne lit plus sont retirés à l'entrée).
-  const analyseReprise = r?.analysis && Object.entries(r.analysis).every(([k, v]) => JSON.stringify(v) === JSON.stringify(voulue.analysis[k]));
+  // Les champs de l'analyse que l'application d'aujourd'hui lit sont repris tels quels (ceux qu'elle ne lit plus sont
+  // retirés à l'entrée) ; un champ qu'elle a ajouté depuis, absent de l'ancienne fiche, entre vide.
+  const analyseReprise = r?.analysis && Object.entries(r.analysis).every(([k, v]) => (k in voulue.analysis ? JSON.stringify(v) === JSON.stringify(voulue.analysis[k]) : v === null));
   check(`${clef} : réglages d'analyse et résumé repris tels quels`, Boolean(analyseReprise) && Object.keys(r.analysis).length >= 5
     && r?.summary?.startMs === s.startMs && r?.summary?.pointCount === voulue.summary.pointCount, JSON.stringify(r?.analysis));
 }
@@ -308,28 +313,46 @@ check('préfixe non déclaré : fichier illisible, rien n\'est rangé', /^0 sess
 // =====================================================================================================================
 console.log('\n== f. Dossier de l\'ancienne application choisi comme mémoire');
 await viderMemoire();
-// Le dossier « choisi » porte le marqueur de l'ancienne application et pas le nôtre.
-console.log('dossier posé :', await evaluate(`(async () => {
-  const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('dossier-autre', { create: true });
-  const w = await (await d.getFileHandle(${JSON.stringify(LEGACY_MARKER_FILE)}, { create: true })).createWritable();
-  await w.write('{}');
-  await w.close();
-  return 'ok';
-})()`));
-// Le bouton « Choisir un dossier » est sur la page des itinéraires (la carte Mémoire de Réglages ne le porte pas).
-await go('/itineraires/liste', 4000);
-await waitFor(`[...document.querySelectorAll('button')].some((b) => /^Choisir (le|un) dossier$/.test(b.textContent.trim()))`, { timeout: 6000, label: 'bouton du dossier' });
-console.log('choisir :', await evaluate(`(() => { const b = [...document.querySelectorAll('button')].find((x) => /^Choisir (le|un) dossier$/.test(x.textContent.trim())); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
+// Le dossier « choisi » porte le marqueur de l'ancienne application et pas le nôtre. Dans le programme Windows, la fenêtre
+// du système répond par `GTRACKER_BANC_DOSSIER` (un dossier du disque retenu d'avance par le lanceur, créé ici) ; dans un
+// navigateur, la fonction `showDirectoryPicker` posée plus haut rend `dossier-autre` de sa mémoire.
+const programme = (await evaluate('Boolean(window.gtrackerBureau)')) === true;
+const dossierChoisi = process.env.GTRACKER_BANC_DOSSIER;
+if (programme) {
+  if (!dossierChoisi) throw new Error('programme Windows sans GTRACKER_BANC_DOSSIER : la fenêtre de choix ne répondrait pas');
+  mkdirSync(dossierChoisi, { recursive: true });
+  writeFileSync(join(dossierChoisi, LEGACY_MARKER_FILE), '{}');
+  console.log('dossier posé : ok');
+} else {
+  console.log('dossier posé :', await evaluate(`(async () => {
+    const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('dossier-autre', { create: true });
+    const w = await (await d.getFileHandle(${JSON.stringify(LEGACY_MARKER_FILE)}, { create: true })).createWritable();
+    await w.write('{}');
+    await w.close();
+    return 'ok';
+  })()`));
+}
+// Le bouton est dans la carte Mémoire de Réglages : « Choisir un dossier » sur la mémoire du navigateur, « Changer de
+// dossier » sur celle du programme Windows.
+await go('/parametres', 4000);
+// La carte Mémoire est repliée tant qu'on ne l'ouvre pas.
+await waitFor(`[...document.querySelectorAll('[role=button]')].some((x) => x.textContent.trim() === 'Mémoire')`, { timeout: 6000, label: 'carte Mémoire' });
+await evaluate(`(() => { if (![...document.querySelectorAll('button')].some((b) => /^(Choisir un dossier|Changer de dossier)$/.test(b.textContent.trim()))) [...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Mémoire')?.click(); return 'ok'; })()`);
+await waitFor(`[...document.querySelectorAll('button')].some((b) => /^(Choisir un dossier|Changer de dossier)$/.test(b.textContent.trim()))`, { timeout: 6000, label: 'bouton du dossier' });
+console.log('choisir :', await evaluate(`(() => { const b = [...document.querySelectorAll('button')].find((x) => /^(Choisir un dossier|Changer de dossier)$/.test(x.textContent.trim())); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
 await waitFor(`/celui de l'autre application/.test(document.body.innerText)`, { timeout: 5000, label: 'refus' });
 const refus = (await evaluate(`document.body.innerText.split('\\n').find((l) => /celui de l'autre application/.test(l)) ?? '(aucune phrase)'`)).replace(/ FERMER$/, '');
 console.log(refus);
 check('le dossier de l\'ancienne application est refusé, avec la phrase qui renvoie à l\'import d\'un dossier',
   refus === `Ce dossier est celui de l'autre application : ajoutez ses sessions par « Ajouter les sessions d'un dossier ».`, refus);
-check('la mémoire en service reste celle du navigateur (rien n\'est écrit dans le dossier refusé)', (await evaluate(`(async () => {
-  const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('dossier-autre');
-  const noms = []; for await (const [n] of d.entries()) noms.push(n);
-  return noms.join(',');
-})()`)) === LEGACY_MARKER_FILE);
+const contenuRefuse = programme
+  ? readdirSync(dossierChoisi).join(',')
+  : await evaluate(`(async () => {
+    const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('dossier-autre');
+    const noms = []; for await (const [n] of d.entries()) noms.push(n);
+    return noms.join(',');
+  })()`);
+check('la mémoire en service reste la même (rien n\'est écrit dans le dossier refusé)', contenuRefuse === LEGACY_MARKER_FILE, contenuRefuse);
 
 console.log('\n--- console (erreurs, avertissements) ---');
 [...new Set(logs)].slice(0, 15).forEach((l) => console.log(l));

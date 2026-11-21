@@ -51,8 +51,16 @@ const stubSource = (built, extra) => `(() => {
     : Promise.resolve(new Response(JSON.stringify(value), { status: 200, headers: { 'Content-Type': 'application/json' } }));
   window.fetch = (input, init) => {
     const url = String(input?.url ?? input);
-    if (url.endsWith('/licences.json')) { window.__licenceFetches.push(url); return answer(${JSON.stringify(built)}); }
-    if (url.endsWith('/licences-hors-js.json')) { window.__licenceFetches.push(url); return answer(${JSON.stringify(extra)}); }
+    if (url.endsWith('/licences.json')) {
+      window.__licenceFetches.push(url);
+      // Une page HTML à la place de la liste : ce que répond le serveur de développement, qui n'a pas ce fichier.
+      return ${JSON.stringify(built)} === 'html' ? Promise.resolve(new Response('<!doctype html><html></html>', { status: 200, headers: { 'Content-Type': 'text/html' } })) : answer(${JSON.stringify(built)});
+    }
+    if (url.endsWith('/licences-hors-js.json')) {
+      if (${JSON.stringify(extra)} === 'réel') return real(input, init);
+      window.__licenceFetches.push(url);
+      return answer(${JSON.stringify(extra)});
+    }
     return real(input, init);
   };
 })();`;
@@ -108,8 +116,10 @@ await shoot('apropos-ouvert');
 // --- 3. Licences dépliées ---
 check('les licences se déplient', (await openLicenses()) === 'ok');
 await waitFor(`document.querySelectorAll('.about-license__row').length > 0`, { timeout: 3000, label: 'lignes' });
-// Mode strict de React, sur le serveur de développement : l'effet part deux fois, le premier chargement annulé.
-check('les deux listes demandées, une fois chacune', (await fetches()) === 4, await fetches());
+// Mode strict de React, sur le serveur de développement seulement : l'effet part deux fois, le premier chargement annulé ;
+// la version construite ne le fait pas.
+const developpement = (await evaluate(`Boolean(document.querySelector('script[src*="/@vite/client"]'))`)) === true;
+check('les deux listes demandées, une fois chacune', (await fetches()) === (developpement ? 4 : 2), await fetches());
 const intro = await evaluate(`[...document.querySelectorAll('.about-licenses__intro')].map((p) => p.textContent)`);
 check('la phrase d\'introduction, seule', intro.length === 1 && intro[0] === "Gtracker s'appuie sur ces composants. Touchez-en un pour lire sa licence.", intro.join(' | '));
 const groups = await evaluate(`[...document.querySelectorAll('.about-licenses__group')].map((p) => p.textContent)`);
@@ -187,7 +197,9 @@ await go('/parametres', 3000);
 check('et le reste au rechargement', (await evaluate(`document.querySelector('.about') === null`)) === true);
 
 // --- 7. Sans liste construite, puis sans rien ---
-await setStub(null);
+// La version construite porte sa vraie `licences.json` : l'absence se joue en la remplaçant par une page HTML, ce que
+// répond le serveur de développement ; le complément, lui, est le vrai fichier.
+await setStub(stubSource('html', 'réel'));
 await go('/parametres', 3000);
 await openBlock();
 await settle({ max: 500 });

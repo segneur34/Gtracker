@@ -204,9 +204,11 @@ const MEMOIRE_DISQUE_SCRIPT = `(() => {
     entries: () => ({ [Symbol.asyncIterator]: async function* () { const r = await reel(); for await (const e of r.entries()) yield e; } }),
   });
 })()`;
-const MEMOIRE_DISQUE = Boolean(process.env.GTRACKER_MEMOIRE);
+// Lu à l'usage et non à l'import : un script qui lance lui-même plusieurs instances (`exe-fermeture`) pose
+// `GTRACKER_MEMOIRE` pour chacune.
+const memoireDisque = () => Boolean(process.env.GTRACKER_MEMOIRE);
 /** L'expression d'un script, réécrite pour la mémoire du disque ; inchangée ailleurs. Pour les scripts qui ont leur propre `Runtime.evaluate`. */
-export const pourMemoire = (expression) => (MEMOIRE_DISQUE ? expression.replaceAll('navigator.storage.getDirectory()', 'window.__bancMemoire()') : expression);
+export const pourMemoire = (expression) => (memoireDisque() ?expression.replaceAll('navigator.storage.getDirectory()', 'window.__bancMemoire()') : expression);
 
 /** Connexion minimale au protocole (celle du navigateur, pour le contexte isolé). */
 const openSocket = async (url) => {
@@ -298,7 +300,7 @@ export const connect = async ({ port, base = BASE, width, height, shotDir, logEn
 
   await send('Runtime.enable'); await send('Log.enable'); await send('Page.enable'); await send('Network.enable');
   await send('Page.addScriptToEvaluateOnNewDocument', { source: PAGE_SCRIPT });
-  if (MEMOIRE_DISQUE) {
+  if (memoireDisque()) {
     await send('Page.addScriptToEvaluateOnNewDocument', { source: MEMOIRE_DISQUE_SCRIPT });
     await send('Runtime.evaluate', { expression: MEMOIRE_DISQUE_SCRIPT });
   }

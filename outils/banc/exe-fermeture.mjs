@@ -12,8 +12,9 @@
 // montrée, transparente (`GTRACKER_BANC_MONTRER=transparente`) : après un rechargement, Chromium ajoute au processus une
 // seconde fenêtre cachée, et la demande de `taskkill` partirait vers elle si celle de l'application était cachée aussi.
 // La vraie boîte de dialogue (boutons « Quitter » et « Rester ») ne se voit qu'à la main : le mode d'essai répond seul.
+// Chaque instance a une mémoire prête (`GTRACKER_MEMOIRE`, dossier neuf), sans quoi l'import du brouillon ne range rien.
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { connect } from './lib/cdp.mjs';
@@ -31,16 +32,30 @@ const vivant = (pid) => spawnSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH'], {
 /** Attend jusqu'à `ms` que le processus ait disparu. */
 const disparu = async (pid, ms) => { for (let t = 0; t < ms; t += 200) { if (!vivant(pid)) return true; await pause(200); } return !vivant(pid); };
 
+// Tout programme lancé est fermé à la sortie, même sur une exception : un échec ne laisse pas d'instance ouverte.
+const lances = new Set();
+process.on('exit', () => {
+  for (const c of lances) if (c.pid && vivant(c.pid)) spawnSync('taskkill', ['/T', '/F', '/PID', String(c.pid)], { stdio: 'ignore', windowsHide: true });
+});
+process.on('uncaughtException', (e) => { console.error(e); process.exit(1); });
+process.on('unhandledRejection', (e) => { console.error(e); process.exit(1); });
+
 let echecs = 0;
 const check = (quoi, ok, detail) => { console.log(`${ok ? 'ok   ' : 'ÉCHEC'} ${quoi}${!ok && detail !== undefined ? ` (${detail})` : ''}`); if (!ok) echecs++; };
 
 /** Une instance du programme sur un profil neuf ; rend le processus, le journal et l'adresse de la page. */
 async function lancerProgramme(quitter, montrer) {
   const profil = mkdtempSync(join(tmpdir(), 'gtracker-fermeture-'));
-  const env = { ...process.env, GTRACKER_BANC: '1', GTRACKER_PROFIL: profil, GTRACKER_BANC_QUITTER: quitter };
+  // Une mémoire prête d'avance, comme celle du lanceur de `passe.mjs --exe` : un dossier neuf retenu sans passer par la
+  // carte Mémoire. `records()` de `lib/cdp.mjs` le lit par Node (`GTRACKER_MEMOIRE` de ce processus, posée avant `connect`).
+  const memoire = `${profil}-memoire`;
+  mkdirSync(memoire, { recursive: true });
+  process.env.GTRACKER_MEMOIRE = memoire;
+  const env = { ...process.env, GTRACKER_BANC: '1', GTRACKER_PROFIL: profil, GTRACKER_MEMOIRE: memoire, GTRACKER_BANC_QUITTER: quitter };
   if (montrer) env.GTRACKER_BANC_MONTRER = 'transparente';
   for (const cle of Object.keys(env)) if (cle.toUpperCase() === 'ELECTRON_RUN_AS_NODE') delete env[cle];
   const child = spawn(exe, [`--remote-debugging-port=${PORT}`, '--lang=fr-FR', '--force-device-scale-factor=1', '--hide-scrollbars'], { env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  lances.add(child);
   const journal = [];
   const lire = (d) => { for (const l of String(d).split(/\r?\n/)) if (l.trim()) journal.push(l.trim()); };
   child.stdout.on('data', lire);
@@ -50,13 +65,16 @@ async function lancerProgramme(quitter, montrer) {
     await pause(300);
     try { ws = (await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json()).find((p) => p.type === 'page')?.webSocketDebuggerUrl ?? null; } catch { /* pas prêt */ }
   }
-  if (!ws) throw new Error('le programme ne répond pas');
-  return { child, journal, ws, profil };
+  if (!ws) {
+    await nettoyer({ child, profil, memoire });
+    throw new Error('le programme ne répond pas');
+  }
+  return { child, journal, ws, profil, memoire };
 }
-const nettoyer = async ({ child, profil }) => {
+const nettoyer = async ({ child, profil, memoire }) => {
   spawnSync('taskkill', ['/T', '/F', '/PID', String(child.pid)], { stdio: 'ignore', windowsHide: true });
   await disparu(child.pid, 5000);
-  rmSync(profil, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+  for (const d of [profil, memoire]) rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
 };
 /** Demande de fermeture faite à la fenêtre, comme la croix : sans `/F`. */
 const fermerWindows = (pid) => spawnSync('taskkill', ['/PID', String(pid)], { encoding: 'utf8', windowsHide: true });
