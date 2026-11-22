@@ -9,7 +9,7 @@
 // - Écrit à la suite, de façon synchrone : l'ordre est celui des événements et une ligne écrite survit à un arrêt
 //   brutal. Une écriture qui échoue est perdue sans rien casser : le journal ne doit jamais gêner le programme.
 // - Rien de personnel n'y entre : ni contenu de fichier, ni nom (de session, de téléphone, de l'utilisateur), ni chemin,
-//   ni adresse web. Les modules de la coquille donnent ces détails à part, pour la seule sortie du mode d'essai
+//   ni adresse web, ni adresse réseau du poste ou d'un téléphone. Les modules de la coquille donnent ces détails à part, pour la seule sortie du mode d'essai
 //   (`Journaliser`), et un filet les retire de ce qui en porterait encore, un message d'erreur du système par exemple
 //   (`sansDonneesPersonnelles`). Les étapes de la page sont bornées (`LONGUEUR_NOTE_MAX`).
 
@@ -61,10 +61,17 @@ export function surUneLigne(message: string, longueurMax = LONGUEUR_LIGNE_MAX): 
   return lettres.length > longueurMax ? `${lettres.slice(0, longueurMax - 1).join('')}…` : aplati
 }
 
+/** Un nombre de 0 à 255, partie d'une adresse IPv4. */
+const OCTET = '(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)'
+
+/** Une adresse IPv4 isolée : quatre nombres, ni collés à un mot ni pris dans un numéro de version plus long. */
+const ADRESSE_IPV4 = new RegExp(`(?<![\\w.])${OCTET}(?:\\.${OCTET}){3}(?!\\w|\\.\\d)`, 'g')
+
 /**
  * Le message sans ce qui dirait qui est l'utilisateur ou ce qu'il range : chaque dossier de `masques` (le dossier
  * personnel de Windows, où est son nom), toute adresse web, tout chemin de Windows (entre guillemets en entier, sinon
- * jusqu'au premier blanc) et tout chemin du stockage d'Android. Filet de sûreté pour les messages d'erreur du système ;
+ * jusqu'au premier blanc), tout chemin du stockage d'Android et toute adresse IPv4 (celle du poste ou d'un téléphone ;
+ * le port qui la suit reste). Filet de sûreté pour les messages d'erreur du système ;
  * les appelants ne mettent déjà au journal ni nom ni chemin (`Journaliser`).
  */
 export function sansDonneesPersonnelles(message: string, masques: readonly string[] = []): string {
@@ -81,6 +88,7 @@ export function sansDonneesPersonnelles(message: string, masques: readonly strin
     .replace(/(['"])(?:[A-Za-z]:[\\/]|\\\\)[^'"]*\1/g, '<chemin>')
     .replace(/(?:\b[A-Za-z]:[\\/]|\\\\)[^\s'"«»,;()]*/g, '<chemin>')
     .replace(/(?<![\w.])\/(?:sdcard|storage|data|mnt)\/[^\s'"«»,;()]*/g, '<chemin>')
+    .replace(ADRESSE_IPV4, '<adresse IP>')
 }
 
 /** La ligne complète, retour à la ligne compris, sans donnée personnelle (`sansDonneesPersonnelles`). */

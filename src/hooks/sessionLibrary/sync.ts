@@ -388,6 +388,14 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       } catch (err) {
         return { ...emptyOutcome('safetyCopy'), first: pair.first, interrupted: false, error: errorMessage(err, String(err)) };
       }
+    } else if (running !== null) {
+      // Première rencontre coupée après que la base a commencé à s'écrire : la paire est déjà suivie, mais la copie
+      // faite au départ couvre encore cette synchronisation ; son dossier se redit, et le témoin le garde.
+      const earlier = witnessSafetyCopy(running, phoneKey(), now());
+      if (earlier) {
+        outcome.safetyCopy = earlier.path;
+        safetyCopyAtMs = earlier.atMs;
+      }
     }
     const startedAtMs = now();
     await writeWitness(startedAtMs);

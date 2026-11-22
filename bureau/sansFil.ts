@@ -57,6 +57,7 @@ import type { Alea, Horloge, TelephoneVisible } from './appairage'
 import { FenetreAppairage, RegistreTelephones, TAILLE_IDENTIFIANT, depuisHex, egalATempsConstant, enHex, tirerIdentifiant } from './appairage'
 import { certificatUtilisable, empreinteCertificat, fabriquerCertificat } from './certificat'
 import { ErreurDisque, codeDe, ecrireAtomique } from './disque'
+import type { Journaliser } from './journal'
 import type { ContexteEcoute, IssueAutorisation, JugementPareFeu, PareFeu, ResultatAutorisation } from './pareFeu'
 import { ESSAIS_PORT } from './pareFeu'
 import type { Gestionnaire } from './pont'
@@ -600,7 +601,8 @@ export type OptionsSansFil = {
   delais?: Partial<Delais>
   horloge?: Horloge
   alea?: Alea
-  journal?: (message: string) => void
+  /** Le journal reçoit les messages sans adresse réseau du poste ; la sortie d'essai les reçoit avec. */
+  journal?: Journaliser
   /** Appelé quand un téléphone se présente et est reconnu. */
   surArrivee?: (avis: AvisArrivee) => void
   /** Appelé quand la liaison d'un téléphone relié se ferme, sauf s'il revient aussitôt par une liaison plus récente. */
@@ -664,7 +666,7 @@ export class ServeurSansFil {
   private readonly delais: Delais
   private readonly horloge: Horloge
   private readonly alea: Alea
-  private readonly journal: (message: string) => void
+  private readonly journal: Journaliser
   private readonly surArrivee: (avis: AvisArrivee) => void
   private readonly surDepart: (avis: AvisDepart) => void
   /** Démarrages, arrêts et relevés d'adresses l'un après l'autre. */
@@ -780,7 +782,7 @@ export class ServeurSansFil {
       }
       this.fenetre?.fermer()
       this.fenetre = new FenetreAppairage({ empreinte: certificat.empreinte, horloge: this.horloge, alea: this.alea, dureeMs: this.dureeFenetreMs })
-      this.journal(`fenêtre d'appairage ouverte sur ${this.adresses[0].adresse}:${this.port}`)
+      this.journal(`fenêtre d'appairage ouverte, port ${this.port}`, `fenêtre d'appairage ouverte sur ${this.adresses[0].adresse}:${this.port}`)
       return this.appairageVisible() as AppairageOuvert
     })
   }
@@ -1041,7 +1043,7 @@ export class ServeurSansFil {
       serveur.once('error', echec)
       serveur.listen({ host: hote, port, exclusive: true }, () => {
         serveur.off('error', echec)
-        serveur.on('error', (e) => this.journal(`serveur sans fil (${hote}) : ${e.message}`))
+        serveur.on('error', (e) => this.journal(`serveur sans fil : ${e.message}`, `serveur sans fil (${hote}) : ${e.message}`))
         resoudre(serveur)
       })
     })
@@ -1077,7 +1079,7 @@ export class ServeurSansFil {
             pris = true
             break
           }
-          this.journal(`écoute impossible sur ${a.adresse} : ${(e as Error).message}`)
+          this.journal(`écoute impossible sur une adresse : ${(e as Error).message}`, `écoute impossible sur ${a.adresse} : ${(e as Error).message}`)
         }
       }
       if (pris) {
@@ -1092,7 +1094,10 @@ export class ServeurSansFil {
       this.adresses = voulues.filter((a) => ouverts.has(a.adresse))
       this.port = port
       this.erreur = null
-      this.journal(`sans-fil à l'écoute : ${this.adresses.map((a) => a.adresse).join(', ')}, port ${port}`)
+      this.journal(
+        `sans-fil à l'écoute : ${this.adresses.length} adresse${this.adresses.length > 1 ? 's' : ''}, port ${port}`,
+        `sans-fil à l'écoute : ${this.adresses.map((a) => a.adresse).join(', ')}, port ${port}`,
+      )
       return
     }
     this.erreur = `Aucun port libre de ${this.portBase} à ${this.portBase + ESSAIS_PORT - 1}.`
@@ -1119,7 +1124,7 @@ export class ServeurSansFil {
         try {
           this.serveurs.set(a.adresse, await this.ouvrirServeur(a.adresse, port, this.certificat))
         } catch (e) {
-          this.journal(`écoute impossible sur ${a.adresse} : ${(e as Error).message}`)
+          this.journal(`écoute impossible sur une adresse : ${(e as Error).message}`, `écoute impossible sur ${a.adresse} : ${(e as Error).message}`)
         }
       }
       this.adresses = voulues.filter((a) => this.serveurs.has(a.adresse))

@@ -140,6 +140,15 @@ describe('compte rendu : ce qui s’est échangé', () => {
     expect(describeSync(outcomeOf([], { interrupted: true })).paragraphs[0]).toBe("La synchronisation précédente s'était arrêtée en route : elle vient d'être terminée.");
   });
 
+  it('une reprise elle-même arrêtée ne se dit pas terminée', () => {
+    const lost = describeSync(outcomeOf([], { interrupted: true, linkLost: 'perdu', complete: false }));
+    expect(lost.title).toBe('Synchronisation arrêtée');
+    expect(lost.paragraphs).toEqual([]);
+    expect(lost.notes[0].text).toBe("Le téléphone n'est plus relié : la synchronisation s'est arrêtée en route. Ce qui est fait est gardé.");
+    const broken = describeSync(outcomeOf([], { interrupted: true, error: 'Panne.', complete: false }));
+    expect(broken.paragraphs.join(' ')).not.toContain('terminée');
+  });
+
   it('modifiée des deux côtés : l’encadré dit ce qui est gardé', () => {
     expect(notesOf(describeSync(outcomeOf([item('followed', [OPS.record], { conflicts: ['notes'] })])))).toEqual([
       "1 session modifiée sur les deux appareils : là où les deux ont changé la même chose, c'est la version de l'ordinateur qui est gardée.",
@@ -358,6 +367,28 @@ describe('deux passes, un compte rendu', () => {
     expect(rowsOf(said)).toEqual(['Reçu du téléphone : 1 session', 'Envoyé au téléphone : 1 session']);
     expect(said.rows.flatMap((r) => r.names)).toEqual(['B', 'A']);
     expect(notesOf(said)).toEqual([]);
+  });
+
+  it('première synchronisation suivie d’une réponse qui retire du téléphone : jamais « rien n’a été supprimé », le dossier de la copie reste', () => {
+    const received = item('newOnPhone', [OPS.toComputer]);
+    const first = outcomeOf([received], { first: 'noBase', safetyCopy: 'C:\\copies\\1', complete: false });
+    expect(describeSync(first).paragraphs).toContain("Première synchronisation : rien n'a été supprimé.");
+    const answer = outcomeOf([item('deletedOnComputer', [OPS.remove]), item('deletedOnComputer', [OPS.remove])]);
+    const merged = mergeSyncPasses(first, answer);
+    expect(merged).toMatchObject({ first: 'noBase', safetyCopy: 'C:\\copies\\1' });
+    const said = describeSync(merged);
+    expect(rowsOf(said)).toContain("Supprimé : 2 sessions supprimées sur l'ordinateur, retirées du téléphone : elles restent 30 jours dans la corbeille de l'ordinateur");
+    expect(said.paragraphs).not.toContain("Première synchronisation : rien n'a été supprimé.");
+    expect(said.paragraphs).toContain('Copie de sécurité :');
+    expect(said.folder).toBe('C:\\copies\\1');
+  });
+
+  it('une reprise coupée en route garde le dossier de la copie faite à la première passe', () => {
+    const first = outcomeOf([item('newOnPhone', [OPS.toComputer])], { first: 'noBase', safetyCopy: 'C:\\copies\\1', complete: false, linkLost: 'coupé' });
+    const resumed = outcomeOf([item('newOnComputer', [OPS.toPhone])], { interrupted: true });
+    const said = describeSync(mergeSyncPasses(first, resumed));
+    expect(said.folder).toBe('C:\\copies\\1');
+    expect(said.paragraphs).toContain('Copie de sécurité :');
   });
 
   it('une passe refusée laisse l’issue de la première ; une liaison perdue n’appelle pas de reprise', () => {

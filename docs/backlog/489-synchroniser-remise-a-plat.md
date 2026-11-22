@@ -133,3 +133,11 @@ Essais au vrai téléphone, quatre pour tout le lot : la fenêtre attend puis pa
 - Plans d'origine : `docs/backlog/449-plan-synchroniser.md`, `450-plan-sans-fil.md`, `481-itineraires.md`, `482-sans-fil-deux-sens.md`.
 - Élément 488 (pare-feu demandé par un message) : à part, plus urgent, mais ses messages se relisent ici.
 - Lots 449, 450, 481, 482 et 487 : leurs essais restent à finir sur le programme 0.01.92 ; cette remise à plat ne les bloque pas.
+
+## Fait le 22/11, et ce qui reste noté
+
+Parties commitées dans l'ordre 1A, 1B, 2, 3B, 3A, 4, 5, puis 6 avec les dernières corrections ; la 3B est passée avant la 3A, qui se sert de ses avis de départ. Tranché par l'orchestrateur pendant le code : une copie de la corbeille qui ne se fond pas (trace tronquée ou différente) reste dans la corbeille, et c'est dit, pour qu'aucune trace ne se perde ; fermer la fenêtre pendant une attente vaut « Annuler » ; une liaison perdue reprend seule trois fois au plus, puis « Recommencer » ; aucune adresse réseau dans le journal.
+
+Vu au banc, laissé hors du lot (sans écart avec la planche) :
+- une coupure pendant la copie de sécurité, puis « Annuler », laisse dans le dossier des copies un dossier « … incomplète » sans que la fenêtre le dise ;
+- dans un test synthétique, une coupure juste après l'écriture de l'identifiant du téléphone fait refaire la copie de sécurité à la reprise (une copie de plus, rien de perdu).

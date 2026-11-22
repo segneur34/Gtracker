@@ -70,7 +70,15 @@ describe('rien de personnel', () => {
     expect(sansDonneesPersonnelles('lien externe : https://exemple.org/page?x=1 ouvert')).toBe('lien externe : <adresse> ouvert')
     expect(sansDonneesPersonnelles('find: /sdcard/Documents/Gtracker/sessions/Jean.gpx: refusé')).toBe('find: <chemin> refusé')
     expect(sansDonneesPersonnelles('téléphone parti (silence) : le téléphone ne répond plus.')).toBe('téléphone parti (silence) : le téléphone ne répond plus.')
-    expect(sansDonneesPersonnelles("fenêtre d'appairage ouverte sur 192.168.1.20:48217 à 10:04")).toBe("fenêtre d'appairage ouverte sur 192.168.1.20:48217 à 10:04")
+  })
+
+  it('retire les adresses IPv4, garde le port, les heures et les numéros de version', () => {
+    expect(sansDonneesPersonnelles("fenêtre d'appairage ouverte sur 192.168.1.20:48217 à 10:04")).toBe("fenêtre d'appairage ouverte sur <adresse IP>:48217 à 10:04")
+    expect(sansDonneesPersonnelles('listen EADDRNOTAVAIL: address not available 10.0.0.7:47000.')).toBe('listen EADDRNOTAVAIL: address not available <adresse IP>:47000.')
+    expect(sansDonneesPersonnelles('sans-fil à l\'écoute : 192.168.1.20, 172.16.0.3, port 47000')).toBe('sans-fil à l\'écoute : <adresse IP>, <adresse IP>, port 47000')
+    expect(sansDonneesPersonnelles('client ::ffff:192.168.43.1 refusé')).toBe('client ::ffff:<adresse IP> refusé')
+    expect(sansDonneesPersonnelles('adb trouvé, serveur 1.0.41, outils 35.0.2')).toBe('adb trouvé, serveur 1.0.41, outils 35.0.2')
+    expect(sansDonneesPersonnelles('version 1.2.3.4.5, octet 300.1.1.1')).toBe('version 1.2.3.4.5, octet 300.1.1.1')
   })
 
   it('le journal daté ne prend que le message, la sortie d’essai prend la ligne détaillée', async () => {

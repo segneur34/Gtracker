@@ -464,6 +464,28 @@ describe('ce que la couche du bouton reçoit', () => {
     }
   });
 
+  it('coupure en pleine copie, base déjà écrite : la reprise, paire suivie, redit le dossier de la copie sans la refaire', async () => {
+    let suivies = 0;
+    for (let n = 0; n < 40; n++) {
+      const pair = pairOf();
+      for (const k of [0, 1, 2]) putSyncSession(pair.computer, at(k));
+      for (const k of [3, 4, 5]) putSyncSession(pair.phone, at(k));
+      let copies = 0;
+      const beforeWrites = async (): Promise<string> => `C:\\copies\\${++copies}`;
+      pair.phone.cutAfter(n);
+      const cut = await run(pair, { beforeWrites });
+      pair.phone.cutAfter(null);
+      if (cut.linkLost === null) break;
+      const id = readMarkerId(pair.phone.text('gtracker.json'));
+      if (id === null || pair.computer.text(syncBasePath(id)) === null) continue;
+      suivies++;
+      const resumed = await run(pair, { beforeWrites });
+      expect(resumed, `coupure après ${n}`).toMatchObject({ interrupted: true, complete: true, safetyCopy: 'C:\\copies\\1' });
+      expect(copies, `coupure après ${n}`).toBe(1);
+    }
+    expect(suivies).toBeGreaterThan(0);
+  });
+
   it('coupure après la copie de sécurité : la copie n’est reprise que si elle est récente, sur une horloge avancée ou reculée aussi', async () => {
     const cases: [string, number, number][] = [['une demi-heure plus tard', HOUR / 2, 1], ['deux heures plus tard', 2 * HOUR, 2], ['des mois plus tard', 90 * 24 * HOUR, 2], ['horloge reculée de deux heures', -2 * HOUR, 2]];
     for (const [label, shift, expectedCopies] of cases) {

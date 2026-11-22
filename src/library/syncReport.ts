@@ -530,14 +530,17 @@ export const describeSync = (
 ): SyncReport => {
   if (outcome.refusal !== null) return refusalReport(outcome, safetyFolder);
   const paragraphs: string[] = [];
-  if (outcome.interrupted) paragraphs.push(t("La synchronisation précédente s'était arrêtée en route : elle vient d'être terminée."));
-  // Un téléphone qu'on ne peut pas écrire ne reçoit pas d'identifiant : chaque passe serait « la première ».
-  if (outcome.phoneWritable && outcome.first !== null) paragraphs.push(t("Première synchronisation : rien n'a été supprimé."));
+  const stopped = outcome.linkLost !== null || outcome.error !== null;
+  // Une reprise elle-même arrêtée n'a rien terminé : la note d'arrêt dit seule ce qu'il en est.
+  if (outcome.interrupted && !stopped) paragraphs.push(t("La synchronisation précédente s'était arrêtée en route : elle vient d'être terminée."));
   const rows = gestureRows(outcome);
+  // Un téléphone qu'on ne peut pas écrire ne reçoit pas d'identifiant : chaque passe serait « la première ». Une
+  // première synchronisation jointe à la passe d'une réponse peut avoir supprimé : la phrase se tait alors.
+  const deleted = rows.some((row) => row.label === t('Supprimé'));
+  if (outcome.phoneWritable && outcome.first !== null && !deleted) paragraphs.push(t("Première synchronisation : rien n'a été supprimé."));
   const notes = exceptionNotes(outcome);
   if (answerFailed !== null) notes.push(answerFailureNote(answerFailed));
   if (unanswered !== null) notes.push({ text: unansweredNote(unanswered), detail: null });
-  const stopped = outcome.linkLost !== null || outcome.error !== null;
   const restart = stopped || outcome.failed.length > 0 || outcome.routes.failed.length > 0;
   const nothing = rows.length === 0 && notes.length === 0;
   if (nothing) paragraphs.push(t('Rien à échanger : les deux appareils ont les mêmes sessions et les mêmes itinéraires.'));
