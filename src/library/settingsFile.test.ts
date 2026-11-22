@@ -27,7 +27,11 @@ import {
   settingsFileInfo,
   settingsSignature,
   sortedSettingsFiles,
-  unseenSettingsEntries,
+  answeredWithSeen,
+  settingsDiffer,
+  settingsFingerprint,
+  settingsToOffer,
+  withAnsweredSettings,
   type SettingsEntry,
 } from './settingsFile';
 import { STORAGE_KEYS } from '../core/appIdentity';
@@ -211,18 +215,82 @@ describe('appareils et noms de fichier', () => {
     expect(settingsEntryKey(friend)).not.toBe(settingsEntryKey(pc));
   });
 
-  it("propose les fichiers des autres appareils jamais vus, le plus récent en tête", () => {
-    const seen = new Set([settingsEntryKey(pc)]);
-    expect(unseenSettingsEntries([pc, phone, friend], seen, 'pc')).toEqual([friend, phone]);
-    expect(unseenSettingsEntries([pc, phone, friend], new Set([settingsEntryKey(phone), settingsEntryKey(friend)]), 'pc')).toEqual([]);
-  });
+  describe('bandeau des réglages', () => {
+    const other = (thresholds: Record<string, number>, savedAt = 5000, extra: Record<string, unknown> = {}): SettingsEntry => ({
+      fileName: 'telephone.json',
+      file: buildSettingsFile({ [STORAGE_KEYS.sportSettings]: { thresholds, ...extra } }, savedAt, null, { id: 'tel', name: 'Téléphone' }),
+    });
+    const mine = { [STORAGE_KEYS.sportSettings]: { thresholds: { wingfoil: 9 } } };
 
-  it("ne propose jamais le fichier de l'appareil, même jamais vu", () => {
-    expect(unseenSettingsEntries([pc], new Set(), 'pc')).toEqual([]);
-  });
+    it('ne propose pas des réglages identiques, même jamais répondus', () => {
+      expect(settingsToOffer([pc, other({ wingfoil: 9 })], 'pc', mine, {})).toEqual([]);
+    });
 
-  it('tient pour vus tous les fichiers la première fois', () => {
-    expect(unseenSettingsEntries([pc, phone, friend], null, 'pc')).toEqual([]);
+    it("ne tient compte ni de l'ordre des clés ni des choix retenus", () => {
+      const reordered = { [STORAGE_KEYS.sportSettings]: { moduleActivity: { voile: 'kite' }, thresholds: { wingfoil: 9 } } };
+      expect(settingsDiffer(reordered, { [STORAGE_KEYS.sportSettings]: { thresholds: { wingfoil: 9 }, recordActivity: 'wing' } })).toBe(false);
+      expect(settingsFingerprint(reordered)).toBe(settingsFingerprint(mine));
+      const twoKeys = (a: number, b: number, swap: boolean) => ({ [STORAGE_KEYS.sportSettings]: { thresholds: swap ? { surf: b, wingfoil: a } : { wingfoil: a, surf: b } } });
+      expect(settingsDiffer(twoKeys(9, 3, true), twoKeys(9, 3, false))).toBe(false);
+      expect(settingsFingerprint(twoKeys(9, 3, true))).toBe(settingsFingerprint(twoKeys(9, 3, false)));
+    });
+
+    it('propose des réglages différents, jamais répondus, le plus récent en tête', () => {
+      const tablet: SettingsEntry = { fileName: 'tablette.json', file: buildSettingsFile({ [STORAGE_KEYS.sportSettings]: { thresholds: { wingfoil: 7 } } }, 9000, null, { id: 'tab', name: 'Tablette' }) };
+      const changed = other({ wingfoil: 12 });
+      expect(settingsToOffer([pc, changed, tablet], 'pc', mine, {})).toEqual([tablet, changed]);
+    });
+
+    it("ne propose jamais le fichier de l'appareil, même différent", () => {
+      const own: SettingsEntry = { fileName: 'pc.json', file: buildSettingsFile({ [STORAGE_KEYS.sportSettings]: { thresholds: { wingfoil: 4 } } }, 1, null, { id: 'pc', name: 'PC' }) };
+      expect(settingsToOffer([own], 'pc', mine, {})).toEqual([]);
+    });
+
+    it('gardés et inchangés là-bas : plus de bandeau, même si les miens changent', () => {
+      const theirs = other({ wingfoil: 12 });
+      const answered = withAnsweredSettings({}, [theirs]);
+      expect(settingsToOffer([pc, theirs], 'pc', mine, answered)).toEqual([]);
+      const mineChanged = { [STORAGE_KEYS.sportSettings]: { thresholds: { wingfoil: 6 } } };
+      expect(settingsToOffer([pc, theirs], 'pc', mineChanged, answered)).toEqual([]);
+      // Ouvrir une session ou choisir l'activité d'un enregistrement là-bas n'est pas changer un réglage.
+      const reopened = other({ wingfoil: 12 }, 8000, { moduleActivity: { voile: 'kite' } });
+      expect(settingsToOffer([pc, reopened], 'pc', mine, answered)).toEqual([]);
+    });
+
+    it('gardés puis changés là-bas : le bandeau revient', () => {
+      const answered = withAnsweredSettings({}, [other({ wingfoil: 12 })]);
+      const changedAgain = other({ wingfoil: 14 }, 8000);
+      expect(settingsToOffer([pc, changedAgain], 'pc', mine, answered)).toEqual([changedAgain]);
+    });
+
+    it("relit l'ancienne liste des fichiers vus : un fichier vu est tenu pour répondu tel qu'il est", () => {
+      const theirs = other({ wingfoil: 12 });
+      const merged = answeredWithSeen(null, new Set([settingsEntryKey(theirs)]), [pc, theirs]);
+      expect(merged).toEqual({ [settingsEntryKey(theirs)]: settingsFingerprint(theirs.file.values) });
+      expect(settingsToOffer([pc, theirs], 'pc', mine, merged)).toEqual([]);
+      expect(settingsToOffer([pc, other({ wingfoil: 14 })], 'pc', mine, merged)).toHaveLength(1);
+      // Une réponse déjà retenue prime sur l'ancienne liste.
+      expect(answeredWithSeen({ [settingsEntryKey(theirs)]: 'x' }, new Set([settingsEntryKey(theirs)]), [theirs])).toEqual({ [settingsEntryKey(theirs)]: 'x' });
+      // Sans ancienne liste, un fichier jamais répondu et différent est proposé.
+      expect(settingsToOffer([pc, theirs], 'pc', mine, answeredWithSeen(null, null, [pc, theirs]))).toEqual([theirs]);
+    });
+
+    it("vu dans l'ancienne liste, puis changé là-bas : le bandeau revient, l'empreinte retenue restant celle du passage", () => {
+      const seen = new Set([settingsEntryKey(other({ wingfoil: 12 }))]);
+      // Premier passage, réponses vides : l'empreinte du fichier tel qu'il est est ajoutée (et l'appareil l'écrit).
+      const first = answeredWithSeen(null, seen, [pc, other({ wingfoil: 12 })]);
+      expect(settingsToOffer([pc, other({ wingfoil: 12 })], 'pc', mine, first)).toEqual([]);
+      // L'autre appareil change un seuil : l'ancienne liste relue ne remplace pas la réponse écrite.
+      const changed = other({ wingfoil: 14 }, 8000);
+      const second = answeredWithSeen(first, seen, [pc, changed]);
+      expect(second).toEqual(first);
+      expect(settingsToOffer([pc, changed], 'pc', mine, second)).toEqual([changed]);
+    });
+
+    it('ne propose que ce qu’une reprise changerait : une clé absente de leur fichier ne compte pas', () => {
+      const profileOnlyHere = { ...mine, [STORAGE_KEYS.athleteProfile]: { voile: EMPTY_ATHLETE_PROFILE } };
+      expect(settingsToOffer([other({ wingfoil: 9 })], 'pc', profileOnlyHere, {})).toEqual([]);
+    });
   });
 
   it("range un fichier importé sous le nom de son appareil, sans écraser celui d'un autre", () => {

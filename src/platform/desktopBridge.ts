@@ -149,10 +149,39 @@ export interface DesktopPhoneBridge {
   effacer?(argument: { chemin: string }): Promise<BridgeAnswer<null>>;
   /**
    * Copie de sécurité d'avant une première synchronisation : le dossier mémoire retenu et ce que liste le téléphone,
-   * copiés sous `<Documents>\Gtracker-copies\<date et heure>\`. Rend le chemin absolu de la copie, à montrer. Absent
+   * copiés sous `<dossier des copies>\<date et heure>\`. Rend le chemin absolu de la copie, à montrer. Absent
    * d'une coquille plus ancienne.
    */
   copieSecurite?(): Promise<BridgeAnswer<string>>;
+  /**
+   * Le dossier des copies de sécurité : celui choisi par l'utilisateur, sinon `<Documents>\Gtracker-copies`. Absent
+   * d'une coquille plus ancienne (le dossier est alors celui-là, sans choix).
+   */
+  dossierCopies?(): Promise<BridgeAnswer<string>>;
+  /**
+   * Fenêtre de choix d'un dossier de Windows (titre facultatif), partie du dossier actuel ; le dossier choisi est
+   * retenu par le programme, sauf s'il est dans la mémoire ou la contient. Absent d'une coquille plus ancienne.
+   */
+  choisirDossierCopies?(argument?: { titre?: string }): Promise<BridgeAnswer<DesktopCopiesChoice>>;
+  /**
+   * Ouvre dans l'explorateur de Windows le dossier des copies ou une copie (chemin rendu par `copieSecurite`) ; tout
+   * autre chemin reçoit `PERMISSION`. Absent d'une coquille plus ancienne.
+   */
+  ouvrirCopie?(argument: { chemin: string }): Promise<BridgeAnswer<null>>;
+  /**
+   * Le rappel reçoit l'avancement de chaque copie de sécurité (`{ fait, total }`, en fichiers) ; rend la fonction qui
+   * se désabonne. Absent d'une coquille plus ancienne.
+   */
+  surAvancementCopie?(rappel: (avis: unknown) => void): () => void;
+}
+
+/**
+ * Issue du choix du dossier des copies : retenu, fenêtre fermée sans choix, ou refusé parce qu'il est dans la mémoire
+ * ou la contient ; `dossier` est le dossier des copies après le choix.
+ */
+export interface DesktopCopiesChoice {
+  issue: 'choisi' | 'annule' | 'memoire';
+  dossier: string;
 }
 
 /**

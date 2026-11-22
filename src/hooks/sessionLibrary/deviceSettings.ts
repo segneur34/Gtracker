@@ -3,8 +3,8 @@ import { SETTINGS_DIR, settingsPath } from '../../library/folderLayout';
 import {
   DEFAULT_DEVICE_NAMES, TRAVELLING_KEYS, adoptedGearValues, adoptedValues, buildSettingsFile, cleanDeviceName, deviceFileName, deviceNameText,
   freeDeviceName, importedSettingsFileName, newestSettingsEntry, ownSettingsEntry, parseSettingsFile,
-  serializeSettingsFile, settingsEntryKey, settingsEntryName, settingsFileInfo, settingsSignature,
-  sortedSettingsFiles, unseenSettingsEntries, type SettingsEntry, type SettingsFileInfo,
+  answeredWithSeen, serializeSettingsFile, settingsEntryName, settingsFileInfo, settingsSignature,
+  settingsToOffer, sortedSettingsFiles, withAnsweredSettings, type SettingsEntry, type SettingsFileInfo,
 } from '../../library/settingsFile';
 import { readPickedFile } from '../../platform/files';
 import type { MemoryFolder } from '../../platform/memoryFolder';
@@ -15,7 +15,7 @@ import { syncRestingHrFile } from '../restingHrFile';
 import { syncLearnedPlacesFile } from '../learnedPlacesFile';
 import { PLACE_RULES } from '../../library/places';
 import { ownSettingsFiles } from '../../library/resetPlan';
-import { errorMessage, finiteOr, newId } from '../../core/basics';
+import { errorMessage, finiteOr, isObject, newId } from '../../core/basics';
 import { libraryState, reportError, setState } from './store';
 import { lib, unwritten } from './memory';
 import { cancelRecordWrite, recordTimers, writeRecordNow } from './recordWrites';
@@ -52,8 +52,14 @@ const DEVICE_ID_KEY = STORAGE_KEYS.deviceId;
 
 const DEVICE_NAME_KEY = STORAGE_KEYS.deviceName;
 
-/** Fichiers de réglages déjà vus par l'appareil (`settingsEntryKey`) : un nouveau n'est proposé qu'une fois. */
+/**
+ * Ancienne liste des fichiers de réglages déjà vus (`settingsEntryKey`), d'avant les deux réponses du bandeau :
+ * relue seulement, un fichier déjà vu étant tenu pour répondu tel qu'il est (`answeredWithSeen`).
+ */
 const SEEN_SETTINGS_KEY = STORAGE_KEYS.seenSettingsFiles;
+
+/** Réponse au bandeau des réglages pour chaque fichier d'un autre appareil (`AnsweredSettings`). */
+const ANSWERED_SETTINGS_KEY = STORAGE_KEYS.answeredSettings;
 
 const SETTINGS_WRITE_DELAY_MS = 2000;
 
@@ -218,30 +224,58 @@ const flushSettings = async (): Promise<void> => {
   }
 };
 
-/** Fichiers de réglages déjà vus (`settingsEntryKey`) ; `null` avant le premier rapprochement qui les retient. */
+/** Ancienne liste des fichiers déjà vus (`settingsEntryKey`) ; `null` si l'appareil n'en a pas. */
 const readSeenSettings = (): Set<string> | null => {
   const raw = jsonStore.read<unknown>(SEEN_SETTINGS_KEY);
   return Array.isArray(raw) ? new Set(raw.filter((key): key is string => typeof key === 'string')) : null;
 };
 
-const markSettingsSeen = (entries: readonly SettingsEntry[]): void => {
-  jsonStore.write(SEEN_SETTINGS_KEY, [...new Set([...(readSeenSettings() ?? []), ...entries.map(settingsEntryKey)])]);
+/**
+ * Réponses retenues, complétées par l'ancienne liste des fichiers vus pour les fichiers lus. Ce complément est
+ * écrit aussitôt : l'empreinte d'un fichier vu est celle du jour où il est passé de l'ancienne liste aux réponses,
+ * et le bandeau revient dès que l'autre appareil change ses réglages.
+ */
+const readAnsweredSettings = (): Record<string, string> => {
+  const raw = jsonStore.read<unknown>(ANSWERED_SETTINGS_KEY);
+  const answered = isObject(raw)
+    ? Object.fromEntries(Object.entries(raw).filter((pair): pair is [string, string] => typeof pair[1] === 'string'))
+    : null;
+  const merged = answeredWithSeen(answered, readSeenSettings(), settingsEntries);
+  // `answeredWithSeen` ne fait qu'ajouter : une clé de plus est un fichier vu qui passe aux réponses.
+  if (Object.keys(merged).length !== Object.keys(answered ?? {}).length) jsonStore.write(ANSWERED_SETTINGS_KEY, merged);
+  return merged;
+};
+
+/** Retient la réponse donnée pour chacun de `entries`, tels qu'ils sont : ils ne reviennent que s'ils changent. */
+const markSettingsAnswered = (entries: readonly SettingsEntry[]): void => {
+  jsonStore.write(ANSWERED_SETTINGS_KEY, withAnsweredSettings(readAnsweredSettings(), entries));
 };
 
 /**
- * Propose, une fois, le plus récent des fichiers d'autres appareils que
- * celui-ci n'a jamais vus (« Nouveau fichier de réglages »), puis les tient
- * tous pour vus. Rien quand l'appareil vient de reprendre tout seul le plus
- * récent. Une proposition encore affichée reste tant que son fichier est là.
+ * Propose, s'il y en a, les réglages d'un autre appareil qui diffèrent de ceux-ci et ont changé depuis la dernière
+ * réponse (`settingsToOffer`) : le bandeau reste jusqu'à « Garder les miens » ou « Prendre ceux de … ». Rien quand
+ * l'appareil vient de reprendre tout seul le plus récent : les fichiers déjà là sont tenus pour répondus. Une
+ * proposition affichée reste la même tant qu'elle vaut.
  */
 const offerNewSettings = (autoAdopted: boolean): void => {
   const id = deviceId();
-  const seen = readSeenSettings();
-  const fresh = autoAdopted ? [] : unseenSettingsEntries(settingsEntries, seen, id);
-  markSettingsSeen(settingsEntries);
+  if (autoAdopted) markSettingsAnswered(settingsEntries.filter((e) => e.file.device?.id !== id));
+  const offers = settingsToOffer(settingsEntries, id, localTravellingValues(), readAnsweredSettings());
   const previous = libraryState().settingsOffer;
-  const offer = fresh[0] ?? (previous ? settingsEntries.find((e) => e.fileName === previous.fileName) : undefined);
+  const offer = (previous ? offers.find((e) => e.fileName === previous.fileName) : undefined) ?? offers[0];
   setState({ settingsOffer: offer ? settingsFileInfo(offer, id) : null });
+};
+
+/**
+ * « Garder les miens » : les réglages de l'appareil restent ; la réponse est retenue pour le fichier `fileName`, tel
+ * qu'il est, qui ne revient que si l'autre appareil change les siens. Le bandeau passe à un autre fichier à
+ * proposer, s'il y en a.
+ */
+export const keepOwnSettings = (fileName: string): void => {
+  const entry = settingsEntries.find((e) => e.fileName === fileName);
+  if (entry) markSettingsAnswered([entry]);
+  setState({ settingsOffer: null });
+  offerNewSettings(false);
 };
 
 /** Remplace les réglages de l'appareil par `values`, clé par clé ; rend vrai si l'un d'eux a changé. */
@@ -270,8 +304,8 @@ const applySettingsValues = (values: Record<string, unknown>): boolean => {
  *   du dossier, et le dit.
  * - Sinon, les réglages de l'appareil sont les siens, quoi que contiennent
  *   les autres fichiers.
- * L'appareil écrit ensuite son fichier s'il manque ou diffère. Le fichier
- * d'un autre appareil qu'il n'avait jamais vu lui est proposé (`offerNewSettings`).
+ * L'appareil écrit ensuite son fichier s'il manque ou diffère. Les réglages
+ * d'un autre appareil qui diffèrent des siens lui sont proposés (`offerNewSettings`).
  */
 const syncSettings = async (f: MemoryFolder): Promise<boolean> => {
   const id = deviceId();
@@ -341,6 +375,8 @@ export const adoptSettingsFile = async (fileName: string): Promise<void> => {
     jsonStore.write(SETTINGS_SAVED_AT_KEY, now);
     lastSignature = settingsSignature(localTravellingValues());
     await readSettingsEntries(f);
+    // Réponse retenue : ses réglages ne sont plus proposés tant que l'autre appareil ne les change pas.
+    markSettingsAnswered([{ fileName, file }]);
     await writeOwnSettings(f, now);
     setState({ message: t('Réglages repris de « {name} ».', { name: deviceNameText(settingsEntryName({ fileName, file })) }), settingsOffer: null });
     await applySettingsChange(true);
@@ -432,7 +468,7 @@ export const renameDevice = async (raw: string): Promise<string | null> => {
 /**
  * « Importer un fichier de réglages » (Réglages › Mémoire) : le fichier
  * choisi est rangé tel quel dans `reglages/`, comme s'il y avait été déposé,
- * et tenu pour vu (le bandeau ne le propose pas). Il sert là où l'on ne peut
+ * et tenu pour répondu (le bandeau ne le propose pas : la question suit l'import). Il sert là où l'on ne peut
  * rien déposer à la main : la mémoire du navigateur (Firefox). Rend le
  * fichier rangé, ou la raison d'un refus.
  */
@@ -452,7 +488,7 @@ export const importSettingsFile = async (picked: File): Promise<{ file: Settings
     await f.writeText(settingsPath(fileName), text);
     const entry: SettingsEntry = { fileName, file };
     settingsEntries = [...settingsEntries.filter((e) => e.fileName !== fileName), entry];
-    markSettingsSeen([entry]);
+    markSettingsAnswered([entry]);
     publishSettingsFiles();
     return { file: settingsFileInfo(entry, id) };
   } catch (err) {

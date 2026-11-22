@@ -37,7 +37,7 @@ function CableHelp({ toolFolder }: { toolFolder: string | null }) {
 }
 
 /**
- * Le téléphone sans câble, dans Réglages › Mémoire, programme Windows seulement (rien dans le navigateur ni sur le
+ * Le téléphone, relié sans câble, dans Réglages › Mémoire, programme Windows seulement (rien dans le navigateur ni sur le
  * téléphone) : la case qui allume le sans-fil (éteint par défaut, avec la phrase qui prévient que Windows va demander
  * l'autorisation), son état, le pare-feu de Windows quand il bloque (avec « Autoriser Gtracker » si l'autorisation
  * suffit), « Relier un téléphone » (adresse, code et temps restant en grand, jusqu'à la liaison ou
@@ -83,9 +83,9 @@ function WirelessPhoneCard() {
 
   return (
     <div className="ui-stack-3 wireless-card" ref={cardRef}>
-      <strong className="wireless-card__title">{t('Téléphone sans câble')}</strong>
+      <strong className="wireless-card__title">{t('Téléphone')}</strong>
       <p className="ui-muted ui-text-s ui-m-0">
-        {t("Gtracker relie votre téléphone à cet ordinateur dès que vous l'ouvrez sur le téléphone, relié au même réseau que l'ordinateur : la même box Wi-Fi, ou un partage de connexion entre les deux. Cliquez ensuite sur « Synchroniser », en haut : les sessions et les itinéraires se copient dans les deux sens, sans câble, si le téléphone a la dernière version de Gtracker ; sinon, ce qui doit aller sur le téléphone attend le câble.")}
+        {t("Reliez votre téléphone une fois, par un code. Ensuite, ouvrez Gtracker sur le téléphone, sur le même réseau que cet ordinateur (la même box Wi-Fi, ou un partage de connexion), puis cliquez sur « Synchroniser », en haut.")}
       </p>
       <label className="ui-row-s2 ui-center">
         <input type="checkbox" className="wireless-card__toggle" checked={active} disabled={busy || state === null}

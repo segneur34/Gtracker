@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptySyncOutcome, type SyncOutcome } from '../../library/syncOutcome';
+import { describePhoneSync } from '../../library/syncReport';
 import type { SyncItem } from '../../library/syncPlan';
 import type { RouteSyncItem } from '../../library/syncRoutes';
 import type { SyncLockOptions } from './sync';
@@ -44,7 +45,27 @@ const load = async () => {
     phoneListsRoutes: (s: State) => s.etat === 'pret' && s.itineraires === true,
     phoneIsRecording: (s: State) => s.etat === 'pret' && s.enregistrement === true,
     phoneMemoryFolder: (label: string) => ({ label }),
-    phoneSafetyCopy: async () => 'C:\\copies\\x',
+    phoneSafetyCopy: async () => {
+      await copyGate;
+      if (copyFails) throw new Error('disque plein');
+      copies.push('C:\\copies\\x');
+      return 'C:\\copies\\x';
+    },
+    safetyCopyFolder: async () => copyFolder,
+    chooseSafetyCopyFolder: async (title?: string) => {
+      chooseTitles.push(title ?? '');
+      return choice;
+    },
+    onSafetyCopyProgress: (listener: (p: { done: number; total: number }) => void) => {
+      copyListeners.push(listener);
+      return () => {
+        copyListeners = copyListeners.filter((l) => l !== listener);
+      };
+    },
+    openSafetyCopy: async (path: string) => {
+      if (path === 'refusé') throw new Error('Seuls le dossier des copies de sécurité et ses copies s’ouvrent ici.');
+      opened.push(path);
+    },
   }));
   vi.doMock('../../platform/wirelessPhone', () => ({
     wirelessAvailable: () => wirelessOn,
@@ -67,6 +88,14 @@ const load = async () => {
   vi.doMock('./sync', () => ({
     synchronizePhone: async (_folder: unknown, options: SyncLockOptions) => {
       calls.push(options);
+      // Comme l'exécutant : la copie de sécurité seulement à une première rencontre d'un téléphone qu'on peut écrire.
+      if (firstMeeting && options.phoneWritable && options.beforeWrites) {
+        try {
+          await options.beforeWrites('noBase');
+        } catch (err) {
+          return { ...emptySyncOutcome('safetyCopy'), first: 'noBase', error: err instanceof Error ? err.message : String(err) };
+        }
+      }
       options.onPlanned?.({} as never, 'noBase');
       options.onProgress?.(3, 5);
       if (failNext) {
@@ -90,8 +119,26 @@ const READY: State = { etat: 'pret', nom: 'Xiaomi', canal: 'cable', ecriture: tr
 let stateQueue: State[];
 /** Panne levée par la prochaine synchronisation. */
 let failNext: Error | null;
+let firstMeeting: boolean;
+let copyGate: Promise<void>;
+let copyFails: boolean;
+let copies: string[];
+let copyFolder: string | null;
+let choice: { outcome: 'chosen' | 'cancelled' | 'insideMemory'; folder: string };
+let chooseTitles: string[];
+let copyListeners: ((p: { done: number; total: number }) => void)[];
+let opened: string[];
 
 beforeEach(() => {
+  firstMeeting = false;
+  copyGate = Promise.resolve();
+  copyFails = false;
+  copies = [];
+  copyFolder = 'C:\\Documents\\Gtracker-copies';
+  choice = { outcome: 'chosen', folder: 'D:\\Copies' };
+  chooseTitles = [];
+  copyListeners = [];
+  opened = [];
   state = { etat: 'pret', nom: 'Xiaomi', canal: 'cable', ecriture: true, itineraires: true };
   calls = [];
   outcomes = [];
@@ -121,9 +168,7 @@ describe('bouton « Synchroniser »', () => {
     expect(steps).toEqual(['searching']);
     expect(calls[0]).toMatchObject({ phoneWritable: true, phonePath: 'Documents/Gtracker', recording, phoneRoutes: true });
     expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced', phone: 'Xiaomi', channel: 'cable' } });
-    // Les rappels publient leur étape : copie de sécurité, puis avancement d'une première synchronisation.
-    expect(await calls[0].beforeWrites?.('noBase')).toBe('C:\\copies\\x');
-    expect(sync.phoneSyncStep()).toEqual({ step: 'safetyCopy', phone: 'Xiaomi', channel: 'cable' });
+    // Les rappels publient leur étape : avancement d'une première synchronisation.
     calls[0].onPlanned?.({} as never, 'noBase');
     calls[0].onProgress?.(12, 50);
     expect(sync.phoneSyncStep()).toEqual({ step: 'copying', phone: 'Xiaomi', channel: 'cable', done: 12, total: 50, first: true });
@@ -142,7 +187,7 @@ describe('bouton « Synchroniser »', () => {
     const sync = await load();
     await sync.synchronizeWithPhone();
     expect(calls[0]).toMatchObject({ phoneWritable: true, phoneRoutes: true, phoneRecording: false });
-    expect(await calls[0].beforeWrites?.('noBase')).toBe('C:\\copies\\x');
+    expect(calls[0].beforeWrites).toBeTypeOf('function');
     calls[0].onPlanned?.({} as never, 'noBase');
     expect(sync.phoneSyncStep()).toMatchObject({ step: 'copying', channel: 'sansFil', first: true });
   });
@@ -154,6 +199,129 @@ describe('bouton « Synchroniser »', () => {
     expect(calls[0]).toMatchObject({ phoneWritable: false, phoneRoutes: true, phoneRecording: true });
   });
 
+});
+
+describe('première synchronisation : écran de départ et copie de sécurité', () => {
+  const stepIs = async (sync: Awaited<ReturnType<typeof load>>, step: string) => {
+    await vi.waitFor(() => expect(sync.phoneSyncStep().step).toBe(step));
+  };
+
+  it('première rencontre d’un téléphone qui s’écrit : l’écran dit le dossier ; un autre dossier choisi, puis « Commencer » ; avancement de la copie', async () => {
+    firstMeeting = true;
+    let release: () => void = () => undefined;
+    copyGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    await stepIs(sync, 'firstStart');
+    expect(sync.phoneSyncStep()).toEqual({
+      step: 'firstStart', phone: 'Xiaomi', channel: 'cable', folder: 'C:\\Documents\\Gtracker-copies', choosing: false, problem: null,
+    });
+    expect(copies).toEqual([]);
+    await sync.chooseFirstSyncFolder();
+    expect(chooseTitles).toEqual(['Dossier des copies de sécurité']);
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'firstStart', folder: 'D:\\Copies', choosing: false, problem: null });
+    sync.startFirstSync();
+    await stepIs(sync, 'safetyCopy');
+    expect(sync.phoneSyncStep()).toEqual({ step: 'safetyCopy', phone: 'Xiaomi', channel: 'cable', done: 0, total: 0 });
+    copyListeners.forEach((listener) => listener({ done: 30, total: 120 }));
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'safetyCopy', done: 30, total: 120 });
+    release();
+    await done;
+    expect(copies).toEqual(['C:\\copies\\x']);
+    expect(copyListeners).toEqual([]);
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced', safetyFolder: 'D:\\Copies' } });
+  });
+
+  it('un dossier dans la mémoire est refusé : la phrase est dite, le dossier ne change pas', async () => {
+    firstMeeting = true;
+    choice = { outcome: 'insideMemory', folder: 'C:\\Documents\\Gtracker-copies' };
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    await stepIs(sync, 'firstStart');
+    await sync.chooseFirstSyncFolder();
+    expect(sync.phoneSyncStep()).toMatchObject({
+      step: 'firstStart', folder: 'C:\\Documents\\Gtracker-copies',
+      problem: 'Les copies ne peuvent pas aller dans la mémoire de cet ordinateur : choisissez un autre dossier.',
+    });
+    sync.startFirstSync();
+    await done;
+    expect(copies).toHaveLength(1);
+  });
+
+  it('pas de première rencontre, ou un téléphone qui ne s’écrit pas : aucun écran de départ, la synchronisation va au bout seule', async () => {
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    expect(sync.phoneSyncStep().step).toBe('over');
+    firstMeeting = true;
+    state = { etat: 'pret', nom: 'Xiaomi', canal: 'sansFil', ecriture: false };
+    await sync.synchronizeWithPhone();
+    expect(sync.phoneSyncStep().step).toBe('over');
+    expect(copies).toEqual([]);
+  });
+
+  it('l’écran de départ fermé sans « Commencer » : rien n’est copié ni synchronisé, la fenêtre revient au repos', async () => {
+    firstMeeting = true;
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    await stepIs(sync, 'firstStart');
+    sync.declineFirstSync();
+    await done;
+    expect(copies).toEqual([]);
+    expect(sync.phoneSyncStep()).toEqual({ step: 'idle' });
+  });
+
+  it('programme plus ancien : l’écran sans dossier, la copie sans nombres', async () => {
+    firstMeeting = true;
+    copyFolder = null;
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    await stepIs(sync, 'firstStart');
+    expect(sync.phoneSyncStep()).toMatchObject({ folder: null });
+    sync.startFirstSync();
+    await done;
+    const step = sync.phoneSyncStep();
+    expect(step.step === 'over' && step.result.kind === 'synced' && step.result.safetyFolder).toBeUndefined();
+  });
+
+  it('la copie qui échoue : le compte rendu dit dans quel dossier, avec « Choisir un autre dossier » et « Recommencer »', async () => {
+    firstMeeting = true;
+    copyFails = true;
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    await stepIs(sync, 'firstStart');
+    sync.startFirstSync();
+    await done;
+    const step = sync.phoneSyncStep();
+    if (step.step !== 'over') throw new Error('compte rendu attendu');
+    expect(describePhoneSync(step.result)).toMatchObject({
+      paragraphs: ["La copie de sécurité n'a pas pu être faite dans « C:\\Documents\\Gtracker-copies » : rien n'a été synchronisé."],
+      detail: 'disque plein', action: 'restart', chooseFolder: true,
+    });
+  });
+
+  it('le téléphone parti pendant l’écran de départ : la copie ratée n’accuse pas le dossier, la fenêtre attend le téléphone', async () => {
+    firstMeeting = true;
+    copyFails = true;
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    await stepIs(sync, 'firstStart');
+    state = { etat: 'absent' };
+    sync.startFirstSync();
+    await stepIs(sync, 'waiting');
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'waiting', wait: { reason: 'lost', detail: 'disque plein' } });
+    sync.cancelPhoneSyncWait();
+    await done;
+    expect(sync.phoneSyncStep()).toEqual({ step: 'idle' });
+  });
+
+  it('« Ouvrir le dossier » ouvre la copie ; un refus du programme rend sa phrase', async () => {
+    const sync = await load();
+    expect(await sync.openSafetyCopyFolder('C:\\copies\\x')).toBeNull();
+    expect(opened).toEqual(['C:\\copies\\x']);
+    expect(await sync.openSafetyCopyFolder('refusé')).toBe('Seuls le dossier des copies de sécurité et ses copies s’ouvrent ici.');
+  });
 });
 
 describe('questions et réponses', () => {

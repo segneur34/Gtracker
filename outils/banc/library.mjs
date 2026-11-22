@@ -260,14 +260,15 @@ autres.device = { id: 'autre-appareil', name: 'Téléphone' };
 autres.values[CLES.sportSettings] = { ...autres.values[CLES.sportSettings], thresholds: { wingfoil: 11 } };
 console.log('écriture :', await writeOpfs('reglages/telephone.json', JSON.stringify(autres)));
 await go('/parametres', 3500);
-// Le fichier de l'autre appareil est annoncé dans la carte Mémoire (« Nouveau fichier de réglages : Téléphone », Reprendre, Fermer).
-await waitFor(`/Nouveau fichier de réglages : Téléphone/.test(document.body.innerText)`, { timeout: 4000, label: "fichier de l'autre appareil annoncé" });
+// Les réglages de l'autre appareil, différents, sont proposés dans la carte Mémoire (« Garder les miens », « Prendre ceux de « Téléphone » »).
+const ANNONCE = /Les réglages de « Téléphone » sont différents de ceux de cet ordinateur/;
+await waitFor(`${ANNONCE}.test(document.body.innerText)`, { timeout: 4000, label: "réglages de l'autre appareil proposés" });
 const apresAutre = await evaluate(`localStorage.getItem('${CLES.sportSettings}')`);
 console.log('stockage de l\'appareil inchangé :', apresAutre === avant);
-console.log(await lines(/Nouveau fichier de réglages/));
+console.log(await lines(/sont différents de ceux de/));
 check('les réglages de l\'appareil ne sont pas remplacés par ceux de l\'autre', apresAutre === avant && !String(apresAutre).includes('"wingfoil":11'));
-check('le fichier de l\'autre appareil est annoncé, avec « Reprendre »', /Nouveau fichier de réglages : Téléphone/.test(await evaluate('document.body.innerText'))
-  && (await evaluate(`[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Reprendre')`)));
+check('les réglages de l\'autre appareil sont proposés, avec les deux réponses', ANNONCE.test(await evaluate('document.body.innerText'))
+  && (await evaluate(`['Garder les miens', 'Prendre ceux de « Téléphone »'].every((t) => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === t))`)));
 
 console.log('\n--- console (erreurs, avertissements) ---');
 [...new Set(logs)].slice(0, 15).forEach((l) => console.log(l));

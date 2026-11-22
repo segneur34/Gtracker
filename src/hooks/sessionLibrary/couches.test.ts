@@ -26,14 +26,14 @@ const LAYERS = [
 /** Valeurs exportées par le point d'entrée, les mêmes qu'avant le découpage (et cinq types). */
 const ENTRY_VALUES = [
   'adoptSettingsFile', 'adoptSettingsGear', 'answerImportQuestion', 'canChooseMemoryFolder', 'canImportSessions', 'chooseFolder', 'correctSessionPlace', 'countErasable', 'currentMemoryFolder', 'dismissIncomingNotice', 'dismissLibraryMessage',
-  'dismissSettingsOffer', 'eraseEverything', 'factoryReset', 'stashRoute', 'trashStore', 'deleteFromTrash', 'emptyWholeTrash', 'restoreFromTrash', 'findLibrarySession', 'hasSessionMotion', 'importEntries', 'importFiles', 'importFromFolder',
+  'keepOwnSettings', 'eraseEverything', 'factoryReset', 'stashRoute', 'trashStore', 'deleteFromTrash', 'emptyWholeTrash', 'restoreFromTrash', 'findLibrarySession', 'hasSessionMotion', 'importEntries', 'importFiles', 'importFromFolder',
   'importSettingsFile', 'librarySession', 'loadFullSession', 'loadSessionGpx', 'openLibrary', 'queueOutdatedRefresh',
   'queueSessionPlace', 'readLibraryState', 'readSessionExport', 'readSessionGpx', 'readSessionMotion', 'reconnectFolder', 'refreshLibrary', 'reloadAfterWrites',
   'removeSession', 'renameDevice', 'reportStartupError', 'saveRecordedSession', 'settingsFileValues', 'startIncomingFiles', 'startLibraryUi',
   'summarizeGpxText', 'switchToBrowserMemory', 'updateSessionRecord', 'useLibraryFields', 'useLibrarySelector',
   'useLibrarySession',
-  'answerPhoneSyncQuestion', 'authorizePhoneSyncFirewall', 'cancelPhoneSyncWait', 'leavePhoneSyncQuestion', 'phoneSyncStep', 'reopenPhoneSyncQuestion',
-  'synchronizeWithPhone', 'usePhoneSync',
+  'answerPhoneSyncQuestion', 'authorizePhoneSyncFirewall', 'cancelPhoneSyncWait', 'chooseFirstSyncFolder', 'declineFirstSync', 'leavePhoneSyncQuestion',
+  'openSafetyCopyFolder', 'phoneSyncStep', 'pickSafetyFolder', 'reopenPhoneSyncQuestion', 'startFirstSync', 'synchronizeWithPhone', 'usePhoneSync',
 ];
 const ENTRY_TYPES = [
   'AddResult', 'AddStatus', 'LibraryState', 'LibraryStatus', 'PhoneSyncAnswer', 'PhoneSyncStep',

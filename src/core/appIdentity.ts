@@ -74,6 +74,8 @@ export const STORAGE_KEYS = {
   deviceId: `${FORMAT_ID}.deviceId` as const,
   deviceName: `${FORMAT_ID}.deviceName` as const,
   seenSettingsFiles: `${FORMAT_ID}.seenSettingsFiles` as const,
+  /** Réponse au bandeau des réglages d'un autre appareil, par fichier (`library/settingsFile.ts`, `AnsweredSettings`). */
+  answeredSettings: `${FORMAT_ID}.answeredSettings` as const,
   summaryGestures: `${FORMAT_ID}.summaryGestures` as const,
   followedTrace: `${FORMAT_ID}.followedTrace` as const,
   fondCarte: `${FORMAT_ID}.fondCarte` as const,

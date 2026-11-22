@@ -41,6 +41,7 @@ export const KEY_CLASSES: Record<keyof typeof STORAGE_KEYS, KeyClass> = {
   deviceId: 'donnee',
   deviceName: 'donnee',
   seenSettingsFiles: 'reglage',
+  answeredSettings: 'reglage',
   summaryGestures: 'donnee',
   followedTrace: 'donnee',
   fondCarte: 'reglage',

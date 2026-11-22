@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DesktopPhoneBridge } from './desktopBridge';
-import { listPhoneFiles, phoneCableAvailable, phoneCanWrite, phoneImportEntries, phoneIsRecording, phoneListsRoutes, phoneMemoryFolder, phoneState } from './phoneCable';
+import {
+  chooseSafetyCopyFolder, listPhoneFiles, onSafetyCopyProgress, openSafetyCopy, phoneCableAvailable, phoneCanWrite, phoneImportEntries, phoneIsRecording,
+  phoneListsRoutes, phoneMemoryFolder, phoneState, safetyCopyFolder, safetyCopyFolderChoosable, safetyCopyOpenable,
+} from './phoneCable';
 
 /**
  * Le téléphone branché, vu de la page : le pont est le vrai code de la coquille (`bureau/telephone.ts`), sur un
@@ -191,5 +194,90 @@ describe('téléphone branché par câble', () => {
     const { entries, unplugged } = phoneImportEntries(['sessions/z.gpx']);
     await expect(entries[0].readText()).rejects.toThrow();
     expect(unplugged()).toBe(false);
+  });
+});
+
+interface ShellCopies {
+  reglageCopies(options: { profil: string; defaut: string; memoire?: () => Promise<string | null> }): unknown;
+  gestionnairesCopies(options: {
+    reglage: unknown;
+    choisirDossier: (demande: { titre: string; depart: string }) => Promise<string | null>;
+    ouvrirDossier: (chemin: string) => Promise<void>;
+  }): Record<string, (argument: unknown) => Promise<Reponse>>;
+}
+const SHELL_COPIES = fileURLToPath(new URL('../../bureau/copieSecurite.ts', import.meta.url));
+const copiesShell = (await import(/* @vite-ignore */ SHELL_COPIES)) as ShellCopies;
+
+describe('dossier des copies de sécurité', () => {
+  /** Le programme Windows à jour, dossier des copies joué par la coquille sur `tmp`. */
+  const plugCopies = (answer: () => string | null, opened: string[], titles: string[]) => {
+    const memory = join(tmp, 'Gtracker');
+    const g = copiesShell.gestionnairesCopies({
+      reglage: copiesShell.reglageCopies({ profil: join(tmp, 'profil'), defaut: join(tmp, 'Gtracker-copies'), memoire: async () => memory }),
+      choisirDossier: async ({ titre }) => (titles.push(titre), answer()),
+      ouvrirDossier: async (chemin) => void opened.push(chemin),
+    });
+    let listener: ((notice: unknown) => void) | null = null;
+    const telephone = {
+      etat: async () => ({ ok: true, valeur: { etat: 'absent' } }),
+      lister: async () => ({ ok: true, valeur: [] }),
+      lireOctets: async () => ({ ok: false, code: 'UNKNOWN', message: 'non' }),
+      dossierCopies: () => g['telephone:dossierCopies'](undefined),
+      choisirDossierCopies: (argument: unknown) => g['telephone:choisirDossierCopies'](argument),
+      ouvrirCopie: (argument: unknown) => g['telephone:ouvrirCopie'](argument),
+      surAvancementCopie: (rappel: (notice: unknown) => void) => {
+        listener = rappel;
+        return () => { listener = null; };
+      },
+    };
+    vi.stubGlobal('window', {
+      gtrackerBureau: { version: '0.0.0', memoire: { ouvrir: async () => ({ ok: true, valeur: { etat: 'aucun' } }) }, textes: async () => ({ ok: true, valeur: null }), telephone },
+    });
+    return { memory, notify: (notice: unknown) => listener?.(notice) };
+  };
+
+  it("coquille plus ancienne : rien à choisir, rien à ouvrir, l'avancement ne vient pas", async () => {
+    plug();
+    expect(safetyCopyFolderChoosable()).toBe(false);
+    expect(safetyCopyOpenable()).toBe(false);
+    expect(await safetyCopyFolder()).toBeNull();
+    await expect(chooseSafetyCopyFolder('Titre')).rejects.toThrow(/trop ancien/);
+    await expect(openSafetyCopy(join(tmp, 'x'))).rejects.toThrow(/trop ancien/);
+    const unsubscribe = onSafetyCopyProgress(() => undefined);
+    expect(unsubscribe()).toBeUndefined();
+  });
+
+  it('lit le dossier, le change par la fenêtre du programme, refuse la mémoire', async () => {
+    let answer: string | null = null;
+    const titles: string[] = [];
+    const { memory } = plugCopies(() => answer, [], titles);
+    expect(safetyCopyFolderChoosable()).toBe(true);
+    expect(await safetyCopyFolder()).toBe(join(tmp, 'Gtracker-copies'));
+    expect(await chooseSafetyCopyFolder('Où ranger les copies')).toEqual({ outcome: 'cancelled', folder: join(tmp, 'Gtracker-copies') });
+    expect(titles).toEqual(['Où ranger les copies']);
+    answer = join(memory, 'copies');
+    expect(await chooseSafetyCopyFolder()).toEqual({ outcome: 'insideMemory', folder: join(tmp, 'Gtracker-copies') });
+    answer = join(tmp, 'Sauvegardes');
+    expect(await chooseSafetyCopyFolder()).toEqual({ outcome: 'chosen', folder: join(tmp, 'Sauvegardes') });
+    expect(await safetyCopyFolder()).toBe(join(tmp, 'Sauvegardes'));
+  });
+
+  it("n'ouvre qu'une copie, et passe l'avancement bien formé", async () => {
+    const opened: string[] = [];
+    const { memory, notify } = plugCopies(() => null, opened, []);
+    const copy = join(tmp, 'Gtracker-copies', '2026-11-22 10-00-00');
+    await fs.mkdir(copy, { recursive: true });
+    await fs.mkdir(memory, { recursive: true });
+    expect(safetyCopyOpenable()).toBe(true);
+    await openSafetyCopy(copy);
+    await expect(openSafetyCopy(memory)).rejects.toThrow();
+    expect(opened).toEqual([copy]);
+    const seen: unknown[] = [];
+    const unsubscribe = onSafetyCopyProgress((progress) => seen.push(progress));
+    notify({ fait: 30, total: 120 });
+    for (const bad of [null, 'x', { fait: 3 }, { fait: 5, total: 4 }, { fait: -1, total: 4 }, { fait: 1.5, total: 4 }]) notify(bad);
+    unsubscribe();
+    notify({ fait: 31, total: 120 });
+    expect(seen).toEqual([{ done: 30, total: 120 }]);
   });
 });

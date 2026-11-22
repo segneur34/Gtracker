@@ -133,8 +133,5 @@ export const dismissLibraryMessage = (): void => setState({ message: null, error
 export const dismissIncomingNotice = (id: string): void =>
   setState({ incomingNotices: state.incomingNotices.filter((notice) => notice.id !== id) });
 
-/** Ferme la proposition d'un nouveau fichier de réglages ; il reste dans la liste de Réglages › Mémoire. */
-export const dismissSettingsOffer = (): void => setState({ settingsOffer: null });
-
 /** État de la bibliothèque, lu hors d'un composant. */
 export const readLibraryState = (): LibraryState => state;

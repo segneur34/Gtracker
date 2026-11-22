@@ -4,15 +4,17 @@ import { t } from '../core/i18n';
 import { SETTINGS_PAIRING_PATH } from '../core/parentPage';
 import { isRecordingActive } from '../hooks/useRecorder';
 import {
-  answerPhoneSyncQuestion, authorizePhoneSyncFirewall, cancelPhoneSyncWait, leavePhoneSyncQuestion, phoneSyncStep, reopenPhoneSyncQuestion,
-  synchronizeWithPhone, usePhoneSync, type PhoneSyncAnswer, type PhoneSyncStep,
+  answerPhoneSyncQuestion, authorizePhoneSyncFirewall, cancelPhoneSyncWait, chooseFirstSyncFolder, declineFirstSync, leavePhoneSyncQuestion,
+  openSafetyCopyFolder, phoneSyncStep, pickSafetyFolder, reopenPhoneSyncQuestion, startFirstSync, synchronizeWithPhone, usePhoneSync,
+  type PhoneSyncAnswer, type PhoneSyncStep,
 } from '../hooks/useSessionLibrary';
 import { routeStore } from '../hooks/routeFiles';
 import {
-  computerScanText, describeNoPhone, describePhoneSync, describeQuestion, describeWait, firstSyncText, linkedPhoneText, syncProgressText,
-  syncRunningTitle, syncStepText, syncSubtitle, type SyncQuestion, type SyncReport, type SyncReportRow, type SyncWait,
+  computerScanText, describeFirstStart, describeNoPhone, describePhoneSync, describeQuestion, describeWait, linkedPhoneText,
+  safetyCopyProgressText, safetyFolderChosenText, syncProgressText, syncRunningTitle, syncStepText, syncSubtitle, type SyncQuestion,
+  type SyncReport, type SyncReportRow, type SyncWait,
 } from '../library/syncReport';
-import { phoneCableAvailable } from '../platform/phoneCable';
+import { phoneCableAvailable, safetyCopyFolderChoosable, safetyCopyOpenable } from '../platform/phoneCable';
 import {
   onWirelessArrival, onWirelessDeparture, wirelessAuthorizable, wirelessAvailable, wirelessDeparturesNotified, wirelessPhones,
 } from '../platform/wirelessPhone';
@@ -32,7 +34,9 @@ import './PhoneSyncButton.css';
  * question attend : le bouton rouvre la fenêtre où elle en est. Téléphone pas là, liaison tombée, ordinateur occupé :
  * la fenêtre attend en disant quoi faire (pare-feu compris, avec « Autoriser Gtracker »), repart seule, et « Annuler »
  * arrête l'attente ; un ordinateur qui ne connaît aucun téléphone mène à Réglages › Mémoire, fenêtre du code ouverte.
- * À côté du bouton, « Redmi relié » tant que le sans-fil tient un téléphone ; rien ne se lance à son arrivée. Absent
+ * Première synchronisation d'un téléphone : un écran de départ dit où ira la copie de sécurité, avec « Choisir un autre
+ * dossier » et « Commencer » (le fermer arrête tout) ; le compte rendu redit où est la copie, avec « Ouvrir le
+ * dossier », et une copie qui échoue propose un autre dossier avant « Recommencer ». À côté du bouton, « Redmi relié » tant que le sans-fil tient un téléphone ; rien ne se lance à son arrivée. Absent
  * ailleurs (navigateur, téléphone, coquille plus ancienne).
  */
 
@@ -80,6 +84,8 @@ const windowOf = (step: PhoneSyncStep): { title: string; subtitle: string | null
     }
     case 'noPhone':
       return { title: describeNoPhone().title, subtitle: null, said: null };
+    case 'firstStart':
+      return { title: describeFirstStart(step.phone, step.folder).title, subtitle: syncSubtitle(step.phone, step.channel), said: null };
     case 'computerBusy':
     case 'comparing':
     case 'safetyCopy':
@@ -129,7 +135,16 @@ function PhoneSyncButton() {
     cancel();
     navigate(SETTINGS_PAIRING_PATH);
   };
+  const declineStart = () => {
+    declineFirstSync();
+    close();
+  };
   const view = windowOf(step);
+  // Fermer la question ne décide rien : la fenêtre passe au compte rendu de ce qui est fait, qui la rappelle. Fermer
+  // l'écran de départ arrête la synchronisation, rien n'étant fait.
+  const onClose = step.step === 'question' ? leavePhoneSyncQuestion
+    : step.step === 'firstStart' ? declineStart
+      : step.step === 'waiting' || step.step === 'noPhone' ? cancel : close;
 
   return (
     <>
@@ -142,14 +157,14 @@ function PhoneSyncButton() {
       {open && (
         // Fermer la question ne décide rien : la fenêtre passe au compte rendu de ce qui est fait, qui la rappelle.
         // Fermer pendant une attente vaut « Annuler » ; pendant l'échange, la synchronisation continue.
-        <Dialog title={view.title} className="phone-sync__dialog"
-          onClose={step.step === 'question' ? leavePhoneSyncQuestion : step.step === 'waiting' || step.step === 'noPhone' ? cancel : close}>
+        <Dialog title={view.title} onClose={onClose} className="phone-sync__dialog">
           {view.subtitle !== null && <p className="phone-sync__subtitle">{view.subtitle}</p>}
           {step.step === 'question' ? <QuestionView question={step.question} />
             : step.step === 'waiting' ? <WaitView wait={step.wait} atMs={step.atMs} firewallMessage={step.firewallMessage} onCancel={cancel} />
               : step.step === 'noPhone' ? <NoPhoneView onClose={cancel} onPair={pair} />
-                : view.said !== null ? <ReportView said={view.said} onClose={close} />
-                  : <ProgressView step={step} />}
+                : step.step === 'firstStart' ? <FirstStartView step={step} />
+                  : view.said !== null ? <ReportView said={view.said} onClose={close} />
+                    : <ProgressView step={step} />}
         </Dialog>
       )}
     </>
@@ -160,15 +175,14 @@ const answer = (a: PhoneSyncAnswer) => () => void answerPhoneSyncQuestion(a);
 
 /** Avancement : une phrase et une barre, sans nombres tant que le total n'est pas connu. */
 function ProgressView({ step }: { step: PhoneSyncStep }) {
-  const first = (step.step === 'copying' && step.first) || step.step === 'safetyCopy';
   const busy = step.step === 'computerBusy';
   const text = step.step === 'copying' ? syncProgressText(step.done, step.total)
     : busy ? computerScanText(step.done, step.total)
-      : syncStepText(step.step === 'comparing' ? 'comparing' : step.step === 'safetyCopy' ? 'safetyCopy' : 'searching');
-  const counted = (step.step === 'copying' || busy) && step.total > 0;
+      : step.step === 'safetyCopy' ? safetyCopyProgressText(step.done, step.total)
+        : syncStepText(step.step === 'comparing' ? 'comparing' : 'searching');
+  const counted = (step.step === 'copying' || step.step === 'safetyCopy' || busy) && step.total > 0;
   return (
     <div className="phone-sync__body" aria-live="polite">
-      {first && <p>{firstSyncText()}</p>}
       <p className="num">{text}</p>
       <progress className="phone-sync__bar" value={counted ? step.done : undefined} max={counted ? step.total : undefined} aria-label={text} />
       <p className="phone-sync__hint">
@@ -258,16 +272,59 @@ function Detail({ text }: { text: string }) {
   );
 }
 
+/** Écran de départ d'une première synchronisation : ce qui va se passer, où ira la copie de sécurité, puis « Commencer ». */
+function FirstStartView({ step }: { step: Extract<PhoneSyncStep, { step: 'firstStart' }> }) {
+  const text = describeFirstStart(step.phone, step.folder);
+  return (
+    <>
+      <div className="phone-sync__body">
+        <p>{text.lead}</p>
+        <p>{text.copy}</p>
+        {step.folder !== null && <code className="phone-sync__folder">{step.folder}</code>}
+        {step.problem !== null && <p className="ui-danger-text" role="status">{step.problem}</p>}
+      </div>
+      <div className="phone-sync__actions">
+        {safetyCopyFolderChoosable() && (
+          <Button variant="secondary" disabled={step.choosing} onClick={() => void chooseFirstSyncFolder()}>{t('Choisir un autre dossier')}</Button>
+        )}
+        <Button variant="primary" disabled={step.choosing} onClick={startFirstSync}>{t('Commencer')}</Button>
+      </div>
+    </>
+  );
+}
+
 function ReportView({ said, onClose }: { said: SyncReport; onClose: () => void }) {
+  const [openProblem, setOpenProblem] = useState<string | null>(null);
+  const [picked, setPicked] = useState<{ folder: string | null; problem: string | null } | null>(null);
+  const [picking, setPicking] = useState(false);
   const extra = said.action === 'restart' ? { label: t('Recommencer'), onClick: run }
     : said.action === 'retry' ? { label: t('Réessayer'), onClick: run }
       : said.action === 'answer' ? { label: t('Répondre'), onClick: reopenPhoneSyncQuestion }
         : null;
+  const openFolder = (folder: string) => {
+    setOpenProblem(null);
+    void openSafetyCopyFolder(folder).then(setOpenProblem);
+  };
+  const choose = async () => {
+    if (picking) return;
+    setPicking(true);
+    setPicked(await pickSafetyFolder());
+    setPicking(false);
+  };
   return (
     <>
       <div className="phone-sync__body" aria-live="polite">
         {said.paragraphs.map((text, i) => <p key={i}>{text}</p>)}
         {said.folder && <code className="phone-sync__folder">{said.folder}</code>}
+        {said.folder && safetyCopyOpenable() && (
+          <div className="ui-row-s2 ui-wrap">
+            <Button size="s" onClick={() => openFolder(said.folder ?? '')}>{t('Ouvrir le dossier')}</Button>
+          </div>
+        )}
+        {openProblem !== null && <p className="ui-danger-text" role="status">{openProblem}</p>}
+        {picked !== null && (picked.problem !== null
+          ? <p className="ui-danger-text" role="status">{picked.problem}</p>
+          : picked.folder !== null && <p role="status">{safetyFolderChosenText(picked.folder)}</p>)}
         {said.detail && <Detail text={said.detail} />}
         {said.rows.length > 0 && <Rows rows={said.rows} />}
         {said.notes.map((note, i) => (
@@ -278,6 +335,9 @@ function ReportView({ said, onClose }: { said: SyncReport; onClose: () => void }
         ))}
       </div>
       <div className="phone-sync__actions">
+        {said.chooseFolder && safetyCopyFolderChoosable() && (
+          <Button variant="secondary" disabled={picking} onClick={() => void choose()}>{t('Choisir un autre dossier')}</Button>
+        )}
         {extra && <Button variant="primary" onClick={extra.onClick}>{extra.label}</Button>}
         <Button variant={extra ? 'secondary' : 'primary'} onClick={onClose}>{t('Fermer')}</Button>
       </div>

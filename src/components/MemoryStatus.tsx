@@ -18,6 +18,7 @@ import ResetZone from './ResetZone';
 import TrashZone from './TrashZone';
 import WirelessPhoneCard from './WirelessPhoneCard';
 import PhoneAppCard from './PhoneAppCard';
+import SafetyCopyFolderSetting from './SafetyCopyFolderSetting';
 import ComputerLinkCard from './ComputerLinkCard';
 import SettingsFiles, { SettingsOfferBanner } from './SettingsFiles';
 import { HelpText, HelpToggle } from './Help';
@@ -35,7 +36,8 @@ import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
  * attention : mémoire fermée, lecture en cours, sessions en attente,
  * doublons, GPX illisibles, messages et fichier de réglages proposé. Dans
  * Réglages en version détaillée (changer de dossier, fichiers de réglages
- * par appareil par `SettingsFiles`, mode d'emploi du copier-coller, recherche du lieu des sessions, et en
+ * par appareil par `SettingsFiles`, dossier des copies de sécurité du programme Windows par
+ * `SafetyCopyFolderSetting`, mode d'emploi du copier-coller, recherche du lieu des sessions, et en
  * dernier la remise à zéro, `ResetZone`). Avec `collapse`, la carte se replie par son titre et ne
  * garde, fermée, que sa ligne d'état et ses alertes, dont la proposition d'un
  * nouveau fichier de réglages (`SettingsOfferBanner`). Dans Réglages, les
@@ -320,6 +322,8 @@ function MemoryStatus({
             </div>
           </>
         )}
+
+        {detailed && desktop && <SafetyCopyFolderSetting />}
 
         {detailed && status === 'ready' && folderKind === 'device' && (
           <>

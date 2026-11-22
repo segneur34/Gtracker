@@ -40,11 +40,11 @@ import { findSession, sessionOfFile } from './sessionLibrary/memory';
  */
 
 export type { LibraryState, LibraryStatus } from './sessionLibrary/store';
-export { dismissIncomingNotice, dismissLibraryMessage, dismissSettingsOffer, readLibraryState, reportStartupError } from './sessionLibrary/store';
+export { dismissIncomingNotice, dismissLibraryMessage, readLibraryState, reportStartupError } from './sessionLibrary/store';
 export { hasSessionMotion } from './sessionLibrary/memory';
 export { summarizeGpxText } from './sessionLibrary/summarySettings';
 export { queueOutdatedRefresh } from './sessionLibrary/summaryQueue';
-export { adoptSettingsFile, adoptSettingsGear, importSettingsFile, reloadAfterWrites, renameDevice, settingsFileValues } from './sessionLibrary/deviceSettings';
+export { adoptSettingsFile, adoptSettingsGear, importSettingsFile, keepOwnSettings, reloadAfterWrites, renameDevice, settingsFileValues } from './sessionLibrary/deviceSettings';
 export type { AddResult, AddStatus } from './sessionLibrary/addSession';
 export { answerImportQuestion, canImportSessions, importEntries, importFiles, importFromFolder, saveRecordedSession } from './sessionLibrary/importer';
 export { startIncomingFiles } from './sessionLibrary/incoming';
@@ -62,8 +62,8 @@ export { stashRoute, trashStore } from './sessionLibrary/trash';
 export type { TrashState } from './sessionLibrary/trash';
 export { deleteFromTrash, emptyWholeTrash, restoreFromTrash } from './sessionLibrary/trashRestore';
 export {
-  answerPhoneSyncQuestion, authorizePhoneSyncFirewall, cancelPhoneSyncWait, leavePhoneSyncQuestion, phoneSyncStep, reopenPhoneSyncQuestion,
-  synchronizeWithPhone, usePhoneSync,
+  answerPhoneSyncQuestion, authorizePhoneSyncFirewall, cancelPhoneSyncWait, chooseFirstSyncFolder, declineFirstSync, leavePhoneSyncQuestion,
+  openSafetyCopyFolder, phoneSyncStep, pickSafetyFolder, reopenPhoneSyncQuestion, startFirstSync, synchronizeWithPhone, usePhoneSync,
 } from './sessionLibrary/phoneSync';
 export type { PhoneSyncAnswer, PhoneSyncStep } from './sessionLibrary/phoneSync';
 export type { ResetProgress } from './sessionLibrary/reset';

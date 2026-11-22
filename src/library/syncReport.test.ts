@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { emptySyncOutcome, type SyncOutcome } from './syncOutcome';
 import type { SyncCase, SyncItem, SyncOp, SyncPlan } from './syncPlan';
 import {
-  computerScanText, describeNoPhone, describePhoneSync, describeQuestion, describeSync, describeSyncQuestion, describeWait, lastSeenText,
-  linkedPhoneText, mergeSyncPasses, syncHasChangedItems, syncProgressText, syncSubtitle, type SyncQuestion, type SyncReport, type SyncWait,
+  computerScanText, describeFirstStart, describeNoPhone, describePhoneSync, describeQuestion, describeSync, describeSyncQuestion, describeWait,
+  lastSeenText, linkedPhoneText, mergeSyncPasses, safetyCopyProgressText, syncHasChangedItems, syncProgressText, syncSubtitle, type SyncQuestion,
+  type SyncReport, type SyncWait,
 } from './syncReport';
 import type { RouteSyncItem, RouteSyncOp } from './syncRoutes';
 
@@ -54,7 +55,7 @@ describe('compte rendu : ce qui s’est échangé', () => {
   it('rien à faire : « Tout est à jour », un seul bouton', () => {
     expect(describeSync(outcomeOf([]))).toEqual({
       title: 'Tout est à jour', paragraphs: ['Rien à échanger : les deux appareils ont les mêmes sessions et les mêmes itinéraires.'],
-      detail: null, rows: [], notes: [], folder: null, action: 'close',
+      detail: null, rows: [], notes: [], folder: null, action: 'close', chooseFolder: false,
     });
   });
 
@@ -124,6 +125,15 @@ describe('compte rendu : ce qui s’est échangé', () => {
     const said = describeSync(outcomeOf([item('newOnPhone', [OPS.toComputer])], { first: 'noBase', safetyCopy: 'C:\\copies\\x' }));
     expect(said.paragraphs).toEqual(["Première synchronisation : rien n'a été supprimé.", 'Copie de sécurité :']);
     expect(said.folder).toBe('C:\\copies\\x');
+  });
+
+  it('écran de départ : ce qui va se passer, puis où ira la copie (sans dossier quand le programme ne le dit pas)', () => {
+    expect(describeFirstStart('Redmi', 'C:\\copies')).toEqual({
+      title: 'Première synchronisation avec « Redmi »',
+      lead: 'Chaque appareil va recevoir ce qui lui manque. Rien ne sera supprimé.',
+      copy: 'Avant de commencer, Gtracker copie les deux mémoires par sécurité dans :',
+    });
+    expect(describeFirstStart('Redmi', null).copy).toBe('Avant de commencer, Gtracker copie les deux mémoires par sécurité.');
   });
 
   it('la synchronisation précédente arrêtée en route est dite terminée', () => {
@@ -259,7 +269,12 @@ describe('synchronisation impossible et téléphone pas prêt', () => {
   it('refus : une phrase, avec où agir ; trois versions plus récentes en une seule', () => {
     expect(describeSync({ ...emptySyncOutcome('safetyCopy'), error: 'disque plein' })).toMatchObject({
       title: 'Synchronisation impossible', paragraphs: ["La copie de sécurité n'a pas pu être faite : rien n'a été synchronisé."], detail: 'disque plein', action: 'restart',
+      chooseFolder: true,
     });
+    // Le dossier où la copie a été demandée est dit ; ailleurs, aucun choix de dossier n'est proposé.
+    expect(describePhoneSync({ kind: 'synced', phone: 'X', channel: 'cable', outcome: emptySyncOutcome('safetyCopy'), safetyFolder: 'D:\\Copies' }).paragraphs)
+      .toEqual(["La copie de sécurité n'a pas pu être faite dans « D:\\Copies » : rien n'a été synchronisé."]);
+    expect(describeSync(emptySyncOutcome('memory')).chooseFolder).toBe(false);
     const newer = ['computerNewer', 'phoneNewer', 'newerBase'] as const;
     expect(new Set(newer.map((r) => describeSync(emptySyncOutcome(r)).paragraphs[0])).size).toBe(1);
     expect(describeSync(emptySyncOutcome('newerBase')).action).toBe('close');
@@ -273,6 +288,10 @@ describe('synchronisation impossible et téléphone pas prêt', () => {
     expect(describePhoneSync({ kind: 'synced', phone: 'Xiaomi', channel: 'cable', outcome: outcomeOf([]) }).title).toBe('Tout est à jour');
     expect(syncProgressText(12, 50)).toBe('Échange des sessions et des itinéraires : 12 fichiers sur 50.');
     expect(syncProgressText(0, 0)).toBe('Échange des sessions et des itinéraires…');
+    // Copie de sécurité : avec ses nombres quand le programme les dit, sans eux sinon.
+    expect(safetyCopyProgressText(30, 120)).toBe('Copie de sécurité des deux mémoires : 30 fichiers sur 120.');
+    expect(safetyCopyProgressText(0, 1)).toBe('Copie de sécurité des deux mémoires : 0 fichier sur 1.');
+    expect(safetyCopyProgressText(0, 0)).toBe('Copie de sécurité des deux mémoires…');
     expect(syncSubtitle('Redmi', 'sansFil')).toBe('Redmi · par le Wi-Fi');
     expect(syncSubtitle('Redmi', 'cable')).toBe('Redmi · par le câble');
   });

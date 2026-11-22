@@ -429,10 +429,6 @@
 
 /* Styles sortis du JSX (élément 160), à valeur égale ; les utilitaires communs sont dans `ui.css`. */
 
-.set-files-grow {
-  flex: 1 1 200px;
-}
-
 .set-files-list {
   list-style: none;
   margin: 0;

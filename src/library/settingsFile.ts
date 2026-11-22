@@ -14,7 +14,8 @@ import { STORAGE_KEYS, FILE_FORMATS } from '../core/appIdentity';
  *
  * Chaque appareil écrit le sien et ne remplace jamais ses réglages par ceux
  * d'un autre de lui-même : on choisit dans Réglages › Mémoire le fichier à
- * reprendre (« Reprendre »). Seul un appareil neuf, sans réglage à lui,
+ * reprendre (« Reprendre »), ou l'on répond au bandeau qui propose ceux d'un
+ * autre appareil quand ils diffèrent (`settingsToOffer`). Seul un appareil neuf, sans réglage à lui,
  * reprend tout seul le plus récent. L'appareil reconnaît son fichier à son
  * identifiant, tiré au hasard, et non à son nom : deux téléphones nommés
  * « Téléphone » ne s'écrasent pas.
@@ -194,21 +195,114 @@ export const settingsEntryKey = (entry: SettingsEntry): string =>
   entry.file.device ? `appareil:${entry.file.device.id}` : `fichier:${entry.fileName.toLowerCase()}`;
 
 /**
- * Fichiers d'autres appareils que celui-ci n'a jamais vus (`seen` : clés
- * `settingsEntryKey` déjà vues), le plus récent en tête : chacun n'est
- * proposé qu'une fois. Sans liste gardée (`null`), la première fois, aucun :
- * les fichiers déjà là sont tenus pour vus.
+ * Réponse retenue pour chaque fichier d'un autre appareil (« Garder les miens »
+ * ou « Prendre ceux de … ») : son empreinte (`settingsFingerprint`) au moment
+ * de la réponse, rangée sous sa clé `settingsEntryKey`.
  */
-export const unseenSettingsEntries = (
-  entries: readonly SettingsEntry[],
+export type AnsweredSettings = Readonly<Record<string, string>>;
+
+/** Texte JSON dont l'ordre des clés ne compte pas : deux appareils rangent les mêmes réglages dans un ordre différent. */
+const canonicalJson = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (isObject(value)) {
+    const keys = Object.keys(value).filter((k) => value[k] !== undefined).sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(value[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+};
+
+/**
+ * Ce que « Prendre ceux de … » reprendrait d'un fichier : ses réglages qui
+ * voyagent, contrôlés comme à la reprise (`checkedValues`), sans les choix
+ * retenus, qui restent ceux de l'appareil (`adoptedValues`).
+ */
+const comparableSettings = (values: Record<string, unknown>): Record<string, unknown> => {
+  const checked = checkedValues(values);
+  const picked: Record<string, unknown> = {};
+  for (const key of TRAVELLING_KEYS) {
+    if (!(key in checked)) continue;
+    const value = checked[key];
+    picked[key] = key === STORAGE_KEYS.sportSettings && isObject(value)
+      ? Object.fromEntries(Object.entries(value).filter(([k]) => !REMEMBERED_CHOICES.includes(k)))
+      : value;
+  }
+  return picked;
+};
+
+/**
+ * Les réglages d'un autre appareil (`theirs`, valeurs de son fichier)
+ * changeraient ceux de cet appareil (`mine`) s'ils étaient pris : une clé qui
+ * voyage, présente dans son fichier, a une autre valeur ici. Les choix retenus
+ * et l'ordre des clés ne comptent pas.
+ */
+export const settingsDiffer = (theirs: Record<string, unknown>, mine: Record<string, unknown>): boolean => {
+  const a = comparableSettings(theirs);
+  const b = comparableSettings(mine);
+  return Object.keys(a).some((key) => canonicalJson(a[key]) !== canonicalJson(b[key]));
+};
+
+/**
+ * Empreinte courte des réglages d'un fichier, telle que la réponse la retient :
+ * elle change quand l'autre appareil change un réglage, pas quand il ouvre une
+ * session ou choisit l'activité d'un enregistrement (FNV-1a sur 32 bits, deux
+ * passes de graines différentes).
+ */
+export const settingsFingerprint = (values: Record<string, unknown>): string => {
+  const text = canonicalJson(comparableSettings(values));
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193 ^ text.length;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193);
+    h2 = Math.imul(h2 ^ c, 0x5bd1e995);
+  }
+  return `${(h1 >>> 0).toString(36)}-${(h2 >>> 0).toString(36)}-${text.length.toString(36)}`;
+};
+
+/**
+ * Réponses retenues, complétées par l'ancienne liste des fichiers vus
+ * (`seen`, clés `settingsEntryKey`, d'avant les deux réponses) : un fichier
+ * déjà vu, encore là, est tenu pour répondu tel qu'il est ; il ne revient que
+ * s'il change.
+ */
+export const answeredWithSeen = (
+  answered: AnsweredSettings | null,
   seen: ReadonlySet<string> | null,
-  deviceId: string
+  entries: readonly SettingsEntry[]
+): Record<string, string> => {
+  const merged: Record<string, string> = { ...answered };
+  if (seen === null) return merged;
+  for (const e of entries) {
+    const key = settingsEntryKey(e);
+    if (seen.has(key) && !(key in merged)) merged[key] = settingsFingerprint(e.file.values);
+  }
+  return merged;
+};
+
+/** Réponses retenues avec celle donnée à l'instant pour chacun de `entries`, tels qu'ils sont. */
+export const withAnsweredSettings = (answered: AnsweredSettings, entries: readonly SettingsEntry[]): Record<string, string> => ({
+  ...answered,
+  ...Object.fromEntries(entries.map((e) => [settingsEntryKey(e), settingsFingerprint(e.file.values)])),
+});
+
+/**
+ * Fichiers d'autres appareils à proposer (bandeau « Garder les miens » ou
+ * « Prendre ceux de … »), le plus récent en tête : ceux dont les réglages
+ * diffèrent de ceux de l'appareil (`mine`), et ont changé depuis la dernière
+ * réponse (`answered`). Des réglages identiques ne sont jamais proposés ; un
+ * fichier répondu ne revient que si l'autre appareil a changé les siens.
+ */
+export const settingsToOffer = (
+  entries: readonly SettingsEntry[],
+  deviceId: string,
+  mine: Record<string, unknown>,
+  answered: AnsweredSettings
 ): SettingsEntry[] =>
-  seen === null
-    ? []
-    : entries
-      .filter((e) => e.file.device?.id !== deviceId && !seen.has(settingsEntryKey(e)))
-      .sort((a, b) => b.file.savedAt - a.file.savedAt);
+  entries
+    .filter((e) => e.file.device?.id !== deviceId
+      && settingsDiffer(e.file.values, mine)
+      && answered[settingsEntryKey(e)] !== settingsFingerprint(e.file.values))
+    .sort((a, b) => b.file.savedAt - a.file.savedAt);
 
 /**
  * Nom sous lequel ranger dans `reglages/` un fichier choisi à la main

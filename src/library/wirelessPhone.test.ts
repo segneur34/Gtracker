@@ -17,10 +17,10 @@ describe('état du sans-fil en phrases', () => {
     expect(status.text).toContain('éteint');
   });
 
-  it('à l\'écoute : l\'adresse, sans conseil de câble ni de débogage USB', () => {
+  it('à l\'écoute : « Prêt », sans l\'adresse (montrée par la fenêtre du code), sans conseil de câble ni de débogage USB', () => {
     const status = describeWireless(state());
-    expect(status.kind).toBe('listening');
-    expect(status.text).toContain('192.168.1.20');
+    expect(status).toEqual({ kind: 'listening', text: 'Prêt : Gtracker attend votre téléphone.' });
+    expect(status.text).not.toContain('192.168.1.20');
     expect(JSON.stringify(status)).not.toMatch(/câble|USB/);
   });
 

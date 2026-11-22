@@ -41,7 +41,11 @@ const memoire = Object.freeze({
  * Le dossier `Documents/Gtracker` du téléphone branché (noms gardés égaux à ceux de `telephone.ts` par un test) :
  * `etat()`, `lister()`, `lireOctets({ chemin })` d'un fichier du dernier listage seulement, et, après un listage,
  * `ecrireOctets({ chemin, octets })` et `effacer({ chemin })` dans la liste blanche que la coquille vérifie, et
- * `copieSecurite()`, qui copie les deux dossiers avant une première synchronisation et rend le chemin de la copie.
+ * `copieSecurite()`, qui copie les deux dossiers avant une première synchronisation et rend le chemin de la copie ;
+ * le dossier des copies (noms gardés égaux à ceux de `copieSecurite.ts`) : `dossierCopies()`, `choisirDossierCopies({
+ * titre })`, qui ouvre la fenêtre de choix de Windows et rend `{ issue, dossier }`, `ouvrirCopie({ chemin })`, borné aux
+ * dossiers des copies, et `surAvancementCopie(rappel)`, appelé avec `{ fait, total }` pendant une copie de sécurité, qui
+ * rend la fonction de désabonnement.
  */
 const telephone = Object.freeze({
   etat: sans('telephone:etat'),
@@ -50,6 +54,16 @@ const telephone = Object.freeze({
   ecrireOctets: avec('telephone:ecrireOctets'),
   effacer: avec('telephone:effacer'),
   copieSecurite: sans('telephone:copieSecurite'),
+  dossierCopies: sans('telephone:dossierCopies'),
+  choisirDossierCopies: avec('telephone:choisirDossierCopies'),
+  ouvrirCopie: avec('telephone:ouvrirCopie'),
+  surAvancementCopie: (rappel: (avis: unknown) => void) => {
+    const ecouteur = (_evenement: unknown, avis: unknown) => rappel(avis)
+    ipcRenderer.on('telephone:avancementCopie', ecouteur)
+    return () => {
+      ipcRenderer.removeListener('telephone:avancementCopie', ecouteur)
+    }
+  },
 })
 
 /**

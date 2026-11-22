@@ -21,12 +21,8 @@ export const describeWireless = (state: WirelessState): WirelessStatus => {
   if (!state.actif) {
     return { kind: 'off', text: t("Le sans-fil est éteint : le téléphone ne peut pas se présenter à cet ordinateur.") };
   }
-  if (state.ecoute) {
-    return {
-      kind: 'listening',
-      text: t("Gtracker attend votre téléphone sur le réseau (adresse {adresse}).", { adresse: state.adresses[0] ?? '' }),
-    };
-  }
+  // L'adresse ne sert qu'à la fenêtre du code, qui la montre.
+  if (state.ecoute) return { kind: 'listening', text: t('Prêt : Gtracker attend votre téléphone.') };
   if (state.erreur !== null) {
     return {
       kind: 'error',

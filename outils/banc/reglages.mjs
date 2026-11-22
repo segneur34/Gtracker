@@ -3,14 +3,15 @@
 // Sur un profil neuf, sans réseau, dans la mémoire du navigateur (« PC »). Le script vérifie :
 //  1. au premier lancement, l'appareil écrit reglages/pc.json ;
 //  3. le fichier d'un autre appareil (« Léa ») déposé dans reglages/ : absent de la liste avant « Mettre à jour »,
-//     présent après, et pas repris de lui-même ; le bandeau « Nouveau fichier de réglages : Léa » paraît ;
-//  4. « Reprendre » du bandeau : confirmation acceptée, rechargement, activités de Léa reprises telles quelles,
-//     seuil repris, choix retenus de l'appareil gardés, pc.json récrit ; plus de bandeau ;
+//     présent après, et pas repris de lui-même ; le bandeau « Les réglages de « Léa » sont différents… » paraît ;
+//  4. « Prendre ceux de « Léa » » du bandeau : « Remplacer » dans la confirmation, rechargement, activités de Léa
+//     reprises telles quelles, seuil repris, choix retenus de l'appareil gardés, pc.json récrit ; plus de bandeau ;
 //  5. renommage de l'appareil : le fichier suit son nom ; un nom déjà porté par un autre fichier est refusé ;
-//  6. un fichier d'un autre appareil posé sous le nom de celui-ci : l'appareil prend un nom libre et le dit ;
-//     le bandeau le propose au lancement, « Fermer » le retire, et il ne revient pas au rechargement ;
+//  6. un fichier d'un autre appareil posé sous le nom de celui-ci, au seuil différent : l'appareil prend un nom libre
+//     et le dit ; le bandeau le propose au lancement, « Garder les miens » le retire sans rien changer, et il ne
+//     revient pas au rechargement ;
 //  8. « Importer un fichier de réglages » : un JSON quelconque et le fichier de l'appareil refusés ; celui d'une
-//     tablette rangé sous son nom, reprise refusée puis faite depuis la liste ; pas de bandeau ensuite ;
+//     tablette rangé sous son nom, « Annuler » dans la confirmation, puis repris depuis la liste ; pas de bandeau ensuite ;
 //  9. bornes de couleur du Wingfoil (lot 150) : 12-30, on efface 30, on retape 35 : 12-35 ; une borne vidée puis quittée
 //     reprend son défaut et garde l'autre ; les deux vidées : plus de réglage, « défaut » ;
 // 10. le seuil suit la session (lot 148, Q57) : seuil du Wingfoil changé, la fiche de sa session recalculée ; seconde
@@ -28,16 +29,9 @@ if (!port) {
 
 // --- Protocole (lib/cdp.mjs) ---
 const { send, evaluate, go, settle, waitFor, wait, shoot, onMessage, check, logs, close, importGpx, records, blockNetwork } =await connect({ port, width: 1400, height: 1000, shotDir });
+/** Premières lignes des confirmations : celles du navigateur, et les titres des fenêtres de la page (`answerAdoptDialog`). */
 const dialogs = [];
 onMessage((msg) => { if (msg.method === 'Page.javascriptDialogOpening') dialogs.push(msg.params.message.split(String.fromCharCode(10))[0]); });
-/**
- * Réponse aux confirmations de la page : acceptées d'office par la bibliothèque ; pour en refuser une, `confirm` de
- * la page répond non (et note son message comme un dialogue), le temps d'y renoncer.
- */
-const refuseDialogs = (refuse) => evaluate(refuse
-  ? `(() => { window.__confirmReel ??= window.confirm; window.confirm = (m) => { window.__refus = String(m); return false; }; return 'ok'; })()`
-  : `(() => { if (window.__confirmReel) window.confirm = window.__confirmReel; return 'ok'; })()`);
-const noteRefus = async () => { const m = await evaluate(`window.__refus ?? null`); if (m) dialogs.push(m.split(String.fromCharCode(10))[0]); };
 /** Lance `action` qui recharge la page, attend le nouveau document puis une page prête (`max` ms au plus). */
 const reloaded = async (action, max) => {
   const before = await evaluate(`window.__banc?.doc ?? null`);
@@ -60,9 +54,16 @@ const rename = async (name, until) => {
   if (until) await waitFor(until, { timeout: 1200, label: 'renommage' });
   await settle({ max: 1200, label: 'renommage' });
 };
-/** Texte du bandeau « Nouveau fichier de réglages », ou « (aucun) ». */
-const banner = () => evaluate(`(() => { const a = [...document.querySelectorAll('.ui-alert')].find((x) => /Nouveau fichier de réglages/.test(x.innerText)); return a ? a.innerText.replace(/\\n/g, ' / ') : '(aucun)'; })()`);
-const clickInBanner = (text) => evaluate(`(() => { const a = [...document.querySelectorAll('.ui-alert')].find((x) => /Nouveau fichier de réglages/.test(x.innerText)); if (!a) return 'bandeau absent'; const b = [...a.querySelectorAll('button')].find((x) => x.textContent.trim() === ${JSON.stringify(text)}); if (!b) return 'bouton absent'; b.click(); return 'ok'; })()`);
+/** Texte du bandeau des réglages d'un autre appareil (« Les réglages de « X » sont différents… »), ou « (aucun) ». */
+const banner = () => evaluate(`(() => { const a = [...document.querySelectorAll('.ui-alert')].find((x) => /sont différents de ceux de/.test(x.innerText)); return a ? a.innerText.replace(/\\n/g, ' / ') : '(aucun)'; })()`);
+const clickInBanner = (text) => evaluate(`(() => { const a = [...document.querySelectorAll('.ui-alert')].find((x) => /sont différents de ceux de/.test(x.innerText)); if (!a) return 'bandeau absent'; const b = [...a.querySelectorAll('button')].find((x) => x.textContent.trim() === ${JSON.stringify(text)}); if (!b) return 'bouton absent'; b.click(); return 'ok'; })()`);
+/** Fenêtre de confirmation « Prendre les réglages de … ? » : son titre est noté dans `dialogs`, puis `answer` y est cliqué. */
+const answerAdoptDialog = async (answer) => {
+  await waitFor(`Boolean(document.querySelector('.ui-dialog'))`, { timeout: 1500, label: 'confirmation' });
+  dialogs.push(await evaluate(`document.querySelector('.ui-dialog__head strong')?.textContent ?? ''`));
+  return evaluate(`(() => { const b = [...document.querySelectorAll('.ui-dialog button')].find((x) => x.textContent.trim() === ${JSON.stringify(answer)}); if (!b) return 'bouton absent'; b.click(); return 'ok'; })()`);
+};
+const dialogOpen = () => evaluate(`Boolean(document.querySelector('.ui-dialog'))`);
 const pageLines = (re) =>evaluate(`document.body.innerText.split('\\n').filter((l) => ${re}.test(l)).join(' | ')`);
 const step = (title) => console.log(`\n== ${title}`);
 
@@ -105,7 +106,10 @@ console.log('bandeau :', await banner());
 await shoot('reglages-liste');
 
 step('4. Reprendre les réglages de Léa, depuis le bandeau');
-console.log('Reprendre :', await reloaded(() => clickInBanner('Reprendre'), 4500));
+console.log('Prendre ceux de Léa :', await reloaded(async () => {
+  const clicked = await clickInBanner('Prendre ceux de « Léa »');
+  return clicked === 'ok' ? answerAdoptDialog('Remplacer') : clicked;
+}, 4500));
 console.log('confirmation :', dialogs.at(-1) ?? '(aucune)');
 const after = await stored();
 console.log('activités :', after?.activities?.map((a) => `${a.name} ${a.color}`).join(', '));
@@ -127,16 +131,20 @@ await evaluate(`(() => { const i = document.querySelector('input[maxlength="40"]
 await shoot('reglages-renomme');
 
 step('6. Un autre appareil sous le nom de celui-ci');
-const intrus = { ...lea, device: { id: 'intrus', name: 'PC du bureau' }, savedAt: Date.now() };
+// Seuil différent de celui de l'appareil : des réglages identiques ne seraient pas proposés.
+const intrus = {
+  ...lea, device: { id: 'intrus', name: 'PC du bureau' }, savedAt: Date.now(),
+  values: { ...lea.values, [CLES.sportSettings]: { ...lea.values[CLES.sportSettings], thresholds: { wingfoil: 17 } } },
+};
 console.log('écrit par-dessus :', await writeFile('reglages/pc-du-bureau.json', intrus));
 await go('/parametres', 4000);
 console.log('message :', await pageLines('/s\'appelle désormais/'));
 console.log('reglages/ :', await listSettings(), '| nom :', await evaluate(`localStorage.getItem('${CLES.deviceName}')`));
 console.log('pc-du-bureau.json reste à l\'intrus :', (await readSettings('pc-du-bureau.json')).device?.id);
 console.log('bandeau au lancement :', await banner());
-console.log('Fermer :', await clickInBanner('Fermer'));
+console.log('Garder les miens :', await clickInBanner('Garder les miens'));
 await wait(300);
-console.log('bandeau après « Fermer » (aucun attendu) :', await banner());
+console.log('bandeau après « Garder les miens » (aucun attendu) :', await banner(), '| seuil de l\'appareil, inchangé :', (await stored())?.thresholds?.wingfoil);
 await go('/parametres', 4000);
 console.log('bandeau après rechargement (aucun attendu) :', await banner());
 
@@ -147,7 +155,12 @@ step('8. Importer un fichier de réglages');
 const importJson = async (name, value) => {
   const noteBefore = await importNote();
   const res = await evaluate(`(() => { const input = document.querySelector('input[type=file][accept*="json"]'); if (!input) return 'champ absent'; const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(JSON.stringify(value))}], ${JSON.stringify(name)}, { type: 'application/json' })); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); return 'ok'; })()`);
-  await waitFor(async () => (await importNote()) !== noteBefore, { timeout: 1500, label: 'message de l’import' });
+  await waitFor(async () => (await importNote()) !== noteBefore || (await dialogOpen()), { timeout: 1500, label: 'message de l’import' });
+  // Fichier rangé : la confirmation s'ouvre ; « Annuler » le laisse dans la liste, et la phrase le dit.
+  if (await dialogOpen()) {
+    await answerAdoptDialog('Annuler');
+    await waitFor(async () => /est dans la liste/.test(await importNote()), { timeout: 1500, label: 'fichier laissé dans la liste' });
+  }
   await settle({ max: 1500 });
   return res;
 };
@@ -160,14 +173,14 @@ const tablet = {
   format: FORMATS.reglages, version: 2, savedAt: Date.now() - 600_000, device: { id: 'tablette-de-lea', name: 'Tablette' },
   values: { [CLES.sportSettings]: { ...(await stored()), thresholds: { wingfoil: 15 } } },
 };
-await refuseDialogs(true);
 console.log('la Tablette, reprise refusée :', await importJson('reglages-tablette.json', tablet), '|', await importNote());
-await noteRefus();
-await refuseDialogs(false);
 console.log('confirmation posée :', dialogs.at(-1));
 console.log('reglages/ :', await listSettings(), '| seuil de l\'appareil, inchangé :', (await stored())?.thresholds?.wingfoil);
 console.log('liste :', await fileList(), '| bandeau (aucun attendu) :', await banner());
-console.log('Reprendre dans la liste :', await reloaded(() => clickButton('Reprendre', 'Tablette'), 4500));
+console.log('Reprendre dans la liste :', await reloaded(async () => {
+  const clicked = await clickButton('Reprendre', 'Tablette');
+  return clicked === 'ok' ? answerAdoptDialog('Remplacer') : clicked;
+}, 4500));
 console.log('seuil wingfoil :', (await stored())?.thresholds?.wingfoil, '(15 attendu)');
 console.log('carte Mémoire :', await openMemory());
 await wait(500);

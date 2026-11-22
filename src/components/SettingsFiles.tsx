@@ -2,7 +2,7 @@ import { dayMonthYearTime } from '../core/calendar';
 import { useEffect, useMemo, useState, useSyncExternalStore, type ChangeEvent } from 'react';
 import { STORAGE_KEYS } from '../core/appIdentity';
 import {
-  adoptSettingsFile, adoptSettingsGear, dismissSettingsOffer, importSettingsFile, renameDevice, settingsFileValues,
+  adoptSettingsFile, adoptSettingsGear, importSettingsFile, keepOwnSettings, renameDevice, settingsFileValues,
   useLibraryFields, type SettingsFileInfo,
 } from '../hooks/useSessionLibrary';
 import { readStoredSettings, subscribeStoredSettings } from '../hooks/useSportSettings';
@@ -12,6 +12,7 @@ import { isDesktopApp, isNativeApp } from '../platform/runtime';
 import GearCompareDialog from './GearCompareDialog';
 import { HelpText, HelpToggle } from './Help';
 import Button from './ui/Button';
+import Dialog from './ui/Dialog';
 import { t, tn } from '../core/i18n';
 import { tRich } from './tRich';
 
@@ -22,50 +23,83 @@ import { tRich } from './tRich';
  * « Reprendre le matériel » quand leur liste de matériel diffère de celle-ci.
  * « Importer un fichier de réglages » range un fichier choisi à la main, puis
  * propose de le reprendre : seul moyen là où l'on ne peut rien déposer dans
- * la mémoire (celle du navigateur, sous Firefox). `SettingsOfferBanner` propose, une fois, celui d'un autre appareil apparu
- * dans le dossier (carte Mémoire, en tête des bibliothèques comme dans
- * Réglages).
+ * la mémoire (celle du navigateur, sous Firefox). `SettingsOfferBanner` propose les réglages d'un autre appareil
+ * quand ils diffèrent de ceux-ci (carte Mémoire, en tête des bibliothèques comme dans Réglages).
  */
 
 
 const mutedStyle = { margin: 0, color: 'var(--muted)', fontSize: 'var(--text-s)', lineHeight: 1.5 } as const;
 
-/** « Reprendre », après confirmation : depuis la liste, le bandeau ou un import. Rend faux si l'on a renoncé. */
-const adopt = (file: SettingsFileInfo): boolean => {
-  const question = `${t('Reprendre les réglages de « {name} » ?', { name: deviceNameText(file.name) })}\n\n`
-    + t('Ils remplacent ceux de cet appareil : activités et leurs réglages, profil du pratiquant, séances du compteur.') + ' '
-    + t("Une session dont l'activité n'existe pas dans ces réglages s'affichera sous le nom de son calcul.");
-  if (!window.confirm(question)) return false;
-  void adoptSettingsFile(file.fileName);
-  return true;
-};
+/**
+ * Confirmation avant de prendre les réglages d'un autre appareil, depuis le bandeau, la liste ou un import :
+ * « Remplacer » les prend (la page se recharge ensuite), « Annuler », × ou le fond ne changent rien.
+ * `onClose` dit si l'on a pris.
+ */
+function AdoptSettingsDialog({ file, onClose }: { file: SettingsFileInfo; onClose: (adopted: boolean) => void }) {
+  const name = deviceNameText(file.name);
+  const cancel = () => onClose(false);
+  const confirm = () => {
+    void adoptSettingsFile(file.fileName);
+    onClose(true);
+  };
+  return (
+    <Dialog title={t('Prendre les réglages de « {name} » ?', { name })} onClose={cancel}>
+      <div className="ui-stack-2">
+        <p className="ui-m-0">
+          {isNativeApp()
+            ? t('Ils remplacent ceux de ce téléphone : activités et leurs réglages, profil du pratiquant, séances du compteur.')
+            : t('Ils remplacent ceux de cet ordinateur : activités et leurs réglages, profil du pratiquant, séances du compteur.')}
+        </p>
+        <p className="ui-hint">{t('Le matériel seul peut aussi se reprendre, dans Réglages › Mémoire.')}</p>
+      </div>
+      <div className="ui-row-s2 ui-wrap ui-mt-12">
+        <Button variant="ghost" onClick={cancel}>{t('Annuler')}</Button>
+        <Button variant="primary" onClick={confirm}>{t('Remplacer')}</Button>
+      </div>
+    </Dialog>
+  );
+}
 
-/** Bandeau « Nouveau fichier de réglages » : « Reprendre » ou « Fermer » ; le fichier reste dans la liste. */
+/**
+ * Bandeau des réglages d'un autre appareil, montré seulement quand ils diffèrent de ceux-ci, sur l'ordinateur comme
+ * sur le téléphone : « Garder les miens », ou « Prendre ceux de … » puis la confirmation. Il reste jusqu'à la réponse.
+ */
 export function SettingsOfferBanner() {
   const { settingsOffer } = useLibraryFields('settingsOffer');
+  /** Fichier dont la confirmation est ouverte. */
+  const [confirming, setConfirming] = useState<string | null>(null);
   if (!settingsOffer) return null;
+  const name = deviceNameText(settingsOffer.name);
   return (
-    <div className="ui-alert ui-alert--warning ui-row-s2 ui-center ui-wrap">
-      <span className="set-files-grow">{tRich('Nouveau fichier de réglages : <strong>{name}</strong>.', { name: deviceNameText(settingsOffer.name) })}</span>
-      <Button size="s" onClick={() => adopt(settingsOffer)}>{t('Reprendre')}</Button>
-      <Button size="s" variant="ghost" onClick={dismissSettingsOffer}>{t('Fermer')}</Button>
+    <div className="ui-alert ui-alert--warning ui-stack-2">
+      <span>
+        {isNativeApp()
+          ? tRich('Les réglages de <strong>« {name} »</strong> sont différents de ceux de ce téléphone.', { name })
+          : tRich('Les réglages de <strong>« {name} »</strong> sont différents de ceux de cet ordinateur.', { name })}
+      </span>
+      <span className="ui-row-s2 ui-wrap">
+        <Button size="s" onClick={() => keepOwnSettings(settingsOffer.fileName)}>{t('Garder les miens')}</Button>
+        <Button size="s" variant="primary" onClick={() => setConfirming(settingsOffer.fileName)}>{t('Prendre ceux de « {name} »', { name })}</Button>
+      </span>
+      {confirming === settingsOffer.fileName && <AdoptSettingsDialog file={settingsOffer} onClose={() => setConfirming(null)} />}
     </div>
   );
 }
 
 /** « Reprendre », et « Reprendre le matériel » si la liste de matériel de ce fichier diffère de celle de cet appareil. */
-function OtherFileActions({ file, theirs, mine, onAdoptGear }: {
+function OtherFileActions({ file, theirs, mine, onAdoptGear, onAdopt }: {
   file: SettingsFileInfo;
   theirs: Record<string, unknown> | null;
   mine: Record<string, unknown>;
   onAdoptGear: (file: SettingsFileInfo, theirs: Record<string, unknown>) => void;
+  onAdopt: (file: SettingsFileInfo) => void;
 }) {
   return (
     <span className="ui-row-s2 ui-wrap">
       {theirs && gearListsDiffer(theirs, mine) && (
         <Button size="s" onClick={() => onAdoptGear(file, theirs)}>{t('Reprendre le matériel')}</Button>
       )}
-      <Button size="s" onClick={() => adopt(file)}>{t('Reprendre')}</Button>
+      <Button size="s" onClick={() => onAdopt(file)}>{t('Reprendre')}</Button>
     </span>
   );
 }
@@ -78,6 +112,8 @@ function SettingsFiles() {
   /** Compte rendu du dernier import d'un fichier de réglages. */
   const [importNote, setImportNote] = useState<{ text: string; failed: boolean } | null>(null);
   const [comparing, setComparing] = useState(false);
+  /** Fichier dont la confirmation « Prendre les réglages » est ouverte ; `imported` : il vient d'être importé. */
+  const [adopting, setAdopting] = useState<{ file: SettingsFileInfo; imported: boolean } | null>(null);
   /** « Comparer le matériel » : programme Windows, quand le dossier porte le fichier de réglages d'un autre appareil. */
   const canCompareGear = isDesktopApp() && settingsFiles.some((f) => !f.own);
 
@@ -119,8 +155,16 @@ function SettingsFiles() {
       setImportNote({ text: result.refusal, failed: true });
       return;
     }
-    if (adopt(result.file)) setImportNote(null);
-    else setImportNote({ text: t('« {name} » est dans la liste : « Reprendre » quand vous voudrez.', { name: deviceNameText(result.file.name) }), failed: false });
+    setImportNote(null);
+    setAdopting({ file: result.file, imported: true });
+  };
+
+  /** Confirmation fermée : un fichier importé et laissé reste dans la liste, et la phrase le dit. */
+  const closeAdopting = (adopted: boolean) => {
+    if (adopting?.imported && !adopted) {
+      setImportNote({ text: t('« {name} » est dans la liste : « Reprendre » quand vous voudrez.', { name: deviceNameText(adopting.file.name) }), failed: false });
+    }
+    setAdopting(null);
   };
 
   return (
@@ -156,7 +200,8 @@ function SettingsFiles() {
             </span>
             {file.own
               ? <span style={{ ...mutedStyle, fontWeight: 600 }}>{t('cet appareil')}</span>
-              : <OtherFileActions file={file} theirs={otherValues[file.fileName] ?? null} mine={mine} onAdoptGear={adoptGear} />}
+              : <OtherFileActions file={file} theirs={otherValues[file.fileName] ?? null} mine={mine} onAdoptGear={adoptGear}
+                onAdopt={(f) => setAdopting({ file: f, imported: false })} />}
           </li>
         ))}
       </ul>
@@ -168,6 +213,7 @@ function SettingsFiles() {
         {canCompareGear && <Button size="s" onClick={() => setComparing(true)}>{t('Comparer le matériel')}</Button>}
       </div>
       {comparing && <GearCompareDialog onClose={() => setComparing(false)} />}
+      {adopting && <AdoptSettingsDialog file={adopting.file} onClose={closeAdopting} />}
       {importNote && <p style={{ ...mutedStyle, color: importNote.failed ? 'var(--danger)' : 'var(--muted)' }}>{importNote.text}</p>}
     </div>
   );

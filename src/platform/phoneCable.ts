@@ -92,6 +92,92 @@ export const phoneSafetyCopy = async (): Promise<string> => {
   return bridgeValue(phone.copieSecurite());
 };
 
+/** Vrai dans le programme Windows dont la coquille laisse choisir le dossier des copies de sécurité. */
+export const safetyCopyFolderChoosable = (): boolean => {
+  const phone = phoneBridge();
+  return typeof phone?.dossierCopies === 'function' && typeof phone.choisirDossierCopies === 'function';
+};
+
+/**
+ * Le dossier des copies de sécurité, chemin absolu, tel que le programme le retient ; `null` hors du programme Windows
+ * et dans une coquille plus ancienne (qui copie sous `<Documents>\Gtracker-copies`, sans choix). Lève sur une panne,
+ * avec la phrase à montrer.
+ */
+export const safetyCopyFolder = async (): Promise<string | null> => {
+  const phone = phoneBridge();
+  if (typeof phone?.dossierCopies !== 'function') return null;
+  return bridgeValue(phone.dossierCopies());
+};
+
+/**
+ * Issue du choix du dossier des copies : retenu (`chosen`), fenêtre fermée sans choix (`cancelled`), ou refusé parce
+ * qu'il est dans la mémoire ou la contient (`insideMemory`) ; `folder` est le dossier des copies après le choix.
+ */
+export interface SafetyCopyFolderChoice {
+  outcome: 'chosen' | 'cancelled' | 'insideMemory';
+  folder: string;
+}
+
+const CHOICE_OUTCOME = { choisi: 'chosen', annule: 'cancelled', memoire: 'insideMemory' } as const;
+
+/**
+ * Ouvre la fenêtre de choix d'un dossier de Windows (`title`, traduit, en titre) et rend ce qu'elle a donné ; le
+ * programme retient lui-même le dossier choisi. Lève hors du programme Windows, dans une coquille plus ancienne
+ * (`safetyCopyFolderChoosable` faux) et sur une panne, avec la phrase à montrer.
+ */
+export const chooseSafetyCopyFolder = async (title?: string): Promise<SafetyCopyFolderChoice> => {
+  const phone = requirePhone();
+  if (typeof phone.choisirDossierCopies !== 'function') {
+    throw Object.assign(new Error(t('Ce programme est trop ancien pour choisir le dossier des copies de sécurité : installez sa dernière version.')), { code: 'UNKNOWN' });
+  }
+  const choice = await bridgeValue(phone.choisirDossierCopies(title ? { titre: title } : {}));
+  return { outcome: CHOICE_OUTCOME[choice.issue] ?? 'cancelled', folder: choice.dossier };
+};
+
+/** Vrai dans le programme Windows dont la coquille sait ouvrir une copie de sécurité dans l'explorateur. */
+export const safetyCopyOpenable = (): boolean => typeof phoneBridge()?.ouvrirCopie === 'function';
+
+/**
+ * Ouvre dans l'explorateur de Windows une copie de sécurité (le chemin rendu par `phoneSafetyCopy`) ou le dossier des
+ * copies. Lève hors du programme Windows, dans une coquille plus ancienne (`safetyCopyOpenable` faux), pour un chemin
+ * que le programme refuse ou un dossier qui ne s'ouvre pas, avec la phrase à montrer.
+ */
+export const openSafetyCopy = async (path: string): Promise<void> => {
+  const phone = requirePhone();
+  if (typeof phone.ouvrirCopie !== 'function') {
+    throw Object.assign(new Error(t('Ce programme est trop ancien pour ouvrir ce dossier : installez sa dernière version.')), { code: 'UNKNOWN' });
+  }
+  await bridgeValue(phone.ouvrirCopie({ chemin: path }));
+};
+
+/** Avancement d'une copie de sécurité, en fichiers : la mémoire de l'ordinateur et le téléphone réunis. */
+export interface SafetyCopyProgress {
+  done: number;
+  total: number;
+}
+
+/** L'avis de la coquille, s'il est bien formé. */
+const progressOf = (notice: unknown): SafetyCopyProgress | null => {
+  if (typeof notice !== 'object' || notice === null) return null;
+  const { fait, total } = notice as { fait?: unknown; total?: unknown };
+  if (typeof fait !== 'number' || typeof total !== 'number' || !Number.isInteger(fait) || !Number.isInteger(total)) return null;
+  return fait >= 0 && fait <= total ? { done: fait, total } : null;
+};
+
+/**
+ * Appelle `listener` à chaque avancement d'une copie de sécurité (au départ, après la mémoire de l'ordinateur, puis
+ * après chaque fichier du téléphone) ; rend la fonction qui se désabonne. Sans effet hors du programme Windows et dans
+ * une coquille plus ancienne, qui ne dit pas l'avancement : la fenêtre garde alors sa phrase sans nombres.
+ */
+export const onSafetyCopyProgress = (listener: (progress: SafetyCopyProgress) => void): (() => void) => {
+  const phone = phoneBridge();
+  if (typeof phone?.surAvancementCopie !== 'function') return () => undefined;
+  return phone.surAvancementCopie((notice) => {
+    const progress = progressOf(notice);
+    if (progress) listener(progress);
+  });
+};
+
 /** Chemin relatif sans barre en trop (`/sessions/` comme `sessions`). */
 const cleanPath = (path: string): string => path.split('/').filter((part) => part !== '').join('/');
 

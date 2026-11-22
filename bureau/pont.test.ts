@@ -12,6 +12,7 @@ import { AVIS_ARRIVEE, AVIS_DEPART, CANAUX_SANS_FIL } from './sansFil'
 import type { DossierDistant } from './telephone'
 import { CANAUX_TELEPHONE, dossierLocal, enSerie, gestionnairesTelephone } from './telephone'
 import { CANAUX_APPLICATION, gestionnairesApplication } from './applicationTelephone'
+import { AVIS_COPIE, CANAUX_COPIES, TITRE_CHOIX_COPIES, gestionnairesCopies, reglageCopies } from './copieSecurite'
 
 const page = { nom: 'contenu de la fenêtre principale' }
 const tete = { url: `${ORIGINE}/sessions`, parent: null }
@@ -150,11 +151,54 @@ describe('copie de sécurité par le pont', () => {
         brancherCanaux({ handle: (canal, rappel) => servis.set(canal, rappel) }, () => true, gestionnairesTelephone(dossierLocal(path.join(tmp, 'telephone')), path.join(tmp, 'lectures'), options))
         return servis.get('telephone:copieSecurite')!({ sender: page, senderFrame: tete })
       }
-      expect(await servir({ memoire: async () => null, copies: path.join(tmp, 'copies') })).toMatchObject({ ok: false })
+      const copies = async () => path.join(tmp, 'copies')
+      expect(await servir({ memoire: async () => null, copies })).toMatchObject({ ok: false })
       expect(await servir({ memoire: async () => memoire })).toMatchObject({ ok: false })
-      const reponse = (await servir({ memoire: async () => memoire, copies: path.join(tmp, 'copies') })) as { ok: true; valeur: string }
+      const avis: unknown[] = []
+      const reponse = (await servir({ memoire: async () => memoire, copies, avancementCopie: (a) => avis.push(a) })) as { ok: true; valeur: string }
       expect(reponse.ok).toBe(true)
       expect(await readFile(path.join(reponse.valeur, 'ordinateur', 'sessions', 'a.gpx'), 'utf8')).toBe('trace')
+      expect(avis).toEqual([{ fait: 0, total: 1 }, { fait: 1, total: 1 }])
+    } finally {
+      await rm(tmp, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('dossier des copies par le pont', () => {
+  it('rend le dossier, le change par la fenêtre de choix (jamais dans la mémoire), et n’ouvre que les copies', async () => {
+    const tmp = await mkdtemp(path.join(tmpdir(), 'gtk-pont-dossier-'))
+    try {
+      const memoire = path.join(tmp, 'Gtracker')
+      const ailleurs = path.join(tmp, 'Sauvegardes')
+      await mkdir(path.join(ailleurs, '2026-11-22 10-00-00'), { recursive: true })
+      await mkdir(memoire, { recursive: true })
+      let reponseFenetre: string | null = null
+      const demandes: { titre: string; depart: string }[] = []
+      const ouverts: string[] = []
+      const reglage = reglageCopies({ profil: path.join(tmp, 'profil'), defaut: path.join(tmp, 'Gtracker-copies'), memoire: async () => memoire })
+      const servis = new Map<string, (e: EvenementPont, ...args: unknown[]) => Promise<unknown>>()
+      brancherCanaux({ handle: (canal, rappel) => servis.set(canal, rappel) }, () => true, gestionnairesCopies({
+        reglage,
+        choisirDossier: async (demande) => (demandes.push(demande), reponseFenetre),
+        ouvrirDossier: async (chemin) => void ouverts.push(chemin),
+      }))
+      const appeler = (canal: string, argument?: unknown) => servis.get(`telephone:${canal}`)!({ sender: page, senderFrame: tete }, argument)
+      expect(await appeler('dossierCopies')).toEqual({ ok: true, valeur: path.join(tmp, 'Gtracker-copies') })
+      expect(await appeler('choisirDossierCopies', { titre: 'Copies' })).toEqual({ ok: true, valeur: { issue: 'annule', dossier: path.join(tmp, 'Gtracker-copies') } })
+      expect(demandes).toEqual([{ titre: 'Copies', depart: path.join(tmp, 'Gtracker-copies') }])
+      reponseFenetre = path.join(memoire, 'copies')
+      expect(await appeler('choisirDossierCopies', {})).toEqual({ ok: true, valeur: { issue: 'memoire', dossier: path.join(tmp, 'Gtracker-copies') } })
+      expect(demandes[1].titre).toBe(TITRE_CHOIX_COPIES)
+      reponseFenetre = ailleurs
+      expect(await appeler('choisirDossierCopies')).toEqual({ ok: true, valeur: { issue: 'choisi', dossier: ailleurs } })
+      expect(await appeler('dossierCopies')).toEqual({ ok: true, valeur: ailleurs })
+      const copie = path.join(ailleurs, '2026-11-22 10-00-00')
+      expect(await appeler('ouvrirCopie', { chemin: copie })).toEqual({ ok: true, valeur: null })
+      for (const chemin of [memoire, tmp, path.join(ailleurs, 'absent'), 'Sauvegardes', 3, undefined]) {
+        expect(await appeler('ouvrirCopie', { chemin }), String(chemin)).toMatchObject({ ok: false, code: 'PERMISSION' })
+      }
+      expect(ouverts).toEqual([copie])
     } finally {
       await rm(tmp, { recursive: true, force: true })
     }
@@ -165,6 +209,12 @@ describe('preload', () => {
   it('nomme les canaux du téléphone comme ses gestionnaires', () => {
     const servis = Object.keys(gestionnairesTelephone({ etat: async () => ({ etat: 'absent' }), lister: async () => [], lire: async () => undefined }, '.'))
     expect(servis).toEqual(CANAUX_TELEPHONE.map((nom) => `telephone:${nom}`))
+  })
+
+  it('nomme les canaux du dossier des copies comme ses gestionnaires', () => {
+    const reglage = reglageCopies({ profil: '.', defaut: '.' })
+    const servis = Object.keys(gestionnairesCopies({ reglage, choisirDossier: async () => null, ouvrirDossier: async () => undefined }))
+    expect(servis).toEqual(CANAUX_COPIES.map((nom) => `telephone:${nom}`))
   })
 
   it('nomme les canaux de l’application comme ses gestionnaires', () => {
@@ -178,10 +228,13 @@ describe('preload', () => {
     const canaux = [...source.matchAll(/'memoire:([A-Za-z]+)'/g)].map((m) => m[1])
     expect(canaux).toEqual([...CANAUX_MEMOIRE])
     for (const nom of CANAUX_MEMOIRE) expect(source).toMatch(new RegExp(`\\b${nom}: (sans|avec)\\('memoire:${nom}'\\)`))
-    const telephone = [...source.matchAll(/'telephone:([A-Za-z]+)'/g)].map((m) => m[1])
-    expect(telephone).toEqual([...CANAUX_TELEPHONE])
-    for (const nom of CANAUX_TELEPHONE) expect(source).toMatch(new RegExp(`\\b${nom}: (sans|avec)\\('telephone:${nom}'\\)`))
+    const telephone = [...source.matchAll(/'telephone:([A-Za-z]+)'/g)].map((m) => m[1]).filter((nom) => `telephone:${nom}` !== AVIS_COPIE)
+    expect(telephone).toEqual([...CANAUX_TELEPHONE, ...CANAUX_COPIES])
+    for (const nom of [...CANAUX_TELEPHONE, ...CANAUX_COPIES]) expect(source).toMatch(new RegExp(`\\b${nom}: (sans|avec)\\('telephone:${nom}'\\)`))
     expect(source).toMatch(/^\s+telephone,$/m)
+    expect(source).toContain(`ipcRenderer.on('${AVIS_COPIE}', ecouteur)`)
+    expect(source).toContain(`ipcRenderer.removeListener('${AVIS_COPIE}', ecouteur)`)
+    expect(source).toMatch(/surAvancementCopie: \(rappel/)
     const avis = [AVIS_ARRIVEE, AVIS_DEPART]
     const sansFil = [...source.matchAll(/'sansfil:([A-Za-z]+)'/g)].map((m) => m[1]).filter((nom) => !avis.includes(`sansfil:${nom}`))
     expect(sansFil).toEqual([...CANAUX_SANS_FIL])

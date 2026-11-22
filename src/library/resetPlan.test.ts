@@ -33,7 +33,7 @@ describe('clés de l\'appareil', () => {
     const { remove, write } = factoryKeyPlan(1);
     expect(write[STORAGE_KEYS.sportSettings]).toEqual({});
     expect(remove).not.toContain(STORAGE_KEYS.sportSettings);
-    for (const key of [STORAGE_KEYS.theme, STORAGE_KEYS.panelSizes, STORAGE_KEYS.rechercheLieu, STORAGE_KEYS.heartRateBelts, STORAGE_KEYS.seenSettingsFiles]) {
+    for (const key of [STORAGE_KEYS.theme, STORAGE_KEYS.panelSizes, STORAGE_KEYS.rechercheLieu, STORAGE_KEYS.heartRateBelts, STORAGE_KEYS.seenSettingsFiles, STORAGE_KEYS.answeredSettings]) {
       expect(remove).toContain(key);
     }
   });

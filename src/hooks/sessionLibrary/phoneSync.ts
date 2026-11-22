@@ -2,14 +2,15 @@ import { useSyncExternalStore } from 'react';
 import { t } from '../../core/i18n';
 import type { SyncOutcome } from '../../library/syncOutcome';
 import {
-  describeSyncQuestion, mergeSyncPasses, syncHasChangedItems, type PhoneCableHold, type PhoneLinkChannel, type PhoneNotReady,
-  type PhoneSyncResult, type SyncQuestion, type SyncWait, type SyncWaitReason,
+  describeSyncQuestion, mergeSyncPasses, safetyFolderRefusedText, syncHasChangedItems, type PhoneCableHold, type PhoneLinkChannel,
+  type PhoneNotReady, type PhoneSyncResult, type SyncQuestion, type SyncWait, type SyncWaitReason,
 } from '../../library/syncReport';
 import { authorizationOutcomeText, firewallNotice } from '../../library/wirelessPhone';
 import { noteJournal } from '../../platform/desktopBridge';
 import { nativeErrorMessage } from '../../platform/nativeMessages';
 import {
-  listPhoneFiles, phoneCanWrite, phoneChannel, phoneIsRecording, phoneListsRoutes, phoneMemoryFolder, phoneSafetyCopy, phoneState, type PhoneState,
+  chooseSafetyCopyFolder, listPhoneFiles, onSafetyCopyProgress, openSafetyCopy, phoneCanWrite, phoneChannel, phoneIsRecording, phoneListsRoutes,
+  phoneMemoryFolder, phoneSafetyCopy, phoneState, safetyCopyFolder, type PhoneState,
 } from '../../platform/phoneCable';
 import {
   authorizeWireless, onWirelessArrival, onWirelessDeparture, phoneDeparture, wirelessAvailable, wirelessPhones, wirelessState,
@@ -37,8 +38,11 @@ import {
  * - Le téléphone n'est écrit que si son canal le sait (`phoneCanWrite` : le câble, ou le Wi-Fi d'un téléphone à jour
  *   qui n'enregistre pas) ; sinon la synchronisation ne fait que la moitié de l'ordinateur, et dit ce qui attend la
  *   mise à jour du téléphone, ou que le téléphone enregistre (`phoneIsRecording`).
- * - À la première synchronisation d'un téléphone qu'on peut écrire, la coquille copie d'abord les deux dossiers
- *   (`phoneSafetyCopy`) ; si la copie échoue, rien n'est fait.
+ * - À la première synchronisation d'un téléphone qu'on peut écrire, un écran de départ (`firstStart`) dit ce qui va se
+ *   passer et où ira la copie de sécurité, dont le dossier peut se changer (`chooseFirstSyncFolder`, retenu par le
+ *   programme) ; « Commencer » (`startFirstSync`) lance la copie des deux dossiers par la coquille (`phoneSafetyCopy`),
+ *   avancement montré quand elle le dit ; fermer l'écran (`declineFirstSync`) arrête tout, rien n'étant fait. Si la
+ *   copie échoue, rien n'est fait.
  * - Une question (suppressions en nombre, sessions de la corbeille encore sur le téléphone) arrête sur l'étape
  *   `question`. Ses deux réponses la règlent (`answerPhoneSyncQuestion`) : la synchronisation repart sans repasser par
  *   la recherche du téléphone, et son compte rendu reprend ce que la première passe avait fait. Fermer la question ne
@@ -70,8 +74,14 @@ export type PhoneSyncStep =
   /** L'ordinateur finit de créer les fiches de ses sessions (`done` sur `total`) avant l'échange. */
   | { step: 'computerBusy'; phone: string; channel: PhoneLinkChannel; done: number; total: number }
   | { step: 'comparing'; phone: string; channel: PhoneLinkChannel }
-  /** Copie de sécurité des deux dossiers, avant une première synchronisation. */
-  | { step: 'safetyCopy'; phone: string; channel: PhoneLinkChannel }
+  /**
+   * Écran de départ d'une première synchronisation, avant la copie de sécurité : `folder`, le dossier des copies
+   * (`null` si le programme ne le dit pas) ; `choosing`, la fenêtre de choix d'un dossier est ouverte ; `problem`, la
+   * phrase d'un dossier refusé ou d'une panne du choix.
+   */
+  | { step: 'firstStart'; phone: string; channel: PhoneLinkChannel; folder: string | null; choosing: boolean; problem: string | null }
+  /** Copie de sécurité des deux dossiers, avant une première synchronisation : `done` fichiers sur `total` (0 : inconnu). */
+  | { step: 'safetyCopy'; phone: string; channel: PhoneLinkChannel; done: number; total: number }
   /** `done` fichiers de sessions traités sur `total` ; `first` : première synchronisation, rien n'est supprimé. */
   | { step: 'copying'; phone: string; channel: PhoneLinkChannel; done: number; total: number; first: boolean }
   /** Une question attend sa réponse ; `result` : ce qui a déjà été fait. */
@@ -139,6 +149,33 @@ let waiting: { cancel: () => void; poke: () => void } | null = null;
 /** Pose l'issue d'une demande d'autorisation dans l'attente en cours. */
 let authorizeHook: ((message: string | null) => void) | null = null;
 
+/** L'écran de départ affiché : « Commencer » (`true`) ou sa fermeture (`false`). */
+let firstStart: { decide: (go: boolean) => void } | null = null;
+
+/** Levée quand l'écran de départ est fermé sans « Commencer » : la synchronisation s'arrête avant toute écriture. */
+class FirstStartDeclined extends Error {}
+
+/**
+ * L'écran de départ d'une première synchronisation : rend, à « Commencer », le dossier des copies retenu à cet instant
+ * (`null` si le programme ne le dit pas) ; lève `FirstStartDeclined` si l'écran est fermé.
+ */
+const awaitFirstStart = async (phone: string, channel: PhoneLinkChannel): Promise<string | null> => {
+  const folder = await safetyCopyFolder().catch(() => null);
+  noteJournal('Synchroniser : écran de départ de la première synchronisation');
+  const go = await new Promise<boolean>((resolve) => {
+    firstStart = {
+      decide: (answer) => {
+        firstStart = null;
+        resolve(answer);
+      },
+    };
+    progress.set({ step: 'firstStart', phone, channel, folder, choosing: false, problem: null });
+  });
+  if (!go) throw new FirstStartDeclined();
+  const now = progress.get();
+  return now.step === 'firstStart' ? now.folder : folder;
+};
+
 const notReady = (state: Exclude<PhoneState, { etat: 'pret' }>): PhoneNotReady =>
   // L'outil du câble absent n'est pas une chose à faire : la fenêtre attend le téléphone par le Wi-Fi.
   ({ kind: 'phone', state: state.etat === 'adbIntrouvable' ? 'absent' : state.etat });
@@ -161,9 +198,18 @@ const awaitComputerScan = async (phone: string, channel: PhoneLinkChannel): Prom
   }
 };
 
-/** Une passe : état du téléphone, listage, puis la synchronisation. `resume` : l'étape « Comparaison » n'est pas montrée. */
-const synchronize = async (options: RunOptions, resume: boolean): Promise<PhoneSyncResult> => {
+/**
+ * Une passe : état du téléphone, listage, puis la synchronisation. `resume` : l'étape « Comparaison » n'est pas montrée.
+ * Rend `null` si l'écran de départ a été fermé sans « Commencer » : rien n'a été fait.
+ */
+const synchronize = async (options: RunOptions, resume: boolean): Promise<PhoneSyncResult | null> => {
   let channel: PhoneLinkChannel | undefined;
+  /**
+   * L'écran de départ, rempli par la copie de sécurité : `declined`, fermé sans « Commencer » ; `folder`, le dossier des
+   * copies où la copie a été demandée, pour dire où elle a échoué ; `phoneLost`, la raison d'une copie ratée parce que
+   * le téléphone n'est plus là (et non le dossier), `null` sinon.
+   */
+  const start: { declined: boolean; folder: string | null; phoneLost: string | null } = { declined: false, folder: null, phoneLost: null };
   try {
     const state = await phoneState();
     if (state.etat !== 'pret') return notReady(state);
@@ -199,9 +245,28 @@ const synchronize = async (options: RunOptions, resume: boolean): Promise<PhoneS
       heldRoutesToKeep: options.heldRoutesToKeep,
       // Sans listage d'`itineraires/` (téléphone ou coquille plus anciens), les itinéraires ne sont pas touchés.
       phoneRoutes: phoneListsRoutes(state),
-      beforeWrites: () => {
-        progress.set({ step: 'safetyCopy', phone, channel: link });
-        return phoneSafetyCopy();
+      beforeWrites: async () => {
+        try {
+          start.folder = await awaitFirstStart(phone, link);
+        } catch (err) {
+          start.declined = err instanceof FirstStartDeclined;
+          throw err;
+        }
+        progress.set({ step: 'safetyCopy', phone, channel: link, done: 0, total: 0 });
+        noteJournal('Synchroniser : copie de sécurité');
+        const stop = onSafetyCopyProgress(({ done, total }) => {
+          if (progress.get().step === 'safetyCopy') progress.set({ step: 'safetyCopy', phone, channel: link, done, total });
+        });
+        try {
+          return await phoneSafetyCopy();
+        } catch (err) {
+          // Parti pendant l'écran de départ ou pendant la copie : c'est la liaison qui manque, pas le dossier.
+          const now = await phoneState().catch(() => null);
+          if (now?.etat !== 'pret') start.phoneLost = nativeErrorMessage(err, t('erreur inconnue'));
+          throw err;
+        } finally {
+          stop();
+        }
       },
       onPlanned: (_plan, reason) => {
         // Sans écriture du téléphone, il n'a pas d'identifiant et chaque passe serait « la première » : rien à annoncer.
@@ -211,8 +276,11 @@ const synchronize = async (options: RunOptions, resume: boolean): Promise<PhoneS
       onProgress: (done, total) => progress.set({ step: 'copying', phone, channel: link, done, total, first }),
     };
     noteJournal(`Synchroniser : échange avec le téléphone (${link === 'sansFil' ? 'Wi-Fi' : 'câble'})`);
-    const outcome: SyncOutcome = await synchronizePhone(phoneMemoryFolder(phone), lock);
-    return { kind: 'synced', phone, channel: link, outcome };
+    const synced: SyncOutcome = await synchronizePhone(phoneMemoryFolder(phone), lock);
+    if (start.declined) return null;
+    // Une copie ratée faute de téléphone porte la marque de la liaison perdue : la fenêtre attend son retour.
+    const outcome = synced.refusal === 'safetyCopy' && start.phoneLost !== null ? { ...synced, linkLost: start.phoneLost } : synced;
+    return { kind: 'synced', phone, channel: link, outcome, ...(start.folder !== null ? { safetyFolder: start.folder } : {}) };
   } catch (err) {
     return { kind: 'error', detail: nativeErrorMessage(err, t('erreur inconnue')), ...(channel ? { channel } : {}) };
   }
@@ -379,7 +447,8 @@ const launch = (options: RunOptions, how: LaunchHow = {}): Promise<void> => {
     let lastSynced: SyncedResult | null = how.answering?.result ?? null;
     /** Arrêt en route (attente annulée, panne, reprises épuisées) : le compte rendu de ce qui est fait, avec la note de l'arrêt. */
     const stopWith = (detail: string | null, kind: 'linkLost' | 'error'): boolean => {
-      if (!lastSynced || !previous) return false;
+      // Une passe refusée (copie de sécurité ratée, ordinateur occupé…) n'a rien fait : rien à rapporter.
+      if (!lastSynced || !previous || previous.refusal !== null) return false;
       const note = detail ?? '';
       const outcome: SyncOutcome = kind === 'linkLost'
         ? { ...previous, linkLost: previous.linkLost ?? note }
@@ -390,6 +459,11 @@ const launch = (options: RunOptions, how: LaunchHow = {}): Promise<void> => {
     };
     for (;;) {
       const pass = await synchronize(options, resume);
+      if (pass === null) {
+        progress.set({ step: 'idle' });
+        noteJournal('Synchroniser : écran de départ fermé, rien de fait');
+        return;
+      }
       if (how.answering && passFailed(pass)) {
         // La réponse n'a rien réglé : la suivante repart des choix d'avant elle.
         current = how.answering.before;
@@ -516,6 +590,53 @@ export const answerPhoneSyncQuestion = (answer: PhoneSyncAnswer): Promise<void> 
 export const leavePhoneSyncQuestion = (): void => {
   const step = progress.get();
   if (step.step === 'question') progress.set({ step: 'over', result: step.result, unanswered: step.question });
+};
+
+/** « Commencer » de l'écran de départ : la copie de sécurité part, puis la synchronisation. Sans effet hors de cet écran. */
+export const startFirstSync = (): void => {
+  const step = progress.get();
+  if (step.step === 'firstStart' && !step.choosing) firstStart?.decide(true);
+};
+
+/** L'écran de départ est fermé sans « Commencer » : la synchronisation s'arrête, rien n'est fait. Sans effet ailleurs. */
+export const declineFirstSync = (): void => {
+  firstStart?.decide(false);
+};
+
+/**
+ * Ouvre la fenêtre de choix du dossier des copies de sécurité, que le programme retient : rend le dossier des copies
+ * après le choix (`null` sur une panne) et la phrase d'un dossier refusé (dans la mémoire) ou de la panne.
+ */
+export const pickSafetyFolder = async (): Promise<{ folder: string | null; problem: string | null }> => {
+  try {
+    const choice = await chooseSafetyCopyFolder(t('Dossier des copies de sécurité'));
+    return { folder: choice.folder, problem: choice.outcome === 'insideMemory' ? safetyFolderRefusedText() : null };
+  } catch (err) {
+    return { folder: null, problem: nativeErrorMessage(err, t('erreur inconnue')) };
+  }
+};
+
+/** « Choisir un autre dossier » de l'écran de départ : l'écran montre ensuite le dossier retenu. Sans effet ailleurs. */
+export const chooseFirstSyncFolder = async (): Promise<void> => {
+  const step = progress.get();
+  if (step.step !== 'firstStart' || step.choosing) return;
+  progress.set({ ...step, choosing: true, problem: null });
+  const picked = await pickSafetyFolder();
+  const now = progress.get();
+  if (now.step === 'firstStart') progress.set({ ...now, folder: picked.folder ?? now.folder, problem: picked.problem, choosing: false });
+};
+
+/**
+ * « Ouvrir le dossier » du compte rendu : ouvre la copie de sécurité (`path`, le chemin rendu par la copie) dans
+ * l'explorateur ; rend la phrase d'un échec, `null` si elle s'est ouverte.
+ */
+export const openSafetyCopyFolder = async (path: string): Promise<string | null> => {
+  try {
+    await openSafetyCopy(path);
+    return null;
+  } catch (err) {
+    return nativeErrorMessage(err, t('erreur inconnue'));
+  }
 };
 
 /** Revient à la question fermée sans réponse (« Répondre » du compte rendu). Sans effet sans question laissée. */

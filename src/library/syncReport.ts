@@ -34,8 +34,11 @@ export type PhoneSyncResult =
   | { kind: 'no-phone-folder'; phone: string }
   /** Panne imprévue avant la synchronisation (état, ouverture du dossier) ; `detail` : sa phrase. */
   | { kind: 'error'; detail: string; channel?: PhoneLinkChannel }
-  /** La synchronisation a été tentée : son issue, même refusée ou coupée. */
-  | { kind: 'synced'; phone: string; channel: PhoneLinkChannel; outcome: SyncOutcome };
+  /**
+   * La synchronisation a été tentée : son issue, même refusée ou coupée ; `safetyFolder` : le dossier des copies où la
+   * copie de sécurité d'une première synchronisation a été demandée, quand le programme le dit.
+   */
+  | { kind: 'synced'; phone: string; channel: PhoneLinkChannel; outcome: SyncOutcome; safetyFolder?: string };
 
 /**
  * Le bouton qui accompagne « Fermer » : aucun (`close`) ; « Recommencer » après une écriture ratée sur l'ordinateur,
@@ -66,13 +69,15 @@ export interface SyncReport {
   detail: string | null;
   rows: SyncReportRow[];
   notes: SyncReportNote[];
-  /** Où est la copie de sécurité, à montrer à part pour qu'on puisse la recopier. */
+  /** Où est la copie de sécurité, à montrer à part pour qu'on puisse la recopier, et l'ouvrir. */
   folder: string | null;
   action: SyncReportAction;
+  /** La copie de sécurité n'a pas pu se faire : « Choisir un autre dossier » accompagne « Recommencer ». */
+  chooseFolder: boolean;
 }
 
 const report = (title: string, paragraphs: string[], action: SyncReportAction, patch: Partial<SyncReport> = {}): SyncReport => ({
-  title, paragraphs, detail: null, rows: [], notes: [], folder: null, action, ...patch,
+  title, paragraphs, detail: null, rows: [], notes: [], folder: null, action, chooseFolder: false, ...patch,
 });
 
 const clean = (detail: string): string => detail.replace(/\.\s*$/, '');
@@ -187,8 +192,33 @@ export const describeNoPhone = (): { title: string; text: string } => ({
 export const computerScanText = (done: number, total: number): string =>
   t("L'ordinateur finit de mettre à jour ses sessions : {done} sur {total}.", { done, total });
 
-/** Phrase montrée pendant la première synchronisation d'un téléphone. */
-export const firstSyncText = (): string => t('Chaque appareil va recevoir ce qui lui manque. Rien ne sera supprimé.');
+/** Ce que dit l'écran de départ d'une première synchronisation, avant la copie de sécurité. */
+export interface FirstStartText {
+  title: string;
+  /** « Chaque appareil va recevoir ce qui lui manque… » */
+  lead: string;
+  /** Où va la copie de sécurité ; suivie du dossier quand il est connu. */
+  copy: string;
+}
+
+/**
+ * L'écran de départ de la première synchronisation avec `phone` : ce qui va se passer, puis où Gtracker copie les deux
+ * mémoires (`folder`, `null` quand le programme ne le dit pas : la phrase s'arrête alors sans dossier).
+ */
+export const describeFirstStart = (phone: string, folder: string | null): FirstStartText => ({
+  title: t('Première synchronisation avec « {phone} »', { phone }),
+  lead: t('Chaque appareil va recevoir ce qui lui manque. Rien ne sera supprimé.'),
+  copy: folder === null
+    ? t('Avant de commencer, Gtracker copie les deux mémoires par sécurité.')
+    : t('Avant de commencer, Gtracker copie les deux mémoires par sécurité dans :'),
+});
+
+/** Un dossier des copies refusé parce qu'il est dans la mémoire de l'ordinateur, ou la contient. */
+export const safetyFolderRefusedText = (): string =>
+  t('Les copies ne peuvent pas aller dans la mémoire de cet ordinateur : choisissez un autre dossier.');
+
+/** Le dossier des copies tel qu'il vient d'être choisi, après un échec de la copie. */
+export const safetyFolderChosenText = (folder: string): string => t('Copies de sécurité : {dossier}', { dossier: folder });
 
 /** Ligne à côté du bouton tant que le sans-fil tient un téléphone. */
 export const linkedPhoneText = (phone: string): string => t('{phone} relié', { phone });
@@ -201,16 +231,17 @@ export const syncSubtitle = (phone: string, channel: PhoneLinkChannel): string =
   channel === 'sansFil' ? t('{phone} · par le Wi-Fi', { phone }) : t('{phone} · par le câble', { phone });
 
 /** Phrase d'une étape d'avant l'échange. */
-export const syncStepText = (step: 'searching' | 'comparing' | 'safetyCopy'): string => {
-  switch (step) {
-    case 'searching':
-      return t('Recherche du téléphone…');
-    case 'comparing':
-      return t('Comparaison des deux appareils…');
-    default:
-      return t('Copie de sécurité des deux mémoires…');
-  }
-};
+export const syncStepText = (step: 'searching' | 'comparing'): string =>
+  step === 'searching' ? t('Recherche du téléphone…') : t('Comparaison des deux appareils…');
+
+/**
+ * Avancement de la copie de sécurité : « … : 30 fichiers sur 120. » ; sans nombres tant que le total n'est pas connu,
+ * ou avec un programme plus ancien qui ne le dit pas.
+ */
+export const safetyCopyProgressText = (done: number, total: number): string =>
+  total > 0
+    ? tn(total, 'Copie de sécurité des deux mémoires : {done} fichier sur {n}.', 'Copie de sécurité des deux mémoires : {done} fichiers sur {n}.', { done })
+    : t('Copie de sécurité des deux mémoires…');
 
 /** Avancement de l'échange : « … : 12 fichiers sur 50. », sans nombres tant que le total n'est pas connu. */
 export const syncProgressText = (done: number, total: number): string =>
@@ -256,8 +287,11 @@ const UNFINISHED: readonly SyncLeftReason[] = ['noRecord', 'unreadableRecord', '
 const baseName = (path: string): string => (path.split('/').pop() ?? path).replace(/\.json$/i, '');
 const fileName = (path: string): string => path.split('/').pop() ?? path;
 
-/** La phrase d'une synchronisation refusée ; rien n'a été fait. */
-const refusalReport = (outcome: SyncOutcome): SyncReport => {
+/**
+ * La phrase d'une synchronisation refusée ; rien n'a été fait. `safetyFolder` : le dossier où la copie de sécurité
+ * a été demandée, dit dans la phrase de son échec.
+ */
+const refusalReport = (outcome: SyncOutcome, safetyFolder: string | null = null): SyncReport => {
   const title = t('Synchronisation impossible');
   switch (outcome.refusal) {
     case 'computerNoMarker':
@@ -275,8 +309,10 @@ const refusalReport = (outcome: SyncOutcome): SyncReport => {
     case 'busy':
       return report(title, [computerBusyText()], 'restart');
     default:
-      return report(title, [t("La copie de sécurité n'a pas pu être faite : rien n'a été synchronisé.")], 'restart', {
-        detail: outcome.error ? clean(outcome.error) : null,
+      return report(title, [safetyFolder === null
+        ? t("La copie de sécurité n'a pas pu être faite : rien n'a été synchronisé.")
+        : t("La copie de sécurité n'a pas pu être faite dans « {dossier} » : rien n'a été synchronisé.", { dossier: safetyFolder })], 'restart', {
+        detail: outcome.error ? clean(outcome.error) : null, chooseFolder: true,
       });
   }
 };
@@ -486,10 +522,13 @@ const unansweredNote = (question: SyncQuestion): string => {
 
 /**
  * Compte rendu d'une synchronisation : une ligne par geste qui a touché quelque chose, les exceptions, et le bouton
- * qui accompagne « Fermer ». `unanswered` : la question que l'utilisateur a fermée sans répondre.
+ * qui accompagne « Fermer ». `unanswered` : la question que l'utilisateur a fermée sans répondre ; `safetyFolder` :
+ * le dossier où la copie de sécurité a été demandée, dit si elle a échoué.
  */
-export const describeSync = (outcome: SyncOutcome, unanswered: SyncQuestion | null = null, answerFailed: PhoneSyncResult | null = null): SyncReport => {
-  if (outcome.refusal !== null) return refusalReport(outcome);
+export const describeSync = (
+  outcome: SyncOutcome, unanswered: SyncQuestion | null = null, answerFailed: PhoneSyncResult | null = null, safetyFolder: string | null = null,
+): SyncReport => {
+  if (outcome.refusal !== null) return refusalReport(outcome, safetyFolder);
   const paragraphs: string[] = [];
   if (outcome.interrupted) paragraphs.push(t("La synchronisation précédente s'était arrêtée en route : elle vient d'être terminée."));
   // Un téléphone qu'on ne peut pas écrire ne reçoit pas d'identifiant : chaque passe serait « la première ».
@@ -542,7 +581,7 @@ export const describePhoneSync = (result: PhoneSyncResult, unanswered: SyncQuest
         detail: clean(result.detail),
       });
     case 'synced':
-      return describeSync(result.outcome, unanswered, answerFailed);
+      return describeSync(result.outcome, unanswered, answerFailed, result.safetyFolder ?? null);
   }
 };
 

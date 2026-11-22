@@ -50,6 +50,7 @@ describe('noms techniques de l\'application', () => {
       deviceId: 'gtracker.deviceId',
       deviceName: 'gtracker.deviceName',
       seenSettingsFiles: 'gtracker.seenSettingsFiles',
+      answeredSettings: 'gtracker.answeredSettings',
       summaryGestures: 'gtracker.summaryGestures',
       followedTrace: 'gtracker.followedTrace',
       fondCarte: 'gtracker.fondCarte',

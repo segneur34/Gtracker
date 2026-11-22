@@ -26,6 +26,8 @@
 //
 // Hors du mode d'essai, le pare-feu de Windows est lu et l'autorisation demandée pour l'exécutable en cours
 // (`process.execPath`), par `pareFeu.ts`.
+//   GTRACKER_BANC_COPIES    en mode d'essai seulement : le dossier des copies de sécurité « choisi » (aucune fenêtre),
+//                           voir `copieSecurite.ts` ; l'ouverture d'une copie y est seulement journalisée
 //   GTRACKER_APK, GTRACKER_BANC_APK_DESTINATION, GTRACKER_BANC_APPLICATION_REFUS : en mode d'essai seulement, voir
 //                           `applicationTelephone.ts` ; le mode d'essai n'ouvre jamais la fenêtre « Enregistrer sous »
 //
@@ -53,7 +55,8 @@ import path from 'node:path'
 import { dossierAdb, dossierAdbConseille } from './adb'
 import type { EssaiApplication } from './applicationTelephone'
 import { cheminApk, essaiApplicationDepuisEnvironnement, gestionnairesApplication } from './applicationTelephone'
-import { DOSSIER_COPIES } from './copieSecurite'
+import { AVIS_COPIE, DOSSIER_COPIES, choixCopiesDepuisEnvironnement, gestionnairesCopies, reglageCopies } from './copieSecurite'
+import { ErreurDisque } from './disque'
 import type { Journal, Journaliser } from './journal'
 import { creerJournal, journaliseur, lireNote, suivreEtats } from './journal'
 import { creerMemoire, gestionnairesMemoire, optionsDepuisEnvironnement } from './memoire'
@@ -338,6 +341,18 @@ const choisirParFenetre = uneALaFois(async ({ titre, depart }: { titre: string; 
   return canceled || filePaths.length === 0 ? null : filePaths[0]
 })
 
+/**
+ * Ouvre un dossier des copies de sécurité dans l'explorateur de Windows ; en mode d'essai, le journalise seulement.
+ * Le chemin a été vérifié par `gestionnairesCopies`.
+ */
+async function ouvrirDossier(chemin: string): Promise<void> {
+  // Sans le chemin : le journal ne garde rien de personnel.
+  journal("ouverture d'un dossier des copies de sécurité")
+  if (BANC) return
+  const erreur = await shell.openPath(chemin)
+  if (erreur) throw new ErreurDisque('UNKNOWN', erreur)
+}
+
 /** Chiffrement du système (DPAPI sous Windows) pour la clé du certificat du sans-fil. */
 const chiffreurSysteme: Chiffreur = {
   disponible: () => safeStorage.isAsyncEncryptionAvailable(),
@@ -421,8 +436,6 @@ function brancherPont(): void {
   const profil = app.getPath('userData')
   const optionsMemoire = optionsDepuisEnvironnement(process.env, { profil, documents: dossierWindows('documents'), maison: dossierWindows('home') }, choisirParFenetre, journal)
   const memoire = creerMemoire(optionsMemoire)
-  // Les copies de sécurité d'avant une première synchronisation : sous Documents (celui d'essai sous le banc).
-  const copies = path.join(optionsMemoire.documents, DOSSIER_COPIES)
   // Les lectures et écritures du téléphone passent par un dossier du profil, vidé au démarrage de ce qu'une coupure y
   // aurait laissé.
   const lectures = path.join(profil, DOSSIER_LECTURES)
@@ -431,6 +444,9 @@ function brancherPont(): void {
     const ouverture = await memoire.ouvrir()
     return ouverture.ok && ouverture.valeur.etat !== 'aucun' ? ouverture.valeur.chemin : null
   }
+  // Les copies de sécurité d'avant une première synchronisation : le dossier choisi par l'utilisateur, retenu dans le
+  // profil, sinon sous Documents (celui d'essai sous le banc).
+  const copies = reglageCopies({ profil, defaut: path.join(optionsMemoire.documents, DOSSIER_COPIES), memoire: memoireRetenue })
   const sansFil = creerSansFil(profil)
   const essaiApplication = essaiApplicationDepuisEnvironnement(process.env, journal)
   const { telephone, cable } = creerTelephone(profil, sansFil, essaiApplication)
@@ -448,7 +464,17 @@ function brancherPont(): void {
     (evenement) => expediteurAdmis(evenement, fenetrePrincipale?.webContents ?? null),
     {
       ...gestionnairesMemoire(memoire),
-      ...gestionnairesTelephone(telephone, lectures, { memoire: memoireRetenue, copies, serie }),
+      ...gestionnairesTelephone(telephone, lectures, {
+        memoire: memoireRetenue,
+        copies: copies.dossier,
+        avancementCopie: (avis) => avertirPage(AVIS_COPIE, avis),
+        serie,
+      }),
+      ...gestionnairesCopies({
+        reglage: copies,
+        choisirDossier: choixCopiesDepuisEnvironnement(process.env, choisirParFenetre, journal),
+        ouvrirDossier,
+      }),
       ...gestionnairesApplication({
         version: VERSION,
         apk,

@@ -25,6 +25,7 @@
 
 import { copyFile, mkdir, open, readFile, readdir, rename, stat, unlink, utimes, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import type { AvancementCopie } from './copieSecurite'
 import { copieSecurite } from './copieSecurite'
 import { ErreurDisque, SUFFIXE_NEUF, SUFFIXE_REMPLACEMENT, avecEssais, codeDe, segmentAdmis } from './disque'
 import { estOctets } from './memoire'
@@ -477,8 +478,10 @@ function estSous(dedans: string, dossier: string): boolean {
 export type OptionsGestionnaires = {
   /** Dossier mémoire retenu, `null` s'il n'y en a pas : le dossier temporaire ne doit jamais s'y trouver. */
   memoire?: () => Promise<string | null>
-  /** Dossier des copies de sécurité (`<Documents>\Gtracker-copies`) ; absent, `telephone:copieSecurite` refuse. */
-  copies?: string
+  /** Dossier des copies de sécurité, relu à chaque copie (`reglageCopies`) ; absent, `telephone:copieSecurite` refuse. */
+  copies?: () => Promise<string>
+  /** Reçoit l'avancement de chaque copie de sécurité, à passer à la page. */
+  avancementCopie?: (avis: AvancementCopie) => void
   /**
    * File des commandes au téléphone, partagée avec les autres canaux qui lui parlent (l'installation de l'application) ;
    * absente, une file propre à ces gestionnaires.
@@ -515,7 +518,8 @@ function champs(argument: unknown): Record<string, unknown> {
  *   listage réussi, et rend le `FichierTelephone` écrit ; le fichier temporaire est effacé, réussite ou échec ;
  * - `telephone:effacer({ chemin })` efface un fichier de la liste blanche, vu au dernier listage ou écrit depuis ;
  * - `telephone:copieSecurite()` copie le dossier mémoire retenu et ce que liste le téléphone dans un dossier neuf des
- *   copies de sécurité (`copieSecurite.ts`), et rend son chemin absolu ; le dernier listage n'en change pas.
+ *   copies de sécurité (`copieSecurite.ts`), annonce son avancement (`avancementCopie`), et rend son chemin absolu ;
+ *   le dernier listage n'en change pas.
  * Un chemin hors de la liste blanche est refusé (`PERMISSION`) avant toute commande au téléphone.
  */
 export function gestionnairesTelephone(dossier: DossierDistant, dossierTemp: string, options: OptionsGestionnaires = {}): Record<string, Gestionnaire> {
@@ -648,7 +652,7 @@ export function gestionnairesTelephone(dossier: DossierDistant, dossierTemp: str
           const memoire = options.memoire ? await options.memoire() : null
           if (memoire === null) throw new ErreurDisque('UNKNOWN', 'Aucun dossier mémoire retenu : pas de copie de sécurité.')
           if (!options.copies) throw new ErreurDisque('UNKNOWN', 'Ce programme ne sait pas où ranger les copies de sécurité.')
-          return copieSecurite({ memoire, telephone: dossier, copies: options.copies })
+          return copieSecurite({ memoire, telephone: dossier, copies: await options.copies(), avancement: options.avancementCopie })
         }),
       ),
   }
