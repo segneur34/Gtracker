@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { errorMessage } from '../core/basics';
 import { t } from '../core/i18n';
-import { pairingDeadline, pairingStatus, type PairingStatus } from '../library/wirelessPhone';
+import { authorizationOutcomeText, pairingDeadline, pairingStatus, type PairingStatus } from '../library/wirelessPhone';
 import {
-  onWirelessArrival, openWirelessPairing, removeWirelessPhone, setWirelessActive, wirelessAvailable, wirelessPhones, wirelessState,
-  type WirelessPairing, type WirelessPhone, type WirelessState,
+  authorizeWireless, onWirelessArrival, openWirelessPairing, removeWirelessPhone, setWirelessActive, wirelessAuthorizable, wirelessAvailable,
+  wirelessPhones, wirelessState, type WirelessPairing, type WirelessPhone, type WirelessState,
 } from '../platform/wirelessPhone';
 
 /**
  * Le sans-fil du programme Windows, vu du bloc de Réglages › Mémoire : l'état du PC et les téléphones reliés, relus
  * toutes les 5 secondes (chaque seconde pendant qu'une fenêtre de liaison est ouverte) et à chaque arrivée d'un
- * téléphone ; la fenêtre de liaison et son issue ; allumer ou éteindre, retirer un téléphone. Rien d'écrit ici : le
- * PC garde tout.
+ * téléphone ; la fenêtre de liaison et son issue ; allumer ou éteindre, retirer un téléphone, demander à Windows
+ * d'autoriser Gtracker sur le réseau. Rien d'écrit ici : le PC garde tout.
  */
 
 /** Relecture de l'état, au repos et pendant une fenêtre de liaison. */
@@ -41,13 +41,21 @@ export interface WirelessPhonesView {
   nowMs: number;
   /** Un geste est en cours : les boutons sont grisés. */
   busy: boolean;
+  /** Vrai si la coquille sait demander l'autorisation au pare-feu de Windows. */
+  authorizable: boolean;
+  /** Phrase de la dernière demande d'autorisation refusée ou en échec, `null` sinon. */
+  authorizationMessage: string | null;
   setActive(active: boolean): Promise<void>;
   startPairing(): Promise<void>;
   removePhone(id: string): Promise<void>;
+  /** Demande à Windows d'autoriser Gtracker sur le réseau, puis montre l'état relu. */
+  authorize(): Promise<void>;
 }
 
 export function useWirelessPhones(): WirelessPhonesView {
   const [available] = useState(wirelessAvailable);
+  const [authorizable] = useState(wirelessAuthorizable);
+  const [authorizationMessage, setAuthorizationMessage] = useState<string | null>(null);
   const [state, setState] = useState<WirelessState | null>(null);
   const [phones, setPhones] = useState<WirelessPhone[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -118,8 +126,17 @@ export function useWirelessPhones(): WirelessPhonesView {
     const next = await setWirelessActive(active);
     if (!alive.current) return;
     setState(next);
+    setAuthorizationMessage(null);
     if (!active) setPairing(null);
     setPhones(await wirelessPhones());
+  }), [act]);
+
+  const authorize = useCallback(() => act(async () => {
+    setAuthorizationMessage(null);
+    const result = await authorizeWireless();
+    if (!alive.current) return;
+    setState(result.etat);
+    setAuthorizationMessage(authorizationOutcomeText(result.issue, result.detail));
   }), [act]);
 
   const startPairing = useCallback(() => act(async () => {
@@ -141,5 +158,8 @@ export function useWirelessPhones(): WirelessPhonesView {
     setPhones(next.phones);
   }), [act, read]);
 
-  return { available, state, phones, error, pairing, pairingStatus: status, nowMs, busy, setActive, startPairing, removePhone };
+  return {
+    available, state, phones, error, pairing, pairingStatus: status, nowMs, busy, authorizable, authorizationMessage,
+    setActive, startPairing, removePhone, authorize,
+  };
 }

@@ -1,11 +1,12 @@
 import { dayMonthYearTime } from '../core/calendar';
 import { t } from '../core/i18n';
 import { formatMinSec } from '../core/units';
-import type { WirelessPhone, WirelessPairing, WirelessState } from '../platform/wirelessPhone';
+import type { AuthorizationOutcome, WirelessPhone, WirelessPairing, WirelessState } from '../platform/wirelessPhone';
 
 /**
- * Le sans-fil du programme Windows, partie pure : ce que dit l'état du PC, le décompte de la fenêtre de liaison d'un
- * téléphone, l'issue de cette fenêtre, et la ligne de chaque téléphone relié.
+ * Le sans-fil du programme Windows, partie pure : ce que dit l'état du PC, le pare-feu de Windows et l'issue de sa
+ * demande d'autorisation, le décompte de la fenêtre de liaison d'un téléphone, l'issue de cette fenêtre, et la ligne
+ * de chaque téléphone relié.
  */
 
 /** Ce que le bloc dit de l'état du sans-fil. */
@@ -13,48 +14,54 @@ export interface WirelessStatus {
   kind: 'off' | 'listening' | 'no-network' | 'error';
   /** La phrase d'état. */
   text: string;
-  /** Avertissement à part (Windows bloque Gtracker), `null` sinon : jamais écrit sans que l'essai ait dit « bloqué ». */
-  warning: string | null;
-  /** Aide à lire quand le PC attend et qu'aucun téléphone n'est là, `null` sinon. */
-  hint: string | null;
 }
 
-/**
- * État du sans-fil en phrases. Le pare-feu n'est jamais présenté comme une certitude : « bloqué » s'affirme ; « ouvert »
- * ou « inconnu » ne disent rien (Windows ne filtre pas le trafic de l'ordinateur vers lui-même).
- */
+/** État du sans-fil en phrases ; le pare-feu se dit à part (`firewallNotice`). */
 export const describeWireless = (state: WirelessState): WirelessStatus => {
   if (!state.actif) {
-    return { kind: 'off', text: t("Le sans-fil est éteint : le téléphone ne peut pas se présenter à cet ordinateur."), warning: null, hint: null };
+    return { kind: 'off', text: t("Le sans-fil est éteint : le téléphone ne peut pas se présenter à cet ordinateur.") };
   }
   if (state.ecoute) {
-    const warning = state.pareFeu === 'bloque'
-      ? t("Windows bloque Gtracker sur ce réseau. Autorisez-le dans le pare-feu de Windows, puis éteignez et rallumez le sans-fil.")
-      : null;
-    const hint = state.relies.length === 0
-      ? t("Aucun téléphone ne se présente ? Ouvrez Gtracker sur le téléphone, relié au même réseau. Si rien ne se passe, le pare-feu de Windows peut bloquer Gtracker (surtout sur un partage de connexion, que Windows range parfois parmi les réseaux publics) : le câble reste possible.")
-      : null;
     return {
       kind: 'listening',
       text: t("Gtracker attend votre téléphone sur le réseau (adresse {adresse}).", { adresse: state.adresses[0] ?? '' }),
-      warning,
-      hint,
     };
   }
   if (state.erreur !== null) {
     return {
       kind: 'error',
       text: t("Le sans-fil ne démarre pas : {detail}.", { detail: state.erreur.replace(/\.\s*$/, '') }),
-      warning: null,
-      hint: null,
     };
   }
   return {
     kind: 'no-network',
     text: t("Le sans-fil ne trouve pas encore de réseau : l'ordinateur est-il relié à une box Wi-Fi, ou partage-t-il sa connexion avec le téléphone ?"),
-    warning: null,
-    hint: null,
   };
+};
+
+/** Ce que le bloc dit du pare-feu de Windows : la phrase, et si le bouton « Autoriser Gtracker » l'accompagne. */
+export interface FirewallNotice {
+  text: string;
+  canAuthorize: boolean;
+}
+
+/**
+ * Le pare-feu en phrase, `null` s'il ne bloque pas : seul « bloqué » s'affirme, « ouvert » et « inconnu » ne disent
+ * rien. Le bouton n'est proposé que si l'autorisation de Gtracker suffirait ; sinon, la phrase dit qu'un réglage de
+ * l'administrateur l'empêche. Sans-fil éteint ou sans écoute : rien.
+ */
+export const firewallNotice = (state: WirelessState): FirewallNotice | null => {
+  if (!state.actif || !state.ecoute || state.pareFeu !== 'bloque') return null;
+  const blocked = t('Windows ne laisse pas passer votre téléphone sur ce réseau.');
+  if (state.pareFeuReparable === true) return { text: blocked, canAuthorize: true };
+  return { text: `${blocked} ${t("Un réglage de l'administrateur de cet ordinateur empêche de l'autoriser ici.")}`, canAuthorize: false };
+};
+
+/** Phrase de l'issue de la demande d'autorisation ; `null` quand elle est accordée (le message du pare-feu s'en va). */
+export const authorizationOutcomeText = (outcome: AuthorizationOutcome, detail?: string): string | null => {
+  if (outcome === 'accordee') return null;
+  if (outcome === 'refusee') return t("Windows n'a pas donné l'autorisation : le téléphone ne pourra pas se présenter sur ce réseau.");
+  return t("L'autorisation n'a pas pu être ajoutée : {detail}.", { detail: (detail ?? t('erreur inconnue')).replace(/\.\s*$/, '') });
 };
 
 /** Heure de fermeture de la fenêtre de liaison, sur l'horloge de la page : `nowMs` au moment où le PC a répondu. */

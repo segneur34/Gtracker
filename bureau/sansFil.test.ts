@@ -10,6 +10,7 @@ import { enHex } from './appairage'
 import { fabriquerCertificat } from './certificat'
 import { estTemporaire } from './disque'
 import { FauxTelephone, RefusPc, sonder } from './fauxTelephone'
+import type { ContexteEcoute, JugementPareFeu, ResultatAutorisation } from './pareFeu'
 import type { Reponse } from './pont'
 import type { AvisArrivee, Chiffreur, OptionsSansFil } from './sansFil'
 import {
@@ -22,6 +23,7 @@ import {
   dossierSansFilPuisCable,
   essaiSansFilDepuisEnvironnement,
   gestionnairesSansFil,
+  pareFeuFactice,
   stockageDossier,
 } from './sansFil'
 import { dossierLocal, gestionnairesTelephone } from './telephone'
@@ -131,7 +133,8 @@ describe('serveur sans fil', () => {
   it('activé, écoute, retient le choix, et reprend au lancement suivant avec le même certificat', async () => {
     const s = serveur()
     const etat = await s.activer(true)
-    expect(etat).toMatchObject({ actif: true, ecoute: true, adresses: ['127.0.0.1'], pareFeu: 'ouvert', erreur: null })
+    // Sans relevé du pare-feu, l'auto-connexion réussie ne dit rien : « inconnu ».
+    expect(etat).toMatchObject({ actif: true, ecoute: true, adresses: ['127.0.0.1'], pareFeu: 'inconnu', pareFeuReparable: false, erreur: null })
     expect(etat.port).toBeGreaterThan(0)
     const { f } = await appairer(s)
     await s.arreter()
@@ -680,6 +683,131 @@ describe('canaux et mode d’essai', () => {
     expect(await canaux['sansfil:retirer']({ id: '../x' })).toMatchObject({ ok: false })
     expect(await canaux['sansfil:retirer']({ id: '0'.repeat(32) })).toEqual({ ok: true, valeur: false })
     expect(await canaux['sansfil:etat'](undefined)).toMatchObject({ ok: true, valeur: { actif: true } })
+    // Sans demande d'autorisation branchée : un échec dit, jamais une exception.
+    expect(await canaux['sansfil:autoriser'](undefined)).toMatchObject({ ok: true, valeur: { issue: 'echec', etat: { actif: true } } })
+  })
+
+  it('le mode d’essai a un pare-feu factice, réglé par ses deux variables', async () => {
+    const journal: string[] = []
+    const essai = essaiSansFilDepuisEnvironnement(
+      { GTRACKER_BANC: '1', GTRACKER_BANC_SANSFIL_PAREFEU: 'bloque', GTRACKER_BANC_SANSFIL_AUTORISATION: 'zut' },
+      (m) => journal.push(m),
+    )
+    expect(journal.some((m) => m.includes('GTRACKER_BANC_SANSFIL_AUTORISATION illisible'))).toBe(true)
+    const ecoute = { adresses: ['127.0.0.1'], port: 1, portSonde: null }
+    expect(await essai?.lirePareFeu(ecoute)).toEqual({ pareFeu: 'bloque', reparable: true })
+    expect(await essai?.autoriserPareFeu()).toEqual({ issue: 'accordee' })
+    expect(journal).toContain("autorisation d'essai : accordee")
+    expect(await essai?.lirePareFeu(ecoute)).toEqual({ pareFeu: 'ouvert', reparable: false })
+    const defaut = essaiSansFilDepuisEnvironnement({ GTRACKER_BANC: '1' })
+    expect(await defaut?.lirePareFeu(ecoute)).toEqual({ pareFeu: 'ouvert', reparable: false })
+    const irreparable = pareFeuFactice('irreparable', 'accordee')
+    await irreparable.autoriserPareFeu()
+    expect(await irreparable.lirePareFeu(ecoute)).toEqual({ pareFeu: 'bloque', reparable: false })
+    expect(await pareFeuFactice('bloque', 'echec').autoriserPareFeu()).toMatchObject({ issue: 'echec', detail: expect.any(String) })
+  })
+})
+
+describe('pare-feu de Windows', () => {
+  /** Un pare-feu réglable, qui compte ses relevés et ses demandes. */
+  function pareFeuReglable(depart: JugementPareFeu, issue: ResultatAutorisation = { issue: 'accordee' }) {
+    const suivi = { jugement: depart, releves: [] as ContexteEcoute[], demandes: 0, ordre: [] as string[] }
+    const options: Partial<OptionsSansFil> = {
+      lirePareFeu: async (ecoute) => {
+        suivi.releves.push(ecoute)
+        suivi.ordre.push('releve')
+        return suivi.jugement
+      },
+      autoriserPareFeu: async () => {
+        suivi.demandes++
+        suivi.ordre.push('demande')
+        if (issue.issue === 'accordee') suivi.jugement = { pareFeu: 'ouvert', reparable: false }
+        return issue
+      },
+    }
+    return { suivi, options }
+  }
+  const BLOQUE: JugementPareFeu = { pareFeu: 'bloque', reparable: true }
+
+  it('relevé lu après la mise à l’écoute, au port pris, puis relu toutes les 30 s tant qu’il bloque', async () => {
+    const { suivi, options } = pareFeuReglable(BLOQUE)
+    const s = serveur({ ...options, delais: { intervalleAdresses: 50 } })
+    const etat = await s.activer(true, false)
+    expect(suivi.demandes).toBe(0)
+    expect(etat).toMatchObject({ pareFeu: 'bloque', pareFeuReparable: true })
+    expect(suivi.releves[0]).toEqual({ adresses: ['127.0.0.1'], port: etat.port, portSonde: null })
+    await quand(() => suivi.releves.length >= 3)
+    // Ouvert (règle posée à la main dans Windows) : vu au relevé suivant, puis plus relu.
+    suivi.jugement = { pareFeu: 'ouvert', reparable: false }
+    await quand(async () => (await s.etat()).pareFeu === 'ouvert')
+    const vus = suivi.releves.length
+    await attendre(200)
+    expect(suivi.releves.length).toBe(vus)
+    expect((await s.etat()).pareFeuReparable).toBe(false)
+  })
+
+  it('à l’allumage, bloqué et réparable : l’autorisation est demandée avant l’écoute', async () => {
+    const { suivi, options } = pareFeuReglable(BLOQUE)
+    const s = serveur(options)
+    const etat = await s.activer(true)
+    expect(suivi.demandes).toBe(1)
+    expect(suivi.ordre).toEqual(['releve', 'demande', 'releve'])
+    expect(etat).toMatchObject({ ecoute: true, pareFeu: 'ouvert', pareFeuReparable: false })
+  })
+
+  it('à l’allumage, refus : le sans-fil s’allume quand même, bloqué et réparable ; rien n’est demandé s’il est ouvert ou irréparable', async () => {
+    const refus = pareFeuReglable(BLOQUE, { issue: 'refusee' })
+    expect(await serveur(refus.options).activer(true)).toMatchObject({ ecoute: true, pareFeu: 'bloque', pareFeuReparable: true })
+    expect(refus.suivi.demandes).toBe(1)
+    await Promise.all(serveurs.splice(0).map((x) => x.arreter()))
+
+    const ouvert = pareFeuReglable({ pareFeu: 'ouvert', reparable: false })
+    await serveur(ouvert.options).activer(true)
+    expect(ouvert.suivi.demandes).toBe(0)
+    await Promise.all(serveurs.splice(0).map((x) => x.arreter()))
+
+    const irreparable = pareFeuReglable({ pareFeu: 'bloque', reparable: false })
+    expect(await serveur(irreparable.options).activer(true)).toMatchObject({ pareFeu: 'bloque', pareFeuReparable: false })
+    expect(irreparable.suivi.demandes).toBe(0)
+  })
+
+  it('autorisation par le canal : accordée puis ouvert ; refus, reste bloqué ; échec, avec sa raison', async () => {
+    const accord = pareFeuReglable(BLOQUE)
+    const s = serveur(accord.options)
+    await s.activer(true, false)
+    const canaux = gestionnairesSansFil(s)
+    const reponse = (await canaux['sansfil:autoriser']('ignoré')) as Reponse
+    expect(reponse).toMatchObject({ ok: true, valeur: { issue: 'accordee', etat: { pareFeu: 'ouvert', pareFeuReparable: false } } })
+    await Promise.all(serveurs.splice(0).map((x) => x.arreter()))
+
+    const refus = pareFeuReglable(BLOQUE, { issue: 'refusee' })
+    const r = serveur(refus.options)
+    await r.activer(true, false)
+    expect(await r.autoriserPareFeu()).toMatchObject({ issue: 'refusee', etat: { pareFeu: 'bloque', pareFeuReparable: true } })
+    await Promise.all(serveurs.splice(0).map((x) => x.arreter()))
+
+    const echec = pareFeuReglable(BLOQUE, { issue: 'echec', detail: 'règle refusée' })
+    const e = serveur(echec.options)
+    await e.activer(true, false)
+    expect(await e.autoriserPareFeu()).toMatchObject({ issue: 'echec', detail: 'règle refusée', etat: { pareFeu: 'bloque' } })
+    // Une demande en échec dont le relevé suivant dit ouvert est accordée.
+    echec.suivi.jugement = { pareFeu: 'ouvert', reparable: false }
+    expect(await e.autoriserPareFeu()).toMatchObject({ issue: 'accordee', etat: { pareFeu: 'ouvert' } })
+  })
+
+  it('sans-fil éteint : l’autorisation est refusée par le canal, sans rien demander', async () => {
+    const { suivi, options } = pareFeuReglable(BLOQUE)
+    const s = serveur(options)
+    await s.demarrer()
+    expect(await gestionnairesSansFil(s)['sansfil:autoriser'](undefined)).toMatchObject({ ok: false, code: 'UNKNOWN' })
+    expect(suivi.demandes).toBe(0)
+  })
+
+  it('relevé illisible : l’auto-connexion en repli, « ouvert » devient « inconnu »', async () => {
+    const s = serveur({ lirePareFeu: async () => null, autoriserPareFeu: async () => ({ issue: 'accordee' }) })
+    expect(await s.activer(true)).toMatchObject({ ecoute: true, pareFeu: 'inconnu', pareFeuReparable: false })
+    const panne = serveur({ lirePareFeu: async () => Promise.reject(new Error('powershell absent')) })
+    await expect(panne.activer(true)).resolves.toMatchObject({ pareFeu: 'inconnu' })
   })
 
   it('ne lit les variables d’essai qu’en mode d’essai, et n’écoute alors que sur la boucle locale', () => {

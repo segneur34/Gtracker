@@ -54,8 +54,9 @@ const telephone = Object.freeze({
 
 /**
  * Le sans-fil du PC (noms gardés égaux à ceux de `sansFil.ts` par un test) : `etat()`, `activer({ actif })`,
- * `ouvrirAppairage()`, `telephones()`, `retirer({ id })`, et `surArrivee(rappel)`, appelé avec `{ id, nom, nouveau }`
- * quand un téléphone se présente, qui rend la fonction de désabonnement.
+ * `ouvrirAppairage()`, `telephones()`, `retirer({ id })`, `autoriser()`, qui demande à Windows d'autoriser Gtracker
+ * sur le réseau et rend `{ issue, detail?, etat }`, et `surArrivee(rappel)`, appelé avec `{ id, nom, nouveau }` quand
+ * un téléphone se présente, qui rend la fonction de désabonnement.
  */
 const sansFil = Object.freeze({
   etat: sans('sansfil:etat'),
@@ -63,6 +64,7 @@ const sansFil = Object.freeze({
   ouvrirAppairage: sans('sansfil:ouvrirAppairage'),
   telephones: sans('sansfil:telephones'),
   retirer: avec('sansfil:retirer'),
+  autoriser: sans('sansfil:autoriser'),
   surArrivee: (rappel: (avis: unknown) => void) => {
     // L'événement d'Electron ne passe pas à la page : seulement l'avis.
     const ecouteur = (_evenement: unknown, avis: unknown) => rappel(avis)

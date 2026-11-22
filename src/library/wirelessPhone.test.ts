@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { WirelessPhone, WirelessState } from '../platform/wirelessPhone';
-import { countdownText, describePhoneSeen, describeWireless, pairingAddress, pairingDeadline, pairingStatus, remainingMs } from './wirelessPhone';
+import {
+  authorizationOutcomeText, countdownText, describePhoneSeen, describeWireless, firewallNotice, pairingAddress, pairingDeadline, pairingStatus, remainingMs,
+} from './wirelessPhone';
 
 const state = (patch: Partial<WirelessState> = {}): WirelessState => ({
   actif: true, ecoute: true, port: 48217, adresses: ['192.168.1.20'], pareFeu: 'inconnu', erreur: null, appairage: null, relies: [], ...patch,
@@ -9,26 +11,17 @@ const state = (patch: Partial<WirelessState> = {}): WirelessState => ({
 const phone = (patch: Partial<WirelessPhone> = {}): WirelessPhone => ({ id: 'a1', nom: 'Pixel', ajouteLe: 1000, vuLe: null, relie: false, ...patch });
 
 describe('état du sans-fil en phrases', () => {
-  it('éteint : une phrase, ni alerte ni aide', () => {
+  it('éteint : une phrase', () => {
     const status = describeWireless(state({ actif: false, ecoute: false }));
-    expect(status).toMatchObject({ kind: 'off', warning: null, hint: null });
+    expect(status.kind).toBe('off');
     expect(status.text).toContain('éteint');
   });
 
-  it('à l\'écoute : l\'adresse, l\'aide sur le réseau et le pare-feu tant que personne n\'est relié', () => {
+  it('à l\'écoute : l\'adresse, sans conseil de câble ni de débogage USB', () => {
     const status = describeWireless(state());
     expect(status.kind).toBe('listening');
     expect(status.text).toContain('192.168.1.20');
-    expect(status.hint).toContain('même réseau');
-    expect(status.hint).toContain('partage de connexion');
-    expect(status.hint).toContain('câble');
-    expect(describeWireless(state({ relies: [{ id: 'a1', nom: 'Pixel' }] })).hint).toBeNull();
-  });
-
-  it('le pare-feu n\'est affirmé que s\'il est bloqué : « ouvert » et « inconnu » ne disent rien', () => {
-    expect(describeWireless(state({ pareFeu: 'bloque' })).warning).toContain('Windows bloque Gtracker');
-    expect(describeWireless(state({ pareFeu: 'ouvert' })).warning).toBeNull();
-    expect(describeWireless(state({ pareFeu: 'inconnu' })).warning).toBeNull();
+    expect(JSON.stringify(status)).not.toMatch(/câble|USB/);
   });
 
   it('activé sans écoute : l\'erreur en clair, ou l\'invitation à relier le réseau', () => {
@@ -37,6 +30,37 @@ describe('état du sans-fil en phrases', () => {
     const noNetwork = describeWireless(state({ ecoute: false, adresses: [] }));
     expect(noNetwork.kind).toBe('no-network');
     expect(noNetwork.text).toContain('partage-t-il sa connexion');
+  });
+});
+
+describe('pare-feu de Windows en phrases', () => {
+  it('bloqué et réparable : la phrase et le bouton', () => {
+    expect(firewallNotice(state({ pareFeu: 'bloque', pareFeuReparable: true }))).toEqual({
+      text: 'Windows ne laisse pas passer votre téléphone sur ce réseau.',
+      canAuthorize: true,
+    });
+  });
+
+  it('bloqué sans réparation possible (ou coquille ancienne) : la phrase et le réglage de l\'administrateur, sans bouton', () => {
+    for (const notice of [firewallNotice(state({ pareFeu: 'bloque', pareFeuReparable: false })), firewallNotice(state({ pareFeu: 'bloque' }))]) {
+      expect(notice?.canAuthorize).toBe(false);
+      expect(notice?.text).toMatch(/^Windows ne laisse pas passer votre téléphone sur ce réseau\. Un réglage de l'administrateur/);
+    }
+  });
+
+  it('ouvert, inconnu, éteint ou sans écoute : rien, et jamais de conseil de câble', () => {
+    expect(firewallNotice(state({ pareFeu: 'ouvert' }))).toBeNull();
+    expect(firewallNotice(state({ pareFeu: 'inconnu', pareFeuReparable: true }))).toBeNull();
+    expect(firewallNotice(state({ actif: false, ecoute: false, pareFeu: 'bloque' }))).toBeNull();
+    expect(firewallNotice(state({ ecoute: false, pareFeu: 'bloque' }))).toBeNull();
+    expect(JSON.stringify(firewallNotice(state({ pareFeu: 'bloque' })))).not.toMatch(/câble|USB/);
+  });
+
+  it('issue de la demande : rien si accordée, le refus, l\'échec avec sa raison', () => {
+    expect(authorizationOutcomeText('accordee')).toBeNull();
+    expect(authorizationOutcomeText('refusee')).toBe("Windows n'a pas donné l'autorisation : le téléphone ne pourra pas se présenter sur ce réseau.");
+    expect(authorizationOutcomeText('echec', "Windows n'a pas répondu à temps.")).toBe("L'autorisation n'a pas pu être ajoutée : Windows n'a pas répondu à temps.");
+    expect(authorizationOutcomeText('echec')).toBe("L'autorisation n'a pas pu être ajoutée : erreur inconnue.");
   });
 });
 

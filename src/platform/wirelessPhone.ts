@@ -1,6 +1,8 @@
 import { t } from '../core/i18n';
 import {
   desktopBridge,
+  type DesktopAuthorizationOutcome,
+  type DesktopWirelessAuthorization,
   type DesktopWirelessBridge,
   type DesktopWirelessPairing,
   type DesktopWirelessPhone,
@@ -12,14 +14,17 @@ import { isDesktopApp } from './runtime';
 /**
  * Le sans-fil du programme Windows : le PC attend le téléphone sur le Wi-Fi de la maison, relié une fois par un code, et
  * range ensuite les sessions qu'il n'a pas (`phoneCable.ts` lit le téléphone par l'un ou l'autre canal). Ici : allumer
- * ou éteindre, ouvrir la fenêtre de liaison, lister et retirer les téléphones reliés, et savoir quand l'un d'eux se
- * présente. Rien n'existe ailleurs (navigateur, téléphone, coquille plus ancienne) : `wirelessAvailable()` est faux et
- * aucune des autres fonctions ne s'exécute.
+ * ou éteindre, ouvrir la fenêtre de liaison, lister et retirer les téléphones reliés, savoir quand l'un d'eux se
+ * présente, et demander à Windows d'autoriser Gtracker sur le réseau. Rien n'existe ailleurs (navigateur, téléphone,
+ * coquille plus ancienne) : `wirelessAvailable()` est faux et aucune des autres fonctions ne s'exécute ; une coquille
+ * qui ne sait pas demander l'autorisation a `wirelessAuthorizable()` faux.
  */
 
 export type WirelessState = DesktopWirelessState;
 export type WirelessPairing = DesktopWirelessPairing;
 export type WirelessPhone = DesktopWirelessPhone;
+export type WirelessAuthorization = DesktopWirelessAuthorization;
+export type AuthorizationOutcome = DesktopAuthorizationOutcome;
 
 /** Un téléphone qui se présente au PC ; `isNew` : il vient d'être relié par le code. */
 export interface WirelessArrival {
@@ -62,6 +67,21 @@ export const wirelessPhones = (): Promise<WirelessPhone[]> => bridgeValue(requir
 
 /** Retire un téléphone : il ne pourra plus se présenter sans être relié de nouveau par un code. Vrai s'il était relié. */
 export const removeWirelessPhone = (id: string): Promise<boolean> => bridgeValue(requireWireless().retirer({ id }));
+
+/** Vrai si la coquille sait demander à Windows d'autoriser Gtracker sur le réseau. */
+export const wirelessAuthorizable = (): boolean => typeof wirelessBridge()?.autoriser === 'function';
+
+/**
+ * Demande à Windows d'autoriser Gtracker sur le réseau (Windows demande de confirmer) ; rend l'issue et l'état relu
+ * aussitôt. Lève si le sans-fil est éteint ou si la coquille ne sait pas le demander.
+ */
+export const authorizeWireless = (): Promise<WirelessAuthorization> => {
+  const bridge = requireWireless();
+  if (typeof bridge.autoriser !== 'function') {
+    throw Object.assign(new Error(t('Ce programme ne sait pas demander cette autorisation à Windows.')), { code: 'UNKNOWN' });
+  }
+  return bridgeValue(bridge.autoriser());
+};
 
 /** Avis lu avec méfiance : ce qui n'a pas la forme attendue est ignoré. */
 const arrivalOf = (notice: unknown): WirelessArrival | null => {

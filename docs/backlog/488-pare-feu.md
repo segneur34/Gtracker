@@ -68,7 +68,7 @@ Mineures, tranchées par l'orchestrateur le 22/11 d'après les recommandations d
 - `essayerAutoConnexion` gardé en repli seulement ;
 - règle bornée aux ports et au sous-réseau local plutôt qu'au programme seul ; la détection vérifie le port réellement pris.
 
-Majeures, posées à l'utilisateur le 22/11, **sans réponse à cette date : rien ne se code avant** :
+Majeures, posées à l'utilisateur le 22/11, **répondues oui toutes deux le 22/11 (Q144 et Q145)** :
 1. Sécurité : la règle vaut aussi sur les réseaux que Windows dit publics. C'est indispensable au partage de connexion ; elle est limitée à Gtracker, à ses deux ports et au sous-réseau local. Recommandé : oui.
 2. À l'allumage du sans-fil sur un PC sans règle : lancer la demande de Gtracker avant l'écoute (une seule demande, la fenêtre de Windows aux cases « privés » et « publics » n'apparaît plus), en sachant que la demande affiche « Windows PowerShell » et non « Gtracker ». Recommandé : oui.
 

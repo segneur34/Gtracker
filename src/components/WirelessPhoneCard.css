@@ -12,6 +12,13 @@
   overflow-wrap: anywhere;
 }
 
+/* Pare-feu de Windows qui bloque : la phrase, le bouton qui demande l'autorisation, l'issue de la demande. */
+.wireless-card__firewall {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 /* Fenêtre de liaison : un cadre à l'encre, adresse et code en grand, lisibles de loin pour les taper sur le téléphone. */
 .wireless-card__pairing {
   display: flex;

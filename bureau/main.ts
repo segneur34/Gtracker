@@ -20,8 +20,12 @@
 //   GTRACKER_MEMOIRE, GTRACKER_DOCUMENTS, GTRACKER_BANC_DOSSIER : en mode d'essai seulement, voir `memoire.ts`
 //   GTRACKER_BANC_TELEPHONE, GTRACKER_BANC_TELEPHONE_ETAT, GTRACKER_BANC_TELEPHONE_COUPURE : en mode d'essai
 //                           seulement, voir `telephone.ts` ; le mode d'essai ne lance jamais le vrai adb
-//   GTRACKER_BANC_SANSFIL_ACTIF, _PORT, _SONDE, _FENETRE_MS, _PROFIL : en mode d'essai seulement, voir `sansFil.ts` ;
-//                           le serveur sans fil d'essai n'écoute que sur 127.0.0.1
+//   GTRACKER_BANC_SANSFIL_ACTIF, _PORT, _SONDE, _FENETRE_MS, _PROFIL, _PAREFEU, _AUTORISATION : en mode d'essai
+//                           seulement, voir `sansFil.ts` ; le serveur sans fil d'essai n'écoute que sur 127.0.0.1, et
+//                           son pare-feu est factice (jamais Windows PowerShell)
+//
+// Hors du mode d'essai, le pare-feu de Windows est lu et l'autorisation demandée pour l'exécutable en cours
+// (`process.execPath`), par `pareFeu.ts`.
 //   GTRACKER_APK, GTRACKER_BANC_APK_DESTINATION, GTRACKER_BANC_APPLICATION_REFUS : en mode d'essai seulement, voir
 //                           `applicationTelephone.ts` ; le mode d'essai n'ouvre jamais la fenêtre « Enregistrer sous »
 //
@@ -46,6 +50,8 @@ import type { EssaiApplication } from './applicationTelephone'
 import { cheminApk, essaiApplicationDepuisEnvironnement, gestionnairesApplication } from './applicationTelephone'
 import { DOSSIER_COPIES } from './copieSecurite'
 import { creerMemoire, gestionnairesMemoire, optionsDepuisEnvironnement } from './memoire'
+import type { ContexteEcoute } from './pareFeu'
+import { autoriserPareFeuWindows, lirePareFeuWindows } from './pareFeu'
 import type { Chiffreur } from './sansFil'
 import { AVIS_ARRIVEE, DOSSIER_SANS_FIL, ServeurSansFil, dossierSansFilPuisCable, essaiSansFilDepuisEnvironnement, gestionnairesSansFil, stockageDossier } from './sansFil'
 import type { DossierDistant } from './telephone'
@@ -329,17 +335,26 @@ const chiffreurSysteme: Chiffreur = {
 function creerSansFil(profil: string): ServeurSansFil {
   const essai = essaiSansFilDepuisEnvironnement(process.env, journal)
   const { dossier, actif, ...reglagesEssai } = essai ?? { dossier: null, actif: false }
+  // Le vrai pare-feu hors du mode d'essai seulement ; en essai, celui de `reglagesEssai` (factice).
+  const pareFeuWindows = essai
+    ? {}
+    : {
+        lirePareFeu: (ecoute: ContexteEcoute) => lirePareFeuWindows({ ...ecoute, exe: process.execPath }),
+        autoriserPareFeu: () => autoriserPareFeuWindows(process.execPath),
+      }
   const serveur = new ServeurSansFil({
     stockage: stockageDossier(dossier ?? path.join(profil, DOSSIER_SANS_FIL)),
     chiffreur: chiffreurSysteme,
     journal,
+    ...pareFeuWindows,
     surArrivee: (avis) => {
       const fenetre = fenetrePrincipale
       if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(AVIS_ARRIVEE, avis)
     },
     ...reglagesEssai,
   })
-  void (actif ? serveur.activer(true) : serveur.demarrer()).catch((e: unknown) => journal(`sans-fil : ${e instanceof Error ? e.message : String(e)}`))
+  // Activé dès le lancement (mode d'essai) : comme un sans-fil déjà allumé, sans demande d'autorisation.
+  void (actif ? serveur.activer(true, false) : serveur.demarrer()).catch((e: unknown) => journal(`sans-fil : ${e instanceof Error ? e.message : String(e)}`))
   app.on('will-quit', () => void serveur.arreter())
   return serveur
 }

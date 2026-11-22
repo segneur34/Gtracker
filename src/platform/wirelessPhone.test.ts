@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  onWirelessArrival, openWirelessPairing, removeWirelessPhone, setWirelessActive, wirelessAvailable, wirelessPhones, wirelessState,
-  type WirelessArrival,
+  authorizeWireless, onWirelessArrival, openWirelessPairing, removeWirelessPhone, setWirelessActive, wirelessAuthorizable, wirelessAvailable,
+  wirelessPhones, wirelessState, type WirelessArrival,
 } from './wirelessPhone';
 import type { DesktopWirelessBridge } from './desktopBridge';
 
@@ -25,7 +25,7 @@ const { fileURLToPath } = (await import(/* @vite-ignore */ 'node:url' as string)
 
 type Reponse = { ok: true; valeur: unknown } | { ok: false; code: string; message: string };
 interface ShellServer {
-  activer(actif: boolean): Promise<unknown>;
+  activer(actif: boolean, demanderAutorisation?: boolean): Promise<unknown>;
   arreter(): Promise<void>;
 }
 interface ShellFake {
@@ -35,6 +35,7 @@ interface ShellSansFil {
   ServeurSansFil: new (options: Record<string, unknown>) => ShellServer;
   gestionnairesSansFil(serveur: ShellServer): Record<string, (argument: unknown) => Promise<Reponse>>;
   stockageDossier(dossier: string): unknown;
+  pareFeuFactice(etat: string, autorisation: string): Record<string, unknown>;
 }
 const SHELL_SERVER = fileURLToPath(new URL('../../bureau/sansFil.ts', import.meta.url));
 const SHELL_FAKE = fileURLToPath(new URL('../../bureau/fauxTelephone.ts', import.meta.url));
@@ -53,9 +54,11 @@ let server: ShellServer;
 /** Rappels abonnés à `surArrivee`, appelés par le serveur à chaque téléphone qui se présente. */
 let listeners: Set<(avis: unknown) => void>;
 
-const plug = (): void => {
+/** Branche le serveur comme pont de la page ; `withAuthorization` faux : une coquille qui ne sait pas l'autorisation. */
+const plug = (withAuthorization = true): void => {
   const g = shell.gestionnairesSansFil(server);
   const sansFil: DesktopWirelessBridge = {
+    ...(withAuthorization ? { autoriser: () => g['sansfil:autoriser'](undefined) as ReturnType<NonNullable<DesktopWirelessBridge['autoriser']>> } : {}),
     etat: () => g['sansfil:etat'](undefined) as ReturnType<DesktopWirelessBridge['etat']>,
     activer: (argument) => g['sansfil:activer'](argument) as ReturnType<DesktopWirelessBridge['activer']>,
     ouvrirAppairage: () => g['sansfil:ouvrirAppairage'](undefined) as ReturnType<DesktopWirelessBridge['ouvrirAppairage']>,
@@ -82,15 +85,18 @@ beforeEach(async () => {
   await fs.mkdir(join(tmp, 'telephone'), { recursive: true });
   await fs.writeFile(join(tmp, 'telephone', 'index.json'), '{}');
   listeners = new Set();
-  server = new shell.ServeurSansFil({
-    stockage: shell.stockageDossier(join(tmp, 'profil')),
-    chiffreur,
-    adresses: () => [{ adresse: '127.0.0.1', masque: '255.0.0.0' }],
-    port: 0,
-    portSonde: null,
-    nomPc: 'PC de test',
-    surArrivee: (avis: unknown) => listeners.forEach((rappel) => rappel(avis)),
-  });
+  server = new shell.ServeurSansFil(serverOptions());
+});
+
+/** Réglages du serveur d'essai, sur la boucle locale, dans le profil temporaire. */
+const serverOptions = (): Record<string, unknown> => ({
+  stockage: shell.stockageDossier(join(tmp, 'profil')),
+  chiffreur,
+  adresses: () => [{ adresse: '127.0.0.1', masque: '255.0.0.0' }],
+  port: 0,
+  portSonde: null,
+  nomPc: 'PC de test',
+  surArrivee: (avis: unknown) => listeners.forEach((rappel) => rappel(avis)),
 });
 
 afterEach(async () => {
@@ -147,6 +153,20 @@ describe('sans-fil du programme Windows, vu de la page', () => {
     stop();
     expect(listeners.size).toBe(0);
     expect((await setWirelessActive(false)).actif).toBe(false);
+  });
+
+  it('pare-feu bloqué et réparable : l\'autorisation demandée par la page l\'ouvre ; une coquille ancienne ne la propose pas', async () => {
+    await server.arreter();
+    server = new shell.ServeurSansFil({ ...serverOptions(), ...shell.pareFeuFactice('bloque', 'accordee') });
+    await server.activer(true, false);
+    plug();
+    expect(wirelessAuthorizable()).toBe(true);
+    expect(await wirelessState()).toMatchObject({ pareFeu: 'bloque', pareFeuReparable: true });
+    expect(await authorizeWireless()).toMatchObject({ issue: 'accordee', etat: { pareFeu: 'ouvert', pareFeuReparable: false } });
+
+    plug(false);
+    expect(wirelessAuthorizable()).toBe(false);
+    expect(() => authorizeWireless()).toThrow();
   });
 
   it('un avis qui n\'a pas la forme attendue est ignoré', async () => {

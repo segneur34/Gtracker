@@ -154,10 +154,20 @@ export interface DesktopPhoneBridge {
 }
 
 /**
- * Ce que l'essai du pare-feu de Windows a trouvé. `ouvert` n'est pas une certitude (Windows ne filtre pas le trafic
- * du PC vers lui-même) : seul `bloque` s'affirme.
+ * Ce que la coquille a lu du pare-feu de Windows : seul `bloque` s'affirme ; `inconnu` quand rien n'a pu être lu (une
+ * coquille plus ancienne ne disait jamais `ouvert` avec certitude).
  */
 export type DesktopFirewall = 'ouvert' | 'bloque' | 'inconnu';
+
+/** Issue de la demande d'autorisation au pare-feu de Windows. */
+export type DesktopAuthorizationOutcome = 'accordee' | 'refusee' | 'echec';
+
+/** Réponse de la demande d'autorisation : son issue, pourquoi elle a échoué (en français), et l'état relu après. */
+export interface DesktopWirelessAuthorization {
+  issue: DesktopAuthorizationOutcome;
+  detail?: string;
+  etat: DesktopWirelessState;
+}
 
 /** Fenêtre de liaison d'un téléphone, ouverte pour 2 minutes ou jusqu'à la liaison. */
 export interface DesktopWirelessPairing {
@@ -181,6 +191,8 @@ export interface DesktopWirelessState {
   port: number | null;
   adresses: string[];
   pareFeu: DesktopFirewall;
+  /** Le pare-feu bloque et l'autorisation de Gtracker suffirait ; absent d'une coquille plus ancienne. */
+  pareFeuReparable?: boolean;
   /** Pourquoi le PC n'écoute pas alors que le sans-fil est activé ; phrase de la coquille, en français. */
   erreur: string | null;
   appairage: DesktopWirelessPairing | null;
@@ -216,6 +228,8 @@ export interface DesktopWirelessBridge {
   telephones(): Promise<BridgeAnswer<DesktopWirelessPhone[]>>;
   /** Vrai si le téléphone était relié. */
   retirer(argument: { id: string }): Promise<BridgeAnswer<boolean>>;
+  /** Demande à Windows d'autoriser Gtracker sur le réseau ; absent d'une coquille plus ancienne. */
+  autoriser?(): Promise<BridgeAnswer<DesktopWirelessAuthorization>>;
   /** Le rappel reçoit l'avis de chaque arrivée ; rend la fonction qui se désabonne. */
   surArrivee(rappel: (avis: unknown) => void): () => void;
 }

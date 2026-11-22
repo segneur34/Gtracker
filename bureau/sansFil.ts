@@ -33,6 +33,17 @@
 //   GTRACKER_BANC_SANSFIL_SONDE      port UDP de la découverte ; absent : pas de découverte
 //   GTRACKER_BANC_SANSFIL_FENETRE_MS durée d'une fenêtre d'appairage, en millisecondes
 //   GTRACKER_BANC_SANSFIL_PROFIL     dossier des secrets du sans-fil, au lieu du dossier `sansfil` du profil
+//   GTRACKER_BANC_SANSFIL_PAREFEU    pare-feu d'essai : « ouvert » (défaut), « bloque » (réparable) ou « irreparable »
+//   GTRACKER_BANC_SANSFIL_AUTORISATION issue de la demande d'autorisation d'essai : « accordee » (défaut, le pare-feu
+//                                    « bloque » s'ouvre), « refusee » ou « echec »
+// En mode d'essai, le pare-feu est toujours factice : jamais Windows PowerShell.
+//
+// Pare-feu de Windows (`pareFeu.ts`) : relevé et jugé après chaque mise à l'écoute, et relu toutes les 30 secondes tant
+// qu'il n'est pas ouvert ; si le relevé ne se lit pas, l'essai d'auto-connexion (`essayerAutoConnexion`) sert de repli
+// et ne peut qu'affirmer un blocage (son « ouvert » devient « inconnu »). Quand l'utilisateur allume le sans-fil et que
+// le relevé dit bloqué et réparable, l'autorisation de Gtracker est demandée avant la mise à l'écoute : Windows ne pose
+// plus sa propre question (réseaux privés ou publics). Refusée ou en échec, le sans-fil s'allume quand même, et la
+// page propose de la redemander (`sansfil:autoriser`). Au lancement, avec le sans-fil déjà allumé, rien n'est demandé.
 
 import type { AddressInfo, Socket } from 'node:net'
 import { randomBytes } from 'node:crypto'
@@ -45,6 +56,8 @@ import type { Alea, Horloge, TelephoneVisible } from './appairage'
 import { FenetreAppairage, RegistreTelephones, TAILLE_IDENTIFIANT, depuisHex, egalATempsConstant, enHex, tirerIdentifiant } from './appairage'
 import { certificatUtilisable, empreinteCertificat, fabriquerCertificat } from './certificat'
 import { ErreurDisque, codeDe, ecrireAtomique } from './disque'
+import type { ContexteEcoute, IssueAutorisation, JugementPareFeu, PareFeu, ResultatAutorisation } from './pareFeu'
+import { ESSAIS_PORT } from './pareFeu'
 import type { Gestionnaire } from './pont'
 import { enReponse } from './pont'
 import { decoderQuestion, encoderReponse, adressesPrivees, memeReseau, nomPcPourSonde, PORT_SONDE } from './sonde'
@@ -89,8 +102,8 @@ export const FICHIER_TELEPHONES = 'telephones.json'
 export const FICHIER_CERTIFICAT = 'certificat.pem'
 export const FICHIER_CLE = 'cle.bin'
 
-/** Ports essayés à partir du premier quand il est pris. */
-export const ESSAIS_PORT = 10
+export { ESSAIS_PORT }
+export type { PareFeu }
 
 /** Délais de la liaison, en millisecondes. */
 export type Delais = {
@@ -467,9 +480,6 @@ async function ecrireParBlocs(commandes: Commandes, chemin: string, fichierLocal
 /** Une adresse où le serveur écoute, avec le masque de son réseau (les questions de découverte en viennent). */
 export type AdresseEcoute = { adresse: string; masque: string }
 
-/** Résultat de l'essai d'auto-connexion : `bloque` quand le PC ne se joint pas lui-même sur son adresse. */
-export type PareFeu = 'ouvert' | 'bloque' | 'inconnu'
-
 /** Une fenêtre d'appairage ouverte, telle que la page l'affiche. */
 export type AppairageOuvert = {
   /** Adresse à taper sur le téléphone si la découverte échoue : la première adresse privée du PC. */
@@ -496,6 +506,8 @@ export type EtatSansFil = {
   /** Adresses privées où le serveur écoute, la première étant celle à afficher. */
   adresses: string[]
   pareFeu: PareFeu
+  /** Vrai si le pare-feu bloque et que l'autorisation de Gtracker (`sansfil:autoriser`) suffirait à ouvrir. */
+  pareFeuReparable: boolean
   /** Pourquoi le serveur n'écoute pas alors qu'il est activé, `null` sinon. */
   erreur: string | null
   /** Fenêtre d'appairage ouverte, `null` s'il n'y en a pas. */
@@ -509,6 +521,9 @@ export type TelephoneListe = TelephoneVisible & { relie: boolean }
 
 /** Avis envoyé quand un téléphone se présente ; `nouveau` s'il vient d'être appairé. */
 export type AvisArrivee = { id: string; nom: string; nouveau: boolean }
+
+/** Issue de la demande d'autorisation au pare-feu, et l'état relu aussitôt après. */
+export type AutorisationSansFil = ResultatAutorisation & { etat: EtatSansFil }
 
 export type OptionsSansFil = {
   stockage: StockageSansFil
@@ -524,8 +539,15 @@ export type OptionsSansFil = {
   /** Nom du PC donné au téléphone. */
   nomPc?: string
   dureeFenetreMs?: number
-  /** Essai d'auto-connexion après chaque mise à l'écoute. */
+  /** Pare-feu relevé et jugé après chaque mise à l'écoute. */
   essaiPareFeu?: boolean
+  /**
+   * Relevé et jugement du pare-feu (`lirePareFeuWindows`) ; `null` ou absent : illisible, l'essai d'auto-connexion sert
+   * de repli.
+   */
+  lirePareFeu?: (ecoute: ContexteEcoute) => Promise<JugementPareFeu | null>
+  /** Demande d'autorisation au pare-feu (`autoriserPareFeuWindows`) ; absente : rien n'est demandé. */
+  autoriserPareFeu?: () => Promise<ResultatAutorisation>
   delais?: Partial<Delais>
   horloge?: Horloge
   alea?: Alea
@@ -586,6 +608,8 @@ export class ServeurSansFil {
   private readonly nomPc: string
   private readonly dureeFenetreMs: number | undefined
   private readonly essaiPareFeu: boolean
+  private readonly lirePareFeu: OptionsSansFil['lirePareFeu'] | null
+  private readonly autoriserSysteme: OptionsSansFil['autoriserPareFeu'] | null
   private readonly delais: Delais
   private readonly horloge: Horloge
   private readonly alea: Alea
@@ -608,6 +632,7 @@ export class ServeurSansFil {
   private port: number | null = null
   private erreur: string | null = null
   private pareFeu: PareFeu = 'inconnu'
+  private pareFeuReparable = false
   private sonde: dgram.Socket | null = null
   private reponsesSonde = { seconde: 0, nombre: 0 }
   private releve: NodeJS.Timeout | null = null
@@ -626,6 +651,8 @@ export class ServeurSansFil {
     this.nomPc = options.nomPc ?? nomDuPc()
     this.dureeFenetreMs = options.dureeFenetreMs
     this.essaiPareFeu = options.essaiPareFeu ?? true
+    this.lirePareFeu = options.lirePareFeu ?? null
+    this.autoriserSysteme = options.autoriserPareFeu ?? null
     this.delais = { ...DELAIS, ...options.delais }
     this.horloge = options.horloge ?? Date.now
     this.alea = options.alea ?? randomBytes
@@ -649,21 +676,40 @@ export class ServeurSansFil {
   async etat(): Promise<EtatSansFil> {
     return this.serie(async () => {
       await this.charger()
-      if (this.actif) await this.actualiserAdresses(this.pareFeu !== 'ouvert')
+      if (this.actif) await this.actualiserAdresses(false)
       return this.etatCourant()
     })
   }
 
-  /** Active ou éteint le sans-fil ; le choix est retenu dans le profil. Éteindre garde les téléphones appairés. */
-  async activer(actif: boolean): Promise<EtatSansFil> {
+  /**
+   * Active ou éteint le sans-fil ; le choix est retenu dans le profil. Éteindre garde les téléphones appairés. Allumer
+   * demande d'abord l'autorisation au pare-feu s'il bloque et que c'est réparable (`demanderAutorisation` faux : jamais,
+   * comme au lancement).
+   */
+  async activer(actif: boolean, demanderAutorisation = true): Promise<EtatSansFil> {
     return this.serie(async () => {
       await this.charger()
       this.actif = actif
       await this.sauverReglages()
       if (actif) {
-        if (this.serveurs.size === 0) await this.allumer()
+        if (this.serveurs.size === 0) await this.allumer(demanderAutorisation)
       } else await this.eteindre()
       return this.etatCourant()
+    })
+  }
+
+  /**
+   * Demande à Windows d'autoriser Gtracker sur le réseau, puis relit aussitôt le pare-feu. Une demande en échec dont le
+   * relevé suivant dit ouvert est accordée. Le sans-fil doit être activé.
+   */
+  async autoriserPareFeu(): Promise<AutorisationSansFil> {
+    return this.serie(async () => {
+      await this.charger()
+      if (!this.actif) throw new ErreurDisque('UNKNOWN', "Le sans-fil est éteint : l'activer avant d'autoriser Gtracker.")
+      const resultat = await this.demanderAutorisation()
+      if (this.port !== null && this.essaiPareFeu) await this.essayerPareFeu()
+      const accordee = resultat.issue === 'echec' && this.pareFeu === 'ouvert'
+      return { ...(accordee ? { issue: 'accordee' as const } : resultat), etat: this.etatCourant() }
     })
   }
 
@@ -837,7 +883,7 @@ export class ServeurSansFil {
 
   // ---------- écoute ----------
 
-  private async allumer(): Promise<void> {
+  private async allumer(demanderAutorisation = false): Promise<void> {
     try {
       this.certificat ??= await this.chargerCertificat()
     } catch (e) {
@@ -845,12 +891,56 @@ export class ServeurSansFil {
       this.journal(this.erreur)
       return
     }
+    if (demanderAutorisation && this.essaiPareFeu) await this.autoriserAvantEcoute()
     this.enService = true
     await this.ecouter()
     await this.ouvrirSonde()
     if (this.port !== null && this.essaiPareFeu) await this.essayerPareFeu()
-    this.releve ??= setInterval(() => void this.serie(() => this.actualiserAdresses(false)).catch(() => undefined), this.delais.intervalleAdresses)
+    this.releve ??= setInterval(
+      () => void this.serie(() => this.actualiserAdresses(this.pareFeu !== 'ouvert')).catch(() => undefined),
+      this.delais.intervalleAdresses,
+    )
     this.releve.unref()
+  }
+
+  /**
+   * Avant la première mise à l'écoute : si le pare-feu bloque Gtracker et que l'autorisation suffirait, elle est
+   * demandée maintenant, pour que Windows ne pose pas sa propre question à l'écoute. Son issue ne change rien à la
+   * suite : le sans-fil s'allume quand même.
+   */
+  private async autoriserAvantEcoute(): Promise<void> {
+    if (!this.lirePareFeu || !this.autoriserSysteme) return
+    const adresses = this.lireAdresses().map((a) => a.adresse)
+    if (adresses.length === 0) return
+    const jugement = await this.relirePareFeu(adresses, this.portBase)
+    if (jugement?.pareFeu !== 'bloque' || !jugement.reparable) return
+    this.journal("pare-feu bloqué : autorisation demandée avant la mise à l'écoute")
+    await this.demanderAutorisation()
+  }
+
+  /** La demande d'autorisation, qui ne rejette jamais. */
+  private async demanderAutorisation(): Promise<ResultatAutorisation> {
+    if (!this.autoriserSysteme) return { issue: 'echec', detail: 'ce programme ne sait pas demander cette autorisation' }
+    try {
+      const resultat = await this.autoriserSysteme()
+      this.journal(`autorisation du pare-feu : ${resultat.issue}${resultat.detail ? ` (${resultat.detail})` : ''}`)
+      return resultat
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e)
+      this.journal(`autorisation du pare-feu : echec (${detail})`)
+      return { issue: 'echec', detail }
+    }
+  }
+
+  /** Le relevé du pare-feu jugé pour ces adresses et ce port ; `null` s'il ne se lit pas. */
+  private async relirePareFeu(adresses: string[], port: number): Promise<JugementPareFeu | null> {
+    if (!this.lirePareFeu) return null
+    try {
+      return await this.lirePareFeu({ adresses, port, portSonde: this.portSonde })
+    } catch (e) {
+      this.journal(`relevé du pare-feu illisible : ${e instanceof Error ? e.message : String(e)}`)
+      return null
+    }
   }
 
   private async eteindre(): Promise<void> {
@@ -868,6 +958,7 @@ export class ServeurSansFil {
     this.port = null
     this.erreur = null
     this.pareFeu = 'inconnu'
+    this.pareFeuReparable = false
     const sonde = this.sonde
     this.sonde = null
     if (sonde) await new Promise<void>((fin) => sonde.close(() => fin()))
@@ -984,8 +1075,20 @@ export class ServeurSansFil {
   private async essayerPareFeu(): Promise<void> {
     const certificat = this.certificat
     if (this.port === null || this.adresses.length === 0 || !certificat) return
-    this.pareFeu = await essayerAutoConnexion(this.adresses[0].adresse, this.port, certificat.empreinte, this.delais.pareFeu)
-    if (this.pareFeu !== 'ouvert') this.journal(`essai d'auto-connexion : ${this.pareFeu}`)
+    const avant = `${this.pareFeu}/${this.pareFeuReparable}`
+    const jugement = await this.relirePareFeu(this.adresses.map((a) => a.adresse), this.port)
+    if (jugement) {
+      this.pareFeu = jugement.pareFeu
+      this.pareFeuReparable = jugement.pareFeu === 'bloque' && jugement.reparable
+    } else {
+      // Relevé illisible : l'auto-connexion ne voit pas un blocage du réseau, elle ne peut qu'en affirmer un.
+      const essai = await essayerAutoConnexion(this.adresses[0].adresse, this.port, certificat.empreinte, this.delais.pareFeu)
+      this.pareFeu = essai === 'ouvert' ? 'inconnu' : essai
+      this.pareFeuReparable = this.pareFeu === 'bloque'
+    }
+    if (`${this.pareFeu}/${this.pareFeuReparable}` !== avant) {
+      this.journal(`pare-feu : ${this.pareFeu}${this.pareFeu === 'bloque' ? (this.pareFeuReparable ? ' (réparable)' : ' (non réparable)') : ''}${jugement ? '' : " (essai d'auto-connexion)"}`)
+    }
   }
 
   // ---------- découverte ----------
@@ -1129,6 +1232,7 @@ export class ServeurSansFil {
       port: this.port,
       adresses: this.adresses.map((a) => a.adresse),
       pareFeu: this.port === null ? 'inconnu' : this.pareFeu,
+      pareFeuReparable: this.port !== null && this.pareFeu === 'bloque' && this.pareFeuReparable && this.autoriserSysteme !== null,
       erreur: this.actif ? this.erreur : null,
       appairage: this.appairageVisible(),
       relies: [...this.relies.values()].map(({ id, nom }) => ({ id, nom })),
@@ -1214,7 +1318,7 @@ export function dossierSansFilPuisCable(sansFil: DossierDistant, cable: DossierD
 // ---------- les canaux de la page ----------
 
 /** Canaux servis ; le pont de la page (`preload.ts`) porte les mêmes noms. */
-export const CANAUX_SANS_FIL = ['etat', 'activer', 'ouvrirAppairage', 'telephones', 'retirer'] as const
+export const CANAUX_SANS_FIL = ['etat', 'activer', 'ouvrirAppairage', 'telephones', 'retirer', 'autoriser'] as const
 
 /** Canal de l'avis envoyé à la page quand un téléphone se présente (`AvisArrivee`). */
 export const AVIS_ARRIVEE = 'sansfil:arrive'
@@ -1229,7 +1333,9 @@ function champ(argument: unknown, nom: string): unknown {
  * - `sansfil:activer({ actif })` active ou éteint, et rend l'`EtatSansFil` qui suit ;
  * - `sansfil:ouvrirAppairage` rend un `AppairageOuvert` ;
  * - `sansfil:telephones` rend les `TelephoneListe` ;
- * - `sansfil:retirer({ id })` rend vrai si le téléphone était appairé.
+ * - `sansfil:retirer({ id })` rend vrai si le téléphone était appairé ;
+ * - `sansfil:autoriser` demande l'autorisation au pare-feu de Windows et rend `{ issue, detail?, etat }` (`issue` :
+ *   `accordee`, `refusee` ou `echec`, `detail` disant pourquoi en français) ; refusé si le sans-fil est éteint.
  */
 export function gestionnairesSansFil(serveur: ServeurSansFil): Record<string, Gestionnaire> {
   return {
@@ -1248,13 +1354,15 @@ export function gestionnairesSansFil(serveur: ServeurSansFil): Record<string, Ge
         if (typeof id !== 'string' || depuisHex(id, TAILLE_IDENTIFIANT) === null) throw new ErreurDisque('UNKNOWN', 'Message mal formé : « id » doit être un identifiant de téléphone.')
         return serveur.retirer(id)
       }),
+    'sansfil:autoriser': () => enReponse(() => serveur.autoriserPareFeu()),
   }
 }
 
 // ---------- mode d'essai ----------
 
 /** Réglages du serveur que le mode d'essai remplace. */
-export type EssaiSansFil = Pick<OptionsSansFil, 'adresses' | 'port' | 'portSonde' | 'hoteSonde' | 'nomPc' | 'dureeFenetreMs'> & {
+export type EssaiSansFil = Pick<OptionsSansFil, 'adresses' | 'port' | 'portSonde' | 'hoteSonde' | 'nomPc' | 'dureeFenetreMs'> &
+  Required<Pick<OptionsSansFil, 'lirePareFeu' | 'autoriserPareFeu'>> & {
   /** Dossier des secrets, `null` : celui du profil d'essai. */
   dossier: string | null
   /** Sans-fil activé dès le lancement. */
@@ -1264,9 +1372,32 @@ export type EssaiSansFil = Pick<OptionsSansFil, 'adresses' | 'port' | 'portSonde
 /** Nom du PC en mode d'essai, le même sur tous les postes pour que les relevés du banc ne changent pas. */
 export const NOM_PC_ESSAI = "PC d'essai"
 
+/** Pare-feu d'essai, avant toute autorisation. */
+export type PareFeuEssai = 'ouvert' | 'bloque' | 'irreparable'
+
+/**
+ * Pare-feu factice du mode d'essai, sans jamais lancer Windows PowerShell : il dit `etat` jusqu'à une autorisation
+ * accordée, qui ouvre un pare-feu « bloque » (pas un « irreparable »). Chaque demande est journalisée.
+ */
+export function pareFeuFactice(
+  etat: PareFeuEssai,
+  autorisation: IssueAutorisation,
+  journal: (message: string) => void = () => undefined,
+): Required<Pick<OptionsSansFil, 'lirePareFeu' | 'autoriserPareFeu'>> {
+  let courant = etat
+  return {
+    lirePareFeu: async () => (courant === 'ouvert' ? { pareFeu: 'ouvert', reparable: false } : { pareFeu: 'bloque', reparable: courant === 'bloque' }),
+    autoriserPareFeu: async () => {
+      journal(`autorisation d'essai : ${autorisation}`)
+      if (autorisation === 'accordee' && courant === 'bloque') courant = 'ouvert'
+      return autorisation === 'echec' ? { issue: 'echec', detail: "échec de l'autorisation d'essai" } : { issue: autorisation }
+    },
+  }
+}
+
 /**
  * Réglages du sans-fil d'essai d'après l'environnement, `null` hors du mode d'essai (`GTRACKER_BANC=1`), où les
- * variables ne sont pas lues. En mode d'essai, le serveur n'écoute que sur 127.0.0.1.
+ * variables ne sont pas lues. En mode d'essai, le serveur n'écoute que sur 127.0.0.1, et le pare-feu est factice.
  */
 export function essaiSansFilDepuisEnvironnement(env: Record<string, string | undefined>, journal: (message: string) => void = () => undefined): EssaiSansFil | null {
   if (env.GTRACKER_BANC !== '1') return null
@@ -1282,8 +1413,19 @@ export function essaiSansFilDepuisEnvironnement(env: Record<string, string | und
   const dureeFenetreMs = entier('GTRACKER_BANC_SANSFIL_FENETRE_MS', 3_600_000) ?? undefined
   const dossier = env.GTRACKER_BANC_SANSFIL_PROFIL?.trim() ? path.resolve(env.GTRACKER_BANC_SANSFIL_PROFIL) : null
   const actif = env.GTRACKER_BANC_SANSFIL_ACTIF === '1'
-  journal(`sans-fil d'essai : 127.0.0.1, port ${port || 'libre'}, découverte ${portSonde ?? 'aucune'}${dureeFenetreMs ? `, fenêtre ${dureeFenetreMs} ms` : ''}${actif ? ', activé' : ''}`)
+  const choix = <T extends string>(nom: string, valeurs: readonly T[]): T => {
+    const brut = env[nom]?.trim() ?? ''
+    if ((valeurs as readonly string[]).includes(brut)) return brut as T
+    if (brut !== '') journal(`${nom} illisible, ignorée : ${brut}`)
+    return valeurs[0]
+  }
+  const pareFeu = choix<PareFeuEssai>('GTRACKER_BANC_SANSFIL_PAREFEU', ['ouvert', 'bloque', 'irreparable'])
+  const autorisation = choix<IssueAutorisation>('GTRACKER_BANC_SANSFIL_AUTORISATION', ['accordee', 'refusee', 'echec'])
+  journal(
+    `sans-fil d'essai : 127.0.0.1, port ${port || 'libre'}, découverte ${portSonde ?? 'aucune'}${dureeFenetreMs ? `, fenêtre ${dureeFenetreMs} ms` : ''}${actif ? ', activé' : ''}, pare-feu ${pareFeu}, autorisation ${autorisation}`,
+  )
   return {
+    ...pareFeuFactice(pareFeu, autorisation, journal),
     adresses: () => [{ adresse: '127.0.0.1', masque: '255.0.0.0' }],
     port,
     portSonde,

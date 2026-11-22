@@ -1,13 +1,14 @@
 import { t } from '../core/i18n';
 import { useWirelessPhones } from '../hooks/useWirelessPhones';
-import { countdownText, describePhoneSeen, describeWireless, pairingAddress, remainingMs } from '../library/wirelessPhone';
+import { countdownText, describePhoneSeen, describeWireless, firewallNotice, pairingAddress, remainingMs } from '../library/wirelessPhone';
 import Button from './ui/Button';
 import './WirelessPhoneCard.css';
 
 /**
  * Le téléphone sans câble, dans Réglages › Mémoire, programme Windows seulement (rien dans le navigateur ni sur le
  * téléphone) : la case qui allume le sans-fil (éteint par défaut, avec la phrase qui prévient que Windows va demander
- * l'autorisation), son état, « Relier un téléphone » (adresse, code et temps restant en grand, jusqu'à la liaison ou
+ * l'autorisation), son état, le pare-feu de Windows quand il bloque (avec « Autoriser Gtracker » si l'autorisation
+ * suffit), « Relier un téléphone » (adresse, code et temps restant en grand, jusqu'à la liaison ou
  * l'échéance de 2 minutes), et la liste des téléphones reliés avec « Retirer ». Les sessions, elles, ne passent que
  * par « Synchroniser » (`PhoneSyncButton`), au clic : l'arrivée d'un téléphone ne fait qu'y inviter.
  */
@@ -16,6 +17,7 @@ function WirelessPhoneCard() {
   if (!view.available) return null;
   const { state, phones, pairing, pairingStatus, busy } = view;
   const status = state ? describeWireless(state) : null;
+  const firewall = state ? firewallNotice(state) : null;
   const active = state?.actif === true;
   const listening = status?.kind === 'listening';
   const waiting = pairing !== null && pairingStatus?.kind === 'waiting';
@@ -33,12 +35,24 @@ function WirelessPhoneCard() {
       </label>
       {state !== null && !active && (
         <p className="ui-muted ui-text-s ui-m-0">
-          {t("En l'allumant, Windows va demander d'autoriser Gtracker sur le réseau : acceptez, sinon le téléphone ne pourra pas se présenter.")}
+          {t("Windows va vous demander d'autoriser Gtracker sur le réseau : acceptez.")}
         </p>
       )}
       {status !== null && <p className="wireless-card__status ui-text-s ui-m-0">{status.text}</p>}
-      {status?.warning && <p className="ui-danger-text ui-text-s ui-m-0 wireless-card__warning">{status.warning}</p>}
-      {status?.hint && phones.every((p) => !p.relie) && !waiting && <p className="ui-muted ui-text-s ui-m-0 wireless-card__hint">{status.hint}</p>}
+      {firewall !== null && (
+        <div className="wireless-card__firewall" role="status">
+          <p className="ui-danger-text ui-text-s ui-m-0">{firewall.text}</p>
+          {firewall.canAuthorize && view.authorizable && (
+            <div className="ui-row-s2 ui-wrap ui-center">
+              <Button size="s" className="wireless-card__authorize" onClick={() => void view.authorize()} disabled={busy}>
+                {t('Autoriser Gtracker')}
+              </Button>
+              <span className="ui-muted ui-text-s">{t('Windows demande de confirmer.')}</span>
+            </div>
+          )}
+          {view.authorizationMessage !== null && <p className="ui-danger-text ui-text-s ui-m-0">{view.authorizationMessage}</p>}
+        </div>
+      )}
       {view.error !== null && <p className="ui-danger-text ui-text-s ui-m-0 wireless-card__error">{view.error}</p>}
 
       {listening && !waiting && (
