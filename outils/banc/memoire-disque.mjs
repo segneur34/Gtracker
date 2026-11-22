@@ -18,7 +18,7 @@
 //     programme fermé : relancé, elle et son sous-dossier disparaissent, l'autre et un dossier posé à la main restent ;
 //     un itinéraire supprimé (« Mettre à la corbeille (30 jours) ») ; « Supprimer définitivement » et « Vider la
 //     corbeille » tenus puis confirmés ; la zone dit « Corbeille vide. » quand elle l'est, le menu « … » de Sessions
-//     porte « Corbeille » en dernier et son appui ouvre Réglages › Mémoire sur la zone (`?bloc=corbeille`) ; le
+//     porte « Gestion de la corbeille » en dernier et son appui ouvre Réglages › Mémoire sur la zone (`?bloc=corbeille`) ; le
 //     sans-fil est allumé pendant tout le cas, et le dossier mémoire ne porte aucun de ses secrets (certificat, clé
 //     chiffrée, registre des téléphones : dans le profil).
 import { spawn, spawnSync } from 'node:child_process';
@@ -397,8 +397,8 @@ try {
     await b.wait(300);
     // Le menu du titre seulement : les lignes de sessions portent chacune le leur dans la page.
     const menuTexte = await b.evaluate(`[...document.querySelector('button.ui-more__button[aria-label="Importer, mettre à jour"]').closest('.ui-more').querySelectorAll('.ui-more__panel button')].map((x) => x.textContent.trim()).join(' | ')`);
-    check('Sessions : le menu « … » porte « Corbeille » en dernier', /Corbeille$/.test(menuTexte), menuTexte);
-    check('Sessions : appui sur « Corbeille »', (await b.clickText('Corbeille')) === 'ok');
+    check('Sessions : le menu « … » porte « Gestion de la corbeille » en dernier', /Gestion de la corbeille$/.test(menuTexte), menuTexte);
+    check('Sessions : appui sur « Gestion de la corbeille »', (await b.clickText('Gestion de la corbeille')) === 'ok');
     await b.waitFor(`location.pathname === '/parametres' && location.search === '?bloc=corbeille'`, { timeout: 5000, label: 'arrivée sur Réglages' });
     await b.waitFor(`Boolean(document.getElementById('zone-corbeille'))`, { timeout: 8000, label: 'zone de la corbeille' });
     await b.wait(600);

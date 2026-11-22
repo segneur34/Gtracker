@@ -170,7 +170,7 @@ function SessionsPage() {
             {hasTrash && (
               <Button onClick={() => navigate(SETTINGS_TRASH_PATH)}>
                 <IconTrash size={18} />
-                {t('Corbeille')}
+                {t('Gestion de la corbeille')}
               </Button>
             )}
           </MoreMenu>

@@ -1937,7 +1937,7 @@
   "Vider la corbeille ? Tout ce qu’elle garde est supprimé définitivement, sans retour possible.": "Empty the trash? Everything it keeps is deleted permanently, with no way back.",
   "Corbeille vidée.": "Trash emptied.",
   "Corbeille vide.": "Trash is empty.",
-  "Corbeille": "Trash",
+  "Gestion de la corbeille": "Manage trash",
   "Restaurer": "Restore",
   "Supprimer définitivement « {name} » : maintenir une seconde": "Delete “{name}” permanently: hold for one second",
   "Vider la corbeille": "Empty the trash",
