@@ -55,8 +55,9 @@ const telephone = Object.freeze({
 /**
  * Le sans-fil du PC (noms gardés égaux à ceux de `sansFil.ts` par un test) : `etat()`, `activer({ actif })`,
  * `ouvrirAppairage()`, `telephones()`, `retirer({ id })`, `autoriser()`, qui demande à Windows d'autoriser Gtracker
- * sur le réseau et rend `{ issue, detail?, etat }`, et `surArrivee(rappel)`, appelé avec `{ id, nom, nouveau }` quand
- * un téléphone se présente, qui rend la fonction de désabonnement.
+ * sur le réseau et rend `{ issue, detail?, etat }`, `surArrivee(rappel)`, appelé avec `{ id, nom, nouveau }` quand
+ * un téléphone se présente, et `surDepart(rappel)`, appelé avec `{ id, nom, raison, heure }` quand un téléphone relié
+ * s'en va ; chacun rend la fonction de désabonnement.
  */
 const sansFil = Object.freeze({
   etat: sans('sansfil:etat'),
@@ -71,6 +72,13 @@ const sansFil = Object.freeze({
     ipcRenderer.on('sansfil:arrive', ecouteur)
     return () => {
       ipcRenderer.removeListener('sansfil:arrive', ecouteur)
+    }
+  },
+  surDepart: (rappel: (avis: unknown) => void) => {
+    const ecouteur = (_evenement: unknown, avis: unknown) => rappel(avis)
+    ipcRenderer.on('sansfil:parti', ecouteur)
+    return () => {
+      ipcRenderer.removeListener('sansfil:parti', ecouteur)
     }
   },
 })
@@ -97,5 +105,7 @@ contextBridge.exposeInMainWorld(
     application,
     /** Textes traduits de la question de fermeture : `{ question, detail, quitter, rester }`. */
     textes: avec('coquille:textes'),
+    /** Écrit une étape de la page dans le journal daté du programme : `{ texte }`, borné à 300 caractères. */
+    noter: avec('coquille:noter'),
   }),
 )

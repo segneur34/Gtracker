@@ -25,6 +25,7 @@
 import { copyFile, mkdir, readFile, rename, stat, unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { ErreurDisque, SUFFIXE_REMPLACEMENT, avecEssais, ecrireAtomique } from './disque'
+import type { Journaliser } from './journal'
 import type { Gestionnaire } from './pont'
 import { enReponse, uneALaFois } from './pont'
 import type { DossierDistant, FileTelephone, RaisonRefus, ResultatInstallation } from './telephone'
@@ -127,7 +128,7 @@ export type OptionsApplication = {
   cable: DossierDistant
   /** File des commandes au téléphone, celle des canaux `telephone:*`. */
   serie: FileTelephone
-  journal?: (message: string) => void
+  journal?: Journaliser
 }
 
 /** Gestionnaires des canaux `application:*`, à brancher par `brancherCanaux` (voir l'en-tête). */
@@ -142,7 +143,7 @@ export function gestionnairesApplication(options: OptionsApplication): Record<st
     if (destination === null || destination === '') return null
     if (!path.isAbsolute(destination)) throw new ErreurDisque('UNKNOWN', 'Destination de l’APK refusée : chemin relatif.')
     await enregistrerApk(apk, destination)
-    journal(`APK enregistrée : ${path.resolve(destination)}`)
+    journal('APK enregistrée', `APK enregistrée : ${path.resolve(destination)}`)
     return path.resolve(destination)
   })
 

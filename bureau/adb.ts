@@ -29,6 +29,7 @@ import { statSync } from 'node:fs'
 import { connect } from 'node:net'
 import path from 'node:path'
 import { ErreurDisque, estTemporaire } from './disque'
+import type { Journaliser } from './journal'
 import type { DossierDistant, EtatTelephone, FichierTelephone, FichierVu, RaisonRefus, ResultatInstallation } from './telephone'
 import { cheminDuCable, cheminEcrivable, cheminRefuse, commeLeTelephone, fichiersAdmis, nomProvisoire, pasPret, resteApresEffacement, sansReel } from './telephone'
 
@@ -417,7 +418,7 @@ export type OptionsAdb = {
   lanceur?: Lanceur
   sonde?: (cible: CibleServeur) => Promise<Sonde>
   existe?: (fichier: string) => boolean
-  journal?: (message: string) => void
+  journal?: Journaliser
 }
 
 /** Délai d'une lecture d'après la taille du fichier. */
@@ -447,7 +448,7 @@ export function dossierAdb(options: OptionsAdb): DossierDistant {
     const s = await lancer(adb, ['version'], DELAIS.court)
     const version = s.code === 0 ? lireVersionAdb(s.stdout) : null
     if (version === null) throw new ErreurDisque('UNKNOWN', `L'outil adb ne répond pas : ${adb}`)
-    journal(`adb : ${adb}, serveur ${version}`)
+    journal(`adb trouvé, serveur ${version}`, `adb : ${adb}, serveur ${version}`)
     outil = { adb, version }
     return outil
   }
@@ -538,7 +539,7 @@ export function dossierAdb(options: OptionsAdb): DossierDistant {
     const texte = `${sortie.stderr}\n${sortie.stdout}`
     if (dossierManquant(texte)) throw absent()
     // Rien de lisible et une erreur qui n'est pas « absent » : `find` du téléphone ne connaît pas `-exec … +`.
-    journal(`listage par find impossible, repli sur stat : ${texte.trim().slice(0, 200)}`)
+    journal('listage par find impossible, repli sur stat', `listage par find impossible, repli sur stat : ${texte.trim().slice(0, 200)}`)
     const racine = await shell(o, s, COMMANDE_RACINE)
     if (racine.code !== 0) {
       if (dossierManquant(`${racine.stderr}\n${racine.stdout}`)) throw absent()
@@ -576,9 +577,9 @@ export function dossierAdb(options: OptionsAdb): DossierDistant {
     if (!estTemporaire(provisoire)) return
     try {
       const sortie = await shell(o, s, commandeEffacer(provisoire))
-      if (sortie.code !== 0) journal(`provisoire non retiré : ${(sortie.stderr || sortie.stdout).trim().slice(0, 200)}`)
+      if (sortie.code !== 0) journal('provisoire non retiré', `provisoire non retiré : ${(sortie.stderr || sortie.stdout).trim().slice(0, 200)}`)
     } catch (e) {
-      journal(`provisoire non retiré : ${e instanceof Error ? e.message : String(e)}`)
+      journal('provisoire non retiré', `provisoire non retiré : ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -676,12 +677,12 @@ export function dossierAdb(options: OptionsAdb): DossierDistant {
       const texte = `${sortie.stdout}\n${sortie.stderr}`
       const lu = lireInstallation(texte)
       if (lu.etat === 'installee') {
-        journal(`application installée sur ${e.nom}`)
+        journal('application installée', `application installée sur ${e.nom}`)
         return { etat: 'installee', nom: e.nom }
       }
       // Téléphone perdu en route : seulement si rien d'autre n'explique l'échec (ni code d'Android, ni raison connue).
       if (lu.raison === 'autre' && codeAndroid(texte.replace(/\r/g, '')) === null && liaisonPerdue(texte)) return { etat: 'horsLigne' }
-      journal(`installation refusée : ${lu.detail}`)
+      journal(`installation refusée : ${lu.raison}`, `installation refusée : ${lu.detail}`)
       return lu
     },
   }

@@ -12,7 +12,8 @@
 //   (`RegistreTelephones`) ; refusé, il reçoit `refus` et la liaison se ferme ;
 // - reconnu, la liaison passe aux limites larges et s'inverse : c'est le PC qui commande (`lister`, `lire` par
 //   blocs de 1 Mio, `ping` toutes les 15 secondes), le téléphone qui répond ; une commande sans réponse ferme la
-//   liaison. Le dernier téléphone arrivé est celui que lit `dossierSansFil()` ;
+//   liaison. Le dernier téléphone arrivé est celui que lit `dossierSansFil()` ; son arrivée et son départ, avec la
+//   raison (`classerDepart`), sont annoncés (`surArrivee`, `surDepart`), et l'heure du départ est gardée pour la liste ;
 // - un téléphone qui annonce la capacité « ecriture » (`CAPACITE_ECRITURE`) est listé en entier (racine, `sessions/`,
 //   `itineraires/`, `reglages/`) et reçoit aussi `ecrire` par blocs de 1 Mio, `valider` et `effacer` ; un téléphone
 //   plus ancien n'en reçoit jamais, son état prêt dit `ecriture: false` et `itineraires: false`. Un téléphone qui
@@ -212,6 +213,43 @@ function coupure(raison: string): ErreurDisque {
   return new ErreurDisque('UNKNOWN', `Liaison avec le téléphone coupée : ${raison}`)
 }
 
+// Raisons de fermeture qu'un départ distingue (`classerDepart`) ; toute autre est une coupure.
+const FERMEE_PAR_LE_TELEPHONE = "l'autre bout a fermé la liaison."
+const DELAI_DEPASSE = 'délai dépassé.'
+const TELEPHONE_MUET = 'le téléphone ne répond plus.'
+const TELEPHONE_RETIRE = 'téléphone retiré.'
+const SANS_FIL_ETEINT = 'sans-fil éteint.'
+const LIAISON_REMPLACEE = 'remplacée par une liaison plus récente du même téléphone.'
+
+/**
+ * Pourquoi un téléphone relié est parti : il a fermé la liaison lui-même (`ferme` : Gtracker a quitté l'écran du
+ * téléphone), il ne répondait plus (`silence` : écran éteint, Wi-Fi perdu), il a été retiré (`retire`), le sans-fil a
+ * été éteint (`eteint`), ou la liaison a cassé autrement (`coupure` : erreur du réseau, trame fautive).
+ */
+export type RaisonDepart = 'ferme' | 'silence' | 'retire' | 'eteint' | 'coupure'
+
+/**
+ * La raison d'un départ d'après la raison de fermeture de la liaison ; `remplace` quand le même téléphone revient par
+ * une liaison plus récente, qui n'est pas un départ.
+ */
+export function classerDepart(raison: string): RaisonDepart | 'remplace' {
+  switch (raison) {
+    case FERMEE_PAR_LE_TELEPHONE:
+      return 'ferme'
+    case DELAI_DEPASSE:
+    case TELEPHONE_MUET:
+      return 'silence'
+    case TELEPHONE_RETIRE:
+      return 'retire'
+    case SANS_FIL_ETEINT:
+      return 'eteint'
+    case LIAISON_REMPLACEE:
+      return 'remplace'
+    default:
+      return 'coupure'
+  }
+}
+
 /**
  * Des messages sur une socket, dans les deux sens. D'abord en file (`prochain`, pour l'accueil, où chaque message
  * est attendu à son tour), puis, après `servir`, chaque message reçu passe aussitôt au gestionnaire donné. Toute
@@ -236,7 +274,7 @@ export class Liaison {
     socket.on('end', () => {
       try {
         this.decodeur.fin()
-        this.fermer("l'autre bout a fermé la liaison.")
+        this.fermer(FERMEE_PAR_LE_TELEPHONE)
       } catch (e) {
         this.fermer((e as Error).message)
       }
@@ -278,8 +316,8 @@ export class Liaison {
     return new Promise((resoudre, rejeter) => {
       const minuteur = setTimeout(() => {
         this.attente = null
-        rejeter(coupure('délai dépassé.'))
-        this.fermer('délai dépassé.')
+        rejeter(coupure(DELAI_DEPASSE))
+        this.fermer(DELAI_DEPASSE)
       }, delaiMs)
       this.attente = { resoudre, rejeter, minuteur }
     })
@@ -376,7 +414,7 @@ class Commandes {
       const minuteur = setTimeout(() => {
         this.enCours.delete(id)
         rejeter(new ErreurDisque('UNKNOWN', 'Le téléphone ne répond pas (délai dépassé).'))
-        this.liaison.fermer('le téléphone ne répond plus.')
+        this.liaison.fermer(TELEPHONE_MUET)
       }, delaiMs)
       this.enCours.set(id, { resoudre, rejeter, minuteur })
       try {
@@ -517,10 +555,21 @@ export type EtatSansFil = {
 }
 
 /** Un téléphone appairé, et s'il est relié en ce moment. */
-export type TelephoneListe = TelephoneVisible & { relie: boolean }
+export type TelephoneListe = TelephoneVisible & {
+  relie: boolean
+  /**
+   * Heure du dernier départ pendant ce lancement du programme, en millisecondes depuis 1970 (horloge du PC), et sa
+   * raison ; `null` pour un téléphone relié en ce moment ou qui n'est pas parti depuis le lancement.
+   */
+  partiLe: number | null
+  raisonDepart: RaisonDepart | null
+}
 
 /** Avis envoyé quand un téléphone se présente ; `nouveau` s'il vient d'être appairé. */
 export type AvisArrivee = { id: string; nom: string; nouveau: boolean }
+
+/** Avis envoyé quand un téléphone relié s'en va ; `heure` en millisecondes depuis 1970 (horloge du PC). */
+export type AvisDepart = { id: string; nom: string; raison: RaisonDepart; heure: number }
 
 /** Issue de la demande d'autorisation au pare-feu, et l'état relu aussitôt après. */
 export type AutorisationSansFil = ResultatAutorisation & { etat: EtatSansFil }
@@ -554,6 +603,8 @@ export type OptionsSansFil = {
   journal?: (message: string) => void
   /** Appelé quand un téléphone se présente et est reconnu. */
   surArrivee?: (avis: AvisArrivee) => void
+  /** Appelé quand la liaison d'un téléphone relié se ferme, sauf s'il revient aussitôt par une liaison plus récente. */
+  surDepart?: (avis: AvisDepart) => void
 }
 
 /** Les adresses privées du PC, d'après ses cartes réseau. */
@@ -615,6 +666,7 @@ export class ServeurSansFil {
   private readonly alea: Alea
   private readonly journal: (message: string) => void
   private readonly surArrivee: (avis: AvisArrivee) => void
+  private readonly surDepart: (avis: AvisDepart) => void
   /** Démarrages, arrêts et relevés d'adresses l'un après l'autre. */
   private readonly serie = enSerie()
 
@@ -640,6 +692,8 @@ export class ServeurSansFil {
   private readonly inconnues = new Set<Liaison>()
   /** Téléphones reliés, dans l'ordre d'arrivée. */
   private readonly relies = new Map<string, Relie>()
+  /** Dernier départ de chaque téléphone parti depuis le lancement, oublié à son retour ou à son retrait. */
+  private readonly departs = new Map<string, { heure: number; raison: RaisonDepart }>()
 
   constructor(options: OptionsSansFil) {
     this.stockage = options.stockage
@@ -658,6 +712,7 @@ export class ServeurSansFil {
     this.alea = options.alea ?? randomBytes
     this.journal = options.journal ?? (() => undefined)
     this.surArrivee = options.surArrivee ?? (() => undefined)
+    this.surDepart = options.surDepart ?? (() => undefined)
   }
 
   /** Relit les réglages et le registre du profil, et met le serveur à l'écoute si le sans-fil a été activé. */
@@ -730,10 +785,14 @@ export class ServeurSansFil {
     })
   }
 
-  /** Téléphones appairés, dans l'ordre d'appairage. */
+  /** Téléphones appairés, dans l'ordre d'appairage, avec l'heure et la raison de leur dernier départ. */
   async telephones(): Promise<TelephoneListe[]> {
     await this.serie(() => this.charger())
-    return this.registre.liste().map((t) => ({ ...t, relie: this.relies.has(t.id) }))
+    return this.registre.liste().map((t) => {
+      const relie = this.relies.has(t.id)
+      const depart = relie ? undefined : this.departs.get(t.id)
+      return { ...t, relie, partiLe: depart?.heure ?? null, raisonDepart: depart?.raison ?? null }
+    })
   }
 
   /** Retire un téléphone : son jeton ne vaut plus rien, et sa liaison en cours se ferme. Faux s'il n'était pas appairé. */
@@ -742,7 +801,8 @@ export class ServeurSansFil {
       await this.charger()
       if (!this.registre.retirer(id)) return false
       await this.sauverRegistre()
-      this.relies.get(id)?.liaison.fermer('téléphone retiré.')
+      this.relies.get(id)?.liaison.fermer(TELEPHONE_RETIRE)
+      this.departs.delete(id)
       this.journal('téléphone retiré')
       return true
     })
@@ -950,8 +1010,8 @@ export class ServeurSansFil {
     this.releve = null
     this.fenetre?.fermer()
     this.fenetre = null
-    for (const r of this.relies.values()) r.liaison.fermer('sans-fil éteint.')
-    for (const l of this.inconnues) l.fermer('sans-fil éteint.')
+    for (const r of this.relies.values()) r.liaison.fermer(SANS_FIL_ETEINT)
+    for (const l of this.inconnues) l.fermer(SANS_FIL_ETEINT)
     await Promise.all([...this.serveurs.values()].map(fermerServeur))
     this.serveurs = new Map()
     this.adresses = []
@@ -1188,7 +1248,7 @@ export class ServeurSansFil {
   private admissibleApresAttente(liaison: Liaison, id: string): boolean {
     if (liaison.fermee) return false
     if (!this.enService) {
-      liaison.fermer('sans-fil éteint.')
+      liaison.fermer(SANS_FIL_ETEINT)
       return false
     }
     if (!this.inscrit(id)) {
@@ -1203,15 +1263,22 @@ export class ServeurSansFil {
     this.inconnues.delete(liaison)
     liaison.elargir()
     const relie: Relie = { id: telephone.id, nom: telephone.nom, liaison, commandes: new Commandes(liaison), capacites }
-    this.relies.get(telephone.id)?.liaison.fermer('remplacée par une liaison plus récente du même téléphone.')
+    this.relies.get(telephone.id)?.liaison.fermer(LIAISON_REMPLACEE)
     this.relies.delete(telephone.id)
     this.relies.set(telephone.id, relie)
+    this.departs.delete(telephone.id)
     const ping = setInterval(() => void relie.commandes.envoyer({ type: 'ping' }, this.delais.ping).catch(() => undefined), this.delais.intervallePing)
     ping.unref()
-    liaison.surFermeture((raison) => {
+    liaison.surFermeture((texte) => {
       clearInterval(ping)
       if (this.relies.get(telephone.id) === relie) this.relies.delete(telephone.id)
-      this.journal(`téléphone parti : ${raison}`)
+      const raison = classerDepart(texte)
+      this.journal(`téléphone parti (${raison}) : ${texte}`)
+      // Le même téléphone revenu par une liaison plus récente n'est pas parti : rien n'est annoncé.
+      if (raison === 'remplace') return
+      const heure = this.horloge()
+      if (raison !== 'retire') this.departs.set(telephone.id, { heure, raison })
+      this.surDepart({ id: telephone.id, nom: telephone.nom, raison, heure })
     })
     this.journal(`téléphone arrivé${nouveau ? ', appairé' : ''}`)
     this.surArrivee({ id: telephone.id, nom: telephone.nom, nouveau })
@@ -1322,6 +1389,9 @@ export const CANAUX_SANS_FIL = ['etat', 'activer', 'ouvrirAppairage', 'telephone
 
 /** Canal de l'avis envoyé à la page quand un téléphone se présente (`AvisArrivee`). */
 export const AVIS_ARRIVEE = 'sansfil:arrive'
+
+/** Canal de l'avis envoyé à la page quand un téléphone relié s'en va (`AvisDepart`). */
+export const AVIS_DEPART = 'sansfil:parti'
 
 function champ(argument: unknown, nom: string): unknown {
   return typeof argument === 'object' && argument !== null && !Array.isArray(argument) ? (argument as Record<string, unknown>)[nom] : undefined

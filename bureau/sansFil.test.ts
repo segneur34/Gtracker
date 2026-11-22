@@ -12,9 +12,10 @@ import { estTemporaire } from './disque'
 import { FauxTelephone, RefusPc, sonder } from './fauxTelephone'
 import type { ContexteEcoute, JugementPareFeu, ResultatAutorisation } from './pareFeu'
 import type { Reponse } from './pont'
-import type { AvisArrivee, Chiffreur, OptionsSansFil } from './sansFil'
+import type { AvisArrivee, AvisDepart, Chiffreur, OptionsSansFil } from './sansFil'
 import {
   CANAUX_SANS_FIL,
+  classerDepart,
   FICHIER_CLE,
   FICHIER_REGLAGES,
   FICHIER_TELEPHONES,
@@ -267,6 +268,67 @@ describe('serveur sans fil', () => {
     liaison.liaison.servir(() => undefined)
     await expect(s.dossierSansFil().lister()).rejects.toThrow(/délai/)
     await quand(async () => (await s.etat()).relies.length === 0)
+  })
+
+  it('annonce le départ d’un téléphone avec sa raison et son heure, le garde pour la liste, l’oublie à son retour', async () => {
+    const departs: AvisDepart[] = []
+    const s = serveur({ surDepart: (a) => departs.push(a), delais: { commande: 200 } })
+    await s.activer(true)
+    const { f, liaison } = await appairer(s)
+    const [{ id }] = await s.telephones()
+    expect((await s.telephones())[0]).toMatchObject({ relie: true, partiLe: null, raisonDepart: null })
+
+    // Gtracker quitte l'écran du téléphone : le téléphone ferme la liaison.
+    const avant = Date.now()
+    liaison.fermer()
+    await quand(() => departs.length === 1)
+    expect(departs[0]).toMatchObject({ id, nom: "Téléphone d'essai", raison: 'ferme' })
+    expect(departs[0].heure).toBeGreaterThanOrEqual(avant)
+    expect((await s.telephones())[0]).toMatchObject({ relie: false, partiLe: departs[0].heure, raisonDepart: 'ferme' })
+
+    // De retour, puis remplacé par une liaison plus récente du même téléphone : ce n'est pas un départ.
+    const retour = await f.connecter()
+    await quand(async () => (await s.telephones())[0].relie)
+    expect((await s.telephones())[0]).toMatchObject({ partiLe: null, raisonDepart: null })
+    const plusRecente = await f.connecter()
+    await quand(async () => retour.liaison.fermee)
+    expect(departs).toHaveLength(1)
+    expect((await s.etat()).relies).toHaveLength(1)
+
+    // Muet : lâché après le délai d'une commande.
+    plusRecente.liaison.servir(() => undefined)
+    await expect(s.dossierSansFil().lister()).rejects.toThrow(/délai/)
+    await quand(() => departs.length === 2)
+    expect(departs[1]).toMatchObject({ id, raison: 'silence' })
+    expect((await s.telephones())[0]).toMatchObject({ relie: false, raisonDepart: 'silence' })
+
+    // Sans-fil éteint, puis téléphone retiré.
+    await s.activer(false)
+    await s.activer(true)
+    const encore = await f.connecter('127.0.0.1', (await s.etat()).port as number)
+    await quand(async () => (await s.telephones())[0].relie)
+    await s.activer(false)
+    await quand(() => departs.length === 3)
+    expect(departs[2]).toMatchObject({ raison: 'eteint' })
+    await quand(() => encore.liaison.fermee)
+    await s.activer(true)
+    await f.connecter('127.0.0.1', (await s.etat()).port as number)
+    await quand(async () => (await s.telephones())[0].relie)
+    expect(await s.retirer(id)).toBe(true)
+    await quand(() => departs.length === 4)
+    expect(departs[3]).toMatchObject({ raison: 'retire' })
+    expect(await s.telephones()).toEqual([])
+  })
+
+  it('classe la raison d’une fermeture', () => {
+    expect(classerDepart("l'autre bout a fermé la liaison.")).toBe('ferme')
+    expect(classerDepart('le téléphone ne répond plus.')).toBe('silence')
+    expect(classerDepart('délai dépassé.')).toBe('silence')
+    expect(classerDepart('téléphone retiré.')).toBe('retire')
+    expect(classerDepart('sans-fil éteint.')).toBe('eteint')
+    expect(classerDepart('remplacée par une liaison plus récente du même téléphone.')).toBe('remplace')
+    expect(classerDepart('read ECONNRESET')).toBe('coupure')
+    expect(classerDepart('liaison fermée.')).toBe('coupure')
   })
 
   it('prend le port suivant quand le premier est pris', async () => {

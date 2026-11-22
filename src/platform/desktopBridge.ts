@@ -9,6 +9,8 @@
  * en lecture seule jusqu'à son adoption) ; la page ne donne jamais de chemin absolu.
  *
  * Les types sont décrits ici, à la main : ceux de la coquille emploient les types de Node, que l'application n'a pas.
+ * Deux gestes de la coquille, sans réponse attendue, s'appellent d'ici : les textes de la question de fermeture
+ * (`sendCloseQuestionTexts`) et une ligne du journal daté (`noteJournal`).
  */
 
 /** Code d'une erreur du pont, lisible par `fileErrorCode`. */
@@ -209,6 +211,13 @@ export interface DesktopWirelessPhone {
   /** Dernière fois vu après la première liaison ; `null` s'il n'est pas revenu. */
   vuLe: number | null;
   relie: boolean;
+  /**
+   * Heure du dernier départ pendant ce lancement du programme, en millisecondes depuis 1970 ; `null` s'il est relié ou
+   * n'est pas parti depuis le lancement ; absent d'une coquille plus ancienne.
+   */
+  partiLe?: number | null;
+  /** Raison de ce départ, `null` avec `partiLe` ; absent d'une coquille plus ancienne. */
+  raisonDepart?: DesktopDepartureReason | null;
 }
 
 /** Avis d'un téléphone qui se présente ; `nouveau` s'il vient d'être relié par le code. */
@@ -216,6 +225,20 @@ export interface DesktopWirelessArrival {
   id: string;
   nom: string;
   nouveau: boolean;
+}
+
+/**
+ * Pourquoi un téléphone relié est parti : il a fermé la liaison (`ferme`, Gtracker a quitté son écran), il ne répondait
+ * plus (`silence`), il a été retiré (`retire`), le sans-fil a été éteint (`eteint`), ou la liaison a cassé (`coupure`).
+ */
+export type DesktopDepartureReason = 'ferme' | 'silence' | 'retire' | 'eteint' | 'coupure';
+
+/** Avis d'un téléphone relié qui s'en va ; `heure` en millisecondes depuis 1970 (horloge du PC). */
+export interface DesktopWirelessDeparture {
+  id: string;
+  nom: string;
+  raison: DesktopDepartureReason;
+  heure: number;
 }
 
 /** Le sans-fil du PC : écoute, fenêtre de liaison, téléphones reliés. */
@@ -232,6 +255,8 @@ export interface DesktopWirelessBridge {
   autoriser?(): Promise<BridgeAnswer<DesktopWirelessAuthorization>>;
   /** Le rappel reçoit l'avis de chaque arrivée ; rend la fonction qui se désabonne. */
   surArrivee(rappel: (avis: unknown) => void): () => void;
+  /** Le rappel reçoit l'avis de chaque départ ; rend la fonction qui se désabonne. Absent d'une coquille plus ancienne. */
+  surDepart?(rappel: (avis: unknown) => void): () => void;
 }
 
 /** L'application du téléphone embarquée : version du programme, présence de l'APK, déjà proposée pour cette version. */
@@ -277,6 +302,11 @@ export interface DesktopBridge {
   /** Absent d'une coquille plus ancienne, ou qui n'emporte pas l'application du téléphone. */
   application?: DesktopAppBridge;
   textes(texts: CloseQuestionTexts): Promise<BridgeAnswer<null>>;
+  /**
+   * Écrit une étape de la page dans le journal daté du programme (`journal.txt` de son profil), bornée à 300
+   * caractères ; absent d'une coquille plus ancienne.
+   */
+  noter?(argument: { texte: string }): Promise<BridgeAnswer<null>>;
 }
 
 /** Le pont du programme Windows, `null` ailleurs (navigateur, téléphone). */
@@ -296,4 +326,31 @@ export const sendCloseQuestionTexts = (texts: CloseQuestionTexts): void => {
   const bridge = desktopBridge();
   if (!bridge) return;
   void bridge.textes(texts).catch(() => undefined);
+};
+
+/** Longueur d'une ligne du journal du programme Windows gardée par la coquille, en caractères. */
+export const DESKTOP_JOURNAL_LINE_MAX = 300;
+
+/** Vrai dans le programme Windows dont la coquille tient un journal daté (`noteJournal`). */
+export const desktopJournalAvailable = (): boolean => typeof desktopBridge()?.noter === 'function';
+
+/**
+ * Note une étape de la page (attente du téléphone, départ d'une synchronisation, issue) dans le journal daté du
+ * programme Windows (`journal.txt` de son profil), pour comprendre après coup ce que l'utilisateur a vu ; rien de
+ * personnel n'y va (ni nom de session, ni contenu de fichier). Sans attendre ni jamais échouer : un refus ou un pont
+ * refermé perdent la ligne, rien de plus. Sans effet ailleurs et dans une coquille plus ancienne. Une ligne vide n'est
+ * pas envoyée ; une ligne trop longue est coupée avant l'envoi.
+ */
+export const noteJournal = (text: string): void => {
+  const bridge = desktopBridge();
+  if (typeof bridge?.noter !== 'function') return;
+  const line = text.trim();
+  if (line === '') return;
+  const letters = [...line];
+  const texte = letters.length > DESKTOP_JOURNAL_LINE_MAX ? letters.slice(0, DESKTOP_JOURNAL_LINE_MAX).join('') : line;
+  try {
+    void bridge.noter({ texte }).catch(() => undefined);
+  } catch {
+    // Pont refermé pendant l'appel : la ligne est perdue.
+  }
 };

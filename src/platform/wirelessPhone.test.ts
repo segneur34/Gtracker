@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  authorizeWireless, onWirelessArrival, openWirelessPairing, removeWirelessPhone, setWirelessActive, wirelessAuthorizable, wirelessAvailable,
-  wirelessPhones, wirelessState, type WirelessArrival,
+  authorizeWireless, onWirelessArrival, onWirelessDeparture, openWirelessPairing, phoneDeparture, removeWirelessPhone, setWirelessActive,
+  wirelessAuthorizable, wirelessAvailable, wirelessDeparturesNotified, wirelessPhones, wirelessState, type WirelessArrival, type WirelessDeparture,
 } from './wirelessPhone';
 import type { DesktopWirelessBridge } from './desktopBridge';
 
@@ -53,12 +53,24 @@ let tmp: string;
 let server: ShellServer;
 /** Rappels abonnés à `surArrivee`, appelés par le serveur à chaque téléphone qui se présente. */
 let listeners: Set<(avis: unknown) => void>;
+/** Rappels abonnés à `surDepart`, appelés par le serveur à chaque téléphone relié qui s'en va. */
+let departureListeners: Set<(avis: unknown) => void>;
 
-/** Branche le serveur comme pont de la page ; `withAuthorization` faux : une coquille qui ne sait pas l'autorisation. */
-const plug = (withAuthorization = true): void => {
+/**
+ * Branche le serveur comme pont de la page ; `withAuthorization` faux : une coquille qui ne sait pas l'autorisation ;
+ * `withDepartures` faux : une coquille qui n'annonce pas les départs.
+ */
+const plug = (withAuthorization = true, withDepartures = true): void => {
   const g = shell.gestionnairesSansFil(server);
+  const departures = {
+    surDepart: (rappel: (avis: unknown) => void) => {
+      departureListeners.add(rappel);
+      return () => departureListeners.delete(rappel);
+    },
+  };
   const sansFil: DesktopWirelessBridge = {
     ...(withAuthorization ? { autoriser: () => g['sansfil:autoriser'](undefined) as ReturnType<NonNullable<DesktopWirelessBridge['autoriser']>> } : {}),
+    ...(withDepartures ? departures : {}),
     etat: () => g['sansfil:etat'](undefined) as ReturnType<DesktopWirelessBridge['etat']>,
     activer: (argument) => g['sansfil:activer'](argument) as ReturnType<DesktopWirelessBridge['activer']>,
     ouvrirAppairage: () => g['sansfil:ouvrirAppairage'](undefined) as ReturnType<DesktopWirelessBridge['ouvrirAppairage']>,
@@ -85,6 +97,7 @@ beforeEach(async () => {
   await fs.mkdir(join(tmp, 'telephone'), { recursive: true });
   await fs.writeFile(join(tmp, 'telephone', 'index.json'), '{}');
   listeners = new Set();
+  departureListeners = new Set();
   server = new shell.ServeurSansFil(serverOptions());
 });
 
@@ -97,6 +110,7 @@ const serverOptions = (): Record<string, unknown> => ({
   portSonde: null,
   nomPc: 'PC de test',
   surArrivee: (avis: unknown) => listeners.forEach((rappel) => rappel(avis)),
+  surDepart: (avis: unknown) => departureListeners.forEach((rappel) => rappel(avis)),
 });
 
 afterEach(async () => {
@@ -167,6 +181,58 @@ describe('sans-fil du programme Windows, vu de la page', () => {
     plug(false);
     expect(wirelessAuthorizable()).toBe(false);
     expect(() => authorizeWireless()).toThrow();
+  });
+
+  it('départ annoncé avec sa raison et son heure, lu aussi dans la liste ; une coquille ancienne ne l\'annonce pas', async () => {
+    plug();
+    expect(wirelessDeparturesNotified()).toBe(true);
+    const departures: WirelessDeparture[] = [];
+    const stop = onWirelessDeparture((d) => departures.push(d));
+    const state = await setWirelessActive(true);
+    const pairing = await openWirelessPairing();
+    const phone = new fake.FauxTelephone({ dossier: join(tmp, 'telephone'), delaiMs: 5_000 });
+    const link = (await phone.appairer(pairing.adresse, pairing.port, pairing.code)) as { fermer(): void };
+    await waitFor(async () => (await wirelessPhones())[0]?.relie === true);
+    const [linked] = await wirelessPhones();
+    expect(phoneDeparture(linked)).toBeNull();
+
+    const before = Date.now();
+    link.fermer();
+    await waitFor(() => departures.length === 1);
+    expect(departures[0]).toMatchObject({ id: linked.id, name: "Téléphone d'essai", reason: 'closedByPhone' });
+    expect(departures[0].atMs).toBeGreaterThanOrEqual(before);
+    const [gone] = await wirelessPhones();
+    expect(phoneDeparture(gone)).toEqual({ atMs: departures[0].atMs, reason: 'closedByPhone' });
+
+    stop();
+    expect(departureListeners.size).toBe(0);
+    expect(state.actif).toBe(true);
+
+    // Coquille plus ancienne : ni avis, ni heure dans la liste.
+    plug(true, false);
+    expect(wirelessDeparturesNotified()).toBe(false);
+    expect(onWirelessDeparture(() => undefined)()).toBeUndefined();
+    expect(phoneDeparture({ id: 'a', nom: 'Pixel', ajouteLe: 0, vuLe: null, relie: false })).toBeNull();
+  });
+
+  it('un avis de départ qui n\'a pas la forme attendue est ignoré ; une raison inconnue devient une coupure', () => {
+    plug();
+    const departures: WirelessDeparture[] = [];
+    onWirelessDeparture((d) => departures.push(d));
+    departureListeners.forEach((rappel) => {
+      rappel(null);
+      rappel({ id: 'a', nom: 'Pixel', raison: 'ferme' });
+      rappel({ id: 'a', nom: 'Pixel', raison: 'silence', heure: 12 });
+      rappel({ id: 'a', nom: 'Pixel', raison: 'neuve', heure: 13 });
+      rappel({ id: 'a', nom: 'Pixel', raison: 'toString', heure: 14 });
+    });
+    expect(departures).toEqual([
+      { id: 'a', name: 'Pixel', reason: 'noAnswer', atMs: 12 },
+      { id: 'a', name: 'Pixel', reason: 'broken', atMs: 13 },
+      { id: 'a', name: 'Pixel', reason: 'broken', atMs: 14 },
+    ]);
+    expect(phoneDeparture({ id: 'a', nom: 'Pixel', ajouteLe: 0, vuLe: null, relie: false, partiLe: 20, raisonDepart: 'eteint' })).toEqual({ atMs: 20, reason: 'wirelessOff' });
+    expect(phoneDeparture({ id: 'a', nom: 'Pixel', ajouteLe: 0, vuLe: null, relie: true, partiLe: 20, raisonDepart: 'eteint' })).toBeNull();
   });
 
   it('un avis qui n\'a pas la forme attendue est ignoré', async () => {

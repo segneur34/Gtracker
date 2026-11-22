@@ -39,6 +39,11 @@
 // le Wi-Fi si un téléphone y est relié (`sansFil.ts`, réglé par les canaux `sansfil:*`, en lecture seule), sinon par
 // le câble (`adb.ts`, le débogage USB), qui sait aussi écrire et effacer un fichier de la liste blanche
 // (`cheminEcrivable`, vérifiée par les gestionnaires avant toute commande).
+//
+// Le journal daté (`journal.ts`) : `journal.txt` dans le profil, toujours écrit, mode d'essai ou non ; il reçoit tout ce
+// que la coquille journalise (liaisons du téléphone, états lus qui changent, refus) et les étapes que la page y note par
+// le canal `coquille:noter`, jamais un nom, un chemin ni une adresse web. En mode d'essai, les lignes de la coquille vont
+// aussi sur la sortie, avec leurs détails (`Journaliser`).
 
 import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol, safeStorage, screen, session, shell } from 'electron'
 import type { OpenDialogOptions, Rectangle, SaveDialogOptions, WebContents } from 'electron'
@@ -49,11 +54,13 @@ import { dossierAdb, dossierAdbConseille } from './adb'
 import type { EssaiApplication } from './applicationTelephone'
 import { cheminApk, essaiApplicationDepuisEnvironnement, gestionnairesApplication } from './applicationTelephone'
 import { DOSSIER_COPIES } from './copieSecurite'
+import type { Journal, Journaliser } from './journal'
+import { creerJournal, journaliseur, lireNote, suivreEtats } from './journal'
 import { creerMemoire, gestionnairesMemoire, optionsDepuisEnvironnement } from './memoire'
 import type { ContexteEcoute } from './pareFeu'
 import { autoriserPareFeuWindows, lirePareFeuWindows } from './pareFeu'
 import type { Chiffreur } from './sansFil'
-import { AVIS_ARRIVEE, DOSSIER_SANS_FIL, ServeurSansFil, dossierSansFilPuisCable, essaiSansFilDepuisEnvironnement, gestionnairesSansFil, stockageDossier } from './sansFil'
+import { AVIS_ARRIVEE, AVIS_DEPART, DOSSIER_SANS_FIL, ServeurSansFil, dossierSansFilPuisCable, essaiSansFilDepuisEnvironnement, gestionnairesSansFil, stockageDossier } from './sansFil'
 import type { DossierDistant } from './telephone'
 import { DOSSIER_LECTURES, dossierLocal, enSerie, essaiTelephoneDepuisEnvironnement, gestionnairesTelephone, viderLectures } from './telephone'
 import { ADRESSE_ACCUEIL, HOTE, estDeLApplication } from './origine'
@@ -85,9 +92,19 @@ const AUTORISATIONS = new Set(['fullscreen', 'clipboard-sanitized-write', 'fileS
 /** Fichier du profil qui retient taille et position de la fenêtre. */
 const FICHIER_FENETRE = 'fenetre.json'
 
-function journal(message: string): void {
-  if (BANC) console.log(`[Gtracker] ${message}`)
+/** Le journal daté, ouvert au premier message : le profil (`GTRACKER_PROFIL`) est alors choisi. */
+let journalDate: Journal | null = null
+
+/** Le journal daté seul, sans la sortie d'essai : ce qui ne sert qu'à relire le poste après coup. */
+const journalSeul: Journal = {
+  noter: (message) => {
+    journalDate ??= creerJournal({ dossier: app.getPath('userData'), masques: [app.getPath('home')] })
+    journalDate.noter(message)
+  },
 }
+
+/** Journal daté, et en mode d'essai la sortie (avec les détails que le fichier ne prend pas : `Journaliser`). */
+const journal: Journaliser = journaliseur(journalSeul, BANC ? (ligne) => console.log(`[Gtracker] ${ligne}`) : null)
 
 // ---------- garde du port de débogage ----------
 // Un port de débogage donne la main sur la page et sa mémoire : seul le mode d'essai l'accepte.
@@ -241,7 +258,7 @@ function ouvrirAuDehors(adresse: string): void {
     return
   }
   if (url.protocol !== 'https:' || estDeLApplication(adresse)) return
-  journal(`lien externe : ${url.href}`)
+  journal('lien externe ouvert', `lien externe : ${url.href}`)
   if (!BANC) void shell.openExternal(url.href)
 }
 
@@ -328,9 +345,16 @@ const chiffreurSysteme: Chiffreur = {
   dechiffrer: async (octets) => (await safeStorage.decryptStringAsync(Buffer.from(octets))).result,
 }
 
+/** Envoie un avis à la page de la fenêtre principale, si elle est ouverte. */
+function avertirPage(canal: string, avis: unknown): void {
+  const fenetre = fenetrePrincipale
+  if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(canal, avis)
+}
+
 /**
  * Le serveur sans fil, secrets dans le profil (ou le dossier d'essai), jamais dans la mémoire. Il ne se met à l'écoute
- * que si l'utilisateur l'a activé ; l'arrivée d'un téléphone est annoncée à la page (`AVIS_ARRIVEE`).
+ * que si l'utilisateur l'a activé ; l'arrivée et le départ d'un téléphone sont annoncés à la page (`AVIS_ARRIVEE`,
+ * `AVIS_DEPART`).
  */
 function creerSansFil(profil: string): ServeurSansFil {
   const essai = essaiSansFilDepuisEnvironnement(process.env, journal)
@@ -347,10 +371,8 @@ function creerSansFil(profil: string): ServeurSansFil {
     chiffreur: chiffreurSysteme,
     journal,
     ...pareFeuWindows,
-    surArrivee: (avis) => {
-      const fenetre = fenetrePrincipale
-      if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(AVIS_ARRIVEE, avis)
-    },
+    surArrivee: (avis) => avertirPage(AVIS_ARRIVEE, avis),
+    surDepart: (avis) => avertirPage(AVIS_DEPART, avis),
     ...reglagesEssai,
   })
   // Activé dès le lancement (mode d'essai) : comme un sans-fil déjà allumé, sans demande d'autorisation.
@@ -369,7 +391,8 @@ function creerTelephone(profil: string, sansFil: ServeurSansFil, essaiApplicatio
   const cable = essai
     ? dossierLocal(essai.stockage, { ...essai, refusInstallation: essaiApplication?.refus ?? null })
     : dossierAdb({ env: process.env, profil, programme: path.dirname(process.execPath), journal })
-  return { telephone: dossierSansFilPuisCable(sansFil.dossierSansFil(), cable), cable }
+  // Chaque changement de l'état lu par la page va au journal daté (pas à la sortie d'essai, que le banc relève).
+  return { telephone: suivreEtats(dossierSansFilPuisCable(sansFil.dossierSansFil(), cable), journalSeul.noter), cable }
 }
 
 /** Dossier proposé par la fenêtre « Enregistrer sous » : Téléchargements, sinon Documents. */
@@ -440,6 +463,12 @@ function brancherPont(): void {
         const textes = lireTextesFermeture(argument)
         if (!textes) return echec('UNKNOWN', 'Textes de la question de fermeture incomplets.')
         textesFermeture = textes
+        return reussite(null)
+      },
+      'coquille:noter': async (argument) => {
+        const note = lireNote(argument)
+        if (note === null) return echec('UNKNOWN', 'Message mal formé : « texte » doit être un texte non vide.')
+        journalSeul.noter(`page : ${note}`)
         return reussite(null)
       },
     },
@@ -515,10 +544,12 @@ function demarrer(): void {
 
   void app.whenReady().then(() => {
     Menu.setApplicationMenu(null)
+    // Au journal daté seulement : la version, qui change à chaque livraison, n'entre pas dans les relevés du banc.
+    journalSeul.noter(`lancement de Gtracker ${VERSION}`)
     gererAutorisations()
     brancherProtocole()
     brancherPont()
-    journal(`prêt : ${ADRESSE_ACCUEIL}, application ${DIST}, profil ${app.getPath('userData')}`)
+    journal('prêt', `prêt : ${ADRESSE_ACCUEIL}, application ${DIST}, profil ${app.getPath('userData')}`)
     ouvrirFenetre()
   })
 }

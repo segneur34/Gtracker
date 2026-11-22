@@ -8,7 +8,7 @@ import { ORIGINE } from './origine'
 import type { EvenementPont, Gestionnaire } from './pont'
 import { TEXTES_FERMETURE, brancherCanaux, enReponse, expediteurAdmis, lireTextesFermeture, reussite, uneALaFois } from './pont'
 import { ErreurDisque } from './disque'
-import { AVIS_ARRIVEE, CANAUX_SANS_FIL } from './sansFil'
+import { AVIS_ARRIVEE, AVIS_DEPART, CANAUX_SANS_FIL } from './sansFil'
 import type { DossierDistant } from './telephone'
 import { CANAUX_TELEPHONE, dossierLocal, enSerie, gestionnairesTelephone } from './telephone'
 import { CANAUX_APPLICATION, gestionnairesApplication } from './applicationTelephone'
@@ -182,17 +182,23 @@ describe('preload', () => {
     expect(telephone).toEqual([...CANAUX_TELEPHONE])
     for (const nom of CANAUX_TELEPHONE) expect(source).toMatch(new RegExp(`\\b${nom}: (sans|avec)\\('telephone:${nom}'\\)`))
     expect(source).toMatch(/^\s+telephone,$/m)
-    const sansFil = [...source.matchAll(/'sansfil:([A-Za-z]+)'/g)].map((m) => m[1]).filter((nom) => `sansfil:${nom}` !== AVIS_ARRIVEE)
+    const avis = [AVIS_ARRIVEE, AVIS_DEPART]
+    const sansFil = [...source.matchAll(/'sansfil:([A-Za-z]+)'/g)].map((m) => m[1]).filter((nom) => !avis.includes(`sansfil:${nom}`))
     expect(sansFil).toEqual([...CANAUX_SANS_FIL])
     for (const nom of CANAUX_SANS_FIL) expect(source).toMatch(new RegExp(`\\b${nom}: (sans|avec)\\('sansfil:${nom}'\\)`))
     expect(source).toMatch(/^\s+sansFil,$/m)
-    expect(source).toContain(`ipcRenderer.on('${AVIS_ARRIVEE}', ecouteur)`)
-    expect(source).toContain(`ipcRenderer.removeListener('${AVIS_ARRIVEE}', ecouteur)`)
+    for (const canal of avis) {
+      expect(source).toContain(`ipcRenderer.on('${canal}', ecouteur)`)
+      expect(source).toContain(`ipcRenderer.removeListener('${canal}', ecouteur)`)
+    }
+    expect(source).toMatch(/surArrivee: \(rappel/)
+    expect(source).toMatch(/surDepart: \(rappel/)
     const application = [...source.matchAll(/'application:([A-Za-z]+)'/g)].map((m) => m[1])
     expect(application).toEqual([...CANAUX_APPLICATION])
     for (const nom of CANAUX_APPLICATION) expect(source).toMatch(new RegExp(`\\b${nom}: (sans|avec)\\('application:${nom}'\\)`))
     expect(source).toMatch(/^\s+application,$/m)
     expect(source).toContain("textes: avec('coquille:textes')")
+    expect(source).toContain("noter: avec('coquille:noter')")
     expect(source).not.toMatch(/exposeInMainWorld\([^)]*ipcRenderer/)
     expect(source).not.toMatch(/from '\.\//)
   })
