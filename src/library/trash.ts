@@ -216,9 +216,46 @@ export const withoutTrashEntries = (entries: readonly TrashEntry[], dirs: readon
   return entries.filter((e) => !gone.has(e.dir.toLowerCase()));
 };
 
-/** Entrées de la plus récemment supprimée à la plus ancienne. */
-export const sortedTrashEntries = (entries: readonly TrashEntry[]): TrashEntry[] =>
-  [...entries].sort((a, b) => b.deletedAtMs - a.deletedAtMs);
+/**
+ * Ordre dans lequel les entrées d'une même session se restaurent : celles de l'ordinateur d'abord, sa mémoire faisant
+ * foi, puis de la plus récemment supprimée à la plus ancienne.
+ */
+export const trashRestoreOrder = (a: TrashEntry, b: TrashEntry): number =>
+  Number(a.origin !== 'ordinateur') - Number(b.origin !== 'ordinateur') || b.deletedAtMs - a.deletedAtMs;
+
+/** Une ligne de la corbeille : toutes les entrées d'une même session, ou un itinéraire. */
+export interface TrashGroup {
+  /** L'entrée montrée et restaurée d'abord (`trashRestoreOrder`) ; les autres ne font que la compléter. */
+  entry: TrashEntry;
+  /** Les entrées de la ligne, `entry` en tête, dans l'ordre de `trashRestoreOrder`. */
+  entries: TrashEntry[];
+  /** Entrée dans la corbeille la plus récente de la ligne. */
+  deletedAtMs: number;
+}
+
+/**
+ * Lignes de la corbeille, de la plus récemment supprimée à la plus ancienne : une par session, qui réunit ses entrées
+ * des deux origines (la copie de l'ordinateur et celle du téléphone rangée à part), une par itinéraire. Les restes
+ * d'une session n'y sont pas.
+ */
+export const groupedTrashEntries = (entries: readonly TrashEntry[]): TrashGroup[] => {
+  const lines = new Map<string, TrashEntry[]>();
+  for (const e of shownTrashEntries(entries)) {
+    const key = e.kind === 'session' && e.startMs !== null ? `session:${e.startMs}` : `dossier:${e.dir.toLowerCase()}`;
+    lines.set(key, [...(lines.get(key) ?? []), e]);
+  }
+  return [...lines.values()]
+    .map((line) => {
+      const sorted = [...line].sort(trashRestoreOrder);
+      return { entry: sorted[0], entries: sorted, deletedAtMs: Math.max(...line.map((e) => e.deletedAtMs)) };
+    })
+    .sort((a, b) => b.deletedAtMs - a.deletedAtMs);
+};
+
+/** La ligne qui tient `entry` ; à défaut, une ligne d'elle seule. */
+export const trashGroupOf = (entries: readonly TrashEntry[], entry: TrashEntry): TrashGroup =>
+  groupedTrashEntries(entries).find((g) => g.entries.some((e) => e.dir === entry.dir))
+    ?? { entry, entries: [entry], deletedAtMs: entry.deletedAtMs };
 
 /** Une copie à faire pour restaurer : de la corbeille vers la mémoire. */
 export interface TrashCopy {
@@ -298,11 +335,14 @@ export const sessionDiscardQuestion = (toTrash: boolean, drafted: boolean): stri
     : t('Supprimer cette session ? Elle part à la corbeille de cet ordinateur, avec sa fiche et ses capteurs, et y reste {days} jours (Réglages › Mémoire).', { days: TRASH_KEEP_DAYS });
 };
 
-/** Combien la corbeille garde de sessions et d'itinéraires. */
-export const trashCounts = (entries: readonly TrashEntry[]): { sessions: number; routes: number } => ({
-  sessions: entries.filter((e) => e.kind === 'session').length,
-  routes: entries.filter((e) => e.kind === 'itineraire').length,
-});
+/** Combien la corbeille garde de sessions et d'itinéraires : une par ligne (`groupedTrashEntries`). */
+export const trashCounts = (entries: readonly TrashEntry[]): { sessions: number; routes: number } => {
+  const groups = groupedTrashEntries(entries);
+  return {
+    sessions: groups.filter((g) => g.entry.kind === 'session').length,
+    routes: groups.filter((g) => g.entry.kind === 'itineraire').length,
+  };
+};
 
 /** Repère de la zone de la corbeille dans Réglages › Mémoire, où mène le menu « … » de Sessions. */
 export const TRASH_ZONE_ID = 'zone-corbeille';

@@ -1972,6 +1972,7 @@
   "« {name} » est revenu dans les itinéraires.": "«{name}» ha vuelto a las rutas.",
   "Entrée de corbeille sans instant de départ.": "Elemento de la papelera sin hora de inicio.",
   "« {name} » est revenue dans la mémoire.": "«{name}» ha vuelto al almacenamiento.",
+  "Une autre copie de cette session reste dans la corbeille : elle n'a pas pu compléter sa fiche.": "Otra copia de esta sesión se queda en la papelera: no pudo completar su ficha.",
   "Restauration impossible : {detail}": "No se pudo restaurar: {detail}",
   "{n} élément de la corbeille": "{n} elemento de la papelera",
   "{n} éléments de la corbeille": "{n} elementos de la papelera",

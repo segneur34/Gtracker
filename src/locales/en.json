@@ -1972,6 +1972,7 @@
   "« {name} » est revenu dans les itinéraires.": "“{name}” is back in the routes.",
   "Entrée de corbeille sans instant de départ.": "Trash entry without a start time.",
   "« {name} » est revenue dans la mémoire.": "“{name}” is back in storage.",
+  "Une autre copie de cette session reste dans la corbeille : elle n'a pas pu compléter sa fiche.": "Another copy of this session stays in the trash: it could not complete its record.",
   "Restauration impossible : {detail}": "Restore failed: {detail}",
   "{n} élément de la corbeille": "{n} item in the trash",
   "{n} éléments de la corbeille": "{n} items in the trash",

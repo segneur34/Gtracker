@@ -128,6 +128,42 @@ afterEach(() => {
   stopTestTimers();
 });
 
+/**
+ * La première session supprimée sur l'ordinateur (fiche nommée « Ordinateur »), et à côté la copie du téléphone que
+ * la synchronisation aurait rangée à part (nommée « Téléphone », avec des notes ; `phoneGpx` : son GPX, celui de
+ * l'ordinateur par défaut). La bibliothèque est rouverte sur ces deux entrées.
+ */
+const twoOrigins = async (phoneGpx?: string): Promise<Library> => {
+  const library = await openFresh();
+  await library.removeSession('2026-10-27_10-00-00_kite.gpx');
+  await drain(library);
+  const [mine] = index().entries;
+  const recordName = mine.files.find((f) => f.name.endsWith('.json'))?.name as string;
+  const edit = (dir: string, patch: Record<string, unknown>): number => {
+    const text = JSON.stringify({ ...JSON.parse(files.get(`corbeille/${mine.dir}/${recordName}`) as string), ...patch }, null, 2);
+    put(`corbeille/${dir}/${recordName}`, text);
+    return text.length;
+  };
+  const phoneDir = `${mine.dir}-2`;
+  for (const f of mine.files) put(`corbeille/${phoneDir}/${f.name}`, files.get(`corbeille/${mine.dir}/${f.name}`) as string);
+  if (phoneGpx !== undefined) put(`corbeille/${phoneDir}/${mine.main}`, phoneGpx);
+  const notes = {
+    foil: '', mast: '', wing: '', gear1: '', gear2: '', conditions: '', gear: null, comment: 'Note du téléphone', windLevel: null, waterState: null,
+    rating: null, savedAt: 100,
+  };
+  const phoneSize = edit(phoneDir, { name: 'Téléphone', notes });
+  const mineSize = edit(mine.dir, { name: 'Ordinateur' });
+  const sized = (entry: TrashEntry, sizes: Record<string, number>): TrashEntry => ({ ...entry, files: entry.files.map((f) => ({ ...f, size: sizes[f.name] ?? f.size })) });
+  const phoneSizes = { [recordName]: phoneSize, ...(phoneGpx !== undefined ? { [mine.main]: phoneGpx.length } : {}) };
+  files.set(TRASH_INDEX_PATH, serializeTrashIndex([
+    sized({ ...mine, dir: phoneDir, origin: 'telephone', name: 'Copie du téléphone' }, phoneSizes), sized(mine, { [recordName]: mineSize }),
+  ]));
+  const reopened = await openFresh();
+  await drain(reopened);
+  expect(reopened.trashStore.get().entries).toHaveLength(2);
+  return reopened;
+};
+
 describe('corbeille du programme Windows', () => {
   it('une session supprimée passe à la corbeille, GPX retiré en premier, et ne compte plus dans la liste', async () => {
     const library = await openFresh();
@@ -170,6 +206,44 @@ describe('corbeille du programme Windows', () => {
     await library.emptyWholeTrash();
     expect(library.trashStore.get().entries).toEqual([]);
     expect(trashFiles()).toEqual([]);
+  });
+
+  it('deux origines, une ligne : « Restaurer » ramène la copie de l’ordinateur, complétée par celle du téléphone, et vide la ligne', async () => {
+    const library = await twoOrigins();
+    const phoneEntry = library.trashStore.get().entries.find((e) => e.origin === 'telephone') as TrashEntry;
+    // Restaurée depuis la ligne, quelle que soit l'entrée qui la porte : l'ordinateur fait foi, le téléphone complète.
+    expect(await library.restoreFromTrash(phoneEntry)).toBe('« Kite » est revenue dans la mémoire.');
+    await drain(library);
+    // La fiche de l'ordinateur garde son nom et reçoit les notes du téléphone, qui lui manquaient.
+    const restored = library.readLibraryState().sessions.find((s) => s.file === '2026-10-27_10-00-00_kite.gpx');
+    expect(restored?.record).toMatchObject({ name: 'Ordinateur', notes: { comment: 'Note du téléphone' } });
+    expect(JSON.parse(files.get('sessions/2026-10-27_10-00-00_kite.json') as string).notes?.comment).toBe('Note du téléphone');
+    expect(library.readLibraryState().sessions).toHaveLength(2);
+    expect(index().entries).toEqual([]);
+    expect(trashFiles()).toEqual([]);
+
+    // « Supprimer définitivement » retire la ligne entière.
+    const again = await twoOrigins();
+    await again.deleteFromTrash(again.trashStore.get().entries.find((e) => e.origin === 'ordinateur') as TrashEntry);
+    expect(index().entries).toEqual([]);
+    expect(trashFiles()).toEqual([]);
+  });
+
+  it.each([
+    ['tronquée (GPX illisible)', (): string => '<?xml version="1.0"?><gpx version="1.1"><trk><trkseg></trkseg></trk></gpx>', false],
+    ['autre trace du même instant', (): string => gpxAt(0).replace('lat="43.6"', 'lat="43.7"'), true],
+  ])('deux origines, copie du téléphone %s : la session revient, la copie reste dans la corbeille et c’est dit', async (_, phoneGpx, completes) => {
+    const library = await twoOrigins(phoneGpx());
+    const message = await library.restoreFromTrash(library.trashStore.get().entries[0]);
+    await drain(library);
+    expect(message).toBe('« Kite » est revenue dans la mémoire. Une autre copie de cette session reste dans la corbeille : elle n\'a pas pu compléter sa fiche.');
+    expect(files.get(GPX)).toBe(gpxAt(0));
+    const restored = library.readLibraryState().sessions.find((s) => s.file === '2026-10-27_10-00-00_kite.gpx');
+    expect(restored?.record.notes?.comment ?? null).toBe(completes ? 'Note du téléphone' : null);
+    const [left] = index().entries;
+    expect(index().entries.map((e) => e.origin)).toEqual(['telephone']);
+    expect(files.get(`corbeille/${left.dir}/${left.main}`)).toBe(phoneGpx());
+    expect(library.trashStore.get().entries.map((e) => e.origin)).toEqual(['telephone']);
   });
 
   it('une session revenue par un import quitte la corbeille', async () => {

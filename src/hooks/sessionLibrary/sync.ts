@@ -18,13 +18,14 @@ import {
 import { planSyncExtras, unknownSyncActivity, type SyncNamedText } from '../../library/syncExtras';
 import { inspectSyncRecord, mergeSyncRecords } from '../../library/syncRecordMerge';
 import {
-  deletesToTrash, isWritableTrash, sessionRestorePlan, sessionTrashEntries, trashFilePath, type TrashCopy, type TrashEntry, type TrashOrigin,
+  deletesToTrash, isWritableTrash, sessionRestorePlan, sessionTrashEntries, trashFilePath, trashRestoreOrder, type TrashCopy, type TrashEntry,
+  type TrashOrigin,
 } from '../../library/trash';
 import {
   addFilesToTrashEntry, copyFromTrash, dropTrashEntries, readTrashIndex, rewriteTrashText, stashFilesInTrash, trashHoldsCopies, trashLeftoversIn,
 } from '../../library/trashFolder';
 import { sessionDisplayName } from '../../library/sessionName';
-import { planRouteSync, restrictRouteSyncPlan, type RouteSyncInput, type RouteSyncPlan } from '../../library/syncRoutes';
+import { planRouteSync, restrictRouteSyncPlan, type RouteSyncInput, type RouteSyncItem, type RouteSyncPlan } from '../../library/syncRoutes';
 import type { FileStat, MemoryFolder } from '../../platform/memoryFolder';
 import { readStoredActivities } from '../useSportSettings';
 import { deviceId, flushWrites } from './deviceSettings';
@@ -499,6 +500,41 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       return null;
     };
 
+    /**
+     * Retient le nom montré de chaque session de `items` qui n'en a pas encore, d'abord par ce qui est déjà lu : sa
+     * fiche relue pour le plan, sinon celle gardée à la dernière synchronisation (`ancestors`), l'ordinateur d'abord,
+     * sinon le nom que la corbeille lui garde. Seule une session que le compte rendu montre (`shown`) est lue s'il le
+     * faut, sur l'ordinateur, puis sur le téléphone en dernier recours ; à défaut, elle prend le nom de son GPX. Un nom
+     * ne fait que dire : une lecture en échec passe à la suivante.
+     */
+    const nameSessions = async (items: readonly SyncItem[], shown: (item: SyncItem) => boolean): Promise<void> => {
+      const trashed = await trashNow();
+      const recordOf = (text: string | null | undefined): SessionRecord | null => (text ? inspectSyncRecord(text).record : null);
+      for (const item of items) {
+        if (outcome.names.sessions[item.startMs] !== undefined) continue;
+        const listedOn = (side: SyncSideName) => (item.files[side] === null ? undefined : input[side].sessions.find((s) => s.gpx.name === item.files[side]));
+        // Fiche non relue pour le plan : son tampon est celui de la base, son texte celui qu'elle a gardé.
+        const knownOn = (side: SyncSideName): SessionRecord | null => recordOf(listedOn(side)?.recordText ?? ancestors.get(item.startMs)?.[side]);
+        const readOn = async (side: SyncSideName): Promise<SessionRecord | null> => {
+          const listed = listedOn(side);
+          return listed?.record ? recordOf(await folders[side].readText(sessionPath(listed.record.name)).catch(() => null)) : null;
+        };
+        const kept = sessionTrashEntries(trashed, item.startMs).sort(trashRestoreOrder)[0];
+        let record = knownOn('computer') ?? knownOn('phone');
+        if (!record && !kept && shown(item)) record = (await readOn('computer')) ?? (await readOn('phone'));
+        const gpx = item.files.computer ?? item.files.phone;
+        const name = record && gpx ? shownName(record, gpx) : kept ? kept.name : gpx ? shownName(null, gpx) : null;
+        if (name !== null) outcome.names.sessions[item.startMs] = name;
+      }
+    };
+    /** Retient le nom de chaque itinéraire de `items` : la base de ses fichiers, celle de l'ordinateur d'abord. */
+    const nameRoutes = (items: readonly RouteSyncItem[]): void => {
+      for (const item of items) {
+        const name = item.files.computer ?? item.files.phone;
+        if (name !== null && outcome.names.routes[item.id] === undefined) outcome.names.routes[item.id] = name;
+      }
+    };
+
     // Réponses « Tout garder » et « Les garder », sur l'ordinateur seul et avant le plan. Une réponse n'agit que sur
     // une session encore dans le cas que la question a montré, d'après le plan du moment sans ces réponses.
     const refusedSessions = options.keepRefused?.sessions ?? [];
@@ -511,6 +547,8 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
         return side ? refusedOn(item.startMs, side) : item.left === 'inTrash' && (heldKept(item.startMs) || refusedOn(item.startMs, 'phone'));
       });
       outcome.kept.sessions = wanted.map((item) => item.startMs);
+      // Nommées tant qu'elles sont encore là où la question les a vues : la corbeille peut les rendre sous un autre nom.
+      await nameSessions(wanted, () => true);
       // D'abord, d'une seule écriture, la base oublie tout ce qui ne doit plus pouvoir se supprimer de soi-même si la
       // suite est coupée : les sessions supprimées sur le téléphone (le plan les y recopie, ou elles l'attendent comme
       // des sessions neuves s'il ne s'écrit pas), et celles de l'ordinateur que sa corbeille ne peut pas rendre (le
@@ -542,6 +580,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       if (changed) input = await readInput();
     }
     const full = sessionPlanOf(outcome.kept.sessions);
+    await nameSessions(full.items, (item) => item.ops.length > 0 || item.restored === true || outcome.kept.sessions.includes(item.startMs));
     // Itinéraires : leur plan est fait maintenant, pour que le garde-fou et sa confirmation les comptent avec les
     // sessions ; ils ne sont exécutés qu'après elles. Rien ne les touche (ni lecture ni écriture) sans `phoneRoutes`.
     outcome.routes.waiting = options.phoneRoutes === false;
@@ -551,12 +590,15 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       held: !keepHeld ? null : heldLists ? options.heldRoutesToKeep ?? [] : 'all',
     };
     if (routeInput && (routeAnswer.refused.length > 0 || routeAnswer.held !== null)) {
-      const kept = await keepRoutes(routePlanOf(routeInput, []), routeAnswer, { computer, base: () => pair.base, setBase: writeBase });
+      const asked = routePlanOf(routeInput, []);
+      const kept = await keepRoutes(asked, routeAnswer, { computer, base: () => pair.base, setBase: writeBase });
       outcome.kept.routes = kept.kept;
+      nameRoutes(asked.items.filter((item) => kept.kept.includes(item.id)));
       outcome.kept.fromTrash.routes = kept.fromTrash;
       if (kept.changed) routeInput = await readRouteSyncInput(folders, pair.base);
     }
     const routeFull: RouteSyncPlan | null = routeInput ? routePlanOf(routeInput, outcome.kept.routes) : null;
+    if (routeFull) nameRoutes(routeFull.items);
     // Le garde-fou ne compte que les suppressions que cette passe peut faire : un téléphone qu'on ne peut pas écrire
     // ne perd rien, et ses retraits ne retiennent pas les mises à la corbeille de l'ordinateur.
     const possible = restrictSyncPlan(full, { ...scope, deletions: true });

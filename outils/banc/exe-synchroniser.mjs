@@ -792,10 +792,9 @@ for (const [nom, nbCorbeille, ks0, fichesChangees = false] of [['g1', 2, TOUTES_
       await b.wait(600);
       const zone = await b.evaluate(`document.getElementById('zone-corbeille').innerText.replace(/\\n+/g, ' / ')`);
       console.log(`  ${nom} : zone de la corbeille de Réglages › Mémoire : ${JSON.stringify(zone)}`);
-      // La liste compte les entrées de la corbeille : une par session retirée, deux quand la copie du téléphone a été rangée à part.
-      const nbEntrees = attendues;
-      const compte = nbEntrees > 1 ? `${nbEntrees} sessions` : `${nbEntrees} session`;
-      check(`${nom} : la corbeille de Réglages › Mémoire dit « Corbeille : ${compte} » (${fichesChangees ? 'deux entrées par session : fiche changée' : 'une par session retirée'})`, new RegExp(`Corbeille : ${compte}(?! \\d)`).test(zone), zone);
+      // La liste compte une ligne par session retirée, même quand la copie du téléphone a été rangée à part (deux entrées).
+      const compte = nbCorbeille > 1 ? `${nbCorbeille} sessions` : `${nbCorbeille} session`;
+      check(`${nom} : la corbeille de Réglages › Mémoire dit « Corbeille : ${compte} » (une ligne par session retirée${fichesChangees ? ', ses deux entrées réunies : fiche changée' : ''})`, new RegExp(`Corbeille : ${compte}(?! \\d)`).test(zone), zone);
       gardeHorsSessions(nom, racine, avantHors);
       check(`${nom} : une seule copie de sécurité en tout`, copiesDe(profil).length === 1, copiesDe(profil).join(','));
       await fermerFenetre(b);

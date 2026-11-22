@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   TRASH_KEEP_MS, deletesToTrash, expiredTrashEntries, routeDeleteButton, sessionDeleteQuestion, sessionDiscardQuestion, isTrashDirName, orphanTrashDirs, parseTrashIndex, reusableRouteEntry, reusableTrashEntry,
-  routeRestorePlan, serializeTrashIndex, sessionRestorePlan, sessionTrashEntries, sortedTrashEntries, trashCounts, trashDirName,
+  groupedTrashEntries, routeRestorePlan, serializeTrashIndex, sessionRestorePlan, sessionTrashEntries, trashCounts, trashDirName, trashGroupOf,
   shownTrashEntries, trashSummaryText, withoutTrashEntries, type TrashEntry,
 } from './trash';
 
@@ -26,9 +26,9 @@ describe('index de la corbeille', () => {
     const leftovers = { ...session(`${NOW}-100-3`, 100), kind: 'restes' as const };
     const entries = [session(`${NOW}-100`, 100), route(`${NOW}-Tour du lac`, 'Tour du lac'), { ...session(`${NOW}-100-2`, 100), origin: 'telephone' as const }, leftovers];
     expect(parseTrashIndex(serializeTrashIndex(entries))).toEqual({ state: 'ok', entries });
-    // Les restes d'une session ne sont ni montrés ni comptés.
+    // Les restes d'une session ne sont ni montrés ni comptés ; ses deux origines font une seule session.
     expect(shownTrashEntries(entries)).toEqual(entries.slice(0, 3));
-    expect(trashCounts(entries)).toEqual({ sessions: 2, routes: 1 });
+    expect(trashCounts(entries)).toEqual({ sessions: 1, routes: 1 });
     expect(serializeTrashIndex([])).toContain('"version": 2');
   });
 
@@ -103,7 +103,25 @@ describe('reprise et identité', () => {
   });
 
   it('les plus récemment supprimées d\'abord', () => {
-    expect(sortedTrashEntries([session('a', 1, 10), session('b', 2, 30), session('c', 3, 20)]).map((e) => e.dir)).toEqual(['b', 'c', 'a']);
+    expect(groupedTrashEntries([session('a', 1, 10), session('b', 2, 30), session('c', 3, 20)]).map((g) => g.entry.dir)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('une ligne par session : l’entrée de l’ordinateur montrée et restaurée d’abord, celles du téléphone avec elle', () => {
+    const phone = (dir: string, startMs: number, deletedAtMs: number): TrashEntry => ({ ...session(dir, startMs, deletedAtMs), origin: 'telephone' });
+    const leftovers = { ...session('restes-1', 1, 90), kind: 'restes' as const };
+    const entries = [phone('tel-1', 1, 50), session('ord-1', 1, 20), session('ord-1-bis', 1, 40), route('r', 'r'), session('ord-2', 2, 30), leftovers, phone('tel-3', 3, 10)];
+    const groups = groupedTrashEntries(entries);
+    expect(groups.map((g) => [g.entry.dir, g.entries.map((e) => e.dir), g.deletedAtMs])).toEqual([
+      ['r', ['r'], NOW],
+      ['ord-1-bis', ['ord-1-bis', 'ord-1', 'tel-1'], 50],
+      ['ord-2', ['ord-2'], 30],
+      // Sans copie de l'ordinateur, celle du téléphone fait la ligne.
+      ['tel-3', ['tel-3'], 10],
+    ]);
+    expect(trashCounts(entries)).toEqual({ sessions: 3, routes: 1 });
+    expect(trashGroupOf(entries, entries[0]).entry.dir).toBe('ord-1-bis');
+    // Une entrée que l'index n'a plus fait une ligne d'elle seule.
+    expect(trashGroupOf([], entries[4]).entries.map((e) => e.dir)).toEqual(['ord-2']);
   });
 });
 

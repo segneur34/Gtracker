@@ -282,6 +282,21 @@ describe('synchronisation des itinéraires, de bout en bout', () => {
     // La corbeille tenait déjà ces mêmes fiches : rien de plus n'y est rangé.
     expect(trashOf(pair).filter((e) => e.kind === 'itineraire')).toHaveLength(2);
   });
+
+  it('restauré après une suppression synchronisée : dit restauré, recopié sur le téléphone, nommé par ses fichiers', async () => {
+    const pair = await syncedPair(4);
+    await trashOnComputer(pair, 'r1');
+    const removed = await run(pair);
+    expect(removed.complete).toBe(true);
+    expect(baseOf(pair)?.removedRoutes).toEqual([iso(1)]);
+    expect(removed.names.routes).toEqual({ [iso(1)]: 'r1' });
+    expect(removed.routes.done.map((i) => i.restored)).toEqual([false]);
+    putRoute(pair.computer, 'r1', iso(1), iso(1));
+    const back = await run(pair);
+    expect(back.routes.done.map((i) => [i.id, i.case, i.restored])).toEqual([[iso(1), 'newOnComputer', true]]);
+    expect(back.names.routes).toEqual({ [iso(1)]: 'r1' });
+    expect(await routesOf(pair.phone)).toEqual(['r0', 'r1', 'r2', 'r3']);
+  });
 });
 
 /** Les suppressions d'itinéraires qu'une passe a retenues, telles que la question les montre. */

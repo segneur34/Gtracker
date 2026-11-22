@@ -920,6 +920,77 @@ describe('réponses définitives : « Tout garder » et « Les garder »', () =>
   });
 });
 
+describe('restauration et noms dans l’issue', () => {
+  const named: SyncOptions['shownName'] = (record, gpx) => `${record ? 'fiche' : 'GPX'} ${gpx}`;
+  const removals = (outcome: SyncOutcome) => (outcome.plan?.items ?? []).flatMap((i) => i.ops).filter((op) => op.kind === 'trash' || op.kind === 'removeFromPhone');
+
+  it('restaurée après une suppression synchronisée : dite restaurée, recopiée sur le téléphone, rien de supprimé', async () => {
+    const pair = await syncedPair(5);
+    await trashOnComputer(pair, 1);
+    const removed = await run(pair, { shownName: named });
+    expect(removed.complete).toBe(true);
+    expect(baseOf(pair)?.removed).toEqual([at(1)]);
+    // Plus sur l'ordinateur : nommée par sa fiche gardée à la dernière synchronisation, sans rien relire.
+    expect(removed.names.sessions[at(1)]).toBe(`fiche ${fileOf(1)}`);
+    expect(removed.done.find((i) => i.startMs === at(1))?.restored).toBe(false);
+
+    await restoreOnComputer(pair, 1);
+    const back = await run(pair, { shownName: named });
+    expect(back).toMatchObject({ deletions: 'made', complete: true, withheldDeletions: [] });
+    expect(back.done.map((i) => [i.startMs, i.case, i.restored])).toEqual([[at(1), 'newOnComputer', true]]);
+    expect(back.done[0].ops).toMatchObject([{ kind: 'copy', to: 'phone' }]);
+    expect(removals(back)).toEqual([]);
+    expect(back.names.sessions).toEqual({ [at(1)]: `fiche ${fileOf(1)}` });
+    expect(baseOf(pair)).toMatchObject({ removed: [] });
+    expect(await syncSessionFiles(pair.phone)).toContain(fileOf(1));
+    // Rien à redire la fois suivante.
+    expect((await run(pair)).plan?.items).toEqual([]);
+  });
+
+  it('restauration seule d’une session que le téléphone tenait : dite restaurée, aucune suppression d’aucun côté', async () => {
+    const pair = pairOf();
+    for (let k = 0; k < 5; k++) putBoth(pair, k);
+    await trashOnComputer(pair, 2);
+    await run(pair);
+    expect(baseOf(pair)?.held).toEqual([at(2)]);
+    await restoreOnComputer(pair, 2);
+    const back = await run(pair, { shownName: named });
+    expect(back).toMatchObject({ deletions: 'made', complete: true, withheldDeletions: [], keptFromPhone: [] });
+    expect(back.plan?.items.map((i) => [i.startMs, i.case, i.restored])).toEqual([[at(2), 'firstMeeting', true]]);
+    expect(removals(back)).toEqual([]);
+    expect(back.names.sessions).toEqual({ [at(2)]: `fiche ${fileOf(2)}` });
+    expect(baseOf(pair)).toMatchObject({ held: [], removed: [] });
+    expect(await bothSides(pair)).toEqual([[0, 1, 2, 3, 4].map(fileOf), [0, 1, 2, 3, 4].map(fileOf)]);
+  });
+
+  it('les sessions réglées par « Tout garder » et « Les garder » sont nommées, sans être dites restaurées', async () => {
+    const { pair, answer } = await keepScenario();
+    const kept = await run(pair, { ...answer, shownName: named });
+    expect(kept.kept.sessions.length).toBeGreaterThan(0);
+    for (const startMs of kept.kept.sessions) expect(kept.names.sessions[startMs], String(startMs)).toMatch(/^(fiche|GPX|session) /);
+    expect((kept.plan?.items ?? []).filter((i) => i.restored)).toEqual([]);
+  });
+
+  it('nommer ne relit aucune fiche déjà lue ni gardée : une fiche changée sur le téléphone, aucune lecture de plus sur l’ordinateur', async () => {
+    const pair = await syncedPair(20);
+    editSyncRecord(pair.phone, fileOf(3), (r) => ({ ...r, notes: notes({ comment: 'Note téléphone' }) }));
+    deleteSyncSession(pair.phone, fileOf(7));
+    const reads: string[] = [];
+    const computer: MemoryFolder = { ...pair.computer, readText: (path) => (path.startsWith('sessions/') && reads.push(path), pair.computer.readText(path)) };
+    const outcome = await run(pair, { shownName: named }, pair.phone, computer);
+    expect(outcome.complete).toBe(true);
+    expect(outcome.names.sessions).toEqual({ [at(3)]: `fiche ${fileOf(3)}`, [at(7)]: `fiche ${fileOf(7)}` });
+    expect(reads).toEqual([]);
+  });
+
+  it('une synchronisation refusée ne nomme rien', async () => {
+    const pair = pairOf();
+    putSyncSession(pair.computer, at(0));
+    const browser = { ...pair.computer, kind: 'browser' as const };
+    expect((await run(pair, { shownName: named }, pair.phone, browser)).names).toEqual({ sessions: {}, routes: {} });
+  });
+});
+
 /**
  * Un peu de tout ce que les deux réponses règlent : une session supprimée sur le téléphone, une supprimée sur
  * l'ordinateur que sa corbeille tient (avec ses capteurs et une fiche changée), une autre que sa corbeille ne tient

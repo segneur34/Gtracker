@@ -268,6 +268,12 @@ export interface SyncItem {
   twoTracks: boolean;
   /** Session suivie dont une fiche gardée manquait ou ne valait plus : fondue comme à une première rencontre. */
   withoutAncestor: boolean;
+  /**
+   * Revenue de la corbeille de l'ordinateur : neuve sur l'ordinateur alors que la synchronisation avait mené sa
+   * suppression au bout (`SyncBase.removed`), ou retrouvée des deux côtés sans ligne alors que le téléphone la tenait
+   * pendant qu'elle était à la corbeille (`SyncBase.held`). Absent : faux.
+   */
+  restored?: boolean;
 }
 
 /** Un fichier laissé de côté sans être rattaché à une session. */
@@ -425,6 +431,7 @@ export const planSync = (input: SyncInput): SyncPlan => {
   const itemOf = (startMs: number, kind: SyncCase, o: Seen | null, t: Seen | null): SyncItem => ({
     startMs, case: kind, files: { computer: o?.files.gpx.name ?? null, phone: t?.files.gpx.name ?? null },
     ops: [], base: { kind: 'keep' }, left: null, conflicts: [], twoTracks: false, withoutAncestor: false,
+    restored: (kind === 'newOnComputer' && base?.removed.includes(startMs) === true) || (kind === 'firstMeeting' && base?.held.includes(startMs) === true),
   });
 
   /** Restes d'une session d'un côté (fiche ou capteurs sans GPX) que la base nomme, à faire partir avec elle. */

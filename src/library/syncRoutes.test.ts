@@ -397,6 +397,25 @@ describe('corbeille', () => {
     expect(await routesOf(pair.phone)).toEqual([]);
     expect(pair.base).toMatchObject({ heldRoutes: [] });
   });
+
+  it('retenu sur le téléphone puis remis sur l’ordinateur : une rencontre sans ligne, dite restaurée ; une suppression refusée non', async () => {
+    const pair = pairOf();
+    putRoute(pair.computer, 'a', iso(0), iso(0));
+    putRoute(pair.phone, 'a', iso(0), iso(0));
+    trashRoute(pair, 'a');
+    await run(pair);
+    expect(pair.base).toMatchObject({ heldRoutes: [iso(0)] });
+    putRoute(pair.computer, 'a', iso(0), iso(0));
+    pair.trash = [];
+    const back = await run(pair);
+    expect(itemOf(back, iso(0))).toMatchObject({ case: 'firstMeeting', restored: true, revived: false, left: null });
+    expect(deletions(back)).toEqual([]);
+    expect(pair.base).toMatchObject({ heldRoutes: [], routes: [{ id: iso(0) }] });
+
+    const other = await syncedPair(2);
+    dropRoute(other.phone, 'r1');
+    expect(itemOf(await run(other, { keep: [iso(1)] }), iso(1))).toMatchObject({ case: 'newOnComputer', restored: false });
+  });
 });
 
 describe('suppressions refusées (`keep`)', () => {

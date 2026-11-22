@@ -3,7 +3,7 @@ import { dayMonthYear } from '../core/calendar';
 import { errorMessage } from '../core/basics';
 import { t } from '../core/i18n';
 import { formatSessionDate } from '../core/units';
-import { TRASH_ZONE_ID, sortedTrashEntries, trashCounts, trashSummaryText, type TrashEntry } from '../library/trash';
+import { TRASH_ZONE_ID, groupedTrashEntries, trashCounts, trashSummaryText, type TrashEntry, type TrashGroup } from '../library/trash';
 import { deleteTrashEntry, emptyTrash, restoreTrashEntry, useTrash } from '../hooks/useTrash';
 import { IconTrash, IconUndo } from './icons';
 import PanelTitle from './PanelTitle';
@@ -13,7 +13,9 @@ import HoldButton from './ui/HoldButton';
 /**
  * Corbeille du programme Windows, dans Réglages › Mémoire : une ligne « Corbeille : n sessions, gardées 30 jours »,
  * (« Corbeille vide. » quand elle l'est, pour que l'arrivée depuis Sessions ne tombe pas sur rien) qui se déplie sur la liste (nom, date de la session, date de suppression) ;
- * pour chaque entrée « Restaurer » et « Supprimer définitivement », et « Vider la corbeille ». Les deux gestes qui
+ * une ligne par session, qui réunit la copie de l'ordinateur et celle du téléphone rangée à part
+ * (`groupedTrashEntries`) ; pour chaque ligne « Restaurer » et « Supprimer définitivement », qui valent pour toutes
+ * ses entrées, et « Vider la corbeille ». Les deux gestes qui
  * effacent se tiennent une seconde puis se confirment, comme « Tout supprimer ». Rien hors du programme Windows :
  * la corbeille y est toujours vide.
  */
@@ -25,9 +27,9 @@ const trashHoldMs = (): number => TRASH_HOLD_MS;
 /** Date montrée d'une entrée : celle de la session, rien pour un itinéraire. */
 const entryDate = (entry: TrashEntry): string | null => (entry.startMs !== null ? formatSessionDate(entry.startMs) : null);
 
-/** Date d'entrée dans la corbeille, accordée à ce qu'elle garde. */
-const deletedOn = (entry: TrashEntry): string => {
-  const date = dayMonthYear(entry.deletedAtMs);
+/** Date d'entrée dans la corbeille de la ligne (la plus récente de ses entrées), accordée à ce qu'elle garde. */
+const deletedOn = ({ entry, deletedAtMs }: TrashGroup): string => {
+  const date = dayMonthYear(deletedAtMs);
   return entry.kind === 'session' ? t('session supprimée le {date}', { date }) : t('itinéraire supprimé le {date}', { date });
 };
 
@@ -78,22 +80,22 @@ function TrashZone() {
       {open && summary !== null && (
         <>
           <ul className="set-files-list">
-            {sortedTrashEntries(entries).map((entry) => (
-              <li key={entry.dir} className="set-files-row">
+            {groupedTrashEntries(entries).map((group) => (
+              <li key={group.entry.dir} className="set-files-row">
                 <span className="ui-stack ui-min-w-0">
-                  <strong className="ui-text-m">{entry.name}</strong>
+                  <strong className="ui-text-m">{group.entry.name}</strong>
                   <span className="num ui-muted ui-text-s">
-                    {[entryDate(entry), deletedOn(entry)].filter(Boolean).join(' · ')}
+                    {[entryDate(group.entry), deletedOn(group)].filter(Boolean).join(' · ')}
                   </span>
                 </span>
                 <span className="ui-row-s2 ui-wrap">
-                  <Button size="s" onClick={() => restore(entry)} disabled={busy}>
+                  <Button size="s" onClick={() => restore(group.entry)} disabled={busy}>
                     <IconUndo size={16} /> {t('Restaurer')}
                   </Button>
-                  <HoldButton onHold={() => remove(entry)} getHoldMs={trashHoldMs} size="s" label={t('Supprimer définitivement')}
+                  <HoldButton onHold={() => remove(group.entry)} getHoldMs={trashHoldMs} size="s" label={t('Supprimer définitivement')}
                     lead={<IconTrash size={16} />} dialTitle={t('Supprimer définitivement')} icon={<IconTrash size={48} />}
                     action="supprimer" disabled={busy}
-                    ariaLabel={t('Supprimer définitivement « {name} » : maintenir une seconde', { name: entry.name })} />
+                    ariaLabel={t('Supprimer définitivement « {name} » : maintenir une seconde', { name: group.entry.name })} />
                 </span>
               </li>
             ))}

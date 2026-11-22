@@ -218,6 +218,12 @@ export interface RouteSyncItem {
   conflict: boolean;
   /** Changé d'un côté, supprimé de l'autre : la modification revient. */
   revived: boolean;
+  /**
+   * Revenu de la corbeille de l'ordinateur : neuf sur l'ordinateur alors que la synchronisation avait mené sa
+   * suppression au bout (`removedRoutes`), ou retrouvé des deux côtés sans ligne alors que le téléphone le tenait
+   * pendant qu'il était à la corbeille (`heldRoutes`). Absent : faux.
+   */
+  restored?: boolean;
 }
 
 export interface RouteSyncPlan {
@@ -335,6 +341,7 @@ export const planRouteSync = (input: RouteSyncInput): RouteSyncPlan => {
     id, createdAt: id.startsWith(ROUTE_NAME_ID_PREFIX) ? null : id, case: kind,
     files: { computer: o?.files.base ?? null, phone: t?.files.base ?? null },
     ops: [], base: { kind: 'keep' }, left: null, conflict: false, revived: false,
+    restored: (kind === 'newOnComputer' && base?.removedRoutes.includes(id) === true) || (kind === 'firstMeeting' && base?.heldRoutes.includes(id) === true),
   });
 
   /**
