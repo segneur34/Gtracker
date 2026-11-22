@@ -96,7 +96,7 @@ describe('matchGearChoice', () => {
 });
 
 describe('effectiveGear', () => {
-  it('garde un choix par ligne, le dernier de la fiche, dans l’ordre des lignes', () => {
+  it('garde un choix par ligne, celui du catalogue, dans l’ordre des lignes', () => {
     const gear = [
       choice('old-foil', 'Foil', 'old-1085', 'Glide v1 1085'),
       choice('g-voile', 'Voile', 'v-65', 'Gong puls 6.5'),
@@ -115,6 +115,49 @@ describe('effectiveGear', () => {
     ];
     const effective = effectiveGear(gear, wing);
     expect(effective.map((e) => [e.group?.id ?? null, e.choice.itemName])).toEqual([['g-voile', 'Reedin 4.5'], [null, 'JP 110']]);
+  });
+
+  describe('fiche à quatre choix : ceux du catalogue puis ceux du catalogue refait, mêmes noms de lignes', () => {
+    // Catalogue d'aujourd'hui, et choix d'un catalogue d'avant : autres identifiants, articles écrits autrement.
+    const today: GearGroup[] = [
+      { id: 'cat-voile', name: 'Voile', items: [{ id: 'v-60', name: 'Strato 6.0' }, { id: 'v-50', name: 'Nimbus 5.0' }] },
+      { id: 'cat-foil', name: 'Foil', items: [{ id: 'f-1100', name: 'Glisse 1100' }, { id: 'f-800', name: 'Glisse 800' }] },
+    ];
+    const newVoile = choice('cat-voile', 'Voile', 'v-60', 'Strato 6.0');
+    const newFoil = choice('cat-foil', 'Foil', 'f-1100', 'Glisse 1100');
+    const oldVoile = choice('avant-voile', 'Voile', 'avant-60', 'Strato six');
+    const oldFoil = choice('avant-foil', 'Foil', 'avant-1100', 'Glisse v1 1100');
+
+    it('retient le choix du catalogue de chaque ligne, quel que soit l’ordre de la fiche', () => {
+      for (const gear of [[newVoile, newFoil, oldVoile, oldFoil], [oldVoile, oldFoil, newVoile, newFoil], [oldFoil, newVoile, newFoil, oldVoile]]) {
+        const effective = effectiveGear(gear, today);
+        expect(effective.map((e) => [e.group?.id, e.item?.id ?? null])).toEqual([['cat-voile', 'v-60'], ['cat-foil', 'f-1100']]);
+        expect(effective.map((e) => e.choice)).toEqual([newVoile, newFoil]);
+      }
+    });
+
+    it('à égalité, le dernier : deux articles du catalogue, ou deux hors liste', () => {
+      const otherFoil = choice('cat-foil', 'Foil', 'f-800', 'Glisse 800');
+      expect(effectiveGear([newFoil, otherFoil], today)[0].choice).toBe(otherFoil);
+      expect(effectiveGear([otherFoil, oldFoil, newFoil], today)[0].choice).toBe(newFoil);
+      const olderFoil = choice('avant-foil', 'Foil', 'avant-900', 'Glisse v1 900');
+      const effective = effectiveGear([oldFoil, olderFoil], today);
+      expect(effective.map((e) => [e.group?.id, e.item, e.choice])).toEqual([['cat-foil', null, olderFoil]]);
+    });
+
+    it('un choix hors liste seul sur sa ligne reste retenu', () => {
+      const effective = effectiveGear([newVoile, oldFoil], today);
+      expect(effective.map((e) => [e.group?.id, e.item?.id ?? null, e.choice])).toEqual([['cat-voile', 'v-60', newVoile], ['cat-foil', null, oldFoil]]);
+    });
+
+    it('rechoisir un article sur une ligne ne laisse qu’un choix pour elle, et garde l’autre ligne', () => {
+      const gear = [newVoile, newFoil, oldVoile, oldFoil];
+      const nimbus = choice('cat-voile', 'Voile', 'v-50', 'Nimbus 5.0');
+      expect(withLineChoice(gear, today, 'cat-voile', nimbus)).toEqual([nimbus, newFoil, oldFoil]);
+      const fixed = withLineChoice(withLineChoice(gear, today, 'cat-voile', newVoile), today, 'cat-foil', newFoil);
+      expect(fixed).toEqual([newVoile, newFoil]);
+      expect(withLineChoice(gear, today, 'cat-foil', null)).toEqual([newVoile, oldVoile]);
+    });
   });
 
   it('ne rend rien sans matériel', () => {

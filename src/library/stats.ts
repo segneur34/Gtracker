@@ -172,7 +172,7 @@ export const gearFilterItems = (groups: readonly GearGroup[], sessions: readonly
 
 /**
  * Session qui porte la pièce `item`, d'après son choix retenu pour chaque groupe (`effectiveGear` : rangé par
- * identifiant, sinon par nom de groupe et de pièce, le dernier d'un groupe gagne). Une pièce de la liste est
+ * identifiant, sinon par nom de groupe et de pièce ; dans un groupe, la pièce de la liste plutôt qu'une hors liste). Une pièce de la liste est
  * retrouvée par son identifiant, ou par son nom dans son groupe ; une pièce hors liste par son nom, dans son groupe.
  */
 export const matchesGear = (session: StatSession, item: GearFilterItem, groups: readonly GearGroup[]): boolean =>

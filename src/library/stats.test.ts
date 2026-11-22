@@ -544,9 +544,10 @@ describe('matériel hors liste et fiches d’un ancien catalogue', () => {
   const reedin = session(at(2026, 10, 2), { gear: [choice('old-voile', 'Voile', 'old-45', 'Reedin 4.5')] });
   const planche = session(at(2026, 10, 3), { gear: [choice('old-p', 'Planche', 'old-95', 'Fanatic 95')] });
   const actuelle = session(at(2026, 10, 13), { gear: [choice('g-voile', 'Voile', 'v-65', 'Gong puls 6.5'), choice('g-foil', 'Foil', 'f-1085', 'Duotone glide 1085')] });
-  // Deux choix « Foil » dans une même fiche : le dernier gagne.
+  // Deux choix « Foil » dans une même fiche : celui du catalogue gagne, qu'il vienne après l'ancien ou avant lui.
   const deuxFoils = session(at(2026, 10, 9), { gear: [choice('old-foil', 'Foil', 'old-1085', 'Glide v1 1085'), choice('g-foil', 'Foil', 'f-1085', 'Duotone glide 1085')] });
-  const all = [ancienne, reedin, planche, actuelle, deuxFoils];
+  const quatreChoix = session(at(2026, 10, 10), { gear: [...actuelle.gear!, ...ancienne.gear!] });
+  const all = [ancienne, reedin, planche, actuelle, deuxFoils, quatreChoix];
   const items = gearFilterItems(groups, all);
   const item = (key: string) => items.find((it) => it.key === key)!;
 
@@ -571,10 +572,17 @@ describe('matériel hors liste et fiches d’un ancien catalogue', () => {
     expect(matchesGear(planche, item('nom:fanatic 95'), groups)).toBe(true);
   });
 
-  it('compte le dernier choix d’un groupe porté deux fois', () => {
-    expect(matchesGear(deuxFoils, item('f-1085'), groups)).toBe(true);
-    expect(matchesGear(deuxFoils, item('nom:glide v1 1085'), groups)).toBe(false);
-    expect(all.filter((s) => matchesGearSelection(s, [item('f-1085')], groups))).toEqual([actuelle, deuxFoils]);
+  it('compte le choix du catalogue d’un groupe porté deux fois, dans les deux ordres', () => {
+    for (const s of [deuxFoils, quatreChoix]) {
+      expect(matchesGear(s, item('f-1085'), groups)).toBe(true);
+      expect(matchesGear(s, item('nom:glide v1 1085'), groups)).toBe(false);
+    }
+    expect(matchesGear(quatreChoix, item('v-65'), groups)).toBe(true);
+    expect(matchesGear(quatreChoix, item('nom:gong plus 6.5'), groups)).toBe(false);
+    expect(all.filter((s) => matchesGearSelection(s, [item('f-1085')], groups))).toEqual([actuelle, deuxFoils, quatreChoix]);
+    expect(all.filter((s) => matchesGearSelection(s, [item('v-65'), item('f-1085')], groups))).toEqual([actuelle, quatreChoix]);
+    // Seule, la fiche à quatre choix ne fait apparaître aucune pièce hors liste.
+    expect(gearFilterItems(groups, [quatreChoix]).filter((it) => it.unlisted)).toEqual([]);
   });
 
   it("relit dans l'adresse la clé stable d'une pièce hors liste", () => {

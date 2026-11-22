@@ -132,11 +132,15 @@ export interface EffectiveGearChoice extends GearMatch {
 }
 
 /**
- * Un choix par ligne : pour chaque ligne du catalogue, le dernier choix de la
- * fiche qui s'y range ; les choix sans ligne sont regroupés par nom de ligne,
- * le dernier gagne aussi (une fiche qui porte deux choix d'une même ligne garde
- * le dernier). Dans l'ordre des lignes du catalogue, puis celles hors catalogue
- * dans l'ordre de la fiche.
+ * Un choix par ligne : pour chaque ligne du catalogue, parmi les choix de la
+ * fiche qui s'y rangent, celui dont l'article est au catalogue plutôt qu'un
+ * article hors liste, et à égalité le dernier ; les choix sans ligne sont
+ * regroupés par nom de ligne, le dernier gagne. Une fiche peut porter deux
+ * choix d'une même ligne : l'ancien choix du matériel ne retirait que ceux de
+ * même identifiant de ligne, et laissait derrière le choix neuf, rangé par nom,
+ * celui d'un catalogue refait ; c'est le choix neuf, pris dans le catalogue,
+ * qui compte. Dans l'ordre des lignes du catalogue, puis celles hors catalogue
+ * dans l'ordre de la fiche. La fiche n'est pas réécrite.
  */
 export const effectiveGear = (gear: readonly GearChoice[] | null, groups: readonly GearGroup[]): EffectiveGearChoice[] => {
   const listed = new Map<string, EffectiveGearChoice>();
@@ -144,6 +148,8 @@ export const effectiveGear = (gear: readonly GearChoice[] | null, groups: readon
   for (const choice of gear ?? []) {
     const match = matchGearChoice(choice, groups);
     if (match.group) {
+      const kept = listed.get(match.group.id);
+      if (kept?.item && !match.item) continue;
       listed.set(match.group.id, { choice, ...match });
     } else {
       const key = gearNameKey(choice.groupName);

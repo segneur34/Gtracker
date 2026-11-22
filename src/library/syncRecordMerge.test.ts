@@ -283,6 +283,51 @@ describe('sans ancêtre : les deux fiches se complètent, rien n’est effacé',
   });
 });
 
+describe('matériel des notes : remplacé en entier, jamais mis bout à bout', () => {
+  const choice = (groupId: string, groupName: string, itemId: string, itemName: string) => ({ groupId, groupName, itemId, itemName });
+  // Choix d'un catalogue d'avant, puis ceux du catalogue refait : mêmes noms de lignes, articles écrits autrement.
+  const old = [choice('avant-voile', 'Voile', 'avant-60', 'Strato six'), choice('avant-foil', 'Foil', 'avant-1100', 'Glisse v1 1100')];
+  const fixed = [choice('cat-voile', 'Voile', 'v-60', 'Strato 6.0'), choice('cat-foil', 'Foil', 'f-1100', 'Glisse 1100')];
+  const other = [choice('cat-voile', 'Voile', 'v-50', 'Nimbus 5.0'), choice('cat-foil', 'Foil', 'f-1100', 'Glisse 1100')];
+  const start: Sides = { computer: onComputer({ notes: notes({ gear: old }) }), phone: onPhone({ notes: notes({ gear: old }) }) };
+
+  it('corrigé sur l’ordinateur, le téléphone inchangé : le téléphone reçoit la correction seule', () => {
+    const now: Sides = { ...start, computer: onComputer({ notes: notes({ gear: fixed, savedAt: 200 }) }) };
+    const merged = merge(now, start);
+    expect(merged.conflicts).toEqual([]);
+    expect(merged.computer).toBeNull();
+    expect(after(now, merged).phone.notes?.gear).toEqual(fixed);
+  });
+
+  it('corrigé sur l’ordinateur, sans ancêtre : l’ordinateur l’emporte, et c’est dit', () => {
+    const now: Sides = { ...start, computer: onComputer({ notes: notes({ gear: fixed, savedAt: 200 }) }) };
+    const merged = merge(now);
+    expect(merged.union).toBe(true);
+    expect(merged.conflicts).toEqual(['notes.gear']);
+    const both = after(now, merged);
+    expect(both.computer.notes?.gear).toEqual(fixed);
+    expect(both.phone.notes?.gear).toEqual(fixed);
+  });
+
+  it('corrigé sur le téléphone, l’ordinateur inchangé : l’ordinateur reçoit la correction seule', () => {
+    const now: Sides = { ...start, phone: onPhone({ notes: notes({ gear: fixed, savedAt: 200 }) }) };
+    const merged = merge(now, start);
+    expect(merged.conflicts).toEqual([]);
+    expect(merged.phone).toBeNull();
+    expect(after(now, merged).computer.notes?.gear).toEqual(fixed);
+  });
+
+  it('changé des deux côtés : celui de l’ordinateur, entier, et c’est dit', () => {
+    const now: Sides = { computer: onComputer({ notes: notes({ gear: fixed, savedAt: 200 }) }), phone: onPhone({ notes: notes({ gear: other, savedAt: 300 }) }) };
+    const merged = merge(now, start);
+    expect(merged.conflicts).toEqual(['notes.gear']);
+    const both = after(now, merged);
+    expect(both.computer.notes?.gear).toEqual(fixed);
+    expect(both.phone.notes?.gear).toEqual(fixed);
+    expect(merge(both, both)).toMatchObject({ computer: null, phone: null });
+  });
+});
+
 describe('fiches qui ne se fondent pas, et deux traces du même instant', () => {
   it('une fiche d’une version plus récente, ou illisible, n’est ni fondue ni réécrite', () => {
     const texts = { computer: text(onComputer({ name: 'A' })), phone: text(onPhone({ version: RECORD_VERSION + 1 })), computerAncestor: null, phoneAncestor: null };
