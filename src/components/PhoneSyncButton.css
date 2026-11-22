@@ -17,22 +17,38 @@
   }
 }
 
-/* Ligne discrète de l'arrivée d'un téléphone relié : à l'encre atténuée, sur une seule ligne, coupée plutôt que de
-   pousser les boutons (la phrase entière est dans l'infobulle). */
-.phone-sync__arrival {
-  max-width: 22em;
+/* « Redmi relié », tant que le sans-fil tient un téléphone : un point à l'encre et le nom, sur une seule ligne, coupé
+   plutôt que de pousser les boutons (la phrase entière est dans l'infobulle). */
+.phone-sync__linked {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 16em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--muted);
   font-size: var(--text-s);
 }
 
+.phone-sync__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
 @media (max-width: 1199.98px) {
-  .phone-sync__arrival {
-    max-width: 12em;
+  .phone-sync__linked {
+    max-width: 10em;
     font-size: var(--text-xs);
   }
+}
+
+/* Ce qu'il y a à faire sur le téléphone pendant l'attente. */
+.phone-sync__steps {
+  margin: 0;
+  padding-left: var(--space-4);
 }
 
 .phone-sync__body {

@@ -1,9 +1,11 @@
 import { t, tn } from '../core/i18n';
-import { formatSessionDate } from '../core/units';
+import { dayMonthYearTime } from '../core/calendar';
+import { formatSessionDate, pad2 } from '../core/units';
 import type { SyncOutcome } from './syncOutcome';
 import type { SyncItem, SyncLeftReason, SyncOp } from './syncPlan';
 import type { SyncSideName } from './syncBase';
 import type { RouteSyncItem, RouteSyncOp } from './syncRoutes';
+import type { FirewallNotice } from './wirelessPhone';
 
 /**
  * Ce que la fenêtre « Synchroniser » du programme Windows dit d'une synchronisation avec le téléphone : l'état d'un
@@ -16,14 +18,14 @@ import type { RouteSyncItem, RouteSyncOp } from './syncRoutes';
 /** Par où le téléphone est lu : le Wi-Fi (`sansFil`) ou le câble. */
 export type PhoneLinkChannel = 'sansFil' | 'cable';
 
+/** État d'un téléphone branché par câble qui n'est pas prêt : autorisation à donner, sans réponse, câble tenu par un autre programme. */
+export type PhoneCableHold = 'autorisation' | 'horsLigne' | 'occupe';
+
 /**
- * Téléphone qui n'est pas prêt : rien de branché ni de relié, autorisation à donner, sans réponse, liaison tenue par un
- * autre programme. `wireless` : le sans-fil du PC attend un téléphone (`listening`) ou est éteint (`off`) ; absent
- * d'un programme qui ne le propose pas. Ou l'outil de Google qui lit le téléphone manque ; `folder` : où le poser.
+ * Téléphone qui n'est pas prêt : rien de relié ni de branché (l'outil du câble absent compris : le câble n'est pas une
+ * chose à faire), ou un téléphone branché qui attend (`PhoneCableHold`).
  */
-export type PhoneNotReady =
-  | { kind: 'phone'; state: 'absent' | 'autorisation' | 'horsLigne' | 'occupe'; wireless?: 'listening' | 'off' }
-  | { kind: 'tool-missing'; folder: string };
+export type PhoneNotReady = { kind: 'phone'; state: 'absent' | PhoneCableHold };
 
 /** Issue du bouton « Synchroniser », de l'état du téléphone au compte rendu. */
 export type PhoneSyncResult =
@@ -78,56 +80,118 @@ const clean = (detail: string): string => detail.replace(/\.\s*$/, '');
 /** Titre de la fenêtre avant que le téléphone soit trouvé, ou quand il n'est pas prêt. */
 const searchTitle = (): string => t('Synchroniser avec le téléphone');
 
-/** Phrases d'un téléphone qui n'est pas prêt, dans la langue de l'interface. */
-export const describePhoneState = (outcome: PhoneNotReady): SyncReport => {
-  const say = (paragraphs: string[], folder: string | null = null): SyncReport => report(searchTitle(), paragraphs, 'retry', { folder });
-  if (outcome.kind === 'tool-missing') {
-    return say([
-      t("Pour lire le téléphone, Gtracker a besoin d'un outil gratuit de Google, « SDK Platform-Tools », absent de cet ordinateur."),
-      t("Téléchargez-le pour Windows sur developer.android.com/tools/releases/platform-tools, ouvrez le fichier .zip, copiez le dossier « platform-tools » qu'il contient dans le dossier ci-dessous, puis cliquez sur « Réessayer »."),
-    ], outcome.folder);
+/**
+ * Pourquoi la fenêtre attend : le téléphone n'est pas là (`absent`), la liaison est tombée (`lost`), ou l'ordinateur
+ * est occupé par un import ou un enregistrement (`busy`). Elle repart seule dès que la cause disparaît.
+ */
+export type SyncWaitReason = 'absent' | 'lost' | 'busy';
+
+/** Ce que la fenêtre sait pendant qu'elle attend. */
+export interface SyncWait {
+  reason: SyncWaitReason;
+  /** Le téléphone connu le plus récemment vu, `null` si aucun n'est connu. */
+  phone: string | null;
+  /** Heure où il a été relié pour la dernière fois, en millisecondes depuis 1970 ; `null` inconnue. */
+  lastSeenMs: number | null;
+  /** Le pare-feu de Windows qui bloque le téléphone, `null` s'il ne bloque pas. */
+  firewall: FirewallNotice | null;
+  /** Un téléphone branché par câble qui attend, `null` sinon. */
+  cable: PhoneCableHold | null;
+  /** Vrai si le sans-fil de l'ordinateur est éteint : le téléphone ne peut pas se présenter. */
+  wirelessOff: boolean;
+  /** Liaison perdue : vrai si elle est tombée pendant l'échange (ce qui est fait est gardé). */
+  midway: boolean;
+  /** Raison technique d'une liaison perdue, montrée repliée. */
+  detail: string | null;
+}
+
+/** Ce que la fenêtre montre pendant qu'elle attend. */
+export interface SyncWaitText {
+  title: string;
+  subtitle: string | null;
+  /** Phrase d'en-tête (liaison perdue, câble, ordinateur occupé), `null` sinon. */
+  lead: string | null;
+  /** Ce qu'il y a à faire sur le téléphone, en liste, après « Sur le téléphone : ». */
+  steps: string[];
+  /** « La synchronisation démarre toute seule… », `null` quand l'en-tête le dit déjà. */
+  closing: string | null;
+  /** Remarques (sans-fil éteint). */
+  notes: string[];
+}
+
+const sameDay = (a: Date, b: Date): boolean =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+/** « Redmi · relié pour la dernière fois à 14 h 32 », « … hier », « … le 12 nov. 2026, 09:10 » ; le nom seul si l'heure est inconnue. */
+export const lastSeenText = (phone: string, lastSeenMs: number | null, nowMs: number): string => {
+  if (lastSeenMs === null) return phone;
+  const seen = new Date(lastSeenMs);
+  const now = new Date(nowMs);
+  if (sameDay(seen, now)) {
+    return t('{phone} · relié pour la dernière fois à {time}', { phone, time: `${seen.getHours()} h ${pad2(seen.getMinutes())}` });
   }
-  switch (outcome.state) {
-    case 'absent': {
-      const usbHelp = t('La première fois, il faut aussi activer le « Débogage USB » du téléphone : ouvrez Paramètres, puis À propos du téléphone, et touchez sept fois « Version » pour afficher les options pour développeurs. Ouvrez-les, activez « Débogage USB », puis revenez ici.');
-      // Sans câble d'abord quand le PC attend un téléphone ; le câble reste toujours proposé en second.
-      if (outcome.wireless === 'listening') {
-        return say([
-          t("Aucun téléphone ne se présente. Ouvrez Gtracker sur votre téléphone, relié au même réseau que cet ordinateur (la même box Wi-Fi, ou un partage de connexion entre le téléphone et l'ordinateur ; pas un réseau « invité »), puis cliquez sur « Réessayer »."),
-          t("À défaut, branchez votre téléphone à l'ordinateur par un câble USB, puis cliquez sur « Réessayer »."),
-          usbHelp,
-        ]);
-      }
-      return say([
-        t("Aucun téléphone n'est vu. Branchez votre téléphone à l'ordinateur par un câble USB, puis cliquez sur « Réessayer »."),
-        usbHelp,
-        ...(outcome.wireless === 'off' ? [t('Sans câble : allumez le sans-fil dans Réglages, Mémoire, puis reliez votre téléphone.')] : []),
-      ]);
-    }
-    case 'autorisation':
-      return say([
-        t("Regardez l'écran du téléphone : une fenêtre demande « Autoriser le débogage USB ? ». Cochez « Toujours autoriser cet ordinateur », touchez « Autoriser », puis cliquez ici sur « Réessayer »."),
-        t("Si le téléphone le redemande au bout d'une semaine : dans les options pour développeurs, cochez « Désactiver le délai d'expiration des autorisations adb » pour ne plus le voir."),
-      ]);
-    case 'horsLigne':
-      return say([t('Le téléphone est branché mais ne répond pas. Déverrouillez son écran, débranchez puis rebranchez le câble, et cliquez sur « Réessayer ».')]);
-    default:
-      return say([t('Un autre programme utilise la liaison avec le téléphone (Android Studio, scrcpy…). Fermez-le, puis cliquez sur « Réessayer ».')]);
-  }
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (sameDay(seen, yesterday)) return t('{phone} · relié pour la dernière fois hier', { phone });
+  return t('{phone} · relié pour la dernière fois le {date}', { phone, date: dayMonthYearTime(lastSeenMs) });
 };
 
-/** Phrase d'un téléphone qui n'a pas pu être lu ; `detail` : la raison donnée par la liaison. */
-export const describePhoneReadError = (detail: string, channel?: PhoneLinkChannel): string =>
-  channel === 'sansFil'
-    ? t("Le téléphone n'a pas pu être lu ({detail}). Vérifiez que Gtracker est ouvert sur le téléphone, puis cliquez sur « Réessayer ».", { detail: clean(detail) })
-    : t("Le téléphone n'a pas pu être lu ({detail}). Vérifiez le câble, puis cliquez sur « Réessayer ».", { detail: clean(detail) });
+/** L'ordinateur occupé : la synchronisation démarre dès qu'il a fini. */
+const computerBusyText = (): string =>
+  t("L'ordinateur est occupé (import ou enregistrement en cours). La synchronisation démarre dès qu'il a fini.");
+
+/** Phrases de la fenêtre qui attend, dans la langue de l'interface ; `nowMs` : l'heure, pour « à 14 h 32 » ou « hier ». */
+export const describeWait = (wait: SyncWait, nowMs: number): SyncWaitText => {
+  const subtitle = wait.phone !== null ? lastSeenText(wait.phone, wait.lastSeenMs, nowMs) : null;
+  const notes = wait.wirelessOff
+    ? [t('Le sans-fil de cet ordinateur est éteint : allumez-le dans Réglages › Mémoire pour que le téléphone puisse se présenter.')]
+    : [];
+  if (wait.reason === 'busy') {
+    return { title: t('Synchronisation en attente'), subtitle, lead: computerBusyText(), steps: [], closing: null, notes: [] };
+  }
+  const title = t('En attente de votre téléphone');
+  const closing = t("La synchronisation démarre toute seule dès qu'il est là.");
+  switch (wait.cable) {
+    case 'autorisation':
+      return { title, subtitle, lead: t("Le téléphone branché demande une autorisation : sur son écran, cochez « Toujours autoriser cet ordinateur » et touchez « Autoriser ». La synchronisation démarre ensuite toute seule."), steps: [], closing: null, notes };
+    case 'horsLigne':
+      return { title, subtitle, lead: t('Le téléphone est branché mais ne répond pas. Déverrouillez son écran, puis débranchez et rebranchez le câble.'), steps: [], closing, notes };
+    case 'occupe':
+      return { title, subtitle, lead: t('Un autre programme tient le câble du téléphone. Fermez-le, ou débranchez le câble pour passer par le Wi-Fi.'), steps: [], closing, notes };
+    default:
+      break;
+  }
+  if (wait.reason === 'lost') {
+    const lead = wait.midway
+      ? t("Le téléphone n'est plus relié : la synchronisation s'est arrêtée en route. Ce qui est fait est gardé. Elle reprend toute seule dès qu'il revient : écran allumé, Gtracker affiché (ou câble rebranché).")
+      : t("Le téléphone a cessé de répondre. Ce qui est fait est gardé. La synchronisation reprend dès qu'il revient : écran allumé, Gtracker affiché.");
+    return { title, subtitle, lead, steps: [], closing: null, notes };
+  }
+  return {
+    title, subtitle, lead: null,
+    steps: [
+      t("allumez l'écran et déverrouillez-le ;"),
+      t('affichez Gtracker ;'),
+      t('restez sur le même réseau que cet ordinateur (la même box Wi-Fi, ou un partage de connexion entre les deux).'),
+    ],
+    closing, notes,
+  };
+};
+
+/** L'écran d'un ordinateur qui ne connaît encore aucun téléphone. */
+export const describeNoPhone = (): { title: string; text: string } => ({
+  title: t('Aucun téléphone relié'),
+  text: t('Cet ordinateur ne connaît encore aucun téléphone. Cela se fait une fois, en tapant un code sur le téléphone.'),
+});
+
+/** L'ordinateur finit de créer les fiches de ses sessions avant l'échange : « … : 12 sur 40. » */
+export const computerScanText = (done: number, total: number): string =>
+  t("L'ordinateur finit de mettre à jour ses sessions : {done} sur {total}.", { done, total });
 
 /** Phrase montrée pendant la première synchronisation d'un téléphone. */
 export const firstSyncText = (): string => t('Chaque appareil va recevoir ce qui lui manque. Rien ne sera supprimé.');
 
-/** Ligne dite quand un téléphone relié se présente par le sans-fil : plus rien ne se copie seul. */
-export const phoneArrivalText = (): string =>
-  t('Téléphone relié : touchez « Synchroniser » pour mettre les deux appareils à jour.');
+/** Ligne à côté du bouton tant que le sans-fil tient un téléphone. */
+export const linkedPhoneText = (phone: string): string => t('{phone} relié', { phone });
 
 /** Titre de la fenêtre pendant que la synchronisation avance. */
 export const syncRunningTitle = (): string => t('Synchronisation en cours');
@@ -209,7 +273,7 @@ const refusalReport = (outcome: SyncOutcome): SyncReport => {
     case 'trashLocked':
       return report(title, [t("La corbeille de cet ordinateur est illisible : par prudence, rien n'a été synchronisé. Ouvrez Réglages › Mémoire › Corbeille.")], 'close');
     case 'busy':
-      return report(title, [t("L'ordinateur est occupé (import ou enregistrement en cours). Recommencez quand il a fini.")], 'restart');
+      return report(title, [computerBusyText()], 'restart');
     default:
       return report(title, [t("La copie de sécurité n'a pas pu être faite : rien n'a été synchronisé.")], 'restart', {
         detail: outcome.error ? clean(outcome.error) : null,
@@ -467,13 +531,16 @@ const answerFailureNote = (failed: PhoneSyncResult): SyncReportNote => {
  */
 export const describePhoneSync = (result: PhoneSyncResult, unanswered: SyncQuestion | null = null, answerFailed: PhoneSyncResult | null = null): SyncReport => {
   switch (result.kind) {
+    // La fenêtre attend un téléphone qui n'est pas prêt (`describeWait`) : ces issues ne s'y montrent pas d'ordinaire.
     case 'phone':
-    case 'tool-missing':
-      return describePhoneState(result);
+      return report(searchTitle(), [t("Le téléphone n'est pas prêt : allumez son écran et affichez Gtracker, puis réessayez.")], 'retry');
     case 'no-phone-folder':
       return report(t('Synchronisation impossible'), [noPhoneMemoryText()], 'restart');
+    // Panne avant l'échange, téléphone présent : elle se dit, avec « Recommencer ».
     case 'error':
-      return report(searchTitle(), [describePhoneReadError(result.detail, result.channel)], 'retry');
+      return report(t('Synchronisation arrêtée'), [t("La synchronisation s'est arrêtée. Ce qui est fait est gardé.")], 'restart', {
+        detail: clean(result.detail),
+      });
     case 'synced':
       return describeSync(result.outcome, unanswered, answerFailed);
   }

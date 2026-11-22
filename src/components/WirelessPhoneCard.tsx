@@ -1,19 +1,78 @@
+import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { t } from '../core/i18n';
+import { settingsBlockFromSearch } from '../core/parentPage';
 import { useWirelessPhones } from '../hooks/useWirelessPhones';
 import { countdownText, describePhoneSeen, describeWireless, firewallNotice, pairingAddress, remainingMs } from '../library/wirelessPhone';
+import { phoneCableAvailable, phoneState } from '../platform/phoneCable';
 import Button from './ui/Button';
 import './WirelessPhoneCard.css';
+
+/**
+ * Le mode d'emploi du câble, replié : il ne sert qu'à qui a activé le débogage USB, et ne doit jamais passer pour une
+ * chose à faire. `toolFolder` : où poser l'outil de Google quand il manque, `null` s'il est là ou inconnu.
+ */
+function CableHelp({ toolFolder }: { toolFolder: string | null }) {
+  return (
+    <details className="wireless-card__cable">
+      <summary className="ui-text-s">{t('Par câble (avancé)')}</summary>
+      <div className="ui-stack-2">
+        <p className="ui-muted ui-text-s ui-m-0">
+          {t("Le câble USB reste possible si le « Débogage USB » du téléphone est activé : ouvrez Paramètres, puis À propos du téléphone, et touchez sept fois « Version » pour afficher les options pour développeurs. Ouvrez-les et activez « Débogage USB ».")}
+        </p>
+        {toolFolder !== null && (
+          <>
+            <p className="ui-muted ui-text-s ui-m-0">
+              {t("Il faut aussi un outil gratuit de Google, « SDK Platform-Tools », absent de cet ordinateur : téléchargez-le pour Windows sur developer.android.com/tools/releases/platform-tools, ouvrez le fichier .zip et copiez le dossier « platform-tools » qu'il contient dans ce dossier :")}
+            </p>
+            <code className="wireless-card__folder">{toolFolder}</code>
+          </>
+        )}
+        <p className="ui-muted ui-text-s ui-m-0">
+          {t("Si le téléphone redemande l'autorisation au bout d'une semaine : dans les options pour développeurs, cochez « Désactiver le délai d'expiration des autorisations adb ».")}
+        </p>
+      </div>
+    </details>
+  );
+}
 
 /**
  * Le téléphone sans câble, dans Réglages › Mémoire, programme Windows seulement (rien dans le navigateur ni sur le
  * téléphone) : la case qui allume le sans-fil (éteint par défaut, avec la phrase qui prévient que Windows va demander
  * l'autorisation), son état, le pare-feu de Windows quand il bloque (avec « Autoriser Gtracker » si l'autorisation
  * suffit), « Relier un téléphone » (adresse, code et temps restant en grand, jusqu'à la liaison ou
- * l'échéance de 2 minutes), et la liste des téléphones reliés avec « Retirer ». Les sessions, elles, ne passent que
- * par « Synchroniser » (`PhoneSyncButton`), au clic : l'arrivée d'un téléphone ne fait qu'y inviter.
+ * l'échéance de 2 minutes), la liste des téléphones reliés avec « Retirer », et le mode d'emploi du câble, replié.
+ * Les sessions, elles, ne passent que par « Synchroniser » (`PhoneSyncButton`), au clic. Arrivée par
+ * `?bloc=relier` (fenêtre « Synchroniser » sans téléphone connu) : la fenêtre du code s'ouvre d'elle-même, une fois.
  */
 function WirelessPhoneCard() {
   const view = useWirelessPhones();
+  const { search } = useLocation();
+  const wantsPairing = settingsBlockFromSearch(search) === 'relier';
+  const cardRef = useRef<HTMLDivElement>(null);
+  const pairingAsked = useRef(false);
+  const [toolFolder, setToolFolder] = useState<string | null>(null);
+  const listeningNow = view.state?.actif === true && view.state.ecoute;
+  const { startPairing } = view;
+
+  useEffect(() => {
+    if (!phoneCableAvailable()) return;
+    let alive = true;
+    phoneState().then((state) => {
+      if (alive && state.etat === 'adbIntrouvable') setToolFolder(state.dossier);
+    }, () => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!wantsPairing || pairingAsked.current || !listeningNow) return;
+    pairingAsked.current = true;
+    cardRef.current?.scrollIntoView({ block: 'center' });
+    void startPairing();
+  }, [wantsPairing, listeningNow, startPairing]);
+
   if (!view.available) return null;
   const { state, phones, pairing, pairingStatus, busy } = view;
   const status = state ? describeWireless(state) : null;
@@ -23,7 +82,7 @@ function WirelessPhoneCard() {
   const waiting = pairing !== null && pairingStatus?.kind === 'waiting';
 
   return (
-    <div className="ui-stack-3 wireless-card">
+    <div className="ui-stack-3 wireless-card" ref={cardRef}>
       <strong className="wireless-card__title">{t('Téléphone sans câble')}</strong>
       <p className="ui-muted ui-text-s ui-m-0">
         {t("Gtracker relie votre téléphone à cet ordinateur dès que vous l'ouvrez sur le téléphone, relié au même réseau que l'ordinateur : la même box Wi-Fi, ou un partage de connexion entre les deux. Cliquez ensuite sur « Synchroniser », en haut : les sessions et les itinéraires se copient dans les deux sens, sans câble, si le téléphone a la dernière version de Gtracker ; sinon, ce qui doit aller sur le téléphone attend le câble.")}
@@ -108,6 +167,7 @@ function WirelessPhoneCard() {
           )}
         </div>
       )}
+      {phoneCableAvailable() && <CableHelp toolFolder={toolFolder} />}
     </div>
   );
 }

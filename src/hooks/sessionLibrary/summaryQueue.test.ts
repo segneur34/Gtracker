@@ -6,7 +6,7 @@ import type { MemoryFolder } from '../../platform/memoryFolder';
 import { trackTestTimers } from '../../test/library.fixture';
 import { createFakeFolder } from '../../test/memoryFolder.fixture';
 import { sessionRecord } from '../../test/record.fixture';
-import type { SummaryRunner } from './summaryQueue';
+import type { SummaryCompute } from './summaryQueue';
 
 /**
  * Calcul des résumés remplaçable, asynchrone (worker) : la file appelle le calcul
@@ -27,7 +27,7 @@ const analyzedAt = (index: number): AnalyzedGpx => ({
 });
 
 /** Faux calcul, asynchrone comme celui du worker : un résumé par GPX, parti d'autant de minutes que son rang. */
-const fakeRunner = vi.fn<SummaryRunner>(async (text) => analyzedAt(Number(/rang="(\d)"/.exec(text)?.[1])));
+const fakeCompute = vi.fn<SummaryCompute>(async (text) => analyzedAt(Number(/rang="(\d)"/.exec(text)?.[1])));
 
 const openFresh = async () => {
   vi.resetModules();
@@ -48,7 +48,7 @@ const turn = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 1
 const settleWithoutTimers = async (library: { readLibraryState(): { scanning: unknown } }): Promise<void> => {
   for (let i = 0; i < 10_000; i++) {
     await turn();
-    if (library.readLibraryState().scanning === null && fakeRunner.mock.calls.length >= NAMES.length) return;
+    if (library.readLibraryState().scanning === null && fakeCompute.mock.calls.length >= NAMES.length) return;
   }
   throw new Error('balayage encore en cours');
 };
@@ -57,7 +57,7 @@ let stopTestTimers: () => void = () => undefined;
 beforeEach(() => {
   files.clear();
   log.length = 0;
-  fakeRunner.mockClear();
+  fakeCompute.mockClear();
   NAMES.forEach((name, i) => files.set(`sessions/${name}`, `<gpx rang="${i}"></gpx>`));
   stopTestTimers = trackTestTimers();
 });
@@ -66,29 +66,29 @@ afterEach(() => {
   vi.doUnmock('../../platform/memoryFolder');
 });
 
-describe('calcul des résumés de la file (setSummaryRunner)', () => {
+describe('calcul des résumés de la file (setSummaryCompute)', () => {
   it('appelle le calcul donné pour chaque GPX sans fiche, dans l’ordre du balayage, une pause entre deux', async () => {
     const { library, queue } = await openFresh();
-    queue.setSummaryRunner(fakeRunner);
+    queue.setSummaryCompute(fakeCompute);
     const timers = vi.spyOn(globalThis, 'setTimeout');
     try {
       await library.openLibrary();
       await settleWithoutTimers(library);
       // Calculs et pauses (minuteries de 0 ms) dans l'ordre où ils ont eu lieu.
       const events = [
-        ...fakeRunner.mock.invocationCallOrder.map((order, i) => ({ order, what: `calcul ${String(fakeRunner.mock.calls[i][0]).match(/rang="(\d)"/)?.[1]}` })),
+        ...fakeCompute.mock.invocationCallOrder.map((order, i) => ({ order, what: `calcul ${String(fakeCompute.mock.calls[i][0]).match(/rang="(\d)"/)?.[1]}` })),
         ...timers.mock.calls.flatMap((call, i) => (call[1] === 0 ? [{ order: timers.mock.invocationCallOrder[i], what: 'pause' }] : [])),
       ].sort((a, b) => a.order - b.order).map((e) => e.what);
       expect(events).toEqual(['calcul 0', 'pause', 'calcul 1', 'pause', 'calcul 2', 'pause']);
     } finally {
       timers.mockRestore();
-      queue.setSummaryRunner(null);
+      queue.setSummaryCompute(null);
     }
     // Ce que le calcul rend est rangé : fiche écrite, session publiée.
     expect(library.readLibraryState().sessions.map((s) => s.record.title).sort()).toEqual(['Trace 0', 'Trace 1', 'Trace 2']);
     expect(parseRecordWithRaw(files.get('sessions/b.json') ?? '')?.parts.summary?.startMs).toBe(START_MS + 60_000);
     // Le calcul reçoit le texte du GPX, le calcul à deviner, et les réglages de l'activité résolus pour les cinq calculs.
-    const [text, options] = fakeRunner.mock.calls[0];
+    const [text, options] = fakeCompute.mock.calls[0];
     expect(text).toBe('<gpx rang="0"></gpx>');
     expect(options.sport).toBeUndefined();
     expect(options.analysis).toBeUndefined();
@@ -99,13 +99,13 @@ describe('calcul des résumés de la file (setSummaryRunner)', () => {
 
   it('un GPX que le calcul ne sait pas résumer est dit illisible, sans arrêter les autres', async () => {
     const { library, queue } = await openFresh();
-    queue.setSummaryRunner((text, options) => (text.includes('rang="1"') ? Promise.resolve(null) : fakeRunner(text, options)));
+    queue.setSummaryCompute((text, options) => (text.includes('rang="1"') ? Promise.resolve(null) : fakeCompute(text, options)));
     try {
       await library.openLibrary();
       for (let i = 0; i < 10_000 && library.readLibraryState().scanning !== null; i++) await turn();
       await turn();
     } finally {
-      queue.setSummaryRunner(null);
+      queue.setSummaryCompute(null);
     }
     expect(library.readLibraryState().unreadable).toEqual(['b.gpx']);
     expect(library.readLibraryState().sessions).toHaveLength(2);
@@ -114,9 +114,9 @@ describe('calcul des résumés de la file (setSummaryRunner)', () => {
 
 describe('calcul asynchrone : la session relue quand le résumé revient', () => {
   /** Calcul qui ne rend son résumé que sur demande (`calls[i].resolve`). */
-  const heldRunner = () => {
+  const heldCompute = () => {
     const calls: { options: SummarizeGpxOptions; resolve: (analyzed: AnalyzedGpx | null) => void }[] = [];
-    const run: SummaryRunner = (_text, options) => new Promise((resolve) => calls.push({ options, resolve }));
+    const run: SummaryCompute = (_text, options) => new Promise((resolve) => calls.push({ options, resolve }));
     return { calls, run };
   };
 
@@ -142,8 +142,8 @@ describe('calcul asynchrone : la session relue quand le résumé revient', () =>
   it('nom changé pendant le calcul : gardé, avec le résumé, sans recalcul', async () => {
     putOutdated();
     const { library, queue } = await openFresh();
-    const { calls, run } = heldRunner();
-    queue.setSummaryRunner(run);
+    const { calls, run } = heldCompute();
+    queue.setSummaryCompute(run);
     try {
       await library.openLibrary();
       await waitFor('un calcul demandé', () => calls.length === 1);
@@ -152,7 +152,7 @@ describe('calcul asynchrone : la session relue quand le résumé revient', () =>
       await waitFor('résumé posé', () => library.readLibraryState().sessions[0]?.record.summary.startMs === START_MS + 5 * 60_000);
       await waitFor('fiche écrite', () => diskRecord()?.summary?.startMs === START_MS + 5 * 60_000);
     } finally {
-      queue.setSummaryRunner(null);
+      queue.setSummaryCompute(null);
     }
     expect(calls).toHaveLength(1);
     expect(library.readLibraryState().sessions[0].record.name).toBe('Au large');
@@ -162,8 +162,8 @@ describe('calcul asynchrone : la session relue quand le résumé revient', () =>
   it('seuil changé pendant le calcul : résumé refait avec le nouveau seuil, le dernier posé', async () => {
     putOutdated();
     const { library, queue } = await openFresh();
-    const { calls, run } = heldRunner();
-    queue.setSummaryRunner(run);
+    const { calls, run } = heldCompute();
+    queue.setSummaryCompute(run);
     try {
       await library.openLibrary();
       await waitFor('un calcul demandé', () => calls.length === 1);
@@ -178,9 +178,57 @@ describe('calcul asynchrone : la session relue quand le résumé revient', () =>
       calls[1].resolve(analyzedAt(7));
       await waitFor('résumé posé', () => library.readLibraryState().sessions[0]?.record.summary.startMs === START_MS + 7 * 60_000);
     } finally {
-      queue.setSummaryRunner(null);
+      queue.setSummaryCompute(null);
     }
     expect(calls).toHaveLength(2);
     expect(library.readLibraryState().sessions[0].record.analysis?.activeThreshold).toBe(2.5);
+  });
+
+  it('portillon : un passage qui ne refait que des résumés cède à une synchronisation entre deux traces, la trace en cours finie', async () => {
+    files.clear();
+    ['a', 'b'].forEach((name, i) => {
+      files.set(`sessions/${name}.gpx`, `<gpx rang="${i}"></gpx>`);
+      files.set(`sessions/${name}.json`, serializeRecord(sessionRecord({ gpx: `${name}.gpx`, sport: 'surf', activityId: 'surf', title: null })));
+    });
+    const { library, queue } = await openFresh();
+    const { calls, run } = heldCompute();
+    queue.setSummaryCompute(run);
+    try {
+      await library.openLibrary();
+      await waitFor('un calcul demandé', () => calls.length === 1);
+      let held = false;
+      const hold = queue.holdSummaryPasses().then((release) => {
+        held = true;
+        return release;
+      });
+      for (let i = 0; i < 20; i++) await turn();
+      // La trace en cours n'est pas finie : la synchronisation l'attend.
+      expect(held).toBe(false);
+      calls[0].resolve(analyzedAt(5));
+      const release = await hold;
+      for (let i = 0; i < 50; i++) await turn();
+      // Arrêté au portillon : la trace suivante attend la fin de la synchronisation.
+      expect(calls).toHaveLength(1);
+      release();
+      await waitFor('le calcul suivant', () => calls.length === 2);
+      calls[1].resolve(analyzedAt(6));
+      await waitFor('passage fini', () => library.readLibraryState().scanning === null);
+    } finally {
+      queue.setSummaryCompute(null);
+    }
+  });
+
+  it('portillon : un passage qui crée des fiches ne s’y arrête pas', async () => {
+    const { library, queue } = await openFresh();
+    queue.setSummaryCompute(fakeCompute);
+    const release = await queue.holdSummaryPasses();
+    try {
+      await library.openLibrary();
+      await settleWithoutTimers(library);
+    } finally {
+      release();
+      queue.setSummaryCompute(null);
+    }
+    expect(fakeCompute).toHaveBeenCalledTimes(NAMES.length);
   });
 });

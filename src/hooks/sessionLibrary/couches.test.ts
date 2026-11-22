@@ -32,11 +32,11 @@ const ENTRY_VALUES = [
   'removeSession', 'renameDevice', 'reportStartupError', 'saveRecordedSession', 'settingsFileValues', 'startIncomingFiles', 'startLibraryUi',
   'summarizeGpxText', 'switchToBrowserMemory', 'updateSessionRecord', 'useLibraryFields', 'useLibrarySelector',
   'useLibrarySession',
-  'answerPhoneSyncQuestion', 'clearPhoneArrivalNote', 'leavePhoneSyncQuestion', 'notePhoneArrival', 'phoneSyncStep', 'reopenPhoneSyncQuestion',
-  'synchronizeWithPhone', 'usePhoneArrivalNote', 'usePhoneSync',
+  'answerPhoneSyncQuestion', 'authorizePhoneSyncFirewall', 'cancelPhoneSyncWait', 'leavePhoneSyncQuestion', 'phoneSyncStep', 'reopenPhoneSyncQuestion',
+  'synchronizeWithPhone', 'usePhoneSync',
 ];
 const ENTRY_TYPES = [
-  'AddResult', 'AddStatus', 'LibraryState', 'LibraryStatus', 'PhoneArrivalNote', 'PhoneSyncAnswer', 'PhoneSyncStep',
+  'AddResult', 'AddStatus', 'LibraryState', 'LibraryStatus', 'PhoneSyncAnswer', 'PhoneSyncStep',
   'ResetProgress', 'SettingsFileInfo', 'TrashState',
 ];
 

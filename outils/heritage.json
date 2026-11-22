@@ -34,7 +34,6 @@
     "src/library/naming.test.ts": 1,
     "src/library/naming.ts": 2,
     "src/library/sessionBundle.test.ts": 6,
-    "src/pages/PlanningPage.tsx": 1,
     "src/recording/session.test.ts": 1,
     "src/settings/activitySettings.test.ts": 1,
     "src/test/gpxParser.legacy.ts": 1
@@ -70,10 +69,6 @@
     "src/library/summary.test.ts": 1,
     "src/library/summaryOptions.ts": 1,
     "src/settings/gear.test.ts": 3
-  },
-  "runner": {
-    "src/hooks/sessionLibrary/summaryQueue.test.ts": 23,
-    "src/hooks/sessionLibrary/summaryQueue.ts": 13
   },
   "segneur34": {
     "src/library/legacyImport.test.ts": 1,

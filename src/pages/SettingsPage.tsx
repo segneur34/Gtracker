@@ -572,6 +572,11 @@ function SettingsPage() {
     const id = window.setTimeout(() => sensorsRef.current?.scrollIntoView({ block: 'start' }), 0);
     return () => window.clearTimeout(id);
   }, [wantsSensors, setBlocks]);
+  /** Arrivée par `?bloc=relier` (fenêtre « Synchroniser ») : Mémoire s'ouvre ; la carte du téléphone ouvre sa fenêtre du code. */
+  const wantsPairing = settingsBlockFromSearch(search) === 'relier';
+  useEffect(() => {
+    if (wantsPairing) setBlocks({ memoire: true });
+  }, [wantsPairing, setBlocks]);
   /** Arrivée par `?bloc=corbeille` (menu « … » de Sessions) : Mémoire s'ouvre et la zone de la corbeille vient à l'écran. */
   const wantsTrash = settingsBlockFromSearch(search) === 'corbeille';
   useEffect(() => {

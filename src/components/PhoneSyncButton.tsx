@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { t } from '../core/i18n';
+import { SETTINGS_PAIRING_PATH } from '../core/parentPage';
 import { isRecordingActive } from '../hooks/useRecorder';
 import {
-  answerPhoneSyncQuestion, clearPhoneArrivalNote, leavePhoneSyncQuestion, notePhoneArrival, phoneSyncStep, reopenPhoneSyncQuestion,
-  synchronizeWithPhone, usePhoneArrivalNote, usePhoneSync, type PhoneSyncAnswer, type PhoneSyncStep,
+  answerPhoneSyncQuestion, authorizePhoneSyncFirewall, cancelPhoneSyncWait, leavePhoneSyncQuestion, phoneSyncStep, reopenPhoneSyncQuestion,
+  synchronizeWithPhone, usePhoneSync, type PhoneSyncAnswer, type PhoneSyncStep,
 } from '../hooks/useSessionLibrary';
 import { routeStore } from '../hooks/routeFiles';
 import {
-  describePhoneSync, describeQuestion, firstSyncText, syncProgressText, syncRunningTitle, syncStepText, syncSubtitle,
-  type SyncQuestion, type SyncReport, type SyncReportRow,
+  computerScanText, describeNoPhone, describePhoneSync, describeQuestion, describeWait, firstSyncText, linkedPhoneText, syncProgressText,
+  syncRunningTitle, syncStepText, syncSubtitle, type SyncQuestion, type SyncReport, type SyncReportRow, type SyncWait,
 } from '../library/syncReport';
 import { phoneCableAvailable } from '../platform/phoneCable';
-import { onWirelessArrival } from '../platform/wirelessPhone';
+import {
+  onWirelessArrival, onWirelessDeparture, wirelessAuthorizable, wirelessAvailable, wirelessDeparturesNotified, wirelessPhones,
+} from '../platform/wirelessPhone';
 import { IconChevronRight } from './icons';
 import Button from './ui/Button';
 import Dialog from './ui/Dialog';
@@ -25,15 +29,44 @@ import './PhoneSyncButton.css';
  * règlent ; puis le compte rendu, une ligne par geste qui se déplie en noms, les exceptions dans un encadré, et
  * « Fermer », accompagné de « Recommencer » quand quelque chose a mal tourné. Fermer la question ne décide rien : le
  * compte rendu de ce qui est fait le rappelle, avec « Répondre ». Fermée en route, la synchronisation continue, et une
- * question attend : le bouton rouvre la fenêtre où elle en est. Quand un téléphone relié se présente, rien ne se
- * lance : une ligne discrète, à côté du bouton, invite à synchroniser. Absent ailleurs (navigateur, téléphone,
- * coquille plus ancienne).
+ * question attend : le bouton rouvre la fenêtre où elle en est. Téléphone pas là, liaison tombée, ordinateur occupé :
+ * la fenêtre attend en disant quoi faire (pare-feu compris, avec « Autoriser Gtracker »), repart seule, et « Annuler »
+ * arrête l'attente ; un ordinateur qui ne connaît aucun téléphone mène à Réglages › Mémoire, fenêtre du code ouverte.
+ * À côté du bouton, « Redmi relié » tant que le sans-fil tient un téléphone ; rien ne se lance à son arrivée. Absent
+ * ailleurs (navigateur, téléphone, coquille plus ancienne).
  */
 
-/** Temps pendant lequel la ligne de l'arrivée reste affichée. */
-const ARRIVAL_NOTE_MS = 12_000;
+/** Relecture des téléphones reliés, pour une coquille qui n'annonce pas les départs. */
+const LINKED_REFRESH_MS = 5000;
 
 const run = () => void synchronizeWithPhone({ recording: isRecordingActive });
+
+/** Le téléphone que le sans-fil tient en ce moment, suivi par ses arrivées et ses départs ; `null` s'il n'y en a pas. */
+const useLinkedPhone = (): { id: string; name: string } | null => {
+  const [linked, setLinked] = useState<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    if (!wirelessAvailable()) return;
+    let alive = true;
+    const read = () => {
+      wirelessPhones().then((phones) => {
+        const phone = phones.find((p) => p.relie);
+        if (alive) setLinked(phone ? { id: phone.id, name: phone.nom } : null);
+      }, () => undefined);
+    };
+    read();
+    const stops = [
+      onWirelessArrival((arrival) => setLinked({ id: arrival.id, name: arrival.name })),
+      onWirelessDeparture((departure) => setLinked((now) => (now?.id === departure.id ? null : now))),
+    ];
+    const timer = wirelessDeparturesNotified() ? null : setInterval(read, LINKED_REFRESH_MS);
+    return () => {
+      alive = false;
+      stops.forEach((stop) => stop());
+      if (timer !== null) clearInterval(timer);
+    };
+  }, []);
+  return linked;
+};
 
 /** Titre et sous-titre de la fenêtre à cette étape, et le compte rendu quand elle en est à l'issue. */
 const windowOf = (step: PhoneSyncStep): { title: string; subtitle: string | null; said: SyncReport | null } => {
@@ -41,6 +74,13 @@ const windowOf = (step: PhoneSyncStep): { title: string; subtitle: string | null
     case 'idle':
     case 'searching':
       return { title: t('Synchroniser avec le téléphone'), subtitle: null, said: null };
+    case 'waiting': {
+      const text = describeWait(step.wait, step.atMs);
+      return { title: text.title, subtitle: text.subtitle, said: null };
+    }
+    case 'noPhone':
+      return { title: describeNoPhone().title, subtitle: null, said: null };
+    case 'computerBusy':
     case 'comparing':
     case 'safetyCopy':
     case 'copying':
@@ -59,9 +99,8 @@ function PhoneSyncButton() {
   const [available] = useState(phoneCableAvailable);
   const [open, setOpen] = useState(false);
   const step = usePhoneSync();
-  const note = usePhoneArrivalNote();
-
-  useEffect(() => onWirelessArrival(() => notePhoneArrival()), []);
+  const linked = useLinkedPhone();
+  const navigate = useNavigate();
 
   // La synchronisation a pu changer les itinéraires de l'ordinateur : leur liste est relue à son issue, question
   // comprise (les itinéraires sont faits avant qu'elle soit posée).
@@ -69,12 +108,6 @@ function PhoneSyncButton() {
   useEffect(() => {
     if (ended) routeStore.reload();
   }, [ended]);
-
-  useEffect(() => {
-    if (note === null) return;
-    const timer = setTimeout(clearPhoneArrivalNote, Math.max(0, note.atMs + ARRIVAL_NOTE_MS - Date.now()));
-    return () => clearTimeout(timer);
-  }, [note]);
 
   if (!available) return null;
 
@@ -85,21 +118,38 @@ function PhoneSyncButton() {
     if (now === 'idle' || now === 'over') run();
   };
   const close = () => setOpen(false);
+  // Annuler l'attente (ou fermer pendant l'attente) : la fenêtre se ferme, sauf si une passe partielle laisse un compte
+  // rendu de ce qui est fait, qu'elle montre alors.
+  const cancel = () => {
+    void cancelPhoneSyncWait().then(() => {
+      if (phoneSyncStep().step === 'idle') close();
+    });
+  };
+  const pair = () => {
+    cancel();
+    navigate(SETTINGS_PAIRING_PATH);
+  };
   const view = windowOf(step);
 
   return (
     <>
-      {note !== null && <span className="phone-sync__arrival" role="status" title={note.text}>{note.text}</span>}
+      {linked !== null && (
+        <span className="phone-sync__linked" role="status" title={linkedPhoneText(linked.name)}>
+          <span className="phone-sync__dot" aria-hidden="true" />{linkedPhoneText(linked.name)}
+        </span>
+      )}
       <Button variant="secondary" className="phone-sync" onClick={start}>{t('Synchroniser')}</Button>
       {open && (
         // Fermer la question ne décide rien : la fenêtre passe au compte rendu de ce qui est fait, qui la rappelle.
-        <Dialog title={view.title} onClose={step.step === 'question' ? leavePhoneSyncQuestion : close} className="phone-sync__dialog">
+        // Fermer pendant une attente vaut « Annuler » ; pendant l'échange, la synchronisation continue.
+        <Dialog title={view.title} className="phone-sync__dialog"
+          onClose={step.step === 'question' ? leavePhoneSyncQuestion : step.step === 'waiting' || step.step === 'noPhone' ? cancel : close}>
           {view.subtitle !== null && <p className="phone-sync__subtitle">{view.subtitle}</p>}
-          {step.step === 'question'
-            ? <QuestionView question={step.question} />
-            : view.said !== null
-              ? <ReportView said={view.said} onClose={close} />
-              : <ProgressView step={step} />}
+          {step.step === 'question' ? <QuestionView question={step.question} />
+            : step.step === 'waiting' ? <WaitView wait={step.wait} atMs={step.atMs} firewallMessage={step.firewallMessage} onCancel={cancel} />
+              : step.step === 'noPhone' ? <NoPhoneView onClose={cancel} onPair={pair} />
+                : view.said !== null ? <ReportView said={view.said} onClose={close} />
+                  : <ProgressView step={step} />}
         </Dialog>
       )}
     </>
@@ -111,16 +161,70 @@ const answer = (a: PhoneSyncAnswer) => () => void answerPhoneSyncQuestion(a);
 /** Avancement : une phrase et une barre, sans nombres tant que le total n'est pas connu. */
 function ProgressView({ step }: { step: PhoneSyncStep }) {
   const first = (step.step === 'copying' && step.first) || step.step === 'safetyCopy';
+  const busy = step.step === 'computerBusy';
   const text = step.step === 'copying' ? syncProgressText(step.done, step.total)
-    : syncStepText(step.step === 'comparing' ? 'comparing' : step.step === 'safetyCopy' ? 'safetyCopy' : 'searching');
-  const counted = step.step === 'copying' && step.total > 0;
+    : busy ? computerScanText(step.done, step.total)
+      : syncStepText(step.step === 'comparing' ? 'comparing' : step.step === 'safetyCopy' ? 'safetyCopy' : 'searching');
+  const counted = (step.step === 'copying' || busy) && step.total > 0;
   return (
     <div className="phone-sync__body" aria-live="polite">
       {first && <p>{firstSyncText()}</p>}
       <p className="num">{text}</p>
       <progress className="phone-sync__bar" value={counted ? step.done : undefined} max={counted ? step.total : undefined} aria-label={text} />
-      <p className="phone-sync__hint">{t('Vous pouvez fermer cette fenêtre : la synchronisation continue.')}</p>
+      <p className="phone-sync__hint">
+        {busy ? t("L'échange avec le téléphone commence juste après.") : t('Vous pouvez fermer cette fenêtre : la synchronisation continue.')}
+      </p>
     </div>
+  );
+}
+
+/** L'attente : quoi faire sur le téléphone, le pare-feu qui bloque, et « Annuler ». Elle repart seule. */
+function WaitView({ wait, atMs, firewallMessage, onCancel }: { wait: SyncWait; atMs: number; firewallMessage: string | null; onCancel: () => void }) {
+  const text = describeWait(wait, atMs);
+  const authorize = wait.firewall?.canAuthorize === true && wirelessAuthorizable();
+  return (
+    <>
+      <div className="phone-sync__body" aria-live="polite">
+        {wait.firewall !== null && (
+          <div className="phone-sync__note">
+            <p>
+              <strong>{wait.firewall.text}</strong>
+              {authorize && <> {t('Autorisez Gtracker : Windows vous demandera de confirmer.')}</>}
+            </p>
+            {firewallMessage !== null && <p className="ui-danger-text">{firewallMessage}</p>}
+          </div>
+        )}
+        {text.lead !== null && <p>{text.lead}</p>}
+        {text.steps.length > 0 && (
+          <>
+            <p>{t('Sur le téléphone :')}</p>
+            <ul className="phone-sync__steps">{text.steps.map((s) => <li key={s}>{s}</li>)}</ul>
+          </>
+        )}
+        {text.closing !== null && <p><strong>{text.closing}</strong></p>}
+        {text.notes.map((note) => <p key={note} className="phone-sync__hint">{note}</p>)}
+        {wait.detail !== null && <Detail text={wait.detail} />}
+      </div>
+      <div className="phone-sync__actions">
+        <Button variant={authorize ? 'secondary' : 'primary'} onClick={onCancel}>{t('Annuler')}</Button>
+        {authorize && <Button variant="primary" onClick={() => void authorizePhoneSyncFirewall()}>{t('Autoriser Gtracker')}</Button>}
+      </div>
+    </>
+  );
+}
+
+/** Aucun téléphone connu : cela se fait une fois, par un code, dans Réglages › Mémoire. */
+function NoPhoneView({ onClose, onPair }: { onClose: () => void; onPair: () => void }) {
+  return (
+    <>
+      <div className="phone-sync__body">
+        <p>{describeNoPhone().text}</p>
+      </div>
+      <div className="phone-sync__actions">
+        <Button variant="secondary" onClick={onClose}>{t('Fermer')}</Button>
+        <Button variant="primary" onClick={onPair}>{t('Relier mon téléphone')}</Button>
+      </div>
+    </>
   );
 }
 

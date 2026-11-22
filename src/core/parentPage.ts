@@ -18,6 +18,12 @@ export const SETTINGS_SENSORS_PATH = `${SETTINGS_PATH}?bloc=capteurs`;
 /** Réglages ouverts sur la corbeille (`?bloc=corbeille`) : la carte Mémoire dépliée, la page défilée jusqu'à elle. */
 export const SETTINGS_TRASH_PATH = `${SETTINGS_PATH}?bloc=corbeille`;
 
+/**
+ * Réglages ouverts pour relier un téléphone (`?bloc=relier`, depuis la fenêtre « Synchroniser » d'un ordinateur qui
+ * n'en connaît aucun) : la carte Mémoire dépliée, la fenêtre du code ouverte.
+ */
+export const SETTINGS_PAIRING_PATH = `${SETTINGS_PATH}?bloc=relier`;
+
 /** Bloc de Réglages désigné par l'adresse (`?bloc=`), `null` s'il n'y en a pas : les blocs gardent alors leur état. */
 export const settingsBlockFromSearch = (search: string): string | null => new URLSearchParams(search).get('bloc');
 

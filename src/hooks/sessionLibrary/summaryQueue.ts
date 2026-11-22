@@ -23,7 +23,7 @@ import type { SummaryJob } from './scan';
 /**
  * File des résumés : crée ou recalcule les fiches une trace à la fois, en laissant l'interface
  * répondre, au lancement, à « Mettre à jour » et après un réglage changé. Le calcul d'un résumé se fait hors du
- * fil de l'affichage (`library/trackWorker.ts`), et reste remplaçable (`setSummaryRunner`).
+ * fil de l'affichage (`library/trackWorker.ts`), et reste remplaçable (`setSummaryCompute`).
  */
 
 /** `stopped` : le dossier a changé, le balayage s'arrête ; `blank` : GPX vide, qui n'est pas une session (ignoré, pas effacé). */
@@ -34,17 +34,17 @@ type JobOutcome = 'done' | 'unreadable' | 'blank' | 'stopped';
  * (`summarizeGpxOptions`), rendu de façon asynchrone ; `null` si la trace a moins de deux points, rejeté si le
  * XML est illisible.
  */
-export type SummaryRunner = (text: string, options: SummarizeGpxOptions) => Promise<AnalyzedGpx | null>;
+export type SummaryCompute = (text: string, options: SummarizeGpxOptions) => Promise<AnalyzedGpx | null>;
 
 /** Calcul par le worker des traces (en ligne sans worker) : les chiffres d'`analyzeGpx`. */
-const workerRunner: SummaryRunner = (text, options) => runInWorker('summarize', text, options);
+const computeInWorker: SummaryCompute = (text, options) => runInWorker('summarize', text, options);
 
-/** Calcul en service, celui du worker sauf remplacement (`setSummaryRunner`). */
-let summaryRunner: SummaryRunner = workerRunner;
+/** Calcul en service, celui du worker sauf remplacement (`setSummaryCompute`). */
+let summaryCompute: SummaryCompute = computeInWorker;
 
 /** Remplace le calcul des résumés de la file (`runJob`), `null` pour revenir à celui du worker : un faux calcul dans les tests. */
-export const setSummaryRunner = (run: SummaryRunner | null): void => {
-  summaryRunner = run ?? workerRunner;
+export const setSummaryCompute = (run: SummaryCompute | null): void => {
+  summaryCompute = run ?? computeInWorker;
 };
 
 /** Un résumé calculé sur une fiche dont une donnée du calcul a changé pendant qu'il tournait est refait, au plus ce nombre de fois. */
@@ -103,7 +103,7 @@ const runJob = async (f: MemoryFolder, gen: number, job: SummaryJob): Promise<Jo
   for (let attempt = 0; ; attempt++) {
     const from = latest?.record ?? job.base;
     try {
-      analyzed = text === null ? null : await summaryRunner(text, summarizeGpxOptions(from, sessionSummarySettings(from)));
+      analyzed = text === null ? null : await summaryCompute(text, summarizeGpxOptions(from, sessionSummarySettings(from)));
     } catch {
       return 'unreadable';
     }
@@ -153,6 +153,39 @@ const runJob = async (f: MemoryFolder, gen: number, job: SummaryJob): Promise<Jo
   return 'done';
 };
 
+/**
+ * Portillon des passages qui ne font que refaire des résumés : tenu fermé par une synchronisation
+ * (`holdSummaryPasses`), il arrête un tel passage entre deux traces jusqu'à ce qu'elle finisse.
+ * `parked` : ceux qui attendent qu'un passage en cours s'y soit arrêté.
+ */
+interface SummaryGate {
+  opened: Promise<void>;
+  parked: (() => void)[];
+}
+
+let gate: SummaryGate | null = null;
+
+/**
+ * Ferme le portillon et rend la fonction qui le rouvre. Un passage qui ne crée aucune fiche cède : la trace en
+ * cours finit (son écriture de fiche ne doit pas croiser celles de la synchronisation), la suite attend la
+ * réouverture ; la promesse se résout quand ce passage est arrêté au portillon, ou fini. Un passage qui crée des
+ * fiches (`lib.scanCompletion`) ne s'y arrête pas : c'est à l'appelant de l'attendre avant.
+ */
+export const holdSummaryPasses = async (): Promise<() => void> => {
+  let open!: () => void;
+  const held: SummaryGate = { opened: new Promise<void>((resolve) => { open = resolve; }), parked: [] };
+  gate = held;
+  const release = (): void => {
+    if (gate === held) gate = null;
+    open();
+  };
+  const pass = lib.scanPass;
+  if (pass && pass !== lib.scanCompletion) {
+    await Promise.race([pass.then(() => undefined, () => undefined), new Promise<void>((resolve) => held.parked.push(resolve))]);
+  }
+  return release;
+};
+
 /** Le compteur du balayage est publié au plus à ce rythme : chaque publication redessine les pages qui le lisent. */
 const SCAN_PROGRESS_INTERVAL_MS = 250;
 
@@ -187,6 +220,13 @@ const runCompleteScan = async (f: MemoryFolder, gen: number, jobs: SummaryJob[],
   try {
     for (let i = 0; i < jobs.length; i++) {
       if (gen !== lib.generation) return;
+      // Résumés seuls : une synchronisation passe devant, entre deux traces.
+      while (createTotal === 0 && gate) {
+        const held = gate;
+        held.parked.splice(0).forEach((resolve) => resolve());
+        await held.opened;
+        if (gen !== lib.generation) return;
+      }
       if (Date.now() - shownAt >= SCAN_PROGRESS_INTERVAL_MS) {
         shownAt = Date.now();
         setState({

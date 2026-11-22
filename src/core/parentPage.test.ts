@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PROFILE_PATH, SESSIONS_PATH, SETTINGS_SENSORS_PATH, SETTINGS_TRASH_PATH, analysisPath, parentPage, sessionFamily, sessionsPath, settingsBlockFromSearch } from './parentPage';
+import { PROFILE_PATH, SESSIONS_PATH, SETTINGS_PAIRING_PATH, SETTINGS_SENSORS_PATH, SETTINGS_TRASH_PATH, analysisPath, parentPage, sessionFamily, sessionsPath, settingsBlockFromSearch } from './parentPage';
 
 describe('settingsBlockFromSearch', () => {
   it("lit le bloc désigné par l'adresse de Réglages, rien sans paramètre", () => {
@@ -10,6 +10,10 @@ describe('settingsBlockFromSearch', () => {
   it('Réglages ouverts par le lien de la ceinture renvoient à Enregistrer, sinon au Profil', () => {
     expect(parentPage('/parametres', '?bloc=capteurs')).toBe('/enregistrer');
     expect(parentPage('/parametres', '')).toBe(PROFILE_PATH);
+  });
+  it('Réglages ouverts pour relier un téléphone : le bloc « relier », retour ordinaire', () => {
+    expect(settingsBlockFromSearch(SETTINGS_PAIRING_PATH.slice(SETTINGS_PAIRING_PATH.indexOf('?')))).toBe('relier');
+    expect(parentPage('/parametres', '?bloc=relier')).toBe(PROFILE_PATH);
   });
   it('Réglages ouverts sur la corbeille renvoient à Sessions', () => {
     expect(settingsBlockFromSearch(SETTINGS_TRASH_PATH.slice(SETTINGS_TRASH_PATH.indexOf('?')))).toBe('corbeille');

@@ -12,6 +12,27 @@
   overflow-wrap: anywhere;
 }
 
+/* Mode d'emploi du câble, replié sous la liste : discret, pour qui a activé le débogage USB. */
+.wireless-card__cable summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.wireless-card__cable[open] summary {
+  margin-bottom: var(--space-2);
+}
+
+.wireless-card__folder {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface-sunken);
+  font-size: var(--text-s);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 /* Pare-feu de Windows qui bloque : la phrase, le bouton qui demande l'autorisation, l'issue de la demande. */
 .wireless-card__firewall {
   display: flex;

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptySyncOutcome, type SyncOutcome } from '../../library/syncOutcome';
 import type { SyncItem } from '../../library/syncPlan';
 import type { RouteSyncItem } from '../../library/syncRoutes';
@@ -37,7 +37,7 @@ const guarded = (): SyncOutcome => synced({ deletions: 'awaitingConfirmation', w
 const load = async () => {
   vi.resetModules();
   vi.doMock('../../platform/phoneCable', () => ({
-    phoneState: async () => state,
+    phoneState: async () => stateQueue.shift() ?? state,
     phoneChannel: (s: { canal?: string }) => s.canal ?? 'cable',
     listPhoneFiles: async () => [],
     phoneCanWrite: (s: State) => s.etat === 'pret' && s.ecriture,
@@ -46,23 +46,69 @@ const load = async () => {
     phoneMemoryFolder: (label: string) => ({ label }),
     phoneSafetyCopy: async () => 'C:\\copies\\x',
   }));
-  vi.doMock('../../platform/wirelessPhone', () => ({ wirelessAvailable: () => false, wirelessState: async () => null }));
+  vi.doMock('../../platform/wirelessPhone', () => ({
+    wirelessAvailable: () => wirelessOn,
+    wirelessState: async () => ({ actif: true, ecoute: true, adresses: ['192.168.1.2'], erreur: null, pareFeu: firewall, pareFeuReparable: true }),
+    wirelessPhones: async () => registry,
+    phoneDeparture: (phone: { partiLe?: number }) => (phone.partiLe ? { atMs: phone.partiLe, reason: 'noAnswer' } : null),
+    wirelessAuthorizable: () => true,
+    authorizeWireless: async () => {
+      firewall = 'ouvert';
+      return { issue: 'refusee', etat: {} };
+    },
+    onWirelessArrival: (listener: () => void) => {
+      arrivals.push(listener);
+      return () => {
+        arrivals = arrivals.filter((l) => l !== listener);
+      };
+    },
+    onWirelessDeparture: () => () => undefined,
+  }));
   vi.doMock('./sync', () => ({
     synchronizePhone: async (_folder: unknown, options: SyncLockOptions) => {
       calls.push(options);
       options.onPlanned?.({} as never, 'noBase');
       options.onProgress?.(3, 5);
+      if (failNext) {
+        const err = failNext;
+        failNext = null;
+        throw err;
+      }
       return outcomes.shift() ?? synced({ complete: true });
     },
   }));
   return import('./phoneSync');
 };
 
+let wirelessOn: boolean;
+let registry: { id: string; nom: string; ajouteLe: number; vuLe: number | null; relie: boolean; partiLe?: number }[];
+let arrivals: (() => void)[];
+let firewall: 'ouvert' | 'bloque';
+const READY: State = { etat: 'pret', nom: 'Xiaomi', canal: 'cable', ecriture: true, itineraires: true };
+
+/** États rendus d'abord, un par lecture, avant `state`. */
+let stateQueue: State[];
+/** Panne levée par la prochaine synchronisation. */
+let failNext: Error | null;
+
 beforeEach(() => {
   state = { etat: 'pret', nom: 'Xiaomi', canal: 'cable', ecriture: true, itineraires: true };
   calls = [];
   outcomes = [];
+  wirelessOn = false;
+  registry = [];
+  arrivals = [];
+  firewall = 'ouvert';
+  stateQueue = [];
+  failNext = null;
 });
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/** Laisse passer les promesses en attente, sans avancer l'horloge. */
+const flush = () => vi.advanceTimersByTimeAsync(0);
 
 describe('bouton « Synchroniser »', () => {
   it('par le câble : téléphone écrit, copie de sécurité branchée, étapes publiées jusqu’au compte rendu', async () => {
@@ -108,13 +154,6 @@ describe('bouton « Synchroniser »', () => {
     expect(calls[0]).toMatchObject({ phoneWritable: false, phoneRoutes: true, phoneRecording: true });
   });
 
-  it('téléphone absent : l’issue le dit, sans synchroniser', async () => {
-    state = { etat: 'absent' };
-    const sync = await load();
-    await sync.synchronizeWithPhone();
-    expect(calls).toEqual([]);
-    expect(sync.phoneSyncStep()).toEqual({ step: 'over', result: { kind: 'phone', state: 'absent' } });
-  });
 });
 
 describe('questions et réponses', () => {
@@ -277,29 +316,187 @@ describe('reprise automatique', () => {
     expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { outcome: { skipped: [held] } } });
   });
 
-  it('le téléphone parti avant la reprise : le compte rendu de la première passe reste', async () => {
-    outcomes = [synced({ done: [sent], skipped: [held] })];
+  it('le téléphone parti avant la reprise : la fenêtre l’attend, puis reprend sans rien perdre', async () => {
+    vi.useFakeTimers();
+    outcomes = [synced({ done: [sent], skipped: [held] }), synced({ done: [held] })];
     const sync = await load();
     const done = sync.synchronizeWithPhone();
     // L'état du téléphone de la première passe est déjà lu : seule la reprise le trouve parti.
     state = { etat: 'absent' };
+    await flush();
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'waiting', wait: { reason: 'lost', midway: true } });
+    state = { etat: 'pret', nom: 'Xiaomi', canal: 'cable', ecriture: true, itineraires: true };
+    await vi.advanceTimersByTimeAsync(sync.WAIT_POLL_MS);
     await done;
-    expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced', outcome: { done: [sent], skipped: [held] } } });
+    const step = sync.phoneSyncStep();
+    expect(step.step === 'over' && step.result.kind === 'synced' && step.result.outcome.done.map((i) => i.startMs)).toEqual([2, 1]);
   });
 });
 
-describe('arrivée d’un téléphone', () => {
-  it('arrivée par le sans-fil : seulement une ligne, rien ne se lance', async () => {
+describe('attentes', () => {
+  it('téléphone absent : la fenêtre attend sans synchroniser, et part seule quand il est prêt (relevé toutes les 3 s)', async () => {
+    vi.useFakeTimers();
+    state = { etat: 'absent' };
     const sync = await load();
-    sync.notePhoneArrival();
+    const done = sync.synchronizeWithPhone();
+    await flush();
     expect(calls).toEqual([]);
-    expect(sync.phoneSyncStep().step).toBe('idle');
-    expect(sync.phoneArrivalNote()?.text).toBe('Téléphone relié : touchez « Synchroniser » pour mettre les deux appareils à jour.');
-    sync.clearPhoneArrivalNote();
-    expect(sync.phoneArrivalNote()).toBeNull();
-    // Une synchronisation efface la ligne.
-    sync.notePhoneArrival();
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'waiting', wait: { reason: 'absent', cable: null, midway: false } });
+    // Un nouvel appel rend la même attente, sans en lancer une autre.
+    void sync.synchronizeWithPhone();
+    await vi.advanceTimersByTimeAsync(sync.WAIT_POLL_MS);
+    expect(calls).toEqual([]);
+    state = { etat: 'pret', nom: 'Xiaomi', canal: 'cable', ecriture: true, itineraires: true };
+    await vi.advanceTimersByTimeAsync(sync.WAIT_POLL_MS);
+    await done;
+    expect(calls).toHaveLength(1);
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced' } });
+  });
+
+  it('par le sans-fil : l’arrivée du téléphone fait partir tout de suite ; le dernier relié et le pare-feu sont dits', async () => {
+    vi.useFakeTimers();
+    wirelessOn = true;
+    firewall = 'bloque';
+    registry = [
+      { id: 'a', nom: 'Vieux', ajouteLe: 1, vuLe: 5, relie: false },
+      { id: 'b', nom: 'Redmi', ajouteLe: 2, vuLe: 10, relie: false, partiLe: 20 },
+    ];
+    state = { etat: 'absent' };
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    await flush();
+    expect(sync.phoneSyncStep()).toMatchObject({
+      step: 'waiting', wait: { phone: 'Redmi', lastSeenMs: 20, firewall: { canAuthorize: true }, wirelessOff: false },
+    });
+    // « Autoriser Gtracker » : l'issue refusée est dite, l'écran est relu.
+    await sync.authorizePhoneSyncFirewall();
+    await flush();
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'waiting', firewallMessage: expect.stringContaining('Windows'), wait: { firewall: null } });
+    state = { etat: 'pret', nom: 'Redmi', canal: 'sansFil', ecriture: true, itineraires: true };
+    arrivals.forEach((arrive) => arrive());
+    await flush();
+    await done;
+    expect(calls).toHaveLength(1);
+  });
+
+  it('aucun téléphone jamais relié : l’écran « Aucun téléphone relié » ; « Annuler » arrête l’attente', async () => {
+    vi.useFakeTimers();
+    wirelessOn = true;
+    state = { etat: 'absent' };
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    await flush();
+    expect(sync.phoneSyncStep()).toEqual({ step: 'noPhone' });
+    sync.cancelPhoneSyncWait();
+    await done;
+    expect(sync.phoneSyncStep()).toEqual({ step: 'idle' });
+    expect(calls).toEqual([]);
+    expect(arrivals).toEqual([]);
+  });
+
+  it('téléphone branché qui attend une autorisation : dit ; l’outil du câble absent n’est jamais une chose à faire', async () => {
+    vi.useFakeTimers();
+    state = { etat: 'autorisation' } as unknown as State;
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    await flush();
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'waiting', wait: { reason: 'absent', cable: 'autorisation' } });
+    state = { etat: 'adbIntrouvable', dossier: 'C:\\outil' } as unknown as State;
+    await vi.advanceTimersByTimeAsync(sync.WAIT_POLL_MS);
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'waiting', wait: { reason: 'absent', cable: null } });
+    sync.cancelPhoneSyncWait();
+    await done;
+  });
+
+  it('liaison perdue pendant l’échange : ce qui est fait est gardé, la synchronisation reprend seule', async () => {
+    vi.useFakeTimers();
+    outcomes = [synced({ done: [sent], linkLost: 'liaison fermée' }), synced({ done: [held] })];
+    // Prêt pour la passe, parti juste après la coupure : la liaison est réellement perdue.
+    stateQueue = [READY, { etat: 'absent' }];
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    await flush();
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'waiting', wait: { reason: 'lost', midway: true, detail: 'liaison fermée' } });
+    await vi.advanceTimersByTimeAsync(sync.WAIT_POLL_MS);
+    await done;
+    const step = sync.phoneSyncStep();
+    expect(step).toMatchObject({ step: 'over', result: { outcome: { linkLost: null } } });
+    expect(step.step === 'over' && step.result.kind === 'synced' && step.result.outcome.done.map((i) => i.startMs)).toEqual([2, 1]);
+  });
+
+  it('panne avec un téléphone présent : pas d’attente, la panne se dit avec « Recommencer », sans boucler', async () => {
+    vi.useFakeTimers();
+    outcomes = [synced({ done: [sent], linkLost: 'écriture refusée' })];
+    const sync = await load();
     await sync.synchronizeWithPhone();
-    expect(sync.phoneArrivalNote()).toBeNull();
+    expect(calls).toHaveLength(1);
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced', outcome: { linkLost: 'écriture refusée', done: [sent] } } });
+    // Erreur de lecture avant l'échange : la fenêtre de panne, une seule passe.
+    failNext = new Error('lecture impossible');
+    await sync.synchronizeWithPhone();
+    await vi.advanceTimersByTimeAsync(sync.WAIT_POLL_MS * 3);
+    expect(calls).toHaveLength(2);
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'error' } });
+  });
+
+  it('liaison perdue encore et encore : quelques reprises seules au plus, puis l’arrêt se dit', async () => {
+    vi.useFakeTimers();
+    outcomes = Array.from({ length: 6 }, () => synced({ done: [sent], linkLost: 'coupée' }));
+    // Par tour : prêt pour la passe, parti après la coupure, encore parti au premier relevé, revenu au suivant.
+    const gone: State = { etat: 'absent' };
+    stateQueue = Array.from({ length: 6 }, () => [READY, gone, gone, READY]).flat();
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    for (let i = 0; i < 6; i++) await vi.advanceTimersByTimeAsync(sync.WAIT_POLL_MS);
+    await done;
+    expect(calls).toHaveLength(sync.MAX_LOST_RESUMES + 1);
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced', outcome: { linkLost: 'coupée', done: [sent] } } });
+  });
+
+  it('« Annuler » après une passe partielle : le compte rendu de ce qui est fait, avec l’arrêt', async () => {
+    vi.useFakeTimers();
+    outcomes = [synced({ done: [sent], linkLost: 'coupée' })];
+    stateQueue = [READY, { etat: 'absent' }];
+    state = { etat: 'absent' };
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    await flush();
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'waiting', wait: { reason: 'lost' } });
+    await sync.cancelPhoneSyncWait();
+    await done;
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced', outcome: { done: [sent], linkLost: 'coupée' } } });
+    expect(arrivals).toEqual([]);
+  });
+
+  it('ordinateur occupé (import ou enregistrement) : la fenêtre attend qu’il ait fini, puis part seule', async () => {
+    vi.useFakeTimers();
+    let recordingNow = true;
+    outcomes = [emptySyncOutcome('busy')];
+    const sync = await load();
+    const done = sync.synchronizeWithPhone({ recording: () => recordingNow });
+    await flush();
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'waiting', wait: { reason: 'busy' } });
+    await vi.advanceTimersByTimeAsync(sync.WAIT_POLL_MS);
+    expect(calls).toHaveLength(1);
+    recordingNow = false;
+    await vi.advanceTimersByTimeAsync(sync.WAIT_POLL_MS);
+    await done;
+    expect(calls).toHaveLength(2);
+    expect(sync.phoneSyncStep().step).toBe('over');
+  });
+
+  it('l’ordinateur qui crée encore ses fiches est attendu, avancement montré, avant l’échange', async () => {
+    const sync = await load();
+    const { lib } = await import('./memory');
+    let finish!: () => void;
+    lib.scanCompletion = new Promise<void>((resolve) => { finish = resolve; });
+    const done = sync.synchronizeWithPhone();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'computerBusy', phone: 'Xiaomi', channel: 'cable' });
+    expect(calls).toEqual([]);
+    finish();
+    lib.scanCompletion = null;
+    await done;
+    expect(calls).toHaveLength(1);
   });
 });

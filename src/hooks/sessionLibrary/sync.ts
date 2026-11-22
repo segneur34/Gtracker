@@ -29,6 +29,7 @@ import { planRouteSync, restrictRouteSyncPlan, type RouteSyncInput, type RouteSy
 import type { FileStat, MemoryFolder } from '../../platform/memoryFolder';
 import { readStoredActivities } from '../useSportSettings';
 import { deviceId, flushWrites } from './deviceSettings';
+import { holdSummaryPasses } from './summaryQueue';
 import { canImportSessions } from './importer';
 import { refreshLibrary } from './lifecycle';
 import { lib } from './memory';
@@ -955,17 +956,23 @@ export const synchronizePhone = async (phone: MemoryFolder, options: SyncLockOpt
   try {
     return await holdTrashDuring(async () => {
       await flushWrites();
+      // Un passage qui crée des fiches s'attend (une fiche écrite en même temps écraserait la fusion) ; un passage qui
+      // ne fait que refaire des résumés cède entre deux traces, et reprend après.
       await settle(lib.scanCompletion);
-      await settle(lib.scanPass);
-      const folder = trashFolderOf(lib.folder);
-      if (!folder) return emptyOutcome('noTrash');
-      return executeSync(folder, phone, {
-        shownName: (record, gpx) => (record ? recordShownName(record, gpx) : gpx),
-        computerDeviceId: deviceId(),
-        // Le téléphone n'est pas vérifié : son fichier de réglages ne se distingue pas sûrement des copies des autres.
-        knownActivities: { computer: readStoredActivities().map((a) => a.id) },
-        ...options,
-      });
+      const release = await holdSummaryPasses();
+      try {
+        const folder = trashFolderOf(lib.folder);
+        if (!folder) return emptyOutcome('noTrash');
+        return await executeSync(folder, phone, {
+          shownName: (record, gpx) => (record ? recordShownName(record, gpx) : gpx),
+          computerDeviceId: deviceId(),
+          // Le téléphone n'est pas vérifié : son fichier de réglages ne se distingue pas sûrement des copies des autres.
+          knownActivities: { computer: readStoredActivities().map((a) => a.id) },
+          ...options,
+        });
+      } finally {
+        release();
+      }
     });
   } catch (err) {
     return { ...emptyOutcome(null), error: errorMessage(err, String(err)) };

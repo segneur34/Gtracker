@@ -2,15 +2,22 @@ import { useSyncExternalStore } from 'react';
 import { t } from '../../core/i18n';
 import type { SyncOutcome } from '../../library/syncOutcome';
 import {
-  describeSyncQuestion, mergeSyncPasses, phoneArrivalText, syncHasChangedItems, type PhoneLinkChannel, type PhoneNotReady, type PhoneSyncResult,
-  type SyncQuestion,
+  describeSyncQuestion, mergeSyncPasses, syncHasChangedItems, type PhoneCableHold, type PhoneLinkChannel, type PhoneNotReady,
+  type PhoneSyncResult, type SyncQuestion, type SyncWait, type SyncWaitReason,
 } from '../../library/syncReport';
+import { authorizationOutcomeText, firewallNotice } from '../../library/wirelessPhone';
+import { noteJournal } from '../../platform/desktopBridge';
 import { nativeErrorMessage } from '../../platform/nativeMessages';
 import {
   listPhoneFiles, phoneCanWrite, phoneChannel, phoneIsRecording, phoneListsRoutes, phoneMemoryFolder, phoneSafetyCopy, phoneState, type PhoneState,
 } from '../../platform/phoneCable';
-import { wirelessAvailable, wirelessState } from '../../platform/wirelessPhone';
+import {
+  authorizeWireless, onWirelessArrival, onWirelessDeparture, phoneDeparture, wirelessAvailable, wirelessPhones, wirelessState,
+  type WirelessPhone,
+} from '../../platform/wirelessPhone';
 import { createStore } from '../createStore';
+import { lib } from './memory';
+import { libraryState, subscribe } from './store';
 import {
   synchronizePhone, type SyncDeletionKey, type SyncHeldAnswer, type SyncLockOptions, type SyncRouteDeletionKey,
 } from './sync';
@@ -21,6 +28,12 @@ import {
  * synchronisation des deux appareils (`synchronizePhone`), dont elle publie les étapes hors des composants
  * (`usePhoneSync`) : la fenêtre peut être fermée et rouverte pendant la synchronisation, qui continue.
  *
+ * - Téléphone pas là, liaison tombée en route, ordinateur occupé par un import ou un enregistrement : l'étape
+ *   `waiting` attend et repart seule, à l'arrivée d'un téléphone par le sans-fil ou sur un relevé toutes les
+ *   `WAIT_POLL_MS` (le câble, l'ordinateur) ; un départ relit l'écran. Ce qui est fait est gardé. Aucun téléphone
+ *   jamais relié : l'étape `noPhone`. « Annuler » arrête l'attente (`cancelPhoneSyncWait`).
+ * - L'ordinateur qui crée encore des fiches est attendu, avancement montré (`computerBusy`) ; un passage qui ne fait
+ *   que refaire des résumés cède à la synchronisation (`holdSummaryPasses`, dans l'exécutant).
  * - Le téléphone n'est écrit que si son canal le sait (`phoneCanWrite` : le câble, ou le Wi-Fi d'un téléphone à jour
  *   qui n'enregistre pas) ; sinon la synchronisation ne fait que la moitié de l'ordinateur, et dit ce qui attend la
  *   mise à jour du téléphone, ou que le téléphone enregistre (`phoneIsRecording`).
@@ -32,12 +45,14 @@ import {
  *   décide rien (`leavePhoneSyncQuestion`) : le compte rendu de ce qui est fait le dit, et elle revient.
  * - Une session, un itinéraire ou un fichier changé pendant l'opération est repris une fois, seul, avant le compte
  *   rendu : il n'est dit que s'il a encore changé.
- * - Un téléphone relié qui se présente par le sans-fil ne déclenche rien : une ligne invite à « Synchroniser »
- *   (`notePhoneArrival`, `usePhoneArrivalNote`).
+ * - Chaque étape est notée au journal du programme (`noteJournal`), sans nom ni chemin.
  */
 
 /** Chemin du dossier lu sur le téléphone, retenu par la base : un autre chemin ferait une paire neuve. */
 const PHONE_FOLDER_PATH = 'Documents/Gtracker';
+
+/** Rythme du relevé pendant une attente : l'état du câble et l'occupation de l'ordinateur ne s'annoncent pas. */
+export const WAIT_POLL_MS = 3000;
 
 type SyncedResult = Extract<PhoneSyncResult, { kind: 'synced' }>;
 
@@ -45,6 +60,15 @@ type SyncedResult = Extract<PhoneSyncResult, { kind: 'synced' }>;
 export type PhoneSyncStep =
   | { step: 'idle' }
   | { step: 'searching' }
+  /**
+   * La fenêtre attend (`wait`) ; `firewallMessage` : l'issue d'une demande d'autorisation refusée ou en échec ;
+   * `atMs` : l'heure du dernier relevé, pour dire « relié à 14 h 32 » ou « hier ».
+   */
+  | { step: 'waiting'; wait: SyncWait; firewallMessage: string | null; atMs: number }
+  /** Cet ordinateur ne connaît encore aucun téléphone. */
+  | { step: 'noPhone' }
+  /** L'ordinateur finit de créer les fiches de ses sessions (`done` sur `total`) avant l'échange. */
+  | { step: 'computerBusy'; phone: string; channel: PhoneLinkChannel; done: number; total: number }
   | { step: 'comparing'; phone: string; channel: PhoneLinkChannel }
   /** Copie de sécurité des deux dossiers, avant une première synchronisation. */
   | { step: 'safetyCopy'; phone: string; channel: PhoneLinkChannel }
@@ -65,30 +89,13 @@ export type PhoneSyncStep =
  */
 export type PhoneSyncAnswer = 'keepAll' | 'deleteBoth' | 'keepHeld' | 'removeHeld';
 
-/** La ligne dite quand un téléphone relié se présente par le sans-fil. */
-export interface PhoneArrivalNote {
-  text: string;
-  /** Heure à laquelle elle a été posée, en millisecondes depuis 1970 : le composant la laisse s'effacer. */
-  atMs: number;
-}
-
 const progress = createStore<PhoneSyncStep>({ step: 'idle' });
-const arrival = createStore<PhoneArrivalNote | null>(null);
 
 /** Étape de la synchronisation, lue hors d'un composant. */
 export const phoneSyncStep = progress.get;
 
 /** Étape de la synchronisation, suivie par le composant. */
 export const usePhoneSync = (): PhoneSyncStep => useSyncExternalStore(progress.subscribe, progress.get);
-
-/** Ligne de la dernière arrivée, lue hors d'un composant. */
-export const phoneArrivalNote = arrival.get;
-
-/** Ligne de la dernière arrivée, suivie par le composant ; `null` quand il n'y en a pas. */
-export const usePhoneArrivalNote = (): PhoneArrivalNote | null => useSyncExternalStore(arrival.subscribe, arrival.get);
-
-/** Efface la ligne de l'arrivée (elle s'est affichée assez longtemps, ou une synchronisation commence). */
-export const clearPhoneArrivalNote = (): void => arrival.set(null);
 
 /** Ce que permet une passe : les réponses déjà données pendant cette synchronisation, et l'enregistreur de l'appelant. */
 interface RunOptions {
@@ -126,23 +133,32 @@ let current: RunOptions = {};
 
 let running: Promise<void> | null = null;
 
-/** Où en est le sans-fil du PC, pour le message d'un téléphone absent ; `undefined` quand il n'y a rien à en dire. */
-const wirelessMode = async (): Promise<'listening' | 'off' | undefined> => {
-  if (!wirelessAvailable()) return undefined;
-  try {
-    const state = await wirelessState();
-    if (!state.actif) return 'off';
-    return state.ecoute ? 'listening' : undefined;
-  } catch {
-    return undefined;
-  }
-};
+/** L'attente en cours : l'arrêter (« Annuler »), ou relever tout de suite (autorisation demandée). */
+let waiting: { cancel: () => void; poke: () => void } | null = null;
 
-const notReady = async (state: Exclude<PhoneState, { etat: 'pret' }>): Promise<PhoneNotReady> => {
-  if (state.etat === 'adbIntrouvable') return { kind: 'tool-missing', folder: state.dossier };
-  if (state.etat !== 'absent') return { kind: 'phone', state: state.etat };
-  const wireless = await wirelessMode();
-  return wireless ? { kind: 'phone', state: 'absent', wireless } : { kind: 'phone', state: 'absent' };
+/** Pose l'issue d'une demande d'autorisation dans l'attente en cours. */
+let authorizeHook: ((message: string | null) => void) | null = null;
+
+const notReady = (state: Exclude<PhoneState, { etat: 'pret' }>): PhoneNotReady =>
+  // L'outil du câble absent n'est pas une chose à faire : la fenêtre attend le téléphone par le Wi-Fi.
+  ({ kind: 'phone', state: state.etat === 'adbIntrouvable' ? 'absent' : state.etat });
+
+/** Attend que l'ordinateur ait fini de créer les fiches de ses sessions, en montrant où il en est. */
+const awaitComputerScan = async (phone: string, channel: PhoneLinkChannel): Promise<void> => {
+  const pending = lib.scanCompletion;
+  if (!pending) return;
+  noteJournal("Synchroniser : attente de l'ordinateur, qui crée ses fiches");
+  const show = (): void => {
+    const scanning = libraryState().scanning;
+    progress.set({ step: 'computerBusy', phone, channel, done: scanning?.done ?? 0, total: scanning?.total ?? 0 });
+  };
+  show();
+  const stop = subscribe(show);
+  try {
+    await pending.then(() => undefined, () => undefined);
+  } finally {
+    stop();
+  }
 };
 
 /** Une passe : état du téléphone, listage, puis la synchronisation. `resume` : l'étape « Comparaison » n'est pas montrée. */
@@ -150,7 +166,7 @@ const synchronize = async (options: RunOptions, resume: boolean): Promise<PhoneS
   let channel: PhoneLinkChannel | undefined;
   try {
     const state = await phoneState();
-    if (state.etat !== 'pret') return await notReady(state);
+    if (state.etat !== 'pret') return notReady(state);
     const phone = state.nom;
     const link: PhoneLinkChannel = phoneChannel(state);
     channel = link;
@@ -161,10 +177,11 @@ const synchronize = async (options: RunOptions, resume: boolean): Promise<PhoneS
     } catch (err) {
       // Parti entre l'état et le listage : l'état du moment, plutôt qu'une panne.
       const now = await phoneState().catch(() => null);
-      if (now && now.etat !== 'pret') return await notReady(now);
+      if (now && now.etat !== 'pret') return notReady(now);
       throw err;
     }
     if (listed === null) return { kind: 'no-phone-folder', phone };
+    await awaitComputerScan(phone, link);
     let first = false;
     const lock: SyncLockOptions = {
       phoneWritable: phoneCanWrite(state),
@@ -193,6 +210,7 @@ const synchronize = async (options: RunOptions, resume: boolean): Promise<PhoneS
       },
       onProgress: (done, total) => progress.set({ step: 'copying', phone, channel: link, done, total, first }),
     };
+    noteJournal(`Synchroniser : échange avec le téléphone (${link === 'sansFil' ? 'Wi-Fi' : 'câble'})`);
     const outcome: SyncOutcome = await synchronizePhone(phoneMemoryFolder(phone), lock);
     return { kind: 'synced', phone, channel: link, outcome };
   } catch (err) {
@@ -204,39 +222,215 @@ const synchronize = async (options: RunOptions, resume: boolean): Promise<PhoneS
 const joined = (previous: SyncOutcome | undefined, pass: PhoneSyncResult): PhoneSyncResult =>
   previous && pass.kind === 'synced' ? { ...pass, outcome: mergeSyncPasses(previous, pass.outcome) } : pass;
 
+/** Ce qui fait attendre après une passe, `null` si rien : `midway`, la synchronisation avait déjà commencé. */
+interface WaitCause {
+  reason: SyncWaitReason;
+  midway: boolean;
+  cable: PhoneCableHold | null;
+  detail: string | null;
+}
+
 /**
- * Une synchronisation, de la recherche du téléphone (ou de la reprise, `how.resume`) à la question ou au compte rendu.
- * Ce qui a changé pendant l'opération est repris par une seconde passe, une seule fois ; si elle ne trouve plus le
- * téléphone, le compte rendu de la première reste. Une réponse qui ne peut pas s'appliquer (téléphone parti,
- * synchronisation refusée) rend le compte rendu de ce qui était fait, la raison (`answerFailed`), et la question
- * laissée sans réponse, à laquelle « Répondre » revient.
+ * Ce qui fait attendre après une passe, `null` si rien : un téléphone pas prêt, une liaison réellement perdue (le
+ * téléphone ne se dit plus prêt : `phoneGone`), un ordinateur occupé. Une panne avec un téléphone présent (erreur de
+ * lecture ou d'écriture, liaison coupée alors qu'il se dit encore prêt) n'attend pas : elle se dit, avec « Recommencer ».
+ */
+const waitCauseOf = (pass: PhoneSyncResult, started: boolean, phoneGone: boolean): WaitCause | null => {
+  if (pass.kind === 'phone') {
+    return { reason: started ? 'lost' : 'absent', midway: started, cable: pass.state === 'absent' ? null : pass.state, detail: null };
+  }
+  if (pass.kind !== 'synced') return null;
+  if (pass.outcome.linkLost !== null) return phoneGone ? { reason: 'lost', midway: true, cable: null, detail: pass.outcome.linkLost } : null;
+  if (pass.outcome.refusal === 'busy') return { reason: 'busy', midway: started, cable: null, detail: null };
+  return null;
+};
+
+/** Reprises seules au plus après une liaison perdue, pour une même synchronisation : au-delà, l'arrêt se dit, avec « Recommencer ». */
+export const MAX_LOST_RESUMES = 3;
+
+/** Vrai si le téléphone ne se dit plus prêt : la liaison est réellement perdue. */
+const phoneGoneNow = async (): Promise<boolean> => {
+  const state = await phoneState().catch(() => null);
+  return state?.etat !== 'pret';
+};
+
+/** Le sans-fil vu pendant une attente : le téléphone le plus récemment vu, le pare-feu, et si le sans-fil est éteint. */
+interface WirelessView {
+  /** Téléphones reliés ; `null` sans sans-fil, ou s'il ne répond pas. */
+  phones: WirelessPhone[] | null;
+  phone: string | null;
+  lastSeenMs: number | null;
+  firewall: SyncWait['firewall'];
+  off: boolean;
+}
+
+const lastSeenOf = (phone: WirelessPhone): number | null => phoneDeparture(phone)?.atMs ?? phone.vuLe ?? null;
+
+const readWireless = async (): Promise<WirelessView> => {
+  const none: WirelessView = { phones: null, phone: null, lastSeenMs: null, firewall: null, off: false };
+  if (!wirelessAvailable()) return none;
+  try {
+    const state = await wirelessState();
+    const phones = await wirelessPhones();
+    const latest = [...phones].sort((a, b) => (lastSeenOf(b) ?? b.ajouteLe) - (lastSeenOf(a) ?? a.ajouteLe))[0];
+    return {
+      phones, phone: latest?.nom ?? null, lastSeenMs: latest ? lastSeenOf(latest) : null,
+      firewall: firewallNotice(state), off: !state.actif && phones.length > 0,
+    };
+  } catch {
+    return none;
+  }
+};
+
+/**
+ * Attend que la cause disparaisse : rend vrai quand la synchronisation peut repartir, faux si l'attente est annulée.
+ * L'écran est relu à chaque relevé (`WAIT_POLL_MS`), à chaque arrivée et à chaque départ d'un téléphone.
+ */
+const waitUntilReady = (cause: WaitCause, options: RunOptions, phoneHint: string | null): Promise<boolean> =>
+  new Promise<boolean>((resolve) => {
+    let done = false;
+    let reading = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let firewallMessage: string | null = null;
+    let wait: SyncWait = {
+      reason: cause.reason, phone: phoneHint, lastSeenMs: null, firewall: null, cable: cause.cable, wirelessOff: false,
+      midway: cause.midway, detail: cause.detail,
+    };
+    const stops: (() => void)[] = [];
+    const finish = (go: boolean): void => {
+      if (done) return;
+      done = true;
+      if (timer !== null) clearTimeout(timer);
+      stops.forEach((stop) => stop());
+      waiting = null;
+      noteJournal(go ? "Synchroniser : fin de l'attente, reprise" : 'Synchroniser : attente annulée');
+      resolve(go);
+    };
+    const show = (): void => progress.set({ step: 'waiting', wait, firewallMessage, atMs: Date.now() });
+    /** `mayGo` faux : le relevé ne fait que remplir l'écran (premier relevé d'une liaison perdue, qui peut encore se dire prête). */
+    const tick = async (mayGo = true): Promise<void> => {
+      if (done || reading) return;
+      reading = true;
+      try {
+        if (cause.reason === 'busy') {
+          if (mayGo && !libraryState().importing && !options.recording?.()) return finish(true);
+          return show();
+        }
+        const state = await phoneState().catch(() => null);
+        if (done) return;
+        if (state?.etat === 'pret') {
+          if (mayGo) return finish(true);
+          return show();
+        }
+        const cable: PhoneCableHold | null = state && state.etat !== 'absent' && state.etat !== 'adbIntrouvable' ? state.etat : null;
+        const wireless = await readWireless();
+        if (done) return;
+        if (cause.reason === 'absent' && cable === null && wireless.phones !== null && wireless.phones.length === 0) {
+          progress.set({ step: 'noPhone' });
+          return;
+        }
+        wait = {
+          ...wait, cable, firewall: wireless.firewall, wirelessOff: wireless.off,
+          phone: wireless.phone ?? wait.phone, lastSeenMs: wireless.lastSeenMs ?? wait.lastSeenMs,
+        };
+        show();
+      } finally {
+        reading = false;
+        if (!done) {
+          if (timer !== null) clearTimeout(timer);
+          timer = setTimeout(() => void tick(), WAIT_POLL_MS);
+        }
+      }
+    };
+    waiting = { cancel: () => finish(false), poke: () => void tick() };
+    authorizeHook = (message) => {
+      firewallMessage = message;
+      if (!done) show();
+    };
+    stops.push(onWirelessArrival(() => void tick()), onWirelessDeparture(() => void tick()), () => {
+      authorizeHook = null;
+    });
+    noteJournal(`Synchroniser : attente (${cause.reason === 'busy' ? 'ordinateur occupé' : cause.reason === 'lost' ? 'liaison perdue' : 'téléphone absent'})`);
+    show();
+    // Une liaison qui vient de tomber peut encore se dire prête : la reprise attend au moins un relevé, sans boucler.
+    void tick(cause.reason === 'absent');
+  });
+
+/**
+ * Une synchronisation, de la recherche du téléphone (ou de la reprise, `how.resume`) à la question ou au compte rendu,
+ * en attendant ce qui manque (téléphone, liaison, ordinateur) sans rien perdre de ce qui est fait. Ce qui a changé
+ * pendant l'opération est repris par une seconde passe, une seule fois. Une réponse qui ne peut pas s'appliquer
+ * (téléphone parti avant, synchronisation refusée) rend le compte rendu de ce qui était fait, la raison
+ * (`answerFailed`), et la question laissée sans réponse, à laquelle « Répondre » revient.
  */
 const launch = (options: RunOptions, how: LaunchHow = {}): Promise<void> => {
   current = options;
   progress.set(how.resume
     ? { step: 'copying', phone: how.resume.phone, channel: how.resume.channel, done: 0, total: 0, first: false }
     : { step: 'searching' });
-  arrival.set(null);
+  if (!how.resume) noteJournal('Synchroniser : recherche du téléphone');
   const run = async (): Promise<void> => {
-    const pass = await synchronize(options, how.resume !== undefined);
-    if (how.answering && passFailed(pass)) {
-      // La réponse n'a rien réglé : la suivante repart des choix d'avant elle.
-      current = how.answering.before;
-      progress.set({ step: 'over', result: how.answering.result, unanswered: how.answering.question, answerFailed: pass });
+    let previous = how.previous;
+    let resume = how.resume !== undefined;
+    let retried = false;
+    let lostResumes = 0;
+    let phoneHint = how.resume?.phone ?? null;
+    /** Ce qui est fait jusqu'ici, avec le téléphone et son canal : le compte rendu d'un arrêt en route. */
+    let lastSynced: SyncedResult | null = how.answering?.result ?? null;
+    /** Arrêt en route (attente annulée, panne, reprises épuisées) : le compte rendu de ce qui est fait, avec la note de l'arrêt. */
+    const stopWith = (detail: string | null, kind: 'linkLost' | 'error'): boolean => {
+      if (!lastSynced || !previous) return false;
+      const note = detail ?? '';
+      const outcome: SyncOutcome = kind === 'linkLost'
+        ? { ...previous, linkLost: previous.linkLost ?? note }
+        : { ...previous, error: previous.error ?? note };
+      progress.set({ step: 'over', result: { ...lastSynced, outcome } });
+      noteJournal('Synchroniser : arrêt en route, compte rendu de ce qui est fait');
+      return true;
+    };
+    for (;;) {
+      const pass = await synchronize(options, resume);
+      if (how.answering && passFailed(pass)) {
+        // La réponse n'a rien réglé : la suivante repart des choix d'avant elle.
+        current = how.answering.before;
+        progress.set({ step: 'over', result: how.answering.result, unanswered: how.answering.question, answerFailed: pass });
+        noteJournal("Synchroniser : la réponse n'a pas pu s'appliquer");
+        return;
+      }
+      if (pass.kind === 'synced' || pass.kind === 'no-phone-folder') phoneHint = pass.phone;
+      if (pass.kind === 'synced') {
+        // Ce que la passe a fait est gardé pour le compte rendu, même coupée ; une reprise ne refait que le reste.
+        const merged = previous ? mergeSyncPasses(previous, pass.outcome) : pass.outcome;
+        lastSynced = { ...pass, outcome: merged };
+      }
+      // Panne de lecture avec ce qui était déjà fait : son compte rendu, avec l'arrêt et « Recommencer ».
+      if (pass.kind === 'error' && stopWith(pass.detail, 'error')) return;
+      const gone = pass.kind === 'synced' && pass.outcome.linkLost !== null ? await phoneGoneNow() : false;
+      const cause = waitCauseOf(pass, previous !== undefined, gone);
+      if (cause) {
+        if (pass.kind === 'synced') previous = lastSynced?.outcome ?? pass.outcome;
+        if (cause.reason === 'lost' && ++lostResumes > MAX_LOST_RESUMES && stopWith(cause.detail, 'linkLost')) return;
+        if (!(await waitUntilReady(cause, options, phoneHint))) {
+          if (!stopWith(cause.detail, cause.reason === 'lost' ? 'linkLost' : 'error')) progress.set({ step: 'idle' });
+          return;
+        }
+        resume = false;
+        continue;
+      }
+      const result = joined(previous, pass);
+      const question = result.kind === 'synced' ? describeSyncQuestion(result.outcome) : null;
+      if (question === null && result.kind === 'synced' && pass.kind === 'synced' && !retried && syncHasChangedItems(pass.outcome)) {
+        retried = true;
+        previous = result.outcome;
+        resume = true;
+        progress.set({ step: 'copying', phone: result.phone, channel: result.channel, done: 0, total: 0, first: false });
+        noteJournal('Synchroniser : reprise des éléments changés en route');
+        continue;
+      }
+      progress.set(question && result.kind === 'synced' ? { step: 'question', question, result } : { step: 'over', result });
+      noteJournal(question ? 'Synchroniser : question posée' : 'Synchroniser : compte rendu');
       return;
     }
-    let result = joined(how.previous, pass);
-    let question = result.kind === 'synced' ? describeSyncQuestion(result.outcome) : null;
-    if (question === null && result.kind === 'synced' && pass.kind === 'synced' && syncHasChangedItems(pass.outcome)) {
-      progress.set({ step: 'copying', phone: result.phone, channel: result.channel, done: 0, total: 0, first: false });
-      const again = await synchronize(options, true);
-      if (again.kind === 'synced') {
-        const merged: SyncedResult = { ...again, outcome: mergeSyncPasses(result.outcome, again.outcome) };
-        result = merged;
-        question = describeSyncQuestion(merged.outcome);
-      }
-    }
-    progress.set(question && result.kind === 'synced' ? { step: 'question', question, result } : { step: 'over', result });
   };
   running = run().finally(() => {
     running = null;
@@ -245,11 +439,38 @@ const launch = (options: RunOptions, how: LaunchHow = {}): Promise<void> => {
 };
 
 /**
- * Lance « Synchroniser » ; pendant qu'elle tourne, un nouvel appel rend la même. `recording` : vrai pendant un
- * enregistrement (l'enregistreur dépend de la bibliothèque : l'appelant le passe), qui fait refuser la synchronisation.
+ * Lance « Synchroniser » ; pendant qu'elle tourne (attente comprise), un nouvel appel rend la même. `recording` : vrai
+ * pendant un enregistrement (l'enregistreur dépend de la bibliothèque : l'appelant le passe), qui fait attendre.
  */
 export const synchronizeWithPhone = (options: { recording?: () => boolean } = {}): Promise<void> =>
   running ?? launch({ recording: options.recording });
+
+/**
+ * « Annuler » de l'attente : la synchronisation s'arrête là, ce qui était fait reste fait. Après une passe partielle,
+ * l'étape passe au compte rendu de ce qui est fait, avec la note de l'arrêt ; sinon, au repos. Rend la promesse de la
+ * synchronisation, résolue une fois l'étape posée. Sans effet hors d'une attente.
+ */
+export const cancelPhoneSyncWait = (): Promise<void> => {
+  waiting?.cancel();
+  return running ?? Promise.resolve();
+};
+
+/**
+ * « Autoriser Gtracker » de l'attente : demande à Windows d'autoriser Gtracker sur le réseau, puis relit l'écran ; un
+ * refus ou un échec y est dit. Sans effet hors d'une attente.
+ */
+export const authorizePhoneSyncFirewall = async (): Promise<void> => {
+  if (!waiting) return;
+  let message: string | null;
+  try {
+    const result = await authorizeWireless();
+    message = authorizationOutcomeText(result.issue, result.detail);
+  } catch (err) {
+    message = authorizationOutcomeText('echec', nativeErrorMessage(err, t('erreur inconnue')));
+  }
+  authorizeHook?.(message);
+  waiting?.poke();
+};
 
 /**
  * Répond à la question posée (étape `question`) : la synchronisation repart avec ce que la réponse règle, en gardant
@@ -303,13 +524,4 @@ export const reopenPhoneSyncQuestion = (): void => {
   if (step.step === 'over' && step.unanswered && step.result.kind === 'synced' && !running) {
     progress.set({ step: 'question', question: step.unanswered, result: step.result });
   }
-};
-
-/**
- * Un téléphone relié se présente par le sans-fil : rien ne se copie seul, une ligne invite à « Synchroniser »
- * (`usePhoneArrivalNote`). Rien n'est dit pendant une synchronisation.
- */
-export const notePhoneArrival = (): void => {
-  if (running) return;
-  arrival.set({ text: phoneArrivalText(), atMs: Date.now() });
 };

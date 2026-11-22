@@ -62,10 +62,10 @@ export { stashRoute, trashStore } from './sessionLibrary/trash';
 export type { TrashState } from './sessionLibrary/trash';
 export { deleteFromTrash, emptyWholeTrash, restoreFromTrash } from './sessionLibrary/trashRestore';
 export {
-  answerPhoneSyncQuestion, clearPhoneArrivalNote, leavePhoneSyncQuestion, notePhoneArrival, phoneSyncStep, reopenPhoneSyncQuestion,
-  synchronizeWithPhone, usePhoneArrivalNote, usePhoneSync,
+  answerPhoneSyncQuestion, authorizePhoneSyncFirewall, cancelPhoneSyncWait, leavePhoneSyncQuestion, phoneSyncStep, reopenPhoneSyncQuestion,
+  synchronizeWithPhone, usePhoneSync,
 } from './sessionLibrary/phoneSync';
-export type { PhoneArrivalNote, PhoneSyncAnswer, PhoneSyncStep } from './sessionLibrary/phoneSync';
+export type { PhoneSyncAnswer, PhoneSyncStep } from './sessionLibrary/phoneSync';
 export type { ResetProgress } from './sessionLibrary/reset';
 export type { SettingsFileInfo } from '../library/settingsFile';
 

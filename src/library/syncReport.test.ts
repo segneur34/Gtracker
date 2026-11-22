@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { emptySyncOutcome, type SyncOutcome } from './syncOutcome';
 import type { SyncCase, SyncItem, SyncOp, SyncPlan } from './syncPlan';
 import {
-  describePhoneState, describePhoneSync, describeQuestion, describeSync, describeSyncQuestion, mergeSyncPasses, syncHasChangedItems,
-  syncProgressText, syncSubtitle, type SyncQuestion, type SyncReport,
+  computerScanText, describeNoPhone, describePhoneSync, describeQuestion, describeSync, describeSyncQuestion, describeWait, lastSeenText,
+  linkedPhoneText, mergeSyncPasses, syncHasChangedItems, syncProgressText, syncSubtitle, type SyncQuestion, type SyncReport, type SyncWait,
 } from './syncReport';
 import type { RouteSyncItem, RouteSyncOp } from './syncRoutes';
 
@@ -267,14 +267,61 @@ describe('synchronisation impossible et téléphone pas prêt', () => {
     expect(describeSync(emptySyncOutcome('phoneNoMarker')).paragraphs).toEqual(describePhoneSync({ kind: 'no-phone-folder', phone: 'X' }).paragraphs);
   });
 
-  it('téléphone pas prêt : sa phrase et « Réessayer » ; avancement et sous-titre', () => {
-    expect(describePhoneState({ kind: 'tool-missing', folder: 'C:\\adb' })).toMatchObject({ folder: 'C:\\adb', action: 'retry' });
+  it('téléphone pas prêt (jamais montré d’ordinaire, la fenêtre attend) : une phrase et « Réessayer » ; avancement et sous-titre', () => {
+    expect(describePhoneSync({ kind: 'phone', state: 'horsLigne' })).toMatchObject({ action: 'retry' });
     expect(describePhoneSync({ kind: 'phone', state: 'horsLigne' }).paragraphs).toHaveLength(1);
     expect(describePhoneSync({ kind: 'synced', phone: 'Xiaomi', channel: 'cable', outcome: outcomeOf([]) }).title).toBe('Tout est à jour');
     expect(syncProgressText(12, 50)).toBe('Échange des sessions et des itinéraires : 12 fichiers sur 50.');
     expect(syncProgressText(0, 0)).toBe('Échange des sessions et des itinéraires…');
     expect(syncSubtitle('Redmi', 'sansFil')).toBe('Redmi · par le Wi-Fi');
     expect(syncSubtitle('Redmi', 'cable')).toBe('Redmi · par le câble');
+  });
+});
+
+describe('la fenêtre qui attend', () => {
+  const NOW = new Date(2026, 10, 22, 15, 0).getTime();
+  const wait = (patch: Partial<SyncWait> = {}): SyncWait => ({
+    reason: 'absent', phone: 'Redmi', lastSeenMs: new Date(2026, 10, 22, 14, 32).getTime(), firewall: null, cable: null, wirelessOff: false,
+    midway: false, detail: null, ...patch,
+  });
+
+  it('téléphone connu, pas relié : quoi faire sur le téléphone, et la synchronisation part seule', () => {
+    expect(describeWait(wait(), NOW)).toEqual({
+      title: 'En attente de votre téléphone', subtitle: 'Redmi · relié pour la dernière fois à 14 h 32', lead: null,
+      steps: [
+        "allumez l'écran et déverrouillez-le ;", 'affichez Gtracker ;',
+        'restez sur le même réseau que cet ordinateur (la même box Wi-Fi, ou un partage de connexion entre les deux).',
+      ],
+      closing: "La synchronisation démarre toute seule dès qu'il est là.", notes: [],
+    });
+    expect(JSON.stringify(describeWait(wait(), NOW))).not.toMatch(/Débogage|Réessayer|Google/);
+  });
+
+  it('relié hier, ou un autre jour, ou heure inconnue', () => {
+    expect(lastSeenText('Redmi', new Date(2026, 10, 21, 9, 5).getTime(), NOW)).toBe('Redmi · relié pour la dernière fois hier');
+    expect(lastSeenText('Redmi', new Date(2026, 10, 12, 9, 5).getTime(), NOW)).toMatch(/^Redmi · relié pour la dernière fois le /);
+    expect(lastSeenText('Redmi', null, NOW)).toBe('Redmi');
+    expect(describeWait(wait({ phone: null }), NOW).subtitle).toBeNull();
+  });
+
+  it('liaison perdue : ce qui est fait est gardé, reprise seule ; câble ; ordinateur occupé ; sans-fil éteint', () => {
+    expect(describeWait(wait({ reason: 'lost', midway: true }), NOW).lead).toBe("Le téléphone n'est plus relié : la synchronisation s'est arrêtée en route. Ce qui est fait est gardé. Elle reprend toute seule dès qu'il revient : écran allumé, Gtracker affiché (ou câble rebranché).");
+    expect(describeWait(wait({ reason: 'lost' }), NOW).lead).toBe("Le téléphone a cessé de répondre. Ce qui est fait est gardé. La synchronisation reprend dès qu'il revient : écran allumé, Gtracker affiché.");
+    expect(describeWait(wait({ cable: 'autorisation' }), NOW)).toMatchObject({ steps: [], closing: null, lead: expect.stringMatching(/^Le téléphone branché demande une autorisation/) });
+    expect(describeWait(wait({ cable: 'horsLigne' }), NOW).lead).toBe('Le téléphone est branché mais ne répond pas. Déverrouillez son écran, puis débranchez et rebranchez le câble.');
+    expect(describeWait(wait({ cable: 'occupe' }), NOW).lead).toBe('Un autre programme tient le câble du téléphone. Fermez-le, ou débranchez le câble pour passer par le Wi-Fi.');
+    expect(describeWait(wait({ reason: 'busy' }), NOW)).toMatchObject({
+      title: 'Synchronisation en attente', lead: "L'ordinateur est occupé (import ou enregistrement en cours). La synchronisation démarre dès qu'il a fini.",
+    });
+    expect(describeWait(wait({ wirelessOff: true }), NOW).notes).toHaveLength(1);
+  });
+
+  it('jamais relié, ordinateur qui finit ses fiches, téléphone relié à côté du bouton', () => {
+    expect(describeNoPhone()).toEqual({
+      title: 'Aucun téléphone relié', text: 'Cet ordinateur ne connaît encore aucun téléphone. Cela se fait une fois, en tapant un code sur le téléphone.',
+    });
+    expect(computerScanText(12, 40)).toBe("L'ordinateur finit de mettre à jour ses sessions : 12 sur 40.");
+    expect(linkedPhoneText('Redmi')).toBe('Redmi relié');
   });
 });
 
