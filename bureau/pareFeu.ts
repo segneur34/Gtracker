@@ -33,6 +33,18 @@ export type PareFeu = 'ouvert' | 'bloque' | 'inconnu'
 /** Jugement du relevé ; `reparable` : l'autorisation de Gtracker suffirait à ouvrir. */
 export type JugementPareFeu = { pareFeu: PareFeu; reparable: boolean }
 
+/**
+ * Relevé qui n'a pas pu être lu, et pourquoi, en français : délai dépassé, code de sortie, sortie illisible. Rien de
+ * personnel (ni chemin, ni contenu de la sortie) : la raison va au journal.
+ */
+export type ReleveRate = { raison: string }
+
+/** Ce que rend une lecture du pare-feu : le jugement, ou la raison de l'échec. */
+export type LecturePareFeu = JugementPareFeu | ReleveRate
+
+/** Vrai si la lecture a échoué. */
+export const releveRate = (lecture: LecturePareFeu): lecture is ReleveRate => 'raison' in lecture
+
 export type IssueAutorisation = 'accordee' | 'refusee' | 'echec'
 
 /** Issue de la demande d'autorisation ; `detail` dit pourquoi elle a échoué, en français. */
@@ -68,8 +80,11 @@ const AUTORISER = 1
 const SORTIE_REFUS = 3
 const SORTIE_ECHEC_REGLES = 4
 
-/** Délai de la lecture. */
-const DELAI_RELEVE_MS = 10_000
+/**
+ * Délai de la lecture : mesurée à 7 s au lancement du programme sur un vrai poste (1 s lancée à la main), quand
+ * Windows charge encore ce que le programme vient de démarrer ; large pour qu'un poste lent ne la fasse pas échouer.
+ */
+export const DELAI_RELEVE_MS = 30_000
 /**
  * Délai de l'autorisation : elle attend la réponse de l'utilisateur à la demande de Windows, qui peut prendre plus
  * longtemps que la lecture.
@@ -386,32 +401,53 @@ export function jugerPareFeu(releve: ReleveWindows | null, contexte: ContexteJug
 
 // ---------- sur le vrai Windows ----------
 
-type Sortie = { code: number; stdout: string; delaiDepasse: boolean; message: string }
+/**
+ * Fin d'un Windows PowerShell : `code` -1 quand il n'a pas rendu de code (lancement impossible, délai, sortie trop
+ * longue), `erreur` le code d'erreur de Node dans ce cas (`ENOENT`…), vide sinon.
+ */
+export type SortiePowershell = { code: number; stdout: string; delaiDepasse: boolean; message: string; erreur: string }
 
 /** Windows PowerShell sur un script encodé, sans shell, fenêtre cachée, délai borné ; ne rejette jamais. */
-function lancerPowershell(encode: string, delaiMs: number, env: Record<string, string | undefined> = process.env): Promise<Sortie> {
+function lancerPowershell(encode: string, delaiMs: number, env: Record<string, string | undefined> = process.env): Promise<SortiePowershell> {
   return new Promise((fin) => {
     execFile(
       cheminPowershell(env),
       [...ARGUMENTS_POWERSHELL, encode],
       { windowsHide: true, timeout: delaiMs, maxBuffer: 4 * 1024 * 1024, encoding: 'utf8', shell: false, env },
       (erreur, stdout) => {
-        if (!erreur) return fin({ code: 0, stdout, delaiDepasse: false, message: '' })
+        if (!erreur) return fin({ code: 0, stdout, delaiDepasse: false, message: '', erreur: '' })
         const e = erreur as NodeJS.ErrnoException & { killed?: boolean; signal?: string | null }
         const code = typeof e.code === 'number' ? e.code : -1
-        fin({ code, stdout: stdout ?? '', delaiDepasse: typeof e.code !== 'string' && e.killed === true && e.signal != null, message: e.message })
+        fin({
+          code,
+          stdout: stdout ?? '',
+          delaiDepasse: typeof e.code !== 'string' && e.killed === true && e.signal != null,
+          message: e.message,
+          erreur: typeof e.code === 'string' ? e.code : '',
+        })
       },
     )
   })
 }
 
-/** Lit et juge le pare-feu de Windows ; `null` si le relevé n'a pas pu être lu (hors de Windows compris). */
-export async function lirePareFeuWindows(contexte: ContexteJugement): Promise<JugementPareFeu | null> {
-  if (process.platform !== 'win32') return null
-  const sortie = await lancerPowershell(scriptReleve(), DELAI_RELEVE_MS, { ...process.env, [VARIABLE_EXE]: contexte.exe })
-  if (sortie.code !== 0) return null
+/**
+ * Le jugement d'un relevé d'après la fin de son Windows PowerShell, ou la raison de l'échec : jamais le message de
+ * Node ni la sortie, qui peuvent porter le chemin du programme (et le nom de l'utilisateur).
+ */
+export function lectureDeSortie(sortie: SortiePowershell, contexte: ContexteJugement, delaiMs: number = DELAI_RELEVE_MS): LecturePareFeu {
+  if (sortie.delaiDepasse) return { raison: `délai de ${Math.round(delaiMs / 1000)} s dépassé` }
+  if (sortie.code === -1) return { raison: `Windows PowerShell en échec${sortie.erreur ? ` (${sortie.erreur})` : ''}` }
+  if (sortie.code !== 0) return { raison: `Windows PowerShell a rendu le code ${sortie.code}` }
   const releve = lireReleve(sortie.stdout)
-  return releve ? jugerPareFeu(releve, contexte) : null
+  if (!releve) return { raison: `sortie illisible (${sortie.stdout.length} caractères)` }
+  return jugerPareFeu(releve, contexte)
+}
+
+/** Lit et juge le pare-feu de Windows ; ne rejette jamais, rend la raison d'un relevé raté (hors de Windows compris). */
+export async function lirePareFeuWindows(contexte: ContexteJugement, { delaiMs = DELAI_RELEVE_MS }: { delaiMs?: number } = {}): Promise<LecturePareFeu> {
+  if (process.platform !== 'win32') return { raison: 'hors de Windows' }
+  const sortie = await lancerPowershell(scriptReleve(), delaiMs, { ...process.env, [VARIABLE_EXE]: contexte.exe })
+  return lectureDeSortie(sortie, contexte, delaiMs)
 }
 
 /** Demande à Windows d'autoriser Gtracker (une demande de confirmation à l'utilisateur) ; ne rejette jamais. */

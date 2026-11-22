@@ -41,7 +41,11 @@
 //
 // Pare-feu de Windows (`pareFeu.ts`) : relevé et jugé après chaque mise à l'écoute, et relu toutes les 30 secondes tant
 // qu'il n'est pas ouvert ; si le relevé ne se lit pas, l'essai d'auto-connexion (`essayerAutoConnexion`) sert de repli
-// et ne peut qu'affirmer un blocage (son « ouvert » devient « inconnu »). Quand l'utilisateur allume le sans-fil et que
+// et ne peut qu'affirmer un blocage (son « ouvert » devient « inconnu »). Un relevé raté est noté au journal avec sa
+// raison (une fois par raison), refait une fois une quinzaine de secondes plus tard, puis à chaque relevé des adresses
+// jusqu'à ce qu'il se lise : un échec au lancement ne laisse pas la page sans nouvelles du pare-feu. Le relevé ne passe
+// pas par la file du serveur (l'état, l'appairage et l'arrêt répondent pendant qu'il traîne), jamais plus d'un à la
+// fois, et son résultat est jeté si l'écoute a changé entre-temps. Quand l'utilisateur allume le sans-fil et que
 // le relevé dit bloqué et réparable, l'autorisation de Gtracker est demandée avant la mise à l'écoute : Windows ne pose
 // plus sa propre question (réseaux privés ou publics). Refusée ou en échec, le sans-fil s'allume quand même, et la
 // page propose de la redemander (`sansfil:autoriser`). Au lancement, avec le sans-fil déjà allumé, rien n'est demandé.
@@ -58,8 +62,8 @@ import { FenetreAppairage, RegistreTelephones, TAILLE_IDENTIFIANT, depuisHex, eg
 import { certificatUtilisable, empreinteCertificat, fabriquerCertificat } from './certificat'
 import { ErreurDisque, codeDe, ecrireAtomique } from './disque'
 import type { Journaliser } from './journal'
-import type { ContexteEcoute, IssueAutorisation, JugementPareFeu, PareFeu, ResultatAutorisation } from './pareFeu'
-import { ESSAIS_PORT } from './pareFeu'
+import type { ContexteEcoute, IssueAutorisation, JugementPareFeu, LecturePareFeu, PareFeu, ResultatAutorisation } from './pareFeu'
+import { ESSAIS_PORT, releveRate } from './pareFeu'
 import type { Gestionnaire } from './pont'
 import { enReponse } from './pont'
 import { decoderQuestion, encoderReponse, adressesPrivees, memeReseau, nomPcPourSonde, PORT_SONDE } from './sonde'
@@ -123,6 +127,11 @@ export type Delais = {
   intervalleAdresses: number
   /** Pour l'essai d'auto-connexion. */
   pareFeu: number
+  /**
+   * Après un relevé du pare-feu raté, avant de le refaire une fois ; plus court que `intervalleAdresses`, pour qu'un
+   * Windows encore occupé au lancement du programme ne laisse pas la page sans nouvelles pendant une demi-minute.
+   */
+  nouveauRelevePareFeu: number
 }
 
 export const DELAIS: Readonly<Delais> = Object.freeze({
@@ -133,6 +142,7 @@ export const DELAIS: Readonly<Delais> = Object.freeze({
   ping: 20_000,
   intervalleAdresses: 30_000,
   pareFeu: 2_000,
+  nouveauRelevePareFeu: 15_000,
 })
 
 /** Liaisons pas encore reconnues gardées ensemble ; au-delà, une connexion de plus est coupée aussitôt. */
@@ -572,6 +582,12 @@ export type AvisArrivee = { id: string; nom: string; nouveau: boolean }
 /** Avis envoyé quand un téléphone relié s'en va ; `heure` en millisecondes depuis 1970 (horloge du PC). */
 export type AvisDepart = { id: string; nom: string; raison: RaisonDepart; heure: number }
 
+/**
+ * Relevé du pare-feu fait avant la première écoute, pour le port de départ ; `demande` : l'autorisation a été demandée
+ * après lui, il n'est donc plus à jour.
+ */
+type ReleveAvantEcoute = { adresses: string; port: number; jugement: JugementPareFeu | null; demande: boolean }
+
 /** Issue de la demande d'autorisation au pare-feu, et l'état relu aussitôt après. */
 export type AutorisationSansFil = ResultatAutorisation & { etat: EtatSansFil }
 
@@ -592,10 +608,10 @@ export type OptionsSansFil = {
   /** Pare-feu relevé et jugé après chaque mise à l'écoute. */
   essaiPareFeu?: boolean
   /**
-   * Relevé et jugement du pare-feu (`lirePareFeuWindows`) ; `null` ou absent : illisible, l'essai d'auto-connexion sert
-   * de repli.
+   * Relevé et jugement du pare-feu (`lirePareFeuWindows`) ; un relevé raté (sa raison, ou `null`) ou une option absente :
+   * l'essai d'auto-connexion sert de repli.
    */
-  lirePareFeu?: (ecoute: ContexteEcoute) => Promise<JugementPareFeu | null>
+  lirePareFeu?: (ecoute: ContexteEcoute) => Promise<LecturePareFeu | null>
   /** Demande d'autorisation au pare-feu (`autoriserPareFeuWindows`) ; absente : rien n'est demandé. */
   autoriserPareFeu?: () => Promise<ResultatAutorisation>
   delais?: Partial<Delais>
@@ -687,6 +703,21 @@ export class ServeurSansFil {
   private erreur: string | null = null
   private pareFeu: PareFeu = 'inconnu'
   private pareFeuReparable = false
+  /** Raison du dernier relevé du pare-feu raté, `null` depuis le dernier relevé lu : le journal ne la redit pas. */
+  private raisonReleveRate: string | null = null
+  /** Nouveau relevé prévu après un échec ; `nouveauReleveFait` : déjà refait depuis le dernier relevé lu. */
+  private nouveauReleve: NodeJS.Timeout | null = null
+  private nouveauReleveFait = false
+  /** Relevé du pare-feu en cours (un seul à la fois), et le relevé neuf qui partira à sa suite. */
+  private releveEnCours: Promise<void> | null = null
+  private releveSuivant: Promise<void> | null = null
+  /** Change à chaque extinction ou changement d'écoute : le relevé d'une écoute passée est jeté. */
+  private generationEcoute = 0
+  /** Écoute pour laquelle le relevé en cours a été lancé. */
+  private generationReleve = 0
+  /** Relevé d'avant l'écoute et demande d'autorisation en cours : deux appels ensemble n'en font qu'un. */
+  private preparation: Promise<ReleveAvantEcoute | null> | null = null
+  private demandeEnCours: Promise<ResultatAutorisation> | null = null
   private sonde: dgram.Socket | null = null
   private reponsesSonde = { seconde: 0, nombre: 0 }
   private releve: NodeJS.Timeout | null = null
@@ -721,7 +752,7 @@ export class ServeurSansFil {
   demarrer(): Promise<void> {
     return this.serie(async () => {
       await this.charger()
-      if (this.actif && this.serveurs.size === 0) await this.allumer()
+      if (this.actif && !this.enService) await this.allumer()
     })
   }
 
@@ -744,30 +775,39 @@ export class ServeurSansFil {
    * comme au lancement).
    */
   async activer(actif: boolean, demanderAutorisation = true): Promise<EtatSansFil> {
-    return this.serie(async () => {
+    const aAllumer = await this.serie(async () => {
       await this.charger()
       this.actif = actif
       await this.sauverReglages()
-      if (actif) {
-        if (this.serveurs.size === 0) await this.allumer(demanderAutorisation)
-      } else await this.eteindre()
-      return this.etatCourant()
+      if (!actif) await this.eteindre()
+      return actif && !this.enService
     })
+    if (aAllumer) {
+      // Hors de la file : le relevé et la demande à l'utilisateur ne retiennent ni l'état, ni l'appairage, ni l'arrêt.
+      const avant = demanderAutorisation && this.essaiPareFeu ? await this.preparerEcoute() : null
+      // Éteint pendant la préparation : l'extinction l'emporte ; un autre allumage déjà fait : rien à refaire.
+      const allume = await this.serie(async () => (this.actif && !this.enService ? this.allumer(avant) : null))
+      await allume?.releve
+    }
+    return this.serie(async () => this.etatCourant())
   }
 
   /**
    * Demande à Windows d'autoriser Gtracker sur le réseau, puis relit aussitôt le pare-feu. Une demande en échec dont le
-   * relevé suivant dit ouvert est accordée. Le sans-fil doit être activé.
+   * relevé suivant dit ouvert est accordée. Le sans-fil doit être activé. Ni la demande ni le relevé ne retiennent la
+   * file du serveur ; deux demandes ensemble n'en font qu'une.
    */
   async autoriserPareFeu(): Promise<AutorisationSansFil> {
-    return this.serie(async () => {
+    await this.serie(async () => {
       await this.charger()
       if (!this.actif) throw new ErreurDisque('UNKNOWN', "Le sans-fil est éteint : l'activer avant d'autoriser Gtracker.")
-      const resultat = await this.demanderAutorisation()
-      if (this.port !== null && this.essaiPareFeu) await this.essayerPareFeu()
-      const accordee = resultat.issue === 'echec' && this.pareFeu === 'ouvert'
-      return { ...(accordee ? { issue: 'accordee' as const } : resultat), etat: this.etatCourant() }
     })
+    const demande = (this.demandeEnCours ??= this.demanderAutorisation().finally(() => (this.demandeEnCours = null)))
+    const resultat = await demande
+    await this.relever(true)
+    const etat = await this.serie(async () => this.etatCourant())
+    const accordee = resultat.issue === 'echec' && etat.pareFeu === 'ouvert'
+    return { ...(accordee ? { issue: 'accordee' as const } : resultat), etat }
   }
 
   /** Ouvre une fenêtre d'appairage (la précédente se ferme). Le sans-fil doit être activé et à l'écoute. */
@@ -945,39 +985,111 @@ export class ServeurSansFil {
 
   // ---------- écoute ----------
 
-  private async allumer(demanderAutorisation = false): Promise<void> {
+  /**
+   * Met le serveur à l'écoute et lance le relevé du pare-feu, sans l'attendre : rend sa promesse (`null` sans relevé),
+   * que `activer` attend hors de la file.
+   * Le relevé fait avant l'écoute (`avant`) sert tel quel s'il visait les mêmes adresses et le même port et que rien
+   * n'a été demandé à Windows entre-temps : un seul relevé au lieu de deux.
+   */
+  private async allumer(avant: ReleveAvantEcoute | null = null): Promise<{ releve: Promise<void> | null }> {
     try {
       this.certificat ??= await this.chargerCertificat()
     } catch (e) {
       this.erreur = `Certificat du sans-fil impossible à préparer : ${(e as Error).message}`
       this.journal(this.erreur)
-      return
+      return { releve: null }
     }
-    if (demanderAutorisation && this.essaiPareFeu) await this.autoriserAvantEcoute()
     this.enService = true
     await this.ecouter()
     await this.ouvrirSonde()
-    if (this.port !== null && this.essaiPareFeu) await this.essayerPareFeu()
+    let releve: Promise<void> | null = null
+    if (this.port !== null && this.essaiPareFeu) {
+      const memeEcoute = avant !== null && avant.port === this.port && avant.adresses === this.adresses.map((a) => a.adresse).join(' ')
+      if (memeEcoute && !avant.demande && avant.jugement) this.appliquerPareFeu(avant.jugement, true)
+      else releve = this.relever()
+    }
     this.releve ??= setInterval(
-      () => void this.serie(() => this.actualiserAdresses(this.pareFeu !== 'ouvert')).catch(() => undefined),
+      () => void this.serie(() => this.actualiserAdresses(this.pareFeu !== 'ouvert' || this.raisonReleveRate !== null)).catch(() => undefined),
       this.delais.intervalleAdresses,
     )
     this.releve.unref()
+    // Dans un objet : une promesse rendue telle quelle par une fonction async serait attendue avec elle.
+    return { releve }
+  }
+
+  /** Le relevé d'avant la première écoute ; deux allumages ensemble n'en font qu'un (et une seule demande). */
+  private preparerEcoute(): Promise<ReleveAvantEcoute | null> {
+    return (this.preparation ??= this.autoriserAvantEcoute().finally(() => (this.preparation = null)))
   }
 
   /**
    * Avant la première mise à l'écoute : si le pare-feu bloque Gtracker et que l'autorisation suffirait, elle est
    * demandée maintenant, pour que Windows ne pose pas sa propre question à l'écoute. Son issue ne change rien à la
-   * suite : le sans-fil s'allume quand même.
+   * suite : le sans-fil s'allume quand même. Rend le relevé fait, pour qu'il serve après l'écoute.
    */
-  private async autoriserAvantEcoute(): Promise<void> {
-    if (!this.lirePareFeu || !this.autoriserSysteme) return
+  private async autoriserAvantEcoute(): Promise<ReleveAvantEcoute | null> {
+    if (!this.lirePareFeu || !this.autoriserSysteme) return null
     const adresses = this.lireAdresses().map((a) => a.adresse)
-    if (adresses.length === 0) return
-    const jugement = await this.relirePareFeu(adresses, this.portBase)
-    if (jugement?.pareFeu !== 'bloque' || !jugement.reparable) return
+    if (adresses.length === 0) return null
+    const jugement = await this.relirePareFeu(adresses, this.portBase, this.generationEcoute)
+    // Éteint pendant le relevé : rien n'est demandé à l'utilisateur.
+    if (jugement === undefined || !this.actif) return null
+    const avant = { adresses: adresses.join(' '), port: this.portBase, jugement, demande: false }
+    if (jugement?.pareFeu !== 'bloque' || !jugement.reparable) return avant
     this.journal("pare-feu bloqué : autorisation demandée avant la mise à l'écoute")
     await this.demanderAutorisation()
+    return { ...avant, demande: true }
+  }
+
+  /**
+   * Relève le pare-feu pour l'écoute en cours, hors de la file du serveur : jamais plus d'un relevé à la fois, et un
+   * appel pendant un relevé rend celui-ci. `neuf` : il faut un relevé commencé après l'appel (autorisation accordée,
+   * adresses changées) ; il part à la fin de celui en cours, un seul pour tous les appels qui l'attendent. Un relevé
+   * fini après une extinction ou un changement d'écoute est jeté.
+   */
+  private relever(neuf = false): Promise<void> {
+    const enCours = this.releveEnCours
+    if (enCours) {
+      // Un relevé d'une écoute passée sera jeté : il en faut un neuf à sa suite, sans en lancer deux à la fois.
+      if (!neuf && this.generationReleve === this.generationEcoute) return enCours
+      return (this.releveSuivant ??= enCours.then(() => {
+        this.releveSuivant = null
+        return this.relever()
+      }))
+    }
+    const certificat = this.certificat
+    const port = this.port
+    if (port === null || this.adresses.length === 0 || !certificat || !this.essaiPareFeu) return Promise.resolve()
+    const adresses = this.adresses.map((a) => a.adresse)
+    const generation = this.generationEcoute
+    this.generationReleve = generation
+    const releve = (async () => {
+      const jugement = await this.relirePareFeu(adresses, port, generation)
+      if (jugement === undefined) return
+      if (jugement) return this.appliquerPareFeu(jugement, true)
+      // Relevé illisible : l'auto-connexion ne voit pas un blocage du réseau, elle ne peut qu'en affirmer un.
+      const essai = await essayerAutoConnexion(adresses[0], port, certificat.empreinte, this.delais.pareFeu)
+      if (generation !== this.generationEcoute) return
+      if (this.lirePareFeu) this.prevoirNouveauReleve()
+      this.appliquerPareFeu({ pareFeu: essai === 'ouvert' ? 'inconnu' : essai, reparable: essai === 'bloque' }, false)
+    })()
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.releveEnCours === releve) this.releveEnCours = null
+      })
+    this.releveEnCours = releve
+    return releve
+  }
+
+  /** Retient le jugement du pare-feu ; `lu` : par le relevé, sinon par l'essai d'auto-connexion. */
+  private appliquerPareFeu(jugement: JugementPareFeu, lu: boolean): void {
+    const avant = `${this.pareFeu}/${this.pareFeuReparable}`
+    this.pareFeu = jugement.pareFeu
+    this.pareFeuReparable = jugement.pareFeu === 'bloque' && jugement.reparable
+    if (lu) this.nouveauReleveFait = false
+    if (`${this.pareFeu}/${this.pareFeuReparable}` !== avant) {
+      this.journal(`pare-feu : ${this.pareFeu}${this.pareFeu === 'bloque' ? (this.pareFeuReparable ? ' (réparable)' : ' (non réparable)') : ''}${lu ? '' : " (essai d'auto-connexion)"}`)
+    }
   }
 
   /** La demande d'autorisation, qui ne rejette jamais. */
@@ -994,20 +1106,50 @@ export class ServeurSansFil {
     }
   }
 
-  /** Le relevé du pare-feu jugé pour ces adresses et ce port ; `null` s'il ne se lit pas. */
-  private async relirePareFeu(adresses: string[], port: number): Promise<JugementPareFeu | null> {
+  /**
+   * Le relevé du pare-feu jugé pour ces adresses et ce port ; `null` s'il ne se lit pas, avec sa raison au journal
+   * quand elle change (un relevé refait toutes les 30 secondes ne la répète pas) ; `undefined` s'il est jeté parce que
+   * l'écoute de `generation` n'est plus celle en cours.
+   */
+  private async relirePareFeu(adresses: string[], port: number, generation: number): Promise<JugementPareFeu | null | undefined> {
     if (!this.lirePareFeu) return null
+    let lecture: LecturePareFeu | null
     try {
-      return await this.lirePareFeu({ adresses, port, portSonde: this.portSonde })
+      lecture = await this.lirePareFeu({ adresses, port, portSonde: this.portSonde })
     } catch (e) {
-      this.journal(`relevé du pare-feu illisible : ${e instanceof Error ? e.message : String(e)}`)
-      return null
+      lecture = { raison: e instanceof Error ? e.message : String(e) }
     }
+    // Sans-fil éteint ou écoute changée pendant le relevé : jeté, sans rien écrire (ni raison, ni journal).
+    if (generation !== this.generationEcoute) return undefined
+    if (lecture !== null && !releveRate(lecture)) {
+      if (this.raisonReleveRate !== null) this.journal('relevé du pare-feu lu après un échec')
+      this.raisonReleveRate = null
+      return lecture
+    }
+    const raison = lecture?.raison ?? 'relevé illisible'
+    if (raison !== this.raisonReleveRate) this.journal(`relevé du pare-feu raté : ${raison}`)
+    this.raisonReleveRate = raison
+    return null
+  }
+
+  /**
+   * Après un relevé raté, le refait une fois `nouveauRelevePareFeu` plus tard ; ensuite, le relevé des adresses le refait
+   * tant qu'il ne se lit pas.
+   */
+  private prevoirNouveauReleve(): void {
+    if (this.nouveauReleve || this.nouveauReleveFait) return
+    this.nouveauReleve = setTimeout(() => {
+      this.nouveauReleve = null
+      this.nouveauReleveFait = true
+      void this.relever()
+    }, this.delais.nouveauRelevePareFeu)
+    this.nouveauReleve.unref()
   }
 
   private async eteindre(): Promise<void> {
     // D'abord : une poignée TLS qui finit pendant l'extinction n'est plus accueillie.
     this.enService = false
+    this.generationEcoute++
     if (this.releve) clearInterval(this.releve)
     this.releve = null
     this.fenetre?.fermer()
@@ -1021,6 +1163,10 @@ export class ServeurSansFil {
     this.erreur = null
     this.pareFeu = 'inconnu'
     this.pareFeuReparable = false
+    if (this.nouveauReleve) clearTimeout(this.nouveauReleve)
+    this.nouveauReleve = null
+    this.nouveauReleveFait = false
+    this.raisonReleveRate = null
     const sonde = this.sonde
     this.sonde = null
     if (sonde) await new Promise<void>((fin) => sonde.close(() => fin()))
@@ -1057,6 +1203,7 @@ export class ServeurSansFil {
     const certificat = this.certificat
     if (!certificat) return
     const voulues = this.lireAdresses()
+    this.generationEcoute++
     this.adresses = []
     this.port = null
     if (voulues.length === 0) {
@@ -1106,7 +1253,9 @@ export class ServeurSansFil {
 
   /** Suit les adresses du PC (Wi-Fi changé, adresse renouvelée) : écoute sur les nouvelles, lâche les disparues. */
   private async actualiserAdresses(retesterPareFeu: boolean): Promise<void> {
-    if (!this.actif || !this.certificat) return
+    // Seul `allumer` met à l'écoute la première fois (avec la découverte, la minuterie et le relevé) : pendant la
+    // préparation d'un allumage (relevé, demande d'autorisation), rien n'écoute encore.
+    if (!this.actif || !this.certificat || !this.enService) return
     const voulues = this.lireAdresses()
     const cles = (liste: AdresseEcoute[]) => liste.map((a) => `${a.adresse}/${a.masque}`).join(' ')
     let change = cles(voulues) !== cles(this.adresses)
@@ -1134,26 +1283,10 @@ export class ServeurSansFil {
       }
       change = true
     }
-    if (this.port !== null && this.essaiPareFeu && (change || retesterPareFeu)) await this.essayerPareFeu()
-  }
-
-  private async essayerPareFeu(): Promise<void> {
-    const certificat = this.certificat
-    if (this.port === null || this.adresses.length === 0 || !certificat) return
-    const avant = `${this.pareFeu}/${this.pareFeuReparable}`
-    const jugement = await this.relirePareFeu(this.adresses.map((a) => a.adresse), this.port)
-    if (jugement) {
-      this.pareFeu = jugement.pareFeu
-      this.pareFeuReparable = jugement.pareFeu === 'bloque' && jugement.reparable
-    } else {
-      // Relevé illisible : l'auto-connexion ne voit pas un blocage du réseau, elle ne peut qu'en affirmer un.
-      const essai = await essayerAutoConnexion(this.adresses[0].adresse, this.port, certificat.empreinte, this.delais.pareFeu)
-      this.pareFeu = essai === 'ouvert' ? 'inconnu' : essai
-      this.pareFeuReparable = this.pareFeu === 'bloque'
-    }
-    if (`${this.pareFeu}/${this.pareFeuReparable}` !== avant) {
-      this.journal(`pare-feu : ${this.pareFeu}${this.pareFeu === 'bloque' ? (this.pareFeuReparable ? ' (réparable)' : ' (non réparable)') : ''}${jugement ? '' : " (essai d'auto-connexion)"}`)
-    }
+    if (change) this.generationEcoute++
+    // Sans l'attendre : la file du serveur ne reste pas derrière un relevé ; un relevé déjà en cours suffit, sauf
+    // si l'écoute a changé (le sien serait jeté) : un neuf part alors à sa suite.
+    if (this.port !== null && this.essaiPareFeu && (change || retesterPareFeu)) void this.relever(change)
   }
 
   // ---------- découverte ----------
@@ -1224,7 +1357,10 @@ export class ServeurSansFil {
       this.journal(`appairage refusé : ${conclusion.raison}`)
       return liaison.refuser(conclusion.raison)
     }
-    const telephone = this.registre.ajouter(m.nom, conclusion.jeton, this.horloge(), this.alea)
+    const maintenant = this.horloge()
+    const telephone = this.registre.ajouter(m.nom, conclusion.jeton, maintenant, this.alea)
+    // L'appairage est sa première liaison : vu comme à une présentation par le jeton.
+    this.registre.marquerVu(telephone.id, maintenant)
     // Inscrit avant d'envoyer le jeton : un PC arrêté juste après ne laisse pas au téléphone un jeton inconnu.
     await this.sauverRegistre()
     if (!this.admissibleApresAttente(liaison, telephone.id)) return

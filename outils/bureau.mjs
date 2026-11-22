@@ -17,7 +17,9 @@
 // Installeur : NSIS par electron-builder, sur le dossier emballé (`--prepackaged`), en un clic, par utilisateur
 // (`%LOCALAPPDATA%\Programs\Gtracker`, sans droits d'administrateur), raccourcis « Gtracker » sur le Bureau et dans le
 // menu Démarrer ; la désinstallation garde le profil (`%APPDATA%\Gtracker`), et le dossier mémoire n'est jamais connu
-// de l'installeur. Une version plus récente s'installe par-dessus. Tout se fabrique dans `bureau/sortie/installeur/`
+// de l'installeur. Une version plus récente s'installe par-dessus, sans question quand Gtracker est ouvert :
+// l'installeur le ferme lui-même (`inclusNsis`), et ne s'arrête sur un message, « Réessayer » ou « Annuler », que s'il
+// n'y parvient pas. Tout se fabrique dans `bureau/sortie/installeur/`
 // (coquille compilée à part : `bureau/dist` de l'essai n'est pas touché), puis l'installeur est rangé dans
 // `bureau/sortie/`. L'APK est celle de Gradle en version de publication (`cheminApk`), jamais une APK de débogage ;
 // absente ou d'une autre version, la construction s'arrête et dit comment la fabriquer.
@@ -120,12 +122,130 @@ function verifierApk(version) {
   throw new Error(messageApkAbsente(version, chemin, existsSync(dossier) ? readdirSync(dossier) : []))
 }
 
+/** Fichier inclus dans le script NSIS, écrit dans l'atelier à chaque construction (jamais suivi par git). */
+export const FICHIER_INCLUS_NSIS = 'installeur.nsh'
+
+/**
+ * Attente de la fermeture demandée à Gtracker (sa fenêtre fermée comme par sa croix), en secondes ; au-delà, ses
+ * processus sont arrêtés de force. Courte : avec un brouillon non enregistré, Gtracker pose sa question et l'installeur
+ * ne l'attend pas, comme le faisait la réponse OK à la question d'electron-builder.
+ */
+export const ATTENTE_FERMETURE_S = 5
+
+/** Attente de la fin des processus arrêtés de force, en secondes ; au-delà, l'installeur demande de fermer Gtracker. */
+export const ATTENTE_FORCE_S = 5
+
+/** Variable d'environnement qui porte le dossier du programme au script de fermeture. */
+const VARIABLE_DOSSIER = 'GTRACKER_DOSSIER_PROGRAMME'
+
+/** Longueur maximale d'une chaîne de NSIS (`NSIS_MAX_STRLEN` du NSIS d'electron-builder). */
+export const LONGUEUR_MAX_NSIS = 8192
+
+/** Message de l'installeur quand Gtracker n'a pas pu être fermé ; ses boutons sont « Réessayer » et « Annuler ». */
+export const MESSAGE_NON_FERME =
+  "Gtracker est ouvert et l'installation n'arrive pas à le fermer.$\\r$\\n$\\r$\\nFermez Gtracker, puis cliquez sur Réessayer. Annuler garde la version déjà installée."
+
+/**
+ * Script Windows PowerShell de fermeture, avant une installation par-dessus. Il vise les processus dont l'exécutable
+ * est dans le dossier du programme (variable `GTRACKER_DOSSIER_PROGRAMME`), pas un Gtracker lancé d'ailleurs ; il
+ * demande d'abord la fermeture de leur fenêtre, attend, puis les arrête de force avec leurs processus fils. Codes de
+ * sortie : 0 plus rien d'ouvert, 1 encore ouvert (lancé par un autre compte, ou en administrateur), 2 en échec.
+ */
+export function scriptFermeture({ fermetureS = ATTENTE_FERMETURE_S, forceS = ATTENTE_FORCE_S } = {}) {
+  return [
+    "$ErrorActionPreference = 'Stop'",
+    'try {',
+    `  $dossier = ([string]$env:${VARIABLE_DOSSIER}).TrimEnd('\\') + '\\'`,
+    '  if ($dossier.Length -lt 4) { exit 2 }',
+    // L'installeur qui a lancé ce script n'est jamais visé, même lancé depuis le dossier du programme.
+    '  $installeur = [int](Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $PID").ParentProcessId',
+    '  function Restants { @(Get-CimInstance -ClassName Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($dossier, [StringComparison]::OrdinalIgnoreCase) -and [int]$_.ProcessId -ne $installeur }) }',
+    '  function Attendre([int]$ms) {',
+    '    $fin = [DateTime]::UtcNow.AddMilliseconds($ms)',
+    '    do { if ((Restants).Count -eq 0) { return $true }; Start-Sleep -Milliseconds 250 } while ([DateTime]::UtcNow -lt $fin)',
+    '    return ((Restants).Count -eq 0)',
+    '  }',
+    '  $ouverts = Restants',
+    '  if ($ouverts.Count -eq 0) { exit 0 }',
+    '  foreach ($p in $ouverts) { $g = Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue; if ($g -and $g.MainWindowHandle -ne [IntPtr]::Zero) { [void]$g.CloseMainWindow() } }',
+    `  if (Attendre ${fermetureS * 1000}) { exit 0 }`,
+    '  $ids = @(Restants | ForEach-Object { [int]$_.ProcessId })',
+    '  $fils = @(Get-CimInstance -ClassName Win32_Process | Where-Object { $ids -contains [int]$_.ParentProcessId -and [int]$_.ProcessId -ne $PID } | ForEach-Object { [int]$_.ProcessId })',
+    '  foreach ($id in ($fils + $ids)) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }',
+    `  if (Attendre ${forceS * 1000}) { exit 0 }`,
+    '  exit 1',
+    '} catch { exit 2 }',
+  ].join('\n')
+}
+
+/**
+ * Fichier inclus dans le script NSIS d'electron-builder (option `nsis.include`). Sa macro `customCheckAppRunning`
+ * remplace, à l'installation seulement, la question « Gtracker est en cours d'utilisation. Cliquez sur OK pour fermer
+ * ce programme. », qui attendait sans limite : l'installeur ferme Gtracker comme le faisait la réponse OK
+ * (`scriptFermeture`), puis installe et relance comme avant. Sans Windows PowerShell, repli sur `taskkill` par le nom
+ * du programme, pour l'utilisateur courant. Gtracker encore ouvert : message « Réessayer » ou « Annuler », toujours au
+ * premier plan ; Annuler laisse l'ancienne version et rend le code 2. La désinstallation (passe `BUILD_UNINSTALLER`)
+ * garde le comportement d'electron-builder.
+ */
+export function inclusNsis(options = {}) {
+  const fermetureMs = (options.fermetureS ?? ATTENTE_FERMETURE_S) * 1000
+  const forceMs = (options.forceS ?? ATTENTE_FORCE_S) * 1000
+  const encode = Buffer.from(scriptFermeture(options), 'utf16le').toString('base64')
+  const filtre = '/FI "USERNAME eq %USERNAME%"'
+  return [
+    "; Fermeture de Gtracker avant une installation par-dessus, sans question (écrit par outils/bureau.mjs).",
+    '!ifndef BUILD_UNINSTALLER',
+    '!macro customCheckAppRunning',
+    `  System::Call 'kernel32::SetEnvironmentVariable(t "${VARIABLE_DOSSIER}", t "$INSTDIR")'`,
+    '  gtracker_fermer:',
+    `  nsExec::Exec '"$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${encode}'`,
+    // nsExec rend le code de sortie, ou « error » (lancement impossible) ou « timeout » : comparaisons en chaînes, à
+    // la casse près, pour que seuls « 0 » et « 1 » comptent comme des codes du script.
+    '  Pop $0',
+    '  ${If} $0 S== "0"',
+    '    Goto gtracker_ferme',
+    '  ${EndIf}',
+    '  ${If} $0 S!= "1"',
+    `    nsExec::Exec '"$SYSDIR\\cmd.exe" /C taskkill /IM "\${APP_EXECUTABLE_FILENAME}" ${filtre}'`,
+    '    Pop $0',
+    `    Sleep ${fermetureMs}`,
+    // Sans `/T` : avec un filtre, taskkill met une vingtaine de secondes à parcourir les arbres de processus ; les
+    // processus de Gtracker portent tous son nom.
+    `    nsExec::Exec '"$SYSDIR\\cmd.exe" /C taskkill /F /IM "\${APP_EXECUTABLE_FILENAME}" ${filtre}'`,
+    '    Pop $0',
+    `    Sleep ${forceMs}`,
+    `    nsExec::Exec \`"$SYSDIR\\cmd.exe" /C tasklist ${filtre} /FI "IMAGENAME eq \${APP_EXECUTABLE_FILENAME}" /FO CSV /NH | "$SYSDIR\\findstr.exe" /B /I /C:"\\"\${APP_EXECUTABLE_FILENAME}\\""\``,
+    '    Pop $0',
+    // findstr : « 1 », rien trouvé, Gtracker est fermé ; « 0 » trouvé, « error », inconnu : le message.
+    '    ${If} $0 S== "1"',
+    '      Goto gtracker_ferme',
+    '    ${EndIf}',
+    '  ${EndIf}',
+    `  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION|MB_TOPMOST|MB_SETFOREGROUND "${MESSAGE_NON_FERME}" /SD IDCANCEL IDRETRY gtracker_fermer`,
+    '  SetErrorLevel 2',
+    '  Quit',
+    '  gtracker_ferme:',
+    '!macroend',
+    '!endif',
+    '',
+  ].join('\r\n')
+}
+
+/**
+ * Octets du fichier inclus : UTF-8 précédé de sa marque (BOM), que makensis reconnaît quelle que soit l'option
+ * `-INPUTCHARSET` ; sans elle, un makensis lancé sans cette option lirait les accents du message dans la page de code
+ * de Windows.
+ */
+export function octetsInclusNsis(options = {}) {
+  return Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(inclusNsis(options), 'utf8')])
+}
+
 /**
  * Configuration d'electron-builder pour l'installeur NSIS : en un clic, par utilisateur, raccourcis « Gtracker » sur
  * le Bureau et dans le menu Démarrer, profil gardé à la désinstallation, en français, sans signature ni retouche de
- * l'exécutable (déjà fait par l'emballage et les fusibles).
+ * l'exécutable (déjà fait par l'emballage et les fusibles). `include` : le fichier de `inclusNsis`, écrit avant.
  */
-export function configNsis({ version, electronVersion, sortie = ATELIER_INSTALLEUR, icone = ICONE }) {
+export function configNsis({ version, electronVersion, sortie = ATELIER_INSTALLEUR, icone = ICONE, include = join(sortie, FICHIER_INCLUS_NSIS) }) {
   return {
     appId: ID_PROGRAMME,
     productName: 'Gtracker',
@@ -154,6 +274,7 @@ export function configNsis({ version, electronVersion, sortie = ATELIER_INSTALLE
       installerLanguages: ['fr_FR'],
       language: '1036',
       differentialPackage: false,
+      include,
     },
     publish: null,
   }
@@ -274,6 +395,7 @@ async function construireInstalleur({ vite, avecApk }) {
   const eb = await importerDuBureau('electron-builder')
   const { build, Platform, Arch } = eb.default ?? eb
   console.log('· installeur (electron-builder, NSIS)')
+  writeFileSync(join(ATELIER_INSTALLEUR, FICHIER_INCLUS_NSIS), octetsInclusNsis(), { flag: 'w' })
   await build({
     targets: Platform.WINDOWS.createTarget('nsis', Arch.x64),
     prepackaged: dirname(exe),

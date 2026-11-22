@@ -171,7 +171,9 @@ describe('serveur sans fil', () => {
     expect(f.memoire).toMatchObject({ nomPc: 'PC de test', adresse: '127.0.0.1' })
     await quand(() => avis.length === 1)
     const telephones = await s.telephones()
-    expect(telephones).toEqual([expect.objectContaining({ nom: "Téléphone d'essai", relie: true, vuLe: null })])
+    // L'appairage compte comme une liaison : l'heure est écrite dans le registre du profil.
+    expect(telephones).toEqual([expect.objectContaining({ nom: "Téléphone d'essai", relie: true, vuLe: telephones[0].ajouteLe })])
+    expect(JSON.parse(await readFile(path.join(secrets, FICHIER_TELEPHONES), 'utf8')).telephones[0].vuLe).toBe(telephones[0].ajouteLe)
     expect(avis).toEqual([{ id: telephones[0].id, nom: "Téléphone d'essai", nouveau: true }])
     // La fenêtre se ferme après un appairage réussi ; le registre ne garde que le hachage du jeton.
     expect((await s.etat()).appairage).toBeNull()
@@ -870,6 +872,210 @@ describe('pare-feu de Windows', () => {
     expect(await s.activer(true)).toMatchObject({ ecoute: true, pareFeu: 'inconnu', pareFeuReparable: false })
     const panne = serveur({ lirePareFeu: async () => Promise.reject(new Error('powershell absent')) })
     await expect(panne.activer(true)).resolves.toMatchObject({ pareFeu: 'inconnu' })
+  })
+
+  it('relevé raté : sa raison au journal, refait après le délai court, puis lu et montré', async () => {
+    const journal: string[] = []
+    let lectures = 0
+    let rate = true
+    const s = serveur({
+      journal: (m) => journal.push(m),
+      lirePareFeu: async () => {
+        lectures++
+        return rate ? { raison: 'délai de 30 s dépassé' } : BLOQUE
+      },
+      autoriserPareFeu: async () => ({ issue: 'accordee' }),
+      delais: { nouveauRelevePareFeu: 50, intervalleAdresses: 60_000 },
+    })
+    expect(await s.activer(true, false)).toMatchObject({ ecoute: true, pareFeu: 'inconnu', pareFeuReparable: false })
+    expect(journal.filter((m) => m.startsWith('relevé du pare-feu'))).toEqual(['relevé du pare-feu raté : délai de 30 s dépassé'])
+    rate = false
+    // Sans attendre le relevé des adresses (une minute ici) : la carte n'est pas laissée muette.
+    await quand(async () => (await s.etat()).pareFeu === 'bloque')
+    expect(lectures).toBe(2)
+    expect((await s.etat()).pareFeuReparable).toBe(true)
+    expect(journal).toContain('relevé du pare-feu lu après un échec')
+  })
+
+  it('relevé qui ne rend jamais la main : l’état, l’appairage, les téléphones et l’arrêt répondent, sans relevés empilés', async () => {
+    let lectures = 0
+    const s = serveur({
+      lirePareFeu: () => {
+        lectures++
+        return new Promise<never>(() => undefined)
+      },
+      delais: { intervalleAdresses: 10, nouveauRelevePareFeu: 10 },
+    })
+    void s.activer(true, false)
+    await quand(async () => (await s.etat()).ecoute)
+    expect((await s.etat()).pareFeu).toBe('inconnu')
+    expect((await s.ouvrirAppairage()).code).toMatch(/^\d{6}$/)
+    expect(await s.telephones()).toEqual([])
+    await attendre(200)
+    expect(lectures).toBe(1)
+    await expect(s.arreter()).resolves.toBeUndefined()
+
+    // Au lancement suivant, le sans-fil déjà allumé : le démarrage n'attend pas le relevé.
+    const relance = serveur({ lirePareFeu: () => new Promise<never>(() => undefined) })
+    await relance.demarrer()
+    expect(await relance.etat()).toMatchObject({ actif: true, ecoute: true, pareFeu: 'inconnu' })
+  })
+
+  it('rallumé avec un relevé lent : rien n’écoute pendant la préparation, puis l’allumage est complet', async () => {
+    const attentes: ((j: JugementPareFeu) => void)[] = []
+    let lent = false
+    const OUVERT: JugementPareFeu = { pareFeu: 'ouvert', reparable: false }
+    const s = serveur({
+      portSonde: 0,
+      hoteSonde: '127.0.0.1',
+      lirePareFeu: () => (lent ? new Promise<JugementPareFeu>((r) => attentes.push(r)) : Promise.resolve(OUVERT)),
+      autoriserPareFeu: async () => ({ issue: 'accordee' }),
+      delais: { intervalleAdresses: 10 },
+    })
+    await s.activer(true)
+    await s.activer(false)
+    lent = true
+    const rallume = s.activer(true)
+    await quand(() => attentes.length === 1)
+    // La page relit l'état pendant la préparation : elle ne met pas le serveur à l'écoute.
+    for (let i = 0; i < 5; i++) {
+      expect(await s.etat()).toMatchObject({ actif: true, ecoute: false, port: null })
+      await attendre(15)
+    }
+    lent = false
+    attentes[0](OUVERT)
+    expect(await rallume).toMatchObject({ actif: true, ecoute: true, pareFeu: 'ouvert' })
+    const portSonde = s.portDecouverte() as number
+    expect(await sonder('127.0.0.1', portSonde, 2_000)).toMatchObject({ port: (await s.etat()).port })
+    // En service : un téléphone est accueilli et appairé.
+    const { liaison } = await appairer(s)
+    await quand(async () => (await s.etat()).relies.length === 1)
+    liaison.fermer()
+  })
+
+  it('éteint pendant la préparation : l’extinction l’emporte, rien n’écoute ni n’est demandé', async () => {
+    const attentes: ((j: JugementPareFeu) => void)[] = []
+    let demandes = 0
+    const s = serveur({
+      lirePareFeu: () => new Promise<JugementPareFeu>((r) => attentes.push(r)),
+      autoriserPareFeu: async () => {
+        demandes++
+        return { issue: 'accordee' }
+      },
+    })
+    const allume = s.activer(true)
+    await quand(() => attentes.length === 1)
+    expect(await s.activer(false)).toMatchObject({ actif: false, ecoute: false })
+    attentes[0](BLOQUE)
+    expect(await allume).toMatchObject({ actif: false, ecoute: false })
+    expect(demandes).toBe(0)
+  })
+
+  it('relevé raté fini après une extinction : ni raison, ni journal, et rien ne s’en souvient au rallumage', async () => {
+    const journal: string[] = []
+    const attentes: ((l: { raison: string }) => void)[] = []
+    let lent = true
+    const s = serveur({
+      journal: (m) => journal.push(m),
+      lirePareFeu: () => (lent ? new Promise<{ raison: string }>((r) => attentes.push(r)) : Promise.resolve(BLOQUE)),
+    })
+    void s.activer(true, false)
+    await quand(() => attentes.length === 1)
+    await s.arreter()
+    attentes[0]({ raison: 'délai de 30 s dépassé' })
+    await attendre(20)
+    expect(journal.filter((m) => m.startsWith('relevé du pare-feu') || m.startsWith('pare-feu'))).toEqual([])
+    lent = false
+    expect(await s.activer(true, false)).toMatchObject({ ecoute: true, pareFeu: 'bloque' })
+    expect(journal.filter((m) => m.startsWith('relevé du pare-feu'))).toEqual([])
+  })
+
+  it('relevés des adresses pendant un relevé lent : jamais deux relevés à la fois', async () => {
+    let lectures = 0
+    let enCours = 0
+    let auPlus = 0
+    const s = serveur({
+      lirePareFeu: async () => {
+        lectures++
+        auPlus = Math.max(auPlus, ++enCours)
+        await attendre(60)
+        enCours--
+        return BLOQUE
+      },
+      delais: { intervalleAdresses: 5 },
+    })
+    await s.activer(true, false)
+    await quand(() => lectures >= 4)
+    expect(auPlus).toBe(1)
+  })
+
+  it('relevé fini après une extinction : jeté, et le relevé de la nouvelle écoute part à sa suite', async () => {
+    const reponses: ((j: JugementPareFeu) => void)[] = []
+    const s = serveur({ lirePareFeu: () => new Promise<JugementPareFeu>((r) => reponses.push(r)) })
+    void s.activer(true, false)
+    await quand(() => reponses.length === 1)
+    await s.arreter()
+    const rallume = s.activer(true, false)
+    // Le relevé de l'écoute éteinte est encore en cours : pas de second relevé à côté.
+    await attendre(100)
+    expect(reponses).toHaveLength(1)
+    reponses[0](BLOQUE)
+    await quand(() => reponses.length === 2)
+    expect((await s.etat()).pareFeu).toBe('inconnu')
+    reponses[1]({ pareFeu: 'ouvert', reparable: false })
+    expect(await rallume).toMatchObject({ pareFeu: 'ouvert' })
+  })
+
+  it('à l’allumage, un seul relevé quand celui d’avant l’écoute visait le même port et que rien n’a été demandé', async () => {
+    const libre = await new Promise<number>((fin) => {
+      const essai = net.createServer().listen(0, '127.0.0.1', () => {
+        const port = (essai.address() as net.AddressInfo).port
+        essai.close(() => fin(port))
+      })
+    })
+    const ouvert = pareFeuReglable({ pareFeu: 'ouvert', reparable: false })
+    expect(await serveur({ ...ouvert.options, port: libre }).activer(true)).toMatchObject({ ecoute: true, port: libre, pareFeu: 'ouvert' })
+    expect(ouvert.suivi.ordre).toEqual(['releve'])
+    await Promise.all(serveurs.splice(0).map((x) => x.arreter()))
+
+    const bloque = pareFeuReglable(BLOQUE)
+    expect(await serveur({ ...bloque.options, port: libre }).activer(true)).toMatchObject({ pareFeu: 'ouvert' })
+    expect(bloque.suivi.ordre).toEqual(['releve', 'demande', 'releve'])
+  })
+
+  it('relevé toujours raté : refait une seule fois au délai court, puis à chaque relevé des adresses, raison dite une fois', async () => {
+    const journal: string[] = []
+    let lectures = 0
+    const lent = serveur({
+      journal: (m) => journal.push(m),
+      lirePareFeu: async () => {
+        lectures++
+        return null
+      },
+      delais: { nouveauRelevePareFeu: 20, intervalleAdresses: 60_000 },
+    })
+    await lent.activer(true, false)
+    await quand(() => lectures === 2)
+    await attendre(150)
+    expect(lectures).toBe(2)
+    expect(journal.filter((m) => m.startsWith('relevé du pare-feu'))).toEqual(['relevé du pare-feu raté : relevé illisible'])
+    await Promise.all(serveurs.splice(0).map((x) => x.arreter()))
+
+    let suivantes = 0
+    const raisons = ['Windows PowerShell a rendu le code 1', 'Windows PowerShell a rendu le code 1', 'sortie illisible (3 caractères)']
+    journal.length = 0
+    const s = serveur({
+      journal: (m) => journal.push(m),
+      lirePareFeu: async () => ({ raison: raisons[Math.min(suivantes++, raisons.length - 1)] }),
+      delais: { nouveauRelevePareFeu: 60_000, intervalleAdresses: 30 },
+    })
+    await s.activer(true, false)
+    await quand(() => suivantes >= 5)
+    expect(journal.filter((m) => m.startsWith('relevé du pare-feu'))).toEqual([
+      'relevé du pare-feu raté : Windows PowerShell a rendu le code 1',
+      'relevé du pare-feu raté : sortie illisible (3 caractères)',
+    ])
+    expect((await s.etat()).pareFeu).toBe('inconnu')
   })
 
   it('ne lit les variables d’essai qu’en mode d’essai, et n’écoute alors que sur la boucle locale', () => {

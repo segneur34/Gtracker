@@ -16,6 +16,8 @@
 //     entrée de désinstallation ;
 //  2. lancement du programme installé en mode d'essai de la coquille, sur un profil temporaire : la page répond ;
 //  3. réinstallation par-dessus, sans `/D=` (comme une mise à jour) : même dossier, fichiers remplacés, une seule entrée ;
+//     puis une autre par-dessus le programme ouvert (fenêtre montrée transparente) : l'installeur le ferme lui-même par
+//     sa fenêtre, sans question ni arrêt forcé, et remplace les fichiers ;
 //  4. désinstallation silencieuse : programme, raccourcis et entrées disparus ;
 //  5. raccourcis d'origine remis, profil, mémoire et Documents comparés au relevé de départ.
 // Les processus lancés reçoivent `GTRACKER_BANC` et un `GTRACKER_PROFIL` temporaire : même si l'installeur ouvrait
@@ -163,6 +165,44 @@ async function lancerInstalle(exe, profil, dossier) {
   }
 }
 
+/** Processus dont l'exécutable est dans `dossier` (programme installé, ses processus fils d'Electron compris). */
+function processusDans(dossier) {
+  const filtre = `$d = '${dossier.replace(/\\?$/, '\\').replace(/'/g, "''")}'; @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($d, [StringComparison]::OrdinalIgnoreCase) }).Count`
+  const r = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', filtre], { encoding: 'utf8', windowsHide: true })
+  return Number.parseInt(r.stdout.trim(), 10)
+}
+
+/**
+ * Réinstallation par-dessus le programme ouvert : l'installeur le ferme par sa fenêtre (« fermeture demandée » au
+ * journal de la coquille), sans question, puis remplace les fichiers. En `/S`, une question serait répondue seule :
+ * l'absence de question se voit au lancement à la main de l'installeur, pas ici.
+ */
+async function reinstallerParDessusOuvert(exe, profil, dossier) {
+  const journal = []
+  const env = { ...environnementEssai(profil), GTRACKER_BANC_MONTRER: 'transparente' }
+  const enfant = spawn(exe, ['--lang=fr-FR'], { env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+  const lire = (d) => { for (const l of String(d).split(/\r?\n/)) if (l.trim()) journal.push(l.trim()) }
+  enfant.stdout.on('data', lire)
+  enfant.stderr.on('data', lire)
+  try {
+    const pret = await attendre(() => journal.some((l) => l.includes('prêt :')), 30_000)
+    await pause(2000)
+    check('programme ouvert avant la réinstallation', pret && vivant(enfant.pid), `${processusDans(dossier)} processus`)
+    const temoin = join(dossier, 'resources', 'temoin-programme-ouvert.txt')
+    writeFileSync(temoin, 'ancien\n')
+    const mtimeAvant = statSync(exe).mtimeMs
+    const r = executer(installeur, ['/S'], profil)
+    check('réinstallation par-dessus le programme ouvert', r.code === 0, `code ${r.code}, ${r.duree}`)
+    check('le programme ouvert a été fermé', await disparu(enfant.pid, 10_000))
+    check('fermé par sa fenêtre, sans arrêt forcé', journal.some((l) => l.includes('fermeture demandée')), journal.slice(-2).join(' | '))
+    check('aucun processus du programme encore ouvert', processusDans(dossier) === 0)
+    check('programme remplacé', existsSync(exe) && statSync(exe).mtimeMs >= mtimeAvant)
+    check("fichiers de l'installation ouverte retirés", !existsSync(temoin))
+  } finally {
+    if (vivant(enfant.pid)) spawnSync('taskkill', ['/T', '/F', '/PID', String(enfant.pid)], { stdio: 'ignore', windowsHide: true })
+  }
+}
+
 // ---------- essai ----------
 async function principal() {
   if (!existsSync(installeur)) throw new Error(`installeur absent : ${installeur} (npm run installeur)`)
@@ -256,6 +296,8 @@ async function principal() {
     check('toujours une seule entrée', entreesGtracker().length === 1)
     check('installation par défaut toujours non touchée', !existsSync(installationParDefaut))
     for (const r of raccourcis) check(`raccourci ${r} après réinstallation`, existsSync(r))
+    await reinstallerParDessusOuvert(exe, profilEssai, dossier)
+    check('toujours une seule entrée après la réinstallation par-dessus le programme ouvert', entreesGtracker().length === 1)
 
     // 4. désinstallation
     const desinstalleur = join(dossier, 'Uninstall Gtracker.exe')

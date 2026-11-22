@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { join, resolve } from 'node:path'
-import { ID_PROGRAMME, cheminApk, configNsis, environnementPropre, messageApkAbsente, nomApk, nomInstalleur, paquetDeLaCoquille, versionBureau } from './bureau.mjs'
+import {
+  ATTENTE_FERMETURE_S,
+  ATTENTE_FORCE_S,
+  FICHIER_INCLUS_NSIS,
+  ID_PROGRAMME,
+  LONGUEUR_MAX_NSIS,
+  MESSAGE_NON_FERME,
+  cheminApk,
+  configNsis,
+  environnementPropre,
+  inclusNsis,
+  messageApkAbsente,
+  nomApk,
+  octetsInclusNsis,
+  nomInstalleur,
+  paquetDeLaCoquille,
+  scriptFermeture,
+  versionBureau,
+} from './bureau.mjs'
 
 describe('cheminApk', () => {
   it('prend l’APK de publication de Gradle, au nom de la version de package.json', () => {
@@ -58,6 +76,83 @@ describe('configNsis', () => {
     expect(config.nsis.installerLanguages).toEqual(['fr_FR'])
     expect(config.appId).toBe(ID_PROGRAMME)
     expect(config.publish).toBeNull()
+  })
+
+  it('porte le fichier inclus, écrit dans l’atelier', () => {
+    expect(config.nsis.include).toBe(join('atelier', FICHIER_INCLUS_NSIS))
+    expect(configNsis({ version: '0.01.77', electronVersion: '45.3.4', include: 'ailleurs.nsh' }).nsis.include).toBe('ailleurs.nsh')
+  })
+})
+
+describe('fermeture de Gtracker par l’installeur', () => {
+  const inclus = inclusNsis()
+  const lignes = inclus.split('\r\n')
+  const commande = lignes.find((l) => l.includes('-EncodedCommand')) ?? ''
+  const decoder = (texte) => Buffer.from(/-EncodedCommand ([A-Za-z0-9+/=]+)'/.exec(texte)?.[1] ?? '', 'base64').toString('utf16le')
+
+  it('remplace la question d’electron-builder à l’installation seulement : la désinstallation garde la sienne', () => {
+    expect(lignes.indexOf('!ifndef BUILD_UNINSTALLER')).toBeLessThan(lignes.indexOf('!macro customCheckAppRunning'))
+    expect(lignes.indexOf('!macroend')).toBeLessThan(lignes.indexOf('!endif'))
+    expect(inclus).not.toMatch(/MB_OKCANCEL|appRunning/)
+  })
+
+  it('passe le dossier du programme par l’environnement, et le script de fermeture tient dans une chaîne de NSIS', () => {
+    expect(inclus).toContain(`SetEnvironmentVariable(t "GTRACKER_DOSSIER_PROGRAMME", t "$INSTDIR")`)
+    expect(decoder(commande)).toBe(scriptFermeture())
+    expect(commande.length).toBeLessThan(LONGUEUR_MAX_NSIS - 512)
+    expect(commande).toContain('-NoProfile -NonInteractive -ExecutionPolicy Bypass')
+  })
+
+  it('demande la fermeture, attend, puis force avec les processus fils ; ne vise que le dossier du programme', () => {
+    const script = scriptFermeture()
+    expect([ATTENTE_FERMETURE_S, ATTENTE_FORCE_S]).toEqual([5, 5])
+    expect(script).toContain('$env:GTRACKER_DOSSIER_PROGRAMME')
+    expect(script).toContain('ExecutablePath.StartsWith($dossier, [StringComparison]::OrdinalIgnoreCase)')
+    const demande = script.indexOf('CloseMainWindow()')
+    const premiereAttente = script.indexOf('if (Attendre 5000) { exit 0 }')
+    const force = script.indexOf('Stop-Process -Id $id -Force')
+    expect(demande).toBeGreaterThan(0)
+    expect(premiereAttente).toBeGreaterThan(demande)
+    expect(force).toBeGreaterThan(premiereAttente)
+    expect(script.lastIndexOf('if (Attendre 5000) { exit 0 }')).toBeGreaterThan(force)
+    expect(script).toContain('ParentProcessId')
+    expect(script).toMatch(/exit 1\n\} catch \{ exit 2 \}$/)
+    const reglee = scriptFermeture({ fermetureS: 8, forceS: 3 })
+    expect(reglee).toContain('if (Attendre 8000) { exit 0 }')
+    expect(reglee).toContain('if (Attendre 3000) { exit 0 }')
+    expect(inclusNsis({ fermetureS: 8, forceS: 3 })).toMatch(/Sleep 8000\r\n[\s\S]*Sleep 3000\r\n/)
+  })
+
+  it('fichier écrit en UTF-8 précédé de sa marque : les accents du message restent justes', () => {
+    const octets = octetsInclusNsis()
+    expect([...octets.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
+    expect(octets.subarray(3).toString('utf8')).toBe(inclus)
+    expect(octets.includes(Buffer.from('Réessayer. Annuler garde la version déjà installée.', 'utf8'))).toBe(true)
+  })
+
+  it('codes de nsExec comparés en chaînes : « error » ou « timeout » ne passent jamais pour « 0 »', () => {
+    const tests = lignes.filter((l) => l.includes('${If} $0'))
+    expect(tests.map((l) => l.trim())).toEqual(['${If} $0 S== "0"', '${If} $0 S!= "1"', '${If} $0 S== "1"'])
+  })
+
+  it('sans Windows PowerShell, repli sur taskkill pour l’utilisateur courant : demande, puis force', () => {
+    const douce = lignes.findIndex((l) => l.includes('taskkill /IM'))
+    const forcee = lignes.findIndex((l) => l.includes('taskkill /F /IM'))
+    expect(douce).toBeGreaterThan(lignes.findIndex((l) => l.includes('${If} $0 S!= "1"')))
+    expect(forcee).toBeGreaterThan(douce)
+    expect(lignes[douce]).toContain('/FI "USERNAME eq %USERNAME%"')
+    expect(lignes[forcee]).toContain('"${APP_EXECUTABLE_FILENAME}"')
+  })
+
+  it('pas fermé : message « Réessayer » au premier plan, Annuler quitte en échec sans installer', () => {
+    const message = lignes.find((l) => l.includes('MessageBox')) ?? ''
+    expect(message).toContain('MB_RETRYCANCEL')
+    expect(message).toContain('MB_TOPMOST|MB_SETFOREGROUND')
+    expect(message).toContain('/SD IDCANCEL IDRETRY gtracker_fermer')
+    expect(message).toContain(MESSAGE_NON_FERME)
+    expect(MESSAGE_NON_FERME).toContain('cliquez sur Réessayer')
+    const suite = lignes.slice(lignes.indexOf(message) + 1, lignes.indexOf(message) + 3).map((l) => l.trim())
+    expect(suite).toEqual(['SetErrorLevel 2', 'Quit'])
   })
 })
 

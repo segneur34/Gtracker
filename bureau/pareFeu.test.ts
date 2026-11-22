@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import type { ReleveWindows, RegleRelevee } from './pareFeu'
-import { REGLE_TCP, REGLE_UDP, VARIABLE_EXE, jugerPareFeu, lireReleve, normaliserChemin, scriptAutorisation, scriptRegles, scriptReleve } from './pareFeu'
+import type { ReleveWindows, RegleRelevee, SortiePowershell } from './pareFeu'
+import {
+  DELAI_RELEVE_MS,
+  REGLE_TCP,
+  REGLE_UDP,
+  VARIABLE_EXE,
+  jugerPareFeu,
+  lectureDeSortie,
+  lireReleve,
+  normaliserChemin,
+  releveRate,
+  scriptAutorisation,
+  scriptRegles,
+  scriptReleve,
+} from './pareFeu'
 
 const EXE = 'C:\\Users\\Ana\\AppData\\Local\\Programs\\Gtracker\\Gtracker.exe'
 const ENV = { LOCALAPPDATA: 'C:\\Users\\Ana\\AppData\\Local' }
@@ -167,6 +180,45 @@ describe('lecture du relevé', () => {
       regles: [{ programme: EXE, action: 'autoriser' }, { action: 1, activee: true, profils: 4, protocole: 17 }],
     })
     expect(lireReleve(json)?.regles).toEqual([{ programme: '', action: 1, activee: true, profils: 4, protocole: 17, ports: '', distantes: '', interfaces: '' }])
+  })
+})
+
+describe('fin du Windows PowerShell du relevé', () => {
+  const contexte = { adresses: [PARTAGE], port: 48217, portSonde: 48218, exe: EXE, env: ENV }
+  const sortie = (patch: Partial<SortiePowershell> = {}): SortiePowershell => ({ code: 0, stdout: '', delaiDepasse: false, message: '', erreur: '', ...patch })
+  const message = `Command failed: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe ${EXE}`
+
+  it('relevé lu : le jugement, tel que le rend jugerPareFeu', () => {
+    const lecture = lectureDeSortie(sortie({ stdout: JSON.stringify(releve()) }), contexte)
+    expect(lecture).toEqual({ pareFeu: 'bloque', reparable: true })
+    expect(releveRate(lecture)).toBe(false)
+  })
+
+  it('délai de trente secondes, dit dans la raison', () => {
+    expect(DELAI_RELEVE_MS).toBe(30_000)
+    expect(lectureDeSortie(sortie({ code: -1, delaiDepasse: true, message }), contexte)).toEqual({ raison: 'délai de 30 s dépassé' })
+    expect(lectureDeSortie(sortie({ code: -1, delaiDepasse: true }), contexte, 12_000)).toEqual({ raison: 'délai de 12 s dépassé' })
+  })
+
+  it('code de sortie, lancement impossible, sortie illisible : la raison, sans chemin ni contenu de la sortie', () => {
+    const raisons = [
+      lectureDeSortie(sortie({ code: 1, stdout: EXE, message }), contexte),
+      lectureDeSortie(sortie({ code: -1, erreur: 'ENOENT', message }), contexte),
+      lectureDeSortie(sortie({ code: -1, message }), contexte),
+      lectureDeSortie(sortie({ stdout: `accès refusé : ${EXE}` }), contexte),
+      lectureDeSortie(sortie({ stdout: '[]' }), contexte),
+    ]
+    expect(raisons).toEqual([
+      { raison: 'Windows PowerShell a rendu le code 1' },
+      { raison: 'Windows PowerShell en échec (ENOENT)' },
+      { raison: 'Windows PowerShell en échec' },
+      { raison: `sortie illisible (${`accès refusé : ${EXE}`.length} caractères)` },
+      { raison: 'sortie illisible (2 caractères)' },
+    ])
+    for (const r of raisons) {
+      expect(releveRate(r)).toBe(true)
+      expect(JSON.stringify(r)).not.toContain('Ana')
+    }
   })
 })
 
