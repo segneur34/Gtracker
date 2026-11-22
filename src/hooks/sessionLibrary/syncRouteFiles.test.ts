@@ -121,6 +121,63 @@ describe('synchronisation des itinéraires, de bout en bout', () => {
     expect(said(outcome)).toContain("1 itinéraire supprimé sur l'ordinateur : retiré du téléphone.");
   });
 
+  // Le nom de fichier d'un itinéraire vient de son nom affiché : un itinéraire créé au même lieu le même jour, sans
+  // nom saisi, reprend celui d'un itinéraire supprimé juste avant. La suppression ne doit pas l'en empêcher.
+  it('supprimé sur l’ordinateur puis un autre rangé sous le même nom : retiré du téléphone, le neuf copié, puis plus rien à faire', async () => {
+    const pair = await syncedPair(1);
+    await trashOnComputer(pair, 'r0');
+    putRoute(pair.computer, 'r0', iso(5), iso(5), { lat: 44 });
+    const outcome = await run(pair, { confirmDeletions: true });
+    expect(outcome.routes.skipped).toEqual([]);
+    expect(outcome.complete).toBe(true);
+    expect(await routesOf(pair.phone)).toEqual(['r0-2']);
+    expect(pair.phone.text(routePath('r0-2.json'))).toBe(pair.computer.text(routePath('r0.json')));
+    expect(said(outcome)).toContain("1 itinéraire supprimé sur l'ordinateur : retiré du téléphone.");
+    expect(baseOf(pair)?.routes.map((r) => r.id)).toEqual([iso(5)]);
+    const next = await run(pair);
+    expect([next.routes.done, next.routes.skipped]).toEqual([[], []]);
+    expect(await routesOf(pair.phone)).toEqual(['r0-2']);
+    expect(await routesOf(pair.computer)).toEqual(['r0']);
+  });
+
+  it('supprimé sur le téléphone puis un autre rangé sous le même nom : à la corbeille de l’ordinateur, le neuf copié, puis plus rien à faire', async () => {
+    const pair = await syncedPair(1);
+    dropRoute(pair.phone, 'r0');
+    putRoute(pair.phone, 'r0', iso(5), iso(5), { lat: 44 });
+    const outcome = await run(pair, { confirmDeletions: true });
+    expect(outcome.routes.skipped).toEqual([]);
+    expect(outcome.complete).toBe(true);
+    expect(await routesOf(pair.computer)).toEqual(['r0-2']);
+    expect(pair.computer.text(routePath('r0-2.json'))).toBe(pair.phone.text(routePath('r0.json')));
+    expect(trashOf(pair).find((e) => e.kind === 'itineraire')).toMatchObject({ createdAt: iso(0), origin: 'ordinateur' });
+    expect(baseOf(pair)?.routes.map((r) => r.id)).toEqual([iso(5)]);
+    const next = await run(pair);
+    expect([next.routes.done, next.routes.skipped]).toEqual([[], []]);
+    expect(await routesOf(pair.computer)).toEqual(['r0-2']);
+    expect(await routesOf(pair.phone)).toEqual(['r0']);
+  });
+
+  it('listage en retard : le même itinéraire encore là sous ce nom, ou une fiche illisible, retient la suppression', async () => {
+    const back = await syncedPair(1);
+    await trashOnComputer(back, 'r0');
+    // Remis sur l'ordinateur juste après le listage, le même itinéraire n'est pas retiré du téléphone.
+    const kept = await run(back, { confirmDeletions: true, onPlanned: () => putRoute(back.computer, 'r0', iso(0), iso(0)) });
+    expect(kept.routes.skipped.map((i) => i.id)).toEqual([iso(0)]);
+    expect(await routesOf(back.phone)).toEqual(['r0']);
+
+    const unreadable = await syncedPair(1);
+    await trashOnComputer(unreadable, 'r0');
+    const held = await run(unreadable, { confirmDeletions: true, onPlanned: () => unreadable.computer.put(routePath('r0.json'), '{ pas une fiche') });
+    expect(held.routes.skipped.map((i) => i.id)).toEqual([iso(0)]);
+    expect(await routesOf(unreadable.phone)).toEqual(['r0']);
+
+    const mirror = await syncedPair(1);
+    dropRoute(mirror.phone, 'r0');
+    const stays = await run(mirror, { confirmDeletions: true, onPlanned: () => putRoute(mirror.phone, 'r0', iso(0), iso(0)) });
+    expect(stays.routes.skipped.map((i) => i.id)).toEqual([iso(0)]);
+    expect(await routesOf(mirror.computer)).toEqual(['r0']);
+  });
+
   it('supprimé sur l’ordinateur mais changé sur le téléphone depuis : la modification revient', async () => {
     const pair = await syncedPair(1);
     await trashOnComputer(pair, 'r0');

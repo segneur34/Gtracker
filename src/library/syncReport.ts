@@ -161,7 +161,7 @@ const routeLines = (outcome: SyncOutcome): { lines: string[]; retry: boolean } =
     lines.push(tn(inTrash, "{n} itinéraire de la corbeille de l'ordinateur est encore sur le téléphone : laissé sur le téléphone.", "{n} itinéraires de la corbeille de l'ordinateur sont encore sur le téléphone : laissés sur le téléphone."));
   }
   if (routes.skipped.length > 0) {
-    lines.push(tn(routes.skipped.length, '{n} itinéraire laissé pour la prochaine fois : il a changé pendant la synchronisation.', '{n} itinéraires laissés pour la prochaine fois : ils ont changé pendant la synchronisation.'));
+    lines.push(tn(routes.skipped.length, '{n} itinéraire non synchronisé cette fois : il a été modifié pendant l’opération. Il le sera au prochain « Synchroniser ».', '{n} itinéraires non synchronisés cette fois : ils ont été modifiés pendant l’opération. Ils le seront au prochain « Synchroniser ».'));
   }
   if (routes.failed.length > 0) {
     const list = [...new Set(routes.failed.map((f) => f.detail.replace(/\.\s*$/, '')))].join(' ; ');
@@ -266,7 +266,7 @@ export const describeSync = (outcome: SyncOutcome, channel: PhoneLinkChannel = '
   }
   if (outcome.skipped.length > 0) {
     retry = true;
-    lines.push(tn(outcome.skipped.length, '{n} session laissée pour la prochaine fois : elle a changé pendant la synchronisation.', '{n} sessions laissées pour la prochaine fois : elles ont changé pendant la synchronisation.'));
+    lines.push(tn(outcome.skipped.length, '{n} session non synchronisée cette fois : elle a été modifiée pendant l’opération. Elle le sera au prochain « Synchroniser ».', '{n} sessions non synchronisées cette fois : elles ont été modifiées pendant l’opération. Elles le seront au prochain « Synchroniser ».'));
   }
   const unknown = outcome.unknownActivities.filter((u) => u.side === 'computer').length;
   if (unknown > 0) {

@@ -107,7 +107,7 @@ describe('compte rendu de la synchronisation', () => {
     const text = describeSync(outcomeOf([], { failed: [{ item: broken, detail: 'Disque plein.' }], skipped: [broken], linkLost: 'perdu', complete: false }));
     expect(text.retry).toBe(true);
     expect(text.paragraphs).toEqual([
-      '1 session laissée pour la prochaine fois : elle a changé pendant la synchronisation.',
+      '1 session non synchronisée cette fois : elle a été modifiée pendant l’opération. Elle le sera au prochain « Synchroniser ».',
       "1 session n'a pas pu être écrite sur l'ordinateur (Disque plein).",
       'Le téléphone a été débranché pendant la synchronisation. Ce qui est fait est gardé : rebranchez-le, puis cliquez sur « Réessayer » pour finir.',
     ]);
@@ -184,7 +184,7 @@ describe('compte rendu et questions des itinéraires', () => {
     expect(said.paragraphs).toEqual([
       'Les itinéraires attendent le câble ou la mise à jour du téléphone.',
       "3 itinéraires laissés tels quels : illisibles, ou d'une version plus récente de Gtracker.",
-      '1 itinéraire laissé pour la prochaine fois : il a changé pendant la synchronisation.',
+      '1 itinéraire non synchronisé cette fois : il a été modifié pendant l’opération. Il le sera au prochain « Synchroniser ».',
     ]);
     expect(said.retry).toBe(true);
   });

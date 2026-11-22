@@ -321,6 +321,35 @@ describe('suivi', () => {
     expect(itemOf(plan, iso(0))).toMatchObject({ case: 'deletedOnBoth', ops: [], base: { kind: 'forget' } });
     expect(pair.base?.routes).toEqual([]);
   });
+
+  // Le nom de fichier d'un itinéraire vient de son nom affiché : un itinéraire créé au même lieu le même jour, sans
+  // nom saisi, reprend celui d'un itinéraire supprimé juste avant.
+  it('supprimé sur l’ordinateur puis un autre rangé sous le même nom : l’ancien est retiré du téléphone, le neuf y est copié sous un nom libre', async () => {
+    const pair = await syncedPair(1);
+    trashRoute(pair, 'r0');
+    putRoute(pair.computer, 'r0', iso(5), iso(5), { lat: 44 });
+    const plan = await run(pair);
+    expect(itemOf(plan, iso(0))).toMatchObject({ case: 'deletedOnComputer', ops: [{ kind: 'removeFromPhone', files: { base: 'r0' }, absent: 'r0.json' }] });
+    expect(itemOf(plan, iso(5))).toMatchObject({ case: 'newOnComputer', ops: [{ kind: 'copy', to: 'phone', base: 'r0-2' }] });
+    expect(await routesOf(pair.phone)).toEqual(['r0-2']);
+    expect(pair.phone.text(routePath('r0-2.json'))).toBe(pair.computer.text(routePath('r0.json')));
+    expect(pair.base?.routes).toMatchObject([{ id: iso(5), computer: { json: { name: 'r0.json' } }, phone: { json: { name: 'r0-2.json' } } }]);
+    expect((await run(pair)).items).toEqual([]);
+  });
+
+  it('supprimé sur le téléphone puis un autre rangé sous le même nom : l’ancien va à la corbeille de l’ordinateur, le neuf y est copié sous un nom libre', async () => {
+    const pair = await syncedPair(1);
+    dropRoute(pair.phone, 'r0');
+    putRoute(pair.phone, 'r0', iso(5), iso(5), { lat: 44 });
+    const plan = await run(pair);
+    expect(itemOf(plan, iso(0))).toMatchObject({ case: 'deletedOnPhone', ops: [{ kind: 'trash', files: { base: 'r0' }, absent: 'r0.json' }] });
+    expect(itemOf(plan, iso(5))).toMatchObject({ case: 'newOnPhone', ops: [{ kind: 'copy', to: 'computer', base: 'r0-2' }] });
+    expect(await routesOf(pair.computer)).toEqual(['r0-2']);
+    expect(pair.computer.text(routePath('r0-2.json'))).toBe(pair.phone.text(routePath('r0.json')));
+    expect(pair.trash).toMatchObject([{ id: iso(0), origin: 'ordinateur', base: 'r0' }]);
+    expect(pair.base?.routes).toMatchObject([{ id: iso(5), computer: { json: { name: 'r0-2.json' } }, phone: { json: { name: 'r0.json' } } }]);
+    expect((await run(pair)).items).toEqual([]);
+  });
 });
 
 describe('corbeille', () => {

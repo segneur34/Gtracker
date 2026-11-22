@@ -149,7 +149,8 @@ export type RouteSyncOp =
   | { kind: 'copy'; to: SyncSideName; source: SyncRouteListed; base: string; replaces: { json: SyncStamp | null; gpx: SyncStamp | null } }
   /**
    * Itinéraire de l'ordinateur mis à sa corbeille (origine `ordinateur`), fiche puis GPX : supprimé sur le téléphone.
-   * `absent` : la fiche qui ne doit plus être sur le téléphone ; si elle y est (listage en retard), ne rien faire.
+   * `absent` : la fiche qui ne doit plus être sur le téléphone ; si elle y tient encore cet itinéraire (listage en
+   * retard), ou ne se lit pas, ne rien faire. Un autre itinéraire rangé depuis sous ce nom n'empêche rien.
    */
   | { kind: 'trash'; files: SyncRouteListed; absent: string | null }
   /**

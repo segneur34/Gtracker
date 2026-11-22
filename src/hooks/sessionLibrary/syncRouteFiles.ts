@@ -143,6 +143,18 @@ export const executeRoutePlan = async (
     const at = await statOf(side, name);
     if (replaced === null ? at !== null : !at || !sameFileStat(at, replaced)) throw new StaleRouteError(name);
   };
+  /**
+   * Renonce si l'itinéraire que la suppression croit parti de ce côté y est encore sous ce nom (listage en retard) :
+   * la fiche porte son identité, ou ne se lit pas (prudence). Un autre itinéraire rangé depuis sous le même nom, que
+   * le nom de fichier tiré du nom affiché rend courant (même lieu, même jour, sans nom saisi), ne la retient pas.
+   * Pour le téléphone, son listage doit avoir été relu avant.
+   */
+  const expectGone = async (side: SyncSideName, name: string | null, id: string): Promise<void> => {
+    if (name === null || !(await statOf(side, name))) return;
+    const text = await folders[side].readText(routePath(name));
+    const record = text === null ? null : parseRouteRecord(text);
+    if (!record || syncRouteId(record.createdAt, name.replace(/\.json$/i, '')) === id) throw new StaleRouteError(name);
+  };
   const bytesOf = async (side: SyncSideName, name: string): Promise<Uint8Array> => {
     const bytes = await folders[side].readBytes(routePath(name));
     if (!bytes) throw new StaleRouteError(name);
@@ -217,7 +229,7 @@ export const executeRoutePlan = async (
       }
       case 'trash': {
         await folders.phone.list(ROUTES_DIR);
-        if (op.absent !== null && (await statOf('phone', op.absent))) throw new StaleRouteError(op.absent);
+        await expectGone('phone', op.absent, item.id);
         const read = await readFiles('computer', op.files);
         await stash(item, 'ordinateur', op.files, read);
         await remove('computer', op.files.json);
@@ -226,7 +238,7 @@ export const executeRoutePlan = async (
         return;
       }
       case 'removeFromPhone': {
-        if (op.absent !== null && (await statOf('computer', op.absent))) throw new StaleRouteError(op.absent);
+        await expectGone('computer', op.absent, item.id);
         // Le listage du téléphone est relu : rien n'en part qui ne soit encore, à l'identique, ce que le plan a vu.
         await folders.phone.list(ROUTES_DIR);
         await expect('phone', op.files.json);
