@@ -16,8 +16,8 @@ import { SYNC_SIDES, otherSyncSide, type SyncSideName } from './syncBase';
  * ne refait que ce qui manque, sans base à tenir. Rien n'est jamais supprimé, d'aucun côté.
  *
  * Fichiers de réglages : recopiés comme des fichiers, jamais adoptés. Aucune valeur de réglage d'un appareil ne
- * change : le fichier reçu est seulement proposé par l'appareil (« Nouveau fichier de réglages »), et seul
- * « Reprendre » l'adopte.
+ * change : les réglages reçus sont seulement proposés par l'appareil qui les reçoit, et ne s'adoptent que sur la
+ * réponse de l'utilisateur.
  * - Un fichier que l'autre côté n'a pas lui est recopié, sauf s'il ne se lit pas, s'il porte l'identifiant de
  *   l'appareil qui le recevrait (chaque appareil écrit seul son fichier), ou si ce côté a déjà, sous un autre nom,
  *   un fichier du même appareil au moins aussi récent (appareil renommé : l'ancien nom ne revient pas ; renommé sans

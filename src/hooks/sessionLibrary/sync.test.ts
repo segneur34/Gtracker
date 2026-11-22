@@ -313,7 +313,7 @@ describe('exécutant de la synchronisation', () => {
     expect(await syncSessionFiles(pair.computer)).not.toContain(fileOf(15));
     expect(trashOf(pair).some((e) => e.startMs === at(15))).toBe(true);
     expect(half.withheldForPhone).toHaveLength(12);
-    expect(describeSync(half).paragraphs).toContain('12 changements attendent le câble ou la mise à jour du téléphone.');
+    expect(describeSync(half).notes.map((n) => n.text)).toContain("Le Gtracker du téléphone est trop ancien pour recevoir par le Wi-Fi : mettez-le à jour (Réglages › Application du téléphone). 12 sessions l'attendent.");
     // Par le câble, les douze retraits du téléphone dépassent le garde-fou.
     const whole = await run(pair);
     expect(whole).toMatchObject({ deletions: 'awaitingConfirmation' });
@@ -529,15 +529,17 @@ describe('ce que la couche du bouton reçoit', () => {
     await trashOnComputer(pair, 2);
     const first = await run(pair);
     const question = describeSyncQuestion(first);
-    expect(question).toMatchObject({ kind: 'inTrash', count: 1, sessions: [{ startMs: at(2), side: 'phone', file: fileOf(2) }] });
-    // « Les laisser » : rien ne change, la question revient.
+    expect(question).toMatchObject({ kind: 'inTrash', sessions: [{ startMs: at(2), side: 'phone', file: fileOf(2) }] });
+    // Sans réponse : rien ne change, la question revient.
     expect(describeSyncQuestion(await run(pair))?.kind).toBe('inTrash');
     const second = await run(pair, { heldOnPhone: 'remove' });
     expect(second.done.find((i) => i.startMs === at(2))?.case).toBe('deletedOnComputer');
     expect(await syncSessionFiles(pair.phone)).not.toContain(fileOf(2));
     expect(trashOf(pair).some((e) => e.startMs === at(2))).toBe(true);
     expect(describeSyncQuestion(second)).toBeNull();
-    expect(describeSync(second).paragraphs).toContain("1 session supprimée sur l'ordinateur : retirée du téléphone.");
+    expect(describeSync(second).rows).toContainEqual(expect.objectContaining({
+      label: 'Supprimé', text: "1 session supprimée sur l'ordinateur, retirée du téléphone : elle reste 30 jours dans la corbeille de l'ordinateur",
+    }));
   });
 
   it('« Retirer du téléphone » d’une session déjà dans la corbeille : une seule entrée si les fichiers sont les mêmes, la copie du téléphone à part sinon', async () => {
@@ -598,14 +600,16 @@ describe('ce que la couche du bouton reçoit', () => {
     const pair = await syncedPair(20);
     for (let k = 0; k < 8; k++) deleteSyncSession(pair.phone, fileOf(k));
     const shown = describeSyncQuestion(await run(pair));
-    expect(shown).toMatchObject({ kind: 'guard', count: 8 });
+    expect(shown).toMatchObject({ kind: 'guard' });
+    expect(shown?.sessions).toHaveLength(8);
     const keys = (shown?.sessions ?? []).map((s) => ({ startMs: s.startMs, side: s.side }));
     // La fenêtre attend ; une session de plus est supprimée sur le téléphone avant la réponse.
     deleteSyncSession(pair.phone, fileOf(8));
     const stale = await run(pair, { confirmDeletions: true, confirmedDeletions: keys });
     expect(stale.deletions).toBe('awaitingConfirmation');
     expect(await syncSessionFiles(pair.computer)).toHaveLength(20);
-    expect(describeSyncQuestion(stale)).toMatchObject({ kind: 'guard', count: 9 });
+    expect(describeSyncQuestion(stale)).toMatchObject({ kind: 'guard' });
+    expect(describeSyncQuestion(stale)?.sessions).toHaveLength(9);
     // Les mêmes, ou moins que ce qui a été montré : elle part.
     const all = [...keys, { startMs: at(8), side: 'computer' as const }, { startMs: at(9), side: 'computer' as const }];
     const made = await run(pair, { confirmDeletions: true, confirmedDeletions: all });
@@ -621,7 +625,7 @@ describe('ce que la couche du bouton reçoit', () => {
     const half = await run(pair, { phoneWritable: false });
     expect(describeSyncQuestion(half)).toBeNull();
     expect(half.withheldForPhone.map((i) => i.startMs)).toEqual([at(7)]);
-    expect(describeSync(half, 'sansFil').paragraphs).toContain('1 changement attend le câble ou la mise à jour du téléphone.');
+    expect(describeSync(half).notes.map((n) => n.text)).toContain("Le Gtracker du téléphone est trop ancien pour recevoir par le Wi-Fi : mettez-le à jour (Réglages › Application du téléphone). 1 session l'attend.");
   });
 });
 

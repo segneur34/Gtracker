@@ -5,8 +5,9 @@ import type { RouteSyncItem } from '../../library/syncRoutes';
 import type { SyncLockOptions } from './sync';
 
 /**
- * La couche du bouton « Synchroniser » : étapes publiées, options passées à la synchronisation, questions et relances,
- * ligne de l'arrivée. Le téléphone et la synchronisation elle-même sont simulés (l'exécutant a ses propres tests).
+ * La couche du bouton « Synchroniser » : étapes publiées, options passées à la synchronisation, questions et réponses,
+ * reprise sans recherche du téléphone, reprise automatique d'un élément changé en route, ligne de l'arrivée. Le
+ * téléphone et la synchronisation elle-même sont simulés (l'exécutant a ses propres tests).
  */
 
 type State =
@@ -21,6 +22,17 @@ const held: SyncItem = {
   startMs: 1, case: 'deletedOnComputer', files: { computer: null, phone: 'a.gpx' }, ops: [], base: { kind: 'hold' }, left: 'inTrash',
   conflicts: [], twoTracks: false, withoutAncestor: false,
 };
+
+const stamp = (name: string) => ({ name, size: 10, mtimeMs: 0 });
+const sent: SyncItem = {
+  startMs: 2, case: 'newOnComputer', files: { computer: 'b.gpx', phone: null }, base: { kind: 'keep' }, left: null,
+  ops: [{ kind: 'copy', to: 'phone', source: { gpx: stamp('b.gpx'), record: null, imu: null }, target: { gpx: 'b.gpx', record: null, imu: null }, recordText: null }],
+  conflicts: [], twoTracks: false, withoutAncestor: false,
+};
+
+const synced = (patch: Partial<SyncOutcome> = {}): SyncOutcome => ({ ...emptySyncOutcome(null), phoneWritable: true, ...patch });
+const inTrash = (): SyncOutcome => synced({ plan: { items: [held] } as never, done: [held] });
+const guarded = (): SyncOutcome => synced({ deletions: 'awaitingConfirmation', withheldDeletions: [held] });
 
 const load = async () => {
   vi.resetModules();
@@ -40,7 +52,7 @@ const load = async () => {
       calls.push(options);
       options.onPlanned?.({} as never, 'noBase');
       options.onProgress?.(3, 5);
-      return outcomes.shift() ?? { ...emptySyncOutcome(null), phoneWritable: true, complete: true };
+      return outcomes.shift() ?? synced({ complete: true });
     },
   }));
   return import('./phoneSync');
@@ -103,41 +115,77 @@ describe('bouton « Synchroniser »', () => {
     expect(calls).toEqual([]);
     expect(sync.phoneSyncStep()).toEqual({ step: 'over', result: { kind: 'phone', state: 'absent' } });
   });
+});
 
-  it('corbeille puis garde-fou : « Retirer du téléphone » relance, et la confirmation garde ce choix', async () => {
-    outcomes = [
-      { ...emptySyncOutcome(null), phoneWritable: true, plan: { items: [held] } as never, done: [held] },
-      { ...emptySyncOutcome(null), phoneWritable: true, deletions: 'awaitingConfirmation', withheldDeletions: [held] },
-    ];
+describe('questions et réponses', () => {
+  it('une réponse repart sans repasser par la recherche du téléphone, et le compte rendu reprend la première passe', async () => {
+    outcomes = [synced({ done: [sent], deletions: 'awaitingConfirmation', withheldDeletions: [held] })];
     const sync = await load();
     await sync.synchronizeWithPhone();
-    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'inTrash', count: 1 } });
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard' } });
+    const answered = sync.answerPhoneSyncQuestion('deleteBoth');
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'copying', phone: 'Xiaomi', channel: 'cable', done: 0, total: 0, first: false });
+    await answered;
+    const step = sync.phoneSyncStep();
+    expect(step.step).toBe('over');
+    // La session envoyée à la première passe est encore dans le compte rendu de la seconde.
+    expect(step.step === 'over' && step.result.kind === 'synced' && step.result.outcome.done.map((i) => i.startMs)).toEqual([2]);
+  });
+
+  it('« Tout garder » : les suppressions montrées partent comme refusées, aucune confirmation', async () => {
+    outcomes = [guarded()];
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    await sync.answerPhoneSyncQuestion('keepAll');
+    expect(calls[1]).toMatchObject({ keepRefused: { sessions: [{ startMs: 1, side: 'phone' }], routes: [] }, confirmDeletions: false });
+    expect(calls[1].confirmedDeletions).toBeUndefined();
+    expect(sync.phoneSyncStep().step).toBe('over');
+  });
+
+  it('« Les garder » : les sessions et itinéraires montrés sortent de la corbeille', async () => {
+    outcomes = [inTrash()];
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    await sync.answerPhoneSyncQuestion('keepHeld');
+    expect(calls[1]).toMatchObject({ heldOnPhone: 'keep', heldToKeep: [1], heldRoutesToKeep: [] });
+    expect(calls[1].heldToRemove).toBeUndefined();
+  });
+
+  it('une réponse qui n’est pas celle de la question posée est sans effet', async () => {
+    outcomes = [inTrash()];
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    await sync.answerPhoneSyncQuestion('keepAll');
+    await sync.answerPhoneSyncQuestion('deleteBoth');
+    expect(calls).toHaveLength(1);
+    expect(sync.phoneSyncStep().step).toBe('question');
+  });
+
+  it('corbeille puis garde-fou : « Les retirer du téléphone » relance, et la confirmation garde ce choix', async () => {
+    outcomes = [inTrash(), guarded()];
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'inTrash' } });
     await sync.answerPhoneSyncQuestion('removeHeld');
     expect(calls[1].heldOnPhone).toBe('remove');
-    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard', count: 1 } });
-    await sync.answerPhoneSyncQuestion('confirmDeletions');
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard' } });
+    await sync.answerPhoneSyncQuestion('deleteBoth');
     expect(calls[2]).toMatchObject({ heldOnPhone: 'remove', confirmDeletions: true });
     expect(sync.phoneSyncStep().step).toBe('over');
   });
 
-  it('garde-fou puis corbeille : la confirmation donnée ne couvre pas « Retirer du téléphone », qui rouvre le garde-fou', async () => {
-    const guarded = { ...emptySyncOutcome(null), phoneWritable: true, deletions: 'awaitingConfirmation' as const, withheldDeletions: [held] };
-    outcomes = [
-      guarded,
-      { ...emptySyncOutcome(null), phoneWritable: true, plan: { items: [held] } as never, done: [held] },
-      guarded,
-    ];
+  it('garde-fou puis corbeille : la confirmation donnée ne couvre pas « Les retirer du téléphone », qui rouvre le garde-fou', async () => {
+    outcomes = [guarded(), inTrash(), guarded()];
     const sync = await load();
     await sync.synchronizeWithPhone();
-    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard' } });
-    await sync.answerPhoneSyncQuestion('confirmDeletions');
+    await sync.answerPhoneSyncQuestion('deleteBoth');
     // Chaque réponse emporte la liste que sa question a montrée.
     expect(calls[1]).toMatchObject({ confirmDeletions: true, confirmedDeletions: [{ startMs: 1, side: 'phone' }] });
     expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'inTrash' } });
     await sync.answerPhoneSyncQuestion('removeHeld');
     expect(calls[2]).toMatchObject({ heldOnPhone: 'remove', heldToRemove: [1], confirmDeletions: false, confirmedDeletions: undefined });
     expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard' } });
-    await sync.answerPhoneSyncQuestion('confirmDeletions');
+    await sync.answerPhoneSyncQuestion('deleteBoth');
     expect(calls[3]).toMatchObject({ heldOnPhone: 'remove', confirmDeletions: true });
     expect(sync.phoneSyncStep().step).toBe('over');
   });
@@ -149,28 +197,98 @@ describe('bouton « Synchroniser »', () => {
     };
     const routes = (patch: Partial<SyncOutcome['routes']>): SyncOutcome['routes'] => ({ ...emptySyncOutcome(null).routes, ...patch });
     outcomes = [
-      { ...emptySyncOutcome(null), phoneWritable: true, deletions: 'awaitingConfirmation', withheldDeletions: [held], routes: routes({ withheldDeletions: [route] }) },
-      { ...emptySyncOutcome(null), phoneWritable: true, routes: routes({ plan: { items: [route], aside: [] } as never }) },
+      synced({ deletions: 'awaitingConfirmation', withheldDeletions: [held], routes: routes({ withheldDeletions: [route] }) }),
+      synced({ routes: routes({ plan: { items: [route], aside: [] } as never }) }),
     ];
     const sync = await load();
     await sync.synchronizeWithPhone();
-    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard', count: 2, text: "Cette synchronisation retirerait 1 session et 1 itinéraire. Rien n'est encore supprimé." } });
-    await sync.answerPhoneSyncQuestion('confirmDeletions');
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard', routes: [{ id: route.id, side: 'phone', label: 'tour' }] } });
+    await sync.answerPhoneSyncQuestion('deleteBoth');
     expect(calls[1]).toMatchObject({ confirmedDeletions: [{ startMs: 1, side: 'phone' }], confirmedRouteDeletions: [{ id: route.id, side: 'phone' }] });
-    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'inTrash', count: 1 } });
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'inTrash' } });
     await sync.answerPhoneSyncQuestion('removeHeld');
     expect(calls[2]).toMatchObject({ heldOnPhone: 'remove', heldToRemove: [], heldRoutesToRemove: [route.id], confirmedRouteDeletions: undefined });
   });
 
-  it('« Annuler » ou « Les laisser » : rien n’est relancé, le compte rendu de ce qui est fait s’affiche', async () => {
-    outcomes = [{ ...emptySyncOutcome(null), phoneWritable: true, plan: { items: [held] } as never, done: [held] }];
+  it('fermer la question ne décide rien : compte rendu de ce qui est fait, « Répondre » y revient, rien n’est relancé', async () => {
+    outcomes = [guarded()];
     const sync = await load();
     await sync.synchronizeWithPhone();
-    await sync.answerPhoneSyncQuestion('leave');
+    sync.leavePhoneSyncQuestion();
     expect(calls).toHaveLength(1);
-    expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced' } });
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced' }, unanswered: { kind: 'guard' } });
+    sync.reopenPhoneSyncQuestion();
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question', question: { kind: 'guard' } });
+    // Rouvert puis fermé de nouveau, la prochaine synchronisation repart du début et repose la question.
+    sync.leavePhoneSyncQuestion();
+    outcomes = [guarded()];
+    await sync.synchronizeWithPhone();
+    expect(calls).toHaveLength(2);
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'question' });
+  });
+});
+
+describe('réponse qui ne peut pas s’appliquer', () => {
+  it('le téléphone parti avant la réponse : ce qui était fait, la raison, et la question à reprendre', async () => {
+    outcomes = [synced({ done: [sent], deletions: 'awaitingConfirmation', withheldDeletions: [held] })];
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    state = { etat: 'absent' };
+    await sync.answerPhoneSyncQuestion('keepAll');
+    expect(calls).toHaveLength(1);
+    expect(sync.phoneSyncStep()).toMatchObject({
+      step: 'over', result: { kind: 'synced', outcome: { done: [sent] } }, unanswered: { kind: 'guard' },
+      answerFailed: { kind: 'phone', state: 'absent' },
+    });
+    // « Répondre » revient à la question ; la réponse suivante ne garde rien de celle qui a échoué.
+    sync.reopenPhoneSyncQuestion();
+    state = { etat: 'pret', nom: 'Xiaomi', canal: 'cable', ecriture: true, itineraires: true };
+    await sync.answerPhoneSyncQuestion('deleteBoth');
+    expect(calls[1]).toMatchObject({ confirmDeletions: true });
+    expect(calls[1].keepRefused).toBeUndefined();
   });
 
+  it('la synchronisation de la réponse refusée : le refus est dit, la question ne revient pas toute seule', async () => {
+    outcomes = [synced({ done: [sent], deletions: 'awaitingConfirmation', withheldDeletions: [held] }), emptySyncOutcome('busy')];
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    await sync.answerPhoneSyncQuestion('keepAll');
+    const step = sync.phoneSyncStep();
+    expect(step).toMatchObject({ step: 'over', result: { outcome: { done: [sent] } }, unanswered: { kind: 'guard' }, answerFailed: { kind: 'synced', outcome: { refusal: 'busy' } } });
+  });
+});
+
+describe('reprise automatique', () => {
+  it('un élément changé en route est repris une fois, seul, sans recherche du téléphone, avant le compte rendu', async () => {
+    outcomes = [synced({ done: [sent], skipped: [held] }), synced({ done: [held] })];
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    expect(calls).toHaveLength(2);
+    const step = sync.phoneSyncStep();
+    expect(step).toMatchObject({ step: 'over', result: { kind: 'synced', outcome: { skipped: [] } } });
+    expect(step.step === 'over' && step.result.kind === 'synced' && step.result.outcome.done.map((i) => i.startMs)).toEqual([2, 1]);
+  });
+
+  it('changé encore à la reprise : pas de troisième passe, le compte rendu le dit', async () => {
+    outcomes = [synced({ skipped: [held] }), synced({ skipped: [held] })];
+    const sync = await load();
+    await sync.synchronizeWithPhone();
+    expect(calls).toHaveLength(2);
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { outcome: { skipped: [held] } } });
+  });
+
+  it('le téléphone parti avant la reprise : le compte rendu de la première passe reste', async () => {
+    outcomes = [synced({ done: [sent], skipped: [held] })];
+    const sync = await load();
+    const done = sync.synchronizeWithPhone();
+    // L'état du téléphone de la première passe est déjà lu : seule la reprise le trouve parti.
+    state = { etat: 'absent' };
+    await done;
+    expect(sync.phoneSyncStep()).toMatchObject({ step: 'over', result: { kind: 'synced', outcome: { done: [sent], skipped: [held] } } });
+  });
+});
+
+describe('arrivée d’un téléphone', () => {
   it('arrivée par le sans-fil : seulement une ligne, rien ne se lance', async () => {
     const sync = await load();
     sync.notePhoneArrival();

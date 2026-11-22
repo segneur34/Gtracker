@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { routePath } from '../../library/folderLayout';
 import { parseSyncBase, readMarkerId, readMarkerSync, syncBasePath, type SyncBase } from '../../library/syncBase';
-import { describeSync, describeSyncQuestion, syncQuestionConfirmLabel, syncQuestionListLabel } from '../../library/syncReport';
+import { describeQuestion, describeSync, describeSyncQuestion } from '../../library/syncReport';
 import { syncRouteListing } from '../../library/syncRoutes';
 import { TRASH_INDEX_PATH, parseTrashIndex, trashFilePath, type TrashEntry } from '../../library/trash';
 import { dropTrashEntries, emptyTrash, stashInTrash } from '../../library/trashFolder';
@@ -61,7 +61,13 @@ const baseOf = (pair: Pair): SyncBase | null => {
   const read = id ? parseSyncBase(pair.computer.text(syncBasePath(id))) : null;
   return read?.state === 'ok' ? read.base : null;
 };
-const said = (outcome: SyncOutcome): string[] => describeSync(outcome).paragraphs;
+const REMOVED_ONE_ROUTE = "Supprimé : 1 itinéraire supprimé sur l'ordinateur, retiré du téléphone : il reste 30 jours dans la corbeille de l'ordinateur";
+
+/** Ce que dit le compte rendu : ses phrases, ses lignes (« geste : ce qu'il a touché ») et ses exceptions. */
+const said = (outcome: SyncOutcome): string[] => {
+  const report = describeSync(outcome);
+  return [...report.paragraphs, ...report.rows.map((row) => `${row.label} : ${row.text}`), ...report.notes.map((note) => note.text)];
+};
 
 /** Une paire synchronisée avec les itinéraires `r0`… des deux côtés. */
 const syncedPair = async (count: number): Promise<Pair> => {
@@ -82,7 +88,7 @@ describe('synchronisation des itinéraires, de bout en bout', () => {
     expect(await routesOf(pair.phone)).toEqual(['baie', 'tour du cap']);
     expect(pair.phone.text(routePath('tour du cap.json'))).toBe(pair.computer.text(routePath('tour du cap.json')));
     expect(baseOf(pair)?.routes.map((r) => r.id)).toEqual([iso(0), iso(1)]);
-    expect(said(outcome)).toContain("1 itinéraire copié vers le téléphone, 1 vers l'ordinateur.");
+    expect(said(outcome)).toEqual(expect.arrayContaining(['Reçu du téléphone : 1 itinéraire', 'Envoyé au téléphone : 1 itinéraire']));
     expect(readMarkerSync(pair.phone.text('gtracker.json'))).toBe(NOW);
     expect((await run(pair)).routes.done).toEqual([]);
   });
@@ -95,8 +101,7 @@ describe('synchronisation des itinéraires, de bout en bout', () => {
     const outcome = await run(pair);
     expect(updatedOf(pair.phone, 'r0')).toBe(iso(3));
     expect(pair.phone.text(routePath('r0.gpx'))).toBe(pair.computer.text(routePath('r0.gpx')));
-    expect(said(outcome)).toContain('1 itinéraire modifié recopié.');
-    expect(said(outcome)).toContain('Sur le téléphone, touchez « Mettre à jour » pour voir les changements.');
+    expect(said(outcome)).toContain("Modifié : 1 itinéraire, recopié sur l'autre appareil");
   });
 
   it('supprimé sur le téléphone : la copie de l’ordinateur va à sa corbeille', async () => {
@@ -108,7 +113,7 @@ describe('synchronisation des itinéraires, de bout en bout', () => {
     const entry = trashOf(pair).find((e) => e.kind === 'itineraire');
     expect(entry).toMatchObject({ routeBase: 'r1', createdAt: iso(1), origin: 'ordinateur', main: 'r1.json' });
     expect(entry?.files.map((f) => f.name).sort()).toEqual(['r1.gpx', 'r1.json']);
-    expect(said(outcome)).toContain("1 itinéraire supprimé sur le téléphone : mis dans la corbeille de l'ordinateur (30 jours).");
+    expect(said(outcome)).toContain("Supprimé : 1 itinéraire supprimé sur le téléphone : il est dans la corbeille de l'ordinateur pour 30 jours");
     expect(baseOf(pair)?.routes.map((r) => r.id)).toEqual([iso(0)]);
   });
 
@@ -118,7 +123,7 @@ describe('synchronisation des itinéraires, de bout en bout', () => {
     const outcome = await run(pair, { confirmDeletions: true });
     expect(await routesOf(pair.phone)).toEqual(['r1']);
     expect(trashOf(pair).filter((e) => e.kind === 'itineraire')).toHaveLength(1);
-    expect(said(outcome)).toContain("1 itinéraire supprimé sur l'ordinateur : retiré du téléphone.");
+    expect(said(outcome)).toContain(REMOVED_ONE_ROUTE);
   });
 
   // Le nom de fichier d'un itinéraire vient de son nom affiché : un itinéraire créé au même lieu le même jour, sans
@@ -132,7 +137,7 @@ describe('synchronisation des itinéraires, de bout en bout', () => {
     expect(outcome.complete).toBe(true);
     expect(await routesOf(pair.phone)).toEqual(['r0-2']);
     expect(pair.phone.text(routePath('r0-2.json'))).toBe(pair.computer.text(routePath('r0.json')));
-    expect(said(outcome)).toContain("1 itinéraire supprimé sur l'ordinateur : retiré du téléphone.");
+    expect(said(outcome)).toContain(REMOVED_ONE_ROUTE);
     expect(baseOf(pair)?.routes.map((r) => r.id)).toEqual([iso(5)]);
     const next = await run(pair);
     expect([next.routes.done, next.routes.skipped]).toEqual([[], []]);
@@ -205,7 +210,7 @@ describe('synchronisation des itinéraires, de bout en bout', () => {
     putRoute(pair.computer, 'r0', iso(0), iso(2), { lat: 44 });
     const outcome = await run(pair);
     expect(parseRouteRecord(pair.phone.text(routePath('r0.json')) as string)?.version).toBe(ROUTE_VERSION + 1);
-    expect(said(outcome)).toContain("1 itinéraire laissé tel quel : illisible, ou d'une version plus récente de Gtracker.");
+    expect(said(outcome)).toContain("1 itinéraire n'a pas été touché : il vient d'une version plus récente de Gtracker. Installez la dernière version de ce programme.");
   });
 
   it('un itinéraire changé sur le téléphone pendant la synchronisation est laissé pour la fois suivante', async () => {
@@ -227,8 +232,9 @@ describe('synchronisation des itinéraires, de bout en bout', () => {
     const waiting = await run(pair, { phoneRoutes: false });
     expect(await routesOf(pair.phone)).toEqual(['r1']);
     expect(await routesOf(pair.computer)).toEqual(['r0']);
-    expect(said(waiting)).toContain('Les itinéraires attendent le câble ou la mise à jour du téléphone.');
-    expect(said(await run(pair, { phoneRoutes: undefined }))).not.toContain('Les itinéraires attendent le câble ou la mise à jour du téléphone.');
+    const routesWaiting = "Les itinéraires n'ont pas été échangés : Gtracker est trop ancien sur l'un des deux appareils. Installez sa dernière version.";
+    expect(said(waiting)).toContain(routesWaiting);
+    expect(said(await run(pair, { phoneRoutes: undefined }))).not.toContain(routesWaiting);
     expect(baseOf(pair)?.routes).toEqual([]);
   });
 
@@ -242,10 +248,8 @@ describe('synchronisation des itinéraires, de bout en bout', () => {
     expect(held.deletions).toBe('awaitingConfirmation');
     expect(await routesOf(pair.phone)).toHaveLength(12);
     const question = describeSyncQuestion(held);
-    expect(question?.text).toBe("Cette synchronisation retirerait 11 itinéraires. Rien n'est encore supprimé.");
     expect(question?.routes).toHaveLength(11);
-    expect(syncQuestionConfirmLabel(question!)).toBe('Supprimer ces 11 itinéraires');
-    expect(syncQuestionListLabel(question!)).toBe('Voir les 11 itinéraires');
+    expect(describeQuestion(question!).rows.map((row) => `${row.label} : ${row.text}`)).toEqual(["Sur l'ordinateur : 11 itinéraires supprimés"]);
     const shown = question!.routes.map((r) => ({ id: r.id, side: r.side }));
     // Une suppression de plus depuis la question : rien n'est supprimé, la question revient.
     await trashOnComputer(pair, 'r11');
@@ -267,7 +271,9 @@ describe('synchronisation des itinéraires, de bout en bout', () => {
     expect(await routesOf(pair.phone)).toEqual(['r0']);
     const question = describeSyncQuestion(first);
     expect(question?.kind).toBe('inTrash');
-    expect(question?.text).toBe("1 itinéraire supprimé sur l'ordinateur est encore sur le téléphone. Le retirer du téléphone ? Il reste 30 jours dans la corbeille de l'ordinateur.");
+    expect(describeQuestion(question!)).toMatchObject({
+      intro: '1 itinéraire est dans la corbeille de cet ordinateur, mais encore sur le téléphone :', names: ['r0'], removeLabel: 'Le retirer du téléphone',
+    });
     // Un autre itinéraire de la corbeille apparu depuis la question : aucun n'est retiré.
     putRoute(pair.computer, 'r1', iso(1), iso(1));
     await trashOnComputer(pair, 'r1');

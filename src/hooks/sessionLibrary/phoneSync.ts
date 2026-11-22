@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react';
 import { t } from '../../core/i18n';
 import type { SyncOutcome } from '../../library/syncOutcome';
-import type { SyncHeldChoice } from '../../library/syncPlan';
 import {
-  describeSyncQuestion, phoneArrivalText, type PhoneLinkChannel, type PhoneNotReady, type PhoneSyncResult, type SyncQuestion,
+  describeSyncQuestion, mergeSyncPasses, phoneArrivalText, syncHasChangedItems, type PhoneLinkChannel, type PhoneNotReady, type PhoneSyncResult,
+  type SyncQuestion,
 } from '../../library/syncReport';
 import { nativeErrorMessage } from '../../platform/nativeMessages';
 import {
@@ -11,7 +11,9 @@ import {
 } from '../../platform/phoneCable';
 import { wirelessAvailable, wirelessState } from '../../platform/wirelessPhone';
 import { createStore } from '../createStore';
-import { synchronizePhone, type SyncDeletionKey, type SyncLockOptions, type SyncRouteDeletionKey } from './sync';
+import {
+  synchronizePhone, type SyncDeletionKey, type SyncHeldAnswer, type SyncLockOptions, type SyncRouteDeletionKey,
+} from './sync';
 
 /**
  * « Synchroniser », dans le programme Windows : la couche du bouton, sous la fenêtre. Elle cherche le téléphone (relié
@@ -20,19 +22,24 @@ import { synchronizePhone, type SyncDeletionKey, type SyncLockOptions, type Sync
  * (`usePhoneSync`) : la fenêtre peut être fermée et rouverte pendant la synchronisation, qui continue.
  *
  * - Le téléphone n'est écrit que si son canal le sait (`phoneCanWrite` : le câble, ou le Wi-Fi d'un téléphone à jour
- *   qui n'enregistre pas) ; sinon la synchronisation ne fait que la moitié de l'ordinateur, et dit ce qui attend le
- *   câble ou la mise à jour du téléphone, ou que le téléphone enregistre (`phoneIsRecording`).
+ *   qui n'enregistre pas) ; sinon la synchronisation ne fait que la moitié de l'ordinateur, et dit ce qui attend la
+ *   mise à jour du téléphone, ou que le téléphone enregistre (`phoneIsRecording`).
  * - À la première synchronisation d'un téléphone qu'on peut écrire, la coquille copie d'abord les deux dossiers
  *   (`phoneSafetyCopy`) ; si la copie échoue, rien n'est fait.
- * - Une question (garde-fou des suppressions, sessions de la corbeille encore sur le téléphone) arrête sur l'étape
- *   `question` ; la réponse (`answerPhoneSyncQuestion`) relance la synchronisation avec ce qu'elle permet, ou s'en tient
- *   à ce qui est fait.
+ * - Une question (suppressions en nombre, sessions de la corbeille encore sur le téléphone) arrête sur l'étape
+ *   `question`. Ses deux réponses la règlent (`answerPhoneSyncQuestion`) : la synchronisation repart sans repasser par
+ *   la recherche du téléphone, et son compte rendu reprend ce que la première passe avait fait. Fermer la question ne
+ *   décide rien (`leavePhoneSyncQuestion`) : le compte rendu de ce qui est fait le dit, et elle revient.
+ * - Une session, un itinéraire ou un fichier changé pendant l'opération est repris une fois, seul, avant le compte
+ *   rendu : il n'est dit que s'il a encore changé.
  * - Un téléphone relié qui se présente par le sans-fil ne déclenche rien : une ligne invite à « Synchroniser »
  *   (`notePhoneArrival`, `usePhoneArrivalNote`).
  */
 
 /** Chemin du dossier lu sur le téléphone, retenu par la base : un autre chemin ferait une paire neuve. */
 const PHONE_FOLDER_PATH = 'Documents/Gtracker';
+
+type SyncedResult = Extract<PhoneSyncResult, { kind: 'synced' }>;
 
 /** Où en est la synchronisation ; `phone` : le nom du téléphone, `channel` : par où il est lu. */
 export type PhoneSyncStep =
@@ -43,16 +50,20 @@ export type PhoneSyncStep =
   | { step: 'safetyCopy'; phone: string; channel: PhoneLinkChannel }
   /** `done` fichiers de sessions traités sur `total` ; `first` : première synchronisation, rien n'est supprimé. */
   | { step: 'copying'; phone: string; channel: PhoneLinkChannel; done: number; total: number; first: boolean }
-  /** Une question attend sa réponse ; `result` : ce qui a déjà été fait, montré si l'on s'en tient là. */
-  | { step: 'question'; question: SyncQuestion; result: Extract<PhoneSyncResult, { kind: 'synced' }> }
-  | { step: 'over'; result: PhoneSyncResult };
+  /** Une question attend sa réponse ; `result` : ce qui a déjà été fait. */
+  | { step: 'question'; question: SyncQuestion; result: SyncedResult }
+  /**
+   * L'issue ; `unanswered` : la question fermée sans réponse, ou dont la réponse n'a pas pu s'appliquer, que le compte
+   * rendu rappelle ; `answerFailed` : la passe de cette réponse, qui n'a rien pu faire (le compte rendu dit pourquoi).
+   */
+  | { step: 'over'; result: PhoneSyncResult; unanswered?: SyncQuestion; answerFailed?: PhoneSyncResult };
 
 /**
- * Réponse à une question : au garde-fou, `withoutDeletions` (« Synchroniser sans rien supprimer »),
- * `confirmDeletions` (« Supprimer ces N sessions ») ou `cancel` ; aux sessions de la corbeille encore sur le
- * téléphone, `removeHeld` (« Retirer du téléphone ») ou `leave` (« Les laisser » : la question reviendra).
+ * Réponse à une question : aux suppressions en nombre, `keepAll` (« Tout garder » : chacune est défaite là où elle a
+ * été faite) ou `deleteBoth` (« Supprimer des deux côtés ») ; aux sessions de la corbeille encore sur le téléphone,
+ * `keepHeld` (« Les garder » : elles sortent de la corbeille) ou `removeHeld` (« Les retirer du téléphone »).
  */
-export type PhoneSyncAnswer = 'withoutDeletions' | 'confirmDeletions' | 'cancel' | 'removeHeld' | 'leave';
+export type PhoneSyncAnswer = 'keepAll' | 'deleteBoth' | 'keepHeld' | 'removeHeld';
 
 /** La ligne dite quand un téléphone relié se présente par le sans-fil. */
 export interface PhoneArrivalNote {
@@ -79,23 +90,38 @@ export const usePhoneArrivalNote = (): PhoneArrivalNote | null => useSyncExterna
 /** Efface la ligne de l'arrivée (elle s'est affichée assez longtemps, ou une synchronisation commence). */
 export const clearPhoneArrivalNote = (): void => arrival.set(null);
 
-/** Ce que permet la relance : les choix déjà faits pendant cette synchronisation, et l'enregistreur de l'appelant. */
+/** Ce que permet une passe : les réponses déjà données pendant cette synchronisation, et l'enregistreur de l'appelant. */
 interface RunOptions {
   recording?: () => boolean;
-  withoutDeletions?: boolean;
   confirmDeletions?: boolean;
-  /** Les suppressions que la question du garde-fou a montrées, seules couvertes par sa confirmation. */
+  /** Les suppressions que la question a montrées, seules couvertes par « Supprimer des deux côtés ». */
   confirmedDeletions?: SyncDeletionKey[];
   /** Les suppressions d'itinéraires que la même question a montrées. */
   confirmedRouteDeletions?: SyncRouteDeletionKey[];
-  heldOnPhone?: SyncHeldChoice;
+  /** « Tout garder » : les suppressions montrées, que l'utilisateur refuse. */
+  keepRefused?: { sessions: SyncDeletionKey[]; routes: SyncRouteDeletionKey[] };
+  heldOnPhone?: SyncHeldAnswer;
   /** Les sessions de la corbeille que la question a montrées, seules à retirer du téléphone. */
   heldToRemove?: number[];
   /** Les itinéraires de la corbeille que la même question a montrés (leurs identités). */
   heldRoutesToRemove?: string[];
+  /** « Les garder » : les sessions et les itinéraires de la corbeille que la question a montrés. */
+  heldToKeep?: number[];
+  heldRoutesToKeep?: string[];
 }
 
-/** Les choix de la synchronisation en cours ou de la dernière, repris par une relance. */
+/** Comment une passe part : `resume`, téléphone déjà trouvé, sans repasser par sa recherche ; `previous`, ce qu'avait fait la passe d'avant. */
+interface LaunchHow {
+  resume?: { phone: string; channel: PhoneLinkChannel };
+  previous?: SyncOutcome;
+  /** La question à laquelle cette passe répond, et ce qui avait été fait : rendus tels quels si la réponse ne s'applique pas. */
+  answering?: { question: SyncQuestion; result: SyncedResult; before: RunOptions };
+}
+
+/** Vrai si une passe n'a rien pu faire : téléphone pas prêt, panne avant la synchronisation, ou synchronisation refusée. */
+const passFailed = (pass: PhoneSyncResult): boolean => pass.kind !== 'synced' || pass.outcome.refusal !== null;
+
+/** Les réponses de la synchronisation en cours ou de la dernière, reprises par la passe suivante. */
 let current: RunOptions = {};
 
 let running: Promise<void> | null = null;
@@ -119,7 +145,8 @@ const notReady = async (state: Exclude<PhoneState, { etat: 'pret' }>): Promise<P
   return wireless ? { kind: 'phone', state: 'absent', wireless } : { kind: 'phone', state: 'absent' };
 };
 
-const synchronize = async (options: RunOptions): Promise<PhoneSyncResult> => {
+/** Une passe : état du téléphone, listage, puis la synchronisation. `resume` : l'étape « Comparaison » n'est pas montrée. */
+const synchronize = async (options: RunOptions, resume: boolean): Promise<PhoneSyncResult> => {
   let channel: PhoneLinkChannel | undefined;
   try {
     const state = await phoneState();
@@ -127,7 +154,7 @@ const synchronize = async (options: RunOptions): Promise<PhoneSyncResult> => {
     const phone = state.nom;
     const link: PhoneLinkChannel = phoneChannel(state);
     channel = link;
-    progress.set({ step: 'comparing', phone, channel: link });
+    if (!resume) progress.set({ step: 'comparing', phone, channel: link });
     let listed: Awaited<ReturnType<typeof listPhoneFiles>>;
     try {
       listed = await listPhoneFiles();
@@ -144,13 +171,15 @@ const synchronize = async (options: RunOptions): Promise<PhoneSyncResult> => {
       phoneRecording: phoneIsRecording(state),
       phonePath: PHONE_FOLDER_PATH,
       recording: options.recording,
-      withoutDeletions: options.withoutDeletions,
       confirmDeletions: options.confirmDeletions,
       confirmedDeletions: options.confirmedDeletions,
       confirmedRouteDeletions: options.confirmedRouteDeletions,
+      keepRefused: options.keepRefused,
       heldOnPhone: options.heldOnPhone,
       heldToRemove: options.heldToRemove,
       heldRoutesToRemove: options.heldRoutesToRemove,
+      heldToKeep: options.heldToKeep,
+      heldRoutesToKeep: options.heldRoutesToKeep,
       // Sans listage d'`itineraires/` (téléphone ou coquille plus anciens), les itinéraires ne sont pas touchés.
       phoneRoutes: phoneListsRoutes(state),
       beforeWrites: () => {
@@ -171,19 +200,47 @@ const synchronize = async (options: RunOptions): Promise<PhoneSyncResult> => {
   }
 };
 
-/** Une synchronisation, de la recherche du téléphone à la question ou au compte rendu. */
-const launch = (options: RunOptions): Promise<void> => {
+/** L'issue d'une passe, jointe à ce qu'avait fait la passe d'avant quand les deux ont synchronisé. */
+const joined = (previous: SyncOutcome | undefined, pass: PhoneSyncResult): PhoneSyncResult =>
+  previous && pass.kind === 'synced' ? { ...pass, outcome: mergeSyncPasses(previous, pass.outcome) } : pass;
+
+/**
+ * Une synchronisation, de la recherche du téléphone (ou de la reprise, `how.resume`) à la question ou au compte rendu.
+ * Ce qui a changé pendant l'opération est repris par une seconde passe, une seule fois ; si elle ne trouve plus le
+ * téléphone, le compte rendu de la première reste. Une réponse qui ne peut pas s'appliquer (téléphone parti,
+ * synchronisation refusée) rend le compte rendu de ce qui était fait, la raison (`answerFailed`), et la question
+ * laissée sans réponse, à laquelle « Répondre » revient.
+ */
+const launch = (options: RunOptions, how: LaunchHow = {}): Promise<void> => {
   current = options;
-  progress.set({ step: 'searching' });
+  progress.set(how.resume
+    ? { step: 'copying', phone: how.resume.phone, channel: how.resume.channel, done: 0, total: 0, first: false }
+    : { step: 'searching' });
   arrival.set(null);
-  running = synchronize(options)
-    .then((result) => {
-      const question = result.kind === 'synced' ? describeSyncQuestion(result.outcome) : null;
-      progress.set(question && result.kind === 'synced' ? { step: 'question', question, result } : { step: 'over', result });
-    })
-    .finally(() => {
-      running = null;
-    });
+  const run = async (): Promise<void> => {
+    const pass = await synchronize(options, how.resume !== undefined);
+    if (how.answering && passFailed(pass)) {
+      // La réponse n'a rien réglé : la suivante repart des choix d'avant elle.
+      current = how.answering.before;
+      progress.set({ step: 'over', result: how.answering.result, unanswered: how.answering.question, answerFailed: pass });
+      return;
+    }
+    let result = joined(how.previous, pass);
+    let question = result.kind === 'synced' ? describeSyncQuestion(result.outcome) : null;
+    if (question === null && result.kind === 'synced' && pass.kind === 'synced' && syncHasChangedItems(pass.outcome)) {
+      progress.set({ step: 'copying', phone: result.phone, channel: result.channel, done: 0, total: 0, first: false });
+      const again = await synchronize(options, true);
+      if (again.kind === 'synced') {
+        const merged: SyncedResult = { ...again, outcome: mergeSyncPasses(result.outcome, again.outcome) };
+        result = merged;
+        question = describeSyncQuestion(merged.outcome);
+      }
+    }
+    progress.set(question && result.kind === 'synced' ? { step: 'question', question, result } : { step: 'over', result });
+  };
+  running = run().finally(() => {
+    running = null;
+  });
   return running;
 };
 
@@ -195,35 +252,56 @@ export const synchronizeWithPhone = (options: { recording?: () => boolean } = {}
   running ?? launch({ recording: options.recording });
 
 /**
- * Répond à la question posée (étape `question`) : relance la synchronisation avec ce que la réponse permet, en gardant
- * les choix déjà faits (« Retirer du téléphone » puis le garde-fou confirmé retire encore ces sessions ; une
- * confirmation donnée avant « Retirer du téléphone » ne couvre pas ces retraits), ou s'en tient à
- * ce qui est fait et montre son compte rendu. Sans effet hors de l'étape `question`.
+ * Répond à la question posée (étape `question`) : la synchronisation repart avec ce que la réponse règle, en gardant
+ * les réponses déjà données (une confirmation donnée avant « Les retirer du téléphone » ne couvre pas ces retraits,
+ * qui peuvent rouvrir le garde-fou). Chaque réponse ne vaut que pour ce que sa question a montré : l'exécutant reçoit
+ * leur liste, et une suppression apparue depuis reste soumise au garde-fou. Sans effet hors de l'étape `question`, ou
+ * pour une réponse qui n'est pas celle de la question posée.
  */
 export const answerPhoneSyncQuestion = (answer: PhoneSyncAnswer): Promise<void> => {
   const step = progress.get();
   if (step.step !== 'question' || running) return running ?? Promise.resolve();
+  const { question, result } = step;
+  const forGuard = answer === 'keepAll' || answer === 'deleteBoth';
+  if (forGuard !== (question.kind === 'guard')) return Promise.resolve();
+  const how: LaunchHow = { resume: { phone: result.phone, channel: result.channel }, previous: result.outcome, answering: { question, result, before: current } };
+  const sessions = question.sessions.map((s) => ({ startMs: s.startMs, side: s.side }));
+  const routes = question.routes.map((r) => ({ id: r.id, side: r.side }));
   switch (answer) {
-    case 'withoutDeletions':
-      return launch({ ...current, withoutDeletions: true, confirmDeletions: false, confirmedDeletions: undefined, confirmedRouteDeletions: undefined });
-    // Une réponse ne vaut que pour les sessions que sa question a montrées : l'exécutant reçoit leur liste, et si le
-    // plan du moment en touche une autre, il ne supprime rien et la question revient.
-    case 'confirmDeletions':
+    case 'keepAll':
       return launch({
-        ...current, confirmDeletions: true, withoutDeletions: false,
-        confirmedDeletions: step.question.sessions.map((s) => ({ startMs: s.startMs, side: s.side })),
-        confirmedRouteDeletions: step.question.routes.map((r) => ({ id: r.id, side: r.side })),
-      });
-    case 'removeHeld':
+        ...current, keepRefused: { sessions, routes }, confirmDeletions: false, confirmedDeletions: undefined, confirmedRouteDeletions: undefined,
+      }, how);
+    case 'deleteBoth':
+      return launch({ ...current, confirmDeletions: true, confirmedDeletions: sessions, confirmedRouteDeletions: routes }, how);
+    case 'keepHeld':
+      return launch({
+        ...current, heldOnPhone: 'keep', heldToKeep: question.sessions.map((s) => s.startMs), heldRoutesToKeep: question.routes.map((r) => r.id),
+        heldToRemove: undefined, heldRoutesToRemove: undefined,
+      }, how);
+    default:
       // Des retraits qui dépassent le garde-fou rouvrent sa fenêtre : une confirmation donnée avant ne les couvre pas.
       return launch({
-        ...current, heldOnPhone: 'remove', heldToRemove: step.question.sessions.map((s) => s.startMs),
-        heldRoutesToRemove: step.question.routes.map((r) => r.id),
-        confirmDeletions: false, confirmedDeletions: undefined, confirmedRouteDeletions: undefined,
-      });
-    default:
-      progress.set({ step: 'over', result: step.result });
-      return Promise.resolve();
+        ...current, heldOnPhone: 'remove', heldToRemove: question.sessions.map((s) => s.startMs), heldRoutesToRemove: question.routes.map((r) => r.id),
+        heldToKeep: undefined, heldRoutesToKeep: undefined, confirmDeletions: false, confirmedDeletions: undefined, confirmedRouteDeletions: undefined,
+      }, how);
+  }
+};
+
+/**
+ * La question est fermée sans réponse : rien n'est décidé. L'étape passe au compte rendu de ce qui est fait, qui
+ * rappelle ce qui attend la réponse (`unanswered`) ; la prochaine synchronisation repose la question.
+ */
+export const leavePhoneSyncQuestion = (): void => {
+  const step = progress.get();
+  if (step.step === 'question') progress.set({ step: 'over', result: step.result, unanswered: step.question });
+};
+
+/** Revient à la question fermée sans réponse (« Répondre » du compte rendu). Sans effet sans question laissée. */
+export const reopenPhoneSyncQuestion = (): void => {
+  const step = progress.get();
+  if (step.step === 'over' && step.unanswered && step.result.kind === 'synced' && !running) {
+    progress.set({ step: 'question', question: step.unanswered, result: step.result });
   }
 };
 
