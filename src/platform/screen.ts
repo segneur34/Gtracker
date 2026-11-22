@@ -23,14 +23,21 @@ interface ScreenPlugin {
 
 const nativePlugin = registerPlugin<ScreenPlugin>('Screen');
 
-let wanted = false;
+/**
+ * Ce qui demande l'écran allumé : l'enregistrement, le test de FC repos, un échange avec l'ordinateur relié. Chacun
+ * le demande et le rend pour lui seul ; l'écran ne s'éteint qu'une fois tous rendus, jamais sous l'enregistreur.
+ */
+export type ScreenOnReason = 'recording' | 'restingHrTest' | 'computerLink';
+
+const holders = new Set<ScreenOnReason>();
+const wanted = (): boolean => holders.size > 0;
 let browserLock: WakeLockSentinel | null = null;
 
 const requestBrowserLock = async (): Promise<void> => {
-  if (!wanted || browserLock !== null || document.visibilityState !== 'visible' || !('wakeLock' in navigator)) return;
+  if (!wanted() || browserLock !== null || document.visibilityState !== 'visible' || !('wakeLock' in navigator)) return;
   try {
     const lock = await navigator.wakeLock.request('screen');
-    if (!wanted) {
+    if (!wanted()) {
       void lock.release();
       return;
     }
@@ -43,10 +50,16 @@ const requestBrowserLock = async (): Promise<void> => {
 
 const onVisibility = (): void => void requestBrowserLock();
 
-/** Garde l'écran allumé, ou rend la main à la mise en veille. */
-export const keepScreenOn = (on: boolean): void => {
-  if (on === wanted) return;
-  wanted = on;
+/**
+ * Garde l'écran allumé pour `reason`, ou rend la demande de `reason` : la mise en veille ne reprend que quand
+ * aucune autre raison ne le tient plus.
+ */
+export const keepScreenOn = (hold: boolean, reason: ScreenOnReason): void => {
+  const before = wanted();
+  if (hold) holders.add(reason);
+  else holders.delete(reason);
+  const on = wanted();
+  if (on === before) return;
   if (isNativeApp()) {
     void nativePlugin.keepOn({ on }).catch(() => undefined);
     return;
@@ -98,7 +111,7 @@ export const onForeground = (listener: () => void): (() => void) => {
  * reprise ne laisse pas l'écran s'éteindre le temps de revenir sur Enregistrer. Sans effet si la page l'a déjà redemandé.
  */
 export const clearStaleScreenOn = (): void => {
-  if (isNativeApp() && !wanted) void nativePlugin.keepOn({ on: false }).catch(() => undefined);
+  if (isNativeApp() && !wanted()) void nativePlugin.keepOn({ on: false }).catch(() => undefined);
 };
 
 /** L'orientation figée survit de même : au démarrage de la page, elle repart libre, comme l'application relancée. */

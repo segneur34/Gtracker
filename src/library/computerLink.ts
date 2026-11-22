@@ -4,8 +4,8 @@ import type { ComputerLinkError, ComputerLinkRefusal, ComputerLinkStatus } from 
 
 /**
  * La liaison sans fil vue du téléphone, partie pure : les phrases de l'état (en français courant, sans le vocabulaire
- * du protocole), le temps écoulé depuis le dernier envoi, la saisie du code et de l'adresse, et la règle qui dit
- * quand la liaison se tente toute seule.
+ * du protocole), le temps écoulé depuis la dernière synchronisation, la saisie du code et de l'adresse, la règle qui
+ * dit quand la liaison se tente toute seule, et le temps pendant lequel un échange garde l'écran allumé.
  */
 
 /** Longueur du code que l'ordinateur affiche. */
@@ -65,7 +65,7 @@ export const linkErrorText = (error: ComputerLinkError): string => {
     case 'protocol':
       return t("L'ordinateur a répondu de façon incompréhensible : vérifiez que Gtracker est à jour sur le téléphone et sur l'ordinateur.");
     default:
-      return t("La liaison avec l'ordinateur s'est coupée. Elle est retentée à l'ouverture de Gtracker, ou touchez « Chercher l'ordinateur ».");
+      return t("La liaison avec l'ordinateur s'est coupée. Gtracker la reprend tout seul tant qu'il est affiché.");
   }
 };
 
@@ -75,15 +75,21 @@ export const refusalText = (refusal: ComputerLinkRefusal): string =>
     ? t('Le code se compose de 6 chiffres, affichés sur l\'ordinateur.')
     : t("L'adresse n'est pas valable : tapez celle que l'ordinateur affiche, par exemple 192.168.1.20:48217.");
 
-/** Ce que le bloc dit de l'état : une phrase d'état, ce qui ne va pas, et le dernier envoi. */
+/** Ce que le bloc dit de l'état : une phrase d'état, ce qui ne va pas, et la dernière synchronisation. */
 export interface LinkLine {
   /** La phrase d'état, `null` quand rien n'est relié ni connu. */
   headline: string | null;
   /** Ce qui ne va pas et quoi faire, `null` sinon. */
   problem: string | null;
-  /** Dernier envoi de sessions, `null` si aucun ordinateur n'est connu. */
+  /** Dernière synchronisation avec l'ordinateur, `null` si aucun ordinateur n'est connu. */
   sent: string | null;
 }
+
+/** Ordinateur connu mais introuvable : ce qu'il faut vérifier, puis où l'ordinateur dira si Windows le bloque. */
+const notFoundText = (computerName: string | null): string =>
+  (computerName === null
+    ? t("L'ordinateur est introuvable. Vérifiez qu'il est allumé, Gtracker ouvert, sur le même réseau ; cliquez-y sur « Synchroniser » : il dira si Windows bloque.")
+    : t("« {name} » est introuvable. Vérifiez qu'il est allumé, Gtracker ouvert, sur le même réseau ; cliquez-y sur « Synchroniser » : il dira si Windows bloque.", { name: computerName }));
 
 /**
  * L'état du greffon en phrases. Sans réseau local (et sans liaison en cours), la phrase du réseau passe avant toute
@@ -107,7 +113,7 @@ export const describeLink = (status: ComputerLinkStatus, nowMs: number): LinkLin
       headline = t('Relié à {name} en ce moment.', { name });
       break;
     case 'notFound':
-      headline = status.paired ? t('{name} est introuvable sur le réseau.', { name }) : t("Gtracker n'a pas trouvé l'ordinateur sur le réseau.");
+      headline = status.paired ? notFoundText(status.computerName) : t("Gtracker n'a pas trouvé l'ordinateur sur le réseau.");
       break;
     case 'idle':
       headline = t("{name} : pas relié pour l'instant.", { name });
@@ -119,18 +125,47 @@ export const describeLink = (status: ComputerLinkStatus, nowMs: number): LinkLin
   let sent: string | null = null;
   if (status.paired) {
     sent = status.lastSentMs === null
-      ? t("Aucune session envoyée pour l'instant.")
-      : t('Dernier envoi : {quand}.', { quand: elapsedText(status.lastSentMs, nowMs) });
+      ? t('Pas encore synchronisé.')
+      : t('Dernière synchronisation : {quand}.', { quand: elapsedText(status.lastSentMs, nowMs) });
   }
   return { headline, problem, sent };
 };
+
+/**
+ * Durée pendant laquelle l'écran reste allumé après la dernière demande de l'ordinateur. Une synchronisation en
+ * envoie sans cesse ; entre deux, l'ordinateur peut se taire le temps d'enregistrer ou de calculer (quelques
+ * secondes). Au-delà, l'échange est fini et la mise en veille reprend.
+ */
+export const EXCHANGE_SCREEN_ON_MS = 30_000;
+
+/**
+ * Heure jusqu'à laquelle l'écran reste allumé pour un échange avec l'ordinateur : liaison ouverte et dernière
+ * demande reçue, plus `EXCHANGE_SCREEN_ON_MS` ; `null` sans liaison ou sans demande connue (greffon plus ancien).
+ */
+export const exchangeScreenOnUntil = (status: ComputerLinkStatus): number | null =>
+  (status.state === 'linked' && status.lastExchangeMs !== null ? status.lastExchangeMs + EXCHANGE_SCREEN_ON_MS : null);
+
+/** Un état qui n'est pas une tentative en cours : celui que le bloc garde pendant une tentative automatique. */
+export const linkSettled = (status: ComputerLinkStatus): boolean => status.state !== 'searching' && status.state !== 'pairing';
+
+/**
+ * L'état que le bloc montre. Une recherche lancée par la relance automatique (ordinateur connu, aucun geste du bloc
+ * en cours) ne se voit pas : le bloc reste sur le dernier état posé (`settled`), phrase, champ « Adresse » et boutons
+ * compris, pour ne pas fermer le clavier de qui tape une adresse. Seuls les gestes du bloc (`ownGesture`) montrent
+ * « Recherche… » ; sans état posé (ouverture de Gtracker), la recherche se montre aussi.
+ */
+export const shownLinkStatus = (
+  status: ComputerLinkStatus, settled: ComputerLinkStatus | null, ownGesture: boolean,
+): ComputerLinkStatus =>
+  (!ownGesture && status.paired && status.state === 'searching' && settled !== null && settled.paired ? settled : status);
 
 /** Le champ « Adresse » se montre quand l'ordinateur n'a pas été trouvé tout seul : l'adresse affichée par l'ordinateur le remplace. */
 export const addressFieldShown = (status: ComputerLinkStatus): boolean =>
   status.state === 'notFound' && status.error !== 'noLocalNetwork' && status.onLocalNetwork;
 
 /**
- * Faut-il tenter la liaison toute seule (à l'ouverture, au retour au premier plan, quand le dossier mémoire change) ?
+ * Faut-il tenter la liaison toute seule (à l'ouverture, au retour au premier plan, quand le dossier mémoire change, et
+ * à intervalle régulier tant que Gtracker est affiché) ?
  * Oui quand un ordinateur est connu, qu'un réseau local est là (partage de connexion compris : jamais « Wi-Fi
  * seulement »), qu'un dossier mémoire est désigné, et qu'aucune tentative n'est en cours. Jamais pendant un
  * enregistrement : rien ne doit gêner le GPS. Déjà relié, l'appel ne fait que donner le dossier à la liaison.

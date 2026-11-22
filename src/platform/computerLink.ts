@@ -31,6 +31,11 @@ export interface ComputerLinkStatus {
   sentFiles: number;
   /** Un réseau local est là : Wi-Fi ou point d'accès du téléphone (partage de connexion compris). */
   onLocalNetwork: boolean;
+  /**
+   * Heure de la dernière demande de l'ordinateur (lecture, écriture, effacement ; jamais le simple signe de vie),
+   * `null` si aucune depuis l'ouverture de Gtracker, ou greffon plus ancien qui ne la donne pas.
+   */
+  lastExchangeMs: number | null;
 }
 
 /** Un appel refusé parce qu'il est mal formé, avant toute tentative. */
@@ -85,6 +90,8 @@ const ERRORS: readonly ComputerLinkError[] = [
 
 const text = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
 
+const instant = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+
 /**
  * L'état tel que le greffon le rend, remis dans sa forme : une valeur inconnue (greffon plus récent que la page)
  * ne casse rien. Un état inconnu se lit « au repos » ; une raison inconnue, une coupure.
@@ -100,9 +107,10 @@ export const readComputerLinkStatus = (raw: unknown): ComputerLinkStatus => {
     paired,
     computerName: text(o.computerName),
     address: text(o.address),
-    lastSentMs: typeof o.lastSentMs === 'number' && Number.isFinite(o.lastSentMs) ? o.lastSentMs : null,
+    lastSentMs: instant(o.lastSentMs),
     sentFiles: typeof o.sentFiles === 'number' && Number.isFinite(o.sentFiles) ? Math.max(0, Math.floor(o.sentFiles)) : 0,
     onLocalNetwork: o.onLocalNetwork === true,
+    lastExchangeMs: instant(o.lastExchangeMs),
   };
 };
 

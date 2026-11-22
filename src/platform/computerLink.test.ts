@@ -41,7 +41,7 @@ vi.mock('./runtime', () => ({ isNativeApp: () => runtime.native }));
 /** L'état tel que le greffon le rend à la page. */
 const RAW = {
   state: 'linked', error: null, paired: true, computerName: 'PC-SALON', address: '192.168.1.20:48217',
-  lastSentMs: 1_700_000_000_000, sentFiles: 3, onLocalNetwork: true,
+  lastSentMs: 1_700_000_000_000, sentFiles: 3, onLocalNetwork: true, lastExchangeMs: 1_700_000_005_000,
 };
 
 beforeEach(() => {
@@ -66,8 +66,15 @@ describe('readComputerLinkStatus : l\'état du greffon remis dans sa forme', () 
   it('relit chaque champ', () => {
     expect(readComputerLinkStatus(RAW)).toEqual<ComputerLinkStatus>({
       state: 'linked', error: null, paired: true, computerName: 'PC-SALON', address: '192.168.1.20:48217',
-      lastSentMs: 1_700_000_000_000, sentFiles: 3, onLocalNetwork: true,
+      lastSentMs: 1_700_000_000_000, sentFiles: 3, onLocalNetwork: true, lastExchangeMs: 1_700_000_005_000,
     });
+  });
+
+  it('la dernière demande de l\'ordinateur est facultative : un greffon plus ancien ne la donne pas', () => {
+    const { lastExchangeMs: _absent, ...older } = RAW;
+    expect(readComputerLinkStatus(older)).toMatchObject({ state: 'linked', lastSentMs: 1_700_000_000_000, lastExchangeMs: null });
+    expect(readComputerLinkStatus({ ...RAW, lastExchangeMs: 'hier' }).lastExchangeMs).toBeNull();
+    expect(readComputerLinkStatus({ ...RAW, lastExchangeMs: null }).lastExchangeMs).toBeNull();
   });
 
   it('un état inconnu se lit au repos, une raison inconnue est une coupure', () => {
@@ -78,6 +85,7 @@ describe('readComputerLinkStatus : l\'état du greffon remis dans sa forme', () 
   it('les champs absents ou mal typés prennent leur valeur vide', () => {
     expect(readComputerLinkStatus(null)).toEqual<ComputerLinkStatus>({
       state: 'unpaired', error: null, paired: false, computerName: null, address: null, lastSentMs: null, sentFiles: 0, onLocalNetwork: false,
+      lastExchangeMs: null,
     });
     expect(readComputerLinkStatus({ ...RAW, computerName: '', address: 4, lastSentMs: 'hier', sentFiles: -2 })).toMatchObject({
       computerName: null, address: null, lastSentMs: null, sentFiles: 0,

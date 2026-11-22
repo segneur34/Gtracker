@@ -461,7 +461,7 @@ describe('liaison sans fil : ce que la page appelle et lit, le greffon le porte'
 
   it('les champs de l\'état et les codes de refus sont ceux que la page lit', () => {
     const status = between(PLUGIN, 'private JSObject statusObject()', 'private void notifyStatus()');
-    for (const field of ['state', 'error', 'paired', 'computerName', 'address', 'lastSentMs', 'sentFiles', 'onLocalNetwork']) {
+    for (const field of ['state', 'error', 'paired', 'computerName', 'address', 'lastSentMs', 'sentFiles', 'onLocalNetwork', 'lastExchangeMs']) {
       expect(status, field).toContain(`"${field}"`);
       expect(LINK_TS, field).toContain(`o.${field}`);
     }

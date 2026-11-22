@@ -344,8 +344,8 @@ function OrientationLockButton() {
 const useScreenOnWhile = (on: boolean): void => {
   useEffect(() => {
     if (!on) return undefined;
-    keepScreenOn(true);
-    return () => keepScreenOn(false);
+    keepScreenOn(true, 'recording');
+    return () => keepScreenOn(false, 'recording');
   }, [on]);
 };
 

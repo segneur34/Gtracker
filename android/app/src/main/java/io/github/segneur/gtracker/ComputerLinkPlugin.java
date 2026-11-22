@@ -90,7 +90,7 @@ import org.json.JSONObject;
  *
  * Pour la page : `status()`, `pair({ code, address?, folder?, base? })`, `connect({ address?, folder?, base? })`,
  * `forget()`, qui rendent toutes l'état (`statusObject`), et l'événement `status`, du même contenu, à chaque
- * changement. `folder` est l'adresse SAF du dossier désigné, `base` le sous-dossier où est la mémoire (« Gtracker »),
+ * changement et à chaque demande du PC (au plus une fois par seconde). `folder` est l'adresse SAF du dossier désigné, `base` le sous-dossier où est la mémoire (« Gtracker »),
  * absent ou vide quand c'est le dossier désigné lui-même.
  */
 @CapacitorPlugin(
@@ -158,6 +158,11 @@ public class ComputerLinkPlugin extends Plugin {
     /** Silence du PC au-delà duquel la liaison est tenue pour morte : il envoie `ping` bien plus souvent. */
     private static final int IDLE_TIMEOUT_MS = 120_000;
     private static final int READ_BUFFER = 16_384;
+    /**
+     * Écart minimal entre deux annonces d'une demande du PC à la page : une synchronisation envoie des dizaines de
+     * demandes par seconde, la page n'a besoin que de savoir qu'un échange dure (elle garde l'écran allumé).
+     */
+    private static final long EXCHANGE_NOTIFY_MS = 1_000;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final ExecutorService closer = Executors.newSingleThreadExecutor();
@@ -168,6 +173,10 @@ public class ComputerLinkPlugin extends Plugin {
     private String error;
     private Connection link;
     private int sentFiles;
+    /** Heure de la dernière demande du PC (hors `ping`), 0 si aucune depuis l'ouverture de l'application. */
+    private long lastExchangeMs;
+    /** Heure de la dernière annonce d'une demande à la page. */
+    private long exchangeNotifiedMs;
     /** Augmente à chaque fermeture voulue (arrière-plan, oubli, nouvel appairage) : une tentative plus ancienne s'arrête. */
     private int generation;
     /** Sockets de la tentative en cours, fermées par une fermeture voulue pour la débloquer. */
@@ -552,6 +561,7 @@ public class ComputerLinkPlugin extends Plugin {
             for (;;) {
                 Incoming m = c.next();
                 if (m == null) break;
+                if (!"ping".equals(m.type)) exchanged();
                 switch (m.type) {
                     case "ping":
                         c.send(ComputerLinkProtocol.encodePong(m.id, recording()));
@@ -828,6 +838,22 @@ public class ComputerLinkPlugin extends Plugin {
             prefs().edit().putLong(KEY_LAST_SENT, System.currentTimeMillis()).apply();
         }
         notifyStatus();
+    }
+
+    /**
+     * Une demande du PC vient d'arriver : son heure est gardée pour l'état, et annoncée à la page au plus une fois
+     * par seconde. Le `ping`, envoyé toutes les quelques secondes tant que la liaison tient, n'en est pas une : la
+     * page garderait sinon l'écran allumé tant que le téléphone est relié.
+     */
+    private void exchanged() {
+        boolean announce;
+        synchronized (this) {
+            long now = System.currentTimeMillis();
+            lastExchangeMs = now;
+            announce = now - exchangeNotifiedMs >= EXCHANGE_NOTIFY_MS || now < exchangeNotifiedMs;
+            if (announce) exchangeNotifiedMs = now;
+        }
+        if (announce) notifyStatus();
     }
 
     // ---------- réseau ----------
@@ -1259,7 +1285,8 @@ public class ComputerLinkPlugin extends Plugin {
      * L'état pour la page : `state`, `error` (raison du dernier échec ou null), `paired`, `computerName`, `address`
      * (« a.b.c.d:port », dernière adresse connue), `lastSentMs` (dernier fichier envoyé jusqu'au bout, ou null),
      * `sentFiles` (fichiers envoyés pendant la liaison en cours), `onLocalNetwork` (un réseau local est là : Wi-Fi ou
-     * point d'accès du téléphone). Jamais le jeton ni l'empreinte.
+     * point d'accès du téléphone), `lastExchangeMs` (dernière demande du PC hors `ping`, ou null). Jamais le jeton
+     * ni l'empreinte.
      */
     private JSObject statusObject() {
         SharedPreferences p = prefs();
@@ -1274,6 +1301,7 @@ public class ComputerLinkPlugin extends Plugin {
             ret.put("computerName", orNull(paired ? p.getString(KEY_COMPUTER_NAME, null) : null));
             ret.put("address", orNull(paired ? p.getString(KEY_ADDRESS, null) : null));
             ret.put("lastSentMs", paired && p.contains(KEY_LAST_SENT) ? (Object) p.getLong(KEY_LAST_SENT, 0) : JSONObject.NULL);
+            ret.put("lastExchangeMs", lastExchangeMs > 0 ? (Object) lastExchangeMs : JSONObject.NULL);
         }
         ret.put("onLocalNetwork", !localLinks().isEmpty());
         return ret;

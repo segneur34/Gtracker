@@ -9,9 +9,9 @@ import './ComputerLinkCard.css';
 /**
  * L'ordinateur relié sans câble, dans Réglages › Mémoire, application du téléphone seulement (rien dans le navigateur
  * ni dans le programme Windows, qui a son propre bloc : `WirelessPhoneCard`). C'est le seul endroit où le téléphone dit
- * l'état de la liaison, que `useComputerLinkLauncher` tente toute seule à l'ouverture. Jamais relié : la marche à
- * suivre et le champ du code, avec l'adresse en plus quand l'ordinateur ne s'est pas trouvé seul. Relié : son nom,
- * l'état, le dernier envoi, « Chercher l'ordinateur » et « Oublier cet ordinateur ».
+ * l'état de la liaison, que `useComputerLinkLauncher` tente toute seule tant que Gtracker est affiché. Jamais relié :
+ * la marche à suivre et le champ du code, avec l'adresse en plus quand l'ordinateur ne s'est pas trouvé seul. Relié :
+ * son nom, l'état, la dernière synchronisation, « Chercher l'ordinateur » et « Oublier cet ordinateur ».
  */
 function ComputerLinkCard() {
   const view = useComputerLink();
@@ -84,7 +84,7 @@ function PairForm({ view, status, headline, blocked, attempting }: PanelProps) {
   return (
     <form className="ui-stack-3" onSubmit={submit}>
       <p className="ui-muted ui-text-s ui-m-0">
-        {t("Pour envoyer vos sessions à l'ordinateur sans câble : sur l'ordinateur, ouvrez Gtracker, Réglages, Mémoire, touchez « Relier un téléphone », puis tapez ici le code affiché. Le téléphone et l'ordinateur doivent être sur le même réseau : la même box Wi-Fi, ou un partage de connexion entre les deux.")}
+        {t("Pour synchroniser ce téléphone avec votre ordinateur : sur l'ordinateur, ouvrez Gtracker, Réglages › Mémoire, « Relier un téléphone », puis tapez ici le code affiché. Les deux doivent être sur le même réseau : la même box Wi-Fi, ou un partage de connexion.")}
       </p>
       {headline !== null && <p className="ui-text-s ui-m-0 computer-link__status" role="status">{headline}</p>}
       <div className="ui-stack-1">
@@ -106,7 +106,7 @@ function PairForm({ view, status, headline, blocked, attempting }: PanelProps) {
   );
 }
 
-/** Ordinateur connu : son nom et l'état, le dernier envoi, « Chercher l'ordinateur » et « Oublier cet ordinateur ». */
+/** Ordinateur connu : son nom et l'état, la dernière synchronisation, « Chercher l'ordinateur » et « Oublier cet ordinateur ». */
 function PairedPanel({ view, status, headline, sent, blocked, attempting }: PanelProps & { sent: string | null }) {
   const [address, setAddress] = useState('');
   const showAddress = addressFieldShown(status);

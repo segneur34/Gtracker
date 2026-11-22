@@ -89,7 +89,7 @@ export const useRestingHrTest = (
     for (const signal of step.signals) void playPattern(RESTING_SIGNAL_TONES[signal], true).catch(() => undefined);
     const result = publish(step.state, nowMs, simRef.current !== null);
     if (step.state.phase === 'fini') {
-      keepScreenOn(false);
+      keepScreenOn(false, 'restingHrTest');
       simRef.current = null;
       if (result) finishedRef.current(result, step.state.startMs);
     }
@@ -145,7 +145,7 @@ export const useRestingHrTest = (
   useEffect(() => () => {
     stateRef.current = null;
     simRef.current = null;
-    keepScreenOn(false);
+    keepScreenOn(false, 'restingHrTest');
   }, []);
 
   /** « Démarrer » avec la ceinture ; `exemple` : avec la FC d'exemple, dans le navigateur. */
@@ -156,7 +156,7 @@ export const useRestingHrTest = (
     else simRef.current = null;
     const state = startRestingTest(nowMs, RESTING_HR_TEST);
     stateRef.current = state;
-    keepScreenOn(true);
+    keepScreenOn(true, 'restingHrTest');
     if (!exemple && bpmRef.current !== null) {
       // La FC lue avant « Démarrer » tient jusqu'à la première mesure reçue.
       state.samples.push({ timeMs: nowMs, bpm: bpmRef.current });
@@ -168,7 +168,7 @@ export const useRestingHrTest = (
   const cancel = useCallback(() => {
     stateRef.current = null;
     simRef.current = null;
-    keepScreenOn(false);
+    keepScreenOn(false, 'restingHrTest');
     setRun(null);
   }, []);
 

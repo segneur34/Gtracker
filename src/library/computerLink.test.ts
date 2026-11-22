@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ComputerLinkError, ComputerLinkStatus } from '../platform/computerLink';
 import {
-  addressFieldShown, addressWellFormed, cleanCode, codeComplete, describeLink, elapsedText, linkErrorText, refusalText, shouldAutoConnect,
+  EXCHANGE_SCREEN_ON_MS, addressFieldShown, addressWellFormed, cleanCode, codeComplete, describeLink, elapsedText, exchangeScreenOnUntil,
+  linkErrorText, linkSettled, refusalText, shouldAutoConnect, shownLinkStatus,
 } from './computerLink';
 
 const NOW = Date.UTC(2026, 10, 20, 12, 0, 0);
@@ -9,7 +10,7 @@ const MIN = 60_000;
 
 const status = (patch: Partial<ComputerLinkStatus> = {}): ComputerLinkStatus => ({
   state: 'idle', error: null, paired: true, computerName: 'PC-SALON', address: '192.168.1.20:48217',
-  lastSentMs: null, sentFiles: 0, onLocalNetwork: true, ...patch,
+  lastSentMs: null, sentFiles: 0, onLocalNetwork: true, lastExchangeMs: null, ...patch,
 });
 
 describe('saisie du code et de l\'adresse', () => {
@@ -57,22 +58,30 @@ describe('phrases d\'erreur : en clair, sans le vocabulaire du protocole', () =>
     expect(linkErrorText('noLocalNetwork')).toContain('partage de connexion');
     expect(linkErrorText('token')).toContain('ne reconnaît plus');
     expect(linkErrorText('version')).toContain('version');
-    expect(linkErrorText('network')).toContain('coupée');
+    expect(linkErrorText('network')).toBe('La liaison avec l\'ordinateur s\'est coupée. Gtracker la reprend tout seul tant qu\'il est affiché.');
+  });
+
+  it('plus aucun conseil de câble ni de débogage', () => {
+    for (const text of ALL.map(linkErrorText)) expect(text).not.toMatch(/USB|débogage|câble/i);
   });
 });
 
 describe('describeLink : ce que le bloc dit', () => {
-  it('relié : le nom, le dernier envoi en temps écoulé', () => {
+  it('relié : le nom, la dernière synchronisation en temps écoulé', () => {
     const line = describeLink(status({ state: 'linked', lastSentMs: NOW - 2 * MIN }), NOW);
-    expect(line).toEqual({ headline: 'Relié à PC-SALON en ce moment.', problem: null, sent: 'Dernier envoi : il y a 2 min.' });
+    expect(line).toEqual({ headline: 'Relié à PC-SALON en ce moment.', problem: null, sent: 'Dernière synchronisation : il y a 2 min.' });
   });
 
-  it('connu mais jamais envoyé', () => {
-    expect(describeLink(status(), NOW)).toMatchObject({ headline: 'PC-SALON : pas relié pour l\'instant.', sent: 'Aucune session envoyée pour l\'instant.' });
+  it('connu mais jamais synchronisé', () => {
+    expect(describeLink(status(), NOW)).toMatchObject({ headline: 'PC-SALON : pas relié pour l\'instant.', sent: 'Pas encore synchronisé.' });
   });
 
-  it('ordinateur introuvable : dit, sans erreur', () => {
-    expect(describeLink(status({ state: 'notFound' }), NOW)).toMatchObject({ headline: 'PC-SALON est introuvable sur le réseau.', problem: null });
+  it('ordinateur introuvable : dit quoi vérifier, et que l\'ordinateur dira si Windows le bloque', () => {
+    expect(describeLink(status({ state: 'notFound' }), NOW)).toMatchObject({
+      headline: '« PC-SALON » est introuvable. Vérifiez qu\'il est allumé, Gtracker ouvert, sur le même réseau ; cliquez-y sur « Synchroniser » : il dira si Windows bloque.',
+      problem: null,
+    });
+    expect(describeLink(status({ state: 'notFound', computerName: null }), NOW).headline).toMatch(/^L'ordinateur est introuvable\. Vérifiez/);
   });
 
   it('une raison d\'échec devient le problème', () => {
@@ -103,6 +112,57 @@ describe('addressFieldShown : l\'adresse se saisit quand l\'ordinateur ne s\'est
     expect(addressFieldShown(status({ state: 'notFound', error: 'noLocalNetwork', onLocalNetwork: false }))).toBe(false);
     expect(addressFieldShown(status({ state: 'idle' }))).toBe(false);
     expect(addressFieldShown(status({ state: 'linked' }))).toBe(false);
+  });
+});
+
+describe('shownLinkStatus : une tentative automatique ne se voit pas', () => {
+  const lost = status({ state: 'notFound' });
+  const searching = status({ state: 'searching' });
+
+  it('relance automatique, ordinateur introuvable : le bloc reste sur « introuvable », champ « Adresse » et boutons compris', () => {
+    const shown = shownLinkStatus(searching, lost, false);
+    expect(shown).toBe(lost);
+    expect(describeLink(shown, NOW).headline).toMatch(/introuvable/);
+    expect(addressFieldShown(shown)).toBe(true);
+  });
+
+  it('une coupure gardée reste dite pendant la relance', () => {
+    const cut = status({ state: 'idle', error: 'network' });
+    expect(describeLink(shownLinkStatus(searching, cut, false), NOW).problem).toBe(linkErrorText('network'));
+  });
+
+  it('un geste du bloc montre la recherche', () => {
+    expect(shownLinkStatus(searching, lost, true)).toBe(searching);
+  });
+
+  it('sans état posé (ouverture), ou ordinateur pas encore connu : la recherche se montre', () => {
+    expect(shownLinkStatus(searching, null, false)).toBe(searching);
+    const unpaired = status({ paired: false, state: 'searching', computerName: null });
+    expect(shownLinkStatus(unpaired, status({ paired: false, state: 'unpaired' }), false)).toBe(unpaired);
+  });
+
+  it('hors recherche, l\'état du greffon passe tel quel', () => {
+    const linked = status({ state: 'linked' });
+    expect(shownLinkStatus(linked, lost, false)).toBe(linked);
+  });
+
+  it('seul un état hors tentative est gardé', () => {
+    expect(linkSettled(lost)).toBe(true);
+    expect(linkSettled(searching)).toBe(false);
+    expect(linkSettled(status({ state: 'pairing' }))).toBe(false);
+  });
+});
+
+describe('exchangeScreenOnUntil : l\'écran reste allumé pendant un échange', () => {
+  it('liaison ouverte et demande reçue : jusqu\'à 30 s après la dernière', () => {
+    expect(EXCHANGE_SCREEN_ON_MS).toBe(30_000);
+    expect(exchangeScreenOnUntil(status({ state: 'linked', lastExchangeMs: NOW }))).toBe(NOW + 30_000);
+  });
+
+  it('sans liaison, ou sans demande connue (greffon plus ancien) : rien', () => {
+    expect(exchangeScreenOnUntil(status({ state: 'idle', lastExchangeMs: NOW }))).toBeNull();
+    expect(exchangeScreenOnUntil(status({ state: 'searching', lastExchangeMs: NOW }))).toBeNull();
+    expect(exchangeScreenOnUntil(status({ state: 'linked', lastExchangeMs: null }))).toBeNull();
   });
 });
 

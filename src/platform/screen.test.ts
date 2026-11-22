@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const resume = vi.hoisted(() => ({ listeners: new Set<() => void>() }));
+const native = vi.hoisted(() => ({ app: false, keepOn: [] as boolean[] }));
 
 vi.mock('./permissions', () => ({
   onAppResume: (listener: () => void) => {
@@ -8,8 +9,58 @@ vi.mock('./permissions', () => ({
     return () => resume.listeners.delete(listener);
   },
 }));
+vi.mock('./runtime', () => ({ isNativeApp: () => native.app }));
+vi.mock('@capacitor/core', () => ({
+  registerPlugin: () => ({
+    keepOn: async ({ on }: { on: boolean }) => { native.keepOn.push(on); },
+    lockOrientation: async () => undefined,
+    isDarkMode: async () => ({ dark: false }),
+    addListener: async () => ({ remove: async () => undefined }),
+  }),
+}));
 
-import { isForeground, onForeground } from './screen';
+import { isForeground, keepScreenOn, onForeground } from './screen';
+
+describe('écran allumé : une demande par raison', () => {
+  beforeEach(() => {
+    native.app = true;
+    native.keepOn = [];
+  });
+  afterEach(() => {
+    keepScreenOn(false, 'recording');
+    keepScreenOn(false, 'computerLink');
+    keepScreenOn(false, 'restingHrTest');
+    native.app = false;
+  });
+
+  it('deux raisons, l\'une rendue : l\'écran reste allumé ; éteint quand la seconde l\'est aussi', () => {
+    keepScreenOn(true, 'recording');
+    keepScreenOn(true, 'computerLink');
+    expect(native.keepOn).toEqual([true]);
+    keepScreenOn(false, 'computerLink');
+    expect(native.keepOn).toEqual([true]);
+    keepScreenOn(false, 'recording');
+    expect(native.keepOn).toEqual([true, false]);
+  });
+
+  it('la liaison rendue avant l\'enregistreur ne l\'éteint pas, et l\'inverse non plus', () => {
+    keepScreenOn(true, 'computerLink');
+    keepScreenOn(true, 'recording');
+    keepScreenOn(false, 'recording');
+    expect(native.keepOn).toEqual([true]);
+    keepScreenOn(false, 'computerLink');
+    expect(native.keepOn).toEqual([true, false]);
+  });
+
+  it('une même raison demandée deux fois ne se compte qu\'une fois, et se rend d\'un coup', () => {
+    keepScreenOn(true, 'computerLink');
+    keepScreenOn(true, 'computerLink');
+    keepScreenOn(false, 'computerLink');
+    expect(native.keepOn).toEqual([true, false]);
+    keepScreenOn(false, 'computerLink');
+    expect(native.keepOn).toEqual([true, false]);
+  });
+});
 
 /** Page factice : son état, et le changement qui prévient ses écouteurs. */
 const stubPage = (initial: DocumentVisibilityState = 'visible') => {
