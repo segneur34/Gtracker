@@ -38,6 +38,14 @@
 //     « Réessayer » reprend, la dernière finit.
 //  6. téléphone à jour qui enregistre une session : rien n'est écrit sur lui, la phrase dédiée, les sessions du
 //     téléphone viennent quand même sur l'ordinateur ; l'enregistrement fini, la synchronisation suivante l'écrit.
+//  7. pare-feu de Windows (pare-feu et autorisation factices du mode d'essai, jamais `powershell` : le journal le prouve ;
+//     `GTRACKER_BANC_SANSFIL_PAREFEU=ouvert|bloque|irreparable`, `GTRACKER_BANC_SANSFIL_AUTORISATION=accordee|refusee|echec`),
+//     un programme par sous-cas, sans-fil allumé dès le lancement sauf 7f : 7a par défaut, rien (ni message, ni bouton, ni
+//     demande) ; 7b bloqué : la phrase, « Autoriser Gtracker » et sa mention, puis le clic accordé fait disparaître le
+//     message (journal « autorisation d'essai : accordee ») ; 7c refusée : phrase de refus, bouton gardé ; 7d en échec :
+//     la raison dite, bouton gardé ; 7e non réparable : phrase de l'administrateur, aucun bouton ; 7f sans-fil éteint puis
+//     allumé par la case avec un pare-feu bloqué : phrase d'allumage, demande partie avant l'écoute, rien d'affiché ensuite.
+//     Les contrôles 1a, 1b et 1e vérifient aussi que l'ancienne aide et l'ancien avertissement ont disparu.
 // Dans chaque compte rendu de « Synchroniser » (`attendreIssue`), relevé phrase par phrase pendant la copie et à la fin : pour
 // un téléphone ancien, la première phrase est « Sans câble, le téléphone n'est pas modifié : seules ses sessions sont copiées
 // vers l'ordinateur. » (après la ligne de reprise d'une synchronisation coupée, s'il y en a une) ; pour un téléphone à jour,
@@ -250,6 +258,9 @@ const carte = (b) => b.evaluate(`(() => {
     statut: tx('.wireless-card__status'),
     avertissement: tx('.wireless-card__warning'),
     aide: tx('.wireless-card__hint'),
+    pareFeu: tx('.wireless-card__firewall'),
+    pareFeuPhrases: [...c.querySelectorAll('.wireless-card__firewall p')].map((x) => x.textContent.trim()),
+    autoriser: c.querySelector('.wireless-card__authorize')?.textContent.trim() ?? null,
     erreur: tx('.wireless-card__error'),
     adresse: tx('.wireless-card__address'),
     code: tx('.wireless-card__code'),
@@ -465,7 +476,8 @@ try {
       console.log(`  bloc, éteint : ${JSON.stringify(c.texte)}`);
       check('1a. le bloc « Téléphone sans câble » est là, case décochée', c.titre === 'Téléphone sans câble' && c.coche === false, JSON.stringify(c.coche));
       check('1a. la phrase d\'état dit que le sans-fil est éteint', c.statut === 'Le sans-fil est éteint : le téléphone ne peut pas se présenter à cet ordinateur.', c.statut);
-      check('1a. la phrase prévient que Windows va demander l\'autorisation', /Windows va demander d'autoriser Gtracker sur le réseau/.test(c.texte), c.texte);
+      check('1a. la phrase prévient que Windows va demander l\'autorisation', c.texte.includes("Windows va vous demander d'autoriser Gtracker sur le réseau : acceptez."), c.texte);
+      check('1a. ni message de pare-feu, ni bouton « Autoriser Gtracker », ni ancien avertissement (pare-feu d\'essai ouvert)', c.pareFeu === null && c.autoriser === null && c.avertissement === null && !c.boutons.includes('Autoriser Gtracker'), JSON.stringify({ pareFeu: c.pareFeu, avertissement: c.avertissement }));
       check('1a. pas de « Relier un téléphone » ni de liste tant que le sans-fil est éteint', !c.boutons.includes('Relier un téléphone') && c.telephones.length === 0 && !/Téléphones reliés/.test(c.texte), c.boutons.join('/'));
       check('1a. aucun secret dans le profil tant que rien n\'est allumé', secretsProfil().length === 0, secretsProfil().join(','));
       await capturer(b, 'sansfil-1-eteint');
@@ -477,10 +489,10 @@ try {
       console.log(`  bloc, allumé : ${JSON.stringify(c.texte)}`);
       check('1b. la case est cochée', c.coche === true);
       check('1b. « Gtracker attend votre téléphone sur le réseau (adresse 127.0.0.1). »', c.statut === 'Gtracker attend votre téléphone sur le réseau (adresse 127.0.0.1).', c.statut);
-      check('1b. l\'aide dit d\'ouvrir Gtracker sur le téléphone (aucun téléphone relié)', /Aucun téléphone ne se présente \? Ouvrez Gtracker sur le téléphone/.test(c.aide ?? ''), c.aide);
+      check('1b. plus d\'aide « Aucun téléphone ne se présente ? » (ni conseil de câble ou de débogage USB)', c.aide === null && !/Aucun téléphone ne se présente|câble USB|débogage USB/.test(c.texte), c.aide ?? c.texte);
+      check('1b. pare-feu d\'essai ouvert : aucun message de Windows ni bouton « Autoriser Gtracker »', c.pareFeu === null && c.autoriser === null && c.avertissement === null, JSON.stringify({ pareFeu: c.pareFeu, avertissement: c.avertissement }));
       check('1b. « Téléphones reliés » : « Aucun téléphone relié pour l\'instant. »', /Téléphones reliés/.test(c.texte) && /Aucun téléphone relié pour l'instant\./.test(c.texte), c.texte);
       check('1b. « Relier un téléphone » est offert', c.boutons.includes('Relier un téléphone'), c.boutons.join('/'));
-      console.log(`  pare-feu : avertissement ${JSON.stringify(c.avertissement)}`);
       await b.waitFor(() => secretsProfil().includes('certificat.pem'), { timeout: 8000, label: 'certificat' });
       check('1b. le profil porte le dossier de secrets du sans-fil (certificat.pem, cle.bin, reglages.json)', ['certificat.pem', 'cle.bin', 'reglages.json'].every((f) => secretsProfil().includes(f)), secretsProfil().join(','));
 
@@ -537,7 +549,7 @@ try {
       console.log(`  après l'appairage : résultat ${JSON.stringify(c.resultat)} ; téléphones ${JSON.stringify(c.telephones)}`);
       check('1e. la page dit « Téléphone Téléphone d\'essai relié. »', c.resultat === "Téléphone Téléphone d'essai relié.", c.resultat);
       check('1e. la liste porte « Téléphone d\'essai » relié en ce moment', c.telephones.length === 1 && /Téléphone d'essai/.test(c.telephones[0]) && /relié en ce moment/.test(c.telephones[0]), JSON.stringify(c.telephones));
-      check('1e. l\'aide « Aucun téléphone ne se présente ? » a disparu', c.aide === null, c.aide);
+      check('1e. toujours aucune aide « Aucun téléphone ne se présente ? » ni message de pare-feu', c.aide === null && !/Aucun téléphone ne se présente/.test(c.texte) && c.pareFeu === null, `${c.aide} / ${c.pareFeu}`);
 
       // -- arrivée : une ligne, plus rien ne se copie seul
       const n1 = await attendreNote(b, MOTIF_ARRIVEE, 'ligne d\'arrivée');
@@ -1022,6 +1034,112 @@ try {
       check('6b. identifiant posé sur le téléphone', typeof marqueurDe(tel)?.id === 'string', JSON.stringify(marqueurDe(tel)));
       await fermerFenetre(b);
       liaison.fermer();
+    });
+  }
+
+  // ---------- 7. pare-feu de Windows ----------
+  console.log('\n== 7. Pare-feu de Windows vu et autorisé par le programme (pare-feu et autorisation factices, jamais powershell)');
+  if (veut('7')) {
+    const BLOQUE = 'Windows ne laisse pas passer votre téléphone sur ce réseau.';
+    const ADMIN = "Un réglage de l'administrateur de cet ordinateur empêche de l'autoriser ici.";
+    const REFUS = "Windows n'a pas donné l'autorisation : le téléphone ne pourra pas se présenter sur ce réseau.";
+    const ALLUMAGE = "Windows va vous demander d'autoriser Gtracker sur le réseau : acceptez.";
+    const sansPowershell = (quoi, p) => check(`${quoi} : aucun powershell lancé (journal de la coquille)`, !p.journal.some((l) => /powershell/i.test(l)), p.journal.join(' | '));
+    const autorisations = (p) => p.journal.filter((l) => /autorisation d'essai/.test(l));
+    const ecoute = (b) => b.waitFor(`/Gtracker attend votre téléphone/.test(document.querySelector('.wireless-card__status')?.textContent ?? '')`, { timeout: 8000, label: 'écoute' });
+    const messageVu = (b) => b.waitFor(`Boolean(document.querySelector('.wireless-card__firewall'))`, { timeout: 8000, label: 'message du pare-feu' });
+    const messageParti = (b) => b.waitFor(`!document.querySelector('.wireless-card__firewall')`, { timeout: 8000, label: 'message du pare-feu disparu' });
+    /** Un programme, sans-fil allumé dès le lancement, bloc ouvert et en écoute. */
+    const cas = async (nom, env, quoi, essai) => avecProgramme(dossier(`${nom}-profil`), dossier(`${nom}-memoire`), { GTRACKER_BANC_SANSFIL_ACTIF: '1', ...env }, quoi, async (b, p) => { await ouvrirMemoire(b); await ecoute(b); await essai(b, p); });
+
+    // 7a. par défaut : rien, et jamais de demande
+    await cas('p7a', {}, '7a', async (b, p) => {
+      await b.settle({ max: 1500 });
+      const c = await carte(b);
+      check('7a. par défaut (pare-feu d\'essai ouvert) : ni message, ni bouton « Autoriser Gtracker »', c.pareFeu === null && c.autoriser === null, JSON.stringify(c.pareFeu));
+      check('7a. la coquille dit « pare-feu ouvert, autorisation accordee » dans son journal d\'essai', p.journal.some((l) => /sans-fil d'essai : .*, pare-feu ouvert, autorisation accordee$/.test(l)), p.journal.join(' | '));
+      check('7a. aucune demande d\'autorisation', autorisations(p).length === 0, autorisations(p).join(' | '));
+      sansPowershell('7a', p);
+    });
+
+    // 7b. bloqué, autorisation accordée : message et bouton ; le clic les fait disparaître
+    await cas('p7b', { GTRACKER_BANC_SANSFIL_PAREFEU: 'bloque' }, '7b', async (b, p) => {
+      await messageVu(b);
+      let c = await carte(b);
+      console.log(`  bloc, pare-feu bloqué : ${JSON.stringify(c.texte)}`);
+      check('7b. la phrase dit que Windows ne laisse pas passer le téléphone', c.pareFeuPhrases[0] === BLOQUE, JSON.stringify(c.pareFeuPhrases));
+      check('7b. le bouton « Autoriser Gtracker » est offert, avec la mention « Windows demande de confirmer. »', c.autoriser === 'Autoriser Gtracker' && c.pareFeu.includes('Windows demande de confirmer.'), JSON.stringify(c.pareFeu));
+      check('7b. le bloc écoute toujours (état « attend votre téléphone »)', /Gtracker attend votre téléphone/.test(c.statut ?? ''), c.statut);
+      check('7b. aucune demande avant le clic', autorisations(p).length === 0, autorisations(p).join(' | '));
+      await capturer(b, 'sansfil-7-pare-feu-bloque');
+      check('7b. clic « Autoriser Gtracker »', (await b.click('.wireless-card__authorize')) === 'ok');
+      await messageParti(b);
+      await b.waitFor(() => autorisations(p).length > 0, { timeout: 5000, label: 'journal de l\'autorisation' });
+      c = await carte(b);
+      check('7b. accordée : le message et le bouton ont disparu, rien d\'autre ne s\'affiche', c.pareFeu === null && c.autoriser === null && c.erreur === null, JSON.stringify({ pareFeu: c.pareFeu, erreur: c.erreur }));
+      check('7b. le journal dit « autorisation d\'essai : accordee » (une seule demande)', autorisations(p).length === 1 && autorisations(p)[0].includes("autorisation d'essai : accordee"), autorisations(p).join(' | '));
+      check('7b. « Relier un téléphone » reste offert', c.boutons.includes('Relier un téléphone'), c.boutons.join('/'));
+      await b.wait(1500);
+      check('7b. après une relecture, toujours rien (le pare-feu relu est ouvert)', (await carte(b)).pareFeu === null);
+      sansPowershell('7b', p);
+    });
+
+    // 7c. bloqué, autorisation refusée : phrase de refus, bouton gardé
+    await cas('p7c', { GTRACKER_BANC_SANSFIL_PAREFEU: 'bloque', GTRACKER_BANC_SANSFIL_AUTORISATION: 'refusee' }, '7c', async (b, p) => {
+      await messageVu(b);
+      check('7c. clic « Autoriser Gtracker »', (await b.click('.wireless-card__authorize')) === 'ok');
+      await b.waitFor(`/Windows n'a pas donné l'autorisation/.test(document.querySelector('.wireless-card__firewall')?.textContent ?? '')`, { timeout: 8000, label: 'phrase de refus' });
+      const c = await carte(b);
+      console.log(`  après refus : ${JSON.stringify(c.pareFeuPhrases)} ; boutons ${c.boutons.join(' / ')}`);
+      check('7c. la phrase du blocage est toujours là, suivie de la phrase de refus', c.pareFeuPhrases[0] === BLOQUE && c.pareFeuPhrases.includes(REFUS), JSON.stringify(c.pareFeuPhrases));
+      check('7c. le bouton « Autoriser Gtracker » est gardé', c.autoriser === 'Autoriser Gtracker', String(c.autoriser));
+      check('7c. le journal dit « autorisation d\'essai : refusee »', autorisations(p).length === 1 && autorisations(p)[0].includes("autorisation d'essai : refusee"), autorisations(p).join(' | '));
+      await capturer(b, 'sansfil-7-pare-feu-refuse');
+      sansPowershell('7c', p);
+    });
+
+    // 7d. bloqué, autorisation en échec : la raison est dite, bouton gardé
+    await cas('p7d', { GTRACKER_BANC_SANSFIL_PAREFEU: 'bloque', GTRACKER_BANC_SANSFIL_AUTORISATION: 'echec' }, '7d', async (b, p) => {
+      await messageVu(b);
+      check('7d. clic « Autoriser Gtracker »', (await b.click('.wireless-card__authorize')) === 'ok');
+      await b.waitFor(`/L'autorisation n'a pas pu être ajoutée/.test(document.querySelector('.wireless-card__firewall')?.textContent ?? '')`, { timeout: 8000, label: 'phrase d\'échec' });
+      const c = await carte(b);
+      console.log(`  après échec : ${JSON.stringify(c.pareFeuPhrases)}`);
+      check('7d. la phrase d\'échec porte la raison', c.pareFeuPhrases.includes("L'autorisation n'a pas pu être ajoutée : échec de l'autorisation d'essai."), JSON.stringify(c.pareFeuPhrases));
+      check('7d. le bouton « Autoriser Gtracker » est gardé', c.autoriser === 'Autoriser Gtracker', String(c.autoriser));
+      sansPowershell('7d', p);
+    });
+
+    // 7e. non réparable : la phrase et celle de l'administrateur, sans bouton
+    await cas('p7e', { GTRACKER_BANC_SANSFIL_PAREFEU: 'irreparable' }, '7e', async (b, p) => {
+      await messageVu(b);
+      const c = await carte(b);
+      console.log(`  pare-feu non réparable : ${JSON.stringify(c.pareFeuPhrases)} ; boutons ${c.boutons.join(' / ')}`);
+      check('7e. la phrase du blocage est suivie de celle de l\'administrateur', c.pareFeuPhrases[0] === `${BLOQUE} ${ADMIN}`, JSON.stringify(c.pareFeuPhrases));
+      check('7e. aucun bouton « Autoriser Gtracker » ni mention de confirmation', c.autoriser === null && !c.boutons.includes('Autoriser Gtracker') && !/Windows demande de confirmer/.test(c.texte), c.boutons.join('/'));
+      check('7e. aucune demande d\'autorisation', autorisations(p).length === 0, autorisations(p).join(' | '));
+      await capturer(b, 'sansfil-7-pare-feu-irreparable');
+      sansPowershell('7e', p);
+    });
+
+    // 7f. allumé depuis la page, sans règle : la phrase d'allumage, la demande part, puis rien ne s'affiche
+    await avecProgramme(dossier('p7f-profil'), dossier('p7f-memoire'), { GTRACKER_BANC_SANSFIL_PAREFEU: 'bloque' }, '7f', async (b, p) => {
+      await ouvrirMemoire(b);
+      let c = await carte(b);
+      check('7f. éteint : la phrase d\'allumage est « Windows va vous demander d\'autoriser Gtracker sur le réseau : acceptez. »', c.texte.includes(ALLUMAGE) && c.coche === false, c.texte);
+      check('7f. éteint : ni message de pare-feu, ni demande', c.pareFeu === null && autorisations(p).length === 0, autorisations(p).join(' | '));
+      check('7f. clic sur la case « Recevoir les sessions du téléphone sans câble »', (await b.click('.wireless-card__toggle')) === 'ok');
+      await ecoute(b);
+      await b.waitFor(() => autorisations(p).length > 0, { timeout: 5000, label: 'journal de l\'autorisation' });
+      await b.settle({ max: 1500 });
+      c = await carte(b);
+      check('7f. la demande est partie à l\'allumage (journal « autorisation d\'essai : accordee »)', autorisations(p).length === 1 && autorisations(p)[0].includes("autorisation d'essai : accordee"), autorisations(p).join(' | '));
+      const iDemande = p.journal.findIndex((l) => /autorisation d'essai/.test(l));
+      const iEcoute = p.journal.findIndex((l) => /sans-fil à l'écoute/.test(l));
+      check('7f. la demande part avant la mise à l\'écoute (ordre du journal de la coquille)', iDemande >= 0 && iEcoute > iDemande, `${iDemande} / ${iEcoute} : ${p.journal.join(' | ')}`);
+      check('7f. accordée : allumé et à l\'écoute, sans message de pare-feu ni bouton', c.coche === true && c.pareFeu === null && c.autoriser === null && c.erreur === null, JSON.stringify({ coche: c.coche, pareFeu: c.pareFeu, erreur: c.erreur }));
+      check('7f. allumé : la phrase d\'allumage a disparu', !c.texte.includes(ALLUMAGE), c.texte);
+      sansPowershell('7f', p);
     });
   }
 } catch (e) {
