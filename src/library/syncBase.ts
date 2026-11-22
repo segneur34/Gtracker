@@ -338,6 +338,23 @@ export const withSyncHeld = (base: SyncBase, startMs: number): SyncBase => ({
 });
 
 /**
+ * La base qui ne sait plus rien d'une session : ni ligne, ni suppression retenue, ni session laissée sur le téléphone.
+ * Pour une suppression que l'utilisateur a refusée : rien n'est posé dans `removed`, la session n'est pas tenue pour
+ * supprimée, et le plan suivant la traite comme neuve là où elle est encore (recopiée de l'autre côté). Sans ligne,
+ * rien ne se supprime : cet oubli ne peut rien faire perdre.
+ */
+export const withoutSyncMemory = (base: SyncBase, startMs: number): SyncBase => ({
+  ...base,
+  sessions: base.sessions.filter((s) => s.startMs !== startMs),
+  removed: base.removed.filter((removed) => removed !== startMs),
+  held: base.held.filter((held) => held !== startMs),
+});
+
+/** Vrai si la base retient quoi que ce soit de cette session (ligne, suppression retenue, session laissée). */
+export const hasSyncMemory = (base: SyncBase, startMs: number): boolean =>
+  base.sessions.some((s) => s.startMs === startMs) || base.removed.includes(startMs) || base.held.includes(startMs);
+
+/**
  * La base à la fin d'une synchronisation menée au bout : sa date, et les suppressions retenues réduites à celles
  * que la corbeille de l'ordinateur tient encore (`trashed`, leurs identités) ; les autres ne servent plus. De même
  * pour les itinéraires (`trashedRoutes`, leurs identités, `syncRouteId`) ; sans cette liste (itinéraires non
@@ -378,3 +395,15 @@ export const withRouteHeld = (base: SyncBase, id: string): SyncBase => ({
   removedRoutes: base.removedRoutes.filter((removed) => removed !== id),
   heldRoutes: withId(base.heldRoutes, id),
 });
+
+/** Comme `withoutSyncMemory`, pour un itinéraire : ni ligne, ni suppression retenue, ni itinéraire laissé sur le téléphone. */
+export const withoutRouteMemory = (base: SyncBase, id: string): SyncBase => ({
+  ...base,
+  routes: base.routes.filter((r) => r.id !== id),
+  removedRoutes: base.removedRoutes.filter((removed) => removed !== id),
+  heldRoutes: base.heldRoutes.filter((held) => held !== id),
+});
+
+/** Vrai si la base retient quoi que ce soit de cet itinéraire. */
+export const hasRouteMemory = (base: SyncBase, id: string): boolean =>
+  base.routes.some((r) => r.id === id) || base.removedRoutes.includes(id) || base.heldRoutes.includes(id);

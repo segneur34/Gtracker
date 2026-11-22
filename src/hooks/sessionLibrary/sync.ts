@@ -4,22 +4,27 @@ import { LEARNED_PLACES_FILE, RESTING_HR_FILE, SESSIONS_DIR, SETTINGS_DIR, sessi
 import { isCompleteGpxText } from '../../library/pendingTemps';
 import type { SessionRecord } from '../../library/record';
 import {
-  SYNC_DIR, SYNC_SIDES, emptySyncBase, markerTextWithId, markerTextWithSync, otherSyncSide, parseSyncBase, readMarkerId, serializeSyncBase,
-  syncAncestorPath, syncBaseLine, syncBasePath, syncRefusal, withSyncDone, withSyncHeld, withSyncLine, withoutSyncLine,
+  SYNC_DIR, SYNC_SIDES, emptySyncBase, hasSyncMemory, markerTextWithId, markerTextWithSync, otherSyncSide, parseSyncBase, readMarkerId,
+  serializeSyncBase, syncAncestorPath, syncBaseLine, syncBasePath, syncRefusal, withSyncDone, withSyncHeld, withSyncLine, withoutSyncLine,
+  withoutSyncMemory,
   type SyncBase, type SyncFiles, type SyncSideName, type SyncStamp,
 } from '../../library/syncBase';
 import { emptySyncOutcome, type SyncOutcome, type SyncUnknownActivity } from '../../library/syncOutcome';
 import {
-  planSync, restrictSyncPlan, syncListing, syncPair, syncRecordsToRead, syncSide,
+  planSync, restrictSyncPlan, syncDeletionSide, syncListing, syncPair, syncRecordsToRead, syncSide,
   type SyncAncestors, type SyncFirstReason, type SyncHeldChoice, type SyncItem, type SyncListing, type SyncOp, type SyncPlan,
   type SyncTargetNames, type SyncTrashed,
 } from '../../library/syncPlan';
 import { planSyncExtras, unknownSyncActivity, type SyncNamedText } from '../../library/syncExtras';
 import { inspectSyncRecord, mergeSyncRecords } from '../../library/syncRecordMerge';
-import { deletesToTrash, isWritableTrash, sessionTrashEntries, trashFilePath, type TrashEntry, type TrashOrigin } from '../../library/trash';
-import { addFilesToTrashEntry, readTrashIndex, rewriteTrashText, stashFilesInTrash } from '../../library/trashFolder';
+import {
+  deletesToTrash, isWritableTrash, sessionRestorePlan, sessionTrashEntries, trashFilePath, type TrashCopy, type TrashEntry, type TrashOrigin,
+} from '../../library/trash';
+import {
+  addFilesToTrashEntry, copyFromTrash, dropTrashEntries, readTrashIndex, rewriteTrashText, stashFilesInTrash, trashHoldsCopies, trashLeftoversIn,
+} from '../../library/trashFolder';
 import { sessionDisplayName } from '../../library/sessionName';
-import { planRouteSync, restrictRouteSyncPlan, type RouteSyncPlan } from '../../library/syncRoutes';
+import { planRouteSync, restrictRouteSyncPlan, type RouteSyncInput, type RouteSyncPlan } from '../../library/syncRoutes';
 import type { FileStat, MemoryFolder } from '../../platform/memoryFolder';
 import { readStoredActivities } from '../useSportSettings';
 import { deviceId, flushWrites } from './deviceSettings';
@@ -28,8 +33,8 @@ import { refreshLibrary } from './lifecycle';
 import { lib } from './memory';
 import { libraryState, setState } from './store';
 import {
-  executeRoutePlan, readRouteSyncInput, routeDeletionKeysOf, routeOpWritesPhone, routePlanFiles, routeRemovalsOf, trashedRouteIds,
-  type SyncRouteDeletionKey,
+  executeRoutePlan, keepRoutes, readRouteSyncInput, routeDeletionKeysOf, routeOpWritesPhone, routePlanFiles, routeRemovalsOf, trashedRouteIds,
+  type RouteKeepAnswer, type SyncRouteDeletionKey,
 } from './syncRouteFiles';
 import { holdTrashDuring, recordShownName, reloadTrash, trashFolderOf } from './trash';
 
@@ -53,6 +58,10 @@ import { holdTrashDuring, recordShownName, reloadTrash, trashFolderOf } from './
  * - Après les sessions, les itinéraires suivent leur propre plan (`library/syncRoutes.ts`, `syncRouteFiles.ts`), fait
  *   au départ avec celui des sessions : un seul garde-fou, une seule confirmation. Ils ne sont touchés que si le
  *   téléphone liste `itineraires/` (`phoneRoutes`).
+ * - Une suppression refusée (« Tout garder », `keepRefused`) et une session de la corbeille gardée (« Les garder »,
+ *   `heldOnPhone: 'keep'`) se règlent avant le plan, sur l'ordinateur seul : la base oublie la session, ou elle sort
+ *   de la corbeille de l'ordinateur si elle y est encore, et le plan la remet là où elle manque. Rien n'y supprime ni
+ *   n'écrase ; l'oubli vient en premier, pour qu'une suite coupée ne laisse pas la suppression refusée se faire.
  * - Puis les fichiers de réglages, les tests de FC repos et les lieux appris suivent leur propre plan
  *   (`library/syncExtras.ts`) : recopiés ou fondus, jamais supprimés, jamais adoptés.
  * - À la fin, si un fichier du téléphone a été écrit ou retiré, l'instant de la synchronisation est posé dans son
@@ -64,6 +73,9 @@ export const SYNC_RUNNING_PATH = `${SYNC_DIR}/en-cours.json`;
 
 export type { SyncExtrasOutcome, SyncFailure, SyncOutcome, SyncRoutesOutcome, SyncStop, SyncUnknownActivity } from '../../library/syncOutcome';
 export type { SyncRouteDeletionKey } from './syncRouteFiles';
+
+/** Réponse sur ce que la corbeille de l'ordinateur tient et qui est encore sur le téléphone ; `keep` : « Les garder ». */
+export type SyncHeldAnswer = SyncHeldChoice | 'keep';
 
 export interface SyncOptions {
   /** Faux : le dossier distant se lit sans s'écrire, seule la moitié de l'ordinateur est faite. Par défaut : s'il n'est pas en lecture seule. */
@@ -79,9 +91,30 @@ export interface SyncOptions {
    * que si le plan du moment n'en fait pas d'autre : sinon rien n'est supprimé, et le garde-fou repose sa question.
    */
   confirmedDeletions?: readonly SyncDeletionKey[];
+  /**
+   * « Tout garder » : les suppressions que la question du garde-fou a montrées et que l'utilisateur refuse (session ou
+   * itinéraire, et côté d'où il serait parti). Chacune est défaite là où elle a été faite : supprimée sur le
+   * téléphone, la session y est recopiée ; supprimée sur l'ordinateur, elle sort de sa corbeille, ou revient du
+   * téléphone si la corbeille ne la tient plus. Une clé n'agit que si la session est encore dans le cas montré ; une
+   * suppression apparue depuis reste soumise au garde-fou. Un téléphone qu'on ne peut pas écrire ne reçoit rien : la
+   * session reste sur l'ordinateur, comme une session neuve qui l'attend, et la question ne revient pas.
+   */
+  keepRefused?: { sessions?: readonly SyncDeletionKey[]; routes?: readonly SyncRouteDeletionKey[] };
   /** Où est le dossier sur le téléphone ; un autre chemin que celui de la base en fait une paire neuve. */
   phonePath?: string | null;
-  heldOnPhone?: SyncHeldChoice;
+  /**
+   * Sort des sessions et des itinéraires de la corbeille de l'ordinateur encore sur le téléphone : `leave` (par
+   * défaut) et `remove`, comme le plan (`SyncHeldChoice`) ; `keep`, « Les garder » : chacun revient sur l'ordinateur,
+   * sorti de sa corbeille si elle le tient encore, sinon recopié du téléphone, et il est de nouveau suivi.
+   */
+  heldOnPhone?: SyncHeldAnswer;
+  /**
+   * Avec `heldOnPhone: 'keep'`, les sessions (`startMs`) et les itinéraires (identités) que la question a montrés :
+   * eux seuls sont gardés, un autre apparu depuis reste laissé et la question revient pour lui. Aucune des deux
+   * listes : tous sont gardés ; une seule donnée, l'autre vaut une liste vide.
+   */
+  heldToKeep?: readonly number[];
+  heldRoutesToKeep?: readonly string[];
   /**
    * Avec `heldOnPhone: 'remove'`, les sessions de la corbeille encore sur le téléphone que l'utilisateur a vues et
    * accepté de retirer (`startMs`). Donnée, si une autre attend d'être retirée, aucune ne l'est : elles restent
@@ -187,13 +220,15 @@ export interface SyncDeletionKey {
 const sameDeletion = (a: SyncDeletionKey, b: SyncDeletionKey): boolean => a.startMs === b.startMs && a.side === b.side;
 
 /**
- * Les suppressions que font ces sessions, une par session, du côté où elle s'applique : la règle de la liste que
- * montre le garde-fou (`describeSyncQuestion`), supprimée sur le téléphone, elle part de l'ordinateur, sinon du
- * téléphone.
+ * Les suppressions que font ces sessions, une par session, du côté où elle s'applique : celles que le garde-fou
+ * compte et que sa question montre (`syncDeletionSide`), supprimée sur le téléphone, elle part de l'ordinateur, sinon
+ * du téléphone. Les restes d'une session absente des deux côtés n'en sont pas.
  */
 const deletionKeysOf = (items: readonly SyncItem[]): SyncDeletionKey[] =>
-  items.filter((item) => item.ops.some((op) => op.kind === 'trash' || op.kind === 'removeFromPhone'))
-    .map((item) => ({ startMs: item.startMs, side: item.case === 'deletedOnPhone' ? 'computer' : 'phone' }));
+  items.flatMap((item) => {
+    const side = syncDeletionSide(item);
+    return side ? [{ startMs: item.startMs, side }] : [];
+  });
 
 /** Une opération à laquelle l'exécutant renonce : l'état du moment n'est pas celui du plan. */
 class StaleError extends Error {}
@@ -326,7 +361,8 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     const ids = { computer: readMarkerId(markers.computer), phone: readMarkerId(markers.phone) };
     const read = ids.phone ? parseSyncBase(await computer.readText(syncBasePath(ids.phone))) : { state: 'absent' as const };
     if (read.state === 'newer') return emptyOutcome('newerBase');
-    const pair = syncPair(ids.computer, ids.phone, options.phonePath ?? null, read.state === 'ok' ? read.base : null);
+    // La base de la paire change avant le plan quand une réponse de l'utilisateur lui fait oublier une session.
+    let pair = syncPair(ids.computer, ids.phone, options.phonePath ?? null, read.state === 'ok' ? read.base : null);
     outcome.first = pair.first;
     const running = await computer.readText(SYNC_RUNNING_PATH);
     outcome.interrupted = running !== null;
@@ -363,22 +399,10 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       if (side === 'phone' && outcome.safetyCopy) await writeWitness(startedAtMs);
     }
 
-    const listings: Record<SyncSideName, SyncListing> = {
-      computer: syncListing(await computer.list(SESSIONS_DIR)), phone: syncListing(await phone.list(SESSIONS_DIR)),
-    };
+    let listings: Record<SyncSideName, SyncListing> = { computer: syncListing([]), phone: syncListing([]) };
     /** Tampon attendu de chaque fichier de `sessions/` : celui du listage, puis celui de nos propres écritures. */
     const expected: Record<SyncSideName, Map<string, FileStat>> = { computer: new Map(), phone: new Map() };
-    for (const side of SYNC_SIDES) {
-      const stamps = [...listings[side].sessions.flatMap((s) => [s.gpx, s.record, s.imu]), ...listings[side].orphans];
-      for (const stamp of stamps) if (stamp) expected[side].set(stamp.name, { size: stamp.size, mtimeMs: stamp.mtimeMs });
-    }
     const ancestors = new Map<number, SyncAncestors>();
-    for (const line of pair.base?.sessions ?? []) {
-      ancestors.set(line.startMs, {
-        computer: await computer.readText(syncAncestorPath(pair.base?.phoneId as string, line.startMs, 'computer')),
-        phone: await computer.readText(syncAncestorPath(pair.base?.phoneId as string, line.startMs, 'phone')),
-      });
-    }
     const sideOf = async (side: SyncSideName) => {
       const texts = new Map<string, string | null>();
       for (const name of syncRecordsToRead(listings[side], pair.base, side, (startMs, of) => (ancestors.get(startMs)?.[of] ?? null) !== null)) {
@@ -396,25 +420,143 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     const trashNow = async (): Promise<TrashEntry[]> => (await readTrashIndex(computer)).entries;
     const trashedOf = (entries: readonly TrashEntry[]): SyncTrashed[] =>
       entries.flatMap((e) => (e.kind !== 'itineraire' && e.startMs !== null ? [{ startMs: e.startMs, files: e.files }] : []));
-    const input = { pair, computer: await sideOf('computer'), phone: await sideOf('phone'), ancestors, trash: trashedOf(await trashNow()) };
-    let plan = planSync({ ...input, heldOnPhone: options.heldOnPhone });
-    if (options.heldOnPhone === 'remove' && options.heldToRemove) {
+    /**
+     * Lit ce que le plan demande : les deux listages, les fiches gardées des lignes de la base, les fiches à relire et
+     * la corbeille. Refait quand une réponse de l'utilisateur a changé l'ordinateur ou la base avant le plan.
+     */
+    const readInput = async () => {
+      listings = { computer: syncListing(await computer.list(SESSIONS_DIR)), phone: syncListing(await phone.list(SESSIONS_DIR)) };
+      for (const side of SYNC_SIDES) {
+        expected[side].clear();
+        const stamps = [...listings[side].sessions.flatMap((s) => [s.gpx, s.record, s.imu]), ...listings[side].orphans];
+        for (const stamp of stamps) if (stamp) expected[side].set(stamp.name, { size: stamp.size, mtimeMs: stamp.mtimeMs });
+      }
+      ancestors.clear();
+      for (const line of pair.base?.sessions ?? []) {
+        ancestors.set(line.startMs, {
+          computer: await computer.readText(syncAncestorPath(pair.base?.phoneId as string, line.startMs, 'computer')),
+          phone: await computer.readText(syncAncestorPath(pair.base?.phoneId as string, line.startMs, 'phone')),
+        });
+      }
+      return { computer: await sideOf('computer'), phone: await sideOf('phone'), ancestors, trash: trashedOf(await trashNow()) };
+    };
+    let input = await readInput();
+    const keepHeld = options.heldOnPhone === 'keep';
+    const heldChoice: SyncHeldChoice | undefined = options.heldOnPhone === 'keep' ? undefined : options.heldOnPhone;
+    /** Le plan entier des sessions ; `keep` : les identités que l'utilisateur garde. */
+    const sessionPlanOf = (keep: readonly number[]): SyncPlan => {
+      const whole = planSync({ ...input, pair, heldOnPhone: heldChoice, keep });
+      if (heldChoice !== 'remove' || !options.heldToRemove) return whole;
       // Retirer seulement les sessions montrées : une autre apparue depuis la question les fait toutes laisser.
       const shown = new Set(options.heldToRemove);
-      const heldNow = planSync({ ...input, heldOnPhone: 'leave' });
-      if (heldNow.items.some((item) => item.left === 'inTrash' && !shown.has(item.startMs))) plan = heldNow;
+      const heldNow = planSync({ ...input, pair, heldOnPhone: 'leave', keep });
+      return heldNow.items.some((item) => item.left === 'inTrash' && !shown.has(item.startMs)) ? heldNow : whole;
+    };
+    /** Le plan entier des itinéraires, de même. */
+    const routePlanOf = (from: Omit<RouteSyncInput, 'heldOnPhone' | 'keep'>, keep: readonly string[]): RouteSyncPlan => {
+      const whole = planRouteSync({ ...from, heldOnPhone: heldChoice, keep });
+      if (heldChoice !== 'remove' || !options.heldRoutesToRemove) return whole;
+      const shown = new Set(options.heldRoutesToRemove);
+      const heldNow = planRouteSync({ ...from, heldOnPhone: 'leave', keep });
+      return heldNow.items.some((item) => item.left === 'inTrash' && !shown.has(item.id)) ? heldNow : whole;
+    };
+
+    /** Écrit la base changée avant le plan, et la retient comme celle de la paire. */
+    const writeBase = async (next: SyncBase): Promise<void> => {
+      await computer.writeText(syncBasePath(next.phoneId), serializeSyncBase(next));
+      pair = { ...pair, base: next };
+    };
+    /**
+     * La base oublie ces sessions (`withoutSyncMemory`), d'une seule écriture, puis leurs fiches gardées : sans ligne,
+     * rien ne les supprime, et le plan les recopie là où elles manquent. Vrai si la base a changé.
+     */
+    const forgetSessions = async (starts: readonly number[]): Promise<boolean> => {
+      const known = pair.base;
+      const gone = known ? starts.filter((startMs) => hasSyncMemory(known, startMs)) : [];
+      if (!known || gone.length === 0) return false;
+      await writeBase(gone.reduce((base, startMs) => withoutSyncMemory(base, startMs), known));
+      for (const startMs of gone) {
+        for (const side of SYNC_SIDES) await computer.remove(syncAncestorPath(known.phoneId, startMs, side));
+      }
+      return true;
+    };
+    /**
+     * Ce qui ferait sortir de la corbeille de l'ordinateur la session `startMs` : les copies d'une entrée qui la
+     * tient avec son GPX et sa fiche, celle venue de l'ordinateur d'abord, la plus récente, sous un nom libre (une
+     * fiche ou des capteurs restés seuls d'une restauration coupée sont repris en place). `null` si aucune entrée ne
+     * convient.
+     */
+    const trashRestoreOf = async (startMs: number): Promise<{ entry: TrashEntry; copies: TrashCopy[] } | null> => {
+      const entries = sessionTrashEntries(await trashNow(), startMs)
+        .sort((a, b) => Number(a.origin !== 'ordinateur') - Number(b.origin !== 'ordinateur') || b.deletedAtMs - a.deletedAtMs);
+      for (const entry of entries) {
+        const names = (await computer.list(SESSIONS_DIR)).map((e) => e.name);
+        const leftovers = new Set(await trashLeftoversIn(computer, entry, SESSIONS_DIR, names));
+        const { copies } = sessionRestorePlan(entry, names.filter((name) => !leftovers.has(name)));
+        const brings = (ext: RegExp): boolean => copies.some((copy) => ext.test(copy.to));
+        if (brings(/\.gpx$/i) && brings(/\.json$/i) && (await trashHoldsCopies(computer, copies))) return { entry, copies };
+      }
+      return null;
+    };
+
+    // Réponses « Tout garder » et « Les garder », sur l'ordinateur seul et avant le plan. Une réponse n'agit que sur
+    // une session encore dans le cas que la question a montré, d'après le plan du moment sans ces réponses.
+    const refusedSessions = options.keepRefused?.sessions ?? [];
+    const heldLists = options.heldToKeep !== undefined || options.heldRoutesToKeep !== undefined;
+    if (refusedSessions.length > 0 || keepHeld) {
+      const refusedOn = (startMs: number, side: SyncSideName): boolean => refusedSessions.some((key) => sameDeletion(key, { startMs, side }));
+      const heldKept = (startMs: number): boolean => keepHeld && (!heldLists || (options.heldToKeep ?? []).includes(startMs));
+      const wanted = sessionPlanOf([]).items.filter((item) => {
+        const side = syncDeletionSide(item);
+        return side ? refusedOn(item.startMs, side) : item.left === 'inTrash' && (heldKept(item.startMs) || refusedOn(item.startMs, 'phone'));
+      });
+      outcome.kept.sessions = wanted.map((item) => item.startMs);
+      // D'abord, d'une seule écriture, la base oublie tout ce qui ne doit plus pouvoir se supprimer de soi-même si la
+      // suite est coupée : les sessions supprimées sur le téléphone (le plan les y recopie, ou elles l'attendent comme
+      // des sessions neuves s'il ne s'écrit pas), et celles de l'ordinateur que sa corbeille ne peut pas rendre (le
+      // plan les recopie depuis le téléphone). Une session suivie que la corbeille rend garde sa ligne : ses deux
+      // fiches se fondront avec leurs ancêtres, sans rien perdre de ce qui a été saisi depuis sur le téléphone.
+      const fromTrash: number[] = [];
+      const forgotten: number[] = [];
+      for (const item of wanted) {
+        const onPhoneOnly = syncDeletionSide(item) !== 'computer';
+        const restorable = onPhoneOnly && (await trashRestoreOf(item.startMs)) !== null;
+        if (restorable) fromTrash.push(item.startMs);
+        if (!restorable || syncBaseLine(pair.base, item.startMs) === null) forgotten.push(item.startMs);
+      }
+      let changed = await forgetSessions(forgotten);
+      // Puis chaque session que la corbeille tient en sort : capteurs, fiche, GPX en dernier, et l'entrée retirée
+      // ensuite seulement. Une coupure entre les deux la laisse dans la mémoire et dans la corbeille, jamais deux fois
+      // dans la mémoire.
+      for (const startMs of fromTrash) {
+        const restore = await trashRestoreOf(startMs);
+        if (!restore) {
+          if (await forgetSessions([startMs])) changed = true;
+          continue;
+        }
+        await copyFromTrash(computer, restore.copies);
+        await dropTrashEntries(computer, [restore.entry.dir]);
+        outcome.kept.fromTrash.sessions.push(startMs);
+        changed = true;
+      }
+      if (changed) input = await readInput();
     }
-    const full = plan;
+    const full = sessionPlanOf(outcome.kept.sessions);
     // Itinéraires : leur plan est fait maintenant, pour que le garde-fou et sa confirmation les comptent avec les
     // sessions ; ils ne sont exécutés qu'après elles. Rien ne les touche (ni lecture ni écriture) sans `phoneRoutes`.
     outcome.routes.waiting = options.phoneRoutes === false;
-    const routeInput = options.phoneRoutes === true ? await readRouteSyncInput(folders, pair.base) : null;
-    let routeFull: RouteSyncPlan | null = routeInput ? planRouteSync({ ...routeInput, heldOnPhone: options.heldOnPhone }) : null;
-    if (routeInput && options.heldOnPhone === 'remove' && options.heldRoutesToRemove) {
-      const shown = new Set(options.heldRoutesToRemove);
-      const heldNow = planRouteSync({ ...routeInput, heldOnPhone: 'leave' });
-      if (heldNow.items.some((item) => item.left === 'inTrash' && !shown.has(item.id))) routeFull = heldNow;
+    let routeInput = options.phoneRoutes === true ? await readRouteSyncInput(folders, pair.base) : null;
+    const routeAnswer: RouteKeepAnswer = {
+      refused: options.keepRefused?.routes ?? [],
+      held: !keepHeld ? null : heldLists ? options.heldRoutesToKeep ?? [] : 'all',
+    };
+    if (routeInput && (routeAnswer.refused.length > 0 || routeAnswer.held !== null)) {
+      const kept = await keepRoutes(routePlanOf(routeInput, []), routeAnswer, { computer, base: () => pair.base, setBase: writeBase });
+      outcome.kept.routes = kept.kept;
+      outcome.kept.fromTrash.routes = kept.fromTrash;
+      if (kept.changed) routeInput = await readRouteSyncInput(folders, pair.base);
     }
+    const routeFull: RouteSyncPlan | null = routeInput ? routePlanOf(routeInput, outcome.kept.routes) : null;
     // Le garde-fou ne compte que les suppressions que cette passe peut faire : un téléphone qu'on ne peut pas écrire
     // ne perd rien, et ses retraits ne retiennent pas les mises à la corbeille de l'ordinateur.
     const possible = restrictSyncPlan(full, { ...scope, deletions: true });
@@ -426,10 +568,13 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     const unconfirmedShown = options.confirmDeletions === true && !confirmed;
     const tripped = possible.guard.tripped || routePossible?.guard.tripped === true;
     outcome.deletions = !scope.deletions ? 'excluded' : (tripped || unconfirmedShown) && !confirmed ? 'awaitingConfirmation' : 'made';
-    plan = restrictSyncPlan(full, { ...scope, deletions: outcome.deletions === 'made' });
+    const plan = restrictSyncPlan(full, { ...scope, deletions: outcome.deletions === 'made' });
     outcome.plan = plan;
     const deletionsOf = (item: SyncItem | undefined): number => item?.ops.filter((op) => op.kind === 'trash' || op.kind === 'removeFromPhone').length ?? 0;
-    outcome.withheldDeletions = possible.items.filter((item) => deletionsOf(item) > deletionsOf(plan.items.find((i) => i.startMs === item.startMs)));
+    // Seulement ce que le garde-fou compte : les restes d'une session absente des deux côtés, retenus avec le reste,
+    // ne sont pas une suppression à montrer ni à confirmer.
+    outcome.withheldDeletions = possible.items.filter((item) =>
+      syncDeletionSide(item) !== null && deletionsOf(item) > deletionsOf(plan.items.find((i) => i.startMs === item.startMs)));
     if (!scope.phone) outcome.withheldForPhone = full.items.filter((item) => phoneOpsOf(item) > 0);
     const routePlan = routeFull ? restrictRouteSyncPlan(routeFull, { ...scope, deletions: outcome.deletions === 'made' }) : null;
     if (routeFull && routePossible && routePlan) {

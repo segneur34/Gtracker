@@ -60,6 +60,18 @@ export interface SyncUnknownActivity {
   activityId: string;
 }
 
+/**
+ * Ce qu'une réponse « Tout garder » ou « Les garder » a réglé à cette passe : les sessions (leur instant de départ) et
+ * les itinéraires (leur identité) qui étaient encore dans le cas montré par la question. `fromTrash` : ceux d'entre
+ * eux sortis de la corbeille de l'ordinateur ; les autres reviennent par une copie depuis l'appareil qui les tient
+ * encore, dans le plan (ou attendent un téléphone qu'on peut écrire).
+ */
+export interface SyncKeptOutcome {
+  sessions: number[];
+  routes: string[];
+  fromTrash: { sessions: number[]; routes: string[] };
+}
+
 /** Ce qu'a fait une synchronisation, pour son compte rendu. */
 export interface SyncOutcome {
   /** Rien n'a été fait, et pourquoi ; `null` : la synchronisation a eu lieu (même coupée). */
@@ -101,6 +113,8 @@ export interface SyncOutcome {
   failed: SyncFailure[];
   /** Identités dont une copie du téléphone a été rangée à la corbeille avant d'en être retirée. */
   keptFromPhone: number[];
+  /** Suppressions refusées et sessions de la corbeille gardées, réglées à cette passe. */
+  kept: SyncKeptOutcome;
   /** Texte de l'erreur du dossier distant qui a tout arrêté (liaison perdue) ; `null` sinon. */
   linkLost: string | null;
   /** Texte d'une autre erreur qui a tout arrêté avant ou après les sessions, ou raison du refus `safetyCopy` ; `null` sinon. */
@@ -125,6 +139,7 @@ export interface SyncOutcome {
 export const emptySyncOutcome = (refusal: SyncStop | null): SyncOutcome => ({
   refusal, interrupted: false, first: null, safetyCopy: null, plan: null, deletions: 'made', withheldDeletions: [], withheldForPhone: [],
   phoneWritable: false, phoneRecording: false, done: [], skipped: [], failed: [], keptFromPhone: [],
+  kept: { sessions: [], routes: [], fromTrash: { sessions: [], routes: [] } },
   extras: { done: [], left: [], withheld: [] }, unknownActivities: [],
   routes: { waiting: false, plan: null, withheldDeletions: [], withheldForPhone: [], done: [], skipped: [], failed: [] },
   linkLost: null, error: null, complete: false,

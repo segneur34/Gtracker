@@ -302,6 +302,36 @@ export const emptyTrash = (f: TrashFolder): Promise<void> =>
     }
   });
 
+/**
+ * Vrai si chaque fichier à recopier est encore dans la corbeille, et s'il y en a : à vérifier avant une restauration
+ * faite sans que l'utilisateur ait désigné l'entrée, pour ne pas la commencer sur une entrée dont un fichier manque.
+ */
+export const trashHoldsCopies = async (f: Pick<MemoryFolder, 'stat'>, copies: readonly TrashCopy[]): Promise<boolean> => {
+  for (const { from } of copies) if (!(await f.stat(from))) return false;
+  return copies.length > 0;
+};
+
+/**
+ * Parmi les fichiers `names` du dossier `dir` de la mémoire, ceux qui sont déjà, sous le même nom et au même contenu,
+ * octet pour octet, des fichiers de l'entrée, alors que son fichier principal n'y est pas : les restes d'une
+ * restauration ou d'une suppression coupée. La restauration peut les reprendre en place (elle y réécrit le même
+ * contenu) au lieu de prendre un nom de plus à côté. Un reste d'un autre contenu n'en est pas : il n'est pas écrasé.
+ */
+export const trashLeftoversIn = async (
+  f: Pick<MemoryFolder, 'readBytes'>, entry: TrashEntry, dir: string, names: readonly string[],
+): Promise<string[]> => {
+  if (names.some((name) => name.toLowerCase() === entry.main.toLowerCase())) return [];
+  const leftovers: string[] = [];
+  for (const name of names) {
+    const kept = entry.files.find((file) => file.name.toLowerCase() === name.toLowerCase());
+    if (!kept) continue;
+    const mine = await f.readBytes(`${dir}/${name}`).catch(() => null);
+    const theirs = await f.readBytes(trashFilePath(entry.dir, kept.name)).catch(() => null);
+    if (mine && theirs && sameBytes(mine, theirs)) leftovers.push(name);
+  }
+  return leftovers;
+};
+
 /** Recopie les fichiers d'une entrée vers la mémoire, dans l'ordre du plan (`sessionRestorePlan`, `routeRestorePlan`). */
 export const copyFromTrash = (f: TrashFolder, copies: readonly TrashCopy[]): Promise<void> =>
   inTrashQueue(async () => {

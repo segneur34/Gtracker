@@ -32,6 +32,10 @@ import {
  * Rien ne se supprime sans ligne dans la base. Le téléphone n'a pas de corbeille : un itinéraire n'en est retiré
  * qu'une fois sa fiche tenue, au contenu près, par la corbeille de l'ordinateur ; sinon sa copie y est rangée
  * d'abord. Une fiche d'une version plus récente de l'application n'est jamais écrasée.
+ *
+ * Une suppression que l'utilisateur a refusée (`RouteSyncInput.keep`) ne se fait pas : l'itinéraire est traité comme
+ * neuf du côté qui l'a encore, donc recopié de l'autre, et sa ligne reposée ; il n'est pas non plus retenu sur le
+ * téléphone à cause de la corbeille. `keep` n'a d'effet que dans ces cas.
  */
 
 /** Préfixe de l'identité d'un itinéraire sans date de création : la base de ses noms, en minuscules. */
@@ -134,6 +138,12 @@ export interface RouteSyncInput {
   trash: readonly SyncTrashedRoute[];
   /** Par défaut `SYNC_HELD_ON_PHONE`, le même choix que pour les sessions. */
   heldOnPhone?: SyncHeldChoice;
+  /**
+   * Identités que l'utilisateur a dit garder, comme `SyncInput.keep` pour les sessions : un itinéraire suivi qui
+   * manque d'un côté est recopié là où il manque au lieu d'être supprimé de l'autre, et un itinéraire du téléphone que
+   * la corbeille ferait retenir est recopié sur l'ordinateur. Sans effet hors de ces cas.
+   */
+  keep?: readonly string[];
 }
 
 /**
@@ -319,6 +329,7 @@ export const planRouteSync = (input: RouteSyncInput): RouteSyncPlan => {
   const computer = oneByIdentity(seen.computer);
   const phone = oneByIdentity(seen.phone);
   const taken: Record<SyncSideName, string[]> = { computer: [...input.computer.names], phone: [...input.phone.names] };
+  const refused = new Set(input.keep ?? []);
 
   const itemOf = (id: string, kind: SyncCase, o: Seen | null, t: Seen | null): RouteSyncItem => ({
     id, createdAt: id.startsWith(ROUTE_NAME_ID_PREFIX) ? null : id, case: kind,
@@ -376,13 +387,13 @@ export const planRouteSync = (input: RouteSyncInput): RouteSyncPlan => {
     base: { kind: 'forget' },
   });
 
-  /** D'un seul côté, inconnu de la base : recopié de l'autre côté. */
+  /** D'un seul côté, inconnu de la base, ou suivi mais que l'utilisateur a dit garder (`keep`) : recopié de l'autre côté. */
   const fresh = (id: string, from: SyncSideName, s: Seen): RouteSyncItem => {
     const item = from === 'computer' ? itemOf(id, 'newOnComputer', s, null) : itemOf(id, 'newOnPhone', null, s);
     // Supprimé sur l'ordinateur sans que la synchronisation l'ait su : il ne revient de lui-même que si elle avait
-    // mené sa suppression au bout et qu'il a été remis depuis sur le téléphone.
+    // mené sa suppression au bout et qu'il a été remis depuis sur le téléphone. Gardé par l'utilisateur, il revient.
     const inTrash = trash.some((entry) => entry.id === id);
-    const heldBack = from === 'phone' && (base?.heldRoutes.includes(id) || (inTrash && !base?.removedRoutes.includes(id)));
+    const heldBack = from === 'phone' && !refused.has(id) && (base?.heldRoutes.includes(id) || (inTrash && !base?.removedRoutes.includes(id)));
     if (heldBack) {
       return (input.heldOnPhone ?? SYNC_HELD_ON_PHONE) === 'remove' ? removedFromPhone(id, null) : { ...item, left: 'inTrash', base: { kind: 'hold' } };
     }
@@ -426,6 +437,8 @@ export const planRouteSync = (input: RouteSyncInput): RouteSyncPlan => {
     const item = here === 'computer' ? itemOf(id, kind, s, null) : itemOf(id, kind, null, s);
     if (s.state === 'unreadable') return { ...item, left: 'unreadable' };
     if (changedSince(s, here, line)) return { ...copyAcross(item, here, s), revived: true };
+    // Suppression refusée : il retourne là où il manque, au lieu de partir de là où il est encore.
+    if (refused.has(id)) return fresh(id, here, s);
     if (gone === 'computer') return removedFromPhone(id, line);
     return {
       ...item,

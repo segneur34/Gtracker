@@ -16,7 +16,7 @@ import {
   SyncCutError, deleteSyncSession, editSyncRecord, hasSyncFiles, putSyncSession, readSyncRecord, syncGpxName, syncMemoryFolder, syncSessionFiles,
   type SyncFolder,
 } from '../../test/syncFolder.fixture';
-import { SYNC_RUNNING_PATH, executeSync, type SyncOptions, type SyncOutcome } from './sync';
+import { SYNC_RUNNING_PATH, executeSync, type SyncDeletionKey, type SyncOptions, type SyncOutcome } from './sync';
 
 const T0 = Date.UTC(2026, 10, 1, 10, 0, 0);
 const HOUR = 3_600_000;
@@ -622,6 +622,382 @@ describe('ce que la couche du bouton reçoit', () => {
     expect(describeSyncQuestion(half)).toBeNull();
     expect(half.withheldForPhone.map((i) => i.startMs)).toEqual([at(7)]);
     expect(describeSync(half, 'sansFil').paragraphs).toContain('1 changement attend le câble ou la mise à jour du téléphone.');
+  });
+});
+
+/** Les suppressions qu'une passe a retenues, telles que la question les montre : la session, et le côté d'où elle partirait. */
+const refusedOf = (outcome: SyncOutcome): SyncDeletionKey[] =>
+  outcome.withheldDeletions.map((item) => ({ startMs: item.startMs, side: item.case === 'deletedOnPhone' ? 'computer' : 'phone' }));
+
+/** Les sessions de la corbeille de l'ordinateur encore sur le téléphone, laissées par cette passe. */
+const heldOf = (outcome: SyncOutcome): number[] => (outcome.plan?.items ?? []).filter((i) => i.left === 'inTrash').map((i) => i.startMs);
+
+const bothSides = async (pair: Pair): Promise<string[][]> => [await syncSessionFiles(pair.computer), await syncSessionFiles(pair.phone)];
+
+const NOTHING_KEPT = { sessions: [], routes: [], fromTrash: { sessions: [], routes: [] } };
+
+describe('réponses définitives : « Tout garder » et « Les garder »', () => {
+  it('« Tout garder », supprimée sur le téléphone : recopiée sur le téléphone et suivie de nouveau, la question ne revient pas', async () => {
+    const pair = await syncedPair(3);
+    deleteSyncSession(pair.phone, fileOf(1));
+    const asked = await run(pair);
+    expect(asked.kept).toEqual(NOTHING_KEPT);
+    expect(refusedOf(asked)).toEqual([{ startMs: at(1), side: 'computer' }]);
+    const kept = await run(pair, { keepRefused: { sessions: refusedOf(asked) } });
+    expect(kept).toMatchObject({ deletions: 'made', complete: true, withheldDeletions: [] });
+    expect(kept.kept).toEqual({ ...NOTHING_KEPT, sessions: [at(1)] });
+    expect(kept.done.find((i) => i.startMs === at(1))).toMatchObject({ case: 'newOnComputer', ops: [{ kind: 'copy', to: 'phone' }] });
+    expect(await bothSides(pair)).toEqual([[0, 1, 2].map(fileOf), [0, 1, 2].map(fileOf)]);
+    expect(trashOf(pair)).toEqual([]);
+    expect(baseOf(pair)).toMatchObject({ removed: [], held: [] });
+    expect(baseOf(pair)?.sessions.map((s) => s.startMs)).toEqual([at(0), at(1), at(2)]);
+    const after = await run(pair);
+    expect(after).toMatchObject({ deletions: 'made', complete: true });
+    expect(after.plan?.items.flatMap((i) => i.ops)).toEqual([]);
+  });
+
+  it('« Tout garder », supprimée sur l’ordinateur : sortie de sa corbeille, les deux fiches fondues, rien n’est retiré du téléphone', async () => {
+    const pair = await syncedPair(3);
+    editSyncRecord(pair.computer, fileOf(1), (r) => ({ ...r, name: 'Nom ordinateur' }));
+    await trashOnComputer(pair, 1);
+    editSyncRecord(pair.phone, fileOf(1), (r) => ({ ...r, notes: notes({ comment: 'Note téléphone' }) }));
+    const asked = await run(pair);
+    expect(refusedOf(asked)).toEqual([{ startMs: at(1), side: 'phone' }]);
+    const kept = await run(pair, { keepRefused: { sessions: refusedOf(asked) } });
+    expect(kept).toMatchObject({ deletions: 'made', complete: true, keptFromPhone: [], withheldDeletions: [] });
+    expect(kept.kept).toEqual({ ...NOTHING_KEPT, sessions: [at(1)], fromTrash: { sessions: [at(1)], routes: [] } });
+    // Suivie comme avant, avec ses fiches gardées : ce que chaque appareil a saisi depuis passe à l'autre.
+    expect(kept.done.find((i) => i.startMs === at(1))).toMatchObject({ case: 'followed', withoutAncestor: false, conflicts: [] });
+    for (const side of [pair.computer, pair.phone]) {
+      expect(readSyncRecord(side, fileOf(1))).toMatchObject({ name: 'Nom ordinateur', notes: { comment: 'Note téléphone' } });
+    }
+    expect(await bothSides(pair)).toEqual([[0, 1, 2].map(fileOf), [0, 1, 2].map(fileOf)]);
+    expect(trashOf(pair)).toEqual([]);
+    expect(baseOf(pair)?.sessions.map((s) => s.startMs)).toEqual([at(0), at(1), at(2)]);
+    expect((await run(pair)).plan?.items.flatMap((i) => i.ops)).toEqual([]);
+  });
+
+  it('« Tout garder », supprimée sur l’ordinateur, corbeille vidée depuis : la base l’oublie et elle revient du téléphone', async () => {
+    const pair = await syncedPair(3);
+    await trashOnComputer(pair, 1);
+    const asked = await run(pair);
+    await emptyTrash(pair.computer);
+    const kept = await run(pair, { keepRefused: { sessions: refusedOf(asked) } });
+    expect(kept).toMatchObject({ deletions: 'made', complete: true, keptFromPhone: [] });
+    expect(kept.kept).toEqual({ ...NOTHING_KEPT, sessions: [at(1)] });
+    expect(kept.done.find((i) => i.startMs === at(1))).toMatchObject({ case: 'newOnPhone', ops: [{ kind: 'copy', to: 'computer' }] });
+    expect(await bothSides(pair)).toEqual([[0, 1, 2].map(fileOf), [0, 1, 2].map(fileOf)]);
+    expect(baseOf(pair)?.sessions.map((s) => s.startMs)).toEqual([at(0), at(1), at(2)]);
+    expect(trashOf(pair)).toEqual([]);
+  });
+
+  it('« Les garder » : la session sort de la corbeille, les fiches se complètent, elle est suivie et n’est plus retenue', async () => {
+    const pair = pairOf();
+    for (let k = 0; k < 5; k++) putBoth(pair, k);
+    editSyncRecord(pair.computer, fileOf(2), (r) => ({ ...r, name: 'Nom ordinateur' }));
+    await trashOnComputer(pair, 2);
+    const first = await run(pair);
+    expect(heldOf(first)).toEqual([at(2)]);
+    expect(baseOf(pair)?.held).toEqual([at(2)]);
+    const kept = await run(pair, { heldOnPhone: 'keep', heldToKeep: heldOf(first) });
+    expect(kept).toMatchObject({ deletions: 'made', complete: true });
+    expect(kept.kept).toEqual({ ...NOTHING_KEPT, sessions: [at(2)], fromTrash: { sessions: [at(2)], routes: [] } });
+    expect(heldOf(kept)).toEqual([]);
+    expect(await bothSides(pair)).toEqual([[0, 1, 2, 3, 4].map(fileOf), [0, 1, 2, 3, 4].map(fileOf)]);
+    expect(readSyncRecord(pair.phone, fileOf(2))?.name).toBe('Nom ordinateur');
+    expect(trashOf(pair)).toEqual([]);
+    expect(baseOf(pair)).toMatchObject({ held: [], removed: [] });
+    expect(baseOf(pair)?.sessions.map((s) => s.startMs)).toContain(at(2));
+    const after = await run(pair);
+    expect(heldOf(after)).toEqual([]);
+    expect(after.plan?.items.flatMap((i) => i.ops)).toEqual([]);
+  });
+
+  it('« Les garder », corbeille vidée depuis : sans réponse la question revient ; gardée, la session revient du téléphone', async () => {
+    const pair = pairOf();
+    for (let k = 0; k < 5; k++) putBoth(pair, k);
+    await trashOnComputer(pair, 2);
+    await run(pair);
+    await emptyTrash(pair.computer);
+    expect(heldOf(await run(pair))).toEqual([at(2)]);
+    const kept = await run(pair, { heldOnPhone: 'keep' });
+    expect(kept.complete).toBe(true);
+    expect(kept.kept).toEqual({ ...NOTHING_KEPT, sessions: [at(2)] });
+    expect(kept.done.find((i) => i.startMs === at(2))).toMatchObject({ case: 'newOnPhone', left: null });
+    expect(await syncSessionFiles(pair.computer)).toEqual([0, 1, 2, 3, 4].map(fileOf));
+    expect(baseOf(pair)).toMatchObject({ held: [], removed: [] });
+    expect(heldOf(await run(pair))).toEqual([]);
+  });
+
+  it('« Les garder » ne garde que les sessions montrées : une autre apparue depuis reste laissée, et la question revient pour elle', async () => {
+    const pair = pairOf();
+    for (let k = 0; k < 5; k++) putBoth(pair, k);
+    await trashOnComputer(pair, 2);
+    const first = await run(pair);
+    putBoth(pair, 7);
+    await trashOnComputer(pair, 7);
+    const kept = await run(pair, { heldOnPhone: 'keep', heldToKeep: heldOf(first) });
+    expect(kept.kept.sessions).toEqual([at(2)]);
+    expect(heldOf(kept)).toEqual([at(7)]);
+    expect(await syncSessionFiles(pair.computer)).toEqual([0, 1, 2, 3, 4].map(fileOf));
+    expect(await syncSessionFiles(pair.phone)).toContain(fileOf(7));
+    expect(baseOf(pair)?.held).toEqual([at(7)]);
+  });
+
+  it('« Les garder » dès la première rencontre, sans base encore : la session sort de la corbeille et les deux appareils se réunissent', async () => {
+    const pair = pairOf();
+    for (let k = 0; k < 5; k++) putBoth(pair, k);
+    await trashOnComputer(pair, 2);
+    const kept = await run(pair, { heldOnPhone: 'keep' });
+    expect(kept).toMatchObject({ first: 'noComputerId', complete: true });
+    expect(kept.kept).toEqual({ ...NOTHING_KEPT, sessions: [at(2)], fromTrash: { sessions: [at(2)], routes: [] } });
+    expect(await bothSides(pair)).toEqual([[0, 1, 2, 3, 4].map(fileOf), [0, 1, 2, 3, 4].map(fileOf)]);
+    expect(baseOf(pair)).toMatchObject({ held: [], removed: [] });
+    expect(baseOf(pair)?.sessions).toHaveLength(5);
+    expect(trashOf(pair)).toEqual([]);
+  });
+
+  it('« Retirer du téléphone » puis « Tout garder » à la question du garde-fou : la session revient de la corbeille, rien n’est retiré', async () => {
+    const pair = pairOf();
+    for (let k = 0; k < 3; k++) putBoth(pair, k);
+    await trashOnComputer(pair, 2);
+    const first = await run(pair);
+    // Un retrait sur trois sessions du téléphone dépasse le garde-fou : sa question suit la première réponse.
+    const removing = await run(pair, { heldOnPhone: 'remove', heldToRemove: heldOf(first) });
+    expect(removing.deletions).toBe('awaitingConfirmation');
+    expect(refusedOf(removing)).toEqual([{ startMs: at(2), side: 'phone' }]);
+    const kept = await run(pair, { heldOnPhone: 'remove', heldToRemove: heldOf(first), keepRefused: { sessions: refusedOf(removing) } });
+    expect(kept).toMatchObject({ deletions: 'made', complete: true, keptFromPhone: [] });
+    expect(kept.kept).toEqual({ ...NOTHING_KEPT, sessions: [at(2)], fromTrash: { sessions: [at(2)], routes: [] } });
+    expect(await bothSides(pair)).toEqual([[0, 1, 2].map(fileOf), [0, 1, 2].map(fileOf)]);
+    expect(baseOf(pair)).toMatchObject({ held: [], removed: [] });
+    expect(trashOf(pair)).toEqual([]);
+  });
+
+  it('réponse périmée : une suppression apparue depuis la question n’est pas faite, la question revient pour elle seule', async () => {
+    const pair = await syncedPair(3);
+    deleteSyncSession(pair.phone, fileOf(1));
+    const asked = await run(pair);
+    // La fenêtre attend ; une autre session est supprimée sur le téléphone avant la réponse. Des clés qui ne valent
+    // pas (mauvais côté, session toujours des deux côtés) sont sans effet.
+    deleteSyncSession(pair.phone, fileOf(2));
+    const stale = await run(pair, {
+      keepRefused: { sessions: [...refusedOf(asked), { startMs: at(2), side: 'phone' }, { startMs: at(0), side: 'computer' }] },
+    });
+    expect(stale.deletions).toBe('awaitingConfirmation');
+    expect(stale.kept.sessions).toEqual([at(1)]);
+    expect(refusedOf(stale)).toEqual([{ startMs: at(2), side: 'computer' }]);
+    expect(await bothSides(pair)).toEqual([[0, 1, 2].map(fileOf), [0, 1].map(fileOf)]);
+    expect(trashOf(pair)).toEqual([]);
+    const kept = await run(pair, { keepRefused: { sessions: refusedOf(stale) } });
+    expect(kept).toMatchObject({ deletions: 'made', complete: true });
+    expect(await bothSides(pair)).toEqual([[0, 1, 2].map(fileOf), [0, 1, 2].map(fileOf)]);
+  });
+
+  it('deux supprimées, puis une, puis une sur le téléphone : chaque question ne compte que ce qui est nouveau', async () => {
+    const pair = await syncedPair(3);
+    await trashOnComputer(pair, 0);
+    await trashOnComputer(pair, 1);
+    const first = await run(pair);
+    expect(refusedOf(first)).toEqual([{ startMs: at(0), side: 'phone' }, { startMs: at(1), side: 'phone' }]);
+    // Fermer la fenêtre ne décide rien : la question revient, avec les mêmes.
+    expect(refusedOf(await run(pair))).toEqual(refusedOf(first));
+    expect((await run(pair, { keepRefused: { sessions: refusedOf(first) } })).complete).toBe(true);
+    await trashOnComputer(pair, 2);
+    const second = await run(pair);
+    expect(refusedOf(second)).toEqual([{ startMs: at(2), side: 'phone' }]);
+    expect((await run(pair, { keepRefused: { sessions: refusedOf(second) } })).complete).toBe(true);
+    deleteSyncSession(pair.phone, fileOf(0));
+    const third = await run(pair);
+    expect(refusedOf(third)).toEqual([{ startMs: at(0), side: 'computer' }]);
+    expect((await run(pair, { keepRefused: { sessions: refusedOf(third) } })).complete).toBe(true);
+    expect(await bothSides(pair)).toEqual([[0, 1, 2].map(fileOf), [0, 1, 2].map(fileOf)]);
+    expect(trashOf(pair)).toEqual([]);
+    expect(baseOf(pair)).toMatchObject({ removed: [], held: [] });
+    expect(describeSyncQuestion(await run(pair))).toBeNull();
+  });
+
+  it('restes sans GPX d’une session absente des deux côtés : ni comptés ni montrés, et la confirmation de ce qui est montré suffit', async () => {
+    const pair = pairOf();
+    for (let k = 0; k < 3; k++) putBoth(pair, k, 12);
+    await run(pair);
+    // Supprimée sur le téléphone, et à la main sur l'ordinateur, GPX seul : sa fiche et ses capteurs y sont restés.
+    deleteSyncSession(pair.phone, fileOf(2));
+    pair.computer.drop(sessionPath(fileOf(2)));
+    // Une vraie suppression à côté : une session sur les deux qui restent, le garde-fou demande.
+    deleteSyncSession(pair.phone, fileOf(1));
+    const asked = await run(pair);
+    expect(asked.deletions).toBe('awaitingConfirmation');
+    expect(asked.withheldDeletions.map((i) => i.startMs)).toEqual([at(1)]);
+    expect(pair.computer.text(sessionPath(recordFileName(fileOf(2))))).not.toBeNull();
+    const made = await run(pair, { confirmDeletions: true, confirmedDeletions: refusedOf(asked) });
+    expect(made).toMatchObject({ deletions: 'made', complete: true });
+    expect(trashOf(pair).map((e) => `${e.startMs === at(1) ? 1 : 2}:${e.kind}`).sort()).toEqual(['1:session', '2:restes']);
+    expect(pair.computer.text(sessionPath(recordFileName(fileOf(2))))).toBeNull();
+  });
+
+  const HALVES: [string, SyncOptions][] = [
+    ['qui ne s’écrit pas', { phoneWritable: false }],
+    ['qui enregistre', { phoneWritable: false, phoneRecording: true }],
+  ];
+
+  it.each(HALVES)('« Tout garder » avec un téléphone %s : rien ne lui est envoyé, la question est réglée sur l’ordinateur', async (_label, half) => {
+    const pair = await syncedPair(4);
+    deleteSyncSession(pair.phone, fileOf(0));
+    await trashOnComputer(pair, 1);
+    const asked = await run(pair);
+    expect(refusedOf(asked)).toEqual([{ startMs: at(0), side: 'computer' }, { startMs: at(1), side: 'phone' }]);
+    const steps = pair.phone.steps();
+    const kept = await run(pair, { ...half, keepRefused: { sessions: refusedOf(asked) } });
+    expect(pair.phone.steps()).toBe(steps);
+    expect(kept).toMatchObject({ phoneWritable: false, phoneRecording: half.phoneRecording === true, complete: false, deletions: 'made', withheldDeletions: [] });
+    expect(kept.kept).toEqual({ ...NOTHING_KEPT, sessions: [at(0), at(1)], fromTrash: { sessions: [at(1)], routes: [] } });
+    // Sur l'ordinateur, tout est revenu ; la session que le téléphone a supprimée l'attend comme une session neuve.
+    expect(await bothSides(pair)).toEqual([[0, 1, 2, 3].map(fileOf), [1, 2, 3].map(fileOf)]);
+    expect(trashOf(pair)).toEqual([]);
+    expect(kept.withheldForPhone.map((i) => i.startMs)).toContain(at(0));
+    expect(baseOf(pair)?.sessions.map((s) => s.startMs)).toEqual([at(1), at(2), at(3)]);
+    // Le téléphone toujours fermé à l'écriture : aucune question ne revient, rien ne part à la corbeille.
+    const again = await run(pair, half);
+    expect(again).toMatchObject({ deletions: 'made', withheldDeletions: [] });
+    expect(describeSyncQuestion(again)).toBeNull();
+    expect(pair.phone.steps()).toBe(steps);
+    expect(trashOf(pair)).toEqual([]);
+    // Le téléphone s'écrit de nouveau : il reçoit la session, sans qu'on redemande rien.
+    const whole = await run(pair);
+    expect(whole).toMatchObject({ deletions: 'made', complete: true });
+    expect(await bothSides(pair)).toEqual([[0, 1, 2, 3].map(fileOf), [0, 1, 2, 3].map(fileOf)]);
+    expect(trashOf(pair)).toEqual([]);
+  });
+
+  it('coupure entre la copie depuis la corbeille et le retrait de l’entrée : la session n’est qu’une fois dans la mémoire, la reprise la suit', async () => {
+    const pair = await syncedPair(3);
+    await trashOnComputer(pair, 1);
+    const asked = await run(pair);
+    // L'index de la corbeille ne s'écrit plus : la session est revenue dans la mémoire, son entrée n'a pas pu partir.
+    const failing: MemoryFolder = {
+      ...pair.computer,
+      writeText: async (path, text) => {
+        if (path === TRASH_INDEX_PATH) throw new Error('coupure');
+        return pair.computer.writeText(path, text);
+      },
+    };
+    const cut = await run(pair, { keepRefused: { sessions: refusedOf(asked) } }, pair.phone, failing);
+    expect(cut.error).toBe('coupure');
+    expect(await bothSides(pair)).toEqual([[0, 1, 2].map(fileOf), [0, 1, 2].map(fileOf)]);
+    expect(sessionTrashEntries(trashOf(pair), at(1))).toHaveLength(1);
+    await everyGpxHasRecord(pair.computer);
+    // Reprise, avec ou sans la réponse : la session est des deux côtés, suivie ; rien à supprimer, rien en double.
+    const resumed = await run(pair, { keepRefused: { sessions: refusedOf(asked) } });
+    expect(resumed).toMatchObject({ interrupted: true, deletions: 'made', complete: true, withheldDeletions: [] });
+    expect(resumed.kept).toEqual(NOTHING_KEPT);
+    expect(await bothSides(pair)).toEqual([[0, 1, 2].map(fileOf), [0, 1, 2].map(fileOf)]);
+    expect((await run(pair)).plan?.items.flatMap((i) => i.ops)).toEqual([]);
+  });
+
+  it('coupure après l’oubli de la base, avant la copie : sans rien redemander, la reprise recopie la session depuis le téléphone', async () => {
+    const pair = await syncedPair(3);
+    await trashOnComputer(pair, 1);
+    const asked = await run(pair);
+    await emptyTrash(pair.computer);
+    const failing: MemoryFolder = {
+      ...pair.computer,
+      writeBytes: async (path, bytes) => {
+        if (path.startsWith('sessions/')) throw new Error('disque plein');
+        return pair.computer.writeBytes(path, bytes);
+      },
+    };
+    const cut = await run(pair, { keepRefused: { sessions: refusedOf(asked) } }, pair.phone, failing);
+    expect(cut.failed.map((f) => f.item.startMs)).toEqual([at(1)]);
+    expect(baseOf(pair)?.sessions.map((s) => s.startMs)).toEqual([at(0), at(2)]);
+    expect(baseOf(pair)).toMatchObject({ removed: [], held: [] });
+    expect(await bothSides(pair)).toEqual([[0, 2].map(fileOf), [0, 1, 2].map(fileOf)]);
+    // Sans la réponse : la session n'est plus une suppression en attente, seulement une session du téléphone à recopier.
+    const resumed = await run(pair);
+    expect(resumed).toMatchObject({ deletions: 'made', complete: true, withheldDeletions: [] });
+    expect(describeSyncQuestion(resumed)).toBeNull();
+    expect(await bothSides(pair)).toEqual([[0, 1, 2].map(fileOf), [0, 1, 2].map(fileOf)]);
+  });
+});
+
+/**
+ * Un peu de tout ce que les deux réponses règlent : une session supprimée sur le téléphone, une supprimée sur
+ * l'ordinateur que sa corbeille tient (avec ses capteurs et une fiche changée), une autre que sa corbeille ne tient
+ * plus, et une session de la corbeille encore sur le téléphone, jamais suivie.
+ */
+const KEPT_SCENARIO = [0, 1, 2, 3, 4, 5];
+
+const keepScenario = async (): Promise<{ pair: Pair; answer: SyncOptions }> => {
+  const pair = pairOf();
+  for (let k = 0; k < 6; k++) putBoth(pair, k, k === 1 || k === 5 ? 30 : undefined);
+  await trashOnComputer(pair, 5);
+  await run(pair);
+  deleteSyncSession(pair.phone, fileOf(0));
+  editSyncRecord(pair.computer, fileOf(1), (r) => ({ ...r, name: 'Nom ordinateur' }));
+  await trashOnComputer(pair, 1);
+  editSyncRecord(pair.phone, fileOf(1), (r) => ({ ...r, notes: notes({ comment: 'Note téléphone' }) }));
+  await trashOnComputer(pair, 2);
+  await dropTrashEntries(pair.computer, sessionTrashEntries(trashOf(pair), at(2)).map((e) => e.dir));
+  const asked = await run(pair);
+  return { pair, answer: { keepRefused: { sessions: refusedOf(asked) }, heldOnPhone: 'keep', heldToKeep: heldOf(asked) } };
+};
+
+/** Chaque session du scénario est encore quelque part, et aucune n'est en double d'un côté. */
+const keptSomewhere = async (pair: Pair): Promise<void> => {
+  const sides = await bothSides(pair);
+  const trashed = new Set(trashOf(pair).map((e) => e.startMs));
+  for (const k of KEPT_SCENARIO) expect(sides.some((names) => names.includes(fileOf(k))) || trashed.has(at(k)), `session ${k}`).toBe(true);
+  for (const names of sides) expect(names.filter((name) => !KEPT_SCENARIO.map(fileOf).includes(name))).toEqual([]);
+};
+
+describe('« Tout garder » et « Les garder » coupés après chaque opération de l’ordinateur', () => {
+  it.each([
+    ['avec la même réponse', true], ['sans la réponse', false],
+  ] as const)('reprise %s : rien de perdu, rien en double', async (_label, answered) => {
+    const reference = await keepScenario();
+    expect(reference.answer.keepRefused?.sessions).toEqual([
+      { startMs: at(0), side: 'computer' }, { startMs: at(1), side: 'phone' }, { startMs: at(2), side: 'phone' },
+    ]);
+    expect(reference.answer.heldToKeep).toEqual([at(5)]);
+    const whole = await run(reference.pair, reference.answer);
+    expect(whole).toMatchObject({ deletions: 'made', complete: true });
+    expect(whole.kept).toEqual({ sessions: [at(0), at(1), at(2), at(5)], routes: [], fromTrash: { sessions: [at(1), at(5)], routes: [] } });
+    const expected = await pictureOf(reference.pair);
+    expect([expected.computer, expected.phone]).toEqual([KEPT_SCENARIO.map(fileOf), KEPT_SCENARIO.map(fileOf)]);
+    expect(trashOf(reference.pair)).toEqual([]);
+
+    let cuts = 0;
+    for (let n = 0; n < 300; n++) {
+      const { pair, answer } = await keepScenario();
+      pair.computer.cutAfter(n);
+      const outcome = await run(pair, answer);
+      pair.computer.cutAfter(null);
+      if (outcome.linkLost === null && outcome.failed.length === 0 && outcome.error === null) {
+        expect(outcome.complete).toBe(true);
+        break;
+      }
+      cuts += 1;
+      await everyGpxHasRecord(pair.computer);
+      await everyGpxHasRecord(pair.phone);
+      await keptSomewhere(pair);
+      if (!answered) {
+        // Le programme relancé ne sait plus la réponse : ce qui n'était pas encore réglé redevient une question, ou
+        // une suppression ordinaire que la corbeille garde ; rien n'est perdu ni doublé.
+        await run(pair);
+        await run(pair);
+        await everyGpxHasRecord(pair.computer);
+        await everyGpxHasRecord(pair.phone);
+        await keptSomewhere(pair);
+        continue;
+      }
+      await run(pair, answer);
+      const final = await run(pair);
+      expect(final.complete, `coupure après ${n}`).toBe(true);
+      expect(final.plan?.items.flatMap((i) => i.ops), `coupure après ${n}`).toEqual([]);
+      expect(await pictureOf(pair), `coupure après ${n}`).toEqual(expected);
+      await keptSomewhere(pair);
+    }
+    expect(cuts).toBeGreaterThan(8);
   });
 });
 

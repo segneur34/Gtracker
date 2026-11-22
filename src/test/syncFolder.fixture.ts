@@ -286,6 +286,8 @@ export interface SyncRunOptions {
   nowMs?: number;
   /** Sort d'une session du téléphone que l'ordinateur a supprimée hors synchronisation ; par défaut celui du moteur. */
   heldOnPhone?: SyncHeldChoice;
+  /** Identités que l'utilisateur a dit garder (`SyncInput.keep`). */
+  keep?: readonly number[];
 }
 
 export interface SyncRun {
@@ -356,6 +358,7 @@ export const runFixtureSync = async (computer: SyncFolder, phone: SyncFolder, op
     const trashedNow = async (): Promise<Set<number>> => new Set((await syncTrashOf(computer)).map((entry) => entry.startMs));
     let plan = planSync({
       pair, computer: await sideOf('computer'), phone: await sideOf('phone'), ancestors, trash: await syncTrashOf(computer), heldOnPhone: options.heldOnPhone,
+      keep: options.keep,
     });
     run.held = plan.guard.tripped && !options.confirmDeletions;
     plan = restrictSyncPlan(plan, { ...scope, deletions: scope.deletions && !run.held });

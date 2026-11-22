@@ -93,6 +93,8 @@ interface RunOptions {
   heldOnPhone?: SyncHeldChoice;
   /** Faux : les suppressions au-delà du garde-fou ne sont pas confirmées (par défaut, elles le sont). */
   confirm?: boolean;
+  /** Identités que l'utilisateur a dit garder (`RouteSyncInput.keep`). */
+  keep?: readonly string[];
 }
 
 /**
@@ -109,7 +111,9 @@ const run = async (pair: RoutePair, options: RunOptions = {}): Promise<RouteSync
     for (const name of routeRecordsToRead(listing, pair.base, side, alsoRead)) texts.set(name, await folder.readText(routePath(name)));
     return syncRouteSide(listing, texts);
   };
-  const full = planRouteSync({ base: pair.base, computer: await sideOf('computer'), phone: await sideOf('phone'), trash, heldOnPhone: options.heldOnPhone });
+  const full = planRouteSync({
+    base: pair.base, computer: await sideOf('computer'), phone: await sideOf('phone'), trash, heldOnPhone: options.heldOnPhone, keep: options.keep,
+  });
   const scope: SyncScope = { computer: true, phone: true, deletions: !full.guard.tripped || options.confirm !== false, ...options.scope };
   const plan = restrictRouteSyncPlan(full, scope);
   let base = pair.base ?? emptySyncBase('ordinateur-0001', 'telephone-0001', null);
@@ -392,6 +396,62 @@ describe('corbeille', () => {
     expect(itemOf(removed, iso(0))).toMatchObject({ case: 'deletedOnComputer', ops: [{ kind: 'removeFromPhone', keep: true }] });
     expect(await routesOf(pair.phone)).toEqual([]);
     expect(pair.base).toMatchObject({ heldRoutes: [] });
+  });
+});
+
+describe('suppressions refusées (`keep`)', () => {
+  it('supprimé sur le téléphone, refusé : recopié sur le téléphone, sa ligne reposée', async () => {
+    const pair = await syncedPair(2);
+    dropRoute(pair.phone, 'r1');
+    const plan = await run(pair, { keep: [iso(1)] });
+    expect(itemOf(plan, iso(1))).toMatchObject({ case: 'newOnComputer', left: null, revived: false, ops: [{ kind: 'copy', to: 'phone' }], base: { kind: 'set' } });
+    expect(plan.guard).toMatchObject({ toTrash: 0, fromPhone: 0 });
+    expect(await routesOf(pair.phone)).toEqual(['r0', 'r1']);
+    expect(await routesOf(pair.computer)).toEqual(['r0', 'r1']);
+    expect(pair.trash).toEqual([]);
+    expect(pair.base).toMatchObject({ removedRoutes: [], routes: [{ id: iso(0) }, { id: iso(1) }] });
+    expect((await run(pair)).items).toEqual([]);
+  });
+
+  it('supprimé sur l’ordinateur, refusé : recopié du téléphone sur l’ordinateur, rien n’est retiré du téléphone', async () => {
+    const pair = await syncedPair(2);
+    trashRoute(pair, 'r1');
+    const plan = await run(pair, { keep: [iso(1)] });
+    expect(itemOf(plan, iso(1))).toMatchObject({ case: 'newOnPhone', left: null, ops: [{ kind: 'copy', to: 'computer' }], base: { kind: 'set' } });
+    expect(deletions(plan)).toEqual([]);
+    expect(await routesOf(pair.phone)).toEqual(['r0', 'r1']);
+    expect(await routesOf(pair.computer)).toEqual(['r0', 'r1']);
+    expect(pair.base?.routes.map((r) => r.id)).toEqual([iso(0), iso(1)]);
+    expect((await run(pair)).items).toEqual([]);
+  });
+
+  it('dans la corbeille de l’ordinateur et encore sur le téléphone, gardé : il revient sur l’ordinateur et n’est plus retenu', async () => {
+    const pair = pairOf();
+    putRoute(pair.computer, 'a', iso(0), iso(0));
+    putRoute(pair.phone, 'a', iso(0), iso(0));
+    trashRoute(pair, 'a');
+    await run(pair);
+    expect(pair.base).toMatchObject({ heldRoutes: [iso(0)] });
+    const plan = await run(pair, { keep: [iso(0)], heldOnPhone: 'remove' });
+    expect(itemOf(plan, iso(0))).toMatchObject({ case: 'newOnPhone', left: null, ops: [{ kind: 'copy', to: 'computer' }] });
+    expect(await routesOf(pair.computer)).toEqual(['a']);
+    expect(await routesOf(pair.phone)).toEqual(['a']);
+    expect(pair.base).toMatchObject({ heldRoutes: [], routes: [{ id: iso(0) }] });
+  });
+
+  it('`keep` n’agit que sur une suppression : un itinéraire suivi ou inconnu suit le plan ordinaire, une autre suppression reste comptée', async () => {
+    const pair = await syncedPair(3);
+    editRoute(pair.phone, 'r0', iso(9), 44);
+    dropRoute(pair.phone, 'r1');
+    dropRoute(pair.phone, 'r2');
+    const plan = await run(pair, { keep: [iso(0), iso(1), iso(42)], confirm: false });
+    expect(plan.tripped).toBe(true);
+    expect(itemOf(plan, iso(0))).toMatchObject({ case: 'followed', ops: [{ kind: 'copy', to: 'computer' }] });
+    expect(itemOf(plan, iso(1))).toMatchObject({ case: 'newOnComputer', ops: [{ kind: 'copy', to: 'phone' }] });
+    expect(itemOf(plan, iso(2))).toMatchObject({ case: 'deletedOnPhone', left: 'outOfScope', ops: [] });
+    expect(itemOf(plan, iso(42))).toBeUndefined();
+    expect(await routesOf(pair.computer)).toEqual(['r0', 'r1', 'r2']);
+    expect(await routesOf(pair.phone)).toEqual(['r0', 'r1']);
   });
 });
 

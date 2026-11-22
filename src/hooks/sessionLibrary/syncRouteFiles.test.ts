@@ -4,10 +4,10 @@ import { parseSyncBase, readMarkerId, readMarkerSync, syncBasePath, type SyncBas
 import { describeSync, describeSyncQuestion, syncQuestionConfirmLabel, syncQuestionListLabel } from '../../library/syncReport';
 import { syncRouteListing } from '../../library/syncRoutes';
 import { TRASH_INDEX_PATH, parseTrashIndex, trashFilePath, type TrashEntry } from '../../library/trash';
-import { stashInTrash } from '../../library/trashFolder';
+import { dropTrashEntries, emptyTrash, stashInTrash } from '../../library/trashFolder';
 import { ROUTE_FORMAT, ROUTE_VERSION, parseRouteRecord, serializeRouteRecord } from '../../planning/routeRecord';
 import { putSyncSession, syncMemoryFolder, type SyncFolder } from '../../test/syncFolder.fixture';
-import { executeSync, type SyncOptions, type SyncOutcome } from './sync';
+import { executeSync, type SyncOptions, type SyncOutcome, type SyncRouteDeletionKey } from './sync';
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 10, 1, 10, 0, 0);
@@ -281,5 +281,117 @@ describe('synchronisation des itinéraires, de bout en bout', () => {
     expect(await routesOf(pair.phone)).toEqual([]);
     // La corbeille tenait déjà ces mêmes fiches : rien de plus n'y est rangé.
     expect(trashOf(pair).filter((e) => e.kind === 'itineraire')).toHaveLength(2);
+  });
+});
+
+/** Les suppressions d'itinéraires qu'une passe a retenues, telles que la question les montre. */
+const refusedRoutesOf = (outcome: SyncOutcome): SyncRouteDeletionKey[] =>
+  outcome.routes.withheldDeletions.map((item) => ({ id: item.id, side: item.case === 'deletedOnPhone' ? 'computer' : 'phone' }));
+
+const createdOf = (folder: SyncFolder, base: string): string | undefined => parseRouteRecord(folder.text(routePath(`${base}.json`)) ?? '')?.createdAt;
+
+describe('réponses définitives pour les itinéraires : « Tout garder » et « Les garder »', () => {
+  it('« Tout garder » : supprimé sur le téléphone, il y retourne ; supprimé sur l’ordinateur, il sort de sa corbeille, ou revient du téléphone si elle ne l’a plus', async () => {
+    const pair = await syncedPair(4);
+    dropRoute(pair.phone, 'r0');
+    await trashOnComputer(pair, 'r1');
+    await trashOnComputer(pair, 'r2');
+    const asked = await run(pair);
+    expect(asked.deletions).toBe('awaitingConfirmation');
+    expect(refusedRoutesOf(asked)).toEqual([{ id: iso(0), side: 'computer' }, { id: iso(1), side: 'phone' }, { id: iso(2), side: 'phone' }]);
+    // Avant la réponse, « r2 » est supprimé définitivement de la corbeille.
+    await dropTrashEntries(pair.computer, trashOf(pair).filter((e) => e.routeBase === 'r2').map((e) => e.dir));
+    const kept = await run(pair, { keepRefused: { routes: refusedRoutesOf(asked) } });
+    expect(kept).toMatchObject({ deletions: 'made', complete: true });
+    expect(kept.routes.withheldDeletions).toEqual([]);
+    expect(kept.kept).toEqual({ sessions: [], routes: [iso(0), iso(1), iso(2)], fromTrash: { sessions: [], routes: [iso(1)] } });
+    expect(await routesOf(pair.computer)).toEqual(['r0', 'r1', 'r2', 'r3']);
+    expect(await routesOf(pair.phone)).toEqual(['r0', 'r1', 'r2', 'r3']);
+    expect(trashOf(pair).filter((e) => e.kind === 'itineraire')).toEqual([]);
+    expect(baseOf(pair)).toMatchObject({ removedRoutes: [], heldRoutes: [] });
+    expect(baseOf(pair)?.routes.map((r) => r.id)).toEqual([iso(0), iso(1), iso(2), iso(3)]);
+    const after = await run(pair);
+    expect(after).toMatchObject({ deletions: 'made', complete: true });
+    expect(after.routes.done).toEqual([]);
+  });
+
+  it('« Tout garder », son nom repris depuis par un autre itinéraire : il sort de la corbeille sous un nom libre, et rien n’est retiré du téléphone', async () => {
+    const pair = await syncedPair(1);
+    await trashOnComputer(pair, 'r0');
+    putRoute(pair.computer, 'r0', iso(5), iso(5), { lat: 44 });
+    const asked = await run(pair);
+    expect(refusedRoutesOf(asked)).toEqual([{ id: iso(0), side: 'phone' }]);
+    const kept = await run(pair, { keepRefused: { routes: refusedRoutesOf(asked) } });
+    expect(kept).toMatchObject({ deletions: 'made', complete: true });
+    expect(kept.kept.fromTrash.routes).toEqual([iso(0)]);
+    expect(await routesOf(pair.computer)).toEqual(['r0', 'r0-2']);
+    expect(await routesOf(pair.phone)).toEqual(['r0', 'r0-2']);
+    expect([createdOf(pair.computer, 'r0'), createdOf(pair.computer, 'r0-2')]).toEqual([iso(5), iso(0)]);
+    expect([createdOf(pair.phone, 'r0'), createdOf(pair.phone, 'r0-2')]).toEqual([iso(0), iso(5)]);
+    expect(baseOf(pair)?.routes.map((r) => r.id)).toEqual([iso(0), iso(5)]);
+    expect(trashOf(pair).filter((e) => e.kind === 'itineraire')).toEqual([]);
+    const after = await run(pair);
+    expect(after).toMatchObject({ deletions: 'made', complete: true });
+    expect(after.routes.done).toEqual([]);
+  });
+
+  it('« Les garder » : seuls les itinéraires montrés reviennent, de la corbeille si elle les tient encore, sinon du téléphone', async () => {
+    const pair = pairOf();
+    for (const k of [0, 1]) {
+      putRoute(pair.computer, `r${k}`, iso(k), iso(k));
+      await trashOnComputer(pair, `r${k}`);
+      putRoute(pair.phone, `r${k}`, iso(k), iso(k));
+    }
+    await run(pair);
+    expect(baseOf(pair)?.heldRoutes).toEqual([iso(0), iso(1)]);
+    const kept = await run(pair, { heldOnPhone: 'keep', heldToKeep: [], heldRoutesToKeep: [iso(0)] });
+    expect(kept.kept).toEqual({ sessions: [], routes: [iso(0)], fromTrash: { sessions: [], routes: [iso(0)] } });
+    expect(await routesOf(pair.computer)).toEqual(['r0']);
+    expect(baseOf(pair)).toMatchObject({ heldRoutes: [iso(1)] });
+    expect(baseOf(pair)?.routes.map((r) => r.id)).toEqual([iso(0)]);
+    // L'autre, la corbeille vidée depuis : sans liste, tous ceux qui restent sont gardés, et il revient du téléphone.
+    await emptyTrash(pair.computer);
+    const all = await run(pair, { heldOnPhone: 'keep' });
+    expect(all.kept).toEqual({ sessions: [], routes: [iso(1)], fromTrash: { sessions: [], routes: [] } });
+    expect(all.complete).toBe(true);
+    expect(await routesOf(pair.computer)).toEqual(['r0', 'r1']);
+    expect(await routesOf(pair.phone)).toEqual(['r0', 'r1']);
+    expect(baseOf(pair)).toMatchObject({ heldRoutes: [], removedRoutes: [] });
+  });
+
+  it('réponse périmée : un itinéraire supprimé depuis la question n’est pas supprimé, la question revient pour lui seul', async () => {
+    const pair = await syncedPair(3);
+    dropRoute(pair.phone, 'r0');
+    const asked = await run(pair);
+    dropRoute(pair.phone, 'r1');
+    const stale = await run(pair, { keepRefused: { routes: [...refusedRoutesOf(asked), { id: iso(1), side: 'phone' }] } });
+    expect(stale.deletions).toBe('awaitingConfirmation');
+    expect(stale.kept.routes).toEqual([iso(0)]);
+    expect(refusedRoutesOf(stale)).toEqual([{ id: iso(1), side: 'computer' }]);
+    expect(await routesOf(pair.computer)).toEqual(['r0', 'r1', 'r2']);
+    expect(await routesOf(pair.phone)).toEqual(['r0', 'r2']);
+    expect(trashOf(pair)).toEqual([]);
+  });
+
+  it('« Tout garder » avec un téléphone qui ne s’écrit pas : l’itinéraire reste sur l’ordinateur et attend le téléphone, la question ne revient pas', async () => {
+    const pair = await syncedPair(2);
+    dropRoute(pair.phone, 'r1');
+    const asked = await run(pair);
+    expect(refusedRoutesOf(asked)).toEqual([{ id: iso(1), side: 'computer' }]);
+    const steps = pair.phone.steps();
+    const kept = await run(pair, { phoneWritable: false, keepRefused: { routes: refusedRoutesOf(asked) } });
+    expect(pair.phone.steps()).toBe(steps);
+    expect(kept.deletions).toBe('made');
+    expect(kept.routes.withheldDeletions).toEqual([]);
+    expect(kept.routes.withheldForPhone.map((i) => i.id)).toEqual([iso(1)]);
+    expect(await routesOf(pair.computer)).toEqual(['r0', 'r1']);
+    expect(trashOf(pair)).toEqual([]);
+    const again = await run(pair, { phoneWritable: false });
+    expect(again.deletions).toBe('made');
+    expect(again.routes.withheldDeletions).toEqual([]);
+    expect(trashOf(pair)).toEqual([]);
+    const whole = await run(pair);
+    expect(whole).toMatchObject({ deletions: 'made', complete: true });
+    expect(await routesOf(pair.phone)).toEqual(['r0', 'r1']);
   });
 });

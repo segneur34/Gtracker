@@ -3,7 +3,9 @@ import { MARKER_FILE } from '../core/appIdentity';
 import { MEMORY_VERSION, markerText, sessionPath } from './folderLayout';
 import { RECORD_VERSION, imuFileName, recordFileName, type StoredSessionNotes } from './record';
 import { SYNC_DIR, emptySyncBase, readMarkerId, syncAncestorPath } from './syncBase';
-import { SYNC_GUARD_MAX_REMOVALS, planSync, restrictSyncPlan, syncListing, syncPair, syncRecordsToRead, syncSide, type SyncItem } from './syncPlan';
+import {
+  SYNC_GUARD_MAX_REMOVALS, planSync, restrictSyncPlan, syncDeletionSide, syncListing, syncPair, syncRecordsToRead, syncSide, type SyncItem,
+} from './syncPlan';
 import {
   SYNC_TRASH_DIR, deleteSyncSession, editSyncRecord, hasSyncFiles, putSyncSession, readFixtureBase, readSyncRecord, restoreSyncSession,
   runFixtureSync, syncGpxName, syncMemoryFolder, syncSessionFiles, trashSyncSession,
@@ -471,6 +473,92 @@ describe('suppressions', () => {
     trashSyncSession(pair.computer, at(1), fileOf(1));
     expect((await sync(pair)).held).toBe(true);
     expect(await syncSessionFiles(pair.phone)).toHaveLength(2);
+  });
+});
+
+describe('suppressions refusées (`keep`)', () => {
+  it('supprimée sur le téléphone, refusée : recopiée sur le téléphone, sa ligne reposée, rien à la corbeille', async () => {
+    const pair = await syncedPair(8, { imuBytes: 8 });
+    deleteSyncSession(pair.phone, fileOf(1));
+    const run = await sync(pair, { keep: [at(1)] });
+    expect(itemAt(run, 1)).toMatchObject({ case: 'newOnComputer', left: null, ops: [{ kind: 'copy', to: 'phone' }], base: { kind: 'set' } });
+    expect(run.plan?.guard).toMatchObject({ tripped: false, toTrash: 0, fromPhone: 0 });
+    expect(await syncSessionFiles(pair.phone)).toHaveLength(8);
+    expect(await syncSessionFiles(pair.computer)).toHaveLength(8);
+    expect(pair.phone.text(sessionPath(imuFileName(fileOf(1))))).not.toBeNull();
+    expect(trashFiles(pair)).toEqual([]);
+    expect(baseStarts(pair)).toHaveLength(8);
+    expect(readFixtureBase(pair.computer, pair.phone)?.removed).toEqual([]);
+    expect((await sync(pair)).plan?.items).toEqual([]);
+  });
+
+  it('supprimée sur l’ordinateur, refusée : recopiée du téléphone sur l’ordinateur, même si la corbeille la tient', async () => {
+    const pair = await syncedPair(8);
+    trashSyncSession(pair.computer, at(1), fileOf(1));
+    editSyncRecord(pair.phone, fileOf(1), (record) => ({ ...record, notes: notes({ comment: 'écrit après coup' }) }));
+    const run = await sync(pair, { keep: [at(1)] });
+    expect(itemAt(run, 1)).toMatchObject({ case: 'newOnPhone', left: null, ops: [{ kind: 'copy', to: 'computer' }], base: { kind: 'set' } });
+    expect(await syncSessionFiles(pair.phone)).toHaveLength(8);
+    expect(await syncSessionFiles(pair.computer)).toHaveLength(8);
+    expect(readSyncRecord(pair.computer, fileOf(1))?.notes?.comment).toBe('écrit après coup');
+    expect(baseStarts(pair)).toHaveLength(8);
+    expect((await sync(pair)).plan?.items).toEqual([]);
+  });
+
+  it('dans la corbeille de l’ordinateur et encore sur le téléphone, gardée : elle revient sur l’ordinateur et n’est plus retenue', async () => {
+    const pair = pairOf();
+    putBoth(pair, 0);
+    putBoth(pair, 1);
+    trashSyncSession(pair.computer, at(1), fileOf(1));
+    await sync(pair);
+    expect(readFixtureBase(pair.computer, pair.phone)?.held).toEqual([at(1)]);
+    const run = await sync(pair, { keep: [at(1)] });
+    expect(itemAt(run, 1)).toMatchObject({ case: 'newOnPhone', left: null, ops: [{ kind: 'copy', to: 'computer' }] });
+    expect(await syncSessionFiles(pair.computer)).toEqual([fileOf(0), fileOf(1)]);
+    expect(readFixtureBase(pair.computer, pair.phone)).toMatchObject({ held: [], removed: [] });
+    expect(baseStarts(pair)).toEqual([at(0), at(1)]);
+    // Même avec « retirer du téléphone » demandé pour les autres, celle-là n'est pas retirée.
+    const other = pairOf();
+    for (let k = 0; k < 10; k++) putBoth(other, k);
+    trashSyncSession(other.computer, at(1), fileOf(1));
+    trashSyncSession(other.computer, at(2), fileOf(2));
+    await sync(other);
+    const mixed = await sync(other, { heldOnPhone: 'remove', keep: [at(1)] });
+    expect(itemAt(mixed, 1)?.case).toBe('newOnPhone');
+    expect(itemAt(mixed, 2)?.case).toBe('deletedOnComputer');
+    expect(await syncSessionFiles(other.phone)).toHaveLength(9);
+    expect(await syncSessionFiles(other.computer)).toContain(fileOf(1));
+  });
+
+  it('`keep` n’agit que sur une suppression : une session suivie, neuve ou inconnue suit le plan ordinaire, et une autre suppression reste comptée', async () => {
+    const pair = await syncedPair(8);
+    putSyncSession(pair.computer, at(20));
+    editSyncRecord(pair.phone, fileOf(3), (record) => ({ ...record, name: 'Renommée' }));
+    deleteSyncSession(pair.phone, fileOf(1));
+    deleteSyncSession(pair.phone, fileOf(2));
+    const run = await sync(pair, { keep: [at(1), at(3), at(20), at(99)] });
+    expect(itemAt(run, 1)?.case).toBe('newOnComputer');
+    expect(itemAt(run, 2)?.case).toBe('deletedOnPhone');
+    expect(itemAt(run, 3)?.case).toBe('followed');
+    expect(itemAt(run, 20)?.case).toBe('newOnComputer');
+    expect(itemAt(run, 99)).toBeUndefined();
+    expect(run.plan?.guard).toMatchObject({ toTrash: 1, fromPhone: 0 });
+    expect(await syncSessionFiles(pair.computer)).not.toContain(fileOf(2));
+    expect(await syncSessionFiles(pair.phone)).toContain(fileOf(1));
+  });
+
+  it('restes d’une session absente des deux côtés : ni comptés par le garde-fou, ni tenus pour une suppression', async () => {
+    const pair = await syncedPair(3, { imuBytes: 8 });
+    // Supprimée sur le téléphone, et sur l'ordinateur à la main, GPX seul : sa fiche et ses capteurs sont restés.
+    deleteSyncSession(pair.phone, fileOf(1));
+    pair.computer.drop(sessionPath(fileOf(1)));
+    const withheld = await sync(pair, { scope: { computer: true, phone: true, deletions: false } });
+    expect(itemAt(withheld, 1)).toMatchObject({ case: 'deletedOnBoth', left: 'outOfScope' });
+    const whole = await sync(pair);
+    expect(itemAt(whole, 1)?.ops.map((op) => op.kind)).toEqual(['trash']);
+    expect(syncDeletionSide(itemAt(whole, 1) as SyncItem)).toBeNull();
+    expect(whole.plan?.guard).toMatchObject({ tripped: false, toTrash: 0, fromPhone: 0 });
+    expect(whole.held).toBe(false);
   });
 });
 

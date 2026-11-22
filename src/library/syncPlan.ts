@@ -34,6 +34,11 @@ import { inspectSyncRecord, mergeSyncRecords, renamedSyncRecord, syncRecordChang
  * Chaque opération est sans effet si elle est déjà faite, et la ligne de base d'une session n'est réécrite qu'une
  * fois toutes ses opérations faites : une synchronisation coupée, ou restreinte à une partie du plan
  * (`restrictSyncPlan`), se reprend en recalculant le plan.
+ *
+ * Une suppression que l'utilisateur a refusée (`SyncInput.keep`) ne se fait pas : la session est traitée comme neuve
+ * du côté qui l'a encore, donc recopiée de l'autre, et sa ligne reposée. Une identité gardée n'est pas non plus
+ * retenue sur le téléphone à cause de la corbeille. `keep` n'a d'effet que dans ces cas : une identité qui n'y est
+ * plus suit le plan ordinaire.
  */
 
 /** Au-delà de ce nombre de sessions à retirer en une fois, la synchronisation demande avant de supprimer. */
@@ -173,6 +178,12 @@ export interface SyncInput {
   trash: readonly SyncTrashed[];
   /** Par défaut `SYNC_HELD_ON_PHONE`. */
   heldOnPhone?: SyncHeldChoice;
+  /**
+   * Identités que l'utilisateur a dit garder : une session suivie qui manque d'un côté n'est pas supprimée de l'autre
+   * mais recopiée là où elle manque, et une session du téléphone que la corbeille ferait retenir est recopiée sur
+   * l'ordinateur. Sans effet sur une identité qui n'est dans aucun de ces cas.
+   */
+  keep?: readonly number[];
 }
 
 /** Noms des fichiers d'une session à l'arrivée d'une copie. */
@@ -375,9 +386,20 @@ const oneByIdentity = (seen: readonly Seen[]): SideSessions => {
   return { kept, copies, duplicates };
 };
 
+/**
+ * Le côté d'où part la session que cette entrée supprime, telle que le garde-fou la compte : `computer`, supprimée
+ * sur le téléphone, sa copie de l'ordinateur va à la corbeille ; `phone`, supprimée sur l'ordinateur, elle est retirée
+ * du téléphone. `null` : l'entrée ne supprime aucune session. Les restes (fiche ou capteurs sans GPX) d'une session
+ * absente des deux côtés n'en sont pas une : ils ne se comptent ni ne se montrent.
+ */
+export const syncDeletionSide = (item: SyncItem): SyncSideName | null =>
+  item.case === 'deletedOnPhone' && item.ops.some((op) => op.kind === 'trash') ? 'computer'
+    : item.case === 'deletedOnComputer' && item.ops.some((op) => op.kind === 'removeFromPhone') ? 'phone'
+      : null;
+
 const guardOf = (items: readonly SyncItem[], count: Record<SyncSideName, number>): SyncGuard => {
-  const toTrash = items.filter((i) => i.case === 'deletedOnPhone' && i.ops.some((op) => op.kind === 'trash')).length;
-  const fromPhone = items.filter((i) => i.case === 'deletedOnComputer' && i.ops.some((op) => op.kind === 'removeFromPhone')).length;
+  const toTrash = items.filter((i) => syncDeletionSide(i) === 'computer').length;
+  const fromPhone = items.filter((i) => syncDeletionSide(i) === 'phone').length;
   const tripped = toTrash + fromPhone > SYNC_GUARD_MAX_REMOVALS
     || toTrash > SYNC_GUARD_MAX_SHARE * count.computer
     || fromPhone > SYNC_GUARD_MAX_SHARE * count.phone;
@@ -396,6 +418,7 @@ export const planSync = (input: SyncInput): SyncPlan => {
     computer: new Set(input.computer.names.map((name) => name.toLowerCase())),
     phone: new Set(input.phone.names.map((name) => name.toLowerCase())),
   };
+  const refused = new Set(input.keep ?? []);
   const ancestorsOf = (startMs: number): SyncAncestors => ancestors.get(startMs) ?? { computer: null, phone: null };
   const trashedFiles = (startMs: number) => trash.filter((entry) => entry.startMs === startMs).flatMap((entry) => entry.files);
 
@@ -465,14 +488,18 @@ export const planSync = (input: SyncInput): SyncPlan => {
     return files.length > 0 ? [{ kind: 'trash', files, absent: null }] : [];
   };
 
-  /** Session d'un seul côté, inconnue de la base : recopiée de l'autre côté. */
+  /**
+   * Session d'un seul côté, inconnue de la base, ou suivie mais que l'utilisateur a dit garder (`keep`) : recopiée de
+   * l'autre côté, et sa ligne posée.
+   */
   const fresh = (startMs: number, from: SyncSideName, s: Seen): SyncItem => {
     const to = otherSyncSide(from);
     const item = from === 'computer' ? itemOf(startMs, 'newOnComputer', s, null) : itemOf(startMs, 'newOnPhone', null, s);
     // Supprimée sur l'ordinateur sans que la synchronisation l'ait su, et encore sur le téléphone. Elle ne revient
     // d'elle-même que si la synchronisation avait mené sa suppression au bout et qu'elle a été remise depuis. La
-    // base s'en souvient : la purge de la corbeille ne la ramène pas.
-    const heldBack = from === 'phone' && (base?.held.includes(startMs) || (trashedFiles(startMs).length > 0 && !base?.removed.includes(startMs)));
+    // base s'en souvient : la purge de la corbeille ne la ramène pas. Gardée par l'utilisateur, elle revient.
+    const heldBack = from === 'phone' && !refused.has(startMs)
+      && (base?.held.includes(startMs) || (trashedFiles(startMs).length > 0 && !base?.removed.includes(startMs)));
     if (heldBack) {
       return (input.heldOnPhone ?? SYNC_HELD_ON_PHONE) === 'remove' ? deletedOnComputer(startMs, null) : { ...item, left: 'inTrash', base: { kind: 'hold' } };
     }
@@ -595,8 +622,9 @@ export const planSync = (input: SyncInput): SyncPlan => {
     const item = hidden ? { ...itemOf(startMs, 'followed', o, t), left: 'changedGpx' as const }
       : o && t ? both(startMs, o, t, line)
         : !line ? (o ? fresh(startMs, 'computer', o) : t ? fresh(startMs, 'phone', t) : deletedOnBoth(startMs, null))
-          : o ? deletedOnPhone(startMs, line)
-            : t ? deletedOnComputer(startMs, line)
+          // Suppression refusée : la session retourne là où elle manque, au lieu de partir de là où elle est encore.
+          : o ? (refused.has(startMs) ? fresh(startMs, 'computer', o) : deletedOnPhone(startMs, line))
+            : t ? (refused.has(startMs) ? fresh(startMs, 'phone', t) : deletedOnComputer(startMs, line))
               : deletedOnBoth(startMs, line);
     if (item) items.push(item);
   }

@@ -3,7 +3,7 @@ import type { FolderEntry } from '../platform/memoryFolder';
 import { TRASH_INDEX_PATH, TRASH_KEEP_MS, parseTrashIndex, sessionRestorePlan, type TrashEntry } from './trash';
 import {
   TRASH_LOCKED_MESSAGE, addFilesToTrashEntry, copyFromTrash, dropTrashEntries, emptyTrash, purgeTrash, readTrashIndex, stashFilesInTrash,
-  stashInTrash, type TrashBytesRequest, type TrashFolder, type TrashRequest,
+  stashInTrash, trashHoldsCopies, trashLeftoversIn, type TrashBytesRequest, type TrashFolder, type TrashRequest,
 } from './trashFolder';
 
 const NOW = Date.UTC(2026, 10, 20, 12);
@@ -281,5 +281,30 @@ describe('sortir de la corbeille', () => {
     ]);
     expect(disk.text('sessions/2026-11-20_10-00-00_wing-2.json')).toBe('{"fiche":1}');
     expect(disk.text('sessions/2026-11-20_10-00-00_wing.json')).toBe('{"orpheline":1}');
+  });
+
+  it('restauration coupée avant le GPX : la fiche et les capteurs restés, identiques, sont repris en place ; un reste d’un autre contenu ne l’est pas', async () => {
+    const disk = diskFolder(sessionFiles());
+    const entry = (await stashInTrash(disk.folder, request(), NOW)) as TrashEntry;
+    for (const path of request().paths) await disk.folder.remove(path);
+    const namesIn = async () => (await disk.folder.list('sessions')).map((e) => e.name);
+    const full = sessionRestorePlan(entry, await namesIn());
+    expect(await trashHoldsCopies(disk.folder, full.copies)).toBe(true);
+    // Capteurs et fiche recopiés, puis la coupure : le GPX manque encore.
+    await copyFromTrash(disk.folder, full.copies.slice(0, 2));
+    const leftovers = await trashLeftoversIn(disk.folder, entry, 'sessions', await namesIn());
+    expect(leftovers.sort()).toEqual(['2026-11-20_10-00-00_wing.imu', '2026-11-20_10-00-00_wing.json']);
+    const resumed = sessionRestorePlan(entry, (await namesIn()).filter((name) => !leftovers.includes(name)));
+    expect(resumed.gpx).toBe('2026-11-20_10-00-00_wing.gpx');
+    // Une fiche restée là avec un autre contenu, même de même taille, n'est pas un reste de cette entrée.
+    disk.files.set('sessions/2026-11-20_10-00-00_wing.json', encoder.encode('{"fiche":2}'));
+    expect(await trashLeftoversIn(disk.folder, entry, 'sessions', await namesIn())).toEqual(['2026-11-20_10-00-00_wing.imu']);
+    // Le fichier principal revenu : plus rien n'est un reste.
+    await copyFromTrash(disk.folder, full.copies.slice(2));
+    expect(await trashLeftoversIn(disk.folder, entry, 'sessions', await namesIn())).toEqual([]);
+    // Un fichier de l'entrée qui manque dans la corbeille, ou rien à recopier : pas de restauration à commencer.
+    await disk.folder.remove(full.copies[1].from);
+    expect(await trashHoldsCopies(disk.folder, full.copies)).toBe(false);
+    expect(await trashHoldsCopies(disk.folder, [])).toBe(false);
   });
 });

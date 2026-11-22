@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { MEMORY_VERSION, markerText } from './folderLayout';
 import {
-  SYNC_BASE_FORMAT, SYNC_BASE_VERSION, emptySyncBase, isSyncId, markerTextWithId, markerTextWithSync, markerTextWithoutId, parseSyncBase, readMarkerId,
-  readMarkerSync, serializeSyncBase,
+  SYNC_BASE_FORMAT, SYNC_BASE_VERSION, emptySyncBase, hasRouteMemory, hasSyncMemory, isSyncId, markerTextWithId, markerTextWithSync,
+  markerTextWithoutId, parseSyncBase, readMarkerId, readMarkerSync, serializeSyncBase,
   syncAncestorPath, syncBaseLine, syncBasePath, syncRefusal, syncRouteBaseLine, withRouteHeld, withRouteLine, withSyncDone, withSyncHeld, withSyncLine,
-  withoutRouteLine, withoutSyncLine,
+  withoutRouteLine, withoutRouteMemory, withoutSyncLine, withoutSyncMemory,
   type SyncBaseRoute, type SyncBaseSession, type SyncFiles,
 } from './syncBase';
 
@@ -173,6 +173,25 @@ describe('lignes de la base', () => {
     expect(withoutSyncLine(held, 15)).toMatchObject({ held: [], removed: [15] });
   });
 
+  it('oublier une session sans la tenir pour supprimée : ni ligne, ni suppression retenue, ni session laissée', () => {
+    const start = { ...base(), removed: [15, 30], held: [25] };
+    expect(hasSyncMemory(start, 10)).toBe(true);
+    expect(hasSyncMemory(start, 15)).toBe(true);
+    expect(hasSyncMemory(start, 25)).toBe(true);
+    expect(hasSyncMemory(start, 99)).toBe(false);
+    const followed = withoutSyncMemory(start, 10);
+    expect(followed.sessions.map((s) => s.startMs)).toEqual([20]);
+    // Rien dans `removed`, à l'inverse de `withoutSyncLine` : la session reviendra comme une session neuve.
+    expect(followed).toMatchObject({ removed: [15, 30], held: [25] });
+    expect(withoutSyncMemory(start, 15)).toMatchObject({ removed: [30], held: [25] });
+    expect(withoutSyncMemory(start, 25)).toMatchObject({ removed: [15, 30], held: [] });
+    expect(withoutSyncMemory(start, 99)).toEqual(start);
+    expect(hasSyncMemory(withoutSyncMemory(withoutSyncMemory(start, 10), 15), 10)).toBe(false);
+    // Les itinéraires et le reste de la base ne bougent pas.
+    const withRoutes = { ...start, removedRoutes: ['a'], heldRoutes: ['b'] };
+    expect(withoutSyncMemory(withRoutes, 10)).toMatchObject({ removedRoutes: ['a'], heldRoutes: ['b'], computerId: 'ordinateur-0001', phonePath: 'Documents/Gtracker' });
+  });
+
   it('chemins de la base et des fiches gardées, par téléphone', () => {
     expect(syncBasePath('telephone-0001')).toBe('synchro/telephone-0001.json');
     expect(syncAncestorPath('telephone-0001', 1234, 'computer')).toBe('synchro/telephone-0001/fiches/1234-ordinateur.json');
@@ -232,6 +251,18 @@ describe('itinéraires dans la base', () => {
     expect(held).toMatchObject({ removedRoutes: ['z'], heldRoutes: ['a', 'c'] });
     expect(withRouteLine(held, route('c')).heldRoutes).toEqual(['a']);
     expect(withoutRouteLine(held, 'c')).toMatchObject({ heldRoutes: ['a'], removedRoutes: ['c', 'z'] });
+  });
+
+  it('oublier un itinéraire sans le tenir pour supprimé', () => {
+    const start = { ...base(), routes: [route('a'), route('b')], removedRoutes: ['c', 'z'], heldRoutes: ['d'], removed: [15], held: [25] };
+    expect(['a', 'c', 'd', 'x'].map((id) => hasRouteMemory(start, id))).toEqual([true, true, true, false]);
+    const followed = withoutRouteMemory(start, 'a');
+    expect(followed.routes.map((r) => r.id)).toEqual(['b']);
+    expect(followed).toMatchObject({ removedRoutes: ['c', 'z'], heldRoutes: ['d'], removed: [15], held: [25] });
+    expect(followed.sessions).toEqual(start.sessions);
+    expect(withoutRouteMemory(start, 'c')).toMatchObject({ removedRoutes: ['z'], heldRoutes: ['d'] });
+    expect(withoutRouteMemory(start, 'd')).toMatchObject({ removedRoutes: ['c', 'z'], heldRoutes: [] });
+    expect(withoutRouteMemory(start, 'x')).toEqual(start);
   });
 
   it('en fin de synchronisation, les suppressions d’itinéraires retenues se réduisent à la corbeille, si on la donne', () => {

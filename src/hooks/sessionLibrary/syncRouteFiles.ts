@@ -2,7 +2,7 @@ import { errorMessage } from '../../core/basics';
 import { ROUTES_DIR, routePath } from '../../library/folderLayout';
 import { routeDisplayName } from '../../library/routeName';
 import {
-  SYNC_SIDES, otherSyncSide, withRouteHeld, withRouteLine, withoutRouteLine,
+  SYNC_SIDES, hasRouteMemory, otherSyncSide, withRouteHeld, withRouteLine, withoutRouteLine, withoutRouteMemory,
   type SyncBase, type SyncSideName, type SyncStamp,
 } from '../../library/syncBase';
 import type { SyncRoutesOutcome } from '../../library/syncOutcome';
@@ -10,8 +10,8 @@ import {
   routeRecordsToRead, syncRouteId, syncRouteLineOf, syncRouteListing, syncRouteSide,
   type RouteSyncInput, type RouteSyncItem, type RouteSyncOp, type RouteSyncPlan, type SyncRouteListed, type SyncTrashedRoute,
 } from '../../library/syncRoutes';
-import { trashFilePath, type TrashEntry, type TrashOrigin } from '../../library/trash';
-import { readTrashIndex, stashFilesInTrash } from '../../library/trashFolder';
+import { routeRestorePlan, trashFilePath, type TrashEntry, type TrashOrigin } from '../../library/trash';
+import { copyFromTrash, dropTrashEntries, readTrashIndex, stashFilesInTrash, trashHoldsCopies, trashLeftoversIn } from '../../library/trashFolder';
 import { isWritableRouteRecord, parseRouteRecord } from '../../planning/routeRecord';
 import type { FileStat, MemoryFolder } from '../../platform/memoryFolder';
 
@@ -93,6 +93,93 @@ export const routeDeletionKeysOf = (items: readonly RouteSyncItem[]): SyncRouteD
 /** Nombre de suppressions d'un itinéraire, pour retrouver celles qu'une restriction a retenues. */
 export const routeRemovalsOf = (item: RouteSyncItem | undefined): number =>
   item?.ops.filter((op) => op.kind === 'trash' || op.kind === 'removeFromPhone').length ?? 0;
+
+/** Ce que les réponses de l'utilisateur gardent des itinéraires. */
+export interface RouteKeepAnswer {
+  /** « Tout garder » : les suppressions refusées, telles que la question les a montrées. */
+  refused: readonly SyncRouteDeletionKey[];
+  /**
+   * « Les garder » : `null`, pas de réponse ; `all`, tous les itinéraires de la corbeille encore sur le téléphone ;
+   * sinon ceux que la question a montrés (leurs identités).
+   */
+  held: 'all' | readonly string[] | null;
+}
+
+export interface RouteKeepContext {
+  /** Le dossier de l'ordinateur, avec sa corbeille. */
+  computer: MemoryFolder;
+  /** La base du moment ; `null` à une première rencontre. */
+  base: () => SyncBase | null;
+  /** Écrit la base changée, et la retient. */
+  setBase: (base: SyncBase) => Promise<void>;
+}
+
+/**
+ * Sort de la corbeille de l'ordinateur l'itinéraire `id`, si une entrée en tient la fiche : celle venue de
+ * l'ordinateur d'abord, la plus récente. Copie GPX puis fiche, sous une base libre (un GPX resté seul d'une
+ * restauration coupée est repris en place), puis retrait de cette seule entrée. Un itinéraire reconnu à son nom
+ * (sans date de création) ne revient que sous ce nom : sous un autre, il serait un autre itinéraire. Rend faux, sans
+ * rien changer, si aucune entrée ne convient.
+ */
+const routeFromTrash = async (computer: MemoryFolder, id: string): Promise<boolean> => {
+  const entries = routeEntriesOf((await readTrashIndex(computer)).entries)
+    .filter((entry) => trashedRouteId(entry) === id)
+    .sort((a, b) => Number(a.origin !== 'ordinateur') - Number(b.origin !== 'ordinateur') || b.deletedAtMs - a.deletedAtMs);
+  for (const entry of entries) {
+    const names = (await computer.list(ROUTES_DIR)).map((e) => e.name);
+    const leftovers = new Set(await trashLeftoversIn(computer, entry, ROUTES_DIR, names));
+    const plan = routeRestorePlan(entry, names.filter((name) => !leftovers.has(name)));
+    if (syncRouteId(entry.createdAt, plan.base) !== id) continue;
+    if (!plan.copies.some((copy) => /\.json$/i.test(copy.to)) || !(await trashHoldsCopies(computer, plan.copies))) continue;
+    await copyFromTrash(computer, plan.copies);
+    await dropTrashEntries(computer, [entry.dir]);
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Applique aux itinéraires les réponses « Tout garder » et « Les garder », avant le plan qui sera exécuté. `shown` :
+ * le plan du moment sans ces réponses ; une réponse n'agit que sur un itinéraire qui y est encore dans le cas que la
+ * question a montré.
+ *
+ * - D'abord, d'une seule écriture, la base oublie chacun d'eux : sans ligne, rien ne le supprime plus de soi-même si
+ *   la suite est coupée. Supprimé sur le téléphone, il devient un itinéraire neuf de l'ordinateur, que le plan y
+ *   recopie (ou qui attend, si le téléphone ne s'écrit pas).
+ * - Puis, supprimé sur l'ordinateur et encore sur le téléphone (suivi, ou laissé à cause de la corbeille), il sort de
+ *   la corbeille si elle le tient encore ; sinon le plan le recopie depuis le téléphone (`RouteSyncInput.keep`).
+ *   Même sorti de la corbeille, sa ligne est oubliée : un itinéraire suivi n'est reconnu que sous le nom que sa ligne
+ *   lui donne, et revenu sous un autre nom, ligne gardée, il serait encore tenu pour supprimé.
+ *
+ * Rien ici ne supprime ni n'écrase : une coupure laisse au pire l'itinéraire à la fois dans la mémoire et dans la
+ * corbeille. Rend les identités gardées (à passer au plan), et celles sorties de la corbeille.
+ */
+export const keepRoutes = async (
+  shown: RouteSyncPlan, answer: RouteKeepAnswer, ctx: RouteKeepContext,
+): Promise<{ kept: string[]; fromTrash: string[]; changed: boolean }> => {
+  const refusedOn = (id: string, side: SyncSideName): boolean => answer.refused.some((key) => key.id === id && key.side === side);
+  const heldKept = (id: string): boolean => answer.held === 'all' || (answer.held !== null && answer.held.includes(id));
+  const removalOf = (item: RouteSyncItem): SyncRouteDeletionKey | null => routeDeletionKeysOf([item])[0] ?? null;
+  const wanted = shown.items.filter((item) => {
+    const removal = removalOf(item);
+    return removal ? refusedOn(item.id, removal.side) : item.left === 'inTrash' && (heldKept(item.id) || refusedOn(item.id, 'phone'));
+  });
+  const kept = wanted.map((item) => item.id);
+  const base = ctx.base();
+  const known = base ? kept.filter((id) => hasRouteMemory(base, id)) : [];
+  let changed = false;
+  if (base && known.length > 0) {
+    await ctx.setBase(known.reduce((next, id) => withoutRouteMemory(next, id), base));
+    changed = true;
+  }
+  const fromTrash: string[] = [];
+  for (const item of wanted) {
+    if (removalOf(item)?.side === 'computer' || !(await routeFromTrash(ctx.computer, item.id))) continue;
+    fromTrash.push(item.id);
+    changed = true;
+  }
+  return { kept, fromTrash, changed };
+};
 
 export interface RouteRunContext {
   folders: Record<SyncSideName, MemoryFolder>;
