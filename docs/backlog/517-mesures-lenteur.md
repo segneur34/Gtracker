@@ -38,3 +38,7 @@ Règle de la fiche 508 : refaire le calcul de fond seulement si l'écran reste f
 ## Non mesuré
 
 Pas de profil par fonction (`FLUIDITE_PROFIL`) ; pas de téléphone réel (le ralenti ×6 du processeur n'imite ni la mémoire ni le stockage d'un Android) ; une seule cadence longue (5 Hz) à 4 h.
+
+## Correction du 23/11 (lot 521)
+
+La ligne « Démarrage sans préchargement » de ce tableau neutralisait tous les calculs différés de la page, pas le seul préchargement. Remesuré : le gel de 0,53 s du démarrage ne vient pas du préchargement mais du calcul du banc de poissons du Profil ; le préchargement ne produit aucune tâche de plus de 0,3 s. La conclusion E-02 ci-dessus est donc fausse sur sa cause. Chiffres : `docs/backlog/521-prechargement.md`.

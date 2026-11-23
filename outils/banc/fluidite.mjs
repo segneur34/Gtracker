@@ -35,7 +35,13 @@
 //     prise de plus sous le profileur ;
 //  6. démarrage : du chargement de `/` au Profil rendu (en-tête `.profile-head__title`), puis au premier répit d'une seconde sans tâche longue
 //     (« interactif »), tâches longues et modules chargés sur 8 s ; avec le préchargement des pages
-//     (`preloadPages` d'`App.tsx`), puis sans (`requestIdleCallback` neutralisé depuis le script, rien dans `src/`) ;
+//     (`preloadPages` d'`App.tsx`), puis sans (les `requestIdleCallback` sans option sont neutralisés depuis le script, rien
+//     dans `src/` ; ceux à échéance, comme le calcul du banc de poissons du Profil, continuent : neutraliser tous les
+//     appels retirerait aussi ce calcul et ferait porter au préchargement un gel qui n'est pas le sien) ;
+//     puis la première ouverture de Sessions, d'Enregistrer et de la longue analyse, juste après le Profil rendu (+0 s)
+//     et 4 s plus tard : durée jusqu'au premier contenu de la page, plus longue tâche bloquante de ce temps ; la liste des
+//     tâches longues du démarrage (instant, durée) est aussi imprimée avec chaque prise, avec les morceaux de code
+//     reçus ; avec `FLUIDITE_PROFIL=1`, une prise de plus sous le profileur (avec préchargement) ;
 //  7. fin d'enregistrement (« analyser », hors de la liste par défaut, `FLUIDITE_MESURES=analyser`) : enregistrement
 //     rejoué à ×600 (voile et surf d'une heure à 1 Hz), ralenti posé juste avant l'arrêt. L'arrêt range la session et
 //     ouvre l'analyse seul : le temps part de l'arrêt (fin des 2 s tenues sur « Arrêter ») et comprend la construction
@@ -57,8 +63,8 @@ const MESURES = (process.env.FLUIDITE_MESURES ?? 'ouverture,quitter,seuil,zoom,r
 const REPS = Math.max(1, Number(process.env.FLUIDITE_REPS ?? 2) || 2);
 /** Prises du zoom (un pincement dure 25 s sous ralenti sur une longue voile) et du démarrage (fenêtre de 8 s par prise) : une seule par défaut. */
 const REPS_LONGUES = Math.max(1, Number(process.env.FLUIDITE_REPS_LONGUES ?? 1) || 1);
-/** Fenêtre du démarrage, en secondes. */
-const FENETRE_S = 8;
+/** Fenêtre du démarrage, en secondes (`FLUIDITE_FENETRE_S=20` pour voir ce qui se passe plus tard, un préchargement différé par exemple). */
+const FENETRE_S = Math.max(2, Number(process.env.FLUIDITE_FENETRE_S ?? 8) || 8);
 const RATES = (process.env.FLUIDITE_RALENTI ?? '1,6').split(',').map((r) => Number(r)).filter((r) => r >= 1);
 /** Une prise de plus sous le profileur à chaque mesure, qui dit où le temps part par fonction : longue, donc à la demande. */
 const PROFIL = process.env.FLUIDITE_PROFIL === '1';
@@ -198,6 +204,37 @@ const profileSummary = (profile, top = 12) => {
     lines.push('  temps inclus (la fonction et ce qu\'elle appelle) :');
     for (const [nm, us] of [...watched].sort((a, b) => b[1] - a[1])) lines.push(`    ${pct(us)}  ${sec(us / 1000).padStart(9)}  ${nm}`);
   }
+  return lines.join('\n');
+};
+/**
+ * La plus longue plage de travail d'un profil (échantillons consécutifs hors repos) : durée, et temps propre par
+ * fonction dans cette plage seulement, pour dire ce que fait la plus longue tâche et non la moyenne du profil.
+ */
+const longestBusy = (profile, top = 14) => {
+  const nodes = new Map(profile.nodes.map((n) => [n.id, n]));
+  const isIdle = (id) => nodes.get(id).callFrame.functionName === '(idle)';
+  let best = { from: 0, to: 0, us: 0 };
+  let from = null;
+  let us = 0;
+  profile.samples.forEach((id, i) => {
+    if (isIdle(id)) {
+      if (from !== null && us > best.us) best = { from, to: i, us };
+      from = null; us = 0;
+    } else {
+      if (from === null) from = i;
+      us += profile.timeDeltas[i];
+    }
+  });
+  if (from !== null && us > best.us) best = { from, to: profile.samples.length, us };
+  const self = new Map();
+  for (let i = best.from; i < best.to; i++) {
+    const n = nodes.get(profile.samples[i]);
+    const url = n.callFrame.url ? n.callFrame.url.split('/').pop().split('?')[0] : '';
+    const key = `${n.callFrame.functionName || '(anonyme)'} ${url}`;
+    self.set(key, (self.get(key) ?? 0) + profile.timeDeltas[i]);
+  }
+  const lines = [`  plus longue plage de travail du profil : ${sec(best.us / 1000)}, temps propre dedans :`];
+  for (const [key, t] of [...self].sort((a, c) => c[1] - a[1]).slice(0, top)) lines.push(`    ${sec(t / 1000).padStart(9)}  ${key}`);
   return lines.join('\n');
 };
 const profileStart = () => send('Profiler.start');
@@ -763,12 +800,14 @@ if (MESURES.includes('demarrage')) {
   await wait(3000);
   let scripts = 0;
   const unlisten = b.onMessage((msg) => { if (msg.method === 'Network.requestWillBeSent' && msg.params.type === 'Script') scripts++; });
-  const startOnce = async () => {
+  const startOnce = async ({ profile = false } = {}) => {
     scripts = 0;
     await reload('/');
+    if (profile) await profileStart();
     const m0 = await metrics();
     await wait(WINDOW_MS);
     const m1 = await metrics();
+    const prof = profile ? await profileStop() : null;
     const homeAt = await evaluate('window.__fluidite.homeAt');
     const lt = await longTasks(0, WINDOW_MS);
     // Interactif : premier instant, après le Profil rendu, suivi d'une seconde sans tâche longue.
@@ -784,14 +823,63 @@ if (MESURES.includes('demarrage')) {
       }
     }
     const tas = await tasMemoire();
-    return { tas, rendu: homeAt, interactif: interactive, max: lt.max, total: lt.total, count: lt.count, script: (m1.ScriptDuration - m0.ScriptDuration) * 1000, modules: scripts };
+    // Morceaux de code arrivés (fin de réception) : ce qui s'évalue juste après explique la tâche longue qui suit.
+    const morceaux = JSON.parse(await evaluate(`JSON.stringify(performance.getEntriesByType('resource').filter((e) => /\\.js(\\?|$)/.test(e.name) && e.responseEnd > 600).sort((a, c) => a.responseEnd - c.responseEnd).map((e) => e.name.split('/').pop().split('?')[0] + '@' + (e.responseEnd / 1000).toFixed(2)))`));
+    const taches = [...lt.tasks].sort((a, c) => a.start - c.start).map((x) => `${sec(x.start)} +${sec(x.end - x.start)}`).join(', ');
+    return { tas, rendu: homeAt, interactif: interactive, max: lt.max, total: lt.total, count: lt.count, script: (m1.ScriptDuration - m0.ScriptDuration) * 1000, modules: scripts, taches, morceaux, prof };
   };
   const startText = (r) => `Profil rendu ${sec(r.rendu)} | interactif ${r.interactif == null ? `> ${FENETRE_S} s` : sec(r.interactif)} | ${ltText(r)} | script ${sec(r.script)} | ${r.modules} modules chargés | ${tasText(r.tas)}`;
+  // Première ouverture d'une page juste après le démarrage, dans chacun des deux modes : le document est rechargé sur
+  // « / », on attend le Profil rendu puis un délai, et la page est ouverte par navigation dans la page ; durée jusqu'à
+  // son premier contenu et plus longue tâche bloquante de ce temps. Une page ouverte avant son préchargement se
+  // charge à la demande : cette mesure dit ce que coûte l'impatience, et ce que le préchargement fait gagner.
+  const PREMIERES = [
+    ['Sessions', '/sessions', `Boolean(document.querySelector('.sessions-head__title'))`],
+    ['Enregistrer', '/enregistrer', `Boolean(document.querySelector('.rec-actions'))`],
+    ['analyse', longUrl, `Boolean(document.querySelector('.an-page h1')?.textContent.trim())`],
+  ];
+  const DELAIS_MS = [0, 4000];
+  const premiere = async (url, test, delai) => {
+    await reload('/');
+    await waitFor(async () => (await evaluate('window.__fluidite.homeAt')) !== null, { timeout: 30000, every: 20, label: 'Profil rendu' });
+    await wait(delai);
+    const out = await evaluate(`new Promise((resolve) => {
+      const t0 = performance.now();
+      ${SPA_GO(url)}
+      const tick = () => {
+        const now = performance.now();
+        if (${test}) resolve({ t0, t1: now, duree: now - t0 });
+        else if (now - t0 > 60000) resolve({ t0, t1: now, duree: null });
+        else setTimeout(tick, 16);
+      };
+      tick();
+    })`);
+    const lt = await longTasks(out.t0, out.t1);
+    return { duree: out.duree, max: lt.max };
+  };
+  results.premieres = {};
+  const mesurePremieres = async (mode) => {
+    results.premieres[mode] = {};
+    for (const rate of RATES) {
+      await throttle(rate);
+      results.premieres[mode][rate] = {};
+      for (const [nom, url, test] of PREMIERES) {
+        for (const delai of DELAIS_MS) {
+          const runs = [];
+          for (let k = 0; k < REPS; k++) runs.push(await premiere(url, test, delai));
+          const med = { duree: median(runs.map((r) => r.duree)), max: median(runs.map((r) => r.max)) };
+          results.premieres[mode][rate][`${nom} à +${delai / 1000} s`] = med;
+          console.log(`première ouverture ${mode} ×${rate} ${nom} ${delai / 1000} s après le Profil : ${runs.map((r) => `${sec(r.duree)} (tâche max ${sec(r.max)})`).join(' ; ')}`);
+          check(`première ouverture ${mode} ×${rate} ${nom} +${delai / 1000} s : la page s'affiche à chaque prise`, runs.every((r) => fini(r.duree)), runs.map((r) => sec(r.duree)).join(' ; '));
+        }
+      }
+    }
+  };
   results.demarrage = {};
   let noPreload = null;
   for (const mode of ['avec préchargement', 'sans préchargement']) {
     if (mode === 'sans préchargement') {
-      noPreload = (await send('Page.addScriptToEvaluateOnNewDocument', { source: `window.requestIdleCallback = () => 0; window.cancelIdleCallback = () => {};` })).result.identifier;
+      noPreload = (await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => { const demande = window.requestIdleCallback.bind(window); window.requestIdleCallback = (fn, options) => (options ? demande(fn, options) : 0); })();` })).result.identifier;
     }
     results.demarrage[mode] = {};
     for (const rate of RATES) {
@@ -801,6 +889,14 @@ if (MESURES.includes('demarrage')) {
         const r = await startOnce();
         runs.push(r);
         console.log(`${mode}, ×${rate} essai ${k + 1} : ${startText(r)}`);
+        console.log(`  tâches longues (instant +durée) : ${r.taches || 'aucune'}`);
+        console.log(`  morceaux reçus après 0,6 s (nom@instant en s) : ${r.morceaux.join(' ')}`);
+      }
+      if (PROFIL && mode === 'avec préchargement') {
+        const p = await startOnce({ profile: true });
+        console.log(`${mode}, ×${rate} sous le profileur : ${ltText(p)}`);
+        console.log(`  tâches longues (instant +durée) : ${p.taches || 'aucune'}`);
+        if (p.prof) console.log(profileSummary(p.prof, 20), '\n', longestBusy(p.prof));
       }
       const med = Object.fromEntries(['rendu', 'interactif', 'max', 'total', 'count', 'script', 'modules'].map((k) => [k, median(runs.map((r) => r[k]))]));
       if (runs.some((r) => r.interactif == null)) med.interactif = null;
@@ -810,6 +906,7 @@ if (MESURES.includes('demarrage')) {
       check(`démarrage ${mode} ×${rate} : le Profil est rendu à chaque prise, modules comptés`, runs.every((r) => fini(r.rendu) && fini(r.modules) && fini(r.script)),
         runs.map((r) => `${sec(r.rendu)}, ${r.modules} modules`).join(' ; '));
     }
+    await mesurePremieres(mode);
   }
   if (noPreload) await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: noPreload });
   unlisten();
