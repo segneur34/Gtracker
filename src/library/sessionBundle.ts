@@ -25,9 +25,26 @@ import { isWritableRecord, serializeRecord, type RecordUnreadable, type RecordWi
 const PREFIX = XML.session.prefix;
 const OPEN = `<extensions><${PREFIX}:session xmlns:${PREFIX}="${XML.session.ns}" version="1">`;
 const closeOf = (prefix: string): string => `</${prefix}:session></extensions>`;
-/** Élément `name` du bloc sous le préfixe `prefix`, et son contenu. */
-const elementPattern = (prefix: string, name: string, attributes = ''): RegExp =>
-  new RegExp(`<${prefix}:${name}${attributes}>([\\s\\S]*?)<\\/${prefix}:${name}>`, 'g');
+/**
+ * Éléments `name` du bloc sous le préfixe `prefix`, dans l'ordre du texte : les groupes de `attributes`, puis le
+ * contenu. La fermeture se cherche par `indexOf` depuis l'ouverture, et une ouverture sans fermeture arrête la
+ * lecture, aucune ouverture plus loin ne pouvant en trouver une : une expression paresseuse referait la recherche
+ * jusqu'au bout du texte pour chaque ouverture, et des milliers d'ouvertures sans fermeture figeraient la page.
+ * Même résultat que `<prefix:name attributes>([\s\S]*?)</prefix:name>` en recherche globale.
+ */
+const elementsOf = (body: string, prefix: string, name: string, attributes = ''): string[][] => {
+  const open = new RegExp(`<${prefix}:${name}${attributes}>`, 'g');
+  const close = `</${prefix}:${name}>`;
+  const found: string[][] = [];
+  for (let m = open.exec(body); m; m = open.exec(body)) {
+    const contentStart = m.index + m[0].length;
+    const end = body.indexOf(close, contentStart);
+    if (end < 0) break;
+    found.push([...m.slice(1), body.slice(contentStart, end)]);
+    open.lastIndex = end + close.length;
+  }
+  return found;
+};
 
 const unescapeXml = (text: string): string => text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 
@@ -156,16 +173,22 @@ export const bundleSessionGpx = (gpx: string, record: SessionRecord, motion: Uin
  * Sans fiche lisible, de même. `prefix` : celui des éléments du bloc.
  */
 const undoEdits = (gpx: string, body: string, prefix: string, record: Pick<RecordWithoutSummary, 'name' | 'marks'> | null): string => {
-  const edits = [...body.matchAll(elementPattern(prefix, 'edit', ' at="(\\d+)" length="(\\d+)"'))]
-    .map((m) => ({ at: Number(m[1]), length: Number(m[2]), original: unescapeXml(m[3]) }));
+  const edits = elementsOf(body, prefix, 'edit', ' at="(\\d+)" length="(\\d+)"')
+    .map(([at, length, original]) => ({ at: Number(at), length: Number(length), original: unescapeXml(original) }));
   if (edits.length === 0 || !record) return gpx;
-  let out = gpx;
-  let limit = gpx.length;
-  for (const e of edits.reverse()) {
-    if (e.at + e.length > limit) return gpx;
-    out = out.slice(0, e.at) + e.original + out.slice(e.at + e.length);
-    limit = e.at;
+  // Chaque retouche finit avant le début de la suivante, la dernière dans le texte : sinon le GPX est gardé tel quel.
+  for (let k = 0; k < edits.length; k++) {
+    if (edits[k].at + edits[k].length > (k + 1 < edits.length ? edits[k + 1].at : gpx.length)) return gpx;
   }
+  // Défaites en un seul passage, dans l'ordre du texte : les positions sont celles du GPX empaqueté.
+  const pieces: string[] = [];
+  let cursor = 0;
+  for (const e of edits) {
+    pieces.push(gpx.slice(cursor, e.at), e.original);
+    cursor = e.at + e.length;
+  }
+  pieces.push(gpx.slice(cursor));
+  const out = pieces.join('');
   return retouchGpx(out, record.name?.trim() || null, record.marks ?? []).gpx === gpx ? out : gpx;
 };
 
@@ -191,7 +214,7 @@ export const unbundleSessionGpx = (text: string): UnbundledGpx => {
   if (!block) return { gpx: text, record: null, unreadable: {}, recordText: null, motion: null, otherSport: null };
   const { prefix, start, bodyStart, end, close } = block;
   const body = text.slice(bodyStart, end);
-  const escapedRecord = elementPattern(prefix, 'record').exec(body)?.[1];
+  const escapedRecord = elementsOf(body, prefix, 'record')[0]?.[0];
   const recordText = escapedRecord === undefined ? null : unescapeXml(escapedRecord);
   // Fiche de cette version ou de l'ancienne application (`parseImportedRecord`).
   const read = recordText === null ? null : parseImportedRecord(recordText);

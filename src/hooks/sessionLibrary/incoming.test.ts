@@ -30,11 +30,17 @@ let listeners: (() => void)[] = [];
 let removed: string[] = [];
 let removeRefused = false;
 let reads = 0;
+/** Témoins de lecture posés chez le téléphone, qui survivent à un lancement comme la file. */
+const witnesses = new Set<string>();
+let markRefused = false;
+/** Gestes de la page sur la file, dans l'ordre : `mark <id> <vrai|faux>`, `read <id>`. */
+let steps: string[] = [];
 
 const fakePort: IncomingFilesPort = {
-  list: async () => [...queue.entries()].map(([id, { name, refusal }]) => ({ id, name, size: 1, refusal })),
+  list: async () => [...queue.entries()].map(([id, { name, refusal }]) => ({ id, name, size: 1, refusal, trying: witnesses.has(id) })),
   read: async (id) => {
     reads += 1;
+    steps.push(`read ${id}`);
     const content = queue.get(id)?.content ?? null;
     return typeof content === 'string' ? new TextEncoder().encode(content) : content;
   },
@@ -42,6 +48,13 @@ const fakePort: IncomingFilesPort = {
     if (removeRefused) throw new Error('retrait refusé');
     removed.push(id);
     queue.delete(id);
+    witnesses.delete(id);
+  },
+  mark: async (id, trying) => {
+    if (markRefused) throw new Error('témoin refusé');
+    steps.push(`mark ${id} ${trying}`);
+    if (trying && queue.has(id)) witnesses.add(id);
+    else witnesses.delete(id);
   },
   subscribe: (listener) => {
     listeners.push(listener);
@@ -101,11 +114,15 @@ beforeEach(() => {
   removeRefused = false;
   opened = 'ready';
   reads = 0;
+  witnesses.clear();
+  markRefused = false;
+  steps = [];
   stopTimers = trackTestTimers();
 });
 afterEach(() => {
   stopTimers();
   vi.doUnmock('../../platform/memoryFolder');
+  vi.doUnmock('../../library/trackWorkerClient');
 });
 
 describe('fichiers reçus d\'une autre application', () => {
@@ -434,11 +451,88 @@ describe('fichiers reçus d\'une autre application', () => {
     expect(notices()[0].route).toBe('Tour du lac (2)');
   });
 
+  it('témoin de lecture posé avant de lire, parti avec la copie', async () => {
+    const id = receive('sortie.gpx', gpxAt(2));
+    await launch();
+    expect(steps[0]).toBe(`mark ${id} true`);
+    expect(steps[1]).toBe(`read ${id}`);
+    expect(removed).toEqual([id]);
+    expect(witnesses.size).toBe(0);
+  });
+
+  it('Gtracker arrêté pendant la lecture : au lancement suivant, refusé et dit, copie retirée, sans rien lire', async () => {
+    const id = receive('piege.gpx', gpxAt(2));
+    witnesses.add(id);
+    const { notices } = await launch();
+    expect(reads).toBe(0);
+    expect(steps).toEqual([]);
+    expect(removed).toEqual([id]);
+    expect(witnesses.size).toBe(0);
+    expect(sessionGpx()).toEqual([]);
+    expect(notices()).toEqual([{
+      id,
+      text: "« piege.gpx » n'a pas été rangé : Gtracker s'est arrêté pendant sa lecture. S'il est bon, ouvrez-le de nouveau.",
+      file: null,
+      trouble: true,
+    }]);
+  });
+
+  it('copie gardée pour un autre essai (écriture refusée) : témoin retiré, rangée au lancement suivant', async () => {
+    writeRefused = true;
+    const id = receive('montre.fit', fitAt(1));
+    await launch();
+    expect(steps).toContain(`mark ${id} false`);
+    expect(witnesses.has(id)).toBe(false);
+    expect(queue.has(id)).toBe(true);
+    writeRefused = false;
+    const second = await launch();
+    expect(second.notices()[0].text).toBe('« montre.fit » est rangé dans la mémoire.');
+  });
+
+  it("itinéraire non rangé (écriture refusée) : témoin retiré, copie gardée", async () => {
+    writeRefused = true;
+    const id = receive('komoot.gpx', ROUTE_ONLY_GPX);
+    const { notices } = await launch();
+    expect(steps).toEqual([`mark ${id} true`, `read ${id}`, `mark ${id} false`]);
+    expect(witnesses.has(id)).toBe(false);
+    expect(queue.has(id)).toBe(true);
+    expect(notices()[0].text).toContain('Gtracker le garde et réessaiera au prochain lancement.');
+  });
+
+  it('témoin impossible à poser : noté, le fichier est rangé quand même', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    markRefused = true;
+    try {
+      receive('sortie.gpx', gpxAt(2));
+      const { notices } = await launch();
+      expect(sessionGpx()).toHaveLength(1);
+      expect(notices()[0].text).toBe('« sortie.gpx » est rangé dans la mémoire.');
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('tri itinéraire ou session trop long : refusé avec la raison, copie retirée, rien de rangé', async () => {
+    vi.doMock('../../library/trackWorkerClient', async (importOriginal) => {
+      const original = await importOriginal<typeof import('../../library/trackWorkerClient')>();
+      const runInWorker: typeof original.runInWorker = (kind, gpxText, options) =>
+        kind === 'routeCheck' ? Promise.reject(new Error('lecture trop longue : fichier refusé')) : original.runInWorker(kind, gpxText, options);
+      return { ...original, runInWorker };
+    });
+    const id = receive('piege.gpx', gpxAt(2));
+    const { notices } = await launch();
+    expect(removed).toEqual([id]);
+    expect(sessionGpx()).toEqual([]);
+    expect(notices()).toEqual([{ id, text: "« piege.gpx » n'a pas été rangé : lecture trop longue : fichier refusé.", file: null, trouble: true }]);
+  });
+
   it('dans le navigateur, la vraie plateforme est sans effet', async () => {
     const { incomingFiles } = await import('../../platform/incomingFile');
     await expect(incomingFiles.list()).resolves.toEqual([]);
     await expect(incomingFiles.read('x')).resolves.toBeNull();
     await expect(incomingFiles.remove('x')).resolves.toBeUndefined();
+    await expect(incomingFiles.mark('x', true)).resolves.toBeUndefined();
     expect(() => incomingFiles.subscribe(() => undefined)).not.toThrow();
   });
 });

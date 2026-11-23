@@ -9,7 +9,7 @@ import { lib } from './memory';
 import { canImportSessions, importEntries, type ImportOutcome } from './importer';
 import { nativeErrorMessage } from '../../platform/nativeMessages';
 import { isGpxFileName } from '../../library/record';
-import { isRouteGpx } from '../../planning/routeImport';
+import { runInWorker } from '../../library/trackWorkerClient';
 
 /**
  * Fichiers reçus d'une autre application (« Ouvrir avec Gtracker », « Partager vers Gtracker »), côté page : la
@@ -24,8 +24,14 @@ import { isRouteGpx } from '../../planning/routeImport';
  *
  * Pendant un enregistrement, la copie native se fait, et la page ne touche à rien : la file reprend à l'arrêt.
  *
+ * Verrou contre le rejeu : avant de lire un fichier, la page pose son témoin de lecture chez le téléphone (`mark`), qui
+ * survit à un arrêt net de Gtracker ; il part avec la copie, ou est retiré quand la copie est gardée pour un autre
+ * essai. Un fichier listé avec son témoin a donc arrêté Gtracker pendant sa lecture, peut-être en le figeant : il est
+ * refusé, dit et retiré sans être relu, au lieu de figer chaque lancement.
+ *
  * Un GPX qui est un itinéraire (fiche d'un itinéraire de Gtracker, ou tracé sans aucun point daté,
- * `isRouteGpx`) est rangé dans `itineraires/` au lieu des sessions (`routeArrival`) ; tout autre fichier suit l'import.
+ * `isRouteGpx`, tranché hors du fil de l'affichage) est rangé dans `itineraires/` au lieu des sessions
+ * (`routeArrival`) ; tout autre fichier suit l'import.
  */
 
 /** Verdict d'un fichier passé par `importEntries` : `retry` garde la copie, les autres la retirent. */
@@ -112,18 +118,36 @@ const notify = (notice: IncomingNotice): void => {
   setState({ incomingNotices: [...libraryState().incomingNotices, notice] });
 };
 
-/** Retire la copie. Un échec n'est pas une perte : au lancement suivant, le rangement dira « déjà présente ». */
-const forget = async (file: IncomingFile): Promise<void> => {
-  await port.remove(file.id).catch((err: unknown) => console.warn('Fichier reçu non retiré', err));
+/** Pose ou retire le témoin de lecture ; un échec est noté, sans plus : le fichier se range quand même. */
+const markTrying = async (file: IncomingFile, trying: boolean): Promise<void> => {
+  try {
+    await port.mark(file.id, trying);
+  } catch (err) {
+    console.warn('Témoin de lecture du fichier reçu non changé', err);
+  }
 };
 
 /**
- * GPX reçu, lu une fois pour savoir si c'est un itinéraire : rangé dans les itinéraires, `'route'` ; sinon son contenu,
+ * Retire la copie, et son témoin de lecture avec elle. Un échec n'est pas une perte : le témoin retiré à part, au
+ * lancement suivant, le rangement dira « déjà présente ».
+ */
+const forget = async (file: IncomingFile): Promise<void> => {
+  try {
+    await port.remove(file.id);
+  } catch (err) {
+    console.warn('Fichier reçu non retiré', err);
+    await markTrying(file, false);
+  }
+};
+
+/**
+ * GPX reçu, lu une fois pour savoir si c'est un itinéraire : rangé dans les itinéraires, `'done'` ; sinon son contenu,
  * que l'import des sessions reprend sans relire la copie. Ni GPX, ni rangement d'itinéraire injecté, ou copie illisible :
  * `undefined`, et l'import la lit lui-même (une lecture en échec y garde la copie pour le lancement suivant). Un échec du
- * rangement de l'itinéraire est dit, la copie gardée pour le lancement suivant, comme une session.
+ * rangement de l'itinéraire est dit, la copie gardée pour le lancement suivant, comme une session. Un tri qui n'aboutit
+ * pas (lecture trop longue, `runInWorker`) refuse le fichier, dit et retiré : `'done'` aussi.
  */
-const routeArrival = async (file: IncomingFile): Promise<'route' | Uint8Array | undefined> => {
+const routeArrival = async (file: IncomingFile): Promise<'done' | Uint8Array | undefined> => {
   const { id, name } = file;
   if (!importRoute || !isGpxFileName(name)) return undefined;
   let bytes: Uint8Array | null;
@@ -133,12 +157,27 @@ const routeArrival = async (file: IncomingFile): Promise<'route' | Uint8Array | 
     return undefined;
   }
   if (bytes === null) return undefined;
-  if (!isRouteGpx(new TextDecoder().decode(bytes))) return bytes;
+  const text = new TextDecoder().decode(bytes);
+  let route: boolean;
   try {
-    const saved = await importRoute(new TextDecoder().decode(bytes), name);
+    route = await runInWorker('routeCheck', text, {});
+  } catch (err) {
+    notify({
+      id,
+      text: t("{quoted} n'a pas été rangé : {reason}", { quoted: quoted(name), reason: sentence(errorMessage(err, t('erreur inconnue'))) }),
+      file: null,
+      trouble: true,
+    });
+    await forget(file);
+    return 'done';
+  }
+  if (!route) return bytes;
+  try {
+    const saved = await importRoute(text, name);
     notify({ id, text: t('{quoted} est rangé dans les itinéraires, sous « {route} ».', { quoted: quoted(name), route: saved.record.name }), file: null, route: saved.base, trouble: false });
     await forget(file);
   } catch (err) {
+    await markTrying(file, false);
     notify({
       id,
       text: t("{quoted} n'a pas pu être rangé dans les itinéraires ({detail}). Gtracker le garde et réessaiera au prochain lancement.", {
@@ -149,7 +188,17 @@ const routeArrival = async (file: IncomingFile): Promise<'route' | Uint8Array | 
       trouble: true,
     });
   }
-  return 'route';
+  return 'done';
+};
+
+/** Ce que `importEntries` dit d'un fichier ; une erreur levée en route retire le témoin, la copie reste pour un autre essai. */
+const importVerdict = async (file: IncomingFile, read: Uint8Array | undefined): Promise<IncomingVerdict> => {
+  try {
+    return incomingVerdict(await importEntries([entryOf(file, read)], { quiet: true }), file.name);
+  } catch (err) {
+    await markTrying(file, false);
+    throw err;
+  }
 };
 
 const handle = async (file: IncomingFile): Promise<void> => {
@@ -160,15 +209,26 @@ const handle = async (file: IncomingFile): Promise<void> => {
     await forget(file);
     return;
   }
+  if (file.trying) {
+    notify({
+      id,
+      text: t("{quoted} n'a pas été rangé : Gtracker s'est arrêté pendant sa lecture. S'il est bon, ouvrez-le de nouveau.", { quoted: quoted(name) }),
+      file: null,
+      trouble: true,
+    });
+    await forget(file);
+    return;
+  }
   const state = libraryState();
   if (!canImportSessions(state)) {
     notify({ id, text: refusedForMemory(name, state.memoryReadOnly), file: null, trouble: true });
     await forget(file);
     return;
   }
+  await markTrying(file, true);
   const arrival = await routeArrival(file);
-  if (arrival === 'route') return;
-  const verdict = incomingVerdict(await importEntries([entryOf(file, arrival)], { quiet: true }), name);
+  if (arrival === 'done') return;
+  const verdict = await importVerdict(file, arrival);
   switch (verdict.kind) {
     case 'added':
       notify({ id, text: t('{quoted} est rangé dans la mémoire.', { quoted: quoted(name) }), file: verdict.file, trouble: false });
@@ -188,6 +248,7 @@ const handle = async (file: IncomingFile): Promise<void> => {
         file: null,
         trouble: true,
       });
+      await markTrying(file, false);
       return;
   }
   await forget(file);

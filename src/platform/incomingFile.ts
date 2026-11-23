@@ -18,6 +18,11 @@ export interface IncomingFile {
   size: number;
   /** Refusé à la réception : aucune copie, juste de quoi le dire. */
   refusal: IncomingRefusal | null;
+  /**
+   * La page avait commencé à le lire (`mark`) et n'a rendu aucun verdict : Gtracker s'est arrêté pendant sa lecture,
+   * peut-être à cause de lui. Il n'est pas relu.
+   */
+  trying: boolean;
 }
 
 /** Ce que la file attend de la plateforme ; une autre réalisation sert aux tests et au banc. */
@@ -26,15 +31,22 @@ export interface IncomingFilesPort {
   list(): Promise<IncomingFile[]>;
   /** Contenu d'un fichier reçu ; `null` s'il n'existe plus. Lève si la lecture échoue : il existe peut-être encore. */
   read(id: string): Promise<Uint8Array | null>;
+  /** Retire le fichier, et son témoin de lecture. */
   remove(id: string): Promise<void>;
+  /**
+   * Pose (`trying`) ou retire le témoin de lecture d'un fichier, gardé par le téléphone même si Gtracker est arrêté
+   * net : posé avant de le lire, retiré quand le fichier est gardé pour un autre essai.
+   */
+  mark(id: string, trying: boolean): Promise<void>;
   /** Appelé à chaque fichier reçu pendant que la page vit ; ceux d'avant se lisent par `list`. */
   subscribe(listener: () => void): void;
 }
 
 interface IncomingFilePlugin {
-  list(): Promise<{ files: { id: string; name: string; size: number; refusal: string | null }[] }>;
+  list(): Promise<{ files: { id: string; name: string; size: number; refusal: string | null; trying?: boolean }[] }>;
   read(options: { id: string }): Promise<{ data: string | null }>;
   remove(options: { id: string }): Promise<void>;
+  mark(options: { id: string; trying: boolean }): Promise<void>;
   addListener(event: 'received', listener: () => void): Promise<PluginListenerHandle>;
 }
 
@@ -50,7 +62,7 @@ export const incomingFiles: IncomingFilesPort = {
   list: async () => {
     if (!isNativeApp()) return [];
     const { files } = await plugin.list();
-    return files.map((file) => ({ ...file, refusal: refusalOf(file.refusal) }));
+    return files.map((file) => ({ ...file, refusal: refusalOf(file.refusal), trying: file.trying === true }));
   },
   read: async (id) => {
     if (!isNativeApp()) return null;
@@ -59,6 +71,9 @@ export const incomingFiles: IncomingFilesPort = {
   },
   remove: async (id) => {
     if (isNativeApp()) await plugin.remove({ id });
+  },
+  mark: async (id, trying) => {
+    if (isNativeApp()) await plugin.mark({ id, trying });
   },
   subscribe: (listener) => {
     if (!isNativeApp()) return;

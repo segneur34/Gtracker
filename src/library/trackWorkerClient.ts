@@ -9,7 +9,7 @@ import {
  * réponse. Deux files, chacune son worker, le même script lancé deux fois : « analyse » pour la trace d'une analyse
  * qu'on ouvre et ses calculs (`prepare`, `analyzeSailing`, `analyzeSurf`, `release` : la mémoire de la session ouverte
  * vit dans ce worker-là), « fond » pour les résumés, les vignettes et la conversion des fichiers de montre
- * (`summarize`, `colorTrack`, `convertFit`). Un worker traite
+ * et le tri des GPX reçus entre itinéraire et session (`summarize`, `colorTrack`, `convertFit`, `routeCheck`). Un worker traite
  * ses demandes dans l'ordre d'arrivée : sans cette séparation, l'analyse touchée attendrait derrière toutes les
  * vignettes déjà demandées. Chaque worker est créé à la première demande de sa file. S'il meurt, les demandes en cours
  * de sa file sont refaites en ligne et la suivante le recrée ; s'il meurt avant d'avoir répondu une fois (fichier
@@ -46,6 +46,7 @@ export const TRACK_QUEUE: Readonly<Record<TrackJobKind, TrackQueue>> = {
   summarize: 'fond',
   colorTrack: 'fond',
   convertFit: 'fond',
+  routeCheck: 'fond',
 };
 
 /**

@@ -30,6 +30,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
@@ -56,6 +58,12 @@ import org.json.JSONObject;
  * Un fichier reçu porte tout dans son nom : `<id>__<état>__<nom d'origine>`, l'état étant `ok` ou le motif
  * du refus (fichier vide, gardé jusqu'à ce que la page l'ait dit). Une copie en cours porte `<id>.tmp`,
  * effacée au lancement suivant : un fichier listé est toujours entier.
+ *
+ * Témoin de lecture (`mark`) : un fichier vide `<nom du fichier reçu>.essai`, posé par la page avant de lire une copie,
+ * retiré avec elle ou quand la page la garde pour un autre essai. Un fichier sur disque survit à un processus tué :
+ * listé avec son témoin (`trying`), le fichier reçu a arrêté Gtracker pendant sa lecture, et la page le refuse au lieu
+ * de le relire. Seule une copie `ok` en porte un, et une copie `ok` finit par `.gpx` ou `.fit` : un refus dont le nom
+ * d'origine finit par `.essai` n'est pas pris pour un témoin.
  */
 @CapacitorPlugin(name = "IncomingFile")
 public class IncomingFilePlugin extends Plugin {
@@ -68,6 +76,7 @@ public class IncomingFilePlugin extends Plugin {
     private static final int NAME_CHARS = 60;
     private static final String DIR = "recus";
     private static final String TMP_SUFFIX = ".tmp";
+    private static final String TRYING_SUFFIX = ".essai";
     private static final String SEPARATOR = "__";
     private static final String STATE_OK = "ok";
     private static final String REFUSED_FORMAT = "format";
@@ -172,11 +181,31 @@ public class IncomingFilePlugin extends Plugin {
         return fileName.endsWith(TMP_SUFFIX) && !fileName.contains(SEPARATOR);
     }
 
+    /** Témoin de lecture d'une copie `ok` : `<id>__ok__<nom>.essai`. */
+    private static boolean isWitness(String fileName) {
+        if (!fileName.endsWith(TRYING_SUFFIX)) return false;
+        String[] parts = fileName.split(SEPARATOR, 3);
+        return parts.length == 3 && STATE_OK.equals(parts[1]);
+    }
+
+    private static File witnessOf(File entry) {
+        return new File(entry.getParentFile(), entry.getName() + TRYING_SUFFIX);
+    }
+
+    /**
+     * Copies interrompues, et témoins restés sans leur copie (retrait à moitié fait). Le témoin d'une copie présente
+     * reste : c'est lui qui dit à la page que la lecture précédente n'a pas abouti.
+     */
     private static void deleteLeftovers(Context context) {
         File[] files = directory(context).listFiles();
         if (files == null) return;
         for (File file : files) {
-            if (isTemporary(file.getName()) && !file.delete()) Log.w(TAG, "Copie interrompue non effacée : " + file.getName());
+            String name = file.getName();
+            if (isTemporary(name) && !file.delete()) Log.w(TAG, "Copie interrompue non effacée : " + name);
+            if (isWitness(name) && !new File(file.getParentFile(), name.substring(0, name.length() - TRYING_SUFFIX.length())).exists()
+                && !file.delete()) {
+                Log.w(TAG, "Témoin orphelin non effacé : " + name);
+            }
         }
     }
 
@@ -287,7 +316,7 @@ public class IncomingFilePlugin extends Plugin {
         return base.isEmpty() ? "fichier" : base;
     }
 
-    /** Fichiers reçus, du plus ancien au plus récent, après toute copie demandée avant cet appel. */
+    /** Fichiers reçus, du plus ancien au plus récent, après toute copie demandée avant cet appel ; les témoins n'en sont pas. */
     @PluginMethod
     public void list(PluginCall call) {
         Context context = getContext().getApplicationContext();
@@ -297,7 +326,10 @@ public class IncomingFilePlugin extends Plugin {
                 File[] files = directory(context).listFiles();
                 if (files != null) {
                     Arrays.sort(files);
+                    Set<String> names = new HashSet<>();
+                    for (File file : files) names.add(file.getName());
                     for (File file : files) {
+                        if (isWitness(file.getName())) continue;
                         String[] parts = file.getName().split(SEPARATOR, 3);
                         if (parts.length < 3) continue;
                         JSObject entry = new JSObject();
@@ -305,6 +337,7 @@ public class IncomingFilePlugin extends Plugin {
                         entry.put("name", parts[2]);
                         entry.put("size", file.length());
                         entry.put("refusal", STATE_OK.equals(parts[1]) ? JSONObject.NULL : parts[1]);
+                        entry.put("trying", names.contains(file.getName() + TRYING_SUFFIX));
                         entries.put(entry);
                     }
                 }
@@ -353,17 +386,53 @@ public class IncomingFilePlugin extends Plugin {
         });
     }
 
-    /** Retire un fichier de la file, une fois son verdict rendu. Déjà absent : rien à faire. Toujours une réponse : la page l'attend. */
+    /**
+     * Retire un fichier de la file, une fois son verdict rendu, et son témoin de lecture d'abord : une copie restée sans
+     * témoin est relue au lancement suivant (« déjà présente »), un témoin resté sans copie est effacé au chargement.
+     * Déjà absent : rien à faire. Toujours une réponse : la page l'attend.
+     */
     @PluginMethod
     public void remove(PluginCall call) {
         File file = entryFile(call);
         runOnWorker(() -> {
             try {
+                if (file != null) {
+                    File witness = witnessOf(file);
+                    if (witness.exists() && !witness.delete()) Log.w(TAG, "Témoin de lecture non effacé : " + witness.getName());
+                }
                 if (file == null || !file.exists() || file.delete()) call.resolve();
                 else call.reject("Fichier reçu non retiré");
             } catch (RuntimeException e) {
                 Log.w(TAG, "Fichier reçu non retiré", e);
                 call.reject("Fichier reçu non retiré");
+            }
+        });
+    }
+
+    /**
+     * Pose (`trying` vrai) ou retire le témoin de lecture d'un fichier reçu, sur le fil de la file : après toute copie,
+     * avant toute lecture demandée ensuite. Rien à protéger si la copie n'existe plus, ni pour un refus, que la page ne
+     * lit pas : aucun témoin posé.
+     */
+    @PluginMethod
+    public void mark(PluginCall call) {
+        File file = entryFile(call);
+        boolean trying = Boolean.TRUE.equals(call.getBoolean("trying", false));
+        runOnWorker(() -> {
+            try {
+                if (file == null) {
+                    call.reject("Fichier reçu inconnu");
+                    return;
+                }
+                File witness = witnessOf(file);
+                boolean done = trying
+                    ? !file.isFile() || !isWitness(witness.getName()) || witness.exists() || witness.createNewFile()
+                    : !witness.exists() || witness.delete();
+                if (done) call.resolve();
+                else call.reject("Témoin de lecture non changé");
+            } catch (IOException | RuntimeException e) {
+                Log.w(TAG, "Témoin de lecture non changé", e);
+                call.reject("Témoin de lecture non changé");
             }
         });
     }

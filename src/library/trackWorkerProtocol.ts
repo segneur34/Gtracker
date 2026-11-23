@@ -8,6 +8,7 @@ import {
   type SailingAnalysisReply,
   type SurfAnalysisReply,
 } from './analysisStore';
+import { isRouteGpx } from '../planning/routeImport';
 import { fitToGpx, type FitConversion } from './fitToGpx';
 import { sessionColorTrack, type SessionColorTrack } from './sessionTrack';
 import { summarizeGpx, type SummarizeGpxOptions } from './summarizeGpx';
@@ -17,7 +18,8 @@ import type { AnalyzedGpx } from './summaryOptions';
  * Messages entre l'application et le worker des traces : lire un GPX et préparer sa trace pour
  * l'analyse (`prepare`), le résumer pour sa fiche (`summarize`), ou tirer sa trace colorée pour une vignette ou une
  * image partagée (`colorTrack`) ; analyser la session ouverte, à voile (`analyzeSailing`) ou de surf (`analyzeSurf`),
- * et oublier sa mémoire quand la page la quitte (`release`) ; convertir un fichier de montre en GPX (`convertFit`).
+ * et oublier sa mémoire quand la page la quitte (`release`) ; convertir un fichier de montre en GPX (`convertFit`) ;
+ * dire si le GPX d'un fichier reçu est un itinéraire (`routeCheck`).
  * Le worker et le calcul en ligne passent par le même
  * aiguillage (`runTrackJob`) : mêmes chiffres par construction.
  */
@@ -65,6 +67,8 @@ export interface TrackJobs {
   release: { options: ReleaseOptions; result: null };
   /** Le texte du GPX n'y sert pas : une chaîne vide ; le FIT est dans les options. */
   convertFit: { options: ConvertFitOptions; result: FitConversion };
+  /** Le GPX d'un fichier reçu est-il un itinéraire (`isRouteGpx`) ? Aucune option. */
+  routeCheck: { options: Record<string, never>; result: boolean };
 }
 
 export type TrackJobKind = keyof TrackJobs;
@@ -103,6 +107,7 @@ export const runTrackJob = <K extends TrackJobKind>(kind: K, gpxText: string, op
     return sessionColorTrack(gpxText, sport, referenceOverrideMs, family) as TrackJobs[K]['result'];
   }
   if (kind === 'convertFit') return fitToGpx((options as ConvertFitOptions).bytes) as TrackJobs[K]['result'];
+  if (kind === 'routeCheck') return isRouteGpx(gpxText) as TrackJobs[K]['result'];
   return summarizeGpx(gpxText, options as SummarizeGpxOptions) as TrackJobs[K]['result'];
 };
 

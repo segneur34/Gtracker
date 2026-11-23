@@ -201,6 +201,41 @@ describe('GPX complet et fiche compacte', () => {
   });
 });
 
+describe('paquet fabriqué pour occuper le lecteur', () => {
+  const P = XML.session.prefix;
+  const CLOSE = `</${P}:session></extensions>`;
+  /** GPX dont le bloc porte `junk` ; `fiche` : un vrai paquet, `junk` glissé avant la fin de son bloc. */
+  const trapped = (junk: string, fiche = false): string =>
+    fiche
+      ? bundleSessionGpx(GPX, record(), null).replace(CLOSE, `${junk}${CLOSE}`)
+      : GPX.replace('</gpx>', `<extensions><${P}:session xmlns:${P}="${XML.session.ns}" version="1">${junk}${CLOSE}</gpx>`);
+  const timed = (text: string) => {
+    const start = performance.now();
+    const back = unbundleSessionGpx(text);
+    return { back, ms: performance.now() - start };
+  };
+
+  it('100 000 fiches ouvertes sans fermeture : lu en moins de 2 s, sans fiche', () => {
+    const { back, ms } = timed(trapped(`<${P}:record>`.repeat(100_000)));
+    expect(ms).toBeLessThan(2000);
+    expect(back.gpx).toBe(GPX);
+    expect(back.record).toBeNull();
+  });
+
+  it('100 000 retouches ouvertes sans fermeture, derrière une vraie fiche : lu en moins de 2 s, GPX rendu', () => {
+    const { back, ms } = timed(trapped(`<${P}:edit at="1" length="1">`.repeat(100_000), true));
+    expect(ms).toBeLessThan(2000);
+    expect(back.gpx).toBe(GPX);
+    expect(back.record).not.toBeNull();
+  });
+
+  it('100 000 retouches fermées, toutes au début : défaites en un passage, puis le GPX gardé tel quel', () => {
+    const { back, ms } = timed(trapped(`<${P}:edit at="0" length="0">x</${P}:edit>`.repeat(100_000), true));
+    expect(ms).toBeLessThan(2000);
+    expect(back.gpx).toBe(GPX);
+  });
+});
+
 describe('completeRecord', () => {
   it('reprend ce qui manque sans rien écraser', () => {
     const existing = record({ name: 'Nom du PC' });

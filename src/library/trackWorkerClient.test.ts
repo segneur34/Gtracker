@@ -7,6 +7,7 @@ import { gpxOf, sailRaw, upDownLegs } from '../test/sailing.fixture';
 import { buildFitActivity } from '../test/fit.fixture';
 import { SURF_TWO_WAVES, surfRaw } from '../test/surf.fixture';
 import { directSailing, directSurf, numberMismatches, sailingPageView, sailingRequest, surfRequest } from '../test/trackAnalysis.fixture';
+import { isRouteGpx } from '../planning/routeImport';
 import { fitToGpx } from './fitToGpx';
 import { sessionColorTrack } from './sessionTrack';
 import { summarizeGpx, summarizeGpxOptions } from './summarizeGpx';
@@ -115,7 +116,7 @@ describe('runInWorker', () => {
     }
     expect(TRACK_QUEUE).toEqual({
       prepare: 'analyse', analyzeSailing: 'analyse', analyzeSurf: 'analyse', release: 'analyse', summarize: 'fond', colorTrack: 'fond',
-      convertFit: 'fond',
+      convertFit: 'fond', routeCheck: 'fond',
     });
     expect(await a).toStrictEqual(prepareTrack(textA, { profile: wing }));
     expect(await b).toStrictEqual(prepareTrack(textB, {}));
@@ -479,5 +480,22 @@ describe('runInWorker : conversion d’un fichier de montre', () => {
     } finally {
       setLanguage('fr', {});
     }
+  });
+});
+
+describe('runInWorker : tri d’un GPX reçu entre itinéraire et session', () => {
+  const ROUTE = '<?xml version="1.0"?><gpx version="1.1"><rte><rtept lat="43.60" lon="3.80"/><rtept lat="43.61" lon="3.80"/></rte></gpx>';
+
+  it('par le worker de la file du fond comme en ligne : le verdict d’isRouteGpx', async () => {
+    expect(TRACK_QUEUE.routeCheck).toBe('fond');
+    vi.stubGlobal('Worker', FakeWorker);
+    const route = await runInWorker('routeCheck', ROUTE, {});
+    const session = await runInWorker('routeCheck', textA, {});
+    expect(FakeWorker.instances[0].received).toEqual(['routeCheck', 'routeCheck']);
+    vi.stubGlobal('Worker', undefined);
+    resetTrackWorker();
+    expect(await runInWorker('routeCheck', ROUTE, {})).toBe(true);
+    expect([route, session]).toEqual([isRouteGpx(ROUTE), isRouteGpx(textA)]);
+    expect([route, session]).toEqual([true, false]);
   });
 });
