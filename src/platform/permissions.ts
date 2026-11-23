@@ -58,8 +58,10 @@ export const readPermissions = async (): Promise<PermissionsStatus> => {
 
 /**
  * Demande une autorisation : la demande système pour la position, les
- * notifications et le Bluetooth ; l'écran système de la batterie, dont on
- * revient par `onAppResume`. Un refus n'est pas une erreur.
+ * notifications et le Bluetooth ; pour la batterie, la page de Gtracker dans
+ * les réglages d'Android (Batterie, « Aucune restriction »), qui ne rend pas
+ * de réponse : l'appel se résout dès la page ouverte, et l'état se relit au
+ * retour dans l'application (`onAppResume`). Un refus n'est pas une erreur.
  */
 export const requestPermission = async (key: PermissionKey): Promise<void> => {
   if (!isNativeApp()) return;

@@ -357,7 +357,7 @@
   "ce panneau": "este panel",
   "Pour enregistrer la trace. « Pendant l'utilisation de l'application » suffit, écran éteint compris.": "Para grabar el track. «Mientras se usa la app» basta, también con la pantalla apagada.",
   "Pour la notification de l'enregistrement, lisible écran verrouillé.": "Para la notificación de la grabación, legible con la pantalla bloqueada.",
-  "Pour qu'Android ne coupe pas l'enregistrement écran éteint : « Autoriser », ou « Aucune restriction ».": "Para que Android no corte la grabación con la pantalla apagada: «Permitir» o «Sin restricciones».",
+  "Sans « Aucune restriction », Android peut couper l'enregistrement écran éteint : « Autoriser », puis Batterie, « Aucune restriction ».": "Si no está en «Sin restricciones», Android puede cortar la grabación con la pantalla apagada: «Permitir», luego Batería, «Sin restricciones».",
   "Pour la ceinture cardio seulement.": "Solo para la banda de frecuencia cardiaca.",
   "accordée": "concedido",
   "à accorder": "por conceder",

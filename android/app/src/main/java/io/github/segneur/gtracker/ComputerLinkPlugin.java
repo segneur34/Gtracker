@@ -115,7 +115,11 @@ public class ComputerLinkPlugin extends Plugin {
     private static final String TAG = "GtrackerLiaison";
 
     static final String LOCAL_NETWORK = "localNetwork";
-    /** Accès au réseau local, demandé à l'utilisateur à partir d'Android 17 (API 37) seulement. */
+    /**
+     * Accès au réseau local : Android 17 (API 37) ne l'impose qu'aux applications qui visent 37 ou plus, et sa
+     * documentation demande de ne pas le déclarer avant. Demandé seulement quand le téléphone et la cible de
+     * l'application atteignent 37 ; le manifeste ne le déclare qu'à ce passage.
+     */
     static final String ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK";
     private static final int LOCAL_NETWORK_SDK = 37;
 
@@ -1507,7 +1511,9 @@ public class ComputerLinkPlugin extends Plugin {
     // ---------- outils ----------
 
     private boolean needsLocalNetworkPermission() {
-        return Build.VERSION.SDK_INT >= LOCAL_NETWORK_SDK && getPermissionState(LOCAL_NETWORK) != PermissionState.GRANTED;
+        return Build.VERSION.SDK_INT >= LOCAL_NETWORK_SDK
+            && getContext().getApplicationInfo().targetSdkVersion >= LOCAL_NETWORK_SDK
+            && getPermissionState(LOCAL_NETWORK) != PermissionState.GRANTED;
     }
 
     /** Refuse l'appel si l'adresse donnée n'est pas une adresse privée du réseau local. */

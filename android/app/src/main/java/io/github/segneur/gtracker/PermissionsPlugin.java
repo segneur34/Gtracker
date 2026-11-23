@@ -1,6 +1,5 @@
 package io.github.segneur.gtracker;
 
-import android.annotation.SuppressLint;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -21,10 +20,11 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * pendant un enregistrement. La position et les notifications sont demandées
  * par le greffon du GPS, le Bluetooth par celui de la ceinture.
  *
- * Batterie : l'écran système « Autoriser l'application à toujours
- * s'exécuter en arrière-plan ? » (ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).
- * Il demande REQUEST_IGNORE_BATTERY_OPTIMIZATIONS au manifeste, que le Play
- * Store encadre ; l'APK est diffusé par lien, hors boutique.
+ * Batterie : l'état se lit sans permission (isIgnoringBatteryOptimizations) ;
+ * pour le changer, la page de Gtracker dans les réglages d'Android, d'où
+ * « Batterie » mène à « Aucune restriction ». Pas de demande directe
+ * (fenêtre « Autoriser ? ») : elle exige au manifeste une permission que
+ * Google Play refuse à une application de sport.
  *
  * Démarrage automatique : propre à MIUI et HyperOS, sans interface standard.
  * On ouvre leur écran s'il existe, sinon les réglages de l'application. Son
@@ -43,19 +43,15 @@ public class PermissionsPlugin extends Plugin {
         call.resolve(ret);
     }
 
-    /** Ouvre l'écran système qui lève l'optimisation de la batterie ; rend la main aussitôt, l'état se relit au retour. */
-    @SuppressLint("BatteryLife")
+    /**
+     * Ouvre la page de Gtracker dans les réglages d'Android (Batterie, puis « Aucune restriction ») ; à défaut, la
+     * liste des applications et de leur batterie. Aucun de ces écrans ne rend de résultat : la méthode rend la main
+     * aussitôt, et la page relit l'état au retour dans l'application.
+     */
     @PluginMethod
     public void requestUnrestrictedBattery(PluginCall call) {
-        Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, packageUri());
-        if (!start(intent)) {
-            // Écran absent sur certains appareils : la liste des applications et leur batterie.
-            if (!start(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) && !start(appSettings())) {
-                call.reject("Réglages de la batterie introuvables");
-                return;
-            }
-        }
-        call.resolve();
+        if (start(appSettings()) || start(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))) call.resolve();
+        else call.reject("Réglages de la batterie introuvables");
     }
 
     /** Marque du téléphone : la page ne montre la ligne du démarrage automatique que sur un Xiaomi. */

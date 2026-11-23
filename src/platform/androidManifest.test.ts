@@ -3,9 +3,8 @@ import { describe, expect, it } from 'vitest';
 /**
  * Le manifeste Android : ni sauvegarde Google ni transfert d'appareil, le dossier mémoire est la seule
  * sauvegarde ; le service de l'enregistrement et ses autorisations déclarés ici, sans compter sur le manifeste d'un
- * greffon ; rien qui démarre avec le téléphone.
- *
- * La permission batterie reste pour l'instant : son retrait se décidera avec le reste, pas par accident.
+ * greffon ; rien qui démarre avec le téléphone ; rien que Google Play refuse (exemption de batterie, accès au réseau
+ * local avant la cible 37) ; ni adresse ni nom de la ceinture dans le journal.
  */
 
 // Les types de Node ne sont pas ceux de l'app (voir `hooks/mediaQueries.test.ts`) : le peu qui sert est décrit à la main.
@@ -19,7 +18,12 @@ const repoFile = (path: string): string => fs.readFileSync(new URL(`../../${path
 
 /** Commentaires XML retirés : un mot cité dans un commentaire ne prouve rien. */
 const withoutComments = (xml: string): string => xml.replace(/<!--[\s\S]*?-->/g, '');
+/** Commentaires Java retirés, pour la même raison. */
+const withoutJavaComments = (java: string): string => java.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '');
+const javaFile = (name: string): string => repoFile(`android/app/src/main/java/io/github/segneur/gtracker/${name}`);
 const MANIFEST = withoutComments(repoFile('android/app/src/main/AndroidManifest.xml'));
+/** Cible de l'application (`targetSdkVersion`), lue où Gradle la prend. */
+const TARGET_SDK = Number(repoFile('android/variables.gradle').match(/\btargetSdkVersion\s*=\s*(\d+)/)?.[1]);
 const RULES = withoutComments(repoFile('android/app/src/main/res/xml/data_extraction_rules.xml'));
 /** Tous les emplacements que connaît `data-extraction-rules` (developer.android.com/identity/data/autobackup). */
 const DOMAINS = ['root', 'file', 'database', 'sharedpref', 'external', 'device_root', 'device_file', 'device_database', 'device_sharedpref'];
@@ -88,10 +92,14 @@ describe('manifeste Android : ce qui reste', () => {
     expect(tagWithName(MANIFEST, 'uses-permission', `android.permission.${name}`)).toBeDefined();
   });
 
-  it('garde la permission batterie', () => {
-    const tag = tagWithName(MANIFEST, 'uses-permission', 'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS');
-    expect(tag).toBeDefined();
-    expect(tag).not.toContain('tools:node');
+  it('aucune exemption de batterie : ni la permission, ni la demande directe, que Google Play refuse au sport', () => {
+    expect(MANIFEST).not.toContain('REQUEST_IGNORE_BATTERY_OPTIMIZATIONS');
+    const plugin = withoutJavaComments(javaFile('PermissionsPlugin.java'));
+    expect(plugin).not.toContain('ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS');
+    expect(plugin).not.toContain('BatteryLife');
+    // « Autoriser » ouvre la page de Gtracker dans Android, d'où Batterie mène à « Aucune restriction ».
+    const request = plugin.match(/public void requestUnrestrictedBattery\(PluginCall call\) \{[\s\S]*?\n {4}\}/)?.[0] ?? '';
+    expect(request).toMatch(/start\(appSettings\(\)\) \|\| start\(new Intent\(Settings\.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS\)\)/);
   });
 
   it("changer la taille ou la graisse du texte du téléphone ne recrée pas l'activité (enregistrement en cours)", () => {
@@ -122,31 +130,42 @@ describe('manifeste Android : fichiers reçus d\'une autre application', () => {
   const withAction = (action: string): string => allWithAction(action)[0] ?? '';
   /** Le filtre VIEW du « Ouvrir avec » par l'extension : le seul qui porte le type générique. */
   const extensionFilter = allWithAction('VIEW').find((f) => f.includes('android:mimeType="*/*"')) ?? '';
-  const TYPES = ['application/gpx+xml', 'application/vnd.ant.fit', 'application/fit', 'application/octet-stream', 'text/xml', 'application/xml'];
+  /** Types précis du GPX et du FIT, les seuls de « Ouvrir avec ». */
+  const TYPES = ['application/gpx+xml', 'application/gpx', 'application/vnd.ant.fit', 'application/fit'];
+  /** Les types déclarés d'un filtre. */
+  const typesOf = (filter: string): string[] => [...filter.matchAll(/android:mimeType="([^"]*)"/g)].map((m) => m[1]).sort();
 
   it('l\'activité reste seule de sa tâche, et le lanceur ne change pas : une ouverture normale reste la même', () => {
     expect(activity).toContain('android:launchMode="singleTask"');
     expect(withAction('MAIN')).toContain('android.intent.category.LAUNCHER');
   });
 
-  it.each(['VIEW', 'SEND'])('%s : les six types, proposé sans lien depuis une page web', (action) => {
+  it.each(['VIEW', 'SEND'])('%s : proposé sans lien depuis une page web, jamais pour du JSON', (action) => {
     const filter = withAction(action);
-    for (const type of TYPES) expect(filter, type).toContain(`android:mimeType="${type}"`);
     expect(filter).toContain('android.intent.category.DEFAULT');
     expect(filter).not.toContain('BROWSABLE');
     expect(filter, 'json').not.toContain('json');
   });
 
-  it('VIEW : application/gpx en plus, pour un gestionnaire qui nomme ainsi le GPX', () => {
-    expect(withAction('VIEW')).toContain('android:mimeType="application/gpx"');
+  it('VIEW par type : les types précis du GPX et du FIT, sans binaire ni XML générique', () => {
+    expect(typesOf(withAction('VIEW'))).toEqual([...TYPES].sort());
   });
 
-  it('un seul filtre VIEW à type générique, borné à l’extension .gpx (Gtracker ne se propose pas pour tout)', () => {
+  it('SEND : les mêmes, et application/octet-stream, seule forme sous laquelle un fichier de montre arrive par un partage', () => {
+    expect(typesOf(withAction('SEND'))).toEqual([...TYPES, 'application/octet-stream'].sort());
+  });
+
+  it('aucun XML générique, nulle part : Gtracker ne se propose pas pour tout fichier XML', () => {
+    expect(activity).not.toContain('android:mimeType="text/xml"');
+    expect(activity).not.toContain('android:mimeType="application/xml"');
+  });
+
+  it('un seul filtre VIEW à type générique, borné aux extensions .gpx et .fit (Gtracker ne se propose pas pour tout)', () => {
     const generic = allWithAction('VIEW').filter((f) => f.includes('*/*'));
     expect(generic).toHaveLength(1);
     expect(extensionFilter).toContain('android:mimeType="*/*"');
     const patterns = [...extensionFilter.matchAll(/android:pathPattern="([^"]*)"/g)].map((m) => m[1]);
-    expect(patterns.sort()).toEqual(['.*\\\\.GPX', '.*\\\\.gpx']);
+    expect(patterns.sort()).toEqual(['.*\\\\.FIT', '.*\\\\.GPX', '.*\\\\.fit', '.*\\\\.gpx'].sort());
     expect(extensionFilter).toContain('android:host="*"');
     expect(extensionFilter).toContain('android:scheme="content"');
     expect(extensionFilter).not.toContain('android:scheme="file"');
@@ -180,12 +199,19 @@ describe('manifeste Android : liaison sans fil avec le programme Windows', () =>
     expect(tag).not.toContain('tools:node');
   });
 
-  it("accès au réseau local déclaré pour toutes les versions, et demandé seulement à partir d'Android 17 (API 37)", () => {
+  it('accès au réseau local déclaré seulement à partir de la cible 37, comme le demande la documentation d’Android', () => {
+    expect(Number.isFinite(TARGET_SDK)).toBe(true);
     const tag = tagWithName(MANIFEST, 'uses-permission', 'android.permission.ACCESS_LOCAL_NETWORK');
-    expect(tag).toBeDefined();
-    expect(tag).not.toContain('maxSdkVersion');
+    if (TARGET_SDK < 37) expect(tag).toBeUndefined();
+    else expect(tag).toBeDefined();
+  });
+
+  it('accès au réseau local demandé seulement quand le téléphone et la cible de l’application atteignent 37', () => {
     expect(PLUGIN).toContain('LOCAL_NETWORK_SDK = 37;');
-    expect(PLUGIN).toMatch(/Build\.VERSION\.SDK_INT >= LOCAL_NETWORK_SDK && getPermissionState\(LOCAL_NETWORK\)/);
+    const needs = PLUGIN.match(/private boolean needsLocalNetworkPermission\(\) \{([\s\S]*?)\n {4}\}/)?.[1] ?? '';
+    expect(needs).toMatch(/Build\.VERSION\.SDK_INT >= LOCAL_NETWORK_SDK/);
+    expect(needs).toMatch(/getApplicationInfo\(\)\.targetSdkVersion >= LOCAL_NETWORK_SDK/);
+    expect(needs).toMatch(/getPermissionState\(LOCAL_NETWORK\)/);
   });
 
   it('aucun trafic en clair autorisé', () => {
@@ -196,6 +222,42 @@ describe('manifeste Android : liaison sans fil avec le programme Windows', () =>
   it("ni service ni tâche de fond : la liaison se ferme quand l'application quitte l'écran", () => {
     expect(PLUGIN).not.toMatch(/startService|startForegroundService|WorkManager|JobScheduler|AlarmManager/);
     expect(PLUGIN).toMatch(/protected void handleOnStop\(\) \{[\s\S]*?stopAll\(\);/);
+  });
+});
+
+describe('ceinture cardio : le journal ne la désigne pas', () => {
+  const PLUGIN = withoutJavaComments(javaFile('HeartRatePlugin.java'));
+  /** Chaque trace, sur une ou plusieurs lignes, jusqu'à la parenthèse qui la ferme en fin de ligne. */
+  const logs = PLUGIN.match(/\bLog\.\w\([\s\S]*?\);\s*$/gm) ?? [];
+
+  it('le journal est bien lu', () => {
+    expect(logs.length).toBeGreaterThan(10);
+  });
+
+  it('aucune trace n’écrit l’adresse ni le nom de la ceinture (le journal se lit par adb)', () => {
+    for (const log of logs) {
+      expect(log, log).not.toMatch(/getString\("(address|name)"|\.getAddress\(\)|\.getName\(\)|\btargetName\b/);
+    }
+  });
+
+  it('le type d’adresse et l’étiquette restent', () => {
+    expect(PLUGIN).toContain('addressTypeText(');
+    expect(PLUGIN).toMatch(/TAG = "GtrackerHR"/);
+  });
+});
+
+describe('fichiers partagés : un seul dossier exposé', () => {
+  const PATHS = withoutComments(repoFile('android/app/src/main/res/xml/file_paths.xml'));
+  const SHARE = javaFile('ShareFilePlugin.java');
+  const shareDir = SHARE.match(/SHARE_DIR = "([^"]+)";/)?.[1];
+
+  it('le dossier du partage, pris dans le cache, est le seul que le FileProvider déclare', () => {
+    expect(shareDir).toBeDefined();
+    expect(SHARE).toContain('new File(getContext().getCacheDir(), SHARE_DIR)');
+    const entries = PATHS.match(/<[\w-]+-path\b[^>]*>/g) ?? [];
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatch(/^<cache-path\b/);
+    expect(entries[0]).toContain(`path="${shareDir}/"`);
   });
 });
 

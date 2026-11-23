@@ -391,7 +391,8 @@ public class HeartRatePlugin extends Plugin {
     /** Se connecte à la ceinture `address` et s'abonne à sa fréquence ; une connexion en cours est d'abord close. */
     @PluginMethod
     public void connect(PluginCall call) {
-        Log.d(TAG, "connexion demandée par la page, adresse " + call.getString("address") + ", nom " + call.getString("name"));
+        // Ni adresse ni nom dans le journal : ils désignent la ceinture du client, et le journal se lit par adb.
+        Log.d(TAG, "connexion demandée par la page");
         withPermission(call, "connectAfterPermission");
     }
 
@@ -405,7 +406,7 @@ public class HeartRatePlugin extends Plugin {
         String target = call.getString("address");
         BluetoothAdapter adapter = adapter();
         if (target == null || !BluetoothAdapter.checkBluetoothAddress(target)) {
-            Log.d(TAG, "connexion refusée : adresse de ceinture invalide (" + target + ")");
+            Log.d(TAG, "connexion refusée : adresse de ceinture " + (target == null ? "absente" : "invalide"));
             call.reject("adresse de ceinture invalide");
             return;
         }

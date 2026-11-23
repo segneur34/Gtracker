@@ -357,7 +357,7 @@
   "ce panneau": "this panel",
   "Pour enregistrer la trace. « Pendant l'utilisation de l'application » suffit, écran éteint compris.": "To record the track. “While using the app” is enough, even with the screen off.",
   "Pour la notification de l'enregistrement, lisible écran verrouillé.": "For the recording notification, readable with the screen locked.",
-  "Pour qu'Android ne coupe pas l'enregistrement écran éteint : « Autoriser », ou « Aucune restriction ».": "So that Android doesn't cut the recording when the screen is off: “Allow”, or “Unrestricted”.",
+  "Sans « Aucune restriction », Android peut couper l'enregistrement écran éteint : « Autoriser », puis Batterie, « Aucune restriction ».": "Without “Unrestricted”, Android may cut the recording when the screen is off: “Allow”, then Battery, “Unrestricted”.",
   "Pour la ceinture cardio seulement.": "For the heart rate strap only.",
   "accordée": "granted",
   "à accorder": "not granted",

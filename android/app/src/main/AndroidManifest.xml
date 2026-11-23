@@ -30,8 +30,9 @@
             </intent-filter>
 
             <!-- « Ouvrir avec Gtracker » d'un GPX ou d'un FIT (IncomingFilePlugin). Gtracker apparaît dans le choix d'Android, sans en
-                 devenir l'application par défaut ; la signature du fichier est vérifiée à la réception, un type ne prouve rien. Pas de
-                 BROWSABLE : une page web ne peut pas pousser de fichier. -->
+                 devenir l'application par défaut ; la signature du fichier est vérifiée à la réception, un type ne prouve rien. Types
+                 précis seulement : ni binaire ni XML générique, pour lesquels Gtracker se proposerait à tout fichier ; un GPX ou un FIT
+                 ainsi typé passe par le filtre de l'extension, plus bas. Pas de BROWSABLE : une page web ne peut pas pousser de fichier. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -40,15 +41,12 @@
                 <data android:mimeType="application/gpx" />
                 <data android:mimeType="application/vnd.ant.fit" />
                 <data android:mimeType="application/fit" />
-                <data android:mimeType="application/octet-stream" />
-                <data android:mimeType="text/xml" />
-                <data android:mimeType="application/xml" />
             </intent-filter>
 
-            <!-- « Ouvrir avec » d'un .gpx dont le gestionnaire de fichiers donne un type inattendu (text/plain, application/gpx,
-                 type vide ou générique selon l'application) : Gtracker est proposé d'après l'extension du nom. Forme connue d'Android
-                 (type générique, hôte joker, motifs de chemin), limitée au GPX ; le JSON n'est jamais proposé. Seul content:// : la
-                 réception refuse file://. Le FIT passe par ses types, plus fiables. -->
+            <!-- « Ouvrir avec » d'un .gpx ou d'un .fit dont le gestionnaire de fichiers donne un type inattendu (text/plain,
+                 application/octet-stream, type vide ou générique selon l'application) : Gtracker est proposé d'après l'extension du
+                 nom. Forme connue d'Android (type générique, hôte joker, motifs de chemin), limitée au GPX et au FIT ; le JSON n'est
+                 jamais proposé. Seul content:// : la réception refuse file://. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -57,19 +55,21 @@
                 <data android:mimeType="*/*" />
                 <data android:pathPattern=".*\\.gpx" />
                 <data android:pathPattern=".*\\.GPX" />
+                <data android:pathPattern=".*\\.fit" />
+                <data android:pathPattern=".*\\.FIT" />
             </intent-filter>
 
             <!-- « Partager vers Gtracker » : le fichier est dans EXTRA_STREAM, l'intention n'a pas d'adresse. Déclarer un schéma ici
-                 l'empêcherait d'entrer (règle des filtres d'Android). -->
+                 l'empêcherait d'entrer (règle des filtres d'Android). application/octet-stream en plus des types précis : c'est la
+                 seule forme sous laquelle un fichier de montre arrive par un partage ; pas de XML générique. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/gpx+xml" />
+                <data android:mimeType="application/gpx" />
                 <data android:mimeType="application/vnd.ant.fit" />
                 <data android:mimeType="application/fit" />
                 <data android:mimeType="application/octet-stream" />
-                <data android:mimeType="text/xml" />
-                <data android:mimeType="application/xml" />
             </intent-filter>
 
         </activity>
@@ -119,11 +119,12 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
-    <!-- Carte « Autorisations » (PermissionsPlugin) : l'écran système qui lève l'optimisation de la batterie. -->
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Batterie « Aucune restriction » (PermissionsPlugin) : aucune permission. L'état se lit sans elle, et le bouton
+         « Autoriser » ouvre la page de Gtracker dans les réglages d'Android ; la demande directe d'exemption n'est pas
+         admise par Google Play pour une application de sport. -->
     <!-- Liaison sans fil avec le programme Windows (ComputerLinkPlugin) : lire les réseaux du téléphone pour écarter
-         le réseau mobile ; l'accès au réseau local n'est demandé qu'à partir d'Android 17 (API 37), une version plus
-         ancienne ignore cette permission. La liaison passe par TLS : aucun trafic en clair n'est autorisé. -->
+         le réseau mobile. L'accès au réseau local (ACCESS_LOCAL_NETWORK) ne se déclare qu'avec une cible 37 ou plus
+         (android/variables.gradle) : la documentation d'Android demande de ne pas le faire avant, et le greffon ne le demande qu'à ce
+         moment-là. La liaison passe par TLS : aucun trafic en clair n'est autorisé. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 </manifest>
