@@ -25,7 +25,9 @@
 //  1. principal (téléphone ancien) : sans-fil éteint (phrase d'avertissement de Windows, pas de « Relier ») ; bloc intitulé
 //     « Téléphone », paragraphe replié « Par câble (avancé) » ; allumé par la case (« Prêt : Gtracker attend votre téléphone. »,
 //     dossier de secrets du profil) ; fenêtre de liaison (adresse, code de 6 chiffres, décompte qui baisse) ; trois mauvais
-//     codes : la fenêtre se ferme (la page le dit) et le bon code est refusé ; nouvelle fenêtre, un mauvais code puis le bon :
+//     codes : la page dit d'où ils venaient (« 3 codes faux reçus, le dernier de l'appareil … »), la fenêtre se ferme et le bon
+//     code est refusé ; nouvelle fenêtre, une application d'avant l'échange SPAKE2 (`ancienEchange`, un `appairer` sans part)
+//     refusée (raison « version ») sans compter comme un code faux, un mauvais code (« Code faux reçu de l'appareil … »), puis le bon :
 //     « Téléphone <nom> relié. » dans le bloc, « <nom> relié » dans la barre, rien n'est rangé à l'arrivée ; « Synchroniser » par
 //     le Wi-Fi : « Reçu du téléphone : 3 sessions » (dont une de plus de 2 Mio, en trois blocs, octet pour octet), l'exception
 //     « trop ancien pour recevoir par le Wi-Fi », jamais de « Première synchronisation », ni copie de sécurité, ni identifiant
@@ -60,7 +62,8 @@
 //     message (journal « autorisation d'essai : accordee ») ; 7c refusée : phrase de refus, bouton gardé ; 7d en échec :
 //     la raison dite, bouton gardé ; 7e non réparable : phrase de l'administrateur, aucun bouton ; 7f sans-fil éteint puis
 //     allumé par la case avec un pare-feu bloqué : phrase d'allumage, demande partie avant l'écoute, rien d'affiché ensuite.
-//     Les contrôles 1a, 1b et 1e vérifient aussi que l'ancienne aide et l'ancien avertissement ont disparu.
+//     Les contrôles 1a, 1b et 1e vérifient aussi que l'ancienne aide et l'ancien avertissement ont disparu. 7g : page en
+//     anglais (`BANC_LANGUE_PAGE`), autorisation d'essai en échec : la phrase et la raison venue de la coquille sortent traduites.
 //  8. (outil du câble imposé introuvable, `GTRACKER_BANC_TELEPHONE_ETAT=adbIntrouvable`) aucun téléphone jamais relié :
 //     « Synchroniser » dit « Aucun téléphone relié » avec « Relier mon téléphone », qui ferme la fenêtre, ouvre Réglages ›
 //     Mémoire et la fenêtre du code d'elle-même ; paragraphe « Par câble (avancé) » replié (l'outil de Google n'est dit que
@@ -139,6 +142,8 @@ const fichesDe = (memoire) => sessionsDe(memoire).filter((n) => n.endsWith('.jso
 /** Fichiers sous `racine` dont le contenu porte l'une des `marques` (chaînes ou tampons). */
 const contenant = (racine, marques) => (arbre(racine) ?? []).filter((c) => !c.endsWith('/')).filter((c) => { const o = readFileSync(join(racine, c)); return marques.some((m) => o.includes(m)); });
 
+/** Marqueur de l'ordinateur sans son identifiant d'appareil (`appareil`, que le programme y écrit au lancement). */
+const sansAppareil = (texte) => { const m = JSON.parse(texte); delete m.appareil; return JSON.stringify(m); };
 const lances = new Set();
 /** Une instance du programme ; `env` s'ajoute à l'environnement d'essai. */
 async function lancer(profil, memoire, env = {}) {
@@ -147,7 +152,10 @@ async function lancer(profil, memoire, env = {}) {
   for (const cle of Object.keys(complet)) if (cle.toUpperCase() === 'ELECTRON_RUN_AS_NODE') delete complet[cle];
   // Les variables du sans-fil et du téléphone d'essai ne viennent jamais de l'environnement du poste.
   for (const cle of Object.keys(complet)) if (/^GTRACKER_BANC_(SANSFIL|TELEPHONE)/.test(cle) && !(cle in env)) delete complet[cle];
-  const child = spawn(exe, [`--remote-debugging-port=${PORT}`, '--lang=fr-FR', '--force-device-scale-factor=1', '--hide-scrollbars'], { env: complet, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  // Langue de la page : français sauf `BANC_LANGUE_PAGE` (cas 7g, page en anglais) ; la variable ne passe pas au programme.
+  const langue = env.BANC_LANGUE_PAGE ?? 'fr-FR';
+  delete complet.BANC_LANGUE_PAGE;
+  const child = spawn(exe, [`--remote-debugging-port=${PORT}`, `--lang=${langue}`, '--force-device-scale-factor=1', '--hide-scrollbars'], { env: complet, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   lances.add(child.pid);
   const journal = [];
   const lire = (d) => { for (const l of String(d).split(/\r?\n/)) if (l.trim()) journal.push(l.trim()); };
@@ -293,6 +301,7 @@ const carte = (b) => b.evaluate(`(() => {
     code: tx('.wireless-card__code'),
     decompte: tx('.wireless-card__countdown'),
     resultat: tx('.wireless-card__result'),
+    codesFaux: tx('.wireless-card__wrong-codes'),
     texte: c.innerText,
     telephones: [...c.querySelectorAll('.wireless-card__phones li')].map((li) => li.innerText.replace(/\\n+/g, ' / ')),
     boutons: [...c.querySelectorAll('button')].map((x) => x.textContent.trim()),
@@ -394,7 +403,9 @@ function posterItineraire(racine, nom, creation, { note = null, maj = null, jour
   }
 }
 /** Le téléphone d'avant l'écriture sans fil, lu seulement : ce que le compte rendu dit de lui. */
-const PHRASE_ANCIEN = 'Le Gtracker du téléphone est trop ancien pour recevoir par le Wi-Fi : mettez-le à jour (Réglages › Application du téléphone).';
+/** Phrase dite avant la demande d'autorisation de Windows (`authorizationNoticeText`, `src/library/wirelessPhone.ts`). */
+const ALLUMAGE = "Windows va demander de confirmer. L'autorisation vaut aussi sur les réseaux publics : le partage de connexion du téléphone en est un.";
+const PHRASE_ANCIEN ='Le Gtracker du téléphone est trop ancien pour recevoir par le Wi-Fi : mettez-le à jour (Réglages › Application du téléphone).';
 /** « Synchroniser » (barre du haut) : attend l'issue et rend la fenêtre ; `{ ancien: true }` pour un téléphone d'avant l'écriture. */
 async function synchroniser(b, quoi, options) {
   check(`« Synchroniser » (${quoi}) : clic`, (await b.click('.shell-topactions .phone-sync')) === 'ok');
@@ -559,14 +570,14 @@ try {
     const secretsProfil = () => arbre(join(profil, 'sansfil')) ?? [];
     let faux = null;
     let jetonHex = null;
-    await avecProgramme(profil, memoire, {}, '1', async (b) => {
+    await avecProgramme(profil, memoire, {}, '1', async (b, p) => {
       await ouvrirMemoire(b);
       let c = await carte(b);
       console.log(`  bloc, éteint : ${JSON.stringify(c.texte)}`);
       check('1a. le bloc « Téléphone » est là (plus « Téléphone sans câble »), case décochée', c.titre === 'Téléphone' && c.coche === false, JSON.stringify({ titre: c.titre, coche: c.coche }));
       check('1a. le paragraphe replié « Par câble (avancé) » est là, fermé, et dit le débogage USB comme une possibilité', c.cable !== null && c.cable.resume === 'Par câble (avancé)' && c.cable.ouvert === false && /Débogage USB/.test(c.cable.texte) && !/Débogage USB/.test(c.texte), JSON.stringify(c.cable));
       check('1a. la phrase d\'état dit que le sans-fil est éteint', c.statut === 'Le sans-fil est éteint : le téléphone ne peut pas se présenter à cet ordinateur.', c.statut);
-      check('1a. la phrase prévient que Windows va demander l\'autorisation', c.texte.includes("Windows va vous demander d'autoriser Gtracker sur le réseau : acceptez."), c.texte);
+      check('1a. la phrase prévient que Windows va demander de confirmer (et que l\'autorisation vaut sur les réseaux publics)', c.texte.includes(ALLUMAGE), c.texte);
       check('1a. ni message de pare-feu, ni bouton « Autoriser Gtracker », ni ancien avertissement (pare-feu d\'essai ouvert)', c.pareFeu === null && c.autoriser === null && c.avertissement === null && !c.boutons.includes('Autoriser Gtracker'), JSON.stringify({ pareFeu: c.pareFeu, avertissement: c.avertissement }));
       check('1a. pas de « Relier un téléphone » ni de liste tant que le sans-fil est éteint', !c.boutons.includes('Relier un téléphone') && c.telephones.length === 0 && !/Téléphones reliés/.test(c.texte), c.boutons.join('/'));
       check('1a. aucun secret dans le profil tant que rien n\'est allumé', secretsProfil().length === 0, secretsProfil().join(','));
@@ -612,7 +623,10 @@ try {
       await b.waitFor(`/La fenêtre s'est fermée sans téléphone relié/.test(document.querySelector('.wireless-card__result')?.textContent ?? '')`, { timeout: 8000, label: 'fenêtre fermée' });
       c = await carte(b);
       console.log(`  après trois échecs : ${JSON.stringify(c.resultat)}`);
-      check('1d. la page dit que la fenêtre s\'est fermée sans téléphone relié', /Cliquez de nouveau sur « Relier un téléphone » et vérifiez le code tapé/.test(c.resultat ?? ''), c.resultat);
+      await b.waitFor(`/3 codes faux reçus/.test(document.querySelector('.wireless-card__wrong-codes')?.textContent ?? '')`, { timeout: 8000, label: 'origine des codes faux' });
+      c = await carte(b);
+      check('1d. la page dit d\'où venaient les codes faux : « 3 codes faux reçus, le dernier de l\'appareil 127.0.0.1. »', c.codesFaux === "3 codes faux reçus, le dernier de l'appareil 127.0.0.1.", c.codesFaux);
+      check('1d. la page dit que la fenêtre s\'est fermée sans téléphone relié',/Cliquez de nouveau sur « Relier un téléphone » et vérifiez le code tapé/.test(c.resultat ?? ''), c.resultat);
       check('1d. le code n\'est plus affiché', c.code === null, c.code);
       // Le bon code, une fois la fenêtre fermée : refusé.
       const tardif = new FauxTelephone({ ancien: true, dossier: tel, nom: 'Trop tard', delaiMs: 5000 });
@@ -628,8 +642,17 @@ try {
       const code = c.code;
       console.log(`  seconde fenêtre : adresse ${c.adresse}, code ${code}`);
       faux = new FauxTelephone({ ancien: true, dossier: tel, delaiMs: 8000 });
+      // Une application d'avant l'échange SPAKE2 (un `appairer` sans part) : refusée (raison « version »), sans compter comme un code faux.
+      const vieux = await tenter(() => new FauxTelephone({ ancienEchange: true, dossier: tel, nom: 'Application ancienne', delaiMs: 5000 }).appairer(ad.hote, ad.port, code));
+      check('1e. une application d\'avant l\'échange SPAKE2 est refusée (raison « version »), même avec le bon code', vieux.refus === 'version', JSON.stringify(vieux));
+      c = await carte(b);
+      check('1e. ce refus ne ferme pas la fenêtre et n\'est pas compté comme un code faux', c.code === code && c.codesFaux === null && c.telephones.length === 0, JSON.stringify({ code: c.code, codesFaux: c.codesFaux, telephones: c.telephones }));
+      check('1e. le journal de la coquille dit « application du téléphone trop ancienne »', p.journal.some((l) => /appairage refusé( \([^)]*\))? : application du téléphone trop ancienne/.test(l)), p.journal.filter((l) => /appairage/.test(l)).join(' | '));
       const un = await tenter(() => new FauxTelephone({ ancien: true, dossier: tel, nom: 'Intrus 4', delaiMs: 5000 }).appairer(ad.hote, ad.port, code === '000000' ? '000001' : '000000'));
       check('1e. un mauvais code est refusé (raison « code »), la fenêtre reste ouverte', un.refus === 'code' && (await carte(b)).code === code, JSON.stringify(un));
+      await b.waitFor(`/Code faux reçu de l'appareil/.test(document.querySelector('.wireless-card__wrong-codes')?.textContent ?? '')`, { timeout: 8000, label: 'origine du code faux' });
+      c = await carte(b);
+      check('1e. la page dit d\'où venait le code faux : « Code faux reçu de l\'appareil 127.0.0.1. »', c.codesFaux === "Code faux reçu de l'appareil 127.0.0.1.", c.codesFaux);
       const bon = await tenter(() => faux.appairer(ad.hote, ad.port, code));
       check('1e. le bon code appaire le téléphone d\'essai', Boolean(bon.liaison), JSON.stringify(bon));
       jetonHex = faux.memoire?.jeton ?? null;
@@ -922,12 +945,12 @@ try {
         const copie = join(profil, 'Documents-essai', 'Gtracker-copies', copies[0]);
         console.log(`  copie de sécurité : ${(arbre(copie) ?? []).filter((c) => !/\/sessions\//.test(c)).join(' ; ')}`);
         check('4b. la copie de l\'ordinateur porte ses sessions d\'avant, celle du téléphone les siennes', JSON.stringify(sessionsDe(join(copie, 'ordinateur'))) === JSON.stringify(avantPc) && JSON.stringify(sessionsDe(join(copie, 'telephone'))) === JSON.stringify(avantTelSessions), `${sessionsDe(join(copie, 'ordinateur')).join(' | ')} / ${sessionsDe(join(copie, 'telephone')).join(' | ')}`);
-        check('4b. les marqueurs copiés sont ceux d\'avant (sans identifiant)', readFileSync(join(copie, 'telephone', 'gtracker.json'), 'utf8') === avantMarqueur && readFileSync(join(copie, 'ordinateur', 'gtracker.json'), 'utf8') === avantMarqueurPc);
+        check('4b. les marqueurs copiés sont ceux d\'avant (sans identifiant)', readFileSync(join(copie, 'telephone', 'gtracker.json'), 'utf8') === avantMarqueur && sansAppareil(readFileSync(join(copie, 'ordinateur', 'gtracker.json'), 'utf8')) === sansAppareil(avantMarqueurPc), JSON.stringify([avantMarqueur, readFileSync(join(copie, 'telephone', 'gtracker.json'), 'utf8'), avantMarqueurPc, readFileSync(join(copie, 'ordinateur', 'gtracker.json'), 'utf8')]));
         check('4b. la copie du téléphone garde aussi ses lieux et son GPX d\'itinéraire seul', existsSync(join(copie, 'telephone', 'lieux.json')) && existsSync(join(copie, 'telephone', 'itineraires', ORPHELIN)));
         check('4b. la copie ne porte aucun temporaire', temporaires(copie).length === 0, temporaires(copie).join(','));
       }
       const m = marqueurDe(tel);
-      check('4b. identifiant et champ « synchro » posés dans gtracker.json du téléphone, format et version gardés', typeof m?.id === 'string' && typeof m?.synchro === 'number' && Object.keys(m).sort().join(',') === 'format,id,synchro,version' && m.format === FORMATS.memoire && m.version === 1, JSON.stringify(m));
+      check('4b. identifiant et champs « synchro » et « passage » posés dans gtracker.json du téléphone, format et version gardés', typeof m?.id === 'string' && typeof m?.synchro === 'number' && m?.passage === 1 && Object.keys(m).sort().join(',') === 'format,id,passage,synchro,version' && m.format === FORMATS.memoire && m.version === 1, JSON.stringify(m));
       const idPc = marqueurDe(memoire)?.id;
       check('4b. l\'ordinateur porte son identifiant, différent de celui du téléphone', typeof idPc === 'string' && idPc !== m?.id, `${idPc} / ${m?.id}`);
       check('4b. la base de la paire est écrite sur l\'ordinateur, sans témoin d\'interruption', existsSync(join(memoire, 'synchro', `${m?.id}.json`)) && !existsSync(join(memoire, 'synchro', 'en-cours.json')), (arbre(join(memoire, 'synchro')) ?? []).join(','));
@@ -1064,6 +1087,8 @@ try {
           const octets = readFileSync(join(tel, c));
           const pc = existsSync(join(memoire, c)) ? readFileSync(join(memoire, c)) : null;
           const ancien = avant.get(c) ?? null;
+          // Le marqueur du téléphone prend un passage neuf à chaque synchronisation : entier, il se lit comme un marqueur.
+          if (c === 'gtracker.json') { try { if (JSON.parse(octets.toString('utf8').replace(/^﻿/, '')).format === FORMATS.memoire) continue; } catch { /* pas un marqueur entier */ } mauvais.push(c); continue; }
           if (!((ancien && octets.equals(ancien)) || (pc && octets.equals(pc)))) mauvais.push(c);
         }
         check(`${quoi} : chaque fichier du téléphone est entier (son état d'avant ou la version de l'ordinateur)`, mauvais.length === 0, mauvais.join(','));
@@ -1072,9 +1097,9 @@ try {
         check(`${quoi} : tout GPX de session du téléphone a sa fiche (une session visible est entière)`, gpxsDe(tel).every((g) => fichesDe(tel).includes(g.replace(/\.gpx$/, '.json'))), sessionsDe(tel).join(' | '));
       };
 
-      // -- première coupure : après deux blocs écrits (la fiche de la grosse session, puis le premier mégaoctet de son GPX)
+      // -- première coupure : après trois blocs écrits (le marqueur et son passage, la fiche de la grosse session, puis le premier mégaoctet de son GPX)
       const ordre1 = [];
-      const coupeur1 = new FauxTelephone({ dossier: tel, memoire: faux.memoire, coupureApresEcritures: 2, delaiMs: 15000, falsifier: (cmd) => { if (cmd.type === 'ecrire') ordre1.push(`${cmd.chemin}@${cmd.debut}`); return undefined; } });
+      const coupeur1 = new FauxTelephone({ dossier: tel, memoire: faux.memoire, coupureApresEcritures: 3, delaiMs: 15000, falsifier: (cmd) => { if (cmd.type === 'ecrire') ordre1.push(`${cmd.chemin}@${cmd.debut}`); return undefined; } });
       let lien = await reconnecter(b, coupeur1, ad);
       check('5b. « Synchroniser » : clic', (await b.click('.shell-topactions .phone-sync')) === 'ok');
       // La liaison coupée en route : la fenêtre attend le retour du téléphone (« Annuler » seul), sans « Réessayer ».
@@ -1083,7 +1108,7 @@ try {
       f = await attendreFenetre(b, attenteCoupee, '5b, attente après la coupure', 40000);
       console.log(`  blocs reçus par le téléphone : ${ordre1.join(' ; ')}`);
       check('5b. la fenêtre attend le retour du téléphone : « Le téléphone n\'est plus relié : la synchronisation s\'est arrêtée en route… » avec « Annuler » seul', attenteCoupee(f ?? { titre: '', barre: true, phrases: [] }) && JSON.stringify(f?.boutons) === JSON.stringify(['Annuler']) && !ANCIENNES.test(f?.tout ?? ''), JSON.stringify(f));
-      check('5b. la coupure est tombée au milieu de la grosse session (deux blocs écrits, le troisième refusé)', coupeur1.blocsEcrits === 2 && ordre1.length === 3 && ordre1[2] === `sessions/${nomFichier(SESSIONS[2])}@${1024 * 1024}`, `${coupeur1.blocsEcrits} bloc(s) écrit(s) ; ${ordre1.join(' ; ')}`);
+      check('5b. la coupure est tombée au milieu de la grosse session (trois blocs écrits : marqueur, fiche, premier bloc du GPX ; le quatrième refusé)', coupeur1.blocsEcrits === 3 && ordre1.length === 4 && ordre1[0] === 'gtracker.json@0' && ordre1[3] === `sessions/${nomFichier(SESSIONS[2])}@${1024 * 1024}`, `${coupeur1.blocsEcrits} bloc(s) écrit(s) ; ${ordre1.join(' ; ')}`);
       check('5b. la grosse session n\'est pas sur le téléphone (ni entière, ni à moitié) : seul son provisoire a existé, il est effacé', !existsSync(join(tel, 'sessions', nomFichier(SESSIONS[2]))), sessionsDe(tel).join(' | '));
       await b.wait(2000);
       entiers('5b');
@@ -1177,7 +1202,6 @@ try {
     const BLOQUE = 'Windows ne laisse pas passer votre téléphone sur ce réseau.';
     const ADMIN = "Un réglage de l'administrateur de cet ordinateur empêche de l'autoriser ici.";
     const REFUS = "Windows n'a pas donné l'autorisation : le téléphone ne pourra pas se présenter sur ce réseau.";
-    const ALLUMAGE = "Windows va vous demander d'autoriser Gtracker sur le réseau : acceptez.";
     const sansPowershell = (quoi, p) => check(`${quoi} : aucun powershell lancé (journal de la coquille)`, !p.journal.some((l) => /powershell/i.test(l)), p.journal.join(' | '));
     const autorisations = (p) => p.journal.filter((l) => /autorisation d'essai/.test(l));
     const ecoute = (b) => b.waitFor(`/Gtracker attend votre téléphone/.test(document.querySelector('.wireless-card__status')?.textContent ?? '')`, { timeout: 8000, label: 'écoute' });
@@ -1202,7 +1226,7 @@ try {
       let c = await carte(b);
       console.log(`  bloc, pare-feu bloqué : ${JSON.stringify(c.texte)}`);
       check('7b. la phrase dit que Windows ne laisse pas passer le téléphone', c.pareFeuPhrases[0] === BLOQUE, JSON.stringify(c.pareFeuPhrases));
-      check('7b. le bouton « Autoriser Gtracker » est offert, avec la mention « Windows demande de confirmer. »', c.autoriser === 'Autoriser Gtracker' && c.pareFeu.includes('Windows demande de confirmer.'), JSON.stringify(c.pareFeu));
+      check('7b. le bouton « Autoriser Gtracker » est offert, avec la phrase « Windows va demander de confirmer. L\'autorisation vaut aussi sur les réseaux publics… »', c.autoriser === 'Autoriser Gtracker' && c.pareFeu.includes(ALLUMAGE), JSON.stringify(c.pareFeu));
       check('7b. le bloc écoute toujours (état « attend votre téléphone »)', /Gtracker attend votre téléphone/.test(c.statut ?? ''), c.statut);
       check('7b. aucune demande avant le clic', autorisations(p).length === 0, autorisations(p).join(' | '));
       await capturer(b, 'sansfil-7-pare-feu-bloque');
@@ -1250,7 +1274,7 @@ try {
       const c = await carte(b);
       console.log(`  pare-feu non réparable : ${JSON.stringify(c.pareFeuPhrases)} ; boutons ${c.boutons.join(' / ')}`);
       check('7e. la phrase du blocage est suivie de celle de l\'administrateur', c.pareFeuPhrases[0] === `${BLOQUE} ${ADMIN}`, JSON.stringify(c.pareFeuPhrases));
-      check('7e. aucun bouton « Autoriser Gtracker » ni mention de confirmation', c.autoriser === null && !c.boutons.includes('Autoriser Gtracker') && !/Windows demande de confirmer/.test(c.texte), c.boutons.join('/'));
+      check('7e. aucun bouton « Autoriser Gtracker » ni mention de confirmation', c.autoriser === null && !c.boutons.includes('Autoriser Gtracker') && !/Windows va demander de confirmer/.test(c.texte), c.boutons.join('/'));
       check('7e. aucune demande d\'autorisation', autorisations(p).length === 0, autorisations(p).join(' | '));
       await capturer(b, 'sansfil-7-pare-feu-irreparable');
       sansPowershell('7e', p);
@@ -1260,7 +1284,7 @@ try {
     await avecProgramme(dossier('p7f-profil'), dossier('p7f-memoire'), { GTRACKER_BANC_SANSFIL_PAREFEU: 'bloque' }, '7f', async (b, p) => {
       await ouvrirMemoire(b);
       let c = await carte(b);
-      check('7f. éteint : la phrase d\'allumage est « Windows va vous demander d\'autoriser Gtracker sur le réseau : acceptez. »', c.texte.includes(ALLUMAGE) && c.coche === false, c.texte);
+      check('7f. éteint : la phrase d\'allumage est « Windows va demander de confirmer. L\'autorisation vaut aussi sur les réseaux publics… »', c.texte.includes(ALLUMAGE) && c.coche === false, c.texte);
       check('7f. éteint : ni message de pare-feu, ni demande', c.pareFeu === null && autorisations(p).length === 0, autorisations(p).join(' | '));
       check('7f. clic sur la case « Recevoir les sessions du téléphone sans câble »', (await b.click('.wireless-card__toggle')) === 'ok');
       await ecoute(b);
@@ -1274,6 +1298,23 @@ try {
       check('7f. accordée : allumé et à l\'écoute, sans message de pare-feu ni bouton', c.coche === true && c.pareFeu === null && c.autoriser === null && c.erreur === null, JSON.stringify({ coche: c.coche, pareFeu: c.pareFeu, erreur: c.erreur }));
       check('7f. allumé : la phrase d\'allumage a disparu', !c.texte.includes(ALLUMAGE), c.texte);
       sansPowershell('7f', p);
+    });
+
+    // 7g. page en anglais : l'erreur de la coquille (écrite en français, détail de l'autorisation d'essai en échec) sort traduite
+    await avecProgramme(dossier('p7g-profil'), dossier('p7g-memoire'), { GTRACKER_BANC_SANSFIL_ACTIF: '1', GTRACKER_BANC_SANSFIL_PAREFEU: 'bloque', GTRACKER_BANC_SANSFIL_AUTORISATION: 'echec', BANC_LANGUE_PAGE: 'en-GB' }, '7g', async (b, p) => {
+      await b.go('/parametres', 5000);
+      await b.waitFor(`[...document.querySelectorAll('[role=button]')].some((x) => x.textContent.trim() === 'Storage')`, { timeout: 8000, label: 'carte Storage' });
+      if (!(await b.evaluate(`Boolean(document.querySelector('.wireless-card'))`))) await b.click(`[...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Storage')`);
+      await messageVu(b);
+      let c = await carte(b);
+      check('7g. page en anglais : la phrase du blocage est traduite', c.pareFeuPhrases[0] === 'Windows is not letting your phone through on this network.', JSON.stringify(c.pareFeuPhrases));
+      check('7g. le bouton s\'appelle « Allow Gtracker »', c.autoriser === 'Allow Gtracker', String(c.autoriser));
+      check('7g. clic « Allow Gtracker » (autorisation d\'essai, jamais celle de Windows)', (await b.click('.wireless-card__authorize')) === 'ok');
+      await b.waitFor(`/could not be added/.test(document.querySelector('.wireless-card__firewall')?.textContent ?? '')`, { timeout: 8000, label: 'phrase d\'échec en anglais' });
+      c = await carte(b);
+      console.log(`  après échec, en anglais : ${JSON.stringify(c.pareFeuPhrases)}`);
+      check('7g. l\'erreur de la coquille sort traduite, sans le français d\'origine', c.pareFeuPhrases.includes('The permission could not be added: trial authorization failed.') && !/échec/.test(c.pareFeu ?? ''), JSON.stringify(c.pareFeuPhrases));
+      sansPowershell('7g', p);
     });
   }
 

@@ -13,7 +13,7 @@
 //  - `pages` : étiquettes pour `--pages` (voile, surf, enregistrer, sessions, planification,
 //    statistiques, profil, reglages) ;
 //  - `solo` : temps réel (rejeu ×1, minuteries) : lancé seul, à la fin ;
-//  - `reseau` : dépend d'un service extérieur (tuiles, imagerie satellite) : écarté par `--sans-reseau` ;
+//  - `reseau` : dépend d'un service extérieur (tuiles) : écarté par `--sans-reseau` ;
 //  - `sansCache` : relevé qui varie d'un jour à l'autre, jamais réutilisé ;
 //  - `dev` : importe `/src/...` dans la page (le lanceur sert toujours par le serveur de développement) ;
 //  - `masques` : [regex, remplacement] appliqués à la sortie avant comparaison (durées, horodatages) ;
@@ -101,7 +101,7 @@ export const SCRIPTS = [
   // Remise à zéro de Réglages › Mémoire : réglages d'usine puis tout supprimer, fichiers étrangers posés dans le dossier.
   { nom: 'remise-a-zero', args: ['{port}', '{travail}', '{captures?}'], pages: ['reglages', 'sessions', 'profil'] },
   { nom: 'rename', args: ['{port}', '{gpx}'], pages: ['sessions', 'voile'] },
-  { nom: 'satellite', args: ['{port}', '{captures?}'], pages: ['voile', 'surf', 'sessions', 'planification'], reseau: true },
+  { nom: 'satellite', args: ['{port}', '{captures?}'], pages: ['voile', 'surf', 'planification', 'reglages'] },
   { nom: 'sauts', args: ['{port}', '{captures?}'], pages: ['voile', 'reglages', 'sessions'], dev: true },
   { nom: 'session-save', args: ['{port}'], pages: ['voile'] },
   { nom: 'session-save-resume', args: ['{port}'], pages: ['voile'] },

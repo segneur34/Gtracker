@@ -9,13 +9,15 @@
 //  2. « Réglages d'usine » : la question dit ce qui reste, la page se recharge sur le Profil ; l'activité et l'unité
 //     reviennent au défaut, l'instant des réglages est posé (jamais retiré), les deux sessions et le pseudo restent,
 //     `reglages/autre.json` aussi, et le fichier de l'appareil est réécrit sans l'activité créée ;
-//  3. « Tout supprimer » : la question dit les deux sessions, la page se recharge ; plus de fiche ni de GPX, Profil
+//  3. « Tout supprimer », le marqueur du dossier portant un identifiant de synchronisation (cas d'une synchronisation
+//     faite : il doit être oublié, rien n'accuse l'accès au dossier) : la question dit les deux sessions, la page se
+//     recharge ; plus de fiche ni de GPX, Profil
 //     sans pseudo, activités de départ, cache des tuiles effacé, fichier de l'autre appareil effacé ; restent les
 //     fichiers étrangers et ce que l'ouverture réécrit (marqueur, LISEZMOI, fichier de réglages de l'appareil), et le
 //     dossier reste désigné.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { CACHES, CLES, connect, DOSSIER_MEMOIRE, FORMATS, vwait } from './lib/cdp.mjs';
+import { CACHES, CLES, connect, DOSSIER_MEMOIRE, FICHIER_MARQUEUR, FORMATS, vwait } from './lib/cdp.mjs';
 import { traceVoile } from './lib/traces.mjs';
 
 const [port, workDir, shotDir] = process.argv.slice(2);
@@ -158,6 +160,14 @@ check('les fichiers étrangers restent', (await readFile('a-moi.txt')) === 'à m
 
 // --- 3. Tout supprimer ---
 step('3. Tout supprimer');
+// Après une synchronisation, le marqueur du dossier porte un identifiant de synchronisation ; « Tout supprimer » doit
+// l'oublier avant d'effacer (cas en panne : plus rien n'était supprimé, et l'accès au dossier était accusé).
+const markerBefore = await readFile(FICHIER_MARQUEUR);
+const withId = markerBefore === null ? null : JSON.stringify({ ...JSON.parse(markerBefore), id: 'banc-sync-0001' }) + '\n';
+console.log('marqueur :', markerBefore === null ? '(absent)' : markerBefore.trim().replace(/\s+/g, ' '));
+check('marqueur du dossier présent', markerBefore !== null);
+if (withId !== null) await writeFile(FICHIER_MARQUEUR, withId);
+check('identifiant de synchronisation posé dans le marqueur', (await readFile(FICHIER_MARQUEUR))?.includes('banc-sync-0001') === true);
 console.log('ouverture :', await openZone());
 questions.length = 0;
 await reloaded(async () => console.log('appui tenu :', await hold('Tout supprimer')), 15000);
@@ -172,10 +182,16 @@ check('fichier de l\'autre appareil effacé', !left.includes('reglages/autre.jso
 check('fichiers étrangers gardés', left.includes('a-moi.txt') && left.includes('sessions/notes.txt'));
 check('rien d\'autre que les étrangers et ce que l\'ouverture réécrit',
   left.filter((p) => !['a-moi.txt', 'sessions/notes.txt', 'gtracker.json', 'LISEZMOI.txt', DEVICE_FILE].includes(p)).length === 0, left.join(', '));
-check('profil effacé', (await key(CLES.athleteProfile)) === null || JSON.parse(await key(CLES.athleteProfile)).me?.name === undefined, await key(CLES.athleteProfile));
+const markerAfter = await readFile(FICHIER_MARQUEUR);
+check('l\'identifiant de synchronisation est oublié', markerAfter === null || !markerAfter.includes('banc-sync-0001'), markerAfter);
+const pageText = await evaluate('document.body.innerText');
+check('aucun message sur l\'accès au dossier ni remise à zéro interrompue', !/Vérifiez l'accès au dossier|Remise à zéro interrompue/.test(pageText));
+check('profil effacé',(await key(CLES.athleteProfile)) === null || JSON.parse(await key(CLES.athleteProfile)).me?.name === undefined, await key(CLES.athleteProfile));
 const sportAfter = JSON.parse((await key(CLES.sportSettings)) ?? 'null');
 check('activités de départ', sportAfter === null || sportAfter.activities === undefined, JSON.stringify(sportAfter));
-check('cache des tuiles effacé', !(await evaluate(`caches.has('${CACHES.tuiles}')`)));
+// Le lancement qui suit rouvre le cache (l'effacement des tuiles d'un fond retiré, fait une fois, le crée vide) : effacé veut dire sans aucune tuile.
+const tilesLeft = await evaluate(`(async () => (await caches.has('${CACHES.tuiles}')) ? (await (await caches.open('${CACHES.tuiles}')).keys()).map((r) => new URL(r.url).pathname) : [])()`);
+check('cache des tuiles effacé (absent, ou sans tuile)', tilesLeft.filter((p) => !p.endsWith('_index.json')).length === 0, tilesLeft.join(', '));
 await go('/profil');
 const title = await evaluate(`document.querySelector('.profile-head__title')?.textContent.trim() ?? '(absent)'`);
 console.log('Profil :', title);

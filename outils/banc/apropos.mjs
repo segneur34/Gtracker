@@ -208,7 +208,9 @@ await waitFor(`document.querySelectorAll('.about-license__row').length > 0`, { t
 const devIntro = await evaluate(`[...document.querySelectorAll('.about-licenses__intro')].map((p) => p.textContent)`);
 check('sans licences.json : la mention', devIntro.includes('Liste complète dans la version construite.'), devIntro.join(' | '));
 const devRows = await rows();
-check('… et le complément réel', ['Logo GONG', '@capacitor/android', 'AndroidX'].every((n) => devRows.some((r) => r.name.startsWith(n))), devRows.map((r) => r.name).join(', '));
+// La liste est filtrée par appareil : seules les lignes communes à tous (logo, icônes) sont sûres d'y être, le code
+// Android n'étant montré que sur le téléphone.
+check('… et le complément réel', ['Logo GONG', 'Feather'].every((n) => devRows.some((r) => r.name.startsWith(n))), devRows.map((r) => r.name).join(', '));
 await shoot('apropos-sans-liste');
 
 await setStub(stubSource('échec', 'échec'));

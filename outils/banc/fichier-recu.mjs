@@ -9,7 +9,10 @@
 //  4. un brouillon ouvert sur l'analyse : aucune navigation seule ; « Voir la session » demande confirmation, refus : on reste ;
 //  5. un fichier refusé par le téléphone, et un FIT illisible : dits, copies retirées ;
 //  6. une session à classer : « Voir la session » demande son activité, puis ouvre l'analyse ;
-//  7. un enregistrement en cours : rien n'est rangé avant l'arrêt.
+//  7. un enregistrement en cours : rien n'est rangé avant l'arrêt ;
+//  8. second essai : la fausse file tient le compte des lectures comme le greffon (`mark(id, true)` l'augmente, `list`
+//     rend `tries`) ; un fichier au compte de 1 (arrêt pendant sa première lecture) est relu et rangé ; au compte de 2
+//     (`MAX_INCOMING_TRIES`) il est refusé sans être relu, avec sa phrase, sa copie retirée.
 import { connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { traceVoile } from './lib/traces.mjs';
@@ -51,25 +54,32 @@ const plugQueue = () => evaluate(`(async () => {
   window.__fauxRecus = {
     queue,
     removed: [],
-    receive: (name, text, refusal = null) => {
-      queue.set(String(Date.now()) + '-' + queue.size + '__' + (refusal ?? 'ok') + '__' + name, { name, text, refusal });
+    marks: [],
+    receive: (name, text, refusal = null, tries = 0) => {
+      queue.set(String(Date.now()) + '-' + queue.size + '__' + (refusal ?? 'ok') + '__' + name, { name, text, refusal, tries });
       listeners.forEach((listener) => listener());
     },
     recorderChanged: () => recorderListeners.forEach((listener) => listener()),
   };
   window.__fauxEnregistrement = false;
   const port = {
-    list: async () => [...queue.entries()].map(([id, f]) => ({ id, name: f.name, size: f.text.length, refusal: f.refusal, tries: 0 })),
+    list: async () => [...queue.entries()].map(([id, f]) => ({ id, name: f.name, size: f.text.length, refusal: f.refusal, tries: f.tries })),
     read: async (id) => (queue.has(id) ? new TextEncoder().encode(queue.get(id).text) : null),
     remove: async (id) => { queue.delete(id); window.__fauxRecus.removed.push(id); },
-    // Aucun arrêt de Gtracker à simuler ici : le compte des lectures commencées reste à 0.
-    mark: async () => {},
+    // Comme le greffon : une lecture commencée augmente le compte, le témoin retiré le remet à 0 (copie gardée pour un autre essai).
+    mark: async (id, trying) => {
+      const f = queue.get(id);
+      if (!f) return;
+      f.tries = trying ? f.tries + 1 : 0;
+      window.__fauxRecus.marks.push({ id, trying, tries: f.tries });
+    },
     subscribe: (listener) => { listeners.push(listener); },
   };
   await library.startIncomingFiles(() => window.__fauxEnregistrement, (listener) => recorderListeners.push(listener), port);
   return true;
 })()`);
-const receive = (name, text, refusal = null) => evaluate(`window.__fauxRecus.receive(${JSON.stringify(name)}, ${JSON.stringify(text)}, ${JSON.stringify(refusal)})`);
+const receive = (name, text, refusal = null, tries = 0) => evaluate(`window.__fauxRecus.receive(${JSON.stringify(name)}, ${JSON.stringify(text)}, ${JSON.stringify(refusal)}, ${tries})`);
+const marks = () => evaluate('window.__fauxRecus.marks');
 const queueSize = () => evaluate('window.__fauxRecus.queue.size');
 const noticeWith = (text, label) => waitFor(async () => (await notices()).some((n) => n.includes(text)), { timeout: 8000, label });
 
@@ -177,6 +187,33 @@ check('pendant un enregistrement : rien de rangé, copie gardée, aucun bandeau'
 await evaluate('window.__fauxEnregistrement = false; window.__fauxRecus.recorderChanged()');
 await noticeWith('pendant.gpx', 'rangée après l\'arrêt');
 check('après l\'arrêt : rangée, copie retirée', (await queueSize()) === 0 && (await records()).length === 4);
+
+// --- 8. Second essai ---
+await go('/sessions', 3000);
+await plugQueue();
+const recordsBefore = (await records()).length;
+// Un fichier jamais lu : la lecture commencée passe son compte à 1, puis il part avec sa copie.
+await receive('neuf.gpx', gpxText(40, 'wingfoil'));
+await noticeWith('neuf.gpx', 'bandeau neuf');
+const firstMarks = await marks();
+check('compte : une lecture commencée passe le compte à 1', firstMarks.length > 0 && firstMarks[0].trying === true && firstMarks[0].tries === 1, JSON.stringify(firstMarks));
+check('compte : rangé, copie retirée', (await queueSize()) === 0 && (await records()).length === recordsBefore + 1);
+// Un fichier dont le compte vaut déjà 1 : Gtracker s'est arrêté pendant sa première lecture ; il est relu et rangé.
+await receive('second.gpx', gpxText(50, 'wingfoil'), null, 1);
+await noticeWith('second.gpx', 'bandeau second essai');
+const secondNotice = (await notices()).find((n) => n.includes('second.gpx'));
+check('compte de 1 : relu et rangé, dit comme un rangement', secondNotice === '« second.gpx » est rangé dans la mémoire.', secondNotice);
+const secondMarks = (await marks()).filter((m) => m.trying);
+check('compte de 1 : la relecture porte le compte à 2', secondMarks.length === 2 && secondMarks[1].tries === 2, JSON.stringify(secondMarks));
+check('compte de 1 : une fiche de plus, copie retirée', (await queueSize()) === 0 && (await records()).length === recordsBefore + 2);
+// Un fichier dont le compte vaut 2 : refusé sans être relu, avec sa phrase, copie retirée.
+await receive('fige.gpx', gpxText(55, 'wingfoil'), null, 2);
+await noticeWith('fige.gpx', 'bandeau refusé au plafond');
+const capNotice = (await notices()).find((n) => n.includes('fige.gpx'));
+check('compte de 2 : refusé, avec la phrase', capNotice === "« fige.gpx » n'a pas été rangé : Gtracker s'est arrêté pendant sa lecture. S'il est bon, ouvrez-le de nouveau.", capNotice);
+check('compte de 2 : copie retirée, rien de rangé, jamais relu', (await queueSize()) === 0 && (await records()).length === recordsBefore + 2 && (await marks()).filter((m) => m.trying).length === 2);
+check('compte de 2 : pas de « Voir la session »', !(await evaluate(`[...document.querySelectorAll('.shell-notice')].some((n) => n.textContent.includes('fige.gpx') && n.textContent.includes('Voir la session'))`)));
+await shoot('fichier-recu-plafond');
 
 check('aucune question inattendue', (await questions()).length === 0);
 console.log(logs.length ? `console :\n${[...new Set(logs)].join('\n')}` : 'console : aucune erreur');

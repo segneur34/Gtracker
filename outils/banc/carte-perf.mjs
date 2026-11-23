@@ -9,8 +9,7 @@
 //     parts) ;
 //  3. mesure 10 zooms puis 10 déplacements de la carte (sans animation) : durées du moteur (`Performance.getMetrics`,
 //     ScriptDuration et TaskDuration), durée de chaque geste jusqu'à l'image suivante, et requêtes de tuiles ;
-//  4. passe la carte sur le fond satellite (liseré blanc sous la trace) et refait 2 et 3 ;
-//  5. retourne à la bibliothèque et relève la vignette de la session (couches, histogramme ; image fixe depuis le
+//  4. retourne à la bibliothèque et relève la vignette de la session (couches, histogramme ; image fixe depuis le
 //     lot 74, sans carte ni canevas).
 // Un compteur de tracés (`stroke` du canevas de la trace, posé avant le chargement de la page) relève « tracés au premier
 // dessin » et « tracés sur un geste » (moyenne des 10 zooms du plan) : ces deux nombres baissent quand la trace compte moins de couleurs.
@@ -227,17 +226,7 @@ console.log(`tracés au premier dessin : ${tracesPremierDessin}`);
 check('compteur de tracés actif (la trace a été tracée)', tracesPremierDessin > 0);
 await measure('plan     ', true);
 
-// 4. Fond satellite : le liseré blanc s'ajoute sous la trace.
-await evaluate(`document.querySelector('${ANALYSE} .map-base-switch__button')?.click(); 'ok'`);
-await wait(300);
-const chosen = await evaluate(`(() => { const b = [...document.querySelectorAll('${ANALYSE} .map-base-switch__choice')].find((x) => x.textContent.trim() === 'Satellite'); b?.click(); return Boolean(b); })()`);
-await settle({ max: 3000, label: 'satellite' });
-console.log('fond satellite     :', chosen ? 'choisi' : '(choix absent)');
-check('satellite : le choix existe et la trace reste en un canevas', chosen && (await layers(ANALYSE)).includes('1 canevas de trace'), await layers(ANALYSE));
-await shoot('carte-perf-satellite');
-await measure('satellite');
-
-// 5. Vignette de la bibliothèque.
+// 4. Vignette de la bibliothèque.
 await go('/voile', 8000);
 await waitFor(`document.querySelectorAll('${VIGNETTE_READY}').length > 0`, { timeout: 20000, label: 'vignette' });
 await settle({ max: 3000, label: 'bibliothèque' });

@@ -38,8 +38,15 @@
 //     l'ordinateur pour 30 jours », sans question (version 2 de l'index, origine « ordinateur ») ;
 //  f. une session supprimée sur l'ordinateur : « Supprimé : … retirée du téléphone : elle reste 30 jours dans la corbeille » ;
 //     puis restaurée par Réglages › Mémoire : « Restauré : 1 session sortie de la corbeille : renvoyée au téléphone » ;
-//     (c : le marqueur du téléphone porte aussi un champ `synchro`, un instant, les autres champs gardés ; d : inchangé quand
-//     rien n'a changé sur le téléphone ; f : plus récent après un retrait) ;
+//     (c : le marqueur du téléphone porte aussi un champ `synchro`, un instant, et un compteur `passage` (1), les autres champs
+//     gardés ; d : `synchro` inchangé quand rien n'a changé sur le téléphone, `passage` augmenté d'un à chaque synchronisation ;
+//     f : `synchro` plus récent après un retrait) ;
+//  o. une copie ancienne du dossier du téléphone remise (marqueur à un passage en retard sur celui de l'ordinateur) alors qu'une
+//     session a été supprimée sur l'ordinateur depuis : traitée comme un nouveau téléphone (écran de départ, identifiant neuf,
+//     « Le dossier du téléphone est une copie plus ancienne… rien n'a été supprimé… »), la session revient sur l'ordinateur, la
+//     corbeille reste vide ;
+//  v. le nom de deux sessions changé des deux côtés (la fiche porte `editedAt.name`) : le dernier saisi l'emporte des deux côtés
+//     (téléphone pour l'une, ordinateur pour l'autre), l'encadré dit qu'une version plus ancienne a été remplacée, rien à la corbeille ;
 //  g. sessions déjà à la corbeille de l'ordinateur et encore sur le téléphone à la première synchronisation : la question de la
 //     corbeille (titre, phrase, noms, « Les garder » / « Les retirer du téléphone », au singulier « La garder » / « La retirer »),
 //     fermée par la croix (le compte rendu la rappelle, « Répondre » la rouvre) puis « Les retirer » (g1 à g4 ; g3 : trois
@@ -76,7 +83,7 @@
 //  j. dans tous les cas, la console de la page sans erreur.
 // `BANC_CAS=c,g,m,i` (facultatif) ne joue que ces cas (a, b, c pour c à f, g, h, m, n, w, p, k, r, rg, i) ; sans lui, tous.
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -100,8 +107,8 @@ const { FauxTelephone } = SANSFIL ? require(fileURLToPath(new URL('../../bureau/
 const ORIGINE = 'https://gtracker.localhost';
 const CAPTURES = process.env.BANC_CAPTURES || null;
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
-/** `BANC_CAS=g,i` (facultatif) : ne joue que ces cas (a, b, c pour c à f, g, h, m, n, w, p, k, r, rg, i) ; sans lui, tous (en `--sansfil`, c, g, h, m, n, r, rg). */
-const CAS = process.env.BANC_CAS ? process.env.BANC_CAS.split(',').map((c) => c.trim()) : SANSFIL ? ['c', 'g', 'h', 'm', 'n', 'r', 'rg'] : null;
+/** `BANC_CAS=g,i` (facultatif) : ne joue que ces cas (a, b, c pour c à f, g, h, m, n, o, v, w, p, k, r, rg, i) ; sans lui, tous (en `--sansfil`, c, g, h, m, n, o, r, rg, v). */
+const CAS = process.env.BANC_CAS ? process.env.BANC_CAS.split(',').map((c) => c.trim()) : SANSFIL ? ['c', 'g', 'h', 'm', 'n', 'o', 'r', 'rg', 'v'] : null;
 const veut = (cas) => CAS === null || CAS.includes(cas);
 const vivant = (pid) => spawnSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH'], { encoding: 'utf8', windowsHide: true }).stdout.includes(` ${pid} `);
 const disparu = async (pid, ms) => { for (let t = 0; t < ms; t += 200) { if (!vivant(pid)) return true; await pause(200); } return !vivant(pid); };
@@ -135,6 +142,8 @@ const contient = (racine, marque) => (arbre(racine) ?? []).filter((c) => !c.ends
 const lireJson = (chemin) => { try { return JSON.parse(readFileSync(chemin, 'utf8').replace(/^﻿/, '')); } catch { return null; } };
 const memes = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
 
+/** Marqueur de l'ordinateur sans son identifiant d'appareil (`appareil`, que le programme y écrit au lancement). */
+const sansAppareil = (texte) => { const m = JSON.parse(texte); delete m.appareil; return JSON.stringify(m); };
 const lances = new Set();
 /** Une instance du programme ; `env` s'ajoute à l'environnement d'essai. */
 async function lancer(profil, memoire, env = {}) {
@@ -704,7 +713,7 @@ try {
         console.log(`  copie de sécurité : ${(arbre(copie) ?? []).join(' ; ')}`);
         check('c. la copie de l\'ordinateur porte ses cinq sessions d\'avant (GPX et fiches), pas celles du téléphone', memes(sessionsDe(join(copie, 'ordinateur')), avantPcSessions), sessionsDe(join(copie, 'ordinateur')).join(' | '));
         check('c. la copie du téléphone porte ses quatre sessions d\'avant, pas celles de l\'ordinateur', memes(sessionsDe(join(copie, 'telephone')), avantTelSessions), sessionsDe(join(copie, 'telephone')).join(' | '));
-        check('c. les marqueurs copiés sont ceux d\'avant (sans identifiant)', readFileSync(join(copie, 'telephone', 'gtracker.json'), 'utf8') === avantMarqueur && readFileSync(join(copie, 'ordinateur', 'gtracker.json'), 'utf8') === avantMarqueurPc);
+        check('c. les marqueurs copiés sont ceux d\'avant (sans identifiant)', readFileSync(join(copie, 'telephone', 'gtracker.json'), 'utf8') === avantMarqueur && sansAppareil(readFileSync(join(copie, 'ordinateur', 'gtracker.json'), 'utf8')) === sansAppareil(avantMarqueurPc));
         // Le câble liste maintenant `itineraires/` : la copie du téléphone en garde l'état d'avant, le GPX seul compris.
         check('c. la copie du téléphone porte aussi ses lieux et son dossier d\'itinéraires (ce que le téléphone liste), octet pour octet', existsSync(join(copie, 'telephone', 'lieux.json')) && existsSync(join(copie, 'telephone', 'itineraires', 'parcours-telephone.gpx')) && readFileSync(join(copie, 'telephone', 'itineraires', 'parcours-telephone.gpx')).equals(readFileSync(join(racine, 'itineraires', 'parcours-telephone.gpx'))), (arbre(join(copie, 'telephone')) ?? []).filter((c) => !c.startsWith('telephone/sessions')).join(','));
         check('c. la copie ne porte aucun temporaire', temporaires(copie).length === 0, temporaires(copie).join(','));
@@ -715,8 +724,10 @@ try {
       check('c. les deux marqueurs portent un identifiant, différent', typeof idTel === 'string' && typeof idPc === 'string' && idTel !== idPc, `${idTel} / ${idPc}`);
       check('c. le marqueur du téléphone garde son format et sa version', lireJson(join(racine, 'gtracker.json'))?.format === FORMATS.memoire && lireJson(join(racine, 'gtracker.json'))?.version === 1);
       const marqueurTel = lireJson(join(racine, 'gtracker.json'));
-      check('c. le marqueur du téléphone porte un champ « synchro » (un instant, celui de la fin de la synchronisation), format, version et identifiant gardés', typeof marqueurTel?.synchro === 'number' && Math.abs(Date.now() - marqueurTel.synchro) < 5 * 60000 && Object.keys(marqueurTel).sort().join(',') === 'format,id,synchro,version', JSON.stringify(marqueurTel));
+      check('c. le marqueur du téléphone porte un champ « synchro » (un instant, celui de la fin de la synchronisation), format, version et identifiant gardés', typeof marqueurTel?.synchro === 'number' && Math.abs(Date.now() - marqueurTel.synchro) < 5 * 60000 && Object.keys(marqueurTel).sort().join(',') === 'format,id,passage,synchro,version', JSON.stringify(marqueurTel));
+      check('c. le marqueur du téléphone porte un compteur « passage » (entier, 1 à la première synchronisation)', marqueurTel?.passage === 1, JSON.stringify(marqueurTel?.passage));
       const synchroC = marqueurTel?.synchro;
+      const passageC = marqueurTel?.passage;
       const synchro = existsSync(join(memoire, 'synchro')) ? readdirSync(join(memoire, 'synchro')) : [];
       console.log(`  synchro/ : ${synchro.join(', ')}`);
       check('c. la base de la paire est écrite (synchro/<identifiant du téléphone>.json), sans témoin d\'interruption', synchro.includes(`${idTel}.json`) && !synchro.includes('en-cours.json'), synchro.join(','));
@@ -737,6 +748,7 @@ try {
       gardeHorsSessions('d', racine, avantHors);
       check('d. pas de seconde copie de sécurité', copiesDe(profil).length === 1, copiesDe(profil).join(','));
       check('d. rien n\'a changé sur le téléphone : son champ « synchro » est celui du cas c', lireJson(join(racine, 'gtracker.json'))?.synchro === synchroC, `${synchroC} / ${lireJson(join(racine, 'gtracker.json'))?.synchro}`);
+      check('d. le compteur « passage » du marqueur a augmenté d\'un (une synchronisation de plus)', lireJson(join(racine, 'gtracker.json'))?.passage === passageC + 1, `${passageC} / ${lireJson(join(racine, 'gtracker.json'))?.passage}`);
       await fermerFenetre(b);
 
       // e : supprimée sur le téléphone
@@ -777,7 +789,7 @@ try {
       r = await synchroniser(b, 'f');
       check('f. une seule ligne : « Supprimé : 1 session supprimée sur l\'ordinateur, retirée du téléphone : elle reste 30 jours dans la corbeille de l\'ordinateur » (1 nom)', JSON.stringify(r.lignes.map((l) => [l.geste, l.texte, l.noms.length])) === JSON.stringify([['Supprimé', "1 session supprimée sur l'ordinateur, retirée du téléphone : elle reste 30 jours dans la corbeille de l'ordinateur", 1]]), JSON.stringify(r.lignes));
       const marqueurF = lireJson(join(racine, 'gtracker.json'));
-      check('f. le téléphone a changé : son champ « synchro » est plus récent que celui du cas c, ses autres champs sont gardés', typeof marqueurF?.synchro === 'number' && marqueurF.synchro > synchroC && marqueurF.format === FORMATS.memoire && marqueurF.version === 1 && typeof marqueurF.id === 'string', JSON.stringify(marqueurF));
+      check('f. le téléphone a changé : son champ « synchro » est plus récent que celui du cas c, ses autres champs sont gardés', typeof marqueurF?.synchro === 'number' && marqueurF.synchro > synchroC && marqueurF.format === FORMATS.memoire && marqueurF.version === 1 && typeof marqueurF.id === 'string' && Number.isSafeInteger(marqueurF.passage) && marqueurF.passage > passageC + 1, JSON.stringify(marqueurF));
       await b.wait(1500);
       const TOUT_F = TOUT_E.filter((k) => k !== SUPPRIMEE_PC);
       memesSessions('f', memoire, tel, TOUT_F);
@@ -1347,6 +1359,96 @@ try {
       const cb = corbeilleDe(memoire);
       check('rg4. la corbeille porte une session et quatre itinéraires, tous d\'origine « ordinateur », chacun avec sa fiche et son GPX', cb.entries.length === 5 && cb.entries.filter((x) => x.kind === 'itineraire').length === 4 && cb.entries.filter((x) => x.kind === 'session').length === 1 && cb.entries.every((x) => x.origin === 'ordinateur' && existsSync(join(cb.dir, x.dir, x.main)) && (x.files ?? []).length === 2), JSON.stringify(cb.entries.map((x) => [x.kind, x.origin, x.main])));
       check('rg4. une seule copie de sécurité en tout', copiesDe(profil).length === 1, copiesDe(profil).join(','));
+      await fermerFenetre(b);
+    });
+  }
+
+  // ---------- o. copie ancienne du dossier du téléphone remise ----------
+  console.log('\n== o. Copie ancienne du dossier du téléphone remise : traitée comme un nouveau téléphone, rien de supprimé');
+  if (veut('o')) {
+    const TROIS = [0, 1, 2];
+    const SUPPRIMEE = 2;
+    const profil = dossier('o-profil');
+    const memoire = fabriquerMemoire('o', TROIS);
+    const tel = fabriquerTelephone('o-tel', TROIS);
+    const racine = racineTel(tel);
+    const sauvegarde = join(dossier('o-sauvegarde'), 'Gtracker');
+    await avecProgramme(profil, memoire, { GTRACKER_BANC_TELEPHONE: tel }, 'o', async (b) => {
+      await b.go('/sessions', 5000);
+      await b.settle({ max: 2000 });
+      let r = await synchroniser(b, 'o1, première synchronisation');
+      check('o1. première synchronisation faite (marqueur du téléphone : identifiant et passage 1)', r.depart !== null && lireJson(join(racine, 'gtracker.json'))?.passage === 1, JSON.stringify([r.titre, lireJson(join(racine, 'gtracker.json'))]));
+      await fermerFenetre(b);
+      // La sauvegarde : le dossier du téléphone tel qu'il est au passage 1.
+      cpSync(racine, sauvegarde, { recursive: true, preserveTimestamps: true });
+      const idSauvegarde = lireJson(join(sauvegarde, 'gtracker.json'))?.id;
+      r = await synchroniser(b, 'o2, seconde synchronisation');
+      check('o2. « Tout est à jour », et le passage du téléphone est monté à 2 (la sauvegarde porte 1)', r.titre === 'Tout est à jour' && lireJson(join(racine, 'gtracker.json'))?.passage === 2 && lireJson(join(sauvegarde, 'gtracker.json'))?.passage === 1, JSON.stringify([r.titre, lireJson(join(racine, 'gtracker.json'))?.passage]));
+      await fermerFenetre(b);
+      // Une session supprimée sur l'ordinateur depuis la sauvegarde, puis la sauvegarde remise sur le téléphone.
+      retirer(memoire, [SUPPRIMEE]);
+      await b.wait(1500);
+      for (const e of readdirSync(racine)) rmSync(join(racine, e), { recursive: true, force: true });
+      cpSync(sauvegarde, racine, { recursive: true, preserveTimestamps: true });
+      check('o3. la copie ancienne est remise : le téléphone porte de nouveau passage 1 et sa session supprimée', lireJson(join(racine, 'gtracker.json'))?.passage === 1 && existsSync(join(racine, 'sessions', `${MODELES[SUPPRIMEE].nom}.gpx`)) && !existsSync(join(memoire, 'sessions', `${MODELES[SUPPRIMEE].nom}.gpx`)));
+      const copiesAvant = copiesDe(profil).length;
+      r = await synchroniser(b, 'o3, copie ancienne remise', { captureDepart: 'synchroniser-depart-copie-ancienne' });
+      check('o3. c\'est une première rencontre : l\'écran de départ s\'est montré', r.depart !== null && /^Première synchronisation avec /.test(r.depart.titre ?? ''), r.depart?.titre);
+      check('o3. le compte rendu dit « Le dossier du téléphone est une copie plus ancienne… rien n\'a été supprimé… »', /^Le dossier du téléphone est une copie plus ancienne .*rien n'a été supprimé\./.test(r.paragraphes[0] ?? ''), JSON.stringify(r.paragraphes));
+      check('o3. la phrase prévient que des sessions supprimées depuis cette copie peuvent revenir', /Des sessions supprimées depuis cette copie peuvent revenir/.test(r.paragraphes[0] ?? ''), r.paragraphes[0]);
+      check('o3. aucune ligne « Supprimé » ; « Reçu du téléphone : 1 session » (celle que l\'ordinateur avait supprimée)', !ligneDe(r, 'Supprimé') && JSON.stringify(r.lignes.filter((l) => l.geste === 'Reçu du téléphone').map((l) => [l.texte, l.noms.length])) === JSON.stringify([['1 session', 1]]), JSON.stringify(r.lignes));
+      await b.wait(1500);
+      check('o3. la corbeille de l\'ordinateur reste vide', corbeilleDe(memoire).entries.length === 0, JSON.stringify(corbeilleDe(memoire).index));
+      memesSessions('o3', memoire, tel, TROIS);
+      const marqueur = lireJson(join(racine, 'gtracker.json'));
+      check('o3. le téléphone a reçu un identifiant neuf (plus celui de la sauvegarde) et un passage', typeof marqueur?.id === 'string' && marqueur.id !== idSauvegarde && Number.isSafeInteger(marqueur.passage), JSON.stringify(marqueur));
+      check('o3. une copie de sécurité de plus a été faite (première rencontre)', copiesDe(profil).length === copiesAvant + 1, `${copiesAvant} puis ${copiesDe(profil).length}`);
+      await fermerFenetre(b);
+      r = await synchroniser(b, 'o4, synchronisation suivante');
+      check('o4. la synchronisation suivante est ordinaire : « Tout est à jour », sans la phrase de la copie ancienne', r.titre === 'Tout est à jour' && !/copie plus ancienne/.test(r.tout ?? ''), JSON.stringify([r.titre, r.paragraphes]));
+      await fermerFenetre(b);
+    });
+  }
+
+  // ---------- v. nom d'une session changé des deux côtés ----------
+  console.log('\n== v. Nom de session changé des deux côtés : le dernier saisi l\'emporte, sur les deux appareils');
+  if (veut('v')) {
+    const DEUX = [0, 1];
+    const profil = dossier('v-profil');
+    const memoire = fabriquerMemoire('v', DEUX);
+    const tel = fabriquerTelephone('v-tel', DEUX);
+    const racine = racineTel(tel);
+    /** Pose un nom et son instant de saisie dans la fiche de la session `k` du dossier `dir`, comme la saisie du nom le fait. */
+    const nommer = (dir, k, nom, instantMs) => {
+      const f = join(dir, 'sessions', `${MODELES[k].nom}.json`);
+      const fiche = lireJson(f);
+      writeFileSync(f, `${JSON.stringify({ ...fiche, name: nom, editedAt: { ...(fiche.editedAt ?? {}), name: instantMs } })}\n`);
+    };
+    const nomDe = (dir, k) => lireJson(join(dir, 'sessions', `${MODELES[k].nom}.json`))?.name ?? null;
+    await avecProgramme(profil, memoire, { GTRACKER_BANC_TELEPHONE: tel }, 'v', async (b) => {
+      await b.go('/sessions', 5000);
+      await b.settle({ max: 2000 });
+      let r = await synchroniser(b, 'v1, première synchronisation');
+      check('v1. première synchronisation faite (écran de départ passé, deux sessions sur chaque appareil)', r.depart !== null && gpxsDe(memoire).length === 2 && gpxsDe(racine).length === 2, r.titre);
+      await fermerFenetre(b);
+      await b.wait(1500);
+      // Deux sessions, chacune renommée des deux côtés : le téléphone saisit le dernier pour la première, l'ordinateur pour la seconde.
+      const maintenant = Date.now();
+      nommer(memoire, 0, 'Nom ordinateur A', maintenant - 120000);
+      nommer(racine, 0, 'Nom téléphone A', maintenant - 5000);
+      nommer(memoire, 1, 'Nom ordinateur B', maintenant - 5000);
+      nommer(racine, 1, 'Nom téléphone B', maintenant - 120000);
+      await b.wait(500);
+      r = await synchroniser(b, 'v2, noms changés des deux côtés');
+      check('v2. un encadré dit que 2 sessions ont été modifiées sur les deux appareils et que la plus ancienne version a été remplacée', /2 sessions modifiées sur les deux appareils : .*c'est la version écrite en dernier qui est gardée .*et la plus ancienne a été remplacée\./.test(r.tout ?? ''), JSON.stringify([r.notes, r.tout]));
+      await b.wait(1500);
+      check('v2. première session : « Nom téléphone A » (saisi en dernier) des deux côtés', nomDe(memoire, 0) === 'Nom téléphone A' && nomDe(racine, 0) === 'Nom téléphone A', `${nomDe(memoire, 0)} / ${nomDe(racine, 0)}`);
+      check('v2. seconde session : « Nom ordinateur B » (saisi en dernier) des deux côtés', nomDe(memoire, 1) === 'Nom ordinateur B' && nomDe(racine, 1) === 'Nom ordinateur B', `${nomDe(memoire, 1)} / ${nomDe(racine, 1)}`);
+      check('v2. la date de saisie suit le nom gardé, des deux côtés', lireJson(join(memoire, 'sessions', `${MODELES[0].nom}.json`))?.editedAt?.name === maintenant - 5000 && lireJson(join(racine, 'sessions', `${MODELES[0].nom}.json`))?.editedAt?.name === maintenant - 5000, JSON.stringify([lireJson(join(memoire, 'sessions', `${MODELES[0].nom}.json`))?.editedAt, lireJson(join(racine, 'sessions', `${MODELES[0].nom}.json`))?.editedAt]));
+      check('v2. rien à la corbeille (la version perdante ne fait pas de doublon), les deux sessions sont toujours là', corbeilleDe(memoire).entries.length === 0 && gpxsDe(memoire).length === 2 && gpxsDe(racine).length === 2, JSON.stringify(corbeilleDe(memoire).index));
+      await fermerFenetre(b);
+      r = await synchroniser(b, 'v3, synchronisation suivante');
+      check('v3. la suivante est ordinaire : « Tout est à jour », les noms ne bougent plus', r.titre === 'Tout est à jour' && nomDe(memoire, 0) === 'Nom téléphone A' && nomDe(racine, 1) === 'Nom ordinateur B', JSON.stringify([r.titre, nomDe(memoire, 0), nomDe(racine, 1)]));
       await fermerFenetre(b);
     });
   }

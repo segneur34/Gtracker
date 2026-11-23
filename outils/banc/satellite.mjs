@@ -1,24 +1,20 @@
-// Banc de test : vue satellite (lot 4 des demandes du 20/10).
+// Banc de test : la photo satellite est retirée, le plan reste seul. À verdict.
 // Usage : node satellite.mjs <port> [<dossier des captures>]
-// Sur un profil neuf, avec réseau vers server.arcgisonline.com (OSM bloqué). Dure environ 1 min 30.
+// Sur un profil neuf, sans réseau (tuiles synthétiques de `lib/tuiles.mjs`). Dure environ 1 min.
 // Le script :
-//  1. importe une session de wingfoil, une de kite et une de surf (remis sur la voile et le surf au lot 330) ;
-//  2. dans chaque analyse, à 1400×1000 : un bouton « Fond de carte » sous le + et le −, mention OSM ; un toucher ouvre
-//     le choix Plan · Satellite sans rien changer, un toucher ailleurs ou Échap le ferme ; « Satellite » passe à la photo
-//     (mention Esri) et ferme le choix ; le texte de la page ne change pas hors mention ; le fond est rangé dans la
-//     fiche de la session (lot 193), pas pour la famille (`gtracker.fondCarte`), et retrouvé après rechargement ; le
-//     wingfoil en satellite laisse le kite en plan ;
-//  3. bibliothèque (vignettes) : pas de bouton, mention OSM ; planification : le fond de la famille de son activité
-//     (la Voile, en satellite), son bouton qui ne pose pas de point, deux points posés sur la photo ;
-//  4. image de partage de la voile : capture de l'aperçu (photo et mention Esri, à l'œil) ;
-//  5. hors ligne : les tuiles satellite vues sont gardées (`sat_…`) et réaffichées après rechargement sans Esri ;
-//  6. à 390×844 : bouton présent, rien ne déborde, choix ouvert compris ; ni le bouton ni le choix n'ouvrent la carte
-//     en plein écran ; la vue agrandie suit le même fond, avec son bouton ;
-//  7. mentions sur téléphone (lot 195), à 390×844 puis 320×640 : satellite sur une seule ligne de 12 px, « Powered by Esri »
-//     en tête, un toucher déplie (classe is-open, hauteur qui grandit, aria-expanded) et un second replie ; plan : « © OpenStreetMap »
-//     entier et sur une ligne ; à 1400 px, rien de replié ni d'aria sur la mention.
+//  1. importe une session de wingfoil et une de surf ;
+//  2. dans chaque analyse, à 1400×1000 puis 390×844 : aucun bouton « Fond de carte » (`.map-base-switch`), mention
+//     « OpenStreetMap », tuiles du plan affichées, rien ne déborde ; planification : aucun bouton non plus ;
+//  3. un fond « satellite » rangé d'avant (fiche de la session `mapBase`, clé `fondCarte` de la famille) donne le plan,
+//     sans erreur, et la fiche reste modifiable ;
+//  4. aucune requête vers l'ancien serveur d'imagerie, pendant tout le script ;
+//  5. effacement unique : une tuile `/tuiles-gardees/sat_14_1_2.png` posée dans le cache avec le drapeau d'effacement
+//     retiré a disparu après rechargement, la tuile voisine du plan est restée, le drapeau est posé, puis une seconde
+//     tuile `sat_` posée n'est plus effacée (une seule fois) ;
+//  6. Réglages › Cartes hors ligne : ni « satellite » ni champ d'adresse pour lui, celui du plan reste.
 import { CACHES, CLES, connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
+import { BLOCKED_EXCEPT_TILES, fakeTiles } from './lib/tuiles.mjs';
 import { enveloppeGpx, pointGpx } from './lib/traces.mjs';
 
 const [port, shotDir] = process.argv.slice(2);
@@ -27,54 +23,35 @@ if (!port) {
   process.exit(1);
 }
 
-// --- Protocole (lib/cdp.mjs) ---
-const { send, evaluate, go, settle, waitFor, wait, blockNetwork, importGpx, records, shoot, close, logs } = await connect({ port, width: 1400, height: 1000, shotDir });
+const b = await connect({ port, width: 1400, height: 1000, shotDir });
+const { send, evaluate, go, settle, waitFor, wait, importGpx, records, shoot, check, finish, logs, onMessage, blockNetwork } = b;
+
+await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
+await fakeTiles(b);
+await blockNetwork(BLOCKED_EXCEPT_TILES);
+
+// Toute requête vers l'ancien serveur d'imagerie, vue par le protocole (servie par la fausse file de tuiles, sans réseau).
+const retiredRequests = [];
+onMessage((msg) => {
+  if (msg.method === 'Network.requestWillBeSent' && /arcgisonline|World_Imagery/i.test(msg.params.request.url)) retiredRequests.push(msg.params.request.url);
+});
 
 const overflow = () => evaluate(`document.documentElement.scrollWidth - document.documentElement.clientWidth`);
-let failures = 0;
-const check = (what, ok, detail) => { console.log(`${ok ? 'ok   ' : 'ÉCHEC'} ${what}${!ok && detail !== undefined ? ` (${detail})` : ''}`); if (!ok) failures++; };
-
-/** Boutons du fond et mentions des cartes de la page (carte compacte d'abord). */
-/** Boutons du fond de la page (ou de `scope`). */
-const buttons = (scope = '') => evaluate(`document.querySelectorAll('${scope} .map-base-switch__button').length`);
-const menuOpen = (scope = '') => evaluate(`document.querySelector('${scope} .map-base-switch__menu') !== null`);
-/** Ouvre le choix du premier bouton (de `scope`) et rend ses lignes. */
-const openMenu = async (scope = '') => {
-  if (!(await menuOpen(scope))) await evaluate(`document.querySelector('${scope} .map-base-switch__button').click()`);
-  await wait(300);
-  return evaluate(`[...document.querySelectorAll('${scope} .map-base-switch__choice')].map((b) => ({ label: b.textContent.trim(), checked: b.getAttribute('aria-checked') === 'true' }))`);
-};
-const closeMenu = async () => {
-  await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
-  await wait(300);
-};
-/** Fond coché dans le choix (ouvert puis refermé). */
-const current = async (scope = '') => {
-  const lines = await openMenu(scope);
-  await closeMenu();
-  return lines.find((l) => l.checked)?.label ?? null;
-};
-const choose = async (label, scope = '', ms = 1000) => {
-  await openMenu(scope);
-  await evaluate(`[...document.querySelectorAll('${scope} .map-base-switch__choice')].find((b) => b.textContent.trim() === ${JSON.stringify(label)})?.click()`);
-  await wait(ms);
-};
+const buttons = () => evaluate(`document.querySelectorAll('.map-base-switch, .map-base-switch__button').length`);
 const attribution = () => evaluate(`document.querySelector('.leaflet-control-attribution')?.textContent ?? ''`);
-const pageText = () => evaluate(`document.body.innerText.replace(/(Powered by Esri · Imagerie © Esri, Vantor, Earthstar Geographics, GIS User Community|Powered by Esri · Imagerie © Esri, Vantor, Earthstar Geographics|© OpenStreetMap)/g, '<mention>')`);
-const storedBases = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.fondCarte}') ?? '{}')`);
-/** Tuiles de la carte compacte affichées (image chargée). */
 const loadedTiles = () => evaluate(`[...document.querySelectorAll('.leaflet-tile-pane img.leaflet-tile')].filter((i) => i.complete && i.naturalWidth > 0).length`);
-const cachedSatTiles = () => evaluate(`(async () => {
+const storedBases = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.fondCarte}') ?? '{}')`);
+const cachedKeys = () => evaluate(`(async () => {
   const cache = await caches.open('${CACHES.tuiles}');
-  return (await cache.keys()).filter((r) => r.url.includes('/sat_')).length;
+  return (await cache.keys()).map((r) => new URL(r.url).pathname).filter((p) => !p.endsWith('_index.json')).sort();
+})()`);
+const putTile = (key) => evaluate(`(async () => {
+  const cache = await caches.open('${CACHES.tuiles}');
+  await cache.put('/tuiles-gardees/${key}.png', new Response('x', { headers: { 'content-type': 'image/png', '${CACHES.entete}': String(Date.now()) } }));
+  return 'ok';
 })()`);
 
-// Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
-await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
-const BLOCKED = ['*://*.openstreetmap.org/*'];
-await blockNetwork(BLOCKED);
-
-// --- 1. Sessions synthétiques : un aller-retour le long de la côte, à Palavas ---
+// --- 1. Sessions synthétiques : un aller-retour le long de la côte ---
 const loopGpx = (type, seconds, speed, t0) => {
   const lat0 = 43.515;
   const mPerDegLon = (Math.PI / 180) * 6371e3 * Math.cos((lat0 * Math.PI) / 180);
@@ -87,10 +64,8 @@ const loopGpx = (type, seconds, speed, t0) => {
   }
   return enveloppeGpx({ nom: 'Boucle', type }, pts);
 };
-/** `key` : le nom de la session dans ce script ; `page` : la page de sa famille (`/voile`, `/surf`). */
 const SESSIONS = [
   { key: 'voile', page: 'voile', start: Date.UTC(2026, 9, 5, 13), type: 'wingfoil', seconds: 900, speed: 7 },
-  { key: 'kite', page: 'voile', start: Date.UTC(2026, 9, 6, 8), type: 'kite', seconds: 1200, speed: 6 },
   { key: 'surf', page: 'surf', start: Date.UTC(2026, 9, 8, 8), type: 'surf', seconds: 600, speed: 2 },
 ];
 const paths = {};
@@ -105,168 +80,93 @@ for (const s of SESSIONS) {
   check(`${s.key} rangée`, Boolean(rec));
 }
 
-// --- 2. Chaque analyse ---
+// --- 2. Les analyses : plan seul, aucun bouton de fond ---
 for (const s of SESSIONS) {
   await go(paths[s.key], 6000);
-  check(`${s.key} : un bouton « Fond de carte », choix fermé`, (await buttons()) === 1 && !(await menuOpen()));
-  check(`${s.key} : mention OSM`, (await attribution()).includes('OpenStreetMap'), await attribution());
-  const corner = await evaluate(`document.querySelector('.map-base-switch')?.closest('.leaflet-top.leaflet-left')?.querySelector('.leaflet-control-zoom') ? 'sous le zoom' : 'ailleurs'`);
-  check(`${s.key} : bouton dans le coin du + et du −`, corner === 'sous le zoom', corner);
-  const textPlan = await pageText();
-  const lines = await openMenu();
-  check(`${s.key} : un toucher ouvre Plan · Satellite, Plan coché, rien changé`,
-    JSON.stringify(lines) === JSON.stringify([{ label: 'Plan', checked: true }, { label: 'Satellite', checked: false }])
-    && (await attribution()).includes('OpenStreetMap'), JSON.stringify(lines));
-  if (s.key === 'voile') {
-    // Un toucher ailleurs ferme le choix sans rien changer ; Échap aussi.
-    await evaluate(`document.querySelector('.leaflet-container').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
-    await wait(300);
-    check('voile : un toucher ailleurs ferme le choix', !(await menuOpen()) && (await attribution()).includes('OpenStreetMap'));
-    await openMenu();
-    await closeMenu();
-    check('voile : Échap ferme le choix', !(await menuOpen()));
-  }
-  await choose('Satellite', '', 4000);
-  check(`${s.key} : « Satellite » ferme le choix`, !(await menuOpen()));
-  check(`${s.key} : mention Esri`, (await attribution()).includes('Esri'), await attribution());
-  check(`${s.key} : texte de la page inchangé hors mention`, (await pageText()) === textPlan);
-  const tiles = await loadedTiles();
-  check(`${s.key} : tuiles satellite affichées`, tiles > 0, tiles);
-  check(`${s.key} : Satellite coché`, (await current()) === 'Satellite');
-  const stored = await storedBases();
-  // Lot 193 (07/11) : le choix fait dans une analyse va dans la fiche de la session ; le fond de la famille
-  // (`gtracker.fondCarte`) ne bouge pas, il ne se change plus que depuis la planification ou le direct.
-  const fiche = (await records())?.find((r) => r.gpx === gpxs[s.key]);
-  check(`${s.key} : fond rangé dans la fiche, pas pour la famille`, fiche?.mapBase === 'satellite' && stored[s.page] !== 'satellite', JSON.stringify({ fiche: fiche?.mapBase ?? null, stored }));
-  await shoot(`satellite-${s.key}`);
-  await go(paths[s.key], 5000);
-  check(`${s.key} : satellite retrouvé après rechargement`, (await current()) === 'Satellite' && (await attribution()).includes('Esri'));
-  if (s.key !== 'voile') {
-    // Retour au plan : seule la voile reste en satellite pour la suite.
-    await choose('Plan');
-    check(`${s.key} : retour au plan`, (await current()) === 'Plan' && (await attribution()).includes('OpenStreetMap'));
-  }
-  if (s.key === 'voile') {
-    await go(paths.kite, 5000);
-    check('wingfoil en satellite, kite en plan', (await current()) === 'Plan' && (await attribution()).includes('OpenStreetMap'));
-  }
+  await waitFor(() => loadedTiles(), { timeout: 6000, label: `tuiles ${s.key}` });
+  check(`${s.key} : aucun bouton « Fond de carte »`, (await buttons()) === 0, await buttons());
+  check(`${s.key} : mention OpenStreetMap`, (await attribution()).includes('OpenStreetMap'), await attribution());
+  check(`${s.key} : tuiles du plan affichées`, (await loadedTiles()) > 0);
+  check(`${s.key} : rien ne déborde`, (await overflow()) <= 0, await overflow());
 }
-console.log('fonds rangés :', JSON.stringify(await storedBases()));
+await shoot('satellite-voile-plan');
 
-// --- 3. Bibliothèque et planification ---
-await go('/voile', 5000);
-const libButtons = await buttons();
-// Vignettes en image fixe depuis le lot 74 : plus de carte Leaflet, la mention OSM est posée sur l'image.
-await waitFor(() => evaluate(`document.querySelectorAll('.lib-row__preview-image').length > 0`), { timeout: 5000, label: 'vignettes' }).catch(() => {});
-const libMaps = await evaluate(`document.querySelectorAll('.lib-row__preview-image').length`);
-const libCredit = await evaluate(`document.querySelector('.lib-row__preview-credit')?.textContent ?? ''`);
-check('bibliothèque de voile : vignettes sans bouton, en plan', libMaps > 0 && libButtons === 0 && libCredit.includes('OpenStreetMap'), `${libMaps} vignettes, ${libButtons} boutons`);
+// --- Planification ---
 await go('/itineraires', 4000);
-// La planification suit la famille de son activité : la Voile (première proposée sur un profil neuf), dont le fond
-// est resté en plan (les analyses ne l'écrivent plus, lot 193) ; c'est ici que le fond de la famille se change.
-const planFamily = await evaluate(`document.querySelector('.plan-map') ? 'ok' : 'absent'`);
-check('planification : un bouton, fond de la famille (voile en plan)', planFamily === 'ok' && (await buttons()) === 1 && (await current()) === 'Plan' && (await attribution()).includes('OpenStreetMap'));
-const markers = () => evaluate(`document.querySelectorAll('.plan-map .leaflet-marker-icon').length`);
-const markersBefore = await markers();
-await choose('Satellite');
-check('planification : « Satellite » sans poser de point', (await current()) === 'Satellite' && (await markers()) === markersBefore && (await attribution()).includes('Esri'));
-check('planification : satellite rangé pour la voile', (await storedBases()).voile === 'satellite');
-// Deux points posés au toucher, pour voir le tracé sur la photo.
-const box = await evaluate(`(() => { const r = document.querySelector('.plan-map .leaflet-container').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; })()`);
-for (const [fx, fy] of [[0.3, 0.5], [0.7, 0.6]]) {
-  const x = box[0] + box[2] * fx;
-  const y = box[1] + box[3] * fy;
-  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
-  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
-  await settle({ max: 800 });
-}
-await wait(3000);
-check('planification : deux points posés', (await markers()) >= markersBefore + 2, await markers());
-await shoot('satellite-planification');
+check('planification : la carte est là, sans bouton de fond', (await evaluate(`document.querySelector('.plan-map .leaflet-container') ? 'ok' : 'absent'`)) === 'ok' && (await buttons()) === 0, await buttons());
+check('planification : mention OpenStreetMap', (await attribution()).includes('OpenStreetMap'), await attribution());
 
-// --- 4. Image de partage de la voile ---
+// --- 3. Un fond « satellite » rangé d'avant ---
+// Fiche de la session de voile : on y écrit `mapBase: 'satellite'` ; la famille aussi dans `fondCarte`.
+const patched = await evaluate(`(async () => {
+  const dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Gtracker')).getDirectoryHandle('sessions');
+  for await (const [name, h] of dir.entries()) {
+    if (!name.endsWith('.json')) continue;
+    const rec = JSON.parse(await (await h.getFile()).text());
+    if (rec.gpx !== ${JSON.stringify(gpxs.voile)}) continue;
+    rec.mapBase = 'satellite';
+    const w = await h.createWritable();
+    await w.write(JSON.stringify(rec));
+    await w.close();
+    localStorage.setItem('${CLES.fondCarte}', JSON.stringify({ voile: 'satellite', surf: 'satellite' }));
+    return name;
+  }
+  return null;
+})()`);
+check('fiche « satellite » posée', patched !== null);
 await go(paths.voile, 6000);
-await evaluate(`document.querySelector('.an-sheet__head .ui-more__button')?.click()`);
-await wait(300);
-await evaluate(`[...document.querySelectorAll('.an-sheet__head .ui-more__panel button')].find((x) => x.textContent.trim() === "Partager l'image")?.click()`);
-let shareReady = false;
-for (let t = 0; t < 20000 && !shareReady; t += 250) {
-  shareReady = await evaluate(`(() => { const i = document.querySelector('.share-dialog__preview img'); return Boolean(i && i.complete && i.naturalWidth > 0); })()`);
-  if (!shareReady) await wait(250);
-}
-check('partage : aperçu dessiné', shareReady);
-await shoot('satellite-partage');
-await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+await waitFor(() => loadedTiles(), { timeout: 6000, label: 'tuiles après fiche satellite' });
+check('fiche « satellite » : le plan, sa mention, aucun bouton', (await attribution()).includes('OpenStreetMap') && !(await attribution()).includes('Esri') && (await buttons()) === 0, await attribution());
+check('fiche « satellite » : la session s\'ouvre, pas en lecture seule', !(await evaluate(`document.body.innerText.includes("n'est pas dans la mémoire")`)));
+await go('/itineraires', 4000);
+check('fond « satellite » de la famille : le plan à la planification', (await attribution()).includes('OpenStreetMap') && (await buttons()) === 0, await attribution());
 
-// --- 5. Hors ligne ---
-const kept = await cachedSatTiles();
-check('tuiles satellite gardées (sat_…)', kept > 0, kept);
-await blockNetwork([...BLOCKED, '*://server.arcgisonline.com/*']);
-await go(paths.voile, 6000);
-const offlineTiles = await loadedTiles();
-check('sans Esri : tuiles satellite réaffichées depuis la mémoire', offlineTiles > 0, offlineTiles);
-await blockNetwork(BLOCKED);
-
-// --- 6. Téléphone ---
+// --- À 390×844 ---
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await go(paths.voile, 6000);
-check('390 : bouton présent', (await buttons()) === 1);
-check('390 : rien ne déborde', (await overflow()) <= 0, await overflow());
-await openMenu();
-check('390 : choix ouvert, rien ne déborde', (await menuOpen()) && (await overflow()) <= 0, await overflow());
-await shoot('satellite-390-choix');
-const fullscreen = () => evaluate(`document.querySelector('.an-map-overlay') !== null && getComputedStyle(document.querySelector('.an-map-overlay')).display !== 'none'`);
-check("390 : le bouton n'ouvre pas le plein écran", !(await fullscreen()));
-await choose('Plan');
-check("390 : le choix n'ouvre pas le plein écran", !(await fullscreen()));
-check('390 : voile repassée au plan', (await current()) === 'Plan');
-await choose('Satellite');
-await evaluate(`document.querySelector('.an-map-frame .leaflet-container').click()`);
-await settle({ max: 2000 });
-check('390 : vue agrandie avec son bouton', (await buttons('.an-map-overlay')) === 1);
-check('390 : vue agrandie en satellite', (await current('.an-map-overlay')) === 'Satellite');
-await shoot('satellite-390-agrandie');
-
-// --- 7. Mentions sur téléphone (lot 195) ---
-const mention = () => evaluate(`(() => {
-  const el = document.querySelector('.an-map-frame .leaflet-control-attribution') ?? document.querySelector('.leaflet-control-attribution');
-  const r = el.getBoundingClientRect();
-  const cs = getComputedStyle(el);
-  return { h: r.height, w: r.width, font: parseFloat(cs.fontSize), line: parseFloat(cs.lineHeight), clipped: el.scrollWidth > el.clientWidth + 1,
-    open: el.classList.contains('is-open'), foldable: el.classList.contains('is-foldable'), role: el.getAttribute('role'),
-    expanded: el.getAttribute('aria-expanded'), text: el.textContent, visibleText: el.innerText, mapW: el.closest('.leaflet-container').getBoundingClientRect().width, style: el.style.maxWidth };
-})()`);
-const tap = () => evaluate(`document.querySelector('.an-map-frame .leaflet-control-attribution, .leaflet-control-attribution').click()`);
-for (const [w, h] of [[390, 844], [320, 640]]) {
-  await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 2, mobile: true });
-  await go(paths.voile, 6000);
-  const closed = await mention();
-  check(`${w} : satellite, une ligne de 12 px`, closed.foldable && closed.font === 12 && closed.h <= closed.line + 2, JSON.stringify(closed));
-  check(`${w} : satellite, « Powered by Esri » en tête, bouton accessible replié`, closed.text.startsWith('Powered by Esri') && closed.role === 'button' && closed.expanded === 'false' && !closed.open, closed.text);
-  check(`${w} : satellite, cadre borné à 65 % de la carte`, closed.w <= closed.mapW * 0.65 + 1, `${closed.w} / ${closed.mapW}`);
-  await tap();
-  await wait(300);
-  const opened = await mention();
-  check(`${w} : un toucher déplie (is-open, hauteur qui grandit, tous les noms)`, opened.open && opened.expanded === 'true' && opened.h > closed.h && !opened.clipped && opened.visibleText.includes('GIS User Community'), JSON.stringify(opened));
-  await shoot(`satellite-${w}-mention-ouverte`);
-  await tap();
-  await wait(300);
-  const again = await mention();
-  check(`${w} : un second toucher replie`, !again.open && again.expanded === 'false' && again.h <= again.line + 2, JSON.stringify(again));
-  check(`${w} : le toucher sur la mention ne déplace pas la carte ni n'ouvre le plein écran`, !(await fullscreen()));
-  await go(paths.kite, 5000);
-  const plan = await mention();
-  check(`${w} : plan, « © OpenStreetMap » entier sur une ligne, sans bouton`, plan.visibleText.includes('OpenStreetMap') && !plan.clipped && plan.h <= plan.line + 2 && !plan.foldable && plan.role === null, JSON.stringify(plan));
-}
-// Ordinateur : rien de replié, pas d'aria sur la mention satellite.
+await waitFor(() => loadedTiles(), { timeout: 6000, label: 'tuiles 390' });
+check('390 : aucun bouton de fond, mention OpenStreetMap, rien ne déborde', (await buttons()) === 0 && (await attribution()).includes('OpenStreetMap') && (await overflow()) <= 0, `${await buttons()} / ${await overflow()}`);
+await shoot('satellite-390');
 await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
-await go(paths.voile, 6000);
-const wide = await mention();
-check('1400 : satellite, mention entière, rien de replié, pas d\'aria', wide.role === null && wide.expanded === null && !wide.clipped && wide.visibleText.startsWith('Powered by Esri'), JSON.stringify(wide));
-await tap();
-check('1400 : un clic sur la mention ne la change pas', !(await mention()).open);
 
-console.log('\nconsole :', logs.length ? `\n  ${logs.slice(0, 15).join('\n  ')}` : 'rien');
-console.log(failures === 0 ? '\nTout passe.' : `\n${failures} échec(s).`);
-await close();
-process.exit(0);
+// --- 5. Effacement unique des tuiles `sat_` ---
+await go('/sessions', 3000);
+// Le premier lancement a noté l'effacement : on le retire, et on pose une tuile de l'ancien fond et une du plan.
+const flagAfterFirstLaunch = await evaluate(`JSON.parse(localStorage.getItem('${CLES.tileCache}') ?? '{}').purged ?? null`);
+console.log('drapeau après le premier lancement :', JSON.stringify(flagAfterFirstLaunch));
+await evaluate(`localStorage.removeItem('${CLES.tileCache}')`);
+await putTile('sat_14_1_2');
+await putTile('14_1_2');
+const before = await cachedKeys();
+console.log('cache avant :', before.join(', '));
+check('tuiles posées dans le cache', before.includes('/tuiles-gardees/sat_14_1_2.png') && before.includes('/tuiles-gardees/14_1_2.png'), before.join(', '));
+await go('/sessions', 3000);
+await waitFor(async () => !(await cachedKeys()).some((k) => k.includes('/sat_')), { timeout: 8000, label: 'effacement des sat_' });
+const after = await cachedKeys();
+console.log('cache après :', after.join(', '));
+check('la tuile sat_ a disparu après rechargement', !after.some((k) => k.includes('/sat_')), after.join(', '));
+check('la tuile voisine du plan est restée', after.includes('/tuiles-gardees/14_1_2.png'), after.join(', '));
+const flag = await waitFor(`JSON.parse(localStorage.getItem('${CLES.tileCache}') ?? '{}').purged?.includes('sat_') === true`, { timeout: 4000, label: 'drapeau' });
+check('le drapeau d\'effacement est posé', Boolean(flag), await evaluate(`localStorage.getItem('${CLES.tileCache}')`));
+await putTile('sat_14_3_4');
+await go('/sessions', 3000);
+await wait(1500);
+check('une seule fois : une tuile sat_ posée ensuite n\'est plus effacée', (await cachedKeys()).includes('/tuiles-gardees/sat_14_3_4.png'), (await cachedKeys()).join(', '));
+
+// --- 6. Réglages › Cartes hors ligne ---
+await go('/parametres', 3000);
+await waitFor(`[...document.querySelectorAll('[role=button]')].some((x) => x.textContent.trim() === 'Cartes hors ligne')`, { timeout: 4000, label: 'bloc Cartes hors ligne' });
+await evaluate(`[...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Cartes hors ligne')?.click()`);
+await settle({ max: 1500, label: 'bloc ouvert' });
+const block = await evaluate(`(() => { const t = [...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Cartes hors ligne'); return t ? t.parentElement.innerText : ''; })()`);
+console.log('bloc :', block.replace(/\n+/g, ' / '));
+check('Cartes hors ligne : le bloc est ouvert', block.length > 30, block);
+check('Cartes hors ligne : plus de « satellite »', !/satellite/i.test(block), block);
+check('Cartes hors ligne : le champ d\'adresse du plan reste', /Adresse des tuiles du plan/.test(block), block);
+await shoot('satellite-reglages');
+
+// --- 4. Aucune requête vers l'ancien serveur ---
+check('aucune requête vers l\'ancien serveur d\'imagerie, de tout le script', retiredRequests.length === 0, retiredRequests.slice(0, 3).join(' | '));
+
+console.log(logs.length ? `console :\n${[...new Set(logs)].join('\n')}` : 'console : aucune erreur');
+await finish('Tout passe.');
