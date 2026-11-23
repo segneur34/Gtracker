@@ -1,0 +1,38 @@
+/* Partie d'un bloc de Réglages (`SettingsSection.tsx`) : un titre, son contenu, et un trait fin à l'encre entre deux
+   parties voisines (le même que celui qui sépare les parties d'une activité). */
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-section + .settings-section {
+  padding-top: var(--space-3);
+  border-top: var(--trait-encre);
+}
+
+.settings-section__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Même écriture pour tous les titres de partie : gras, à la taille d'un titre de carte, à l'encre (un titre qui se
+   replie, `PanelTitle`, a déjà la même). */
+.settings-section__title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-title);
+  font-size: var(--text-m);
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-spacing);
+  line-height: 1.3;
+  text-transform: var(--title-case);
+}
+
+/* Lignes de réglage rangées sous un titre de partie : à l'aplomb du titre, séparées par l'écart de la colonne. */
+.settings-section > .settings-row--sub {
+  padding-left: 0;
+  border-top: 0;
+}

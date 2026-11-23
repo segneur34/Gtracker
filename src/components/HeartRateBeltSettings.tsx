@@ -1,6 +1,6 @@
 import { t } from '../core/i18n';
 import { plainError } from '../platform/errorText';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState, type Ref } from 'react';
 import { useBeltLive } from '../hooks/useBeltLive';
 import { useRecorderStatus } from '../hooks/useRecorder';
 import { beltLabels } from '../platform/beltList';
@@ -10,7 +10,8 @@ import {
   type FoundBelt, type HeartRateBelt,
 } from '../platform/heartRate';
 import BeltStatus from './BeltStatus';
-import { SettingRow } from './Help';
+import { HelpText, HelpToggle, SettingRow } from './Help';
+import SettingsSection from './SettingsSection';
 import Button from './ui/Button';
 
 /** Nom de la connexion prise par l'essai, rendue en quittant la page. */
@@ -22,9 +23,10 @@ const SIGNAL_IN_RANGE_DBM = -80;
 const signalLabel = (rssi: number): string => (rssi >= SIGNAL_NEAR_DBM ? t('proche') : rssi >= SIGNAL_IN_RANGE_DBM ? t('à portée') : t('loin'));
 
 /**
- * Ceintures et montres du bloc « Connexion » de Réglages : les ceintures et montres retenues sur ce
- * téléphone, ajoutées par une recherche, essayées (fréquence en
- * direct), choisies ou oubliées. L'application s'en souvient de plusieurs et
+ * La partie « Ceintures et montres » du bloc « Connexion » de Réglages (`sectionRef` la désigne) : les ceintures et
+ * montres retenues sur ce téléphone, ajoutées par une recherche, essayées (fréquence en
+ * direct), choisies ou oubliées. Hors du téléphone, elle n'est qu'une phrase sous son titre.
+ * L'application s'en souvient de plusieurs et
  * n'en lit qu'une à la fois : celle « utilisée au prochain départ »
  * (`platform/heartRate.ts`), que chaque activité propose à l'enregistrement si sa case est cochée. L'état de la
  * connexion se lit toujours, essai ou enregistrement en cours ; une recherche
@@ -32,7 +34,7 @@ const signalLabel = (rssi: number): string => (rssi >= SIGNAL_NEAR_DBM ? t('proc
  * Pendant un enregistrement, rien ne change l'appareil utilisé : « Utiliser »,
  * « Oublier » et l'essai d'un autre sont grisés.
  */
-function HeartRateBeltSettings() {
+function HeartRateBeltSettings({ sectionRef }: { sectionRef?: Ref<HTMLDivElement> }) {
   const [belts, setBelts] = useState<HeartRateBelt[]>(savedBelts);
   const [active, setActive] = useState<HeartRateBelt | null>(savedBelt);
   const [found, setFound] = useState<FoundBelt[] | null>(null);
@@ -62,7 +64,11 @@ function HeartRateBeltSettings() {
   }, []);
 
   if (!heartRateSupported()) {
-    return <p className="settings-block__intro">{t("Sur l'application Android seulement.")}</p>;
+    return (
+      <SettingsSection title={t('Ceintures et montres')} ref={sectionRef}>
+        <p className="ui-hint">{t("Sur l'application Android seulement.")}</p>
+      </SettingsSection>
+    );
   }
 
   /** Relit la liste et l'appareil actif, après un changement. */
@@ -155,11 +161,10 @@ function HeartRateBeltSettings() {
   };
 
   return (
-    <>
-      <SettingRow label={t('Ceintures et montres')} helpKey="capteurs:ceinture"
-        help={t("Ceinture ou montre qui diffuse sa fréquence cardiaque en Bluetooth (basse consommation), sans appairage ni application de sa marque : portez-la, électrodes humidifiées, puis « Ajouter ». L'application s'en souvient de plusieurs et n'en lit qu'une à la fois, celle « utilisée au prochain départ » : « Utiliser » la change ici, « Changer » à la page Enregistrer. Elle est proposée à l'enregistrement des activités où « Ceinture cardio » est cochée.")}>
-        {belts.length === 0 && <span className="settings-sports__mark">{t('aucune')}</span>}
-      </SettingRow>
+    <SettingsSection title={t('Ceintures et montres')} extra={<HelpToggle helpKey="capteurs:ceinture" label={t('Ceintures et montres')} />} ref={sectionRef}>
+      <HelpText helpKey="capteurs:ceinture">
+        {t("Ceinture ou montre qui diffuse sa fréquence cardiaque en Bluetooth (basse consommation), sans appairage ni application de sa marque : portez-la, électrodes humidifiées, puis « Ajouter ». L'application s'en souvient de plusieurs et n'en lit qu'une à la fois, celle « utilisée au prochain départ » : « Utiliser » la change ici, « Changer » à la page Enregistrer. Elle est proposée à l'enregistrement des activités où « Ceinture cardio » est cochée.")}
+      </HelpText>
       {belts.map((b, i) => {
         const isActive = active?.address === b.address;
         const usedByRecording = recording && held === b.address;
@@ -193,6 +198,7 @@ function HeartRateBeltSettings() {
       })}
       <div className="settings-row settings-row--sub">
         <div className="settings-sports__pair">
+          {belts.length === 0 && <span className="settings-sports__mark">{t('aucune')}</span>}
           <Button size="s" disabled={scanning} onClick={() => void search()}>{scanning ? t('Recherche…') : t('Ajouter')}</Button>
           {scanning && <Button size="s" onClick={cancelSearch}>{t('Annuler')}</Button>}
         </div>
@@ -212,7 +218,7 @@ function HeartRateBeltSettings() {
         </div>
       )}
       {error && <div className="ui-alert ui-alert--warning">{error}</div>}
-    </>
+    </SettingsSection>
   );
 }
 

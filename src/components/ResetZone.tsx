@@ -6,6 +6,7 @@ import { isFolderDesignated } from '../platform/memoryFolder';
 import { HelpText } from './Help';
 import { IconTrash, IconUndo } from './icons';
 import PanelTitle from './PanelTitle';
+import SettingsSection from './SettingsSection';
 import Dialog from './ui/Dialog';
 import HoldButton from './ui/HoldButton';
 import { dateLocale, t } from '../core/i18n';
@@ -84,8 +85,7 @@ function ResetZone() {
   };
 
   return (
-    <div className="ui-stack-3">
-      <PanelTitle label={t('Remise à zéro')} open={open} onToggle={() => setOpen((o) => !o)} helpKey="memoire:remise" />
+    <SettingsSection heading={<PanelTitle label={t('Remise à zéro')} open={open} onToggle={() => setOpen((o) => !o)} helpKey="memoire:remise" />}>
       {open && (
         <>
           <HelpText helpKey="memoire:remise">
@@ -109,7 +109,7 @@ function ResetZone() {
           <p className="ui-m-0" aria-live="polite">{runningText(running.kind, running.progress)}</p>
         </Dialog>
       )}
-    </div>
+    </SettingsSection>
   );
 }
 

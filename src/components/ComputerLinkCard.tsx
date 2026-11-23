@@ -3,6 +3,7 @@ import { t } from '../core/i18n';
 import { useComputerLink, type ComputerLinkView } from '../hooks/useComputerLink';
 import { CODE_LENGTH, addressFieldShown, addressWellFormed, cleanCode, codeComplete, describeLink, refusalText } from '../library/computerLink';
 import type { ComputerLinkStatus } from '../platform/computerLink';
+import SettingsSection from './SettingsSection';
 import Button from './ui/Button';
 import './ComputerLinkCard.css';
 
@@ -26,8 +27,7 @@ function ComputerLinkCard() {
   const problem = view.problem ?? line.problem;
 
   return (
-    <div className="ui-stack-3 computer-link">
-      <strong className="computer-link__title">{t('Ordinateur')}</strong>
+    <SettingsSection title={t('Ordinateur')} className="computer-link">
       {!folderOk && (
         <p className="ui-muted ui-text-s ui-m-0 computer-link__note">
           {t("Sans dossier mémoire accessible (plus haut), la liaison avec l'ordinateur ne se fait pas : il y lit vos sessions.")}
@@ -42,7 +42,7 @@ function ComputerLinkCard() {
         ? <PairedPanel view={view} status={status} headline={line.headline} sent={line.sent} blocked={blocked} attempting={attempting} />
         : <PairForm view={view} status={status} headline={line.headline} blocked={blocked} attempting={attempting} />}
       {problem !== null && <p className="ui-danger-text ui-text-s ui-m-0 computer-link__problem" role="status">{problem}</p>}
-    </div>
+    </SettingsSection>
   );
 }
 

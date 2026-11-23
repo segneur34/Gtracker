@@ -1,12 +1,5 @@
-/* Téléphone sans câble (`WirelessPhoneCard.tsx`), dans Réglages › Connexion : titre, case, état, fenêtre de liaison et
+/* Téléphone sans câble (`WirelessPhoneCard.tsx`), dans Réglages › Connexion : case, état, fenêtre de liaison et
    liste des téléphones reliés. Encre sur fond clair, jamais de vert vif en texte (charte). */
-
-.wireless-card__title {
-  font-family: var(--font-title);
-  font-weight: var(--title-weight);
-  letter-spacing: var(--title-spacing);
-  text-transform: var(--title-case);
-}
 
 .wireless-card__status {
   overflow-wrap: anywhere;

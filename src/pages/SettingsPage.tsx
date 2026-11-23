@@ -62,6 +62,7 @@ import { PermissionsSettings } from '../components/PermissionsStatus';
 import PanelTitle from '../components/PanelTitle';
 import AboutSettings from '../components/AboutSettings';
 import SettingsPart from '../components/SettingsPart';
+import SettingsSection from '../components/SettingsSection';
 import ShadePicker from '../components/ShadePicker';
 import ActivityGlyph from '../components/logos/ActivityGlyph';
 import IconPicker from '../components/IconPicker';
@@ -684,9 +685,12 @@ function SettingsPage() {
         <BlockTitle label={t('Pratiquant')} open={open.pratiquant} onToggle={() => toggle('pratiquant')} helpKey="pratiquant"
           help={t("Pour l'énergie estimée des analyses, les zones cardiaques de toutes les activités. Tout est facultatif.")} />
         {open.pratiquant && (
-          <div className="settings-block__body">
+          <div className="settings-block__body ui-stack-3">
             {/* Les réglages de l'écran Profil, les mêmes que dans la fenêtre de sa photo ronde. */}
-            <ProfileScreenSettings />
+            <SettingsSection title={t('Écran Profil')}>
+              <ProfileScreenSettings />
+            </SettingsSection>
+            <SettingsSection title={t('Corps et cœur')}>
             <NumberField label={t('Poids')} unit="kg" step={0.5} min={20} max={300} value={profile.weightKg} onCommit={profileField('weightKg')} placeholder={t('ex. 72')}
               helpKey="pratiquant:poids" help={t("Pour l'énergie.")} />
             <NumberField label={t('Taille')} unit="cm" min={100} max={250} value={profile.heightCm} onCommit={profileField('heightCm')} placeholder={t('ex. 178')}
@@ -708,6 +712,7 @@ function SettingsPage() {
               before={<Link to={RESTING_HR_PATH} className="ui-btn ui-btn--secondary ui-btn--s set-test-btn" aria-label={t('Test de FC repos')}>{t('Test')}</Link>}
               helpKey="pratiquant:fc-repos" help={t('Avec la FC max, les seuils se calculent sur la réserve cardiaque, plus juste. Le bouton Test la mesure avec la ceinture.')} />
             <HeartRateThresholdsField profile={profile} onChange={setThresholds} />
+            </SettingsSection>
           </div>
         )}
       </div>

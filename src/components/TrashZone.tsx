@@ -7,6 +7,7 @@ import { TRASH_ZONE_ID, groupedTrashEntries, trashCounts, trashSummaryText, type
 import { deleteTrashEntry, emptyTrash, restoreTrashEntry, useTrash } from '../hooks/useTrash';
 import { IconTrash, IconUndo } from './icons';
 import PanelTitle from './PanelTitle';
+import SettingsSection from './SettingsSection';
 import Button from './ui/Button';
 import HoldButton from './ui/HoldButton';
 
@@ -74,9 +75,9 @@ function TrashZone() {
   });
 
   return (
-    <div className="ui-stack-3" id={TRASH_ZONE_ID}>
+    <SettingsSection id={TRASH_ZONE_ID} title={summary === null ? t('Corbeille') : undefined}
+      heading={summary === null ? undefined : <PanelTitle label={summary} open={open} onToggle={() => setOpen((o) => !o)} />}>
       {summary === null && error === null && note === null && <p className="ui-muted ui-text-s ui-m-0">{t('Corbeille vide.')}</p>}
-      {summary !== null && <PanelTitle label={summary} open={open} onToggle={() => setOpen((o) => !o)} />}
       {open && summary !== null && (
         <>
           <ul className="set-files-list">
@@ -109,7 +110,7 @@ function TrashZone() {
       )}
       {error !== null && <p className="ui-muted ui-text-s ui-m-0">{error}</p>}
       {note !== null && <p className={note.failed ? 'ui-danger-text ui-text-s ui-m-0' : 'ui-muted ui-text-s ui-m-0'}>{note.text}</p>}
-    </div>
+    </SettingsSection>
   );
 }
 

@@ -452,11 +452,9 @@
   border-top: 1px solid var(--line-soft);
 }
 
-.set-files-title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--text-m);
+/* Chemin du dossier des copies de sécurité : long, il passe à la ligne n'importe où. */
+.set-safety-folder {
+  overflow-wrap: anywhere;
 }
 
 .set-head-row {

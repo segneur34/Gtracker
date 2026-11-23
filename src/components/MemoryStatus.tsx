@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   canChooseMemoryFolder,
   canImportSessions,
@@ -18,6 +18,7 @@ import ResetZone from './ResetZone';
 import TrashZone from './TrashZone';
 import SafetyCopyFolderSetting from './SafetyCopyFolderSetting';
 import SettingsFiles, { SettingsOfferBanner } from './SettingsFiles';
+import SettingsSection from './SettingsSection';
 import { HelpText, HelpToggle } from './Help';
 import { useInSettings } from './helpContext';
 import Button from './ui/Button';
@@ -48,6 +49,11 @@ import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
 
 const mutedStyle = { margin: 0, color: 'var(--muted)', fontSize: 'var(--text-s)', lineHeight: 1.5 } as const;
 const rowStyle = { display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' } as const;
+
+/** Hors de Réglages, les parties de la carte n'ont ni titre ni trait : leurs lignes se suivent. */
+function PlainPart({ children }: { title?: string; extra?: ReactNode; children?: ReactNode }) {
+  return <>{children}</>;
+}
 
 function MemoryStatus({
   detailed = false, compact = false, collapse,
@@ -140,6 +146,12 @@ function MemoryStatus({
     );
   }
 
+  /** Dans Réglages, la carte se range en parties titrées (`SettingsSection`) ; ailleurs, les mêmes lignes sans titre. */
+  const Part = detailed ? SettingsSection : PlainPart;
+  /** Le « ? » de l'emplacement se pose sur le titre de sa partie quand une explication existe pour ce dossier. */
+  const placeHelp = status === 'ready'
+    && ((folderKind === 'browser' && !compact && inSettings) || (detailed && (folderKind === 'picked' || folderKind === 'disk')));
+
   const heading = collapse
     ? <PanelTitle label={t('Mémoire')} open={collapse.open} onToggle={collapse.onToggle}
       extra={collapse.open ? <HelpToggle helpKey="memoire" label={t('Mémoire')} size="s" /> : undefined} />
@@ -165,24 +177,31 @@ function MemoryStatus({
         <HelpText helpKey="memoire">
           {t("Le dossier garde chaque session (sa trace GPX et sa fiche) et un fichier de réglages par appareil. Pour sauvegarder ou changer d'appareil, copiez le dossier Gtracker entier : sur le téléphone, Stockage interne › Documents › Gtracker.")}
         </HelpText>
-        {statusLine}
+        {detailed && <SettingsOfferBanner />}
 
-        {creating && (
-          <p style={mutedStyle}>
-            {t('Lecture des traces sans fiche : {done} / {total}', { done: creating.done, total: creating.total })}
-          </p>
-        )}
+        <Part title={t('Mise à jour')}>
+          {statusLine}
 
-        {library.pendingCount > 0 && (
-          <p style={mutedStyle}>
-            {tn(
-              library.pendingCount,
-              "{n} session enregistrée en attente d'un dossier mémoire, gardée dans le dossier privé de l'application.",
-              "{n} sessions enregistrées en attente d'un dossier mémoire, gardées dans le dossier privé de l'application."
-            )}
-          </p>
-        )}
+          {creating && (
+            <p style={mutedStyle}>
+              {t('Lecture des traces sans fiche : {done} / {total}', { done: creating.done, total: creating.total })}
+            </p>
+          )}
 
+          {library.pendingCount > 0 && (
+            <p style={mutedStyle}>
+              {tn(
+                library.pendingCount,
+                "{n} session enregistrée en attente d'un dossier mémoire, gardée dans le dossier privé de l'application.",
+                "{n} sessions enregistrées en attente d'un dossier mémoire, gardées dans le dossier privé de l'application."
+              )}
+            </p>
+          )}
+
+          {detailed && alert}
+        </Part>
+
+        <Part title={t('Emplacement')} extra={placeHelp ? <HelpToggle helpKey="memoire:emplacement" label={t('Emplacement')} /> : undefined}>
         {status === 'unavailable' && native && (
           <>
             {inSettings ? (
@@ -244,15 +263,12 @@ function MemoryStatus({
 
         {status === 'ready' && folderKind === 'browser' && !compact && inSettings && (
           <>
-            <p style={mutedStyle}>
-              {t('Emplacement : la mémoire de ce navigateur.')}
-              <HelpToggle helpKey="memoire:emplacement" label={t('Emplacement')} />
-            </p>
             <HelpText helpKey="memoire:emplacement">
               {canChoose
                 ? t("Invisible dans l'explorateur de fichiers. Choisissez un dossier (conseil : Documents › Gtracker) pour sauvegarder les sessions ou les passer au téléphone.")
                 : t("Invisible dans l'explorateur de fichiers. Pour un dossier du PC, ouvrez Gtracker dans Chrome ou Edge.")}
             </HelpText>
+            <p style={mutedStyle}>{t('La mémoire de ce navigateur.')}</p>
             {!guaranteed && (
               <p style={mutedStyle}>
                 {t("Ce navigateur ne garantit pas de garder cette mémoire : il peut la vider s'il manque de place.")}
@@ -273,7 +289,6 @@ function MemoryStatus({
         {status === 'ready' && folderKind === 'browser' && !compact && !inSettings && (
           <>
             <p style={mutedStyle}>
-              {detailed ? `${t('Emplacement : la mémoire interne de ce navigateur.')} ` : ''}
               {t("Les sessions sont gardées dans ce navigateur : aucun dossier sur le PC, l'explorateur de fichiers ne les voit pas.")}
               {' '}
               {canChoose
@@ -290,13 +305,10 @@ function MemoryStatus({
 
         {detailed && status === 'ready' && folderKind === 'picked' && (
           <>
-            <p style={mutedStyle}>
-              {t('Emplacement : {dossier}, sur ce PC.', { dossier: shownFolder ??'' })}
-              <HelpToggle helpKey="memoire:emplacement" label={t('Emplacement')} />
-            </p>
             <HelpText helpKey="memoire:emplacement">
               {t("Le navigateur ne donne que le nom du dossier : son chemin s'affiche dans la fenêtre de « Voir ou changer le dossier ». Annuler n'y change rien.")}
             </HelpText>
+            <p style={mutedStyle}>{t('{dossier}, sur ce PC.', { dossier: shownFolder ??'' })}</p>
             <div style={rowStyle}>
               <Button onClick={() => void chooseFolder()}>{t('Voir ou changer le dossier')}</Button>
               <Button onClick={() => void switchToBrowserMemory()}>{t('Revenir à la mémoire du navigateur')}</Button>
@@ -306,13 +318,10 @@ function MemoryStatus({
 
         {detailed && status === 'ready' && folderKind === 'disk' && (
           <>
-            <p style={mutedStyle}>
-              {t('Emplacement : {dossier}, sur ce PC.', { dossier: shownFolder ??'' })}
-              <HelpToggle helpKey="memoire:emplacement" label={t('Emplacement')} />
-            </p>
             <HelpText helpKey="memoire:emplacement">
               {t("Pour sauvegarder vos sessions ou les passer au téléphone, copiez ce dossier entier. Changer de dossier ne déplace rien : la mémoire devient celle du dossier choisi.")}
             </HelpText>
+            <p style={mutedStyle}>{t('{dossier}, sur ce PC.', { dossier: shownFolder ??'' })}</p>
             {place?.state === 'ready' && place.oneDrive && <p style={mutedStyle}>{inOneDrive}</p>}
             <div style={rowStyle}>
               <Button onClick={() => void chooseFolder()}>{t('Changer de dossier')}</Button>
@@ -320,11 +329,9 @@ function MemoryStatus({
           </>
         )}
 
-        {detailed && desktop && <SafetyCopyFolderSetting />}
-
         {detailed && status === 'ready' && folderKind === 'device' && (
           <>
-            <p style={mutedStyle}>{t('Emplacement : {dossier}, dans le stockage interne du téléphone.', { dossier: shownFolder ??'' })}</p>
+            <p style={mutedStyle}>{t('{dossier}, dans le stockage interne du téléphone.', { dossier: shownFolder ??'' })}</p>
             <div style={rowStyle}>
               <Button onClick={() => void chooseFolder()}>{t('Changer de dossier')}</Button>
             </div>
@@ -362,11 +369,14 @@ function MemoryStatus({
           </p>
         )}
 
-        <SettingsOfferBanner />
+        </Part>
+
+        {detailed && desktop && <SafetyCopyFolderSetting />}
+        {!detailed && <SettingsOfferBanner />}
         {detailed && status === 'ready' && <SettingsFiles />}
         {detailed && <PlaceSearchSetting />}
 
-        {alert}
+        {!detailed && alert}
         {detailed && status === 'ready' && folderKind === 'disk' && <TrashZone />}
         {detailed && <ResetZone />}
       </div>
@@ -381,7 +391,7 @@ function MemoryStatus({
 function PlaceSearchSetting() {
   const [on, setOn] = usePlaceSearch();
   return (
-    <div className="ui-stack-3">
+    <SettingsSection title={t('Lieu des sessions')}>
       <label className="ui-row-s2 ui-center">
         <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} />
         <span>{t('Chercher le lieu des sessions')}</span>
@@ -389,7 +399,7 @@ function PlaceSearchSetting() {
       <p style={mutedStyle}>
         {t("Le lieu d'une session est cherché en ligne d'après son point de départ et, si la sortie finit ailleurs, son point d'arrivée, arrondis à une centaine de mètres : un départ de chez vous en dit le quartier. Case décochée, rien n'est envoyé et le nom d'une session est son activité seule.")}
       </p>
-    </div>
+    </SettingsSection>
   );
 }
 

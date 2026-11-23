@@ -11,6 +11,7 @@ import { DEVICE_NAME_MAX, adoptedGearChanges, deviceNameText, gearListsDiffer } 
 import { isDesktopApp, isNativeApp } from '../platform/runtime';
 import GearCompareDialog from './GearCompareDialog';
 import { HelpText, HelpToggle } from './Help';
+import SettingsSection from './SettingsSection';
 import Button from './ui/Button';
 import Dialog from './ui/Dialog';
 import { t, tn } from '../core/i18n';
@@ -168,10 +169,7 @@ function SettingsFiles() {
   };
 
   return (
-    <div className="ui-stack-2">
-      <strong className="set-files-title">
-        {t('Réglages')}<HelpToggle helpKey="memoire:reglages" label={t('Réglages par appareil')} />
-      </strong>
+    <SettingsSection title={t('Réglages')} extra={<HelpToggle helpKey="memoire:reglages" label={t('Réglages par appareil')} />}>
       <HelpText helpKey="memoire:reglages">
         {folderKind === 'browser'
           ? t("Chaque appareil range ses réglages sous son nom (Gtracker › reglages). Pour reprendre ceux d'un autre : « Importer un fichier de réglages », puis choisissez son fichier.")
@@ -193,7 +191,7 @@ function SettingsFiles() {
         {settingsFiles.map((file) => (
           <li key={file.fileName} className="set-files-row">
             <span className="ui-stack ui-min-w-0">
-              <strong className="ui-text-m">{deviceNameText(file.name)}</strong>
+              <strong className="ui-text-s">{deviceNameText(file.name)}</strong>
               <span className="num" style={mutedStyle}>
                 {tn(file.activityCount, '{n} activité', '{n} activités')} · {t('modifiés le {date}', { date: dayMonthYearTime(file.savedAt) })}
               </span>
@@ -215,7 +213,7 @@ function SettingsFiles() {
       {comparing && <GearCompareDialog onClose={() => setComparing(false)} />}
       {adopting && <AdoptSettingsDialog file={adopting.file} onClose={closeAdopting} />}
       {importNote && <p style={{ ...mutedStyle, color: importNote.failed ? 'var(--danger)' : 'var(--muted)' }}>{importNote.text}</p>}
-    </div>
+    </SettingsSection>
   );
 }
 

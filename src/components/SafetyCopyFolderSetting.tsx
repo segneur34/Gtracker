@@ -3,6 +3,7 @@ import { errorMessage } from '../core/basics';
 import { t } from '../core/i18n';
 import { chooseSafetyCopyFolder, safetyCopyFolder, safetyCopyFolderChoosable } from '../platform/phoneCable';
 import { HelpText, HelpToggle } from './Help';
+import SettingsSection from './SettingsSection';
 import Button from './ui/Button';
 
 /**
@@ -47,19 +48,16 @@ function SafetyCopyFolderSetting() {
   };
 
   return (
-    <div className="ui-stack-3">
-      <p className="ui-hint ui-hint--m">
-        {folder === null ? t('Copies de sécurité') : t('Copies de sécurité : {dossier}', { dossier: folder })}
-        <HelpToggle helpKey="memoire:copies" label={t('Copies de sécurité')} />
-      </p>
+    <SettingsSection title={t('Copies de sécurité')} extra={<HelpToggle helpKey="memoire:copies" label={t('Copies de sécurité')} />}>
       <HelpText helpKey="memoire:copies">
         {t("Avant la première synchronisation avec un téléphone, Gtracker copie les deux mémoires par sécurité dans ce dossier. Rien n'y est jamais effacé.")}
       </HelpText>
+      {folder !== null && <p className="ui-hint ui-hint--m set-safety-folder">{folder}</p>}
       <div className="ui-row-s2 ui-wrap">
         <Button disabled={busy} onClick={() => void choose()}>{t('Choisir un autre dossier')}</Button>
       </div>
       {problem !== null && <p className="ui-text-s ui-m-0 ui-danger-text" role="status">{problem}</p>}
-    </div>
+    </SettingsSection>
   );
 }
 

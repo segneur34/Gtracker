@@ -5,6 +5,7 @@ import { settingsBlockFromSearch } from '../core/parentPage';
 import { useWirelessPhones } from '../hooks/useWirelessPhones';
 import { authorizationNoticeText, countdownText, describePhoneSeen, describeWireless, firewallNotice, pairingAddress, remainingMs, wrongCodesText } from '../library/wirelessPhone';
 import { phoneCableAvailable, phoneState } from '../platform/phoneCable';
+import SettingsSection from './SettingsSection';
 import Button from './ui/Button';
 import './WirelessPhoneCard.css';
 
@@ -83,8 +84,7 @@ function WirelessPhoneCard() {
   const wrongCodes = state !== null && pairing !== null ? wrongCodesText(state) : null;
 
   return (
-    <div className="ui-stack-3 wireless-card" ref={cardRef}>
-      <strong className="wireless-card__title">{t('Téléphone')}</strong>
+    <SettingsSection title={t('Téléphone')} className="wireless-card" ref={cardRef}>
       <p className="ui-muted ui-text-s ui-m-0">
         {t("Reliez votre téléphone une fois, par un code. Ensuite, ouvrez Gtracker sur le téléphone, sur le même réseau que cet ordinateur (la même box Wi-Fi, ou un partage de connexion), puis cliquez sur « Synchroniser », en haut.")}
       </p>
@@ -148,7 +148,7 @@ function WirelessPhoneCard() {
 
       {(active || phones.length > 0) && (
         <div className="ui-stack-3 wireless-card__phones">
-          <strong className="ui-text-m">{t('Téléphones reliés')}</strong>
+          <strong className="ui-text-s">{t('Téléphones reliés')}</strong>
           {phones.length === 0 ? (
             <p className="ui-muted ui-text-s ui-m-0">{t("Aucun téléphone relié pour l'instant.")}</p>
           ) : (
@@ -156,7 +156,7 @@ function WirelessPhoneCard() {
               {phones.map((phone) => (
                 <li key={phone.id} className="set-files-row">
                   <span className="ui-stack ui-min-w-0">
-                    <strong className="ui-text-m">{phone.nom}</strong>
+                    <strong className="ui-text-s">{phone.nom}</strong>
                     <span className="ui-muted ui-text-s">{describePhoneSeen(phone)}</span>
                   </span>
                   <Button size="s" onClick={() => void view.removePhone(phone.id)} disabled={busy}
@@ -170,7 +170,7 @@ function WirelessPhoneCard() {
         </div>
       )}
       {phoneCableAvailable() && <CableHelp toolFolder={toolFolder} />}
-    </div>
+    </SettingsSection>
   );
 }
 

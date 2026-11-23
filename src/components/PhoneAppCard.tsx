@@ -6,6 +6,7 @@ import {
 } from '../platform/phoneApp';
 import { HelpText, HelpToggle } from './Help';
 import { useInSettings } from './helpContext';
+import SettingsSection from './SettingsSection';
 import Button from './ui/Button';
 import Dialog from './ui/Dialog';
 import './PhoneAppCard.css';
@@ -82,11 +83,8 @@ function PhoneAppCard() {
   const { info, busy } = app;
 
   return (
-    <div className="ui-stack-3 phone-app">
-      <span className="ui-row-s2 ui-center">
-        <strong className="phone-app__title">{t('Application du téléphone')}</strong>
-        {inSettings && info?.available && <HelpToggle helpKey="memoire:application" label={t('Application du téléphone')} />}
-      </span>
+    <SettingsSection title={t('Application du téléphone')} className="phone-app"
+      extra={inSettings && info?.available ? <HelpToggle helpKey="memoire:application" label={t('Application du téléphone')} /> : undefined}>
       {info !== null && (
         <p className="ui-muted ui-text-s ui-m-0">
           {info.available
@@ -104,7 +102,7 @@ function PhoneAppCard() {
         </div>
       )}
       <OutcomeLine outcome={app.outcome} />
-    </div>
+    </SettingsSection>
   );
 }
 
