@@ -22,7 +22,7 @@ npx vitest run src/sailing/wind.test.ts -t "nom"   un fichier, un test
 npm run build                     tsc -b && vite build
 ```
 
-`npm run verif` vérifie aussi les renvois des documents (`outils/docs-cites.mjs`, `outils/docs-inventaire.mjs`) : un fichier cité qui n'existe plus fait échouer. La même commande tourne à chaque envoi vers `main` (`.github/workflows/verif.yml`), suivie de `npx cap sync android` puis du test JUnit du format `.imu` (`./gradlew testDebugUnitTest`). Ce test ne fait pas partie de `npm run verif` en local.
+`npm run verif` vérifie aussi les renvois des documents (`outils/docs-cites.mjs`, `outils/docs-inventaire.mjs`) : un fichier cité qui n'existe plus fait échouer. La même commande tourne à chaque envoi vers `main` (`.github/workflows/verif.yml`), suivie de `npx cap sync android` puis des essais Java (`./gradlew testDebugUnitTest` : format `.imu`, protocole de la liaison sans câble, et la liaison côté téléphone, `ComputerLinkCommandsTest`, jouée sous Robolectric sur un faux fournisseur de documents). Ils ne font pas partie de `npm run verif` en local : depuis `android/`, sous JDK 21, `./gradlew testDebugUnitTest`, ou `--tests "*ComputerLinkCommandsTest"` pour cette classe ; Robolectric télécharge une fois l'image d'Android 35 (environ 200 Mo).
 
 ## Web
 

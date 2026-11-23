@@ -37,7 +37,7 @@ Ces réglages évitent que le téléphone coupe le GPS quand l'écran s'éteint.
 
 Si vous touchez **Plus tard**, la carte revient à la version suivante tant qu'il manque une autorisation.
 
-**Batterie**. Si la carte ne s'en charge pas, ouvrez Paramètres, puis Applications, puis Gtracker, puis Batterie (ou « Économiseur de batterie »), et choisissez **Aucune restriction** (ou « Non restreinte »).
+**Batterie**. Touchez **Autoriser** dans la carte : Android ouvre la page de Gtracker. Choisissez Batterie (ou « Économiseur de batterie »), puis **Aucune restriction** (ou « Non restreinte »), et revenez dans Gtracker : la ligne passe à « accordée ». Sans ce réglage, Android peut couper l'enregistrement écran éteint.
 
 **Sur les téléphones Xiaomi, Redmi et POCO**, la carte propose aussi un lien vers le réglage **Démarrage automatique** : activez-le (Paramètres, puis Applications, puis Gtracker).
 
