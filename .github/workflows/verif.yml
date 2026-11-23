@@ -15,7 +15,14 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            bureau/package-lock.json
       - run: npm ci
+      # Dépendances de la coquille Windows, pour que npm run verif vérifie bureau/ (il échoue sous CI sans elles) ;
+      # sans scripts d'installation : le typecheck n'a besoin que des types d'Electron, pas de son binaire.
+      - run: npm ci --ignore-scripts
+        working-directory: bureau
       # Lint sans avertissement toléré, tous les tests en ordre mélangé (graine tirée à chaque passage), build,
       # renvois des documents.
       - run: npm run verif

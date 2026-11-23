@@ -3,9 +3,15 @@
 //
 //   node outils/installeur-essai.mjs [<installeur.exe>] [--sans-apk] [--releve]
 //
-// Par défaut, l'installeur de la version de `package.json` dans `bureau/sortie/` (`npm run installeur`), qui doit
-// contenir l'APK ; `--sans-apk` pour un installeur construit sans elle (son absence est alors vérifiée) ; `--releve`
-// affiche seulement l'état du poste (raccourcis, installation, profil, Documents), sans rien installer.
+// Par défaut, l'installeur d'essai de la version de `package.json` dans `bureau/sortie/`
+// (`node outils/bureau.mjs --installeur --essai`, fichier `Gtracker-Setup-essai-<version>.exe`), qui doit contenir
+// l'APK ; `--sans-apk` pour un installeur construit sans elle (son absence est alors vérifiée) ; `--releve` affiche
+// seulement l'état du poste (raccourcis, installation, profil, Documents), sans rien installer.
+//
+// Seul l'installeur d'essai est accepté : le programme livré ignore le mode d'essai et ses variables, et s'ouvrirait
+// sur le vrai profil. Un autre nom de fichier est refusé avant toute installation ; après l'installation, le marqueur
+// d'essai est relu dans l'archive du programme installé, et son absence arrête l'essai sans rien lancer (le programme
+// est alors désinstallé comme à la fin d'un essai cassé).
 //
 // Étapes :
 //  0. état de départ : un programme déjà installé (dossier `%LOCALAPPDATA%\Programs\Gtracker` ou entrée « Gtracker »
@@ -20,15 +26,17 @@
 //     sa fenêtre, sans question ni arrêt forcé, et remplace les fichiers ;
 //  4. désinstallation silencieuse : programme, raccourcis et entrées disparus ;
 //  5. raccourcis d'origine remis, profil, mémoire et Documents comparés au relevé de départ.
-// Les processus lancés reçoivent `GTRACKER_BANC` et un `GTRACKER_PROFIL` temporaire : même si l'installeur ouvrait
-// le programme, le vrai profil ne serait pas touché.
+// Les processus lancés reçoivent `GTRACKER_BANC` et un `GTRACKER_PROFIL` temporaire, que le programme d'essai installé
+// respecte : même si l'installeur ouvrait le programme, le vrai profil ne serait pas touché.
+// Limite connue : l'installeur d'essai a l'identifiant du programme livré, il écrit donc la vraie entrée de la liste
+// des programmes (HKCU) ; d'où l'arrêt de l'étape 0 quand Gtracker est déjà installé, et la désinstallation finale.
 
 import { spawn, spawnSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { environnementPropre, nomApk, nomInstalleur, versionBureau } from './bureau.mjs'
+import { environnementPropre, estInstalleurEssai, lireProgramme, nomApk, nomInstalleur, versionBureau } from './bureau.mjs'
 
 const RACINE = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = 9471
@@ -40,8 +48,9 @@ const sansApk = args.includes('--sans-apk')
 const releveSeul = args.includes('--releve')
 const donne = args.find((a) => !a.startsWith('--'))
 // Version : celle du nom de l'installeur donné, sinon celle de `package.json`.
-const version = (donne && /Gtracker-Setup-(.+)\.exe$/i.exec(donne)?.[1]) || JSON.parse(readFileSync(join(RACINE, 'package.json'), 'utf8')).version
-const installeur = resolve(donne ?? join(RACINE, 'bureau', 'sortie', nomInstalleur(version)))
+const version = (donne && /Gtracker-Setup-essai-(.+)\.exe$/i.exec(donne)?.[1]) || JSON.parse(readFileSync(join(RACINE, 'package.json'), 'utf8')).version
+const installeur = resolve(donne ?? join(RACINE, 'bureau', 'sortie', nomInstalleur(version, { essai: true })))
+const FABRIQUER_ESSAI = 'node outils/bureau.mjs --installeur --essai'
 
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 let echecs = 0
@@ -205,7 +214,7 @@ async function reinstallerParDessusOuvert(exe, profil, dossier) {
 
 // ---------- essai ----------
 async function principal() {
-  if (!existsSync(installeur)) throw new Error(`installeur absent : ${installeur} (npm run installeur)`)
+  if (!existsSync(installeur)) throw new Error(`installeur d'essai absent : ${installeur} (${FABRIQUER_ESSAI})`)
   const temp = tmpdir()
   if (/\s/.test(temp)) throw new Error(`dossier temporaire avec une espace (${temp}) : /D= ne l'accepte pas`)
   const atelier = mkdtempSync(join(temp, 'gtracker-installeur-'))
@@ -232,6 +241,12 @@ async function principal() {
     const processus = spawnSync('tasklist', ['/FI', 'IMAGENAME eq Gtracker.exe', '/NH'], { encoding: 'utf8', windowsHide: true }).stdout
     console.log(`· Gtracker.exe en cours : ${(processus.match(/Gtracker\.exe/gi) ?? []).length}`)
     rmSync(atelier, { recursive: true, force: true })
+    return
+  }
+  if (!estInstalleurEssai(installeur)) {
+    rmSync(atelier, { recursive: true, force: true })
+    console.log(`REFUSÉ : ${basename(installeur)} n'est pas un installeur d'essai (Gtracker-Setup-essai-<version>.exe, ${FABRIQUER_ESSAI}). Le programme livré ignore le mode d'essai et s'ouvrirait sur le vrai profil ; rien n'a été installé.`)
+    process.exitCode = 2
     return
   }
   if (existsSync(installationParDefaut) || entreesAvant.length > 0) {
@@ -264,6 +279,12 @@ async function principal() {
     check('Gtracker.exe dans le dossier choisi', existsSync(exe), dossier)
     check('resources\\dist\\index.html', existsSync(join(dossier, 'resources', 'dist', 'index.html')))
     check('resources\\app.asar (la coquille)', existsSync(join(dossier, 'resources', 'app.asar')))
+    // Rien n'est lancé sans le marqueur d'essai dans l'archive installée ; l'arrêt passe par la désinstallation finale.
+    let paquet = null
+    try { paquet = (await lireProgramme(dossier)).paquet } catch (e) { console.log(`archive illisible : ${e.message}`) }
+    if (!check("programme installé en mode d'essai (marqueur gtrackerEssai)", paquet?.gtrackerEssai === true)) {
+      throw new Error(`le programme installé n'a pas le marqueur d'essai : il ne sera pas lancé (${FABRIQUER_ESSAI})`)
+    }
     const apk = join(dossier, 'resources', nomApk(version))
     if (sansApk) check(`pas d'APK (installeur d'essai) : ${nomApk(version)}`, !existsSync(apk))
     else check(`APK rangée : resources\\${nomApk(version)}`, existsSync(apk), existsSync(apk) ? `${statSync(apk).size} octets` : undefined)

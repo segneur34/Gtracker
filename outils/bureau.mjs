@@ -1,7 +1,8 @@
 // Programme Windows de Gtracker (coquille Electron du dossier `bureau/`).
 //
 //   node outils/bureau.mjs           compile l'application et la coquille, puis lance la coquille sur `dist/` pour essayer
-//   node outils/bureau.mjs --exe     compile, puis fabrique le dossier du programme : bureau/sortie/Gtracker-win32-x64/
+//   node outils/bureau.mjs --exe     compile, puis fabrique le programme d'essai, celui du banc, jamais diffusé :
+//                                    bureau/sortie/Gtracker-win32-x64/
 //   node outils/bureau.mjs --installeur   (npm run installeur) compile, emballe avec l'APK de la même version, puis
 //                                    fabrique l'installeur : bureau/sortie/Gtracker-Setup-<version>.exe
 //
@@ -9,10 +10,21 @@
 //   --sans-vite      ne refait pas `dist/` (déjà construit)
 //   --compiler       compile seulement, sans lancer ni emballer (pour un lanceur, le banc par exemple)
 //   --sans-apk       avec --installeur, pour les essais seulement : installeur sans l'application du téléphone
+//   --essai          avec --installeur : installeur d'essai, jamais diffusé, `Gtracker-Setup-essai-<version>.exe`, dont
+//                    le programme porte le marqueur d'essai ; le seul que lance `outils/installeur-essai.mjs`
 //   -- <arguments>   passés tels quels à la coquille lancée pour essayer (après `--`)
 //
 // L'essai tourne sur le profil `bureau/sortie/profil-essai/` (jamais la mémoire du programme installé), sauf si
 // `GTRACKER_PROFIL` est donné. Les autres variables de la coquille (`GTRACKER_BANC`…) passent telles quelles.
+//
+// Mode d'essai : la coquille lancée sur `bureau/dist` et le programme de `--exe` portent le marqueur `gtrackerEssai` dans
+// leur package.json, et lisent donc les variables `GTRACKER_*` ; l'installeur compile sa coquille sans ce marqueur, et
+// le programme livré les ignore toutes, port de débogage refusé compris (`bureau/modeEssai.ts`). Seul l'installeur
+// d'essai (`--installeur --essai`), à son nom propre, installe un programme qui porte le marqueur.
+//
+// Contenu emballé : la coquille compilée réduite aux modules que `main.js` et `preload.js` chargent (le faux téléphone
+// du banc reste dehors), et le moteur web en cinq langues (`LANGUES_GARDEES`). Chaque programme emballé, d'essai ou
+// de l'installeur, est relu après coup (`controlerProgramme`, l'installeur sans `elevate.exe`) : un écart arrête tout.
 //
 // Installeur : NSIS par electron-builder, sur le dossier emballé (`--prepackaged`), en un clic, par utilisateur
 // (`%LOCALAPPDATA%\Programs\Gtracker`, sans droits d'administrateur), raccourcis « Gtracker » sur le Bureau et dans le
@@ -70,14 +82,18 @@ export function versionBureau(version) {
   return m.slice(1, 4).map((n) => String(Number.parseInt(n, 10))).join('.')
 }
 
-/** Contenu du package.json de la coquille compilée : son nom, sa version, son point d'entrée. */
-export function paquetDeLaCoquille(version) {
+/**
+ * Contenu du package.json de la coquille compilée : son nom, sa version, son point d'entrée ; avec `essai`, le marqueur
+ * du programme d'essai (`gtrackerEssai`), sans lequel le programme emballé ignore toute variable `GTRACKER_*`.
+ */
+export function paquetDeLaCoquille(version, { essai = false } = {}) {
   return {
     name: 'gtracker',
     productName: 'Gtracker',
     description: 'Gtracker',
     version: versionBureau(version),
     gtrackerVersion: version,
+    ...(essai ? { gtrackerEssai: true } : {}),
     private: true,
     main: 'main.js',
   }
@@ -88,9 +104,17 @@ export function nomApk(version) {
   return `Gtracker-${version}.apk`
 }
 
-/** Nom du fichier de l'installeur : la version affichée, comme celle de l'APK. */
-export function nomInstalleur(version) {
-  return `Gtracker-Setup-${version}.exe`
+/**
+ * Nom du fichier de l'installeur : la version affichée, comme celle de l'APK. L'installeur d'essai (`essai`), qui
+ * installe un programme en mode d'essai, porte `essai` dans son nom pour ne jamais passer pour l'installeur livré.
+ */
+export function nomInstalleur(version, { essai = false } = {}) {
+  return essai ? `Gtracker-Setup-essai-${version}.exe` : `Gtracker-Setup-${version}.exe`
+}
+
+/** Vrai si le nom de fichier est celui d'un installeur d'essai (`nomInstalleur(version, { essai: true })`). */
+export function estInstalleurEssai(nom) {
+  return /^Gtracker-Setup-essai-.+\.exe$/i.test(String(nom).split(/[\\/]/).pop())
 }
 
 /**
@@ -293,7 +317,7 @@ export function octetsInclusNsis(options = {}) {
  * le Bureau et dans le menu Démarrer, profil gardé à la désinstallation, en français, sans signature ni retouche de
  * l'exécutable (déjà fait par l'emballage et les fusibles). `include` : le fichier de `inclusNsis`, écrit avant.
  */
-export function configNsis({ version, electronVersion, sortie = ATELIER_INSTALLEUR, icone = ICONE, include = join(sortie, FICHIER_INCLUS_NSIS) }) {
+export function configNsis({ version, electronVersion, sortie = ATELIER_INSTALLEUR, icone = ICONE, include = join(sortie, FICHIER_INCLUS_NSIS), essai = false }) {
   return {
     appId: ID_PROGRAMME,
     productName: 'Gtracker',
@@ -311,6 +335,8 @@ export function configNsis({ version, electronVersion, sortie = ATELIER_INSTALLE
     nsis: {
       oneClick: true,
       perMachine: false,
+      // Sans l'outil tiers `resources\elevate.exe`, inutile par utilisateur et sans mise à jour automatique.
+      packElevateHelper: false,
       createDesktopShortcut: true,
       createStartMenuShortcut: true,
       shortcutName: 'Gtracker',
@@ -318,7 +344,7 @@ export function configNsis({ version, electronVersion, sortie = ATELIER_INSTALLE
       uninstallerIcon: icone,
       uninstallDisplayName: 'Gtracker',
       deleteAppDataOnUninstall: false,
-      artifactName: nomInstalleur(version),
+      artifactName: nomInstalleur(version, { essai }),
       installerLanguages: ['fr_FR'],
       language: '1036',
       differentialPackage: false,
@@ -335,6 +361,126 @@ export function environnementPropre(env) {
   return propre
 }
 
+/** Appel `require` d'un chemin relatif dans le JavaScript compilé par tsc (`require("./adb")`). */
+const REQUIRE_RELATIF = /\brequire\(\s*["'](\.{1,2}\/[^"']*)["']\s*\)/g
+
+/** Nom du fichier d'un `require` relatif : `./adb` donne `adb.js` ; un nom qui porte déjà son extension la garde. */
+function fichierRequis(chemin, depuis) {
+  if (!/^\.\/[^/\\]+$/.test(chemin)) {
+    throw new Error(`${depuis} : require("${chemin}") sort de la racine de la coquille compilée, que l'emballage seul prend`)
+  }
+  const nom = chemin.slice(2)
+  return /\.(c?js|json|node)$/i.test(nom) ? nom : `${nom}.js`
+}
+
+/**
+ * Fichiers utiles de la coquille compilée : la fermeture des `require` relatifs du JavaScript compilé, depuis les
+ * points d'entrée, sans liste figée (un module qu'un fichier utile charge est pris, même produit à part par la
+ * compilation). `lire(nom)` rend le texte d'un fichier du dossier compilé. Rend les noms triés (`main.js`…). Un module
+ * requis absent, ou un `require` vers un sous-dossier ou hors du dossier, arrête la construction.
+ */
+export function modulesUtiles(lire, departs = ['main.js', 'preload.js']) {
+  const utiles = new Set()
+  const aLire = departs.map((nom) => ({ nom, depuis: 'point d’entrée' }))
+  while (aLire.length > 0) {
+    const { nom, depuis } = aLire.pop()
+    if (utiles.has(nom)) continue
+    let texte
+    try {
+      texte = lire(nom)
+    } catch (e) {
+      throw new Error(`module ${nom} introuvable dans la coquille compilée (requis par ${depuis}) : ${e.message}`)
+    }
+    utiles.add(nom)
+    for (const m of texte.matchAll(REQUIRE_RELATIF)) aLire.push({ nom: fichierRequis(m[1], nom), depuis: nom })
+  }
+  return [...utiles].sort()
+}
+
+/** Fichiers utiles du dossier compilé `source`. */
+function utilesDe(source) {
+  return modulesUtiles((nom) => readFileSync(join(source, nom), 'utf8'))
+}
+
+/**
+ * Filtre `ignore` de l'outil d'emballage : vrai pour tout ce qui reste dehors. L'outil passe le chemin relatif au
+ * dossier de la coquille, à barres droites (`/main.js`), et `''` pour le dossier lui-même ; une fonction remplace ses
+ * exclusions par défaut. Seuls entrent `package.json` et les fichiers `utiles` : le faux téléphone des essais, chargé
+ * par le banc depuis le dossier compilé, n'est jamais emballé.
+ */
+export function ignorerHorsModules(utiles) {
+  const gardes = new Set(['', '/package.json', ...utiles.map((nom) => `/${nom}`)])
+  return (nom) => !gardes.has(nom)
+}
+
+/** Langues du moteur web gardées dans le programme : celles de l'application, et en-US, repli de Chromium. */
+export const LANGUES_GARDEES = ['fr', 'en-US', 'en-GB', 'es', 'es-419']
+
+/** Fichiers de langue du moteur web (`locales/*.pak`) à retirer : tous sauf ceux de `LANGUES_GARDEES`. */
+export function languesAOter(noms) {
+  const gardes = new Set(LANGUES_GARDEES.map((langue) => `${langue}.pak`))
+  return noms.filter((nom) => nom.endsWith('.pak') && !gardes.has(nom))
+}
+
+/**
+ * Crochet `afterExtract` de l'outil d'emballage : les fichiers de langue sont dans le moteur web extrait (`buildPath`),
+ * pas dans la copie de la coquille ; un moteur sans dossier `locales` arrête l'emballage.
+ */
+function retirerLangues({ buildPath }) {
+  const dossier = join(buildPath, 'locales')
+  for (const nom of languesAOter(readdirSync(dossier))) rmSync(join(dossier, nom))
+}
+
+/** Chemin d'une entrée de l'archive, tel que `@electron/asar` le liste (`\main.js` sous Windows), en `main.js`. */
+function entreeArchive(chemin) {
+  return chemin.replace(/\\/g, '/').replace(/^\/+/, '')
+}
+
+/**
+ * Écarts du programme emballé, sur ce qui en a été lu (`lireProgramme`) : `ressources`, noms de `resources\` ;
+ * `langues`, noms de `locales\` ; `asar`, entrées de l'archive de la coquille ; `paquet`, son package.json. Attendus :
+ * pas d'`elevate.exe`, exactement les langues gardées, exactement les fichiers `utiles` et `package.json` dans
+ * l'archive, et le marqueur d'essai présent pour le programme d'essai (`essai`), absent sinon. Rend la liste des écarts.
+ */
+export function controlerProgramme({ ressources, langues, asar, paquet }, { utiles, essai = false }) {
+  const ecarts = []
+  if (ressources.includes('elevate.exe')) ecarts.push('resources\\elevate.exe présent (outil tiers inutile)')
+  const languesAttendues = LANGUES_GARDEES.map((langue) => `${langue}.pak`).sort()
+  const languesVues = [...langues].sort()
+  if (languesVues.join('|') !== languesAttendues.join('|')) {
+    ecarts.push(`langues du moteur web : ${languesVues.join(', ') || 'aucune'} au lieu de ${languesAttendues.join(', ')}`)
+  }
+  const attendus = new Set(['package.json', ...utiles])
+  const vus = new Set(asar.map(entreeArchive))
+  const enTrop = [...vus].filter((nom) => !attendus.has(nom)).sort()
+  const manquants = [...attendus].filter((nom) => !vus.has(nom)).sort()
+  if (enTrop.length > 0) ecarts.push(`archive de la coquille, en trop : ${enTrop.join(', ')}`)
+  if (manquants.length > 0) ecarts.push(`archive de la coquille, manquants : ${manquants.join(', ')}`)
+  const marque = paquet?.gtrackerEssai !== undefined
+  if (essai && paquet?.gtrackerEssai !== true) ecarts.push("marqueur d'essai absent du package.json de l'archive")
+  if (!essai && marque) ecarts.push("marqueur d'essai présent dans le package.json de l'archive")
+  return ecarts
+}
+
+/** Lit dans le dossier emballé ce que `controlerProgramme` contrôle. */
+export async function lireProgramme(dossier) {
+  const asar = await importerDuBureau('@electron/asar')
+  const archive = join(dossier, 'resources', 'app.asar')
+  return {
+    ressources: readdirSync(join(dossier, 'resources')),
+    langues: readdirSync(join(dossier, 'locales')),
+    asar: asar.listPackage(archive, { isPack: false }),
+    paquet: JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8')),
+  }
+}
+
+/** Contrôle à la construction : un écart du programme emballé dans `dossier` arrête tout. */
+async function verifierProgramme(dossier, { source, essai }) {
+  const ecarts = controlerProgramme(await lireProgramme(dossier), { utiles: utilesDe(source), essai })
+  if (ecarts.length > 0) throw new Error(`programme non conforme (${dossier}) : ${ecarts.join(' ; ')}`)
+  console.log('· contrôle du programme : conforme')
+}
+
 function etape(titre, commande, argv) {
   console.log(`· ${titre}`)
   const r = spawnSync(process.execPath, [commande, ...argv], { cwd: RACINE, stdio: 'inherit', env: environnementPropre(process.env) })
@@ -348,7 +494,8 @@ function modulesDe(depart) {
   }
 }
 
-function compiler({ vite, sortie = COMPILE }) {
+/** Compile l'application et la coquille dans `sortie` ; `essai` pose le marqueur du programme d'essai (défaut : oui). */
+function compiler({ vite, sortie = COMPILE, essai = true }) {
   if (!existsSync(join(BUREAU, 'node_modules', 'electron'))) {
     throw new Error('Electron absent : lancer « npm install » dans le dossier bureau/')
   }
@@ -361,7 +508,7 @@ function compiler({ vite, sortie = COMPILE }) {
   rmSync(sortie, { recursive: true, force: true })
   etape('compilation de la coquille (tsc -p bureau)', join(modules, 'typescript', 'bin', 'tsc'), ['-p', BUREAU, '--outDir', sortie])
   const version = lireVersion()
-  writeFileSync(join(sortie, 'package.json'), JSON.stringify(paquetDeLaCoquille(version), null, 2) + '\n', 'utf8')
+  writeFileSync(join(sortie, 'package.json'), JSON.stringify(paquetDeLaCoquille(version, { essai }), null, 2) + '\n', 'utf8')
   return version
 }
 
@@ -402,6 +549,8 @@ async function emballer(version, { source = COMPILE, sortie = SORTIE, ressources
     appCopyright: 'Gtracker',
     icon: ICONE,
     asar: true,
+    ignore: ignorerHorsModules(utilesDe(source)),
+    afterExtract: [retirerLangues],
     prune: false,
     overwrite: true,
     quiet: true,
@@ -429,8 +578,11 @@ function poids(chemin) {
   return `${(statSync(chemin).size / 1024 / 1024).toFixed(1).replace('.', ',')} Mo`
 }
 
-/** Construit l'installeur dans l'atelier, puis le range dans `bureau/sortie/` ; rend son chemin. */
-async function construireInstalleur({ vite, avecApk }) {
+/**
+ * Construit l'installeur dans l'atelier, puis le range dans `bureau/sortie/` ; rend son chemin. `essai` : l'installeur
+ * d'essai, à son nom propre, dont le programme porte le marqueur d'essai (`outils/installeur-essai.mjs` seulement).
+ */
+async function construireInstalleur({ vite, avecApk, essai = false }) {
   const debut = Date.now()
   const version = lireVersion()
   // L'APK se vérifie avant tout : une construction de plusieurs minutes ne doit pas échouer à la fin.
@@ -438,7 +590,9 @@ async function construireInstalleur({ vite, avecApk }) {
   console.log(apk ? `· application du téléphone : ${apk} (${poids(apk)})` : "· sans l'application du téléphone (essai)")
   rmSync(ATELIER_INSTALLEUR, { recursive: true, force: true })
   const coquille = join(ATELIER_INSTALLEUR, 'coquille')
-  compiler({ vite, sortie: coquille })
+  // Coquille du programme livré sans le marqueur d'essai ; celle de l'installeur d'essai le porte.
+  if (essai) console.log("· installeur d'essai : programme en mode d'essai, jamais diffusé")
+  compiler({ vite, sortie: coquille, essai })
   const exe = await emballer(version, { source: coquille, sortie: ATELIER_INSTALLEUR, ressources: apk ? [apk] : [] })
   const eb = await importerDuBureau('electron-builder')
   const { build, Platform, Arch } = eb.default ?? eb
@@ -449,11 +603,13 @@ async function construireInstalleur({ vite, avecApk }) {
     prepackaged: dirname(exe),
     projectDir: coquille,
     publish: 'never',
-    config: configNsis({ version, electronVersion: versionElectron() }),
+    config: configNsis({ version, electronVersion: versionElectron(), essai }),
   })
-  const fabrique = join(ATELIER_INSTALLEUR, nomInstalleur(version))
+  // electron-builder copie `elevate.exe` dans le dossier emballé à la fin de `build` : le contrôle vient après.
+  await verifierProgramme(dirname(exe), { source: coquille, essai })
+  const fabrique = join(ATELIER_INSTALLEUR, nomInstalleur(version, { essai }))
   if (!existsSync(fabrique)) throw new Error(`installeur introuvable après electron-builder : ${fabrique}`)
-  const range = join(SORTIE, nomInstalleur(version))
+  const range = join(SORTIE, nomInstalleur(version, { essai }))
   rmSync(range, { force: true })
   renameSync(fabrique, range)
   console.log(`· installeur : ${range} (${poids(range)}, ${Math.round((Date.now() - debut) / 1000)} s)`)
@@ -479,11 +635,11 @@ export async function principal(args) {
   const options = separation < 0 ? args : args.slice(0, separation)
   const passes = separation < 0 ? [] : args.slice(separation + 1)
   if (options.includes('--installeur')) {
-    await construireInstalleur({ vite: !options.includes('--sans-vite'), avecApk: !options.includes('--sans-apk') })
+    await construireInstalleur({ vite: !options.includes('--sans-vite'), avecApk: !options.includes('--sans-apk'), essai: options.includes('--essai') })
     return
   }
   const version = compiler({ vite: !options.includes('--sans-vite') })
-  if (options.includes('--exe')) await emballer(version)
+  if (options.includes('--exe')) await verifierProgramme(dirname(await emballer(version)), { source: COMPILE, essai: true })
   else if (!options.includes('--compiler')) essayer(passes)
 }
 

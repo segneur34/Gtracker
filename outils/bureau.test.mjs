@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { join, resolve } from 'node:path'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   ATTENTE_FERMETURE_S,
   ATTENTE_FORCE_S,
@@ -8,10 +10,16 @@ import {
   LONGUEUR_MAX_NSIS,
   MESSAGE_NON_FERME,
   cheminApk,
+  LANGUES_GARDEES,
   configNsis,
+  controlerProgramme,
   environnementPropre,
+  estInstalleurEssai,
+  ignorerHorsModules,
   inclusNsis,
+  languesAOter,
   messageApkAbsente,
+  modulesUtiles,
   nomApk,
   octetsInclusNsis,
   nomInstalleur,
@@ -60,6 +68,7 @@ describe('configNsis', () => {
   it('installe par utilisateur, en un clic, sans droits d’administrateur', () => {
     expect(config.nsis.oneClick).toBe(true)
     expect(config.nsis.perMachine).toBe(false)
+    expect(config.nsis.packElevateHelper).toBe(false)
     expect(config.win.target).toEqual([{ target: 'nsis', arch: ['x64'] }])
     expect(config.win.signAndEditExecutable).toBe(false)
   })
@@ -72,6 +81,16 @@ describe('configNsis', () => {
     expect(config.nsis.artifactName).toBe('Gtracker-Setup-0.01.77.exe')
     expect(nomInstalleur('0.01.77')).toBe(config.nsis.artifactName)
     expect(config.extraMetadata.version).toBe('0.1.77')
+  })
+
+  it('donne à l’installeur d’essai un nom qui ne se confond pas avec celui de l’installeur livré', () => {
+    const essai = configNsis({ version: '0.01.77', electronVersion: '45.3.4', sortie: 'atelier', icone: 'icone.ico', essai: true })
+    expect(essai.nsis.artifactName).toBe('Gtracker-Setup-essai-0.01.77.exe')
+    expect(nomInstalleur('0.01.77', { essai: true })).toBe(essai.nsis.artifactName)
+    expect(estInstalleurEssai(join('bureau', 'sortie', 'Gtracker-Setup-essai-0.01.77.exe'))).toBe(true)
+    expect(estInstalleurEssai('C:\\x\\gtracker-setup-essai-0.01.77.exe')).toBe(true)
+    expect(estInstalleurEssai(join('bureau', 'sortie', nomInstalleur('0.01.77')))).toBe(false)
+    expect(estInstalleurEssai('Gtracker-Setup-0.01.77-essai.exe')).toBe(false)
   })
 
   it('pose les raccourcis « Gtracker », l’icône, le français et un identifiant stable', () => {
@@ -260,6 +279,12 @@ describe('paquetDeLaCoquille', () => {
     expect(p.productName).toBe('Gtracker')
     expect(p.main).toBe('main.js')
   })
+
+  it('ne porte le marqueur du programme d’essai que si on le demande', () => {
+    expect(paquetDeLaCoquille('0.01.40')).not.toHaveProperty('gtrackerEssai')
+    expect(paquetDeLaCoquille('0.01.40', { essai: false })).not.toHaveProperty('gtrackerEssai')
+    expect(paquetDeLaCoquille('0.01.40', { essai: true }).gtrackerEssai).toBe(true)
+  })
 })
 
 describe('environnementPropre', () => {
@@ -267,5 +292,122 @@ describe('environnementPropre', () => {
     const env = { ELECTRON_RUN_AS_NODE: '1', Electron_Run_As_Node: '1', GTRACKER_BANC: '1' }
     expect(environnementPropre(env)).toEqual({ GTRACKER_BANC: '1' })
     expect(env.ELECTRON_RUN_AS_NODE).toBe('1')
+  })
+})
+
+/** Lecteur d'un faux dossier compilé ; un fichier absent lève comme `readFileSync`. */
+function lecteur(fichiers) {
+  return (nom) => {
+    if (!(nom in fichiers)) throw new Error(`ENOENT: ${nom}`)
+    return fichiers[nom]
+  }
+}
+
+describe('modulesUtiles', () => {
+  const compile = {
+    'main.js': '"use strict";\nconst electron_1 = require("electron");\nconst adb_1 = require("./adb");\nconst p = require(\'./pont.js\');\n',
+    'preload.js': 'const electron_1 = require("electron");\n',
+    'adb.js': 'const fs = require("node:fs");\nconst appairage_1 = require("./appairage");\n',
+    'appairage.js': 'const spake2 = require("./spake2");\nconst adb_1 = require("./adb");\n',
+    'spake2.js': 'module.exports = {};\n',
+    'pont.js': '',
+    'fauxTelephone.js': 'const trames_1 = require("./trames");\n',
+    'trames.js': '',
+  }
+
+  it('suit les require relatifs depuis main.js et preload.js, sans liste figée, et laisse le reste', () => {
+    expect(modulesUtiles(lecteur(compile))).toEqual(['adb.js', 'appairage.js', 'main.js', 'pont.js', 'preload.js', 'spake2.js'])
+  })
+
+  it('arrête sur un module requis absent, en disant qui le requiert', () => {
+    const { 'spake2.js': _absent, ...sans } = compile
+    expect(() => modulesUtiles(lecteur(sans))).toThrow(/spake2\.js.*appairage\.js/)
+  })
+
+  it('arrête sur un require vers un sous-dossier ou hors du dossier', () => {
+    expect(() => modulesUtiles(lecteur({ 'main.js': 'require("./essai/faux")', 'preload.js': '' }))).toThrow(/essai\/faux/)
+    expect(() => modulesUtiles(lecteur({ 'main.js': 'require("../outils/x")', 'preload.js': '' }))).toThrow(/\.\.\/outils\/x/)
+  })
+})
+
+describe('ignorerHorsModules', () => {
+  const ignorer = ignorerHorsModules(['main.js', 'preload.js', 'adb.js'])
+
+  it('garde le dossier, package.json et les modules utiles, sous les noms que passe l’outil d’emballage', () => {
+    for (const nom of ['', '/package.json', '/main.js', '/preload.js', '/adb.js']) expect(ignorer(nom)).toBe(false)
+  })
+
+  it('laisse dehors tout le reste, faux téléphone compris', () => {
+    for (const nom of ['/fauxTelephone.js', '/main.js.map', '/essai', '/essai/x.js', '/package-lock.json', 'main.js']) expect(ignorer(nom)).toBe(true)
+  })
+})
+
+describe('langues du moteur web', () => {
+  const electron = ['af', 'ar', 'de', 'en-GB', 'en-US', 'es-419', 'es', 'fr', 'pt-BR', 'zh-TW'].map((l) => `${l}.pak`)
+
+  it('ne garde que fr, en-US (repli de Chromium), en-GB, es et es-419', () => {
+    expect(LANGUES_GARDEES).toEqual(['fr', 'en-US', 'en-GB', 'es', 'es-419'])
+    expect(languesAOter(electron)).toEqual(['af.pak', 'ar.pak', 'de.pak', 'pt-BR.pak', 'zh-TW.pak'])
+  })
+
+  it('ne touche à aucun autre fichier du dossier', () => {
+    expect(languesAOter(['LISEZMOI.txt', 'fr.pak', 'it.pak'])).toEqual(['it.pak'])
+  })
+})
+
+describe('controlerProgramme', () => {
+  const utiles = ['adb.js', 'main.js', 'preload.js']
+  const propre = {
+    ressources: ['app.asar', 'dist', 'Gtracker-0.01.77.apk'],
+    langues: ['en-GB.pak', 'en-US.pak', 'es-419.pak', 'es.pak', 'fr.pak'],
+    asar: ['\\adb.js', '\\main.js', '\\package.json', '\\preload.js'],
+    paquet: { name: 'gtracker', main: 'main.js' },
+  }
+
+  it('ne dit rien d’un programme conforme, séparateurs de Windows ou non', () => {
+    expect(controlerProgramme(propre, { utiles })).toEqual([])
+    expect(controlerProgramme({ ...propre, asar: ['/adb.js', '/main.js', '/package.json', '/preload.js'] }, { utiles })).toEqual([])
+    expect(controlerProgramme({ ...propre, paquet: { gtrackerEssai: true } }, { utiles, essai: true })).toEqual([])
+  })
+
+  it('relève elevate.exe', () => {
+    expect(controlerProgramme({ ...propre, ressources: [...propre.ressources, 'elevate.exe'] }, { utiles })).toEqual([expect.stringMatching(/elevate\.exe/)])
+  })
+
+  it('relève une langue de trop ou en moins', () => {
+    expect(controlerProgramme({ ...propre, langues: [...propre.langues, 'de.pak'] }, { utiles })).toEqual([expect.stringMatching(/de\.pak/)])
+    expect(controlerProgramme({ ...propre, langues: propre.langues.slice(1) }, { utiles })).toEqual([expect.stringMatching(/langues/)])
+  })
+
+  it('relève un fichier de trop ou manquant dans l’archive', () => {
+    expect(controlerProgramme({ ...propre, asar: [...propre.asar, '\\fauxTelephone.js'] }, { utiles })).toEqual([expect.stringMatching(/en trop : fauxTelephone\.js/)])
+    expect(controlerProgramme({ ...propre, asar: propre.asar.slice(1) }, { utiles })).toEqual([expect.stringMatching(/manquants : adb\.js/)])
+  })
+
+  it('exige le marqueur d’essai pour le programme d’essai, son absence pour l’installeur', () => {
+    expect(controlerProgramme({ ...propre, paquet: { gtrackerEssai: true } }, { utiles })).toEqual([expect.stringMatching(/marqueur d'essai présent/)])
+    expect(controlerProgramme({ ...propre, paquet: { gtrackerEssai: false } }, { utiles })).toEqual([expect.stringMatching(/marqueur d'essai présent/)])
+    expect(controlerProgramme(propre, { utiles, essai: true })).toEqual([expect.stringMatching(/marqueur d'essai absent/)])
+  })
+})
+
+describe('sources de la coquille', () => {
+  const bureau = join(dirname(fileURLToPath(import.meta.url)), '..', 'bureau')
+  /** Imports de valeur (ni `import type`) d'un fichier source, rendus comme les `require` que tsc écrirait. */
+  const IMPORT_VALEUR = /^\s*(?:import|export)\s+(?!type\b)(?:[^'"]*?\sfrom\s+)?['"]\.\/([^'"]+)['"]/gm
+  const lireSource = (nom) => {
+    const texte = readFileSync(join(bureau, nom.replace(/\.js$/, '.ts')), 'utf8')
+    // Un module produit par la compilation, sans source dans bureau/, n'est pas suivi ici : le contrôle de
+    // l'emballage le couvre.
+    return [...texte.matchAll(IMPORT_VALEUR)]
+      .filter((m) => existsSync(join(bureau, `${m[1]}.ts`)))
+      .map((m) => `require("./${m[1]}")`)
+      .join('\n')
+  }
+
+  it('main.ts et preload.ts chargent tous les fichiers de la coquille, sauf exactement le faux téléphone du banc', () => {
+    const utiles = new Set(modulesUtiles(lireSource).map((nom) => nom.replace(/\.js$/, '.ts')))
+    const sources = readdirSync(bureau).filter((nom) => nom.endsWith('.ts') && !nom.endsWith('.test.ts') && !nom.endsWith('.d.ts'))
+    expect(sources.filter((nom) => !utiles.has(nom))).toEqual(['fauxTelephone.ts'])
   })
 })

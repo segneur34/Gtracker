@@ -137,14 +137,20 @@ async function briqueDocuments() {
   return { ok: false, ms, resume: `documents : renvois faux (${secondes(ms)})`, details }
 }
 
+/** Ligne dite quand la coquille Windows n'a pu être vérifiée faute de ses dépendances. */
+const COQUILLE_NON_VERIFIEE = '  coquille non vérifiée (dépendances de bureau/ absentes)'
+
 async function briqueTsc() {
   let r = await lancer(BIN.tsc, ['-b'])
-  // La coquille Windows (`bureau/`) se vérifie à part, seulement là où ses dépendances sont installées.
-  if (r.code === 0 && existsSync(join(RACINE, 'bureau', 'node_modules', 'electron'))) {
+  // La coquille Windows (`bureau/`) se vérifie à part, là où ses dépendances sont installées ; sinon la sortie le dit,
+  // et la vérification en ligne (`CI`), qui les installe, échoue.
+  const coquillePrete = existsSync(join(RACINE, 'bureau', 'node_modules', 'electron'))
+  if (r.code === 0 && coquillePrete) {
     const coquille = await lancer(BIN.tsc, ['-p', 'bureau', '--noEmit'])
     r = { ...coquille, ms: r.ms + coquille.ms }
   }
-  if (r.code === 0) return { ok: true, ms: r.ms, details: [] }
+  if (r.code === 0 && !coquillePrete) return { ok: !process.env.CI, ms: r.ms, details: [], avis: [COQUILLE_NON_VERIFIEE] }
+  if (r.code === 0) return { ok: true, ms: r.ms, details: [], avis: [] }
   const erreurs = sansCouleur(r.out + r.err)
     .split('\n')
     .filter((l) => /error TS\d+/.test(l))
@@ -154,26 +160,29 @@ async function briqueTsc() {
 
 async function briqueBuild() {
   const t = await briqueTsc()
-  if (!t.ok) return { ok: false, ms: t.ms, resume: `build : typecheck en échec (${secondes(t.ms)})`, details: t.details }
+  const avis = t.avis ?? []
+  if (!t.ok) return { ok: false, ms: t.ms, resume: `build : typecheck en échec (${secondes(t.ms)})`, details: [...t.details, ...avis] }
   const r = await lancer(BIN.vite, ['build', '--logLevel', 'error'])
   const ms = t.ms + r.ms
-  if (r.code === 0) return { ok: true, ms, resume: `build : ok (${secondes(ms)})`, details: [] }
+  if (r.code === 0) return { ok: true, ms, resume: `build : ok (${secondes(ms)})`, details: avis }
   return {
     ok: false,
     ms,
     resume: `build : vite en échec (${secondes(ms)})`,
-    details: sansCouleur(r.out + r.err).trim().split('\n').slice(0, 15).map((l) => '  ' + l),
+    details: [...sansCouleur(r.out + r.err).trim().split('\n').slice(0, 15).map((l) => '  ' + l), ...avis],
   }
 }
 
 async function briqueTypecheck() {
   const t = await briqueTsc()
-  return {
-    ok: t.ok,
-    ms: t.ms,
-    resume: t.ok ? `typecheck : ok (${secondes(t.ms)})` : `typecheck : ${t.details.length} erreur${t.details.length > 1 ? 's' : ''} (${secondes(t.ms)})`,
-    details: t.ok ? [] : t.details,
-  }
+  const avis = t.avis ?? []
+  const n = t.details.length
+  const resume = t.ok
+    ? `typecheck : ok (${secondes(t.ms)})`
+    : n === 0
+      ? `typecheck : coquille non vérifiée sous CI (${secondes(t.ms)})`
+      : `typecheck : ${n} erreur${n > 1 ? 's' : ''} (${secondes(t.ms)})`
+  return { ok: t.ok, ms: t.ms, resume, details: [...(t.ok ? [] : t.details), ...avis] }
 }
 
 async function briqueTests(ports) {

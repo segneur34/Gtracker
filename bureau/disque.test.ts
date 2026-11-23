@@ -12,6 +12,7 @@ import {
   estDansOneDrive,
   resoudre,
   segmentAdmis,
+  variable,
 } from './disque'
 
 let tmp: string
@@ -318,6 +319,15 @@ describe('OneDrive et dossier proposé', () => {
     expect(estDansOneDrive('C:\\Users\\marin\\OneDriveAutre\\Gtracker', env)).toBe(false)
     expect(estDansOneDrive('C:\\Users\\marin\\Documents\\Gtracker', env)).toBe(false)
     expect(estDansOneDrive('C:\\Users\\marin\\Documents', {})).toBe(false)
+  })
+
+  it('lit les variables de OneDrive quelle que soit la casse de leur nom (copie de l’environnement hors mode d’essai)', () => {
+    const copie = { ONEDRIVE: 'C:\\Users\\marin\\OneDrive', onedrivecommercial: '  C:\\Users\\marin\\OneDrive - Club ' }
+    expect(estDansOneDrive('C:\\Users\\marin\\OneDrive\\Documents', copie)).toBe(true)
+    expect(estDansOneDrive('C:\\Users\\marin\\OneDrive - Club\\Gtracker', copie)).toBe(true)
+    expect(dossierPropose('C:\\Users\\marin\\OneDrive\\Documents', 'C:\\Users\\marin', copie).documentsOneDrive).toBe(true)
+    expect(variable({ Path: 'a' }, 'PATH')).toBe('a')
+    expect(variable({ PATH: '  ' }, 'Path')).toBeUndefined()
   })
 
   it('propose Documents\\Gtracker, ou le dossier de l’utilisateur si Documents est dans OneDrive', () => {

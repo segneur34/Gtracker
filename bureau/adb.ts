@@ -28,7 +28,7 @@ import { execFile } from 'node:child_process'
 import { statSync } from 'node:fs'
 import { connect } from 'node:net'
 import path from 'node:path'
-import { ErreurDisque, estTemporaire } from './disque'
+import { ErreurDisque, estTemporaire, variable } from './disque'
 import type { Journaliser } from './journal'
 import type { DossierDistant, EtatTelephone, FichierTelephone, FichierVu, RaisonRefus, ResultatInstallation } from './telephone'
 import { cheminDuCable, cheminEcrivable, cheminRefuse, commeLeTelephone, fichiersAdmis, nomProvisoire, pasPret, resteApresEffacement, sansReel } from './telephone'
@@ -261,13 +261,6 @@ function erreurAdb(texte: string): string | null {
 }
 
 // ---------- recherche de l'outil ----------
-
-/** Valeur d'une variable d'environnement, sans tenir compte de la casse de son nom (comme Windows). */
-function variable(env: Record<string, string | undefined>, nom: string): string | undefined {
-  const cle = Object.keys(env).find((k) => k.toLowerCase() === nom.toLowerCase())
-  const v = cle === undefined ? undefined : env[cle]?.trim()
-  return v ? v : undefined
-}
 
 /** Dossier où l'utilisateur peut poser l'outil s'il n'est pas sur le poste : `platform-tools` du profil du programme. */
 export function dossierAdbConseille(profil: string): string {

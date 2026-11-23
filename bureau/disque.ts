@@ -141,6 +141,17 @@ export function resoudre(racine: string, chemin: unknown, racineAdmise = false):
 /** Variables d'environnement de Windows qui désignent les dossiers de OneDrive (personnel et professionnel). */
 const VARIABLES_ONEDRIVE = ['OneDrive', 'OneDriveConsumer', 'OneDriveCommercial']
 
+/**
+ * Valeur d'une variable d'environnement, sans tenir compte de la casse de son nom (comme Windows), sans espaces autour,
+ * `undefined` si vide. L'environnement passé peut être une copie en objet simple, sensible à la casse, et non
+ * `process.env`.
+ */
+export function variable(env: Record<string, string | undefined>, nom: string): string | undefined {
+  const cle = Object.keys(env).find((k) => k.toLowerCase() === nom.toLowerCase())
+  const v = cle === undefined ? undefined : env[cle]?.trim()
+  return v ? v : undefined
+}
+
 /** Chemin de Windows comparable : absolu, sans barre finale, en minuscules (le disque ignore la casse). */
 function comparable(chemin: string): string {
   return path.win32.resolve(chemin).replace(/\\+$/, '').toLowerCase()
@@ -150,7 +161,7 @@ function comparable(chemin: string): string {
 export function estDansOneDrive(chemin: string, env: Record<string, string | undefined>): boolean {
   const cible = comparable(chemin)
   return VARIABLES_ONEDRIVE.some((nom) => {
-    const racine = env[nom]?.trim()
+    const racine = variable(env, nom)
     if (!racine) return false
     const base = comparable(racine)
     return cible === base || cible.startsWith(`${base}\\`)

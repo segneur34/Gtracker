@@ -5,6 +5,8 @@
 // Chrome sans fenêtre), rendu jamais ralenti, port de débogage accepté, aucun accès au réseau réel (les autres hôtes
 // sont refusés et journalisés), autorisations et fermetures journalisées sur la sortie, question de fermeture
 // répondue seule (`GTRACKER_BANC_QUITTER=non` pour rester sur la page). Hors de ce mode, un port de débogage fait quitter.
+// Le mode d'essai et toutes les variables ci-dessous ne sont lus qu'hors emballage ou dans le programme d'essai du banc
+// (marqueur `gtrackerEssai` du package.json, `modeEssai.ts`) : le programme livré par l'installeur les ignore toutes.
 //
 // Fenêtre cachée et demande de fermeture de Windows : après un rechargement de la page, Chromium ajoute au processus
 // une seconde fenêtre cachée sans titre, et la demande de fermeture (`taskkill` sans `/F`) part vers elle et non vers
@@ -62,6 +64,8 @@ import { ErreurDisque } from './disque'
 import type { Journal, Journaliser } from './journal'
 import { creerJournal, journaliseur, lireNote, suivreEtats } from './journal'
 import { creerMemoire, gestionnairesMemoire, optionsDepuisEnvironnement } from './memoire'
+import type { PaquetDeLaCoquille } from './modeEssai'
+import { environnementDeLaCoquille, essaiPermis } from './modeEssai'
 import type { ContexteEcoute } from './pareFeu'
 import { actionElevee, autoriserPareFeuWindows, executerActionElevee, lirePareFeuWindows } from './pareFeu'
 import type { Chiffreur } from './sansFil'
@@ -75,10 +79,23 @@ import { CSP, reponseA } from './protocole'
 import { gardeRechargements } from './rechargement'
 import { STATUT_REFUS, entetesSortants, estUnRefus } from './sortant'
 
-const BANC = process.env.GTRACKER_BANC === '1'
-const QUITTER_EN_ESSAI = (process.env.GTRACKER_BANC_QUITTER ?? 'oui') !== 'non'
-const MONTRER_EN_ESSAI = ['1', 'transparente'].includes(process.env.GTRACKER_BANC_MONTRER ?? '')
-const TRANSPARENTE_EN_ESSAI = process.env.GTRACKER_BANC_MONTRER === 'transparente'
+/** Le package.json de la coquille, écrit par l'emballage : version affichée et marqueur du programme d'essai. */
+function lirePaquet(): PaquetDeLaCoquille | null {
+  try {
+    return JSON.parse(readFileSync(path.join(__dirname, 'package.json'), 'utf8')) as PaquetDeLaCoquille
+  } catch {
+    return null
+  }
+}
+const PAQUET = lirePaquet()
+
+/** Variables d'environnement lues par la coquille : sans aucune `GTRACKER_*` dans le programme livré (`modeEssai.ts`). */
+const ENV = environnementDeLaCoquille(process.env, essaiPermis({ emballe: app.isPackaged, paquet: PAQUET }))
+
+const BANC = ENV.GTRACKER_BANC === '1'
+const QUITTER_EN_ESSAI = (ENV.GTRACKER_BANC_QUITTER ?? 'oui') !== 'non'
+const MONTRER_EN_ESSAI = ['1', 'transparente'].includes(ENV.GTRACKER_BANC_MONTRER ?? '')
+const TRANSPARENTE_EN_ESSAI = ENV.GTRACKER_BANC_MONTRER === 'transparente'
 
 /** Fond de la fenêtre avant le premier dessin de la page : celui du thème clair, pour éviter un éclair d'une autre couleur. */
 const FOND = '#ffffff'
@@ -119,22 +136,14 @@ const DEBOGAGE_REFUSE = !BANC && DEBOGAGE.some((s) => app.commandLine.hasSwitch(
 
 // ---------- version et profil ----------
 /** Version de l'application telle qu'elle s'affiche (`0.01.40`), écrite par l'emballage dans le package.json de la coquille. */
-function versionAffichee(): string {
-  try {
-    const paquet = JSON.parse(readFileSync(path.join(__dirname, 'package.json'), 'utf8')) as { gtrackerVersion?: string }
-    return paquet.gtrackerVersion ?? app.getVersion()
-  } catch {
-    return app.getVersion()
-  }
-}
-const VERSION = versionAffichee()
+const VERSION = PAQUET?.gtrackerVersion ?? app.getVersion()
 
 app.setName('Gtracker')
-if (process.env.GTRACKER_PROFIL) app.setPath('userData', path.resolve(process.env.GTRACKER_PROFIL))
+if (ENV.GTRACKER_PROFIL) app.setPath('userData', path.resolve(ENV.GTRACKER_PROFIL))
 
 /** Dossier de l'application à servir : à côté du programme une fois emballé, `dist/` du dépôt sinon. */
 const DIST = path.resolve(
-  process.env.GTRACKER_DIST ?? (app.isPackaged ? path.join(process.resourcesPath, 'dist') : path.join(__dirname, '..', '..', 'dist')),
+  ENV.GTRACKER_DIST ?? (app.isPackaged ? path.join(process.resourcesPath, 'dist') : path.join(__dirname, '..', '..', 'dist')),
 )
 
 // ---------- service des fichiers ----------
@@ -508,7 +517,7 @@ function avertirPage(canal: string, avis: unknown): void {
  * `AVIS_DEPART`).
  */
 function creerSansFil(profil: string): ServeurSansFil {
-  const essai = essaiSansFilDepuisEnvironnement(process.env, journal)
+  const essai = essaiSansFilDepuisEnvironnement(ENV, journal)
   const { dossier, actif, ...reglagesEssai } = essai ?? { dossier: null, actif: false }
   // Le vrai pare-feu hors du mode d'essai seulement ; en essai, celui de `reglagesEssai` (factice).
   const pareFeuWindows = essai
@@ -538,10 +547,10 @@ function creerSansFil(profil: string): ServeurSansFil {
  * rendu à part : l'application ne s'installe que par lui.
  */
 function creerTelephone(profil: string, sansFil: ServeurSansFil, essaiApplication: EssaiApplication | null): { telephone: DossierDistant; cable: DossierDistant } {
-  const essai = essaiTelephoneDepuisEnvironnement(process.env, dossierAdbConseille(profil), journal)
+  const essai = essaiTelephoneDepuisEnvironnement(ENV, dossierAdbConseille(profil), journal)
   const cable = essai
     ? dossierLocal(essai.stockage, { ...essai, refusInstallation: essaiApplication?.refus ?? null })
-    : dossierAdb({ env: process.env, profil, programme: path.dirname(process.execPath), journal })
+    : dossierAdb({ env: ENV, profil, programme: path.dirname(process.execPath), journal })
   // Chaque changement de l'état lu par la page va au journal daté (pas à la sortie d'essai, que le banc relève).
   return { telephone: suivreEtats(dossierSansFilPuisCable(sansFil.dossierSansFil(), cable), journalSeul.noter), cable }
 }
@@ -570,7 +579,7 @@ async function choisirDestinationApk({ titre, nom }: { titre: string; nom: strin
 
 function brancherPont(): void {
   const profil = app.getPath('userData')
-  const optionsMemoire = optionsDepuisEnvironnement(process.env, { profil, documents: dossierWindows('documents'), maison: dossierWindows('home') }, choisirParFenetre, journal)
+  const optionsMemoire = optionsDepuisEnvironnement(ENV, { profil, documents: dossierWindows('documents'), maison: dossierWindows('home') }, choisirParFenetre, journal)
   const memoire = creerMemoire(optionsMemoire)
   // Les lectures et écritures du téléphone passent par un dossier du profil, vidé au démarrage de ce qu'une coupure y
   // aurait laissé.
@@ -584,7 +593,7 @@ function brancherPont(): void {
   // profil, sinon sous Documents (celui d'essai sous le banc).
   const copies = reglageCopies({ profil, defaut: path.join(optionsMemoire.documents, DOSSIER_COPIES), memoire: memoireRetenue })
   const sansFil = creerSansFil(profil)
-  const essaiApplication = essaiApplicationDepuisEnvironnement(process.env, journal)
+  const essaiApplication = essaiApplicationDepuisEnvironnement(ENV, journal)
   const { telephone, cable } = creerTelephone(profil, sansFil, essaiApplication)
   // Une seule file pour tout ce qui parle au téléphone : listages, lectures, écritures et installation de l'application.
   const serie = enSerie()
@@ -608,7 +617,7 @@ function brancherPont(): void {
       }),
       ...gestionnairesCopies({
         reglage: copies,
-        choisirDossier: choixCopiesDepuisEnvironnement(process.env, choisirParFenetre, journal),
+        choisirDossier: choixCopiesDepuisEnvironnement(ENV, choisirParFenetre, journal),
         ouvrirDossier,
       }),
       ...gestionnairesApplication({
