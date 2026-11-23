@@ -1,9 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_ATHLETE_PROFILE } from './athleteProfile';
-import { PROFILE_PROMPT_FIELDS, missingProfileFields, phoneAppOfferGate, profilePromptGate, shouldPromptProfile } from './profilePrompt';
+import {
+  PROFILE_PROMPT_FIELDS, SAFETY_NOTICE_UNSEEN, missingProfileFields, phoneAppOfferGate, profilePromptGate, readSafetyNotice,
+  shouldPromptProfile,
+} from './profilePrompt';
+
+describe('readSafetyNotice : la mise en garde de la première ouverture, relue de l\'appareil', () => {
+  it('lue seulement quand « vue » vaut vrai', () => {
+    expect(readSafetyNotice({ vue: true })).toEqual({ vue: true });
+    expect(readSafetyNotice({ vue: false })).toEqual(SAFETY_NOTICE_UNSEEN);
+  });
+
+  it("revient pour toute autre forme gardée (valeur abîmée, d'un autre type)", () => {
+    for (const raw of [null, undefined, true, 'vue', 1, [], {}, { vue: 'true' }, { vue: 1 }]) {
+      expect(readSafetyNotice(raw)).toEqual(SAFETY_NOTICE_UNSEEN);
+    }
+  });
+});
 
 describe("phoneAppOfferGate : l'application du téléphone après toutes les cartes d'ouverture", () => {
-  const free = { memoryNeedsAction: false, memoryReady: true, permissionsShown: false, profileShown: false };
+  const free = { memoryNeedsAction: false, memoryReady: true, permissionsShown: false, profileShown: false, safetyShown: false };
+
+  it('attend le lancement suivant quand la mise en garde de la première ouverture a paru à celui-ci', () => {
+    expect(phoneAppOfferGate({ ...free, safetyShown: true })).toBe(false);
+  });
 
   it('est posée quand la mémoire est prête et que rien ne paraît', () => {
     expect(phoneAppOfferGate(free)).toBe(true);
@@ -68,18 +88,22 @@ describe('shouldPromptProfile', () => {
 });
 
 describe('profilePromptGate : mémoire, autorisations, puis profil', () => {
-  const ready = { memoryNeedsAction: false, memoryReady: true };
+  const ready = { memoryNeedsAction: false, memoryReady: true, safetyShown: false };
 
   it('attend la lecture des autorisations', () => {
     expect(profilePromptGate({ ...ready, permissionsShown: null }).mount).toBe(false);
   });
 
   it("n'est pas posé tant que la mémoire n'est pas prête", () => {
-    expect(profilePromptGate({ memoryNeedsAction: false, memoryReady: false, permissionsShown: false }).mount).toBe(false);
+    expect(profilePromptGate({ ...ready, memoryReady: false, permissionsShown: false }).mount).toBe(false);
   });
 
   it('se tait derrière la carte de la mémoire', () => {
-    expect(profilePromptGate({ memoryNeedsAction: true, memoryReady: false, permissionsShown: null })).toEqual({ mount: true, otherCardShown: true });
+    expect(profilePromptGate({ ...ready, memoryNeedsAction: true, memoryReady: false, permissionsShown: null })).toEqual({ mount: true, otherCardShown: true });
+  });
+
+  it('attend le lancement suivant quand la mise en garde de la première ouverture a paru à celui-ci', () => {
+    expect(profilePromptGate({ ...ready, permissionsShown: false, safetyShown: true })).toEqual({ mount: true, otherCardShown: true });
   });
 
   it('se tait derrière la carte des autorisations', () => {

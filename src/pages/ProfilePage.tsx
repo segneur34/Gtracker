@@ -33,6 +33,7 @@ import { effectiveDistanceUnit, useVisibility } from '../hooks/useSportSettings'
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
 import { activityShares, favoriteActivities, favoriteActivity, favoriteSpot } from '../library/profile';
 import { phoneAppOfferGate, profilePromptGate } from '../library/profilePrompt';
+import { safetyNoticeShownThisLaunch } from '../hooks/useSafetyNotice';
 import { inBounds, profilePeriodOf, statsPeriodBounds, statsTotals } from '../library/stats';
 import { TUTORIAL_OF_DAY_VISIBLE, tutorialCardGate } from '../tutorials/tutorials';
 import { OTHERS_COLOR } from '../components/chartStyle';
@@ -136,10 +137,12 @@ function ProfilePage() {
   const memoryNeedsAction = status === 'unavailable' || status === 'needs-permission' || error !== null;
   /** La carte des autorisations paraît-elle ? `null` tant qu'elle n'a pas lu les autorisations. */
   const [permissionsShown, setPermissionsShown] = useState<boolean | null>(null);
-  const gate = profilePromptGate({ memoryNeedsAction, memoryReady: status === 'ready', permissionsShown });
+  /** La mise en garde de la première ouverture (`AppShell`) a paru à ce lancement : profil et suivantes attendent le suivant. */
+  const safetyShown = safetyNoticeShownThisLaunch();
+  const gate = profilePromptGate({ memoryNeedsAction, memoryReady: status === 'ready', permissionsShown, safetyShown });
   /** Le pop-up du profil s'ouvre-t-il ? `null` tant qu'il n'a pas tranché. */
   const [profileShown, setProfileShown] = useState<boolean | null>(null);
-  const tutorialGate = tutorialCardGate({ memoryNeedsAction, memoryReady: status === 'ready', permissionsShown, profileShown });
+  const tutorialGate = tutorialCardGate({ memoryNeedsAction, memoryReady: status === 'ready', permissionsShown, profileShown, safetyShown });
 
   /** « Bienvenue » au-dessus du nom ou pseudo de Réglages, « Bienvenue » seul sans lui. */
   const { profile } = useAthleteProfile();
@@ -293,7 +296,7 @@ function ProfilePage() {
       {gate.mount && <ProfilePrompt otherCardShown={gate.otherCardShown} onDecided={setProfileShown} />}
       {/* Programme Windows : l'application du téléphone qu'il emporte, proposée une fois par version, après toutes les
           autres cartes d'ouverture et jamais par-dessus l'une d'elles. */}
-      {phoneAppOfferGate({ memoryNeedsAction, memoryReady: status === 'ready', permissionsShown, profileShown }) && <PhoneAppOffer />}
+      {phoneAppOfferGate({ memoryNeedsAction, memoryReady: status === 'ready', permissionsShown, profileShown, safetyShown }) && <PhoneAppOffer />}
 
       {!memoryNeedsAction && <MemoryStatus compact />}
 

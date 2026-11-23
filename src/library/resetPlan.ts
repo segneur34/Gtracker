@@ -59,6 +59,8 @@ export const KEY_CLASSES: Record<keyof typeof STORAGE_KEYS, KeyClass> = {
   lieuxAppris: 'donnee',
   langue: 'reglage',
   brouillons: 'donnee',
+  // « Tout supprimer » fait revenir la mise en garde de la première ouverture ; « Réglages d'usine » la garde.
+  miseEnGarde: 'donnee',
 };
 
 const keysOf = (wanted: (c: KeyClass) => boolean): string[] =>

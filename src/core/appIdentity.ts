@@ -94,6 +94,8 @@ export const STORAGE_KEYS = {
   langue: `${FORMAT_ID}.langue` as const,
   /** Brouillons des sessions de la mémoire pas encore enregistrés (`library/sessionDrafts.ts`). */
   brouillons: `${FORMAT_ID}.brouillons` as const,
+  /** Mise en garde de la première ouverture lue (`hooks/useSafetyNotice.ts`) ; ne voyage pas. */
+  miseEnGarde: `${FORMAT_ID}.miseEnGarde` as const,
 };
 
 /** Caches du navigateur (Cache API, IndexedDB) et en-tête des tuiles gardées. */

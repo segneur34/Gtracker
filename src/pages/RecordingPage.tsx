@@ -996,12 +996,16 @@ function RecordingScreen() {
         </div>
       ) : !pending && (
         // Au repos, la moitié du bouton choisit une trace à suivre ; l'un sous l'autre quand la place manque (écran
-        // étroit, texte d'Android agrandi).
+        // étroit, texte d'Android agrandi). Entre les deux sur téléphone, sous les deux sur ordinateur : la mise en
+        // garde de navigation, à chaque départ, dans les deux familles.
         <div className="rec-actions ui-row-10 ui-wrap">
           <Button variant="record" size="l" className="rec-action-btn" onClick={handleStart} disabled={!canStart}>
             <span className="ui-record-dot" />
             {t('Démarrer')}
           </Button>
+          <p className="rec-notice">
+            {t("L'application n'est ni un instrument de navigation ni un équipement de sécurité : gardez le matériel et les précautions qu'exige votre sortie.")}
+          </p>
           <Button variant="secondary" size="l" className="rec-action-btn" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
             <IconRoute size={20} />
             {t('Suivre une trace')}

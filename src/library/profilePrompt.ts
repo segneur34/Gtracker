@@ -51,28 +51,48 @@ export const shouldPromptProfile = ({ native, missing, askedThisLaunch, otherCar
 }): boolean => native && missing.length > 0 && !askedThisLaunch && !otherCardShown;
 
 /**
- * Ordre des cartes d'ouverture du Profil : la mémoire, puis les autorisations, puis le profil. Le pop-up
- * n'est posé qu'une fois les deux décidées (`permissionsShown` : `null` tant que les
- * autorisations ne sont pas lues) ; `otherCardShown` : l'une d'elles est à l'écran.
+ * Mise en garde de la première ouverture (« Avant de partir », `components/SafetyNotice.tsx`), telle que gardée sur
+ * l'appareil : `vue` une fois « J'ai compris » touché. Elle passe avant toutes les cartes d'ouverture.
  */
+export interface SafetyNoticeRecord {
+  vue: boolean;
+}
+
+/** Rien de gardé : la mise en garde n'a pas été lue sur cet appareil. */
+export const SAFETY_NOTICE_UNSEEN: SafetyNoticeRecord = { vue: false };
+
+/** Relecture contrôlée de la valeur gardée : seul `vue: true` la tient pour lue, toute autre forme la fait revenir. */
+export const readSafetyNotice = (raw: unknown): SafetyNoticeRecord => ({
+  vue: typeof raw === 'object' && raw !== null && (raw as { vue?: unknown }).vue === true,
+});
+
 /**
  * La fenêtre de l'application du téléphone (programme Windows) passe après toutes les autres cartes d'ouverture :
  * posée seulement quand la mémoire est prête et que les autorisations et le pop-up du profil ont décidé de ne pas
- * paraître (`false`, ni `null` en attente ni `true`). Si l'un d'eux s'est ouvert, elle attend le lancement suivant :
- * jamais deux fenêtres ouvertes d'elles-mêmes l'une sur l'autre.
+ * paraître (`false`, ni `null` en attente ni `true`). Si l'un d'eux s'est ouvert, ou la mise en garde de la première
+ * ouverture à ce lancement (`safetyShown`), elle attend le lancement suivant : jamais deux fenêtres ouvertes
+ * d'elles-mêmes l'une sur l'autre.
  */
-export const phoneAppOfferGate = ({ memoryNeedsAction, memoryReady, permissionsShown, profileShown }: {
+export const phoneAppOfferGate = ({ memoryNeedsAction, memoryReady, permissionsShown, profileShown, safetyShown }: {
   memoryNeedsAction: boolean;
   memoryReady: boolean;
   permissionsShown: boolean | null;
   profileShown: boolean | null;
-}): boolean => !memoryNeedsAction && memoryReady && permissionsShown === false && profileShown === false;
+  safetyShown: boolean;
+}): boolean => !safetyShown && !memoryNeedsAction && memoryReady && permissionsShown === false && profileShown === false;
 
-export const profilePromptGate = ({ memoryNeedsAction, memoryReady, permissionsShown }: {
+/**
+ * Ordre des cartes d'ouverture du Profil : la mémoire, puis les autorisations, puis le profil. Le pop-up
+ * n'est posé qu'une fois les deux décidées (`permissionsShown` : `null` tant que les
+ * autorisations ne sont pas lues) ; `otherCardShown` : l'une d'elles est à l'écran, ou la mise en garde de la
+ * première ouverture a paru à ce lancement (`safetyShown`) : le profil est alors demandé au lancement suivant.
+ */
+export const profilePromptGate = ({ memoryNeedsAction, memoryReady, permissionsShown, safetyShown }: {
   memoryNeedsAction: boolean;
   memoryReady: boolean;
   permissionsShown: boolean | null;
+  safetyShown: boolean;
 }): { mount: boolean; otherCardShown: boolean } => ({
   mount: memoryNeedsAction || (memoryReady && permissionsShown !== null),
-  otherCardShown: memoryNeedsAction || permissionsShown === true,
+  otherCardShown: memoryNeedsAction || permissionsShown === true || safetyShown,
 });

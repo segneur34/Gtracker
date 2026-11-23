@@ -27,6 +27,20 @@ export const pushBackLayer = (close: () => void): (() => void) => {
   };
 };
 
+/**
+ * Pose une vue que le retour ne ferme pas (fenêtre qui ne se ferme que par son bouton) : le retour est absorbé, la
+ * vue se repose aussitôt au-dessus, et ni la page ni l'application ne se ferment derrière elle. La fonction rendue
+ * la retire.
+ */
+export const holdBackLayer = (): (() => void) => {
+  let remove: () => void = () => undefined;
+  const hold = () => {
+    remove = pushBackLayer(hold);
+  };
+  hold();
+  return () => remove();
+};
+
 /** Ce qu'a fait un retour : vue fermée, page retenue (brouillon), page au-dessus, ou rien (Profil). */
 export type BackOutcome = 'layer' | 'held' | 'page' | 'none';
 

@@ -17,6 +17,7 @@ import GongLogo from './GongLogo';
 import ImportQuestion from './ImportQuestion';
 import IncomingFileNotice from './IncomingFileNotice';
 import PhoneSyncButton from './PhoneSyncButton';
+import SafetyNotice from './SafetyNotice';
 
 /**
  * Cadre de toutes les pages : navigation et bandeau d'enregistrement.
@@ -237,7 +238,10 @@ function AppShell() {
           title={paused ? t('Reprise') : t('Pause')} hint={t('Maintenez le bouton')} />
       )}
 
-      <ImportQuestion />
+      {/* Mise en garde de la première ouverture, par-dessus toutes les pages ; la question d'import attend sa lecture. */}
+      <SafetyNotice>
+        <ImportQuestion />
+      </SafetyNotice>
     </div>
   );
 }

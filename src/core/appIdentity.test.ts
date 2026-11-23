@@ -68,6 +68,7 @@ describe('noms techniques de l\'application', () => {
       lieuxAppris: 'gtracker.lieuxAppris',
       langue: 'gtracker.langue',
       brouillons: 'gtracker.brouillons',
+      miseEnGarde: 'gtracker.miseEnGarde',
     });
   });
 

@@ -115,7 +115,11 @@ describe('état des tutoriels', () => {
 });
 
 describe("garde de la carte du jour sur l'accueil", () => {
-  const base = { memoryNeedsAction: false, memoryReady: true, permissionsShown: false, profileShown: false };
+  const base = { memoryNeedsAction: false, memoryReady: true, permissionsShown: false, profileShown: false, safetyShown: false };
+  it("attend le lancement suivant quand la mise en garde de la première ouverture a paru à celui-ci", () => {
+    expect(tutorialCardGate({ ...base, safetyShown: true })).toBe('blocked');
+    expect(tutorialCardGate({ ...base, safetyShown: true, profileShown: null })).toBe('blocked');
+  });
   it('libre quand rien d\'autre n\'est à l\'écran', () => {
     expect(tutorialCardGate(base)).toBe('free');
   });

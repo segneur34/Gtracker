@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { EXIT_FLUSH_MAX_MS, dispatchBack, exitAfter, pushBackLayer, setBackNavigator } from './backButton';
+import { EXIT_FLUSH_MAX_MS, dispatchBack, exitAfter, holdBackLayer, pushBackLayer, setBackNavigator } from './backButton';
 
 describe('exitAfter', () => {
   afterEach(() => {
@@ -73,6 +73,30 @@ describe('dispatchBack', () => {
 
     expect(dispatchBack(canLeave)).toBe('held');
     expect(dispatchBack(() => true)).toBe('page');
+    expect(navigate).toHaveBeenCalledTimes(1);
+    removeNavigator();
+    expect(dispatchBack()).toBe('none');
+  });
+
+  it('absorbe le retour sous une vue tenue : elle se repose, ni la page ni l\'application ne se ferment', () => {
+    const navigate = vi.fn(() => true);
+    const removeNavigator = setBackNavigator(navigate);
+    const release = holdBackLayer();
+
+    for (let i = 0; i < 3; i++) expect(dispatchBack()).toBe('layer');
+    expect(navigate).not.toHaveBeenCalled();
+
+    // Une vue ouverte par-dessus se ferme d'abord ; la vue tenue reste dessous.
+    const close = vi.fn();
+    pushBackLayer(close);
+    expect(dispatchBack()).toBe('layer');
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(dispatchBack()).toBe('layer');
+    expect(navigate).not.toHaveBeenCalled();
+
+    // Retirée (bouton de la fenêtre), le retour remonte de nouveau à la page au-dessus.
+    release();
+    expect(dispatchBack()).toBe('page');
     expect(navigate).toHaveBeenCalledTimes(1);
     removeNavigator();
     expect(dispatchBack()).toBe('none');

@@ -29,8 +29,10 @@ export const CLES = Object.freeze({
   restingHr: cle('restingHr'), planning: cle('planning'), routeList: cle('routeList'),
   triBibliotheque: cle('triBibliotheque'), heartRateBelts: cle('heartRateBelts'), memoryFolder: cle('memoryFolder'),
   permissionsSeenVersion: cle('permissionsSeenVersion'), tileCache: cle('tileCache'), tileUrls: cle('tileUrls'),
-  rechercheLieu: cle('rechercheLieu'), lieuxAppris: cle('lieuxAppris'),
+  rechercheLieu: cle('rechercheLieu'), lieuxAppris: cle('lieuxAppris'), miseEnGarde: cle('miseEnGarde'),
 });
+/** Valeur de `CLES.miseEnGarde` une fois la fenêtre « Avant de partir » touchée (`useSafetyNotice`, clé `fenetre`). */
+export const MISE_EN_GARDE_VUE = JSON.stringify({ fenetre: { vue: true } });
 /** Clés qui voyagent dans `values` de chaque `reglages/<appareil>.json` (`TRAVELLING_KEYS`, `library/settingsFile.ts`). */
 export const CLES_VOYAGEUSES = Object.freeze([CLES.sportSettings, CLES.athleteProfile]);
 /** Formats de fichier que les scripts écrivent pour éprouver une lecture (`FILE_FORMATS`, `core/appIdentity.ts`). */
@@ -116,6 +118,12 @@ const PAGE_SCRIPT = `(() => {
   // Heure réelle de la dernière mutation du DOM.
   new MutationObserver(() => { banc.lastMutation = realNow(); })
     .observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+})();`;
+
+// Fenêtre « Avant de partir » tenue pour touchée : la clé est écrite quand elle manque, dans chaque document, avant
+// l'application. Un stockage refusé (page vide, origine opaque) ne doit rien casser.
+export const MISE_EN_GARDE_SCRIPT = `(() => {
+  try { if (localStorage.getItem('${CLES.miseEnGarde}') === null) localStorage.setItem('${CLES.miseEnGarde}', ${JSON.stringify(MISE_EN_GARDE_VUE)}); } catch {}
 })();`;
 
 const STATE = `(() => { const b = window.__banc; if (!b) return null; return { doc: b.doc, ready: document.readyState, mounted: (document.getElementById('root')?.childElementCount ?? 1) > 0, fonts: document.fonts.status, fetches: b.fetches, timers: b.timers.size, last: b.lastMutation, quiet: b.now() - b.lastMutation }; })()`;
@@ -230,9 +238,11 @@ const openSocket = async (url) => {
  * Options : `width` et `height` (fenêtre d'ordinateur, sinon celle de Chrome), `shotDir` (dossier des captures),
  * `logEntries` (ajoute aux erreurs de console celles du journal du navigateur, `Log.entryAdded`), `isolated` (essai :
  * l'onglet dans un contexte de navigation neuf, `Target.createBrowserContext`, stockages vides comme un profil
- * neuf, jeté à la fermeture ; `BANC_CONTEXTE=1` l'impose ; pas le défaut).
+ * neuf, jeté à la fermeture ; `BANC_CONTEXTE=1` l'impose ; pas le défaut), `miseEnGardeVue` (vrai d'ordinaire : la fenêtre
+ * « Avant de partir » de la première ouverture est tenue pour touchée, la clé étant écrite à chaque document quand elle manque,
+ * sans écraser une valeur posée autrement ; faux : profil vraiment neuf, pour le script qui éprouve la fenêtre).
  */
-export const connect = async ({ port, base = BASE, width, height, shotDir, logEntries = false, isolated = process.env.BANC_CONTEXTE === '1' } = {}) => {
+export const connect = async ({ port, base = BASE, width, height, shotDir, logEntries = false, isolated = process.env.BANC_CONTEXTE === '1', miseEnGardeVue = true } = {}) => {
   const startedAt = Date.now();
   const ownTab = !process.env.BANC_WS;
   if (ownTab && !port) throw new Error('connect : port Chrome manquant');
@@ -300,6 +310,7 @@ export const connect = async ({ port, base = BASE, width, height, shotDir, logEn
 
   await send('Runtime.enable'); await send('Log.enable'); await send('Page.enable'); await send('Network.enable');
   await send('Page.addScriptToEvaluateOnNewDocument', { source: PAGE_SCRIPT });
+  if (miseEnGardeVue) await send('Page.addScriptToEvaluateOnNewDocument', { source: MISE_EN_GARDE_SCRIPT });
   if (memoireDisque()) {
     await send('Page.addScriptToEvaluateOnNewDocument', { source: MEMOIRE_DISQUE_SCRIPT });
     await send('Runtime.evaluate', { expression: MEMOIRE_DISQUE_SCRIPT });

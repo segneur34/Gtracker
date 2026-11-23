@@ -20,3 +20,21 @@ Relevé de l'outil de livraison du 23/11 (`node outils/livraison.mjs`, avertisse
 ## Résultat attendu
 
 Les avertissements « lot N » et « point N » de l'outil de livraison à zéro (hors faux amis à exempter un par un), une garde qui les y tient, le lot 331 refermé.
+
+## Avancement (23/11)
+
+- Documents : faits et commités (ETAT, INVENTAIRE, MISE_EN_PAGE, documents du banc).
+- Scripts du banc, thème Android, deux fichiers de `src/` et d'`outils/` : faits et commités ; cinq messages imprimés ne citent plus de lot.
+- Relevé de l'outil de livraison après la partie « documents » : « lot N » 153, « point N » 21 (avant les scripts du banc) ; à relire après ce commit.
+
+## Reste : les gardes (dernière partie)
+
+Modèle | Réflexion : Opus | medium
+
+But : que ces mots ne reviennent pas dans ce qui est remis, et que le relevé de l'outil de livraison soit à zéro ou n'affiche que des exceptions nommées.
+
+1. **Documents remis** : `outils/docs-cites.mjs` (étape « documents » de la vérification) refuse, dans les documents de sa liste `DOCUMENTS` et hors des blocs d'atelier, « lot N », « point N » (deux ou trois chiffres), « élément N », « essai N », le nom d'un document d'atelier, le nom de l'assistant ; faux amis par une liste d'exceptions courte, chacune avec sa raison (« par lots de 32 paquets », « 5 points par seconde »…). Avec ses essais.
+2. **Commentaires d'`outils/` et de `bureau/`** : la garde de la règle 14 (`src/architecture.test.ts`, qui ne lit que `src/`) s'étend à ces dossiers, ou une garde sœur côté `outils/` ; les fichiers d'atelier qui ne partent pas (`ATELIER` d'`outils/livraison.mjs`) en sont exclus, eux parlent de lots à bon droit. Les dates seules restent admises.
+3. **`outils/docs-cites.mjs` nomme les documents d'atelier** (`DOCUMENTS_ATELIER`), ce qui les cite dans le dépôt remis : sortir cette liste dans un fichier qui part avec l'atelier (ajouté à `ATELIER`) et que l'outil lit s'il existe, ou une autre façon qui laisse le dépôt remis sans ces noms ; la vérification doit passer dans les deux dépôts.
+4. **`src/architecture.test.ts`** cite DECISIONS, le reste à faire et le journal (vers les lignes 296 à 298 et 334) : dire la chose sans ces noms.
+5. **Relevé de l'outil de livraison** (`AVERTISSEMENTS` d'`outils/livraison.mjs`) : ce qui reste après nettoyage est soit corrigé, soit une exception nommée dans l'outil avec sa raison (la constante `MODELES` des scripts `exe-sansfil` et `exe-synchroniser`, `/chaine` et `.claude/worktrees` dans `.gitignore`, `.oxlintrc.json`, `vite.config.ts`, `outils/verif.mjs` et `outils/banc/passe.mjs`, qui sont des chemins à ignorer et non du vocabulaire). L'outil lit l'arbre commité : ses fonctions de recherche s'essaient sur des textes d'essai, le relevé réel se relit après le commit.

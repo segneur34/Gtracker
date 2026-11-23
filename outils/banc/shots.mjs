@@ -6,6 +6,7 @@
 // WAIT (ms d'attente après chargement, défaut 2500).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { MISE_EN_GARDE_SCRIPT } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 
 const [port, outDir, size, ...paths] = process.argv.slice(2);
@@ -37,6 +38,8 @@ await send('Runtime.enable');
 await send('Page.enable');
 // Rangée « avancé » des analyses ouverte d'office, onglets posés dans `gtracker.sections` rejoués à chaque analyse (`lib/onglets.mjs`, 05/11) ; `general.mjs` éprouve la rangée fermée.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
+// Fenêtre « Avant de partir » tenue pour touchée, comme dans `connect` : sans elle, chaque capture montrerait la fenêtre.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: MISE_EN_GARDE_SCRIPT });
 await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
 if (mobile) await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
 

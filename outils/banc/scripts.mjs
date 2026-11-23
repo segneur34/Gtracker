@@ -40,6 +40,8 @@ export const SCRIPTS = [
   { nom: 'allure-session', args: ['{port}', '{gpx}', '{gpx2}'], pages: ['voile', 'enregistrer'] },
   // À propos et licences de Réglages : `fetch` remplacé par une liste synthétique, puis le repli sans `licences.json`.
   { nom: 'apropos', args: ['{port}', '{captures?}'], pages: ['reglages'] },
+  // Fenêtre « Avant de partir » de la première ouverture (profil sans la clé) et phrase de navigation sous « Démarrer ».
+  { nom: 'mise-en-garde', args: ['{port}', '{captures?}'], pages: ['profil', 'enregistrer'] },
   { nom: 'balises', args: ['{port}', '{travail}', '{captures?}'], pages: ['planification', 'enregistrer', 'reglages', 'voile'], solo: true },
   { nom: 'barre', args: ['{port}', '{captures?}'], pages: ['voile', 'statistiques'] },
   { nom: 'bench', args: ['{port}', 'analyse', '{gpx}'], pages: ['enregistrer', 'voile'] },

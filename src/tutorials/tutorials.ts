@@ -93,15 +93,17 @@ export const TUTORIAL_OF_DAY_VISIBLE: boolean = false;
 /**
  * Ordre des cartes d'ouverture du Profil : la mémoire, les autorisations, le pop-up du profil, puis la carte du jour,
  * qui ne s'empile pas sur eux. `wait` tant que l'un n'est pas décidé (`null`) ; `blocked` si l'un
- * est à l'écran : elle attend alors le lancement suivant ; `free` sinon.
+ * est à l'écran, ou si la mise en garde de la première ouverture a paru à ce lancement (`safetyShown`) : elle attend
+ * alors le lancement suivant ; `free` sinon.
  */
-export const tutorialCardGate = ({ memoryNeedsAction, memoryReady, permissionsShown, profileShown }: {
+export const tutorialCardGate = ({ memoryNeedsAction, memoryReady, permissionsShown, profileShown, safetyShown }: {
   memoryNeedsAction: boolean;
   memoryReady: boolean;
   permissionsShown: boolean | null;
   profileShown: boolean | null;
+  safetyShown: boolean;
 }): 'wait' | 'blocked' | 'free' => {
-  if (memoryNeedsAction || permissionsShown === true || profileShown === true) return 'blocked';
+  if (safetyShown || memoryNeedsAction || permissionsShown === true || profileShown === true) return 'blocked';
   if (!memoryReady || permissionsShown === null || profileShown === null) return 'wait';
   return 'free';
 };

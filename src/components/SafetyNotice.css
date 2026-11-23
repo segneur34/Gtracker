@@ -1,0 +1,18 @@
+/* Mise en garde de la première ouverture (`SafetyNotice.tsx`), dans une `Dialog` : deux paragraphes à pleine encre et
+   le bouton « J'ai compris » à droite. */
+
+.safety-notice {
+  width: min(440px, 100%);
+}
+
+.safety-notice__text {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.safety-notice__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
