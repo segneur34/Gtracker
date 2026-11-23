@@ -375,7 +375,7 @@ const createBrowserStore = (): TileStore => {
 
 export const tileStore: TileStore = isNativeApp() ? nativeStore : createBrowserStore();
 
-/** Clé du plafond, propre à l'appareil (hors de `reglages.json`), qui porte aussi les effacements déjà faits. */
+/** Clé du plafond, propre à l'appareil (hors du fichier de réglages de l'appareil, `reglages/<appareil>.json`), qui porte aussi les effacements déjà faits. */
 const CAP_STORAGE_KEY = STORAGE_KEYS.tileCache;
 
 /** Ce que range `CAP_STORAGE_KEY` : le plafond choisi, et les préfixes de fonds retirés dont les tuiles sont effacées. */
@@ -439,7 +439,7 @@ export const purgeRetiredTiles = async (store: TileStore = tileStore): Promise<v
   jsonStore.write(CAP_STORAGE_KEY, { ...readTileSettings(), purged: [...purgedPrefixes(), ...todo] });
 };
 
-/** Clé des adresses de tuiles choisies, propre à l'appareil (hors de `reglages.json`), comme le plafond. */
+/** Clé des adresses de tuiles choisies, propre à l'appareil (hors du fichier de réglages de l'appareil, `reglages/<appareil>.json`), comme le plafond. */
 const URL_STORAGE_KEY = STORAGE_KEYS.tileUrls;
 
 /**

@@ -17,8 +17,9 @@ import type { DesktopOpening, DesktopProposal } from './desktopBridge';
  * sauvegarder ou la déplacer d'un appareil à l'autre :
  *
  *     Gtracker/
- *       gtracker.json, reglages.json, LISEZMOI.txt
+ *       gtracker.json, LISEZMOI.txt, reglages/<appareil>.json
  *       sessions/   un GPX et sa fiche JSON par session
+ *     (disposition complète : docs/ETAT_DU_PROJET.md §6.1)
  *
  * Ce module ne sait rien de ce contenu : il lit, écrit et liste des fichiers
  * par chemin relatif (`sessions/x.gpx`), texte ou binaires (capteurs, `.imu`). La bibliothèque

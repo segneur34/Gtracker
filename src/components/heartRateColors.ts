@@ -2,7 +2,7 @@ import { t } from '../core/i18n';
 
 /**
  * Couleurs des zones cardiaques, de « sous Z1 » (indice 0) à Z5 : couleurs de
- * données des graphes et des tableaux, en dur comme les autres (CLAUDE.md).
+ * données des graphes et des tableaux, en dur comme les autres (`ARCHITECTURE.md`, « Toujours », couleurs).
  */
 export const HEART_ZONE_COLORS = ['#b0bec5', '#78909c', '#42a5f5', '#66bb6a', '#ffa726', '#ef5350'] as const;
 

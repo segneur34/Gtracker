@@ -155,7 +155,7 @@ describe("sens des dépendances entre dossiers de src/", () => {
 });
 
 /**
- * Règle 9 de `CLAUDE.md` : chaque famille a son module d'analyse, à une adresse, et une seule page Sessions les liste
+ * Règle 9 d'`ARCHITECTURE.md` : chaque famille a son module d'analyse, à une adresse, et une seule page Sessions les liste
  * toutes ; il n'y a que deux familles. Un dossier de la terre recréé (`running`, `cycling`, `land`) n'aurait pas de ligne dans `ALLOWED` et ferait
  * déjà échouer « chaque dossier de src/ a une règle » ; son vocabulaire est gardé par le cliquet de `outils/heritage.mjs`.
  */
@@ -188,7 +188,7 @@ describe('familles et adresses (règle 9)', () => {
 });
 
 /**
- * Règle 12 de `CLAUDE.md` : stockage, fichiers, position, son, vibreur, capteurs, ceinture, notification, écran allumé
+ * Règle 12 d'`ARCHITECTURE.md` : stockage, fichiers, position, son, vibreur, capteurs, ceinture, notification, écran allumé
  * et orientation passent par `src/platform/`. Hors de ce dossier, aucune de ces API du navigateur ni aucun paquet
  * natif (`@capacitor/*`, `@capgo/*`, importé de façon statique ou dynamique, ou en type seul) : chacun a sa version
  * navigateur et téléphone dans `platform/`, choisie par `isNativeApp()`. Les commentaires ne comptent pas.
@@ -295,7 +295,7 @@ describe('aucun nom de calcul en dur hors de ses tables (capacités du profil)',
 /**
  * Aucun renvoi d'atelier dans `src/`, tests compris : un lecteur de `src/` n'a ni le reste à faire, ni l'historique. Refusés :
  * un numéro de lot, une question « Qnn », un « n° N » du reste à faire, une section du journal et son nom. Une règle de
- * `CLAUDE.md` (« règle n°2 ») et une section de `DECISIONS` (« DECISIONS §10 ») restent permises. Les dates ne sont pas gardées
+ * `ARCHITECTURE.md` (« règle n°2 ») et une section de `DECISIONS` (« DECISIONS §10 ») restent permises. Les dates ne sont pas gardées
  * (formats et exemples du métier). Les exceptions sont des faux amis, en « fichier  texte trouvé » : la liste ne fait que diminuer.
  */
 const WORKSHOP_REFS = /\blots? [0-9]+|\bQ[0-9]{1,3}\b|(?<!règle )n° ?[0-9]+|\bpoints? [0-9]+|(?<!DECISIONS )§ ?10\b|HISTORIQ[U]E/;
@@ -329,7 +329,7 @@ describe("aucun renvoi d'atelier dans src/", () => {
 });
 
 /**
- * Règle 13 de `CLAUDE.md`, seconde phrase : aucune donnée d'une autre application n'est relue, sauf par la porte d'import
+ * Règle 13 d'`ARCHITECTURE.md`, seconde phrase : aucune donnée d'une autre application n'est relue, sauf par la porte d'import
  * (`library/legacyImport`). Seuls ces fichiers de `src/` l'importent (code, tests compris) : la liste ne fait que diminuer.
  * Le nom de l'ancienne application, lui, est gardé par `heritage.test.ts`.
  */

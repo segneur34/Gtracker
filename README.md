@@ -60,13 +60,21 @@ Les tests Java d'Android se lancent par Gradle (`docs/DEVELOPPER.md`) ; ce que c
 
 ## Documentation
 
-- `CLAUDE.md` : règles d'architecture, conventions et décisions transverses.
+- `ARCHITECTURE.md` : règles d'architecture (« règle N » dans le code) et conventions à suivre en ajoutant du code.
 - `docs/ETAT_DU_PROJET.md` : pipeline, persistance et disposition du dossier des sessions (§6.1), tests (§8), dette, chantiers, avancement du plan mobile (§12).
-- `docs/DECISIONS.md` : décisions de l'utilisateur propres à chaque domaine.
-- `docs/HISTORIQUE.md` : décisions et pièges, en points numérotés.
 - `docs/INVENTAIRE.md` : carte des fichiers.
 - `docs/MISE_EN_PAGE.md` : patron commun des pages d'analyse.
-- `docs/MODELES.md` : quel modèle et quel effort pour quelle tâche, sous-agents de `.claude/agents/`.
+- `docs/GLOSSAIRE.md` : les mots du code qui trompent, en une page.
 - `docs/DEVELOPPER.md` : construire l'application (Node, JDK 21, signature, APK, hébergement web) et le programme Windows (installeur).
 - `docs/INSTALLATION.md` : installer l'APK sur un téléphone Android, puis le programme Windows, et relier les deux.
 - `outils/banc/LISEZMOI.md` : banc de test dans un Chrome sans fenêtre, mode d'emploi.
+
+<!-- atelier -->
+Documents de l'atelier, qui ne partent pas avec le dépôt remis :
+
+- `CLAUDE.md` : consignes de l'assistant et décisions transverses de l'utilisateur ; il importe `ARCHITECTURE.md`.
+- `docs/DECISIONS.md` : décisions de l'utilisateur propres à chaque domaine.
+- `docs/HISTORIQUE.md` : décisions et pièges, en points numérotés.
+- `docs/MODELES.md` : quel modèle et quel effort pour quelle tâche, sous-agents de `.claude/agents/`.
+- `docs/BACKLOG.md` : le reste à faire.
+<!-- /atelier -->

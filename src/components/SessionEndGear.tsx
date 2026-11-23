@@ -17,7 +17,7 @@ interface Props {
  * Matériel de la session, choisi à la fin de l'enregistrement, juste avant
  * « Analyser » : le choix par groupe de l'onglet « matériel et
  * notes » (`GearPicker`), vide d'office, jamais repris d'une autre session
- * (DECISIONS §8). Rien n'est montré sans activité ou si l'activité n'a pas de
+ * (le matériel d'une sortie se choisit à chaque fois). Rien n'est montré sans activité ou si l'activité n'a pas de
  * liste de matériel. Le choix est écrit dans la fiche par « Analyser ».
  */
 export default function SessionEndGear({ activity, gear, onChange }: Props) {

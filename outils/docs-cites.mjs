@@ -1,6 +1,7 @@
 // Renvois des documents vivants : chaque fichier ou nom de code cité entre accents graves existe-t-il ?
 //
-//   node outils/docs-cites.mjs [document.md …]     sans argument : les documents vivants (liste ci-dessous)
+//   node outils/docs-cites.mjs [document.md …]     sans argument : les documents remis, puis ceux de l'atelier
+//                                                  qui existent (listes ci-dessous)
 //
 // Un chemin (« core/units.ts », « outils/banc/ ») doit désigner un fichier ou un dossier du dépôt ; un nom seul
 // (« formatDecimal ») doit apparaître dans le code. `docs/HISTORIQUE.md` et `docs/backlog/` ne sont pas vérifiés :
@@ -13,22 +14,24 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const racine = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+// Documents remis avec le dépôt : obligatoires, un document absent est un renvoi faux.
 const DOCUMENTS = [
-  'CLAUDE.md',
+  'ARCHITECTURE.md',
   'README.md',
   'docs/ETAT_DU_PROJET.md',
-  'docs/DECISIONS.md',
   'docs/MISE_EN_PAGE.md',
-  'docs/MODELES.md',
   'docs/INSTALLATION.md',
   'docs/DEVELOPPER.md',
   'docs/INVENTAIRE.md',
   'docs/GLOSSAIRE.md',
-  'docs/BACKLOG.md',
   'outils/LISEZMOI.md',
   'outils/banc/LISEZMOI.md',
   'outils/banc/SCRIPTS.md',
 ]
+// Documents de l'atelier, qui ne partent pas avec le dépôt remis (`outils/livraison.mjs`) : obligatoires dans le dépôt de
+// travail, reconnu à son journal (`docs/HISTORIQUE.md`) ; ailleurs, vérifiés seulement s'ils existent, pour que la
+// vérification passe aussi dans le dépôt remis.
+const DOCUMENTS_ATELIER = ['CLAUDE.md', 'docs/DECISIONS.md', 'docs/MODELES.md', 'docs/BACKLOG.md']
 // Fichiers générés par la construction et ignorés par git : jamais parcourus, pour voir ici ce que voit un clone neuf
 // (vérification sur GitHub ; `licences.json` n'était trouvé que dans la copie Android, sur ce seul poste).
 const GENERES = ['android/app/src/main/assets', 'android/capacitor-cordova-android-plugins']
@@ -71,7 +74,10 @@ const JOURNAL = path.join(racine, 'docs/HISTORIQUE.md')
 const points = new Set(fs.existsSync(JOURNAL) ? [...fs.readFileSync(JOURNAL, 'utf8').matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1])) : [])
 const premierPoint = points.size > 0 ? Math.min(...points) : Infinity
 
-const documents = process.argv.length > 2 ? process.argv.slice(2) : DOCUMENTS
+const documents =
+  process.argv.length > 2
+    ? process.argv.slice(2)
+    : [...DOCUMENTS, ...(fs.existsSync(JOURNAL) ? DOCUMENTS_ATELIER : DOCUMENTS_ATELIER.filter((d) => fs.existsSync(path.resolve(racine, d))))]
 const problemes = []
 for (const doc of documents) {
   const chemin = path.resolve(racine, doc)

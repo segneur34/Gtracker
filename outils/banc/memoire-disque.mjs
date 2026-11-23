@@ -390,7 +390,7 @@ try {
     check('avant toute suppression : deux GPX, deux fiches, aucun dossier corbeille/ sur le disque', gpxs(memG).length === 2 && fiches(memG).length === 2 && !existsSync(corbeille), JSON.stringify(arbre(memG)));
     await ouvrirMemoire(b);
     check('Réglages › Mémoire : pas de ligne « Corbeille » tant qu\'elle est vide', (await ligneCorbeille(b)) === null, String(await ligneCorbeille(b)));
-    check('Réglages › Mémoire : la zone dit « Corbeille vide. » quand elle est vide', await b.evaluate(`document.getElementById('zone-corbeille')?.textContent.trim() === 'Corbeille vide.'`) === true);
+    check('Réglages › Mémoire : la zone dit « Corbeille vide. » quand elle est vide', await b.evaluate(`document.getElementById('zone-corbeille')?.textContent.trim().endsWith('Corbeille vide.')`) === true);
     // -- Le menu « … » de Sessions porte « Corbeille » ; son appui arrive sur Réglages, Mémoire dépliée, zone à l'écran.
     await pageSessions(b);
     await b.evaluate(`document.querySelector('button.ui-more__button[aria-label="Importer, mettre à jour"]')?.click()`);

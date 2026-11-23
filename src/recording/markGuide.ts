@@ -84,7 +84,7 @@ export const sanitizeBeepCurve = (raw: unknown): BeepPoint[] | null => {
   return points.length >= L.minPoints && points.length <= L.maxPoints ? points : null;
 };
 
-/** Réglage relu (Réglages, `reglages.json`) ; `null` s'il est illisible. Vibration active à défaut. */
+/** Réglage relu (Réglages, `reglages/<appareil>.json`) ; `null` s'il est illisible. Vibration active à défaut. */
 export const sanitizeMarkGuide = (raw: unknown): MarkGuideSettings | null => {
   if (!isObject(raw)) return null;
   const curve = sanitizeBeepCurve(raw.curve);

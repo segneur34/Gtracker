@@ -9,7 +9,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * Trace suivie pendant l'enregistrement, gardée hors des pages : elle reste
  * affichée quand on quitte la page Enregistrer et qu'on y revient. Gardée sur
  * l'appareil jusqu'à « Retirer », fermeture de l'application ou plantage
- * compris ; propre à l'appareil, elle ne voyage pas dans `reglages.json`.
+ * compris ; propre à l'appareil, elle ne voyage pas dans le fichier de réglages de l'appareil (`reglages/<appareil>.json`).
  * Amincie dès qu'on la choisit (`thinFollowedTrace`) : la même trace est
  * suivie et gardée, et elle pèse peu dans le stockage de l'appareil.
  */

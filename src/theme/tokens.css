@@ -233,7 +233,7 @@
   --ring-line: 0 0 0 1px var(--line-strong);
 
   /* Graphes : quadrillage, graduations (texte et trait), repères neutres (lignes de phase, seuils), voile
-     sous le pointeur. Les couleurs des données restent en dur (`CLAUDE.md`). */
+     sous le pointeur. Les couleurs des données restent en dur (`ARCHITECTURE.md`, « Toujours », couleurs). */
   --chart-grid: #dddddd;
   --chart-axis: #555555;
   --chart-tick: #666666;

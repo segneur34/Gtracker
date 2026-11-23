@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Cliquet du vocabulaire de la terre (règle 13 de `CLAUDE.md`) : course, vélo et Entraînement sont partis ;
+ * Cliquet du vocabulaire de la terre (règle 13 d'`ARCHITECTURE.md`) : course, vélo et Entraînement sont partis ;
  * leurs mots ne doivent plus remonter dans `src/`, commentaires et tests compris. Pour chaque motif de
  * `outils/heritage.mjs`, le relevé `outils/heritage.json` fige un nombre par fichier : une hausse, ou une occurrence
  * dans un fichier absent du relevé, fait échouer ; une baisse est signalée pour qu'on la fige (`node outils/heritage.mjs

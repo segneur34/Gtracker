@@ -4,7 +4,7 @@ import { isFiniteNumber, isObject, parseJson, stringifyJson } from '../core/basi
 export { MARKER_FILE };
 
 /**
- * Disposition du dossier mémoire (`docs/ETAT_DU_PROJET.md` §6) :
+ * Disposition du dossier mémoire (détail : `docs/ETAT_DU_PROJET.md` §6.1) :
  *
  *     Gtracker/
  *       gtracker.json    marqueur, pour reconnaître le dossier et dire sa version
@@ -23,6 +23,12 @@ export { MARKER_FILE };
  *                        (`planning/routeRecord.ts`)
  *       journaux/        les journaux d'enregistrement restés illisibles, copiés
  *                        tels quels pour l'utilisateur (`hooks/setAsideJournals.ts`)
+ *       corbeille/       programme Windows seulement : l'index des suppressions
+ *                        (`corbeille.json`) et un sous-dossier par suppression, gardé
+ *                        30 jours (`trash.ts`)
+ *       synchro/         programme Windows seulement : la base de la synchronisation
+ *                        avec chaque téléphone, et le témoin d'une synchronisation en
+ *                        cours (`sync.ts`, `syncBase.ts`)
  */
 
 export const SESSIONS_DIR = 'sessions';

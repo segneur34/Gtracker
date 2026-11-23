@@ -243,7 +243,7 @@ function HeartRateThresholdsField({ profile, onChange }: { profile: AthleteProfi
  * Page Paramètres : mémoire, activités et tous leurs réglages (affichage,
  * enregistrement, onglets, balises), cartes hors ligne et caractéristiques du
  * pratiquant, en blocs repliables (chaque activité se replie aussi). Tout est enregistré sur l'appareil
- * à la saisie, recopié dans le dossier mémoire (`reglages.json`), et relu par
+ * à la saisie, recopié dans le dossier mémoire (`reglages/<appareil>.json`), et relu par
  * chaque module à son ouverture.
  */
 /** Actions d'une carte d'activité, les mêmes à chaque rendu de la page : une carte inchangée ne se redessine pas. */

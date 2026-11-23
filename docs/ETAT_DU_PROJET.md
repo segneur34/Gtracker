@@ -1,10 +1,17 @@
 # État du projet Gtracker
 
-Document de passation, tenu à jour à chaque lot validé ; dernière passe d'ensemble le 11 novembre 2026 (lot 331, documents remis d'accord avec le code voile et surf). Il complète `CLAUDE.md`, qui donne les règles et les décisions transverses de l'utilisateur, et `docs/DECISIONS.md`, qui donne ses décisions par domaine, sans les répéter. On y trouve l'architecture, le pipeline, la persistance, les tests, la dette, les chantiers et la cible mobile, dont **l'avancement n'est tenu qu'au §12**. L'historique des décisions (§10) est dans `docs/HISTORIQUE.md`, la carte des fichiers (§5) dans `docs/INVENTAIRE.md`. Les numéros de section ne changent pas : le code y renvoie.
+Document de passation. Il complète `ARCHITECTURE.md`, qui donne les règles d'architecture, sans les répéter. On y trouve l'architecture, le pipeline, la persistance, les tests, la dette, les chantiers et la cible mobile, dont **l'avancement n'est tenu qu'au §12**. La carte des fichiers (§5) est dans `docs/INVENTAIRE.md`. Les numéros de section ne changent pas : le code y renvoie.
+
+<!-- atelier -->
+Tenu à jour à chaque lot validé ; dernière passe d'ensemble le 11 novembre 2026 (lot 331, documents remis d'accord avec le code voile et surf). Il complète aussi `CLAUDE.md`, qui donne les décisions transverses de l'utilisateur, et `docs/DECISIONS.md`, qui donne ses décisions par domaine, sans les répéter. L'historique des décisions (§10) est dans `docs/HISTORIQUE.md`.
+<!-- /atelier -->
 
 Pour que ce document reste léger :
 - les seuils, fenêtres et formules se lisent dans le code, où ils sont nommés et commentés ;
-- l'Avancement ne tient que les phases et le reste à faire ; le détail de chaque lot est dans HISTORIQUE.
+- l'Avancement ne tient que les phases et le reste à faire.
+<!-- atelier -->
+- le détail de chaque lot n'est pas dans l'Avancement mais dans HISTORIQUE.
+<!-- /atelier -->
 
 ## 1. Résumé
 
@@ -47,7 +54,10 @@ Les couches, de bas en haut. Tous les imports sont relatifs, sans alias de chemi
 - **Noyau `core/`** : sans notion de sport, en unités SI, du parseur GPX aux profils de support, en passant par la cinématique, les filtres, l'allure de la session, les cumuls, le masque d'activité, le dénivelé et les tops.
 - **Famille** (`core/sportProfiles.ts`, point 89) : la famille d'un calcul, écrite une fois dans son profil (`SportProfile.family`), range ses sessions (page Sessions, barre, listes d'activités, Réglages) et dit comment elles se calculent et s'affichent (unités, chiffres du direct, onglets, module d'analyse) : `sportFamily`, `'voile' | 'surf'`. L'ancien « traitement », qui portait les mêmes noms depuis le lot 305, y est fondu. Le surf (point 97) est une famille à lui : ni vent, ni dénivelé.
 - **Briques communes** (point 168) : `core/geoPlane.ts` (plan local, projection sur un segment), `core/search.ts` (dichotomies), `core/basics.ts` (`clamp`, `isObject`, `isFiniteNumber`, `plural`), `core/units.ts` (seul lieu des conversions) et `hooks/createStore.ts` (magasins hors des composants) ; `platform/files.ts` expose l'unique `filesystem()`. Une nouvelle copie de l'une d'elles est une dette.
-- **Sports** : `sailing/` en nœuds sur `PointData` (adaptateur `sailing/pointData.ts`, règle 5), `surfing/` en SI. La terre (dossiers `running`, `cycling`, `land`) est partie aux lots 302 et 303 : `landWords.test.ts` refuse le retour de son vocabulaire (relevé figé `outils/heritage.json`, qui ne doit que baisser) et `architecture.test.ts` garde les deux familles et leurs adresses (règle 13, point 307).
+- **Sports** : `sailing/` en nœuds sur `PointData` (adaptateur `sailing/pointData.ts`, règle 5), `surfing/` en SI. La terre (dossiers `running`, `cycling`, `land`) est partie : `architecture.test.ts` garde les deux familles et leurs adresses (règle 13).
+  <!-- atelier -->
+  Partie aux lots 302 et 303 (point 307) ; `landWords.test.ts` refuse le retour de son vocabulaire (relevé figé `outils/heritage.json`, qui ne doit que baisser).
+  <!-- /atelier -->
 - **Logique pure de l'application**, testée en node : `recording/` (positions, journal, GPX, direct, trace suivie), `library/` (fiche, résumé, rapprochement, réglages qui voyagent) et `planning/` (itinéraires).
 - **Plateforme `platform/`** : seul accès au stockage, aux fichiers, à la position, au son, au vibreur, aux capteurs et à la notification (règle 12). `isNativeApp()` choisit la version navigateur ou téléphone de chaque module ; les hooks et les pages ne voient pas la différence. Exception : `compass`, la boussole, n'existe que dans le navigateur.
 - **Hooks** :
@@ -160,7 +170,11 @@ Numéro de section gardé, car le code y renvoie.
 
 ### 4.4 Couleur de la trace
 
-Dégradé continu `speedGradientColor` (`core/speedGradient.ts`), sur la vitesse de couleur de `core/trackColor.ts` (`trackColorSpeedsMs`, `trackColorSegments`), commune aux modules et à l'aperçu de la liste (point 94) : vitesse lissée du noyau en voile et en surf, sans lissage de plus. La vignette part de la trace d'analyse (`analysisTrack`, `library/summary.ts`, filtres du support et allure de la session), lisse sur la trace entière, puis échantillonne. L'ordre des bornes effectives est dans `CLAUDE.md`. La suggestion vient de `suggestSpeedRangeMs` en voile, mesurée sur la trace entière, dans l'analyse comme dans la vignette. Ailleurs, le défaut du traitement est donné par `defaultSpeedRangeOf` (`settings/activitySettings.ts`). La carte se cadre sur l'emprise de la trace (`trackBounds`). La trace colorée est une seule couche canevas, `ColoredTrackPath` (`components/coloredTrackPath.ts`, posée par `components/TrackSegmentsLayer.tsx`, analyses et vignettes, points 93 et 212), dans un volet sous les autres tracés : 256 tranches prises dans l'ordre, regroupées par couleur dans chaque tranche (`pathsByColor`), le dernier passage dessus ; 54 002 couches sur 3 h à 5 Hz deviennent 3 ; surbrillances, marqueurs et manœuvres restent en SVG. Ses traits ne sont redessinés que si leur tableau change : l'appelant le mémorise.
+Dégradé continu `speedGradientColor` (`core/speedGradient.ts`), sur la vitesse de couleur de `core/trackColor.ts` (`trackColorSpeedsMs`, `trackColorSegments`), commune aux modules et à l'aperçu de la liste (point 94) : vitesse lissée du noyau en voile et en surf, sans lissage de plus. La vignette part de la trace d'analyse (`analysisTrack`, `library/summary.ts`, filtres du support et allure de la session), lisse sur la trace entière, puis échantillonne. La suggestion vient de `suggestSpeedRangeMs` en voile, mesurée sur la trace entière, dans l'analyse comme dans la vignette. Ailleurs, le défaut du traitement est donné par `defaultSpeedRangeOf` (`settings/activitySettings.ts`). La carte se cadre sur l'emprise de la trace (`trackBounds`). La trace colorée est une seule couche canevas, `ColoredTrackPath` (`components/coloredTrackPath.ts`, posée par `components/TrackSegmentsLayer.tsx`, analyses et vignettes, points 93 et 212), dans un volet sous les autres tracés : 256 tranches prises dans l'ordre, regroupées par couleur dans chaque tranche (`pathsByColor`), le dernier passage dessus ; 54 002 couches sur 3 h à 5 Hz deviennent 3 ; surbrillances, marqueurs et manœuvres restent en SVG. Ses traits ne sont redessinés que si leur tableau change : l'appelant le mémorise.
+
+<!-- atelier -->
+L'ordre des bornes effectives est dans `CLAUDE.md` (décisions transverses, « Couleur de trace »).
+<!-- /atelier -->
 
 ### 4.5 Surf (`SurfModule`)
 
@@ -178,7 +192,10 @@ Dans `docs/INVENTAIRE.md` : une ligne par fichier, son rôle et ses points d'ent
 
 ### 6.1 Le dossier mémoire
 
-Le principe est dans `docs/DECISIONS.md` (§8, « Mémoire et fichiers »). Le dossier mémoire est le format des données des utilisateurs : cette section en est la description complète, et la seule ; les autres documents y renvoient. Noms de dossiers et de fichiers dans `library/folderLayout.ts` (tous appareils), `library/trash.ts` et `library/syncBase.ts` (programme Windows seulement).
+<!-- atelier -->
+Le principe est dans `docs/DECISIONS.md` (§8, « Mémoire et fichiers »).
+<!-- /atelier -->
+Le dossier mémoire est le format des données des utilisateurs : cette section en est la description complète, et la seule ; les autres documents y renvoient. Noms de dossiers et de fichiers dans `library/folderLayout.ts` (tous appareils), `library/trash.ts` et `library/syncBase.ts` (programme Windows seulement).
 
 ```
 Gtracker/
@@ -361,7 +378,10 @@ Ils se vérifient au banc (`outils/banc/`, voir son `LISEZMOI.md` : bibliothèqu
 
 ## 9. Dette et code mort
 
-Pas de `any` dans `src/` (nettoyages des points 15, 44 et 168) ; le code mort laissé par les retraits de fonctions est suivi au reste à faire. Limites connues, par ordre d'importance ; ce qui reste à faire est dans `docs/BACKLOG.md`, cité par son numéro :
+<!-- atelier -->
+Ce qui reste à faire est dans `docs/BACKLOG.md`, cité ici par son numéro.
+<!-- /atelier -->
+Pas de `any` dans `src/` (nettoyages des points 15, 44 et 168) ; le code mort laissé par les retraits de fonctions est suivi au reste à faire. Limites connues, par ordre d'importance :
 
 - **Résumés de la liste** : recalculés en arrière-plan quand un réglage qui les change bouge (seuil d'une activité, allure imposée, foil et seuil de vague en surf), point 239. Le résumé porte l'empreinte de ces réglages (`summary.optionsKey`) ; `queueOutdatedRefresh` refait les périmés une trace à la fois, la plus récente d'abord, par la file des fiches du lancement, et la ligne « n sessions à mettre à jour » de la bibliothèque s'efface seule. Le seuil (et le foil en surf) suit la session : porté par `summary.activitySettings`, lu d'abord dans la fiche (une ancienne le lit dans `optionsKey`, sans réécriture), il est le même pour la liste, l'analyse, le partage et les Statistiques ; deux appareils ne se renvoient plus les résumés, seul un geste dans Réglages (`library/summaryGestures.ts`) recalcule et réécrit, repris après fermeture (lot 148). Limites : une trace illisible n'est pas retentée avant la prochaine ouverture ou « Mettre à jour » ; des réglages repris d'un fichier du dossier ne déclenchent rien sur le moment (le lancement suivant refait ce qu'il faut).
 - **Fiche réécrite à l'ouverture** : ouvrir une session voile réécrit sa fiche si le nombre ou la réussite des manœuvres a changé, et la date du fichier change. Le cache des fiches n'est pas rafraîchi après une écriture : la fiche est relue au lancement suivant, sans autre effet.
@@ -375,11 +395,19 @@ Pas de `any` dans `src/` (nettoyages des points 15, 44 et 168) ; le code mort la
 
 ## 10. Historique des décisions et pièges rencontrés
 
+Journal tenu à part, qui n'est pas remis avec le dépôt : les renvois « point N » et « §10, point N » des documents et du code y mènent.
+
+<!-- atelier -->
 Tenu dans `docs/HISTORIQUE.md`, numérotation inchangée : les renvois « §10, point N » y mènent. Le journal commence au point 323 ; les points 1 à 322, d'avant la version voile et surf, sont hors dépôt (son en-tête dit où les lire). À consulter sur le sujet qu'on touche, avant de retenter ce qui a déjà été essayé.
+<!-- /atelier -->
 
 ## 11. Limites connues
 
-Des faits sur le code, sans intention : ce qui reste à faire est dans `docs/BACKLOG.md`, cité ici par son numéro (« reste à faire n° N ») ou par celui de l'essai au téléphone.
+Des faits sur le code, sans intention.
+
+<!-- atelier -->
+Ce qui reste à faire est dans `docs/BACKLOG.md`, cité ici par son numéro (« reste à faire n° N ») ou par celui de l'essai au téléphone.
+<!-- /atelier -->
 
 - **Panneaux d'une analyse sur plusieurs colonnes** : chacun remonte sous le dernier de sa colonne (`components/panelPacking.ts`), sans vide sous un panneau court, mais les colonnes peuvent finir de hauteurs inégales.
 
@@ -403,7 +431,10 @@ Des faits sur le code, sans intention : ce qui reste à faire est dans `docs/BAC
 - **Tenus pour bons sans essai sur le terrain** : les bords en voile pendant l'enregistrement (point 62), « Précédent » de la planification (point 63), l'activité d'une session changée en route (point 64).
 - **Fluidité** (points 263, 270 et 400) : toutes ces mesures sont du banc (version compilée, ordinateur, processeur ralenti six fois pour imiter un téléphone, `fluidite-compile.mjs`) ; aucune n'a été prise au téléphone, où l'utilisateur ne retrouve pas ces durées faute de très longue session ; seul « Analyser » à la fin d'un enregistrement lui paraissait un peu long (point 282). Une mesure de rapidité se fait sur la version compilée, jamais sur le serveur de développement.
   - Lecture du GPX, cinématique puis, depuis le lot 400, l'analyse (seuil, vent, polaire, couleurs de la trace) et les vignettes tournent dans un calcul en arrière-plan à deux files (« analyse » et « fond »), non sur le fil de la page. Voile d'une heure à 5 Hz ouverte depuis Sessions : trace affichée en 0,36 s à vitesse normale, 0,9 s ralenti six fois (1,4 s avant) ; plus longue tâche qui fige l'écran : 0,22 s ralenti six fois (1,03 s avant) ; écran figé en tout 0,45 s (1,27 s avant). À vitesse normale l'attente elle-même ne raccourcit pas : le calcul dure autant, il a changé de fil.
-  - Pas plus rapides : le changement du seuil d'activité (environ 0,05 s à vitesse normale, 0,4 s ralenti, le redessin de la page en est le gros) et la mise à jour des résumés de douze sessions au lancement (0,7 à 1,2 s, 2,1 à 2,5 s ralenti). Pendant un recalcul, les derniers chiffres restent affichés (§2 des décisions).
+  - Pas plus rapides : le changement du seuil d'activité (environ 0,05 s à vitesse normale, 0,4 s ralenti, le redessin de la page en est le gros) et la mise à jour des résumés de douze sessions au lancement (0,7 à 1,2 s, 2,1 à 2,5 s ralenti). Pendant un recalcul, les derniers chiffres restent affichés.
+    <!-- atelier -->
+    Chiffres gardés pendant un recalcul : §2 des décisions.
+    <!-- /atelier -->
   - Zoom d'un graphe : un magasin externe lu par `useSyncExternalStore`, un bloc `ZoomView` par groupe de graphes seul redessiné à chaque image, 17 rendus du module sur 5 cycles de zoom ; image la plus longue d'une session de 2 h à ×6 : 1,9 → 1,5 s ; le zoom reste sous 1 s sauf voile 3 h à 5 Hz avec 4 graphes ouverts (1,2 s) : pas de plafond de lignes (point 280). Reste le dessin des graphes par Recharts.
 - **Vignettes gardées** (point 252) : une session sans calcul, montrée dans chaque famille, n'a qu'une entrée gardée et se relit d'une famille à l'autre.
 - **Programme Windows** (points 429 à 431) : non signé (avertissement « éditeur inconnu » à l'installation, accepté ; mise à jour en relançant un installeur plus récent) ; Windows n'a rien dit sur le poste où il a été fabriqué, comportement ailleurs non éprouvé. Pare-feu (point 464) : le programme installé est un nouveau fichier pour le pare-feu de Windows, autorisé par défaut sur les réseaux privés seulement, alors que le partage de connexion du PC compte comme public ; le programme le voit et propose « Autoriser Gtracker » (éprouvé sur le vrai poste le 22/11, demande au nom de Gtracker le 23/11). Limites gardées (point 470) : un blocage posé par l'utilisateur pour Gtracker compte même s'il ne vise qu'un autre profil de réseau ou un autre port ; le programme élevé est rangé dans le dossier de l'utilisateur, remplaçable par un logiciel du même utilisateur (une installation par machine et un programme signé ferment ce point). Cartes d'OpenStreetMap : serveurs de bénévoles à règle d'usage, fournisseur à revoir avant une vente (lot 308) ; les images de refus reçues avant le lot 454 restent dans le cache des tuiles du programme, à vider une fois. Programme de débogage de l'utilisateur employé tel quel, redistribution à faire lire par un juriste avant toute vente. Non prouvé au banc : la vraie fenêtre de choix de dossier de Windows, un vrai OneDrive, un disque débranché. Câble (points 442 et 454) : le débogage USB n'est pas le moyen de base d'un acheteur, qui ne l'activera pas ; le chemin lu est fixe (`Documents/Gtracker`), un téléphone dont la mémoire est ailleurs donne « dossier absent » ; le sans-fil existe (points 456 et 462) ; l'autre canal prévu est « Transfert de fichiers » (élément 452). Le compte rendu écrit « 0 sessions ajoutées » au pluriel (élément 466). Un dossier à plusieurs fichiers de montre poserait la question de la montre pendant la lecture (cas improbable). Synchronisation (lot 494) : à la première ouverture après la mise à jour, le téléphone complète le marqueur de son dossier ; si l'ordinateur synchronise dans ce même instant, le passage suivant est pris pour une copie ancienne (rien de perdu, des sessions supprimées peuvent revenir une fois). Liaison sans fil (lot 498) : un appareil qui falsifie quatre adresses peut encore empêcher de trouver l'ordinateur (l'adresse tapée le contourne). Langues (lot 502) : l'écran des licences de l'installeur reste en français pour deux textes (dette 511).
@@ -428,9 +459,16 @@ Décidée le 23 septembre 2026 ; le choix de Capacitor et les options écartées
 
 ### Avancement
 
-C'est le seul endroit où il est tenu : les phases et le reste à faire. Le détail de chaque lot est dans HISTORIQUE.
+C'est le seul endroit où il est tenu : les phases et le reste à faire.
 
-- **Phases 0 à 3 et plan en six lots** : faits du 23/09 au 08/11, avant la version voile et surf ; détail aux points 36 à 322 de l'historique d'avant, hors dépôt (en-tête de `docs/HISTORIQUE.md`). Le test de 2 h écran éteint, reporté par l'utilisateur à la phase 1, reste à faire. Dépendances à jour depuis le 28/10 (TypeScript 7.0.2, `@types/node` 26, Capacitor 8.6.0, point 192) ; les alertes de `npm audit` sont au §9.
+<!-- atelier -->
+Le détail de chaque lot est dans HISTORIQUE.
+<!-- /atelier -->
+
+- **Phases 0 à 3 et plan en six lots** : faits du 23/09 au 08/11, avant la version voile et surf ; détail aux points 36 à 322 de l'historique d'avant, hors dépôt. Le test de 2 h écran éteint, reporté par l'utilisateur à la phase 1, reste à faire. Dépendances à jour depuis le 28/10 (TypeScript 7.0.2, `@types/node` 26, Capacitor 8.6.0, point 192) ; les alertes de `npm audit` sont au §9.
+  <!-- atelier -->
+  L'historique d'avant : son lieu est dit dans l'en-tête de `docs/HISTORIQUE.md`.
+  <!-- /atelier -->
 - **Phase 2, interface mobile** : trois passes faites (points 47 à 49, 52, 56 à 58, 69 ; patron dans `docs/MISE_EN_PAGE.md`), puis les petites largeurs, la taille du texte d'Android jusqu'à 130 % et le téléphone tourné (point 139, relevé `tailles.mjs`). Restent :
   - toucher au lieu du survol : fait pour les graphes de vitesse, d'altitude et du vent (points 73, 94) ; reste la courbe d'un saut.
   - Fait : sous Android, les sélecteurs de fichiers d'import (`ImportButtons`, `PlanningPage`, `RoutesPage`) n'ont plus de filtre `accept`, qui grisait parfois les GPX ; le navigateur garde `.gpx` et `.fit`.
@@ -442,7 +480,9 @@ C'est le seul endroit où il est tenu : les phases et le reste à faire. Le dét
 
 ### Enregistrement
 
+<!-- atelier -->
 Les principes sont dans `docs/DECISIONS.md` (§6, « Enregistrement ») ; ce qui suit est technique.
+<!-- /atelier -->
 
 - **Positions** : vitesse fournie par le système (Doppler) ; cadence et distance dans `SportProfile.recording` (1 s, 0 m pour tous). Le 1 Hz tient aussi le coût du vent (point 23).
 - **Service de position** (point 401) : à nous, sans paquet tiers (`RecordingService.java`, greffon `Recording` dans `RecordingPlugin.java`) ; il écoute le GPS brut du téléphone et survit à la fermeture de l'application (balayage des récentes). Il écrit chaque position dans un journal natif privé, hors sauvegarde (`FixLog.java`, `recording-fixes.jsonl`), en plus de la page ; la page rattrape ce qui lui manque en le relisant (`recording/nativeLog.ts`) à la reprise, à « Continuer » et à « Arrêter ». `Recording.state()` dit l'état du service et signale la page revenue.
@@ -457,7 +497,10 @@ Les principes sont dans `docs/DECISIONS.md` (§6, « Enregistrement ») ; ce qui
   - Un changement d'activité ajoute une ligne `activity`.
 - **GPX** : écrit complet à l'arrêt, avec seulement la vitesse en extension (`<speed>` en m/s). Il est nommé `AAAA-MM-JJ_hh-mm-ss_<support>.gpx`, et ce nom ne change plus ensuite.
 - **Pause automatique** : sous 0,3 m/s pendant 60 s de temps de trace pour un calcul sans pré-réglage, sinon celle du pré-réglage de l'activité (point 130) ; 0 la désactive. À la lecture, le premier point de chaque `<trkseg>` après le premier porte `segmentStart` (`core/gpxParser.ts`) : le pas qui couvre la pause n'est ni parcouru ni en action.
-- **Durée et pause manuelle** (lot 158) : la durée affichée est celle de la trace moins les pauses manuelles (`manualPausedMs`, posé par `addFixAfterManualPause` au premier point gardé après la reprise, sans la part de pause automatique d'avant l'appui) ; figée pendant la pause (§6 des décisions), elle reprend à la reprise sans rattraper la pause. Les pauses automatiques restent comptées.
+- **Durée et pause manuelle** (lot 158) : la durée affichée est celle de la trace moins les pauses manuelles (`manualPausedMs`, posé par `addFixAfterManualPause` au premier point gardé après la reprise, sans la part de pause automatique d'avant l'appui) ; figée pendant la pause, elle reprend à la reprise sans rattraper la pause. Les pauses automatiques restent comptées.
+  <!-- atelier -->
+  Durée figée pendant la pause : §6 des décisions.
+  <!-- /atelier -->
 - **En direct** : `useLiveRecording`, hors des composants, recalcule les statistiques, les bords (`recording/liveStats.ts`, `liveLegs.ts`) et l'avancement sur la trace suivie (un accrochage lointain n'est validé qu'après 80 m gagnés et parcourus, point 313 ; limite : boucle courue à contresens, avancement à 0) au plus toutes les 2 s quand une page les lit, toutes les 5 s sinon, sans coût qui croisse avec la durée (points 167 et 402 : cinématique reprise sur la queue non figée, `resumeKinematics`, tableaux coupés puis prolongés sur place, distance, temps actif, FC, vitesse max et bords repris par `liveSegment.ts` jusqu'au dernier point figé, segments fermés gardés dans `LiveStatsMemory`, curseur `createFollowCursor` ; 0,13 ms par calcul à 6 h à 1 Hz, chiffres égaux au calcul complet ; restent en O(n) bon marché l'insertion des rapports Doppler et la comparaison du préfixe des positions) ; il suit l'état de l'enregistreur seulement (plus d'abonnement direct aux positions). `useRecorderSelector` lit une tranche de l'état de l'enregistreur (primitive ou référence existante, jamais un objet neuf) et `useRecorderStatus` en donne le statut ; la page Enregistrer et la barre de l'application ne se redessinent plus à chaque position (seules la carte, les chiffres, la durée et le bouton rond suivent ; point 210), `useRecordingClock` la durée affichée (elle bat en pause automatique et quand un chiffre « Heure » est lu). Les tracés Leaflet des segments fermés de `LiveMap` sont gardés par segment, seul le dernier est étendu.
 - **Notification** (point 101) : `hooks/recordingNotification.ts` récrit celle du service GPS (même numéro, même canal, nommé « Enregistrement ») par le greffon `RecordingNotificationPlugin.java` : activité et état au titre, chiffres choisis par activité (2 au plus, `MAX_NOTIFICATION_FIELDS` : au-delà, Android coupe la ligne), chronomètre d'Android, visibilité publique ; au rythme des positions, au plus toutes les 5 s. En pause manuelle, le GPS reste allumé (point 253), la notification dit « en pause » et ses chiffres restent figés. Perte du GPS (point 254) ou de la FC (point 305) : « GPS perdu » ou « FC perdue » au titre, tant qu'elle dure. Si HyperOS en masque le contenu : réglage du téléphone, Notifications › écran verrouillé.
 - **Balises en voile et en surf** (points 77 et 120) : le guidage (`hooks/useMarkGuide.ts`) vit hors React, branché au démarrage dans `main.tsx`, et avance à chaque position reçue (`subscribeToFixes` de l'enregistreur). Le rythme des bips est tenu par le greffon `BeeperPlugin.java`, sur un fil à lui ; le service GPS garde le processeur éveillé. Son sur le flux des alarmes, vibration d'usage alarme (permission `VIBRATE`). Les bips se taisent pendant une perte du GPS et reprennent à la position suivante.
@@ -465,7 +508,10 @@ Les principes sont dans `docs/DECISIONS.md` (§6, « Enregistrement ») ; ce qui
 - **FC perdue** (point 305) : même machine que le GPS (`gpsWatch.ts`), nourrie par les mesures lisibles de la ceinture (`useRecorder.ts`) ; délais `beltLostDelayS` (60 s) et `beltLostRearmS` (120 s) du profil d'enregistrement ; son à trois notes descendantes et vibration par le même minuteur natif, « FC perdue » à la notification et dans l'alerte de la page, une fois par perte ; rien en pause manuelle ni avant la première mesure.
 - **Capteurs, pour les sauts** (point 91) : quand « Mesurer les sauts » est cochée, le greffon `MotionPlugin.java` écrit accéléromètre et gyroscope bruts à 100 Hz, sur un fil à lui, dans le fichier privé `capteurs/<startedAtMs>.imu`, par paquets compressés indépendants (`ImuWriter.java`) : un arrêt brutal ne perd que le dernier. Pas de service au premier plan à lui : celui du GPS suffit (séance entière écran éteint, plus long trou 0,06 s, 2,8 Mo/h). La capture suit la pause manuelle, continue pendant la pause automatique, et une capture orpheline est arrêtée et retrouvée au lancement suivant. Le fil des capteurs est quitté à la destruction de l'activité (`handleOnDestroy`), comme le bipeur (point 273). Sans gyroscope, la case est grisée.
 - **Ceinture cardio** (point 115) : greffon `HeartRatePlugin.java` (service 0x180D, `BLUETOOTH_SCAN` avec `neverForLocation` et `BLUETOOTH_CONNECT`, demandées à l'exécution) ; avant chaque connexion, une recherche courte filtrée sur l'adresse rend l'appareil avec son vrai type d'adresse (point 146) ; jamais jointe, la ceinture est recherchée de nouveau (`searching`, bouton « Réglages Bluetooth » en secours), toutes les 10 s pendant 5 min, puis toutes les 30 s ; perdue après une jonction, reconnexion par `autoConnect`. Plusieurs appareils retenus, un seul lu à la fois, l'actif (point 315) : pas de changement une fois l'enregistrement parti ; « Réessayer » (`retryBelt`, au moins 6 s entre deux recherches, une tentative à la fois) relance la recherche sans attendre le prochain essai ; « Arrêter de chercher » en route coupe la recherche et fait partir le cadre rouge, « Reprendre la ceinture » la reconnecte (point 409) ; la recherche s'arrête côté Android (`stopScan`). Journal `adb logcat -s GtrackerHR`. Chaque mesure (bpm, contact) arrive par événement ; l'enregistreur joint la dernière à chaque position, 3 s au plus. Une connexion restée ouverte par un arrêt brutal est relâchée au lancement suivant (`releaseOrphanedBelt`). La page Enregistrer la prend dès que la case est cochée et la passe à l'enregistreur au départ (`useBeltWarmup`, point 119).
-- **Pas de zone cardio visée** (retirée le 11/11, `docs/DECISIONS.md` §6) : aucun bip de sortie de zone pendant l'enregistrement. Les bips qui restent sont ceux des balises, du GPS perdu, de la ceinture perdue et du test de FC repos (`recording/signalTones.ts` : `debut` et `finGuide`) ; les tons sont `court` et `long` (`core/beepDurations.ts`, `TonePlayer.java`).
+- **Pas de zone cardio visée** (retirée le 11/11) : aucun bip de sortie de zone pendant l'enregistrement. Les bips qui restent sont ceux des balises, du GPS perdu, de la ceinture perdue et du test de FC repos (`recording/signalTones.ts` : `debut` et `finGuide`) ; les tons sont `court` et `long` (`core/beepDurations.ts`, `TonePlayer.java`).
+  <!-- atelier -->
+  Décision : `docs/DECISIONS.md` §6.
+  <!-- /atelier -->
 - **Service GPS de l'enregistrement** : notre service de position (`RecordingService.java`, greffon `Recording`) ne sert qu'à l'enregistrement ; une localisation ponctuelle ne l'emprunte plus et reste possible pendant un enregistrement ; `platform/location.ts` attend la fin d'un arrêt avant tout départ. Les commandes de l'enregistreur (démarrer, reprendre, pause) sont sérialisées par un verrou.
 - **Satellites** (point 120) : `GnssPlugin.java` lit l'état du GNSS (`registerGnssStatusCallback`, satellites en vue et servant à la position), que le service de position ne transmet pas ; `watchSatellites` (`platform/location.ts`), suivi par la page Enregistrer tant que l'enregistrement tourne.
 - **Autorisations** (point 119) : carte « Autorisations » en tête du Profil (au premier lancement et après une mise à jour s'il en manque une) et bloc « Autorisations » de Réglages (`components/PermissionsStatus.tsx`) ; position et notifications par le greffon `Recording`, Bluetooth par `HeartRatePlugin.java`, batterie et démarrage automatique par `PermissionsPlugin.java`. La ligne « Démarrage automatique » n'existe que sur Xiaomi, Redmi et POCO (seule la marque est lue) et n'affiche aucun état ; « Tout autoriser » n'ouvre son écran qu'une fois par appareil (clé `gtracker.autostartOpened`, remise à zéro avec les autres réglages de l'appareil).
@@ -476,7 +522,10 @@ Les principes sont dans `docs/DECISIONS.md` (§6, « Enregistrement ») ; ce qui
 
 ### Compiler, installer, signer
 
-- **Développement** : `npm run dev` (ou `outils/lancer-gtracker.bat`) et le navigateur du PC ; mise en page mobile au mode appareil de Chrome. `BrowserRouter` fonctionne dans la WebView, chargement direct de chaque route compris.
+- **Développement** : `npm run dev` et le navigateur du PC ; mise en page mobile au mode appareil de Chrome. `BrowserRouter` fonctionne dans la WebView, chargement direct de chaque route compris.
+  <!-- atelier -->
+  Sur le poste, `outils/lancer-gtracker.bat` démarre le serveur s'il ne tourne pas et ouvre l'application.
+  <!-- /atelier -->
 - **Outils** :
   - **JDK 21** (Temurin) : le Java 25 d'Android Studio 2026.1 ne fait pas tourner Gradle 8.14.3 ; **Gradle reste en 8.14.3** (`android/gradle/wrapper/gradle-wrapper.properties`) : le 9.6 et au-delà refusent le plugin Android 8.13 (API interne retirée, constaté le 08/11 avec le 9.7.1 posé par Android Studio) ;
   - SDK dans `%LOCALAPPDATA%\Android\Sdk` ;
@@ -492,7 +541,10 @@ Les principes sont dans `docs/DECISIONS.md` (§6, « Enregistrement ») ; ce qui
   - Android refuse une mise à jour signée d'une autre clé, sauf désinstallation, qui efface les données (point 41).
 - **Format de Google** (lot 501) : `./gradlew bundleRelease` écrit le fichier au format de Google (AAB), signé par la même clé, à côté de l'APK ; il refuse de se construire sans clé. Le code n'est ni réduit ni obscurci (R8 peut casser les greffons, appelés par réflexion : élément 515).
 - **Contenu de l'APK** (lot 151) : le manifeste n'a plus le récepteur de démarrage du greffon GPS ni `RECEIVE_BOOT_COMPLETED` (il ne restaurait que des zones de géorepérage, jamais employées) ; `allowBackup` à false et `data_extraction_rules.xml` excluent tout de la sauvegarde et du transfert d'appareil. `androidManifest.test.ts` garde ces points. `androidManifest.test.ts` garde en plus : aucune exemption de batterie, la permission « réseau local » absente tant que la cible (`android/variables.gradle`) reste sous 37, aucune trace de la ceinture qui écrive son nom ou son adresse (l'étiquette `GtrackerHR`, les états et les délais restent), dossier partagé de `file_paths.xml` cohérent avec `SHARE_DIR`. Les licences : `licences.json` généré à la racine de `dist` par la construction, et le complément `public/licences-hors-js.json`, refait à la main par `outils/licences-hors-js.mjs` quand une dépendance native change ; un test refuse toute dépendance de production hors liste blanche (plus aucune exception depuis le lot 189). L'écran des licences est filtré par appareil (`shells` de chaque ligne du complément, `licensesForShell`) : le téléphone ne montre pas Electron ni NSIS, le programme Windows ni AndroidX, Cordova ni Capacitor Android (point 468).
-- **Repère de version** : `0.MM.NN`, correctif sur deux chiffres ; après `.99`, le nombre du milieu augmente (0.00.99, puis 0.01.00 : choix du 15/11) ; `outils/fin-de-lot.mjs` franchit `.99` seul (0.01.99 donne 0.02.00) et refuse 0.99.99. Chaque APK diffusée porte un tag annoté `v<version>` sur son commit (`git tag -a v0.01.01 -m "APK 0.01.01"`), posé à la construction, envoyé avec le commit (`git push origin main --follow-tags`).
+- **Repère de version** : `0.MM.NN`, correctif sur deux chiffres ; après `.99`, le nombre du milieu augmente (0.00.99, puis 0.01.00 : choix du 15/11 ; 0.01.99 donne 0.02.00). Chaque APK diffusée porte un tag annoté `v<version>` sur son commit (`git tag -a v0.01.01 -m "APK 0.01.01"`), posé à la construction, envoyé avec le commit (`git push origin main --follow-tags`).
+  <!-- atelier -->
+  `outils/fin-de-lot.mjs` franchit `.99` seul et refuse 0.99.99.
+  <!-- /atelier -->
 - **Diffusion** : l'APK par un lien (Drive, WeTransfer), avec la fiche `docs/INSTALLATION.md`. Après une réinstallation, désigner à nouveau le dossier mémoire : le sélecteur d'Android redonne accès aux fichiers déjà écrits.
 - **Inspection** :
   - capture d'écran : `adb exec-out screencap -p` ;

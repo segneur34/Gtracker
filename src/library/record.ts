@@ -645,7 +645,7 @@ const unreadableFields = (raw: Record<string, unknown>, parts: RecordWithoutSumm
     const readObject = read[key];
     if (rawObject === undefined || rawObject === null) continue;
     if (!isObject(readObject)) {
-      // Résumé illisible : refait depuis le GPX, sans garder son brut (DECISIONS §8).
+      // Résumé illisible : refait depuis le GPX, sans garder son brut (le résumé se recalcule, il n'a rien à perdre).
       if (key !== 'summary') lost[key] = { raw: rawObject, read: readObject };
       continue;
     }
