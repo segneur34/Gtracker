@@ -8,6 +8,8 @@ Gravités : « bloque la vente », « avant livraison » (visible par un client 
 
 Résultat attendu : plus aucune image satellite prise sans licence : le fond satellite est coupé, les images déjà gardées sur les appareils sont effacées à la mise à jour, et GONG pourra le rebrancher avec un compte chez le fournisseur. Modèle : Opus/high.
 
+Réponse de l'utilisateur du 23/11 : « les images satellites peuvent être enlevées, c'est pas un problème si elles sont pas dans une première version ». Le fond satellite est donc retiré de cette version (plus proposé nulle part, plus aucune requête vers son serveur), les images satellite déjà gardées sur les appareils sont effacées à la mise à jour, et le code reste simple à rebrancher par GONG sur un fournisseur sous contrat. Change DECISIONS §8 pour le seul satellite (à écrire à la passe de documentation).
+
 ### C-01 · Images satellite prises sans compte ni licence, et gardées sans limite
 
 - Gravité : bloque la vente ; effort : petit ; vérification : sourcé ; côté : vendeur avant la cession, à confirmer par un professionnel du droit.
@@ -34,6 +36,8 @@ Résultat attendu : plus aucune image satellite prise sans licence : le fond sat
 ## 494 · Synchronisation et « Tout supprimer »
 
 Résultat attendu : « Tout supprimer » marche de nouveau après une synchronisation, une copie du dossier du téléphone n'envoie plus de sessions à la corbeille, une note saisie pendant une synchronisation n'est plus perdue. Modèle : Opus/high.
+
+Réponse de l'utilisateur du 23/11, sur un même champ modifié des deux côtés : « il faut que ce soit la dernière version écrite qui soit gardée, tel ou pc, et l'autre corbeille mais ça risque de créer des doublons de session non ? si oui on garde pas ». Donc : c'est la version écrite en dernier qui gagne, qu'elle vienne du téléphone ou de l'ordinateur (aujourd'hui l'ordinateur gagne toujours) ; la version perdante ne va à la corbeille que si cela ne peut pas faire apparaître une seconde fois la même session (dans la liste, ou à la restauration) ; sinon elle n'est pas gardée, et le compte rendu de la synchronisation dit qu'une version plus ancienne a été remplacée. Le plan doit dire sur quelle date s'appuyer, ce qui se passe quand les dates manquent ou sont égales (repli : l'ordinateur gagne, comme aujourd'hui), et si une copie en corbeille créerait un doublon.
 
 ### A-01 · « Tout supprimer » ne supprime plus rien après une première synchronisation
 
@@ -98,6 +102,8 @@ Résultat attendu : un fichier GPX ou de montre fabriqué exprès, ou simplement
 ## 496 · Ne rien perdre à la fermeture, dire les coupures
 
 Résultat attendu : une saisie est sur le disque avant que l'application se ferme, une session coupée par le téléphone le dit en tête de son analyse, une fenêtre du programme Windows restée blanche se recharge. Modèle : Opus/high.
+
+Réponse de l'utilisateur du 23/11, sur l'arrêt seul d'un enregistrement application fermée (1 h sans s'éloigner de 200 m) : ajouter « sans bouger ». L'arrêt seul ne joue que si, en plus, aucune vraie vitesse n'a été vue pendant cette heure : un téléphone oublié sur une table s'arrête, un surfeur qui prend des vagues au même pic ou un bateau qui navigue continuent. La règle des 12 h après la fermeture ne change pas. Change DECISIONS §6 (à écrire à la passe de documentation). Le seuil de « vraie vitesse » est à proposer par le plan, d'après ce que le service connaît déjà (règle d'architecture 3 : pas de seuil en dur propre à un support).
 
 ### A-03 · Un enregistrement coupé par le téléphone est rangé sans le dire
 
@@ -177,6 +183,8 @@ Résultat attendu : le programme livré ne contient plus ni mode d'essai ni outi
 
 Résultat attendu : sur un Wi-Fi partagé, personne ne peut se faire passer pour l'ordinateur pendant l'appairage ni empêcher le téléphone de trouver le sien, le code à 6 chiffres tapé restant tel quel. Modèle : Fable/high.
 
+Réponses de l'utilisateur du 23/11 : trouver une solution pour qu'aucun intrus ne puisse se glisser dans l'appairage sans fil ; le risque est jugé relatif (réseau familial, appairage fait devant le téléphone et l'ordinateur), donc le sans-fil reste actif en attendant la correction. Contraintes : le geste de l'utilisateur change le moins possible (l'ordinateur affiche 6 chiffres, tapés sur le téléphone, DECISIONS §8) ; aucun secret ne doit pouvoir être retrouvé hors ligne à partir de ce qui passe sur le réseau ; primitives éprouvées seulement, aucune cryptographie à courbes écrite à la main ; les appareils déjà reliés le restent. Le plan compare au moins deux voies (échange authentifié par mot de passe avec une bibliothèque auditée ; code court dérivé de la liaison avec engagement préalable, qui demande une confirmation des deux côtés) et dit ce que chacune change à l'écran : tout geste en plus est une question à poser à l'utilisateur avant de coder.
+
 ### B-01 · Appairage sans fil : un intrus sur le même Wi-Fi peut prendre la place de l'ordinateur
 
 - Gravité : bloque la vente ; effort : moyen ; vérification : confirmé.
@@ -209,6 +217,8 @@ Résultat attendu : sur un Wi-Fi partagé, personne ne peut se faire passer pour
 ## 499 · Licences et phrases exactes
 
 Résultat attendu : l'écran des licences dit vrai sur chaque appareil, cite le jeu d'icônes repris et donne le lien du code source de FFmpeg, et aucune phrase de l'application n'affirme un accord ou une confidentialité qu'on ne peut pas prouver. Modèle : Sonnet/high.
+
+Réponse de l'utilisateur du 23/11 : pas d'accord écrit de GONG, et l'application ne va qu'à GONG. La phrase « reproduit avec l'accord de GONG SUP » devient une mention neutre, qui n'affirme aucun accord et ne nomme pas de société (le titulaire exact de la marque n'est pas établi).
 
 ### C-16 · Bibliothèque FFmpeg livrée sans lien vers son code source
 
@@ -427,6 +437,8 @@ Résultat attendu : le code du téléphone qui reçoit, écrit et efface des fic
 ## 506 · Dossier de la cession, à monter avec un avocat
 
 Résultat attendu : un acte de cession écrit avec son annexe de déclarations, l'avis d'un avocat sur les conditions de l'abonnement d'IA, une copie datée de l'historique gardée comme preuve, un fichier de crédits pour chaque image. Modèle : sans code.
+
+Réponse de l'utilisateur du 23/11 : l'application, avec les photos et le logo de GONG, ne va qu'à GONG ; pas d'accord écrit à ce jour.
 
 ### C-02 · Acte de cession et déclaration écrite des points connus à préparer
 
