@@ -464,7 +464,9 @@ export function dossierAdb(options: OptionsAdb): DossierDistant {
       const s = await lancer(o.adb, ['start-server'], DELAIS.demarrage)
       sonde = await sonder(cible)
       if (sonde.etat === 'aucun') {
-        throw new ErreurDisque('UNKNOWN', `Le serveur adb ne démarre pas${s.delaiDepasse ? ' (délai dépassé)' : ''} : ${(s.stderr || s.stdout).trim().slice(0, 300)}`)
+        const detail = (s.stderr || s.stdout).trim().slice(0, 300)
+        if (s.delaiDepasse) throw new ErreurDisque('UNKNOWN', `Le serveur adb ne démarre pas (délai dépassé) : ${detail}`)
+        throw new ErreurDisque('UNKNOWN', `Le serveur adb ne démarre pas : ${detail}`)
       }
     }
     if (sonde.etat !== 'version' || sonde.version !== o.version) {

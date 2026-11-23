@@ -5,8 +5,8 @@ import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CANAUX_MEMOIRE } from './memoire'
 import { ORIGINE } from './origine'
-import type { EvenementPont, Gestionnaire } from './pont'
-import { TEXTES_FERMETURE, brancherCanaux, enReponse, expediteurAdmis, lireTextesFermeture, reussite, uneALaFois } from './pont'
+import type { EvenementPont, Gestionnaire, LangueDeLaPage } from './pont'
+import { TEXTES_CHUTE, TEXTES_FERMETURE, brancherCanaux, enReponse, expediteurAdmis, langueDeLaPage, lireTextesFermeture, reussite, uneALaFois } from './pont'
 import { ErreurDisque } from './disque'
 import { AVIS_ARRIVEE, AVIS_DEPART, CANAUX_SANS_FIL } from './sansFil'
 import type { DossierDistant } from './telephone'
@@ -110,6 +110,29 @@ describe('textes de la question de fermeture', () => {
     expect(lireTextesFermeture({ ...anglais, detail: 'x'.repeat(600) })).toBeNull()
     expect(lireTextesFermeture('Quit')).toBeNull()
     expect(TEXTES_FERMETURE.question).toBe('Quitter sans enregistrer ?')
+  })
+})
+
+describe('question de relance après des chutes de la page', () => {
+  it('existe dans chacune des trois langues, chaque texte non vide et propre à sa langue', () => {
+    const langues = Object.keys(TEXTES_CHUTE).sort()
+    expect(langues).toEqual(['en', 'es', 'fr'])
+    const vus = new Set<string>()
+    for (const langue of langues as LangueDeLaPage[]) {
+      for (const texte of Object.values(TEXTES_CHUTE[langue])) {
+        expect(texte.trim()).not.toBe('')
+        vus.add(texte)
+      }
+    }
+    expect(vus.size).toBe(12)
+  })
+
+  it('la langue de la page vient de son attribut lang ; une valeur inconnue donne le français', () => {
+    expect(langueDeLaPage('en')).toBe('en')
+    expect(langueDeLaPage('es')).toBe('es')
+    expect(langueDeLaPage('fr')).toBe('fr')
+    expect(langueDeLaPage('de')).toBe('fr')
+    expect(langueDeLaPage(undefined)).toBe('fr')
   })
 })
 

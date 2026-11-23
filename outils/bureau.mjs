@@ -169,9 +169,26 @@ const VARIABLE_DOSSIER = 'GTRACKER_DOSSIER_PROGRAMME'
 /** Longueur maximale d'une chaîne de NSIS (`NSIS_MAX_STRLEN` du NSIS d'electron-builder). */
 export const LONGUEUR_MAX_NSIS = 8192
 
-/** Message de l'installeur quand Gtracker n'a pas pu être fermé ; ses boutons sont « Réessayer » et « Annuler ». */
-export const MESSAGE_NON_FERME =
-  "Gtracker est ouvert et l'installation n'arrive pas à le fermer.$\\r$\\n$\\r$\\nFermez Gtracker, puis cliquez sur Réessayer. Annuler garde la version déjà installée."
+/**
+ * Langues de l'installeur (noms d'electron-builder). Le français d'abord : c'est celle de repli quand la langue de
+ * Windows n'est pas du lot ; NSIS prend sinon celle de Windows, l'installeur ne pouvant pas connaître celle que
+ * l'utilisateur a réglée dans Gtracker.
+ */
+export const LANGUES_INSTALLEUR = ['fr_FR', 'en_US', 'es_ES']
+
+/** Nom, dans le script NSIS, du message ci-dessous (`LangString`), lu par `$(…)` selon la langue de l'installeur. */
+export const NOM_MESSAGE_NON_FERME = 'GTRACKER_NON_FERME'
+
+/**
+ * Message de l'installeur quand Gtracker n'a pas pu être fermé, par numéro de langue de Windows (1036 français, 1033
+ * anglais, 3082 espagnol) ; ses boutons, ceux de Windows, sont « Réessayer » et « Annuler » (« Retry » et « Cancel »,
+ * « Reintentar » et « Cancelar »).
+ */
+export const MESSAGES_NON_FERME = {
+  1036: "Gtracker est ouvert et l'installation n'arrive pas à le fermer.$\\r$\\n$\\r$\\nFermez Gtracker, puis cliquez sur Réessayer. Annuler garde la version déjà installée.",
+  1033: "Gtracker is open and the installer cannot close it.$\\r$\\n$\\r$\\nClose Gtracker, then click Retry. Cancel keeps the version already installed.",
+  3082: "Gtracker está abierto y el instalador no consigue cerrarlo.$\\r$\\n$\\r$\\nCierra Gtracker y pulsa Reintentar. Cancelar conserva la versión ya instalada.",
+}
 
 /**
  * Script Windows PowerShell de fermeture, avant une installation par-dessus. Il vise les processus dont l'exécutable
@@ -259,6 +276,7 @@ export function inclusNsis(options = {}) {
   return [
     "; Fermeture de Gtracker avant une installation par-dessus, sans question, et retrait de ses règles du pare-feu à la désinstallation (écrit par outils/bureau.mjs).",
     '!ifndef BUILD_UNINSTALLER',
+    ...Object.entries(MESSAGES_NON_FERME).map(([langue, texte]) => `LangString ${NOM_MESSAGE_NON_FERME} ${langue} "${texte}"`),
     '!macro customCheckAppRunning',
     `  System::Call 'kernel32::SetEnvironmentVariable(t "${VARIABLE_DOSSIER}", t "$INSTDIR")'`,
     '  gtracker_fermer:',
@@ -285,7 +303,7 @@ export function inclusNsis(options = {}) {
     '      Goto gtracker_ferme',
     '    ${EndIf}',
     '  ${EndIf}',
-    `  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION|MB_TOPMOST|MB_SETFOREGROUND "${MESSAGE_NON_FERME}" /SD IDCANCEL IDRETRY gtracker_fermer`,
+    `  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION|MB_TOPMOST|MB_SETFOREGROUND "$(${NOM_MESSAGE_NON_FERME})" /SD IDCANCEL IDRETRY gtracker_fermer`,
     '  SetErrorLevel 2',
     '  Quit',
     '  gtracker_ferme:',
@@ -314,7 +332,7 @@ export function octetsInclusNsis(options = {}) {
 
 /**
  * Configuration d'electron-builder pour l'installeur NSIS : en un clic, par utilisateur, raccourcis « Gtracker » sur
- * le Bureau et dans le menu Démarrer, profil gardé à la désinstallation, en français, sans signature ni retouche de
+ * le Bureau et dans le menu Démarrer, profil gardé à la désinstallation, en français, anglais et espagnol, sans signature ni retouche de
  * l'exécutable (déjà fait par l'emballage et les fusibles). `include` : le fichier de `inclusNsis`, écrit avant.
  */
 export function configNsis({ version, electronVersion, sortie = ATELIER_INSTALLEUR, icone = ICONE, include = join(sortie, FICHIER_INCLUS_NSIS), essai = false }) {
@@ -345,7 +363,7 @@ export function configNsis({ version, electronVersion, sortie = ATELIER_INSTALLE
       uninstallDisplayName: 'Gtracker',
       deleteAppDataOnUninstall: false,
       artifactName: nomInstalleur(version, { essai }),
-      installerLanguages: ['fr_FR'],
+      installerLanguages: LANGUES_INSTALLEUR,
       language: '1036',
       differentialPackage: false,
       include,

@@ -1,11 +1,15 @@
 import { errorMessage } from '../core/basics';
 import { t } from '../core/i18n';
+import { shellPhrase } from './shellMessages';
 
 /**
  * Messages de refus des greffons Android (`call.reject` des classes Java) : écrits en français côté téléphone, quelle
  * que soit la langue de l'interface, ils reviennent à la page comme message d'erreur. Rendus ici dans la langue de
  * l'interface, par une table indexée par le texte reçu, au caractère près ; le Java ne change pas. Seuls ceux qui
  * peuvent arriver à l'écran y figurent : une phrase changée côté Java se change ici aussi.
+ *
+ * Les erreurs de la coquille du programme Windows s'y rendent de la même façon, par leur propre table
+ * (`shellMessages.ts`).
  *
  * Le dossier mémoire rejette « phrase : détail d'Android » (`rejectCoded`) : la phrase se traduit, le détail reste tel
  * quel (`plainError` le remplace par la phrase seule quand il est technique).
@@ -44,7 +48,11 @@ const NATIVE_MESSAGES: Readonly<Record<string, string>> = {
   'Fichier reçu illisible': t('Fichier reçu illisible'),
 };
 
-const isNativePhrase = (text: string): boolean => Object.hasOwn(NATIVE_MESSAGES, text);
+/** Phrase d'un greffon ou de la coquille du programme Windows (`shellMessages.ts`) dans la langue de l'interface ; `undefined` si `text` n'en est pas une. */
+const translatePhrase = (text: string): string | undefined =>
+  Object.hasOwn(NATIVE_MESSAGES, text) ? NATIVE_MESSAGES[text] : (shellPhrase(text) ?? undefined);
+
+const isNativePhrase = (text: string): boolean => translatePhrase(text) !== undefined;
 
 /** Phrase avant le détail d'Android ; le texte entier s'il n'en porte pas. */
 const phraseOf = (text: string): string => {
@@ -56,14 +64,16 @@ const phraseOf = (text: string): string => {
 export const isNativeMessage = (text: string): boolean => isNativePhrase(text) || isNativePhrase(phraseOf(text));
 
 /** Phrase d'un greffon dans la langue de l'interface ; tout autre texte, tel quel. */
-export const nativePhrase = (text: string): string => (isNativePhrase(text) ? NATIVE_MESSAGES[text] : text);
+export const nativePhrase = (text: string): string => translatePhrase(text) ?? text;
 
 /** Message d'un greffon dans la langue de l'interface, le détail d'Android gardé tel quel ; tout autre texte, tel quel. */
 export const nativeText = (text: string): string => {
-  if (isNativePhrase(text)) return NATIVE_MESSAGES[text];
+  const whole = translatePhrase(text);
+  if (whole !== undefined) return whole;
   const phrase = phraseOf(text);
-  if (phrase === text || !isNativePhrase(phrase)) return text;
-  return t('{phrase} : {detail}', { phrase: NATIVE_MESSAGES[phrase], detail: text.slice(phrase.length + DETAIL_SEPARATOR.length) });
+  const translated = phrase === text ? undefined : translatePhrase(phrase);
+  if (translated === undefined) return text;
+  return t('{phrase} : {detail}', { phrase: translated, detail: text.slice(phrase.length + DETAIL_SEPARATOR.length) });
 };
 
 /** Message d'une erreur attrapée (`errorMessage`), celui d'un greffon rendu dans la langue de l'interface. */

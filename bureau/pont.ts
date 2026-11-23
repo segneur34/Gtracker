@@ -113,6 +113,51 @@ export const TEXTES_FERMETURE: TextesFermeture = Object.freeze({
   rester: 'Rester',
 })
 
+// ---------- texte de la question de relance après des chutes de la page ----------
+
+/** Langues de l'interface (`LANGUAGES` de `src/core/i18n.ts`, que la coquille ne peut pas importer). */
+export type LangueDeLaPage = 'fr' | 'en' | 'es'
+
+/** Textes de la question posée quand la page s'arrête plusieurs fois de suite. */
+export type TextesChute = {
+  /** Bouton qui relance le programme. */
+  relancer: string
+  /** Bouton qui ferme. */
+  fermer: string
+  question: string
+  detail: string
+}
+
+/**
+ * Textes de cette question dans chaque langue : la page, arrêtée, ne peut pas les passer, la coquille les porte donc
+ * elle-même et prend ceux de la langue que la page lui a fait connaître.
+ */
+export const TEXTES_CHUTE: Readonly<Record<LangueDeLaPage, TextesChute>> = Object.freeze({
+  fr: {
+    relancer: 'Relancer',
+    fermer: 'Fermer',
+    question: "La page s'est arrêtée : relancer ?",
+    detail: "Elle s'est arrêtée plusieurs fois en quelques minutes. Relancer redémarre le programme.",
+  },
+  en: {
+    relancer: 'Restart',
+    fermer: 'Close',
+    question: 'The page has stopped: restart?',
+    detail: 'It has stopped several times within a few minutes. Restarting reopens the program.',
+  },
+  es: {
+    relancer: 'Reiniciar',
+    fermer: 'Cerrar',
+    question: 'La página se ha detenido: ¿reiniciar?',
+    detail: 'Se ha detenido varias veces en pocos minutos. Reiniciar vuelve a abrir el programa.',
+  },
+})
+
+/** Langue de la page d'après son attribut `lang` ; le français pour toute autre valeur. */
+export function langueDeLaPage(valeur: unknown): LangueDeLaPage {
+  return valeur === 'en' || valeur === 'es' ? valeur : 'fr'
+}
+
 /** Longueur maximale d'un texte de la question. */
 const TEXTE_MAX = 500
 

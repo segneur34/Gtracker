@@ -73,7 +73,8 @@ import { AVIS_ARRIVEE, AVIS_DEPART, DOSSIER_SANS_FIL, ServeurSansFil, dossierSan
 import type { DossierDistant } from './telephone'
 import { DOSSIER_LECTURES, dossierLocal, enSerie, essaiTelephoneDepuisEnvironnement, gestionnairesTelephone, viderLectures } from './telephone'
 import { ADRESSE_ACCUEIL, HOTE, estDeLApplication } from './origine'
-import { TEXTES_FERMETURE, brancherCanaux, echec, expediteurAdmis, lireTextesFermeture, reussite, uneALaFois } from './pont'
+import type { LangueDeLaPage } from './pont'
+import { TEXTES_CHUTE, TEXTES_FERMETURE, brancherCanaux, echec, expediteurAdmis, langueDeLaPage, lireTextesFermeture, reussite, uneALaFois } from './pont'
 import type { TextesFermeture } from './pont'
 import { CSP, reponseA } from './protocole'
 import { gardeRechargements } from './rechargement'
@@ -310,6 +311,9 @@ function raccourcis(fenetre: BrowserWindow): void {
 // la croix de la fenêtre semblerait ne rien faire. Ses textes sont ceux que la page a passés dans sa langue
 // (`coquille:textes`), en français tant qu'elle n'a rien passé.
 let textesFermeture: TextesFermeture = TEXTES_FERMETURE
+// Langue de la page, lue quand elle passe ses textes (elle l'a posée avant) : la question de relance après des chutes
+// la prend, la page arrêtée ne pouvant plus la dire.
+let languePage: LangueDeLaPage = 'fr'
 
 function questionDeFermeture(fenetre: BrowserWindow): void {
   fenetre.webContents.on('will-prevent-unload', (evenement) => {
@@ -436,16 +440,17 @@ function relancerApresChute(fenetre: BrowserWindow): void {
     }
     journal('chutes trop rapprochées : relance proposée')
     if (BANC) return
+    const textes = TEXTES_CHUTE[languePage]
     void dialog
       .showMessageBox(fenetre, {
         type: 'error',
-        buttons: ['Relancer', 'Fermer'],
+        buttons: [textes.relancer, textes.fermer],
         defaultId: 0,
         cancelId: 1,
         noLink: true,
         title: 'Gtracker',
-        message: "La page s'est arrêtée : relancer ?",
-        detail: "Elle s'est arrêtée plusieurs fois en quelques minutes. Relancer redémarre le programme.",
+        message: textes.question,
+        detail: textes.detail,
       })
       .then(({ response }) => {
         journal(`relance après les chutes : ${response === 0 ? 'relancer' : 'fermer'}`)
@@ -634,6 +639,10 @@ function brancherPont(): void {
         const textes = lireTextesFermeture(argument)
         if (!textes) return echec('UNKNOWN', 'Textes de la question de fermeture incomplets.')
         textesFermeture = textes
+        fenetrePrincipale?.webContents.executeJavaScript('document.documentElement.lang').then(
+          (langue: unknown) => { languePage = langueDeLaPage(langue) },
+          () => undefined,
+        )
         return reussite(null)
       },
       'coquille:noter': async (argument) => {

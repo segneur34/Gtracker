@@ -10,6 +10,7 @@ import {
   type DesktopWirelessState,
 } from './desktopBridge';
 import { bridgeValue } from './diskMemory';
+import { nativeText } from './nativeMessages';
 import { isDesktopApp } from './runtime';
 
 /**
@@ -82,11 +83,16 @@ const requireWireless = (): DesktopWirelessBridge => {
   return bridge;
 };
 
+/** État rendu par la coquille, dont la phrase `erreur` (écrite en français) passe dans la langue de l'interface. */
+const stateOf = (state: WirelessState): WirelessState =>
+  typeof state.erreur === 'string' ? { ...state, erreur: nativeText(state.erreur) } : state;
+
 /** État du sans-fil ; lève sur une panne imprévue, avec la phrase à montrer. */
-export const wirelessState = (): Promise<WirelessState> => bridgeValue(requireWireless().etat());
+export const wirelessState = (): Promise<WirelessState> => bridgeValue(requireWireless().etat()).then(stateOf);
 
 /** Allume ou éteint le sans-fil (le choix est retenu) ; rend l'état qui suit. */
-export const setWirelessActive = (active: boolean): Promise<WirelessState> => bridgeValue(requireWireless().activer({ actif: active }));
+export const setWirelessActive = (active: boolean): Promise<WirelessState> =>
+  bridgeValue(requireWireless().activer({ actif: active })).then(stateOf);
 
 /** Ouvre la fenêtre de liaison d'un téléphone ; lève si le sans-fil est éteint ou sans réseau. */
 export const openWirelessPairing = (): Promise<WirelessPairing> => bridgeValue(requireWireless().ouvrirAppairage());
@@ -116,7 +122,11 @@ export const authorizeWireless = (): Promise<WirelessAuthorization> => {
   if (typeof bridge.autoriser !== 'function') {
     throw Object.assign(new Error(t('Ce programme ne sait pas demander cette autorisation à Windows.')), { code: 'UNKNOWN' });
   }
-  return bridgeValue(bridge.autoriser());
+  return bridgeValue(bridge.autoriser()).then((result) => ({
+    ...result,
+    ...(result.detail === undefined ? {} : { detail: nativeText(result.detail) }),
+    etat: stateOf(result.etat),
+  }));
 };
 
 /** Avis lu avec méfiance : ce qui n'a pas la forme attendue est ignoré. */

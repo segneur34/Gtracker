@@ -8,7 +8,9 @@ import {
   FICHIER_INCLUS_NSIS,
   ID_PROGRAMME,
   LONGUEUR_MAX_NSIS,
-  MESSAGE_NON_FERME,
+  LANGUES_INSTALLEUR,
+  MESSAGES_NON_FERME,
+  NOM_MESSAGE_NON_FERME,
   cheminApk,
   LANGUES_GARDEES,
   configNsis,
@@ -99,7 +101,7 @@ describe('configNsis', () => {
     expect(config.nsis.shortcutName).toBe('Gtracker')
     expect(config.productName).toBe('Gtracker')
     expect(config.win.icon).toBe('icone.ico')
-    expect(config.nsis.installerLanguages).toEqual(['fr_FR'])
+    expect(config.nsis.installerLanguages).toEqual(['fr_FR', 'en_US', 'es_ES'])
     expect(config.appId).toBe(ID_PROGRAMME)
     expect(config.publish).toBeNull()
   })
@@ -149,6 +151,24 @@ describe('fermeture de Gtracker par l’installeur', () => {
     expect(inclusNsis({ fermetureS: 8, forceS: 3 })).toMatch(/Sleep 8000\r\n[\s\S]*Sleep 3000\r\n/)
   })
 
+  it('le message est écrit dans les trois langues de l’installeur, chacune par son numéro de Windows', () => {
+    const numeros = { fr_FR: 1036, en_US: 1033, es_ES: 3082 }
+    expect(LANGUES_INSTALLEUR.map((l) => String(numeros[l])).sort()).toEqual(Object.keys(MESSAGES_NON_FERME).sort())
+    const declares = lignes.filter((l) => l.startsWith(`LangString ${NOM_MESSAGE_NON_FERME} `))
+    expect(declares).toHaveLength(3)
+    // Dans la passe de l'installeur seulement, avant la macro qui les lit.
+    const debut = lignes.indexOf('!ifndef BUILD_UNINSTALLER')
+    for (const l of declares) expect(lignes.indexOf(l)).toBeGreaterThan(debut)
+    expect(Math.max(...declares.map((l) => lignes.indexOf(l)))).toBeLessThan(lignes.indexOf('!macro customCheckAppRunning'))
+    for (const [numero, texte] of Object.entries(MESSAGES_NON_FERME)) {
+      expect(declares).toContain(`LangString ${NOM_MESSAGE_NON_FERME} ${numero} "${texte}"`)
+      expect(texte).toMatch(/\$\\r\$\\n\$\\r\$\\n/)
+      expect(texte).not.toMatch(/"/)
+    }
+    expect(MESSAGES_NON_FERME[1033]).toContain('Retry')
+    expect(MESSAGES_NON_FERME[3082]).toContain('Reintentar')
+  })
+
   it('fichier écrit en UTF-8 précédé de sa marque : les accents du message restent justes', () => {
     const octets = octetsInclusNsis()
     expect([...octets.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
@@ -175,8 +195,8 @@ describe('fermeture de Gtracker par l’installeur', () => {
     expect(message).toContain('MB_RETRYCANCEL')
     expect(message).toContain('MB_TOPMOST|MB_SETFOREGROUND')
     expect(message).toContain('/SD IDCANCEL IDRETRY gtracker_fermer')
-    expect(message).toContain(MESSAGE_NON_FERME)
-    expect(MESSAGE_NON_FERME).toContain('cliquez sur Réessayer')
+    expect(message).toContain(`"$(${NOM_MESSAGE_NON_FERME})"`)
+    expect(MESSAGES_NON_FERME[1036]).toContain('cliquez sur Réessayer')
     const suite = lignes.slice(lignes.indexOf(message) + 1, lignes.indexOf(message) + 3).map((l) => l.trim())
     expect(suite).toEqual(['SetErrorLevel 2', 'Quit'])
   })

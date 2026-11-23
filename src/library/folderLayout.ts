@@ -56,8 +56,8 @@ export const readMarkerVersion = (text: string | null): number => {
   return isObject(marker) && marker.format === MEMORY_FORMAT && isFiniteNumber(marker.version) ? marker.version : 1;
 };
 
-/** Texte du `LISEZMOI.txt`, en fins de ligne Windows : il sera surtout ouvert sur un PC. */
-export const readmeText = (): string =>
+/** Le `LISEZMOI.txt` en français, une ligne par élément. */
+const readmeFrench = (): string[] =>
   [
     'Dossier mémoire de Gtracker',
     '===========================',
@@ -95,4 +95,94 @@ export const readmeText = (): string =>
     'Ne modifiez pas les fichiers à la main, sauf pour les supprimer : supprimez',
     'alors le GPX, sa fiche et son .imu ensemble.',
     '',
-  ].join('\r\n');
+  ];
+
+/** Le même texte en anglais : les noms de fichiers et de dossiers sont ceux du disque, les intitulés ceux de l'écran anglais. */
+const readmeEnglish = (): string[] => [
+  'Gtracker storage folder',
+  '=======================',
+  '',
+  'This folder holds all your sessions and settings.',
+  '',
+  '- sessions/: one GPX track per session, and next to it a .json record with the same',
+  '  name (summary, sport, notes). The GPX is the reference: the record can be rebuilt,',
+  '  except the notes. A session whose jumps were measured also has an .imu file with',
+  '  the same name: the phone\'s accelerometer and gyroscope readings.',
+  '- itineraires/: the planned routes. The .json record is the reference (waypoints,',
+  '  track); the GPX with the same name is there to take into another app or onto a',
+  '  watch.',
+  '- reglages/: one settings file per device (telephone.json, pc.json...): activities',
+  '  and their settings, bottom bar, athlete profile. Each device writes its own. To',
+  '  load those of another device, or of someone else: drop their file here, then in',
+  '  Settings > Storage, "Update" and "Load".',
+  '- fc-repos.json: your resting heart rate tests. Each device adds its own and loads',
+  '  those of the others when the folder is opened.',
+  '- lieux.json: the places you corrected, used to name later sessions that start from',
+  '  the same spot. Shared between devices like fc-repos.json.',
+  `- ${JOURNALS_DIR}/: only exists if an interrupted recording could not be rebuilt: its`,
+  '  log is copied there as it is, to keep or to delete.',
+  `- ${MARKER_FILE}: lets the app recognise this folder.`,
+  '',
+  'To back up or to change device: copy the whole Gtracker folder.',
+  'On the phone, it is in Internal storage > Documents > Gtracker',
+  '(over a USB cable from the PC, or with the file manager).',
+  '',
+  'To add a track from another app: drop its GPX in sessions/.',
+  'The app creates its record at the next launch, or when you tap',
+  '"Update" at the top of a session list.',
+  '',
+  'Do not edit the files by hand, except to delete them: then delete the GPX, its',
+  'record and its .imu together.',
+  '',
+];
+
+/** Le même texte en espagnol, sur le même principe. */
+const readmeSpanish = (): string[] => [
+  'Carpeta de almacenamiento de Gtracker',
+  '=====================================',
+  '',
+  'Esta carpeta contiene todas tus sesiones y tus ajustes.',
+  '',
+  '- sessions/: un track GPX por sesión, y al lado una ficha .json con el mismo nombre',
+  '  (resumen, deporte, notas). El GPX es la referencia: la ficha se puede recalcular,',
+  '  salvo las notas. Una sesión cuyos saltos se han medido tiene además un archivo',
+  '  .imu con el mismo nombre: las mediciones del acelerómetro y del giroscopio del',
+  '  teléfono.',
+  '- itineraires/: las rutas planificadas. La ficha .json es la referencia (puntos de',
+  '  paso, trazado); el GPX con el mismo nombre sirve para llevarlo a otra aplicación o',
+  '  a un reloj.',
+  '- reglages/: un archivo de ajustes por dispositivo (telephone.json, pc.json...):',
+  '  actividades y sus ajustes, barra inferior, perfil del deportista. Cada dispositivo',
+  '  escribe el suyo. Para cargar los de otro dispositivo, o de otra persona: deja su',
+  '  archivo aquí y, en Ajustes > Almacenamiento, pulsa «Actualizar» y «Cargar».',
+  '- fc-repos.json: tus tests de FC en reposo. Cada dispositivo añade los suyos y',
+  '  recupera los de los demás al abrir la carpeta.',
+  '- lieux.json: los lugares que has corregido, para nombrar las sesiones siguientes',
+  '  salidas del mismo sitio. Se comparten entre dispositivos como fc-repos.json.',
+  `- ${JOURNALS_DIR}/: solo existe si una grabación interrumpida no se pudo reconstruir:`,
+  '  su registro se copia aquí tal cual, para conservarlo o borrarlo.',
+  `- ${MARKER_FILE}: permite que la aplicación reconozca esta carpeta.`,
+  '',
+  'Para hacer una copia de seguridad o cambiar de dispositivo: copia la carpeta Gtracker entera.',
+  'En el teléfono está en Almacenamiento interno > Documents > Gtracker',
+  '(por cable USB desde el PC, o con el gestor de archivos).',
+  '',
+  'Para añadir un track de otra aplicación: deja su GPX en sessions/.',
+  'La aplicación crea su ficha en el siguiente arranque, o al pulsar',
+  '«Actualizar» en la parte superior de una lista de sesiones.',
+  '',
+  'No modifiques los archivos a mano, salvo para borrarlos: borra entonces el GPX,',
+  'su ficha y su .imu juntos.',
+  '',
+];
+
+/** Ligne qui sépare les trois langues du `LISEZMOI.txt`. */
+export const README_SEPARATOR = '-'.repeat(78);
+
+/**
+ * Texte du `LISEZMOI.txt` : français, puis anglais, puis espagnol, dans un seul fichier (le dossier se partage entre
+ * appareils et il s'ouvre à la main, sans langue connue), séparés par une ligne de tirets, en fins de ligne Windows :
+ * il sera surtout ouvert sur un PC.
+ */
+export const readmeText = (): string =>
+  [...readmeFrench(), README_SEPARATOR, '', ...readmeEnglish(), README_SEPARATOR, '', ...readmeSpanish()].join('\r\n');
