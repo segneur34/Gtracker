@@ -4,7 +4,7 @@ import { bandIndex } from '../core/basics';
 import { sportFamily, type SportFamily } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
 import {
-  formatClock, formatDistance, formatShortDistance, formatSpeed, formatTimeOfDay, type DistanceUnit, type SpeedUnit,
+  MISSING, formatClock, formatDistance, formatShortDistance, formatSpeed, formatTimeOfDay, type DistanceUnit, type SpeedUnit,
 } from '../core/units';
 import { LIVE_STATS_DEFAULTS, type LiveStats, type LiveStatsOptions } from './liveStats';
 
@@ -208,9 +208,7 @@ export interface LiveFieldContext extends LiveFieldUnits {
   heartRateZoneBounds: readonly number[] | null;
 }
 
-const NONE = '—';
-
-/** Valeur d'un chiffre, formatée dans les unités de l'activité ; « — » quand elle manque. */
+/** Valeur d'un chiffre, formatée dans les unités de l'activité ; `MISSING` quand elle manque. */
 export const liveFieldValue = (key: LiveFieldKey, ctx: LiveFieldContext): string => {
   const { stats, speedUnit, distanceUnit } = ctx;
   switch (key) {
@@ -221,23 +219,23 @@ export const liveFieldValue = (key: LiveFieldKey, ctx: LiveFieldContext): string
     case 'lastDistance': return formatSpeed(stats.lastDistanceSpeedMs, speedUnit);
     case 'distance': return formatDistance(stats.distanceM, distanceUnit);
     case 'duration': return formatClock(ctx.durationMs);
-    case 'clock': return ctx.nowMs === null ? NONE : formatTimeOfDay(ctx.nowMs).slice(0, 5);
-    case 'remaining': return ctx.remainingM === null ? NONE : formatDistance(ctx.remainingM, distanceUnit);
+    case 'clock': return ctx.nowMs === null ? MISSING : formatTimeOfDay(ctx.nowMs).slice(0, 5);
+    case 'remaining': return ctx.remainingM === null ? MISSING : formatDistance(ctx.remainingM, distanceUnit);
     case 'remainingTime': {
       // Hors pauses, jamais la moyenne active : elle rendrait l'heure d'arrivée trop optimiste.
       const speed = stats.averageSpeedMs;
-      return ctx.remainingM === null || speed === null || speed <= 0 ? NONE : formatClock((ctx.remainingM / speed) * 1000);
+      return ctx.remainingM === null || speed === null || speed <= 0 ? MISSING : formatClock((ctx.remainingM / speed) * 1000);
     }
     case 'recentTopShort': return formatSpeed(stats.recentTopsMs[0] ?? null, speedUnit);
     case 'recentTopLong': return formatSpeed(stats.recentTopsMs[1] ?? null, speedUnit);
-    case 'heading': return ctx.headingDeg === null ? NONE : `${roundBearingDeg(ctx.headingDeg)}°`;
-    case 'legAverage': return stats.legs.current ? formatSpeed(stats.legs.current.averageSpeedMs, speedUnit) : NONE;
-    case 'markDistance': return ctx.markDistanceM === null ? NONE : formatShortDistance(ctx.markDistanceM, distanceUnit);
-    case 'markBearing': return ctx.markBearingDeg === null ? NONE : `${roundBearingDeg(ctx.markBearingDeg)}°`;
-    case 'heartRate': return ctx.heartRateBpm === null ? NONE : `${Math.round(ctx.heartRateBpm)} bpm`;
-    case 'averageHeartRate': return stats.averageHeartRateBpm === null ? NONE : `${Math.round(stats.averageHeartRateBpm)} bpm`;
+    case 'heading': return ctx.headingDeg === null ? MISSING : `${roundBearingDeg(ctx.headingDeg)}°`;
+    case 'legAverage': return stats.legs.current ? formatSpeed(stats.legs.current.averageSpeedMs, speedUnit) : MISSING;
+    case 'markDistance': return ctx.markDistanceM === null ? MISSING : formatShortDistance(ctx.markDistanceM, distanceUnit);
+    case 'markBearing': return ctx.markBearingDeg === null ? MISSING : `${roundBearingDeg(ctx.markBearingDeg)}°`;
+    case 'heartRate': return ctx.heartRateBpm === null ? MISSING : `${Math.round(ctx.heartRateBpm)} bpm`;
+    case 'averageHeartRate': return stats.averageHeartRateBpm === null ? MISSING : `${Math.round(stats.averageHeartRateBpm)} bpm`;
     case 'heartRateZone': {
-      if (ctx.heartRateBpm === null || ctx.heartRateZoneBounds === null) return NONE;
+      if (ctx.heartRateBpm === null || ctx.heartRateZoneBounds === null) return MISSING;
       const bpm = Math.round(ctx.heartRateBpm);
       const zone = bandIndex(bpm, ctx.heartRateZoneBounds);
       return `${zone === 0 ? t('sous Z1') : `Z${zone}`} · ${bpm}`;

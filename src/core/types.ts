@@ -87,7 +87,7 @@ export interface TrackPoint {
 
 /** Meilleur segment sur une cible de temps ou de distance. */
 export interface TopSegment {
-  /** Valeur formatée dans l'unité d'affichage du support, ou "-" si non atteint. */
+  /** Valeur formatée dans l'unité d'affichage du support, ou le signe de valeur absente (`MISSING`, `core/units.ts`) si non atteint. */
   val: string;
   /** La même vitesse, en nombre, dans l'unité du convertisseur ; `null` si non atteint. */
   speed: number | null;

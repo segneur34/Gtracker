@@ -32,7 +32,7 @@ import MoreMenu from '../components/ui/MoreMenu';
 import PageHeader from '../components/ui/PageHeader';
 import { activityDisplayName, activityFamily, findActivity, type Activity } from '../core/activities';
 import { DEFAULT_MAP_CENTER, trackBounds } from '../core/displayConfig';
-import { formatDistance, toDisplayDistance } from '../core/units';
+import { MISSING, formatDistance, toDisplayDistance } from '../core/units';
 import { useLeaveWarning } from '../hooks/leaveGuard';
 import { useGoOnRoute } from '../hooks/useGoOnRoute';
 import { useMapBase } from '../hooks/useMapBase';
@@ -784,7 +784,7 @@ function PlanningPage() {
                 <span className="plan-figures__item num">{tn(markCount, '{n} balise', '{n} balises')}</span>
                 <span className="plan-figures__item">
                   {t('bord max')}{' '}
-                  <strong className="num">{legs.length > 0 ? formatDistance(Math.max(...legs.map((l) => l.distanceM)), distanceUnit) : '—'}</strong>
+                  <strong className="num">{legs.length > 0 ? formatDistance(Math.max(...legs.map((l) => l.distanceM)), distanceUnit) : MISSING}</strong>
                 </span>
               </div>
               <div className="plan-actions">
@@ -813,7 +813,7 @@ function PlanningPage() {
                           <strong className="plan-point__name">
                             {i === 0 ? t('Départ') : i === last ? (looped ? t('Arrivée, retour au départ') : t('Arrivée')) : pointName(i)}
                           </strong>
-                          <span className="plan-point__leg num">{leg ? formatDistance(leg.distanceM, distanceUnit) : '—'}</span>
+                          <span className="plan-point__leg num">{leg ? formatDistance(leg.distanceM, distanceUnit) : MISSING}</span>
                           <span className="plan-point__bearing num">{leg ? `${roundBearingDeg(leg.bearingDeg)}°` : ''}</span>
                         </button>
                         {touched && (

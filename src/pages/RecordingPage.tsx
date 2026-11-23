@@ -26,7 +26,7 @@ import {
   sportFamily, type SportFamily,
 } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
-import { formatClock, formatDistance, formatShortDistance, formatSpeed, formatDecimal, formatMeters } from '../core/units';
+import { MISSING, formatClock, formatDistance, formatShortDistance, formatSpeed, formatDecimal, formatMeters } from '../core/units';
 import LiveMap from '../components/LiveMap';
 import { clearFollowedTrace, useFollowedTrace } from '../hooks/useFollowedTrace';
 import { useTransientValue } from '../hooks/useTransientValue';
@@ -147,7 +147,7 @@ const followStatItems = (activity: Activity, progress: FollowProgress | null, to
   const distanceUnit = effectiveDistanceUnit(activity);
   const total = formatDistance(totalM, distanceUnit, 1);
   return [
-    { label: t('Restant'), value: progress ? formatDistance(progress.remainingM, distanceUnit) : '—' },
+    { label: t('Restant'), value: progress ? formatDistance(progress.remainingM, distanceUnit) : MISSING },
     {
       label: t('Fait, sur {total}', { total }),
       value: progress ? `${Math.round((100 * progress.progressM) / Math.max(1, progress.totalM))} %` : t('à rejoindre'),
@@ -157,7 +157,7 @@ const followStatItems = (activity: Activity, progress: FollowProgress | null, to
 
 /** Avancement d'un parcours de voile : distance restante par les balises, et balises validées. */
 const courseStatItems = (activity: Activity, view: MarkGuideView): { label: string; value: string }[] => [
-  { label: t('Restant'), value: view.remainingM !== null ? formatDistance(view.remainingM, effectiveDistanceUnit(activity)) : '—' },
+  { label: t('Restant'), value: view.remainingM !== null ? formatDistance(view.remainingM, effectiveDistanceUnit(activity)) : MISSING },
   { label: t('Balises validées'), value: `${view.outcomes.filter((o) => o === 'validated').length}/${view.marks.length}` },
 ];
 
@@ -619,11 +619,11 @@ function RecordingGpsCard({ busy, deviceGps }: {
         <div style={STAT_GRID}>
           <Stat label={t('Durée')} value={formatClock(pointsDurationMs)} />
           <Stat label={t('Points')} value={String(stats.pointCount)} />
-          <Stat label={t('Intervalle moyen')} value={meanIntervalS === null ? '—' : `${formatDecimal(meanIntervalS, 1)} s`} />
+          <Stat label={t('Intervalle moyen')} value={meanIntervalS === null ? MISSING : `${formatDecimal(meanIntervalS, 1)} s`} />
           <Stat label={t('Plus long trou')} value={`${Math.round(stats.longestGapS)} s`} />
-          <Stat label={t('Précision')} value={stats.lastAccuracyM === null ? '—' : `${Math.round(stats.lastAccuracyM)} m`} />
+          <Stat label={t('Précision')} value={stats.lastAccuracyM === null ? MISSING : `${Math.round(stats.lastAccuracyM)} m`} />
           {busy && deviceGps && (
-            <Stat label={t('Satellites utilisés')} value={satellites === null ? '—' : t('{used} sur {visible}', { used: satellites.used, visible: satellites.visible })} />
+            <Stat label={t('Satellites utilisés')} value={satellites === null ? MISSING : t('{used} sur {visible}', { used: satellites.used, visible: satellites.visible })} />
           )}
         </div>
       </details>

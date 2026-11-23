@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  commaDecimal, formatDecimal, formatDuration, formatShortDuration, parseDecimal, formatDistanceAuto, formatMeters, pad2, signedPercent, speedSourceText,
+  MISSING, commaDecimal, formatDecimal, formatDuration, formatShortDuration, parseDecimal, formatDistanceAuto, formatMeters, pad2, signedPercent, speedSourceText,
   formatClock, formatTimeOfDay, formatClockMinutes, formatDistance, formatMinSec, formatSessionDate, formatKnots, formatShortDistance, formatSpeed, formatSpeedValue, fromDisplaySpeed, knotsToChartValue, knotsToDisplay, kmhToMs, speedFromText, toDisplayDistance, toDisplaySpeed, SPEED_UNIT_LABEL, type SpeedUnit, orDash, speedCellOf, speedDecimals, toRoundedDisplaySpeed,
 } from './units';
 
@@ -13,14 +13,14 @@ describe('distances', () => {
   it('formate avec le symbole et le nombre de décimales demandé', () => {
     expect(formatDistance(29_720, 'km')).toBe('29,72 km');
     expect(formatDistance(3704, 'nm', 1)).toBe('2,0 NM');
-    expect(formatDistance(NaN, 'km')).toBe('-');
+    expect(formatDistance(NaN, 'km')).toBe('—');
   });
 
   it('donne une distance d\'approche en mètres sous 1 000 m', () => {
     expect(formatShortDistance(143.4, 'km')).toBe('143 m');
     expect(formatShortDistance(143.4, 'nm')).toBe('143 m');
     expect(formatShortDistance(3704, 'nm')).toBe('2,00 NM');
-    expect(formatShortDistance(NaN, 'km')).toBe('-');
+    expect(formatShortDistance(NaN, 'km')).toBe('—');
   });
 });
 
@@ -44,7 +44,7 @@ describe('formatKnots', () => {
   });
 
   it('rend tel quel ce qui n\'est pas un nombre', () => {
-    expect(formatKnots('-', 'kmh')).toBe('-');
+    expect(formatKnots(MISSING, 'kmh')).toBe('—');
   });
 });
 
@@ -100,8 +100,8 @@ describe('pad2 et formatSpeed', () => {
     for (const ms of [0, 0.1, 2.5, 7.77, 15.123, -1]) {
       for (const unit of ['kn', 'kmh', 'ms'] as const) expect(formatSpeed(ms, unit)).toBe(oldFormatSpeed(ms, unit).replace('.', ','));
     }
-    expect(formatSpeed(null, 'kn')).toBe('-');
-    expect(formatSpeed(NaN, 'kmh')).toBe('-');
+    expect(formatSpeed(null, 'kn')).toBe('—');
+    expect(formatSpeed(NaN, 'kmh')).toBe('—');
   });
 });
 
@@ -115,7 +115,7 @@ describe('vitesse d’affichage', () => {
   it('formatSpeedValue écrit une valeur déjà convertie, sans symbole', () => {
     expect(formatSpeedValue(12.44, 'kn')).toBe('12,4');
     expect(formatSpeedValue(12.446, 'ms')).toBe('12,45');
-    expect(formatSpeedValue(NaN, 'kmh')).toBe('-');
+    expect(formatSpeedValue(NaN, 'kmh')).toBe('—');
   });
 });
 
@@ -202,17 +202,18 @@ describe('formats d\'affichage uniques', () => {
 });
 
 describe('gardes des formateurs de durée et de nombre', () => {
-  it('« - » pour NaN et l’infini, partout ; pour le négatif dans les durées seulement', () => {
+  it('« — » pour NaN et l’infini, partout ; pour le négatif dans les durées seulement', () => {
+    expect(MISSING).toBe('—');
     for (const v of [NaN, Infinity, -Infinity]) {
-      expect(formatDuration(v)).toBe('-');
-      expect(formatShortDuration(v)).toBe('-');
-      expect(formatClock(v)).toBe('-');
-      expect(formatMinSec(v)).toBe('-');
-      expect(formatDecimal(v)).toBe('-');
+      expect(formatDuration(v)).toBe('—');
+      expect(formatShortDuration(v)).toBe('—');
+      expect(formatClock(v)).toBe('—');
+      expect(formatMinSec(v)).toBe('—');
+      expect(formatDecimal(v)).toBe('—');
       expect(formatMeters(v)).toBe('—');
     }
-    expect(formatDuration(-90_000)).toBe('-');
-    expect(formatClockMinutes(NaN)).toBe('-');
+    expect(formatDuration(-90_000)).toBe('—');
+    expect(formatClockMinutes(NaN)).toBe('—');
   });
 
   it('formatShortDuration, le chronomètre et le décompte gardent leur plancher à 0 pour un reste négatif, et les écritures ordinaires ne bougent pas', () => {
@@ -286,8 +287,8 @@ describe('valeur d’un champ de vitesse', () => {
 
 describe('formateurs sans valeur', () => {
   it('rendent « - » pour NaN, l infini et le négatif sans sens', () => {
-    expect(formatTimeOfDay(NaN)).toBe('-');
-    expect(formatSessionDate(NaN)).toBe('-');
+    expect(formatTimeOfDay(NaN)).toBe('—');
+    expect(formatSessionDate(NaN)).toBe('—');
   });
   it('gardent une valeur négative légitime', () => {
     expect(formatDecimal(-2.5, 1)).toBe('-2,5');

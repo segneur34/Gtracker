@@ -20,7 +20,7 @@ import PageHeader from '../components/ui/PageHeader';
 import { FAMILY_ACCENT, FAMILY_LABEL, activitiesOfFamily, activityDisplayName, activityFamily, type Activity } from '../core/activities';
 import { REFERENCE_HEART_RATE, SPORT_FAMILIES, getSportProfile, type SportFamily } from '../core/sportProfiles';
 import {
-  formatDistanceAuto, formatDecimal,
+  MISSING, formatDistanceAuto, formatDecimal,
   DISTANCE_UNIT_SYMBOL, SPEED_UNIT_LABEL, formatDuration, formatShortDuration, formatSpeed, formatSpeedValue,
   toDisplayDistance, toDisplaySpeed, type DistanceUnit, type SpeedUnit,
 } from '../core/units';
@@ -526,7 +526,7 @@ function StatisticsPage() {
   /** Le choix en cours, dans la ligne « Sélection ». */
   const choiceSummary = [family ? FAMILY_LABEL[family] : t('Toutes les familles'), ...(activity ? [activityDisplayName(activity)] : []), ...gearSelection.map(gearPickLabel), period === 'tout' ? t('depuis le début') : periodLabel].join(' · ');
   const empty = inPeriod.length === 0;
-  const lastText = regular.weeksSinceLast === null ? '—'
+  const lastText = regular.weeksSinceLast === null ? MISSING
     : regular.weeksSinceLast === 0 ? t('cette semaine')
     : regular.weeksSinceLast === 1 ? t('la semaine dernière')
     : t('il y a {n} semaines', { n: regular.weeksSinceLast });

@@ -1,4 +1,5 @@
 import type { CumulativeTrack, TopSegment, TopTarget, TrackPoint } from './types';
+import { MISSING } from './units';
 
 /** Nombre de meilleurs segments retenus par cible. */
 const DEFAULT_TOP_COUNT = 3;
@@ -214,7 +215,7 @@ const computeTopSegmentsWith = (
     tops.push({ val: vals[k].toFixed(decimals), speed: vals[k], path });
   }
 
-  while (tops.length < count) tops.push({ val: '-', speed: null, path: [] });
+  while (tops.length < count) tops.push({ val: MISSING, speed: null, path: [] });
   return tops;
 };
 

@@ -2,9 +2,9 @@ import { t } from '../../core/i18n';
 import { SETTINGS_DIR, settingsPath } from '../../library/folderLayout';
 import {
   DEFAULT_DEVICE_NAMES, TRAVELLING_KEYS, adoptedGearValues, adoptedValues, buildSettingsFile, cleanDeviceName, deviceFileName, deviceNameText,
-  freeDeviceName, importedSettingsFileName, newestSettingsEntry, ownSettingsEntry, parseSettingsFile,
+  freeDeviceName, importedSettingsFileName, isWritableSettingsFile, newestSettingsEntry, ownSettingsEntry, parseSettingsFile,
   answeredWithSeen, serializeSettingsFile, settingsEntryName, settingsFileInfo, settingsSignature,
-  settingsToOffer, sortedSettingsFiles, withAnsweredSettings, type SettingsEntry, type SettingsFileInfo,
+  settingsToOffer, sortedSettingsFiles, withAnsweredSettings, withUnknownActivities, type SettingsEntry, type SettingsFileInfo,
 } from '../../library/settingsFile';
 import { readPickedFile } from '../../platform/files';
 import type { MemoryFolder } from '../../platform/memoryFolder';
@@ -155,7 +155,10 @@ const readSettingsListing = async (f: MemoryFolder): Promise<{ entries: Settings
   return { entries, unreadable };
 };
 
-/** Noms des fichiers de `reglages/` écrits par cet appareil (« Réglages d'usine » les retire), relus à l'instant. */
+/**
+ * Noms des fichiers de `reglages/` écrits par cet appareil (« Réglages d'usine » les retire), relus à l'instant ;
+ * ceux d'une version plus récente compris : l'effacement est voulu par l'utilisateur.
+ */
 export const ownSettingsFileNames = async (f: MemoryFolder): Promise<string[]> => {
   const { entries } = await readSettingsListing(f);
   return ownSettingsFiles(entries.map((e) => ({ fileName: e.fileName, deviceId: e.file.device?.id ?? null })), deviceId());
@@ -175,15 +178,29 @@ const publishSettingsFiles = (): void => {
 };
 
 /**
+ * Un fichier de cet appareil dans `reglages/` vient d'une version plus récente : l'appareil n'écrit plus le sien
+ * (ni réécrit, ni renommé, ni retiré) ; ses réglages changés ici restent sur l'appareil.
+ */
+const ownFileIsNewer = (id: string): boolean =>
+  settingsEntries.some((e) => e.file.device?.id === id && !isWritableSettingsFile(e.file));
+
+/** Valeurs à écrire dans le fichier de l'appareil, avec les activités d'un calcul inconnu de son fichier en place. */
+const ownFileValues = (own: SettingsEntry | null): Record<string, unknown> =>
+  withUnknownActivities(localTravellingValues(), own?.file.values ?? null);
+
+/**
  * Écrit le fichier de l'appareil, sous son nom. Le fichier d'un autre
  * appareil qui porte déjà ce nom n'est jamais écrasé, ni un fichier qui ne se
  * lit pas, fût-il le sien : l'appareil prend un nom libre (« Téléphone 2 »)
- * et l'annonce. Son fichier précédent, sous un autre nom, est retiré.
+ * et l'annonce. Son fichier précédent, sous un autre nom, est retiré. Les
+ * activités d'un calcul que cette version ne connaît pas, dans son fichier en
+ * place, y restent (`withUnknownActivities`), sauf quand `replacing` : les
+ * réglages d'un autre appareil viennent d'être repris, ils remplacent tout.
  */
-const writeOwnSettings = async (f: MemoryFolder, savedAt: number): Promise<void> => {
+const writeOwnSettings = async (f: MemoryFolder, savedAt: number, replacing = false): Promise<void> => {
   // Stockage illisible au démarrage : les réglages en mémoire ne sont pas ceux de l'appareil, son fichier reste tel quel.
   // Mémoire en lecture seule : rien n'y est écrit.
-  if (storageStartupFailure() || f.readOnly) {
+  if (storageStartupFailure() || f.readOnly || ownFileIsNewer(deviceId())) {
     publishSettingsFiles();
     return;
   }
@@ -203,7 +220,7 @@ const writeOwnSettings = async (f: MemoryFolder, savedAt: number): Promise<void>
     });
   }
   const fileName = deviceFileName(name);
-  const file = buildSettingsFile(localTravellingValues(), savedAt, own?.file ?? null, { id, name });
+  const file = buildSettingsFile(replacing ? localTravellingValues() : ownFileValues(own), savedAt, own?.file ?? null, { id, name });
   await f.writeText(settingsPath(fileName), serializeSettingsFile(file));
   if (own && own.fileName !== fileName) await f.remove(settingsPath(own.fileName));
   settingsEntries = [...settingsEntries.filter((e) => e !== own && e.fileName !== fileName), { fileName, file }];
@@ -327,8 +344,10 @@ const syncSettings = async (f: MemoryFolder): Promise<boolean> => {
   if (savedAt === null) savedAt = Date.now();
   jsonStore.write(SETTINGS_SAVED_AT_KEY, savedAt);
   lastSignature = settingsSignature(localTravellingValues());
+  // Comparé avec ce que l'écriture mettrait (`buildSettingsFile`) : des clés ou des activités d'un calcul inconnu,
+  // gardées dans le fichier seulement, ne le font pas réécrire à chaque ouverture.
   const upToDate = own !== null && own.file.savedAt === savedAt && own.fileName === deviceFileName(deviceName())
-    && settingsSignature(own.file.values) === lastSignature;
+    && settingsSignature(own.file.values) === settingsSignature({ ...own.file.values, ...ownFileValues(own) });
   if (upToDate) publishSettingsFiles();
   else await writeOwnSettings(f, savedAt);
   offerNewSettings(autoAdopted);
@@ -377,7 +396,7 @@ export const adoptSettingsFile = async (fileName: string): Promise<void> => {
     await readSettingsEntries(f);
     // Réponse retenue : ses réglages ne sont plus proposés tant que l'autre appareil ne les change pas.
     markSettingsAnswered([{ fileName, file }]);
-    await writeOwnSettings(f, now);
+    await writeOwnSettings(f, now, true);
     setState({ message: t('Réglages repris de « {name} ».', { name: deviceNameText(settingsEntryName({ fileName, file })) }), settingsOffer: null });
     await applySettingsChange(true);
   } catch (err) {
@@ -485,6 +504,11 @@ export const importSettingsFile = async (picked: File): Promise<{ file: Settings
     await readSettingsEntries(f);
     const taken = new Set((await f.list(SETTINGS_DIR)).map((e) => e.name.toLowerCase()));
     const fileName = importedSettingsFileName(file, picked.name, settingsEntries, taken);
+    // Le fichier que l'import remplacerait vient d'une version plus récente : il reste tel quel.
+    const replaced = settingsEntries.find((e) => e.fileName === fileName);
+    if (replaced && !isWritableSettingsFile(replaced.file)) {
+      return { refusal: t('Import impossible : {detail}', { detail: t('une version plus récente y est déjà') }) };
+    }
     await f.writeText(settingsPath(fileName), text);
     const entry: SettingsEntry = { fileName, file };
     settingsEntries = [...settingsEntries.filter((e) => e.fileName !== fileName), entry];

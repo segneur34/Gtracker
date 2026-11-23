@@ -53,7 +53,7 @@ import type { SurfAnalysisReply, TrackColorOptions } from '../library/analysisSt
 import { runInWorker } from '../library/trackWorkerClient';
 import { colorKeyOf, useKeptSegments, useTrackAnalysis } from '../hooks/useTrackAnalysis';
 import {
-  SPEED_UNIT_LABEL, speedSourceText, formatDistance, formatDuration, formatShortDuration, formatSpeed, formatSpeedValue, formatTimeOfDay,
+  MISSING, SPEED_UNIT_LABEL, speedSourceText, formatDistance, formatDuration, formatShortDuration, formatSpeed, formatSpeedValue, formatTimeOfDay,
   fromDisplaySpeed, toDisplaySpeed, formatDecimal, orDash, speedCellOf
 } from '../core/units';
 import { useTimeChartAxis } from '../hooks/useTimeChartAxis';
@@ -300,7 +300,7 @@ function SurfModule() {
     ...(foil ? [
       { key: 'longestFlight', label: t('Plus long vol'), value: orDash(summary.longestFlightS, formatShortDuration) },
       { key: 'flightTime', label: t('Ratio de vol ({pct} %)', { pct: flightPct }), value: formatShortDuration(summary.flightS) },
-      { key: 'wavesInFlight', label: t('Vagues en un vol'), value: String(summary.maxWavesInFlight ?? '—'), title: t('Le plus de vagues reliées par un même vol') },
+      { key: 'wavesInFlight', label: t('Vagues en un vol'), value: String(summary.maxWavesInFlight ?? MISSING), title: t('Le plus de vagues reliées par un même vol') },
     ] : []),
     { key: 'distance', label: t('Distance totale'), value: formatDistance(totalDistanceM, distanceUnit) },
     ...heartRateShareStats(heart),
@@ -760,7 +760,7 @@ function SurfModule() {
                               <td style={tdStyle} data-label={t('Max')}>{formatSpeedValue(toDisplaySpeed(w.maxSpeedMs, speedUnit), speedUnit)}</td>
                               <td style={tdStyle} data-label={t('Moy.')}>{formatSpeedValue(toDisplaySpeed(w.avgSpeedMs, speedUnit), speedUnit)}</td>
                               <td style={tdStyle} data-label={gyroTurns.size > 0 ? t('Vir.') : t('Vir.*')}>{gyroTurns.get(w) ?? (gyroTurns.size > 0 ? `${w.turns}*` : w.turns)}</td>
-                              {foil && <td style={tdStyle} data-label={t('Vol')}>{w.flight ?? '—'}</td>}
+                              {foil && <td style={tdStyle} data-label={t('Vol')}>{w.flight ?? MISSING}</td>}
                               <td style={tdStyle} className="an-cadre__voir">
                                 <ShowButton shown={shown} onClick={() => highlight.show('vagues', shown ? null : String(w.n))} />
                               </td>
@@ -820,7 +820,7 @@ function SurfModule() {
                                 <span className="an-wave-short">{r.after === 0 ? t('Départ') : (foil ? t('Après le vol {n}', { n: r.after }) : t('Après la vague {n}', { n: r.after }))}</span>
                               </td>
                               <td style={tdStyle} data-label={t('Retour')}>{r.returnS === null ? t('enchaîné') : formatShortDuration(r.returnS)}</td>
-                              <td style={tdStyle} data-label={t('Dist.')}>{r.straightM === null ? '—' : `${Math.round(r.straightM)} m`}</td>
+                              <td style={tdStyle} data-label={t('Dist.')}>{r.straightM === null ? MISSING : `${Math.round(r.straightM)} m`}</td>
                               <td style={tdStyle} data-label={t('Rem.')}><span className="an-wave-long">{orDash(r.returnSpeedMs, (v) => formatSpeed(v, speedUnit))}</span><span className="an-wave-short">{speedCellOf(speedUnit)(r.returnSpeedMs)}</span></td>
                               <td style={tdStyle} data-label={t('Rame')}><span className="an-wave-long">{orDash(r.paddleSpeedMs, (v) => formatSpeed(v, speedUnit))}</span><span className="an-wave-short">{speedCellOf(speedUnit)(r.paddleSpeedMs)}</span></td>
                               <td style={tdStyle} data-label={t('Att.')}>{formatShortDuration(r.waitS)}</td>
@@ -850,7 +850,7 @@ function SurfModule() {
                       : t("Hors vague : le temps du vol passé hors des vagues, vu par le GPS ; sans les capteurs, rien ne dit s'il est pompé.")}
                   </>}
                   flights={flights} podium={podiumFlights}
-                  extraFlightTiles={<StatTile label={t('Vagues en un vol')} value={summary.maxWavesInFlight ?? '—'} />}
+                  extraFlightTiles={<StatTile label={t('Vagues en un vol')} value={summary.maxWavesInFlight ?? MISSING} />}
                   pumping={flightPumping} pumpSummary={pumpSummary}
                   shown={flightShown} onShow={(key) => highlight.show('vols', key)} accent={ACCENT}
                   speedCell={speedCell} unitLabel={unitLabel}

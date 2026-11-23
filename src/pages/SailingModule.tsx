@@ -29,7 +29,7 @@ import { activeRatioLabel } from '../core/sportProfiles';
 import { effectiveSpeedRange } from '../core/trackColor';
 import type { TopSegment } from '../core/types';
 import {
-  SPEED_UNIT_LABEL, SPEED_UNIT_SYMBOL, formatDistance, formatKnots, formatSpeed, formatTimeOfDay,
+  MISSING, SPEED_UNIT_LABEL, SPEED_UNIT_SYMBOL, formatDistance, formatKnots, formatSpeed, formatTimeOfDay,
   knotsToChartValue, knotsToMs, toDisplaySpeed, formatDecimal, commaDecimal, speedCellOf
 } from '../core/units';
 import { polarExcludedPoints, speedPolar, type PolarBin } from '../sailing/wind';
@@ -342,7 +342,7 @@ function SailingModule() {
     return foil ? t('Temps en vol (≥{threshold} {unit})', vars) : t('Temps actif (≥{threshold} {unit})', vars);
   };
   /** Sans seuil (bateau) : « Temps en mouvement », le temps de navigation déjà calculé (`stats.activeTime`, masque sans seuil). */
-  const movingTimeStat: ShareStat = { key: 'movingTime', label: t('Temps en mouvement'), value: stats?.activeTime ?? '—' };
+  const movingTimeStat: ShareStat = { key: 'movingTime', label: t('Temps en mouvement'), value: stats?.activeTime ?? MISSING };
   /**
    * Chiffres de l'onglet « général », proposés aussi pour l'image de partage. Sans seuil (bateau),
    * toute la session compte en navigation : ni distance, temps, ratio ni moyenne actifs.
@@ -375,11 +375,11 @@ function SailingModule() {
   ] : [];
   /** Virements ou empannages réussis sur le total, et leur part ; « — » sans vent connu. */
   const maneuverRate = (summary: { success: number; fail: number } | null): string => {
-    if (!maneuverStats) return '—';
+    if (!maneuverStats) return MISSING;
     const total = (summary?.success ?? 0) + (summary?.fail ?? 0);
     return total > 0 ? `${summary!.success} / ${total} (${Math.round((summary!.success / total) * 100)} %)` : '0';
   };
-  const topValue = (top: TopSegment | undefined): string => (top && top.val !== '-' ? `${showKn(top.val)} ${speedSymbol}` : '—');
+  const topValue = (top: TopSegment | undefined): string => (top && top.val !== MISSING ? `${showKn(top.val)} ${speedSymbol}` : MISSING);
   /**
    * Sauts et pumping dans « général », si l'activité montre leur onglet et que la session porte la donnée :
    * sauts calculés, pumping coché et mesuré sur au moins un vol. Décocher l'onglet retire ses tuiles.

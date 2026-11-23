@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PointData } from './pointData';
 import type { ManeuverLocation, ManeuverStats, WindReference } from './maneuvers';
+import { MISSING } from '../core/units';
 import { calculateVmgStats, calculateWindStats, vmgBridgedHoles, vmgChartRows, vmgManeuverSpans, vmgSeries, windInputWarning, type VmgStats } from './sailingAnalytics';
 
 /** Forme des copies gelées : cases en chaînes `toFixed(1)`, comme à l'origine. */
@@ -131,7 +132,7 @@ const legacyVmgStats = (trackData: PointData[], wind: WindReference, minSpeedKn:
         selected.push({ start: w.start, end: w.end });
       }
     }
-    while (tops.length < 3) tops.push({ val: '-', path: [] });
+    while (tops.length < 3) tops.push({ val: MISSING, path: [] });
     return tops;
   };
   return {
@@ -380,7 +381,7 @@ const frozenVmgStats = (trackData: PointData[], wind: WindReference, minSpeedKn:
         selected.push({ start: w.start, end: w.end });
       }
     }
-    while (tops.length < 3) tops.push({ val: '-', path: [] });
+    while (tops.length < 3) tops.push({ val: MISSING, path: [] });
     return tops;
   };
   return {

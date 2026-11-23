@@ -3,7 +3,7 @@ import { setLanguage } from '../core/i18n';
 import { prepareTrack } from '../core/prepareTrack';
 import { SPORT_PROFILES, getSportProfile, sportFamily, type SportProfile } from '../core/sportProfiles';
 import type { SportType } from '../core/types';
-import { knotsToMs } from '../core/units';
+import { MISSING, knotsToMs } from '../core/units';
 import { withWindAt } from '../sailing/sailingAnalytics';
 import { gpxOf, sailRaw, upDownLegs } from '../test/sailing.fixture';
 import { SURF_FOIL_FLIGHTS, SURF_TWO_WAVES, surfRaw } from '../test/surf.fixture';
@@ -157,7 +157,7 @@ describe('rien de ce qui revient du calcul ne dépend de la langue', () => {
       expectSame(inLanguage('en', () => sailingPageView(inFrench)), reference);
       // La référence est bien écrite en anglais : la relance moyenne a son point décimal.
       const relaunch = [reference.analysis.maneuverSummary.tack, reference.analysis.maneuverSummary.jibe]
-        .map((s) => s?.averages.relaunch).find((v) => v !== undefined && v !== '-');
+        .map((s) => s?.averages.relaunch).find((v) => v !== undefined && v !== MISSING);
       expect(relaunch).toMatch(/^\d+\.\d s$/);
       // Et aucune chaîne du résultat n'écrit un nombre à la française.
       expect(stringsOf(inFrench).filter((s) => /\d,\d/.test(s))).toEqual([]);

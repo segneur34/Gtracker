@@ -7,7 +7,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import type { DotItemDotProps } from 'recharts';
 import { normalizeDeg } from '../../core/angles';
 import { t } from '../../core/i18n';
-import { SPEED_UNIT_SYMBOL, commaDecimal, formatKnots, type SpeedUnit } from '../../core/units';
+import { MISSING, SPEED_UNIT_SYMBOL, commaDecimal, formatKnots, type SpeedUnit } from '../../core/units';
 import type { PointData } from '../../sailing/pointData';
 import type { VmgGraphPoint, WindGraphPoint, WindStats } from '../../sailing/sailingAnalytics';
 import type { ChartZoom } from '../../hooks/useChartZoom';
@@ -101,14 +101,14 @@ export const sailingChartReaders = ({ trackData, timeChart, heart, windStats, vm
   const windReadout = (z: ChartZoom) => (i: number): Readout | null => {
     if (!timeChart.readable(z, i) || !windStats) return null;
     const direction = windStats.windAt(trackData[i].timeMs);
-    return { values: [{ text: direction === null ? '—' : `${normalizeDeg(Math.round(direction))}°`, color: WIND_COLOR }], at: readAt(i) };
+    return { values: [{ text: direction === null ? MISSING : `${normalizeDeg(Math.round(direction))}°`, color: WIND_COLOR }], at: readAt(i) };
   };
   /** VMG du point survolé : la valeur, et de quel côté du vent. */
   const readVmg = (z: ChartZoom) => (i: number): Readout | null => {
     if (!timeChart.readable(z, i)) return null;
     const vmg = vmgSeries[i] ?? null;
     return {
-      values: [{ text: vmg === null ? '—' : (vmg < 0 ? t('portant {v} {unit}', { v: showKn(Math.abs(vmg)), unit: speedSymbol }) : t('près {v} {unit}', { v: showKn(Math.abs(vmg)), unit: speedSymbol })), color: VMG_COLOR }],
+      values: [{ text: vmg === null ? MISSING : (vmg < 0 ? t('portant {v} {unit}', { v: showKn(Math.abs(vmg)), unit: speedSymbol }) : t('près {v} {unit}', { v: showKn(Math.abs(vmg)), unit: speedSymbol })), color: VMG_COLOR }],
       at: readAt(i),
     };
   };

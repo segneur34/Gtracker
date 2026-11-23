@@ -1,5 +1,6 @@
 import { toRad } from './angles';
 import type { TileCoord } from './tiles';
+import { MISSING } from './units';
 
 /**
  * Image de partage d'une session : calculs purs (cadrage de la trace en
@@ -250,5 +251,5 @@ export const pickShareStats = (available: readonly ShareStat[], chosen: readonly
   (chosen === null ? available.slice(0, SHARE_IMAGE.defaultStatCount) : available.filter((stat) => chosen.includes(stat.key)))
     .slice(0, SHARE_IMAGE.maxStats);
 
-/** Chiffres à proposer pour l'image : ceux que la session n'a pas (« — ») n'y apporteraient rien. */
-export const shareableStats = (stats: readonly ShareStat[]): ShareStat[] => stats.filter((stat) => stat.value !== '—');
+/** Chiffres à proposer pour l'image : ceux que la session n'a pas (`MISSING`) n'y apporteraient rien. */
+export const shareableStats = (stats: readonly ShareStat[]): ShareStat[] => stats.filter((stat) => stat.value !== MISSING);

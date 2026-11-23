@@ -4,7 +4,7 @@ import { PanelHeading } from './PanelTitle';
 import HighlightPath from './HighlightPath';
 import { HIGHLIGHT_PODIUM_COLORS, PODIUM_RANKS, podiumColor } from './highlightColors';
 import type { TopSegment, TopTarget } from '../core/types';
-import { SPEED_UNIT_LABEL, type SpeedUnit } from '../core/units';
+import { MISSING, SPEED_UNIT_LABEL, type SpeedUnit } from '../core/units';
 import { t } from '../core/i18n';
 import MapToggle from './ui/MapToggle';
 
@@ -56,7 +56,7 @@ export default function TopsPanel({ targets, tops, unit, selected, onSelect, acc
                   <tr key={target.key} className={reached ? 'ui-table__row' : 'ui-table__row ui-table__row--empty'}>
                     <td className="ui-cell ui-cell--bold">{target.label}</td>
                     {[0, 1, 2].map((idx) => (
-                      <td key={idx} style={{ padding: '0.4em 0.6em', textAlign: 'center', fontWeight: idx === 0 ? 'bold' : 'normal' }}>{values[idx]?.val ?? '-'}</td>
+                      <td key={idx} style={{ padding: '0.4em 0.6em', textAlign: 'center', fontWeight: idx === 0 ? 'bold' : 'normal' }}>{values[idx]?.val ?? MISSING}</td>
                     ))}
                     <td className="ui-cell ui-cell--center">
                       <MapToggle shown={shown} disabled={!reached} color={accent} ink="var(--on-ink)" onClick={() => onSelect(shown ? null : target.key)} />

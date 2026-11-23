@@ -3,6 +3,7 @@ import { activityDisplayName } from '../core/activities';
 import { dayMonthYearTime } from '../core/calendar';
 import { STORAGE_KEYS } from '../core/appIdentity';
 import { t, tn } from '../core/i18n';
+import { MISSING } from '../core/units';
 import { settingsFileValues, useLibraryFields, type SettingsFileInfo } from '../hooks/useSessionLibrary';
 import { readStoredSettings, subscribeStoredSettings, useAllSportSettings } from '../hooks/useSportSettings';
 import {
@@ -193,9 +194,9 @@ function GearCompareDialog({ onClose }: { onClose: () => void }) {
         {line.rows.map((row, k) => (
           <tr key={`${row.pc?.id ?? ''}|${row.phone?.id ?? ''}|${k}`}>
             <td className="gear-compare__kind">{rowKindText(row.kind)}</td>
-            <td>{row.pc?.name ?? '—'}</td>
+            <td>{row.pc?.name ?? MISSING}</td>
             <td>
-              {row.phone?.name ?? '—'}
+              {row.phone?.name ?? MISSING}
               {row.kind === 'pcOnly' && <span className="gear-compare__note">{t('(lui sera proposé)')}</span>}
             </td>
             <td className="gear-compare__act">

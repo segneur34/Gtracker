@@ -3,13 +3,14 @@
  * couleur, puis l'abscisse. Pures ; chaque module décide quand lire (point
  * survolé dans la plage zoomée) et donne le texte de l'abscisse.
  */
+import { MISSING } from '../core/units';
 import type { Readout, ReadoutValue } from './ChartReadout';
 import { SPEED_COLOR } from './chartStyle';
 import { HEART_RATE_COLOR } from './heartRateColors';
 
-/** Valeur de FC lue en un point : « 142 bpm », ou « — » sans valeur (trou de ceinture). */
+/** Valeur de FC lue en un point : « 142 bpm », ou `MISSING` sans valeur (trou de ceinture). */
 const heartRateValue = (bpm: number | null | undefined): ReadoutValue => (
-  { text: bpm === null || bpm === undefined ? '—' : `${Math.round(bpm)} bpm`, color: HEART_RATE_COLOR }
+  { text: bpm === null || bpm === undefined ? MISSING : `${Math.round(bpm)} bpm`, color: HEART_RATE_COLOR }
 );
 
 /** FC lue en un point, avec son abscisse. */

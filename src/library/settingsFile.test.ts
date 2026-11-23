@@ -17,6 +17,7 @@ import {
   deviceNameText,
   freeDeviceName,
   importedSettingsFileName,
+  isWritableSettingsFile,
   newestSettingsEntry,
   ownSettingsEntry,
   parseSettingsFile,
@@ -32,6 +33,7 @@ import {
   settingsFingerprint,
   settingsToOffer,
   withAnsweredSettings,
+  withUnknownActivities,
   type SettingsEntry,
 } from './settingsFile';
 import { STORAGE_KEYS } from '../core/appIdentity';
@@ -83,12 +85,13 @@ describe('parseSettingsFile', () => {
     format: SETTINGS_FORMAT, version: 2, savedAt: 1790000000000, device: { id: 'abc', name: 'Téléphone' }, values, ...over,
   });
 
-  it('lit une version future comme une autre, et sa réécriture garde son numéro et ses clés', () => {
+  it('lit une version future comme une autre, tenue pour non réinscriptible', () => {
     const read = parseSettingsFile(file({ version: 7, values: { [STORAGE_KEYS.sportSettings]: {}, 'gtracker.futur': { x: 1 } } }));
     expect(read?.version).toBe(7);
-    const written = buildSettingsFile({ [STORAGE_KEYS.sportSettings]: { ancien: true } }, 1, read, { id: 'abc', name: 'T' });
-    expect(written.version).toBe(7);
-    expect(written.values['gtracker.futur']).toEqual({ x: 1 });
+    expect(read?.values['gtracker.futur']).toEqual({ x: 1 });
+    expect(isWritableSettingsFile(read!)).toBe(false);
+    expect(isWritableSettingsFile(parseSettingsFile(file())!)).toBe(true);
+    expect(isWritableSettingsFile(parseSettingsFile(file({ version: 1 }))!)).toBe(true);
   });
 
   it('champs mal typés : savedAt en texte ou values en tableau, fichier ignoré ; appareil mal formé, null', () => {
@@ -116,11 +119,51 @@ describe('parseSettingsFile', () => {
 });
 
 describe('buildSettingsFile', () => {
-  it('garde les clés et la version d\'un fichier écrit par une version plus récente', () => {
-    const previous = { format: SETTINGS_FORMAT, version: SETTINGS_VERSION + 1, savedAt: 1, device: null, values: { 'gtracker.futur': 1 } } as const;
+  it('garde les clés inconnues du fichier précédent, et écrit toujours la version de cette application', () => {
+    const previous = { format: SETTINGS_FORMAT, version: SETTINGS_VERSION, savedAt: 1, device: null, values: { 'gtracker.futur': 1 } } as const;
     const file = buildSettingsFile(values, 2, previous);
     expect(file.values).toEqual({ 'gtracker.futur': 1, ...values });
-    expect(file.version).toBe(SETTINGS_VERSION + 1);
+    expect(file.version).toBe(SETTINGS_VERSION);
+  });
+
+  it('aucune version écrite ne dépasse la constante, quel que soit le fichier précédent', () => {
+    for (const version of [1, SETTINGS_VERSION, SETTINGS_VERSION + 1, 99]) {
+      const previous = { format: SETTINGS_FORMAT, version, savedAt: 1, device: null, values: {} } as const;
+      expect(buildSettingsFile(values, 2, previous).version).toBe(SETTINGS_VERSION);
+    }
+    expect(buildSettingsFile(values, 2).version).toBe(SETTINGS_VERSION);
+  });
+});
+
+describe('withUnknownActivities', () => {
+  const key = STORAGE_KEYS.sportSettings;
+  const wing = { id: 'wingfoil', name: 'Wingfoil', base: 'wingfoil', color: '#004aad' };
+  const kite = { id: 'kite', name: 'Kite', base: 'kite', color: '#d32f2f' };
+  const futur = { id: 'futur', name: 'Futur', base: 'calcul-a-venir', color: '#123456', reglage: 1 };
+  const autre = { id: 'autre', name: 'Autre', base: 'autre-calcul', color: '#654321' };
+  const sport = (activities: unknown[], extra: Record<string, unknown> = {}) => ({ [key]: { ...extra, activities } });
+
+  it('remet une activité d’un calcul inconnu, absente, juste après sa voisine d’avant', () => {
+    const next = withUnknownActivities(sport([wing, kite], { thresholds: { kite: 9 } }), sport([wing, futur, kite]));
+    expect(next).toEqual(sport([wing, futur, kite], { thresholds: { kite: 9 } }));
+  });
+
+  it('en tête sans voisine, et plusieurs à la suite gardent leur ordre', () => {
+    expect(withUnknownActivities(sport([kite]), sport([futur, autre, kite]))).toEqual(sport([futur, autre, kite]));
+  });
+
+  it('une activité d’un calcul connu, absente, reste retirée ; une activité déjà là n’est pas doublée', () => {
+    expect(withUnknownActivities(sport([wing]), sport([wing, kite]))).toEqual(sport([wing]));
+    const same = sport([wing, futur]);
+    expect(withUnknownActivities(same, sport([futur, wing]))).toBe(same);
+  });
+
+  it('mêmes valeurs sans fichier précédent, ou sans liste rangée d’un côté', () => {
+    const mine = sport([wing]);
+    expect(withUnknownActivities(mine, null)).toBe(mine);
+    expect(withUnknownActivities(mine, { [key]: {} })).toBe(mine);
+    const defaults = { [key]: { thresholds: {} } };
+    expect(withUnknownActivities(defaults, sport([futur]))).toBe(defaults);
   });
 });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeKinematics } from '../core/kinematics';
 import type { RawTrackPoint } from '../core/types';
-import { knotsToMs } from '../core/units';
+import { MISSING, knotsToMs } from '../core/units';
 import { sampledIndices } from '../core/chartZoom';
 import { CHART_MAX_POINTS } from '../core/displayConfig';
 import { trackToPointData, type PointData } from './pointData';
@@ -701,7 +701,7 @@ describe('détection et classement', () => {
     expect(dist[0]).toBeLessThanOrEqual(dist[1]);
     // Gain au vent : réussies seulement (ici, aucun virement), puis le plus grand d'abord, affiché signé.
     expect(summary.tack!.tops.windwardGain).toHaveLength(0);
-    expect(summary.tack!.averages.windwardGain).toBe('-');
+    expect(summary.tack!.averages.windwardGain).toBe(MISSING);
     const reussies = summarizeManeuvers(detectAndClassify(track, 0, { successThresholdKn: 2 }));
     const gain = reussies.tack!.tops.windwardGain.map((t) => t.value);
     expect(gain).toHaveLength(3);
@@ -712,7 +712,7 @@ describe('détection et classement', () => {
     // Le cap de sortie d'un empannage est un choix d'allure : moyenne, pas de podium.
     expect(summary.tack!.tops.headingChange.length).toBeGreaterThan(0);
     expect(summary.jibe!.tops.headingChange).toHaveLength(0);
-    expect(summary.jibe!.averages.headingChange).not.toBe('-');
+    expect(summary.jibe!.averages.headingChange).not.toBe(MISSING);
 
     expect(summary.jibe).not.toBeNull();
     expect(summary.jibe!.count).toBe(1);

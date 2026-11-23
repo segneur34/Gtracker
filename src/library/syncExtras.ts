@@ -6,7 +6,7 @@ import { PLACE_RULES, type LearnedPlace, type PlaceRules } from './places';
 import {
   isNewerRestingHrFile, mergeRestingResults, parseRestingHrFile, restingHrFileText, sameRestingResults, type StoredRestingResult,
 } from './restingHrStore';
-import { SETTINGS_VERSION, parseSettingsFile, type SettingsFile } from './settingsFile';
+import { isWritableSettingsFile, parseSettingsFile, type SettingsFile } from './settingsFile';
 import { SYNC_SIDES, otherSyncSide, type SyncSideName } from './syncBase';
 
 /**
@@ -174,7 +174,7 @@ const planSettings = (input: SyncExtrasInput, plan: SyncExtrasPlan): void => {
       const winner = settingsWinner(device, own, input.phoneDeviceId ?? null, c.file.savedAt, p.file.savedAt);
       const loser = otherSyncSide(winner);
       const target = copies[loser] as SettingsCopy;
-      if ((target.file as SettingsFile).version > SETTINGS_VERSION) {
+      if (!isWritableSettingsFile(target.file as SettingsFile)) {
         leave(settingsPath(target.name), loser, 'newer');
         continue;
       }

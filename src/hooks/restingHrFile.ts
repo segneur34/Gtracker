@@ -1,6 +1,6 @@
 import { RESTING_HR_FILE } from '../library/folderLayout';
 import {
-  RESTING_HR_KEY, mergeRestingResults, parseRestingHrFile, readStoredRestingResults, restingHrFileText, sameRestingResults,
+  RESTING_HR_KEY, isNewerRestingHrFile, mergeRestingResults, parseRestingHrFile, readStoredRestingResults, restingHrFileText, sameRestingResults,
   type StoredRestingResult,
 } from '../library/restingHrStore';
 import type { MemoryFolder } from '../platform/memoryFolder';
@@ -18,25 +18,30 @@ import { jsonStore, storageStartupFailure } from '../platform/storage';
 export const readDeviceRestingResults = (): StoredRestingResult[] => readStoredRestingResults(jsonStore.read<unknown>(RESTING_HR_KEY));
 
 /**
- * Écrit `results` dans le dossier, sauf en lecture seule ou si le fichier en place ne se lit pas (jamais écrasé).
- * Lève si l'écriture échoue : à l'appelant de ne pas en faire un obstacle.
+ * Écrit `results` dans le dossier, sauf en lecture seule ou si le fichier en place ne se lit pas ou vient d'une
+ * version plus récente (jamais écrasé) : les tests restent alors sur l'appareil. Lève si l'écriture échoue : à
+ * l'appelant de ne pas en faire un obstacle.
  */
 export const saveRestingHrFile = async (f: MemoryFolder, results: readonly StoredRestingResult[]): Promise<void> => {
   if (f.readOnly) return;
-  if (parseRestingHrFile(await f.readText(RESTING_HR_FILE)) === null) return;
+  const text = await f.readText(RESTING_HR_FILE);
+  if (parseRestingHrFile(text) === null || isNewerRestingHrFile(text)) return;
   await f.writeText(RESTING_HR_FILE, restingHrFileText(results));
 };
 
 /**
  * À l'ouverture du dossier : fusionne le fichier et la liste de l'appareil. La clé de l'appareil et le fichier ne
- * sont réécrits que si la fusion a changé quelque chose. Fichier illisible : rien n'est touché. Stockage de
- * l'appareil illisible au démarrage : sa liste n'est pas fiable, rien n'est écrit de son côté.
+ * sont réécrits que si la fusion a changé quelque chose. Fichier illisible : rien n'est touché. Fichier d'une version
+ * plus récente : ses tests sont repris sur l'appareil, lui n'est jamais réécrit. Stockage de l'appareil illisible au
+ * démarrage : sa liste n'est pas fiable, rien n'est écrit de son côté.
  */
 export const syncRestingHrFile = async (f: MemoryFolder): Promise<void> => {
-  const fromFile = parseRestingHrFile(await f.readText(RESTING_HR_FILE));
+  const text = await f.readText(RESTING_HR_FILE);
+  const fromFile = parseRestingHrFile(text);
   if (fromFile === null || storageStartupFailure()) return;
   const local = readDeviceRestingResults();
   const merged = mergeRestingResults(local, fromFile);
   if (!sameRestingResults(merged, local)) jsonStore.write(RESTING_HR_KEY, merged);
-  if (!f.readOnly && !sameRestingResults(merged, fromFile)) await f.writeText(RESTING_HR_FILE, restingHrFileText(merged));
+  const writable = !f.readOnly && !isNewerRestingHrFile(text);
+  if (writable && !sameRestingResults(merged, fromFile)) await f.writeText(RESTING_HR_FILE, restingHrFileText(merged));
 };

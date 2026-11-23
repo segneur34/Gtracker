@@ -6,7 +6,7 @@ import { WIND_LOCAL_MAX_GAP_MIN, isDirected, windAt, type ManeuverKind, type Man
 import { VMG_MIN_WINDOW_RATIO, VMG_WINDOW_S } from './sailingConfig';
 import { circularStats, interpolateDirection, type TimedDirection, type WindEstimate } from './wind';
 import { angleDiff, circularMean, normalizeDeg } from '../core/angles';
-import { formatDecimal, msToKnots } from '../core/units';
+import { MISSING, formatDecimal, msToKnots } from '../core/units';
 import { MAX_GAP_S } from '../core/sportProfiles';
 import { t } from '../core/i18n';
 
@@ -367,7 +367,7 @@ const metricValue = (m: ManeuverLocation, metric: ManeuverMetric): number | null
 };
 
 export const formatMetric = (metric: ManeuverMetric, value: number | null): string => {
-  if (value === null || !isFinite(value)) return '-';
+  if (value === null || !isFinite(value)) return MISSING;
   switch (metric) {
     case 'conservation':
       return `${Math.round(value * 100)} %`;
@@ -429,7 +429,7 @@ const summarizeType = (
     averages[key] =
       valued.length > 0
         ? formatMetric(key, valued.reduce((a, e) => a + e.value, 0) / valued.length)
-        : '-';
+        : MISSING;
 
     if (!ranked.includes(type)) {
       tops[key] = [];
@@ -677,7 +677,7 @@ export const calculateVmgStats = (
       val: side.vals[k].toFixed(1),
       path: trackData.slice(side.starts[k], side.ends[k] + 1).map((p) => [p.lat, p.lon] as [number, number]),
     }));
-    while (tops.length < 3) tops.push({ val: '-', path: [] });
+    while (tops.length < 3) tops.push({ val: MISSING, path: [] });
     return tops;
   };
 

@@ -3,7 +3,7 @@ import type { ShareStat } from '../core/shareImage';
 import { FOIL_RATIO_LABEL, type SportFamily } from '../core/sportProfiles';
 import type { PumpingSummary } from '../core/pumping';
 import {
-  commaDecimal, formatDecimal, formatDistance, formatDuration, formatSessionDate, formatShortDuration, formatSpeed, orDash, type DistanceUnit, type SpeedUnit,
+  MISSING, commaDecimal, formatDecimal, formatDistance, formatDuration, formatSessionDate, formatShortDuration, formatSpeed, orDash, type DistanceUnit, type SpeedUnit,
 } from '../core/units';
 import { downloadBaseName } from './naming';
 import { RATINGS, WIND_LEVELS, type Rating, type WindLevel } from './notes';
@@ -34,8 +34,6 @@ export interface ShareExtras {
   rating?: Rating | null;
 }
 
-const DASH = '—';
-
 /** Libellé de l'appréciation, sans icône ni emoji (« Bien ») ; `null` sans appréciation. */
 const ratingLabel = (rating: Rating | null | undefined): string | null => RATINGS.find((r) => r.value === rating)?.label ?? null;
 
@@ -44,12 +42,12 @@ const windShareValue = (deg: number | null | undefined, level: WindLevel | null 
   const dir = deg === null || deg === undefined || !Number.isFinite(deg) ? null : `${Math.round(((deg % 360) + 360) % 360)}°`;
   const force = WIND_LEVELS.find((w) => w.value === level)?.label ?? null;
   if (dir && force) return `${dir} · ${force.toLowerCase()}`;
-  return dir ?? force ?? DASH;
+  return dir ?? force ?? MISSING;
 };
 
 /** « 83 % (10/12) » : la réussite des manœuvres, « — » sans manœuvre classée. */
 const maneuverSuccessValue = (m: { success: number; total: number } | null | undefined): string =>
-  m && m.total > 0 ? `${Math.round((m.success / m.total) * 100)} % (${m.success}/${m.total})` : DASH;
+  m && m.total > 0 ? `${Math.round((m.success / m.total) * 100)} % (${m.success}/${m.total})` : MISSING;
 
 /**
  * Ligne « FC moyenne » de « général » et du partage, dans les deux modules : présente
@@ -105,19 +103,19 @@ export const shareExtraStats = (
 ): ShareStat[] => {
   const { foil = false } = options;
   const value = (v: number | null | undefined, format: (n: number) => string): string =>
-    v === null || v === undefined || !Number.isFinite(v) ? DASH : format(v);
+    v === null || v === undefined || !Number.isFinite(v) ? MISSING : format(v);
   const rows: Record<string, ShareStat> = {
     maneuverSuccess: { key: 'maneuverSuccess', label: t('Manœuvres réussies'), value: maneuverSuccessValue(extras.maneuvers) },
     pumpingShare: { key: 'pumpingShare', label: t('Pumping'), value: value(extras.pumpingShare, (s) => t('{n} % du vol', { n: Math.round(s * 100) })) },
     wind: { key: 'wind', label: t('Vent'), value: windShareValue(extras.windDeg, extras.windLevel) },
-    rating: { key: 'rating', label: t('Appréciation'), value: ratingLabel(extras.rating) ?? DASH },
+    rating: { key: 'rating', label: t('Appréciation'), value: ratingLabel(extras.rating) ?? MISSING },
   };
   return SHARE_EXTRA_KEYS[family].filter((key) => key !== 'pumpingShare' || foil).map((key) => rows[key]);
 };
 
 /** Ratio de vol d'une voile sur foil : temps en vol sur temps en mouvement, en pour cent, comme « général » (`activeRatio`). */
 const flightRatioValue = (movingS: number | null, inMotionS: number | undefined): string =>
-  movingS === null || inMotionS === undefined || inMotionS <= 0 ? DASH : `${commaDecimal(Math.min(100, (movingS / inMotionS) * 100).toFixed(1))}%`;
+  movingS === null || inMotionS === undefined || inMotionS <= 0 ? MISSING : `${commaDecimal(Math.min(100, (movingS / inMotionS) * 100).toFixed(1))}%`;
 
 /**
  * Chiffres de l'image de partage tirés du résumé d'une fiche, là où l'analyse
@@ -163,35 +161,35 @@ const summaryBaseStats = (
   const movingS = summary.movingTimeS;
   const movingM = summary.movingDistanceM ?? null;
   const distance = formatDistance(summary.distanceM, units.distance);
-  const speed = (ms: number | null) => (ms === null || !Number.isFinite(ms) ? '—' : formatSpeed(ms, units.speed));
+  const speed = (ms: number | null) => (ms === null || !Number.isFinite(ms) ? MISSING : formatSpeed(ms, units.speed));
   const per = (m: number | null, s: number | null) => (m === null || s === null || s <= 0 ? null : m / s);
 
   if (family === 'voile') {
     const active = new Set(['activeDistance', 'activeTime', 'activeRatio', 'activeAverage']);
     // Sans seuil (bateau), `movingTimeS` est le temps en mouvement (toute la navigation, pauses et trous immobiles ôtés).
-    const movingTime = { key: 'movingTime', label: t('Temps en mouvement'), value: movingS === null ? '—' : formatDuration(movingS * 1000) };
+    const movingTime = { key: 'movingTime', label: t('Temps en mouvement'), value: movingS === null ? MISSING : formatDuration(movingS * 1000) };
     return [
       { key: 'distance', label: t('Distance'), value: distance },
-      { key: 'activeDistance', label: t('Distance active'), value: movingM === null ? '—' : formatDistance(movingM, units.distance) },
+      { key: 'activeDistance', label: t('Distance active'), value: movingM === null ? MISSING : formatDistance(movingM, units.distance) },
       { key: 'totalTime', label: t('Temps total'), value: formatDuration(totalS * 1000) },
       ...(withActiveThreshold ? [] : [movingTime]),
-      { key: 'activeTime', label: foil ? t('Temps en vol') : t('Temps actif'), value: movingS === null ? '—' : formatDuration(movingS * 1000) },
+      { key: 'activeTime', label: foil ? t('Temps en vol') : t('Temps actif'), value: movingS === null ? MISSING : formatDuration(movingS * 1000) },
       // Sur foil : la part du temps en mouvement passée en vol, comme « général ».
       ...(foil ? [{ key: 'activeRatio', label: FOIL_RATIO_LABEL, value: flightRatioValue(movingS, summary.inMotionS) }] : []),
       { key: 'averageSpeed', label: t('Vitesse moyenne'), value: speed(per(summary.distanceM, totalS)) },
       { key: 'activeAverage', label: t('Moyenne active'), value: speed(per(movingM, movingS)) },
       { key: 'maxSpeed', label: t('Vitesse max'), value: speed(summary.maxSpeedMs) },
-      { key: 'maneuvers', label: t('Manœuvres'), value: summary.maneuverCount === undefined ? '—' : String(summary.maneuverCount) },
+      { key: 'maneuvers', label: t('Manœuvres'), value: summary.maneuverCount === undefined ? MISSING : String(summary.maneuverCount) },
     ].filter((stat) => withActiveThreshold || !active.has(stat.key));
   }
   // Surf.
   return [
     { key: 'totalTime', label: t('Durée de la session'), value: formatDuration(totalS * 1000) },
-    { key: 'waves', label: t('Vagues'), value: summary.waveCount === undefined ? '—' : String(summary.waveCount) },
-    { key: 'longestWave', label: t('Plus longue vague'), value: summary.longestWaveM == null ? '—' : `${Math.round(summary.longestWaveM)} m` },
+    { key: 'waves', label: t('Vagues'), value: summary.waveCount === undefined ? MISSING : String(summary.waveCount) },
+    { key: 'longestWave', label: t('Plus longue vague'), value: summary.longestWaveM == null ? MISSING : `${Math.round(summary.longestWaveM)} m` },
     // Sans vague, pas de vitesse max : « — », comme sa page.
-    { key: 'maxSpeed', label: t('Vitesse max'), value: summary.maxSpeedMs > 0 ? speed(summary.maxSpeedMs) : '—' },
-    { key: 'longestFlight', label: t('Plus long vol'), value: summary.longestFlightS == null ? '—' : formatShortDuration(summary.longestFlightS) },
+    { key: 'maxSpeed', label: t('Vitesse max'), value: summary.maxSpeedMs > 0 ? speed(summary.maxSpeedMs) : MISSING },
+    { key: 'longestFlight', label: t('Plus long vol'), value: summary.longestFlightS == null ? MISSING : formatShortDuration(summary.longestFlightS) },
     { key: 'distance', label: t('Distance totale'), value: distance },
   ];
 };

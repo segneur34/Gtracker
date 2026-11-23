@@ -12,9 +12,10 @@ import {
 import { activityTabs, isTabShown, toggleTabChoice, type TabChoices } from '../core/analysisTabs';
 import type { SportType } from '../core/types';
 import {
-  DISTANCE_UNIT_LABEL, DISTANCE_UNIT_SYMBOL, SPEED_UNIT_LABEL, formatSpeedValue, fromDisplaySpeed, kmhToMs, msToKmh, toDisplaySpeed,
+  DISTANCE_UNIT_LABEL, DISTANCE_UNIT_SYMBOL, SPEED_UNIT_LABEL, formatSpeedValue, fromDisplaySpeed, kmhToMs, msToKmh, toDisplaySpeed, toRoundedDisplaySpeed,
   type DistanceUnit, type SpeedUnit, commaDecimal, parseDecimal
 } from '../core/units';
+import { toFixedNumber } from '../core/basics';
 import { useFavoriteBrush } from '../hooks/useFavoriteBrush';
 import '../components/BrushFrame.css';
 import { useOpenSections } from '../hooks/useOpenSections';
@@ -53,7 +54,8 @@ import BeepCurveEditor from '../components/BeepCurveEditor';
 import ConnectionSettings from '../components/ConnectionSettings';
 import { CARD_STYLE } from '../components/styles';
 import { FAMILY_ICON } from '../components/familyIcons';
-import { IconChevronRight, IconEye, IconEyeOff } from '../components/icons';
+import { IconEye, IconEyeOff } from '../components/icons';
+import FoldTitle from '../components/ui/FoldTitle';
 import MemoryStatus from '../components/MemoryStatus';
 import { TRASH_ZONE_ID } from '../library/trash';
 import { PermissionsSettings } from '../components/PermissionsStatus';
@@ -297,9 +299,7 @@ const ActivityCard = memo(function ActivityCard({
   const overridden = isActivityOverridden(s);
   // Seuil : en voile dans l'unité choisie (rangé dans celle du calcul, les nœuds), en surf dans l'unité de son calcul.
   const thresholdUnit: SpeedUnit = sailing ? s.speedUnit : p.thresholdUnit;
-  const thresholdShown = parseFloat(
-    toDisplaySpeed(fromDisplaySpeed(s.activeThreshold, p.thresholdUnit), thresholdUnit).toFixed(thresholdUnit === 'ms' ? 2 : 1)
-  );
+  const thresholdShown = toRoundedDisplaySpeed(fromDisplaySpeed(s.activeThreshold, p.thresholdUnit), thresholdUnit);
   // Voile sans réglage ni pré-réglage : champ vide, le seuil est suggéré par l'allure de chaque session.
   const thresholdEmpty = thresholdFollowsPace(activity) && !s.isThresholdOverridden;
   /** Seuil à 0 : aucun seuil réglé ; les pauses de l'enregistrement et les arrêts complets sont ôtés d'office. */
@@ -323,7 +323,7 @@ const ActivityCard = memo(function ActivityCard({
       : nextBoundPair(current, 'delayS', next, defaultAutoPauseOf(activity), isValidAutoPause);
     if (pause !== current) setFor(id, 'autoPause', pause);
   };
-  const pauseKmh = parseFloat(msToKmh(s.autoPause.speedMs).toFixed(1));
+  const pauseKmh = toFixedNumber(msToKmh(s.autoPause.speedMs), 1);
   // Les menus des chiffres du direct les nomment comme le direct : « Moyenne active » en voile et en surf.
   const fieldUnits: LiveFieldUnits = { ...s, options: { ...LIVE_STATS_DEFAULTS, activeAverage: usesActiveAverage(p) } };
   const summary = [
@@ -343,12 +343,11 @@ const ActivityCard = memo(function ActivityCard({
       <div className="settings-activity__head">
         {/* Le nom fait partie du bouton qui déplie et replie, ouvert comme fermé : seul « Renommer » (menu « … ») le met
             dans un champ, pour ne pas le changer par mégarde en voulant replier la carte. */}
-        <button type="button" className="settings-activity__toggle" aria-expanded={isOpen}
-          onClick={() => {
+        <FoldTitle className="settings-activity__toggle" open={isOpen} chevronClassName="settings-activity__chevron"
+          onToggle={() => {
             toggleActivity(id);
             if (renamingThis) setRenaming(null);
           }}>
-          <IconChevronRight size={14} className="settings-activity__chevron" style={{ transform: isOpen ? 'rotate(90deg)' : undefined }} />
           {!renamingThis && <ActivityGlyph activity={activity} size={18} swatch className="settings-activity__icon" />}
           {!renamingThis && <strong className="settings-activity__name">{activityDisplayName(activity)}</strong>}
           {!renamingThis && <span className="settings-sports__mark">{sportDisplayName(activity.base)}</span>}
@@ -357,7 +356,7 @@ const ActivityCard = memo(function ActivityCard({
               {summary}{overridden ? ` · ${t('modifié')}` : ''}
             </span>
           )}
-        </button>
+        </FoldTitle>
         {renamingThis && (
           <>
             <ActivityNameField activity={activity} onRename={(name) => updateActivity(id, { name })} onDone={() => setRenaming(null)} />
@@ -971,12 +970,11 @@ function FamilyHeading({ family, hidden, disabled, open, names, onOpen, onToggle
   return (
     <div className={`settings-activities__family${open ? ' settings-activities__family--open' : ''}`}
       style={{ color: hidden ? 'var(--muted)' : FAMILY_ACCENT[family] }}>
-      <button type="button" className="settings-activities__family-toggle" aria-expanded={open} onClick={onOpen}>
-        <IconChevronRight size={14} className="settings-activity__chevron" style={{ transform: open ? 'rotate(90deg)' : undefined }} />
+      <FoldTitle className="settings-activities__family-toggle" open={open} onToggle={onOpen} chevronClassName="settings-activity__chevron">
         <Icon size={18} />
         <span className="settings-activities__family-name">{FAMILY_LABEL[family]}</span>
         {!open && <span className="settings-activities__family-summary">{names.join(' · ')}</span>}
-      </button>
+      </FoldTitle>
       <EyeButton name={FAMILY_LABEL[family]} hidden={hidden} disabled={disabled} onToggle={onToggle} />
     </div>
   );

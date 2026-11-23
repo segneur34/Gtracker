@@ -6,7 +6,7 @@
  */
 import type { Dispatch, SetStateAction } from 'react';
 import { t, tn } from '../../core/i18n';
-import { formatDecimal, formatTimeOfDay } from '../../core/units';
+import { MISSING, formatDecimal, formatTimeOfDay } from '../../core/units';
 import { MANEUVER_LOST_FLIGHT_S } from '../../sailing/sailingConfig';
 import { MANEUVER_METRICS, TACK_LABELS, formatMetric, type ManeuverSummary, type windInputWarning } from '../../sailing/sailingAnalytics';
 import type { ManeuverLocation, ManeuverStats } from '../../sailing/maneuvers';
@@ -119,8 +119,8 @@ export default function ManeuversPanel({
               <td className="ui-bold" title={hint}>{label}</td>
               <td className="an-man__center an-man__ok ui-bold ui-text-m">{summary?.success ?? 0}</td>
               <td className="an-man__center an-man__ko ui-text-m">{summary?.fail ?? 0}</td>
-              <td className="an-man__center">{summary ? showKn(summary.vminAvg) : '-'}</td>
-              <td className="an-man__center ui-bold">{summary ? showKn(summary.vminMax) : '-'}</td>
+              <td className="an-man__center">{summary ? showKn(summary.vminAvg) : MISSING}</td>
+              <td className="an-man__center ui-bold">{summary ? showKn(summary.vminMax) : MISSING}</td>
               <td className="an-man__carte">
                 <MapToggle shown={shown} color="var(--voile)" ink="var(--on-ink)" title={mapTitle} onClick={toggle}
                   style={{ padding: '3px 10px', border: 'none' }} />
@@ -165,10 +165,10 @@ export default function ManeuversPanel({
                   <tr key={tack} className="ui-table__row">
                     <td className="ui-bold">{TACK_LABELS[tack]}</td>
                     <td className="an-man__center">
-                      {onTack ? <><span className="an-man__ok ui-bold">{onTack.success}</span>{` / ${onTack.count}`}</> : '-'}
+                      {onTack ? <><span className="an-man__ok ui-bold">{onTack.success}</span>{` / ${onTack.count}`}</> : MISSING}
                     </td>
-                    <td className="an-man__center">{onTack ? showKn(onTack.vminMedian) : '-'}</td>
-                    <td className="an-man__center">{onTack ? formatMetric('conservation', onTack.conservationMedian) : '-'}</td>
+                    <td className="an-man__center">{onTack ? showKn(onTack.vminMedian) : MISSING}</td>
+                    <td className="an-man__center">{onTack ? formatMetric('conservation', onTack.conservationMedian) : MISSING}</td>
                   </tr>
                 );
               })}
@@ -326,7 +326,7 @@ export default function ManeuversPanel({
                         </td>
                         {[0, 1, 2].map((rank) => (
                           <td key={rank} title={tops[rank] ? formatTimeOfDay(tops[rank].timeMs) : undefined}>
-                            {ranked ? tops[rank]?.label ?? '-' : '—'}
+                            {ranked ? tops[rank]?.label ?? MISSING : MISSING}
                           </td>
                         ))}
                         <td>

@@ -5,6 +5,7 @@
 import type { ReactNode } from 'react';
 import { t } from '../../core/i18n';
 import type { TopSegment } from '../../core/types';
+import { MISSING } from '../../core/units';
 import type { ChartZoomSource } from '../../hooks/useChartZoom';
 import type { SailingChartRows } from '../../hooks/useSailingChartRows';
 import type { TimeChartAxis } from '../../hooks/useTimeChartAxis';
@@ -57,7 +58,7 @@ export default function VmgPanel({
       </div>
       <div className="an-vmg-top__ranks">
         {PODIUM_RANKS.map((rank, idx) => (
-          <span key={rank} style={{ color: HIGHLIGHT_PODIUM_COLORS[idx] }}>{rank}: {values[idx] ? showKn(values[idx].val) : '-'}</span>
+          <span key={rank} style={{ color: HIGHLIGHT_PODIUM_COLORS[idx] }}>{rank}: {values[idx] ? showKn(values[idx].val) : MISSING}</span>
         ))}
       </div>
     </div>

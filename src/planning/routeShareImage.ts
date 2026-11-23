@@ -2,7 +2,7 @@ import { roundBearingDeg } from '../core/angles';
 import { cumulativeDistancesM } from '../core/geo';
 import { t } from '../core/i18n';
 import type { ShareStat } from '../core/shareImage';
-import { formatDistance, toDisplayDistance, type DistanceUnit } from '../core/units';
+import { MISSING, formatDistance, toDisplayDistance, type DistanceUnit } from '../core/units';
 import { courseLegs, isLooped, routeTotals, waypointDistances, type PlannedRoute, type RoutePoint } from './route';
 import { markLabel } from './routeGpx';
 
@@ -111,7 +111,7 @@ export const routeShareStats = (route: PlannedRoute, unit: DistanceUnit): ShareS
     {
       key: 'plusLongBord',
       label: t('Plus long bord'),
-      value: legs.length > 0 ? formatDistance(Math.max(...legs.map((l) => l.distanceM)), unit) : '—',
+      value: legs.length > 0 ? formatDistance(Math.max(...legs.map((l) => l.distanceM)), unit) : MISSING,
     },
   ];
 };

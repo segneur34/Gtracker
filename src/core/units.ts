@@ -20,11 +20,18 @@ export const msToKmh = (ms: number): number => ms * MS_TO_KMH;
 export const kmhToMs = (kmh: number): number => kmh / MS_TO_KMH;
 
 /**
+ * Le seul signe d'une valeur absente à l'écran : le tiret long « — ». Tous les formateurs
+ * d'affichage et tous les écrans l'emploient ; ni dans une phrase (ponctuation), ni dans un
+ * fichier ou une fiche (où une valeur absente s'écrit autrement).
+ */
+export const MISSING = '—';
+
+/**
  * Nombre décimal à l'affichage : séparateur de la langue (virgule en français),
  * `decimals` chiffres fixes (« 12,40 »). Le seul formateur des décimales d'écran :
  * les valeurs passées aux bibliothèques, aux fichiers et aux fiches restent des nombres à point.
  */
-export const formatDecimal = (value: number, decimals = 1): string => (isFinite(value) ? value.toFixed(decimals).replace('.', decimalSeparator()) : '-');
+export const formatDecimal = (value: number, decimals = 1): string => (isFinite(value) ? value.toFixed(decimals).replace('.', decimalSeparator()) : MISSING);
 
 /** Texte décimal déjà arrondi (« 12.4 ») mis au séparateur de la langue pour l'affichage ; tout autre texte est rendu tel quel. */
 export const commaDecimal = (text: string | number): string => String(text).replace(/^(-?\d+)\.(\d+)$/, `$1${decimalSeparator()}$2`);
@@ -111,7 +118,7 @@ export const SPEED_UNIT_SYMBOL: Record<SpeedUnit, string> = {
 
 /** Formate une vitesse en m/s dans l'unité choisie, avec son symbole. */
 export function formatSpeed(ms: number | null, unit: SpeedUnit): string {
-  if (ms === null || !isFinite(ms)) return '-';
+  if (ms === null || !isFinite(ms)) return MISSING;
   switch (unit) {
     case 'kn':
       return `${formatDecimal(msToKnots(ms), 1)} ${SPEED_UNIT_SYMBOL.kn}`;
@@ -130,14 +137,14 @@ export const toRoundedDisplaySpeed = (ms: number, unit: SpeedUnit): number => to
 
 /** Formate une valeur déjà exprimée dans l'unité, pour les axes de graphe. */
 export const formatSpeedValue = (value: number, unit: SpeedUnit): string => {
-  if (!isFinite(value)) return '-';
+  if (!isFinite(value)) return MISSING;
   return formatDecimal(value, speedDecimals(unit));
 };
 
-/** Valeur formatée, ou « — » quand elle manque (`null`). */
-export const orDash = (value: number | null, format: (v: number) => string): string => (value === null ? '—' : format(value));
+/** Valeur formatée, ou `MISSING` quand elle manque (`null`). */
+export const orDash = (value: number | null, format: (v: number) => string): string => (value === null ? MISSING : format(value));
 
-/** Case de tableau d'une vitesse en m/s, dans l'unité de l'activité (sans unité écrite) ; « — » sans valeur. */
+/** Case de tableau d'une vitesse en m/s, dans l'unité de l'activité (sans unité écrite) ; `MISSING` sans valeur. */
 export const speedCellOf = (unit: SpeedUnit) => (ms: number | null): string =>
   orDash(ms, (v) => formatSpeedValue(toDisplaySpeed(v, unit), unit));
 
@@ -149,7 +156,7 @@ export const knotsToDisplay = (kn: number, unit: SpeedUnit): number => toDisplay
 
 /**
  * Valeur en nœuds, nombre ou texte déjà arrondi (tops, VMG), formatée dans
- * l'unité, sans symbole. Un texte qui n'est pas un nombre (« - ») est rendu
+ * l'unité, sans symbole. Un texte qui n'est pas un nombre (`MISSING`) est rendu
  * tel quel. En nœuds, le texte reçu est rendu inchangé.
  */
 export const formatKnots = (kn: number | string, unit: SpeedUnit): string => {
@@ -195,13 +202,13 @@ export const toDisplayDistance = (m: number, unit: DistanceUnit): number => m / 
 
 /** Formate une distance en mètres dans l'unité choisie, avec son symbole. */
 export const formatDistance = (m: number, unit: DistanceUnit, decimals = 2): string =>
-  isFinite(m) ? `${formatDecimal(toDisplayDistance(m, unit), decimals)} ${DISTANCE_UNIT_SYMBOL[unit]}` : '-';
+  isFinite(m) ? `${formatDecimal(toDisplayDistance(m, unit), decimals)} ${DISTANCE_UNIT_SYMBOL[unit]}` : MISSING;
 
 /** Distance dans l'unité, deux décimales sous 10 unités et une au-delà (bibliothèque, statistiques). */
 export const formatDistanceAuto = (m: number, unit: DistanceUnit): string => formatDistance(m, unit, toDisplayDistance(m, unit) < 10 ? 2 : 1);
 
-/** Mètres entiers, « 120 m » ; « — » sans valeur ou sans valeur finie. */
-export const formatMeters = (m: number | null): string => (m === null || !isFinite(m) ? '—' : `${Math.round(m)} m`);
+/** Mètres entiers, « 120 m » ; `MISSING` sans valeur ou sans valeur finie. */
+export const formatMeters = (m: number | null): string => (m === null || !isFinite(m) ? MISSING : `${Math.round(m)} m`);
 
 /** Distance d'approche (une balise) : en mètres sous 1 000 m, quelle que soit l'unité ; au-delà, dans l'unité. */
 export const formatShortDistance = (m: number, unit: DistanceUnit): string =>
@@ -209,12 +216,12 @@ export const formatShortDistance = (m: number, unit: DistanceUnit): string =>
 
 /**
  * Formate une durée en millisecondes, par exemple `1 h 24` ou `37 min` : la
- * seule écriture des durées. « - » pour une durée négative, `NaN` ou infinie
- * (C2-6) : aucune durée de l'application n'est négative, et une telle valeur
+ * seule écriture des durées. `MISSING` pour une durée négative, `NaN` ou infinie :
+ * aucune durée de l'application n'est négative, et une telle valeur
  * ne s'écrit pas comme un chiffre.
  */
 export const formatDuration = (ms: number): string => {
-  if (!isFinite(ms) || ms < 0) return '-';
+  if (!isFinite(ms) || ms < 0) return MISSING;
   const totalMin = Math.floor(ms / 60000);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
@@ -223,11 +230,11 @@ export const formatDuration = (ms: number): string => {
 
 /**
  * Durée courte, en secondes : « 45 s », « 1 min 05 », puis comme `formatDuration`
- * au-delà d'une heure ; « - » si `NaN` ou infinie. Une durée négative garde son
+ * au-delà d'une heure ; `MISSING` si `NaN` ou infinie. Une durée négative garde son
  * plancher à 0 : un reste de soustraction (temps pompé) s'écrit « 0 s ».
  */
 export const formatShortDuration = (s: number): string => {
-  if (!isFinite(s)) return '-';
+  if (!isFinite(s)) return MISSING;
   const total = Math.max(0, Math.round(s));
   if (total < 60) return `${total} s`;
   if (total >= 3600) return formatDuration(total * 1000);
@@ -235,12 +242,12 @@ export const formatShortDuration = (s: number): string => {
 };
 
 /**
- * Durée en `h:mm:ss`, pour un chronomètre ; « - » si `NaN` ou infinie. Une
+ * Durée en `h:mm:ss`, pour un chronomètre ; `MISSING` si `NaN` ou infinie. Une
  * durée négative garde son plancher à 0 : le chrono du direct ne doit jamais
- * montrer « - » sur un reste de soustraction (pause, reprise).
+ * montrer `MISSING` sur un reste de soustraction (pause, reprise).
  */
 export const formatClock = (ms: number): string => {
-  if (!isFinite(ms)) return '-';
+  if (!isFinite(ms)) return MISSING;
   const total = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(total / 3600)}:${pad2(Math.floor((total % 3600) / 60))}:${pad2(total % 60)}`;
 };
@@ -251,9 +258,9 @@ export const formatClockMinutes = (minutes: number): string => formatClock(minut
 /** Joules par kilocalorie. */
 export const J_PER_KCAL = 4184;
 
-/** Durée en secondes au format `m:ss` (de 0 à 59 min), pour un décompte ; « - » si `NaN` ou infinie, plancher à 0 pour un reste négatif. */
+/** Durée en secondes au format `m:ss` (de 0 à 59 min), pour un décompte ; `MISSING` si `NaN` ou infinie, plancher à 0 pour un reste négatif. */
 export const formatMinSec = (s: number): string => {
-  if (!isFinite(s)) return '-';
+  if (!isFinite(s)) return MISSING;
   const total = Math.max(0, Math.round(s));
   return `${Math.floor(total / 60)}:${pad2(total % 60)}`;
 };
@@ -261,7 +268,7 @@ export const formatMinSec = (s: number): string => {
 /** Heure locale `hh:mm:ss` d'un instant, pour désigner un moment de la session. */
 export const formatTimeOfDay = (ms: number): string => {
   const date = new Date(ms);
-  if (isNaN(date.getTime())) return '-';
+  if (isNaN(date.getTime())) return MISSING;
   return `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
 };
 
@@ -274,6 +281,6 @@ const shortWeekday = (date: Date): string =>
 /** Date et heure de départ d'une session, en heure locale : « mer. 14/10/2026 · 10:02 ». */
 export const formatSessionDate = (ms: number): string => {
   const date = new Date(ms);
-  if (isNaN(date.getTime())) return '-';
+  if (isNaN(date.getTime())) return MISSING;
   return `${shortWeekday(date)} ${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()} · ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 };

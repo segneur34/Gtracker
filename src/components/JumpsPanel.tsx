@@ -5,7 +5,7 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { ReferenceLine } from 'recharts';
 import { jumpCurveRows, jumpDoubtLabel, type JumpCurveRow, type SessionJump } from '../core/jumps';
 import { JUMP_DETECTION } from '../core/sportProfiles';
-import { formatShortDistance, formatSpeed, formatTimeOfDay, type DistanceUnit, type SpeedUnit, formatDecimal, commaDecimal } from '../core/units';
+import { MISSING, formatShortDistance, formatSpeed, formatTimeOfDay, type DistanceUnit, type SpeedUnit, formatDecimal, commaDecimal } from '../core/units';
 import type { JumpsStatus } from '../hooks/useSessionJumps';
 import { createHoverStore } from '../hooks/useChartHover';
 import { useChartZoom } from '../hooks/useChartZoom';
@@ -123,7 +123,7 @@ function JumpCurveChart({ first, second, numbers, trackIndexAt }: {
     ? {
       values: jumps.map((_, k) => {
         const h = k === 0 ? hovered.premier : hovered.second;
-        return { text: t('n° {n} : {value}', { n: numbers[k], value: h === null ? '—' : `${commaDecimal(roundTo(h, 2))} m` }), color: CURVE_COLORS[k] };
+        return { text: t('n° {n} : {value}', { n: numbers[k], value: h === null ? MISSING : `${commaDecimal(roundTo(h, 2))} m` }), color: CURVE_COLORS[k] };
       }),
       at: t('{time} s depuis le décollage', { time: commaDecimal(toFixedNumber(hovered.t, 2)) }),
     }
@@ -258,7 +258,7 @@ function JumpsPanel({
                     {meters(j.heightM)}
                   </td>
                   <td className="an-jump-flight" data-label={t("en l'air")} style={cellStyle}>{seconds(j.flightS)}</td>
-                  <td className="an-jump-length" style={cellStyle}>{j.lengthM === null ? '—' : formatShortDistance(j.lengthM, distanceUnit)}</td>
+                  <td className="an-jump-length" style={cellStyle}>{j.lengthM === null ? MISSING : formatShortDistance(j.lengthM, distanceUnit)}</td>
                   <td className="an-jump-speed" style={cellStyle}>{formatSpeed(j.speedMs, speedUnit)}</td>
                   <td className="an-jump-map" style={cellStyle}>
                     <span className="an-jump-actions">

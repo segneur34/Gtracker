@@ -12,7 +12,7 @@ import {
   WINDOW_SCAN_START, bestWindowSpeedMs, computeAllTopSegments, computeTopSegments, extendHoleCounts, scanBestWindow,
 } from './topSegments';
 import type { RawTrackPoint, TopTarget, TrackPoint } from './types';
-import { msToKnots } from './units';
+import { MISSING, msToKnots } from './units';
 import { sameData } from '../test/sameData';
 import { mPerDegLon } from '../test/geo.fixture';
 import { eastwardTrack } from '../test/track.fixture';
@@ -37,7 +37,7 @@ describe('computeTopSegments, cible de temps', () => {
     const tops = computeTopSegments(track, buildCumulativeTrack(track), TIME_5S, msToKnots);
 
     expect(tops).toHaveLength(3);
-    expect(tops.every((t) => t.val === '-' || parseFloat(t.val) > 0)).toBe(true);
+    expect(tops.every((t) => t.val === MISSING || parseFloat(t.val) > 0)).toBe(true);
   });
 
   it('ne retient que des segments disjoints', () => {
@@ -62,7 +62,7 @@ describe('computeTopSegments, cible de temps', () => {
     const track = eastwardTrack([5, 5]);
     const tops = computeTopSegments(track, buildCumulativeTrack(track), TIME_5S, msToKnots);
 
-    expect(tops.map((t) => t.val)).toEqual(['-', '-', '-']);
+    expect(tops.map((t) => t.val)).toEqual([MISSING, MISSING, MISSING]);
   });
 
   it('interpole la borne de fin quand aucun point ne tombe pile sur la cible', () => {
@@ -270,7 +270,7 @@ describe('cibles des tops en surf et en planche (onglet générique)', () => {
       const b = computeAllTopSegments(five, buildCumulativeTrack(five), targets, kmh);
       for (const target of targets) {
         expect(b[target.key][0].val, target.key).toBe(a[target.key][0].val);
-        expect(b[target.key].map((top) => top.val === '-'), target.key).toEqual(a[target.key].map((top) => top.val === '-'));
+        expect(b[target.key].map((top) => top.val === MISSING), target.key).toEqual(a[target.key].map((top) => top.val === MISSING));
       }
     });
   }
@@ -280,8 +280,8 @@ describe('cibles des tops en surf et en planche (onglet générique)', () => {
     const tops = computeAllTopSegments(track, buildCumulativeTrack(track), SURF_TOP_TARGETS, kmh);
     expect(parseFloat(tops.t2s[0].val)).toBeCloseTo(kmh(7), 0);
     expect(parseFloat(tops.t10s[0].val)).toBeGreaterThan(kmh(5) - 0.5);
-    expect(tops.d1km[0].val).not.toBe('-');
-    expect(tops.d5km[0].val).toBe('-');
+    expect(tops.d1km[0].val).not.toBe(MISSING);
+    expect(tops.d5km[0].val).toBe(MISSING);
   });
 
   it('planche : les 1 000 m rapides, et le mille plus lent', () => {
@@ -367,7 +367,7 @@ const frozenTopSegments = (
       }
     }
   }
-  while (tops.length < count) tops.push({ val: '-', speed: null, path: [] });
+  while (tops.length < count) tops.push({ val: MISSING, speed: null, path: [] });
   return tops;
 };
 

@@ -8,7 +8,7 @@ import MapToggle from './ui/MapToggle';
 import StatTile from './ui/StatTile';
 import Swatch from './ui/Swatch';
 import type { FlightPumping, FlightSpan, PumpingSeries, PumpingSummary } from '../core/pumping';
-import { formatShortDuration, formatTimeOfDay, formatDecimal, orDash } from '../core/units';
+import { MISSING, formatShortDuration, formatTimeOfDay, formatDecimal, orDash } from '../core/units';
 import { t, tn } from '../core/i18n';
 import { tdStyle, thStyle } from './tableStyle';
 import type { PumpingStatus } from '../hooks/useSessionPumping';
@@ -35,7 +35,7 @@ interface PanelBaseProps {
   onShow: (key: PumpingHighlightKey | null) => void;
   /** Couleur du module, pour le bouton « Voir ». */
   accent: string;
-  /** Vitesse dans l'unité de l'activité, « — » sans valeur ; `unitLabel` est son unité, dans les titres. */
+  /** Vitesse dans l'unité de l'activité, `MISSING` sans valeur ; `unitLabel` est son unité, dans les titres. */
   speedCell: (ms: number | null) => string;
   unitLabel: string;
   /** Lecture des capteurs (`useSessionPumping`). */
@@ -255,8 +255,8 @@ export function FlightsPanel<F extends FlightSpan>({
                   {moduleColumns.map((c) => <td key={c.header} data-label={c.header.toLowerCase()} style={tdStyle}>{c.cell(f)}</td>)}
                   {measuring && (
                     <>
-                      <td data-label={t('séries')} style={tdStyle}>{pump ? pump.series.length : '—'}</td>
-                      <td data-label={t('pompé')} style={tdStyle}>{pump ? formatShortDuration(pump.pumpS) : '—'}</td>
+                      <td data-label={t('séries')} style={tdStyle}>{pump ? pump.series.length : MISSING}</td>
+                      <td data-label={t('pompé')} style={tdStyle}>{pump ? formatShortDuration(pump.pumpS) : MISSING}</td>
                     </>
                   )}
                   <td className="an-pump-map" style={tdStyle}>{mapButton(flightKey(f.n))}</td>
@@ -281,7 +281,7 @@ export function FlightsPanel<F extends FlightSpan>({
       <div className="an-sheet__stats an-sheet__stats--always">
         <StatTile label={t('Vols')} value={flights.length} />
         <StatTile label={t('Temps de vol')} value={formatShortDuration(totalFlightS)} />
-        <StatTile label={t('Plus long vol')} value={flights.length > 0 ? formatShortDuration(longestFlightS) : '—'} />
+        <StatTile label={t('Plus long vol')} value={flights.length > 0 ? formatShortDuration(longestFlightS) : MISSING} />
         {extraFlightTiles}
       </div>
       {flights.length > 0 && flightTable(podium, flights.length > 1)}
