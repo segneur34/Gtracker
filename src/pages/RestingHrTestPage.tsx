@@ -98,7 +98,7 @@ function RestingHrTestPage() {
 
       {native && !beltChosen && (
         <div className="ui-alert ui-alert--warning">
-          {tRich('Aucune ceinture cardio choisie : choisissez-la dans <a>Réglages</a>, bloc « Capteurs ».', undefined, { a: (c) => <Link to={SETTINGS_PATH}>{c}</Link> })}
+          {tRich('Aucune ceinture cardio choisie : choisissez-la dans <a>Réglages</a>, bloc « Connexion ».', undefined, { a: (c) => <Link to={SETTINGS_PATH}>{c}</Link> })}
         </div>
       )}
       {error && <div className="ui-alert ui-alert--danger">{error}</div>}

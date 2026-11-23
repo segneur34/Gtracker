@@ -12,7 +12,7 @@ import './PhoneAppCard.css';
 
 /**
  * L'application du téléphone que le programme Windows emporte (`platform/phoneApp.ts`), programme Windows seulement :
- * - `PhoneAppCard`, dans Réglages › Mémoire : sa version, « Enregistrer l'APK… » (fenêtre « Enregistrer sous » de
+ * - `PhoneAppCard`, dans Réglages › Connexion : sa version, « Enregistrer l'APK… » (fenêtre « Enregistrer sous » de
  *   Windows) et « Installer par le câble », avec ce que chaque geste a donné ; sans APK, la phrase qui le dit ;
  * - `PhoneAppOffer`, la fenêtre de première ouverture du Profil, une fois la mémoire choisie, tant que la version n'a
  *   pas été proposée : les deux mêmes boutons et « Plus tard » ; chacun des trois, comme la croix, retient que cette

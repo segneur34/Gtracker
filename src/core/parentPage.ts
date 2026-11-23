@@ -12,7 +12,7 @@ export const SETTINGS_PATH = '/parametres';
 /** Page Enregistrer (`RECORD_PATH` de `navigation.ts`, qui importe ce module). */
 const RECORD_ROUTE = '/enregistrer';
 
-/** Réglages ouverts sur le bloc « Capteurs » (`?bloc=capteurs`), où se trouve le bouton « Ajouter » d'une ceinture. */
+/** Réglages ouverts sur le bloc « Connexion » (`?bloc=capteurs`), à la ligne des ceintures, où se trouve le bouton « Ajouter ». */
 export const SETTINGS_SENSORS_PATH = `${SETTINGS_PATH}?bloc=capteurs`;
 
 /** Réglages ouverts sur la corbeille (`?bloc=corbeille`) : la carte Mémoire dépliée, la page défilée jusqu'à elle. */
@@ -20,7 +20,7 @@ export const SETTINGS_TRASH_PATH = `${SETTINGS_PATH}?bloc=corbeille`;
 
 /**
  * Réglages ouverts pour relier un téléphone (`?bloc=relier`, depuis la fenêtre « Synchroniser » d'un ordinateur qui
- * n'en connaît aucun) : la carte Mémoire dépliée, la fenêtre du code ouverte.
+ * n'en connaît aucun) : le bloc Connexion déplié, la fenêtre du code ouverte.
  */
 export const SETTINGS_PAIRING_PATH = `${SETTINGS_PATH}?bloc=relier`;
 

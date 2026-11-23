@@ -1,0 +1,9 @@
+/* Bloc « Connexion » de Réglages (`ConnectionSettings.tsx`) : le titre de la ligne des ceintures hors du téléphone,
+   dans la même écriture que les titres des cartes de liaison. */
+
+.connection-settings__title {
+  font-family: var(--font-title);
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-spacing);
+  text-transform: var(--title-case);
+}

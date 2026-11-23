@@ -148,7 +148,7 @@ const computerBusyText = (): string =>
 export const describeWait = (wait: SyncWait, nowMs: number): SyncWaitText => {
   const subtitle = wait.phone !== null ? lastSeenText(wait.phone, wait.lastSeenMs, nowMs) : null;
   const notes = wait.wirelessOff
-    ? [t('Le sans-fil de cet ordinateur est éteint : allumez-le dans Réglages › Mémoire pour que le téléphone puisse se présenter.')]
+    ? [t('Le sans-fil de cet ordinateur est éteint : allumez-le dans Réglages › Connexion pour que le téléphone puisse se présenter.')]
     : [];
   if (wait.reason === 'busy') {
     return { title: t('Synchronisation en attente'), subtitle, lead: computerBusyText(), steps: [], closing: null, notes: [] };

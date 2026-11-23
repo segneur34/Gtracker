@@ -895,7 +895,7 @@ function RecordingScreen() {
             <CaptureOption label={t('Ceinture cardio')} checked={measureHeartRate} disabled={belt === null}
               onChange={setHeartRatePicked} noteAlert={belt === null}
               note={belt === null
-                ? tRich('Aucune ceinture choisie : <a>Réglages</a>, bloc « Capteurs ».', undefined, { a: (children) => <Link to={SETTINGS_SENSORS_PATH}>{children}</Link> })
+                ? tRich('Aucune ceinture choisie : <a>Réglages</a>, bloc « Connexion ».', undefined, { a: (children) => <Link to={SETTINGS_SENSORS_PATH}>{children}</Link> })
                 : <>
                   {t("{label}, portée et humidifiée : elle n'émet qu'au contact de la peau.", { label: beltLabel })}
                   {retainedBelts.length >= 2 && (
@@ -922,7 +922,7 @@ function RecordingScreen() {
             </CaptureOption>
           )}
           {choosingBelt && (
-            // Appareil du prochain départ, parmi ceux retenus dans Réglages › Capteurs : liste dessinée, jamais le menu d'Android.
+            // Appareil du prochain départ, parmi ceux retenus dans Réglages › Connexion : liste dessinée, jamais le menu d'Android.
             <ChoiceSheet label={t('Appareil cardio')} onClose={() => setChoosingBelt(false)}>
               <div className="activity-select__heading"><strong>{t('Appareil cardio')}</strong></div>
               {retainedBelts.map((b, i) => (

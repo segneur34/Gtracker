@@ -139,7 +139,7 @@ function FinishRecording() {
 
 /**
  * Liaison sans fil avec l'ordinateur : tentée seule à l'ouverture et à chaque retour au premier plan, sans rien
- * afficher hors de Réglages › Mémoire (`useComputerLinkLauncher`).
+ * afficher hors de Réglages › Connexion (`useComputerLinkLauncher`).
  */
 function ComputerLinkLauncher() {
   useComputerLinkLauncher();

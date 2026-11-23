@@ -8,7 +8,7 @@ import {
 } from '../platform/wirelessPhone';
 
 /**
- * Le sans-fil du programme Windows, vu du bloc de Réglages › Mémoire : l'état du PC et les téléphones reliés, relus
+ * Le sans-fil du programme Windows, vu du bloc de Réglages › Connexion : l'état du PC et les téléphones reliés, relus
  * toutes les 5 secondes (chaque seconde pendant qu'une fenêtre de liaison est ouverte) et à chaque arrivée d'un
  * téléphone ; la fenêtre de liaison et son issue ; allumer ou éteindre, retirer un téléphone, demander à Windows
  * d'autoriser Gtracker sur le réseau. Rien d'écrit ici : le PC garde tout.

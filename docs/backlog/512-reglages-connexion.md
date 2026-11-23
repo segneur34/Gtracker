@@ -38,3 +38,22 @@ Quelqu'un qui cherche comment relier son téléphone à son ordinateur ne pense 
 
 - « Tracker » : le bloc « Capteurs » ? Réponse du 23/11 : oui, le bloc « Capteurs » ; il disparaît comme bloc à part, son contenu passe dans « Connexion ».
 - Rangement, réponse du 23/11 : prochain paquet, en tête d'Ensuite.
+- Planche montrée le 23/11 (hors dépôt, dossier `planche-512` de l'atelier) et validée le 23/11 (« je suis d'accord avec tes recommandations »). La disposition retenue est dans « Disposition validée » ci-dessous.
+
+## Disposition validée (23/11)
+
+Ordre des blocs de Réglages : Pratiquant, Activités, Enregistrement, Affichage, Cartes hors ligne, Mémoire, **Connexion**, Autorisations, Tutoriels, À propos. Le bloc « Capteurs » n'existe plus.
+
+Dans « Connexion », de haut en bas, chaque carte gardant son contenu, ses boutons et ses phrases :
+- sur le téléphone : la carte « Ordinateur » (`ComputerLinkCard`), puis les ceintures et montres (`HeartRateBeltSettings`) ;
+- sur le programme Windows : la carte « Téléphone » (`WirelessPhoneCard`, « Par câble (avancé) » compris), la carte « Application du téléphone » (`PhoneAppCard`), puis, en bas, la ligne des ceintures, précédée de son titre : « Ceintures et montres » et « Sur l'application Android seulement. » ;
+- dans un navigateur : la seule ligne des ceintures (les cartes de liaison ne s'y montrent pas).
+
+Tranché par l'orchestrateur :
+- nom « Connexion », au singulier ; aide « ? » du bloc : « Ce qui relie Gtracker à un autre appareil : l'ordinateur ou le téléphone, les ceintures cardio et les montres. » ;
+- restent dans Mémoire : emplacement, copie de sécurité, fichiers de réglages (dont « Reprendre le matériel » et « Matériel des deux appareils », et la phrase qui y renvoie), lieu des sessions, corbeille, remise à zéro ;
+- le bloc démarre replié ; l'état ouvert de l'ancien bloc « Capteurs » n'est pas repris ;
+- `?bloc=relier` ouvre « Connexion » et la fenêtre du code ; `?bloc=capteurs` (lien de la page Enregistrer) ouvre « Connexion » et amène les ceintures à l'écran, le retour d'Android ramenant toujours à Enregistrer ; les deux adresses gardent leur nom ;
+- les phrases « Réglages › Mémoire » qui parlent de la liaison et toutes les « Réglages › Capteurs » deviennent « Réglages › Connexion » (français, anglais, espagnol), commentaires du code compris ; celles qui parlent du dossier, des fichiers de réglages ou du lieu restent « Réglages › Mémoire ».
+
+Le lot part en deux parties : A, le code et ses tests (Sonnet, effort élevé) ; B, les scripts du banc qui ouvraient Mémoire pour la liaison ou « Capteurs » (Sonnet), après la A.

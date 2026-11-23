@@ -37,7 +37,7 @@ function CableHelp({ toolFolder }: { toolFolder: string | null }) {
 }
 
 /**
- * Le téléphone, relié sans câble, dans Réglages › Mémoire, programme Windows seulement (rien dans le navigateur ni sur le
+ * Le téléphone, relié sans câble, dans Réglages › Connexion, programme Windows seulement (rien dans le navigateur ni sur le
  * téléphone) : la case qui allume le sans-fil (éteint par défaut, avec la phrase qui prévient que Windows va demander
  * l'autorisation), son état, le pare-feu de Windows quand il bloque (avec « Autoriser Gtracker » si l'autorisation
  * suffit), « Relier un téléphone » (adresse, code et temps restant en grand, jusqu'à la liaison ou
@@ -124,7 +124,7 @@ function WirelessPhoneCard() {
       {pairing !== null && waiting && (
         <div className="wireless-card__pairing" role="group" aria-label={t('Relier un téléphone')}>
           <p className="ui-m-0">
-            {t("Sur le téléphone, ouvrez Gtracker, puis Réglages, Mémoire, et reliez-le à cet ordinateur. S'il ne le trouve pas seul, tapez l'adresse et le code :")}
+            {t("Sur le téléphone, ouvrez Gtracker, puis Réglages, Connexion, et reliez-le à cet ordinateur. S'il ne le trouve pas seul, tapez l'adresse et le code :")}
           </p>
           <div className="wireless-card__fields">
             <span className="wireless-card__label">{t('Adresse')}</span>

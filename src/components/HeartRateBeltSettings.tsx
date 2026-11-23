@@ -22,7 +22,7 @@ const SIGNAL_IN_RANGE_DBM = -80;
 const signalLabel = (rssi: number): string => (rssi >= SIGNAL_NEAR_DBM ? t('proche') : rssi >= SIGNAL_IN_RANGE_DBM ? t('à portée') : t('loin'));
 
 /**
- * Bloc « Capteurs » de Réglages : les ceintures et montres retenues sur ce
+ * Ceintures et montres du bloc « Connexion » de Réglages : les ceintures et montres retenues sur ce
  * téléphone, ajoutées par une recherche, essayées (fréquence en
  * direct), choisies ou oubliées. L'application s'en souvient de plusieurs et
  * n'en lit qu'une à la fois : celle « utilisée au prochain départ »

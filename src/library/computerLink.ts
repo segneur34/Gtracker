@@ -53,7 +53,7 @@ export const linkErrorText = (error: ComputerLinkError): string => {
     case 'proof':
       return t("Cet appareil ne connaît pas le code : ce n'est peut-être pas votre ordinateur. Rien n'a été gardé. Vérifiez le code et réessayez.");
     case 'token':
-      return t("L'ordinateur ne reconnaît plus ce téléphone. Reliez-le de nouveau : sur l'ordinateur, Réglages, Mémoire, « Relier un téléphone », puis tapez ici le code affiché.");
+      return t("L'ordinateur ne reconnaît plus ce téléphone. Reliez-le de nouveau : sur l'ordinateur, Réglages, Connexion, « Relier un téléphone », puis tapez ici le code affiché.");
     case 'certificate':
       return t("L'ordinateur qui répond n'est plus celui que ce téléphone connaît : il a peut-être été réinstallé. Oubliez-le, puis reliez-le de nouveau.");
     case 'version':

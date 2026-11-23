@@ -34,7 +34,7 @@ import './PhoneSyncButton.css';
  * compte rendu de ce qui est fait le rappelle, avec « Répondre ». Fermée en route, la synchronisation continue, et une
  * question attend : le bouton rouvre la fenêtre où elle en est. Téléphone pas là, liaison tombée, ordinateur occupé :
  * la fenêtre attend en disant quoi faire (pare-feu compris, avec « Autoriser Gtracker »), repart seule, et « Annuler »
- * arrête l'attente ; un ordinateur qui ne connaît aucun téléphone mène à Réglages › Mémoire, fenêtre du code ouverte.
+ * arrête l'attente ; un ordinateur qui ne connaît aucun téléphone mène à Réglages › Connexion, fenêtre du code ouverte.
  * Première synchronisation d'un téléphone : un écran de départ dit où ira la copie de sécurité, avec « Choisir un autre
  * dossier » et « Commencer » (le fermer arrête tout) ; le compte rendu redit où est la copie, avec « Ouvrir le
  * dossier », et une copie qui échoue propose un autre dossier avant « Recommencer ». À côté du bouton, « Redmi relié » tant que le sans-fil tient un téléphone ; rien ne se lance à son arrivée. Absent
@@ -228,7 +228,7 @@ function WaitView({ wait, atMs, firewallMessage, onCancel }: { wait: SyncWait; a
   );
 }
 
-/** Aucun téléphone connu : cela se fait une fois, par un code, dans Réglages › Mémoire. */
+/** Aucun téléphone connu : cela se fait une fois, par un code, dans Réglages › Connexion. */
 function NoPhoneView({ onClose, onPair }: { onClose: () => void; onPair: () => void }) {
   return (
     <>

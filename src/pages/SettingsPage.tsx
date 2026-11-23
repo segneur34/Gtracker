@@ -50,7 +50,7 @@ import {
 import { LIVE_STATS_DEFAULTS, usesActiveAverage } from '../recording/liveStats';
 import { simulatedApproachMs } from '../recording/markGuide';
 import BeepCurveEditor from '../components/BeepCurveEditor';
-import HeartRateBeltSettings from '../components/HeartRateBeltSettings';
+import ConnectionSettings from '../components/ConnectionSettings';
 import { CARD_STYLE } from '../components/styles';
 import { FAMILY_ICON } from '../components/familyIcons';
 import { IconChevronRight, IconEye, IconEyeOff } from '../components/icons';
@@ -155,9 +155,9 @@ function AnalysisTabsSetting({ view, profile, onChange }: {
 const cardStyle = { ...CARD_STYLE, marginBottom: '15px' } as const;
 
 /** Blocs repliables de la page, tous fermés au départ ; l'état est mémorisé. */
-type SettingsBlock = 'memoire' | 'autorisations' | 'activites' | 'enregistrement' | 'capteurs' | 'affichage' | 'cartes' | 'pratiquant' | 'tutoriels' | 'apropos';
+type SettingsBlock = 'memoire' | 'connexion' | 'autorisations' | 'activites' | 'enregistrement' | 'affichage' | 'cartes' | 'pratiquant' | 'tutoriels' | 'apropos';
 const SETTINGS_BLOCK_DEFAULTS: Record<SettingsBlock, boolean> = {
-  memoire: false, autorisations: false, activites: false, enregistrement: false, capteurs: false, affichage: false, cartes: false,
+  memoire: false, connexion: false, autorisations: false, activites: false, enregistrement: false, affichage: false, cartes: false,
   pratiquant: false, tutoriels: false, apropos: false,
 };
 /** Plafonds proposés pour les cartes gardées, en Mo : une liste plutôt qu'un champ, qui effacerait des tuiles à chaque chiffre tapé. */
@@ -523,7 +523,7 @@ const ActivityCard = memo(function ActivityCard({
               }} />
             )}
             <SettingRow label={t('Ceinture cardio')} helpKey={`${id}:ceinture`}
-                help={t("La ceinture du bloc « Capteurs » (celle « utilisée au prochain départ » s'il y en a plusieurs) est proposée, cochée, à chaque enregistrement ; la fréquence cardiaque est écrite dans la trace.")}>
+                help={t("La ceinture du bloc « Connexion » (celle « utilisée au prochain départ » s'il y en a plusieurs) est proposée, cochée, à chaque enregistrement ; la fréquence cardiaque est écrite dans la trace.")}>
                 <label className="settings-sports__pair">
                   <input type="checkbox" checked={s.heartRate} onChange={(e) => setFor(id, 'heartRate', e.target.checked)} />
                   <span>{t('Proposer la ceinture cardio')}</span>
@@ -562,20 +562,27 @@ function SettingsPage() {
   } = useAllSportSettings();
   const { profile, setNumber, setSex, setThresholds, age } = useAthleteProfile();
   const { open, toggle, set: setBlocks, closeAll: closeBlocks } = useOpenSections<SettingsBlock>('settings', SETTINGS_BLOCK_DEFAULTS);
-  /** Arrivée par `?bloc=capteurs` (lien de la page Enregistrer) : le bloc s'ouvre et vient à l'écran, une fois. */
-  const sensorsRef = useRef<HTMLDivElement>(null);
+  /** Arrivée par `?bloc=capteurs` (lien de la page Enregistrer) : Connexion s'ouvre et la ligne des ceintures vient à l'écran, une fois. */
+  const beltsRef = useRef<HTMLDivElement>(null);
   const { search } = useLocation();
   const wantsSensors = settingsBlockFromSearch(search) === 'capteurs';
   useEffect(() => {
     if (!wantsSensors) return;
-    setBlocks({ capteurs: true });
-    const id = window.setTimeout(() => sensorsRef.current?.scrollIntoView({ block: 'start' }), 0);
-    return () => window.clearTimeout(id);
+    setBlocks({ connexion: true });
+    // La ligne n'est montée qu'une fois le bloc ouvert : on la guette un court moment.
+    let tries = 0;
+    const id = window.setInterval(() => {
+      const row = beltsRef.current;
+      tries += 1;
+      if (row) row.scrollIntoView({ block: 'start' });
+      if (row || tries >= 20) window.clearInterval(id);
+    }, 50);
+    return () => window.clearInterval(id);
   }, [wantsSensors, setBlocks]);
-  /** Arrivée par `?bloc=relier` (fenêtre « Synchroniser ») : Mémoire s'ouvre ; la carte du téléphone ouvre sa fenêtre du code. */
+  /** Arrivée par `?bloc=relier` (fenêtre « Synchroniser ») : Connexion s'ouvre ; la carte du téléphone ouvre sa fenêtre du code. */
   const wantsPairing = settingsBlockFromSearch(search) === 'relier';
   useEffect(() => {
-    if (wantsPairing) setBlocks({ memoire: true });
+    if (wantsPairing) setBlocks({ connexion: true });
   }, [wantsPairing, setBlocks]);
   /** Arrivée par `?bloc=corbeille` (menu « … » de Sessions) : Mémoire s'ouvre et la zone de la corbeille vient à l'écran. */
   const wantsTrash = settingsBlockFromSearch(search) === 'corbeille';
@@ -739,11 +746,6 @@ function SettingsPage() {
         )}
       </div>
 
-      <div style={cardStyle} ref={sensorsRef}>
-        <PanelTitle label={t('Capteurs')} open={open.capteurs} onToggle={() => toggle('capteurs')} />
-        {open.capteurs && <div className="settings-block__body"><HeartRateBeltSettings /></div>}
-      </div>
-
       <div style={cardStyle}>
         <PanelTitle label={t('Enregistrement')} open={open.enregistrement} onToggle={() => toggle('enregistrement')} />
         {open.enregistrement && (
@@ -781,6 +783,12 @@ function SettingsPage() {
       </div>
 
       <MemoryStatus detailed collapse={{ open: open.memoire, onToggle: () => toggle('memoire') }} />
+
+      <div style={cardStyle}>
+        <BlockTitle label={t('Connexion')} open={open.connexion} onToggle={() => toggle('connexion')} helpKey="connexion"
+          help={t("Ce qui relie Gtracker à un autre appareil : l'ordinateur ou le téléphone, les ceintures cardio et les montres.")} />
+        {open.connexion && <div className="settings-block__body"><ConnectionSettings beltsRef={beltsRef} /></div>}
+      </div>
 
       <div style={cardStyle}>
         <BlockTitle label={t('Autorisations')} open={open.autorisations} onToggle={() => toggle('autorisations')} helpKey="autorisations"

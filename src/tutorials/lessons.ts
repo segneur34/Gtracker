@@ -158,7 +158,7 @@ export const LESSONS: readonly Lesson[] = [
     icon: 'cardio',
     target: '/profil',
     body: [
-      t("Une ceinture cardio Bluetooth se relie dans Réglages › Capteurs ; une fois retenue, l'enregistrement la reprend."),
+      t("Une ceinture cardio Bluetooth se relie dans Réglages › Connexion ; une fois retenue, l'enregistrement la reprend."),
       t('Dans Réglages › Pratiquant, la FC max et la FC de repos fixent vos zones cardiaques, et leurs seuils se règlent au même endroit. Sans FC max, elle est estimée par l\'âge.'),
       t('Un test guidé mesure la FC de repos, trois minutes immobile : il est dans Réglages › Pratiquant.'),
       t("L'onglet « cardio » des analyses montre le temps passé dans chaque zone."),

@@ -19,7 +19,7 @@ import { useLibraryFields } from './useSessionLibrary';
  * - `useComputerLinkLauncher`, monté une fois pour toute l'application, tente la liaison toute seule à l'ouverture, au
  *   retour au premier plan, quand le dossier mémoire devient accessible et à intervalle régulier tant que Gtracker est
  *   affiché, sans rien afficher ; il garde l'écran allumé pendant un échange avec l'ordinateur ;
- * - `useComputerLink`, pour le bloc « Ordinateur » de Réglages › Mémoire, seul endroit où l'état se dit.
+ * - `useComputerLink`, pour le bloc « Ordinateur » de Réglages › Connexion, seul endroit où l'état se dit.
  * Rien n'est tenté pendant un enregistrement. Le greffon garde seul le jumelage, et ferme la liaison quand
  * l'application quitte l'écran.
  */

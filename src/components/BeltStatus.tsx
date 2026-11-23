@@ -16,7 +16,7 @@ const STATE_COLOR: Record<BeltState, string> = {
 
 /**
  * État de la ceinture cardio en une ligne : pastille, libellé, FC en direct.
- * Dans Réglages (bloc Capteurs) et sous la case « Ceinture cardio » de la page
+ * Dans Réglages (bloc Connexion) et sous la case « Ceinture cardio » de la page
  * Enregistrer. `offText` remplace « non connectée » (Bluetooth éteint,
  * permission refusée) ; `children` suit la ligne. Une ceinture introuvable
  * offre en secours les réglages Bluetooth d'Android.
