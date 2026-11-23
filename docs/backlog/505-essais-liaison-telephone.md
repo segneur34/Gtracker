@@ -44,6 +44,13 @@ Le code du téléphone qui reçoit les ordres de l'ordinateur est en Java : `Com
 
 Commentaires sans numéro de lot, la raison en clair. Ne rien perdre (`docs/DECISIONS.md` §8) : original intact jusqu'à valider, provisoire effacé à la coupure, jamais d'écriture pendant un enregistrement. Essais synthétiques seulement. Rien à essayer au téléphone, pas de banc (la page ne change pas).
 
+## Réalisé (23/11)
+
+- Robolectric 4.16, Android simulé 35 (`@Config(sdk = 35)`, image déjà présente dans `~/.m2` sur le poste), sans `includeAndroidResources`.
+- `FakeDocuments` est un `ContentProvider` qui parle DocumentsContract (`call`, `query`, `openFile`), pas une sous-classe de `DocumentsProvider` : le ContentResolver de Robolectric appelle l'ancienne forme de `query`, que `DocumentsProvider` refuse et rend finale.
+- Les neuf cas en 21 essais (`ComputerLinkCommandsTest`), chacun vérifiant en fin d'essai qu'aucun provisoire ne reste tenu (`MemoryTree`, registre lu par réflexion). L'arrêt brutal est simulé par les provisoires qu'il laisse, posés sur le disque : sous Windows, un flux resté ouvert empêche d'effacer son fichier.
+- Aucun défaut du code de production trouvé.
+
 ## À la passe de documentation
 
 ETAT §8 (« les greffons Java » parmi les non testés : phrase périmée), INVENTAIRE (la classe neuve et son essai), DEVELOPPER (la commande Gradle), un point d'HISTORIQUE.

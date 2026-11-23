@@ -6,7 +6,6 @@ import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.net.Uri;
 import android.os.Build;
 import android.os.SystemClock;
 import android.util.Log;
@@ -24,8 +23,6 @@ import io.github.segneur.gtracker.ComputerLinkProtocol.FrameDecoder;
 import io.github.segneur.gtracker.ComputerLinkProtocol.FrameException;
 import io.github.segneur.gtracker.ComputerLinkProtocol.Incoming;
 import io.github.segneur.gtracker.ComputerLinkProtocol.ProbeAnswer;
-import io.github.segneur.gtracker.ComputerLinkProtocol.RemoteFile;
-import io.github.segneur.gtracker.ComputerLinkProtocol.WriteSession;
 import java.io.BufferedOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
@@ -68,7 +65,7 @@ import org.json.JSONObject;
  * Liaison sans fil avec le programme Windows (format : ComputerLinkProtocol, et les en-têtes de bureau/trames.ts,
  * appairage.ts et sonde.ts). Le PC écoute, le téléphone se connecte, puis répond aux commandes du PC (`lister`,
  * `lire`, `ping`, et, la capacité « ecriture » annoncée, `ecrire`, `valider`, `effacer`) dans le dossier mémoire
- * désigné.
+ * désigné ; les réponses aux commandes et l'écriture en cours sont dans ComputerLinkCommands, une par liaison.
  *
  * - Écriture : l'appairage vaut accord, comme le câble ; rien n'est écrit ni effacé pendant un enregistrement
  *   (`erreur` PERMISSION), ni hors de la liste blanche (`ComputerLinkProtocol.writeAllowed`, sous le sous-dossier
@@ -977,29 +974,7 @@ public class ComputerLinkPlugin extends Plugin {
             for (;;) {
                 Incoming m = c.next();
                 if (m == null) break;
-                if (!"ping".equals(m.type)) exchanged();
-                switch (m.type) {
-                    case "ping":
-                        c.send(ComputerLinkProtocol.encodePong(m.id, recording()));
-                        break;
-                    case "lister":
-                        c.send(listFiles(c, m.id));
-                        break;
-                    case "lire":
-                        c.send(readBlock(c, m));
-                        break;
-                    case "ecrire":
-                        c.send(writeBlock(c, m));
-                        break;
-                    case "valider":
-                        c.send(commitWrite(c, m));
-                        break;
-                    case "effacer":
-                        c.send(eraseFile(c, m));
-                        break;
-                    default:
-                        throw new FrameException(ComputerLinkProtocol.UNKNOWN_MESSAGE, "Message inattendu une fois relié : " + m.type);
-                }
+                c.send(c.commands.answer(m, c.root));
             }
         } catch (FrameException e) {
             Log.w(TAG, "liaison : message illisible", e);
@@ -1009,7 +984,7 @@ public class ComputerLinkPlugin extends Plugin {
             failure = ERROR_NETWORK;
         }
         // Liaison coupée en pleine écriture : provisoire effacé, original intact.
-        abandonWrite(c);
+        c.commands.abandon();
         boolean wasCurrent;
         synchronized (this) {
             wasCurrent = link == c;
@@ -1024,227 +999,11 @@ public class ComputerLinkPlugin extends Plugin {
     }
 
     /**
-     * Réponse à `lister` : fichiers de la racine et des `LISTED_DIRS`, sans dossier ni provisoire. Chaque dossier est
-     * d'abord remis en ordre comme l'application le fait en le lisant (`MemoryWriter.settle`) : un remplacement
-     * interrompu est terminé et son fichier listé sous son nom, une création interrompue effacée.
+     * Les réponses aux commandes d'une liaison (ComputerLinkCommands) : dossier mémoire par le ContentResolver de
+     * l'application, état « enregistre » lu au service d'enregistrement, et les annonces de ce greffon.
      */
-    private byte[] listFiles(Connection c, long id) throws FrameException {
-        MemoryRoot root = c.root;
-        if (root == null) return ComputerLinkProtocol.encodeError(id, ComputerLinkProtocol.ERROR_NOT_FOUND, "Aucun dossier mémoire désigné sur le téléphone.");
-        try {
-            Uri tree = Uri.parse(root.folder);
-            MemoryTree memory = new MemoryTree(getContext().getContentResolver());
-            MemoryWriter writer = new MemoryWriter(getContext().getContentResolver());
-            String rootId = memory.baseDir(tree, root.base);
-            if (rootId == null) return ComputerLinkProtocol.encodeError(id, ComputerLinkProtocol.ERROR_NOT_FOUND, "Dossier mémoire introuvable sur le téléphone : " + root.base);
-            List<RemoteFile> files = new ArrayList<>();
-            java.util.Map<String, String> dirs = new java.util.LinkedHashMap<>();
-            for (MemoryWriter.Shown shown : writer.settle(tree, memory.children(tree, rootId))) {
-                if (shown.child.isDir) {
-                    if (ComputerLinkProtocol.LISTED_DIRS.contains(shown.name)) dirs.put(shown.name, shown.child.id);
-                } else if (shown.child.sizeKnown) {
-                    files.add(new RemoteFile(shown.name, shown.child.size, shown.child.mtimeMs));
-                }
-            }
-            for (java.util.Map.Entry<String, String> dir : dirs.entrySet()) {
-                for (MemoryWriter.Shown shown : writer.settle(tree, memory.children(tree, dir.getValue()))) {
-                    if (!shown.child.isDir && shown.child.sizeKnown) files.add(new RemoteFile(dir.getKey() + "/" + shown.name, shown.child.size, shown.child.mtimeMs));
-                }
-            }
-            return ComputerLinkProtocol.encodeList(id, files);
-        } catch (FrameException e) {
-            return ComputerLinkProtocol.encodeError(id, ComputerLinkProtocol.ERROR_UNKNOWN, "Liste trop longue pour une trame.");
-        } catch (Exception e) {
-            Log.w(TAG, "lister", e);
-            return ComputerLinkProtocol.encodeError(id, MemoryTree.errorCode(e), "Lecture du dossier impossible : " + e.getMessage());
-        }
-    }
-
-    /** Réponse à `lire` : les octets demandés, plus courts seulement à la fin du fichier. */
-    private byte[] readBlock(Connection c, Incoming m) throws FrameException {
-        MemoryRoot root = c.root;
-        if (root == null) return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_NOT_FOUND, "Aucun dossier mémoire désigné sur le téléphone.");
-        try {
-            Uri tree = Uri.parse(root.folder);
-            MemoryTree memory = new MemoryTree(getContext().getContentResolver());
-            // Le chemin a passé `pathAllowed` et le sous-dossier `baseAllowed` : il ne désigne qu'un fichier de la
-            // racine du dossier mémoire ou de son `sessions/`, cherché nom par nom depuis la racine de l'arbre.
-            String docId = memory.resolveExisting(tree, ComputerLinkProtocol.inBase(root.base, m.path));
-            long size = docId == null ? -1 : memory.fileSize(tree, docId);
-            if (size < 0) return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_NOT_FOUND, "Fichier absent : " + m.path);
-            int wanted = (int) Math.max(0, Math.min(m.length, size - m.start));
-            byte[] data = new byte[wanted];
-            int read = 0;
-            if (wanted > 0) {
-                try (InputStream in = memory.open(tree, docId)) {
-                    skipFully(in, m.start);
-                    while (read < wanted) {
-                        int n = in.read(data, read, wanted - read);
-                        if (n < 0) break;
-                        read += n;
-                    }
-                }
-            }
-            if (read > 0 && m.start + read >= size) fileSent();
-            return ComputerLinkProtocol.encodeBlock(m.id, m.start, data, read);
-        } catch (Exception | OutOfMemoryError e) {
-            Log.w(TAG, "lire", e);
-            return ComputerLinkProtocol.encodeError(m.id, MemoryTree.errorCode(e), "Lecture impossible : " + e.getMessage());
-        }
-    }
-
-    // ---------- écritures du PC ----------
-
-    private static final String RECORDING_REFUSAL = "Le téléphone enregistre une session : rien n'y est écrit ni effacé.";
-    private static final String NO_MEMORY_FOLDER = "Aucun dossier mémoire désigné sur le téléphone.";
-
-    /** Vrai pendant un enregistrement : le téléphone n'écrit ni n'efface rien pour le PC. */
-    private static boolean recording() {
-        return RecordingService.snapshot().running;
-    }
-
-    /** Le dossier où écrire un chemin admis par `writeAllowed`, et le nom du fichier dedans. */
-    private static final class Target {
-        final Uri tree;
-        final String parentId;
-        final String name;
-
-        Target(Uri tree, String parentId, String name) {
-            this.tree = tree;
-            this.parentId = parentId;
-            this.name = name;
-        }
-    }
-
-    /**
-     * Le dossier d'un chemin admis par `writeAllowed`, sous le sous-dossier de la mémoire (`baseAllowed`) : la racine
-     * de la mémoire, ou l'un des `WRITABLE_DIRS`, créé avec `create` s'il manque. `null` si la mémoire est
-     * introuvable, ou, sans `create`, si le sous-dossier manque.
-     */
-    private static Target targetOf(MemoryWriter writer, MemoryTree memory, MemoryRoot root, String path, boolean create) throws Exception {
-        Uri tree = Uri.parse(root.folder);
-        String rootId = memory.baseDir(tree, root.base);
-        if (rootId == null) return null;
-        int slash = path.indexOf('/');
-        String parentId = slash < 0 ? rootId : writer.resolveFrom(tree, rootId, path.substring(0, slash), create);
-        return parentId == null ? null : new Target(tree, parentId, path.substring(slash + 1));
-    }
-
-    /**
-     * Réponse à `ecrire`. Le premier bloc (debut 0) abandonne l'écriture non validée d'avant et ouvre le provisoire :
-     * `.gtracker-tmp` si le fichier existe, `.gtracker-new` sinon. Chaque bloc suivant doit continuer l'écriture
-     * (`WriteSession.continues`) ; sinon, ou sur toute erreur, l'écriture est abandonnée, l'original intact.
-     */
-    private byte[] writeBlock(Connection c, Incoming m) throws FrameException {
-        if (recording()) {
-            abandonWrite(c);
-            return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_PERMISSION, RECORDING_REFUSAL);
-        }
-        MemoryRoot root = c.root;
-        if (root == null) {
-            abandonWrite(c);
-            return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_NOT_FOUND, NO_MEMORY_FOLDER);
-        }
-        try {
-            if (WriteSession.opens(m.start)) {
-                abandonWrite(c);
-                MemoryWriter writer = new MemoryWriter(getContext().getContentResolver());
-                MemoryTree memory = new MemoryTree(getContext().getContentResolver());
-                Target t = targetOf(writer, memory, root, m.path, true);
-                if (t == null) return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_NOT_FOUND, "Dossier mémoire introuvable sur le téléphone : " + root.base);
-                String existing = memory.findChild(t.tree, t.parentId, t.name);
-                MemoryTree.Child current = existing == null ? null : memory.describe(t.tree, existing);
-                if (current != null && current.isDir) return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_UNKNOWN, m.path + " est un dossier sur le téléphone.");
-                boolean replacing = current != null;
-                c.provisional = writer.open(t.tree, t.parentId, t.name, ComputerLinkProtocol.provisionalName(t.name, replacing), m.path);
-                c.writer = writer;
-                c.writing = new WriteSession(m.path, m.size, replacing);
-            } else if (c.writing == null || !c.writing.continues(m.path, m.start, m.size, m.length)) {
-                abandonWrite(c);
-                return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_UNKNOWN, "Bloc hors d'ordre pour " + m.path + " : écriture abandonnée.");
-            }
-            c.provisional.out.write(m.body);
-            c.writing.wrote(m.length);
-        } catch (Exception | OutOfMemoryError e) {
-            Log.w(TAG, "ecrire", e);
-            abandonWrite(c);
-            return ComputerLinkProtocol.encodeError(m.id, MemoryTree.errorCode(e), "Écriture impossible : " + e.getMessage());
-        }
-        return ComputerLinkProtocol.encodeDone(m.id);
-    }
-
-    /**
-     * Réponse à `valider` : l'écriture en cours doit viser ce chemin, de cette taille, tous ses octets reçus ; le
-     * provisoire, sa taille relue, prend alors la place du fichier (`MemoryWriter.commit`). Rend le fichier tel qu'il
-     * est désormais, avec la taille et la date que `lister` montrera.
-     */
-    private byte[] commitWrite(Connection c, Incoming m) throws FrameException {
-        if (recording()) {
-            abandonWrite(c);
-            return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_PERMISSION, RECORDING_REFUSAL);
-        }
-        if (c.writing == null || c.provisional == null || !c.writing.completes(m.path, m.size)) {
-            abandonWrite(c);
-            return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_UNKNOWN, "Validation refusée pour " + m.path + " : aucune écriture complète de " + m.size + " octets en cours.");
-        }
-        MemoryTree.Child done;
-        try {
-            done = c.writer.commit(c.provisional, m.size, m.path);
-        } catch (Exception | OutOfMemoryError e) {
-            Log.w(TAG, "valider", e);
-            abandonWrite(c);
-            return ComputerLinkProtocol.encodeError(m.id, MemoryTree.errorCode(e), "Mise en place impossible : " + e.getMessage());
-        }
-        c.provisional = null;
-        c.writer = null;
-        c.writing = null;
-        return ComputerLinkProtocol.encodeWritten(m.id, m.path, done.sizeKnown ? done.size : m.size, done.mtimeMs);
-    }
-
-    /**
-     * Réponse à `effacer` : le fichier et le provisoire d'un remplacement interrompu laissé à côté
-     * (`MemoryWriter.erase`) ; sans effet sur un fichier absent. L'écriture en cours du même chemin est abandonnée.
-     */
-    private byte[] eraseFile(Connection c, Incoming m) throws FrameException {
-        if (recording()) return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_PERMISSION, RECORDING_REFUSAL);
-        MemoryRoot root = c.root;
-        if (root == null) return ComputerLinkProtocol.encodeError(m.id, ComputerLinkProtocol.ERROR_NOT_FOUND, NO_MEMORY_FOLDER);
-        if (c.writing != null && c.writing.path.equals(m.path)) abandonWrite(c);
-        try {
-            MemoryWriter writer = new MemoryWriter(getContext().getContentResolver());
-            Target t = targetOf(writer, new MemoryTree(getContext().getContentResolver()), root, m.path, false);
-            if (t != null) writer.erase(t.tree, t.parentId, t.name, m.path);
-        } catch (Exception e) {
-            Log.w(TAG, "effacer", e);
-            return ComputerLinkProtocol.encodeError(m.id, MemoryTree.errorCode(e), "Effacement impossible : " + e.getMessage());
-        }
-        return ComputerLinkProtocol.encodeDone(m.id);
-    }
-
-    /** Abandonne l'écriture en cours de la liaison, s'il y en a une : flux fermé, provisoire effacé. Ne lève jamais. */
-    private static void abandonWrite(Connection c) {
-        MemoryWriter.Provisional p = c.provisional;
-        MemoryWriter writer = c.writer;
-        c.provisional = null;
-        c.writer = null;
-        c.writing = null;
-        if (p != null && writer != null) writer.abandon(p);
-    }
-
-    private static void skipFully(InputStream in, long count) throws IOException {
-        long left = count;
-        byte[] scrap = null;
-        while (left > 0) {
-            long skipped = in.skip(left);
-            if (skipped > 0) {
-                left -= skipped;
-                continue;
-            }
-            if (scrap == null) scrap = new byte[8192];
-            int n = in.read(scrap, 0, (int) Math.min(scrap.length, left));
-            if (n < 0) return;
-            left -= n;
-        }
+    private ComputerLinkCommands newCommands() {
+        return new ComputerLinkCommands(getContext().getContentResolver(), () -> RecordingService.snapshot().running, this::exchanged, this::fileSent);
     }
 
     /** Un fichier vient de partir jusqu'à son dernier octet. */
@@ -1512,7 +1271,7 @@ public class ComputerLinkPlugin extends Plugin {
             if (fingerprint == null) throw new SSLException("Aucun certificat présenté.");
             if (!alive(gen)) throw new IOException("Liaison fermée.");
             untrack(plain);
-            return new Connection(ssl, target, fingerprint);
+            return new Connection(ssl, target, fingerprint, newCommands());
         } catch (GeneralSecurityException e) {
             untrack(plain);
             closeQuietly(plain);
@@ -1592,7 +1351,7 @@ public class ComputerLinkPlugin extends Plugin {
      * Le dossier mémoire que lit la liaison, posé d'un bloc : l'arbre désigné (adresse SAF) et le sous-dossier où est
      * la mémoire, `null` quand c'est l'arbre lui-même.
      */
-    private static final class MemoryRoot {
+    static final class MemoryRoot {
         final String folder;
         final String base;
 
@@ -1604,7 +1363,8 @@ public class ComputerLinkPlugin extends Plugin {
 
     /**
      * Une liaison TLS avec le PC : flux, décodeur aux limites de l'accueil, élargi au corps d'un bloc d'écriture une
-     * fois relié (`COMMAND_LIMITS`), et l'écriture en cours, que seul le fil de la liaison touche.
+     * fois relié (`COMMAND_LIMITS`), et les réponses aux commandes avec l'écriture en cours, que seul le fil de la
+     * liaison touche.
      */
     private static final class Connection {
         final SSLSocket socket;
@@ -1619,15 +1379,14 @@ public class ComputerLinkPlugin extends Plugin {
         volatile MemoryRoot root;
         /** Vrai une fois fermée exprès : l'erreur de lecture qui suit n'en est pas une. */
         volatile boolean closed;
-        /** Écriture en cours : l'ordre de ses blocs, son provisoire ouvert et qui l'écrit ; tous nuls sinon. */
-        WriteSession writing;
-        MemoryWriter.Provisional provisional;
-        MemoryWriter writer;
+        /** Réponses aux commandes du PC, et l'écriture en cours. */
+        final ComputerLinkCommands commands;
 
-        Connection(SSLSocket socket, Endpoint endpoint, byte[] fingerprint) throws IOException {
+        Connection(SSLSocket socket, Endpoint endpoint, byte[] fingerprint, ComputerLinkCommands commands) throws IOException {
             this.socket = socket;
             this.endpoint = endpoint;
             this.fingerprint = fingerprint;
+            this.commands = commands;
             this.in = socket.getInputStream();
             this.out = new BufferedOutputStream(socket.getOutputStream(), 65_536);
         }
