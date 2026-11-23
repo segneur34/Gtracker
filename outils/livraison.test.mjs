@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -326,6 +326,8 @@ describe('de bout en bout, dans un dépôt jetable', () => {
     ecrire('package.json', JSON.stringify({ name: 'essai', version: '1.0.0', scripts: { test: 'vitest run', backlog: 'node outils/backlog.mjs' } }, null, 2) + '\n')
     ecrire('outils/lancer.bat', 'echo un\r\necho deux\r\n')
     ecrire('outils/gradlew', '#!/bin/sh\necho ok\n')
+    // Hors de Windows, git lit le bit exécutable sur le disque : sans lui, le second commit (`commit -a`) le retirerait.
+    chmodSync(join(racine, 'outils/gradlew'), 0o755)
     ecrire('dossier avec espace/note.md', 'Note.\n')
     ecrire('android/app/build.gradle', 'android {\n    namespace = "org.exemple.essai"\n    defaultConfig {\n        applicationId "org.exemple.essai"\n    }\n}\n')
     ecrire('capacitor.config.ts', "export default {\n  appId: 'org.exemple.essai',\n}\n")
