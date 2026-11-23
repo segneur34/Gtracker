@@ -10,6 +10,7 @@ import { sessionPath } from '../../library/folderLayout';
 import { uniqueSessionFileName } from '../../library/naming';
 import type { NewRecordOptions } from '../../library/newRecord';
 import type { KeptRecordText } from '../../library/recordText';
+import { exceedsListedSize, MAX_LISTED_FILE_MB } from '../../library/reconcile';
 import {
   completeRecord, imuFileName, isGpxFileName, recordFileName, serializeRecord, type RecordUnreadable,
   type SessionAnalysis, type SessionSource,
@@ -72,6 +73,8 @@ export interface AddResult {
    * la fiche apportée donnerait quelque chose : rien n'y est ajouté.
    */
   recordReadOnly?: boolean;
+  /** Import refusé (`invalid`) : son GPX dépasse `MAX_LISTED_FILE_BYTES`, `message` le dit. */
+  tooLarge?: boolean;
 }
 
 /** Ce qu'une session apporte en entrant dans la mémoire : sa fiche (`NewRecordOptions`), et comment la ranger. */
@@ -121,6 +124,11 @@ export const addGpx = async (text: string, source: SessionSource, options: AddOp
   const kept = options.keepRecordText;
   // Fiche qui dit le calcul, les réglages et l'activité du résumé : celle qui accompagne le GPX, même gardée telle quelle.
   const from = options.record ?? kept?.parts ?? null;
+  // GPX importé trop gros (tiré d'un FIT compris) : rangé, il disparaîtrait de la liste au lancement suivant. Le GPX
+  // seul est mesuré, sans les capteurs ni la fiche d'un paquet ; un enregistrement n'est jamais refusé pour sa taille.
+  if (source === 'import' && exceedsListedSize(text)) {
+    return { status: 'invalid', file: null, tooLarge: true, message: t('il dépasse {size} Mo', { size: MAX_LISTED_FILE_MB }) };
+  }
   let analyzed: AnalyzedGpx | null;
   try {
     const sport = options.sport !== undefined ? options.sport : from?.sport ?? undefined;

@@ -8,6 +8,7 @@ import {
   type SailingAnalysisReply,
   type SurfAnalysisReply,
 } from './analysisStore';
+import { fitToGpx, type FitConversion } from './fitToGpx';
 import { sessionColorTrack, type SessionColorTrack } from './sessionTrack';
 import { summarizeGpx, type SummarizeGpxOptions } from './summarizeGpx';
 import type { AnalyzedGpx } from './summaryOptions';
@@ -16,7 +17,8 @@ import type { AnalyzedGpx } from './summaryOptions';
  * Messages entre l'application et le worker des traces : lire un GPX et préparer sa trace pour
  * l'analyse (`prepare`), le résumer pour sa fiche (`summarize`), ou tirer sa trace colorée pour une vignette ou une
  * image partagée (`colorTrack`) ; analyser la session ouverte, à voile (`analyzeSailing`) ou de surf (`analyzeSurf`),
- * et oublier sa mémoire quand la page la quitte (`release`). Le worker et le calcul en ligne passent par le même
+ * et oublier sa mémoire quand la page la quitte (`release`) ; convertir un fichier de montre en GPX (`convertFit`).
+ * Le worker et le calcul en ligne passent par le même
  * aiguillage (`runTrackJob`) : mêmes chiffres par construction.
  */
 
@@ -47,6 +49,11 @@ export interface ColorTrackOptions {
   family: SportFamily;
 }
 
+/** Options de `convertFit` : le contenu du fichier de montre, copié vers le worker. */
+export interface ConvertFitOptions {
+  bytes: Uint8Array;
+}
+
 /** Ce que prend et rend chaque calcul. */
 export interface TrackJobs {
   prepare: { options: PrepareJobOptions; result: PreparedTrack };
@@ -56,6 +63,8 @@ export interface TrackJobs {
   analyzeSurf: { options: AnalyzeSurfOptions; result: SurfAnalysisReply };
   /** Le texte du GPX n'y sert pas : une chaîne vide. */
   release: { options: ReleaseOptions; result: null };
+  /** Le texte du GPX n'y sert pas : une chaîne vide ; le FIT est dans les options. */
+  convertFit: { options: ConvertFitOptions; result: FitConversion };
 }
 
 export type TrackJobKind = keyof TrackJobs;
@@ -93,6 +102,7 @@ export const runTrackJob = <K extends TrackJobKind>(kind: K, gpxText: string, op
     const { sport, referenceOverrideMs, family } = options as ColorTrackOptions;
     return sessionColorTrack(gpxText, sport, referenceOverrideMs, family) as TrackJobs[K]['result'];
   }
+  if (kind === 'convertFit') return fitToGpx((options as ConvertFitOptions).bytes) as TrackJobs[K]['result'];
   return summarizeGpx(gpxText, options as SummarizeGpxOptions) as TrackJobs[K]['result'];
 };
 

@@ -13,6 +13,7 @@
  * qu'un refus. Seul un fichier qui n'est pas un FIT lève une erreur.
  */
 
+import { isTrackPosition } from './geo';
 import { t } from './i18n';
 
 /** Type de fichier d'une activité (`file` du profil FIT). */
@@ -44,6 +45,22 @@ export interface ParsedFit {
   timerEvents: FitTimerEvent[];
   /** Fichier coupé, ou abîmé au point qu'on ne peut lire la suite : ce qui précède est rendu. */
   truncated: boolean;
+  /** Plus de points que le plafond de lecture (`maxRecords`) : la lecture s'est arrêtée là, le fichier est à refuser. */
+  tooManyRecords: boolean;
+}
+
+/**
+ * Plafond de points (messages `record` datés) lus dans un FIT. Un FIT écrit ses points en quelques octets et en
+ * produit dix fois plus en GPX : sans borne, un fichier fabriqué exprès de quelques mégaoctets épuise la mémoire du
+ * téléphone. 4 h à 5 points par seconde font 72 000 points, 24 h à 1 point par seconde 86 400 ; ce plafond garde
+ * le GPX produit sous les 30 Mo d'une session de la mémoire.
+ */
+export const MAX_FIT_RECORDS = 120_000;
+
+/** Options de `parseFit`. */
+export interface ParseFitOptions {
+  /** Plafond de points lus, `MAX_FIT_RECORDS` par défaut. */
+  maxRecords?: number;
 }
 
 const HEADER_SIZES = new Set([12, 14]);
@@ -261,7 +278,7 @@ const readRecord = (timeMs: number, read: FieldReader): FitRecord => {
   if (latRaw !== undefined && lonRaw !== undefined) {
     const lat = latRaw * SEMICIRCLE_TO_DEG;
     const lon = lonRaw * SEMICIRCLE_TO_DEG;
-    if (Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+    if (isTrackPosition(lat, lon)) {
       record.lat = lat;
       record.lon = lon;
     }
@@ -278,8 +295,12 @@ const readRecord = (timeMs: number, read: FieldReader): FitRecord => {
   return record;
 };
 
-/** Lit un FIT ; lève une erreur en clair si ce n'en est pas un (vide, signature fausse). */
-export const parseFit = (bytes: Uint8Array): ParsedFit => {
+/**
+ * Lit un FIT ; lève une erreur en clair si ce n'en est pas un (vide, signature fausse). Au-delà de `maxRecords`
+ * points, la lecture s'arrête et `tooManyRecords` est levé.
+ */
+export const parseFit = (bytes: Uint8Array, { maxRecords = MAX_FIT_RECORDS }: ParseFitOptions = {}): ParsedFit => {
+  let tooManyRecords = false;
   let fileType: number | null = null;
   let fileTypeSeen = false;
   const sessionSports: number[] = [];
@@ -291,7 +312,12 @@ export const parseFit = (bytes: Uint8Array): ParsedFit => {
     switch (global) {
       case MESG_RECORD: {
         const timeMs = timeOf(timestampS);
-        if (timeMs !== null) records.push(readRecord(timeMs, read));
+        if (timeMs === null) break;
+        if (records.length >= maxRecords) {
+          tooManyRecords = true;
+          return true;
+        }
+        records.push(readRecord(timeMs, read));
         break;
       }
       case MESG_EVENT: {
@@ -323,7 +349,7 @@ export const parseFit = (bytes: Uint8Array): ParsedFit => {
     }
   });
 
-  return { fileType, sportCodes: sessionSports.length > 0 ? sessionSports : sportMessages, records, timerEvents, truncated };
+  return { fileType, sportCodes: sessionSports.length > 0 ? sessionSports : sportMessages, records, timerEvents, truncated, tooManyRecords };
 };
 
 /**

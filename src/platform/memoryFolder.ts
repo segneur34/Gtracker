@@ -549,6 +549,8 @@ export interface ImportEntry {
   name: string;
   /** Clé qui rapproche un GPX de sa fiche et de ses capteurs : chemin sans extension, en minuscules. */
   key: string;
+  /** Taille du fichier en octets, quand on la connaît sans le lire. */
+  size?: number;
   readText(): Promise<string | null>;
   readBytes(): Promise<Uint8Array | null>;
 }
@@ -567,11 +569,14 @@ export const pickFolderToImport = async (): Promise<ImportEntry[] | null> => {
   const base = shouldDescendIntoMemory(name ?? '', new Set(root.map((e) => e.name))) ? MEMORY_FOLDER_NAME : '';
   const full = (path: string) => [...splitPath(base), ...splitPath(path)].join('/');
   const list = async (path: string) => (await nativeFolder.list({ uri, path: full(path) })).entries;
-  return folderImportPaths(base ? await list('') : root, await list('sessions')).map((path) => {
+  const [top, sessions] = [base ? await list('') : root, await list('sessions')];
+  const sizes = new Map([...top.map((e) => [e.name, e.size] as const), ...sessions.map((e) => [`sessions/${e.name}`, e.size] as const)]);
+  return folderImportPaths(top, sessions).map((path) => {
     const fileName = path.split('/').pop()!;
     return {
       name: fileName,
       key: fileName.replace(/\.(gpx|fit|json|imu)$/i, '').toLowerCase(),
+      size: sizes.get(path),
       readText: async () => (await nativeFolder.readText({ uri, path: full(path) })).text,
       readBytes: async () => {
         const { data } = await nativeFolder.readBase64({ uri, path: full(path) });

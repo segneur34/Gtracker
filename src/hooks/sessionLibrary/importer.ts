@@ -4,8 +4,10 @@ import type { SportType } from '../../core/types';
 import { describeImport, type ImportReport } from '../../library/importReport';
 import { importRecordChoice } from '../../library/importEntry';
 import { upgradeImportedImu } from '../../library/legacyImport';
-import { fitToGpx, isFitActivity, type FitConversion } from '../../library/fitToGpx';
+import { isFitActivity, type FitConversion } from '../../library/fitToGpx';
+import { MAX_LISTED_FILE_BYTES, MAX_LISTED_FILE_MB } from '../../library/reconcile';
 import { isBlankGpxText, isFitFileName, isGpxFileName } from '../../library/record';
+import { runInWorker } from '../../library/trackWorkerClient';
 import { unbundleSessionGpx } from '../../library/sessionBundle';
 import { readPickedBytes, readPickedFile } from '../../platform/files';
 import { memoryLabelText, pickFolderToImport, type ImportEntry } from '../../platform/memoryFolder';
@@ -70,6 +72,7 @@ export const saveRecordedSession = async (
 const pickedEntry = (file: File): ImportEntry => ({
   name: file.name,
   key: (file.webkitRelativePath || file.name).replace(/\.(gpx|fit|json|imu)$/i, '').toLowerCase(),
+  size: file.size,
   readText: () => readPickedFile(file),
   readBytes: () => readPickedBytes(file),
 });
@@ -122,8 +125,12 @@ const noteFailure = (report: ImportOutcome, name: string, reason: string): void 
   report.failed.push(t('{name} : {reason}', { name, reason }));
 };
 
-/** Porte au compte rendu ce que `addGpx` a fait d'un fichier. */
-const noteAddResult = (report: ImportReport, result: AddResult, name: string): void => {
+/** Porte au compte rendu ce que `addGpx` a fait d'un fichier ; un GPX trop gros, avec sa raison, sans nouvel essai. */
+const noteAddResult = (report: ImportOutcome, result: AddResult, name: string): void => {
+  if (result.status === 'invalid' && result.tooLarge && result.message) {
+    noteFailure(report, name, result.message);
+    return;
+  }
   if (result.status === 'added' && result.file) report.added.push(result.file);
   else if (result.status === 'duplicate') {
     report.duplicates += 1;
@@ -225,15 +232,22 @@ export const importEntries = async (
     for (const entry of entries) {
       if (!isFitFileName(entry.name)) continue;
       try {
+        // FIT plus gros que la plus grosse session rangée : refusé sans être lu, une lecture d'un bloc pourrait faire
+        // tomber l'application.
+        if (entry.size !== undefined && entry.size > MAX_LISTED_FILE_BYTES) {
+          noteFailure(report, entry.name, t('il dépasse {size} Mo', { size: MAX_LISTED_FILE_MB }));
+          continue;
+        }
         const bytes = await entry.readBytes();
         if (bytes === null) {
           noteFailure(report, entry.name, t('illisible'));
           continue;
         }
-        // Un fichier qui n'est pas un FIT ne le deviendra pas : refusé pour de bon, à la différence d'une écriture en échec.
+        // Un fichier qui n'est pas un FIT ne le deviendra pas : refusé pour de bon, à la différence d'une écriture en
+        // échec. Converti hors du fil de l'affichage ; une erreur du calcul, délai passé compris, est un refus.
         let fit: FitConversion;
         try {
-          fit = fitToGpx(bytes);
+          fit = await runInWorker('convertFit', '', { bytes });
         } catch (err) {
           noteFailure(report, entry.name, nativeErrorMessage(err, t('fichier illisible')));
           continue;

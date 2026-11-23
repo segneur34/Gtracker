@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setLanguage } from '../core/i18n';
 import { kinematicsProfileOf, prepareTrack } from '../core/prepareTrack';
 import { getSportProfile } from '../core/sportProfiles';
 import { sessionRecord } from '../test/record.fixture';
 import { gpxOf, sailRaw, upDownLegs } from '../test/sailing.fixture';
+import { buildFitActivity } from '../test/fit.fixture';
 import { SURF_TWO_WAVES, surfRaw } from '../test/surf.fixture';
 import { directSailing, directSurf, numberMismatches, sailingPageView, sailingRequest, surfRequest } from '../test/trackAnalysis.fixture';
+import { fitToGpx } from './fitToGpx';
 import { sessionColorTrack } from './sessionTrack';
 import { summarizeGpx, summarizeGpxOptions } from './summarizeGpx';
-import { TRACK_QUEUE, resetTrackWorker, runInWorker } from './trackWorkerClient';
+import { FOND_JOB_TIMEOUT_MS, TRACK_QUEUE, resetTrackWorker, runInWorker } from './trackWorkerClient';
 import { analysisMemoryKey, handleTrackRequest, type TrackRequest, type TrackResponse } from './trackWorkerProtocol';
 
 /**
@@ -113,6 +115,7 @@ describe('runInWorker', () => {
     }
     expect(TRACK_QUEUE).toEqual({
       prepare: 'analyse', analyzeSailing: 'analyse', analyzeSurf: 'analyse', release: 'analyse', summarize: 'fond', colorTrack: 'fond',
+      convertFit: 'fond',
     });
     expect(await a).toStrictEqual(prepareTrack(textA, { profile: wing }));
     expect(await b).toStrictEqual(prepareTrack(textB, {}));
@@ -361,5 +364,120 @@ describe('runInWorker', () => {
     first.release();
     await flush();
     expect(await waiting).toStrictEqual(prepareTrack(textB));
+  });
+});
+
+describe('runInWorker : délai de la file du fond', () => {
+  const options = summarizeGpxOptions(sessionRecord({ sport: 'wingfoil' }), () => ({ thresholdOverride: 8, foil: true }));
+  const color = { sport: 'wingfoil', referenceOverrideMs: null, family: 'voile' } as const;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('worker muet : à l’échéance, la demande la plus ancienne est refusée, la suivante servie par un worker neuf, jamais en ligne', async () => {
+    vi.stubGlobal('Worker', FakeWorker);
+    FakeWorker.hold = true;
+    const stuck = thrown(() => runInWorker('summarize', textA, options));
+    let settled = false;
+    const next = runInWorker('summarize', textB, options).finally(() => {
+      settled = true;
+    });
+    const first = FakeWorker.instances[0];
+    vi.advanceTimersByTime(FOND_JOB_TIMEOUT_MS - 1);
+    await flush();
+    expect(first.terminated).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect((await stuck)?.message).toBe('lecture trop longue : fichier refusé');
+    expect(first.terminated).toBe(true);
+    expect(FakeWorker.instances).toHaveLength(2);
+    const fresh = FakeWorker.instances[1];
+    expect(fresh.received).toEqual(['summarize']);
+    expect(fresh.held[0].gpxText).toBe(textB);
+    // Rien refait sur le fil de l'affichage : la suivante attend son worker neuf.
+    await flush();
+    expect(settled).toBe(false);
+    fresh.release();
+    expect(await next).toStrictEqual(summarizeGpx(textB, options));
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('le délai se réarme à chaque réponse : une file lente mais vivante ne refuse rien', async () => {
+    vi.stubGlobal('Worker', FakeWorker);
+    FakeWorker.hold = true;
+    const all = Promise.all([textA, textB, textA].map((gpx) => runInWorker('colorTrack', gpx, color)));
+    const worker = FakeWorker.instances[0];
+    for (let i = 0; i < 2; i++) {
+      vi.advanceTimersByTime(FOND_JOB_TIMEOUT_MS - 1000);
+      worker.answer(worker.held.shift()!);
+    }
+    vi.advanceTimersByTime(FOND_JOB_TIMEOUT_MS - 1000);
+    worker.release();
+    expect(await all).toStrictEqual([textA, textB, textA].map((gpx) => sessionColorTrack(gpx, 'wingfoil', null, 'voile')));
+    expect(FakeWorker.instances).toHaveLength(1);
+    expect(worker.terminated).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('ni pour la file de l’analyse, ni sans Worker', async () => {
+    vi.stubGlobal('Worker', FakeWorker);
+    FakeWorker.hold = true;
+    const waiting = runInWorker('prepare', textB, {});
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(10 * FOND_JOB_TIMEOUT_MS);
+    FakeWorker.instances[0].release();
+    expect(await waiting).toStrictEqual(prepareTrack(textB));
+    vi.stubGlobal('Worker', undefined);
+    resetTrackWorker();
+    const inline = runInWorker('summarize', textA, options);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(await inline).toStrictEqual(summarizeGpx(textA, options));
+  });
+});
+
+describe('runInWorker : conversion d’un fichier de montre', () => {
+  const start = Date.UTC(2026, 9, 27, 10);
+  const fit = buildFitActivity({ points: [0, 10, 20].map((s, i) => ({ timeMs: start + s * 1000, lat: 43.6 + i * 0.0003, lon: 3.8, speedMs: 3, hr: 140 })) });
+
+  it('par le worker de la file du fond comme en ligne : le résultat de fitToGpx', async () => {
+    expect(TRACK_QUEUE.convertFit).toBe('fond');
+    vi.stubGlobal('Worker', FakeWorker);
+    const viaWorker = await runInWorker('convertFit', '', { bytes: fit });
+    expect(FakeWorker.instances[0].received).toEqual(['convertFit']);
+    vi.stubGlobal('Worker', undefined);
+    resetTrackWorker();
+    const inline = await runInWorker('convertFit', '', { bytes: fit });
+    expect(viaWorker).toStrictEqual(fitToGpx(fit));
+    expect(inline).toStrictEqual(viaWorker);
+    expect(viaWorker.kind).toBe('session');
+  });
+
+  it('refus et erreurs écrits en français par le worker, rendus dans la langue de l’interface', async () => {
+    setLanguage('en', {
+      'trop de points pour une seule session : fichier refusé': 'too many points for a single session: file refused',
+      'fichier vide': 'empty file',
+      "ce n'est pas un fichier FIT": 'not a FIT file',
+    });
+    try {
+      vi.stubGlobal('Worker', FakeWorker);
+      FakeWorker.hold = true;
+      const refused = runInWorker('convertFit', '', { bytes: fit });
+      const empty = thrown(() => runInWorker('convertFit', '', { bytes: new Uint8Array() }));
+      const notFit = thrown(() => runInWorker('convertFit', '', { bytes: new Uint8Array([1, 2, 3]) }));
+      const worker = FakeWorker.instances[0];
+      const [a, b, c] = worker.held.map((request) => request.id);
+      // Ce que rend un vrai worker, qui n'a pas de dictionnaire.
+      worker.onmessage?.({ data: { id: a, result: { kind: 'refused', reason: 'trop de points pour une seule session : fichier refusé' } } });
+      worker.onmessage?.({ data: { id: b, error: { name: 'Error', message: 'fichier vide' } } });
+      worker.onmessage?.({ data: { id: c, error: { name: 'Error', message: "ce n'est pas un fichier FIT" } } });
+      expect(await refused).toEqual({ kind: 'refused', reason: 'too many points for a single session: file refused' });
+      expect((await empty)?.message).toBe('empty file');
+      expect((await notFit)?.message).toBe('not a FIT file');
+    } finally {
+      setLanguage('fr', {});
+    }
   });
 });

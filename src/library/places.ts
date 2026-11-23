@@ -1,5 +1,5 @@
 import { isFiniteNumber, isObject } from '../core/basics';
-import { haversineDistance } from '../core/geo';
+import { haversineDistance, isTrackPosition } from '../core/geo';
 import type { LatLon } from '../core/types';
 import { roundedPoint, type PhotonFeature } from '../planning/geocoding';
 
@@ -91,6 +91,9 @@ const readPlaceSpot = (raw: unknown): PlaceSpot | null => {
   const { name, source, lat, lon } = raw;
   if (!PLACE_SOURCES.includes(source as PlaceSource)) return null;
   if (!isLatLon(lat, lon)) return null;
+  // Un lieu de la carte cherché au (0, 0) l'a été sur le point d'un enregistreur sans satellites, que le lecteur
+  // écarte désormais : lu absent, il est cherché de nouveau sur le vrai départ. Un lieu saisi n'est jamais touché.
+  if (source === 'carte' && lat === 0 && lon === 0) return null;
   if (name !== null && typeof name !== 'string') return null;
   const trimmed = typeof name === 'string' ? name.trim() : null;
   return { name: isUsablePlaceName(trimmed) ? trimmed : null, source: source as PlaceSource, lat, lon: lon as number };
@@ -396,7 +399,10 @@ export const firstTrackPoint = (gpxText: string): LatLon | null => {
   return null;
 };
 
-/** Position lue dans les attributs d'une balise `<trkpt>`, `null` si elle ne se lit pas. */
+/**
+ * Position lue dans les attributs d'une balise `<trkpt>`, `null` si elle ne se lit pas ou si le lecteur GPX
+ * l'écarte (hors bornes, ou le (0, 0) d'un enregistreur sans satellites : `isTrackPosition`).
+ */
 const pointOfAttributes = (attributes: string): LatLon | null => {
   const attr = (name: string): number => {
     const found = new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`).exec(attributes);
@@ -404,7 +410,7 @@ const pointOfAttributes = (attributes: string): LatLon | null => {
   };
   const lat = attr('lat');
   const lon = attr('lon');
-  return isLatLon(lat, lon) ? { lat, lon } : null;
+  return isTrackPosition(lat, lon) ? { lat, lon } : null;
 };
 
 /**

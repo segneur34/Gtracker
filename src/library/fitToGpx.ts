@@ -1,4 +1,4 @@
-import { FIT_FILE_ACTIVITY, parseFit, readFitFileType, type FitRecord, type FitTimerEvent } from '../core/fitParser';
+import { FIT_FILE_ACTIVITY, parseFit, readFitFileType, type FitRecord, type FitTimerEvent, type ParseFitOptions } from '../core/fitParser';
 import { t } from '../core/i18n';
 import { getSportProfile } from '../core/sportProfiles';
 import type { LocationFix } from '../platform/location';
@@ -94,10 +94,15 @@ export const isFitActivity = (bytes: Uint8Array): boolean => {
   }
 };
 
-/** Convertit un FIT ; lève une erreur en clair si ce n'en est pas un. Un FIT coupé rend les points lus jusqu'à la coupure. */
-export const fitToGpx = (bytes: Uint8Array): FitConversion => {
-  const fit = parseFit(bytes);
+/**
+ * Convertit un FIT ; lève une erreur en clair si ce n'en est pas un. Un FIT coupé rend les points lus jusqu'à la
+ * coupure ; un FIT de plus de `maxRecords` points (`MAX_FIT_RECORDS` par défaut) est refusé.
+ */
+export const fitToGpx = (bytes: Uint8Array, options: ParseFitOptions = {}): FitConversion => {
+  const fit = parseFit(bytes, options);
   if (fit.fileType !== null && fit.fileType !== FIT_FILE_ACTIVITY) return { kind: 'not-activity' };
+  // Avant le sport : la lecture arrêtée au plafond n'a pas vu le message `session`, écrit en fin de fichier.
+  if (fit.tooManyRecords) return { kind: 'refused', reason: t('trop de points pour une seule session : fichier refusé') };
   const type = fitSportName(fit.sportCodes);
   // Course ou vélo, avec ou sans positions (tapis, home-trainer) : laissé de côté, sans écrire de GPX.
   if (isOtherSportType(type)) return { kind: 'other-sport' };

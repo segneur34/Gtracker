@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { parseGpx } from '../core/gpxParser';
 import { computeKinematics } from '../core/kinematics';
 import { buildCumulativeTrack, segmentDistanceM } from '../core/sessionStats';
+import { MAX_FIT_RECORDS } from '../core/fitParser';
 import { buildFitActivity, type FitPointSpec } from '../test/fit.fixture';
+import { MAX_LISTED_FILE_BYTES } from './reconcile';
 import { fitToGpx, isFitActivity } from './fitToGpx';
 import { guessSport } from './naming';
 
@@ -195,5 +197,28 @@ describe('FIT refusés', () => {
     expect(isFitActivity(buildFitActivity({ points: seconds(2) }))).toBe(true);
     expect(isFitActivity(buildFitActivity({ points: seconds(2), fileType: 6 }))).toBe(false);
     expect(isFitActivity(new TextEncoder().encode('pas un FIT du tout'))).toBe(false);
+  });
+});
+
+describe('plafond de points d\'un FIT', () => {
+  it('au-delà de `maxRecords`, refusé avec sa raison, sans GPX', () => {
+    expect(fitToGpx(buildFitActivity({ points: seconds(10) }), { maxRecords: 9 })).toEqual({
+      kind: 'refused', reason: 'trop de points pour une seule session : fichier refusé',
+    });
+    expect(fitToGpx(buildFitActivity({ points: seconds(10) }), { maxRecords: 10 }).kind).toBe('session');
+  });
+
+  it(`au plafond (${MAX_FIT_RECORDS} points, tous les champs), le GPX produit tient dans les 30 Mo d'une session`, () => {
+    // Chaque valeur à sa plus longue écriture : longitude à trois chiffres et signe, sept décimales, altitude
+    // négative, vitesse au millième, FC à trois chiffres.
+    const longest = Array.from({ length: MAX_FIT_RECORDS }, (_, s): FitPointSpec => ({
+      timeMs: T0 + s * 1000, lat: -43.5123457 - s * 1.3e-6, lon: -123.4567891 + s * 1.7e-6, altitudeM: -123.4, speedMs: 12.345, hr: 188,
+    }));
+    const t0 = performance.now();
+    const gpx = gpxOf(buildFitActivity({ points: longest }));
+    const ms = performance.now() - t0;
+    const bytes = new TextEncoder().encode(gpx).length;
+    console.log(`FIT de ${MAX_FIT_RECORDS} points : GPX de ${(bytes / 1e6).toFixed(1)} Mo en ${Math.round(ms)} ms`);
+    expect(bytes).toBeLessThanOrEqual(MAX_LISTED_FILE_BYTES);
   });
 });

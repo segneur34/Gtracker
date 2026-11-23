@@ -115,6 +115,16 @@ describe('arrivée dans la fiche', () => {
     expect(readSessionPlace({ ...carte, arrival: { name: 'X', source: 'deviné', lat: 1, lon: 1 } })).toEqual(carte);
   });
 
+  it('un lieu de la carte posé en (0, 0) est lu absent, cherché de nouveau ; un lieu saisi est gardé', () => {
+    const zero = { lat: 0, lon: 0 };
+    expect(readSessionPlace({ name: 'Golfe de Guinée', source: 'carte', ...zero })).toBeNull();
+    expect(readSessionPlace({ name: null, source: 'carte', ...zero, arrival: null })).toBeNull();
+    expect(readSessionPlace({ ...carte, arrival: { name: 'Golfe de Guinée', source: 'carte', ...zero } })).toEqual(carte);
+    const typed = { name: 'Chez moi', source: 'utilisateur' as const, ...zero };
+    expect(readSessionPlace(typed)).toEqual(typed);
+    expect(readSessionPlace({ ...carte, lat: 0 })).toEqual({ ...carte, lat: 0 });
+  });
+
   it('une arrivée compte comme ailleurs au-delà de `elsewhereM`', () => {
     const at = (m: number) => ({ lat: START.lat + m / M_PER_DEG, lon: START.lon });
     expect(isElsewhere(START, at(1999), PLACE_RULES)).toBe(false);
@@ -278,5 +288,13 @@ describe('firstTrackPoint', () => {
   it('saute un point illisible ; sans point, rien', () => {
     expect(firstTrackPoint('<trkpt lat="x" lon="1"></trkpt><trkpt lat="2" lon="3"/>')).toEqual({ lat: 2, lon: 3 });
     expect(firstTrackPoint('<gpx><trk/></gpx>')).toBeNull();
+  });
+
+  it('saute le (0, 0) d\'un enregistreur sans satellites et les positions hors de la Terre, au départ comme à l\'arrivée', () => {
+    const gpx = '<gpx><trk><trkseg><trkpt lat="0" lon="0"/><trkpt lat="200" lon="3"/><trkpt lat="43.54" lon="3.95"/>'
+      + '<trkpt lat="44" lon="4"/><trkpt lat="44" lon="181"/><trkpt lat="0.0" lon="0.000"/></trkseg></trk></gpx>';
+    expect(firstTrackPoint(gpx)).toEqual({ lat: 43.54, lon: 3.95 });
+    expect(lastTrackPoint(gpx)).toEqual({ lat: 44, lon: 4 });
+    expect(firstTrackPoint('<trkpt lat="0" lon="0"/>')).toBeNull();
   });
 });

@@ -1,3 +1,4 @@
+import { isTrackPosition } from './geo';
 import { t } from './i18n';
 import type { RawTrackPoint } from './types';
 import { INVALID_XML_CHARS } from './xml';
@@ -67,6 +68,25 @@ const checkText = (raw: string): void => {
   if (raw.indexOf(']]>') !== -1) malformed();
   if (raw.indexOf('&#') !== -1) checkCharRefs(raw);
 };
+
+/*
+ * Plafonds du lecteur. Un fichier fabriqué exprès, de moins d'un mégaoctet, peut sinon l'occuper des minutes :
+ * le doublon d'attribut, le préfixe déclaré et le champ d'un point se cherchent chacun parmi ce qui est déjà
+ * ouvert, et ce coût grandit comme le carré de ce qu'on empile. Au-delà d'un plafond, le fichier est refusé comme
+ * mal formé. Les valeurs laissent une large marge aux fichiers des montres, téléphones et logiciels connus.
+ */
+
+/** Attributs d'une seule balise : un GPX en porte quelques-uns (la racine, une douzaine avec ses `xmlns`). */
+const MAX_ATTRIBUTES_PER_TAG = 64;
+
+/** Points (`trkpt`, `rtept`) ouverts l'un dans l'autre : un GPX n'en imbrique jamais ; quatre tolèrent un écart. */
+const MAX_OPEN_POINTS = 4;
+
+/**
+ * Déclarations d'espace de noms (`xmlns:…`) en portée à la fois, de la racine à la balise lue : une douzaine à la
+ * racine, plus celle que certains logiciels répètent sur chaque point.
+ */
+const MAX_NAMESPACE_DECLARATIONS = 64;
 
 const LT = 60;
 const GT = 62;
@@ -263,6 +283,7 @@ const scanXml = (text: string, visitor: XmlVisitor): void => {
         if (value.indexOf('<') !== -1) malformed();
         if (checkContent && value.indexOf('&#') !== -1) checkCharRefs(value);
         if (attributes === null) attributes = [];
+        if (attributes.length >= 2 * MAX_ATTRIBUTES_PER_TAG) malformed();
         for (let a = 0; a < attributes.length; a += 2) if (attributes[a] === attributeName) malformed();
         attributes.push(attributeName, value);
         k = close + 1;
@@ -273,6 +294,7 @@ const scanXml = (text: string, visitor: XmlVisitor): void => {
         if (!attrs[a].startsWith('xmlns:')) continue;
         const prefix = attrs[a].slice(6);
         if (prefix === '' || prefix === 'xmlns' || prefix.indexOf(':') !== -1) malformed();
+        if (nsPrefixes.length >= MAX_NAMESPACE_DECLARATIONS) malformed();
         nsPrefixes.push(prefix);
         nsDepths.push(names.length);
       }
@@ -460,6 +482,7 @@ const readGpxDocument = (text: string): GpxDocument => {
       if (!prefixed) {
         if (name === 'trkpt' || name === 'rtept') {
           point = { lat: attributeOf(attributes, 'lat'), lon: attributeOf(attributes, 'lon'), parent, slots: new Array<number>(2 * FIELD_COUNT).fill(-1) };
+          if (openPoints.length >= MAX_OPEN_POINTS) malformed();
           doc[name].push(point);
           openPoints.push(point);
         } else if ((name === 'trk' || name === 'rte' || name === 'metadata') && doc[name] === undefined) {
@@ -555,8 +578,9 @@ export const parseGpx = (gpxContent: string): ParsedGpx => {
     // date égale est gardée : `spreadEqualTimes` la répartit.
     const timeMs = new Date(time).getTime();
     if (!isFinite(timeMs)) continue;
-    // Un point sans position ne sert à rien non plus : il n'entre pas dans la trace.
-    if (!isFinite(lat) || !isFinite(lon)) continue;
+    // Un point sans position ne sert à rien non plus : il n'entre pas dans la trace, pas plus qu'une position
+    // hors de la Terre ou le (0, 0) d'un enregistreur qui n'a pas encore capté les satellites.
+    if (!isTrackPosition(lat, lon)) continue;
     if (timeMs < lastRawTimeMs) continue;
     lastRawTimeMs = timeMs;
 
@@ -613,7 +637,7 @@ export const parseGpxPath = (gpxContent: string): ParsedGpxPath => {
     for (const record of records) {
       const lat = parseFloat(record.lat ?? '');
       const lon = parseFloat(record.lon ?? '');
-      if (!isFinite(lat) || !isFinite(lon)) continue;
+      if (!isTrackPosition(lat, lon)) continue;
       const eleM = numberOf(doc, fieldSpan(record, 'ele'));
       points.push(eleM !== undefined ? { lat, lon, eleM } : { lat, lon });
     }

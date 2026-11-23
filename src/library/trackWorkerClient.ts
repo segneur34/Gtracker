@@ -1,4 +1,5 @@
 import { t } from '../core/i18n';
+import type { FitConversion } from './fitToGpx';
 import {
   errorFromJob, runTrackJob, type TrackJobKind, type TrackJobs, type TrackRequest, type TrackResponse,
 } from './trackWorkerProtocol';
@@ -7,20 +8,30 @@ import {
  * Client des workers des traces : `runInWorker` envoie un calcul à un worker (`trackWorker.ts`) et rend sa
  * réponse. Deux files, chacune son worker, le même script lancé deux fois : « analyse » pour la trace d'une analyse
  * qu'on ouvre et ses calculs (`prepare`, `analyzeSailing`, `analyzeSurf`, `release` : la mémoire de la session ouverte
- * vit dans ce worker-là), « fond » pour les résumés et les vignettes (`summarize`, `colorTrack`). Un worker traite
+ * vit dans ce worker-là), « fond » pour les résumés, les vignettes et la conversion des fichiers de montre
+ * (`summarize`, `colorTrack`, `convertFit`). Un worker traite
  * ses demandes dans l'ordre d'arrivée : sans cette séparation, l'analyse touchée attendrait derrière toutes les
  * vignettes déjà demandées. Chaque worker est créé à la première demande de sa file. S'il meurt, les demandes en cours
  * de sa file sont refaites en ligne et la suivante le recrée ; s'il meurt avant d'avoir répondu une fois (fichier
  * introuvable, worker refusé), sa file se calcule en ligne jusqu'au rechargement ; l'autre file n'en est pas
  * touchée. Sans `Worker` (tests, vieux WebView) ou si sa création lève, le calcul se fait en ligne, toujours de
  * façon asynchrone : un seul chemin pour l'appelant, mêmes chiffres (`runTrackJob`).
+ *
+ * La file « fond » a un délai (`FOND_JOB_TIMEOUT_MS`) : un fichier fabriqué pour occuper le lecteur y bloquerait
+ * sinon, jusqu'au rechargement, les résumés, les vignettes et le rangement des enregistrements. À l'échéance, son
+ * worker est arrêté, la demande la plus ancienne refusée, et les suivantes repartent dans l'ordre sur un worker neuf,
+ * jamais en ligne, où la même demande figerait la page. Sans worker, pas de délai : un calcul en ligne ne s'arrête pas.
  */
 
 interface PendingJob {
+  /** La demande telle qu'envoyée : renvoyée à un worker neuf quand celui de sa file est arrêté à l'échéance. */
+  request: TrackRequest;
   /** Rend la réponse du worker. */
   answer(response: TrackResponse): void;
   /** Refait le calcul en ligne : le worker est mort sans répondre. */
   redo(): void;
+  /** Rejette la demande : le délai de sa file est passé. */
+  refuse(error: Error): void;
 }
 
 /** Files des calculs, chacune servie par son worker. */
@@ -34,7 +45,18 @@ export const TRACK_QUEUE: Readonly<Record<TrackJobKind, TrackQueue>> = {
   release: 'analyse',
   summarize: 'fond',
   colorTrack: 'fond',
+  convertFit: 'fond',
 };
+
+/**
+ * Délai accordé par la file « fond » à sa demande la plus ancienne, réarmé à chaque réponse. Le résumé d'une longue
+ * session honnête (4 h à 5 points par seconde, 20 Mo de GPX) prend moins de deux secondes sur un ordinateur : un
+ * téléphone lent a de la marge, et un fichier fabriqué pour occuper le lecteur est refusé au bout d'une minute.
+ */
+export const FOND_JOB_TIMEOUT_MS = 60_000;
+
+/** Délai de chaque file, `null` : aucun. L'analyse ouverte n'en a pas : la page attend son propre calcul. */
+const QUEUE_TIMEOUT_MS: Readonly<Record<TrackQueue, number | null>> = { analyse: null, fond: FOND_JOB_TIMEOUT_MS };
 
 /** État d'une file : son worker, ses demandes en attente de réponse. */
 interface QueueState {
@@ -43,12 +65,19 @@ interface QueueState {
   answered: boolean;
   /** Plus de worker pour cette file jusqu'au rechargement : sa création a levé, ou il est mort avant toute réponse. */
   inlineOnly: boolean;
+  /** Demandes envoyées au worker, dans l'ordre d'envoi : la première est la plus ancienne. */
   pending: Map<number, PendingJob>;
+  /** Délai de la file, `null` : aucun. */
+  timeoutMs: number | null;
+  /** Minuterie de la demande la plus ancienne, armée tant qu'une demande attend le worker. */
+  deadline: ReturnType<typeof setTimeout> | null;
 }
 
-const newQueueState = (): QueueState => ({ worker: null, answered: false, inlineOnly: false, pending: new Map() });
+const newQueueState = (timeoutMs: number | null): QueueState => ({
+  worker: null, answered: false, inlineOnly: false, pending: new Map(), timeoutMs, deadline: null,
+});
 
-const queues: Record<TrackQueue, QueueState> = { analyse: newQueueState(), fond: newQueueState() };
+const queues: Record<TrackQueue, QueueState> = { analyse: newQueueState(QUEUE_TIMEOUT_MS.analyse), fond: newQueueState(QUEUE_TIMEOUT_MS.fond) };
 let nextId = 1;
 
 /**
@@ -59,6 +88,18 @@ let nextId = 1;
  */
 const JOB_MESSAGES: Readonly<Record<string, () => string>> = {
   'Fichier GPX illisible : le XML est mal formé.': () => t('Fichier GPX illisible : le XML est mal formé.'),
+  'fichier vide': () => t('fichier vide'),
+  "ce n'est pas un fichier FIT": () => t("ce n'est pas un fichier FIT"),
+};
+
+/**
+ * Raisons d'un fichier de montre refusé (`fitToGpx`), rendues dans le résultat de `convertFit` : écrites en français
+ * par le worker, traduites ici comme `JOB_MESSAGES`. Une raison changée dans `fitToGpx.ts` se change ici aussi.
+ */
+const FIT_REFUSALS: Readonly<Record<string, () => string>> = {
+  'fichier coupé avant le premier point': () => t('fichier coupé avant le premier point'),
+  'aucune position dans ce fichier (tapis, salle) : pas de trace à ranger': () => t('aucune position dans ce fichier (tapis, salle) : pas de trace à ranger'),
+  'trop de points pour une seule session : fichier refusé': () => t('trop de points pour une seule session : fichier refusé'),
 };
 
 /** Erreur du calcul dans la langue de l'interface, même nom ; tout autre message, tel quel. */
@@ -69,6 +110,13 @@ const inPageLanguage = (error: unknown): unknown => {
   return translated;
 };
 
+/** Résultat rendu par le worker, dans la langue de l'interface : la raison d'un fichier de montre refusé ; tout autre, tel quel. */
+const resultInPageLanguage = (kind: TrackJobKind, result: TrackJobs[TrackJobKind]['result']): TrackJobs[TrackJobKind]['result'] => {
+  if (kind !== 'convertFit') return result;
+  const fit = result as FitConversion;
+  return fit.kind === 'refused' && Object.hasOwn(FIT_REFUSALS, fit.reason) ? { ...fit, reason: FIT_REFUSALS[fit.reason]() } : fit;
+};
+
 /**
  * Calcul en ligne, rendu par une promesse résolue au tour suivant : jamais par une minuterie (les tests de la
  * file des résumés comptent les leurs).
@@ -76,11 +124,36 @@ const inPageLanguage = (error: unknown): unknown => {
 const runInline = <K extends TrackJobKind>(kind: K, gpxText: string, options: TrackJobs[K]['options']): Promise<TrackJobs[K]['result']> =>
   Promise.resolve().then(() => runTrackJob(kind, gpxText, options)).catch((error: unknown) => Promise.reject(inPageLanguage(error)));
 
+/** Arrête la minuterie d'une file. */
+const clearDeadline = (queue: QueueState): void => {
+  if (queue.deadline !== null) clearTimeout(queue.deadline);
+  queue.deadline = null;
+};
+
+/** Arme, de nouveau, le délai de la demande la plus ancienne d'une file qui en a un ; rien si plus rien n'attend. */
+const armDeadline = (queue: QueueState): void => {
+  clearDeadline(queue);
+  if (queue.timeoutMs === null || queue.pending.size === 0) return;
+  queue.deadline = setTimeout(() => expire(queue), queue.timeoutMs);
+};
+
 /** Demandes en attente d'une file, retirées et refaites en ligne. */
 const redoPending = (queue: QueueState): void => {
+  clearDeadline(queue);
   const waiting = [...queue.pending.values()];
   queue.pending.clear();
   for (const job of waiting) job.redo();
+};
+
+/** Envoie une demande au worker d'une file ; refaite en ligne si ses options ne se clonent pas. */
+const post = (queue: QueueState, target: Worker, job: PendingJob): void => {
+  try {
+    target.postMessage(job.request);
+  } catch {
+    // Options qu'on ne sait pas cloner : ce calcul-là se fait en ligne.
+    queue.pending.delete(job.request.id);
+    job.redo();
+  }
 };
 
 /** Worker d'une file mort : oublié, et ce qu'il devait rendre refait en ligne. */
@@ -90,6 +163,30 @@ const fail = (queue: QueueState, dead: Worker): void => {
   dead.terminate();
   if (!queue.answered) queue.inlineOnly = true;
   redoPending(queue);
+};
+
+/**
+ * Délai passé : le worker de la file est arrêté, sa demande la plus ancienne refusée, et les suivantes renvoyées dans
+ * l'ordre à un worker neuf. Si ce worker ne peut pas être créé, la file passe en ligne comme sans `Worker`.
+ */
+const expire = (queue: QueueState): void => {
+  queue.deadline = null;
+  const stuck = queue.worker;
+  const head = queue.pending.values().next().value;
+  if (!stuck || !head) return;
+  queue.pending.delete(head.request.id);
+  queue.worker = null;
+  queue.answered = false;
+  stuck.terminate();
+  head.refuse(new Error(t('lecture trop longue : fichier refusé')));
+  if (queue.pending.size === 0) return;
+  const fresh = currentWorker(queue);
+  if (!fresh) {
+    redoPending(queue);
+    return;
+  }
+  for (const job of [...queue.pending.values()]) post(queue, fresh, job);
+  armDeadline(queue);
 };
 
 /** Le worker d'une file, créé à sa première demande ; `null` s'il n'y en a pas (en ligne). `Worker` est lu à ce moment-là. */
@@ -106,10 +203,13 @@ const currentWorker = (queue: QueueState): Worker | null => {
   queue.worker = created;
   queue.answered = false;
   created.onmessage = (event: MessageEvent<TrackResponse>) => {
-    if (queue.worker === created) queue.answered = true;
+    // Réponse tardive d'un worker remplacé (mort, arrêté à l'échéance) : ses demandes ont été refaites ou renvoyées.
+    if (queue.worker !== created) return;
+    queue.answered = true;
     const job = queue.pending.get(event.data.id);
     if (!job) return;
     queue.pending.delete(event.data.id);
+    armDeadline(queue);
     job.answer(event.data);
   };
   created.onerror = () => fail(queue, created);
@@ -118,11 +218,13 @@ const currentWorker = (queue: QueueState): Worker | null => {
 };
 
 /**
- * Lit et prépare un GPX (`prepare`, `core/prepareTrack.ts`), le résume (`summarize`, `summarizeGpx.ts`) ou en tire
- * la trace colorée d'une vignette (`colorTrack`, `sessionTrack.ts`) hors du fil de l'affichage, dans la file du
+ * Lit et prépare un GPX (`prepare`, `core/prepareTrack.ts`), le résume (`summarize`, `summarizeGpx.ts`), en tire
+ * la trace colorée d'une vignette (`colorTrack`, `sessionTrack.ts`) ou convertit un fichier de montre (`convertFit`,
+ * `fitToGpx.ts`) hors du fil de l'affichage, dans la file du
  * calcul (`TRACK_QUEUE`). La promesse rend le même résultat que le calcul en ligne, ou est rejetée par une erreur de
  * même nom et même message, dans la langue de l'interface. Analyse de la session ouverte (`analyzeSailing`,
- * `analyzeSurf`) de même ; `release` vide sa mémoire sans jamais créer de worker.
+ * `analyzeSurf`) de même ; `release` vide sa mémoire sans jamais créer de worker. Une demande de la file « fond »
+ * restée sans réponse au-delà de son délai est rejetée par « lecture trop longue : fichier refusé ».
  */
 export const runInWorker = <K extends TrackJobKind>(kind: K, gpxText: string, options: TrackJobs[K]['options']): Promise<TrackJobs[K]['result']> => {
   const queue = queues[TRACK_QUEUE[kind]];
@@ -143,25 +245,21 @@ const send = <K extends TrackJobKind>(
   queue: QueueState, target: Worker, kind: K, gpxText: string, options: TrackJobs[K]['options']
 ): Promise<TrackJobs[K]['result']> =>
   new Promise<TrackJobs[K]['result']>((resolve, reject) => {
-    const id = nextId++;
-    const redo = () => {
-      runInline(kind, gpxText, options).then(resolve, reject);
-    };
-    queue.pending.set(id, {
+    const job: PendingJob = {
+      request: { id: nextId++, kind, gpxText, options } as TrackRequest,
       answer: (response) => {
         if ('error' in response) reject(inPageLanguage(errorFromJob(response.error)));
         // La réponse à la demande `id` est celle de son calcul : TypeScript ne relie pas l'identifiant au type.
-        else resolve(response.result as TrackJobs[K]['result']);
+        else resolve(resultInPageLanguage(kind, response.result) as TrackJobs[K]['result']);
       },
-      redo,
-    });
-    try {
-      target.postMessage({ id, kind, gpxText, options } as TrackRequest);
-    } catch {
-      // Options qu'on ne sait pas cloner : ce calcul-là se fait en ligne.
-      queue.pending.delete(id);
-      redo();
-    }
+      redo: () => {
+        runInline(kind, gpxText, options).then(resolve, reject);
+      },
+      refuse: reject,
+    };
+    queue.pending.set(job.request.id, job);
+    post(queue, target, job);
+    if (queue.deadline === null) armDeadline(queue);
   });
 
 /** Oublie les workers des deux files (tests) : le prochain appel relit `Worker` et en crée un. Les demandes en cours sont refaites en ligne. */

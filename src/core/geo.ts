@@ -40,6 +40,15 @@ export const initialBearing = (
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 };
 
+/**
+ * Vrai si un point lu dans un fichier porte une position de la trace : latitude et longitude finies, dans leurs
+ * bornes, et pas exactement (0, 0). Ce couple est la position que certains enregistreurs écrivent avant d'avoir
+ * capté les satellites ; gardé, il tire la carte et la vignette jusqu'au golfe de Guinée et prive la session de
+ * son lieu. Aucune session de voile ou de surf ne passe exactement par ce point du large.
+ */
+export const isTrackPosition = (lat: number, lon: number): boolean =>
+  Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && !(lat === 0 && lon === 0);
+
 /** Point projeté dans un plan local, en mètres. */
 export interface PlanePoint {
   x: number;

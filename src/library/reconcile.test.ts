@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { FolderEntry } from '../platform/memoryFolder';
 import { MARKER_FILE } from './folderLayout';
 import type { SessionRecord } from './record';
-import { MAX_LISTED_FILE_BYTES, indexByRecordName, oddRecordExtensions, planReconcile, type LibraryCache } from './reconcile';
+import { MAX_LISTED_FILE_BYTES, exceedsListedSize, indexByRecordName, oddRecordExtensions, planReconcile, type LibraryCache } from './reconcile';
 import { sessionRecord } from '../test/record.fixture';
 
 const file = (name: string, size = 100, mtimeMs = 1000): FolderEntry => ({ name, kind: 'file', size, mtimeMs });
@@ -83,6 +83,31 @@ describe('planReconcile', () => {
     expect(plan.rootGpx).toEqual(['a.gpx', 'b.gpx', MARKER_GPX, 'reglages.gpx']);
     // Un `reglages.json` à la racine n'est plus un fichier de l'application : la fiche de `reglages.gpx`.
     expect(plan.rootRecords).toEqual({ 'a.gpx': 'a.json', 'reglages.gpx': 'reglages.json' });
+  });
+});
+
+describe('exceedsListedSize', () => {
+  const utf8Length = (text: string): number => new TextEncoder().encode(text).length;
+
+  it('compte les octets UTF-8 sans encoder : au plafond, gardé ; un octet de plus, refusé', () => {
+    expect(exceedsListedSize('a'.repeat(MAX_LISTED_FILE_BYTES))).toBe(false);
+    expect(exceedsListedSize('a'.repeat(MAX_LISTED_FILE_BYTES + 1))).toBe(true);
+    // « é » : deux octets ; un tiers du plafond en caractères suffit à juger sans boucle.
+    const half = 'é'.repeat(MAX_LISTED_FILE_BYTES / 2);
+    expect(utf8Length(half)).toBe(MAX_LISTED_FILE_BYTES);
+    expect(exceedsListedSize(half)).toBe(false);
+    expect(exceedsListedSize(`${half}a`)).toBe(true);
+    expect(exceedsListedSize('é'.repeat(MAX_LISTED_FILE_BYTES / 3))).toBe(false);
+  });
+
+  it('trois octets pour un caractère comme « € », quatre pour une paire de substitution', () => {
+    const euros = '€'.repeat(MAX_LISTED_FILE_BYTES / 3 + 1);
+    expect(utf8Length(euros)).toBeGreaterThan(MAX_LISTED_FILE_BYTES);
+    expect(exceedsListedSize(euros)).toBe(true);
+    const pairs = '\u{1F30A}'.repeat(MAX_LISTED_FILE_BYTES / 4);
+    expect(utf8Length(pairs)).toBe(MAX_LISTED_FILE_BYTES);
+    expect(exceedsListedSize(pairs)).toBe(false);
+    expect(exceedsListedSize(`${pairs}a`)).toBe(true);
   });
 });
 

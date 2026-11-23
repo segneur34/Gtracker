@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FIT_BASE, FIT_INVALID, FIT_MESG, buildFitActivity, fitCrc, fitTime, fitWriter, semicircles } from '../test/fit.fixture';
-import { FIT_FILE_ACTIVITY, parseFit, readFitFileType } from './fitParser';
+import { FIT_FILE_ACTIVITY, MAX_FIT_RECORDS, parseFit, readFitFileType } from './fitParser';
 
 const T0 = Date.UTC(2026, 9, 10, 10, 0, 0);
 
@@ -237,5 +237,26 @@ describe('type du fichier, sans lire la suite', () => {
     writer.define(0, FIT_MESG.record, [{ num: 253, base: FIT_BASE.uint32 }]).message(0, [fitTime(T0)]);
     expect(readFitFileType(writer.bytes())).toBeNull();
     expect(() => readFitFileType(new Uint8Array(3))).toThrow("ce n'est pas un fichier FIT");
+  });
+});
+
+describe('lecteur FIT : plafond de points et position zéro', () => {
+  it('lit jusqu\'à `maxRecords` points ; au-delà, s\'arrête et lève `tooManyRecords`', () => {
+    const points = Array.from({ length: 6 }, (_, s) => point(s));
+    const full = parseFit(buildFitActivity({ points }), { maxRecords: 6 });
+    expect(full.tooManyRecords).toBe(false);
+    expect(full.records).toHaveLength(6);
+    const over = parseFit(buildFitActivity({ points }), { maxRecords: 5 });
+    expect(over.tooManyRecords).toBe(true);
+    expect(over.records).toHaveLength(5);
+    expect(parseFit(buildFitActivity({ points })).tooManyRecords).toBe(false);
+    expect(MAX_FIT_RECORDS).toBe(120_000);
+  });
+
+  it('un point en (0, 0) exact garde son heure, sans position', () => {
+    const writer = fitWriter();
+    writer.define(0, FIT_MESG.record, [{ num: 253, base: FIT_BASE.uint32 }, { num: 0, base: FIT_BASE.sint32 }, { num: 1, base: FIT_BASE.sint32 }]);
+    writer.message(0, [fitTime(T0), 0, 0]);
+    expect(parseFit(writer.bytes()).records).toStrictEqual([{ timeMs: T0 }]);
   });
 });

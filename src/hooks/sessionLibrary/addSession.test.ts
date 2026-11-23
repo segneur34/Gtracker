@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SportType } from '../../core/types';
 import type { RecordWithoutSummary, SessionAnalysis, SessionSource } from '../../library/record';
+import { MAX_LISTED_FILE_BYTES } from '../../library/reconcile';
 import { analyzeGpx } from '../../library/summaryOptions';
 import { handleTrackRequest, type TrackRequest, type TrackResponse } from '../../library/trackWorkerProtocol';
 import type { MemoryFolder } from '../../platform/memoryFolder';
@@ -419,5 +420,30 @@ describe('imports, par le même chemin', () => {
     const report = await importing;
     expect(report.added).toHaveLength(2);
     expect(report.duplicates).toBe(1);
+  });
+});
+
+describe('plafond de taille d’une session à l’import', () => {
+  /** La trace, et un commentaire qui la porte juste au-delà du plafond de la liste. */
+  const oversized = (): string => run(1).replace('</gpx>', `<!--${'x'.repeat(MAX_LISTED_FILE_BYTES)}--></gpx>`);
+
+  it('GPX importé trop gros : refusé sans calcul ni écriture ; un enregistrement de même taille est rangé', async () => {
+    useWorker();
+    const { addGpx } = await openFresh();
+    const big = oversized();
+    expect(await addGpx(big, 'import', {})).toStrictEqual({ status: 'invalid', file: null, tooLarge: true, message: 'il dépasse 30 Mo' });
+    expect(FakeWorker.posts).toHaveLength(0);
+    expect(log.filter((l) => l.includes('sessions/'))).toEqual([]);
+    expect((await addGpx(big, 'enregistrement', { sport: 'surf' })).status).toBe('added');
+  });
+
+  it('dans un import de fichiers : nommé avec sa raison, sans nouvel essai, les autres rangés', async () => {
+    const { library } = await openFresh();
+    const entry = (name: string, text: string) => ({ name, key: name.replace(/\.gpx$/, ''), readText: async () => text, readBytes: async () => null });
+    const report = await library.importEntries([entry('gros.gpx', oversized()), entry('a.gpx', run(1, { name: 'A', type: 'surf' }))]);
+    expect(report.failedFiles).toEqual([{ name: 'gros.gpx', reason: 'il dépasse 30 Mo' }]);
+    expect(report.retryable).toEqual([]);
+    expect(report.invalid).toEqual([]);
+    expect(report.added).toHaveLength(1);
   });
 });

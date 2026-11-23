@@ -98,10 +98,15 @@ export const RECORD_VERSION = 1;
  * longue vague et temps de glisse s'allongent ; le nombre de vagues et la
  * vitesse max ne changent pas.
  *
+ * 23 (23 novembre 2026) : le lecteur GPX écarte un point hors des bornes de la
+ * Terre ou posé exactement en (0, 0), position d'un enregistreur qui n'a pas
+ * encore capté les satellites : emprise de la carte, vignette, lieu et
+ * manœuvres d'une trace qui en portait changent.
+ *
  * Les versions sautées (6, 10, 11, 17 et 18) ne changeaient aucun chiffre de la
  * voile ni du surf ; le numéro est gardé.
  */
-export const SUMMARY_CALC_VERSION = 22;
+export const SUMMARY_CALC_VERSION = 23;
 
 export type SessionSource = 'enregistrement' | 'import';
 
@@ -345,7 +350,7 @@ export interface SessionRecord {
   notes: StoredSessionNotes | null;
   /** Absent des fiches écrites avant son introduction : lu comme `null`. */
   analysis: SessionAnalysis | null;
-  /** Fond de carte de cette session (plan ou satellite), changé tout de suite ; absent : celui de la famille (Réglages de l'appareil). */
+  /** Fond de carte de cette session (`core/mapBase.ts`), changé tout de suite ; absent : celui de la famille (Réglages de l'appareil). */
   mapBase?: MapBase;
   /** Sauts mesurés (voile) ; absent sans `.imu`, avant leur calcul, ou si la fiche en porte de mal formés. */
   jumps?: SessionJumps;

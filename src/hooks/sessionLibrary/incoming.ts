@@ -99,6 +99,7 @@ const entryOf = (file: IncomingFile, read?: Uint8Array): ImportEntry => {
   return {
     name: file.name,
     key: file.id,
+    size: file.size,
     readBytes,
     readText: async () => {
       const bytes = await readBytes();

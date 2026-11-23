@@ -56,6 +56,27 @@ export interface ReconcilePlan {
  */
 export const MAX_LISTED_FILE_BYTES = 30 * 1024 * 1024;
 
+/** `MAX_LISTED_FILE_BYTES` en mégaoctets, pour le dire. */
+export const MAX_LISTED_FILE_MB = MAX_LISTED_FILE_BYTES / (1024 * 1024);
+
+/**
+ * Vrai si le texte, écrit en UTF-8, dépasserait `MAX_LISTED_FILE_BYTES` : il disparaîtrait de la liste au lancement
+ * suivant. Les octets sont comptés sans encoder le texte (30 Mo de plus en mémoire) : un caractère de l'alphabet
+ * latin de base vaut 1 octet, jusqu'à U+07FF 2, une moitié de paire de substitution 2 (la paire, 4), tout autre 3.
+ */
+export const exceedsListedSize = (text: string): boolean => {
+  // Au moins un octet par unité, au plus trois : la plupart des textes se jugent sans boucle.
+  if (text.length > MAX_LISTED_FILE_BYTES) return true;
+  if (text.length * 3 <= MAX_LISTED_FILE_BYTES) return false;
+  let bytes = 0;
+  for (let i = 0; i < text.length; i++) {
+    const unit = text.charCodeAt(i);
+    bytes += unit < 0x80 ? 1 : unit < 0x800 || (unit >= 0xd800 && unit <= 0xdfff) ? 2 : 3;
+    if (bytes > MAX_LISTED_FILE_BYTES) return true;
+  }
+  return false;
+};
+
 const isOversized = (entry: FolderEntry): boolean => entry.size > MAX_LISTED_FILE_BYTES;
 
 const isRecordFileName = (name: string): boolean => /\.json$/i.test(name);

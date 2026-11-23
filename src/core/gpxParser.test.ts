@@ -314,3 +314,86 @@ describe('parseGpx : lecture du XML sans DOMParser', () => {
     expect(r.rawPoints[n - 1].rawTimeMs! - r.rawPoints[0].rawTimeMs!).toBe(((n - 1) * 1000) / hz);
   });
 });
+
+/** Heure du point à la seconde `s` (moins d'une minute). */
+const T = (s: number) => `2026-10-01T10:00:${String(s).padStart(2, '0')}Z`;
+
+describe('points sans position de la trace', () => {
+  it('écarte le (0, 0) exact et les positions hors de la Terre, garde un zéro seul', () => {
+    const xml = gpx(`<trk><trkseg>${[
+      pt(43.5, 3.9, T(0)), pt(0, 0, T(1)), pt(200, 3.9, T(2)), pt(43.5, 181, T(3)), pt(0, 3.9, T(4)), pt(43.5, 0, T(5)),
+    ].join('')}</trkseg></trk>`);
+    expect(parseGpx(xml).rawPoints.map((p) => [p.lat, p.lon])).toEqual([[43.5, 3.9], [0, 3.9], [43.5, 0]]);
+    expect(parseGpxPath(xml).points.map((p) => [p.lat, p.lon])).toEqual([[43.5, 3.9], [0, 3.9], [43.5, 0]]);
+  });
+});
+
+describe('plafonds du lecteur : un fichier fabriqué exprès est refusé vite', () => {
+  /** Lecture chronométrée : refus « mal formé », en moins de 2 s. */
+  const refusedQuickly = (xml: string) => {
+    const t0 = performance.now();
+    expect(() => parseGpx(xml)).toThrow(MALFORMED);
+    const ms = performance.now() - t0;
+    expect(ms).toBeLessThan(2000);
+    return ms;
+  };
+  const attributes = (n: number) => Array.from({ length: n }, (_, k) => `a${k}="${k}"`).join(' ');
+
+  it('une balise à 65 attributs est refusée, à 64 elle passe', () => {
+    const tag = (n: number) => gpx(`<trk><trkseg><trkpt lat="45" lon="5" ${attributes(n - 2)}><time>${T(0)}</time></trkpt></trkseg></trk>`);
+    expect(parseGpx(tag(64)).rawPoints).toHaveLength(1);
+    refusedQuickly(tag(65));
+    // La forme de l'attaque : des dizaines de milliers d'attributs sur une seule balise.
+    const ms = refusedQuickly(gpx(`<trk ${attributes(80_000)}/>`));
+    console.log(`balise à 80 000 attributs : refusée en ${Math.round(ms)} ms`);
+  });
+
+  it('des points imbriqués sur cinq niveaux sont refusés, sur quatre ils passent', () => {
+    const nested = (depth: number) =>
+      gpx(`<trk><trkseg>${'<trkpt lat="45" lon="5">'.repeat(depth)}<time>${T(0)}</time>${'</trkpt>'.repeat(depth)}</trkseg></trk>`);
+    expect(parseGpx(nested(4)).rawPoints).toHaveLength(4);
+    refusedQuickly(nested(5));
+    const ms = refusedQuickly(nested(32_000));
+    console.log(`32 000 points imbriqués : refusés en ${Math.round(ms)} ms`);
+  });
+
+  it('65 déclarations d\'espace de noms en portée sont refusées, 64 passent', () => {
+    // La racine en déclare une (`gpxtpx`) ; chaque élément imbriqué en ajoute une.
+    const doc = (count: number) => {
+      const extra = count - 1;
+      const open = Array.from({ length: extra }, (_, k) => `<e${k} xmlns:n${k}="urn:${k}">`).join('');
+      const close = Array.from({ length: extra }, (_, k) => `</e${extra - 1 - k}>`).join('');
+      return gpx(`<extensions>${open}${close}</extensions><trk><trkseg>${pt(45, 5, T(0))}</trkseg></trk>`);
+    };
+    expect(parseGpx(doc(64)).rawPoints).toHaveLength(1);
+    refusedQuickly(doc(65));
+    const deep = 50_000;
+    const ms = refusedQuickly(gpx(`${Array.from({ length: deep }, (_, k) => `<e xmlns:n${k}="u">`).join('')}${'</e>'.repeat(deep)}`));
+    console.log(`${deep} déclarations imbriquées : refusées en ${Math.round(ms)} ms`);
+  });
+
+  it('un GPX honnête de 4 h à 5 points par seconde passe : Doppler, FC, cap, 12 espaces de noms, un par point', () => {
+    const roots = Array.from({ length: 10 }, (_, k) => `xmlns:ns${k}="http://example.com/ns${k}"`).join(' ');
+    const head = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="montre" ${NS} ${roots}><trk><name>4 h</name><trkseg>`;
+    const n = 4 * 3600 * 5;
+    const t0 = Date.parse(T(0));
+    const parts: string[] = [head];
+    for (let i = 0; i < n; i++) {
+      parts.push(
+        `<trkpt lat="${(43.5 + i * 1e-6).toFixed(7)}" lon="3.9"><ele>1.2</ele><time>${new Date(t0 + i * 200).toISOString()}</time>` +
+          `<extensions><gpxtpx:TrackPointExtension xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">` +
+          `<gpxtpx:hr>${120 + (i % 40)}</gpxtpx:hr><gpxtpx:speed>${(5 + (i % 30) / 10).toFixed(1)}</gpxtpx:speed><gpxtpx:course>${i % 360}</gpxtpx:course>` +
+          `</gpxtpx:TrackPointExtension></extensions></trkpt>\n`,
+      );
+    }
+    parts.push('</trkseg></trk></gpx>');
+    const xml = parts.join('');
+    const t1 = performance.now();
+    const r = parseGpx(xml);
+    const ms = performance.now() - t1;
+    expect(r.rawPoints).toHaveLength(n);
+    expect(r.hasDeviceSpeed).toBe(true);
+    expect(r.rawPoints[n - 1]).toMatchObject({ hr: 120 + ((n - 1) % 40), courseDeg: (n - 1) % 360 });
+    console.log(`GPX honnête de 4 h à 5 Hz (${n} points, ${(xml.length / 1e6).toFixed(1)} Mo) : lu en ${Math.round(ms)} ms`);
+  });
+});

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MAX_LISTED_FILE_BYTES } from '../../library/reconcile';
 import type { ImportEntry, MemoryFolder } from '../../platform/memoryFolder';
 import { buildFitActivity, type FitPointSpec } from '../../test/fit.fixture';
 import { gpxAt, settle, tick, trackTestTimers } from '../../test/library.fixture';
@@ -64,6 +65,18 @@ afterEach(() => {
 });
 
 describe('import de FIT', () => {
+  it('FIT plus gros que le plafond d’une session : refusé avant d’être lu, sans nouvel essai', async () => {
+    const library = await openFresh();
+    let reads = 0;
+    const big = { ...entry('enorme.fit', fitAt(1), () => (reads += 1)), size: MAX_LISTED_FILE_BYTES + 1 };
+    const atLimit = { ...entry('montre.fit', fitAt(2)), size: MAX_LISTED_FILE_BYTES };
+    const report = await library.importEntries([big, atLimit]);
+    expect(reads).toBe(0);
+    expect(report.failedFiles).toEqual([{ name: 'enorme.fit', reason: 'il dépasse 30 Mo' }]);
+    expect(report.retryable).toEqual([]);
+    expect(report.added).toHaveLength(1);
+  });
+
   it('range un FIT sous un GPX, jamais le .fit : FC et sport repris, fiche créée', async () => {
     const library = await openFresh();
     const report = await library.importEntries([entry('montre.fit', fitAt(1, { sessionSports: [38] }))]);

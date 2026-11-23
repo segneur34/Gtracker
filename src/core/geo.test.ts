@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toRad } from './angles';
-import { cumulativeDistancesM, EARTH_RADIUS_M, haversineDistance, pathLengthM, planeProjection } from './geo';
+import { cumulativeDistancesM, EARTH_RADIUS_M, haversineDistance, isTrackPosition, pathLengthM, planeProjection } from './geo';
 
 let seed = 11;
 const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
@@ -37,5 +37,18 @@ describe('géodésie', () => {
     expect(pathLengthM([])).toBe(0);
     expect(pathLengthM(points.slice(0, 1))).toBe(0);
     expect(cumulativeDistancesM([])).toEqual([]);
+  });
+
+  it('position de la trace : finie, dans les bornes, jamais exactement (0, 0)', () => {
+    expect(isTrackPosition(43.5, 3.9)).toBe(true);
+    expect(isTrackPosition(90, -180)).toBe(true);
+    expect(isTrackPosition(0, 3.9)).toBe(true);
+    expect(isTrackPosition(43.5, 0)).toBe(true);
+    expect(isTrackPosition(0, 0)).toBe(false);
+    expect(isTrackPosition(-0, 0)).toBe(false);
+    expect(isTrackPosition(200, 3.9)).toBe(false);
+    expect(isTrackPosition(43.5, 181)).toBe(false);
+    expect(isTrackPosition(NaN, 3.9)).toBe(false);
+    expect(isTrackPosition(43.5, Infinity)).toBe(false);
   });
 });
