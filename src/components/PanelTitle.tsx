@@ -2,10 +2,10 @@ import type { ReactNode } from 'react';
 import { t } from '../core/i18n';
 import { formatSessionDate } from '../core/units';
 import { HelpToggle } from './Help';
-import { IconChevronRight } from './icons';
+import FoldTitle from './ui/FoldTitle';
 
 /**
- * Titre d'un panneau d'analyse, cliquable pour le refermer sans remonter à la
+ * Titre d'un panneau d'analyse (`FoldTitle`), cliquable pour le refermer sans remonter à la
  * rangée d'onglets : utile quand le panneau ouvert dépasse l'écran, surtout
  * sur téléphone. Le nom en capitales espacées, comme les titres de l'accueil ;
  * `extra` (date, mention) garde sa casse. Plus petit dans les analyses
@@ -21,19 +21,13 @@ function PanelTitle({ label, extra, open, onToggle, helpKey }: {
   helpKey?: string;
 }) {
   return (
-    <strong
-      role="button"
-      tabIndex={0}
-      onClick={onToggle}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
-      className="ui-panel-title">
-      <IconChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined, transition: 'transform 0.15s', flexShrink: 0 }} />
+    <FoldTitle nested open={open} onToggle={onToggle} className="ui-panel-title">
       <span className="ui-panel-title__text">
         {label}
       </span>
       {extra}
       {helpKey && open && <HelpToggle helpKey={helpKey} label={typeof label === 'string' ? label : t('ce panneau')} size="s" />}
-    </strong>
+    </FoldTitle>
   );
 }
 

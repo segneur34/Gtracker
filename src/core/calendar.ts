@@ -86,6 +86,18 @@ export const dayMonthTime = dateFormatter({ day: 'numeric', month: 'short', hour
 export const monthYearShort = dateFormatter({ month: 'short', year: '2-digit' });
 /** « mars 2026 » */
 export const monthYearLong = dateFormatter({ month: 'long', year: 'numeric' });
+/** « 14:05 » : heure et minutes sur deux chiffres, dans le format de la langue. */
+export const timeShort = dateFormatter({ hour: '2-digit', minute: '2-digit' });
+/** « jeu. 12 » */
+export const weekdayDay = dateFormatter({ weekday: 'short', day: 'numeric' });
+/** « 12/03/2026 » : la date en chiffres, dans l'ordre et la forme de la langue. */
+export const dateNumeric = dateFormatter({});
+/** « jeudi 12 mars » */
+export const weekdayDayMonthLong = dateFormatter({ weekday: 'long', day: 'numeric', month: 'long' });
+/** Initiale du jour de `when` (« J »), pour l'axe d'un graphe. */
+export const weekdayNarrow = dateFormatter({ weekday: 'narrow' });
+/** Initiale du mois de `when` (« M »), pour l'axe d'un graphe. */
+export const monthNarrow = dateFormatter({ month: 'narrow' });
 
 /** Piles d'une barre : le nombre de sessions de chaque activité, dans l'ordre de `order` (les absentes à la suite). */
 export const stacksByActivity = (

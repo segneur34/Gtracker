@@ -1,0 +1,176 @@
+/* Onglet « manœuvres » de la voile (`ManeuversPanel.tsx`). Les règles du téléphone (`.an-man-*` de
+   `pages/analysisMobile.css`, qui forcent leurs valeurs) restent prioritaires sur celles-ci ; là où une règle de
+   l'ordinateur y est de même poids (marge des cellules de la synthèse), le sélecteur d'ici est plus précis. */
+
+/* En-tête : titre et rappel du seuil de manœuvre ratée. */
+.an-man__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.an-man__hint {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+/* Tableaux de synthèse (par type, puis par amure). */
+.an-man__table {
+  border-collapse: collapse;
+  font-size: var(--text-s);
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.an-man__table--spaced {
+  margin-bottom: 10px;
+}
+
+.an-man__table thead tr {
+  background-color: var(--surface-sunken);
+}
+
+.an-man__left {
+  text-align: left;
+}
+
+.an-man__center {
+  text-align: center;
+}
+
+.an-man__ok {
+  color: var(--success);
+}
+
+.an-man__ko {
+  color: var(--danger);
+}
+
+/* Colonne « Carte » : sa marge propre passe devant celle des cellules de la synthèse. */
+.an-man-summary th.an-man__carte-head {
+  padding: 7px 10px;
+}
+
+.an-man-summary td.an-man__carte {
+  padding: 4px 10px;
+  text-align: center;
+}
+
+/* Blocs : tableau par amure, barre de son titre, explications. */
+.an-man__block {
+  margin-bottom: 10px;
+}
+
+.an-man__tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.an-man__note {
+  margin: 0 0 10px;
+  padding: var(--space-2);
+  background-color: var(--bg);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.an-man__note--warn {
+  background-color: var(--warning-soft);
+  border-left-color: var(--warning-line);
+}
+
+.an-man__legend {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+/* « Détails » : un cadre par type, avec son podium et sa liste. */
+.an-man__details {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+.an-man__detail {
+  flex: 1 1 380px;
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 10px var(--space-3);
+}
+
+.an-man__detail-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.an-man__podium {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+}
+
+.an-man__podium thead tr {
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.an-man__podium th {
+  padding: 3px var(--space-1);
+  font-weight: normal;
+}
+
+.an-man__podium td {
+  padding: var(--space-1);
+  text-align: center;
+}
+
+.an-man__podium td:first-child {
+  text-align: left;
+}
+
+.an-man__podium td:last-child {
+  padding: 2px var(--space-1);
+  text-align: right;
+}
+
+.an-man__podium tbody tr + tr {
+  border-top: var(--trait-encre);
+}
+
+.an-man__podium tbody tr.an-man__metric--on {
+  background-color: var(--voile-soft);
+}
+
+.an-man__sub {
+  display: block;
+  font-weight: normal;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.an-man__more {
+  margin-top: var(--space-2);
+}
+
+.an-man__list {
+  margin: var(--space-2) 0 0;
+  padding-left: 18px;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  line-height: 1.5;
+}

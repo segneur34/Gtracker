@@ -19,6 +19,11 @@ import { CARD_STYLE, HALF_PANEL_STYLE } from '../styles';
 import Button from '../ui/Button';
 import MapToggle from '../ui/MapToggle';
 import SegmentedControl from '../ui/SegmentedControl';
+import './ManeuversPanel.css';
+
+/** Panneau en « Détails » : toute la largeur de la ligne ; sinon une demi-ligne (`HALF_PANEL_STYLE`). La marge est celle du panneau d'analyse resserré. */
+const PANEL_STYLE_DETAILS = { ...CARD_STYLE, flex: '1 1 100%', padding: '12px 15px' } as const;
+const PANEL_STYLE_HALF = { ...CARD_STYLE, ...HALF_PANEL_STYLE, padding: '12px 15px' } as const;
 
 type ManeuverKind = 'tack' | 'jibe';
 
@@ -81,22 +86,22 @@ export default function ManeuversPanel({
   /** Explications repliées derrière le « ? » : enregistrement, virages écartés, lecture des podiums. */
   const maneuverHelpOpen = useHelp('voile:manoeuvres')?.open ?? false;
   return (
-    <ResizablePanel id={view.details ? 'sailing.carte.manoeuvres.details' : 'sailing.carte.manoeuvres'} anchorId={anchorId} style={{ ...CARD_STYLE, ...(view.details ? { flex: '1 1 100%' } : HALF_PANEL_STYLE), padding: '12px 15px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
+    <ResizablePanel id={view.details ? 'sailing.carte.manoeuvres.details' : 'sailing.carte.manoeuvres'} anchorId={anchorId} style={view.details ? PANEL_STYLE_DETAILS : PANEL_STYLE_HALF}>
+      <div className="an-man__head">
         <PanelTitle label={t('Manœuvres')} open={open} onToggle={onToggle} helpKey="voile:manoeuvres" />
-        <span style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>{t('ratée si moins de {v} {unit} pendant au moins {s} s', { v: showThreshold(activeThresholdKn), unit: speedSymbol, s: MANEUVER_LOST_FLIGHT_S })}</span>
+        <span className="an-man__hint">{t('ratée si moins de {v} {unit} pendant au moins {s} s', { v: showThreshold(activeThresholdKn), unit: speedSymbol, s: MANEUVER_LOST_FLIGHT_S })}</span>
       </div>
 
       <div className="an-man-scroll">
-      <table className="an-man-summary" style={{ borderCollapse: 'collapse', fontSize: 'var(--text-s)', backgroundColor: 'var(--surface)', border: '1px solid var(--line)', marginBottom: '10px' }}>
+      <table className="an-man-summary an-man__table an-man__table--spaced">
         <thead>
-          <tr style={{ backgroundColor: 'var(--surface-sunken)' }}>
-            <th style={{ textAlign: 'left' }}>{t('Type')}</th>
+          <tr>
+            <th className="an-man__left">{t('Type')}</th>
             <th>{t('Réussis')}</th>
             <th>{t('Ratés')}</th>
             <th title={t('Vitesse minimale pendant la manœuvre, moyenne sur toutes les manœuvres')}>{t('Vmin moy. ({unit})', { unit: speedSymbol })}</th>
             <th title={t('Meilleure vitesse minimale conservée sur une manœuvre')}>{t('Vmin max ({unit})', { unit: speedSymbol })}</th>
-            <th style={{ padding: '7px 10px' }}>{t('Carte')}</th>
+            <th className="an-man__carte-head">{t('Carte')}</th>
           </tr>
         </thead>
         <tbody>
@@ -111,12 +116,12 @@ export default function ManeuversPanel({
               : []),
           ] as const).map(([label, summary, shown, toggle, hint, mapTitle]) => (
             <tr key={label} className="ui-table__row">
-              <td style={{ fontWeight: 700 }} title={hint}>{label}</td>
-              <td style={{ textAlign: 'center', color: 'var(--success)', fontWeight: 700, fontSize: 'var(--text-m)' }}>{summary?.success ?? 0}</td>
-              <td style={{ textAlign: 'center', color: 'var(--danger)', fontSize: 'var(--text-m)' }}>{summary?.fail ?? 0}</td>
-              <td style={{ textAlign: 'center' }}>{summary ? showKn(summary.vminAvg) : '-'}</td>
-              <td style={{ textAlign: 'center', fontWeight: 700 }}>{summary ? showKn(summary.vminMax) : '-'}</td>
-              <td style={{ padding: '4px 10px', textAlign: 'center' }}>
+              <td className="ui-bold" title={hint}>{label}</td>
+              <td className="an-man__center an-man__ok ui-bold ui-text-m">{summary?.success ?? 0}</td>
+              <td className="an-man__center an-man__ko ui-text-m">{summary?.fail ?? 0}</td>
+              <td className="an-man__center">{summary ? showKn(summary.vminAvg) : '-'}</td>
+              <td className="an-man__center ui-bold">{summary ? showKn(summary.vminMax) : '-'}</td>
+              <td className="an-man__carte">
                 <MapToggle shown={shown} color="var(--voile)" ink="var(--on-ink)" title={mapTitle} onClick={toggle}
                   style={{ padding: '3px 10px', border: 'none' }} />
               </td>
@@ -128,7 +133,7 @@ export default function ManeuversPanel({
 
       {/* Vent saisi loin du vent calculé fiable : les virages tombent en « sens incertain », on le dit. */}
       {windWarning && (
-        <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--warning-soft)', borderLeft: '3px solid var(--warning-line)', borderRadius: 'var(--radius-s)', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
+        <p className="an-man__note an-man__note--warn">
           {tnRich(windWarning.unclassified,
             'Le vent saisi ({manual}°) écarte <strong>{n}</strong> virage, ni virement ni empannage ; le vent calculé est à {auto}°. Vérifier la direction.',
             'Le vent saisi ({manual}°) écarte <strong>{n}</strong> virages, ni virement ni empannage ; le vent calculé est à {auto}°. Vérifier la direction.',
@@ -138,16 +143,16 @@ export default function ManeuversPanel({
 
       {/* Par amure : virements ou empannages selon l'amure d'avant la manœuvre, médianes. */}
       {(maneuverSummary.tack || maneuverSummary.jibe) && (
-        <div className="an-man-scroll" style={{ marginBottom: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
+        <div className="an-man-scroll an-man__block">
+          <div className="an-man__tools">
             <strong className="ui-subtitle">{t('Par amure')}</strong>
             <SegmentedControl<'tack' | 'jibe'> label={t('Manœuvres par amure')} accent="var(--voile)" value={view.tackType} onChange={view.setTackType}
               items={[{ key: 'tack', label: t('Virements') }, { key: 'jibe', label: t('Empannages') }]} />
           </div>
-          <table className="an-man-summary" style={{ borderCollapse: 'collapse', fontSize: 'var(--text-s)', backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>
+          <table className="an-man-summary an-man__table">
             <thead>
-              <tr style={{ backgroundColor: 'var(--surface-sunken)' }}>
-                <th style={{ textAlign: 'left' }} title={t("Amure avant la manœuvre : d'où vient le vent")}>{t('Amure')}</th>
+              <tr>
+                <th className="an-man__left" title={t("Amure avant la manœuvre : d'où vient le vent")}>{t('Amure')}</th>
                 <th title={t('Manœuvres réussies sur le total de cette amure')}>{t('Réussis')}</th>
                 <th title={t('Vitesse minimale pendant la manœuvre, médiane sur cette amure')}>{t('Vmin méd. ({unit})', { unit: speedSymbol })}</th>
                 <th title={t("Vitesse minimale sur vitesse d'approche, médiane sur cette amure")}>{t('Conservation')}</th>
@@ -158,12 +163,12 @@ export default function ManeuversPanel({
                 const onTack = maneuverSummary.byTack[view.tackType][tack];
                 return (
                   <tr key={tack} className="ui-table__row">
-                    <td style={{ fontWeight: 700 }}>{TACK_LABELS[tack]}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      {onTack ? <><span style={{ color: 'var(--success)', fontWeight: 700 }}>{onTack.success}</span>{` / ${onTack.count}`}</> : '-'}
+                    <td className="ui-bold">{TACK_LABELS[tack]}</td>
+                    <td className="an-man__center">
+                      {onTack ? <><span className="an-man__ok ui-bold">{onTack.success}</span>{` / ${onTack.count}`}</> : '-'}
                     </td>
-                    <td style={{ textAlign: 'center' }}>{onTack ? showKn(onTack.vminMedian) : '-'}</td>
-                    <td style={{ textAlign: 'center' }}>{onTack ? formatMetric('conservation', onTack.conservationMedian) : '-'}</td>
+                    <td className="an-man__center">{onTack ? showKn(onTack.vminMedian) : '-'}</td>
+                    <td className="an-man__center">{onTack ? formatMetric('conservation', onTack.conservationMedian) : '-'}</td>
                   </tr>
                 );
               })}
@@ -173,7 +178,7 @@ export default function ManeuversPanel({
       )}
 
       {maneuverHelpOpen && (<>
-      <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--bg)', borderLeft: '3px solid var(--line-strong)', borderRadius: 'var(--radius-s)', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
+      <p className="an-man__note">
         {tnRich(pointCount,
           "<strong>Enregistrement :</strong> {n} point, un toutes les {s} s en médiane. Entrée de virage retenue au-dessus de {v} {unit}, d'après l'allure de la session.",
           "<strong>Enregistrement :</strong> {n} points, un toutes les {s} s en médiane. Entrée de virage retenue au-dessus de {v} {unit}, d'après l'allure de la session.",
@@ -192,7 +197,7 @@ export default function ManeuversPanel({
         m.rejected.tooShort > 0 ||
         m.rejected.noFlight > 0 ||
         m.rejected.fullTurn > 0) && (
-        <p style={{ margin: '0 0 10px', padding: '8px', backgroundColor: 'var(--bg)', borderLeft: '3px solid var(--line-strong)', borderRadius: 'var(--radius-s)', color: 'var(--ink-2)', fontSize: 'var(--text-xs)', lineHeight: '1.6' }}>
+        <p className="an-man__note">
           {tnRich(m.locations.length,
             "<strong>{n} virage retenu</strong>, et d'autres écartés en chemin :",
             "<strong>{n} virages retenus</strong>, et d'autres écartés en chemin :")}
@@ -256,7 +261,7 @@ export default function ManeuversPanel({
         </p>
       )}
       {view.details && (
-        <p style={{ margin: '0 0 10px', color: 'var(--muted)', fontSize: 'var(--text-xs)', lineHeight: 1.45 }}>
+        <p className="an-man__legend">
           {t("Survolez une ligne pour la définition, une case du podium pour l'heure de la manœuvre. Le podium retient la meilleure valeur : conservation la plus haute, relance la plus courte, cap (virements seulement) et distance les plus faibles, gain au vent le plus grand ; à égalité, la meilleure conservation.")}
         </p>
       )}
@@ -267,7 +272,7 @@ export default function ManeuversPanel({
         items={[{ key: 'resume', label: t('Résumé') }, { key: 'details', label: t('Détails') }]} />
 
       {view.details && (
-      <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', marginTop: '12px' }}>
+      <div className="an-man__details">
         {([
           ['tack', t('Virements'), maneuverSummary.tack],
           ['jibe', t('Empannages'), maneuverSummary.jibe],
@@ -275,56 +280,56 @@ export default function ManeuversPanel({
           const ofType = m.locations.filter((loc) => loc.type === type);
           const listOpen = view.listOpen[type];
           return (
-          <div key={type} className="an-man-detail" style={{ flex: '1 1 380px', backgroundColor: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-m)', padding: '10px 12px' }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
+          <div key={type} className="an-man-detail an-man__detail">
+            <div className="an-man__detail-head">
               <strong className="ui-subtitle">{title}</strong>
               {summary ? (
-                <span style={{ fontSize: 'var(--text-s)' }}>
-                  <span style={{ color: 'var(--success)', fontWeight: 700 }}>{tn(summary.success, '{n} réussi', '{n} réussis')}</span>
+                <span className="ui-text-s">
+                  <span className="an-man__ok ui-bold">{tn(summary.success, '{n} réussi', '{n} réussis')}</span>
                   {' · '}
-                  <span style={{ color: 'var(--danger)' }}>{tn(summary.fail, '{n} raté', '{n} ratés')}</span>
+                  <span className="an-man__ko">{tn(summary.fail, '{n} raté', '{n} ratés')}</span>
                   {' · '}{tRich('Vmin moy. {avg} {unit}, max <strong>{max}</strong> {unit}', { avg: showKn(summary.vminAvg), unit: speedSymbol, max: showKn(summary.vminMax) })}
                 </span>
               ) : (
-                <span style={{ color: 'var(--muted)', fontSize: 'var(--text-s)' }}>{t('aucun')}</span>
+                <span className="ui-muted ui-text-s">{t('aucun')}</span>
               )}
             </div>
 
             {summary && (
-              <table className="an-man-podium" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-xs)' }}>
+              <table className="an-man-podium an-man__podium">
                 <thead>
-                  <tr style={{ color: 'var(--muted)', borderBottom: '1px solid var(--line)' }}>
-                    <th style={{ textAlign: 'left', padding: '3px 4px', fontWeight: 'normal' }}>{t('Métrique')}</th>
-                    <th style={{ padding: '3px 4px', fontWeight: 'normal' }}>{t('Moyenne')}</th>
+                  <tr>
+                    <th className="an-man__left">{t('Métrique')}</th>
+                    <th>{t('Moyenne')}</th>
                     {PODIUM_RANKS.map((rank, idx) => (
-                      <th key={rank} style={{ padding: '3px 4px', fontWeight: 'normal', color: HIGHLIGHT_PODIUM_COLORS[idx] }}>{rank}</th>
+                      <th key={rank} style={{ color: HIGHLIGHT_PODIUM_COLORS[idx] }}>{rank}</th>
                     ))}
-                    <th style={{ padding: '3px 4px' }} />
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {MANEUVER_METRICS.map((metric, rowIdx) => {
+                  {MANEUVER_METRICS.map((metric) => {
                     const key = `${type}:${metric.key}`;
                     const active = selectedManeuverTop === key;
                     const tops = summary.tops[metric.key];
                     const ranked = metric.ranked.includes(type);
                     return (
-                      <tr key={metric.key} title={metric.hint} style={{ borderTop: rowIdx > 0 ? 'var(--trait-encre)' : undefined, backgroundColor: active ? 'var(--voile-soft)' : 'transparent' }}>
-                        <td style={{ padding: '4px', textAlign: 'left' }}>{metric.label}</td>
-                        <td style={{ padding: '4px', textAlign: 'center', fontWeight: 700 }}>
+                      <tr key={metric.key} title={metric.hint} className={active ? 'an-man__metric--on' : undefined}>
+                        <td>{metric.label}</td>
+                        <td className="ui-bold">
                           {summary.averages[metric.key]}
                           {metric.key === 'relaunch' && summary.withoutRelaunch > 0 && (
-                            <span style={{ display: 'block', fontWeight: 'normal', color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>
+                            <span className="an-man__sub">
                               {t('{n} sans relance', { n: summary.withoutRelaunch })}
                             </span>
                           )}
                         </td>
                         {[0, 1, 2].map((rank) => (
-                          <td key={rank} title={tops[rank] ? formatTimeOfDay(tops[rank].timeMs) : undefined} style={{ padding: '4px', textAlign: 'center' }}>
+                          <td key={rank} title={tops[rank] ? formatTimeOfDay(tops[rank].timeMs) : undefined}>
                             {ranked ? tops[rank]?.label ?? '-' : '—'}
                           </td>
                         ))}
-                        <td style={{ padding: '2px 4px', textAlign: 'right' }}>
+                        <td>
                           <MapToggle
                             shown={active} color="var(--voile)" ink="var(--on-ink)" labels={[t('Carte'), t('Masquer')]} disabled={tops.length === 0}
                             onClick={() => onSelectTop(active ? null : key)}
@@ -337,7 +342,7 @@ export default function ManeuversPanel({
               </table>
             )}
             {summary && ofType.length > 0 && (
-              <Button size="s" style={{ marginTop: '8px' }} aria-expanded={listOpen}
+              <Button size="s" className="an-man__more" aria-expanded={listOpen}
                 onClick={() => view.setListOpen((prev) => ({ ...prev, [type]: !prev[type] }))}>
                 {listOpen
                   ? (type === 'tack' ? t('Replier les virements ▲') : t('Replier les empannages ▲'))
@@ -345,11 +350,11 @@ export default function ManeuversPanel({
               </Button>
             )}
             {summary && listOpen && ofType.length > 0 && (
-              <ul style={{ margin: '8px 0 0', paddingLeft: '18px', fontSize: 'var(--text-xs)', color: 'var(--ink-2)', lineHeight: 1.5 }}>
+              <ul className="an-man__list">
                 {ofType.map((loc) => (
                   <li key={loc.timeMs}>
                     {formatTimeOfDay(loc.timeMs)}{' · '}
-                    <span style={{ color: loc.success ? 'var(--success)' : 'var(--danger)' }}>{loc.success ? t('réussi') : t('raté')}</span>
+                    <span className={loc.success ? 'an-man__ok' : 'an-man__ko'}>{loc.success ? t('réussi') : t('raté')}</span>
                     {' · '}{t('Vmin {v} {unit}', { v: showKn(loc.vmin), unit: speedSymbol })}
                     {maneuverNotes(loc).map((note) => ` · ${note}`).join('')}
                   </li>

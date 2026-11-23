@@ -122,10 +122,16 @@ export function formatSpeed(ms: number | null, unit: SpeedUnit): string {
   }
 }
 
+/** Décimales d'une vitesse à l'écran et dans un champ de saisie : deux en m/s, une en nœuds et en km/h. */
+export const speedDecimals = (unit: SpeedUnit): number => (unit === 'ms' ? 2 : 1);
+
+/** Vitesse en m/s dans l'unité choisie, arrondie comme à l'affichage (`speedDecimals`) : la valeur d'un champ de saisie. */
+export const toRoundedDisplaySpeed = (ms: number, unit: SpeedUnit): number => toFixedNumber(toDisplaySpeed(ms, unit), speedDecimals(unit));
+
 /** Formate une valeur déjà exprimée dans l'unité, pour les axes de graphe. */
 export const formatSpeedValue = (value: number, unit: SpeedUnit): string => {
   if (!isFinite(value)) return '-';
-  return formatDecimal(value, unit === 'ms' ? 2 : 1);
+  return formatDecimal(value, speedDecimals(unit));
 };
 
 /** Valeur formatée, ou « — » quand elle manque (`null`). */
@@ -162,7 +168,7 @@ export const knotsToChartValue = (kn: number, unit: SpeedUnit): number => {
   if (!isFinite(kn)) return kn;
   if (unit === 'kn') return toFixedNumber(kn, 1);
   const value = knotsToDisplay(kn, unit);
-  return toFixedNumber(value, unit === 'ms' ? 2 : 1);
+  return toFixedNumber(value, speedDecimals(unit));
 };
 
 /** Unité dans laquelle une distance est présentée : kilomètres ou milles nautiques. */

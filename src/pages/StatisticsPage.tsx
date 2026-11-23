@@ -1,4 +1,4 @@
-import { dayMonthYear } from '../core/calendar';
+import { dayMonthNumeric, dayMonthYear } from '../core/calendar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -695,7 +695,7 @@ function StatisticsPage() {
                               const row = active ? (payload?.[0]?.payload as ChartRow | WeekRow | undefined) : undefined;
                               if (!row || row.y === undefined) return null;
                               if (isWeekRow(row)) {
-                                const monday = new Date(row.weekStartMs).toLocaleDateString(dateLocale(), { day: '2-digit', month: '2-digit' });
+                                const monday = dayMonthNumeric(row.weekStartMs);
                                 return (
                                   <div className="stats-tooltip">
                                     <strong>{t('Semaine du {monday}', { monday })}</strong>

@@ -14,7 +14,8 @@ import { useThemedShade } from '../hooks/useTheme';
 import { useVisibleStatSessions } from '../hooks/useVisibleStatSessions';
 import { activityBarUnit, buildActivityChart, type ChartRange, type ChartSession } from '../library/activityChart';
 import './ActivityChart.css';
-import { dateLocale, t, tn } from '../core/i18n';
+import { timeShort, weekdayDay } from '../core/calendar';
+import { t, tn } from '../core/i18n';
 
 /**
  * Graphe d'activités du profil, venu de l'accueil (maquette du 23 septembre 2026), sur la
@@ -46,9 +47,6 @@ const TOTALS_DEFAULT = { totaux: true };
 
 /** Distance dans l'unité choisie pour l'activité dans Réglages. */
 const distanceText = (m: number, activity: Activity): string => formatDistance(m, effectiveDistanceUnit(activity), 1);
-
-const formatTime = (ms: number): string =>
-  new Date(ms).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
 
 
 function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: number; frame: BrushFrameProps }) {
@@ -164,8 +162,8 @@ function ActivityChart({ period, nowMs, frame }: { period: ChartRange; nowMs: nu
                       <span className="ui-swatch" style={{ background: shown(activity.color) }} />
                       <span className="actchart__name">{activityDisplayName(activity)}</span>
                       <span className="actchart__meta num">
-                        {weekly && `${new Date(s.startMs).toLocaleDateString(dateLocale(), { weekday: 'short', day: 'numeric' })} · `}
-                        {formatTime(s.startMs)} · {formatDuration(s.durationS * 1000)} · {distanceText(s.distanceM, activity)}
+                        {weekly && `${weekdayDay(s.startMs)} · `}
+                        {timeShort(s.startMs)} · {formatDuration(s.durationS * 1000)} · {distanceText(s.distanceM, activity)}
                       </span>
                     </button>
                   </li>

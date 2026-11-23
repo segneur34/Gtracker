@@ -9,7 +9,8 @@ import { effectiveDistanceUnit } from '../hooks/useSportSettings';
 import { routeActivity, routeDistanceM } from '../planning/routeList';
 import ActivityGlyph from './logos/ActivityGlyph';
 import Button from './ui/Button';
-import { dateLocale, t } from '../core/i18n';
+import { dateNumeric } from '../core/calendar';
+import { t } from '../core/i18n';
 import './RouteList.css';
 
 /**
@@ -58,7 +59,7 @@ function RouteList({ routes, activities, onOpen, currentBase = null, actions, go
                 {' · '}
                 {formatDistance(distances.get(saved.base) ?? 0, activity ? effectiveDistanceUnit(activity) : 'km')}
                 {' · '}
-                {new Date(saved.record.updatedAt).toLocaleDateString(dateLocale())}
+                {dateNumeric(new Date(saved.record.updatedAt))}
               </span>
             </span>
           </>

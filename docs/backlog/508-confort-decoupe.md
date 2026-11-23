@@ -57,6 +57,16 @@ Fichiers : `src/library/settingsFile.ts`, `src/hooks/sessionLibrary/deviceSettin
 - A-11 (heure d'une session lue dans un autre fuseau) : aucun décalage horaire n'est stocké ; décision de produit, à l'utilisateur.
 - knip (recherche de code mort par outil) : dépendance de plus, points d'entrée du banc et de la coquille à régler.
 
+## Réponses de l'utilisateur (23/11)
+
+- A-11, heure d'une session faite dans un autre fuseau : « l'écrire, sans code ». L'heure affichée est celle de l'appareil qui lit la session ; à écrire dans `docs/DECISIONS.md` §2 à la passe de documentation, et dans la note de remise (507).
+- D-05, confirmations par la boîte du système : « non, à laisser » avant la vente.
+- D-09, valeur absente : le tiret long « — » partout (part S7, après S1 et S3).
+
+## Avancement
+
+- S1, S2 et S3 codées et commitées le 23/11, le banc restant à passer. Écarts admis de S2 : le chevron du pli du Profil s'anime (0,15 s) comme les autres ; celui de `ChartFold` ne rétrécit plus quand le libellé déborde. De S1 : le constat de la virgule dans `SpeedRangeEditor` était faux (champs numériques), rien n'est corrigé.
+
 ## Ensuite
 
 Mettre à jour les lignes 309 et 404 du reste à faire (D-04 en partie fait, cliquet) et retirer l'élément 479 (fait par S4).

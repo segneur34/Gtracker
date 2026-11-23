@@ -14,6 +14,7 @@ import { brushFrame } from '../components/brushFrame';
 import { brushColorFor } from '../core/brushColor';
 import { IconChevronRight } from '../components/icons';
 import Button from '../components/ui/Button';
+import FoldTitle from '../components/ui/FoldTitle';
 import { activityDisplayName, logoColor, type Activity } from '../core/activities';
 import { activityLogo, type LogoId } from '../core/activityLogos';
 import { DISTANCE_UNIT_SYMBOL, formatDecimal, formatDuration, toDisplayDistance, type DistanceUnit } from '../core/units';
@@ -330,11 +331,11 @@ function ProfilePage() {
                   </div>
                 </div>
                 <div className="profile-split__detail">
-                  <button type="button" className="profile-fold" aria-expanded={open.detail} onClick={() => toggle('detail')}>
+                  <FoldTitle className="profile-fold" open={open.detail} onToggle={() => toggle('detail')}
+                    chevronSide="end" openDirection="up" chevronSize={16} chevronClassName="profile-fold__chevron">
                     <span className="profile-fold__label">{t('Par activité')}</span>
                     <span className="profile-fold__meta num">{tn(slices.length, '{n} activité', '{n} activités')}</span>
-                    <IconChevronRight size={16} className="profile-fold__chevron" style={{ transform: `rotate(${open.detail ? -90 : 90}deg)` }} />
-                  </button>
+                  </FoldTitle>
                   {open.detail && (
                     <ul className="profile-legend">
                       {slices.flatMap((s) => {

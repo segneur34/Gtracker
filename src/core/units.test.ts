@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   commaDecimal, formatDecimal, formatDuration, formatShortDuration, parseDecimal, formatDistanceAuto, formatMeters, pad2, signedPercent, speedSourceText,
-  formatClock, formatTimeOfDay, formatClockMinutes, formatDistance, formatMinSec, formatSessionDate, formatKnots, formatShortDistance, formatSpeed, formatSpeedValue, fromDisplaySpeed, knotsToChartValue, knotsToDisplay, kmhToMs, speedFromText, toDisplayDistance, toDisplaySpeed, SPEED_UNIT_LABEL, type SpeedUnit, orDash, speedCellOf,
+  formatClock, formatTimeOfDay, formatClockMinutes, formatDistance, formatMinSec, formatSessionDate, formatKnots, formatShortDistance, formatSpeed, formatSpeedValue, fromDisplaySpeed, knotsToChartValue, knotsToDisplay, kmhToMs, speedFromText, toDisplayDistance, toDisplaySpeed, SPEED_UNIT_LABEL, type SpeedUnit, orDash, speedCellOf, speedDecimals, toRoundedDisplaySpeed,
 } from './units';
 
 describe('distances', () => {
@@ -267,6 +267,20 @@ describe('orDash et speedCellOf', () => {
     expect(speedCellOf('ms')(5)).toBe(formatSpeedValue(toDisplaySpeed(5, 'ms'), 'ms'));
     expect(speedCellOf('kn')(5)).toBe(formatSpeedValue(toDisplaySpeed(5, 'kn'), 'kn'));
     expect(speedCellOf('kmh')(5)).toBe('18,0');
+  });
+});
+
+describe('valeur d’un champ de vitesse', () => {
+  // Écriture d'avant `toRoundedDisplaySpeed`, gardée en copie gelée.
+  const oldRounded = (ms: number, unit: SpeedUnit): number => Number(toDisplaySpeed(ms, unit).toFixed(unit === 'ms' ? 2 : 1));
+  it('arrondit à 2 décimales en m/s, à 1 ailleurs, comme avant', () => {
+    expect([speedDecimals('ms'), speedDecimals('kn'), speedDecimals('kmh')]).toEqual([2, 1, 1]);
+    for (const unit of ['kn', 'kmh', 'ms'] as const) {
+      for (const ms of [0, 0.05, 1.234, 5.4321, 12.5, 25.999, 1e-9]) expect(toRoundedDisplaySpeed(ms, unit)).toBe(oldRounded(ms, unit));
+    }
+    expect(toRoundedDisplaySpeed(1, 'kn')).toBe(1.9);
+    expect(toRoundedDisplaySpeed(1.234, 'ms')).toBe(1.23);
+    expect(toRoundedDisplaySpeed(NaN, 'kn')).toBeNaN();
   });
 });
 

@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState, type MouseEvent, type P
 import { activityDisplayName, type Activity } from '../core/activities';
 import { activityLogo } from '../core/activityLogos';
 import { t } from '../core/i18n';
+import { usePrefersReducedMotion } from '../hooks/useNarrowScreen';
 import { useThemedShade } from '../hooks/useTheme';
 import { IconChevronRight } from './icons';
 import { isDrag, pageScrollTarget, rowArrows, type RowArrows } from './activityRowScroll';
@@ -27,6 +28,7 @@ function ActivityBubbles({ total, choices, selected, onSelect }: {
   onSelect: (activityId: string | null) => void;
 }) {
   const shade = useThemedShade();
+  const reduced = usePrefersReducedMotion();
   const row = useRef<HTMLDivElement>(null);
 
   // Une fois, à l'ouverture : le rond choisi dans la partie visible de la rangée, sans faire défiler la page.
@@ -60,7 +62,6 @@ function ActivityBubbles({ total, choices, selected, onSelect }: {
   const page = (direction: 1 | -1) => {
     const el = row.current;
     if (!el) return;
-    const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     el.scrollTo({
       left: pageScrollTarget(direction, el.scrollLeft, el.clientWidth, el.scrollWidth),
       behavior: reduced ? 'auto' : 'smooth',

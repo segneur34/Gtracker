@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { brushColorFor } from '../core/brushColor';
-import { weekdayDayMonthYear } from '../core/calendar';
+import { timeShort, weekdayDayMonthYear } from '../core/calendar';
 import { activityDisplayName, type Activity } from '../core/activities';
 import { sportFamily, type SportFamily } from '../core/sportProfiles';
 import { formatDistanceAuto, formatDuration, formatShortDuration, formatSpeed } from '../core/units';
@@ -20,16 +20,13 @@ import SessionPreviewMap from './SessionPreviewMap';
 import SessionRenameField from './SessionRenameField';
 import Button from './ui/Button';
 import MoreMenu from './ui/MoreMenu';
-import { dateLocale, t, tn } from '../core/i18n';
+import { t, tn } from '../core/i18n';
 import { sessionDeleteQuestion } from '../library/trash';
 import { useDeletesToTrash } from '../hooks/useTrash';
 import './SessionRow.css';
 
 /** Marge de la ligne à l'écran pour la file des lieux : aucune, seules les lignes vues comptent. */
 const ROW_PLACE_MARGIN = '0px';
-
-const formatTime = (ms: number): string =>
-  new Date(ms).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
 
 /** Chiffres d'une ligne, selon la famille de son calcul. */
 const rowStats =(session: LibrarySession, activity: Activity | null): string[] => {
@@ -159,7 +156,7 @@ const SessionRow = memo(function SessionRow({
   };
 
   const activityLabel = activity ? activityDisplayName(activity) : t('À classer');
-  const date = `${weekdayDayMonthYear(startMs)} · ${formatTime(startMs)}`;
+  const date = `${weekdayDayMonthYear(startMs)} · ${timeShort(startMs)}`;
   // Sous un nom donné, l'activité reste écrite à côté de la date ; le nom calculé la porte déjà.
   const named = customName(record) !== null;
 

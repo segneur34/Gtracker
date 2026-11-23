@@ -144,17 +144,6 @@
   box-shadow: var(--ring-line);
 }
 
-/* Bandeau photo qui déborde des marges de la page (accueil, bibliothèque) ; hauteur, marges intérieures et ombre du texte restent à la page. */
-.ui-photo-banner {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) 0;
-  background-size: cover;
-  background-position: center;
-  color: var(--on-accent);
-}
-
 /* Fond d'une fenêtre modale (`Dialog`, `ActivitySelect`, `GearPicker`) : au-dessus de tout (`--z-dialog`). */
 .ui-modal-backdrop {
   position: fixed;
@@ -888,6 +877,26 @@
   font-weight: var(--title-weight);
   letter-spacing: var(--title-spacing);
   text-transform: var(--title-case);
+}
+
+/* Chevron d'un titre repliable (`FoldTitle`) : tourne en 0,15 s. `--down` pointe à droite replié et vers le bas ouvert ;
+   `--up` pointe vers le bas replié et vers le haut ouvert. */
+.ui-chevron {
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.ui-chevron--down.ui-chevron--open,
+.ui-chevron--up {
+  transform: rotate(90deg);
+}
+
+.ui-chevron--up.ui-chevron--open {
+  transform: rotate(-90deg);
+}
+
+.ui-chevron--ink {
+  color: var(--ink);
 }
 
 .ui-semibold {

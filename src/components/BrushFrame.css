@@ -111,8 +111,7 @@
   /* Trait fin au pinceau, horizontal, entre deux lignes d'une liste : le masque des cadres, réduit à l'épaisseur de
      bouton, dont on ne garde que l'arête du haut (moitié haute de la boîte). Il déborde de chaque côté de plus
      que la largeur d'un coin du masque, et le `clip-path` rogne ce débord : il ne reste que la partie droite de
-     l'arête, sur la largeur de la ligne, sans rien couper de la liste. Une ligne le prend par `.brush-rule`, ou par ces règles. */
-  .brush-rule,
+     l'arête, sur la largeur de la ligne, sans rien couper de la liste. Une ligne le prend par ces règles. */
   .settings-activities .settings-activity + .settings-activity,
   .settings-activities .settings-activity + .settings-activities__family,
   .settings-activities .settings-activities__family + .settings-activities__family {
@@ -121,7 +120,6 @@
     border-top: 0;
   }
 
-  .brush-rule::before,
   .settings-activities .settings-activity + .settings-activity::before,
   .settings-activities .settings-activity + .settings-activities__family::before,
   .settings-activities .settings-activities__family + .settings-activities__family::before {

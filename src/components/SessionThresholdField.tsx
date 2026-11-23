@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SPEED_UNIT_LABEL, fromDisplaySpeed, speedFromText, toDisplaySpeed, type SpeedUnit } from '../core/units';
+import { SPEED_UNIT_LABEL, fromDisplaySpeed, speedFromText, toRoundedDisplaySpeed, type SpeedUnit } from '../core/units';
 import { t } from '../core/i18n';
 import Button from './ui/Button';
 
@@ -43,7 +43,7 @@ interface SessionThresholdFieldProps {
  * changement d'unité).
  */
 function SessionThresholdField({ label, title, value, defaultValue, isOverridden, unit, thresholdUnit, hint, note, commit = 'input', onChange }: SessionThresholdFieldProps) {
-  const shown = (v: number): string => String(Number(toDisplaySpeed(fromDisplaySpeed(v, thresholdUnit), unit).toFixed(unit === 'ms' ? 2 : 1)));
+  const shown = (v: number): string => String(toRoundedDisplaySpeed(fromDisplaySpeed(v, thresholdUnit), unit));
   const [text, setText] = useState(() => shown(value));
   const key = `${value}|${unit}`;
   const [prevKey, setPrevKey] = useState(key);

@@ -27,8 +27,7 @@
   background-color: var(--field-veil);
 }
 
-/* Entre deux lignes de la liste : un trait fin au pinceau (`.brush-rule`, `BrushFrame.css`), qui reprend ce trait
-   simple quand le navigateur ne sait pas peindre au pinceau. */
+/* Entre deux lignes de la liste : un trait fin et simple. */
 .settings-activity + .settings-activity {
   border-top: var(--trait-encre);
 }

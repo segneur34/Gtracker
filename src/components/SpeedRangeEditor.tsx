@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { isValidSpeedRange, type SpeedRangeMs } from '../core/speedGradient';
-import { SPEED_UNIT_LABEL, fromDisplaySpeed, speedFromText, toDisplaySpeed, type SpeedUnit } from '../core/units';
+import { SPEED_UNIT_LABEL, fromDisplaySpeed, parseDecimal, speedFromText, toRoundedDisplaySpeed, type SpeedUnit } from '../core/units';
 import { t } from '../core/i18n';
 import Button from './ui/Button';
 
@@ -32,7 +32,7 @@ function SpeedRangeEditor({ unit, range, isOverridden, commit = 'input', onChang
   const unitLabel = SPEED_UNIT_LABEL[unit];
 
   /** Valeur d'une borne dans l'unité choisie, arrondie pour le champ de saisie. */
-  const boundValue = (ms: number): number => Number(toDisplaySpeed(ms, unit).toFixed(unit === 'ms' ? 2 : 1));
+  const boundValue = (ms: number): number => toRoundedDisplaySpeed(ms, unit);
 
   /**
    * Texte affiché par champ, distinct de la borne enregistrée : les deux
@@ -75,7 +75,7 @@ function SpeedRangeEditor({ unit, range, isOverridden, commit = 'input', onChang
     (bound === 'min' ? setMinText : setMaxText)(text);
     if (commit === 'blur') return;
 
-    const parsed = parseFloat(text);
+    const parsed = parseDecimal(text);
     if (isNaN(parsed) || parsed <= 0) return;
     const ms = fromDisplaySpeed(parsed, unit);
     if (!isFinite(ms)) return;

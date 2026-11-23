@@ -26,9 +26,13 @@ Filtres d'ouverture retenus (tranché par l'orchestrateur) : « Ouvrir avec » g
 - Les traces restent actives en version diffusée (le diagnostic par adb s'en sert) ; seules les données qui identifient la ceinture partent. L'adresse de l'ordinateur sur le réseau local reste dans les traces de la liaison.
 - Changement d'identifiant de l'application, compte développeur et signature par Google Play : hors lot (308, acheteur).
 
-## Décision 1, à l'utilisateur
+## Décision 1, réponse de l'utilisateur (23/11)
 
-Retirer l'exemption de batterie de toutes les versions (recommandé : une seule construction, un seul manifeste testé ; « Autoriser » ouvre la page de Gtracker dans Android, deux touches de plus, une fois), ou la garder sous une variante « hors boutique » (deux constructions, deux fois plus de tests, risque d'envoyer la mauvaise).
+« On n'a pas vraiment le choix » : l'exemption de batterie est retirée de toutes les versions (une seule construction). Il demande en contrepartie un message qui dise que, sans cette autorisation, l'application risque de mal fonctionner, et l'essai des 20 minutes écran éteint.
+
+Le message existe déjà en deux endroits, à garder et à préciser, sans écran neuf :
+- page Enregistrer, quand la batterie est restreinte : « Batterie restreinte : Android peut couper l'enregistrement, application fermée. » avec son bouton « Autoriser » (inchangé) ;
+- Réglages › Autorisations, ligne de la batterie : la phrase dit le risque et le chemin, puisque le bouton ouvre maintenant la page de Gtracker dans Android : « Sans « Aucune restriction », Android peut couper l'enregistrement écran éteint : « Autoriser », puis Batterie, « Aucune restriction ». » (remplace la phrase prévue plus haut pour `PermissionsStatus.tsx`).
 
 ## Vérification
 

@@ -53,3 +53,45 @@ describe('styles en ligne', () => {
     expect(added, `Style en ligne dans un fichier sans relevé : mettez-le en classe CSS, ou lancez \`${COMMANDE}\` si c'est voulu.`).toEqual([]);
   });
 });
+
+/**
+ * Cliquet des `!important` des feuilles de style : leur nombre par fichier `.css` de `src/` (commentaires exclus) ne
+ * remonte pas, et un fichier absent du relevé n'en a aucun. Chacun est une règle qui en force une autre (téléphone
+ * contre ordinateur, ou contre un style posé en ligne) : plus il y en a, plus l'ordre des règles devient fragile.
+ * Le relevé est `outils/important.json`, à tenir à la main : abaisser un nombre quand un `!important` disparaît.
+ */
+const RELEVE_IMPORTANT = new URL('../../outils/important.json', import.meta.url);
+
+/** Nombre de `!important` par fichier `.css` (chemin relatif à la racine, avec `src/`), seuls les fichiers qui en ont. */
+function countImportant(dir: URL = SRC, prefix = ''): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      Object.assign(counts, countImportant(new URL(`${entry.name}/`, dir), `${prefix}${entry.name}/`));
+    } else if (entry.name.endsWith('.css')) {
+      const code = fs.readFileSync(new URL(entry.name, dir), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      const n = (code.match(/!important/g) ?? []).length;
+      if (n > 0) counts[`src/${prefix}${entry.name}`] = n;
+    }
+  }
+  return counts;
+}
+
+describe('!important des feuilles de style', () => {
+  const frozen = JSON.parse(fs.readFileSync(RELEVE_IMPORTANT, 'utf8')) as Record<string, number>;
+  const found = countImportant();
+
+  it('aucune feuille ne dépasse son nombre figé', () => {
+    const rises = Object.entries(found)
+      .filter(([file, n]) => file in frozen && n > frozen[file])
+      .map(([file, n]) => `${file} : figé ${frozen[file]}, trouvé ${n}`);
+    expect(rises, 'Trop de !important : règlez la priorité par la précision du sélecteur, ou relevez outils/important.json si la hausse est voulue.').toEqual([]);
+  });
+
+  it("une feuille absente du relevé n'a aucun !important", () => {
+    const added = Object.entries(found)
+      .filter(([file]) => !(file in frozen))
+      .map(([file, n]) => `${file} : figé 0, trouvé ${n}`);
+    expect(added, "!important dans une feuille sans relevé : règlez la priorité par la précision du sélecteur, ou ajoutez-la à outils/important.json si c'est voulu.").toEqual([]);
+  });
+});

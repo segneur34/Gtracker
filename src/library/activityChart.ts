@@ -8,9 +8,10 @@
  * contient le premier jeudi de l'année.
  */
 import {
-  DAY_MS, addDays, isoWeek, isoWeekday, monthYearLong, shortDate, stacksByActivity, startOfDay, startOfIsoWeek,
+  DAY_MS, addDays, isoWeek, isoWeekday, monthNarrow, monthYearLong, shortDate, stacksByActivity, startOfDay, startOfIsoWeek, weekdayDayMonthLong,
+  weekdayNarrow,
 } from '../core/calendar';
-import { currentLang, dateLocale, t } from '../core/i18n';
+import { currentLang, t } from '../core/i18n';
 
 export type ChartPeriod = 'semaine' | 'trente' | 'sixmois' | 'annee';
 
@@ -70,7 +71,7 @@ export interface ActivityChartData {
 const DAY_LETTERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 /** Initiale du jour `i` de la semaine (0 : lundi) : les lettres françaises en français, `Intl` ailleurs. */
 const dayLetter = (i: number): string =>
-  currentLang() === 'fr' ? DAY_LETTERS[i] : new Date(2024, 0, 1 + i).toLocaleDateString(dateLocale(), { weekday: 'narrow' });
+  currentLang() === 'fr' ? DAY_LETTERS[i] : weekdayNarrow(new Date(2024, 0, 1 + i));
 /**
  * Vue 30 jours : barres d'avant le premier lundi en dessous desquelles la
  * première barre ne porte pas de numéro de semaine. Sur téléphone, une barre
@@ -79,14 +80,11 @@ const dayLetter = (i: number): string =>
  */
 const FIRST_LABEL_MIN_SLOTS = 4;
 
-const longDay = (ms: number): string =>
-  new Date(ms).toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' });
-
 
 const MONTH_LETTERS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 /** Initiale du mois `m` (0 : janvier) : les lettres françaises en français, `Intl` ailleurs. */
 const monthLetter = (m: number): string =>
-  currentLang() === 'fr' ? MONTH_LETTERS[m] : new Date(2024, m, 1).toLocaleDateString(dateLocale(), { month: 'narrow' });
+  currentLang() === 'fr' ? MONTH_LETTERS[m] : monthNarrow(new Date(2024, m, 1));
 
 interface Slot {
   startMs: number;
@@ -138,7 +136,7 @@ const slotsOf = (period: ChartRange, nowMs: number, oldestMs: number | null = nu
     const monday = startOfIsoWeek(nowMs);
     for (let i = 0; i < 7; i++) {
       const day = addDays(monday, i);
-      slots.push({ startMs: day, endMs: addDays(day, 1), label: dayLetter(i), title: longDay(day), weekStart: false, future: day > today });
+      slots.push({ startMs: day, endMs: addDays(day, 1), label: dayLetter(i), title: weekdayDayMonthLong(day), weekStart: false, future: day > today });
     }
     const sunday = addDays(monday, 6);
     return {
@@ -159,7 +157,7 @@ const slotsOf = (period: ChartRange, nowMs: number, oldestMs: number | null = nu
       slots.push({
         startMs: day, endMs: addDays(day, 1),
         label: monday || (i === 0 && labelFirst) ? t('S{week}', { week }) : '',
-        title: t('{day} (S{week})', { day: longDay(day), week }),
+        title: t('{day} (S{week})', { day: weekdayDayMonthLong(day), week }),
         weekStart: monday && i > 0, future: false,
       });
     }

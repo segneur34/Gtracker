@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import './BeepCurveEditor.css';
 import Button from './ui/Button';
-import { formatSpeed, type SpeedUnit, commaDecimal } from '../core/units';
+import { formatSpeed, type SpeedUnit, commaDecimal, parseDecimal } from '../core/units';
 import { useRecorderStatus } from '../hooks/useRecorder';
 import { BEEP_LONG_MS } from '../core/beepDurations';
 import { getBeeper } from '../platform/beeper';
@@ -9,7 +9,7 @@ import {
   BEEP_CURVE_LIMITS, MARK_GUIDE_DEFAULTS, beepIntervalMs, beepStartM, sanitizeMarkGuide, validationRadiusM,
   type BeepPoint, type MarkGuideSettings,
 } from '../recording/markGuide';
-import { clamp } from '../core/basics';
+import { clamp, toFixedNumber } from '../core/basics';
 import { t } from '../core/i18n';
 
 /**
@@ -59,7 +59,7 @@ const ticks = (max: number, step: number): number[] => Array.from({ length: Math
 const xStep = (xMax: number): number => (xMax <= 300 ? 50 : xMax <= 600 ? 100 : xMax <= 1200 ? 250 : 500);
 const yStep = (yMax: number): number => (yMax <= 3000 ? 500 : 1000);
 
-const seconds = (ms: number): string => `${commaDecimal(parseFloat((ms / 1000).toFixed(2)))} s`;
+const seconds = (ms: number): string => `${commaDecimal(toFixedNumber(ms / 1000, 2))} s`;
 const sameGuide = (a: MarkGuideSettings, b: MarkGuideSettings): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 /** Saisie d'un nombre, rangée à la sortie du champ ou sur Entrée : une valeur à moitié tapée ne réordonne pas la courbe. */
@@ -73,7 +73,7 @@ function CommitField({ value, unit, step, label, onCommit }: {
   const [text, setText] = useState<string | null>(null);
   const commit = () => {
     if (text === null) return;
-    const parsed = parseFloat(text.replace(',', '.'));
+    const parsed = parseDecimal(text);
     setText(null);
     if (isFinite(parsed) && parsed !== value) onCommit(parsed);
   };
@@ -288,7 +288,7 @@ function BeepCurveEditor({
             </button>
             <CommitField value={p.distanceM} unit="m" step={5} label={t('Distance du point {n}', { n: i + 1 })}
               onCommit={(v) => setPoint(i, { distanceM: v })} />
-            <CommitField value={parseFloat((p.intervalMs / 1000).toFixed(2))} unit="s" step={0.05} label={t('Intervalle entre deux bips, point {n}', { n: i + 1 })}
+            <CommitField value={toFixedNumber(p.intervalMs / 1000, 2)} unit="s" step={0.05} label={t('Intervalle entre deux bips, point {n}', { n: i + 1 })}
               onCommit={(v) => setPoint(i, { intervalMs: v * 1000 })} />
           </li>
         ))}

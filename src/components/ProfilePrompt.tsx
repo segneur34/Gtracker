@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { t } from '../core/i18n';
+import { parseDecimal } from '../core/units';
 import { HelpText, HelpToggle } from './Help';
 import { tRich } from './tRich';
 import Button from './ui/Button';
@@ -61,7 +62,7 @@ function ProfilePrompt({ otherCardShown, onDecided }: { otherCardShown: boolean;
   const close = () => setClosed(true);
   const save = () => {
     if (draft.name.trim() !== '') setName(draft.name.trim());
-    const year = draft.birthYear.trim() === '' ? null : parseFloat(draft.birthYear.replace(',', '.'));
+    const year = draft.birthYear.trim() === '' ? null : parseDecimal(draft.birthYear);
     if (year !== null && !isNaN(year)) setNumber('birthYear', Math.round(year));
     close();
   };

@@ -15,7 +15,8 @@ import ActivitySelect from './ActivitySelect';
 import Button from './ui/Button';
 import Card from './ui/Card';
 import SegmentedControl from './ui/SegmentedControl';
-import { dateLocale, t } from '../core/i18n';
+import { dateNumeric } from '../core/calendar';
+import { t } from '../core/i18n';
 import { tRich } from './tRich';
 
 /**
@@ -49,7 +50,7 @@ const ROW_STYLE = {
 const DETAIL_STYLE = { color: 'var(--muted)', fontSize: 'var(--text-s)' } as const;
 const LIST_STYLE = { display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', margin: 0, padding: 0, listStyle: 'none' } as const;
 
-const formatDate = (ms: number | string) => new Date(ms).toLocaleDateString(dateLocale());
+const formatDate = (ms: number | string) => dateNumeric(new Date(ms));
 
 function FollowTracePicker({ onClose, onPicked }: { onClose: () => void; onPicked?: (trace: FollowedTrace) => void }) {
   const { status, sessions } = useLibraryFields('status', 'sessions');

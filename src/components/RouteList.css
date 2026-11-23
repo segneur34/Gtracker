@@ -59,10 +59,3 @@
   height: 8px;
   border-radius: 50%;
 }
-
-/* Bouton à icône seule d'une ligne (« Partager ») : carré de 45 px, une fois et demie la hauteur d'un petit bouton (30 px, `.ui-btn--s`) (choix du produit). « Partir » garde sa taille. */
-.route-list__icon-btn {
-  min-width: 45px;
-  min-height: 45px;
-  padding: 0;
-}
