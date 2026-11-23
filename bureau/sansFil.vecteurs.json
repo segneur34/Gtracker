@@ -7,8 +7,7 @@
     "cheminsLecture": "Règle de cheminDuCable (bureau/telephone.ts) : chemins qu'une commande lire peut demander et qu'une liste peut porter ; chaque texte de admis est accepté, chaque texte de refuses refusé. Un téléphone sans la capacité ecriture ne liste que la racine et sessions/, mais le PC accepte la règle entière.",
     "cheminsEcriture": "Règle de cheminEcrivable (bureau/telephone.ts), seule liste blanche de ecrire, valider, effacer et ecrit, des deux côtés : chaque texte de admis est accepté, chaque texte de refuses refusé. Le chemin le plus long admis a 512 caractères, celui de 513 est refusé.",
     "jetons": "hachageHex est le SHA-256 des 32 octets de jetonHex.",
-    "sondes": "Encoder une question ou une réponse redonne octetsHex, et le décodage rend ses champs ; chaque paquet de etrangers est refusé comme question et comme réponse.",
-    "sondesV2": "questionsV2 et reponsesV2 : format de la découverte à l'octet de version 2, même disposition que la version 1. Dans une réponse, identifiantSondeHex remplace l'identifiant du PC : les 16 premiers octets de HMAC-SHA256(clé = les 16 octets de identifiantPcHex, « gtracker-sonde » en ASCII ‖ les 16 octets du nonce de la question), et le nom est vide.",
+    "sondes": "Un seul format de découverte, à l'octet de version 2. Encoder une question (nonceHex) redonne octetsHex, et la décoder rend son nonce. Dans une réponse, identifiantSondeHex tient la place de l'identifiant du PC : les 16 premiers octets de HMAC-SHA256(clé = les 16 octets de identifiantPcHex, « gtracker-sonde » en ASCII ‖ les 16 octets du nonce de la question), et la longueur du nom vaut 0 ; encoder nonceHex, port et identifiantSondeHex redonne octetsHex, et le décodage rend ces champs. Chaque paquet de etrangers, dont toute question ou réponse à l'octet de version 1 (identifiant du PC en clair), est refusé comme question et comme réponse.",
     "spake2": "Chaque cas de spake2.cas : w tiré de code, puis l'échange de bureau/spake2.ts joué avec x et y fixés (A = le téléphone, idA, B = le PC, idB = les 32 octets de empreinteHex, aad) donne partAHex (pA), partBHex (pB), kHex (K), confirmationAHex (cA, envoyée par le téléphone dans preuve) et confirmationBHex (cB, envoyée par le PC dans appaire). Les trames « appairer, échange SPAKE2 », « defi, échange SPAKE2 », « preuve, confirmation du téléphone » et « appaire, confirmation du PC » portent les octets du premier cas."
   },
   "trames": [
@@ -321,46 +320,14 @@
   ],
   "sondes": {
     "questions": [
-      { "nonceHex": "000102030405060708090a0b0c0d0e0f", "octetsHex": "4754524b0101000102030405060708090a0b0c0d0e0f" }
+      { "nonceHex": "000102030405060708090a0b0c0d0e0f", "octetsHex": "4754524b0201000102030405060708090a0b0c0d0e0f" }
     ],
     "reponses": [
       {
         "nonceHex": "000102030405060708090a0b0c0d0e0f",
         "port": 48217,
-        "identifiantHex": "101112131415161718191a1b1c1d1e1f",
-        "nom": "Bureau d’Élise",
-        "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc59101112131415161718191a1b1c1d1e1f114275726561752064e28099c3896c697365"
-      },
-      {
-        "nonceHex": "000102030405060708090a0b0c0d0e0f",
-        "port": 48218,
-        "identifiantHex": "101112131415161718191a1b1c1d1e1f",
-        "nom": "",
-        "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc5a101112131415161718191a1b1c1d1e1f00"
-      }
-    ],
-    "etrangers": [
-      { "nom": "autre signature", "octetsHex": "475452410101000102030405060708090a0b0c0d0e0f" },
-      { "nom": "autre version", "octetsHex": "4754524b0301000102030405060708090a0b0c0d0e0f" },
-      { "nom": "question v2 allongée", "octetsHex": "4754524b0201000102030405060708090a0b0c0d0e0f00" },
-      { "nom": "réponse v2 amputée de son dernier octet", "octetsHex": "4754524b0202000102030405060708090a0b0c0d0e0fbc59060e2059a0994134a647739fc96a53c7" },
-      { "nom": "question amputée", "octetsHex": "4754524b0101000102030405060708090a0b0c0d0e" },
-      { "nom": "question allongée", "octetsHex": "4754524b0101000102030405060708090a0b0c0d0e0f00" },
-      { "nom": "réponse au port nul", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0f0000101112131415161718191a1b1c1d1e1f025043" },
-      { "nom": "réponse dont le nom est plus court qu'annoncé", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc59101112131415161718191a1b1c1d1e1f0250" },
-      { "nom": "réponse au nom qui n'est pas de l'UTF-8", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc59101112131415161718191a1b1c1d1e1f02c328" },
-      { "nom": "réponse au nom de 65 octets", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc59101112131415161718191a1b1c1d1e1f417878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878" }
-    ],
-    "questionsV2": [
-      { "nonceHex": "000102030405060708090a0b0c0d0e0f", "octetsHex": "4754524b0201000102030405060708090a0b0c0d0e0f" }
-    ],
-    "reponsesV2": [
-      {
-        "nonceHex": "000102030405060708090a0b0c0d0e0f",
-        "port": 48217,
         "identifiantPcHex": "101112131415161718191a1b1c1d1e1f",
         "identifiantSondeHex": "060e2059a0994134a647739fc96a53c7",
-        "nom": "",
         "octetsHex": "4754524b0202000102030405060708090a0b0c0d0e0fbc59060e2059a0994134a647739fc96a53c700"
       },
       {
@@ -368,9 +335,23 @@
         "port": 48218,
         "identifiantPcHex": "101112131415161718191a1b1c1d1e1f",
         "identifiantSondeHex": "6c7328b3d7f00e8991e9ead9ec806bdd",
-        "nom": "",
         "octetsHex": "4754524b0202f0f1f2f3f4f5f6f7f8f9fafbfcfdfeffbc5a6c7328b3d7f00e8991e9ead9ec806bdd00"
       }
+    ],
+    "etrangers": [
+      { "nom": "question de version 1", "octetsHex": "4754524b0101000102030405060708090a0b0c0d0e0f" },
+      { "nom": "réponse de version 1, identifiant du PC en clair", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc5a101112131415161718191a1b1c1d1e1f00" },
+      { "nom": "réponse de version 1 qui porte le nom du PC", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc59101112131415161718191a1b1c1d1e1f114275726561752064e28099c3896c697365" },
+      { "nom": "autre signature", "octetsHex": "475452410201000102030405060708090a0b0c0d0e0f" },
+      { "nom": "autre version", "octetsHex": "4754524b0301000102030405060708090a0b0c0d0e0f" },
+      { "nom": "question amputée", "octetsHex": "4754524b0201000102030405060708090a0b0c0d0e" },
+      { "nom": "question allongée", "octetsHex": "4754524b0201000102030405060708090a0b0c0d0e0f00" },
+      { "nom": "réponse amputée de son dernier octet", "octetsHex": "4754524b0202000102030405060708090a0b0c0d0e0fbc59060e2059a0994134a647739fc96a53c7" },
+      { "nom": "réponse allongée", "octetsHex": "4754524b0202000102030405060708090a0b0c0d0e0fbc59060e2059a0994134a647739fc96a53c70000" },
+      { "nom": "réponse au port nul", "octetsHex": "4754524b0202000102030405060708090a0b0c0d0e0f0000060e2059a0994134a647739fc96a53c700" },
+      { "nom": "réponse à la bonne taille dont la longueur du nom n'est pas nulle", "octetsHex": "4754524b0202000102030405060708090a0b0c0d0e0fbc59060e2059a0994134a647739fc96a53c701" },
+      { "nom": "réponse qui porte un nom", "octetsHex": "4754524b0202000102030405060708090a0b0c0d0e0fbc59060e2059a0994134a647739fc96a53c706425552454155" },
+      { "nom": "réponse dont le nom est plus court qu'annoncé", "octetsHex": "4754524b0202000102030405060708090a0b0c0d0e0fbc59060e2059a0994134a647739fc96a53c70250" }
     ]
   },
   "spake2": {

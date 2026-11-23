@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 import type { InfoAdresse } from './sonde'
 import {
   NOM_PC_MAX_OCTETS,
-  VERSION_SONDE,
   VERSION_SONDE_V2,
+  VERSIONS_SONDE,
   adresseDeDiffusion,
   adressePrivee,
   adressesPrivees,
@@ -17,15 +17,14 @@ import {
   lireIPv4,
   memeReseau,
   nomPcPourSonde,
+  questionDAutreVersion,
 } from './sonde'
 
 type Vecteurs = {
   sondes: {
     questions: { nonceHex: string; octetsHex: string }[]
-    reponses: { nonceHex: string; port: number; identifiantHex: string; nom: string; octetsHex: string }[]
+    reponses: { nonceHex: string; port: number; identifiantPcHex: string; identifiantSondeHex: string; octetsHex: string }[]
     etrangers: { nom: string; octetsHex: string }[]
-    questionsV2: { nonceHex: string; octetsHex: string }[]
-    reponsesV2: { nonceHex: string; port: number; identifiantPcHex: string; identifiantSondeHex: string; nom: string; octetsHex: string }[]
   }
 }
 const { sondes } = (JSON.parse(readFileSync(path.join(__dirname, 'sansFil.vecteurs.json'), 'utf8')) as Vecteurs)
@@ -34,46 +33,34 @@ const hex = (o: Uint8Array) => Buffer.from(o).toString('hex')
 const deHex = (t: string) => Uint8Array.from(Buffer.from(t, 'hex'))
 
 describe('question et réponse de découverte', () => {
-  it('reproduisent les jeux d’essai partagés avec le téléphone', () => {
+  it('reproduisent les jeux d’essai partagés avec le téléphone : identifiant de sonde sous HMAC du nonce, sans nom', () => {
+    // Un seul format, à l'octet 2 : jamais l'octet 1, sous lequel une application lirait l'identifiant en clair.
+    expect(VERSIONS_SONDE).toEqual([2])
+    expect(sondes.questions.length).toBeGreaterThan(0)
     for (const v of sondes.questions) {
       expect(hex(encoderQuestion(deHex(v.nonceHex)))).toBe(v.octetsHex)
-      expect(decoderQuestion(deHex(v.octetsHex))).toEqual({ version: VERSION_SONDE, nonce: deHex(v.nonceHex) })
+      expect(deHex(v.octetsHex)[4]).toBe(VERSION_SONDE_V2)
+      expect(decoderQuestion(deHex(v.octetsHex))).toEqual({ nonce: deHex(v.nonceHex) })
       expect(decoderReponse(deHex(v.octetsHex))).toBeNull()
+      expect(questionDAutreVersion(deHex(v.octetsHex))).toBe(false)
     }
+    expect(sondes.reponses.length).toBeGreaterThan(1)
     for (const v of sondes.reponses) {
-      const reponse = { version: VERSION_SONDE, nonce: deHex(v.nonceHex), port: v.port, identifiant: deHex(v.identifiantHex), nom: v.nom }
-      expect(hex(encoderReponse(reponse))).toBe(v.octetsHex)
-      const lue = decoderReponse(deHex(v.octetsHex))!
-      expect({ ...lue, nonce: hex(lue.nonce), identifiant: hex(lue.identifiant) }).toEqual({ ...reponse, nonce: v.nonceHex, identifiant: v.identifiantHex })
-      expect(decoderQuestion(deHex(v.octetsHex))).toBeNull()
-    }
-  })
-
-  it('reproduisent en version 2 les jeux d’essai : identifiant de sonde sous HMAC du nonce, nom vide', () => {
-    expect(sondes.questionsV2.length).toBeGreaterThan(0)
-    for (const v of sondes.questionsV2) {
-      expect(hex(encoderQuestion(deHex(v.nonceHex), VERSION_SONDE_V2))).toBe(v.octetsHex)
-      expect(decoderQuestion(deHex(v.octetsHex))).toEqual({ version: VERSION_SONDE_V2, nonce: deHex(v.nonceHex) })
-      expect(decoderReponse(deHex(v.octetsHex))).toBeNull()
-    }
-    expect(sondes.reponsesV2.length).toBeGreaterThan(1)
-    for (const v of sondes.reponsesV2) {
       const identifiant = identifiantDeSonde(deHex(v.identifiantPcHex), deHex(v.nonceHex))
       expect(hex(identifiant)).toBe(v.identifiantSondeHex)
       // Jamais l'identifiant du PC en clair.
       expect(v.octetsHex).not.toContain(v.identifiantPcHex)
-      const reponse = { version: VERSION_SONDE_V2, nonce: deHex(v.nonceHex), port: v.port, identifiant, nom: v.nom }
+      const reponse = { nonce: deHex(v.nonceHex), port: v.port, identifiant }
       expect(hex(encoderReponse(reponse))).toBe(v.octetsHex)
       expect(decoderReponse(deHex(v.octetsHex))).toEqual(reponse)
       expect(decoderQuestion(deHex(v.octetsHex))).toBeNull()
     }
     // Un autre nonce donne un autre identifiant de sonde : un hôte du réseau ne suit pas le PC d'une question à l'autre.
-    expect(new Set(sondes.reponsesV2.map((v) => v.identifiantSondeHex)).size).toBe(sondes.reponsesV2.length)
-    expect(() => encoderReponse({ version: VERSION_SONDE_V2, nonce: new Uint8Array(16), port: 1, identifiant: new Uint8Array(16), nom: 'PC' })).toThrow()
+    expect(new Set(sondes.reponses.map((v) => v.identifiantSondeHex)).size).toBe(sondes.reponses.length)
     expect(() => identifiantDeSonde(new Uint8Array(15), new Uint8Array(16))).toThrow()
   })
 
-  it('ignorent un paquet étranger', () => {
+  it('ignorent un paquet étranger, dont toute question ou réponse de version 1', () => {
     expect(sondes.etrangers.length).toBeGreaterThan(0)
     for (const v of sondes.etrangers) {
       expect(decoderQuestion(deHex(v.octetsHex)), v.nom).toBeNull()
@@ -83,15 +70,22 @@ describe('question et réponse de découverte', () => {
     expect(decoderReponse(Buffer.from('\x00\x00\x01\x00\x00\x01', 'latin1'))).toBeNull()
   })
 
+  it('reconnaissent une question d’une autre version, et elle seule', () => {
+    const etranger = (nom: string) => deHex(sondes.etrangers.find((v) => v.nom === nom)!.octetsHex)
+    expect(questionDAutreVersion(etranger('question de version 1'))).toBe(true)
+    expect(questionDAutreVersion(etranger('autre version'))).toBe(true)
+    for (const nom of ['autre signature', 'question amputée', 'question allongée', 'réponse de version 1, identifiant du PC en clair']) {
+      expect(questionDAutreVersion(etranger(nom)), nom).toBe(false)
+    }
+  })
+
   it('refusent d’encoder un champ hors bornes', () => {
-    const base = { version: VERSION_SONDE, nonce: new Uint8Array(16), port: 48217, identifiant: new Uint8Array(16), nom: 'PC' } as const
-    expect(() => encoderReponse({ ...base, version: 3 as never })).toThrow()
+    const base = { nonce: new Uint8Array(16), port: 48217, identifiant: new Uint8Array(16) } as const
     expect(() => encoderQuestion(new Uint8Array(15))).toThrow()
+    expect(() => encoderReponse({ ...base, nonce: new Uint8Array(15) })).toThrow()
     expect(() => encoderReponse({ ...base, port: 0 })).toThrow()
     expect(() => encoderReponse({ ...base, port: 65536 })).toThrow()
     expect(() => encoderReponse({ ...base, identifiant: new Uint8Array(8) })).toThrow()
-    expect(() => encoderReponse({ ...base, nom: 'é'.repeat(33) })).toThrow()
-    expect(() => encoderReponse({ ...base, nom: 'a\tb' })).toThrow()
   })
 
   it('ramènent le nom du PC à 64 octets sans couper un caractère', () => {

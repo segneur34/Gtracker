@@ -27,8 +27,7 @@ import { TAILLE_NONCE, depuisHex, egalATempsConstant, enHex } from './appairage'
 import { empreinteCertificat } from './certificat'
 import { ErreurDisque, SUFFIXE_NEUF, SUFFIXE_REMPLACEMENT, codeDe, estTemporaire } from './disque'
 import { Liaison } from './sansFil'
-import type { VersionSonde } from './sonde'
-import { TAILLE_NONCE_SONDE, VERSION_SONDE, VERSION_SONDE_V2, decoderReponse, encoderQuestion, identifiantDeSonde } from './sonde'
+import { TAILLE_NONCE_SONDE, decoderReponse, encoderQuestion, identifiantDeSonde } from './sonde'
 import { commencerAppairage, confirmationValide, conclure } from './spake2'
 import type { FichierTelephone } from './telephone'
 import { DOSSIERS_DU_CABLE, DOSSIER_SESSIONS, cheminAdmis, cheminDuCable, cheminEcrivable, cheminRefuse, fichiersAdmis, nomProvisoire } from './telephone'
@@ -99,28 +98,20 @@ export type LiaisonFaux = {
 }
 
 /**
- * Un PC trouvé par la découverte : l'adresse est celle d'où vient la réponse. `identifiantPc` est l'identifiant lu
- * dans la réponse : celui du PC en version 1, l'identifiant de sonde en version 2 (`identifiantDeSonde`).
+ * Un PC trouvé par la découverte : l'adresse est celle d'où vient la réponse, `identifiantSonde` l'identifiant de
+ * sonde lu dans la réponse (`identifiantDeSonde`), jamais l'identifiant du PC.
  */
-export type PcTrouve = { adresse: string; port: number; identifiantPc: string; nom: string; version: VersionSonde }
+export type PcTrouve = { adresse: string; port: number; identifiantSonde: string }
 
 /**
- * Diffuse une question de découverte vers `hote:port` (adresse de diffusion, ou celle du PC), dans la version donnée
- * (1 par défaut), et rend la première réponse à son nonce dans cette version, `null` après `delaiMs`. En version 2,
- * `pcAttendu` (identifiant du PC appairé, en hexadécimal) écarte toute réponse dont l'identifiant de sonde n'est pas
- * le sien, comme le fait le téléphone appairé.
+ * Diffuse une question de découverte vers `hote:port` (adresse de diffusion, ou celle du PC), et rend la première
+ * réponse à son nonce, `null` après `delaiMs`. `pcAttendu` (identifiant du PC appairé, en hexadécimal) écarte toute
+ * réponse dont l'identifiant de sonde n'est pas le sien, comme le fait le téléphone appairé.
  */
-export function sonder(
-  hote: string,
-  port: number,
-  delaiMs = 3_000,
-  alea: Alea = randomBytes,
-  version: VersionSonde = VERSION_SONDE,
-  pcAttendu?: string,
-): Promise<PcTrouve | null> {
+export function sonder(hote: string, port: number, delaiMs = 3_000, alea: Alea = randomBytes, pcAttendu?: string): Promise<PcTrouve | null> {
   return new Promise((resoudre) => {
     const nonce = alea(TAILLE_NONCE_SONDE)
-    const attendu = version === VERSION_SONDE_V2 && pcAttendu !== undefined ? identifiantDeSonde(Buffer.from(pcAttendu, 'hex'), nonce) : null
+    const attendu = pcAttendu !== undefined ? identifiantDeSonde(Buffer.from(pcAttendu, 'hex'), nonce) : null
     const socket = dgram.createSocket('udp4')
     let fini = false
     const finir = (pc: PcTrouve | null) => {
@@ -134,13 +125,13 @@ export function sonder(
     socket.on('error', () => finir(null))
     socket.on('message', (paquet, source) => {
       const r = decoderReponse(paquet)
-      if (!r || r.version !== version || !egalATempsConstant(r.nonce, nonce)) return
+      if (!r || !egalATempsConstant(r.nonce, nonce)) return
       if (attendu !== null && !egalATempsConstant(r.identifiant, attendu)) return
-      finir({ adresse: source.address, port: r.port, identifiantPc: enHex(r.identifiant), nom: r.nom, version: r.version })
+      finir({ adresse: source.address, port: r.port, identifiantSonde: enHex(r.identifiant) })
     })
     socket.bind(0, () => {
       socket.setBroadcast(true)
-      socket.send(encoderQuestion(nonce, version), port, hote)
+      socket.send(encoderQuestion(nonce), port, hote)
     })
   })
 }

@@ -34,8 +34,8 @@ import {
   pareFeuFactice,
   stockageDossier,
 } from './sansFil'
-import type { ReponseSonde, VersionSonde } from './sonde'
-import { TAILLE_NONCE_SONDE, VERSION_SONDE, VERSION_SONDE_V2, decoderReponse, encoderQuestion } from './sonde'
+import type { ReponseSonde } from './sonde'
+import { TAILLE_NONCE_SONDE, decoderReponse, encoderQuestion, identifiantDeSonde } from './sonde'
 import { M_P256, commencerAppairage, conclure, scalaireDuCode } from './spake2'
 import { dossierLocal, gestionnairesTelephone } from './telephone'
 import type { Commande, Message, MessageAppaire, RaisonRefus } from './trames'
@@ -114,20 +114,31 @@ function coupeeDans(port: number, adresseLocale: string, ms: number): Promise<bo
   return fermeeDans(socket, ms).finally(() => socket.destroy())
 }
 
-/** Envoie `n` questions de découverte depuis `adresseLocale`, et rend les réponses reçues dans la demi-seconde qui suit. */
-async function questionner(portSonde: number, adresseLocale: string, n: number, version: VersionSonde = VERSION_SONDE): Promise<ReponseSonde[]> {
+/**
+ * Envoie `n` questions de découverte depuis `adresseLocale` (celles que rend `question`, une question du format
+ * sinon), et rend les réponses reçues dans la demi-seconde qui suit, octets bruts compris.
+ */
+async function questionner(
+  portSonde: number,
+  adresseLocale: string,
+  n: number,
+  question: () => Uint8Array = () => encoderQuestion(randomBytes(TAILLE_NONCE_SONDE)),
+): Promise<(ReponseSonde & { octets: Buffer })[]> {
   const socket = dgram.createSocket('udp4')
-  const recues: ReponseSonde[] = []
+  const recues: (ReponseSonde & { octets: Buffer })[] = []
   socket.on('message', (paquet) => {
     const reponse = decoderReponse(paquet)
-    if (reponse) recues.push(reponse)
+    if (reponse) recues.push({ ...reponse, octets: paquet })
   })
   await new Promise<void>((fin) => socket.bind(0, adresseLocale, () => fin()))
-  for (let k = 0; k < n; k++) socket.send(encoderQuestion(randomBytes(TAILLE_NONCE_SONDE), version), portSonde, '127.0.0.1')
+  for (let k = 0; k < n; k++) socket.send(question(), portSonde, '127.0.0.1')
   await attendre(500)
   socket.close()
   return recues
 }
+
+/** Une question de découverte à l'octet de version 1, celui d'un format qui portait l'identifiant du PC en clair. */
+const questionVersion1 = (): Uint8Array => Buffer.concat([Buffer.from('GTRK', 'ascii'), Buffer.from([1, 1]), randomBytes(TAILLE_NONCE_SONDE)])
 
 /** Appaire un faux téléphone au serveur, qui doit être activé. */
 async function appairer(s: ServeurSansFil, f = faux()) {
@@ -390,22 +401,21 @@ describe('serveur sans fil', () => {
     await expect(s.ouvrirAppairage()).rejects.toThrow(/réseau local/)
   })
 
-  it('répond à la découverte par son port et son identifiant, sans donner son nom', async () => {
+  it('répond à la découverte par son port et l’identifiant de sonde, sans donner ni son identifiant ni son nom', async () => {
     const s = serveur({ portSonde: 0, hoteSonde: '127.0.0.1' })
     await s.activer(true)
     const portSonde = s.portDecouverte() as number
     expect(portSonde).toBeGreaterThan(0)
     const trouve = await sonder('127.0.0.1', portSonde, 2_000)
-    expect(trouve).toMatchObject({ adresse: '127.0.0.1', port: (await s.etat()).port, nom: '' })
+    expect(trouve).toMatchObject({ adresse: '127.0.0.1', port: (await s.etat()).port })
     const { f } = await appairer(s)
-    expect(trouve?.identifiantPc).toBe(f.memoire?.identifiantPc)
     // Le nom du PC ne part qu'au téléphone reconnu.
     expect(f.memoire?.nomPc).toBe('PC de test')
-    // Version 2 : l'identifiant ne part que sous HMAC du nonce, que seul le téléphone appairé sait vérifier.
-    const v2 = await sonder('127.0.0.1', portSonde, 2_000, randomBytes, VERSION_SONDE_V2, f.memoire?.identifiantPc)
-    expect(v2).toMatchObject({ adresse: '127.0.0.1', port: (await s.etat()).port, nom: '', version: VERSION_SONDE_V2 })
-    expect(v2?.identifiantPc).not.toBe(f.memoire?.identifiantPc)
-    expect(await sonder('127.0.0.1', portSonde, 500, randomBytes, VERSION_SONDE_V2, '00'.repeat(16))).toBeNull()
+    // L'identifiant ne part que sous HMAC du nonce, que seul le téléphone appairé sait vérifier.
+    expect(trouve?.identifiantSonde).not.toBe(f.memoire?.identifiantPc)
+    const appaire = await sonder('127.0.0.1', portSonde, 2_000, randomBytes, f.memoire?.identifiantPc)
+    expect(appaire).toMatchObject({ adresse: '127.0.0.1', port: (await s.etat()).port })
+    expect(await sonder('127.0.0.1', portSonde, 500, randomBytes, '00'.repeat(16))).toBeNull()
   })
 
   it('répond trois fois par seconde au plus à une même adresse, sans priver les autres', async () => {
@@ -416,10 +426,34 @@ describe('serveur sans fil', () => {
     expect(await questionner(portSonde, '127.0.0.1', 6)).toHaveLength(3)
     expect(await questionner(portSonde, '127.0.0.2', 2)).toHaveLength(2)
     expect(await questionner(portSonde, '127.0.0.1', 1)).toHaveLength(0)
-    // Les deux versions partagent le plafond de l'adresse ; un hôte bavard ne prive pas le téléphone d'une autre.
-    expect(await questionner(portSonde, '127.0.0.1', 3, VERSION_SONDE_V2)).toHaveLength(0)
-    const v2 = await questionner(portSonde, '127.0.0.3', 2, VERSION_SONDE_V2)
-    expect(v2.map((r) => r.version)).toEqual([VERSION_SONDE_V2, VERSION_SONDE_V2])
+  })
+
+  it('ne répond pas à une question de version 1, sans rien prendre au plafond de son adresse, et le note une fois par adresse', async () => {
+    const fige = Date.now()
+    const lignes: { message: string; essai?: string }[] = []
+    const s = serveur({ portSonde: 0, hoteSonde: '127.0.0.1', horloge: () => fige, journal: (message, essai) => lignes.push({ message, essai }) })
+    await s.activer(true)
+    const portSonde = s.portDecouverte() as number
+    const { f } = await appairer(s)
+    const identifiantPc = f.memoire?.identifiantPc as string
+    expect(await questionner(portSonde, '127.0.0.1', 5, questionVersion1)).toHaveLength(0)
+    expect(await questionner(portSonde, '127.0.0.2', 2, questionVersion1)).toHaveLength(0)
+    // Écartées avant le décompte : les trois réponses de la seconde restent à l'adresse.
+    const recues = await questionner(portSonde, '127.0.0.1', 3)
+    expect(recues).toHaveLength(3)
+    for (const r of recues) {
+      // Jamais l'identifiant du PC en clair : sa trace sous HMAC du nonce de la question, et rien après.
+      expect(r.octets.toString('hex')).not.toContain(identifiantPc)
+      expect(Buffer.from(r.identifiant).toString('hex')).toBe(Buffer.from(identifiantDeSonde(Buffer.from(identifiantPc, 'hex'), r.nonce)).toString('hex'))
+      expect(r.octets[4]).toBe(2)
+    }
+    const notees = lignes.filter((l) => l.message.includes('autre version'))
+    expect(notees.map((l) => l.essai)).toEqual([
+      "découverte : question d'une autre version de l'application du téléphone, sans réponse (127.0.0.1)",
+      "découverte : question d'une autre version de l'application du téléphone, sans réponse (127.0.0.2)",
+    ])
+    // L'adresse ne va qu'au texte du mode d'essai, pas au journal daté.
+    for (const l of notees) expect(l.message).not.toMatch(/127\.0\.0/)
   })
 })
 

@@ -835,127 +835,79 @@ final class ComputerLinkProtocol {
     // ---------- découverte UDP ----------
 
     static final byte[] PROBE_SIGNATURE = { 0x47, 0x54, 0x52, 0x4b };
-    /** Version 1 : la réponse porte l'identifiant du PC en clair (PC ancien, ou PC neuf qui répond à une APK ancienne). */
-    static final int PROBE_VERSION = 1;
     /**
-     * Version 2 : même disposition, mais la réponse porte, à la place de l'identifiant, sa trace liée à la question
-     * (`probeId`), et un nom vide ; seul un téléphone qui connaît déjà l'identifiant la reconnaît.
+     * Octet de version du seul format de la découverte : la réponse porte, à la place de l'identifiant du PC, sa trace
+     * liée à la question (`probeId`), et un nom vide ; seul un téléphone qui connaît déjà l'identifiant la reconnaît.
+     * Jamais 1 : sous cet octet, une application lirait l'identifiant en clair. Tout autre octet est étranger.
      */
     static final int PROBE_VERSION_2 = 2;
     static final int PROBE_QUESTION = 0x01;
     static final int PROBE_ANSWER = 0x02;
     static final int PROBE_NONCE_SIZE = 16;
-    /** Plus long nom du PC dans une réponse, en octets UTF-8. */
-    static final int PC_NAME_MAX_BYTES = 64;
-    /** Étiquette de la trace de l'identifiant dans une réponse de version 2. */
+    /** Étiquette de la trace de l'identifiant dans une réponse. */
     static final String PROBE_LABEL = "gtracker-sonde";
     /** PC retenus au plus par une découverte : chacun est essayé à son tour, un faux ne cache pas le vrai. */
     static final int CANDIDATES_MAX = 4;
     private static final int QUESTION_SIZE = 6 + PROBE_NONCE_SIZE;
-    private static final int ANSWER_FIXED_SIZE = 6 + PROBE_NONCE_SIZE + 2 + COMPUTER_ID_SIZE + 1;
+    /** Taille d'une réponse : la longueur du nom, son dernier octet, vaut toujours 0. */
+    private static final int ANSWER_SIZE = 6 + PROBE_NONCE_SIZE + 2 + COMPUTER_ID_SIZE + 1;
 
     /**
-     * Réponse d'un PC : version, nonce recopié, port TCP, identifiant (sa trace en version 2), nom (vide en version 2).
-     * L'adresse est celle d'où vient le paquet.
+     * Réponse d'un PC : nonce recopié, port TCP, trace de l'identifiant (`probeId`). L'adresse est celle d'où vient
+     * le paquet.
      */
     static final class ProbeAnswer {
-        final int version;
         final byte[] nonce;
         final int port;
-        final byte[] computerId;
-        final String name;
+        final byte[] trace;
 
-        ProbeAnswer(byte[] nonce, int port, byte[] computerId, String name) {
-            this(PROBE_VERSION, nonce, port, computerId, name);
-        }
-
-        ProbeAnswer(int version, byte[] nonce, int port, byte[] computerId, String name) {
-            this.version = version;
+        ProbeAnswer(byte[] nonce, int port, byte[] trace) {
             this.nonce = nonce;
             this.port = port;
-            this.computerId = computerId;
-            this.name = name;
+            this.trace = trace;
         }
     }
 
-    /** Version du paquet (1 ou 2) s'il porte la signature et la sorte attendues, -1 sinon. */
-    private static int probeVersion(byte[] packet, int kind) {
-        for (int i = 0; i < PROBE_SIGNATURE.length; i++) if (packet[i] != PROBE_SIGNATURE[i]) return -1;
-        if (packet[5] != kind) return -1;
-        return packet[4] == PROBE_VERSION || packet[4] == PROBE_VERSION_2 ? packet[4] : -1;
+    /** Vrai si le paquet porte la signature, la version et la sorte attendues. */
+    private static boolean probeHeader(byte[] packet, int kind) {
+        for (int i = 0; i < PROBE_SIGNATURE.length; i++) if (packet[i] != PROBE_SIGNATURE[i]) return false;
+        return packet[4] == PROBE_VERSION_2 && packet[5] == kind;
     }
 
-    /** Octets d'une question de version 1. */
+    /** Octets d'une question. */
     static byte[] encodeQuestion(byte[] nonce) {
-        return encodeQuestion(nonce, PROBE_VERSION);
-    }
-
-    /** Octets d'une question de la version donnée (1 ou 2). */
-    static byte[] encodeQuestion(byte[] nonce, int version) {
         requireSize(nonce, PROBE_NONCE_SIZE, "Nonce de la question");
-        if (version != PROBE_VERSION && version != PROBE_VERSION_2) throw new IllegalArgumentException("Version de la découverte inconnue : " + version + ".");
         ByteBuffer out = ByteBuffer.allocate(QUESTION_SIZE);
-        out.put(PROBE_SIGNATURE).put((byte) version).put((byte) PROBE_QUESTION).put(nonce);
+        out.put(PROBE_SIGNATURE).put((byte) PROBE_VERSION_2).put((byte) PROBE_QUESTION).put(nonce);
         return out.array();
     }
 
-    /** Le nonce d'une question de version 1, `null` pour un paquet étranger. */
-    static byte[] decodeQuestion(byte[] packet) {
-        if (packet.length != QUESTION_SIZE || probeVersion(packet, PROBE_QUESTION) != PROBE_VERSION) return null;
-        return java.util.Arrays.copyOfRange(packet, 6, QUESTION_SIZE);
-    }
-
-    /**
-     * Octets d'une réponse ; le nom doit tenir en 64 octets UTF-8, sans caractère de contrôle, et être vide en
-     * version 2.
-     */
+    /** Octets d'une réponse, nom vide. */
     static byte[] encodeAnswer(ProbeAnswer answer) {
         requireSize(answer.nonce, PROBE_NONCE_SIZE, "Nonce de la question");
-        requireSize(answer.computerId, COMPUTER_ID_SIZE, "Identifiant du PC");
-        if (answer.version != PROBE_VERSION && answer.version != PROBE_VERSION_2) throw new IllegalArgumentException("Version de la découverte inconnue : " + answer.version + ".");
+        requireSize(answer.trace, COMPUTER_ID_SIZE, "Trace de l'identifiant du PC");
         if (answer.port < 1 || answer.port > 65535) throw new IllegalArgumentException("Port hors bornes : " + answer.port + ".");
-        byte[] name = answer.name.getBytes(StandardCharsets.UTF_8);
-        if (name.length > PC_NAME_MAX_BYTES || (name.length > 0 && !nameAllowed(answer.name))) throw new IllegalArgumentException("Nom du PC refusé dans une réponse.");
-        if (answer.version == PROBE_VERSION_2 && name.length > 0) throw new IllegalArgumentException("Nom du PC dans une réponse de version 2.");
-        ByteBuffer out = ByteBuffer.allocate(ANSWER_FIXED_SIZE + name.length);
-        out.put(PROBE_SIGNATURE).put((byte) answer.version).put((byte) PROBE_ANSWER).put(answer.nonce);
-        out.putShort((short) answer.port).put(answer.computerId).put((byte) name.length).put(name);
+        ByteBuffer out = ByteBuffer.allocate(ANSWER_SIZE);
+        out.put(PROBE_SIGNATURE).put((byte) PROBE_VERSION_2).put((byte) PROBE_ANSWER).put(answer.nonce);
+        out.putShort((short) answer.port).put(answer.trace).put((byte) 0);
         return out.array();
     }
 
-    /**
-     * La réponse d'un PC, version 1 ou 2, `null` pour un paquet étranger. En version 2, un nom (que le PC n'envoie
-     * plus) est sauté sans être lu : la longueur annoncée doit seulement tomber juste.
-     */
+    /** La réponse d'un PC, `null` pour un paquet étranger (autre version, autre taille, port nul, nom non vide). */
     static ProbeAnswer decodeAnswer(byte[] packet) {
-        if (packet.length < ANSWER_FIXED_SIZE) return null;
-        int version = probeVersion(packet, PROBE_ANSWER);
-        if (version < 0) return null;
-        int nameLength = packet[ANSWER_FIXED_SIZE - 1] & 0xff;
-        if (nameLength > PC_NAME_MAX_BYTES || packet.length != ANSWER_FIXED_SIZE + nameLength) return null;
+        if (packet.length != ANSWER_SIZE || !probeHeader(packet, PROBE_ANSWER)) return null;
+        if (packet[ANSWER_SIZE - 1] != 0) return null;
         int port = ((packet[6 + PROBE_NONCE_SIZE] & 0xff) << 8) | (packet[7 + PROBE_NONCE_SIZE] & 0xff);
         if (port == 0) return null;
         byte[] nonce = java.util.Arrays.copyOfRange(packet, 6, 6 + PROBE_NONCE_SIZE);
-        byte[] computerId = java.util.Arrays.copyOfRange(packet, 8 + PROBE_NONCE_SIZE, 8 + PROBE_NONCE_SIZE + COMPUTER_ID_SIZE);
-        if (version == PROBE_VERSION_2) return new ProbeAnswer(version, nonce, port, computerId, "");
-        String name;
-        try {
-            name = StandardCharsets.UTF_8.newDecoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT)
-                .decode(ByteBuffer.wrap(packet, ANSWER_FIXED_SIZE, nameLength))
-                .toString();
-        } catch (CharacterCodingException e) {
-            return null;
-        }
-        if (!name.isEmpty() && !nameAllowed(name)) return null;
-        return new ProbeAnswer(version, nonce, port, computerId, name);
+        byte[] trace = java.util.Arrays.copyOfRange(packet, 8 + PROBE_NONCE_SIZE, 8 + PROBE_NONCE_SIZE + COMPUTER_ID_SIZE);
+        return new ProbeAnswer(nonce, port, trace);
     }
 
     /**
-     * Trace de l'identifiant d'un PC dans une réponse de version 2 : les 16 premiers octets de
-     * HMAC-SHA256(clé = identifiant, « gtracker-sonde » en ASCII ‖ nonce de la question). Liée à la question, elle
-     * ne dit rien de l'identifiant à qui ne le connaît pas, et ne resert pas pour une autre question.
+     * Trace de l'identifiant d'un PC dans une réponse : les 16 premiers octets de HMAC-SHA256(clé = identifiant,
+     * « gtracker-sonde » en ASCII ‖ nonce de la question). Liée à la question, elle ne dit rien de l'identifiant à
+     * qui ne le connaît pas, et ne resert pas pour une autre question.
      */
     static byte[] probeId(byte[] computerId, byte[] nonce) {
         requireSize(computerId, COMPUTER_ID_SIZE, "Identifiant du PC");
@@ -972,47 +924,32 @@ final class ComputerLinkProtocol {
     }
 
     /**
-     * Vrai si la réponse vient du PC d'identifiant `computerId`, à la question de nonce `nonce` : identifiant en clair
-     * en version 1, sa trace (`probeId`) en version 2. Une réponse n'est pas une preuve : l'empreinte du certificat,
-     * vérifiée ensuite, l'est.
+     * Vrai si la réponse vient du PC d'identifiant `computerId`, à la question de nonce `nonce` : elle porte la trace
+     * de cet identifiant pour ce nonce (`probeId`), jamais l'identifiant lui-même. Une réponse n'est pas une preuve :
+     * l'empreinte du certificat, vérifiée ensuite, l'est.
      */
     static boolean answerFrom(ProbeAnswer answer, byte[] computerId, byte[] nonce) {
-        if (answer.version == PROBE_VERSION_2) return sameBytes(answer.computerId, probeId(computerId, nonce));
-        return sameBytes(answer.computerId, computerId);
+        return sameBytes(answer.trace, probeId(computerId, nonce));
     }
 
     /**
-     * Les PC trouvés par une découverte, dans l'ordre où ils seront essayés : un seul candidat par adresse IP source,
-     * quel que soit le port annoncé (un appareil qui répond plusieurs fois, sur plusieurs ports, ne prend qu'une place
-     * et ne peut pas, seul, écarter le vrai PC) ; les réponses de version 2 d'abord (PC neuf), puis celles de
-     * version 1, chacune dans l'ordre d'arrivée ; au plus `max` adresses.
+     * Les PC trouvés par une découverte, dans l'ordre où ils seront essayés, celui d'arrivée : un seul candidat par
+     * adresse IP source, quel que soit le port annoncé (un appareil qui répond plusieurs fois, sur plusieurs ports, ne
+     * prend qu'une place et ne peut pas, seul, écarter le vrai PC) ; au plus `max` adresses.
      */
     static final class Candidates<T> {
         private final int max;
         private final List<String> keys = new ArrayList<>();
-        private final List<Integer> versions = new ArrayList<>();
         private final List<T> values = new ArrayList<>();
 
         Candidates(int max) {
             this.max = max;
         }
 
-        /**
-         * Ajoute le PC d'adresse IP `key` (sans le port) ; une adresse déjà vue n'est que relevée en version 2 (sa
-         * réponse de version 2 remplace celle de version 1), une seconde réponse de même version est ignorée. Faux si
-         * rien n'a changé.
-         */
-        boolean add(String key, int version, T value) {
-            int at = keys.indexOf(key);
-            if (at >= 0) {
-                if (version != PROBE_VERSION_2 || versions.get(at) == PROBE_VERSION_2) return false;
-                versions.set(at, PROBE_VERSION_2);
-                values.set(at, value);
-                return true;
-            }
-            if (full()) return false;
+        /** Ajoute le PC d'adresse IP `key` (sans le port) ; une adresse déjà vue est ignorée. Faux si rien n'a changé. */
+        boolean add(String key, T value) {
+            if (keys.contains(key) || full()) return false;
             keys.add(key);
-            versions.add(version);
             values.add(value);
             return true;
         }
@@ -1026,10 +963,7 @@ final class ComputerLinkProtocol {
         }
 
         List<T> ordered() {
-            List<T> out = new ArrayList<>();
-            for (int i = 0; i < keys.size(); i++) if (versions.get(i) == PROBE_VERSION_2) out.add(values.get(i));
-            for (int i = 0; i < keys.size(); i++) if (versions.get(i) != PROBE_VERSION_2) out.add(values.get(i));
-            return out;
+            return new ArrayList<>(values);
         }
     }
 

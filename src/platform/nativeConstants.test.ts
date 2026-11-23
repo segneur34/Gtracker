@@ -376,8 +376,8 @@ describe('liaison sans fil : mêmes constantes au PC et au téléphone', () => {
   const VECTEURS = JSON.parse(bureau('sansFil.vecteurs.json')) as {
     trames: { nom: string; enTete?: { capacites?: unknown } }[];
     sondes: {
-      questionsV2: { octetsHex: string }[];
-      reponsesV2: { nonceHex: string; identifiantPcHex: string; identifiantSondeHex: string }[];
+      questions: { octetsHex: string }[];
+      reponses: { nonceHex: string; identifiantPcHex: string; identifiantSondeHex: string }[];
     };
   };
   /** Un entier écrit `48_217` ou `48217`. */
@@ -396,7 +396,6 @@ describe('liaison sans fil : mêmes constantes au PC et au téléphone', () => {
     expect(javaConst('MESSAGE_MAX')).toBe(tsConst(TRAMES, 'MESSAGE_MAX'));
     expect(javaConst('CODE_DIGITS')).toBe(tsConst(APPAIRAGE, 'CHIFFRES_CODE'));
     expect(CODE_LENGTH).toBe(tsConst(APPAIRAGE, 'CHIFFRES_CODE'));
-    expect(javaConst('PC_NAME_MAX_BYTES')).toBe(tsConst(SONDE, 'NOM_PC_MAX_OCTETS'));
   });
 
   it("limites des trames : celles d'une liaison reconnue et celles de l'accueil", () => {
@@ -439,11 +438,15 @@ describe('liaison sans fil : mêmes constantes au PC et au téléphone', () => {
     expect(captured(PROTOCOL, /\bPAIR_CAPABILITIES = [^;]*Arrays\.asList\(([^)]*)\)/).split(',').map((s) => s.trim())).toEqual(['CAPABILITY_WRITE', 'CAPABILITY_SPAKE2']);
   });
 
-  it('découverte de version 2 : octet de version et étiquette de la trace de l’identifiant', () => {
-    for (const q of VECTEURS.sondes.questionsV2) expect(parseInt(q.octetsHex.slice(8, 10), 16)).toBe(javaConst('PROBE_VERSION_2'));
+  it('découverte : un seul octet de version, le même des deux côtés, et étiquette de la trace de l’identifiant', () => {
+    expect(javaConst('PROBE_VERSION_2')).toBe(tsConst(SONDE, 'VERSION_SONDE_V2'));
+    // Plus aucune version qui porte l'identifiant du PC en clair, ni d'un côté ni de l'autre.
+    expect(PROTOCOL).not.toMatch(/\bPROBE_VERSION\b/);
+    expect(SONDE).not.toMatch(/\bVERSION_SONDE\b/);
+    for (const q of VECTEURS.sondes.questions) expect(parseInt(q.octetsHex.slice(8, 10), 16)).toBe(javaConst('PROBE_VERSION_2'));
     const label = captured(PROTOCOL, /\bPROBE_LABEL = "([^"]+)";/);
-    expect(VECTEURS.sondes.reponsesV2.length).toBeGreaterThan(0);
-    for (const r of VECTEURS.sondes.reponsesV2) {
+    expect(VECTEURS.sondes.reponses.length).toBeGreaterThan(0);
+    for (const r of VECTEURS.sondes.reponses) {
       const trace = hmac(sha256, hexToBytes(r.identifiantPcHex), concatBytes(utf8ToBytes(label), hexToBytes(r.nonceHex))).slice(0, javaConst('COMPUTER_ID_SIZE'));
       expect(bytesToHex(trace)).toBe(r.identifiantSondeHex);
     }

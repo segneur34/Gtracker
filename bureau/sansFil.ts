@@ -66,7 +66,7 @@ import type { ContexteEcoute, IssueAutorisation, JugementPareFeu, LecturePareFeu
 import { ESSAIS_PORT, releveRate } from './pareFeu'
 import type { Gestionnaire } from './pont'
 import { enReponse } from './pont'
-import { decoderQuestion, encoderReponse, adressesPrivees, identifiantDeSonde, memeReseau, nomPcPourSonde, PORT_SONDE, VERSION_SONDE_V2 } from './sonde'
+import { decoderQuestion, encoderReponse, adressesPrivees, identifiantDeSonde, memeReseau, nomPcPourSonde, PORT_SONDE, questionDAutreVersion } from './sonde'
 import type { DossierDistant, EtatTelephone, FichierTelephone } from './telephone'
 import { cheminAdmis, cheminEcrivable, cheminRefuse, enSerie, fichiersAdmis, pasPret } from './telephone'
 import type {
@@ -174,6 +174,12 @@ const REPONSES_SONDE_PAR_SECONDE = 200
 
 /** Réponses de découverte envoyées par seconde à une même adresse : un hôte bavard n'en obtient pas davantage. */
 const REPONSES_SONDE_PAR_ADRESSE = 3
+
+/**
+ * Adresses dont une question de découverte d'une autre version est notée au journal, une fois chacune, au plus pour
+ * un lancement : une application du téléphone qui en envoie à chaque recherche n'allonge pas le journal sans fin.
+ */
+const AUTRE_VERSION_ADRESSES_NOTEES = 32
 
 /** Attente de la fin propre d'une liaison refusée avant de la couper. */
 const ATTENTE_FIN_MS = 2_000
@@ -755,6 +761,8 @@ export class ServeurSansFil {
   private sonde: dgram.Socket | null = null
   /** Réponses de découverte de la seconde en cours, en tout et par adresse (au plus `REPONSES_SONDE_PAR_SECONDE` adresses). */
   private reponsesSonde = { seconde: 0, nombre: 0, parAdresse: new Map<string, number>() }
+  /** Adresses dont une question de découverte d'une autre version est déjà notée au journal. */
+  private readonly autreVersionNotees = new Set<string>()
   private releve: NodeJS.Timeout | null = null
   private fenetre: FenetreAppairage | null = null
   private codesFaux: CodesFaux | null = null
@@ -1355,8 +1363,12 @@ export class ServeurSansFil {
 
   private repondreSonde(sonde: dgram.Socket, paquet: Buffer, source: dgram.RemoteInfo): void {
     const question = decoderQuestion(paquet)
-    if (!question || this.port === null) return
-    if (!this.adresses.some((a) => memeReseau(source.address, a.adresse, a.masque))) return
+    const duReseau = this.adresses.some((a) => memeReseau(source.address, a.adresse, a.masque))
+    if (!question) {
+      if (duReseau && questionDAutreVersion(paquet)) this.noterAutreVersion(source.address)
+      return
+    }
+    if (this.port === null || !duReseau) return
     const seconde = Math.floor(this.horloge() / 1000)
     if (seconde !== this.reponsesSonde.seconde) this.reponsesSonde = { seconde, nombre: 0, parAdresse: new Map() }
     const compte = this.reponsesSonde
@@ -1364,13 +1376,22 @@ export class ServeurSansFil {
     if (deLAdresse > REPONSES_SONDE_PAR_ADRESSE || compte.nombre >= REPONSES_SONDE_PAR_SECONDE) return
     compte.parAdresse.set(source.address, deLAdresse)
     compte.nombre++
-    // Nom vide : le téléphone ne s'en sert pas, et le nom de Windows n'a pas à partir chez tout hôte qui le demande.
-    // Version 2 : l'identifiant du PC ne part que sous HMAC du nonce ; la version 1 reste servie aux applications
-    // du téléphone d'avant elle, déjà reliées.
-    const identifiantPc = Buffer.from(this.identifiantPc, 'hex')
-    const identifiant = question.version === VERSION_SONDE_V2 ? identifiantDeSonde(identifiantPc, question.nonce) : identifiantPc
-    const reponse = encoderReponse({ version: question.version, nonce: question.nonce, port: this.port, identifiant, nom: '' })
+    // L'identifiant du PC ne part que sous HMAC du nonce, que seul un téléphone appairé sait vérifier ; le nom de
+    // Windows ne part pas : le téléphone ne s'en sert pas.
+    const identifiant = identifiantDeSonde(Buffer.from(this.identifiantPc, 'hex'), question.nonce)
+    const reponse = encoderReponse({ nonce: question.nonce, port: this.port, identifiant })
     sonde.send(reponse, source.port, source.address, () => undefined)
+  }
+
+  /**
+   * Une question d'une autre version, sans réponse : une ligne au journal, une fois par adresse, rien à l'écran (une
+   * application du téléphone qui en envoie le fait à chaque recherche, et se replie ensuite sur l'adresse tapée).
+   */
+  private noterAutreVersion(adresse: string): void {
+    if (this.autreVersionNotees.has(adresse) || this.autreVersionNotees.size >= AUTRE_VERSION_ADRESSES_NOTEES) return
+    this.autreVersionNotees.add(adresse)
+    const texte = "découverte : question d'une autre version de l'application du téléphone, sans réponse"
+    this.journal(texte, `${texte} (${adresse})`)
   }
 
   // ---------- accueil d'un téléphone ----------

@@ -80,9 +80,10 @@ import org.json.JSONObject;
  *   en est client. Jamais le réseau mobile, un tunnel ou un VPN, jamais une adresse publique.
  * - Découverte : l'adresse donnée par la page si elle en donne une ; sinon la dernière adresse connue (1 s), si
  *   elle est sur un réseau local présent, puis une question en diffusion UDP sur chaque réseau local (3 s).
- *   La question part en version 1 et en version 2 ; une réponse de version 2 porte la trace de l'identifiant du PC
- *   liée à la question (`ComputerLinkProtocol.probeId`), vérifiée ici. Jusqu'à 4 PC sont retenus et essayés à
- *   tour de rôle : un appareil qui répond à la place du PC ne le cache pas.
+ *   Une seule question, un seul format : la réponse porte la trace de l'identifiant du PC liée à la question
+ *   (`ComputerLinkProtocol.probeId`), vérifiée ici, jamais l'identifiant en clair. Jusqu'à 4 PC sont retenus et
+ *   essayés à tour de rôle : un appareil qui répond à la place du PC ne le cache pas. Sans réponse, la page montre le
+ *   champ « Adresse ».
  * - TLS à empreinte fixée : aucune chaîne de confiance ; à l'appairage, l'empreinte reçue est l'identité du PC dans
  *   l'échange SPAKE2 ; ensuite, tout certificat d'une autre empreinte est refusé avant le moindre message.
  * - Appairage par le code affiché sur le PC, échange SPAKE2 (bureau/spake2.ts) mené par la page, qui seule voit le
@@ -1146,17 +1147,14 @@ public class ComputerLinkPlugin extends Plugin {
      * Cherche le PC par une question diffusée sur chaque réseau local, depuis une socket attachée à ce réseau, vers
      * son adresse de diffusion (255.255.255.255 suivrait la route par défaut, le réseau mobile quand le téléphone
      * partage sa connexion) ; le Wi-Fi d'Android reçoit en plus la diffusion générale, que son `Network` attache.
-     * La question part en version 2 et en version 1, du même nonce. Avec `computerId`, seul ce PC est retenu
-     * (`ComputerLinkProtocol.answerFrom`). Rend les PC trouvés dans l'ordre où les essayer (`Candidates`), au plus
+     * Avec `computerId`, seul ce PC est retenu : sa réponse porte la trace de son identifiant pour le nonce de la
+     * question (`ComputerLinkProtocol.answerFrom`). Rend les PC trouvés dans l'ordre où les essayer (`Candidates`), au plus
      * `CANDIDATES_MAX`, après une courte écoute de plus une fois le premier trouvé ; vide si aucun n'a répondu à
      * temps. Une réponse n'est pas une preuve : l'empreinte du certificat ou l'échange SPAKE2, ensuite, l'est.
      */
     private List<Found> discover(int gen, List<LocalLink> links, byte[] computerId) throws IOException {
         byte[] nonce = randomBytes(ComputerLinkProtocol.PROBE_NONCE_SIZE);
-        byte[][] questions = {
-            ComputerLinkProtocol.encodeQuestion(nonce, ComputerLinkProtocol.PROBE_VERSION_2),
-            ComputerLinkProtocol.encodeQuestion(nonce, ComputerLinkProtocol.PROBE_VERSION),
-        };
+        byte[] question = ComputerLinkProtocol.encodeQuestion(nonce);
         ComputerLinkProtocol.Candidates<Found> found = new ComputerLinkProtocol.Candidates<>(ComputerLinkProtocol.CANDIDATES_MAX);
         List<DatagramSocket> sockets = new ArrayList<>();
         List<LocalLink> socketLinks = new ArrayList<>();
@@ -1195,12 +1193,10 @@ public class ComputerLinkPlugin extends Plugin {
                 if (sends < 2 && now >= nextSend) {
                     for (int i = 0; i < sockets.size(); i++) {
                         for (InetAddress target : targets.get(i)) {
-                            for (byte[] question : questions) {
-                                try {
-                                    sockets.get(i).send(new DatagramPacket(question, question.length, target, ComputerLinkProtocol.PROBE_PORT));
-                                } catch (IOException e) {
-                                    // Une adresse de diffusion refusée n'empêche pas les autres.
-                                }
+                            try {
+                                sockets.get(i).send(new DatagramPacket(question, question.length, target, ComputerLinkProtocol.PROBE_PORT));
+                            } catch (IOException e) {
+                                // Une adresse de diffusion refusée n'empêche pas les autres.
                             }
                         }
                     }
@@ -1227,7 +1223,7 @@ public class ComputerLinkPlugin extends Plugin {
                     if (!ComputerLinkProtocol.privateIpv4(ip) || !ComputerLinkProtocol.sameSubnet(ip, link.ip, link.prefixLength)) continue;
                     Endpoint endpoint = new Endpoint(ComputerLinkProtocol.formatIpv4(ip), answer.port);
                     // Une place par adresse, pas par port : l'écoute ne s'arrête tôt qu'avec 4 adresses distinctes.
-                    if (found.add(endpoint.host, answer.version, new Found(endpoint, link))) {
+                    if (found.add(endpoint.host, new Found(endpoint, link))) {
                         deadline = Math.min(deadline, SystemClock.elapsedRealtime() + DISCOVERY_GRACE_MS);
                     }
                 }

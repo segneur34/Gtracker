@@ -122,11 +122,11 @@ type CasCommun = {
   confirmationBHex: string
 }
 type Trame = { nom: string; emetteur: string; enTete: Record<string, unknown> }
-type ReponseV2 = { nonceHex: string; port: number; identifiantPcHex: string; identifiantSondeHex: string; nom: string; octetsHex: string }
+type ReponseSonde = { nonceHex: string; port: number; identifiantPcHex: string; identifiantSondeHex: string; octetsHex: string }
 const vecteurs = JSON.parse(readFileSync(path.join(__dirname, 'sansFil.vecteurs.json'), 'utf8')) as {
   spake2: { cas: CasCommun[] }
   trames: Trame[]
-  sondes: { questionsV2: { nonceHex: string; octetsHex: string }[]; reponsesV2: ReponseV2[] }
+  sondes: { questions: { nonceHex: string; octetsHex: string }[]; reponses: ReponseSonde[] }
 }
 
 /** Raison de l'`ErreurSpake2` levée par `action`, ou `null` si rien n'est levé. */
@@ -366,16 +366,15 @@ describe('jeux d’essai partagés avec le téléphone', () => {
     expect(trame('appaire, confirmation du PC').preuve).toBe(cas.confirmationBHex)
   })
 
-  it('les sondes de la découverte v2 suivent leur description : version 2, identifiant sous HMAC, nom vide', () => {
-    for (const v of vecteurs.sondes.questionsV2) expect(v.octetsHex).toBe(`4754524b0201${v.nonceHex}`)
-    expect(vecteurs.sondes.reponsesV2.length).toBeGreaterThan(1)
-    for (const v of vecteurs.sondes.reponsesV2) {
+  it('les sondes de la découverte suivent leur description : version 2, identifiant sous HMAC, nom vide', () => {
+    for (const v of vecteurs.sondes.questions) expect(v.octetsHex).toBe(`4754524b0201${v.nonceHex}`)
+    expect(vecteurs.sondes.reponses.length).toBeGreaterThan(1)
+    for (const v of vecteurs.sondes.reponses) {
       const sonde = createHmac('sha256', deHex(v.identifiantPcHex))
         .update(Buffer.concat([Buffer.from('gtracker-sonde', 'ascii'), deHex(v.nonceHex)]))
         .digest()
         .subarray(0, 16)
       expect(v.identifiantSondeHex).toBe(hex(sonde))
-      expect(v.nom).toBe('')
       expect(v.octetsHex).toBe(`4754524b0202${v.nonceHex}${v.port.toString(16).padStart(4, '0')}${v.identifiantSondeHex}00`)
     }
   })
