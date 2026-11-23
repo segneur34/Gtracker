@@ -122,7 +122,7 @@ async function essai(titre, quitter, avecBrouillon, rechargement = false) {
   console.log(`\n== ${titre}`);
   const p = await lancerProgramme(quitter, rechargement);
   process.env.BANC_WS = p.ws;
-  const b = await connect({ port: PORT, base: ORIGINE, width: 1400, height: 1000 });
+  const b = await connect({ port: PORT, base: ORIGINE, width: 1400, height: 1000, rechargerPage: rechargement });
   try {
     if (rechargement) { await b.wait(1500); check('la page s\'est rechargée', await recharger(b)); }
     if (avecBrouillon) check('un brouillon attend (barre « Enregistrer la session »)', await faireUnBrouillon(b));
@@ -178,7 +178,7 @@ async function ecrituresVidees() {
   console.log('\n== G. Nom de session saisi, fermeture aussitôt : écritures vidées, nom gardé à la réouverture');
   const p = await lancerProgramme('non', false);
   process.env.BANC_WS = p.ws;
-  const b = await connect({ port: PORT, base: ORIGINE, width: 1400, height: 1000 });
+  const b = await connect({ port: PORT, base: ORIGINE, width: 1400, height: 1000, rechargerPage: false });
   let ferme = false;
   try {
     const { evaluate, waitFor, wait, blockNetwork, importGpx, records } = b;

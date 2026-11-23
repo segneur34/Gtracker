@@ -240,9 +240,10 @@ const openSocket = async (url) => {
  * l'onglet dans un contexte de navigation neuf, `Target.createBrowserContext`, stockages vides comme un profil
  * neuf, jeté à la fermeture ; `BANC_CONTEXTE=1` l'impose ; pas le défaut), `miseEnGardeVue` (vrai d'ordinaire : la fenêtre
  * « Avant de partir » de la première ouverture est tenue pour touchée, la clé étant écrite à chaque document quand elle manque,
- * sans écraser une valeur posée autrement ; faux : profil vraiment neuf, pour le script qui éprouve la fenêtre).
+ * sans écraser une valeur posée autrement ; faux : profil vraiment neuf, pour le script qui éprouve la fenêtre),
+ * `rechargerPage` (vrai d'ordinaire : sur une page déjà chargée, la clé posée tout de suite est suivie d'un rechargement ; faux : sans rechargement).
  */
-export const connect = async ({ port, base = BASE, width, height, shotDir, logEntries = false, isolated = process.env.BANC_CONTEXTE === '1', miseEnGardeVue = true } = {}) => {
+export const connect = async ({ port, base = BASE, width, height, shotDir, logEntries = false, isolated = process.env.BANC_CONTEXTE === '1', miseEnGardeVue = true, rechargerPage = true } = {}) => {
   const startedAt = Date.now();
   const ownTab = !process.env.BANC_WS;
   if (ownTab && !port) throw new Error('connect : port Chrome manquant');
@@ -377,6 +378,29 @@ export const connect = async ({ port, base = BASE, width, height, shotDir, logEn
     }
     return settle({ max: Math.max(0, max - (Date.now() - t0)), label: path });
   };
+
+  // Page déjà chargée (programme Windows : on s'y attache, aucun nouveau document ne passera par le script posé plus haut) :
+  // la fenêtre « Avant de partir » est peut-être déjà montrée. La clé est écrite tout de suite si elle manque, puis la page
+  // est rechargée pour que le script parte sans la fenêtre (sauf `rechargerPage: false`, pour le script dont la demande de
+  // fermeture ne doit viser que le premier document : tout chargement de document y fait apparaître une seconde fenêtre cachée).
+  if (!ownTab && miseEnGardeVue) {
+    const posee = await evaluate(`(() => { try {
+      if (localStorage.getItem('${CLES.miseEnGarde}') !== null) return false;
+      localStorage.setItem('${CLES.miseEnGarde}', ${JSON.stringify(MISE_EN_GARDE_VUE)});
+      return true;
+    } catch { return false; } })()`);
+    if (posee && rechargerPage) {
+      const avant = await evaluate(`window.__banc?.doc ?? null`);
+      await send('Page.reload');
+      const t0 = Date.now();
+      while (Date.now() - t0 < 15000) {
+        const doc = await evaluate(`window.__banc?.doc ?? null`);
+        if (doc && doc !== avant) break;
+        await wait(50);
+      }
+      await settle({ max: 15000, label: 'rechargement' });
+    }
+  }
 
   /**
    * Évalue `expr` (expression de la page, ou fonction de Node, asynchrone ou non) jusqu'à une valeur vraie, tous
