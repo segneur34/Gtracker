@@ -15,8 +15,8 @@
  *   4. octets recopiés ici en littéraux : chaque texte est la suite de ses lignes jointes par un saut de ligne
  *      (LF, y compris à la fin), le .imu en base64.
  *
- * Ce fichier contient forcément creator="Tracker", tracker-session, tracker-capteurs et l'adresse du dépôt
- * d'origine : c'est l'un des trois fichiers d'exception de la garde des anciens noms. Ne pas les « nettoyer ».
+ * Ce fichier contient forcément creator="Tracker", tracker-session, tracker-capteurs et l'ancien préfixe
+ * d'espace de noms (son adresse est neutre, le code ne la lit pas) : c'est l'un des trois fichiers d'exception de la garde des anciens noms. Ne pas les « nettoyer ».
  * Il fige l'écriture de cette version : l'application d'origine peut écrire autrement plus tard.
  *
  * Contenu : la trace de chaque session (GPX de l'enregistreur), sa fiche (nom, notes, deux repères, réglages
@@ -740,7 +740,7 @@ export const LEGACY_WING_BUNDLE: string = [
   '      <trkpt lat="43.4995233916516" lon="3.8009140781365285"><ele>1.3</ele><time>2026-06-01T10:01:40.000Z</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>144</gpxtpx:hr><gpxtpx:speed>7.78</gpxtpx:speed><gpxtpx:course>77.39</gpxtpx:course></gpxtpx:TrackPointExtension></extensions></trkpt>',
   '    </trkseg>',
   '  </trk>',
-  '<extensions><tracker:session xmlns:tracker="https://github.com/segneur34/Tracker/session" version="1"><tracker:record>{',
+  '<extensions><tracker:session xmlns:tracker="https://tracker.example.invalid/session" version="1"><tracker:record>{',
   '  "format": "tracker-session",',
   '  "version": 1,',
   '  "gpx": "2026-06-01_12-00-00_wingfoil.gpx",',
@@ -1116,7 +1116,7 @@ export const LEGACY_SURF_BUNDLE: string = [
   '      <trkpt lat="43.6" lon="3.8035219209834015"><ele>1.3</ele><time>2026-09-20T10:03:46.000Z</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:speed>0.1</gpxtpx:speed><gpxtpx:course>90</gpxtpx:course></gpxtpx:TrackPointExtension></extensions></trkpt>',
   '    </trkseg>',
   '  </trk>',
-  '<extensions><tracker:session xmlns:tracker="https://github.com/segneur34/Tracker/session" version="1"><tracker:record>{',
+  '<extensions><tracker:session xmlns:tracker="https://tracker.example.invalid/session" version="1"><tracker:record>{',
   '  "format": "tracker-session",',
   '  "version": 1,',
   '  "gpx": "2026-09-20_12-00-00_surf.gpx",',

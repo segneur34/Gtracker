@@ -73,9 +73,9 @@ export type TileUrlOverrides = Partial<Record<MapBase, string>>;
 
 const TILE_MARKS = ['{z}', '{x}', '{y}'] as const;
 
-/** Vrai pour une adresse web qui porte `{z}`, `{x}` et `{y}` une fois chacun, et aucun autre repère entre accolades (`{s}`…). */
+/** Vrai pour une adresse en `https://` qui porte `{z}`, `{x}` et `{y}` une fois chacun, et aucun autre repère entre accolades (`{s}`…). */
 export const isTileTemplate = (value: string): boolean => {
-  if (!/^https?:\/\/\S+$/.test(value)) return false;
+  if (!/^https:\/\/\S+$/.test(value)) return false;
   const marks = value.match(/\{[^}]*\}/g) ?? [];
   return marks.length === TILE_MARKS.length && TILE_MARKS.every((mark) => marks.filter((m) => m === mark).length === 1);
 };

@@ -1484,7 +1484,7 @@
   "Pour tous les bips : balises, FC repos. Un haut-parleur de téléphone porte le mieux vers l'aigu ; plus grave, le bip s'entend moins fort. « Écouter » joue le signal d'un changement de phase.": "For all beeps: marks, resting HR. A phone speaker carries high pitches best; a lower beep is heard less loudly. “Listen” plays the signal for a phase change.",
   "Propre à cet appareil : il n'est pas repris par un autre téléphone ni par le fichier de réglages.": "Specific to this device: it is not carried over to another phone or to the settings file.",
   "Cartes hors ligne": "Offline maps",
-  "Chaque morceau de carte vu avec le réseau reste visible sans réseau. Pour préparer une sortie, parcourez la zone en ligne, de loin puis de près.": "Every map tile viewed online stays visible offline. To prepare for a session, browse the area online, zoomed out and then in close.",
+  "Chaque morceau de carte vu avec le réseau reste visible sans réseau.": "Every map tile viewed online stays visible offline.",
   "Ce qu'il faut pour enregistrer écran éteint. Refusée deux fois, une autorisation ne se redemande plus : « Ouvrir les réglages » mène à celles de l'application.": "What is needed to record with the screen off. Once refused twice, a permission is no longer asked for again: “Open settings” leads to the app's permissions.",
   "Tutoriels": "Tutorials",
   "À propos": "About",

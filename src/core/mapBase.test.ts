@@ -76,6 +76,8 @@ describe('adresse des tuiles réglable', () => {
     expect(tileTemplate('plan', { plan: 'https://tuiles.example.org/{z}/{x}.png' })).toBe(MAP_BASES.plan.url);
     expect(tileTemplate('plan', { plan: 'tuiles.example.org/{z}/{x}/{y}.png' })).toBe(MAP_BASES.plan.url);
     expect(isTileTemplate('ftp://a/{z}/{x}/{y}')).toBe(false);
+    expect(isTileTemplate('http://a.example/{z}/{x}/{y}')).toBe(false);
+    expect(tileTemplate('plan', { plan: 'http://tuiles.example.org/{z}/{x}/{y}.png' })).toBe(MAP_BASES.plan.url);
     expect(isTileTemplate('https://a b/{z}/{x}/{y}')).toBe(false);
   });
 

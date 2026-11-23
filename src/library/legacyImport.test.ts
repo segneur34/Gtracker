@@ -491,13 +491,24 @@ describe('porte d\'import : lecture de l\'ancien format (fonctions pures)', () =
   it('relit un paquet de l\'ancienne application sans retouches ni capteurs (0.2.82)', () => {
     // Déménagé de `sessionBundle.test.ts` : la fiche et rien d'autre, sous l'ancien préfixe.
     const escaped = LEGACY_WING_RECORD.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const old = LEGACY_WING_GPX.replace('</gpx>', '<extensions><tracker:session xmlns:tracker="https://github.com/segneur34/Tracker/session" version="1">'
+    const old = LEGACY_WING_GPX.replace('</gpx>', '<extensions><tracker:session xmlns:tracker="https://tracker.example.invalid/session" version="1">'
       + `<tracker:record>${escaped}</tracker:record></tracker:session></extensions></gpx>`);
     const back = unbundleSessionGpx(old);
     expect(back.gpx).toBe(LEGACY_WING_GPX);
     expect(back.record?.name).toBe(SESSIONS.wing.name);
     expect(back.record?.format).toBe(RECORD_FORMAT);
     expect(back.motion).toBeNull();
+  });
+
+  it('une session de l\'ancienne application se reconnaît quel que soit l\'espace de noms déclaré', () => {
+    const escaped = LEGACY_WING_RECORD.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    for (const namespace of ['https://tracker.example.invalid/session', 'https://autre.example.invalid/x', 'urn:inconnu']) {
+      const old = LEGACY_WING_GPX.replace('</gpx>', `<extensions><tracker:session xmlns:tracker="${namespace}" version="1">`
+        + `<tracker:record>${escaped}</tracker:record></tracker:session></extensions></gpx>`);
+      const back = unbundleSessionGpx(old);
+      expect(back.gpx).toBe(LEGACY_WING_GPX);
+      expect(back.record?.name).toBe(SESSIONS.wing.name);
+    }
   });
 
   it('fiche de septembre de l\'ancienne application (58aa8bb) : lue sans perte, réécrite sans perte au format neuf', () => {

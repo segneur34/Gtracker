@@ -28,3 +28,7 @@ Relevés le 23/11 par l'outil de livraison (`node outils/livraison.mjs`, recherc
 ## Vérification
 
 `node outils/verif.mjs --rapide` par l'agent ; `npm run verif`, banc (`reglages`, `reglages-aide`, un script de carte) et `node outils/livraison.mjs` par l'orchestrateur : la recherche « vendeur : github » ne doit plus trouver que la configuration et son essai.
+
+## Point 3, tranché le 23/11 d'après le plan (agent `Plan`, règle d'OSM relue le jour même)
+
+Pas de code, des commentaires justes. La règle dit : suivre les en-têtes de cache et revalider par requête conditionnelle, ou, pour un cache qui ne peut pas les lire, garder chaque tuile sept jours au moins : c'est ce que fait l'application. La page ne peut pas faire mieux : le serveur d'OSM n'expose pas son `ETag` à une page d'une autre origine (ni `Last-Modified`, absent) et sa réponse préliminaire n'admet pas `If-None-Match` ; deux nœuds de cache ont d'ailleurs rendu deux `ETag` pour la même tuile. Une revalidation native (requête hors de la page sur le téléphone, `ETag` gardé par le relais du programme Windows) reste possible mais ajoute un chemin réseau et un fichier dans le dossier des tuiles, pour un fournisseur que l'acheteur doit de toute façon remplacer : laissé à l'acheteur, dit dans la note de remise. Relevé au passage, non traité : dans le navigateur et sur le téléphone, une image de refus rendue par OSM (réponse 200 marquée d'un en-tête que la page ne lit pas) serait gardée comme une tuile.

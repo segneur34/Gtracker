@@ -7,9 +7,16 @@
  *
  * Les règles d'OpenStreetMap interdisent de télécharger une zone à l'avance :
  * on ne garde que les tuiles affichées en ligne. Une tuile gardée qui a vieilli
- * (`refreshAgeMs`) est redemandée en entier, sans lire les en-têtes de cache
- * du serveur ni faire de requête conditionnelle (garder l'`ETag` de chaque
- * tuile serait la suite, pour suivre à la lettre les règles techniques d'OSM).
+ * (`refreshAgeMs`) est redemandée en entier. Les règles techniques d'OSM
+ * demandent de suivre les en-têtes de cache du serveur et de revalider par
+ * requête conditionnelle ; pour un cache qui ne peut pas les lire, elles
+ * demandent de garder chaque tuile sept jours au moins, ce qui est fait ici.
+ * La page ne peut en effet pas revalider elle-même : le serveur d'OSM n'expose
+ * pas son `ETag` à une page d'une autre origine et refuse un `If-None-Match`
+ * posé par elle. Seul le cache HTTP du moteur web revalide, quand il a encore
+ * la tuile. Avec un autre fournisseur de cartes, relire ses en-têtes : une
+ * requête faite hors de la page (requête native sur le téléphone, relais du
+ * programme Windows) pourrait garder l'`ETag` et revalider.
  */
 
 export interface TileCoord {
@@ -19,7 +26,7 @@ export interface TileCoord {
 }
 
 export const TILE_CACHE_DEFAULTS = {
-  /** Âge au-delà duquel une tuile gardée est redemandée en entier, si le réseau répond, quelle que soit la durée que fixe le serveur. */
+  /** Âge au-delà duquel une tuile gardée est redemandée en entier, si le réseau répond : sept jours, la durée minimale que les règles d'OSM fixent à un cache qui ne lit pas les en-têtes du serveur. */
   refreshAgeMs: 7 * 24 * 3600 * 1000,
   /** Place occupée au plus, en mégaoctets. */
   capMb: 500,

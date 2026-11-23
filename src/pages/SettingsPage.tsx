@@ -782,7 +782,7 @@ function SettingsPage() {
 
       <div style={cardStyle}>
         <BlockTitle label={t('Cartes hors ligne')} open={open.cartes} onToggle={() => toggle('cartes')} helpKey="cartes"
-          help={t('Chaque morceau de carte vu avec le réseau reste visible sans réseau. Pour préparer une sortie, parcourez la zone en ligne, de loin puis de près.')} />
+          help={t('Chaque morceau de carte vu avec le réseau reste visible sans réseau.')} />
         {open.cartes && <div className="settings-block__body"><OfflineMapsSettings /></div>}
       </div>
 
