@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { tileUrl } from '../core/mapBase';
-import { tileKey, type AncestorTile } from '../core/tiles';
+import { fillTileTemplate, MAP_BASES, tileUrl, type MapBaseSource } from '../core/mapBase';
+import { tileKey, type AncestorTile, type TileCoord } from '../core/tiles';
 import { createTileResolver, isAbsentStatus, onNetworkBack, type FetchedTile } from './mapTiles';
 import type { StoredTile } from './tileCache';
 
@@ -18,18 +18,38 @@ interface Call {
   answer: (result: FetchedTile) => void;
 }
 
+/**
+ * Fond photographique factice, à côté du plan : son serveur n'a pas toutes les tuiles au large, et la case
+ * remonte alors aux parentes, demandées au serveur (`fetchAncestors`), sur plus de zooms que le plan.
+ */
+const PHOTO: MapBaseSource = {
+  label: 'Photo',
+  url: 'https://photo.example.org/{z}/{y}/{x}.jpg',
+  attribution: 'Photo factice',
+  credit: 'Photo factice',
+  creditUrl: 'photo.example.org',
+  keyPrefix: 'photo_',
+  overzoomDepth: 6,
+  fetchAncestors: true,
+  photo: true,
+};
+type TestBase = 'plan' | 'photo';
+const SOURCES: Record<TestBase, MapBaseSource> = { plan: MAP_BASES.plan, photo: PHOTO };
+const photoUrl = (tile: TileCoord) => fillTileTemplate(PHOTO.url, tile);
+
 /** Résolveur sur une mémoire et un serveur factices ; `serve` répond tout de suite, sinon la requête attend `answer`. */
 const setup = ({ stored = {}, serve, online = true, template }: {
   stored?: Record<string, StoredTile>;
   serve?: (url: string) => FetchedTile;
   online?: boolean;
-  template?: (base: 'plan' | 'satellite') => string;
+  template?: (base: TestBase) => string;
 } = {}) => {
   const memory = new Map(Object.entries(stored));
   const calls: Call[] = [];
   const kept: string[] = [];
   const crops: { ancestor: AncestorTile; size: number }[] = [];
-  const resolver = createTileResolver({
+  const resolver = createTileResolver<TestBase>({
+    sources: SOURCES,
     store: { read: async (key) => memory.get(key) ?? null },
     keep: async (key, blob) => {
       kept.push(key);
@@ -165,22 +185,37 @@ describe('requêtes partagées', () => {
 
 describe('remontée vers les zooms inférieurs', () => {
   it('ne redemande pas le temps de la page une tuile que le serveur n’a pas', async () => {
-    // Photo satellite au large : la tuile et ses parentes demandées une fois, la plus haute servie.
+    // Photo au large : la tuile et ses parentes demandées une fois, la plus haute servie.
     const top = { z: 12, x: 2101, y: 1494 };
-    const { resolver, calls } = setup({ serve: (url) => (url === tileUrl('satellite', top) ? image('large') : 'absent') });
-    expect(await resolver.resolveTile(TILE, 'satellite', 256)).toBe('data:agrandie-12');
+    const { resolver, calls, kept } = setup({ serve: (url) => (url === photoUrl(top) ? image('large') : 'absent') });
+    expect(await resolver.resolveTile(TILE, 'photo', 256)).toBe('data:agrandie-12');
     expect(calls).toHaveLength(4);
-    // La parente reçue est gardée : la seconde fois, plus rien ne part.
+    // La parente reçue est gardée sous la clé de son fond : la seconde fois, plus rien ne part.
     await flush();
-    expect(await resolver.resolveTile(TILE, 'satellite', 256)).toBe('data:agrandie-12');
+    expect(kept).toEqual([tileKey(top, 'photo_')]);
+    expect(await resolver.resolveTile(TILE, 'photo', 256)).toBe('data:agrandie-12');
     expect(calls).toHaveLength(4);
+  });
+
+  it('le plan ne demande pas les parentes au serveur', async () => {
+    const { resolver, calls } = setup({ serve: () => 'absent' });
+    expect(await resolver.resolveTile(TILE, 'plan', 256)).toBeNull();
+    expect(calls.map((c) => c.url)).toEqual([tileUrl('plan', TILE)]);
+  });
+
+  it('agrandit au plus `overzoomDepth` zooms plus bas', async () => {
+    const far = { z: 10, x: 525, y: 373 };
+    const stored = { [tileKey(far)]: { blob: image('plan'), savedAtMs: NOW }, [tileKey(far, 'photo_')]: { blob: image('photo'), savedAtMs: NOW } };
+    const { resolver } = setup({ stored, online: false });
+    expect(await resolver.resolveTile(TILE, 'plan', 256)).toBeNull();
+    expect(await resolver.resolveTile(TILE, 'photo', 256)).toBe('data:agrandie-10');
   });
 
   it('après un échec du réseau, ne lit plus que la mémoire', async () => {
     const parent = { z: 11, x: 1050, y: 747 };
-    const { resolver, calls } = setup({ stored: { [tileKey(parent, 'sat_')]: { blob: image('gardée'), savedAtMs: NOW } }, serve: () => 'echec' });
-    expect(await resolver.resolveTile(TILE, 'satellite', 256)).toBe('data:agrandie-11');
-    expect(calls.map((c) => c.url)).toEqual([tileUrl('satellite', TILE)]);
+    const { resolver, calls } = setup({ stored: { [tileKey(parent, 'photo_')]: { blob: image('gardée'), savedAtMs: NOW } }, serve: () => 'echec' });
+    expect(await resolver.resolveTile(TILE, 'photo', 256)).toBe('data:agrandie-11');
+    expect(calls.map((c) => c.url)).toEqual([photoUrl(TILE)]);
   });
 });
 
@@ -282,11 +317,11 @@ describe('resolveExactTile : la vraie tuile seulement', () => {
     expect(crops).toEqual([]);
   });
 
-  it('une tuile absente rend null, sans requête, même au large en satellite', async () => {
+  it('une tuile absente rend null, sans requête, même au large sur un fond photographique', async () => {
     const { resolver, calls } = setup({ serve: () => 'absent' });
-    expect(await resolver.resolveExactTile(TILE, 'satellite')).toBeNull();
+    expect(await resolver.resolveExactTile(TILE, 'photo')).toBeNull();
     expect(calls).toHaveLength(1);
-    expect(await resolver.resolveExactTile(TILE, 'satellite')).toBeNull();
+    expect(await resolver.resolveExactTile(TILE, 'photo')).toBeNull();
     expect(calls).toHaveLength(1);
   });
 

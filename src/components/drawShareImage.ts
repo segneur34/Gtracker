@@ -1,5 +1,5 @@
 import { cardHeight, cardTop, fitView, fullView, mapHeight, projectPoint, SHARE_IMAGE, statColumns, viewTiles, type ShareStat } from '../core/shareImage';
-import { MAP_BASES, type MapBase } from '../core/mapBase';
+import { shareCredit, type MapBase } from '../core/mapBase';
 import { tileKey, type TileCoord } from '../core/tiles';
 import { GONG_LOGO_HEIGHT, GONG_LOGO_PATH, GONG_LOGO_WIDTH } from './gongLogoPath';
 import { lightToken } from '../theme/lightToken';
@@ -178,9 +178,10 @@ export const drawShareImage = async (content: ShareImageContent, tileImage: Tile
   if (!course) track.draw();
   // Sans fond de carte, pas de mention non plus.
   if (content.withMap && track.view) {
-    // Mention qu'exigent les conditions d'usage des tuiles du fond, au ras du bas, sous le cartouche.
+    // Mention qu'exigent les conditions d'usage des tuiles du fond, au ras du bas, sous le cartouche ; une image ne
+    // porte pas de lien, l'adresse de la licence est donc écrite en toutes lettres.
     ctx.font = `400 22px ${family}`;
-    const text = MAP_BASES[content.base].credit;
+    const text = shareCredit(content.base);
     const w = ctx.measureText(text).width + 20;
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.fillRect(widthPx - w, heightPx - 34, w, 34);

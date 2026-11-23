@@ -36,13 +36,20 @@ export interface TileStore {
   /** Toutes les tuiles gardées, avec leur taille et leur date. */
   list(): Promise<CachedTileEntry[]>;
   remove(keys: string[]): Promise<void>;
+  /**
+   * Efface toutes les tuiles réellement rangées dont la clé commence par l'un de `prefixes`, d'après le contenu du
+   * magasin et non d'un index qui pourrait en oublier ; rejette si l'une n'a pas pu être effacée.
+   */
+  removeByPrefix(prefixes: readonly string[]): Promise<void>;
   clear(): Promise<void>;
 }
 
+const hasPrefix = (key: string, prefixes: readonly string[]): boolean => prefixes.some((prefix) => key.startsWith(prefix));
+
 const TILE_DIR = 'tuiles';
 /**
- * Type par défaut d'une tuile. Toutes sont nommées `.png`, les photos du fond
- * satellite (JPEG) comprises : le décodeur d'image reconnaît le format au contenu.
+ * Type par défaut d'une tuile. Toutes sont nommées `.png`, celles d'un fond
+ * photographique (JPEG) comprises : le décodeur d'image reconnaît le format au contenu.
  */
 const TILE_TYPE = 'image/png';
 
@@ -119,6 +126,11 @@ const nativeStore: TileStore = {
         // Déjà absente.
       }
     }
+  },
+  // La liste du téléphone est celle du dossier, lue en entier au premier accès.
+  removeByPrefix: async (prefixes) => {
+    const keys = [...(await nativeEntries()).keys()].filter((key) => hasPrefix(key, prefixes));
+    if (keys.length > 0) await nativeStore.remove(keys);
   },
   clear: async () => {
     const { Filesystem, Directory } = await filesystem();
@@ -207,6 +219,8 @@ export const createBrowserTileStore = (storage: Pick<CacheStorage, 'open' | 'del
   };
 
   let index: Promise<Map<string, CachedTileEntry>> | null = null;
+  /** Comparaison en arrière-plan de l'index rangé aux tuiles du cache (`verify`), tant qu'elle tourne. */
+  let verifying: Promise<void> = Promise.resolve();
   let dirty = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -270,7 +284,7 @@ export const createBrowserTileStore = (storage: Pick<CacheStorage, 'open' | 'del
       const stored: unknown = await cache.match(INDEX_URL).then((r) => r?.json()).catch(() => null);
       const parsed = parseIndex(stored);
       if (parsed) {
-        void verify(cache, parsed);
+        verifying = verify(cache, parsed);
         return parsed;
       }
       const rebuilt = await rebuild(cache, await tileRequests(cache));
@@ -315,6 +329,28 @@ export const createBrowserTileStore = (storage: Pick<CacheStorage, 'open' | 'del
       }
       schedule();
     },
+    removeByPrefix: async (prefixes) => {
+      const cache = await openCache();
+      if (!cache) return;
+      const known = await entries();
+      // La comparaison de l'index aux tuiles finie d'abord : elle ne peut plus y remettre une clé effacée ici.
+      await verifying;
+      const failed = new Set<string>();
+      // Les tuiles du cache lui-même : une tuile gardée par une page fermée avant d'écrire l'index n'y est pas.
+      for (const request of await tileRequests(cache)) {
+        const key = keyOfUrl(request.url);
+        if (!hasPrefix(key, prefixes)) continue;
+        try {
+          await cache.delete(request);
+        } catch {
+          failed.add(key);
+        }
+      }
+      // L'index suit : plus aucune de ces clés, sauf celles restées dans le cache.
+      for (const key of [...known.keys()]) if (hasPrefix(key, prefixes) && !failed.has(key)) known.delete(key);
+      schedule();
+      if (failed.size > 0) throw new Error('tuiles non effacées');
+    },
     clear: async () => {
       if (timer !== null) clearTimeout(timer);
       timer = null;
@@ -339,8 +375,24 @@ const createBrowserStore = (): TileStore => {
 
 export const tileStore: TileStore = isNativeApp() ? nativeStore : createBrowserStore();
 
-/** Clé du plafond, propre à l'appareil (hors de `reglages.json`). */
+/** Clé du plafond, propre à l'appareil (hors de `reglages.json`), qui porte aussi les effacements déjà faits. */
 const CAP_STORAGE_KEY = STORAGE_KEYS.tileCache;
+
+/** Ce que range `CAP_STORAGE_KEY` : le plafond choisi, et les préfixes de fonds retirés dont les tuiles sont effacées. */
+interface StoredTileSettings {
+  capMb?: number;
+  purged?: string[];
+}
+
+const readTileSettings = (): StoredTileSettings => {
+  const stored = jsonStore.read<StoredTileSettings>(CAP_STORAGE_KEY);
+  return stored && typeof stored === 'object' ? stored : {};
+};
+
+const purgedPrefixes = (): string[] => {
+  const purged = readTileSettings().purged;
+  return Array.isArray(purged) ? purged.filter((p): p is string => typeof p === 'string') : [];
+};
 
 /** Plafond permis dans Réglages, en mégaoctets. */
 const TILE_CAP_LIMITS_MB = { min: 10, max: 20_000 } as const;
@@ -350,13 +402,41 @@ export const isValidTileCap = (value: unknown): value is number =>
 
 /** Plafond de la place occupée par les tuiles gardées, en mégaoctets. */
 export const tileCapMb = (): number => {
-  const value = jsonStore.read<{ capMb?: number }>(CAP_STORAGE_KEY)?.capMb;
+  const value = readTileSettings().capMb;
   return isValidTileCap(value) ? value : TILE_CACHE_DEFAULTS.capMb;
 };
 
-/** Plafond retenu sur l'appareil ; `null` revient au défaut. */
+/** Plafond retenu sur l'appareil ; `null` revient au défaut. Les effacements déjà faits restent notés. */
 export const writeTileCapMb = (next: number | null): void => {
-  jsonStore.write(CAP_STORAGE_KEY, next === null ? {} : { capMb: next });
+  const purged = purgedPrefixes();
+  jsonStore.write(CAP_STORAGE_KEY, {
+    ...(next === null ? {} : { capMb: next }),
+    ...(purged.length > 0 ? { purged } : {}),
+  });
+};
+
+/**
+ * Préfixes des clés de tuiles d'un fond retiré de l'application (`core/mapBase.ts`) : celles qui restent sur
+ * l'appareil sont effacées une fois, au lancement qui suit la mise à jour.
+ */
+export const RETIRED_TILE_PREFIXES: readonly string[] = ['sat_'];
+
+/**
+ * Efface les tuiles gardées des fonds retirés, une seule fois par préfixe, sur le téléphone, dans le navigateur et
+ * dans le programme Windows (le même magasin que la carte). Le préfixe n'est noté fait qu'après l'effacement entier :
+ * coupé en route (application fermée, erreur), il est repris au lancement suivant.
+ */
+export const purgeRetiredTiles = async (store: TileStore = tileStore): Promise<void> => {
+  const done = purgedPrefixes();
+  const todo = RETIRED_TILE_PREFIXES.filter((prefix) => !done.includes(prefix));
+  if (todo.length === 0 || writesSuspended()) return;
+  try {
+    await store.removeByPrefix(todo);
+  } catch {
+    // Magasin illisible : on recommence au lancement suivant.
+    return;
+  }
+  jsonStore.write(CAP_STORAGE_KEY, { ...readTileSettings(), purged: [...purgedPrefixes(), ...todo] });
 };
 
 /** Clé des adresses de tuiles choisies, propre à l'appareil (hors de `reglages.json`), comme le plafond. */

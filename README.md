@@ -15,11 +15,10 @@ Aucune clé, aucun compte, aucune télémétrie ; seuls ces services reçoivent 
 | Service | Quand | Ce qui part |
 |---|---|---|
 | Tuiles OpenStreetMap (`tile.openstreetmap.org`) | à chaque carte, image de partage ou vignette de session en vue « plan », sauf tuile déjà gardée sur l'appareil | la position de la tuile (zoom, colonne, ligne), donc la zone regardée |
-| Tuiles Esri (`server.arcgisonline.com`) | carte en vue satellite | idem |
 | Photon (`photon.komoot.io`), recherche inverse | pour nommer une session par son lieu : à la fin d'un enregistrement, à l'import, à l'ouverture d'une analyse et pour les sessions de la liste qui n'ont pas encore de lieu ; allumée d'office, se coupe dans Réglages › Mémoire | le point de départ de la session, et son point d'arrivée s'il est éloigné du départ, arrondis à trois décimales (une centaine de mètres), avec la langue (français ou anglais) et le rayon de recherche ; jamais la trace, l'heure ni le nom de la session |
 | Photon (`photon.komoot.io`), recherche par nom | recherche d'un lieu dans Planifier | le texte tapé et le centre de la carte |
 
-Un lieu déjà appris sur l'appareil (corrigé par l'utilisateur) est repris sans interroger le service. Réglages permet aussi de remplacer l'adresse des tuiles du plan ou du satellite par celle d'un autre serveur : les tuiles sont alors demandées à cette adresse.
+Un lieu déjà appris sur l'appareil (corrigé par l'utilisateur) est repris sans interroger le service. Réglages permet aussi de remplacer l'adresse des tuiles du plan par celle d'un autre serveur : les tuiles sont alors demandées à cette adresse.
 
 Ouvrir un GPX, l'analyser, enregistrer et lire les Statistiques n'appellent rien d'autre que les tuiles de la carte et, sauf si on l'a coupée, la recherche du lieu des sessions. Aucun service de calcul d'itinéraire ni d'altitude n'est appelé.
 

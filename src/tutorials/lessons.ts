@@ -70,7 +70,6 @@ export const LESSONS: readonly Lesson[] = [
       t("La trace est colorée par la vitesse : grise quand vous allez lentement, puis un dégradé jusqu'aux plus grandes vitesses. Les bornes se règlent par activité dans Réglages, ou pour une seule session dans son onglet « réglages »."),
       t('Deux doigts pour zoomer, un pour se déplacer. Sur le téléphone, un toucher sur la carte l\'ouvre en plein écran ; tourné, il s\'y met de lui-même. Le retour la referme.'),
       t('Sous un graphe, « +carte » ouvre la carte avec les graphes dessous : le doigt posé sur un graphe montre le point sur la trace.'),
-      t('Le bouton sous le + et le − passe du plan à la photo satellite.'),
     ],
   },
   {

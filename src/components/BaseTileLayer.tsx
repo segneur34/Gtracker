@@ -18,15 +18,15 @@ import 'leaflet/dist/leaflet.css';
 import './BaseTileLayer.css';
 
 /**
- * Fond de carte commun à toutes les cartes de l'application : le plan
- * d'OpenStreetMap, ou la photo satellite d'Esri (`core/mapBase.ts`), avec la
+ * Fond de carte commun à toutes les cartes de l'application, l'un de ceux de
+ * `core/mapBase.ts` (le plan d'OpenStreetMap seul dans cette version), avec la
  * mention qu'exigent les conditions d'usage de chacun (et celles du calcul
  * d'itinéraire, qui repose sur OSM). La mention de Leaflet, facultative, est
  * retirée pour qu'elle tienne même sur l'aperçu de la bibliothèque.
  *
  * Avec une famille (analyses, enregistrement, planification), le fond est
  * celui qu'elle a retenu (`useMapBase`) et un bouton, sous le + et le −, le
- * change ; sans famille, le plan seul, sans bouton. Les vignettes de la
+ * change s'il y a plusieurs fonds ; sans famille, le plan seul, sans bouton. Les vignettes de la
  * bibliothèque ne sont pas des cartes : des images fixes
  * (`drawTrackPreview.ts`), sur les mêmes tuiles (`platform/mapTiles.ts`).
  *
@@ -223,7 +223,7 @@ class CachedTileLayer extends L.TileLayer {
   }
 }
 
-/** Classes du cadre des mentions (`theme/base.css`) : repliable (satellite, téléphone), puis ouvert. */
+/** Classes du cadre des mentions (`theme/base.css`) : repliable (fond photographique, téléphone), puis ouvert. */
 const FOLDABLE_CLASS = 'is-foldable';
 const OPEN_CLASS = 'is-open';
 
@@ -262,13 +262,14 @@ function boundAttribution(map: L.Map): () => void {
 }
 
 /**
- * Mention du satellite, sur téléphone : une ligne coupée, qu'un toucher déplie en entier puis replie (Esri demande
- * qu'on puisse lire tous les noms sur petit écran). Leaflet 1.9 n'a pas de contrôle repliable. Sur ordinateur, ou
- * en plan (la règle d'OSM interdit de cacher la mention), rien n'est posé. Rend le retrait de tout ce qui l'a été.
+ * Mention d'un fond photographique (`photo`), sur téléphone : une ligne coupée, qu'un toucher déplie en entier puis
+ * replie, pour qu'on puisse lire tous les noms sur petit écran. Leaflet 1.9 n'a pas de contrôle repliable. Sur
+ * ordinateur, ou en plan (la règle d'OSM interdit de cacher la mention), rien n'est posé. Rend le retrait de tout ce
+ * qui l'a été.
  */
 function foldAttribution(map: L.Map, base: MapBase): () => void {
   const box = map.attributionControl?.getContainer();
-  if (!box || base !== 'satellite') return () => {};
+  if (!box || !MAP_BASES[base].photo) return () => {};
   box.classList.add(FOLDABLE_CLASS);
   const query = window.matchMedia(NARROW_QUERY);
   const toggle = (): void => {
@@ -349,16 +350,14 @@ function TileLayer({ base }: { base: MapBase }) {
   return null;
 }
 
-/** Choix du menu, dans l'ordre. */
-const BASE_CHOICES: ReadonlyArray<{ base: MapBase; label: string }> = [
-  { base: 'plan', label: t('Plan') },
-  { base: 'satellite', label: t('Satellite') },
-];
+/** Choix du menu, dans l'ordre de `MAP_BASES`. */
+const BASE_CHOICES: ReadonlyArray<{ base: MapBase; label: string }> = (Object.keys(MAP_BASES) as MapBase[])
+  .map((base) => ({ base, label: MAP_BASES[base].label }));
 
 /**
  * Bouton du coin haut gauche, sous le + et le −, qui ouvre le choix du fond
- * (plan ou satellite) à sa droite. Un choix le ferme ; un toucher ailleurs ou
- * Échap aussi, sans rien changer.
+ * à sa droite, monté seulement s'il y a au moins deux fonds. Un choix le ferme ;
+ * un toucher ailleurs ou Échap aussi, sans rien changer.
  */
 function BaseSwitch({ base, onChange }: { base: MapBase; onChange: (base: MapBase) => void }) {
   const map = useMap();
@@ -409,7 +408,7 @@ function BaseTileLayer({ family }: { family: SportFamily }) {
   return (
     <>
       <TileLayer base={base} />
-      <BaseSwitch base={base} onChange={setBase} />
+      {BASE_CHOICES.length > 1 && <BaseSwitch base={base} onChange={setBase} />}
     </>
   );
 }

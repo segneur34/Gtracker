@@ -166,12 +166,12 @@ describe('fiches modifiées', () => {
 
   it('changée des deux côtés : fondue, écrite des deux côtés, le conflit dit', async () => {
     const pair = await syncedPair(1);
-    editSyncRecord(pair.computer, fileOf(0), (record) => ({ ...record, name: 'Ordinateur', mapBase: 'satellite' }));
+    editSyncRecord(pair.computer, fileOf(0), (record) => ({ ...record, name: 'Ordinateur', mapBase: 'plan' }));
     editSyncRecord(pair.phone, fileOf(0), (record) => ({ ...record, name: 'Téléphone', notes: notes({ comment: 'belle session' }) }));
     const run = await sync(pair);
     expect(itemAt(run, 0)?.conflicts).toEqual(['name']);
     for (const folder of [pair.computer, pair.phone]) {
-      expect(readSyncRecord(folder, fileOf(0))).toMatchObject({ name: 'Ordinateur', mapBase: 'satellite', notes: { comment: 'belle session' } });
+      expect(readSyncRecord(folder, fileOf(0))).toMatchObject({ name: 'Ordinateur', mapBase: 'plan', notes: { comment: 'belle session' } });
     }
     expect((await sync(pair)).plan?.items).toEqual([]);
   });
@@ -214,10 +214,10 @@ describe('fiches modifiées', () => {
     const pair = await syncedPair(4, { record: { name: 'Mistral' } });
     const kept = syncAncestorPath(readMarkerId(pair.phone.text(MARKER_FILE)) as string, at(1), 'phone');
     pair.computer.drop(kept);
-    editSyncRecord(pair.computer, fileOf(1), (record) => ({ ...record, mapBase: 'satellite' }));
+    editSyncRecord(pair.computer, fileOf(1), (record) => ({ ...record, mapBase: 'plan' }));
     const run = await sync(pair);
     expect(itemAt(run, 1)).toMatchObject({ case: 'followed', left: null, withoutAncestor: true });
-    expect(readSyncRecord(pair.phone, fileOf(1))).toMatchObject({ name: 'Mistral', mapBase: 'satellite' });
+    expect(readSyncRecord(pair.phone, fileOf(1))).toMatchObject({ name: 'Mistral', mapBase: 'plan' });
     expect(pair.computer.text(kept)).not.toBeNull();
     expect((await sync(pair)).plan?.items).toEqual([]);
 

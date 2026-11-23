@@ -1,4 +1,4 @@
-/* Choix du fond de carte, plan ou satellite (`BaseTileLayer.tsx`) : un bouton sous le + et le − de Leaflet,
+/* Choix du fond de carte, quand il y en a plusieurs (`BaseTileLayer.tsx`) : un bouton sous le + et le − de Leaflet,
    de leur taille, et son menu à sa droite. */
 .map-base-switch {
   position: relative;

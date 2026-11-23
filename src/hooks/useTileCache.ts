@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { tileCacheUsageByBase, type MapBase, type TileUrlOverrides } from '../core/mapBase';
+import type { MapBase, TileUrlOverrides } from '../core/mapBase';
 import { tileCacheUsage, type TileCacheUsage } from '../core/tiles';
 import { evictTiles, isValidTileCap, tileCapMb, tileStore, tileUrlOverrides, writeTileCapMb, writeTileUrlOverride } from '../platform/tileCache';
 
@@ -12,8 +12,6 @@ import { evictTiles, isValidTileCap, tileCapMb, tileStore, tileUrlOverrides, wri
 /** Place occupée, plafond et vidage, pour la page Réglages. */
 export const useTileCache = () => {
   const [usage, setUsage] = useState<TileCacheUsage | null>(null);
-  /** Part du fond satellite, dont les photos pèsent plus que le plan. */
-  const [satellite, setSatellite] = useState<TileCacheUsage | null>(null);
   const [capMb, setCapMbState] = useState(tileCapMb);
   /** Adresses des tuiles saisies, par fond (vide : celle d'origine). */
   const [urls, setUrls] = useState<TileUrlOverrides>(tileUrlOverrides);
@@ -26,7 +24,6 @@ export const useTileCache = () => {
     void tileStore.list().then((entries) => {
       if (cancelled) return;
       setUsage(tileCacheUsage(entries));
-      setSatellite(tileCacheUsageByBase(entries).satellite);
     });
     return () => {
       cancelled = true;
@@ -53,5 +50,5 @@ export const useTileCache = () => {
     setUrls(tileUrlOverrides());
   }, []);
 
-  return { usage, satellite, capMb, setCapMb, clear, urls, setUrl };
+  return { usage, capMb, setCapMb, clear, urls, setUrl };
 };

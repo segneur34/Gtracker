@@ -50,6 +50,14 @@ describe('ce que la synchronisation peut faire d’une fiche', () => {
     expect(inspectSyncRecord(JSON.stringify({ ...onPhone(), summary: null }))).toEqual({ state: 'unreadable', startMs: null, record: null });
   });
 
+  it('une fiche rangée avec le fond satellite, retiré, se lit sans fond et se fond comme une autre', () => {
+    const old = JSON.stringify({ ...onPhone(), mapBase: 'satellite' });
+    const info = inspectSyncRecord(old);
+    expect(info.state).toBe('ok');
+    expect(info.record).not.toHaveProperty('mapBase');
+    expect(mergeSyncRecords({ computer: text(onComputer()), phone: old, computerAncestor: null, phoneAncestor: null })).toMatchObject({ conflicts: [] });
+  });
+
   it('une fiche recopiée sous un autre nom nomme son nouveau GPX et garde tout le reste', () => {
     const renamed = JSON.parse(renamedSyncRecord(text(onPhone({ futur: { a: 1 } })), 'tel-2.gpx') as string);
     expect(renamed).toEqual({ ...onPhone({ futur: { a: 1 } }), gpx: 'tel-2.gpx' });
@@ -187,7 +195,7 @@ describe('fusion à trois : ce qu’un côté a changé passe à l’autre', () 
   });
 
   it('une fois les deux fiches écrites et gardées, la fusion suivante n’a plus rien à faire', () => {
-    const now: Sides = { computer: onComputer({ name: 'Ordinateur', mapBase: 'satellite' }), phone: onPhone({ name: 'Téléphone', notes: notes({ comment: 'x' }) }) };
+    const now: Sides = { computer: onComputer({ name: 'Ordinateur', mapBase: 'plan' }), phone: onPhone({ name: 'Téléphone', notes: notes({ comment: 'x' }) }) };
     const settled = after(now, merge(now, before));
     expect(merge(settled, settled)).toMatchObject({ computer: null, phone: null, conflicts: [] });
   });
@@ -207,7 +215,7 @@ describe('sans ancêtre : les deux fiches se complètent, rien n’est effacé',
   it('chaque côté reçoit ce que l’autre a de plus', () => {
     const now: Sides = {
       computer: onComputer({ name: 'Mistral', notes: null, marks: [] }),
-      phone: onPhone({ notes: notes({ comment: 'belle session' }), marks: [MARK], mapBase: 'satellite' }),
+      phone: onPhone({ notes: notes({ comment: 'belle session' }), marks: [MARK], mapBase: 'plan' }),
     };
     const merged = merge(now);
     const both = after(now, merged);
@@ -217,7 +225,7 @@ describe('sans ancêtre : les deux fiches se complètent, rien n’est effacé',
       expect(side.name).toBe('Mistral');
       expect(side.notes?.comment).toBe('belle session');
       expect(side.marks).toEqual([MARK]);
-      expect(side.mapBase).toBe('satellite');
+      expect(side.mapBase).toBe('plan');
     }
     // Les notes arrivent sur l'ordinateur sans la date de l'horloge du téléphone.
     expect(both.computer.notes?.savedAt).toBe(0);
@@ -238,12 +246,12 @@ describe('sans ancêtre : les deux fiches se complètent, rien n’est effacé',
 
   it('une seule des deux fiches gardées manque : fondue sans ancêtre, rien n’est effacé, et le côté resté suivi l’emporte', () => {
     const start: Sides = { computer: onComputer({ name: 'Avant' }), phone: onPhone({ name: 'Avant' }) };
-    const now: Sides = { computer: onComputer({ name: 'Avant', mapBase: 'satellite' }), phone: onPhone({ name: 'Renommée' }) };
+    const now: Sides = { computer: onComputer({ name: 'Avant', mapBase: 'plan' }), phone: onPhone({ name: 'Renommée' }) };
     const merged = mergeSyncRecords({ computer: text(now.computer), phone: text(now.phone), computerAncestor: null, phoneAncestor: text(start.phone) });
     expect(merged).toMatchObject({ union: true, conflicts: ['name'] });
     const both = after(now, merged as SyncRecordMerge);
-    expect(both.computer).toMatchObject({ name: 'Renommée', mapBase: 'satellite' });
-    expect(both.phone).toMatchObject({ name: 'Renommée', mapBase: 'satellite' });
+    expect(both.computer).toMatchObject({ name: 'Renommée', mapBase: 'plan' });
+    expect(both.phone).toMatchObject({ name: 'Renommée', mapBase: 'plan' });
   });
 
   it('nom différent des deux côtés : celui de l’ordinateur, et c’est dit', () => {

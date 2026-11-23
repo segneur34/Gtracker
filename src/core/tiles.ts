@@ -6,8 +6,10 @@
  * les fonds dans `core/mapBase.ts`.
  *
  * Les règles d'OpenStreetMap interdisent de télécharger une zone à l'avance :
- * on ne garde que les tuiles affichées en ligne, et on les redemande quand
- * elles ont vieilli, comme le veulent les en-têtes du serveur.
+ * on ne garde que les tuiles affichées en ligne. Une tuile gardée qui a vieilli
+ * (`refreshAgeMs`) est redemandée en entier, sans lire les en-têtes de cache
+ * du serveur ni faire de requête conditionnelle (garder l'`ETag` de chaque
+ * tuile serait la suite, pour suivre à la lettre les règles techniques d'OSM).
  */
 
 export interface TileCoord {
@@ -17,7 +19,7 @@ export interface TileCoord {
 }
 
 export const TILE_CACHE_DEFAULTS = {
-  /** Âge au-delà duquel une tuile gardée est redemandée, si le réseau répond. */
+  /** Âge au-delà duquel une tuile gardée est redemandée en entier, si le réseau répond, quelle que soit la durée que fixe le serveur. */
   refreshAgeMs: 7 * 24 * 3600 * 1000,
   /** Place occupée au plus, en mégaoctets. */
   capMb: 500,

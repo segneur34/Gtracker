@@ -6,7 +6,7 @@ import type { SportFamily } from '../core/sportProfiles';
  */
 
 /**
- * Liseré blanc sous un trait d'épaisseur `weight` sur le fond satellite : la
+ * Liseré blanc sous un trait d'épaisseur `weight` sur un fond photographique : la
  * trace reste lisible sur la mer, la forêt ou les toits. Une seule épaisseur
  * partout, trait + 3 (analyses, direct, planification). Un appelant le fige
  * en constante de module : un trait de `components/map/` réapplique son style

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baseOfTileKey, isMapBase, resolveMapBase, isTileTemplate, MAP_BASES, tileCacheUsageByBase, tileTemplate, tileUrl } from './mapBase';
+import { fillTileTemplate, isMapBase, resolveMapBase, isTileTemplate, MAP_BASES, shareCredit, tileTemplate, tileUrl } from './mapBase';
 import { tileKey } from './tiles';
 
 describe('tileUrl', () => {
@@ -9,47 +9,50 @@ describe('tileUrl', () => {
     expect(tileUrl('plan', tile)).toBe('https://tile.openstreetmap.org/15/16808/11953.png');
   });
 
-  it('donne l’adresse Esri dans l’ordre y puis x, sans image grise au large', () => {
-    expect(tileUrl('satellite', tile))
-      .toBe('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/15/11953/16808?blankTile=false');
+  it('remplit un gabarit dans n’importe quel ordre des repères', () => {
+    expect(fillTileTemplate('https://a.example/{z}/{y}/{x}', tile)).toBe('https://a.example/15/11953/16808');
   });
 });
 
 describe('clés des tuiles par fond', () => {
-  const tile = { z: 14, x: 8310, y: 5980 };
-
-  it('garde la clé du plan, préfixe celle du satellite', () => {
-    expect(tileKey(tile, MAP_BASES.plan.keyPrefix)).toBe('14_8310_5980');
-    expect(tileKey(tile, MAP_BASES.satellite.keyPrefix)).toBe('sat_14_8310_5980');
-  });
-
-  it('range chaque tuile gardée sous son fond', () => {
-    expect(baseOfTileKey('14_8310_5980')).toBe('plan');
-    expect(baseOfTileKey('sat_14_8310_5980')).toBe('satellite');
-    const entries = [
-      { key: '14_1_1', bytes: 10, savedAtMs: 0 },
-      { key: 'sat_14_1_1', bytes: 30, savedAtMs: 0 },
-      { key: 'sat_14_1_2', bytes: 20, savedAtMs: 0 },
-    ];
-    expect(tileCacheUsageByBase(entries)).toEqual({ plan: { tiles: 1, bytes: 10 }, satellite: { tiles: 2, bytes: 50 } });
+  it('garde la clé du plan sans préfixe : les tuiles déjà gardées restent lisibles', () => {
+    expect(tileKey({ z: 14, x: 8310, y: 5980 }, MAP_BASES.plan.keyPrefix)).toBe('14_8310_5980');
   });
 });
 
 describe('isMapBase', () => {
-  it('écarte une valeur stockée inconnue', () => {
+  it('écarte une valeur stockée inconnue, et un fond retiré', () => {
     expect(isMapBase('plan')).toBe(true);
-    expect(isMapBase('satellite')).toBe(true);
+    expect(isMapBase('satellite')).toBe(false);
     expect(isMapBase('hybride')).toBe(false);
+    expect(isMapBase('toString')).toBe(false);
     expect(isMapBase(undefined)).toBe(false);
   });
 });
 
 describe('resolveMapBase', () => {
   it('prend le fond de la session, sinon celui de la famille', () => {
-    expect(resolveMapBase('satellite', 'plan')).toBe('satellite');
-    expect(resolveMapBase('plan', 'satellite')).toBe('plan');
-    expect(resolveMapBase(undefined, 'satellite')).toBe('satellite');
+    expect(resolveMapBase('plan', 'plan')).toBe('plan');
+    expect(resolveMapBase(undefined, 'plan')).toBe('plan');
     expect(resolveMapBase('hybride', 'plan')).toBe('plan');
+  });
+
+  it('une fiche rangée avec le fond retiré prend celui de la famille', () => {
+    expect(resolveMapBase('satellite', 'plan')).toBe('plan');
+  });
+});
+
+describe('mentions', () => {
+  it('le plan n’est pas un fond photographique', () => {
+    expect(MAP_BASES.plan.photo).toBe(false);
+  });
+
+  it('l’image de partage porte l’adresse de la licence d’OpenStreetMap', () => {
+    expect(shareCredit('plan')).toBe('© OpenStreetMap · openstreetmap.org/copyright');
+  });
+
+  it('la vignette garde la mention courte', () => {
+    expect(MAP_BASES.plan.credit).toBe('© OpenStreetMap');
   });
 });
 
@@ -60,13 +63,12 @@ describe('adresse des tuiles réglable', () => {
   it('vide ou absente : l’adresse d’origine', () => {
     expect(tileTemplate('plan')).toBe(MAP_BASES.plan.url);
     expect(tileTemplate('plan', {})).toBe(MAP_BASES.plan.url);
-    expect(tileTemplate('satellite', { satellite: '' })).toBe(MAP_BASES.satellite.url);
-    expect(tileTemplate('satellite', { satellite: '   ' })).toBe(MAP_BASES.satellite.url);
+    expect(tileTemplate('plan', { plan: '' })).toBe(MAP_BASES.plan.url);
+    expect(tileTemplate('plan', { plan: '   ' })).toBe(MAP_BASES.plan.url);
   });
 
-  it('renseignée : la sienne, espaces autour retirés, et pour son fond seulement', () => {
+  it('renseignée : la sienne, espaces autour retirés', () => {
     expect(tileTemplate('plan', { plan: `  ${custom} ` })).toBe(custom);
-    expect(tileTemplate('satellite', { plan: custom })).toBe(MAP_BASES.satellite.url);
     expect(tileUrl('plan', tile, tileTemplate('plan', { plan: custom }))).toBe('https://tuiles.example.org/15/16808/11953.png');
   });
 
@@ -84,13 +86,7 @@ describe('adresse des tuiles réglable', () => {
     expect(isTileTemplate('https://a.example/{y}/{x}/{z}.png')).toBe(true);
   });
 
-  it('les adresses d’origine sont valides', () => {
+  it('l’adresse d’origine est valide', () => {
     expect(isTileTemplate(MAP_BASES.plan.url)).toBe(true);
-    expect(isTileTemplate(MAP_BASES.satellite.url)).toBe(true);
-  });
-
-  it('libellé d’Esri complet, sur la carte et sur l’image de partage', () => {
-    expect(MAP_BASES.satellite.attribution).toBe('Powered by Esri &middot; Imagerie &copy; Esri, Vantor, Earthstar Geographics, GIS User Community');
-    expect(MAP_BASES.satellite.credit).toBe('Powered by Esri · Imagerie © Esri, Vantor, Earthstar Geographics, GIS User Community');
   });
 });

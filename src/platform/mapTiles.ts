@@ -1,4 +1,4 @@
-import { MAP_BASES, tileTemplate, tileUrl, type MapBase } from '../core/mapBase';
+import { fillTileTemplate, MAP_BASES, tileTemplate, type MapBase, type MapBaseSource } from '../core/mapBase';
 import { ancestorTile, isStale, TILE_CACHE_DEFAULTS, tileKey, type AncestorTile, type TileCoord } from '../core/tiles';
 import { keepTile, tileStore, tileUrlOverrides, type StoredTile } from './tileCache';
 
@@ -28,7 +28,10 @@ export type TileContent = Blob | string;
  */
 export type FetchedTile = Blob | 'absent' | 'echec';
 
-export interface TileResolverDeps {
+/** `B` : nom d'un fond, l'un de `MAP_BASES` dans l'application, un fond factice dans les tests. */
+export interface TileResolverDeps<B extends string = MapBase> {
+  /** Description des fonds (clé des tuiles, remontée aux parentes, adresse d'origine) ; sans elle, `MAP_BASES`. */
+  sources?: Readonly<Record<B, MapBaseSource>>;
   store: { read(key: string): Promise<StoredTile | null> };
   /** Garde une tuile reçue (et contrôle le plafond). */
   keep: (key: string, blob: Blob) => Promise<void>;
@@ -39,14 +42,14 @@ export interface TileResolverDeps {
   crop: (blob: Blob, ancestor: AncestorTile, size: number) => Promise<string | null>;
   now: () => number;
   /** Gabarit d'adresse du fond, lu à chaque demande (Réglages peut le changer) ; sans lui, celui d'origine. */
-  template?: (base: MapBase) => string;
+  template?: (base: B) => string;
 }
 
-export interface TileResolver {
+export interface TileResolver<B extends string = MapBase> {
   /** Ce qu'affiche la case `coords` de `size` pixels ; `signal` : la case n'est plus voulue. */
-  resolveTile: (coords: TileCoord, base: MapBase, size: number, signal?: AbortSignal) => Promise<TileContent | null>;
+  resolveTile: (coords: TileCoord, base: B, size: number, signal?: AbortSignal) => Promise<TileContent | null>;
   /** La tuile `coords` elle-même, gardée ou reçue, jamais un agrandissement ; `null` si on ne l'a pas (une tuile que le serveur n'a pas ne part pas). */
-  resolveExactTile: (coords: TileCoord, base: MapBase, signal?: AbortSignal) => Promise<Blob | null>;
+  resolveExactTile: (coords: TileCoord, base: B, signal?: AbortSignal) => Promise<Blob | null>;
 }
 
 /** Requête en cours d'une tuile, partagée par ceux qui l'attendent. */
@@ -56,11 +59,12 @@ interface Pending {
   waiters: number;
 }
 
-export const createTileResolver = (deps: TileResolverDeps): TileResolver => {
+export const createTileResolver = <B extends string = MapBase>(deps: TileResolverDeps<B>): TileResolver<B> => {
+  const sources: Readonly<Record<B, MapBaseSource>> = deps.sources ?? (MAP_BASES as Readonly<Record<string, MapBaseSource>>);
   const pending = new Map<string, Pending>();
   /** Tuiles que le serveur n'a pas, le temps de la page. */
   const absent = new Set<string>();
-  const urlOf = (base: MapBase, tile: TileCoord): string => tileUrl(base, tile, deps.template?.(base));
+  const urlOf = (base: B, tile: TileCoord): string => fillTileTemplate(deps.template?.(base) ?? sources[base].url, tile);
 
   /**
    * Tuile `key` demandée au serveur ; une même tuile en cours est partagée.
@@ -104,19 +108,19 @@ export const createTileResolver = (deps: TileResolverDeps): TileResolver => {
   };
 
   /** Parente gardée, sinon demandée au serveur si le fond le permet, que le réseau répond et qu'on n'a pas renoncé. */
-  const ancestorBlob = async (tile: TileCoord, base: MapBase, network: boolean, signal?: AbortSignal): Promise<Blob | 'echec' | null> => {
-    const key = tileKey(tile, MAP_BASES[base].keyPrefix);
+  const ancestorBlob = async (tile: TileCoord, base: B, network: boolean, signal?: AbortSignal): Promise<Blob | 'echec' | null> => {
+    const key = tileKey(tile, sources[base].keyPrefix);
     const stored = await deps.store.read(key);
     if (stored) return stored.blob;
-    if (!network || !MAP_BASES[base].fetchAncestors || absent.has(key) || !deps.isOnline()) return null;
+    if (!network || !sources[base].fetchAncestors || absent.has(key) || !deps.isOnline()) return null;
     const fresh = await request(key, urlOf(base, tile), signal);
     return fresh === 'absent' ? null : fresh;
   };
 
   /** Case de `coords` découpée dans la tuile la plus proche des zooms inférieurs. */
-  const overzoomedTile = async (coords: TileCoord, size: number, base: MapBase, network: boolean, signal?: AbortSignal): Promise<string | null> => {
+  const overzoomedTile = async (coords: TileCoord, size: number, base: B, network: boolean, signal?: AbortSignal): Promise<string | null> => {
     let online = network;
-    for (let depth = 1; depth <= MAP_BASES[base].overzoomDepth; depth++) {
+    for (let depth = 1; depth <= sources[base].overzoomDepth; depth++) {
       if (signal?.aborted) return null;
       const ancestor = ancestorTile(coords, depth);
       if (!ancestor) return null;
@@ -143,8 +147,8 @@ export const createTileResolver = (deps: TileResolverDeps): TileResolver => {
     return stored.blob;
   };
 
-  const resolveExactTile: TileResolver['resolveExactTile'] = async (coords, base, signal) => {
-    const key = tileKey(coords, MAP_BASES[base].keyPrefix);
+  const resolveExactTile: TileResolver<B>['resolveExactTile'] = async (coords, base, signal) => {
+    const key = tileKey(coords, sources[base].keyPrefix);
     const url = urlOf(base, coords);
     const stored = await storedTile(key, url);
     if (stored) return stored;
@@ -153,8 +157,8 @@ export const createTileResolver = (deps: TileResolverDeps): TileResolver => {
     return typeof fresh === 'string' ? null : fresh;
   };
 
-  const resolveTile: TileResolver['resolveTile'] = async (coords, base, size, signal) => {
-    const key = tileKey(coords, MAP_BASES[base].keyPrefix);
+  const resolveTile: TileResolver<B>['resolveTile'] = async (coords, base, size, signal) => {
+    const key = tileKey(coords, sources[base].keyPrefix);
     const url = urlOf(base, coords);
     const stored = await storedTile(key, url);
     if (stored) return stored;
@@ -172,7 +176,7 @@ export const createTileResolver = (deps: TileResolverDeps): TileResolver => {
 };
 
 /**
- * Vrai pour une réponse qui dit que le serveur n'a pas la tuile (404, 410 : la photo au large chez Esri) ; un
+ * Vrai pour une réponse qui dit que le serveur n'a pas la tuile (404, 410 : une photo absente au large) ; un
  * refus passager (429 trop de requêtes, 503 indisponible…) n'en est pas un.
  */
 export const isAbsentStatus = (status: number): boolean => status === 404 || status === 410;
@@ -229,7 +233,7 @@ const cropAncestor = async (blob: Blob, ancestor: AncestorTile, size: number): P
   }
 };
 
-const resolver = createTileResolver({
+const resolver = createTileResolver<MapBase>({
   store: tileStore,
   keep: keepTile,
   fetchTile,

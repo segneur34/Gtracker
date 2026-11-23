@@ -78,7 +78,7 @@ function ShareDialog({
   /** Échec du dessin, pour ce qu'il devait montrer. */
   const [failure, setFailure] = useState<{ text: string; key: string } | null>(null);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
-  /** Fond de carte de la session, celui de l'analyse (sinon de la famille) : plan ou satellite. */
+  /** Fond de carte de la session, celui de l'analyse (sinon de la famille). */
   const [base] = useMapBase(family, file);
   const tileImage = useMemo(() => createTileImageLoader(base), [base]);
   const withMap = choice.map ?? true;

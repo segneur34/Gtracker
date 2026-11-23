@@ -254,13 +254,22 @@ describe('sauts de la fiche', () => {
 
 describe('fond de carte de la fiche', () => {
   it('fond de carte de la session : relu avec garde, changé sans refaire le résumé', () => {
-    expect(parseRecord(serializeRecord(record({ mapBase: 'satellite' })))?.mapBase).toBe('satellite');
+    expect(parseRecord(serializeRecord(record({ mapBase: 'plan' })))?.mapBase).toBe('plan');
     expect(parseRecord(serializeRecord(record()))).not.toHaveProperty('mapBase');
     expect(parseRecord(JSON.stringify({ ...record(), mapBase: 'hybride' }))).not.toHaveProperty('mapBase');
-    const sat = applyRecordPatch(record(), { mapBase: 'satellite' });
-    expect(sat).toEqual({ record: { ...record(), mapBase: 'satellite' }, resummarize: false });
-    expect(applyRecordPatch(sat.record, { mapBase: null }).record).not.toHaveProperty('mapBase');
+    const plan = applyRecordPatch(record(), { mapBase: 'plan' });
+    expect(plan).toEqual({ record: { ...record(), mapBase: 'plan' }, resummarize: false });
+    expect(applyRecordPatch(plan.record, { mapBase: null }).record).not.toHaveProperty('mapBase');
     expect(applyRecordPatch(record(), { mapBase: null })).toEqual({ record: record(), resummarize: false });
+  });
+
+  it('une fiche rangée avec le fond satellite, retiré, se lit sans fond, sans erreur ni lecture seule', () => {
+    const text = JSON.stringify({ ...record({ name: 'Ancienne' }), mapBase: 'satellite' });
+    const read = parseRecord(text);
+    expect(read).not.toBeNull();
+    expect(read).not.toHaveProperty('mapBase');
+    expect(read?.name).toBe('Ancienne');
+    expect(isWritableRecord(read!)).toBe(true);
   });
 });
 
@@ -316,13 +325,13 @@ describe('lieu de la fiche', () => {
 describe('fiche allégée du cache', () => {
   const jumps: SessionJumps = { version: 1, computedAt: '2026-10-08T14:00:00.000Z', jumps: [] };
   const full = {
-    ...record({ name: 'Sortie', mapBase: 'satellite', jumps }),
+    ...record({ name: 'Sortie', mapBase: 'plan', jumps }),
     venuDuFutur: { lourd: true },
   } as SessionRecord;
 
   it("ne garde que ce que la liste montre et ce que l'utilisateur saisit", () => {
     const light = lightRecord(full);
-    expect(light).toEqual(record({ name: 'Sortie', mapBase: 'satellite' }));
+    expect(light).toEqual(record({ name: 'Sortie', mapBase: 'plan' }));
     for (const key of ['jumps', 'venuDuFutur']) expect(light).not.toHaveProperty(key);
   });
 
@@ -604,9 +613,9 @@ describe('completeRecord', () => {
   const jumps: SessionJumps = { version: 1, computedAt: '2026-10-08T14:00:00.000Z', jumps: [] };
 
   it('reprend les sauts et le fond de carte qui manquent, sans refaire le résumé', () => {
-    const { record: done, resummarize } = completeRecord(record(), record({ jumps, mapBase: 'satellite' }));
+    const { record: done, resummarize } = completeRecord(record(), record({ jumps, mapBase: 'plan' }));
     expect(done.jumps).toEqual(jumps);
-    expect(done.mapBase).toBe('satellite');
+    expect(done.mapBase).toBe('plan');
     expect(resummarize).toBe(false);
   });
 
@@ -641,7 +650,7 @@ describe('carryRecordEdits (changement de dossier)', () => {
 
   it('reporte les saisies, retire celles que la copie en mémoire n’a plus, et garde le reste de la cible', () => {
     const jumps: SessionJumps = { version: 2, computedAt: '2026-10-04T15:00:00.000Z', jumps: [] };
-    const target = record({ name: 'Ancien', marks, jumps, mapBase: 'satellite' }, { distanceM: 1 });
+    const target = record({ name: 'Ancien', marks, jumps, mapBase: 'plan' }, { distanceM: 1 });
     const edited = record({ name: 'Matin', activityId: 'a-wing', notes: { ...EMPTY_NOTES, comment: 'Bien', savedAt: 1 } }, { distanceM: 2 });
     const { record: done, resummarize } = carryRecordEdits(target, edited);
     expect(done.name).toBe('Matin');
@@ -683,7 +692,7 @@ describe("fiche d'une version future relue puis réécrite (A1)", () => {
     pumping: null, waveThreshold: null, waveDirectionDeg: null, savedAt: 5,
   };
   const valid = record({
-    name: 'Sortie', analysis, mapBase: 'satellite', jumps,
+    name: 'Sortie', analysis, mapBase: 'plan', jumps,
     marks: [{ timeMs: START_MS + 60_000, lat: 43.5, lon: 3.9, label: 'Saut' }],
     notes: { ...EMPTY_NOTES, comment: 'bien', rating: 4, savedAt: 3 },
   });

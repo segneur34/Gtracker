@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createBrowserTileStore } from './tileCache';
+import { createBrowserTileStore, purgeRetiredTiles, RETIRED_TILE_PREFIXES, tileCapMb, writeTileCapMb, type TileStore } from './tileCache';
 
 /** Cache API factice : réponses rangées par chemin, lectures comptées. */
 class FakeCache {
@@ -117,5 +117,93 @@ describe('tuiles gardées dans le navigateur', () => {
     await store.write('14_1_1', tile(10));
     expect(await store.read('14_1_1')).toBeNull();
     expect(await store.list()).toEqual([]);
+  });
+});
+
+describe('effacement des tuiles d’un fond retiré', () => {
+  const memory = new Map<string, string>();
+  beforeEach(() => {
+    memory.clear();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => memory.get(k) ?? null,
+      setItem: (k: string, v: string) => void memory.set(k, v),
+      removeItem: (k: string) => void memory.delete(k),
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** Magasin factice sur une liste de clés ; `fail` fait échouer l'effacement par préfixe. */
+  const fakeStore = (keys: string[], fail = false) => {
+    const kept = new Set(keys);
+    const calls = { list: 0 };
+    const store: TileStore = {
+      read: async () => null,
+      write: async (key) => void kept.add(key),
+      list: async () => [...kept].map((key) => ({ key, bytes: 1, savedAtMs: 0 })),
+      remove: async (removed) => removed.forEach((key) => kept.delete(key)),
+      removeByPrefix: async (prefixes) => {
+        calls.list++;
+        if (fail) throw new Error('illisible');
+        for (const key of [...kept]) if (prefixes.some((p) => key.startsWith(p))) kept.delete(key);
+      },
+      clear: async () => kept.clear(),
+    };
+    return { store, kept, calls };
+  };
+
+  it('dans le navigateur, efface aussi les tuiles absentes de l’index, et l’index ne les regagne pas', async () => {
+    const storage = fakeStorage();
+    const first = createBrowserTileStore(storage);
+    await first.write('14_1_1', tile(10));
+    await first.write('sat_14_1_1', tile(20));
+    await first.flushIndex();
+    // Une tuile gardée par une page fermée avant d'avoir rangé l'index.
+    await storage.cache.put('/tuiles-gardees/sat_14_1_2.png', new Response(tile(30), { headers: { 'content-length': '30', 'x-gtracker-saved-at': '5' } }));
+    const next = createBrowserTileStore(storage);
+    await purgeRetiredTiles(next);
+    expect([...storage.cache.entries.keys()].filter((p) => p !== '/tuiles-gardees/_index.json')).toEqual(['/tuiles-gardees/14_1_1.png']);
+    // La comparaison de l'index aux tuiles, en arrière-plan, n'y remet rien.
+    await vi.advanceTimersByTimeAsync(1000);
+    expect((await next.list()).map((e) => e.key)).toEqual(['14_1_1']);
+    expect((await createBrowserTileStore(storage).list()).map((e) => e.key)).toEqual(['14_1_1']);
+    // Noté fait : le lancement suivant ne refait rien.
+    const again = fakeStore(['sat_14_1_3']);
+    await purgeRetiredTiles(again.store);
+    expect(again.calls.list).toBe(0);
+  });
+
+  it('n’efface que les clés des fonds retirés, et le note une seule fois', async () => {
+    expect(RETIRED_TILE_PREFIXES).toEqual(['sat_']);
+    const { store, kept, calls } = fakeStore(['14_1_1', 'sat_14_1_1', 'sat_14_1_2', '15_2_2']);
+    await purgeRetiredTiles(store);
+    expect([...kept].sort()).toEqual(['14_1_1', '15_2_2']);
+    // Une tuile qui porterait encore le préfixe n'est plus cherchée : l'effacement n'est fait qu'une fois.
+    await store.write('sat_9_9_9', tile(1));
+    await purgeRetiredTiles(store);
+    expect(calls.list).toBe(1);
+    expect(kept.has('sat_9_9_9')).toBe(true);
+  });
+
+  it('coupé en route, il est repris au lancement suivant', async () => {
+    const broken = fakeStore(['sat_14_1_1'], true);
+    await purgeRetiredTiles(broken.store);
+    expect(broken.kept.has('sat_14_1_1')).toBe(true);
+    const next = fakeStore(['sat_14_1_1']);
+    await purgeRetiredTiles(next.store);
+    expect(next.kept.size).toBe(0);
+    expect(next.calls.list).toBe(1);
+  });
+
+  it('le plafond changé garde la trace de l’effacement, et inversement', async () => {
+    writeTileCapMb(1000);
+    const first = fakeStore(['sat_14_1_1']);
+    await purgeRetiredTiles(first.store);
+    expect(tileCapMb()).toBe(1000);
+    writeTileCapMb(null);
+    writeTileCapMb(2000);
+    expect(tileCapMb()).toBe(2000);
+    const again = fakeStore(['sat_14_1_1']);
+    await purgeRetiredTiles(again.store);
+    expect(again.calls.list).toBe(0);
   });
 });

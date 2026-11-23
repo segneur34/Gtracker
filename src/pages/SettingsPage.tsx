@@ -1117,11 +1117,11 @@ function AddActivityForm({
 const megabytes = (bytes: number): string => (bytes / 1e6).toLocaleString(dateLocale(), { maximumFractionDigits: 1 });
 
 /**
- * Cartes gardées sur l'appareil (plan et satellite) : place occupée, plafond, vidage. Monté
+ * Cartes gardées sur l'appareil : place occupée, plafond, vidage, adresse des tuiles de chaque fond. Monté
  * seulement bloc ouvert, parce que compter les tuiles lit tout leur dossier.
  */
 function OfflineMapsSettings() {
-  const { usage, satellite, capMb, setCapMb, clear, urls, setUrl } = useTileCache();
+  const { usage, capMb, setCapMb, clear, urls, setUrl } = useTileCache();
   const choices = TILE_CAP_CHOICES_MB.includes(capMb) ? TILE_CAP_CHOICES_MB : [...TILE_CAP_CHOICES_MB, capMb].sort((a, b) => a - b);
 
   const askClear = () => {
@@ -1136,7 +1136,6 @@ function OfflineMapsSettings() {
         <span className="ui-field-row__label">{t('Place occupée')}</span>
         <span className="num">
           {usage === null ? '…' : t('{size} Mo ({tiles} morceaux)', { size: megabytes(usage.bytes), tiles: usage.tiles.toLocaleString(dateLocale()) })}
-          {satellite && satellite.tiles > 0 && t(', dont satellite {size} Mo', { size: megabytes(satellite.bytes) })}
         </span>
       </div>
       <label className="ui-field-row">
@@ -1145,12 +1144,11 @@ function OfflineMapsSettings() {
           {choices.map((mb) => <option key={mb} value={mb}>{mb >= 1000 ? t('{n} Go', { n: mb / 1000 }) : t('{n} Mo', { n: mb })}</option>)}
         </select>
       </label>
-      <HelpText helpKey="cartes:plafond">{t('Au-delà, les plus anciens morceaux sont effacés. Les photos du fond satellite pèsent plus que le plan.')}</HelpText>
+      <HelpText helpKey="cartes:plafond">{t('Au-delà, les plus anciens morceaux sont effacés.')}</HelpText>
       <Button size="s" onClick={askClear} disabled={usage?.tiles === 0}>
         {t('Vider')}
       </Button>
       <TileUrlField base="plan" label={t('Adresse des tuiles du plan')} value={urls.plan ?? ''} onCommit={setUrl} />
-      <TileUrlField base="satellite" label={t('Adresse des tuiles du satellite')} value={urls.satellite ?? ''} onCommit={setUrl} />
     </>
   );
 }

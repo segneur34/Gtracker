@@ -36,6 +36,7 @@ import { formatDistance, toDisplayDistance } from '../core/units';
 import { useLeaveWarning } from '../hooks/leaveGuard';
 import { useGoOnRoute } from '../hooks/useGoOnRoute';
 import { useMapBase } from '../hooks/useMapBase';
+import { MAP_BASES } from '../core/mapBase';
 import { useOpenSections } from '../hooks/useOpenSections';
 import { usePlannedRoute } from '../hooks/usePlannedRoute';
 import { getLastFix, useRecorderStatus } from '../hooks/useRecorder';
@@ -117,7 +118,7 @@ const writePrefs = (patch: PlanningPrefs): void => jsonStore.write(PREFS_KEY, { 
 
 /** Épaisseur du tracé. */
 const ROUTE_WEIGHT = 5;
-/** Liseré blanc sous le tracé, sur le fond satellite, le même que celui des analyses. */
+/** Liseré blanc sous le tracé, sur un fond photographique, le même que celui des analyses. */
 const HALO_STYLE = haloStyle(ROUTE_WEIGHT);
 /** Style du tracé, constant : Leaflet ne refait `setStyle` que si l'objet change. */
 const LEG_STYLE: L.PathOptions = { color: ROUTE_COLOR, weight: ROUTE_WEIGHT, opacity: 0.9, interactive: false };
@@ -248,7 +249,7 @@ function PlanningPage() {
   /** Famille de l'activité planifiée : son fond de carte, celui de ses analyses. */
   // Sans activité, le fond de la voile.
   const mapFamily = activity ? activityFamily(activity) : 'voile';
-  const satellite = useMapBase(mapFamily)[0] === 'satellite';
+  const photo = MAP_BASES[useMapBase(mapFamily)[0]].photo;
 
   const planner = usePlannedRoute();
   const { route } = planner;
@@ -696,7 +697,7 @@ function PlanningPage() {
               {/* Fond de la famille de l'activité planifiée : celui de ses analyses, changé ici aussi. */}
               <BaseTileLayer family={mapFamily} />
               <MapEvents onTap={onMapTap} onTakeOver={takeOver} />
-              {satellite && route.legs.map((leg, i) => (
+              {photo && route.legs.map((leg, i) => (
                 <Polyline key={`halo-${i}`} positions={latLngsOf(leg.points)} pathOptions={HALO_STYLE} />
               ))}
               {route.legs.map((leg, i) => {

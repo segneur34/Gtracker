@@ -6,7 +6,7 @@ import { updateSessionRecord, useLibrarySession } from './useSessionLibrary';
 import { STORAGE_KEYS } from '../core/appIdentity';
 
 /**
- * Fond de carte (plan ou satellite). Celui d'une famille est propre à
+ * Fond de carte (`core/mapBase.ts`). Celui d'une famille est propre à
  * l'appareil (clé `gtracker.fondCarte`) : il sert à la planification, au direct
  * et de départ aux sessions. Celui d'une analyse est propre à sa session, dans
  * sa fiche (`mapBase`), changé tout de suite par le bouton de la carte, comme

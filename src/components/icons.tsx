@@ -248,7 +248,7 @@ export const IconRefresh = ({ size = 20, ...props }: IconProps) => (
   </svg>
 );
 
-/** Deux couches empilées : le bouton qui change le fond de carte, plan ou satellite. */
+/** Deux couches empilées : le bouton qui change le fond de carte. */
 export const IconLayers = ({ size = 20, ...props }: IconProps) => (
   <svg {...strokeProps(size)} {...props}>
     <path d="M12 3l9 5-9 5-9-5z" />

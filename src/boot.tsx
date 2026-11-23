@@ -16,6 +16,7 @@ import { startTheme } from './hooks/useTheme';
 import { installBackButton } from './platform/backButton';
 import { clearStaleScreenOn, resetOrientationLock } from './platform/screen';
 import { onDesktopClose, sendCloseQuestionTexts } from './platform/desktopBridge';
+import { purgeRetiredTiles } from './platform/tileCache';
 import { t } from './core/i18n';
 
 /**
@@ -54,6 +55,8 @@ export const startApp = async (): Promise<void> => {
     </React.StrictMode>
   );
   startLibraryUi(isRecordingActive);
+  // Tuiles d'un fond de carte retiré de l'application, encore gardées sur l'appareil : effacées une fois.
+  void purgeRetiredTiles();
   installLeaveGuard();
   // Pendant un enregistrement, la touche retour met l'application en arrière-plan ; sinon, elle la ferme une fois les
   // écritures en attente sur le disque, comme la croix du programme Windows.

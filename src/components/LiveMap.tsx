@@ -15,6 +15,7 @@ import type { CourseMark } from '../recording/markGuide';
 import type { SessionMark } from '../core/sessionMarks';
 import type { SportFamily } from '../core/sportProfiles';
 import { useMapBase } from '../hooks/useMapBase';
+import { MAP_BASES } from '../core/mapBase';
 import BaseTileLayer from './BaseTileLayer';
 import { SessionMarksLayer } from './SessionMarks';
 import MapAutoResize from './MapAutoResize';
@@ -38,7 +39,7 @@ interface LiveMapProps {
   accuracyM?: number | null;
   /** Couleur de la trace et de la flèche, celle de la famille du support (`LIVE_TRACK_COLOR`). */
   color: string;
-  /** Famille de l'activité : son fond de carte, plan ou satellite (`BaseTileLayer`). */
+  /** Famille de l'activité : son fond de carte (`BaseTileLayer`). */
   family: SportFamily;
   height: string;
   /** Trace suivie, ce qu'il en reste : en pointillé sous la trace en cours. */
@@ -63,20 +64,20 @@ const GUIDE_STYLE = { color: '#263238', weight: GUIDE_WEIGHT, opacity: 1, dashAr
 const GUIDE_DONE_STYLE = { color: '#757575', weight: GUIDE_DONE_WEIGHT, opacity: 0.85, interactive: false } as const;
 /** Épaisseur de la trace enregistrée. */
 const TRACK_WEIGHT = 4;
-/** Liseré blanc sous la trace, sur le fond satellite. */
+/** Liseré blanc sous la trace, sur un fond photographique. */
 const HALO_STYLE = haloStyle(TRACK_WEIGHT);
 /** Le même liseré sous la trace suivie, à son épaisseur. */
 const GUIDE_HALO_STYLE = haloStyle(GUIDE_WEIGHT);
 const GUIDE_DONE_HALO_STYLE = haloStyle(GUIDE_DONE_WEIGHT);
 /**
  * Calques de la trace suivie, sous celui des tracés (400 chez Leaflet) : la partie faite naît en cours de route et
- * le liseré au passage en satellite, et un tracé monté tard passerait sinon par-dessus la trace enregistrée.
+ * le liseré au passage sur un fond photographique, et un tracé monté tard passerait sinon par-dessus la trace enregistrée.
  */
 const GUIDE_HALO_PANE = { name: 'traceSuivieLisere', style: { zIndex: 380 } };
 const GUIDE_PANE = { name: 'traceSuivie', style: { zIndex: 390 } };
 /**
  * Calque du liseré de la trace enregistrée et de son prolongement : au-dessus de la trace suivie, sous celui des
- * tracés (400) où reste la trace. Passer en satellite en cours de route crée le liseré après la trace : sans ce
+ * tracés (400) où reste la trace. Passer sur un fond photographique en cours de route crée le liseré après la trace : sans ce
  * calque, il se poserait par-dessus elle.
  */
 const TRACK_HALO_PANE = { name: 'traceLisere', style: { zIndex: 395 } };
@@ -198,7 +199,7 @@ const segmentBlocks = (segment: LocationFix[]): [number, number][][] =>
  */
 function LiveMap({ segments, position, positionSegment = null, accuracyM = null, color, family, height, guide, guideDone, travel, overlay, marks, validationRadiusM, notes }: LiveMapProps) {
   const [following, setFollowing] = useState(true);
-  const halo = useMapBase(family)[0] === 'satellite';
+  const halo = MAP_BASES[useMapBase(family)[0]].photo;
   // Tracés mémorisés : `segments` ne change qu'au recalcul (toutes les 2 s, `useLiveRecording`), la position à chaque mesure.
   // Leaflet ne reprend un tracé que si son tableau de points change : les blocs fermés gardent le leur.
   const paths = useMemo(() => segments.map(segmentBlocks), [segments]);
